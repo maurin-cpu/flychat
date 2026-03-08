@@ -1,0 +1,99 @@
+"""
+Flychat - Entry Point.
+Wetterdaten laden, Engine initialisieren, Flask starten.
+"""
+
+import os
+import logging
+import threading
+import time
+from datetime import datetime
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+import config
+from chat_engine import FlychatEngine
+from instantdb_client import InstantDBClient
+from web import app, init_app
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+def daily_refresh(engine, refresh_hour=6):
+    """Hintergrund-Thread: Wetterdaten taeglich um refresh_hour Uhr neu laden."""
+    while True:
+        now = datetime.now()
+        # Naechster Refresh-Zeitpunkt
+        next_refresh = now.replace(hour=refresh_hour, minute=0, second=0, microsecond=0)
+        if now >= next_refresh:
+            # Heute schon vorbei -> morgen
+            next_refresh = next_refresh.replace(day=now.day + 1)
+
+        wait_seconds = (next_refresh - now).total_seconds()
+        logger.info(f"Naechster Wetter-Refresh in {wait_seconds/3600:.1f}h ({next_refresh.strftime('%Y-%m-%d %H:%M')})")
+        time.sleep(wait_seconds)
+
+        logger.info("Starte taeglichen Wetter-Refresh...")
+        try:
+            engine.refresh_weather()
+            logger.info("Wetter-Refresh erfolgreich.")
+        except Exception as e:
+            logger.error(f"Wetter-Refresh fehlgeschlagen: {e}")
+
+
+def main():
+    logger.info("=== Flychat startet ===")
+
+    # InstantDB-Client initialisieren (optional)
+    instantdb = None
+    if config.INSTANTDB_ADMIN_TOKEN:
+        instantdb = InstantDBClient(
+            app_id=config.INSTANTDB_APP_ID,
+            admin_token=config.INSTANTDB_ADMIN_TOKEN,
+            api_url=config.INSTANTDB_API_URL,
+        )
+        logger.info("InstantDB-Client initialisiert")
+    else:
+        logger.info("InstantDB: Kein INSTANTDB_ADMIN_TOKEN gesetzt, Cloud-Sync deaktiviert")
+
+    # Engine initialisieren
+    engine = FlychatEngine(instantdb_client=instantdb)
+
+    # Wetterdaten laden (initial)
+    logger.info("Lade Wetterdaten...")
+    try:
+        engine.refresh_weather()
+        logger.info(f"Wetterdaten geladen: {len(engine.weather_data)} Spots")
+    except Exception as e:
+        logger.error(f"Initiales Laden fehlgeschlagen: {e}")
+        logger.info("App startet trotzdem - Wetterdaten koennen spaeter geladen werden.")
+
+    # Spots nach InstantDB synchronisieren
+    if instantdb:
+        try:
+            engine.sync_spots_to_instantdb()
+        except Exception as e:
+            logger.error(f"InstantDB Spots-Sync fehlgeschlagen: {e}")
+
+    # Flask-App mit Engine verbinden
+    init_app(engine)
+
+    # Hintergrund-Thread fuer taeglichen Refresh
+    refresh_thread = threading.Thread(target=daily_refresh, args=(engine,), daemon=True)
+    refresh_thread.start()
+
+    # Flask starten
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "true").lower() == "true"
+    logger.info(f"Flask startet auf Port {port} (debug={debug})")
+    app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=debug)
+
+
+if __name__ == "__main__":
+    main()

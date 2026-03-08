@@ -1,0 +1,8 @@
+﻿region,fluggebiet,site_name,latitude,longitude,elevation_m,windrichtung,ideal_wind_min_kmh,ideal_wind_max_kmh,slope_azimuth,slope_angle,kritischer_foehn,Bemerkungen
+Zürich,Uetliberg,Balderen,47.3226,8.5008,730,NO-O,15,30,225,30,Süd,"Am Uetliberg wird nicht klassisch gesoart – der Wind drückt die Thermik an den Hang, wodurch man in der hangnahen Thermik fliegt. Ab 15km/h funktioniert dies, ab 20km/h hat man sehr gute Bedingungen. Bei guter Thermik plus passendem Wind hat man Top-Bedingungen. Wenn der Wind unter 15km/h ist funktioniert das ber nicht mehr gut auch wenn Thermik vorhandne wäre dann kann man dort nicht gut fliegen, gibt dan oft abgleiter."
+Berneroberland,Grindelwald,First,46.6575,8.0551,2120,O-SW,5,30,,,Süd,
+Zentralschweiz,Engelberg,Tümpfeli,46.838,8.412,1800,S-SO,5,30,,,Süd,
+Zentralschweiz,Engelberg,Brunnihütte,46.8425,8.4104,1870,NW-SW,5,30,,,Süd,
+Zentralschweiz,Engelberg,Fürenalp,46.805,8.4657,1800,S-W,5,30,,,Süd,
+Zentralschweiz,Pilatus,Pilatus Kulm,46.9793,8.2552,2059,S-W,5,30,,,Süd,
+Zentralschweiz,Zug,Zugerberg,47.14793,8.53581,947,NW-SW,5,30,,,Süd,"Einfach bei Westwind, Mittel bei Nordwest oder Südwestwind"

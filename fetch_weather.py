@@ -1,220 +1,200 @@
-#!/usr/bin/env python3
-"""Einfaches Skript zur Abfrage der Wettervorhersage von Swiss Meteo (konfigurierbar über config.py)"""
+"""
+Wetterdaten-Aggregation für Flychat.
+Adaptiert von uetliberg_ticker/fetch_weather.py - Multi-Spot Support.
+"""
 
 import requests
-import math
 import json
 import os
-import csv
 from datetime import datetime
+
 import config
 
-def load_locations_from_csv(csv_path):
-    """
-    Liest Standorte aus einer CSV-Datei ein.
-    
-    Args:
-        csv_path: Pfad zur CSV-Datei
-        
-    Returns:
-        Liste von Dictionaries mit 'name', 'latitude', 'longitude'
-    """
-    locations = []
-    
-    try:
-        if not os.path.exists(csv_path):
-            print(f"[WARNUNG] CSV-Datei nicht gefunden: {csv_path}")
-            return locations
-        
-        with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row_num, row in enumerate(reader, start=2):  # Start bei 2 wegen Header
-                try:
-                    name = row.get('Name', '').strip()
-                    latitude_str = row.get('Latitude', '').strip()
-                    longitude_str = row.get('Longitude', '').strip()
-                    
-                    # Überspringe leere Zeilen
-                    if not name or not latitude_str or not longitude_str:
-                        continue
-                    
-                    # Konvertiere Koordinaten zu float
-                    latitude = float(latitude_str)
-                    longitude = float(longitude_str)
-                    
-                    # Validiere Koordinaten (Schweiz liegt etwa zwischen 45.8-47.8°N und 5.9-10.5°E)
-                    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
-                        print(f"[WARNUNG] Ungültige Koordinaten in Zeile {row_num}: {name} ({latitude}, {longitude})")
-                        continue
-                    
-                    locations.append({
-                        'name': name,
-                        'latitude': latitude,
-                        'longitude': longitude
-                    })
-                    
-                except ValueError as e:
-                    print(f"[WARNUNG] Fehler beim Parsen der Zeile {row_num}: {e}")
-                    continue
-                except Exception as e:
-                    print(f"[WARNUNG] Unerwarteter Fehler in Zeile {row_num}: {e}")
-                    continue
-        
-        print(f"[INFO] {len(locations)} Standorte aus CSV-Datei geladen")
-        return locations
-        
-    except Exception as e:
-        print(f"[FEHLER] Fehler beim Lesen der CSV-Datei: {e}")
-        return locations
 
+def get_weather_for_location(location_name, latitude, longitude):
+    """
+    Ruft stündliche Wettervorhersage ab (Hybrid-Modell: ICON-CH1 + Seamless + GFS).
+    Gibt (hourly_data, pressure_level_data) als dict-of-dicts zurück.
+    """
+    pl_params = ",".join(config.PRESSURE_LEVEL_PARAMS)
 
-def get_temperature_forecast_for_location(location_name, latitude, longitude):
-    """
-    Ruft stündliche Wettervorhersage ab (MeteoSwiss ICON-CH Modell)
-    Die Anzahl der Tage wird über config.FORECAST_DAYS konfiguriert.
-    
-    Args:
-        location_name: Name des Standorts
-        latitude: Breitengrad
-        longitude: Längengrad
-    
-    Returns:
-        Dictionary mit Zeitstempeln als Schlüssel und Wetterdaten als Werte.
-        Format: {timestamp: {"temperature_2m": float, "cloud_base": float, "precipitation": float, 
-        "cloud_cover": float, "cloud_cover_low": float, "cloud_cover_mid": float, 
-        "cloud_cover_high": float, "sunshine_duration": float, ...}, ...}
-    """
-    
-    # API-Endpunkt von Open-Meteo mit MeteoSwiss ICON-CH Modell (aus config.py)
-    url = config.API_URL
-    
-    # API-Parameter gemäß Open-Meteo Beispiel für MeteoSwiss ICON-CH
-    # Reihenfolge der hourly Parameter ist wichtig und muss mit der Extraktion übereinstimmen
-    hourly_params = [
-        "temperature_2m",
-        "cloud_base",
-        "wind_speed_10m",
-        "wind_direction_10m",
-        "cloud_cover",
-        "precipitation",
-        "precipitation_probability",
-        "cloud_cover_low",
-        "cloud_cover_mid",
-        "cloud_cover_high",
-        "sunshine_duration"
-    ]
-    
-    params = {
+    params_ch1 = {
         "latitude": latitude,
         "longitude": longitude,
-        "models": config.API_MODEL,
-        "hourly": ",".join(hourly_params),  # Als komma-separierter String für requests
+        "models": "meteoswiss_icon_ch1",
+        "hourly": ",".join(config.HOURLY_PARAMS) + "," + pl_params,
         "forecast_days": config.FORECAST_DAYS,
-        "forecast_hours": config.FORECAST_HOURS,
-        "temporal_resolution": config.TEMPORAL_RESOLUTION,
-        "past_hours": config.PAST_HOURS,
-        "timezone": config.TIMEZONE
+        "timezone": config.TIMEZONE,
     }
-    
+
+    params_seamless = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "models": "icon_seamless",
+        "hourly": ",".join(config.HOURLY_PARAMS) + "," + pl_params,
+        "forecast_days": config.FORECAST_DAYS,
+        "timezone": config.TIMEZONE,
+    }
+
     try:
-        # API-Anfrage
-        response = requests.get(url, params=params, timeout=config.API_TIMEOUT)
-        response.raise_for_status()
-        data = response.json()
-
-    
-        # Extrahiere stündliche Daten
-        hourly = data.get("hourly", {})
-        hourly_times = hourly.get("time", [])
-        temperature = hourly.get("temperature_2m", [])
-        cloud_base = hourly.get("cloud_base", [])
-        wind_speed = hourly.get("wind_speed_10m", [])
-        wind_direction = hourly.get("wind_direction_10m", [])
-        cloud_cover = hourly.get("cloud_cover", [])
-        precipitation = hourly.get("precipitation", [])
-        precipitation_probability = hourly.get("precipitation_probability", [])
-        cloud_cover_low = hourly.get("cloud_cover_low", [])
-        cloud_cover_mid = hourly.get("cloud_cover_mid", [])
-        cloud_cover_high = hourly.get("cloud_cover_high", [])
-        sunshine_duration = hourly.get("sunshine_duration", [])
-        
-        if not hourly_times:
-            print(f"[WARNUNG] Keine stündlichen Daten verfügbar für {location_name}")
-            return
-        
-        # Erstelle Dictionary mit Zeitstempeln als Schlüssel
-        hourly_data = {}
-        for i, time_str in enumerate(hourly_times):
-            hourly_data[time_str] = {
-                "temperature_2m": temperature[i] if i < len(temperature) else None,
-                "cloud_base": cloud_base[i] if i < len(cloud_base) else None,
-                "wind_speed_10m": wind_speed[i] if i < len(wind_speed) else None,
-                "wind_direction_10m": wind_direction[i] if i < len(wind_direction) else None,
-                "cloud_cover": cloud_cover[i] if i < len(cloud_cover) else None,
-                "precipitation": precipitation[i] if i < len(precipitation) else None,
-                "precipitation_probability": precipitation_probability[i] if i < len(precipitation_probability) else None,
-                "cloud_cover_low": cloud_cover_low[i] if i < len(cloud_cover_low) else None,
-                "cloud_cover_mid": cloud_cover_mid[i] if i < len(cloud_cover_mid) else None,
-                "cloud_cover_high": cloud_cover_high[i] if i < len(cloud_cover_high) else None,
-                "sunshine_duration": sunshine_duration[i] if i < len(sunshine_duration) else None
-            }
-        
-        # Minimale Info-Ausgabe
-        if hourly_data:
-            print(f"[INFO] {len(hourly_data)} Zeitstempel für {location_name} abgerufen")
-        
-        # Gib auch das Dictionary zurück für weitere Verarbeitung
-        return hourly_data
-        
-    except requests.exceptions.RequestException as e:
-        print(f"[FEHLER] Fehler beim Abrufen der Daten für {location_name}: {e}")
-    except Exception as e:
-        print(f"[FEHLER] Unerwarteter Fehler für {location_name}: {e}")
-
-
-def get_temperature_forecast_for_all_locations():
-    """
-    Ruft Wettervorhersage für alle Standorte aus der CSV-Datei ab.
-    Speichert alle Daten in einer einzigen JSON-Datei.
-    """
-    locations = load_locations_from_csv(config.CSV_FILE_PATH)
-    
-    if not locations:
-        print("[FEHLER] Keine Standorte gefunden. Bitte überprüfen Sie die CSV-Datei.")
-        return
-    
-    successful = 0
-    failed = 0
-    all_weather_data = {}
-    
-    for idx, location in enumerate(locations, 1):
-        print(f"[{idx}/{len(locations)}] Verarbeite Standort: {location['name']}")
+        # ICON-CH1 (optional, hochauflösend)
+        data_ch1 = None
         try:
-            hourly_data = get_temperature_forecast_for_location(
-                location['name'],
-                location['latitude'],
-                location['longitude']
-            )
-            if hourly_data:
-                all_weather_data[location['name']] = {
-                    'latitude': location['latitude'],
-                    'longitude': location['longitude'],
-                    'hourly_data': hourly_data
-                }
-            successful += 1
+            print(f"  [INFO] ICON-CH1 für {location_name}...")
+            resp_ch1 = requests.get(config.API_URL, params=params_ch1, timeout=config.API_TIMEOUT)
+            resp_ch1.raise_for_status()
+            data_ch1 = resp_ch1.json()
+        except requests.exceptions.RequestException as e:
+            print(f"  [WARN] ICON-CH1 fehlgeschlagen: {e}")
+
+        # Seamless (Pflicht)
+        print(f"  [INFO] Seamless für {location_name}...")
+        resp_sl = requests.get(config.API_URL, params=params_seamless, timeout=config.API_TIMEOUT)
+        resp_sl.raise_for_status()
+        data_sl = resp_sl.json()
+
+        hourly_ch1 = data_ch1.get("hourly", {}) if data_ch1 else {}
+        hourly_sl = data_sl.get("hourly", {})
+
+        times_sl = hourly_sl.get("time", [])
+        if not times_sl:
+            print(f"  [WARN] Keine Seamless Daten für {location_name}")
+            return None, None
+
+        # Merge: Start mit Seamless, überschreibe mit CH1
+        hourly_data = {}
+        pressure_level_data = {}
+
+        for i, time_str in enumerate(times_sl):
+            entry = {}
+            for param in config.HOURLY_PARAMS:
+                val = hourly_sl.get(param, [None])[i] if i < len(hourly_sl.get(param, [])) else None
+                entry[param] = val
+            hourly_data[time_str] = entry
+
+            pl_entry = {}
+            for param in config.PRESSURE_LEVEL_PARAMS:
+                val = hourly_sl.get(param, [None])[i] if i < len(hourly_sl.get(param, [])) else None
+                pl_entry[param] = val
+            pressure_level_data[time_str] = pl_entry
+
+        # Überschreibe mit ICON-CH1 (wo verfügbar)
+        times_ch1 = hourly_ch1.get("time", []) if hourly_ch1 else []
+        for i, time_str in enumerate(times_ch1):
+            if time_str not in hourly_data:
+                continue
+            for param in config.HOURLY_PARAMS:
+                val_ch1 = hourly_ch1.get(param, [None])[i] if i < len(hourly_ch1.get(param, [])) else None
+                if val_ch1 is not None:
+                    hourly_data[time_str][param] = val_ch1
+            if time_str in pressure_level_data:
+                for param in config.PRESSURE_LEVEL_PARAMS:
+                    val_ch1 = hourly_ch1.get(param, [None])[i] if i < len(hourly_ch1.get(param, [])) else None
+                    if val_ch1 is not None:
+                        pressure_level_data[time_str][param] = val_ch1
+
+        # Cloud-Base-Sentinel: >6000m = wolkenfrei
+        for time_str in hourly_data:
+            cb = hourly_data[time_str].get("cloud_base")
+            if cb is not None and cb > 6000:
+                hourly_data[time_str]["cloud_base"] = None
+
+        # GFS Supplement (BLH, LI, CIN)
+        try:
+            params_gfs = {
+                "latitude": latitude,
+                "longitude": longitude,
+                "hourly": ",".join(config.GFS_SUPPLEMENTARY_PARAMS),
+                "models": "gfs_seamless",
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }
+            resp_gfs = requests.get(config.API_URL, params=params_gfs, timeout=10)
+            resp_gfs.raise_for_status()
+            hourly_gfs = resp_gfs.json().get("hourly", {})
+            gfs_times = hourly_gfs.get("time", [])
+            filled = 0
+            for i, ts in enumerate(gfs_times):
+                if ts in hourly_data:
+                    for p in config.GFS_SUPPLEMENTARY_PARAMS:
+                        if hourly_data[ts].get(p) is None:
+                            val = hourly_gfs.get(p, [None])[i] if i < len(hourly_gfs.get(p, [])) else None
+                            if val is not None:
+                                hourly_data[ts][p] = val
+                                filled += 1
+            print(f"  [INFO] GFS-Supplement: {filled} Werte aufgefüllt")
         except Exception as e:
-            print(f"[FEHLER] Fehler beim Verarbeiten von {location['name']}: {e}")
-            failed += 1
-    
-    # Speichere alle Wetterdaten in einer einzigen JSON-Datei
-    os.makedirs(config.OUTPUT_DIR, exist_ok=True)
-    json_filename = os.path.join(config.OUTPUT_DIR, config.WEATHER_JSON_FILENAME)
-    with open(json_filename, 'w', encoding='utf-8') as f:
-        json.dump(all_weather_data, f, indent=2, ensure_ascii=False)
-    print(f"\n[INFO] Alle Wetterdaten gespeichert in: {json_filename}")
-    print(f"[INFO] Erfolgreich: {successful}, Fehlgeschlagen: {failed}")
+            print(f"  [WARN] GFS-Supplement fehlgeschlagen: {e}")
+
+        print(f"  [INFO] {len(hourly_data)} Zeitstempel für {location_name}")
+        return hourly_data, pressure_level_data
+
+    except requests.exceptions.RequestException as e:
+        print(f"  [FEHLER] API-Fehler für {location_name}: {e}")
+        return None, None
+    except Exception as e:
+        print(f"  [FEHLER] Unerwarteter Fehler für {location_name}: {e}")
+        return None, None
 
 
-if __name__ == "__main__":
-    get_temperature_forecast_for_all_locations()
+def fetch_all_spots(spots, save_to_file=True):
+    """
+    Holt Wetterdaten für ALLE Spots und speichert sie in einer JSON-Datei.
+    Returns: Dict mit allen Spot-Daten.
+    """
+    all_data = {
+        "_meta": {
+            "last_updated": datetime.now().isoformat(),
+            "spots_count": len(spots),
+        }
+    }
 
+    for spot in spots:
+        name = spot["name"]
+        print(f"[INFO] Lade Wetterdaten für {name} ({spot['fluggebiet']})...")
+
+        result = get_weather_for_location(name, spot["latitude"], spot["longitude"])
+
+        if result is None or result[0] is None:
+            print(f"[WARN] Keine Daten für {name}")
+            continue
+
+        hourly_data, pressure_level_data = result
+        all_data[name] = {
+            "latitude": spot["latitude"],
+            "longitude": spot["longitude"],
+            "elevation_m": spot["elevation_m"],
+            "hourly_data": hourly_data,
+            "pressure_level_data": pressure_level_data,
+        }
+
+    if save_to_file:
+        config.DATA_DIR.mkdir(exist_ok=True)
+        with open(config.WEATHER_JSON_PATH, "w", encoding="utf-8") as f:
+            json.dump(all_data, f, indent=2, ensure_ascii=False)
+        print(f"[INFO] Wetterdaten gespeichert: {config.WEATHER_JSON_PATH}")
+
+    return all_data
+
+
+def load_cached_weather():
+    """Lade gecachte Wetterdaten aus JSON."""
+    if not config.WEATHER_JSON_PATH.exists():
+        return None
+    with open(config.WEATHER_JSON_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def is_cache_fresh(max_age_hours=12):
+    """Prüft ob der Cache noch frisch genug ist."""
+    if not config.WEATHER_JSON_PATH.exists():
+        return False
+    data = load_cached_weather()
+    if not data or "_meta" not in data:
+        return False
+    try:
+        last_updated = datetime.fromisoformat(data["_meta"]["last_updated"])
+        age = (datetime.now() - last_updated).total_seconds() / 3600
+        return age < max_age_hours
+    except (ValueError, KeyError):
+        return False
