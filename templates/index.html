@@ -89,8 +89,100 @@
         box-shadow: 0 0 12px var(--color-primary-glow);
     }
 
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .chat-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--color-text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .reset-btn {
+        background: rgba(255, 68, 68, 0.1);
+        border: 1px solid rgba(255, 68, 68, 0.2);
+        color: #ff4444;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .reset-btn:hover {
+        background: rgba(255, 68, 68, 0.2);
+        border-color: rgba(255, 68, 68, 0.4);
+        box-shadow: 0 0 10px rgba(255, 68, 68, 0.1);
+    }
+
+    .analyse-btn {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        color: #3b82f6;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .analyse-btn:hover {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: rgba(59, 130, 246, 0.5);
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+    }
+
+    .analyse-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .analyse-btn .spinner {
+        display: none;
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    .analyse-btn.loading .spinner {
+        display: inline-block;
+    }
+
+    .analyse-btn.loading .btn-text {
+        display: none;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .chat-header-actions {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
     @media (max-width: 900px) {
-        .unified-layout { flex-direction: column; }
+        .unified-layout {
+            flex-direction: column;
+        }
 
         .chat-sidebar {
             width: 100% !important;
@@ -124,11 +216,18 @@
     <!-- Links: Chat -->
     <aside class="chat-sidebar" id="chatSidebar">
         <div class="chat-container">
-            <div class="analysis-area">
-                <button id="analyzeBtn" class="analyze-btn">Hochladen LLM</button>
-                <span id="analysisStatus" class="analysis-status">Wetterdaten bereit für Analyse</span>
+            <div class="chat-header">
+                <span class="chat-title">Chat-Berater</span>
+                <div class="chat-header-actions">
+                    <button id="refreshAndAnalyseBtn" class="analyse-btn">
+                        <span class="spinner"></span>
+                        <span class="btn-text">Wetter laden + LLM Analyse</span>
+                    </button>
+                    <button id="resetChatBtn" class="reset-btn">
+                        <span>↺</span> Neuer Chat
+                    </button>
+                </div>
             </div>
-
             <div class="chat-messages" id="chatMessages" style="overflow-x: hidden;">
                 <div class="chat-message bot">
                     Hallo! Ich bin dein Flychat-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.

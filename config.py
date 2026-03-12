@@ -11,9 +11,18 @@ from pathlib import Path
 # ============================================================================
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
-API_MODEL = "meteoswiss_icon_ch1"  # MeteoSwiss ICON CH1 - supports cloud_base
+
+# Wettermodell-Hybrid:
+# - WIND_MODEL: Wind/Böen/Leewarnungen -> lokal präziser (CH1)
+# - THERMAL_MODEL: Thermik/Wolken/Strahlung -> robuster für Fliegbarkeit (ICON-D2)
+WIND_MODEL = "meteoswiss_icon_ch1"
+THERMAL_MODEL = "icon_d2"
+
+# Rückwärtskompatibilität für ältere Skripte
+API_MODEL = WIND_MODEL
+
 API_TIMEOUT = 30
-FORECAST_DAYS = 3
+FORECAST_DAYS = 5
 TIMEZONE = "Europe/Zurich"
 
 # ============================================================================
@@ -31,6 +40,23 @@ PROJECT_ROOT = Path(__file__).parent.absolute()
 DATA_DIR = PROJECT_ROOT / "data"
 CSV_PATH = DATA_DIR / "fluggebiete.csv"
 WEATHER_JSON_PATH = DATA_DIR / "wetterdaten.json"
+REGIONEN_GEOJSON_PATH = DATA_DIR / "regionen_referenzpunkte.geojson"
+
+# ============================================================================
+# SPOT SOURCE AREAS (manuelle Overrides fuer Referenzpunkte)
+# ============================================================================
+# Pro Spot koennen 4 regionale Referenzpunkte [lat, lon] definiert werden.
+# Der Startplatz selbst wird automatisch als Punkt 1 hinzugefuegt.
+# Spots ohne Eintrag nutzen die Punkte aus dem Regionen-GeoJSON.
+
+SPOT_SOURCE_AREAS = {
+    "Balderen": [
+        [47.4150, 8.5900],   # Noerdlich (Altstetten/Hoengg)
+        [47.2500, 8.7500],   # Sued-Oestlich (Meilen/Zuerichsee)
+        [47.4300, 8.4700],   # Westlich (Dietikon/Schlieren)
+        [47.1600, 8.6600],   # Suedlich (Horgen/Zugersee)
+    ],
+}
 
 # ============================================================================
 # WETTERPARAMETER
@@ -63,6 +89,7 @@ HOURLY_PARAMS = [
     "et0_fao_evapotranspiration",
     "vapour_pressure_deficit",
     "snow_depth",
+    "weather_code",  # WMO: 95/96/99 = Gewitter
 ]
 
 # Parameter die via GFS-Supplementary-Call geholt werden (bei icon_seamless oft null)
@@ -122,7 +149,7 @@ THERMAL_PARAMS = {
     },
 
     # --- Topografie-Bonus ---
-    "topo_bonus_max": 1.4,
+    "topo_bonus_max": 1.45,
     "topo_bonus_H_fraction": 0.4,
 
     # --- Solare Überhitzung ---
@@ -133,8 +160,18 @@ THERMAL_PARAMS = {
     "second_ascent_entrainment_factor": 0.75,
 
     # --- Climb-Factor ---
-    "climb_factor": 0.50,
-    "climb_factor_damping_threshold": 4.0,
+    "climb_factor": {
+        "winter": 0.45,
+        "spring": 0.62,
+        "summer": 0.55,
+        "autumn": 0.50,
+    },
+    "climb_factor_damping_threshold": {
+        "winter": 3.5,
+        "spring": 4.5,
+        "summer": 4.0,
+        "autumn": 3.8,
+    },
     "climb_hard_cap": 4.5,
 
     # --- DWD-Updraft-Blending ---

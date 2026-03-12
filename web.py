@@ -9,6 +9,8 @@ from datetime import datetime
 
 import config
 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
+from source_area import get_all_regions_geojson
+from fetch_weather import get_weather_for_location
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "flychat-dev-key")
@@ -42,6 +44,11 @@ def map_page():
     return render_template("index.html")
 
 
+@app.route("/analyses")
+def analyses_page():
+    return render_template("analyses.html", instantdb_app_id=config.INSTANTDB_APP_ID)
+
+
 # ============================================================================
 # CHAT API
 # ============================================================================
@@ -62,14 +69,36 @@ def api_chat():
     return jsonify({"reply": reply, "session_id": session_id})
 
 
-@app.route("/api/analyze", methods=["POST"])
-def api_analyze():
-    """Triggered die manuelle LLM-Analyse."""
+@app.route("/api/reset-chat", methods=["POST"])
+def api_reset_chat():
+    """Setzt die aktuelle Konversation zurück."""
+    session_id = request.json.get("session_id")
+    if session_id:
+        engine.reset_conversation(session_id)
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "Keine Session-ID"}), 400
+
+
+
+
+@app.route("/api/run-analyses", methods=["POST"])
+def api_run_analyses():
+    """Startet die LLM Spot-Analyse für alle Spots."""
     try:
-        summary = engine.analyze_weather()
-        return jsonify({"success": True, "summary": summary})
+        result = engine.run_spot_analyses()
+        return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/analyses")
+def api_analyses():
+    """Debug-Endpoint: Zeigt aktuelle Voranalysen als JSON."""
+    return jsonify({
+        "analyses_count": len(engine.spot_analyses),
+        "analyses_loaded_at": engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None,
+        "analyses": engine.spot_analyses,
+    })
 
 
 @app.route("/api/refresh-spots", methods=["POST"])
@@ -78,6 +107,16 @@ def api_refresh_spots():
     try:
         count = engine.reload_spots()
         return jsonify({"success": True, "spots_count": count})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/refresh-weather", methods=["POST"])
+def api_refresh_weather():
+    """Erzwingt einen Neustart des Wetter-Downloads und baut den Kontext neu."""
+    try:
+        engine.refresh_weather(force=True)
+        return jsonify({"success": True, "message": "Wetterdaten und Thermik neu berechnet."})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -94,6 +133,8 @@ def api_status():
         "spots_count": len(engine.spots),
         "weather_spots": spot_names,
         "weather_loaded_at": engine.weather_loaded_at.isoformat() if engine.weather_loaded_at else None,
+        "analyses_count": len(engine.spot_analyses),
+        "analyses_loaded_at": engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None,
     })
 
 
@@ -106,14 +147,45 @@ def api_spots():
     return jsonify(engine.get_spots_geojson())
 
 
+@app.route("/api/regionen")
+def api_regionen():
+    """Gibt alle Regionen als GeoJSON FeatureCollection zurück (für Karten-Overlay)."""
+    return jsonify(get_all_regions_geojson())
+
+
 # ============================================================================
 # WEATHER API (für Meteogramm)
 # ============================================================================
 
+def _ensure_spot_weather(spot_name):
+    """
+    Stellt sicher, dass Wetterdaten für den Spot vorhanden sind.
+    Falls nicht (z.B. vorheriger Fetch fehlgeschlagen): On-Demand-Fetch.
+    """
+    if spot_name in engine.weather_data:
+        return engine.weather_data[spot_name]
+    spot = next((s for s in engine.spots if s["name"] == spot_name), None)
+    if not spot:
+        return None
+    result = get_weather_for_location(spot_name, spot["latitude"], spot["longitude"])
+    if result is None or result[0] is None:
+        return None
+    hourly_data, pressure_level_data, ref_points = result
+    engine.weather_data[spot_name] = {
+        "latitude": spot["latitude"],
+        "longitude": spot["longitude"],
+        "elevation_m": spot["elevation_m"],
+        "hourly_data": hourly_data,
+        "pressure_level_data": pressure_level_data,
+        "reference_points": ref_points,
+    }
+    return engine.weather_data[spot_name]
+
+
 @app.route("/api/weather/<spot_name>")
 def api_weather(spot_name):
     """Wetterdaten für einen Spot, formatiert für D3.js Meteogramm."""
-    spot_data = engine.weather_data.get(spot_name)
+    spot_data = _ensure_spot_weather(spot_name)
     if not spot_data:
         return jsonify({"error": f"Spot '{spot_name}' nicht gefunden"}), 404
 
@@ -172,7 +244,7 @@ def api_weather(spot_name):
 @app.route("/api/altitude-wind/<spot_name>")
 def api_altitude_wind(spot_name):
     """Höhenwind-Profile für einen Spot, formatiert für Meteogramm."""
-    spot_data = engine.weather_data.get(spot_name)
+    spot_data = _ensure_spot_weather(spot_name)
     if not spot_data:
         return jsonify({"error": f"Spot '{spot_name}' nicht gefunden"}), 404
 
@@ -238,6 +310,7 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     "time": time_str,
                     "amount": precipitation,
                     "probability": precip_prob if precip_prob is not None else 0,
+                    "weather_code": data.get("weather_code"),
                 })
 
             # Thermik
@@ -284,6 +357,9 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     timestamp=timestamp,
                     slope_azimuth=slope_azimuth,
                     slope_angle=slope_angle,
+                    low_cloud=data.get("cloud_cover_low", 0),
+                    mid_cloud=data.get("cloud_cover_mid", 0),
+                    high_cloud=data.get("cloud_cover_high", 0),
                 )
                 if "error" not in therm:
                     therm_climb = therm["climb_rate"]
@@ -291,6 +367,18 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     therm_max_h = therm["max_height"]
                     therm_diagnostics = therm.get("diagnostics", {})
                     therm_warnings = therm.get("data_warnings", [])
+
+            # Wolkenbasis + Schichten
+            cloud_base = data.get("cloud_base")
+            cloud_cover = data.get("cloud_cover")
+            cloud_cover_low = data.get("cloud_cover_low")
+            cloud_cover_mid = data.get("cloud_cover_mid")
+            cloud_cover_high = data.get("cloud_cover_high")
+
+            # Nutzbare Thermikhoehe an Wolkenbasis kappen
+            if (therm_max_h and cloud_base and cloud_base > elev_ref
+                    and therm_max_h > cloud_base):
+                therm_max_h = cloud_base
 
             if cape is not None:
                 chart_data["thermik"].append({
@@ -303,14 +391,15 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     "data_warnings": therm_warnings,
                 })
 
-            # Wolkenbasis
-            cloud_base = data.get("cloud_base")
-            cloud_cover = data.get("cloud_cover")
             if cloud_base is not None or cloud_cover is not None:
                 chart_data["cloudbase"].append({
                     "time": time_str,
                     "height": cloud_base,
                     "cover": cloud_cover,
+                    "cover_low": cloud_cover_low,
+                    "cover_mid": cloud_cover_mid,
+                    "cover_high": cloud_cover_high,
+                    "weather_code": data.get("weather_code"),
                 })
         except Exception:
             continue
