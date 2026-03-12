@@ -39,8 +39,17 @@ FLIGHT_HOURS_END = 17    # End-Stunde für Flugstunden (0-23, exklusiv)
 PROJECT_ROOT = Path(__file__).parent.absolute()
 DATA_DIR = PROJECT_ROOT / "data"
 CSV_PATH = DATA_DIR / "fluggebiete.csv"
-WEATHER_JSON_PATH = DATA_DIR / "wetterdaten.json"
 REGIONEN_GEOJSON_PATH = DATA_DIR / "regionen_referenzpunkte.geojson"
+
+# Vercel: Nur /tmp ist schreibbar. Readonly-Daten (CSV, GeoJSON) bleiben in data/
+if os.environ.get("VERCEL"):
+    _WRITABLE_DIR = Path("/tmp/flychat")
+    _WRITABLE_DIR.mkdir(parents=True, exist_ok=True)
+    WEATHER_JSON_PATH = _WRITABLE_DIR / "wetterdaten.json"
+    HISTORY_DIR = _WRITABLE_DIR / "history"
+else:
+    WEATHER_JSON_PATH = DATA_DIR / "wetterdaten.json"
+    HISTORY_DIR = DATA_DIR / "history"
 
 # ============================================================================
 # SPOT SOURCE AREAS (manuelle Overrides fuer Referenzpunkte)

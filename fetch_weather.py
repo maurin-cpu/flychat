@@ -307,7 +307,7 @@ def fetch_all_spots(spots, save_to_file=True):
         }
 
     if save_to_file:
-        config.DATA_DIR.mkdir(exist_ok=True)
+        config.WEATHER_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(config.WEATHER_JSON_PATH, "w", encoding="utf-8") as f:
             json.dump(all_data, f, indent=2, ensure_ascii=False)
         print(f"[INFO] Wetterdaten gespeichert: {config.WEATHER_JSON_PATH}")

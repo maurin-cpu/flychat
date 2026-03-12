@@ -49,7 +49,7 @@ class FlychatEngine:
         self.client = OpenAI(api_key=api_key) if api_key else None
 
         # History-Persistenz
-        self.history_dir = config.DATA_DIR / "history"
+        self.history_dir = config.HISTORY_DIR
         self.history_dir.mkdir(parents=True, exist_ok=True)
         self._load_all_conversations()
 
