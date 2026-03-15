@@ -238,6 +238,7 @@
                 <button class="quick-btn" data-msg="Wo kann ich heute fliegen?">Wo fliegen?</button>
                 <button class="quick-btn" data-msg="Wie sind die Bedingungen heute?">Heute?</button>
                 <button class="quick-btn" data-msg="Gibt es Föhn-Gefahr?">Föhn?</button>
+                <button class="quick-btn foehn-btn" id="openFoehnBtn">Föhndiagramm</button>
             </div>
 
             <div class="typing-indicator" id="typingIndicator">
@@ -273,6 +274,21 @@
                 <div class="meteogram-chart" id="meteogramChart"></div>
             </div>
         </div>
+
+        <!-- Foehn Diagram Overlay -->
+        <div class="meteogram-overlay" id="foehnOverlay">
+            <div class="meteogram-panel">
+                <div class="meteogram-header">
+                    <div>
+                        <h2>Föhndiagramm</h2>
+                        <span class="spot-info">Druckdifferenz Lugano – Zürich | 5-Tage-Prognose</span>
+                    </div>
+                    <button class="meteogram-close" id="foehnClose">&times;</button>
+                </div>
+                <div class="meteogram-chart" id="foehnChart"></div>
+            </div>
+        </div>
+
         <div class="tooltip" id="tooltip"></div>
     </main>
 </div>
@@ -283,6 +299,7 @@
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="{{ url_for('static', filename='js/meteogram.js') }}"></script>
+<script src="{{ url_for('static', filename='js/foehn_diagram.js') }}"></script>
 <script src="{{ url_for('static', filename='js/map.js') }}"></script>
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 <script>

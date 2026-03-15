@@ -262,6 +262,36 @@ def interpolate_temp_at_height(elevation_ref: float, profile: List[Dict]) -> Opt
     return below['temp'] + frac * (above['temp'] - below['temp'])
 
 
+def calculate_thermic_clouds(low_clouds: float, mid_clouds: float, high_clouds: float) -> dict:
+    """
+    Berechnet die thermisch relevante Bewölkung und die solare Dämpfung.
+    Gewichtung nach Regtherm-Logik: Tiefe Wolken blockieren Einstrahlung fast komplett (100%), 
+    mittlere teilweise (70%), hohe Cirren dämpfen nur leicht (25%).
+
+    Physikalische Fundierung des Exponenten 1.5 beim sun_factor:
+    Die Thermik skaliert in der Praxis nicht linear zur Sonneneinstrahlung. 
+    Diese Parameterisierung (Potenzfunktion 1.5) bildet das Schwellenwert-Verhalten der Thermik ab 
+    (vgl. Liechti & Neininger, 1994 "AlpTherm"). Sinkt die Einstrahlung, wird die nötige 
+    Auslösetemperatur (Trigger Temperature) am Boden nicht mehr erreicht, und das für den Gleitschirm 
+    nutzbare Steigen (abzüglich Eigensinken) bricht überproportional schnell zusammen.
+    """
+    low = low_clouds or 0.0
+    mid = mid_clouds or 0.0
+    high = high_clouds or 0.0
+
+    display_cloud = (low * 1.0) + (mid * 0.7) + (high * 0.25)
+    display_cloud = max(0.0, min(100.0, display_cloud))
+
+    sun_index = 100.0 - display_cloud
+    sun_factor = math.pow(sun_index / 100.0, 1.5)
+
+    return {
+        'display_cloud': display_cloud,
+        'sun_index': sun_index,
+        'sun_factor': sun_factor
+    }
+
+
 def calculate_thermal_profile(
     surface_temp: float,
     surface_dewpoint: float,
@@ -285,6 +315,9 @@ def calculate_thermal_profile(
     timestamp: str = None,
     slope_azimuth: float = None,
     slope_angle: float = None,
+    low_cloud: float = 0,
+    mid_cloud: float = 0,
+    high_cloud: float = 0,
 ) -> Dict:
     """
     Berechnet das Thermik-Profil mit physikalisch fundiertem Modell.
@@ -721,6 +754,14 @@ def calculate_thermal_profile(
     # wegen Eigensinken im Kreisflug (-1.0m/s bis -1.5m/s) und unperfekter Zentrierung.
     CLIMB_FACTOR = _get_thermal_param("climb_factor", timestamp, default=0.50)
 
+    # =========================================================================
+    # 6. DUAL W*-BERECHNUNG (Modifiziert mit Regtherm Sun-Factor)
+    # =========================================================================
+    thermic_clouds = calculate_thermic_clouds(low_cloud, mid_cloud, high_cloud)
+    display_cloud = thermic_clouds['display_cloud']
+    sun_index = thermic_clouds['sun_index']
+    sun_factor = thermic_clouds['sun_factor']
+
     T_kelvin = start_temp + 273.15
     z_i = max_thermal_height - elevation_m
 
@@ -768,8 +809,11 @@ def calculate_thermal_profile(
             climb_factor = CLIMB_FACTOR
 
         avg_climb = raw_w_star * climb_factor
+        
+        # WENDE SUN-FACTOR AN (Regtherm Logik)
+        avg_climb = avg_climb * sun_factor
 
-        # DWD-Updraft-Blending (Default: deaktiviert — keine physikalische Grundlage für Skalierung)
+        # DWD-Updraft-Blending (Default: deaktiviert)
         if _get_thermal_param("use_dwd_updraft_blending", timestamp, default=False):
             if updraft is not None and updraft > 0:
                 dwd_scale = _get_thermal_param("dwd_updraft_scale", timestamp, default=2.0)
@@ -796,6 +840,10 @@ def calculate_thermal_profile(
     if avg_climb >= 1.5: rating = 7
     if avg_climb >= 2.5: rating = 9
     if avg_climb >= 3.5: rating = 10
+
+    # Deckelung bei Bewölkung (Sun Index < 20 = Thermik nicht nutzbar)
+    if sun_index < 20:
+        rating = min(1, rating)
 
     # CIN-Bremse: Konvektive Hemmung reduziert Rating
     if convective_inhibition is not None:
@@ -857,6 +905,9 @@ def calculate_thermal_profile(
         'lifted_index': round(lifted_index, 1) if lifted_index is not None else None,
         'convective_inhibition': round(convective_inhibition, 0) if convective_inhibition is not None else None,
         'vapour_pressure_deficit': round(vpd, 2) if vpd is not None else None,
+        'sun_index': round(sun_index, 1),
+        'display_cloud': round(display_cloud, 1),
+        'sun_factor': round(sun_factor, 3),
     }
 
     return {
@@ -966,6 +1017,9 @@ def analyze_hour(hourly_data: Dict, pressure_data: Dict, time_index: int,
             timestamp=ts_val,
             slope_azimuth=slope_azimuth,
             slope_angle=slope_angle,
+            low_cloud=_get_val('cloud_cover_low'),
+            mid_cloud=_get_val('cloud_cover_mid'),
+            high_cloud=_get_val('cloud_cover_high'),
         )
 
     except Exception as e:

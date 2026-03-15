@@ -89,7 +89,7 @@ class FlychatEngine:
 
         # 2. Föhn-Daten holen
         try:
-            self.foehn_data = fetch_foehn_data(forecast_days=2)
+            self.foehn_data = fetch_foehn_data(forecast_days=config.FORECAST_DAYS)
         except Exception as e:
             logger.error(f"Föhn-Daten fehlgeschlagen: {e}")
             self.foehn_data = None
@@ -344,24 +344,32 @@ class FlychatEngine:
         return "\n".join(lines)
 
     def _get_forecast_dates(self) -> list:
-        """Ermittelt verfügbare Vorhersage-Tage aus den Wetterdaten."""
+        """Ermittelt verfügbare Vorhersage-Tage aus den Wetterdaten (nur Heute + Zukunft)."""
         dates = set()
         now = datetime.now()
+        today_str = now.strftime("%Y-%m-%d")
+        
         for spot_name, spot_data in self.weather_data.items():
             if spot_name == "_meta":
                 continue
             for timestamp in spot_data.get("hourly_data", {}).keys():
                 try:
                     dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                    if dt.timestamp() >= (now.timestamp() - 3600):
+                    date_str = dt.strftime("%Y-%m-%d")
+                    # Nur heute und Zukunft
+                    if date_str >= today_str:
                         if config.FLIGHT_HOURS_START <= dt.hour < config.FLIGHT_HOURS_END:
-                            dates.add(dt.strftime("%Y-%m-%d"))
+                            dates.add(date_str)
                 except Exception:
                     pass
         return sorted(dates)
 
-    def _build_single_spot_context(self, spot, date_str: str) -> str:
-        """Baut Wetterkontext für EINEN Spot an EINEM Tag."""
+    def _build_single_spot_context(self, spot, date_str: str, mode: str = "chat") -> str:
+        """
+        Baut Wetterkontext für EINEN Spot an EINEM Tag.
+        mode="chat": Filtert vergangene Stunden aus (für aktuelle Anfragen).
+        mode="dashboard": Zeigt alle Stunden des Tages (10-17) für die Analyse.
+        """
         if not self.weather_data:
             return ""
 
@@ -410,8 +418,13 @@ class FlychatEngine:
                 # Nur den angefragten Tag
                 if dt.strftime("%Y-%m-%d") != date_str:
                     continue
-                if dt.timestamp() < (now.timestamp() - 3600):
-                    continue
+                
+                # Im Chat-Modus: Vergangene Stunden ausblenden
+                if mode == "chat":
+                    if dt.timestamp() < (now.timestamp() - 3600):
+                        continue
+                
+                # Immer: Nur Flugstunden
                 if not (config.FLIGHT_HOURS_START <= dt.hour < config.FLIGHT_HOURS_END):
                     continue
             except Exception:
@@ -515,11 +528,10 @@ class FlychatEngine:
 
         return "\n".join(lines)
 
-    def _safety_check_single_spot_day(self, spot, date_str: str) -> dict:
+    def _safety_check_single_spot_day(self, spot, date_str: str, context: str) -> dict:
         """Phase 1: Reiner Sicherheitscheck für einen Spot/Tag via LLM."""
         name = spot["name"]
         try:
-            context = self._build_single_spot_context(spot, date_str)
             if not context:
                 return {"spot": name, "date": date_str, "safety_status": "error", "error": "Keine Daten für diesen Tag"}
 
@@ -549,11 +561,10 @@ class FlychatEngine:
             logger.error(f"Safety-Check für {name}/{date_str} fehlgeschlagen: {e}")
             return {"spot": name, "date": date_str, "safety_status": "error", "phase": "safety", "error": str(e)}
 
-    def _flyability_single_spot_day(self, spot, date_str: str, safety_result: dict) -> dict:
+    def _flyability_single_spot_day(self, spot, date_str: str, safety_result: dict, context: str) -> dict:
         """Phase 2: Flugtauglichkeit für einen bereits als sicher eingestuften Spot/Tag."""
         name = spot["name"]
         try:
-            context = self._build_single_spot_context(spot, date_str)
             if not context:
                 return {"spot": name, "date": date_str, "status": "error", "error": "Keine Daten für diesen Tag"}
 
@@ -632,8 +643,10 @@ class FlychatEngine:
             futures = {}
             for spot in spots_to_analyze:
                 for date_str in forecast_dates:
-                    future = executor.submit(self._safety_check_single_spot_day, spot, date_str)
-                    futures[future] = (spot["name"], date_str)
+                    ctx = self._build_single_spot_context(spot, date_str, mode="dashboard")
+                    if ctx:
+                        future = executor.submit(self._safety_check_single_spot_day, spot, date_str, ctx)
+                        futures[future] = (spot["name"], date_str)
 
             for future in as_completed(futures):
                 spot_name, date_str = futures[future]
@@ -661,7 +674,8 @@ class FlychatEngine:
             with ThreadPoolExecutor(max_workers=3) as executor:
                 futures = {}
                 for spot, date_str, safety in flyability_tasks:
-                    future = executor.submit(self._flyability_single_spot_day, spot, date_str, safety)
+                    ctx = self._build_single_spot_context(spot, date_str, mode="dashboard")
+                    future = executor.submit(self._flyability_single_spot_day, spot, date_str, safety, ctx)
                     futures[future] = (spot["name"], date_str)
 
                 for future in as_completed(futures):
@@ -754,12 +768,12 @@ class FlychatEngine:
                         "date": date_str,
                         "status": entry.get("status", "error"),
                         "best_window": entry.get("best_window", "?"),
-                        "recommendation": entry.get("recommendation", ""),
                         "updated_at": self.analyses_loaded_at.isoformat(),
                     }
                     safety = entry.get("safety", {})
                     doc_data["safety_status"] = safety.get("safety_status", "error")
                     doc_data["safe_window"] = safety.get("safe_window", "keins")
+                    doc_data["safety_feedback"] = safety.get("summary", "")
                     for key in ["no_go_reasons", "caution_notes"]:
                         val = safety.get(key, [])
                         if isinstance(val, list):
@@ -776,6 +790,7 @@ class FlychatEngine:
                         doc_data["flight_duration"] = fly.get("flight_duration_estimate", "")
                         doc_data["xc_potential"] = fly.get("xc_potential", "")
                         doc_data["peak_climb_rate"] = fly.get("peak_climb_rate", 0)
+                        doc_data["flyability_feedback"] = fly.get("recommendation", "")
 
                     docs[doc_id] = doc_data
 

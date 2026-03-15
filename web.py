@@ -11,6 +11,8 @@ import config
 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
 from source_area import get_all_regions_geojson
 from fetch_weather import get_weather_for_location
+from foehn_indicators import fetch_foehn_data, evaluate_foehn, FOEHN_STATIONS, \
+    THRESHOLD_DELTA_P_CAUTION, THRESHOLD_DELTA_P_DANGER, THRESHOLD_HUMIDITY_LOW
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "flychat-dev-key")
@@ -207,12 +209,17 @@ def api_weather(spot_name):
         slope_angle=spot_info.get("slope_angle") if spot_info else None,
     )
 
-    # Gruppiere nach Tagen
+    # Gruppiere nach Tagen (nur Heute + Zukunft)
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    
     dates = set()
     for entry in chart_data.get("wind", []):
         try:
             dt = datetime.fromisoformat(entry["time"])
-            dates.add(dt.strftime("%Y-%m-%d"))
+            date_str = dt.strftime("%Y-%m-%d")
+            if date_str >= today_str:
+                dates.add(date_str)
         except Exception:
             pass
 
@@ -251,18 +258,22 @@ def api_altitude_wind(spot_name):
     pressure_level_data = spot_data.get("pressure_level_data", {})
     alt_data = format_altitude_wind_for_charts(pressure_level_data)
 
-    # Gruppiere nach Tagen
+    # Gruppiere nach Tagen (nur Heute + Zukunft)
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    
     by_day = {}
     for profile in alt_data.get("profiles", []):
         try:
             dt = datetime.fromisoformat(profile["time"])
             date_str = dt.strftime("%Y-%m-%d")
-            if date_str not in by_day:
-                by_day[date_str] = []
-            by_day[date_str].append({
-                "hour": dt.hour,
-                "profiles": profile["levels"],
-            })
+            if date_str >= today_str:
+                if date_str not in by_day:
+                    by_day[date_str] = []
+                by_day[date_str].append({
+                    "hour": dt.hour,
+                    "profiles": profile["levels"],
+                })
         except Exception:
             pass
 
@@ -272,6 +283,91 @@ def api_altitude_wind(spot_name):
         "dates": sorted_dates,
         "data": by_day,
     })
+
+
+# ============================================================================
+# FÖHN API
+# ============================================================================
+
+@app.route("/api/foehn")
+def api_foehn():
+    """Föhn-Zeitreihe: stündliche Delta-P, Kammwind, Feuchte für Diagramm."""
+    raw = None
+    if engine and engine.foehn_data:
+        raw = engine.foehn_data
+    else:
+        raw = fetch_foehn_data(forecast_days=config.FORECAST_DAYS)
+
+    if not raw:
+        return jsonify({"error": "Föhn-Daten nicht verfügbar"}), 503
+
+    nord = raw["nord"]
+    sued = raw["sued"]
+    h_nord = nord.get("hourly", {})
+    h_sued = sued.get("hourly", {})
+    times = h_nord.get("time", [])
+
+    if not times:
+        return jsonify({"error": "Keine Zeitreihe"}), 503
+
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+
+    by_day = {}
+    for i, t in enumerate(times):
+        try:
+            dt = datetime.fromisoformat(t.replace("Z", "+00:00"))
+        except Exception:
+            continue
+
+        date_str = dt.strftime("%Y-%m-%d")
+        if date_str < today_str:
+            continue
+
+        p_nord = _safe_get(h_nord.get("pressure_msl"), i)
+        p_sued = _safe_get(h_sued.get("pressure_msl"), i)
+        delta_p = round(p_sued - p_nord, 1) if p_nord is not None and p_sued is not None else None
+
+        wind_700 = _safe_get(h_nord.get("wind_speed_700hPa"), i)
+        dir_700 = _safe_get(h_nord.get("wind_direction_700hPa"), i)
+        rh_nord = _safe_get(h_nord.get("relative_humidity_2m"), i)
+
+        # Determine level via evaluate_foehn
+        ev = evaluate_foehn(nord, sued, time_index=i)
+
+        entry = {
+            "time": t,
+            "hour": dt.hour,
+            "delta_p": delta_p,
+            "level": ev["level"],
+            "crest_wind_kmh": round(wind_700, 0) if wind_700 is not None else None,
+            "crest_dir_deg": round(dir_700, 0) if dir_700 is not None else None,
+            "humidity_nord": round(rh_nord, 0) if rh_nord is not None else None,
+        }
+
+        if date_str not in by_day:
+            by_day[date_str] = []
+        by_day[date_str].append(entry)
+
+    sorted_dates = sorted(by_day.keys())
+
+    return jsonify({
+        "dates": sorted_dates,
+        "data": by_day,
+        "thresholds": {
+            "delta_p_caution": THRESHOLD_DELTA_P_CAUTION,
+            "delta_p_danger": THRESHOLD_DELTA_P_DANGER,
+            "humidity_low": THRESHOLD_HUMIDITY_LOW,
+        },
+        "stations": FOEHN_STATIONS,
+    })
+
+
+def _safe_get(arr, i):
+    """Sicher einen Wert aus einer Liste holen."""
+    if arr is None or not isinstance(arr, list) or i >= len(arr):
+        return None
+    return arr[i]
 
 
 # ============================================================================

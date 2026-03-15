@@ -25,7 +25,6 @@ def load_spots(csv_path=None):
                 "elevation_m": int(float(row["elevation_m"])),
                 "windrichtung": row["windrichtung"].strip(),
                 "bemerkung": row.get("Bemerkungen", "").strip(),
-                "ideal_wind_min": int(row["ideal_wind_min_kmh"]) if row.get("ideal_wind_min_kmh") else 5,
                 "ideal_wind_max": int(row["ideal_wind_max_kmh"]) if row.get("ideal_wind_max_kmh") else 30,
                 "slope_azimuth": int(row["slope_azimuth"]) if row.get("slope_azimuth") else None,
                 "slope_angle": int(row["slope_angle"]) if row.get("slope_angle") else 25,

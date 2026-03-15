@@ -260,6 +260,29 @@
         line-height: 1.6;
     }
 
+    .ai-feedback-box {
+        margin-top: 8px;
+        padding: 8px 12px;
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--glass-border);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .ai-feedback-label {
+        display: block;
+        font-weight: 700;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+        color: var(--color-text-muted);
+    }
+
+    .ai-feedback-safety .ai-feedback-label { color: #818CF8; }
+    .ai-feedback-flyability .ai-feedback-label { color: #10B981; }
+
     .safety-issues {
         color: #EF4444;
         font-weight: 500;
@@ -422,16 +445,29 @@ function render() {
         statusBar.textContent = 'Stand: ' + d.toLocaleString('de-CH');
     }
 
-    // Alle Tage sammeln
+    // Alle Tage sammeln (nur Heute + Zukunft)
+    var todayStr = new Date().toISOString().split('T')[0];
     var allDates = new Set();
     Object.values(analysesNested).forEach(function(days) {
-        Object.keys(days).forEach(function(dateStr) { allDates.add(dateStr); });
+        Object.keys(days).forEach(function(d) { 
+            if (d >= todayStr) allDates.add(d); 
+        });
     });
     var sortedDates = Array.from(allDates).sort();
 
+    if (sortedDates.length === 0) {
+        emptyState.style.display = 'block';
+        statusBar.textContent = 'Keine aktuellen Analysedaten';
+        dayTabs.style.display = 'none';
+        daySummary.style.display = 'none';
+        spotsGrid.innerHTML = '';
+        headerMeta.textContent = '';
+        return;
+    }
+
     headerMeta.textContent = spotNames.length + ' Spots, ' + sortedDates.length + ' Tage';
 
-    if (!currentDate || sortedDates.indexOf(currentDate) === -1) {
+    if (!currentDate || !sortedDates.includes(currentDate)) {
         currentDate = sortedDates[0];
     }
 
@@ -565,11 +601,25 @@ function createCard(name, a) {
         html += '</div>';
     }
 
-    if (a.recommendation) {
-        html += '<div class="spot-recommendation">' + escHtml(a.recommendation) + '</div>';
+    // KI Feedback: Sicherheit (IMMER)
+    var safetyFeedback = a.safety_feedback || a.summary || '';
+    if (safetyFeedback) {
+        html += '<div class="ai-feedback-box ai-feedback-safety">' +
+            '<span class="ai-feedback-label">KI-Feedback: Sicherheit</span>' +
+            escHtml(safetyFeedback) +
+            '</div>';
     }
 
-    html += '</div>';
+    // KI Feedback: Fliegbarkeit (falls vorhanden)
+    var flyFeedback = a.flyability_feedback || a.recommendation || '';
+    if (flyFeedback) {
+        html += '<div class="ai-feedback-box ai-feedback-flyability">' +
+            '<span class="ai-feedback-label">KI-Feedback: Fliegbarkeit</span>' +
+            escHtml(flyFeedback) +
+            '</div>';
+    }
+
+    html += '</div>'; // End spot-card-body
 
     card.innerHTML = html;
     return card;

@@ -15,7 +15,8 @@
     <nav class="navbar">
         <a href="/chat" class="navbar-brand">Fly<span>chat</span></a>
         <div class="navbar-links">
-            <a href="/chat" class="{% if request.path == '/chat' %}active{% endif %}">Chat</a>
+            <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Chat</a>
+            <a href="/analyses" class="{% if request.path == '/analyses' %}active{% endif %}">Analysen</a>
         </div>
     </nav>
     {% block content %}{% endblock %}
