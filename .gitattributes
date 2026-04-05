@@ -1,0 +1,10 @@
+# Set default behavior to handle line endings automatically.
+* text=auto
+
+# Ensure specific file types use LF (common for shell scripts and JSON on many platforms)
+*.sh text eol=lf
+*.json text eol=auto
+*.py text eol=auto
+*.html text eol=auto
+*.css text eol=auto
+*.js text eol=auto
