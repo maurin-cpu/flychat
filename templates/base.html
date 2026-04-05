@@ -15,12 +15,27 @@
     <nav class="navbar">
         <a href="/chat" class="navbar-brand">Fly<span>chat</span></a>
         <div class="navbar-links">
-            <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Chat</a>
+            <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Startplätze</a>
+            <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
             <a href="/analyses" class="{% if request.path == '/analyses' %}active{% endif %}">Analysen</a>
+            <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen">Föhn</button>
         </div>
     </nav>
     {% block content %}{% endblock %}
     {% block scripts %}{% endblock %}
+    <script>
+        (function () {
+            var btn = document.getElementById('navFoehnBtn');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                if (typeof window.openFoehn === 'function') {
+                    window.openFoehn();
+                } else {
+                    window.location.href = '/chat?foehn=1';
+                }
+            });
+        })();
+    </script>
 </body>
 
 </html>

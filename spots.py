@@ -11,25 +11,33 @@ def load_spots(csv_path=None):
     """Lädt alle Spots aus der CSV-Datei."""
     path = csv_path or CSV_PATH
     spots = []
-    with open(path, encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if not row.get("site_name", "").strip():
-                continue
-            spots.append({
-                "region": row["region"].strip(),
-                "fluggebiet": row["fluggebiet"].strip(),
-                "name": row["site_name"].strip(),
-                "latitude": float(row["latitude"]),
-                "longitude": float(row["longitude"]),
-                "elevation_m": int(float(row["elevation_m"])),
-                "windrichtung": row["windrichtung"].strip(),
-                "bemerkung": row.get("Bemerkungen", "").strip(),
-                "ideal_wind_max": int(row["ideal_wind_max_kmh"]) if row.get("ideal_wind_max_kmh") else 30,
-                "slope_azimuth": int(row["slope_azimuth"]) if row.get("slope_azimuth") else None,
-                "slope_angle": int(row["slope_angle"]) if row.get("slope_angle") else 25,
-                "kritischer_foehn": row.get("kritischer_foehn", "Süd").strip() or "Süd",
-            })
+    # UTF-8 (mit BOM-Support), Fallback auf Windows-1252 (Excel-Standard)
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            lines = f.readlines()
+    except UnicodeDecodeError:
+        with open(path, encoding="cp1252") as f:
+            lines = f.readlines()
+
+    import io
+    reader = csv.DictReader(io.StringIO("".join(lines)))
+    for row in reader:
+        if not row.get("site_name", "").strip():
+            continue
+        spots.append({
+            "region": row["region"].strip(),
+            "fluggebiet": row["fluggebiet"].strip(),
+            "name": row["site_name"].strip(),
+            "latitude": float(row["latitude"]),
+            "longitude": float(row["longitude"]),
+            "elevation_m": int(float(row["elevation_m"])),
+            "windrichtung": row["windrichtung"].strip(),
+            "bemerkung": row.get("Bemerkungen", "").strip(),
+            "ideal_wind_max": int(row["ideal_wind_max_kmh"]) if row.get("ideal_wind_max_kmh") else 30,
+            "slope_azimuth": int(row["slope_azimuth"]) if row.get("slope_azimuth") else None,
+            "slope_angle": int(row["slope_angle"]) if row.get("slope_angle") else 25,
+            "kritischer_foehn": row.get("kritischer_foehn", "Süd").strip() or "Süd",
+        })
     return spots
 
 

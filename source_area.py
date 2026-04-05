@@ -41,6 +41,7 @@ def _load_regions():
             "polygon": polygon,
             "reference_points": props.get("reference_points", []),
             "elevation_ref": props.get("elevation_ref"),
+            "kritischer_foehn": props.get("kritischer_foehn", "Beide"),
         })
 
     print(f"[INFO] {len(_regions_cache)} Regionen geladen aus {path.name}")
@@ -92,6 +93,11 @@ def get_region_name_for_spot(spot_name, lat, lon):
     """Gibt den Region-Namen fuer einen Spot zurueck (fuer Anzeige)."""
     region = find_region_for_point(lat, lon)
     return region["region"] if region else None
+
+
+def get_all_regions():
+    """Gibt die gecachte Liste aller Regionen zurueck (fuer Region-Analyse)."""
+    return _load_regions()
 
 
 def get_all_regions_geojson():

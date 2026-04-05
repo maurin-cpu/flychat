@@ -2,6 +2,9 @@
 Wetterdaten-Aggregation für Flychat.
 Adaptiert von uetliberg_ticker/fetch_weather.py - Multi-Spot Support.
 
+Batch-Modus: Alle Spots in 4 API-Calls statt 112 Einzel-Requests.
+Referenzpunkt-Dedup: Regionale Punkte nur einmal abfragen (140 → ~48 Punkte).
+
 Generalisierte Source-Area Aggregation:
 - Wolken: 30%-Perzentil (Regtherm-Gewichtung) -> findet regionale Sonnenfenster
 - Alle anderen Parameter: Flächenmittel (Spatial Mean)
@@ -12,271 +15,505 @@ import requests
 import json
 import os
 import time
-from datetime import datetime
+import copy
+from datetime import datetime, timedelta
 
 import config
 
-# Verzögerung zwischen API-Aufrufen (Open-Meteo Rate-Limit: Multi-Location-Requests zählen stärker)
-API_DELAY_BETWEEN_CALLS = 1.5  # Sekunden
-API_DELAY_BETWEEN_SPOTS = 2.5  # Sekunden
+# Verzögerung zwischen Batch-Calls (Open-Meteo Rate-Limit)
+API_DELAY_BETWEEN_CALLS = 3.5  # Sekunden zwischen den 4 Batch-Calls
+API_RETRY_MAX = 4              # Max Retries bei 429
+API_RETRY_BASE_WAIT = 15       # Basis-Wartezeit bei 429 (Sekunden), verdoppelt sich pro Retry
+API_BATCH_TIMEOUT = 90         # Timeout für Batch-Requests (mehr Punkte = mehr Verarbeitungszeit)
+
 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
-from source_area import get_reference_points
+from source_area import get_reference_points, get_all_regions
+
+# --- Aggregation Constants (Modul-Level) ---
+CLOUD_PARAMS = {"cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"}
+PRECIP_USE_MIN = {"precipitation", "rain", "precipitation_probability"}
 
 
-def get_weather_for_location(location_name, latitude, longitude):
+class DailyLimitExceeded(Exception):
+    """Raised when the Open-Meteo daily API limit is hit."""
+    pass
+
+
+def _api_get_with_retry(url, params, timeout, label=""):
     """
-    Ruft stündliche Wettervorhersage ab (Hybrid-Modell: WIND_MODEL + THERMAL_MODEL + GFS).
-    Nutzt 5-Punkt Source-Area-Raster mit regionaler Wolken-Aggregation (30%-Perzentil).
-    Gibt (hourly_data, pressure_level_data, reference_points) zurück.
+    requests.get() mit automatischem Retry bei 429 Too Many Requests.
+    Nutzt Retry-After Header falls vorhanden, sonst exponentiellen Backoff.
+    Erkennt Tageslimit und bricht sofort ab (kein sinnloses Retrying).
     """
-    pl_params = ",".join(config.PRESSURE_LEVEL_PARAMS)
-    
-    ref_points = get_reference_points(location_name, latitude, longitude)
-    
-    lat_str = ",".join(str(round(p[0], 4)) for p in ref_points)
-    lon_str = ",".join(str(round(p[1], 4)) for p in ref_points)
-
-    params_wind = {
-        "latitude": lat_str,
-        "longitude": lon_str,
-        "models": config.WIND_MODEL,
-        "hourly": ",".join(config.HOURLY_PARAMS) + "," + pl_params,
-        "forecast_days": config.FORECAST_DAYS,
-        "timezone": config.TIMEZONE,
-    }
-
-    params_thermal = {
-        "latitude": lat_str,
-        "longitude": lon_str,
-        "models": config.THERMAL_MODEL,
-        "hourly": ",".join(config.HOURLY_PARAMS) + "," + pl_params,
-        "forecast_days": config.FORECAST_DAYS,
-        "timezone": config.TIMEZONE,
-    }
-    
-    CLOUD_PARAMS = {"cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"}
-    PRECIP_USE_MIN = {"precipitation", "rain", "precipitation_probability"}
-
-    def _aggregate_regional_data(data_list):
-        """
-        Generalisierte Source-Area Aggregation:
-        - Wolken: 30%-Perzentil -> findet regionale Sonnenfenster (Blue Holes)
-        - Niederschlag: Regionale Signifikanz (mind. 2 von N Punkten > 0.1, sonst 0.0)
-        - Temperatur, Strahlung, Druckniveaus: SPOT-Punkt (data_list[0]) behalten!
-          Thermik haengt von den Bedingungen AM Startplatz ab, nicht vom Regionalmittel.
-          Burnair/XC Therm nutzen ebenfalls den Spot-Punkt fuer die Thermik-Berechnung.
-        """
-        if not data_list or not isinstance(data_list, list): return data_list
-        primary = data_list[0]  # Spot-Punkt = erste Koordinate
-        if "hourly" not in primary: return primary
-
-        PRECIP_THRESHOLD = 0.1   # mm oder %
-        PRECIP_MIN_POINTS = 2    # mind. 2 von N Punkten muessen > Schwellenwert sein
-
-        all_params = [k for k in primary["hourly"].keys() if k != "time"]
-        num_hours = len(primary["hourly"].get("time", []))
-        
-        for i in range(num_hours):
-            # Wolken: 30%-Perzentil (NWP ueberschaetzt Wolken in Bergen systematisch)
-            point_cloud_values = []
-            for d in data_list:
-                h = d.get("hourly", {})
-                raw_low = h.get("cloud_cover_low", [None])[i] if i < len(h.get("cloud_cover_low", [])) else None
-                raw_mid = h.get("cloud_cover_mid", [None])[i] if i < len(h.get("cloud_cover_mid", [])) else None
-                raw_high = h.get("cloud_cover_high", [None])[i] if i < len(h.get("cloud_cover_high", [])) else None
-                raw_total = h.get("cloud_cover", [None])[i] if i < len(h.get("cloud_cover", [])) else None
-                if raw_low is None or raw_mid is None or raw_high is None or raw_total is None:
+    for attempt in range(API_RETRY_MAX + 1):
+        try:
+            resp = requests.get(url, params=params, timeout=timeout)
+            if resp.status_code == 429:
+                # Tageslimit erkennen → sofort abbrechen
+                try:
+                    body = resp.json()
+                    if "daily" in body.get("reason", "").lower():
+                        raise DailyLimitExceeded(body["reason"])
+                except (ValueError, KeyError):
+                    pass
+                if attempt < API_RETRY_MAX:
+                    retry_after = resp.headers.get("Retry-After")
+                    if retry_after:
+                        wait = int(retry_after) + 2
+                    else:
+                        wait = API_RETRY_BASE_WAIT * (2 ** attempt)
+                    print(f"  [RATE-LIMIT] 429 bei {label} — warte {wait}s (Versuch {attempt + 1}/{API_RETRY_MAX})...")
+                    time.sleep(wait)
                     continue
-                score = (raw_low * 1.0) + (raw_mid * 0.7) + (raw_high * 0.25)
-                point_cloud_values.append({
-                    "score": score, "low": raw_low, "mid": raw_mid, "high": raw_high,
-                    "total": raw_total
-                })
+            resp.raise_for_status()
+            return resp
+        except DailyLimitExceeded:
+            raise
+        except requests.exceptions.HTTPError as e:
+            if "429" in str(e) and attempt < API_RETRY_MAX:
+                wait = API_RETRY_BASE_WAIT * (2 ** attempt)
+                print(f"  [RATE-LIMIT] 429 bei {label} — warte {wait}s (Versuch {attempt + 1}/{API_RETRY_MAX})...")
+                time.sleep(wait)
+                continue
+            raise
+    return None
 
-            if point_cloud_values:
-                point_cloud_values.sort(key=lambda x: x["score"])
-                target_idx = 1 if len(point_cloud_values) >= 4 else 0
-                rep = point_cloud_values[target_idx]
-                primary["hourly"]["cloud_cover_low"][i] = int(rep["low"])
-                primary["hourly"]["cloud_cover_mid"][i] = int(rep["mid"])
-                primary["hourly"]["cloud_cover_high"][i] = int(rep["high"])
-                primary["hourly"]["cloud_cover"][i] = int(rep["total"])
-            
-            # Nur Wolken + Niederschlag aggregieren; Rest = Spot-Punkt (primary bleibt)
-            for k in all_params:
-                if k in CLOUD_PARAMS:
-                    continue
-                if k in PRECIP_USE_MIN:
-                    vals = [d["hourly"].get(k, [None])[i] for d in data_list if i < len(d.get("hourly", {}).get(k, []))]
-                    valid_vals = [v for v in vals if v is not None]
-                    if valid_vals:
-                        points_above = sum(1 for v in valid_vals if v > PRECIP_THRESHOLD)
-                        if points_above >= PRECIP_MIN_POINTS:
-                            primary["hourly"][k][i] = sum(valid_vals) / len(valid_vals)
-                        else:
-                            primary["hourly"][k][i] = 0.0
+
+def _wait_for_api_ready():
+    """
+    Pre-Check: Prüft ob die Open-Meteo API erreichbar ist (simpler 1-Punkt-Request).
+    Wartet bei 429 bis das Rate-Limit abgelaufen ist, bevor der Batch startet.
+    Erkennt Tageslimit und bricht sofort ab.
+    """
+    test_params = {
+        "latitude": 47.37,
+        "longitude": 8.55,
+        "hourly": "temperature_2m",
+        "forecast_days": 1,
+        "timezone": "Europe/Zurich",
+    }
+    for attempt in range(6):  # Max ~10 Minuten warten
+        try:
+            resp = requests.get(config.API_URL, params=test_params, timeout=10)
+            if resp.status_code == 429:
+                # Tageslimit → sofort abbrechen, kein Warten hilft
+                try:
+                    body = resp.json()
+                    if "daily" in body.get("reason", "").lower():
+                        print(f"[FEHLER] Open-Meteo Tageslimit erreicht: {body['reason']}")
+                        print("[INFO] Nutze vorhandenen Cache. Nächster Versuch morgen.")
+                        return False
+                except (ValueError, KeyError):
+                    pass
+                retry_after = resp.headers.get("Retry-After")
+                if retry_after:
+                    wait = int(retry_after) + 2
+                else:
+                    wait = 60 * (attempt + 1)
+                print(f"[RATE-LIMIT] API noch blockiert — warte {wait}s (Pre-Check {attempt + 1}/6)...")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            print("[INFO] API-Pre-Check OK — starte Wetter-Download...")
+            return True
+        except requests.exceptions.RequestException as e:
+            print(f"[WARN] API-Pre-Check fehlgeschlagen: {e}")
+            time.sleep(30)
+    print("[FEHLER] API nach 6 Versuchen nicht erreichbar — breche ab.")
+    return False
+
+
+def _aggregate_regional_data(data_list):
+    """
+    Generalisierte Source-Area Aggregation:
+    - Wolken: 30%-Perzentil -> findet regionale Sonnenfenster (Blue Holes)
+    - Niederschlag: Regionale Signifikanz (mind. 2 von N Punkten > 0.0, sonst 0.0)
+    - Temperatur, Strahlung, Druckniveaus: SPOT-Punkt (data_list[0]) behalten!
+      Thermik haengt von den Bedingungen AM Startplatz ab, nicht vom Regionalmittel.
+    """
+    if not data_list or not isinstance(data_list, list):
+        return data_list
+    primary = data_list[0]  # Spot-Punkt = erste Koordinate
+    if "hourly" not in primary:
         return primary
 
-    try:
-        data_wind = None
-        try:
-            print(f"  [INFO] Wind-Modell {config.WIND_MODEL} ({len(ref_points)}-Punkte) für {location_name}...")
-            resp_wind = requests.get(config.API_URL, params=params_wind, timeout=config.API_TIMEOUT)
-            resp_wind.raise_for_status()
-            res_json = resp_wind.json()
-            data_wind_list = res_json if isinstance(res_json, list) else [res_json]
-            data_wind = _aggregate_regional_data(data_wind_list)
-        except requests.exceptions.RequestException as e:
-            print(f"  [WARN] Wind-Modell {config.WIND_MODEL} fehlgeschlagen: {e}")
+    all_params = [k for k in primary["hourly"].keys() if k != "time"]
+    num_hours = len(primary["hourly"].get("time", []))
 
-        data_thermal = None
-        time.sleep(API_DELAY_BETWEEN_CALLS)
-        try:
-            print(f"  [INFO] Thermik-Modell {config.THERMAL_MODEL} ({len(ref_points)}-Punkte) für {location_name}...")
-            resp_thermal = requests.get(config.API_URL, params=params_thermal, timeout=config.API_TIMEOUT)
-            resp_thermal.raise_for_status()
-            res_json = resp_thermal.json()
-            data_thermal_list = res_json if isinstance(res_json, list) else [res_json]
-            data_thermal = _aggregate_regional_data(data_thermal_list)
-        except requests.exceptions.RequestException as e:
-            print(f"  [WARN] Thermik-Modell {config.THERMAL_MODEL} fehlgeschlagen: {e}")
+    for i in range(num_hours):
+        # Wolken: 30%-Perzentil (NWP ueberschaetzt Wolken in Bergen systematisch)
+        point_cloud_values = []
+        for d in data_list:
+            h = d.get("hourly", {})
+            raw_low = h.get("cloud_cover_low", [None])[i] if i < len(h.get("cloud_cover_low", [])) else None
+            raw_mid = h.get("cloud_cover_mid", [None])[i] if i < len(h.get("cloud_cover_mid", [])) else None
+            raw_high = h.get("cloud_cover_high", [None])[i] if i < len(h.get("cloud_cover_high", [])) else None
+            raw_total = h.get("cloud_cover", [None])[i] if i < len(h.get("cloud_cover", [])) else None
+            if raw_low is None or raw_mid is None or raw_high is None or raw_total is None:
+                continue
+            score = (raw_low * 1.0) + (raw_mid * 0.7) + (raw_high * 0.25)
+            point_cloud_values.append({
+                "score": score, "low": raw_low, "mid": raw_mid, "high": raw_high,
+                "total": raw_total
+            })
 
-        hourly_wind = data_wind.get("hourly", {}) if data_wind else {}
-        hourly_thermal = data_thermal.get("hourly", {}) if data_thermal else {}
+        if point_cloud_values:
+            point_cloud_values.sort(key=lambda x: x["score"])
+            target_idx = 1 if len(point_cloud_values) >= 4 else 0
+            rep = point_cloud_values[target_idx]
+            primary["hourly"]["cloud_cover_low"][i] = int(rep["low"])
+            primary["hourly"]["cloud_cover_mid"][i] = int(rep["mid"])
+            primary["hourly"]["cloud_cover_high"][i] = int(rep["high"])
+            primary["hourly"]["cloud_cover"][i] = int(rep["total"])
 
-        # Basis für Thermik/Wolken: THERMAL_MODEL; Fallback: WIND_MODEL
-        hourly_base = hourly_thermal or hourly_wind
-        times_base = hourly_base.get("time", [])
-        if not times_base:
-            print(f"  [WARN] Keine Basisdaten für {location_name}")
-            return None, None, ref_points
+        # Nur Wolken + Niederschlag aggregieren; Rest = Spot-Punkt (primary bleibt)
+        for k in all_params:
+            if k in CLOUD_PARAMS:
+                continue
+            if k in PRECIP_USE_MIN:
+                vals = [d["hourly"].get(k, [None])[i] for d in data_list if i < len(d.get("hourly", {}).get(k, []))]
+                valid_vals = [v for v in vals if v is not None]
+                if valid_vals:
+                    points_with_rain = sum(1 for v in valid_vals if v > 0.0)
+                    if points_with_rain >= 2:
+                        primary["hourly"][k][i] = max(valid_vals)
+                    else:
+                        primary["hourly"][k][i] = 0.0
+    return primary
 
-        hourly_data = {}
-        pressure_level_data = {}
 
-        for i, time_str in enumerate(times_base):
-            entry = {}
-            for param in config.HOURLY_PARAMS:
-                val = hourly_base.get(param, [None])[i] if i < len(hourly_base.get(param, [])) else None
-                entry[param] = val
-            hourly_data[time_str] = entry
+def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback, hourly_gfs, elevation):
+    """
+    Verarbeitet vorgeladene Wetterdaten für einen einzelnen Spot.
+    Merged Wind/Thermal/Fallback-Modelle, füllt GFS-Supplement, berechnet Thermik.
 
-            pl_entry = {}
-            for param in config.PRESSURE_LEVEL_PARAMS:
-                val = hourly_base.get(param, [None])[i] if i < len(hourly_base.get(param, [])) else None
-                pl_entry[param] = val
-            pressure_level_data[time_str] = pl_entry
+    Args:
+        data_wind: Wind-Daten (dict mit hourly, Einzelpunkt)
+        data_thermal: Aggregierte Thermal-Daten (dict mit hourly)
+        data_fallback: Aggregierte Fallback-Daten (dict mit hourly)
+        hourly_gfs: GFS hourly dict (oder None)
+        elevation: Höhe des Spots in Metern (aus CSV)
 
-        # Wind aus WIND_MODEL überlagern (Boden + Höhenwind) für bessere lokale Windtreue
-        wind_surface_params = ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"]
-        wind_pl_params = [
-            p for p in config.PRESSURE_LEVEL_PARAMS
-            if p.startswith("wind_speed_") or p.startswith("wind_direction_") or p.startswith("geopotential_height_")
-        ]
+    Returns: (hourly_data, pressure_level_data) oder None bei Fehler
+    """
+    hourly_wind = data_wind.get("hourly", {}) if data_wind else {}
+    hourly_thermal = data_thermal.get("hourly", {}) if data_thermal else {}
+    hourly_fallback = data_fallback.get("hourly", {}) if data_fallback else {}
 
+    # Basis-Zeitachse: Fallback-Modell (ICON-EU, 120h) hat die längste Reichweite
+    times_base = hourly_fallback.get("time", [])
+    if not times_base:
         times_wind = hourly_wind.get("time", []) if hourly_wind else []
-        for i, time_str in enumerate(times_wind):
-            if time_str not in hourly_data: continue
-            for param in wind_surface_params:
-                val_w = hourly_wind.get(param, [None])[i] if i < len(hourly_wind.get(param, [])) else None
-                if val_w is not None:
-                    hourly_data[time_str][param] = val_w
-            if time_str in pressure_level_data:
-                for param in wind_pl_params:
-                    val_w = hourly_wind.get(param, [None])[i] if i < len(hourly_wind.get(param, [])) else None
-                    if val_w is not None:
-                        pressure_level_data[time_str][param] = val_w
+        times_thermal = hourly_thermal.get("time", []) if hourly_thermal else []
+        all_times_set = set(times_wind + times_thermal)
+        times_base = sorted(list(all_times_set))
 
-        for time_str in hourly_data:
-            cb = hourly_data[time_str].get("cloud_base")
-            if cb is not None and cb > 6000:
-                hourly_data[time_str]["cloud_base"] = None
+    if not times_base:
+        print(f"  [WARN] Keine Basisdaten für {location_name}")
+        return None
 
-        time.sleep(API_DELAY_BETWEEN_CALLS)
+    def is_model_valid_for_day(hourly_data_dict, date_str, param):
+        if not hourly_data_dict:
+            return False
+        times = hourly_data_dict.get("time", [])
+        vals = hourly_data_dict.get(param, [])
+        if not times or not vals:
+            return False
+        found_any = False
+        for idx, t in enumerate(times):
+            if t.startswith(date_str):
+                hour = int(t[11:13])
+                if config.FLIGHT_HOURS_START <= hour < config.FLIGHT_HOURS_END:
+                    val = vals[idx] if idx < len(vals) else None
+                    if val is None:
+                        return False
+                    found_any = True
+        return found_any
+
+    # Pro Tag entscheiden: Welches Modell liefert die Daten? Kein Mischen am selben Tag!
+    dates = sorted(list(set([t[:10] for t in times_base])))
+    thermal_model_by_day = {}
+    wind_model_by_day = {}
+    for d in dates:
+        thermal_model_by_day[d] = hourly_thermal if is_model_valid_for_day(hourly_thermal, d, "temperature_2m") else hourly_fallback
+        wind_model_by_day[d] = hourly_wind if is_model_valid_for_day(hourly_wind, d, "wind_speed_10m") else hourly_fallback
+
+    hourly_data = {}
+    pressure_level_data = {}
+
+    wind_surface_params = ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"]
+    wind_pl_params = [
+        p for p in config.PRESSURE_LEVEL_PARAMS
+        if p.startswith("wind_speed_") or p.startswith("wind_direction_") or p.startswith("geopotential_height_")
+    ]
+
+    for time_str in times_base:
+        d = time_str[:10]
+        t_src = thermal_model_by_day.get(d, hourly_fallback)
+        w_src = wind_model_by_day.get(d, hourly_fallback)
+
         try:
-            params_gfs = {
-                "latitude": latitude,
-                "longitude": longitude,
-                "hourly": ",".join(config.GFS_SUPPLEMENTARY_PARAMS),
-                "models": "gfs_seamless",
-                "forecast_days": config.FORECAST_DAYS,
-                "timezone": config.TIMEZONE,
-            }
-            resp_gfs = requests.get(config.API_URL, params=params_gfs, timeout=10)
-            resp_gfs.raise_for_status()
-            hourly_gfs = resp_gfs.json().get("hourly", {})
-            gfs_times = hourly_gfs.get("time", [])
-            filled = 0
-            for i, ts in enumerate(gfs_times):
-                if ts in hourly_data:
-                    for p in config.GFS_SUPPLEMENTARY_PARAMS:
-                        if hourly_data[ts].get(p) is None:
-                            val = hourly_gfs.get(p, [None])[i] if i < len(hourly_gfs.get(p, [])) else None
-                            if val is not None:
-                                hourly_data[ts][p] = val
-                                filled += 1
-            print(f"  [INFO] GFS-Supplement: {filled} Werte aufgefüllt")
-        except Exception as e:
-            print(f"  [WARN] GFS-Supplement fehlgeschlagen: {e}")
+            i_therm = t_src.get("time", []).index(time_str)
+        except ValueError:
+            i_therm = -1
 
-        elevation = 0
-        if data_thermal:
-            elevation = data_thermal.get("elevation", 0)
-        elif data_wind:
-            elevation = data_wind.get("elevation", 0)
-        for ts, data in hourly_data.items():
-            temp = data.get("temperature_2m")
-            rh = data.get("relative_humidity_2m", 50)
-            radiation = data.get("direct_radiation")
-            bl_height = data.get("boundary_layer_height", 0)
-            
-            if temp is not None and radiation is not None and radiation > 50:
-                dewpoint = calculate_dewpoint(temp, rh)
-                
-                p_level_list = []
-                pl_data = pressure_level_data.get(ts, {})
-                for level in config.PRESSURE_LEVELS:
-                    h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                    t_val = pl_data.get(f"temperature_{level}hPa")
-                    if h_val is not None and t_val is not None:
-                        p_level_list.append({"pressure": level, "height": h_val, "temp": t_val})
+        try:
+            i_wind = w_src.get("time", []).index(time_str)
+        except ValueError:
+            i_wind = -1
 
-                profile = calculate_thermal_profile(
-                    surface_temp=temp,
-                    surface_dewpoint=dewpoint,
-                    elevation_m=elevation,
-                    pressure_levels_data=p_level_list,
-                    boundary_layer_height_agl=bl_height,
-                    direct_radiation=radiation,
-                    timestamp=ts,
-                    low_cloud=data.get("cloud_cover_low", 0),
-                    mid_cloud=data.get("cloud_cover_mid", 0),
-                    high_cloud=data.get("cloud_cover_high", 0)
-                )
-                climb_rate = profile.get("climb_rate", 0) if profile else 0
-                
-                # THERMIK PROXY CALCULATION
-                # (Hier bleibt die Logik für climb_rate erhalten, aber der künstliche Burn-Off entfällt)
-                # Die Bewölkung wird nun spatial über das Minimum-Prinzip geregelt.
-                        
-        print(f"  [INFO] {len(hourly_data)} Zeitstempel für {location_name} (Source-Area: {len(ref_points)} Punkte)")
-        return hourly_data, pressure_level_data, ref_points
+        entry = {}
+        for param in config.HOURLY_PARAMS:
+            val = None
+            if i_therm >= 0:
+                val = t_src.get(param, [None])[i_therm] if i_therm < len(t_src.get(param, [])) else None
+            entry[param] = val
 
-    except requests.exceptions.RequestException as e:
-        print(f"  [FEHLER] API-Fehler für {location_name}: {e}")
-        return None, None, ref_points
-    except Exception as e:
-        import traceback
-        print(f"  [FEHLER] Unerwarteter Fehler für {location_name}: {e}")
-        traceback.print_exc()
-        return None, None, ref_points
+        if i_wind >= 0:
+            for param in wind_surface_params:
+                val_w = w_src.get(param, [None])[i_wind] if i_wind < len(w_src.get(param, [])) else None
+                if val_w is not None:
+                    entry[param] = val_w
+
+        hourly_data[time_str] = entry
+
+        pl_entry = {}
+        for param in config.PRESSURE_LEVEL_PARAMS:
+            val = None
+            if i_therm >= 0:
+                val = t_src.get(param, [None])[i_therm] if i_therm < len(t_src.get(param, [])) else None
+
+            # Prioritize wind source for wind-specific profile parameters
+            if i_wind >= 0 and param in wind_pl_params:
+                val_w = w_src.get(param, [None])[i_wind] if i_wind < len(w_src.get(param, [])) else None
+                if val_w is not None:
+                    val = val_w
+
+            pl_entry[param] = val
+
+        pressure_level_data[time_str] = pl_entry
+
+    # Cloud base filter
+    for time_str in hourly_data:
+        cb = hourly_data[time_str].get("cloud_base")
+        if cb is not None and cb > 6000:
+            hourly_data[time_str]["cloud_base"] = None
+
+    # GFS Supplement
+    if hourly_gfs:
+        gfs_times = hourly_gfs.get("time", [])
+        filled = 0
+        for i, ts in enumerate(gfs_times):
+            if ts in hourly_data:
+                for p in config.GFS_SUPPLEMENTARY_PARAMS:
+                    if hourly_data[ts].get(p) is None:
+                        val = hourly_gfs.get(p, [None])[i] if i < len(hourly_gfs.get(p, [])) else None
+                        if val is not None:
+                            hourly_data[ts][p] = val
+                            filled += 1
+                for p in config.GFS_CROSSCHECK_PARAMS:
+                    val = hourly_gfs.get(p, [None])[i] if i < len(hourly_gfs.get(p, [])) else None
+                    if val is not None:
+                        hourly_data[ts][f"{p}_gfs"] = val
+
+    # Thermik-Berechnung
+    for ts, data in hourly_data.items():
+        temp = data.get("temperature_2m")
+        rh = data.get("relative_humidity_2m", 50)
+        radiation = data.get("direct_radiation")
+        bl_height = data.get("boundary_layer_height", 0)
+
+        if temp is not None and radiation is not None and radiation > 50:
+            dewpoint = calculate_dewpoint(temp, rh)
+
+            p_level_list = []
+            pl_data = pressure_level_data.get(ts, {})
+            for level in config.PRESSURE_LEVELS:
+                h_val = pl_data.get(f"geopotential_height_{level}hPa")
+                t_val = pl_data.get(f"temperature_{level}hPa")
+                if h_val is not None and t_val is not None:
+                    p_level_list.append({"pressure": level, "height": h_val, "temp": t_val})
+
+            calculate_thermal_profile(
+                surface_temp=temp,
+                surface_dewpoint=dewpoint,
+                elevation_m=elevation,
+                pressure_levels_data=p_level_list,
+                boundary_layer_height_agl=bl_height,
+                direct_radiation=radiation,
+                timestamp=ts,
+                low_cloud=data.get("cloud_cover_low", 0),
+                mid_cloud=data.get("cloud_cover_mid", 0),
+                high_cloud=data.get("cloud_cover_high", 0)
+            )
+
+    print(f"  [OK] {location_name}: {len(hourly_data)} Zeitstempel")
+    return hourly_data, pressure_level_data
+
+
+def _build_param_lists():
+    """Baut die Parameter-Listen für jeden Modell-Call."""
+    # Wind: surface wind + pressure level wind/geopotential
+    wind_params = ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"]
+    for level in config.PRESSURE_LEVELS:
+        wind_params.extend([
+            f"wind_speed_{level}hPa",
+            f"wind_direction_{level}hPa",
+            f"geopotential_height_{level}hPa",
+        ])
+
+    # Thermal: all surface + alle Druckniveau-Params (inkl. Wind)
+    # ICON-D2 liefert PL-Wind für 9 von 13 Levels — nötig weil ICON-CH1 kein PL-Wind kann
+    thermal_params = list(config.HOURLY_PARAMS) + list(config.PRESSURE_LEVEL_PARAMS)
+
+    # Fallback: everything (vollständiges Backup)
+    fallback_params = list(config.HOURLY_PARAMS) + list(config.PRESSURE_LEVEL_PARAMS)
+
+    # GFS: supplementary only
+    gfs_params = list(config.GFS_SUPPLEMENTARY_PARAMS) + list(config.GFS_CROSSCHECK_PARAMS)
+
+    return wind_params, thermal_params, fallback_params, gfs_params
 
 
 def fetch_all_spots(spots, save_to_file=True):
     """
-    Holt Wetterdaten für ALLE Spots und speichert sie in einer JSON-Datei.
+    Holt Wetterdaten für ALLE Spots in 4 Batch-Requests (statt 112 Einzel-Calls).
+    Dedupliziert regionale Referenzpunkte für minimalen API-Verbrauch.
+    Bei Tageslimit: Nutzt vorhandenen Cache.
     Returns: Dict mit allen Spot-Daten.
     """
+    # Pre-Check: Warte bis API verfügbar
+    if not _wait_for_api_ready():
+        cached = load_cached_weather()
+        return cached if cached else {}
+
+    cached = load_cached_weather()
+
+    # === Phase 1: Referenzpunkte sammeln und deduplizieren ===
+    spot_refs = {}      # {name: [[lat,lon], ...]}
+    unique_points = []  # list of [lat, lon]
+    point_index = {}    # {(lat_r, lon_r): index_in_unique}
+
+    for spot in spots:
+        refs = get_reference_points(spot["name"], spot["latitude"], spot["longitude"], quiet=True)
+        spot_refs[spot["name"]] = refs
+        for pt in refs:
+            key = (round(pt[0], 4), round(pt[1], 4))
+            if key not in point_index:
+                point_index[key] = len(unique_points)
+                unique_points.append([round(pt[0], 4), round(pt[1], 4)])
+
+    # Region-Referenzpunkte: nur in point_index registrieren (NICHT in unique_points!).
+    # Regionen nutzen den gleichen Batch wie Spots — aber nur fuer Punkte die
+    # ohnehin schon von Spots abgefragt werden. Nicht-ueberlappende Region-Punkte
+    # werden in Phase 4 per eigenem Batch geholt.
+    all_regions = get_all_regions()
+    region_refs = {}  # {region_id: [[lat,lon], ...]}
+    region_only_points = []  # Punkte die NUR von Regionen gebraucht werden
+    region_only_index = {}   # {(lat_r, lon_r): index_in_region_only_points}
+    for region in all_regions:
+        rid = region["id"]
+        region_refs[rid] = region["reference_points"]
+        for pt in region["reference_points"]:
+            key = (round(pt[0], 4), round(pt[1], 4))
+            if key not in point_index and key not in region_only_index:
+                region_only_index[key] = len(region_only_points)
+                region_only_points.append([round(pt[0], 4), round(pt[1], 4)])
+
+    spot_lats = [str(s["latitude"]) for s in spots]
+    spot_lons = [str(s["longitude"]) for s in spots]
+    unique_lats = [str(p[0]) for p in unique_points]
+    unique_lons = [str(p[1]) for p in unique_points]
+
+    shared_region_pts = sum(1 for r in all_regions for pt in r["reference_points"]
+                           if (round(pt[0], 4), round(pt[1], 4)) in point_index)
+    print(f"[INFO] {len(spots)} Spots, {len(unique_points)} Spot-Punkte (dedup), "
+          f"{len(all_regions)} Regionen ({shared_region_pts} geteilte + {len(region_only_points)} eigene Punkte)")
+
+    wind_params, thermal_params, fallback_params, gfs_params = _build_param_lists()
+
+    # === Phase 2: 4 Batch-API-Calls ===
+    batch_wind = None
+    batch_thermal = None
+    batch_fallback = None
+    batch_gfs = None
+
+    try:
+        # 1. Wind (28 Spot-Punkte, nur Wind-Vars)
+        print(f"[API] Batch Wind: {len(spots)} Punkte, {len(wind_params)} Vars, Modell {config.WIND_MODEL}")
+        resp = _api_get_with_retry(config.API_URL, {
+            "latitude": ",".join(spot_lats),
+            "longitude": ",".join(spot_lons),
+            "models": config.WIND_MODEL,
+            "hourly": ",".join(wind_params),
+            "forecast_days": config.FORECAST_DAYS,
+            "timezone": config.TIMEZONE,
+        }, API_BATCH_TIMEOUT, label="Batch-Wind")
+        batch_wind = resp.json()
+        if not isinstance(batch_wind, list):
+            batch_wind = [batch_wind]
+        print(f"  [OK] {len(batch_wind)} Wind-Antworten")
+
+        time.sleep(API_DELAY_BETWEEN_CALLS)
+
+        # 2. Thermal (deduplizierte Punkte, Thermik-Vars)
+        print(f"[API] Batch Thermal: {len(unique_points)} Punkte, {len(thermal_params)} Vars, Modell {config.THERMAL_MODEL}")
+        resp = _api_get_with_retry(config.API_URL, {
+            "latitude": ",".join(unique_lats),
+            "longitude": ",".join(unique_lons),
+            "models": config.THERMAL_MODEL,
+            "hourly": ",".join(thermal_params),
+            "forecast_days": config.FORECAST_DAYS,
+            "timezone": config.TIMEZONE,
+        }, API_BATCH_TIMEOUT, label="Batch-Thermal")
+        batch_thermal = resp.json()
+        if not isinstance(batch_thermal, list):
+            batch_thermal = [batch_thermal]
+        print(f"  [OK] {len(batch_thermal)} Thermal-Antworten")
+
+        time.sleep(API_DELAY_BETWEEN_CALLS)
+
+        # 3. Fallback (deduplizierte Punkte, ALLE Vars — Backup für Tag 3-5 + Ausfälle)
+        print(f"[API] Batch Fallback: {len(unique_points)} Punkte, {len(fallback_params)} Vars, Modell {config.FALLBACK_MODEL}")
+        resp = _api_get_with_retry(config.API_URL, {
+            "latitude": ",".join(unique_lats),
+            "longitude": ",".join(unique_lons),
+            "models": config.FALLBACK_MODEL,
+            "hourly": ",".join(fallback_params),
+            "forecast_days": config.FORECAST_DAYS,
+            "timezone": config.TIMEZONE,
+        }, API_BATCH_TIMEOUT, label="Batch-Fallback")
+        batch_fallback = resp.json()
+        if not isinstance(batch_fallback, list):
+            batch_fallback = [batch_fallback]
+        print(f"  [OK] {len(batch_fallback)} Fallback-Antworten")
+
+        time.sleep(API_DELAY_BETWEEN_CALLS)
+
+        # 4. GFS (28 Spot-Punkte, Supplement-Vars)
+        print(f"[API] Batch GFS: {len(spots)} Punkte, {len(gfs_params)} Vars")
+        resp = _api_get_with_retry(config.API_URL, {
+            "latitude": ",".join(spot_lats),
+            "longitude": ",".join(spot_lons),
+            "models": "gfs_seamless",
+            "hourly": ",".join(gfs_params),
+            "forecast_days": config.FORECAST_DAYS,
+            "timezone": config.TIMEZONE,
+        }, API_BATCH_TIMEOUT, label="Batch-GFS")
+        batch_gfs = resp.json()
+        if not isinstance(batch_gfs, list):
+            batch_gfs = [batch_gfs]
+        print(f"  [OK] {len(batch_gfs)} GFS-Antworten")
+
+    except DailyLimitExceeded:
+        print("[FEHLER] Tageslimit erreicht während Batch-Calls")
+        return cached if cached else {}
+    except Exception as e:
+        print(f"[FEHLER] Batch-API fehlgeschlagen: {e}")
+        if not batch_thermal and not batch_fallback:
+            return cached if cached else {}
+
+    # === Phase 3: Per-Spot Verarbeitung ===
     all_data = {
         "_meta": {
             "last_updated": datetime.now().isoformat(),
@@ -285,34 +522,310 @@ def fetch_all_spots(spots, save_to_file=True):
     }
 
     for i, spot in enumerate(spots):
-        if i > 0:
-            time.sleep(API_DELAY_BETWEEN_SPOTS)
         name = spot["name"]
-        print(f"[INFO] Lade Wetterdaten für {name} ({spot['fluggebiet']})...")
+        refs = spot_refs[name]
 
-        result = get_weather_for_location(name, spot["latitude"], spot["longitude"])
+        # Wind: direkt per Index (1:1 Spot-Zuordnung)
+        data_wind = batch_wind[i] if batch_wind and i < len(batch_wind) else None
 
-        if result is None or result[0] is None:
-            print(f"[WARN] Keine Daten für {name}")
+        # Thermal: Referenzpunkte aus Batch extrahieren, dann aggregieren
+        data_thermal = None
+        if batch_thermal:
+            thermal_data_list = []
+            for j, pt in enumerate(refs):
+                key = (round(pt[0], 4), round(pt[1], 4))
+                idx = point_index.get(key)
+                if idx is not None and idx < len(batch_thermal):
+                    # Deepcopy nur für Spot-Punkt (wird von Aggregation modifiziert)
+                    data = copy.deepcopy(batch_thermal[idx]) if j == 0 else batch_thermal[idx]
+                    thermal_data_list.append(data)
+            if thermal_data_list:
+                data_thermal = _aggregate_regional_data(thermal_data_list)
+
+        # Fallback: gleiche Referenzpunkt-Zuordnung
+        data_fallback = None
+        if batch_fallback:
+            fallback_data_list = []
+            for j, pt in enumerate(refs):
+                key = (round(pt[0], 4), round(pt[1], 4))
+                idx = point_index.get(key)
+                if idx is not None and idx < len(batch_fallback):
+                    data = copy.deepcopy(batch_fallback[idx]) if j == 0 else batch_fallback[idx]
+                    fallback_data_list.append(data)
+            if fallback_data_list:
+                data_fallback = _aggregate_regional_data(fallback_data_list)
+
+        # GFS
+        hourly_gfs = None
+        if batch_gfs and i < len(batch_gfs):
+            hourly_gfs = batch_gfs[i].get("hourly", {})
+
+        # Spot verarbeiten (merge + thermik)
+        try:
+            result = _process_spot_weather(
+                name, data_wind, data_thermal, data_fallback,
+                hourly_gfs, spot["elevation_m"]
+            )
+        except Exception as e:
+            import traceback
+            print(f"  [FEHLER] Verarbeitung {name}: {e}")
+            traceback.print_exc()
+            if cached and name in cached:
+                all_data[name] = cached[name]
             continue
 
-        hourly_data, pressure_level_data, ref_points = result
+        if result is None:
+            if cached and name in cached:
+                all_data[name] = cached[name]
+                print(f"  [CACHE] {name}: Nutze Cache-Daten")
+            else:
+                print(f"  [WARN] Keine Daten für {name}")
+            continue
+
+        hourly_data, pressure_level_data = result
+
+        missing = validate_spot_data(name, hourly_data, config.FORECAST_DAYS)
+        if missing:
+            print(f"  [WARN] {name}: Tage {', '.join(missing)} unvollständig")
+
         all_data[name] = {
             "latitude": spot["latitude"],
             "longitude": spot["longitude"],
             "elevation_m": spot["elevation_m"],
             "hourly_data": hourly_data,
             "pressure_level_data": pressure_level_data,
-            "reference_points": ref_points,
+            "reference_points": refs,
         }
+
+    # === Phase 4: Region-Wetter aggregieren ===
+    # Eigene Batch-Calls fuer Region-only Punkte (nicht im Spot-Batch enthalten)
+    batch_region_thermal = None
+    batch_region_fallback = None
+
+    if region_only_points:
+        region_lats = [str(p[0]) for p in region_only_points]
+        region_lons = [str(p[1]) for p in region_only_points]
+
+        try:
+            time.sleep(API_DELAY_BETWEEN_CALLS)
+            print(f"[API] Batch Region-Thermal: {len(region_only_points)} Punkte, Modell {config.THERMAL_MODEL}")
+            resp = _api_get_with_retry(config.API_URL, {
+                "latitude": ",".join(region_lats),
+                "longitude": ",".join(region_lons),
+                "models": config.THERMAL_MODEL,
+                "hourly": ",".join(thermal_params),
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }, API_BATCH_TIMEOUT, label="Batch-Region-Thermal")
+            batch_region_thermal = resp.json()
+            if not isinstance(batch_region_thermal, list):
+                batch_region_thermal = [batch_region_thermal]
+            print(f"  [OK] {len(batch_region_thermal)} Region-Thermal-Antworten")
+
+            time.sleep(API_DELAY_BETWEEN_CALLS)
+            print(f"[API] Batch Region-Fallback: {len(region_only_points)} Punkte, Modell {config.FALLBACK_MODEL}")
+            resp = _api_get_with_retry(config.API_URL, {
+                "latitude": ",".join(region_lats),
+                "longitude": ",".join(region_lons),
+                "models": config.FALLBACK_MODEL,
+                "hourly": ",".join(fallback_params),
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }, API_BATCH_TIMEOUT, label="Batch-Region-Fallback")
+            batch_region_fallback = resp.json()
+            if not isinstance(batch_region_fallback, list):
+                batch_region_fallback = [batch_region_fallback]
+            print(f"  [OK] {len(batch_region_fallback)} Region-Fallback-Antworten")
+        except DailyLimitExceeded:
+            print("[WARN] Tageslimit bei Region-Batch — Regionen werden übersprungen")
+        except Exception as e:
+            print(f"[WARN] Region-Batch fehlgeschlagen: {e}")
+
+    def _get_batch_entry_for_point(pt, batch_spot, batch_region):
+        """Holt Batch-Eintrag: zuerst Spot-Batch, dann Region-Batch."""
+        key = (round(pt[0], 4), round(pt[1], 4))
+        # Punkt im Spot-Batch?
+        idx = point_index.get(key)
+        if idx is not None and batch_spot and idx < len(batch_spot):
+            return batch_spot[idx]
+        # Punkt im Region-Batch?
+        ridx = region_only_index.get(key)
+        if ridx is not None and batch_region and ridx < len(batch_region):
+            return batch_region[ridx]
+        return None
+
+    region_data = {}
+    for region in all_regions:
+        rid = region["id"]
+        rname = region["region"]
+        refs = region_refs.get(rid, [])
+        elev_ref = region.get("elevation_ref", 1200)
+
+        if not refs:
+            continue
+
+        # Thermal: Referenzpunkte aus Spot- und Region-Batch extrahieren
+        data_thermal_r = None
+        thermal_data_list = []
+        for j, pt in enumerate(refs):
+            entry = _get_batch_entry_for_point(pt, batch_thermal, batch_region_thermal)
+            if entry is not None:
+                data = copy.deepcopy(entry) if j == 0 else entry
+                thermal_data_list.append(data)
+        if thermal_data_list:
+            data_thermal_r = _aggregate_regional_data(thermal_data_list)
+
+        # Fallback
+        data_fallback_r = None
+        fallback_data_list = []
+        for j, pt in enumerate(refs):
+            entry = _get_batch_entry_for_point(pt, batch_fallback, batch_region_fallback)
+            if entry is not None:
+                data = copy.deepcopy(entry) if j == 0 else entry
+                fallback_data_list.append(data)
+        if fallback_data_list:
+            data_fallback_r = _aggregate_regional_data(fallback_data_list)
+
+        # Wind: Nutze ersten Referenzpunkt (Regionen haben keinen separaten Wind-Punkt)
+        data_wind_r = _get_batch_entry_for_point(refs[0], batch_thermal, batch_region_thermal) if refs else None
+
+        try:
+            result = _process_spot_weather(
+                f"Region:{rname}", data_wind_r, data_thermal_r, data_fallback_r,
+                None, elev_ref
+            )
+        except Exception as e:
+            print(f"  [FEHLER] Region {rname}: {e}")
+            continue
+
+        if result is None:
+            continue
+
+        hourly_data, pressure_level_data = result
+        region_data[rid] = {
+            "region_id": rid,
+            "region_name": rname,
+            "elevation_ref": elev_ref,
+            "hourly_data": hourly_data,
+            "pressure_level_data": pressure_level_data,
+            "reference_points": refs,
+        }
+
+    print(f"[INFO] {len(region_data)} Regionen verarbeitet")
+
+    spot_keys = [k for k in all_data if k != "_meta"]
+    print(f"[INFO] Fertig: {len(spot_keys)} Spots + {len(region_data)} Regionen verarbeitet")
 
     if save_to_file:
         config.WEATHER_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
+        # Speichere Regions-Daten unter _regions Key
+        all_data["_regions"] = region_data
         with open(config.WEATHER_JSON_PATH, "w", encoding="utf-8") as f:
             json.dump(all_data, f, indent=2, ensure_ascii=False)
         print(f"[INFO] Wetterdaten gespeichert: {config.WEATHER_JSON_PATH}")
 
-    return all_data
+    return all_data, region_data
+
+
+def get_weather_for_location(location_name, latitude, longitude):
+    """
+    Einzelspot-Modus: Holt Wetterdaten für einen einzelnen Spot (4 API-Calls).
+    Wird nur noch für Einzel-Retries verwendet — Hauptpfad ist fetch_all_spots() mit Batching.
+    """
+    ref_points = get_reference_points(location_name, latitude, longitude)
+
+    wind_params, thermal_params, fallback_params, gfs_params = _build_param_lists()
+
+    lat_str = ",".join(str(round(p[0], 4)) for p in ref_points)
+    lon_str = ",".join(str(round(p[1], 4)) for p in ref_points)
+
+    try:
+        # Wind (Einzelpunkt)
+        data_wind = None
+        try:
+            resp = _api_get_with_retry(config.API_URL, {
+                "latitude": latitude, "longitude": longitude,
+                "models": config.WIND_MODEL,
+                "hourly": ",".join(wind_params),
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }, config.API_TIMEOUT, label=f"Wind/{location_name}")
+            data_wind = resp.json()
+        except requests.exceptions.RequestException as e:
+            print(f"  [WARN] Wind fehlgeschlagen: {e}")
+
+        time.sleep(API_DELAY_BETWEEN_CALLS)
+
+        # Thermal (5 Punkte)
+        data_thermal = None
+        try:
+            resp = _api_get_with_retry(config.API_URL, {
+                "latitude": lat_str, "longitude": lon_str,
+                "models": config.THERMAL_MODEL,
+                "hourly": ",".join(thermal_params),
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }, config.API_TIMEOUT, label=f"Thermal/{location_name}")
+            res_json = resp.json()
+            data_list = res_json if isinstance(res_json, list) else [res_json]
+            data_thermal = _aggregate_regional_data(data_list)
+        except requests.exceptions.RequestException as e:
+            print(f"  [WARN] Thermal fehlgeschlagen: {e}")
+
+        time.sleep(API_DELAY_BETWEEN_CALLS)
+
+        # Fallback (5 Punkte, alle Params)
+        data_fallback = None
+        try:
+            resp = _api_get_with_retry(config.API_URL, {
+                "latitude": lat_str, "longitude": lon_str,
+                "models": config.FALLBACK_MODEL,
+                "hourly": ",".join(fallback_params),
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }, config.API_TIMEOUT, label=f"Fallback/{location_name}")
+            res_json = resp.json()
+            data_list = res_json if isinstance(res_json, list) else [res_json]
+            data_fallback = _aggregate_regional_data(data_list)
+        except requests.exceptions.RequestException as e:
+            print(f"  [WARN] Fallback fehlgeschlagen: {e}")
+
+        time.sleep(API_DELAY_BETWEEN_CALLS)
+
+        # GFS
+        hourly_gfs = None
+        try:
+            resp = _api_get_with_retry(config.API_URL, {
+                "latitude": latitude, "longitude": longitude,
+                "hourly": ",".join(gfs_params),
+                "models": "gfs_seamless",
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }, 10, label=f"GFS/{location_name}")
+            hourly_gfs = resp.json().get("hourly", {})
+        except Exception as e:
+            print(f"  [WARN] GFS fehlgeschlagen: {e}")
+
+        elevation = 0
+        if data_thermal:
+            elevation = data_thermal.get("elevation", 0)
+        elif data_wind:
+            elevation = data_wind.get("elevation", 0)
+
+        result = _process_spot_weather(location_name, data_wind, data_thermal, data_fallback, hourly_gfs, elevation)
+        if result is None:
+            return None, None, ref_points
+
+        hourly_data, pressure_level_data = result
+        return hourly_data, pressure_level_data, ref_points
+
+    except DailyLimitExceeded:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"  [FEHLER] {location_name}: {e}")
+        traceback.print_exc()
+        return None, None, ref_points
 
 
 def load_cached_weather():
@@ -323,6 +836,17 @@ def load_cached_weather():
         return json.load(f)
 
 
+def load_cached_weather_timestamp():
+    """Gibt den Zeitpunkt des letzten Cache-Updates zurück (oder None)."""
+    data = load_cached_weather()
+    if not data or "_meta" not in data:
+        return None
+    try:
+        return datetime.fromisoformat(data["_meta"]["last_updated"])
+    except (ValueError, KeyError):
+        return None
+
+
 def is_cache_fresh(max_age_hours=12):
     """Prüft ob der Cache noch frisch genug ist."""
     if not config.WEATHER_JSON_PATH.exists():
@@ -330,8 +854,7 @@ def is_cache_fresh(max_age_hours=12):
     data = load_cached_weather()
     if not data or "_meta" not in data:
         return False
-    # Mindestens ein Spot mit hourly_data muss vorhanden sein
-    spot_keys = [k for k in data.keys() if k != "_meta"]
+    spot_keys = [k for k in data.keys() if k not in ("_meta", "_regions")]
     if not spot_keys:
         return False
     has_valid_spot = any(
@@ -346,3 +869,52 @@ def is_cache_fresh(max_age_hours=12):
         return age < max_age_hours
     except (ValueError, KeyError):
         return False
+
+
+def validate_spot_data(spot_name, hourly_data, forecast_days):
+    """Prüft ob Kernparameter (temp, wind) für alle Forecast-Tage vorhanden sind.
+    Returns: Liste fehlender Tage (leer = ok)."""
+    if not hourly_data:
+        today = datetime.now().date()
+        return [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(forecast_days)]
+
+    today = datetime.now().date()
+    expected_days = [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(forecast_days)]
+
+    missing = []
+    for day_str in expected_days:
+        has_valid_hour = False
+        for ts, entry in hourly_data.items():
+            if not ts.startswith(day_str):
+                continue
+            try:
+                hour = int(ts[11:13])
+            except (ValueError, IndexError):
+                continue
+            if not (config.FLIGHT_HOURS_START <= hour < config.FLIGHT_HOURS_END):
+                continue
+            temp = entry.get("temperature_2m")
+            wind = entry.get("wind_speed_10m")
+            if temp is not None and wind is not None:
+                has_valid_hour = True
+                break
+        if not has_valid_hour:
+            missing.append(day_str)
+    return missing
+
+
+def is_cache_complete():
+    """Prüft ob ALLE Spots im Cache vollständige Daten für alle Forecast-Tage haben."""
+    data = load_cached_weather()
+    if not data:
+        return False
+    spot_keys = [k for k in data.keys() if k not in ("_meta", "_regions")]
+    if not spot_keys:
+        return False
+    for spot_name in spot_keys:
+        hourly_data = data.get(spot_name, {}).get("hourly_data", {})
+        missing = validate_spot_data(spot_name, hourly_data, config.FORECAST_DAYS)
+        if missing:
+            print(f"[CACHE] {spot_name}: Tage unvollständig: {', '.join(missing)}")
+            return False
+    return True

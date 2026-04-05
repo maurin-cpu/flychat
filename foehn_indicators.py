@@ -283,6 +283,88 @@ def _empty_result(reason: str) -> dict:
     }
 
 
+def build_foehn_llm_context(nord: dict, sued: dict) -> str:
+    """
+    Aufbereiteter Föhn-Zusatztext für den LLM-Kontext:
+    Referenzstationen, Schwellen, pro Flugstunde ΔP (Süd/Nord), 700 hPa, Label, ggf. Böigkeit.
+    """
+    from datetime import datetime as dt
+    from datetime import timedelta as td
+
+    h_nord = nord.get("hourly", {})
+    h_sued = sued.get("hourly", {})
+    times = h_nord.get("time", [])
+    if not times:
+        return ""
+
+    today = dt.now().date()
+    last_date = today + td(days=config.FORECAST_DAYS - 1)
+
+    lines = [
+        "═══ FÖHN — ZEITREIHE & GRADIENTEN (KI) ═══",
+        f"Stationen: Nord = {FOEHN_STATIONS['nord']['name']} ({FOEHN_STATIONS['nord']['role']}), "
+        f"Süd = {FOEHN_STATIONS['sued']['name']} ({FOEHN_STATIONS['sued']['role']})",
+        "Definition: ΔP_Süd = P(Lugano) − P(Zürich) [hPa], positiv → Tendenz Südföhn | "
+        "ΔP_Nord = P(Zürich) − P(Lugano) [hPa], positiv → Tendenz Nordföhn (mathematisch Gegenteil).",
+        "Pro Stunde (nur Flugstunden, lokale Zeit; Spalte „…-Tendenz“ = welche Lage laut Gradient überwiegt):",
+    ]
+
+    pm_n = h_nord.get("pressure_msl")
+    pm_s = h_sued.get("pressure_msl")
+    if not isinstance(pm_n, list) or not isinstance(pm_s, list):
+        lines.append("(Keine Druckzeitreihe in den Daten.)")
+        return "\n".join(lines)
+
+    count = 0
+    for i, t in enumerate(times):
+        try:
+            d = dt.fromisoformat(t.replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if d.date() < today or d.date() > last_date:
+            continue
+        if not (config.FLIGHT_HOURS_START <= d.hour < config.FLIGHT_HOURS_END):
+            continue
+        if i >= len(pm_n) or i >= len(pm_s):
+            continue
+
+        p_zrh = pm_n[i]
+        p_lug = pm_s[i]
+        if p_zrh is None or p_lug is None:
+            continue
+
+        dp_sued = round(p_lug - p_zrh, 1)
+        dp_nord = round(p_zrh - p_lug, 1)
+
+        if dp_sued >= 0.5:
+            lage = "Südföhn-Tendenz"
+        elif dp_nord >= 0.5:
+            lage = "Nordföhn-Tendenz"
+        else:
+            lage = "Gradient schwach"
+
+        ev = evaluate_foehn(nord, sued, time_index=i, kritischer_foehn="Beide")
+        crest = ev.get("crest_wind_kmh")
+        cdir = ev.get("crest_dir_deg")
+        ts = t.replace("T", " ")[:16]
+        label = ev.get("label", "?")
+        gust_r = ev.get("gust_ratio")
+        gust_str = f" | Bö/Wind={gust_r:.1f}×" if gust_r is not None else ""
+
+        lines.append(
+            f"  {ts} | ΔP_Süd={dp_sued:+.1f} ΔP_Nord={dp_nord:+.1f} hPa | "
+            f"700hPa {crest} km/h/{cdir}° | {lage} | {label}{gust_str}"
+        )
+        count += 1
+        if count >= 200:
+            break
+
+    if count == 0:
+        lines.append("(Keine Flugstunden im Vorhersagefenster.)")
+
+    return "\n".join(lines)
+
+
 def get_foehn_for_dashboard(forecast_days: int = 2) -> dict:
     """
     Liefert Föhn-Evaluation für die nächsten Flugstunden (heute + morgen).

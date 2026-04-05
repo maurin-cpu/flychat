@@ -70,6 +70,40 @@ def _terrain_factor(elevation_m: float) -> float:
         return (elevation_m - elev_low) / (elev_high - elev_low)
 
 
+def _compute_free_atm_gamma(profile: List[Dict], blh_msl: float, elevation_m: float) -> float:
+    """
+    Berechnet den potentiellen Temperatur-Gradienten (γ_θ) der freien Atmosphaere
+    oberhalb der aktuellen BLH. Fuer das Encroachment-Modell (Tennekes 1973).
+
+    γ_θ = dT/dz + DALR   (K/m)
+
+    Groesseres γ_θ = stabilere Atmosphaere = langsameres BLH-Wachstum.
+    """
+    ref_height = max(blh_msl, elevation_m + 200)
+    above = sorted(
+        [p for p in profile if p['height'] > ref_height
+         and p.get('temp') is not None],
+        key=lambda p: p['height']
+    )
+
+    if len(above) < 2:
+        return 0.004  # Fallback: typische Stabilitaet (leicht stabil)
+
+    # Gradient ueber 2-3 Schichten fuer Robustheit
+    p_low = above[0]
+    p_high = above[min(2, len(above) - 1)]
+    dh = p_high['height'] - p_low['height']
+
+    if dh < 100:
+        return 0.004
+
+    dT_dz = (p_high['temp'] - p_low['temp']) / dh   # negativ bei normalem Lapse Rate
+    gamma_theta = dT_dz + DALR                        # potentieller Temp-Gradient
+
+    # Clamp: min 0.002 (sehr instabil), max 0.020 (starke Inversion)
+    return max(0.002, min(0.020, gamma_theta))
+
+
 def calculate_dewpoint(temp_c: float, rh_percent: float) -> float:
     """Berechnet den Taupunkt mittels Magnus-Formel."""
     if temp_c is None or rh_percent is None or rh_percent <= 0:
@@ -104,11 +138,8 @@ def estimate_sensible_heat_flux(shortwave_radiation: float, sunshine_duration_s:
     """
     if shortwave_radiation is None or shortwave_radiation <= 0:
         return 0.0
-    sun_factor = 1.0
-    if sunshine_duration_s is not None:
-        sun_factor = min(1.0, max(0.0, sunshine_duration_s / 3600.0))
     coeff = _get_thermal_param("global_radiation_to_H", timestamp, default=0.20)
-    return shortwave_radiation * coeff * sun_factor
+    return shortwave_radiation * coeff
 
 
 def calculate_topography_bonus(
@@ -264,26 +295,23 @@ def interpolate_temp_at_height(elevation_ref: float, profile: List[Dict]) -> Opt
 
 def calculate_thermic_clouds(low_clouds: float, mid_clouds: float, high_clouds: float) -> dict:
     """
-    Berechnet die thermisch relevante Bewölkung und die solare Dämpfung.
-    Gewichtung nach Regtherm-Logik: Tiefe Wolken blockieren Einstrahlung fast komplett (100%), 
-    mittlere teilweise (70%), hohe Cirren dämpfen nur leicht (25%).
+    Berechnet die thermisch relevante Bewölkung und einen Anzeige-Sonnenindex.
+    Gewichtung nach Regtherm-Logik: Tiefe Wolken blockieren Einstrahlung fast komplett (100%),
+    mittlere teilweise (50%), hohe Cirren dämpfen nur leicht (10%).
 
-    Physikalische Fundierung des Exponenten 1.5 beim sun_factor:
-    Die Thermik skaliert in der Praxis nicht linear zur Sonneneinstrahlung. 
-    Diese Parameterisierung (Potenzfunktion 1.5) bildet das Schwellenwert-Verhalten der Thermik ab 
-    (vgl. Liechti & Neininger, 1994 "AlpTherm"). Sinkt die Einstrahlung, wird die nötige 
-    Auslösetemperatur (Trigger Temperature) am Boden nicht mehr erreicht, und das für den Gleitschirm 
-    nutzbare Steigen (abzüglich Eigensinken) bricht überproportional schnell zusammen.
+    sun_index = 100 - display_cloud (100 = klar). sun_factor = 0.5 + 0.5 * (sun_index/100)
+    linear 0.5..1.0 — nur für Anzeige/Diagnostik; die Steigrate wird nicht damit multipliziert
+    (Bewölkung steckt bereits in H über die modellierte Strahlung).
     """
     low = low_clouds or 0.0
     mid = mid_clouds or 0.0
     high = high_clouds or 0.0
 
-    display_cloud = (low * 1.0) + (mid * 0.7) + (high * 0.25)
+    display_cloud = (low * 1.0) + (mid * 0.5) + (high * 0.1)
     display_cloud = max(0.0, min(100.0, display_cloud))
 
     sun_index = 100.0 - display_cloud
-    sun_factor = math.pow(sun_index / 100.0, 1.5)
+    sun_factor = 0.5 + 0.5 * (sun_index / 100.0)
 
     return {
         'display_cloud': display_cloud,
@@ -318,6 +346,11 @@ def calculate_thermal_profile(
     low_cloud: float = 0,
     mid_cloud: float = 0,
     high_cloud: float = 0,
+    boundary_layer_height_gfs: float = None,
+    previous_max_height: float = None,
+    cumulative_buoyancy: float = None,
+    peak_H: float = None,
+    peak_shortwave: float = None,
 ) -> Dict:
     """
     Berechnet das Thermik-Profil mit physikalisch fundiertem Modell.
@@ -391,10 +424,6 @@ def calculate_thermal_profile(
     if not h_valid:
         # Fallback 1: Bessere Schätzung aus direkter + diffuser Strahlung
         if direct_radiation is not None and diffuse_radiation is not None:
-            sun_factor = 1.0
-            if sunshine_duration_s is not None:
-                sun_factor = min(1.0, max(0.0, sunshine_duration_s / 3600.0))
-            
             # --- PHYSIKALISCHE H-BERECHNUNG ---
             # 1. Topografie-Bonus (nur gedämpfter Anteil wirkt auf konvektive Thermik)
             raw_topo_bonus = calculate_topography_bonus(timestamp, slope_azimuth, slope_angle)
@@ -412,7 +441,7 @@ def calculate_thermal_profile(
             dir_h = direct_radiation * dir_coeff * effective_topo
             diff_h = diffuse_radiation * diff_coeff
 
-            H = (dir_h + diff_h) * sun_factor * veg_factor
+            H = (dir_h + diff_h) * veg_factor
 
             # H-Cap: terrain-aware (Mittelland vs. Alpin)
             h_cap_base = _get_thermal_param("H_cap", timestamp, default=220)
@@ -684,60 +713,112 @@ def calculate_thermal_profile(
             
             prev_height_h = h
         
-        z_i_parcel = max_thermal_height - elevation_m
-        data_warnings.append(
-            f"Solar-Überhitzung: ΔT={dt_excess:.1f}°C (H={H:.0f} W/m²) "
-            f"→ Parcel-BLH={z_i_parcel:.0f}m AGL"
-        )
+    # =========================================================================
+    # 5c. BLH-PLAUSIBILISIERUNG & CROSS-CHECK (GFS)
+    # =========================================================================
+    # Wir nutzen primär die eigene Parcel-Berechnung (max_thermal_height).
+    # GFS dient nur noch als Vergleich (Cross-Check).
     
-        # Wir nutzen surface_temp (benanntes Argument) und start_temp (lokale Variable)
-        blh_val = boundary_layer_height_agl
+    if boundary_layer_height_gfs is not None and surface_temp is not None and start_temp is not None:
+        # GFS Boden-Niveau schätzen (Gradient ca. 0.8°C/100m)
+        dt_gfs = surface_temp - start_temp
+        model_elev_diff = dt_gfs / 0.008  
+        gfs_surface_msl = min(elevation_m, elevation_m - model_elev_diff)
+        gfs_blh_msl = gfs_surface_msl + boundary_layer_height_gfs
+        
+        # Cross-Check gegen Parcel-Ergebnis
+        diff = abs(max_thermal_height - gfs_blh_msl)
+        if diff >= 1000:
+            data_warnings.append(f"Info: GFS-Modell weicht stark ab (Diff={diff:.0f}m).")
 
-        if surface_temp is not None and start_temp is not None and blh_val is not None:
-            # Modell-Feedback: Wo ist das Modell-Boden-Niveau?
-            # T2m bezieht sich auf Modell-Boden + 2m. start_temp ist auf elevation_m.
-            # Temp-Differenz -> Höhen-Differenz (ca. 0.8°C pro 100m)
-            dt_model = surface_temp - start_temp
-            # Wenn dt_model > 0, ist Modellboden tiefer. Wenn < 0, ist er höher.
-            model_elev_diff = dt_model / 0.008  
-            model_surface_msl = min(elevation_m, elevation_m - model_elev_diff)
-            
-            blh_msl = model_surface_msl + blh_val
-            
-            # Obergrenze: Falls Modellboden extrem tief geschätzt wird (z.B. >500m unter uns), deckeln
-            blh_msl = max(blh_msl, elevation_m + 100) # Mindestens 100m Steigen wenn Modell BLH liefert
-            
-            parcel_zi = max_thermal_height - elevation_m
-            
-            # Verbessertes Fallback: Wenn das Paket weniger als 250m steigt
-            # ODER die Parcel-Höhe weniger als die Hälfte der Modell-BLH beträgt,
-            # vertrauen wir dem Wettermodell eher als der Paketmethode.
-            if not (parcel_zi > 250 and max_thermal_height >= blh_msl * 0.5):
-                # Fallback nutzen
-                if H > 20:
-                    max_thermal_height = blh_msl
-                    data_warnings.append(
-                        f"BLH-Fallback: Parcel-BLH ({parcel_zi:.0f}m) zu niedrig, "
-                        f"nutze Modell-BLH={blh_val:.0f}m AGL"
-                    )
-            else:
-                # Parcel hat selbst eine BLH gefunden → begrenzen falls Modell-BLH deutlich niedriger
-                if max_thermal_height > blh_msl * 1.5:
-                    max_thermal_height = int(blh_msl * 1.4)
-                    data_warnings.append(
-                        f"BLH-Begrenzung: Parcel={parcel_zi:.0f}m > Modell={blh_val:.0f}m AGL, "
-                        f"begrenzt auf {max_thermal_height - elevation_m:.0f}m AGL"
-                    )
-    
     # H-basierte Fallback-Schaetzung der Thermiktiefe
     # Greift wenn weder Parcel noch BLH verfügbar, aber Sonne heizt.
     if max_thermal_height <= elevation_m and H > 50:
-        # Encroachment-Modell
         z_i_est = int(min(2000, max(300, H * 5)))
         max_thermal_height = elevation_m + z_i_est
         data_warnings.append(
             f"H-Schaetzung: Thermiktiefe ~{z_i_est}m (H={H:.0f} W/m²)"
         )
+
+    # =========================================================================
+    # 5e. ENCROACHMENT-MODELL (Carson/Tennekes 1973)
+    # =========================================================================
+    # Physikalisch fundierte Obergrenze fuer die BLH basierend auf der
+    # kumulierten Bodenheizung des Tages. Verhindert unphysikalische Spruenge.
+    #
+    # Formel: h² = h₀² + [2·(1+2A) / γ_θ] × Σ(w'θ'_s · Δt)
+    #
+    A_ENTRAIN = 0.2              # Entrainment-Verhaeltnis (Stull 1988)
+    H0_INIT = 100.0              # Initiale Mischungsschicht bei Tagesbeginn (m)
+    DT_SECONDS = 3600.0          # Zeitschritt = 1 Stunde
+
+    # Kinematischer Waermefluss dieser Stunde
+    w_theta_s = H / (RHO * CP) if H > 0 else 0.0
+    buoyancy_contribution = w_theta_s * DT_SECONDS   # K·m (Beitrag dieser Stunde)
+
+    # Kumulierter Waermefluss (wird von aussen uebergeben)
+    total_buoyancy = (cumulative_buoyancy or 0.0) + buoyancy_contribution
+
+    # γ_θ aus dem aktuellen Temperaturprofil
+    gamma_theta = _compute_free_atm_gamma(profile, max_thermal_height, elevation_m)
+
+    # Encroachment-BLH berechnen
+    h_enc_msl = None
+    if gamma_theta > 0 and total_buoyancy > 0:
+        h_enc_agl = math.sqrt(H0_INIT**2 + 2 * (1 + 2 * A_ENTRAIN) / gamma_theta * total_buoyancy)
+        h_enc_msl = elevation_m + h_enc_agl
+
+        # Encroachment als Obergrenze verwenden
+        if max_thermal_height > h_enc_msl:
+            data_warnings.append(
+                f"Encroachment-Cap: {max_thermal_height:.0f}m → {h_enc_msl:.0f}m "
+                f"(γ_θ={gamma_theta*1000:.1f} K/km, cum={total_buoyancy:.0f} K·m)"
+            )
+            max_thermal_height = h_enc_msl
+
+    # =========================================================================
+    # 5d. THERMAL INERTIA (H-skaliert)
+    # =========================================================================
+    # Die Grenzschicht fällt nicht sofort zusammen wenn eine Wolke die Sonne
+    # kurz verdeckt. Aber der Verfall skaliert mit dem Verhältnis H/peak_H:
+    #   Am Peak (Mittag): 5% Verfall -> Glättung gegen Wolkenschwankungen
+    #   Bei sinkendem H:  bis 30% Verfall -> Abend-Zusammenbruch
+    #   Bei H=0:          30% Verfall -> schneller aber nicht instantaner Kollaps
+    if previous_max_height is not None and previous_max_height > elevation_m:
+        if peak_H is not None and peak_H > 0 and H > 0:
+            h_ratio = min(1.0, H / peak_H)
+            decay_rate = 0.05 + (1.0 - h_ratio) * 0.25
+        elif H > 0:
+            decay_rate = 0.05
+        else:
+            decay_rate = 0.30
+
+        inertia_height = previous_max_height - ((previous_max_height - elevation_m) * decay_rate)
+        inertia_height = max(elevation_m, inertia_height)
+
+        if max_thermal_height < inertia_height:
+            data_warnings.append(
+                f"Thermik-Inertia: {max_thermal_height:.0f}m -> {inertia_height:.0f}m "
+                f"(Verfall {decay_rate:.0%}, H/peak={H:.0f}/{peak_H or 0:.0f})"
+            )
+            max_thermal_height = inertia_height
+
+    # =========================================================================
+    # 5f. GFS/MODEL PBL CAP (Triple-Constraint)
+    # =========================================================================
+    # Das NWP-Modell (GFS) berechnet die BLH mit Bulk-Richardson-Schema und
+    # vollständiger Strahlungsbilanz. Sobald am Abend die Ausstrahlung überwiegt,
+    # sinkt die Modell-BLH rapide. Dieser Cap überschreibt die Thermal Inertia.
+    pbl_cap_applied = False
+    if boundary_layer_height_gfs is not None:
+        gfs_blh_msl = elevation_m + boundary_layer_height_gfs
+        if max_thermal_height > gfs_blh_msl:
+            data_warnings.append(
+                f"GFS-PBL-Cap: {max_thermal_height:.0f}m -> {gfs_blh_msl:.0f}m "
+                f"(GFS BLH={boundary_layer_height_gfs:.0f}m AGL)"
+            )
+            max_thermal_height = gfs_blh_msl
+            pbl_cap_applied = True
 
     # =========================================================================
     # 6. DUAL W*-BERECHNUNG (Geometrisches-Mittel-Strategie)
@@ -769,9 +850,10 @@ def calculate_thermal_profile(
     w_star_deardorff = 0.0
     avg_climb = 0.0
     mean_dT = 0.0
-    limiting_factor = "keine_thermik"
+    limiting_factor = "model_pbl_cap" if pbl_cap_applied else "keine_thermik"
 
-    if z_i > 50:
+    H_MIN_THRESHOLD = 30.0
+    if z_i > 50 and H >= H_MIN_THRESHOLD:
         if valid_layers > 0:
             mean_dT = cumulative_temp_diff / valid_layers
 
@@ -784,20 +866,18 @@ def calculate_thermal_profile(
             buoyancy_flux = H / (RHO * CP)
             w_star_deardorff = ((G / T_kelvin) * buoyancy_flux * z_i) ** (1.0 / 3.0)
 
-        # c) Kombination: Gewichtete Mischung wenn beide verfuegbar
-        if w_star_parcel > 0 and w_star_deardorff > 0:
-            # Wenn Paketaufstieg sehr stark ist, gewichte ihn stärker (Lokale Thermik)
-            raw_w_star = (w_star_parcel * 0.60 + w_star_deardorff * 0.40)
-            if w_star_parcel < w_star_deardorff:
-                limiting_factor = "inversion_stability"
-            else:
-                limiting_factor = "solar_energy"
-        elif w_star_parcel > 0:
-            raw_w_star = w_star_parcel
-            limiting_factor = "solar_energy"
-        elif w_star_deardorff > 0:
-            raw_w_star = w_star_deardorff
+        # c) RASP / BLIPMAP Standard: W* wird exklusiv nach Deardorff berechnet!
+        # Das Parcel-Verfahren (w*_parcel) tendiert bei trockener Thermik zu 
+        # extremen Überschätzungen (stammt eig. aus der CAPE-Ansatz für Gewitter).
+        # We scale Deardorff w* by 1.45 to reflect the "core" updraft strength
+        # that gliders actively try to center within (XC Therm / Regtherm alignment).
+        if w_star_deardorff > 0:
+            raw_w_star = w_star_deardorff * 1.45
             limiting_factor = "inversion_stability"
+        elif w_star_parcel > 0:
+            # Reiner Fallback falls H=0 aber Paket trotzdem instabil (Föhn/Dynamik)
+            raw_w_star = w_star_parcel * 0.5
+            limiting_factor = "solar_energy"
         else:
             raw_w_star = 0.0
 
@@ -810,9 +890,9 @@ def calculate_thermal_profile(
 
         avg_climb = raw_w_star * climb_factor
         
-        # WENDE SUN-FACTOR AN (Regtherm Logik)
-        avg_climb = avg_climb * sun_factor
-
+        # HINWEIS: W*-Deardorff beinhaltet die Bewölkungsdämpfung bereits physikalisch
+        # über den surface_sensible_heat_flux (H), weshalb wir hier nicht nochmals 
+        # künstlich mit einem "sun_factor" multiplizieren dürfen (sonst doppelte Bestrafung).
         # DWD-Updraft-Blending (Default: deaktiviert)
         if _get_thermal_param("use_dwd_updraft_blending", timestamp, default=False):
             if updraft is not None and updraft > 0:
@@ -829,6 +909,35 @@ def calculate_thermal_profile(
         hard_cap = _get_thermal_param("climb_hard_cap", timestamp, default=4.5)
         avg_climb = min(hard_cap, avg_climb)
 
+    elif z_i > 50:
+        limiting_factor = "H_below_threshold"
+        data_warnings.append(
+            f"H unter Schwellenwert: {H:.0f} W/m² < {H_MIN_THRESHOLD:.0f} -> keine nutzbare Thermik"
+        )
+
+    # =========================================================================
+    # 6b. KONVEKTIVER VIGOR (min von H/peak_H und SW/peak_SW)
+    # =========================================================================
+    # ICON-D2 liefert hier oft keine BLH; GFS sinkt teils erst spaet. H und
+    # Globalstrahlung sind stark korreliert — ein Produkt wuerde denselben
+    # Abendverfall doppelt daempfen. Ein Limit genuegt: min(...) (keine Doppelzaehlung).
+    convective_vigor = None
+    if (
+        peak_H is not None and peak_H > 0
+        and peak_shortwave is not None and peak_shortwave > 0
+        and shortwave_radiation is not None
+    ):
+        h_ratio = max(0.0, min(1.0, H / peak_H))
+        sw_ratio = max(0.0, min(1.0, shortwave_radiation / peak_shortwave))
+        convective_vigor = min(h_ratio, sw_ratio)
+        if avg_climb > 0 and convective_vigor < 0.999:
+            avg_climb *= convective_vigor
+            if convective_vigor < 0.92:
+                data_warnings.append(
+                    f"Konvektions-Vigor: x{convective_vigor:.2f} "
+                    f"(H/peak={h_ratio:.2f}, SW/peak={sw_ratio:.2f})"
+                )
+
     # =========================================================================
     # 7. BEWERTUNG (Rating 0-10)
     # =========================================================================
@@ -841,9 +950,11 @@ def calculate_thermal_profile(
     if avg_climb >= 2.5: rating = 9
     if avg_climb >= 3.5: rating = 10
 
-    # Deckelung bei Bewölkung (Sun Index < 20 = Thermik nicht nutzbar)
-    if sun_index < 20:
-        rating = min(1, rating)
+    # Bewölkungs-Hinweis (Sun Index < 10 = extreme Bewölkung): nur Rating deckeln.
+    # Steigrate kommt aus H/Deardorff — nicht zusaetzlich per Wolkenfeld auf 0 setzen
+    # (Modelltreue; vgl. schwache Thermik bei XC/Burnair bei Regen/Bewölkung).
+    if sun_index < 10:
+        rating = min(2, rating)
 
     # CIN-Bremse: Konvektive Hemmung reduziert Rating
     if convective_inhibition is not None:
@@ -908,6 +1019,15 @@ def calculate_thermal_profile(
         'sun_index': round(sun_index, 1),
         'display_cloud': round(display_cloud, 1),
         'sun_factor': round(sun_factor, 3),
+        'boundary_layer_height_gfs': round(boundary_layer_height_gfs) if boundary_layer_height_gfs is not None else None,
+        'buoyancy_contribution': round(buoyancy_contribution, 1),
+        'cumulative_buoyancy': round(total_buoyancy, 1),
+        'gamma_theta': round(gamma_theta, 5),
+        'encroachment_blh': round(h_enc_msl) if h_enc_msl is not None else None,
+        'pbl_cap_applied': pbl_cap_applied,
+        'peak_H': round(peak_H, 1) if peak_H is not None else None,
+        'peak_shortwave': round(peak_shortwave, 1) if peak_shortwave is not None else None,
+        'convective_vigor': round(convective_vigor, 3) if convective_vigor is not None else None,
     }
 
     return {
@@ -1020,6 +1140,7 @@ def analyze_hour(hourly_data: Dict, pressure_data: Dict, time_index: int,
             low_cloud=_get_val('cloud_cover_low'),
             mid_cloud=_get_val('cloud_cover_mid'),
             high_cloud=_get_val('cloud_cover_high'),
+            boundary_layer_height_gfs=_get_val('boundary_layer_height_gfs'),
         )
 
     except Exception as e:

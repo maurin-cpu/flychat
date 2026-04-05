@@ -65,14 +65,12 @@ def main():
     # Engine initialisieren
     engine = FlychatEngine(instantdb_client=instantdb)
 
-    # Wetterdaten laden (initial)
-    logger.info("Lade Wetterdaten...")
+    # Wetterdaten aus lokalem Cache laden (kein API-Call, nur JSON lesen)
     try:
-        engine.refresh_weather()
-        logger.info(f"Wetterdaten geladen: {len(engine.weather_data)} Spots")
+        engine.load_weather_from_cache()
     except Exception as e:
-        logger.error(f"Initiales Laden fehlgeschlagen: {e}")
-        logger.info("App startet trotzdem - Wetterdaten koennen spaeter geladen werden.")
+        logger.error(f"Cache-Laden fehlgeschlagen: {e}")
+        logger.info("Wetterdaten: Manuell via UI laden (Button 'Wetterdaten laden')")
 
     # Spots nach InstantDB synchronisieren
     if instantdb:

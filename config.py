@@ -15,14 +15,16 @@ API_URL = "https://api.open-meteo.com/v1/forecast"
 # Wettermodell-Hybrid:
 # - WIND_MODEL: Wind/Böen/Leewarnungen -> lokal präziser (CH1)
 # - THERMAL_MODEL: Thermik/Wolken/Strahlung -> robuster für Fliegbarkeit (ICON-D2)
-WIND_MODEL = "meteoswiss_icon_ch1"
+WIND_MODEL = "icon_d2" #meteoswiss_icon_ch1
 THERMAL_MODEL = "icon_d2"
+FALLBACK_MODEL = "icon_eu"
 
 # Rückwärtskompatibilität für ältere Skripte
 API_MODEL = WIND_MODEL
 
 API_TIMEOUT = 30
 FORECAST_DAYS = 5
+# Vorhersage-Zeitachse: Wanduhrzeit Schweiz (MESZ/MEZ). Open-Meteo liefert `time` in dieser Zone.
 TIMEZONE = "Europe/Zurich"
 
 # ============================================================================
@@ -103,9 +105,13 @@ HOURLY_PARAMS = [
 
 # Parameter die via GFS-Supplementary-Call geholt werden (bei icon_seamless oft null)
 GFS_SUPPLEMENTARY_PARAMS = [
-    "boundary_layer_height",
     "lifted_index",
     "convective_inhibition",
+]
+
+# Parameter für den Cross-Check (werden als {param}_gfs gespeichert)
+GFS_CROSSCHECK_PARAMS = [
+    "boundary_layer_height",
 ]
 
 # ============================================================================
@@ -162,18 +168,18 @@ THERMAL_PARAMS = {
     "topo_bonus_H_fraction": 0.4,
 
     # --- Solare Überhitzung ---
-    "solar_excess_max_C": 1.5,
-    "solar_excess_H_divisor": 200,
+    "solar_excess_max_C": 2.5,
+    "solar_excess_H_divisor": 100,
 
     # --- Entrainment 2. Aufstieg ---
     "second_ascent_entrainment_factor": 0.75,
 
     # --- Climb-Factor ---
     "climb_factor": {
-        "winter": 0.45,
-        "spring": 0.62,
-        "summer": 0.55,
-        "autumn": 0.50,
+        "winter": 0.60,
+        "spring": 0.85,
+        "summer": 0.80,
+        "autumn": 0.70,
     },
     "climb_factor_damping_threshold": {
         "winter": 3.5,

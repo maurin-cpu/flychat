@@ -2,7 +2,10 @@
 __pycache__/
 *.pyc
 data/wetterdaten.json
+weather_context_dump.txt
 .venv/
 venv/
 
 .vercel
+
+.claude/

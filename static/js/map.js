@@ -17,7 +17,6 @@
     var foehnOverlay = document.getElementById('foehnOverlay');
     var foehnChart = document.getElementById('foehnChart');
     var foehnCloseBtn = document.getElementById('foehnClose');
-    var openFoehnBtn = document.getElementById('openFoehnBtn');
 
     // Current meteogram state
     var currentWeather = null;
@@ -26,12 +25,8 @@
     var currentDateIdx = 0;
     var markersByName = {}; // Store marker references
     var currentRefLayer = null; // Store reference points overlay
-
-    var regionColors = [
-        '#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981',
-        '#3B82F6', '#EF4444', '#14B8A6', '#F97316', '#A855F7',
-        '#06B6D4', '#84CC16', '#E879F9', '#22D3EE', '#FB923C'
-    ];
+    var _iconUid = 0; // Unique ID counter for SVG defs
+    var hideNotSafe = true; // Default: dim not_safe spots
 
     // ===== MAP INIT =====
     function initMap() {
@@ -41,55 +36,21 @@
             zoomControl: true,
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
             subdomains: 'abcd',
             maxZoom: 18,
         }).addTo(map);
 
-        loadRegions();
         loadSpots();
-    }
-
-    // ===== LOAD REGIONS =====
-    function loadRegions() {
-        fetch('/api/regionen')
-            .then(function (resp) { return resp.json(); })
-            .then(function (geojson) {
-                L.geoJSON(geojson, {
-                    style: function (feature) {
-                        var idx = geojson.features.indexOf(feature) % regionColors.length;
-                        return {
-                            color: regionColors[idx],
-                            weight: 1.5,
-                            opacity: 0.6,
-                            fill: false,
-                            fillOpacity: 0,
-                            dashArray: '4, 4'
-                        };
-                    },
-                    onEachFeature: function (feature, layer) {
-                        var p = feature.properties;
-                        layer.bindTooltip(p.region, {
-                            className: 'map-tooltip region-tooltip',
-                            direction: 'center',
-                            permanent: false,
-                            sticky: true,
-                        });
-                    }
-                }).addTo(map);
-            })
-            .catch(function (err) {
-                console.error('Regionen laden fehlgeschlagen:', err);
-            });
     }
 
     // ===== DIRECTION PARSER =====
     function getDirAngles(dirStr) {
         if (!dirStr) return null;
         var dirs = {
-            'N': 0, 'NNO': 22.5, 'NO': 45, 'ONO': 67.5,
-            'O': 90, 'OSO': 112.5, 'SO': 135, 'SSO': 157.5,
+            'N': 0, 'NNO': 22.5, 'NNE': 22.5, 'NO': 45, 'NE': 45, 'ONO': 67.5, 'ENE': 67.5,
+            'O': 90, 'E': 90, 'OSO': 112.5, 'ESE': 112.5, 'SO': 135, 'SE': 135, 'SSO': 157.5, 'SSE': 157.5,
             'S': 180, 'SSW': 202.5, 'SW': 225, 'WSW': 247.5,
             'W': 270, 'WNW': 292.5, 'NW': 315, 'NNW': 337.5
         };
@@ -115,61 +76,134 @@
         return null;
     }
 
+    // ===== STYLE SYSTEM (Traffic Light + Intensity, Light Map) =====
+    // safety: 'safe' | 'conditional' | 'not_safe' | 'default' | 'no_data'
+    // quality: 'gray' (bad) | 'green' (good) | 'violet' (legendary)
+    function mapSafetyAndQualityToStyle(safety, quality) {
+        // Default / unanalyzed
+        if (safety === 'default' || safety === 'no_data') {
+            return {
+                fill: safety === 'no_data' ? '#9ca3af' : '#6b7280',
+                stroke: safety === 'no_data' ? '#6b7280' : '#4b5563',
+                glow: null, showStripes: false, showWarning: false,
+                safetyLabel: safety === 'no_data' ? 'Keine Daten' : '',
+                qualityLabel: ''
+            };
+        }
+
+        // NOT SAFE — dark red, stripes
+        if (safety === 'not_safe') {
+            return {
+                fill: '#dc2626', stroke: '#991b1b',
+                glow: null, showStripes: true, showWarning: false,
+                safetyLabel: 'Nicht sicher', qualityLabel: ''
+            };
+        }
+
+        // SAFE — green traffic light, quality = intensity
+        if (safety === 'safe') {
+            if (quality === 'gray') return {
+                fill: '#86efac', stroke: '#16a34a',
+                glow: null, showStripes: false, showWarning: false,
+                safetyLabel: 'Sicher', qualityLabel: 'Schwach'
+            };
+            if (quality === 'violet') return {
+                fill: '#15803d', stroke: '#14532d',
+                glow: 'rgba(22, 163, 74, 0.4)', showStripes: false, showWarning: false,
+                safetyLabel: 'Sicher', qualityLabel: 'Top'
+            };
+            return { // green = good
+                fill: '#22c55e', stroke: '#15803d',
+                glow: null, showStripes: false, showWarning: false,
+                safetyLabel: 'Sicher', qualityLabel: 'Gut'
+            };
+        }
+
+        // CONDITIONAL — amber
+        if (quality === 'gray') return {
+            fill: '#fbbf24', stroke: '#b45309',
+            glow: null, showStripes: false, showWarning: true,
+            safetyLabel: 'Vorsicht', qualityLabel: 'Schwach'
+        };
+        if (quality === 'violet') return {
+            fill: '#d97706', stroke: '#78350f',
+            glow: null, showStripes: false, showWarning: true,
+            safetyLabel: 'Vorsicht', qualityLabel: 'Gut*'
+        };
+        return { // green = good
+            fill: '#f59e0b', stroke: '#92400e',
+            glow: null, showStripes: false, showWarning: true,
+            safetyLabel: 'Vorsicht', qualityLabel: 'Gut'
+        };
+    }
+
     // ===== CUSTOM MARKER GENERATOR =====
-    function createSpotIcon(props, status, isHighlighted) {
-        var color = '#6366F1'; // Default Indigo
-        var stroke = '#818CF8';
-        if (status === 'orange') {
-            color = '#F59E0B';
-            stroke = '#FFF';
-        } else if (status === 'green') {
-            color = '#10B981';
-            stroke = '#FFF';
-        }
-
-        var radius = isHighlighted ? 10 : 8;
-        var strokeWidth = isHighlighted ? 3 : 2;
-        var svgSize = 48;
+    // safety: 'safe' | 'conditional' | 'not_safe' | 'default' | 'no_data'
+    // quality: 'gray' (bad) | 'green' (good) | 'violet' (legendary)
+    function createSpotIcon(props, safety, quality, isHighlighted) {
+        var uid = ++_iconUid;
+        var style = mapSafetyAndQualityToStyle(safety, quality);
+        var svgSize = 44;
         var center = svgSize / 2;
+        var radius = isHighlighted ? 8 : 6;
 
-        var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '" style="overflow: visible;">';
+        var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">';
 
-        // 1. Draw Direction Arc if available
-        var dirAngles = getDirAngles(props.windrichtung);
-        if (dirAngles) {
-            // Arc logic
-            var arcRadius = radius + 14;
-            var startAngle = (dirAngles[0] - 90) * Math.PI / 180; // SVG 0 is East, so -90 for North
-            var endAngle = (dirAngles[1] - 90) * Math.PI / 180;
-
-            var x1 = center + arcRadius * Math.cos(startAngle);
-            var y1 = center + arcRadius * Math.sin(startAngle);
-            var x2 = center + arcRadius * Math.cos(endAngle);
-            var y2 = center + arcRadius * Math.sin(endAngle);
-
-            var largeArcFlag = endAngle - startAngle <= Math.PI ? "0" : "1";
-
-            var d = [
-                "M", center, center,
-                "L", x1, y1,
-                "A", arcRadius, arcRadius, 0, largeArcFlag, 1, x2, y2,
-                "Z"
-            ].join(" ");
-
-            // Subtle colored wedge pointing in the launch direction
-            var wedgeColor = status === 'orange' ? 'rgba(245, 158, 11, 0.25)' :
-                status === 'green' ? 'rgba(16, 185, 129, 0.25)' :
-                    'rgba(99, 102, 241, 0.25)';
-            var wedgeStroke = status === 'orange' ? 'rgba(245, 158, 11, 0.5)' :
-                status === 'green' ? 'rgba(16, 185, 129, 0.5)' :
-                    'rgba(99, 102, 241, 0.5)';
-
-            html += '<path d="' + d + '" fill="' + wedgeColor + '" stroke="' + wedgeStroke + '" stroke-width="1.5" stroke-dasharray="2,2" />';
+        // Defs: stripes pattern (unique ID per marker)
+        if (style.showStripes) {
+            html += '<defs><pattern id="st' + uid + '" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">';
+            html += '<line x1="0" y1="0" x2="0" y2="4" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>';
+            html += '</pattern></defs>';
         }
 
-        // 2. Main Circle Marker
-        var pulseClass = isHighlighted ? 'highlight-pulse' : '';
-        html += '<circle class="' + pulseClass + '" cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="' + color + '" stroke="' + stroke + '" stroke-width="' + strokeWidth + '" fill-opacity="0.9" />';
+        // Wind direction sector
+        if (props && props.windrichtung) {
+            var angles = getDirAngles(props.windrichtung);
+            if (angles) {
+                var sectorInner = radius + 1;
+                var sectorOuter = radius + 9;
+                var startRad = (angles[0] - 90) * Math.PI / 180;
+                var endRad = (angles[1] - 90) * Math.PI / 180;
+                var ix1 = center + sectorInner * Math.cos(startRad);
+                var iy1 = center + sectorInner * Math.sin(startRad);
+                var ix2 = center + sectorInner * Math.cos(endRad);
+                var iy2 = center + sectorInner * Math.sin(endRad);
+                var ox1 = center + sectorOuter * Math.cos(startRad);
+                var oy1 = center + sectorOuter * Math.sin(startRad);
+                var ox2 = center + sectorOuter * Math.cos(endRad);
+                var oy2 = center + sectorOuter * Math.sin(endRad);
+                var largeArc = (angles[1] - angles[0]) > 180 ? 1 : 0;
+
+                var d = 'M ' + ox1 + ' ' + oy1 +
+                    ' A ' + sectorOuter + ' ' + sectorOuter + ' 0 ' + largeArc + ' 1 ' + ox2 + ' ' + oy2 +
+                    ' L ' + ix2 + ' ' + iy2 +
+                    ' A ' + sectorInner + ' ' + sectorInner + ' 0 ' + largeArc + ' 0 ' + ix1 + ' ' + iy1 + ' Z';
+
+                html += '<path d="' + d + '" fill="' + style.stroke + '" opacity="0.5" />';
+            }
+        }
+
+        // Glow — ONLY for safe + legendary (Rule 3)
+        if (style.glow && (isHighlighted || (safety === 'safe' && quality === 'violet'))) {
+            html += '<circle cx="' + center + '" cy="' + center + '" r="' + (radius + 4) + '" fill="' + style.glow + '" />';
+            html += '<circle cx="' + center + '" cy="' + center + '" r="' + (radius + 7) + '" fill="' + style.glow.replace('0.45', '0.15') + '" />';
+        }
+
+        // Main circle
+        html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="' + style.fill + '" stroke="' + style.stroke + '" stroke-width="' + (isHighlighted ? '2' : '1.5') + '" />';
+
+        // Stripes overlay for not_safe (Rule 1 — accessibility pattern)
+        if (style.showStripes) {
+            html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="url(#st' + uid + ')" />';
+        }
+
+        // Warning triangle for conditional (Rule 2 — accessibility icon)
+        if (style.showWarning) {
+            var tx = center + radius - 1;
+            var ty = center - radius + 1;
+            html += '<polygon points="' + tx + ',' + (ty - 5) + ' ' + (tx - 4) + ',' + (ty + 3) + ' ' + (tx + 4) + ',' + (ty + 3) + '" fill="#eab308" stroke="#854d0e" stroke-width="0.5" />';
+            html += '<text x="' + tx + '" y="' + (ty + 2.5) + '" text-anchor="middle" fill="#854d0e" font-size="6" font-weight="bold" font-family="sans-serif">!</text>';
+        }
 
         html += '</svg>';
 
@@ -178,8 +212,26 @@
             className: 'custom-spot-marker',
             iconSize: [svgSize, svgSize],
             iconAnchor: [center, center],
-            tooltipAnchor: [0, -radius - 4]
+            tooltipAnchor: [0, -radius - 6]
         });
+    }
+
+    // ===== TOOLTIP BUILDER =====
+    function buildTooltipHtml(p, style) {
+        var html = '<b>' + p.name + '</b><br>' +
+            p.fluggebiet + ' (' + p.region + ')<br>' +
+            p.elevation_m + 'm MSL | Wind: ' + p.windrichtung;
+        if (!p.has_weather) {
+            html += '<br><span style="color:#F59E0B;">Keine Wetterdaten geladen</span>';
+        }
+        if (style && style.safetyLabel) {
+            html += '<br><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + style.fill + ';margin-right:4px;vertical-align:middle;"></span>';
+            html += '<span style="color:' + style.stroke + ';">' + style.safetyLabel + '</span>';
+            if (style.qualityLabel) {
+                html += ' &middot; ' + style.qualityLabel;
+            }
+        }
+        return html;
     }
 
     // ===== LOAD SPOTS =====
@@ -189,21 +241,19 @@
             .then(function (geojson) {
                 var geoJsonLayer = L.geoJSON(geojson, {
                     pointToLayer: function (feature, latlng) {
+                        var initSafety = feature.properties.has_weather ? 'default' : 'no_data';
                         return L.marker(latlng, {
-                            icon: createSpotIcon(feature.properties, 'default', false)
+                            icon: createSpotIcon(feature.properties, initSafety, 'green', false)
                         });
                     },
                     onEachFeature: function (feature, layer) {
                         var p = feature.properties;
-                        // Store feature properties on the marker for later updates
                         layer.featureProperties = p;
-                        layer.currentStatus = 'default';
+                        layer.currentSafety = p.has_weather ? 'default' : 'no_data';
+                        layer.currentQuality = 'green';
 
-                        markersByName[p.name] = layer; // Store reference
-                        var tooltip = '<b>' + p.name + '</b><br>' +
-                            p.fluggebiet + ' (' + p.region + ')<br>' +
-                            p.elevation_m + 'm MSL | Wind: ' + p.windrichtung;
-                        layer.bindTooltip(tooltip, {
+                        markersByName[p.name] = layer;
+                        layer.bindTooltip(buildTooltipHtml(p, null), {
                             className: 'map-tooltip',
                             direction: 'top',
                             offset: [0, -10],
@@ -222,18 +272,18 @@
                                 p.reference_points.slice(1).forEach(function(pt) {
                                     // 1. Connection Line
                                     var line = L.polyline([spotPt, pt], {
-                                        color: '#6366F1',
+                                        color: '#4f46e5',
                                         weight: 1.5,
                                         dashArray: '5, 5',
-                                        opacity: 0.6
+                                        opacity: 0.5
                                     });
                                     refGroup.addLayer(line);
 
                                     // 2. Small markers for the grid points
                                     var circle = L.circleMarker(pt, {
                                         radius: 4,
-                                        color: '#6366F1',
-                                        fillColor: '#1e1e2f',
+                                        color: '#4f46e5',
+                                        fillColor: '#fff',
                                         fillOpacity: 1,
                                         weight: 2
                                     });
@@ -389,11 +439,6 @@
     foehnOverlay.addEventListener('click', function (e) {
         if (e.target === foehnOverlay) closeFoehn();
     });
-    if (openFoehnBtn) {
-        openFoehnBtn.addEventListener('click', function () {
-            openFoehn();
-        });
-    }
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
@@ -406,13 +451,12 @@
     });
     // ===== HIGHLIGHTING =====
     window.highlightSpots = function (items) {
-        // Reset all markers
+        // Reset all markers to their current analysis state
         Object.values(markersByName).forEach(function (marker) {
-            if (marker.currentStatus !== 'default') {
-                marker.currentStatus = 'default';
-                marker.setIcon(createSpotIcon(marker.featureProperties, 'default', false));
-                marker.getElement().style.zIndex = '';
-            }
+            var safety = marker.currentSafety || 'default';
+            var quality = marker.currentQuality || 'green';
+            marker.setIcon(createSpotIcon(marker.featureProperties, safety, quality, false));
+            if (marker.getElement()) marker.getElement().style.zIndex = '';
         });
 
         if (!items || !Array.isArray(items)) return;
@@ -420,21 +464,78 @@
         // Highlight selected
         items.forEach(function (item) {
             var name = typeof item === 'string' ? item : item.name;
-            var status = typeof item === 'object' ? item.status : 'green';
-
             var marker = markersByName[name];
             if (marker) {
-                marker.currentStatus = status;
-                marker.setIcon(createSpotIcon(marker.featureProperties, status, true));
-
-                // Bring to front by setting a high z-index on the element
-                if (marker.getElement()) {
-                    marker.getElement().style.zIndex = 1000;
-                }
+                var safety = marker.currentSafety || 'default';
+                var quality = marker.currentQuality || 'green';
+                marker.setIcon(createSpotIcon(marker.featureProperties, safety, quality, true));
+                if (marker.getElement()) marker.getElement().style.zIndex = 1000;
             }
         });
     };
 
+    // ===== SPOT COLORING (from LLM analyses) =====
+    // Traffic light: safety = base color, quality = intensity
+    window.updateSpotColors = function (analysisData, dateStr) {
+        // analysisData: {spot_name: {date_str: {safety_status, fly_status, ...}}}
+        if (!analysisData || !dateStr) return;
+
+        Object.keys(markersByName).forEach(function (name) {
+            var marker = markersByName[name];
+            var spotAnalysis = analysisData[name];
+            if (!spotAnalysis) return;
+            var dayData = spotAnalysis[dateStr];
+            if (!dayData) return;
+
+            var safety = dayData.safety_status || 'safe';
+            var quality = dayData.fly_status || 'green';
+
+            marker.currentSafety = safety;
+            marker.currentQuality = quality;
+            marker.setIcon(createSpotIcon(marker.featureProperties, safety, quality, false));
+
+            // Update tooltip with analysis info
+            var style = mapSafetyAndQualityToStyle(safety, quality);
+            marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, style));
+        });
+    };
+
+    // ===== REFRESH SPOT MARKERS =====
+    window.refreshSpotMarkers = function () {
+        fetch('/api/spots')
+            .then(function (resp) { return resp.json(); })
+            .then(function (geojson) {
+                geojson.features.forEach(function (feature) {
+                    var p = feature.properties;
+                    var marker = markersByName[p.name];
+                    if (marker) {
+                        marker.featureProperties = p;
+                        // Don't override analysis data if it exists
+                        if (!marker.currentSafety || marker.currentSafety === 'default' || marker.currentSafety === 'no_data') {
+                            var safety = p.has_weather ? 'default' : 'no_data';
+                            marker.currentSafety = safety;
+                            marker.currentQuality = 'green';
+                            marker.setIcon(createSpotIcon(p, safety, 'green', false));
+                        }
+                        var style = mapSafetyAndQualityToStyle(marker.currentSafety, marker.currentQuality);
+                        marker.setTooltipContent(buildTooltipHtml(p, style));
+                    }
+                });
+            })
+            .catch(function (err) {
+                console.error('Spot-Status Update fehlgeschlagen:', err);
+            });
+    };
+
     // ===== START =====
     initMap();
+
+    window.openFoehn = openFoehn;
+
+    try {
+        if (new URLSearchParams(window.location.search).get('foehn') === '1') {
+            openFoehn();
+            history.replaceState({}, '', window.location.pathname);
+        }
+    } catch (e) { /* ignore */ }
 })();

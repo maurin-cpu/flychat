@@ -73,8 +73,8 @@ window.Meteogram = (function () {
     }
 
     // ===== LAYOUT CONSTANTS =====
-    const MARGIN = { top: 12, right: 24, bottom: 0, left: 96 };
-    const CELL_H = 36;
+    var MARGIN = { top: 12, right: 24, bottom: 0, left: (window.innerWidth <= 480) ? 56 : 96 };
+    var CELL_H = 36;
     const GROUND_ROWS = 3;
     const GROUND_H = GROUND_ROWS * 24;
     const TIME_LABEL_H = 28;
@@ -88,13 +88,21 @@ window.Meteogram = (function () {
         return code === 95 || code === 96 || code === 99;
     }
 
+    /** Einheitlich mit Spot-Analysen: MO–SO gross, DD.MM.JJJJ */
+    function formatDayTabLabel(dateStr) {
+        var d = new Date(dateStr + 'T12:00:00');
+        var dayNames = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
+        var dd = String(d.getDate()).padStart(2, '0');
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var yyyy = d.getFullYear();
+        return dayNames[d.getDay()] + ' ' + dd + '.' + mm + '.' + yyyy;
+    }
+
     // ===== TABS =====
     function buildTabs(container, dates, onSelect) {
         container.innerHTML = '';
-        const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
         dates.forEach(function (d, idx) {
-            var dt = new Date(d + 'T00:00');
-            var label = dayNames[dt.getDay()] + ' ' + dt.getDate() + '.' + (dt.getMonth() + 1) + '.';
+            var label = formatDayTabLabel(d);
             var btn = document.createElement('button');
             btn.className = 'tab-btn' + (idx === 0 ? ' active' : '');
             btn.textContent = label;
@@ -170,9 +178,12 @@ window.Meteogram = (function () {
                 }
                 if (below && above && below !== above) {
                     var frac = (targetAlt - below.altitude) / (above.altitude - below.altitude);
+                    var gustBelow = below.wind_gusts != null ? below.wind_gusts : below.wind_speed;
+                    var gustAbove = above.wind_gusts != null ? above.wind_gusts : above.wind_speed;
                     grid[ri][ci] = {
                         altitude: targetAlt,
                         wind_speed: below.wind_speed + frac * (above.wind_speed - below.wind_speed),
+                        wind_gusts: gustBelow + frac * (gustAbove - gustBelow),
                         wind_direction: below.wind_direction,
                         temperature: below.temperature + frac * (above.temperature - below.temperature),
                         pressure: below.pressure
@@ -197,11 +208,14 @@ window.Meteogram = (function () {
             });
         }
 
-        // Dimensions
+        // Dimensions (responsive)
+        MARGIN.left = (window.innerWidth <= 480) ? 56 : 96;
         var panelWidth = container.clientWidth || 800;
-        var minChartW = MARGIN.left + nCols * 40 + MARGIN.right;
+        var minCellW = (window.innerWidth <= 480) ? 28 : 40;
+        var minChartW = MARGIN.left + nCols * minCellW + MARGIN.right;
         var chartW = Math.max(panelWidth, minChartW);
         var CELL_W = (chartW - MARGIN.left - MARGIN.right) / nCols;
+        var isNarrow = CELL_W < 36;
         var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * CELL_H + GROUND_H + TIME_LABEL_H + 8;
 
         var svg = d3.select(container)
@@ -394,6 +408,7 @@ window.Meteogram = (function () {
                 chartG.append('text').attr('class', 'therm-value')
                     .attr('x', ci * CELL_W + CELL_W / 2)
                     .attr('y', rowY(ri) + CELL_H - 4)
+                    .attr('font-size', isNarrow ? '8px' : '10px')
                     .text(localRate.toFixed(1));
 
                 thermikCells[ri + ',' + ci] = localRate;
@@ -463,7 +478,7 @@ window.Meteogram = (function () {
                 .text(dt.getHours() + 'h');
         });
 
-        // ===== WIND ARROWS + VALUES =====
+        // ===== WIND ARROWS + VALUES + GUST BARS =====
         var allCells = [];
         for (var ri3 = 0; ri3 < nRows; ri3++) {
             for (var ci3 = 0; ci3 < nCols; ci3++) {
@@ -474,21 +489,31 @@ window.Meteogram = (function () {
                 var hasThermik = thermikCells[ri3 + ',' + ci3] != null;
                 var cy = rowY(ri3) + CELL_H * (hasThermik ? 0.5 : 0.42);
                 var speed = d.wind_speed;
+                var gusts = d.wind_gusts != null ? d.wind_gusts : speed;
+                var gustDiff = gusts - speed;
                 var isAloftWarning = speed > 35;
-                var color = isAloftWarning ? '#ef4444' : windColor(speed); // Red for ALOFT-WARN
+                var isGustWarning = gustDiff > 15;
+                var isGustNotable = gustDiff > 10;
+                // Always show gusts
+                var showGusts = true;
+                var color = (isAloftWarning || isGustWarning) ? '#ef4444' : windColor(speed);
 
-                // Only draw wind background if no thermik cell (thermik bg already drawn)
+                // Background
                 if (!hasThermik) {
+                    var bgFill = windBgColor(speed);
+                    if (isGustWarning) bgFill = 'rgba(239, 68, 68, 0.15)';
+                    else if (isAloftWarning) bgFill = 'rgba(239, 68, 68, 0.15)';
+                    else if (isGustNotable) bgFill = 'rgba(249, 115, 22, 0.08)';
                     chartG.append('rect')
                         .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
                         .attr('width', CELL_W - 2).attr('height', CELL_H - 2)
-                        .attr('fill', isAloftWarning ? 'rgba(239, 68, 68, 0.15)' : windBgColor(speed)) // Red tint if warning
+                        .attr('fill', bgFill)
                         .attr('rx', 3);
                 }
 
                 var g = chartG.append('g')
                     .attr('transform', 'translate(' + cx + ', ' + cy + ')')
-                    .style('filter', isAloftWarning ? 'drop-shadow(0 0 3px rgba(239, 68, 68, 0.7))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))')
+                    .style('filter', (isAloftWarning || isGustWarning) ? 'drop-shadow(0 0 3px rgba(239, 68, 68, 0.7))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))')
                     .style('opacity', 0);
 
                 g.append('path')
@@ -496,14 +521,34 @@ window.Meteogram = (function () {
                     .attr('fill', color)
                     .attr('transform', 'rotate(' + ((d.wind_direction + 180) % 360) + ')');
 
-                // Show wind speed number in all cells. Put it at the top if there's thermik data at the bottom.
-                var windTextY = rowY(ri3) + (hasThermik ? 9 : CELL_H - 4);
-                chartG.append('text').attr('class', 'wind-value')
-                    .attr('x', cx).attr('y', windTextY)
-                    .attr('font-size', '9px').attr('fill', color).attr('opacity', hasThermik ? 1.0 : (isAloftWarning ? 1.0 : 0.7))
-                    .attr('font-weight', isAloftWarning ? 'bold' : 'normal')
-                    .style('text-shadow', hasThermik ? '0 1px 2px rgba(255,255,255,0.8)' : 'none')
-                    .text(Math.round(speed));
+                // Wind speed + gust number
+                // Gust color: red (>15 diff), orange (>5 diff), muted orange (mild)
+                var gustColor = isGustWarning ? '#ef4444' : (isGustNotable ? '#F97316' : '#D97706');
+                var windTextY = rowY(ri3) + (hasThermik ? 10 : CELL_H - 4);
+                if (showGusts) {
+                    // Show wind/gust format: "25/32"
+                    var windGustText = chartG.append('text').attr('class', 'wind-value')
+                        .attr('x', cx).attr('y', windTextY)
+                        .attr('font-size', isNarrow ? '7px' : '9px')
+                        .attr('font-weight', (isGustWarning || isAloftWarning) ? 'bold' : '600')
+                        .style('text-shadow', hasThermik ? '0 1px 2px rgba(255,255,255,0.8)' : 'none');
+                    // Speed part in wind color
+                    windGustText.append('tspan').attr('fill', color)
+                        .text(Math.round(speed));
+                    // Separator
+                    windGustText.append('tspan').attr('fill', '#94A3B8')
+                        .text('/');
+                    // Gust part in graduated color
+                    windGustText.append('tspan').attr('fill', gustColor)
+                        .text(Math.round(gusts));
+                } else {
+                    chartG.append('text').attr('class', 'wind-value')
+                        .attr('x', cx).attr('y', windTextY)
+                        .attr('font-size', isNarrow ? '8px' : '9px').attr('fill', color).attr('opacity', hasThermik ? 1.0 : (isAloftWarning ? 1.0 : 0.7))
+                        .attr('font-weight', isAloftWarning ? 'bold' : 'normal')
+                        .style('text-shadow', hasThermik ? '0 1px 2px rgba(255,255,255,0.8)' : 'none')
+                        .text(Math.round(speed));
+                }
 
                 allCells.push({ g: g, ci: ci3, ri: ri3 });
             }
@@ -662,6 +707,10 @@ window.Meteogram = (function () {
                     var dd = grid[ri][ci];
                     html += '<div class="tooltip-row"><span class="tooltip-label">Hoehe</span><span class="tooltip-value">' + Math.round(dd.altitude) + 'm</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">Wind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
+                    if (dd.wind_gusts != null && Math.round(dd.wind_gusts) > Math.round(dd.wind_speed)) {
+                        var gustCol = dd.wind_gusts > dd.wind_speed + 15 ? '#ef4444' : (dd.wind_gusts > dd.wind_speed + 5 ? '#F97316' : '#D97706');
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Boeen</span><span class="tooltip-value" style="color:' + gustCol + '">' + Math.round(dd.wind_gusts) + ' km/h</span></div>';
+                    }
                     html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">Temp</span><span class="tooltip-value">' + dd.temperature.toFixed(1) + '\u00B0C</span></div>';
                     // Thermik rate at this altitude
@@ -713,6 +762,7 @@ window.Meteogram = (function () {
     return {
         windColor: windColor,
         arrowPath: arrowPath,
+        formatDayTabLabel: formatDayTabLabel,
         buildTabs: buildTabs,
         renderChart: renderChart
     };

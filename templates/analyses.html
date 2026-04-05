@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Flychat - Spot-Analysen{% endblock %}
+{% block title %}Flychat - Analysen{% endblock %}
 
 {% block head %}
 <style>
@@ -26,7 +26,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 24px;
+        margin-bottom: 16px;
     }
 
     .analyses-header h1 {
@@ -51,14 +51,14 @@
     .run-btn {
         padding: 8px 20px;
         border-radius: var(--radius-sm);
-        border: none;
-        background: linear-gradient(135deg, var(--color-primary-vivid), #7c3aed);
-        color: white;
+        border: 1px solid var(--color-primary);
+        background: var(--color-primary);
+        color: #fff;
         font-size: 13px;
         font-weight: 600;
         cursor: pointer;
-        transition: all var(--transition-base);
-        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
         font-family: inherit;
         display: flex;
         align-items: center;
@@ -67,7 +67,8 @@
 
     .run-btn:hover:not(:disabled) {
         transform: translateY(-1px);
-        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+        background: var(--color-primary-vivid);
+        box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
     }
 
     .run-btn:disabled {
@@ -96,6 +97,41 @@
         color: var(--color-text-muted);
     }
 
+    /* Sub-Tabs */
+    .sub-tabs {
+        display: flex;
+        gap: 2px;
+        margin-bottom: 16px;
+        padding: 3px;
+        background: var(--glass-bg-light);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-md);
+        width: fit-content;
+    }
+
+    .sub-tab {
+        padding: 7px 20px;
+        border-radius: var(--radius-sm);
+        border: none;
+        background: transparent;
+        color: var(--color-text-muted);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        font-family: inherit;
+    }
+
+    .sub-tab:hover {
+        color: var(--color-text);
+        background: #f1f5f9;
+    }
+
+    .sub-tab.active {
+        background: var(--color-primary-light);
+        color: var(--color-primary);
+    }
+
     /* Day Tabs */
     .day-tabs {
         display: flex;
@@ -106,6 +142,9 @@
         border: 1px solid var(--glass-border);
         border-radius: var(--radius-md);
         width: fit-content;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .day-tab {
@@ -119,15 +158,16 @@
         cursor: pointer;
         transition: all var(--transition-fast);
         font-family: inherit;
+        flex-shrink: 0;
     }
 
     .day-tab:hover {
-        color: var(--color-text-secondary);
-        background: rgba(255, 255, 255, 0.04);
+        color: var(--color-text);
+        background: #f1f5f9;
     }
 
     .day-tab.active {
-        background: rgba(99, 102, 241, 0.15);
+        background: var(--color-primary-light);
         color: var(--color-primary);
     }
 
@@ -139,18 +179,28 @@
     }
 
     .day-tab.active .day-label {
-        color: rgba(129, 140, 248, 0.7);
+        color: var(--color-primary);
+    }
+
+    .empty-day-hint {
+        padding: 24px;
+        color: var(--color-text-muted);
+        font-size: 14px;
+        text-align: center;
+        max-width: 480px;
     }
 
     /* Summary Bar */
     .day-summary {
         display: flex;
+        flex-wrap: wrap;
         gap: 16px;
         margin-bottom: 20px;
         padding: 12px 18px;
-        background: var(--glass-bg-light);
-        border: 1px solid var(--glass-border);
+        background: var(--color-bg-elevated);
+        border: 1px solid var(--color-border);
         border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
     }
 
     .summary-chip {
@@ -167,49 +217,74 @@
         border-radius: 50%;
     }
 
-    .summary-dot.green { background: #10B981; box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
-    .summary-dot.orange { background: #F59E0B; box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); }
-    .summary-dot.yellow { background: #EAB308; box-shadow: 0 0 6px rgba(234, 179, 8, 0.3); }
-    .summary-dot.not_safe { background: #EF4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.4); }
-    .summary-dot.error { background: #6B7280; }
+    .summary-dot.safe { background: #22c55e; }
+    .summary-dot.conditional { background: #f59e0b; }
+    .summary-dot.not_safe { background: #ef4444; }
+    .summary-dot.gray { background: #94a3b8; }
+    .summary-dot.green { background: #22c55e; }
+    .summary-dot.violet { background: #8b5cf6; }
+    .summary-dot.no_data { background: #f97316; }
+    .summary-dot.error { background: #9ca3af; }
 
-    /* Spot Cards Grid */
+    /* Cards Grid */
     .spots-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
         gap: 16px;
     }
 
     .spot-card {
-        background: var(--glass-bg-light);
-        border: 1px solid var(--glass-border);
+        background: var(--color-bg-elevated);
+        border: 1px solid var(--color-border);
         border-radius: var(--radius-lg);
         padding: 18px 20px;
-        transition: all var(--transition-fast);
+        transition: all 0.2s ease;
+        box-shadow: var(--shadow-sm);
     }
 
     .spot-card:hover {
+        transform: translateY(-2px);
         border-color: var(--color-border-hover);
         box-shadow: var(--shadow-md);
     }
 
-    .spot-card.status-green { border-left: 3px solid #10B981; }
-    .spot-card.status-orange { border-left: 3px solid #F59E0B; }
-    .spot-card.status-yellow { border-left: 3px solid #EAB308; }
-    .spot-card.status-not_safe { border-left: 3px solid #EF4444; }
-    .spot-card.status-error { border-left: 3px solid #6B7280; }
+    .spot-card.safety-safe { border-left: 3px solid #5ba888; }
+    .spot-card.safety-conditional { border-left: 3px solid #d9b47a; }
+    .spot-card.safety-not_safe { border-left: 3px solid #d67575; }
+    .spot-card.safety-no_data { border-left: 3px solid #e8b797; }
+    .spot-card.safety-error { border-left: 3px solid #8a919e; }
+    .spot-card.fly-violet { box-shadow: inset 0 3px 0 #8d66c8; }
+    .spot-card.fly-green { box-shadow: inset 0 3px 0 #5ba888; }
+    .spot-card.fly-gray { box-shadow: inset 0 3px 0 #a8afbb; }
 
     .spot-card-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
+        gap: 10px;
         margin-bottom: 12px;
+    }
+
+    .spot-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: flex-end;
+        max-width: 62%;
     }
 
     .spot-name {
         font-size: 15px;
         font-weight: 600;
         letter-spacing: -0.2px;
+    }
+
+    .spot-name .ref-info {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--color-text-muted);
+        display: block;
+        margin-top: 2px;
     }
 
     .spot-status-badge {
@@ -221,11 +296,14 @@
         letter-spacing: 0.04em;
     }
 
-    .badge-green { background: rgba(16, 185, 129, 0.15); color: #10B981; }
-    .badge-orange { background: rgba(245, 158, 11, 0.15); color: #F59E0B; }
-    .badge-yellow { background: rgba(234, 179, 8, 0.15); color: #EAB308; }
-    .badge-not_safe { background: rgba(239, 68, 68, 0.15); color: #EF4444; }
-    .badge-error { background: rgba(107, 114, 128, 0.15); color: #6B7280; }
+    .badge-safety-safe { background: #dcfce7; color: #166534; }
+    .badge-safety-conditional { background: #fef3c7; color: #92400e; }
+    .badge-safety-not_safe { background: #fee2e2; color: #991b1b; }
+    .badge-safety-no_data { background: #ffedd5; color: #9a3412; }
+    .badge-safety-error { background: #f3f4f6; color: #6b7280; }
+    .badge-fly-gray { background: #f1f5f9; color: #64748b; }
+    .badge-fly-green { background: #dcfce7; color: #166534; }
+    .badge-fly-violet { background: #ede9fe; color: #6d28d9; }
 
     .spot-card-body {
         display: flex;
@@ -264,10 +342,11 @@
         margin-top: 8px;
         padding: 8px 12px;
         border-radius: var(--radius-md);
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid var(--glass-border);
+        background: #f8fafc;
+        border: 1px solid var(--color-border);
         font-size: 12px;
         line-height: 1.5;
+        color: var(--color-text-light);
     }
 
     .ai-feedback-label {
@@ -280,8 +359,8 @@
         color: var(--color-text-muted);
     }
 
-    .ai-feedback-safety .ai-feedback-label { color: #818CF8; }
-    .ai-feedback-flyability .ai-feedback-label { color: #10B981; }
+    .ai-feedback-safety .ai-feedback-label { color: var(--color-primary); }
+    .ai-feedback-flyability .ai-feedback-label { color: #059669; }
 
     .safety-issues {
         color: #EF4444;
@@ -292,7 +371,7 @@
         font-size: 10px;
         padding: 2px 7px;
         border-radius: var(--radius-pill);
-        background: rgba(255, 255, 255, 0.06);
+        background: #f1f5f9;
         color: var(--color-text-muted);
         font-weight: 500;
         text-transform: uppercase;
@@ -321,6 +400,13 @@
         .analyses-container { padding: 12px; }
         .spots-grid { grid-template-columns: 1fr; }
         .analyses-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+        .spot-card { padding: 14px; }
+        .day-summary { gap: 8px; }
+    }
+
+    @media (max-width: 480px) {
+        body { padding-top: 52px; }
+        .navbar { height: 52px; }
     }
 </style>
 {% endblock %}
@@ -328,22 +414,36 @@
 {% block content %}
 <div class="analyses-container">
     <div class="analyses-header">
-        <h1>Spot-Analysen <span id="headerMeta"></span></h1>
+        <h1>Analysen <span id="headerMeta"></span></h1>
         <div class="header-actions">
             <span class="status-bar" id="statusBar"></span>
-            <button class="run-btn" id="runAnalysesBtn">
+            <button class="run-btn" id="runSpotBtn">
                 <span class="spinner"></span>
-                <span class="btn-label">Analyse starten</span>
+                <span class="btn-label">Spot-Analyse starten</span>
+            </button>
+            <button class="run-btn" id="runRegionBtn" style="display: none;">
+                <span class="spinner"></span>
+                <span class="btn-label">Region-Analyse starten</span>
             </button>
         </div>
     </div>
 
+    <!-- Sub-Tabs -->
+    <div class="sub-tabs" id="subTabs">
+        <button class="sub-tab active" data-view="spots">Startplätze</button>
+        <button class="sub-tab" data-view="regions">Regionen</button>
+    </div>
+
     <div class="day-tabs" id="dayTabs" style="display: none;"></div>
     <div class="day-summary" id="daySummary" style="display: none;"></div>
+
+    <!-- Two grids, only one visible at a time -->
     <div class="spots-grid" id="spotsGrid"></div>
+    <div class="spots-grid" id="regionsGrid" style="display: none;"></div>
+
     <div class="empty-state" id="emptyState">
         <h2>Keine Analysen vorhanden</h2>
-        <p>Klicke "Analyse starten" um die LLM-Analyse fuer alle Spots und Vorhersagetage durchzufuehren.</p>
+        <p>Klicke "Analyse starten" um die LLM-Analyse durchzuführen.</p>
     </div>
 </div>
 {% endblock %}
@@ -353,86 +453,169 @@
 import { init } from 'https://esm.sh/@instantdb/core';
 
 const APP_ID = '{{ instantdb_app_id }}';
+const FORECAST_DAYS = {{ forecast_days }};
 const db = init({ appId: APP_ID });
+
+function formatDayTabLabel(dateStr) {
+    var d = new Date(dateStr + 'T12:00:00');
+    var dayNames = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
+    var dd = String(d.getDate()).padStart(2, '0');
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var yyyy = d.getFullYear();
+    return dayNames[d.getDay()] + ' ' + dd + '.' + mm + '.' + yyyy;
+}
+
+function enumerateForecastDates() {
+    var now = new Date();
+    var out = [];
+    for (var i = 0; i < FORECAST_DAYS; i++) {
+        var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+        out.push(
+            d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+        );
+    }
+    return out;
+}
 
 var dayTabs = document.getElementById('dayTabs');
 var daySummary = document.getElementById('daySummary');
 var spotsGrid = document.getElementById('spotsGrid');
+var regionsGrid = document.getElementById('regionsGrid');
 var emptyState = document.getElementById('emptyState');
-var runBtn = document.getElementById('runAnalysesBtn');
+var runSpotBtn = document.getElementById('runSpotBtn');
+var runRegionBtn = document.getElementById('runRegionBtn');
 var statusBar = document.getElementById('statusBar');
 var headerMeta = document.getElementById('headerMeta');
+var subTabsEl = document.getElementById('subTabs');
 
-// Nested structure: {spot_name: {date_str: analysis}}
-var analysesNested = {};
-var latestUpdatedAt = null;
+var spotAnalysesNested = {};
+var regionAnalysesNested = {};
+var spotLatestUpdatedAt = null;
+var regionLatestUpdatedAt = null;
 var currentDate = null;
-
-var statusLabels = {
-    green: 'Grün',
-    orange: 'Orange',
-    yellow: 'Gelb',
-    not_safe: 'Nicht sicher',
-    error: 'Fehler'
-};
+var currentView = 'spots'; // 'spots' or 'regions'
 
 var safetyLabels = {
-    safe: 'Sicher',
-    conditional: 'Bedingt',
-    not_safe: 'Nicht sicher',
+    safe: 'Grün',
+    conditional: 'Orange',
+    not_safe: 'Rot',
+    no_data: 'Keine Daten',
     error: 'Fehler'
 };
 
-// ─── InstantDB Live-Subscription ───────────────────────────────
+var flyTierLabels = {
+    gray: 'Grau (Abgleiter)',
+    green: 'Grün (fliegbar)',
+    violet: 'Violett (legendär / XC)'
+};
+
+function normalizeFlyTier(ft) {
+    if (!ft) return '';
+    var k = String(ft).trim().toLowerCase();
+    if (k === 'gray' || k === 'green' || k === 'violet') return k;
+    if (k === 'yellow') return 'gray';
+    if (k === 'orange') return 'green';
+    return 'green';
+}
+
+// ─── Sub-Tab Switch ─────────────────────────────────────────────
+subTabsEl.addEventListener('click', function(e) {
+    var btn = e.target.closest('.sub-tab');
+    if (!btn) return;
+    var view = btn.getAttribute('data-view');
+    if (view === currentView) return;
+
+    currentView = view;
+    subTabsEl.querySelectorAll('.sub-tab').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+
+    if (view === 'spots') {
+        runSpotBtn.style.display = '';
+        runRegionBtn.style.display = 'none';
+    } else {
+        runSpotBtn.style.display = 'none';
+        runRegionBtn.style.display = '';
+    }
+
+    render();
+});
+
+// ─── InstantDB: Spot Analyses ───────────────────────────────────
 db.subscribeQuery({ spot_analyses: {} }, function(resp) {
     if (resp.error) {
-        console.error('InstantDB Fehler:', resp.error.message);
-        statusBar.textContent = 'InstantDB: ' + resp.error.message;
+        console.error('InstantDB Spot-Fehler:', resp.error.message);
         return;
     }
     if (resp.data) {
         var entries = resp.data.spot_analyses || [];
-        buildNestedData(entries);
+        spotAnalysesNested = {};
+        spotLatestUpdatedAt = null;
+        entries.forEach(function(entry) {
+            var spotName = entry.spot;
+            var dateStr = entry.date;
+            if (!spotName || !dateStr) return;
+            ['no_go_reasons', 'caution_notes'].forEach(function(key) {
+                if (typeof entry[key] === 'string') {
+                    try { entry[key] = JSON.parse(entry[key]); }
+                    catch(e) { entry[key] = entry[key] ? [entry[key]] : []; }
+                }
+            });
+            if (!spotAnalysesNested[spotName]) spotAnalysesNested[spotName] = {};
+            spotAnalysesNested[spotName][dateStr] = entry;
+            if (entry.updated_at && (!spotLatestUpdatedAt || entry.updated_at > spotLatestUpdatedAt)) {
+                spotLatestUpdatedAt = entry.updated_at;
+            }
+        });
         render();
     }
 });
 
-function buildNestedData(entries) {
-    analysesNested = {};
-    latestUpdatedAt = null;
-
-    entries.forEach(function(entry) {
-        var spotName = entry.spot;
-        var dateStr = entry.date;
-        if (!spotName || !dateStr) return;
-
-        // JSON-Strings parsen
-        ['no_go_reasons', 'caution_notes'].forEach(function(key) {
-            if (typeof entry[key] === 'string') {
-                try { entry[key] = JSON.parse(entry[key]); }
-                catch(e) { entry[key] = entry[key] ? [entry[key]] : []; }
+// ─── InstantDB: Region Analyses ─────────────────────────────────
+db.subscribeQuery({ region_analyses: {} }, function(resp) {
+    if (resp.error) {
+        console.error('InstantDB Region-Fehler:', resp.error.message);
+        return;
+    }
+    if (resp.data) {
+        var entries = resp.data.region_analyses || [];
+        regionAnalysesNested = {};
+        regionLatestUpdatedAt = null;
+        entries.forEach(function(entry) {
+            var regionId = entry.region_id;
+            var dateStr = entry.date;
+            if (!regionId || !dateStr) return;
+            ['no_go_reasons', 'caution_notes'].forEach(function(key) {
+                if (typeof entry[key] === 'string') {
+                    try { entry[key] = JSON.parse(entry[key]); }
+                    catch(e) { entry[key] = entry[key] ? [entry[key]] : []; }
+                }
+            });
+            if (!regionAnalysesNested[regionId]) regionAnalysesNested[regionId] = {};
+            regionAnalysesNested[regionId][dateStr] = entry;
+            if (entry.updated_at && (!regionLatestUpdatedAt || entry.updated_at > regionLatestUpdatedAt)) {
+                regionLatestUpdatedAt = entry.updated_at;
             }
         });
-
-        if (!analysesNested[spotName]) analysesNested[spotName] = {};
-        analysesNested[spotName][dateStr] = entry;
-
-        if (entry.updated_at) {
-            if (!latestUpdatedAt || entry.updated_at > latestUpdatedAt) {
-                latestUpdatedAt = entry.updated_at;
-            }
-        }
-    });
-}
+        render();
+    }
+});
 
 // ─── Rendering ─────────────────────────────────────────────────
 function render() {
-    var spotNames = Object.keys(analysesNested);
-    if (spotNames.length === 0) {
+    var activeNested = currentView === 'spots' ? spotAnalysesNested : regionAnalysesNested;
+    var activeLatest = currentView === 'spots' ? spotLatestUpdatedAt : regionLatestUpdatedAt;
+    var activeGrid = currentView === 'spots' ? spotsGrid : regionsGrid;
+    var hiddenGrid = currentView === 'spots' ? regionsGrid : spotsGrid;
+
+    activeGrid.style.display = '';
+    hiddenGrid.style.display = 'none';
+
+    var keys = Object.keys(activeNested);
+    if (keys.length === 0) {
         emptyState.style.display = 'block';
         dayTabs.style.display = 'none';
         daySummary.style.display = 'none';
-        spotsGrid.innerHTML = '';
+        activeGrid.innerHTML = '';
         headerMeta.textContent = '';
         statusBar.textContent = 'Keine Daten in InstantDB';
         return;
@@ -440,51 +623,22 @@ function render() {
 
     emptyState.style.display = 'none';
 
-    if (latestUpdatedAt) {
-        var d = new Date(latestUpdatedAt);
+    if (activeLatest) {
+        var d = new Date(activeLatest);
         statusBar.textContent = 'Stand: ' + d.toLocaleString('de-CH');
     }
 
-    // Alle Tage sammeln (nur Heute + Zukunft)
-    var todayStr = new Date().toISOString().split('T')[0];
-    var allDates = new Set();
-    Object.values(analysesNested).forEach(function(days) {
-        Object.keys(days).forEach(function(d) { 
-            if (d >= todayStr) allDates.add(d); 
-        });
-    });
-    var sortedDates = Array.from(allDates).sort();
-
-    if (sortedDates.length === 0) {
-        emptyState.style.display = 'block';
-        statusBar.textContent = 'Keine aktuellen Analysedaten';
-        dayTabs.style.display = 'none';
-        daySummary.style.display = 'none';
-        spotsGrid.innerHTML = '';
-        headerMeta.textContent = '';
-        return;
-    }
-
-    headerMeta.textContent = spotNames.length + ' Spots, ' + sortedDates.length + ' Tage';
+    var sortedDates = enumerateForecastDates();
+    var label = currentView === 'spots' ? ' Spots' : ' Regionen';
+    headerMeta.textContent = keys.length + label + ', ' + FORECAST_DAYS + ' Tage';
 
     if (!currentDate || !sortedDates.includes(currentDate)) {
         currentDate = sortedDates[0];
     }
 
     renderDayTabs(sortedDates);
-    renderDaySummary();
-    renderSpots();
-}
-
-function getDayLabel(dateStr) {
-    var today = new Date();
-    today.setHours(0, 0, 0, 0);
-    var d = new Date(dateStr + 'T00:00:00');
-    var diff = Math.round((d - today) / 86400000);
-    if (diff === 0) return 'Heute';
-    if (diff === 1) return 'Morgen';
-    if (diff === 2) return 'Übermorgen';
-    return d.toLocaleDateString('de-CH', { weekday: 'short' });
+    renderDaySummary(activeNested);
+    renderCards(activeNested, activeGrid);
 }
 
 function renderDayTabs(dates) {
@@ -493,7 +647,7 @@ function renderDayTabs(dates) {
     dates.forEach(function(dateStr) {
         var btn = document.createElement('button');
         btn.className = 'day-tab' + (dateStr === currentDate ? ' active' : '');
-        btn.innerHTML = dateStr + '<span class="day-label">' + getDayLabel(dateStr) + '</span>';
+        btn.innerHTML = '<span class="day-label">' + formatDayTabLabel(dateStr) + '</span>';
         btn.addEventListener('click', function() {
             currentDate = dateStr;
             render();
@@ -502,54 +656,85 @@ function renderDayTabs(dates) {
     });
 }
 
-function renderDaySummary() {
+function renderDaySummary(activeNested) {
     daySummary.style.display = 'flex';
     daySummary.innerHTML = '';
 
-    var counts = { green: 0, orange: 0, yellow: 0, not_safe: 0, error: 0 };
-    Object.values(analysesNested).forEach(function(days) {
+    var safetyC = { safe: 0, conditional: 0, not_safe: 0, no_data: 0 };
+    var flyC = { gray: 0, green: 0, violet: 0 };
+    var errN = 0;
+    Object.values(activeNested).forEach(function(days) {
         var a = days[currentDate];
         if (!a) return;
-        var s = a.status || 'error';
-        if (counts[s] !== undefined) counts[s]++;
-        else counts.error++;
+        var ss = a.safety_status || 'error';
+        if (safetyC[ss] !== undefined) safetyC[ss]++;
+        else errN++;
+        var ft = (ss !== 'not_safe' && ss !== 'no_data' && ss !== 'error') ? normalizeFlyTier(a.fly_status || '') : '';
+        if (ft && flyC[ft] !== undefined) flyC[ft]++;
     });
 
-    ['green', 'orange', 'yellow', 'not_safe', 'error'].forEach(function(key) {
-        if (counts[key] === 0) return;
+    function addChip(dotClass, n, label) {
+        if (n === 0) return;
         var chip = document.createElement('div');
         chip.className = 'summary-chip';
-        chip.innerHTML = '<span class="summary-dot ' + key + '"></span>' + counts[key] + ' ' + statusLabels[key];
+        chip.innerHTML = '<span class="summary-dot ' + dotClass + '"></span>' + n + ' ' + label;
         daySummary.appendChild(chip);
-    });
+    }
+    addChip('safe', safetyC.safe, 'Sich. Grün');
+    addChip('conditional', safetyC.conditional, 'Sich. Orange');
+    addChip('not_safe', safetyC.not_safe, 'Sich. Rot');
+    addChip('no_data', safetyC.no_data, 'Keine Daten');
+    addChip('violet', flyC.violet, 'Flug legendär');
+    addChip('green', flyC.green, 'Flug fliegbar');
+    addChip('gray', flyC.gray, 'Flug Abgleiter');
+    if (errN > 0) addChip('error', errN, 'Fehler');
 }
 
-function renderSpots() {
-    spotsGrid.innerHTML = '';
-    var spotNames = Object.keys(analysesNested).sort();
+function renderCards(activeNested, grid) {
+    grid.innerHTML = '';
+    var keys = Object.keys(activeNested).sort();
 
-    var order = { green: 0, orange: 1, yellow: 2, not_safe: 3, error: 4 };
-    spotNames.sort(function(a, b) {
-        var sa = (analysesNested[a][currentDate] || {}).status || 'error';
-        var sb = (analysesNested[b][currentDate] || {}).status || 'error';
-        return (order[sa] || 3) - (order[sb] || 3);
+    var flyOrder = { violet: 0, green: 1, gray: 2 };
+    var safetyOrder = { safe: 0, conditional: 1, not_safe: 2, no_data: 3, error: 4 };
+    keys.sort(function(a, b) {
+        var xa = (activeNested[a] || {})[currentDate] || {};
+        var xb = (activeNested[b] || {})[currentDate] || {};
+        var fa = (xa.safety_status === 'not_safe' || xa.safety_status === 'error') ? '' : (xa.fly_status || '');
+        var fb = (xb.safety_status === 'not_safe' || xb.safety_status === 'error') ? '' : (xb.fly_status || '');
+        var oa = fa && flyOrder[fa] !== undefined ? flyOrder[fa] : 9;
+        var ob = fb && flyOrder[fb] !== undefined ? flyOrder[fb] : 9;
+        if (oa !== ob) return oa - ob;
+        var sa = xa.safety_status || 'error';
+        var sb = xb.safety_status || 'error';
+        return (safetyOrder[sa] ?? 9) - (safetyOrder[sb] ?? 9);
     });
 
-    spotNames.forEach(function(name) {
-        var analysis = (analysesNested[name] || {})[currentDate];
+    var anyCard = false;
+    keys.forEach(function(key) {
+        var analysis = (activeNested[key] || {})[currentDate];
         if (!analysis) return;
-        spotsGrid.appendChild(createCard(name, analysis));
+        anyCard = true;
+        var displayName = currentView === 'regions' ? (analysis.region_name || key) : key;
+        grid.appendChild(createCard(displayName, analysis));
     });
+    if (!anyCard) {
+        var hint = document.createElement('div');
+        hint.className = 'empty-day-hint';
+        hint.textContent = 'Fuer diesen Tag liegt noch keine Analyse vor. Analyse starten oder Wetter aktualisieren.';
+        grid.appendChild(hint);
+    }
 }
 
 function createCard(name, a) {
-    var status = a.status || 'error';
-    var card = document.createElement('div');
-    card.className = 'spot-card status-' + status;
-
-    var badgeClass = 'badge-' + status;
-    var badgeText = statusLabels[status] || status;
     var safetyStatus = a.safety_status || 'error';
+    var phase2Ok = (safetyStatus === 'safe' || safetyStatus === 'conditional');
+    var isRegion = (currentView === 'regions');
+
+    var card = document.createElement('div');
+    card.className = 'spot-card safety-' + safetyStatus;
+
+    var safetyBadgeClass = 'badge-safety-' + safetyStatus;
+    var safetyBadgeText = (safetyLabels[safetyStatus] || safetyStatus);
 
     var noGoReasons = a.no_go_reasons || [];
     if (typeof noGoReasons === 'string') {
@@ -561,11 +746,48 @@ function createCard(name, a) {
     }
 
     var html = '<div class="spot-card-header">' +
-        '<span class="spot-name">' + escHtml(name) + '</span>' +
-        '<span class="spot-status-badge ' + badgeClass + '">' + escHtml(badgeText) + '</span>' +
-        '</div>';
+        '<div style="display: flex; flex-direction: column; gap: 4px;">' +
+        '<span class="spot-name">' + escHtml(name) + '</span>';
 
-    if (status === 'error') {
+    // For regions: show quality badge; for spots: show fly tier badge
+    if (isRegion) {
+        var ft = normalizeFlyTier(a.flyability_tier || a.fly_status || '');
+        var regionBadgeLabels = { gray: 'Schwach', green: 'Gut', violet: 'Top' };
+        var regionBadgeColors = { gray: '#64748b', green: '#166534', violet: '#6d28d9' };
+        var regionBadgeBg = { gray: '#f1f5f9', green: '#dcfce7', violet: '#ede9fe' };
+        var rlabel = regionBadgeLabels[ft] || 'Gut';
+        var rcolor = regionBadgeColors[ft] || '#166534';
+        var rbg = regionBadgeBg[ft] || '#dcfce7';
+
+        if (safetyStatus === 'not_safe') {
+            html += '<span style="font-size: 12px; font-weight: 700; color: #991b1b; background: #fee2e2; padding: 3px 10px; border-radius: 100px;">NO-GO</span>';
+        } else {
+            html += '<span style="font-size: 12px; font-weight: 600; color: ' + rcolor + '; background: ' + rbg + '; padding: 3px 10px; border-radius: 100px;">' + rlabel + '</span>';
+        }
+    } else {
+        // Spots: show fly tier badge (gray/green/violet)
+        var flyStatus = a.fly_status || 'green';
+        var flyBadgeClass = 'badge-fly-' + flyStatus;
+        var flyLabels = { gray: 'Abgleiter', green: 'Fliegbar', violet: 'Legendär' };
+        var flyBadgeText = flyLabels[flyStatus] || flyStatus;
+        html += '<span class="spot-status-badge ' + flyBadgeClass + '">' + escHtml(flyBadgeText) + '</span>';
+    }
+
+    html += '</div>' +
+        '<span class="spot-badges">' +
+        '<span class="spot-status-badge ' + safetyBadgeClass + '">' + escHtml(safetyBadgeText) + '</span>' +
+        '</span></div>';
+
+    if (safetyStatus === 'no_data') {
+        html += '<div class="spot-card-body">' +
+            '<div class="spot-row"><span class="spot-row-label">Status</span><span class="spot-row-value" style="color: #F97316;">Wetterdaten unvollstaendig</span></div>' +
+            '<div class="spot-row"><span class="spot-row-label">Info</span><span class="spot-row-value">' + escHtml(a.safety_feedback || 'Keine KI-Analyse moeglich') + '</span></div>' +
+            '</div>';
+        card.innerHTML = html;
+        return card;
+    }
+
+    if (safetyStatus === 'error') {
         html += '<div class="spot-card-body">' +
             '<div class="spot-row"><span class="spot-row-label">Fehler</span><span class="spot-row-value">' + escHtml(a.error || 'Unbekannt') + '</span></div>' +
             '</div>';
@@ -575,12 +797,11 @@ function createCard(name, a) {
 
     html += '<div class="spot-card-body">';
 
-    // Phase 1: Sicherheit
     html += row('Sicherheit', safetyLabels[safetyStatus] || safetyStatus);
     html += row('Fenster', a.safe_window || a.best_window || '-');
     html += row('Wind', a.wind_summary || '-');
     if (a.foehn_risk && a.foehn_risk !== 'none') {
-        html += row('Föhn', a.foehn_risk);
+        html += row('Foehn', a.foehn_risk);
     }
     if (noGoReasons.length > 0) {
         html += '<div class="spot-row"><span class="spot-row-label">NO-GO</span><span class="spot-row-value safety-issues">' + escHtml(noGoReasons.join(', ')) + '</span></div>';
@@ -589,11 +810,21 @@ function createCard(name, a) {
         html += row('Vorsicht', cautionNotes.join(', '));
     }
 
-    // Phase 2: Flugtauglichkeit (nur wenn vorhanden)
-    if (a.fly_status) {
+    if (phase2Ok) {
         html += '<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--glass-border);">';
+
+        if (isRegion) {
+            var regionFt = normalizeFlyTier(a.flyability_tier || a.fly_status || '');
+            var regionQualLabels = { gray: 'Schwach', green: 'Gut', violet: 'Top' };
+            html += row('Flugqualität', regionQualLabels[regionFt] || 'Gut');
+        } else {
+            var flyStatus = a.fly_status || 'green';
+            var flyLabels = { gray: 'Abgleiter', green: 'Gut fliegbar', violet: 'Legendär' };
+            html += row('Flugqualität', flyLabels[flyStatus] || flyStatus);
+        }
+
         html += row('Flugtyp', a.flight_type || '-');
-        html += row('Dauer', a.flight_duration || '-');
+        html += row('Dauer', a.flight_duration_estimate || a.flight_duration || '-');
         html += row('XC', a.xc_potential || '-');
         if (a.peak_climb_rate) {
             html += row('Peak', a.peak_climb_rate + ' m/s');
@@ -601,7 +832,6 @@ function createCard(name, a) {
         html += '</div>';
     }
 
-    // KI Feedback: Sicherheit (IMMER)
     var safetyFeedback = a.safety_feedback || a.summary || '';
     if (safetyFeedback) {
         html += '<div class="ai-feedback-box ai-feedback-safety">' +
@@ -610,8 +840,7 @@ function createCard(name, a) {
             '</div>';
     }
 
-    // KI Feedback: Fliegbarkeit (falls vorhanden)
-    var flyFeedback = a.flyability_feedback || a.recommendation || '';
+    var flyFeedback = phase2Ok ? (a.flyability_feedback || a.recommendation || '') : '';
     if (flyFeedback) {
         html += '<div class="ai-feedback-box ai-feedback-flyability">' +
             '<span class="ai-feedback-label">KI-Feedback: Fliegbarkeit</span>' +
@@ -619,7 +848,7 @@ function createCard(name, a) {
             '</div>';
     }
 
-    html += '</div>'; // End spot-card-body
+    html += '</div>';
 
     card.innerHTML = html;
     return card;
@@ -636,15 +865,12 @@ function escHtml(str) {
     return div.innerHTML;
 }
 
-// ─── "Analyse starten" Button ──────────────────────────────────
-// Triggert den Backend-Endpoint, der die LLM-Analyse startet
-// und die Ergebnisse nach InstantDB pusht.
-// Die subscribeQuery oben aktualisiert die Anzeige automatisch.
-runBtn.addEventListener('click', function() {
-    if (runBtn.disabled) return;
-    runBtn.disabled = true;
-    runBtn.classList.add('loading');
-    statusBar.textContent = 'Analyse läuft...';
+// ─── Run Buttons ────────────────────────────────────────────────
+runSpotBtn.addEventListener('click', function() {
+    if (runSpotBtn.disabled) return;
+    runSpotBtn.disabled = true;
+    runSpotBtn.classList.add('loading');
+    statusBar.textContent = 'Spot-Analyse laeuft...';
 
     fetch('/api/run-analyses', {
         method: 'POST',
@@ -653,7 +879,7 @@ runBtn.addEventListener('click', function() {
         .then(function(resp) { return resp.json(); })
         .then(function(data) {
             if (data.success) {
-                statusBar.textContent = data.results_count + ' Analysen abgeschlossen — Daten werden live aktualisiert';
+                statusBar.textContent = data.results_count + ' Spot-Analysen abgeschlossen';
             } else {
                 statusBar.textContent = 'Fehler: ' + (data.error || 'Unbekannt');
             }
@@ -662,8 +888,35 @@ runBtn.addEventListener('click', function() {
             statusBar.textContent = 'Fehler: ' + err.message;
         })
         .finally(function() {
-            runBtn.disabled = false;
-            runBtn.classList.remove('loading');
+            runSpotBtn.disabled = false;
+            runSpotBtn.classList.remove('loading');
+        });
+});
+
+runRegionBtn.addEventListener('click', function() {
+    if (runRegionBtn.disabled) return;
+    runRegionBtn.disabled = true;
+    runRegionBtn.classList.add('loading');
+    statusBar.textContent = 'Region-Analyse laeuft...';
+
+    fetch('/api/run-region-analyses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            if (data.success) {
+                statusBar.textContent = data.results_count + ' Region-Analysen abgeschlossen';
+            } else {
+                statusBar.textContent = 'Fehler: ' + (data.error || 'Unbekannt');
+            }
+        })
+        .catch(function(err) {
+            statusBar.textContent = 'Fehler: ' + err.message;
+        })
+        .finally(function() {
+            runRegionBtn.disabled = false;
+            runRegionBtn.classList.remove('loading');
         });
 });
 </script>

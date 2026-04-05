@@ -28,14 +28,15 @@
     }
 
     .chat-sidebar {
-        width: 420px;
-        min-width: 320px;
-        border-right: 1px solid var(--glass-border);
+        /* Breite: großzügig für Tabellen/Markdown; JS setzt ggf. gespeicherte oder ideale Breite */
+        width: min(600px, max(480px, 38vw));
+        min-width: 340px;
+        max-width: min(720px, 92vw);
+        flex-shrink: 0;
+        border-right: 1px solid var(--color-border);
         display: flex;
         flex-direction: column;
-        background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(11, 17, 32, 0.98) 100%);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        background: var(--color-bg);
         transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -53,7 +54,8 @@
         height: 100%;
         max-width: none;
         margin: 0;
-        padding: 16px 18px;
+        padding: 16px 20px 18px;
+        min-width: 0;
         border-radius: 0;
         box-shadow: none;
         display: flex;
@@ -78,7 +80,7 @@
         width: 3px;
         height: 40px;
         border-radius: 4px;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.1);
         transition: all var(--transition-fast);
     }
 
@@ -95,21 +97,21 @@
         align-items: center;
         margin-bottom: 12px;
         padding-bottom: 8px;
-        border-bottom: 1px solid var(--glass-border);
+        border-bottom: 1px solid var(--color-border);
     }
 
     .chat-title {
         font-weight: 600;
         font-size: 0.95rem;
-        color: var(--color-text-dim);
+        color: var(--color-text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
 
     .reset-btn {
-        background: rgba(255, 68, 68, 0.1);
-        border: 1px solid rgba(255, 68, 68, 0.2);
-        color: #ff4444;
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        color: #dc2626;
         padding: 4px 10px;
         border-radius: 6px;
         font-size: 0.8rem;
@@ -121,15 +123,14 @@
     }
 
     .reset-btn:hover {
-        background: rgba(255, 68, 68, 0.2);
-        border-color: rgba(255, 68, 68, 0.4);
-        box-shadow: 0 0 10px rgba(255, 68, 68, 0.1);
+        background: #fecaca;
+        border-color: #f87171;
     }
 
     .analyse-btn {
-        background: rgba(59, 130, 246, 0.1);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        color: #3b82f6;
+        background: #dbeafe;
+        border: 1px solid #93c5fd;
+        color: #2563eb;
         padding: 4px 10px;
         border-radius: 6px;
         font-size: 0.8rem;
@@ -141,9 +142,8 @@
     }
 
     .analyse-btn:hover {
-        background: rgba(59, 130, 246, 0.2);
-        border-color: rgba(59, 130, 246, 0.5);
-        box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+        background: #bfdbfe;
+        border-color: #60a5fa;
     }
 
     .analyse-btn:disabled {
@@ -155,8 +155,8 @@
         display: none;
         width: 12px;
         height: 12px;
-        border: 2px solid rgba(59, 130, 246, 0.3);
-        border-top-color: #3b82f6;
+        border: 2px solid #bfdbfe;
+        border-top-color: #2563eb;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
     }
@@ -172,6 +172,169 @@
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
+
+    /* ── Progress Card ────────────────────────────── */
+    .progress-card {
+        padding: 16px 18px !important;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .progress-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--color-text);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .progress-timer {
+        font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 13px;
+        color: var(--color-text-muted);
+    }
+    .progress-bar-track {
+        height: 4px;
+        border-radius: 2px;
+        background: #e5e7eb;
+        margin-bottom: 12px;
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        background: linear-gradient(90deg, var(--color-primary-vivid), #818CF8);
+        width: 0%;
+        transition: width 0.5s ease;
+    }
+    .progress-bar-fill.indeterminate {
+        width: 100% !important;
+        background: linear-gradient(90deg, transparent, var(--color-primary-vivid), transparent);
+        background-size: 200% 100%;
+        animation: indeterminate 1.5s ease-in-out infinite;
+    }
+    @keyframes indeterminate {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    .progress-bar-fill.bar-done {
+        background: linear-gradient(90deg, #22c55e, #4ade80);
+        width: 100% !important;
+    }
+    .progress-bar-fill.bar-error {
+        background: linear-gradient(90deg, #ef4444, #f87171);
+        width: 100% !important;
+    }
+    .progress-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .progress-step {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--color-text-muted);
+        font-size: 13px;
+        transition: color 0.2s;
+    }
+    .progress-step .step-icon {
+        width: 18px;
+        text-align: center;
+        flex-shrink: 0;
+        font-size: 12px;
+    }
+    .step-pending .step-icon { color: var(--color-text-muted); }
+    .step-active {
+        color: var(--color-text) !important;
+    }
+    .step-active .step-icon {
+        color: var(--color-primary);
+        animation: pulse-icon 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse-icon {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%      { opacity: 0.5; transform: scale(0.85); }
+    }
+    .step-done {
+        color: var(--color-text-light) !important;
+    }
+    .step-done .step-icon { color: #22c55e; }
+    .step-error {
+        color: #f87171 !important;
+    }
+    .step-error .step-icon { color: #ef4444; }
+
+    .progress-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+        gap: 8px;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--color-border);
+    }
+    .progress-stat {
+        text-align: center;
+        padding: 8px 4px;
+        background: #f8fafc;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--color-border);
+    }
+    .stat-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--color-text);
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 10px;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-top: 2px;
+    }
+
+    .progress-days {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .day-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+    }
+    .day-label {
+        font-weight: 600;
+        color: var(--color-text-light);
+        min-width: 42px;
+    }
+    .day-chips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .day-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+    .day-chip.chip-safe       { background: rgba(34,197,94,0.15);  color: #4ade80; }
+    .day-chip.chip-conditional { background: rgba(251,146,60,0.15); color: #fb923c; }
+    .day-chip.chip-not-safe   { background: rgba(239,68,68,0.15);  color: #f87171; }
+    .day-chip.chip-error      { background: rgba(148,163,184,0.1); color: #94a3b8; }
 
     .chat-header-actions {
         display: flex;
@@ -208,6 +371,137 @@
             height: 3px;
         }
     }
+
+    /* Mobile Toggle Bar */
+    .mobile-toggle {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 2001;
+        background: rgba(255, 255, 255, 0.92);
+        border-top: 1px solid var(--color-border);
+        backdrop-filter: blur(var(--glass-blur));
+        -webkit-backdrop-filter: blur(var(--glass-blur));
+        padding: 8px 16px;
+        gap: 8px;
+    }
+
+    .mobile-toggle-btn {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--color-text-secondary);
+        font-size: 14px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .mobile-toggle-btn.active {
+        background: var(--color-primary-light);
+        color: var(--color-primary);
+        border-color: rgba(79, 70, 229, 0.3);
+    }
+
+    @media (max-width: 600px) {
+        .mobile-toggle {
+            display: flex;
+        }
+
+        body {
+            padding-top: 52px;
+            padding-bottom: 54px;
+        }
+
+        .navbar {
+            height: 52px;
+        }
+
+        .unified-layout {
+            flex-direction: row;
+        }
+
+        .chat-sidebar {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            height: 100% !important;
+            border-right: none;
+            flex-shrink: 0;
+        }
+
+        .map-main {
+            width: 100%;
+            height: 100%;
+        }
+
+        .resizer {
+            display: none;
+        }
+
+        .unified-layout.show-map .chat-sidebar {
+            display: none;
+        }
+
+        .unified-layout.show-chat .map-main {
+            display: none;
+        }
+    }
+
+    /* ── Floating Controls for Map ─────────── */
+    .floating-control {
+        position: absolute;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(12px) saturate(1.2);
+        -webkit-backdrop-filter: blur(12px) saturate(1.2);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    /* ── Day Tabs ────────────────────────────────────────── */
+    .floating-day-tabs {
+        top: 16px;
+        left: 16px;
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 10px;
+        max-width: calc(100vw - 200px);
+        overflow-x: auto;
+    }
+
+    .floating-day-tab {
+        padding: 6px 14px;
+        border-radius: 7px;
+        border: none;
+        background: transparent;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: inherit;
+        flex-shrink: 0;
+        white-space: nowrap;
+        letter-spacing: 0.01em;
+    }
+
+    .floating-day-tab:hover {
+        color: #1e293b;
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .floating-day-tab.active {
+        background: #4f46e5;
+        color: #fff;
+        font-weight: 600;
+    }
 </style>
 {% endblock %}
 
@@ -219,9 +513,13 @@
             <div class="chat-header">
                 <span class="chat-title">Chat-Berater</span>
                 <div class="chat-header-actions">
-                    <button id="refreshAndAnalyseBtn" class="analyse-btn">
+                    <button id="refreshWeatherBtn" class="analyse-btn">
                         <span class="spinner"></span>
-                        <span class="btn-text">Wetter laden + LLM Analyse</span>
+                        <span class="btn-text">Wetter laden</span>
+                    </button>
+                    <button id="runAnalysesBtn" class="analyse-btn">
+                        <span class="spinner"></span>
+                        <span class="btn-text">LLM Analyse</span>
                     </button>
                     <button id="resetChatBtn" class="reset-btn">
                         <span>↺</span> Neuer Chat
@@ -238,7 +536,6 @@
                 <button class="quick-btn" data-msg="Wo kann ich heute fliegen?">Wo fliegen?</button>
                 <button class="quick-btn" data-msg="Wie sind die Bedingungen heute?">Heute?</button>
                 <button class="quick-btn" data-msg="Gibt es Föhn-Gefahr?">Föhn?</button>
-                <button class="quick-btn foehn-btn" id="openFoehnBtn">Föhndiagramm</button>
             </div>
 
             <div class="typing-indicator" id="typingIndicator">
@@ -259,6 +556,9 @@
     <!-- Rechts: Karte -->
     <main class="map-main">
         <div id="map"></div>
+
+        <!-- Floating Day Tabs for Map -->
+        <div class="floating-control floating-day-tabs" id="mapDayTabs" style="display: none;"></div>
 
         <!-- Meteogram Overlay -->
         <div class="meteogram-overlay" id="meteogramOverlay">
@@ -292,6 +592,11 @@
         <div class="tooltip" id="tooltip"></div>
     </main>
 </div>
+
+<div class="mobile-toggle" id="mobileToggle">
+    <button class="mobile-toggle-btn active" data-target="chat">Chat</button>
+    <button class="mobile-toggle-btn" data-target="map">Karte</button>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -303,49 +608,248 @@
 <script src="{{ url_for('static', filename='js/map.js') }}"></script>
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 <script>
-    const resizer = document.getElementById('resizer');
-    const sidebar = document.getElementById('chatSidebar');
-    let isDragging = false;
+    (function () {
+        var STORAGE_KEY = 'flychat_sidebar_width';
+        var resizer = document.getElementById('resizer');
+        var sidebar = document.getElementById('chatSidebar');
+        var layout = document.querySelector('.unified-layout');
+        var isDragging = false;
+        var MIN_SIDEBAR_W = 340;
 
-    resizer.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        resizer.classList.add('dragging');
-        document.body.style.cursor = 'col-resize';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-
-        let newWidth;
-        if (window.innerWidth > 900) {
-            newWidth = e.clientX;
-            // Begrenzungen
-            if (newWidth < 300) newWidth = 300;
-            if (newWidth > window.innerWidth * 0.8) newWidth = window.innerWidth * 0.8;
-            sidebar.style.width = `${newWidth}px`;
-        } else {
-            newWidth = e.clientY - 60; // Navbar abziehen
-            sidebar.style.height = `${newWidth}px`;
+        function idealChatWidth() {
+            var w = window.innerWidth;
+            if (w <= 900) return null;
+            return Math.round(Math.min(640, Math.max(500, w * 0.39)));
         }
 
-        if (window.map) {
-            window.map.invalidateSize();
+        function applyInitialSidebarWidth() {
+            if (!sidebar || window.innerWidth <= 900) return;
+            var saved = localStorage.getItem(STORAGE_KEY);
+            var sw = saved ? parseInt(saved, 10) : NaN;
+            var maxW = window.innerWidth * 0.78;
+            if (!isNaN(sw) && sw >= MIN_SIDEBAR_W && sw <= maxW) {
+                sidebar.style.width = sw + 'px';
+                return;
+            }
+            var ideal = idealChatWidth();
+            if (ideal) sidebar.style.width = ideal + 'px';
         }
-    });
 
-    document.addEventListener('mouseup', () => {
-        if (isDragging) {
+        applyInitialSidebarWidth();
+
+        window.addEventListener('resize', function () {
+            if (!sidebar || window.innerWidth <= 900) return;
+            var w = sidebar.offsetWidth;
+            var maxW = window.innerWidth * 0.78;
+            if (w > maxW) sidebar.style.width = Math.round(maxW) + 'px';
+        });
+
+        // Mouse drag
+        if (resizer) {
+            resizer.addEventListener('mousedown', function () {
+                isDragging = true;
+                resizer.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+            });
+        }
+
+        document.addEventListener('mousemove', function (e) {
+            if (!isDragging || !sidebar) return;
+
+            var newWidth;
+            if (window.innerWidth > 900) {
+                newWidth = e.clientX;
+                if (newWidth < MIN_SIDEBAR_W) newWidth = MIN_SIDEBAR_W;
+                if (newWidth > window.innerWidth * 0.78) newWidth = window.innerWidth * 0.78;
+                sidebar.style.width = newWidth + 'px';
+            } else {
+                newWidth = e.clientY - 60;
+                sidebar.style.height = newWidth + 'px';
+            }
+
+            if (window.map) window.map.invalidateSize();
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (!isDragging) return;
             isDragging = false;
-            resizer.classList.remove('dragging');
+            if (resizer) resizer.classList.remove('dragging');
             document.body.style.cursor = 'default';
-        }
-    });
+            if (sidebar && window.innerWidth > 900) {
+                try {
+                    localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
+                } catch (err) { /* ignore */ }
+            }
+            if (window.map) window.map.invalidateSize();
+        });
 
-    // Init map rendering check
-    window.addEventListener('load', () => {
-        if (window.map) {
-            window.map.invalidateSize();
+        // Touch drag (tablets)
+        if (resizer) {
+            resizer.addEventListener('touchstart', function (e) {
+                isDragging = true;
+                resizer.classList.add('dragging');
+                e.preventDefault();
+            }, { passive: false });
         }
+
+        document.addEventListener('touchmove', function (e) {
+            if (!isDragging || !sidebar) return;
+            var touch = e.touches[0];
+            var newWidth;
+            if (window.innerWidth > 900) {
+                newWidth = touch.clientX;
+                if (newWidth < MIN_SIDEBAR_W) newWidth = MIN_SIDEBAR_W;
+                if (newWidth > window.innerWidth * 0.78) newWidth = window.innerWidth * 0.78;
+                sidebar.style.width = newWidth + 'px';
+            } else {
+                newWidth = touch.clientY - 60;
+                sidebar.style.height = newWidth + 'px';
+            }
+            if (window.map) window.map.invalidateSize();
+        }, { passive: true });
+
+        document.addEventListener('touchend', function () {
+            if (!isDragging) return;
+            isDragging = false;
+            if (resizer) resizer.classList.remove('dragging');
+            if (sidebar && window.innerWidth > 900) {
+                try {
+                    localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
+                } catch (err) { /* ignore */ }
+            }
+            if (window.map) window.map.invalidateSize();
+        });
+
+        // Mobile toggle (Chat / Karte)
+        var mobileToggle = document.getElementById('mobileToggle');
+        if (mobileToggle && layout) {
+            // Default: show chat on phone
+            if (window.innerWidth <= 600) {
+                layout.classList.add('show-chat');
+            }
+            mobileToggle.addEventListener('click', function (e) {
+                var btn = e.target.closest('.mobile-toggle-btn');
+                if (!btn) return;
+                var target = btn.getAttribute('data-target');
+                mobileToggle.querySelectorAll('.mobile-toggle-btn').forEach(function (b) {
+                    b.classList.remove('active');
+                });
+                btn.classList.add('active');
+                layout.classList.remove('show-chat', 'show-map');
+                layout.classList.add('show-' + target);
+                if (target === 'map' && window.map) {
+                    setTimeout(function () { window.map.invalidateSize(); }, 50);
+                }
+            });
+        }
+
+        window.addEventListener('load', function () {
+            if (window.map) window.map.invalidateSize();
+        });
+    })();
+</script>
+
+<!-- Spot-Analysen: InstantDB Live-Subscription fuer Spot-Marker-Faerbung -->
+<script type="module">
+import { init } from 'https://esm.sh/@instantdb/core';
+
+const APP_ID = '{{ instantdb_app_id }}';
+const FORECAST_DAYS = {{ forecast_days }};
+const db = init({ appId: APP_ID });
+
+function enumerateForecastDates() {
+    var now = new Date();
+    var out = [];
+    for (var i = 0; i < FORECAST_DAYS; i++) {
+        var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+        out.push(
+            d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+        );
+    }
+    return out;
+}
+
+function formatDayTabLabel(dateStr) {
+    var d = new Date(dateStr + 'T12:00:00');
+    var dayNames = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
+    var dd = String(d.getDate()).padStart(2, '0');
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    return dayNames[d.getDay()] + ' ' + dd + '.' + mm;
+}
+
+function normalizeFlyTier(ft) {
+    if (!ft) return '';
+    var k = String(ft).trim().toLowerCase();
+    if (k === 'gray' || k === 'green' || k === 'violet') return k;
+    if (k === 'yellow') return 'gray';
+    if (k === 'orange') return 'green';
+    return 'green';
+}
+
+var dayTabsEl = document.getElementById('mapDayTabs');
+var dates = enumerateForecastDates();
+var currentDate = dates[0];
+var analysisData = null;
+
+// Build day tabs
+function buildDayTabs() {
+    if (!dayTabsEl) return;
+    dayTabsEl.innerHTML = '';
+    dates.forEach(function(dateStr) {
+        var btn = document.createElement('button');
+        btn.className = 'floating-day-tab' + (dateStr === currentDate ? ' active' : '');
+        btn.textContent = formatDayTabLabel(dateStr);
+        btn.addEventListener('click', function() {
+            currentDate = dateStr;
+            dayTabsEl.querySelectorAll('.floating-day-tab').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            if (window.updateSpotColors && analysisData) {
+                window.updateSpotColors(analysisData, currentDate);
+            }
+        });
+        dayTabsEl.appendChild(btn);
     });
+    dayTabsEl.style.display = 'flex';
+}
+
+db.subscribeQuery({ spot_analyses: {} }, function(resp) {
+    if (resp.error) {
+        console.error('Spot InstantDB Fehler:', resp.error.message);
+        return;
+    }
+    if (resp.data) {
+        var entries = resp.data.spot_analyses || [];
+        if (entries.length === 0) {
+            if (dayTabsEl) dayTabsEl.style.display = 'none';
+            return;
+        }
+
+        // Build nested structure: {spot_name: {date_str: analysis}}
+        var nested = {};
+        entries.forEach(function(e) {
+            var spot = e.spot;
+            var ds = e.date;
+            if (!spot || !ds) return;
+            if (!nested[spot]) nested[spot] = {};
+            var copy = Object.assign({}, e);
+            if (copy.fly_status) {
+                copy.fly_status = normalizeFlyTier(copy.fly_status);
+            }
+            nested[spot][ds] = copy;
+        });
+
+        analysisData = nested;
+
+        // Build day tabs if not built yet
+        if (dayTabsEl && dayTabsEl.children.length === 0) {
+            buildDayTabs();
+        }
+
+        // Color markers for current selected date
+        if (window.updateSpotColors) {
+            window.updateSpotColors(nested, currentDate);
+        }
+    }
+});
 </script>
 {% endblock %}
