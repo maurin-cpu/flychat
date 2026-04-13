@@ -18,6 +18,7 @@ def _load_skill(filename: str) -> str:
 
 
 SYSTEM_PROMPT = _load_skill("system_chat.md")
+CAPABILITIES_GUIDE = _load_skill("chat_capabilities_guide.md")
 FOEHN_CHAT_KNOWLEDGE = _load_skill("foehn_chat_knowledge.md")
 _FOEHN_LLM_REGIONAL_GUIDE_TEMPLATE = _load_skill("foehn_llm_regional_guide.md")
 

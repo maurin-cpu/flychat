@@ -8,8 +8,9 @@ import os
 import json
 import logging
 import re
+import time
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from datetime import datetime, timedelta
 from openai import OpenAI
 
@@ -21,15 +22,17 @@ from foehn_indicators import (
     evaluate_foehn,
     build_foehn_llm_context,
 )
-from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
+from thermik_calculator import calculate_thermal_profile, calculate_dewpoint, get_terrain_zone
 from gust_calculator import (
     estimate_altitude_gusts,
     collect_gust_anchors,
     estimate_altitude_gusts_multi_anchor,
     interpolate_gust_from_anchors,
+    apply_oi_gust_correction,
 )
 from prompts import (
     SYSTEM_PROMPT,
+    CAPABILITIES_GUIDE,
     FOEHN_CHAT_KNOWLEDGE,
     SAFETY_CHECK_PROMPT,
     FLYABILITY_PROMPT,
@@ -38,10 +41,133 @@ from prompts import (
     format_foehn_llm_regional_guide,
 )
 from source_area import get_all_regions, find_region_for_point
+from station_observations import StationManager
+import routing
 
 logger = logging.getLogger(__name__)
 
 MAX_HISTORY_MESSAGES = 40  # Max messages per conversation before trimming
+
+
+_WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+
+
+def _weekday_de(dt_or_str) -> str:
+    """German weekday name from datetime or 'YYYY-MM-DD' string."""
+    if isinstance(dt_or_str, str):
+        dt_or_str = datetime.strptime(dt_or_str, "%Y-%m-%d")
+    return _WOCHENTAGE[dt_or_str.weekday()]
+
+
+def _is_permanent_api_error(err: Exception) -> bool:
+    """Prüft ob ein OpenAI-Fehler permanent ist (kein Retry sinnvoll).
+    insufficient_quota, authentication_error, invalid_api_key → sofort abbrechen.
+    rate_limit, timeout, connection → transient, Retry lohnt sich."""
+    err_str = str(err).lower()
+    return any(kw in err_str for kw in ("insufficient_quota", "invalid_api_key", "authentication"))
+
+# ============================================================================
+# OPENAI TOOL SCHEMAS (Phase 1: Standort-basierte Spot-Filterung)
+# ============================================================================
+# Drei Tools für den Chat-Use-Case:
+#   1. geocode_location — Adresse / Stadt → Koordinaten
+#   2. find_spots_within_travel_time — Isochrone + Spot-Filter (Hauptfunktion)
+#   3. clear_map_overlays — Karten-Overlays zurücksetzen
+#
+# Nach Erhalt eines Tool-Calls dispatcht answer_stream() an _dispatch_tool(),
+# yieldet sofort map_action-Events ans Frontend und ruft danach erneut OpenAI auf.
+
+TOOLS: list = [
+    {
+        "type": "function",
+        "function": {
+            "name": "geocode_location",
+            "description": (
+                "Geokodiert eine vom Piloten genannte Adresse oder Stadt zu Koordinaten. "
+                "Verwende dieses Tool wenn der Pilot einen Standort nennt (z.B. 'Zürich', "
+                "'Bern', 'Bahnhofstrasse 5 Luzern') und wir wissen müssen wo er ist, "
+                "BEVOR wir mit find_spots_within_travel_time die erreichbaren Spots suchen."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Adresse, Stadt oder Ortsname (z.B. 'Zürich' oder 'Bern Bahnhof')."
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_spots_within_travel_time",
+            "description": (
+                "Findet alle Fluggebiete, die der Pilot von einem Startpunkt aus innerhalb "
+                "einer maximalen Reisezeit erreichen kann. Berechnet eine Isochrone (erreichbare "
+                "Zone) per Valhalla, zeichnet sie automatisch auf der Karte ein und filtert die "
+                "Spots, die darin liegen. Liefert die Liste der erreichbaren Spots zurück, "
+                "inklusive Voranalyse-Daten (Sicherheit, Fliegbarkeit) für deine Empfehlung."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lat": {
+                        "type": "number",
+                        "description": "Latitude des Startpunkts (WGS84). Aus geocode_location.",
+                    },
+                    "lon": {
+                        "type": "number",
+                        "description": "Longitude des Startpunkts (WGS84). Aus geocode_location.",
+                    },
+                    "minutes": {
+                        "type": "integer",
+                        "description": "Maximale Reisezeit in Minuten (z.B. 60, 90, 120).",
+                        "minimum": 1,
+                        "maximum": 360,
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["auto", "bicycle", "pedestrian"],
+                        "description": (
+                            "Verkehrsmittel: 'auto' für Auto, 'bicycle' für Velo, "
+                            "'pedestrian' für zu Fuss. Default 'auto'."
+                        ),
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": (
+                            "Optional: Anzeigename des Startpunkts für die Karte (z.B. 'Zürich'). "
+                            "Wird neben dem Pin angezeigt."
+                        ),
+                    },
+                },
+                "required": ["lat", "lon", "minutes"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "clear_map_overlays",
+            "description": (
+                "Entfernt alle dynamischen Overlays von der Karte (Isochrone, "
+                "User-Standort-Pin, Spot-Highlights). Verwende wenn der Pilot "
+                "'Karte zurücksetzen', 'alles löschen', 'reset karte' o.ä. sagt."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+]
+
+
+# Hard limit gegen Endlosschleifen im Tool-Call-Loop (Risk-Mitigation aus Plan)
+MAX_TOOL_ITERATIONS = 5
 
 # Phase-2 Fliegbarkeit: gray / green / violet (Legacy: yellow/orange/green → gray/green/violet)
 _FLYABILITY_TIERS = frozenset({"gray", "green", "violet"})
@@ -49,12 +175,49 @@ _FLYABILITY_TIERS = frozenset({"gray", "green", "violet"})
 
 def _normalize_flyability_tier(raw: str | None) -> str:
     if not raw:
-        return "green"
+        return ""
     r = str(raw).strip().lower()
     if r in _FLYABILITY_TIERS:
         return r
-    legacy = {"yellow": "gray", "orange": "green", "green": "violet"}
-    return legacy.get(r, "green")
+    legacy = {"yellow": "gray", "orange": "green"}
+    return legacy.get(r, "")
+
+# Regex zum Entfernen versehentlich verbliebener interner Tags aus LLM-Antworten.
+# Matcht z.B. "ALOFT-GUST-WARN 1h", "[SHEAR-DEGRADED]", "GUST-DANGER 3h" etc.
+_TAG_SANITIZE_RE = re.compile(
+    r'\[?(?:ALOFT-GUST-WARN|ALOFT-GUST-DANGER|ALOFT-WARN|ALOFT-DANGER'
+    r'|GUST-WARN|GUST-DANGER|WIND-OK|WIND-WRONG|WIND-CALM|WIND-MODERATE|WIND-STRONG'
+    r'|STRONG-WIND-WARN|RAIN-WARN|CAPE-WARN|OVERCAST-DANGER'
+    r'|SHEAR-DEGRADED|SHEAR-UNUSABLE'
+    r'|THERMAL-TORN-DEGRADED|THERMAL-TORN-UNUSABLE'
+    r'|THERMAL-ROUGH-DEGRADED|THERMAL-ROUGH-UNUSABLE)\]?\s*\d*h?',
+    re.IGNORECASE
+)
+
+
+def _sanitize_llm_text(text: str) -> str:
+    """Entfernt versehentlich verbliebene interne Tags aus LLM-Antworten."""
+    if not text or not isinstance(text, str):
+        return text
+    cleaned = _TAG_SANITIZE_RE.sub('', text)
+    # Doppelte Leerzeichen und Kommas aufräumen
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned)
+    cleaned = re.sub(r',\s*,', ',', cleaned)
+    cleaned = re.sub(r'^\s*,\s*', '', cleaned)
+    cleaned = re.sub(r'\s*,\s*$', '', cleaned)
+    return cleaned.strip()
+
+
+def _sanitize_llm_result(result: dict) -> dict:
+    """Sanitiert alle Text-Felder eines LLM-Ergebnisses von internen Tags."""
+    for key in ("summary", "recommendation", "thermal_quality"):
+        if key in result and isinstance(result[key], str):
+            result[key] = _sanitize_llm_text(result[key])
+    for key in ("caution_notes", "no_go_reasons"):
+        if key in result and isinstance(result[key], list):
+            result[key] = [_sanitize_llm_text(item) for item in result[key] if _sanitize_llm_text(item)]
+    return result
+
 
 COMPASS_POINTS = {
     "N": 0.0, "NNO": 22.5, "NO": 45.0, "ONO": 67.5,
@@ -208,10 +371,23 @@ class FlychatEngine:
         self.region_weather_data = {}
         self.region_analyses = {}
         self.region_analyses_loaded_at = None
+        # Fix B: Tracking ob letzter refresh_weather() echt war oder Stale-Fallback
+        self.last_refresh_stale = False
+        self.last_refresh_status_reason = None
+
+        # Cache fuer Boeen-Floor Enforcement (Post-hoc LLM-Override):
+        # Key = f"{spot_name}|{date_str}", Value = dict mit gust-warn/danger Zaehlern.
+        # Wird in _build_single_spot_context geschrieben (Main-Thread, sequentiell)
+        # und in _safety_check_single_spot_day gelesen (Worker-Threads). Thread-safe,
+        # weil Keys vor dem Submit gesetzt sind und danach nur gelesen werden.
+        self._ctx_gust_cache = {}
+        # Cache fuer Thermik-Qualitaet (Flyability-Override bei falschem gray):
+        # Key = f"{name}|{date_str}", Value = dict mit thermal_hours_total, tq_danger_h, peak_climb_proxy
+        self._ctx_tq_cache = {}
 
         api_key = os.environ.get("OPENAI_API_KEY")
         self.model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-        self.client = OpenAI(api_key=api_key) if api_key else None
+        self.client = OpenAI(api_key=api_key, timeout=120.0) if api_key else None
 
         # History-Persistenz
         self.history_dir = config.HISTORY_DIR
@@ -221,6 +397,19 @@ class FlychatEngine:
         # Analyse-Persistenz
         self.analyses_file = config.DATA_DIR / "spot_analyses.json"
         self._load_analyses_cache()
+
+        # Stationsdaten + Bias-Korrektur
+        try:
+            self.station_manager = StationManager(config.STATION_DB_PATH, self.spots)
+            if self.station_manager.needs_discovery():
+                print("[ENGINE] Erste Station-Discovery wird durchgeführt...")
+                self.station_manager.discover_stations()
+                if self.station_manager.needs_backfill():
+                    print("[ENGINE] Backfill historischer Stationsdaten...")
+                    self.station_manager.backfill_observations()
+        except Exception as e:
+            logger.error(f"StationManager Init fehlgeschlagen: {e}")
+            self.station_manager = None
 
     def _load_all_conversations(self):
         """Lädt alle Conversations aus dem history-Verzeichnis."""
@@ -304,6 +493,10 @@ class FlychatEngine:
         print("[ENGINE] Lade Wetterdaten für alle Spots...")
         self.spots = load_spots() # Reload spots to pick up CSV changes
 
+        # Fix B: Reset stale-tracking am Start jedes Refresh-Versuchs
+        self.last_refresh_stale = False
+        self.last_refresh_status_reason = None
+
         # 1. Wetterdaten holen (oder Cache nutzen)
         if not force and is_cache_fresh(max_age_hours=12) and is_cache_complete():
             print("[ENGINE] Nutze gecachte Wetterdaten (vollständig)")
@@ -322,6 +515,20 @@ class FlychatEngine:
                 self.weather_data = result
                 self.region_weather_data = result.pop("_regions", {}) if result else {}
 
+        # Fix B: Stale-Cache-Fallback erkennen und SOFORT abbrechen.
+        # fetch_all_spots() markiert via _meta.fetch_status, wenn der echte Fetch
+        # fehlschlug und nur der alte Cache zurückgegeben wurde. In diesem Fall:
+        # - Föhn/Stations/Context NICHT neu bauen (Daten haben sich nicht geändert)
+        # - Analysen NICHT löschen (Daten sind unverändert, alte Analysen sind valid)
+        # - last_refresh_stale Flag setzen für API-Endpoint
+        fetch_status = (self.weather_data or {}).get("_meta", {}).get("fetch_status")
+        if fetch_status == "stale_cache":
+            reason = (self.weather_data or {}).get("_meta", {}).get("fetch_status_reason", "unknown")
+            print(f"[WARN] Wetter-Refresh fehlgeschlagen ({reason}) — überspringe Föhn/Stations/Context, alte Daten bleiben unverändert")
+            self.last_refresh_stale = True
+            self.last_refresh_status_reason = reason
+            return
+
         # KRITISCH: Wenn keine Wetterdaten verfügbar sind, alte Analysen löschen!
         if not self.weather_data or len([k for k in self.weather_data if not k.startswith("_")]) == 0:
             print("[WARNUNG] Keine Wetterdaten verfügbar - lösche alte Analysen zur Sicherheit")
@@ -330,33 +537,59 @@ class FlychatEngine:
             self._clear_analyses_cache()
             return
 
-        # 2. Föhn-Daten holen
+        # 2. Alte Analysen invalidieren (Wetterdaten haben sich geändert!)
+        print("[ENGINE] Lösche veraltete Analysen (neue Wetterdaten geladen)")
+        self.spot_analyses = {}
+        self.region_analyses = {}
+        self.analyses_loaded_at = None
+        self.region_analyses_loaded_at = None
+        self._clear_analyses_cache()
+        if self.instantdb:
+            try:
+                self.instantdb.delete_all("spot_analyses")
+                self.instantdb.delete_all("region_analyses")
+            except Exception as e:
+                logger.error(f"InstantDB Analyse-Cleanup fehlgeschlagen: {e}")
+
+        # 3. Föhn-Daten holen
         try:
             self.foehn_data = fetch_foehn_data(forecast_days=config.FORECAST_DAYS)
         except Exception as e:
             logger.error(f"Föhn-Daten fehlgeschlagen: {e}")
             self.foehn_data = None
 
-        # 3. Kontext-String bauen
+        # 3b. Stationsdaten sammeln + Bias-Korrektur anwenden (Spots + Regionen)
+        if self.station_manager:
+            try:
+                self.station_manager.collect_observations()
+                self.station_manager.create_pairs(self.weather_data)
+                self.station_manager.apply_bias_correction(self.weather_data)
+                # Region-Bias: nur ueber Spots innerhalb des Polygons
+                try:
+                    from source_area import _load_regions
+                    regions_with_polygons = _load_regions()
+                    if regions_with_polygons and self.region_weather_data:
+                        self.station_manager.apply_bias_correction_to_regions(
+                            self.region_weather_data, regions_with_polygons
+                        )
+                except Exception as e:
+                    logger.error(f"Region-Bias-Korrektur fehlgeschlagen: {e}")
+            except Exception as e:
+                logger.error(f"Station Bias-Korrektur fehlgeschlagen: {e}")
+
+        # 4. Kontext-String bauen
         self.weather_context_str = self._build_weather_context()
         self.weather_loaded_at = datetime.now()
 
-        # 4. Conversations NICHT komplett resetten, aber Cache markieren
+        # 5. Conversations NICHT komplett resetten, aber Cache markieren
         for conv in self.conversations.values():
              conv["first_question"] = True
 
-        # 5. An InstantDB pushen (non-blocking)
+        # 6. An InstantDB pushen (non-blocking)
         if self.instantdb:
             threading.Thread(target=self._push_to_instantdb, daemon=True).start()
 
         print(f"[ENGINE] Wetterdaten geladen ({len(self.weather_data) - 1} Spots)")
-
-        # 6. Automatische Analyse für neue/fehlende Spots (wenn LLM verfügbar)
-        if self.client:
-            new_spots = [s["name"] for s in self.spots if s["name"] not in self.spot_analyses]
-            if new_spots:
-                print(f"[ENGINE] Neue Spots ohne Analyse gefunden ({len(new_spots)}): {new_spots}. Starte Hintergrund-Analyse...")
-                threading.Thread(target=self.run_spot_analyses, kwargs={"spot_names": new_spots}, daemon=True).start()
 
     def _build_weather_context(self) -> str:
         """Formatiert ALLE Spot-Daten + Thermik + Föhn als einen Text-Block."""
@@ -410,16 +643,50 @@ class FlychatEngine:
             # Formatiere Stundendaten (nur Flugstunden)
             sorted_times = sorted(hourly_data.keys())
             hourly_lines = []
-            
+
             prev_max_h = None
             prev_day = None
             cumulative_bf = 0.0
             peak_H = 0.0
             peak_sw = 0.0
 
+            # Per-Tag-Tracking für TAGESPROFIL-Block
+            day_state = {"tag_counts": {}, "clean": 0, "total": 0, "day": None}
+
+            def _emit_day_profile(state):
+                """Hängt eine TAGESPROFIL-Zeile für einen abgeschlossenen Tag an."""
+                if state["total"] == 0:
+                    return
+                clean_pct = (state["clean"] / state["total"]) * 100
+                major_tags_order = [
+                    "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+                    "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-WARN]", "[OVERCAST-DANGER]",
+                    "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
+                    "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
+                    "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]",
+                    "[WIND-WRONG]",
+                ]
+                hist_parts = []
+                for t in major_tags_order:
+                    cnt = state["tag_counts"].get(t, 0)
+                    if cnt > 0:
+                        hist_parts.append(f"{t.strip('[]')} {cnt}h")
+                hist_str = (" | Hauptgefahren: " + ", ".join(hist_parts)) if hist_parts else ""
+                warn = ""
+                if 0 < clean_pct < 35:
+                    warn = "  → ACHTUNG <35%: Tag überwiegend gefährlich, max. conditional!"
+                hourly_lines.append(
+                    f"  ═══ TAGESPROFIL {state['day']} ({_weekday_de(state['day'])}): "
+                    f"{state['clean']}/{state['total']}h sauber = {clean_pct:.0f}%"
+                    f"{hist_str}{warn}"
+                )
+
             for timestamp in sorted_times:
                 current_day = timestamp[:10]
                 if current_day != prev_day:
+                    # Vorherigen Tag abschließen
+                    _emit_day_profile(day_state)
+                    day_state = {"tag_counts": {}, "clean": 0, "total": 0, "day": current_day}
                     prev_max_h = None
                     cumulative_bf = 0.0
                     peak_H = 0.0
@@ -484,6 +751,9 @@ class FlychatEngine:
                 cloud_base_raw = data.get("cloud_base")
                 cloud_base = f"{cloud_base_raw}m" if cloud_base_raw is not None else "wolkenfrei"
                 cloud_cover = data.get("cloud_cover", "N/A")
+                low_cl = float(data.get("cloud_cover_low") or 0)
+                mid_cl = float(data.get("cloud_cover_mid") or 0)
+                high_cl = float(data.get("cloud_cover_high") or 0)
                 precip = data.get("precipitation", "N/A")
                 sunshine = data.get("sunshine_duration", "N/A")
                 sunshine_str = f"{sunshine / 3600:.2f}h" if isinstance(sunshine, (int, float)) and sunshine > 0 else "0h"
@@ -514,65 +784,69 @@ class FlychatEngine:
 
                 pl_data = pressure_level_data.get(timestamp, {})
                 if pl_data:
-                    # Build levels for gust calculation
-                    alt_levels = []
-                    for level in [850, 700]:
+                    # Display levels mit 3 Klassen (siehe _build_single_spot_context):
+                    #   * = Flugbereich, ~ = Buffer (thermik+1500m), kein Marker = 850/700 Föhn-Anker
+                    buffer_top = effective_ceiling + 500
+                    display_levels_set = set()
+                    for level in config.PRESSURE_LEVELS:
+                        h_val = pl_data.get(f"geopotential_height_{level}hPa")
+                        if h_val is None:
+                            continue
+                        if spot["elevation_m"] <= h_val <= buffer_top:
+                            display_levels_set.add(level)
+                    display_levels_set.add(850)
+                    display_levels_set.add(700)
+
+                    display_levels = []
+                    for level in sorted(display_levels_set, reverse=True):
                         h_val = pl_data.get(f"geopotential_height_{level}hPa")
                         ws = pl_data.get(f"wind_speed_{level}hPa")
                         wd = pl_data.get(f"wind_direction_{level}hPa")
                         if h_val is not None and ws is not None:
-                            alt_levels.append({"pressure": level, "altitude": h_val,
-                                               "wind_speed": ws, "wind_direction": wd})
+                            display_levels.append({"pressure": level, "altitude": h_val,
+                                                   "wind_speed": ws, "wind_direction": wd})
 
-                    # Compute altitude gusts for display levels
-                    if alt_levels:
-                        alt_levels_with_gusts = estimate_altitude_gusts(
+                    if display_levels:
+                        display_with_gusts = estimate_altitude_gusts(
                             wind_speed_10m=wind_speed,
                             wind_gusts_10m=wind_gusts,
-                            pressure_levels_data=alt_levels,
+                            pressure_levels_data=display_levels,
                             elevation_m=spot["elevation_m"],
                             boundary_layer_height=data.get("boundary_layer_height"),
                         )
-                        for lv in alt_levels_with_gusts:
-                            gust_str = ""
-                            if lv.get("wind_gusts") is not None and lv["wind_gusts"] > lv["wind_speed"] + 2:
-                                gust_str = f" (Böen {lv['wind_gusts']:.0f}km/h)"
+                        for lv in display_with_gusts:
+                            alt = lv["altitude"]
+                            in_range = spot["elevation_m"] <= alt <= effective_ceiling
+                            in_buffer = effective_ceiling < alt <= buffer_top
+                            if in_range:
+                                marker = "*"
+                            elif in_buffer:
+                                marker = "~"
+                            else:
+                                marker = ""
+                            ws_val = lv["wind_speed"]
+                            g_val = lv.get("wind_gusts")
                             wd_val = lv.get("wind_direction")
-                            if wd_val is not None:
-                                alt_wind_info += f" | {lv['pressure']}hPa({int(lv['altitude'])}m): {lv['wind_speed']:.0f}km/h{gust_str} aus {wd_val:.0f}°"
-
-                    for level in config.PRESSURE_LEVELS:
-                        h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                        ws = pl_data.get(f"wind_speed_{level}hPa")
-                        if h_val is not None and ws is not None:
-                            if spot["elevation_m"] <= h_val <= effective_ceiling:
-                                if ws > 40:
+                            if g_val is not None and g_val > ws_val + 2:
+                                wind_str = f"{ws_val:.0f}/{g_val:.0f}"
+                            else:
+                                wind_str = f"{ws_val:.0f}"
+                            dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
+                            alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
+                            if in_range:
+                                if ws_val > 40:
                                     aloft_danger = True
-                                elif ws > 30:
+                                elif ws_val > 30:
                                     aloft_warn = True
-
-                    # Gust warnings for altitude levels in flying range
-                    all_fly_levels = []
-                    for level in config.PRESSURE_LEVELS:
-                        h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                        ws = pl_data.get(f"wind_speed_{level}hPa")
-                        if h_val is not None and ws is not None and spot["elevation_m"] <= h_val <= effective_ceiling:
-                            all_fly_levels.append({"pressure": level, "altitude": h_val, "wind_speed": ws})
-
-                    if all_fly_levels:
-                        fly_with_gusts = estimate_altitude_gusts(
-                            wind_speed_10m=wind_speed,
-                            wind_gusts_10m=wind_gusts,
-                            pressure_levels_data=all_fly_levels,
-                            elevation_m=spot["elevation_m"],
-                            boundary_layer_height=data.get("boundary_layer_height"),
-                        )
-                        for lv in fly_with_gusts:
-                            g = lv.get("wind_gusts", 0)
-                            if g > 40:
-                                aloft_gust_danger = True
-                            elif g > 30:
-                                aloft_gust_warn = True
+                                if g_val is not None:
+                                    # T(z) > 40 km/h im Flugbereich = DANGER,
+                                    # unabhängig vom Modellwind W(z).
+                                    # Turbulenzrisiko >40 km/h ist ein Sicherheits-
+                                    # problem auch bei moderatem Grundwind.
+                                    if g_val > 40:
+                                        aloft_gust_danger = True
+                                    elif g_val > 30:
+                                        aloft_gust_warn = True
 
                 if aloft_danger:
                     if "[ALOFT-DANGER]" not in warnings:
@@ -595,15 +869,42 @@ class FlychatEngine:
                 except Exception:
                     pass
 
-                if isinstance(cloud_cover, (int, float)) and cloud_cover >= 80:
-                    warnings.append("[OVERCAST-WARN]")
+                # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
+                if (cloud_base_raw is not None
+                        and isinstance(cloud_base_raw, (int, float))
+                        and isinstance(cloud_cover, (int, float))
+                        and cloud_cover >= 75
+                        and cloud_base_raw < spot["elevation_m"] + 500):
+                    warnings.append("[OVERCAST-DANGER]")
 
                 warning_str = " " + " ".join(warnings) if warnings else ""
 
+                # Tag-Histogram pro Tag für TAGESPROFIL
+                for w in warnings:
+                    day_state["tag_counts"][w] = day_state["tag_counts"].get(w, 0) + 1
+                if not is_ok:
+                    day_state["tag_counts"]["[WIND-WRONG]"] = day_state["tag_counts"].get("[WIND-WRONG]", 0) + 1
+                # "Clean" = WIND-OK ohne harte Warnungen
+                hard_warnings_set = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+                                     "[RAIN-WARN]", "[CAPE-WARN]", "[STRONG-WIND-WARN]", "[OVERCAST-DANGER]"}
+                has_hard = bool(hard_warnings_set & set(warnings))
+                if is_ok and not has_hard:
+                    day_state["clean"] += 1
+                day_state["total"] += 1
+
+                # Surface gust excess for LLM context
+                sfc_excess = ""
+                if isinstance(wind_gusts, (int, float)) and isinstance(wind_speed, (int, float)):
+                    exc = max(0, wind_gusts - wind_speed)
+                    sfc_excess = f", Exzess +{exc:.0f}km/h"
+
                 hourly_lines.append(
-                    f"{time_str}: Temp {temp}°C | Wind {wind_speed}km/h aus {wind_dir}° (Böen {wind_gusts}km/h) {wind_status}{warning_str} | "
-                    f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% | Sonne {sunshine_str}{alt_wind_info}{thermal_info}"
+                    f"{time_str}: Temp {temp}°C | Wind {wind_speed}km/h aus {wind_dir}° (Turbulenzrisiko {wind_gusts}km/h{sfc_excess}) {wind_status}{warning_str} | "
+                    f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | Sonne {sunshine_str}{alt_wind_info}{thermal_info}"
                 )
+
+            # Letzten Tag noch abschließen
+            _emit_day_profile(day_state)
 
             # Füge Peak-Info in den Info-Bereich ein
             lines[spot_info_idx] += f" | PEAK-THERMIK: {max_climb} m/s bis {max_climb_h}m MSL"
@@ -681,6 +982,345 @@ class FlychatEngine:
             peak_shortwave=peak_sw,
         )
         return therm
+
+    def _calculate_wind_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m):
+        """
+        Berechnet die vertikale Windscherung dU/dz durch die Thermikschicht.
+
+        Returns: (dU_dz_kmh_per_100m, u_top_kmh, u_sfc_kmh) oder (None, None, None)
+        falls keine pressure levels verfuegbar.
+
+        Basis: meteo_research/wind_shear_thermal_quality.md Abschnitt 3.2/3.3.
+        """
+        if not isinstance(wind_speed_10m, (int, float)):
+            return (None, None, None)
+        if not pl_data or not isinstance(thermal_top_m, (int, float)):
+            return (None, None, None)
+        if thermal_top_m <= elevation_m:
+            return (None, None, None)
+
+        # Sammle alle pressure-level Winde zwischen elevation und thermal_top
+        winds_in_layer = []
+        for level in config.PRESSURE_LEVELS:
+            h_val = pl_data.get(f"geopotential_height_{level}hPa")
+            ws_val = pl_data.get(f"wind_speed_{level}hPa")
+            if h_val is None or ws_val is None:
+                continue
+            if elevation_m <= h_val <= thermal_top_m:
+                winds_in_layer.append((h_val, ws_val))
+
+        if len(winds_in_layer) < 1:
+            return (None, None, None)
+
+        # Waehle den hoechsten Punkt in der Schicht als U_top
+        winds_in_layer.sort(key=lambda x: x[0])
+        h_top, u_top = winds_in_layer[-1]
+
+        # Distanz vom 10 m ueber Grund (~ wind_speed_10m Referenz) bis h_top
+        dz_m = h_top - elevation_m
+        if dz_m < 200:
+            # Zu duenne Schicht fuer belastbare Scherungs-Schaetzung
+            return (None, None, None)
+
+        du_kmh = abs(u_top - wind_speed_10m)
+        du_dz_kmh_per_100m = (du_kmh / dz_m) * 100.0
+        return (du_dz_kmh_per_100m, u_top, wind_speed_10m)
+
+    def _calculate_segment_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m):
+        """
+        Berechnet Windscherung pro Segment zwischen konsekutiven Levels.
+
+        Sammelt Surface-Anker (elevation_m, wind_speed_10m) + alle PL-Windpunkte
+        innerhalb [elevation_m, thermal_top_m]. Berechnet dU/dz zwischen
+        aufeinanderfolgenden Levels.
+
+        Returns: (segments, column_shear)
+            segments: list of dicts with keys: alt_lo, alt_hi, du_dz, wind_lo, wind_hi
+            column_shear: (du_dz_kmh_per_100m, u_top, u_sfc) fuer Rueckwaertskompatibilitaet
+        """
+        empty = ([], (None, None, None))
+        if not isinstance(wind_speed_10m, (int, float)):
+            return empty
+        if not pl_data or not isinstance(thermal_top_m, (int, float)):
+            return empty
+        if thermal_top_m <= elevation_m:
+            return empty
+
+        # Sammle Windpunkte: Surface-Anker + pressure levels in der Schicht
+        points = [(elevation_m, wind_speed_10m)]
+        for level in config.PRESSURE_LEVELS:
+            h_val = pl_data.get(f"geopotential_height_{level}hPa")
+            ws_val = pl_data.get(f"wind_speed_{level}hPa")
+            if h_val is None or ws_val is None:
+                continue
+            if elevation_m < h_val <= thermal_top_m:
+                points.append((h_val, ws_val))
+
+        if len(points) < 2:
+            return empty
+
+        points.sort(key=lambda x: x[0])
+
+        # Segmente zwischen konsekutiven Levels
+        MIN_SEGMENT_DZ = 50  # m
+        segments = []
+        for i in range(len(points) - 1):
+            h_lo, w_lo = points[i]
+            h_hi, w_hi = points[i + 1]
+            dz = h_hi - h_lo
+            if dz < MIN_SEGMENT_DZ:
+                continue
+            du_kmh = abs(w_hi - w_lo)
+            du_dz = (du_kmh / dz) * 100.0
+            segments.append({
+                "alt_lo": h_lo,
+                "alt_hi": h_hi,
+                "du_dz": du_dz,
+                "wind_lo": w_lo,
+                "wind_hi": w_hi,
+            })
+
+        # Column shear fuer Rueckwaertskompatibilitaet
+        h_bottom, w_bottom = points[0]
+        h_top, w_top = points[-1]
+        total_dz = h_top - h_bottom
+        if total_dz < 200:
+            column_shear = (None, None, None)
+        else:
+            col_du_dz = (abs(w_top - w_bottom) / total_dz) * 100.0
+            column_shear = (col_du_dz, w_top, w_bottom)
+
+        return (segments, column_shear)
+
+    def _calculate_bs_ratio(self, climb_rate_ms, du_dz_kmh_per_100m):
+        """
+        Einfacher B/S-Proxy nach meteo_research/wind_shear_thermal_quality.md 3.3:
+            simple_BS = w* / dU_dz * 100
+        mit w* in m/s und dU_dz in km/h/100m. Die Eichung (siehe config.py
+        BS_RATIO_THRESHOLDS) bildet die Standardform ab: ≥100 gut, ≤60 zerrissen.
+
+        Returns: float oder None bei unbrauchbaren Eingaben.
+        """
+        if not isinstance(climb_rate_ms, (int, float)) or climb_rate_ms <= 0:
+            return None
+        if not isinstance(du_dz_kmh_per_100m, (int, float)) or du_dz_kmh_per_100m <= 0:
+            return None
+        return (climb_rate_ms / du_dz_kmh_per_100m) * 100.0
+
+    def _calculate_gust_factor(self, wind_speed_10m, wind_gusts_10m, climb_rate_ms):
+        """
+        Boeigkeitsfaktor relativ zur Thermik-Vertikalgeschwindigkeit:
+            GF = mechanical_excess / w*
+        Konvektive Baseline (BETA × w*) wird abgezogen (Panofsky et al. 1977).
+        Abschnitt 3.4 + 3.5 im Research-Dokument.
+
+        Returns: float oder None.
+        """
+        if not isinstance(wind_speed_10m, (int, float)):
+            return None
+        if not isinstance(wind_gusts_10m, (int, float)):
+            return None
+        if not isinstance(climb_rate_ms, (int, float)) or climb_rate_ms <= 0:
+            return None
+        delta_ms = max(0.0, (wind_gusts_10m - wind_speed_10m) / 3.6)
+        # Konvektive Baseline abziehen (Panofsky et al. 1977):
+        # Auf Thermiktagen stammt ein Teil des Böen-Excess aus der
+        # Konvektion selbst (≈ BETA × w*), nicht aus mechanischer Störung.
+        mechanical_ms = max(0.0, delta_ms - config.CONVECTIVE_GUST_BETA * climb_rate_ms)
+        if mechanical_ms <= 0:
+            return None
+        return mechanical_ms / climb_rate_ms
+
+    @staticmethod
+    def _parabolic_climb(alt, elevation_m, max_height_m, peak_climb_ms):
+        """Lokale Steigrate aus parabolischem Profil (0 an Basis/Top, Peak in Mitte)."""
+        if alt <= elevation_m or alt >= max_height_m or peak_climb_ms <= 0:
+            return 0.0
+        mid = (elevation_m + max_height_m) / 2
+        half = (max_height_m - elevation_m) / 2
+        if half <= 0:
+            return 0.0
+        return max(0.0, peak_climb_ms * (1 - ((alt - mid) / half) ** 2))
+
+    def _thermal_quality_tags(
+        self,
+        wind_speed_10m,
+        wind_gusts_10m,
+        pl_data,
+        elevation_m,
+        thermal_top_m,
+        climb_rate_ms,
+        region_id=None,
+        altitude_gusts=None,
+    ):
+        """
+        Berechnet die 6 Thermik-Qualitaets-Tags pro Stunde:
+            [SHEAR-DEGRADED]/[SHEAR-UNUSABLE]
+            [THERMAL-TORN-DEGRADED]/[THERMAL-TORN-UNUSABLE]
+            [THERMAL-ROUGH-DEGRADED]/[THERMAL-ROUGH-UNUSABLE]
+
+        Zusaetzlich: Per-Segment-Klassifikation fuer TQ-Ratio.
+        Jedes Segment (zwischen konsekutiven Windlevels) bekommt eigene Tags.
+        tq_ratio = {"total": N, "clean": M, "tags": {"SHEAR-DEG": k, ...}}
+
+        Returns: (list_of_tags, debug_dict).
+        """
+        tags = []
+        debug = {"du_dz": None, "bs": None, "gf": None, "zone": None, "tq_ratio": None}
+
+        # Gate: keine Thermik -> keine Qualitaets-Tags
+        if (not isinstance(climb_rate_ms, (int, float))
+                or climb_rate_ms < config.THERMAL_QUALITY_MIN_CLIMB):
+            return (tags, debug)
+
+        terrain_zone = get_terrain_zone(elevation_m, region_id)
+        debug["zone"] = terrain_zone
+
+        # --- Per-Segment Shear ---
+        shear_cfg = config.SHEAR_THRESHOLDS.get(
+            terrain_zone, config.SHEAR_THRESHOLDS["alpen"]
+        )
+        segments, column_shear = self._calculate_segment_shear(
+            wind_speed_10m, pl_data, elevation_m, thermal_top_m
+        )
+        du_dz = column_shear[0]
+        debug["du_dz"] = du_dz
+
+        # Column-level SHEAR tags (Rueckwaertskompatibilitaet)
+        if du_dz is not None:
+            if du_dz >= shear_cfg["danger"]:
+                tags.append("[SHEAR-UNUSABLE]")
+            elif du_dz >= shear_cfg["warn"]:
+                tags.append("[SHEAR-DEGRADED]")
+
+        # --- B/S Ratio (Thermik zerrissen) ---
+        bs = self._calculate_bs_ratio(climb_rate_ms, du_dz)
+        debug["bs"] = bs
+        if bs is not None:
+            if bs <= config.BS_RATIO_THRESHOLDS["danger"]:
+                tags.append("[THERMAL-TORN-UNUSABLE]")
+            elif bs <= config.BS_RATIO_THRESHOLDS["warn"]:
+                tags.append("[THERMAL-TORN-DEGRADED]")
+
+        # --- Gust Factor (Thermik ruppig) ---
+        surface_gf = self._calculate_gust_factor(wind_speed_10m, wind_gusts_10m, climb_rate_ms)
+        debug["gf"] = surface_gf
+
+        # Per-altitude GF: Turbulenz-Exzess auf jeder Hoehenstufe vs. Peak-Steigrate.
+        gf_altitude = {}
+        worst_gf = surface_gf
+        if altitude_gusts and thermal_top_m and elevation_m:
+            for lv in altitude_gusts:
+                alt = lv.get("altitude")
+                t_excess = lv.get("turbulence_excess")
+                if alt is None or t_excess is None:
+                    continue
+                if not (elevation_m < alt < thermal_top_m):
+                    continue
+                local_excess_ms = t_excess / 3.6
+                # Konvektive Baseline abziehen (gleicher Ansatz wie Surface-GF)
+                local_mechanical_ms = max(0.0, local_excess_ms - config.CONVECTIVE_GUST_BETA * climb_rate_ms)
+                if local_mechanical_ms <= 0:
+                    continue
+                local_gf = local_mechanical_ms / climb_rate_ms
+                gf_altitude[int(alt)] = round(local_gf, 2)
+                if worst_gf is None or local_gf > worst_gf:
+                    worst_gf = local_gf
+        debug["gf_altitude"] = gf_altitude
+
+        if worst_gf is not None:
+            if worst_gf >= config.GUST_FACTOR_THRESHOLDS["danger"]:
+                tags.append("[THERMAL-ROUGH-UNUSABLE]")
+            elif worst_gf >= config.GUST_FACTOR_THRESHOLDS["warn"]:
+                tags.append("[THERMAL-ROUGH-DEGRADED]")
+
+        # --- Per-Segment Klassifikation fuer TQ-Ratio ---
+        # Jedes Segment bekommt eigene Tags basierend auf lokaler Scherung,
+        # lokaler B/S-Ratio (mit parabolischer Steigrate) und worst GF im Segment.
+        CLIMB_FLOOR = 0.3  # m/s — verhindert false-positives am Saeulenrand
+        seg_results = []
+        for seg in segments:
+            seg_tags = []
+            # Lokale Scherung
+            if seg["du_dz"] >= shear_cfg["danger"]:
+                seg_tags.append("SHEAR-UNU")
+            elif seg["du_dz"] >= shear_cfg["warn"]:
+                seg_tags.append("SHEAR-DEG")
+
+            # Lokale B/S: Steigrate am Segment-Mittelpunkt
+            seg_mid = (seg["alt_lo"] + seg["alt_hi"]) / 2
+            local_climb = self._parabolic_climb(
+                seg_mid, elevation_m, thermal_top_m, climb_rate_ms
+            )
+            local_climb = max(local_climb, CLIMB_FLOOR)
+            if seg["du_dz"] > 0:
+                local_bs = (local_climb / seg["du_dz"]) * 100.0
+                if local_bs <= config.BS_RATIO_THRESHOLDS["danger"]:
+                    seg_tags.append("TORN-UNU")
+                elif local_bs <= config.BS_RATIO_THRESHOLDS["warn"]:
+                    seg_tags.append("TORN-DEG")
+
+            # Lokaler worst GF: suche altitude_gusts innerhalb des Segments
+            seg_worst_gf = None
+            if altitude_gusts:
+                for lv in altitude_gusts:
+                    alt = lv.get("altitude")
+                    t_excess = lv.get("turbulence_excess")
+                    if alt is None or t_excess is None:
+                        continue
+                    if seg["alt_lo"] <= alt <= seg["alt_hi"]:
+                        local_excess_ms = t_excess / 3.6
+                        local_mech_ms = max(0.0, local_excess_ms - config.CONVECTIVE_GUST_BETA * max(local_climb, CLIMB_FLOOR))
+                        if local_mech_ms <= 0:
+                            continue
+                        lf = local_mech_ms / max(local_climb, CLIMB_FLOOR)
+                        if seg_worst_gf is None or lf > seg_worst_gf:
+                            seg_worst_gf = lf
+            # Surface GF gilt nur fuer das unterste Segment
+            if seg["alt_lo"] == elevation_m and surface_gf is not None:
+                if seg_worst_gf is None or surface_gf > seg_worst_gf:
+                    seg_worst_gf = surface_gf
+            if seg_worst_gf is not None:
+                if seg_worst_gf >= config.GUST_FACTOR_THRESHOLDS["danger"]:
+                    seg_tags.append("ROUGH-UNU")
+                elif seg_worst_gf >= config.GUST_FACTOR_THRESHOLDS["warn"]:
+                    seg_tags.append("ROUGH-DEG")
+
+            seg_results.append({"alt_lo": seg["alt_lo"], "alt_hi": seg["alt_hi"], "tags": seg_tags})
+
+        # TQ-Ratio Zaehlung
+        if seg_results:
+            n_total = len(seg_results)
+            n_clean = sum(1 for s in seg_results if not s["tags"])
+            tag_counts = {}
+            for s in seg_results:
+                for t in s["tags"]:
+                    tag_counts[t] = tag_counts.get(t, 0) + 1
+            debug["tq_ratio"] = {"total": n_total, "clean": n_clean, "tags": tag_counts}
+
+        return (tags, debug)
+
+    @staticmethod
+    def _format_tq_ratio(tq_ratio):
+        """
+        Formatiert tq_ratio-Dict als kompakten String fuer LLM-Kontext.
+        Input:  {"total": 8, "clean": 7, "tags": {"SHEAR-DEG": 1}}
+        Output: "TQ 7/8 sauber, 1/8 SHEAR-DEG"
+        Wenn alles sauber → leerer String (kein Extra-Text an guten Stunden).
+        """
+        if not tq_ratio:
+            return ""
+        total = tq_ratio.get("total", 0)
+        clean = tq_ratio.get("clean", 0)
+        tag_counts = tq_ratio.get("tags", {})
+        if total <= 0:
+            return ""
+        if clean == total:
+            return f"TQ {clean}/{total} sauber"
+        parts = [f"TQ {clean}/{total} sauber"]
+        for tag, count in sorted(tag_counts.items()):
+            parts.append(f"{count}/{total} {tag}")
+        return ", ".join(parts)
 
     def _calculate_thermal_for_hour(self, data, pl_data, elevation_m, timestamp, spot, prev_max_h=None):
         """Berechnet Thermik-Proxy für eine Stunde eines Spots."""
@@ -785,7 +1425,7 @@ class FlychatEngine:
             wind_degrees = ""
 
         lines = [
-            f"WETTERDATEN FÜR: {name} — TAG: {date_str} (Stand: {updated})",
+            f"WETTERDATEN FÜR: {name} — TAG: {date_str} ({_weekday_de(date_str)}) (Stand: {updated})",
             f"═══ SPOT: {name} ({spot['fluggebiet']}, {spot['region']}) ═══",
             f"Höhe: {spot['elevation_m']}m MSL | "
             f"Windrichtung erlaubt: {spot['windrichtung']}{wind_degrees} | "
@@ -808,6 +1448,17 @@ class FlychatEngine:
         warned_hours = []      # WIND-OK aber mit harten Warnungen (GUST/ALOFT/RAIN/CAPE)
         hourly_gusts = {}      # hour_str → gust value für Trend-Analyse
         rain_hours = []        # Stunden mit Niederschlag
+        tag_counts = {}        # tag_name -> count über den ganzen Tag (für Tagesprofil)
+        # Thermik-Qualitaets-Zaehler
+        thermal_hours_total = 0  # Stunden mit climb > 0.3 m/s
+        thermal_clean_h = 0     # Thermik-Stunden ohne Quality-Tags
+        tq_rough_danger_h = 0
+        tq_rough_warn_h = 0
+        tq_torn_danger_h = 0
+        tq_torn_warn_h = 0
+        tq_shear_danger_h = 0
+        tq_shear_warn_h = 0
+        peak_climb_proxy = 0.0
 
         for timestamp in sorted_times:
             try:
@@ -833,6 +1484,8 @@ class FlychatEngine:
 
             thermal_info = ""
             effective_ceiling = spot["elevation_m"] + 1000
+            h_climb = None
+            h_max_h = None
             try:
                 therm = self._calculate_thermal_raw(
                     data, pressure_level_data.get(timestamp, {}),
@@ -840,6 +1493,8 @@ class FlychatEngine:
                 )
                 if therm and "error" not in therm:
                     h_climb = therm["climb_rate"]
+                    if isinstance(h_climb, (int, float)) and h_climb > peak_climb_proxy:
+                        peak_climb_proxy = h_climb
                     h_max_h = therm["max_height"]
                     effective_ceiling = max(effective_ceiling, h_max_h + 1000)
                     lcl = therm.get("lcl")
@@ -855,6 +1510,9 @@ class FlychatEngine:
             cloud_base_raw = data.get("cloud_base")
             cloud_base = f"{cloud_base_raw}m" if cloud_base_raw is not None else "wolkenfrei"
             cloud_cover = data.get("cloud_cover", "N/A")
+            low_cl = float(data.get("cloud_cover_low") or 0)
+            mid_cl = float(data.get("cloud_cover_mid") or 0)
+            high_cl = float(data.get("cloud_cover_high") or 0)
 
             is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"])
             wind_status = "[WIND-OK]" if is_ok else "[WIND-WRONG]"
@@ -894,75 +1552,77 @@ class FlychatEngine:
             aloft_danger = False
             aloft_gust_warn = False
             aloft_gust_danger = False
+            display_with_gusts = None
 
             pl_data = pressure_level_data.get(timestamp, {})
             if pl_data:
-                # Build levels for gust calculation (display levels)
-                alt_levels = []
-                for level in [850, 700]:
+                # Display levels mit 3 Klassen:
+                #   * = Flugbereich (elevation bis effective_ceiling = thermik+1000m): harte Tags
+                #   ~ = Buffer-Zone (effective_ceiling bis effective_ceiling+500m = thermik+1500m): nur Info
+                #   ohne Marker: 850/700 hPa als Föhn-Anker
+                buffer_top = effective_ceiling + 500
+                display_levels_set = set()
+                for level in config.PRESSURE_LEVELS:
+                    h_val = pl_data.get(f"geopotential_height_{level}hPa")
+                    if h_val is None:
+                        continue
+                    if spot["elevation_m"] <= h_val <= buffer_top:
+                        display_levels_set.add(level)
+                # Always include 850/700 for foehn detection
+                display_levels_set.add(850)
+                display_levels_set.add(700)
+
+                display_levels = []
+                for level in sorted(display_levels_set, reverse=True):
                     h_val = pl_data.get(f"geopotential_height_{level}hPa")
                     ws = pl_data.get(f"wind_speed_{level}hPa")
                     wd = pl_data.get(f"wind_direction_{level}hPa")
                     if h_val is not None and ws is not None:
-                        alt_levels.append({"pressure": level, "altitude": h_val,
-                                           "wind_speed": ws, "wind_direction": wd})
+                        display_levels.append({"pressure": level, "altitude": h_val,
+                                               "wind_speed": ws, "wind_direction": wd})
 
-                # Compute altitude gusts for display levels
-                if alt_levels:
-                    alt_levels_with_gusts = estimate_altitude_gusts(
+                if display_levels:
+                    display_with_gusts = estimate_altitude_gusts(
                         wind_speed_10m=wind_speed,
                         wind_gusts_10m=wind_gusts,
-                        pressure_levels_data=alt_levels,
-                        elevation_m=elevation_m,
-                        boundary_layer_height=data.get("boundary_layer_height"),
-                    )
-                    for lv in alt_levels_with_gusts:
-                        gust_str = ""
-                        if lv.get("wind_gusts") is not None and lv["wind_gusts"] > lv["wind_speed"] + 2:
-                            gust_str = f" (Böen {lv['wind_gusts']:.0f}km/h)"
-                        wd_val = lv.get("wind_direction")
-                        if wd_val is not None:
-                            alt_wind_info += f" | {lv['pressure']}hPa({int(lv['altitude'])}m): {lv['wind_speed']:.0f}km/h{gust_str} aus {wd_val:.0f}°"
-                else:
-                    for level in [850, 700]:
-                        h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                        ws = pl_data.get(f"wind_speed_{level}hPa")
-                        wd = pl_data.get(f"wind_direction_{level}hPa")
-                        if h_val is not None and ws is not None and wd is not None:
-                            alt_wind_info += f" | {level}hPa({int(h_val)}m): {ws:.0f}km/h aus {wd:.0f}°"
-
-                for level in config.PRESSURE_LEVELS:
-                    h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                    ws = pl_data.get(f"wind_speed_{level}hPa")
-                    if h_val is not None and ws is not None:
-                        if spot["elevation_m"] <= h_val <= effective_ceiling:
-                            if ws > 40:
-                                aloft_danger = True
-                            elif ws > 30:
-                                aloft_warn = True
-
-                # Gust warnings for altitude levels in flying range
-                all_fly_levels = []
-                for level in config.PRESSURE_LEVELS:
-                    h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                    ws = pl_data.get(f"wind_speed_{level}hPa")
-                    if h_val is not None and ws is not None and spot["elevation_m"] <= h_val <= effective_ceiling:
-                        all_fly_levels.append({"pressure": level, "altitude": h_val, "wind_speed": ws})
-
-                if all_fly_levels:
-                    fly_with_gusts = estimate_altitude_gusts(
-                        wind_speed_10m=wind_speed,
-                        wind_gusts_10m=wind_gusts,
-                        pressure_levels_data=all_fly_levels,
+                        pressure_levels_data=display_levels,
                         elevation_m=spot["elevation_m"],
                         boundary_layer_height=data.get("boundary_layer_height"),
                     )
-                    for lv in fly_with_gusts:
-                        g = lv.get("wind_gusts", 0)
-                        if g > 40:
-                            aloft_gust_danger = True
-                        elif g > 30:
-                            aloft_gust_warn = True
+                    for lv in display_with_gusts:
+                        alt = lv["altitude"]
+                        in_range = spot["elevation_m"] <= alt <= effective_ceiling
+                        in_buffer = effective_ceiling < alt <= buffer_top
+                        if in_range:
+                            marker = "*"
+                        elif in_buffer:
+                            marker = "~"
+                        else:
+                            marker = ""
+                        ws_val = lv["wind_speed"]
+                        g_val = lv.get("wind_gusts")
+                        wd_val = lv.get("wind_direction")
+                        if g_val is not None and g_val > ws_val + 2:
+                            wind_str = f"{ws_val:.0f}/{g_val:.0f}"
+                        else:
+                            wind_str = f"{ws_val:.0f}"
+                        dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
+                        alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
+                        # Set ALOFT tags only for in-range (*) levels
+                        if in_range:
+                            if ws_val > 40:
+                                aloft_danger = True
+                            elif ws_val > 30:
+                                aloft_warn = True
+                            if g_val is not None:
+                                # T(z) > 40 km/h im Flugbereich = DANGER,
+                                # unabhängig vom Modellwind W(z).
+                                # Turbulenzrisiko >40 km/h ist ein Sicherheits-
+                                # problem auch bei moderatem Grundwind.
+                                if g_val > 40:
+                                    aloft_gust_danger = True
+                                elif g_val > 30:
+                                    aloft_gust_warn = True
 
             if aloft_danger:
                 if "[ALOFT-DANGER]" not in warnings:
@@ -985,19 +1645,97 @@ class FlychatEngine:
             except Exception:
                 pass
 
+            # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
+            if (cloud_base_raw is not None
+                    and isinstance(cloud_base_raw, (int, float))
+                    and isinstance(cloud_cover, (int, float))
+                    and cloud_cover >= 75
+                    and cloud_base_raw < elevation_m + 500):
+                warnings.append("[OVERCAST-DANGER]")
+
+            # Thermik-Qualitaets-Tags (Scherung / Zerrissenheit / Boeigkeit).
+            # Basis: meteo_research/wind_shear_thermal_quality.md
+            # Nur aktiv wenn Thermik existiert — ohne climb_rate sind die
+            # Boeen-Risiken bereits durch [GUST-*] und [ALOFT-*] abgedeckt.
+            tq_info = ""
+            try:
+                quality_tags, quality_debug = self._thermal_quality_tags(
+                    wind_speed_10m=wind_speed,
+                    wind_gusts_10m=wind_gusts,
+                    pl_data=pressure_level_data.get(timestamp, {}),
+                    elevation_m=elevation_m,
+                    thermal_top_m=h_max_h,
+                    climb_rate_ms=h_climb,
+                    region_id=spot.get("region_id"),
+                    altitude_gusts=display_with_gusts,
+                )
+                for tag in quality_tags:
+                    if tag not in warnings:
+                        warnings.append(tag)
+                tq_str = self._format_tq_ratio(quality_debug.get("tq_ratio"))
+                if tq_str:
+                    tq_info = f" | {tq_str}"
+            except Exception as e:
+                logging.warning(
+                    "Thermik-Quality-Tag-Berechnung fehlgeschlagen für %s: %s",
+                    name, e
+                )
+
+            # Thermik-Qualitaets-Zaehler aktualisieren
+            if isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB:
+                thermal_hours_total += 1
+                tq_tags_this_hour = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-"))}
+                if not tq_tags_this_hour:
+                    thermal_clean_h += 1
+                else:
+                    if "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour:
+                        tq_rough_danger_h += 1
+                    elif "[THERMAL-ROUGH-DEGRADED]" in tq_tags_this_hour:
+                        tq_rough_warn_h += 1
+                    if "[THERMAL-TORN-UNUSABLE]" in tq_tags_this_hour:
+                        tq_torn_danger_h += 1
+                    elif "[THERMAL-TORN-DEGRADED]" in tq_tags_this_hour:
+                        tq_torn_warn_h += 1
+                    if "[SHEAR-UNUSABLE]" in tq_tags_this_hour:
+                        tq_shear_danger_h += 1
+                    elif "[SHEAR-DEGRADED]" in tq_tags_this_hour:
+                        tq_shear_warn_h += 1
+
             warning_str = " " + " ".join(warnings) if warnings else ""
 
+            # Tag-Histogram: zähle alle Warnungen + WIND-WRONG für Tagesprofil
+            for w in warnings:
+                tag_counts[w] = tag_counts.get(w, 0) + 1
+            if not is_ok:
+                tag_counts["[WIND-WRONG]"] = tag_counts.get("[WIND-WRONG]", 0) + 1
+
             # Klassifiziere saubere vs. gewarnte Stunden (nach allen Warnungen)
-            hard_warnings = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]", "[RAIN-WARN]", "[CAPE-WARN]", "[STRONG-WIND-WARN]"}
+            # WICHTIG: Die Thermik-Qualitaets-Tags (SHEAR / THERMAL-TORN / THERMAL-ROUGH)
+            # gehoeren hier NICHT rein. Sie betreffen die Fliegbarkeit (kann ich Thermik
+            # fliegen?), nicht die Sicherheit (kann ich starten und heil wieder landen?).
+            # Eine Stunde mit SHEAR-UNUSABLE + WIND-OK + keine Boeen bleibt sicher fliegbar
+            # (Abgleiter), sie ist nur thermisch wertlos. Die LLM-Fliegbarkeits-Phase
+            # (flyability.md) interpretiert die Tags und degradiert auf gray/green.
+            hard_warnings = {
+                "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+                "[RAIN-WARN]", "[CAPE-WARN]", "[STRONG-WIND-WARN]",
+                "[OVERCAST-DANGER]",
+            }
             has_hard_warn = bool(hard_warnings & set(warnings))
             if is_ok and not has_hard_warn:
                 clean_hours.append(hour_str)
             elif is_ok and has_hard_warn:
                 warned_hours.append(hour_str)
 
+            # Surface gust excess for LLM context
+            sfc_excess = ""
+            if isinstance(wind_gusts, (int, float)) and isinstance(wind_speed, (int, float)):
+                exc = max(0, wind_gusts - wind_speed)
+                sfc_excess = f", Exzess +{exc:.0f}km/h"
+
             lines.append(
-                f"{time_str}: Temp {temp}°C | Wind {wind_speed}km/h aus {wind_dir}° (Böen {wind_gusts}km/h) {wind_status}{warning_str} | "
-                f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% | FLUGBEREICH: {elevation_m}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}"
+                f"{time_str}: Temp {temp}°C | Wind {wind_speed}km/h aus {wind_dir}° (Turbulenzrisiko {wind_gusts}km/h{sfc_excess}) {wind_status}{warning_str} | "
+                f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | FLUGBEREICH: {elevation_m}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
             )
 
         if not has_data:
@@ -1019,6 +1757,148 @@ class FlychatEngine:
             lines.append(f"→ ACHTUNG: Alle {len(wind_ok_hours)} WIND-OK-Stunden haben harte Warnungen (WIND/GUST/ALOFT/RAIN/CAPE)! Status sollte NOT_SAFE sein!")
         else:
             lines.append(f"→ Kein fliegbares Fenster. Status sollte not_safe sein.")
+
+        # ─── TAGESPROFIL: Ganzheitliche Sicht für LLM-Bewertung ───
+        total_actual = len(wind_ok_hours) + len(wind_wrong_hours)
+        if total_actual > 0:
+            clean_pct = (len(clean_hours) / total_actual) * 100
+            lines.append("")
+            lines.append("═══ TAGESPROFIL (für ganzheitliche Beurteilung) ═══")
+            lines.append(
+                f"Flugfenster ausgewertet: {total_actual}h "
+                f"(zwischen {config.FLIGHT_HOURS_START:02d}:00 und {config.FLIGHT_HOURS_END:02d}:00)"
+            )
+            lines.append(
+                f"Verhältnis sauber/gesamt: {len(clean_hours)}/{total_actual}h = {clean_pct:.0f}%"
+            )
+            # Histogramm der Hauptgefahren über den ganzen Tag
+            major_tags_order = [
+                "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+                "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-WARN]", "[OVERCAST-DANGER]",
+                "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
+                "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
+                "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]",
+                "[WIND-WRONG]",
+            ]
+            hist_parts = []
+            for t in major_tags_order:
+                cnt = tag_counts.get(t, 0)
+                if cnt > 0:
+                    hist_parts.append(f"{t.strip('[]')} {cnt}h")
+            if hist_parts:
+                lines.append(f"Hauptgefahren am Tag: {', '.join(hist_parts)}")
+            # Verdict-Hinweis bei niedrigem Verhältnis
+            if 0 < clean_pct < 35:
+                lines.append(
+                    f"→ ACHTUNG Verhältnis < 35%: Tag ist überwiegend gefährlich. "
+                    f"Auch wenn ein 4h-Fenster existiert, prüfe ob es eingekesselt ist. "
+                    f"Status maximal conditional, oft eher not_safe."
+                )
+
+        # ─── BÖEN-INFO: Zusammenfassung für LLM-Bewertung ───
+        gust_warn_h = tag_counts.get("[GUST-WARN]", 0)
+        aloft_gust_warn_h = tag_counts.get("[ALOFT-GUST-WARN]", 0)
+        gust_danger_h = tag_counts.get("[GUST-DANGER]", 0)
+        aloft_gust_danger_h = tag_counts.get("[ALOFT-GUST-DANGER]", 0)
+        max_surface_gust = max(hourly_gusts.values()) if hourly_gusts else 0
+
+        # "Harte Warnungen" = alles was eine Stunde objektiv unfliegbar macht
+        hard_warning_tags = [
+            "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+            "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-WARN]", "[OVERCAST-DANGER]",
+        ]
+        hard_warning_hours = sum(tag_counts.get(t, 0) for t in hard_warning_tags)
+
+        # Cache fuer deterministische Zahlen-Injektion in _safety_check_single_spot_day.
+        # LLM darf diese NICHT selber schreiben (Halluzinations-Schutz).
+        self._ctx_gust_cache[f"{name}|{date_str}"] = {
+            "gust_warn_hours": gust_warn_h,
+            "aloft_gust_warn_hours": aloft_gust_warn_h,
+            "gust_danger_hours": gust_danger_h,
+            "aloft_gust_danger_hours": aloft_gust_danger_h,
+            "max_surface_gust": max_surface_gust,
+            "wind_ok_count": len(wind_ok_hours),
+            "wind_wrong_count": len(wind_wrong_hours),
+            "clean_hours_count": len(clean_hours),
+            "hard_warning_hours": hard_warning_hours,
+            "rain_hours": len(rain_hours),
+            "rain_hour_list": rain_hours,
+        }
+
+        # Cache fuer deterministische Flyability-Override (gray→green bei <50% UNUSABLE)
+        self._ctx_tq_cache[f"{name}|{date_str}"] = {
+            "thermal_hours_total": thermal_hours_total,
+            "tq_danger_h": tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h,
+            "peak_climb_proxy": peak_climb_proxy,
+        }
+
+        if gust_danger_h > 0 or aloft_gust_danger_h > 0:
+            danger_bits = []
+            if gust_danger_h > 0:
+                danger_bits.append(f"Bodenböen >40 km/h in {gust_danger_h}h")
+            if aloft_gust_danger_h > 0:
+                danger_bits.append(f"Höhenböen >40 km/h in {aloft_gust_danger_h}h")
+            lines.append(
+                f"→ BÖEN-INFO: {', '.join(danger_bits)}. "
+                f"Prüfe den WIND-TREND: Wenn Böen nachlassen und 4+ saubere Stunden am Rand "
+                f"(nicht eingekesselt) bleiben, ist conditional möglich. "
+                f"Sonst not_safe. PFLICHT: Böen MIT Zahlen in no_go_reasons oder caution_notes."
+            )
+        elif gust_warn_h > 0 or aloft_gust_warn_h > 0:
+            warn_bits = []
+            if gust_warn_h > 0:
+                warn_bits.append(f"Bodenböen >30 km/h in {gust_warn_h}h (max ~{int(max_surface_gust)} km/h)")
+            if aloft_gust_warn_h > 0:
+                warn_bits.append(f"Höhenböen >30 km/h in {aloft_gust_warn_h}h im Flugbereich")
+            lines.append(
+                f"→ BÖEN-INFO: {', '.join(warn_bits)}. "
+                f"Status DARF NICHT 'safe' sein — mindestens conditional. "
+                f"PFLICHT: Böen-Hinweis MIT Zahlen in caution_notes nennen."
+            )
+
+        # ──��� THERMIK-QUALITÄT: Zusammenfassung für LLM (analog BÖEN-FLOOR) ───
+        if thermal_hours_total > 0:
+            tq_danger_h = tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h
+            tq_warn_h = tq_rough_warn_h + tq_torn_warn_h + tq_shear_warn_h
+            tq_parts = []
+            if tq_rough_danger_h:
+                tq_parts.append(f"ROUGH-UNUSABLE {tq_rough_danger_h}h")
+            if tq_torn_danger_h:
+                tq_parts.append(f"TORN-UNUSABLE {tq_torn_danger_h}h")
+            if tq_shear_danger_h:
+                tq_parts.append(f"SHEAR-UNUSABLE {tq_shear_danger_h}h")
+            if tq_rough_warn_h:
+                tq_parts.append(f"ROUGH-DEGRADED {tq_rough_warn_h}h")
+            if tq_torn_warn_h:
+                tq_parts.append(f"TORN-DEGRADED {tq_torn_warn_h}h")
+            if tq_shear_warn_h:
+                tq_parts.append(f"SHEAR-DEGRADED {tq_shear_warn_h}h")
+            tq_parts.append(f"sauber {thermal_clean_h}h")
+            unusable_pct = round(100 * tq_danger_h / thermal_hours_total)
+            lines.append(
+                f"→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): "
+                f"{', '.join(tq_parts)} von {thermal_hours_total} Thermik-Stunden. "
+                f"UNUSABLE-Anteil: {unusable_pct}% ({tq_danger_h}/{thermal_hours_total}h). "
+                f"Peak-Steigen (Proxy): {peak_climb_proxy:.1f} m/s."
+            )
+            if tq_danger_h > 0 and unusable_pct > 50:
+                lines.append(
+                    f"  UNUSABLE > 50%: Falls du green/violet gewählt hast → degradiere zu gray (Abgleiter). "
+                    f"Falls bereits gray → bleibt gray. Hat KEINEN Einfluss auf safety_status."
+                )
+            elif tq_danger_h > 0 and unusable_pct <= 50:
+                clean_h_count = thermal_hours_total - tq_danger_h
+                lines.append(
+                    f"  UNUSABLE ≤ 50% ({unusable_pct}%): Kein Downgrade nötig — behalte deine Bewertung. "
+                    f"{clean_h_count} saubere Thermik-Stunden als best_window nutzen. "
+                    f"Text muss zum fly_status passen (green/violet → nicht 'unbrauchbar' schreiben)."
+                )
+        else:
+            lines.append(
+                "→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): "
+                "KEINE THERMIK-STUNDEN — Peak-Steigen (Proxy): 0.0 m/s. "
+                "Kein nutzbarer Aufwind im gesamten Flugfenster. fly_status = gray (Abgleiter)."
+            )
 
         # Wind-Trend nach dem sauberen Fenster
         trend = _compute_wind_trend(clean_hours, hourly_gusts)
@@ -1087,7 +1967,7 @@ class FlychatEngine:
 
         krit_foehn = region.get("kritischer_foehn", "Beide")
         lines = [
-            f"WETTERDATEN FUER REGION: {rname} — TAG: {date_str} (Stand: {updated})",
+            f"WETTERDATEN FUER REGION: {rname} — TAG: {date_str} ({_weekday_de(date_str)}) (Stand: {updated})",
             f"═══ REGION: {rname} (Referenzhoehe: {elev_ref}m MSL, Kritischer Foehn: {krit_foehn}) ═══",
         ]
 
@@ -1103,6 +1983,17 @@ class FlychatEngine:
         warned_hours = []
         hourly_gusts = {}      # hour_str → gust value für Trend-Analyse
         rain_hours = []        # Stunden mit Niederschlag
+        tag_counts = {}        # tag_name → count (für Tagesprofil-Histogramm)
+        # Thermik-Qualitaets-Zaehler
+        thermal_hours_total = 0
+        thermal_clean_h = 0
+        tq_rough_danger_h = 0
+        tq_rough_warn_h = 0
+        tq_torn_danger_h = 0
+        tq_torn_warn_h = 0
+        tq_shear_danger_h = 0
+        tq_shear_warn_h = 0
+        peak_climb_proxy = 0.0
 
         # Dummy spot dict for _calculate_thermal_raw compatibility
         dummy_spot = {
@@ -1133,6 +2024,8 @@ class FlychatEngine:
             # Thermik berechnen
             thermal_info = ""
             effective_ceiling = elev_ref + 1000
+            h_climb = None
+            h_max_h = None
             try:
                 therm = self._calculate_thermal_raw(
                     data, pressure_level_data.get(timestamp, {}),
@@ -1140,6 +2033,8 @@ class FlychatEngine:
                 )
                 if therm and "error" not in therm:
                     h_climb = therm["climb_rate"]
+                    if isinstance(h_climb, (int, float)) and h_climb > peak_climb_proxy:
+                        peak_climb_proxy = h_climb
                     h_max_h = therm["max_height"]
                     effective_ceiling = max(effective_ceiling, h_max_h + 1000)
                     lcl = therm.get("lcl")
@@ -1155,6 +2050,9 @@ class FlychatEngine:
             cloud_base_raw = data.get("cloud_base")
             cloud_base = f"{cloud_base_raw}m" if cloud_base_raw is not None else "wolkenfrei"
             cloud_cover = data.get("cloud_cover", "N/A")
+            low_cl = float(data.get("cloud_cover_low") or 0)
+            mid_cl = float(data.get("cloud_cover_mid") or 0)
+            high_cl = float(data.get("cloud_cover_high") or 0)
 
             # Multi-Anchor Böen: Spots + Referenzpunkt als Ankerpunkte
             pl_data = pressure_level_data.get(timestamp, {})
@@ -1268,92 +2166,92 @@ class FlychatEngine:
             aloft_danger = False
             aloft_gust_warn = False
             aloft_gust_danger = False
+            display_with_gusts = None
 
             if pl_data:
-                # Build levels for gust calculation (display levels)
-                alt_levels = []
-                for level in [850, 700]:
+                # Display levels mit 3 Klassen (siehe _build_single_spot_context):
+                #   * = Flugbereich, ~ = Buffer (thermik+1500m), kein Marker = 850/700 Föhn-Anker
+                buffer_top = effective_ceiling + 500
+                display_levels_set = set()
+                for level in config.PRESSURE_LEVELS:
+                    h_val = pl_data.get(f"geopotential_height_{level}hPa")
+                    if h_val is None:
+                        continue
+                    if elev_ref <= h_val <= buffer_top:
+                        display_levels_set.add(level)
+                display_levels_set.add(850)
+                display_levels_set.add(700)
+
+                display_levels = []
+                for level in sorted(display_levels_set, reverse=True):
                     h_val = pl_data.get(f"geopotential_height_{level}hPa")
                     ws = pl_data.get(f"wind_speed_{level}hPa")
                     wd = pl_data.get(f"wind_direction_{level}hPa")
                     if h_val is not None and ws is not None:
-                        alt_levels.append({"pressure": level, "altitude": h_val,
-                                           "wind_speed": ws, "wind_direction": wd})
+                        display_levels.append({"pressure": level, "altitude": h_val,
+                                               "wind_speed": ws, "wind_direction": wd})
 
-                # Compute altitude gusts for display levels
-                if alt_levels:
+                if display_levels:
                     if anchors:
-                        alt_levels_with_gusts = estimate_altitude_gusts_multi_anchor(
+                        display_with_gusts = estimate_altitude_gusts_multi_anchor(
                             anchors=anchors,
-                            pressure_levels_data=alt_levels,
+                            pressure_levels_data=display_levels,
+                            elevation_ref=elev_ref,
+                            boundary_layer_height=data.get("boundary_layer_height"),
+                            region_id=rid,
+                        )
+                        # OI-Korrektur (spiegelt das Chart in web.format_altitude_wind_for_charts):
+                        # Region-Klassifizierer und Frontend-Meteogramm sehen damit identische Werte.
+                        # Ohne diesen Schritt würde der Klassifizierer Roh-Werte aus der Multi-Anchor-
+                        # Extrapolation sehen, das Chart dagegen die OI-geglätteten — Inkonsistenz.
+                        display_with_gusts = apply_oi_gust_correction(
+                            pressure_levels=display_with_gusts,
+                            anchors=anchors,
                             elevation_ref=elev_ref,
                             boundary_layer_height=data.get("boundary_layer_height"),
                             region_id=rid,
                         )
                     else:
-                        alt_levels_with_gusts = estimate_altitude_gusts(
+                        display_with_gusts = estimate_altitude_gusts(
                             wind_speed_10m=wind_speed_surface,
                             wind_gusts_10m=wind_gusts_surface,
-                            pressure_levels_data=alt_levels,
+                            pressure_levels_data=display_levels,
                             elevation_m=elev_ref,
                             boundary_layer_height=data.get("boundary_layer_height"),
                         )
-                    for lv in alt_levels_with_gusts:
-                        gust_str = ""
-                        if lv.get("wind_gusts") is not None and lv["wind_gusts"] > lv["wind_speed"] + 2:
-                            gust_str = f" (Boeen {lv['wind_gusts']:.0f}km/h)"
+                    for lv in display_with_gusts:
+                        alt = lv["altitude"]
+                        in_range = elev_ref <= alt <= effective_ceiling
+                        in_buffer = effective_ceiling < alt <= buffer_top
+                        if in_range:
+                            marker = "*"
+                        elif in_buffer:
+                            marker = "~"
+                        else:
+                            marker = ""
+                        ws_val = lv["wind_speed"]
+                        g_val = lv.get("wind_gusts")
                         wd_val = lv.get("wind_direction")
-                        if wd_val is not None:
-                            alt_wind_info += f" | {lv['pressure']}hPa({int(lv['altitude'])}m): {lv['wind_speed']:.0f}km/h{gust_str} aus {wd_val:.0f}°"
-                else:
-                    for level in [850, 700]:
-                        h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                        ws = pl_data.get(f"wind_speed_{level}hPa")
-                        wd = pl_data.get(f"wind_direction_{level}hPa")
-                        if h_val is not None and ws is not None and wd is not None:
-                            alt_wind_info += f" | {level}hPa({int(h_val)}m): {ws:.0f}km/h aus {wd:.0f}°"
-
-                for level in config.PRESSURE_LEVELS:
-                    h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                    ws = pl_data.get(f"wind_speed_{level}hPa")
-                    if h_val is not None and ws is not None:
-                        if elev_ref <= h_val <= effective_ceiling:
-                            if ws > 40:
+                        if g_val is not None and g_val > ws_val + 2:
+                            wind_str = f"{ws_val:.0f}/{g_val:.0f}"
+                        else:
+                            wind_str = f"{ws_val:.0f}"
+                        dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
+                        alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
+                        if in_range:
+                            if ws_val > 40:
                                 aloft_danger = True
-                            elif ws > 30:
+                            elif ws_val > 30:
                                 aloft_warn = True
-
-                # Gust warnings for altitude levels in flying range
-                all_fly_levels = []
-                for level in config.PRESSURE_LEVELS:
-                    h_val = pl_data.get(f"geopotential_height_{level}hPa")
-                    ws = pl_data.get(f"wind_speed_{level}hPa")
-                    if h_val is not None and ws is not None and elev_ref <= h_val <= effective_ceiling:
-                        all_fly_levels.append({"pressure": level, "altitude": h_val, "wind_speed": ws})
-
-                if all_fly_levels:
-                    if anchors:
-                        fly_with_gusts = estimate_altitude_gusts_multi_anchor(
-                            anchors=anchors,
-                            pressure_levels_data=all_fly_levels,
-                            elevation_ref=elev_ref,
-                            boundary_layer_height=data.get("boundary_layer_height"),
-                            region_id=rid,
-                        )
-                    else:
-                        fly_with_gusts = estimate_altitude_gusts(
-                            wind_speed_10m=wind_speed_surface,
-                            wind_gusts_10m=wind_gusts_surface,
-                            pressure_levels_data=all_fly_levels,
-                            elevation_m=elev_ref,
-                            boundary_layer_height=data.get("boundary_layer_height"),
-                        )
-                    for lv in fly_with_gusts:
-                        g = lv.get("wind_gusts", 0)
-                        if g > 40:
-                            aloft_gust_danger = True
-                        elif g > 30:
-                            aloft_gust_warn = True
+                            if g_val is not None:
+                                # T(z) > 40 km/h im Flugbereich = DANGER,
+                                # unabhängig vom Modellwind W(z).
+                                # Turbulenzrisiko >40 km/h ist ein Sicherheits-
+                                # problem auch bei moderatem Grundwind.
+                                if g_val > 40:
+                                    aloft_gust_danger = True
+                                elif g_val > 30:
+                                    aloft_gust_warn = True
 
             if aloft_danger:
                 warnings.append("[ALOFT-DANGER]")
@@ -1372,13 +2270,75 @@ class FlychatEngine:
             except Exception:
                 pass
 
-            if isinstance(cloud_cover, (int, float)) and cloud_cover >= 80:
-                warnings.append("[OVERCAST-WARN]")
+            # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
+            if (cloud_base_raw is not None
+                    and isinstance(cloud_base_raw, (int, float))
+                    and isinstance(cloud_cover, (int, float))
+                    and cloud_cover >= 75
+                    and cloud_base_raw < elev_ref + 500):
+                warnings.append("[OVERCAST-DANGER]")
+
+            # Thermik-Qualitaets-Tags (Scherung / Zerrissenheit / Boeigkeit)
+            # Analog zum Spot-Pfad — fehlte bisher im Region-Pfad.
+            # WICHTIG: Immer echten 10m-Bodenwind verwenden, NICHT den
+            # effektiven wind_speed (kann Hoehenwind enthalten).
+            # Scherung = Windaenderung mit Hoehe, braucht echten Surface-Anker.
+            tq_info = ""
+            try:
+                quality_tags, quality_debug = self._thermal_quality_tags(
+                    wind_speed_10m=wind_speed_surface,
+                    wind_gusts_10m=wind_gusts_surface,
+                    pl_data=pl_data,
+                    elevation_m=elev_ref,
+                    thermal_top_m=h_max_h,
+                    climb_rate_ms=h_climb,
+                    region_id=rid,
+                    altitude_gusts=display_with_gusts,
+                )
+                for tag in quality_tags:
+                    if tag not in warnings:
+                        warnings.append(tag)
+                tq_str = self._format_tq_ratio(quality_debug.get("tq_ratio"))
+                if tq_str:
+                    tq_info = f" | {tq_str}"
+            except Exception as e:
+                logging.warning(
+                    "Thermik-Quality-Tag-Berechnung fehlgeschlagen für Region %s: %s",
+                    rname, e
+                )
+
+            # Thermik-Qualitaets-Zaehler aktualisieren
+            if isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB:
+                thermal_hours_total += 1
+                tq_tags_this_hour = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-"))}
+                if not tq_tags_this_hour:
+                    thermal_clean_h += 1
+                else:
+                    if "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour:
+                        tq_rough_danger_h += 1
+                    elif "[THERMAL-ROUGH-DEGRADED]" in tq_tags_this_hour:
+                        tq_rough_warn_h += 1
+                    if "[THERMAL-TORN-UNUSABLE]" in tq_tags_this_hour:
+                        tq_torn_danger_h += 1
+                    elif "[THERMAL-TORN-DEGRADED]" in tq_tags_this_hour:
+                        tq_torn_warn_h += 1
+                    if "[SHEAR-UNUSABLE]" in tq_tags_this_hour:
+                        tq_shear_danger_h += 1
+                    elif "[SHEAR-DEGRADED]" in tq_tags_this_hour:
+                        tq_shear_warn_h += 1
 
             warning_str = " " + " ".join(warnings) if warnings else ""
 
+            # Tag-Histogram für Tagesprofil
+            for w in warnings:
+                tag_counts[w] = tag_counts.get(w, 0) + 1
+            if wind_status == "[WIND-STRONG]":
+                tag_counts["[WIND-STRONG]"] = tag_counts.get("[WIND-STRONG]", 0) + 1
+            elif wind_status == "[WIND-MODERATE]":
+                tag_counts["[WIND-MODERATE]"] = tag_counts.get("[WIND-MODERATE]", 0) + 1
+
             # Klassifiziere saubere vs. gewarnte Stunden
-            hard_warnings = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]", "[RAIN-WARN]", "[CAPE-WARN]", "[WIND-STRONG]"}
+            hard_warnings = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]", "[RAIN-WARN]", "[CAPE-WARN]", "[WIND-STRONG]", "[OVERCAST-DANGER]"}
             has_hard_warn = bool(hard_warnings & set(warnings)) or wind_status == "[WIND-STRONG]"
             if not has_hard_warn:
                 clean_hours.append(hour_str)
@@ -1390,9 +2350,15 @@ class FlychatEngine:
             wd_fmt = f"{wind_dir:.0f}" if isinstance(wind_dir, float) else str(wind_dir)
             wg_fmt = f"{wind_gusts:.0f}" if isinstance(wind_gusts, float) else str(wind_gusts)
 
+            # Surface gust excess for LLM context
+            sfc_excess = ""
+            if isinstance(wind_gusts, (int, float)) and isinstance(wind_speed, (int, float)):
+                exc = max(0, wind_gusts - wind_speed)
+                sfc_excess = f", Exzess +{exc:.0f}km/h"
+
             lines.append(
-                f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}° (Boeen {wg_fmt}km/h) {wind_status}{ref_wind_info}{warning_str} | "
-                f"Wolkenbasis {cloud_base} | Bewoelkung {cloud_cover}% | FLUGBEREICH: {elev_ref}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}"
+                f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}° (Turbulenzrisiko {wg_fmt}km/h{sfc_excess}) {wind_status}{ref_wind_info}{warning_str} | "
+                f"Wolkenbasis {cloud_base} | Bewoelkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | FLUGBEREICH: {elev_ref}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
             )
 
         if not has_data:
@@ -1417,6 +2383,92 @@ class FlychatEngine:
             lines.append(f"→ ACHTUNG: Alle fliegbaren Stunden haben harte Warnungen! Status sollte NOT_SAFE sein!")
         else:
             lines.append(f"→ Kein fliegbares Fenster. Status sollte not_safe sein.")
+
+        # Cache fuer deterministische Flyability-Override (gray→green bei <50% UNUSABLE)
+        self._ctx_tq_cache[f"{rname}|{date_str}"] = {
+            "thermal_hours_total": thermal_hours_total,
+            "tq_danger_h": tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h,
+            "peak_climb_proxy": peak_climb_proxy,
+        }
+
+        # ─── TAGESPROFIL: Ganzheitliche Sicht für LLM-Bewertung ───
+        total_actual = len(calm_hours) + len(moderate_hours) + len(strong_hours)
+        if total_actual > 0:
+            clean_pct = (len(clean_hours) / total_actual) * 100
+            lines.append("")
+            lines.append("═══ TAGESPROFIL (für ganzheitliche Beurteilung) ═══")
+            lines.append(
+                f"Flugfenster ausgewertet: {total_actual}h "
+                f"(zwischen {config.FLIGHT_HOURS_START:02d}:00 und {config.FLIGHT_HOURS_END:02d}:00)"
+            )
+            lines.append(
+                f"Verhaeltnis sauber/gesamt: {len(clean_hours)}/{total_actual}h = {clean_pct:.0f}%"
+            )
+            major_tags_order = [
+                "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+                "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-WARN]", "[OVERCAST-DANGER]",
+                "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
+                "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
+                "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]",
+                "[WIND-MODERATE]",
+            ]
+            hist_parts = []
+            for t in major_tags_order:
+                cnt = tag_counts.get(t, 0)
+                if cnt > 0:
+                    hist_parts.append(f"{t.strip('[]')} {cnt}h")
+            if hist_parts:
+                lines.append(f"Hauptgefahren am Tag: {', '.join(hist_parts)}")
+            if 0 < clean_pct < 35:
+                lines.append(
+                    f"→ ACHTUNG Verhaeltnis < 35%: Tag ist ueberwiegend gefaehrlich. "
+                    f"Auch wenn ein 4h-Fenster existiert, pruefe ob es eingekesselt ist. "
+                    f"Status maximal conditional, oft eher not_safe."
+                )
+
+        # ─── THERMIK-QUALITÄT: Zusammenfassung für LLM (analog BÖEN-FLOOR) ───
+        if thermal_hours_total > 0:
+            tq_danger_h = tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h
+            tq_warn_h = tq_rough_warn_h + tq_torn_warn_h + tq_shear_warn_h
+            tq_parts = []
+            if tq_rough_danger_h:
+                tq_parts.append(f"ROUGH-UNUSABLE {tq_rough_danger_h}h")
+            if tq_torn_danger_h:
+                tq_parts.append(f"TORN-UNUSABLE {tq_torn_danger_h}h")
+            if tq_shear_danger_h:
+                tq_parts.append(f"SHEAR-UNUSABLE {tq_shear_danger_h}h")
+            if tq_rough_warn_h:
+                tq_parts.append(f"ROUGH-DEGRADED {tq_rough_warn_h}h")
+            if tq_torn_warn_h:
+                tq_parts.append(f"TORN-DEGRADED {tq_torn_warn_h}h")
+            if tq_shear_warn_h:
+                tq_parts.append(f"SHEAR-DEGRADED {tq_shear_warn_h}h")
+            tq_parts.append(f"sauber {thermal_clean_h}h")
+            unusable_pct = round(100 * tq_danger_h / thermal_hours_total)
+            lines.append(
+                f"→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): "
+                f"{', '.join(tq_parts)} von {thermal_hours_total} Thermik-Stunden. "
+                f"UNUSABLE-Anteil: {unusable_pct}% ({tq_danger_h}/{thermal_hours_total}h). "
+                f"Peak-Steigen (Proxy): {peak_climb_proxy:.1f} m/s."
+            )
+            if tq_danger_h > 0 and unusable_pct > 50:
+                lines.append(
+                    f"  UNUSABLE > 50%: Falls du green/violet gewählt hast → degradiere zu gray (Abgleiter). "
+                    f"Falls bereits gray → bleibt gray. Hat KEINEN Einfluss auf safety_status."
+                )
+            elif tq_danger_h > 0 and unusable_pct <= 50:
+                clean_h_count = thermal_hours_total - tq_danger_h
+                lines.append(
+                    f"  UNUSABLE ≤ 50% ({unusable_pct}%): Kein Downgrade nötig — behalte deine Bewertung. "
+                    f"{clean_h_count} saubere Thermik-Stunden als best_window nutzen. "
+                    f"Text muss zum fly_status passen (green/violet → nicht 'unbrauchbar' schreiben)."
+                )
+        else:
+            lines.append(
+                "→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): "
+                "KEINE THERMIK-STUNDEN — Peak-Steigen (Proxy): 0.0 m/s. "
+                "Kein nutzbarer Aufwind im gesamten Flugfenster. fly_status = gray (Abgleiter)."
+            )
 
         # Wind-Trend nach dem sauberen Fenster
         trend = _compute_wind_trend(clean_hours, hourly_gusts)
@@ -1451,9 +2503,39 @@ class FlychatEngine:
 
         return "\n".join(lines)
 
+    def _build_and_safety_check_spot(self, spot, date_str: str) -> tuple:
+        """Worker-Wrapper: Context bauen + Safety-Check in einem Schritt.
+        Returns (ctx_string_or_None, result_dict)."""
+        name = spot["name"]
+        ctx = self._build_single_spot_context(spot, date_str, mode="dashboard")
+        if not ctx:
+            return None, {
+                "spot": name, "date": date_str,
+                "safety_status": "no_data", "phase": "safety",
+                "summary": "Keine Wetterdaten fuer diesen Tag",
+            }
+        result = self._safety_check_single_spot_day(spot, date_str, ctx)
+        return ctx, result
+
+    def _build_and_safety_check_region(self, region, date_str: str) -> tuple:
+        """Worker-Wrapper: Context bauen + Safety-Check in einem Schritt.
+        Returns (ctx_string_or_None, result_dict)."""
+        ctx = self._build_single_region_context(region, date_str)
+        if not ctx:
+            return None, {
+                "region": region["region"], "region_id": region["id"],
+                "date": date_str, "safety_status": "no_data", "phase": "safety",
+                "summary": "Keine Wetterdaten fuer diesen Tag",
+            }
+        result = self._safety_check_single_region_day(region, date_str, ctx)
+        return ctx, result
+
     def _safety_check_single_spot_day(self, spot, date_str: str, context: str) -> dict:
         """Phase 1: Reiner Sicherheitscheck für einen Spot/Tag via LLM."""
         name = spot["name"]
+        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
+            return {"spot": name, "date": date_str, "safety_status": "error",
+                    "error": "API-Abbruch: permanenter Fehler bei vorherigem Call"}
         try:
             if not context:
                 return {"spot": name, "date": date_str, "safety_status": "error", "error": "Keine Daten für diesen Tag"}
@@ -1461,23 +2543,48 @@ class FlychatEngine:
             messages = [
                 {"role": "system", "content": SAFETY_CHECK_PROMPT},
                 {"role": "user", "content": (
-                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}"
                 )},
             ]
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=400,
-                response_format={"type": "json_object"},
-            )
-            raw = response.choices[0].message.content
-            result = json.loads(raw)
+            # Retry-Logik: 1 Wiederholung bei Fehler (Timeout, Rate-Limit, JSON-Fehler)
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=600,
+                        response_format={"type": "json_object"},
+                    )
+                    raw = response.choices[0].message.content
+                    result = json.loads(raw)
+                    last_err = None
+                    break
+                except Exception as api_err:
+                    last_err = api_err
+                    if _is_permanent_api_error(api_err):
+                        if getattr(self, '_api_abort', None):
+                            self._api_abort.set()
+                        break  # Kein Retry bei Quota/Auth-Fehlern
+                    if attempt == 0:
+                        logger.warning(f"Safety-Check für {name}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
+                        time.sleep(3)
+            if last_err:
+                raise last_err
             result["spot"] = name
             result["date"] = date_str
             result["phase"] = "safety"
+
+            # ─── Deterministische Zahlen aus Cache injizieren (Halluzinations-Schutz) ───
+            # Das LLM halluziniert manchmal wind_ok_count (z.B. "1" obwohl Kontext 7 zeigt).
+            # Wir ueberschreiben daher IMMER mit den im Kontext-Bau gezaehlten Werten.
+            gust_info = self._ctx_gust_cache.get(f"{name}|{date_str}", {})
+            if gust_info:
+                result["wind_ok_count"] = gust_info.get("wind_ok_count", 0)
+                result["wind_wrong_count"] = gust_info.get("wind_wrong_count", 0)
 
             # Hard override: 0 WIND-OK Stunden = immer not_safe
             wind_ok = result.get("wind_ok_count", -1)
@@ -1490,15 +2597,82 @@ class FlychatEngine:
                     nogo.append("Keine Stunde mit korrekter Windrichtung")
                 result["no_go_reasons"] = nogo
 
+            # ─── Böen-Floor: Mindestens conditional wenn Böen vorhanden ───
+            # LLM darf nicht "safe" sagen wenn GUST-WARN/DANGER-Stunden existieren.
+            # Bei DANGER entscheidet das LLM anhand des Trends (Verbesserung → conditional möglich).
+            if gust_info:
+                gwarn = gust_info.get("gust_warn_hours", 0) + gust_info.get("aloft_gust_warn_hours", 0)
+                gdanger = gust_info.get("gust_danger_hours", 0) + gust_info.get("aloft_gust_danger_hours", 0)
+
+                # Mindestens conditional wenn Böen vorhanden (safe nie erlaubt)
+                if (gwarn > 0 or gdanger > 0) and result.get("safety_status") == "safe":
+                    max_gust = int(gust_info.get("max_surface_gust", 0) or 0)
+                    logger.warning(
+                        f"Böen-Floor-Override fuer {name}/{date_str}: LLM gab 'safe' "
+                        f"trotz GUST-WARN {gwarn}h / GUST-DANGER {gdanger}h → conditional"
+                    )
+                    result["safety_status"] = "conditional"
+                    cn = result.get("caution_notes", []) or []
+                    has_gust_note = any(
+                        any(kw in (n or "").lower() for kw in ["böen", "böe", "gust", "turbulenz"])
+                        for n in cn
+                    )
+                    if not has_gust_note:
+                        bits = []
+                        sfc_warn = gust_info.get("gust_warn_hours", 0)
+                        alo_warn = gust_info.get("aloft_gust_warn_hours", 0)
+                        if sfc_warn > 0 and max_gust > 0:
+                            bits.append(f"Bodenböen bis ~{max_gust} km/h in {sfc_warn}h")
+                        elif sfc_warn > 0:
+                            bits.append(f"Bodenböen über 30 km/h in {sfc_warn}h")
+                        if alo_warn > 0:
+                            bits.append(f"Höhenböen über 30 km/h im Flugbereich in {alo_warn}h")
+                        if gust_info.get("gust_danger_hours", 0) > 0:
+                            bits.append(f"Bodenböen über 40 km/h in {gust_info['gust_danger_hours']}h")
+                        if gust_info.get("aloft_gust_danger_hours", 0) > 0:
+                            bits.append(f"Höhenböen über 40 km/h in {gust_info['aloft_gust_danger_hours']}h")
+                        cn.append(
+                            "Starke Böen erkannt: " + ", ".join(bits) +
+                            " — Trend und Fenster prüfen."
+                        )
+                    result["caution_notes"] = cn
+
+            # ─── Overclaim-Ceiling: LLM darf nicht grundlos 'not_safe' sagen ───
+            # Spiegelbild zum Böen-Floor. Wenn KEINE harten Warnungen vorhanden sind
+            # UND mindestens 4 saubere Stunden existieren, darf der Status nicht
+            # 'not_safe' sein. Fängt Halluzinationen ab bei denen das LLM Gefahren
+            # erfindet, die der deterministische Kontext nicht hergibt.
+            if gust_info and result.get("safety_status") == "not_safe":
+                has_hard_warnings = gust_info.get("hard_warning_hours", 0) > 0
+                clean_cnt = gust_info.get("clean_hours_count", 0)
+                if not has_hard_warnings and clean_cnt >= 4:
+                    logger.warning(
+                        f"Overclaim-Override für {name}/{date_str}: LLM gab 'not_safe' "
+                        f"trotz {clean_cnt}h sauberen Stunden und 0 harten Warnungen → conditional"
+                    )
+                    result["safety_status"] = "conditional"
+                    # Note in caution_notes hinterlassen, damit Nutzer sieht warum
+                    cn = result.get("caution_notes", []) or []
+                    cn.append(
+                        f"Automatische Korrektur: Die Wetterdaten zeigen {clean_cnt} saubere "
+                        f"Flugstunden ohne harte Warnungen — bitte Meteogramm selbst prüfen."
+                    )
+                    result["caution_notes"] = cn
+                    # no_go_reasons leeren, da sie von der LLM halluziniert wurden
+                    result["no_go_reasons"] = []
+
             return result
 
         except Exception as e:
-            logger.error(f"Safety-Check für {name}/{date_str} fehlgeschlagen: {e}")
+            logger.error(f"Safety-Check für {name}/{date_str} fehlgeschlagen (nach 2 Versuchen): {e}")
             return {"spot": name, "date": date_str, "safety_status": "error", "phase": "safety", "error": str(e)}
 
     def _flyability_single_spot_day(self, spot, date_str: str, safety_result: dict, context: str) -> dict:
         """Phase 2: Flugtauglichkeit für einen bereits als sicher eingestuften Spot/Tag."""
         name = spot["name"]
+        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
+            return {"spot": name, "date": date_str, "status": "error",
+                    "error": "API-Abbruch: permanenter Fehler bei vorherigem Call"}
         try:
             if not context:
                 return {"spot": name, "date": date_str, "status": "error", "error": "Keine Daten für diesen Tag"}
@@ -1523,28 +2697,77 @@ class FlychatEngine:
             messages = [
                 {"role": "system", "content": FLYABILITY_PROMPT},
                 {"role": "user", "content": (
-                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}\n{safety_context}"
                 )},
             ]
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=500,
-                response_format={"type": "json_object"},
-            )
-            raw = response.choices[0].message.content
-            result = json.loads(raw)
+            # Retry-Logik: 1 Wiederholung bei Fehler
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.3,
+                        max_tokens=500,
+                        response_format={"type": "json_object"},
+                    )
+                    raw = response.choices[0].message.content
+                    result = json.loads(raw)
+                    last_err = None
+                    break
+                except Exception as api_err:
+                    last_err = api_err
+                    if _is_permanent_api_error(api_err):
+                        if getattr(self, '_api_abort', None):
+                            self._api_abort.set()
+                        break
+                    if attempt == 0:
+                        logger.warning(f"Flyability-Check für {name}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
+                        time.sleep(3)
+            if last_err:
+                raise last_err
+
             tier = _normalize_flyability_tier(
-                result.get("flyability_tier") or result.get("status")
+                result.get("flyability_tier") or result.get("fly_status") or result.get("status")
             )
             result["flyability_tier"] = tier
-            result["status"] = tier  # Abwärtskompatibilität (gleiche Bedeutung wie früher „status“)
+            result["fly_status"] = tier
+            result["status"] = tier  # Abwärtskompatibilität
             result["spot"] = name
             result["date"] = date_str
             result["phase"] = "flyability"
+
+            # Tag-Sanitierung
+            _sanitize_llm_result(result)
+
+            # Deterministischer Downgrade: green/violet → gray
+            tq = self._ctx_tq_cache.get(f"{name}|{date_str}", {})
+            if tq and tier in ("green", "violet"):
+                tht = tq.get("thermal_hours_total", 0)
+                tqd = tq.get("tq_danger_h", 0)
+                peak = tq.get("peak_climb_proxy", 0)
+                downgrade = False
+                reason = ""
+                # Keine Thermik → gray (egal was LLM sagt)
+                if tht == 0 or peak < 0.3:
+                    downgrade = True
+                    reason = f"keine Thermik (peak={peak:.1f}, hours={tht})"
+                # UNUSABLE > 50% → gray
+                elif tht > 0:
+                    unusable_pct = (tqd / max(1, tht)) * 100
+                    if unusable_pct > 50:
+                        downgrade = True
+                        reason = f"UNUSABLE={unusable_pct:.0f}% ({tqd}/{tht}h)"
+                if downgrade:
+                    result["fly_status"] = "gray"
+                    result["flyability_tier"] = "gray"
+                    result["status"] = "gray"
+                    logger.warning(
+                        f"Flyability-Downgrade: {name}/{date_str} {tier}→gray ({reason})"
+                    )
+
             return result
 
         except Exception as e:
@@ -1552,209 +2775,21 @@ class FlychatEngine:
             return {"spot": name, "date": date_str, "status": "error", "phase": "flyability", "error": str(e)}
 
     def run_spot_analyses(self, spot_names: list = None) -> dict:
-        """Zweiphasen-Orchestrierung: Safety → Filter → Flyability."""
-        if not self.client:
-            return {"success": False, "error": "OPENAI_API_KEY nicht konfiguriert"}
-
-        if not self.weather_data:
-            return {"success": False, "error": "Keine Wetterdaten geladen"}
-
-        if spot_names:
-            spots_to_analyze = [s for s in self.spots if s["name"] in spot_names and s["name"] in self.weather_data]
-        else:
-            spots_to_analyze = [s for s in self.spots if s["name"] in self.weather_data]
-
-        if not spots_to_analyze:
-            return {"success": False, "error": "Keine zu analysierenden Spots gefunden"}
-
-        forecast_dates = self._get_forecast_dates()
-        if not forecast_dates:
-            return {"success": False, "error": "Keine Vorhersage-Tage verfügbar"}
-
-        spots_by_name = {s["name"]: s for s in spots_to_analyze}
-
-        # ── PRE-VALIDATION: Vollständigkeit pro Spot prüfen ──
-        incomplete_spot_days = {}  # {spot_name: set(date_strs)}
-        for spot in spots_to_analyze:
-            name = spot["name"]
-            spot_data = self.weather_data.get(name, {})
-            hourly_data = spot_data.get("hourly_data", {})
-            missing = validate_spot_data(name, hourly_data, config.FORECAST_DAYS)
-            if missing:
-                incomplete_spot_days[name] = set(missing)
-                logger.warning(f"Unvollständige Daten für {name}: {', '.join(missing)} — keine KI-Analyse für diese Tage")
-
-        # ── PHASE 1: Safety-Checks (alle Spots parallel) ──
-        total_safety = len(spots_to_analyze) * len(forecast_dates)
-        skipped_no_data = 0
-        logger.info(f"Phase 1 (Safety): {len(spots_to_analyze)} Spots × {len(forecast_dates)} Tage = {total_safety} Aufrufe")
-
-        safety_results = {}  # {spot_name: {date_str: safety_dict}}
-
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {}
-            for spot in spots_to_analyze:
-                for date_str in forecast_dates:
-                    # Unvollständige Daten → kein LLM-Call
-                    if date_str in incomplete_spot_days.get(spot["name"], set()):
-                        safety_results.setdefault(spot["name"], {})[date_str] = {
-                            "spot": spot["name"],
-                            "date": date_str,
-                            "safety_status": "no_data",
-                            "phase": "safety",
-                            "summary": "Wetterdaten unvollständig — keine KI-Analyse möglich (Modell-Update?)",
-                        }
-                        skipped_no_data += 1
-                        continue
-
-                    ctx = self._build_single_spot_context(spot, date_str, mode="dashboard")
-                    if ctx:
-                        future = executor.submit(self._safety_check_single_spot_day, spot, date_str, ctx)
-                        futures[future] = (spot["name"], date_str)
-                    else:
-                        safety_results.setdefault(spot["name"], {})[date_str] = {
-                            "spot": spot["name"],
-                            "date": date_str,
-                            "safety_status": "no_data",
-                            "phase": "safety",
-                            "summary": "Keine Wetterdaten für diesen Tag",
-                        }
-
-            for future in as_completed(futures):
-                spot_name, date_str = futures[future]
-                try:
-                    result = future.result()
-                except Exception as e:
-                    logger.error(f"Safety-Future für {spot_name}/{date_str} fehlgeschlagen: {e}")
-                    result = {"spot": spot_name, "date": date_str, "safety_status": "error", "error": str(e)}
-                safety_results.setdefault(spot_name, {})[date_str] = result
-
-        # ── FILTER: Welche Spot/Tag-Kombis brauchen Phase 2? ──
-        flyability_tasks = []
-        for spot_name, days in safety_results.items():
-            for date_str, safety in days.items():
-                status = safety.get("safety_status", "error")
-                if status in ("safe", "conditional"):
-                    flyability_tasks.append((spots_by_name[spot_name], date_str, safety))
-
-        logger.info(f"Phase 1 fertig. {len(flyability_tasks)} von {total_safety} Spot/Tag-Kombis sind sicher → Phase 2 ({skipped_no_data} übersprungen wegen fehlender Daten)")
-
-        # ── PHASE 2: Flyability (nur sichere Spots parallel) ──
-        flyability_results = {}  # {spot_name: {date_str: flyability_dict}}
-
-        if flyability_tasks:
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                futures = {}
-                for spot, date_str, safety in flyability_tasks:
-                    ctx = self._build_single_spot_context(spot, date_str, mode="dashboard")
-                    future = executor.submit(self._flyability_single_spot_day, spot, date_str, safety, ctx)
-                    futures[future] = (spot["name"], date_str)
-
-                for future in as_completed(futures):
-                    spot_name, date_str = futures[future]
-                    try:
-                        result = future.result()
-                    except Exception as e:
-                        logger.error(f"Flyability-Future für {spot_name}/{date_str} fehlgeschlagen: {e}")
-                        result = {"spot": spot_name, "date": date_str, "status": "error", "error": str(e)}
-                    flyability_results.setdefault(spot_name, {})[date_str] = result
-
-        # ── MERGE: Beide Phasen zusammenführen ──
-        merged = self.spot_analyses.copy()
-        for spot_name, days in safety_results.items():
-            merged[spot_name] = {}
-            for date_str, safety in days.items():
-                entry = {"safety": safety}
-                fly = flyability_results.get(spot_name, {}).get(date_str)
-                # Fliegbarkeit getrennt von Sicherheit: fly_status = gray|green|violet; nur bei not_safe fehlt sie
-                safety_status = safety.get("safety_status", "error")
-                if fly:
-                    tier = _normalize_flyability_tier(
-                        fly.get("flyability_tier") or fly.get("status")
-                    )
-                    fly["flyability_tier"] = tier
-                    fly["status"] = tier
-                    entry["flyability"] = fly
-                    entry["fly_status"] = tier
-                    entry["status"] = tier
-                elif safety_status == "not_safe":
-                    entry["fly_status"] = ""
-                    entry["status"] = "not_safe"
-                elif safety_status == "no_data":
-                    entry["fly_status"] = ""
-                    entry["status"] = "no_data"
-                elif safety_status == "error":
-                    entry["fly_status"] = ""
-                    entry["status"] = "error"
-                else:
-                    entry["fly_status"] = ""
-                    entry["status"] = "error"
-                entry["best_window"] = safety.get("safe_window", "keins")
-                entry["recommendation"] = ""
-                if fly:
-                    entry["recommendation"] = fly.get("recommendation", "")
-                    entry["best_window"] = fly.get("best_window", entry["best_window"])
-                merged[spot_name][date_str] = entry
-
-        self.spot_analyses = merged
-        self.analyses_loaded_at = datetime.now()
-        self._save_analyses_cache()
-
-        if self.instantdb:
-            threading.Thread(target=self._push_analyses_to_instantdb, daemon=True).start()
-
-        # Summary: Sicherheit und Fliegbarkeit getrennt
-        per_day_counts = {}
-        for date_str in forecast_dates:
-            safety_c = {"safe": 0, "conditional": 0, "not_safe": 0, "no_data": 0}
-            fly_c = {"gray": 0, "green": 0, "violet": 0}
-            err_n = 0
-            for spot_name, days in merged.items():
-                ent = days.get(date_str, {})
-                ss = ent.get("safety", {}).get("safety_status", "error")
-                if ss in safety_c:
-                    safety_c[ss] += 1
-                else:
-                    err_n += 1
-                ft = ent.get("fly_status") or ""
-                if ft in fly_c:
-                    fly_c[ft] += 1
-            per_day_counts[date_str] = {
-                "safety": safety_c,
-                "fly": fly_c,
-                "error": err_n,
-            }
-
-        actual_safety_calls = total_safety - skipped_no_data
-        total_calls = actual_safety_calls + len(flyability_tasks)
-        logger.info(f"Spot-Analysen abgeschlossen: {total_calls} LLM-Aufrufe ({actual_safety_calls} Safety + {len(flyability_tasks)} Flyability, {skipped_no_data} übersprungen wegen fehlender Daten)")
-
-        results_summary = {}
-        for spot_name, days in merged.items():
-            results_summary[spot_name] = {}
-            for date_str, entry in days.items():
-                results_summary[spot_name][date_str] = {
-                    "status": entry.get("status", "error"),
-                    "safety_status": entry.get("safety", {}).get("safety_status", "error"),
-                    "fly_status": entry.get("fly_status", ""),
-                    "best_window": entry.get("best_window", "?"),
-                    "recommendation": entry.get("recommendation", ""),
-                }
-
-        return {
-            "success": True,
-            "results_count": total_calls,
-            "safety_count": total_safety,
-            "flyability_count": len(flyability_tasks),
-            "spots_count": len(merged),
-            "dates": forecast_dates,
-            "per_day_counts": per_day_counts,
-            "results_summary": results_summary,
-        }
+        """Wrapper: konsumiert den Stream-Generator und gibt das finale Ergebnis zurueck."""
+        last_result = None
+        for evt in self.run_spot_analyses_stream(spot_names):
+            if evt.get("event") == "error":
+                return {"success": False, "error": evt["data"].get("message", "Unbekannt")}
+            if evt.get("event") == "spot_done":
+                last_result = evt["data"]
+        if last_result:
+            return {"success": True, **last_result}
+        return {"success": False, "error": "Kein Ergebnis"}
 
     def _push_analyses_to_instantdb(self):
-        """Pusht Spot-Analysen nach InstantDB (Hintergrund-Thread)."""
+        """Pusht Spot-Analysen nach InstantDB (Hintergrund-Thread). Löscht zuerst alte Records."""
         try:
+            self.instantdb.delete_all("spot_analyses")
             docs = {}
             for spot_name, days in self.spot_analyses.items():
                 for date_str, entry in days.items():
@@ -1768,6 +2803,7 @@ class FlychatEngine:
                     }
                     safety = entry.get("safety", {})
                     doc_data["safety_status"] = safety.get("safety_status", "error")
+                    doc_data["error"] = safety.get("error", "")
                     doc_data["safe_window"] = safety.get("safe_window", "keins")
                     doc_data["safety_feedback"] = safety.get("summary", "")
                     for key in ["no_go_reasons", "caution_notes"]:
@@ -1781,11 +2817,11 @@ class FlychatEngine:
 
                     ss = safety.get("safety_status", "error")
                     fly = entry.get("flyability", {})
+                    fly_status_merged = entry.get("fly_status", "")
                     # Phase 2 nur bei safe/conditional — sonst alte InstantDB-Felder explizit leeren (Merge behält sonst Altlasten)
-                    if fly and ss in ("safe", "conditional"):
-                        doc_data["fly_status"] = _normalize_flyability_tier(
-                            fly.get("flyability_tier") or fly.get("status")
-                        )
+                    if fly and fly_status_merged and ss in ("safe", "conditional"):
+                        doc_data["fly_status"] = fly_status_merged
+                        doc_data["flyability_tier"] = fly_status_merged
                         doc_data["flight_type"] = fly.get("flight_type", "")
                         doc_data["flight_duration"] = fly.get("flight_duration_estimate", "")
                         doc_data["xc_potential"] = fly.get("xc_potential", "")
@@ -1793,11 +2829,13 @@ class FlychatEngine:
                         doc_data["flyability_feedback"] = fly.get("recommendation", "")
                     else:
                         doc_data["fly_status"] = ""
+                        doc_data["flyability_tier"] = ""
                         doc_data["flight_type"] = ""
                         doc_data["flight_duration"] = ""
                         doc_data["xc_potential"] = ""
                         doc_data["peak_climb_rate"] = 0
                         doc_data["flyability_feedback"] = ""
+                        doc_data["fly_error"] = entry.get("fly_error", "")
 
                     docs[doc_id] = doc_data
 
@@ -1815,6 +2853,10 @@ class FlychatEngine:
     def _safety_check_single_region_day(self, region, date_str: str, context: str) -> dict:
         """Phase 1: Sicherheitscheck fuer eine Region/Tag via LLM."""
         rname = region["region"]
+        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
+            return {"region": rname, "region_id": region["id"], "date": date_str,
+                    "safety_status": "error", "phase": "safety",
+                    "error": "API-Abbruch: permanenter Fehler bei vorherigem Call"}
         try:
             if not context:
                 return {"region": rname, "date": date_str, "safety_status": "error", "error": "Keine Daten"}
@@ -1822,20 +2864,39 @@ class FlychatEngine:
             messages = [
                 {"role": "system", "content": REGION_SAFETY_CHECK_PROMPT},
                 {"role": "user", "content": (
-                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}"
                 )},
             ]
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=400,
-                response_format={"type": "json_object"},
-            )
-            raw = response.choices[0].message.content
-            result = json.loads(raw)
+            # Retry-Logik: 1 Wiederholung bei Fehler
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=600,
+                        response_format={"type": "json_object"},
+                    )
+                    raw = response.choices[0].message.content
+                    result = json.loads(raw)
+                    last_err = None
+                    break
+                except Exception as api_err:
+                    last_err = api_err
+                    if _is_permanent_api_error(api_err):
+                        logger.error(f"Region Safety-Check fuer {rname}/{date_str}: permanenter API-Fehler ({api_err}) — kein Retry")
+                        if getattr(self, '_api_abort', None):
+                            self._api_abort.set()
+                        break
+                    if attempt == 0:
+                        logger.warning(f"Region Safety-Check fuer {rname}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
+                        time.sleep(3)
+            if last_err:
+                raise last_err
+
             result["region"] = rname
             result["region_id"] = region["id"]
             result["date"] = date_str
@@ -1864,13 +2925,17 @@ class FlychatEngine:
             return result
 
         except Exception as e:
-            logger.error(f"Region Safety-Check fuer {rname}/{date_str} fehlgeschlagen: {e}")
+            logger.error(f"Region Safety-Check fuer {rname}/{date_str} fehlgeschlagen (nach 2 Versuchen): {e}")
             return {"region": rname, "region_id": region["id"], "date": date_str,
                     "safety_status": "error", "phase": "safety", "error": str(e)}
 
     def _flyability_single_region_day(self, region, date_str: str, safety_result: dict, context: str) -> dict:
         """Phase 2: Flugtauglichkeit fuer eine bereits als sicher eingestufte Region/Tag."""
         rname = region["region"]
+        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
+            return {"region": rname, "region_id": region["id"], "date": date_str,
+                    "status": "error", "phase": "flyability",
+                    "error": "API-Abbruch: permanenter Fehler bei vorherigem Call"}
         try:
             if not context:
                 return {"region": rname, "date": date_str, "status": "error", "error": "Keine Daten"}
@@ -1891,29 +2956,80 @@ class FlychatEngine:
             messages = [
                 {"role": "system", "content": REGION_FLYABILITY_PROMPT},
                 {"role": "user", "content": (
-                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}\n{safety_context}"
                 )},
             ]
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=500,
-                response_format={"type": "json_object"},
-            )
-            raw = response.choices[0].message.content
-            result = json.loads(raw)
+            # Retry-Logik: 1 Wiederholung bei Fehler
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.3,
+                        max_tokens=500,
+                        response_format={"type": "json_object"},
+                    )
+                    raw = response.choices[0].message.content
+                    result = json.loads(raw)
+                    last_err = None
+                    break
+                except Exception as api_err:
+                    last_err = api_err
+                    if _is_permanent_api_error(api_err):
+                        logger.error(f"Region Flyability-Check fuer {rname}/{date_str}: permanenter API-Fehler ({api_err}) — kein Retry")
+                        if getattr(self, '_api_abort', None):
+                            self._api_abort.set()
+                        break
+                    if attempt == 0:
+                        logger.warning(f"Region Flyability-Check fuer {rname}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
+                        time.sleep(3)
+            if last_err:
+                raise last_err
+
             tier = _normalize_flyability_tier(
-                result.get("flyability_tier") or result.get("status")
+                result.get("flyability_tier") or result.get("fly_status") or result.get("status")
             )
             result["flyability_tier"] = tier
+            result["fly_status"] = tier
             result["status"] = tier
             result["region"] = rname
             result["region_id"] = region["id"]
             result["date"] = date_str
             result["phase"] = "flyability"
+
+            # Tag-Sanitierung
+            _sanitize_llm_result(result)
+
+            # Deterministische Flyability-Overrides
+            tq = self._ctx_tq_cache.get(f"{rname}|{date_str}", {})
+            if tq:
+                tht = tq.get("thermal_hours_total", 0)
+                tqd = tq.get("tq_danger_h", 0)
+                peak = tq.get("peak_climb_proxy", 0)
+                # Keine Thermik → gray (egal was LLM sagt)
+                if tier in ("green", "violet") and (tht == 0 or peak < 0.3):
+                    result["fly_status"] = "gray"
+                    result["flyability_tier"] = "gray"
+                    result["status"] = "gray"
+                    logger.warning(
+                        f"Flyability-Downgrade: {rname}/{date_str} {tier}→gray "
+                        f"(keine Thermik: peak={peak:.1f}, hours={tht})"
+                    )
+                # gray→green Upgrade bei guter Thermik + <50% UNUSABLE
+                elif tier == "gray" and tht > 0:
+                    unusable_pct = (tqd / max(1, tht)) * 100
+                    if peak >= 1.0 and unusable_pct < 50:
+                        result["fly_status"] = "green"
+                        result["flyability_tier"] = "green"
+                        result["status"] = "green"
+                        logger.warning(
+                            f"Flyability-Override: {rname}/{date_str} gray→green "
+                            f"(peak={peak:.1f}, UNUSABLE={unusable_pct:.0f}%)"
+                        )
+
             return result
 
         except Exception as e:
@@ -1922,142 +3038,21 @@ class FlychatEngine:
                     "status": "error", "phase": "flyability", "error": str(e)}
 
     def run_region_analyses(self) -> dict:
-        """Zweiphasen-Orchestrierung fuer Regionen: Safety → Filter → Flyability."""
-        if not self.client:
-            return {"success": False, "error": "OPENAI_API_KEY nicht konfiguriert"}
-
-        if not self.region_weather_data:
-            return {"success": False, "error": "Keine Region-Wetterdaten geladen"}
-
-        all_regions = get_all_regions()
-        regions_with_data = [r for r in all_regions if r["id"] in self.region_weather_data]
-
-        if not regions_with_data:
-            return {"success": False, "error": "Keine Regionen mit Wetterdaten"}
-
-        forecast_dates = self._get_forecast_dates()
-        if not forecast_dates:
-            return {"success": False, "error": "Keine Vorhersage-Tage verfuegbar"}
-
-        regions_by_id = {r["id"]: r for r in regions_with_data}
-
-        # ── PHASE 1: Safety-Checks ──
-        total_safety = len(regions_with_data) * len(forecast_dates)
-        logger.info(f"Region Phase 1 (Safety): {len(regions_with_data)} Regionen × {len(forecast_dates)} Tage = {total_safety}")
-
-        safety_results = {}  # {region_id: {date_str: safety_dict}}
-
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {}
-            for region in regions_with_data:
-                for date_str in forecast_dates:
-                    ctx = self._build_single_region_context(region, date_str)
-                    if ctx:
-                        future = executor.submit(
-                            self._safety_check_single_region_day, region, date_str, ctx
-                        )
-                        futures[future] = (region["id"], date_str)
-                    else:
-                        safety_results.setdefault(region["id"], {})[date_str] = {
-                            "region": region["region"], "region_id": region["id"],
-                            "date": date_str, "safety_status": "no_data",
-                            "phase": "safety", "summary": "Keine Wetterdaten fuer diesen Tag",
-                        }
-
-            for future in as_completed(futures):
-                rid, date_str = futures[future]
-                try:
-                    result = future.result()
-                except Exception as e:
-                    logger.error(f"Region Safety-Future {rid}/{date_str} fehlgeschlagen: {e}")
-                    result = {"region_id": rid, "date": date_str, "safety_status": "error", "error": str(e)}
-                safety_results.setdefault(rid, {})[date_str] = result
-
-        # ── FILTER ──
-        flyability_tasks = []
-        for rid, days in safety_results.items():
-            for date_str, safety in days.items():
-                status = safety.get("safety_status", "error")
-                if status in ("safe", "conditional"):
-                    flyability_tasks.append((regions_by_id[rid], date_str, safety))
-
-        logger.info(f"Region Phase 1 fertig. {len(flyability_tasks)} von {total_safety} sicher → Phase 2")
-
-        # ── PHASE 2: Flyability ──
-        flyability_results = {}
-
-        if flyability_tasks:
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                futures = {}
-                for region, date_str, safety in flyability_tasks:
-                    ctx = self._build_single_region_context(region, date_str)
-                    future = executor.submit(
-                        self._flyability_single_region_day, region, date_str, safety, ctx
-                    )
-                    futures[future] = (region["id"], date_str)
-
-                for future in as_completed(futures):
-                    rid, date_str = futures[future]
-                    try:
-                        result = future.result()
-                    except Exception as e:
-                        logger.error(f"Region Flyability-Future {rid}/{date_str} fehlgeschlagen: {e}")
-                        result = {"region_id": rid, "date": date_str, "status": "error", "error": str(e)}
-                    flyability_results.setdefault(rid, {})[date_str] = result
-
-        # ── MERGE ──
-        merged = {}
-        for rid, days in safety_results.items():
-            merged[rid] = {}
-            for date_str, safety in days.items():
-                entry = {"safety": safety}
-                fly = flyability_results.get(rid, {}).get(date_str)
-                safety_status = safety.get("safety_status", "error")
-                if fly:
-                    tier = _normalize_flyability_tier(
-                        fly.get("flyability_tier") or fly.get("status")
-                    )
-                    fly["flyability_tier"] = tier
-                    fly["status"] = tier
-                    entry["flyability"] = fly
-                    entry["fly_status"] = tier
-                    entry["status"] = tier
-                elif safety_status == "not_safe":
-                    entry["fly_status"] = ""
-                    entry["status"] = "not_safe"
-                elif safety_status == "no_data":
-                    entry["fly_status"] = ""
-                    entry["status"] = "no_data"
-                else:
-                    entry["fly_status"] = ""
-                    entry["status"] = "error"
-                entry["best_window"] = safety.get("safe_window", "keins")
-                entry["recommendation"] = ""
-                if fly:
-                    entry["recommendation"] = fly.get("recommendation", "")
-                    entry["best_window"] = fly.get("best_window", entry["best_window"])
-                entry["region_name"] = safety.get("region", regions_by_id.get(rid, {}).get("region", rid))
-                merged[rid][date_str] = entry
-
-        self.region_analyses = merged
-        self.region_analyses_loaded_at = datetime.now()
-
-        if self.instantdb:
-            threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
-
-        total_calls = total_safety + len(flyability_tasks)
-        logger.info(f"Region-Analysen abgeschlossen: {total_calls} LLM-Aufrufe")
-
-        return {
-            "success": True,
-            "results_count": total_calls,
-            "regions_count": len(merged),
-            "dates": forecast_dates,
-        }
+        """Wrapper: konsumiert den Stream-Generator und gibt das finale Ergebnis zurueck."""
+        last_result = None
+        for evt in self.run_region_analyses_stream():
+            if evt.get("event") == "error":
+                return {"success": False, "error": evt["data"].get("message", "Unbekannt")}
+            if evt.get("event") == "region_done":
+                last_result = evt["data"]
+        if last_result:
+            return {"success": True, **last_result}
+        return {"success": False, "error": "Kein Ergebnis"}
 
     def _push_region_analyses_to_instantdb(self):
-        """Pusht Region-Analysen nach InstantDB."""
+        """Pusht Region-Analysen nach InstantDB. Löscht zuerst alte Records."""
         try:
+            self.instantdb.delete_all("region_analyses")
             docs = {}
             for rid, days in self.region_analyses.items():
                 for date_str, entry in days.items():
@@ -2065,6 +3060,7 @@ class FlychatEngine:
                     safety = entry.get("safety", {})
                     fly = entry.get("flyability", {})
                     ss = safety.get("safety_status", "error")
+                    fly_status_merged = entry.get("fly_status", "")
 
                     doc_data = {
                         "region_id": rid,
@@ -2074,6 +3070,7 @@ class FlychatEngine:
                         "best_window": entry.get("best_window", "?"),
                         "updated_at": self.region_analyses_loaded_at.isoformat(),
                         "safety_status": ss,
+                        "error": safety.get("error", ""),
                         "safe_window": safety.get("safe_window", "keins"),
                         "safety_feedback": safety.get("summary", ""),
                         "foehn_risk": safety.get("foehn_risk", "none"),
@@ -2086,10 +3083,9 @@ class FlychatEngine:
                         else:
                             doc_data[key] = str(val)
 
-                    if fly and ss in ("safe", "conditional"):
-                        doc_data["fly_status"] = _normalize_flyability_tier(
-                            fly.get("flyability_tier") or fly.get("status")
-                        )
+                    if fly and fly_status_merged and ss in ("safe", "conditional"):
+                        doc_data["fly_status"] = fly_status_merged
+                        doc_data["flyability_tier"] = fly_status_merged
                         doc_data["flight_type"] = fly.get("flight_type", "")
                         doc_data["flight_duration"] = fly.get("flight_duration_estimate", "")
                         doc_data["xc_potential"] = fly.get("xc_potential", "")
@@ -2097,11 +3093,13 @@ class FlychatEngine:
                         doc_data["flyability_feedback"] = fly.get("recommendation", "")
                     else:
                         doc_data["fly_status"] = ""
+                        doc_data["flyability_tier"] = ""
                         doc_data["flight_type"] = ""
                         doc_data["flight_duration"] = ""
                         doc_data["xc_potential"] = ""
                         doc_data["peak_climb_rate"] = 0
                         doc_data["flyability_feedback"] = ""
+                        doc_data["fly_error"] = entry.get("fly_error", "")
 
                     docs[doc_id] = doc_data
 
@@ -2111,6 +3109,1329 @@ class FlychatEngine:
                 logger.warning("InstantDB: Region-Analysen push fehlgeschlagen")
         except Exception as e:
             logger.error(f"InstantDB Region-Analysen-Push fehlgeschlagen: {e}")
+
+    # ── SSE Streaming generators ────────────────────────────────────────
+    # Heartbeat: wait() mit Timeout statt as_completed() — verhindert
+    # Connection-Timeout wenn ein einzelner LLM-Call lange dauert.
+
+    _HEARTBEAT_INTERVAL = 15  # Sekunden zwischen Keepalive-Events
+    _HEARTBEAT_EVENT = {"event": "heartbeat", "data": {}}
+
+    def run_region_analyses_stream(self):
+        """Generator: yields progress events for region analyses (Safety → Flyability)."""
+        self._api_abort = threading.Event()  # Early-Abort bei permanentem API-Fehler
+        if not self.client:
+            yield {"event": "error", "data": {"message": "OPENAI_API_KEY nicht konfiguriert"}}
+            return
+        if not self.region_weather_data:
+            yield {"event": "error", "data": {"message": "Keine Region-Wetterdaten geladen"}}
+            return
+
+        all_regions = get_all_regions()
+        regions_with_data = [r for r in all_regions if r["id"] in self.region_weather_data]
+        if not regions_with_data:
+            yield {"event": "error", "data": {"message": "Keine Regionen mit Wetterdaten"}}
+            return
+
+        forecast_dates = self._get_forecast_dates()
+        if not forecast_dates:
+            yield {"event": "error", "data": {"message": "Keine Vorhersage-Tage verfuegbar"}}
+            return
+
+        regions_by_id = {r["id"]: r for r in regions_with_data}
+        total_safety = len(regions_with_data) * len(forecast_dates)
+
+        # ── Phase: region_safety ──
+        yield {"event": "phase", "data": {"phase": "region_safety", "total": total_safety}}
+
+        safety_results = {}
+        completed_safety = 0
+
+        context_cache = {}  # {region|rid|date: ctx} fuer Phase 2
+
+        with ThreadPoolExecutor(max_workers=config.LLM_MAX_WORKERS) as executor:
+            futures = {}
+            _last_hb = time.monotonic()
+            for region in regions_with_data:
+                for date_str in forecast_dates:
+                    future = executor.submit(self._build_and_safety_check_region, region, date_str)
+                    futures[future] = (region["id"], region["region"], date_str)
+
+            remaining = set(futures.keys())
+            while remaining:
+                done, remaining = wait(remaining, timeout=self._HEARTBEAT_INTERVAL, return_when=FIRST_COMPLETED)
+                if not done:
+                    yield self._HEARTBEAT_EVENT
+                    continue
+                for future in done:
+                    rid, rname, date_str = futures[future]
+                    ctx = None
+                    try:
+                        ctx, result = future.result()
+                    except Exception as e:
+                        logger.error(f"Region Safety-Future {rid}/{date_str} fehlgeschlagen: {e}")
+                        result = {"region_id": rid, "date": date_str, "safety_status": "error", "error": str(e)}
+                    if ctx:
+                        context_cache[f"region|{rid}|{date_str}"] = ctx
+                    safety_results.setdefault(rid, {})[date_str] = result
+                    completed_safety += 1
+                    yield {"event": "progress", "data": {
+                        "phase": "region_safety", "name": rname, "date": date_str,
+                        "completed": completed_safety, "total": total_safety,
+                        "result": result.get("safety_status", "error"),
+                    }}
+
+        # ── Filter ──
+        flyability_tasks = []
+        for rid, days in safety_results.items():
+            for date_str, safety in days.items():
+                if safety.get("safety_status", "error") in ("safe", "conditional"):
+                    flyability_tasks.append((regions_by_id[rid], date_str, safety))
+
+        # ── Phase: region_fly ──
+        total_fly = len(flyability_tasks)
+        yield {"event": "phase", "data": {"phase": "region_fly", "total": total_fly}}
+
+        flyability_results = {}
+        completed_fly = 0
+
+        if flyability_tasks:
+            with ThreadPoolExecutor(max_workers=config.LLM_MAX_WORKERS) as executor:
+                futures = {}
+                _last_hb = time.monotonic()
+                for region, date_str, safety in flyability_tasks:
+                    ctx = context_cache.get(f"region|{region['id']}|{date_str}")
+                    if not ctx:
+                        ctx = self._build_single_region_context(region, date_str)
+                    future = executor.submit(
+                        self._flyability_single_region_day, region, date_str, safety, ctx
+                    )
+                    futures[future] = (region["id"], region["region"], date_str)
+                    if time.monotonic() - _last_hb > self._HEARTBEAT_INTERVAL:
+                        yield self._HEARTBEAT_EVENT
+                        _last_hb = time.monotonic()
+
+                remaining = set(futures.keys())
+                while remaining:
+                    done, remaining = wait(remaining, timeout=self._HEARTBEAT_INTERVAL, return_when=FIRST_COMPLETED)
+                    if not done:
+                        yield self._HEARTBEAT_EVENT
+                        continue
+                    for future in done:
+                        rid, rname, date_str = futures[future]
+                        try:
+                            result = future.result()
+                        except Exception as e:
+                            logger.error(f"Region Flyability-Future {rid}/{date_str} fehlgeschlagen: {e}")
+                            result = {"region_id": rid, "date": date_str, "status": "error", "error": str(e)}
+                        flyability_results.setdefault(rid, {})[date_str] = result
+                        completed_fly += 1
+                        yield {"event": "progress", "data": {
+                            "phase": "region_fly", "name": rname, "date": date_str,
+                            "completed": completed_fly, "total": total_fly,
+                            "result": result.get("flyability_tier", result.get("status", "error")),
+                        }}
+
+        # ── Merge + Persist ──
+        merged = {}
+        for rid, days in safety_results.items():
+            merged[rid] = {}
+            for date_str, safety in days.items():
+                entry = {"safety": safety}
+                fly = flyability_results.get(rid, {}).get(date_str)
+                safety_status = safety.get("safety_status", "error")
+                fly_is_error = fly and (fly.get("error") or fly.get("phase") == "flyability" and not fly.get("flyability_tier") and not fly.get("fly_status"))
+                if fly and not fly_is_error:
+                    tier = _normalize_flyability_tier(
+                        fly.get("flyability_tier") or fly.get("fly_status") or fly.get("status")
+                    )
+                    if not tier:
+                        # LLM returned invalid/missing tier — treat as error
+                        logger.warning(f"Region {rid}/{date_str}: Flyability-Tier leer/ungueltig, raw={fly}")
+                        entry["fly_status"] = ""
+                        entry["fly_error"] = "Flyability-Analyse unvollstaendig"
+                        entry["status"] = safety_status
+                    else:
+                        fly["flyability_tier"] = tier
+                        fly["status"] = tier
+                        entry["flyability"] = fly
+                        entry["fly_status"] = tier
+                        entry["status"] = tier
+                elif fly_is_error:
+                    entry["fly_status"] = ""
+                    entry["fly_error"] = fly.get("error", "Flyability-Analyse fehlgeschlagen")
+                    entry["status"] = safety_status
+                elif safety_status == "not_safe":
+                    entry["fly_status"] = ""
+                    entry["status"] = "not_safe"
+                elif safety_status == "no_data":
+                    entry["fly_status"] = ""
+                    entry["status"] = "no_data"
+                else:
+                    entry["fly_status"] = ""
+                    entry["fly_error"] = "Flyability-Analyse nicht durchgefuehrt"
+                    entry["status"] = "error"
+                entry["best_window"] = safety.get("safe_window", "keins")
+                entry["recommendation"] = ""
+                if fly and not fly_is_error:
+                    entry["recommendation"] = fly.get("recommendation", "")
+                    entry["best_window"] = fly.get("best_window", entry["best_window"])
+                entry["region_name"] = safety.get("region", regions_by_id.get(rid, {}).get("region", rid))
+                merged[rid][date_str] = entry
+
+        self.region_analyses = merged
+        self.region_analyses_loaded_at = datetime.now()
+        if self.instantdb:
+            threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
+
+        total_calls = total_safety + total_fly
+        logger.info(f"Region-Analysen (stream) abgeschlossen: {total_calls} LLM-Aufrufe")
+
+        yield {"event": "region_done", "data": {
+            "regions_count": len(merged), "results_count": total_calls, "dates": forecast_dates,
+        }}
+
+    def run_spot_analyses_stream(self, spot_names: list = None):
+        """Generator: yields progress events for spot analyses (Safety → Flyability)."""
+        self._api_abort = threading.Event()  # Early-Abort bei permanentem API-Fehler
+        # Caches von vorherigem Lauf leeren (sonst wachsen sie unbegrenzt)
+        self._ctx_gust_cache.clear()
+        self._ctx_tq_cache.clear()
+        if not self.client:
+            yield {"event": "error", "data": {"message": "OPENAI_API_KEY nicht konfiguriert"}}
+            return
+        if not self.weather_data:
+            yield {"event": "error", "data": {"message": "Keine Wetterdaten geladen"}}
+            return
+
+        if spot_names:
+            spots_to_analyze = [s for s in self.spots if s["name"] in spot_names and s["name"] in self.weather_data]
+        else:
+            spots_to_analyze = [s for s in self.spots if s["name"] in self.weather_data]
+        if not spots_to_analyze:
+            yield {"event": "error", "data": {"message": "Keine zu analysierenden Spots gefunden"}}
+            return
+
+        forecast_dates = self._get_forecast_dates()
+        if not forecast_dates:
+            yield {"event": "error", "data": {"message": "Keine Vorhersage-Tage verfuegbar"}}
+            return
+
+        spots_by_name = {s["name"]: s for s in spots_to_analyze}
+
+        # Pre-validation
+        incomplete_spot_days = {}
+        for spot in spots_to_analyze:
+            name = spot["name"]
+            spot_data = self.weather_data.get(name, {})
+            hourly_data = spot_data.get("hourly_data", {})
+            missing = validate_spot_data(name, hourly_data, config.FORECAST_DAYS)
+            if missing:
+                incomplete_spot_days[name] = set(missing)
+
+        total_safety = len(spots_to_analyze) * len(forecast_dates)
+        skipped_no_data = 0
+
+        # ── Phase: spot_safety ──
+        yield {"event": "phase", "data": {"phase": "spot_safety", "total": total_safety}}
+
+        safety_results = {}
+        completed_safety = 0
+
+        context_cache = {}  # {spot_name|date_str: ctx} fuer Phase 2
+
+        with ThreadPoolExecutor(max_workers=config.LLM_MAX_WORKERS) as executor:
+            futures = {}
+            _last_hb = time.monotonic()
+            for spot in spots_to_analyze:
+                for date_str in forecast_dates:
+                    if date_str in incomplete_spot_days.get(spot["name"], set()):
+                        safety_results.setdefault(spot["name"], {})[date_str] = {
+                            "spot": spot["name"], "date": date_str,
+                            "safety_status": "no_data", "phase": "safety",
+                            "summary": "Wetterdaten unvollstaendig",
+                        }
+                        skipped_no_data += 1
+                        completed_safety += 1
+                        continue
+
+                    future = executor.submit(self._build_and_safety_check_spot, spot, date_str)
+                    futures[future] = (spot["name"], date_str)
+
+            remaining = set(futures.keys())
+            while remaining:
+                done, remaining = wait(remaining, timeout=self._HEARTBEAT_INTERVAL, return_when=FIRST_COMPLETED)
+                if not done:
+                    yield self._HEARTBEAT_EVENT
+                    continue
+                for future in done:
+                    spot_name, date_str = futures[future]
+                    ctx = None
+                    try:
+                        ctx, result = future.result()
+                    except Exception as e:
+                        logger.error(f"Safety-Future fuer {spot_name}/{date_str} fehlgeschlagen: {e}")
+                        result = {"spot": spot_name, "date": date_str, "safety_status": "error", "error": str(e)}
+                    if ctx:
+                        context_cache[f"spot|{spot_name}|{date_str}"] = ctx
+                    safety_results.setdefault(spot_name, {})[date_str] = result
+                    completed_safety += 1
+                    yield {"event": "progress", "data": {
+                        "phase": "spot_safety", "name": spot_name, "date": date_str,
+                        "completed": completed_safety, "total": total_safety,
+                        "result": result.get("safety_status", "error"),
+                    }}
+
+        # ── Filter ──
+        logger.info("[SPOT-STREAM] Safety abgeschlossen (%d/%d), filtere flyability_tasks...", completed_safety, total_safety)
+        flyability_tasks = []
+        for spot_name, days in safety_results.items():
+            for date_str, safety in days.items():
+                if safety.get("safety_status", "error") in ("safe", "conditional"):
+                    flyability_tasks.append((spots_by_name[spot_name], date_str, safety))
+
+        # ── Phase: spot_fly ──
+        total_fly = len(flyability_tasks)
+        logger.info("[SPOT-STREAM] %d flyability_tasks, sende phase-Event...", total_fly)
+        yield {"event": "phase", "data": {"phase": "spot_fly", "total": total_fly}}
+        logger.info("[SPOT-STREAM] phase-Event gesendet, starte Flyability-Executor...")
+
+        flyability_results = {}
+        completed_fly = 0
+
+        if flyability_tasks:
+            with ThreadPoolExecutor(max_workers=config.LLM_MAX_WORKERS) as executor:
+                futures = {}
+                _last_hb = time.monotonic()
+                for spot, date_str, safety in flyability_tasks:
+                    ctx = context_cache.get(f"spot|{spot['name']}|{date_str}")
+                    if not ctx:
+                        ctx = self._build_single_spot_context(spot, date_str, mode="dashboard")
+                    future = executor.submit(self._flyability_single_spot_day, spot, date_str, safety, ctx)
+                    futures[future] = (spot["name"], date_str)
+                    if time.monotonic() - _last_hb > self._HEARTBEAT_INTERVAL:
+                        yield self._HEARTBEAT_EVENT
+                        _last_hb = time.monotonic()
+
+                remaining = set(futures.keys())
+                while remaining:
+                    done, remaining = wait(remaining, timeout=self._HEARTBEAT_INTERVAL, return_when=FIRST_COMPLETED)
+                    if not done:
+                        yield self._HEARTBEAT_EVENT
+                        continue
+                    for future in done:
+                        spot_name, date_str = futures[future]
+                        try:
+                            result = future.result()
+                        except Exception as e:
+                            logger.error(f"Flyability-Future fuer {spot_name}/{date_str} fehlgeschlagen: {e}")
+                            result = {"spot": spot_name, "date": date_str, "status": "error", "error": str(e)}
+                        flyability_results.setdefault(spot_name, {})[date_str] = result
+                        completed_fly += 1
+                        yield {"event": "progress", "data": {
+                            "phase": "spot_fly", "name": spot_name, "date": date_str,
+                            "completed": completed_fly, "total": total_fly,
+                            "result": result.get("flyability_tier", result.get("status", "error")),
+                        }}
+
+        # ── Merge + Persist ──
+        merged = {}
+        for spot_name, days in safety_results.items():
+            merged[spot_name] = {}
+            for date_str, safety in days.items():
+                entry = {"safety": safety}
+                fly = flyability_results.get(spot_name, {}).get(date_str)
+                safety_status = safety.get("safety_status", "error")
+                fly_is_error = fly and (fly.get("error") or fly.get("phase") == "flyability" and not fly.get("flyability_tier") and not fly.get("fly_status"))
+                if fly and not fly_is_error:
+                    tier = _normalize_flyability_tier(
+                        fly.get("flyability_tier") or fly.get("fly_status") or fly.get("status")
+                    )
+                    if not tier:
+                        logger.warning(f"Spot {spot_name}/{date_str}: Flyability-Tier leer/ungueltig, raw={fly}")
+                        entry["fly_status"] = ""
+                        entry["fly_error"] = "Flyability-Analyse unvollstaendig"
+                        entry["status"] = safety_status
+                    else:
+                        fly["flyability_tier"] = tier
+                        fly["status"] = tier
+                        entry["flyability"] = fly
+                        entry["fly_status"] = tier
+                        entry["status"] = tier
+                elif fly_is_error:
+                    entry["fly_status"] = ""
+                    entry["fly_error"] = fly.get("error", "Flyability-Analyse fehlgeschlagen")
+                    entry["status"] = safety_status
+                elif safety_status == "not_safe":
+                    entry["fly_status"] = ""
+                    entry["status"] = "not_safe"
+                elif safety_status == "no_data":
+                    entry["fly_status"] = ""
+                    entry["status"] = "no_data"
+                elif safety_status == "error":
+                    entry["fly_status"] = ""
+                    entry["status"] = "error"
+                else:
+                    entry["fly_status"] = ""
+                    entry["fly_error"] = "Flyability-Analyse nicht durchgefuehrt"
+                    entry["status"] = "error"
+                entry["best_window"] = safety.get("safe_window", "keins")
+                entry["recommendation"] = ""
+                if fly and not fly_is_error:
+                    entry["recommendation"] = fly.get("recommendation", "")
+                    entry["best_window"] = fly.get("best_window", entry["best_window"])
+                merged[spot_name][date_str] = entry
+
+        self.spot_analyses = merged
+        self.analyses_loaded_at = datetime.now()
+        self._save_analyses_cache()
+        if self.instantdb:
+            threading.Thread(target=self._push_analyses_to_instantdb, daemon=True).start()
+
+        # Build per_day_counts + summary
+        per_day_counts = {}
+        for date_str in forecast_dates:
+            safety_c = {"safe": 0, "conditional": 0, "not_safe": 0, "no_data": 0}
+            fly_c = {"gray": 0, "green": 0, "violet": 0}
+            err_n = 0
+            for sn, days in merged.items():
+                ent = days.get(date_str, {})
+                ss = ent.get("safety", {}).get("safety_status", "error")
+                if ss in safety_c:
+                    safety_c[ss] += 1
+                else:
+                    err_n += 1
+                ft = ent.get("fly_status") or ""
+                if ft in fly_c:
+                    fly_c[ft] += 1
+            per_day_counts[date_str] = {"safety": safety_c, "fly": fly_c, "error": err_n}
+
+        actual_safety_calls = total_safety - skipped_no_data
+        total_calls = actual_safety_calls + total_fly
+        logger.info(f"Spot-Analysen (stream) abgeschlossen: {total_calls} LLM-Aufrufe")
+
+        yield {"event": "spot_done", "data": {
+            "spots_count": len(merged), "results_count": total_calls,
+            "safety_count": total_safety, "flyability_count": total_fly,
+            "dates": forecast_dates, "per_day_counts": per_day_counts,
+        }}
+
+    # ════════════════════════════════════════════════════════════════════════
+    # BATCH-API-MODUS (OpenAI Batch API — 50% guenstiger, asynchron)
+    # ════════════════════════════════════════════════════════════════════════
+
+    def _build_batch_jsonl(self, requests: list[dict]) -> str:
+        """Baut JSONL-String fuer OpenAI Batch API.
+        Jeder Request: {"custom_id": ..., "method": "POST", "url": "/v1/chat/completions",
+                        "body": {model, messages, temperature, max_tokens, response_format}}
+        """
+        lines = []
+        for req in requests:
+            line = json.dumps(req, ensure_ascii=False)
+            lines.append(line)
+        return "\n".join(lines)
+
+    def _submit_batch(self, jsonl_content: str, description: str) -> str:
+        """Laedt JSONL hoch, erstellt Batch, gibt batch_id zurueck."""
+        import io
+        file_obj = io.BytesIO(jsonl_content.encode("utf-8"))
+        file_obj.name = "batch_input.jsonl"
+        uploaded = self.client.files.create(file=file_obj, purpose="batch")
+        logger.info(f"Batch-Datei hochgeladen: {uploaded.id} ({description})")
+
+        batch = self.client.batches.create(
+            input_file_id=uploaded.id,
+            endpoint="/v1/chat/completions",
+            completion_window="24h",
+            metadata={"description": description},
+        )
+        logger.info(f"Batch erstellt: {batch.id} ({description}), Status: {batch.status}")
+        return batch.id
+
+    def _poll_batch(self, batch_id: str, poll_interval: int = None) -> dict:
+        """Pollt Batch bis abgeschlossen. Gibt {custom_id: parsed_json} zurueck."""
+        if poll_interval is None:
+            poll_interval = config.LLM_BATCH_POLL_INTERVAL
+
+        while True:
+            batch = self.client.batches.retrieve(batch_id)
+            status = batch.status
+            logger.info(f"Batch {batch_id}: Status={status}, "
+                        f"completed={batch.request_counts.completed}/{batch.request_counts.total}, "
+                        f"failed={batch.request_counts.failed}")
+
+            if status == "completed":
+                break
+            elif status in ("failed", "expired", "cancelled"):
+                error_msg = f"Batch {batch_id} fehlgeschlagen: Status={status}"
+                if batch.errors and batch.errors.data:
+                    error_msg += f", Fehler: {batch.errors.data[0].message}"
+                raise RuntimeError(error_msg)
+            time.sleep(poll_interval)
+
+        # Ergebnisse herunterladen und parsen
+        output_file_id = batch.output_file_id
+        if not output_file_id:
+            raise RuntimeError(f"Batch {batch_id} hat keine Output-Datei")
+
+        content = self.client.files.content(output_file_id)
+        results = {}
+        for line in content.text.strip().split("\n"):
+            if not line.strip():
+                continue
+            entry = json.loads(line)
+            custom_id = entry["custom_id"]
+            resp_body = entry.get("response", {}).get("body", {})
+            choices = resp_body.get("choices", [])
+            if choices:
+                raw = choices[0].get("message", {}).get("content", "{}")
+                try:
+                    results[custom_id] = json.loads(raw)
+                except json.JSONDecodeError:
+                    results[custom_id] = {"error": f"JSON-Parse-Fehler: {raw[:200]}"}
+            else:
+                err = entry.get("error", {})
+                results[custom_id] = {"error": err.get("message", "Keine Antwort")}
+        logger.info(f"Batch {batch_id}: {len(results)} Ergebnisse geparst")
+        return results
+
+    def _apply_spot_safety_overrides(self, result: dict, name: str, date_str: str) -> dict:
+        """Wendet deterministische Overrides auf Spot-Safety-Ergebnis an (identisch zu Parallel-Modus)."""
+        result["spot"] = name
+        result["date"] = date_str
+        result["phase"] = "safety"
+
+        # Gust-Cache-Injection
+        gust_info = self._ctx_gust_cache.get(f"{name}|{date_str}", {})
+        if gust_info:
+            result["wind_ok_count"] = gust_info.get("wind_ok_count", 0)
+            result["wind_wrong_count"] = gust_info.get("wind_wrong_count", 0)
+
+        # Hard override: 0 WIND-OK = not_safe
+        wind_ok = result.get("wind_ok_count", -1)
+        if isinstance(wind_ok, int) and wind_ok == 0 and result.get("safety_status") != "not_safe":
+            logger.warning(f"[BATCH] Safety-Override fuer {name}/{date_str}: 0 WIND-OK → not_safe")
+            result["safety_status"] = "not_safe"
+            result["safe_window"] = "keins"
+            nogo = result.get("no_go_reasons", [])
+            if not any("Windrichtung" in r for r in nogo):
+                nogo.append("Keine Stunde mit korrekter Windrichtung")
+            result["no_go_reasons"] = nogo
+
+        # Boeen-Floor
+        if gust_info:
+            gwarn = gust_info.get("gust_warn_hours", 0) + gust_info.get("aloft_gust_warn_hours", 0)
+            gdanger = gust_info.get("gust_danger_hours", 0) + gust_info.get("aloft_gust_danger_hours", 0)
+            if (gwarn > 0 or gdanger > 0) and result.get("safety_status") == "safe":
+                result["safety_status"] = "conditional"
+                cn = result.get("caution_notes", []) or []
+                cn.append("Starke Böen erkannt — Trend und Fenster prüfen.")
+                result["caution_notes"] = cn
+
+        # Overclaim-Ceiling
+        if gust_info and result.get("safety_status") == "not_safe":
+            if not gust_info.get("hard_warning_hours", 0) and gust_info.get("clean_hours_count", 0) >= 4:
+                result["safety_status"] = "conditional"
+                cn = result.get("caution_notes", []) or []
+                cn.append(f"Automatische Korrektur: {gust_info['clean_hours_count']} saubere Flugstunden.")
+                result["caution_notes"] = cn
+                result["no_go_reasons"] = []
+
+        # Tag-Sanitierung: Entfernt versehentlich verbliebene interne Tags
+        _sanitize_llm_result(result)
+
+        return result
+
+    def _apply_region_safety_overrides(self, result: dict, rname: str, region: dict, date_str: str) -> dict:
+        """Wendet deterministische Overrides auf Region-Safety-Ergebnis an."""
+        result["region"] = rname
+        result["region_id"] = region["id"]
+        result["date"] = date_str
+        result["phase"] = "safety"
+
+        strong = result.get("wind_strong_count", 0)
+        calm = result.get("wind_calm_count", 0)
+        moderate = result.get("wind_moderate_count", 0)
+        if (isinstance(strong, int) and isinstance(calm, int) and isinstance(moderate, int)
+                and calm == 0 and strong > moderate
+                and result.get("safety_status") in ("safe", "conditional")):
+            logger.warning(f"[BATCH] Region Safety-Override fuer {rname}/{date_str}: "
+                           f"{strong} WIND-STRONG, 0 WIND-CALM → not_safe")
+            result["safety_status"] = "not_safe"
+            result["safe_window"] = "keins"
+            nogo = result.get("no_go_reasons", [])
+            if not any("WIND-STRONG" in r for r in nogo):
+                nogo.append(f"Ueberwiegend WIND-STRONG ({strong} von {strong + moderate} Stunden)")
+            result["no_go_reasons"] = nogo
+
+        # Tag-Sanitierung: Entfernt versehentlich verbliebene interne Tags
+        _sanitize_llm_result(result)
+
+        return result
+
+    def run_all_analyses_batch_stream(self):
+        """Batch-Modus: Sammelt alle Requests, schickt als OpenAI-Batch, pollt bis fertig."""
+        if not self.client:
+            yield {"event": "error", "data": {"message": "OPENAI_API_KEY nicht konfiguriert"}}
+            return
+
+        all_regions = get_all_regions()
+        regions_with_data = [r for r in all_regions if r["id"] in self.region_weather_data] if self.region_weather_data else []
+        spots_to_analyze = [s for s in self.spots if s["name"] in self.weather_data] if self.weather_data else []
+        forecast_dates = self._get_forecast_dates()
+        _now = datetime.now()
+        now_str = f"{_now.strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(_now)})"
+
+        total_items = (len(regions_with_data) + len(spots_to_analyze)) * len(forecast_dates) * 2
+        yield {"event": "init", "data": {
+            "mode": "batch",
+            "regions_count": len(regions_with_data),
+            "spots_count": len(spots_to_analyze),
+            "days": len(forecast_dates),
+            "total_calls": total_items,
+        }}
+
+        # ── Phase 1: Safety-Batch aufbauen ──
+        yield {"event": "phase", "data": {"phase": "batch_safety_build", "total": 0}}
+        safety_requests = []
+        safety_meta = {}  # custom_id → (type, name/id, date_str, region_or_spot_dict)
+
+        # Spot-Safety-Requests
+        for spot in spots_to_analyze:
+            name = spot["name"]
+            for date_str in forecast_dates:
+                ctx = self._build_single_spot_context(spot, date_str, mode="analysis")
+                if not ctx:
+                    continue
+                cid = f"spot_safety|{name}|{date_str}"
+                safety_requests.append({
+                    "custom_id": cid,
+                    "method": "POST",
+                    "url": "/v1/chat/completions",
+                    "body": {
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": SAFETY_CHECK_PROMPT},
+                            {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
+                        ],
+                        "temperature": 0.2,
+                        "max_tokens": 600,
+                        "response_format": {"type": "json_object"},
+                    },
+                })
+                safety_meta[cid] = ("spot", name, date_str, spot)
+
+        # Region-Safety-Requests
+        for region in regions_with_data:
+            rid = region["id"]
+            rname = region["region"]
+            for date_str in forecast_dates:
+                ctx = self._build_single_region_context(region, date_str)
+                if not ctx:
+                    continue
+                cid = f"region_safety|{rid}|{date_str}"
+                safety_requests.append({
+                    "custom_id": cid,
+                    "method": "POST",
+                    "url": "/v1/chat/completions",
+                    "body": {
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": REGION_SAFETY_CHECK_PROMPT},
+                            {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
+                        ],
+                        "temperature": 0.2,
+                        "max_tokens": 600,
+                        "response_format": {"type": "json_object"},
+                    },
+                })
+                safety_meta[cid] = ("region", rid, date_str, region)
+
+        if not safety_requests:
+            yield {"event": "error", "data": {"message": "Keine Safety-Requests aufgebaut"}}
+            return
+
+        # Batch einreichen
+        yield {"event": "phase", "data": {"phase": "batch_safety_submit",
+                                           "total": len(safety_requests)}}
+        try:
+            jsonl = self._build_batch_jsonl(safety_requests)
+            safety_batch_id = self._submit_batch(jsonl, f"Safety-Check ({len(safety_requests)} Requests)")
+        except Exception as e:
+            logger.error(f"Batch-Submit fehlgeschlagen: {e}")
+            yield {"event": "error", "data": {"message": f"Batch-Submit fehlgeschlagen: {e}"}}
+            return
+
+        # Polling
+        yield {"event": "phase", "data": {"phase": "batch_safety_poll",
+                                           "batch_id": safety_batch_id,
+                                           "total": len(safety_requests)}}
+        try:
+            safety_raw = self._poll_batch(safety_batch_id)
+        except Exception as e:
+            logger.error(f"Batch-Poll fehlgeschlagen: {e}")
+            yield {"event": "error", "data": {"message": f"Batch fehlgeschlagen: {e}"}}
+            return
+
+        # ── Safety-Ergebnisse parsen + Overrides anwenden ──
+        spot_safety_results = {}
+        region_safety_results = {}
+
+        for cid, raw_result in safety_raw.items():
+            meta = safety_meta.get(cid)
+            if not meta:
+                continue
+            typ, name_or_id, date_str, obj = meta
+
+            if raw_result.get("error"):
+                if typ == "spot":
+                    spot_safety_results.setdefault(name_or_id, {})[date_str] = {
+                        "spot": name_or_id, "date": date_str,
+                        "safety_status": "error", "phase": "safety",
+                        "error": raw_result["error"],
+                    }
+                else:
+                    region_safety_results.setdefault(name_or_id, {})[date_str] = {
+                        "region": obj["region"], "region_id": name_or_id, "date": date_str,
+                        "safety_status": "error", "phase": "safety",
+                        "error": raw_result["error"],
+                    }
+                continue
+
+            if typ == "spot":
+                result = self._apply_spot_safety_overrides(raw_result, name_or_id, date_str)
+                spot_safety_results.setdefault(name_or_id, {})[date_str] = result
+            else:
+                result = self._apply_region_safety_overrides(raw_result, obj["region"], obj, date_str)
+                region_safety_results.setdefault(name_or_id, {})[date_str] = result
+
+        yield {"event": "progress", "data": {
+            "phase": "batch_safety_done",
+            "completed": len(safety_raw),
+            "total": len(safety_requests),
+        }}
+
+        # ── Phase 2: Flyability-Batch ──
+        fly_requests = []
+        fly_meta = {}
+
+        # Spot-Flyability
+        for spot in spots_to_analyze:
+            name = spot["name"]
+            for date_str in forecast_dates:
+                safety = spot_safety_results.get(name, {}).get(date_str)
+                if not safety or safety.get("safety_status") not in ("safe", "conditional"):
+                    continue
+                ctx = self._build_single_spot_context(spot, date_str, mode="analysis")
+                if not ctx:
+                    continue
+                safe_window = safety.get("safe_window", "unbekannt")
+                safety_status = safety.get("safety_status", "safe")
+                caution_notes = safety.get("caution_notes", [])
+                safety_context = (
+                    f"\n═══ SICHERHEITSANALYSE (bereits geprüft) ═══\n"
+                    f"Safety-Status: {safety_status}\n"
+                    f"Sicheres Fenster: {safe_window}\n"
+                )
+                if caution_notes:
+                    safety_context += f"Vorsichtshinweise: {', '.join(caution_notes)}\n"
+                safety_context += (
+                    "Analysiere NUR die Stunden innerhalb des sicheren Fensters.\n"
+                    "Hinweis: 'conditional' (Orange) betrifft nur Gefahren/Vorsicht - "
+                    "flyability_tier kann trotzdem 'violet' sein, wenn Thermik/XC aussergewoehnlich sind.\n"
+                )
+                cid = f"spot_fly|{name}|{date_str}"
+                fly_requests.append({
+                    "custom_id": cid,
+                    "method": "POST",
+                    "url": "/v1/chat/completions",
+                    "body": {
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": FLYABILITY_PROMPT},
+                            {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n{safety_context}"},
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 500,
+                        "response_format": {"type": "json_object"},
+                    },
+                })
+                fly_meta[cid] = ("spot", name, date_str, spot, safety)
+
+        # Region-Flyability
+        regions_by_id = {r["id"]: r for r in regions_with_data}
+        for rid, days in region_safety_results.items():
+            region = regions_by_id.get(rid)
+            if not region:
+                continue
+            rname = region["region"]
+            for date_str, safety in days.items():
+                if safety.get("safety_status") not in ("safe", "conditional"):
+                    continue
+                ctx = self._build_single_region_context(region, date_str)
+                if not ctx:
+                    continue
+                safe_window = safety.get("safe_window", "unbekannt")
+                safety_status = safety.get("safety_status", "safe")
+                caution_notes = safety.get("caution_notes", [])
+                safety_context = (
+                    f"\n═══ SICHERHEITSANALYSE (bereits geprüft) ═══\n"
+                    f"Safety-Status: {safety_status}\n"
+                    f"Sicheres Fenster: {safe_window}\n"
+                )
+                if caution_notes:
+                    safety_context += f"Vorsichtshinweise: {', '.join(caution_notes)}\n"
+                safety_context += "Analysiere NUR die Stunden innerhalb des sicheren Fensters.\n"
+                cid = f"region_fly|{rid}|{date_str}"
+                fly_requests.append({
+                    "custom_id": cid,
+                    "method": "POST",
+                    "url": "/v1/chat/completions",
+                    "body": {
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": REGION_FLYABILITY_PROMPT},
+                            {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n{safety_context}"},
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 500,
+                        "response_format": {"type": "json_object"},
+                    },
+                })
+                fly_meta[cid] = ("region", rid, date_str, region, safety)
+
+        spot_fly_results = {}
+        region_fly_results = {}
+
+        if fly_requests:
+            yield {"event": "phase", "data": {"phase": "batch_fly_submit",
+                                               "total": len(fly_requests)}}
+            try:
+                jsonl = self._build_batch_jsonl(fly_requests)
+                fly_batch_id = self._submit_batch(jsonl, f"Flyability ({len(fly_requests)} Requests)")
+            except Exception as e:
+                logger.error(f"Flyability-Batch-Submit fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Flyability-Batch fehlgeschlagen: {e}"}}
+                return
+
+            yield {"event": "phase", "data": {"phase": "batch_fly_poll",
+                                               "batch_id": fly_batch_id,
+                                               "total": len(fly_requests)}}
+            try:
+                fly_raw = self._poll_batch(fly_batch_id)
+            except Exception as e:
+                logger.error(f"Flyability-Batch-Poll fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Flyability-Batch fehlgeschlagen: {e}"}}
+                return
+
+            for cid, raw_result in fly_raw.items():
+                meta = fly_meta.get(cid)
+                if not meta:
+                    continue
+                typ, name_or_id, date_str, obj, safety = meta
+
+                if raw_result.get("error"):
+                    err_entry = {
+                        "date": date_str, "status": "error", "phase": "flyability",
+                        "error": raw_result["error"],
+                    }
+                    if typ == "spot":
+                        err_entry["spot"] = name_or_id
+                        spot_fly_results.setdefault(name_or_id, {})[date_str] = err_entry
+                    else:
+                        err_entry["region"] = obj["region"]
+                        err_entry["region_id"] = name_or_id
+                        region_fly_results.setdefault(name_or_id, {})[date_str] = err_entry
+                    continue
+
+                tier = _normalize_flyability_tier(
+                    raw_result.get("flyability_tier") or raw_result.get("fly_status") or raw_result.get("status")
+                )
+                raw_result["flyability_tier"] = tier
+                raw_result["fly_status"] = tier
+                raw_result["status"] = tier
+
+                # Tag-Sanitierung
+                _sanitize_llm_result(raw_result)
+
+                # Deterministische Flyability-Overrides
+                cache_key = f"{name_or_id}|{date_str}" if typ == "spot" else f"{obj.get('region', name_or_id)}|{date_str}"
+                tq = self._ctx_tq_cache.get(cache_key, {})
+                if tq:
+                    tht = tq.get("thermal_hours_total", 0)
+                    tqd = tq.get("tq_danger_h", 0)
+                    peak = tq.get("peak_climb_proxy", 0)
+                    # Keine Thermik → gray (egal was LLM sagt)
+                    if tier in ("green", "violet") and (tht == 0 or peak < 0.3):
+                        raw_result["fly_status"] = "gray"
+                        raw_result["flyability_tier"] = "gray"
+                        raw_result["status"] = "gray"
+                        tier = "gray"
+                        logger.warning(
+                            f"[BATCH] Flyability-Downgrade: {cache_key} {tier}→gray "
+                            f"(keine Thermik: peak={peak:.1f}, hours={tht})"
+                        )
+                    # gray→green Upgrade bei guter Thermik + <50% UNUSABLE
+                    elif tier == "gray" and tht > 0:
+                        unusable_pct = (tqd / max(1, tht)) * 100
+                        if peak >= 1.0 and unusable_pct < 50:
+                            raw_result["fly_status"] = "green"
+                            raw_result["flyability_tier"] = "green"
+                            raw_result["status"] = "green"
+                            logger.warning(
+                                f"[BATCH] Flyability-Override: {cache_key} gray→green "
+                                f"(peak={peak:.1f}, UNUSABLE={unusable_pct:.0f}%)"
+                            )
+
+                if typ == "spot":
+                    raw_result["spot"] = name_or_id
+                    raw_result["date"] = date_str
+                    raw_result["phase"] = "flyability"
+                    spot_fly_results.setdefault(name_or_id, {})[date_str] = raw_result
+                else:
+                    raw_result["region"] = obj["region"]
+                    raw_result["region_id"] = name_or_id
+                    raw_result["date"] = date_str
+                    raw_result["phase"] = "flyability"
+                    region_fly_results.setdefault(name_or_id, {})[date_str] = raw_result
+
+            yield {"event": "progress", "data": {
+                "phase": "batch_fly_done",
+                "completed": len(fly_raw),
+                "total": len(fly_requests),
+            }}
+
+        # ── Merge: Spot-Ergebnisse (identisch zu run_spot_analyses_stream) ──
+        spot_merged = {}
+        for spot_name, days in spot_safety_results.items():
+            spot_merged[spot_name] = {}
+            for date_str, safety in days.items():
+                entry = {"safety": safety}
+                fly = spot_fly_results.get(spot_name, {}).get(date_str)
+                safety_status = safety.get("safety_status", "error")
+                if fly and not fly.get("error"):
+                    tier = fly.get("flyability_tier", "")
+                    if tier:
+                        entry["flyability"] = fly
+                        entry["fly_status"] = tier
+                        entry["status"] = tier
+                    else:
+                        entry["fly_status"] = ""
+                        entry["status"] = safety_status
+                elif safety_status == "not_safe":
+                    entry["fly_status"] = ""
+                    entry["status"] = "not_safe"
+                elif safety_status == "no_data":
+                    entry["fly_status"] = ""
+                    entry["status"] = "no_data"
+                elif safety_status == "error":
+                    entry["fly_status"] = ""
+                    entry["status"] = "error"
+                else:
+                    entry["fly_status"] = ""
+                    entry["status"] = safety_status
+                entry["best_window"] = safety.get("safe_window", "keins")
+                entry["recommendation"] = ""
+                if fly and not fly.get("error"):
+                    entry["recommendation"] = fly.get("recommendation", "")
+                    entry["best_window"] = fly.get("best_window", entry["best_window"])
+                spot_merged[spot_name][date_str] = entry
+
+        self.spot_analyses = spot_merged
+        self.analyses_loaded_at = datetime.now()
+        self._save_analyses_cache()
+        if self.instantdb:
+            threading.Thread(target=self._push_analyses_to_instantdb, daemon=True).start()
+
+        # ── Merge: Region-Ergebnisse (identisch zu run_region_analyses_stream) ──
+        region_merged = {}
+        for rid, days in region_safety_results.items():
+            region_merged[rid] = {}
+            for date_str, safety in days.items():
+                entry = {"safety": safety}
+                fly = region_fly_results.get(rid, {}).get(date_str)
+                safety_status = safety.get("safety_status", "error")
+                if fly and not fly.get("error"):
+                    tier = fly.get("flyability_tier", "")
+                    if tier:
+                        entry["flyability"] = fly
+                        entry["fly_status"] = tier
+                        entry["status"] = tier
+                    else:
+                        entry["fly_status"] = ""
+                        entry["status"] = safety_status
+                elif safety_status == "not_safe":
+                    entry["fly_status"] = ""
+                    entry["status"] = "not_safe"
+                elif safety_status == "no_data":
+                    entry["fly_status"] = ""
+                    entry["status"] = "no_data"
+                else:
+                    entry["fly_status"] = ""
+                    entry["status"] = safety_status
+                entry["best_window"] = safety.get("safe_window", "keins")
+                entry["recommendation"] = ""
+                if fly and not fly.get("error"):
+                    entry["recommendation"] = fly.get("recommendation", "")
+                    entry["best_window"] = fly.get("best_window", entry["best_window"])
+                entry["region_name"] = safety.get("region", rid)
+                region_merged[rid][date_str] = entry
+
+        self.region_analyses = region_merged
+        self.region_analyses_loaded_at = datetime.now()
+        if self.instantdb:
+            threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
+
+        total_calls = len(safety_requests) + len(fly_requests)
+        logger.info(f"Batch-Analysen abgeschlossen: {total_calls} Calls total")
+
+        yield {"event": "done", "data": {
+            "success": True,
+            "mode": "batch",
+            "total_calls": total_calls,
+            "safety_count": len(safety_requests),
+            "flyability_count": len(fly_requests),
+        }}
+
+    def run_all_analyses_stream(self):
+        """Orchestrator: Regionen + Spots PARALLEL in einem gemeinsamen Pool.
+        Phase 1: Alle Safety-Calls (Regionen + Spots) gleichzeitig.
+        Phase 2: Alle Flyability-Calls (nur safe/conditional) gleichzeitig.
+        Dispatcht zum Batch-Modus wenn config.LLM_ANALYSIS_MODE == 'batch'.
+        """
+        if config.LLM_ANALYSIS_MODE == "batch":
+            yield from self.run_all_analyses_batch_stream()
+            return
+
+        self._api_abort = threading.Event()
+
+        if not self.client:
+            yield {"event": "error", "data": {"message": "OPENAI_API_KEY nicht konfiguriert"}}
+            return
+
+        all_regions = get_all_regions()
+        regions_with_data = [r for r in all_regions if r["id"] in self.region_weather_data] if self.region_weather_data else []
+        spots_to_analyze = [s for s in self.spots if s["name"] in self.weather_data] if self.weather_data else []
+        forecast_dates = self._get_forecast_dates()
+
+        if not forecast_dates:
+            yield {"event": "error", "data": {"message": "Keine Vorhersage-Tage verfuegbar"}}
+            return
+
+        regions_by_id = {r["id"]: r for r in regions_with_data}
+        spots_by_name = {s["name"]: s for s in spots_to_analyze}
+        days = len(forecast_dates)
+
+        # Pre-validation fuer Spots
+        from fetch_weather import validate_spot_data
+        incomplete_spot_days = {}
+        for spot in spots_to_analyze:
+            name = spot["name"]
+            spot_data = self.weather_data.get(name, {})
+            hourly_data = spot_data.get("hourly_data", {})
+            missing = validate_spot_data(name, hourly_data, config.FORECAST_DAYS)
+            if missing:
+                incomplete_spot_days[name] = set(missing)
+
+        total_safety = len(regions_with_data) * days + len(spots_to_analyze) * days
+        total_est = total_safety * 2  # Safety + Flyability (worst case)
+
+        yield {"event": "init", "data": {
+            "regions_count": len(regions_with_data),
+            "spots_count": len(spots_to_analyze),
+            "days": days, "total_calls": total_est,
+        }}
+
+        try:
+            # ══════════════════════════════════════════════════════════════
+            # PHASE 1: Alle Safety-Calls (Regionen + Spots) GEMISCHT
+            # ══════════════════════════════════════════════════════════════
+            yield {"event": "phase", "data": {"phase": "all_safety", "total": total_safety}}
+            logger.info(f"[UNIFIED] Phase 1: {total_safety} Safety-Calls "
+                        f"({len(regions_with_data)} Regionen + {len(spots_to_analyze)} Spots x {days} Tage)")
+
+            spot_safety = {}       # {spot_name: {date: result}}
+            region_safety = {}     # {rid: {date: result}}
+            context_cache = {}     # {key: ctx_string} — wiederverwendbar fuer Flyability
+            completed_safety = 0
+            skipped_no_data = 0
+
+            with ThreadPoolExecutor(max_workers=config.LLM_MAX_WORKERS) as executor:
+                futures = {}
+                _last_hb = time.monotonic()
+
+                # ── Spot-Safety submits (Context-Build + API-Call im Worker) ──
+                for spot in spots_to_analyze:
+                    name = spot["name"]
+                    for date_str in forecast_dates:
+                        if date_str in incomplete_spot_days.get(name, set()):
+                            spot_safety.setdefault(name, {})[date_str] = {
+                                "spot": name, "date": date_str,
+                                "safety_status": "no_data", "phase": "safety",
+                                "summary": "Wetterdaten unvollstaendig",
+                            }
+                            skipped_no_data += 1
+                            completed_safety += 1
+                            continue
+                        future = executor.submit(self._build_and_safety_check_spot, spot, date_str)
+                        futures[future] = ("spot", name, date_str)
+
+                # ── Region-Safety submits (Context-Build + API-Call im Worker) ──
+                for region in regions_with_data:
+                    rid = region["id"]
+                    for date_str in forecast_dates:
+                        future = executor.submit(self._build_and_safety_check_region, region, date_str)
+                        futures[future] = ("region", rid, date_str)
+
+                # ── Ergebnisse einsammeln (Worker liefern (ctx, result) Tuples) ──
+                remaining = set(futures.keys())
+                while remaining:
+                    done, remaining = wait(remaining, timeout=self._HEARTBEAT_INTERVAL, return_when=FIRST_COMPLETED)
+                    if not done:
+                        yield self._HEARTBEAT_EVENT
+                        continue
+                    for future in done:
+                        typ, name_or_id, date_str = futures[future]
+                        ctx = None
+                        try:
+                            ctx, result = future.result()
+                        except Exception as e:
+                            logger.error(f"Safety-Future {typ}/{name_or_id}/{date_str}: {e}")
+                            if typ == "spot":
+                                result = {"spot": name_or_id, "date": date_str, "safety_status": "error", "error": str(e)}
+                            else:
+                                result = {"region_id": name_or_id, "date": date_str, "safety_status": "error", "error": str(e)}
+                        # Context cachen fuer Phase 2 (Flyability)
+                        if ctx:
+                            cache_key = f"{typ}|{name_or_id}|{date_str}"
+                            context_cache[cache_key] = ctx
+                        if typ == "spot":
+                            spot_safety.setdefault(name_or_id, {})[date_str] = result
+                        else:
+                            region_safety.setdefault(name_or_id, {})[date_str] = result
+                        completed_safety += 1
+                        yield {"event": "progress", "data": {
+                            "phase": "all_safety", "type": typ,
+                            "name": name_or_id, "date": date_str,
+                            "completed": completed_safety, "total": total_safety,
+                            "result": result.get("safety_status", "error"),
+                        }}
+
+            logger.info(f"[UNIFIED] Phase 1 fertig: {completed_safety} Safety-Calls")
+
+            # ══════════════════════════════════════════════════════════════
+            # PHASE 2: Alle Flyability-Calls (nur safe/conditional) GEMISCHT
+            # ══════════════════════════════════════════════════════════════
+            fly_tasks = []  # (typ, obj, name_or_id, date_str, safety_result)
+
+            for spot_name, days_dict in spot_safety.items():
+                for date_str, safety in days_dict.items():
+                    if safety.get("safety_status") in ("safe", "conditional"):
+                        fly_tasks.append(("spot", spots_by_name[spot_name], spot_name, date_str, safety))
+
+            for rid, days_dict in region_safety.items():
+                for date_str, safety in days_dict.items():
+                    if safety.get("safety_status") in ("safe", "conditional"):
+                        fly_tasks.append(("region", regions_by_id[rid], rid, date_str, safety))
+
+            total_fly = len(fly_tasks)
+            yield {"event": "phase", "data": {"phase": "all_fly", "total": total_fly}}
+            logger.info(f"[UNIFIED] Phase 2: {total_fly} Flyability-Calls")
+
+            spot_fly = {}
+            region_fly = {}
+            completed_fly = 0
+
+            if fly_tasks:
+                with ThreadPoolExecutor(max_workers=config.LLM_MAX_WORKERS) as executor:
+                    futures = {}
+                    _last_hb = time.monotonic()
+
+                    for typ, obj, name_or_id, date_str, safety in fly_tasks:
+                        cache_key = f"{typ}|{name_or_id}|{date_str}"
+                        ctx = context_cache.get(cache_key)
+                        if not ctx:
+                            # Fallback: Kontext neu bauen (sollte selten passieren)
+                            if typ == "spot":
+                                ctx = self._build_single_spot_context(obj, date_str, mode="dashboard")
+                            else:
+                                ctx = self._build_single_region_context(obj, date_str)
+
+                        if typ == "spot":
+                            future = executor.submit(self._flyability_single_spot_day, obj, date_str, safety, ctx)
+                        else:
+                            future = executor.submit(self._flyability_single_region_day, obj, date_str, safety, ctx)
+                        futures[future] = (typ, name_or_id, date_str)
+
+                        if time.monotonic() - _last_hb > self._HEARTBEAT_INTERVAL:
+                            yield self._HEARTBEAT_EVENT
+                            _last_hb = time.monotonic()
+
+                    remaining = set(futures.keys())
+                    while remaining:
+                        done, remaining = wait(remaining, timeout=self._HEARTBEAT_INTERVAL, return_when=FIRST_COMPLETED)
+                        if not done:
+                            yield self._HEARTBEAT_EVENT
+                            continue
+                        for future in done:
+                            typ, name_or_id, date_str = futures[future]
+                            try:
+                                result = future.result()
+                            except Exception as e:
+                                logger.error(f"Fly-Future {typ}/{name_or_id}/{date_str}: {e}")
+                                result = {"date": date_str, "status": "error", "error": str(e)}
+                                if typ == "spot":
+                                    result["spot"] = name_or_id
+                                else:
+                                    result["region_id"] = name_or_id
+                            if typ == "spot":
+                                spot_fly.setdefault(name_or_id, {})[date_str] = result
+                            else:
+                                region_fly.setdefault(name_or_id, {})[date_str] = result
+                            completed_fly += 1
+                            yield {"event": "progress", "data": {
+                                "phase": "all_fly", "type": typ,
+                                "name": name_or_id, "date": date_str,
+                                "completed": completed_fly, "total": total_fly,
+                                "result": result.get("flyability_tier", result.get("status", "error")),
+                            }}
+
+            # Kontext-Cache freigeben
+            context_cache.clear()
+            logger.info(f"[UNIFIED] Phase 2 fertig: {completed_fly} Flyability-Calls")
+
+            # ══════════════════════════════════════════════════════════════
+            # MERGE + PERSIST: Spot-Ergebnisse
+            # ══════════════════════════════════════════════════════════════
+            spot_merged = {}
+            for spot_name, days_dict in spot_safety.items():
+                spot_merged[spot_name] = {}
+                for date_str, safety in days_dict.items():
+                    entry = {"safety": safety}
+                    fly = spot_fly.get(spot_name, {}).get(date_str)
+                    safety_status = safety.get("safety_status", "error")
+                    fly_is_error = fly and (fly.get("error") or fly.get("phase") == "flyability" and not fly.get("flyability_tier") and not fly.get("fly_status"))
+                    if fly and not fly_is_error:
+                        tier = _normalize_flyability_tier(
+                            fly.get("flyability_tier") or fly.get("fly_status") or fly.get("status")
+                        )
+                        if not tier:
+                            entry["fly_status"] = ""
+                            entry["fly_error"] = "Flyability-Analyse unvollstaendig"
+                            entry["status"] = safety_status
+                        else:
+                            fly["flyability_tier"] = tier
+                            fly["status"] = tier
+                            entry["flyability"] = fly
+                            entry["fly_status"] = tier
+                            entry["status"] = tier
+                    elif fly_is_error:
+                        entry["fly_status"] = ""
+                        entry["fly_error"] = fly.get("error", "Flyability-Analyse fehlgeschlagen")
+                        entry["status"] = safety_status
+                    elif safety_status == "not_safe":
+                        entry["fly_status"] = ""
+                        entry["status"] = "not_safe"
+                    elif safety_status == "no_data":
+                        entry["fly_status"] = ""
+                        entry["status"] = "no_data"
+                    elif safety_status == "error":
+                        entry["fly_status"] = ""
+                        entry["status"] = "error"
+                    else:
+                        entry["fly_status"] = ""
+                        entry["fly_error"] = "Flyability-Analyse nicht durchgefuehrt"
+                        entry["status"] = "error"
+                    entry["best_window"] = safety.get("safe_window", "keins")
+                    entry["recommendation"] = ""
+                    if fly and not fly_is_error:
+                        entry["recommendation"] = fly.get("recommendation", "")
+                        entry["best_window"] = fly.get("best_window", entry["best_window"])
+                    spot_merged[spot_name][date_str] = entry
+
+            self.spot_analyses = spot_merged
+            self.analyses_loaded_at = datetime.now()
+            self._save_analyses_cache()
+            if self.instantdb:
+                threading.Thread(target=self._push_analyses_to_instantdb, daemon=True).start()
+
+            # ══════════════════════════════════════════════════════════════
+            # MERGE + PERSIST: Region-Ergebnisse
+            # ══════════════════════════════════════════════════════════════
+            region_merged = {}
+            for rid, days_dict in region_safety.items():
+                region_merged[rid] = {}
+                for date_str, safety in days_dict.items():
+                    entry = {"safety": safety}
+                    fly = region_fly.get(rid, {}).get(date_str)
+                    safety_status = safety.get("safety_status", "error")
+                    fly_is_error = fly and (fly.get("error") or fly.get("phase") == "flyability" and not fly.get("flyability_tier") and not fly.get("fly_status"))
+                    if fly and not fly_is_error:
+                        tier = _normalize_flyability_tier(
+                            fly.get("flyability_tier") or fly.get("fly_status") or fly.get("status")
+                        )
+                        if not tier:
+                            logger.warning(f"Region {rid}/{date_str}: Flyability-Tier leer/ungueltig")
+                            entry["fly_status"] = ""
+                            entry["fly_error"] = "Flyability-Analyse unvollstaendig"
+                            entry["status"] = safety_status
+                        else:
+                            fly["flyability_tier"] = tier
+                            fly["status"] = tier
+                            entry["flyability"] = fly
+                            entry["fly_status"] = tier
+                            entry["status"] = tier
+                    elif fly_is_error:
+                        entry["fly_status"] = ""
+                        entry["fly_error"] = fly.get("error", "Flyability-Analyse fehlgeschlagen")
+                        entry["status"] = safety_status
+                    elif safety_status == "not_safe":
+                        entry["fly_status"] = ""
+                        entry["status"] = "not_safe"
+                    elif safety_status == "no_data":
+                        entry["fly_status"] = ""
+                        entry["status"] = "no_data"
+                    else:
+                        entry["fly_status"] = ""
+                        entry["fly_error"] = "Flyability-Analyse nicht durchgefuehrt"
+                        entry["status"] = "error"
+                    entry["best_window"] = safety.get("safe_window", "keins")
+                    entry["recommendation"] = ""
+                    if fly and not fly_is_error:
+                        entry["recommendation"] = fly.get("recommendation", "")
+                        entry["best_window"] = fly.get("best_window", entry["best_window"])
+                    entry["region_name"] = safety.get("region", regions_by_id.get(rid, {}).get("region", rid))
+                    region_merged[rid][date_str] = entry
+
+            self.region_analyses = region_merged
+            self.region_analyses_loaded_at = datetime.now()
+            if self.instantdb:
+                threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
+
+            # ══════════════════════════════════════════════════════════════
+            # DONE
+            # ══════════════════════════════════════════════════════════════
+            actual_safety = completed_safety - skipped_no_data
+            total_calls = actual_safety + completed_fly
+            logger.info(f"[UNIFIED] Fertig: {total_calls} LLM-Calls "
+                        f"(Safety: {actual_safety}, Fly: {completed_fly}, "
+                        f"Skipped: {skipped_no_data})")
+
+            yield {"event": "done", "data": {
+                "success": True,
+                "total_calls": total_calls,
+                "safety_count": actual_safety,
+                "flyability_count": completed_fly,
+                "skipped_no_data": skipped_no_data,
+                "region_stats": {"regions_count": len(region_merged)},
+                "spot_stats": {"spots_count": len(spot_merged)},
+            }}
+
+        except GeneratorExit:
+            logger.warning("[UNIFIED] Client hat Verbindung geschlossen (GeneratorExit)")
+        except Exception as e:
+            logger.exception("[UNIFIED] run_all_analyses_stream Fehler")
+            yield {"event": "error", "data": {"message": str(e)}}
 
     def _build_analyses_context(self) -> str:
         """Formatiert Voranalysen zweistufig: Sicherheit zuerst, dann Flugtauglichkeit."""
@@ -2130,7 +4451,7 @@ class FlychatEngine:
 
         for date_str in sorted_dates:
             lines.append(f"╔══════════════════════════════════════════╗")
-            lines.append(f"║  TAG: {date_str}")
+            lines.append(f"║  TAG: {date_str} ({_weekday_de(date_str)})")
             lines.append(f"╚══════════════════════════════════════════╝")
 
             # ── BLOCK 1: SICHERHEITSÜBERSICHT ──
@@ -2205,7 +4526,7 @@ class FlychatEngine:
                         continue
 
                     ft = _normalize_flyability_tier(
-                        fly.get("flyability_tier") or fly.get("status")
+                        fly.get("flyability_tier") or fly.get("fly_status") or fly.get("status")
                     )
                     status_label = {
                         "gray": "GRAU (Abgleiter/mau)",
@@ -2262,8 +4583,17 @@ class FlychatEngine:
             return ""
 
         lines = [
-            "VORANALYSEN — KURZÜBERSICHT (interne Datenbasis)",
+            "VORANALYSEN — KURZÜBERSICHT (interne Datenbasis, BINDEND)",
             f"Stand: {self.analyses_loaded_at.isoformat() if self.analyses_loaded_at else 'unbekannt'}",
+            "",
+            "WICHTIG — HARTE EMPFEHLUNGS-REGEL:",
+            "  • Spots/Tage unter 'SICHERHEIT nicht ok' (not_safe), 'DATEN UNVOLLSTÄNDIG' (no_data)",
+            "    und 'Analyse fehlt/Fehler' sind für [RECOMMENDED: …] VERBOTEN.",
+            "  • Diese Spots dürfen weder als Top-Pick, Alternative, 'vielleicht später' noch",
+            "    als 'geht knapp' empfohlen werden. Die Voranalyse hat Veto-Recht.",
+            "  • Empfohlen werden dürfen nur Spots aus 'FLIEGBARKEIT legendär/fliegbar/Abgleiter'",
+            "    (also Sicherheits-Status safe oder conditional).",
+            "  • Du darfst diese Einteilung kommentieren und Nuancen benennen, aber niemals überstimmen.",
             "",
         ]
 
@@ -2303,7 +4633,7 @@ class FlychatEngine:
                 elif ft:
                     green_f.append((name, bw))
 
-            lines.append(f"─── {date_str} ───")
+            lines.append(f"─── {date_str} ({_weekday_de(date_str)}) ───")
 
             def _fmt_group(label: str, items: list):
                 if not items:
@@ -2317,16 +4647,16 @@ class FlychatEngine:
 
             if not_safe:
                 if len(not_safe) <= 12:
-                    lines.append(f"  SICHERHEIT nicht ok (Phase 2 entfällt): {', '.join(not_safe)}")
+                    lines.append(f"  SICHERHEIT nicht ok (NICHT EMPFEHLEN — Phase 2 entfällt): {', '.join(not_safe)}")
                 else:
                     lines.append(
-                        f"  SICHERHEIT nicht ok (Phase 2 entfällt): {', '.join(not_safe[:12])} "
+                        f"  SICHERHEIT nicht ok (NICHT EMPFEHLEN — Phase 2 entfällt): {', '.join(not_safe[:12])} "
                         f"… (+{len(not_safe) - 12} weitere)"
                     )
             if no_data:
-                lines.append(f"  DATEN UNVOLLSTÄNDIG (keine Analyse): {', '.join(no_data)}")
+                lines.append(f"  DATEN UNVOLLSTÄNDIG (NICHT EMPFEHLEN — keine Analyse): {', '.join(no_data)}")
             if errors:
-                lines.append(f"  Analyse fehlt/Fehler: {', '.join(errors)}")
+                lines.append(f"  Analyse fehlt/Fehler (NICHT EMPFEHLEN): {', '.join(errors)}")
 
             # Kurz-Tipps: violet zuerst, dann green
             tips = []
@@ -2509,7 +4839,7 @@ class FlychatEngine:
         messages = [
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT + "\n\n" + FOEHN_CHAT_KNOWLEDGE,
+                "content": SYSTEM_PROMPT + "\n\n" + CAPABILITIES_GUIDE + "\n\n" + FOEHN_CHAT_KNOWLEDGE,
             },
         ]
         self.conversations[session_id] = {
@@ -2543,6 +4873,16 @@ class FlychatEngine:
         if not self.client:
             return "Fehler: OPENAI_API_KEY nicht konfiguriert."
 
+        # FORMAT-HINT aus der Frage extrahieren (wird ans LLM gesendet, aber nicht in History gespeichert)
+        format_hint = ""
+        hint_match = re.search(r'\s*\[FORMAT-HINT:\s*[^\]]*\]', question)
+        if hint_match:
+            format_hint = hint_match.group(0)
+            question_clean = question[:hint_match.start()] + question[hint_match.end():]
+            question_clean = question_clean.strip()
+        else:
+            question_clean = question
+
         # Sicherstellen dass Wetterdaten verfügbar sind (Fallback: InstantDB)
         self._ensure_weather_context()
 
@@ -2568,7 +4908,7 @@ class FlychatEngine:
                 context_block = self.weather_context_str
 
             user_content = (
-                f"AKTUELZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"AKTUELZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n"
                 "Hintergrunddaten für deine Antwort (nicht wörtlich als Gesamtreport ausgeben):\n"
                 "==========================================================\n"
                 f"{context_block}\n"
@@ -2576,13 +4916,13 @@ class FlychatEngine:
                 "Beantworte die Frage des Piloten **direkt** und in angemessenem Umfang — wie in einem "
                 "kurzen Chat. Keine vollständige Tabelle aller Spots, es sei denn der Pilot verlangt "
                 "ausdrücklich eine Übersicht/Tabelle **aller** Gebiete oder einen mehrzeiligen Vergleich.\n"
-                "Bei **Föhn-Fragen**: die Föhn-Lage nur aus dem Block „FÖHN-INDIKATOR“ (ΔP, Kammwind, Level) "
-                "ableiten — nicht aus „alle Spots nicht sicher“ schließen, dass es „keinen Föhn“ gäbe.\n\n"
-                f"Frage des Piloten: {question}"
+                'Bei **Föhn-Fragen**: die Föhn-Lage nur aus dem Block „FÖHN-INDIKATOR" (ΔP, Kammwind, Level) '
+                'ableiten — nicht aus „alle Spots nicht sicher" schließen, dass es „keinen Föhn" gäbe.\n\n'
+                f"Frage des Piloten: {question_clean}{format_hint}"
             )
             conv["first_question"] = False
         else:
-            user_content = question
+            user_content = question_clean + format_hint
 
         messages.append({"role": "user", "content": user_content})
 
@@ -2604,11 +4944,352 @@ class FlychatEngine:
             logger.error(f"OpenAI API Fehler: {e}")
             reply = f"Entschuldigung, es gab einen Fehler bei der Verarbeitung: {e}"
 
+        # Strip FORMAT-HINT from stored user message to keep history clean
+        if format_hint and messages:
+            last_user = messages[-1]
+            if last_user.get("role") == "user" and format_hint in last_user.get("content", ""):
+                last_user["content"] = last_user["content"].replace(format_hint, "").rstrip()
+
         messages.append({"role": "assistant", "content": reply})
         conv["last_activity"] = datetime.now().isoformat()
         self._save_conversation(session_id)
 
         return reply
+
+    # ========================================================================
+    # PHASE 1: TOOL-USE + STREAMING
+    # ========================================================================
+
+    def _build_spot_context_for_tool(self, spot: dict) -> dict:
+        """Baut einen kompakten Spot-Eintrag für die Tool-Antwort an den LLM.
+
+        Enthält Stammdaten + (falls vorhanden) Voranalyse-Kurzfassung pro Tag.
+        Wird vom find_spots_within_travel_time Tool verwendet.
+        """
+        name = spot.get("name", "")
+        entry = {
+            "name": name,
+            "fluggebiet": spot.get("fluggebiet", ""),
+            "region": spot.get("region", ""),
+            "elevation_m": spot.get("elevation_m"),
+            "windrichtung": spot.get("windrichtung", ""),
+            "latitude": spot.get("latitude"),
+            "longitude": spot.get("longitude"),
+        }
+        # Voranalysen pro Tag (kompakt)
+        analyses = self.spot_analyses.get(name, {}) if self.spot_analyses else {}
+        if analyses:
+            days_summary = {}
+            for date_str, day in analyses.items():
+                if not isinstance(day, dict):
+                    continue
+                safety = day.get("safety", {}) if isinstance(day.get("safety"), dict) else {}
+                days_summary[date_str] = {
+                    "safety_status": safety.get("safety_status") or day.get("safety_status"),
+                    "fly_status": day.get("fly_status"),
+                    "best_window": day.get("best_window"),
+                    "recommendation": (day.get("recommendation") or "")[:240],
+                }
+            if days_summary:
+                entry["analyses"] = days_summary
+        return entry
+
+    def _dispatch_tool(self, name: str, args: dict) -> dict:
+        """Führt einen Tool-Call aus und gibt ein dispatch-Resultat zurück.
+
+        Returns Dict mit:
+            - "content": JSON-serialisierbares Resultat für den OpenAI tool-message
+            - "map_actions": Liste von Map-Action-Events, die sofort ans Frontend
+              gestreamt werden sollen (oder leere Liste).
+        """
+        if name == "geocode_location":
+            query = (args.get("query") or "").strip()
+            if not query:
+                return {"content": {"error": "Leere Query"}, "map_actions": []}
+            try:
+                result = routing.geocode(query)
+            except routing.RoutingError as e:
+                return {
+                    "content": {"error": f"Geocoding fehlgeschlagen: {e}"},
+                    "map_actions": [],
+                }
+            if result is None:
+                return {
+                    "content": {"error": f"Ort '{query}' nicht gefunden"},
+                    "map_actions": [],
+                }
+            return {"content": result, "map_actions": []}
+
+        if name == "find_spots_within_travel_time":
+            try:
+                lat = float(args["lat"])
+                lon = float(args["lon"])
+                minutes = int(args["minutes"])
+            except (KeyError, TypeError, ValueError) as e:
+                return {
+                    "content": {"error": f"Ungültige Parameter: {e}"},
+                    "map_actions": [],
+                }
+            mode = (args.get("mode") or "auto").lower()
+            label = (args.get("label") or "").strip()
+
+            try:
+                iso = routing.isochrone(lat, lon, minutes, mode)
+            except (routing.RoutingError, ValueError) as e:
+                return {
+                    "content": {
+                        "error": (
+                            f"Routing-Service ist aktuell nicht erreichbar ({e}). "
+                            "Bitte in ein paar Minuten erneut versuchen."
+                        )
+                    },
+                    "map_actions": [],
+                }
+
+            try:
+                matched = routing.spots_in_polygon(iso, self.spots)
+            except routing.RoutingError as e:
+                return {
+                    "content": {"error": f"Spot-Filter fehlgeschlagen: {e}"},
+                    "map_actions": [],
+                }
+
+            spot_entries = [self._build_spot_context_for_tool(s) for s in matched]
+            spot_names = [s["name"] for s in matched if s.get("name")]
+
+            mode_label = {
+                "auto": "Auto",
+                "bicycle": "Velo",
+                "pedestrian": "zu Fuss",
+            }.get(mode, mode)
+            iso_label = f"{minutes} min {mode_label}"
+
+            map_actions = [
+                {
+                    "type": "map_action",
+                    "action": "drawIsochrone",
+                    "payload": {"geojson": iso, "label": iso_label},
+                },
+                {
+                    "type": "map_action",
+                    "action": "setUserLocation",
+                    "payload": {"lat": lat, "lon": lon, "label": label or "Standort"},
+                },
+                {
+                    "type": "map_action",
+                    "action": "highlightSpots",
+                    "payload": {"spots": spot_names},
+                },
+            ]
+
+            return {
+                "content": {
+                    "origin": {"lat": lat, "lon": lon, "label": label},
+                    "minutes": minutes,
+                    "mode": mode,
+                    "count": len(spot_entries),
+                    "spots": spot_entries,
+                },
+                "map_actions": map_actions,
+            }
+
+        if name == "clear_map_overlays":
+            return {
+                "content": {"ok": True},
+                "map_actions": [
+                    {
+                        "type": "map_action",
+                        "action": "clearAllOverlays",
+                        "payload": {},
+                    }
+                ],
+            }
+
+        return {
+            "content": {"error": f"Unbekanntes Tool '{name}'"},
+            "map_actions": [],
+        }
+
+    def answer_stream(self, session_id: str, question: str):
+        """Streaming-Variante von answer() mit Tool-Use.
+
+        Generator: yieldet Events der Form
+            {"type": "text",       "content": "..."}      # finaler Antworttext
+            {"type": "map_action", "action": "...",       # Map-Update
+                                   "payload": {...}}
+            {"type": "status",     "content": "..."}      # optionale Statusnachricht
+            {"type": "error",      "content": "..."}      # Fehler
+            {"type": "done"}                              # Stream-Ende
+        """
+        if not self.client:
+            yield {"type": "error", "content": "OPENAI_API_KEY nicht konfiguriert."}
+            yield {"type": "done"}
+            return
+
+        # FORMAT-HINT extrahieren (analog answer())
+        format_hint = ""
+        hint_match = re.search(r'\s*\[FORMAT-HINT:\s*[^\]]*\]', question)
+        if hint_match:
+            format_hint = hint_match.group(0)
+            question_clean = question[:hint_match.start()] + question[hint_match.end():]
+            question_clean = question_clean.strip()
+        else:
+            question_clean = question
+
+        self._ensure_weather_context()
+        if not self.weather_context_str:
+            yield {
+                "type": "text",
+                "content": "Wetterdaten werden geladen... Bitte versuche es gleich nochmal.",
+            }
+            yield {"type": "done"}
+            return
+
+        self._ensure_spot_analyses()
+
+        messages = self._get_or_create_conversation(session_id)
+        conv = self.conversations[session_id]
+
+        if conv["first_question"]:
+            analyses_context = self._build_compact_analyses_for_chat()
+            if analyses_context:
+                foehn_snap = self._build_foehn_context_for_ai()
+                context_block = analyses_context + "\n\n" + foehn_snap
+            else:
+                context_block = self.weather_context_str
+
+            user_content = (
+                f"AKTUELZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n"
+                "Hintergrunddaten für deine Antwort (nicht wörtlich als Gesamtreport ausgeben):\n"
+                "==========================================================\n"
+                f"{context_block}\n"
+                "==========================================================\n"
+                "Beantworte die Frage des Piloten **direkt** und in angemessenem Umfang — wie in einem "
+                "kurzen Chat. Keine vollständige Tabelle aller Spots, es sei denn der Pilot verlangt "
+                "ausdrücklich eine Übersicht/Tabelle **aller** Gebiete oder einen mehrzeiligen Vergleich.\n"
+                'Bei **Föhn-Fragen**: die Föhn-Lage nur aus dem Block „FÖHN-INDIKATOR" (ΔP, Kammwind, Level) '
+                'ableiten — nicht aus „alle Spots nicht sicher" schließen, dass es „keinen Föhn" gäbe.\n\n'
+                f"Frage des Piloten: {question_clean}{format_hint}"
+            )
+            conv["first_question"] = False
+        else:
+            user_content = question_clean + format_hint
+
+        messages.append({"role": "user", "content": user_content})
+
+        # History trimmen
+        if len(messages) > MAX_HISTORY_MESSAGES:
+            messages[:] = messages[:2] + messages[-(MAX_HISTORY_MESSAGES - 2):]
+
+        # ───── Tool-Call-Loop ────────────────────────────────────────────────
+        reply_text = ""
+        tool_iterations = 0
+        emitted_status = False
+
+        try:
+            while True:
+                if tool_iterations >= MAX_TOOL_ITERATIONS:
+                    yield {
+                        "type": "error",
+                        "content": "Tool-Call-Limit erreicht. Bitte Frage neu formulieren.",
+                    }
+                    break
+
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    tools=TOOLS,
+                    tool_choice="auto",
+                    temperature=0.7,
+                    max_tokens=2000,
+                )
+                choice = response.choices[0]
+                msg = choice.message
+                finish_reason = choice.finish_reason
+
+                # Falls Tool-Calls angefordert wurden: dispatchen
+                tool_calls = getattr(msg, "tool_calls", None) or []
+                if tool_calls:
+                    # Assistant-Message mit tool_calls in History anhängen
+                    messages.append({
+                        "role": "assistant",
+                        "content": msg.content or "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments,
+                                },
+                            }
+                            for tc in tool_calls
+                        ],
+                    })
+
+                    # Optional: einmaliger Status-Hinweis vor dem ersten Tool
+                    if not emitted_status:
+                        yield {
+                            "type": "status",
+                            "content": "Ich suche erreichbare Spots…",
+                        }
+                        emitted_status = True
+
+                    for tc in tool_calls:
+                        fn_name = tc.function.name
+                        try:
+                            fn_args = json.loads(tc.function.arguments or "{}")
+                        except json.JSONDecodeError as e:
+                            fn_args = {}
+                            logger.warning(f"Tool {fn_name} arguments JSON invalid: {e}")
+
+                        dispatch = self._dispatch_tool(fn_name, fn_args)
+
+                        # Map-Actions sofort an Frontend streamen
+                        for action in dispatch.get("map_actions", []):
+                            yield action
+
+                        # Tool-Resultat als tool-message in History
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "name": fn_name,
+                            "content": json.dumps(
+                                dispatch.get("content", {}), ensure_ascii=False
+                            ),
+                        })
+
+                    tool_iterations += 1
+                    continue  # nächste LLM-Iteration
+
+                # Kein Tool-Call mehr → finale Antwort
+                reply_text = msg.content or ""
+                messages.append({"role": "assistant", "content": reply_text})
+                if reply_text:
+                    yield {"type": "text", "content": reply_text}
+                break
+
+        except Exception as e:
+            logger.error(f"OpenAI API Fehler (stream): {e}")
+            yield {
+                "type": "error",
+                "content": f"Fehler bei der Verarbeitung: {e}",
+            }
+
+        # FORMAT-HINT aus letzter user-message strippen (analog answer())
+        if format_hint:
+            for m in reversed(messages):
+                if m.get("role") == "user" and isinstance(m.get("content"), str) and format_hint in m["content"]:
+                    m["content"] = m["content"].replace(format_hint, "").rstrip()
+                    break
+
+        conv["last_activity"] = datetime.now().isoformat()
+        try:
+            self._save_conversation(session_id)
+        except Exception as e:
+            logger.error(f"_save_conversation fehlgeschlagen: {e}")
+
+        yield {"type": "done"}
 
     def reset_conversation(self, session_id: str):
         """Conversation zurücksetzen."""

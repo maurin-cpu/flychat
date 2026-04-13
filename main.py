@@ -7,7 +7,7 @@ import os
 import logging
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 
@@ -32,8 +32,7 @@ def daily_refresh(engine, refresh_hour=6):
         # Naechster Refresh-Zeitpunkt
         next_refresh = now.replace(hour=refresh_hour, minute=0, second=0, microsecond=0)
         if now >= next_refresh:
-            # Heute schon vorbei -> morgen
-            next_refresh = next_refresh.replace(day=now.day + 1)
+            next_refresh = next_refresh + timedelta(days=1)
 
         wait_seconds = (next_refresh - now).total_seconds()
         logger.info(f"Naechster Wetter-Refresh in {wait_seconds/3600:.1f}h ({next_refresh.strftime('%Y-%m-%d %H:%M')})")
@@ -89,8 +88,13 @@ def main():
     # Flask starten
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "true").lower() == "true"
-    logger.info(f"Flask startet auf Port {port} (debug={debug})")
-    app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=debug)
+    # Reloader DEAKTIVIERT: Der Watchdog auf Windows/OneDrive erkennt staendig
+    # Dateiänderungen (OneDrive-Sync, Cache-Writes, sogar Python-Stdlib) und
+    # startet den Server neu — das killt laufende SSE-Verbindungen und Analysen.
+    # Debug-Modus (Debugger, Tracebacks) bleibt aktiv.
+    use_reloader = os.environ.get("FLASK_RELOADER", "false").lower() == "true"
+    logger.info(f"Flask startet auf Port {port} (debug={debug}, reloader={use_reloader})")
+    app.run(host="0.0.0.0", port=port, debug=debug, use_reloader=use_reloader)
 
 
 if __name__ == "__main__":

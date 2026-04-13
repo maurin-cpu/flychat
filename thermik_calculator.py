@@ -3,6 +3,8 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import logging
 
+from config import THERMAL_PARAMS
+
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -37,15 +39,11 @@ def _get_season(timestamp: str) -> str:
 
 def _get_thermal_param(key: str, timestamp: str = None, default=None):
     """Holt einen Thermik-Parameter aus config.py, jahreszeitabhängig wenn nötig."""
-    try:
-        from config import THERMAL_PARAMS
-        value = THERMAL_PARAMS.get(key, default)
-        if isinstance(value, dict) and timestamp:
-            season = _get_season(timestamp)
-            return value.get(season, default)
-        return value
-    except ImportError:
-        return default
+    value = THERMAL_PARAMS.get(key, default)
+    if isinstance(value, dict) and timestamp:
+        season = _get_season(timestamp)
+        return value.get(season, default)
+    return value
 
 
 def _terrain_factor(elevation_m: float) -> float:
@@ -68,6 +66,110 @@ def _terrain_factor(elevation_m: float) -> float:
         return 1.0
     else:
         return (elevation_m - elev_low) / (elev_high - elev_low)
+
+
+# ============================================================================
+# Terrain-Zone Lookup (5 Klassen aus data/regionen.csv)
+# ============================================================================
+# Gueltige Zonen (mittelland, jura, voralpen, alpen, hochalpin) — siehe
+# data/regionen.csv und docs/THERMIK_TERRAIN_KALIBRIERUNG.md.
+_VALID_TERRAIN_ZONES = ("mittelland", "jura", "voralpen", "alpen", "hochalpin")
+
+# Cache fuer regionen.csv (lazy-load, einmalig pro Prozess)
+_region_terrain_cache: Optional[Dict[str, str]] = None
+
+
+def _load_region_terrain_map() -> Dict[str, str]:
+    """Laedt {region_id: terrain_type} aus data/regionen.csv (einmalig gecached)."""
+    global _region_terrain_cache
+    if _region_terrain_cache is not None:
+        return _region_terrain_cache
+
+    import csv
+    from pathlib import Path
+
+    _region_terrain_cache = {}
+    csv_path = Path(__file__).resolve().parent / "data" / "regionen.csv"
+    if not csv_path.exists():
+        logger.warning("Thermik: regionen.csv nicht gefunden: %s", csv_path)
+        return _region_terrain_cache
+
+    try:
+        with open(csv_path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                rid = (row.get("id") or "").strip()
+                tt = (row.get("terrain_type") or "").strip()
+                if rid and tt in _VALID_TERRAIN_ZONES:
+                    _region_terrain_cache[rid] = tt
+    except Exception as exc:
+        logger.warning("Thermik: konnte regionen.csv nicht lesen: %s", exc)
+        return _region_terrain_cache
+
+    logger.info("Thermik: %d Regionen-Terrain-Typen geladen", len(_region_terrain_cache))
+    return _region_terrain_cache
+
+
+def get_terrain_zone(elevation_m: float, region_id: str = None) -> str:
+    """
+    Bestimmt die Terrain-Zone fuer einen Spot.
+
+    1. Wenn region_id bekannt → exakter Lookup aus data/regionen.csv
+    2. Sonst: elevation-basierter Fallback in 5 Stufen
+
+    Die Schwellen des Fallbacks orientieren sich an den typischen Referenz-
+    elevationen der regionen.csv-Eintraege:
+      mittelland:  < 850 m   (Seeland, Mittelland, Genfersee)
+      jura:        850–1300  (Jura Ost/West/Zentral)
+      voralpen:    1300–1550 (Napf, Schwarzsee, Glarnerland)
+      alpen:       1550–1900 (Berner Oberland, Alpstein, Tessin Zentral)
+      hochalpin:   ≥ 1900 m  (Wallis, Engadin, Tessin Nord, Goms, Surselva)
+
+    Args:
+        elevation_m: Referenzhoehe des Spots/der Region (m MSL)
+        region_id: optionale Regions-ID (z.B. "tessin_nord", "zentralwallis")
+
+    Returns:
+        Eine der Strings aus _VALID_TERRAIN_ZONES.
+    """
+    if region_id:
+        terrain_map = _load_region_terrain_map()
+        zone = terrain_map.get(region_id)
+        if zone in _VALID_TERRAIN_ZONES:
+            return zone
+
+    # Elevation-Fallback (5 Stufen)
+    if elevation_m is None:
+        return "alpen"  # konservativer Default
+    if elevation_m < 850:
+        return "mittelland"
+    elif elevation_m < 1300:
+        return "jura"
+    elif elevation_m < 1550:
+        return "voralpen"
+    elif elevation_m < 1900:
+        return "alpen"
+    else:
+        return "hochalpin"
+
+
+def _get_terrain_param(key: str, terrain_zone: str, default=None):
+    """
+    Holt einen terrain-zonen-abhaengigen Parameter aus THERMAL_PARAMS.
+
+    Erwartet, dass THERMAL_PARAMS[key] ein Dict mit Zonen-Keys ist
+    (mittelland/jura/voralpen/alpen/hochalpin).
+
+    Faellt auf:
+    1. Den Wert fuer 'alpen' im Dict zurueck, falls die Zone fehlt.
+    2. Den default-Parameter, falls der Key gar nicht existiert.
+    """
+    value = THERMAL_PARAMS.get(key)
+    if isinstance(value, dict):
+        return value.get(terrain_zone, value.get("alpen", default))
+    if value is not None:
+        return value  # Backward-Compat: jemand hat einen festen Wert gesetzt
+    return default
 
 
 def _compute_free_atm_gamma(profile: List[Dict], blh_msl: float, elevation_m: float) -> float:
@@ -293,6 +395,75 @@ def interpolate_temp_at_height(elevation_ref: float, profile: List[Dict]) -> Opt
     return below['temp'] + frac * (above['temp'] - below['temp'])
 
 
+def _interpolate_profile(profile: List[Dict], dz_m: float = 100.0) -> List[Dict]:
+    """
+    Interpoliert das Druckniveau-Profil linear auf feine Hoehenschritte (default 100 m).
+
+    Standard in modernen Soaring-Modellen (RASP, RegTherm, XC Therm). Verbessert die
+    Aufloesung des Parcel-Ascent insbesondere im Hochalpinen, wo die nativen
+    Druckniveau-Schritte (z.B. 850→800 hPa ≈ 500 m) Inversionen verfehlen koennen.
+
+    - Temperatur wird linear interpoliert (lokal lapse-rate-konstant).
+    - Druck wird logarithmisch interpoliert (hydrostatisch korrekt).
+    - Original-Druckniveaus bleiben in der Liste enthalten.
+
+    Quellen: Wang (2021), Markowski & Richardson (2010); siehe
+    meteo_research/thermal_model_calibration.md.
+    """
+    if not profile or len(profile) < 2:
+        return profile
+
+    sorted_p = sorted(
+        [p for p in profile
+         if p.get('height') is not None and p.get('temp') is not None],
+        key=lambda x: x['height']
+    )
+    if len(sorted_p) < 2:
+        return sorted_p
+
+    fine: List[Dict] = []
+    for i in range(len(sorted_p) - 1):
+        lower = sorted_p[i]
+        upper = sorted_p[i + 1]
+        h0 = lower['height']
+        h1 = upper['height']
+        t0 = lower['temp']
+        t1 = upper['temp']
+        p0 = lower.get('pressure')
+        p1 = upper.get('pressure')
+
+        # Original-Unterpunkt einfuegen
+        fine.append(lower)
+
+        gap = h1 - h0
+        if gap <= dz_m:
+            continue
+
+        n_steps = int(gap // dz_m)
+        for k in range(1, n_steps + 1):
+            h = h0 + k * dz_m
+            if h >= h1:
+                break
+            frac = (h - h0) / gap
+            t = t0 + frac * (t1 - t0)
+
+            # Druck logarithmisch interpolieren (hydrostatisch konsistent)
+            if p0 is not None and p1 is not None and p0 > 0 and p1 > 0:
+                p = math.exp(math.log(p0) + frac * (math.log(p1) - math.log(p0)))
+            else:
+                p = None
+
+            fine.append({
+                'height': h,
+                'temp': t,
+                'pressure': p,
+            })
+
+    # Original-Oberpunkt anhaengen
+    fine.append(sorted_p[-1])
+    return fine
+
+
 def calculate_thermic_clouds(low_clouds: float, mid_clouds: float, high_clouds: float) -> dict:
     """
     Berechnet die thermisch relevante Bewölkung und einen Anzeige-Sonnenindex.
@@ -351,6 +522,7 @@ def calculate_thermal_profile(
     cumulative_buoyancy: float = None,
     peak_H: float = None,
     peak_shortwave: float = None,
+    region_id: str = None,
 ) -> Dict:
     """
     Berechnet das Thermik-Profil mit physikalisch fundiertem Modell.
@@ -381,12 +553,25 @@ def calculate_thermal_profile(
     if surface_temp is None:
         return {'error': 'Fehlende Bodentemperatur'}
 
+    # Terrain-Zone bestimmen (5 Stufen: mittelland/jura/voralpen/alpen/hochalpin)
+    # Bevorzugt ueber region_id aus data/regionen.csv, Fallback ueber elevation_m.
+    # Wird fuer zonen-differenzierte Parameter wie min_thermal_depth_agl verwendet.
+    terrain_zone = get_terrain_zone(elevation_m, region_id)
+
     # Profil sortiert von unten nach oben (nur gültige Einträge)
     profile = sorted(
         [p for p in pressure_levels_data
          if p.get('height') is not None and p.get('temp') is not None],
         key=lambda x: x['height']
     )
+
+    # Druckniveau-Profil auf feine Hoehenschritte interpolieren (Default 100 m).
+    # Standard in RASP/RegTherm/XC-Therm. Verbessert die Aufloesung im Hochalpinen,
+    # wo die nativen ICON-Druckniveaus 400-500 m auseinanderliegen koennen und
+    # Inversionen sonst verfehlt werden. Setze parcel_interp_dz_m=0 zum Deaktivieren.
+    interp_dz = _get_thermal_param("parcel_interp_dz_m", default=100)
+    if interp_dz and interp_dz > 0 and len(profile) >= 2:
+        profile = _interpolate_profile(profile, dz_m=float(interp_dz))
 
     # =========================================================================
     # 1. ELEVATED HEAT SOURCE + SOLARE ÜBERHITZUNG
@@ -487,25 +672,24 @@ def calculate_thermal_profile(
     H = max(0.0, H)
 
     # =========================================================================
-    # 2.5 SCHNEEDECKEN-BLOCKADE (Albedo & Schmelzwärme)
+    # 2.5 SCHNEEDECKEN-BLOCKADE (Albedo & Schmelzwärme, Schritt 4 Terrain-Kalibrierung)
     # =========================================================================
-    # Terrain-differenzierte Schnee-Dämpfung:
-    # Mittelland: Flache Wiesen unter Schnee → 80% Reduktion (H*0.20, max 50 W/m²)
-    # Alpin: Mischoberflächen (Felswände + Schnee) → 50% Reduktion (H*0.50, max 150 W/m²)
+    # 5-Zonen-Daempfung (statt frueher 2-Zonen-Interpolation):
+    #   Mittelland 0.20 / 50 W/m² | Jura 0.30 / 100 | Voralpen 0.40 / 120
+    #   Alpen 0.50 / 150          | Hochalpin 0.65 / 180
+    # Felswaende und schneefreie Suedhaenge im Hochalpinen lassen mehr H zu.
     if snow_depth is not None and snow_depth > 0.05:  # > 5cm Schnee
-        t_factor = _terrain_factor(elevation_m)
-        # Interpoliere zwischen Mittelland (0.20) und Alpin (0.50) Dämpfung
-        mittelland_damping = 0.20
-        alpine_damping = _get_thermal_param("alpine_snow_damping_factor", timestamp, default=0.50)
-        snow_factor = mittelland_damping + t_factor * (alpine_damping - mittelland_damping)
-        # Interpoliere H-Max zwischen Mittelland (50) und Alpin (150)
-        mittelland_h_max = 50.0
-        alpine_h_max = _get_thermal_param("alpine_snow_H_max", timestamp, default=150)
-        snow_h_max = mittelland_h_max + t_factor * (alpine_h_max - mittelland_h_max)
+        snow_factor = float(_get_terrain_param(
+            "snow_damping_factor", terrain_zone, default=0.20
+        ))
+        snow_h_max = float(_get_terrain_param(
+            "snow_H_max", terrain_zone, default=50
+        ))
         H = min(snow_h_max, H * snow_factor)
         data_warnings.append(
-            f"Schneedecke ({snow_depth:.2f}m): H auf {H:.0f} W/m² reduziert "
-            f"(Terrain-Faktor={t_factor:.2f}, Damping={snow_factor:.0%})"
+            f"Schneedecke ({snow_depth:.2f}m, {terrain_zone}): "
+            f"H auf {H:.0f} W/m² reduziert "
+            f"(Damping={snow_factor:.0%}, max={snow_h_max:.0f})"
         )
 
     # =========================================================================
@@ -554,13 +738,15 @@ def calculate_thermal_profile(
     # =========================================================================
     # 5. PAKETAUFSTIEG MIT ENTRAINMENT (Schicht für Schicht)
     # =========================================================================
-    # Terrain-differenzierte Entrainment-Rate:
-    #   Mittelland (MU=0.0002): Mehr Einmischung, weniger organisierte Thermik
-    #   Alpin (MU=0.00015): Weniger Einmischung, Talwindsysteme + Felswände
-    #     erzeugen organisiertere, stärkere Thermik-Schläuche
-    t_factor = _terrain_factor(elevation_m)
-    alpine_mu = _get_thermal_param("alpine_MU", timestamp, default=0.00015)
-    effective_mu = MU + t_factor * (alpine_mu - MU)  # 0.0002 → 0.00015
+    # Terrain-differenzierte Entrainment-Rate (Schritt 6 Terrain-Kalibrierung):
+    # 5-stufiger Lookup statt 2-Stufen-Interpolation. Niedrigeres MU im
+    # Hochalpinen, weil Talwindsysteme + Felswaende organisiertere, kompaktere
+    # Schlauche mit geringerer lateraler Einmischung erzeugen.
+    #   Mittelland 0.00022 | Jura 0.00020 | Voralpen 0.00018
+    #   Alpen      0.00015 | Hochalpin 0.00012
+    effective_mu = float(_get_terrain_param(
+        "entrainment_mu", terrain_zone, default=MU
+    ))
 
     # Cumulus-Entrainment: Über LCL reduzierte Einmischung (Morrison et al. 2021)
     # Feuchte Thermiken breiten sich 1.7x weniger aus → kompakterer Kern
@@ -652,8 +838,79 @@ def calculate_thermal_profile(
         solar_max = _get_thermal_param("solar_excess_max_C", timestamp, default=1.5)
         solar_div = _get_thermal_param("solar_excess_H_divisor", timestamp, default=200)
         if snow_depth is not None and snow_depth > 0.05:
-            dt_excess = 0.0
-            data_warnings.append("Keine solare Überhitzung möglich wegen Schneedecke.")
+            # Schneefreie Felswände im (voralpin-)hochalpinen Gelände liefern
+            # auch unter einer flächigen Schneedecke weiterhin solare
+            # Überhitzung: Südexponierte Rock Faces erreichen im Frühling
+            # 20-30 °C Oberflächentemperatur, während T2m durch den Schnee
+            # auf ~0 °C gepinnt bleibt. Das bricht die bodennahe Inversion
+            # und erlaubt den Parcel-Aufstieg. Mittelland/Jura: vollständige
+            # Blockade (keine Rock Faces, homogene Schneedecke).
+            #
+            # GATES (alle UND-verknüpft, beide Schwellen aus Literatur):
+            #   (1) Zone: nur voralpen/alpen/hochalpin
+            #   (2) shortwave_radiation > 300 W/m²: Tagsüber, nicht in
+            #       Dämmerung/Nacht
+            #   (3) direct_radiation > 400 W/m²: geometrisches Gate.
+            #       Entspricht Sonnenhöhe > ~30° bei DNI ≈ 800 W/m².
+            #       Im Tiefwinter (Dez/Jan) bei 47°N nicht erreichbar
+            #       → Felswände werden nur gestreift, nicht aufgeheizt.
+            #       Quelle: Hahn & Ohmura (1992) Theor. Appl. Climatol.
+            #       46, 161-170 (Strahlungsklimatologie Schweizer Alpen).
+            #   (4) H > 25 W/m²: energetisches Gate. Organisierte
+            #       Konvektion (zentrierbare Schläuche) braucht laut
+            #       Whiteman (2000) Mountain Meteorology §6.3 und
+            #       Stull (1988) BLM §11.4 mindestens 25-50 W/m²
+            #       sustained surface heating. H ist hier bereits
+            #       *nach* snow_damping → misst die effektive Heizung
+            #       der Region als Ganzes (Schnee-Mittel), nicht das
+            #       theoretische Maximum auf einer einzelnen Felswand.
+            #       Im Tiefwinter mit dichter Schneedecke und flacher
+            #       Sonne bleibt H regional unter dieser Schwelle, der
+            #       Branch wird also korrekt deaktiviert.
+            #
+            # Validierung gegen Beobachtung:
+            #   Beide Gates zusammen reproduzieren die empirische
+            #   Paragliding-Saison im Alpenraum (Saisonstart Mitte
+            #   Februar in den Südalpen, Ende Oktober).
+            rock_face_zone = terrain_zone in ("voralpen", "alpen", "hochalpin")
+            sw_ok = shortwave_radiation is not None and shortwave_radiation > 300
+            direct_ok = direct_radiation is not None and direct_radiation > 400
+            h_ok = H > 25
+            if rock_face_zone and sw_ok and direct_ok and h_ok:
+                rock_boost = float(_get_terrain_param(
+                    "rock_face_dt_boost_C", terrain_zone, default=1.5
+                ))
+                rock_frac = float(_get_terrain_param(
+                    "rock_face_base_fraction", terrain_zone, default=0.5
+                ))
+                base_dt = min(solar_max, H / solar_div)
+                dt_excess = base_dt * rock_frac + rock_boost
+                # Safety cap: nie mehr als 2.5x solar_max Überhitzung
+                dt_excess = min(dt_excess, float(solar_max) * 2.5)
+                data_warnings.append(
+                    f"Rock-Face Überhitzung ({terrain_zone}, Schnee="
+                    f"{snow_depth:.1f}m, dir_rad={direct_radiation:.0f}, "
+                    f"H={H:.0f}): ΔT={dt_excess:.2f}°C "
+                    f"(base×{rock_frac:.0%} + boost {rock_boost:.1f}°C)"
+                )
+            else:
+                dt_excess = 0.0
+                # Erkläre, welches Gate blockiert (für Debugging/Transparenz)
+                blockers = []
+                if not rock_face_zone:
+                    blockers.append(f"zone={terrain_zone}")
+                if not sw_ok:
+                    sw_str = f"{shortwave_radiation:.0f}" if shortwave_radiation is not None else "None"
+                    blockers.append(f"SW={sw_str}<300")
+                if not direct_ok:
+                    dr_str = f"{direct_radiation:.0f}" if direct_radiation is not None else "None"
+                    blockers.append(f"dir_rad={dr_str}<400")
+                if not h_ok:
+                    blockers.append(f"H={H:.0f}<25")
+                data_warnings.append(
+                    f"Keine solare Überhitzung wegen Schneedecke "
+                    f"(Rock-Face Gates: {', '.join(blockers)})."
+                )
         else:
             dt_excess = min(solar_max, H / solar_div)
             
@@ -804,21 +1061,67 @@ def calculate_thermal_profile(
             max_thermal_height = inertia_height
 
     # =========================================================================
-    # 5f. GFS/MODEL PBL CAP (Triple-Constraint)
+    # 5f. GFS/MODEL PBL CAP (Triple-Constraint, terrain-differenziert)
     # =========================================================================
     # Das NWP-Modell (GFS) berechnet die BLH mit Bulk-Richardson-Schema und
     # vollständiger Strahlungsbilanz. Sobald am Abend die Ausstrahlung überwiegt,
-    # sinkt die Modell-BLH rapide. Dieser Cap überschreibt die Thermal Inertia.
+    # sinkt die Modell-BLH rapide.
+    #
+    # Schritt 3 der Terrain-Kalibrierung: Drei Modi je nach Zone (siehe config.py):
+    #   - hard        : klassischer harter Cap (Mittelland, Jura).
+    #   - soft        : 50/50-Blend zwischen Parcel und GFS (Voralpen, Alpen).
+    #   - sanity_only : Kein Cap, nur Warnung (Hochalpin – Guo 2022 zeigt dort
+    #                   eine systematische GFS-BLH-Unterschaetzung von 200-500 m).
     pbl_cap_applied = False
     if boundary_layer_height_gfs is not None:
         gfs_blh_msl = elevation_m + boundary_layer_height_gfs
+        cap_mode = _get_terrain_param(
+            "gfs_pbl_cap_mode", terrain_zone, default="hard"
+        )
+
         if max_thermal_height > gfs_blh_msl:
-            data_warnings.append(
-                f"GFS-PBL-Cap: {max_thermal_height:.0f}m -> {gfs_blh_msl:.0f}m "
-                f"(GFS BLH={boundary_layer_height_gfs:.0f}m AGL)"
-            )
-            max_thermal_height = gfs_blh_msl
-            pbl_cap_applied = True
+            if cap_mode == "hard":
+                data_warnings.append(
+                    f"GFS-PBL-Cap [hard,{terrain_zone}]: "
+                    f"{max_thermal_height:.0f}m -> {gfs_blh_msl:.0f}m "
+                    f"(GFS BLH={boundary_layer_height_gfs:.0f}m AGL)"
+                )
+                max_thermal_height = gfs_blh_msl
+                pbl_cap_applied = True
+
+            elif cap_mode == "soft":
+                # Gewichteter Mittelwert: pull max_thermal_height teilweise
+                # Richtung GFS-BLH, nie unter GFS-BLH selbst.
+                soft_w = float(_get_thermal_param(
+                    "gfs_pbl_soft_weight", default=0.5
+                ) or 0.5)
+                blended = (
+                    soft_w * gfs_blh_msl + (1.0 - soft_w) * max_thermal_height
+                )
+                blended = max(blended, gfs_blh_msl)  # nie unter GFS-Floor
+                data_warnings.append(
+                    f"GFS-PBL-Cap [soft,{terrain_zone}]: "
+                    f"{max_thermal_height:.0f}m -> {blended:.0f}m "
+                    f"(GFS BLH={boundary_layer_height_gfs:.0f}m AGL, w={soft_w})"
+                )
+                max_thermal_height = blended
+                pbl_cap_applied = True
+
+            elif cap_mode == "sanity_only":
+                # Kein Cap, nur Warnung wenn die Differenz auffaellig gross ist.
+                sanity_warn_m = float(_get_thermal_param(
+                    "gfs_pbl_sanity_warn_m", default=1500
+                ) or 1500)
+                excess = max_thermal_height - gfs_blh_msl
+                if excess > sanity_warn_m:
+                    data_warnings.append(
+                        f"GFS-PBL-Sanity [{terrain_zone}]: "
+                        f"Parcel {max_thermal_height:.0f}m liegt "
+                        f"{excess:.0f}m ueber GFS-BLH "
+                        f"({boundary_layer_height_gfs:.0f}m AGL) "
+                        f"- akzeptiert (Hochalpin GFS-Bias)."
+                    )
+                # max_thermal_height bleibt unveraendert (kein Cap)
 
     # =========================================================================
     # 6. DUAL W*-BERECHNUNG (Geometrisches-Mittel-Strategie)
@@ -852,8 +1155,22 @@ def calculate_thermal_profile(
     mean_dT = 0.0
     limiting_factor = "model_pbl_cap" if pbl_cap_applied else "keine_thermik"
 
-    H_MIN_THRESHOLD = 30.0
-    if z_i > 50 and H >= H_MIN_THRESHOLD:
+    # H-Ramp (Schritt 5 Terrain-Kalibrierung): Linearer Ramp statt harter
+    # H_MIN_THRESHOLD = 30. Unter h_ramp_low = 0% Thermik, ueber h_ramp_high =
+    # 100%, dazwischen linear. Hochalpine Felswaende koppeln bereits bei
+    # niedrigem H (10-40 W/m^2) Konvektion via Hangwindsystem.
+    h_ramp_low = float(_get_terrain_param("h_ramp_low", terrain_zone, default=30))
+    h_ramp_high = float(_get_terrain_param("h_ramp_high", terrain_zone, default=80))
+    if h_ramp_high <= h_ramp_low:
+        h_ramp_high = h_ramp_low + 1.0  # Schutz vor Division-by-zero
+
+    if z_i > 50 and H > h_ramp_low:
+        # H-Ramp-Faktor [0..1] berechnen
+        if H >= h_ramp_high:
+            h_ramp_factor = 1.0
+        else:
+            h_ramp_factor = (H - h_ramp_low) / (h_ramp_high - h_ramp_low)
+
         if valid_layers > 0:
             mean_dT = cumulative_temp_diff / valid_layers
 
@@ -867,7 +1184,7 @@ def calculate_thermal_profile(
             w_star_deardorff = ((G / T_kelvin) * buoyancy_flux * z_i) ** (1.0 / 3.0)
 
         # c) RASP / BLIPMAP Standard: W* wird exklusiv nach Deardorff berechnet!
-        # Das Parcel-Verfahren (w*_parcel) tendiert bei trockener Thermik zu 
+        # Das Parcel-Verfahren (w*_parcel) tendiert bei trockener Thermik zu
         # extremen Überschätzungen (stammt eig. aus der CAPE-Ansatz für Gewitter).
         # We scale Deardorff w* by 1.45 to reflect the "core" updraft strength
         # that gliders actively try to center within (XC Therm / Regtherm alignment).
@@ -888,10 +1205,27 @@ def calculate_thermal_profile(
         else:
             climb_factor = CLIMB_FACTOR
 
+        # Schritt 6: Terrain-Multiplikator auf den jahreszeitlichen climb_factor.
+        # Hochalpine Schlauche sind enger und besser zentrierbar -> hoeherer
+        # Wirkungsgrad. Mittelland: breite, unruhige Bloecke -> reduziert.
+        terrain_climb_mult = float(_get_terrain_param(
+            "climb_factor_terrain", terrain_zone, default=1.0
+        ))
+        climb_factor *= terrain_climb_mult
+
         avg_climb = raw_w_star * climb_factor
-        
+
+        # H-Ramp anwenden (Schritt 5): Gesamtdaempfung im Schwellbereich
+        if h_ramp_factor < 1.0:
+            avg_climb *= h_ramp_factor
+            data_warnings.append(
+                f"H-Ramp [{terrain_zone}]: H={H:.0f} W/m² in "
+                f"[{h_ramp_low:.0f}..{h_ramp_high:.0f}] -> "
+                f"Faktor {h_ramp_factor:.2f}"
+            )
+
         # HINWEIS: W*-Deardorff beinhaltet die Bewölkungsdämpfung bereits physikalisch
-        # über den surface_sensible_heat_flux (H), weshalb wir hier nicht nochmals 
+        # über den surface_sensible_heat_flux (H), weshalb wir hier nicht nochmals
         # künstlich mit einem "sun_factor" multiplizieren dürfen (sonst doppelte Bestrafung).
         # DWD-Updraft-Blending (Default: deaktiviert)
         if _get_thermal_param("use_dwd_updraft_blending", timestamp, default=False):
@@ -912,7 +1246,8 @@ def calculate_thermal_profile(
     elif z_i > 50:
         limiting_factor = "H_below_threshold"
         data_warnings.append(
-            f"H unter Schwellenwert: {H:.0f} W/m² < {H_MIN_THRESHOLD:.0f} -> keine nutzbare Thermik"
+            f"H unter Ramp-Schwelle: {H:.0f} W/m² < {h_ramp_low:.0f} "
+            f"[{terrain_zone}] -> keine nutzbare Thermik"
         )
 
     # =========================================================================
@@ -969,10 +1304,29 @@ def calculate_thermal_profile(
                 f"CIN-Bremse: CIN={convective_inhibition:.0f} J/kg (mässig) → Rating -1"
             )
 
-    # Minimale Thermikhöhe: Unter 150m ueber Start ist Thermik kaum nutzbar
-    if max_thermal_height < elevation_m + 150:
+    # Minimale Thermikhöhe — Soft-Ramp statt Hard-Cutoff (Schritt 8 Terrain-Kalibrierung):
+    # Deardorff w* ist eine stetige Kubikwurzel-Funktion: flache Thermik erzeugt
+    # automatisch kleine Steigwerte, kein physikalischer Grund fuer binären Cutoff.
+    # Statt "depth < min_depth → 0" verwenden wir eine lineare Rampe:
+    #   depth_agl = 0            → factor = 0.0 (kein Steigen)
+    #   depth_agl = min_depth/2  → factor = 0.5 (halbes Steigen)
+    #   depth_agl >= min_depth   → factor = 1.0 (unveraendert)
+    # Gleiche Muster wie die H-Ramp (Schritt 5).
+    min_depth_agl = _get_terrain_param(
+        "min_thermal_depth_agl", terrain_zone, default=150
+    )
+    depth_agl = max_thermal_height - elevation_m
+    if depth_agl <= 0:
         rating = min(rating, 1)
         avg_climb = 0.0
+    elif depth_agl < min_depth_agl:
+        depth_ramp_factor = depth_agl / min_depth_agl
+        avg_climb *= depth_ramp_factor
+        rating = min(rating, max(1, round(rating * depth_ramp_factor)))
+        data_warnings.append(
+            f"Depth-Ramp [{terrain_zone}]: {depth_agl:.0f}m AGL "
+            f"< {min_depth_agl}m -> Faktor {depth_ramp_factor:.2f}"
+        )
 
     # =========================================================================
     # 8. BODENFEUCHTE-BREMSE (Latenter Wärmefluss)

@@ -14,7 +14,8 @@ window.FoehnDiagram = (function () {
     'use strict';
 
     // Layout: generous gaps so panels never overlap
-    var MARGIN = { top: 44, right: 40, bottom: 32, left: 56 };
+    // bottom margin includes space for the date labels under day-start ticks
+    var MARGIN = { top: 44, right: 40, bottom: 46, left: 56 };
     // Gap between panels must fit: x-axis labels (~22px) + day-labels (~16px) + title (~16px) + padding
     var PANEL_GAP = 64;
     var DAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -106,13 +107,39 @@ window.FoehnDiagram = (function () {
     }
 
     // --- Helper: draw x-axis at bottom of a panel ---
+    // Day-start ticks additionally get a date label (e.g. "Di 8.4.") below the hour.
     function drawXAxis(g, panelH, x) {
+        var ticks = x.ticks(d3.timeHour.every(6));
+        var daysSeen = {};
+        var dayStartTickTimes = {};
+        ticks.forEach(function (t) {
+            var key = t.getFullYear() + '-' + t.getMonth() + '-' + t.getDate();
+            if (!daysSeen[key]) {
+                daysSeen[key] = true;
+                dayStartTickTimes[t.getTime()] = true;
+            }
+        });
+
         var axis = d3.axisBottom(x)
-            .ticks(d3.timeHour.every(6))
+            .tickValues(ticks)
             .tickFormat(function (d) { return d.getHours() + 'h'; });
-        g.append('g').attr('class', 'foehn-axis')
+
+        var axisG = g.append('g').attr('class', 'foehn-axis')
             .attr('transform', 'translate(0,' + panelH + ')')
             .call(axis);
+
+        // Append a date label under the hour label for the first tick of each day.
+        axisG.selectAll('.tick').each(function (d) {
+            if (!dayStartTickTimes[d.getTime()]) return;
+            d3.select(this).append('text')
+                .attr('y', 22)
+                .attr('dy', '0.71em')
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '10px')
+                .attr('font-weight', '600')
+                .attr('fill', 'rgba(255,255,255,0.75)')
+                .text(DAY_NAMES[d.getDay()] + ' ' + d.getDate() + '.' + (d.getMonth() + 1) + '.');
+        });
     }
 
     // --- Main render (all days at once) ---

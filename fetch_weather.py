@@ -2,7 +2,7 @@
 Wetterdaten-Aggregation für Flychat.
 Adaptiert von uetliberg_ticker/fetch_weather.py - Multi-Spot Support.
 
-Batch-Modus: Alle Spots in 4 API-Calls statt 112 Einzel-Requests.
+Batch-Modus: Alle Spots in 6 API-Calls (D2+Thermal+Fallback+GFS+CH1+CH2).
 Referenzpunkt-Dedup: Regionale Punkte nur einmal abfragen (140 → ~48 Punkte).
 
 Generalisierte Source-Area Aggregation:
@@ -13,6 +13,7 @@ Generalisierte Source-Area Aggregation:
 
 import requests
 import json
+import math
 import os
 import time
 import copy
@@ -22,7 +23,10 @@ import config
 
 # Verzögerung zwischen Batch-Calls (Open-Meteo Rate-Limit)
 API_DELAY_BETWEEN_CALLS = 3.5  # Sekunden zwischen den 4 Batch-Calls
-API_RETRY_MAX = 4              # Max Retries bei 429
+# Fix D: Retries reduziert von 4 → 2. Vorher: 15+30+60+120 = 225s Wartezeit
+# bei sustainted Rate-Limits (User-getriggerter Refresh wird unzumutbar lang).
+# Jetzt: 15+30 = max 45s, dann sauberer Stale-Cache-Fallback.
+API_RETRY_MAX = 2              # Max Retries bei 429 (war 4)
 API_RETRY_BASE_WAIT = 15       # Basis-Wartezeit bei 429 (Sekunden), verdoppelt sich pro Retry
 API_BATCH_TIMEOUT = 90         # Timeout für Batch-Requests (mehr Punkte = mehr Verarbeitungszeit)
 
@@ -39,12 +43,27 @@ class DailyLimitExceeded(Exception):
     pass
 
 
+def _mark_stale_cache(cached, reason):
+    """
+    Fix A: Markiert einen Cache-Fallback als stale, damit Aufrufer (refresh_weather,
+    api_refresh_weather) erkennen können, dass kein echter Refresh stattgefunden hat.
+    Setzt _meta.fetch_status = "stale_cache" + Grund.
+    """
+    if cached:
+        meta = cached.setdefault("_meta", {})
+        meta["fetch_status"] = "stale_cache"
+        meta["fetch_status_reason"] = reason
+    return cached if cached else {}
+
+
 def _api_get_with_retry(url, params, timeout, label=""):
     """
     requests.get() mit automatischem Retry bei 429 Too Many Requests.
     Nutzt Retry-After Header falls vorhanden, sonst exponentiellen Backoff.
     Erkennt Tageslimit und bricht sofort ab (kein sinnloses Retrying).
+    Injiziert automatisch den Open-Meteo API-Key wenn konfiguriert.
     """
+    config.with_api_key(params)
     for attempt in range(API_RETRY_MAX + 1):
         try:
             resp = requests.get(url, params=params, timeout=timeout)
@@ -85,13 +104,13 @@ def _wait_for_api_ready():
     Wartet bei 429 bis das Rate-Limit abgelaufen ist, bevor der Batch startet.
     Erkennt Tageslimit und bricht sofort ab.
     """
-    test_params = {
+    test_params = config.with_api_key({
         "latitude": 47.37,
         "longitude": 8.55,
         "hourly": "temperature_2m",
         "forecast_days": 1,
         "timezone": "Europe/Zurich",
-    }
+    })
     for attempt in range(6):  # Max ~10 Minuten warten
         try:
             resp = requests.get(config.API_URL, params=test_params, timeout=10)
@@ -123,6 +142,70 @@ def _wait_for_api_ready():
     return False
 
 
+def _aggregate_wind_across_points(data_list):
+    """
+    Aggregiert Wind/Gust/Richtung über mehrere Referenzpunkte (für Regionen).
+
+    Für Regionen gibt es keinen dedizierten Spot-Punkt — der Regionalwind soll
+    repräsentativ für das gesamte Polygon sein, nicht nur für refs[0]. Ein
+    einzelner alpiner Referenzpunkt würde sonst die gesamte Region dominieren
+    (z.B. "Mittelland Zentral" mit einem 1662m-Punkt).
+
+    Verfahren:
+    - wind_speed_10m, wind_gusts_10m: Median über alle RPs (robust gegen Ausreißer)
+    - wind_direction_10m: Vektoriell gemittelt (zirkulär korrekt)
+
+    Mutiert primary (data_list[0]) in-place und returniert es. NUR für Regionen,
+    NICHT für Spots aufrufen — Spots nutzen ihren eigenen Punkt.
+    """
+    if not data_list or len(data_list) < 2:
+        return data_list[0] if data_list else None
+    primary = data_list[0]
+    if "hourly" not in primary:
+        return primary
+
+    h_primary = primary["hourly"]
+    n_hours = len(h_primary.get("time", []))
+
+    # Median-Aggregation für Skalar-Winde (robust gegen den einen alpinen Ausreißer)
+    for k in ("wind_speed_10m", "wind_gusts_10m"):
+        if k not in h_primary:
+            continue
+        for i in range(n_hours):
+            vals = []
+            for d in data_list:
+                arr = d.get("hourly", {}).get(k, [])
+                if i < len(arr) and arr[i] is not None:
+                    vals.append(arr[i])
+            if vals:
+                vals.sort()
+                m = len(vals)
+                median = vals[m // 2] if m % 2 else (vals[m // 2 - 1] + vals[m // 2]) / 2
+                h_primary[k][i] = round(median, 2)
+
+    # Vektorielle Mittelung der Windrichtung (zirkulär, gewichtet mit wind_speed)
+    if "wind_direction_10m" in h_primary and "wind_speed_10m" in h_primary:
+        for i in range(n_hours):
+            us, vs = [], []
+            for d in data_list:
+                h = d.get("hourly", {})
+                sp_arr = h.get("wind_speed_10m", [])
+                dr_arr = h.get("wind_direction_10m", [])
+                if (i < len(sp_arr) and i < len(dr_arr)
+                        and sp_arr[i] is not None and dr_arr[i] is not None):
+                    rad = math.radians(dr_arr[i])
+                    us.append(sp_arr[i] * math.sin(rad))
+                    vs.append(sp_arr[i] * math.cos(rad))
+            if us:
+                u_avg = sum(us) / len(us)
+                v_avg = sum(vs) / len(vs)
+                dir_avg = (math.degrees(math.atan2(u_avg, v_avg)) + 360) % 360
+                if i < len(h_primary["wind_direction_10m"]):
+                    h_primary["wind_direction_10m"][i] = round(dir_avg, 1)
+
+    return primary
+
+
 def _aggregate_regional_data(data_list):
     """
     Generalisierte Source-Area Aggregation:
@@ -130,6 +213,8 @@ def _aggregate_regional_data(data_list):
     - Niederschlag: Regionale Signifikanz (mind. 2 von N Punkten > 0.0, sonst 0.0)
     - Temperatur, Strahlung, Druckniveaus: SPOT-Punkt (data_list[0]) behalten!
       Thermik haengt von den Bedingungen AM Startplatz ab, nicht vom Regionalmittel.
+    - Wind: hier NICHT aggregiert. Fuer Regionen separat via
+      _aggregate_wind_across_points() aufrufen.
     """
     if not data_list or not isinstance(data_list, list):
         return data_list
@@ -182,10 +267,12 @@ def _aggregate_regional_data(data_list):
     return primary
 
 
-def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback, hourly_gfs, elevation):
+def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback, hourly_gfs, elevation,
+                          data_ch1=None, data_ch2=None):
     """
     Verarbeitet vorgeladene Wetterdaten für einen einzelnen Spot.
     Merged Wind/Thermal/Fallback-Modelle, füllt GFS-Supplement, berechnet Thermik.
+    Optional: CH1/CH2 Bodenböen für Multi-Modell-Vergleich.
 
     Args:
         data_wind: Wind-Daten (dict mit hourly, Einzelpunkt)
@@ -193,6 +280,8 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
         data_fallback: Aggregierte Fallback-Daten (dict mit hourly)
         hourly_gfs: GFS hourly dict (oder None)
         elevation: Höhe des Spots in Metern (aus CSV)
+        data_ch1: ICON-CH1 Bodendaten (dict mit hourly, optional)
+        data_ch2: ICON-CH2 Bodendaten (dict mit hourly, optional)
 
     Returns: (hourly_data, pressure_level_data) oder None bei Fehler
     """
@@ -247,20 +336,21 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
         if p.startswith("wind_speed_") or p.startswith("wind_direction_") or p.startswith("geopotential_height_")
     ]
 
+    # Pre-build time→index dicts for O(1) lookup (statt O(n) .index() pro Timestamp)
+    _time_idx_cache = {}
+    def _get_time_index(src):
+        src_id = id(src)
+        if src_id not in _time_idx_cache:
+            _time_idx_cache[src_id] = {t: i for i, t in enumerate(src.get("time", []))}
+        return _time_idx_cache[src_id]
+
     for time_str in times_base:
         d = time_str[:10]
         t_src = thermal_model_by_day.get(d, hourly_fallback)
         w_src = wind_model_by_day.get(d, hourly_fallback)
 
-        try:
-            i_therm = t_src.get("time", []).index(time_str)
-        except ValueError:
-            i_therm = -1
-
-        try:
-            i_wind = w_src.get("time", []).index(time_str)
-        except ValueError:
-            i_wind = -1
+        i_therm = _get_time_index(t_src).get(time_str, -1)
+        i_wind = _get_time_index(w_src).get(time_str, -1)
 
         entry = {}
         for param in config.HOURLY_PARAMS:
@@ -277,6 +367,13 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
 
         hourly_data[time_str] = entry
 
+        # Fallback-Index für PL-Lücken (Regionen haben keinen eigenen Wind-Batch,
+        # daher fehlen geopotential_height/wind_speed/wind_direction auf Druckniveaus
+        # in den ersten 2 Tagen wo ICON-D2 Thermal gewählt wird).
+        i_fb = -1
+        if hourly_fallback and (t_src is not hourly_fallback or w_src is not hourly_fallback):
+            i_fb = _get_time_index(hourly_fallback).get(time_str, -1)
+
         pl_entry = {}
         for param in config.PRESSURE_LEVEL_PARAMS:
             val = None
@@ -289,6 +386,12 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
                 if val_w is not None:
                     val = val_w
 
+            # Fallback auf ICON-EU wenn Thermal/Wind-Modell den PL-Param nicht hat
+            if val is None and i_fb >= 0:
+                val_fb = hourly_fallback.get(param, [None])[i_fb] if i_fb < len(hourly_fallback.get(param, [])) else None
+                if val_fb is not None:
+                    val = val_fb
+
             pl_entry[param] = val
 
         pressure_level_data[time_str] = pl_entry
@@ -298,6 +401,66 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
         cb = hourly_data[time_str].get("cloud_base")
         if cb is not None and cb > 6000:
             hourly_data[time_str]["cloud_base"] = None
+
+    # Multi-Modell Böen-Merge: CH1/CH2 Bodenböen mit ICON-D2 vergleichen
+    hourly_ch1 = data_ch1.get("hourly", {}) if data_ch1 else {}
+    hourly_ch2 = data_ch2.get("hourly", {}) if data_ch2 else {}
+    ch1_times = hourly_ch1.get("time", [])
+    ch2_times = hourly_ch2.get("time", [])
+    ch1_gusts = hourly_ch1.get("wind_gusts_10m", [])
+    ch2_gusts = hourly_ch2.get("wind_gusts_10m", [])
+    ch1_speed = hourly_ch1.get("wind_speed_10m", [])
+    ch2_speed = hourly_ch2.get("wind_speed_10m", [])
+    ch1_dir = hourly_ch1.get("wind_direction_10m", [])
+    ch2_dir = hourly_ch2.get("wind_direction_10m", [])
+
+    # Index-Maps für schnellen Zugriff
+    ch1_idx = {t: i for i, t in enumerate(ch1_times)} if ch1_times else {}
+    ch2_idx = {t: i for i, t in enumerate(ch2_times)} if ch2_times else {}
+
+    multi_model_count = 0
+    for time_str in hourly_data:
+        entry = hourly_data[time_str]
+        d2_gust = entry.get("wind_gusts_10m")
+
+        # CH1 Werte extrahieren
+        ch1_g = None
+        i1 = ch1_idx.get(time_str)
+        if i1 is not None and i1 < len(ch1_gusts):
+            ch1_g = ch1_gusts[i1]
+
+        # CH2 Werte extrahieren
+        ch2_g = None
+        i2 = ch2_idx.get(time_str)
+        if i2 is not None and i2 < len(ch2_gusts):
+            ch2_g = ch2_gusts[i2]
+
+        # Einzelmodell-Werte speichern (Transparenz)
+        if ch1_g is not None:
+            entry["wind_gusts_10m_ch1"] = ch1_g
+            if i1 is not None and i1 < len(ch1_speed):
+                entry["wind_speed_10m_ch1"] = ch1_speed[i1]
+            if i1 is not None and i1 < len(ch1_dir):
+                entry["wind_direction_10m_ch1"] = ch1_dir[i1]
+
+        if ch2_g is not None:
+            entry["wind_gusts_10m_ch2"] = ch2_g
+            if i2 is not None and i2 < len(ch2_speed):
+                entry["wind_speed_10m_ch2"] = ch2_speed[i2]
+            if i2 is not None and i2 < len(ch2_dir):
+                entry["wind_direction_10m_ch2"] = ch2_dir[i2]
+
+        # Merge: Maximum aller verfügbaren Modelle (konservativ/sicher)
+        gust_values = [v for v in [d2_gust, ch1_g, ch2_g] if v is not None]
+        if len(gust_values) > 1:
+            max_gust = max(gust_values)
+            if d2_gust is not None and max_gust > d2_gust:
+                entry["wind_gusts_10m_d2"] = d2_gust  # Original D2 aufbewahren
+                entry["wind_gusts_10m"] = max_gust
+                multi_model_count += 1
+
+    if multi_model_count > 0:
+        print(f"  [MULTI] {location_name}: {multi_model_count} Stunden mit höheren CH1/CH2 Böen übernommen")
 
     # GFS Supplement
     if hourly_gfs:
@@ -362,11 +525,12 @@ def _build_param_lists():
             f"geopotential_height_{level}hPa",
         ])
 
-    # Thermal: all surface + alle Druckniveau-Params (inkl. Wind)
-    # ICON-D2 liefert PL-Wind für 9 von 13 Levels — nötig weil ICON-CH1 kein PL-Wind kann
-    thermal_params = list(config.HOURLY_PARAMS) + list(config.PRESSURE_LEVEL_PARAMS)
+    # Thermal: Surface + nur Temperatur auf Druckniveaus.
+    # Wind-PL kommt bereits vom Wind-Batch, Geopotential vom Wind-Batch.
+    thermal_pl_params = [f"temperature_{level}hPa" for level in config.PRESSURE_LEVELS]
+    thermal_params = list(config.HOURLY_PARAMS) + thermal_pl_params
 
-    # Fallback: everything (vollständiges Backup)
+    # Fallback: Surface + alle PL-Params (vollständiges Backup für Tag 3-5 / ICON-D2-Ausfall)
     fallback_params = list(config.HOURLY_PARAMS) + list(config.PRESSURE_LEVEL_PARAMS)
 
     # GFS: supplementary only
@@ -385,7 +549,7 @@ def fetch_all_spots(spots, save_to_file=True):
     # Pre-Check: Warte bis API verfügbar
     if not _wait_for_api_ready():
         cached = load_cached_weather()
-        return cached if cached else {}
+        return _mark_stale_cache(cached, "api_pre_check_failed")
 
     cached = load_cached_weather()
 
@@ -432,11 +596,13 @@ def fetch_all_spots(spots, save_to_file=True):
 
     wind_params, thermal_params, fallback_params, gfs_params = _build_param_lists()
 
-    # === Phase 2: 4 Batch-API-Calls ===
+    # === Phase 2: 6 Batch-API-Calls ===
     batch_wind = None
     batch_thermal = None
     batch_fallback = None
     batch_gfs = None
+    batch_ch1 = None
+    batch_ch2 = None
 
     try:
         # 1. Wind (28 Spot-Punkte, nur Wind-Vars)
@@ -505,13 +671,56 @@ def fetch_all_spots(spots, save_to_file=True):
             batch_gfs = [batch_gfs]
         print(f"  [OK] {len(batch_gfs)} GFS-Antworten")
 
+        time.sleep(API_DELAY_BETWEEN_CALLS)
+
+        # 5. CH1 — MeteoSwiss ICON-CH1 (1km, ~33h Horizont, nur Bodenwind)
+        ch_params = config.CH_SURFACE_PARAMS
+        print(f"[API] Batch CH1: {len(spots)} Punkte, {len(ch_params)} Vars, Modell {config.CH1_MODEL}")
+        try:
+            resp = _api_get_with_retry(config.API_URL, {
+                "latitude": ",".join(spot_lats),
+                "longitude": ",".join(spot_lons),
+                "models": config.CH1_MODEL,
+                "hourly": ",".join(ch_params),
+                "forecast_days": config.CH1_FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }, API_BATCH_TIMEOUT, label="Batch-CH1")
+            batch_ch1 = resp.json()
+            if not isinstance(batch_ch1, list):
+                batch_ch1 = [batch_ch1]
+            print(f"  [OK] {len(batch_ch1)} CH1-Antworten")
+        except Exception as e:
+            print(f"  [WARN] CH1-Batch fehlgeschlagen (nicht kritisch): {e}")
+            batch_ch1 = None
+
+        time.sleep(API_DELAY_BETWEEN_CALLS)
+
+        # 6. CH2 — MeteoSwiss ICON-CH2 (2km, 5 Tage Horizont, nur Bodenwind)
+        print(f"[API] Batch CH2: {len(spots)} Punkte, {len(ch_params)} Vars, Modell {config.CH2_MODEL}")
+        try:
+            resp = _api_get_with_retry(config.API_URL, {
+                "latitude": ",".join(spot_lats),
+                "longitude": ",".join(spot_lons),
+                "models": config.CH2_MODEL,
+                "hourly": ",".join(ch_params),
+                "forecast_days": config.CH2_FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }, API_BATCH_TIMEOUT, label="Batch-CH2")
+            batch_ch2 = resp.json()
+            if not isinstance(batch_ch2, list):
+                batch_ch2 = [batch_ch2]
+            print(f"  [OK] {len(batch_ch2)} CH2-Antworten")
+        except Exception as e:
+            print(f"  [WARN] CH2-Batch fehlgeschlagen (nicht kritisch): {e}")
+            batch_ch2 = None
+
     except DailyLimitExceeded:
         print("[FEHLER] Tageslimit erreicht während Batch-Calls")
-        return cached if cached else {}
+        return _mark_stale_cache(cached, "daily_limit_exceeded")
     except Exception as e:
         print(f"[FEHLER] Batch-API fehlgeschlagen: {e}")
         if not batch_thermal and not batch_fallback:
-            return cached if cached else {}
+            return _mark_stale_cache(cached, f"batch_failed: {type(e).__name__}: {e}")
 
     # === Phase 3: Per-Spot Verarbeitung ===
     all_data = {
@@ -560,11 +769,16 @@ def fetch_all_spots(spots, save_to_file=True):
         if batch_gfs and i < len(batch_gfs):
             hourly_gfs = batch_gfs[i].get("hourly", {})
 
+        # CH1/CH2: direkt per Index (1:1 Spot-Zuordnung, wie Wind)
+        data_ch1 = batch_ch1[i] if batch_ch1 and i < len(batch_ch1) else None
+        data_ch2 = batch_ch2[i] if batch_ch2 and i < len(batch_ch2) else None
+
         # Spot verarbeiten (merge + thermik)
         try:
             result = _process_spot_weather(
                 name, data_wind, data_thermal, data_fallback,
-                hourly_gfs, spot["elevation_m"]
+                hourly_gfs, spot["elevation_m"],
+                data_ch1=data_ch1, data_ch2=data_ch2,
             )
         except Exception as e:
             import traceback
@@ -665,29 +879,35 @@ def fetch_all_spots(spots, save_to_file=True):
             continue
 
         # Thermal: Referenzpunkte aus Spot- und Region-Batch extrahieren
+        # Fuer Regionen: ALLE Referenzpunkte deepcopien, damit wir sie fuer
+        # Wind-Aggregation separat mutieren koennen ohne den Batch zu veraendern.
         data_thermal_r = None
         thermal_data_list = []
-        for j, pt in enumerate(refs):
+        for pt in refs:
             entry = _get_batch_entry_for_point(pt, batch_thermal, batch_region_thermal)
             if entry is not None:
-                data = copy.deepcopy(entry) if j == 0 else entry
-                thermal_data_list.append(data)
+                thermal_data_list.append(copy.deepcopy(entry))
         if thermal_data_list:
             data_thermal_r = _aggregate_regional_data(thermal_data_list)
+            # NEU: Wind/Gust/Richtung ueber ALLE RPs aggregieren (Median),
+            # sodass kein einzelner alpiner RP die ganze Region dominiert.
+            data_thermal_r = _aggregate_wind_across_points(thermal_data_list)
 
-        # Fallback
+        # Fallback — ebenfalls mit Wind-Aggregation ueber alle RPs
         data_fallback_r = None
         fallback_data_list = []
-        for j, pt in enumerate(refs):
+        for pt in refs:
             entry = _get_batch_entry_for_point(pt, batch_fallback, batch_region_fallback)
             if entry is not None:
-                data = copy.deepcopy(entry) if j == 0 else entry
-                fallback_data_list.append(data)
+                fallback_data_list.append(copy.deepcopy(entry))
         if fallback_data_list:
             data_fallback_r = _aggregate_regional_data(fallback_data_list)
+            data_fallback_r = _aggregate_wind_across_points(fallback_data_list)
 
-        # Wind: Nutze ersten Referenzpunkt (Regionen haben keinen separaten Wind-Punkt)
-        data_wind_r = _get_batch_entry_for_point(refs[0], batch_thermal, batch_region_thermal) if refs else None
+        # Wind: Nutze das thermal-aggregierte Ergebnis (Wind ist Teil der Thermal-Params
+        # via HOURLY_PARAMS). Dadurch hat data_wind_r jetzt Median-Wind ueber alle RPs
+        # statt nur refs[0]. Falls Thermal nicht verfuegbar, Fallback auf Fallback-Batch.
+        data_wind_r = data_thermal_r or data_fallback_r
 
         try:
             result = _process_spot_weather(

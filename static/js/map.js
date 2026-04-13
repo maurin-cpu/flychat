@@ -7,26 +7,33 @@
     var map;
     var overlay = document.getElementById('meteogramOverlay');
     var chartContainer = document.getElementById('meteogramChart');
+    var windTimelineContainer = document.getElementById('windTimelineChart');
+    var textViewContainer = document.getElementById('textViewChart');
+    var analyseViewContainer = document.getElementById('analyseViewChart');
     var tabsContainer = document.getElementById('meteogramTabs');
+    var viewTabsContainer = document.getElementById('meteogramViewTabs');
     var titleEl = document.getElementById('meteogramTitle');
     var infoEl = document.getElementById('meteogramInfo');
     var closeBtn = document.getElementById('meteogramClose');
     var tooltipEl = document.getElementById('tooltip');
-
-    // Foehn overlay elements
-    var foehnOverlay = document.getElementById('foehnOverlay');
-    var foehnChart = document.getElementById('foehnChart');
-    var foehnCloseBtn = document.getElementById('foehnClose');
+    var currentView = 'meteogram';  // 'meteogram', 'windtimeline', or 'text' (analyse is permanent aside)
+    var asideEl = document.getElementById('meteogramAside');
+    var asideToggleBtn = document.getElementById('meteogramAsideToggle');
 
     // Current meteogram state
     var currentWeather = null;
     var currentAltWind = null;
     var currentDates = [];
     var currentDateIdx = 0;
+    var currentSpotName = '';
     var markersByName = {}; // Store marker references
     var currentRefLayer = null; // Store reference points overlay
     var _iconUid = 0; // Unique ID counter for SVG defs
     var hideNotSafe = true; // Default: dim not_safe spots
+
+    // Phase 1 (Tool-Use): Layers für Isochrone + User-Standort
+    var isochroneLayer = null;
+    var userLocationMarker = null;
 
     // ===== MAP INIT =====
     function initMap() {
@@ -41,6 +48,12 @@
             subdomains: 'abcd',
             maxZoom: 18,
         }).addTo(map);
+
+        // Expose the Leaflet map instance under a non-colliding name.
+        // `window.map` is unusable because `<div id="map">` auto-creates an
+        // HTML implicit global pointing to the DIV element, which has no
+        // invalidateSize() method and would crash sidebar resize handlers.
+        window.flychatMap = map;
 
         loadSpots();
     }
@@ -103,13 +116,14 @@
         // SAFE — green traffic light, quality = intensity
         if (safety === 'safe') {
             if (quality === 'gray') return {
-                fill: '#86efac', stroke: '#16a34a',
+                fill: '#9ca3af', stroke: '#6b7280',
                 glow: null, showStripes: false, showWarning: false,
                 safetyLabel: 'Sicher', qualityLabel: 'Schwach'
             };
             if (quality === 'violet') return {
-                fill: '#15803d', stroke: '#14532d',
-                glow: 'rgba(22, 163, 74, 0.4)', showStripes: false, showWarning: false,
+                // Legendary spots: violet (matches the "Legendär" / "Top" category in the analysis page)
+                fill: '#8b5cf6', stroke: '#6d28d9',
+                glow: 'rgba(139, 92, 246, 0.45)', showStripes: false, showWarning: false,
                 safetyLabel: 'Sicher', qualityLabel: 'Top'
             };
             return { // green = good
@@ -309,16 +323,130 @@
     }
 
 
+    // ===== VIEW TABS (Meteogramm / Windverlauf / Text) =====
+    // Analyse is permanently shown in the aside panel next to the chart.
+    if (viewTabsContainer) {
+        viewTabsContainer.querySelectorAll('.view-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var view = btn.dataset.view;
+                if (view === currentView) return;
+                currentView = view;
+                viewTabsContainer.querySelectorAll('.view-tab').forEach(function (b) {
+                    b.classList.toggle('active', b.dataset.view === view);
+                });
+                chartContainer.style.display = 'none';
+                if (windTimelineContainer) windTimelineContainer.style.display = 'none';
+                if (textViewContainer) textViewContainer.style.display = 'none';
+
+                if (view === 'meteogram') {
+                    chartContainer.style.display = '';
+                } else if (view === 'windtimeline') {
+                    if (windTimelineContainer) windTimelineContainer.style.display = '';
+                    renderWindTimeline();
+                } else if (view === 'text') {
+                    if (textViewContainer) textViewContainer.style.display = '';
+                    renderTextView();
+                }
+            });
+        });
+    }
+
+    // ===== ANALYSE ASIDE TOGGLE (mobile collapsible) =====
+    if (asideToggleBtn && asideEl) {
+        asideToggleBtn.addEventListener('click', function () {
+            var collapsed = asideEl.classList.toggle('collapsed');
+            asideToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        });
+    }
+
+    function renderAnalyseView() {
+        if (!analyseViewContainer || !currentDates.length) return;
+        var dateStr = currentDates[currentDateIdx];
+        // Look up analysis data set globally by index.html
+        var analysis = null;
+        if (window.analysisData
+            && window.analysisData[currentSpotName]
+            && window.analysisData[currentSpotName][dateStr]) {
+            analysis = window.analysisData[currentSpotName][dateStr];
+        }
+        if (!Meteogram.renderAnalysisView) {
+            analyseViewContainer.innerHTML = '<div class="error-state">Analyse-Ansicht nicht verfügbar.</div>';
+            return;
+        }
+        Meteogram.renderAnalysisView(analyseViewContainer, analysis, {
+            spotName: currentSpotName,
+            dateStr: dateStr,
+        });
+    }
+
+    function renderTextView() {
+        if (!currentWeather || !currentDates.length || !textViewContainer) return;
+        var dateStr = currentDates[currentDateIdx];
+        var wxDay = currentWeather.data[dateStr] || {};
+        var altProfiles = (currentAltWind && currentAltWind.data && currentAltWind.data[dateStr]) || [];
+        var altDay = { profiles: [] };
+        altProfiles.forEach(function (p) {
+            altDay.profiles.push({
+                time: dateStr + 'T' + (p.hour < 10 ? '0' : '') + p.hour + ':00:00',
+                levels: p.profiles || [],
+            });
+        });
+        Meteogram.renderTextView(textViewContainer, wxDay, altDay, {
+            elevation: currentWeather.elevation_m,
+            spotName: currentSpotName,
+            dateStr: dateStr,
+            source: 'flychat-spot',
+        });
+    }
+
+    function renderWindTimeline() {
+        if (!currentAltWind || !currentDates.length || !windTimelineContainer) return;
+        var dateStr = currentDates[currentDateIdx];
+        var altProfiles = (currentAltWind.data && currentAltWind.data[dateStr]) || [];
+        var elevation = currentWeather ? currentWeather.elevation_m : 1000;
+
+        // Create a tooltip element inside the windtimeline container
+        var wtTooltip = windTimelineContainer.querySelector('.wt-tooltip');
+        if (!wtTooltip) {
+            wtTooltip = document.createElement('div');
+            wtTooltip.className = 'wt-tooltip tooltip';
+            windTimelineContainer.style.position = 'relative';
+            windTimelineContainer.appendChild(wtTooltip);
+        }
+
+        WindTimeline.render(windTimelineContainer, wtTooltip, altProfiles, {
+            elevation_m: elevation,
+            dateStr: dateStr,
+        });
+    }
+
     // ===== METEOGRAM OVERLAY =====
     function openMeteogram(spotName, props) {
+        currentSpotName = spotName;
         titleEl.textContent = spotName;
         infoEl.textContent = props
             ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + props.windrichtung
             : '';
         chartContainer.innerHTML = '<div class="error-state">Lade Daten...</div>';
+        if (windTimelineContainer) windTimelineContainer.innerHTML = '';
+        if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">Lade Analyse...</div>';
+        if (textViewContainer) textViewContainer.innerHTML = '';
         tabsContainer.innerHTML = '';
         overlay.style.display = 'flex';
         overlay.classList.add('visible');
+
+        // Reset to meteogram view
+        currentView = 'meteogram';
+        chartContainer.style.display = '';
+        if (windTimelineContainer) windTimelineContainer.style.display = 'none';
+        if (textViewContainer) textViewContainer.style.display = 'none';
+        // Aside starts expanded on desktop; on mobile user can collapse it.
+        if (asideEl) asideEl.classList.remove('collapsed');
+        if (viewTabsContainer) {
+            viewTabsContainer.querySelectorAll('.view-tab').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.view === 'meteogram');
+            });
+        }
 
         Promise.all([
             fetch('/api/weather/' + encodeURIComponent(spotName)).then(function (r) { return r.json(); }),
@@ -343,15 +471,30 @@
                     return;
                 }
 
-                // Build tabs - buildTabs callback receives date string, not index
-                Meteogram.buildTabs(tabsContainer, currentDates, function (dateStr) {
-                    currentDateIdx = currentDates.indexOf(dateStr);
-                    if (currentDateIdx < 0) currentDateIdx = 0;
-                    renderCurrentDay();
-                });
+                // Build day tabs inside the overlay
+                var selectedDate = window.currentDate || currentDates[0];
+                currentDateIdx = currentDates.indexOf(selectedDate);
+                if (currentDateIdx < 0) currentDateIdx = 0;
 
-                // Render first day
-                currentDateIdx = 0;
+                if (currentDates.length > 1) {
+                    Meteogram.buildTabs(tabsContainer, currentDates, function (dateStr) {
+                        var idx = currentDates.indexOf(dateStr);
+                        if (idx >= 0 && idx !== currentDateIdx) {
+                            currentDateIdx = idx;
+                            window.currentDate = dateStr;
+                            renderCurrentDay();
+                            // Sync floating map day tabs + marker colours
+                            syncFloatingDayTabs(dateStr);
+                        }
+                    });
+                    tabsContainer.style.display = '';
+                    // buildTabs marks idx 0 active – correct to selected day
+                    var allTabs = tabsContainer.querySelectorAll('.tab-btn');
+                    allTabs.forEach(function (b, i) { b.classList.toggle('active', i === currentDateIdx); });
+                } else {
+                    tabsContainer.style.display = 'none';
+                }
+
                 renderCurrentDay();
             })
             .catch(function (err) {
@@ -377,7 +520,30 @@
 
         Meteogram.renderChart(chartContainer, tooltipEl, wxDay, altDay, {
             elevation: currentWeather.elevation_m,
+            windrichtung: currentWeather.windrichtung,
+            idealWindMax: currentWeather.ideal_wind_max,
         });
+
+        // Wetter-Zeitstempel unter dem Spot-Meteogramm
+        var existingTs = chartContainer.querySelector('.meteogram-weather-ts');
+        if (existingTs) existingTs.remove();
+        if (currentWeather.last_updated) {
+            var tsDiv = document.createElement('div');
+            tsDiv.className = 'meteogram-weather-ts';
+            tsDiv.style.cssText = 'font-size:10px;color:#94a3b8;text-align:right;padding:2px 8px 0;';
+            tsDiv.textContent = 'Wetter-Stand: ' + currentWeather.last_updated.replace('T', ' ').slice(0, 16);
+            chartContainer.appendChild(tsDiv);
+        }
+
+        // Analyse panel is always visible in the aside – refresh on every day change.
+        renderAnalyseView();
+
+        // Also update wind timeline / text view if that view is currently active
+        if (currentView === 'windtimeline') {
+            renderWindTimeline();
+        } else if (currentView === 'text') {
+            renderTextView();
+        }
     }
 
     function closeMeteogram() {
@@ -388,44 +554,35 @@
         currentAltWind = null;
     }
 
-    // ===== FOEHN OVERLAY =====
-    function openFoehn() {
-        foehnChart.innerHTML = '<div class="error-state">Lade Föhn-Daten...</div>';
-        foehnOverlay.style.display = 'flex';
-        foehnOverlay.classList.add('visible');
-
-        fetch('/api/foehn')
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.error) {
-                    foehnChart.innerHTML = '<div class="error-state">' + data.error + '</div>';
-                    return;
-                }
-                var dates = data.dates || [];
-                if (dates.length === 0) {
-                    foehnChart.innerHTML = '<div class="error-state">Keine Föhn-Daten verfügbar.</div>';
-                    return;
-                }
-
-                // Flatten all days into one continuous array
-                var allData = [];
-                dates.forEach(function (dateStr) {
-                    var dayArr = data.data[dateStr] || [];
-                    dayArr.forEach(function (entry) { allData.push(entry); });
-                });
-
-                FoehnDiagram.renderChart(foehnChart, tooltipEl, allData, data.thresholds);
-            })
-            .catch(function (err) {
-                foehnChart.innerHTML = '<div class="error-state">Fehler: ' + err.message + '</div>';
+    /** Sync the floating map-level day tabs + marker colours after an
+     *  overlay-internal day switch. */
+    function syncFloatingDayTabs(dateStr) {
+        var mapDayTabs = document.getElementById('mapDayTabs');
+        if (mapDayTabs) {
+            mapDayTabs.querySelectorAll('.floating-day-tab').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.date === dateStr);
             });
+        }
+        if (window.updateSpotColors && window.analysisData) {
+            window.updateSpotColors(window.analysisData, dateStr);
+        }
     }
 
-    function closeFoehn() {
-        foehnOverlay.style.display = 'none';
-        foehnOverlay.classList.remove('visible');
-        tooltipEl.classList.remove('visible');
-    }
+    // Listen for day changes from the floating map tabs
+    window.addEventListener('flychat-day-change', function (e) {
+        if (!currentWeather || !currentDates.length) return;
+        var newDate = e.detail && e.detail.date;
+        if (!newDate) return;
+        var idx = currentDates.indexOf(newDate);
+        if (idx >= 0 && idx !== currentDateIdx) {
+            currentDateIdx = idx;
+            renderCurrentDay();
+            // Keep overlay day tabs in sync
+            tabsContainer.querySelectorAll('.tab-btn').forEach(function (b, i) {
+                b.classList.toggle('active', i === idx);
+            });
+        }
+    });
 
     // ===== EVENT LISTENERS =====
     closeBtn.addEventListener('click', closeMeteogram);
@@ -434,19 +591,9 @@
         if (e.target === overlay) closeMeteogram();
     });
 
-    // Foehn overlay events
-    foehnCloseBtn.addEventListener('click', closeFoehn);
-    foehnOverlay.addEventListener('click', function (e) {
-        if (e.target === foehnOverlay) closeFoehn();
-    });
-
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-            if (foehnOverlay.classList.contains('visible')) {
-                closeFoehn();
-            } else if (overlay.classList.contains('visible')) {
-                closeMeteogram();
-            }
+        if (e.key === 'Escape' && overlay.classList.contains('visible')) {
+            closeMeteogram();
         }
     });
     // ===== HIGHLIGHTING =====
@@ -527,15 +674,124 @@
             });
     };
 
+    // ===== PHASE 1: ISOCHRONE + USER LOCATION OVERLAYS =====
+    function drawIsochrone(geojson, label) {
+        if (!geojson) return;
+        // Vorherige Isochrone entfernen
+        clearIsochrone();
+        try {
+            isochroneLayer = L.geoJSON(geojson, {
+                style: function () {
+                    return {
+                        color: '#4f46e5',
+                        weight: 2,
+                        opacity: 0.85,
+                        fillColor: '#6366f1',
+                        fillOpacity: 0.18,
+                        dashArray: '4 4'
+                    };
+                }
+            });
+            if (label) {
+                isochroneLayer.bindTooltip('Erreichbar in ' + label, {
+                    sticky: true,
+                    className: 'map-tooltip'
+                });
+            }
+            isochroneLayer.addTo(map);
+
+            // Karte auf Isochrone fitten — falls Layer Bounds liefert
+            try {
+                var bounds = isochroneLayer.getBounds();
+                if (bounds && bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 11 });
+                }
+            } catch (e) { /* fitBounds optional */ }
+        } catch (e) {
+            console.error('drawIsochrone fehlgeschlagen:', e);
+        }
+    }
+
+    function clearIsochrone() {
+        if (isochroneLayer) {
+            try { map.removeLayer(isochroneLayer); } catch (e) { /* ignore */ }
+            isochroneLayer = null;
+        }
+    }
+
+    function setUserLocation(lat, lon, label) {
+        if (typeof lat !== 'number' || typeof lon !== 'number') return;
+        clearUserLocation();
+        try {
+            // Custom div-marker im Indigo-Stil
+            var html = '<div style="' +
+                'width:18px;height:18px;border-radius:50%;' +
+                'background:#4f46e5;border:3px solid #fff;' +
+                'box-shadow:0 0 0 2px #4f46e5,0 2px 8px rgba(0,0,0,0.3);' +
+                '"></div>';
+            var icon = L.divIcon({
+                html: html,
+                className: 'user-location-marker',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+                tooltipAnchor: [0, -14]
+            });
+            userLocationMarker = L.marker([lat, lon], { icon: icon, zIndexOffset: 2000 });
+            if (label) {
+                userLocationMarker.bindTooltip(label, {
+                    permanent: false,
+                    direction: 'top',
+                    className: 'map-tooltip'
+                });
+            }
+            userLocationMarker.addTo(map);
+        } catch (e) {
+            console.error('setUserLocation fehlgeschlagen:', e);
+        }
+    }
+
+    function clearUserLocation() {
+        if (userLocationMarker) {
+            try { map.removeLayer(userLocationMarker); } catch (e) { /* ignore */ }
+            userLocationMarker = null;
+        }
+    }
+
+    function clearAllOverlays() {
+        clearIsochrone();
+        clearUserLocation();
+        if (typeof window.highlightSpots === 'function') {
+            window.highlightSpots(null);
+        }
+    }
+
+    // Zentrale Frontend-API für Tool-Calls aus dem Chat (Phase 1).
+    // Strukturierte Namespace statt loser window-Funktionen.
+    window.flymap = {
+        get map() { return map; },
+        get markers() { return markersByName; },
+        drawIsochrone: drawIsochrone,
+        clearIsochrone: clearIsochrone,
+        setUserLocation: setUserLocation,
+        clearUserLocation: clearUserLocation,
+        highlightSpots: function (items) {
+            if (typeof window.highlightSpots === 'function') {
+                window.highlightSpots(items);
+            }
+        },
+        clearHighlights: function () {
+            if (typeof window.highlightSpots === 'function') {
+                window.highlightSpots(null);
+            }
+        },
+        clearAllOverlays: clearAllOverlays,
+        fitBounds: function (bounds) {
+            if (map && bounds) {
+                try { map.fitBounds(bounds); } catch (e) { /* ignore */ }
+            }
+        }
+    };
+
     // ===== START =====
     initMap();
-
-    window.openFoehn = openFoehn;
-
-    try {
-        if (new URLSearchParams(window.location.search).get('foehn') === '1') {
-            openFoehn();
-            history.replaceState({}, '', window.location.pathname);
-        }
-    } catch (e) { /* ignore */ }
 })();

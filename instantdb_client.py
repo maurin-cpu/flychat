@@ -79,6 +79,34 @@ class InstantDBClient:
             logger.error(f"InstantDB delete fehlgeschlagen ({table_name}/{doc_id}): {e}")
             return False
 
+    def delete_all(self, table_name: str) -> bool:
+        """Loescht alle Records einer Tabelle. Query + Batch-Delete."""
+        data = self.query(table_name)
+        if data is None:
+            return False
+
+        records = data.get(table_name, [])
+        if not records:
+            logger.debug(f"InstantDB delete_all: {table_name} ist bereits leer")
+            return True
+
+        ids = [r["id"] for r in records if "id" in r]
+        if not ids:
+            return True
+
+        url = f"{self.api_url}/admin/transact"
+        steps = [["delete", table_name, doc_id] for doc_id in ids]
+        payload = {"steps": steps}
+
+        try:
+            resp = requests.post(url, json=payload, headers=self._headers(), timeout=15)
+            resp.raise_for_status()
+            logger.info(f"InstantDB delete_all OK: {table_name} ({len(ids)} records geloescht)")
+            return True
+        except Exception as e:
+            logger.error(f"InstantDB delete_all fehlgeschlagen ({table_name}): {e}")
+            return False
+
     def batch_upsert(self, table_name: str, docs: dict[str, dict]) -> bool:
         """Erstellt/aktualisiert mehrere Dokumente in einer Transaktion."""
         url = f"{self.api_url}/admin/transact"

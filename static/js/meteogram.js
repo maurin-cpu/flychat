@@ -21,6 +21,15 @@ window.Meteogram = (function () {
         return windColor(speed) + '14';
     }
 
+    // Turbulence risk color (based on absolute T(z) value)
+    function turbulenceColor(tz) {
+        if (tz <= 10) return '#059669';   // Green — ruhig
+        if (tz <= 20) return '#10B981';   // Light green — moderat
+        if (tz <= 25) return '#D97706';   // Amber — spürbar
+        if (tz <= 30) return '#EA580C';   // Orange — kräftig
+        return '#DC2626';                 // Red — stark/gefährlich
+    }
+
     function precipColor(mm) {
         if (mm <= 0) return 'transparent';
         if (mm < 1) return '#93C5FD';
@@ -82,10 +91,91 @@ window.Meteogram = (function () {
     const PRECIP_ROW_H = 20;
     const CLOUD_STRIP_H = 3 * CLOUD_ROW_H + PRECIP_ROW_H; // CH, CM, CL + Niederschlag/Gewitter
     const CLOUD_GAP = 6;
+    // Warnings strip: small pills under the ground section summarising hour-ranges
+    const WARN_ROW_H = 16;
+    const WARN_ROW_GAP = 2;
+    const WARN_MAX_ROWS = 4;
 
     // WMO weather_code: 95/96/99 = Gewitter
     function isThunderstorm(code) {
         return code === 95 || code === 96 || code === 99;
+    }
+
+    // ===== DIRECTION PARSER (compatible with map.js) =====
+    // Returns an array of [startDeg, endDeg] sectors (0-360+ possibly), or null.
+    // Accepts "SW", "SW-W", "N-NO-O", "W/NW", etc.
+    var DIR_TO_DEG = {
+        'N': 0, 'NNO': 22.5, 'NNE': 22.5, 'NO': 45, 'NE': 45,
+        'ONO': 67.5, 'ENE': 67.5, 'O': 90, 'E': 90,
+        'OSO': 112.5, 'ESE': 112.5, 'SO': 135, 'SE': 135,
+        'SSO': 157.5, 'SSE': 157.5, 'S': 180,
+        'SSW': 202.5, 'SW': 225, 'WSW': 247.5,
+        'W': 270, 'WNW': 292.5, 'NW': 315, 'NNW': 337.5
+    };
+
+    function parseWindDirection(dirStr) {
+        if (!dirStr) return null;
+        var clean = String(dirStr).toUpperCase().replace(/\s+/g, '');
+        var parts = clean.split(/[\/,]/).filter(function (p) { return p.length > 0; });
+        var sectors = [];
+        parts.forEach(function (part) {
+            var subs = part.split('-').filter(function (p) { return p.length > 0; });
+            if (subs.length === 0) return;
+            if (subs.length === 1) {
+                var a = DIR_TO_DEG[subs[0]];
+                if (a == null) return;
+                sectors.push([a - 22.5, a + 22.5]);
+                return;
+            }
+            var a1 = DIR_TO_DEG[subs[0]];
+            var a2 = DIR_TO_DEG[subs[subs.length - 1]];
+            if (a1 == null || a2 == null) return;
+            if (Math.abs(a1 - a2) > 180) {
+                if (a1 < a2) a1 += 360; else a2 += 360;
+            }
+            var lo = Math.min(a1, a2) - 22.5;
+            var hi = Math.max(a1, a2) + 22.5;
+            sectors.push([lo, hi]);
+        });
+        return sectors.length > 0 ? sectors : null;
+    }
+
+    function isDirInSectors(deg, sectors, bufferDeg) {
+        if (!sectors || sectors.length === 0 || deg == null) return true; // unknown -> treat as OK
+        var buf = bufferDeg || 10;
+        for (var i = 0; i < sectors.length; i++) {
+            var lo = sectors[i][0] - buf;
+            var hi = sectors[i][1] + buf;
+            // Normalize wind direction into [lo, lo+360) range
+            var d = deg;
+            while (d < lo) d += 360;
+            if (d >= lo && d <= hi) return true;
+        }
+        return false;
+    }
+
+    // Group consecutive cells where `pred(ci)` returns true into [startCol, endCol] ranges
+    function groupConsecutive(nCols, pred) {
+        var groups = [];
+        var start = null;
+        for (var ci = 0; ci < nCols; ci++) {
+            if (pred(ci)) {
+                if (start == null) start = ci;
+            } else if (start != null) {
+                groups.push([start, ci - 1]);
+                start = null;
+            }
+        }
+        if (start != null) groups.push([start, nCols - 1]);
+        return groups;
+    }
+
+    // Format a column range as "HH-HHh" using times[]
+    function formatHourRange(times, startCi, endCi) {
+        var h1 = new Date(times[startCi]).getHours();
+        var h2 = new Date(times[endCi]).getHours();
+        if (h1 === h2) return h1 + 'h';
+        return h1 + '-' + h2 + 'h';
     }
 
     /** Einheitlich mit Spot-Analysen: MO–SO gross, DD.MM.JJJJ */
@@ -180,10 +270,16 @@ window.Meteogram = (function () {
                     var frac = (targetAlt - below.altitude) / (above.altitude - below.altitude);
                     var gustBelow = below.wind_gusts != null ? below.wind_gusts : below.wind_speed;
                     var gustAbove = above.wind_gusts != null ? above.wind_gusts : above.wind_speed;
+                    var trBelow = below.turbulence_risk != null ? below.turbulence_risk : gustBelow;
+                    var trAbove = above.turbulence_risk != null ? above.turbulence_risk : gustAbove;
+                    var teBelow = below.turbulence_excess != null ? below.turbulence_excess : 0;
+                    var teAbove = above.turbulence_excess != null ? above.turbulence_excess : 0;
                     grid[ri][ci] = {
                         altitude: targetAlt,
                         wind_speed: below.wind_speed + frac * (above.wind_speed - below.wind_speed),
                         wind_gusts: gustBelow + frac * (gustAbove - gustBelow),
+                        turbulence_risk: trBelow + frac * (trAbove - trBelow),
+                        turbulence_excess: teBelow + frac * (teAbove - teBelow),
                         wind_direction: below.wind_direction,
                         temperature: below.temperature + frac * (above.temperature - below.temperature),
                         pressure: below.pressure
@@ -216,7 +312,120 @@ window.Meteogram = (function () {
         var chartW = Math.max(panelWidth, minChartW);
         var CELL_W = (chartW - MARGIN.left - MARGIN.right) / nCols;
         var isNarrow = CELL_W < 36;
-        var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * CELL_H + GROUND_H + TIME_LABEL_H + 8;
+
+        // ===== COMPUTE PLAIN-LANGUAGE WARNING BANDS =====
+        // These are grouped hour-ranges (ci..ci) used later to draw pills
+        // BELOW the ground strip in plain German.
+        var elevation = (options && options.elevation) || 0;
+        var windSectors = parseWindDirection(options.windrichtung || '');
+        var idealWindMax = options.idealWindMax || 30;
+
+        // Per-column boolean flags
+        var flagBuf = [];
+        for (var wci = 0; wci < nCols; wci++) flagBuf.push({});
+
+        times.forEach(function (t, ci) {
+            var wx = wxByTime[t] || {};
+            var wind = wx.wind || {};
+            var precip = wx.precipitation || {};
+            var thermik = wx.thermik || {};
+            var profile = profiles[ci];
+            var f = flagBuf[ci];
+
+            // Ground wind direction wrong
+            if (windSectors && wind.direction != null
+                && wind.speed != null && wind.speed >= 3) {
+                if (!isDirInSectors(wind.direction, windSectors, 10)) {
+                    f.wrong = true;
+                }
+            }
+            // Strong ground wind
+            if (wind.speed != null && wind.speed > idealWindMax) {
+                f.strong = true;
+            }
+            // Gusts
+            if (wind.gusts != null && wind.speed != null) {
+                if (wind.gusts > 40) f.gustDanger = true;
+                else if (wind.gusts > 30 && (wind.gusts - wind.speed) > 15) f.gustWarn = true;
+                else if (wind.gusts > 30) f.gustWarn = true;
+            }
+            // Rain
+            if (precip.amount != null && precip.amount > 0.05) f.rain = true;
+            var wcAll = (precip.weather_code != null) ? precip.weather_code
+                      : ((wx.cloudbase && wx.cloudbase.weather_code != null) ? wx.cloudbase.weather_code : null);
+            if (isThunderstorm(wcAll)) f.storm = true;
+            // CAPE
+            if (thermik.cape != null && thermik.cape > 800) f.cape = true;
+
+            // Aloft danger (within flight layer: elevation .. thermal_max + 1000m)
+            if (profile && profile.levels && elevation > 0) {
+                var topLimit = (thermik.max_height || (elevation + 2000)) + 1000;
+                for (var li = 0; li < profile.levels.length; li++) {
+                    var lv = profile.levels[li];
+                    if (lv == null || lv.altitude == null) continue;
+                    if (lv.altitude < elevation || lv.altitude > topLimit) continue;
+                    var wsA = lv.wind_speed;
+                    var wgA = lv.wind_gusts != null ? lv.wind_gusts : wsA;
+                    if (wsA != null) {
+                        if (wsA > 40) f.aloftDanger = true;
+                        else if (wsA > 30) f.aloftWarn = true;
+                    }
+                    if (wgA != null) {
+                        if (wgA > 40) f.aloftGustDanger = true;
+                        else if (wgA > 30) f.aloftGustWarn = true;
+                    }
+                }
+            }
+        });
+
+        // Warning type configuration, in priority order
+        var WARN_TYPES = [
+            { key: 'storm',            label: 'Gewitter',               color: '#92400E', bg: '#FEF3C7' },
+            { key: 'rain',             label: 'Regen',                  color: '#1E3A8A', bg: '#DBEAFE' },
+            { key: 'gustDanger',       label: 'Böen gefährlich',        color: '#991B1B', bg: '#FEE2E2' },
+            { key: 'aloftDanger',      label: 'Höhenwind gefährlich',   color: '#991B1B', bg: '#FEE2E2' },
+            { key: 'aloftGustDanger',  label: 'Höhenböen gefährlich',   color: '#991B1B', bg: '#FEE2E2' },
+            { key: 'strong',           label: 'Grundwind zu stark',     color: '#991B1B', bg: '#FEE2E2' },
+            { key: 'wrong',            label: 'Wind falsche Richtung',  color: '#9A3412', bg: '#FFEDD5' },
+            { key: 'gustWarn',         label: 'Böen stark',             color: '#9A3412', bg: '#FFEDD5' },
+            { key: 'aloftWarn',        label: 'Höhenwind kräftig',      color: '#9A3412', bg: '#FFEDD5' },
+            { key: 'aloftGustWarn',    label: 'Höhenböen kräftig',      color: '#9A3412', bg: '#FFEDD5' },
+            { key: 'cape',             label: 'Überentwicklung (CAPE)', color: '#92400E', bg: '#FEF3C7' }
+        ];
+
+        // Build groups per warning type
+        var warnBands = [];
+        WARN_TYPES.forEach(function (wt) {
+            var groups = groupConsecutive(nCols, function (ci) { return !!flagBuf[ci][wt.key]; });
+            groups.forEach(function (g) {
+                warnBands.push({
+                    key: wt.key,
+                    label: wt.label,
+                    color: wt.color,
+                    bg: wt.bg,
+                    start: g[0],
+                    end: g[1],
+                });
+            });
+        });
+
+        // Row-pack (greedy) so non-overlapping bands share a row
+        warnBands.forEach(function (b) { b.row = -1; });
+        var rowLastEnd = []; // rowLastEnd[row] = last end col used
+        warnBands.forEach(function (b) {
+            for (var r = 0; r < WARN_MAX_ROWS; r++) {
+                if (rowLastEnd[r] == null || rowLastEnd[r] < b.start) {
+                    b.row = r;
+                    rowLastEnd[r] = b.end;
+                    return;
+                }
+            }
+            // overflow: drop lower-priority ones that don't fit
+        });
+        var usedRows = Math.max(0, rowLastEnd.length);
+        var WARN_STRIP_H = usedRows > 0 ? (usedRows * (WARN_ROW_H + WARN_ROW_GAP) + 6) : 0;
+
+        var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * CELL_H + GROUND_H + WARN_STRIP_H + TIME_LABEL_H + 8;
 
         var svg = d3.select(container)
             .append('svg')
@@ -230,7 +439,7 @@ window.Meteogram = (function () {
         var GRID_TOP = CLOUD_STRIP_H + CLOUD_GAP;
         function rowY(ri) { return GRID_TOP + (nRows - 1 - ri) * CELL_H; }
         var gridBottom = GRID_TOP + nRows * CELL_H;
-        var elevation = (options && options.elevation) || 0;
+        // elevation already extracted above (line 319) for the warning band loop
 
         // Helper for altitude to Y coordinate (smooth, not grid-aligned)
         function altToY(alt) {
@@ -473,7 +682,7 @@ window.Meteogram = (function () {
             var dt = new Date(t);
             chartG.append('text').attr('class', 'time-label')
                 .attr('x', ci * CELL_W + CELL_W / 2)
-                .attr('y', gridBottom + GROUND_H + TIME_LABEL_H)
+                .attr('y', gridBottom + GROUND_H + WARN_STRIP_H + TIME_LABEL_H)
                 .attr('text-anchor', 'middle')
                 .text(dt.getHours() + 'h');
         });
@@ -492,8 +701,8 @@ window.Meteogram = (function () {
                 var gusts = d.wind_gusts != null ? d.wind_gusts : speed;
                 var gustDiff = gusts - speed;
                 var isAloftWarning = speed > 35;
-                var isGustWarning = gustDiff > 15;
-                var isGustNotable = gustDiff > 10;
+                var isGustWarning = gustDiff > 15 && gusts > 30;
+                var isGustNotable = gustDiff > 10 && gusts > 25;
                 // Always show gusts
                 var showGusts = true;
                 var color = (isAloftWarning || isGustWarning) ? '#ef4444' : windColor(speed);
@@ -522,8 +731,8 @@ window.Meteogram = (function () {
                     .attr('transform', 'rotate(' + ((d.wind_direction + 180) % 360) + ')');
 
                 // Wind speed + gust number
-                // Gust color: red (>15 diff), orange (>5 diff), muted orange (mild)
-                var gustColor = isGustWarning ? '#ef4444' : (isGustNotable ? '#F97316' : '#D97706');
+                // Gust color: red if dangerous, orange if notable, otherwise by absolute gust value
+                var gustColor = isGustWarning ? '#ef4444' : (isGustNotable ? '#F97316' : windColor(gusts));
                 var windTextY = rowY(ri3) + (hasThermik ? 10 : CELL_H - 4);
                 if (showGusts) {
                     // Show wind/gust format: "25/32"
@@ -548,6 +757,21 @@ window.Meteogram = (function () {
                         .attr('font-weight', isAloftWarning ? 'bold' : 'normal')
                         .style('text-shadow', hasThermik ? '0 1px 2px rgba(255,255,255,0.8)' : 'none')
                         .text(Math.round(speed));
+                }
+
+                // Turbulence risk strip (thin colored bar at right edge of cell)
+                var tRisk = d.turbulence_risk != null ? d.turbulence_risk : gusts;
+                var tExcess = d.turbulence_excess != null ? d.turbulence_excess : gustDiff;
+                if (tExcess > 1) {
+                    var stripW = isNarrow ? 4 : 6;
+                    chartG.append('rect')
+                        .attr('x', ci3 * CELL_W + CELL_W - stripW - 1)
+                        .attr('y', rowY(ri3) + 1)
+                        .attr('width', stripW)
+                        .attr('height', CELL_H - 2)
+                        .attr('fill', turbulenceColor(tRisk))
+                        .attr('opacity', 0.7)
+                        .attr('rx', 2);
                 }
 
                 allCells.push({ g: g, ci: ci3, ri: ri3 });
@@ -589,16 +813,19 @@ window.Meteogram = (function () {
             
             if (spd != null) {
                 var wColor = windColor(spd);
-                var isGustWarning = gusts != null && (gusts > spd + 15);
+                var gustDiffGround = gusts != null ? gusts - spd : 0;
+                var isGustWarning = gusts != null && gustDiffGround > 15 && gusts > 30;
+                var isGustNotableGround = gusts != null && gustDiffGround > 10 && gusts > 25;
                 var gy = groundY + 13;
 
                 // 1. Gust Shadow (if gusts are significantly higher or for visual depth)
                 if (gusts != null && gusts > spd) {
+                    var gustShadowColor = isGustWarning ? '#ef4444' : (isGustNotableGround ? '#F97316' : windColor(gusts));
                     var gShadow = chartG.append('g')
                         .attr('transform', 'translate(' + (cx - 15) + ', ' + gy + ')');
                     gShadow.append('path')
                         .attr('d', arrowPath(gusts * 0.7))
-                        .attr('fill', isGustWarning ? '#ef4444' : '#F97316') // Red if warning, else Orange
+                        .attr('fill', gustShadowColor)
                         .attr('opacity', 0.3)
                         .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(0.65)');
                 }
@@ -650,7 +877,7 @@ window.Meteogram = (function () {
                     .attr('x', ci * CELL_W + 1).attr('y', groundY + 48 + 1)
                     .attr('width', CELL_W - 2).attr('height', 22).attr('rx', 3)
                     .attr('fill', thermBg).attr('opacity', 0.4);
-                
+
                 chartG.append('text').attr('class', 'ground-value')
                     .attr('x', cx).attr('y', groundY + 48 + 14)
                     .attr('dominant-baseline', 'central').attr('font-size', '10px')
@@ -659,15 +886,75 @@ window.Meteogram = (function () {
             }
         });
 
+        // ===== WARNINGS STRIP =====
+        // Plain-German hour-range pills below the ground strip.
+        if (warnBands.length > 0 && WARN_STRIP_H > 0) {
+            var warnTop = groundY + GROUND_H + 4;
+            // Row label on the left (only on first row, in muted color)
+            chartG.append('text').attr('class', 'ground-label')
+                .attr('x', -8).attr('y', warnTop + WARN_ROW_H / 2 + 3)
+                .attr('text-anchor', 'end')
+                .attr('fill', '#92400E')
+                .text('Warnungen');
+
+            warnBands.forEach(function (band) {
+                if (band.row < 0) return; // dropped due to row overflow
+                var bx = band.start * CELL_W + 1;
+                var bw = (band.end - band.start + 1) * CELL_W - 2;
+                var by = warnTop + band.row * (WARN_ROW_H + WARN_ROW_GAP);
+                var bcx = bx + bw / 2;
+
+                // Pill background
+                chartG.append('rect')
+                    .attr('x', bx).attr('y', by)
+                    .attr('width', bw).attr('height', WARN_ROW_H)
+                    .attr('rx', 4)
+                    .attr('fill', band.bg)
+                    .attr('stroke', band.color)
+                    .attr('stroke-width', 0.75)
+                    .attr('opacity', 0.95);
+
+                // Label text — auto-shorten if pill too narrow
+                var rangeStr = formatHourRange(times, band.start, band.end);
+                var fullLabel = band.label + ' ' + rangeStr;
+                // Rough fit: ~5.5px per char at 10px font
+                var maxChars = Math.floor((bw - 6) / 5.5);
+                var displayLabel;
+                if (fullLabel.length <= maxChars) {
+                    displayLabel = fullLabel;
+                } else if (band.label.length + 1 + rangeStr.length <= maxChars) {
+                    displayLabel = band.label + ' ' + rangeStr;
+                } else if (rangeStr.length + 1 <= maxChars) {
+                    // Drop label, keep range visible
+                    displayLabel = rangeStr;
+                } else {
+                    displayLabel = '';
+                }
+
+                if (displayLabel) {
+                    chartG.append('text')
+                        .attr('x', bcx).attr('y', by + WARN_ROW_H / 2 + 3)
+                        .attr('text-anchor', 'middle')
+                        .attr('font-size', '10px')
+                        .attr('font-weight', '600')
+                        .attr('fill', band.color)
+                        .text(displayLabel);
+                }
+
+                // Tooltip on hover (native title, simple + reliable)
+                chartG.append('title').text(fullLabel);
+            });
+        }
+
         // ===== CROSSHAIR + TOOLTIP =====
         var crossV = chartG.append('line').attr('class', 'crosshair-v')
-            .attr('y1', 0).attr('y2', gridBottom + GROUND_H);
+            .attr('y1', 0).attr('y2', gridBottom + GROUND_H + WARN_STRIP_H);
         var crossH = chartG.append('line').attr('class', 'crosshair-h')
             .attr('x1', 0).attr('x2', nCols * CELL_W);
 
         chartG.append('rect')
             .attr('width', nCols * CELL_W)
-            .attr('height', gridBottom + GROUND_H)
+            .attr('height', gridBottom + GROUND_H + WARN_STRIP_H)
             .attr('fill', 'transparent')
             .on('mousemove', function (event) {
                 var coords = d3.pointer(event);
@@ -707,9 +994,13 @@ window.Meteogram = (function () {
                     var dd = grid[ri][ci];
                     html += '<div class="tooltip-row"><span class="tooltip-label">Hoehe</span><span class="tooltip-value">' + Math.round(dd.altitude) + 'm</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">Wind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
-                    if (dd.wind_gusts != null && Math.round(dd.wind_gusts) > Math.round(dd.wind_speed)) {
-                        var gustCol = dd.wind_gusts > dd.wind_speed + 15 ? '#ef4444' : (dd.wind_gusts > dd.wind_speed + 5 ? '#F97316' : '#D97706');
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Boeen</span><span class="tooltip-value" style="color:' + gustCol + '">' + Math.round(dd.wind_gusts) + ' km/h</span></div>';
+                    var tRiskVal = dd.turbulence_risk != null ? dd.turbulence_risk : dd.wind_gusts;
+                    var tExcessVal = dd.turbulence_excess != null ? dd.turbulence_excess : (tRiskVal != null ? tRiskVal - dd.wind_speed : 0);
+                    if (tRiskVal != null && Math.round(tRiskVal) > Math.round(dd.wind_speed)) {
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Turbulenzrisiko</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">' + Math.round(tRiskVal) + ' km/h</span></div>';
+                        if (tExcessVal > 1) {
+                            html += '<div class="tooltip-row"><span class="tooltip-label">Exzess</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">+' + Math.round(tExcessVal) + ' km/h</span></div>';
+                        }
                     }
                     html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">Temp</span><span class="tooltip-value">' + dd.temperature.toFixed(1) + '\u00B0C</span></div>';
@@ -758,12 +1049,400 @@ window.Meteogram = (function () {
             });
     }
 
+    // ===== TEXT VIEW =====
+    // Renders ALL meteogram data as a machine-readable JSON document inside a
+    // <pre> block, with stable data-attributes so a browser extension (e.g. the
+    // Claude browser extension) can locate and parse the payload to compare
+    // forecasts (xctherm, etc.) against Flychat. No information from the
+    // graphical meteogram is omitted.
+    function renderTextView(container, wxDay, altDay, options) {
+        container.innerHTML = '';
+        options = options || {};
+        var elevation = options.elevation || 0;
+        var spotName = options.spotName || '';
+        var dateStr = options.dateStr || '';
+        var sourceLabel = options.source || 'flychat';
+
+        if (!altDay || !altDay.profiles || altDay.profiles.length === 0) {
+            container.innerHTML = '<div class="error-state">Keine Daten fuer diesen Tag.</div>';
+            return;
+        }
+
+        var MIN_HOUR = 6, MAX_HOUR = 18;
+        function hourFromTime(t) { return new Date(t).getHours(); }
+
+        var profiles = altDay.profiles.filter(function (p) {
+            var h = hourFromTime(p.time);
+            return h >= MIN_HOUR && h <= MAX_HOUR;
+        });
+        if (profiles.length === 0) {
+            container.innerHTML = '<div class="error-state">Keine Daten fuer diesen Tag.</div>';
+            return;
+        }
+
+        // Build wxByTime lookup
+        var wxByTime = {};
+        if (wxDay) {
+            ['wind', 'precipitation', 'thermik', 'cloudbase'].forEach(function (key) {
+                (wxDay[key] || []).forEach(function (item) {
+                    var t = item.time;
+                    if (!wxByTime[t]) wxByTime[t] = {};
+                    wxByTime[t][key] = item;
+                });
+            });
+        }
+
+        // Numeric rounding helper that preserves nulls
+        function num(v, decimals) {
+            if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return null;
+            var n = Number(v);
+            if (isNaN(n)) return null;
+            if (decimals == null) return n;
+            var p = Math.pow(10, decimals);
+            return Math.round(n * p) / p;
+        }
+
+        // Build per-hour structured data
+        var hours = profiles.map(function (p) {
+            var t = p.time;
+            var hh = hourFromTime(t);
+            var wx = wxByTime[t] || {};
+            var wind = wx.wind || {};
+            var precip = wx.precipitation || {};
+            var therm = wx.thermik || {};
+            var cb = wx.cloudbase || {};
+
+            var wc = precip.weather_code != null ? precip.weather_code
+                   : (cb.weather_code != null ? cb.weather_code : null);
+
+            // Sort levels ascending by altitude
+            var levels = (p.levels || []).slice().sort(function (a, b) {
+                return (a.altitude || 0) - (b.altitude || 0);
+            });
+            var aloft = levels.map(function (l) {
+                return {
+                    altitude_m: num(l.altitude, 0),
+                    wind_speed_kmh: num(l.wind_speed, 1),
+                    wind_gusts_kmh: num(l.wind_gusts != null ? l.wind_gusts : l.wind_speed, 1),
+                    wind_direction_deg: num(l.wind_direction, 0),
+                    temperature_c: num(l.temperature, 1),
+                    pressure_hpa: num(l.pressure, 0),
+                    turbulence_risk_kmh: num(l.turbulence_risk, 1),
+                    turbulence_excess_kmh: num(l.turbulence_excess, 1)
+                };
+            });
+
+            return {
+                hour: hh,
+                time: t,
+                surface: {
+                    wind_speed_kmh: num(wind.speed, 1),
+                    wind_gusts_kmh: num(wind.gusts, 1),
+                    wind_direction_deg: num(wind.direction, 0),
+                    precipitation_mm: num(precip.amount, 2),
+                    weather_code: wc,
+                    is_thunderstorm: isThunderstorm(wc),
+                    cloud_cover_high_pct: num(cb.cover_high, 0),
+                    cloud_cover_mid_pct: num(cb.cover_mid, 0),
+                    cloud_cover_low_pct: num(cb.cover_low, 0),
+                    cloud_base_m: num(cb.height, 0)
+                },
+                thermal: {
+                    climb_rate_ms: num(therm.climb_rate, 2),
+                    max_height_m: num(therm.max_height, 0),
+                    rating: num(therm.rating, 1),
+                    cape_jkg: num(therm.cape, 0)
+                },
+                aloft: aloft
+            };
+        });
+
+        var payload = {
+            source: sourceLabel,
+            schema_version: 1,
+            spot: spotName || null,
+            elevation_m: num(elevation, 0),
+            date: dateStr || null,
+            timezone: 'Europe/Zurich',
+            generated_at: new Date().toISOString(),
+            units: {
+                wind: 'km/h',
+                altitude: 'm MSL',
+                temperature: 'degC',
+                precipitation: 'mm/h',
+                climb_rate: 'm/s',
+                cape: 'J/kg',
+                pressure: 'hPa',
+                cloud_cover: 'percent',
+                wind_direction: 'deg (meteorological FROM)'
+            },
+            field_descriptions: {
+                'surface.wind_speed_kmh': 'ICON-D2 10m mean wind speed',
+                'surface.wind_gusts_kmh': 'Multi-model max gusts (D2/CH1/CH2), bias-corrected',
+                'aloft.wind_speed_kmh': 'W(z) - raw ICON-D2 model wind at altitude',
+                'aloft.wind_gusts_kmh': 'T(z) - turbulence risk product (W(z) + Gauss-blended excess)',
+                'aloft.turbulence_excess_kmh': 'T(z) - W(z), surface gust excess attenuated with altitude',
+                'thermal.climb_rate_ms': 'Mean column climb rate',
+                'thermal.max_height_m': 'Working ceiling (MSL)',
+                'thermal.rating': '0-10 thermal quality score'
+            },
+            hours: hours
+        };
+
+        var jsonStr = JSON.stringify(payload, null, 2);
+
+        // Wrapper
+        var wrapper = document.createElement('div');
+        wrapper.className = 'mg-text-view';
+
+        // Human-readable header bar
+        var header = document.createElement('div');
+        header.className = 'mg-text-header';
+        var headerParts = [];
+        if (spotName) headerParts.push('<strong>' + spotName + '</strong>');
+        if (dateStr) headerParts.push(dateStr);
+        if (elevation) headerParts.push(Math.round(elevation) + ' m MSL');
+        headerParts.push(profiles.length + ' Stunden &middot; ' + (profiles[0].levels || []).length + ' Druckniveaus');
+        header.innerHTML = headerParts.join(' &middot; ');
+        wrapper.appendChild(header);
+
+        // Action bar with copy button
+        var actions = document.createElement('div');
+        actions.className = 'mg-text-actions';
+
+        var hint = document.createElement('span');
+        hint.className = 'mg-text-hint';
+        hint.textContent = 'Maschinenlesbar (JSON) - fuer Browser-Extension / xctherm-Vergleich';
+        actions.appendChild(hint);
+
+        var copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'mg-text-copy-btn';
+        copyBtn.textContent = 'JSON kopieren';
+        copyBtn.addEventListener('click', function () {
+            var done = function () {
+                var orig = 'JSON kopieren';
+                copyBtn.textContent = 'Kopiert!';
+                setTimeout(function () { copyBtn.textContent = orig; }, 1500);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(jsonStr).then(done, function () {
+                    // fallback to legacy selection
+                    var sel = window.getSelection();
+                    var range = document.createRange();
+                    range.selectNodeContents(pre);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                });
+            } else {
+                var sel = window.getSelection();
+                var range = document.createRange();
+                range.selectNodeContents(pre);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        });
+        actions.appendChild(copyBtn);
+        wrapper.appendChild(actions);
+
+        // <pre> JSON block — extension reads this via data-flychat-textview="json"
+        var pre = document.createElement('pre');
+        pre.className = 'mg-text-json';
+        pre.setAttribute('data-flychat-textview', 'json');
+        pre.setAttribute('data-flychat-source', sourceLabel);
+        if (spotName) pre.setAttribute('data-flychat-spot', spotName);
+        if (dateStr) pre.setAttribute('data-flychat-date', dateStr);
+        pre.setAttribute('data-flychat-hours', String(hours.length));
+        pre.textContent = jsonStr;
+        wrapper.appendChild(pre);
+
+        container.appendChild(wrapper);
+    }
+
+    // ===== ANALYSE VIEW =====
+    // Renders the per-spot LLM analysis as the same .spot-card layout used on /analyses.
+    // analysisDay structure (from InstantDB spot_analyses): {
+    //     safety_status, fly_status, safe_window, wind_summary, foehn_risk,
+    //     no_go_reasons, caution_notes, safety_feedback, flyability_feedback,
+    //     flight_type, flight_duration_estimate, xc_potential, peak_climb_rate, ...
+    // }
+    function renderAnalysisView(container, analysisDay, options) {
+        container.innerHTML = '';
+        options = options || {};
+        var spotName = options.spotName || '';
+        var dateStr = options.dateStr || '';
+
+        function escHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        function row(label, value) {
+            return '<div class="spot-row"><span class="spot-row-label">'
+                + escHtml(label) + '</span><span class="spot-row-value">'
+                + escHtml(value) + '</span></div>';
+        }
+        function normalizeFlyTier(ft) {
+            if (!ft) return 'green';
+            var k = String(ft).trim().toLowerCase();
+            if (k === 'gray' || k === 'green' || k === 'violet') return k;
+            if (k === 'yellow') return 'gray';
+            if (k === 'orange') return 'green';
+            return 'green';
+        }
+        function parseMaybeList(val) {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') {
+                try { var p = JSON.parse(val); return Array.isArray(p) ? p : [val]; }
+                catch (e) { return [val]; }
+            }
+            return [];
+        }
+
+        if (!analysisDay || !analysisDay.safety_status) {
+            container.innerHTML = '<div class="mg-analysis-empty">'
+                + 'Für diesen Tag liegt noch keine Analyse vor.<br>'
+                + 'Über die <em>Analyse-Seite</em> lassen sich die LLM-Analysen erzeugen.'
+                + '</div>';
+            return;
+        }
+
+        var a = analysisDay;
+        var safetyStatus = a.safety_status || 'error';
+        var phase2Ok = (safetyStatus === 'safe' || safetyStatus === 'conditional');
+        var flyStatus = normalizeFlyTier(a.fly_status || '');
+
+        var safetyLabels = {
+            safe: 'Grün',
+            conditional: 'Orange',
+            not_safe: 'Rot',
+            no_data: 'Keine Daten',
+            error: 'Fehler'
+        };
+        var safetyBadgeClass = 'badge-safety-' + safetyStatus;
+        var safetyBadgeText = safetyLabels[safetyStatus] || safetyStatus;
+
+        var noGoReasons = parseMaybeList(a.no_go_reasons);
+        var cautionNotes = parseMaybeList(a.caution_notes);
+
+        var card = document.createElement('div');
+        card.className = 'spot-card safety-' + safetyStatus;
+        if (phase2Ok && flyStatus) {
+            card.className += ' fly-' + flyStatus;
+        }
+
+        var html = '<div class="spot-card-header">'
+            + '<div style="display: flex; flex-direction: column; gap: 4px;">'
+            + '<span class="spot-name">' + escHtml(spotName) + '</span>';
+
+        // Fly tier badge (gray / green / violet)
+        var flyBadgeClass = 'badge-fly-' + flyStatus;
+        var flyLabels = { gray: 'Abgleiter', green: 'Fliegbar', violet: 'Legendär' };
+        var flyBadgeText = flyLabels[flyStatus] || flyStatus;
+        html += '<span class="spot-status-badge ' + flyBadgeClass + '">' + escHtml(flyBadgeText) + '</span>';
+
+        html += '</div>'
+            + '<span class="spot-badges">'
+            + '<span class="spot-status-badge ' + safetyBadgeClass + '">' + escHtml(safetyBadgeText) + '</span>'
+            + '</span></div>';
+
+        // Special states: no_data / error — short body, early return
+        if (safetyStatus === 'no_data') {
+            html += '<div class="spot-card-body">'
+                + '<div class="spot-row"><span class="spot-row-label">Status</span>'
+                + '<span class="spot-row-value" style="color: #F97316;">Wetterdaten unvollständig</span></div>'
+                + '<div class="spot-row"><span class="spot-row-label">Info</span>'
+                + '<span class="spot-row-value">' + escHtml(a.safety_feedback || 'Keine KI-Analyse möglich') + '</span></div>'
+                + '</div>';
+            card.innerHTML = html;
+            container.appendChild(card);
+            appendDatestamp();
+            return;
+        }
+        if (safetyStatus === 'error') {
+            html += '<div class="spot-card-body">'
+                + '<div class="spot-row"><span class="spot-row-label">Fehler</span>'
+                + '<span class="spot-row-value">' + escHtml(a.error || 'Unbekannt') + '</span></div>'
+                + '</div>';
+            card.innerHTML = html;
+            container.appendChild(card);
+            appendDatestamp();
+            return;
+        }
+
+        // Body
+        html += '<div class="spot-card-body">';
+        html += row('Sicherheit', safetyLabels[safetyStatus] || safetyStatus);
+        html += row('Fenster', a.safe_window || a.best_window || '-');
+        html += row('Wind', a.wind_summary || '-');
+        if (a.foehn_risk && a.foehn_risk !== 'none') {
+            html += row('Föhn', a.foehn_risk);
+        }
+        if (noGoReasons.length > 0) {
+            html += '<div class="spot-row"><span class="spot-row-label">NO-GO</span>'
+                + '<span class="spot-row-value safety-issues">' + escHtml(noGoReasons.join(', ')) + '</span></div>';
+        }
+        if (cautionNotes.length > 0) {
+            html += row('Vorsicht', cautionNotes.join(', '));
+        }
+
+        // Phase 2 — only if flyable
+        if (phase2Ok) {
+            html += '<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--glass-border);">';
+            var flyQualLabels = { gray: 'Abgleiter', green: 'Gut fliegbar', violet: 'Legendär' };
+            html += row('Flugqualität', flyQualLabels[flyStatus] || flyStatus);
+            html += row('Flugtyp', a.flight_type || '-');
+            html += row('Dauer', a.flight_duration_estimate || a.flight_duration || '-');
+            html += row('XC', a.xc_potential || '-');
+            if (a.peak_climb_rate) {
+                html += row('Peak', a.peak_climb_rate + ' m/s');
+            }
+            html += '</div>';
+        }
+
+        // KI-Feedback boxes
+        var safetyFeedback = a.safety_feedback || a.summary || '';
+        if (safetyFeedback) {
+            html += '<div class="ai-feedback-box ai-feedback-safety">'
+                + '<span class="ai-feedback-label">KI-Feedback: Sicherheit</span>'
+                + escHtml(safetyFeedback)
+                + '</div>';
+        }
+        var flyFeedback = phase2Ok ? (a.flyability_feedback || a.recommendation || '') : '';
+        if (flyFeedback) {
+            html += '<div class="ai-feedback-box ai-feedback-flyability">'
+                + '<span class="ai-feedback-label">KI-Feedback: Fliegbarkeit</span>'
+                + escHtml(flyFeedback)
+                + '</div>';
+        }
+
+        html += '</div>';
+        card.innerHTML = html;
+        container.appendChild(card);
+        appendDatestamp();
+
+        function appendDatestamp() {
+            if (!dateStr) return;
+            var d = document.createElement('div');
+            d.className = 'mg-analysis-datestamp';
+            d.textContent = 'Analyse für ' + dateStr;
+            container.appendChild(d);
+        }
+    }
+
     // Public API
     return {
         windColor: windColor,
         arrowPath: arrowPath,
         formatDayTabLabel: formatDayTabLabel,
         buildTabs: buildTabs,
-        renderChart: renderChart
+        renderChart: renderChart,
+        renderTextView: renderTextView,
+        renderAnalysisView: renderAnalysisView
     };
 })();

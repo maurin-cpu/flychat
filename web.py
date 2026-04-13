@@ -4,8 +4,10 @@ Routes: Chat-API, Spots-API, Wetter-API, Meteogramm-API.
 """
 
 import os
+import json
 import logging
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+import threading
+from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, stream_with_context
 from datetime import datetime, timedelta
 
 import config
@@ -22,6 +24,8 @@ from gust_calculator import (
     estimate_altitude_gusts_multi_anchor,
     get_scale_height,
     get_oi_scale_lengths,
+    get_L_up,
+    get_effective_L_up,
 )
 from source_area import find_region_for_point
 
@@ -29,8 +33,39 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "flychat-dev-key")
 
 # Ensure JSON responses send raw UTF-8 characters (ä, ö, ü instead of \uXXXX)
-app.config['JSON_AS_ASCII'] = False 
+app.config['JSON_AS_ASCII'] = False
 app.json.ensure_ascii = False
+
+
+# Cache-Busting für statische Files: liefert mtime des Files als Versions-String,
+# der an Script-/Link-URLs angehängt wird (?v=...). Bei jeder Datei-Änderung ändert
+# sich der Wert und der Browser muss zwingend neu laden.
+@app.context_processor
+def _inject_static_v():
+    static_dir = os.path.join(app.root_path, "static")
+
+    def static_v(filename):
+        try:
+            full = os.path.join(static_dir, filename)
+            return str(int(os.path.getmtime(full)))
+        except OSError:
+            return "0"
+
+    return {"static_v": static_v}
+
+
+# Weather-API responses ändern sich nur beim Refresh (~1x/Tag).
+# 60s Browser-Cache = sofortige Overlays beim Tab-Wechsel, ohne stale-Risiko.
+_CACHEABLE_PREFIXES = ("/api/weather/", "/api/altitude-wind/",
+                       "/api/region-weather/", "/api/region-altitude-wind/",
+                       "/api/foehn", "/api/regionen-polygone")
+
+@app.after_request
+def _add_cache_headers(response):
+    if request.path.startswith(_CACHEABLE_PREFIXES) and response.status_code == 200:
+        response.headers["Cache-Control"] = "public, max-age=60"
+    return response
+
 
 # Global engine instance (set in main.py)
 engine = None
@@ -107,6 +142,29 @@ def api_chat():
     if not message:
         return jsonify({"error": "Leere Nachricht"}), 400
 
+    # Phase 1: Streaming-Variante (Tool-Use + Map-Actions) wenn Client opt-in
+    accept = request.headers.get("Accept", "")
+    if "application/x-ndjson" in accept:
+        def generate():
+            try:
+                for event in engine.answer_stream(session_id, message):
+                    yield json.dumps(event, ensure_ascii=False) + "\n"
+            except Exception as e:
+                logger.exception("answer_stream Fehler")
+                err_event = {"type": "error", "content": str(e)}
+                yield json.dumps(err_event, ensure_ascii=False) + "\n"
+                yield json.dumps({"type": "done"}, ensure_ascii=False) + "\n"
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype="application/x-ndjson",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",  # disable nginx buffering
+            },
+        )
+
+    # Legacy Pfad: einmalige JSON-Antwort
     reply = engine.answer(session_id, message)
     return jsonify({"reply": reply, "session_id": session_id})
 
@@ -163,6 +221,128 @@ def api_region_analyses():
     })
 
 
+import queue as _queue_mod
+
+# ── Analyse-State: Background-Thread + Event-Queue ──
+# Die Analyse laeuft in einem eigenen Thread und pusht Events in eine Queue.
+# Der SSE-Endpoint liest aus der Queue. Wenn der Client disconnected, laeuft
+# die Analyse trotzdem weiter. Der Polling-Endpoint kann den Status abfragen.
+_analysis_lock = threading.Lock()
+_analysis_running = False
+_analysis_completed = False
+_analysis_error = None
+_analysis_result = None
+_analysis_queue = None  # queue.Queue — wird bei Start erstellt
+
+
+def _run_analysis_in_background(eng, q):
+    """Laeuft in eigenem Thread, pusht Events in die Queue."""
+    global _analysis_running, _analysis_completed, _analysis_error, _analysis_result
+    try:
+        for evt in eng.run_all_analyses_stream():
+            q.put(evt)
+            # Bei done-Event: Ergebnis cachen
+            if evt.get("event") == "done":
+                data = evt.get("data", {})
+                rs = data.get("region_stats") or {}
+                ss = data.get("spot_stats") or {}
+                _analysis_result = {
+                    "regions_count": rs.get("regions_count", 0),
+                    "spots_count": ss.get("spots_count", 0),
+                    "total_calls": data.get("total_calls", 0),
+                }
+                _analysis_completed = True
+    except Exception as e:
+        logger.exception("[ANALYSIS-BG] Fehler im Analyse-Thread")
+        q.put({"event": "error", "data": {"message": str(e)}})
+        _analysis_error = str(e)
+    finally:
+        q.put(None)  # Sentinel: "fertig"
+        _analysis_running = False
+        logger.info("[ANALYSIS-BG] Analyse-Thread beendet (completed=%s)", _analysis_completed)
+
+
+@app.route("/api/analyses-status")
+def api_analyses_status():
+    """Polling-Endpoint: Status der laufenden/letzten Analyse."""
+    if _analysis_running:
+        return jsonify({"running": True, "completed": False})
+    if _analysis_completed and _analysis_result:
+        return jsonify({
+            "running": False, "completed": True,
+            "regions_count": _analysis_result.get("regions_count", 0),
+            "spots_count": _analysis_result.get("spots_count", 0),
+            "total_calls": _analysis_result.get("total_calls", 0),
+        })
+    return jsonify({"running": False, "completed": False,
+                     "error": _analysis_error})
+
+
+@app.route("/api/run-all-analyses-stream")
+def api_run_all_analyses_stream():
+    """SSE-Endpoint: Startet Analyse im Background-Thread, streamt Events aus Queue."""
+    global _analysis_running, _analysis_completed, _analysis_error, _analysis_result, _analysis_queue
+
+    with _analysis_lock:
+        if _analysis_running:
+            logger.warning("[SSE] Analyse laeuft bereits, lehne zweiten Request ab")
+            return Response(
+                "event: error\ndata: {\"message\": \"Analyse läuft bereits\"}\n\n",
+                mimetype="text/event-stream",
+                headers={"Cache-Control": "no-cache"},
+            )
+
+        _analysis_running = True
+        _analysis_completed = False
+        _analysis_error = None
+        _analysis_result = None
+        _analysis_queue = _queue_mod.Queue()
+
+    # Analyse in Background-Thread starten
+    t = threading.Thread(
+        target=_run_analysis_in_background,
+        args=(engine, _analysis_queue),
+        daemon=True,
+    )
+    t.start()
+
+    def generate():
+        yield "retry: 300000\n\n"
+        try:
+            while True:
+                try:
+                    evt = _analysis_queue.get(timeout=15)
+                except _queue_mod.Empty:
+                    # Heartbeat wenn Queue leer (Thread arbeitet noch)
+                    if not _analysis_running:
+                        break
+                    yield "event: heartbeat\ndata: {}\n\n"
+                    continue
+                if evt is None:
+                    break  # Sentinel: Thread ist fertig
+                event_type = evt.get("event", "message")
+                if event_type == "heartbeat":
+                    yield "event: heartbeat\ndata: {}\n\n"
+                    continue
+                data = evt.get("data", {})
+                yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+        except GeneratorExit:
+            logger.warning("[SSE] Client disconnected — Analyse laeuft im Background weiter")
+        except Exception as e:
+            logger.exception("[SSE] analyses stream Fehler")
+            yield f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 @app.route("/api/regionen-polygone")
 def api_regionen_polygone():
     """Region-GeoJSON angereichert mit Analyse-Daten fuer Karten-Faerbung."""
@@ -187,7 +367,13 @@ def api_refresh_spots():
 
 @app.route("/api/refresh-weather", methods=["POST"])
 def api_refresh_weather():
-    """Erzwingt einen Neustart des Wetter-Downloads und baut den Kontext neu."""
+    """Erzwingt einen Neustart des Wetter-Downloads und baut den Kontext neu.
+
+    Fix #1+B: Erkennt stille Stale-Returns von fetch_all_spots() via expliziten
+    `engine.last_refresh_stale` Flag (gesetzt in chat_engine.refresh_weather()).
+    Wenn der Refresh fehlschlug, kommt schnell ein HTTP 503 + ehrlicher Reason
+    zurück — statt fälschlicher Erfolgsmeldung nach Minuten von Retry-Wartezeit.
+    """
     try:
         engine.refresh_weather(force=True)
         spot_names = [k for k in engine.weather_data.keys() if not k.startswith("_")]
@@ -195,10 +381,46 @@ def api_refresh_weather():
         if len(spot_names) == 0:
             return jsonify({
                 "success": False,
+                "stale": True,
+                "reason": "no_data",
                 "error": "API-Tageslimit erreicht. Keine Wetterdaten verfügbar. Alle alten Analysen wurden zur Sicherheit gelöscht. Bitte morgen erneut versuchen."
             }), 503
 
-        return jsonify({"success": True, "message": "Wetterdaten und Thermik neu berechnet.", "spots_count": len(spot_names)})
+        new_ts = engine.weather_data.get("_meta", {}).get("last_updated")
+
+        # Fix B: Expliziter Stale-Flag aus dem Engine. Setzt refresh_weather()
+        # wenn fetch_all_spots() stille auf den alten Cache zurückgefallen ist.
+        if getattr(engine, "last_refresh_stale", False):
+            reason = getattr(engine, "last_refresh_status_reason", "unknown") or "unknown"
+            reason_msgs = {
+                "api_pre_check_failed": "Open-Meteo API nicht erreichbar (Pre-Check fehlgeschlagen)",
+                "daily_limit_exceeded": "Open-Meteo Tageslimit (10000 Calls/Tag) erreicht",
+            }
+            human_reason = reason_msgs.get(reason)
+            if not human_reason:
+                if reason.startswith("batch_failed"):
+                    human_reason = "Batch-Download fehlgeschlagen — vermutlich Minuten-Rate-Limit (600 weighted/min)"
+                else:
+                    human_reason = reason
+            return jsonify({
+                "success": False,
+                "stale": True,
+                "reason": reason,
+                "error": (
+                    "Wetter-Refresh fehlgeschlagen: " + human_reason + ". "
+                    "Es werden weiterhin die alten (vortägigen) Daten verwendet — "
+                    "die alten Analysen bleiben gültig."
+                ),
+                "last_updated": new_ts,
+                "spots_count": len(spot_names),
+            }), 503
+
+        return jsonify({
+            "success": True,
+            "message": "Wetterdaten und Thermik neu berechnet.",
+            "spots_count": len(spot_names),
+            "last_updated": new_ts,
+        })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -221,6 +443,46 @@ def api_status():
 
 
 # ============================================================================
+# STATIONS API (Bias-Korrektur)
+# ============================================================================
+
+@app.route("/api/stations/status")
+def api_stations_status():
+    """Übersicht: Stationen, Paare, Bias pro Spot."""
+    if not engine.station_manager:
+        return jsonify({"error": "StationManager nicht initialisiert"}), 503
+    try:
+        status = engine.station_manager.get_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/stations/discover", methods=["POST"])
+def api_stations_discover():
+    """Stationen neu suchen (manuell)."""
+    if not engine.station_manager:
+        return jsonify({"error": "StationManager nicht initialisiert"}), 503
+    try:
+        count = engine.station_manager.discover_stations()
+        return jsonify({"success": True, "mappings_count": count})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/stations/collect", methods=["POST"])
+def api_stations_collect():
+    """Beobachtungen holen (manuell)."""
+    if not engine.station_manager:
+        return jsonify({"error": "StationManager nicht initialisiert"}), 503
+    try:
+        count = engine.station_manager.collect_observations()
+        return jsonify({"success": True, "observations_count": count})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ============================================================================
 # SPOTS API
 # ============================================================================
 
@@ -235,6 +497,59 @@ def api_regionen():
     return jsonify(get_all_regions_geojson())
 
 
+def _group_chart_by_day(chart_data):
+    """Gruppiert chart_data (wind/precipitation/thermik/cloudbase) nach Tagen (heute+zukunft)."""
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    dates = set()
+    for entry in chart_data.get("wind", []):
+        try:
+            date_str = datetime.fromisoformat(entry["time"]).strftime("%Y-%m-%d")
+            if date_str >= today_str:
+                dates.add(date_str)
+        except Exception:
+            pass
+    max_date_str = (now.date() + timedelta(days=config.FORECAST_DAYS - 1)).strftime("%Y-%m-%d")
+    sorted_dates = [d for d in sorted(dates) if d <= max_date_str]
+    by_day = {d: {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []} for d in sorted_dates}
+    for key in ("wind", "precipitation", "thermik", "cloudbase"):
+        for entry in chart_data.get(key, []):
+            try:
+                date_str = datetime.fromisoformat(entry["time"]).strftime("%Y-%m-%d")
+                if date_str in by_day:
+                    by_day[date_str][key].append(entry)
+            except Exception:
+                pass
+    return sorted_dates, by_day
+
+
+def _group_profiles_by_day(alt_data):
+    """Gruppiert Höhenwind-Profile nach Tagen (heute+zukunft)."""
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    by_day = {}
+    for profile in alt_data.get("profiles", []):
+        try:
+            dt = datetime.fromisoformat(profile["time"])
+            date_str = dt.strftime("%Y-%m-%d")
+            if date_str >= today_str:
+                if date_str not in by_day:
+                    by_day[date_str] = []
+                by_day[date_str].append({"hour": dt.hour, "profiles": profile["levels"]})
+        except Exception:
+            pass
+    max_date_str = (now.date() + timedelta(days=config.FORECAST_DAYS - 1)).strftime("%Y-%m-%d")
+    sorted_dates = [d for d in sorted(by_day.keys()) if d <= max_date_str]
+    by_day = {d: by_day[d] for d in sorted_dates if d in by_day}
+    return sorted_dates, by_day
+
+
+def _stale_meta():
+    """Returns (last_updated, is_stale) from weather cache metadata."""
+    cache_meta = engine.weather_data.get("_meta", {}) if engine.weather_data else {}
+    return cache_meta.get("last_updated"), None  # is_stale set by caller from len(dates)
+
+
 @app.route("/api/region-weather/<region_id>")
 def api_region_weather(region_id):
     """Wetterdaten fuer eine Region, formatiert fuer Meteogramm."""
@@ -247,34 +562,8 @@ def api_region_weather(region_id):
     elevation_ref = region_data.get("elevation_ref", 1200)
 
     chart_data = format_data_for_charts(hourly_data, pressure_level_data, elevation_ref=elevation_ref)
-
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-    dates = set()
-    for entry in chart_data.get("wind", []):
-        try:
-            dt = datetime.fromisoformat(entry["time"])
-            date_str = dt.strftime("%Y-%m-%d")
-            if date_str >= today_str:
-                dates.add(date_str)
-        except Exception:
-            pass
-
-    max_date_str = (now.date() + timedelta(days=config.FORECAST_DAYS - 1)).strftime("%Y-%m-%d")
-    sorted_dates = [d for d in sorted(dates) if d <= max_date_str]
-
-    by_day = {}
-    for date_str in sorted_dates:
-        by_day[date_str] = {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}
-    for key in ["wind", "precipitation", "thermik", "cloudbase"]:
-        for entry in chart_data.get(key, []):
-            try:
-                dt = datetime.fromisoformat(entry["time"])
-                date_str = dt.strftime("%Y-%m-%d")
-                if date_str in by_day:
-                    by_day[date_str][key].append(entry)
-            except Exception:
-                pass
+    sorted_dates, by_day = _group_chart_by_day(chart_data)
+    last_updated, _ = _stale_meta()
 
     return jsonify({
         "region_id": region_id,
@@ -282,6 +571,9 @@ def api_region_weather(region_id):
         "elevation_ref": elevation_ref,
         "dates": sorted_dates,
         "data": by_day,
+        "stale": len(sorted_dates) < config.FORECAST_DAYS,
+        "last_updated": last_updated,
+        "expected_days": config.FORECAST_DAYS,
     })
 
 
@@ -345,31 +637,16 @@ def api_region_altitude_wind(region_id):
         surface_anchor_by_time=surface_anchor_by_time,
     )
 
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-    by_day = {}
-    for profile in alt_data.get("profiles", []):
-        try:
-            dt = datetime.fromisoformat(profile["time"])
-            date_str = dt.strftime("%Y-%m-%d")
-            if date_str >= today_str:
-                if date_str not in by_day:
-                    by_day[date_str] = []
-                by_day[date_str].append({
-                    "hour": dt.hour,
-                    "profiles": profile["levels"],
-                })
-        except Exception:
-            pass
-
-    max_date_str = (now.date() + timedelta(days=config.FORECAST_DAYS - 1)).strftime("%Y-%m-%d")
-    sorted_dates = [d for d in sorted(by_day.keys()) if d <= max_date_str]
-    by_day = {d: by_day[d] for d in sorted_dates if d in by_day}
+    sorted_dates, by_day = _group_profiles_by_day(alt_data)
+    last_updated, _ = _stale_meta()
 
     return jsonify({
         "region_id": region_id,
         "dates": sorted_dates,
         "data": by_day,
+        "stale": len(sorted_dates) < config.FORECAST_DAYS,
+        "last_updated": last_updated,
+        "expected_days": config.FORECAST_DAYS,
     })
 
 
@@ -427,43 +704,19 @@ def api_weather(spot_name):
         slope_angle=spot_info.get("slope_angle") if spot_info else None,
     )
 
-    # Gruppiere nach Tagen (nur Heute + Zukunft)
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-    
-    dates = set()
-    for entry in chart_data.get("wind", []):
-        try:
-            dt = datetime.fromisoformat(entry["time"])
-            date_str = dt.strftime("%Y-%m-%d")
-            if date_str >= today_str:
-                dates.add(date_str)
-        except Exception:
-            pass
-
-    max_date_str = (now.date() + timedelta(days=config.FORECAST_DAYS - 1)).strftime("%Y-%m-%d")
-    sorted_dates = [d for d in sorted(dates) if d <= max_date_str]
-
-    # Gruppiere chart_data nach Tagen
-    by_day = {}
-    for date_str in sorted_dates:
-        by_day[date_str] = {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}
-
-    for key in ["wind", "precipitation", "thermik", "cloudbase"]:
-        for entry in chart_data.get(key, []):
-            try:
-                dt = datetime.fromisoformat(entry["time"])
-                date_str = dt.strftime("%Y-%m-%d")
-                if date_str in by_day:
-                    by_day[date_str][key].append(entry)
-            except Exception:
-                pass
+    sorted_dates, by_day = _group_chart_by_day(chart_data)
+    last_updated, _ = _stale_meta()
 
     return jsonify({
         "spot_name": spot_name,
         "elevation_m": elevation_m,
         "dates": sorted_dates,
         "data": by_day,
+        "stale": len(sorted_dates) < config.FORECAST_DAYS,
+        "last_updated": last_updated,
+        "expected_days": config.FORECAST_DAYS,
+        "windrichtung": (spot_info.get("windrichtung") if spot_info else None),
+        "ideal_wind_max": (spot_info.get("ideal_wind_max") if spot_info else None),
     })
 
 
@@ -484,35 +737,34 @@ def api_altitude_wind(spot_name):
     if region:
         region_id = region["id"]
 
-    alt_data = format_altitude_wind_for_charts(pressure_level_data, hourly_data, elevation_m, region_id)
+    # Surface anchor: Bodenböen als Ankerpunkt ins Höhenprofil einspeisen
+    # (gleiche Logik wie Region-Route — ohne dies fehlt OI-Korrektur + Running Max)
+    surface_anchor_by_time = {}
+    for timestamp, hour_data in hourly_data.items():
+        gust = hour_data.get("wind_gusts_10m")
+        ws = hour_data.get("wind_speed_10m")
+        if gust is not None and ws is not None:
+            surface_anchor_by_time[timestamp] = {
+                "elevation_m": elevation_m,
+                "gust_kmh": float(gust),
+                "wind_speed_kmh": float(ws),
+            }
 
-    # Gruppiere nach Tagen (nur Heute + Zukunft)
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
+    alt_data = format_altitude_wind_for_charts(
+        pressure_level_data, hourly_data, elevation_m, region_id,
+        surface_anchor_by_time=surface_anchor_by_time,
+    )
 
-    by_day = {}
-    for profile in alt_data.get("profiles", []):
-        try:
-            dt = datetime.fromisoformat(profile["time"])
-            date_str = dt.strftime("%Y-%m-%d")
-            if date_str >= today_str:
-                if date_str not in by_day:
-                    by_day[date_str] = []
-                by_day[date_str].append({
-                    "hour": dt.hour,
-                    "profiles": profile["levels"],
-                })
-        except Exception:
-            pass
+    sorted_dates, by_day = _group_profiles_by_day(alt_data)
+    last_updated, _ = _stale_meta()
 
-    max_date_str = (now.date() + timedelta(days=config.FORECAST_DAYS - 1)).strftime("%Y-%m-%d")
-    sorted_dates = [d for d in sorted(by_day.keys()) if d <= max_date_str]
-    # Nur Daten für die im Zeitraum liegenden Tage
-    by_day = {d: by_day[d] for d in sorted_dates if d in by_day}
     return jsonify({
         "spot_name": spot_name,
         "dates": sorted_dates,
         "data": by_day,
+        "stale": len(sorted_dates) < config.FORECAST_DAYS,
+        "last_updated": last_updated,
+        "expected_days": config.FORECAST_DAYS,
     })
 
 
@@ -805,9 +1057,9 @@ def _oi_gust_correction(grid_alts, grid_gusts, grid_ws, anchors, L_up, L_down):
     Der beobachtete Böen-Exzess (gust - wind) an Ankerpunkten wird per
     asymmetrischem Gauss-Kernel auf das Höhenprofil verteilt:
     - Aufwärts: terrain-abhängiger Kernel (L_up aus TERRAIN_OI_L_UP)
-      Flach (mittelland): 3×H_g ≈ 1050m (Oberflächenrauigkeit)
-      Bergig (voralpen+): 5×H_g ≈ 2100-2500m (orographische Schwerewellen,
-      Dörnbrack & Nappo 1997, Sharman et al. 2012)
+      Flach (mittelland): 1.0×H_g ≈ 350m (Oberflächenrauigkeit)
+      Bergig (voralpen+): 1.3-1.5×H_g ≈ 550-750m (Turbulenz-Zerfallsskala,
+      Letson et al. 2019)
     - Abwärts: enger Kernel (L_down = H_g, Turbulenz zerfällt schnell)
 
     Args:
@@ -892,7 +1144,7 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
                         "temperature": temperature if temperature is not None else 0,
                     })
 
-            # Compute altitude gusts
+            # Compute altitude gusts (turbulence risk T(z))
             if hourly_data and elevation_m is not None and profile["levels"]:
                 surface = hourly_data.get(timestamp, {})
                 anchors = gust_anchors_by_time.get(timestamp, []) if gust_anchors_by_time else []
@@ -917,13 +1169,16 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
                         region_id=region_id,
                     )
 
-            # Surface anchor: re-grid onto 0-4000m and apply OI gust correction.
+            # Surface anchor: re-grid onto 0-4000m and apply kernel-based gust correction.
             #
-            # Method (simplified Optimal Interpolation):
+            # Method (kernel-weighted correction):
             # 1. Interpolate pressure-level model data onto regular grid
             # 2. Collect all anchor points (surface + spot anchors)
             # 3. Compute residuals: observed_gust - model_gust at each anchor
-            # 4. Distribute corrections smoothly via Gaussian kernel (L = max(H_g, BLH))
+            # 4. Distribute corrections smoothly via Gaussian kernel.
+            #    L_up = get_effective_L_up(...) — terrain-gewichteter BLH-Boost
+            #    statt blindem max(L_up_terrain, BLH). Im Mittelland kein Boost
+            #    (Reibungs-Skala), im Hochalpinen voller Boost (Schwerewellen).
             # 5. Result: model is pulled toward observations, no V-shape artifacts
             anchor = surface_anchor_by_time.get(timestamp) if surface_anchor_by_time else None
             if anchor and profile["levels"]:
@@ -987,39 +1242,52 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
                         "wind_speed_kmh": sa_ws_free,
                     })
 
-                # OI correlation lengths (terrain-abhängig):
-                # L_up: orographische Schwerewellen-Skala (voralpen/alpen: 5×H_g)
-                #   oder BLH wenn grösser (konvektive Durchmischung Nachmittag)
+                # Kernel correlation lengths (terrain-abhängig):
+                # L_up: Turbulenz-Zerfallsskala (voralpen/alpen: 1.3-1.4×H_g),
+                #   im Bergland zusätzlich BLH-gewichtet (siehe get_effective_L_up).
+                #   Im flachen Mittelland fliesst BLH NICHT ein, weil Reibungs-
+                #   Korrelationslänge und konvektive Mischschicht zwei verschiedene
+                #   Phänomene sind.
                 # L_down = H_g: Turbulenz-Zerfall abwärts
-                L_up_terrain, L_down = get_oi_scale_lengths(elev_anchor, region_id)
+                _, L_down = get_oi_scale_lengths(elev_anchor, region_id)
                 sfc = hourly_data.get(timestamp, {}) if hourly_data else {}
                 blh = sfc.get("boundary_layer_height") or sfc.get("boundary_layer_height_gfs") or 0
-                L_up = max(L_up_terrain, blh)
+                L_up = get_effective_L_up(elev_anchor, region_id, blh)
                 grid_gusts_oi = _oi_gust_correction(
                     grid_alts, grid_gusts_bg, grid_ws, oi_anchors, L_up, L_down,
                 )
 
-                # Assemble grid levels
+                # Assemble grid levels with 2-Produkt fields
                 grid_levels = []
                 for i, grid_alt in enumerate(grid_alts):
                     gust_final = max(grid_gusts_oi[i], grid_ws[i])
+                    excess = round(gust_final - grid_ws[i], 1)
                     grid_levels.append({
                         "altitude": grid_alt,
                         "wind_speed": round(grid_ws[i], 1),
                         "wind_gusts": round(gust_final, 1),
+                        "turbulence_excess": max(0, excess),
                         "wind_direction": round(grid_dir[i]),
                         "temperature": round(grid_temp[i], 1),
                     })
 
-                # Monoton steigende Böen: Jede Höhe hat mindestens so
-                # starke Böen wie die darunter (mehr Exposition, weniger
-                # Abschirmung). Physik: Stull 1988, mixed-layer Turbulenz.
+                # Running Maximum nur auf T(z) = wind_gusts (Safety-Layer).
+                # W(z) = wind_speed bleibt physikalisch ehrlich.
                 running_max = 0.0
                 for lv in grid_levels:
                     running_max = max(running_max, lv["wind_gusts"])
                     lv["wind_gusts"] = running_max
+                    lv["turbulence_excess"] = round(lv["wind_gusts"] - lv["wind_speed"], 1)
 
                 profile["levels"] = grid_levels
+
+            # Ensure turbulence fields exist on all levels + add turbulence_risk alias
+            for lv in profile["levels"]:
+                if "turbulence_excess" not in lv:
+                    lv["turbulence_excess"] = round(
+                        lv.get("wind_gusts", lv.get("wind_speed", 0)) - lv.get("wind_speed", 0), 1
+                    )
+                lv["turbulence_risk"] = lv.get("wind_gusts", lv.get("wind_speed", 0))
 
             if len(profile["levels"]) >= 2:
                 chart_data["profiles"].append(profile)

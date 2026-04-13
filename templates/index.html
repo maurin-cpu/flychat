@@ -2,7 +2,7 @@
 {% block title %}Flychat - Cockpit{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
 <style>
     .navbar {
         position: fixed;
@@ -270,6 +270,13 @@
         color: #f87171 !important;
     }
     .step-error .step-icon { color: #ef4444; }
+    .step-unknown {
+        color: #fbbf24 !important;
+    }
+    .step-unknown .step-icon {
+        color: #f59e0b;
+        font-weight: bold;
+    }
 
     .progress-stats {
         display: grid;
@@ -570,22 +577,27 @@
                     </div>
                     <button class="meteogram-close" id="meteogramClose">&times;</button>
                 </div>
-                <div class="meteogram-tabs" id="meteogramTabs"></div>
-                <div class="meteogram-chart" id="meteogramChart"></div>
-            </div>
-        </div>
-
-        <!-- Foehn Diagram Overlay -->
-        <div class="meteogram-overlay" id="foehnOverlay">
-            <div class="meteogram-panel">
-                <div class="meteogram-header">
-                    <div>
-                        <h2>Föhndiagramm</h2>
-                        <span class="spot-info">Druckdifferenz Lugano – Zürich | 5-Tage-Prognose</span>
-                    </div>
-                    <button class="meteogram-close" id="foehnClose">&times;</button>
+                <!-- View tabs: Meteogramm / Windverlauf / Text (Analyse is always visible in aside) -->
+                <div class="meteogram-view-tabs" id="meteogramViewTabs">
+                    <button class="view-tab active" data-view="meteogram">Meteogramm</button>
+                    <button class="view-tab" data-view="windtimeline">Windverlauf</button>
+                    <button class="view-tab" data-view="text">Text</button>
                 </div>
-                <div class="meteogram-chart" id="foehnChart"></div>
+                <div class="meteogram-tabs" id="meteogramTabs" style="display:none;"></div>
+                <div class="meteogram-body">
+                    <div class="meteogram-main">
+                        <div class="meteogram-chart" id="meteogramChart"></div>
+                        <div class="meteogram-chart" id="windTimelineChart" style="display:none;"></div>
+                        <div class="meteogram-chart" id="textViewChart" style="display:none;"></div>
+                    </div>
+                    <aside class="meteogram-aside" id="meteogramAside">
+                        <div class="meteogram-aside-header">
+                            <span class="meteogram-aside-title">Analyse</span>
+                            <button class="meteogram-aside-toggle" id="meteogramAsideToggle" type="button" aria-label="Analyse ein-/ausblenden">&#x25BE;</button>
+                        </div>
+                        <div class="meteogram-aside-body" id="analyseViewChart"></div>
+                    </aside>
+                </div>
             </div>
         </div>
 
@@ -600,13 +612,15 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="{{ url_for('static', filename='js/meteogram.js') }}"></script>
-<script src="{{ url_for('static', filename='js/foehn_diagram.js') }}"></script>
-<script src="{{ url_for('static', filename='js/map.js') }}"></script>
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script defer src="https://d3js.org/d3.v7.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script defer src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/wind-timeline.js') }}?v={{ static_v('js/wind-timeline.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/foehn_diagram.js') }}?v={{ static_v('js/foehn_diagram.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/map.js') }}?v={{ static_v('js/map.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/chat.js') }}?v={{ static_v('js/chat.js') }}"></script>
 <script>
     (function () {
         var STORAGE_KEY = 'flychat_sidebar_width';
@@ -667,7 +681,7 @@
                 sidebar.style.height = newWidth + 'px';
             }
 
-            if (window.map) window.map.invalidateSize();
+            if (window.flychatMap) window.flychatMap.invalidateSize();
         });
 
         document.addEventListener('mouseup', function () {
@@ -680,7 +694,7 @@
                     localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
                 } catch (err) { /* ignore */ }
             }
-            if (window.map) window.map.invalidateSize();
+            if (window.flychatMap) window.flychatMap.invalidateSize();
         });
 
         // Touch drag (tablets)
@@ -705,7 +719,7 @@
                 newWidth = touch.clientY - 60;
                 sidebar.style.height = newWidth + 'px';
             }
-            if (window.map) window.map.invalidateSize();
+            if (window.flychatMap) window.flychatMap.invalidateSize();
         }, { passive: true });
 
         document.addEventListener('touchend', function () {
@@ -717,7 +731,7 @@
                     localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
                 } catch (err) { /* ignore */ }
             }
-            if (window.map) window.map.invalidateSize();
+            if (window.flychatMap) window.flychatMap.invalidateSize();
         });
 
         // Mobile toggle (Chat / Karte)
@@ -737,14 +751,14 @@
                 btn.classList.add('active');
                 layout.classList.remove('show-chat', 'show-map');
                 layout.classList.add('show-' + target);
-                if (target === 'map' && window.map) {
-                    setTimeout(function () { window.map.invalidateSize(); }, 50);
+                if (target === 'map' && window.flychatMap) {
+                    setTimeout(function () { window.flychatMap.invalidateSize(); }, 50);
                 }
             });
         }
 
         window.addEventListener('load', function () {
-            if (window.map) window.map.invalidateSize();
+            if (window.flychatMap) window.flychatMap.invalidateSize();
         });
     })();
 </script>
@@ -789,6 +803,7 @@ function normalizeFlyTier(ft) {
 var dayTabsEl = document.getElementById('mapDayTabs');
 var dates = enumerateForecastDates();
 var currentDate = dates[0];
+window.currentDate = currentDate;
 var analysisData = null;
 
 // Build day tabs
@@ -798,14 +813,18 @@ function buildDayTabs() {
     dates.forEach(function(dateStr) {
         var btn = document.createElement('button');
         btn.className = 'floating-day-tab' + (dateStr === currentDate ? ' active' : '');
+        btn.dataset.date = dateStr;
         btn.textContent = formatDayTabLabel(dateStr);
         btn.addEventListener('click', function() {
             currentDate = dateStr;
+            window.currentDate = dateStr;
             dayTabsEl.querySelectorAll('.floating-day-tab').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
             if (window.updateSpotColors && analysisData) {
                 window.updateSpotColors(analysisData, currentDate);
             }
+            // Notify meteogram overlay of day change
+            window.dispatchEvent(new CustomEvent('flychat-day-change', { detail: { date: dateStr } }));
         });
         dayTabsEl.appendChild(btn);
     });
@@ -839,6 +858,7 @@ db.subscribeQuery({ spot_analyses: {} }, function(resp) {
         });
 
         analysisData = nested;
+        window.analysisData = nested;
 
         // Build day tabs if not built yet
         if (dayTabsEl && dayTabsEl.children.length === 0) {

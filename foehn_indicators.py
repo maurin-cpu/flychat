@@ -67,7 +67,7 @@ def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
     lats = [FOEHN_STATIONS["nord"]["lat"], FOEHN_STATIONS["sued"]["lat"]]
     lons = [FOEHN_STATIONS["nord"]["lon"], FOEHN_STATIONS["sued"]["lon"]]
 
-    params = {
+    params = config.with_api_key({
         "latitude": ",".join(str(x) for x in lats),
         "longitude": ",".join(str(x) for x in lons),
         "hourly": (
@@ -76,7 +76,7 @@ def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
         ),
         "forecast_days": forecast_days,
         "timezone": config.TIMEZONE,
-    }
+    })
 
     try:
         resp = requests.get(config.API_URL, params=params, timeout=config.API_TIMEOUT)
