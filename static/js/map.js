@@ -56,6 +56,29 @@
         window.flychatMap = map;
 
         loadSpots();
+
+        // Map Legend (collapsible, bottom-left)
+        var legend = L.control({ position: 'bottomleft' });
+        legend.onAdd = function () {
+            var div = L.DomUtil.create('div', 'map-legend collapsed');
+            div.innerHTML =
+                '<button class="map-legend-toggle" aria-label="Legende ein-/ausblenden">Legende</button>' +
+                '<div class="map-legend-body">' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-excellent)"></span> Sicher &amp; Gut</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-fly-violet)"></span> Top / XC</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-marginal)"></span> Vorsicht</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-critical)"></span> Nicht sicher</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-unknown)"></span> Keine Daten</div>' +
+                '</div>';
+            var toggle = div.querySelector('.map-legend-toggle');
+            toggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                div.classList.toggle('collapsed');
+            });
+            L.DomEvent.disableClickPropagation(div);
+            return div;
+        };
+        legend.addTo(map);
     }
 
     // ===== DIRECTION PARSER =====
@@ -267,11 +290,22 @@
                         layer.currentQuality = 'green';
 
                         markersByName[p.name] = layer;
-                        layer.bindTooltip(buildTooltipHtml(p, null), {
-                            className: 'map-tooltip',
-                            direction: 'top',
-                            offset: [0, -10],
-                        });
+                        // On mobile: use popup (tap-friendly); on desktop: tooltip (hover)
+                        var isMobile = window.innerWidth <= 600;
+                        if (isMobile) {
+                            layer.bindPopup(buildTooltipHtml(p, null), {
+                                className: 'map-tooltip',
+                                offset: [0, -10],
+                                closeButton: false,
+                                maxWidth: 260,
+                            });
+                        } else {
+                            layer.bindTooltip(buildTooltipHtml(p, null), {
+                                className: 'map-tooltip',
+                                direction: 'top',
+                                offset: [0, -10],
+                            });
+                        }
                         layer.on('click', function () {
                             openMeteogram(p.name, p);
                         });
@@ -434,6 +468,8 @@
         tabsContainer.innerHTML = '';
         overlay.style.display = 'flex';
         overlay.classList.add('visible');
+        if (window._overlayScrollLock) window._overlayScrollLock();
+        closeBtn.focus();
 
         // Reset to meteogram view
         currentView = 'meteogram';
@@ -498,7 +534,12 @@
                 renderCurrentDay();
             })
             .catch(function (err) {
-                chartContainer.innerHTML = '<div class="error-state">Fehler: ' + err.message + '</div>';
+                chartContainer.innerHTML = '<div class="error-state">Fehler: ' + err.message +
+                    '<br><button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="this.parentNode.innerHTML=\'Lade...\'">' +
+                    'Erneut versuchen</button></div>';
+                chartContainer.querySelector('.btn').addEventListener('click', function () {
+                    loadWeatherForSpot(currentSpotName);
+                });
             });
     }
 
@@ -552,6 +593,7 @@
         tooltipEl.classList.remove('visible');
         currentWeather = null;
         currentAltWind = null;
+        if (window._overlayScrollUnlock) window._overlayScrollUnlock();
     }
 
     /** Sync the floating map-level day tabs + marker colours after an

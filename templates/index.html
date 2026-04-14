@@ -16,9 +16,17 @@
     body {
         padding-top: 60px;
         overflow: hidden;
-        height: 100vh;
+        height: 100dvh;
         display: flex;
         flex-direction: column;
+    }
+
+    #main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
     }
 
     .unified-layout {
@@ -30,7 +38,7 @@
     .chat-sidebar {
         /* Breite: großzügig für Tabellen/Markdown; JS setzt ggf. gespeicherte oder ideale Breite */
         width: min(600px, max(480px, 38vw));
-        min-width: 340px;
+        min-width: 300px;
         max-width: min(720px, 92vw);
         flex-shrink: 0;
         border-right: 1px solid var(--color-border);
@@ -63,7 +71,7 @@
     }
 
     .resizer {
-        width: 5px;
+        width: 12px;
         background: transparent;
         cursor: col-resize;
         transition: background var(--transition-fast);
@@ -71,24 +79,28 @@
         position: relative;
     }
 
+    /* 3-dot handle */
     .resizer::after {
-        content: '';
+        content: '\u2022\00a0\u2022\00a0\u2022';
         position: absolute;
         top: 50%;
         left: 50%;
-        transform: translate(-50%, -50%);
-        width: 3px;
-        height: 40px;
-        border-radius: 4px;
-        background: rgba(0, 0, 0, 0.1);
+        transform: translate(-50%, -50%) rotate(90deg);
+        font-size: 10px;
+        letter-spacing: 2px;
+        color: rgba(0, 0, 0, 0.15);
         transition: all var(--transition-fast);
+        white-space: nowrap;
     }
 
     .resizer:hover::after,
     .resizer.dragging::after {
-        background: var(--color-primary);
-        height: 60px;
-        box-shadow: 0 0 12px var(--color-primary-glow);
+        color: var(--color-primary);
+    }
+
+    .resizer:hover,
+    .resizer.dragging {
+        background: rgba(79, 70, 229, 0.04);
     }
 
     .chat-header {
@@ -108,70 +120,7 @@
         letter-spacing: 0.05em;
     }
 
-    .reset-btn {
-        background: #fee2e2;
-        border: 1px solid #fca5a5;
-        color: #dc2626;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        cursor: pointer;
-        transition: all var(--transition-fast);
-        display: flex;
-        align-items: center;
-        gap: 5px;
-    }
-
-    .reset-btn:hover {
-        background: #fecaca;
-        border-color: #f87171;
-    }
-
-    .analyse-btn {
-        background: #dbeafe;
-        border: 1px solid #93c5fd;
-        color: #2563eb;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        cursor: pointer;
-        transition: all var(--transition-fast);
-        display: flex;
-        align-items: center;
-        gap: 5px;
-    }
-
-    .analyse-btn:hover {
-        background: #bfdbfe;
-        border-color: #60a5fa;
-    }
-
-    .analyse-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .analyse-btn .spinner {
-        display: none;
-        width: 12px;
-        height: 12px;
-        border: 2px solid #bfdbfe;
-        border-top-color: #2563eb;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-
-    .analyse-btn.loading .spinner {
-        display: inline-block;
-    }
-
-    .analyse-btn.loading .btn-text {
-        display: none;
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
+    /* Header buttons use global .btn system from style.css */
 
     /* ── Progress Card ────────────────────────────── */
     .progress-card {
@@ -224,11 +173,11 @@
         100% { background-position: -200% 0; }
     }
     .progress-bar-fill.bar-done {
-        background: linear-gradient(90deg, #22c55e, #4ade80);
+        background: linear-gradient(90deg, var(--color-safety-excellent), #4ade80);
         width: 100% !important;
     }
     .progress-bar-fill.bar-error {
-        background: linear-gradient(90deg, #ef4444, #f87171);
+        background: linear-gradient(90deg, var(--color-safety-critical), #f87171);
         width: 100% !important;
     }
     .progress-steps {
@@ -265,16 +214,16 @@
     .step-done {
         color: var(--color-text-light) !important;
     }
-    .step-done .step-icon { color: #22c55e; }
+    .step-done .step-icon { color: var(--color-safety-excellent); }
     .step-error {
         color: #f87171 !important;
     }
-    .step-error .step-icon { color: #ef4444; }
+    .step-error .step-icon { color: var(--color-safety-critical); }
     .step-unknown {
         color: #fbbf24 !important;
     }
     .step-unknown .step-icon {
-        color: #f59e0b;
+        color: var(--color-safety-marginal);
         font-weight: bold;
     }
 
@@ -338,10 +287,10 @@
         font-size: 11px;
         font-weight: 500;
     }
-    .day-chip.chip-safe       { background: rgba(34,197,94,0.15);  color: #4ade80; }
-    .day-chip.chip-conditional { background: rgba(251,146,60,0.15); color: #fb923c; }
-    .day-chip.chip-not-safe   { background: rgba(239,68,68,0.15);  color: #f87171; }
-    .day-chip.chip-error      { background: rgba(148,163,184,0.1); color: #94a3b8; }
+    .day-chip.chip-safe       { background: rgba(34,197,94,0.15);  color: var(--color-safety-excellent); }
+    .day-chip.chip-conditional { background: rgba(245,158,11,0.15); color: var(--color-safety-marginal); }
+    .day-chip.chip-not-safe   { background: rgba(239,68,68,0.15);  color: var(--color-safety-critical); }
+    .day-chip.chip-error      { background: rgba(148,163,184,0.1); color: var(--color-safety-unknown); }
 
     .chat-header-actions {
         display: flex;
@@ -349,7 +298,7 @@
         align-items: center;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1023px) {
         .unified-layout {
             flex-direction: column;
         }
@@ -379,54 +328,15 @@
         }
     }
 
-    /* Mobile Toggle Bar */
-    .mobile-toggle {
-        display: none;
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        z-index: 2001;
-        background: rgba(255, 255, 255, 0.92);
-        border-top: 1px solid var(--color-border);
-        backdrop-filter: blur(var(--glass-blur));
-        -webkit-backdrop-filter: blur(var(--glass-blur));
-        padding: 8px 16px;
-        gap: 8px;
-    }
-
-    .mobile-toggle-btn {
-        flex: 1;
-        padding: 10px;
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-sm);
-        background: transparent;
-        color: var(--color-text-secondary);
-        font-size: 14px;
-        font-weight: 600;
-        font-family: inherit;
-        cursor: pointer;
-        transition: all var(--transition-fast);
-    }
-
-    .mobile-toggle-btn.active {
-        background: var(--color-primary-light);
-        color: var(--color-primary);
-        border-color: rgba(79, 70, 229, 0.3);
-    }
-
-    @media (max-width: 600px) {
-        .mobile-toggle {
-            display: flex;
-        }
-
+    @media (max-width: 639px) {
         body {
-            padding-top: 52px;
-            padding-bottom: 54px;
+            padding-top: 48px;
+            padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
         }
 
         .navbar {
-            height: 52px;
+            height: 48px;
+            padding-top: env(safe-area-inset-top, 0px);
         }
 
         .unified-layout {
@@ -460,55 +370,7 @@
         }
     }
 
-    /* ── Floating Controls for Map ─────────── */
-    .floating-control {
-        position: absolute;
-        z-index: 1000;
-        background: rgba(255, 255, 255, 0.88);
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        backdrop-filter: blur(12px) saturate(1.2);
-        -webkit-backdrop-filter: blur(12px) saturate(1.2);
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    }
-
-    /* ── Day Tabs ────────────────────────────────────────── */
-    .floating-day-tabs {
-        top: 16px;
-        left: 16px;
-        display: flex;
-        gap: 2px;
-        padding: 3px;
-        border-radius: 10px;
-        max-width: calc(100vw - 200px);
-        overflow-x: auto;
-    }
-
-    .floating-day-tab {
-        padding: 6px 14px;
-        border-radius: 7px;
-        border: none;
-        background: transparent;
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        font-family: inherit;
-        flex-shrink: 0;
-        white-space: nowrap;
-        letter-spacing: 0.01em;
-    }
-
-    .floating-day-tab:hover {
-        color: #1e293b;
-        background: rgba(0, 0, 0, 0.05);
-    }
-
-    .floating-day-tab.active {
-        background: #4f46e5;
-        color: #fff;
-        font-weight: 600;
-    }
+    /* Floating controls: use shared .floating-control / .floating-day-tabs from style.css */
 </style>
 {% endblock %}
 
@@ -519,24 +381,31 @@
         <div class="chat-container">
             <div class="chat-header">
                 <span class="chat-title">Chat-Berater</span>
+                <span class="data-freshness" id="dataFreshness" title="Alter der Wetterdaten"></span>
                 <div class="chat-header-actions">
-                    <button id="refreshWeatherBtn" class="analyse-btn">
+                    <button id="refreshWeatherBtn" class="btn btn-secondary btn-sm" aria-label="Wetterdaten laden">
                         <span class="spinner"></span>
                         <span class="btn-text">Wetter laden</span>
                     </button>
-                    <button id="runAnalysesBtn" class="analyse-btn">
+                    <button id="runAnalysesBtn" class="btn btn-secondary btn-sm" aria-label="LLM Analyse starten">
                         <span class="spinner"></span>
-                        <span class="btn-text">LLM Analyse</span>
+                        <span class="btn-text">Voranalyse</span>
                     </button>
-                    <button id="resetChatBtn" class="reset-btn">
+                    <button id="resetChatBtn" class="btn btn-danger btn-sm" aria-label="Neuen Chat starten">
                         <span>↺</span> Neuer Chat
                     </button>
                 </div>
             </div>
-            <div class="chat-messages" id="chatMessages" style="overflow-x: hidden;">
+            <div class="chat-messages" id="chatMessages" style="overflow-x: hidden;" aria-live="polite" aria-relevant="additions">
                 <div class="chat-message bot">
                     Hallo! Ich bin dein Flychat-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
                 </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator" aria-hidden="true">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
             </div>
 
             <div class="quick-actions" id="quickActions">
@@ -545,15 +414,13 @@
                 <button class="quick-btn" data-msg="Gibt es Föhn-Gefahr?">Föhn?</button>
             </div>
 
-            <div class="typing-indicator" id="typingIndicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-
             <div class="chat-input-area">
-                <input type="text" class="chat-input" id="chatInput" placeholder="Frag mich..." autocomplete="off">
-                <button class="chat-send-btn" id="chatSendBtn">Senden</button>
+                <label for="chatInput" class="sr-only">Nachricht eingeben</label>
+                <textarea rows="1" class="chat-input" id="chatInput" placeholder="Frag mich..." autocomplete="off"></textarea>
+                <button class="chat-send-btn" id="chatSendBtn" aria-label="Nachricht senden">
+                    <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    <span class="send-label">Senden</span>
+                </button>
             </div>
         </div>
     </aside>
@@ -568,20 +435,21 @@
         <div class="floating-control floating-day-tabs" id="mapDayTabs" style="display: none;"></div>
 
         <!-- Meteogram Overlay -->
-        <div class="meteogram-overlay" id="meteogramOverlay">
+        <div class="meteogram-overlay" id="meteogramOverlay" role="dialog" aria-modal="true" aria-label="Meteogramm">
             <div class="meteogram-panel">
+                <div class="overlay-swipe-handle"></div>
                 <div class="meteogram-header">
                     <div>
                         <h2 id="meteogramTitle">Meteogramm</h2>
                         <span class="spot-info" id="meteogramInfo"></span>
                     </div>
-                    <button class="meteogram-close" id="meteogramClose">&times;</button>
+                    <button class="meteogram-close" id="meteogramClose" aria-label="Schliessen">&times;</button>
                 </div>
                 <!-- View tabs: Meteogramm / Windverlauf / Text (Analyse is always visible in aside) -->
                 <div class="meteogram-view-tabs" id="meteogramViewTabs">
                     <button class="view-tab active" data-view="meteogram">Meteogramm</button>
                     <button class="view-tab" data-view="windtimeline">Windverlauf</button>
-                    <button class="view-tab" data-view="text">Text</button>
+                    <button class="view-tab" data-view="text" style="display:none;">Text</button>
                 </div>
                 <div class="meteogram-tabs" id="meteogramTabs" style="display:none;"></div>
                 <div class="meteogram-body">
@@ -605,10 +473,6 @@
     </main>
 </div>
 
-<div class="mobile-toggle" id="mobileToggle">
-    <button class="mobile-toggle-btn active" data-target="chat">Chat</button>
-    <button class="mobile-toggle-btn" data-target="map">Karte</button>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -628,7 +492,7 @@
         var sidebar = document.getElementById('chatSidebar');
         var layout = document.querySelector('.unified-layout');
         var isDragging = false;
-        var MIN_SIDEBAR_W = 340;
+        var MIN_SIDEBAR_W = 300;
 
         function idealChatWidth() {
             var w = window.innerWidth;
@@ -637,7 +501,7 @@
         }
 
         function applyInitialSidebarWidth() {
-            if (!sidebar || window.innerWidth <= 900) return;
+            if (!sidebar || window.innerWidth < 1024) return;
             var saved = localStorage.getItem(STORAGE_KEY);
             var sw = saved ? parseInt(saved, 10) : NaN;
             var maxW = window.innerWidth * 0.78;
@@ -652,7 +516,7 @@
         applyInitialSidebarWidth();
 
         window.addEventListener('resize', function () {
-            if (!sidebar || window.innerWidth <= 900) return;
+            if (!sidebar || window.innerWidth < 1024) return;
             var w = sidebar.offsetWidth;
             var maxW = window.innerWidth * 0.78;
             if (w > maxW) sidebar.style.width = Math.round(maxW) + 'px';
@@ -671,7 +535,7 @@
             if (!isDragging || !sidebar) return;
 
             var newWidth;
-            if (window.innerWidth > 900) {
+            if (window.innerWidth >= 1024) {
                 newWidth = e.clientX;
                 if (newWidth < MIN_SIDEBAR_W) newWidth = MIN_SIDEBAR_W;
                 if (newWidth > window.innerWidth * 0.78) newWidth = window.innerWidth * 0.78;
@@ -689,7 +553,7 @@
             isDragging = false;
             if (resizer) resizer.classList.remove('dragging');
             document.body.style.cursor = 'default';
-            if (sidebar && window.innerWidth > 900) {
+            if (sidebar && window.innerWidth >= 1024) {
                 try {
                     localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
                 } catch (err) { /* ignore */ }
@@ -710,7 +574,7 @@
             if (!isDragging || !sidebar) return;
             var touch = e.touches[0];
             var newWidth;
-            if (window.innerWidth > 900) {
+            if (window.innerWidth >= 1024) {
                 newWidth = touch.clientX;
                 if (newWidth < MIN_SIDEBAR_W) newWidth = MIN_SIDEBAR_W;
                 if (newWidth > window.innerWidth * 0.78) newWidth = window.innerWidth * 0.78;
@@ -726,7 +590,7 @@
             if (!isDragging) return;
             isDragging = false;
             if (resizer) resizer.classList.remove('dragging');
-            if (sidebar && window.innerWidth > 900) {
+            if (sidebar && window.innerWidth >= 1024) {
                 try {
                     localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
                 } catch (err) { /* ignore */ }
@@ -734,18 +598,20 @@
             if (window.flychatMap) window.flychatMap.invalidateSize();
         });
 
-        // Mobile toggle (Chat / Karte)
-        var mobileToggle = document.getElementById('mobileToggle');
-        if (mobileToggle && layout) {
+        // Mobile toggle (Chat / Karte) via bottom nav
+        var mobileNav = document.getElementById('mobileNav');
+        if (mobileNav && layout) {
             // Default: show chat on phone
-            if (window.innerWidth <= 600) {
+            if (window.innerWidth < 640) {
                 layout.classList.add('show-chat');
             }
-            mobileToggle.addEventListener('click', function (e) {
-                var btn = e.target.closest('.mobile-toggle-btn');
+            mobileNav.addEventListener('click', function (e) {
+                var btn = e.target.closest('.mobile-nav-item[data-target]');
                 if (!btn) return;
                 var target = btn.getAttribute('data-target');
-                mobileToggle.querySelectorAll('.mobile-toggle-btn').forEach(function (b) {
+                if (target !== 'chat' && target !== 'map') return;
+                // Update active state on chat/map buttons only
+                mobileNav.querySelectorAll('.mobile-nav-item[data-target]').forEach(function (b) {
                     b.classList.remove('active');
                 });
                 btn.classList.add('active');
@@ -760,6 +626,27 @@
         window.addEventListener('load', function () {
             if (window.flychatMap) window.flychatMap.invalidateSize();
         });
+
+        // Meteogram overlay: scroll-lock + swipe-dismiss + focus management
+        var meteogramOverlay = document.getElementById('meteogramOverlay');
+        var meteogramClose = document.getElementById('meteogramClose');
+        if (meteogramOverlay && window._setupSwipeDismiss) {
+            window._setupSwipeDismiss(meteogramOverlay, function () {
+                if (meteogramClose) meteogramClose.click();
+            });
+        }
+
+        // iOS virtual keyboard awareness
+        if (window.visualViewport) {
+            var chatInputArea = document.querySelector('.chat-input-area');
+            window.visualViewport.addEventListener('resize', function () {
+                if (!chatInputArea) return;
+                var kbHeight = window.innerHeight - window.visualViewport.height;
+                if (kbHeight > 100) {
+                    chatInputArea.scrollIntoView({ block: 'end', behavior: 'smooth' });
+                }
+            });
+        }
     })();
 </script>
 

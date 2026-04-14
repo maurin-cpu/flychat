@@ -9,4 +9,4 @@
 *.css text eol=auto
 *.js text eol=auto
 *.csv text eol=auto
-
+*.md text eol=auto

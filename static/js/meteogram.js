@@ -952,101 +952,132 @@ window.Meteogram = (function () {
         var crossH = chartG.append('line').attr('class', 'crosshair-h')
             .attr('x1', 0).attr('x2', nCols * CELL_W);
 
-        chartG.append('rect')
+        // Shared tooltip builder for mouse and touch
+        function showTooltipAt(coords, clientX, clientY) {
+            var mx = coords[0], my = coords[1];
+            var ci = Math.floor(mx / CELL_W);
+            if (ci < 0 || ci >= nCols) return;
+
+            var colX = ci * CELL_W + CELL_W / 2;
+            crossV.attr('x1', colX).attr('x2', colX).classed('visible', true);
+            crossH.attr('y1', my).attr('y2', my).classed('visible', true);
+
+            var t = times[ci];
+            var dt = new Date(t);
+            var timeStr = dt.getHours() + ':00';
+            var wx = wxByTime[t] || {};
+
+            var html = '<div class="tooltip-title">' + timeStr + '</div>';
+
+            // Cloud info
+            if (wx.cloudbase) {
+                var cb = wx.cloudbase;
+                var hasCloud = (cb.cover_low > 0) || (cb.cover_mid > 0) || (cb.cover_high > 0);
+                if (hasCloud) {
+                    html += '<div class="tooltip-row" style="margin-bottom:4px"><span class="tooltip-label">Wolken</span><span class="tooltip-value" style="font-size:10px">';
+                    if (cb.cover_high > 0) html += 'H:' + Math.round(cb.cover_high) + '% ';
+                    if (cb.cover_mid > 0) html += 'M:' + Math.round(cb.cover_mid) + '% ';
+                    if (cb.cover_low > 0) html += 'T:' + Math.round(cb.cover_low) + '%';
+                    html += '</span></div>';
+                }
+                if (cb.height != null) {
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Wolkenbasis</span><span class="tooltip-value">' + Math.round(cb.height) + 'm</span></div>';
+                }
+            }
+
+            var ri = nRows - 1 - Math.floor((my - GRID_TOP) / CELL_H);
+            if (my >= GRID_TOP && ri >= 0 && ri < nRows && grid[ri] && grid[ri][ci]) {
+                var dd = grid[ri][ci];
+                html += '<div class="tooltip-row"><span class="tooltip-label">Hoehe</span><span class="tooltip-value">' + Math.round(dd.altitude) + 'm</span></div>';
+                html += '<div class="tooltip-row"><span class="tooltip-label">Wind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
+                var tRiskVal = dd.turbulence_risk != null ? dd.turbulence_risk : dd.wind_gusts;
+                var tExcessVal = dd.turbulence_excess != null ? dd.turbulence_excess : (tRiskVal != null ? tRiskVal - dd.wind_speed : 0);
+                if (tRiskVal != null && Math.round(tRiskVal) > Math.round(dd.wind_speed)) {
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Turbulenzrisiko</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">' + Math.round(tRiskVal) + ' km/h</span></div>';
+                    if (tExcessVal > 1) {
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Exzess</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">+' + Math.round(tExcessVal) + ' km/h</span></div>';
+                    }
+                }
+                html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0</span></div>';
+                html += '<div class="tooltip-row"><span class="tooltip-label">Temp</span><span class="tooltip-value">' + dd.temperature.toFixed(1) + '\u00B0C</span></div>';
+                // Thermik rate at this altitude
+                var localThermRate = thermikCells[ri + ',' + ci];
+                if (localThermRate != null && localThermRate > 0) {
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Steigrate hier</span><span class="tooltip-value" style="color:' + thermClimbColor(localThermRate) + '">' + localThermRate.toFixed(1) + ' m/s</span></div>';
+                }
+            }
+            if (wx.wind) {
+                html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Boden</span><span class="tooltip-value" style="color:' + windColor(wx.wind.speed) + '">' + Math.round(wx.wind.speed) + ' km/h</span></div>';
+                if (wx.wind.gusts != null) {
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Boeen</span><span class="tooltip-value" style="color:' + windColor(wx.wind.gusts) + '">' + Math.round(wx.wind.gusts) + ' km/h</span></div>';
+                }
+            }
+            if (wx.thermik) {
+                if (wx.thermik.climb_rate > 0) {
+                    html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Steigrate</span><span class="tooltip-value">' + wx.thermik.climb_rate.toFixed(1) + ' m/s</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Arbeitsh\u00f6he</span><span class="tooltip-value">' + wx.thermik.max_height + ' m MSL</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Rating</span><span class="tooltip-value">' + wx.thermik.rating + '/10</span></div>';
+                }
+                if (wx.thermik.cape > 0) html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';
+            }
+            if (wx.precipitation && wx.precipitation.amount > 0) {
+                html += '<div class="tooltip-row"><span class="tooltip-label">Regen</span><span class="tooltip-value">' + wx.precipitation.amount.toFixed(1) + ' mm</span></div>';
+            }
+            var wc = (wx.precipitation && wx.precipitation.weather_code != null) ? wx.precipitation.weather_code : (wx.cloudbase && wx.cloudbase.weather_code);
+            if (isThunderstorm(wc)) {
+                html += '<div class="tooltip-row"><span class="tooltip-label">Gewitter</span><span class="tooltip-value">\u26A1 vorhergesagt</span></div>';
+            }
+
+            tooltipEl.innerHTML = html;
+            tooltipEl.classList.add('visible');
+
+            var tx = clientX + 16;
+            var ty = clientY - 10;
+            if (tx + 200 > window.innerWidth) tx = clientX - 200;
+            if (ty + 250 > window.innerHeight) ty = clientY - 250;
+            tooltipEl.style.left = tx + 'px';
+            tooltipEl.style.top = ty + 'px';
+        }
+
+        function hideTooltip() {
+            crossV.classed('visible', false);
+            crossH.classed('visible', false);
+            tooltipEl.classList.remove('visible');
+        }
+
+        var interactRect = chartG.append('rect')
             .attr('width', nCols * CELL_W)
             .attr('height', gridBottom + GROUND_H + WARN_STRIP_H)
             .attr('fill', 'transparent')
             .on('mousemove', function (event) {
-                var coords = d3.pointer(event);
-                var mx = coords[0], my = coords[1];
-                var ci = Math.floor(mx / CELL_W);
-                if (ci < 0 || ci >= nCols) return;
-
-                var colX = ci * CELL_W + CELL_W / 2;
-                crossV.attr('x1', colX).attr('x2', colX).classed('visible', true);
-                crossH.attr('y1', my).attr('y2', my).classed('visible', true);
-
-                var t = times[ci];
-                var dt = new Date(t);
-                var timeStr = dt.getHours() + ':00';
-                var wx = wxByTime[t] || {};
-
-                var html = '<div class="tooltip-title">' + timeStr + '</div>';
-
-                // Cloud info
-                if (wx.cloudbase) {
-                    var cb = wx.cloudbase;
-                    var hasCloud = (cb.cover_low > 0) || (cb.cover_mid > 0) || (cb.cover_high > 0);
-                    if (hasCloud) {
-                        html += '<div class="tooltip-row" style="margin-bottom:4px"><span class="tooltip-label">Wolken</span><span class="tooltip-value" style="font-size:10px">';
-                        if (cb.cover_high > 0) html += 'H:' + Math.round(cb.cover_high) + '% ';
-                        if (cb.cover_mid > 0) html += 'M:' + Math.round(cb.cover_mid) + '% ';
-                        if (cb.cover_low > 0) html += 'T:' + Math.round(cb.cover_low) + '%';
-                        html += '</span></div>';
-                    }
-                    if (cb.height != null) {
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Wolkenbasis</span><span class="tooltip-value">' + Math.round(cb.height) + 'm</span></div>';
-                    }
-                }
-
-                var ri = nRows - 1 - Math.floor((my - GRID_TOP) / CELL_H);
-                if (my >= GRID_TOP && ri >= 0 && ri < nRows && grid[ri] && grid[ri][ci]) {
-                    var dd = grid[ri][ci];
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Hoehe</span><span class="tooltip-value">' + Math.round(dd.altitude) + 'm</span></div>';
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Wind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
-                    var tRiskVal = dd.turbulence_risk != null ? dd.turbulence_risk : dd.wind_gusts;
-                    var tExcessVal = dd.turbulence_excess != null ? dd.turbulence_excess : (tRiskVal != null ? tRiskVal - dd.wind_speed : 0);
-                    if (tRiskVal != null && Math.round(tRiskVal) > Math.round(dd.wind_speed)) {
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Turbulenzrisiko</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">' + Math.round(tRiskVal) + ' km/h</span></div>';
-                        if (tExcessVal > 1) {
-                            html += '<div class="tooltip-row"><span class="tooltip-label">Exzess</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">+' + Math.round(tExcessVal) + ' km/h</span></div>';
-                        }
-                    }
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0</span></div>';
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Temp</span><span class="tooltip-value">' + dd.temperature.toFixed(1) + '\u00B0C</span></div>';
-                    // Thermik rate at this altitude
-                    var localThermRate = thermikCells[ri + ',' + ci];
-                    if (localThermRate != null && localThermRate > 0) {
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Steigrate hier</span><span class="tooltip-value" style="color:' + thermClimbColor(localThermRate) + '">' + localThermRate.toFixed(1) + ' m/s</span></div>';
-                    }
-                }
-                if (wx.wind) {
-                    html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Boden</span><span class="tooltip-value" style="color:' + windColor(wx.wind.speed) + '">' + Math.round(wx.wind.speed) + ' km/h</span></div>';
-                    if (wx.wind.gusts != null) {
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Boeen</span><span class="tooltip-value" style="color:' + windColor(wx.wind.gusts) + '">' + Math.round(wx.wind.gusts) + ' km/h</span></div>';
-                    }
-                }
-                if (wx.thermik) {
-                    if (wx.thermik.climb_rate > 0) {
-                        html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Steigrate</span><span class="tooltip-value">' + wx.thermik.climb_rate.toFixed(1) + ' m/s</span></div>';
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Arbeitsh\u00f6he</span><span class="tooltip-value">' + wx.thermik.max_height + ' m MSL</span></div>';
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Rating</span><span class="tooltip-value">' + wx.thermik.rating + '/10</span></div>';
-                    }
-                    if (wx.thermik.cape > 0) html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';
-                }
-                if (wx.precipitation && wx.precipitation.amount > 0) {
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Regen</span><span class="tooltip-value">' + wx.precipitation.amount.toFixed(1) + ' mm</span></div>';
-                }
-                var wc = (wx.precipitation && wx.precipitation.weather_code != null) ? wx.precipitation.weather_code : (wx.cloudbase && wx.cloudbase.weather_code);
-                if (isThunderstorm(wc)) {
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Gewitter</span><span class="tooltip-value">\u26A1 vorhergesagt</span></div>';
-                }
-
-                tooltipEl.innerHTML = html;
-                tooltipEl.classList.add('visible');
-
-                var tx = event.clientX + 16;
-                var ty = event.clientY - 10;
-                if (tx + 200 > window.innerWidth) tx = event.clientX - 200;
-                if (ty + 250 > window.innerHeight) ty = event.clientY - 250;
-                tooltipEl.style.left = tx + 'px';
-                tooltipEl.style.top = ty + 'px';
+                showTooltipAt(d3.pointer(event), event.clientX, event.clientY);
             })
-            .on('mouseleave', function () {
-                crossV.classed('visible', false);
-                crossH.classed('visible', false);
-                tooltipEl.classList.remove('visible');
-            });
+            .on('mouseleave', hideTooltip);
+
+        // Touch support: tap to show, tap elsewhere to hide
+        var touchActive = false;
+        interactRect.node().addEventListener('touchstart', function (e) {
+            e.preventDefault();
+            var touch = e.touches[0];
+            var coords = d3.pointer(touch, interactRect.node());
+            showTooltipAt(coords, touch.clientX, touch.clientY);
+            touchActive = true;
+        }, { passive: false });
+        interactRect.node().addEventListener('touchmove', function (e) {
+            if (!touchActive) return;
+            var touch = e.touches[0];
+            var coords = d3.pointer(touch, interactRect.node());
+            showTooltipAt(coords, touch.clientX, touch.clientY);
+        }, { passive: true });
+        interactRect.node().addEventListener('touchend', function () {
+            // Keep tooltip visible after touch; next tap elsewhere will hide
+        }, { passive: true });
+        document.addEventListener('touchstart', function (e) {
+            if (touchActive && !interactRect.node().contains(e.target)) {
+                hideTooltip();
+                touchActive = false;
+            }
+        }, { passive: true });
     }
 
     // ===== TEXT VIEW =====

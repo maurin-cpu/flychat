@@ -14,26 +14,61 @@
 </head>
 
 <body>
-    <nav class="navbar">
+    <a href="#main-content" class="skip-link">Zum Inhalt springen</a>
+    <nav class="navbar" role="navigation" aria-label="Hauptnavigation">
         <a href="/chat" class="navbar-brand">Fly<span>chat</span></a>
         <div class="navbar-links">
             <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Startplätze</a>
             <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
             <a href="/analyses" class="{% if request.path == '/analyses' %}active{% endif %}">Analysen</a>
-            <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen">Föhn</button>
+            <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen" aria-label="Föhndiagramm öffnen">Föhn</button>
         </div>
     </nav>
+    <div id="main-content">
     {% block content %}{% endblock %}
+    </div>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-nav" id="mobileNav" role="navigation" aria-label="Mobile Navigation">
+        {% if request.path == '/' or request.path == '/chat' %}
+        <button class="mobile-nav-item active" data-target="chat" aria-label="Chat anzeigen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+        </button>
+        <button class="mobile-nav-item" data-target="map" aria-label="Karte anzeigen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+            <span>Map</span>
+        </button>
+        {% else %}
+        <a href="/chat" class="mobile-nav-item {% if request.path == '/' or request.path == '/chat' %}active{% endif %}" aria-label="Chat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+        </a>
+        {% endif %}
+        <a href="/regionen" class="mobile-nav-item {% if request.path == '/regionen' %}active{% endif %}" aria-label="Regionen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>Regionen</span>
+        </a>
+        <a href="/analyses" class="mobile-nav-item {% if request.path == '/analyses' %}active{% endif %}" aria-label="Analysen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+            <span>Analysen</span>
+        </a>
+        <button class="mobile-nav-item" id="mobileNavFoehnBtn" aria-label="Föhndiagramm öffnen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+            <span>Föhn</span>
+        </button>
+    </nav>
 
     <!-- Foehn Diagram Overlay (shared across all pages) -->
-    <div class="meteogram-overlay" id="foehnOverlay">
+    <div class="meteogram-overlay" id="foehnOverlay" role="dialog" aria-modal="true" aria-label="Föhndiagramm">
         <div class="meteogram-panel">
+            <div class="overlay-swipe-handle"></div>
             <div class="meteogram-header">
                 <div>
                     <h2>Föhndiagramm</h2>
                     <span class="spot-info">Druckdifferenz Lugano – Zürich | 5-Tage-Prognose</span>
                 </div>
-                <button class="meteogram-close" id="foehnClose">&times;</button>
+                <button class="meteogram-close" id="foehnClose" aria-label="Schliessen">&times;</button>
             </div>
             <div class="meteogram-chart" id="foehnChart"></div>
         </div>
@@ -47,8 +82,23 @@
             var foehnChart = document.getElementById('foehnChart');
             var foehnCloseBtn = document.getElementById('foehnClose');
             var foehnTooltip = document.getElementById('foehnTooltip');
+            var _foehnTrigger = null;
+            var _scrollY = 0;
 
-            function openFoehn() {
+            // Shared overlay scroll-lock helpers
+            window._overlayScrollLock = function () {
+                _scrollY = window.scrollY;
+                document.body.classList.add('overlay-open');
+                document.body.style.top = -_scrollY + 'px';
+            };
+            window._overlayScrollUnlock = function () {
+                document.body.classList.remove('overlay-open');
+                document.body.style.top = '';
+                window.scrollTo(0, _scrollY);
+            };
+
+            function openFoehn(trigger) {
+                _foehnTrigger = trigger || null;
                 if (typeof FoehnDiagram === 'undefined') {
                     window.location.href = '/chat?foehn=1';
                     return;
@@ -56,6 +106,8 @@
                 foehnChart.innerHTML = '<div class="error-state">Lade Föhn-Daten...</div>';
                 foehnOverlay.style.display = 'flex';
                 foehnOverlay.classList.add('visible');
+                window._overlayScrollLock();
+                foehnCloseBtn.focus();
 
                 fetch('/api/foehn')
                     .then(function (r) { return r.json(); })
@@ -85,6 +137,8 @@
                 foehnOverlay.style.display = 'none';
                 foehnOverlay.classList.remove('visible');
                 foehnTooltip.classList.remove('visible');
+                window._overlayScrollUnlock();
+                if (_foehnTrigger && _foehnTrigger.focus) _foehnTrigger.focus();
             }
 
             foehnCloseBtn.addEventListener('click', closeFoehn);
@@ -99,20 +153,57 @@
 
             window.openFoehn = openFoehn;
 
-            // Auto-open if ?foehn=1 in URL
-            try {
-                if (new URLSearchParams(window.location.search).get('foehn') === '1') {
-                    openFoehn();
-                    history.replaceState({}, '', window.location.pathname);
-                }
-            } catch (e) { /* ignore */ }
+            // Auto-open if ?foehn=1 in URL — must wait for defer scripts
+            window.addEventListener('DOMContentLoaded', function () {
+                try {
+                    if (new URLSearchParams(window.location.search).get('foehn') === '1') {
+                        history.replaceState({}, '', window.location.pathname);
+                        openFoehn();
+                    }
+                } catch (e) { /* ignore */ }
+            });
 
+            // Desktop navbar foehn button
             var btn = document.getElementById('navFoehnBtn');
             if (btn) {
-                btn.addEventListener('click', function () {
-                    openFoehn();
-                });
+                btn.addEventListener('click', function () { openFoehn(btn); });
             }
+
+            // Mobile nav foehn button
+            var mobileBtn = document.getElementById('mobileNavFoehnBtn');
+            if (mobileBtn) {
+                mobileBtn.addEventListener('click', function () { openFoehn(mobileBtn); });
+            }
+
+            // Swipe-to-close on overlay swipe handles
+            function setupSwipeDismiss(overlay, closeFn) {
+                var handle = overlay.querySelector('.overlay-swipe-handle');
+                if (!handle) return;
+                var startY = 0, currentY = 0, panel = overlay.querySelector('.meteogram-panel');
+                handle.addEventListener('touchstart', function (e) {
+                    startY = e.touches[0].clientY;
+                    currentY = startY;
+                    if (panel) panel.style.transition = 'none';
+                }, { passive: true });
+                handle.addEventListener('touchmove', function (e) {
+                    currentY = e.touches[0].clientY;
+                    var dy = currentY - startY;
+                    if (dy > 0 && panel) {
+                        panel.style.transform = 'translateY(' + dy + 'px)';
+                    }
+                }, { passive: true });
+                handle.addEventListener('touchend', function () {
+                    var dy = currentY - startY;
+                    if (panel) {
+                        panel.style.transition = '';
+                        panel.style.transform = '';
+                    }
+                    if (dy > 80) closeFn();
+                }, { passive: true });
+            }
+
+            setupSwipeDismiss(foehnOverlay, closeFoehn);
+            window._setupSwipeDismiss = setupSwipeDismiss;
         })();
     </script>
 </body>

@@ -136,13 +136,23 @@
         }
     }
 
+    var skeletonEl = null;
+
     function showTyping() {
-        typingEl.classList.add('visible');
+        // Use skeleton shimmer instead of typing dots
+        if (!skeletonEl) {
+            skeletonEl = document.createElement('div');
+            skeletonEl.className = 'skeleton-loading';
+            skeletonEl.innerHTML = '<div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line"></div>';
+        }
+        messagesEl.appendChild(skeletonEl);
         messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
     function hideTyping() {
-        typingEl.classList.remove('visible');
+        if (skeletonEl && skeletonEl.parentNode) {
+            skeletonEl.parentNode.removeChild(skeletonEl);
+        }
     }
 
     function setLoading(loading) {
@@ -287,8 +297,8 @@
 
         // Reset highlights on new user message
         if (window.highlightSpots) window.highlightSpots(null);
-        // Hide quick actions after first message
-        if (quickActions) quickActions.style.display = 'none';
+        // Compact quick actions after first message (keep visible as chips)
+        if (quickActions) quickActions.classList.add('compact');
 
         setLoading(true);
 
@@ -319,7 +329,24 @@
             })
             .catch(function (err) {
                 clearStatus();
-                appendMessage('bot', 'Fehler: ' + err.message);
+                var errorDiv = document.createElement('div');
+                errorDiv.className = 'message bot-message';
+                errorDiv.innerHTML = '<div class="message-content">' +
+                    '<p>Fehler: ' + err.message + '</p>' +
+                    '<button class="btn btn-secondary btn-sm" onclick="this.parentNode.parentNode.remove();" style="margin-top:8px;">Verwerfen</button> ' +
+                    '</div>';
+                var retryBtn = document.createElement('button');
+                retryBtn.className = 'btn btn-primary btn-sm';
+                retryBtn.style.marginTop = '8px';
+                retryBtn.style.marginLeft = '8px';
+                retryBtn.textContent = 'Erneut versuchen';
+                retryBtn.addEventListener('click', function () {
+                    errorDiv.remove();
+                    sendMessage(text);
+                });
+                errorDiv.querySelector('.message-content').appendChild(retryBtn);
+                messagesEl.appendChild(errorDiv);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
             })
             .finally(function () {
                 clearStatus();
@@ -328,10 +355,26 @@
             });
     }
 
+    // ── Textarea auto-resize ──────────────────────────
+    function autoResizeInput() {
+        inputEl.style.height = 'auto';
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+        // Re-enable overflow-y when content exceeds max
+        inputEl.style.overflowY = inputEl.scrollHeight > 160 ? 'auto' : 'hidden';
+    }
+
+    inputEl.addEventListener('input', autoResizeInput);
+
+    function resetInputHeight() {
+        inputEl.style.height = 'auto';
+        inputEl.style.overflowY = 'hidden';
+    }
+
     // Event Listeners
     sendBtn.addEventListener('click', function () {
         sendMessage(inputEl.value);
         inputEl.value = '';
+        resetInputHeight();
     });
 
     inputEl.addEventListener('keydown', function (e) {
@@ -339,7 +382,9 @@
             e.preventDefault();
             sendMessage(inputEl.value);
             inputEl.value = '';
+            resetInputHeight();
         }
+        // Shift+Enter = newline (default behavior for textarea)
     });
 
     // Reset Chat
@@ -362,9 +407,12 @@
                         // UI zurücksetzen
                         messagesEl.innerHTML = '';
                         appendMessage('bot', 'Hallo! Ich bin dein Flychat-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.');
-                        if (quickActions) quickActions.style.display = 'flex';
+                        if (quickActions) {
+                            quickActions.classList.remove('compact');
+                        }
                         if (window.highlightSpots) window.highlightSpots(null);
                         inputEl.value = '';
+                        resetInputHeight();
                         inputEl.focus();
                     }
                 })
@@ -645,6 +693,7 @@
                         ]);
                         finalizeProgress(card, true, stats);
                         if (window.refreshSpotMarkers) window.refreshSpotMarkers();
+                        if (window.updateDataFreshness) window.updateDataFreshness(new Date().toISOString());
                     } else {
                         finalizeProgress(card, false);
                         var msg = data.error || ('Server error: ' + result.status);
@@ -866,6 +915,49 @@
             if (msg) sendMessage(msg);
         });
     });
+
+    // ── Onboarding Hints (first visit only) ──────────────
+    (function () {
+        var key = 'flychat_onboarded';
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, '1');
+        var qa = document.getElementById('quickActions');
+        if (!qa) return;
+
+        function showHint(target, text) {
+            var hint = document.createElement('div');
+            hint.className = 'onboarding-hint';
+            hint.textContent = text;
+            document.body.appendChild(hint);
+            var rect = target.getBoundingClientRect();
+            hint.style.left = (rect.left + rect.width / 2 - hint.offsetWidth / 2) + 'px';
+            hint.style.top = (rect.top - hint.offsetHeight - 10) + 'px';
+            setTimeout(function () { if (hint.parentNode) hint.remove(); }, 4000);
+        }
+
+        setTimeout(function () { showHint(qa, 'Klicke hier fuer Schnellfragen'); }, 1500);
+    })();
+
+    // ── Data Freshness Indicator ──────────────────────────
+    var freshnessEl = document.getElementById('dataFreshness');
+    function updateFreshness(isoStr) {
+        if (!freshnessEl || !isoStr) return;
+        var ts = new Date(isoStr);
+        var ageMs = Date.now() - ts.getTime();
+        var ageH = ageMs / 3600000;
+        var hh = String(ts.getHours()).padStart(2, '0');
+        var mm = String(ts.getMinutes()).padStart(2, '0');
+        freshnessEl.textContent = 'Daten von ' + hh + ':' + mm;
+        freshnessEl.className = 'data-freshness ' + (ageH < 1 ? 'fresh' : ageH < 3 ? 'stale' : 'old');
+    }
+
+    // Check weather_state from API
+    fetch('/api/status').then(function (r) { return r.json(); }).then(function (d) {
+        if (d.weather_loaded_at) updateFreshness(d.weather_loaded_at);
+    }).catch(function () { /* ignore */ });
+
+    // Update after successful weather refresh
+    window.updateDataFreshness = updateFreshness;
 
     inputEl.focus();
 })();
