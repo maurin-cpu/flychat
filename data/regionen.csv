@@ -1,0 +1,30 @@
+id,region_name,terrain_type,elevation_ref,kritischer_foehn,description
+seeland_emmental,Seeland / Emmental,mittelland,600,Süd,Flaches Mittelland mit Hügelzone
+mittelland_west,Mittelland West,mittelland,700,Süd,Flaches bis leicht hügeliges Mittelland
+mittelland_ost,Mittelland Ost,mittelland,730,Süd,Zürich-Umgebung mit Albiskette
+genferseeregion,Genferseeregion,mittelland,800,Süd,Genfersee-Becken mit Weinbergen und Jorat
+jura_ost,Jura Ost,jura,900,Süd,Jura-Ketten: Wasserflue / Geissflue
+jura_west,Jura West,jura,1200,Süd,Jura-Ketten: Mauborget / Suchet
+jura_zentral,Jura Zentral,jura,1280,Süd,Jura-Ketten: Weissenstein
+mittelland_zentral,Mittelland Zentral,voralpen,1400,Süd,Napf-Gebiet - hügelig bis bergig
+glarnerland_walensee,Glarnerland / Walensee,voralpen,1300,Süd,Steile Talflanken am Walensee
+schwarzsee_gantrisch,Schwarzsee / Gantrisch,voralpen,1500,Süd,Voralpine Ketten Freiburg/Bern
+Rheinthal,Ostschweiz,voralpen,1500,Beide,Tiefe Alpentäler Misox/Calanca
+bodenseeraum,Alpstein / Ostschweiz,ostschweiz,600,Süd,Steile Alpentäler Uri
+waadtlaender_alpen,Waadtländer Alpen,alpen,1600,Süd,Alpenrand Waadt: Leysin/Diablerets
+alpstein,Alpstein / Ostschweiz,alpen,1640,Süd,Markante Kalkfelsen Appenzell
+tessin_zentral,Tessin Zentral,alpen,1650,Nord,Südalpentäler Locarno/Cimetta
+Praettigau - Davos,Praettigau - Davos,alpen,1700,Beide,Alpentäler um Chur/Prättigau
+berner_oberland,Berner Oberland,alpen,1800,Beide,Interlaken-Gebiet mit Hochalpen-Übergang
+zentralschweizer_voralpen,Zentralschweizer Voralpen,alpen,1860,Süd,Engelberg / Pilatus / Stoos
+berner_voralpen,Berner Voralpen,alpen,1800,Beide,Niederhorn / Stockhorn - exponierte Grate
+freiburger_voralpen,Freiburger Voralpen,voralpen,1500,Süd,Moléson - freistehende Gipfel
+mattertal_saastal,Mattertal / Saastal,hochalpin,2000,Beide,Tiefe Hochtäler mit Gletscherwind
+tessin_nord,Tessin Nord,hochalpin,2000,Nord,Hochalpine Südtäler mit starker Konvektion
+zentralwallis,Zentralwallis,hochalpin,2100,Beide,Hochalpines Rhonetal Leukerbad/Lötschental
+engadin_unter,Engadin Unter,hochalpin,2100,Beide,Hochtal mit starken Talwindsystemen
+unterwallis,Unterwallis,hochalpin,2200,Beide,Verbier / Grand-St-Bernard - exponiert
+oberwallis_goms,Oberwallis / Goms,hochalpin,2200,Beide,Hochtal Goms mit Gletschereinfluss
+surselva,Surselva,hochalpin,2200,Beide,Vorderrheintal / Flims - orographisch komplex
+zentrales_mittelland,Zentrales Mittelland,mittelland,600,Süd,Flaches Mittelland zwischen Bern und Zürich
+engadin_ober,Engadin Ober,hochalpin,2450,Beide,Höchstes bewohntes Tal - extreme Exposition

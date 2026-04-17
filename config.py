@@ -59,6 +59,10 @@ FORECAST_DAYS = 5
 # Vorhersage-Zeitachse: Wanduhrzeit Schweiz (MESZ/MEZ). Open-Meteo liefert `time` in dieser Zone.
 TIMEZONE = "Europe/Zurich"
 
+# Referenzpunkte auf der Karte anzeigen (Linien vom Startplatz zu den
+# regionalen Thermik-Referenzpunkten beim Hover). False = ausgeblendet.
+SHOW_REFERENCE_POINTS = False
+
 # ============================================================================
 # FLUGSTUNDEN-KONFIGURATION
 # ============================================================================
@@ -72,7 +76,11 @@ FLIGHT_HOURS_END = 17    # End-Stunde für Flugstunden (0-23, exklusiv)
 
 PROJECT_ROOT = Path(__file__).parent.absolute()
 DATA_DIR = PROJECT_ROOT / "data"
-CSV_PATH = DATA_DIR / "fluggebiete.csv"
+
+# Spot-CSV: "complete" = alle ~490 Startplätze, "test" = reduziertes Set für Entwicklung
+# Umschalten: USE_SPOT_CSV = "test" oder "complete"
+USE_SPOT_CSV = os.environ.get("FLYCHAT_SPOT_CSV", "complete")  # "complete" | "test"
+CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
 REGIONEN_GEOJSON_PATH = DATA_DIR / "regionen_referenzpunkte.geojson"
 
 # Vercel: Nur /tmp ist schreibbar. Readonly-Daten (CSV, GeoJSON) bleiben in data/
@@ -461,6 +469,11 @@ GUST_FACTOR_THRESHOLDS = {
 # Vor GF-Berechnung wird dieser Anteil abgezogen.
 CONVECTIVE_GUST_BETA = 1.8
 
+# Unter diesem mechanischen Exzess (m/s) wird bei GF >= danger
+# FRAGMENTED statt UNUSABLE vergeben — das Problem ist schwache Thermik,
+# nicht extreme Turbulenz.
+GF_DANGER_MIN_MECHANICAL_MS = 3.0
+
 # Mittlerer Grundwind durch die Mischungsschicht (km/h).
 # Alternative/ergaenzende Schwelle falls SHEAR-Berechnung wegen fehlender
 # pressure levels nicht verfuegbar ist.
@@ -475,6 +488,12 @@ BL_MEAN_WIND_THRESHOLDS = {
 # Minimum climb_rate fuer Tag-Aktivierung — unter diesem Wert wird keine
 # Thermik-Qualitaets-Warnung ausgegeben (keine Thermik -> keine Zerrissenheit).
 THERMAL_QUALITY_MIN_CLIMB = 0.3   # m/s
+
+# Produktive-Thermik-Schwellen (Flyability-Tier-Berechnung)
+PRODUCTIVE_CLIMB_MIN = 0.7      # m/s — Mindest-Climb fuer "produktive" Stunde
+PRODUCTIVE_CLOUD_MAX = 80       # % — Max max(low,mid) fuer "produktive" Stunde (Thermik bis ~80% vorhanden, ab 80% stirbt sie — FAA Soaring Weather)
+PRODUCTIVE_HOURS_FOR_GREEN = 4  # Mindest-Stunden fuer gray->green Upgrade
+PRODUCTIVE_HOURS_DOWNGRADE = 2  # Untere Schwelle: green/violet -> gray
 
 # ============================================================================
 # INSTANTDB-KONFIGURATION

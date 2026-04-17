@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% block title %}Flychat - Regionen{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    /* ── Leaflet Tooltip (Light) ──────────────────────────── */
+    .leaflet-tooltip.region-tooltip {
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        color: #1e293b;
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        line-height: 1.45;
+        padding: 6px 10px;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    .leaflet-tooltip.region-tooltip::before {
+        display: none;
+    }
+
+    .region-label {
+        background: transparent !important;
+        border: none !important;
+    }
+
+    .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 2000;
+        height: 60px;
+    }
+
+    body {
+        padding-top: 60px;
+        overflow: hidden;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .region-map-wrapper {
+        flex: 1;
+        position: relative;
+    }
+
+    #regionMap {
+        height: 100%;
+        width: 100%;
+    }
+
+    /* Floating controls: use shared .floating-control / .floating-day-tabs from style.css */
+
+    /* ── Run Button (uses .btn system + positioning) ──── */
+    .floating-run-btn {
+        position: absolute;
+        z-index: 1000;
+        top: 16px;
+        right: 16px;
+    }
+
+    /* ── Status Bar ──────────────────────────────────────── */
+    .floating-status {
+        bottom: 16px;
+        left: 16px;
+        font-size: 11px;
+        color: #475569;
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .floating-status:empty { display: none; }
+
+    /* ── Region Overlay (Light) ───────────────────────────── */
+    #regionOverlay .meteogram-panel {
+        max-width: 1800px;
+        width: 96vw;
+        height: 92vh;
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.2);
+    }
+
+    #regionOverlay .meteogram-header {
+        padding: 18px 24px 14px;
+        background: #fafafa;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    #regionOverlay .meteogram-header h2 {
+        color: #1e293b;
+    }
+
+    #regionOverlay .meteogram-close {
+        color: #64748b;
+        border-color: #e5e7eb;
+    }
+
+    #regionOverlay .meteogram-close:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+    }
+
+    #regionOverlayBody {
+        max-height: 75vh;
+        overflow-y: auto;
+        padding: 0 24px 20px;
+    }
+
+    /* Overlay-level day tabs */
+    .region-overlay-day-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 0 24px 12px;
+        flex-wrap: wrap;
+    }
+
+    .region-overlay-day-tabs .tab-btn {
+        padding: 6px 14px;
+        border-radius: 7px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: inherit;
+    }
+
+    .region-overlay-day-tabs .tab-btn:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+    }
+
+    .region-overlay-day-tabs .tab-btn.active {
+        background: #0369a1;
+        color: #fff;
+        border-color: #0369a1;
+    }
+
+    /* Region overlay layout: analysis + meteogram side by side on wide screens */
+    .region-overlay-content {
+        display: flex;
+        gap: 24px;
+    }
+
+    .region-overlay-analysis {
+        flex: 0 0 340px;
+        min-width: 280px;
+    }
+
+    .region-overlay-meteogram {
+        flex: 1;
+        min-width: 0;
+        overflow-x: auto;
+    }
+
+    .region-meteogram-chart {
+        min-height: 200px;
+        position: relative;
+    }
+
+    .region-meteogram-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 200px;
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
+    .region-meteogram-spot-label {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-bottom: 8px;
+    }
+
+    @media (max-width: 1023px) {
+        .region-overlay-content {
+            flex-direction: column;
+        }
+        .region-overlay-analysis {
+            flex: none;
+            min-width: 0;
+        }
+    }
+
+    @media (max-width: 639px) {
+        body {
+            padding-top: 48px;
+            padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+            height: 100dvh;
+        }
+        .navbar { height: 48px; }
+        .region-map-wrapper {
+            height: calc(100dvh - 48px - 60px - env(safe-area-inset-bottom, 0px));
+        }
+        .floating-day-tabs { max-width: calc(100vw - 130px); top: 10px; left: 10px; }
+        .floating-run-btn { top: 10px; right: 10px; padding: 6px 12px; font-size: 11px; }
+        .floating-status { bottom: calc(10px + 60px + env(safe-area-inset-bottom, 0px)); left: 10px; }
+        #regionOverlay .meteogram-panel { max-width: 100vw; width: 100vw; height: 100dvh; border-radius: 0; }
+        #regionOverlayBody { padding: 0 16px 16px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="region-map-wrapper">
+    <div id="regionMap"></div>
+
+    <!-- Floating Run Button -->
+    <button class="btn btn-primary btn-sm floating-run-btn" id="runRegionBtn">
+        <span class="spinner"></span>
+        <span class="btn-label">Analyse starten</span>
+    </button>
+
+    <!-- Floating Status -->
+    <div class="floating-control floating-status" id="statusBar"></div>
+
+    <!-- Meteogram Tooltip -->
+    <div class="tooltip" id="regionMeteogramTooltip"></div>
+
+    <!-- Region Analysis Overlay -->
+    <div class="meteogram-overlay" id="regionOverlay" role="dialog" aria-modal="true" aria-label="Region-Analyse">
+        <div class="meteogram-panel">
+            <div class="overlay-swipe-handle"></div>
+            <div class="meteogram-header">
+                <div>
+                    <h2 id="regionOverlayTitle">Region</h2>
+                </div>
+                <button class="meteogram-close" id="regionOverlayClose" aria-label="Schliessen">&times;</button>
+            </div>
+            <div id="regionOverlayBody"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script defer src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/wind-timeline.js') }}?v={{ static_v('js/wind-timeline.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/foehn_diagram.js') }}?v={{ static_v('js/foehn_diagram.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/region-map.js') }}?v={{ static_v('js/region-map.js') }}"></script>
+<script type="module">
+import { init } from 'https://esm.sh/@instantdb/core';
+
+var APP_ID = '{{ instantdb_app_id }}';
+var db = init({ appId: APP_ID });
+
+function normalizeFlyTier(ft) {
+    if (!ft) return '';
+    var k = String(ft).trim().toLowerCase();
+    if (k === 'gray' || k === 'green' || k === 'violet') return k;
+    if (k === 'yellow') return 'gray';
+    if (k === 'orange') return 'green';
+    return 'green';
+}
+
+var runBtn = document.getElementById('runRegionBtn');
+var statusBar = document.getElementById('statusBar');
+var currentDate = window.currentDate;
+
+// Listen for day changes from navbar tabs
+window.addEventListener('flychat-day-change', function(e) {
+    currentDate = e.detail.date;
+    if (window.setRegionDate) window.setRegionDate(currentDate);
+});
+
+// InstantDB subscription
+db.subscribeQuery({ region_analyses: {} }, function(resp) {
+    if (resp.error) {
+        console.error('InstantDB Fehler:', resp.error.message);
+        statusBar.textContent = 'InstantDB: ' + resp.error.message;
+        return;
+    }
+    if (resp.data) {
+        var entries = resp.data.region_analyses || [];
+        if (entries.length === 0) {
+            statusBar.textContent = 'Keine Region-Analysen vorhanden';
+            return;
+        }
+
+        var nested = {};
+        var latestUpdatedAt = null;
+        entries.forEach(function(e) {
+            var rid = e.region_id;
+            var ds = e.date;
+            if (!rid || !ds) return;
+            if (!nested[rid]) nested[rid] = {};
+
+            ['no_go_reasons', 'caution_notes'].forEach(function(key) {
+                if (typeof e[key] === 'string') {
+                    try { e[key] = JSON.parse(e[key]); }
+                    catch(err) { e[key] = e[key] ? [e[key]] : []; }
+                }
+            });
+
+            if (e.flyability_tier) {
+                e.flyability_tier = normalizeFlyTier(e.flyability_tier);
+            }
+            nested[rid][ds] = e;
+
+            if (e.updated_at && (!latestUpdatedAt || e.updated_at > latestUpdatedAt)) {
+                latestUpdatedAt = e.updated_at;
+            }
+        });
+
+        if (latestUpdatedAt) {
+            var d = new Date(latestUpdatedAt);
+            statusBar.textContent = 'Stand: ' + d.toLocaleString('de-CH');
+        }
+
+        if (window.setRegionAnalyses) window.setRegionAnalyses(nested);
+        if (window.setRegionDate) window.setRegionDate(currentDate);
+    }
+});
+
+// Run button
+runBtn.addEventListener('click', function() {
+    if (runBtn.disabled) return;
+    runBtn.disabled = true;
+    runBtn.classList.add('loading');
+    statusBar.textContent = 'Region-Analyse laeuft...';
+
+    fetch('/api/run-region-analyses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            if (data.success) {
+                statusBar.textContent = data.results_count + ' Analysen abgeschlossen';
+            } else {
+                statusBar.textContent = 'Fehler: ' + (data.error || 'Unbekannt');
+            }
+        })
+        .catch(function(err) {
+            statusBar.textContent = 'Fehler: ' + err.message;
+        })
+        .finally(function() {
+            runBtn.disabled = false;
+            runBtn.classList.remove('loading');
+        });
+});
+
+// Swipe-to-close on region overlay
+var regionOverlay = document.getElementById('regionOverlay');
+var regionOverlayClose = document.getElementById('regionOverlayClose');
+if (regionOverlay && window._setupSwipeDismiss) {
+    window._setupSwipeDismiss(regionOverlay, function () {
+        if (regionOverlayClose) regionOverlayClose.click();
+    });
+}
+</script>
+{% endblock %}

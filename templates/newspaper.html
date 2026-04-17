@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Flugwetter – Flychat{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/newspaper.css') }}?v={{ static_v('css/newspaper.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="np" id="newspaperRoot">
+  <header class="np-header">
+    <div class="np-header-left">
+      <h1 class="np-logo">Flugwetter</h1>
+      <span class="np-date-range" id="npDateRange">wird geladen…</span>
+    </div>
+    <div class="np-header-right">
+      <span class="np-timestamp" id="npGeneratedAt"></span>
+      <button type="button" class="np-btn-gen" id="npGenerateBtn">Aktualisieren</button>
+    </div>
+  </header>
+
+  <section class="np-fazit" id="npFazit" hidden></section>
+
+  <nav class="np-day-tabs" id="npDayTabs" role="tablist" aria-label="Tagesauswahl"></nav>
+
+  <section class="np-filters" id="npFilters">
+    <div class="np-filter-row">
+      <div class="np-filter-chips" id="npFilterChips"></div>
+      <button type="button" class="np-filter-reset" id="npFilterReset" disabled>Alle</button>
+      <button type="button" class="np-filter-map-btn" id="npMapToggle" title="Karte ein/aus">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+    </div>
+    <div class="np-filter-map" id="npFilterMap" hidden></div>
+  </section>
+
+  <div class="np-day-info" id="npDayInfo"></div>
+
+  <section class="np-content" id="npContent"></section>
+
+  <div class="tooltip" id="npMeteogramTooltip"></div>
+
+  <footer class="np-footer">
+    <p>ICON-D2/EU/CH1/CH2 + GFS via Open-Meteo · winds.mobi · Flychat-KI</p>
+  </footer>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
+<script src="{{ url_for('static', filename='js/newspaper.js') }}?v={{ static_v('js/newspaper.js') }}"></script>
+{% endblock %}

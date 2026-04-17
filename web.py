@@ -26,6 +26,7 @@ from gust_calculator import (
     get_oi_scale_lengths,
     get_L_up,
     get_effective_L_up,
+    aggregate_spot_excess,
 )
 from source_area import find_region_for_point
 
@@ -67,6 +68,38 @@ def _add_cache_headers(response):
     return response
 
 
+# ---------------------------------------------------------------------------
+# JSON-Error-Handler für /api/*
+# Ohne dies liefert Flask bei Exceptions/404 eine HTML-Fehlerseite zurück,
+# was im Frontend zu "Unexpected token '<'..."-Parse-Fehlern führt.
+# Alle API-Routen antworten jetzt garantiert mit JSON.
+# ---------------------------------------------------------------------------
+from werkzeug.exceptions import HTTPException
+
+
+def _is_api_request() -> bool:
+    try:
+        return request.path.startswith("/api/")
+    except RuntimeError:
+        return False
+
+
+@app.errorhandler(HTTPException)
+def _handle_http_exception(e):
+    if _is_api_request():
+        return jsonify({"error": e.description or e.name, "status": e.code}), e.code
+    return e  # Default HTML-Handling für Seiten
+
+
+@app.errorhandler(Exception)
+def _handle_unexpected_exception(e):
+    logger.exception("Unbehandelte Exception bei %s", getattr(request, "path", "?"))
+    if _is_api_request():
+        return jsonify({"error": "Serverfehler: " + str(e), "status": 500}), 500
+    # Nicht-API: Flask-Default (HTML) weiterreichen
+    raise e
+
+
 # Global engine instance (set in main.py)
 engine = None
 
@@ -87,6 +120,7 @@ def index():
         "index.html",
         instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
+        show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
 
 
@@ -96,6 +130,7 @@ def chat_page():
         "index.html",
         instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
+        show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
 
 
@@ -105,6 +140,7 @@ def map_page():
         "index.html",
         instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
+        show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
 
 
@@ -124,6 +160,128 @@ def regionen_page():
         instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
     )
+
+
+@app.route("/newspaper")
+def newspaper_page():
+    return render_template(
+        "newspaper.html",
+        instantdb_app_id=config.INSTANTDB_APP_ID,
+        forecast_days=config.FORECAST_DAYS,
+    )
+
+
+@app.route("/api/newspaper", methods=["GET"])
+def api_newspaper_get():
+    """Liefert das zuletzt generierte Wochen-Fazit (Cache)."""
+    data = engine._load_weekly_newspaper()
+    if not data:
+        # Falls kein Cache: nur die Rohdaten-Aggregation ohne LLM-Fazit
+        aggregated = engine.build_newspaper_data()
+        return jsonify({
+            "success": True,
+            "days": aggregated.get("days", []),
+            "forecast_dates": aggregated.get("forecast_dates", []),
+            "generated_at": aggregated.get("generated_at", ""),
+            "fazit": None,
+        })
+    # Ergaenze lat/lon + region_id/region_name fuer Spots, falls der Cache alt ist.
+    # So muss der Cache nicht zwingend neu generiert werden, damit die Mini-Karte
+    # rendert UND der Regionen-Filter korrekt funktioniert (aelteres
+    # chat_engine.py hatte einen Bug wo region_id immer "unknown" war).
+    try:
+        spot_coord_lookup = {}
+        spot_region_lookup = {}  # spot_name -> (region_id, region_name)
+        spot_wind_lookup = {}    # spot_name -> windrichtung (fuer alten Cache ohne Feld)
+        for s in getattr(engine, "spots", []) or []:
+            # load_spots() benutzt "latitude"/"longitude" als Keys (nicht lat/lon).
+            lat = s.get("latitude", s.get("lat"))
+            lon = s.get("longitude", s.get("lon"))
+            try:
+                lat_f = float(lat)
+                lon_f = float(lon)
+            except Exception:
+                continue
+            spot_coord_lookup[s["name"]] = (lat_f, lon_f)
+            spot_wind_lookup[s["name"]] = s.get("windrichtung", "") or ""
+            try:
+                region = find_region_for_point(lat_f, lon_f)
+                if region:
+                    # Das Region-Dict hat Keys "id" + "region" (lesbarer Name),
+                    # nicht "name"! Fallback: id als Name wenn region fehlt.
+                    rid = region.get("id", "unknown")
+                    rname = region.get("region") or region.get("name") or rid
+                    spot_region_lookup[s["name"]] = (rid, rname)
+            except Exception:
+                pass
+
+        for day in data.get("days", []) or []:
+            for entry in day.get("top_spots", []) or []:
+                spot_name = entry.get("spot")
+                # lat/lon Fallback
+                if entry.get("lat") is None or entry.get("lon") is None:
+                    coords = spot_coord_lookup.get(spot_name)
+                    if coords:
+                        entry["lat"], entry["lon"] = coords
+                # windrichtung Fallback (alter Cache hat das Feld nicht;
+                # Frontend braucht es fuer den Startrichtungs-Sektor am Marker)
+                if not entry.get("windrichtung"):
+                    wr = spot_wind_lookup.get(spot_name)
+                    if wr:
+                        entry["windrichtung"] = wr
+                # Region anreichern wenn fehlend oder "unknown" (alter Cache)
+                needs_region = (
+                    not entry.get("region_id")
+                    or entry.get("region_id") == "unknown"
+                    or not entry.get("region_name")
+                )
+                if needs_region:
+                    reg = spot_region_lookup.get(spot_name)
+                    if reg:
+                        entry["region_id"] = reg[0]
+                        entry["region_name"] = reg[1]
+
+            # counts_by_region Fallback — alter Cache hat das Feld nicht.
+            # Berechnung aus engine.spot_analyses, damit Frontend-Filter
+            # korrekte fliegbar/abgleiter/nogo/bedingt-Werte anzeigen kann.
+            if not day.get("counts_by_region"):
+                date_str = day.get("date")
+                cbr = {}
+                if date_str and hasattr(engine, "spot_analyses"):
+                    for spot_name, days in (engine.spot_analyses or {}).items():
+                        if not spot_name or not str(spot_name).strip():
+                            continue
+                        e = days.get(date_str) if isinstance(days, dict) else None
+                        if not e:
+                            continue
+                        rid_tuple = spot_region_lookup.get(spot_name)
+                        rid = rid_tuple[0] if rid_tuple else "unknown"
+                        c = cbr.setdefault(rid, {"flyable": 0, "bronze": 0, "nogo": 0, "conditional": 0})
+                        safety = e.get("safety", {}) or {}
+                        ss = safety.get("safety_status", "") or ""
+                        fs = e.get("fly_status", "") or (e.get("flyability", {}) or {}).get("fly_status", "") or ""
+                        if ss == "not_safe":
+                            c["nogo"] += 1
+                            continue
+                        if fs == "gray":
+                            c["bronze"] += 1
+                            continue
+                        if ss == "conditional":
+                            c["conditional"] += 1
+                        if fs in ("green", "violet"):
+                            c["flyable"] += 1
+                day["counts_by_region"] = cbr
+    except Exception:
+        pass
+    return jsonify(data)
+
+
+@app.route("/api/newspaper/generate", methods=["POST"])
+def api_newspaper_generate():
+    """Triggert die LLM-Wochenzusammenfassung (neu generieren)."""
+    result = engine.generate_weekly_newspaper()
+    status = 200 if result.get("success") else 500
+    return jsonify(result), status
 
 
 # ============================================================================
@@ -172,7 +330,8 @@ def api_chat():
 @app.route("/api/reset-chat", methods=["POST"])
 def api_reset_chat():
     """Setzt die aktuelle Konversation zurück."""
-    session_id = request.json.get("session_id")
+    data = request.get_json(silent=True) or {}
+    session_id = data.get("session_id")
     if session_id:
         engine.reset_conversation(session_id)
         return jsonify({"success": True})
@@ -193,12 +352,56 @@ def api_run_analyses():
 
 @app.route("/api/analyses")
 def api_analyses():
-    """Debug-Endpoint: Zeigt aktuelle Voranalysen als JSON."""
-    return jsonify({
-        "analyses_count": len(engine.spot_analyses),
-        "analyses_loaded_at": engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None,
-        "analyses": engine.spot_analyses,
-    })
+    """Gibt Spot-Analysen im flachen Format zurück (wie InstantDB-Subscription)."""
+    flat = {}
+    loaded_at = engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None
+    for spot_name, days in engine.spot_analyses.items():
+        flat[spot_name] = {}
+        for date_str, entry in days.items():
+            safety = entry.get("safety", {})
+            fly = entry.get("flyability", {})
+            fly_status = entry.get("fly_status", "")
+            doc = {
+                "spot": spot_name,
+                "date": date_str,
+                "status": entry.get("status", "error"),
+                "safety_status": safety.get("safety_status", "error"),
+                "safe_window": safety.get("safe_window", "keins"),
+                "best_window": entry.get("best_window", "?"),
+                "safety_feedback": safety.get("summary", ""),
+                "error": safety.get("error", ""),
+                "foehn_risk": safety.get("foehn_risk", "none"),
+                "wind_summary": safety.get("wind_summary", ""),
+                "updated_at": loaded_at,
+                "rating": float(entry.get("rating", 0.0) or 0.0),
+                "is_conditional": bool(entry.get("is_conditional", False)),
+                "conditional_reason": entry.get("conditional_reason", "") or "",
+            }
+            for key in ("no_go_reasons", "caution_notes"):
+                val = safety.get(key, [])
+                doc[key] = json.dumps(val, ensure_ascii=False) if isinstance(val, list) else str(val)
+            for lbl_key in ("primary_no_go", "primary_caution", "primary_reducer", "primary_booster"):
+                doc[lbl_key] = safety.get(lbl_key) or None
+            ss = safety.get("safety_status", "error")
+            if fly and fly_status and ss in ("safe", "conditional"):
+                doc["fly_status"] = fly_status
+                doc["flyability_tier"] = fly_status
+                doc["flight_type"] = fly.get("flight_type", "")
+                doc["flight_duration"] = fly.get("flight_duration_estimate", "")
+                doc["xc_potential"] = fly.get("xc_potential", "")
+                doc["peak_climb_rate"] = fly.get("peak_climb_rate", 0)
+                doc["flyability_feedback"] = fly.get("recommendation", "")
+                for lkey in ("flyability_limits", "highlights"):
+                    val = fly.get(lkey, [])
+                    if isinstance(val, list):
+                        val = val[:3]
+                    doc[lkey] = json.dumps(val if isinstance(val, list) else [], ensure_ascii=False)
+            else:
+                doc["fly_status"] = ""
+                doc["flyability_tier"] = ""
+                doc["fly_error"] = entry.get("fly_error", "")
+            flat[spot_name][date_str] = doc
+    return jsonify({"spot_analyses": flat, "analyses_count": len(flat)})
 
 
 @app.route("/api/run-region-analyses", methods=["POST"])
@@ -213,12 +416,49 @@ def api_run_region_analyses():
 
 @app.route("/api/region-analyses")
 def api_region_analyses():
-    """Debug-Endpoint: Zeigt aktuelle Region-Analysen als JSON."""
-    return jsonify({
-        "analyses_count": len(engine.region_analyses),
-        "analyses_loaded_at": engine.region_analyses_loaded_at.isoformat() if engine.region_analyses_loaded_at else None,
-        "analyses": engine.region_analyses,
-    })
+    """Gibt Region-Analysen im flachen Format zurück."""
+    flat = {}
+    loaded_at = engine.region_analyses_loaded_at.isoformat() if engine.region_analyses_loaded_at else None
+    for rid, days in engine.region_analyses.items():
+        flat[rid] = {}
+        for date_str, entry in days.items():
+            safety = entry.get("safety", {})
+            fly = entry.get("flyability", {})
+            fly_status = entry.get("fly_status", "")
+            ss = safety.get("safety_status", entry.get("safety_status", "error"))
+            doc = {
+                "region_id": rid,
+                "region_name": entry.get("region_name", rid),
+                "date": date_str,
+                "status": entry.get("status", "error"),
+                "safety_status": ss,
+                "safe_window": safety.get("safe_window", entry.get("safe_window", "keins")),
+                "best_window": entry.get("best_window", "?"),
+                "safety_feedback": safety.get("summary", entry.get("summary", "")),
+                "foehn_risk": safety.get("foehn_risk", entry.get("foehn_risk", "none")),
+                "wind_summary": safety.get("wind_summary", entry.get("wind_summary", "")),
+                "updated_at": loaded_at,
+                "rating": float(entry.get("rating", 0.0) or 0.0),
+                "is_conditional": bool(entry.get("is_conditional", False)),
+                "conditional_reason": entry.get("conditional_reason", "") or "",
+            }
+            for key in ("no_go_reasons", "caution_notes"):
+                val = safety.get(key, entry.get(key, []))
+                doc[key] = json.dumps(val, ensure_ascii=False) if isinstance(val, list) else str(val)
+            for lbl_key in ("primary_no_go", "primary_caution", "primary_reducer", "primary_booster"):
+                doc[lbl_key] = safety.get(lbl_key) or None
+            if fly and fly_status and ss in ("safe", "conditional"):
+                doc["fly_status"] = fly_status
+                doc["flyability_tier"] = fly_status
+                doc["recommendation"] = fly.get("recommendation", "")
+                doc["peak_climb_rate"] = fly.get("peak_climb_rate", 0)
+                doc["flight_type"] = fly.get("flight_type", "")
+            else:
+                doc["fly_status"] = ""
+                doc["flyability_tier"] = ""
+                doc["fly_error"] = entry.get("fly_error", "")
+            flat[rid][date_str] = doc
+    return jsonify({"region_analyses": flat, "analyses_count": len(flat)})
 
 
 import queue as _queue_mod
@@ -394,12 +634,14 @@ def api_refresh_weather():
             reason = getattr(engine, "last_refresh_status_reason", "unknown") or "unknown"
             reason_msgs = {
                 "api_pre_check_failed": "Open-Meteo API nicht erreichbar (Pre-Check fehlgeschlagen)",
-                "daily_limit_exceeded": "Open-Meteo Tageslimit (10000 Calls/Tag) erreicht",
+                "daily_limit_exceeded": "Open-Meteo Tageslimit erreicht",
             }
             human_reason = reason_msgs.get(reason)
             if not human_reason:
                 if reason.startswith("batch_failed"):
-                    human_reason = "Batch-Download fehlgeschlagen — vermutlich Minuten-Rate-Limit (600 weighted/min)"
+                    # Echten Fehler aus dem Reason extrahieren statt Rate-Limit zu vermuten
+                    detail = reason.replace("batch_failed: ", "")
+                    human_reason = f"Batch-Download fehlgeschlagen ({detail})"
                 else:
                     human_reason = reason
             return jsonify({
@@ -544,6 +786,41 @@ def _group_profiles_by_day(alt_data):
     return sorted_dates, by_day
 
 
+def _ground_wind_by_day(hourly_data, elevation_m, sorted_dates):
+    """Extrahiert Bodenwind (10m, terrain-korrigiert) pro Tag/Stunde.
+
+    Dies ist der sicherheitsrelevante Startwind — nicht der freie Höhenwind.
+    Open-Meteo `wind_direction_10m` ist bereits terrain-korrigiert (Talwind,
+    Hangeffekte via ICON Surface Scheme), `wind_direction_XhPa` nicht.
+    """
+    result = {d: [] for d in sorted_dates}
+    if not hourly_data:
+        return result
+    for timestamp, hd in hourly_data.items():
+        try:
+            dt = datetime.fromisoformat(timestamp)
+        except Exception:
+            continue
+        date_str = dt.strftime("%Y-%m-%d")
+        if date_str not in result:
+            continue
+        ws = hd.get("wind_speed_10m")
+        wd = hd.get("wind_direction_10m")
+        wg = hd.get("wind_gusts_10m")
+        if ws is None and wd is None and wg is None:
+            continue
+        result[date_str].append({
+            "hour": dt.hour,
+            "wind_speed": float(ws) if ws is not None else None,
+            "wind_direction": float(wd) if wd is not None else None,
+            "wind_gusts": float(wg) if wg is not None else None,
+            "elevation_m": elevation_m,
+        })
+    for d in result:
+        result[d].sort(key=lambda x: x["hour"])
+    return result
+
+
 def _stale_meta():
     """Returns (last_updated, is_stale) from weather cache metadata."""
     cache_meta = engine.weather_data.get("_meta", {}) if engine.weather_data else {}
@@ -561,7 +838,8 @@ def api_region_weather(region_id):
     pressure_level_data = region_data.get("pressure_level_data", {})
     elevation_ref = region_data.get("elevation_ref", 1200)
 
-    chart_data = format_data_for_charts(hourly_data, pressure_level_data, elevation_ref=elevation_ref)
+    chart_data = format_data_for_charts(hourly_data, pressure_level_data, elevation_ref=elevation_ref,
+                                        region_id=region_id)
     sorted_dates, by_day = _group_chart_by_day(chart_data)
     last_updated, _ = _stale_meta()
 
@@ -588,8 +866,14 @@ def api_region_altitude_wind(region_id):
     hourly_data = region_data.get("hourly_data", {})
     elevation_ref = region_data.get("elevation_ref", 1200)
 
-    # Multi-Anchor: Spots in Region finden und Anker pro Timestamp sammeln
-    gust_anchors_by_time = None
+    # Multi-Spot-Bodenexzess (Apr 2026 Refactor):
+    # Statt Spot-Höhen als vertikale Anker zu nutzen (10m-Bodenmessung ist
+    # KEINE Höhenmessung der freien Atmosphäre!), aggregieren wir die Boden-
+    # exzesse aller Spots in der Region zu einem robusten Region-Wert.
+    # Das Höhenprofil wird dann via Single-Anchor + Gauss-Decay aufgebaut.
+    gust_anchors_by_time = None  # Multi-Anker deaktiviert
+    spot_excesses_by_time = {}    # {timestamp: [excess1, excess2, ...]}
+
     region_info = find_region_for_point(
         region_data.get("latitude", 0), region_data.get("longitude", 0)
     )
@@ -608,28 +892,45 @@ def api_region_altitude_wind(region_id):
             s for s in engine.spots
             if region_polygon.contains(ShapelyPoint(s["longitude"], s["latitude"]))
         ]
-        if region_spots:
-            gust_anchors_by_time = {}
-            for timestamp in pressure_level_data.keys():
-                # Nur Spot-Anker für Höhenprofil (keine Referenzpunkt-Bodenböen —
-                # Bodenturbulenzen gehören nicht ins atmosphärische Höhenprofil)
-                anchors = collect_gust_anchors(
-                    region_polygon, region_spots, engine.weather_data, timestamp,
-                )
-                if anchors:
-                    gust_anchors_by_time[timestamp] = anchors
+        # Sammle Bodenexzess (gust_10m - wind_10m) pro Stunde von allen Spots.
+        # Die Werte werden später via aggregate_spot_excess (Median bei ≥3,
+        # Mittel bei 2, Pass-through bei 1) zu einem robusten Region-Exzess.
+        for spot in region_spots:
+            spot_data = engine.weather_data.get(spot["name"])
+            if not spot_data:
+                continue
+            for ts, hd in spot_data.get("hourly_data", {}).items():
+                ws = hd.get("wind_speed_10m")
+                gust = hd.get("wind_gusts_10m")
+                if ws is None or gust is None:
+                    continue
+                excess = max(0.0, float(gust) - float(ws))
+                spot_excesses_by_time.setdefault(ts, []).append(excess)
 
-    # Surface anchor: Referenzpunkt-Bodenböen als Ankerpunkt pro Timestamp
+    # Surface anchor: ein einziger Anker am Region-Referenzpunkt mit
+    # aggregiertem Multi-Spot-Bodenexzess. Der Region-Center-Exzess fliesst
+    # mit ein, sodass auch Regionen ohne Spots einen sauberen Wert liefern.
     surface_anchor_by_time = {}
     for timestamp, hour_data in hourly_data.items():
         gust = hour_data.get("wind_gusts_10m")
         ws = hour_data.get("wind_speed_10m")
-        if gust is not None and ws is not None:
-            surface_anchor_by_time[timestamp] = {
-                "elevation_m": elevation_ref,
-                "gust_kmh": float(gust),
-                "wind_speed_kmh": float(ws),
-            }
+        wd = hour_data.get("wind_direction_10m")
+        if gust is None or ws is None:
+            continue
+
+        ws_f = float(ws)
+        ref_excess = max(0.0, float(gust) - ws_f)
+        excesses = list(spot_excesses_by_time.get(timestamp, []))
+        excesses.append(ref_excess)
+        agg_excess = aggregate_spot_excess(excesses)
+        aggregated_gust = ws_f + agg_excess
+
+        surface_anchor_by_time[timestamp] = {
+            "elevation_m": elevation_ref,
+            "gust_kmh": aggregated_gust,
+            "wind_speed_kmh": ws_f,
+            "wind_direction_10m": float(wd) if wd is not None else None,
+        }
 
     alt_data = format_altitude_wind_for_charts(
         pressure_level_data, hourly_data, elevation_ref, region_id,
@@ -638,12 +939,15 @@ def api_region_altitude_wind(region_id):
     )
 
     sorted_dates, by_day = _group_profiles_by_day(alt_data)
+    ground_wind = _ground_wind_by_day(hourly_data, elevation_ref, sorted_dates)
     last_updated, _ = _stale_meta()
 
     return jsonify({
         "region_id": region_id,
+        "elevation_m": elevation_ref,
         "dates": sorted_dates,
         "data": by_day,
+        "ground_wind": ground_wind,
         "stale": len(sorted_dates) < config.FORECAST_DAYS,
         "last_updated": last_updated,
         "expected_days": config.FORECAST_DAYS,
@@ -690,18 +994,22 @@ def api_weather(spot_name):
     pressure_level_data = spot_data.get("pressure_level_data", {})
     elevation_m = spot_data.get("elevation_m", 850)
 
-    # Finde den Spot für slope_azimuth/angle
+    # Finde den Spot für slope_azimuth/angle und Region-ID
     spot_info = None
     for s in engine.spots:
         if s["name"] == spot_name:
             spot_info = s
             break
 
+    spot_region = find_region_for_point(spot_data.get("latitude", 0), spot_data.get("longitude", 0))
+    spot_region_id = spot_region["id"] if spot_region else None
+
     chart_data = format_data_for_charts(
         hourly_data, pressure_level_data,
         elevation_ref=elevation_m,
         slope_azimuth=spot_info.get("slope_azimuth") if spot_info else None,
         slope_angle=spot_info.get("slope_angle") if spot_info else None,
+        region_id=spot_region_id,
     )
 
     sorted_dates, by_day = _group_chart_by_day(chart_data)
@@ -743,11 +1051,13 @@ def api_altitude_wind(spot_name):
     for timestamp, hour_data in hourly_data.items():
         gust = hour_data.get("wind_gusts_10m")
         ws = hour_data.get("wind_speed_10m")
+        wd = hour_data.get("wind_direction_10m")
         if gust is not None and ws is not None:
             surface_anchor_by_time[timestamp] = {
                 "elevation_m": elevation_m,
                 "gust_kmh": float(gust),
                 "wind_speed_kmh": float(ws),
+                "wind_direction_10m": float(wd) if wd is not None else None,
             }
 
     alt_data = format_altitude_wind_for_charts(
@@ -756,12 +1066,15 @@ def api_altitude_wind(spot_name):
     )
 
     sorted_dates, by_day = _group_profiles_by_day(alt_data)
+    ground_wind = _ground_wind_by_day(hourly_data, elevation_m, sorted_dates)
     last_updated, _ = _stale_meta()
 
     return jsonify({
         "spot_name": spot_name,
+        "elevation_m": elevation_m,
         "dates": sorted_dates,
         "data": by_day,
+        "ground_wind": ground_wind,
         "stale": len(sorted_dates) < config.FORECAST_DAYS,
         "last_updated": last_updated,
         "expected_days": config.FORECAST_DAYS,
@@ -858,7 +1171,7 @@ def _safe_get(arr, i):
 # ============================================================================
 
 def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=None,
-                           slope_azimuth=None, slope_angle=None):
+                           slope_azimuth=None, slope_angle=None, region_id=None):
     """Formatiert Daten für D3.js Charts inkl. Thermik-Physik."""
     chart_data = {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}
     sorted_times = sorted(hourly_data.keys())
@@ -958,6 +1271,7 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     cumulative_buoyancy=cumulative_bf,
                     peak_H=peak_H,
                     peak_shortwave=peak_sw,
+                    region_id=region_id,
                 )
                 if "error" not in therm:
                     therm_climb = therm["climb_rate"]
@@ -1186,9 +1500,11 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
 
                 levels = sorted(profile["levels"], key=lambda l: l["altitude"])
 
-                # Wind/dir/temp: rein aus Drucklevel-Daten (freie Atmosphäre).
-                # Der Anker-Bodenwind wird NICHT eingefügt — er ist terrain-
-                # geschützt (10m AGL) und würde einen künstlichen Dip erzeugen.
+                # Wind/dir/temp: Drucklevel-Daten (freie Atmosphäre) für die Höhe,
+                # aber am Boden (0m AGL) wird der 10m-Bodenwind verwendet.
+                # Grund: Open-Meteo Bodenwind ist terrain-korrigiert (Talwind/
+                # Hangeffekte), während PL-Wind an gleicher Höhe freie Atmosphäre
+                # zeigt. Für den Startplatz ist der Bodenwind die relevante Grösse.
                 ws_pts = []
                 for lv in levels:
                     ws_pts.append((
@@ -1206,6 +1522,10 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
                 )
 
                 # Build grid: wind_speed/dir/temp + model gusts
+                # Am Boden (0m AGL) wird der 10m-Bodenwind eingesetzt statt
+                # PL-Interpolation — er reflektiert die realen Startbedingungen.
+                sfc_ws = anchor.get("wind_speed_kmh")
+                sfc_dir = anchor.get("wind_direction_10m")
                 grid_alts = []
                 grid_gusts_bg = []
                 grid_ws = []
@@ -1214,6 +1534,11 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
                 for grid_alt in range(0, GRID_MAX + 1, GRID_STEP):
                     ws_val, dir_val, temp_val = _interp_ws(ws_pts, grid_alt)
                     gust_val = _interp_scalar(gust_pts, grid_alt)
+                    # 0m AGL = Startplatz: Bodenwind statt PL-Interpolation
+                    if grid_alt == 0 and sfc_ws is not None:
+                        ws_val = sfc_ws
+                    if grid_alt == 0 and sfc_dir is not None:
+                        dir_val = sfc_dir
                     grid_alts.append(grid_alt)
                     grid_gusts_bg.append(gust_val)
                     grid_ws.append(ws_val)
@@ -1271,12 +1596,21 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
                         "temperature": round(grid_temp[i], 1),
                     })
 
-                # Running Maximum nur auf T(z) = wind_gusts (Safety-Layer).
-                # W(z) = wind_speed bleibt physikalisch ehrlich.
+                # Running Maximum nur INNERHALB der Grenzschicht (PBL × 1.2)
+                # als Safety-Layer. Über der PBL gibt es keine Boden-getriebene
+                # Turbulenz mehr → Böe folgt der natürlichen Gauss-Decay (= Wind).
+                # Vorher wurde der Max-Wert unbegrenzt nach oben durchgezogen,
+                # was Höhen-Böen auf 4 km systematisch überschätzte (z.B.
+                # 36 km/h statt physikalisch korrekter ~21 km/h).
+                pbl_cap_alt = ((elevation_m or 0) + blh * 1.2) if blh > 0 else float("inf")
+
                 running_max = 0.0
                 for lv in grid_levels:
-                    running_max = max(running_max, lv["wind_gusts"])
-                    lv["wind_gusts"] = running_max
+                    if lv["altitude"] <= pbl_cap_alt:
+                        # In/an der PBL: Running-Max anwenden (Sicherheit)
+                        running_max = max(running_max, lv["wind_gusts"])
+                        lv["wind_gusts"] = running_max
+                    # Über PBL: wind_gusts bleibt der OI-Wert (decayed → Wind)
                     lv["turbulence_excess"] = round(lv["wind_gusts"] - lv["wind_speed"], 1)
 
                 profile["levels"] = grid_levels

@@ -100,7 +100,7 @@
 
     .resizer:hover,
     .resizer.dragging {
-        background: rgba(79, 70, 229, 0.04);
+        background: rgba(3, 105, 161, 0.04);
     }
 
     .chat-header {
@@ -158,7 +158,7 @@
     .progress-bar-fill {
         height: 100%;
         border-radius: 2px;
-        background: linear-gradient(90deg, var(--color-primary-vivid), #818CF8);
+        background: linear-gradient(90deg, var(--color-primary-vivid), #38bdf8);
         width: 0%;
         transition: width 0.5s ease;
     }
@@ -340,21 +340,45 @@
         }
 
         .unified-layout {
-            flex-direction: row;
+            flex-direction: column;
         }
 
         .chat-sidebar {
             width: 100% !important;
             min-width: 0 !important;
             max-width: none !important;
-            height: 100% !important;
+            flex: 1 1 auto;
+            height: auto !important;
             border-right: none;
             flex-shrink: 0;
         }
 
+        /* Mini-map peek strip */
         .map-main {
             width: 100%;
-            height: 100%;
+            height: 56px;
+            flex-shrink: 0;
+            order: -1;
+            overflow: hidden;
+            border-bottom: 1px solid var(--color-border);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .map-main::after {
+            content: 'Karte anzeigen \25BE';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            background: linear-gradient(transparent, rgba(255,255,255,0.9));
+            padding: 8px 0 4px;
+            pointer-events: none;
+            z-index: 1001;
         }
 
         .resizer {
@@ -365,8 +389,18 @@
             display: none;
         }
 
-        .unified-layout.show-chat .map-main {
+        .unified-layout.show-map .map-main {
+            height: 100%;
+            order: 0;
+            border-bottom: none;
+        }
+
+        .unified-layout.show-map .map-main::after {
             display: none;
+        }
+
+        .unified-layout.show-chat .map-main {
+            display: flex;
         }
     }
 
@@ -387,9 +421,9 @@
                         <span class="spinner"></span>
                         <span class="btn-text">Wetter laden</span>
                     </button>
-                    <button id="runAnalysesBtn" class="btn btn-secondary btn-sm" aria-label="LLM Analyse starten">
+                    <button id="runAnalysesBtn" class="btn btn-secondary btn-sm attention-pulse" aria-label="Analyse starten">
                         <span class="spinner"></span>
-                        <span class="btn-text">Voranalyse</span>
+                        <span class="btn-text">Analyse starten</span>
                     </button>
                     <button id="resetChatBtn" class="btn btn-danger btn-sm" aria-label="Neuen Chat starten">
                         <span>↺</span> Neuer Chat
@@ -397,6 +431,8 @@
                 </div>
             </div>
             <div class="chat-messages" id="chatMessages" style="overflow-x: hidden;" aria-live="polite" aria-relevant="additions">
+                <!-- Morning Briefing Card (populated by chat.js when analyses exist) -->
+                <div id="morningBriefing" style="display:none;"></div>
                 <div class="chat-message bot">
                     Hallo! Ich bin dein Flychat-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
                 </div>
@@ -431,17 +467,18 @@
     <main class="map-main">
         <div id="map"></div>
 
-        <!-- Floating Day Tabs for Map -->
-        <div class="floating-control floating-day-tabs" id="mapDayTabs" style="display: none;"></div>
-
         <!-- Meteogram Overlay -->
         <div class="meteogram-overlay" id="meteogramOverlay" role="dialog" aria-modal="true" aria-label="Meteogramm">
             <div class="meteogram-panel">
                 <div class="overlay-swipe-handle"></div>
                 <div class="meteogram-header">
-                    <div>
+                    <div class="meteogram-header-text">
                         <h2 id="meteogramTitle">Meteogramm</h2>
                         <span class="spot-info" id="meteogramInfo"></span>
+                    </div>
+                    <div class="meteogram-rating-badge" id="meteogramRatingBadge" style="display:none;">
+                        <span class="meteogram-rating-value" id="meteogramRatingValue">—</span>
+                        <span class="meteogram-rating-label">/ 10</span>
                     </div>
                     <button class="meteogram-close" id="meteogramClose" aria-label="Schliessen">&times;</button>
                 </div>
@@ -601,30 +638,50 @@
         // Mobile toggle (Chat / Karte) via bottom nav
         var mobileNav = document.getElementById('mobileNav');
         if (mobileNav && layout) {
-            // Default: show chat on phone
+            // Default: show chat on phone (with mini-map peek)
             if (window.innerWidth < 640) {
                 layout.classList.add('show-chat');
             }
-            mobileNav.addEventListener('click', function (e) {
-                var btn = e.target.closest('.mobile-nav-item[data-target]');
-                if (!btn) return;
-                var target = btn.getAttribute('data-target');
+
+            function switchMobileView(target) {
                 if (target !== 'chat' && target !== 'map') return;
-                // Update active state on chat/map buttons only
                 mobileNav.querySelectorAll('.mobile-nav-item[data-target]').forEach(function (b) {
                     b.classList.remove('active');
                 });
-                btn.classList.add('active');
+                var activeBtn = mobileNav.querySelector('.mobile-nav-item[data-target="' + target + '"]');
+                if (activeBtn) activeBtn.classList.add('active');
                 layout.classList.remove('show-chat', 'show-map');
                 layout.classList.add('show-' + target);
                 if (target === 'map' && window.flychatMap) {
                     setTimeout(function () { window.flychatMap.invalidateSize(); }, 50);
                 }
+            }
+
+            mobileNav.addEventListener('click', function (e) {
+                var btn = e.target.closest('.mobile-nav-item[data-target]');
+                if (!btn) return;
+                switchMobileView(btn.getAttribute('data-target'));
             });
+
+            // Mini-map peek tap → expand to full map
+            var mapMain = document.querySelector('.map-main');
+            if (mapMain && window.innerWidth < 640) {
+                mapMain.addEventListener('click', function () {
+                    if (!layout.classList.contains('show-map')) {
+                        switchMobileView('map');
+                    }
+                });
+            }
         }
 
         window.addEventListener('load', function () {
-            if (window.flychatMap) window.flychatMap.invalidateSize();
+            if (window.flychatMap) {
+                window.flychatMap.invalidateSize();
+                // On mobile, invalidate again after a short delay for the mini-map peek
+                if (window.innerWidth < 640) {
+                    setTimeout(function () { window.flychatMap.invalidateSize(); }, 200);
+                }
+            }
         });
 
         // Meteogram overlay: scroll-lock + swipe-dismiss + focus management
@@ -655,28 +712,7 @@
 import { init } from 'https://esm.sh/@instantdb/core';
 
 const APP_ID = '{{ instantdb_app_id }}';
-const FORECAST_DAYS = {{ forecast_days }};
 const db = init({ appId: APP_ID });
-
-function enumerateForecastDates() {
-    var now = new Date();
-    var out = [];
-    for (var i = 0; i < FORECAST_DAYS; i++) {
-        var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-        out.push(
-            d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
-        );
-    }
-    return out;
-}
-
-function formatDayTabLabel(dateStr) {
-    var d = new Date(dateStr + 'T12:00:00');
-    var dayNames = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
-    var dd = String(d.getDate()).padStart(2, '0');
-    var mm = String(d.getMonth() + 1).padStart(2, '0');
-    return dayNames[d.getDay()] + ' ' + dd + '.' + mm;
-}
 
 function normalizeFlyTier(ft) {
     if (!ft) return '';
@@ -687,37 +723,46 @@ function normalizeFlyTier(ft) {
     return 'green';
 }
 
-var dayTabsEl = document.getElementById('mapDayTabs');
-var dates = enumerateForecastDates();
-var currentDate = dates[0];
-window.currentDate = currentDate;
-var analysisData = null;
+// Re-color markers when day changes via navbar tabs
+window.addEventListener('flychat-day-change', function(e) {
+    if (window.analysisData && window.updateSpotColors) {
+        window.updateSpotColors(window.analysisData, e.detail.date);
+    }
+});
 
-// Build day tabs
-function buildDayTabs() {
-    if (!dayTabsEl) return;
-    dayTabsEl.innerHTML = '';
-    dates.forEach(function(dateStr) {
-        var btn = document.createElement('button');
-        btn.className = 'floating-day-tab' + (dateStr === currentDate ? ' active' : '');
-        btn.dataset.date = dateStr;
-        btn.textContent = formatDayTabLabel(dateStr);
-        btn.addEventListener('click', function() {
-            currentDate = dateStr;
-            window.currentDate = dateStr;
-            dayTabsEl.querySelectorAll('.floating-day-tab').forEach(function(b) { b.classList.remove('active'); });
-            btn.classList.add('active');
-            if (window.updateSpotColors && analysisData) {
-                window.updateSpotColors(analysisData, currentDate);
+// ── Helper: normalize fly_status in nested analysis data ──
+function _normalizeFlyStatusInNested(nested) {
+    for (var key in nested) {
+        for (var ds in nested[key]) {
+            if (nested[key][ds].fly_status) {
+                nested[key][ds].fly_status = normalizeFlyTier(nested[key][ds].fly_status);
             }
-            // Notify meteogram overlay of day change
-            window.dispatchEvent(new CustomEvent('flychat-day-change', { detail: { date: dateStr } }));
-        });
-        dayTabsEl.appendChild(btn);
-    });
-    dayTabsEl.style.display = 'flex';
+        }
+    }
+    return nested;
 }
 
+// ── Primary: Load analyses from API (always available, no InstantDB dependency) ──
+fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.spot_analyses && Object.keys(data.spot_analyses).length > 0) {
+        window.analysisData = _normalizeFlyStatusInNested(data.spot_analyses);
+        if (window.updateSpotColors) {
+            window.updateSpotColors(window.analysisData, window.currentDate);
+        }
+        // Notify open spot panel to re-render analysis view
+        window.dispatchEvent(new CustomEvent('flychat-analyses-loaded'));
+        console.log('[INIT] Spot-Analysen via API geladen:', Object.keys(data.spot_analyses).length);
+    }
+}).catch(function(e) { console.warn('API spot analyses fetch failed:', e); });
+
+fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.region_analyses && Object.keys(data.region_analyses).length > 0) {
+        window.regionAnalysisData = _normalizeFlyStatusInNested(data.region_analyses);
+        console.log('[INIT] Region-Analysen via API geladen:', Object.keys(data.region_analyses).length);
+    }
+}).catch(function(e) { console.warn('API region analyses fetch failed:', e); });
+
+// ── Secondary: InstantDB subscriptions for live updates (after new analysis runs) ──
 db.subscribeQuery({ spot_analyses: {} }, function(resp) {
     if (resp.error) {
         console.error('Spot InstantDB Fehler:', resp.error.message);
@@ -725,12 +770,8 @@ db.subscribeQuery({ spot_analyses: {} }, function(resp) {
     }
     if (resp.data) {
         var entries = resp.data.spot_analyses || [];
-        if (entries.length === 0) {
-            if (dayTabsEl) dayTabsEl.style.display = 'none';
-            return;
-        }
+        if (entries.length === 0) return;
 
-        // Build nested structure: {spot_name: {date_str: analysis}}
         var nested = {};
         entries.forEach(function(e) {
             var spot = e.spot;
@@ -744,18 +785,37 @@ db.subscribeQuery({ spot_analyses: {} }, function(resp) {
             nested[spot][ds] = copy;
         });
 
-        analysisData = nested;
         window.analysisData = nested;
 
-        // Build day tabs if not built yet
-        if (dayTabsEl && dayTabsEl.children.length === 0) {
-            buildDayTabs();
-        }
-
-        // Color markers for current selected date
         if (window.updateSpotColors) {
-            window.updateSpotColors(nested, currentDate);
+            window.updateSpotColors(nested, window.currentDate);
         }
+    }
+});
+
+db.subscribeQuery({ region_analyses: {} }, function(resp) {
+    if (resp.error) {
+        console.error('Region InstantDB Fehler:', resp.error.message);
+        return;
+    }
+    if (resp.data) {
+        var entries = resp.data.region_analyses || [];
+        if (entries.length === 0) return;
+
+        var nested = {};
+        entries.forEach(function(e) {
+            var rid = e.region_id;
+            var ds = e.date;
+            if (!rid || !ds) return;
+            if (!nested[rid]) nested[rid] = {};
+            var copy = Object.assign({}, e);
+            if (copy.fly_status) {
+                copy.fly_status = normalizeFlyTier(copy.fly_status);
+            }
+            nested[rid][ds] = copy;
+        });
+
+        window.regionAnalysisData = nested;
     }
 });
 </script>

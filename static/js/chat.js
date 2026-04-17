@@ -331,10 +331,17 @@
                 clearStatus();
                 var errorDiv = document.createElement('div');
                 errorDiv.className = 'message bot-message';
-                errorDiv.innerHTML = '<div class="message-content">' +
-                    '<p>Fehler: ' + err.message + '</p>' +
-                    '<button class="btn btn-secondary btn-sm" onclick="this.parentNode.parentNode.remove();" style="margin-top:8px;">Verwerfen</button> ' +
-                    '</div>';
+                var contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                var msgP = document.createElement('p');
+                msgP.textContent = 'Fehler: ' + (err && err.message ? err.message : 'Unbekannt');
+                contentDiv.appendChild(msgP);
+                var dismissBtn = document.createElement('button');
+                dismissBtn.className = 'btn btn-secondary btn-sm';
+                dismissBtn.style.marginTop = '8px';
+                dismissBtn.textContent = 'Verwerfen';
+                dismissBtn.addEventListener('click', function () { errorDiv.remove(); });
+                contentDiv.appendChild(dismissBtn);
                 var retryBtn = document.createElement('button');
                 retryBtn.className = 'btn btn-primary btn-sm';
                 retryBtn.style.marginTop = '8px';
@@ -344,7 +351,8 @@
                     errorDiv.remove();
                     sendMessage(text);
                 });
-                errorDiv.querySelector('.message-content').appendChild(retryBtn);
+                contentDiv.appendChild(retryBtn);
+                errorDiv.appendChild(contentDiv);
                 messagesEl.appendChild(errorDiv);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             })
@@ -582,7 +590,7 @@
         var details = data.results_summary || {};
         var summary = '';
         var flyTierLabels = {
-            gray: 'Grau (Abgleiter)',
+            gray: 'Bronze (Abgleiter)',
             green: 'Gr\u00fcn',
             violet: 'Violett',
             not_safe: '\u2014',
@@ -728,24 +736,25 @@
             if (refreshWeatherBtn) refreshWeatherBtn.disabled = true;
 
             var card = createProgressCard('LLM-Analyse', [
-                'Sicherheitscheck',
-                'Fliegbarkeit'
+                'Analyse'
             ]);
 
             var phaseMap = {
                 'all_safety': 0,
-                'all_fly': 1,
+                'all_fly': 0,
+                // Combined phases (single call per spot/region)
+                'region_combined': 0,
+                'spot_combined': 0,
                 // Legacy single-type phases (run_spot/region_analyses_stream)
                 'region_safety': 0,
-                'region_fly': 1,
+                'region_fly': 0,
                 'spot_safety': 0,
-                'spot_fly': 1
+                'spot_fly': 0
             };
 
             // Track per-type progress within each phase
             var phaseProgress = {
-                0: { region: 0, spot: 0, region_total: 0, spot_total: 0 },
-                1: { region: 0, spot: 0, region_total: 0, spot_total: 0 }
+                0: { region: 0, spot: 0, region_total: 0, spot_total: 0 }
             };
 
             var regionStats = null;
@@ -755,8 +764,7 @@
             var es = new EventSource('/api/run-all-analyses-stream');
 
             var baseLabels = [
-                'Sicherheitscheck',
-                'Fliegbarkeit'
+                'Analyse'
             ];
 
             function finish(success, extraHtml, errorMsg) {
@@ -832,6 +840,13 @@
                 ]);
                 var dayChips = buildDayChipsHtml(ss);
                 finish(true, stats + dayChips);
+
+                // Update button text to show completion time
+                var hh = String(new Date().getHours()).padStart(2, '0');
+                var mm = String(new Date().getMinutes()).padStart(2, '0');
+                var textEl = runAnalysesBtn.querySelector('.btn-text');
+                if (textEl) textEl.textContent = 'Analyse aktualisieren (' + hh + ':' + mm + ')';
+                runAnalysesBtn.classList.remove('attention-pulse');
             });
 
             // Server-sent error event (event: error\ndata: {...})
@@ -938,18 +953,340 @@
         setTimeout(function () { showHint(qa, 'Klicke hier fuer Schnellfragen'); }, 1500);
     })();
 
+    // ── Week Briefing Card (region-based) ──────────────────────────
+    var briefingEl = document.getElementById('morningBriefing');
+    var briefingBuilt = false;
+
+    var WEEKDAYS_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    var WEEKDAYS_FULL = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+    function _dateStr(d) {
+        return d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    }
+
+    function _tierDot(safety, tier) {
+        var cls = 'tier-' + (safety === 'not_safe' ? 'not-safe' : (tier || 'gray'));
+        var icons = { 'violet': '\u2605', 'green': '\u2713', 'gray': '\u223C' };
+        var icon = safety === 'not_safe' ? '\u2717' : (icons[tier] || '\u223C');
+        return '<span class="briefing-tier-dot ' + cls + '">' + icon + '</span>';
+    }
+
+    /**
+     * Summarize a single forecast day from region analyses.
+     * Returns { score, safeCount, totalCount, bestRegion, bestTier, bestSafety,
+     *           bestClimb, bestWindow, flyableRegions }
+     */
+    function _summarizeDay(regionData, dateStr) {
+        var tierRank = { 'violet': 3, 'green': 2, 'gray': 1 };
+        var safeRank = { 'safe': 3, 'conditional': 2, 'not_safe': 1 };
+
+        var regions = [];
+        Object.keys(regionData).forEach(function (rid) {
+            var d = regionData[rid][dateStr];
+            if (d) regions.push({ id: rid, data: d });
+        });
+        if (regions.length === 0) return null;
+
+        // Rank regions
+        regions.sort(function (a, b) {
+            var sa = safeRank[a.data.safety_status] || 0;
+            var sb = safeRank[b.data.safety_status] || 0;
+            if (sa !== sb) return sb - sa;
+            var fa = tierRank[a.data.fly_status] || 0;
+            var fb = tierRank[b.data.fly_status] || 0;
+            if (fa !== fb) return fb - fa;
+            var ca = parseFloat(a.data.peak_climb_rate) || 0;
+            var cb = parseFloat(b.data.peak_climb_rate) || 0;
+            return cb - ca;
+        });
+
+        var best = regions[0];
+        var bd = best.data;
+        var safeCount = regions.filter(function (r) {
+            return r.data.safety_status === 'safe' && r.data.fly_status && r.data.fly_status !== 'gray';
+        }).length;
+        var flyableNames = regions
+            .filter(function (r) { return r.data.safety_status === 'safe' && r.data.fly_status && r.data.fly_status !== 'gray'; })
+            .slice(0, 3)
+            .map(function (r) { return r.data.region_name || r.id; });
+
+        var bSafety = bd.safety_status || 'not_safe';
+        var bTier = bd.fly_status || 'gray';
+        // Score: higher = better day
+        var score = (safeRank[bSafety] || 0) * 100 + (tierRank[bTier] || 0) * 10 + safeCount;
+
+        return {
+            score: score,
+            safeCount: safeCount,
+            totalCount: regions.length,
+            bestRegion: bd.region_name || best.id,
+            bestTier: bTier,
+            bestSafety: bSafety,
+            bestClimb: bd.peak_climb_rate,
+            bestWindow: bd.best_window || bd.safe_window || '',
+            flyableRegions: flyableNames,
+            feedback: bd.flyability_feedback || bd.safety_feedback || ''
+        };
+    }
+
+    function buildWeekBriefing(regionData) {
+        if (!briefingEl || briefingBuilt) return;
+        if (!regionData || typeof regionData !== 'object' || Object.keys(regionData).length === 0) return;
+
+        var now = new Date();
+        var todayStr = _dateStr(now);
+
+        // Collect all dates
+        var allDates = {};
+        Object.keys(regionData).forEach(function (rid) {
+            Object.keys(regionData[rid]).forEach(function (ds) {
+                allDates[ds] = true;
+            });
+        });
+        var dates = Object.keys(allDates).sort();
+        if (dates.length === 0) return;
+
+        // Summarize each day
+        var daySummaries = {};
+        var bestDayStr = null;
+        var bestScore = -1;
+        dates.forEach(function (ds) {
+            var s = _summarizeDay(regionData, ds);
+            if (s) {
+                daySummaries[ds] = s;
+                if (s.score > bestScore) {
+                    bestScore = s.score;
+                    bestDayStr = ds;
+                }
+            }
+        });
+
+        if (!bestDayStr) return;
+
+        // ── Best day highlight ──
+        var bestDay = daySummaries[bestDayStr];
+        var bestDate = new Date(bestDayStr + 'T12:00:00');
+        var isToday = bestDayStr === todayStr;
+        var dayName = isToday ? 'Heute' : WEEKDAYS_FULL[bestDate.getDay()] + ' ' + bestDate.getDate() + '.';
+
+        var tierIcons = { 'violet': '\u2605', 'green': '\u2713', 'gray': '\u223C' };
+        var tierIcon = bestDay.bestSafety === 'not_safe' ? '\u2717' : (tierIcons[bestDay.bestTier] || '\u223C');
+        var tierClass = 'tier-' + (bestDay.bestSafety === 'not_safe' ? 'not-safe' : bestDay.bestTier);
+
+        var summary = bestDay.feedback || '';
+        if (summary.length > 120) summary = summary.substring(0, 117) + '...';
+
+        var chips = '';
+        if (bestDay.bestWindow && bestDay.bestWindow !== 'keins' && bestDay.bestWindow !== '?') {
+            chips += '<span class="briefing-detail-chip"><span class="chip-icon">\u2600</span> ' + bestDay.bestWindow + '</span>';
+        }
+        if (bestDay.bestClimb && parseFloat(bestDay.bestClimb) > 0) {
+            chips += '<span class="briefing-detail-chip"><span class="chip-icon">\u2191</span> ' + bestDay.bestClimb + ' m/s</span>';
+        }
+        chips += '<span class="briefing-detail-chip">' + bestDay.safeCount + '/' + bestDay.totalCount + ' Regionen fliegbar</span>';
+
+        // Flyable region names as a hint
+        var regionHint = '';
+        if (bestDay.flyableRegions.length > 0) {
+            regionHint = '<div class="briefing-region-hint">' + bestDay.flyableRegions.join(', ') + '</div>';
+        }
+
+        var bestHtml =
+            '<div class="briefing-best-day-label">' + dayName + ' \u2014 bester Flugtag</div>' +
+            '<div class="briefing-spot">' +
+            '<div class="briefing-tier-badge ' + tierClass + '">' + tierIcon + '</div>' +
+            '<div class="briefing-spot-info">' +
+            '<div class="briefing-spot-name">' + bestDay.bestRegion + '</div>' +
+            '<div class="briefing-spot-summary">' + summary + '</div>' +
+            '</div>' +
+            '</div>' +
+            regionHint +
+            '<div class="briefing-details">' + chips + '</div>' +
+            '<div class="briefing-actions">' +
+            '<button class="btn btn-primary btn-sm" id="briefingAskBestDay">Details</button>' +
+            '<button class="btn btn-secondary btn-sm" id="briefingAskChat">Wo fliegen?</button>' +
+            '</div>';
+
+        // ── Other days (compact rows) ──
+        var otherDates = dates.filter(function (d) { return d !== bestDayStr; });
+        var weekRows = '';
+        if (otherDates.length > 0) {
+            weekRows = '<div class="briefing-week-divider"></div>';
+            otherDates.forEach(function (ds) {
+                var s = daySummaries[ds];
+                if (!s) return;
+                var d = new Date(ds + 'T12:00:00');
+                var label = ds === todayStr ? 'Heute' : WEEKDAYS_SHORT[d.getDay()] + ' ' + d.getDate() + '.';
+
+                var metrics = '';
+                if (s.bestSafety === 'not_safe' || (s.bestTier === 'gray' && s.safeCount === 0)) {
+                    metrics = '<span class="week-row-meta">kaum fliegbar</span>';
+                } else {
+                    var parts = [];
+                    if (s.bestClimb && parseFloat(s.bestClimb) > 0) parts.push('\u2191' + s.bestClimb);
+                    parts.push(s.safeCount + '/' + s.totalCount + ' Reg.');
+                    metrics = '<span class="week-row-meta">' + parts.join(' \u00b7 ') + '</span>';
+                }
+
+                weekRows +=
+                    '<div class="briefing-week-row" data-date="' + ds + '">' +
+                    '<span class="week-row-day">' + label + '</span>' +
+                    _tierDot(s.bestSafety, s.bestTier) +
+                    '<span class="week-row-spot">' + s.bestRegion + '</span>' +
+                    metrics +
+                    '</div>';
+            });
+        }
+
+        var briefingTime = now.toLocaleDateString('de-CH', { day: 'numeric', month: 'short' }) +
+            ', ' + now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+
+        briefingEl.innerHTML =
+            '<div class="morning-briefing">' +
+            '<div class="morning-briefing-header">' +
+            '<span class="briefing-icon">\u2600\uFE0F</span> Wochenbriefing' +
+            '<span class="briefing-timestamp">' + briefingTime + '</span>' +
+            '</div>' +
+            bestHtml +
+            weekRows +
+            '</div>';
+
+        briefingEl.style.display = '';
+        briefingBuilt = true;
+
+        // Wire up buttons
+        var detailBtn = document.getElementById('briefingAskBestDay');
+        if (detailBtn) {
+            detailBtn.addEventListener('click', function () {
+                var q = isToday
+                    ? 'Wie sind die Flugbedingungen heute in ' + bestDay.bestRegion + '?'
+                    : 'Wie werden die Flugbedingungen am ' + WEEKDAYS_FULL[bestDate.getDay()] + ' in ' + bestDay.bestRegion + '?';
+                sendMessage(q);
+            });
+        }
+        var askBtn = document.getElementById('briefingAskChat');
+        if (askBtn) {
+            askBtn.addEventListener('click', function () {
+                sendMessage(isToday
+                    ? 'Welche Region ist heute am besten zum Fliegen?'
+                    : 'Welche Region ist am ' + WEEKDAYS_FULL[bestDate.getDay()] + ' am besten zum Fliegen?');
+            });
+        }
+
+        // Wire up week rows — click asks chat about that day
+        briefingEl.querySelectorAll('.briefing-week-row').forEach(function (row) {
+            row.addEventListener('click', function () {
+                var ds = row.getAttribute('data-date');
+                var d = new Date(ds + 'T12:00:00');
+                var dayN = ds === todayStr ? 'heute' : 'am ' + WEEKDAYS_FULL[d.getDay()];
+                sendMessage('Wie sind die Flugbedingungen ' + dayN + '?');
+            });
+        });
+    }
+
+    // Listen for analysis data from the InstantDB subscription (set on window by index.html)
+    var _briefingCheckInterval = setInterval(function () {
+        // Briefing uses region data; quick actions + map colors use spot data
+        var hasRegions = window.regionAnalysisData && Object.keys(window.regionAnalysisData).length > 0;
+        var hasSpots = window.analysisData && Object.keys(window.analysisData).length > 0;
+
+        if (hasRegions) {
+            buildWeekBriefing(window.regionAnalysisData);
+        }
+        if (hasSpots) {
+            updateQuickActionsFromAnalyses(window.analysisData);
+        }
+        if (hasRegions || hasSpots) {
+            if (runAnalysesBtn) runAnalysesBtn.classList.remove('attention-pulse');
+        }
+        if (hasRegions && hasSpots) {
+            clearInterval(_briefingCheckInterval);
+        }
+    }, 500);
+    // Stop checking after 30s
+    setTimeout(function () { clearInterval(_briefingCheckInterval); }, 30000);
+
+    // ── Context-Aware Quick Actions ──────────────────────────
+    function updateQuickActionsFromAnalyses(analysisData) {
+        if (!quickActions) return;
+
+        var now = new Date();
+        var todayStr = now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0');
+
+        // Find best spot for contextual actions
+        var bestSpot = null;
+        var bestScore = -1;
+        var tierRank = { 'violet': 3, 'green': 2, 'gray': 1 };
+        var safeRank = { 'safe': 3, 'conditional': 2, 'not_safe': 1 };
+
+        Object.keys(analysisData).forEach(function (name) {
+            var d = analysisData[name][todayStr];
+            if (!d) return;
+            var score = (safeRank[d.safety_status] || 0) * 10 + (tierRank[d.fly_status] || 0);
+            if (score > bestScore) {
+                bestScore = score;
+                bestSpot = name;
+            }
+        });
+
+        // Replace quick action buttons with context-aware ones
+        var contextActions = [
+            { msg: 'Welche Region ist heute am besten zum Fliegen?', label: 'Beste Region?' },
+            { msg: 'Wo ist die Thermik am st\u00e4rksten?', label: 'Beste Thermik?' },
+            { msg: 'Welcher Tag diese Woche ist am besten?', label: 'Bester Tag?' },
+            { msg: 'Wie wird das Wetter morgen?', label: 'Morgen?' },
+        ];
+
+        quickActions.innerHTML = '';
+        contextActions.forEach(function (a) {
+            var btn = document.createElement('button');
+            btn.className = 'quick-btn';
+            btn.setAttribute('data-msg', a.msg);
+            btn.textContent = a.label;
+            btn.addEventListener('click', function () { sendMessage(a.msg); });
+            quickActions.appendChild(btn);
+        });
+    }
+
     // ── Data Freshness Indicator ──────────────────────────
     var freshnessEl = document.getElementById('dataFreshness');
+    var _freshnessIso = null;
     function updateFreshness(isoStr) {
         if (!freshnessEl || !isoStr) return;
-        var ts = new Date(isoStr);
+        _freshnessIso = isoStr;
+        _renderFreshness();
+    }
+
+    function _renderFreshness() {
+        if (!freshnessEl || !_freshnessIso) return;
+        var ts = new Date(_freshnessIso);
         var ageMs = Date.now() - ts.getTime();
-        var ageH = ageMs / 3600000;
+        var ageMin = ageMs / 60000;
         var hh = String(ts.getHours()).padStart(2, '0');
         var mm = String(ts.getMinutes()).padStart(2, '0');
-        freshnessEl.textContent = 'Daten von ' + hh + ':' + mm;
-        freshnessEl.className = 'data-freshness ' + (ageH < 1 ? 'fresh' : ageH < 3 ? 'stale' : 'old');
+        var ageLabel;
+        var cls;
+        if (ageMin < 30) {
+            ageLabel = 'Aktuell';
+            cls = 'fresh';
+        } else if (ageMin < 120) {
+            ageLabel = Math.round(ageMin) + ' min';
+            cls = 'stale';
+        } else {
+            ageLabel = Math.round(ageMin / 60) + ' h';
+            cls = 'old';
+        }
+        freshnessEl.textContent = hh + ':' + mm + ' \u00B7 ' + ageLabel;
+        freshnessEl.className = 'data-freshness ' + cls;
+        freshnessEl.title = 'Wetterdaten von ' + hh + ':' + mm + ' Uhr (' + ageLabel + ' alt)';
     }
+
+    // Refresh age display every 60s
+    setInterval(_renderFreshness, 60000);
 
     // Check weather_state from API
     fetch('/api/status').then(function (r) { return r.json(); }).then(function (d) {

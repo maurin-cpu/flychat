@@ -107,17 +107,39 @@ class InstantDBClient:
             logger.error(f"InstantDB delete_all fehlgeschlagen ({table_name}): {e}")
             return False
 
-    def batch_upsert(self, table_name: str, docs: dict[str, dict]) -> bool:
-        """Erstellt/aktualisiert mehrere Dokumente in einer Transaktion."""
+    def batch_upsert(self, table_name: str, docs: dict[str, dict], chunk_size: int = 500) -> bool:
+        """Erstellt/aktualisiert mehrere Dokumente. Splittet in Chunks, da InstantDB transact
+        ein Payload-Size-Limit (~1 MB) hat. Bei 486 Spots × 5 Tagen = 2430 Docs (~2 MB)
+        muss gechunkt werden, sonst 400 Bad Request."""
         url = f"{self.api_url}/admin/transact"
-        steps = [["update", table_name, doc_id, data] for doc_id, data in docs.items()]
-        payload = {"steps": steps}
-
-        try:
-            resp = requests.post(url, json=payload, headers=self._headers(), timeout=15)
-            resp.raise_for_status()
-            logger.debug(f"InstantDB batch_upsert OK: {table_name} ({len(docs)} docs)")
+        items = list(docs.items())
+        if not items:
             return True
-        except Exception as e:
-            logger.error(f"InstantDB batch_upsert fehlgeschlagen ({table_name}): {e}")
-            return False
+
+        total = len(items)
+        n_chunks = (total + chunk_size - 1) // chunk_size
+        for i in range(0, total, chunk_size):
+            chunk = items[i:i + chunk_size]
+            steps = [["update", table_name, doc_id, data] for doc_id, data in chunk]
+            payload = {"steps": steps}
+            try:
+                resp = requests.post(url, json=payload, headers=self._headers(), timeout=30)
+                resp.raise_for_status()
+            except requests.HTTPError as e:
+                body = ""
+                try:
+                    body = e.response.text[:500] if e.response is not None else ""
+                except Exception:
+                    pass
+                logger.error(
+                    f"InstantDB batch_upsert fehlgeschlagen ({table_name}, chunk {i//chunk_size + 1}/{n_chunks}, {len(chunk)} docs): {e} | Body: {body}"
+                )
+                return False
+            except Exception as e:
+                logger.error(
+                    f"InstantDB batch_upsert fehlgeschlagen ({table_name}, chunk {i//chunk_size + 1}/{n_chunks}): {e}"
+                )
+                return False
+
+        logger.debug(f"InstantDB batch_upsert OK: {table_name} ({total} docs in {n_chunks} chunk(s))")
+        return True

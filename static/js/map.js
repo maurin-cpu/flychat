@@ -14,11 +14,38 @@
     var viewTabsContainer = document.getElementById('meteogramViewTabs');
     var titleEl = document.getElementById('meteogramTitle');
     var infoEl = document.getElementById('meteogramInfo');
+    var ratingBadgeEl = document.getElementById('meteogramRatingBadge');
+    var ratingValueEl = document.getElementById('meteogramRatingValue');
     var closeBtn = document.getElementById('meteogramClose');
     var tooltipEl = document.getElementById('tooltip');
     var currentView = 'meteogram';  // 'meteogram', 'windtimeline', or 'text' (analyse is permanent aside)
     var asideEl = document.getElementById('meteogramAside');
     var asideToggleBtn = document.getElementById('meteogramAsideToggle');
+
+    // Safer JSON fetch: prüft r.ok + Content-Type, liefert verständliche Fehlermeldung
+    // statt "Unexpected token '<'..." wenn Server HTML (z.B. 500-Page) zurückgibt.
+    function fetchJson(url) {
+        return fetch(url, { headers: { 'Accept': 'application/json' } }).then(function (r) {
+            var ctype = (r.headers.get('content-type') || '').toLowerCase();
+            return r.text().then(function (txt) {
+                if (!r.ok) {
+                    var msg;
+                    if (ctype.indexOf('application/json') >= 0) {
+                        try { msg = (JSON.parse(txt) || {}).error; } catch (e) { msg = null; }
+                    }
+                    throw new Error(msg || ('HTTP ' + r.status + ' beim Laden der Wetterdaten'));
+                }
+                if (ctype.indexOf('application/json') < 0) {
+                    throw new Error('Server lieferte keine JSON-Daten (vermutlich Fehlerseite). Bitte kurz warten und erneut versuchen.');
+                }
+                try {
+                    return JSON.parse(txt);
+                } catch (e) {
+                    throw new Error('Antwort konnte nicht gelesen werden: ' + e.message);
+                }
+            });
+        });
+    }
 
     // Current meteogram state
     var currentWeather = null;
@@ -60,12 +87,14 @@
         // Map Legend (collapsible, bottom-left)
         var legend = L.control({ position: 'bottomleft' });
         legend.onAdd = function () {
-            var div = L.DomUtil.create('div', 'map-legend collapsed');
+            var isMobile = window.innerWidth <= 639;
+            var div = L.DomUtil.create('div', 'map-legend' + (isMobile ? ' collapsed' : ''));
             div.innerHTML =
                 '<button class="map-legend-toggle" aria-label="Legende ein-/ausblenden">Legende</button>' +
                 '<div class="map-legend-body">' +
                 '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-excellent)"></span> Sicher &amp; Gut</div>' +
                 '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-fly-violet)"></span> Top / XC</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-fly-gray)"></span> Abgleiter</div>' +
                 '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-marginal)"></span> Vorsicht</div>' +
                 '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-critical)"></span> Nicht sicher</div>' +
                 '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-unknown)"></span> Keine Daten</div>' +
@@ -113,7 +142,7 @@
     }
 
     // ===== STYLE SYSTEM (Traffic Light + Intensity, Light Map) =====
-    // safety: 'safe' | 'conditional' | 'not_safe' | 'default' | 'no_data'
+    // safety: 'safe' | 'conditional' | 'not_safe' | 'default' | 'no_data' | 'error'
     // quality: 'gray' (bad) | 'green' (good) | 'violet' (legendary)
     function mapSafetyAndQualityToStyle(safety, quality) {
         // Default / unanalyzed
@@ -124,6 +153,15 @@
                 glow: null, showStripes: false, showWarning: false,
                 safetyLabel: safety === 'no_data' ? 'Keine Daten' : '',
                 qualityLabel: ''
+            };
+        }
+
+        // ERROR — analysis failed (e.g. API budget)
+        if (safety === 'error') {
+            return {
+                fill: '#f87171', stroke: '#b91c1c',
+                glow: null, showStripes: false, showWarning: false,
+                safetyLabel: 'Analyse-Fehler', qualityLabel: ''
             };
         }
 
@@ -139,9 +177,9 @@
         // SAFE — green traffic light, quality = intensity
         if (safety === 'safe') {
             if (quality === 'gray') return {
-                fill: '#9ca3af', stroke: '#6b7280',
+                fill: '#B08D57', stroke: '#8A6D3B',
                 glow: null, showStripes: false, showWarning: false,
-                safetyLabel: 'Sicher', qualityLabel: 'Schwach'
+                safetyLabel: 'Sicher', qualityLabel: 'Abgleiter'
             };
             if (quality === 'violet') return {
                 // Legendary spots: violet (matches the "Legendär" / "Top" category in the analysis page)
@@ -160,7 +198,7 @@
         if (quality === 'gray') return {
             fill: '#fbbf24', stroke: '#b45309',
             glow: null, showStripes: false, showWarning: true,
-            safetyLabel: 'Vorsicht', qualityLabel: 'Schwach'
+            safetyLabel: 'Vorsicht', qualityLabel: 'Abgleiter'
         };
         if (quality === 'violet') return {
             fill: '#d97706', stroke: '#78350f',
@@ -312,7 +350,7 @@
                         
                         // Hover Effect for Reference Points
                         layer.on('mouseover', function () {
-                            if (p.reference_points && p.reference_points.length > 1) {
+                            if (SHOW_REFERENCE_POINTS && p.reference_points && p.reference_points.length > 1) {
                                 var refGroup = L.layerGroup();
                                 var spotPt = p.reference_points[0]; // Point 0 is the spot itself
                                 
@@ -320,7 +358,7 @@
                                 p.reference_points.slice(1).forEach(function(pt) {
                                     // 1. Connection Line
                                     var line = L.polyline([spotPt, pt], {
-                                        color: '#4f46e5',
+                                        color: '#0369a1',
                                         weight: 1.5,
                                         dashArray: '5, 5',
                                         opacity: 0.5
@@ -330,7 +368,7 @@
                                     // 2. Small markers for the grid points
                                     var circle = L.circleMarker(pt, {
                                         radius: 4,
-                                        color: '#4f46e5',
+                                        color: '#0369a1',
                                         fillColor: '#fff',
                                         fillOpacity: 1,
                                         weight: 2
@@ -351,9 +389,28 @@
                     },
                 }).addTo(map);
             })
+            .then(openSpotFromUrl)
             .catch(function (err) {
                 console.error('Spots laden fehlgeschlagen:', err);
             });
+    }
+
+    // Deep-Link: wenn /?spot=<Name> in der URL steht, entsprechenden Spot öffnen
+    function openSpotFromUrl() {
+        try {
+            var params = new URLSearchParams(window.location.search);
+            var spotName = params.get('spot');
+            if (!spotName) return;
+            var marker = markersByName[spotName];
+            if (!marker) return;
+            if (marker.getLatLng) {
+                map.setView(marker.getLatLng(), Math.max(map.getZoom(), 12));
+            }
+            // Nur Tooltip öffnen, NICHT automatisch Meteogramm laden
+            if (marker.openTooltip) marker.openTooltip();
+        } catch (e) {
+            console.warn('[map] Spot aus URL konnte nicht geöffnet werden:', e);
+        }
     }
 
 
@@ -411,6 +468,45 @@
             spotName: currentSpotName,
             dateStr: dateStr,
         });
+        renderRatingBadge(analysis);
+    }
+
+    function renderRatingBadge(analysis) {
+        if (!ratingBadgeEl || !ratingValueEl) return;
+        var rating = analysis && analysis.rating;
+        var r = (rating === null || rating === undefined) ? NaN : Number(rating);
+        var safetyStatus = (analysis && analysis.safety_status) || '';
+        var flyStatus = (analysis && analysis.fly_status) || '';
+        var isCond = !!(analysis && analysis.is_conditional);
+        var condReason = (analysis && analysis.conditional_reason) || '';
+
+        // Reset tier classes
+        ratingBadgeEl.classList.remove('tier-green', 'tier-violet', 'tier-not-safe', 'is-conditional');
+
+        if (!isFinite(r) || r <= 0) {
+            // No rating or NO-GO with 0.0 → either hide or show NO-GO
+            if (safetyStatus === 'not_safe') {
+                ratingValueEl.textContent = '0.0';
+                ratingBadgeEl.classList.add('tier-not-safe');
+                ratingBadgeEl.title = 'NO-GO: ' + ((analysis && analysis.safety && analysis.safety.reasoning) || 'Nicht sicher fliegbar');
+                ratingBadgeEl.style.display = '';
+            } else {
+                ratingBadgeEl.style.display = 'none';
+                ratingBadgeEl.title = '';
+            }
+            return;
+        }
+
+        ratingValueEl.textContent = r.toFixed(1);
+        if (flyStatus === 'violet') ratingBadgeEl.classList.add('tier-violet');
+        else if (flyStatus === 'green') ratingBadgeEl.classList.add('tier-green');
+        // gray tier uses default bronze badge styling
+        if (isCond) ratingBadgeEl.classList.add('is-conditional');
+
+        var tooltip = 'Rating ' + r.toFixed(1) + ' / 10';
+        if (isCond && condReason) tooltip += ' · Bedingt: ' + condReason;
+        ratingBadgeEl.title = tooltip;
+        ratingBadgeEl.style.display = '';
     }
 
     function renderTextView() {
@@ -461,6 +557,10 @@
         infoEl.textContent = props
             ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + props.windrichtung
             : '';
+        if (ratingBadgeEl) {
+            ratingBadgeEl.style.display = 'none';
+            ratingBadgeEl.classList.remove('tier-green', 'tier-violet', 'tier-not-safe', 'is-conditional');
+        }
         chartContainer.innerHTML = '<div class="error-state">Lade Daten...</div>';
         if (windTimelineContainer) windTimelineContainer.innerHTML = '';
         if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">Lade Analyse...</div>';
@@ -485,8 +585,8 @@
         }
 
         Promise.all([
-            fetch('/api/weather/' + encodeURIComponent(spotName)).then(function (r) { return r.json(); }),
-            fetch('/api/altitude-wind/' + encodeURIComponent(spotName)).then(function (r) { return r.json(); }),
+            fetchJson('/api/weather/' + encodeURIComponent(spotName)),
+            fetchJson('/api/altitude-wind/' + encodeURIComponent(spotName)),
         ])
             .then(function (results) {
                 currentWeather = results[0];
@@ -534,12 +634,23 @@
                 renderCurrentDay();
             })
             .catch(function (err) {
-                chartContainer.innerHTML = '<div class="error-state">Fehler: ' + err.message +
-                    '<br><button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="this.parentNode.innerHTML=\'Lade...\'">' +
-                    'Erneut versuchen</button></div>';
-                chartContainer.querySelector('.btn').addEventListener('click', function () {
-                    loadWeatherForSpot(currentSpotName);
+                chartContainer.textContent = '';
+                var errBox = document.createElement('div');
+                errBox.className = 'error-state';
+                errBox.appendChild(document.createTextNode(
+                    'Fehler: ' + (err && err.message ? err.message : 'Unbekannt')
+                ));
+                errBox.appendChild(document.createElement('br'));
+                var retryBtn = document.createElement('button');
+                retryBtn.className = 'btn btn-secondary btn-sm';
+                retryBtn.style.marginTop = '12px';
+                retryBtn.textContent = 'Erneut versuchen';
+                retryBtn.addEventListener('click', function () {
+                    errBox.textContent = 'Lade...';
+                    openMeteogram(currentSpotName, null);
                 });
+                errBox.appendChild(retryBtn);
+                chartContainer.appendChild(errBox);
             });
     }
 
@@ -559,10 +670,20 @@
             });
         });
 
+        // Bodenwind (10m, terrain-korrigiert) pro Stunde -> Lookup {time: data}
+        // Safety-relevanter Startwind, getrennt vom freien Höhenwind.
+        var groundWindByTime = {};
+        var gwList = (currentAltWind.ground_wind && currentAltWind.ground_wind[dateStr]) || [];
+        gwList.forEach(function (g) {
+            var t = dateStr + 'T' + (g.hour < 10 ? '0' : '') + g.hour + ':00:00';
+            groundWindByTime[t] = g;
+        });
+
         Meteogram.renderChart(chartContainer, tooltipEl, wxDay, altDay, {
             elevation: currentWeather.elevation_m,
             windrichtung: currentWeather.windrichtung,
             idealWindMax: currentWeather.ideal_wind_max,
+            groundWindByTime: groundWindByTime,
         });
 
         // Wetter-Zeitstempel unter dem Spot-Meteogramm
@@ -596,19 +717,25 @@
         if (window._overlayScrollUnlock) window._overlayScrollUnlock();
     }
 
-    /** Sync the floating map-level day tabs + marker colours after an
+    /** Sync the navbar day tabs + marker colours after an
      *  overlay-internal day switch. */
     function syncFloatingDayTabs(dateStr) {
-        var mapDayTabs = document.getElementById('mapDayTabs');
-        if (mapDayTabs) {
-            mapDayTabs.querySelectorAll('.floating-day-tab').forEach(function (b) {
+        var navDayTabs = document.getElementById('navDayTabs');
+        if (navDayTabs) {
+            navDayTabs.querySelectorAll('.navbar-day-btn').forEach(function (b) {
                 b.classList.toggle('active', b.dataset.date === dateStr);
             });
         }
+        window.currentDate = dateStr;
         if (window.updateSpotColors && window.analysisData) {
             window.updateSpotColors(window.analysisData, dateStr);
         }
     }
+
+    // Re-render analysis view when analyses are loaded (API fetch after page load)
+    window.addEventListener('flychat-analyses-loaded', function () {
+        renderAnalyseView();
+    });
 
     // Listen for day changes from the floating map tabs
     window.addEventListener('flychat-day-change', function (e) {
@@ -672,9 +799,17 @@
         Object.keys(markersByName).forEach(function (name) {
             var marker = markersByName[name];
             var spotAnalysis = analysisData[name];
-            if (!spotAnalysis) return;
-            var dayData = spotAnalysis[dateStr];
-            if (!dayData) return;
+            var dayData = spotAnalysis && spotAnalysis[dateStr];
+
+            if (!dayData) {
+                // No analysis for this date (e.g. Sunday beyond forecast) → reset to no_data
+                marker.currentSafety = 'no_data';
+                marker.currentQuality = 'green';
+                marker.setIcon(createSpotIcon(marker.featureProperties, 'no_data', 'green', false));
+                var noDataStyle = mapSafetyAndQualityToStyle('no_data', 'green');
+                marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, noDataStyle));
+                return;
+            }
 
             var safety = dayData.safety_status || 'safe';
             var quality = dayData.fly_status || 'green';
@@ -725,10 +860,10 @@
             isochroneLayer = L.geoJSON(geojson, {
                 style: function () {
                     return {
-                        color: '#4f46e5',
+                        color: '#0369a1',
                         weight: 2,
                         opacity: 0.85,
-                        fillColor: '#6366f1',
+                        fillColor: '#0ea5e9',
                         fillOpacity: 0.18,
                         dashArray: '4 4'
                     };
@@ -768,8 +903,8 @@
             // Custom div-marker im Indigo-Stil
             var html = '<div style="' +
                 'width:18px;height:18px;border-radius:50%;' +
-                'background:#4f46e5;border:3px solid #fff;' +
-                'box-shadow:0 0 0 2px #4f46e5,0 2px 8px rgba(0,0,0,0.3);' +
+                'background:#0369a1;border:3px solid #fff;' +
+                'box-shadow:0 0 0 2px #0369a1,0 2px 8px rgba(0,0,0,0.3);' +
                 '"></div>';
             var icon = L.divIcon({
                 html: html,

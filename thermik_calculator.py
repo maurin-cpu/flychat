@@ -1034,34 +1034,12 @@ def calculate_thermal_profile(
             max_thermal_height = h_enc_msl
 
     # =========================================================================
-    # 5d. THERMAL INERTIA (H-skaliert)
-    # =========================================================================
-    # Die Grenzschicht fällt nicht sofort zusammen wenn eine Wolke die Sonne
-    # kurz verdeckt. Aber der Verfall skaliert mit dem Verhältnis H/peak_H:
-    #   Am Peak (Mittag): 5% Verfall -> Glättung gegen Wolkenschwankungen
-    #   Bei sinkendem H:  bis 30% Verfall -> Abend-Zusammenbruch
-    #   Bei H=0:          30% Verfall -> schneller aber nicht instantaner Kollaps
-    if previous_max_height is not None and previous_max_height > elevation_m:
-        if peak_H is not None and peak_H > 0 and H > 0:
-            h_ratio = min(1.0, H / peak_H)
-            decay_rate = 0.05 + (1.0 - h_ratio) * 0.25
-        elif H > 0:
-            decay_rate = 0.05
-        else:
-            decay_rate = 0.30
-
-        inertia_height = previous_max_height - ((previous_max_height - elevation_m) * decay_rate)
-        inertia_height = max(elevation_m, inertia_height)
-
-        if max_thermal_height < inertia_height:
-            data_warnings.append(
-                f"Thermik-Inertia: {max_thermal_height:.0f}m -> {inertia_height:.0f}m "
-                f"(Verfall {decay_rate:.0%}, H/peak={H:.0f}/{peak_H or 0:.0f})"
-            )
-            max_thermal_height = inertia_height
-
-    # =========================================================================
     # 5f. GFS/MODEL PBL CAP (Triple-Constraint, terrain-differenziert)
+    # =========================================================================
+    # WICHTIG: Der GFS-Cap wird VOR der Thermal Inertia (5d) angewendet,
+    # damit die Inertia den Cap-Effekt glätten kann. Alte Reihenfolge
+    # (Inertia vor Cap) führte dazu, dass der Hard-Cap die Inertia-Glättung
+    # sofort wieder zunichte machte → plötzliche Thermik-Einbrüche.
     # =========================================================================
     # Das NWP-Modell (GFS) berechnet die BLH mit Bulk-Richardson-Schema und
     # vollständiger Strahlungsbilanz. Sobald am Abend die Ausstrahlung überwiegt,
@@ -1122,6 +1100,38 @@ def calculate_thermal_profile(
                         f"- akzeptiert (Hochalpin GFS-Bias)."
                     )
                 # max_thermal_height bleibt unveraendert (kein Cap)
+
+    # =========================================================================
+    # 5d. THERMAL INERTIA (H-skaliert) — NACH dem GFS-Cap
+    # =========================================================================
+    # Die Grenzschicht fällt nicht sofort zusammen wenn eine Wolke die Sonne
+    # kurz verdeckt oder der GFS-Cap plötzlich absinkt. Der Verfall skaliert
+    # mit dem Verhältnis H/peak_H:
+    #   Am Peak (Mittag): 5% Verfall -> Glättung gegen Wolkenschwankungen
+    #   Bei sinkendem H:  bis 30% Verfall -> Abend-Zusammenbruch
+    #   Bei H=0:          30% Verfall -> schneller aber nicht instantaner Kollaps
+    #
+    # Wird NACH dem GFS-Cap angewendet, damit der Hard-Cap-Effekt geglättet
+    # wird. Alte Reihenfolge (Inertia vor Cap) führte zu abrupten Thermik-
+    # Einbrüchen, weil der Cap die Inertia-Korrektur sofort überschrieb.
+    if previous_max_height is not None and previous_max_height > elevation_m:
+        if peak_H is not None and peak_H > 0 and H > 0:
+            h_ratio = min(1.0, H / peak_H)
+            decay_rate = 0.05 + (1.0 - h_ratio) * 0.25
+        elif H > 0:
+            decay_rate = 0.05
+        else:
+            decay_rate = 0.30
+
+        inertia_height = previous_max_height - ((previous_max_height - elevation_m) * decay_rate)
+        inertia_height = max(elevation_m, inertia_height)
+
+        if max_thermal_height < inertia_height:
+            data_warnings.append(
+                f"Thermik-Inertia: {max_thermal_height:.0f}m -> {inertia_height:.0f}m "
+                f"(Verfall {decay_rate:.0%}, H/peak={H:.0f}/{peak_H or 0:.0f})"
+            )
+            max_thermal_height = inertia_height
 
     # =========================================================================
     # 6. DUAL W*-BERECHNUNG (Geometrisches-Mittel-Strategie)
@@ -1251,27 +1261,16 @@ def calculate_thermal_profile(
         )
 
     # =========================================================================
-    # 6b. KONVEKTIVER VIGOR (min von H/peak_H und SW/peak_SW)
+    # 6b. KONVEKTIVER VIGOR — ENTFERNT (Apr 2026)
     # =========================================================================
-    # ICON-D2 liefert hier oft keine BLH; GFS sinkt teils erst spaet. H und
-    # Globalstrahlung sind stark korreliert — ein Produkt wuerde denselben
-    # Abendverfall doppelt daempfen. Ein Limit genuegt: min(...) (keine Doppelzaehlung).
+    # Doppel-Daempfung: w* = (g/T × H × z_i)^(1/3) enthaelt H bereits.
+    # Zusaetzliche Multiplikation mit H/peak_H zaehlt H doppelt und erzeugt
+    # kuenstliche 0.1 m/s Einbrueche bei kurzen Wolkendurchgaengen (13-14h Bug).
+    # Abendverfall wird bereits durch drei unabhaengige Mechanismen abgedeckt:
+    #   - Thermal Inertia (5d): H-skalierter Hoehenverfall
+    #   - GFS PBL Cap (5f): Modell-BLH sinkt abends
+    #   - Depth-Ramp (Step 8): flache Thermik → reduziertes Steigen
     convective_vigor = None
-    if (
-        peak_H is not None and peak_H > 0
-        and peak_shortwave is not None and peak_shortwave > 0
-        and shortwave_radiation is not None
-    ):
-        h_ratio = max(0.0, min(1.0, H / peak_H))
-        sw_ratio = max(0.0, min(1.0, shortwave_radiation / peak_shortwave))
-        convective_vigor = min(h_ratio, sw_ratio)
-        if avg_climb > 0 and convective_vigor < 0.999:
-            avg_climb *= convective_vigor
-            if convective_vigor < 0.92:
-                data_warnings.append(
-                    f"Konvektions-Vigor: x{convective_vigor:.2f} "
-                    f"(H/peak={h_ratio:.2f}, SW/peak={sw_ratio:.2f})"
-                )
 
     # =========================================================================
     # 7. BEWERTUNG (Rating 0-10)

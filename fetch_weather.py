@@ -29,6 +29,7 @@ API_DELAY_BETWEEN_CALLS = 3.5  # Sekunden zwischen den 4 Batch-Calls
 API_RETRY_MAX = 2              # Max Retries bei 429 (war 4)
 API_RETRY_BASE_WAIT = 15       # Basis-Wartezeit bei 429 (Sekunden), verdoppelt sich pro Retry
 API_BATCH_TIMEOUT = 90         # Timeout für Batch-Requests (mehr Punkte = mehr Verarbeitungszeit)
+API_CHUNK_SIZE = 80            # Max Locations pro API-Call (URL-Länge + Timeout-Schutz)
 
 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
 from source_area import get_reference_points, get_all_regions
@@ -140,6 +141,52 @@ def _wait_for_api_ready():
             time.sleep(30)
     print("[FEHLER] API nach 6 Versuchen nicht erreichbar — breche ab.")
     return False
+
+
+def _chunked_api_get(lats, lons, base_params, timeout, label="", chunk_size=None):
+    """
+    Batch-API-Call mit automatischem Chunking bei vielen Locations.
+    Verhindert URL-Überlauf (>8000 Zeichen) und Timeouts bei grossen Batches.
+    Gibt immer eine Liste von Ergebnissen zurück (ein Eintrag pro Location).
+    """
+    if chunk_size is None:
+        chunk_size = API_CHUNK_SIZE
+
+    if len(lats) <= chunk_size:
+        params = {**base_params, "latitude": ",".join(lats), "longitude": ",".join(lons)}
+        resp = _api_get_with_retry(config.API_URL, params, timeout, label=label)
+        if resp is None:
+            raise requests.exceptions.RequestException(
+                f"API nach {API_RETRY_MAX + 1} Versuchen nicht verfügbar: {label}"
+            )
+        result = resp.json()
+        return result if isinstance(result, list) else [result]
+
+    all_results = []
+    n_chunks = math.ceil(len(lats) / chunk_size)
+    for ci in range(n_chunks):
+        i = ci * chunk_size
+        chunk_lats = lats[i:i + chunk_size]
+        chunk_lons = lons[i:i + chunk_size]
+        chunk_label = f"{label} [{i + 1}-{min(i + chunk_size, len(lats))}/{len(lats)}]"
+
+        params = {**base_params, "latitude": ",".join(chunk_lats), "longitude": ",".join(chunk_lons)}
+        resp = _api_get_with_retry(config.API_URL, params, timeout, label=chunk_label)
+        if resp is None:
+            raise requests.exceptions.RequestException(
+                f"API nach {API_RETRY_MAX + 1} Versuchen nicht verfügbar: {chunk_label}"
+            )
+        result = resp.json()
+        if isinstance(result, list):
+            all_results.extend(result)
+        else:
+            all_results.append(result)
+
+        if ci < n_chunks - 1:
+            time.sleep(API_DELAY_BETWEEN_CALLS)
+
+    print(f"  [OK] {label}: {len(all_results)} Antworten aus {n_chunks} Chunks")
+    return all_results
 
 
 def _aggregate_wind_across_points(data_list):
@@ -605,70 +652,50 @@ def fetch_all_spots(spots, save_to_file=True):
     batch_ch2 = None
 
     try:
-        # 1. Wind (28 Spot-Punkte, nur Wind-Vars)
+        # 1. Wind (Spot-Punkte, nur Wind-Vars) — chunked bei >80 Spots
         print(f"[API] Batch Wind: {len(spots)} Punkte, {len(wind_params)} Vars, Modell {config.WIND_MODEL}")
-        resp = _api_get_with_retry(config.API_URL, {
-            "latitude": ",".join(spot_lats),
-            "longitude": ",".join(spot_lons),
+        batch_wind = _chunked_api_get(spot_lats, spot_lons, {
             "models": config.WIND_MODEL,
             "hourly": ",".join(wind_params),
             "forecast_days": config.FORECAST_DAYS,
             "timezone": config.TIMEZONE,
         }, API_BATCH_TIMEOUT, label="Batch-Wind")
-        batch_wind = resp.json()
-        if not isinstance(batch_wind, list):
-            batch_wind = [batch_wind]
         print(f"  [OK] {len(batch_wind)} Wind-Antworten")
 
         time.sleep(API_DELAY_BETWEEN_CALLS)
 
         # 2. Thermal (deduplizierte Punkte, Thermik-Vars)
         print(f"[API] Batch Thermal: {len(unique_points)} Punkte, {len(thermal_params)} Vars, Modell {config.THERMAL_MODEL}")
-        resp = _api_get_with_retry(config.API_URL, {
-            "latitude": ",".join(unique_lats),
-            "longitude": ",".join(unique_lons),
+        batch_thermal = _chunked_api_get(unique_lats, unique_lons, {
             "models": config.THERMAL_MODEL,
             "hourly": ",".join(thermal_params),
             "forecast_days": config.FORECAST_DAYS,
             "timezone": config.TIMEZONE,
         }, API_BATCH_TIMEOUT, label="Batch-Thermal")
-        batch_thermal = resp.json()
-        if not isinstance(batch_thermal, list):
-            batch_thermal = [batch_thermal]
         print(f"  [OK] {len(batch_thermal)} Thermal-Antworten")
 
         time.sleep(API_DELAY_BETWEEN_CALLS)
 
         # 3. Fallback (deduplizierte Punkte, ALLE Vars — Backup für Tag 3-5 + Ausfälle)
         print(f"[API] Batch Fallback: {len(unique_points)} Punkte, {len(fallback_params)} Vars, Modell {config.FALLBACK_MODEL}")
-        resp = _api_get_with_retry(config.API_URL, {
-            "latitude": ",".join(unique_lats),
-            "longitude": ",".join(unique_lons),
+        batch_fallback = _chunked_api_get(unique_lats, unique_lons, {
             "models": config.FALLBACK_MODEL,
             "hourly": ",".join(fallback_params),
             "forecast_days": config.FORECAST_DAYS,
             "timezone": config.TIMEZONE,
         }, API_BATCH_TIMEOUT, label="Batch-Fallback")
-        batch_fallback = resp.json()
-        if not isinstance(batch_fallback, list):
-            batch_fallback = [batch_fallback]
         print(f"  [OK] {len(batch_fallback)} Fallback-Antworten")
 
         time.sleep(API_DELAY_BETWEEN_CALLS)
 
-        # 4. GFS (28 Spot-Punkte, Supplement-Vars)
+        # 4. GFS (Spot-Punkte, Supplement-Vars)
         print(f"[API] Batch GFS: {len(spots)} Punkte, {len(gfs_params)} Vars")
-        resp = _api_get_with_retry(config.API_URL, {
-            "latitude": ",".join(spot_lats),
-            "longitude": ",".join(spot_lons),
+        batch_gfs = _chunked_api_get(spot_lats, spot_lons, {
             "models": "gfs_seamless",
             "hourly": ",".join(gfs_params),
             "forecast_days": config.FORECAST_DAYS,
             "timezone": config.TIMEZONE,
         }, API_BATCH_TIMEOUT, label="Batch-GFS")
-        batch_gfs = resp.json()
-        if not isinstance(batch_gfs, list):
-            batch_gfs = [batch_gfs]
         print(f"  [OK] {len(batch_gfs)} GFS-Antworten")
 
         time.sleep(API_DELAY_BETWEEN_CALLS)
@@ -677,17 +704,12 @@ def fetch_all_spots(spots, save_to_file=True):
         ch_params = config.CH_SURFACE_PARAMS
         print(f"[API] Batch CH1: {len(spots)} Punkte, {len(ch_params)} Vars, Modell {config.CH1_MODEL}")
         try:
-            resp = _api_get_with_retry(config.API_URL, {
-                "latitude": ",".join(spot_lats),
-                "longitude": ",".join(spot_lons),
+            batch_ch1 = _chunked_api_get(spot_lats, spot_lons, {
                 "models": config.CH1_MODEL,
                 "hourly": ",".join(ch_params),
                 "forecast_days": config.CH1_FORECAST_DAYS,
                 "timezone": config.TIMEZONE,
             }, API_BATCH_TIMEOUT, label="Batch-CH1")
-            batch_ch1 = resp.json()
-            if not isinstance(batch_ch1, list):
-                batch_ch1 = [batch_ch1]
             print(f"  [OK] {len(batch_ch1)} CH1-Antworten")
         except Exception as e:
             print(f"  [WARN] CH1-Batch fehlgeschlagen (nicht kritisch): {e}")
@@ -698,17 +720,12 @@ def fetch_all_spots(spots, save_to_file=True):
         # 6. CH2 — MeteoSwiss ICON-CH2 (2km, 5 Tage Horizont, nur Bodenwind)
         print(f"[API] Batch CH2: {len(spots)} Punkte, {len(ch_params)} Vars, Modell {config.CH2_MODEL}")
         try:
-            resp = _api_get_with_retry(config.API_URL, {
-                "latitude": ",".join(spot_lats),
-                "longitude": ",".join(spot_lons),
+            batch_ch2 = _chunked_api_get(spot_lats, spot_lons, {
                 "models": config.CH2_MODEL,
                 "hourly": ",".join(ch_params),
                 "forecast_days": config.CH2_FORECAST_DAYS,
                 "timezone": config.TIMEZONE,
             }, API_BATCH_TIMEOUT, label="Batch-CH2")
-            batch_ch2 = resp.json()
-            if not isinstance(batch_ch2, list):
-                batch_ch2 = [batch_ch2]
             print(f"  [OK] {len(batch_ch2)} CH2-Antworten")
         except Exception as e:
             print(f"  [WARN] CH2-Batch fehlgeschlagen (nicht kritisch): {e}")
@@ -823,32 +840,22 @@ def fetch_all_spots(spots, save_to_file=True):
         try:
             time.sleep(API_DELAY_BETWEEN_CALLS)
             print(f"[API] Batch Region-Thermal: {len(region_only_points)} Punkte, Modell {config.THERMAL_MODEL}")
-            resp = _api_get_with_retry(config.API_URL, {
-                "latitude": ",".join(region_lats),
-                "longitude": ",".join(region_lons),
+            batch_region_thermal = _chunked_api_get(region_lats, region_lons, {
                 "models": config.THERMAL_MODEL,
                 "hourly": ",".join(thermal_params),
                 "forecast_days": config.FORECAST_DAYS,
                 "timezone": config.TIMEZONE,
             }, API_BATCH_TIMEOUT, label="Batch-Region-Thermal")
-            batch_region_thermal = resp.json()
-            if not isinstance(batch_region_thermal, list):
-                batch_region_thermal = [batch_region_thermal]
             print(f"  [OK] {len(batch_region_thermal)} Region-Thermal-Antworten")
 
             time.sleep(API_DELAY_BETWEEN_CALLS)
             print(f"[API] Batch Region-Fallback: {len(region_only_points)} Punkte, Modell {config.FALLBACK_MODEL}")
-            resp = _api_get_with_retry(config.API_URL, {
-                "latitude": ",".join(region_lats),
-                "longitude": ",".join(region_lons),
+            batch_region_fallback = _chunked_api_get(region_lats, region_lons, {
                 "models": config.FALLBACK_MODEL,
                 "hourly": ",".join(fallback_params),
                 "forecast_days": config.FORECAST_DAYS,
                 "timezone": config.TIMEZONE,
             }, API_BATCH_TIMEOUT, label="Batch-Region-Fallback")
-            batch_region_fallback = resp.json()
-            if not isinstance(batch_region_fallback, list):
-                batch_region_fallback = [batch_region_fallback]
             print(f"  [OK] {len(batch_region_fallback)} Region-Fallback-Antworten")
         except DailyLimitExceeded:
             print("[WARN] Tageslimit bei Region-Batch — Regionen werden übersprungen")

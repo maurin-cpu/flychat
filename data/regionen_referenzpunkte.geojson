@@ -3033,10 +3033,10 @@
         ]
       },
       "properties": {
-        "id": "haslital_grimsel",
-        "region": "Haslital / Grimselgebiet",
+        "id": "zentrales_mittelland",
+        "region": "Zentrales Mittelland",
         "name": "Hasliberg Planplatten",
-        "elevation_ref": 2200,
+        "elevation_ref": 600,
         "reference_points": [
           [
             47.7103,
@@ -3055,7 +3055,7 @@
             8.0716
           ]
         ],
-        "kritischer_foehn": "Beide"
+        "kritischer_foehn": "Süd"
       }
     },
     {

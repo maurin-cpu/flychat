@@ -237,10 +237,13 @@ def evaluate_foehn(
     label = {"none": "Kein Föhn", "caution": "Föhn-Vorsicht", "danger": "Föhn-Gefahr"}[level]
     message = _build_message(level, delta_p_sued if is_suedfoehn_active else delta_p_nord, crest_wind, crest_dir, rh_nord)
 
+    foehn_direction = "Süd" if is_suedfoehn_active else ("Nord" if is_nordfoehn_active else "none")
+
     return {
         "level": level,
         "label": label,
         "message": message,
+        "foehn_direction": foehn_direction,
         # Für Abwärtskompatibilität liefern wir den Delta-P der aktuell aktiven Strömung zurück
         "delta_p_hpa": delta_p_sued if is_suedfoehn_active else delta_p_nord,
         "crest_wind_kmh": round(crest_wind, 0) if crest_wind is not None else None,

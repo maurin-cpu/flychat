@@ -1,0 +1,1134 @@
+/* ══════════════════════════════════════════════════════════════
+   Flychat – Flugwetter Dashboard
+   Professional UX: scannable, accessible, polished.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Container ──────────────────────────────────────────────── */
+
+.np {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-16);
+  color: var(--color-text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+
+.np-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0 var(--space-5);
+  margin-bottom: var(--space-5);
+  border-bottom: none;
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.np-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-primary) 40%, var(--color-border) 100%);
+  border-radius: 1px;
+}
+
+.np-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.np-logo {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--color-primary);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.np-date-range {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.np-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.np-timestamp {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.np-btn-gen {
+  padding: 8px 20px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 180ms ease, box-shadow 180ms ease, transform 120ms ease;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(3, 105, 161, 0.2);
+  letter-spacing: 0.01em;
+}
+
+.np-btn-gen:hover {
+  background: var(--color-primary-vivid);
+  box-shadow: 0 3px 10px rgba(3, 105, 161, 0.3);
+  transform: translateY(-1px);
+}
+
+.np-btn-gen:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.np-btn-gen:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.np-btn-gen:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Fazit (collapsible weekly summary) ──────────────────── */
+
+.np-fazit {
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-5);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  line-height: 1.6;
+  cursor: pointer;
+  user-select: none;
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+
+.np-fazit:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+}
+
+.np-fazit[hidden] { display: none; }
+
+.np-fazit-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.np-fazit-label {
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
+}
+
+.np-fazit-chevron {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms;
+}
+
+.np-fazit:hover .np-fazit-chevron { opacity: 0.8; }
+.np-fazit.is-open .np-fazit-chevron { transform: rotate(180deg); opacity: 1; color: var(--color-primary); }
+
+.np-fazit-body {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.np-fazit-body[hidden] { display: none; }
+
+.np-fazit-best {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
+  letter-spacing: -0.02em;
+}
+
+.np-fazit-text {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.np-fazit-rating {
+  display: inline-block;
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  padding: 4px 14px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(3, 105, 161, 0.15);
+}
+
+/* ── Day Tabs ────────────────────────────────────────────── */
+
+.np-day-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 6px 2px var(--space-4);
+  margin-bottom: var(--space-4);
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.np-day-tabs::-webkit-scrollbar { display: none; }
+
+.np-day-tab {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  flex: 1 1 0;
+  min-width: 64px;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.np-day-tab:hover {
+  border-color: var(--color-primary);
+  background: #f0f9ff;
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+}
+
+.np-day-tab:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.np-day-tab.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(3, 105, 161, 0.25);
+  transform: translateY(-2px);
+}
+
+.np-day-tab.is-active .np-tab-weekday,
+.np-day-tab.is-active .np-tab-date,
+.np-day-tab.is-active .np-tab-count { color: #fff; }
+
+.np-day-tab.is-active .np-tab-weekday { opacity: 0.7; }
+
+.np-day-tab.is-best::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  background: #f59e0b;
+  border-radius: 50%;
+  border: 2px solid var(--color-bg);
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.4);
+}
+
+.np-day-tab.is-active.is-best::after {
+  border-color: var(--color-primary);
+  background: #fbbf24;
+}
+
+.np-tab-weekday {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.np-tab-date {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.np-tab-dots {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.np-tab-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.np-tab-dot.violet { background: var(--color-fly-violet); }
+.np-tab-dot.green { background: var(--color-fly-green); }
+
+.np-day-tab.is-active .np-tab-dot.violet { background: #c4b5fd; }
+.np-day-tab.is-active .np-tab-dot.green { background: #86efac; }
+
+.np-tab-count {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Region Filter ───────────────────────────────────────── */
+
+.np-filters {
+  margin-bottom: var(--space-5);
+}
+
+.np-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.np-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.np-filter-chip {
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 180ms ease;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.np-filter-chip:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: #f0f9ff;
+  box-shadow: 0 1px 3px rgba(3, 105, 161, 0.08);
+}
+
+.np-filter-chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.np-filter-chip.is-active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  box-shadow: 0 1px 4px rgba(3, 105, 161, 0.2);
+}
+
+.np-filter-chip.is-active:hover {
+  background: var(--color-primary-vivid);
+  border-color: var(--color-primary-vivid);
+}
+
+.np-filter-reset {
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 180ms ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.np-filter-reset:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.np-filter-reset:disabled { opacity: 0.35; cursor: default; }
+
+.np-filter-map-btn {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  background: var(--color-bg-elevated);
+  flex-shrink: 0;
+  transition: all 180ms ease;
+}
+
+.np-filter-map-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: #f0f9ff;
+}
+
+.np-filter-map-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.np-filter-map-btn.is-active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.np-filter-map {
+  width: 100%;
+  height: 280px;
+  margin-top: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #f3f1ec;
+  position: relative;
+  z-index: 0;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.np-filter-map[hidden] { display: none; }
+
+.np-filter-map .leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #f3f1ec;
+  font-family: inherit;
+  outline: none;
+}
+
+.np-filter-map .leaflet-interactive { cursor: pointer; }
+
+.np-filter-map .np-region-label {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+/* ── Day Info Bar ────────────────────────────────────────── */
+
+.np-day-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-3) 0 var(--space-4);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.np-day-info:empty { display: none; }
+
+.np-day-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.np-day-stats {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.np-day-stats strong {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.np-stat-violet strong { color: var(--color-fly-violet); }
+.np-stat-green strong { color: var(--color-fly-green); }
+.np-stat-bronze strong { color: var(--color-fly-gray); }
+
+/* ── Content Area ────────────────────────────────────────── */
+
+.np-content-empty {
+  padding: var(--space-16) var(--space-6);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+  line-height: 1.7;
+}
+
+/* ── Region Section ──────────────────────────────────────── */
+
+.np-region {
+  margin-bottom: var(--space-8);
+}
+
+.np-region-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--space-2) 0 var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.np-region-name {
+  font-size: var(--text-md);
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+.np-region-rating {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Spot Row ────────────────────────────────────────────── */
+
+.np-spot-list {
+  list-style: none;
+  padding: 4px 2px;
+  margin: 0 -2px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.np-spot {
+  display: block;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: box-shadow 200ms ease, border-color 200ms ease, transform 150ms ease;
+}
+
+.np-spot.tier-green { border-left-color: var(--color-fly-green); }
+.np-spot.tier-violet {
+  border-left-color: var(--color-fly-violet);
+  background: linear-gradient(135deg, var(--color-fly-violet-bg) 0%, #faf8ff 100%);
+}
+.np-spot.tier-bronze {
+  border-left-color: var(--color-fly-gray);
+  background: linear-gradient(135deg, var(--color-fly-gray-bg) 0%, #faf8f4 100%);
+}
+
+.np-spot:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+  transform: translateY(-1px);
+}
+
+.np-spot.is-expanded {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-border-hover);
+}
+
+/* Toggle (clickable header area) */
+.np-spot-toggle {
+  all: unset;
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 120ms ease;
+}
+
+.np-spot-toggle:hover { background: rgba(0, 0, 0, 0.02); }
+
+.np-spot-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-lg);
+}
+
+/* Top line: name + metrics + rating */
+.np-spot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.np-spot-name {
+  font-weight: 700;
+  font-size: var(--text-md);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+  letter-spacing: -0.01em;
+}
+
+.np-spot-spacer { flex: 1; }
+
+/* ── Status-Leiste (Chips) ──────────────────────────────── */
+
+.np-spot-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  align-items: center;
+}
+
+.np-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  line-height: 1.3;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.01em;
+}
+
+/* Safety chips */
+.np-chip--safe {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.np-chip--cond {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.np-chip--warn {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #78350f;
+  font-weight: 500;
+  font-size: 10.5px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Info chips */
+.np-chip--window {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1e40af;
+  font-variant-numeric: tabular-nums;
+}
+
+.np-chip--type {
+  border-color: transparent;
+  background: none;
+  color: var(--color-text-muted);
+  padding-left: 0;
+  font-weight: 500;
+}
+
+.np-chip--climb {
+  font-variant-numeric: tabular-nums;
+  color: #15803d;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+/* Tier accents on chips */
+.np-spot.tier-violet .np-chip--safe {
+  background: var(--color-fly-violet-bg);
+  border-color: var(--color-fly-violet);
+  color: var(--color-fly-violet-text);
+}
+
+/* Divider between toggle and details */
+.np-spot-divider {
+  display: none;
+}
+
+.np-spot.is-expanded .np-spot-divider {
+  display: block;
+  height: 1px;
+  background: var(--color-border);
+  margin: 0;
+}
+
+.np-spot-rating {
+  font-weight: 800;
+  font-size: 1.35rem;
+  min-width: 2.2em;
+  text-align: right;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+
+.np-spot.tier-violet .np-spot-rating { color: var(--color-fly-violet-text); }
+.np-spot.tier-green .np-spot-rating { color: var(--color-fly-green-text); }
+
+.np-spot-chevron {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1), color 150ms;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.np-spot:hover .np-spot-chevron { opacity: 0.8; color: var(--color-text-secondary); }
+.np-spot.is-expanded .np-spot-chevron { transform: rotate(180deg); color: var(--color-primary); opacity: 1; }
+
+/* Map link */
+.np-spot-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 180ms ease;
+  flex-shrink: 0;
+}
+
+.np-spot-map-link:hover {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 6px rgba(3, 105, 161, 0.2);
+}
+
+/* ── Spot Details (expanded) ─────────────────────────────── */
+
+.np-spot-details {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-elevated) 100%);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  animation: npSlideIn 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes npSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.np-spot-details[hidden] { display: none; }
+
+/* ── Detail: Top row (labels left, rec right) ────────────── */
+
+.np-detail-top {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.np-detail-top > .np-detail-labels {
+  flex: 1;
+  min-width: 0;
+}
+
+.np-detail-rec {
+  flex: 0 0 42%;
+  max-width: 42%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  box-shadow: var(--shadow-sm);
+}
+
+.np-detail-rec-icon {
+  font-style: normal;
+  color: var(--color-primary);
+  margin-right: 3px;
+}
+
+/* ── Detail: Structured Labels ─────────────── */
+
+.np-detail-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.np-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid transparent;
+}
+
+.np-label-icon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.np-label-text {
+  color: var(--color-text-secondary);
+  min-width: 0;
+}
+
+/* Good */
+.np-label--good { background: #f0fdf4; border-left-color: #22c55e; }
+.np-label--good .np-label-icon { color: #16a34a; }
+.np-label--good .np-label-text { color: #15803d; }
+
+/* Warning */
+.np-label--warn { background: #fffbeb; border-left-color: #f59e0b; }
+.np-label--warn .np-label-icon { color: #d97706; }
+.np-label--warn .np-label-text { color: #92400e; }
+
+/* Bad / No-go */
+.np-label--bad { background: #fef2f2; border-left-color: #ef4444; }
+.np-label--bad .np-label-icon { color: #dc2626; }
+.np-label--bad .np-label-text { color: #991b1b; font-weight: 500; }
+
+/* Info */
+.np-label--info { background: #eff6ff; border-left-color: #3b82f6; }
+.np-label--info .np-label-icon { color: #2563eb; }
+.np-label--info .np-label-text { color: #1e40af; font-weight: 600; }
+
+/* Tier accents */
+.np-spot.tier-violet .np-label--good { background: #f5f3ff; border-left-color: #8b5cf6; }
+.np-spot.tier-violet .np-label--good .np-label-icon { color: #7c3aed; }
+.np-spot.tier-violet .np-label--good .np-label-text { color: #5b21b6; }
+
+.np-spot.tier-violet .np-label--info { background: #f5f3ff; border-left-color: #8b5cf6; }
+.np-spot.tier-violet .np-label--info .np-label-icon { color: #7c3aed; }
+.np-spot.tier-violet .np-label--info .np-label-text { color: #5b21b6; }
+
+/* ── Detail: Summary text (below meteogram) ─────────────── */
+
+.np-detail-summary {
+  padding: var(--space-3) var(--space-4);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
+}
+
+.np-detail-summary p { margin: 0; }
+
+.np-detail-empty {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-style: italic;
+}
+
+/* ── Section titles (map, meteogram) ──────────────────────── */
+
+.np-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.np-detail-icon { font-size: 12px; }
+
+/* ── Map & Meteogram in details ──────────────────────────── */
+
+.np-detail-mapmeteo-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.np-detail-mapblock,
+.np-detail-meteoblock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.np-spot-minimap {
+  width: 100%;
+  height: 300px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+
+.np-spot-minimap--nodata {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.np-map-openlink {
+  display: inline-block;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  line-height: 1.2;
+  transition: all 180ms ease;
+}
+
+.np-map-openlink:hover {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.np-spot-meteogram {
+  width: 100%;
+  min-height: 140px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+
+.np-meteogram-chart {
+  width: 100%;
+  min-height: 140px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.np-meteogram-chart svg { display: block; }
+
+.np-meteogram-loading,
+.np-meteogram-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-style: italic;
+  text-align: center;
+}
+
+.np-minimap-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-style: italic;
+}
+
+/* ── Footer ──────────────────────────────────────────────── */
+
+.np-footer {
+  margin-top: var(--space-12);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+  letter-spacing: 0.02em;
+  opacity: 0.7;
+}
+
+.np-footer p { margin: 0; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .np {
+    padding: var(--space-3) var(--space-3) var(--space-12);
+  }
+
+  .np-header {
+    gap: var(--space-2);
+    padding: var(--space-3) 0 var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  .np-logo { font-size: 1.2rem; }
+  .np-date-range { display: none; }
+
+  .np-day-tabs { gap: 6px; padding-bottom: var(--space-3); margin-bottom: var(--space-3); }
+  .np-day-tab { min-width: 52px; padding: 10px 10px; border-radius: var(--radius-md); }
+  .np-tab-date { font-size: 1.1rem; }
+  .np-tab-weekday { font-size: 9px; }
+
+  .np-filters { margin-bottom: var(--space-4); }
+  .np-filter-chips { gap: 5px; }
+  .np-filter-chip { font-size: 10.5px; padding: 4px 10px; }
+
+  .np-day-info { padding: var(--space-2) 0 var(--space-3); margin-bottom: var(--space-4); }
+  .np-day-title { font-size: 1rem; }
+
+  .np-region { margin-bottom: var(--space-6); }
+  .np-region-head { border-bottom-width: 1.5px; padding-bottom: var(--space-2); margin-bottom: var(--space-2); }
+
+  .np-spot { border-radius: var(--radius-md); }
+  .np-spot-toggle { padding: 10px 12px; }
+  .np-spot-name { font-size: var(--text-sm); }
+  .np-spot-status { gap: 4px; margin-top: 6px; }
+  .np-chip { font-size: 10px; padding: 2px 8px; }
+  .np-chip--type { display: none; }
+  .np-chip--warn { max-width: 180px; }
+  .np-spot-rating { font-size: 1.15rem; }
+  .np-spot:hover { transform: none; }
+
+  .np-spot-details { padding: var(--space-3) var(--space-3) var(--space-4); }
+  .np-detail-top { flex-direction: column; gap: 10px; }
+  .np-detail-rec { flex: none; max-width: 100%; }
+  .np-label { font-size: 11.5px; padding: 5px 10px; }
+  .np-label-icon { font-size: 12px; width: 14px; }
+  .np-spot-minimap { height: 220px; }
+  .np-filter-map { height: 220px; }
+
+  .np-fazit {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+  }
+
+  .np-fazit-label { font-size: var(--text-sm); }
+
+  .np-content-empty { padding: var(--space-12) var(--space-4); }
+}
+
+/* Tablet-only: side-by-side map+meteogram in detail */
+@media (min-width: 641px) and (max-width: 960px) {
+  .np { padding: var(--space-5) var(--space-4) var(--space-12); }
+}
+
+/* Extra polish: reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .np-spot,
+  .np-day-tab,
+  .np-btn-gen,
+  .np-filter-chip,
+  .np-spot-chevron,
+  .np-fazit-chevron,
+  .np-spot-details {
+    transition: none !important;
+    animation: none !important;
+  }
+}

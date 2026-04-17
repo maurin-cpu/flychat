@@ -245,11 +245,29 @@ window.Meteogram = (function () {
         var times = profiles.map(function (p) { return p.time; });
         var nCols = times.length;
 
-        // Fixed altitude grid 0-4000m in 250m steps
+        // Fixed altitude grid in 250m steps, starting from launch elevation
         var STEP = 250;
+        var FULL_ROWS = 17; // 0-4000m = 17 rows (reference for constant chart height)
+        var elevation = (options && options.elevation) || 0;
+        var minGridAlt = Math.floor(elevation / STEP) * STEP;
         var altitudes = [];
-        for (var a = 0; a <= 4000; a += STEP) altitudes.push(a);
+        for (var a = minGridAlt; a <= 4000; a += STEP) altitudes.push(a);
         var nRows = altitudes.length;
+        // Scale cell height so the grid area stays constant regardless of row count
+        var cellH = Math.round(FULL_ROWS * CELL_H / nRows);
+        var scale = cellH / CELL_H; // 1.0 at 17 rows, ~1.9 at 9 rows
+
+        // Bodenwind-Override: grid[0] bekommt den terrain-korrigierten 10m-Wind
+        // (statt PL-Interpolation der freien Atmosphäre). Row bleibt optisch
+        // gleich hoch wie alle anderen — der Bodenwind ist physikalisch nur
+        // am Boden gültig, keine dicke Schicht. Thermik wird normal gerendert.
+        var groundWindByTime = (options && options.groundWindByTime) || null;
+        var hasGroundRow = !!(groundWindByTime && elevation > 0);
+        // Bei Regionen ist `elevation` nur ein Referenzpunkt, kein Startplatz.
+        // Thermik darf dann auch in den Grid-Zeilen UNTER dem Referenzpunkt
+        // rendern (Region-Einzugsgebiet umfasst verschiedene Höhen).
+        var isRegion = !!(options && options.isRegion);
+        var thermalBaseAlt = isRegion ? minGridAlt : elevation;
 
         // Interpolated grid
         var grid = [];
@@ -292,6 +310,31 @@ window.Meteogram = (function () {
             });
         });
 
+        // Bodenwind-Injection: grid[0] mit terrain-korrigiertem 10m-Wind
+        // überschreiben. Turbulenz-Exzess = Böen − Mittelwind (Gust-Delta),
+        // damit der Strip am rechten Rand der Kachel die Böen-Intensität
+        // anzeigt (gleiche Logik wie Höhenkacheln).
+        if (hasGroundRow) {
+            profiles.forEach(function (p, ci) {
+                var gw = groundWindByTime[p.time];
+                if (!gw) return;
+                var ws = gw.wind_speed != null ? gw.wind_speed : 0;
+                var wg = gw.wind_gusts != null ? gw.wind_gusts : ws;
+                var wd = gw.wind_direction != null ? gw.wind_direction : 0;
+                grid[0][ci] = {
+                    altitude: elevation,
+                    wind_speed: ws,
+                    wind_gusts: wg,
+                    turbulence_risk: wg,
+                    turbulence_excess: Math.max(0, wg - ws),
+                    wind_direction: wd,
+                    temperature: grid[0][ci] ? grid[0][ci].temperature : 0,
+                    pressure: null,
+                    isGroundRow: true
+                };
+            });
+        }
+
         // Weather lookup by time
         var wxByTime = {};
         if (wxDay) {
@@ -316,7 +359,7 @@ window.Meteogram = (function () {
         // ===== COMPUTE PLAIN-LANGUAGE WARNING BANDS =====
         // These are grouped hour-ranges (ci..ci) used later to draw pills
         // BELOW the ground strip in plain German.
-        var elevation = (options && options.elevation) || 0;
+        // elevation already extracted above for altitude grid filtering
         var windSectors = parseWindDirection(options.windrichtung || '');
         var idealWindMax = options.idealWindMax || 30;
 
@@ -425,7 +468,7 @@ window.Meteogram = (function () {
         var usedRows = Math.max(0, rowLastEnd.length);
         var WARN_STRIP_H = usedRows > 0 ? (usedRows * (WARN_ROW_H + WARN_ROW_GAP) + 6) : 0;
 
-        var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * CELL_H + GROUND_H + WARN_STRIP_H + TIME_LABEL_H + 8;
+        var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
 
         var svg = d3.select(container)
             .append('svg')
@@ -437,14 +480,18 @@ window.Meteogram = (function () {
             .attr('transform', 'translate(' + MARGIN.left + ', ' + MARGIN.top + ')');
 
         var GRID_TOP = CLOUD_STRIP_H + CLOUD_GAP;
-        function rowY(ri) { return GRID_TOP + (nRows - 1 - ri) * CELL_H; }
-        var gridBottom = GRID_TOP + nRows * CELL_H;
-        // elevation already extracted above (line 319) for the warning band loop
+        // Alle Rows gleich hoch — Bodenwind ist physikalisch punktuell,
+        // keine dicke Schicht. Row 0 zeigt Bodenwind-Daten, Thermik-Farbe
+        // bleibt normal gerendert.
+        function rowY(ri) { return GRID_TOP + (nRows - 1 - ri) * cellH; }
+        function rowHeight(ri) { return cellH; }
+        var gridBottom = GRID_TOP + nRows * cellH;
 
         // Helper for altitude to Y coordinate (smooth, not grid-aligned)
+        var bottomAlt = altitudes[0];
+        var topAlt = altitudes[altitudes.length - 1];
         function altToY(alt) {
-            var topAlt = altitudes[altitudes.length - 1];
-            return GRID_TOP + (1 - alt / topAlt) * (nRows * CELL_H);
+            return GRID_TOP + (1 - (alt - bottomAlt) / (topAlt - bottomAlt)) * (nRows * cellH);
         }
 
         // ===== CLOUD STRIP (Smooth Area Charts) =====
@@ -592,6 +639,27 @@ window.Meteogram = (function () {
             .attr('y1', CLOUD_STRIP_H + CLOUD_GAP / 2).attr('y2', CLOUD_STRIP_H + CLOUD_GAP / 2)
             .attr('stroke', '#94A3B8').attr('stroke-width', 1.5);
 
+        // ===== STARTPLATZ-REIHE Hintergrund (Row 0) =====
+        // Row 0 IST der Startplatz — eine eigene KATEGORIE von Wind-Kacheln
+        // (Bodenwind, terrain-korrigiert), klar abgegrenzt von den Zeilen
+        // darüber (freie Atmosphäre). Gestalt-Prinzip "Common Region":
+        //   • Starker Orange-Tint als Zonen-Hintergrund
+        //   • Sektions-Trenner (oben) zwischen Row 0 und Row 1+
+        //   • Zell-Umrisse pro Kachel (siehe Wind-Cell-Rendering weiter unten)
+        // NUR bei Spots — Regionen haben keinen Startplatz.
+        if (hasGroundRow && elevation > 0) {
+            // Zonen-Hintergrund: Orange-200 mit höherer Opacity.
+            // Thermik-Cells (opacity 0.8) überlagern später und mischen sich
+            // mit dem Orange — die Zelle bleibt als "Startplatz-Kachel mit
+            // Thermik" erkennbar.
+            chartG.append('rect').attr('class', 'launch-row-bg')
+                .attr('x', 0).attr('y', rowY(0))
+                .attr('width', nCols * CELL_W).attr('height', cellH)
+                .attr('fill', '#FED7AA')  // Orange-200
+                .attr('opacity', 0.7)
+                .style('pointer-events', 'none');
+        }
+
         // Track cells that have thermik numbers (key: "ri,ci")
         var thermikCells = {};
 
@@ -605,19 +673,25 @@ window.Meteogram = (function () {
 
             for (var ri = 0; ri < nRows; ri++) {
                 var alt = altitudes[ri];
-                var localRate = thermalRateAtAltitude(climb, maxAlt, elevation, alt);
+                // Row 0 bei Spots = Startplatz-Kachel. Verwende `elevation` für
+                // die Thermik-Berechnung (statt altitudes[0]=minGridAlt=1000m
+                // bei elevation=1228m), damit die Startplatz-Kachel die
+                // Thermik ab Boden zeigt — nicht "unter Startplatz = keine Thermik".
+                var thermAlt = (ri === 0 && hasGroundRow && elevation > 0) ? elevation : alt;
+                var localRate = thermalRateAtAltitude(climb, maxAlt, thermalBaseAlt, thermAlt);
                 if (localRate <= 0) continue;
 
                 var bgColor = thermClimbColor(localRate);
                 chartG.append('rect')
                     .attr('x', ci * CELL_W + 1).attr('y', rowY(ri) + 1)
-                    .attr('width', CELL_W - 2).attr('height', CELL_H - 2)
+                    .attr('width', CELL_W - 2).attr('height', cellH - 2)
                     .attr('fill', bgColor).attr('rx', 3).attr('opacity', 0.8);
 
+                var thermFontSize = Math.round((isNarrow ? 8 : 10) * Math.min(scale, 1.8));
                 chartG.append('text').attr('class', 'therm-value')
                     .attr('x', ci * CELL_W + CELL_W / 2)
-                    .attr('y', rowY(ri) + CELL_H - 4)
-                    .attr('font-size', isNarrow ? '8px' : '10px')
+                    .attr('y', rowY(ri) + cellH - 4 * scale)
+                    .attr('font-size', thermFontSize + 'px')
                     .text(localRate.toFixed(1));
 
                 thermikCells[ri + ',' + ci] = localRate;
@@ -625,64 +699,60 @@ window.Meteogram = (function () {
         });
 
         // ===== GRID LINES =====
-        for (var ri2 = 0; ri2 <= nRows; ri2++) {
+        // Horizontale Linien an den Top-Kanten jeder Row + Bottom der Ground-Row
+        for (var ri2 = 0; ri2 < nRows; ri2++) {
+            var lineY = rowY(ri2);
             chartG.append('line').attr('class', 'grid-line')
                 .attr('x1', 0).attr('x2', nCols * CELL_W)
-                .attr('y1', GRID_TOP + ri2 * CELL_H).attr('y2', GRID_TOP + ri2 * CELL_H);
+                .attr('y1', lineY).attr('y2', lineY);
         }
+        chartG.append('line').attr('class', 'grid-line')
+            .attr('x1', 0).attr('x2', nCols * CELL_W)
+            .attr('y1', gridBottom).attr('y2', gridBottom);
         for (var ci2 = 0; ci2 <= nCols; ci2++) {
             chartG.append('line').attr('class', 'grid-line')
                 .attr('x1', ci2 * CELL_W).attr('x2', ci2 * CELL_W)
-                .attr('y1', GRID_TOP).attr('y2', gridBottom + GROUND_H);
+                .attr('y1', GRID_TOP).attr('y2', gridBottom + TIME_LABEL_H + GROUND_H);
         }
 
-        // ===== LAUNCH SITE ELEVATION LINE =====
-        if (elevation > 0) {
-            var elevY = altToY(elevation);
-            // Background shadow for the line
-            chartG.append('line')
-                .attr('x1', 0).attr('x2', nCols * CELL_W)
-                .attr('y1', elevY).attr('y2', elevY)
-                .attr('stroke', 'rgba(0,0,0,0.4)')
-                .attr('stroke-width', 4)
-                .attr('stroke-linecap', 'round');
-
-            // Main indicator line
-            chartG.append('line')
-                .attr('x1', 0).attr('x2', nCols * CELL_W)
-                .attr('y1', elevY).attr('y2', elevY)
-                .attr('stroke', '#F97316') // Orange-500
-                .attr('stroke-width', 2)
-                .attr('stroke-dasharray', '6,4')
-                .attr('stroke-linecap', 'round');
-
-            // Label
-            chartG.append('text')
-                .attr('x', 4).attr('y', elevY - 4)
-                .attr('fill', '#F97316')
-                .attr('font-size', '10px')
-                .attr('font-weight', 'bold')
-                .text('STARTPLATZ (' + Math.round(elevation) + 'm)');
-        }
+        // (Kein horizontaler Balken — Row 0 Kacheln werden pro Zelle mit
+        // Orange-Rahmen versehen, siehe Wind-Cell-Rendering weiter unten.)
 
         // ===== ALTITUDE LABELS =====
+        var altLabelStep = cellH >= 45 ? 250 : 500; // label every 250m when cells are large enough
+        var altFontSize = Math.round(11 * Math.min(scale, 1.5));
         altitudes.forEach(function (alt, ri) {
-            if (alt % 500 !== 0) return;
+            // Row 0 bei Spots: "★ Start XXXm" statt normale Höhen-Beschriftung.
+            // Die Reihe IST der Startplatz (Bodenwind-Werte), darum wird das
+            // Row-Label selbst zur Startplatz-Kennzeichnung — das ist klarer
+            // als ein separates Label irgendwo anders im Grid.
+            if (ri === 0 && hasGroundRow && elevation > 0) {
+                chartG.append('text').attr('class', 'axis-label start-label')
+                    .attr('x', -8).attr('y', rowY(ri) + cellH / 2)
+                    .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
+                    .attr('font-size', altFontSize + 'px')
+                    .attr('font-weight', '700')
+                    .attr('fill', '#C2410C')  // Orange-700
+                    .text('\u2605 Start ' + Math.round(elevation) + 'm');
+                return;
+            }
+            if (alt % altLabelStep !== 0) return;
             var displayAlt = alt >= 1000
                 ? (alt / 1000).toFixed(alt % 1000 === 0 ? 0 : 1) + 'k'
                 : alt.toString();
             chartG.append('text').attr('class', 'axis-label')
-                .attr('x', -8).attr('y', rowY(ri) + CELL_H / 2)
+                .attr('x', -8).attr('y', rowY(ri) + cellH / 2)
                 .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
+                .attr('font-size', altFontSize + 'px')
                 .text(displayAlt + 'm');
         });
 
-        // ===== TIME LABELS =====
+        // ===== TIME LABELS (between grid and ground rows) =====
         times.forEach(function (t, ci) {
             var dt = new Date(t);
             chartG.append('text').attr('class', 'time-label')
                 .attr('x', ci * CELL_W + CELL_W / 2)
-                .attr('y', gridBottom + GROUND_H + WARN_STRIP_H + TIME_LABEL_H)
+                .attr('y', gridBottom + TIME_LABEL_H - 6)
                 .attr('text-anchor', 'middle')
                 .text(dt.getHours() + 'h');
         });
@@ -694,55 +764,109 @@ window.Meteogram = (function () {
                 var d = grid[ri3][ci3];
                 if (!d) continue;
 
+                var isGround = (ri3 === 0 && hasGroundRow && d.isGroundRow);
+                var rH3 = rowHeight(ri3);
                 var cx = ci3 * CELL_W + CELL_W / 2;
                 var hasThermik = thermikCells[ri3 + ',' + ci3] != null;
-                var cy = rowY(ri3) + CELL_H * (hasThermik ? 0.5 : 0.42);
+                var cy = rowY(ri3) + rH3 * (hasThermik ? 0.5 : 0.42);
                 var speed = d.wind_speed;
                 var gusts = d.wind_gusts != null ? d.wind_gusts : speed;
                 var gustDiff = gusts - speed;
-                var isAloftWarning = speed > 35;
+                var isAloftWarning = !isGround && speed > 35;
                 var isGustWarning = gustDiff > 15 && gusts > 30;
                 var isGustNotable = gustDiff > 10 && gusts > 25;
+
+                // Ground-Row: Richtungs-Check gegen erlaubte Sektoren
+                var isWrongDir = false;
+                if (isGround && windSectors && d.wind_direction != null && speed >= 3) {
+                    isWrongDir = !isDirInSectors(d.wind_direction, windSectors, 10);
+                }
+                // Ground-Row: Grundwind zu stark?
+                var isGroundStrong = isGround && speed > idealWindMax;
+
                 // Always show gusts
                 var showGusts = true;
+                // `color` = Pfeil-Farbe. Kann bei falscher Windrichtung (Row 0)
+                // auf Rot gesetzt werden — signalisiert: Richtung problematisch.
                 var color = (isAloftWarning || isGustWarning) ? '#ef4444' : windColor(speed);
+                if (isGround && isWrongDir) color = '#DC2626';  // Pfeil rot bei falscher Richtung
+                // `speedColor` = Farbe der Wind-Zahl. Ignoriert Windrichtung —
+                // wenn die Stärke selbst harmlos ist (z.B. 12 km/h), bleibt
+                // die Zahl grün/neutral. Nur Stärken-Warnungen (Böen, Höhenwind)
+                // färben die Zahl rot.
+                var speedColor = (isAloftWarning || isGustWarning) ? '#ef4444' : windColor(speed);
 
-                // Background
-                if (!hasThermik) {
+                // Background — Ground-Row hat eigene warme Tönung (bereits gezeichnet),
+                // hier nur noch Warnfarben-Overlay bei Richtungs-/Stärke-Problemen.
+                if (isGround) {
+                    var gBgFill = null;
+                    if (isWrongDir) gBgFill = 'rgba(220, 38, 38, 0.18)';      // Rot — falsche Richtung
+                    else if (isGroundStrong || isGustWarning) gBgFill = 'rgba(239, 68, 68, 0.15)';
+                    else if (isGustNotable) gBgFill = 'rgba(249, 115, 22, 0.10)';
+                    if (gBgFill) {
+                        chartG.append('rect')
+                            .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
+                            .attr('width', CELL_W - 2).attr('height', rH3 - 2)
+                            .attr('fill', gBgFill)
+                            .attr('rx', 3);
+                    }
+                    // Orange-Rahmen pro Row-0-Kachel — visuelle Abgrenzung als
+                    // "Startplatz-Wind-Zelle" (Card-Effekt). Bei Wrong-Dir
+                    // bekommt der Rahmen einen roten Akzent als Warnhinweis.
+                    chartG.append('rect').attr('class', 'launch-cell-frame')
+                        .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
+                        .attr('width', CELL_W - 2).attr('height', rH3 - 2)
+                        .attr('fill', 'none')
+                        .attr('stroke', isWrongDir ? '#DC2626' : '#F97316')  // Rot bei Fehler, sonst Orange-500
+                        .attr('stroke-width', isWrongDir ? 2 : 1.5)
+                        .attr('rx', 3)
+                        .style('pointer-events', 'none');
+                } else if (!hasThermik) {
                     var bgFill = windBgColor(speed);
                     if (isGustWarning) bgFill = 'rgba(239, 68, 68, 0.15)';
                     else if (isAloftWarning) bgFill = 'rgba(239, 68, 68, 0.15)';
                     else if (isGustNotable) bgFill = 'rgba(249, 115, 22, 0.08)';
                     chartG.append('rect')
                         .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
-                        .attr('width', CELL_W - 2).attr('height', CELL_H - 2)
+                        .attr('width', CELL_W - 2).attr('height', rH3 - 2)
                         .attr('fill', bgFill)
                         .attr('rx', 3);
                 }
 
+                var arrowScale = Math.min(scale, 1.8);
+                var gFilter;
+                if (isGround && isWrongDir) {
+                    gFilter = 'drop-shadow(0 0 4px rgba(220, 38, 38, 0.8))';
+                } else if (isAloftWarning || isGustWarning) {
+                    gFilter = 'drop-shadow(0 0 3px rgba(239, 68, 68, 0.7))';
+                } else {
+                    gFilter = 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))';
+                }
                 var g = chartG.append('g')
                     .attr('transform', 'translate(' + cx + ', ' + cy + ')')
-                    .style('filter', (isAloftWarning || isGustWarning) ? 'drop-shadow(0 0 3px rgba(239, 68, 68, 0.7))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))')
+                    .style('filter', gFilter)
                     .style('opacity', 0);
 
                 g.append('path')
                     .attr('d', arrowPath(speed))
                     .attr('fill', color)
-                    .attr('transform', 'rotate(' + ((d.wind_direction + 180) % 360) + ')');
+                    .attr('transform', 'rotate(' + ((d.wind_direction + 180) % 360) + ') scale(' + arrowScale + ')');
 
                 // Wind speed + gust number
                 // Gust color: red if dangerous, orange if notable, otherwise by absolute gust value
                 var gustColor = isGustWarning ? '#ef4444' : (isGustNotable ? '#F97316' : windColor(gusts));
-                var windTextY = rowY(ri3) + (hasThermik ? 10 : CELL_H - 4);
+                var windFontSize = Math.round((isNarrow ? 7 : 9) * Math.min(scale, 1.8));
+                var windTextY = rowY(ri3) + (hasThermik ? Math.round(10 * scale) : rH3 - Math.round(4 * scale));
                 if (showGusts) {
                     // Show wind/gust format: "25/32"
                     var windGustText = chartG.append('text').attr('class', 'wind-value')
                         .attr('x', cx).attr('y', windTextY)
-                        .attr('font-size', isNarrow ? '7px' : '9px')
-                        .attr('font-weight', (isGustWarning || isAloftWarning) ? 'bold' : '600')
+                        .attr('font-size', windFontSize + 'px')
+                        .attr('font-weight', (isGround || isGustWarning || isAloftWarning) ? 'bold' : '600')
                         .style('text-shadow', hasThermik ? '0 1px 2px rgba(255,255,255,0.8)' : 'none');
-                    // Speed part in wind color
-                    windGustText.append('tspan').attr('fill', color)
+                    // Speed part in wind color (nicht rot bei WrongDir — die
+                    // Zahl selbst ist ja nicht gefährlich, nur die Richtung)
+                    windGustText.append('tspan').attr('fill', speedColor)
                         .text(Math.round(speed));
                     // Separator
                     windGustText.append('tspan').attr('fill', '#94A3B8')
@@ -753,22 +877,27 @@ window.Meteogram = (function () {
                 } else {
                     chartG.append('text').attr('class', 'wind-value')
                         .attr('x', cx).attr('y', windTextY)
-                        .attr('font-size', isNarrow ? '8px' : '9px').attr('fill', color).attr('opacity', hasThermik ? 1.0 : (isAloftWarning ? 1.0 : 0.7))
+                        .attr('font-size', windFontSize + 'px').attr('fill', speedColor).attr('opacity', hasThermik ? 1.0 : (isAloftWarning ? 1.0 : 0.7))
                         .attr('font-weight', isAloftWarning ? 'bold' : 'normal')
                         .style('text-shadow', hasThermik ? '0 1px 2px rgba(255,255,255,0.8)' : 'none')
                         .text(Math.round(speed));
                 }
 
-                // Turbulence risk strip (thin colored bar at right edge of cell)
+                // Böen-/Turbulenz-Strip (vertikaler Farbbalken am rechten Rand).
+                // In Row 0 zeigt er Bodenböen (gustDiff = Böen−Wind). In Row 1+
+                // zeigt er Turbulenz-Risiko (Gauss-Kernel-Exzess über der Höhe).
+                // Bei Row 0 leicht nach innen versetzt, damit Orange-Rahmen
+                // der Kachel nicht überdeckt wird.
                 var tRisk = d.turbulence_risk != null ? d.turbulence_risk : gusts;
                 var tExcess = d.turbulence_excess != null ? d.turbulence_excess : gustDiff;
                 if (tExcess > 1) {
-                    var stripW = isNarrow ? 4 : 6;
+                    var stripW = Math.round((isNarrow ? 4 : 6) * Math.min(scale, 1.5));
+                    var stripMargin = isGround ? 3 : 1;  // Row 0: mehr Abstand für Orange-Rahmen
                     chartG.append('rect')
-                        .attr('x', ci3 * CELL_W + CELL_W - stripW - 1)
-                        .attr('y', rowY(ri3) + 1)
+                        .attr('x', ci3 * CELL_W + CELL_W - stripW - stripMargin)
+                        .attr('y', rowY(ri3) + stripMargin)
                         .attr('width', stripW)
-                        .attr('height', CELL_H - 2)
+                        .attr('height', rH3 - 2 * stripMargin)
                         .attr('fill', turbulenceColor(tRisk))
                         .attr('opacity', 0.7)
                         .attr('rx', 2);
@@ -785,7 +914,7 @@ window.Meteogram = (function () {
         });
 
         // ===== GROUND STRIP =====
-        var groundY = gridBottom;
+        var groundY = gridBottom + TIME_LABEL_H;
         chartG.append('rect').attr('class', 'ground-bg')
             .attr('x', 0).attr('y', groundY)
             .attr('width', nCols * CELL_W).attr('height', GROUND_H);
@@ -948,7 +1077,7 @@ window.Meteogram = (function () {
 
         // ===== CROSSHAIR + TOOLTIP =====
         var crossV = chartG.append('line').attr('class', 'crosshair-v')
-            .attr('y1', 0).attr('y2', gridBottom + GROUND_H + WARN_STRIP_H);
+            .attr('y1', 0).attr('y2', gridBottom + TIME_LABEL_H + GROUND_H + WARN_STRIP_H);
         var crossH = chartG.append('line').attr('class', 'crosshair-h')
             .attr('x1', 0).attr('x2', nCols * CELL_W);
 
@@ -985,25 +1114,49 @@ window.Meteogram = (function () {
                 }
             }
 
-            var ri = nRows - 1 - Math.floor((my - GRID_TOP) / CELL_H);
+            // Row-Detection mit Sonder-Handling für Ground-Row (ri=0) mit extra Höhe
+            var ri;
+            var groundTop = GRID_TOP + (nRows - 1) * cellH;
+            if (hasGroundRow && my >= groundTop && my < gridBottom) {
+                ri = 0;
+            } else {
+                ri = nRows - 1 - Math.floor((my - GRID_TOP) / cellH);
+            }
             if (my >= GRID_TOP && ri >= 0 && ri < nRows && grid[ri] && grid[ri][ci]) {
                 var dd = grid[ri][ci];
-                html += '<div class="tooltip-row"><span class="tooltip-label">Hoehe</span><span class="tooltip-value">' + Math.round(dd.altitude) + 'm</span></div>';
-                html += '<div class="tooltip-row"><span class="tooltip-label">Wind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
-                var tRiskVal = dd.turbulence_risk != null ? dd.turbulence_risk : dd.wind_gusts;
-                var tExcessVal = dd.turbulence_excess != null ? dd.turbulence_excess : (tRiskVal != null ? tRiskVal - dd.wind_speed : 0);
-                if (tRiskVal != null && Math.round(tRiskVal) > Math.round(dd.wind_speed)) {
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Turbulenzrisiko</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">' + Math.round(tRiskVal) + ' km/h</span></div>';
-                    if (tExcessVal > 1) {
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Exzess</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">+' + Math.round(tExcessVal) + ' km/h</span></div>';
+                var isGroundCell = ri === 0 && hasGroundRow && dd.isGroundRow;
+                if (isGroundCell) {
+                    // Ground-Row Tooltip: Startplatz-fokussierte Infos
+                    html += '<div class="tooltip-row" style="margin-top:4px;padding-top:4px;border-top:1px solid #F97316"><span class="tooltip-label" style="color:#C2410C;font-weight:700">\u2605 Startplatz</span><span class="tooltip-value" style="color:#C2410C;font-weight:700">' + Math.round(elevation) + 'm</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Bodenwind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
+                    if (dd.wind_gusts != null && Math.round(dd.wind_gusts) > Math.round(dd.wind_speed)) {
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Böen</span><span class="tooltip-value" style="color:' + windColor(dd.wind_gusts) + '">' + Math.round(dd.wind_gusts) + ' km/h</span></div>';
                     }
-                }
-                html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0</span></div>';
-                html += '<div class="tooltip-row"><span class="tooltip-label">Temp</span><span class="tooltip-value">' + dd.temperature.toFixed(1) + '\u00B0C</span></div>';
-                // Thermik rate at this altitude
-                var localThermRate = thermikCells[ri + ',' + ci];
-                if (localThermRate != null && localThermRate > 0) {
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Steigrate hier</span><span class="tooltip-value" style="color:' + thermClimbColor(localThermRate) + '">' + localThermRate.toFixed(1) + ' m/s</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0</span></div>';
+                    if (windSectors && dd.wind_direction != null && dd.wind_speed >= 3) {
+                        var dirOk = isDirInSectors(dd.wind_direction, windSectors, 10);
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Start-Check</span><span class="tooltip-value" style="color:' + (dirOk ? '#059669' : '#DC2626') + ';font-weight:700">' + (dirOk ? '\u2713 OK' : '\u2715 Falsche Richtung') + '</span></div>';
+                    }
+                } else {
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Hoehe</span><span class="tooltip-value">' + Math.round(dd.altitude) + 'm</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Wind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
+                    var tRiskVal = dd.turbulence_risk != null ? dd.turbulence_risk : dd.wind_gusts;
+                    var tExcessVal = dd.turbulence_excess != null ? dd.turbulence_excess : (tRiskVal != null ? tRiskVal - dd.wind_speed : 0);
+                    if (tRiskVal != null && Math.round(tRiskVal) > Math.round(dd.wind_speed)) {
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Turbulenzrisiko</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">' + Math.round(tRiskVal) + ' km/h</span></div>';
+                        if (tExcessVal > 1) {
+                            html += '<div class="tooltip-row"><span class="tooltip-label">Exzess</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">+' + Math.round(tExcessVal) + ' km/h</span></div>';
+                        }
+                    }
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0 <span style="color:#94A3B8;font-size:10px">(freie Atm.)</span></span></div>';
+                    if (dd.temperature != null) {
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Temp</span><span class="tooltip-value">' + dd.temperature.toFixed(1) + '\u00B0C</span></div>';
+                    }
+                    // Thermik rate at this altitude
+                    var localThermRate = thermikCells[ri + ',' + ci];
+                    if (localThermRate != null && localThermRate > 0) {
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Steigrate hier</span><span class="tooltip-value" style="color:' + thermClimbColor(localThermRate) + '">' + localThermRate.toFixed(1) + ' m/s</span></div>';
+                    }
                 }
             }
             if (wx.wind) {
@@ -1047,7 +1200,7 @@ window.Meteogram = (function () {
 
         var interactRect = chartG.append('rect')
             .attr('width', nCols * CELL_W)
-            .attr('height', gridBottom + GROUND_H + WARN_STRIP_H)
+            .attr('height', gridBottom + TIME_LABEL_H + GROUND_H + WARN_STRIP_H)
             .attr('fill', 'transparent')
             .on('mousemove', function (event) {
                 showTooltipAt(d3.pointer(event), event.clientX, event.clientY);
@@ -1291,19 +1444,20 @@ window.Meteogram = (function () {
     }
 
     // ===== ANALYSE VIEW =====
-    // Renders the per-spot LLM analysis as the same .spot-card layout used on /analyses.
-    // analysisDay structure (from InstantDB spot_analyses): {
-    //     safety_status, fly_status, safe_window, wind_summary, foehn_risk,
-    //     no_go_reasons, caution_notes, safety_feedback, flyability_feedback,
-    //     flight_type, flight_duration_estimate, xc_potential, peak_climb_rate, ...
-    // }
+    // Pilot-first decision flow: answers "Can I fly?" immediately, then progressively
+    // reveals details. Structure:
+    //   Level 1: Decision Hero Banner (safety status — large, unmissable)
+    //   Level 2: Best Window Highlight (when to fly)
+    //   Level 3: Key Metrics Grid (wind, thermal, flight type)
+    //   Level 4: Safety Alerts (NO-GO, caution, foehn)
+    //   Level 5: AI Insights (expandable text)
     function renderAnalysisView(container, analysisDay, options) {
         container.innerHTML = '';
         options = options || {};
         var spotName = options.spotName || '';
         var dateStr = options.dateStr || '';
 
-        function escHtml(str) {
+        function esc(str) {
             if (str === null || str === undefined) return '';
             return String(str)
                 .replace(/&/g, '&amp;')
@@ -1311,11 +1465,6 @@ window.Meteogram = (function () {
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
-        }
-        function row(label, value) {
-            return '<div class="spot-row"><span class="spot-row-label">'
-                + escHtml(label) + '</span><span class="spot-row-value">'
-                + escHtml(value) + '</span></div>';
         }
         function normalizeFlyTier(ft) {
             if (!ft) return 'green';
@@ -1335,10 +1484,12 @@ window.Meteogram = (function () {
             return [];
         }
 
+        // ── Empty state ──
         if (!analysisDay || !analysisDay.safety_status) {
             container.innerHTML = '<div class="mg-analysis-empty">'
-                + 'Für diesen Tag liegt noch keine Analyse vor.<br>'
-                + 'Über die <em>Analyse-Seite</em> lassen sich die LLM-Analysen erzeugen.'
+                + 'Keine Analyse vorhanden.<br>'
+                + '<span style="font-size:12px;margin-top:6px;display:inline-block;">'
+                + 'Klicke auf <strong>Analyse starten</strong>, um die KI-Bewertung zu erzeugen.</span>'
                 + '</div>';
             return;
         }
@@ -1347,121 +1498,176 @@ window.Meteogram = (function () {
         var safetyStatus = a.safety_status || 'error';
         var phase2Ok = (safetyStatus === 'safe' || safetyStatus === 'conditional');
         var flyStatus = normalizeFlyTier(a.fly_status || '');
-
-        var safetyLabels = {
-            safe: 'Grün',
-            conditional: 'Orange',
-            not_safe: 'Rot',
-            no_data: 'Keine Daten',
-            error: 'Fehler'
-        };
-        var safetyBadgeClass = 'badge-safety-' + safetyStatus;
-        var safetyBadgeText = safetyLabels[safetyStatus] || safetyStatus;
-
         var noGoReasons = parseMaybeList(a.no_go_reasons);
         var cautionNotes = parseMaybeList(a.caution_notes);
 
-        var card = document.createElement('div');
-        card.className = 'spot-card safety-' + safetyStatus;
-        if (phase2Ok && flyStatus) {
-            card.className += ' fly-' + flyStatus;
-        }
+        var wrapper = document.createElement('div');
+        wrapper.className = 'mg-analysis-view';
+        var html = '';
 
-        var html = '<div class="spot-card-header">'
-            + '<div style="display: flex; flex-direction: column; gap: 4px;">'
-            + '<span class="spot-name">' + escHtml(spotName) + '</span>';
+        // ── Level 1: Decision Hero Banner ──
+        var decisionConfig = {
+            safe:        { cls: 'safe',    icon: '\u2713', label: 'Fliegbar',     sub: '' },
+            conditional: { cls: 'conditional', icon: '!',  label: 'Bedingt fliegbar', sub: 'Einschränkungen beachten' },
+            not_safe:    { cls: 'not_safe', icon: '\u2715', label: 'Nicht fliegbar', sub: 'Sicherheitsrisiken vorhanden' },
+            no_data:     { cls: 'unknown',  icon: '?',     label: 'Keine Daten',    sub: 'Wetterdaten unvollständig' },
+            error:       { cls: 'unknown',  icon: '?',     label: 'Fehler',         sub: esc(a.error || 'Analyse fehlgeschlagen') }
+        };
+        var dc = decisionConfig[safetyStatus] || decisionConfig.error;
 
-        // Fly tier badge (gray / green / violet)
-        var flyBadgeClass = 'badge-fly-' + flyStatus;
-        var flyLabels = { gray: 'Abgleiter', green: 'Fliegbar', violet: 'Legendär' };
-        var flyBadgeText = flyLabels[flyStatus] || flyStatus;
-        html += '<span class="spot-status-badge ' + flyBadgeClass + '">' + escHtml(flyBadgeText) + '</span>';
-
-        html += '</div>'
-            + '<span class="spot-badges">'
-            + '<span class="spot-status-badge ' + safetyBadgeClass + '">' + escHtml(safetyBadgeText) + '</span>'
-            + '</span></div>';
-
-        // Special states: no_data / error — short body, early return
-        if (safetyStatus === 'no_data') {
-            html += '<div class="spot-card-body">'
-                + '<div class="spot-row"><span class="spot-row-label">Status</span>'
-                + '<span class="spot-row-value" style="color: #F97316;">Wetterdaten unvollständig</span></div>'
-                + '<div class="spot-row"><span class="spot-row-label">Info</span>'
-                + '<span class="spot-row-value">' + escHtml(a.safety_feedback || 'Keine KI-Analyse möglich') + '</span></div>'
-                + '</div>';
-            card.innerHTML = html;
-            container.appendChild(card);
-            appendDatestamp();
-            return;
-        }
-        if (safetyStatus === 'error') {
-            html += '<div class="spot-card-body">'
-                + '<div class="spot-row"><span class="spot-row-label">Fehler</span>'
-                + '<span class="spot-row-value">' + escHtml(a.error || 'Unbekannt') + '</span></div>'
-                + '</div>';
-            card.innerHTML = html;
-            container.appendChild(card);
-            appendDatestamp();
-            return;
-        }
-
-        // Body
-        html += '<div class="spot-card-body">';
-        html += row('Sicherheit', safetyLabels[safetyStatus] || safetyStatus);
-        html += row('Fenster', a.safe_window || a.best_window || '-');
-        html += row('Wind', a.wind_summary || '-');
-        if (a.foehn_risk && a.foehn_risk !== 'none') {
-            html += row('Föhn', a.foehn_risk);
-        }
-        if (noGoReasons.length > 0) {
-            html += '<div class="spot-row"><span class="spot-row-label">NO-GO</span>'
-                + '<span class="spot-row-value safety-issues">' + escHtml(noGoReasons.join(', ')) + '</span></div>';
-        }
-        if (cautionNotes.length > 0) {
-            html += row('Vorsicht', cautionNotes.join(', '));
-        }
-
-        // Phase 2 — only if flyable
+        // For safe/conditional: include fly quality in sub-line
         if (phase2Ok) {
-            html += '<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--glass-border);">';
-            var flyQualLabels = { gray: 'Abgleiter', green: 'Gut fliegbar', violet: 'Legendär' };
-            html += row('Flugqualität', flyQualLabels[flyStatus] || flyStatus);
-            html += row('Flugtyp', a.flight_type || '-');
-            html += row('Dauer', a.flight_duration_estimate || a.flight_duration || '-');
-            html += row('XC', a.xc_potential || '-');
-            if (a.peak_climb_rate) {
-                html += row('Peak', a.peak_climb_rate + ' m/s');
+            var flyQualLabels = { gray: 'Soaring / Abgleiter', green: 'Gut fliegbar', violet: 'Hervorragend — XC-Tag' };
+            dc.sub = flyQualLabels[flyStatus] || dc.sub;
+        }
+
+        html += '<div class="mga-decision ' + dc.cls + '">'
+            + '<div class="mga-decision-icon">' + dc.icon + '</div>'
+            + '<div class="mga-decision-text">'
+            + '<div class="mga-decision-status">' + esc(dc.label) + '</div>';
+        if (dc.sub) {
+            html += '<div class="mga-decision-sub">' + esc(dc.sub) + '</div>';
+        }
+        html += '</div>';
+        // Fly tier badge (inline, right-side)
+        if (phase2Ok) {
+            var flyBadgeLabels = { gray: 'Abgleiter', green: 'Thermik', violet: 'XC-Tag' };
+            html += '<span class="mga-fly-badge ' + flyStatus + '">'
+                + esc(flyBadgeLabels[flyStatus] || flyStatus) + '</span>';
+        }
+        html += '</div>';
+
+        // Early return for error / no_data
+        if (safetyStatus === 'no_data' || safetyStatus === 'error') {
+            var feedback = a.safety_feedback || a.summary || '';
+            if (feedback) {
+                html += '<div style="padding:8px 12px;font-size:12.5px;color:var(--color-text-light);line-height:1.5;">'
+                    + esc(feedback) + '</div>';
+            }
+            wrapper.innerHTML = html;
+            container.appendChild(wrapper);
+            appendDatestamp();
+            return;
+        }
+
+        // ── Level 2: Best Window ──
+        var window_ = a.safe_window || a.best_window || '';
+        if (window_) {
+            html += '<div class="mga-window">'
+                + '<div>'
+                + '<div class="mga-window-label">Bestes Fenster</div>'
+                + '<div class="mga-window-time">' + esc(window_) + '</div>'
+                + '</div>'
+                + '</div>';
+        }
+
+        // ── Level 4: Safety & Quality Alerts ──
+        var flyabilityLimits = parseMaybeList(a.flyability_limits);
+        var highlightNotes = parseMaybeList(a.highlights);
+        if (noGoReasons.length > 0 || cautionNotes.length > 0 || flyabilityLimits.length > 0 || highlightNotes.length > 0) {
+            html += '<div class="mga-alerts">';
+            noGoReasons.forEach(function(r) {
+                html += '<div class="mga-alert nogo">'
+                    + '<div class="mga-alert-icon">\u2715</div>'
+                    + '<div>' + esc(r) + '</div></div>';
+            });
+            cautionNotes.forEach(function(n) {
+                html += '<div class="mga-alert caution">'
+                    + '<div class="mga-alert-icon">!</div>'
+                    + '<div>' + esc(n) + '</div></div>';
+            });
+            if (phase2Ok) {
+                flyabilityLimits.forEach(function(l) {
+                    html += '<div class="mga-alert flyability">'
+                        + '<div class="mga-alert-icon">\u2193</div>'
+                        + '<div>' + esc(l) + '</div></div>';
+                });
+                highlightNotes.forEach(function(h) {
+                    html += '<div class="mga-alert positive">'
+                        + '<div class="mga-alert-icon">\u2713</div>'
+                        + '<div>' + esc(h) + '</div></div>';
+                });
             }
             html += '</div>';
         }
 
-        // KI-Feedback boxes
-        var safetyFeedback = a.safety_feedback || a.summary || '';
-        if (safetyFeedback) {
-            html += '<div class="ai-feedback-box ai-feedback-safety">'
-                + '<span class="ai-feedback-label">KI-Feedback: Sicherheit</span>'
-                + escHtml(safetyFeedback)
-                + '</div>';
+        // ── Level 3: Key Metrics Grid ──
+        html += '<div class="mga-metrics">';
+
+        // Wind — always shown
+        html += '<div class="mga-metric full-width">'
+            + '<div class="mga-metric-label">Wind</div>'
+            + '<div class="mga-metric-value">' + esc(a.wind_summary || '-') + '</div>'
+            + '</div>';
+
+        // Flight details (only if flyable)
+        if (phase2Ok) {
+            if (a.flight_type) {
+                html += '<div class="mga-metric">'
+                    + '<div class="mga-metric-label">Flugtyp</div>'
+                    + '<div class="mga-metric-value">' + esc(a.flight_type) + '</div>'
+                    + '</div>';
+            }
+            var duration = a.flight_duration_estimate || a.flight_duration || '';
+            if (duration) {
+                html += '<div class="mga-metric">'
+                    + '<div class="mga-metric-label">Dauer</div>'
+                    + '<div class="mga-metric-value">' + esc(duration) + '</div>'
+                    + '</div>';
+            }
+            if (a.peak_climb_rate) {
+                html += '<div class="mga-metric">'
+                    + '<div class="mga-metric-label">Peak Thermik</div>'
+                    + '<div class="mga-metric-value">' + esc(a.peak_climb_rate) + ' m/s</div>'
+                    + '</div>';
+            }
+            if (a.xc_potential) {
+                html += '<div class="mga-metric">'
+                    + '<div class="mga-metric-label">XC-Potenzial</div>'
+                    + '<div class="mga-metric-value">' + esc(a.xc_potential) + '</div>'
+                    + '</div>';
+            }
         }
+        html += '</div>';
+
+        // ── Level 5: AI Insights (expandable) ──
+        var safetyFeedback = a.safety_feedback || a.summary || '';
         var flyFeedback = phase2Ok ? (a.flyability_feedback || a.recommendation || '') : '';
-        if (flyFeedback) {
-            html += '<div class="ai-feedback-box ai-feedback-flyability">'
-                + '<span class="ai-feedback-label">KI-Feedback: Fliegbarkeit</span>'
-                + escHtml(flyFeedback)
-                + '</div>';
+
+        if (safetyFeedback || flyFeedback) {
+            html += '<div class="mga-insights">';
+            if (safetyFeedback) {
+                html += '<div class="mga-insight safety open">'
+                    + '<button class="mga-insight-toggle" type="button">Sicherheits-Einschätzung</button>'
+                    + '<div class="mga-insight-body">' + esc(safetyFeedback) + '</div>'
+                    + '</div>';
+            }
+            if (flyFeedback) {
+                html += '<div class="mga-insight flyability' + (safetyFeedback ? '' : ' open') + '">'
+                    + '<button class="mga-insight-toggle" type="button">Flug-Einschätzung</button>'
+                    + '<div class="mga-insight-body">' + esc(flyFeedback) + '</div>'
+                    + '</div>';
+            }
+            html += '</div>';
         }
 
-        html += '</div>';
-        card.innerHTML = html;
-        container.appendChild(card);
+        wrapper.innerHTML = html;
+
+        // Wire up expandable toggles
+        wrapper.querySelectorAll('.mga-insight-toggle').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                btn.parentElement.classList.toggle('open');
+            });
+        });
+
+        container.appendChild(wrapper);
         appendDatestamp();
 
         function appendDatestamp() {
             if (!dateStr) return;
             var d = document.createElement('div');
             d.className = 'mg-analysis-datestamp';
-            d.textContent = 'Analyse für ' + dateStr;
+            d.textContent = 'Analyse: ' + dateStr;
             container.appendChild(d);
         }
     }

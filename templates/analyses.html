@@ -251,7 +251,7 @@
     .badge-safety-conditional { background: var(--color-safety-marginal-bg); color: var(--color-safety-marginal-text); }
     .badge-safety-not_safe { background: var(--color-safety-critical-bg); color: var(--color-safety-critical-text); }
     .badge-safety-no_data { background: var(--color-safety-nodata-bg); color: var(--color-safety-nodata-text); }
-    .badge-safety-error { background: var(--color-safety-unknown-bg); color: var(--color-safety-unknown-text); }
+    .badge-safety-error { background: #fee2e2; color: #b91c1c; }
     .badge-fly-gray { background: var(--color-fly-gray-bg); color: var(--color-fly-gray-text); }
     .badge-fly-green { background: var(--color-fly-green-bg); color: var(--color-fly-green-text); }
     .badge-fly-violet { background: var(--color-fly-violet-bg); color: var(--color-fly-violet-text); }
@@ -396,6 +396,96 @@
         margin-top: 2px;
     }
 
+    /* ─── Smart-Labels (4-Kategorien-System) ──────────── */
+    .smart-labels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 4px;
+    }
+
+    .smart-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 9px;
+        border-radius: var(--radius-pill);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        line-height: 1.3;
+        border: 1px solid transparent;
+    }
+
+    .smart-label-icon {
+        font-size: 12px;
+        line-height: 1;
+    }
+
+    .smart-label.cat-no_go {
+        background: #fee2e2;
+        color: #991b1b;
+        border-color: #fecaca;
+    }
+
+    .smart-label.cat-conditional {
+        background: #fff7ed;
+        color: #9a3412;
+        border-color: #fed7aa;
+    }
+
+    .smart-label.cat-reducer {
+        background: #F5EDE0;
+        color: #6B5430;
+        border-color: #D9C5A3;
+    }
+
+    .smart-label.cat-booster {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    /* Details-Akkordeon fuer Rohdaten-Listen */
+    .details-toggle {
+        margin-top: 8px;
+        border-top: 1px dashed var(--glass-border);
+        padding-top: 8px;
+    }
+
+    .details-toggle summary {
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 2px 0;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .details-toggle summary::before {
+        content: '▸';
+        display: inline-block;
+        transition: transform 0.15s;
+        font-size: 9px;
+    }
+
+    .details-toggle[open] summary::before {
+        transform: rotate(90deg);
+    }
+
+    .details-toggle summary:hover {
+        color: var(--color-text);
+    }
+
+    .details-toggle[open] > div {
+        margin-top: 6px;
+    }
+
     .confidence-badge {
         font-size: 10px;
         padding: 2px 7px;
@@ -483,6 +573,7 @@
 {% block scripts %}
 <script type="module">
 import { init } from 'https://esm.sh/@instantdb/core';
+import { pickDisplayLabels } from "{{ url_for('static', filename='js/label-catalog.js') }}";
 
 const APP_ID = '{{ instantdb_app_id }}';
 const FORECAST_DAYS = {{ forecast_days }};
@@ -526,13 +617,15 @@ var spotLatestUpdatedAt = null;
 var regionLatestUpdatedAt = null;
 var currentDate = null;
 var currentView = 'spots'; // 'spots' or 'regions'
+var spotLoadedFromApi = false;
+var regionLoadedFromApi = false;
 
 var safetyLabels = {
     safe: 'Grün',
     conditional: 'Orange',
     not_safe: 'Rot',
     no_data: 'Keine Daten',
-    error: 'Fehler'
+    error: 'Analyse-Fehler'
 };
 
 var flyTierLabels = {
@@ -572,7 +665,42 @@ subTabsEl.addEventListener('click', function(e) {
     render();
 });
 
-// ─── InstantDB: Spot Analyses ───────────────────────────────────
+// ─── Primary: API fetch (sofort verfügbar, kein InstantDB nötig) ─────
+fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.spot_analyses) {
+        var nested = data.spot_analyses;
+        // API gibt nested {spotName: {date: doc}} zurück — direkt übernehmen
+        spotAnalysesNested = nested;
+        spotLoadedFromApi = true;
+        if (data.spot_analyses) {
+            var allDocs = [];
+            Object.values(nested).forEach(function(days) { Object.values(days).forEach(function(d) { allDocs.push(d); }); });
+            allDocs.forEach(function(d) {
+                if (d.updated_at && (!spotLatestUpdatedAt || d.updated_at > spotLatestUpdatedAt)) {
+                    spotLatestUpdatedAt = d.updated_at;
+                }
+            });
+        }
+        render();
+    }
+}).catch(function(e) { console.warn('API spot analyses fetch failed:', e); });
+
+fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+    if (data.region_analyses) {
+        regionAnalysesNested = data.region_analyses;
+        regionLoadedFromApi = true;
+        Object.values(data.region_analyses).forEach(function(days) {
+            Object.values(days).forEach(function(d) {
+                if (d.updated_at && (!regionLatestUpdatedAt || d.updated_at > regionLatestUpdatedAt)) {
+                    regionLatestUpdatedAt = d.updated_at;
+                }
+            });
+        });
+        render();
+    }
+}).catch(function(e) { console.warn('API region analyses fetch failed:', e); });
+
+// ─── Secondary: InstantDB subscriptions for live updates ────────
 db.subscribeQuery({ spot_analyses: {} }, function(resp) {
     if (resp.error) {
         console.error('InstantDB Spot-Fehler:', resp.error.message);
@@ -580,6 +708,8 @@ db.subscribeQuery({ spot_analyses: {} }, function(resp) {
     }
     if (resp.data) {
         var entries = resp.data.spot_analyses || [];
+        // Leere InstantDB-Antwort überschreibt nicht die API-Daten
+        if (entries.length === 0 && spotLoadedFromApi) return;
         spotAnalysesNested = {};
         spotLatestUpdatedAt = null;
         entries.forEach(function(entry) {
@@ -610,6 +740,8 @@ db.subscribeQuery({ region_analyses: {} }, function(resp) {
     }
     if (resp.data) {
         var entries = resp.data.region_analyses || [];
+        // Leere InstantDB-Antwort überschreibt nicht die API-Daten
+        if (entries.length === 0 && regionLoadedFromApi) return;
         regionAnalysesNested = {};
         regionLatestUpdatedAt = null;
         entries.forEach(function(entry) {
@@ -782,13 +914,11 @@ function createCard(name, a) {
         '<div style="display: flex; flex-direction: column; gap: 4px;">' +
         '<span class="spot-name">' + escHtml(name) + '</span>';
 
-    // For regions: show quality badge; for spots: show fly tier badge
+    // Fliegbarkeits-Badge (gray/green/violet) — nur wenn Daten vorhanden
     if (isRegion) {
-        if (safetyStatus === 'not_safe') {
-            html += '<span style="font-size: 12px; font-weight: 700; color: #991b1b; background: #fee2e2; padding: 3px 10px; border-radius: 100px;">NO-GO</span>';
-        } else if (hasFlyData) {
+        if (safetyStatus !== 'not_safe' && hasFlyData) {
             var ft = normalizeFlyTier(a.flyability_tier || a.fly_status || '');
-            var regionBadgeLabels = { gray: 'Schwach', green: 'Gut', violet: 'Top' };
+            var regionBadgeLabels = { gray: 'Abgleiter', green: 'Gut', violet: 'Top' };
             var regionBadgeColors = { gray: '#64748b', green: '#166534', violet: '#6d28d9' };
             var regionBadgeBg = { gray: '#f1f5f9', green: '#dcfce7', violet: '#ede9fe' };
             var rlabel = regionBadgeLabels[ft] || ft;
@@ -797,7 +927,6 @@ function createCard(name, a) {
             html += '<span style="font-size: 12px; font-weight: 600; color: ' + rcolor + '; background: ' + rbg + '; padding: 3px 10px; border-radius: 100px;">' + rlabel + '</span>';
         }
     } else {
-        // Spots: show fly tier badge (gray/green/violet) only if data exists
         if (hasFlyData) {
             var flyStatus = a.fly_status || 'gray';
             var flyBadgeClass = 'badge-fly-' + flyStatus;
@@ -805,6 +934,18 @@ function createCard(name, a) {
             var flyBadgeText = flyLabels[flyStatus] || flyStatus;
             html += '<span class="spot-status-badge ' + flyBadgeClass + '">' + escHtml(flyBadgeText) + '</span>';
         }
+    }
+
+    // Smart-Labels (max 1 bei not_safe, bis 3 bei conditional, bis 2 bei safe)
+    var smartLabels = pickDisplayLabels(a);
+    if (smartLabels.length > 0) {
+        html += '<div class="smart-labels">';
+        smartLabels.forEach(function(lbl) {
+            html += '<span class="smart-label cat-' + lbl.category + '">' +
+                    '<span class="smart-label-icon">' + lbl.icon + '</span>' +
+                    escHtml(lbl.label) + '</span>';
+        });
+        html += '</div>';
     }
 
     html += '</div>' +
@@ -822,8 +963,11 @@ function createCard(name, a) {
     }
 
     if (safetyStatus === 'error') {
+        var errMsg = a.error || 'Analyse fehlgeschlagen';
+        var errHint = 'Bitte Analyse erneut starten.';
         html += '<div class="spot-card-body">' +
-            '<div class="spot-row"><span class="spot-row-label">Fehler</span><span class="spot-row-value">' + escHtml(a.error || 'Unbekannt') + '</span></div>' +
+            '<div class="spot-row"><span class="spot-row-label">\u26A0 Fehler</span><span class="spot-row-value" style="color:#b91c1c;">' + escHtml(errMsg) + '</span></div>' +
+            '<div class="spot-row"><span class="spot-row-label"></span><span class="spot-row-value" style="font-size:11px;color:#6b7280;">' + errHint + '</span></div>' +
             '</div>';
         card.innerHTML = html;
         return card;
@@ -837,34 +981,33 @@ function createCard(name, a) {
     if (a.foehn_risk && a.foehn_risk !== 'none') {
         html += row('Foehn', a.foehn_risk);
     }
-    html += '<div class="warning-section nogo-section">';
-    html += '<span class="warning-section-label">NO-GO</span>';
-    if (noGoReasons.length > 0) {
-        html += '<ul class="warning-list nogo-list">';
-        noGoReasons.forEach(function(r) { html += '<li>' + escHtml(r) + '</li>'; });
-        html += '</ul>';
-    } else {
-        html += '<div class="warning-none">Keine</div>';
+    // Detail-Akkordeon: nur wenn mindestens eine Liste Eintraege hat
+    if (noGoReasons.length > 0 || cautionNotes.length > 0) {
+        html += '<details class="details-toggle">';
+        html += '<summary>Details anzeigen</summary><div>';
+        if (noGoReasons.length > 0) {
+            html += '<div class="warning-section nogo-section">';
+            html += '<span class="warning-section-label">NO-GO</span>';
+            html += '<ul class="warning-list nogo-list">';
+            noGoReasons.forEach(function(r) { html += '<li>' + escHtml(r) + '</li>'; });
+            html += '</ul></div>';
+        }
+        if (cautionNotes.length > 0) {
+            html += '<div class="warning-section caution-section">';
+            html += '<span class="warning-section-label">Vorsicht</span>';
+            html += '<ul class="warning-list caution-list">';
+            cautionNotes.forEach(function(n) { html += '<li>' + escHtml(n) + '</li>'; });
+            html += '</ul></div>';
+        }
+        html += '</div></details>';
     }
-    html += '</div>';
-
-    html += '<div class="warning-section caution-section">';
-    html += '<span class="warning-section-label">Vorsicht</span>';
-    if (cautionNotes.length > 0) {
-        html += '<ul class="warning-list caution-list">';
-        cautionNotes.forEach(function(n) { html += '<li>' + escHtml(n) + '</li>'; });
-        html += '</ul>';
-    } else {
-        html += '<div class="warning-none">Keine</div>';
-    }
-    html += '</div>';
 
     if (phase2Ok) {
         html += '<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--glass-border);">';
 
         if (isRegion) {
             var regionFt = normalizeFlyTier(a.flyability_tier || a.fly_status || '');
-            var regionQualLabels = { gray: 'Schwach', green: 'Gut', violet: 'Top' };
+            var regionQualLabels = { gray: 'Abgleiter', green: 'Gut', violet: 'Top' };
             html += row('Flugqualität', regionQualLabels[regionFt] || regionFt);
         } else {
             var flyStatus = normalizeFlyTier(a.fly_status || '');
