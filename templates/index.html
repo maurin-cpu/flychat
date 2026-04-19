@@ -482,17 +482,20 @@
                     </div>
                     <button class="meteogram-close" id="meteogramClose" aria-label="Schliessen">&times;</button>
                 </div>
-                <!-- View tabs: Meteogramm / Windverlauf / Text (Analyse is always visible in aside) -->
+                <!-- View tabs: Meteogramm / Text (Analyse is always visible in aside) -->
                 <div class="meteogram-view-tabs" id="meteogramViewTabs">
                     <button class="view-tab active" data-view="meteogram">Meteogramm</button>
-                    <button class="view-tab" data-view="windtimeline">Windverlauf</button>
                     <button class="view-tab" data-view="text" style="display:none;">Text</button>
+                    <div class="model-toggle" id="modelToggle" style="display:none;">
+                        <span class="model-label">Modell</span>
+                        <button class="model-btn active" data-model="default">D2</button>
+                        <button class="model-btn" data-model="ch1">CH1</button>
+                    </div>
                 </div>
                 <div class="meteogram-tabs" id="meteogramTabs" style="display:none;"></div>
                 <div class="meteogram-body">
                     <div class="meteogram-main">
                         <div class="meteogram-chart" id="meteogramChart"></div>
-                        <div class="meteogram-chart" id="windTimelineChart" style="display:none;"></div>
                         <div class="meteogram-chart" id="textViewChart" style="display:none;"></div>
                     </div>
                     <aside class="meteogram-aside" id="meteogramAside">
@@ -517,7 +520,6 @@
 <script defer src="https://d3js.org/d3.v7.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
-<script defer src="{{ url_for('static', filename='js/wind-timeline.js') }}?v={{ static_v('js/wind-timeline.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/foehn_diagram.js') }}?v={{ static_v('js/foehn_diagram.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/map.js') }}?v={{ static_v('js/map.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>
@@ -707,12 +709,15 @@
     })();
 </script>
 
-<!-- Spot-Analysen: InstantDB Live-Subscription fuer Spot-Marker-Faerbung -->
+<!-- Spot/Region-Analysen: Supabase Realtime fuer Live-Updates nach neuen Analyse-Runs -->
 <script type="module">
-import { init } from 'https://esm.sh/@instantdb/core';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const APP_ID = '{{ instantdb_app_id }}';
-const db = init({ appId: APP_ID });
+const SUPABASE_URL = '{{ supabase_url }}';
+const SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
 
 function normalizeFlyTier(ft) {
     if (!ft) return '';
@@ -730,7 +735,6 @@ window.addEventListener('flychat-day-change', function(e) {
     }
 });
 
-// ── Helper: normalize fly_status in nested analysis data ──
 function _normalizeFlyStatusInNested(nested) {
     for (var key in nested) {
         for (var ds in nested[key]) {
@@ -742,14 +746,13 @@ function _normalizeFlyStatusInNested(nested) {
     return nested;
 }
 
-// ── Primary: Load analyses from API (always available, no InstantDB dependency) ──
+// ── Primary: Load analyses from API (JSON/Postgres via Python backend) ──
 fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
     if (data.spot_analyses && Object.keys(data.spot_analyses).length > 0) {
         window.analysisData = _normalizeFlyStatusInNested(data.spot_analyses);
         if (window.updateSpotColors) {
             window.updateSpotColors(window.analysisData, window.currentDate);
         }
-        // Notify open spot panel to re-render analysis view
         window.dispatchEvent(new CustomEvent('flychat-analyses-loaded'));
         console.log('[INIT] Spot-Analysen via API geladen:', Object.keys(data.spot_analyses).length);
     }
@@ -762,61 +765,60 @@ fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(functi
     }
 }).catch(function(e) { console.warn('API region analyses fetch failed:', e); });
 
-// ── Secondary: InstantDB subscriptions for live updates (after new analysis runs) ──
-db.subscribeQuery({ spot_analyses: {} }, function(resp) {
-    if (resp.error) {
-        console.error('Spot InstantDB Fehler:', resp.error.message);
-        return;
-    }
-    if (resp.data) {
-        var entries = resp.data.spot_analyses || [];
-        if (entries.length === 0) return;
+// ── Secondary: Supabase Realtime als Trigger fuer Re-Fetch ──
+// Rohe Postgres-Payload hat nested Struktur (safety: {...}, flyability: {...}).
+// /api/analyses flattet das in die Struktur die map.js/updateSpotColors erwartet.
+// Daher: Bei Realtime-Event einfach API neu ziehen (debounced, damit nicht
+// 2430 Events → 2430 Fetches triggern).
+if (supabase) {
+    var _spotRefreshTimer = null;
+    var _regionRefreshTimer = null;
 
-        var nested = {};
-        entries.forEach(function(e) {
-            var spot = e.spot;
-            var ds = e.date;
-            if (!spot || !ds) return;
-            if (!nested[spot]) nested[spot] = {};
-            var copy = Object.assign({}, e);
-            if (copy.fly_status) {
-                copy.fly_status = normalizeFlyTier(copy.fly_status);
-            }
-            nested[spot][ds] = copy;
+    function _debouncedRefetchSpots() {
+        clearTimeout(_spotRefreshTimer);
+        _spotRefreshTimer = setTimeout(function() {
+            fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
+                if (data.spot_analyses && Object.keys(data.spot_analyses).length > 0) {
+                    window.analysisData = _normalizeFlyStatusInNested(data.spot_analyses);
+                    if (window.updateSpotColors) {
+                        window.updateSpotColors(window.analysisData, window.currentDate);
+                    }
+                    window.dispatchEvent(new CustomEvent('flychat-analyses-loaded'));
+                    console.log('[REALTIME] Spot-Analysen refresh:', Object.keys(data.spot_analyses).length);
+                }
+            }).catch(function(e) { console.warn('Refetch /api/analyses failed:', e); });
+        }, 500);
+    }
+
+    function _debouncedRefetchRegions() {
+        clearTimeout(_regionRefreshTimer);
+        _regionRefreshTimer = setTimeout(function() {
+            fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+                if (data.region_analyses && Object.keys(data.region_analyses).length > 0) {
+                    window.regionAnalysisData = _normalizeFlyStatusInNested(data.region_analyses);
+                    console.log('[REALTIME] Region-Analysen refresh:', Object.keys(data.region_analyses).length);
+                }
+            }).catch(function(e) { console.warn('Refetch /api/region-analyses failed:', e); });
+        }, 500);
+    }
+
+    supabase.channel('spot_analyses_changes')
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'spot_analyses' },
+            _debouncedRefetchSpots)
+        .subscribe(function(status) {
+            if (status === 'SUBSCRIBED') console.log('[REALTIME] spot_analyses subscribed');
         });
 
-        window.analysisData = nested;
-
-        if (window.updateSpotColors) {
-            window.updateSpotColors(nested, window.currentDate);
-        }
-    }
-});
-
-db.subscribeQuery({ region_analyses: {} }, function(resp) {
-    if (resp.error) {
-        console.error('Region InstantDB Fehler:', resp.error.message);
-        return;
-    }
-    if (resp.data) {
-        var entries = resp.data.region_analyses || [];
-        if (entries.length === 0) return;
-
-        var nested = {};
-        entries.forEach(function(e) {
-            var rid = e.region_id;
-            var ds = e.date;
-            if (!rid || !ds) return;
-            if (!nested[rid]) nested[rid] = {};
-            var copy = Object.assign({}, e);
-            if (copy.fly_status) {
-                copy.fly_status = normalizeFlyTier(copy.fly_status);
-            }
-            nested[rid][ds] = copy;
+    supabase.channel('region_analyses_changes')
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'region_analyses' },
+            _debouncedRefetchRegions)
+        .subscribe(function(status) {
+            if (status === 'SUBSCRIBED') console.log('[REALTIME] region_analyses subscribed');
         });
-
-        window.regionAnalysisData = nested;
-    }
-});
+} else {
+    console.warn('[REALTIME] Supabase URL/Key fehlen — keine Live-Updates, nur Polling via /api/*');
+}
 </script>
 {% endblock %}

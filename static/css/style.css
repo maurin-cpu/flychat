@@ -1682,7 +1682,7 @@ body.page-fixed-nav {
 }
 
 /* ============================================================================
-   VIEW TABS (Meteogramm / Windverlauf)
+   VIEW TABS (Meteogramm / Text)
    ============================================================================ */
 
 .meteogram-view-tabs {
@@ -1715,6 +1715,48 @@ body.page-fixed-nav {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
     font-weight: 600;
+}
+
+/* Model toggle (D2 / CH1) inline in view-tabs row */
+.model-toggle {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: auto;
+    padding-right: 4px;
+}
+.model-label {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    margin-right: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.model-btn {
+    padding: 2px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    line-height: 1.4;
+}
+.model-btn:hover:not(:disabled) {
+    color: var(--color-text-light);
+    border-color: var(--color-border-hover);
+}
+.model-btn.active {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+}
+.model-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
 }
 
 /* ============================================================================
@@ -2178,230 +2220,22 @@ body.page-fixed-nav {
     .mga-window-time { font-size: 14px; }
 }
 
-/* ============================================================================
-   SPOT CARD (shared between /analyses page and meteogram aside panel)
-   ============================================================================ */
 
-.spot-card {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: 18px 20px;
-    transition: all 0.2s ease;
-    box-shadow: var(--shadow-sm);
-}
-
-.spot-card:hover {
-    border-color: var(--color-border-hover);
-    box-shadow: var(--shadow-md);
-}
-
-/* Safety top stripe (4px, full width) */
-.spot-card.safety-safe         { border-top: 4px solid var(--color-safety-excellent); }
-.spot-card.safety-conditional  { border-top: 4px solid var(--color-safety-marginal); }
-.spot-card.safety-not_safe     { border-top: 4px solid var(--color-safety-critical); }
-.spot-card.safety-no_data      { border-top: 4px solid var(--color-safety-unknown); }
-.spot-card.safety-error        { border-top: 4px solid var(--color-safety-unknown); }
-
-/* Fly tier accent stripe (top inset shadow) */
-.spot-card.fly-violet          { box-shadow: inset 0 3px 0 var(--color-fly-violet); }
-.spot-card.fly-green           { box-shadow: inset 0 3px 0 var(--color-fly-green); }
-.spot-card.fly-gray            { box-shadow: inset 0 3px 0 var(--color-fly-gray); }
-
-.spot-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
-.spot-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    justify-content: flex-end;
-    max-width: 62%;
-}
-
-.spot-name {
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: -0.2px;
-}
-
-.spot-name .ref-info {
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--color-text-muted);
-    display: block;
-    margin-top: 2px;
-}
-
-.spot-status-badge {
-    padding: 3px 10px;
-    border-radius: var(--radius-pill);
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.badge-safety-safe         { background: var(--color-safety-excellent-bg); color: var(--color-safety-excellent-text); }
-.badge-safety-conditional  { background: var(--color-safety-marginal-bg); color: var(--color-safety-marginal-text); }
-.badge-safety-not_safe     { background: var(--color-safety-critical-bg); color: var(--color-safety-critical-text); }
-.badge-safety-no_data      { background: var(--color-safety-nodata-bg); color: var(--color-safety-nodata-text); }
-.badge-safety-error        { background: var(--color-safety-unknown-bg); color: var(--color-safety-unknown-text); }
-.badge-fly-gray            { background: var(--color-fly-gray-bg); color: var(--color-fly-gray-text); }
-.badge-fly-green           { background: var(--color-fly-green-bg); color: var(--color-fly-green-text); }
-.badge-fly-violet          { background: var(--color-fly-violet-bg); color: var(--color-fly-violet-text); }
-
-.spot-card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.spot-row {
-    display: flex;
-    gap: 8px;
-    font-size: 12.5px;
-    line-height: 1.5;
-}
-
-.spot-row-label {
-    color: var(--color-text-muted);
-    min-width: 90px;
-    flex-shrink: 0;
-    font-weight: 500;
-}
-
-.spot-row-value {
-    color: var(--color-text-secondary);
-}
-
-.spot-recommendation {
-    margin-top: 8px;
-    padding-top: 10px;
-    border-top: 1px solid var(--glass-border);
-    font-size: 12.5px;
-    color: var(--color-text);
-    line-height: 1.6;
-}
-
-.ai-feedback-box {
-    margin-top: 8px;
-    padding: 8px 12px;
-    border-radius: var(--radius-md);
-    background: #f8fafc;
-    border: 1px solid var(--color-border);
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--color-text-light);
-}
-
-.ai-feedback-label {
-    display: block;
-    font-weight: 700;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 4px;
-    color: var(--color-text-muted);
-}
-
-.ai-feedback-safety .ai-feedback-label { color: var(--color-primary); }
-.ai-feedback-flyability .ai-feedback-label { color: var(--color-safety-excellent-text); }
-
-.safety-issues {
-    color: #EF4444;
-    font-weight: 500;
-}
-
-/* Compact variant inside the meteogram aside panel (legacy, kept for /analyses page) */
-.meteogram-aside .spot-card {
-    margin: 12px 14px;
-    padding: 14px 16px;
-    box-shadow: none;
-    border-color: var(--color-border);
-}
-
-.meteogram-aside .spot-card:hover {
-    box-shadow: none;
-}
-
-.meteogram-aside .spot-row-label {
-    min-width: 76px;
-}
-
-/* ============================================================================
-   WIND TIMELINE CHART
-   ============================================================================ */
-
-.wt-height-selector {
-    display: flex;
-    gap: 4px;
-    padding: 8px 12px;
-    flex-wrap: wrap;
-}
-
-.wt-height-btn {
-    padding: 4px 12px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text-light);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-family: inherit;
-}
-
-.wt-height-btn:hover {
-    background: #f1f5f9;
-    border-color: var(--color-border-hover);
-}
-
-.wt-height-btn.active {
-    background: var(--color-primary-light);
-    color: var(--color-primary);
-    border-color: rgba(3, 105, 161, 0.3);
-    font-weight: 600;
-}
-
-.wt-chart-area {
-    padding: 0 8px 8px;
-    min-height: 260px;
-}
-
-.wt-chart-area svg {
-    display: block;
-    width: 100%;
-}
-
-.wt-tooltip {
-    position: absolute;
-    pointer-events: none;
-    z-index: 50;
-}
-
-/* Responsive: smaller height selector on mobile */
+/* Responsive: view tabs + model toggle on mobile */
 @media (max-width: 639px) {
-    .wt-height-selector {
-        padding: 6px 8px;
-        gap: 3px;
-    }
-    .wt-height-btn {
-        padding: 3px 8px;
-        font-size: 11px;
-    }
     .meteogram-view-tabs {
         padding: 6px 16px 0;
     }
     .view-tab {
         padding: 5px 10px;
         font-size: 12px;
+    }
+    .model-label {
+        display: none;
+    }
+    .model-btn {
+        padding: 2px 8px;
+        font-size: 10px;
     }
 }
 
@@ -2742,14 +2576,7 @@ textarea.chat-input::placeholder {
     touch-action: manipulation;
 }
 
-.wt-height-btn {
-    padding: 8px 14px;
-    min-height: 40px;
-    touch-action: manipulation;
-}
-
-.reset-btn,
-.analyse-btn {
+.reset-btn {
     min-height: 40px;
     padding: 8px 14px;
     touch-action: manipulation;
@@ -3092,15 +2919,6 @@ body.overlay-open {
     min-width: 200px;
 }
 
-/* Attention pulse for analyse button */
-@keyframes attentionPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(3, 105, 161, 0.4); }
-    50% { box-shadow: 0 0 0 6px rgba(3, 105, 161, 0); }
-}
-
-.btn.attention-pulse {
-    animation: attentionPulse 2s ease-in-out 3;
-}
 
 /* ============================================================================
    SKELETON LOADING (replaces typing dots for chat)

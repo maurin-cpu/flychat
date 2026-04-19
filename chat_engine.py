@@ -42,7 +42,7 @@ from prompts import (
     REGION_FLYABILITY_PROMPT,
     SPOT_COMBINED_PROMPT,
     REGION_COMBINED_PROMPT,
-    WEEKLY_NEWSPAPER_PROMPT,
+    WEEKLY_BRIEFING_PROMPT,
     format_foehn_llm_regional_guide,
 )
 from source_area import get_all_regions, find_region_for_point
@@ -51,136 +51,26 @@ import routing
 
 logger = logging.getLogger(__name__)
 
-MAX_HISTORY_MESSAGES = 40  # Max messages per conversation before trimming
-
-# Token-Budget-Management: verhindert 400-Fehler bei gpt-4o-mini (128k Limit)
-_MODEL_TOKEN_LIMITS = {
-    "gpt-4o-mini": 128_000,
-    "gpt-4o": 128_000,
-    "gpt-4-turbo": 128_000,
-    "gpt-4": 8_192,
-    "gpt-3.5-turbo": 16_385,
-}
-_DEFAULT_TOKEN_LIMIT = 128_000
-# Reserve für System-Prompt, Tools, User-Frage, Response-Tokens, History
-_TOKEN_BUDGET_RESERVE = 20_000
-
-
-def _estimate_tokens(text: str) -> int:
-    """Grobe Token-Schätzung: ~3.5 Zeichen pro Token für DE/Zahlen-Mix."""
-    return int(len(text) / 3.5)
-
-
-def _truncate_weather_context(context: str, max_tokens: int) -> str:
-    """Kürzt den Roh-Wetterkontext progressiv bis er ins Token-Budget passt.
-
-    Strategie: Forecast-Tage von hinten entfernen (Tag 5→4→3...).
-    Fallback: Harter Zeichenlimit-Cut an Spot-Grenze.
-    """
-    if _estimate_tokens(context) <= max_tokens:
-        return context
-
-    # Alle vorkommenden Tage identifizieren (aus TAGESPROFIL-Zeilen)
-    import re as _re
-    day_pattern = _re.compile(r"═══ TAGESPROFIL (\d{4}-\d{2}-\d{2})")
-    all_days = sorted(set(day_pattern.findall(context)))
-
-    if len(all_days) <= 1:
-        # Nur 1 Tag oder keine Tagesmarker → harter Cut
-        max_chars = int(max_tokens * 3.5)
-        truncated = context[:max_chars]
-        # An letzter Spot-Grenze schneiden
-        last_spot = truncated.rfind("═══ SPOT:")
-        if last_spot > len(truncated) // 2:
-            truncated = truncated[:last_spot]
-        return truncated + f"\n\n[KONTEXT GEKÜRZT — Token-Limit erreicht]"
-
-    # Progressiv letzte Tage entfernen
-    days_to_keep = len(all_days)
-    result = context
-    while days_to_keep > 1 and _estimate_tokens(result) > max_tokens:
-        days_to_keep -= 1
-        keep_set = set(all_days[:days_to_keep])
-        # Pro Spot nur Zeilen der behaltenen Tage behalten
-        result = _filter_context_by_days(context, keep_set, all_days)
-
-    if _estimate_tokens(result) <= max_tokens:
-        logger.warning(
-            "Wetterkontext gekürzt: %d→%d Tage (%d→%d geschätzte Tokens)",
-            len(all_days), days_to_keep,
-            _estimate_tokens(context), _estimate_tokens(result),
-        )
-        return result + f"\n\n[KONTEXT GEKÜRZT: {days_to_keep}/{len(all_days)} Vorhersagetage — Token-Limit]"
-
-    # Fallback: harter Cut
-    max_chars = int(max_tokens * 3.5)
-    truncated = result[:max_chars]
-    last_spot = truncated.rfind("═══ SPOT:")
-    if last_spot > len(truncated) // 2:
-        truncated = truncated[:last_spot]
-    logger.warning(
-        "Wetterkontext hart gekürzt: %d→%d Zeichen",
-        len(context), len(truncated),
-    )
-    return truncated + f"\n\n[KONTEXT GEKÜRZT — Token-Limit erreicht]"
-
-
-def _filter_context_by_days(context: str, keep_days: set, all_days: list) -> str:
-    """Filtert den Wetterkontext: behält nur Zeilen für die angegebenen Tage."""
-    lines = context.split("\n")
-    result_lines = []
-    current_day = None
-    drop_days = set(all_days) - keep_days
-
-    for line in lines:
-        # Spot-Header → immer behalten
-        if line.startswith("═══ SPOT:"):
-            current_day = None
-            result_lines.append(line)
-            continue
-
-        # Tag wechseln wenn wir ein Datum in der Zeile erkennen
-        for d in all_days:
-            if d in line:
-                current_day = d
-                break
-
-        if current_day and current_day in drop_days:
-            continue
-
-        result_lines.append(line)
-
-    return "\n".join(result_lines)
-
-
-_WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-
-
-def _weekday_de(dt_or_str) -> str:
-    """German weekday name from datetime or 'YYYY-MM-DD' string."""
-    if isinstance(dt_or_str, str):
-        dt_or_str = datetime.strptime(dt_or_str, "%Y-%m-%d")
-    return _WOCHENTAGE[dt_or_str.weekday()]
-
-
-def _is_permanent_api_error(err: Exception) -> bool:
-    """Prüft ob ein OpenAI-Fehler permanent ist (kein Retry sinnvoll).
-    insufficient_quota, authentication_error, invalid_api_key → sofort abbrechen.
-    rate_limit, timeout, connection → transient, Retry lohnt sich."""
-    err_str = str(err).lower()
-    return any(kw in err_str for kw in ("insufficient_quota", "invalid_api_key", "authentication"))
-
-
-def _user_friendly_api_error(err: Exception) -> str:
-    """Gibt eine benutzerfreundliche Fehlermeldung fuer permanente API-Fehler zurueck."""
-    err_str = str(err).lower()
-    if "insufficient_quota" in err_str:
-        return "API-Budget aufgebraucht — bitte OpenAI-Guthaben aufladen"
-    if "invalid_api_key" in err_str:
-        return "Ungueltiger API-Key — bitte in den Einstellungen pruefen"
-    if "authentication" in err_str:
-        return "API-Authentifizierung fehlgeschlagen — bitte API-Key pruefen"
-    return f"API-Fehler: {err}"
+# ============================================================================
+# Konstanten + Pure-Helpers → engine/_common.py (Phase 2 Refactor)
+# Re-Exports fuer Backwards-Compatibility (bestehender Code importiert aus chat_engine).
+# ============================================================================
+from engine._common import (
+    MAX_HISTORY_MESSAGES,
+    _MODEL_TOKEN_LIMITS,
+    _DEFAULT_TOKEN_LIMIT,
+    _TOKEN_BUDGET_RESERVE,
+    _CTX_CACHE_MAX_ENTRIES,
+    MAX_TOOL_ITERATIONS,
+    _estimate_tokens,
+    _log_prompt_cache_usage,
+    _truncate_weather_context,
+    _filter_context_by_days,
+    _WOCHENTAGE,
+    _weekday_de,
+    _is_permanent_api_error,
+    _user_friendly_api_error,
+)
 
 # ============================================================================
 # OPENAI TOOL SCHEMAS (Phase 1: Standort-basierte Spot-Filterung)
@@ -282,474 +172,30 @@ TOOLS: list = [
 ]
 
 
-# Hard limit gegen Endlosschleifen im Tool-Call-Loop (Risk-Mitigation aus Plan)
-MAX_TOOL_ITERATIONS = 5
-
-# Phase-2 Fliegbarkeit: gray / green / violet (Legacy: yellow/orange/green → gray/green/violet)
-_FLYABILITY_TIERS = frozenset({"gray", "green", "violet"})
-
-
-def _normalize_flyability_tier(raw: str | None) -> str:
-    if not raw:
-        return ""
-    r = str(raw).strip().lower()
-    if r in _FLYABILITY_TIERS:
-        return r
-    legacy = {"yellow": "gray", "orange": "green"}
-    return legacy.get(r, "")
-
-
-# ══════════════════════════════════════════════════════════════════
-# Tier-Gated Rating (Newspaper)
-# Wertebereiche sind VERBINDLICH und werden auf LLM-Output geclampt:
-#   not_safe → 0.0
-#   gray     → 2.0 - 4.9
-#   green    → 5.0 - 8.4
-#   violet   → 8.5 - 10.0
-# ══════════════════════════════════════════════════════════════════
-_TIER_RATING_RANGES = {
-    "gray":   (2.0, 4.9),
-    "green":  (5.0, 8.4),
-    "violet": (8.5, 10.0),
-}
-
-
-def _clamp_rating_to_tier(tier: str, rating, safety_status: str = "") -> float:
-    """Clampt das LLM-Rating auf den Tier-Bereich. not_safe → 0.0."""
-    if safety_status == "not_safe":
-        return 0.0
-    try:
-        r = float(rating)
-    except (TypeError, ValueError):
-        r = 0.0
-    rng = _TIER_RATING_RANGES.get(tier)
-    if not rng:
-        return 0.0
-    lo, hi = rng
-    if r < lo:
-        r = lo
-    elif r > hi:
-        r = hi
-    return round(r, 1)
-
-
-def _compute_rating_from_subratings(result: dict, tier: str, safety_status: str = "") -> float:
-    """Berechnet das Gesamtrating deterministisch aus 4 LLM-Sub-Ratings.
-
-    G-Eval-Ansatz: Das LLM vergibt 4 Einzel-Ratings (thermal, window, wind, xc),
-    die App berechnet daraus gewichtet das Gesamtrating. Das LLM ist gut im
-    Beurteilen einzelner Aspekte, schlecht im Zusammenrechnen.
-
-    Gewichte: thermal 35%, window 25%, wind 25%, xc 15%.
-    Ergebnis wird anschliessend auf den Tier-Korridor geclampt.
-    """
-    def _clamp(v, lo, hi):
-        try:
-            v = float(v)
-        except (TypeError, ValueError):
-            v = 5.0
-        return max(lo, min(hi, v))
-
-    thermal = _clamp(result.get("thermal_rating", 5), 1, 10)
-    window  = _clamp(result.get("window_rating", 5), 1, 10)
-    wind    = _clamp(result.get("wind_rating", 5), 1, 10)
-    xc      = _clamp(result.get("xc_rating", 5), 1, 10)
-    raw = 0.35 * thermal + 0.25 * window + 0.25 * wind + 0.15 * xc
-    return _clamp_rating_to_tier(tier, raw, safety_status)
-
-# Mapping interner Tags auf kurze, natuerliche deutsche Begriffe.
-# Laengere Varianten zuerst, damit z.B. THERMAL-TORN-DEGRADED vor TORN-DEGRADED matcht.
-_TAG_NATURAL = [
-    # Thermik-Qualitaet (lange Form zuerst)
-    ("THERMAL-TORN-UNUSABLE",  "Thermik zerrissen"),
-    ("THERMAL-TORN-DEGRADED",  "Thermik unruhig"),
-    ("THERMAL-ROUGH-FRAGMENTED", "Thermik fragmentiert"),
-    ("THERMAL-ROUGH-UNUSABLE", "extreme Turbulenz"),
-    ("THERMAL-ROUGH-DEGRADED", "ruppige Thermik"),
-    ("SHEAR-UNUSABLE",         "starke Scherung"),
-    ("SHEAR-DEGRADED",         "Hoehenscherung"),
-    # Kurzformen (LLM kuerzt manchmal ab)
-    ("TORN-UNUSABLE",          "Thermik zerrissen"),
-    ("TORN-DEGRADED",          "Thermik unruhig"),
-    ("ROUGH-FRAG",             "Thermik fragmentiert"),
-    ("ROUGH-UNUSABLE",         "extreme Turbulenz"),
-    ("ROUGH-DEGRADED",         "ruppige Thermik"),
-    ("SHEAR-DEG",              "Hoehenscherung"),
-    # Wind / Boeen
-    ("ALOFT-GUST-DANGER",      "gefaehrliche Hoehenboeen"),
-    ("ALOFT-GUST-WARN",        "kraeftige Hoehenboeen"),
-    ("ALOFT-DANGER",           "gefaehrlicher Hoehenwind"),
-    ("ALOFT-WARN",             "kraeftiger Hoehenwind"),
-    ("GUST-DANGER",            "gefaehrliche Boeen"),
-    ("GUST-WARN",              "starke Boeen"),
-    ("STRONG-WIND-WARN",       "zu starker Grundwind"),
-    ("WIND-STRONG",            "starker Wind"),
-    ("WIND-MODERATE",          "maessiger Wind"),
-    ("WIND-WRONG",             "falsche Windrichtung"),
-    ("WIND-CALM",              "ruhiger Wind"),
-    ("WIND-OK",                "passende Windrichtung"),
-    # Sonstiges
-    ("RAIN-WARN",              "Regen"),
-    ("CAPE-WARN",              "Ueberentwicklung"),
-    ("OVERCAST-DANGER",        "dichte Wolkendecke"),
-]
-
-# Lookup-Dict fuer schnellen Zugriff (uppercase key → natuerlicher Text)
-_TAG_NATURAL_MAP = {tag.upper(): natural for tag, natural in _TAG_NATURAL}
-
-# Regex zum Ersetzen interner Tags durch natuerliche Sprache in LLM-Antworten.
-# Matcht z.B. "ALOFT-GUST-WARN 1h", "[SHEAR-DEGRADED]", "GUST-DANGER 3h",
-# sowie Kurzformen wie "TORN-DEGRADED", "ROUGH-DEGRADED", "SHEAR-DEG".
-_TAG_SANITIZE_RE = re.compile(
-    r'\[?(?:'
-    + '|'.join(re.escape(tag) for tag, _ in _TAG_NATURAL)
-    + r')\]?(?:\s+\d+h)?',
-    re.IGNORECASE
+# ============================================================================
+# Flyability-Tier + Rating, Tag-Sanitization, Primary-Labels, Wind-Trend,
+# Rain-Sandwich, Altitude-Interpolation → alle nach engine._common (Phase 2).
+# Re-Exports fuer Backwards-Compat innerhalb dieses Moduls.
+# ============================================================================
+from engine._common import (
+    _FLYABILITY_TIERS,
+    _normalize_flyability_tier,
+    _TIER_RATING_RANGES,
+    _clamp_rating_to_tier,
+    _compute_rating_from_subratings,
+    _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
+    _sanitize_llm_text, _sanitize_llm_result,
+    _LABEL_KEYS_NO_GO, _LABEL_KEYS_CONDITIONAL,
+    _LABEL_KEYS_REDUCER, _LABEL_KEYS_BOOSTER,
+    _NO_GO_RANK, _CONDITIONAL_RANK,
+    _KEYWORD_TO_KEY_NO_GO, _KEYWORD_TO_KEY_CAUTION,
+    _pick_key_from_list, _validate_key, _derive_primary_labels,
+    COMPASS_POINTS,
+    _compute_wind_trend,
+    _detect_rain_sandwich,
+    _interpolate_wind_at_altitude,
 )
 
-
-def _sanitize_llm_text(text: str) -> str:
-    """Ersetzt versehentlich verbliebene interne Tags durch kurze deutsche Begriffe."""
-    if not text or not isinstance(text, str):
-        return text
-
-    def _replace_tag(m):
-        raw = m.group(0)
-        # Klammern und Whitespace entfernen, trailing "3h" etc. abschneiden
-        core = re.sub(r'[\[\]]', '', raw).strip()
-        core = re.sub(r'\s+\d+h?$', '', core).strip()
-        return _TAG_NATURAL_MAP.get(core.upper(), '')
-
-    cleaned = _TAG_SANITIZE_RE.sub(_replace_tag, text)
-    # Doppelte Leerzeichen und Kommas aufraeumen
-    cleaned = re.sub(r'\s{2,}', ' ', cleaned)
-    cleaned = re.sub(r',\s*,', ',', cleaned)
-    cleaned = re.sub(r'^\s*,\s*', '', cleaned)
-    cleaned = re.sub(r'\s*,\s*$', '', cleaned)
-    return cleaned.strip()
-
-
-def _sanitize_llm_result(result: dict) -> dict:
-    """Sanitiert alle Text-Felder eines LLM-Ergebnisses von internen Tags."""
-    for key in ("summary", "recommendation", "thermal_quality", "wind_summary", "wind_shear",
-                "xc_details", "soaring_options", "safety_feedback"):
-        if key in result and isinstance(result[key], str):
-            result[key] = _sanitize_llm_text(result[key])
-    for key in ("caution_notes", "no_go_reasons", "flyability_limits", "highlights"):
-        if key in result and isinstance(result[key], list):
-            result[key] = [_sanitize_llm_text(item) for item in result[key] if _sanitize_llm_text(item)]
-    _derive_primary_labels(result)
-    return result
-
-
-# ══════════════════════════════════════════════════════════════
-# Primary-Label-System (siehe static/js/label-catalog.js)
-# ══════════════════════════════════════════════════════════════
-
-_LABEL_KEYS_NO_GO = {
-    "FOEHN", "GEWITTER", "STURM", "ALOFT_DANGER", "STRONG_WIND",
-    "REGEN", "SCHNEE", "OVERCAST", "SICHT", "VEREISUNG", "EINGEKESSELT"
-}
-_LABEL_KEYS_CONDITIONAL = {
-    "STARKER_WIND", "WINDRICHTUNG", "TURBULENZ", "SHEAR_WIND",
-    "GUST_SPREAD", "KURZES_FENSTER", "TREND_SCHLECHTER"
-}
-_LABEL_KEYS_REDUCER = {
-    "VIEL_BEWOELKUNG", "SCHWACHE_THERMIK", "TIEFE_BASIS",
-    "KURZES_FLUGFENSTER", "KALT", "FEUCHT", "INVERSION"
-}
-_LABEL_KEYS_BOOSTER = {
-    "XC_BEDINGUNGEN", "STARKE_THERMIK", "HOHE_BASIS", "GUTE_EINSTRAHLUNG",
-    "RUECKENWIND_XC", "STABILE_KALTFRONT", "LANGES_FENSTER", "KONVERGENZ"
-}
-
-# Ranking fuer Heuristik-Fallback (niedriger = wichtiger)
-_NO_GO_RANK = [
-    "FOEHN", "GEWITTER", "STURM", "ALOFT_DANGER", "STRONG_WIND",
-    "REGEN", "SCHNEE", "OVERCAST", "SICHT", "VEREISUNG", "EINGEKESSELT"
-]
-_CONDITIONAL_RANK = [
-    "STARKER_WIND", "WINDRICHTUNG", "TURBULENZ", "SHEAR_WIND",
-    "GUST_SPREAD", "KURZES_FENSTER", "TREND_SCHLECHTER"
-]
-
-# Keyword → Key Mapping fuer Heuristik-Fallback (aus no_go_reasons/caution_notes)
-_KEYWORD_TO_KEY_NO_GO = [
-    (r'\bf[oö]hn', "FOEHN"),
-    (r'\bgewitter|blitz|cape', "GEWITTER"),
-    (r'\bsturm', "STURM"),
-    (r'\bh[oö]henwind|h[oö]henboee|aloft', "ALOFT_DANGER"),
-    (r'\b(starker? wind|wind.*stark|grundwind.*hoch|strong.?wind)', "STRONG_WIND"),
-    (r'\bregen|niederschlag|rain', "REGEN"),
-    (r'\bschnee|snow', "SCHNEE"),
-    (r'\bovercast|wolkendecke|bew[oö]lkt.*tief|basis.*unter', "OVERCAST"),
-    (r'\bsicht|nebel|fog', "SICHT"),
-    (r'\bvereisung|icing', "VEREISUNG"),
-    (r'\beingekesselt|kein fenster|fenster fehlt', "EINGEKESSELT"),
-]
-_KEYWORD_TO_KEY_CAUTION = [
-    (r'\bwindrichtung|wind.*falsch|grenzwert.*richtung', "WINDRICHTUNG"),
-    (r'\b(scherung|shear)', "SHEAR_WIND"),
-    (r'\bturbulenz|ruppig|rau(h)?', "TURBULENZ"),
-    (r'\bb[oö]ig|gust.?spread|gust.?exzess', "GUST_SPREAD"),
-    (r'\bkurzes fenster|fenster kurz', "KURZES_FENSTER"),
-    (r'\bverschlechter|trend.*schlecht', "TREND_SCHLECHTER"),
-    (r'\bstarker? wind|wind.*stark', "STARKER_WIND"),
-]
-
-
-def _pick_key_from_list(items: list, keyword_map: list) -> str | None:
-    """Heuristik: Erstes Listen-Element → Key per Keyword-Matching."""
-    if not items:
-        return None
-    # Durchsuche alle Eintraege; erstes Match gewinnt
-    for item in items:
-        if not isinstance(item, str):
-            continue
-        lower = item.lower()
-        for pattern, key in keyword_map:
-            if re.search(pattern, lower):
-                return key
-    return None
-
-
-def _validate_key(raw, allowed_set: set) -> str | None:
-    """Validiert einen primary_* Key gegen die erlaubte Menge."""
-    if not raw or not isinstance(raw, str):
-        return None
-    k = raw.strip().upper()
-    if not k or k in ("NULL", "NONE", "-"):
-        return None
-    return k if k in allowed_set else None
-
-
-def _derive_primary_labels(result: dict) -> None:
-    """Validiert und ergaenzt primary_no_go/caution/reducer/booster im LLM-Ergebnis.
-
-    - Ungueltige Keys werden auf None gesetzt.
-    - Fehlende primary_no_go/caution werden heuristisch aus den Listen abgeleitet.
-    - primary_reducer/booster bleiben None wenn LLM keinen Key liefert (kein Fallback).
-    """
-    if not isinstance(result, dict):
-        return
-
-    safety = result.get("safety_status", "")
-
-    # Validieren
-    p_no_go = _validate_key(result.get("primary_no_go"), _LABEL_KEYS_NO_GO)
-    p_caution = _validate_key(result.get("primary_caution"), _LABEL_KEYS_CONDITIONAL)
-    p_reducer = _validate_key(result.get("primary_reducer"), _LABEL_KEYS_REDUCER)
-    p_booster = _validate_key(result.get("primary_booster"), _LABEL_KEYS_BOOSTER)
-
-    # Fallback fuer NO-GO: aus no_go_reasons ableiten
-    if safety == "not_safe" and not p_no_go:
-        p_no_go = _pick_key_from_list(result.get("no_go_reasons", []), _KEYWORD_TO_KEY_NO_GO)
-    # Bei not_safe die anderen Kategorien leeren (gem. UI-Regel: nur 1 Label)
-    if safety == "not_safe":
-        p_caution = None
-        p_reducer = None
-        p_booster = None
-
-    # Fallback fuer CONDITIONAL: aus caution_notes ableiten
-    if safety == "conditional" and not p_caution:
-        p_caution = _pick_key_from_list(result.get("caution_notes", []), _KEYWORD_TO_KEY_CAUTION)
-
-    # Bei safe sollen NO_GO und CONDITIONAL nicht gesetzt sein
-    if safety == "safe":
-        p_no_go = None
-        p_caution = None
-
-    result["primary_no_go"] = p_no_go
-    result["primary_caution"] = p_caution
-    result["primary_reducer"] = p_reducer
-    result["primary_booster"] = p_booster
-
-
-COMPASS_POINTS = {
-    "N": 0.0, "NNO": 22.5, "NO": 45.0, "ONO": 67.5,
-    "O": 90.0, "OSO": 112.5, "SO": 135.0, "SSO": 157.5,
-    "S": 180.0, "SSW": 202.5, "SW": 225.0, "WSW": 247.5,
-    "W": 270.0, "WNW": 292.5, "NW": 315.0, "NNW": 337.5
-}
-
-
-def _compute_wind_trend(clean_hours: list[str], hourly_gusts: dict[str, float]) -> str:
-    """
-    Berechnet Windtendenz rund um das saubere Fenster.
-
-    Returns z.B.:
-        "WIND-TREND: VERSCHLECHTERUNG — Böen steigen nach Fenster von 37→57 km/h"
-        "WIND-TREND: VERBESSERUNG — Böen fallen nach Fenster von 40→20 km/h"
-        "WIND-TREND: EINGEKESSELT — Fenster liegt zwischen zwei Böen-Phasen (48→37→46 km/h)"
-        "WIND-TREND: STABIL"
-    """
-    if not clean_hours or not hourly_gusts:
-        return ""
-
-    # Alle Stunden sortiert
-    all_hours = sorted(hourly_gusts.keys())
-    if not all_hours:
-        return ""
-
-    clean_set = set(clean_hours)
-    first_clean = min(clean_set)
-    last_clean = max(clean_set)
-
-    # Böen VOR dem Fenster (bis zu 3 Stunden)
-    pre_gusts = []
-    for h in all_hours:
-        if h >= first_clean:
-            break
-        pre_gusts.append(hourly_gusts[h])
-    pre_gusts = pre_gusts[-3:]  # letzte 3 vor dem Fenster
-
-    # Böen IM Fenster
-    window_gusts = [hourly_gusts[h] for h in all_hours if h in clean_set and h in hourly_gusts]
-
-    # Böen NACH dem Fenster (bis zu 3 Stunden)
-    post_gusts = []
-    past_window = False
-    for h in all_hours:
-        if h > last_clean:
-            past_window = True
-        if past_window and h in hourly_gusts:
-            post_gusts.append(hourly_gusts[h])
-            if len(post_gusts) >= 3:
-                break
-
-    if not window_gusts:
-        return ""
-
-    avg_window = sum(window_gusts) / len(window_gusts)
-    avg_pre = sum(pre_gusts) / len(pre_gusts) if pre_gusts else 0
-    avg_post = sum(post_gusts) / len(post_gusts) if post_gusts else 0
-    max_post = max(post_gusts) if post_gusts else 0
-    max_pre = max(pre_gusts) if pre_gusts else 0
-
-    # Schwellenwerte
-    DANGER_GUST = 40  # km/h
-
-    pre_danger = avg_pre > DANGER_GUST
-    post_danger = avg_post > DANGER_GUST
-
-    if pre_danger and post_danger:
-        return (
-            f"WIND-TREND: EINGEKESSELT — Fenster liegt zwischen zwei Böen-Phasen "
-            f"(vorher Ø{avg_pre:.0f}, Fenster Ø{avg_window:.0f}, nachher Ø{avg_post:.0f} km/h). "
-            f"ERHÖHTES RISIKO: Verschlechterung nach dem Fenster sehr wahrscheinlich!"
-        )
-    elif post_danger and not pre_danger:
-        return (
-            f"WIND-TREND: VERSCHLECHTERUNG — Böen steigen nach dem Fenster stark an "
-            f"(Fenster Ø{avg_window:.0f} → nachher Ø{avg_post:.0f} km/h, max {max_post:.0f} km/h). "
-            f"ERHÖHTES RISIKO!"
-        )
-    elif pre_danger and not post_danger:
-        return (
-            f"WIND-TREND: VERBESSERUNG — Böen nehmen ab "
-            f"(vorher Ø{avg_pre:.0f} → Fenster Ø{avg_window:.0f} → nachher Ø{avg_post:.0f} km/h). "
-            f"Positiver Trend."
-        )
-    elif post_gusts and avg_post > avg_window + 10:
-        return (
-            f"WIND-TREND: LEICHTE VERSCHLECHTERUNG — Böen nehmen nach dem Fenster zu "
-            f"(Fenster Ø{avg_window:.0f} → nachher Ø{avg_post:.0f} km/h)."
-        )
-    else:
-        return "WIND-TREND: STABIL — Keine signifikante Verschlechterung nach dem Fenster."
-
-
-def _detect_rain_sandwich(rain_hours: list, all_hours_sorted: list) -> dict:
-    """Erkennt ob trockene Stunden zwischen Regenperioden eingekesselt sind.
-
-    Returns dict mit:
-        is_sandwiched: bool — trockenes Fenster zwischen zwei Regenperioden
-        max_dry_gap: int — laengstes zusammenhaengendes trockenes Fenster (Stunden)
-        dry_start: str — Beginn des laengsten trockenen Fensters
-        dry_end: str — Ende des laengsten trockenen Fensters
-    """
-    if not rain_hours or not all_hours_sorted:
-        return {"is_sandwiched": False, "max_dry_gap": len(all_hours_sorted or []),
-                "dry_start": "", "dry_end": ""}
-
-    rain_set = set(rain_hours)
-
-    # Zusammenhaengende trockene Abschnitte finden
-    dry_stretches = []
-    current_dry = []
-    for h in all_hours_sorted:
-        if h not in rain_set:
-            current_dry.append(h)
-        else:
-            if current_dry:
-                dry_stretches.append(current_dry[:])
-            current_dry = []
-    if current_dry:
-        dry_stretches.append(current_dry)
-
-    if not dry_stretches:
-        return {"is_sandwiched": False, "max_dry_gap": 0,
-                "dry_start": "", "dry_end": ""}
-
-    # Laengstes trockenes Fenster
-    longest = max(dry_stretches, key=len)
-    dry_start = longest[0]
-    dry_end = longest[-1]
-
-    # Eingekesselt = Regen VOR und NACH dem trockenen Fenster
-    rain_before = any(h < dry_start for h in rain_hours)
-    rain_after = any(h > dry_end for h in rain_hours)
-
-    return {
-        "is_sandwiched": rain_before and rain_after,
-        "max_dry_gap": len(longest),
-        "dry_start": dry_start,
-        "dry_end": dry_end,
-    }
-
-
-def _interpolate_wind_at_altitude(pl_data: dict, target_alt: float, pressure_levels: list) -> tuple:
-    """
-    Interpoliert Windgeschwindigkeit und -richtung auf einer Zielhöhe aus Drucklevel-Daten.
-
-    Returns (wind_speed, wind_direction) oder (None, None) wenn keine Daten vorhanden.
-    """
-    levels = []
-    for level in pressure_levels:
-        h = pl_data.get(f"geopotential_height_{level}hPa")
-        ws = pl_data.get(f"wind_speed_{level}hPa")
-        wd = pl_data.get(f"wind_direction_{level}hPa")
-        if h is not None and ws is not None:
-            levels.append((h, ws, wd))
-
-    if not levels:
-        return None, None
-
-    levels.sort(key=lambda x: x[0])
-
-    # Zielhöhe unter dem tiefsten Level → tiefstes Level verwenden
-    if target_alt <= levels[0][0]:
-        return levels[0][1], levels[0][2]
-
-    # Zielhöhe über dem höchsten Level → höchstes Level verwenden
-    if target_alt >= levels[-1][0]:
-        return levels[-1][1], levels[-1][2]
-
-    # Lineare Interpolation zwischen den umschliessenden Levels
-    for i in range(len(levels) - 1):
-        h_low, ws_low, wd_low = levels[i]
-        h_high, ws_high, wd_high = levels[i + 1]
-        if h_low <= target_alt <= h_high:
-            dh = h_high - h_low
-            if dh == 0:
-                return ws_low, wd_low
-            frac = (target_alt - h_low) / dh
-            ws_interp = ws_low + frac * (ws_high - ws_low)
-            # Windrichtung: nächstes Level verwenden (Richtungsinterpolation ist komplex)
-            wd_interp = wd_low if frac < 0.5 else wd_high
-            return ws_interp, wd_interp
-
-    return None, None
 
 
 class FlychatEngine:
@@ -819,6 +265,16 @@ class FlychatEngine:
                 except Exception as e:
                     logger.error(f"Fehler beim Laden der History {session_id}: {e}")
 
+    def _ctx_cache_put(self, cache: dict, key: str, value):
+        """Setzt cache[key]=value mit Hard-Cap-Guard gegen Leaks bei Clear-Fehlern."""
+        if len(cache) >= _CTX_CACHE_MAX_ENTRIES and key not in cache:
+            logger.warning(
+                "ctx-cache Overflow (%d Eintraege) — force-clear zur Vermeidung eines Leaks",
+                len(cache),
+            )
+            cache.clear()
+        cache[key] = value
+
     def _save_conversation(self, session_id: str):
         """Speichert eine Conversation als JSON."""
         if session_id not in self.conversations:
@@ -829,28 +285,63 @@ class FlychatEngine:
         except Exception as e:
             logger.error(f"Fehler beim Speichern der History {session_id}: {e}")
 
+    def _get_pg_client(self):
+        """Lazy Postgres-Client Getter (identisch zu fetch_weather._get_pg_client)."""
+        try:
+            from fetch_weather import _get_pg_client
+            return _get_pg_client()
+        except Exception:
+            return None
+
     def _load_analyses_cache(self):
-        """Lädt Spot- und Region-Analysen aus Datei und pusht nach InstantDB."""
+        """Laedt Spot- und Region-Analysen.
+        Primaer aus Postgres, Fallback auf JSON-Files. Pusht bei Erfolg nach InstantDB.
+        """
         loaded_any = False
-        if self.analyses_file.exists():
+
+        client = self._get_pg_client()
+        pg_loaded = False
+        if client is not None:
             try:
-                with open(self.analyses_file, "r", encoding="utf-8") as f:
-                    self.spot_analyses = json.load(f)
-                    self.analyses_loaded_at = datetime.fromtimestamp(self.analyses_file.stat().st_mtime)
-                print(f"[ENGINE] {len(self.spot_analyses)} Spot-Analysen aus Cache geladen.")
-                loaded_any = True
+                spot_pg = client.get_all_spot_analyses()
+                region_pg = client.get_all_region_analyses()
+                if spot_pg:
+                    self.spot_analyses = spot_pg
+                    self.analyses_loaded_at = datetime.now()
+                    print(f"[ENGINE] {len(spot_pg)} Spot-Analysen aus Postgres geladen.")
+                    loaded_any = True
+                    pg_loaded = True
+                if region_pg:
+                    self.region_analyses = region_pg
+                    self.region_analyses_loaded_at = datetime.now()
+                    print(f"[ENGINE] {len(region_pg)} Region-Analysen aus Postgres geladen.")
+                    loaded_any = True
+                    pg_loaded = True
             except Exception as e:
-                logger.error(f"Fehler beim Laden des Spot-Analyse-Caches: {e}")
-        if self.region_analyses_file.exists():
-            try:
-                with open(self.region_analyses_file, "r", encoding="utf-8") as f:
-                    self.region_analyses = json.load(f)
-                    self.region_analyses_loaded_at = datetime.fromtimestamp(
-                        self.region_analyses_file.stat().st_mtime)
-                print(f"[ENGINE] {len(self.region_analyses)} Region-Analysen aus Cache geladen.")
-                loaded_any = True
-            except Exception as e:
-                logger.error(f"Fehler beim Laden des Region-Analyse-Caches: {e}")
+                logger.error(f"Postgres-Load Analysen fehlgeschlagen, nutze JSON-Fallback: {e}")
+
+        # Fallback auf JSON wenn Postgres leer oder nicht verfuegbar
+        if not pg_loaded:
+            if self.analyses_file.exists():
+                try:
+                    with open(self.analyses_file, "r", encoding="utf-8") as f:
+                        self.spot_analyses = json.load(f)
+                        self.analyses_loaded_at = datetime.fromtimestamp(self.analyses_file.stat().st_mtime)
+                    print(f"[ENGINE] {len(self.spot_analyses)} Spot-Analysen aus JSON-Cache geladen.")
+                    loaded_any = True
+                except Exception as e:
+                    logger.error(f"Fehler beim Laden des Spot-Analyse-Caches: {e}")
+            if self.region_analyses_file.exists():
+                try:
+                    with open(self.region_analyses_file, "r", encoding="utf-8") as f:
+                        self.region_analyses = json.load(f)
+                        self.region_analyses_loaded_at = datetime.fromtimestamp(
+                            self.region_analyses_file.stat().st_mtime)
+                    print(f"[ENGINE] {len(self.region_analyses)} Region-Analysen aus JSON-Cache geladen.")
+                    loaded_any = True
+                except Exception as e:
+                    logger.error(f"Fehler beim Laden des Region-Analyse-Caches: {e}")
+
         # Push nach InstantDB damit Frontend-Subscriptions sofort Daten haben
         if loaded_any and self.instantdb:
             if self.spot_analyses:
@@ -859,18 +350,30 @@ class FlychatEngine:
                 threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
 
     def _save_analyses_cache(self):
-        """Speichert Spot-Analysen in Datei."""
+        """Speichert Spot-Analysen (Postgres primaer, JSON-File als Fallback/Backup)."""
+        # 1. Postgres
+        client = self._get_pg_client()
+        if client is not None:
+            try:
+                client.upsert_spot_analyses(self.spot_analyses)
+            except Exception as e:
+                logger.error(f"Postgres-Save Spot-Analysen fehlgeschlagen: {e}")
+        # 2. JSON (Backup/Fallback)
         try:
-            with open(self.analyses_file, "w", encoding="utf-8") as f:
-                json.dump(self.spot_analyses, f, ensure_ascii=False, indent=2)
+            config.atomic_write_json(self.analyses_file, self.spot_analyses)
         except Exception as e:
             logger.error(f"Fehler beim Speichern des Spot-Analyse-Caches: {e}")
 
     def _save_region_analyses_cache(self):
-        """Speichert Region-Analysen in Datei."""
+        """Speichert Region-Analysen (Postgres primaer, JSON-File als Fallback/Backup)."""
+        client = self._get_pg_client()
+        if client is not None:
+            try:
+                client.upsert_region_analyses(self.region_analyses)
+            except Exception as e:
+                logger.error(f"Postgres-Save Region-Analysen fehlgeschlagen: {e}")
         try:
-            with open(self.region_analyses_file, "w", encoding="utf-8") as f:
-                json.dump(self.region_analyses, f, ensure_ascii=False, indent=2)
+            config.atomic_write_json(self.region_analyses_file, self.region_analyses)
         except Exception as e:
             logger.error(f"Fehler beim Speichern des Region-Analyse-Caches: {e}")
 
@@ -881,6 +384,14 @@ class FlychatEngine:
                 self.analyses_file.unlink()
             if self.region_analyses_file.exists():
                 self.region_analyses_file.unlink()
+            # Auch Postgres leeren damit kein Zombie-State zurueckbleibt
+            client = self._get_pg_client()
+            if client is not None:
+                try:
+                    client.delete_spot_analyses()
+                    client.delete_region_analyses()
+                except Exception as e:
+                    logger.error(f"Postgres-Clear Analysen fehlgeschlagen: {e}")
             print("[ENGINE] Analyse-Cache gelöscht (Wetterdaten fehlen)")
         except Exception as e:
             logger.error(f"Fehler beim Löschen des Analyse-Caches: {e}")
@@ -1088,7 +599,7 @@ class FlychatEngine:
                 clean_pct = (state["clean"] / state["total"]) * 100
                 major_tags_order = [
                     "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                    "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-WARN]", "[OVERCAST-DANGER]",
+                    "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
                     "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
                     "[THERMAL-ROUGH-FRAGMENTED]",
                     "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
@@ -1299,6 +810,14 @@ class FlychatEngine:
                 except Exception:
                     pass
 
+                # WMO weather_code 95/96/99 = Gewitter (deterministisches Modellsignal)
+                try:
+                    wcode = data.get("weather_code")
+                    if isinstance(wcode, (int, float)) and int(wcode) in (95, 96, 99):
+                        warnings.append("[THUNDERSTORM]")
+                except Exception:
+                    pass
+
                 # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
                 if (cloud_base_raw is not None
                         and isinstance(cloud_base_raw, (int, float))
@@ -1316,7 +835,7 @@ class FlychatEngine:
                     day_state["tag_counts"][wind_status] = day_state["tag_counts"].get(wind_status, 0) + 1
                 # "Clean" = WIND-OK ohne harte Warnungen
                 hard_warnings_set = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                                     "[RAIN-WARN]", "[CAPE-WARN]", "[STRONG-WIND-WARN]", "[OVERCAST-DANGER]"}
+                                     "[RAIN-WARN]", "[CAPE-WARN]", "[THUNDERSTORM]", "[STRONG-WIND-WARN]", "[OVERCAST-DANGER]"}
                 has_hard = bool(hard_warnings_set & set(warnings))
                 if is_ok and not has_hard:
                     day_state["clean"] += 1
@@ -2186,6 +1705,14 @@ class FlychatEngine:
             except Exception:
                 pass
 
+            # WMO weather_code 95/96/99 = Gewitter (deterministisches Modellsignal)
+            try:
+                wcode = data.get("weather_code")
+                if isinstance(wcode, (int, float)) and int(wcode) in (95, 96, 99):
+                    warnings.append("[THUNDERSTORM]")
+            except Exception:
+                pass
+
             # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
             if (cloud_base_raw is not None
                     and isinstance(cloud_base_raw, (int, float))
@@ -2270,7 +1797,7 @@ class FlychatEngine:
             # (flyability.md) interpretiert die Tags und degradiert auf gray/green.
             hard_warnings = {
                 "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                "[RAIN-WARN]", "[CAPE-WARN]", "[STRONG-WIND-WARN]",
+                "[RAIN-WARN]", "[CAPE-WARN]", "[THUNDERSTORM]", "[STRONG-WIND-WARN]",
                 "[OVERCAST-DANGER]",
             }
             has_hard_warn = bool(hard_warnings & set(warnings))
@@ -2300,13 +1827,13 @@ class FlychatEngine:
         lines.append(f"[WIND-WRONG] Stunden ({len(wind_wrong_hours)}): {', '.join(wind_wrong_hours) if wind_wrong_hours else 'KEINE'}")
         lines.append(f"Saubere Stunden ({len(clean_hours)}): {', '.join(clean_hours) if clean_hours else 'KEINE'} (WIND-OK ohne harte Warnungen)")
         if warned_hours:
-            lines.append(f"⚠ Gewarnete WIND-OK Stunden ({len(warned_hours)}): {', '.join(warned_hours)} (WIND-OK aber WIND/GUST/ALOFT/RAIN/CAPE/PL-WARN!)")
+            lines.append(f"⚠ Gewarnete WIND-OK Stunden ({len(warned_hours)}): {', '.join(warned_hours)} (WIND-OK aber WIND/GUST/ALOFT/RAIN/CAPE/THUNDERSTORM/PL-WARN!)")
         if len(clean_hours) >= 3:
             lines.append(f"→ {len(clean_hours)} saubere Stunden: safety_status eher safe oder conditional (Grün/Orange).")
         elif clean_hours:
             lines.append(f"→ Nur {len(clean_hours)} saubere Stunden: Status sollte maximal conditional sein.")
         elif wind_ok_hours and not clean_hours:
-            lines.append(f"→ ACHTUNG: Alle {len(wind_ok_hours)} WIND-OK-Stunden haben harte Warnungen (WIND/GUST/ALOFT/RAIN/CAPE)! Status sollte NOT_SAFE sein!")
+            lines.append(f"→ ACHTUNG: Alle {len(wind_ok_hours)} WIND-OK-Stunden haben harte Warnungen (WIND/GUST/ALOFT/RAIN/CAPE/THUNDERSTORM)! Status sollte NOT_SAFE sein!")
         else:
             lines.append(f"→ Kein fliegbares Fenster. Status sollte not_safe sein.")
 
@@ -2326,7 +1853,7 @@ class FlychatEngine:
             # Histogramm der Hauptgefahren über den ganzen Tag
             major_tags_order = [
                 "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-WARN]", "[OVERCAST-DANGER]",
+                "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
                 "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
                 "[THERMAL-ROUGH-FRAGMENTED]",
                 "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
@@ -2358,13 +1885,13 @@ class FlychatEngine:
         # "Harte Warnungen" = alles was eine Stunde objektiv unfliegbar macht
         hard_warning_tags = [
             "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-            "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-WARN]", "[OVERCAST-DANGER]",
+            "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
         ]
         hard_warning_hours = sum(tag_counts.get(t, 0) for t in hard_warning_tags)
 
         # Cache fuer deterministische Zahlen-Injektion in _safety_check_single_spot_day.
         # LLM darf diese NICHT selber schreiben (Halluzinations-Schutz).
-        self._ctx_gust_cache[f"{name}|{date_str}"] = {
+        self._ctx_cache_put(self._ctx_gust_cache, f"{name}|{date_str}", {
             "gust_warn_hours": gust_warn_h,
             "aloft_gust_warn_hours": aloft_gust_warn_h,
             "gust_danger_hours": gust_danger_h,
@@ -2376,7 +1903,7 @@ class FlychatEngine:
             "hard_warning_hours": hard_warning_hours,
             "rain_hours": len(rain_hours),
             "rain_hour_list": rain_hours,
-        }
+        })
 
         # Rain-Sandwich-Erkennung fuer Prefilter + NIEDERSCHLAG-TREND
         all_hours_sorted = sorted(hourly_gusts.keys()) or sorted(set(wind_ok_hours + wind_wrong_hours))
@@ -2387,14 +1914,14 @@ class FlychatEngine:
         # Cache fuer deterministische Flyability-Override
         # rough_danger_h = THERMAL-ROUGH-UNUSABLE + FRAGMENTED → einziger gray-Trigger.
         # tq_danger_h bleibt Summe aller UNUSABLE/FRAGMENTED fuer Text-Hinweise.
-        self._ctx_tq_cache[f"{name}|{date_str}"] = {
+        self._ctx_cache_put(self._ctx_tq_cache, f"{name}|{date_str}", {
             "thermal_hours_total": thermal_hours_total,
             "tq_danger_h": tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h,
             "rough_danger_h": tq_rough_danger_h,
             "peak_climb_proxy": peak_climb_proxy,
             "productive_thermal_h": productive_thermal_h,
             "clean_hours_count": len(clean_hours),
-        }
+        })
 
         if gust_danger_h > 0 or aloft_gust_danger_h > 0:
             danger_bits = []
@@ -2890,6 +2417,14 @@ class FlychatEngine:
             except Exception:
                 pass
 
+            # WMO weather_code 95/96/99 = Gewitter (deterministisches Modellsignal)
+            try:
+                wcode = data.get("weather_code")
+                if isinstance(wcode, (int, float)) and int(wcode) in (95, 96, 99):
+                    warnings.append("[THUNDERSTORM]")
+            except Exception:
+                pass
+
             # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
             if (cloud_base_raw is not None
                     and isinstance(cloud_base_raw, (int, float))
@@ -2969,7 +2504,7 @@ class FlychatEngine:
                 tag_counts["[WIND-MODERATE]"] = tag_counts.get("[WIND-MODERATE]", 0) + 1
 
             # Klassifiziere saubere vs. gewarnte Stunden
-            hard_warnings = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]", "[RAIN-WARN]", "[CAPE-WARN]", "[WIND-STRONG]", "[OVERCAST-DANGER]"}
+            hard_warnings = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]", "[RAIN-WARN]", "[CAPE-WARN]", "[THUNDERSTORM]", "[WIND-STRONG]", "[OVERCAST-DANGER]"}
             has_hard_warn = bool(hard_warnings & set(warnings)) or wind_status == "[WIND-STRONG]"
             if not has_hard_warn:
                 clean_hours.append(hour_str)
@@ -3022,7 +2557,7 @@ class FlychatEngine:
         all_hours_sorted_region = sorted(hourly_gusts.keys()) or sorted(set(calm_hours + moderate_hours + strong_hours))
         rain_pattern = _detect_rain_sandwich(rain_hours, all_hours_sorted_region)
 
-        self._ctx_tq_cache[f"{rname}|{date_str}"] = {
+        self._ctx_cache_put(self._ctx_tq_cache, f"{rname}|{date_str}", {
             "thermal_hours_total": thermal_hours_total,
             "tq_danger_h": tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h,
             "rough_danger_h": tq_rough_danger_h,
@@ -3032,7 +2567,7 @@ class FlychatEngine:
             "rain_sandwiched": rain_pattern["is_sandwiched"],
             "max_dry_gap": rain_pattern["max_dry_gap"],
             "rain_cnt": len(rain_hours),
-        }
+        })
 
         # ─── TAGESPROFIL: Ganzheitliche Sicht für LLM-Bewertung ───
         total_actual = len(calm_hours) + len(moderate_hours) + len(strong_hours)
@@ -3049,7 +2584,7 @@ class FlychatEngine:
             )
             major_tags_order = [
                 "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-WARN]", "[OVERCAST-DANGER]",
+                "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
                 "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
                 "[THERMAL-ROUGH-FRAGMENTED]",
                 "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
@@ -3358,6 +2893,7 @@ class FlychatEngine:
                         max_tokens=1100,
                         response_format={"type": "json_object"},
                     )
+                    _log_prompt_cache_usage(response, label="spot_combined")
                     raw = response.choices[0].message.content
                     result = json.loads(raw)
                     last_err = None
@@ -3673,6 +3209,7 @@ class FlychatEngine:
                         max_tokens=1100,
                         response_format={"type": "json_object"},
                     )
+                    _log_prompt_cache_usage(response, label="region_combined")
                     raw = response.choices[0].message.content
                     result = json.loads(raw)
                     last_err = None
@@ -3899,32 +3436,32 @@ class FlychatEngine:
             logger.error(f"InstantDB Region-Analysen-Push fehlgeschlagen: {e}")
 
     # ════════════════════════════════════════════════════════════════════════
-    # WEEKLY NEWSPAPER — Wochen-Fazit aus Spot- und Region-Analysen
+    # WEEKLY BRIEFING — Wochen-Fazit aus Spot- und Region-Analysen
     # ════════════════════════════════════════════════════════════════════════
 
-    def _weekly_newspaper_cache_path(self) -> Path:
-        return Path("data") / "weekly_newspaper.json"
+    def _weekly_briefing_cache_path(self) -> Path:
+        return Path("data") / "weekly_briefing.json"
 
-    def _save_weekly_newspaper(self, data: dict) -> None:
+    def _save_weekly_briefing(self, data: dict) -> None:
         try:
-            p = self._weekly_newspaper_cache_path()
+            p = self._weekly_briefing_cache_path()
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception as e:
-            logger.warning(f"Weekly-Newspaper-Cache-Save fehlgeschlagen: {e}")
+            logger.warning(f"Weekly-Briefing-Cache-Save fehlgeschlagen: {e}")
 
-    def _load_weekly_newspaper(self) -> dict | None:
+    def _load_weekly_briefing(self) -> dict | None:
         try:
-            p = self._weekly_newspaper_cache_path()
+            p = self._weekly_briefing_cache_path()
             if not p.is_file():
                 return None
             return json.loads(p.read_text(encoding="utf-8"))
         except Exception as e:
-            logger.warning(f"Weekly-Newspaper-Cache-Load fehlgeschlagen: {e}")
+            logger.warning(f"Weekly-Briefing-Cache-Load fehlgeschlagen: {e}")
             return None
 
-    def build_newspaper_data(self) -> dict:
-        """Aggregiert spot_analyses + region_analyses in eine Newspaper-Struktur.
+    def build_briefing_data(self) -> dict:
+        """Aggregiert spot_analyses + region_analyses in eine Briefing-Struktur.
         Filter: zeigt nur green + violet (NO-GO und Abgleiter ausgeblendet).
         """
         from source_area import get_all_regions
@@ -4026,7 +3563,7 @@ class FlychatEngine:
                     "best_window": fly.get("best_window", "") or entry.get("best_window", ""),
                     "recommendation": fly.get("recommendation", ""),
                     "safety_feedback": safety.get("summary", ""),
-                    # Volle Voranalyse fuer Ausklapp-Ansicht im Newspaper
+                    # Volle Voranalyse fuer Ausklapp-Ansicht im Briefing
                     "analysis_full": entry,
                 })
             spot_entries.sort(key=lambda e: e["rating"], reverse=True)
@@ -4061,7 +3598,7 @@ class FlychatEngine:
             days_data.append({
                 "date": date_str,
                 "weekday": _weekday_de(datetime.fromisoformat(date_str)),
-                "top_spots": spot_entries[:20],
+                "top_spots": spot_entries,
                 "top_regions": region_entries[:10],
                 "counts": {
                     "spots_total": sum(1 for days in self.spot_analyses.values() if date_str in days),
@@ -4081,11 +3618,11 @@ class FlychatEngine:
             "days": days_data,
         }
 
-    def generate_weekly_newspaper(self) -> dict:
+    def generate_weekly_briefing(self) -> dict:
         """Erstellt das Wochen-Fazit via LLM (inkl. bester Wochentag, Regionen-Ranking, Tages-Highlights)."""
         if not self.client:
             return {"success": False, "error": "OPENAI_API_KEY nicht konfiguriert"}
-        data = self.build_newspaper_data()
+        data = self.build_briefing_data()
         if not data.get("days"):
             return {"success": False, "error": "Keine Analysedaten vorhanden"}
 
@@ -4122,7 +3659,7 @@ class FlychatEngine:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": WEEKLY_NEWSPAPER_PROMPT},
+                    {"role": "system", "content": WEEKLY_BRIEFING_PROMPT},
                     {"role": "user", "content": (
                         f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                         f"WOCHEN-DATEN:\n{ctx}\n"
@@ -4132,6 +3669,7 @@ class FlychatEngine:
                 max_tokens=1500,
                 response_format={"type": "json_object"},
             )
+            _log_prompt_cache_usage(response, label="weekly_briefing")
             raw = response.choices[0].message.content
             fazit = json.loads(raw)
             # Clamp week_rating
@@ -4149,10 +3687,10 @@ class FlychatEngine:
                 "days": data["days"],
                 "fazit": fazit,
             }
-            self._save_weekly_newspaper(result)
+            self._save_weekly_briefing(result)
             return result
         except Exception as e:
-            logger.error(f"Weekly-Newspaper LLM-Call fehlgeschlagen: {e}")
+            logger.error(f"Weekly-Briefing LLM-Call fehlgeschlagen: {e}")
             return {"success": False, "error": str(e)}
 
     # ── SSE Streaming generators ────────────────────────────────────────
@@ -4253,7 +3791,7 @@ class FlychatEngine:
                 }
                 entry = {"safety": safety}
 
-                # Rating / Conditional-Flag (Newspaper) — top-level fuer einfachen Zugriff
+                # Rating / Conditional-Flag (Briefing) — top-level fuer einfachen Zugriff
                 entry["rating"] = float(result.get("rating", 0.0) or 0.0)
                 entry["is_conditional"] = bool(result.get("is_conditional", False))
                 entry["conditional_reason"] = result.get("conditional_reason", "") or ""
@@ -4450,7 +3988,7 @@ class FlychatEngine:
                 }
                 entry = {"safety": safety}
 
-                # Rating / Conditional-Flag (Newspaper) — top-level fuer einfachen Zugriff
+                # Rating / Conditional-Flag (Briefing) — top-level fuer einfachen Zugriff
                 entry["rating"] = float(result.get("rating", 0.0) or 0.0)
                 entry["is_conditional"] = bool(result.get("is_conditional", False))
                 entry["conditional_reason"] = result.get("conditional_reason", "") or ""
@@ -5319,7 +4857,7 @@ class FlychatEngine:
                         "error": result.get("error", ""),
                     }
                     entry = {"safety": safety}
-                    # Rating / Conditional-Flag (Newspaper)
+                    # Rating / Conditional-Flag (Briefing)
                     entry["rating"] = float(result.get("rating", 0.0) or 0.0)
                     entry["is_conditional"] = bool(result.get("is_conditional", False))
                     entry["conditional_reason"] = result.get("conditional_reason", "") or ""
@@ -5401,7 +4939,7 @@ class FlychatEngine:
                         "error": result.get("error", ""),
                     }
                     entry = {"safety": safety}
-                    # Rating / Conditional-Flag (Newspaper)
+                    # Rating / Conditional-Flag (Briefing)
                     entry["rating"] = float(result.get("rating", 0.0) or 0.0)
                     entry["is_conditional"] = bool(result.get("is_conditional", False))
                     entry["conditional_reason"] = result.get("conditional_reason", "") or ""
@@ -6031,6 +5569,7 @@ class FlychatEngine:
                 temperature=0.7,
                 max_tokens=2000,
             )
+            _log_prompt_cache_usage(response, label="chat_answer")
             reply = response.choices[0].message.content
         except Exception as e:
             logger.error(f"OpenAI API Fehler: {e}")
@@ -6302,6 +5841,7 @@ class FlychatEngine:
                     temperature=0.7,
                     max_tokens=2000,
                 )
+                _log_prompt_cache_usage(response, label="chat_stream")
                 choice = response.choices[0]
                 msg = choice.message
                 finish_reason = choice.finish_reason

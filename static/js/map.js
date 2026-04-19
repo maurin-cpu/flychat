@@ -7,7 +7,6 @@
     var map;
     var overlay = document.getElementById('meteogramOverlay');
     var chartContainer = document.getElementById('meteogramChart');
-    var windTimelineContainer = document.getElementById('windTimelineChart');
     var textViewContainer = document.getElementById('textViewChart');
     var analyseViewContainer = document.getElementById('analyseViewChart');
     var tabsContainer = document.getElementById('meteogramTabs');
@@ -18,9 +17,11 @@
     var ratingValueEl = document.getElementById('meteogramRatingValue');
     var closeBtn = document.getElementById('meteogramClose');
     var tooltipEl = document.getElementById('tooltip');
-    var currentView = 'meteogram';  // 'meteogram', 'windtimeline', or 'text' (analyse is permanent aside)
+    var currentView = 'meteogram';  // 'meteogram' or 'text' (analyse is permanent aside)
     var asideEl = document.getElementById('meteogramAside');
     var asideToggleBtn = document.getElementById('meteogramAsideToggle');
+    var modelToggleEl = document.getElementById('modelToggle');
+    var currentWindModel = 'default';  // 'default' (D2) or 'ch1'
 
     // Safer JSON fetch: prüft r.ok + Content-Type, liefert verständliche Fehlermeldung
     // statt "Unexpected token '<'..." wenn Server HTML (z.B. 500-Page) zurückgibt.
@@ -414,7 +415,7 @@
     }
 
 
-    // ===== VIEW TABS (Meteogramm / Windverlauf / Text) =====
+    // ===== VIEW TABS (Meteogramm / Text) =====
     // Analyse is permanently shown in the aside panel next to the chart.
     if (viewTabsContainer) {
         viewTabsContainer.querySelectorAll('.view-tab').forEach(function (btn) {
@@ -426,14 +427,10 @@
                     b.classList.toggle('active', b.dataset.view === view);
                 });
                 chartContainer.style.display = 'none';
-                if (windTimelineContainer) windTimelineContainer.style.display = 'none';
                 if (textViewContainer) textViewContainer.style.display = 'none';
 
                 if (view === 'meteogram') {
                     chartContainer.style.display = '';
-                } else if (view === 'windtimeline') {
-                    if (windTimelineContainer) windTimelineContainer.style.display = '';
-                    renderWindTimeline();
                 } else if (view === 'text') {
                     if (textViewContainer) textViewContainer.style.display = '';
                     renderTextView();
@@ -529,30 +526,16 @@
         });
     }
 
-    function renderWindTimeline() {
-        if (!currentAltWind || !currentDates.length || !windTimelineContainer) return;
-        var dateStr = currentDates[currentDateIdx];
-        var altProfiles = (currentAltWind.data && currentAltWind.data[dateStr]) || [];
-        var elevation = currentWeather ? currentWeather.elevation_m : 1000;
-
-        // Create a tooltip element inside the windtimeline container
-        var wtTooltip = windTimelineContainer.querySelector('.wt-tooltip');
-        if (!wtTooltip) {
-            wtTooltip = document.createElement('div');
-            wtTooltip.className = 'wt-tooltip tooltip';
-            windTimelineContainer.style.position = 'relative';
-            windTimelineContainer.appendChild(wtTooltip);
-        }
-
-        WindTimeline.render(windTimelineContainer, wtTooltip, altProfiles, {
-            elevation_m: elevation,
-            dateStr: dateStr,
-        });
-    }
-
     // ===== METEOGRAM OVERLAY =====
     function openMeteogram(spotName, props) {
         currentSpotName = spotName;
+        currentWindModel = 'default';
+        if (modelToggleEl) {
+            modelToggleEl.style.display = 'none';
+            modelToggleEl.querySelectorAll('.model-btn').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.model === 'default');
+            });
+        }
         titleEl.textContent = spotName;
         infoEl.textContent = props
             ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + props.windrichtung
@@ -562,7 +545,6 @@
             ratingBadgeEl.classList.remove('tier-green', 'tier-violet', 'tier-not-safe', 'is-conditional');
         }
         chartContainer.innerHTML = '<div class="error-state">Lade Daten...</div>';
-        if (windTimelineContainer) windTimelineContainer.innerHTML = '';
         if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">Lade Analyse...</div>';
         if (textViewContainer) textViewContainer.innerHTML = '';
         tabsContainer.innerHTML = '';
@@ -574,7 +556,6 @@
         // Reset to meteogram view
         currentView = 'meteogram';
         chartContainer.style.display = '';
-        if (windTimelineContainer) windTimelineContainer.style.display = 'none';
         if (textViewContainer) textViewContainer.style.display = 'none';
         // Aside starts expanded on desktop; on mobile user can collapse it.
         if (asideEl) asideEl.classList.remove('collapsed');
@@ -618,6 +599,7 @@
                         if (idx >= 0 && idx !== currentDateIdx) {
                             currentDateIdx = idx;
                             window.currentDate = dateStr;
+                            updateModelToggle();
                             renderCurrentDay();
                             // Sync floating map day tabs + marker colours
                             syncFloatingDayTabs(dateStr);
@@ -631,6 +613,7 @@
                     tabsContainer.style.display = 'none';
                 }
 
+                updateModelToggle();
                 renderCurrentDay();
             })
             .catch(function (err) {
@@ -654,12 +637,62 @@
             });
     }
 
+    /** Show/hide model toggle and enable/disable CH1 button based on current day */
+    function updateModelToggle() {
+        if (!modelToggleEl || !currentWeather) return;
+        // CH1 verfügbar wenn altitude-wind CH1-Profile hat
+        var hasCh1 = !!(currentAltWind && currentAltWind.data_ch1);
+        modelToggleEl.style.display = hasCh1 ? '' : 'none';
+        if (!hasCh1) return;
+        var dateStr = currentDates[currentDateIdx];
+        var ch1Btn = modelToggleEl.querySelector('[data-model="ch1"]');
+        if (ch1Btn) {
+            var available = !!(currentAltWind.data_ch1[dateStr]);
+            ch1Btn.disabled = !available;
+            // If CH1 selected but not available on this day, revert to default
+            if (!available && currentWindModel === 'ch1') {
+                currentWindModel = 'default';
+                modelToggleEl.querySelectorAll('.model-btn').forEach(function (b) {
+                    b.classList.toggle('active', b.dataset.model === 'default');
+                });
+            }
+        }
+    }
+
+    /** Swap wind data to CH1 model values (returns shallow copy of wxDay with replaced wind array) */
+    function applyWindModel(wxDay) {
+        if (currentWindModel !== 'ch1' || !wxDay || !wxDay.wind) return wxDay;
+        var copy = {};
+        for (var k in wxDay) copy[k] = wxDay[k];
+        copy.wind = wxDay.wind.map(function (w) {
+            if (w.gusts_ch1 != null) {
+                return {
+                    time: w.time,
+                    speed: w.speed_ch1 != null ? w.speed_ch1 : w.speed,
+                    gusts: w.gusts_ch1,
+                    direction: w.direction_ch1 != null ? w.direction_ch1 : w.direction,
+                    speed_ch1: w.speed_ch1,
+                    gusts_ch1: w.gusts_ch1,
+                    direction_ch1: w.direction_ch1,
+                };
+            }
+            return w;
+        });
+        return copy;
+    }
+
     function renderCurrentDay() {
         var dateStr = currentDates[currentDateIdx];
         if (!dateStr) return;
 
         var wxDay = currentWeather.data[dateStr] || {};
-        var altProfiles = (currentAltWind.data && currentAltWind.data[dateStr]) || [];
+        wxDay = applyWindModel(wxDay);
+
+        // Bei CH1-Modell: alternative Höhenprofile + Bodenwind verwenden (falls vorhanden)
+        var useCh1 = currentWindModel === 'ch1';
+        var altSource = useCh1 && currentAltWind.data_ch1 ? currentAltWind.data_ch1 : currentAltWind.data;
+        var gwSource = useCh1 && currentAltWind.ground_wind_ch1 ? currentAltWind.ground_wind_ch1 : currentAltWind.ground_wind;
+        var altProfiles = (altSource && altSource[dateStr]) || [];
 
         // renderChart expects altDay = {profiles: [{time, levels: [...]}]}
         var altDay = { profiles: [] };
@@ -673,7 +706,7 @@
         // Bodenwind (10m, terrain-korrigiert) pro Stunde -> Lookup {time: data}
         // Safety-relevanter Startwind, getrennt vom freien Höhenwind.
         var groundWindByTime = {};
-        var gwList = (currentAltWind.ground_wind && currentAltWind.ground_wind[dateStr]) || [];
+        var gwList = (gwSource && gwSource[dateStr]) || [];
         gwList.forEach(function (g) {
             var t = dateStr + 'T' + (g.hour < 10 ? '0' : '') + g.hour + ':00:00';
             groundWindByTime[t] = g;
@@ -700,10 +733,8 @@
         // Analyse panel is always visible in the aside – refresh on every day change.
         renderAnalyseView();
 
-        // Also update wind timeline / text view if that view is currently active
-        if (currentView === 'windtimeline') {
-            renderWindTimeline();
-        } else if (currentView === 'text') {
+        // Also update text view if that view is currently active
+        if (currentView === 'text') {
             renderTextView();
         }
     }
@@ -714,6 +745,8 @@
         tooltipEl.classList.remove('visible');
         currentWeather = null;
         currentAltWind = null;
+        currentWindModel = 'default';
+        if (modelToggleEl) modelToggleEl.style.display = 'none';
         if (window._overlayScrollUnlock) window._overlayScrollUnlock();
     }
 
@@ -745,6 +778,7 @@
         var idx = currentDates.indexOf(newDate);
         if (idx >= 0 && idx !== currentDateIdx) {
             currentDateIdx = idx;
+            updateModelToggle();
             renderCurrentDay();
             // Keep overlay day tabs in sync
             tabsContainer.querySelectorAll('.tab-btn').forEach(function (b, i) {
@@ -765,6 +799,22 @@
             closeMeteogram();
         }
     });
+
+    // Model toggle (D2 / CH1) click handler
+    if (modelToggleEl) {
+        modelToggleEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('.model-btn');
+            if (!btn || btn.disabled) return;
+            var model = btn.dataset.model;
+            if (model === currentWindModel) return;
+            currentWindModel = model;
+            modelToggleEl.querySelectorAll('.model-btn').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.model === model);
+            });
+            renderCurrentDay();
+        });
+    }
+
     // ===== HIGHLIGHTING =====
     window.highlightSpots = function (items) {
         // Reset all markers to their current analysis state

@@ -4,44 +4,44 @@
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
-<link rel="stylesheet" href="{{ url_for('static', filename='css/newspaper.css') }}?v={{ static_v('css/newspaper.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/briefing.css') }}?v={{ static_v('css/briefing.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="np" id="newspaperRoot">
-  <header class="np-header">
-    <div class="np-header-left">
-      <h1 class="np-logo">Flugwetter</h1>
-      <span class="np-date-range" id="npDateRange">wird geladen…</span>
+<div class="bf" id="briefingRoot">
+  <header class="bf-header">
+    <div class="bf-header-left">
+      <h1 class="bf-logo">Flugwetter</h1>
+      <span class="bf-date-range" id="bfDateRange">wird geladen…</span>
     </div>
-    <div class="np-header-right">
-      <span class="np-timestamp" id="npGeneratedAt"></span>
-      <button type="button" class="np-btn-gen" id="npGenerateBtn">Aktualisieren</button>
+    <div class="bf-header-right">
+      <span class="bf-timestamp" id="bfGeneratedAt"></span>
+      <button type="button" class="bf-btn-gen" id="bfGenerateBtn">Aktualisieren</button>
     </div>
   </header>
 
-  <section class="np-fazit" id="npFazit" hidden></section>
+  <section class="bf-fazit" id="bfFazit" hidden></section>
 
-  <nav class="np-day-tabs" id="npDayTabs" role="tablist" aria-label="Tagesauswahl"></nav>
+  <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="Tagesauswahl"></nav>
 
-  <section class="np-filters" id="npFilters">
-    <div class="np-filter-row">
-      <div class="np-filter-chips" id="npFilterChips"></div>
-      <button type="button" class="np-filter-reset" id="npFilterReset" disabled>Alle</button>
-      <button type="button" class="np-filter-map-btn" id="npMapToggle" title="Karte ein/aus">
+  <section class="bf-filters" id="bfFilters">
+    <div class="bf-filter-row">
+      <div class="bf-filter-chips" id="bfFilterChips"></div>
+      <button type="button" class="bf-filter-reset" id="bfFilterReset" disabled>Alle</button>
+      <button type="button" class="bf-filter-map-btn" id="bfMapToggle" title="Karte ein/aus">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
       </button>
     </div>
-    <div class="np-filter-map" id="npFilterMap" hidden></div>
+    <div class="bf-filter-map" id="bfFilterMap" hidden></div>
   </section>
 
-  <div class="np-day-info" id="npDayInfo"></div>
+  <div class="bf-day-info" id="bfDayInfo"></div>
 
-  <section class="np-content" id="npContent"></section>
+  <section class="bf-content" id="bfContent"></section>
 
-  <div class="tooltip" id="npMeteogramTooltip"></div>
+  <div class="tooltip" id="bfMeteogramTooltip"></div>
 
-  <footer class="np-footer">
+  <footer class="bf-footer">
     <p>ICON-D2/EU/CH1/CH2 + GFS via Open-Meteo · winds.mobi · Flychat-KI</p>
   </footer>
 </div>
@@ -51,5 +51,5 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
-<script src="{{ url_for('static', filename='js/newspaper.js') }}?v={{ static_v('js/newspaper.js') }}"></script>
+<script src="{{ url_for('static', filename='js/briefing.js') }}?v={{ static_v('js/briefing.js') }}"></script>
 {% endblock %}

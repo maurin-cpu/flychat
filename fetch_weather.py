@@ -21,6 +21,10 @@ from datetime import datetime, timedelta
 
 import config
 
+# Lazy Supabase-Client Singleton (siehe _get_pg_client).
+_pg_client = None
+_pg_client_init = False
+
 # Verzögerung zwischen Batch-Calls (Open-Meteo Rate-Limit)
 API_DELAY_BETWEEN_CALLS = 3.5  # Sekunden zwischen den 4 Batch-Calls
 # Fix D: Retries reduziert von 4 → 2. Vorher: 15+30+60+120 = 225s Wartezeit
@@ -498,13 +502,14 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
                 entry["wind_direction_10m_ch2"] = ch2_dir[i2]
 
         # Merge: Maximum aller verfügbaren Modelle (konservativ/sicher)
-        gust_values = [v for v in [d2_gust, ch1_g, ch2_g] if v is not None]
-        if len(gust_values) > 1:
-            max_gust = max(gust_values)
-            if d2_gust is not None and max_gust > d2_gust:
-                entry["wind_gusts_10m_d2"] = d2_gust  # Original D2 aufbewahren
-                entry["wind_gusts_10m"] = max_gust
-                multi_model_count += 1
+        if config.MULTI_MODEL_GUST_MERGE:
+            gust_values = [v for v in [d2_gust, ch1_g, ch2_g] if v is not None]
+            if len(gust_values) > 1:
+                max_gust = max(gust_values)
+                if d2_gust is not None and max_gust > d2_gust:
+                    entry["wind_gusts_10m_d2"] = d2_gust  # Original D2 aufbewahren
+                    entry["wind_gusts_10m"] = max_gust
+                    multi_model_count += 1
 
     if multi_model_count > 0:
         print(f"  [MULTI] {location_name}: {multi_model_count} Stunden mit höheren CH1/CH2 Böen übernommen")
@@ -944,14 +949,55 @@ def fetch_all_spots(spots, save_to_file=True):
     print(f"[INFO] Fertig: {len(spot_keys)} Spots + {len(region_data)} Regionen verarbeitet")
 
     if save_to_file:
-        config.WEATHER_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
         # Speichere Regions-Daten unter _regions Key
         all_data["_regions"] = region_data
-        with open(config.WEATHER_JSON_PATH, "w", encoding="utf-8") as f:
-            json.dump(all_data, f, indent=2, ensure_ascii=False)
-        print(f"[INFO] Wetterdaten gespeichert: {config.WEATHER_JSON_PATH}")
+        # 1. Postgres-Write (primaer) — falls konfiguriert
+        _write_weather_to_postgres(all_data, region_data)
+        # 2. JSON-Write (Fallback/Backup) — async, blockiert Aufrufer nicht
+        # `all_data` wird nach diesem Punkt nicht mehr mutiert → safe fuer pass-by-reference.
+        config.queue_atomic_write_json(config.WEATHER_JSON_PATH, all_data)
+        print(f"[INFO] Wetterdaten-Write eingereiht: {config.WEATHER_JSON_PATH}")
 
     return all_data, region_data
+
+
+def _get_pg_client():
+    """Lazy Singleton fuer SupabaseClient. None wenn SUPABASE_DATABASE_URL nicht gesetzt."""
+    global _pg_client, _pg_client_init
+    if _pg_client_init:
+        return _pg_client
+    _pg_client_init = True
+    try:
+        from supabase_client import get_client_from_env
+        _pg_client = get_client_from_env()
+        if _pg_client is not None:
+            print("[INFO] Supabase-Client initialisiert (Postgres aktiv)")
+    except Exception as e:
+        print(f"[WARN] Supabase-Client nicht verfuegbar: {e}")
+        _pg_client = None
+    return _pg_client
+
+
+def _write_weather_to_postgres(all_data, region_data):
+    """Dual-Write: Schreibt Wetterdaten zusaetzlich nach Postgres (wenn konfiguriert).
+    Fire-and-log — Fehler blockieren den JSON-Fallback nicht."""
+    client = _get_pg_client()
+    if client is None:
+        return
+    try:
+        import time as _t
+        t0 = _t.time()
+        meta = all_data.get("_meta") or {}
+        if meta:
+            client.upsert_weather_meta(meta)
+        spots = {k: v for k, v in all_data.items() if not k.startswith("_")}
+        if spots:
+            client.upsert_forecasts(spots)
+        if region_data:
+            client.upsert_regions_forecasts(region_data)
+        print(f"[INFO] Postgres-Write: {len(spots)} Spots + {len(region_data)} Regionen in {_t.time()-t0:.1f}s")
+    except Exception as e:
+        print(f"[WARN] Postgres-Write fehlgeschlagen (JSON-Fallback greift): {e}")
 
 
 def get_weather_for_location(location_name, latitude, longitude):
@@ -1056,7 +1102,27 @@ def get_weather_for_location(location_name, latitude, longitude):
 
 
 def load_cached_weather():
-    """Lade gecachte Wetterdaten aus JSON."""
+    """Lade gecachte Wetterdaten.
+
+    Primaer aus Postgres (supabase). Fallback: wetterdaten.json wenn Postgres
+    leer oder nicht verfuegbar. Rekonstruiert das alte JSON-Format
+    (_meta + _regions + {spot_name: data}) damit Aufrufer unveraendert bleiben.
+    """
+    client = _get_pg_client()
+    if client is not None:
+        try:
+            meta = client.get_weather_meta()
+            forecasts = client.get_all_forecasts()
+            regions = client.get_all_regions_forecasts()
+            if forecasts:
+                data = dict(forecasts)
+                data["_meta"] = meta or {}
+                data["_regions"] = regions or {}
+                return data
+            # Postgres leer → Fallback auf JSON
+        except Exception as e:
+            print(f"[WARN] load_cached_weather: Postgres-Read fehlgeschlagen, nutze JSON-Fallback: {e}")
+
     if not config.WEATHER_JSON_PATH.exists():
         return None
     with open(config.WEATHER_JSON_PATH, "r", encoding="utf-8") as f:

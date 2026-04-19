@@ -20,7 +20,10 @@ def _get_engine():
     global _engine
     if _engine is None:
         instantdb = None
-        if config.INSTANTDB_ADMIN_TOKEN:
+        supabase_active = bool(os.environ.get("SUPABASE_URL", "").strip()
+                               and os.environ.get("SUPABASE_ANON_KEY", "").strip())
+        # InstantDB nur wenn Supabase NICHT konfiguriert (Fallback-Modus)
+        if not supabase_active and config.INSTANTDB_ADMIN_TOKEN:
             instantdb = InstantDBClient(
                 app_id=config.INSTANTDB_APP_ID,
                 admin_token=config.INSTANTDB_ADMIN_TOKEN,

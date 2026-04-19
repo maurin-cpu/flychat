@@ -21,8 +21,7 @@
         <div class="navbar-links">
             <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Startplätze</a>
             <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
-            <a href="/analyses" class="{% if request.path == '/analyses' %}active{% endif %}">Analysen</a>
-            <a href="/newspaper" class="{% if request.path == '/newspaper' %}active{% endif %}">Newspaper</a>
+            <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Briefing</a>
             <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen" aria-label="Föhndiagramm öffnen">Föhn</button>
         </div>
     </nav>
@@ -82,13 +81,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             <span>Regionen</span>
         </a>
-        <a href="/analyses" class="mobile-nav-item {% if request.path == '/analyses' %}active{% endif %}" aria-label="Analysen">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-            <span>Analysen</span>
-        </a>
-        <a href="/newspaper" class="mobile-nav-item {% if request.path == '/newspaper' %}active{% endif %}" aria-label="Newspaper">
+        <a href="/briefing" class="mobile-nav-item {% if request.path == '/briefing' %}active{% endif %}" aria-label="Briefing">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
-            <span>Zeitung</span>
+            <span>Briefing</span>
         </a>
         <button class="mobile-nav-item" id="mobileNavFoehnBtn" aria-label="Föhndiagramm öffnen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>

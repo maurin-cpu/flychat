@@ -55,8 +55,8 @@
 
   // ── State ───────────────────────────────────────────────────
 
-  const LS_REGION_FILTER_KEY = "flychat.newspaper.regionFilter";
-  const LS_DAY_IDX_KEY = "flychat.newspaper.dayIdx";
+  const LS_REGION_FILTER_KEY = "flychat.briefing.regionFilter";
+  const LS_DAY_IDX_KEY = "flychat.briefing.dayIdx";
 
   let state = {
     data: null,
@@ -181,18 +181,18 @@
     const dates = data.forecast_dates || [];
     const first = dates[0];
     const last = dates[dates.length - 1];
-    const rangeEl = $("npDateRange");
+    const rangeEl = $("bfDateRange");
     if (rangeEl) {
       rangeEl.textContent = first && last ? `${formatDateShort(first)} – ${formatDateShort(last)}` : "";
     }
-    const tsEl = $("npGeneratedAt");
+    const tsEl = $("bfGeneratedAt");
     if (tsEl) tsEl.textContent = formatGeneratedAt(data.generated_at);
   }
 
   // ── Render: Fazit ───────────────────────────────────────────
 
   function renderFazit(data) {
-    const el = $("npFazit");
+    const el = $("bfFazit");
     if (!el) return;
     const fazit = data.fazit;
     if (!fazit) { el.hidden = true; return; }
@@ -204,23 +204,23 @@
     const summary = fazit.week_summary || "";
 
     el.innerHTML = `
-      <div class="np-fazit-head">
-        <span class="np-fazit-label">Wochenfazit${bw.weekday ? ` — Bester Tag: ${escapeHtml(bw.weekday)}` : ""}</span>
-        <span class="np-fazit-chevron" aria-hidden="true">▾</span>
+      <div class="bf-fazit-head">
+        <span class="bf-fazit-label">Wochenfazit${bw.weekday ? ` — Bester Tag: ${escapeHtml(bw.weekday)}` : ""}</span>
+        <span class="bf-fazit-chevron" aria-hidden="true">▾</span>
       </div>
-      <div class="np-fazit-body"${state.fazitOpen ? "" : " hidden"}>
-        ${headline ? `<div class="np-fazit-best">${escapeHtml(headline)}</div>` : ""}
-        ${summary ? `<p class="np-fazit-text">${escapeHtml(summary)}</p>` : ""}
-        ${wrating !== "—" ? `<span class="np-fazit-rating">${wrating} / 10</span>` : ""}
+      <div class="bf-fazit-body"${state.fazitOpen ? "" : " hidden"}>
+        ${headline ? `<div class="bf-fazit-best">${escapeHtml(headline)}</div>` : ""}
+        ${summary ? `<p class="bf-fazit-text">${escapeHtml(summary)}</p>` : ""}
+        ${wrating !== "—" ? `<span class="bf-fazit-rating">${wrating} / 10</span>` : ""}
       </div>
     `;
-    el.className = `np-fazit${state.fazitOpen ? " is-open" : ""}`;
+    el.className = `bf-fazit${state.fazitOpen ? " is-open" : ""}`;
 
     if (!el._flyBound) {
       el._flyBound = true;
       el.addEventListener("click", () => {
         state.fazitOpen = !state.fazitOpen;
-        const body = el.querySelector(".np-fazit-body");
+        const body = el.querySelector(".bf-fazit-body");
         if (body) body.hidden = !state.fazitOpen;
         el.classList.toggle("is-open", state.fazitOpen);
       });
@@ -230,7 +230,7 @@
   // ── Render: Day Tabs ────────────────────────────────────────
 
   function renderDayTabs(data) {
-    const container = $("npDayTabs");
+    const container = $("bfDayTabs");
     if (!container) return;
     const days = data.days || [];
     if (!days.length) { container.innerHTML = ""; return; }
@@ -256,24 +256,24 @@
 
       // Build dots (max 4)
       const dots = [];
-      for (let j = 0; j < Math.min(violet, 2); j++) dots.push('<span class="np-tab-dot violet"></span>');
-      for (let j = 0; j < Math.min(green, 2); j++) dots.push('<span class="np-tab-dot green"></span>');
+      for (let j = 0; j < Math.min(violet, 2); j++) dots.push('<span class="bf-tab-dot violet"></span>');
+      for (let j = 0; j < Math.min(green, 2); j++) dots.push('<span class="bf-tab-dot green"></span>');
 
       const dateObj = new Date(d.date + "T12:00:00");
       const dayNum = dateObj.getDate();
       const wdShort = (d.weekday || "").substring(0, 2);
 
-      const cls = ["np-day-tab"];
+      const cls = ["bf-day-tab"];
       if (isActive) cls.push("is-active");
       if (isBest) cls.push("is-best");
 
       return `
         <button type="button" class="${cls.join(" ")}" role="tab"
                 aria-selected="${isActive}" data-day-idx="${i}">
-          <span class="np-tab-weekday">${escapeHtml(wdShort)}</span>
-          <span class="np-tab-date">${dayNum}</span>
-          ${dots.length ? `<span class="np-tab-dots">${dots.join("")}</span>` : ""}
-          ${flyable > 0 ? `<span class="np-tab-count">${flyable}</span>` : ""}
+          <span class="bf-tab-weekday">${escapeHtml(wdShort)}</span>
+          <span class="bf-tab-date">${dayNum}</span>
+          ${dots.length ? `<span class="bf-tab-dots">${dots.join("")}</span>` : ""}
+          ${flyable > 0 ? `<span class="bf-tab-count">${flyable}</span>` : ""}
         </button>
       `;
     }).join("");
@@ -281,7 +281,7 @@
     if (!container._flyBound) {
       container._flyBound = true;
       container.addEventListener("click", (ev) => {
-        const btn = ev.target.closest(".np-day-tab");
+        const btn = ev.target.closest(".bf-day-tab");
         if (!btn) return;
         const idx = parseInt(btn.dataset.dayIdx, 10);
         if (!isFinite(idx)) return;
@@ -300,8 +300,8 @@
   // ── Render: Filters ─────────────────────────────────────────
 
   function renderFilters(data) {
-    const chipsEl = $("npFilterChips");
-    const resetBtn = $("npFilterReset");
+    const chipsEl = $("bfFilterChips");
+    const resetBtn = $("bfFilterReset");
     if (!chipsEl) return;
 
     const regions = collectAllRegions(data);
@@ -320,13 +320,13 @@
 
     chipsEl.innerHTML = regions.map((r) => {
       const active = state.filterRegions.has(r.id);
-      return `<button type="button" class="np-filter-chip${active ? " is-active" : ""}" data-region-id="${escapeHtml(r.id)}" aria-pressed="${active}">${escapeHtml(r.name)}</button>`;
+      return `<button type="button" class="bf-filter-chip${active ? " is-active" : ""}" data-region-id="${escapeHtml(r.id)}" aria-pressed="${active}">${escapeHtml(r.name)}</button>`;
     }).join("");
 
     if (!chipsEl._flyBound) {
       chipsEl._flyBound = true;
       chipsEl.addEventListener("click", (ev) => {
-        const btn = ev.target.closest(".np-filter-chip");
+        const btn = ev.target.closest(".bf-filter-chip");
         if (!btn) return;
         const id = btn.dataset.regionId;
         if (!id) return;
@@ -349,12 +349,12 @@
     }
 
     // Map toggle
-    const mapBtn = $("npMapToggle");
+    const mapBtn = $("bfMapToggle");
     if (mapBtn && !mapBtn._flyBound) {
       mapBtn._flyBound = true;
       mapBtn.addEventListener("click", () => {
         state.mapVisible = !state.mapVisible;
-        const mapEl = $("npFilterMap");
+        const mapEl = $("bfFilterMap");
         if (mapEl) mapEl.hidden = !state.mapVisible;
         mapBtn.classList.toggle("is-active", state.mapVisible);
         if (state.mapVisible) initFilterMap(regions);
@@ -391,7 +391,7 @@
   }
 
   function initFilterMap(regions) {
-    const el = $("npFilterMap");
+    const el = $("bfFilterMap");
     if (!el) return;
 
     if (_filterMap.map) {
@@ -399,7 +399,7 @@
       return;
     }
     if (typeof L === "undefined") {
-      el.innerHTML = '<div class="np-minimap-fallback">Karte nicht verfuegbar</div>';
+      el.innerHTML = '<div class="bf-minimap-fallback">Karte nicht verfuegbar</div>';
       return;
     }
 
@@ -429,7 +429,7 @@
               _filterMap.pathById.set(rid, lyr);
 
               lyr.bindTooltip(props.region || props.name || rid, {
-                className: "np-region-label", direction: "center", permanent: false, sticky: true,
+                className: "bf-region-label", direction: "center", permanent: false, sticky: true,
               });
 
               lyr.on("click", () => {
@@ -452,27 +452,27 @@
           } catch (_) {}
           try { renderFilters(state.data); } catch (_) {}
         })
-        .catch((err) => console.warn("[newspaper] filter-map fetch failed", err));
+        .catch((err) => console.warn("[briefing] filter-map fetch failed", err));
 
       requestAnimationFrame(() => { try { mapObj.invalidateSize(); } catch (_) {} });
       setTimeout(() => { try { mapObj.invalidateSize(); } catch (_) {} }, 300);
     } catch (e) {
-      console.warn("[newspaper] filter-map init failed", e);
-      el.innerHTML = '<div class="np-minimap-fallback">Karte nicht verfuegbar</div>';
+      console.warn("[briefing] filter-map init failed", e);
+      el.innerHTML = '<div class="bf-minimap-fallback">Karte nicht verfuegbar</div>';
     }
   }
 
   // ── Render: Day Content ─────────────────────────────────────
 
   function renderDayContent() {
-    const infoEl = $("npDayInfo");
-    const contentEl = $("npContent");
+    const infoEl = $("bfDayInfo");
+    const contentEl = $("bfContent");
     if (!infoEl || !contentEl) return;
 
     const day = getSelectedDay();
     if (!day) {
       infoEl.innerHTML = "";
-      contentEl.innerHTML = '<div class="np-content-empty">Noch keine Prognosedaten vorhanden.</div>';
+      contentEl.innerHTML = '<div class="bf-content-empty">Noch keine Prognosedaten vorhanden.</div>';
       return;
     }
 
@@ -486,11 +486,11 @@
     const green = Math.max(0, (counts.spots_flyable || 0) - violet);
 
     infoEl.innerHTML = `
-      <span class="np-day-title">${escapeHtml(day.weekday || "")} ${formatDateDE(day.date)}</span>
-      <span class="np-day-stats">
-        ${violet > 0 ? `<span class="np-stat-violet"><strong>${violet}</strong> legendaer</span>` : ""}
-        ${green > 0 ? `<span class="np-stat-green"><strong>${green}</strong> fliegbar</span>` : ""}
-        ${counts.spots_bronze > 0 ? `<span class="np-stat-bronze"><strong>${counts.spots_bronze}</strong> Abgleiter</span>` : ""}
+      <span class="bf-day-title">${escapeHtml(day.weekday || "")} ${formatDateDE(day.date)}</span>
+      <span class="bf-day-stats">
+        ${violet > 0 ? `<span class="bf-stat-violet"><strong>${violet}</strong> legendaer</span>` : ""}
+        ${green > 0 ? `<span class="bf-stat-green"><strong>${green}</strong> fliegbar</span>` : ""}
+        ${counts.spots_bronze > 0 ? `<span class="bf-stat-bronze"><strong>${counts.spots_bronze}</strong> Abgleiter</span>` : ""}
         ${counts.spots_nogo > 0 ? `<span><strong>${counts.spots_nogo}</strong> NO-GO</span>` : ""}
       </span>
     `;
@@ -513,7 +513,7 @@
     });
 
     if (!groups.length) {
-      contentEl.innerHTML = `<div class="np-content-empty">Keine fliegbaren Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} — ${counts.spots_nogo || 0} NO-GO, ${counts.spots_bronze || 0} Abgleiter.</div>`;
+      contentEl.innerHTML = `<div class="bf-content-empty">Keine fliegbaren Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} — ${counts.spots_nogo || 0} NO-GO, ${counts.spots_bronze || 0} Abgleiter.</div>`;
       return;
     }
 
@@ -525,12 +525,12 @@
     const rating = meta ? formatRating(meta.rating) : "";
     const spotsHtml = group.spots.map(renderSpotRow).join("");
     return `
-      <div class="np-region">
-        <div class="np-region-head">
-          <span class="np-region-name">${escapeHtml(name)}</span>
-          ${rating ? `<span class="np-region-rating">${rating}</span>` : ""}
+      <div class="bf-region">
+        <div class="bf-region-head">
+          <span class="bf-region-name">${escapeHtml(name)}</span>
+          ${rating ? `<span class="bf-region-rating">${rating}</span>` : ""}
         </div>
-        <ul class="np-spot-list">${spotsHtml}</ul>
+        <ul class="bf-spot-list">${spotsHtml}</ul>
       </div>
     `;
   }
@@ -544,22 +544,22 @@
     // ── Status-Leiste: kompakte Chips mit Analyse-Infos ──
     const ss = spot.safety_status || "";
     const safetyLabel = ss === "safe" ? "Sicher" : ss === "conditional" ? "Bedingt" : "";
-    const safetyCls = ss === "safe" ? "np-chip--safe" : ss === "conditional" ? "np-chip--cond" : "";
+    const safetyCls = ss === "safe" ? "bf-chip--safe" : ss === "conditional" ? "bf-chip--cond" : "";
 
     const chips = [];
-    if (safetyLabel) chips.push(`<span class="np-chip ${safetyCls}">${escapeHtml(safetyLabel)}</span>`);
-    if (spot.best_window) chips.push(`<span class="np-chip np-chip--window">${escapeHtml(spot.best_window)}</span>`);
-    if (spot.flight_type) chips.push(`<span class="np-chip np-chip--type">${escapeHtml(spot.flight_type)}</span>`);
+    if (safetyLabel) chips.push(`<span class="bf-chip ${safetyCls}">${escapeHtml(safetyLabel)}</span>`);
+    if (spot.best_window) chips.push(`<span class="bf-chip bf-chip--window">${escapeHtml(spot.best_window)}</span>`);
+    if (spot.flight_type) chips.push(`<span class="bf-chip bf-chip--type">${escapeHtml(spot.flight_type)}</span>`);
     if (spot.peak_climb_rate && Number(spot.peak_climb_rate) > 0) {
-      chips.push(`<span class="np-chip np-chip--climb">↑${Number(spot.peak_climb_rate).toFixed(1)} m/s</span>`);
+      chips.push(`<span class="bf-chip bf-chip--climb">↑${Number(spot.peak_climb_rate).toFixed(1)} m/s</span>`);
     }
-    if (spot.flight_duration) chips.push(`<span class="np-chip">${escapeHtml(spot.flight_duration)}</span>`);
+    if (spot.flight_duration) chips.push(`<span class="bf-chip">${escapeHtml(spot.flight_duration)}</span>`);
     if (spot.is_conditional && spot.conditional_reason) {
-      chips.push(`<span class="np-chip np-chip--warn">${escapeHtml(spot.conditional_reason)}</span>`);
+      chips.push(`<span class="bf-chip bf-chip--warn">${escapeHtml(spot.conditional_reason)}</span>`);
     }
 
     const statusBar = chips.length
-      ? `<div class="np-spot-status">${chips.join("")}</div>`
+      ? `<div class="bf-spot-status">${chips.join("")}</div>`
       : "";
 
     const mapHref = `/map?spot=${encodeURIComponent(spot.spot)}`;
@@ -569,44 +569,44 @@
     const labelsHtml = renderSpotLabels(analysisForDetails);
     const summaryHtml = renderSpotSummary(analysisForDetails);
     const recText = (analysisForDetails.recommendation || (analysisForDetails.flyability || {}).recommendation || "").trim();
-    const recHtml = recText ? `<div class="np-detail-rec"><span class="np-detail-rec-icon">✍</span> ${escapeHtml(recText)}</div>` : "";
+    const recHtml = recText ? `<div class="bf-detail-rec"><span class="bf-detail-rec-icon">✍</span> ${escapeHtml(recText)}</div>` : "";
     const hasCoords = spot.lat != null && spot.lon != null;
 
     const miniMapInner = hasCoords
-      ? `<div class="np-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-quality="${escapeHtml(spot.fly_status || "")}"></div>`
-      : `<div class="np-spot-minimap np-spot-minimap--nodata">Keine Koordinaten</div>`;
+      ? `<div class="bf-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-quality="${escapeHtml(spot.fly_status || "")}"></div>`
+      : `<div class="bf-spot-minimap bf-spot-minimap--nodata">Keine Koordinaten</div>`;
 
     return `
-      <li class="np-spot ${tier}">
-        <div class="np-spot-toggle" role="button" tabindex="0" aria-expanded="false">
-          <div class="np-spot-row">
-            <span class="np-spot-name">${escapeHtml(spot.spot)}</span>
-            <span class="np-spot-spacer"></span>
-            <a class="np-spot-map-link" href="${escapeHtml(mapHref)}" title="Karte">📍</a>
-            <span class="np-spot-rating">${formatRating(spot.rating)}</span>
-            <span class="np-spot-chevron" aria-hidden="true">▾</span>
+      <li class="bf-spot ${tier}">
+        <div class="bf-spot-toggle" role="button" tabindex="0" aria-expanded="false">
+          <div class="bf-spot-row">
+            <span class="bf-spot-name">${escapeHtml(spot.spot)}</span>
+            <span class="bf-spot-spacer"></span>
+            <a class="bf-spot-map-link" href="${escapeHtml(mapHref)}" title="Karte">📍</a>
+            <span class="bf-spot-rating">${formatRating(spot.rating)}</span>
+            <span class="bf-spot-chevron" aria-hidden="true">▾</span>
           </div>
           ${statusBar}
         </div>
-        <div class="np-spot-divider"></div>
-        <div class="np-spot-details" hidden>
-          <div class="np-detail-top">
-            ${labelsHtml ? `<div class="np-detail-labels">${labelsHtml}</div>` : ""}
+        <div class="bf-spot-divider"></div>
+        <div class="bf-spot-details" hidden>
+          <div class="bf-detail-top">
+            ${labelsHtml ? `<div class="bf-detail-labels">${labelsHtml}</div>` : ""}
             ${recHtml}
           </div>
-          <div class="np-detail-mapmeteo-row">
-            <section class="np-detail-mapblock">
-              <h4 class="np-detail-title"><span class="np-detail-icon">🗺</span>Startplatz</h4>
+          <div class="bf-detail-mapmeteo-row">
+            <section class="bf-detail-mapblock">
+              <h4 class="bf-detail-title"><span class="bf-detail-icon">🗺</span>Startplatz</h4>
               ${miniMapInner}
             </section>
-            <section class="np-detail-meteoblock">
-              <h4 class="np-detail-title"><span class="np-detail-icon">📈</span>Meteogramm</h4>
-              <div class="np-spot-meteogram" data-spot="${escapeHtml(spot.spot)}" data-date="${escapeHtml(spot.date || "")}">
-                <div class="np-meteogram-chart"></div>
+            <section class="bf-detail-meteoblock">
+              <h4 class="bf-detail-title"><span class="bf-detail-icon">📈</span>Meteogramm</h4>
+              <div class="bf-spot-meteogram" data-spot="${escapeHtml(spot.spot)}" data-date="${escapeHtml(spot.date || "")}">
+                <div class="bf-meteogram-chart"></div>
               </div>
             </section>
           </div>
-          ${summaryHtml ? `<div class="np-detail-summary"><p>${summaryHtml}</p></div>` : ""}
+          ${summaryHtml ? `<div class="bf-detail-summary"><p>${summaryHtml}</p></div>` : ""}
         </div>
       </li>
     `;
@@ -679,7 +679,7 @@
     if (!items.length) return "";
 
     return items.map((it) =>
-      `<div class="np-label np-label--${it.cls}"><span class="np-label-icon">${it.icon}</span><span class="np-label-text">${escapeHtml(it.text)}</span></div>`
+      `<div class="bf-label bf-label--${it.cls}"><span class="bf-label-icon">${it.icon}</span><span class="bf-label-text">${escapeHtml(it.text)}</span></div>`
     ).join("");
   }
 
@@ -711,22 +711,22 @@
   // ── Spot Toggle (expand/collapse) ───────────────────────────
 
   function handleSpotToggle(ev) {
-    if (ev.target.closest(".np-spot-map-link")) return;
-    if (ev.target.closest(".np-spot-minimap")) return;
-    if (ev.target.closest(".np-spot-meteogram")) return;
-    const toggle = ev.target.closest(".np-spot-toggle");
+    if (ev.target.closest(".bf-spot-map-link")) return;
+    if (ev.target.closest(".bf-spot-minimap")) return;
+    if (ev.target.closest(".bf-spot-meteogram")) return;
+    const toggle = ev.target.closest(".bf-spot-toggle");
     if (!toggle) return;
-    const li = toggle.closest(".np-spot");
+    const li = toggle.closest(".bf-spot");
     if (!li) return;
-    const details = li.querySelector(".np-spot-details");
+    const details = li.querySelector(".bf-spot-details");
     if (!details) return;
     const isOpen = li.classList.toggle("is-expanded");
     toggle.setAttribute("aria-expanded", String(isOpen));
     if (isOpen) {
       details.removeAttribute("hidden");
-      const miniMap = details.querySelector(".np-spot-minimap");
-      if (miniMap && !miniMap.classList.contains("np-spot-minimap--nodata")) initMiniMap(miniMap);
-      const meteogramEl = details.querySelector(".np-spot-meteogram");
+      const miniMap = details.querySelector(".bf-spot-minimap");
+      if (miniMap && !miniMap.classList.contains("bf-spot-minimap--nodata")) initMiniMap(miniMap);
+      const meteogramEl = details.querySelector(".bf-spot-meteogram");
       if (meteogramEl) initMeteogram(meteogramEl);
       // Smooth scroll the expanded spot into view
       requestAnimationFrame(() => {
@@ -742,7 +742,7 @@
 
   function handleSpotKeydown(ev) {
     if (ev.key !== "Enter" && ev.key !== " ") return;
-    const toggle = ev.target.closest(".np-spot-toggle");
+    const toggle = ev.target.closest(".bf-spot-toggle");
     if (!toggle || toggle !== ev.target) return;
     ev.preventDefault();
     handleSpotToggle(ev);
@@ -750,9 +750,9 @@
 
   // ── Mini Map ────────────────────────────────────────────────
 
-  const _npIcon = { uid: 0 };
+  const _bfIcon = { uid: 0 };
 
-  function npGetDirAngles(dirStr) {
+  function bfGetDirAngles(dirStr) {
     if (!dirStr) return null;
     const dirs = {
       'N':0,'NNO':22.5,'NNE':22.5,'NO':45,'NE':45,'ONO':67.5,'ENE':67.5,
@@ -774,7 +774,7 @@
     return null;
   }
 
-  function npSafetyQualityStyle(safety, quality) {
+  function bfSafetyQualityStyle(safety, quality) {
     if (safety === 'default' || safety === 'no_data' || !safety) {
       return { fill: safety === 'no_data' ? '#9ca3af' : '#6b7280', stroke: safety === 'no_data' ? '#6b7280' : '#4b5563', glow: null, showStripes: false, showWarning: false };
     }
@@ -790,17 +790,17 @@
     return { fill: '#f59e0b', stroke: '#92400e', glow: null, showStripes: false, showWarning: true };
   }
 
-  function npCreateSpotIcon(windrichtung, safety, quality) {
-    const uid = ++_npIcon.uid;
-    const style = npSafetyQualityStyle(safety, quality);
+  function bfCreateSpotIcon(windrichtung, safety, quality) {
+    const uid = ++_bfIcon.uid;
+    const style = bfSafetyQualityStyle(safety, quality);
     const sz = 44, c = sz / 2, r = 7;
     let h = '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">';
 
     if (style.showStripes) {
-      h += '<defs><pattern id="nps'+uid+'" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/></pattern></defs>';
+      h += '<defs><pattern id="bfs'+uid+'" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/></pattern></defs>';
     }
 
-    const angles = npGetDirAngles(windrichtung);
+    const angles = bfGetDirAngles(windrichtung);
     if (angles) {
       const si = r+1, so = r+9;
       const sr = (angles[0]-90)*Math.PI/180, er = (angles[1]-90)*Math.PI/180;
@@ -815,7 +815,7 @@
       h += '<circle cx="'+c+'" cy="'+c+'" r="'+(r+7)+'" fill="'+style.glow.replace('0.45','0.15')+'" />';
     }
     h += '<circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="'+style.fill+'" stroke="'+style.stroke+'" stroke-width="1.5" />';
-    if (style.showStripes) h += '<circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="url(#nps'+uid+')" />';
+    if (style.showStripes) h += '<circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="url(#bfs'+uid+')" />';
     if (style.showWarning) {
       const tx=c+r-1, ty=c-r+1;
       h += '<polygon points="'+tx+','+(ty-5)+' '+(tx-4)+','+(ty+3)+' '+(tx+4)+','+(ty+3)+'" fill="#eab308" stroke="#854d0e" stroke-width="0.5" />';
@@ -833,7 +833,7 @@
     const href = el.dataset.href || "";
 
     if (typeof L === "undefined" || !isFinite(lat) || !isFinite(lon)) {
-      el.innerHTML = '<div class="np-minimap-fallback">Karte nicht verfuegbar</div>';
+      el.innerHTML = '<div class="bf-minimap-fallback">Karte nicht verfuegbar</div>';
       return;
     }
     try {
@@ -846,13 +846,13 @@
         subdomains: 'abcd', maxZoom: 18,
       }).addTo(mapObj);
 
-      const icon = npCreateSpotIcon(el.dataset.windrichtung || "", el.dataset.safety || "", el.dataset.quality || "");
+      const icon = bfCreateSpotIcon(el.dataset.windrichtung || "", el.dataset.safety || "", el.dataset.quality || "");
       L.marker([lat, lon], { icon }).addTo(mapObj).bindTooltip(spotName, { direction: "top" });
 
       if (href) {
         const ctrl = L.control({ position: "topright" });
         ctrl.onAdd = function () {
-          const a = L.DomUtil.create("a", "np-map-openlink");
+          const a = L.DomUtil.create("a", "bf-map-openlink");
           a.href = href;
           a.innerHTML = "↗ Karte";
           L.DomEvent.disableClickPropagation(a);
@@ -865,8 +865,8 @@
       requestAnimationFrame(() => { try { mapObj.invalidateSize(); } catch (_) {} });
       setTimeout(() => { try { mapObj.invalidateSize(); } catch (_) {} }, 250);
     } catch (e) {
-      console.warn("[newspaper] mini-map init failed", e);
-      el.innerHTML = '<div class="np-minimap-fallback">Karte nicht verfuegbar</div>';
+      console.warn("[briefing] mini-map init failed", e);
+      el.innerHTML = '<div class="bf-minimap-fallback">Karte nicht verfuegbar</div>';
     }
   }
 
@@ -890,25 +890,25 @@
     el._flyInited = true;
     const spotName = el.dataset.spot || "";
     const dateStr = el.dataset.date || "";
-    const chartEl = el.querySelector(".np-meteogram-chart");
+    const chartEl = el.querySelector(".bf-meteogram-chart");
     if (!chartEl || !spotName || !dateStr) return;
 
     if (typeof window.Meteogram === "undefined" || typeof d3 === "undefined") {
-      chartEl.innerHTML = '<div class="np-meteogram-fallback">Meteogramm nicht verfuegbar</div>';
+      chartEl.innerHTML = '<div class="bf-meteogram-fallback">Meteogramm nicht verfuegbar</div>';
       return;
     }
-    chartEl.innerHTML = '<div class="np-meteogram-loading">Lade Meteogramm…</div>';
+    chartEl.innerHTML = '<div class="bf-meteogram-loading">Lade Meteogramm…</div>';
 
     fetchMeteogramData(spotName)
       .then((data) => {
         const weather = data.weather || {};
         const altWind = data.altWind || {};
-        if (weather.error) { chartEl.innerHTML = '<div class="np-meteogram-fallback">' + escapeHtml(weather.error) + '</div>'; return; }
-        if (altWind.error) { chartEl.innerHTML = '<div class="np-meteogram-fallback">' + escapeHtml(altWind.error) + '</div>'; return; }
+        if (weather.error) { chartEl.innerHTML = '<div class="bf-meteogram-fallback">' + escapeHtml(weather.error) + '</div>'; return; }
+        if (altWind.error) { chartEl.innerHTML = '<div class="bf-meteogram-fallback">' + escapeHtml(altWind.error) + '</div>'; return; }
         const wxDay = (weather.data || {})[dateStr] || {};
         const altProfiles = (altWind.data || {})[dateStr] || [];
         if (!wxDay || !altProfiles.length) {
-          chartEl.innerHTML = '<div class="np-meteogram-fallback">Keine Daten fuer ' + escapeHtml(dateStr) + '</div>';
+          chartEl.innerHTML = '<div class="bf-meteogram-fallback">Keine Daten fuer ' + escapeHtml(dateStr) + '</div>';
           return;
         }
         const altDay = { profiles: [] };
@@ -922,7 +922,7 @@
           groundWindByTime[dateStr + "T" + hh + ":00:00"] = g;
         });
         chartEl.innerHTML = "";
-        const tooltipEl = document.getElementById("npMeteogramTooltip");
+        const tooltipEl = document.getElementById("bfMeteogramTooltip");
         try {
           window.Meteogram.renderChart(chartEl, tooltipEl, wxDay, altDay, {
             elevation: weather.elevation_m,
@@ -931,45 +931,45 @@
             groundWindByTime: groundWindByTime,
           });
         } catch (e) {
-          console.warn("[newspaper] Meteogram failed", e);
-          chartEl.innerHTML = '<div class="np-meteogram-fallback">Render-Fehler</div>';
+          console.warn("[briefing] Meteogram failed", e);
+          chartEl.innerHTML = '<div class="bf-meteogram-fallback">Render-Fehler</div>';
         }
       })
       .catch((err) => {
-        console.warn("[newspaper] meteogram fetch failed", err);
-        chartEl.innerHTML = '<div class="np-meteogram-fallback">Daten nicht verfuegbar</div>';
+        console.warn("[briefing] meteogram fetch failed", err);
+        chartEl.innerHTML = '<div class="bf-meteogram-fallback">Daten nicht verfuegbar</div>';
       });
   }
 
   // ── API ─────────────────────────────────────────────────────
 
-  async function loadNewspaper() {
+  async function loadBriefing() {
     try {
-      const res = await fetch("/api/newspaper", { cache: "no-store" });
+      const res = await fetch("/api/briefing", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       render(data);
     } catch (err) {
-      console.error("[newspaper] load failed", err);
-      const el = $("npContent");
-      if (el) el.innerHTML = `<div class="np-content-empty">Fehler: ${escapeHtml(err.message)}</div>`;
+      console.error("[briefing] load failed", err);
+      const el = $("bfContent");
+      if (el) el.innerHTML = `<div class="bf-content-empty">Fehler: ${escapeHtml(err.message)}</div>`;
     }
   }
 
   async function generateFazit() {
     if (state.generating) return;
     state.generating = true;
-    const btn = $("npGenerateBtn");
+    const btn = $("bfGenerateBtn");
     const orig = btn.textContent;
     btn.disabled = true;
     btn.textContent = "Generiert…";
     try {
-      const res = await fetch("/api/newspaper/generate", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const res = await fetch("/api/briefing/generate", { method: "POST", headers: { "Content-Type": "application/json" } });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Fehlgeschlagen");
       render(data);
     } catch (err) {
-      console.error("[newspaper] generate failed", err);
+      console.error("[briefing] generate failed", err);
       alert(`Fehler: ${err.message}`);
     } finally {
       state.generating = false;
@@ -992,16 +992,16 @@
   // ── Init ────────────────────────────────────────────────────
 
   function init() {
-    const btn = $("npGenerateBtn");
+    const btn = $("bfGenerateBtn");
     if (btn) btn.addEventListener("click", generateFazit);
 
-    const contentEl = $("npContent");
+    const contentEl = $("bfContent");
     if (contentEl) {
       contentEl.addEventListener("click", handleSpotToggle);
       contentEl.addEventListener("keydown", handleSpotKeydown);
     }
 
-    loadNewspaper();
+    loadBriefing();
   }
 
   if (document.readyState === "loading") {

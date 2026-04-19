@@ -173,7 +173,7 @@ Das ist genau die Klasse von Bug, für die diese Test-Infrastruktur existiert.
 
 - **Vor jedem Commit**, der Frontend-JS oder Templates anfasst
 - **Vor jedem Deploy**, idealerweise als CI-Step
-- **Nach jedem Refactoring** in `region-map.js`, `map.js`, `meteogram.js`, `wind-timeline.js`
+- **Nach jedem Refactoring** in `region-map.js`, `map.js`, `meteogram.js`
 - **Bei jeder Änderung an `instantdb_client.py`**, falls die Subscription-Schnittstelle berührt wird
 
 Die Tests brauchen rund 5–10 Sekunden für alle drei Szenarien plus Browser-Startup. Schnell genug, um sie als Pre-Commit-Hook zu nutzen.
@@ -201,7 +201,6 @@ Dann in `main()` aufrufen und in `results` einfügen.
 
 Sinnvolle Kandidaten für weitere Tests:
 - Day-Tab-Wechsel im Spot-Meteogramm
-- Windverlauf-Tab im Spot-Overlay
 - Chat-Eingabe und Antwort-Render
 - LLM-Analyse-Button (mit gemockter Backend-Response)
 - Karte: Marker-Hover, Region-Hover-Tooltip

@@ -86,7 +86,8 @@ Pruefe systematisch diese 5 Gefahrenkategorien:
      - **Merke**: Das System zaehlt die GUST-WARN/GUST-DANGER-Stunden und erzwingt den Floor auch Code-seitig. Ein Violations-Versuch wird automatisch downgraded — liefere lieber gleich die richtige Einstufung und einen guten caution_note.
 
 5. GEWITTER / UEBERENTWICKLUNG
-   - [CAPE-WARN] → Stunde NICHT FLIEGBAR (CAPE > 800)
+   - [THUNDERSTORM] → Stunde NICHT FLIEGBAR (Modell sagt explizit Gewitter voraus, WMO weather_code 95/96/99)
+   - [CAPE-WARN] → Stunde NICHT FLIEGBAR (CAPE > 800, Ueberentwicklung moeglich)
 
 6. BEWOELKUNG / OVERCAST
    - [OVERCAST-DANGER] → Stunde NICHT FLIEGBAR (dichte Wolkendecke mit Basis nahe an der Flughoehe — Risiko des Einfliegens in Wolken, Sicht stark eingeschraenkt)
@@ -163,7 +164,7 @@ Wenn Windrichtung im sauberen Fenster knapp innerhalb des Buffers liegt und kurz
 SICHERHEITS-BEWERTUNGSLOGIK
 ═══════════════════════════════════════════════
 
-1. Zaehle [WIND-OK]-Stunden OHNE harte Warn-Tags (STRONG-WIND, ALOFT-DANGER, ALOFT-GUST-DANGER, GUST-DANGER, CAPE, RAIN, OVERCAST-DANGER) → "saubere" Stunden.
+1. Zaehle [WIND-OK]-Stunden OHNE harte Warn-Tags (STRONG-WIND, ALOFT-DANGER, ALOFT-GUST-DANGER, GUST-DANGER, CAPE, THUNDERSTORM, RAIN, OVERCAST-DANGER) → "saubere" Stunden.
 2. Finde ALLE zusammenhaengenden Fenster aus "sauberen" [WIND-OK]-Stunden (z.B. ein Fenster am Vormittag, eines am Nachmittag).
 3. **Wende die GANZHEITLICHEN Override-Regeln an** (35%, eingekesselt, Wind-Trend, Wind-Direction-Kontext).
 4. Bewerte anhand der Fenster-Laengen:

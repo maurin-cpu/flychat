@@ -934,7 +934,6 @@ window.Meteogram = (function () {
             var wind = wx.wind || {};
             var precip = wx.precipitation || {};
             var cx = ci * CELL_W + CELL_W / 2;
-
             // Combined Row 0: Surface wind + Gusts
             var spd = wind.speed != null ? Math.round(wind.speed) : null;
             var gusts = wind.gusts != null ? Math.round(wind.gusts) : null;

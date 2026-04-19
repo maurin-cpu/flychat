@@ -16,6 +16,7 @@ Persistenz: SQLite (data/station_observations.db)
 import sqlite3
 import logging
 import math
+import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -105,6 +106,10 @@ def _haversine_km(lat1, lon1, lat2, lon2):
 
 
 class StationManager:
+    # Kurzlebiger Bias-Cache gegen wiederholte SQLite-Reads im Refresh- und
+    # /api/stations/status-Pfad (150+ Spots × mehrere Aufrufer).
+    _BIAS_CACHE_TTL_SEC = 60
+
     def __init__(self, db_path, spots):
         """
         SQLite öffnen/erstellen, Schema anlegen falls nötig.
@@ -117,6 +122,9 @@ class StationManager:
         self.spots = spots
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
+        # Bias-Cache: spot_name -> (bias_or_None, expiry_ts)
+        self._bias_cache = {}
+        self._bias_cache_lock = threading.Lock()
 
     def _init_db(self):
         """Schema erstellen falls nötig."""
@@ -563,6 +571,8 @@ class StationManager:
 
             conn.commit()
             print(f"[STATIONS] Backfill-Paare: {total_pairs} Forecast-Observation Paare erstellt")
+            if total_pairs:
+                self._invalidate_bias_cache()
             return total_pairs
 
         finally:
@@ -649,6 +659,8 @@ class StationManager:
 
             conn.commit()
             logger.info(f"[STATIONS] {total_pairs} neue Forecast-Observation Paare erstellt")
+            if total_pairs:
+                self._invalidate_bias_cache()
             return total_pairs
 
         finally:
@@ -658,15 +670,40 @@ class StationManager:
     # Bias-Berechnung
     # ===================================================================
 
+    def _invalidate_bias_cache(self):
+        """Leert den Bias-Cache (nach forecast_pairs-Writes)."""
+        with self._bias_cache_lock:
+            self._bias_cache.clear()
+
     def get_bias(self, spot_name, lookback_days=None):
         """
         Exponentiell gewichteter Durchschnitt der Forecast-Fehler.
 
         Returns: float (km/h, positiv = Modell unterschätzt) oder None wenn <BIAS_MIN_PAIRS Paare.
+        Nutzt Cache fuer Default-lookback (TTL _BIAS_CACHE_TTL_SEC).
         """
         if lookback_days is None:
             lookback_days = config.BIAS_LOOKBACK_DAYS
 
+        use_cache = lookback_days == config.BIAS_LOOKBACK_DAYS
+        if use_cache:
+            with self._bias_cache_lock:
+                hit = self._bias_cache.get(spot_name)
+                if hit is not None:
+                    value, expiry = hit
+                    if time.time() < expiry:
+                        return value
+                    del self._bias_cache[spot_name]
+
+        result = self._compute_bias(spot_name, lookback_days)
+
+        if use_cache:
+            with self._bias_cache_lock:
+                self._bias_cache[spot_name] = (result, time.time() + self._BIAS_CACHE_TTL_SEC)
+        return result
+
+    def _compute_bias(self, spot_name, lookback_days):
+        """Rechnet Bias ungecached aus SQLite."""
         conn = self._connect()
         try:
             cutoff = (datetime.now() - timedelta(days=lookback_days)).isoformat()
@@ -700,7 +737,6 @@ class StationManager:
 
             bias = error_sum / weight_sum
             return round(bias, 1)
-
         finally:
             conn.close()
 
@@ -710,7 +746,11 @@ class StationManager:
         Greift nur ein wenn genug Paare vorhanden.
 
         Bias wird auf ±BIAS_MAX_CORRECTION km/h begrenzt (Sicherheitslimit).
+        Deaktivierbar via config.BIAS_CORRECTION_ENABLED.
         """
+        if not config.BIAS_CORRECTION_ENABLED:
+            logger.info("[STATIONS] Bias-Korrektur deaktiviert (BIAS_CORRECTION_ENABLED=False)")
+            return 0
         max_corr = config.BIAS_MAX_CORRECTION
         corrected_count = 0
         for spot in self.spots:
@@ -750,6 +790,7 @@ class StationManager:
     def apply_bias_correction_to_regions(self, region_weather_data, regions_with_polygons):
         """
         Wendet die Bias-Korrektur auch auf Regionen an.
+        Deaktivierbar via config.BIAS_CORRECTION_ENABLED.
 
         WICHTIG: Der Region-Bias wird ausschliesslich aus Spots berechnet, die
         - geografisch INNERHALB des Region-Polygons liegen (Point-in-Polygon) UND
@@ -767,6 +808,9 @@ class StationManager:
             region_weather_data: Dict {region_id: {hourly_data: {...}, "elevation_ref": X}}
             regions_with_polygons: Liste von Dicts mit "id", "polygon", "elevation_ref".
         """
+        if not config.BIAS_CORRECTION_ENABLED:
+            logger.info("[STATIONS] Region-Bias-Korrektur deaktiviert (BIAS_CORRECTION_ENABLED=False)")
+            return 0
         if not _HAS_SHAPELY:
             logger.warning("[STATIONS] shapely fehlt — Region-Bias uebersprungen")
             return 0
@@ -956,5 +1000,7 @@ class StationManager:
             conn.commit()
             if del_obs or del_pairs:
                 logger.info(f"[STATIONS] Cleanup: {del_obs} Beobachtungen, {del_pairs} Paare entfernt")
+            if del_pairs:
+                self._invalidate_bias_cache()
         finally:
             conn.close()

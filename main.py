@@ -49,17 +49,22 @@ def daily_refresh(engine, refresh_hour=6):
 def main():
     logger.info("=== Flychat startet ===")
 
-    # InstantDB-Client initialisieren (optional)
+    # InstantDB-Client: abgeschaltet wenn Supabase konfiguriert ist.
+    # Supabase Realtime uebernimmt Frontend-Sync → InstantDB-Push ist redundant.
     instantdb = None
-    if config.INSTANTDB_ADMIN_TOKEN:
+    supabase_active = bool(os.environ.get("SUPABASE_URL", "").strip()
+                           and os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    if supabase_active:
+        logger.info("Supabase aktiv → InstantDB deaktiviert (Realtime via Postgres)")
+    elif config.INSTANTDB_ADMIN_TOKEN:
         instantdb = InstantDBClient(
             app_id=config.INSTANTDB_APP_ID,
             admin_token=config.INSTANTDB_ADMIN_TOKEN,
             api_url=config.INSTANTDB_API_URL,
         )
-        logger.info("InstantDB-Client initialisiert")
+        logger.info("InstantDB-Client initialisiert (Fallback-Modus)")
     else:
-        logger.info("InstantDB: Kein INSTANTDB_ADMIN_TOKEN gesetzt, Cloud-Sync deaktiviert")
+        logger.info("Weder Supabase noch InstantDB konfiguriert — nur lokale JSON-Caches")
 
     # Engine initialisieren
     engine = FlychatEngine(instantdb_client=instantdb)

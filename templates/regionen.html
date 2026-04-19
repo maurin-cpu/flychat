@@ -255,14 +255,16 @@
 <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script defer src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
-<script defer src="{{ url_for('static', filename='js/wind-timeline.js') }}?v={{ static_v('js/wind-timeline.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/foehn_diagram.js') }}?v={{ static_v('js/foehn_diagram.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/region-map.js') }}?v={{ static_v('js/region-map.js') }}"></script>
 <script type="module">
-import { init } from 'https://esm.sh/@instantdb/core';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-var APP_ID = '{{ instantdb_app_id }}';
-var db = init({ appId: APP_ID });
+var SUPABASE_URL = '{{ supabase_url }}';
+var SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
+var supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
 
 function normalizeFlyTier(ft) {
     if (!ft) return '';
@@ -276,61 +278,75 @@ function normalizeFlyTier(ft) {
 var runBtn = document.getElementById('runRegionBtn');
 var statusBar = document.getElementById('statusBar');
 var currentDate = window.currentDate;
+var _nested = {};
+var _latestUpdatedAt = null;
 
-// Listen for day changes from navbar tabs
 window.addEventListener('flychat-day-change', function(e) {
     currentDate = e.detail.date;
     if (window.setRegionDate) window.setRegionDate(currentDate);
 });
 
-// InstantDB subscription
-db.subscribeQuery({ region_analyses: {} }, function(resp) {
-    if (resp.error) {
-        console.error('InstantDB Fehler:', resp.error.message);
-        statusBar.textContent = 'InstantDB: ' + resp.error.message;
+function _applyApiPayload(regionAnalyses) {
+    var newNested = {};
+    var newestTs = null;
+    for (var rid in regionAnalyses) {
+        newNested[rid] = {};
+        for (var ds in regionAnalyses[rid]) {
+            var copy = Object.assign({}, regionAnalyses[rid][ds]);
+            if (copy.flyability_tier) copy.flyability_tier = normalizeFlyTier(copy.flyability_tier);
+            newNested[rid][ds] = copy;
+            if (copy.updated_at && (!newestTs || copy.updated_at > newestTs)) {
+                newestTs = copy.updated_at;
+            }
+        }
+    }
+    _nested = newNested;
+    if (newestTs) {
+        _latestUpdatedAt = newestTs;
+        var d = new Date(newestTs);
+        statusBar.textContent = 'Stand: ' + d.toLocaleString('de-CH');
+    }
+    if (window.setRegionAnalyses) window.setRegionAnalyses(_nested);
+    if (window.setRegionDate) window.setRegionDate(currentDate);
+}
+
+// 1) Initial-Load via API
+fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+    var regionAnalyses = data.region_analyses || {};
+    if (Object.keys(regionAnalyses).length === 0) {
+        statusBar.textContent = 'Keine Region-Analysen vorhanden';
         return;
     }
-    if (resp.data) {
-        var entries = resp.data.region_analyses || [];
-        if (entries.length === 0) {
-            statusBar.textContent = 'Keine Region-Analysen vorhanden';
-            return;
-        }
-
-        var nested = {};
-        var latestUpdatedAt = null;
-        entries.forEach(function(e) {
-            var rid = e.region_id;
-            var ds = e.date;
-            if (!rid || !ds) return;
-            if (!nested[rid]) nested[rid] = {};
-
-            ['no_go_reasons', 'caution_notes'].forEach(function(key) {
-                if (typeof e[key] === 'string') {
-                    try { e[key] = JSON.parse(e[key]); }
-                    catch(err) { e[key] = e[key] ? [e[key]] : []; }
-                }
-            });
-
-            if (e.flyability_tier) {
-                e.flyability_tier = normalizeFlyTier(e.flyability_tier);
-            }
-            nested[rid][ds] = e;
-
-            if (e.updated_at && (!latestUpdatedAt || e.updated_at > latestUpdatedAt)) {
-                latestUpdatedAt = e.updated_at;
-            }
-        });
-
-        if (latestUpdatedAt) {
-            var d = new Date(latestUpdatedAt);
-            statusBar.textContent = 'Stand: ' + d.toLocaleString('de-CH');
-        }
-
-        if (window.setRegionAnalyses) window.setRegionAnalyses(nested);
-        if (window.setRegionDate) window.setRegionDate(currentDate);
-    }
+    _applyApiPayload(regionAnalyses);
+}).catch(function(err) {
+    statusBar.textContent = 'Fehler: ' + err.message;
 });
+
+// 2) Realtime-Subscription: Bei Aenderungen API neu abrufen (flat-shape, debounced).
+// Rohe Postgres-Payload ist nested — API /api/region-analyses flattet korrekt.
+if (supabase) {
+    var _refreshTimer = null;
+    supabase.channel('region_analyses_changes')
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'region_analyses' },
+            function() {
+                clearTimeout(_refreshTimer);
+                _refreshTimer = setTimeout(function() {
+                    fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+                        var regionAnalyses = data.region_analyses || {};
+                        if (Object.keys(regionAnalyses).length > 0) {
+                            _applyApiPayload(regionAnalyses);
+                            console.log('[REALTIME] region_analyses refresh:', Object.keys(regionAnalyses).length);
+                        }
+                    }).catch(function(e) { console.warn('Refetch failed:', e); });
+                }, 500);
+            })
+        .subscribe(function(status) {
+            if (status === 'SUBSCRIBED') console.log('[REALTIME] region_analyses subscribed');
+        });
+} else {
+    console.warn('[REALTIME] Supabase URL/Key fehlen — keine Live-Updates, nur Polling via /api/*');
+}
 
 // Run button
 runBtn.addEventListener('click', function() {

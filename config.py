@@ -3,7 +3,13 @@ Konfigurationsdatei für Flychat
 Adaptiert von uetliberg_ticker/config.py - Multi-Spot, Chat-basiert.
 """
 
+import atexit
+import json
+import logging
 import os
+import queue
+import tempfile
+import threading
 from pathlib import Path
 
 # .env so früh wie möglich laden, damit alle Importer (auch web.py, das nicht
@@ -40,7 +46,7 @@ def with_api_key(params):
 # Wettermodell-Hybrid:
 # - WIND_MODEL: Wind/Böen/Leewarnungen -> lokal präziser (CH1)
 # - THERMAL_MODEL: Thermik/Wolken/Strahlung -> robuster für Fliegbarkeit (ICON-D2)
-WIND_MODEL = "meteoswiss_icon_ch1" #meteoswiss_icon_ch1, icon_d2, icon_eu
+WIND_MODEL = "icon_d2" #meteoswiss_icon_ch1, icon_d2, icon_eu
 THERMAL_MODEL = "icon_d2"
 FALLBACK_MODEL = "icon_eu"
 
@@ -507,6 +513,8 @@ WINDS_MOBI_API = "https://winds.mobi/api/2.3"
 STATION_SEARCH_RADIUS_KM = 30
 STATION_MAX_ELEV_DIFF_M = 300   # Vorher 500 — enger, weniger Expositions-Verfälschung
 STATION_MAX_PER_SPOT = 3
+BIAS_CORRECTION_ENABLED = False   # Bias-Korrektur auf wind_gusts_10m anwenden (Spots + Regionen)
+MULTI_MODEL_GUST_MERGE = False    # wind_gusts_10m = max(D2, CH1, CH2). False = nur WIND_MODEL verwenden
 BIAS_LOOKBACK_DAYS = 14
 BIAS_ALPHA = 0.85         # Exponentieller Gewichtungsfaktor (jüngere Paare stärker)
 BIAS_MIN_PAIRS = 5        # Mindestanzahl Paare bevor Bias angewendet wird
@@ -547,3 +555,94 @@ LLM_MAX_WORKERS = int(os.environ.get("LLM_MAX_WORKERS", "20"))
 
 # Poll-Intervall (Sekunden) im "batch"-Modus, wie oft der Batch-Status geprüft wird.
 LLM_BATCH_POLL_INTERVAL = int(os.environ.get("LLM_BATCH_POLL_INTERVAL", "30"))
+
+
+def atomic_write_json(path, data, indent=2, ensure_ascii=False):
+    """Schreibt JSON atomar via temp-file + os.replace().
+    Verhindert Corruption wenn ein paralleler Reader waehrend des Writes liest.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=str(path.parent),
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=indent, ensure_ascii=ensure_ascii)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Async-Write-Queue fuer grosse JSON-Dateien (z.B. wetterdaten.json, 196 MB).
+# Entkoppelt den 3-5s File-IO vom Aufrufer. Caveat: Der Daten-Dict darf NACH
+# queue_atomic_write_json() nicht mehr mutiert werden (keine Defensivkopie
+# wegen Speicherdruck bei 196 MB). Nutzer ist fuer Immutability verantwortlich.
+# ---------------------------------------------------------------------------
+_write_queue = None
+_write_worker = None
+_write_worker_lock = threading.Lock()
+_write_logger = logging.getLogger(__name__ + ".async_write")
+
+
+def _writer_loop():
+    while True:
+        job = _write_queue.get()
+        try:
+            if job is None:
+                return
+            path, data, indent, ensure_ascii = job
+            try:
+                atomic_write_json(path, data, indent=indent, ensure_ascii=ensure_ascii)
+            except Exception as e:
+                _write_logger.error("Async-Write fehlgeschlagen (%s): %s", path, e)
+        finally:
+            _write_queue.task_done()
+
+
+def _ensure_async_writer():
+    global _write_queue, _write_worker
+    with _write_worker_lock:
+        if _write_worker is not None:
+            return
+        _write_queue = queue.Queue()
+        _write_worker = threading.Thread(
+            target=_writer_loop, daemon=True, name="atomic-writer"
+        )
+        _write_worker.start()
+        atexit.register(_flush_async_writer)
+
+
+def _flush_async_writer(timeout: float = 30.0):
+    """Wartet bis zu timeout Sekunden auf Abschluss aller pending Writes."""
+    if _write_queue is None:
+        return
+    # queue.join() hat kein Timeout → Workaround ueber Polling
+    import time as _time
+    deadline = _time.time() + timeout
+    while _time.time() < deadline:
+        if _write_queue.unfinished_tasks == 0:
+            return
+        _time.sleep(0.1)
+    _write_logger.warning(
+        "Async-Write Flush-Timeout nach %ss — %d Jobs ausstehend",
+        timeout, _write_queue.unfinished_tasks,
+    )
+
+
+def queue_atomic_write_json(path, data, indent=2, ensure_ascii=False):
+    """Non-blocking: Reiht einen atomaren JSON-Write in die Hintergrund-Queue ein.
+
+    WICHTIG: `data` darf nach diesem Aufruf NICHT mehr mutiert werden (keine Kopie).
+    Bei Crash zwischen Enqueue und Flush geht der Write verloren — OK fuer
+    re-fetchbare Daten wie wetterdaten.json, NICHT fuer LLM-Analysen.
+    """
+    _ensure_async_writer()
+    _write_queue.put((path, data, indent, ensure_ascii))

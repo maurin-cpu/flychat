@@ -91,8 +91,16 @@
     {
       "role": "assistant",
       "content": "In der Region Seeland und Emmental gibt es einige erreichbare Startplätze, die du erkunden kannst. Hier sind die wichtigsten:\n\n1. **Weissenstein**\n   - **Höhe:** 1233 m\n   - **Windrichtung:** S-SO\n   - **Sicherheitsstatus:** Nicht sicher\n\n2. **Röti**\n   - **Höhe:** 1393 m\n   - **Windrichtung:** N-NO\n   - **Sicherheitsstatus:** Bedingt (green), beste Bedingungen am 16. April von 11:00 bis 16:00 Uhr.\n\n3. **Décollage Ost (Bözingenberg)**\n   - **Höhe:** 932 m\n   - **Windrichtung:** O-SW\n   - **Sicherheitsstatus:** Sicher (gray), nutzbare Bedingungen von 10:00 bis 16:00 Uhr.\n\n4. **Grenchenberg Nord**\n   - **Höhe:** 1329 m\n   - **Windrichtung:** NW-N\n   - **Sicherheitsstatus:** Sicher (green), beste Bedingungen am 18. April von 10:00 bis 17:00 Uhr.\n\nHier ist die Karte mit den relevanten Startplätzen in der Region Seeland und Emmental:\n\n[MAP:spots=Weissenstein,Röti,Décollage Ost,Grenchenberg Nord] \n\nWenn du mehr Informationen zu einem bestimmten Spot benötigst, lass es mich wissen!"
+    },
+    {
+      "role": "user",
+      "content": "Wo ist die Thermik am stärksten?"
+    },
+    {
+      "role": "assistant",
+      "content": "Die stärkste Thermik ist am **Vercorin 3** mit einem Peak von 2.2 m/s und einem Zeitfenster von 10:00 bis 16:00 Uhr. Ebenfalls stark ist die Thermik am **Seebodenalp** mit einem Peak von 2.0 m/s, ebenfalls im Zeitfenster von 10:00 bis 16:00 Uhr.\n\nHier ist eine Karte, die die besten Spots für die stärkste Thermik zeigt:\n\n[MAP:spots=Vercorin 3,Seebodenalp] \n\nWenn du weitere Informationen zu einem bestimmten Spot benötigst, lass es mich wissen!"
     }
   ],
-  "last_activity": "2026-04-15T18:02:11.448154",
+  "last_activity": "2026-04-19T19:28:06.984532",
   "first_question": false
 }

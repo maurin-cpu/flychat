@@ -47,7 +47,7 @@ REGION_SAFETY_CHECK_PROMPT = _load_skill("region_safety_check.md")
 REGION_FLYABILITY_PROMPT = _load_skill("region_flyability.md")
 SPOT_COMBINED_PROMPT = _load_skill("spot_combined_analysis.md")
 REGION_COMBINED_PROMPT = _load_skill("region_combined_analysis.md")
-WEEKLY_NEWSPAPER_PROMPT = _load_skill("weekly_newspaper.md")
+WEEKLY_BRIEFING_PROMPT = _load_skill("weekly_briefing.md")
 
 # Für Tests oder externe Tools
 SKILLS_DIR = _SKILLS_DIR

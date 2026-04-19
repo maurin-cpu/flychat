@@ -481,11 +481,9 @@
         bodyHtml += '<div class="region-overlay-meteogram">';
         bodyHtml += '<div class="meteogram-view-tabs" id="regionViewTabs">';
         bodyHtml += '<button class="view-tab active" data-view="meteogram">Meteogramm</button>';
-        bodyHtml += '<button class="view-tab" data-view="windtimeline">Windverlauf</button>';
         bodyHtml += '<button class="view-tab" data-view="text">Text</button>';
         bodyHtml += '</div>';
         bodyHtml += '<div class="region-meteogram-chart" id="regionMeteogramChart"><div class="region-meteogram-loading">Meteogramm wird geladen...</div></div>';
-        bodyHtml += '<div class="region-meteogram-chart" id="regionWindTimelineChart" style="display:none;"></div>';
         bodyHtml += '<div class="region-meteogram-chart" id="regionTextViewChart" style="display:none;"></div>';
         bodyHtml += '</div></div>';
 
@@ -502,7 +500,6 @@
         // View tab switching for region overlay
         var regionViewTabs = document.getElementById('regionViewTabs');
         var regionMeteogramChart = document.getElementById('regionMeteogramChart');
-        var regionWindTimeline = document.getElementById('regionWindTimelineChart');
         var regionTextView = document.getElementById('regionTextViewChart');
         var regionCurrentView = 'meteogram';
 
@@ -516,14 +513,10 @@
                         b.classList.toggle('active', b.dataset.view === view);
                     });
                     regionMeteogramChart.style.display = 'none';
-                    if (regionWindTimeline) regionWindTimeline.style.display = 'none';
                     if (regionTextView) regionTextView.style.display = 'none';
 
                     if (view === 'meteogram') {
                         regionMeteogramChart.style.display = '';
-                    } else if (view === 'windtimeline') {
-                        if (regionWindTimeline) regionWindTimeline.style.display = '';
-                        renderRegionWindTimeline(rid);
                     } else if (view === 'text') {
                         if (regionTextView) regionTextView.style.display = '';
                         renderRegionTextView(rid);
@@ -575,43 +568,6 @@
             spotName: cached.regionName || rid,
             dateStr: activeDate,
             source: 'flychat-region',
-        });
-    }
-
-    function renderRegionWindTimeline(rid) {
-        var chartEl = document.getElementById('regionWindTimelineChart');
-        if (!chartEl) return;
-
-        var cached = meteogramCache[rid];
-        if (!cached) {
-            chartEl.innerHTML = '<p style="color:#64748B;text-align:center;padding:20px">Daten werden geladen...</p>';
-            return;
-        }
-
-        var altData = cached.altData;
-        var wxData = cached.wxData;
-        var dates = wxData.dates || [];
-        var activeDate = (currentDate && dates.indexOf(currentDate) >= 0) ? currentDate : dates[0];
-        var altDayRaw = altData.data ? altData.data[activeDate] : null;
-        var elevation = wxData.elevation_ref || 1200;
-
-        if (!altDayRaw || !altDayRaw.length) {
-            chartEl.innerHTML = '<p style="color:#64748B;text-align:center;padding:20px">Keine Höhenwinddaten</p>';
-            return;
-        }
-
-        // Create tooltip
-        var wtTooltip = chartEl.querySelector('.wt-tooltip');
-        if (!wtTooltip) {
-            wtTooltip = document.createElement('div');
-            wtTooltip.className = 'wt-tooltip tooltip';
-            chartEl.style.position = 'relative';
-            chartEl.appendChild(wtTooltip);
-        }
-
-        WindTimeline.render(chartEl, wtTooltip, altDayRaw, {
-            elevation_m: elevation,
-            dateStr: activeDate,
         });
     }
 
@@ -693,9 +649,7 @@
                     renderMeteogramDay(wxData, altData, d, chartEl);
                     // Update analysis panel
                     updateOverlayAnalysis(rid, d);
-                    // Update wind timeline / text if visible
-                    var wtEl = document.getElementById('regionWindTimelineChart');
-                    if (wtEl && wtEl.style.display !== 'none') renderRegionWindTimeline(rid);
+                    // Update text view if visible
                     var textEl = document.getElementById('regionTextViewChart');
                     if (textEl && textEl.style.display !== 'none') renderRegionTextView(rid);
                     // Sync navbar
@@ -822,9 +776,7 @@
                 var chartEl = document.getElementById('regionMeteogramChart');
                 if (chartEl) renderMeteogramDay(cache.wxData, cache.altData, newDate, chartEl);
             }
-            // Re-render wind timeline / text if visible
-            var wtEl = document.getElementById('regionWindTimelineChart');
-            if (wtEl && wtEl.style.display !== 'none') renderRegionWindTimeline(overlayRid);
+            // Re-render text view if visible
             var textEl = document.getElementById('regionTextViewChart');
             if (textEl && textEl.style.display !== 'none') renderRegionTextView(overlayRid);
         }
