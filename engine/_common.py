@@ -301,7 +301,8 @@ _TAG_NATURAL = [
     ("WIND-OK",                "passende Windrichtung"),
     # Sonstiges
     ("RAIN-WARN",              "Regen"),
-    ("CAPE-WARN",              "Ueberentwicklung"),
+    ("CAPE-DANGER",            "Ueberentwicklungsgefahr"),
+    ("CAPE-WARN",              "Ueberentwicklung moeglich"),
     ("OVERCAST-DANGER",        "dichte Wolkendecke"),
 ]
 
@@ -601,6 +602,153 @@ def _detect_rain_sandwich(rain_hours: list, all_hours_sorted: list) -> dict:
         "dry_start": dry_start,
         "dry_end": dry_end,
     }
+
+
+def _detect_gust_trend(gust_hours: list, all_hours_sorted: list) -> dict:
+    """Erkennt Boeen-Trendmuster ueber den Tag (analog _detect_rain_sandwich).
+
+    Boeen-Stunden = Stunden mit irgendeinem der Tags
+    [GUST-WARN], [GUST-DANGER], [ALOFT-GUST-WARN], [ALOFT-GUST-DANGER].
+
+    Returns dict mit:
+        is_sandwiched: bool — ruhiges Fenster zwischen zwei boeigen Phasen
+        max_calm_gap: int — laengstes zusammenhaengendes ruhiges Fenster (Stunden)
+        calm_start: str — Beginn des laengsten ruhigen Fensters
+        calm_end: str — Ende
+        gusts_before_calm: bool — boeige Stunden vor dem laengsten ruhigen Fenster
+        gusts_after_calm: bool — boeige Stunden nach dem laengsten ruhigen Fenster
+        gust_count: int — Anzahl boeiger Stunden
+        total_count: int — Gesamtanzahl Stunden im Fenster
+    """
+    total = len(all_hours_sorted or [])
+    if not gust_hours or not all_hours_sorted:
+        return {
+            "is_sandwiched": False,
+            "max_calm_gap": total,
+            "calm_start": all_hours_sorted[0] if all_hours_sorted else "",
+            "calm_end": all_hours_sorted[-1] if all_hours_sorted else "",
+            "gusts_before_calm": False,
+            "gusts_after_calm": False,
+            "gust_count": 0,
+            "total_count": total,
+        }
+
+    gust_set = set(gust_hours)
+    calm_stretches = []
+    current_calm = []
+    for h in all_hours_sorted:
+        if h not in gust_set:
+            current_calm.append(h)
+        else:
+            if current_calm:
+                calm_stretches.append(current_calm[:])
+            current_calm = []
+    if current_calm:
+        calm_stretches.append(current_calm)
+
+    if not calm_stretches:
+        return {
+            "is_sandwiched": False,
+            "max_calm_gap": 0,
+            "calm_start": "",
+            "calm_end": "",
+            "gusts_before_calm": False,
+            "gusts_after_calm": False,
+            "gust_count": len(gust_hours),
+            "total_count": total,
+        }
+
+    longest = max(calm_stretches, key=len)
+    calm_start = longest[0]
+    calm_end = longest[-1]
+    gusts_before = any(h < calm_start for h in gust_hours)
+    gusts_after = any(h > calm_end for h in gust_hours)
+
+    return {
+        "is_sandwiched": gusts_before and gusts_after,
+        "max_calm_gap": len(longest),
+        "calm_start": calm_start,
+        "calm_end": calm_end,
+        "gusts_before_calm": gusts_before,
+        "gusts_after_calm": gusts_after,
+        "gust_count": len(gust_hours),
+        "total_count": total,
+    }
+
+
+def _format_gust_trend_text(gust_pattern: dict, gust_hours: list) -> str:
+    """Erzeugt BOEEN-TREND Text-Zeile fuer LLM-Kontext (analog NIEDERSCHLAG-TREND).
+
+    Pattern-Klassifikation:
+      DURCHGEHEND  — boeige Stunden >= 75% des Tages oder ruhiges Fenster < 2h
+      EINGEKESSELT — Boeen vor UND nach ruhigem Fenster (< 4h Gap)
+      EINGEKESSELT (knapp) — wie oben aber Gap 4-5h
+      AUFKLAERUNG  — boeig nur frueh, danach ruhig (keine Rueckkehr)
+      ZUNEHMEND    — ruhig morgens, boeig nachmittags
+      VEREINZELT   — boeige Stunden gestreut, lange ruhige Phase vorhanden
+    """
+    if not gust_hours:
+        return ""
+
+    gc = gust_pattern.get("gust_count", 0)
+    tc = gust_pattern.get("total_count", 0)
+    if tc == 0 or gc == 0:
+        return ""
+
+    gusts_before = gust_pattern.get("gusts_before_calm", False)
+    gusts_after = gust_pattern.get("gusts_after_calm", False)
+    is_sand = gust_pattern.get("is_sandwiched", False)
+    calm_gap = gust_pattern.get("max_calm_gap", 0)
+    calm_start = gust_pattern.get("calm_start", "")
+    calm_end = gust_pattern.get("calm_end", "")
+
+    if gc >= max(1, int(0.75 * tc)) or calm_gap < 2:
+        return (
+            f"BOEEN-TREND: DURCHGEHEND — Boeige Stunden in {gc} von {tc}h, "
+            f"laengstes ruhiges Fenster nur {calm_gap}h. "
+            f"Kein verlaesslich ruhiges Flugfenster. "
+            f"→ safety_status sollte not_safe sein."
+        )
+
+    if is_sand and calm_gap < 4:
+        return (
+            f"BOEEN-TREND: EINGEKESSELT — Ruhiges Fenster nur {calm_gap}h "
+            f"({calm_start}-{calm_end}) zwischen boeigen Phasen "
+            f"({gc}h boeig insgesamt). Pilot startet in eskalierende Bedingungen — "
+            f"Boeen kommen zurueck! "
+            f"→ safety_status sollte not_safe sein. primary_no_go = EINGEKESSELT-BOEEN"
+        )
+
+    if is_sand:
+        return (
+            f"BOEEN-TREND: EINGEKESSELT (knapp) — Ruhiges Fenster {calm_gap}h "
+            f"({calm_start}-{calm_end}) zwischen boeigen Phasen "
+            f"({gc}h boeig insgesamt). Boeen kommen zurueck — Pilot muss vor Ende landen. "
+            f"→ Maximal conditional. In caution_notes konkret begruenden!"
+        )
+
+    if gusts_before and not gusts_after:
+        return (
+            f"BOEEN-TREND: AUFKLAERUNG — Boeig frueh ({gc}h, bis {calm_start}), "
+            f"danach ruhig ({calm_gap}h ab {calm_start}). "
+            f"Boeen ziehen ab, danach stabil ruhig — keine Rueckkehr. "
+            f"→ Ruhige Stunden normal bewerten, safe_window dort setzen. "
+            f"safety_status kann safe oder conditional sein, je nach Wind-Sektor und Restrisiko."
+        )
+
+    if gusts_after and not gusts_before:
+        return (
+            f"BOEEN-TREND: ZUNEHMEND — Ruhig morgens ({calm_gap}h, bis {calm_end}), "
+            f"danach {gc}h boeig. Pilot muss vor Eskalation landen. "
+            f"→ Maximal conditional. safe_window auf Morgens setzen, "
+            f"in caution_notes auf Verschlechterung hinweisen."
+        )
+
+    return (
+        f"BOEEN-TREND: VEREINZELT — {gc}h boeige Phasen verteilt, "
+        f"laengstes ruhiges Fenster {calm_gap}h ({calm_start}-{calm_end}). "
+        f"→ Pruefe ob ruhiges Fenster fuer Pilot-Niveau und Sektor reicht."
+    )
 
 
 def _interpolate_wind_at_altitude(pl_data: dict, target_alt: float, pressure_levels: list) -> tuple:

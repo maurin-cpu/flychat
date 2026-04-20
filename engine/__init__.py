@@ -3,12 +3,16 @@ Flychat Engine Package — aufgeteilt aus dem ehemaligen 6500-Zeilen-Monolith ch
 
 Struktur:
     _common.py          — Konstanten + Pure-Helpers (keine Engine-State-Abhaengigkeit)
-    weather_context.py  — _build_weather_context + Formatierungs-Helfer
-    spot_analyzer.py    — run_spot_analyses_stream + Safety/Flyability fuer Spots
-    region_analyzer.py  — run_region_analyses_* + Region-Varianten
-    chat_orchestrator.py— answer + answer_stream + Tool-Loop
+    weather_context.py  — WeatherContextMixin: _build_weather_context, Thermik/Shear/Gust
+                          Helpers, _build_single_{spot,region}_context
+    analyzers.py        — AnalyzersMixin: Spot- + Region-Analyzers, Batch-Modus,
+                          run_{spot,region,all}_analyses[_stream], Briefing-Datenpfad
+    chat_orchestrator.py— ChatOrchestratorMixin: answer + answer_stream + Tool-Loop
+                          (geocode, isochrone, map-actions)
 
 Backwards-Kompatibilitaet:
     `from chat_engine import FlychatEngine` funktioniert weiterhin — chat_engine.py
-    re-exportiert aus diesem Package.
+    kombiniert die Mixins via Mehrfachvererbung:
+        class FlychatEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
+            ...
 """

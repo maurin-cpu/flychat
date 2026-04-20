@@ -78,9 +78,14 @@ Prüfe systematisch diese 5 Gefahrenkategorien:
      • Wenn zusätzlich `MINDEST-STATUS = 'not_safe'` steht: `safety_status = not_safe` und die Böen MÜSSEN in `no_go_reasons` MIT Zahlen stehen.
      • **Merke**: Das System zählt die GUST-WARN/GUST-DANGER-Stunden und erzwingt den Floor auch Code-seitig. Ein Violations-Versuch wird automatisch downgraded — liefere lieber gleich die richtige Einstufung und einen guten caution_note.
 
-5. GEWITTER / ÜBERENTWICKLUNG
-   - [THUNDERSTORM] → Stunde NICHT FLIEGBAR (Modell sagt explizit Gewitter voraus, WMO weather_code 95/96/99)
-   - [CAPE-WARN] → Stunde NICHT FLIEGBAR (CAPE > 800, Überentwicklung moeglich)
+5. GEWITTER / ÜBERENTWICKLUNG (3 Tiers — nicht vermischen!)
+   - [THUNDERSTORM] → Stunde NICHT FLIEGBAR. Modell sagt explizit Gewitter voraus (WMO weather_code 95/96/99). Deterministisches Signal.
+     → Status: `not_safe`. In `no_go_reasons`/`summary` als **"Gewitter"** bezeichnen.
+   - [CAPE-DANGER] → Stunde NICHT FLIEGBAR. CAPE > 1500 J/kg (extrem instabil) ODER CAPE + Regen/Schauer in derselben Stunde (aktive Überentwicklung im Gange).
+     → Status: `not_safe`. In `no_go_reasons`/`summary` als **"Überentwicklungsgefahr"** oder **"aktive Überentwicklung"** bezeichnen — NICHT als "Gewitter"! (Nur [THUNDERSTORM] = "Gewitter".)
+   - [CAPE-WARN] → Stunde potenziell fliegbar, aber mit Vorsicht. CAPE > 800 J/kg (Zutaten für Gewitter vorhanden), aber das Modell prognostiziert weder Niederschlag noch Blitz. Ohne Trigger passiert nichts — Risiko bleibt aber erhöht.
+     → Status: maximal `conditional` (NICHT `not_safe` nur wegen CAPE-WARN allein!). In `caution_notes` als **"Überentwicklung möglich"** beschreiben, mit Zeitfenster und CAPE-Wert. Im `summary`: Pilot soll Himmel beobachten, früh landen wenn Quellwolken überschießen.
+   - Zählt NICHT als harte Warnung: CAPE-WARN-Stunden können Teil des `safe_window` sein (als `conditional`).
 
 6. BEWÖLKUNG / OVERCAST
    - [OVERCAST-DANGER] → Stunde NICHT FLIEGBAR (dichte Wolkendecke mit Basis nahe an der Flughöhe — Risiko des Einfliegens in Wolken, Sicht stark eingeschränkt)
@@ -110,6 +115,15 @@ ZUSÄTZLICHE SICHERHEITSKRITERIEN
    - SPÄTE AUFKLÄRUNG → Wenige trockene Stunden: Maximal **conditional**
    - REGEN BIS ABEND / GANZTÄGIG → **not_safe**
    - **WICHTIG**: [RAIN-WARN] macht NUR die betroffene Stunde unfliegbar, NICHT den ganzen Tag! Aber: Wie beim Wind-Trend gilt — ein sauberes Fenster, das von Regen eingerahmt wird, ist NICHT sicher.
+- **BÖEN-TREND** (falls vorhanden): Der Tagesverlauf der Böen ist entscheidend, analog zum Regen!
+   - AUFKLÄRUNG → böig früh, danach ruhig (keine Rückkehr): Positiver Trend! Ruhige Stunden normal bewerten, safe_window dort setzen. safety_status kann **safe** oder **conditional** sein, je nach Restrisiko.
+   - ZUNEHMEND → ruhig morgens, böig nachmittags: Pilot muss vor Eskalation landen. Maximal **conditional**, safe_window auf Morgens setzen, in `caution_notes` auf Verschlechterung hinweisen.
+   - EINGEKESSELT (knapp) → ruhiges Fenster 4-5h zwischen zwei böigen Phasen: KRITISCH! Böen kommen zurück. Maximal **conditional**, in `caution_notes` konkret begründen.
+   - EINGEKESSELT → ruhiges Fenster < 4h zwischen böigen Phasen: → **not_safe**, primary_no_go = EINGEKESSELT-BÖEN.
+   - DURCHGEHEND → böig fast den ganzen Tag (>=75% Stunden) oder ruhiges Fenster < 2h: → **not_safe**.
+   - VEREINZELT → böige Stunden gestreut, lange ruhige Phase vorhanden: prüfe ob das Fenster für Pilot-Niveau und Sektor reicht.
+   - **STUNDEN-RICHTWERTE**: [GUST-DANGER] oder [ALOFT-GUST-DANGER] >=1h → mindestens **conditional**. [GUST-WARN] oder [ALOFT-GUST-WARN] >=3h → mindestens **conditional**. **AUFKLÄRUNG** kann diese Richtwerte überschreiben (ruhige Stunden nach Böen-Aufklärung sind normal nutzbar).
+   - **KERNREGEL**: Der TREND ist entscheidend! Böig → ruhig bleibt ruhig = OK. Ruhig → böig → ruhig → böig = gefährlich.
 
 ═══════════════════════════════════════════════
 GANZHEITLICHE TAGESBEURTEILUNG (kontextuelle Override-Regeln)
@@ -181,10 +195,10 @@ Schätzungen. Wenn etwas nicht im Datenblock steht, erfinde es nicht.
   "safety_status": "safe|conditional|not_safe",
   "safe_window": "z.B. '10:00-11:00, 14:00-16:00' oder '11:00-15:00' oder 'keins'",
   "no_go_reasons": [
-    "KURZE, strukturierte Einträge — EIN Eintrag pro Gefahrenkategorie. Format: 'Kategorie: Wert, Zeitfenster'. KEINE langen Sätze, KEINE Tags, KEINE eckigen Klammern. Beispiele: 'Regen: 2.1mm/h, 14:00-18:00', 'Böen: 46 km/h am Boden, 13:00-16:00', 'Höhenwind: 42-48 km/h auf 2500m, 10:00-14:00', 'Föhn: Süd, ΔP 7.2 hPa ab 11:00', 'Gewitter: CAPE 1200 J/kg, 15:00-18:00'. Leer [] wenn keine."
+    "KURZE, strukturierte Einträge — EIN Eintrag pro Gefahrenkategorie. Format: 'Kategorie: Wert, Zeitfenster'. KEINE langen Sätze, KEINE Tags, KEINE eckigen Klammern. Beispiele: 'Regen: 2.1mm/h, 14:00-18:00', 'Böen: 46 km/h am Boden, 13:00-16:00', 'Höhenwind: 42-48 km/h auf 2500m, 10:00-14:00', 'Föhn: Süd, ΔP 7.2 hPa ab 11:00', 'Überentwicklungsgefahr: CAPE 1800 J/kg, 15:00-18:00' (bei [CAPE-DANGER]), 'Gewitter: Modell explizit, 15:00-18:00' (nur bei [THUNDERSTORM]). [CAPE-WARN] gehört NICHT hier rein (→ caution_notes). Leer [] wenn keine."
   ],
   "caution_notes": [
-    "KURZE, strukturierte Warnhinweise — EIN Eintrag pro Risikofaktor. Format: 'Kategorie: Kerninfo, Zeitbezug'. KEINE langen Sätze, KEINE Tags, KEINE eckigen Klammern. Beispiele: 'Höhenböen: steigend 28→38 km/h, 11:00-16:00', 'Winddrehung: SW→W ab 15:00, Spot-Sektor endet', 'Böen: 34 km/h am Boden, 13:00-15:00 — sportlich', 'Bewölkung: 60% mittel ab Mittag, Basis 2400m', 'Böen-Spread: Wind 8 / Böen 32 km/h — Turbulenzpakete'. Leer [] wenn keine."
+    "KURZE, strukturierte Warnhinweise — EIN Eintrag pro Risikofaktor. Format: 'Kategorie: Kerninfo, Zeitbezug'. KEINE langen Sätze, KEINE Tags, KEINE eckigen Klammern. Beispiele: 'Höhenböen: steigend 28→38 km/h, 11:00-16:00', 'Winddrehung: SW→W ab 15:00, Spot-Sektor endet', 'Böen: 34 km/h am Boden, 13:00-15:00 — sportlich', 'Überentwicklung möglich: CAPE 1100 J/kg, 13:00-16:00 — Himmel beobachten' (bei [CAPE-WARN]), 'Bewölkung: 60% mittel ab Mittag, Basis 2400m', 'Böen-Spread: Wind 8 / Böen 32 km/h — Turbulenzpakete'. Leer [] wenn keine."
   ],
   "wind_summary": "Wind-Zusammenfassung (2-3 Sätze): Tagesverlauf der Richtung, Hauptband der Geschwindigkeit, ob die Richtung im Spot-Sektor stabil bleibt oder dreht — mit konkreten Zahlen und Stunden.",
   "wind_shear": "2-3 Sätze: Höhenwind vs. Bodenwind, Verhältnis, Föhn-Anzeichen, vertikale Richtungsdrehung. Leer NUR wenn vollkommen unauffällig.",

@@ -77,9 +77,14 @@ Pruefe systematisch diese 5 Gefahrenkategorien:
    - [GUST-WARN] → Vorsicht! (Boeen ueber 30km/h, fliegbar aber sportlich/boeig).
    - Windkonsistenz: Haeufige Richtungswechsel = SCHLECHT
 
-5. GEWITTER / UEBERENTWICKLUNG
-   - [THUNDERSTORM] → Stunde NICHT FLIEGBAR (Modell sagt explizit Gewitter voraus, WMO weather_code 95/96/99)
-   - [CAPE-WARN] → Stunde NICHT FLIEGBAR (CAPE > 800, Ueberentwicklung moeglich)
+5. GEWITTER / UEBERENTWICKLUNG (3 Tiers — nicht vermischen!)
+   - [THUNDERSTORM] → Stunde NICHT FLIEGBAR. Modell sagt explizit Gewitter voraus (WMO weather_code 95/96/99). Deterministisches Signal.
+     → Status: `not_safe`. In `no_go_reasons`/`summary` als **"Gewitter"** bezeichnen.
+   - [CAPE-DANGER] → Stunde NICHT FLIEGBAR. CAPE > 1500 J/kg (extrem instabil) ODER CAPE + Regen/Schauer in derselben Stunde (aktive Ueberentwicklung im Gange).
+     → Status: `not_safe`. In `no_go_reasons`/`summary` als **"Ueberentwicklungsgefahr"** oder **"aktive Ueberentwicklung"** bezeichnen — NICHT als "Gewitter"! (Nur [THUNDERSTORM] = "Gewitter".)
+   - [CAPE-WARN] → Stunde potenziell fliegbar, aber mit Vorsicht. CAPE > 800 J/kg (Zutaten fuer Gewitter vorhanden), aber das Modell prognostiziert weder Niederschlag noch Blitz. Ohne Trigger passiert nichts — Risiko bleibt aber erhoeht.
+     → Status: maximal `conditional` (NICHT `not_safe` nur wegen CAPE-WARN allein!). In `caution_notes` als **"Ueberentwicklung moeglich"** beschreiben, mit Zeitfenster und CAPE-Wert. Im `summary`: Pilot soll Himmel beobachten, frueh landen wenn Quellwolken ueberschiessen.
+   - Zaehlt NICHT als harte Warnung: CAPE-WARN-Stunden koennen Teil des `safe_window` sein (als `conditional`).
 
 6. BEWOELKUNG / OVERCAST
    - [OVERCAST-DANGER] → Stunde NICHT FLIEGBAR (dichte Wolkendecke mit Basis nahe an der Flughoehe)
@@ -109,6 +114,15 @@ ZUSAETZLICHE SICHERHEITSKRITERIEN
   - REGEN BIS ABEND / GANZTAEGIG → **not_safe**
   - **KERNREGEL**: Der TREND ist entscheidend! Regen morgens → dann trocken = OK. Aber trocken → Regen → trocken → Regen = gefaehrlich, auch wenn einzelne Stunden trocken sind.
   - [RAIN-WARN] macht NUR die betroffene Stunde unfliegbar, NICHT den ganzen Tag — aber das Muster (wann regnet es, wann nicht, kommt Regen zurueck?) bestimmt den safety_status.
+- **BOEEN-TREND** (falls vorhanden): Der Tagesverlauf der Boeen ist entscheidend, analog zum Regen!
+  - AUFKLAERUNG → boeig frueh, danach ruhig (keine Rueckkehr): Positiver Trend! Ruhige Stunden normal bewerten, safe_window dort setzen. safety_status kann **safe** oder **conditional** sein, je nach Restrisiko.
+  - ZUNEHMEND → ruhig morgens, boeig nachmittags: Pilot muss vor Eskalation landen. Maximal **conditional**, safe_window auf Morgens setzen, in caution_notes auf Verschlechterung hinweisen.
+  - EINGEKESSELT (knapp) → ruhiges Fenster 4-5h zwischen zwei boeigen Phasen: KRITISCH! Boeen kommen zurueck. Maximal **conditional**, in caution_notes konkret begruenden.
+  - EINGEKESSELT → ruhiges Fenster < 4h zwischen boeigen Phasen: → **not_safe**, primary_no_go = EINGEKESSELT-BOEEN.
+  - DURCHGEHEND → boeig fast den ganzen Tag (>=75% Stunden) oder ruhiges Fenster < 2h: → **not_safe**.
+  - VEREINZELT → boeige Stunden gestreut, lange ruhige Phase vorhanden: pruefe ob das Fenster fuer Pilot-Niveau und Sektor reicht.
+  - **STUNDEN-RICHTWERTE**: [GUST-DANGER] oder [ALOFT-GUST-DANGER] >=1h → mindestens **conditional**. [GUST-WARN] oder [ALOFT-GUST-WARN] >=3h → mindestens **conditional**. **AUFKLAERUNG** kann diese Richtwerte ueberschreiben (ruhige Stunden nach Boeen-Aufklaerung sind normal nutzbar).
+  - **KERNREGEL**: Der TREND ist entscheidend! Boeig → ruhig bleibt ruhig = OK. Ruhig → boeig → ruhig → boeig = gefaehrlich.
 
 ═══════════════════════════════════════════════
 GANZHEITLICHE TAGESBEURTEILUNG (kontextuelle Override-Regeln)
@@ -144,7 +158,10 @@ SICHERHEITS-BEWERTUNGSLOGIK
 4. Bewerte anhand der Fenster-Laengen:
    - Mindestens EIN Fenster >= 3h am Stueck (mind. 4 saubere Stunden hintereinander) UND Verhaeltnis >= 60% UND nicht eingekesselt → "safe"
    - Mindestens EIN Fenster >= 3h mit grenzwertigem Wind, VORSICHTS-Tags, oder Verhaeltnis 35-60% → "conditional"
-   - KEIN Fenster mit 4 sauberen Stunden am Stueck, oder Verhaeltnis < 35% mit eingekesseltem Fenster → "not_safe"
+   - **3h-Fenster (kein 4h-Block):** Genau 3 saubere Stunden am Stueck → "conditional". `safe_window` = die 3 sauberen Stunden. `flight_type` und `flyability_tier` werden anhand der Thermik IN diesen 3 Stunden bestimmt:
+     - Gute Thermik (Peak >= 1.0 m/s UND productive_thermal_h >= 2 in den 3h) → `flight_type: "Thermikflug"`, normale Tier-Bewertung
+     - Schwache/keine Thermik in den 3h → `flight_type: "Abgleiter"`, `flyability_tier: "gray"`
+   - KEIN Fenster mit mindestens 3 sauberen Stunden am Stueck, oder Verhaeltnis < 35% mit eingekesseltem Fenster → "not_safe"
 
 ══════════════════════════════════════════
 TEIL 2: FLIEGBARKEIT
@@ -377,5 +394,5 @@ Bei not_safe: alle auf 1 setzen. Das System berechnet daraus das Gesamtrating un
 
 Regeln fuer safety_status:
 - "safe": Mindestens EIN Fenster mit 4 sauberen Stunden hintereinander (3h Dauer), keine harten Warnungen.
-- "conditional": Mindestens EIN Fenster mit 4 sauberen Stunden, aber eingeschraenkt.
-- "not_safe": Kein durchgehendes 4-Stunden-Fenster vorhanden.
+- "conditional": Mindestens EIN Fenster mit 4 sauberen Stunden, aber eingeschraenkt. ODER nur 3 saubere Stunden am Stueck — dann je nach Thermik: `flight_type: "Thermikflug"` (gute Thermik) oder `"Abgleiter"` (schwach/keine).
+- "not_safe": Kein zusammenhaengendes Fenster mit mindestens 3 sauberen Stunden vorhanden.

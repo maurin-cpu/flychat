@@ -77,6 +77,16 @@ FLIGHT_HOURS_START = 10   # Start-Stunde für Flugstunden (0-23)
 FLIGHT_HOURS_END = 17    # End-Stunde für Flugstunden (0-23, exklusiv)
 
 # ============================================================================
+# WINDRICHTUNGS-TOLERANZ
+# ============================================================================
+# Erlaubte Abweichung der Windrichtung vom Startplatz-Sektor, als Prozent
+# der Sektorbreite. Wird symmetrisch an beide Sektor-Enden angehängt.
+# Beispiel: Sektor N-W (= 270°–360°, Breite 90°) + 10% → ±9° Puffer
+#           → effektiv erlaubt von 261° bis 9°.
+# 0.0 = strikt (nur innerhalb des deklarierten Sektors).
+WIND_DIRECTION_TOLERANCE_PCT = 0.10
+
+# ============================================================================
 # PFAD-KONFIGURATION
 # ============================================================================
 
