@@ -1,5 +1,5 @@
 -- ============================================================================
--- Flychat Initial Schema (Supabase / Postgres)
+-- Gleitcast Initial Schema (Supabase / Postgres)
 -- ============================================================================
 -- Ersetzt:
 --   data/wetterdaten.json         → forecasts + regions_forecasts + weather_meta

@@ -1,5 +1,5 @@
 /**
- * Flychat - Map + Meteogram Overlay
+ * Gleitcast - Map + Meteogram Overlay
  */
 (function () {
     'use strict';
@@ -67,7 +67,7 @@
     function initMap() {
         map = L.map('map', {
             center: [46.8, 8.3],
-            zoom: 9,
+            zoom: 7,
             zoomControl: true,
         });
 
@@ -81,7 +81,7 @@
         // `window.map` is unusable because `<div id="map">` auto-creates an
         // HTML implicit global pointing to the DIV element, which has no
         // invalidateSize() method and would crash sidebar resize handlers.
-        window.flychatMap = map;
+        window.gleitcastMap = map;
 
         loadSpots();
 
@@ -389,6 +389,16 @@
                         });
                     },
                 }).addTo(map);
+
+                // Nach dem Laden an alle Spots anpassen (Gesamtansicht Schweiz)
+                try {
+                    var bounds = geoJsonLayer.getBounds();
+                    if (bounds && bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [20, 20] });
+                    }
+                } catch (e) {
+                    console.warn('fitBounds fehlgeschlagen:', e);
+                }
             })
             .then(openSpotFromUrl)
             .catch(function (err) {
@@ -522,7 +532,7 @@
             elevation: currentWeather.elevation_m,
             spotName: currentSpotName,
             dateStr: dateStr,
-            source: 'flychat-spot',
+            source: 'gleitcast-spot',
         });
     }
 
@@ -766,12 +776,12 @@
     }
 
     // Re-render analysis view when analyses are loaded (API fetch after page load)
-    window.addEventListener('flychat-analyses-loaded', function () {
+    window.addEventListener('gleitcast-analyses-loaded', function () {
         renderAnalyseView();
     });
 
     // Listen for day changes from the floating map tabs
-    window.addEventListener('flychat-day-change', function (e) {
+    window.addEventListener('gleitcast-day-change', function (e) {
         if (!currentWeather || !currentDates.length) return;
         var newDate = e.detail && e.detail.date;
         if (!newDate) return;

@@ -1,5 +1,5 @@
 /**
- * Flychat Error Monitor
+ * Gleitcast Error Monitor
  * ----------------------
  * Fängt uncaught JavaScript-Errors und unhandled Promise-Rejections,
  * zeigt sie als sichtbaren roten Banner oben am Bildschirm.
@@ -15,7 +15,7 @@
 (function () {
     'use strict';
 
-    var BANNER_ID = 'flychat-error-banner';
+    var BANNER_ID = 'gleitcast-error-banner';
     var AUTO_HIDE_MS = 12000;
     var hideTimer = null;
 
@@ -166,7 +166,7 @@
     });
 
     // Public API for manual reporting
-    window.FlychatErrorMonitor = {
+    window.GleitcastErrorMonitor = {
         report: function (text) { showError('\u26A0 ' + text); },
         hide: hideBanner
     };

@@ -132,7 +132,7 @@ Quellen: [burnair Thermik-Prognosen](https://www.burnair.ch/portfolio-item/therm
 |--------|--------------|-----|--------|
 | Regtherm | 1 (Talboden) | Einfach, bewaehrt | Ungenau bei untypischem Referenzpunkt |
 | Burnair | 2 (ICON-D2 + EU) | Besser, modellspezifisch | Immer noch potenziell ungenau |
-| **Flychat** | **4 (raeumlich verteilt)** | Beste Wolken-/Niederschlagsaggregation | Mehr Datenpunkte im Batch |
+| **Gleitcast** | **4 (raeumlich verteilt)** | Beste Wolken-/Niederschlagsaggregation | Mehr Datenpunkte im Batch |
 
 ### Referenzpunkt-Verteilung
 
@@ -145,7 +145,7 @@ Quellen: [burnair Thermik-Prognosen](https://www.burnair.ch/portfolio-item/therm
 
 **Wolken**: 30th-Perzentil ueber alle Referenzpunkte → findet regionale "Blue Holes" (bewaehrter Regtherm-Ansatz)
 
-**Thermik**: Am Referenzpunkt berechnen, NICHT raeumlich mitteln. Thermik haengt stark von der lokalen Elevation und dem Temperaturprofil ab. Flychat nutzt korrekterweise die `elevation_ref` der Region als Startpunkt fuer Parcel-Ascent.
+**Thermik**: Am Referenzpunkt berechnen, NICHT raeumlich mitteln. Thermik haengt stark von der lokalen Elevation und dem Temperaturprofil ab. Gleitcast nutzt korrekterweise die `elevation_ref` der Region als Startpunkt fuer Parcel-Ascent.
 
 **Niederschlag**: Regionale Signifikanz — nur wenn >= 2 von N Punkten Niederschlag melden (vermeidet isolierte Modell-Artefakte).
 
@@ -172,9 +172,9 @@ Regtherm argumentiert explizit, dass **regionale Aggregation besser als rohe Git
 
 ---
 
-## Flychat-Positionierung im Vergleich
+## Gleitcast-Positionierung im Vergleich
 
-| Feature | XC Therm | Burnair | **Flychat** |
+| Feature | XC Therm | Burnair | **Gleitcast** |
 |---------|----------|---------|-------------|
 | Kern-Modell | Regtherm (lizenziert) | Regtherm + 40-Param-Algo | Eigenes Parcel-Ascent + Encroachment |
 | Referenzpunkte/Region | 1 | 2 | **4** (raeumlich verteilt) |
@@ -185,14 +185,14 @@ Regtherm argumentiert explizit, dass **regionale Aggregation besser als rohe Git
 | CH-Regionen | 44 | ~50-60 (feiner unterteilt) | **29** (unsere Polygone) |
 | Update-Frequenz | 3-6x taeglich | 3-6x taeglich | On-Demand (Nutzer-gesteuert) |
 
-### Flychat-Vorteile
+### Gleitcast-Vorteile
 
 1. **Mehr Referenzpunkte** als beide Konkurrenten → bessere raeumliche Abdeckung
 2. **Explizite Safety-Flyability-Trennung** → Region kann "conditional + violet" sein (starke Thermik trotz Vorsicht)
 3. **LLM-basierte Analyse** → natuerlichsprachliche Erklaerungen statt nur Zahlen/Farben
 4. **Transparente Methodik** → Nutzer sieht Stuendliche Daten + KI-Erklaerung
 
-### Flychat-Limitierungen vs. Konkurrenz
+### Gleitcast-Limitierungen vs. Konkurrenz
 
 1. **Kein Volumeneffekt** — Regtherm modelliert Tal-Volumen-Heizung explizit
 2. **Keine Talwind-Kopplung** — Regtherm beruecksichtigt horizontale Kompensationsstroemungen

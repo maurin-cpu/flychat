@@ -1,5 +1,5 @@
 """
-Flask Web-Server für Flychat.
+Flask Web-Server für Gleitcast.
 Routes: Chat-API, Spots-API, Wetter-API, Meteogramm-API.
 """
 
@@ -7,15 +7,19 @@ import os
 import copy
 import json
 import logging
+import math
 import threading
+from functools import wraps
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, stream_with_context
 from datetime import datetime, timedelta
 
 import config
 
 logger = logging.getLogger(__name__)
-from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
-from source_area import get_all_regions_geojson
+from thermik_calculator import compute_daily_thermals
+from source_area import get_all_regions_geojson, get_all_regions
+from subscriber import get_manager_from_env as _get_subscriber_manager
+from email_service import send_confirm_email, send_welcome_email, build_briefing_context
 from fetch_weather import get_weather_for_location
 from foehn_indicators import fetch_foehn_data, evaluate_foehn, FOEHN_STATIONS, \
     THRESHOLD_DELTA_P_CAUTION, THRESHOLD_DELTA_P_DANGER, THRESHOLD_HUMIDITY_LOW
@@ -27,12 +31,11 @@ from gust_calculator import (
     get_oi_scale_lengths,
     get_L_up,
     get_effective_L_up,
-    aggregate_spot_excess,
 )
 from source_area import find_region_for_point
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "flychat-dev-key")
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "gleitcast-dev-key")
 
 # Ensure JSON responses send raw UTF-8 characters (ä, ö, ü instead of \uXXXX)
 app.config['JSON_AS_ASCII'] = False
@@ -116,10 +119,425 @@ def _handle_unexpected_exception(e):
 engine = None
 
 
-def init_app(flychat_engine):
+def init_app(gleitcast_engine):
     """Setzt die globale Engine-Instanz."""
     global engine
-    engine = flychat_engine
+    engine = gleitcast_engine
+
+
+# ============================================================================
+# SUBSCRIBER / E-MAIL-BRIEFING ROUTES (Stufe 1 — ohne Versand)
+# ============================================================================
+
+def _regions_for_form():
+    """Liste der Regionen fuer das Subscribe-Formular. Sortiert nach Name."""
+    regions = get_all_regions()
+    simple = [{"id": r["id"], "region": r["region"]} for r in regions]
+    simple.sort(key=lambda x: x["region"].lower())
+    return simple
+
+
+def _region_names(region_ids: list[str]) -> list[str]:
+    """IDs -> Anzeigenamen. Unbekannte IDs werden durchgereicht."""
+    lookup = {r["id"]: r["region"] for r in get_all_regions()}
+    return [lookup.get(rid, rid) for rid in (region_ids or [])]
+
+
+def _status_page(state: str, title: str, message: str = "", submessage: str = "",
+                 http_code: int = 200):
+    html = render_template(
+        "subscribe_status.html",
+        state=state, title=title, message=message, submessage=submessage,
+    )
+    return html, http_code
+
+
+@app.route("/preview/briefing", methods=["GET"])
+def preview_briefing():
+    """Rendert das Briefing mit Demo-Subscriber (alle Regionen) und aktuellen
+    echten Daten. Ohne Auth — fuer Landing-Page-Sample.
+    """
+    if engine is None:
+        return _status_page(
+            "error", "Vorschau nicht verfuegbar",
+            "Der Briefing-Service ist gerade nicht geladen.",
+            http_code=503,
+        )
+
+    try:
+        briefing_data = engine.build_briefing_data()
+    except Exception as e:
+        logger.exception("preview_briefing: build_briefing_data failed: %s", e)
+        return _status_page(
+            "error", "Vorschau nicht verfuegbar",
+            "Die Briefing-Daten konnten gerade nicht geladen werden.",
+            http_code=503,
+        )
+
+    # Demo-Subscriber mit allen Regionen (so sieht man Spots aus der ganzen Schweiz)
+    all_region_ids = [r["id"] for r in get_all_regions()]
+    demo_subscriber = {
+        "id": 0,
+        "email": "vorschau@gleitcast.ch",
+        "regions": all_region_ids,
+        "skill_level": "standard",
+        "action_token": "demo",
+    }
+
+    ctx = build_briefing_context(demo_subscriber, briefing_data)
+    # Vorschau-Links neutralisieren, damit niemand versehentlich '/unsubscribe/demo' klickt
+    ctx["urls"]["unsubscribe"] = "#"
+    ctx["urls"]["feedback_correct"] = "#"
+    ctx["urls"]["feedback_wrong"] = "#"
+    ctx["urls"]["account"] = "#"
+    # Dashboard-Link darf bleiben — zeigt auf /briefing mit Filter
+
+    return render_template("email/briefing.html", **ctx)
+
+
+@app.route("/subscribe", methods=["GET"])
+def subscribe_form():
+    return render_template(
+        "subscribe.html",
+        regions=_regions_for_form(),
+        prefill_email="",
+        prefill_regions=set(),
+        prefill_level="standard",
+        flash_error=request.args.get("err", ""),
+        flash_ok="",
+    )
+
+
+@app.route("/subscribe", methods=["POST"])
+def subscribe_submit():
+    email = (request.form.get("email") or "").strip()
+    regions = request.form.getlist("regions")
+    skill_level = request.form.get("skill_level", "standard")
+
+    # Re-render mit Fehlermeldung + Prefill
+    def _rerender(err: str):
+        return render_template(
+            "subscribe.html",
+            regions=_regions_for_form(),
+            prefill_email=email,
+            prefill_regions=set(regions),
+            prefill_level=skill_level,
+            flash_error=err,
+            flash_ok="",
+        ), 400
+
+    if not email:
+        return _rerender("Bitte gib deine E-Mail-Adresse ein.")
+    if not regions:
+        return _rerender("Bitte waehle mindestens eine Region aus.")
+
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        logger.error("/subscribe POST: SUPABASE_DATABASE_URL nicht konfiguriert")
+        return _rerender("Der Abo-Service ist gerade nicht verfuegbar. Bitte spaeter nochmal.")
+
+    result = mgr.create(email=email, regions=regions, skill_level=skill_level)
+    if result is None:
+        # Haeufigster Grund: E-Mail bereits aktiv/pending
+        return _rerender(
+            "Diese E-Mail ist bereits registriert oder ungueltig. "
+            "Falls du den Bestaetigungs-Link nicht findest, schreib uns."
+        )
+
+    # Bestaetigungs-Mail versenden (async, damit der Request nicht auf SMTP wartet)
+    try:
+        send_confirm_email(result["email"], result["confirm_token"])
+    except Exception as e:
+        logger.exception("Confirm-Mail-Versand fehlgeschlagen fuer %s: %s",
+                         result["email"], e)
+        # Subscriber bleibt als 'pending' in der DB. Admin kann Token manuell rausziehen.
+
+    return _status_page(
+        state="ok",
+        title="Fast geschafft!",
+        message=f"Wir haben eine Bestaetigungs-E-Mail an {result['email']} geschickt.",
+        submessage="Klicke auf den Link in der E-Mail, um dein Abo zu aktivieren. "
+                   "Kein Mail erhalten? Schau im Spam-Ordner.",
+    )
+
+
+@app.route("/confirm/<token>", methods=["GET"])
+def subscribe_confirm(token):
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return _status_page(
+            "error", "Bestaetigung fehlgeschlagen",
+            "Der Service ist gerade nicht verfuegbar. Bitte spaeter nochmal.",
+            http_code=503,
+        )
+
+    result = mgr.confirm(token)
+    if result is None:
+        # Vielleicht schon bestaetigt? Dann ist confirm_token NULL -> get_by_action_token wuerde gehen,
+        # aber der Link kommt nicht vom Action-Token. Wir zeigen einfach "ungueltig/abgelaufen".
+        return _status_page(
+            "error", "Link ungueltig oder bereits verwendet",
+            "Dieser Bestaetigungs-Link ist abgelaufen oder wurde bereits benutzt.",
+            http_code=404,
+        )
+
+    # Welcome-Mail (async, nicht blockierend)
+    try:
+        send_welcome_email(
+            email=result["email"],
+            action_token=result["action_token"],
+            regions=_region_names(result.get("regions") or []),
+            skill_level=result.get("skill_level", "standard"),
+        )
+    except Exception as e:
+        logger.exception("Welcome-Mail-Versand fehlgeschlagen fuer %s: %s",
+                         result["email"], e)
+
+    return _status_page(
+        "ok", "Abo aktiviert!",
+        f"Willkommen bei Gleitcast, {result['email']}.",
+        submessage="Dein erstes Briefing kommt am naechsten Montag, Mittwoch oder Freitag um 06:30.",
+    )
+
+
+@app.route("/feedback/<token>/<verdict>", methods=["GET"])
+def subscribe_feedback(token, verdict):
+    """One-Click-Feedback aus Briefing-Mail. Akzeptiert correct|wrong.
+    Rate-Limit: max 1 Eintrag pro Subscriber pro Kalendertag.
+    """
+    if verdict not in ("correct", "wrong"):
+        return _status_page(
+            "error", "Ungueltige Bewertung",
+            "Dieser Link ist ungueltig.",
+            http_code=400,
+        )
+
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return _status_page(
+            "error", "Feedback fehlgeschlagen",
+            "Der Service ist gerade nicht verfuegbar.",
+            http_code=503,
+        )
+
+    sub = mgr.get_by_action_token(token)
+    if sub is None:
+        return _status_page(
+            "error", "Link ungueltig",
+            "Dieser Feedback-Link ist nicht (mehr) gueltig.",
+            http_code=404,
+        )
+
+    from datetime import date
+    ok = mgr.record_feedback(sub["id"], date.today(), verdict)
+    if not ok:
+        return _status_page(
+            "error", "Feedback fehlgeschlagen",
+            "Dein Feedback konnte nicht gespeichert werden. Versuch's spaeter nochmal.",
+            http_code=500,
+        )
+
+    if verdict == "correct":
+        return _status_page(
+            "ok", "Danke fuer die Bestaetigung!",
+            "Dein Feedback hilft uns, die Vorhersage zu verbessern.",
+        )
+    return _status_page(
+        "ok", "Danke fuer dein Feedback!",
+        "Schade, dass die Vorhersage nicht gepasst hat. Wir lernen daraus.",
+        submessage="Mehr Details kannst du uns gerne per E-Mail-Antwort schicken.",
+    )
+
+
+@app.route("/account/<token>", methods=["GET"])
+def account_page(token):
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return _status_page(
+            "error", "Service nicht verfuegbar",
+            "Bitte spaeter nochmal versuchen.",
+            http_code=503,
+        )
+    sub = mgr.get_by_action_token(token)
+    if sub is None:
+        return _status_page(
+            "error", "Link ungueltig",
+            "Dieser Account-Link ist nicht (mehr) gueltig.",
+            http_code=404,
+        )
+    return render_template(
+        "account.html",
+        subscriber=sub,
+        token=token,
+        region_names=_region_names(sub.get("regions") or []),
+        flash_ok=request.args.get("ok", ""),
+        flash_error=request.args.get("err", ""),
+    )
+
+
+@app.route("/account/<token>/<action>", methods=["POST"])
+def account_action(token, action):
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return redirect(f"/account/{token}?err=Service+nicht+verfuegbar")
+
+    if action == "pause_14d" or action == "pause_30d":
+        from datetime import date, timedelta
+        days = 14 if action == "pause_14d" else 30
+        until = date.today() + timedelta(days=days)
+        ok = mgr.pause(token, until)
+        if not ok:
+            return redirect(f"/account/{token}?err=Pause+fehlgeschlagen")
+        return redirect(f"/account/{token}?ok=Pausiert+bis+{until.isoformat()}")
+
+    if action == "resume":
+        ok = mgr.resume(token)
+        if not ok:
+            return redirect(f"/account/{token}?err=Fortsetzen+fehlgeschlagen")
+        return redirect(f"/account/{token}?ok=Abo+wieder+aktiv")
+
+    if action == "unsubscribe":
+        ok = mgr.unsubscribe(token)
+        if not ok:
+            return redirect(f"/account/{token}?err=Abmelden+fehlgeschlagen")
+        return _status_page(
+            "ok", "Abgemeldet",
+            "Du bekommst keine Briefings mehr. Schade, dass du gehst!",
+            submessage="Du kannst dich jederzeit wieder anmelden.",
+        )
+
+    return _status_page(
+        "error", "Unbekannte Aktion",
+        "Diese Aktion ist nicht erlaubt.",
+        http_code=400,
+    )
+
+
+@app.route("/unsubscribe/<token>", methods=["GET"])
+def subscribe_unsubscribe(token):
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return _status_page(
+            "error", "Abmeldung fehlgeschlagen",
+            "Der Service ist gerade nicht verfuegbar. Bitte spaeter nochmal.",
+            http_code=503,
+        )
+
+    ok = mgr.unsubscribe(token)
+    if not ok:
+        return _status_page(
+            "error", "Link ungueltig",
+            "Dieser Abmelde-Link ist nicht (mehr) gueltig.",
+            http_code=404,
+        )
+
+    return _status_page(
+        "ok", "Abgemeldet",
+        "Du bekommst keine Briefings mehr. Schade, dass du gehst!",
+        submessage="Du kannst dich jederzeit wieder anmelden.",
+    )
+
+
+# ============================================================================
+# ADMIN-DASHBOARD (HTTP Basic Auth via ADMIN_PASSWORD env)
+# ============================================================================
+
+def _require_admin(f):
+    """HTTP-Basic-Auth-Decorator. Nur Password-Check, User-Feld ignoriert."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        expected = (config.ADMIN_PASSWORD or "").strip()
+        if not expected:
+            return ("Admin deaktiviert (ADMIN_PASSWORD nicht gesetzt)",
+                    503, {"Content-Type": "text/plain; charset=utf-8"})
+        auth = request.authorization
+        if not auth or (auth.password or "") != expected:
+            return Response(
+                "Admin-Bereich — Zugriff nur mit Passwort.\n",
+                401,
+                {"WWW-Authenticate": 'Basic realm="Gleitcast Admin"',
+                 "Content-Type": "text/plain; charset=utf-8"},
+            )
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.route("/admin", methods=["GET"])
+@_require_admin
+def admin_index():
+    return redirect("/admin/subscribers")
+
+
+@app.route("/admin/subscribers", methods=["GET"])
+@_require_admin
+def admin_subscribers():
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return _status_page("error", "Admin nicht verfuegbar",
+                            "SUPABASE_DATABASE_URL nicht konfiguriert.",
+                            http_code=503)
+    return render_template(
+        "admin/subscribers.html",
+        stats_counts=mgr.count_by_status(),
+        stats_feedback=mgr.count_feedback_overall(days=30),
+        subscribers=mgr.list_recent(limit=50),
+        flash_ok=request.args.get("ok", ""),
+        flash_error=request.args.get("err", ""),
+    )
+
+
+@app.route("/admin/subscribers/send-test", methods=["POST"])
+@_require_admin
+def admin_send_test():
+    from email_service import send_briefing_email
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return redirect("/admin/subscribers?err=Service+nicht+verfuegbar")
+
+    email = (request.form.get("email") or "").strip()
+    sub = mgr.get_by_email(email) if email else None
+    if not sub:
+        return redirect(f"/admin/subscribers?err=Subscriber+{email}+nicht+gefunden")
+
+    if engine is None:
+        return redirect("/admin/subscribers?err=Engine+noch+nicht+geladen")
+    try:
+        briefing_data = engine.build_briefing_data()
+        send_briefing_email(sub, briefing_data, async_send=True)
+    except Exception as e:
+        logger.exception("admin_send_test: %s", e)
+        return redirect(f"/admin/subscribers?err=Versand-Fehler:+{e}")
+
+    return redirect(f"/admin/subscribers?ok=Test-Briefing+an+{email}+versendet")
+
+
+@app.route("/admin/subscribers/trigger-all", methods=["POST"])
+@_require_admin
+def admin_trigger_all():
+    if engine is None:
+        return redirect("/admin/subscribers?err=Engine+noch+nicht+geladen")
+    from scheduler import _send_briefings_once
+    try:
+        stats = _send_briefings_once(engine)
+    except Exception as e:
+        logger.exception("admin_trigger_all: %s", e)
+        return redirect(f"/admin/subscribers?err=Fehler:+{e}")
+    return redirect(
+        f"/admin/subscribers?ok=Versand+abgeschlossen:+"
+        f"sent={stats['sent']}+failed={stats['failed']}"
+    )
+
+
+@app.route("/admin/subscribers/<int:sub_id>/block", methods=["POST"])
+@_require_admin
+def admin_block(sub_id):
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return redirect("/admin/subscribers?err=Service+nicht+verfuegbar")
+    ok = mgr.block(sub_id)
+    if not ok:
+        return redirect(f"/admin/subscribers?err=Sperre+fehlgeschlagen+fuer+%23{sub_id}")
+    return redirect(f"/admin/subscribers?ok=Subscriber+%23{sub_id}+gesperrt")
 
 
 # ============================================================================
@@ -314,6 +732,12 @@ def api_analyses():
                 doc["fly_status"] = ""
                 doc["flyability_tier"] = ""
                 doc["fly_error"] = entry.get("fly_error", "")
+            sf = entry.get("streckenflug") or {}
+            doc["streckenflug_tier"] = sf.get("tier", "kein_xc")
+            doc["streckenflug_rating"] = int(sf.get("rating", 0) or 0)
+            doc["streckenflug_summary"] = sf.get("summary", "") or ""
+            doc["streckenflug_limiting_factor"] = sf.get("limiting_factor", "none")
+            doc["streckenflug_region_context_available"] = bool(sf.get("region_context_available", False))
             flat[spot_name][date_str] = doc
     return jsonify({"spot_analyses": flat, "analyses_count": len(flat)})
 
@@ -763,6 +1187,13 @@ def api_region_weather(region_id):
 
     chart_data = format_data_for_charts(hourly_data, pressure_level_data, elevation_ref=elevation_ref,
                                         region_id=region_id)
+
+    # Regionen haben keine Böen (Apr 2026): gusts = null.
+    # Frontend (meteogram.js) interpretiert null korrekt: hasRealGust=false →
+    # keine Gust-Label, keine Gust-Warnungen. Tooltip zeigt "Böen: -".
+    for w in chart_data.get("wind", []):
+        w["gusts"] = None
+
     sorted_dates, by_day = _group_chart_by_day(chart_data)
     last_updated, _ = _stale_meta()
 
@@ -775,6 +1206,7 @@ def api_region_weather(region_id):
         "stale": len(sorted_dates) < config.FORECAST_DAYS,
         "last_updated": last_updated,
         "expected_days": config.FORECAST_DAYS,
+        "is_region": True,
     })
 
 
@@ -789,80 +1221,25 @@ def api_region_altitude_wind(region_id):
     hourly_data = region_data.get("hourly_data", {})
     elevation_ref = region_data.get("elevation_ref", 1200)
 
-    # Multi-Spot-Bodenexzess (Apr 2026 Refactor):
-    # Statt Spot-Höhen als vertikale Anker zu nutzen (10m-Bodenmessung ist
-    # KEINE Höhenmessung der freien Atmosphäre!), aggregieren wir die Boden-
-    # exzesse aller Spots in der Region zu einem robusten Region-Wert.
-    # Das Höhenprofil wird dann via Single-Anchor + Gauss-Decay aufgebaut.
-    gust_anchors_by_time = None  # Multi-Anker deaktiviert
-    spot_excesses_by_time = {}    # {timestamp: [excess1, excess2, ...]}
-
-    region_info = find_region_for_point(
-        region_data.get("latitude", 0), region_data.get("longitude", 0)
-    )
-    if region_info is None:
-        # Fallback: Region aus source_area per ID suchen
-        from source_area import get_all_regions
-        for r in get_all_regions():
-            if r["id"] == region_id:
-                region_info = r
-                break
-
-    if region_info and region_info.get("polygon"):
-        from shapely.geometry import Point as ShapelyPoint
-        region_polygon = region_info["polygon"]
-        region_spots = [
-            s for s in engine.spots
-            if region_polygon.contains(ShapelyPoint(s["longitude"], s["latitude"]))
-        ]
-        # Sammle Bodenexzess (gust_10m - wind_10m) pro Stunde von allen Spots.
-        # Die Werte werden später via aggregate_spot_excess (Median bei ≥3,
-        # Mittel bei 2, Pass-through bei 1) zu einem robusten Region-Exzess.
-        for spot in region_spots:
-            spot_data = engine.weather_data.get(spot["name"])
-            if not spot_data:
-                continue
-            for ts, hd in spot_data.get("hourly_data", {}).items():
-                ws = hd.get("wind_speed_10m")
-                gust = hd.get("wind_gusts_10m")
-                if ws is None or gust is None:
-                    continue
-                excess = max(0.0, float(gust) - float(ws))
-                spot_excesses_by_time.setdefault(ts, []).append(excess)
-
-    # Surface anchor: ein einziger Anker am Region-Referenzpunkt mit
-    # aggregiertem Multi-Spot-Bodenexzess. Der Region-Center-Exzess fliesst
-    # mit ein, sodass auch Regionen ohne Spots einen sauberen Wert liefern.
-    surface_anchor_by_time = {}
-    for timestamp, hour_data in hourly_data.items():
-        gust = hour_data.get("wind_gusts_10m")
-        ws = hour_data.get("wind_speed_10m")
-        wd = hour_data.get("wind_direction_10m")
-        if gust is None or ws is None:
-            continue
-
-        ws_f = float(ws)
-        ref_excess = max(0.0, float(gust) - ws_f)
-        excesses = list(spot_excesses_by_time.get(timestamp, []))
-        excesses.append(ref_excess)
-        agg_excess = aggregate_spot_excess(excesses)
-        aggregated_gust = ws_f + agg_excess
-
-        surface_anchor_by_time[timestamp] = {
-            "elevation_m": elevation_ref,
-            "gust_kmh": aggregated_gust,
-            "wind_speed_kmh": ws_f,
-            "wind_direction_10m": float(wd) if wd is not None else None,
-        }
-
+    # Region-Höhenprofil: KEINE Böen-Addition am Höhenprofil.
+    # Begründung: Die Referenzhöhe ist ein einzelner Punkt, während die
+    # Startplätze innerhalb der Region stark variierende Höhen haben.
+    # Ein Single-Anchor + Gauss-Kernel erzeugt eine sichtbare "Böen-Beule"
+    # an der Referenzhöhe (und Dämpfung darüber/darunter) — das verrät
+    # die Berechnungsstelle optisch und ist physikalisch für eine Region
+    # nicht aussagekräftig. Altitude-Böen sind nur für einzelne Startplätze
+    # sinnvoll (api_altitude_wind), wo das Ankerlevel = Boden ist.
+    # Das Bodenband bleibt erhalten (separater _ground_wind_by_day-Pfad).
     alt_data = format_altitude_wind_for_charts(
-        pressure_level_data, hourly_data, elevation_ref, region_id,
-        gust_anchors_by_time=gust_anchors_by_time,
-        surface_anchor_by_time=surface_anchor_by_time,
+        pressure_level_data, region_id=region_id,
     )
 
     sorted_dates, by_day = _group_profiles_by_day(alt_data)
     ground_wind = _ground_wind_by_day(hourly_data, elevation_ref, sorted_dates)
+    # Regionen haben keine Böen (Apr 2026): Bodenband ohne wind_gusts.
+    for day_entries in ground_wind.values():
+        for e in day_entries:
+            e["wind_gusts"] = None
     last_updated, _ = _stale_meta()
 
     return jsonify({
@@ -874,6 +1251,7 @@ def api_region_altitude_wind(region_id):
         "stale": len(sorted_dates) < config.FORECAST_DAYS,
         "last_updated": last_updated,
         "expected_days": config.FORECAST_DAYS,
+        "is_region": True,
     })
 
 
@@ -1008,7 +1386,7 @@ def api_altitude_wind(spot_name):
 
     # CH1-Höhenprofil: gleiche PL-Daten, aber CH1-Bodenböen als Anker.
     # WICHTIG 1: Deep-copy der PL-Daten, da format_altitude_wind_for_charts
-    #   die Level-Dicts mutiert (wind_gusts, running_max etc.)
+    #   die Level-Dicts mutiert (wind_gusts, turbulence_excess etc.)
     # WICHTIG 2: hourly_data muss CH1-Oberflächenwerte enthalten, damit
     #   estimate_altitude_gusts (Step 1 in format_altitude_wind_for_charts)
     #   das CH1-Böenprofil als Background berechnet. Sonst wird der D2-
@@ -1150,21 +1528,22 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
     chart_data = {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}
     sorted_times = sorted(hourly_data.keys())
 
-    prev_max_h = None
-    prev_day = None
-    cumulative_bf = 0.0       # Kumulierter Buoyancy-Flux (Encroachment-Modell)
-    peak_H = 0.0              # Tages-Maximum des sensiblen Wärmeflusses
-    peak_sw = 0.0             # Tages-Maximum der Globalstrahlung (W/m²)
+    elev_ref = elevation_ref if elevation_ref is not None else 850
+
+    # Stateful Thermik-Berechnung über alle Stunden — identisch zu
+    # _build_single_spot_context / _build_single_region_context, damit
+    # Anzeige und LLM-Kontext dieselben Werte sehen.
+    daily_thermals = compute_daily_thermals(
+        hourly_data,
+        pressure_level_data,
+        elev_ref,
+        config.PRESSURE_LEVELS,
+        slope_azimuth=slope_azimuth,
+        slope_angle=slope_angle,
+        region_id=region_id,
+    )
 
     for timestamp in sorted_times:
-        current_day = timestamp[:10]
-        if current_day != prev_day:
-            prev_max_h = None
-            cumulative_bf = 0.0       # Reset pro Tag
-            peak_H = 0.0             # Reset pro Tag
-            peak_sw = 0.0            # Reset pro Tag
-            prev_day = current_day
-            
         data = hourly_data[timestamp]
         try:
             dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
@@ -1196,75 +1575,23 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     "weather_code": data.get("weather_code"),
                 })
 
-            # Thermik
+            # Thermik — aus stateful daily_thermals lesen
             cape = data.get("cape", 0)
-            p_levels = []
-            if pressure_level_data and timestamp in pressure_level_data:
-                for level in config.PRESSURE_LEVELS:
-                    h_val = pressure_level_data[timestamp].get(f"geopotential_height_{level}hPa")
-                    t_val = pressure_level_data[timestamp].get(f"temperature_{level}hPa")
-                    if h_val is not None and t_val is not None:
-                        p_levels.append({"pressure": level, "height": h_val, "temp": t_val})
-
-            surf_temp = data.get("temperature_2m")
-            surf_dew = calculate_dewpoint(surf_temp, data.get("relative_humidity_2m", 50))
-            elev_ref = elevation_ref if elevation_ref is not None else 850
-
             therm_climb = 0
             therm_rating = 0
             therm_max_h = None
+            therm_lcl = None
             therm_diagnostics = {}
             therm_warnings = []
 
-            if surf_temp is not None and p_levels:
-                therm = calculate_thermal_profile(
-                    surface_temp=surf_temp,
-                    surface_dewpoint=surf_dew,
-                    elevation_m=elev_ref,
-                    pressure_levels_data=p_levels,
-                    boundary_layer_height_agl=data.get("boundary_layer_height"),
-                    sunshine_duration_s=data.get("sunshine_duration"),
-                    surface_sensible_heat_flux=data.get("surface_sensible_heat_flux"),
-                    surface_latent_heat_flux=data.get("surface_latent_heat_flux"),
-                    shortwave_radiation=data.get("shortwave_radiation"),
-                    direct_radiation=data.get("direct_radiation"),
-                    diffuse_radiation=data.get("diffuse_radiation"),
-                    soil_moisture=data.get("soil_moisture_0_to_1cm"),
-                    soil_temperature=data.get("soil_temperature_0cm"),
-                    updraft=data.get("updraft"),
-                    et0=data.get("et0_fao_evapotranspiration"),
-                    vpd=data.get("vapour_pressure_deficit"),
-                    lifted_index=data.get("lifted_index"),
-                    convective_inhibition=data.get("convective_inhibition"),
-                    snow_depth=data.get("snow_depth"),
-                    timestamp=timestamp,
-                    slope_azimuth=slope_azimuth,
-                    slope_angle=slope_angle,
-                    low_cloud=data.get("cloud_cover_low", 0),
-                    mid_cloud=data.get("cloud_cover_mid", 0),
-                    high_cloud=data.get("cloud_cover_high", 0),
-                    boundary_layer_height_gfs=data.get("boundary_layer_height_gfs"),
-                    previous_max_height=prev_max_h,
-                    cumulative_buoyancy=cumulative_bf,
-                    peak_H=peak_H,
-                    peak_shortwave=peak_sw,
-                    region_id=region_id,
-                )
-                if "error" not in therm:
-                    therm_climb = therm["climb_rate"]
-                    therm_rating = therm["rating"]
-                    therm_max_h = therm["max_height"]
-                    prev_max_h = therm_max_h
-                    therm_diagnostics = therm.get("diagnostics", {})
-                    therm_warnings = therm.get("data_warnings", [])
-                    # Buoyancy akkumulieren (Encroachment-Modell)
-                    cumulative_bf += therm_diagnostics.get("buoyancy_contribution", 0)
-                    # Peak-H für H-skalierte Inertia tracken
-                    current_H = therm_diagnostics.get("sensible_heat_flux", 0)
-                    peak_H = max(peak_H, current_H)
-                    sw = data.get("shortwave_radiation")
-                    if sw is not None:
-                        peak_sw = max(peak_sw, sw)
+            therm = daily_thermals.get(timestamp)
+            if therm and "error" not in therm:
+                therm_climb = therm["climb_rate"]
+                therm_rating = therm["rating"]
+                therm_max_h = therm["max_height"]
+                therm_lcl = therm.get("lcl")
+                therm_diagnostics = therm.get("diagnostics", {})
+                therm_warnings = therm.get("data_warnings", [])
 
             # Wolkenbasis + Schichten
             cloud_base = data.get("cloud_base")
@@ -1273,10 +1600,17 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
             cloud_cover_mid = data.get("cloud_cover_mid")
             cloud_cover_high = data.get("cloud_cover_high")
 
-            # Nutzbare Thermikhoehe an Wolkenbasis kappen
-            if (therm_max_h and cloud_base and cloud_base > elev_ref
-                    and therm_max_h > cloud_base):
-                therm_max_h = cloud_base
+            # FLIEGBARKEITS-CAP: Thermik nicht ueber die Wolkenbasis anzeigen.
+            # Bevorzugt tatsaechliche Wolkenbasis (Open-Meteo cloud_base, wenn Cumuli
+            # existieren). Fallback: theoretische LCL (Bolton, aus Thermik-Modul).
+            # Oberhalb beides: VFR-Flug nicht erlaubt -> nicht als fliegbar zaehlen.
+            cloud_limit = None
+            if cloud_base and cloud_base > elev_ref:
+                cloud_limit = cloud_base
+            elif therm_lcl and therm_lcl > elev_ref:
+                cloud_limit = therm_lcl
+            if therm_max_h and cloud_limit and therm_max_h > cloud_limit:
+                therm_max_h = cloud_limit
 
             if cape is not None:
                 chart_data["thermik"].append({
@@ -1285,6 +1619,7 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     "climb_rate": therm_climb,
                     "rating": therm_rating,
                     "max_height": therm_max_h,
+                    "lcl": therm_lcl,
                     "diagnostics": therm_diagnostics,
                     "data_warnings": therm_warnings,
                 })
@@ -1573,23 +1908,12 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
                         "temperature": round(grid_temp[i], 1),
                     })
 
-                # Running Maximum nur INNERHALB der Grenzschicht (PBL × 1.2)
-                # als Safety-Layer. Über der PBL gibt es keine Boden-getriebene
-                # Turbulenz mehr → Böe folgt der natürlichen Gauss-Decay (= Wind).
-                # Vorher wurde der Max-Wert unbegrenzt nach oben durchgezogen,
-                # was Höhen-Böen auf 4 km systematisch überschätzte (z.B.
-                # 36 km/h statt physikalisch korrekter ~21 km/h).
-                pbl_cap_alt = ((elevation_m or 0) + blh * 1.2) if blh > 0 else float("inf")
-
-                running_max = 0.0
-                for lv in grid_levels:
-                    if lv["altitude"] <= pbl_cap_alt:
-                        # In/an der PBL: Running-Max anwenden (Sicherheit)
-                        running_max = max(running_max, lv["wind_gusts"])
-                        lv["wind_gusts"] = running_max
-                    # Über PBL: wind_gusts bleibt der OI-Wert (decayed → Wind)
-                    lv["turbulence_excess"] = round(lv["wind_gusts"] - lv["wind_speed"], 1)
-
+                # Running-Maximum wurde entfernt: OI-Gauss + PBL-Sigmoid liefern
+                # bereits eine monoton abklingende T(z)-Kurve. Running-Max zog
+                # lokale Wind-Dips (W(z)-Shear) künstlich hoch und verletzte die
+                # Asymmetrie von L_up/L_down. Früher propagierte es Ausreißer
+                # bis 4 km Höhe (36 km/h Mittelland-Artefakt); der PBL-Cap war
+                # nur Pflaster. Jetzt folgt T(z) reiner Gauss-Decay aus Anker.
                 profile["levels"] = grid_levels
 
             # Ensure turbulence fields exist on all levels + add turbulence_risk alias

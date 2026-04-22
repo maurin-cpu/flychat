@@ -1,0 +1,16 @@
+GLEITCAST — Bestaetige dein Abo
+
+Hallo {{ email }},
+
+bitte bestaetige deine E-Mail-Adresse, um dein kostenloses Flugwetter-Abo
+zu aktivieren.
+
+Link zum Bestaetigen:
+{{ urls.confirm }}
+
+Nach der Bestaetigung bekommst du Montag, Mittwoch und Freitag morgens
+ein personalisiertes Briefing mit den besten Flugtagen fuer deine Regionen.
+
+--
+Du hast dieses Abo nicht angefordert? Dann ignoriere diese E-Mail einfach —
+ohne Bestaetigung wird nichts aktiviert.

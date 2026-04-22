@@ -1,5 +1,5 @@
 /**
- * Flychat - Region Map + Analysis Overlay (Traffic Light System, Light Theme)
+ * Gleitcast - Region Map + Analysis Overlay (Traffic Light System, Light Theme)
  */
 (function () {
     'use strict';
@@ -153,7 +153,7 @@
     function initMap() {
         map = L.map('regionMap', {
             center: [46.8, 8.3],
-            zoom: 9,
+            zoom: 7,
             zoomControl: true,
         });
 
@@ -165,7 +165,78 @@
         }).addTo(map);
 
         labelMarkersGroup = L.layerGroup().addTo(map);
+
+        // Re-render Labels bei Zoom-Wechsel (Labels werden je nach Zoom als Pill, Dot oder gar nicht gezeichnet)
+        map.on('zoomend', function () {
+            if (currentDate && regionAnalyses) colorRegions(currentDate);
+        });
+
         loadRegions();
+    }
+
+    // Dedizierte Pill-Palette: maximiert Kontrast zwischen den 6 (safety × quality) Kombinationen
+    // Polygon-Farben (style.border) bleiben dabei unverändert; nur die Label-Pill nutzt diese Tabelle,
+    // damit "Bronze safe-Abgleiter" nicht mit den Conditional-Gelbtönen verwechselt wird.
+    function getPillBg(safety, quality) {
+        if (safety === 'safe') {
+            if (quality === 'gray')   return '#78716c'; // stone — Abgleiter/so-so
+            if (quality === 'violet') return '#7c3aed'; // violet — Top
+            return '#16a34a';                            // green — Gut
+        }
+        if (safety === 'conditional') {
+            if (quality === 'violet') return '#b45309'; // amber-900 — caution Top
+            return '#d97706';                            // amber — caution (Gut & Abgleiter)
+        }
+        if (safety === 'not_safe') return '#b91c1c';
+        return '#6b7280'; // no_data fallback
+    }
+
+    // Label-Variante je nach Zoom: >=9 volle Pill, 7-8 Farbpunkt, <7 nichts
+    function buildRegionLabel(style, badge, safety, quality, zoom) {
+        if (zoom < 7) return null;
+
+        var pillBg = getPillBg(safety, quality);
+
+        // Dot-Modus (Zoom 7-8): nur farbiger Punkt, keine Schrift
+        if (zoom < 9) {
+            var dotHtml = '<div style="width:10px;height:10px;border-radius:50%;'
+                + 'background:' + pillBg + ';'
+                + 'box-shadow:0 0 0 2px rgba(255,255,255,0.85),0 1px 3px rgba(0,0,0,0.2);'
+                + '"></div>';
+            return { html: dotHtml, size: [12, 12], anchor: [6, 6] };
+        }
+
+        // Pill-Modus (Zoom >=9): integrierte Pill, Breite = Textbreite
+        var bg = pillBg, txtColor = '#fff', text;
+        if (safety === 'not_safe') {
+            text = '\u2715 NO-GO';
+        } else if (style.isError) {
+            bg = '#991b1b';
+            text = '\u26A0 Fehler';
+        } else if (style.showWarning) {
+            // Conditional: Warn-Icon hat Priorität
+            text = '\u26A0 ' + badge;
+        } else {
+            // Safe: Tier-Icon zeigt Qualitaet (Abgleiter / Gut / Top)
+            var tierIcon = '';
+            if (quality === 'gray')        tierIcon = '\u25CB ';  // \u25CB = Abgleiter
+            else if (quality === 'violet') tierIcon = '\u2605 ';  // \u2605 = Top
+            else                           tierIcon = '\u2713 ';  // \u2713 = Gut
+            text = tierIcon + badge;
+        }
+
+        // transform:translate(-50%,-50%) zentriert die Pill auf ihre eigene Breite,
+        // size:[0,0] verhindert dass Leaflet das Wrapper-Div auf 120px streckt
+        var pillHtml = '<div style="'
+            + 'display:inline-block;'
+            + 'transform:translate(-50%,-50%);'
+            + 'font-size:11px;font-weight:700;color:' + txtColor + ';'
+            + 'background:' + bg + ';'
+            + 'padding:3px 10px;border-radius:999px;'
+            + 'white-space:nowrap;letter-spacing:0.01em;'
+            + 'box-shadow:0 1px 3px rgba(0,0,0,0.18),0 0 0 1.5px rgba(255,255,255,0.7);'
+            + '">' + text + '</div>';
+        return { html: pillHtml, size: [0, 0], anchor: [0, 0] };
     }
 
     // ===== LOAD REGIONS =====
@@ -173,7 +244,7 @@
         fetch('/api/regionen')
             .then(function (resp) { return resp.json(); })
             .then(function (geojson) {
-                L.geoJSON(geojson, {
+                var regionsLayer = L.geoJSON(geojson, {
                     style: function () {
                         return {
                             color: '#9ca3af',
@@ -204,6 +275,16 @@
                         });
                     }
                 }).addTo(map);
+
+                // Nach dem Laden an alle Regionen anpassen (Gesamtansicht Schweiz)
+                try {
+                    var bounds = regionsLayer.getBounds();
+                    if (bounds && bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [20, 20] });
+                    }
+                } catch (e) {
+                    console.warn('fitBounds fehlgeschlagen:', e);
+                }
 
                 if (regionAnalyses && currentDate) colorRegions(currentDate);
             })
@@ -246,29 +327,22 @@
                 dashArray: ''
             });
 
-            // Center label
+            // Center label — zoom-responsive (Pill / Dot / nichts)
             var bounds = layer.getBounds();
             var center = bounds.getCenter();
-            var labelHtml = '';
+            var label = buildRegionLabel(style, badge, safety, quality, map.getZoom());
 
-            if (safety === 'not_safe') {
-                labelHtml = '<div style="font-size:11px;font-weight:700;color:' + style.labelColor + ';text-shadow:' + style.labelShadow + ';white-space:nowrap;background:rgba(255,255,255,0.7);padding:2px 8px;border-radius:6px;border:1px solid ' + style.border + ';">NO-GO</div>';
-            } else if (style.isError) {
-                labelHtml = '<div style="font-size:11px;font-weight:600;color:' + style.labelColor + ';text-shadow:' + style.labelShadow + ';white-space:nowrap;background:rgba(255,255,255,0.7);padding:2px 8px;border-radius:6px;border:1px solid ' + style.border + ';">\u26A0 Fehler</div>';
-            } else {
-                var prefix = style.showWarning ? '\u26A0 ' : '';
-                labelHtml = '<div style="font-size:11px;font-weight:600;color:' + style.labelColor + ';text-shadow:' + style.labelShadow + ';white-space:nowrap;background:rgba(255,255,255,0.7);padding:2px 8px;border-radius:6px;border:1px solid ' + style.border + ';">' + prefix + badge + '</div>';
+            if (label) {
+                labelMarkersGroup.addLayer(L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'region-label',
+                        html: label.html,
+                        iconSize: label.size,
+                        iconAnchor: label.anchor
+                    }),
+                    interactive: false
+                }));
             }
-
-            labelMarkersGroup.addLayer(L.marker(center, {
-                icon: L.divIcon({
-                    className: 'region-label',
-                    html: labelHtml,
-                    iconSize: [120, 30],
-                    iconAnchor: [60, 15]
-                }),
-                interactive: false
-            }));
 
             // Tooltip
             var tipHtml = '<b>' + layer.regionName + '</b>';
@@ -567,7 +641,7 @@
             elevation: elevation,
             spotName: cached.regionName || rid,
             dateStr: activeDate,
-            source: 'flychat-region',
+            source: 'gleitcast-region',
         });
     }
 
@@ -753,7 +827,7 @@
     });
 
     // Listen for navbar day changes — update open overlay + map coloring
-    window.addEventListener('flychat-day-change', function (e) {
+    window.addEventListener('gleitcast-day-change', function (e) {
         var newDate = e.detail && e.detail.date;
         if (!newDate) return;
         currentDate = newDate;

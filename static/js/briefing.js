@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   Flychat – Flugwetter Dashboard
+   Gleitcast – Flugwetter Dashboard
    Tab-based day selector, region filter chips, compact spot rows.
    ══════════════════════════════════════════════════════════════ */
 
@@ -55,8 +55,8 @@
 
   // ── State ───────────────────────────────────────────────────
 
-  const LS_REGION_FILTER_KEY = "flychat.briefing.regionFilter";
-  const LS_DAY_IDX_KEY = "flychat.briefing.dayIdx";
+  const LS_REGION_FILTER_KEY = "gleitcast.briefing.regionFilter";
+  const LS_DAY_IDX_KEY = "gleitcast.briefing.dayIdx";
 
   let state = {
     data: null,
@@ -65,6 +65,9 @@
     selectedDayIdx: loadDayIdx(),
     fazitOpen: false,
     mapVisible: false,
+    // focusSpot: ephemer via URL-Param gesetzt, zeigt nur diesen einen Spot.
+    // Nicht persistiert — wird beim Reload geleert wenn URL-Param weg ist.
+    focusSpot: null,
   };
 
   function loadRegionFilter() {
@@ -170,9 +173,15 @@
 
   function filterDaySpots(day) {
     if (!day) return [];
-    const spots = day.top_spots || [];
-    if (!state.filterRegions || state.filterRegions.size === 0) return spots;
-    return spots.filter((s) => regionPassesFilter(s.region_id));
+    let spots = day.top_spots || [];
+    if (state.filterRegions && state.filterRegions.size > 0) {
+      spots = spots.filter((s) => regionPassesFilter(s.region_id));
+    }
+    if (state.focusSpot) {
+      const want = state.focusSpot.toLowerCase();
+      spots = spots.filter((s) => (s.spot || "").toLowerCase() === want);
+    }
+    return spots;
   }
 
   // ── Render: Header ──────────────────────────────────────────
@@ -293,6 +302,9 @@
   function selectDay(idx) {
     state.selectedDayIdx = idx;
     saveDayIdx(idx);
+    // Bei manuellem Tab-Wechsel Spot-Focus loesen, sonst sieht User
+    // in anderen Tagen leeren State weil der Spot nur an einem Tag ist.
+    state.focusSpot = null;
     renderDayTabs(state.data);
     renderDayContent();
   }
@@ -365,6 +377,8 @@
   }
 
   function applyFilter() {
+    // Manueller Region-Filter-Toggle loest Spot-Focus (User erkundet neu).
+    state.focusSpot = null;
     saveRegionFilter(state.filterRegions);
     renderFilters(state.data);
     renderDayTabs(state.data);
@@ -413,7 +427,7 @@
         subdomains: 'abcd', maxZoom: 14,
       }).addTo(mapObj);
       _filterMap.map = mapObj;
-      mapObj.fitBounds([[45.8, 5.9], [47.9, 10.6]], { padding: [6, 6] });
+      mapObj.fitBounds([[45.8, 5.9], [47.9, 10.6]], { padding: [20, 20], maxZoom: 7 });
 
       fetch("/api/regionen-polygone", { cache: "no-store" })
         .then((r) => r.json())
@@ -448,7 +462,7 @@
           try { mapObj.invalidateSize(); } catch (_) {}
           try {
             const b = layer.getBounds();
-            if (b && b.isValid()) mapObj.fitBounds(b, { padding: [6, 6] });
+            if (b && b.isValid()) mapObj.fitBounds(b, { padding: [20, 20], maxZoom: 7 });
           } catch (_) {}
           try { renderFilters(state.data); } catch (_) {}
         })
@@ -512,12 +526,48 @@
       return rb - ra;
     });
 
+    // Focus-Banner (wenn Nutzer aus E-Mail auf einen spezifischen Spot kam)
+    const focusBanner = state.focusSpot
+      ? `<div class="bf-focus-banner" role="status">
+           <span class="bf-focus-text">Zeige nur <strong>${escapeHtml(state.focusSpot)}</strong></span>
+           <button type="button" class="bf-focus-clear" onclick="window.__bf_clearFocus && window.__bf_clearFocus()">Alle Spots zeigen</button>
+         </div>`
+      : "";
+
     if (!groups.length) {
-      contentEl.innerHTML = `<div class="bf-content-empty">Keine fliegbaren Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} — ${counts.spots_nogo || 0} NO-GO, ${counts.spots_bronze || 0} Abgleiter.</div>`;
+      const emptyMsg = state.focusSpot
+        ? `Spot "${escapeHtml(state.focusSpot)}" nicht in diesem Tag gefunden.`
+        : `Keine fliegbaren Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} — ${counts.spots_nogo || 0} NO-GO, ${counts.spots_bronze || 0} Abgleiter.`;
+      contentEl.innerHTML = focusBanner + `<div class="bf-content-empty">${emptyMsg}</div>`;
       return;
     }
 
-    contentEl.innerHTML = groups.map((g) => renderRegionSection(g, regionsMap[g.region_id])).join("");
+    contentEl.innerHTML = focusBanner + groups.map((g) => renderRegionSection(g, regionsMap[g.region_id])).join("");
+
+    // Focus-Modus: die eine verbleibende Spot-Kachel direkt aufklappen.
+    if (state.focusSpot) {
+      requestAnimationFrame(() => autoExpandFocusSpot());
+    }
+  }
+
+  function autoExpandFocusSpot() {
+    const contentEl = $("bfContent");
+    if (!contentEl) return;
+    const li = contentEl.querySelector(".bf-spot");
+    if (!li || li.classList.contains("is-expanded")) return;
+    const toggle = li.querySelector(".bf-spot-toggle");
+    const details = li.querySelector(".bf-spot-details");
+    if (!toggle || !details) return;
+    li.classList.add("is-expanded");
+    toggle.setAttribute("aria-expanded", "true");
+    details.removeAttribute("hidden");
+    const miniMap = details.querySelector(".bf-spot-minimap");
+    if (miniMap && !miniMap.classList.contains("bf-spot-minimap--nodata")) initMiniMap(miniMap);
+    const meteogramEl = details.querySelector(".bf-spot-meteogram");
+    if (meteogramEl) initMeteogram(meteogramEl);
+    requestAnimationFrame(() => {
+      try { li.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (_) {}
+    });
   }
 
   function renderRegionSection(group, meta) {
@@ -989,9 +1039,73 @@
     renderDayContent();
   }
 
+  // ── Deep-Link via URL-Params (E-Mail-Briefing -> Dashboard) ─
+  // Erwartete Params:
+  //   regions=<id1>,<id2>,...  -> ueberschreibt state.filterRegions
+  //   day=<N>                  -> waehlt den Tag-Tab mit Index N
+  //   spot=<name>              -> ephemerer Focus auf genau diesen Spot
+  // Nach Anwendung wird die URL bereinigt, damit Bookmarks/History die
+  // Params nicht dauerhaft mitschleppen. Fehlen alle Params -> Fallback
+  // auf das bestehende localStorage-Verhalten.
+  function parseUrlParams() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const regionsParam = params.get("regions");
+      const dayParam = params.get("day");
+      const spotParam = params.get("spot");
+      let touched = false;
+
+      if (regionsParam) {
+        const ids = regionsParam.split(",").map(s => s.trim()).filter(Boolean);
+        if (ids.length > 0) {
+          state.filterRegions = new Set(ids);
+          saveRegionFilter(state.filterRegions);
+          touched = true;
+        }
+      }
+
+      if (dayParam !== null) {
+        const idx = parseInt(dayParam, 10);
+        if (isFinite(idx) && idx >= 0) {
+          state.selectedDayIdx = idx;
+          saveDayIdx(idx);
+          touched = true;
+        }
+      }
+
+      if (spotParam) {
+        state.focusSpot = spotParam.trim();
+        touched = true;
+      } else {
+        state.focusSpot = null;
+      }
+
+      if (touched) {
+        try {
+          history.replaceState({}, "", window.location.pathname);
+        } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      console.warn("[briefing] URL param parse failed", e);
+    }
+  }
+
+  function clearFocusSpot() {
+    if (!state.focusSpot) return;
+    state.focusSpot = null;
+    try {
+      if (state.data) renderDayContent();
+    } catch (e) { /* ignore */ }
+  }
+
+  // Expose fuer onclick im Focus-Banner
+  window.__bf_clearFocus = clearFocusSpot;
+
   // ── Init ────────────────────────────────────────────────────
 
   function init() {
+    parseUrlParams();
+
     const btn = $("bfGenerateBtn");
     if (btn) btn.addEventListener("click", generateFazit);
 

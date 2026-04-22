@@ -1,6 +1,6 @@
 # Premium Dark-Theme UI Design Research
 
-Actionable design findings from 8 best-in-class dark-theme applications, compiled for the Flychat redesign.
+Actionable design findings from 8 best-in-class dark-theme applications, compiled for the Gleitcast redesign.
 
 ---
 
@@ -33,7 +33,7 @@ Actionable design findings from 8 best-in-class dark-theme applications, compile
 - **Typography**: System font stack (Inter-like), tight letter-spacing, medium weight (~500) for labels
 - **Spacing**: 8px grid system, generous padding (16-24px in cards), 4px micro-spacing for inline elements
 
-### Actionable Takeaways for Flychat
+### Actionable Takeaways for Gleitcast
 - Use near-black bg with very slight cool undertone (not pure `#000`)
 - Derive border/surface colors from white at extremely low opacity (5-8%)
 - Limit accent to one hue; use it only for interactive/active states
@@ -85,7 +85,7 @@ Actionable design findings from 8 best-in-class dark-theme applications, compile
 - Borders over shadows in dark mode
 - **Spacing**: 4px base unit, consistent 16px / 24px / 32px rhythm
 
-### Actionable Takeaways for Flychat
+### Actionable Takeaways for Gleitcast
 - Consider a true `#000` background if going for maximum contrast/OLED efficiency
 - Use a well-defined gray scale with consistent steps
 - Replace shadows with border treatments in dark mode
@@ -151,7 +151,7 @@ Actionable design findings from 8 best-in-class dark-theme applications, compile
 - Provide fallback: `background: rgba(17, 25, 40, 0.92)` for browsers without backdrop-filter
 - Avoid glass on frequently re-rendering elements
 
-### Actionable Takeaways for Flychat
+### Actionable Takeaways for Gleitcast
 - Use glassmorphism for map overlay panels (sidebar, spot info cards)
 - The `rgba(17, 25, 40, 0.75)` with `blur(16px)` is ideal for weather data panels on maps
 - Always add `saturate()` alongside blur to prevent washed-out appearance
@@ -190,7 +190,7 @@ Actionable design findings from 8 best-in-class dark-theme applications, compile
 - Compact spacing in the sidebar (28-32px row height)
 - Content area uses standard web spacing
 
-### Actionable Takeaways for Flychat
+### Actionable Takeaways for Gleitcast
 - Use a semantic variable system (background, foregroundPrimary/Secondary/Tertiary, accent, hover, focus)
 - Desaturate accent colors ~15-20% for dark backgrounds to avoid eye strain
 - Different background levels (bg -> bgExtra -> cutout) create depth without borders
@@ -238,7 +238,7 @@ For data viz on dark backgrounds, follow Stripe's approach:
 - Extensible theming architecture supports "darker mode" overlays
 - Color tokens include a full semantic layer: `color.bg.primary`, `color.bg.secondary`, `color.text.primary`, etc.
 
-### Actionable Takeaways for Flychat
+### Actionable Takeaways for Gleitcast
 - Use blue-black (`#14171D`) not neutral gray for dashboard backgrounds (feels more premium)
 - For thermal/wind data viz, use perceptually uniform color scales (LCH space)
 - Muted text color (`#C9CED8`) is more pleasant than bright white
@@ -289,7 +289,7 @@ For data viz on dark backgrounds, follow Stripe's approach:
 - Dynamically adapts tint, opacity, contrast based on background content
 - Semi-transparent overlay of 10-30% opacity (auto-adjusted for legibility)
 
-### Actionable Takeaways for Flychat
+### Actionable Takeaways for Gleitcast
 - Use weather-condition-aware background gradients (even subtle ones behind the map)
 - Frosted glass panels on map should use ~12-20% white bg with 16-20px blur
 - Hairline borders (0.5-1px) at very low opacity look premium on retina
@@ -337,7 +337,7 @@ For data viz on dark backgrounds, follow Stripe's approach:
 - **Isobars/contours**: Thin lines (1-2px) at low opacity over color overlay
 - **Spot markers**: Circular badges with wind speed number, colored by wind scale
 
-### Actionable Takeaways for Flychat
+### Actionable Takeaways for Gleitcast
 - Wind color scale: white(calm) -> blue(light) -> green(moderate) -> orange(fresh) -> red(strong) -> purple(gale)
 - Map overlays at 40-60% opacity with map dark tiles underneath
 - Use particle animations for wind if performance allows
@@ -374,7 +374,7 @@ For data viz on dark backgrounds, follow Stripe's approach:
 - **Map markers**: Site icons colored by flyability
 - **Data panels**: Compact forecast tables with color-coded cells
 
-### Actionable Takeaways for Flychat
+### Actionable Takeaways for Gleitcast
 - Modular widget grid is the standard for flight instrument apps
 - Large numbers for key metrics (climb rate, wind speed)
 - Thermal data: green-yellow-orange-red scale is universal in PG
@@ -384,7 +384,7 @@ For data viz on dark backgrounds, follow Stripe's approach:
 
 ---
 
-## Cross-Cutting Synthesis: Design System for Flychat
+## Cross-Cutting Synthesis: Design System for Gleitcast
 
 ### Recommended Background Colors
 ```css

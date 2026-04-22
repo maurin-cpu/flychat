@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · Subscribers – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="sp sp--wide">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Admin · Subscribers</h1>
+    <div class="sp-subtitle">E-Mail-Briefing · intern</div>
+  </header>
+
+  {% if flash_ok %}
+    <div class="sp-flash sp-flash--ok" role="status">{{ flash_ok }}</div>
+  {% endif %}
+  {% if flash_error %}
+    <div class="sp-flash sp-flash--error" role="alert">{{ flash_error }}</div>
+  {% endif %}
+
+  <!-- Stat-Kacheln -->
+  <div class="sp-stats">
+    <div class="sp-stat sp-stat--active">
+      <div class="sp-stat__label">Aktiv</div>
+      <div class="sp-stat__value">{{ stats_counts.active }}</div>
+    </div>
+    <div class="sp-stat sp-stat--pending">
+      <div class="sp-stat__label">Pending</div>
+      <div class="sp-stat__value">{{ stats_counts.pending }}</div>
+    </div>
+    <div class="sp-stat sp-stat--paused">
+      <div class="sp-stat__label">Pausiert</div>
+      <div class="sp-stat__value">{{ stats_counts.paused }}</div>
+    </div>
+    <div class="sp-stat sp-stat--unsubscribed">
+      <div class="sp-stat__label">Abgemeldet</div>
+      <div class="sp-stat__value">{{ stats_counts.unsubscribed }}</div>
+    </div>
+  </div>
+
+  <!-- Feedback-Karte -->
+  <section class="sp-card">
+    <div class="sp-card__label">Feedback letzten {{ stats_feedback.window_days }} Tagen</div>
+    <div class="sp-fb-card">
+      {% if stats_feedback.accuracy_pct is none %}
+        <div class="sp-fb-card__value sp-fb-card__value--none">—</div>
+        <div class="sp-fb-card__detail">noch keine Feedbacks</div>
+      {% else %}
+        <div class="sp-fb-card__value
+          {% if stats_feedback.accuracy_pct >= 75 %}sp-fb-card__value--good
+          {% elif stats_feedback.accuracy_pct >= 50 %}sp-fb-card__value--mid
+          {% else %}sp-fb-card__value--low{% endif %}">
+          {{ stats_feedback.accuracy_pct }}%
+        </div>
+        <div class="sp-fb-card__detail">
+          {{ stats_feedback.correct }} korrekt · {{ stats_feedback.wrong }} falsch
+          · {{ stats_feedback.total }} gesamt
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Actions -->
+  <div class="sp-admin-actions">
+
+    <div class="sp-action-block">
+      <h3>Test-Briefing senden</h3>
+      <p>Generiert ein Briefing für die E-Mail und schickt es sofort (async via SMTP).</p>
+      <form method="post" action="/admin/subscribers/send-test">
+        <input class="sp-input" type="email" name="email" placeholder="pilot@example.ch" required autocomplete="off">
+        <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit" style="width:auto;">Senden</button>
+      </form>
+    </div>
+
+    <div class="sp-action-block">
+      <h3>Scheduler jetzt triggern</h3>
+      <p>Versendet die Briefing-Mail an ALLE aktiven Subscriber (manueller Mo/Mi/Fr-Trigger).</p>
+      <form method="post" action="/admin/subscribers/trigger-all"
+            onsubmit="return confirm('Briefing an alle {{ stats_counts.active }} aktiven Subscriber jetzt senden?');">
+        <button class="sp-btn sp-btn--ghost sp-btn--sm" type="submit">
+          Jetzt versenden ({{ stats_counts.active }} Empfänger)
+        </button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Subscriber-Tabelle -->
+  <div class="sp-tbl-card">
+    <h2>Letzte {{ subscribers|length }} Subscriber</h2>
+    {% if subscribers %}
+    <div class="sp-tbl-scroll">
+      <table class="sp-tbl">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>E-Mail</th>
+            <th>Status</th>
+            <th>Level</th>
+            <th>Regionen</th>
+            <th>Registriert</th>
+            <th>Letzter Versand</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in subscribers %}
+          <tr>
+            <td class="sp-tbl__dt">#{{ s.id }}</td>
+            <td class="sp-tbl__email">{{ s.email }}</td>
+            <td><span class="sp-pill sp-pill--{{ s.status }}">{{ s.status }}</span></td>
+            <td>{{ s.skill_level }}</td>
+            <td title="{{ (s.regions or [])|join(', ') }}" style="font-size:var(--text-sm);color:var(--color-text-muted);">
+              {{ (s.regions or [])|length }} Region{% if (s.regions or [])|length != 1 %}en{% endif %}
+            </td>
+            <td class="sp-tbl__dt">{{ s.created_at.strftime('%Y-%m-%d %H:%M') if s.created_at else '' }}</td>
+            <td class="sp-tbl__dt">{{ s.last_sent_at.strftime('%Y-%m-%d %H:%M') if s.last_sent_at else '—' }}</td>
+            <td>
+              {% if s.status != 'unsubscribed' %}
+              <form method="post" action="/admin/subscribers/{{ s.id }}/block"
+                    onsubmit="return confirm('Subscriber #{{ s.id }} ({{ s.email }}) sperren?');"
+                    style="display:inline;">
+                <button class="sp-btn sp-btn--danger sp-btn--xs" type="submit" style="width:auto;">Sperren</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="sp-empty">Noch keine Subscriber.</div>
+    {% endif %}
+  </div>
+
+</main>
+{% endblock %}

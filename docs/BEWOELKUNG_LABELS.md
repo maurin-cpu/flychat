@@ -69,9 +69,12 @@ Bei Konflikt gewinnt immer der Reducer (sicherheitsrelevanter).
 | Schwelle | Wert | Typ | Wo definiert |
 |----------|------|-----|-------------|
 | Booster-Label | ≤50% max(tief,mittel) | LLM-Label | Skills (spot/region_combined, flyability) |
-| Produktive Stunde | <80% max(tief,mittel) | Deterministisch | config.py `PRODUCTIVE_CLOUD_MAX = 80` |
+| Produktive Stunde (tief) | ≤80% cloud_cover_low | Deterministisch | config.py `PRODUCTIVE_LOW_CLOUD_MAX = 80` |
+| Produktive Stunde (mittel) | ≤90% cloud_cover_mid | Deterministisch | config.py `PRODUCTIVE_MID_CLOUD_MAX = 90` |
 | Reducer-Label | ≥80% max(tief,mittel) | LLM-Label | Skills (spot/region_combined, flyability) |
 | OVERCAST-DANGER | ≥75% total + Basis tief | Deterministisch | chat_engine.py (3 Stellen) |
+
+**Warum tief und mittel für die produktive Stunde getrennt?** Research (Sektion 6 in `meteo_research/cloud_cover_thermal_impact.md`): Tiefe Wolken werfen direkten Schatten auf die Quellfläche → harter Thermik-Kill ab 80%. Mittlere Wolken (Altostratus, 3–6 km) sitzen über der Thermik-Arbeitshöhe und reduzieren Einstrahlung nur indirekt; laut FAA "praktisch tot" erst >87%. Eine einheitliche `max(low, mid) ≤ 80`-Schwelle würde Tage mit blauem Himmel-unten und hoher Altostratus-Decke fälschlich als "nicht produktiv" klassifizieren. Die Label-Logik (Booster/Reducer) bleibt bewusst bei `max(low, mid)` — dort geht es um Pilot-Wahrnehmung, nicht Thermik-Physik.
 
 **Wichtig**: Die Schwellen dienen verschiedenen Zwecken:
 - **Labels** (Booster/Reducer) = Qualitäts-Wahrnehmung für den Piloten
@@ -95,7 +98,7 @@ Hohe Bewölkung (Cirrus, >6000m) wird **ignoriert**:
 - `static/js/label-catalog.js` — Label-Definitionen, Exklusionsgruppen
 
 ### Backend
-- `config.py` — `PRODUCTIVE_CLOUD_MAX = 80`
+- `config.py` — `PRODUCTIVE_LOW_CLOUD_MAX = 80`, `PRODUCTIVE_MID_CLOUD_MAX = 90`
 - `chat_engine.py` — `_LABEL_KEYS_REDUCER`, `_LABEL_KEYS_BOOSTER`, OVERCAST-DANGER Logik
 
 ### Skills (LLM-Prompts)
@@ -119,3 +122,9 @@ Hohe Bewölkung (Cirrus, >6000m) wird **ignoriert**:
 - **Rename**: `HOHE_BEWOELKUNG` → `VIEL_BEWOELKUNG` (alter Name suggerierte "hohe Wolken" statt "hoher Bedeckungsgrad")
 - **Schwelle**: `PRODUCTIVE_CLOUD_MAX` von 70% auf 80% angehoben (Forschung: Thermik bis ~80% vorhanden)
 - **Forschungsbasis**: FAA AC 00-6A, Matuszko (2012), USHPA, Pagen
+
+### Apr 2026 — Low/Mid-Trennung für Produktiv-Stunde
+- **Aufgeteilt**: `PRODUCTIVE_CLOUD_MAX` → `PRODUCTIVE_LOW_CLOUD_MAX = 80` + `PRODUCTIVE_MID_CLOUD_MAX = 90`
+- **Grund**: `max(low, mid) ≤ 80` markierte Tage mit blauem Himmel-unten aber Altostratus-Decke fälschlich als "nicht produktiv", obwohl das Thermik-Modell (cloud-attenuierte SW-Radiation) noch solides Steigen ausgab.
+- **Research-Basis**: Cloud Impact Sektion 6 differenziert tief (direkter Boden-Shade) vs. mittel (indirekt über Einstrahlung, "praktisch tot" laut FAA erst >87%).
+- **Effekt**: Altostratus-Tage mit 87-90% mid kippen nicht mehr automatisch auf Abgleiter/gray.

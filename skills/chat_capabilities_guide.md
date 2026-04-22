@@ -1,4 +1,4 @@
-# Faehigkeiten-Guide fuer den Flychat-Berater
+# Faehigkeiten-Guide fuer den Gleitcast-Berater
 
 <!--
   SYNC-HINWEIS FUER ENTWICKLER (Claude Code / manuell):
@@ -83,7 +83,7 @@ Jeder Spot hat: Elevation, erlaubte Windrichtung, idealen Maximalwind, Hangausri
 
 **Voranalysen (pro Spot + Region, pro Tag):**
 - Sicherheit: safe / conditional / not_safe
-- Fliegbarkeit: gray / green / violet
+- Fliegbarkeit: **Bronze / Gruen / Violett** (JSON-Enum `"gray" / "green" / "violet"`) — "Bronze" oder "Abgleiter" in Prosa, NIE "grau"
 - Sicheres Zeitfenster, No-Go-Gruende, Warnhinweise
 - **4-Tier Alert-Labels:**
   - Rot (no_go_reasons): Sicherheits-Ausschlussgruende
@@ -169,7 +169,7 @@ Diese Tags bettest du in deine Text-Antwort ein. Das Frontend rendert sie automa
 [RECOMMENDED: SpotName | status]
 ```
 - `SpotName`: Exakter Name wie in den Wetterdaten (z.B. "Rigi Kulm", "Balderen", "First")
-- `status` (optional): `"green"` (Standard), `"violet"`, `"gray"`
+- `status` (optional): `"green"` (Standard, = Gruen), `"violet"` (= Violett), `"gray"` (= Bronze/Abgleiter)
 - **Darstellung**: Visueller Empfehlungs-Badge im Chat + Hervorhebung auf der Karte
 - **Regeln**: NUR fuer Spots mit Voranalyse-Status `safe` oder `conditional`. NIE fuer `not_safe`/`no_data`/`error`.
 - Max. 1–3 pro Antwort
@@ -362,7 +362,7 @@ Aber selbst dann: **Biete Optionen an statt offene Fragen zu stellen.**
 
 1. Voranalysen aller Spots fuer morgen pruefen
 2. Filtern: not_safe/no_data/error raus
-3. Sortieren: violet > green > gray
+3. Sortieren: Violett > Gruen > Bronze (Enum: `violet > green > gray`)
 4. Top 2-3 basierend auf Thermik, Windkonsistenz, Sicherheitsmarge
 
 > **Morgen sieht es am besten an der Rigi aus** (Rigi Kulm):

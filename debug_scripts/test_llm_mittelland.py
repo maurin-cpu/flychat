@@ -13,9 +13,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from openai import OpenAI
-from prompts import REGION_FLYABILITY_PROMPT
+from prompts import REGION_COMBINED_PROMPT
 import config
-from chat_engine import FlychatEngine
+from chat_engine import GleitcastEngine
 
 # --- Init Engine mit echten Wetterdaten ---
 api_key = os.environ.get("OPENAI_API_KEY")
@@ -31,8 +31,8 @@ print(f"Shear-Schwellen Mittelland: {config.SHEAR_THRESHOLDS['mittelland']}")
 print()
 
 # --- Engine laden um echten Kontext zu bauen ---
-print("Lade FlychatEngine mit gecachten Wetterdaten...")
-engine = FlychatEngine()
+print("Lade GleitcastEngine mit gecachten Wetterdaten...")
+engine = GleitcastEngine()
 engine.load_weather_from_cache()
 
 from source_area import get_all_regions
@@ -134,15 +134,15 @@ print("LLM CALL...")
 print("=" * 70)
 
 messages = [
-    {"role": "system", "content": REGION_FLYABILITY_PROMPT},
+    {"role": "system", "content": REGION_COMBINED_PROMPT},
     {"role": "user", "content": full_user_msg},
 ]
 
 response = client.chat.completions.create(
     model=model,
     messages=messages,
-    temperature=0.3,
-    max_tokens=500,
+    temperature=0.2,
+    max_tokens=1100,
     response_format={"type": "json_object"},
 )
 

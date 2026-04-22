@@ -1,5 +1,5 @@
 """
-Flychat Engine — Konstanten + Pure-Helpers.
+Gleitcast Engine — Konstanten + Pure-Helpers.
 
 Alles in dieser Datei hat KEINE Abhaengigkeit zur Engine-Klasse/State.
 Nur Konstanten + pure Funktionen. Damit trivial unit-testbar.
@@ -21,14 +21,30 @@ MAX_HISTORY_MESSAGES = 40  # Max messages per conversation before trimming
 
 
 # ============================================================================
-# Token-Budget-Management: verhindert 400-Fehler bei gpt-4o-mini (128k Limit)
+# Token-Budget-Management: verhindert 400-Fehler bei grossen Kontexten.
+# Konservativ auf *effektives* Input-Budget je Modell gesetzt (nicht das
+# volle Context-Window, damit Output + Overhead Platz haben).
 # ============================================================================
 _MODEL_TOKEN_LIMITS = {
-    "gpt-4o-mini": 128_000,
-    "gpt-4o": 128_000,
-    "gpt-4-turbo": 128_000,
-    "gpt-4": 8_192,
-    "gpt-3.5-turbo": 16_385,
+    # OpenAI
+    "gpt-4o-mini":    128_000,
+    "gpt-4o":         128_000,
+    "gpt-4-turbo":    128_000,
+    "gpt-4":            8_192,
+    "gpt-3.5-turbo":   16_385,
+    "gpt-4.1":        128_000,
+    "gpt-4.1-mini":   128_000,
+    "gpt-4.1-nano":   128_000,
+    # Anthropic (Claude) — alle aktuellen Modelle haben 200k Context
+    "claude-haiku-4-5":   200_000,
+    "claude-sonnet-4-6":  200_000,
+    "claude-opus-4-7":    200_000,
+    "claude-3-5-haiku-latest":  200_000,
+    "claude-3-5-sonnet-latest": 200_000,
+    # Google Gemini — 1M Context bei 2.5-Reihe
+    "gemini-2.5-flash":      1_000_000,
+    "gemini-2.5-flash-lite": 1_000_000,
+    "gemini-2.5-pro":        1_000_000,
 }
 _DEFAULT_TOKEN_LIMIT = 128_000
 # Reserve fuer System-Prompt, Tools, User-Frage, Response-Tokens, History
@@ -173,24 +189,35 @@ def _weekday_de(dt_or_str) -> str:
 
 
 # ============================================================================
-# OpenAI-Error-Klassifikation
+# LLM-Error-Klassifikation (Provider-uebergreifend: OpenAI + Anthropic + Gemini)
 # ============================================================================
+_PERMANENT_ERROR_KEYWORDS = (
+    # OpenAI
+    "insufficient_quota", "invalid_api_key", "authentication",
+    # Anthropic
+    "authentication_error", "permission_error", "invalid api key",
+    # Gemini / Google
+    "permission_denied", "unauthenticated", "api key not valid",
+    "api_key_invalid", "invalid_argument: api key",
+)
+
+
 def _is_permanent_api_error(err: Exception) -> bool:
-    """Prueft ob ein OpenAI-Fehler permanent ist (kein Retry sinnvoll).
+    """Prueft ob ein LLM-Fehler permanent ist (kein Retry sinnvoll).
     insufficient_quota, authentication_error, invalid_api_key → sofort abbrechen.
     rate_limit, timeout, connection → transient, Retry lohnt sich."""
     err_str = str(err).lower()
-    return any(kw in err_str for kw in ("insufficient_quota", "invalid_api_key", "authentication"))
+    return any(kw in err_str for kw in _PERMANENT_ERROR_KEYWORDS)
 
 
 def _user_friendly_api_error(err: Exception) -> str:
-    """Gibt eine benutzerfreundliche Fehlermeldung fuer permanente API-Fehler zurueck."""
+    """Gibt eine benutzerfreundliche Fehlermeldung fuer permanente LLM-Fehler zurueck."""
     err_str = str(err).lower()
-    if "insufficient_quota" in err_str:
-        return "API-Budget aufgebraucht — bitte OpenAI-Guthaben aufladen"
-    if "invalid_api_key" in err_str:
+    if "insufficient_quota" in err_str or "quota" in err_str:
+        return "API-Budget aufgebraucht — bitte Provider-Guthaben aufladen"
+    if any(kw in err_str for kw in ("invalid_api_key", "api_key_invalid", "api key not valid", "invalid api key")):
         return "Ungueltiger API-Key — bitte in den Einstellungen pruefen"
-    if "authentication" in err_str:
+    if any(kw in err_str for kw in ("authentication", "unauthenticated", "permission_denied", "permission_error")):
         return "API-Authentifizierung fehlgeschlagen — bitte API-Key pruefen"
     return f"API-Fehler: {err}"
 
@@ -279,6 +306,8 @@ _TAG_NATURAL = [
     ("THERMAL-ROUGH-DEGRADED", "ruppige Thermik"),
     ("SHEAR-UNUSABLE",         "starke Scherung"),
     ("SHEAR-DEGRADED",         "Hoehenscherung"),
+    ("THERMAL-WIND-UNUSABLE",  "Grundwind zerreisst Thermik"),
+    ("THERMAL-WIND-DEGRADED",  "Grundwind stoert Thermik"),
     # Kurzformen (LLM kuerzt manchmal ab)
     ("TORN-UNUSABLE",          "Thermik zerrissen"),
     ("TORN-DEGRADED",          "Thermik unruhig"),
@@ -286,6 +315,8 @@ _TAG_NATURAL = [
     ("ROUGH-UNUSABLE",         "extreme Turbulenz"),
     ("ROUGH-DEGRADED",         "ruppige Thermik"),
     ("SHEAR-DEG",              "Hoehenscherung"),
+    ("WIND-UNUSABLE",          "Grundwind zu stark fuer Thermik"),
+    ("WIND-DEGRADED",          "starker Grundwind stoert Thermik"),
     # Wind / Boeen
     ("ALOFT-GUST-DANGER",      "gefaehrliche Hoehenboeen"),
     ("ALOFT-GUST-WARN",        "kraeftige Hoehenboeen"),
@@ -479,17 +510,26 @@ COMPASS_POINTS = {
 }
 
 
-def _compute_wind_trend(clean_hours: list[str], hourly_gusts: dict[str, float]) -> str:
+def _compute_wind_trend(
+    clean_hours: list[str],
+    hourly_values: dict[str, float],
+    value_label: str = "Böen",
+    danger_threshold: float = 40,
+) -> str:
     """Berechnet Windtendenz rund um das saubere Fenster.
+
+    value_label: "Böen" (Spot, Default) oder "Wind" (Region, keine Böen).
+    danger_threshold: km/h, ab der der Wert als gefährlich gilt
+        (40 für Böen, 30 für Wind-only).
 
     Returns z.B.:
         "WIND-TREND: VERSCHLECHTERUNG — Böen steigen nach Fenster von 37→57 km/h"
         "WIND-TREND: STABIL"
     """
-    if not clean_hours or not hourly_gusts:
+    if not clean_hours or not hourly_values:
         return ""
 
-    all_hours = sorted(hourly_gusts.keys())
+    all_hours = sorted(hourly_values.keys())
     if not all_hours:
         return ""
 
@@ -497,61 +537,60 @@ def _compute_wind_trend(clean_hours: list[str], hourly_gusts: dict[str, float]) 
     first_clean = min(clean_set)
     last_clean = max(clean_set)
 
-    # Böen VOR dem Fenster (bis zu 3 Stunden)
-    pre_gusts = []
+    # Werte VOR dem Fenster (bis zu 3 Stunden)
+    pre_vals = []
     for h in all_hours:
         if h >= first_clean:
             break
-        pre_gusts.append(hourly_gusts[h])
-    pre_gusts = pre_gusts[-3:]
+        pre_vals.append(hourly_values[h])
+    pre_vals = pre_vals[-3:]
 
-    # Böen IM Fenster
-    window_gusts = [hourly_gusts[h] for h in all_hours if h in clean_set and h in hourly_gusts]
+    # Werte IM Fenster
+    window_vals = [hourly_values[h] for h in all_hours if h in clean_set and h in hourly_values]
 
-    # Böen NACH dem Fenster (bis zu 3 Stunden)
-    post_gusts = []
+    # Werte NACH dem Fenster (bis zu 3 Stunden)
+    post_vals = []
     past_window = False
     for h in all_hours:
         if h > last_clean:
             past_window = True
-        if past_window and h in hourly_gusts:
-            post_gusts.append(hourly_gusts[h])
-            if len(post_gusts) >= 3:
+        if past_window and h in hourly_values:
+            post_vals.append(hourly_values[h])
+            if len(post_vals) >= 3:
                 break
 
-    if not window_gusts:
+    if not window_vals:
         return ""
 
-    avg_window = sum(window_gusts) / len(window_gusts)
-    avg_pre = sum(pre_gusts) / len(pre_gusts) if pre_gusts else 0
-    avg_post = sum(post_gusts) / len(post_gusts) if post_gusts else 0
-    max_post = max(post_gusts) if post_gusts else 0
+    avg_window = sum(window_vals) / len(window_vals)
+    avg_pre = sum(pre_vals) / len(pre_vals) if pre_vals else 0
+    avg_post = sum(post_vals) / len(post_vals) if post_vals else 0
+    max_post = max(post_vals) if post_vals else 0
 
-    DANGER_GUST = 40  # km/h
-    pre_danger = avg_pre > DANGER_GUST
-    post_danger = avg_post > DANGER_GUST
+    pre_danger = avg_pre > danger_threshold
+    post_danger = avg_post > danger_threshold
 
     if pre_danger and post_danger:
         return (
-            f"WIND-TREND: EINGEKESSELT — Fenster liegt zwischen zwei Böen-Phasen "
+            f"WIND-TREND: EINGEKESSELT — Fenster liegt zwischen zwei {value_label}-Phasen "
             f"(vorher Ø{avg_pre:.0f}, Fenster Ø{avg_window:.0f}, nachher Ø{avg_post:.0f} km/h). "
             f"ERHÖHTES RISIKO: Verschlechterung nach dem Fenster sehr wahrscheinlich!"
         )
     elif post_danger and not pre_danger:
         return (
-            f"WIND-TREND: VERSCHLECHTERUNG — Böen steigen nach dem Fenster stark an "
+            f"WIND-TREND: VERSCHLECHTERUNG — {value_label} steigen nach dem Fenster stark an "
             f"(Fenster Ø{avg_window:.0f} → nachher Ø{avg_post:.0f} km/h, max {max_post:.0f} km/h). "
             f"ERHÖHTES RISIKO!"
         )
     elif pre_danger and not post_danger:
         return (
-            f"WIND-TREND: VERBESSERUNG — Böen nehmen ab "
+            f"WIND-TREND: VERBESSERUNG — {value_label} nehmen ab "
             f"(vorher Ø{avg_pre:.0f} → Fenster Ø{avg_window:.0f} → nachher Ø{avg_post:.0f} km/h). "
             f"Positiver Trend."
         )
-    elif post_gusts and avg_post > avg_window + 10:
+    elif post_vals and avg_post > avg_window + 10:
         return (
-            f"WIND-TREND: LEICHTE VERSCHLECHTERUNG — Böen nehmen nach dem Fenster zu "
+            f"WIND-TREND: LEICHTE VERSCHLECHTERUNG — {value_label} nehmen nach dem Fenster zu "
             f"(Fenster Ø{avg_window:.0f} → nachher Ø{avg_post:.0f} km/h)."
         )
     else:
@@ -604,11 +643,13 @@ def _detect_rain_sandwich(rain_hours: list, all_hours_sorted: list) -> dict:
     }
 
 
-def _detect_gust_trend(gust_hours: list, all_hours_sorted: list) -> dict:
+def _detect_gust_trend(gust_hours: list, all_hours_sorted: list,
+                       gust_danger_hours: list = None) -> dict:
     """Erkennt Boeen-Trendmuster ueber den Tag (analog _detect_rain_sandwich).
 
     Boeen-Stunden = Stunden mit irgendeinem der Tags
     [GUST-WARN], [GUST-DANGER], [ALOFT-GUST-WARN], [ALOFT-GUST-DANGER].
+    gust_danger_hours: Untermenge mit Tags >40 km/h (DANGER-Level).
 
     Returns dict mit:
         is_sandwiched: bool — ruhiges Fenster zwischen zwei boeigen Phasen
@@ -617,10 +658,12 @@ def _detect_gust_trend(gust_hours: list, all_hours_sorted: list) -> dict:
         calm_end: str — Ende
         gusts_before_calm: bool — boeige Stunden vor dem laengsten ruhigen Fenster
         gusts_after_calm: bool — boeige Stunden nach dem laengsten ruhigen Fenster
-        gust_count: int — Anzahl boeiger Stunden
+        gust_count: int — Anzahl boeiger Stunden (WARN + DANGER)
+        danger_count: int — Anzahl Stunden mit DANGER-Level (>40 km/h)
         total_count: int — Gesamtanzahl Stunden im Fenster
     """
     total = len(all_hours_sorted or [])
+    danger_count = len(gust_danger_hours or [])
     if not gust_hours or not all_hours_sorted:
         return {
             "is_sandwiched": False,
@@ -630,6 +673,7 @@ def _detect_gust_trend(gust_hours: list, all_hours_sorted: list) -> dict:
             "gusts_before_calm": False,
             "gusts_after_calm": False,
             "gust_count": 0,
+            "danger_count": 0,
             "total_count": total,
         }
 
@@ -655,6 +699,7 @@ def _detect_gust_trend(gust_hours: list, all_hours_sorted: list) -> dict:
             "gusts_before_calm": False,
             "gusts_after_calm": False,
             "gust_count": len(gust_hours),
+            "danger_count": danger_count,
             "total_count": total,
         }
 
@@ -672,6 +717,7 @@ def _detect_gust_trend(gust_hours: list, all_hours_sorted: list) -> dict:
         "gusts_before_calm": gusts_before,
         "gusts_after_calm": gusts_after,
         "gust_count": len(gust_hours),
+        "danger_count": danger_count,
         "total_count": total,
     }
 
@@ -686,12 +732,17 @@ def _format_gust_trend_text(gust_pattern: dict, gust_hours: list) -> str:
       AUFKLAERUNG  — boeig nur frueh, danach ruhig (keine Rueckkehr)
       ZUNEHMEND    — ruhig morgens, boeig nachmittags
       VEREINZELT   — boeige Stunden gestreut, lange ruhige Phase vorhanden
+
+    Severitaet: not_safe nur bei DANGER-Mehrheit (>40 km/h Bodenboeen ODER
+    >40 km/h Hoehenboeen im Flugraum). Reine WARN-Level (30-40 km/h) →
+    max conditional, sportlich.
     """
     if not gust_hours:
         return ""
 
     gc = gust_pattern.get("gust_count", 0)
     tc = gust_pattern.get("total_count", 0)
+    dc = gust_pattern.get("danger_count", 0)
     if tc == 0 or gc == 0:
         return ""
 
@@ -702,21 +753,39 @@ def _format_gust_trend_text(gust_pattern: dict, gust_hours: list) -> str:
     calm_start = gust_pattern.get("calm_start", "")
     calm_end = gust_pattern.get("calm_end", "")
 
+    danger_majority = dc >= max(3, int(0.5 * gc))
+
     if gc >= max(1, int(0.75 * tc)) or calm_gap < 2:
+        if danger_majority:
+            return (
+                f"BOEEN-TREND: DURCHGEHEND (DANGER-Mehrheit) — Boeige Stunden in {gc} von {tc}h, "
+                f"davon {dc}h mit Boeen >40 km/h (Boden oder Flugraum), "
+                f"laengstes ruhiges Fenster nur {calm_gap}h. "
+                f"Kein verlaesslich ruhiges Flugfenster. "
+                f"→ safety_status sollte not_safe sein."
+            )
         return (
-            f"BOEEN-TREND: DURCHGEHEND — Boeige Stunden in {gc} von {tc}h, "
-            f"laengstes ruhiges Fenster nur {calm_gap}h. "
-            f"Kein verlaesslich ruhiges Flugfenster. "
-            f"→ safety_status sollte not_safe sein."
+            f"BOEEN-TREND: DURCHGEHEND (WARN-Level) — Boeige Stunden in {gc} von {tc}h, "
+            f"laengstes ruhiges Fenster {calm_gap}h. "
+            f"Boeen durchwegs 30-40 km/h (sportlich, aber fliegbar). "
+            f"→ maximal conditional, nicht not_safe. Sportliche Bedingungen in caution_notes erwaehnen."
         )
 
     if is_sand and calm_gap < 4:
+        if danger_majority:
+            return (
+                f"BOEEN-TREND: EINGEKESSELT (DANGER) — Ruhiges Fenster nur {calm_gap}h "
+                f"({calm_start}-{calm_end}) zwischen boeigen Phasen "
+                f"({gc}h boeig, davon {dc}h >40 km/h). "
+                f"Pilot startet in eskalierende Bedingungen — Boeen kommen zurueck! "
+                f"→ safety_status sollte not_safe sein. primary_no_go = EINGEKESSELT-BOEEN"
+            )
         return (
-            f"BOEEN-TREND: EINGEKESSELT — Ruhiges Fenster nur {calm_gap}h "
+            f"BOEEN-TREND: EINGEKESSELT (WARN-Level) — Ruhiges Fenster {calm_gap}h "
             f"({calm_start}-{calm_end}) zwischen boeigen Phasen "
-            f"({gc}h boeig insgesamt). Pilot startet in eskalierende Bedingungen — "
-            f"Boeen kommen zurueck! "
-            f"→ safety_status sollte not_safe sein. primary_no_go = EINGEKESSELT-BOEEN"
+            f"({gc}h boeig, 30-40 km/h). "
+            f"Boeen kommen zurueck — Pilot muss vor Ende landen, sportlich. "
+            f"→ maximal conditional. Zeitfenster in caution_notes konkret begruenden."
         )
 
     if is_sand:

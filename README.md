@@ -1,4 +1,4 @@
-# FlyChat - Thermik & Wetter Assistant
+# Gleitcast - Thermik & Wetter Assistant
 
 Dieses Projekt dient der Analyse und Vorhersage von Thermikbedingungen für Gleitschirmflieger.
 

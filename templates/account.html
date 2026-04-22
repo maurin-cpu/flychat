@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Dein Abo – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="sp">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Dein Abo</h1>
+    <div class="sp-subtitle">Einstellungen verwalten</div>
+  </header>
+
+  {% if flash_ok %}
+    <div class="sp-flash sp-flash--ok" role="status">{{ flash_ok }}</div>
+  {% endif %}
+  {% if flash_error %}
+    <div class="sp-flash sp-flash--error" role="alert">{{ flash_error }}</div>
+  {% endif %}
+
+  <section class="sp-card">
+    <div class="sp-card__label">Status</div>
+    <dl class="sp-kv">
+      <dt>E-Mail</dt>
+      <dd>{{ subscriber.email }}</dd>
+      <dt>Status</dt>
+      <dd>
+        <span class="sp-pill sp-pill--{{ subscriber.status }}">
+          {% if subscriber.status == 'active' %}Aktiv
+          {% elif subscriber.status == 'paused' %}Pausiert{% if subscriber.paused_until %} bis {{ subscriber.paused_until }}{% endif %}
+          {% elif subscriber.status == 'pending' %}Nicht bestätigt
+          {% elif subscriber.status == 'unsubscribed' %}Abgemeldet
+          {% else %}{{ subscriber.status }}{% endif %}
+        </span>
+      </dd>
+      <dt>Level</dt>
+      <dd>
+        {% if subscriber.skill_level == 'beginner' %}Anfänger
+        {% elif subscriber.skill_level == 'expert' %}Profi
+        {% else %}Standard{% endif %}
+      </dd>
+      <dt>Regionen</dt>
+      <dd>
+        {% for r in region_names %}{{ r }}{% if not loop.last %}, {% endif %}{% endfor %}
+      </dd>
+    </dl>
+  </section>
+
+  {% if subscriber.status == 'active' %}
+  <section class="sp-card">
+    <div class="sp-card__label">Pause</div>
+    <div class="sp-card__hint">Keine Zeit zum Fliegen? Pausiere deine Briefings vorübergehend.</div>
+    <div class="sp-actions sp-actions--two-col">
+      <form method="post" action="/account/{{ token }}/pause_14d">
+        <button type="submit" class="sp-btn sp-btn--secondary" style="width:100%;">Pause 2 Wochen</button>
+      </form>
+      <form method="post" action="/account/{{ token }}/pause_30d">
+        <button type="submit" class="sp-btn sp-btn--secondary" style="width:100%;">Pause 1 Monat</button>
+      </form>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if subscriber.status == 'paused' %}
+  <section class="sp-card">
+    <div class="sp-card__label">Pause beenden</div>
+    <div class="sp-card__hint">
+      Wieder Lust auf Briefings? Deine Pause endet ohnehin automatisch
+      {% if subscriber.paused_until %} am {{ subscriber.paused_until }}{% endif %}.
+    </div>
+    <form method="post" action="/account/{{ token }}/resume">
+      <button type="submit" class="sp-btn sp-btn--primary">Jetzt fortsetzen</button>
+    </form>
+  </section>
+  {% endif %}
+
+  <section class="sp-card">
+    <div class="sp-card__label">Abmelden</div>
+    <div class="sp-card__hint">
+      Keine Lust mehr? Ein Klick und du bist raus. Du kannst dich jederzeit wieder anmelden.
+    </div>
+    <form method="post" action="/account/{{ token }}/unsubscribe">
+      <button type="submit" class="sp-btn sp-btn--danger">Endgültig abmelden</button>
+    </form>
+  </section>
+
+</main>
+{% endblock %}

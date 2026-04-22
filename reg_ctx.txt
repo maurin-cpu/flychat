@@ -1,0 +1,40 @@
+WETTERDATEN FUER REGION: Zentralschweizer Voralpen — TAG: 2026-04-21 (Dienstag) (Stand: 2026-04-21T14:09:36.385890)
+═══ REGION: Zentralschweizer Voralpen (Referenzhoehe: 1860m MSL, Kritischer Foehn: Süd) ═══
+2026-04-21 10:00: Temp 2.1°C | Wind 3km/h aus 344° (Turbulenzrisiko 17km/h, Exzess +13km/h) [WIND-CALM] [Anker-Boeen 1860m: 17km/h, 1 Anker] [THERMAL-ROUGH-FRAGMENTED] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1860–2948m MSL | 850hPa(1470m): 6/17km/h aus 48° | 800hPa(1959m)*: 5/18km/h aus 238° | 700hPa(3016m)~: 28/31km/h aus 264° | THERMIK-PROXY: 0.3 m/s bis 1948m MSL, LCL/Basis 2373m (Guete: 1/10)
+2026-04-21 11:00: Temp 3.3°C | Wind 6km/h aus 351° (Turbulenzrisiko 18km/h, Exzess +12km/h) [WIND-CALM] [Anker-Boeen 1860m: 18km/h, 1 Anker] [ALOFT-WARN] [ALOFT-GUST-WARN] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1860–3448m MSL | 850hPa(1469m): 5/15km/h aus 354° | 800hPa(1960m)*: 3/18km/h aus 248° | 700hPa(3016m)*: 31/34km/h aus 263° | THERMIK-PROXY: 1.5 m/s bis 2448m MSL, LCL/Basis 2448m (Guete: 5/10) | TQ 0/1 sauber, 1/1 ROUGH-UNU, 1/1 SHEAR-UNU, 1/1 TORN-UNU
+2026-04-21 12:00: Temp 4.1°C | Wind 7km/h aus 354° (Turbulenzrisiko 20km/h, Exzess +13km/h) [WIND-CALM] [Anker-Boeen 1860m: 20km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1860–3575m MSL | 850hPa(1466m): 7/18km/h aus 333° | 800hPa(1958m)*: 4/19km/h aus 276° | 700hPa(3016m)*: 22/25km/h aus 257° | THERMIK-PROXY: 1.6 m/s bis 2575m MSL, LCL/Basis 2575m (Guete: 7/10) | TQ 0/1 sauber, 1/1 ROUGH-UNU, 1/1 SHEAR-DEG, 1/1 TORN-UNU
+2026-04-21 13:00: Temp 4.6°C | Wind 9km/h aus 352° (Turbulenzrisiko 21km/h, Exzess +12km/h) [WIND-CALM] [Anker-Boeen 1860m: 21km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 9% (tief 9%, mittel 0%, hoch 0%) | FLUGBEREICH: 1860–3578m MSL | 850hPa(1467m): 9/20km/h aus 337° | 800hPa(1959m)*: 5/20km/h aus 315° | 700hPa(3017m)*: 18/22km/h aus 258° | THERMIK-PROXY: 1.8 m/s bis 2578m MSL, LCL/Basis 2578m (Guete: 7/10) | TQ 0/1 sauber, 1/1 ROUGH-UNU, 1/1 SHEAR-UNU, 1/1 TORN-UNU
+2026-04-21 14:00: Temp 5.0°C | Wind 9km/h aus 1° (Turbulenzrisiko 21km/h, Exzess +12km/h) [WIND-CALM] [Anker-Boeen 1860m: 21km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1860–3632m MSL | 850hPa(1471m): 10/20km/h aus 2° | 800hPa(1963m)*: 7/20km/h aus 360° | 700hPa(3021m)*: 20/23km/h aus 254° | THERMIK-PROXY: 1.8 m/s bis 2632m MSL, LCL/Basis 2632m (Guete: 7/10) | TQ 0/1 sauber, 1/1 ROUGH-FRAG, 1/1 SHEAR-DEG, 1/1 TORN-UNU
+2026-04-21 15:00: Temp 5.2°C | Wind 10km/h aus 357° (Turbulenzrisiko 22km/h, Exzess +12km/h) [WIND-CALM] [Anker-Boeen 1860m: 22km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 68% (tief 68%, mittel 0%, hoch 0%) | FLUGBEREICH: 1860–3741m MSL | 850hPa(1472m): 15/25km/h aus 30° | 800hPa(1964m)*: 14/25km/h aus 28° | 700hPa(3021m)*: 23/26km/h aus 254° | 600hPa(4204m)~: 48km/h aus 273° | THERMIK-PROXY: 1.9 m/s bis 2741m MSL, LCL/Basis 2741m (Guete: 7/10) | TQ 0/1 sauber, 1/1 ROUGH-FRAG, 1/1 SHEAR-UNU, 1/1 TORN-UNU
+2026-04-21 16:00: Temp 5.4°C | Wind 15km/h aus 16° (Turbulenzrisiko 26km/h, Exzess +11km/h) [WIND-CALM] [Anker-Boeen 1860m: 26km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 57% (tief 57%, mittel 0%, hoch 0%) | FLUGBEREICH: 1860–3856m MSL | 850hPa(1474m): 18/28km/h aus 45° | 800hPa(1966m)*: 16/28km/h aus 43° | 700hPa(3024m)*: 24/28km/h aus 261° | 600hPa(4206m)~: 49km/h aus 273° | THERMIK-PROXY: 1.9 m/s bis 2856m MSL, LCL/Basis 2856m (Guete: 7/10) | TQ 0/1 sauber, 1/1 ROUGH-FRAG, 1/1 TORN-UNU
+
+═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══
+[WIND-CALM] Stunden (7): 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00
+[WIND-MODERATE] Stunden (0): KEINE
+[WIND-STRONG] Stunden (0): KEINE (NICHT FLIEGBAR)
+Saubere Stunden (7): 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00
+→ 7 saubere Stunden: safety_status eher safe oder conditional.
+
+═══ TAGESPROFIL (für ganzheitliche Beurteilung) ═══
+Flugfenster ausgewertet: 7h (zwischen 10:00 und 17:00)
+Verhaeltnis sauber/gesamt: 7/7h = 100%
+Hauptgefahren am Tag: THERMAL-ROUGH-FRAGMENTED 1h, ALOFT-WARN 1h, ALOFT-GUST-WARN 1h
+
+═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══
+10:00:clean · 11:00:WARN(ALOFT+ALOFT-GUST) · 12:00:clean · 13:00:clean · 14:00:clean · 15:00:clean · 16:00:clean
+→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen zwei gefaehrlichen = NICHT als stabiles Fenster werten).
+
+═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══
+10:00:degraded(ROUGH-FRAG) · 11:00:produktiv(1.5) · 12:00:produktiv(1.6) · 13:00:produktiv(1.8) · 14:00:produktiv(1.8) · 15:00:produktiv(1.9) · 16:00:produktiv(1.9)
+→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · degraded = ruppig aber fliegbar · unusable = Thermik unbrauchbar (Klapper/Scherung) · keine-thermik = kein Steigen.
+
+═══ HOEHEN-SEGMENTE im Flugbereich (Gefahr nach Hoehe, Safety) ═══
+11:00 | Band 1860-3448m (Thermik-Top 2448m): 1960m:OK · 3016m:WARN
+→ DANGER/WARN im Flugbereich = relevante Sicherheits-Gefahr. Pruefe, ob die gefaehrliche Hoehe im genutzten Kurbelband liegt (Referenzhoehe bis Thermik-Top).
+→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): ROUGH-DEGRADED 1h, sauber 6h von 7 Thermik-Stunden. ROUGH-UNUSABLE-Anteil: 0% (0/7h), Gesamt-UNUSABLE-Anteil: 0% (0/7h). Peak-Steigen (Proxy): 1.9 m/s.
+→ PRODUKTIVE-THERMIK: 6h (Climb ≥0.7 m/s, tief ≤80%, mittel ≤90%, kein ROUGH-UNUSABLE). Min für green-Tag: 4h. HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar).
+WIND-TREND: STABIL — Keine signifikante Verschlechterung nach dem Fenster.
+BOEEN-TREND: AUFKLAERUNG — Boeig frueh (1h, bis 12:00), danach ruhig (5h ab 12:00). Boeen ziehen ab, danach stabil ruhig — keine Rueckkehr. → Ruhige Stunden normal bewerten, safe_window dort setzen. safety_status kann safe oder conditional sein, je nach Wind-Sektor und Restrisiko.
+
+═══ FÖHN-INDIKATOR ═══
+Keine Föhn-Daten verfügbar.

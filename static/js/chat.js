@@ -1,5 +1,5 @@
 /**
- * Flychat - Chat Frontend Logic
+ * Gleitcast - Chat Frontend Logic
  */
 (function () {
     'use strict';
@@ -20,10 +20,10 @@
     var isLoading = false;
 
     function getSessionId() {
-        var id = localStorage.getItem('flychat_session');
+        var id = localStorage.getItem('gleitcast_session');
         if (!id) {
             id = 'sess_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-            localStorage.setItem('flychat_session', id);
+            localStorage.setItem('gleitcast_session', id);
         }
         return id;
     }
@@ -414,7 +414,7 @@
                     if (data.success) {
                         // UI zurücksetzen
                         messagesEl.innerHTML = '';
-                        appendMessage('bot', 'Hallo! Ich bin dein Flychat-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.');
+                        appendMessage('bot', 'Hallo! Ich bin dein Gleitcast-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.');
                         if (quickActions) {
                             quickActions.classList.remove('compact');
                         }
@@ -933,7 +933,7 @@
 
     // ── Onboarding Hints (first visit only) ──────────────
     (function () {
-        var key = 'flychat_onboarded';
+        var key = 'gleitcast_onboarded';
         if (localStorage.getItem(key)) return;
         localStorage.setItem(key, '1');
         var qa = document.getElementById('quickActions');

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>Deine Vorhersage-Genauigkeit</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#111827;">
+
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
+Deine Gleitcast-Vorhersage war letzten Monat zu {{ stats.accuracy_pct }}% korrekt.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding:28px 32px 12px;">
+            <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;">Gleitcast &middot; Monatsrueckblick</div>
+            <div style="font-size:13px;color:#9ca3af;margin-top:2px;">{{ month_label }}</div>
+          </td>
+        </tr>
+
+        <!-- Hero: Accuracy-Zahl gross -->
+        <tr>
+          <td align="center" style="padding:12px 32px 4px;">
+            <div style="font-size:14px;color:#6b7280;margin-bottom:4px;">Deine Prognose war zu</div>
+            <div style="font-size:56px;font-weight:700;line-height:1;color:{{ color }};letter-spacing:-0.02em;">
+              {{ stats.accuracy_pct }}%
+            </div>
+            <div style="font-size:14px;color:#6b7280;margin-top:4px;">richtig.</div>
+          </td>
+        </tr>
+
+        <!-- Detail -->
+        <tr>
+          <td style="padding:20px 32px 8px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
+              <tr>
+                <td style="padding:14px 16px;font-size:14px;color:#374151;line-height:1.6;">
+                  Basierend auf <strong>{{ stats.total }}</strong> Feedbacks von dir
+                  in den letzten {{ stats.window_days }} Tagen:<br>
+                  <span style="color:#15803d;">{{ stats.correct }} mal passte die Vorhersage</span> &middot;
+                  <span style="color:#b91c1c;">{{ stats.wrong }} mal lag sie daneben</span>.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Framing-Text -->
+        <tr>
+          <td style="padding:16px 32px 4px;">
+            <p style="margin:0;font-size:15px;line-height:1.6;color:#374151;">
+              {{ message }}
+            </p>
+          </td>
+        </tr>
+
+        <!-- CTA -->
+        <tr>
+          <td style="padding:20px 32px 16px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="left" bgcolor="#7c3aed" style="border-radius:8px;">
+                  <a href="{{ urls.account }}"
+                     style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;background:#7c3aed;">
+                    Einstellungen anpassen
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 32px 28px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+            <p style="margin:0 0 6px;font-size:11px;line-height:1.6;color:#9ca3af;">
+              Gleitcast ist Decision Support &mdash; die finale Entscheidung triffst du.
+              Im Zweifel: nicht fliegen.
+            </p>
+            <p style="margin:10px 0 0;font-size:11px;color:#9ca3af;">
+              <a href="{{ urls.unsubscribe }}" style="color:#6b7280;text-decoration:underline;">Abmelden</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

@@ -1,5 +1,5 @@
 """
-Vercel Entry Point für Flychat.
+Vercel Entry Point für Gleitcast.
 Lazy-Initialisierung der Engine beim ersten Request (kein langer Cold-Start).
 """
 
@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from web import app, init_app
-from chat_engine import FlychatEngine
+from chat_engine import GleitcastEngine
 from instantdb_client import InstantDBClient
 import config
 
@@ -29,7 +29,7 @@ def _get_engine():
                 admin_token=config.INSTANTDB_ADMIN_TOKEN,
                 api_url=config.INSTANTDB_API_URL,
             )
-        _engine = FlychatEngine(instantdb_client=instantdb)
+        _engine = GleitcastEngine(instantdb_client=instantdb)
         init_app(_engine)
         # Kein refresh_weather() beim Cold-Start - verhindert Timeout (viele API-Calls).
         # Nutzer triggert /api/refresh-weather manuell.

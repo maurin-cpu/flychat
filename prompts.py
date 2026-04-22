@@ -1,5 +1,5 @@
 """
-Chat- und Analyse-Prompts für Flychat.
+Chat- und Analyse-Prompts für Gleitcast.
 
 Die Texte liegen unter skills/*.md (ein Skill = eine Markdown-Datei).
 Beim Import werden sie geladen; Änderungen an den .md-Dateien wirken nach Neustart des Prozesses.
@@ -8,6 +8,21 @@ Beim Import werden sie geladen; Änderungen an den .md-Dateien wirken nach Neust
 from pathlib import Path
 
 _SKILLS_DIR = Path(__file__).resolve().parent / "skills"
+_SHARED_DIR = _SKILLS_DIR / "shared"
+
+# Reihenfolge der Shared-Bausteine, wie sie in den Analyse-Prompt eingefügt werden.
+# Pädagogische Ordnung: Prinzipien → Input-Karte → Gefahren → Override → Fliegbarkeit → Formulierung → Sub-Ratings.
+_SHARED_BLOCKS = [
+    "_core_principles.md",
+    "_input_map.md",
+    "_hazard_blocks.md",
+    "_tages_override.md",
+    "_flyability_tiers.md",
+    "_formulierungs_tabelle.md",
+    "_subratings_tables.md",
+]
+
+_INSERT_MARKER = "<!-- INSERT_SHARED -->"
 
 
 def _load_skill(filename: str) -> str:
@@ -15,6 +30,31 @@ def _load_skill(filename: str) -> str:
     if not path.is_file():
         raise FileNotFoundError(f"Skill-Datei fehlt: {path}")
     return path.read_text(encoding="utf-8")
+
+
+def _load_shared(filename: str) -> str:
+    path = _SHARED_DIR / filename
+    if not path.is_file():
+        raise FileNotFoundError(f"Shared-Baustein fehlt: {path}")
+    return path.read_text(encoding="utf-8")
+
+
+def compose_analysis_prompt(mode: str) -> str:
+    """Komponiert den Analyse-Prompt aus einem Mode-Template + Shared-Bausteinen.
+
+    mode = 'spot' → skills/spot_analysis.md mit eingefügten Shared-Blöcken.
+    mode = 'region' → skills/region_analysis.md mit eingefügten Shared-Blöcken.
+
+    Das Template muss den Marker '<!-- INSERT_SHARED -->' enthalten; dort werden die
+    Shared-Bausteine in fester Reihenfolge (siehe _SHARED_BLOCKS) eingesetzt.
+    """
+    if mode not in ("spot", "region"):
+        raise ValueError(f"Unbekannter Analyse-Mode: {mode!r}")
+    template = _load_skill(f"{mode}_analysis.md")
+    if _INSERT_MARKER not in template:
+        raise ValueError(f"{mode}_analysis.md enthält keinen {_INSERT_MARKER}-Marker")
+    shared = "\n\n".join(_load_shared(name) for name in _SHARED_BLOCKS)
+    return template.replace(_INSERT_MARKER, shared)
 
 
 SYSTEM_PROMPT = _load_skill("system_chat.md")
@@ -40,13 +80,8 @@ def format_foehn_llm_regional_guide() -> str:
         sued_end=SUEDFOEHN_DIR_END,
         sued_start=SUEDFOEHN_DIR_START,
     )
-SPOT_ANALYSIS_PROMPT = _load_skill("spot_analysis_legacy.md")
-SAFETY_CHECK_PROMPT = _load_skill("safety_check.md")
-FLYABILITY_PROMPT = _load_skill("flyability.md")
-REGION_SAFETY_CHECK_PROMPT = _load_skill("region_safety_check.md")
-REGION_FLYABILITY_PROMPT = _load_skill("region_flyability.md")
-SPOT_COMBINED_PROMPT = _load_skill("spot_combined_analysis.md")
-REGION_COMBINED_PROMPT = _load_skill("region_combined_analysis.md")
+SPOT_COMBINED_PROMPT = compose_analysis_prompt("spot")
+REGION_COMBINED_PROMPT = compose_analysis_prompt("region")
 WEEKLY_BRIEFING_PROMPT = _load_skill("weekly_briefing.md")
 
 # Für Tests oder externe Tools

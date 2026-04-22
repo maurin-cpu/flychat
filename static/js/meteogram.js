@@ -48,9 +48,11 @@ window.Meteogram = (function () {
         return '#67E8F9';
     }
 
-    // Parabolic thermal profile: local climb rate at a given altitude
-    function thermalRateAtAltitude(climbRate, maxHeight, elevation, altitude) {
+    // Parabolic thermal profile: local climb rate at a given altitude.
+    // Flyability cap: above LCL (cloud base) is VFR-illegal / not flyable, so return 0.
+    function thermalRateAtAltitude(climbRate, maxHeight, elevation, altitude, lcl) {
         if (altitude < elevation || altitude >= maxHeight || climbRate <= 0) return 0;
+        if (lcl && altitude >= lcl) return 0;
         var columnH = maxHeight - elevation;
         if (columnH <= 0) return 0;
         var frac = (altitude - elevation) / columnH; // 0 at ground, 1 at top
@@ -94,7 +96,6 @@ window.Meteogram = (function () {
     // Warnings strip: small pills under the ground section summarising hour-ranges
     const WARN_ROW_H = 16;
     const WARN_ROW_GAP = 2;
-    const WARN_MAX_ROWS = 4;
 
     // WMO weather_code: 95/96/99 = Gewitter
     function isThunderstorm(code) {
@@ -250,8 +251,10 @@ window.Meteogram = (function () {
         var FULL_ROWS = 17; // 0-4000m = 17 rows (reference for constant chart height)
         var elevation = (options && options.elevation) || 0;
         var minGridAlt = Math.floor(elevation / STEP) * STEP;
+        // Alpine zones (≥1800m, entspricht Terrain-Faktor 1.0) brauchen mehr Headroom
+        var maxGridAlt = elevation >= 1800 ? 5000 : 4000;
         var altitudes = [];
-        for (var a = minGridAlt; a <= 4000; a += STEP) altitudes.push(a);
+        for (var a = minGridAlt; a <= maxGridAlt; a += STEP) altitudes.push(a);
         var nRows = altitudes.length;
         // Scale cell height so the grid area stays constant regardless of row count
         var cellH = Math.round(FULL_ROWS * CELL_H / nRows);
@@ -452,20 +455,19 @@ window.Meteogram = (function () {
             });
         });
 
-        // Row-pack (greedy) so non-overlapping bands share a row
+        // Row-pack (greedy) so non-overlapping bands share a row.
+        // No row cap — strip grows as needed so no warning gets dropped.
         warnBands.forEach(function (b) { b.row = -1; });
         var rowLastEnd = []; // rowLastEnd[row] = last end col used
         warnBands.forEach(function (b) {
-            for (var r = 0; r < WARN_MAX_ROWS; r++) {
-                if (rowLastEnd[r] == null || rowLastEnd[r] < b.start) {
-                    b.row = r;
-                    rowLastEnd[r] = b.end;
-                    return;
-                }
+            var r = 0;
+            while (rowLastEnd[r] != null && rowLastEnd[r] >= b.start) {
+                r++;
             }
-            // overflow: drop lower-priority ones that don't fit
+            b.row = r;
+            rowLastEnd[r] = b.end;
         });
-        var usedRows = Math.max(0, rowLastEnd.length);
+        var usedRows = rowLastEnd.length;
         var WARN_STRIP_H = usedRows > 0 ? (usedRows * (WARN_ROW_H + WARN_ROW_GAP) + 6) : 0;
 
         var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
@@ -670,6 +672,7 @@ window.Meteogram = (function () {
             var climb = wx.thermik.climb_rate || 0;
             if (climb <= 0) return;
             var maxAlt = wx.thermik.max_height || (altitudes[altitudes.length - 1] + 200);
+            var lclAlt = wx.thermik.lcl || null;  // Wolkenbasis (MSL), ab hier VFR nicht mehr fliegbar
 
             for (var ri = 0; ri < nRows; ri++) {
                 var alt = altitudes[ri];
@@ -678,7 +681,7 @@ window.Meteogram = (function () {
                 // bei elevation=1228m), damit die Startplatz-Kachel die
                 // Thermik ab Boden zeigt — nicht "unter Startplatz = keine Thermik".
                 var thermAlt = (ri === 0 && hasGroundRow && elevation > 0) ? elevation : alt;
-                var localRate = thermalRateAtAltitude(climb, maxAlt, thermalBaseAlt, thermAlt);
+                var localRate = thermalRateAtAltitude(climb, maxAlt, thermalBaseAlt, thermAlt, lclAlt);
                 if (localRate <= 0) continue;
 
                 var bgColor = thermClimbColor(localRate);
@@ -772,9 +775,12 @@ window.Meteogram = (function () {
                 var speed = d.wind_speed;
                 var gusts = d.wind_gusts != null ? d.wind_gusts : speed;
                 var gustDiff = gusts - speed;
-                var isAloftWarning = !isGround && speed > 35;
+                var isAloftWarning = !isGround && speed > 30;
                 var isGustWarning = gustDiff > 15 && gusts > 30;
                 var isGustNotable = gustDiff > 10 && gusts > 25;
+                // Kein Böen-Label anzeigen wenn gusts ≈ speed (z.B. Regionen-
+                // Höhenprofil ohne Böen-Addition, wo gusts auf speed zurückfällt).
+                var hasRealGust = (Math.round(gusts) > Math.round(speed));
 
                 // Ground-Row: Richtungs-Check gegen erlaubte Sektoren
                 var isWrongDir = false;
@@ -784,8 +790,10 @@ window.Meteogram = (function () {
                 // Ground-Row: Grundwind zu stark?
                 var isGroundStrong = isGround && speed > idealWindMax;
 
-                // Always show gusts
-                var showGusts = true;
+                // Show gust part only when gust is meaningfully above wind_speed.
+                // Regionen-Höhenprofil liefert keine Böen (gusts == speed) —
+                // dort soll nur die reine Windzahl angezeigt werden.
+                var showGusts = hasRealGust;
                 // `color` = Pfeil-Farbe. Kann bei falscher Windrichtung (Row 0)
                 // auf Rot gesetzt werden — signalisiert: Richtung problematisch.
                 var color = (isAloftWarning || isGustWarning) ? '#ef4444' : windColor(speed);
@@ -922,7 +930,8 @@ window.Meteogram = (function () {
             .attr('x1', 0).attr('x2', nCols * CELL_W)
             .attr('y1', groundY).attr('y2', groundY);
 
-        var groundLabels = ['Wind / Böen', 'Temp / Regen', 'Thermik'];
+        // Regionen haben keine Böen (Apr 2026) — Label ohne "/ Böen".
+        var groundLabels = [isRegion ? 'Wind' : 'Wind / Böen', 'Temp / Regen', 'Thermik'];
         groundLabels.forEach(function (lbl, i) {
             chartG.append('text').attr('class', 'ground-label')
                 .attr('x', -8).attr('y', groundY + i * 24 + 14)
@@ -1236,7 +1245,7 @@ window.Meteogram = (function () {
     // Renders ALL meteogram data as a machine-readable JSON document inside a
     // <pre> block, with stable data-attributes so a browser extension (e.g. the
     // Claude browser extension) can locate and parse the payload to compare
-    // forecasts (xctherm, etc.) against Flychat. No information from the
+    // forecasts (xctherm, etc.) against Gleitcast. No information from the
     // graphical meteogram is omitted.
     function renderTextView(container, wxDay, altDay, options) {
         container.innerHTML = '';
@@ -1244,7 +1253,7 @@ window.Meteogram = (function () {
         var elevation = options.elevation || 0;
         var spotName = options.spotName || '';
         var dateStr = options.dateStr || '';
-        var sourceLabel = options.source || 'flychat';
+        var sourceLabel = options.source || 'gleitcast';
 
         if (!altDay || !altDay.profiles || altDay.profiles.length === 0) {
             container.innerHTML = '<div class="error-state">Keine Daten fuer diesen Tag.</div>';
@@ -1428,14 +1437,14 @@ window.Meteogram = (function () {
         actions.appendChild(copyBtn);
         wrapper.appendChild(actions);
 
-        // <pre> JSON block — extension reads this via data-flychat-textview="json"
+        // <pre> JSON block — extension reads this via data-gleitcast-textview="json"
         var pre = document.createElement('pre');
         pre.className = 'mg-text-json';
-        pre.setAttribute('data-flychat-textview', 'json');
-        pre.setAttribute('data-flychat-source', sourceLabel);
-        if (spotName) pre.setAttribute('data-flychat-spot', spotName);
-        if (dateStr) pre.setAttribute('data-flychat-date', dateStr);
-        pre.setAttribute('data-flychat-hours', String(hours.length));
+        pre.setAttribute('data-gleitcast-textview', 'json');
+        pre.setAttribute('data-gleitcast-source', sourceLabel);
+        if (spotName) pre.setAttribute('data-gleitcast-spot', spotName);
+        if (dateStr) pre.setAttribute('data-gleitcast-date', dateStr);
+        pre.setAttribute('data-gleitcast-hours', String(hours.length));
         pre.textContent = jsonStr;
         wrapper.appendChild(pre);
 
@@ -1627,13 +1636,39 @@ window.Meteogram = (function () {
                     + '</div>';
             }
         }
+
+        // ── Streckenflug-Metric (immer zeigen, auch bei not_safe) ──
+        var sfTier = a.streckenflug_tier || 'kein_xc';
+        var sfRating = a.streckenflug_rating;
+        var sfLimit = a.streckenflug_limiting_factor || 'none';
+        var sfCtxOk = !!a.streckenflug_region_context_available;
+        var sfTierLabels = {
+            kein_xc:  'kein XC',
+            lokal:    'Lokal',
+            moderat:  'Moderat',
+            top:      'Top-XC'
+        };
+        var sfLabel = sfTierLabels[sfTier] || sfTier;
+        var sfValueHtml = '<span class="mga-sf-badge ' + sfTier + '">' + esc(sfLabel) + '</span>';
+        if (typeof sfRating === 'number' && sfRating > 0) {
+            sfValueHtml += ' <span class="mga-sf-rating">' + sfRating + '/10</span>';
+        }
+        if (!sfCtxOk && sfTier !== 'kein_xc') {
+            sfValueHtml += ' <span class="mga-sf-ctx-warn" title="Region-Kontext fehlt — reine Spot-Einschätzung">⚠</span>';
+        }
+        html += '<div class="mga-metric full-width streckenflug">'
+            + '<div class="mga-metric-label">Streckenflug</div>'
+            + '<div class="mga-metric-value">' + sfValueHtml + '</div>'
+            + '</div>';
+
         html += '</div>';
 
         // ── Level 5: AI Insights (expandable) ──
         var safetyFeedback = a.safety_feedback || a.summary || '';
         var flyFeedback = phase2Ok ? (a.flyability_feedback || a.recommendation || '') : '';
+        var sfFeedback = a.streckenflug_summary || '';
 
-        if (safetyFeedback || flyFeedback) {
+        if (safetyFeedback || flyFeedback || sfFeedback) {
             html += '<div class="mga-insights">';
             if (safetyFeedback) {
                 html += '<div class="mga-insight safety open">'
@@ -1645,6 +1680,26 @@ window.Meteogram = (function () {
                 html += '<div class="mga-insight flyability' + (safetyFeedback ? '' : ' open') + '">'
                     + '<button class="mga-insight-toggle" type="button">Flug-Einschätzung</button>'
                     + '<div class="mga-insight-body">' + esc(flyFeedback) + '</div>'
+                    + '</div>';
+            }
+            if (sfFeedback) {
+                var sfLimitLabels = {
+                    region_wind_aloft:       'Limit: Region-Höhenwinde',
+                    weak_regional_thermals:  'Limit: Region-Thermik schwach',
+                    ceiling_low:             'Limit: Basis zu tief',
+                    spot_wind_direction:     'Limit: Spot-Windrichtung',
+                    abgleiter_only:          'Limit: nur Abgleiter',
+                    spot_not_flyable:        'Limit: Spot nicht fliegbar'
+                };
+                var sfBodyHtml = esc(sfFeedback);
+                if (sfLimit && sfLimit !== 'none' && sfLimitLabels[sfLimit]) {
+                    sfBodyHtml += '<div class="mga-sf-limit-note">'
+                        + esc(sfLimitLabels[sfLimit]) + '</div>';
+                }
+                var alreadyOpen = (!safetyFeedback && !flyFeedback);
+                html += '<div class="mga-insight streckenflug ' + sfTier + (alreadyOpen ? ' open' : '') + '">'
+                    + '<button class="mga-insight-toggle" type="button">Streckenflug-Einschätzung</button>'
+                    + '<div class="mga-insight-body">' + sfBodyHtml + '</div>'
                     + '</div>';
             }
             html += '</div>';

@@ -2,7 +2,7 @@
 
 ## Was ist das Flyability-Tier?
 
-Pro Spot und Tag ordnet Flychat ein **Tier** zu, das die thermische Flugqualität in 3 Stufen klassifiziert (orthogonal zur Sicherheit aus Phase 1):
+Pro Spot und Tag ordnet Gleitcast ein **Tier** zu, das die thermische Flugqualität in 3 Stufen klassifiziert (orthogonal zur Sicherheit aus Phase 1):
 
 | Tier | Bedeutung | Frontend-Farbe |
 |------|-----------|----------------|
@@ -16,6 +16,30 @@ Die LLM (Claude) trifft die initiale Bewertung anhand des Wetter-Kontexts. Ansch
 
 ---
 
+## Violett-Kriterien (XC-Tag)
+
+Violett ist **kein** Auto-Override — die LLM entscheidet final. Der TAGESPROFIL-Block zeigt jedoch einen expliziten `→ VIOLETT-Kandidat: …` Hint, wenn **alle** folgenden Schwellen erfüllt sind:
+
+| Feld | Schwelle | Konstante in `config.py` |
+|------|----------|--------------------------|
+| Peak-Thermik (Proxy) | ≥ 2.5 m/s | `VIOLET_PEAK_MIN` |
+| Produktive Stunden | ≥ 5 | `VIOLET_HOURS_MIN` |
+| ROUGH-UNUSABLE-Anteil | < 30 % | `VIOLET_ROUGH_MAX` |
+| Gesamt-UNUSABLE-Anteil | < 30 % | `VIOLET_UNUSABLE_MAX` |
+| Ø tiefe Wolken (über Thermikstunden) | ≤ 50 % | `VIOLET_CLOUD_LOW_MAX` |
+| Ø mittlere Wolken (über Thermikstunden) | ≤ 50 % | `VIOLET_CLOUD_MID_MAX` |
+
+**Cloud-Schwellen basieren auf `meteo_research/cloud_cover_thermal_impact.md` Sektion 1+6:**
+- 12–50 % Cu = OPTIMAL (SCT, Matuszko-Effekt, Latentwärme-Boost).
+- 50–60 % Cu = Dämpfung beginnt (FAA).
+- Altostratus ab ~50 % reduziert Einstrahlung signifikant.
+
+Violett erfordert damit die optimale Cu-Zone (oder Blau-Thermik 0 %), nicht den Dämpfungsbereich. 60–80 % Cu kann ein guter Thermiktag sein → bleibt green.
+
+**Mittelwerte werden NUR über Thermikstunden** (climb ≥ 0.3 m/s) gebildet, damit Morgenstunden mit Hochnebel den Schnitt nicht verfälschen (analog zur `productive_thermal_h`-Logik).
+
+---
+
 ## Die zentrale Metrik: `productive_thermal_h`
 
 Eine Stunde zählt als **produktive Thermik-Stunde**, wenn alle drei Bedingungen erfüllt sind:
@@ -23,8 +47,11 @@ Eine Stunde zählt als **produktive Thermik-Stunde**, wenn alle drei Bedingungen
 | Bedingung | Schwelle | Konstante in `config.py` |
 |-----------|----------|--------------------------|
 | Climb-Rate | ≥ 0.7 m/s | `PRODUCTIVE_CLIMB_MIN` |
-| max(low, mid) Wolken | ≤ 70 % | `PRODUCTIVE_CLOUD_MAX` |
-| Keine UNUSABLE-Tags | — | (z.B. SHEAR-UNUSABLE, THERMAL-TORN-UNUSABLE) |
+| Tiefe Wolken (<3 km) | ≤ 80 % | `PRODUCTIVE_LOW_CLOUD_MAX` |
+| Mittlere Wolken (3–6 km) | ≤ 90 % | `PRODUCTIVE_MID_CLOUD_MAX` |
+| Kein THERMAL-ROUGH-UNUSABLE | — | (SHEAR/TORN/FRAGMENTED zählen MIT) |
+
+**Wolken-Differenzierung** (Basis: `meteo_research/cloud_cover_thermal_impact.md` Sektion 6): Tiefe Wolken werfen direkt Schatten auf die Quellfläche und werden bei ≥80% harter Blocker (FAA-Soaring-Regel). Mittlere Wolken (Altostratus) sitzen über der Thermik-Arbeitshöhe und dämpfen nur indirekt über reduzierte Einstrahlung — "praktisch tot" laut FAA erst >87%, daher Schwelle 90%. Diese Trennung verhindert, dass hohe Altostratus-Decken bei blauem Himmel-unten einen soliden Thermiktag fälschlich als "nicht produktiv" markieren.
 
 **Warum diese Definition?**
 Frühere Logik nutzte zwei Metriken (`avg_low_mid_cloud` Mittelwert + `flyable_thermal_h` Counter mit ≥0.5 m/s). Problem: Morgenstunden mit dichten Wolken UND nur 0.3-1.0 m/s Climb verzerrten den Wolken-Mittelwert nach oben — obwohl in diesen Stunden eh kein nennenswertes Steigen herrschte. Beispiel Voralpen 16.04.2026: 4-5h klare Mittagsthermik wurde fälschlich als "Abgleiter" eingestuft, weil der Schnitt durch Morgenwolken auf 70-80 % gezogen wurde.
@@ -76,7 +103,7 @@ Das ist nötig, weil die LLM unter `gray` typischerweise pessimistische Textfeld
 Zur Transparenz für die LLM enthält der TAGESPROFIL-Block einen expliziten Counter:
 
 ```
-→ PRODUKTIVE-THERMIK: 4h (Climb ≥0.7 m/s, Wolken ≤70%, kein UNUSABLE). Min für green-Tag: 4h.
+→ PRODUKTIVE-THERMIK: 4h (Climb ≥0.7 m/s, tief ≤80%, mittel ≤90%, kein ROUGH-UNUSABLE). Min für green-Tag: 4h.
 ```
 
 Der Hint erscheint **nur** wenn `thermal_hours_total > 0`. Die Skill-Prompts (`skills/flyability.md`, `skills/region_flyability.md`, `skills/spot_combined_analysis.md`, `skills/region_combined_analysis.md`) referenzieren diesen Counter im Selbst-Check:
@@ -111,10 +138,19 @@ Cache-Migration ist nicht nötig — die Override-Logik nutzt `tq.get(..., 0)` D
 Alle Schwellen in `config.py`:
 
 ```python
-PRODUCTIVE_CLIMB_MIN = 0.7      # m/s — Mindest-Climb für "produktive" Stunde
-PRODUCTIVE_CLOUD_MAX = 70       # % — Max max(low,mid) für "produktive" Stunde
-PRODUCTIVE_HOURS_FOR_GREEN = 4  # Mindest-Stunden für gray->green Upgrade
-PRODUCTIVE_HOURS_DOWNGRADE = 2  # Untere Schwelle: green/violet -> gray
+PRODUCTIVE_CLIMB_MIN = 0.7       # m/s — Mindest-Climb für "produktive" Stunde
+PRODUCTIVE_LOW_CLOUD_MAX = 80    # % — Max cloud_cover_low (direkter Boden-Shade)
+PRODUCTIVE_MID_CLOUD_MAX = 90    # % — Max cloud_cover_mid (indirekte Dämpfung)
+PRODUCTIVE_HOURS_FOR_GREEN = 4   # Mindest-Stunden für gray->green Upgrade
+PRODUCTIVE_HOURS_DOWNGRADE = 2   # Untere Schwelle: green/violet -> gray
+
+# Violett-Kandidat-Schwellen (LLM-Hint, kein Override)
+VIOLET_PEAK_MIN = 2.5            # m/s
+VIOLET_HOURS_MIN = 5             # produktive Stunden
+VIOLET_ROUGH_MAX = 30            # % — Max ROUGH-UNUSABLE-Anteil
+VIOLET_UNUSABLE_MAX = 30         # % — Max Gesamt-UNUSABLE-Anteil
+VIOLET_CLOUD_LOW_MAX = 50        # % — Ø tief über Thermikstunden
+VIOLET_CLOUD_MID_MAX = 50        # % — Ø mittel über Thermikstunden
 ```
 
 ---

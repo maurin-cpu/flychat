@@ -1,0 +1,36 @@
+WETTERDATEN FUER REGION: Freiburger Voralpen — TAG: 2026-04-20 (Montag) (Stand: 2026-04-20T09:52:45.199440)
+═══ REGION: Freiburger Voralpen (Referenzhoehe: 1500m MSL, Kritischer Foehn: Süd) ═══
+2026-04-20 10:00: Temp 9.5°C | Wind 6km/h aus 256° (Turbulenzrisiko 21km/h, Exzess +14km/h) [WIND-CALM] [Anker-Boeen 1500m: 21km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1500–2881m MSL | 850hPa(1481m): 4/21km/h aus 256° | 800hPa(1973m)*: 7/21km/h aus 228° | 700hPa(3040m)~: 33km/h aus 279° | THERMIK-PROXY: 1.5 m/s bis 1881m MSL, LCL/Basis 2092m (Guete: 5/10)
+2026-04-20 11:00: Temp 10.9°C | Wind 8km/h aus 277° (Turbulenzrisiko 21km/h, Exzess +13km/h) [WIND-CALM] [Anker-Boeen 1500m: 21km/h, 1 Anker] [ALOFT-WARN] [ALOFT-GUST-WARN] | Wolkenbasis wolkenfrei | Bewoelkung 4% (tief 4%, mittel 0%, hoch 0%) | FLUGBEREICH: 1500–3078m MSL | 850hPa(1485m): 5/21km/h aus 270° | 800hPa(1978m)*: 5/21km/h aus 241° | 700hPa(3045m)*: 31km/h aus 276° | THERMIK-PROXY: 1.8 m/s bis 2078m MSL, LCL/Basis 2258m (Guete: 7/10) | TQ 1/1 sauber
+2026-04-20 12:00: Temp 11.9°C | Wind 9km/h aus 301° (Turbulenzrisiko 20km/h, Exzess +11km/h) [WIND-CALM] [Anker-Boeen 1500m: 20km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 1% (tief 0%, mittel 1%, hoch 0%) | FLUGBEREICH: 1500–3309m MSL | 850hPa(1482m): 5/20km/h aus 290° | 800hPa(1977m)*: 5/20km/h aus 288° | 700hPa(3044m)*: 28km/h aus 275° | THERMIK-PROXY: 2.1 m/s bis 2309m MSL, LCL/Basis 2504m (Guete: 7/10) | TQ 1/1 sauber
+2026-04-20 13:00: Temp 12.3°C | Wind 10km/h aus 306° (Turbulenzrisiko 22km/h, Exzess +12km/h) [WIND-CALM] [Anker-Boeen 1500m: 22km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 82% (tief 58%, mittel 45%, hoch 13%) | FLUGBEREICH: 1500–3146m MSL | 850hPa(1482m): 6/22km/h aus 297° | 800hPa(1977m)*: 6/22km/h aus 315° | 700hPa(3044m)*: 25km/h aus 270° | THERMIK-PROXY: 2.0 m/s bis 2146m MSL, LCL/Basis 2393m (Guete: 7/10) | TQ 1/1 sauber
+2026-04-20 14:00: Temp 12.4°C | Wind 11km/h aus 309° (Turbulenzrisiko 23km/h, Exzess +12km/h) [WIND-CALM] [Anker-Boeen 1500m: 23km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 86% (tief 0%, mittel 81%, hoch 66%) | FLUGBEREICH: 1500–2880m MSL | 850hPa(1480m): 9/23km/h aus 302° | 800hPa(1975m)*: 8/23km/h aus 323° | 700hPa(3042m)~: 24km/h aus 263° | THERMIK-PROXY: 1.6 m/s bis 1880m MSL, LCL/Basis 2429m (Guete: 7/10)
+2026-04-20 15:00: Temp 12.2°C | Wind 11km/h aus 311° (Turbulenzrisiko 25km/h, Exzess +14km/h) [WIND-CALM] [Anker-Boeen 1500m: 25km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 99% (tief 0%, mittel 87%, hoch 97%) | FLUGBEREICH: 1500–2878m MSL | 850hPa(1478m): 9/25km/h aus 302° | 800hPa(1974m)*: 8/25km/h aus 320° | 700hPa(3040m)~: 23km/h aus 253° | THERMIK-PROXY: 1.6 m/s bis 1878m MSL, LCL/Basis 2778m (Guete: 7/10)
+2026-04-20 16:00: Temp 11.9°C | Wind 11km/h aus 316° (Turbulenzrisiko 25km/h, Exzess +14km/h) [WIND-CALM] [Anker-Boeen 1500m: 25km/h, 1 Anker] | Wolkenbasis wolkenfrei | Bewoelkung 98% (tief 58%, mittel 93%, hoch 60%) | FLUGBEREICH: 1500–2971m MSL | 850hPa(1475m): 11/25km/h aus 307° | 800hPa(1971m)*: 11/25km/h aus 317° | 700hPa(3038m)~: 24km/h aus 247° | THERMIK-PROXY: 1.6 m/s bis 1971m MSL, LCL/Basis 2506m (Guete: 2/10) | TQ 1/1 sauber
+
+═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══
+[WIND-CALM] Stunden (7): 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00
+[WIND-MODERATE] Stunden (0): KEINE
+[WIND-STRONG] Stunden (0): KEINE (NICHT FLIEGBAR)
+Saubere Stunden (7): 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00
+→ 7 saubere Stunden: safety_status eher safe oder conditional.
+
+═══ TAGESPROFIL (für ganzheitliche Beurteilung) ═══
+Flugfenster ausgewertet: 7h (zwischen 10:00 und 17:00)
+Verhaeltnis sauber/gesamt: 7/7h = 100%
+Hauptgefahren am Tag: ALOFT-WARN 1h, ALOFT-GUST-WARN 1h
+
+═══ STUNDENVERLAUF (Reihenfolge pruefen: Trend, eingekesselte Fenster) ═══
+10:00:clean · 11:00:WARN(ALOFT+ALOFT-GUST) · 12:00:clean · 13:00:clean · 14:00:clean · 15:00:clean · 16:00:clean
+→ Erkenne Trends (wird es besser/schlechter?) und eingekesselte Stunden (gute Stunde zwischen zwei schlechten = NICHT als stabiles Fenster werten).
+
+═══ HOEHEN-SEGMENTE im Flugbereich (Gefahr nach Hoehe) ═══
+11:00 | Band 1500-3078m (Thermik-Top 2078m): 1978m:OK · 3045m:WARN
+→ DANGER/WARN im Flugbereich = relevante Gefahr. Pruefe, ob die gefaehrliche Hoehe im genutzten Kurbelband liegt (Referenzhoehe bis Thermik-Top).
+→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): sauber 7h von 7 Thermik-Stunden. ROUGH-UNUSABLE-Anteil: 0% (0/7h), Gesamt-UNUSABLE-Anteil: 0% (0/7h). Peak-Steigen (Proxy): 2.1 m/s.
+→ PRODUKTIVE-THERMIK: 3h (Climb ≥0.7 m/s, Wolken ≤80%, kein ROUGH-UNUSABLE). Min für green-Tag: 4h. HINWEIS: TORN-/SHEAR-UNUSABLE zählen MIT (Bart-Zentrierung schwieriger, aber fliegbar).
+WIND-TREND: STABIL — Keine signifikante Verschlechterung nach dem Fenster.
+BOEEN-TREND: AUFKLAERUNG — Boeig frueh (1h, bis 12:00), danach ruhig (5h ab 12:00). Boeen ziehen ab, danach stabil ruhig — keine Rueckkehr. → Ruhige Stunden normal bewerten, safe_window dort setzen. safety_status kann safe oder conditional sein, je nach Wind-Sektor und Restrisiko.
+
+═══ FÖHN-INDIKATOR ═══
+Keine Föhn-Daten verfügbar.

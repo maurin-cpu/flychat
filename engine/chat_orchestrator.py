@@ -1,8 +1,8 @@
 """
-Flychat Engine — Mixin: ChatOrchestratorMixin.
+Gleitcast Engine — Mixin: ChatOrchestratorMixin.
 
 Ausgeschnitten aus chat_engine.py (Monolith-Split). Methoden-Signaturen
-unveraendert, Klasse wird via Mehrfachvererbung in FlychatEngine eingebunden.
+unveraendert, Klasse wird via Mehrfachvererbung in GleitcastEngine eingebunden.
 """
 
 import copy
@@ -42,8 +42,7 @@ from source_area import (
     get_all_regions,
 )
 from prompts import (
-    SYSTEM_PROMPT, SAFETY_CHECK_PROMPT, FLYABILITY_PROMPT,
-    REGION_SAFETY_CHECK_PROMPT, REGION_FLYABILITY_PROMPT,
+    SYSTEM_PROMPT,
     SPOT_COMBINED_PROMPT, REGION_COMBINED_PROMPT,
     WEEKLY_BRIEFING_PROMPT, CAPABILITIES_GUIDE, FOEHN_CHAT_KNOWLEDGE,
     format_foehn_llm_regional_guide,
@@ -70,6 +69,104 @@ from engine._common import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# TOOL SCHEMAS (Standort-basierte Spot-Filterung via Isochrone)
+# ============================================================================
+# Drei Tools:
+#   1. geocode_location               — Adresse/Stadt → Koordinaten
+#   2. find_spots_within_travel_time  — Isochrone + Spot-Filter (Hauptfunktion)
+#   3. clear_map_overlays             — Map-Overlays zuruecksetzen
+# Nach Erhalt eines Tool-Calls dispatcht answer_stream() an _dispatch_tool(),
+# yieldet Map-Action-Events sofort ans Frontend und ruft danach erneut das LLM.
+TOOLS: list = [
+    {
+        "type": "function",
+        "function": {
+            "name": "geocode_location",
+            "description": (
+                "Geokodiert eine vom Piloten genannte Adresse oder Stadt zu Koordinaten. "
+                "Verwende dieses Tool wenn der Pilot einen Standort nennt (z.B. 'Zürich', "
+                "'Bern', 'Bahnhofstrasse 5 Luzern') und wir wissen müssen wo er ist, "
+                "BEVOR wir mit find_spots_within_travel_time die erreichbaren Spots suchen."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Adresse, Stadt oder Ortsname (z.B. 'Zürich' oder 'Bern Bahnhof')."
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_spots_within_travel_time",
+            "description": (
+                "Findet alle Fluggebiete, die der Pilot von einem Startpunkt aus innerhalb "
+                "einer maximalen Reisezeit erreichen kann. Berechnet eine Isochrone (erreichbare "
+                "Zone) per Valhalla, zeichnet sie automatisch auf der Karte ein und filtert die "
+                "Spots, die darin liegen. Liefert die Liste der erreichbaren Spots zurück, "
+                "inklusive Voranalyse-Daten (Sicherheit, Fliegbarkeit) für deine Empfehlung."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lat": {
+                        "type": "number",
+                        "description": "Latitude des Startpunkts (WGS84). Aus geocode_location.",
+                    },
+                    "lon": {
+                        "type": "number",
+                        "description": "Longitude des Startpunkts (WGS84). Aus geocode_location.",
+                    },
+                    "minutes": {
+                        "type": "integer",
+                        "description": "Maximale Reisezeit in Minuten (z.B. 60, 90, 120).",
+                        "minimum": 1,
+                        "maximum": 360,
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["auto", "bicycle", "pedestrian"],
+                        "description": (
+                            "Verkehrsmittel: 'auto' für Auto, 'bicycle' für Velo, "
+                            "'pedestrian' für zu Fuss. Default 'auto'."
+                        ),
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": (
+                            "Optional: Anzeigename des Startpunkts für die Karte (z.B. 'Zürich'). "
+                            "Wird neben dem Pin angezeigt."
+                        ),
+                    },
+                },
+                "required": ["lat", "lon", "minutes"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "clear_map_overlays",
+            "description": (
+                "Entfernt alle dynamischen Overlays von der Karte (Isochrone, "
+                "User-Standort-Pin, Spot-Highlights). Verwende wenn der Pilot "
+                "'Karte zurücksetzen', 'alles löschen', 'reset karte' o.ä. sagt."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+]
 
 
 class ChatOrchestratorMixin:
@@ -112,8 +209,8 @@ class ChatOrchestratorMixin:
 
     def answer(self, session_id: str, question: str) -> str:
         """Beantwortet eine Pilotenfrage. Wetterdaten sind im Kontext."""
-        if not self.client:
-            return "Fehler: OPENAI_API_KEY nicht konfiguriert."
+        if not self.chat_client:
+            return f"Fehler: Kein API-Key fuer Chat-Provider '{self.chat_provider}' konfiguriert."
 
         # FORMAT-HINT aus der Frage extrahieren (wird ans LLM gesendet, aber nicht in History gespeichert)
         format_hint = ""
@@ -150,7 +247,7 @@ class ChatOrchestratorMixin:
                 context_block = self.weather_context_str
 
             # Token-Budget: Kontext kürzen falls er das Modell-Limit sprengt
-            model_limit = _MODEL_TOKEN_LIMITS.get(self.model, _DEFAULT_TOKEN_LIMIT)
+            model_limit = _MODEL_TOKEN_LIMITS.get(self.chat_model, _DEFAULT_TOKEN_LIMIT)
             system_tokens = _estimate_tokens(messages[0]["content"]) if messages else 0
             context_budget = model_limit - _TOKEN_BUDGET_RESERVE - system_tokens
             if context_budget > 0 and _estimate_tokens(context_block) > context_budget:
@@ -180,10 +277,10 @@ class ChatOrchestratorMixin:
             # Behalte System-Prompt + erste User-Message (mit Wetterdaten) + letzte N Messages
             messages[:] = messages[:2] + messages[-(MAX_HISTORY_MESSAGES - 2):]
 
-        # OpenAI API Call
+        # LLM Chat Call (Provider abhaengig: OpenAI / Anthropic / Gemini)
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.chat_client.chat.completions.create(
+                model=self.chat_model,
                 messages=messages,
                 temperature=0.7,
                 max_tokens=2000,
@@ -191,7 +288,7 @@ class ChatOrchestratorMixin:
             _log_prompt_cache_usage(response, label="chat_answer")
             reply = response.choices[0].message.content
         except Exception as e:
-            logger.error(f"OpenAI API Fehler: {e}")
+            logger.error(f"Chat-LLM ({self.chat_provider}) Fehler: {e}")
             reply = f"Entschuldigung, es gab einen Fehler bei der Verarbeitung: {e}"
 
         # Strip FORMAT-HINT from stored user message to keep history clean
@@ -371,8 +468,11 @@ class ChatOrchestratorMixin:
             {"type": "error",      "content": "..."}      # Fehler
             {"type": "done"}                              # Stream-Ende
         """
-        if not self.client:
-            yield {"type": "error", "content": "OPENAI_API_KEY nicht konfiguriert."}
+        if not self.chat_client:
+            yield {
+                "type": "error",
+                "content": f"Kein API-Key fuer Chat-Provider '{self.chat_provider}' konfiguriert.",
+            }
             yield {"type": "done"}
             return
 
@@ -409,7 +509,7 @@ class ChatOrchestratorMixin:
                 context_block = self.weather_context_str
 
             # Token-Budget: Kontext kürzen falls er das Modell-Limit sprengt
-            model_limit = _MODEL_TOKEN_LIMITS.get(self.model, _DEFAULT_TOKEN_LIMIT)
+            model_limit = _MODEL_TOKEN_LIMITS.get(self.chat_model, _DEFAULT_TOKEN_LIMIT)
             system_tokens = _estimate_tokens(messages[0]["content"]) if messages else 0
             context_budget = model_limit - _TOKEN_BUDGET_RESERVE - system_tokens
             if context_budget > 0 and _estimate_tokens(context_block) > context_budget:
@@ -452,8 +552,8 @@ class ChatOrchestratorMixin:
                     }
                     break
 
-                response = self.client.chat.completions.create(
-                    model=self.model,
+                response = self.chat_client.chat.completions.create(
+                    model=self.chat_model,
                     messages=messages,
                     tools=TOOLS,
                     tool_choice="auto",
@@ -528,7 +628,7 @@ class ChatOrchestratorMixin:
                 break
 
         except Exception as e:
-            logger.error(f"OpenAI API Fehler (stream): {e}")
+            logger.error(f"Chat-LLM ({self.chat_provider}) Fehler (stream): {e}")
             yield {
                 "type": "error",
                 "content": f"Fehler bei der Verarbeitung: {e}",

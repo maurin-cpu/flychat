@@ -1,8 +1,8 @@
-# Böen-Modell: Wie Flychat Höhenböen berechnet
+# Böen-Modell: Wie Gleitcast Höhenböen berechnet
 
 ## Was berechnen wir?
 
-Flychat schätzt für jede Region und jeden Spot ein vertikales Böenprofil von 0 bis 4000m MSL in 250m-Schritten. Das Profil zeigt, wie stark die Böen auf jeder Höhe sind — entscheidend für die Flugplanung (Startplatzwahl, Sicherheit in der Höhe).
+Gleitcast schätzt für jede Region und jeden Spot ein vertikales Böenprofil von 0 bis 4000m MSL in 250m-Schritten. Das Profil zeigt, wie stark die Böen auf jeder Höhe sind — entscheidend für die Flugplanung (Startplatzwahl, Sicherheit in der Höhe).
 
 Das Ergebnis ist **monoton steigend**: Böen nehmen mit der Höhe nie ab. Physik: Mehr Höhe = mehr Exposition, weniger Terrain-Abschirmung.
 
@@ -160,22 +160,15 @@ Physik dahinter:
 - Alt: `L_up = max(2500, 1.0 × 2500) = 2500 m`
 - Neu: `L_up = max(750, 0.25 × 2500) = 750 m` → drastisch reduziert, Burnair-konform
 
-### Schritt 3: Running Maximum — Monotonie erzwingen
+### Schritt 3: ~~Running Maximum~~ — entfernt (Apr 2026)
 
-Nach der OI-Korrektur wird von unten nach oben ein Running Maximum angewandt:
+Früher wurde nach der OI-Korrektur ein Running-Maximum von unten nach oben angewandt, um Monotonie zu erzwingen. Diese Safety-Layer wurde entfernt:
 
-```
-running_max = 0
-Für jede Höhe von 0m bis 4000m:
-    running_max = max(running_max, böe_an_dieser_höhe)
-    böe_an_dieser_höhe = running_max
-```
+- **Problem**: Zog lokale Wind-Dips (W(z)-Shear in Übergangsschichten) künstlich hoch und propagierte Bodenböen-Ausreißer bis in die freie Atmosphäre (36 km/h Mittelland-Artefakt auf 4 km). Der nachträgliche PBL-Cap war nur ein Pflaster.
+- **Physik-Check**: Stull 1988 beschreibt vertikalen Impulstransport *innerhalb* der Mischungsschicht, aber die Turbulenz-**Amplitude** nimmt mit Distanz vom Boden ab — genau das was der Gauss-Kernel bereits modelliert. Running-Max interpretierte "Böen nehmen mit Höhe nicht ab" zu streng.
+- **Ersatz**: Der OI-Gauss-Kernel (Schritt 2) plus PBL-Sigmoid-Blend erzeugen bereits eine physikalisch monoton abklingende T(z)-Kurve. Die Asymmetrie L_up ≠ L_down bleibt dadurch intakt.
 
-Wenn irgendwo eine Böe kleiner wäre als die darunter, wird sie auf den Wert darunter angehoben.
-
-Physikalische Begründung (Stull 1988): In der turbulenten Grenzschicht transportiert die Durchmischung Impuls nach oben. Höhere Punkte sind stärker exponiert und weniger abgeschirmt. Böen können mit der Höhe nicht abnehmen.
-
-**Effekt:** Es entsteht ein Plateau dort, wo der OI-Exzess bereits abfällt, der Höhenwind aber noch nicht stark genug ist. Sobald der freie Atmosphärenwind das Plateau übersteigt, steigen die Böen weiter.
+T(z) folgt jetzt reiner Gauss-Decay aus dem Anker. Oberhalb PBL → T(z) → W(z).
 
 ---
 
@@ -183,18 +176,18 @@ Physikalische Begründung (Stull 1988): In der turbulenten Grenzschicht transpor
 
 Anker: 1300m MSL, Böe 36.7 km/h, freier Wind 10.4 km/h → Exzess 26.3 km/h
 
-| Höhe | Wind (Drucklevel) | OI-Exzess | Böe nach OI | nach Running Max |
-|------|-------------------|-----------|-------------|------------------|
-| 0m | 10.4 | 0.2 | 10.6 | 10.6 |
-| 500m | 10.4 | 4.1 | 14.5 | 14.5 |
-| 1000m | 10.4 | 20.8 | 31.2 | 31.2 |
-| 1250m | 10.4 | 25.9 | 36.3 | 36.3 |
-| 1500m | 10.3 | 22.0 | 32.3 | **36.3** (Plateau) |
-| 2000m | 16.8 | 14.2 | 31.0 | **36.3** (Plateau) |
-| 2500m | 25.2 | 7.6 | 32.8 | **36.3** (Plateau) |
-| 3000m | 31.0 | 3.1 | 34.1 | **36.3** (Plateau) |
-| 3500m | 40.0 | 1.0 | 41.0 | 41.0 |
-| 4000m | 50.0 | 0.2 | 50.2 | 50.2 |
+| Höhe | Wind (Drucklevel) | OI-Exzess | Böe (T(z) = ws + Exzess) |
+|------|-------------------|-----------|--------------------------|
+| 0m | 10.4 | 0.2 | 10.6 |
+| 500m | 10.4 | 4.1 | 14.5 |
+| 1000m | 10.4 | 20.8 | 31.2 |
+| 1250m | 10.4 | 25.9 | 36.3 |
+| 1500m | 10.3 | 22.0 | 32.3 |
+| 2000m | 16.8 | 14.2 | 31.0 |
+| 2500m | 25.2 | 7.6 | 32.8 |
+| 3000m | 31.0 | 3.1 | 34.1 |
+| 3500m | 40.0 | 1.0 | 41.0 |
+| 4000m | 50.0 | 0.2 | 50.2 |
 
 Der Exzess ist überall monoton abnehmend. Die Gesamtböe konvergiert in grosser Höhe zum reinen Höhenwind (kein Turbulenz-Exzess in der freien Atmosphäre).
 

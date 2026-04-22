@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Flychat - Cockpit{% endblock %}
+{% block title %}Gleitcast - Cockpit{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
@@ -434,7 +434,7 @@
                 <!-- Morning Briefing Card (populated by chat.js when analyses exist) -->
                 <div id="morningBriefing" style="display:none;"></div>
                 <div class="chat-message bot">
-                    Hallo! Ich bin dein Flychat-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
+                    Hallo! Ich bin dein Gleitcast-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
                 </div>
             </div>
 
@@ -526,7 +526,7 @@
 <script defer src="{{ url_for('static', filename='js/chat.js') }}?v={{ static_v('js/chat.js') }}"></script>
 <script>
     (function () {
-        var STORAGE_KEY = 'flychat_sidebar_width';
+        var STORAGE_KEY = 'gleitcast_sidebar_width';
         var resizer = document.getElementById('resizer');
         var sidebar = document.getElementById('chatSidebar');
         var layout = document.querySelector('.unified-layout');
@@ -584,7 +584,7 @@
                 sidebar.style.height = newWidth + 'px';
             }
 
-            if (window.flychatMap) window.flychatMap.invalidateSize();
+            if (window.gleitcastMap) window.gleitcastMap.invalidateSize();
         });
 
         document.addEventListener('mouseup', function () {
@@ -597,7 +597,7 @@
                     localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
                 } catch (err) { /* ignore */ }
             }
-            if (window.flychatMap) window.flychatMap.invalidateSize();
+            if (window.gleitcastMap) window.gleitcastMap.invalidateSize();
         });
 
         // Touch drag (tablets)
@@ -622,7 +622,7 @@
                 newWidth = touch.clientY - 60;
                 sidebar.style.height = newWidth + 'px';
             }
-            if (window.flychatMap) window.flychatMap.invalidateSize();
+            if (window.gleitcastMap) window.gleitcastMap.invalidateSize();
         }, { passive: true });
 
         document.addEventListener('touchend', function () {
@@ -634,7 +634,7 @@
                     localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
                 } catch (err) { /* ignore */ }
             }
-            if (window.flychatMap) window.flychatMap.invalidateSize();
+            if (window.gleitcastMap) window.gleitcastMap.invalidateSize();
         });
 
         // Mobile toggle (Chat / Karte) via bottom nav
@@ -654,8 +654,8 @@
                 if (activeBtn) activeBtn.classList.add('active');
                 layout.classList.remove('show-chat', 'show-map');
                 layout.classList.add('show-' + target);
-                if (target === 'map' && window.flychatMap) {
-                    setTimeout(function () { window.flychatMap.invalidateSize(); }, 50);
+                if (target === 'map' && window.gleitcastMap) {
+                    setTimeout(function () { window.gleitcastMap.invalidateSize(); }, 50);
                 }
             }
 
@@ -677,11 +677,11 @@
         }
 
         window.addEventListener('load', function () {
-            if (window.flychatMap) {
-                window.flychatMap.invalidateSize();
+            if (window.gleitcastMap) {
+                window.gleitcastMap.invalidateSize();
                 // On mobile, invalidate again after a short delay for the mini-map peek
                 if (window.innerWidth < 640) {
-                    setTimeout(function () { window.flychatMap.invalidateSize(); }, 200);
+                    setTimeout(function () { window.gleitcastMap.invalidateSize(); }, 200);
                 }
             }
         });
@@ -729,7 +729,7 @@ function normalizeFlyTier(ft) {
 }
 
 // Re-color markers when day changes via navbar tabs
-window.addEventListener('flychat-day-change', function(e) {
+window.addEventListener('gleitcast-day-change', function(e) {
     if (window.analysisData && window.updateSpotColors) {
         window.updateSpotColors(window.analysisData, e.detail.date);
     }
@@ -753,7 +753,7 @@ fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data
         if (window.updateSpotColors) {
             window.updateSpotColors(window.analysisData, window.currentDate);
         }
-        window.dispatchEvent(new CustomEvent('flychat-analyses-loaded'));
+        window.dispatchEvent(new CustomEvent('gleitcast-analyses-loaded'));
         console.log('[INIT] Spot-Analysen via API geladen:', Object.keys(data.spot_analyses).length);
     }
 }).catch(function(e) { console.warn('API spot analyses fetch failed:', e); });
@@ -783,7 +783,7 @@ if (supabase) {
                     if (window.updateSpotColors) {
                         window.updateSpotColors(window.analysisData, window.currentDate);
                     }
-                    window.dispatchEvent(new CustomEvent('flychat-analyses-loaded'));
+                    window.dispatchEvent(new CustomEvent('gleitcast-analyses-loaded'));
                     console.log('[REALTIME] Spot-Analysen refresh:', Object.keys(data.spot_analyses).length);
                 }
             }).catch(function(e) { console.warn('Refetch /api/analyses failed:', e); });

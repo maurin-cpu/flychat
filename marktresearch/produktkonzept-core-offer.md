@@ -1,6 +1,6 @@
-# Flychat -- Produktkonzept & Core Offer
+# Gleitcast -- Produktkonzept & Core Offer
 
-**Produkt:** Flychat -- KI/LLM-Gleitschirm-Wetter-App zur Gebietsfindung und Flugplanung
+**Produkt:** Gleitcast -- KI/LLM-Gleitschirm-Wetter-App zur Gebietsfindung und Flugplanung
 **Zielgruppe:** Gleitschirmpiloten
 **Erstellt:** 2026-03-06
 **Methodik:** Copywriting-Frameworks, Launch-Strategy, Pricing-Strategy + bisherige Pain-Point- & Wettbewerbsanalyse
@@ -9,7 +9,7 @@
 
 ## Die Produktvision in einem Satz
 
-> **Flychat ist der KI-Co-Pilot, der Gleitschirmpiloten in 30 Sekunden sagt, wo sie heute fliegen sollen -- und erklärt warum.**
+> **Gleitcast ist der KI-Co-Pilot, der Gleitschirmpiloten in 30 Sekunden sagt, wo sie heute fliegen sollen -- und erklärt warum.**
 
 ---
 
@@ -17,7 +17,7 @@
 
 *"Es ist Samstagmorgen, 6:30 Uhr. Ich weiß, dass heute ein guter Flugtag sein könnte. Ich öffne Windy, Meteo-Parapente, Burnair, checke zwei Webcams, schaue ins Windgramm, vergleiche drei Gebiete... 45 Minuten später bin ich unsicherer als vorher. Mein Kumpel ruft an: 'Wo fahren wir hin?' Ich sage: 'Keine Ahnung.' Er fährt ohne mich."*
 
-**Das ist der Moment, den Flychat eliminiert.**
+**Das ist der Moment, den Gleitcast eliminiert.**
 
 ---
 
@@ -27,7 +27,7 @@
 **Das Feature, das alles verändert.**
 
 **Was es tut:**
-Jeden Morgen (oder on-demand) liefert Flychat eine natürlichsprachliche Zusammenfassung der Flugbedingungen -- zugeschnitten auf den Standort, das Können und die Präferenzen des Piloten.
+Jeden Morgen (oder on-demand) liefert Gleitcast eine natürlichsprachliche Zusammenfassung der Flugbedingungen -- zugeschnitten auf den Standort, das Können und die Präferenzen des Piloten.
 
 **Beispiel-Output:**
 > *"Heute ist ein guter XC-Tag in den Nordalpen. Schwache Südwestlage, trockene Luft, Thermikauslöse ab ca. 11:30 Uhr. Basis steigt bis 15 Uhr auf ~2.400m. Vorsicht: Ab 16 Uhr Überentwicklung im Inntal möglich. Windgeschwindigkeit in Gipfelhöhe 15-20 km/h SW -- akzeptabel für B-Schirme und höher."*
@@ -52,7 +52,7 @@ Jeden Morgen (oder on-demand) liefert Flychat eine natürlichsprachliche Zusamme
 **Das Feature, das die FOMO tötet.**
 
 **Was es tut:**
-Flychat vergleicht alle relevanten Fluggebiete im Umkreis und rankt sie nach Flugqualität -- mit einer klaren Nr. 1-Empfehlung und transparenter Begründung.
+Gleitcast vergleicht alle relevanten Fluggebiete im Umkreis und rankt sie nach Flugqualität -- mit einer klaren Nr. 1-Empfehlung und transparenter Begründung.
 
 **Beispiel-Output:**
 > *1. Brauneck (92/100) -- "Beste Hangexposition für die heutige SW-Lage. Talwind unterstützt Thermik ab Mittag. 3 von 4 Modellen stimmen überein."*
@@ -152,7 +152,7 @@ Schritt 5: Entscheide & fahre los
 ```
 
 **How It Works (für Landing Page):**
-1. **Öffne Flychat** -- Dein persönliches Briefing wartet bereits
+1. **Öffne Gleitcast** -- Dein persönliches Briefing wartet bereits
 2. **Sieh, wo es heute am besten ist** -- KI rankt alle Gebiete für dich
 3. **Vertrau der Empfehlung** -- Transparente Begründung und Konfidenz-Level
 
@@ -162,7 +162,7 @@ Schritt 5: Entscheide & fahre los
 
 ### Der Wert-Vergleich (Mental Accounting)
 
-| Was Piloten heute investieren | Was Flychat spart |
+| Was Piloten heute investieren | Was Gleitcast spart |
 |---|---|
 | 45 Min. Wetteranalyse pro Flugtag | **30 Sekunden** |
 | 7 verschiedene Webseiten/Apps | **1 App** |
@@ -178,7 +178,7 @@ Schritt 5: Entscheide & fahre los
 
 - **14 Tage kostenlos testen** -- Voller Zugang, keine Kreditkarte
 - **Keine Bindung** -- Monatlich kündbar
-- **Geld-zurück-Garantie** -- "Wenn Flychat dir nicht mindestens einen besseren Flugtag bringt, bekommst du dein Geld zurück."
+- **Geld-zurück-Garantie** -- "Wenn Gleitcast dir nicht mindestens einen besseren Flugtag bringt, bekommst du dein Geld zurück."
 
 ---
 
@@ -218,25 +218,25 @@ Schritt 5: Entscheide & fahre los
 ### Headline für Landing Page:
 
 > **Verpasse nie wieder den besten Flugtag.**
-> *Flychat sagt dir in 30 Sekunden, wo du heute fliegen sollst -- mit KI-gestützter Wetteranalyse.*
+> *Gleitcast sagt dir in 30 Sekunden, wo du heute fliegen sollst -- mit KI-gestützter Wetteranalyse.*
 
 ### Waitlist-Mechanik (Scarcity + Mimetic Desire):
 
 1. **"Trag dich ein -- die ersten 500 Piloten fliegen kostenlos."** (Scarcity)
 2. **Fortschrittsanzeige:** "387/500 Plätze vergeben" (Goal-Gradient + Urgency)
-3. **Priority Queue:** "Teile Flychat mit einem Fliegerkollegen und springe 50 Plätze nach vorne" (Referral + Bandwagon)
+3. **Priority Queue:** "Teile Gleitcast mit einem Fliegerkollegen und springe 50 Plätze nach vorne" (Referral + Bandwagon)
 4. **Preview-Content:** Wöchentliches "KI-Flugwetter-Briefing" per E-Mail an die Warteliste (Reciprocity + Mere Exposure)
 
 ### Waitlist-CTA:
 
 > **[Platz sichern -- kostenloser Early Access]**
-> *Kein Spam. Nur eine Nachricht, wenn Flychat startet.*
+> *Kein Spam. Nur eine Nachricht, wenn Gleitcast startet.*
 
 ---
 
 ## Zusammenfassung: Warum Piloten sich sofort eintragen
 
-| Psychologischer Trigger | Wie Flychat ihn nutzt |
+| Psychologischer Trigger | Wie Gleitcast ihn nutzt |
 |---|---|
 | **Loss Aversion** | "Verpasse nie wieder den besten Flugtag" |
 | **Scarcity** | "Erste 500 Piloten kostenlos" |

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="sp">
+  <div class="sp-status">
+    <div class="sp-status__icon sp-status__icon--{{ state }}" aria-hidden="true">
+      {% if state == 'ok' %}&check;{% elif state == 'error' %}!{% else %}·{% endif %}
+    </div>
+    <h1>{{ title }}</h1>
+    {% if message %}<p>{{ message }}</p>{% endif %}
+    {% if submessage %}<p style="font-size:var(--text-md);">{{ submessage }}</p>{% endif %}
+    <a class="sp-status__back" href="/subscribe">Zurück zur Anmeldung</a>
+  </div>
+</main>
+{% endblock %}

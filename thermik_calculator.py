@@ -217,12 +217,30 @@ def calculate_dewpoint(temp_c: float, rh_percent: float) -> float:
 
 
 def calculate_lcl_approx(temp_c: float, dewpoint_c: float, elevation_m: float) -> float:
-    """Näherungsweise Berechnung des Lifting Condensation Level (Wolkenbasis in m.ü.M.).
-    Faustregel: (T - Td) * 125 = LCL in Metern über Grund."""
+    """Lifting Condensation Level (Wolkenbasis in m.ü.M.) nach Bolton (1980).
+
+    Formel (Bolton, MWR 108, eq. 22):
+        T_LCL = 1 / (1/(Td - 56) + ln(T/Td)/800) + 56       [Kelvin]
+        h_LCL = (T - T_LCL) / DALR                            [m AGL]
+
+    T und Td MÜSSEN vom selben Niveau stammen (i.d.R. 2m-Messung).
+    Für die konvektive Grenzschicht gilt Mixed-Layer-Äquivalenz:
+        θ und q sind in der ML näherungsweise konstant → LCL(ML) ≈ LCL(surface)
+        (Stull 1988, An Introduction to Boundary Layer Meteorology, §13.3.4)
+    """
     if temp_c is None or dewpoint_c is None:
         return None
-    spread = max(0, temp_c - dewpoint_c)
-    lcl_agl = spread * 125.0
+    if temp_c <= dewpoint_c:
+        return elevation_m  # gesättigt → Kondensation am Boden
+    T = temp_c + 273.15
+    Td = dewpoint_c + 273.15
+    try:
+        T_lcl = 1.0 / (1.0/(Td - 56.0) + math.log(T/Td)/800.0) + 56.0
+    except (ValueError, ZeroDivisionError):
+        return None
+    lcl_agl = (T - T_lcl) / DALR  # DALR in K/m → Höhe in m
+    if lcl_agl < 0:
+        lcl_agl = 0
     return elevation_m + lcl_agl
 
 
@@ -729,11 +747,16 @@ def calculate_thermal_profile(
             )
 
     # =========================================================================
-    # 4. LCL (Wolkenbasis) berechnen
+    # 4. LCL (Wolkenbasis) berechnen — Bolton (1980) aus konsistenten 2m-Werten
     # =========================================================================
+    # WICHTIG: T und Td MÜSSEN vom selben Niveau stammen. Frueher wurde
+    # start_temp (aus dem ICON-PL-Profil bei elevation_m interpoliert, d.h.
+    # kalte freie Atmosphaere) mit surface_dewpoint (aus T_2m + RH_2m, warme
+    # Oberflaeche) gemischt → spread minimal → LCL fehlerhaft tief (~50m AGL).
+    # Fix: beide aus der 2m-Messung → Mixed-Layer-Aequivalent (Stull 1988).
     lcl_msl = None
-    if surface_dewpoint is not None:
-        lcl_msl = calculate_lcl_approx(start_temp, surface_dewpoint, elevation_m)
+    if surface_dewpoint is not None and surface_temp is not None:
+        lcl_msl = calculate_lcl_approx(surface_temp, surface_dewpoint, elevation_m)
 
     # =========================================================================
     # 5. PAKETAUFSTIEG MIT ENTRAINMENT (Schicht für Schicht)
@@ -760,6 +783,24 @@ def calculate_thermal_profile(
 
     parcel_temp = start_temp
     prev_height = elevation_m
+
+    # -------------------------------------------------------------------------
+    # PENETRATIVE CONVECTION (CAPE/CIN-analog, Stull 1988, Holtslag/Moeng 1991)
+    # -------------------------------------------------------------------------
+    # Eine thermische Blase akkumuliert beim Aufstieg durch labile Schichten
+    # kinetische Energie (analog zu CAPE). Beim Treffen auf eine stabile Schicht
+    # (Inversion) wird diese Energie gegen die negative Auftriebsarbeit (CIN)
+    # verbraucht. Durchstoesst die Blase die Inversion, wenn CAPE >= CIN.
+    #
+    # Implementation: Overshoot-Budget in K*m (vereinfachtes CAPE-Aequivalent).
+    # Laden: +Delta_T * dh bei Parcel > Env. Verbrauchen: -Delta_T * dh bei
+    # Parcel < Env. Ist Budget vor Erreichen des Layers < cost → Parcel stoppt.
+    #
+    # OVERSHOOT_CAP limitiert maximale akkumulierte Energie, um unphysikalische
+    # Durchstoesse mehrfacher Inversionen zu verhindern. Wert 150 K*m liegt im
+    # Literatur-Bereich (100-200 K*m) fuer gut entwickelte Grenzschicht-Thermik.
+    overshoot_budget = 0.0
+    OVERSHOOT_CAP = 150.0  # K*m, CAPE-aequivalent fuer thermische Blase
 
     for layer in profile:
         h = layer['height']
@@ -809,14 +850,27 @@ def calculate_thermal_profile(
             'ti': round(ti, 2)
         })
 
-        # Prüfe ob das Paket noch steigt (0.5K Toleranz für Trägheit der Blase)
-        if parcel_temp >= env_temp - 0.5:
+        delta_t = parcel_temp - env_temp  # positiv = Parcel waermer = Auftrieb
+
+        if delta_t >= -0.5:
+            # Labile Schicht (mit 0.5K Traegheit): Parcel steigt
             max_thermal_height = h
-            cumulative_temp_diff += (parcel_temp - env_temp)
+            cumulative_temp_diff += delta_t
             valid_layers += 1
+            # Positiven Auftrieb ins Budget laden (CAPE-Aequivalent)
+            if delta_t > 0:
+                overshoot_budget = min(OVERSHOOT_CAP, overshoot_budget + delta_t * dh)
         else:
-            # Inversion oder Sperrschicht erreicht -> Thermik-Obergrenze
-            break
+            # Stabile Schicht: negative Auftriebsarbeit (CIN-Kosten)
+            cin_cost = (-delta_t) * dh  # K*m positiv
+            if overshoot_budget >= cin_cost:
+                # Penetrative Convection: Budget reicht, Parcel durchstoesst
+                overshoot_budget -= cin_cost
+                max_thermal_height = h
+                valid_layers += 1
+            else:
+                # Budget leer → echte Thermik-Obergrenze erreicht
+                break
 
         prev_height = h
 
@@ -915,7 +969,7 @@ def calculate_thermal_profile(
             dt_excess = min(solar_max, H / solar_div)
             
         heated_start = start_temp + dt_excess
-        
+
         # Zweiter Paketaufstieg mit überhitzter Starttemperatur
         parcel_temp_h = heated_start
         prev_height_h = elevation_m
@@ -923,7 +977,10 @@ def calculate_thermal_profile(
         cumulative_temp_diff = 0.0
         valid_layers = 0
         ti_profile = []  # Reset TI-Profil
-        
+
+        # Overshoot-Budget auch fuer 2. Aufstieg (Penetrative Convection)
+        overshoot_budget_h = 0.0
+
         for layer in profile:
             h = layer['height']
             if h <= elevation_m:
@@ -932,7 +989,7 @@ def calculate_thermal_profile(
             dh = h - prev_height_h
             if dh <= 0:
                 continue
-            
+
             # Adiabatischer Aufstieg (vereinfacht ohne Entrainment für BLH-Bestimmung)
             if lcl_msl and h > lcl_msl:
                 if prev_height_h < lcl_msl:
@@ -943,7 +1000,7 @@ def calculate_thermal_profile(
                     parcel_temp_h -= SALR * dh
             else:
                 parcel_temp_h -= DALR * dh
-            
+
             # Entrainment für 2. Aufstieg (terrain-aware, mit Config-Faktor)
             # Über LCL: zusätzlich reduziert (feuchte Thermiken mischen weniger)
             mu_factor = _get_thermal_param("second_ascent_entrainment_factor", timestamp, default=1.0)
@@ -951,7 +1008,7 @@ def calculate_thermal_profile(
             if lcl_msl and h > lcl_msl:
                 mu_light *= moist_mu_factor
             parcel_temp_h -= mu_light * (parcel_temp_h - env_temp) * dh
-            
+
             ti = env_temp - parcel_temp_h
             ti_profile.append({
                 'height': h,
@@ -960,14 +1017,26 @@ def calculate_thermal_profile(
                 'env_temp': env_temp,
                 'ti': round(ti, 2)
             })
-            
-            if parcel_temp_h >= env_temp - 0.3:  # Engere Toleranz bei überhitztem Paket
+
+            delta_t_h = parcel_temp_h - env_temp
+
+            if delta_t_h >= -0.3:
+                # Labile Schicht (engere 0.3K Toleranz bei ueberhitztem Paket)
                 max_thermal_height = h
-                cumulative_temp_diff += (parcel_temp_h - env_temp)
+                cumulative_temp_diff += delta_t_h
                 valid_layers += 1
+                if delta_t_h > 0:
+                    overshoot_budget_h = min(OVERSHOOT_CAP, overshoot_budget_h + delta_t_h * dh)
             else:
-                break
-            
+                # Stabile Schicht: CIN-Kosten gegen Budget (CAPE) rechnen
+                cin_cost_h = (-delta_t_h) * dh
+                if overshoot_budget_h >= cin_cost_h:
+                    overshoot_budget_h -= cin_cost_h
+                    max_thermal_height = h
+                    valid_layers += 1
+                else:
+                    break
+
             prev_height_h = h
         
     # =========================================================================
@@ -1392,6 +1461,110 @@ def calculate_thermal_profile(
         'diagnostics': diagnostics,
         'data_warnings': data_warnings,
     }
+
+
+def compute_daily_thermals(
+    hourly_data: Dict,
+    pressure_level_data: Optional[Dict],
+    elevation_m: float,
+    pressure_levels: List[int],
+    slope_azimuth: float = None,
+    slope_angle: float = None,
+    region_id: str = None,
+) -> Dict[str, Dict]:
+    """
+    Stateful Thermik-Berechnung für alle Stunden.
+
+    Single Source of Truth: Meteogramm-Anzeige, Flyability-Analyse und LLM-Kontext
+    lesen aus derselben Berechnung. State (previous_max_height, cumulative_buoyancy,
+    peak_H, peak_shortwave) wird pro Kalendertag zurückgesetzt, damit Thermal Inertia,
+    Encroachment-Cap und H-skalierte Verfallsrate konsistent wirken.
+
+    Returns: {timestamp: therm_result}  (therm_result enthält 'error' bei Fehlschlag)
+    """
+    results: Dict[str, Dict] = {}
+    sorted_times = sorted(hourly_data.keys())
+
+    prev_max_h = None
+    prev_day = None
+    cumulative_bf = 0.0
+    peak_H = 0.0
+    peak_sw = 0.0
+
+    for timestamp in sorted_times:
+        current_day = timestamp[:10]
+        if current_day != prev_day:
+            prev_max_h = None
+            cumulative_bf = 0.0
+            peak_H = 0.0
+            peak_sw = 0.0
+            prev_day = current_day
+
+        data = hourly_data[timestamp]
+        pl_data = pressure_level_data.get(timestamp, {}) if pressure_level_data else {}
+
+        p_levels = []
+        for level in pressure_levels:
+            h_val = pl_data.get(f"geopotential_height_{level}hPa")
+            t_val = pl_data.get(f"temperature_{level}hPa")
+            if h_val is not None and t_val is not None:
+                p_levels.append({"pressure": level, "height": h_val, "temp": t_val})
+
+        surface_temp = data.get("temperature_2m")
+        surface_dewpoint = calculate_dewpoint(
+            surface_temp, data.get("relative_humidity_2m", 50)
+        )
+
+        therm = calculate_thermal_profile(
+            surface_temp=surface_temp,
+            surface_dewpoint=surface_dewpoint,
+            elevation_m=elevation_m,
+            pressure_levels_data=p_levels,
+            boundary_layer_height_agl=data.get("boundary_layer_height"),
+            sunshine_duration_s=data.get("sunshine_duration"),
+            surface_sensible_heat_flux=data.get("surface_sensible_heat_flux"),
+            surface_latent_heat_flux=data.get("surface_latent_heat_flux"),
+            shortwave_radiation=data.get("shortwave_radiation"),
+            direct_radiation=data.get("direct_radiation"),
+            diffuse_radiation=data.get("diffuse_radiation"),
+            soil_moisture=data.get("soil_moisture_0_to_1cm"),
+            soil_temperature=data.get("soil_temperature_0cm"),
+            updraft=data.get("updraft"),
+            et0=data.get("et0_fao_evapotranspiration"),
+            vpd=data.get("vapour_pressure_deficit"),
+            lifted_index=data.get("lifted_index"),
+            convective_inhibition=data.get("convective_inhibition"),
+            snow_depth=data.get("snow_depth"),
+            timestamp=timestamp,
+            slope_azimuth=slope_azimuth,
+            slope_angle=slope_angle,
+            low_cloud=data.get("cloud_cover_low", 0),
+            mid_cloud=data.get("cloud_cover_mid", 0),
+            high_cloud=data.get("cloud_cover_high", 0),
+            boundary_layer_height_gfs=data.get("boundary_layer_height_gfs"),
+            previous_max_height=prev_max_h,
+            cumulative_buoyancy=cumulative_bf,
+            peak_H=peak_H,
+            peak_shortwave=peak_sw,
+            region_id=region_id,
+        )
+
+        results[timestamp] = therm
+
+        if therm and "error" not in therm:
+            max_h = therm.get("max_height")
+            if isinstance(max_h, (int, float)):
+                prev_max_h = max_h
+            diag = therm.get("diagnostics", {}) or {}
+            cumulative_bf += diag.get("buoyancy_contribution", 0) or 0
+            current_H = diag.get("sensible_heat_flux", 0) or 0
+            if current_H > peak_H:
+                peak_H = current_H
+            sw = data.get("shortwave_radiation")
+            if isinstance(sw, (int, float)) and sw > peak_sw:
+                peak_sw = sw
+
+    return results
 
 
 def analyze_hour(hourly_data: Dict, pressure_data: Dict, time_index: int,

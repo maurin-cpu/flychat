@@ -3,7 +3,7 @@ import json
 import sys
 from datetime import datetime
 
-cache_path = "C:/Users/user/OneDrive/Projekte/flychat/data/wetterdaten.json"
+cache_path = "C:/Users/user/OneDrive/Projekte/gleitcast/data/wetterdaten.json"
 with open(cache_path, "r", encoding="utf-8") as f:
     d = json.load(f)
 

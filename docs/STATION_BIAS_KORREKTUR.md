@@ -258,7 +258,7 @@ forecast_pairs (spot_name, timestamp, station_id, forecast_gust, observed_gust, 
 
 **Dateipfad:**
 - Lokal: `data/station_observations.db`
-- Vercel: `/tmp/flychat/station_observations.db`
+- Vercel: `/tmp/gleitcast/station_observations.db`
 
 ---
 

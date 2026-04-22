@@ -1,5 +1,5 @@
 """
-Supabase / Postgres Client fuer Flychat.
+Supabase / Postgres Client fuer Gleitcast.
 
 Ersetzt die JSON-Files (wetterdaten.json, spot_analyses.json, region_analyses.json)
 und den InstantDB-Push-Pfad durch eine gemanagte Postgres-DB mit Supabase-Realtime.

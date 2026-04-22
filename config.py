@@ -1,5 +1,5 @@
 """
-Konfigurationsdatei für Flychat
+Konfigurationsdatei für Gleitcast
 Adaptiert von uetliberg_ticker/config.py - Multi-Spot, Chat-basiert.
 """
 
@@ -95,13 +95,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 # Spot-CSV: "complete" = alle ~490 Startplätze, "test" = reduziertes Set für Entwicklung
 # Umschalten: USE_SPOT_CSV = "test" oder "complete"
-USE_SPOT_CSV = os.environ.get("FLYCHAT_SPOT_CSV", "complete")  # "complete" | "test"
+USE_SPOT_CSV = os.environ.get("GLEITCAST_SPOT_CSV", "complete")  # "complete" | "test"
 CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
 REGIONEN_GEOJSON_PATH = DATA_DIR / "regionen_referenzpunkte.geojson"
 
 # Vercel: Nur /tmp ist schreibbar. Readonly-Daten (CSV, GeoJSON) bleiben in data/
 if os.environ.get("VERCEL"):
-    _WRITABLE_DIR = Path("/tmp/flychat")
+    _WRITABLE_DIR = Path("/tmp/gleitcast")
     _WRITABLE_DIR.mkdir(parents=True, exist_ok=True)
     WEATHER_JSON_PATH = _WRITABLE_DIR / "wetterdaten.json"
     HISTORY_DIR = _WRITABLE_DIR / "history"
@@ -507,9 +507,47 @@ THERMAL_QUALITY_MIN_CLIMB = 0.3   # m/s
 
 # Produktive-Thermik-Schwellen (Flyability-Tier-Berechnung)
 PRODUCTIVE_CLIMB_MIN = 0.7      # m/s — Mindest-Climb fuer "produktive" Stunde
-PRODUCTIVE_CLOUD_MAX = 80       # % — Max max(low,mid) fuer "produktive" Stunde (Thermik bis ~80% vorhanden, ab 80% stirbt sie — FAA Soaring Weather)
+# Wolken-Schwellen: tief und mittel getrennt (meteo_research/cloud_cover_thermal_impact.md Sektion 6).
+# Tiefe Wolken (<3000m) werfen direkten Schatten auf die Quellflaeche → harter Kill ab 80% (FAA).
+# Mittlere Wolken (3000-6000m, Altostratus) reduzieren Einstrahlung nur indirekt, sitzen ueber der
+# Thermik-Arbeitshoehe → "praktisch tot" laut FAA erst >87%, daher lockerer bei 90%.
+PRODUCTIVE_LOW_CLOUD_MAX = 80   # % — Max cloud_cover_low fuer "produktive" Stunde
+PRODUCTIVE_MID_CLOUD_MAX = 90   # % — Max cloud_cover_mid fuer "produktive" Stunde
+PRODUCTIVE_CLOUD_MAX = 80       # % — DEPRECATED, behalten fuer Abwaertskompatibilitaet. Nutze LOW/MID getrennt.
 PRODUCTIVE_HOURS_FOR_GREEN = 4  # Mindest-Stunden fuer gray->green Upgrade
 PRODUCTIVE_HOURS_DOWNGRADE = 2  # Untere Schwelle: green/violet -> gray
+
+# Violett-Kriterien (XC-Tag). LLM entscheidet final, aber TAGESPROFIL zeigt diese
+# Schwellen als Violett-Kandidat-Hint. Research: meteo_research/cloud_cover_thermal_impact.md
+# - Wolken-Maxima 50/50 matchen FAA-Daempfungsgrenze: darueber beginnt signifikante
+#   Einstrahlungsreduktion (Altostratus ab ~50%, Cu-Dampfung ab 50-60%). Violett =
+#   optimale Cu-Zone (12-50% SCT) oder Blau (0%), keine Ueberentwicklung.
+# - Peak 2.5 m/s und 5h produktiv strenger als green (4h) = "gute Konsistenz" fuer XC.
+# - ROUGH/UNUSABLE<30% = saubere Thermik, keine Bart-Zentrierungsprobleme.
+VIOLET_PEAK_MIN = 2.5           # m/s — Mindest-Peak fuer Violett-Kandidat
+VIOLET_HOURS_MIN = 5            # Mindest-produktive-Stunden fuer Violett
+VIOLET_ROUGH_MAX = 30           # % — Max ROUGH-UNUSABLE-Anteil
+VIOLET_UNUSABLE_MAX = 30        # % — Max Gesamt-UNUSABLE-Anteil
+VIOLET_CLOUD_LOW_MAX = 50       # % — Max Ø tiefe Wolken ueber Thermikstunden
+VIOLET_CLOUD_MID_MAX = 50       # % — Max Ø mittlere Wolken ueber Thermikstunden
+PRODUCTIVE_BAND_DEPTH_MIN = 400 # m — Mindest-Banddicke (thermal_top - elevation). Unter dieser Tiefe
+                                # zaehlt die Stunde NICHT als produktiv, weil kein nutzbares
+                                # Hoehenband zum Kurbeln vorhanden ist (flache Inversions-/
+                                # Mittellandtage, Thermik-Deckel zu nah am Start).
+
+# ─── Höhenwind-Schwellen (einheitlich über Backend, Skills, UI) ───
+# Konservative Auslegung: Ab 30 km/h Höhenwind im Flugbereich ist die Stunde
+# gefährlich (ALOFT-DANGER). Zwischen 20–30 km/h: "kräftig" (ALOFT-WARN, nur Info).
+# Flugbereich = elevation_ref bis thermal_top + 1000m (effective_ceiling).
+ALOFT_DANGER_KMH = 30           # Höhenwind > 30 km/h im Flugbereich → [ALOFT-DANGER]
+ALOFT_WARN_KMH = 20             # Höhenwind 20–30 km/h im Flugbereich → [ALOFT-WARN]
+
+# ALOFT-Override Schwellen (Stunden):
+# - CONDITIONAL_HOURS: safe → conditional (mindestens Vorsicht bei Bodenwind-ruhig).
+# - NOTSAFE_HOURS:    safe/conditional → not_safe (harter NO-GO-Trigger,
+#   deckt "kräftiger Dauerhöhenwind im Flugbereich" auch wenn Bodenwind ok aussieht).
+ALOFT_DANGER_CONDITIONAL_HOURS = 3
+ALOFT_DANGER_NOTSAFE_HOURS = 3
 
 # ============================================================================
 # INSTANTDB-KONFIGURATION
@@ -540,6 +578,26 @@ INSTANTDB_ADMIN_TOKEN = os.environ.get("INSTANTDB_ADMIN_TOKEN")
 INSTANTDB_API_URL = "https://api.instantdb.com"
 
 # ============================================================================
+# E-MAIL-BRIEFING (SMTP Infomaniak)
+# ============================================================================
+# Alle Werte via ENV ueberschreibbar. BASE_URL noch Platzhalter — sobald
+# Landing-Domain steht (z.B. https://gleitcast.ch) in .env setzen.
+BASE_URL        = os.environ.get("GLEITCAST_BASE_URL", "https://example.invalid")
+
+# Infomaniak SMTP (Standardwerte aus ihrer Doku; Port 465 SSL oder 587 STARTTLS)
+SMTP_HOST       = os.environ.get("SMTP_HOST", "mail.infomaniak.com")
+SMTP_PORT       = int(os.environ.get("SMTP_PORT", "465"))
+SMTP_USE_SSL    = os.environ.get("SMTP_USE_SSL", "1") == "1"   # True = SSL:465, False = STARTTLS:587
+SMTP_USER       = os.environ.get("SMTP_USER", "")               # meist = SENDER_EMAIL
+SMTP_PASSWORD   = os.environ.get("SMTP_PASSWORD", "")
+SENDER_EMAIL    = os.environ.get("SENDER_EMAIL", "briefing@example.invalid")
+SENDER_NAME     = os.environ.get("SENDER_NAME", "Gleitcast")
+
+# Admin-Dashboard: HTTP Basic Auth (nur Password-Check, User ignoriert).
+# Leer = Admin-Routen geben 503 zurueck (deaktiviert).
+ADMIN_PASSWORD  = os.environ.get("ADMIN_PASSWORD", "")
+
+# ============================================================================
 # ROUTING / GEOCODING (Phase 1)
 # ============================================================================
 # Public Valhalla (FOSSGIS-gehostet) für Isochronen + Routing.
@@ -547,8 +605,64 @@ INSTANTDB_API_URL = "https://api.instantdb.com"
 VALHALLA_URL = os.environ.get("VALHALLA_URL", "https://valhalla1.openstreetmap.de")
 NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
 ROUTING_TIMEOUT = 15  # seconds (Valhalla + Nominatim HTTP)
-ROUTING_USER_AGENT = "Flychat/1.0 (paragliding weather app)"
+ROUTING_USER_AGENT = "Gleitcast/1.0 (paragliding weather app)"
 GEOCODE_CACHE_TTL = 24 * 3600  # 24h in-memory cache für Nominatim
+
+# ============================================================================
+# LLM-PROVIDER + MODELL (Chat + Analyse getrennt konfigurierbar)
+# ============================================================================
+# Drei unterstuetzte Provider: "openai" | "anthropic" | "gemini"
+#   - openai    : gpt-4o-mini (guenstig, Batch-API, bekannt stabil)
+#   - anthropic : Claude Haiku 4.5 (beste Tool-Call + DE-Qualitaet)
+#   - gemini    : Gemini 2.5 Flash / Flash-Lite (guenstigste Option)
+#
+# Hybrid-Setup moeglich: z.B. Chat=anthropic, Analyse=openai (Batch).
+# Jeder aktive Provider braucht den entsprechenden API-Key als ENV-Variable.
+
+CHAT_PROVIDER = os.environ.get("CHAT_PROVIDER", "openai").lower()
+ANALYSIS_PROVIDER = os.environ.get("ANALYSIS_PROVIDER", "openai").lower()
+
+# Modell pro Provider + Anwendung. ENV-Overrides erlauben Feintuning.
+LLM_MODELS = {
+    "openai": {
+        "chat":     os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+        "analysis": os.environ.get("OPENAI_ANALYSIS_MODEL", "gpt-4o-mini"),
+    },
+    "anthropic": {
+        "chat":     os.environ.get("ANTHROPIC_CHAT_MODEL", "claude-haiku-4-5"),
+        "analysis": os.environ.get("ANTHROPIC_ANALYSIS_MODEL", "claude-haiku-4-5"),
+    },
+    "gemini": {
+        "chat":     os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash"),
+        "analysis": os.environ.get("GEMINI_ANALYSIS_MODEL", "gemini-2.5-flash-lite"),
+    },
+}
+
+# API-Keys (nur der aktive Provider muss gesetzt sein)
+OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")
+
+# Rueckwaertskompatibilitaet: OPENAI_MODEL (alter ENV-Name) ueberschreibt beide Defaults
+_legacy_model = os.environ.get("OPENAI_MODEL", "").strip()
+if _legacy_model:
+    LLM_MODELS["openai"]["chat"] = _legacy_model
+    LLM_MODELS["openai"]["analysis"] = _legacy_model
+
+
+def get_api_key(provider: str) -> str:
+    """Gibt den API-Key fuer einen Provider zurueck."""
+    return {
+        "openai":    OPENAI_API_KEY,
+        "anthropic": ANTHROPIC_API_KEY,
+        "gemini":    GEMINI_API_KEY,
+    }.get(provider, "")
+
+
+def get_model(provider: str, purpose: str) -> str:
+    """purpose = 'chat' oder 'analysis'."""
+    return LLM_MODELS.get(provider, {}).get(purpose, "")
+
 
 # ============================================================================
 # LLM-ANALYSE-KONFIGURATION
@@ -556,6 +670,8 @@ GEOCODE_CACHE_TTL = 24 * 3600  # 24h in-memory cache für Nominatim
 
 # Modus: "parallel" = schnell (viele gleichzeitige Calls), "batch" = guenstig
 # (OpenAI Batch API, 50% billiger, dauert 5-30 Min).
+# HINWEIS: Batch wird nur von OpenAI unterstuetzt. Bei ANALYSIS_PROVIDER !=
+# "openai" wird automatisch auf "parallel" gefallen (Warnung im Log).
 LLM_ANALYSIS_MODE = os.environ.get("LLM_ANALYSIS_MODE", "parallel")
 
 # Anzahl paralleler LLM-Calls im "parallel"-Modus.

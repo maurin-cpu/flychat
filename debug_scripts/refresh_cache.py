@@ -12,7 +12,7 @@ def do_refresh():
     fetch_weather.API_DELAY_BETWEEN_CALLS = 2.0
     fetch_weather.API_DELAY_BETWEEN_SPOTS = 5.0
     
-    engine = chat_engine.FlychatEngine()
+    engine = chat_engine.GleitcastEngine()
     print(f"Lade {len(engine.spots)} Spots...")
     engine.weather_data = fetch_weather.fetch_all_spots(engine.spots, save_to_file=True)
     

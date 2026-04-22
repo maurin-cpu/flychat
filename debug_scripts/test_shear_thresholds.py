@@ -7,9 +7,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from chat_engine import FlychatEngine
+from chat_engine import GleitcastEngine
 
-engine = FlychatEngine.__new__(FlychatEngine)  # ohne __init__
+engine = GleitcastEngine.__new__(GleitcastEngine)  # ohne __init__
 
 print("=" * 70)
 print("SHEAR THRESHOLDS TEST")

@@ -1,0 +1,103 @@
+═══════════════════════════════════════════════
+TEIL 2: FLIEGBARKEIT (3-TIER-SYSTEM)
+═══════════════════════════════════════════════
+
+**GATE:** Wenn `safety_status = not_safe` → Teil 2 komplett ueberspringen. Setze alle Flyability-Felder auf Minimal-Werte (siehe JSON-Schema der jeweiligen Analyse).
+
+Analysiere NUR die Stunden innerhalb des sicheren Fensters (`safe_window` aus Teil 1).
+
+─────────────────────────────────
+NUMERIK-REGEL (verbindlich)
+─────────────────────────────────
+
+- Alle Zahlenwerte aus dem TAGESPROFIL EXAKT uebernehmen.
+- `peak_climb_rate` = der im TAGESPROFIL genannte `Peak-Steigen (Proxy)` direkt 1:1 (z.B. 2.6 m/s → 2.6, NICHT auf 2.0/2.5/3.0 runden).
+- Keine Abrundung, kein Aufrunden, keine "Konservativitaet bei Zahlen".
+- Konservativitaet gilt NUR fuer die Tier-Wahl, NICHT fuer Zahlenfelder.
+- Bei Abweichung zwischen TAGESPROFIL und Meteogramm-Grid → TAGESPROFIL gewinnt.
+
+**Begriffs-Hinweis (UI vs. Enum):**
+Die UI zeigt die Tiers als **Bronze / Gruen / Violett**. Der `fly_status`-Enum-Wert im JSON heisst jedoch `"gray" / "green" / "violet"` (Code-Kompatibilitaet — NICHT aendern!). In deinen Prosa-Feldern (`recommendation`, `thermal_quality`, `summary`) sprich vom **"Bronze-Tag" / "Abgleiter-Tag"** — NIEMALS von "grauem Tag".
+
+─────────────────────────────────
+TIER-DEFINITIONEN
+─────────────────────────────────
+
+**BRONZE (Abgleiter / kaum fliegbar)** — Enum-Wert: `"gray"`. Vier harte Kriterien, nur eines muss erfuellt sein:
+1. Peak-Thermik < 1 m/s, ODER
+2. max(tiefe, mittlere) Wolken ≥ 80% waehrend Thermikstunden — Stunde zaehlt nicht als produktiv (System-Schwelle 80%). Wenn dadurch < 2 produktive Stunden bleiben → Bronze, ODER
+3. **THERMAL-ROUGH-UNUSABLE** in > 50% der Thermik-Stunden (mechanische Klapper-Gefahr, nur Spots), ODER
+4. **THERMAL-WIND-UNUSABLE** in > 50% der Thermik-Stunden (BL-Grundwind zu stark → Thermikblase organisiert sich nicht, Research Abschnitt 3.1). Gilt fuer Spots UND Regionen.
+
+**GRUEN (fliegbar, solider Thermiktag)** — Enum-Wert: `"green"`.
+- Peak-Thermik ca. 1-2.5 m/s, ordentliche bis gute Basis.
+- 1-4h Flug moeglich, lokale Thermikfluege, evtl. kurze Strecken.
+
+**VIOLETT (legendaer / Top-XC)** — Enum-Wert: `"violet"`. **ALLE** Kriterien muessen erfuellt sein:
+- Peak-Thermik ≥ **2.5 m/s** (aus `Peak-Steigen (Proxy)`).
+- Produktive Thermik ≥ **5h** (aus `PRODUKTIVE-THERMIK`).
+- ROUGH-UNUSABLE < **30%** der Thermikstunden.
+- Gesamt-UNUSABLE < **30%** der Thermikstunden.
+- Ø tiefe Wolken ≤ **50%** (ueber Thermikstunden) — optimale Cu-Zone, keine Ueberentwicklung.
+- Ø mittlere Wolken ≤ **50%** — keine Altostratus-Daempfung (Quelle: `meteo_research/cloud_cover_thermal_impact.md` Sektion 6).
+- 4+ Stunden Flug, starkes XC-Potential.
+
+**Shortcut:** Wenn das TAGESPROFIL den Hint `→ VIOLETT-Kandidat: ...` enthaelt, sind alle harten Schwellen bereits erfuellt — du DARFST violet waehlen. Setze dann `peak_climb_rate` EXAKT auf den dort genannten Peak-Wert.
+
+**Faustregel bei Unsicherheit:** Gruen waehlen (konservativ). Bronze NUR wenn eines der drei harten Kriterien erfuellt ist.
+
+─────────────────────────────────
+TQ-DOWNGRADE-REGEL (EINMAL, verbindlich)
+─────────────────────────────────
+
+**Bewertungsreihenfolge:**
+
+1. **ZUERST** bewertest du die Thermik-Staerke anhand Peak m/s, Wolken und Basis → Bronze, Gruen oder Violett.
+2. **DANACH** pruefst du die UNUSABLE-Downgrade-Regeln:
+   - Ist dein Tier **Gruen oder Violett** UND **ROUGH-UNUSABLE > 50%** (Klapper-Gefahr, Spots) ODER **WIND-UNUSABLE > 50%** (BL-Grundwind reisst Blase auseinander, Spots + Regionen)? → **degradiere zu Bronze**.
+   - Beide ≤ 50% → aendere NICHTS, behalte Bronze/Gruen/Violett.
+   - Keines der beiden macht einen Bronze-Tag NICHT zu Gruen.
+3. **SHEAR-UNUSABLE und THERMAL-TORN-UNUSABLE** (beliebig viel) fuehren **NIE zu Bronze**, nur zu **Violett → Gruen** (reine Qualitaets-Issue, kein Sicherheitsrisiko).
+4. DEGRADED-Varianten aller Typen: **Violett → Gruen**, nie Bronze.
+
+**Beispiele:**
+- Peak 0.8 m/s, ROUGH-UNUSABLE 25% → **Bronze** (Peak < 1, ROUGH irrelevant).
+- Peak 1.7 m/s, ROUGH-UNUSABLE 25% → **Gruen** (Thermik gut, ROUGH unter 50%).
+- Peak 2.0 m/s, ROUGH-UNUSABLE 60% → **Bronze** (Thermik waere Gruen, aber Klapper-Gefahr).
+- Peak 2.0 m/s, WIND-UNUSABLE 70% → **Bronze** (Grundwind reisst Thermik auseinander, Abgleiter).
+- Peak 2.0 m/s, SHEAR-UNUSABLE 80%, ROUGH-UNUSABLE 0%, WIND-UNUSABLE 0% → **Gruen** (SHEAR allein macht kein Bronze).
+- Peak 2.8 m/s, THERMAL-TORN-DEGRADED → **Gruen** (nicht Violett, aber kein Bronze).
+- Peak 2.8 m/s, WIND-DEGRADED 60% → **Gruen** (DEGRADED degradiert nur Violet→Green).
+
+**Konsequenzen bei Downgrade wegen ROUGH-UNUSABLE > 50% ODER WIND-UNUSABLE > 50%:**
+- `flight_type` → "Abgleiter" statt "Thermikflug".
+- `peak_climb_rate` → maximal 1.0 m/s eintragen (sonst echter Peak).
+- `xc_potential` → "low".
+
+**Konsequenzen bei SHEAR/TORN-UNUSABLE allein (Tier bleibt max green):**
+- `flight_type` bleibt "Thermikflug".
+- `peak_climb_rate` unveraendert.
+- `xc_potential` kann "moderate" bleiben (Wind hilft bei Strecke).
+- Text beschreibt "Thermik anspruchsvoll, Bart-Zentrierung schwierig".
+
+─────────────────────────────────
+PRODUKTIVE-THERMIK-Check (aus TAGESPROFIL)
+─────────────────────────────────
+
+Wenn im TAGESPROFIL `→ PRODUKTIVE-THERMIK: Nh` steht:
+- **N ≥ 4** → Gruen/Violett moeglich.
+- **N < 2** → fly_status MUSS `"gray"` (Bronze) sein.
+- **2 ≤ N < 4** → Grenzfall, abhaengig von Peak und Wind.
+
+─────────────────────────────────
+CONDITIONAL-FLAG (visuelles Badge)
+─────────────────────────────────
+
+Setze `is_conditional = true` wenn **eine** dieser Bedingungen zutrifft (bei not_safe oder Bronze immer false):
+
+1. **Foehn-Vorsicht**: Foehn-Indikator = "caution".
+2. **TQ-Tags mittel**: SHEAR/TORN/ROUGH/WIND-UNUSABLE-Stunden 10-50% der Thermikstunden.
+3. **Tiefe Wolkenbasis**: Basis < Startplatzhoehe + 500m UND Bedeckung ≥ 75%.
+4. **Starke Hoehen-Turbulenz**: Turbulenzrisiko deutlich ueber Grundwind in produktiven Hoehen (T > W + 10 km/h).
+
+Das Rating aendert sich durch `is_conditional` NICHT — nur das Flag sorgt fuer einen ⚠ Hinweis im UI. `conditional_reason` = max 1 Satz Begruendung.

@@ -1,5 +1,9 @@
 requests>=2.31.0
 openai>=1.10.0
+# Optional LLM-Provider (werden erst geladen, wenn CHAT_PROVIDER / ANALYSIS_PROVIDER gesetzt).
+# Siehe config.py + llm_client.py. Bei Bedarf einkommentieren.
+anthropic>=0.40.0
+google-genai>=1.0.0
 python-dotenv>=1.0.0
 flask>=3.0.0
 shapely>=2.0.0

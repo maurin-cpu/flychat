@@ -1,5 +1,5 @@
 """
-Routing- und Geocoding-Modul für Flychat (Phase 1).
+Routing- und Geocoding-Modul für Gleitcast (Phase 1).
 
 Stellt drei Funktionen für den Chat-Tool-Use bereit:
 - geocode(query): Adresse → lat/lon (Nominatim)
@@ -181,7 +181,7 @@ def isochrone(lat: float, lon: float, minutes: int, mode: str = "auto") -> dict:
         "polygons": True,
         "denoise": 0.5,
         "generalize": 50,
-        "id": "flychat",
+        "id": "gleitcast",
     }
     headers = {
         "User-Agent": config.ROUTING_USER_AGENT,

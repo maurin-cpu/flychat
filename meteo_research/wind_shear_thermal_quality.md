@@ -5,7 +5,7 @@
 > oder unfliegbar wird. Basis fuer ein neues Label-System in `chat_engine.py`
 > analog zu `[GUST-WARN]`, `[RAIN-WARN]`, `[ALOFT-DANGER]`.
 >
-> **Kontext:** Das Flychat-Modell berechnet heute ein Thermik-Rating
+> **Kontext:** Das Gleitcast-Modell berechnet heute ein Thermik-Rating
 > (`rating 1..10`, `climb_rate` in m/s) ueber `thermik_calculator.py` rein
 > aus der parcel-based Auftriebsenergie und Senkel-Gradienten. Der Effekt
 > von Windscherung — also das mechanische Zerreissen der Blase — wird
@@ -167,7 +167,7 @@ waechst. Das erklaert, warum:
   Scherung aushalten.
 
 Dieses Skalen-Argument deckt sich 1:1 mit den Terrain-Zonen des
-Flychat-Modells: `L_up` aus `gust_calculator.py` (mittelland=350 m,
+Gleitcast-Modells: `L_up` aus `gust_calculator.py` (mittelland=350 m,
 hochalpin=750 m) ist die Turbulenz-Zerfallsskala (≈1.0–1.5×H_g,
 Letson et al. 2019), nicht die Schwerewellen-Kohärenzskala.
 
@@ -206,7 +206,7 @@ Beispiel: Bodenwind 10 km/h, 850-hPa-Wind (ca 1500 m) 40 km/h.
 Differenz = 30 km/h, Distanz = 1500 m. `dU/dz = 2 km/h / 100 m`.
 Exakt der Grenzwert.
 
-### 3.3 B/S-Ratio aus Flychat-Daten
+### 3.3 B/S-Ratio aus Gleitcast-Daten
 
 Konkrete Formel, die mit den heute verfuegbaren Groessen berechenbar
 ist:
@@ -346,14 +346,24 @@ Analog zu den bestehenden Tags in `chat_engine.py` Zeile 1105–1229
 `[RAIN-WARN]`, `[CAPE-WARN]`, `[OVERCAST-DANGER]`) sollen pro Stunde
 drei neue Tags berechnet werden:
 
-| Tag                      | Bedingung                                     | Quelle          |
-|--------------------------|-----------------------------------------------|-----------------|
-| `[SHEAR-DEGRADED]`           | `dU/dz` ueber Zone-WARN-Schwelle              | Abschnitt 3.2   |
-| `[SHEAR-UNUSABLE]`         | `dU/dz` ueber Zone-DANGER-Schwelle            | Abschnitt 3.2   |
-| `[THERMAL-TORN-DEGRADED]`    | `B/S < 5` **und** `climb_rate > 0`            | Abschnitt 3.3   |
-| `[THERMAL-TORN-UNUSABLE]`  | `B/S < 3` **und** `climb_rate > 0`            | Abschnitt 3.3   |
-| `[THERMAL-ROUGH-DEGRADED]`   | `GF ≥ 1` **und** `climb_rate > 0`             | Abschnitt 3.4   |
-| `[THERMAL-ROUGH-UNUSABLE]` | `GF ≥ 2` **und** `climb_rate > 0`             | Abschnitt 3.4   |
+| Tag                      | Bedingung                                     | Quelle          | Gilt fuer       |
+|--------------------------|-----------------------------------------------|-----------------|-----------------|
+| `[SHEAR-DEGRADED]`           | `dU/dz` ueber Zone-WARN-Schwelle              | Abschnitt 3.2   | Spot + Region   |
+| `[SHEAR-UNUSABLE]`         | `dU/dz` ueber Zone-DANGER-Schwelle            | Abschnitt 3.2   | Spot + Region   |
+| `[THERMAL-TORN-DEGRADED]`    | `B/S < 5` **und** `climb_rate > 0`            | Abschnitt 3.3   | Spot + Region   |
+| `[THERMAL-TORN-UNUSABLE]`  | `B/S < 3` **und** `climb_rate > 0`            | Abschnitt 3.3   | Spot + Region   |
+| `[THERMAL-ROUGH-DEGRADED]`   | `GF ≥ 1` **und** `climb_rate > 0`             | Abschnitt 3.4   | **nur Spot**    |
+| `[THERMAL-ROUGH-UNUSABLE]` | `GF ≥ 2` **und** `climb_rate > 0`             | Abschnitt 3.4   | **nur Spot**    |
+| `[THERMAL-WIND-DEGRADED]`  | `U_BL ≥ zone.warn` **und** `climb_rate > 0`   | Abschnitt 3.1   | Spot + Region   |
+| `[THERMAL-WIND-UNUSABLE]`  | `U_BL ≥ zone.danger` **und** `climb_rate > 0` | Abschnitt 3.1   | Spot + Region   |
+
+**THERMAL-WIND (Apr 2026)** — Hintergrund fuer das neue Tag:
+Regionen haben seit April 2026 keine Boeen mehr (Boeen sind raeumlich lokale Spitzenwerte, auf Region-Ebene physikalisch nicht aussagekraeftig). Damit faellt die ROUGH-Familie (basierend auf Gust-Factor `delta_gust / w*`) fuer Regionen weg. Stattdessen wird Mechanismus **D (Grundwind durch die Mischungsschicht)** aus Abschnitt 3.1 als eigenstaendige Tag-Familie herausgezogen:
+- `U_BL` = arithmetisches Mittel aus 10m-Bodenwind plus allen PL-Winden mit `elevation_m < h ≤ thermal_top_m`. Fallback 850 hPa falls keine PL-Samples in der Schicht.
+- Schwellen aus `BL_MEAN_WIND_THRESHOLDS` in `config.py` — terrain-zonen-abhaengig, identisch zur Tabelle in Abschnitt 4 (Spalten BL-Mean WARN/DANGER).
+- Physikalischer Kern: bei zu starkem mittleren Horizontalwind kann sich die Blase gar nicht organisiert abloesen (Abschnitt 2.5: Blasen-Groesse als Schutzfaktor). Das ist unabhaengig von Scherung (Mechanismus 2) und mechanischer Turbulenz (Mechanismus 3).
+- Tag gilt sowohl fuer Spots als auch Regionen — bei Spots **zusaetzlich** zu ROUGH (unterschiedliche Mechanismen).
+- Blockiert `productive_thermal_h` analog zu ROUGH-UNUSABLE, triggert gray-Downgrade bei > 50% der Thermik-Stunden. Ist **kein** Safety-Tag (wie ROUGH-UNUSABLE ebenfalls nur Fliegbarkeit betrifft).
 
 Die `climb_rate > 0` Vorbedingung verhindert False-Positives in
 Morgenstunden ohne Thermik — Scherung ohne Thermik ist kein
@@ -370,17 +380,12 @@ hard_warnings = {
     "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
     "[RAIN-WARN]", "[CAPE-WARN]", "[STRONG-WIND-WARN]",
     "[OVERCAST-DANGER]",
-    # NEU:
-    "[SHEAR-UNUSABLE]",
-    "[THERMAL-TORN-UNUSABLE]",
-    "[THERMAL-ROUGH-UNUSABLE]",
 }
 ```
 
-Die WARN-Varianten kommen bewusst nicht ins hard-set, weil Thermik-
-Qualitaetsverlust allein noch kein Sicherheits-NoGo ist — der Pilot
-soll gewarnt werden, aber die Stunde nicht automatisch aus dem
-"clean"-Zaehler fallen.
+**Wichtig:** Die THERMAL-*-UNUSABLE Tags (SHEAR, TORN, ROUGH, WIND) sind **KEINE** Safety-Hard-Tags und kommen NICHT ins `hard_warnings`-Set. Sie wirken nur auf die Fliegbarkeits-Phase (`productive_thermal_h`, gray-Downgrade), nicht auf `safety_status`. Eine Stunde mit `[THERMAL-WIND-UNUSABLE]` und keinen Safety-Flags bleibt theoretisch fliegbar (Abgleiter), ist aber nicht als Thermikstunde zu zaehlen.
+
+Die WARN/DEGRADED-Varianten aller TQ-Tags sind rein informativ — sie degradieren maximal Violett→Gruen, blockieren aber keine Produktiv-Stunden.
 
 ### 5.2 Histogramm-Integration
 
@@ -493,7 +498,7 @@ clean/warned-Zaehler einzuordnen.
 
 - **Kalibrierung der Zonen-Schwellen** in Abschnitt 4 ist ein
   Literatur-Transfer, kein direkter Messwert. Eine Validierung gegen
-  eigene winds.mobi-Daten und Flychat-Historie waere wuenschenswert.
+  eigene winds.mobi-Daten und Gleitcast-Historie waere wuenschenswert.
 - **Unabhaengigkeit der Tags**: Wenn `dU/dz` hoch ist, ist B/S meist
   auch klein. Die drei Tags koennten korrelieren und zu doppelter
   Bestrafung fuehren. Empfehlung: in einer ersten Iteration alle drei

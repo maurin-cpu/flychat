@@ -1,5 +1,5 @@
 """
-Spot-Verwaltung für Flychat.
+Spot-Verwaltung für Gleitcast.
 Lädt Fluggebiete aus CSV und stellt Such-/Filterfunktionen bereit.
 """
 

@@ -1,5 +1,5 @@
 """
-Source-Area-Modul fuer Flychat.
+Source-Area-Modul fuer Gleitcast.
 
 Bestimmt die 5 Referenzpunkte pro Spot:
   Punkt 1 = Startplatz (immer)

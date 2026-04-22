@@ -3,7 +3,7 @@
 **Status:** Recherche-Dokument — keine Implementierung. Basis für kommende Kalibrierung
 des `thermik_calculator.py` und Erweiterung von `config.py`.
 
-**Kontext:** Vergleich Flychat vs. XC Therm (DI 07.04.2026) zeigte systematische
+**Kontext:** Vergleich Gleitcast vs. XC Therm (DI 07.04.2026) zeigte systematische
 Abweichungen über 8 Regionen. Dieses Dokument validiert die vorgeschlagenen Korrekturen
 gegen Peer-Reviewed-Literatur und differenziert sie nach den 5 Terrain-Klassen, die
 in `data/regionen.csv` bereits definiert sind (**mittelland, jura, voralpen, alpen,
@@ -12,7 +12,7 @@ aber bisher nur in 2 Stufen (mittelland/alpin linear interpoliert).
 
 ---
 
-## Problemübersicht: Was Flychat vs. XC Therm zeigt
+## Problemübersicht: Was Gleitcast vs. XC Therm zeigt
 
 Vergleichs-Befund über 8 Regionen am 07.04.2026:
 
@@ -394,7 +394,7 @@ Genauigkeit verbessert.
 | Hochalpin (Grat) | 2-3 h |
 | Hochalpin (Tal) | 4-5 h |
 
-Das lässt sich in Flychat nicht pauschal per Terrain-Class machen, weil *innerhalb*
+Das lässt sich in Gleitcast nicht pauschal per Terrain-Class machen, weil *innerhalb*
 eines Spots der Start meist am Hang liegt. Praktikabler Vorschlag: Den H-Rampen-Start
 (Korrektur 4) so wählen, dass hochalpine Spots bereits bei H=15 W/m² rampen anfangen
 — das deckt den Hangwind-Beitrag ab.
@@ -614,10 +614,10 @@ THERMAL_PARAMS = {
 ## Offene Fragen für zukünftige Recherche
 
 1. **Valley-Volume-Effect (Steinacker)** — AlpTherm/Regtherm modellieren das explizit,
-   Flychat nicht. Wie groß ist der Fehler ohne? Messung vs. Regtherm nötig.
+   Gleitcast nicht. Wie groß ist der Fehler ohne? Messung vs. Regtherm nötig.
 
 2. **Regionale Talwind-Kopplung** — Regtherm-Innovation (horizontale Kompensationsflüsse).
-   Nicht in Flychat abgebildet. Vermutlich ein sekundärer Effekt, der erst nach den
+   Nicht in Gleitcast abgebildet. Vermutlich ein sekundärer Effekt, der erst nach den
    oben genannten Punkten relevant wird.
 
 3. **Cumulus-Feedback auf H** — Bestehend in `meteo_research/cumulus_feedback.md`,

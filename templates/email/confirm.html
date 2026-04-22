@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>Bestaetige dein Gleitcast-Abo</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#111827;">
+
+<!-- Preheader (Vorschautext): sichtbar in Inbox-Preview, unsichtbar in der Mail -->
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
+  Klicke auf den Button, um dein Flugwetter-Abo zu aktivieren.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding:28px 32px 12px;">
+            <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;">Gleitcast</div>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:8px 32px 24px;">
+            <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">
+              Fast geschafft!
+            </h1>
+            <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#374151;">
+              Hallo {{ email }},
+            </p>
+            <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#374151;">
+              bitte bestaetige deine E-Mail-Adresse, um dein kostenloses Flugwetter-Abo
+              zu aktivieren. Du bekommst ab sofort Montag, Mittwoch und Freitag morgens
+              ein personalisiertes Briefing.
+            </p>
+
+            <!-- Bulletproof CTA Button -->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
+              <tr>
+                <td align="center" bgcolor="#7c3aed" style="border-radius:8px;">
+                  <a href="{{ urls.confirm }}"
+                     style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;background:#7c3aed;">
+                    Abo bestaetigen
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 8px;font-size:13px;color:#6b7280;">
+              Button funktioniert nicht? Kopiere diesen Link in deinen Browser:
+            </p>
+            <p style="margin:0 0 20px;font-size:13px;color:#4b5563;word-break:break-all;">
+              <a href="{{ urls.confirm }}" style="color:#7c3aed;">{{ urls.confirm }}</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:16px 32px 28px;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:12px;line-height:1.6;color:#9ca3af;">
+              Du hast dieses Abo nicht angefordert? Dann ignoriere diese E-Mail einfach &mdash;
+              ohne Bestaetigung wird nichts aktiviert.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

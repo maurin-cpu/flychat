@@ -1,4 +1,4 @@
-/* Flychat - Light Theme (City Guide Style) */
+/* Gleitcast - Light Theme (City Guide Style) */
 
 :root {
     /* Colors - Light palette (Aviation Blue) */
@@ -2196,6 +2196,57 @@ body.page-fixed-nav {
 .mga-fly-badge.gray  { background: var(--color-fly-gray-bg);   color: var(--color-fly-gray-text); }
 .mga-fly-badge.green { background: var(--color-fly-green-bg);  color: var(--color-fly-green-text); }
 .mga-fly-badge.violet { background: var(--color-fly-violet-bg); color: var(--color-fly-violet-text); }
+
+/* ── Streckenflug-Metric + Badge ─────────────────────────── */
+.mga-metric.streckenflug .mga-metric-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.mga-sf-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.mga-sf-badge.kein_xc  { background: #eef1f4; color: #64748b; }
+.mga-sf-badge.lokal    { background: #e0f2fe; color: #0369a1; }
+.mga-sf-badge.moderat  { background: #dcfce7; color: #15803d; }
+.mga-sf-badge.top      { background: #f3e8ff; color: #7c3aed; }
+
+.mga-sf-rating {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.mga-sf-ctx-warn {
+    font-size: 13px;
+    color: #d97706;
+    cursor: help;
+}
+
+.mga-insight.streckenflug .mga-insight-toggle {
+    color: #7c3aed;
+}
+
+.mga-sf-limit-note {
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #fef3c7;
+    border-left: 3px solid #f59e0b;
+    border-radius: 2px;
+    font-size: 11.5px;
+    color: #92400e;
+    font-weight: 600;
+}
 
 /* ── Datestamp ────────────────────────────────────────── */
 .mg-analysis-datestamp {

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Flychat - Regionen{% endblock %}
+{% block title %}Gleitcast - Regionen{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -281,7 +281,7 @@ var currentDate = window.currentDate;
 var _nested = {};
 var _latestUpdatedAt = null;
 
-window.addEventListener('flychat-day-change', function(e) {
+window.addEventListener('gleitcast-day-change', function(e) {
     currentDate = e.detail.date;
     if (window.setRegionDate) window.setRegionDate(currentDate);
 });

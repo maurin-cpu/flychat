@@ -1,7 +1,5 @@
 import json
 import sys
-import urllib.request
-from datetime import datetime
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -11,25 +9,27 @@ try:
         d = json.load(f)
         b_data = d.get('Balderen', {}).get('hourly_data', {})
         p_data = d.get('Balderen', {}).get('pressure_level_data', {})
-        
-        from chat_engine import FlychatEngine
-        
-        # Override to disable inertia for the test
-        import thermik_calculator
-        
-        eng = FlychatEngine()
+
+        from chat_engine import GleitcastEngine
+        from thermik_calculator import compute_daily_thermals
+        import config
+
+        eng = GleitcastEngine()
         spot = [s for s in eng.spots if s['name'] == 'Balderen'][0]
-        
+
+        daily = compute_daily_thermals(
+            b_data, p_data, spot['elevation_m'], config.PRESSURE_LEVELS,
+            slope_azimuth=spot.get('slope_azimuth'),
+            slope_angle=spot.get('slope_angle'),
+        )
+
         print("Time  | Climb | Max_H | Rating | Warnings")
         print("-" * 70)
         for ts in sorted(b_data.keys()):
             if "2026-04-03" in ts:
                 hour = int(ts[11:13])
                 if 12 <= hour <= 19:
-                    hf = b_data[ts]
-                    pl = p_data.get(ts, {})
-                    
-                    therm = eng._calculate_thermal_raw(hf, pl, spot['elevation_m'], ts, spot, prev_max_h=None)
+                    therm = daily.get(ts) or {}
                     climb = therm.get('climb_rate', 0)
                     mxh = therm.get('max_height', 0)
                     rating = therm.get('rating', 0)

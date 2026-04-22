@@ -1,6 +1,6 @@
 # Umfassender Vergleich von Wettermodellen für das Gleitschirmfliegen
 
-Diese Forschungsarbeit analysiert, welche Wettermodelle in der Gleitschirmfliegerei (insbesondere für Thermik- und Streckenflugprognosen) als Standard gelten, wie sich Modelle wie ICON-D2, ICON-CH1 und AROME unterscheiden und was die beste Wahl für das *Flychat*-Projekt ist.
+Diese Forschungsarbeit analysiert, welche Wettermodelle in der Gleitschirmfliegerei (insbesondere für Thermik- und Streckenflugprognosen) als Standard gelten, wie sich Modelle wie ICON-D2, ICON-CH1 und AROME unterscheiden und was die beste Wahl für das *Gleitcast*-Projekt ist.
 
 ---
 
@@ -49,9 +49,9 @@ Führende Plattformen für Gleitschirmflieger nutzen tief im Maschinenraum prim�
 
 ---
 
-## 3. Schlussfolgerungen und Empfehlung für Flychat
+## 3. Schlussfolgerungen und Empfehlung für Gleitcast
 
-Aktuell nutzt *Flychat* das `meteoswiss_icon_ch1` via Open-Meteo. 
+Aktuell nutzt *Gleitcast* das `meteoswiss_icon_ch1` via Open-Meteo. 
 
 **Erkenntnisse für unsere Architektur:**
 1. Für dedizierte Analysen von Talwind-Engpässen oder komplexem Föhn (z.B. Reusstal) ist ICON-CH1 unschlagbar.
@@ -60,10 +60,10 @@ Aktuell nutzt *Flychat* das `meteoswiss_icon_ch1` via Open-Meteo.
 
 ### Empfehlung für die Umsetzung
 
-Wir sollten die Kern-Wetterdatenbeschaffung in Flychat auf **ICON-D2** umstellen.
+Wir sollten die Kern-Wetterdatenbeschaffung in Gleitcast auf **ICON-D2** umstellen.
 
 **Begründung:** 
-Das Ziel von Flychat ist es, dem Piloten verlässliche Aussagen über Thermik, Wolken und grundsätzliche Fliegbarkeit zu geben. Das ICON-D2 Modell ist dafür erwiesenermaßen der "Sweet Spot" aus hoher Auflösung (2.2 km) und physikalischer Stabilität (weniger "Fehlalarme" bei Restbewölkung). Open-Meteo bietet `icon_d2` als vollwertige API-Alternative an. 
+Das Ziel von Gleitcast ist es, dem Piloten verlässliche Aussagen über Thermik, Wolken und grundsätzliche Fliegbarkeit zu geben. Das ICON-D2 Modell ist dafür erwiesenermaßen der "Sweet Spot" aus hoher Auflösung (2.2 km) und physikalischer Stabilität (weniger "Fehlalarme" bei Restbewölkung). Open-Meteo bietet `icon_d2` als vollwertige API-Alternative an. 
 
 **(Optionaler Zusatz:)** 
 Sollten wir später feststellen, dass wir für Föhn-Warnungen an spezifischen Spots (z.B. Brunnihütte) doch die 1km-Genauigkeit brauchen, könnten wir in Zukunft ein "Hybrid-System" bauen: ICON-D2 für Strahlung/Thermik/Wolken und ICON-CH1 *nur* für den Bodenwind. Für den ersten Schritt empfehle ich jedoch einen klaren Wechsel auf ICON-D2, um das "Balderen-Problem" (und ähnliche) sofort zu lösen und eine Datenkonsistenz mit beliebten Tools wie Burnair zu erreichen.

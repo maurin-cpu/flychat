@@ -3,14 +3,13 @@ Turbulenzrisiko-Berechnung: 2-Produkt-Architektur (Windprofil + Turbulenzrisiko)
 
 Zwei getrennte Produkte:
   W(z) — Windprofil: Reiner ICON-D2 Modellwind (keine Korrektur)
-  T(z) — Turbulenzrisiko: W(z) + Exzess × Gauss-Kernel + Running Maximum
+  T(z) — Turbulenzrisiko: W(z) + Exzess × Gauss-Kernel (rein Gauss, kein Running-Max)
 
 Methode:
 - Exzess am Boden: ΔG = max(0, wind_gusts_10m - W(10m))
-- T_raw(z) = W(z) + ΔG × exp(-z_agl² / (2 × L_up²))   [Gauss-Kernel]
-- T(z) = running_maximum(T_raw)                           [Safety-Layer]
+- T(z) = W(z) + ΔG × exp(-z_agl² / (2 × L_up²))        [Gauss-Kernel]
 - L_up ist terrain-abhängig (Korrelationslänge aufwärts)
-- PBL als weiches Sicherheitsnetz
+- PBL als weiches Sicherheitsnetz (sigmoid blend → ws über PBL)
 
 Der Gauss-Kernel fällt sanfter ab als die frühere Exponentialfunktion —
 das ist beabsichtigt, weil T(z) ein Sicherheitssignal ist.
@@ -668,7 +667,7 @@ def apply_oi_gust_correction(
     3. Verteile den Exzess via asymmetrischem Gauss-Kernel auf jede Pressure-
        Level-Höhe (L_up aufwärts terrain-abhängig, L_down=H_g abwärts).
     4. wind_gusts = max(model_gust, ws + interpolated_excess).
-    5. Running-Maximum bottom-to-top als Safety-Layer.
+    5. PBL sigmoid blend: über der PBL geht T(z) → W(z).
 
     Args:
         pressure_levels: Liste von Dicts (altitude, wind_speed, wind_gusts, ...).
@@ -751,21 +750,9 @@ def apply_oi_gust_correction(
         lv["wind_gusts"] = round(gust_final, 1)
         lv["turbulence_excess"] = round(max(0.0, gust_final - ws), 1)
 
-    # Running Maximum bottom-to-top als Safety-Layer, aber NUR innerhalb
-    # der Grenzschicht (PBL × 1.2). Über der PBL gibt es keine Boden-
-    # getriebene Turbulenz mehr → Böe folgt der natürlichen Gauss-Decay.
-    # Spiegelt das Verhalten von web.format_altitude_wind_for_charts.
-    pbl_cap_alt = (elevation_ref + boundary_layer_height * 1.2) if (
-        boundary_layer_height is not None and boundary_layer_height > 0
-    ) else float("inf")
-
-    running_max = 0.0
-    for lv in levels_sorted:
-        if lv.get("altitude", 0) <= pbl_cap_alt:
-            running_max = max(running_max, lv.get("wind_gusts", 0))
-            lv["wind_gusts"] = round(running_max, 1)
-        # Über PBL: wind_gusts bleibt der OI-Wert (kein Update)
-        ws = lv.get("wind_speed", 0)
-        lv["turbulence_excess"] = round(max(0.0, lv.get("wind_gusts", 0) - ws), 1)
+    # Running-Maximum wurde entfernt: OI-Gauss + PBL-Sigmoid produzieren bereits
+    # eine monoton abklingende T(z)-Kurve. Running-Max zog lokale Wind-Dips
+    # (W(z)-Shear) künstlich hoch und verletzte die Asymmetrie von L_up/L_down.
+    # Höhenböen folgen jetzt reiner Gauss-Decay oberhalb des Ankers.
 
     return levels_sorted

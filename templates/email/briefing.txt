@@ -1,0 +1,61 @@
+GLEITCAST — Dein Flugwetter KW{{ kw }}
+{{ briefing_weekday }}, {{ briefing_date }}
+
+{% if warnings -%}
+!!! SICHERHEITS-HINWEIS
+{% for w in warnings -%}
+* {{ w.label }}{% if w.days_short %} an {% for d in w.days_short %}{{ d }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %} erwartet
+{% endfor -%}
+Details in den Tages-Blocks unten pruefen.
+
+{% endif -%}
+{% if verdict -%}
+============================================================
+{{ verdict.day.tier_label|upper }}: {{ verdict.headline }}
+{%- if verdict.spot %}
+{{ verdict.spot.spot }}{% if verdict.spot.window %} · {{ verdict.spot.window }}{% endif %} · Rating {{ verdict.spot.rating_display }}
+{%- endif %}
+Im Dashboard: {{ urls.dashboard }}
+============================================================
+
+{% endif -%}
+{% if region_matrix -%}
+DEINE REGIONEN · DIESE WOCHE
+{%- set col_w = 4 %}
+            {% for d in day_short_labels %}{{ '%-4s'|format(d) }}{% endfor %} Best
+{% for r in region_matrix -%}
+{{ '%-12.12s'|format(r.region_name) }}{% for cell in r.days %}{% if cell.tier == "none" %} --  {% elif cell.tier == "violet" %} ## {% elif cell.tier == "green" %} OO {% elif cell.tier == "conditional" %} =! {% else %} .. {% endif %}{% endfor %}  {{ '%.1f'|format(r.best_rating) }}
+{% endfor %}
+Legende:  ## legendaer   OO fliegbar   =! bedingt   -- nichts
+
+{% endif -%}
+{% if top_spots_week -%}
+TOP 5 STARTS DIESE WOCHE
+{% for s in top_spots_week -%}
+{{ loop.index }}. {{ s.spot }} ({{ s.region_name }}) — {{ s.day_short }}{% if s.window %} · {{ s.window }}{% endif %} · {{ s.tier_label }} · {{ s.rating_display }}
+{% endfor %}
+
+{% endif -%}
+DETAILS PRO TAG
+{% for day in days %}
+-- {{ day.label.long }} — {{ day.tier_label|upper }} --
+{% if day.shown_spots %}{% for s in day.shown_spots %}  {{ loop.index }}. {{ s.spot }} ({{ s.region_name }}) — {{ s.tier_label }} · {{ s.rating_display }}
+{% if s.window %}     Fenster: {{ s.window }}
+{% endif %}{% if s.safety_sentence %}     Sicherheit: {{ s.safety_sentence }}
+{% endif %}{% if s.flyability_sentence %}     Flug: {{ s.flyability_sentence }}
+{% endif %}{% endfor %}{% if day.more_count > 0 %}  + {{ day.more_count }} weitere Spot{% if day.more_count != 1 %}s{% endif %} im Dashboard
+{% endif %}{% else %}  Keine fliegbaren Spots in deinen Regionen.
+{% endif %}{% endfor %}
+
+------------------------------------------------------------
+War diese Vorhersage richtig?
+ Ja:   {{ urls.feedback_correct }}
+ Nein: {{ urls.feedback_wrong }}
+------------------------------------------------------------
+
+Quellen: ICON-CH1 (1 km), ICON-D2, ICON-EU, Open-Meteo.
+Gleitcast ist Decision Support — du entscheidest.
+Im Zweifel: nicht fliegen.
+
+Dashboard: {{ urls.dashboard }}
+Abmelden:  {{ urls.unsubscribe }}

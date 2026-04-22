@@ -1,5 +1,5 @@
 """
-Flychat - Entry Point.
+Gleitcast - Entry Point.
 Wetterdaten laden, Engine initialisieren, Flask starten.
 """
 
@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import config
-from chat_engine import FlychatEngine
+from chat_engine import GleitcastEngine
 from instantdb_client import InstantDBClient
 from web import app, init_app
 
@@ -47,7 +47,7 @@ def daily_refresh(engine, refresh_hour=6):
 
 
 def main():
-    logger.info("=== Flychat startet ===")
+    logger.info("=== Gleitcast startet ===")
 
     # InstantDB-Client: abgeschaltet wenn Supabase konfiguriert ist.
     # Supabase Realtime uebernimmt Frontend-Sync → InstantDB-Push ist redundant.
@@ -67,7 +67,7 @@ def main():
         logger.info("Weder Supabase noch InstantDB konfiguriert — nur lokale JSON-Caches")
 
     # Engine initialisieren
-    engine = FlychatEngine(instantdb_client=instantdb)
+    engine = GleitcastEngine(instantdb_client=instantdb)
 
     # Wetterdaten aus lokalem Cache laden (kein API-Call, nur JSON lesen)
     try:
@@ -89,6 +89,20 @@ def main():
     # Hintergrund-Thread fuer taeglichen Refresh
     refresh_thread = threading.Thread(target=daily_refresh, args=(engine,), daemon=True)
     refresh_thread.start()
+
+    # Hintergrund-Thread fuer Briefing-Versand Mo/Mi/Fr 06:30.
+    # Mit GLEITCAST_BRIEFINGS=0 deaktivierbar (z.B. in Dev-Umgebung).
+    briefings_enabled = os.environ.get("GLEITCAST_BRIEFINGS", "1").strip() != "0"
+    if briefings_enabled:
+        from scheduler import briefing_scheduler
+        scheduler_thread = threading.Thread(
+            target=briefing_scheduler, args=(engine,), daemon=True,
+            name="briefing-scheduler",
+        )
+        scheduler_thread.start()
+        logger.info("Briefing-Scheduler gestartet (Mo/Mi/Fr 06:30)")
+    else:
+        logger.info("Briefing-Scheduler deaktiviert (GLEITCAST_BRIEFINGS=0)")
 
     # Flask starten
     port = int(os.environ.get("PORT", 5000))

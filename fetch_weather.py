@@ -1,5 +1,5 @@
 """
-Wetterdaten-Aggregation für Flychat.
+Wetterdaten-Aggregation für Gleitcast.
 Adaptiert von uetliberg_ticker/fetch_weather.py - Multi-Spot Support.
 
 Batch-Modus: Alle Spots in 6 API-Calls (D2+Thermal+Fallback+GFS+CH1+CH2).
@@ -203,8 +203,11 @@ def _aggregate_wind_across_points(data_list):
     (z.B. "Mittelland Zentral" mit einem 1662m-Punkt).
 
     Verfahren:
-    - wind_speed_10m, wind_gusts_10m: Median über alle RPs (robust gegen Ausreißer)
+    - wind_speed_10m: Median über alle RPs (robust gegen Ausreißer)
     - wind_direction_10m: Vektoriell gemittelt (zirkulär korrekt)
+
+    Böen (wind_gusts_10m) werden auf Region-Ebene NICHT aggregiert (Apr 2026):
+    Böen sind lokale Spitzenwerte und gehören auf Spot-Ebene.
 
     Mutiert primary (data_list[0]) in-place und returniert es. NUR für Regionen,
     NICHT für Spots aufrufen — Spots nutzen ihren eigenen Punkt.
@@ -218,8 +221,8 @@ def _aggregate_wind_across_points(data_list):
     h_primary = primary["hourly"]
     n_hours = len(h_primary.get("time", []))
 
-    # Median-Aggregation für Skalar-Winde (robust gegen den einen alpinen Ausreißer)
-    for k in ("wind_speed_10m", "wind_gusts_10m"):
+    # Median-Aggregation nur für wind_speed_10m (Böen sind Spot-lokal).
+    for k in ("wind_speed_10m",):
         if k not in h_primary:
             continue
         for i in range(n_hours):
@@ -1111,9 +1114,16 @@ def load_cached_weather():
     client = _get_pg_client()
     if client is not None:
         try:
+            import time as _t
+            t0 = _t.time()
             meta = client.get_weather_meta()
+            print(f"[INFO] Postgres-Read: meta in {_t.time()-t0:.1f}s")
+            t0 = _t.time()
             forecasts = client.get_all_forecasts()
+            print(f"[INFO] Postgres-Read: {len(forecasts)} Spots in {_t.time()-t0:.1f}s")
+            t0 = _t.time()
             regions = client.get_all_regions_forecasts()
+            print(f"[INFO] Postgres-Read: {len(regions)} Regionen in {_t.time()-t0:.1f}s")
             if forecasts:
                 data = dict(forecasts)
                 data["_meta"] = meta or {}

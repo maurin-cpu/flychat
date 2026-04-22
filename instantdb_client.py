@@ -1,5 +1,5 @@
 """
-InstantDB Admin API Client fuer Flychat.
+InstantDB Admin API Client fuer Gleitcast.
 Wrapper fuer die InstantDB HTTP Admin API mit Soft-Fail (Logging statt Exceptions)
 und Retry-Logik (Exponential Backoff bei 429/5xx/Connection-Errors).
 """
@@ -38,7 +38,7 @@ class InstantDBClient:
     @staticmethod
     def make_id(name: str) -> str:
         """Erzeugt eine deterministische UUID v5 aus einem Namen."""
-        return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"flychat.{name}"))
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"gleitcast.{name}"))
 
     def _post_with_retry(self, url: str, payload: dict, timeout: int = 10, label: str = ""):
         """POST mit Exponential Backoff bei 429/5xx/Connection-Errors.

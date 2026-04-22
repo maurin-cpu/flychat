@@ -187,27 +187,39 @@ window.ChatCharts = (function () {
             .attr('text-anchor', 'end')
             .text(function (d) { return d + ' km/h'; });
 
-        // Gusts area
-        var gustLine = d3.line()
-            .x(function (d) { return x(d.time); })
-            .y(function (d) { return y(d.gusts || d.speed || 0); })
-            .curve(d3.curveMonotoneX);
+        // Böen-Daten vorhanden? Regionen liefern gusts=null → keine Gust-Visualisierung.
+        var hasGusts = data.some(function (d) { return d.gusts != null && d.gusts > d.speed; });
 
         var windLine = d3.line()
             .x(function (d) { return x(d.time); })
             .y(function (d) { return y(d.speed || 0); })
             .curve(d3.curveMonotoneX);
 
-        // Area between wind and gusts
-        var area = d3.area()
-            .x(function (d) { return x(d.time); })
-            .y0(function (d) { return y(d.speed || 0); })
-            .y1(function (d) { return y(d.gusts || d.speed || 0); })
-            .curve(d3.curveMonotoneX);
+        if (hasGusts) {
+            var gustLine = d3.line()
+                .x(function (d) { return x(d.time); })
+                .y(function (d) { return y(d.gusts || d.speed || 0); })
+                .curve(d3.curveMonotoneX);
 
-        g.append('path').datum(data)
-            .attr('d', area)
-            .attr('fill', 'rgba(234, 88, 12, 0.12)');
+            // Area between wind and gusts
+            var area = d3.area()
+                .x(function (d) { return x(d.time); })
+                .y0(function (d) { return y(d.speed || 0); })
+                .y1(function (d) { return y(d.gusts || d.speed || 0); })
+                .curve(d3.curveMonotoneX);
+
+            g.append('path').datum(data)
+                .attr('d', area)
+                .attr('fill', 'rgba(234, 88, 12, 0.12)');
+
+            // Gust line
+            g.append('path').datum(data)
+                .attr('d', gustLine)
+                .attr('fill', 'none')
+                .attr('stroke', '#EA580C')
+                .attr('stroke-width', 1.5)
+                .attr('stroke-dasharray', '4,3');
+        }
 
         // Wind line
         g.append('path').datum(data)
@@ -215,14 +227,6 @@ window.ChatCharts = (function () {
             .attr('fill', 'none')
             .attr('stroke', '#10B981')
             .attr('stroke-width', 2);
-
-        // Gust line
-        g.append('path').datum(data)
-            .attr('d', gustLine)
-            .attr('fill', 'none')
-            .attr('stroke', '#EA580C')
-            .attr('stroke-width', 1.5)
-            .attr('stroke-dasharray', '4,3');
 
         // Dots
         var tip = createTooltip(container);
@@ -235,8 +239,11 @@ window.ChatCharts = (function () {
             .attr('stroke-width', 1.5)
             .on('mouseover', function (event, d) {
                 var h = new Date(d.time).getHours();
+                var gustLine = (d.gusts != null && d.gusts > d.speed)
+                    ? '<br>B\u00f6en: ' + d.gusts + ' km/h'
+                    : '';
                 tip.show(event.offsetX, event.offsetY,
-                    '<b>' + h + ':00</b><br>Wind: ' + (d.speed || 0) + ' km/h<br>B\u00f6en: ' + (d.gusts || '-') + ' km/h' +
+                    '<b>' + h + ':00</b><br>Wind: ' + (d.speed || 0) + ' km/h' + gustLine +
                     (d.direction_label ? '<br>Richtung: ' + d.direction_label : ''));
             })
             .on('mouseout', function () { tip.hide(); });

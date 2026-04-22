@@ -1,8 +1,8 @@
 """
-Flychat Engine — Mixin: WeatherContextMixin.
+Gleitcast Engine — Mixin: WeatherContextMixin.
 
 Ausgeschnitten aus chat_engine.py (Monolith-Split). Methoden-Signaturen
-unveraendert, Klasse wird via Mehrfachvererbung in FlychatEngine eingebunden.
+unveraendert, Klasse wird via Mehrfachvererbung in GleitcastEngine eingebunden.
 """
 
 import copy
@@ -28,12 +28,11 @@ from foehn_indicators import (
     fetch_foehn_data, evaluate_foehn, build_foehn_llm_context,
 )
 from thermik_calculator import (
-    calculate_thermal_profile, calculate_dewpoint, get_terrain_zone,
+    get_terrain_zone, compute_daily_thermals,
 )
 from gust_calculator import (
     estimate_altitude_gusts, collect_gust_anchors,
-    estimate_altitude_gusts_multi_anchor,
-    apply_oi_gust_correction, aggregate_spot_excess, get_L_up,
+    aggregate_spot_excess, get_L_up,
     interpolate_gust_from_anchors,
 )
 from station_observations import StationManager
@@ -42,8 +41,7 @@ from source_area import (
     get_all_regions,
 )
 from prompts import (
-    SYSTEM_PROMPT, SAFETY_CHECK_PROMPT, FLYABILITY_PROMPT,
-    REGION_SAFETY_CHECK_PROMPT, REGION_FLYABILITY_PROMPT,
+    SYSTEM_PROMPT,
     SPOT_COMBINED_PROMPT, REGION_COMBINED_PROMPT,
     WEEKLY_BRIEFING_PROMPT, CAPABILITIES_GUIDE, FOEHN_CHAT_KNOWLEDGE,
     format_foehn_llm_regional_guide,
@@ -70,6 +68,81 @@ from engine._common import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
+    """Formatiert ein Region-Analyse-Ergebnis als kompakten Kontext-Block fuer den
+    Spot-Prompt (Teil 4 Streckenflug). Bei fehlendem Ergebnis wird ein expliziter
+    "nicht verfuegbar"-Hinweis erzeugt, damit das LLM erkennt, dass es die
+    Streckenflug-Bewertung nur auf Spot-Daten stuetzen muss.
+    """
+    header = "### REGION-KONTEXT (bereits analysiert) ###"
+    region_name = (spot_region or {}).get("region") or (spot_region or {}).get("id") or "unbekannte Region"
+    if not region_result or not isinstance(region_result, dict):
+        return (
+            f"{header}\n"
+            f"Region-Kontext: nicht verfuegbar (Region: {region_name}).\n"
+            f"→ Bewerte Streckenflug NUR anhand der Spot-Daten. "
+            f"streckenflug.tier max 'moderat', region_context_available=false, "
+            f"summary erwaehnt explizit: 'Region-Kontext fehlt — reine Spot-Einschaetzung.'"
+        )
+
+    safety = region_result.get("safety") if isinstance(region_result.get("safety"), dict) else {}
+    fly = region_result.get("flyability") if isinstance(region_result.get("flyability"), dict) else {}
+
+    def _g(key, default=None):
+        """Bevorzugt nested safety/flyability, faellt zurueck auf flat."""
+        if key in safety:
+            return safety.get(key, default)
+        if key in fly:
+            return fly.get(key, default)
+        return region_result.get(key, default)
+
+    ss = _g("safety_status", "error")
+
+    parts = [
+        header,
+        f"Region: {region_result.get('region_name') or region_result.get('region') or region_name}",
+        f"Safety-Status: {ss} | Safe-Window: {_g('safe_window', '?')}",
+        (
+            f"Wind-Stunden (Region-weit): CALM={_g('wind_calm_count', 0)}h, "
+            f"MODERATE={_g('wind_moderate_count', 0)}h, "
+            f"STRONG={_g('wind_strong_count', 0)}h"
+        ),
+        f"Foehn-Risiko: {_g('foehn_risk', 'none')}",
+    ]
+    if _g("wind_summary"):
+        parts.append(f"Wind-Zusammenfassung: {_g('wind_summary')}")
+    if _g("wind_shear"):
+        parts.append(f"Wind-Shear: {_g('wind_shear')}")
+
+    fly_tier = _g("fly_status") or _g("flyability_tier") or ""
+    if ss in ("safe", "conditional") and fly_tier:
+        parts.append(
+            f"Region-Fly-Status: {fly_tier} | "
+            f"Flugtyp: {_g('flight_type', '?')} | "
+            f"Peak-Climb: {_g('peak_climb_rate', 0)} m/s"
+        )
+        tq = _g("thermal_quality")
+        if tq:
+            parts.append(f"Region-Thermik: {tq}")
+        xc_pot = _g("xc_potential")
+        xc_det = _g("xc_details")
+        if xc_pot or xc_det:
+            parts.append(f"Region-XC: {xc_pot or '?'} — {xc_det or ''}")
+    else:
+        parts.append("Region-Fliegbarkeit: nicht fliegbar (not_safe) — Streckenflug.tier muss 'kein_xc' sein.")
+
+    summary = _g("summary")
+    if summary:
+        parts.append(f"Region-Summary: {summary}")
+
+    parts.append(
+        "→ Nutze diesen Block AUSSCHLIESSLICH fuer TEIL 4 (Streckenflug). "
+        "Konflikt-Check: Spot fliegbar + Region WIND-STRONG>=2h oder Foehn → "
+        "streckenflug.tier max 'lokal', limiting_factor='region_wind_aloft'."
+    )
+    return "\n".join(parts)
 
 
 class WeatherContextMixin:
@@ -122,19 +195,27 @@ class WeatherContextMixin:
             pressure_level_data = spot_data.get("pressure_level_data", {})
             elevation_m = spot["elevation_m"]
 
+            # Stateful Thermik-Berechnung über alle Stunden (Single Source of Truth
+            # mit Meteogramm und Single-Day-Context).
+            daily_thermals = compute_daily_thermals(
+                hourly_data,
+                pressure_level_data,
+                elevation_m,
+                config.PRESSURE_LEVELS,
+                slope_azimuth=spot.get("slope_azimuth"),
+                slope_angle=spot.get("slope_angle"),
+                region_id=spot_region_id,
+            )
+
             # Peak-Werte für Zusammenfassung finden
             max_climb = 0.0
             max_climb_h = 0
-            
+
             # Formatiere Stundendaten (nur Flugstunden)
             sorted_times = sorted(hourly_data.keys())
             hourly_lines = []
 
-            prev_max_h = None
             prev_day = None
-            cumulative_bf = 0.0
-            peak_H = 0.0
-            peak_sw = 0.0
 
             # Per-Tag-Tracking für TAGESPROFIL-Block
             day_state = {"tag_counts": {}, "clean": 0, "total": 0, "day": None}
@@ -147,10 +228,10 @@ class WeatherContextMixin:
                 major_tags_order = [
                     "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
                     "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
-                    "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
+                    "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]", "[THERMAL-WIND-UNUSABLE]",
                     "[THERMAL-ROUGH-FRAGMENTED]",
                     "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
-                    "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]",
+                    "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]", "[THERMAL-WIND-DEGRADED]",
                     "[WIND-WRONG]",
                 ]
                 hist_parts = []
@@ -174,12 +255,8 @@ class WeatherContextMixin:
                     # Vorherigen Tag abschließen
                     _emit_day_profile(day_state)
                     day_state = {"tag_counts": {}, "clean": 0, "total": 0, "day": current_day}
-                    prev_max_h = None
-                    cumulative_bf = 0.0
-                    peak_H = 0.0
-                    peak_sw = 0.0
                     prev_day = current_day
-                    
+
                 try:
                     dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
                     # Vorhersage gemäss config.FORECAST_DAYS (Kalendertage ab heute)
@@ -196,37 +273,26 @@ class WeatherContextMixin:
                 data = hourly_data[timestamp]
                 time_str = timestamp.replace("T", " ")[:16]
 
-                # ... (Rest der Zeilen bleibt gleich, aber wir sammeln sie erst)
-                # Thermik-Proxy berechnen
+                # Thermik-Proxy aus stateful Berechnung lesen
                 thermal_info = ""
                 h_climb = 0.0
                 h_max_h = 0
                 effective_ceiling = spot["elevation_m"] + 1000
                 try:
-                    therm = self._calculate_thermal_raw(
-                        data, pressure_level_data.get(timestamp, {}),
-                        elevation_m, timestamp, spot, prev_max_h,
-                        cumulative_bf=cumulative_bf,
-                        peak_H=peak_H,
-                        peak_sw=peak_sw,
-                        region_id=spot_region_id,
-                    )
+                    therm = daily_thermals.get(timestamp)
                     if therm and "error" not in therm:
                         h_climb = therm["climb_rate"]
-                        h_max_h = therm["max_height"]
-                        prev_max_h = h_max_h
-                        diag = therm.get("diagnostics", {})
-                        cumulative_bf += diag.get("buoyancy_contribution", 0)
-                        peak_H = max(peak_H, diag.get("sensible_heat_flux", 0) or 0)
-                        sw = data.get("shortwave_radiation")
-                        if sw is not None:
-                            peak_sw = max(peak_sw, sw)
+                        thermal_top_raw = therm["max_height"]
+                        lcl = therm.get("lcl")
+                        if isinstance(thermal_top_raw, (int, float)) and isinstance(lcl, (int, float)):
+                            h_max_h = min(thermal_top_raw, lcl)
+                        else:
+                            h_max_h = thermal_top_raw
                         effective_ceiling = max(effective_ceiling, h_max_h + 1000)
                         if h_climb > max_climb:
                             max_climb = h_climb
                             max_climb_h = h_max_h
-                        
-                        lcl = therm.get("lcl")
+
                         lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
                         thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str} (Güte: {therm['rating']}/10)"
                 except Exception as e:
@@ -322,9 +388,9 @@ class WeatherContextMixin:
                             dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
                             alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
                             if in_range:
-                                if ws_val > 40:
+                                if ws_val > config.ALOFT_DANGER_KMH:
                                     aloft_danger = True
-                                elif ws_val > 30:
+                                elif ws_val > config.ALOFT_WARN_KMH:
                                     aloft_warn = True
                                 if g_val is not None:
                                     # T(z) > 40 km/h im Flugbereich = DANGER,
@@ -433,57 +499,6 @@ class WeatherContextMixin:
         if series:
             return guide + "\n\n" + head + "\n\n" + series
         return guide + "\n\n" + head
-
-    def _calculate_thermal_raw(
-        self, data, pl_data, elevation_m, timestamp, spot, prev_max_h=None,
-        cumulative_bf=0.0, peak_H=0.0, peak_sw=0.0, region_id=None,
-    ):
-        """Berechnet Thermik-Proxy für eine Stunde eines Spots und gibt das Roh-Ergebnis zurück."""
-        p_levels = []
-        for level in config.PRESSURE_LEVELS:
-            h_val = pl_data.get(f"geopotential_height_{level}hPa")
-            t_val = pl_data.get(f"temperature_{level}hPa")
-            if h_val is not None and t_val is not None:
-                p_levels.append({"pressure": level, "height": h_val, "temp": t_val})
-
-        surf_dew = calculate_dewpoint(
-            data.get("temperature_2m"), data.get("relative_humidity_2m", 50)
-        )
-
-        therm = calculate_thermal_profile(
-            surface_temp=data.get("temperature_2m"),
-            surface_dewpoint=surf_dew,
-            elevation_m=elevation_m,
-            pressure_levels_data=p_levels,
-            boundary_layer_height_agl=data.get("boundary_layer_height"),
-            sunshine_duration_s=data.get("sunshine_duration"),
-            surface_sensible_heat_flux=data.get("surface_sensible_heat_flux"),
-            surface_latent_heat_flux=data.get("surface_latent_heat_flux"),
-            shortwave_radiation=data.get("shortwave_radiation"),
-            direct_radiation=data.get("direct_radiation"),
-            diffuse_radiation=data.get("diffuse_radiation"),
-            soil_moisture=data.get("soil_moisture_0_to_1cm"),
-            soil_temperature=data.get("soil_temperature_0cm"),
-            updraft=data.get("updraft"),
-            et0=data.get("et0_fao_evapotranspiration"),
-            vpd=data.get("vapour_pressure_deficit"),
-            lifted_index=data.get("lifted_index"),
-            convective_inhibition=data.get("convective_inhibition"),
-            snow_depth=data.get("snow_depth"),
-            timestamp=timestamp,
-            slope_azimuth=spot.get("slope_azimuth"),
-            slope_angle=spot.get("slope_angle"),
-            low_cloud=data.get("cloud_cover_low", 0),
-            mid_cloud=data.get("cloud_cover_mid", 0),
-            high_cloud=data.get("cloud_cover_high", 0),
-            boundary_layer_height_gfs=data.get("boundary_layer_height_gfs"),
-            previous_max_height=prev_max_h,
-            cumulative_buoyancy=cumulative_bf,
-            peak_H=peak_H,
-            peak_shortwave=peak_sw,
-            region_id=region_id,
-        )
-        return therm
 
     def _calculate_wind_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m):
         """
@@ -609,6 +624,49 @@ class WeatherContextMixin:
             return None
         return (climb_rate_ms / du_dz_kmh_per_100m) * 100.0
 
+    def _calculate_bl_mean_wind(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m):
+        """
+        Mittlerer Horizontalwind durch die Mischungsschicht (km/h).
+        Mechanismus D aus meteo_research/wind_shear_thermal_quality.md Abschnitt 3.1:
+        Ab einer bestimmten Grundwind-Staerke kann sich die Thermikblase gar nicht
+        erst organisiert abloesen — unabhaengig von Scherung oder Boeigkeit.
+
+        Verfahren: Surface-Wind (10m) + alle PL-Winde mit
+        `elevation_m < h_val <= thermal_top_m` einsammeln, arithmetisches Mittel.
+        Ohne PL-Samples in der Schicht: Fallback auf 850 hPa (nur wenn Hoehe nahe
+        der BL — sonst return None).
+
+        Returns: float km/h oder None.
+        """
+        if not isinstance(wind_speed_10m, (int, float)):
+            return None
+        if not pl_data or not isinstance(thermal_top_m, (int, float)):
+            return None
+        if thermal_top_m <= elevation_m:
+            return None
+
+        samples = [float(wind_speed_10m)]
+        for level in config.PRESSURE_LEVELS:
+            h_val = pl_data.get(f"geopotential_height_{level}hPa")
+            ws_val = pl_data.get(f"wind_speed_{level}hPa")
+            if h_val is None or ws_val is None:
+                continue
+            if elevation_m < h_val <= thermal_top_m:
+                samples.append(float(ws_val))
+
+        # Mindestens 2 Samples (Surface + 1 PL) sonst unzuverlaessig.
+        if len(samples) < 2:
+            # Fallback: 850 hPa, falls innerhalb sinnvoller Schicht-Naehe
+            h_850 = pl_data.get("geopotential_height_850hPa")
+            ws_850 = pl_data.get("wind_speed_850hPa")
+            if (h_850 is not None and ws_850 is not None
+                    and elevation_m < h_850 <= thermal_top_m + 500):
+                samples.append(float(ws_850))
+            if len(samples) < 2:
+                return None
+
+        return sum(samples) / len(samples)
+
     def _calculate_gust_factor(self, wind_speed_10m, wind_gusts_10m, climb_rate_ms):
         """
         Boeigkeitsfaktor relativ zur Thermik-Vertikalgeschwindigkeit:
@@ -668,7 +726,8 @@ class WeatherContextMixin:
         Returns: (list_of_tags, debug_dict).
         """
         tags = []
-        debug = {"du_dz": None, "bs": None, "gf": None, "zone": None, "tq_ratio": None}
+        debug = {"du_dz": None, "bs": None, "gf": None, "zone": None,
+                 "tq_ratio": None, "bl_mean_wind": None}
 
         # Gate: keine Thermik -> keine Qualitaets-Tags
         if (not isinstance(climb_rate_ms, (int, float))
@@ -703,6 +762,24 @@ class WeatherContextMixin:
                 tags.append("[THERMAL-TORN-UNUSABLE]")
             elif bs <= config.BS_RATIO_THRESHOLDS["warn"]:
                 tags.append("[THERMAL-TORN-DEGRADED]")
+
+        # --- BL-Mean-Wind (Thermik-Organisation durch Grundwind gestoert) ---
+        # Mechanismus D aus wind_shear_thermal_quality.md Abschnitt 3.1:
+        # Grosse mittlere Windgeschwindigkeit durch die BL verhindert, dass
+        # sich die Blase organisiert abloest — unabhaengig von Scherung/Boeen.
+        # Ersetzt fuer Regionen die ROUGH-Familie (die Boeen braucht).
+        bl_mean_wind = self._calculate_bl_mean_wind(
+            wind_speed_10m, pl_data, elevation_m, thermal_top_m
+        )
+        debug["bl_mean_wind"] = bl_mean_wind
+        if bl_mean_wind is not None:
+            bl_cfg = config.BL_MEAN_WIND_THRESHOLDS.get(
+                terrain_zone, config.BL_MEAN_WIND_THRESHOLDS["alpen"]
+            )
+            if bl_mean_wind >= bl_cfg["danger"]:
+                tags.append("[THERMAL-WIND-UNUSABLE]")
+            elif bl_mean_wind >= bl_cfg["warn"]:
+                tags.append("[THERMAL-WIND-DEGRADED]")
 
         # --- Gust Factor (Thermik ruppig) ---
         surface_gf = self._calculate_gust_factor(wind_speed_10m, wind_gusts_10m, climb_rate_ms)
@@ -836,21 +913,6 @@ class WeatherContextMixin:
         for tag, count in sorted(tag_counts.items()):
             parts.append(f"{count}/{total} {tag}")
         return ", ".join(parts)
-
-    def _calculate_thermal_for_hour(self, data, pl_data, elevation_m, timestamp, spot, prev_max_h=None, region_id=None):
-        """Berechnet Thermik-Proxy für eine Stunde eines Spots."""
-        therm = self._calculate_thermal_raw(data, pl_data, elevation_m, timestamp, spot, prev_max_h, region_id=region_id)
-
-        if "error" not in therm:
-            climb = therm["climb_rate"]
-            max_h = therm["max_height"]
-            lcl = therm.get("lcl")
-            lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
-            return (
-                f" | THERMIK-PROXY: {climb} m/s bis {max_h}m MSL"
-                f"{lcl_str} (Güte: {therm['rating']}/10)"
-            )
-        return ""
 
     def _format_foehn_info(self, date_str: str = None, kritischer_foehn: str = "Süd") -> str:
         """Formatiert Föhn-Indikatoren als Text. Sucht bei Angabe eines Datums das Maximum."""
@@ -1002,11 +1064,14 @@ class WeatherContextMixin:
             for i in range(config.FORECAST_DAYS)
         ]
 
-    def _build_single_spot_context(self, spot, date_str: str, mode: str = "chat") -> str:
+    def _build_single_spot_context(self, spot, date_str: str, mode: str = "chat", region_analysis_result: dict = None) -> str:
         """
         Baut Wetterkontext für EINEN Spot an EINEM Tag.
         mode="chat": Filtert vergangene Stunden aus (für aktuelle Anfragen).
         mode="dashboard": Zeigt alle Stunden des Tages (10-17) für die Analyse.
+        region_analysis_result: optional, bereits berechnete Region-Analyse für diesen Tag.
+            Wird als Kontext-Block am Ende angehängt für die Streckenflug-Bewertung.
+            None oder leer → Block "Region-Kontext: nicht verfügbar" wird angehängt.
         """
         if not self.weather_data:
             return ""
@@ -1048,6 +1113,20 @@ class WeatherContextMixin:
         spot_region = find_region_for_point(spot["latitude"], spot["longitude"])
         spot_region_id = spot_region["id"] if spot_region else None
 
+        # Stateful Thermik-Berechnung über alle Stunden (Single Source of Truth:
+        # gleiche climb_rate / max_height wie im Meteogramm). Thermal Inertia,
+        # Encroachment-Cap und H-skalierte Verfallsrate wirken nur mit State-
+        # Carry-Over korrekt.
+        daily_thermals = compute_daily_thermals(
+            hourly_data,
+            pressure_level_data,
+            elevation_m,
+            config.PRESSURE_LEVELS,
+            slope_azimuth=spot.get("slope_azimuth"),
+            slope_angle=spot.get("slope_angle"),
+            region_id=spot_region_id,
+        )
+
         sorted_times = sorted(hourly_data.keys())
         now = datetime.now()
         has_data = False
@@ -1058,7 +1137,11 @@ class WeatherContextMixin:
         hourly_gusts = {}      # hour_str → gust value für Trend-Analyse
         rain_hours = []        # Stunden mit Niederschlag
         gust_hours = []        # Stunden mit GUST/ALOFT-GUST WARN/DANGER (fuer BOEEN-TREND)
+        gust_danger_hours = [] # Nur DANGER-Level (>40 km/h Boden oder Flugraum)
         tag_counts = {}        # tag_name -> count über den ganzen Tag (für Tagesprofil)
+        safety_timeline = []       # (hour_str, klass, label) - SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter)
+        fly_timeline = []          # (hour_str, klass, label) - FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet)
+        altitude_segment_lines = []  # Pro Stunde eine Zeile mit Hoehen-Safety-Map
         # Thermik-Qualitaets-Zaehler
         thermal_hours_total = 0  # Stunden mit climb > 0.3 m/s
         thermal_clean_h = 0     # Thermik-Stunden ohne Quality-Tags
@@ -1068,8 +1151,16 @@ class WeatherContextMixin:
         tq_torn_warn_h = 0
         tq_shear_danger_h = 0
         tq_shear_warn_h = 0
+        tq_wind_danger_h = 0
+        tq_wind_warn_h = 0
         peak_climb_proxy = 0.0
-        productive_thermal_h = 0   # Stunden mit climb>=0.7 + max(low,mid)<=70% + kein UNUSABLE
+        productive_thermal_h = 0   # Stunden mit climb>=0.7 + low<=80% + mid<=90% + kein ROUGH-UNUSABLE
+        band_too_shallow_h = 0     # Stunden mit climb>=0.7 aber Band zu duenn (<MIN_DEPTH)
+        # Cloud-Akkumulatoren NUR ueber Thermikstunden (climb>=0.3) — analog zur Logik
+        # bei productive_thermal_h: Morgenwolken ohne Thermik zaehlen nicht mit.
+        # Fuer Violett-Check (XC-Tag braucht saubere Sonne).
+        cloud_low_sum = 0.0
+        cloud_mid_sum = 0.0
 
         for timestamp in sorted_times:
             try:
@@ -1098,18 +1189,21 @@ class WeatherContextMixin:
             h_climb = None
             h_max_h = None
             try:
-                therm = self._calculate_thermal_raw(
-                    data, pressure_level_data.get(timestamp, {}),
-                    elevation_m, timestamp, spot,
-                    region_id=spot_region_id,
-                )
+                therm = daily_thermals.get(timestamp)
                 if therm and "error" not in therm:
                     h_climb = therm["climb_rate"]
                     if isinstance(h_climb, (int, float)) and h_climb > peak_climb_proxy:
                         peak_climb_proxy = h_climb
-                    h_max_h = therm["max_height"]
-                    effective_ceiling = max(effective_ceiling, h_max_h + 1000)
+                    # h_max_h = FLIEGBARE Thermik-Obergrenze, gecappt bei LCL (Wolkenbasis)
+                    # Oberhalb der Wolkenbasis ist VFR-Flug nicht erlaubt → nicht als
+                    # fliegbare Thermik zaehlen. Raw-Parcel-Top bleibt in therm["max_height"].
+                    thermal_top_raw = therm["max_height"]
                     lcl = therm.get("lcl")
+                    if isinstance(thermal_top_raw, (int, float)) and isinstance(lcl, (int, float)):
+                        h_max_h = min(thermal_top_raw, lcl)
+                    else:
+                        h_max_h = thermal_top_raw
+                    effective_ceiling = max(effective_ceiling, h_max_h + 1000)
                     lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
                     thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str} (Güte: {therm['rating']}/10)"
             except Exception as e:
@@ -1223,9 +1317,9 @@ class WeatherContextMixin:
                         alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
                         # Set ALOFT tags only for in-range (*) levels
                         if in_range:
-                            if ws_val > 40:
+                            if ws_val > config.ALOFT_DANGER_KMH:
                                 aloft_danger = True
-                            elif ws_val > 30:
+                            elif ws_val > config.ALOFT_WARN_KMH:
                                 aloft_warn = True
                             if g_val is not None:
                                 # T(z) > 40 km/h im Flugbereich = DANGER,
@@ -1310,23 +1404,45 @@ class WeatherContextMixin:
             # Thermik-Qualitaets-Zaehler aktualisieren
             if isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB:
                 thermal_hours_total += 1
-                tq_tags_this_hour = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-"))}
-                # THERMAL-ROUGH-UNUSABLE und THERMAL-ROUGH-FRAGMENTED blockieren den
-                # Produktiv-Zaehler. THERMAL-TORN und SHEAR sind reine Qualitaets-Issues
-                # und duerfen die Fliegbarkeit NICHT auf gray kippen.
+                cloud_low_sum += low_cl
+                cloud_mid_sum += mid_cl
+                tq_tags_this_hour = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-", "[THERMAL-WIND-"))}
+                # THERMAL-ROUGH-UNUSABLE (mechanische Klapper-Gefahr, nur Spots) ODER
+                # THERMAL-WIND-UNUSABLE (Grundwind zu stark, Blase organisiert sich nicht,
+                # Research 3.1) blockieren den Produktiv-Zaehler. FRAGMENTED ist "zu schwach,
+                # nicht gefaehrlich" — gehoert damit nicht in den Gefahren-Topf.
+                # SHEAR/TORN bleiben reine Qualitaets-Issues (Bart schwer zentrierbar,
+                # aber Thermik existiert) und blockieren produktive Stunden nicht.
                 rough_unusable_this_hour = (
                     "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour
-                    or "[THERMAL-ROUGH-FRAGMENTED]" in tq_tags_this_hour
+                    or "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour
                 )
+                # Wolken-Check: tief und mittel getrennt (Research-Sektion 6: unterschiedliche
+                # Wirkung auf Thermik). low=direkte Abschattung, mid=indirekt ueber Einstrahlung.
+                cloud_ok = (low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX
+                            and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX)
+                # Band-Tiefe: Thermik-Top muss mindestens PRODUCTIVE_BAND_DEPTH_MIN
+                # ueber Startplatz liegen, sonst kein nutzbares Kurbelband.
+                band_depth = (h_max_h - elevation_m) if isinstance(h_max_h, (int, float)) else 0
+                band_usable = band_depth >= config.PRODUCTIVE_BAND_DEPTH_MIN
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
-                        and max(low_cl, mid_cl) <= config.PRODUCTIVE_CLOUD_MAX
-                        and not rough_unusable_this_hour):
+                        and cloud_ok
+                        and not rough_unusable_this_hour
+                        and band_usable):
                     productive_thermal_h += 1
+                elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
+                        and cloud_ok
+                        and not rough_unusable_this_hour
+                        and not band_usable):
+                    band_too_shallow_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
                 else:
-                    if "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour or "[THERMAL-ROUGH-FRAGMENTED]" in tq_tags_this_hour:
+                    # Nur echtes UNUSABLE als Gefahrenzaehler; FRAGMENTED als eigener Warn-Zaehler.
+                    if "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour:
                         tq_rough_danger_h += 1
+                    elif "[THERMAL-ROUGH-FRAGMENTED]" in tq_tags_this_hour:
+                        tq_rough_warn_h += 1
                     elif "[THERMAL-ROUGH-DEGRADED]" in tq_tags_this_hour:
                         tq_rough_warn_h += 1
                     if "[THERMAL-TORN-UNUSABLE]" in tq_tags_this_hour:
@@ -1337,6 +1453,10 @@ class WeatherContextMixin:
                         tq_shear_danger_h += 1
                     elif "[SHEAR-DEGRADED]" in tq_tags_this_hour:
                         tq_shear_warn_h += 1
+                    if "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour:
+                        tq_wind_danger_h += 1
+                    elif "[THERMAL-WIND-DEGRADED]" in tq_tags_this_hour:
+                        tq_wind_warn_h += 1
 
             warning_str = " " + " ".join(warnings) if warnings else ""
 
@@ -1346,10 +1466,109 @@ class WeatherContextMixin:
             if not is_ok:
                 tag_counts[wind_status] = tag_counts.get(wind_status, 0) + 1
 
+            # ─── STUNDENVERLAUF: klassifiziere diese Stunde ───
+            # ─── SICHERHEITS-VERLAUF: nur Safety-Tags (Wind/Boeen/Regen/CAPE/Gewitter) ───
+            safety_hard_tags = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+                                "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]",
+                                "[STRONG-WIND-WARN]", "[OVERCAST-DANGER]"}
+            safety_warn_tags = {"[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
+                                "[CAPE-WARN]"}
+            s_hard = [t for t in warnings if t in safety_hard_tags]
+            s_warn = [t for t in warnings if t in safety_warn_tags]
+            if not is_ok:
+                s_klass = "wind-wrong"
+                s_label = "WIND-WRONG"
+            elif s_hard:
+                s_klass = "danger"
+                s_label = "DANGER(" + "+".join(t.strip("[]").replace("-WARN", "").replace("-DANGER", "") for t in s_hard) + ")"
+            elif s_warn:
+                s_klass = "warn"
+                s_label = "WARN(" + "+".join(t.strip("[]").replace("-WARN", "").replace("-DANGER", "") for t in s_warn) + ")"
+            else:
+                s_klass = "clean"
+                s_label = "clean"
+            safety_timeline.append((hour_str, s_klass, s_label))
+
+            # ─── FLIEGBARKEITS-VERLAUF: nur Thermik-Qualitaet + Produktivitaet ───
+            # Unabhaengig von Safety — hier geht es rein um "kann man thermisch fliegen?"
+            tq_tags_this_hour_fly = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-", "[THERMAL-WIND-"))}
+            unusable_hits = [t for t in tq_tags_this_hour_fly if t.endswith("-UNUSABLE]")]
+            fragmented_hits = [t for t in tq_tags_this_hour_fly if t.endswith("-FRAGMENTED]")]
+            degraded_hits = [t for t in tq_tags_this_hour_fly if t.endswith("-DEGRADED]")]
+            has_thermal = isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB
+            cloud_ok_tl = low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX
+            is_productive = (
+                has_thermal
+                and h_climb >= config.PRODUCTIVE_CLIMB_MIN
+                and cloud_ok_tl
+                and "[THERMAL-ROUGH-UNUSABLE]" not in unusable_hits
+                and "[THERMAL-WIND-UNUSABLE]" not in unusable_hits
+                and isinstance(h_max_h, (int, float))
+                and (h_max_h - elevation_m) >= config.PRODUCTIVE_BAND_DEPTH_MIN
+            )
+            if not has_thermal:
+                f_klass = "keine-thermik"
+                f_label = "keine-thermik"
+            elif unusable_hits:
+                f_klass = "unusable"
+                f_label = "UNUSABLE(" + "+".join(t.strip("[]").replace("THERMAL-", "").replace("-UNUSABLE", "") for t in unusable_hits) + ")"
+            elif is_productive:
+                f_klass = "produktiv"
+                f_label = f"produktiv({h_climb:.1f})"
+            elif fragmented_hits or degraded_hits:
+                # FRAGMENTED = schwache Thermik (eigene Kategorie, kein UNUSABLE-Gefahr)
+                f_klass = "degraded"
+                parts = [t.strip("[]").replace("THERMAL-", "").replace("-FRAGMENTED", "-FRAG") for t in fragmented_hits]
+                parts += [t.strip("[]").replace("THERMAL-", "").replace("-DEGRADED", "") for t in degraded_hits]
+                f_label = "degraded(" + "+".join(parts) + ")"
+            else:
+                # Thermik vorhanden aber nicht produktiv (z.B. Band zu duenn, Wolken, schwacher Climb)
+                reason = []
+                if isinstance(h_max_h, (int, float)) and (h_max_h - elevation_m) < config.PRODUCTIVE_BAND_DEPTH_MIN:
+                    reason.append("band-flach")
+                if not cloud_ok_tl:
+                    reason.append("wolken")
+                if h_climb < config.PRODUCTIVE_CLIMB_MIN:
+                    reason.append("schwach")
+                f_klass = "soaring"
+                f_label = "soaring(" + "+".join(reason) + ")" if reason else "soaring"
+            fly_timeline.append((hour_str, f_klass, f_label))
+
+            # ─── HOEHEN-SEGMENTE: kompakte Safety-Map pro Stunde ───
+            if display_with_gusts:
+                seg_parts = []
+                any_warn = False
+                for lv in display_with_gusts:
+                    alt = lv["altitude"]
+                    if not (elevation_m <= alt <= effective_ceiling):
+                        continue
+                    ws_val = lv["wind_speed"]
+                    g_val = lv.get("wind_gusts")
+                    top_val = max(ws_val, g_val) if g_val is not None else ws_val
+                    if top_val > 40:
+                        cls = "DANGER"
+                        any_warn = True
+                    elif top_val > 30:
+                        cls = "WARN"
+                        any_warn = True
+                    else:
+                        cls = "OK"
+                    seg_parts.append(f"{int(alt)}m:{cls}")
+                if seg_parts and any_warn:
+                    top_str = f"{int(h_max_h)}m" if isinstance(h_max_h, (int, float)) else "?"
+                    altitude_segment_lines.append(
+                        f"{hour_str} | Band {elevation_m}-{int(effective_ceiling)}m (Thermik-Top {top_str}): "
+                        + " · ".join(seg_parts)
+                    )
+
             gust_tags = {"[GUST-WARN]", "[GUST-DANGER]",
                          "[ALOFT-GUST-WARN]", "[ALOFT-GUST-DANGER]"}
-            if gust_tags & set(warnings):
+            gust_danger_tags = {"[GUST-DANGER]", "[ALOFT-GUST-DANGER]"}
+            warn_set = set(warnings)
+            if gust_tags & warn_set:
                 gust_hours.append(hour_str)
+                if gust_danger_tags & warn_set:
+                    gust_danger_hours.append(hour_str)
 
             # Klassifiziere saubere vs. gewarnte Stunden (nach allen Warnungen)
             # WICHTIG: Die Thermik-Qualitaets-Tags (SHEAR / THERMAL-TORN / THERMAL-ROUGH)
@@ -1417,10 +1636,10 @@ class WeatherContextMixin:
             major_tags_order = [
                 "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
                 "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
-                "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
+                "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]", "[THERMAL-WIND-UNUSABLE]",
                 "[THERMAL-ROUGH-FRAGMENTED]",
                 "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
-                "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]",
+                "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]", "[THERMAL-WIND-DEGRADED]",
                 "[WIND-WRONG]",
             ]
             hist_parts = []
@@ -1438,11 +1657,47 @@ class WeatherContextMixin:
                     f"Status maximal conditional, oft eher not_safe."
                 )
 
+        # ─── SICHERHEITS-VERLAUF: Sequenz pro Flugstunde (fuer safety_status) ───
+        if safety_timeline:
+            lines.append("")
+            lines.append("═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══")
+            seq_parts = [f"{h}:{lbl}" for (h, _k, lbl) in safety_timeline]
+            lines.append(" · ".join(seq_parts))
+            lines.append(
+                "→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen "
+                "zwei gefaehrlichen = NICHT als stabiles Fenster werten)."
+            )
+
+        # ─── FLIEGBARKEITS-VERLAUF: Sequenz pro Flugstunde (fuer fly_status) ───
+        if fly_timeline:
+            lines.append("")
+            lines.append("═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══")
+            seq_parts_f = [f"{h}:{lbl}" for (h, _k, lbl) in fly_timeline]
+            lines.append(" · ".join(seq_parts_f))
+            lines.append(
+                "→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · "
+                "degraded = ruppig aber fliegbar · unusable = Thermik unbrauchbar (Klapper/Scherung) · "
+                "keine-thermik = kein Steigen."
+            )
+
+        # ─── HOEHEN-SEGMENTE: Safety-Karte pro Stunde (nur wenn Gefahr im Band) ───
+        if altitude_segment_lines:
+            lines.append("")
+            lines.append("═══ HOEHEN-SEGMENTE im Flugbereich (Gefahr nach Hoehe, Safety) ═══")
+            for seg_line in altitude_segment_lines:
+                lines.append(seg_line)
+            lines.append(
+                "→ DANGER/WARN im Flugbereich (*) = relevante Sicherheits-Gefahr. Pruefe, ob die "
+                "gefaehrliche Hoehe im genutzten Kurbelband liegt (Start bis Thermik-Top)."
+            )
+
         # ─── BÖEN-INFO: Zusammenfassung für LLM-Bewertung ───
         gust_warn_h = tag_counts.get("[GUST-WARN]", 0)
         aloft_gust_warn_h = tag_counts.get("[ALOFT-GUST-WARN]", 0)
         gust_danger_h = tag_counts.get("[GUST-DANGER]", 0)
         aloft_gust_danger_h = tag_counts.get("[ALOFT-GUST-DANGER]", 0)
+        aloft_warn_h = tag_counts.get("[ALOFT-WARN]", 0)
+        aloft_danger_h = tag_counts.get("[ALOFT-DANGER]", 0)
         max_surface_gust = max(hourly_gusts.values()) if hourly_gusts else 0
 
         # "Harte Warnungen" = alles was eine Stunde objektiv unfliegbar macht
@@ -1459,11 +1714,15 @@ class WeatherContextMixin:
             "aloft_gust_warn_hours": aloft_gust_warn_h,
             "gust_danger_hours": gust_danger_h,
             "aloft_gust_danger_hours": aloft_gust_danger_h,
+            "aloft_warn_hours": aloft_warn_h,
+            "aloft_danger_hours": aloft_danger_h,
             "max_surface_gust": max_surface_gust,
             "wind_ok_count": len(wind_ok_hours),
             "wind_wrong_count": len(wind_wrong_hours),
             "clean_hours_count": len(clean_hours),
             "hard_warning_hours": hard_warning_hours,
+            "thunderstorm_hours": tag_counts.get("[THUNDERSTORM]", 0),
+            "strong_wind_warn_hours": tag_counts.get("[STRONG-WIND-WARN]", 0),
             "rain_hours": len(rain_hours),
             "rain_hour_list": rain_hours,
         })
@@ -1475,14 +1734,20 @@ class WeatherContextMixin:
         self._ctx_gust_cache[f"{name}|{date_str}"]["max_dry_gap"] = rain_pattern["max_dry_gap"]
 
         # Cache fuer deterministische Flyability-Override
-        # rough_danger_h = THERMAL-ROUGH-UNUSABLE + FRAGMENTED → einziger gray-Trigger.
-        # tq_danger_h bleibt Summe aller UNUSABLE/FRAGMENTED fuer Text-Hinweise.
+        # rough_danger_h = NUR THERMAL-ROUGH-UNUSABLE → echter gray-Trigger.
+        # FRAGMENTED bedeutet "Thermik zu schwach, nicht gefaehrlich" (siehe config.py)
+        # und zaehlt daher in tq_rough_warn_h (wie DEGRADED), nicht in danger_h.
+        # tq_danger_h bleibt Summe aller UNUSABLE fuer Text-Hinweise.
         self._ctx_cache_put(self._ctx_tq_cache, f"{name}|{date_str}", {
             "thermal_hours_total": thermal_hours_total,
-            "tq_danger_h": tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h,
+            "tq_danger_h": tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h + tq_wind_danger_h,
             "rough_danger_h": tq_rough_danger_h,
+            "wind_danger_h": tq_wind_danger_h,
             "peak_climb_proxy": peak_climb_proxy,
             "productive_thermal_h": productive_thermal_h,
+            "avg_low_cloud_thermal_h": (cloud_low_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+            "avg_mid_cloud_thermal_h": (cloud_mid_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+            "band_too_shallow_h": band_too_shallow_h,
             "clean_hours_count": len(clean_hours),
         })
 
@@ -1512,8 +1777,8 @@ class WeatherContextMixin:
 
         # ──��� THERMIK-QUALITÄT: Zusammenfassung für LLM (analog BÖEN-FLOOR) ───
         if thermal_hours_total > 0:
-            tq_danger_h = tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h
-            tq_warn_h = tq_rough_warn_h + tq_torn_warn_h + tq_shear_warn_h
+            tq_danger_h = tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h + tq_wind_danger_h
+            tq_warn_h = tq_rough_warn_h + tq_torn_warn_h + tq_shear_warn_h + tq_wind_warn_h
             tq_parts = []
             if tq_rough_danger_h:
                 tq_parts.append(f"ROUGH-UNUSABLE {tq_rough_danger_h}h")
@@ -1521,12 +1786,16 @@ class WeatherContextMixin:
                 tq_parts.append(f"TORN-UNUSABLE {tq_torn_danger_h}h")
             if tq_shear_danger_h:
                 tq_parts.append(f"SHEAR-UNUSABLE {tq_shear_danger_h}h")
+            if tq_wind_danger_h:
+                tq_parts.append(f"WIND-UNUSABLE {tq_wind_danger_h}h")
             if tq_rough_warn_h:
                 tq_parts.append(f"ROUGH-DEGRADED {tq_rough_warn_h}h")
             if tq_torn_warn_h:
                 tq_parts.append(f"TORN-DEGRADED {tq_torn_warn_h}h")
             if tq_shear_warn_h:
                 tq_parts.append(f"SHEAR-DEGRADED {tq_shear_warn_h}h")
+            if tq_wind_warn_h:
+                tq_parts.append(f"WIND-DEGRADED {tq_wind_warn_h}h")
             tq_parts.append(f"sauber {thermal_clean_h}h")
             unusable_pct = round(100 * tq_danger_h / thermal_hours_total)
             rough_pct = round(100 * tq_rough_danger_h / thermal_hours_total)
@@ -1549,6 +1818,15 @@ class WeatherContextMixin:
                     f"Sie degradieren MAXIMAL violet→green. KEIN gray-Downgrade wegen TORN/SHEAR. "
                     f"Der Tag bleibt Thermikflug-tauglich, Bart-Zentrierung ist nur schwieriger."
                 )
+            if tq_wind_danger_h > 0:
+                wind_pct = round(100 * tq_wind_danger_h / thermal_hours_total)
+                lines.append(
+                    f"  WIND-UNUSABLE in {tq_wind_danger_h}h ({wind_pct}%): Mittlerer BL-Wind "
+                    f"ueber Danger-Schwelle — Thermikblase kann sich nicht organisiert "
+                    f"abloesen. Zaehlt WIE ROUGH-UNUSABLE in den Produktiv-Zaehler "
+                    f"(blockiert green/violet). Der Tag wird dadurch gray (Abgleiter, falls "
+                    f"Soaring moeglich) — KEIN Einfluss auf safety_status."
+                )
         else:
             lines.append(
                 "→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): "
@@ -1560,10 +1838,38 @@ class WeatherContextMixin:
         if thermal_hours_total > 0:
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
-                f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, Wolken ≤{config.PRODUCTIVE_CLOUD_MAX}%, "
-                f"kein ROUGH-UNUSABLE). Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
-                f"HINWEIS: TORN-/SHEAR-UNUSABLE zählen MIT (Bart-Zentrierung schwieriger, aber fliegbar)."
+                f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, tief ≤{config.PRODUCTIVE_LOW_CLOUD_MAX}%, "
+                f"mittel ≤{config.PRODUCTIVE_MID_CLOUD_MAX}%, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
+                f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
+                f"HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT "
+                f"(Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
             )
+
+            # ─── VIOLETT-Kandidat-Check (XC-Tag) ───
+            # Nur Hint anzeigen wenn ALLE harten Schwellen erfuellt. LLM entscheidet final.
+            avg_low = cloud_low_sum / thermal_hours_total
+            avg_mid = cloud_mid_sum / thermal_hours_total
+            _unusable_pct = 100.0 * tq_danger_h / thermal_hours_total
+            _rough_pct = 100.0 * tq_rough_danger_h / thermal_hours_total
+            _is_violet_candidate = (
+                peak_climb_proxy >= config.VIOLET_PEAK_MIN
+                and productive_thermal_h >= config.VIOLET_HOURS_MIN
+                and _rough_pct < config.VIOLET_ROUGH_MAX
+                and _unusable_pct < config.VIOLET_UNUSABLE_MAX
+                and avg_low <= config.VIOLET_CLOUD_LOW_MAX
+                and avg_mid <= config.VIOLET_CLOUD_MID_MAX
+            )
+            if _is_violet_candidate:
+                lines.append(
+                    f"→ VIOLETT-Kandidat: Peak {peak_climb_proxy:.1f} m/s, "
+                    f"produktiv {productive_thermal_h}h, ROUGH {_rough_pct:.0f}%, "
+                    f"UNUSABLE {_unusable_pct:.0f}%, Ø tief {avg_low:.0f}%, Ø mittel {avg_mid:.0f}%. "
+                    f"Alle Violett-Schwellen erfüllt (Peak≥{config.VIOLET_PEAK_MIN}, "
+                    f"prod≥{config.VIOLET_HOURS_MIN}h, ROUGH<{config.VIOLET_ROUGH_MAX}%, "
+                    f"UNUSABLE<{config.VIOLET_UNUSABLE_MAX}%, Ø tief≤{config.VIOLET_CLOUD_LOW_MAX}%, "
+                    f"Ø mittel≤{config.VIOLET_CLOUD_MID_MAX}% — optimale Cu-Zone, keine Altostratus-Dämpfung). "
+                    f"fly_status = violet erlaubt."
+                )
 
         # Wind-Trend nach dem sauberen Fenster
         trend = _compute_wind_trend(clean_hours, hourly_gusts)
@@ -1619,7 +1925,7 @@ class WeatherContextMixin:
 
         # Boeen-Trend (analog Niederschlag-Trend)
         if gust_hours and all_hours_sorted:
-            gust_pattern = _detect_gust_trend(gust_hours, all_hours_sorted)
+            gust_pattern = _detect_gust_trend(gust_hours, all_hours_sorted, gust_danger_hours)
             gust_trend_text = _format_gust_trend_text(gust_pattern, gust_hours)
             if gust_trend_text:
                 lines.append(gust_trend_text)
@@ -1628,6 +1934,10 @@ class WeatherContextMixin:
         lines.append("")
         krit_foehn = spot.get("kritischer_foehn", "Süd")
         lines.append(self._format_foehn_info(date_str=date_str, kritischer_foehn=krit_foehn))
+
+        # Region-Kontext für Streckenflug-Bewertung (TEIL 4)
+        lines.append("")
+        lines.append(_format_region_context_block(region_analysis_result, spot_region))
 
         return "\n".join(lines)
 
@@ -1672,6 +1982,17 @@ class WeatherContextMixin:
         hourly_data = region_data.get("hourly_data", {})
         pressure_level_data = region_data.get("pressure_level_data", {})
 
+        # Stateful Thermik-Berechnung über alle Stunden (Single Source of Truth:
+        # gleiche climb_rate / max_height wie im Meteogramm). Siehe
+        # _build_single_spot_context für Motivation (Inertia/Encroachment).
+        daily_thermals = compute_daily_thermals(
+            hourly_data,
+            pressure_level_data,
+            elev_ref,
+            config.PRESSURE_LEVELS,
+            region_id=rid,
+        )
+
         sorted_times = sorted(hourly_data.keys())
         has_data = False
         calm_hours = []
@@ -1679,9 +2000,8 @@ class WeatherContextMixin:
         strong_hours = []
         clean_hours = []
         warned_hours = []
-        hourly_gusts = {}      # hour_str → gust value für Trend-Analyse
+        hourly_winds = {}      # hour_str → Windgeschwindigkeit für Trend-Analyse (Regionen haben keine Böen)
         rain_hours = []        # Stunden mit Niederschlag
-        gust_hours = []        # Stunden mit GUST/ALOFT-GUST WARN/DANGER (fuer BOEEN-TREND)
         tag_counts = {}        # tag_name → count (für Tagesprofil-Histogramm)
         # Thermik-Qualitaets-Zaehler
         thermal_hours_total = 0
@@ -1692,20 +2012,17 @@ class WeatherContextMixin:
         tq_torn_warn_h = 0
         tq_shear_danger_h = 0
         tq_shear_warn_h = 0
+        tq_wind_danger_h = 0
+        tq_wind_warn_h = 0
         peak_climb_proxy = 0.0
-        productive_thermal_h = 0   # Stunden mit climb>=0.7 + max(low,mid)<=70% + kein UNUSABLE
-
-        # Dummy spot dict for _calculate_thermal_raw compatibility
-        dummy_spot = {
-            "name": rname,
-            "elevation_m": elev_ref,
-            "slope_azimuth": None,
-            "slope_angle": None,
-        }
-
-        # Multi-Anchor: Spots in Region finden (fuer Boeen-Interpolation)
-        region_spots = self._get_spots_in_region(region)
-        region_polygon = region.get("polygon")
+        productive_thermal_h = 0   # Stunden mit climb>=0.7 + low<=80% + mid<=90% + kein ROUGH-UNUSABLE
+        band_too_shallow_h = 0     # Stunden mit climb>=0.7 aber Band zu duenn (<MIN_DEPTH)
+        # Cloud-Akkumulatoren NUR ueber Thermikstunden (climb>=0.3) — fuer Violett-Check.
+        cloud_low_sum = 0.0
+        cloud_mid_sum = 0.0
+        safety_timeline = []       # (hour_str, klass, label) - SICHERHEITS-VERLAUF (Region)
+        fly_timeline = []          # (hour_str, klass, label) - FLIEGBARKEITS-VERLAUF (Region)
+        altitude_segment_lines = []  # Pro Stunde eine Hoehen-Safety-Zeile
 
         for timestamp in sorted_times:
             try:
@@ -1727,18 +2044,21 @@ class WeatherContextMixin:
             h_climb = None
             h_max_h = None
             try:
-                therm = self._calculate_thermal_raw(
-                    data, pressure_level_data.get(timestamp, {}),
-                    elev_ref, timestamp, dummy_spot,
-                    region_id=rid,
-                )
+                therm = daily_thermals.get(timestamp)
                 if therm and "error" not in therm:
                     h_climb = therm["climb_rate"]
                     if isinstance(h_climb, (int, float)) and h_climb > peak_climb_proxy:
                         peak_climb_proxy = h_climb
-                    h_max_h = therm["max_height"]
-                    effective_ceiling = max(effective_ceiling, h_max_h + 1000)
+                    # h_max_h = FLIEGBARE Thermik-Obergrenze, gecappt bei LCL (Wolkenbasis)
+                    # Oberhalb der Wolkenbasis ist VFR-Flug nicht erlaubt → nicht als
+                    # fliegbare Thermik zaehlen. Raw-Parcel-Top bleibt in therm["max_height"].
+                    thermal_top_raw = therm["max_height"]
                     lcl = therm.get("lcl")
+                    if isinstance(thermal_top_raw, (int, float)) and isinstance(lcl, (int, float)):
+                        h_max_h = min(thermal_top_raw, lcl)
+                    else:
+                        h_max_h = thermal_top_raw
+                    effective_ceiling = max(effective_ceiling, h_max_h + 1000)
                     lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
                     thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str} (Guete: {therm['rating']}/10)"
             except Exception as e:
@@ -1747,7 +2067,6 @@ class WeatherContextMixin:
             temp = data.get("temperature_2m", "N/A")
             wind_speed_surface = data.get("wind_speed_10m", "N/A")
             wind_dir_surface = data.get("wind_direction_10m", "N/A")
-            wind_gusts_surface = data.get("wind_gusts_10m", "N/A")
             cloud_base_raw = data.get("cloud_base")
             cloud_base = f"{cloud_base_raw}m" if cloud_base_raw is not None else "wolkenfrei"
             cloud_cover = data.get("cloud_cover", "N/A")
@@ -1755,101 +2074,37 @@ class WeatherContextMixin:
             mid_cl = float(data.get("cloud_cover_mid") or 0)
             high_cl = float(data.get("cloud_cover_high") or 0)
 
-            # Single-Anchor mit Multi-Spot-aggregiertem Bodenexzess
-            # (Apr 2026 Refactor — siehe MEMORY.md):
-            # Spot-Höhen sind keine Höhenmessungen der freien Atmosphäre.
-            # Stattdessen aggregieren wir die 10m-Bodenexzesse aller Spots
-            # in der Region via Median (ausreißer-immun) zu einem robusten
-            # Region-Exzess. Das Höhenprofil entsteht via Gauss-Decay um
-            # diesen einzelnen Anker.
+            # Regionen: KEINE Böen (Apr 2026 Refactor).
+            # Böen sind lokale Spitzenwerte und gehören auf Spot-Ebene.
+            # Auf Region-Ebene wird nur der Wind bewertet. Thermik-Zerreiß-
+            # Signale kommen aus SHEAR, BS-Ratio und (Phase 2) BL-Mean-Wind.
             pl_data = pressure_level_data.get(timestamp, {})
-            anchors = []
-            if isinstance(wind_gusts_surface, (int, float)) and isinstance(wind_speed_surface, (int, float)):
-                ws_f = float(wind_speed_surface)
-                ref_excess = max(0.0, float(wind_gusts_surface) - ws_f)
-                excesses = [ref_excess]
-                # Spot-Bodenexzesse der Region einsammeln
-                if region_polygon and region_spots:
-                    for spot in region_spots:
-                        spot_data = self.weather_data.get(spot["name"])
-                        if not spot_data:
-                            continue
-                        hd = spot_data.get("hourly_data", {}).get(timestamp)
-                        if not hd:
-                            continue
-                        spot_ws = hd.get("wind_speed_10m")
-                        spot_gust = hd.get("wind_gusts_10m")
-                        if spot_ws is None or spot_gust is None:
-                            continue
-                        excesses.append(max(0.0, float(spot_gust) - float(spot_ws)))
-                agg_excess = aggregate_spot_excess(excesses)
-                anchors = [{
-                    "elevation_m": elev_ref,
-                    "gust_kmh": ws_f + agg_excess,
-                    "wind_speed_kmh": ws_f,
-                    "source": f"Ref-{rname}+{len(excesses)}sp",
-                }]
-
             wind_speed = wind_speed_surface
             wind_dir = wind_dir_surface
-            wind_gusts = wind_gusts_surface
             ref_wind_info = ""
 
-            if anchors:
-                # Multi-Anchor: Böen auf Referenzhöhe aus echten Spot-Daten interpolieren
-                anchor_gust, anchor_ws = interpolate_gust_from_anchors(anchors, elev_ref)
-                if anchor_gust is not None and isinstance(wind_speed_surface, (int, float)):
-                    # Effektiver Wind: max(Boden, Anker-Interpolation)
-                    if anchor_ws is not None and anchor_ws > wind_speed_surface:
-                        wind_speed = anchor_ws
-                    wind_gusts = max(
-                        wind_gusts_surface if isinstance(wind_gusts_surface, (int, float)) else 0,
-                        anchor_gust,
-                    )
-                    ref_wind_info = f" [Anker-Boeen {elev_ref}m: {anchor_gust:.0f}km/h, {len(anchors)} Anker]"
-                elif anchor_gust is not None:
-                    wind_speed = anchor_ws if anchor_ws is not None else wind_speed_surface
-                    wind_gusts = anchor_gust
-                    ref_wind_info = f" [Anker-Boeen {elev_ref}m: {anchor_gust:.0f}km/h]"
-            else:
-                # Fallback: Drucklevel-Interpolation (altes Verfahren)
-                ref_ws, ref_wd = _interpolate_wind_at_altitude(pl_data, elev_ref, config.PRESSURE_LEVELS)
-                if ref_ws is not None and isinstance(wind_speed_surface, (int, float)):
-                    if ref_ws > wind_speed_surface:
-                        wind_speed = ref_ws
-                        if ref_wd is not None:
-                            wind_dir = ref_wd
-                        ref_gusts_estimate = ref_ws * 1.3
-                        if isinstance(wind_gusts_surface, (int, float)):
-                            wind_gusts = max(wind_gusts_surface, ref_gusts_estimate)
-                        else:
-                            wind_gusts = ref_gusts_estimate
-                    ref_wind_info = f" [Ref-Wind {elev_ref}m: {ref_ws:.0f}km/h"
-                    if ref_wd is not None:
-                        ref_wind_info += f" aus {ref_wd:.0f}°"
-                    ref_wind_info += "]"
-                elif ref_ws is not None:
+            # Ref-Wind aus Drucklevel-Interpolation: Starker Wind auf
+            # Referenzhöhe (auch wenn Boden windstill) zählt für WIND-STRONG.
+            ref_ws, ref_wd = _interpolate_wind_at_altitude(pl_data, elev_ref, config.PRESSURE_LEVELS)
+            if ref_ws is not None and isinstance(wind_speed_surface, (int, float)):
+                if ref_ws > wind_speed_surface:
                     wind_speed = ref_ws
-                    wind_dir = ref_wd if ref_wd is not None else "N/A"
-                    ref_gusts_estimate = ref_ws * 1.3
-                    wind_gusts = ref_gusts_estimate
-                    ref_wind_info = f" [Ref-Wind {elev_ref}m: {ref_ws:.0f}km/h]"
+                    if ref_wd is not None:
+                        wind_dir = ref_wd
+                ref_wind_info = f" [Ref-Wind {elev_ref}m: {ref_ws:.0f}km/h"
+                if ref_wd is not None:
+                    ref_wind_info += f" aus {ref_wd:.0f}°"
+                ref_wind_info += "]"
+            elif ref_ws is not None:
+                wind_speed = ref_ws
+                wind_dir = ref_wd if ref_wd is not None else "N/A"
+                ref_wind_info = f" [Ref-Wind {elev_ref}m: {ref_ws:.0f}km/h]"
 
             # Wind-Staerke Tags (basierend auf effektivem Wind = max aus Boden und Referenzhoehe)
+            # Regionen haben keine Böen, Klassifikation nur aus wind_speed.
             hour_str = f"{dt.hour:02d}:00"
-            if isinstance(wind_gusts, (int, float)):
-                hourly_gusts[hour_str] = wind_gusts
-            if isinstance(wind_speed, (int, float)) and isinstance(wind_gusts, (int, float)):
-                if wind_speed > 30 or wind_gusts > 40:
-                    wind_status = "[WIND-STRONG]"
-                    strong_hours.append(hour_str)
-                elif wind_speed > 20 or wind_gusts > 30:
-                    wind_status = "[WIND-MODERATE]"
-                    moderate_hours.append(hour_str)
-                else:
-                    wind_status = "[WIND-CALM]"
-                    calm_hours.append(hour_str)
-            elif isinstance(wind_speed, (int, float)):
+            if isinstance(wind_speed, (int, float)):
+                hourly_winds[hour_str] = wind_speed
                 if wind_speed > 30:
                     wind_status = "[WIND-STRONG]"
                     strong_hours.append(hour_str)
@@ -1864,11 +2119,6 @@ class WeatherContextMixin:
                 calm_hours.append(hour_str)
 
             warnings = []
-            if isinstance(wind_gusts, (int, float)):
-                if wind_gusts > 40:
-                    warnings.append("[GUST-DANGER]")
-                elif wind_gusts > 30:
-                    warnings.append("[GUST-WARN]")
 
             try:
                 precip = data.get("precipitation")
@@ -1878,13 +2128,11 @@ class WeatherContextMixin:
             except Exception:
                 pass
 
-            # Hoehenwind mit Böen
+            # Hoehenwind (Regionen: ohne Böen).
             alt_wind_info = ""
             aloft_warn = False
             aloft_danger = False
-            aloft_gust_warn = False
-            aloft_gust_danger = False
-            display_with_gusts = None
+            display_levels_out = None
 
             if pl_data:
                 # Display levels mit 3 Klassen (siehe _build_single_spot_context):
@@ -1910,34 +2158,10 @@ class WeatherContextMixin:
                                                "wind_speed": ws, "wind_direction": wd})
 
                 if display_levels:
-                    if anchors:
-                        display_with_gusts = estimate_altitude_gusts_multi_anchor(
-                            anchors=anchors,
-                            pressure_levels_data=display_levels,
-                            elevation_ref=elev_ref,
-                            boundary_layer_height=data.get("boundary_layer_height"),
-                            region_id=rid,
-                        )
-                        # OI-Korrektur (spiegelt das Chart in web.format_altitude_wind_for_charts):
-                        # Region-Klassifizierer und Frontend-Meteogramm sehen damit identische Werte.
-                        # Ohne diesen Schritt würde der Klassifizierer Roh-Werte aus der Multi-Anchor-
-                        # Extrapolation sehen, das Chart dagegen die OI-geglätteten — Inkonsistenz.
-                        display_with_gusts = apply_oi_gust_correction(
-                            pressure_levels=display_with_gusts,
-                            anchors=anchors,
-                            elevation_ref=elev_ref,
-                            boundary_layer_height=data.get("boundary_layer_height"),
-                            region_id=rid,
-                        )
-                    else:
-                        display_with_gusts = estimate_altitude_gusts(
-                            wind_speed_10m=wind_speed_surface,
-                            wind_gusts_10m=wind_gusts_surface,
-                            pressure_levels_data=display_levels,
-                            elevation_m=elev_ref,
-                            boundary_layer_height=data.get("boundary_layer_height"),
-                        )
-                    for lv in display_with_gusts:
+                    # Regionen: kein Böen-Höhenprofil.
+                    # Nur wind_speed + wind_direction pro Drucklevel.
+                    display_levels_out = display_levels
+                    for lv in display_levels_out:
                         alt = lv["altitude"]
                         in_range = elev_ref <= alt <= effective_ceiling
                         in_buffer = effective_ceiling < alt <= buffer_top
@@ -1948,38 +2172,19 @@ class WeatherContextMixin:
                         else:
                             marker = ""
                         ws_val = lv["wind_speed"]
-                        g_val = lv.get("wind_gusts")
                         wd_val = lv.get("wind_direction")
-                        if g_val is not None and g_val > ws_val + 2:
-                            wind_str = f"{ws_val:.0f}/{g_val:.0f}"
-                        else:
-                            wind_str = f"{ws_val:.0f}"
                         dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
-                        alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
+                        alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {ws_val:.0f}km/h{dir_str}"
                         if in_range:
-                            if ws_val > 40:
+                            if ws_val > config.ALOFT_DANGER_KMH:
                                 aloft_danger = True
-                            elif ws_val > 30:
+                            elif ws_val > config.ALOFT_WARN_KMH:
                                 aloft_warn = True
-                            if g_val is not None:
-                                # T(z) > 40 km/h im Flugbereich = DANGER,
-                                # unabhängig vom Modellwind W(z).
-                                # Turbulenzrisiko >40 km/h ist ein Sicherheits-
-                                # problem auch bei moderatem Grundwind.
-                                if g_val > 40:
-                                    aloft_gust_danger = True
-                                elif g_val > 30:
-                                    aloft_gust_warn = True
 
             if aloft_danger:
                 warnings.append("[ALOFT-DANGER]")
             elif aloft_warn:
                 warnings.append("[ALOFT-WARN]")
-
-            if aloft_gust_danger:
-                warnings.append("[ALOFT-GUST-DANGER]")
-            elif aloft_gust_warn:
-                warnings.append("[ALOFT-GUST-WARN]")
 
             try:
                 cape = data.get("cape")
@@ -2009,8 +2214,8 @@ class WeatherContextMixin:
                     and cloud_base_raw < elev_ref + 500):
                 warnings.append("[OVERCAST-DANGER]")
 
-            # Thermik-Qualitaets-Tags (Scherung / Zerrissenheit / Boeigkeit)
-            # Analog zum Spot-Pfad — fehlte bisher im Region-Pfad.
+            # Thermik-Qualitaets-Tags (Scherung / Zerrissenheit).
+            # Regionen: keine Böen → keine ROUGH-Tags, nur SHEAR + TORN.
             # WICHTIG: Immer echten 10m-Bodenwind verwenden, NICHT den
             # effektiven wind_speed (kann Hoehenwind enthalten).
             # Scherung = Windaenderung mit Hoehe, braucht echten Surface-Anker.
@@ -2018,13 +2223,13 @@ class WeatherContextMixin:
             try:
                 quality_tags, quality_debug = self._thermal_quality_tags(
                     wind_speed_10m=wind_speed_surface,
-                    wind_gusts_10m=wind_gusts_surface,
+                    wind_gusts_10m=None,
                     pl_data=pl_data,
                     elevation_m=elev_ref,
                     thermal_top_m=h_max_h,
                     climb_rate_ms=h_climb,
                     region_id=rid,
-                    altitude_gusts=display_with_gusts,
+                    altitude_gusts=None,
                 )
                 for tag in quality_tags:
                     if tag not in warnings:
@@ -2041,23 +2246,43 @@ class WeatherContextMixin:
             # Thermik-Qualitaets-Zaehler aktualisieren
             if isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB:
                 thermal_hours_total += 1
-                tq_tags_this_hour = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-"))}
-                # THERMAL-ROUGH-UNUSABLE und THERMAL-ROUGH-FRAGMENTED blockieren den
-                # Produktiv-Zaehler. THERMAL-TORN und SHEAR sind reine Qualitaets-Issues
-                # und duerfen die Fliegbarkeit NICHT auf gray kippen.
+                cloud_low_sum += low_cl
+                cloud_mid_sum += mid_cl
+                tq_tags_this_hour = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-", "[THERMAL-WIND-"))}
+                # THERMAL-ROUGH-UNUSABLE (mechanische Klapper-Gefahr, nur Spots) ODER
+                # THERMAL-WIND-UNUSABLE (Grundwind zu stark, Blase organisiert sich nicht,
+                # Research 3.1) blockieren den Produktiv-Zaehler. FRAGMENTED ist "zu schwach,
+                # nicht gefaehrlich" — gehoert damit nicht in den Gefahren-Topf.
+                # SHEAR/TORN bleiben reine Qualitaets-Issues (Bart schwer zentrierbar,
+                # aber Thermik existiert) und blockieren produktive Stunden nicht.
                 rough_unusable_this_hour = (
                     "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour
-                    or "[THERMAL-ROUGH-FRAGMENTED]" in tq_tags_this_hour
+                    or "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour
                 )
+                # Wolken-Check: tief und mittel getrennt (Research-Sektion 6: unterschiedliche
+                # Wirkung auf Thermik). low=direkte Abschattung, mid=indirekt ueber Einstrahlung.
+                cloud_ok = (low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX
+                            and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX)
+                band_depth_r = (h_max_h - elev_ref) if isinstance(h_max_h, (int, float)) else 0
+                band_usable_r = band_depth_r >= config.PRODUCTIVE_BAND_DEPTH_MIN
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
-                        and max(low_cl, mid_cl) <= config.PRODUCTIVE_CLOUD_MAX
-                        and not rough_unusable_this_hour):
+                        and cloud_ok
+                        and not rough_unusable_this_hour
+                        and band_usable_r):
                     productive_thermal_h += 1
+                elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
+                        and cloud_ok
+                        and not rough_unusable_this_hour
+                        and not band_usable_r):
+                    band_too_shallow_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
                 else:
-                    if "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour or "[THERMAL-ROUGH-FRAGMENTED]" in tq_tags_this_hour:
+                    # Nur echtes UNUSABLE als Gefahrenzaehler; FRAGMENTED als eigener Warn-Zaehler.
+                    if "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour:
                         tq_rough_danger_h += 1
+                    elif "[THERMAL-ROUGH-FRAGMENTED]" in tq_tags_this_hour:
+                        tq_rough_warn_h += 1
                     elif "[THERMAL-ROUGH-DEGRADED]" in tq_tags_this_hour:
                         tq_rough_warn_h += 1
                     if "[THERMAL-TORN-UNUSABLE]" in tq_tags_this_hour:
@@ -2068,6 +2293,10 @@ class WeatherContextMixin:
                         tq_shear_danger_h += 1
                     elif "[SHEAR-DEGRADED]" in tq_tags_this_hour:
                         tq_shear_warn_h += 1
+                    if "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour:
+                        tq_wind_danger_h += 1
+                    elif "[THERMAL-WIND-DEGRADED]" in tq_tags_this_hour:
+                        tq_wind_warn_h += 1
 
             warning_str = " " + " ".join(warnings) if warnings else ""
 
@@ -2079,13 +2308,101 @@ class WeatherContextMixin:
             elif wind_status == "[WIND-MODERATE]":
                 tag_counts["[WIND-MODERATE]"] = tag_counts.get("[WIND-MODERATE]", 0) + 1
 
-            gust_tags = {"[GUST-WARN]", "[GUST-DANGER]",
-                         "[ALOFT-GUST-WARN]", "[ALOFT-GUST-DANGER]"}
-            if gust_tags & set(warnings):
-                gust_hours.append(hour_str)
+            # ─── SICHERHEITS-VERLAUF (Region) ───
+            # Regionen haben keine Böen → keine GUST-*/ALOFT-GUST-* Tags möglich.
+            safety_hard_r = {"[ALOFT-DANGER]",
+                             "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]",
+                             "[WIND-STRONG]", "[OVERCAST-DANGER]"}
+            safety_warn_r = {"[ALOFT-WARN]", "[CAPE-WARN]"}
+            s_hard_r = [t for t in warnings if t in safety_hard_r]
+            s_warn_r = [t for t in warnings if t in safety_warn_r]
+            if wind_status == "[WIND-STRONG]" and "[WIND-STRONG]" not in s_hard_r:
+                s_hard_r.append("[WIND-STRONG]")
+            if s_hard_r:
+                s_klass_r = "danger"
+                s_label_r = "DANGER(" + "+".join(t.strip("[]").replace("-WARN", "").replace("-DANGER", "") for t in s_hard_r) + ")"
+            elif s_warn_r or wind_status == "[WIND-MODERATE]":
+                s_klass_r = "warn"
+                bits = [t.strip("[]").replace("-WARN", "").replace("-DANGER", "") for t in s_warn_r]
+                if wind_status == "[WIND-MODERATE]" and "MODERATE" not in bits:
+                    bits.append("WIND-MOD")
+                s_label_r = "WARN(" + "+".join(bits) + ")" if bits else "WARN"
+            else:
+                s_klass_r = "clean"
+                s_label_r = "clean"
+            safety_timeline.append((hour_str, s_klass_r, s_label_r))
+
+            # ─── FLIEGBARKEITS-VERLAUF (Region) ───
+            tq_tags_r = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-", "[THERMAL-WIND-"))}
+            unusable_r = [t for t in tq_tags_r if t.endswith("-UNUSABLE]")]
+            fragmented_r = [t for t in tq_tags_r if t.endswith("-FRAGMENTED]")]
+            degraded_r = [t for t in tq_tags_r if t.endswith("-DEGRADED]")]
+            has_thermal_r = isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB
+            cloud_ok_r = low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX
+            is_productive_r = (
+                has_thermal_r
+                and h_climb >= config.PRODUCTIVE_CLIMB_MIN
+                and cloud_ok_r
+                and "[THERMAL-ROUGH-UNUSABLE]" not in unusable_r
+                and "[THERMAL-WIND-UNUSABLE]" not in unusable_r
+                and isinstance(h_max_h, (int, float))
+                and (h_max_h - elev_ref) >= config.PRODUCTIVE_BAND_DEPTH_MIN
+            )
+            if not has_thermal_r:
+                f_klass_r = "keine-thermik"
+                f_label_r = "keine-thermik"
+            elif unusable_r:
+                f_klass_r = "unusable"
+                f_label_r = "UNUSABLE(" + "+".join(t.strip("[]").replace("THERMAL-", "").replace("-UNUSABLE", "") for t in unusable_r) + ")"
+            elif is_productive_r:
+                f_klass_r = "produktiv"
+                f_label_r = f"produktiv({h_climb:.1f})"
+            elif fragmented_r or degraded_r:
+                # FRAGMENTED = schwache Thermik (eigene Kategorie, kein UNUSABLE-Gefahr)
+                f_klass_r = "degraded"
+                parts_r = [t.strip("[]").replace("THERMAL-", "").replace("-FRAGMENTED", "-FRAG") for t in fragmented_r]
+                parts_r += [t.strip("[]").replace("THERMAL-", "").replace("-DEGRADED", "") for t in degraded_r]
+                f_label_r = "degraded(" + "+".join(parts_r) + ")"
+            else:
+                reason_r = []
+                if isinstance(h_max_h, (int, float)) and (h_max_h - elev_ref) < config.PRODUCTIVE_BAND_DEPTH_MIN:
+                    reason_r.append("band-flach")
+                if not cloud_ok_r:
+                    reason_r.append("wolken")
+                if h_climb < config.PRODUCTIVE_CLIMB_MIN:
+                    reason_r.append("schwach")
+                f_klass_r = "soaring"
+                f_label_r = "soaring(" + "+".join(reason_r) + ")" if reason_r else "soaring"
+            fly_timeline.append((hour_str, f_klass_r, f_label_r))
+
+            # ─── HOEHEN-SEGMENTE (Region) ───
+            if display_levels_out:
+                seg_parts_r = []
+                any_warn_r = False
+                for lv in display_levels_out:
+                    alt = lv["altitude"]
+                    if not (elev_ref <= alt <= effective_ceiling):
+                        continue
+                    ws_val = lv["wind_speed"]
+                    if ws_val > config.ALOFT_DANGER_KMH:
+                        cls = "DANGER"
+                        any_warn_r = True
+                    elif ws_val > config.ALOFT_WARN_KMH:
+                        cls = "WARN"
+                        any_warn_r = True
+                    else:
+                        cls = "OK"
+                    seg_parts_r.append(f"{int(alt)}m:{cls}")
+                if seg_parts_r and any_warn_r:
+                    top_str_r = f"{int(h_max_h)}m" if isinstance(h_max_h, (int, float)) else "?"
+                    altitude_segment_lines.append(
+                        f"{hour_str} | Band {elev_ref}-{int(effective_ceiling)}m (Thermik-Top {top_str_r}): "
+                        + " · ".join(seg_parts_r)
+                    )
 
             # Klassifiziere saubere vs. gewarnte Stunden
-            hard_warnings = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[WIND-STRONG]", "[OVERCAST-DANGER]"}
+            # Regionen: keine GUST-/ALOFT-GUST-Tags in hard_warnings.
+            hard_warnings = {"[ALOFT-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[WIND-STRONG]", "[OVERCAST-DANGER]"}
             has_hard_warn = bool(hard_warnings & set(warnings)) or wind_status == "[WIND-STRONG]"
             if not has_hard_warn:
                 clean_hours.append(hour_str)
@@ -2095,16 +2412,9 @@ class WeatherContextMixin:
             # Wind-Werte formatieren (koennen Floats sein nach Interpolation)
             ws_fmt = f"{wind_speed:.0f}" if isinstance(wind_speed, float) else str(wind_speed)
             wd_fmt = f"{wind_dir:.0f}" if isinstance(wind_dir, float) else str(wind_dir)
-            wg_fmt = f"{wind_gusts:.0f}" if isinstance(wind_gusts, float) else str(wind_gusts)
-
-            # Surface gust excess for LLM context
-            sfc_excess = ""
-            if isinstance(wind_gusts, (int, float)) and isinstance(wind_speed, (int, float)):
-                exc = max(0, wind_gusts - wind_speed)
-                sfc_excess = f", Exzess +{exc:.0f}km/h"
 
             lines.append(
-                f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}° (Turbulenzrisiko {wg_fmt}km/h{sfc_excess}) {wind_status}{ref_wind_info}{warning_str} | "
+                f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}° {wind_status}{ref_wind_info}{warning_str} | "
                 f"Wolkenbasis {cloud_base} | Bewoelkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | FLUGBEREICH: {elev_ref}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
             )
 
@@ -2132,22 +2442,36 @@ class WeatherContextMixin:
             lines.append(f"→ Kein fliegbares Fenster. Status sollte not_safe sein.")
 
         # Cache fuer deterministische Flyability-Override
-        # rough_danger_h = THERMAL-ROUGH-UNUSABLE + FRAGMENTED → einziger gray-Trigger.
-        # tq_danger_h bleibt Summe aller UNUSABLE/FRAGMENTED fuer Text-Hinweise.
+        # rough_danger_h = NUR THERMAL-ROUGH-UNUSABLE → echter gray-Trigger.
+        # FRAGMENTED bedeutet "Thermik zu schwach, nicht gefaehrlich" (siehe config.py)
+        # und zaehlt daher in tq_rough_warn_h (wie DEGRADED), nicht in danger_h.
+        # tq_danger_h bleibt Summe aller UNUSABLE fuer Text-Hinweise.
         # Rain-Sandwich-Erkennung fuer Region-Override + NIEDERSCHLAG-TREND
-        all_hours_sorted_region = sorted(hourly_gusts.keys()) or sorted(set(calm_hours + moderate_hours + strong_hours))
+        all_hours_sorted_region = sorted(hourly_winds.keys()) or sorted(set(calm_hours + moderate_hours + strong_hours))
         rain_pattern = _detect_rain_sandwich(rain_hours, all_hours_sorted_region)
 
         self._ctx_cache_put(self._ctx_tq_cache, f"{rname}|{date_str}", {
             "thermal_hours_total": thermal_hours_total,
-            "tq_danger_h": tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h,
+            "tq_danger_h": tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h + tq_wind_danger_h,
             "rough_danger_h": tq_rough_danger_h,
+            "wind_danger_h": tq_wind_danger_h,
             "peak_climb_proxy": peak_climb_proxy,
             "productive_thermal_h": productive_thermal_h,
+            "avg_low_cloud_thermal_h": (cloud_low_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+            "avg_mid_cloud_thermal_h": (cloud_mid_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+            "band_too_shallow_h": band_too_shallow_h,
             "clean_hours_count": len(clean_hours),
             "rain_sandwiched": rain_pattern["is_sandwiched"],
             "max_dry_gap": rain_pattern["max_dry_gap"],
             "rain_cnt": len(rain_hours),
+        })
+
+        # Region-Aloft-Cache (Wind-only, keine Böen) für ALOFT-Override in
+        # _post_process_combined_region. Regionen haben keine GUST-Tags mehr,
+        # der Cache enthält nur wind-basierte Höhenwind-Zähler.
+        self._ctx_cache_put(self._ctx_gust_cache, f"{rname}|{date_str}", {
+            "aloft_warn_hours": tag_counts.get("[ALOFT-WARN]", 0),
+            "aloft_danger_hours": tag_counts.get("[ALOFT-DANGER]", 0),
         })
 
         # ─── TAGESPROFIL: Ganzheitliche Sicht für LLM-Bewertung ───
@@ -2163,13 +2487,14 @@ class WeatherContextMixin:
             lines.append(
                 f"Verhaeltnis sauber/gesamt: {len(clean_hours)}/{total_actual}h = {clean_pct:.0f}%"
             )
+            # Regionen haben keine Böen → keine GUST-*/ALOFT-GUST-*/THERMAL-ROUGH-* Tags.
+            # THERMAL-WIND-* ersetzen ROUGH-* auf Region-Ebene (BL-Mean-Wind statt GF).
             major_tags_order = [
-                "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+                "[ALOFT-DANGER]",
                 "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
-                "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]",
-                "[THERMAL-ROUGH-FRAGMENTED]",
-                "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
-                "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]",
+                "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-WIND-UNUSABLE]",
+                "[ALOFT-WARN]",
+                "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-WIND-DEGRADED]",
                 "[WIND-MODERATE]",
             ]
             hist_parts = []
@@ -2186,10 +2511,44 @@ class WeatherContextMixin:
                     f"Status maximal conditional, oft eher not_safe."
                 )
 
+        # ─── SICHERHEITS-VERLAUF (Region) ───
+        if safety_timeline:
+            lines.append("")
+            lines.append("═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══")
+            seq_parts = [f"{h}:{lbl}" for (h, _k, lbl) in safety_timeline]
+            lines.append(" · ".join(seq_parts))
+            lines.append(
+                "→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen "
+                "zwei gefaehrlichen = NICHT als stabiles Fenster werten)."
+            )
+
+        # ─── FLIEGBARKEITS-VERLAUF (Region) ───
+        if fly_timeline:
+            lines.append("")
+            lines.append("═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══")
+            seq_parts_f = [f"{h}:{lbl}" for (h, _k, lbl) in fly_timeline]
+            lines.append(" · ".join(seq_parts_f))
+            lines.append(
+                "→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · "
+                "degraded = ruppig aber fliegbar · unusable = Thermik unbrauchbar (Klapper/Scherung) · "
+                "keine-thermik = kein Steigen."
+            )
+
+        # ─── HOEHEN-SEGMENTE (Region) ───
+        if altitude_segment_lines:
+            lines.append("")
+            lines.append("═══ HOEHEN-SEGMENTE im Flugbereich (Gefahr nach Hoehe, Safety) ═══")
+            for seg_line in altitude_segment_lines:
+                lines.append(seg_line)
+            lines.append(
+                "→ DANGER/WARN im Flugbereich = relevante Sicherheits-Gefahr. Pruefe, ob die "
+                "gefaehrliche Hoehe im genutzten Kurbelband liegt (Referenzhoehe bis Thermik-Top)."
+            )
+
         # ─── THERMIK-QUALITÄT: Zusammenfassung für LLM (analog BÖEN-FLOOR) ───
         if thermal_hours_total > 0:
-            tq_danger_h = tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h
-            tq_warn_h = tq_rough_warn_h + tq_torn_warn_h + tq_shear_warn_h
+            tq_danger_h = tq_rough_danger_h + tq_torn_danger_h + tq_shear_danger_h + tq_wind_danger_h
+            tq_warn_h = tq_rough_warn_h + tq_torn_warn_h + tq_shear_warn_h + tq_wind_warn_h
             tq_parts = []
             if tq_rough_danger_h:
                 tq_parts.append(f"ROUGH-UNUSABLE {tq_rough_danger_h}h")
@@ -2197,12 +2556,16 @@ class WeatherContextMixin:
                 tq_parts.append(f"TORN-UNUSABLE {tq_torn_danger_h}h")
             if tq_shear_danger_h:
                 tq_parts.append(f"SHEAR-UNUSABLE {tq_shear_danger_h}h")
+            if tq_wind_danger_h:
+                tq_parts.append(f"WIND-UNUSABLE {tq_wind_danger_h}h")
             if tq_rough_warn_h:
                 tq_parts.append(f"ROUGH-DEGRADED {tq_rough_warn_h}h")
             if tq_torn_warn_h:
                 tq_parts.append(f"TORN-DEGRADED {tq_torn_warn_h}h")
             if tq_shear_warn_h:
                 tq_parts.append(f"SHEAR-DEGRADED {tq_shear_warn_h}h")
+            if tq_wind_warn_h:
+                tq_parts.append(f"WIND-DEGRADED {tq_wind_warn_h}h")
             tq_parts.append(f"sauber {thermal_clean_h}h")
             unusable_pct = round(100 * tq_danger_h / thermal_hours_total)
             rough_pct = round(100 * tq_rough_danger_h / thermal_hours_total)
@@ -2225,6 +2588,15 @@ class WeatherContextMixin:
                     f"Sie degradieren MAXIMAL violet→green. KEIN gray-Downgrade wegen TORN/SHEAR. "
                     f"Der Tag bleibt Thermikflug-tauglich, Bart-Zentrierung ist nur schwieriger."
                 )
+            if tq_wind_danger_h > 0:
+                wind_pct = round(100 * tq_wind_danger_h / thermal_hours_total)
+                lines.append(
+                    f"  WIND-UNUSABLE in {tq_wind_danger_h}h ({wind_pct}%): Mittlerer BL-Wind "
+                    f"ueber Danger-Schwelle — Thermikblase kann sich nicht organisiert "
+                    f"abloesen. Zaehlt WIE ROUGH-UNUSABLE in den Produktiv-Zaehler "
+                    f"(blockiert green/violet). Der Tag wird dadurch gray (Abgleiter, falls "
+                    f"Soaring moeglich) — KEIN Einfluss auf safety_status."
+                )
         else:
             lines.append(
                 "→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): "
@@ -2236,13 +2608,44 @@ class WeatherContextMixin:
         if thermal_hours_total > 0:
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
-                f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, Wolken ≤{config.PRODUCTIVE_CLOUD_MAX}%, "
-                f"kein ROUGH-UNUSABLE). Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
-                f"HINWEIS: TORN-/SHEAR-UNUSABLE zählen MIT (Bart-Zentrierung schwieriger, aber fliegbar)."
+                f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, tief ≤{config.PRODUCTIVE_LOW_CLOUD_MAX}%, "
+                f"mittel ≤{config.PRODUCTIVE_MID_CLOUD_MAX}%, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
+                f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
+                f"HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT "
+                f"(Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
             )
 
-        # Wind-Trend nach dem sauberen Fenster
-        trend = _compute_wind_trend(clean_hours, hourly_gusts)
+            # ─── VIOLETT-Kandidat-Check (XC-Tag) ───
+            # Nur Hint anzeigen wenn ALLE harten Schwellen erfuellt. LLM entscheidet final.
+            avg_low = cloud_low_sum / thermal_hours_total
+            avg_mid = cloud_mid_sum / thermal_hours_total
+            _unusable_pct = 100.0 * tq_danger_h / thermal_hours_total
+            _rough_pct = 100.0 * tq_rough_danger_h / thermal_hours_total
+            _is_violet_candidate = (
+                peak_climb_proxy >= config.VIOLET_PEAK_MIN
+                and productive_thermal_h >= config.VIOLET_HOURS_MIN
+                and _rough_pct < config.VIOLET_ROUGH_MAX
+                and _unusable_pct < config.VIOLET_UNUSABLE_MAX
+                and avg_low <= config.VIOLET_CLOUD_LOW_MAX
+                and avg_mid <= config.VIOLET_CLOUD_MID_MAX
+            )
+            if _is_violet_candidate:
+                lines.append(
+                    f"→ VIOLETT-Kandidat: Peak {peak_climb_proxy:.1f} m/s, "
+                    f"produktiv {productive_thermal_h}h, ROUGH {_rough_pct:.0f}%, "
+                    f"UNUSABLE {_unusable_pct:.0f}%, Ø tief {avg_low:.0f}%, Ø mittel {avg_mid:.0f}%. "
+                    f"Alle Violett-Schwellen erfüllt (Peak≥{config.VIOLET_PEAK_MIN}, "
+                    f"prod≥{config.VIOLET_HOURS_MIN}h, ROUGH<{config.VIOLET_ROUGH_MAX}%, "
+                    f"UNUSABLE<{config.VIOLET_UNUSABLE_MAX}%, Ø tief≤{config.VIOLET_CLOUD_LOW_MAX}%, "
+                    f"Ø mittel≤{config.VIOLET_CLOUD_MID_MAX}% — optimale Cu-Zone, keine Altostratus-Dämpfung). "
+                    f"fly_status = violet erlaubt."
+                )
+
+        # Wind-Trend nach dem sauberen Fenster (Regionen: Windgeschwindigkeit statt Böen)
+        trend = _compute_wind_trend(
+            clean_hours, hourly_winds,
+            value_label="Wind", danger_threshold=30,
+        )
         if trend:
             lines.append(trend)
 
@@ -2291,13 +2694,6 @@ class WeatherContextMixin:
                 f"NIEDERSCHLAG-TREND: GANZTAEGIG — Regen in {len(rain_hours)} Stunden. "
                 f"→ not_safe."
             )
-
-        # Boeen-Trend (analog Niederschlag-Trend)
-        if gust_hours and all_hours_sorted_region:
-            gust_pattern = _detect_gust_trend(gust_hours, all_hours_sorted_region)
-            gust_trend_text = _format_gust_trend_text(gust_pattern, gust_hours)
-            if gust_trend_text:
-                lines.append(gust_trend_text)
 
         # Foehn: regionsspezifisch (Süd/Nord/Beide)
         krit_foehn = region.get("kritischer_foehn", "Beide")

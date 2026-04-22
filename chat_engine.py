@@ -1,5 +1,5 @@
 """
-Chat-Engine für Flychat.
+Chat-Engine für Gleitcast.
 Zentrale Klasse die Pilotenfragen beantwortet.
 Globaler Wetterdaten-Kontext + Per-User Conversation History.
 """
@@ -13,9 +13,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from datetime import datetime, timedelta
 from pathlib import Path
-from openai import OpenAI
 
 import config
+from llm_client import build_client
 from spots import load_spots
 from fetch_weather import fetch_all_spots, load_cached_weather, load_cached_weather_timestamp, is_cache_fresh, is_cache_complete, validate_spot_data
 from foehn_indicators import (
@@ -36,10 +36,6 @@ from prompts import (
     SYSTEM_PROMPT,
     CAPABILITIES_GUIDE,
     FOEHN_CHAT_KNOWLEDGE,
-    SAFETY_CHECK_PROMPT,
-    FLYABILITY_PROMPT,
-    REGION_SAFETY_CHECK_PROMPT,
-    REGION_FLYABILITY_PROMPT,
     SPOT_COMBINED_PROMPT,
     REGION_COMBINED_PROMPT,
     WEEKLY_BRIEFING_PROMPT,
@@ -83,93 +79,9 @@ from engine._common import (
 # Nach Erhalt eines Tool-Calls dispatcht answer_stream() an _dispatch_tool(),
 # yieldet sofort map_action-Events ans Frontend und ruft danach erneut OpenAI auf.
 
-TOOLS: list = [
-    {
-        "type": "function",
-        "function": {
-            "name": "geocode_location",
-            "description": (
-                "Geokodiert eine vom Piloten genannte Adresse oder Stadt zu Koordinaten. "
-                "Verwende dieses Tool wenn der Pilot einen Standort nennt (z.B. 'Zürich', "
-                "'Bern', 'Bahnhofstrasse 5 Luzern') und wir wissen müssen wo er ist, "
-                "BEVOR wir mit find_spots_within_travel_time die erreichbaren Spots suchen."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Adresse, Stadt oder Ortsname (z.B. 'Zürich' oder 'Bern Bahnhof')."
-                    }
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "find_spots_within_travel_time",
-            "description": (
-                "Findet alle Fluggebiete, die der Pilot von einem Startpunkt aus innerhalb "
-                "einer maximalen Reisezeit erreichen kann. Berechnet eine Isochrone (erreichbare "
-                "Zone) per Valhalla, zeichnet sie automatisch auf der Karte ein und filtert die "
-                "Spots, die darin liegen. Liefert die Liste der erreichbaren Spots zurück, "
-                "inklusive Voranalyse-Daten (Sicherheit, Fliegbarkeit) für deine Empfehlung."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "lat": {
-                        "type": "number",
-                        "description": "Latitude des Startpunkts (WGS84). Aus geocode_location.",
-                    },
-                    "lon": {
-                        "type": "number",
-                        "description": "Longitude des Startpunkts (WGS84). Aus geocode_location.",
-                    },
-                    "minutes": {
-                        "type": "integer",
-                        "description": "Maximale Reisezeit in Minuten (z.B. 60, 90, 120).",
-                        "minimum": 1,
-                        "maximum": 360,
-                    },
-                    "mode": {
-                        "type": "string",
-                        "enum": ["auto", "bicycle", "pedestrian"],
-                        "description": (
-                            "Verkehrsmittel: 'auto' für Auto, 'bicycle' für Velo, "
-                            "'pedestrian' für zu Fuss. Default 'auto'."
-                        ),
-                    },
-                    "label": {
-                        "type": "string",
-                        "description": (
-                            "Optional: Anzeigename des Startpunkts für die Karte (z.B. 'Zürich'). "
-                            "Wird neben dem Pin angezeigt."
-                        ),
-                    },
-                },
-                "required": ["lat", "lon", "minutes"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "clear_map_overlays",
-            "description": (
-                "Entfernt alle dynamischen Overlays von der Karte (Isochrone, "
-                "User-Standort-Pin, Spot-Highlights). Verwende wenn der Pilot "
-                "'Karte zurücksetzen', 'alles löschen', 'reset karte' o.ä. sagt."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {},
-            },
-        },
-    },
-]
+# TOOLS ist jetzt in engine/chat_orchestrator.py definiert (wird dort genutzt).
+# Re-Export fuer Rueckwaertskompat falls externer Code `from chat_engine import TOOLS` nutzt.
+from engine.chat_orchestrator import TOOLS  # noqa: F401
 
 
 # ============================================================================
@@ -203,7 +115,7 @@ from engine.analyzers import AnalyzersMixin
 from engine.chat_orchestrator import ChatOrchestratorMixin
 
 
-class FlychatEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
+class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
     def __init__(self, instantdb_client=None):
         self.spots = load_spots()
         self.weather_data = {}
@@ -232,9 +144,37 @@ class FlychatEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
         # Key = f"{name}|{date_str}", Value = dict mit thermal_hours_total, tq_danger_h, peak_climb_proxy
         self._ctx_tq_cache = {}
 
-        api_key = os.environ.get("OPENAI_API_KEY")
-        self.model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-        self.client = OpenAI(api_key=api_key, timeout=120.0) if api_key else None
+        # LLM-Clients: Chat + Analyse getrennt konfigurierbar (config.py).
+        # Hybrid-Setup moeglich (z.B. Chat=anthropic, Analyse=openai).
+        self.chat_provider = config.CHAT_PROVIDER
+        self.analysis_provider = config.ANALYSIS_PROVIDER
+        self.chat_model = config.get_model(self.chat_provider, "chat")
+        self.analysis_model = config.get_model(self.analysis_provider, "analysis")
+        self.chat_client = build_client(
+            self.chat_provider, config.get_api_key(self.chat_provider), timeout=120.0
+        )
+        # Wenn Chat- und Analyse-Provider identisch sind UND gleicher Key → Client teilen
+        if (
+            self.analysis_provider == self.chat_provider
+            and self.chat_client is not None
+        ):
+            self.analysis_client = self.chat_client
+        else:
+            self.analysis_client = build_client(
+                self.analysis_provider,
+                config.get_api_key(self.analysis_provider),
+                timeout=120.0,
+            )
+
+        # Rueckwaertskompatibilitaet: self.client/self.model zeigen auf CHAT-Slot.
+        # Bestehender Code, der self.client/self.model noch direkt nutzt, bleibt funktional.
+        self.client = self.chat_client
+        self.model = self.chat_model
+        logger.info(
+            "LLM-Setup: chat=%s/%s, analysis=%s/%s",
+            self.chat_provider, self.chat_model,
+            self.analysis_provider, self.analysis_model,
+        )
 
         # History-Persistenz
         self.history_dir = config.HISTORY_DIR

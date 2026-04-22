@@ -1,6 +1,6 @@
-# Flychat MVP -- Feature-Definition (revidiert)
+# Gleitcast MVP -- Feature-Definition (revidiert)
 
-**Produkt:** Flychat -- KI/LLM-Gleitschirm-Wetter-App
+**Produkt:** Gleitcast -- KI/LLM-Gleitschirm-Wetter-App
 **Zielgruppe:** Gleitschirmpiloten
 **Erstellt:** 2026-03-06
 **Revidiert:** 2026-03-06 -- Abgleich mit Datenlage, Kostenrealität und Chat-Architektur (LlamaIndex)
@@ -118,7 +118,7 @@ Ein Spot-Ranking mit Scores (88/100 vs. 74/100) suggeriert eine Differenzierungs
 **Allgemeine Wetterlage erklären:**
 ```
 Pilot: "Wie wird's heute?"
-Flychat: "Schwache Südwestlage über den Nordalpen. Trocken
+Gleitcast: "Schwache Südwestlage über den Nordalpen. Trocken
 bis 16 Uhr, dann einzelne Schauer im Inntal möglich.
 Wind in Gipfelhöhe 12-18 km/h aus SW. Bewölkung nimmt
 ab Mittag leicht zu. Grundsätzlich ein fliegbarer Tag."
@@ -127,7 +127,7 @@ ab Mittag leicht zu. Grundsätzlich ein fliegbarer Tag."
 **Spots vergleichen (Wind, Sicherheit):**
 ```
 Pilot: "Brauneck oder Wallberg?"
-Flychat: "Windtechnisch sind beide gut -- SW passt zu
+Gleitcast: "Windtechnisch sind beide gut -- SW passt zu
 beiden Hangexpositionen. Am Wallberg werden Böen bis
 25 km/h ab 14 Uhr vorhergesagt, am Brauneck bleibt
 es ruhiger (Böen max 20 km/h). Wenn du den ganzen Tag
@@ -137,7 +137,7 @@ fliegen willst, ist Brauneck die sicherere Wahl."
 **Spots negativ filtern:**
 ```
 Pilot: "Wo kann ich heute fliegen?"
-Flychat: "Von deinen 12 Spots fallen heute 5 raus:
+Gleitcast: "Von deinen 12 Spots fallen heute 5 raus:
 Hochries und Kampenwand haben Nordwind (falsche Richtung),
 Spitzingsee hat Regen ab Mittag, Tegernsee-Ost und
 Hirschberg haben Böen über 30 km/h. Die restlichen 7
@@ -147,7 +147,7 @@ haben passenden Wind und sind trocken."
 **Sicherheitshinweise:**
 ```
 Pilot: "Ist der Wind am Wallberg sicher für einen B-Schirm?"
-Flychat: "Aktuell 16 km/h mit Böen bis 20 -- das ist OK
+Gleitcast: "Aktuell 16 km/h mit Böen bis 20 -- das ist OK
 für B-Schirme. Ab 14 Uhr steigen die Böen auf bis zu
 25 km/h -- dann wird's grenzwertig. Ich würde vormittags
 starten und den Wind im Auge behalten."
@@ -156,7 +156,7 @@ starten und den Wind im Auge behalten."
 **Morgen/Übermorgen einschätzen:**
 ```
 Pilot: "Wird morgen besser als heute?"
-Flychat: "Morgen dreht der Wind auf West und wird stärker
+Gleitcast: "Morgen dreht der Wind auf West und wird stärker
 (20-25 km/h). Weniger Spots haben passende Exposition.
 Heute ist der bessere Tag -- wenn du kannst, nutze ihn."
 ```
@@ -166,7 +166,7 @@ Heute ist der bessere Tag -- wenn du kannst, nutze ihn."
 **Thermik:**
 ```
 Pilot: "Wie wird die Thermik heute?"
-Flychat: "Der Spread liegt bei 8°C, das deutet auf
+Gleitcast: "Der Spread liegt bei 8°C, das deutet auf
 moderate Thermik-Potenziale hin -- aber das ist eine
 grobe Einschätzung. Für eine zuverlässige Thermik-
 Prognose empfehle ich, zusätzlich Meteo-Parapente
@@ -176,7 +176,7 @@ zu checken -- die haben das beste Modell dafür."
 **Basishöhe:**
 ```
 Pilot: "Wie hoch wird die Basis?"
-Flychat: "Basierend auf der Luftfeuchtigkeit schätze ich
+Gleitcast: "Basierend auf der Luftfeuchtigkeit schätze ich
 die Kondensationshöhe auf ca. 2.200-2.500m -- aber das
 ist eine Berechnung, keine Messung. Die tatsächliche
 Basis hängt stark von der Thermik-Entwicklung ab."
@@ -185,7 +185,7 @@ Basis hängt stark von der Thermik-Entwicklung ab."
 **XC-Potenzial:**
 ```
 Pilot: "Ist heute ein XC-Tag?"
-Flychat: "Wind und Wetter passen grundsätzlich -- wenig
+Gleitcast: "Wind und Wetter passen grundsätzlich -- wenig
 Regen, moderate Windstärke, überwiegend sonnig. Ob es
 für XC reicht, hängt von der Thermik ab, und da bin ich
 noch nicht zuverlässig genug. Der Spread sieht aber
@@ -229,7 +229,7 @@ vielversprechend aus."
 **Beispiel-Interaktion:**
 ```
 Pilot:  /heute
-Flychat: Bayerische Voralpen, 6. März 2026:
+Gleitcast: Bayerische Voralpen, 6. März 2026:
 
 Schwache SW-Lage, trocken bis 16 Uhr. Wind in
 Gipfelhöhe 12-18 km/h. 7 von 12 Spots haben
@@ -240,7 +240,7 @@ Tegernsee-Ost (Böen 32 km/h), Hirschberg (Böen 30 km/h).
 Willst du zwei Spots vergleichen?
 
 Pilot:  Brauneck oder Blomberg?
-Flychat: Brauneck ist heute die bessere Wahl:
+Gleitcast: Brauneck ist heute die bessere Wahl:
 - Wind SW 14 km/h (passt perfekt zur Exposition)
 - Böen max 20 km/h (sicher)
 - Bewölkung 20% bis 15 Uhr
@@ -284,7 +284,7 @@ moderate Thermik hin -- das ist aber eine Schätzung.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│          FLYCHAT MVP (revidiert)                      │
+│          GLEITCAST MVP (revidiert)                      │
 │          "ChatGPT für Flugwetter"                    │
 │                                                     │
 │  Kern-Feature:                                      │
@@ -316,7 +316,7 @@ moderate Thermik hin -- das ist aber eine Schätzung.
 ## Warum dieser MVP perfekt vermarktbar ist
 
 ### 1. Ein-Satz-Pitch
-> **"Frag Flychat, wo du heute fliegen sollst -- in natürlicher Sprache, ehrlich und in 30 Sekunden."**
+> **"Frag Gleitcast, wo du heute fliegen sollst -- in natürlicher Sprache, ehrlich und in 30 Sekunden."**
 
 ### 2. Headline-Formulas
 
@@ -330,13 +330,13 @@ moderate Thermik hin -- das ist aber eine Schätzung.
 | **[Feature] for [audience] to [outcome]** | "Ein KI-Berater für Gleitschirmpiloten, um in 30 Sekunden zu entscheiden" |
 
 ### 3. "How It Works" für Landing Page
-1. **Frag Flychat** -- "Wo soll ich heute fliegen?" oder jede andere Flugwetter-Frage
+1. **Frag Gleitcast** -- "Wo soll ich heute fliegen?" oder jede andere Flugwetter-Frage
 2. **Bekomm eine ehrliche Antwort** -- Basierend auf aktuellen Wetterdaten, in natürlicher Sprache
 3. **Entscheide und fahr los** -- In 30 Sekunden statt 45 Minuten
 
 ### 4. Pre-Launch Marketing-Ideen
 
-| Marketing-Idea | Anwendung auf Flychat MVP |
+| Marketing-Idea | Anwendung auf Gleitcast MVP |
 |---|---|
 | **#15 Engineering as Marketing** | Telegram Bot als dauerhaft kostenloses Tool in Piloten-Gruppen |
 | **#79 Early-Access Referrals** | "Lad den Bot in deine Fluggruppe ein" = viraler Verbreitungsweg |
@@ -349,7 +349,7 @@ moderate Thermik hin -- das ist aber eine Schätzung.
 ### 5. Vermarktbare Differenzierung (vs. Wettbewerb)
 
 ```
-Was andere zeigen:          Was Flychat macht:
+Was andere zeigen:          Was Gleitcast macht:
 ─────────────────           ──────────────────
 Windgramm                → "SW 15 km/h, passt zum Brauneck"
 Thermik-Karte            → "Spread bei 8°C, Thermik möglich

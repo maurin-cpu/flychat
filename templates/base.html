@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Flychat{% endblock %}</title>
+    <title>{% block title %}Gleitcast{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ static_v('css/style.css') }}">
@@ -16,13 +16,14 @@
 <body>
     <a href="#main-content" class="skip-link">Zum Inhalt springen</a>
     <nav class="navbar" role="navigation" aria-label="Hauptnavigation">
-        <a href="/chat" class="navbar-brand">Fly<span>chat</span></a>
+        <a href="/chat" class="navbar-brand">Gleit<span>cast</span></a>
         <div class="navbar-day-tabs" id="navDayTabs"></div>
         <div class="navbar-links">
             <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Startplätze</a>
             <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
             <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Briefing</a>
             <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen" aria-label="Föhndiagramm öffnen">Föhn</button>
+            <a href="/subscribe" class="{% if request.path == '/subscribe' %}active{% endif %}">Abonnieren</a>
         </div>
     </nav>
     <script>
@@ -50,7 +51,7 @@
                 window.currentDate = dateStr;
                 container.querySelectorAll('.navbar-day-btn').forEach(function(b) { b.classList.remove('active'); });
                 btn.classList.add('active');
-                window.dispatchEvent(new CustomEvent('flychat-day-change', { detail: { date: dateStr } }));
+                window.dispatchEvent(new CustomEvent('gleitcast-day-change', { detail: { date: dateStr } }));
             });
             container.appendChild(btn);
         });

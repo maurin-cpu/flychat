@@ -1,0 +1,24 @@
+GLEITCAST — Willkommen an Bord!
+
+Dein Abo ist aktiv. Ab jetzt bekommst du Montag, Mittwoch und Freitag
+um 06:30 ein Briefing mit den besten Flugtagen fuer deine Regionen.
+
+DEINE EINSTELLUNGEN
+-------------------
+Regionen: {% for r in regions %}{{ r }}{% if not loop.last %}, {% endif %}{% endfor %}
+Level:    {% if skill_level == 'beginner' %}Anfaenger{% elif skill_level == 'expert' %}Profi{% else %}Standard{% endif %}
+
+WAS DU ERWARTEN KANNST
+----------------------
+- 5-Tage-Vorhersage mit Ampel pro Tag
+- Top-Startplaetze in deinen Regionen, nach Rating sortiert
+- Warum-Erklaerung: Sicherheit zuerst, dann Fliegbarkeit
+- Foehn- und Gewitter-Warnungen, sobald relevant
+
+Naechstes Briefing: Montag, Mittwoch oder Freitag 06:30
+
+--
+Gleitcast ist Decision Support — die finale Entscheidung triffst du.
+Im Zweifel: nicht fliegen.
+
+Abmelden: {{ urls.unsubscribe }}
