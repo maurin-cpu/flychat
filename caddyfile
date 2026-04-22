@@ -1,0 +1,3 @@
+gleitcast.ch, www.gleitcast.ch {
+reverse_proxy localhost:5000
+}                        

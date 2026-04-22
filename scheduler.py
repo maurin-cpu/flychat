@@ -1,11 +1,16 @@
 """
-Briefing-Scheduler (Stufe 4).
+Daily-Scheduler (Stufe 4).
 
-Versendet Mo/Mi/Fr um 06:30 an alle aktiven Subscriber.
+Taeglicher Ablauf an konfigurierten Wochentagen (siehe config.DAILY_RUN_*):
+  1. engine.refresh_weather()       — Wetterdaten neu laden
+  2. engine.build_briefing_data()   — LLM-Analyse (innerhalb _send_briefings_once)
+  3. Mails an aktive Subscriber versenden
+
+Zusaetzlich: Monats-Accuracy-Mail am 1. des Monats um 07:00.
 
 Laufzeit-Modi:
   - als Daemon-Thread (aus main.py aufgerufen): schlaeft bis zum naechsten
-    Slot und sendet dann
+    Slot und fuehrt dann die Sequenz aus
   - als CLI (`python scheduler.py --now`): sendet sofort einmal, Exit
 
 Umgebungsvariablen:
@@ -24,12 +29,9 @@ import time as time_mod
 from datetime import datetime, time, timedelta
 from typing import Optional, Tuple
 
-logger = logging.getLogger(__name__)
+import config
 
-# Mo=0, Mi=2, Fr=4  (datetime.weekday-Konvention)
-SEND_WEEKDAYS = {0, 2, 4}
-SEND_HOUR = 6
-SEND_MINUTE = 30
+logger = logging.getLogger(__name__)
 
 # Monats-Accuracy-Mail: 1. des Monats um 07:00
 ACCURACY_HOUR = 7
@@ -37,15 +39,16 @@ ACCURACY_MINUTE = 0
 
 
 def _next_send_time(now: datetime) -> datetime:
-    """Naechster Mo/Mi/Fr 06:30 strikt NACH `now`."""
+    """Naechster konfigurierter Wochentag zur konfigurierten Uhrzeit, strikt NACH `now`."""
     for days_ahead in range(0, 8):
         candidate = (now + timedelta(days=days_ahead)).replace(
-            hour=SEND_HOUR, minute=SEND_MINUTE, second=0, microsecond=0
+            hour=config.DAILY_RUN_HOUR, minute=config.DAILY_RUN_MINUTE,
+            second=0, microsecond=0,
         )
-        if candidate.weekday() in SEND_WEEKDAYS and candidate > now:
+        if candidate.weekday() in config.DAILY_RUN_WEEKDAYS and candidate > now:
             return candidate
-    # Sollte nie erreicht werden (eine Woche hat Mo+Mi+Fr)
-    return now + timedelta(hours=1)
+    # Fallback wenn DAILY_RUN_WEEKDAYS leer ist
+    return now + timedelta(hours=24)
 
 
 def _next_accuracy_time(now: datetime) -> datetime:
@@ -160,8 +163,26 @@ def _send_accuracy_once() -> dict:
     return {"total": len(subs), "sent": sent, "skipped": skipped, "failed": failed}
 
 
+def _daily_run(engine) -> dict:
+    """Sequenzieller Daily-Job: refresh_weather -> build_briefing_data -> Mails.
+
+    refresh_weather wird auch bei Fehler nicht blockierend — Briefings laufen
+    dann mit den zuletzt gecachten Daten, statt ganz auszufallen.
+    """
+    logger.info("Daily run: starte Wetter-Refresh...")
+    try:
+        engine.refresh_weather()
+        logger.info("Daily run: Wetter-Refresh OK")
+    except Exception as e:
+        logger.exception("Daily run: Wetter-Refresh fehlgeschlagen — Briefings "
+                         "laufen mit Cache-Daten weiter: %s", e)
+
+    logger.info("Daily run: starte LLM-Analyse + Briefing-Versand...")
+    return _send_briefings_once(engine)
+
+
 def briefing_scheduler(engine) -> None:
-    """Daemon-Thread-Entry: dispatcht Briefing (Mo/Mi/Fr 06:30) UND
+    """Daemon-Thread-Entry: dispatcht Daily-Run (konfig. Tage + Uhrzeit) UND
     Monats-Accuracy (1. des Monats 07:00). Einheitlicher Sleep-Loop.
     """
     test_mode = os.environ.get("SCHEDULER_TEST_MODE", "").strip() in ("1", "true", "yes")
@@ -191,7 +212,7 @@ def briefing_scheduler(engine) -> None:
             if next_event_type == "accuracy":
                 _send_accuracy_once()
             else:
-                _send_briefings_once(engine)
+                _daily_run(engine)
         except Exception as e:
             logger.exception("Scheduler: uncaught exception during %s: %s",
                              next_event_type, e)

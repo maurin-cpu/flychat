@@ -6,8 +6,6 @@ Wetterdaten laden, Engine initialisieren, Flask starten.
 import os
 import logging
 import threading
-import time
-from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 
@@ -23,27 +21,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-
-def daily_refresh(engine, refresh_hour=6):
-    """Hintergrund-Thread: Wetterdaten taeglich um refresh_hour Uhr neu laden."""
-    while True:
-        now = datetime.now()
-        # Naechster Refresh-Zeitpunkt
-        next_refresh = now.replace(hour=refresh_hour, minute=0, second=0, microsecond=0)
-        if now >= next_refresh:
-            next_refresh = next_refresh + timedelta(days=1)
-
-        wait_seconds = (next_refresh - now).total_seconds()
-        logger.info(f"Naechster Wetter-Refresh in {wait_seconds/3600:.1f}h ({next_refresh.strftime('%Y-%m-%d %H:%M')})")
-        time.sleep(wait_seconds)
-
-        logger.info("Starte taeglichen Wetter-Refresh...")
-        try:
-            engine.refresh_weather()
-            logger.info("Wetter-Refresh erfolgreich.")
-        except Exception as e:
-            logger.error(f"Wetter-Refresh fehlgeschlagen: {e}")
 
 
 def main():
@@ -86,23 +63,25 @@ def main():
     # Flask-App mit Engine verbinden
     init_app(engine)
 
-    # Hintergrund-Thread fuer taeglichen Refresh
-    refresh_thread = threading.Thread(target=daily_refresh, args=(engine,), daemon=True)
-    refresh_thread.start()
-
-    # Hintergrund-Thread fuer Briefing-Versand Mo/Mi/Fr 06:30.
-    # Mit GLEITCAST_BRIEFINGS=0 deaktivierbar (z.B. in Dev-Umgebung).
+    # Hintergrund-Thread fuer Daily-Run (Wetter-Refresh -> LLM-Analyse -> Mails).
+    # Zeitplan via config.DAILY_RUN_{WEEKDAYS,HOUR,MINUTE}.
+    # Mit GLEITCAST_BRIEFINGS=0 deaktivierbar — dann findet AUCH KEIN taeglicher
+    # Wetter-Refresh mehr statt (Cache bleibt stale bis zum naechsten Restart).
     briefings_enabled = os.environ.get("GLEITCAST_BRIEFINGS", "1").strip() != "0"
     if briefings_enabled:
         from scheduler import briefing_scheduler
         scheduler_thread = threading.Thread(
             target=briefing_scheduler, args=(engine,), daemon=True,
-            name="briefing-scheduler",
+            name="daily-scheduler",
         )
         scheduler_thread.start()
-        logger.info("Briefing-Scheduler gestartet (Mo/Mi/Fr 06:30)")
+        logger.info(
+            "Daily-Scheduler gestartet: Wochentage=%s, Uhrzeit=%02d:%02d",
+            sorted(config.DAILY_RUN_WEEKDAYS),
+            config.DAILY_RUN_HOUR, config.DAILY_RUN_MINUTE,
+        )
     else:
-        logger.info("Briefing-Scheduler deaktiviert (GLEITCAST_BRIEFINGS=0)")
+        logger.info("Daily-Scheduler deaktiviert (GLEITCAST_BRIEFINGS=0)")
 
     # Flask starten
     port = int(os.environ.get("PORT", 5000))

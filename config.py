@@ -578,6 +578,15 @@ INSTANTDB_ADMIN_TOKEN = os.environ.get("INSTANTDB_ADMIN_TOKEN")
 INSTANTDB_API_URL = "https://api.instantdb.com"
 
 # ============================================================================
+# TAEGLICHER ABLAUF (Wetter-Refresh + LLM-Analyse + Briefing-Versand)
+# ============================================================================
+# Sequenzieller Job: refresh_weather() -> build_briefing_data() (LLM) -> Mails.
+# Wochentage: 0=Mo, 1=Di, 2=Mi, 3=Do, 4=Fr, 5=Sa, 6=So
+DAILY_RUN_WEEKDAYS = {0, 1, 2, 3, 4, 5, 6}  # Default: jeden Tag
+DAILY_RUN_HOUR     = 6
+DAILY_RUN_MINUTE   = 0
+
+# ============================================================================
 # E-MAIL-BRIEFING (SMTP Infomaniak)
 # ============================================================================
 # Alle Werte via ENV ueberschreibbar. BASE_URL noch Platzhalter — sobald
