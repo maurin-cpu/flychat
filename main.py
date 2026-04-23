@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import config
+import config_overrides
+config_overrides.init()  # Snapshottet Defaults + wendet data/config_overrides.json an
 from chat_engine import GleitcastEngine
 from instantdb_client import InstantDBClient
 from web import app, init_app

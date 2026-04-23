@@ -24,8 +24,8 @@ TIER-DEFINITIONEN
 ─────────────────────────────────
 
 **BRONZE (Abgleiter / kaum fliegbar)** — Enum-Wert: `"gray"`. Vier harte Kriterien, nur eines muss erfuellt sein:
-1. Peak-Thermik < 1 m/s, ODER
-2. max(tiefe, mittlere) Wolken ≥ 80% waehrend Thermikstunden — Stunde zaehlt nicht als produktiv (System-Schwelle 80%). Wenn dadurch < 2 produktive Stunden bleiben → Bronze, ODER
+1. Peak-Thermik < {{cfg.PRODUCTIVE_CLIMB_MIN}} m/s, ODER
+2. tiefe Wolken ≥ {{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}% ODER mittlere Wolken ≥ {{cfg.PRODUCTIVE_MID_CLOUD_MAX}}% waehrend Thermikstunden — Stunde zaehlt nicht als produktiv. Wenn dadurch < {{cfg.PRODUCTIVE_HOURS_DOWNGRADE}} produktive Stunden bleiben → Bronze, ODER
 3. **THERMAL-ROUGH-UNUSABLE** in > 50% der Thermik-Stunden (mechanische Klapper-Gefahr, nur Spots), ODER
 4. **THERMAL-WIND-UNUSABLE** in > 50% der Thermik-Stunden (BL-Grundwind zu stark → Thermikblase organisiert sich nicht, Research Abschnitt 3.1). Gilt fuer Spots UND Regionen.
 
@@ -34,12 +34,12 @@ TIER-DEFINITIONEN
 - 1-4h Flug moeglich, lokale Thermikfluege, evtl. kurze Strecken.
 
 **VIOLETT (legendaer / Top-XC)** — Enum-Wert: `"violet"`. **ALLE** Kriterien muessen erfuellt sein:
-- Peak-Thermik ≥ **2.5 m/s** (aus `Peak-Steigen (Proxy)`).
-- Produktive Thermik ≥ **5h** (aus `PRODUKTIVE-THERMIK`).
-- ROUGH-UNUSABLE < **30%** der Thermikstunden.
-- Gesamt-UNUSABLE < **30%** der Thermikstunden.
-- Ø tiefe Wolken ≤ **50%** (ueber Thermikstunden) — optimale Cu-Zone, keine Ueberentwicklung.
-- Ø mittlere Wolken ≤ **50%** — keine Altostratus-Daempfung (Quelle: `meteo_research/cloud_cover_thermal_impact.md` Sektion 6).
+- Peak-Thermik ≥ **{{cfg.VIOLET_PEAK_MIN}} m/s** (aus `Peak-Steigen (Proxy)`).
+- Produktive Thermik ≥ **{{cfg.VIOLET_HOURS_MIN}}h** (aus `PRODUKTIVE-THERMIK`).
+- ROUGH-UNUSABLE < **{{cfg.VIOLET_ROUGH_MAX}}%** der Thermikstunden.
+- Gesamt-UNUSABLE < **{{cfg.VIOLET_UNUSABLE_MAX}}%** der Thermikstunden.
+- Ø tiefe Wolken ≤ **{{cfg.VIOLET_CLOUD_LOW_MAX}}%** (ueber Thermikstunden) — optimale Cu-Zone, keine Ueberentwicklung.
+- Ø mittlere Wolken ≤ **{{cfg.VIOLET_CLOUD_MID_MAX}}%** — keine Altostratus-Daempfung (Quelle: `meteo_research/cloud_cover_thermal_impact.md` Sektion 6).
 - 4+ Stunden Flug, starkes XC-Potential.
 
 **Shortcut:** Wenn das TAGESPROFIL den Hint `→ VIOLETT-Kandidat: ...` enthaelt, sind alle harten Schwellen bereits erfuellt — du DARFST violet waehlen. Setze dann `peak_climb_rate` EXAKT auf den dort genannten Peak-Wert.
@@ -85,9 +85,9 @@ PRODUKTIVE-THERMIK-Check (aus TAGESPROFIL)
 ─────────────────────────────────
 
 Wenn im TAGESPROFIL `→ PRODUKTIVE-THERMIK: Nh` steht:
-- **N ≥ 4** → Gruen/Violett moeglich.
-- **N < 2** → fly_status MUSS `"gray"` (Bronze) sein.
-- **2 ≤ N < 4** → Grenzfall, abhaengig von Peak und Wind.
+- **N ≥ {{cfg.PRODUCTIVE_HOURS_FOR_GREEN}}** → Gruen/Violett moeglich.
+- **N < {{cfg.PRODUCTIVE_HOURS_DOWNGRADE}}** → fly_status MUSS `"gray"` (Bronze) sein.
+- **{{cfg.PRODUCTIVE_HOURS_DOWNGRADE}} ≤ N < {{cfg.PRODUCTIVE_HOURS_FOR_GREEN}}** → Grenzfall, abhaengig von Peak und Wind.
 
 ─────────────────────────────────
 CONDITIONAL-FLAG (visuelles Badge)

@@ -542,6 +542,30 @@ PRODUCTIVE_BAND_DEPTH_MIN = 400 # m — Mindest-Banddicke (thermal_top - elevati
 ALOFT_DANGER_KMH = 30           # Höhenwind > 30 km/h im Flugbereich → [ALOFT-DANGER]
 ALOFT_WARN_KMH = 20             # Höhenwind 20–30 km/h im Flugbereich → [ALOFT-WARN]
 
+# ─── Bodenwind-Magnitude-Schwellen (Region-Ebene, magnitudenbasiert) ───
+# Regionen haben keinen Sektor-Check, nur Stärke-Klassifikation.
+WIND_STRONG_KMH = 30            # Grundwind > 30 km/h → [WIND-STRONG] (unfliegbar)
+WIND_MODERATE_KMH = 20          # Grundwind 20–30 km/h → [WIND-MODERATE] (sportlich)
+# < WIND_MODERATE_KMH → [WIND-CALM] (ruhig)
+
+# ─── Bodenböen-Schwellen (Spots) ───
+# wind_gusts_10m (nach Bias-Korrektur + Multi-Modell-Merge).
+GUST_WARN_KMH = 30              # Böen > 30 km/h mit Spread-Trigger → [GUST-WARN]
+GUST_DANGER_KMH = 40            # Böen > 40 km/h → [GUST-DANGER] (unfliegbar)
+GUST_SPREAD_KMH = 15            # Mindest-Exzess (gusts - wind) für [GUST-WARN]-Trigger
+GUST_WARN_ABSOLUTE_KMH = 35     # Absolut-Böen-Schwelle ohne Spread-Check
+
+# ─── Höhen-Turbulenz-Schwellen (T(z), Spots) ───
+# Turbulenzrisiko = W(z) + exp-Decay vom Bodenboeen-Exzess.
+ALOFT_GUST_WARN_KMH = 30        # T(z) > 30 km/h im Flugbereich → [ALOFT-GUST-WARN]
+ALOFT_GUST_DANGER_KMH = 40      # T(z) > 40 km/h im Flugbereich → [ALOFT-GUST-DANGER]
+
+# ─── CAPE-Schwellen (Konvektionsenergie, J/kg) ───
+# CAPE-DANGER (hart): extreme Instabilität ODER CAPE + Regen (aktive Ueberentwicklung).
+# CAPE-WARN (soft):   Potenzial vorhanden, Modell prognostiziert keinen Trigger.
+CAPE_WARN_JKG = 800             # CAPE > 800 J/kg → [CAPE-WARN]
+CAPE_DANGER_JKG = 1500          # CAPE > 1500 J/kg → [CAPE-DANGER]
+
 # ALOFT-Override Schwellen (Stunden):
 # - CONDITIONAL_HOURS: safe → conditional (mindestens Vorsicht bei Bodenwind-ruhig).
 # - NOTSAFE_HOURS:    safe/conditional → not_safe (harter NO-GO-Trigger,

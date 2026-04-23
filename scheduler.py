@@ -163,11 +163,42 @@ def _send_accuracy_once() -> dict:
     return {"total": len(subs), "sent": sent, "skipped": skipped, "failed": failed}
 
 
-def _daily_run(engine) -> dict:
-    """Sequenzieller Daily-Job: refresh_weather -> build_briefing_data -> Mails.
+def _run_llm_analysis(engine) -> bool:
+    """Drained run_all_analyses_stream() einmal. Returns True wenn 'done' Event kam.
 
-    refresh_weather wird auch bei Fehler nicht blockierend — Briefings laufen
-    dann mit den zuletzt gecachten Daten, statt ganz auszufallen.
+    Failure-tolerant: bei Exception oder 'error'-Event wird False geliefert und
+    der Daily-Job laeuft mit den alten Analysen weiter.
+    """
+    try:
+        got_done = False
+        last_error = None
+        for evt in engine.run_all_analyses_stream():
+            ev = (evt or {}).get("event")
+            if ev == "done":
+                got_done = True
+                data = evt.get("data", {}) or {}
+                logger.info("Daily run: LLM-Analyse done (total_calls=%s, mode=%s)",
+                            data.get("total_calls"), data.get("mode"))
+            elif ev == "error":
+                last_error = (evt.get("data", {}) or {}).get("message")
+                logger.error("Daily run: LLM-Analyse error: %s", last_error)
+        if not got_done:
+            logger.error("Daily run: LLM-Analyse beendet ohne 'done' "
+                         "(last_error=%s) — Briefings laufen mit alten Analysen",
+                         last_error)
+        return got_done
+    except Exception as e:
+        logger.exception("Daily run: LLM-Analyse-Exception — Briefings laufen "
+                         "mit alten Analysen weiter: %s", e)
+        return False
+
+
+def _daily_run(engine) -> dict:
+    """Sequenzieller Daily-Job: refresh_weather -> LLM-Analyse -> Briefings.
+
+    Jeder Schritt ist failure-tolerant: Wenn Wetter-Refresh oder LLM-Analyse
+    scheitern, werden Briefings trotzdem mit den zuletzt gecachten Daten/Analysen
+    versendet, statt ganz auszufallen.
     """
     logger.info("Daily run: starte Wetter-Refresh...")
     try:
@@ -177,18 +208,27 @@ def _daily_run(engine) -> dict:
         logger.exception("Daily run: Wetter-Refresh fehlgeschlagen — Briefings "
                          "laufen mit Cache-Daten weiter: %s", e)
 
-    logger.info("Daily run: starte LLM-Analyse + Briefing-Versand...")
+    logger.info("Daily run: starte LLM-Analyse...")
+    _run_llm_analysis(engine)
+
+    logger.info("Daily run: starte Briefing-Versand...")
     return _send_briefings_once(engine)
 
 
 def briefing_scheduler(engine) -> None:
     """Daemon-Thread-Entry: dispatcht Daily-Run (konfig. Tage + Uhrzeit) UND
     Monats-Accuracy (1. des Monats 07:00). Einheitlicher Sleep-Loop.
+
+    Jobs werden innerhalb eines Flask-App-Contexts ausgefuehrt, damit
+    render_template (Mailversand) funktioniert.
     """
     test_mode = os.environ.get("SCHEDULER_TEST_MODE", "").strip() in ("1", "true", "yes")
     if test_mode:
         logger.warning("Scheduler: SCHEDULER_TEST_MODE aktiv — erster Lauf in 30s, "
                        "danach normaler Zeitplan")
+
+    # Flask-App einmalig laden — wird pro Job-Aufruf mit app_context() gewrapped.
+    from web import app as flask_app
 
     first_iter = True
     while True:
@@ -209,10 +249,11 @@ def briefing_scheduler(engine) -> None:
         time_mod.sleep(max(1, wait_seconds))
 
         try:
-            if next_event_type == "accuracy":
-                _send_accuracy_once()
-            else:
-                _daily_run(engine)
+            with flask_app.app_context(), flask_app.test_request_context():
+                if next_event_type == "accuracy":
+                    _send_accuracy_once()
+                else:
+                    _daily_run(engine)
         except Exception as e:
             logger.exception("Scheduler: uncaught exception during %s: %s",
                              next_event_type, e)
@@ -223,7 +264,8 @@ def briefing_scheduler(engine) -> None:
 # ---------------------------------------------------------------------------
 
 def _cli_now() -> int:
-    """`python scheduler.py --now`: baut Engine + sendet einmal. Exit 0 bei Erfolg."""
+    """`python scheduler.py --now`: voller Daily-Zyklus (Refresh -> LLM-Analyse
+    -> Briefings). Exit 0 bei Erfolg (keine Mail-Failures)."""
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
@@ -244,7 +286,7 @@ def _cli_now() -> int:
     # Flask-App-Context ist noetig fuer render_template
     from web import app as flask_app
     with flask_app.app_context(), flask_app.test_request_context():
-        stats = _send_briefings_once(eng)
+        stats = _daily_run(eng)
 
     print(f"[DONE] total={stats['total']} sent={stats['sent']} "
           f"skipped={stats['skipped']} failed={stats['failed']}")

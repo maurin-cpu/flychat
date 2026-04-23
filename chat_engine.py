@@ -32,15 +32,7 @@ from gust_calculator import (
     apply_oi_gust_correction,
     aggregate_spot_excess,
 )
-from prompts import (
-    SYSTEM_PROMPT,
-    CAPABILITIES_GUIDE,
-    FOEHN_CHAT_KNOWLEDGE,
-    SPOT_COMBINED_PROMPT,
-    REGION_COMBINED_PROMPT,
-    WEEKLY_BRIEFING_PROMPT,
-    format_foehn_llm_regional_guide,
-)
+from prompts import format_foehn_llm_regional_guide
 from source_area import get_all_regions, find_region_for_point
 from station_observations import StationManager
 import routing

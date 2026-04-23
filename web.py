@@ -540,6 +540,57 @@ def admin_block(sub_id):
     return redirect(f"/admin/subscribers?ok=Subscriber+%23{sub_id}+gesperrt")
 
 
+@app.route("/admin/config", methods=["GET"])
+@_require_admin
+def admin_config():
+    import config_overrides
+    return render_template(
+        "admin/config.html",
+        schema=config_overrides.SCHEMA,
+        values=config_overrides.current_values(),
+        defaults=config_overrides.default_values(),
+        overlay=config_overrides.get_overrides(),
+        flash_ok=request.args.get("ok", ""),
+        flash_error=request.args.get("err", ""),
+    )
+
+
+@app.route("/admin/config/save", methods=["POST"])
+@_require_admin
+def admin_config_save():
+    import config_overrides
+
+    # Alle Form-Keys einsammeln. Checkboxen, die NICHT gecheckt sind, fehlen
+    # komplett im Form → wir setzen sie explizit auf False fuer bool-Felder.
+    schema_flat: dict = {}
+    for _section, groups in config_overrides.SCHEMA.items():
+        for _group, fields in groups.items():
+            for f in fields:
+                schema_flat[f["key"]] = f
+
+    form_values: dict = {}
+    for key, field in schema_flat.items():
+        if field["type"] == "bool":
+            form_values[key] = key in request.form  # check vorhanden = True
+        elif field["type"] == "weekdays":
+            # mehrere gleichnamige Checkboxen → getlist
+            form_values[key] = request.form.getlist(key)
+        else:
+            if key in request.form:
+                form_values[key] = request.form.get(key, "")
+
+    try:
+        changed = config_overrides.save_overrides(form_values)
+    except Exception as e:
+        logger.exception("admin_config_save: %s", e)
+        return redirect(f"/admin/config?err=Fehler+beim+Speichern:+{e}")
+
+    if not changed:
+        return redirect("/admin/config?ok=Keine+Aenderungen")
+    msg = f"Gespeichert+und+sofort+aktiv+%28{len(changed)}+Werte%29"
+    return redirect(f"/admin/config?ok={msg}")
+
+
 # ============================================================================
 # PAGE ROUTES
 # ============================================================================

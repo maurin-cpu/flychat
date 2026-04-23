@@ -41,12 +41,8 @@ from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
     get_all_regions,
 )
-from prompts import (
-    SYSTEM_PROMPT,
-    SPOT_COMBINED_PROMPT, REGION_COMBINED_PROMPT,
-    WEEKLY_BRIEFING_PROMPT, CAPABILITIES_GUIDE, FOEHN_CHAT_KNOWLEDGE,
-    format_foehn_llm_regional_guide,
-)
+import prompts
+from prompts import format_foehn_llm_regional_guide
 import routing
 from engine._common import (
     MAX_HISTORY_MESSAGES, MAX_TOOL_ITERATIONS,
@@ -178,7 +174,7 @@ class ChatOrchestratorMixin:
         messages = [
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT + "\n\n" + CAPABILITIES_GUIDE + "\n\n" + FOEHN_CHAT_KNOWLEDGE,
+                "content": prompts.SYSTEM_PROMPT + "\n\n" + prompts.CAPABILITIES_GUIDE + "\n\n" + prompts.FOEHN_CHAT_KNOWLEDGE,
             },
         ]
         self.conversations[session_id] = {

@@ -40,7 +40,7 @@ Erwaehne in Region-Analysen keine Boeigkeit und keine Klapper-Gefahr — nur die
 BEWOELKUNGS-LABELS (Booster vs. Reducer — Matuszko/FAA)
 ─────────────────────────────────
 
-- **`GUTE_EINSTRAHLUNG` (Booster)**: Optimale Cu-Bedeckung 12-50% (SCT) = staerkste Thermik. Latentwaerme-Boost, Cu markiert Einstiege, teils bewoelkter Himmel liefert sogar MEHR Solarenergie als wolkenlos (Streueffekt). Setzen wenn: max(tief, mittel) ≤ 50% mit Cu-Charakter ODER klarer Himmel (<30%). Auch blauer Himmel (0%) ist Booster.
-- **`VIEL_BEWOELKUNG` (Reducer)**: Ab ~80% max(tief, mittel) wird Sonne weitgehend blockiert, Thermik stirbt. Setzen wenn: max(tief, mittel) ≥ 80% waehrend > 50% der Thermikstunden. Starke Ueberentwicklung (OD) mit Abschirmung gehoert auch hierher.
-- **Neutralzone 50-80%**: Weder Booster noch Reducer — Daempfung beginnt (FAA 5/10-Regel), Thermik noch vorhanden aber abnehmend.
+- **`GUTE_EINSTRAHLUNG` (Booster)**: Optimale Cu-Bedeckung 12-{{cfg.VIOLET_CLOUD_LOW_MAX}}% (SCT) = staerkste Thermik. Latentwaerme-Boost, Cu markiert Einstiege, teils bewoelkter Himmel liefert sogar MEHR Solarenergie als wolkenlos (Streueffekt). Setzen wenn: max(tief, mittel) ≤ {{cfg.VIOLET_CLOUD_LOW_MAX}}% mit Cu-Charakter ODER klarer Himmel (<30%). Auch blauer Himmel (0%) ist Booster.
+- **`VIEL_BEWOELKUNG` (Reducer)**: Ab ~{{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}% max(tief, mittel) wird Sonne weitgehend blockiert, Thermik stirbt. Setzen wenn: max(tief, mittel) ≥ {{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}% waehrend > 50% der Thermikstunden. Starke Ueberentwicklung (OD) mit Abschirmung gehoert auch hierher.
+- **Neutralzone {{cfg.VIOLET_CLOUD_LOW_MAX}}-{{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}%**: Weder Booster noch Reducer — Daempfung beginnt (FAA 5/10-Regel), Thermik noch vorhanden aber abnehmend.
 - **Cirrus ignorieren**: Nur hohe Bewoelkung (tief + mittel <30%) → WEDER Reducer NOCH Booster (Cirrus laesst 70-85% Solarstrahlung durch).

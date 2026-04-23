@@ -12,28 +12,28 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 
 **Harte No-Go-Tags = DANGER-Level** (Stunde wird UNFLIEGBAR, gehoert NIEMALS ins safe_window):
 - `[RAIN-WARN]` — Niederschlag ≥ 0.05 mm/h
-- `[GUST-DANGER]` — Bodenboeen > 40 km/h *(nur Spots)*
-- `[ALOFT-DANGER]` — Wind in Flugschicht > 30 km/h (= NO-GO-Trigger ab 3h/Tag)
-- `[ALOFT-GUST-DANGER]` — Turbulenz in Flugschicht > 40 km/h *(nur Spots)*
+- `[GUST-DANGER]` — Bodenboeen > {{cfg.GUST_DANGER_KMH}} km/h *(nur Spots)*
+- `[ALOFT-DANGER]` — Wind in Flugschicht > {{cfg.ALOFT_DANGER_KMH}} km/h (= NO-GO-Trigger ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h/Tag)
+- `[ALOFT-GUST-DANGER]` — Turbulenz in Flugschicht > {{cfg.ALOFT_GUST_DANGER_KMH}} km/h *(nur Spots)*
 - `[STRONG-WIND-WARN]` — Grundwind ueber Spot-Maximum *(nur Spots)*
 - `[THUNDERSTORM]` — Modell sagt Gewitter (weather_code 95/96/99)
-- `[CAPE-DANGER]` — CAPE > 1500 J/kg ODER CAPE + Regen aktiv
+- `[CAPE-DANGER]` — CAPE > {{cfg.CAPE_DANGER_JKG}} J/kg ODER CAPE + Regen aktiv
 - `[OVERCAST-DANGER]` — Dichte Wolkendecke nahe Flughoehe
 
 **Weiche Vorsichts-Tags = WARN-Level** (Stunde wird SPORTLICH, bleibt fliegbar fuer erfahrene Piloten, Status mind. conditional):
-- `[GUST-WARN]` — Bodenboeen 30-40 km/h *(nur Spots)*
-- `[ALOFT-WARN]` — Flugschicht-Wind 20-30 km/h (sportlich, noch fliegbar)
-- `[ALOFT-GUST-WARN]` — Flugschicht-Turbulenz 30-40 km/h *(nur Spots)*
-- `[CAPE-WARN]` — CAPE 800-1500 J/kg ohne Trigger
+- `[GUST-WARN]` — Bodenboeen {{cfg.GUST_WARN_KMH}}-{{cfg.GUST_DANGER_KMH}} km/h *(nur Spots)*
+- `[ALOFT-WARN]` — Flugschicht-Wind {{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h (sportlich, noch fliegbar)
+- `[ALOFT-GUST-WARN]` — Flugschicht-Turbulenz {{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h *(nur Spots)*
+- `[CAPE-WARN]` — CAPE {{cfg.CAPE_WARN_JKG}}-{{cfg.CAPE_DANGER_JKG}} J/kg ohne Trigger
 
 **Richtungs-Tags (Spot-Modus):**
 - `[WIND-OK]` — Windrichtung liegt im erlaubten Spot-Sektor (inkl. 10° Buffer)
 - `[WIND-WRONG]` — Windrichtung ausserhalb des Spot-Sektors → Stunde UNFLIEGBAR
 
 **Magnitude-Tags (Region-Modus):** Regionen haben keinen Sektor und keine Boeen, nur Wind-Staerke auf Referenzhoehe.
-- `[WIND-CALM]` — Wind < 20 km/h → RUHIG
-- `[WIND-MODERATE]` — Wind 20-30 km/h → SPORTLICH (= WARN-Level fuer Regionen)
-- `[WIND-STRONG]` — Wind > 30 km/h → UNFLIEGBAR (= DANGER-Level fuer Regionen)
+- `[WIND-CALM]` — Wind < {{cfg.WIND_MODERATE_KMH}} km/h → RUHIG
+- `[WIND-MODERATE]` — Wind {{cfg.WIND_MODERATE_KMH}}-{{cfg.WIND_STRONG_KMH}} km/h → SPORTLICH (= WARN-Level fuer Regionen)
+- `[WIND-STRONG]` — Wind > {{cfg.WIND_STRONG_KMH}} km/h → UNFLIEGBAR (= DANGER-Level fuer Regionen)
 
 **Stunden-Klassifikation** (siehe KERNREGEL in `_hazard_blocks.md`):
 - `RUHIG` = Windrichtung passt + KEINE Tags = komfortabel.
@@ -54,7 +54,7 @@ B) DRUCKLEVEL-WERTE (Flugschicht-Zeile)
 Format: `pressure(altitude_m)MARKER: wind/boeen km/h aus dir°`
 
 **Marker verstehen:**
-- `*` = **Flugbereich** (Spot-Hoehe bis Thermik+1000m, inkl. Lid-Zone) — HIER feuern die [ALOFT-*]-Tags. Trend-Bewertung (20-30 km/h steigend = WARN, > 30 km/h = DANGER) gilt voll.
+- `*` = **Flugbereich** (Spot-Hoehe bis Thermik+1000m, inkl. Lid-Zone) — HIER feuern die [ALOFT-*]-Tags. Trend-Bewertung ({{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h steigend = WARN, > {{cfg.ALOFT_DANGER_KMH}} km/h = DANGER) gilt voll.
 - `~` = **Buffer-Zone** (500m ueber dem Flugbereich) — KEINE harten Tags, aber wenn dort Boeen > 50 km/h: Hinweis in `caution_notes` ("scharfer Hoehensturm direkt ueber Thermikspitze"). Wenn Buffer ruhiger als Flugbereich: Entwarnung.
 - **Kein Marker** = nur 850/700 hPa als Foehn-Anker. Fuer direkte Sicherheit irrelevant ausser als Foehn-Indikator.
 
@@ -66,7 +66,7 @@ Hier hat das System bereits alles gezaehlt und geflagged:
 
 - `Verhaeltnis sauber/gesamt: X/Yh = Z%` — Anteil sauberer Stunden (RUHIG + SPORTLICH) im Flugfenster
 - `Hauptgefahren am Tag: GUST-DANGER 4h, ALOFT-DANGER 2h, ...` — Histogramm der Gefahren (Regionen: ohne GUST-* Eintraege)
-- `→ PRODUKTIVE-THERMIK: Nh` — produktive Thermikstunden (Climb ≥0.7 + Wolken <80% + kein ROUGH-UNUSABLE + kein WIND-UNUSABLE). Regionen: ROUGH-UNUSABLE-Kriterium faellt weg (keine Boeen), aber WIND-UNUSABLE ist Pflicht-Filter.
+- `→ PRODUKTIVE-THERMIK: Nh` — produktive Thermikstunden (Climb ≥{{cfg.PRODUCTIVE_CLIMB_MIN}} + tief <{{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}% + mittel <{{cfg.PRODUCTIVE_MID_CLOUD_MAX}}% + kein ROUGH-UNUSABLE + kein WIND-UNUSABLE). Regionen: ROUGH-UNUSABLE-Kriterium faellt weg (keine Boeen), aber WIND-UNUSABLE ist Pflicht-Filter.
 - `→ BOEEN-FLOOR: MINDEST-STATUS = 'conditional'` oder `'not_safe'` — vom System **erzwungener** Mindeststatus (nicht verhandelbar!) *(nur Spots)*
 - `→ ACHTUNG Verhaeltnis < 35%: ...` — optionaler Warnhinweis
 - `THERMIK-QUALITAET-Block`: Zaehler fuer SHEAR/TORN/ROUGH-UNUSABLE-Stunden + TQ-Ratio pro Stunde (Regionen: kein ROUGH)

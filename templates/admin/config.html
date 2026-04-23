@@ -1,0 +1,768 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · Config – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+<style>
+  /* ═══════════════════════════════════════════════════════════
+     Admin Config — Intuitive Editor
+     Built on existing design tokens from style.css / subscribe.css
+     ═══════════════════════════════════════════════════════════ */
+
+  /* ── Tab Nav ───────────────────────────────────────────── */
+  .cfg-tabs {
+    display: flex; gap: 6px; margin: 0 0 var(--space-4);
+    flex-wrap: wrap;
+  }
+  .cfg-tab {
+    padding: 8px 16px; border-radius: var(--radius-pill);
+    border: 1.5px solid var(--color-border); color: var(--color-text-secondary);
+    text-decoration: none; font-size: var(--text-sm); font-weight: 600;
+    background: var(--color-bg-elevated, #fff);
+    transition: all 180ms ease;
+    line-height: 1.2;
+  }
+  .cfg-tab:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  .cfg-tab.is-active {
+    background: var(--color-primary); color: #fff;
+    border-color: var(--color-primary);
+    box-shadow: 0 1px 4px rgba(3,105,161,0.25);
+  }
+
+  /* ── Info-Banner ──────────────────────────────────────── */
+  .cfg-banner {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: linear-gradient(135deg, #eef6ff 0%, #f5fbff 100%);
+    border: 1px solid #b6d9ff; color: #0c4d8a;
+    padding: 14px 16px; border-radius: var(--radius-lg);
+    margin-bottom: var(--space-5); font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+  .cfg-banner__icon {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    background: #0c4d8a; color: #fff; display: flex;
+    align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .cfg-banner strong { font-weight: 700; }
+  .cfg-banner code {
+    background: rgba(12,77,138,0.12); padding: 1px 6px;
+    border-radius: 4px; font-size: 12px;
+  }
+
+  /* ── Toolbar (Search + Section Nav) ─────────────────── */
+  .cfg-toolbar {
+    position: sticky; top: 0; z-index: 5;
+    background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+    padding: var(--space-3) 0; margin: 0 0 var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .cfg-search {
+    position: relative; margin-bottom: var(--space-3);
+  }
+  .cfg-search__input {
+    width: 100%; padding: 11px 40px 11px 40px;
+    font-size: 15px;
+    background: var(--color-surface); border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md); color: var(--color-text);
+    font-family: inherit;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+  .cfg-search__input:focus {
+    outline: none; border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+  }
+  .cfg-search__icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--color-text-muted); pointer-events: none;
+  }
+  .cfg-search__clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: transparent; border: 0; cursor: pointer;
+    color: var(--color-text-muted); padding: 6px; border-radius: 50%;
+    display: none;
+  }
+  .cfg-search__clear:hover { background: var(--color-bg); color: var(--color-text); }
+  .cfg-search.has-value .cfg-search__clear { display: block; }
+  .cfg-jumpnav {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .cfg-jumpnav__label {
+    font-size: 11px; font-weight: 700;
+    color: var(--color-text-muted); text-transform: uppercase;
+    letter-spacing: 0.08em; padding: 5px 0; margin-right: 4px;
+  }
+  .cfg-jump {
+    padding: 4px 10px; border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border); background: var(--color-bg-elevated, #fff);
+    font-size: 11.5px; font-weight: 600; color: var(--color-text-secondary);
+    text-decoration: none; transition: all 180ms ease;
+    white-space: nowrap;
+  }
+  .cfg-jump:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-glow); }
+
+  /* ── Sections ──────────────────────────────────────── */
+  .cfg-section { margin-bottom: var(--space-6); scroll-margin-top: 140px; }
+  .cfg-section__title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.1rem; font-weight: 700; margin: 0 0 var(--space-3);
+    color: var(--color-text);
+    padding-bottom: var(--space-2);
+    border-bottom: 2px solid var(--color-primary);
+  }
+  .cfg-section__badge {
+    font-size: 11px; font-weight: 600; padding: 3px 8px;
+    border-radius: var(--radius-pill); background: var(--color-primary-glow);
+    color: var(--color-primary);
+  }
+
+  .cfg-group {
+    background: var(--color-card, #fff); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5);
+    margin-bottom: var(--space-4); box-shadow: var(--shadow-sm);
+    scroll-margin-top: 140px;
+  }
+  .cfg-group__title {
+    font-size: 13px; font-weight: 700; margin: 0 0 var(--space-3);
+    color: var(--color-text);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  /* ── Field Row ─────────────────────────────────────── */
+  .cfg-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 320px);
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--color-border);
+    align-items: start;
+    transition: background 180ms ease;
+  }
+  .cfg-field:first-of-type { border-top: 0; padding-top: 0; }
+  .cfg-field.is-dirty {
+    background: linear-gradient(90deg, rgba(255,198,0,0.06) 0%, transparent 100%);
+  }
+  .cfg-field.is-hidden { display: none; }
+  @media (max-width: 720px) {
+    .cfg-field { grid-template-columns: 1fr; }
+  }
+
+  .cfg-field__info-col { min-width: 0; }
+  .cfg-field__header {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .cfg-field__key {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px; font-weight: 600; color: var(--color-text);
+    word-break: break-word;
+  }
+  .cfg-field__badge-mod {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; font-weight: 700; padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    background: #fff6d6; color: #7a5a00; border: 1px solid #f0d88a;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .cfg-field__badge-dirty {
+    display: none;
+    font-size: 10.5px; font-weight: 700; padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--color-primary); color: #fff;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .cfg-field.is-dirty .cfg-field__badge-dirty { display: inline-flex; }
+  .cfg-field__tooltip-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--color-primary-glow); color: var(--color-primary);
+    font-size: 11px; font-weight: 800; cursor: help;
+    border: 0; flex-shrink: 0;
+    transition: all 180ms ease;
+  }
+  .cfg-field__tooltip-btn:hover {
+    background: var(--color-primary); color: #fff; transform: scale(1.1);
+  }
+  .cfg-field__help {
+    margin-top: 4px; font-size: var(--text-sm);
+    color: var(--color-text-muted); line-height: 1.45;
+  }
+
+  /* ── Control Column ───────────────────────────────── */
+  .cfg-field__control {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .cfg-input {
+    padding: 8px 10px; font-size: 15px;
+    background: var(--color-surface); border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md); color: var(--color-text);
+    font-family: inherit; min-width: 0;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+  .cfg-input:focus {
+    outline: none; border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+  }
+  .cfg-input--num { width: 110px; flex: 0 0 auto; }
+  .cfg-input--text { flex: 1 1 auto; }
+  .cfg-unit {
+    color: var(--color-text-muted); font-size: 13px; font-weight: 500;
+  }
+  .cfg-field__reset {
+    display: none;
+    background: transparent; border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); color: var(--color-text-muted);
+    width: 32px; height: 32px; cursor: pointer;
+    align-items: center; justify-content: center;
+    transition: all 180ms ease; padding: 0;
+  }
+  .cfg-field__reset:hover {
+    border-color: var(--color-primary); color: var(--color-primary);
+    background: var(--color-primary-glow);
+  }
+  .cfg-field.is-override .cfg-field__reset { display: inline-flex; }
+  .cfg-field__default {
+    width: 100%; font-size: 11.5px; color: var(--color-text-muted);
+    margin-top: 2px;
+  }
+  .cfg-field__default code {
+    background: var(--color-bg); padding: 1px 6px; border-radius: 3px;
+    font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  /* ── Toggle Switch ────────────────────────────────── */
+  .cfg-switch {
+    position: relative; display: inline-block; width: 46px; height: 26px;
+    flex-shrink: 0;
+  }
+  .cfg-switch input { opacity: 0; width: 0; height: 0; }
+  .cfg-switch__slider {
+    position: absolute; inset: 0; cursor: pointer;
+    background: #cbd5e0; border-radius: 26px;
+    transition: all 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .cfg-switch__slider::before {
+    content: ""; position: absolute; height: 20px; width: 20px;
+    left: 3px; top: 3px; background: #fff; border-radius: 50%;
+    transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .cfg-switch input:checked + .cfg-switch__slider { background: var(--color-primary); }
+  .cfg-switch input:checked + .cfg-switch__slider::before { transform: translateX(20px); }
+  .cfg-switch input:focus-visible + .cfg-switch__slider {
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+  }
+  .cfg-switch-label {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 500; color: var(--color-text-secondary);
+  }
+
+  /* ── Weekdays Pills ───────────────────────────────── */
+  .cfg-weekdays { display: flex; gap: 4px; flex-wrap: wrap; }
+  .cfg-weekday {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 40px; padding: 7px 9px;
+    border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-bg-elevated, #fff);
+    font-size: 13px; font-weight: 600; color: var(--color-text-secondary);
+    cursor: pointer; user-select: none;
+    transition: all 180ms ease;
+  }
+  .cfg-weekday:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  .cfg-weekday input { display: none; }
+  .cfg-weekday:has(input:checked) {
+    background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+    box-shadow: 0 1px 3px rgba(3,105,161,0.25);
+  }
+
+  /* ── Sticky Save Bar ──────────────────────────────── */
+  .cfg-savebar {
+    position: sticky; bottom: 0;
+    background: rgba(255,255,255,0.97); backdrop-filter: blur(12px);
+    border-top: 1.5px solid var(--color-border);
+    padding: var(--space-3) 0;
+    margin-top: var(--space-6);
+    display: flex; align-items: center; gap: var(--space-3);
+    z-index: 10;
+  }
+  .cfg-savebar__status {
+    flex: 1; font-size: 13px; font-weight: 500;
+    color: var(--color-text-muted);
+  }
+  .cfg-savebar__status.has-changes { color: #7a5a00; }
+  .cfg-savebar__status strong {
+    color: var(--color-text); font-weight: 700;
+  }
+  .cfg-savebar__status.has-changes strong { color: #7a5a00; }
+  .cfg-savebar__btn {
+    font-family: inherit; font-size: var(--text-sm); font-weight: 600;
+    padding: 10px 18px; border-radius: var(--radius-md);
+    cursor: pointer; transition: all 180ms ease;
+    border: 1.5px solid transparent;
+  }
+  .cfg-savebar__btn--ghost {
+    background: transparent; color: var(--color-text-secondary);
+    border-color: var(--color-border);
+  }
+  .cfg-savebar__btn--ghost:hover:not(:disabled) {
+    color: var(--color-text); border-color: var(--color-text-muted);
+  }
+  .cfg-savebar__btn--ghost:disabled { opacity: 0.35; cursor: default; }
+  .cfg-savebar__btn--primary {
+    background: var(--color-primary); color: #fff;
+    border-color: var(--color-primary);
+  }
+  .cfg-savebar__btn--primary:hover {
+    background: var(--color-primary-vivid, #0369a1);
+    box-shadow: 0 4px 12px rgba(3,105,161,0.3);
+    transform: translateY(-1px);
+  }
+  .cfg-savebar__shortcut {
+    display: inline-block;
+    margin-left: 6px; font-size: 10.5px; font-weight: 600;
+    opacity: 0.75; padding: 2px 5px; background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+  }
+
+  /* ── Toast ───────────────────────────────────────── */
+  .cfg-toast {
+    position: fixed; top: 24px; right: 24px; left: 24px;
+    max-width: 480px; margin-left: auto;
+    background: #0c5f2e; color: #fff;
+    padding: 14px 18px; border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    display: flex; align-items: center; gap: 10px;
+    font-size: var(--text-sm); font-weight: 500;
+    z-index: 100;
+    animation: cfgToastIn 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .cfg-toast--error { background: #991b1b; }
+  .cfg-toast__icon {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(255,255,255,0.22);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .cfg-toast--fadeout { animation: cfgToastOut 240ms ease forwards; }
+  @keyframes cfgToastIn {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes cfgToastOut {
+    to { opacity: 0; transform: translateY(-12px); }
+  }
+
+  /* ── Mobile Tooltip Popover ───────────────────────── */
+  .cfg-popover {
+    position: absolute; z-index: 50;
+    background: #1f2937; color: #fff;
+    padding: 10px 12px; border-radius: var(--radius-md);
+    font-size: 13px; line-height: 1.5;
+    max-width: 280px; box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    pointer-events: none;
+    opacity: 0; transition: opacity 160ms ease;
+  }
+  .cfg-popover.is-visible { opacity: 1; pointer-events: auto; }
+  .cfg-popover::before {
+    content: ""; position: absolute; top: -5px; left: 12px;
+    border: 5px solid transparent; border-bottom-color: #1f2937;
+    border-top: 0;
+  }
+
+  /* ── Empty State ─────────────────────────────────── */
+  .cfg-empty {
+    text-align: center; padding: var(--space-6);
+    color: var(--color-text-muted); font-size: var(--text-sm);
+    display: none;
+  }
+  .cfg-empty.is-visible { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="sp sp--wide" id="cfgMain">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Admin · Konfiguration</h1>
+    <div class="sp-subtitle">Laufzeit-Einstellungen · config.py Overlay</div>
+  </header>
+
+  <nav class="cfg-tabs" aria-label="Admin Bereiche">
+    <a href="/admin/subscribers" class="cfg-tab">Subscribers</a>
+    <a href="/admin/config" class="cfg-tab is-active" aria-current="page">Konfiguration</a>
+  </nav>
+
+  <div class="cfg-banner" role="note">
+    <div class="cfg-banner__icon" aria-hidden="true">i</div>
+    <div>
+      <strong>Live-Anwendung:</strong> Gespeicherte Werte greifen sofort.
+      Sensible Daten wie API-Keys und Passwoerter werden <strong>nicht</strong>
+      angezeigt und sind nur via <code>.env</code> konfigurierbar.
+    </div>
+  </div>
+
+  <div class="cfg-toolbar">
+    <div class="cfg-search" id="cfgSearch">
+      <svg class="cfg-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="search" class="cfg-search__input" id="cfgSearchInput"
+             placeholder="Einstellung suchen (Key oder Beschreibung)..."
+             autocomplete="off" spellcheck="false">
+      <button type="button" class="cfg-search__clear" id="cfgSearchClear" aria-label="Suche leeren">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="cfg-jumpnav" aria-label="Direktsprung">
+      <span class="cfg-jumpnav__label">Springen zu:</span>
+      <a href="#sec-meteo" class="cfg-jump">Meteo</a>
+      <a href="#sec-technisch" class="cfg-jump">Technisch</a>
+      {% for group_name in schema.meteo.keys() %}
+        <a href="#grp-{{ loop.index }}-meteo" class="cfg-jump">{{ group_name }}</a>
+      {% endfor %}
+      {% for group_name in schema.technisch.keys() %}
+        <a href="#grp-{{ loop.index }}-technisch" class="cfg-jump">{{ group_name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="cfg-empty" id="cfgEmpty">
+    Keine Einstellung gefunden. <button type="button" class="sp-btn sp-btn--ghost sp-btn--xs" id="cfgEmptyReset" style="width:auto;display:inline-block;margin-left:6px;">Filter zuruecksetzen</button>
+  </div>
+
+  <form method="post" action="/admin/config/save" class="sp-form" id="cfgForm">
+
+    {# ═══════════════ METEO ═══════════════ #}
+    <section class="cfg-section" id="sec-meteo">
+      <h2 class="cfg-section__title">
+        Meteo-Konfiguration
+        <span class="cfg-section__badge">Fliegerisch</span>
+      </h2>
+
+      {% for group_name, fields in schema.meteo.items() %}
+      <div class="cfg-group" id="grp-{{ loop.index }}-meteo">
+        <h3 class="cfg-group__title">{{ group_name }}</h3>
+
+        {% for f in fields %}
+          {% set val = values[f.key] %}
+          {% set def = defaults[f.key] %}
+          {% set is_over = f.key in overlay %}
+          <div class="cfg-field {% if is_over %}is-override{% endif %}"
+               data-field data-key="{{ f.key }}" data-help="{{ f.help|lower }}"
+               data-default="{{ def|tojson|forceescape }}">
+            <div class="cfg-field__info-col">
+              <div class="cfg-field__header">
+                <button type="button" class="cfg-field__tooltip-btn" data-tooltip="{{ f.help }}" aria-label="Hilfe fuer {{ f.key }}">i</button>
+                <span class="cfg-field__key">{{ f.key }}</span>
+                {% if is_over %}
+                  <span class="cfg-field__badge-mod" title="Wert weicht vom Code-Default ab">geaendert</span>
+                {% endif %}
+                <span class="cfg-field__badge-dirty">ungespeichert</span>
+              </div>
+              <div class="cfg-field__help">{{ f.help }}</div>
+            </div>
+            <div class="cfg-field__control">
+              {% include 'admin/_config_input.html' %}
+              <button type="button" class="cfg-field__reset" data-reset-key="{{ f.key }}"
+                      title="Auf Default zuruecksetzen" aria-label="Auf Default zuruecksetzen">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+                </svg>
+              </button>
+              <div class="cfg-field__default">
+                Default: <code>{{ def }}</code>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </section>
+
+    {# ═══════════════ TECHNISCH ═══════════════ #}
+    <section class="cfg-section" id="sec-technisch">
+      <h2 class="cfg-section__title">
+        Technische Konfiguration
+        <span class="cfg-section__badge">Betrieb</span>
+      </h2>
+
+      {% for group_name, fields in schema.technisch.items() %}
+      <div class="cfg-group" id="grp-{{ loop.index }}-technisch">
+        <h3 class="cfg-group__title">{{ group_name }}</h3>
+
+        {% for f in fields %}
+          {% set val = values[f.key] %}
+          {% set def = defaults[f.key] %}
+          {% set is_over = f.key in overlay %}
+          <div class="cfg-field {% if is_over %}is-override{% endif %}"
+               data-field data-key="{{ f.key }}" data-help="{{ f.help|lower }}"
+               data-default="{{ def|tojson|forceescape }}">
+            <div class="cfg-field__info-col">
+              <div class="cfg-field__header">
+                <button type="button" class="cfg-field__tooltip-btn" data-tooltip="{{ f.help }}" aria-label="Hilfe fuer {{ f.key }}">i</button>
+                <span class="cfg-field__key">{{ f.key }}</span>
+                {% if is_over %}
+                  <span class="cfg-field__badge-mod" title="Wert weicht vom Code-Default ab">geaendert</span>
+                {% endif %}
+                <span class="cfg-field__badge-dirty">ungespeichert</span>
+              </div>
+              <div class="cfg-field__help">{{ f.help }}</div>
+            </div>
+            <div class="cfg-field__control">
+              {% include 'admin/_config_input.html' %}
+              <button type="button" class="cfg-field__reset" data-reset-key="{{ f.key }}"
+                      title="Auf Default zuruecksetzen" aria-label="Auf Default zuruecksetzen">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+                </svg>
+              </button>
+              <div class="cfg-field__default">
+                Default: <code>{{ def }}</code>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </section>
+
+    <div class="cfg-savebar" role="region" aria-label="Speichern">
+      <div class="cfg-savebar__status" id="cfgSaveStatus">Keine Aenderungen</div>
+      <button type="button" class="cfg-savebar__btn cfg-savebar__btn--ghost"
+              id="cfgDiscardBtn" disabled>Verwerfen</button>
+      <button type="submit" class="cfg-savebar__btn cfg-savebar__btn--primary">
+        Speichern<kbd class="cfg-savebar__shortcut">Ctrl S</kbd>
+      </button>
+    </div>
+  </form>
+
+  {# Flash als Toast #}
+  {% if flash_ok %}
+    <div class="cfg-toast" id="cfgFlashToast" role="status">
+      <span class="cfg-toast__icon" aria-hidden="true">✓</span>
+      <span>{{ flash_ok }}</span>
+    </div>
+  {% endif %}
+  {% if flash_error %}
+    <div class="cfg-toast cfg-toast--error" id="cfgFlashToast" role="alert">
+      <span class="cfg-toast__icon" aria-hidden="true">!</span>
+      <span>{{ flash_error }}</span>
+    </div>
+  {% endif %}
+
+  {# Popover fuer Tooltips (shared) #}
+  <div class="cfg-popover" id="cfgPopover" role="tooltip" aria-hidden="true"></div>
+</main>
+
+<script>
+(function() {
+  'use strict';
+  var form = document.getElementById('cfgForm');
+  if (!form) return;
+
+  // ─── Dirty-Tracking ───────────────────────────────────────
+  // Initial-Werte pro Feld einsammeln, danach Diff rechnen.
+  var fields = Array.prototype.slice.call(document.querySelectorAll('[data-field]'));
+  var initialSnapshot = {};
+
+  function fieldSignature(fieldEl) {
+    var key = fieldEl.dataset.key;
+    var inputs = fieldEl.querySelectorAll('input[name="' + CSS.escape(key) + '"], select[name="' + CSS.escape(key) + '"]');
+    if (!inputs.length) return '';
+    var first = inputs[0];
+    if (first.type === 'checkbox') {
+      // Weekdays = multiple checkboxes, collect all
+      if (inputs.length > 1) {
+        return Array.prototype.filter.call(inputs, function(i){return i.checked;})
+          .map(function(i){return i.value;}).sort().join(',');
+      }
+      return first.checked ? '1' : '0';
+    }
+    return first.value;
+  }
+
+  fields.forEach(function(f) {
+    initialSnapshot[f.dataset.key] = fieldSignature(f);
+  });
+
+  var saveStatus = document.getElementById('cfgSaveStatus');
+  var discardBtn = document.getElementById('cfgDiscardBtn');
+
+  function updateDirtyState() {
+    var dirtyCount = 0;
+    fields.forEach(function(f) {
+      var now = fieldSignature(f);
+      var isDirty = now !== initialSnapshot[f.dataset.key];
+      f.classList.toggle('is-dirty', isDirty);
+      if (isDirty) dirtyCount++;
+    });
+    if (dirtyCount === 0) {
+      saveStatus.textContent = 'Keine Aenderungen';
+      saveStatus.classList.remove('has-changes');
+      discardBtn.disabled = true;
+    } else {
+      saveStatus.innerHTML = '<strong>' + dirtyCount + '</strong> ungespeicherte Aenderung' + (dirtyCount === 1 ? '' : 'en');
+      saveStatus.classList.add('has-changes');
+      discardBtn.disabled = false;
+    }
+  }
+
+  form.addEventListener('input', updateDirtyState);
+  form.addEventListener('change', updateDirtyState);
+
+  // ─── Verwerfen ────────────────────────────────────────────
+  discardBtn.addEventListener('click', function() {
+    if (!confirm('Alle ungespeicherten Aenderungen verwerfen?')) return;
+    window.location.reload();
+  });
+
+  // ─── Reset-auf-Default pro Feld ───────────────────────────
+  document.querySelectorAll('[data-reset-key]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var fieldEl = btn.closest('[data-field]');
+      if (!fieldEl) return;
+      var defaultVal;
+      try { defaultVal = JSON.parse(fieldEl.dataset.default); }
+      catch (e) { console.warn('Bad default for', fieldEl.dataset.key); return; }
+
+      var key = fieldEl.dataset.key;
+      var inputs = fieldEl.querySelectorAll('input[name="' + CSS.escape(key) + '"], select[name="' + CSS.escape(key) + '"]');
+      if (!inputs.length) return;
+
+      if (inputs[0].type === 'checkbox') {
+        if (inputs.length > 1) {
+          // weekdays
+          var defSet = new Set((defaultVal || []).map(String));
+          inputs.forEach(function(inp) { inp.checked = defSet.has(inp.value); });
+        } else {
+          inputs[0].checked = Boolean(defaultVal);
+        }
+      } else {
+        inputs[0].value = String(defaultVal);
+      }
+      updateDirtyState();
+    });
+  });
+
+  // ─── Suche ────────────────────────────────────────────────
+  var searchWrap = document.getElementById('cfgSearch');
+  var searchInput = document.getElementById('cfgSearchInput');
+  var searchClear = document.getElementById('cfgSearchClear');
+  var emptyState = document.getElementById('cfgEmpty');
+  var emptyReset = document.getElementById('cfgEmptyReset');
+
+  function applyFilter(q) {
+    q = (q || '').trim().toLowerCase();
+    searchWrap.classList.toggle('has-value', q.length > 0);
+    var visibleCount = 0;
+    fields.forEach(function(f) {
+      if (!q) {
+        f.classList.remove('is-hidden');
+        visibleCount++; return;
+      }
+      var hay = f.dataset.key.toLowerCase() + ' ' + (f.dataset.help || '');
+      var match = hay.indexOf(q) !== -1;
+      f.classList.toggle('is-hidden', !match);
+      if (match) visibleCount++;
+    });
+    // Gruppen mit 0 sichtbaren Feldern ausblenden
+    document.querySelectorAll('.cfg-group').forEach(function(g) {
+      var hasVisible = g.querySelector('[data-field]:not(.is-hidden)');
+      g.style.display = hasVisible ? '' : 'none';
+    });
+    document.querySelectorAll('.cfg-section').forEach(function(s) {
+      var hasVisible = s.querySelector('.cfg-group[style=""], .cfg-group:not([style])') ||
+                       Array.prototype.some.call(s.querySelectorAll('.cfg-group'),
+                         function(g){return g.style.display !== 'none';});
+      s.style.display = hasVisible ? '' : 'none';
+    });
+    emptyState.classList.toggle('is-visible', visibleCount === 0);
+  }
+
+  searchInput.addEventListener('input', function() { applyFilter(searchInput.value); });
+  searchClear.addEventListener('click', function() {
+    searchInput.value = ''; applyFilter(''); searchInput.focus();
+  });
+  emptyReset.addEventListener('click', function() {
+    searchInput.value = ''; applyFilter('');
+  });
+
+  // "/" fokussiert Suche
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
+      e.preventDefault(); searchInput.focus();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  // ─── Tooltip-Popover (touch-friendly) ────────────────────
+  var popover = document.getElementById('cfgPopover');
+  var popoverTimer = null;
+
+  function showPopover(target, text) {
+    clearTimeout(popoverTimer);
+    popover.textContent = text;
+    var rect = target.getBoundingClientRect();
+    var top = rect.bottom + window.scrollY + 8;
+    var left = rect.left + window.scrollX;
+    // Gegen rechten Rand korrigieren
+    var maxLeft = document.documentElement.clientWidth - 296;
+    if (left > maxLeft) left = maxLeft;
+    popover.style.top = top + 'px';
+    popover.style.left = left + 'px';
+    popover.classList.add('is-visible');
+    popover.setAttribute('aria-hidden', 'false');
+  }
+  function hidePopover(delay) {
+    clearTimeout(popoverTimer);
+    popoverTimer = setTimeout(function() {
+      popover.classList.remove('is-visible');
+      popover.setAttribute('aria-hidden', 'true');
+    }, delay || 0);
+  }
+  document.querySelectorAll('[data-tooltip]').forEach(function(btn) {
+    btn.addEventListener('mouseenter', function() { showPopover(btn, btn.dataset.tooltip); });
+    btn.addEventListener('mouseleave', function() { hidePopover(120); });
+    btn.addEventListener('focus', function() { showPopover(btn, btn.dataset.tooltip); });
+    btn.addEventListener('blur', function() { hidePopover(0); });
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (popover.classList.contains('is-visible') && popover.textContent === btn.dataset.tooltip) {
+        hidePopover(0);
+      } else {
+        showPopover(btn, btn.dataset.tooltip);
+      }
+    });
+  });
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('[data-tooltip]') && !e.target.closest('#cfgPopover')) {
+      hidePopover(0);
+    }
+  });
+
+  // ─── Flash-Toast Auto-Fade ───────────────────────────────
+  var toast = document.getElementById('cfgFlashToast');
+  if (toast) {
+    setTimeout(function() { toast.classList.add('cfg-toast--fadeout'); }, 3500);
+    setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3900);
+  }
+
+  // ─── unload warn bei ungespeicherten Aenderungen ─────────
+  var isSubmitting = false;
+  form.addEventListener('submit', function() { isSubmitting = true; });
+  window.addEventListener('beforeunload', function(e) {
+    if (isSubmitting) return;
+    var anyDirty = fields.some(function(f){return f.classList.contains('is-dirty');});
+    if (anyDirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // Init
+  updateDirtyState();
+})();
+</script>
+{% endblock %}

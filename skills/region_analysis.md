@@ -21,9 +21,9 @@ REGION-SPEZIFIK: WIND-TAGS MAGNITUDE-BASIERT
 
 Regionen haben KEINEN erlaubten Sektor (nicht wie Spots) und **KEINE Boeen** (Apr 2026 Refactor). Windwerte werden auf die **Referenzhoehe** der Region interpoliert und in drei Magnitude-Klassen eingeteilt — nur basierend auf Windgeschwindigkeit:
 
-- `[WIND-CALM]` — Wind < 20 km/h → RUHIG (gute Bedingungen).
-- `[WIND-MODERATE]` — Wind 20-30 km/h → SPORTLICH (= WARN-Level fuer Regionen, fliegbar fuer erfahrene Piloten).
-- `[WIND-STRONG]` — Wind > 30 km/h → UNFLIEGBAR (= DANGER-Level fuer Regionen).
+- `[WIND-CALM]` — Wind < {{cfg.WIND_MODERATE_KMH}} km/h → RUHIG (gute Bedingungen).
+- `[WIND-MODERATE]` — Wind {{cfg.WIND_MODERATE_KMH}}-{{cfg.WIND_STRONG_KMH}} km/h → SPORTLICH (= WARN-Level fuer Regionen, fliegbar fuer erfahrene Piloten).
+- `[WIND-STRONG]` — Wind > {{cfg.WIND_STRONG_KMH}} km/h → UNFLIEGBAR (= DANGER-Level fuer Regionen).
 
 **Stunden-Klassifikation siehe KERNREGEL** in `_hazard_blocks.md`. Saubere Stunden (RUHIG + SPORTLICH) gehoeren ins `safe_window`. SPORTLICHE Stunden in `caution_notes` mit Uhrzeit markieren.
 

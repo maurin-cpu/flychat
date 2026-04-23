@@ -41,12 +41,8 @@ from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
     get_all_regions,
 )
-from prompts import (
-    SYSTEM_PROMPT,
-    SPOT_COMBINED_PROMPT, REGION_COMBINED_PROMPT,
-    WEEKLY_BRIEFING_PROMPT, CAPABILITIES_GUIDE, FOEHN_CHAT_KNOWLEDGE,
-    format_foehn_llm_regional_guide,
-)
+import prompts
+from prompts import format_foehn_llm_regional_guide
 from engine._common import (
     MAX_HISTORY_MESSAGES, MAX_TOOL_ITERATIONS,
     _MODEL_TOKEN_LIMITS, _DEFAULT_TOKEN_LIMIT, _TOKEN_BUDGET_RESERVE,
@@ -225,7 +221,7 @@ class AnalyzersMixin:
                         "phase": "combined", "error": "Keine Daten fuer diesen Tag"}
 
             messages = [
-                {"role": "system", "content": SPOT_COMBINED_PROMPT},
+                {"role": "system", "content": prompts.SPOT_COMBINED_PROMPT},
                 {"role": "user", "content": (
                     f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}"
@@ -379,7 +375,7 @@ class AnalyzersMixin:
                         "phase": "combined", "error": "Keine Daten"}
 
             messages = [
-                {"role": "system", "content": REGION_COMBINED_PROMPT},
+                {"role": "system", "content": prompts.REGION_COMBINED_PROMPT},
                 {"role": "user", "content": (
                     f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}"
@@ -731,7 +727,7 @@ class AnalyzersMixin:
             response = self.analysis_client.chat.completions.create(
                 model=self.analysis_model,
                 messages=[
-                    {"role": "system", "content": WEEKLY_BRIEFING_PROMPT},
+                    {"role": "system", "content": prompts.WEEKLY_BRIEFING_PROMPT},
                     {"role": "user", "content": (
                         f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                         f"WOCHEN-DATEN:\n{ctx}\n"
@@ -1752,7 +1748,7 @@ class AnalyzersMixin:
                     "body": {
                         "model": self.analysis_model,
                         "messages": [
-                            {"role": "system", "content": REGION_COMBINED_PROMPT},
+                            {"role": "system", "content": prompts.REGION_COMBINED_PROMPT},
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
@@ -1855,7 +1851,7 @@ class AnalyzersMixin:
                     "body": {
                         "model": self.analysis_model,
                         "messages": [
-                            {"role": "system", "content": SPOT_COMBINED_PROMPT},
+                            {"role": "system", "content": prompts.SPOT_COMBINED_PROMPT},
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,

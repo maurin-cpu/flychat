@@ -106,7 +106,7 @@ Zusaetzlich pruefen: Ist die zweite Gefahrenphase SCHLIMMER als die erste?
 
 **Sonderfall 2: Boden-Gefahren (Bodenboeen Block 3, Bodenwind Block 2, Regen Block 1)**
 
-Bei EINGEKESSELT mit DANGER am BODEN gelten **strengere Fenster-Schwellen** als in der Standard-Regel, weil die Landung direkt betroffen waere. Bei Boeen > 40 km/h am Boden reicht ein 30-60 min Prognose-Fehler, und der Pilot landet in der Gefahrenphase — kein Rueckzug nach oben moeglich.
+Bei EINGEKESSELT mit DANGER am BODEN gelten **strengere Fenster-Schwellen** als in der Standard-Regel, weil die Landung direkt betroffen waere. Bei Boeen > {{cfg.GUST_DANGER_KMH}} km/h am Boden reicht ein 30-60 min Prognose-Fehler, und der Pilot landet in der Gefahrenphase — kein Rueckzug nach oben moeglich.
 
 - **Fenster < 5h** → **immer `not_safe`**, auch wenn durchgehend RUHIG innen.
 - **Fenster ≥ 5h + durchgehend RUHIG innen** → `conditional` moeglich. Pilot MUSS mind. 90 min vor Rueckkehr gelandet sein. In `caution_notes` explizit Timing-Risiko und harte Landezeit nennen.
@@ -135,9 +135,9 @@ BLOCK 2 — BODENWIND (Richtung & Staerke)
 - `[STRONG-WIND-WARN]` → Stunde unfliegbar (Grundwind ueber Spot-Maximum).
 
 **Tags (Regionen):** Magnitude-basiert auf Referenzhoehe, kein Sektor-Check.
-- `[WIND-STRONG]` → Stunde unfliegbar (Wind > 30 km/h).
-- `[WIND-MODERATE]` → sportlich, fliegbar (20-30 km/h).
-- `[WIND-CALM]` → ruhig (< 20 km/h).
+- `[WIND-STRONG]` → Stunde unfliegbar (Wind > {{cfg.WIND_STRONG_KMH}} km/h).
+- `[WIND-MODERATE]` → sportlich, fliegbar ({{cfg.WIND_MODERATE_KMH}}-{{cfg.WIND_STRONG_KMH}} km/h).
+- `[WIND-CALM]` → ruhig (< {{cfg.WIND_MODERATE_KMH}} km/h).
 
 **Richtungsdreher im Tagesverlauf (Spots):**
 - Windrichtung dreht weg vom erlaubten Sektor → max **conditional**, in `caution_notes` mit Uhrzeit erwaehnen.
@@ -150,7 +150,7 @@ BLOCK 3 — BOEEN (Bodenboeen, NUR Spots)
 **WICHTIG — Regionen vs. Spots:** Regionen haben **keine Boeen** mehr (Apr 2026 Refactor). Boeen-Tags (`[GUST-*]`, `[ALOFT-GUST-*]`, `[THERMAL-ROUGH-*]`) und die BOEEN-FLOOR-Regel gelten **nur fuer Spots**. Im Region-Kontext: Boeen NIE erwaehnen — Thermik-Zerreiss-Signale kommen ueber `[SHEAR-*]` und `[THERMAL-TORN-*]`.
 
 **Tags:**
-- `[GUST-DANGER]` → Stunde unfliegbar (Bodenboeen > 40 km/h).
+- `[GUST-DANGER]` → Stunde unfliegbar (Bodenboeen > {{cfg.GUST_DANGER_KMH}} km/h).
 - `[GUST-WARN]` → Stunde bleibt nutzbar, aber Tag mindestens **conditional**.
 
 **GROUNDING-REGEL (PFLICHT):** Boeen-Formulierungen ("starke Boeen", "Bodenboeen bis X km/h", "GUST-WARN Xh") sind NUR erlaubt, wenn im TAGESPROFIL-Histogramm `Hauptgefahren am Tag:` explizit `GUST-WARN Nh`, `GUST-DANGER Nh`, `ALOFT-GUST-WARN Nh` oder `ALOFT-GUST-DANGER Nh` mit N≥1 steht. Fehlt die Zaehlung → keine Boeen-Warnung, keine "starke Boeen", keine erfundene km/h-Angabe. Bei gewuenschter Zahl verwende ausschliesslich `max_surface_gust` aus dem Datenblock, sonst keine Zahl.
@@ -163,14 +163,14 @@ Wenn im TAGESPROFIL steht `→ BOEEN-FLOOR (hart, System-erzwungen): MINDEST-STA
 - Wenn `MINDEST-STATUS = 'not_safe'` steht: `safety_status = not_safe`, Boeen MUESSEN in `no_go_reasons` MIT Zahlen.
 - Das System prueft und downgraded automatisch — liefere gleich die richtige Einstufung.
 
-**Trend-Muster:** siehe TREND-VOKABULAR. Gefahrenschwellen Boeen: WARN-Level = `[GUST-WARN]` 30-40 km/h / DANGER-Level = `[GUST-DANGER]` > 40 km/h. Bodengefahr → **Sonderfall 2 (Boden-Gefahren)** anwenden bei EINGEKESSELT-Mustern (Fenster < 5h immer not_safe).
+**Trend-Muster:** siehe TREND-VOKABULAR. Gefahrenschwellen Boeen: WARN-Level = `[GUST-WARN]` {{cfg.GUST_WARN_KMH}}-{{cfg.GUST_DANGER_KMH}} km/h / DANGER-Level = `[GUST-DANGER]` > {{cfg.GUST_DANGER_KMH}} km/h. Bodengefahr → **Sonderfall 2 (Boden-Gefahren)** anwenden bei EINGEKESSELT-Mustern (Fenster < 5h immer not_safe).
 
 **Stunden-Richtwerte (zusaetzlich, gelten unabhaengig vom Trend-Muster):**
 - `[GUST-DANGER]` ≥ 1h → mindestens **conditional**. Mehrere DANGER-Stunden in Serie → **not_safe**.
 - `[GUST-WARN]` ≥ 3h → mindestens **conditional** (= SPORTLICHE Stunden). Auch durchgehend WARN-Level ist NICHT not_safe — nur sportlich.
 - `AUFKLAERUNG`-Trend kann diese Richtwerte ueberschreiben (ruhige Stunden nach Boeen-Aufklaerung normal nutzbar).
 
-**Leitregel:** Bodenboeen 30-40 km/h = SPORTLICHE Stunde (Start/Landung sportlich). Erst > 40 km/h = UNFLIEGBARE Stunde.
+**Leitregel:** Bodenboeen {{cfg.GUST_WARN_KMH}}-{{cfg.GUST_DANGER_KMH}} km/h = SPORTLICHE Stunde (Start/Landung sportlich). Erst > {{cfg.GUST_DANGER_KMH}} km/h = UNFLIEGBARE Stunde.
 
 **Boendifferenz (Gust Spread):** Hohe Differenz Wind ↔ Boeen = Turbulenz-Indikator, auch ohne Tag erwaehnen.
 
@@ -179,10 +179,10 @@ BLOCK 4 — HOEHENWIND (FLUGSCHICHT)
 ─────────────────────────────────
 
 **Tags** (gelten NUR fuer Hoehen mit Marker `*` im Flugbereich):
-- `[ALOFT-DANGER]` → Stunde unfliegbar (Wind in Flugschicht > 30 km/h). **Ab 3h pro Tag → hartes NO-GO** (Post-Processing zwingt `not_safe`, auch wenn Bodenwind ruhig ist).
-- `[ALOFT-GUST-DANGER]` → Stunde unfliegbar (Turbulenz > 40 km/h auf Flughoehe — extreme Klapper-Gefahr). **Nur Spots.** Ab 3h ebenfalls NO-GO.
-- `[ALOFT-WARN]` → Vorsicht, sportlich (20-30 km/h).
-- `[ALOFT-GUST-WARN]` → Vorsicht, Turbulenz wahrscheinlich (30-40 km/h). **Nur Spots.**
+- `[ALOFT-DANGER]` → Stunde unfliegbar (Wind in Flugschicht > {{cfg.ALOFT_DANGER_KMH}} km/h). **Ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h pro Tag → hartes NO-GO** (Post-Processing zwingt `not_safe`, auch wenn Bodenwind ruhig ist).
+- `[ALOFT-GUST-DANGER]` → Stunde unfliegbar (Turbulenz > {{cfg.ALOFT_GUST_DANGER_KMH}} km/h auf Flughoehe — extreme Klapper-Gefahr). **Nur Spots.** Ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h ebenfalls NO-GO.
+- `[ALOFT-WARN]` → Vorsicht, sportlich ({{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h).
+- `[ALOFT-GUST-WARN]` → Vorsicht, Turbulenz wahrscheinlich ({{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h). **Nur Spots.**
 
 **Regionen:** Nur `[ALOFT-WARN]` und `[ALOFT-DANGER]` (reine Windstaerke auf Flughoehe). Hoehenboeen-Tags (`ALOFT-GUST-*`) existieren auf Region-Ebene nicht.
 
@@ -190,7 +190,7 @@ BLOCK 4 — HOEHENWIND (FLUGSCHICHT)
 - Boeen > 50 km/h dort → Hinweis in `caution_notes` ("scharfer Hoehensturm in Xm direkt ueber Thermikspitze, kann eindringen").
 - Buffer ruhiger als Flugschicht → Entwarnung (kein Risiko von oben).
 
-**Trend-Muster:** siehe TREND-VOKABULAR. Gefahrenschwellen Hoehenwind: WARN-Level = `[ALOFT-WARN]` 20-30 km/h / DANGER-Level = `[ALOFT-DANGER]` > 30 km/h. Fuer Turbulenz (nur Spots): `[ALOFT-GUST-WARN]` 30-40 km/h / `[ALOFT-GUST-DANGER]` > 40 km/h. Flugschichtgefahr → **Sonderfall 1 (Hoehenwind)** anwenden bei EINGEKESSELT-Mustern (eskalierend vs. symmetrisch pruefen).
+**Trend-Muster:** siehe TREND-VOKABULAR. Gefahrenschwellen Hoehenwind: WARN-Level = `[ALOFT-WARN]` {{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h / DANGER-Level = `[ALOFT-DANGER]` > {{cfg.ALOFT_DANGER_KMH}} km/h. Fuer Turbulenz (nur Spots): `[ALOFT-GUST-WARN]` {{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h / `[ALOFT-GUST-DANGER]` > {{cfg.ALOFT_GUST_DANGER_KMH}} km/h. Flugschichtgefahr → **Sonderfall 1 (Hoehenwind)** anwenden bei EINGEKESSELT-Mustern (eskalierend vs. symmetrisch pruefen).
 
 **Vertikale Wind-Drehung:** Wind dreht in der vertikalen Saeule (z.B. unten Sued, oben West) → Scherung → in `wind_shear` vermerken, eher **conditional**.
 
@@ -217,7 +217,7 @@ BLOCK 5 — FOEHN
 
 **Versteckter Foehn** (auch bei niedrigem ΔP pruefen):
 - Hoehenwind (850/700 hPa) stark, Bodenwind schwach — Verhaeltnis > 3:1.
-- 850 hPa Wind > 30 km/h bei Bodenwind < 10 km/h.
+- 850 hPa Wind > {{cfg.ALOFT_DANGER_KMH}} km/h bei Bodenwind < 10 km/h.
 - Richtung des Hoehenwinds MUSS zur Foehnrichtung passen (Suedfoehn → Suedwind). Sonst ignorieren.
 - Bei versteckten Foehn: Status mindestens **conditional** mit Begruendung in `caution_notes`.
 
@@ -234,10 +234,10 @@ BLOCK 6 — KONVEKTION / UEBERENTWICKLUNG (3 Tiers)
 - `[THUNDERSTORM]` → Stunde unfliegbar. Modell sagt explizit Gewitter voraus (weather_code 95/96/99). Deterministisch.
   → Status: **not_safe**. In `no_go_reasons`/`summary` als **"Gewitter"** bezeichnen. `primary_no_go = GEWITTER`.
 
-- `[CAPE-DANGER]` → Stunde unfliegbar. CAPE > 1500 J/kg (extrem instabil) ODER CAPE + Regen/Schauer in derselben Stunde (aktive Ueberentwicklung).
+- `[CAPE-DANGER]` → Stunde unfliegbar. CAPE > {{cfg.CAPE_DANGER_JKG}} J/kg (extrem instabil) ODER CAPE + Regen/Schauer in derselben Stunde (aktive Ueberentwicklung).
   → Status: **not_safe**. In `no_go_reasons`/`summary` als **"Ueberentwicklungsgefahr"** oder **"aktive Ueberentwicklung"** bezeichnen — NICHT als "Gewitter". `primary_no_go = UEBERENTWICKLUNG`.
 
-- `[CAPE-WARN]` → Stunde potenziell fliegbar, aber mit Vorsicht. CAPE > 800 J/kg, aber Modell prognostiziert weder Niederschlag noch Blitz.
+- `[CAPE-WARN]` → Stunde potenziell fliegbar, aber mit Vorsicht. CAPE > {{cfg.CAPE_WARN_JKG}} J/kg, aber Modell prognostiziert weder Niederschlag noch Blitz.
   → Status: maximal **conditional** (NICHT not_safe nur wegen CAPE-WARN allein). In `caution_notes` als **"Ueberentwicklung moeglich"** beschreiben, mit Zeitfenster und CAPE-Wert. Im `summary`: Pilot soll Himmel beobachten, frueh landen wenn Quellwolken ueberschiessen.
   → CAPE-WARN-Stunden koennen Teil des `safe_window` sein.
 

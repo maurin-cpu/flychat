@@ -35,7 +35,7 @@ GLOSSAR
 
 - `wind_speed` = reiner Modellwind W(z) auf der jeweiligen Hoehe.
 - `wind_gusts` = **Turbulenzrisiko T(z)** (Wind + Gauss-Kernel-Aufschlag aus Bodenexzess) — NICHT die klassische meteorologische Boee. Zeigt Klapper-Gefahr an.
-- **PRODUKTIVE-THERMIK** = Stunden mit Climb ≥ 0.7 m/s, max(tief, mittel)-Wolken < 80%, kein ROUGH-UNUSABLE.
-- **VIOLETT-Kandidat** = System-Hint im TAGESPROFIL wenn ALLE Violett-Schwellen erfuellt sind (Peak ≥ 2.5 m/s, produktiv ≥ 5h, ROUGH < 30%, UNUSABLE < 30%, Ø tief ≤ 50%, Ø mittel ≤ 50%). Berechtigt zur Wahl `fly_status = "violet"`.
+- **PRODUKTIVE-THERMIK** = Stunden mit Climb ≥ {{cfg.PRODUCTIVE_CLIMB_MIN}} m/s, tief < {{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}% UND mittel < {{cfg.PRODUCTIVE_MID_CLOUD_MAX}}%, kein ROUGH-UNUSABLE.
+- **VIOLETT-Kandidat** = System-Hint im TAGESPROFIL wenn ALLE Violett-Schwellen erfuellt sind (Peak ≥ {{cfg.VIOLET_PEAK_MIN}} m/s, produktiv ≥ {{cfg.VIOLET_HOURS_MIN}}h, ROUGH < {{cfg.VIOLET_ROUGH_MAX}}%, UNUSABLE < {{cfg.VIOLET_UNUSABLE_MAX}}%, Ø tief ≤ {{cfg.VIOLET_CLOUD_LOW_MAX}}%, Ø mittel ≤ {{cfg.VIOLET_CLOUD_MID_MAX}}%). Berechtigt zur Wahl `fly_status = "violet"`.
 - **Flugbereich** = Spot-/Referenzhoehe bis Thermikhoehe + 1000 m (inkl. Lid-Zone).
 - **Buffer-Zone** = Flugbereich + 500 m (nur Hinweis, keine harten Tags).

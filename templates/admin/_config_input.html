@@ -1,0 +1,43 @@
+{#
+  Input-Variante abhaengig von f.type.
+  Kontext: f (field dict), val (current value).
+#}
+{%- if f.type == "bool" -%}
+  <label class="cfg-switch" title="{{ f.help }}">
+    <input type="checkbox" name="{{ f.key }}" {% if val %}checked{% endif %}>
+    <span class="cfg-switch__slider"></span>
+  </label>
+
+{%- elif f.type == "choice" -%}
+  <select class="cfg-input" name="{{ f.key }}" title="{{ f.help }}">
+    {% for choice in f.choices %}
+      <option value="{{ choice }}" {% if val == choice %}selected{% endif %}>{{ choice }}</option>
+    {% endfor %}
+  </select>
+
+{%- elif f.type == "weekdays" -%}
+  {% set day_labels = ["Mo","Di","Mi","Do","Fr","Sa","So"] %}
+  {% set selected = val or [] %}
+  <div class="cfg-weekdays" title="{{ f.help }}">
+    {% for i in range(7) %}
+      <label class="cfg-weekday">
+        <input type="checkbox" name="{{ f.key }}" value="{{ i }}"
+               {% if i in selected %}checked{% endif %}>
+        {{ day_labels[i] }}
+      </label>
+    {% endfor %}
+  </div>
+
+{%- elif f.type == "int" or f.type == "float" -%}
+  <input class="cfg-input cfg-input--num" type="number" name="{{ f.key }}"
+         value="{{ val }}"
+         {% if f.min is defined %}min="{{ f.min }}"{% endif %}
+         {% if f.max is defined %}max="{{ f.max }}"{% endif %}
+         {% if f.step is defined %}step="{{ f.step }}"{% elif f.type == 'float' %}step="0.01"{% else %}step="1"{% endif %}
+         title="{{ f.help }}">
+  {% if f.unit %}<span class="cfg-unit">{{ f.unit }}</span>{% endif %}
+
+{%- else -%}
+  <input class="cfg-input" type="text" name="{{ f.key }}" value="{{ val }}" title="{{ f.help }}">
+  {% if f.unit %}<span class="cfg-unit">{{ f.unit }}</span>{% endif %}
+{%- endif -%}

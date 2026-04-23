@@ -324,7 +324,7 @@ class WeatherContextMixin:
                     warnings.append("[STRONG-WIND-WARN]")
 
                 if isinstance(wind_gusts, (int, float)) and isinstance(wind_speed, (int, float)):
-                    if (wind_gusts > 30 and wind_gusts - wind_speed > 15) or wind_gusts > 35:
+                    if (wind_gusts > config.GUST_WARN_KMH and wind_gusts - wind_speed > config.GUST_SPREAD_KMH) or wind_gusts > config.GUST_WARN_ABSOLUTE_KMH:
                         warnings.append("[GUST-WARN]")
 
                 if isinstance(precip, (int, float)) and precip > 0.05:
@@ -393,13 +393,13 @@ class WeatherContextMixin:
                                 elif ws_val > config.ALOFT_WARN_KMH:
                                     aloft_warn = True
                                 if g_val is not None:
-                                    # T(z) > 40 km/h im Flugbereich = DANGER,
+                                    # T(z) > ALOFT_GUST_DANGER_KMH im Flugbereich = DANGER,
                                     # unabhängig vom Modellwind W(z).
-                                    # Turbulenzrisiko >40 km/h ist ein Sicherheits-
+                                    # Turbulenzrisiko ist ein Sicherheits-
                                     # problem auch bei moderatem Grundwind.
-                                    if g_val > 40:
+                                    if g_val > config.ALOFT_GUST_DANGER_KMH:
                                         aloft_gust_danger = True
-                                    elif g_val > 30:
+                                    elif g_val > config.ALOFT_GUST_WARN_KMH:
                                         aloft_gust_warn = True
 
                 if aloft_danger:
@@ -418,10 +418,10 @@ class WeatherContextMixin:
 
                 try:
                     cape = data.get("cape")
-                    if isinstance(cape, (int, float)) and cape > 800:
+                    if isinstance(cape, (int, float)) and cape > config.CAPE_WARN_JKG:
                         # CAPE-DANGER (hart): extreme Instabilitaet oder CAPE + Regen/Schauer (aktive Ueberentwicklung)
                         # CAPE-WARN (soft): Potenzial vorhanden, aber Modell prognostiziert keinen Trigger → conditional
-                        if cape > 1500 or "[RAIN-WARN]" in warnings:
+                        if cape > config.CAPE_DANGER_JKG or "[RAIN-WARN]" in warnings:
                             warnings.append("[CAPE-DANGER]")
                         else:
                             warnings.append("[CAPE-WARN]")
@@ -1232,9 +1232,9 @@ class WeatherContextMixin:
                 warnings.append("[STRONG-WIND-WARN]")
 
             if isinstance(wind_gusts, (int, float)) and isinstance(wind_speed, (int, float)):
-                if wind_gusts > 40:
+                if wind_gusts > config.GUST_DANGER_KMH:
                     warnings.append("[GUST-DANGER]")
-                elif (wind_gusts > 30 and wind_gusts - wind_speed > 15) or wind_gusts > 30:
+                elif (wind_gusts > config.GUST_WARN_KMH and wind_gusts - wind_speed > config.GUST_SPREAD_KMH) or wind_gusts > config.GUST_WARN_KMH:
                     warnings.append("[GUST-WARN]")
 
             try:
@@ -1322,13 +1322,11 @@ class WeatherContextMixin:
                             elif ws_val > config.ALOFT_WARN_KMH:
                                 aloft_warn = True
                             if g_val is not None:
-                                # T(z) > 40 km/h im Flugbereich = DANGER,
+                                # T(z) > ALOFT_GUST_DANGER_KMH im Flugbereich = DANGER,
                                 # unabhängig vom Modellwind W(z).
-                                # Turbulenzrisiko >40 km/h ist ein Sicherheits-
-                                # problem auch bei moderatem Grundwind.
-                                if g_val > 40:
+                                if g_val > config.ALOFT_GUST_DANGER_KMH:
                                     aloft_gust_danger = True
-                                elif g_val > 30:
+                                elif g_val > config.ALOFT_GUST_WARN_KMH:
                                     aloft_gust_warn = True
 
             if aloft_danger:
@@ -1347,10 +1345,10 @@ class WeatherContextMixin:
 
             try:
                 cape = data.get("cape")
-                if isinstance(cape, (int, float)) and cape > 800:
+                if isinstance(cape, (int, float)) and cape > config.CAPE_WARN_JKG:
                     # CAPE-DANGER (hart): extreme Instabilitaet oder CAPE + Regen (aktive Ueberentwicklung)
                     # CAPE-WARN (soft): Potenzial vorhanden, aber kein Trigger → conditional
-                    if cape > 1500 or "[RAIN-WARN]" in warnings:
+                    if cape > config.CAPE_DANGER_JKG or "[RAIN-WARN]" in warnings:
                         warnings.append("[CAPE-DANGER]")
                     else:
                         warnings.append("[CAPE-WARN]")
@@ -2105,10 +2103,10 @@ class WeatherContextMixin:
             hour_str = f"{dt.hour:02d}:00"
             if isinstance(wind_speed, (int, float)):
                 hourly_winds[hour_str] = wind_speed
-                if wind_speed > 30:
+                if wind_speed > config.WIND_STRONG_KMH:
                     wind_status = "[WIND-STRONG]"
                     strong_hours.append(hour_str)
-                elif wind_speed > 20:
+                elif wind_speed > config.WIND_MODERATE_KMH:
                     wind_status = "[WIND-MODERATE]"
                     moderate_hours.append(hour_str)
                 else:
@@ -2188,10 +2186,10 @@ class WeatherContextMixin:
 
             try:
                 cape = data.get("cape")
-                if isinstance(cape, (int, float)) and cape > 800:
+                if isinstance(cape, (int, float)) and cape > config.CAPE_WARN_JKG:
                     # CAPE-DANGER (hart): extreme Instabilitaet oder CAPE + Regen (aktive Ueberentwicklung)
                     # CAPE-WARN (soft): Potenzial vorhanden, aber kein Trigger → conditional
-                    if cape > 1500 or "[RAIN-WARN]" in warnings:
+                    if cape > config.CAPE_DANGER_JKG or "[RAIN-WARN]" in warnings:
                         warnings.append("[CAPE-DANGER]")
                     else:
                         warnings.append("[CAPE-WARN]")
