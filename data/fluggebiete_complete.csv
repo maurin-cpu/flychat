@@ -1,5 +1,5 @@
 region,fluggebiet,site_name,latitude,longitude,elevation_m,windrichtung,ideal_wind_max_kmh,slope_azimuth,slope_angle,kritischer_foehn,Bemerkungen
-Zürich,Uetliberg,Balderen,47.3226,8.5008,730,NO-O,30,225,30,Süd,"[INFO] Kein klassisches Soaring, Wind drückt Thermik an den Hang. [BEDINGUNG] WENN Wind < 15 km/h DANN hohes Risiko für Abgleiter (auch bei guter Thermik!). [BEDINGUNG] WENN Wind >= 15 km/h DANN Soaring möglich (unabhängig von Sonne/Bewölkung/Thermik). [BEDINGUNG] WENN Wind >= 20 km/h DANN sehr gute Bedingungen. [BEDINGUNG] WENN Wind >= 15 km/h UND gute Thermik DANN Top-Bedingungen."
+Zürich,Uetliberg,Balderen,47.3226,8.5008,730,NNO-O,30,225,30,Süd,"[INFO] Kein klassisches Soaring, Wind drückt Thermik an den Hang. [BEDINGUNG] WENN Wind < 15 km/h DANN hohes Risiko für Abgleiter (auch bei guter Thermik!). [BEDINGUNG] WENN Wind >= 15 km/h DANN Soaring möglich (unabhängig von Sonne/Bewölkung/Thermik). [BEDINGUNG] WENN Wind >= 20 km/h DANN sehr gute Bedingungen. [BEDINGUNG] WENN Wind >= 15 km/h UND gute Thermik DANN Top-Bedingungen."
 Zentralschweiz,Engelberg,Tämpfeli,46.838,8.412,1800,S-SO,30,,,Süd,
 Zentralschweiz,Engelberg,Brunnihütte,46.8425,8.4104,1870,W-SW,30,,,Süd,
 Zentralschweiz,Engelberg,Fürenalp,46.805,8.4657,1800,S-W,30,,,Süd,
