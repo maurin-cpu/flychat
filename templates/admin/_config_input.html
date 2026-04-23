@@ -15,6 +15,22 @@
     {% endfor %}
   </select>
 
+{%- elif f.type == "time" -%}
+  {# val ist ein HH:MM String; in zwei Teile splitten, mit 00:00 als Fallback #}
+  {% set _tparts = (val or "00:00").split(":") %}
+  {% set _hh = _tparts[0] if _tparts|length > 0 else "00" %}
+  {% set _mm = _tparts[1] if _tparts|length > 1 else "00" %}
+  <div class="cfg-timepicker" data-timepicker title="{{ f.help }}">
+    <svg class="cfg-timepicker__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+    <input type="number" class="cfg-timepicker__hh" min="0" max="23" value="{{ _hh }}" aria-label="Stunde" inputmode="numeric">
+    <span class="cfg-timepicker__sep" aria-hidden="true">:</span>
+    <input type="number" class="cfg-timepicker__mm" min="0" max="59" step="5" value="{{ _mm }}" aria-label="Minute" inputmode="numeric">
+    <input type="hidden" name="{{ f.key }}" value="{{ val }}">
+  </div>
+  <span class="cfg-unit">Uhr</span>
+
 {%- elif f.type == "weekdays" -%}
   {% set day_labels = ["Mo","Di","Mi","Do","Fr","Sa","So"] %}
   {% set selected = val or [] %}

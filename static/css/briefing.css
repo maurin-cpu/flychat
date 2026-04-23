@@ -575,11 +575,16 @@
 
 .bf-region-head {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) 0 var(--space-3);
   margin-bottom: var(--space-3);
   border-bottom: 2px solid var(--color-primary);
+}
+
+.bf-region-name {
+  flex: 1;
+  min-width: 0;
 }
 
 .bf-region-name {
@@ -823,6 +828,42 @@
   color: #fff;
   border-color: var(--color-primary);
   box-shadow: 0 2px 6px rgba(3, 105, 161, 0.2);
+}
+
+/* Share button (spot row + region header) */
+.bf-share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 180ms ease;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+
+.bf-share-btn:hover,
+.bf-share-btn:focus-visible {
+  background: #25D366;
+  border-color: #25D366;
+  color: #fff;
+  outline: none;
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.35);
+}
+
+.bf-share-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.bf-share-btn--region {
+  margin-left: auto;
 }
 
 /* ── Spot Details (expanded) ─────────────────────────────── */

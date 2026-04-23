@@ -574,11 +574,20 @@
     const name = (meta && meta.region_name) || group.region_name || (group.region_id === "unknown" ? "Weitere Spots" : group.region_id);
     const rating = meta ? formatRating(meta.rating) : "";
     const spotsHtml = group.spots.map(renderSpotRow).join("");
+    const shareBtn = group.region_id && group.region_id !== "unknown"
+      ? `<button type="button" class="bf-share-btn bf-share-btn--region"
+                 data-share-kind="region"
+                 data-share-region="${escapeHtml(group.region_id)}"
+                 data-share-region-name="${escapeHtml(name)}"
+                 data-share-rating="${rating}"
+                 title="Region teilen" aria-label="Region teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`
+      : "";
     return `
       <div class="bf-region">
         <div class="bf-region-head">
           <span class="bf-region-name">${escapeHtml(name)}</span>
           ${rating ? `<span class="bf-region-rating">${rating}</span>` : ""}
+          ${shareBtn}
         </div>
         <ul class="bf-spot-list">${spotsHtml}</ul>
       </div>
@@ -626,6 +635,14 @@
       ? `<div class="bf-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-quality="${escapeHtml(spot.fly_status || "")}"></div>`
       : `<div class="bf-spot-minimap bf-spot-minimap--nodata">Keine Koordinaten</div>`;
 
+    const ratingStr = formatRating(spot.rating);
+    const shareBtn = `<button type="button" class="bf-share-btn bf-share-btn--spot"
+             data-share-kind="spot"
+             data-share-region="${escapeHtml(spot.region_id || "")}"
+             data-share-region-name="${escapeHtml(spot.region_name || "")}"
+             data-share-spot="${escapeHtml(spot.spot)}"
+             data-share-rating="${ratingStr}"
+             title="Startplatz teilen" aria-label="Startplatz teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`;
     return `
       <li class="bf-spot ${tier}">
         <div class="bf-spot-toggle" role="button" tabindex="0" aria-expanded="false">
@@ -633,7 +650,8 @@
             <span class="bf-spot-name">${escapeHtml(spot.spot)}</span>
             <span class="bf-spot-spacer"></span>
             <a class="bf-spot-map-link" href="${escapeHtml(mapHref)}" title="Karte">📍</a>
-            <span class="bf-spot-rating">${formatRating(spot.rating)}</span>
+            ${shareBtn}
+            <span class="bf-spot-rating">${ratingStr}</span>
             <span class="bf-spot-chevron" aria-hidden="true">▾</span>
           </div>
           ${statusBar}
@@ -761,6 +779,7 @@
   // ── Spot Toggle (expand/collapse) ───────────────────────────
 
   function handleSpotToggle(ev) {
+    if (ev.target.closest(".bf-share-btn")) return;
     if (ev.target.closest(".bf-spot-map-link")) return;
     if (ev.target.closest(".bf-spot-minimap")) return;
     if (ev.target.closest(".bf-spot-meteogram")) return;
@@ -796,6 +815,38 @@
     if (!toggle || toggle !== ev.target) return;
     ev.preventDefault();
     handleSpotToggle(ev);
+  }
+
+  function handleShareClick(ev) {
+    const btn = ev.target.closest(".bf-share-btn");
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const kind = btn.dataset.shareKind;
+    const regionId = btn.dataset.shareRegion || "";
+    const regionName = btn.dataset.shareRegionName || "";
+    const spotName = btn.dataset.shareSpot || "";
+    const rating = btn.dataset.shareRating || "";
+    const dayIdx = state.selectedDayIdx || 0;
+    let title, text;
+    if (kind === "spot") {
+      const rtxt = rating && rating !== "—" ? ` — Rating ${rating}/10` : "";
+      title = `${spotName}${rtxt}`;
+      text = `${spotName}${regionName ? " (" + regionName + ")" : ""}${rtxt} · Gleitcast Flugwetter`;
+    } else {
+      const rtxt = rating && rating !== "—" ? ` — Rating ${rating}/10` : "";
+      title = `${regionName || "Region"}${rtxt}`;
+      text = `${regionName || "Region"}${rtxt} · Gleitcast Flugwetter`;
+    }
+    if (typeof window.gleitcastShare === "function") {
+      window.gleitcastShare({
+        region_id: regionId,
+        day_idx: dayIdx,
+        spot: kind === "spot" ? spotName : undefined,
+        title: title,
+        text: text,
+      });
+    }
   }
 
   // ── Mini Map ────────────────────────────────────────────────
@@ -1113,6 +1164,7 @@
     if (contentEl) {
       contentEl.addEventListener("click", handleSpotToggle);
       contentEl.addEventListener("keydown", handleSpotKeydown);
+      contentEl.addEventListener("click", handleShareClick);
     }
 
     loadBriefing();

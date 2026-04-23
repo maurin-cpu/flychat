@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time as time_mod
 from datetime import datetime, time, timedelta
 from typing import Optional, Tuple
@@ -32,6 +33,16 @@ from typing import Optional, Tuple
 import config
 
 logger = logging.getLogger(__name__)
+
+# Signal zum sofortigen Neu-Berechnen des naechsten Slots (z.B. nach Admin-Config-Save).
+_wake_event = threading.Event()
+
+
+def notify_config_changed() -> None:
+    """Signalisiert dem Scheduler-Thread, dass sich DAILY_RUN_* geaendert hat.
+    Der Thread wacht aus seinem Sleep auf und rechnet den naechsten Slot neu."""
+    _wake_event.set()
+
 
 # Monats-Accuracy-Mail: 1. des Monats um 07:00
 ACCURACY_HOUR = 7
@@ -246,7 +257,11 @@ def briefing_scheduler(engine) -> None:
                         wait_seconds / 3600)
 
         first_iter = False
-        time_mod.sleep(max(1, wait_seconds))
+        woke_early = _wake_event.wait(timeout=max(1, wait_seconds))
+        _wake_event.clear()
+        if woke_early:
+            logger.info("Scheduler: Config-Aenderung signalisiert — rechne naechsten Slot neu")
+            continue  # kein Job ausfuehren, zurueck zum Anfang und Slot neu berechnen
 
         try:
             with flask_app.app_context(), flask_app.test_request_context():

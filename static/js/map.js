@@ -16,6 +16,7 @@
     var ratingBadgeEl = document.getElementById('meteogramRatingBadge');
     var ratingValueEl = document.getElementById('meteogramRatingValue');
     var closeBtn = document.getElementById('meteogramClose');
+    var shareBtn = document.getElementById('meteogramShare');
     var tooltipEl = document.getElementById('tooltip');
     var currentView = 'meteogram';  // 'meteogram' or 'text' (analyse is permanent aside)
     var asideEl = document.getElementById('meteogramAside');
@@ -54,6 +55,8 @@
     var currentDates = [];
     var currentDateIdx = 0;
     var currentSpotName = '';
+    var currentSpotProps = null;
+    var currentSpotRating = null;
     var markersByName = {}; // Store marker references
     var currentRefLayer = null; // Store reference points overlay
     var _iconUid = 0; // Unique ID counter for SVG defs
@@ -482,6 +485,7 @@
         if (!ratingBadgeEl || !ratingValueEl) return;
         var rating = analysis && analysis.rating;
         var r = (rating === null || rating === undefined) ? NaN : Number(rating);
+        currentSpotRating = isFinite(r) && r > 0 ? r : null;
         var safetyStatus = (analysis && analysis.safety_status) || '';
         var flyStatus = (analysis && analysis.fly_status) || '';
         var isCond = !!(analysis && analysis.is_conditional);
@@ -539,6 +543,8 @@
     // ===== METEOGRAM OVERLAY =====
     function openMeteogram(spotName, props) {
         currentSpotName = spotName;
+        currentSpotProps = props || null;
+        currentSpotRating = null;
         currentWindModel = 'default';
         if (modelToggleEl) {
             modelToggleEl.style.display = 'none';
@@ -799,6 +805,27 @@
 
     // ===== EVENT LISTENERS =====
     closeBtn.addEventListener('click', closeMeteogram);
+
+    if (shareBtn) {
+        shareBtn.addEventListener('click', function () {
+            if (!currentSpotName || typeof window.gleitcastShare !== 'function') return;
+            var regionId = (currentSpotProps && currentSpotProps.region_id) || '';
+            var regionName = (currentSpotProps && currentSpotProps.region) || '';
+            var rText = currentSpotRating != null ? ' — Rating ' + currentSpotRating.toFixed(1) + '/10' : '';
+            var dayIdx = 0;
+            if (window.currentDate && currentDates && currentDates.length) {
+                var idx = currentDates.indexOf(window.currentDate);
+                if (idx >= 0) dayIdx = idx;
+            }
+            window.gleitcastShare({
+                region_id: regionId,
+                day_idx: dayIdx,
+                spot: currentSpotName,
+                title: currentSpotName + rText,
+                text: currentSpotName + (regionName ? ' (' + regionName + ')' : '') + rText + ' · Gleitcast Flugwetter',
+            });
+        });
+    }
 
     overlay.addEventListener('click', function (e) {
         if (e.target === overlay) closeMeteogram();

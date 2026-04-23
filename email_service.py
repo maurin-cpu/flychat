@@ -582,12 +582,29 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             s["url"] = (f"{base}/briefing?regions={s['region_id']}"
                         f"&day={day_idx}&spot={spot_q}")
 
+    # WhatsApp-Share: kurzer Text + Deep-Link. wa.me/?text=<URL-encoded>
+    # Der Deep-Link enthaelt schon die Subscriber-Regionen + besten Tag,
+    # Empfaenger landet gefiltert. Rich-Preview kommt per OG-Tags auf /briefing.
+    if verdict:
+        share_msg = f"{verdict['headline']} — Gleitcast-Briefing KW{today.isocalendar().week}:"
+    else:
+        share_msg = f"Mein Gleitcast-Briefing für KW{today.isocalendar().week}:"
+    share_payload = f"{share_msg}\n{deep_link}"
+    share = {
+        "url":          deep_link,
+        "text":         share_msg,
+        "whatsapp":     f"https://wa.me/?text={quote(share_payload, safe='')}",
+        "telegram":     f"https://t.me/share/url?url={quote(deep_link, safe='')}&text={quote(share_msg, safe='')}",
+        "mailto":       f"mailto:?subject={quote('Gleitcast Briefing KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
+    }
+
     return {
         "subscriber_email": subscriber.get("email", ""),
         "days": days_out,
         "verdict": verdict,
         "best_day_idx": best_day_idx,
         "urls": urls,
+        "share": share,
         "warnings": warnings,
         "briefing_date": today.strftime("%d.%m.%Y"),
         "briefing_weekday": _WEEKDAY_DE_LONG[today.weekday()],

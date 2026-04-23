@@ -15,9 +15,13 @@ window.FoehnDiagram = (function () {
 
     // Layout: generous gaps so panels never overlap
     // bottom margin includes space for the date labels under day-start ticks
-    var MARGIN = { top: 44, right: 40, bottom: 46, left: 56 };
-    // Gap between panels must fit: x-axis labels (~22px) + day-labels (~16px) + title (~16px) + padding
-    var PANEL_GAP = 64;
+    function isMobile() {
+        return typeof window !== 'undefined' && window.innerWidth < 640;
+    }
+    var MARGIN_DESKTOP = { top: 44, right: 40, bottom: 46, left: 56 };
+    // Mobile: bigger top so the in-chart panel title has breathing room;
+    // left wide enough for "+10 hPa" tick labels at 9px; right wide enough for legend pill
+    var MARGIN_MOBILE  = { top: 38, right: 12, bottom: 42, left: 48 };
     var DAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
     // Crest-wind thresholds (from foehn_indicators.py)
@@ -84,7 +88,8 @@ window.FoehnDiagram = (function () {
     }
 
     // --- Helper: draw day separators + day labels on a panel group ---
-    function drawDaySeparators(g, panelH, x, dayBoundaries, innerW) {
+    // On mobile, date labels are only at the bottom x-axis (avoids duplicates).
+    function drawDaySeparators(g, panelH, x, dayBoundaries, innerW, mobile) {
         dayBoundaries.forEach(function (db, i) {
             var bx = x(db.dt);
             if (i > 0) {
@@ -95,6 +100,7 @@ window.FoehnDiagram = (function () {
                     .attr('stroke-width', 1)
                     .attr('stroke-dasharray', '6,3');
             }
+            if (mobile) return;  // skip top date labels on mobile
             var nextBx = (i < dayBoundaries.length - 1) ? x(dayBoundaries[i + 1].dt) : innerW;
             var labelX = bx + (nextBx - bx) / 2;
             g.append('text')
@@ -108,8 +114,10 @@ window.FoehnDiagram = (function () {
 
     // --- Helper: draw x-axis at bottom of a panel ---
     // Day-start ticks additionally get a date label (e.g. "Di 8.4.") below the hour.
-    function drawXAxis(g, panelH, x) {
-        var ticks = x.ticks(d3.timeHour.every(6));
+    function drawXAxis(g, panelH, x, mobile) {
+        // Mobile: every 12h (0h/12h only) — avoids label overlap on narrow viewports
+        var everyHours = mobile ? 12 : 6;
+        var ticks = x.ticks(d3.timeHour.every(everyHours));
         var daysSeen = {};
         var dayStartTickTimes = {};
         ticks.forEach(function (t) {
@@ -128,17 +136,23 @@ window.FoehnDiagram = (function () {
             .attr('transform', 'translate(0,' + panelH + ')')
             .call(axis);
 
+        if (mobile) {
+            axisG.selectAll('text').attr('font-size', '9px');
+        }
+
         // Append a date label under the hour label for the first tick of each day.
         axisG.selectAll('.tick').each(function (d) {
             if (!dayStartTickTimes[d.getTime()]) return;
             d3.select(this).append('text')
-                .attr('y', 22)
+                .attr('y', mobile ? 18 : 22)
                 .attr('dy', '0.71em')
                 .attr('text-anchor', 'middle')
-                .attr('font-size', '10px')
+                .attr('font-size', mobile ? '9px' : '10px')
                 .attr('font-weight', '600')
                 .attr('fill', 'rgba(255,255,255,0.75)')
-                .text(DAY_NAMES[d.getDay()] + ' ' + d.getDate() + '.' + (d.getMonth() + 1) + '.');
+                .text(mobile
+                    ? DAY_NAMES[d.getDay()] + ' ' + d.getDate() + '.'
+                    : DAY_NAMES[d.getDay()] + ' ' + d.getDate() + '.' + (d.getMonth() + 1) + '.');
         });
     }
 
@@ -158,23 +172,37 @@ window.FoehnDiagram = (function () {
         // Parse times
         allData.forEach(function (d) { d._dt = new Date(d.time); });
 
-        // Dimensions
-        var panelWidth = container.clientWidth || 900;
+        // Dimensions — recompute mobile flag per render so rotation/resize works
+        var mobile = isMobile();
+        var MARGIN = mobile ? MARGIN_MOBILE : MARGIN_DESKTOP;
+        // Mobile gap: must fit hour label (~11px) + day label (~13px) + title (~14px) + padding
+        var PANEL_GAP = mobile ? 56 : 64;
+
+        var viewportW = (typeof window !== 'undefined' && window.innerWidth) || 900;
+        var panelWidth = container.clientWidth;
+        if (!panelWidth || panelWidth < 50) panelWidth = viewportW - (mobile ? 24 : 80);
         var nHours = allData.length;
-        var minPxPerHour = 10;
-        var chartW = Math.max(panelWidth, MARGIN.left + MARGIN.right + nHours * minPxPerHour);
+        // On mobile: strictly fit the viewport (no horizontal scroll).
+        // On desktop: enforce min pixel density for readability.
+        var chartW = mobile
+            ? Math.min(panelWidth, viewportW)
+            : Math.max(panelWidth, MARGIN.left + MARGIN.right + nHours * 10);
         var innerW = chartW - MARGIN.left - MARGIN.right;
 
-        var P1_H = 200;  // Delta-P
-        var P2_H = 120;  // Crest wind
-        var P3_H = 100;  // Humidity
+        // Mobile: more generous panel heights so charts aren't squished
+        var P1_H = mobile ? 160 : 200;  // Delta-P
+        var P2_H = mobile ? 95  : 120;  // Crest wind
+        var P3_H = mobile ? 80  : 100;  // Humidity
         var totalH = MARGIN.top + P1_H + PANEL_GAP + P2_H + PANEL_GAP + P3_H + MARGIN.bottom;
 
         var svg = d3.select(container)
             .append('svg')
             .attr('width', chartW)
             .attr('height', totalH)
-            .style('display', 'block');
+            .attr('viewBox', '0 0 ' + chartW + ' ' + totalH)
+            .attr('preserveAspectRatio', 'xMidYMid meet')
+            .style('display', 'block')
+            .style('max-width', '100%');
 
         // X scale
         var tMin = allData[0]._dt;
@@ -221,11 +249,11 @@ window.FoehnDiagram = (function () {
                 .attr('width', innerW).attr('height', z.y1 - z.y0).attr('fill', z.fill);
         });
 
-        // Threshold lines with labels
-        drawThreshold(g1, innerW, yDp, TH_DANGER, '#EF4444', 'Gefahr +' + TH_DANGER + ' hPa', 'right');
-        drawThreshold(g1, innerW, yDp, TH_CAUTION, '#F59E0B', 'Vorsicht +' + TH_CAUTION + ' hPa', 'right');
-        drawThreshold(g1, innerW, yDp, -TH_CAUTION, '#F59E0B', 'Vorsicht \u2212' + TH_CAUTION + ' hPa', 'right');
-        drawThreshold(g1, innerW, yDp, -TH_DANGER, '#EF4444', 'Gefahr \u2212' + TH_DANGER + ' hPa', 'right');
+        // Threshold lines (labels hidden on mobile — panel is too narrow; zones convey intent)
+        drawThreshold(g1, innerW, yDp, TH_DANGER, '#EF4444', mobile ? null : 'Gefahr +' + TH_DANGER + ' hPa', 'right');
+        drawThreshold(g1, innerW, yDp, TH_CAUTION, '#F59E0B', mobile ? null : 'Vorsicht +' + TH_CAUTION + ' hPa', 'right');
+        drawThreshold(g1, innerW, yDp, -TH_CAUTION, '#F59E0B', mobile ? null : 'Vorsicht \u2212' + TH_CAUTION + ' hPa', 'right');
+        drawThreshold(g1, innerW, yDp, -TH_DANGER, '#EF4444', mobile ? null : 'Gefahr \u2212' + TH_DANGER + ' hPa', 'right');
 
         // Zero line
         g1.append('line').attr('x1', 0).attr('x2', innerW)
@@ -262,23 +290,34 @@ window.FoehnDiagram = (function () {
             .attr('fill', 'none').attr('stroke', '#F1F5F9').attr('stroke-width', 2);
 
         // Y axis
-        g1.append('g').attr('class', 'foehn-axis')
-            .call(d3.axisLeft(yDp).ticks(6).tickFormat(function (v) { return v + ' hPa'; }));
-        drawXAxis(g1, P1_H, x);
-        drawDaySeparators(g1, P1_H, x, dayBoundaries, innerW);
+        var y1Axis = d3.axisLeft(yDp).ticks(mobile ? 4 : 6).tickFormat(function (v) { return v + ' hPa'; });
+        var y1AxisG = g1.append('g').attr('class', 'foehn-axis').call(y1Axis);
+        if (mobile) y1AxisG.selectAll('text').attr('font-size', '9px');
+        drawXAxis(g1, P1_H, x, mobile);
+        drawDaySeparators(g1, P1_H, x, dayBoundaries, innerW, mobile);
 
-        // Panel title
-        g1.append('text').attr('class', 'foehn-axis-label')
-            .attr('x', -MARGIN.left + 8).attr('y', -20)
-            .text('Druckdifferenz (S\u00fcd \u2212 Nord)');
-
-        // Legend
-        g1.append('text').attr('x', 4).attr('y', yDp(dpMax * 0.9) + 4)
-            .attr('font-size', '10px').attr('fill', '#EF4444').attr('opacity', 0.7)
-            .text('\u2191 S\u00fcdf\u00f6hn');
-        g1.append('text').attr('x', 4).attr('y', yDp(-dpMax * 0.9))
-            .attr('font-size', '10px').attr('fill', '#3B82F6').attr('opacity', 0.7)
-            .text('\u2193 Nordf\u00f6hn');
+        // Panel title — mobile: centered above chart, shorter label; desktop: in left margin
+        if (mobile) {
+            // Colored inline title acts as its own legend: ↑ Süd (red) − ↓ Nord (blue)
+            var titleM = g1.append('text').attr('class', 'foehn-axis-label')
+                .attr('x', innerW / 2).attr('y', -12)
+                .attr('text-anchor', 'middle').attr('font-size', '11px');
+            titleM.append('tspan').attr('fill', '#EF4444').attr('font-weight', '700').text('\u2191 S\u00fcd');
+            titleM.append('tspan').text(' \u2212 ');
+            titleM.append('tspan').attr('fill', '#3B82F6').attr('font-weight', '700').text('\u2193 Nord');
+            titleM.append('tspan').text(' (hPa)');
+        } else {
+            g1.append('text').attr('class', 'foehn-axis-label')
+                .attr('x', -MARGIN.left + 8).attr('y', -20)
+                .text('Druckdifferenz (S\u00fcd \u2212 Nord)');
+            // Legend (desktop: inside panel, top-left)
+            g1.append('text').attr('x', 4).attr('y', yDp(dpMax * 0.9) + 4)
+                .attr('font-size', '10px').attr('fill', '#EF4444').attr('opacity', 0.7)
+                .text('\u2191 S\u00fcdf\u00f6hn');
+            g1.append('text').attr('x', 4).attr('y', yDp(-dpMax * 0.9))
+                .attr('font-size', '10px').attr('fill', '#3B82F6').attr('opacity', 0.7)
+                .text('\u2193 Nordf\u00f6hn');
+        }
 
         // ================================================================
         // PANEL 2: Crest Wind 700 hPa
@@ -298,7 +337,7 @@ window.FoehnDiagram = (function () {
         });
 
         // Crest wind threshold
-        drawThreshold(g2, innerW, yCw, TH_CREST_CAUTION, '#F59E0B', 'Vorsicht ' + TH_CREST_CAUTION + ' km/h', 'right');
+        drawThreshold(g2, innerW, yCw, TH_CREST_CAUTION, '#F59E0B', mobile ? null : 'Vorsicht ' + TH_CREST_CAUTION + ' km/h', 'right');
 
         // Bars
         allData.filter(function (d) { return d.crest_wind_kmh != null; }).forEach(function (d) {
@@ -311,14 +350,22 @@ window.FoehnDiagram = (function () {
                 .attr('rx', 1).attr('opacity', 0.8);
         });
 
-        g2.append('g').attr('class', 'foehn-axis')
-            .call(d3.axisLeft(yCw).ticks(4).tickFormat(function (v) { return v + ' km/h'; }));
-        drawXAxis(g2, P2_H, x);
-        drawDaySeparators(g2, P2_H, x, dayBoundaries, innerW);
+        var y2Axis = d3.axisLeft(yCw).ticks(mobile ? 3 : 4).tickFormat(function (v) { return v + ' km/h'; });
+        var y2AxisG = g2.append('g').attr('class', 'foehn-axis').call(y2Axis);
+        if (mobile) y2AxisG.selectAll('text').attr('font-size', '9px');
+        drawXAxis(g2, P2_H, x, mobile);
+        drawDaySeparators(g2, P2_H, x, dayBoundaries, innerW, mobile);
 
-        g2.append('text').attr('class', 'foehn-axis-label')
-            .attr('x', -MARGIN.left + 8).attr('y', -20)
-            .text('Kammwind 700 hPa (\u2248 3000m)');
+        if (mobile) {
+            g2.append('text').attr('class', 'foehn-axis-label')
+                .attr('x', innerW / 2).attr('y', -12)
+                .attr('text-anchor', 'middle').attr('font-size', '11px')
+                .text('Kammwind 700 hPa (km/h)');
+        } else {
+            g2.append('text').attr('class', 'foehn-axis-label')
+                .attr('x', -MARGIN.left + 8).attr('y', -20)
+                .text('Kammwind 700 hPa (\u2248 3000m)');
+        }
 
         // ================================================================
         // PANEL 3: Humidity Nord
@@ -334,7 +381,7 @@ window.FoehnDiagram = (function () {
             .attr('fill', 'rgba(245, 158, 11, 0.06)');
 
         // Threshold with label
-        drawThreshold(g3, innerW, yRh, TH_HUMIDITY, '#F59E0B', 'F\u00f6hn trocken <' + TH_HUMIDITY + '%', 'right');
+        drawThreshold(g3, innerW, yRh, TH_HUMIDITY, '#F59E0B', mobile ? null : 'F\u00f6hn trocken <' + TH_HUMIDITY + '%', 'right');
 
         // Line
         g3.append('path').datum(allData)
@@ -345,14 +392,22 @@ window.FoehnDiagram = (function () {
                 .curve(d3.curveMonotoneX))
             .attr('fill', 'none').attr('stroke', '#38BDF8').attr('stroke-width', 2);
 
-        g3.append('g').attr('class', 'foehn-axis')
-            .call(d3.axisLeft(yRh).ticks(4).tickFormat(function (v) { return v + '%'; }));
-        drawXAxis(g3, P3_H, x);
-        drawDaySeparators(g3, P3_H, x, dayBoundaries, innerW);
+        var y3Axis = d3.axisLeft(yRh).ticks(mobile ? 3 : 4).tickFormat(function (v) { return v + '%'; });
+        var y3AxisG = g3.append('g').attr('class', 'foehn-axis').call(y3Axis);
+        if (mobile) y3AxisG.selectAll('text').attr('font-size', '9px');
+        drawXAxis(g3, P3_H, x, mobile);
+        drawDaySeparators(g3, P3_H, x, dayBoundaries, innerW, mobile);
 
-        g3.append('text').attr('class', 'foehn-axis-label')
-            .attr('x', -MARGIN.left + 8).attr('y', -20)
-            .text('Luftfeuchtigkeit Z\u00fcrich');
+        if (mobile) {
+            g3.append('text').attr('class', 'foehn-axis-label')
+                .attr('x', innerW / 2).attr('y', -12)
+                .attr('text-anchor', 'middle').attr('font-size', '11px')
+                .text('Luftfeuchtigkeit Z\u00fcrich (%)');
+        } else {
+            g3.append('text').attr('class', 'foehn-axis-label')
+                .attr('x', -MARGIN.left + 8).attr('y', -20)
+                .text('Luftfeuchtigkeit Z\u00fcrich');
+        }
 
         // ================================================================
         // CROSSHAIR + TOOLTIP
@@ -415,6 +470,7 @@ window.FoehnDiagram = (function () {
                 crossV.style('opacity', 0);
                 tooltipEl.classList.remove('visible');
             });
+
     }
 
     return { renderChart: renderChart };

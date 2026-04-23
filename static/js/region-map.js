@@ -821,6 +821,28 @@
 
     // ===== EVENT LISTENERS =====
     if (overlayClose) overlayClose.addEventListener('click', closeRegionOverlay);
+
+    var overlayShare = document.getElementById('regionOverlayShare');
+    if (overlayShare) {
+        overlayShare.addEventListener('click', function () {
+            if (!overlayRid || typeof window.gleitcastShare !== 'function') return;
+            var regionName = (meteogramCache[overlayRid] && meteogramCache[overlayRid].regionName) || overlayRid;
+            var dateStr = regionActiveDate[overlayRid] || currentDate || window.currentDate;
+            var dayIdx = 0;
+            if (dateStr) {
+                var now = new Date();
+                var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                var target = new Date(dateStr + 'T12:00:00');
+                dayIdx = Math.max(0, Math.round((target - today) / 86400000));
+            }
+            window.gleitcastShare({
+                region_id: overlayRid,
+                day_idx: dayIdx,
+                title: regionName + ' · Gleitcast',
+                text: regionName + ' · Gleitcast Flugwetter',
+            });
+        });
+    }
     if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) closeRegionOverlay(); });
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && overlay && overlay.classList.contains('visible')) closeRegionOverlay();

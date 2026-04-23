@@ -4,7 +4,26 @@ Lädt Fluggebiete aus CSV und stellt Such-/Filterfunktionen bereit.
 """
 
 import csv
+import re
 from config import CSV_PATH
+
+
+_URL_UNSAFE_CHARS = re.compile(r"[\\/?#]+")
+
+
+def sanitize_spot_name(name: str) -> str:
+    """Entfernt URL-gefährliche Zeichen aus Spot-Namen.
+
+    Flask-Routen mit `<string:name>` matchen keine Pfad-Separatoren — ein `/`
+    im Spot-Namen (z.B. DHV-Import "Oberrieden Start-/Landeplatz") liefert
+    sonst Werkzeugs HTML-404 statt unseres JSON-Handlers.
+    """
+    if not name:
+        return name
+    cleaned = _URL_UNSAFE_CHARS.sub("-", name)
+    while "--" in cleaned:
+        cleaned = cleaned.replace("--", "-")
+    return cleaned.strip(" -") or name.strip()
 
 
 def load_spots(csv_path=None):
@@ -27,7 +46,7 @@ def load_spots(csv_path=None):
         spots.append({
             "region": row["region"].strip(),
             "fluggebiet": row["fluggebiet"].strip(),
-            "name": row["site_name"].strip(),
+            "name": sanitize_spot_name(row["site_name"].strip()),
             "latitude": float(row["latitude"]),
             "longitude": float(row["longitude"]),
             "elevation_m": int(float(row["elevation_m"])),

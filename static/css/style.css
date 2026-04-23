@@ -270,14 +270,22 @@ body.page-fixed-nav {
 
 .floating-day-tabs {
     top: var(--space-4);
-    left: var(--space-4);
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     gap: 2px;
     padding: 3px;
     border-radius: 10px;
-    max-width: calc(100vw - 200px);
+    max-width: calc(100% - 120px);
     overflow-x: auto;
 }
+
+/* Desktop: inline day-name + date (single row per button) */
+.floating-day-tabs .navbar-day-btn .day-name,
+.floating-day-tabs .navbar-day-btn .day-date {
+    display: inline;
+}
+.floating-day-tabs .navbar-day-btn .day-date::before { content: ' '; }
 
 .floating-day-tab {
     padding: 6px 14px;
@@ -492,6 +500,7 @@ body.page-fixed-nav {
 .chat-messages {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     scroll-behavior: smooth;
@@ -1022,6 +1031,32 @@ body.page-fixed-nav {
     border-color: var(--color-border-hover);
 }
 
+.meteogram-share {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    padding: 0;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.meteogram-share:hover,
+.meteogram-share:focus-visible {
+    background: #25D366;
+    border-color: #25D366;
+    color: #fff;
+    outline: none;
+    box-shadow: 0 2px 6px rgba(37, 211, 102, 0.35);
+}
+
 .meteogram-tabs {
     display: flex;
     gap: 4px;
@@ -1060,6 +1095,17 @@ body.page-fixed-nav {
     padding: 20px;
     min-height: 0;
     min-width: 0;
+}
+
+/* Föhn diagram should never horizontally scroll on mobile — chart scales to fit */
+@media (max-width: 639px) {
+    #foehnChart {
+        overflow-x: hidden;
+    }
+    #foehnChart svg {
+        max-width: 100%;
+        height: auto;
+    }
 }
 
 /* ===== METEOGRAM BODY: chart + analysis aside (responsive) ===== */
@@ -1430,18 +1476,45 @@ body.page-fixed-nav {
     }
 }
 
-/* Day tabs scroll fade indicators */
-.floating-day-tabs {
-    position: relative;
-}
-
+/* Mobile: day tabs at the bottom-center (thumb-reach), above the bottom nav,
+   two-line square buttons, no horizontal scroll */
 @media (max-width: 639px) {
     .floating-day-tabs {
-        -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
-        mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
-        padding-left: 8px;
-        padding-right: 8px;
+        top: auto;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        bottom: calc(var(--space-4) + 60px + env(safe-area-inset-bottom, 0px));
+        gap: 4px;
+        padding: 4px;
+        border-radius: 12px;
+        max-width: calc(100vw - 16px);
+        overflow-x: visible;
     }
+    .floating-day-tabs .navbar-day-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        padding: 6px 6px;
+        min-width: 46px;
+        line-height: 1.15;
+        border-radius: 8px;
+    }
+    .floating-day-tabs .navbar-day-btn .day-name {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+    }
+    .floating-day-tabs .navbar-day-btn .day-date {
+        display: block;
+        font-size: 10px;
+        opacity: 0.85;
+        font-variant-numeric: tabular-nums;
+    }
+    .floating-day-tabs .navbar-day-btn .day-date::before { content: none; }
 }
 
 /* Meteogram tabs scroll fade on mobile */

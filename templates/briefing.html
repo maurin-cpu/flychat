@@ -1,6 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Flugwetter – Gleitcast{% endblock %}
+{% block title %}{% if og and og.title %}{{ og.title }}{% else %}Flugwetter – Gleitcast{% endif %}{% endblock %}
+
+{% block meta %}
+<meta property="og:site_name" content="Gleitcast">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ og.title if og else 'Gleitcast – Flugwetter' }}">
+<meta property="og:description" content="{{ og.description if og else 'Präzise Thermik- und Wind-Prognose für die Schweizer Berge.' }}">
+<meta property="og:url" content="{{ og.url if og else request.url }}">
+<meta property="og:image" content="{{ og.image if og else (request.url_root.rstrip('/') + '/og-image/briefing.png') }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:locale" content="de_CH">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="{{ og.description if og else 'Präzise Thermik- und Wind-Prognose für die Schweizer Berge.' }}">
+{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />

@@ -155,10 +155,9 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
              "help": "HTTP-Timeout fuer Open-Meteo Requests."},
         ],
         "Briefing-Scheduler": [
-            {"key": "DAILY_RUN_HOUR", "type": "int", "min": 0, "max": 23, "unit": "h",
-             "help": "Uhrzeit (Stunde) fuer den taeglichen Refresh + Briefing-Versand."},
-            {"key": "DAILY_RUN_MINUTE", "type": "int", "min": 0, "max": 59, "unit": "min",
-             "help": "Uhrzeit (Minute) fuer den taeglichen Refresh."},
+            {"key": "DAILY_RUN_TIME", "type": "time",
+             "composed_from": ["DAILY_RUN_HOUR", "DAILY_RUN_MINUTE"],
+             "help": "Exakte Uhrzeit (HH:MM) an der der taegliche Refresh + Briefing-Versand startet."},
             {"key": "DAILY_RUN_WEEKDAYS", "type": "weekdays",
              "help": "Wochentage, an denen der Daily-Run laeuft. 0=Mo, 6=So."},
         ],
@@ -202,7 +201,12 @@ def get_overrides() -> dict[str, Any]:
 
 
 def _coerce(value: Any, field: dict) -> Any:
-    """Konvertiert Form-String in Ziel-Typ. ValueError bei ungueltigen Werten."""
+    """Konvertiert Form-String in Ziel-Typ. ValueError bei ungueltigen Werten.
+
+    Fuer type='time' wird die Rueckgabe ein Tupel (hour, minute). Die Aufloesung
+    auf die zugrundeliegenden Config-Keys (DAILY_RUN_HOUR, DAILY_RUN_MINUTE)
+    erfolgt in apply_overrides() und save_overrides().
+    """
     t = field["type"]
     if t == "bool":
         if isinstance(value, bool):
@@ -226,11 +230,25 @@ def _coerce(value: Any, field: dict) -> Any:
         else:
             items = [x.strip() for x in str(value).split(",") if x.strip() != ""]
         return set(int(x) for x in items if 0 <= int(x) <= 6)
+    if t == "time":
+        # Erwartet "HH:MM" String; Rueckgabe (hour, minute) Tupel
+        sval = str(value).strip()
+        if ":" not in sval:
+            raise ValueError(f"Ungueltiges Zeitformat fuer {field['key']}: {sval!r} (erwartet HH:MM)")
+        h_str, m_str = sval.split(":", 1)
+        h, m = int(h_str), int(m_str)
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            raise ValueError(f"Zeit ausserhalb 00:00-23:59: {sval!r}")
+        return (h, m)
     raise ValueError(f"Unbekannter Typ: {t}")
 
 
 def apply_overrides(overrides: dict[str, Any] | None = None) -> list[str]:
-    """Setzt Overlay-Werte auf das config-Modul. Gibt Liste angewandter Keys zurueck."""
+    """Setzt Overlay-Werte auf das config-Modul. Gibt Liste angewandter Keys zurueck.
+
+    Fuer virtuelle composed-Keys (z.B. DAILY_RUN_TIME) werden die
+    zugrundeliegenden Keys (DAILY_RUN_HOUR, DAILY_RUN_MINUTE) gesetzt.
+    """
     if overrides is None:
         overrides = get_overrides()
     schema = _flat_keys()
@@ -239,11 +257,24 @@ def apply_overrides(overrides: dict[str, Any] | None = None) -> list[str]:
         if k not in schema:
             logger.warning("Override-Key '%s' nicht im Schema — ignoriert.", k)
             continue
+        field = schema[k]
         try:
-            coerced = _coerce(v, schema[k])
+            coerced = _coerce(v, field)
         except (TypeError, ValueError) as e:
             logger.warning("Override '%s' konnte nicht konvertiert werden: %s", k, e)
             continue
+
+        # Virtuelles time-Feld: Tupel (h, m) -> zwei Config-Attribute setzen
+        if field["type"] == "time" and "composed_from" in field:
+            sub_keys = field["composed_from"]
+            if len(sub_keys) != 2 or not isinstance(coerced, tuple) or len(coerced) != 2:
+                logger.warning("Ungueltige time-Konfiguration fuer %s", k)
+                continue
+            setattr(config, sub_keys[0], coerced[0])
+            setattr(config, sub_keys[1], coerced[1])
+            applied.append(k)
+            continue
+
         setattr(config, k, coerced)
         applied.append(k)
     if applied:
@@ -275,14 +306,21 @@ def save_overrides(new_values: dict[str, Any]) -> list[str]:
             logger.warning("save_overrides: Wert fuer %s ignoriert: %s", k, e)
             continue
 
-        default_val = getattr(config, k, None)
-        # Weekdays-Set serialisieren fuer Vergleich
-        if field["type"] == "weekdays":
-            coerced_for_json: Any = sorted(coerced)
+        # Virtuelles time-Feld: Vergleich mit aktuellem (HOUR, MINUTE) aus config
+        if field["type"] == "time" and "composed_from" in field:
+            sub_keys = field["composed_from"]
+            coerced_for_json: Any = f"{coerced[0]:02d}:{coerced[1]:02d}"
+            # Default aus _ORIGINAL_DEFAULTS (pre-overlay state)
+            def_h = _ORIGINAL_DEFAULTS.get(sub_keys[0], getattr(config, sub_keys[0], 0))
+            def_m = _ORIGINAL_DEFAULTS.get(sub_keys[1], getattr(config, sub_keys[1], 0))
+            default_for_compare = f"{def_h:02d}:{def_m:02d}"
+        elif field["type"] == "weekdays":
+            coerced_for_json = sorted(coerced)
+            default_val = _ORIGINAL_DEFAULTS.get(k, getattr(config, k, None))
             default_for_compare = sorted(default_val) if default_val else []
         else:
             coerced_for_json = coerced
-            default_for_compare = default_val
+            default_for_compare = _ORIGINAL_DEFAULTS.get(k, getattr(config, k, None))
 
         # Nur speichern wenn abweichend vom Default
         if coerced_for_json == default_for_compare:
@@ -319,14 +357,30 @@ _ORIGINAL_DEFAULTS: dict[str, Any] = {}
 def snapshot_defaults() -> None:
     """Snapshottet Code-Defaults VOR dem ersten apply_overrides.
     Muss EINMAL beim App-Start aufgerufen werden, noch vor apply_overrides().
+
+    Fuer virtuelle composed-Keys werden die zugrundeliegenden Keys
+    gesnapshotet (DAILY_RUN_HOUR/MINUTE, nicht DAILY_RUN_TIME).
     """
     schema = _flat_keys()
-    for k in schema:
-        if hasattr(config, k):
+    for k, field in schema.items():
+        if "composed_from" in field:
+            for sub in field["composed_from"]:
+                if hasattr(config, sub):
+                    _ORIGINAL_DEFAULTS[sub] = getattr(config, sub)
+        elif hasattr(config, k):
             _ORIGINAL_DEFAULTS[k] = getattr(config, k)
 
 
 def _restore_default(key: str) -> None:
+    schema = _flat_keys()
+    field = schema.get(key)
+    # Virtuelle composed-Keys: restaurieren die zugrundeliegenden Keys
+    if field and "composed_from" in field:
+        for sub in field["composed_from"]:
+            if sub in _ORIGINAL_DEFAULTS:
+                setattr(config, sub, _ORIGINAL_DEFAULTS[sub])
+        logger.info("Config-Override '%s' (composed) auf Default zurueckgesetzt.", key)
+        return
     if key in _ORIGINAL_DEFAULTS:
         setattr(config, key, _ORIGINAL_DEFAULTS[key])
         logger.info("Config-Override '%s' auf Default zurueckgesetzt.", key)
@@ -334,13 +388,18 @@ def _restore_default(key: str) -> None:
 
 def current_values() -> dict[str, Any]:
     """Aktuell geltende Werte (Overlay ueber Defaults gemergt).
-    Fuer UI-Befuellung."""
+    Fuer UI-Befuellung. Virtuelle Keys werden aus ihren Sub-Keys komponiert."""
     out: dict[str, Any] = {}
     schema = _flat_keys()
-    for k in schema:
+    for k, field in schema.items():
+        if field["type"] == "time" and "composed_from" in field:
+            sub_keys = field["composed_from"]
+            h = getattr(config, sub_keys[0], 0)
+            m = getattr(config, sub_keys[1], 0)
+            out[k] = f"{int(h):02d}:{int(m):02d}"
+            continue
         val = getattr(config, k, None)
-        # weekdays-Set -> sortierte Liste fuer JSON/HTML
-        if schema[k]["type"] == "weekdays" and isinstance(val, (set, frozenset)):
+        if field["type"] == "weekdays" and isinstance(val, (set, frozenset)):
             val = sorted(val)
         out[k] = val
     return out
@@ -349,7 +408,15 @@ def current_values() -> dict[str, Any]:
 def default_values() -> dict[str, Any]:
     """Code-Defaults (was gilt ohne Overlay). Fuer UI-Hint 'Default: X'."""
     out: dict[str, Any] = {}
-    for k, v in _ORIGINAL_DEFAULTS.items():
+    schema = _flat_keys()
+    for k, field in schema.items():
+        if field["type"] == "time" and "composed_from" in field:
+            sub_keys = field["composed_from"]
+            h = _ORIGINAL_DEFAULTS.get(sub_keys[0], 0)
+            m = _ORIGINAL_DEFAULTS.get(sub_keys[1], 0)
+            out[k] = f"{int(h):02d}:{int(m):02d}"
+            continue
+        v = _ORIGINAL_DEFAULTS.get(k)
         if isinstance(v, (set, frozenset)):
             out[k] = sorted(v)
         else:

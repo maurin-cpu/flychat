@@ -552,7 +552,7 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
 
     def get_spots_geojson(self):
         """Gibt alle Spots als GeoJSON FeatureCollection zurück."""
-        from source_area import get_reference_points
+        from source_area import get_reference_points, find_region_for_point
 
         features = []
         for spot in self.spots:
@@ -565,6 +565,9 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
                     spot_name, spot["latitude"], spot["longitude"], quiet=True
                 )
 
+            region_obj = find_region_for_point(spot["latitude"], spot["longitude"])
+            region_id = region_obj["id"] if region_obj else None
+
             features.append({
                 "type": "Feature",
                 "geometry": {
@@ -574,6 +577,7 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
                 "properties": {
                     "name": spot["name"],
                     "region": spot["region"],
+                    "region_id": region_id,
                     "fluggebiet": spot["fluggebiet"],
                     "elevation_m": spot["elevation_m"],
                     "windrichtung": spot["windrichtung"],

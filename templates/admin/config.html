@@ -53,10 +53,13 @@
 
   /* ── Toolbar (Search + Section Nav) ─────────────────── */
   .cfg-toolbar {
-    position: sticky; top: 0; z-index: 5;
-    background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
-    padding: var(--space-3) 0; margin: 0 0 var(--space-4);
-    border-bottom: 1px solid var(--color-border);
+    position: sticky; top: var(--space-3); z-index: 5;
+    background: rgba(255,255,255,0.96); backdrop-filter: blur(10px);
+    padding: var(--space-3) var(--space-4);
+    margin: 0 0 var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
   }
   .cfg-search {
     position: relative; margin-bottom: var(--space-3);
@@ -205,6 +208,46 @@
   }
   .cfg-input--num { width: 110px; flex: 0 0 auto; }
   .cfg-input--text { flex: 1 1 auto; }
+
+  /* ── Timepicker (Clock Icon + HH : MM Spinner) ────── */
+  .cfg-timepicker {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; flex: 0 0 auto;
+    background: var(--color-surface);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+  .cfg-timepicker:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+  }
+  .cfg-timepicker__icon {
+    color: var(--color-primary); flex-shrink: 0;
+  }
+  .cfg-timepicker__hh,
+  .cfg-timepicker__mm {
+    -moz-appearance: textfield; appearance: textfield;
+    width: 2.2ch; border: 0; outline: 0; background: transparent;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;
+    color: var(--color-text); text-align: center; padding: 0;
+  }
+  .cfg-timepicker__hh::-webkit-outer-spin-button,
+  .cfg-timepicker__hh::-webkit-inner-spin-button,
+  .cfg-timepicker__mm::-webkit-outer-spin-button,
+  .cfg-timepicker__mm::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .cfg-timepicker__sep {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 17px; font-weight: 700; color: var(--color-text-muted);
+    animation: cfgTimeSepBlink 2s ease-in-out infinite;
+  }
+  @keyframes cfgTimeSepBlink {
+    0%, 45%, 100% { opacity: 1; }
+    50%, 95% { opacity: 0.3; }
+  }
   .cfg-unit {
     color: var(--color-text-muted); font-size: 13px; font-weight: 500;
   }
@@ -277,13 +320,19 @@
 
   /* ── Sticky Save Bar ──────────────────────────────── */
   .cfg-savebar {
-    position: sticky; bottom: 0;
+    position: sticky; bottom: var(--space-3);
     background: rgba(255,255,255,0.97); backdrop-filter: blur(12px);
-    border-top: 1.5px solid var(--color-border);
-    padding: var(--space-3) 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-4);
     margin-top: var(--space-6);
     display: flex; align-items: center; gap: var(--space-3);
     z-index: 10;
+    box-shadow: 0 -2px 16px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+    flex-wrap: wrap;
+  }
+  @media (max-width: 520px) {
+    .cfg-savebar__status { flex-basis: 100%; margin-bottom: 4px; }
   }
   .cfg-savebar__status {
     flex: 1; font-size: 13px; font-weight: 500;
@@ -400,6 +449,68 @@
       angezeigt und sind nur via <code>.env</code> konfigurierbar.
     </div>
   </div>
+
+  {# ══════════════════ Manuelle Ausloeser ══════════════════ #}
+  <section class="cfg-section" id="sec-actions">
+    <h2 class="cfg-section__title">
+      Manuelle Ausloeser
+      <span class="cfg-section__badge">Ops</span>
+    </h2>
+    <div class="cfg-group">
+      <p class="cfg-field__help" style="margin-bottom:12px;">
+        Starte Wetterabruf und LLM-Analysen ausserhalb des Schedulers.
+        Laufende Aktionen deaktivieren die anderen Buttons bis zum Abschluss.
+      </p>
+      <div class="cfg-actions-row">
+        <button type="button" id="adminRefreshWeatherBtn"
+                class="sp-btn sp-btn--primary" data-action="refresh-weather">
+          <span class="sp-btn__spinner" aria-hidden="true"></span>
+          <span class="sp-btn__label">Wetter laden</span>
+        </button>
+        <button type="button" id="adminRunAnalysesBtn"
+                class="sp-btn sp-btn--primary" data-action="run-analyses">
+          <span class="sp-btn__spinner" aria-hidden="true"></span>
+          <span class="sp-btn__label">Analyse starten</span>
+        </button>
+        <button type="button" id="adminRunRegionBtn"
+                class="sp-btn sp-btn--primary" data-action="run-region-analyses">
+          <span class="sp-btn__spinner" aria-hidden="true"></span>
+          <span class="sp-btn__label">Analyse Regionen</span>
+        </button>
+      </div>
+      <div class="cfg-actions-status" id="adminActionStatus" role="status" aria-live="polite"></div>
+    </div>
+  </section>
+  <style>
+    .cfg-actions-row {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    }
+    .cfg-actions-row .sp-btn {
+      width: auto; padding: 10px 16px; font-size: 14px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .cfg-actions-row .sp-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+    .cfg-actions-row .sp-btn .sp-btn__spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff;
+      display: none;
+    }
+    .cfg-actions-row .sp-btn.is-loading .sp-btn__spinner {
+      display: inline-block; animation: admin-spin 0.7s linear infinite;
+    }
+    @keyframes admin-spin { to { transform: rotate(360deg); } }
+    .cfg-actions-status {
+      margin-top: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.45;
+      color: var(--color-text-secondary); background: var(--color-bg);
+      border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      min-height: 40px; font-variant-numeric: tabular-nums;
+    }
+    .cfg-actions-status:empty::before {
+      content: "Bereit."; color: var(--color-text-muted);
+    }
+    .cfg-actions-status.is-ok    { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
+    .cfg-actions-status.is-error { color: #7f1d1d; background: #fef2f2; border-color: #fecaca; }
+  </style>
 
   <div class="cfg-toolbar">
     <div class="cfg-search" id="cfgSearch">
@@ -583,6 +694,41 @@
     return first.value;
   }
 
+  // ─── Timepicker-Logik: HH + MM Spinner <-> Hidden Input ──
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function clampInt(v, lo, hi) {
+    v = parseInt(v, 10);
+    if (isNaN(v)) return lo;
+    return Math.max(lo, Math.min(hi, v));
+  }
+  function syncTimepicker(tp) {
+    var hh = clampInt(tp.querySelector('.cfg-timepicker__hh').value, 0, 23);
+    var mm = clampInt(tp.querySelector('.cfg-timepicker__mm').value, 0, 59);
+    tp.querySelector('.cfg-timepicker__hh').value = pad2(hh);
+    tp.querySelector('.cfg-timepicker__mm').value = pad2(mm);
+    var hidden = tp.querySelector('input[type="hidden"]');
+    if (hidden) hidden.value = pad2(hh) + ':' + pad2(mm);
+  }
+  document.querySelectorAll('[data-timepicker]').forEach(function(tp) {
+    var hhEl = tp.querySelector('.cfg-timepicker__hh');
+    var mmEl = tp.querySelector('.cfg-timepicker__mm');
+    // Initial pad + sync
+    syncTimepicker(tp);
+    [hhEl, mmEl].forEach(function(el) {
+      el.addEventListener('input', function() { syncTimepicker(tp); });
+      el.addEventListener('blur', function() { syncTimepicker(tp); });
+      el.addEventListener('wheel', function(e) {
+        // Scrollrad erhoeht/senkt den Wert
+        e.preventDefault();
+        var step = parseInt(el.step || '1', 10) || 1;
+        var cur = parseInt(el.value, 10) || 0;
+        el.value = cur + (e.deltaY < 0 ? step : -step);
+        syncTimepicker(tp);
+        el.dispatchEvent(new Event('input', {bubbles: true}));
+      }, {passive: false});
+    });
+  });
+
   fields.forEach(function(f) {
     initialSnapshot[f.dataset.key] = fieldSignature(f);
   });
@@ -628,6 +774,18 @@
       catch (e) { console.warn('Bad default for', fieldEl.dataset.key); return; }
 
       var key = fieldEl.dataset.key;
+
+      // Timepicker-Sonderfall: HH:MM in Spinner + Hidden setzen
+      var tp = fieldEl.querySelector('[data-timepicker]');
+      if (tp) {
+        var parts = String(defaultVal).split(':');
+        tp.querySelector('.cfg-timepicker__hh').value = parts[0] || '00';
+        tp.querySelector('.cfg-timepicker__mm').value = parts[1] || '00';
+        syncTimepicker(tp);
+        updateDirtyState();
+        return;
+      }
+
       var inputs = fieldEl.querySelectorAll('input[name="' + CSS.escape(key) + '"], select[name="' + CSS.escape(key) + '"]');
       if (!inputs.length) return;
 
@@ -763,6 +921,69 @@
 
   // Init
   updateDirtyState();
+})();
+</script>
+
+<script>
+// ─── Admin Manual Triggers ─────────────────────────────
+(function () {
+  'use strict';
+  var statusEl = document.getElementById('adminActionStatus');
+  var btns = Array.prototype.slice.call(
+    document.querySelectorAll('[data-action]')
+  );
+  if (!statusEl || !btns.length) return;
+
+  var ENDPOINTS = {
+    'refresh-weather':     { url: '/api/refresh-weather',     label: 'Wetter laden' },
+    'run-analyses':        { url: '/api/run-analyses',        label: 'Analyse' },
+    'run-region-analyses': { url: '/api/run-region-analyses', label: 'Analyse Regionen' }
+  };
+
+  function setBusy(activeBtn, busy) {
+    btns.forEach(function (b) {
+      b.disabled = busy;
+      if (b === activeBtn) b.classList.toggle('is-loading', busy);
+      else b.classList.remove('is-loading');
+    });
+  }
+  function setStatus(text, state) {
+    statusEl.textContent = text || '';
+    statusEl.classList.toggle('is-ok',    state === 'ok');
+    statusEl.classList.toggle('is-error', state === 'error');
+  }
+
+  btns.forEach(function (btn) {
+    var cfg = ENDPOINTS[btn.dataset.action];
+    if (!cfg) return;
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      setBusy(btn, true);
+      setStatus(cfg.label + ' laeuft ...', '');
+      var started = Date.now();
+      fetch(cfg.url, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+        .then(function (result) {
+          var d = result.data || {};
+          var secs = ((Date.now() - started) / 1000).toFixed(1);
+          if (d.success === false || (!d.success && !result.ok)) {
+            setStatus(cfg.label + ' fehlgeschlagen: ' + (d.error || ('HTTP ' + result.status)), 'error');
+            return;
+          }
+          var parts = [];
+          if (typeof d.spots_count === 'number')   parts.push(d.spots_count + ' Spots');
+          if (Array.isArray(d.dates))              parts.push(d.dates.length + ' Tage');
+          if (typeof d.results_count === 'number') parts.push(d.results_count + ' Analysen');
+          setStatus(cfg.label + ' OK ('
+                    + (parts.length ? parts.join(' · ') + ' · ' : '')
+                    + secs + 's)', 'ok');
+        })
+        .catch(function (err) {
+          setStatus(cfg.label + ' Fehler: ' + err.message, 'error');
+        })
+        .finally(function () { setBusy(btn, false); });
+    });
+  });
 })();
 </script>
 {% endblock %}

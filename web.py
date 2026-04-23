@@ -587,6 +587,15 @@ def admin_config_save():
 
     if not changed:
         return redirect("/admin/config?ok=Keine+Aenderungen")
+
+    # Scheduler-Thread aufwecken, damit DAILY_RUN_* sofort greifen statt erst
+    # beim naechsten planmaessigen Aufwachen.
+    try:
+        from scheduler import notify_config_changed
+        notify_config_changed()
+    except Exception as e:
+        logger.warning("admin_config_save: notify_config_changed fehlgeschlagen: %s", e)
+
     msg = f"Gespeichert+und+sofort+aktiv+%28{len(changed)}+Werte%29"
     return redirect(f"/admin/config?ok={msg}")
 
@@ -634,13 +643,226 @@ def regionen_page():
     )
 
 
+@app.route("/og-image/briefing.png")
+def og_image_briefing():
+    """Dynamisches OpenGraph-Bild fuer Link-Previews.
+
+    Query-Params: tier (violet|green|conditional|gray|none), title, subtitle.
+    Rendert ein 1200x630 PNG mit Tier-Farbverlauf + Gleitcast-Branding + Text.
+    Fallback auf statisches Default-Design wenn keine Params.
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        logger.warning("og_image_briefing: Pillow nicht installiert, 502 Response")
+        return Response("OG-Image-Generator nicht verfuegbar (Pillow fehlt)",
+                        status=502, mimetype="text/plain")
+
+    tier = (request.args.get("tier") or "none").lower()
+    title = (request.args.get("title") or "Gleitcast – Flugwetter").strip()
+    subtitle = (request.args.get("subtitle") or
+                "Praezise Thermik- und Wind-Prognose fuer die Schweizer Berge.").strip()
+
+    # Tier -> Gradient-Farben (Hex -> RGB)
+    tier_colors = {
+        "violet":      ("#6d28d9", "#a78bfa"),
+        "green":       ("#15803d", "#4ade80"),
+        "conditional": ("#b45309", "#fbbf24"),
+        "gray":        ("#475569", "#94a3b8"),
+        "none":        ("#1e293b", "#475569"),
+    }
+    top_hex, bot_hex = tier_colors.get(tier, tier_colors["none"])
+
+    def _hex_to_rgb(h: str) -> tuple[int, int, int]:
+        h = h.lstrip("#")
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+
+    W, H = 1200, 630
+    top_rgb = _hex_to_rgb(top_hex)
+    bot_rgb = _hex_to_rgb(bot_hex)
+
+    # Vertikaler Gradient via Line-Fill
+    img = Image.new("RGB", (W, H), top_rgb)
+    draw = ImageDraw.Draw(img)
+    for y in range(H):
+        t = y / (H - 1)
+        r = int(top_rgb[0] + (bot_rgb[0] - top_rgb[0]) * t)
+        g = int(top_rgb[1] + (bot_rgb[1] - top_rgb[1]) * t)
+        b = int(top_rgb[2] + (bot_rgb[2] - top_rgb[2]) * t)
+        draw.line([(0, y), (W, y)], fill=(r, g, b))
+
+    # Dunkler Schleier unten fuer Text-Kontrast
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    odraw = ImageDraw.Draw(overlay)
+    odraw.rectangle([0, int(H * 0.55), W, H], fill=(0, 0, 0, 110))
+    img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+    draw = ImageDraw.Draw(img)
+
+    # Fonts — Fallback-Kette (Windows/Linux/macOS)
+    def _load_font(size: int):
+        candidates = [
+            "C:\\Windows\\Fonts\\segoeuib.ttf",     # Segoe UI Bold
+            "C:\\Windows\\Fonts\\arialbd.ttf",       # Arial Bold
+            "C:\\Windows\\Fonts\\segoeui.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+        ]
+        for path in candidates:
+            try:
+                return ImageFont.truetype(path, size)
+            except (OSError, IOError):
+                continue
+        return ImageFont.load_default()
+
+    brand_font = _load_font(42)
+    title_font = _load_font(72)
+    sub_font   = _load_font(36)
+
+    # Brand-Header oben links
+    draw.text((60, 50), "GLEITCAST", font=brand_font, fill=(255, 255, 255))
+    draw.line([(60, 110), (260, 110)], fill=(255, 255, 255, 200), width=4)
+
+    # Titel mittig-unten — Zeilenumbruch bei >30 Zeichen
+    def _wrap(text: str, max_chars: int) -> list[str]:
+        words = text.split()
+        lines, cur = [], ""
+        for w in words:
+            if len(cur) + len(w) + 1 <= max_chars:
+                cur = (cur + " " + w).strip()
+            else:
+                if cur:
+                    lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        return lines[:2]  # max 2 Zeilen
+
+    title_lines = _wrap(title, 28)
+    title_y = int(H * 0.60)
+    for line in title_lines:
+        draw.text((60, title_y), line, font=title_font, fill=(255, 255, 255))
+        title_y += 82
+
+    # Subtitle
+    sub_lines = _wrap(subtitle, 48)
+    sub_y = title_y + 16
+    for line in sub_lines:
+        draw.text((60, sub_y), line, font=sub_font, fill=(226, 232, 240))
+        sub_y += 48
+
+    import io
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+    return Response(buf.getvalue(), mimetype="image/png",
+                    headers={"Cache-Control": "public, max-age=600"})
+
+
 @app.route("/briefing")
 def briefing_page():
+    # OG-Meta: wenn ?regions=...&day=... gesetzt, dynamische Titel/Beschreibung
+    # fuer hübsche Link-Previews (WhatsApp, iMessage, Telegram, ...).
+    regions_q = (request.args.get("regions") or "").strip()
+    day_q = request.args.get("day")
+    spot_q = (request.args.get("spot") or "").strip()
+    og = _build_briefing_og(regions_q, day_q, spot_q)
     return render_template(
         "briefing.html",
         instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
+        og=og,
     )
+
+
+def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "") -> dict:
+    """Baut OG-Meta-Daten fuer die Briefing-Seite aus Query-Params.
+
+    - Fallback: generische Site-Description wenn keine Filter gesetzt.
+    - Mit Filter: peekt briefing_data und baut Title aus bestem Spot / Tag-Tier.
+    """
+    base_url = request.url_root.rstrip("/")
+    title = "Gleitcast – Flugwetter für Gleitschirmpiloten"
+    desc  = "Präzise Thermik- und Wind-Prognose für die Schweizer Berge."
+    img   = f"{base_url}/og-image/briefing.png"
+
+    region_ids = [r.strip() for r in regions_csv.split(",") if r.strip()] if regions_csv else []
+    try:
+        day_idx = int(day_str) if day_str is not None and day_str != "" else None
+    except ValueError:
+        day_idx = None
+
+    if not region_ids or engine is None:
+        return {"title": title, "description": desc, "image": img, "url": request.url}
+
+    try:
+        briefing_data = engine.build_briefing_data()
+    except Exception:
+        logger.exception("_build_briefing_og: build_briefing_data failed")
+        return {"title": title, "description": desc, "image": img, "url": request.url}
+
+    days = briefing_data.get("days", []) or []
+    region_names = _region_names(region_ids)
+    region_label = region_names[0] if len(region_names) == 1 else f"{len(region_names)} Regionen"
+
+    # Spot/Tag ermitteln
+    target_day = None
+    if day_idx is not None and 0 <= day_idx < len(days):
+        target_day = days[day_idx]
+
+    my_spots_per_day = []
+    for d in days:
+        spots = [s for s in (d.get("top_spots") or [])
+                 if s.get("region_id") in region_ids]
+        my_spots_per_day.append((d, spots))
+
+    # Besten Spot finden (optional gefiltert auf spot_q)
+    def _spot_rank(s):
+        from email_service import _TIER_RANK, _spot_tier
+        return (_TIER_RANK.get(_spot_tier(s), -1), float(s.get("rating") or 0))
+
+    best_spot = None
+    best_day  = None
+    if target_day is not None:
+        spots = [s for s in (target_day.get("top_spots") or [])
+                 if s.get("region_id") in region_ids
+                 and (not spot_name or s.get("spot") == spot_name)]
+        if spots:
+            best_spot = max(spots, key=_spot_rank)
+            best_day  = target_day
+    if best_spot is None:
+        # Ueber alle Tage besten Spot finden
+        flat = [(d, s) for d, spots in my_spots_per_day for s in spots]
+        if spot_name:
+            flat = [(d, s) for d, s in flat if s.get("spot") == spot_name]
+        if flat:
+            best_day, best_spot = max(flat, key=lambda pair: _spot_rank(pair[1]))
+
+    from email_service import _TIER_META, _spot_tier, _date_label
+    if best_spot and best_day:
+        tier = _spot_tier(best_spot)
+        meta = _TIER_META.get(tier, _TIER_META["gray"])
+        rating = float(best_spot.get("rating") or 0)
+        label = _date_label(best_day.get("date", ""))
+        day_short = label.get("short", "")
+        title = f"{best_spot.get('spot','')} – {day_short} {meta['label']} {rating:.1f}"
+        desc = f"{region_label} · {meta['label']} · Rating {rating:.1f} · Gleitcast-Briefing"
+        tier_param = tier
+    else:
+        tier_param = "none"
+        title = f"Gleitcast – {region_label}"
+        desc = "Kein fliegbares Fenster in dieser Region im aktuellen Zeitraum."
+
+    # Dynamisches OG-Image mit Tier-Farbe + Headline
+    from urllib.parse import urlencode, quote
+    img_params = {
+        "tier": tier_param,
+        "title": title[:80],
+        "subtitle": desc[:100],
+    }
+    img = f"{base_url}/og-image/briefing.png?{urlencode(img_params, quote_via=quote)}"
+
+    return {"title": title, "description": desc, "image": img, "url": request.url}
 
 
 @app.route("/api/briefing", methods=["GET"])

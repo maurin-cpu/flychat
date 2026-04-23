@@ -5,6 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gleitcast{% endblock %}</title>
+    {% block meta %}
+    <meta property="og:site_name" content="Gleitcast">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Gleitcast – Flugwetter für Gleitschirmpiloten">
+    <meta property="og:description" content="Präzise Thermik- und Wind-Prognose für die Schweizer Berge.">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/og-image/briefing.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    {% endblock %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ static_v('css/style.css') }}">
@@ -17,7 +28,6 @@
     <a href="#main-content" class="skip-link">Zum Inhalt springen</a>
     <nav class="navbar" role="navigation" aria-label="Hauptnavigation">
         <a href="/chat" class="navbar-brand">Gleit<span>cast</span></a>
-        <div class="navbar-day-tabs" id="navDayTabs"></div>
         <div class="navbar-links">
             <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Startplätze</a>
             <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
@@ -30,8 +40,6 @@
     (function() {
         var FORECAST_DAYS = {{ forecast_days|default(5) }};
         window.SHOW_REFERENCE_POINTS = {{ show_reference_points|default(false)|tojson }};
-        var container = document.getElementById('navDayTabs');
-        if (!container) return;
         var now = new Date();
         var dates = [];
         for (var i = 0; i < FORECAST_DAYS; i++) {
@@ -40,22 +48,66 @@
         }
         var dayNames = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
         window.currentDate = dates[0];
-        dates.forEach(function(dateStr) {
-            var dd = new Date(dateStr + 'T12:00:00');
-            var label = dayNames[dd.getDay()] + ' ' + String(dd.getDate()).padStart(2, '0') + '.' + String(dd.getMonth() + 1).padStart(2, '0');
-            var btn = document.createElement('button');
-            btn.className = 'navbar-day-btn' + (dateStr === dates[0] ? ' active' : '');
-            btn.dataset.date = dateStr;
-            btn.textContent = label;
-            btn.addEventListener('click', function() {
-                window.currentDate = dateStr;
-                container.querySelectorAll('.navbar-day-btn').forEach(function(b) { b.classList.remove('active'); });
-                btn.classList.add('active');
-                window.dispatchEvent(new CustomEvent('gleitcast-day-change', { detail: { date: dateStr } }));
+
+        function renderDayTabs() {
+            var container = document.getElementById('navDayTabs');
+            if (!container || container.dataset.rendered === '1') return;
+            container.dataset.rendered = '1';
+            dates.forEach(function(dateStr) {
+                var dd = new Date(dateStr + 'T12:00:00');
+                var dayLabel = dayNames[dd.getDay()];
+                var dateLabel = String(dd.getDate()).padStart(2, '0') + '.' + String(dd.getMonth() + 1).padStart(2, '0');
+                var btn = document.createElement('button');
+                btn.className = 'navbar-day-btn' + (dateStr === dates[0] ? ' active' : '');
+                btn.dataset.date = dateStr;
+                btn.innerHTML = '<span class="day-name">' + dayLabel + '</span><span class="day-date">' + dateLabel + '</span>';
+                btn.addEventListener('click', function() {
+                    window.currentDate = dateStr;
+                    container.querySelectorAll('.navbar-day-btn').forEach(function(b) { b.classList.remove('active'); });
+                    btn.classList.add('active');
+                    window.dispatchEvent(new CustomEvent('gleitcast-day-change', { detail: { date: dateStr } }));
+                });
+                container.appendChild(btn);
             });
-            container.appendChild(btn);
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', renderDayTabs);
+        } else {
+            renderDayTabs();
+        }
     })();
+
+    /* Gleitcast Share: native share sheet (mobile) mit WhatsApp-Fallback (wa.me).
+       Der Ziel-Link geht immer auf /briefing — dort liefert _build_briefing_og
+       Title / Description / tier-farbiges OG-Bild für Rich-Preview in WhatsApp. */
+    window.gleitcastShare = function (opts) {
+        opts = opts || {};
+        var origin = window.location.origin;
+        var params = [];
+        if (opts.region_id) params.push('regions=' + encodeURIComponent(opts.region_id));
+        if (opts.day_idx != null) params.push('day=' + encodeURIComponent(opts.day_idx));
+        if (opts.spot) params.push('spot=' + encodeURIComponent(opts.spot));
+        var url = origin + '/briefing' + (params.length ? '?' + params.join('&') : '');
+        var title = opts.title || 'Gleitcast Flugwetter';
+        var text = opts.text || title;
+
+        if (navigator.share) {
+            try {
+                navigator.share({ title: title, text: text, url: url }).catch(function () {});
+                return;
+            } catch (e) { /* fall through */ }
+        }
+        var payload = text + '\n' + url;
+        var waUrl = 'https://wa.me/?text=' + encodeURIComponent(payload);
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    /* Shared WhatsApp-icon SVG (used by share buttons in briefing + overlays) */
+    window.gleitcastShareIconSVG =
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>' +
+        '<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
     </script>
     <div id="main-content">
     {% block content %}{% endblock %}
@@ -63,25 +115,47 @@
 
     <!-- Mobile Bottom Navigation -->
     <nav class="mobile-nav" id="mobileNav" role="navigation" aria-label="Mobile Navigation">
-        {% if request.path == '/' or request.path == '/chat' %}
+        {% set is_chat = request.path == '/' or request.path == '/chat' %}
+        {% set is_regionen = request.path == '/regionen' %}
+        {% if is_chat %}
         <button class="mobile-nav-item active" data-target="chat" aria-label="Chat anzeigen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>Chat</span>
         </button>
-        <button class="mobile-nav-item" data-target="map" aria-label="Karte anzeigen">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-            <span>Map</span>
+        <button class="mobile-nav-item" data-target="map" aria-label="Spots anzeigen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Spots</span>
         </button>
+        {% elif is_regionen %}
+        <button class="mobile-nav-item" data-target="chat" aria-label="Chat anzeigen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+        </button>
+        <a href="/chat?view=map" class="mobile-nav-item" aria-label="Spots anzeigen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Spots</span>
+        </a>
         {% else %}
-        <a href="/chat" class="mobile-nav-item {% if request.path == '/' or request.path == '/chat' %}active{% endif %}" aria-label="Chat">
+        <a href="/chat" class="mobile-nav-item" aria-label="Chat anzeigen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>Chat</span>
         </a>
+        <a href="/chat?view=map" class="mobile-nav-item" aria-label="Spots anzeigen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Spots</span>
+        </a>
         {% endif %}
-        <a href="/regionen" class="mobile-nav-item {% if request.path == '/regionen' %}active{% endif %}" aria-label="Regionen">
+        {% if is_regionen %}
+        <button class="mobile-nav-item active" data-target="map" aria-label="Regionen anzeigen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>Regionen</span>
+        </button>
+        {% else %}
+        <a href="/regionen" class="mobile-nav-item" aria-label="Regionen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             <span>Regionen</span>
         </a>
+        {% endif %}
         <a href="/briefing" class="mobile-nav-item {% if request.path == '/briefing' %}active{% endif %}" aria-label="Briefing">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
             <span>Briefing</span>

@@ -16,6 +16,8 @@ Details in den Tages-Blocks unten pruefen.
 {{ verdict.spot.spot }}{% if verdict.spot.window %} · {{ verdict.spot.window }}{% endif %} · Rating {{ verdict.spot.rating_display }}
 {%- endif %}
 Im Dashboard: {{ urls.dashboard }}
+{% if share -%}Per WhatsApp teilen: {{ share.whatsapp }}
+{% endif -%}
 ============================================================
 
 {% endif -%}

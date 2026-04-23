@@ -51,9 +51,58 @@
         min-height: 0;
     }
 
+    /* ── Unified Layout (Chat + Map) ─────────────────────── */
+    .unified-layout {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .chat-sidebar {
+        width: min(600px, max(480px, 38vw));
+        min-width: 300px;
+        max-width: min(720px, 92vw);
+        flex-shrink: 0;
+        border-right: 1px solid var(--color-border);
+        display: flex;
+        flex-direction: column;
+        background: var(--color-bg);
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .map-main {
+        flex: 1;
+        position: relative;
+        min-width: 0;
+    }
+
+    .chat-container {
+        height: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 16px 20px 18px;
+        min-width: 0;
+        border-radius: 0;
+        box-shadow: none;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .resizer {
+        width: 12px;
+        background: transparent;
+        cursor: col-resize;
+        transition: background var(--transition-fast);
+        z-index: 2001;
+        position: relative;
+    }
+
     .region-map-wrapper {
         flex: 1;
         position: relative;
+        width: 100%;
+        height: 100%;
     }
 
     #regionMap {
@@ -63,12 +112,52 @@
 
     /* Floating controls: use shared .floating-control / .floating-day-tabs from style.css */
 
-    /* ── Run Button (uses .btn system + positioning) ──── */
-    .floating-run-btn {
-        position: absolute;
-        z-index: 1000;
-        top: 16px;
-        right: 16px;
+    .chat-header-actions {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    @media (max-width: 1023px) {
+        .unified-layout { flex-direction: column; }
+        .chat-sidebar {
+            width: 100% !important;
+            height: 50%;
+            border-right: none;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .resizer {
+            width: 100%;
+            height: 5px;
+            cursor: row-resize;
+        }
+    }
+
+    @media (max-width: 639px) {
+        .unified-layout { flex-direction: column; }
+        .chat-sidebar {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            flex: 1 1 0;
+            min-height: 0;
+            height: auto !important;
+            border-right: none;
+            display: none;
+        }
+        .map-main {
+            display: block;
+            width: 100%;
+            flex: 1 1 0;
+            min-height: 0;
+            overflow: hidden;
+            position: relative;
+        }
+        .resizer { display: none; }
+        .unified-layout.show-chat .chat-sidebar { display: flex !important; }
+        .unified-layout.show-chat .map-main { display: none !important; }
+        .unified-layout.show-map .chat-sidebar { display: none !important; }
+        .unified-layout.show-map .map-main { display: block !important; }
     }
 
     /* ── Status Bar ──────────────────────────────────────── */
@@ -113,6 +202,18 @@
     #regionOverlay .meteogram-close:hover {
         background: #f1f5f9;
         color: #1e293b;
+    }
+
+    #regionOverlay .meteogram-share {
+        color: #64748b;
+        border-color: #e5e7eb;
+    }
+
+    #regionOverlay .meteogram-share:hover,
+    #regionOverlay .meteogram-share:focus-visible {
+        background: #25D366;
+        border-color: #25D366;
+        color: #fff;
     }
 
     #regionOverlayBody {
@@ -207,11 +308,6 @@
             height: 100dvh;
         }
         .navbar { height: 48px; }
-        .region-map-wrapper {
-            height: calc(100dvh - 48px - 60px - env(safe-area-inset-bottom, 0px));
-        }
-        .floating-day-tabs { max-width: calc(100vw - 130px); top: 10px; left: 10px; }
-        .floating-run-btn { top: 10px; right: 10px; padding: 6px 12px; font-size: 11px; }
         .floating-status { bottom: calc(10px + 60px + env(safe-area-inset-bottom, 0px)); left: 10px; }
         #regionOverlay .meteogram-panel { max-width: 100vw; width: 100vw; height: 100dvh; border-radius: 0; }
         #regionOverlayBody { padding: 0 16px 16px; }
@@ -220,43 +316,185 @@
 {% endblock %}
 
 {% block content %}
-<div class="region-map-wrapper">
-    <div id="regionMap"></div>
-
-    <!-- Floating Run Button -->
-    <button class="btn btn-primary btn-sm floating-run-btn" id="runRegionBtn">
-        <span class="spinner"></span>
-        <span class="btn-label">Analyse starten</span>
-    </button>
-
-    <!-- Floating Status -->
-    <div class="floating-control floating-status" id="statusBar"></div>
-
-    <!-- Meteogram Tooltip -->
-    <div class="tooltip" id="regionMeteogramTooltip"></div>
-
-    <!-- Region Analysis Overlay -->
-    <div class="meteogram-overlay" id="regionOverlay" role="dialog" aria-modal="true" aria-label="Region-Analyse">
-        <div class="meteogram-panel">
-            <div class="overlay-swipe-handle"></div>
-            <div class="meteogram-header">
-                <div>
-                    <h2 id="regionOverlayTitle">Region</h2>
+<div class="unified-layout">
+    <!-- Links: Chat -->
+    <aside class="chat-sidebar" id="chatSidebar">
+        <div class="chat-container">
+            <div class="chat-header">
+                <span class="chat-title">Chat-Berater</span>
+                <span class="data-freshness" id="dataFreshness" title="Alter der Wetterdaten"></span>
+                <div class="chat-header-actions">
+                    <button id="resetChatBtn" class="btn btn-danger btn-sm" aria-label="Neuen Chat starten">
+                        <span>↺</span> Neuer Chat
+                    </button>
                 </div>
-                <button class="meteogram-close" id="regionOverlayClose" aria-label="Schliessen">&times;</button>
             </div>
-            <div id="regionOverlayBody"></div>
+            <div class="chat-messages" id="chatMessages" style="overflow-x: hidden;" aria-live="polite" aria-relevant="additions">
+                <div id="morningBriefing" style="display:none;"></div>
+                <div class="chat-message bot">
+                    Hallo! Ich bin dein Gleitcast-Berater. Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator" aria-hidden="true">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+
+            <div class="quick-actions" id="quickActions">
+                <button class="quick-btn" data-msg="Wo kann ich heute fliegen?">Wo fliegen?</button>
+                <button class="quick-btn" data-msg="Wie sind die Bedingungen heute?">Heute?</button>
+                <button class="quick-btn" data-msg="Gibt es Föhn-Gefahr?">Föhn?</button>
+            </div>
+
+            <div class="chat-input-area">
+                <label for="chatInput" class="sr-only">Nachricht eingeben</label>
+                <textarea rows="1" class="chat-input" id="chatInput" placeholder="Frag mich..." autocomplete="off"></textarea>
+                <button class="chat-send-btn" id="chatSendBtn" aria-label="Nachricht senden">
+                    <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    <span class="send-label">Senden</span>
+                </button>
+            </div>
         </div>
-    </div>
+    </aside>
+
+    <div class="resizer" id="resizer"></div>
+
+    <!-- Rechts: Karte -->
+    <main class="map-main">
+        <div class="region-map-wrapper">
+            <div id="regionMap"></div>
+
+            <!-- Floating Day Tabs (overlay on map, below navbar) -->
+            <div class="floating-control floating-day-tabs" id="navDayTabs"></div>
+
+            <!-- Floating Status -->
+            <div class="floating-control floating-status" id="statusBar"></div>
+
+            <!-- Meteogram Tooltip -->
+            <div class="tooltip" id="regionMeteogramTooltip"></div>
+
+            <!-- Region Analysis Overlay -->
+            <div class="meteogram-overlay" id="regionOverlay" role="dialog" aria-modal="true" aria-label="Region-Analyse">
+                <div class="meteogram-panel">
+                    <div class="overlay-swipe-handle"></div>
+                    <div class="meteogram-header">
+                        <div>
+                            <h2 id="regionOverlayTitle">Region</h2>
+                        </div>
+                        <button class="meteogram-share" id="regionOverlayShare" type="button" aria-label="Region teilen" title="Teilen (WhatsApp)">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        </button>
+                        <button class="meteogram-close" id="regionOverlayClose" aria-label="Schliessen">&times;</button>
+                    </div>
+                    <div id="regionOverlayBody"></div>
+                </div>
+            </div>
+        </div>
+    </main>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/foehn_diagram.js') }}?v={{ static_v('js/foehn_diagram.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/region-map.js') }}?v={{ static_v('js/region-map.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/chat.js') }}?v={{ static_v('js/chat.js') }}"></script>
+<script>
+(function () {
+    var STORAGE_KEY = 'gleitcast_sidebar_width';
+    var resizer = document.getElementById('resizer');
+    var sidebar = document.getElementById('chatSidebar');
+    var layout = document.querySelector('.unified-layout');
+    var isDragging = false;
+    var MIN_SIDEBAR_W = 300;
+
+    function idealChatWidth() {
+        var w = window.innerWidth;
+        if (w <= 900) return null;
+        return Math.round(Math.min(640, Math.max(500, w * 0.39)));
+    }
+
+    function applyInitialSidebarWidth() {
+        if (!sidebar || window.innerWidth < 1024) return;
+        var stored = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+        if (stored && stored >= MIN_SIDEBAR_W) {
+            sidebar.style.width = stored + 'px';
+            return;
+        }
+        var ideal = idealChatWidth();
+        if (ideal) sidebar.style.width = ideal + 'px';
+    }
+    applyInitialSidebarWidth();
+
+    if (resizer && sidebar) {
+        resizer.addEventListener('mousedown', function () {
+            isDragging = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            resizer.classList.add('dragging');
+        });
+        document.addEventListener('mousemove', function (e) {
+            if (!isDragging) return;
+            var newW = Math.max(MIN_SIDEBAR_W, Math.min(window.innerWidth * 0.92, e.clientX));
+            sidebar.style.width = newW + 'px';
+            if (window.regionMap && window.regionMap.invalidateSize) window.regionMap.invalidateSize();
+        });
+        document.addEventListener('mouseup', function () {
+            if (!isDragging) return;
+            isDragging = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            resizer.classList.remove('dragging');
+            var w = parseInt(sidebar.style.width, 10);
+            if (w && w >= MIN_SIDEBAR_W) localStorage.setItem(STORAGE_KEY, String(w));
+            if (window.regionMap && window.regionMap.invalidateSize) window.regionMap.invalidateSize();
+        });
+    }
+
+    // Mobile toggle (Chat / Regionen-Karte) via bottom nav
+    var mobileNav = document.getElementById('mobileNav');
+    if (mobileNav && layout) {
+        var initialView = 'map';
+        try {
+            var v = new URLSearchParams(window.location.search).get('view');
+            if (v === 'chat' || v === 'map') {
+                initialView = v;
+                history.replaceState({}, '', window.location.pathname);
+            }
+        } catch (e) { /* ignore */ }
+
+        function switchMobileView(target) {
+            if (target !== 'chat' && target !== 'map') return;
+            mobileNav.querySelectorAll('.mobile-nav-item[data-target]').forEach(function (b) {
+                b.classList.remove('active');
+            });
+            var activeBtn = mobileNav.querySelector('.mobile-nav-item[data-target="' + target + '"]');
+            if (activeBtn) activeBtn.classList.add('active');
+            layout.classList.remove('show-chat', 'show-map');
+            layout.classList.add('show-' + target);
+            if (target === 'map' && window.regionMap && window.regionMap.invalidateSize) {
+                setTimeout(function () { window.regionMap.invalidateSize(); }, 50);
+            }
+        }
+
+        if (window.innerWidth < 640) {
+            switchMobileView(initialView);
+        }
+
+        mobileNav.addEventListener('click', function (e) {
+            var btn = e.target.closest('.mobile-nav-item[data-target]');
+            if (!btn) return;
+            switchMobileView(btn.getAttribute('data-target'));
+        });
+    }
+})();
+</script>
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -275,7 +513,6 @@ function normalizeFlyTier(ft) {
     return 'green';
 }
 
-var runBtn = document.getElementById('runRegionBtn');
 var statusBar = document.getElementById('statusBar');
 var currentDate = window.currentDate;
 var _nested = {};
@@ -347,34 +584,6 @@ if (supabase) {
 } else {
     console.warn('[REALTIME] Supabase URL/Key fehlen — keine Live-Updates, nur Polling via /api/*');
 }
-
-// Run button
-runBtn.addEventListener('click', function() {
-    if (runBtn.disabled) return;
-    runBtn.disabled = true;
-    runBtn.classList.add('loading');
-    statusBar.textContent = 'Region-Analyse laeuft...';
-
-    fetch('/api/run-region-analyses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
-        .then(function(resp) { return resp.json(); })
-        .then(function(data) {
-            if (data.success) {
-                statusBar.textContent = data.results_count + ' Analysen abgeschlossen';
-            } else {
-                statusBar.textContent = 'Fehler: ' + (data.error || 'Unbekannt');
-            }
-        })
-        .catch(function(err) {
-            statusBar.textContent = 'Fehler: ' + err.message;
-        })
-        .finally(function() {
-            runBtn.disabled = false;
-            runBtn.classList.remove('loading');
-        });
-});
 
 // Swipe-to-close on region overlay
 var regionOverlay = document.getElementById('regionOverlay');
