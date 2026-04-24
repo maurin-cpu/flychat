@@ -462,11 +462,20 @@
     }
 
     // ===== ANALYSE ASIDE TOGGLE (mobile collapsible) =====
-    if (asideToggleBtn && asideEl) {
-        asideToggleBtn.addEventListener('click', function () {
+    // Toggle wird durch Button ODER Header-Tap ausgelöst (grössere Tap-Target).
+    if (asideEl) {
+        var asideHeader = asideEl.querySelector('.meteogram-aside-header');
+        var toggleAside = function (ev) {
+            // Verhindern, dass interaktive Inhalte im Body den Toggle triggern
+            if (ev && ev.target && ev.target.closest && ev.target.closest('.meteogram-aside-body')) return;
             var collapsed = asideEl.classList.toggle('collapsed');
-            asideToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-        });
+            if (asideToggleBtn) {
+                asideToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            }
+        };
+        // Header bekommt den Handler (Button bubbled hinauf — kein Doppel-Toggle).
+        if (asideHeader) asideHeader.addEventListener('click', toggleAside);
+        else if (asideToggleBtn) asideToggleBtn.addEventListener('click', toggleAside);
     }
 
     function renderAnalyseView() {
@@ -582,8 +591,16 @@
         currentView = 'meteogram';
         chartContainer.style.display = '';
         if (textViewContainer) textViewContainer.style.display = 'none';
-        // Aside starts expanded on desktop; on mobile user can collapse it.
-        if (asideEl) asideEl.classList.remove('collapsed');
+        // Aside startet expanded auf Desktop, collapsed auf Mobile (Sheet-Pattern):
+        // Auf Mobile sieht der User zuerst das Meteogramm in voller Höhe, kann
+        // die Analyse via Toggle-Button ausklappen.
+        if (asideEl) {
+            var isMobile = window.innerWidth <= 640;
+            asideEl.classList.toggle('collapsed', isMobile);
+            if (asideToggleBtn) {
+                asideToggleBtn.setAttribute('aria-expanded', isMobile ? 'false' : 'true');
+            }
+        }
         if (viewTabsContainer) {
             viewTabsContainer.querySelectorAll('.view-tab').forEach(function (b) {
                 b.classList.toggle('active', b.dataset.view === 'meteogram');

@@ -1109,6 +1109,23 @@ body.page-fixed-nav {
     padding: 20px;
     min-height: 0;
     min-width: 0;
+    /* Scrollbar dezent — Desktop kann scrollen wenn nötig, aber subtil */
+    scrollbar-width: thin;
+}
+
+/* MOBILE: Meteogramm passt IMMER ohne Scroll. Keine Scrollbar, keine
+   Möglichkeit zu scrollen — Chart wird via JS auf Container-Größe gerendert. */
+@media (max-width: 640px) {
+    .meteogram-chart {
+        overflow: hidden !important;
+        padding: 8px 10px;
+        scrollbar-width: none;
+    }
+    .meteogram-chart::-webkit-scrollbar { display: none; }
+    .meteogram-chart svg {
+        max-width: 100%;
+        display: block;
+    }
 }
 
 /* Tier legend — shows what cell colors mean, always visible above meteogram */
@@ -1782,21 +1799,132 @@ body.page-fixed-nav {
         font-size: 17px;
     }
 
+    /* Sheet-Look: Panel sitzt unten, Karte bleibt oben sichtbar (~80px peek).
+       Bottom-Sheet-Pattern statt Vollbild-Modal — User behält Map-Kontext. */
+    .meteogram-overlay.visible {
+        align-items: flex-end;
+        background: rgba(0, 0, 0, 0.35);
+    }
     .meteogram-panel {
         width: 100vw;
-        height: 100dvh;
-        border-radius: 0;
+        height: calc(100dvh - 60px);
+        max-height: calc(100dvh - 60px);
+        border-radius: 20px 20px 0 0;
+        border: none;
+        border-top: 1px solid var(--color-border);
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    /* Drag-Handle prominenter machen — visuelles Sheet-Affordance */
+    .meteogram-panel .overlay-swipe-handle {
+        display: block;
+        width: 40px;
+        height: 4px;
+        background: var(--color-border-hover, #cbd5e1);
+        border-radius: 2px;
+        margin: 8px auto 4px;
+    }
+
+    /* Header kompakter — mehr Platz für Chart */
+    .meteogram-header {
+        padding: 8px 16px 10px;
+    }
+    .meteogram-header h2 {
+        font-size: 15px;
+    }
+    .meteogram-header .spot-info {
+        font-size: 11px;
+        margin-top: 1px;
+    }
+    .meteogram-rating-badge {
+        padding: 4px 10px;
+    }
+    .meteogram-rating-value {
+        font-size: 18px;
+    }
+    .meteogram-share,
+    .meteogram-close {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* View-Tabs kompakter (Meteogramm/Text) */
+    .meteogram-view-tabs {
+        padding: 6px 12px;
     }
 
     .meteogram-tabs {
         overflow-x: auto;
         flex-wrap: nowrap;
         -webkit-overflow-scrolling: touch;
-        padding: 8px 16px;
+        padding: 6px 12px;
+        scrollbar-width: none;
     }
+    .meteogram-tabs::-webkit-scrollbar { display: none; }
 
     .tab-btn {
         flex-shrink: 0;
+    }
+
+    /* Aside Peek-Bar (collapsed): kompakte 44px-Leiste am unteren Rand.
+       Wenn expanded: schwebt als Bottom-Sheet ÜBER dem Chart (position:absolute),
+       damit das Meteogramm nicht zusammengedrückt wird. */
+    .meteogram-body { position: relative; }
+    .meteogram-aside {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 60vh;
+        background: var(--color-bg-elevated, #fff);
+        z-index: 5;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+        border-radius: 16px 16px 0 0;
+        transition: max-height 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .meteogram-aside.collapsed {
+        max-height: 44px;
+        box-shadow: 0 -1px 0 var(--color-border, #e5e7eb);
+        border-radius: 0;
+    }
+    /* Main bekommt Platz für die Peek-Bar reserviert, damit der Chart nicht
+       direkt am unteren Rand klebt. */
+    .meteogram-main {
+        padding-bottom: 44px;
+    }
+    .meteogram-aside-header {
+        padding: 10px 16px;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .meteogram-aside-toggle {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--color-primary, #0369a1);
+        color: #fff;
+        border: none;
+        font-size: 14px;
+        font-weight: 700;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        transition: transform 200ms cubic-bezier(0.4,0,0.2,1);
+    }
+    .meteogram-aside.collapsed .meteogram-aside-toggle {
+        transform: rotate(0deg);
+    }
+    .meteogram-aside:not(.collapsed) .meteogram-aside-toggle {
+        transform: rotate(180deg);
+    }
+    /* Aside-Body bekommt nur dezenten Scrollbar wenn Inhalt überläuft */
+    .meteogram-aside-body {
+        scrollbar-width: thin;
+        padding: 12px 16px env(safe-area-inset-bottom, 16px);
+    }
+    .meteogram-aside-body::-webkit-scrollbar { width: 4px; }
+    .meteogram-aside-body::-webkit-scrollbar-thumb {
+        background: var(--color-border-hover, #cbd5e1);
+        border-radius: 2px;
     }
 }
 

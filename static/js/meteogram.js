@@ -327,12 +327,22 @@ window.Meteogram = (function () {
         var nCols = times.length;
 
         // Fixed altitude grid in 250m steps, starting from launch elevation
-        var STEP = 250;
-        var FULL_ROWS = 17; // 0-4000m = 17 rows (reference for constant chart height)
+        // Mobile: 500m-Steps statt 250m → halbiert Reihenanzahl, Pfeile bleiben
+        // gross genug für Touch + lesbare Schrift, ohne dass das Chart vertikal
+        // scrollen muss. Desktop bleibt bei feiner Auflösung.
+        var _isMobile_local = window.innerWidth <= 640;
+        var STEP = _isMobile_local ? 500 : 250;
+        var FULL_ROWS = _isMobile_local ? 9 : 17; // 0-4000m: 9 rows @ 500m, 17 rows @ 250m
         var elevation = (options && options.elevation) || 0;
         var minGridAlt = Math.floor(elevation / STEP) * STEP;
         // Alpine zones (≥1800m, entspricht Terrain-Faktor 1.0) brauchen mehr Headroom
-        var maxGridAlt = elevation >= 1800 ? 5000 : 4000;
+        // Mobile: deckeln auf elevation + 3000m (deckt 95% der Flüge ab); Desktop bleibt bei 4000-5000m absolut.
+        var maxGridAlt;
+        if (_isMobile_local) {
+            maxGridAlt = Math.min(elevation >= 1800 ? 5000 : 4000, minGridAlt + 3000);
+        } else {
+            maxGridAlt = elevation >= 1800 ? 5000 : 4000;
+        }
         var altitudes = [];
         for (var a = minGridAlt; a <= maxGridAlt; a += STEP) altitudes.push(a);
         var nRows = altitudes.length;
@@ -443,7 +453,8 @@ window.Meteogram = (function () {
         // passt IMMER in den Container — kein horizontaler Scroll, egal ob
         // Zahlen an oder aus. Numbers werden bei Bedarf kleiner gerendert.
         var isNarrowScreen = window.innerWidth <= 480;
-        MARGIN.left = isMobileViewport ? (showNumbers ? 52 : 44) : 96;
+        // Mobile-Margin: 56px reicht für "1.5k", "Start 1500m" wird auf Mobile verkürzt.
+        MARGIN.left = isMobileViewport ? 56 : 96;
         MARGIN.right = isMobileViewport ? 12 : 24;
         // clientWidth kann während Layout-Race 0 sein → safer fallback aus
         // Viewport-Breite, damit das Chart NIE die Mobile-Viewport sprengt.
@@ -575,6 +586,30 @@ window.Meteogram = (function () {
         var WARN_STRIP_H = usedRows > 0 ? (usedRows * (WARN_ROW_H + WARN_ROW_GAP) + 6) : 0;
 
         var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
+
+        // MOBILE COMPACT: Chart MUSS in den verfügbaren Container passen — kein
+        // vertikaler Scroll. Strategie: cellH schrumpfen falls nötig, aber Floor
+        // bei 22px halten (Arrows + Tier-Fill bleiben erkennbar). Scale-Floor
+        // bei 0.85, damit Schrift nicht unter ~9px fällt.
+        if (isMobileViewport) {
+            var containerH = container.clientHeight || 0;
+            if (containerH < 100) {
+                containerH = Math.max(280, window.innerHeight - 200);
+            }
+            var legendReserve = 36;  // .mg-tier-legend ca. 28px + 8px gap
+            var availableH = containerH - legendReserve;
+            if (chartH > availableH) {
+                var fixedH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
+                var availForRows = Math.max(0, availableH - fixedH);
+                var newCellH = Math.max(22, Math.floor(availForRows / Math.max(1, nRows)));
+                if (newCellH < cellH) {
+                    cellH = newCellH;
+                    // Scale-Floor: Schrift nie unter ~85% der Originalgrösse → bleibt lesbar.
+                    scale = Math.max(0.85, cellH / CELL_H);
+                    chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
+                }
+            }
+        }
 
         // ===== TIER LEGEND (Pill-Chips) =====
         // 3 Pills zeigen die Bedeutung der Zell-Farben. Bleibt immer sichtbar,
@@ -750,15 +785,83 @@ window.Meteogram = (function () {
                 .attr('rx', 3)
                 .attr('title', hasPrecip ? precipAmt.toFixed(1) + ' mm' + (hasStorm ? ' + Gewitter' : '') : 'Gewitter');
 
-            // Einfacher Text: mm-Wert oder "Blitz"
-            var label = hasStorm && hasPrecip ? precipAmt.toFixed(1) + ' \u26A1' : (hasStorm ? 'Blitz' : precipAmt.toFixed(1) + ' mm');
-            chartG.append('text')
-                .attr('x', cx)
-                .attr('y', precipRowY + PRECIP_ROW_H / 2 + 1)
-                .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-                .attr('font-size', '12px').attr('font-weight', '700')
-                .attr('fill', hasStorm ? '#92400E' : '#1E3A5F')
-                .text(label);
+            if (isMobileViewport) {
+                // Mobile: keine Zahlen — Icons zentriert. Regen als Tropfen,
+                // Gewitter als Blitz. Beide selbst gezeichnet (SVG path), damit
+                // sie schriftunabhängig sauber rendern.
+                var iconSize = Math.min(14, PRECIP_ROW_H - 4);
+                var iconY = precipRowY + (PRECIP_ROW_H - iconSize) / 2;
+                var iconScale = iconSize / 24;
+                if (hasStorm) {
+                    // Klassischer Blitz-Pfad in viewBox 24x24.
+                    var boltX = cx - iconSize * 0.32;
+                    chartG.append('path')
+                        .attr('d', 'M13 2 L4 14 L11 14 L9 22 L20 10 L13 10 Z')
+                        .attr('transform', 'translate(' + boltX + ',' + iconY + ') scale(' + iconScale + ')')
+                        .attr('fill', '#92400E')
+                        .attr('stroke', '#FBBF24')
+                        .attr('stroke-width', 0.8 / iconScale)
+                        .attr('stroke-linejoin', 'round');
+                } else if (hasPrecip) {
+                    // Tropfen-Pfad: Spitze oben (12,2), Kreisboden unten.
+                    // Bezier-Kurven formen die klassische Tropfen-Silhouette.
+                    var dropX = cx - iconSize * 0.5;
+                    var dropColor = precipAmt >= 3 ? '#1D4ED8' : precipAmt >= 1 ? '#2563EB' : '#3B82F6';
+                    chartG.append('path')
+                        .attr('d', 'M12 2 C12 2 4 12 4 16 C4 20 7.5 22 12 22 C16.5 22 20 20 20 16 C20 12 12 2 12 2 Z')
+                        .attr('transform', 'translate(' + dropX + ',' + iconY + ') scale(' + iconScale + ')')
+                        .attr('fill', dropColor)
+                        .attr('stroke', '#DBEAFE')
+                        .attr('stroke-width', 0.8 / iconScale)
+                        .attr('stroke-linejoin', 'round');
+                }
+            } else {
+                // Desktop: Self-gezeichnete Icons (gleich wie Mobile) + mm-Wert
+                // daneben — kein Emoji-⚡ mehr (no-emoji-icons Regel).
+                // Layout: icon links, text rechts, gemeinsam zentriert.
+                var dIconSize = 12;
+                var dIconY = precipRowY + (PRECIP_ROW_H - dIconSize) / 2;
+                var dIconScale = dIconSize / 24;
+                var dText = hasPrecip ? precipAmt.toFixed(1) + ' mm' : '';
+                var dGap = dText ? 3 : 0;
+                // Approx. Textbreite (font 11px, ~6.2px/char).
+                var dTextW = dText.length * 6.2;
+                var dTotalW = dIconSize + dGap + dTextW;
+                var dStartX = cx - dTotalW / 2;
+                var dIconX = dStartX;
+                var dTextX = dStartX + dIconSize + dGap;
+
+                if (hasStorm) {
+                    // Blitz (gleicher Pfad wie Mobile).
+                    chartG.append('path')
+                        .attr('d', 'M13 2 L4 14 L11 14 L9 22 L20 10 L13 10 Z')
+                        .attr('transform', 'translate(' + dIconX + ',' + dIconY + ') scale(' + dIconScale + ')')
+                        .attr('fill', '#92400E')
+                        .attr('stroke', '#FBBF24')
+                        .attr('stroke-width', 0.8 / dIconScale)
+                        .attr('stroke-linejoin', 'round');
+                } else {
+                    // Tropfen (gleicher Pfad wie Mobile).
+                    var dDropColor = precipAmt >= 3 ? '#1D4ED8' : precipAmt >= 1 ? '#2563EB' : '#3B82F6';
+                    chartG.append('path')
+                        .attr('d', 'M12 2 C12 2 4 12 4 16 C4 20 7.5 22 12 22 C16.5 22 20 20 20 16 C20 12 12 2 12 2 Z')
+                        .attr('transform', 'translate(' + dIconX + ',' + dIconY + ') scale(' + dIconScale + ')')
+                        .attr('fill', dDropColor)
+                        .attr('stroke', '#DBEAFE')
+                        .attr('stroke-width', 0.8 / dIconScale)
+                        .attr('stroke-linejoin', 'round');
+                }
+
+                if (dText) {
+                    chartG.append('text')
+                        .attr('x', dTextX)
+                        .attr('y', precipRowY + PRECIP_ROW_H / 2 + 1)
+                        .attr('text-anchor', 'start').attr('dominant-baseline', 'central')
+                        .attr('font-size', '11px').attr('font-weight', '700')
+                        .attr('fill', hasStorm ? '#92400E' : '#1E3A5F')
+                        .text(dText);
+                }
+            }
         });
 
         // Separator line between cloud strip and altitude grid
@@ -816,12 +919,15 @@ window.Meteogram = (function () {
                     .attr('width', CELL_W - 2).attr('height', cellH - 2)
                     .attr('fill', bgColor).attr('rx', 3).attr('opacity', 0.8);
 
-                var thermFontSize = Math.round((isNarrow ? 8 : 10) * Math.min(scale, 1.8));
-                chartG.append('text').attr('class', 'therm-value')
-                    .attr('x', ci * CELL_W + CELL_W / 2)
-                    .attr('y', rowY(ri) + cellH - 4 * scale)
-                    .attr('font-size', thermFontSize + 'px')
-                    .text(localRate.toFixed(1));
+                // Mobile: nur Farbe, keine Zahl — Steigrate via Farbcode + Tooltip.
+                if (!isMobileViewport) {
+                    var thermFontSize = Math.round((isNarrow ? 8 : 10) * Math.min(scale, 1.8));
+                    chartG.append('text').attr('class', 'therm-value')
+                        .attr('x', ci * CELL_W + CELL_W / 2)
+                        .attr('y', rowY(ri) + cellH - 4 * scale)
+                        .attr('font-size', thermFontSize + 'px')
+                        .text(localRate.toFixed(1));
+                }
 
                 thermikCells[ri + ',' + ci] = localRate;
             }
@@ -864,13 +970,19 @@ window.Meteogram = (function () {
         var altFontSize = Math.round(11 * Math.min(scale, 1.5));
         altitudes.forEach(function (alt, ri) {
             if (ri === 0 && hasGroundRow && elevation > 0) {
+                // Mobile: kompakte Form ohne "Start"-Wort, sonst wird abgeschnitten.
+                var startLabel = isMobileViewport
+                    ? '\u2605 ' + (elevation >= 1000
+                        ? (elevation / 1000).toFixed(elevation % 1000 === 0 ? 0 : 1) + 'k'
+                        : Math.round(elevation) + 'm')
+                    : '\u2605 Start ' + Math.round(elevation) + 'm';
                 chartG.append('text').attr('class', 'axis-label start-label')
                     .attr('x', -8).attr('y', rowY(ri) + cellH / 2)
                     .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
                     .attr('font-size', altFontSize + 'px')
                     .attr('font-weight', '700')
                     .attr('fill', '#C2410C')
-                    .text('\u2605 Start ' + Math.round(elevation) + 'm');
+                    .text(startLabel);
                 return;
             }
             if (alt % altLabelStep !== 0) return;
@@ -946,7 +1058,16 @@ window.Meteogram = (function () {
 
                 var showGusts = hasRealGust;
                 // Pfeilfarbe: Tier-basiert. WrongDir überschreibt mit Rot (Richtungs-Warnung).
-                var color = isWrongDir ? '#DC2626' : tierTextColor(windTier);
+                // Höhen-Zelle danger: kein roter Fill mehr (Tier ueber Perimeter) →
+                // Pfeil rot statt weiss, damit auf hellem/Thermik-Bg sichtbar.
+                var color;
+                if (isWrongDir) {
+                    color = '#DC2626';
+                } else if (windTier === 'danger' && !isGround) {
+                    color = '#9F1239';
+                } else {
+                    color = tierTextColor(windTier);
+                }
                 // Wind-Zahl Farbe: immer Tier-Farbe der Windstärke (nicht Richtung).
                 var speedColor = tierTextColor(windTier);
 
@@ -977,15 +1098,56 @@ window.Meteogram = (function () {
                         .attr('stroke-width', frameWidth)
                         .attr('rx', 3)
                         .style('pointer-events', 'none');
-                } else if (!hasThermik) {
-                    // Altitude-Grid-Zelle: Tier-Fill direkt.
-                    // calm = transparent (keine Zeichnung), caution = 38% amber, danger = 100% rose.
-                    if (cellTier !== 'calm') {
+                } else {
+                    // Altitude-Grid-Zelle: Tier ueber Perimeter (Border + kleines
+                    // Eck-Dreieck bei danger), kein Hintergrund-Fill — Thermik-
+                    // Farbe (xc-therm Skala) bleibt ungestoerter Glance-Kanal.
+                    // Gedaempfte Hue (orange-700 / rose-800 statt -600/-700)
+                    // damit Warnung lesbar, aber nicht "schreiend".
+                    // - calm: kein Border
+                    // - caution: 1.5px Orange-700 (gedaempfter als #EA580C)
+                    // - danger: 1.75px Rose-800 + Eck-Dreieck mit "!" (Form-
+                    //   Redundanz fuer Farbenblinde, dezent in Groesse)
+                    if (cellTier === 'caution') {
                         chartG.append('rect')
-                            .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
-                            .attr('width', CELL_W - 2).attr('height', rH3 - 2)
-                            .attr('fill', tierFillColor(cellTier))
-                            .attr('rx', 3);
+                            .attr('x', ci3 * CELL_W + 1.25).attr('y', rowY(ri3) + 1.25)
+                            .attr('width', CELL_W - 2.5).attr('height', rH3 - 2.5)
+                            .attr('fill', 'none')
+                            .attr('stroke', '#C2410C')
+                            .attr('stroke-opacity', 0.75)
+                            .attr('stroke-width', 1.5)
+                            .attr('rx', 3)
+                            .style('pointer-events', 'none');
+                    } else if (cellTier === 'danger') {
+                        chartG.append('rect')
+                            .attr('x', ci3 * CELL_W + 1.5).attr('y', rowY(ri3) + 1.5)
+                            .attr('width', CELL_W - 3).attr('height', rH3 - 3)
+                            .attr('fill', 'none')
+                            .attr('stroke', '#9F1239')
+                            .attr('stroke-opacity', 0.8)
+                            .attr('stroke-width', 1.75)
+                            .attr('rx', 3)
+                            .style('pointer-events', 'none');
+                        // Eck-Dreieck oben rechts (Form-Redundanz fuer color-not-only).
+                        // Dezent: 9px statt 11px, leicht transparent.
+                        var bdx = ci3 * CELL_W + CELL_W - 1.5;
+                        var bdy = rowY(ri3) + 1.5;
+                        var bds = Math.round(9 * Math.min(scale, 1.3));
+                        chartG.append('path')
+                            .attr('d', 'M ' + (bdx - bds) + ' ' + bdy + ' L ' + bdx + ' ' + bdy + ' L ' + bdx + ' ' + (bdy + bds) + ' Z')
+                            .attr('fill', '#9F1239')
+                            .attr('fill-opacity', 0.85)
+                            .style('pointer-events', 'none');
+                        chartG.append('text')
+                            .attr('x', bdx - bds * 0.32)
+                            .attr('y', bdy + bds * 0.42)
+                            .attr('text-anchor', 'middle')
+                            .attr('dominant-baseline', 'middle')
+                            .attr('font-size', Math.round(bds * 0.6) + 'px')
+                            .attr('font-weight', '900')
+                            .attr('fill', '#FFFFFF')
+                            .style('pointer-events', 'none')
+                            .text('!');
                     }
                 }
 
@@ -993,9 +1155,11 @@ window.Meteogram = (function () {
                 var gFilter;
                 if (isGround && isWrongDir) {
                     gFilter = 'drop-shadow(0 0 4px rgba(220, 38, 38, 0.8))';
-                } else if (cellTier === 'danger') {
+                } else if (isGround && cellTier === 'danger') {
+                    // Ground-danger hat noch den rosa Fill → roter Glow betont.
                     gFilter = 'drop-shadow(0 0 3px rgba(225, 29, 72, 0.55))';
                 } else {
+                    // Hoehen-danger: Border + rote Zahl reichen — kein Glow noetig.
                     gFilter = 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))';
                 }
                 var g = chartG.append('g')
@@ -1014,10 +1178,18 @@ window.Meteogram = (function () {
                 // Erst bei Tag-ueberschreitender Boee (>30 km/h) wird sie farbig
                 // und sticht als Warnung raus.
                 var gustColor = gustTier === 'calm' ? '#64748B' : tierTextColor(gustTier);
-                // Voll saturierte danger-Zelle: alle Zahlen weiss fuer Kontrast.
+                // Tier-Override fuer Wind/Boeen-Zahl:
+                // - Ground-Row danger: rosa-Fill bleibt → weisse Zahl fuer Kontrast.
+                // - Hoehen-Zelle danger: kein Fill mehr (Tier ueber Perimeter),
+                //   Zahl bleibt rot → auf Thermik mit weissem Halo (textShadow).
                 if (cellTier === 'danger') {
-                    speedColor = '#FFFFFF';
-                    gustColor = '#FFFFFF';
+                    if (isGround) {
+                        speedColor = '#FFFFFF';
+                        gustColor = '#FFFFFF';
+                    } else {
+                        speedColor = '#9F1239';
+                        gustColor = '#9F1239';
+                    }
                 }
                 var windFontSize = Math.round((isNarrow ? 7 : 9) * Math.min(scale, 1.8));
                 // Font-Weight als 3. Tier-Kanal: 400 / 500 / 700.
@@ -1029,7 +1201,16 @@ window.Meteogram = (function () {
                 var windTextY = rowY(ri3) + (hasThermik ? Math.round(10 * scale) : rH3 - Math.round(4 * scale));
                 // Text-Shadow nur auf Thermik-Zellen (Lesbarkeit ueber gelbem Bg) —
                 // auf gefuellten Tier-Zellen nicht noetig (genug Kontrast).
-                var textShadow = (hasThermik && cellTier === 'calm') ? '0 1px 2px rgba(255,255,255,0.8)' : 'none';
+                // Bei danger auf Thermik: starker weisser Halo, damit rote Zahl
+                // klar absteht (kein Pill noetig).
+                var textShadow = 'none';
+                if (hasThermik) {
+                    if (cellTier === 'danger') {
+                        textShadow = '0 0 3px rgba(255,255,255,0.95), 0 0 2px rgba(255,255,255,0.95)';
+                    } else if (cellTier === 'calm') {
+                        textShadow = '0 1px 2px rgba(255,255,255,0.8)';
+                    }
+                }
                 if (showNumbers && showGusts) {
                     var windGustText = chartG.append('text').attr('class', 'wind-value')
                         .attr('x', cx).attr('y', windTextY)
@@ -1039,8 +1220,14 @@ window.Meteogram = (function () {
                         .style('font-variant-numeric', 'tabular-nums');
                     windGustText.append('tspan').attr('fill', speedColor)
                         .text(Math.round(speed));
-                    // Separator — auf danger weiss, sonst muted grey.
-                    var sepColor = cellTier === 'danger' ? 'rgba(255,255,255,0.7)' : '#94A3B8';
+                    // Separator — Ground-danger weiss (auf rosa Fill), Hoehen-danger
+                    // halbtransparent rot (passend zu roten Zahlen), sonst muted grey.
+                    var sepColor;
+                    if (cellTier === 'danger') {
+                        sepColor = isGround ? 'rgba(255,255,255,0.7)' : 'rgba(159,18,57,0.45)';
+                    } else {
+                        sepColor = '#94A3B8';
+                    }
                     windGustText.append('tspan').attr('fill', sepColor).text('/');
                     windGustText.append('tspan').attr('fill', gustColor)
                         .text(Math.round(gusts));
@@ -1062,11 +1249,10 @@ window.Meteogram = (function () {
                 // der Kachel nicht überdeckt wird.
                 var tRisk = d.turbulence_risk != null ? d.turbulence_risk : gusts;
                 var tExcess = d.turbulence_excess != null ? d.turbulence_excess : gustDiff;
-                // Turbulenz-Strip nur zeigen wenn (a) nennenswerter Exzess UND
-                // (b) Zelle nicht bereits voll danger-gefuellt (sonst redundant).
-                // Farbe: bei calm-Tier muted slate (Boee existiert, aber nicht
-                // Tag-relevant), bei caution/danger tier-farbig als Warnsignal.
-                if (tExcess > 1 && cellTier !== 'danger') {
+                // Turbulenz-Strip am rechten Zellrand. Auf Mobile komplett aus
+                // (visuell zu unruhig in der dichten Mobile-View — Turbulenz
+                // ist via Tooltip + cellTier-Farbe abgedeckt).
+                if (!isMobileViewport && tExcess > 1 && cellTier !== 'danger') {
                     var stripW = Math.round((isNarrow ? 4 : 6) * Math.min(scale, 1.5));
                     var stripMargin = isGround ? 3 : 1;
                     var tStripTier = classifyTier(tRisk, gustMetric, thresholds);
@@ -1103,7 +1289,10 @@ window.Meteogram = (function () {
             .attr('y1', groundY).attr('y2', groundY);
 
         // Regionen haben keine Böen (Apr 2026) — Label ohne "/ Böen".
-        var groundLabels = [isRegion ? 'Wind' : 'Wind / Böen', 'Temp / Regen', 'Thermik'];
+        // Mobile: kompakte Labels (oder ganz weg), damit linker Margin reicht.
+        var groundLabels = isMobileViewport
+            ? ['Wind', 'Temp', 'Therm']
+            : [isRegion ? 'Wind' : 'Wind / Böen', 'Temp / Regen', 'Thermik'];
         groundLabels.forEach(function (lbl, i) {
             chartG.append('text').attr('class', 'ground-label')
                 .attr('x', -8).attr('y', groundY + i * 24 + 14)
@@ -1215,11 +1404,14 @@ window.Meteogram = (function () {
                     .attr('width', CELL_W - 2).attr('height', 22).attr('rx', 3)
                     .attr('fill', thermBg).attr('opacity', 0.4);
 
-                chartG.append('text').attr('class', 'ground-value')
-                    .attr('x', cx).attr('y', groundY + 48 + 14)
-                    .attr('dominant-baseline', 'central').attr('font-size', '10px')
-                    .attr('font-weight', '700').attr('fill', '#1E293B')
-                    .text(therm.climb_rate.toFixed(1));
+                // Mobile: nur Farbe, keine Zahl. Desktop: Steigrate als Text.
+                if (!isMobileViewport) {
+                    chartG.append('text').attr('class', 'ground-value')
+                        .attr('x', cx).attr('y', groundY + 48 + 14)
+                        .attr('dominant-baseline', 'central').attr('font-size', '10px')
+                        .attr('font-weight', '700').attr('fill', '#1E293B')
+                        .text(therm.climb_rate.toFixed(1));
+                }
             }
         });
 

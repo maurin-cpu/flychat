@@ -2040,9 +2040,17 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
     chart_data = {"profiles": []}
     sorted_times = sorted(pressure_level_data.keys())
 
-    # Grid: 0-4000m in 250m steps
+    # Grid: 0-GRID_MAX in 250m steps, dynamisch nach Spot-Höhe.
+    # Frontend (meteogram.js) rendert bei elevation>=1800m bis 5000m MSL —
+    # ohne dynamischen GRID_MAX blieben obere Zellen leer (z.B. Laucheralp
+    # 1981m verlor die Zeilen 4250-5000m MSL). Buffer = elevation + 3100m
+    # gibt ≥3km Headroom über Startplatz bei alpinen Spots. Für Regionen
+    # (kein elevation_m) Fallback 5500m (deckt Engadin Ober 2450m ab).
     GRID_STEP = 250
-    GRID_MAX = 4000
+    if elevation_m is not None:
+        GRID_MAX = max(4000, math.ceil((elevation_m + 3100) / GRID_STEP) * GRID_STEP)
+    else:
+        GRID_MAX = 5500
 
     for timestamp in sorted_times:
         data = pressure_level_data[timestamp]
@@ -2210,6 +2218,25 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
                 # bis 4 km Höhe (36 km/h Mittelland-Artefakt); der PBL-Cap war
                 # nur Pflaster. Jetzt folgt T(z) reiner Gauss-Decay aus Anker.
                 profile["levels"] = grid_levels
+
+            # Top-Extrapolation: Regionen (kein Surface-Anchor-Re-Grid) enden
+            # mit dem höchsten Pressure-Level (~4200m MSL bei 600 hPa). Für hoch
+            # gelegene Regionen will das Frontend bis 5000m MSL rendern — ohne
+            # synthetisches Top-Level blieben obere Zellen leer. Wir padden mit
+            # den Werten des höchsten tatsächlichen Levels (konstante Fortsetzung
+            # = konservativ, Wind ändert in diesen 1-2 km kaum). Nur wenn noch
+            # nicht re-gridded (levels ohne "wind_gusts" Feld = PL-Rohdaten).
+            if profile["levels"] and "wind_gusts" not in profile["levels"][-1]:
+                levels_sorted = sorted(profile["levels"], key=lambda l: l["altitude"])
+                top = levels_sorted[-1]
+                if top["altitude"] < GRID_MAX - GRID_STEP:
+                    profile["levels"].append({
+                        "pressure": top.get("pressure"),
+                        "altitude": GRID_MAX,
+                        "wind_speed": top.get("wind_speed", 0),
+                        "wind_direction": top.get("wind_direction", 0),
+                        "temperature": top.get("temperature", 0),
+                    })
 
             # Ensure turbulence fields exist on all levels + add turbulence_risk alias
             for lv in profile["levels"]:
