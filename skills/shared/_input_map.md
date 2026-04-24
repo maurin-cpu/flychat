@@ -26,20 +26,30 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 - `[ALOFT-GUST-WARN]` — Flugschicht-Turbulenz {{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h *(nur Spots)*
 - `[CAPE-WARN]` — CAPE {{cfg.CAPE_WARN_JKG}}-{{cfg.CAPE_DANGER_JKG}} J/kg ohne Trigger
 
-**Richtungs-Tags (Spot-Modus):**
-- `[WIND-OK]` — Windrichtung liegt im erlaubten Spot-Sektor (inkl. 10° Buffer)
-- `[WIND-WRONG]` — Windrichtung ausserhalb des Spot-Sektors → Stunde UNFLIEGBAR
+**Richtungs-Tags (Spot-Modus) — Start-Bedingung, KEINE Flug-Gefahr:**
+- `[WIND-OK]` — Windrichtung liegt im erlaubten Spot-Sektor (inkl. 10° Buffer) → Start moeglich.
+- `[WIND-WRONG]` — Windrichtung ausserhalb des Spot-Sektors → **Stunde nicht startbar** (NICHT UNFLIEGBAR). Stunden NACH einem gueltigen Start-Fenster sind kein Sicherheitsproblem (Pilot ist in der Luft, Landung separat). Details: `_hazard_blocks.md` Block 2 Start-Fenster-Regel.
 
 **Magnitude-Tags (Region-Modus):** Regionen haben keinen Sektor und keine Boeen, nur Wind-Staerke auf Referenzhoehe.
 - `[WIND-CALM]` — Wind < {{cfg.WIND_MODERATE_KMH}} km/h → RUHIG
 - `[WIND-MODERATE]` — Wind {{cfg.WIND_MODERATE_KMH}}-{{cfg.WIND_STRONG_KMH}} km/h → SPORTLICH (= WARN-Level fuer Regionen)
 - `[WIND-STRONG]` — Wind > {{cfg.WIND_STRONG_KMH}} km/h → UNFLIEGBAR (= DANGER-Level fuer Regionen)
 
-**Stunden-Klassifikation** (siehe KERNREGEL in `_hazard_blocks.md`):
-- `RUHIG` = Windrichtung passt + KEINE Tags = komfortabel.
-- `SPORTLICH` = Windrichtung passt + ≥1 WARN-Tag, KEIN DANGER = fliegbar erfahren.
-- `UNFLIEGBAR` = ≥1 DANGER-Tag ODER Windrichtung falsch.
-- "Sauber" = RUHIG ODER SPORTLICH. `safe_window` = sauberes Fenster.
+**Stunden-Klassifikation** (siehe KERNREGEL in `_hazard_blocks.md`) — **zwei unabhaengige Achsen**:
+
+*Achse 1 — Flug-Gefahr (betrifft Pilot in der Luft):*
+- `RUHIG` = KEINE Tags = komfortabel.
+- `SPORTLICH` = ≥1 WARN-Tag, KEIN DANGER = fliegbar erfahren.
+- `UNFLIEGBAR` = ≥1 DANGER-Tag (RAIN, GUST-DANGER, ALOFT-*, STRONG-WIND-WARN, THUNDERSTORM, CAPE-DANGER, OVERCAST-DANGER) — `[WIND-WRONG]` zaehlt NICHT hier rein.
+
+*Achse 2 — Start-Moeglichkeit (betrifft nur Startplatz):*
+- `STARTBAR` = `[WIND-OK]` (Region: `[WIND-CALM]` oder `[WIND-MODERATE]`).
+- `NICHT-STARTBAR` = `[WIND-WRONG]` (Spot) ODER `[WIND-STRONG]` (Region).
+
+*Kombinierter Begriff:*
+- **Saubere Stunde** = STARTBAR UND nicht UNFLIEGBAR (keine DANGER-Tags). Das ist die einzige Stundenart, in der ein Pilot sicher starten kann.
+- `safe_window` = zusammenhaengender Block sauberer Stunden.
+- Stunden mit `[WIND-WRONG]` aber ohne DANGER-Tags sind **nicht UNFLIEGBAR** — sie sind "nicht startbar". Tag-Status haengt allein am laengsten Block sauberer Stunden (Schwellen: `{{cfg.CLEAN_WINDOW_MIN_HOURS}}h`/`{{cfg.CLEAN_WINDOW_GREEN_HOURS}}h`).
 
 **Thermik-Qualitaets-Tags** (gelten NUR fuer Teil 2 Fliegbarkeit, NIE fuer Sicherheit):
 - `[SHEAR-DEGRADED]` / `[SHEAR-UNUSABLE]` — Windscherung: Wind dreht/beschleunigt mit Hoehe, Blase wird gekippt (Spot + Region).
@@ -71,5 +81,6 @@ Hier hat das System bereits alles gezaehlt und geflagged:
 - `→ ACHTUNG Verhaeltnis < 35%: ...` — optionaler Warnhinweis
 - `THERMIK-QUALITAET-Block`: Zaehler fuer SHEAR/TORN/ROUGH-UNUSABLE-Stunden + TQ-Ratio pro Stunde (Regionen: kein ROUGH)
 - **Trend-Labels (falls vorhanden):** AUFKLAERUNG / ZUNEHMEND / EINGEKESSELT / DURCHGEHEND (WARN/DANGER) / VEREINZELT / STABIL — vollstaendige Definitionen siehe TREND-VOKABULAR in `_hazard_blocks.md`. Wende sie pro Gefahrenblock an (Regen, Bodenwind, Boeen, Hoehenwind, CAPE, Wolken). Foehn ist ausgenommen (severity-pauschal, kein Trend).
+- **Eigene Trend-Zeilen:** Direkt nach TAGESPROFIL koennen `NIEDERSCHLAG-TREND`, `BOEEN-TREND` (nur Spots) und `HOEHENWIND-TREND` stehen. Diese Zeilen sind das System-Urteil zum jeweiligen Gefahrenblock — PFLICHT-Input fuer deinen Status. Wenn eine Zeile explizit `→ safety_status sollte not_safe sein` sagt, setze not_safe. Wenn sie `→ Ruhige Stunden normal bewerten` sagt (AUFKLAERUNG), nutze das saubere Fenster fuer `safe_window` — auch wenn morgens DANGER-Stunden waren.
 
 **Deine Pflicht:** Diese Werte lesen, nicht selber berechnen. Wenn BOEEN-FLOOR steht, ist das verbindlich. Wenn "Verhaeltnis < 35%" steht, MUSS das in `caution_notes` oder `no_go_reasons`.

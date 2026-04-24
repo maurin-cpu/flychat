@@ -29,6 +29,13 @@ Wenn eine Zahl nicht genannt werden soll: beschreibe qualitativ ("leicht boeig",
 - **Fliegbarkeit (Teil 2)**: Wie gut ist das Flugwetter wenn man fliegt? UI-Namen **Bronze / Gruen / Violett** — JSON-Enum-Werte `"gray" / "green" / "violet"` (Code erwartet diese englischen Werte; in deinen Prosa-Feldern verwendest du die deutschen UI-Namen).
 Ein Tag kann *bedingt sicher* sein und trotzdem *legendaeres XC-Wetter* haben — oder *safe* sein mit nur *Abgleiter*-Niveau. **Thermik-Qualitaets-Tags** ([SHEAR-*], [TORN-*], [ROUGH-*]) betreffen ausschliesslich Teil 2 — NIEMALS als Grund fuer not_safe/conditional verwenden.
 
+**4. WIND-WRONG ist eine Start-Bedingung, keine Flug-Gefahr.**
+`[WIND-WRONG]` heisst: **in dieser Stunde kann der Pilot am Startplatz nicht starten** — weil der Wind aus der falschen Richtung kommt. Das ist **kein** UNFLIEGBAR-Grund wie Regen, Gewitter oder Sturm. Ist der Pilot einmal in der Luft, ist die Bodenwindrichtung am Startplatz irrelevant (Landung erfolgt typischerweise auf separatem Landeplatz). Deshalb:
+- `[WIND-WRONG]`-Stunden **NACH** einem gueltigen Start-Fenster sind **nicht** UNFLIEGBAR. Sie bedeuten nur: kein weiterer Start moeglich.
+- Tag-Status haengt am **laengsten zusammenhaengenden sauberen Fenster** (WIND-OK + keine DANGER-Tags), nicht an der Summe der WIND-WRONG-Stunden.
+- Ein Richtungsdreher im Tagesverlauf (auch >90°) macht aus einem saubereren Morgen-Fenster **keinen not_safe-Tag** — er ist nur eine Anmerkung in `caution_notes`.
+- `[WIND-STRONG]` bleibt UNFLIEGBAR (zu starker Wind trifft Pilot auch in der Luft).
+
 ═══════════════════════════════════════════════
 GLOSSAR
 ═══════════════════════════════════════════════

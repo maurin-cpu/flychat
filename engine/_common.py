@@ -820,6 +820,190 @@ def _format_gust_trend_text(gust_pattern: dict, gust_hours: list) -> str:
     )
 
 
+def _detect_aloft_trend(aloft_hours: list, all_hours_sorted: list,
+                        aloft_danger_hours: list = None) -> dict:
+    """Erkennt Hoehenwind-Trendmuster ueber den Tag (analog _detect_gust_trend).
+
+    aloft_hours = Stunden mit [ALOFT-WARN] ODER [ALOFT-DANGER] im Flugbereich.
+    aloft_danger_hours: Untermenge mit [ALOFT-DANGER] (> ALOFT_DANGER_KMH).
+
+    Returns dict mit:
+        is_sandwiched: bool — ruhiges Fenster zwischen zwei Hoehenwind-Phasen
+        max_calm_gap: int — laengstes zusammenhaengendes ruhiges Fenster (Stunden)
+        calm_start: str — Beginn des laengsten ruhigen Fensters
+        calm_end: str — Ende
+        aloft_before_calm: bool — Hoehenwind-Stunden vor dem laengsten ruhigen Fenster
+        aloft_after_calm: bool — Hoehenwind-Stunden nach dem laengsten ruhigen Fenster
+        aloft_count: int — Anzahl Hoehenwind-Stunden (WARN + DANGER)
+        danger_count: int — Anzahl Stunden mit DANGER-Level (> ALOFT_DANGER_KMH)
+        total_count: int — Gesamtanzahl Stunden im Fenster
+        pattern_label: str — AUFKLAERUNG | ZUNEHMEND | EINGEKESSELT | EINGEKESSELT_KNAPP
+                             | DURCHGEHEND_DANGER | DURCHGEHEND_WARN | VEREINZELT | KEIN
+    """
+    total = len(all_hours_sorted or [])
+    danger_count = len(aloft_danger_hours or [])
+    if not aloft_hours or not all_hours_sorted:
+        return {
+            "is_sandwiched": False,
+            "max_calm_gap": total,
+            "calm_start": all_hours_sorted[0] if all_hours_sorted else "",
+            "calm_end": all_hours_sorted[-1] if all_hours_sorted else "",
+            "aloft_before_calm": False,
+            "aloft_after_calm": False,
+            "aloft_count": 0,
+            "danger_count": 0,
+            "total_count": total,
+            "pattern_label": "KEIN",
+        }
+
+    aloft_set = set(aloft_hours)
+    calm_stretches = []
+    current_calm = []
+    for h in all_hours_sorted:
+        if h not in aloft_set:
+            current_calm.append(h)
+        else:
+            if current_calm:
+                calm_stretches.append(current_calm[:])
+            current_calm = []
+    if current_calm:
+        calm_stretches.append(current_calm)
+
+    ac = len(aloft_hours)
+
+    if not calm_stretches:
+        return {
+            "is_sandwiched": False,
+            "max_calm_gap": 0,
+            "calm_start": "",
+            "calm_end": "",
+            "aloft_before_calm": False,
+            "aloft_after_calm": False,
+            "aloft_count": ac,
+            "danger_count": danger_count,
+            "total_count": total,
+            "pattern_label": "DURCHGEHEND_DANGER" if danger_count >= max(3, int(0.5 * ac)) else "DURCHGEHEND_WARN",
+        }
+
+    longest = max(calm_stretches, key=len)
+    calm_start = longest[0]
+    calm_end = longest[-1]
+    aloft_before = any(h < calm_start for h in aloft_hours)
+    aloft_after = any(h > calm_end for h in aloft_hours)
+    is_sand = aloft_before and aloft_after
+    calm_gap = len(longest)
+    danger_majority = danger_count >= max(3, int(0.5 * ac))
+
+    # Pattern-Klassifikation (parallel zu _format_gust_trend_text)
+    if ac >= max(1, int(0.75 * total)) or calm_gap < 2:
+        label = "DURCHGEHEND_DANGER" if danger_majority else "DURCHGEHEND_WARN"
+    elif is_sand and calm_gap < 4:
+        label = "EINGEKESSELT"
+    elif is_sand:
+        label = "EINGEKESSELT_KNAPP"
+    elif aloft_before and not aloft_after:
+        label = "AUFKLAERUNG"
+    elif aloft_after and not aloft_before:
+        label = "ZUNEHMEND"
+    else:
+        label = "VEREINZELT"
+
+    return {
+        "is_sandwiched": is_sand,
+        "max_calm_gap": calm_gap,
+        "calm_start": calm_start,
+        "calm_end": calm_end,
+        "aloft_before_calm": aloft_before,
+        "aloft_after_calm": aloft_after,
+        "aloft_count": ac,
+        "danger_count": danger_count,
+        "total_count": total,
+        "pattern_label": label,
+    }
+
+
+def _format_aloft_trend_text(aloft_pattern: dict, aloft_hours: list,
+                             danger_kmh: float = 30, warn_kmh: float = 20) -> str:
+    """Erzeugt HOEHENWIND-TREND Text-Zeile fuer LLM-Kontext (analog BOEEN-TREND).
+
+    Pattern-Klassifikation: siehe _detect_aloft_trend → pattern_label.
+    Severitaet: not_safe nur bei DURCHGEHEND_DANGER oder EINGEKESSELT mit DANGER
+    und Fenster < 3h. AUFKLAERUNG darf conditional bleiben, auch wenn morgens
+    DANGER war. ZUNEHMEND → max conditional (Pilot landet frueh).
+    """
+    if not aloft_hours:
+        return ""
+
+    ac = aloft_pattern.get("aloft_count", 0)
+    tc = aloft_pattern.get("total_count", 0)
+    dc = aloft_pattern.get("danger_count", 0)
+    if tc == 0 or ac == 0:
+        return ""
+
+    calm_gap = aloft_pattern.get("max_calm_gap", 0)
+    calm_start = aloft_pattern.get("calm_start", "")
+    calm_end = aloft_pattern.get("calm_end", "")
+    label = aloft_pattern.get("pattern_label", "")
+
+    if label == "DURCHGEHEND_DANGER":
+        return (
+            f"HOEHENWIND-TREND: DURCHGEHEND (DANGER-Mehrheit) — Hoehenwind in {ac} von {tc}h, "
+            f"davon {dc}h > {danger_kmh:.0f} km/h in der Flugschicht. "
+            f"Laengstes ruhiges Fenster nur {calm_gap}h. "
+            f"Kein verlaesslich ruhiges Flugfenster. "
+            f"→ safety_status sollte not_safe sein. primary_no_go = ALOFT_DANGER"
+        )
+    if label == "DURCHGEHEND_WARN":
+        return (
+            f"HOEHENWIND-TREND: DURCHGEHEND (WARN-Level) — Hoehenwind in {ac} von {tc}h "
+            f"bei {warn_kmh:.0f}-{danger_kmh:.0f} km/h, laengstes ruhiges Fenster {calm_gap}h. "
+            f"→ maximal conditional, nicht not_safe. Sportlich in caution_notes erwaehnen."
+        )
+    if label == "EINGEKESSELT":
+        if dc >= max(1, int(0.3 * ac)):
+            return (
+                f"HOEHENWIND-TREND: EINGEKESSELT (DANGER) — Ruhiges Fenster nur {calm_gap}h "
+                f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen "
+                f"({ac}h Hoehenwind, davon {dc}h > {danger_kmh:.0f} km/h). "
+                f"Pilot startet in eskalierende Bedingungen — Wind kommt zurueck! "
+                f"→ safety_status sollte not_safe sein. primary_no_go = EINGEKESSELT-HOEHENWIND"
+            )
+        return (
+            f"HOEHENWIND-TREND: EINGEKESSELT (WARN-Level) — Ruhiges Fenster {calm_gap}h "
+            f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen ({ac}h bei {warn_kmh:.0f}-{danger_kmh:.0f} km/h). "
+            f"Wind kommt zurueck — Pilot muss vor Ende landen. "
+            f"→ maximal conditional. Zeitfenster in caution_notes konkret begruenden."
+        )
+    if label == "EINGEKESSELT_KNAPP":
+        return (
+            f"HOEHENWIND-TREND: EINGEKESSELT (knapp) — Ruhiges Fenster {calm_gap}h "
+            f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen ({ac}h insgesamt). "
+            f"Wind kommt zurueck — Pilot muss vor Ende landen. "
+            f"→ Maximal conditional. In caution_notes konkret begruenden."
+        )
+    if label == "AUFKLAERUNG":
+        return (
+            f"HOEHENWIND-TREND: AUFKLAERUNG — Hoehenwind frueh ({ac}h, bis {calm_start}, "
+            f"{dc}h davon > {danger_kmh:.0f} km/h), danach ruhig ({calm_gap}h ab {calm_start}). "
+            f"Wind zieht ab, keine Rueckkehr. "
+            f"→ Ruhige Stunden normal bewerten, safe_window dort setzen. "
+            f"safety_status kann safe oder conditional sein, auch wenn morgens DANGER war."
+        )
+    if label == "ZUNEHMEND":
+        return (
+            f"HOEHENWIND-TREND: ZUNEHMEND — Ruhig morgens ({calm_gap}h, bis {calm_end}), "
+            f"danach {ac}h Hoehenwind ({dc}h > {danger_kmh:.0f} km/h). Pilot muss vor Eskalation landen. "
+            f"→ Maximal conditional. safe_window auf Morgen setzen, "
+            f"in caution_notes auf Verschlechterung hinweisen."
+        )
+    return (
+        f"HOEHENWIND-TREND: VEREINZELT — {ac}h Hoehenwind-Phasen verteilt "
+        f"(davon {dc}h > {danger_kmh:.0f} km/h), laengstes ruhiges Fenster {calm_gap}h "
+        f"({calm_start}-{calm_end}). "
+        f"→ Pruefe ob ruhiges Fenster fuer Flugplan reicht; maximal conditional bei DANGER-Stunden."
+    )
+
+
 def _interpolate_wind_at_altitude(pl_data: dict, target_alt: float, pressure_levels: list) -> tuple:
     """Interpoliert Windgeschwindigkeit und -richtung auf einer Zielhoehe aus Drucklevel-Daten.
 

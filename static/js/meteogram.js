@@ -8,7 +8,69 @@
 window.Meteogram = (function () {
     'use strict';
 
-    // ===== COLOR SCALES =====
+    // ===== TIER SYSTEM =====
+    // Drei Tiers matchen die LLM-Bewertung (_hazard_blocks.md KERNREGEL):
+    //   calm     = RUHIG       (Wert unter WARN)
+    //   caution  = SPORTLICH   (WARN-Level)
+    //   danger   = UNFLIEGBAR  (DANGER-Level)
+    // Schwellen kommen aus config.py via /api/weather → options.thresholds.
+    // Fallback-Defaults entsprechen config.py-Werten, falls API fehlt.
+    var DEFAULT_THRESHOLDS = {
+        ground_wind: { warn: 20, danger: 30 },
+        ground_gust: { warn: 30, danger: 40 },
+        aloft_wind:  { warn: 20, danger: 30 },
+        aloft_gust:  { warn: 30, danger: 40 },
+    };
+
+    function _th(thresholds, metric) {
+        return (thresholds && thresholds[metric]) || DEFAULT_THRESHOLDS[metric];
+    }
+
+    function classifyTier(value, metric, thresholds) {
+        if (value == null) return 'calm';
+        var th = _th(thresholds, metric);
+        if (value > th.danger) return 'danger';
+        if (value > th.warn) return 'caution';
+        return 'calm';
+    }
+
+    // Tier visual tokens (mirror style.css --tier-* — keep in sync).
+    var TIER_STYLES = {
+        calm:    { text: '#047857', fill: 'transparent',             frame: '#F97316' },  // frame = existing orange launch-frame
+        caution: { text: '#78350F', fill: 'rgba(245, 158, 11, 0.38)', frame: '#D97706' },
+        danger:  { text: '#FFFFFF', fill: '#E11D48',                 frame: '#BE123C' },
+    };
+
+    function tierTextColor(tier) { return TIER_STYLES[tier].text; }
+    function tierFillColor(tier) { return TIER_STYLES[tier].fill; }
+    function tierFrameColor(tier) { return TIER_STYLES[tier].frame; }
+
+    var TIER_LABELS = { calm: 'Ruhig', caution: 'Sportlich', danger: 'Unfliegbar' };
+    var TIER_DOTS   = { calm: '#10B981', caution: '#F59E0B', danger: '#E11D48' };
+
+    // Leitet den dominanten Python-Tag-Namen aus Windstaerke/Boee + Schwellen ab.
+    // Spiegelt die Logik aus weather_context.py (Ground vs Aloft, Wind vs Gust).
+    function deriveDominantTag(isGround, speed, gusts, thresholds) {
+        var wind = _th(thresholds, isGround ? 'ground_wind' : 'aloft_wind');
+        var gust = _th(thresholds, isGround ? 'ground_gust' : 'aloft_gust');
+        var tags = [];
+        if (speed != null) {
+            if (speed > wind.danger) tags.push({ tier: 'danger', name: isGround ? 'STRONG-WIND-WARN' : 'ALOFT-DANGER' });
+            else if (speed > wind.warn) tags.push({ tier: 'caution', name: isGround ? 'WIND-MODERATE' : 'ALOFT-WARN' });
+        }
+        if (gusts != null && gusts > speed) {
+            if (gusts > gust.danger) tags.push({ tier: 'danger', name: isGround ? 'GUST-DANGER' : 'ALOFT-GUST-DANGER' });
+            else if (gusts > gust.warn) tags.push({ tier: 'caution', name: isGround ? 'GUST-WARN' : 'ALOFT-GUST-WARN' });
+        }
+        // Schlimmstes Tag gewinnt.
+        var ORDER = { calm: 0, caution: 1, danger: 2 };
+        tags.sort(function (a, b) { return ORDER[b.tier] - ORDER[a.tier]; });
+        return tags.length > 0 ? tags[0] : null;
+    }
+
+    // ===== COLOR SCALES (legacy gradient — kept for non-semantic uses) =====
+    // Only used for the thermik/cloud/precip strips and the map.js ground-arrow
+    // fallback. New cell coloring uses tier functions above.
     function windColor(speed) {
         if (speed <= 10) return '#059669';
         if (speed <= 20) return '#10B981';
@@ -19,6 +81,24 @@ window.Meteogram = (function () {
 
     function windBgColor(speed) {
         return windColor(speed) + '14';
+    }
+
+    // Stronger background tint used when numbers are hidden, so the speed
+    // is visible from the cell color alone. Steps: ruhig → leicht → mittel → stark.
+    function windBgColorStrong(speed) {
+        if (speed == null) return 'transparent';
+        if (speed <= 5) return '#05966914';   // sehr ruhig (8%)
+        if (speed <= 12) return '#10B98126';  // moderat (15%)
+        if (speed <= 20) return '#10B98140';  // spürbar (25%)
+        if (speed <= 25) return '#D9770655';  // stark (33%)
+        if (speed <= 30) return '#EA580C66';  // kräftig (40%)
+        return '#DC262680';                   // gefährlich (50%)
+    }
+
+    // Read user pref: show numeric wind/gust labels in cells
+    function readShowNumbers() {
+        try { return localStorage.getItem('gleitcast.meteogram.showNumbers') === '1'; }
+        catch (e) { return false; }
     }
 
     // Turbulence risk color (based on absolute T(z) value)
@@ -271,6 +351,14 @@ window.Meteogram = (function () {
         // rendern (Region-Einzugsgebiet umfasst verschiedene Höhen).
         var isRegion = !!(options && options.isRegion);
         var thermalBaseAlt = isRegion ? minGridAlt : elevation;
+        // Numbers toggle (mobile only): when off, wind/gust digits in cells are
+        // hidden and speed is encoded as cell background tint. The toggle pill
+        // above the chart flips this preference (persisted in localStorage).
+        // Desktop (>640px) keeps the original layout — Zahlen immer an.
+        var isMobileViewport = window.innerWidth <= 640;
+        var showNumbers = (options && typeof options.showNumbers === 'boolean')
+            ? options.showNumbers : readShowNumbers();
+        if (!isMobileViewport) showNumbers = true;
 
         // Interpolated grid
         var grid = [];
@@ -351,11 +439,26 @@ window.Meteogram = (function () {
         }
 
         // Dimensions (responsive)
-        MARGIN.left = (window.innerWidth <= 480) ? 56 : 96;
-        var panelWidth = container.clientWidth || 800;
-        var minCellW = (window.innerWidth <= 480) ? 28 : 40;
+        // Desktop bleibt unverändert (Original-Layout). Auf Mobile: Chart
+        // passt IMMER in den Container — kein horizontaler Scroll, egal ob
+        // Zahlen an oder aus. Numbers werden bei Bedarf kleiner gerendert.
+        var isNarrowScreen = window.innerWidth <= 480;
+        MARGIN.left = isMobileViewport ? (showNumbers ? 52 : 44) : 96;
+        MARGIN.right = isMobileViewport ? 12 : 24;
+        // clientWidth kann während Layout-Race 0 sein → safer fallback aus
+        // Viewport-Breite, damit das Chart NIE die Mobile-Viewport sprengt.
+        var safeFallback = isMobileViewport
+            ? Math.max(240, window.innerWidth - 32)
+            : 800;
+        var panelWidth = container.clientWidth || safeFallback;
+        if (isMobileViewport) {
+            // Hard-Cap an Viewport: niemals breiter als Bildschirm minus Body-Padding.
+            panelWidth = Math.min(panelWidth, window.innerWidth - 24);
+        }
+        // Mobile: nie unter Container — kein erzwungener Scroll. Desktop: Original-Floor.
+        var minCellW = isMobileViewport ? 0 : 40;
         var minChartW = MARGIN.left + nCols * minCellW + MARGIN.right;
-        var chartW = Math.max(panelWidth, minChartW);
+        var chartW = isMobileViewport ? panelWidth : Math.max(panelWidth, minChartW);
         var CELL_W = (chartW - MARGIN.left - MARGIN.right) / nCols;
         var isNarrow = CELL_W < 36;
 
@@ -365,6 +468,7 @@ window.Meteogram = (function () {
         // elevation already extracted above for altitude grid filtering
         var windSectors = parseWindDirection(options.windrichtung || '');
         var idealWindMax = options.idealWindMax || 30;
+        var thresholds = options.thresholds || DEFAULT_THRESHOLDS;
 
         // Per-column boolean flags
         var flagBuf = [];
@@ -471,6 +575,28 @@ window.Meteogram = (function () {
         var WARN_STRIP_H = usedRows > 0 ? (usedRows * (WARN_ROW_H + WARN_ROW_GAP) + 6) : 0;
 
         var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
+
+        // ===== TIER LEGEND (Pill-Chips) =====
+        // 3 Pills zeigen die Bedeutung der Zell-Farben. Bleibt immer sichtbar,
+        // damit der Pilot die Logik auf einen Blick versteht.
+        var legendBar = document.createElement('div');
+        legendBar.className = 'mg-tier-legend';
+        legendBar.setAttribute('aria-label', 'Farb-Legende: Ruhig, Sportlich, Unfliegbar');
+        [
+            { tier: 'calm',    label: 'Ruhig',     color: '#10B981' },
+            { tier: 'caution', label: 'Sportlich', color: '#F59E0B' },
+            { tier: 'danger',  label: 'Unfliegbar', color: '#E11D48' },
+        ].forEach(function (entry) {
+            var pill = document.createElement('span');
+            pill.className = 'mg-tier-pill mg-tier-' + entry.tier;
+            var dot = document.createElement('span');
+            dot.className = 'mg-tier-dot';
+            dot.style.background = entry.color;
+            pill.appendChild(dot);
+            pill.appendChild(document.createTextNode(entry.label));
+            legendBar.appendChild(pill);
+        });
+        container.appendChild(legendBar);
 
         var svg = d3.select(container)
             .append('svg')
@@ -722,20 +848,28 @@ window.Meteogram = (function () {
         // Orange-Rahmen versehen, siehe Wind-Cell-Rendering weiter unten.)
 
         // ===== ALTITUDE LABELS =====
-        var altLabelStep = cellH >= 45 ? 250 : 500; // label every 250m when cells are large enough
+        // Typographie = Scope-Indikator fuer LLM-Rating-Zone (siehe _input_map.md).
+        // Flugbereich = Spot bis max_thermal_height + 1000m (Lid-Zone inklusive).
+        // Puffer      = +500m drueber.
+        // Ueber Puffer = rein informativ — LLM bewertet nicht.
+        var peakThermikMaxH = 0;
+        if (wxDay && wxDay.thermik) {
+            wxDay.thermik.forEach(function (t) {
+                if (t.max_height && t.max_height > peakThermikMaxH) peakThermikMaxH = t.max_height;
+            });
+        }
+        var flightCeiling = peakThermikMaxH > 0 ? peakThermikMaxH + 1000 : elevation + 2000;
+        var bufferTop = flightCeiling + 500;
+        var altLabelStep = cellH >= 45 ? 250 : 500;
         var altFontSize = Math.round(11 * Math.min(scale, 1.5));
         altitudes.forEach(function (alt, ri) {
-            // Row 0 bei Spots: "★ Start XXXm" statt normale Höhen-Beschriftung.
-            // Die Reihe IST der Startplatz (Bodenwind-Werte), darum wird das
-            // Row-Label selbst zur Startplatz-Kennzeichnung — das ist klarer
-            // als ein separates Label irgendwo anders im Grid.
             if (ri === 0 && hasGroundRow && elevation > 0) {
                 chartG.append('text').attr('class', 'axis-label start-label')
                     .attr('x', -8).attr('y', rowY(ri) + cellH / 2)
                     .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
                     .attr('font-size', altFontSize + 'px')
                     .attr('font-weight', '700')
-                    .attr('fill', '#C2410C')  // Orange-700
+                    .attr('fill', '#C2410C')
                     .text('\u2605 Start ' + Math.round(elevation) + 'm');
                 return;
             }
@@ -743,10 +877,24 @@ window.Meteogram = (function () {
             var displayAlt = alt >= 1000
                 ? (alt / 1000).toFixed(alt % 1000 === 0 ? 0 : 1) + 'k'
                 : alt.toString();
+            // Scope-Abstufung: Flugbereich normal, Puffer muted, darueber klein+muted.
+            var labelFill = '#334155';    // default (Flugbereich)
+            var labelWeight = '500';
+            var labelSize = altFontSize;
+            if (alt > bufferTop) {
+                labelFill = '#CBD5E1';     // sehr muted, rein informativ
+                labelWeight = '400';
+                labelSize = Math.max(9, altFontSize - 1);
+            } else if (alt > flightCeiling) {
+                labelFill = '#94A3B8';     // muted (Puffer)
+                labelWeight = '400';
+            }
             chartG.append('text').attr('class', 'axis-label')
                 .attr('x', -8).attr('y', rowY(ri) + cellH / 2)
                 .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
-                .attr('font-size', altFontSize + 'px')
+                .attr('font-size', labelSize + 'px')
+                .attr('font-weight', labelWeight)
+                .attr('fill', labelFill)
                 .text(displayAlt + 'm');
         });
 
@@ -775,42 +923,41 @@ window.Meteogram = (function () {
                 var speed = d.wind_speed;
                 var gusts = d.wind_gusts != null ? d.wind_gusts : speed;
                 var gustDiff = gusts - speed;
-                var isAloftWarning = !isGround && speed > 30;
-                var isGustWarning = gustDiff > 15 && gusts > 30;
-                var isGustNotable = gustDiff > 10 && gusts > 25;
                 // Kein Böen-Label anzeigen wenn gusts ≈ speed (z.B. Regionen-
                 // Höhenprofil ohne Böen-Addition, wo gusts auf speed zurückfällt).
                 var hasRealGust = (Math.round(gusts) > Math.round(speed));
+
+                // Tier-Klassifikation gemaess config.py-Schwellen.
+                // Ground-Row: nutzt ground_wind/gust; Altitude-Grid: aloft_wind/gust.
+                // Der kombinierte Zell-Tier ist das Maximum aus Wind- und Gust-Tier
+                // (= das schlimmere der beiden bestimmt die Zellenwirkung).
+                var windMetric = isGround ? 'ground_wind' : 'aloft_wind';
+                var gustMetric = isGround ? 'ground_gust' : 'aloft_gust';
+                var windTier = classifyTier(speed, windMetric, thresholds);
+                var gustTier = hasRealGust ? classifyTier(gusts, gustMetric, thresholds) : 'calm';
+                var TIER_ORDER = { calm: 0, caution: 1, danger: 2 };
+                var cellTier = TIER_ORDER[gustTier] > TIER_ORDER[windTier] ? gustTier : windTier;
 
                 // Ground-Row: Richtungs-Check gegen erlaubte Sektoren
                 var isWrongDir = false;
                 if (isGround && windSectors && d.wind_direction != null && speed >= 3) {
                     isWrongDir = !isDirInSectors(d.wind_direction, windSectors, 10);
                 }
-                // Ground-Row: Grundwind zu stark?
-                var isGroundStrong = isGround && speed > idealWindMax;
 
-                // Show gust part only when gust is meaningfully above wind_speed.
-                // Regionen-Höhenprofil liefert keine Böen (gusts == speed) —
-                // dort soll nur die reine Windzahl angezeigt werden.
                 var showGusts = hasRealGust;
-                // `color` = Pfeil-Farbe. Kann bei falscher Windrichtung (Row 0)
-                // auf Rot gesetzt werden — signalisiert: Richtung problematisch.
-                var color = (isAloftWarning || isGustWarning) ? '#ef4444' : windColor(speed);
-                if (isGround && isWrongDir) color = '#DC2626';  // Pfeil rot bei falscher Richtung
-                // `speedColor` = Farbe der Wind-Zahl. Ignoriert Windrichtung —
-                // wenn die Stärke selbst harmlos ist (z.B. 12 km/h), bleibt
-                // die Zahl grün/neutral. Nur Stärken-Warnungen (Böen, Höhenwind)
-                // färben die Zahl rot.
-                var speedColor = (isAloftWarning || isGustWarning) ? '#ef4444' : windColor(speed);
+                // Pfeilfarbe: Tier-basiert. WrongDir überschreibt mit Rot (Richtungs-Warnung).
+                var color = isWrongDir ? '#DC2626' : tierTextColor(windTier);
+                // Wind-Zahl Farbe: immer Tier-Farbe der Windstärke (nicht Richtung).
+                var speedColor = tierTextColor(windTier);
 
-                // Background — Ground-Row hat eigene warme Tönung (bereits gezeichnet),
-                // hier nur noch Warnfarben-Overlay bei Richtungs-/Stärke-Problemen.
+                // Background — Tier-basiert (calm=leer, caution=38% amber, danger=100% rose).
+                // Fill-Intensitaet ist der primaere Glance-Kanal.
                 if (isGround) {
+                    // WrongDir rot uebersteuert alles (auch calm) — zeigt
+                    // "Richtung passt nicht" unabhaengig vom Speed-Tier.
                     var gBgFill = null;
-                    if (isWrongDir) gBgFill = 'rgba(220, 38, 38, 0.18)';      // Rot — falsche Richtung
-                    else if (isGroundStrong || isGustWarning) gBgFill = 'rgba(239, 68, 68, 0.15)';
-                    else if (isGustNotable) gBgFill = 'rgba(249, 115, 22, 0.10)';
+                    if (isWrongDir) gBgFill = 'rgba(220, 38, 38, 0.18)';
+                    else if (cellTier !== 'calm') gBgFill = tierFillColor(cellTier);
                     if (gBgFill) {
                         chartG.append('rect')
                             .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
@@ -818,35 +965,36 @@ window.Meteogram = (function () {
                             .attr('fill', gBgFill)
                             .attr('rx', 3);
                     }
-                    // Orange-Rahmen pro Row-0-Kachel — visuelle Abgrenzung als
-                    // "Startplatz-Wind-Zelle" (Card-Effekt). Bei Wrong-Dir
-                    // bekommt der Rahmen einen roten Akzent als Warnhinweis.
+                    // Launch-Cell-Frame: Farbe folgt dem Tier — Frame IST der
+                    // Tier-Indikator fuer die Ground-Row. WrongDir rot = Sonderfall.
+                    var frameColor = isWrongDir ? '#DC2626' : tierFrameColor(cellTier);
+                    var frameWidth = (isWrongDir || cellTier === 'danger') ? 2 : 1.5;
                     chartG.append('rect').attr('class', 'launch-cell-frame')
                         .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
                         .attr('width', CELL_W - 2).attr('height', rH3 - 2)
                         .attr('fill', 'none')
-                        .attr('stroke', isWrongDir ? '#DC2626' : '#F97316')  // Rot bei Fehler, sonst Orange-500
-                        .attr('stroke-width', isWrongDir ? 2 : 1.5)
+                        .attr('stroke', frameColor)
+                        .attr('stroke-width', frameWidth)
                         .attr('rx', 3)
                         .style('pointer-events', 'none');
                 } else if (!hasThermik) {
-                    var bgFill = windBgColor(speed);
-                    if (isGustWarning) bgFill = 'rgba(239, 68, 68, 0.15)';
-                    else if (isAloftWarning) bgFill = 'rgba(239, 68, 68, 0.15)';
-                    else if (isGustNotable) bgFill = 'rgba(249, 115, 22, 0.08)';
-                    chartG.append('rect')
-                        .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
-                        .attr('width', CELL_W - 2).attr('height', rH3 - 2)
-                        .attr('fill', bgFill)
-                        .attr('rx', 3);
+                    // Altitude-Grid-Zelle: Tier-Fill direkt.
+                    // calm = transparent (keine Zeichnung), caution = 38% amber, danger = 100% rose.
+                    if (cellTier !== 'calm') {
+                        chartG.append('rect')
+                            .attr('x', ci3 * CELL_W + 1).attr('y', rowY(ri3) + 1)
+                            .attr('width', CELL_W - 2).attr('height', rH3 - 2)
+                            .attr('fill', tierFillColor(cellTier))
+                            .attr('rx', 3);
+                    }
                 }
 
                 var arrowScale = Math.min(scale, 1.8);
                 var gFilter;
                 if (isGround && isWrongDir) {
                     gFilter = 'drop-shadow(0 0 4px rgba(220, 38, 38, 0.8))';
-                } else if (isAloftWarning || isGustWarning) {
-                    gFilter = 'drop-shadow(0 0 3px rgba(239, 68, 68, 0.7))';
+                } else if (cellTier === 'danger') {
+                    gFilter = 'drop-shadow(0 0 3px rgba(225, 29, 72, 0.55))';
                 } else {
                     gFilter = 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))';
                 }
@@ -860,34 +1008,50 @@ window.Meteogram = (function () {
                     .attr('fill', color)
                     .attr('transform', 'rotate(' + ((d.wind_direction + 180) % 360) + ') scale(' + arrowScale + ')');
 
-                // Wind speed + gust number
-                // Gust color: red if dangerous, orange if notable, otherwise by absolute gust value
-                var gustColor = isGustWarning ? '#ef4444' : (isGustNotable ? '#F97316' : windColor(gusts));
+                // Wind-Zahl: Tier-Farbe. Boeen-Zahl: nur wenn caution/danger,
+                // sonst muted Slate (#64748B) — damit sie sich vom Wind-Gruen
+                // absetzt und Hierarchie klar ist (Wind=Tier, Boee=Zusatz-Info).
+                // Erst bei Tag-ueberschreitender Boee (>30 km/h) wird sie farbig
+                // und sticht als Warnung raus.
+                var gustColor = gustTier === 'calm' ? '#64748B' : tierTextColor(gustTier);
+                // Voll saturierte danger-Zelle: alle Zahlen weiss fuer Kontrast.
+                if (cellTier === 'danger') {
+                    speedColor = '#FFFFFF';
+                    gustColor = '#FFFFFF';
+                }
                 var windFontSize = Math.round((isNarrow ? 7 : 9) * Math.min(scale, 1.8));
+                // Font-Weight als 3. Tier-Kanal: 400 / 500 / 700.
+                var tierWeight = (cellTier === 'danger') ? '700'
+                                : (cellTier === 'caution') ? '600'
+                                : '500';
+                // Danger-Zellen leicht groesser fuer zusaetzliche Emphase.
+                var tierFontSize = cellTier === 'danger' ? windFontSize + 1 : windFontSize;
                 var windTextY = rowY(ri3) + (hasThermik ? Math.round(10 * scale) : rH3 - Math.round(4 * scale));
-                if (showGusts) {
-                    // Show wind/gust format: "25/32"
+                // Text-Shadow nur auf Thermik-Zellen (Lesbarkeit ueber gelbem Bg) —
+                // auf gefuellten Tier-Zellen nicht noetig (genug Kontrast).
+                var textShadow = (hasThermik && cellTier === 'calm') ? '0 1px 2px rgba(255,255,255,0.8)' : 'none';
+                if (showNumbers && showGusts) {
                     var windGustText = chartG.append('text').attr('class', 'wind-value')
                         .attr('x', cx).attr('y', windTextY)
-                        .attr('font-size', windFontSize + 'px')
-                        .attr('font-weight', (isGround || isGustWarning || isAloftWarning) ? 'bold' : '600')
-                        .style('text-shadow', hasThermik ? '0 1px 2px rgba(255,255,255,0.8)' : 'none');
-                    // Speed part in wind color (nicht rot bei WrongDir — die
-                    // Zahl selbst ist ja nicht gefährlich, nur die Richtung)
+                        .attr('font-size', tierFontSize + 'px')
+                        .attr('font-weight', tierWeight)
+                        .style('text-shadow', textShadow)
+                        .style('font-variant-numeric', 'tabular-nums');
                     windGustText.append('tspan').attr('fill', speedColor)
                         .text(Math.round(speed));
-                    // Separator
-                    windGustText.append('tspan').attr('fill', '#94A3B8')
-                        .text('/');
-                    // Gust part in graduated color
+                    // Separator — auf danger weiss, sonst muted grey.
+                    var sepColor = cellTier === 'danger' ? 'rgba(255,255,255,0.7)' : '#94A3B8';
+                    windGustText.append('tspan').attr('fill', sepColor).text('/');
                     windGustText.append('tspan').attr('fill', gustColor)
                         .text(Math.round(gusts));
-                } else {
+                } else if (showNumbers) {
                     chartG.append('text').attr('class', 'wind-value')
                         .attr('x', cx).attr('y', windTextY)
-                        .attr('font-size', windFontSize + 'px').attr('fill', speedColor).attr('opacity', hasThermik ? 1.0 : (isAloftWarning ? 1.0 : 0.7))
-                        .attr('font-weight', isAloftWarning ? 'bold' : 'normal')
-                        .style('text-shadow', hasThermik ? '0 1px 2px rgba(255,255,255,0.8)' : 'none')
+                        .attr('font-size', tierFontSize + 'px').attr('fill', speedColor)
+                        .attr('opacity', (hasThermik || cellTier !== 'calm') ? 1.0 : 0.8)
+                        .attr('font-weight', tierWeight)
+                        .style('text-shadow', textShadow)
+                        .style('font-variant-numeric', 'tabular-nums')
                         .text(Math.round(speed));
                 }
 
@@ -898,16 +1062,24 @@ window.Meteogram = (function () {
                 // der Kachel nicht überdeckt wird.
                 var tRisk = d.turbulence_risk != null ? d.turbulence_risk : gusts;
                 var tExcess = d.turbulence_excess != null ? d.turbulence_excess : gustDiff;
-                if (tExcess > 1) {
+                // Turbulenz-Strip nur zeigen wenn (a) nennenswerter Exzess UND
+                // (b) Zelle nicht bereits voll danger-gefuellt (sonst redundant).
+                // Farbe: bei calm-Tier muted slate (Boee existiert, aber nicht
+                // Tag-relevant), bei caution/danger tier-farbig als Warnsignal.
+                if (tExcess > 1 && cellTier !== 'danger') {
                     var stripW = Math.round((isNarrow ? 4 : 6) * Math.min(scale, 1.5));
-                    var stripMargin = isGround ? 3 : 1;  // Row 0: mehr Abstand für Orange-Rahmen
+                    var stripMargin = isGround ? 3 : 1;
+                    var tStripTier = classifyTier(tRisk, gustMetric, thresholds);
+                    var stripColor = tStripTier === 'calm' ? '#94A3B8'
+                                   : tStripTier === 'caution' ? '#F59E0B'
+                                   : '#E11D48';
                     chartG.append('rect')
                         .attr('x', ci3 * CELL_W + CELL_W - stripW - stripMargin)
                         .attr('y', rowY(ri3) + stripMargin)
                         .attr('width', stripW)
                         .attr('height', rH3 - 2 * stripMargin)
-                        .attr('fill', turbulenceColor(tRisk))
-                        .attr('opacity', 0.7)
+                        .attr('fill', stripColor)
+                        .attr('opacity', tStripTier === 'calm' ? 0.5 : 0.75)
                         .attr('rx', 2);
                 }
 
@@ -949,43 +1121,71 @@ window.Meteogram = (function () {
             var dir = wind.direction;
             
             if (spd != null) {
-                var wColor = windColor(spd);
-                var gustDiffGround = gusts != null ? gusts - spd : 0;
-                var isGustWarning = gusts != null && gustDiffGround > 15 && gusts > 30;
-                var isGustNotableGround = gusts != null && gustDiffGround > 10 && gusts > 25;
-                var gy = groundY + 13;
+                // Tier-Klassifikation fuer die Ground-Strip Wind-Row.
+                var gWindTier = classifyTier(spd, 'ground_wind', thresholds);
+                var gGustTier = (gusts != null && gusts > spd)
+                    ? classifyTier(gusts, 'ground_gust', thresholds) : 'calm';
+                var gORDER = { calm: 0, caution: 1, danger: 2 };
+                var gCellTier = gORDER[gGustTier] > gORDER[gWindTier] ? gGustTier : gWindTier;
 
-                // 1. Gust Shadow (if gusts are significantly higher or for visual depth)
+                var gy = groundY + 13;
+                var arrowOffsetX = showNumbers ? -15 : 0;
+
+                // Tier-Fill als primaerer Glance-Kanal fuer die Bodenwind-Row.
+                if (gCellTier !== 'calm') {
+                    chartG.append('rect')
+                        .attr('x', ci * CELL_W + 1).attr('y', groundY + 1)
+                        .attr('width', CELL_W - 2).attr('height', 22).attr('rx', 3)
+                        .attr('fill', tierFillColor(gCellTier));
+                }
+
+                // Pfeil: Wind-Tier. Boeen-Shadow: nur farbig wenn Boee in
+                // caution/danger, sonst muted, damit Boeen-Pfeil sich vom Wind
+                // absetzt ohne Warnsignal.
+                var gArrowColor = gCellTier === 'danger' ? '#FFFFFF' : tierTextColor(gWindTier);
+                var gGustArrowColor = gCellTier === 'danger' ? '#FFFFFF'
+                                    : (gGustTier === 'calm' ? '#94A3B8' : tierTextColor(gGustTier));
+
+                // 1. Gust Shadow (wenn Boeen deutlich ueber Wind)
                 if (gusts != null && gusts > spd) {
-                    var gustShadowColor = isGustWarning ? '#ef4444' : (isGustNotableGround ? '#F97316' : windColor(gusts));
                     var gShadow = chartG.append('g')
-                        .attr('transform', 'translate(' + (cx - 15) + ', ' + gy + ')');
+                        .attr('transform', 'translate(' + (cx + arrowOffsetX) + ', ' + gy + ')');
                     gShadow.append('path')
                         .attr('d', arrowPath(gusts * 0.7))
-                        .attr('fill', gustShadowColor)
-                        .attr('opacity', 0.3)
+                        .attr('fill', gGustArrowColor)
+                        .attr('opacity', gCellTier === 'danger' ? 0.5 : 0.3)
                         .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(0.65)');
                 }
 
                 // 2. Primary Wind Arrow
                 var gArrow = chartG.append('g')
-                    .attr('transform', 'translate(' + (cx - 15) + ', ' + gy + ')');
+                    .attr('transform', 'translate(' + (cx + arrowOffsetX) + ', ' + gy + ')');
                 gArrow.append('path')
                     .attr('d', arrowPath(spd * 0.7))
-                    .attr('fill', wColor)
+                    .attr('fill', gArrowColor)
                     .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(0.65)');
-                
-                // 3. Combined Text: "Wind / Böen"
-                var label = spd.toString();
-                if (gusts != null) label += ' / ' + gusts;
 
-                chartG.append('text').attr('class', 'ground-value')
-                    .attr('x', cx + 6).attr('y', gy + 1)
-                    .attr('dominant-baseline', 'central')
-                    .attr('fill', isGustWarning ? '#ef4444' : wColor)
-                    .attr('font-weight', isGustWarning ? 'bold' : 'normal')
-                    .attr('font-size', '10px')
-                    .text(label);
+                // 3. "Wind / Böen" als tspans, damit Böe eigene Farbe bekommt.
+                if (showNumbers) {
+                    var gTextColor = gCellTier === 'danger' ? '#FFFFFF' : tierTextColor(gWindTier);
+                    var gGustTextColor = gCellTier === 'danger' ? '#FFFFFF'
+                                       : (gGustTier === 'calm' ? '#64748B' : tierTextColor(gGustTier));
+                    var gSepColor = gCellTier === 'danger' ? 'rgba(255,255,255,0.7)' : '#94A3B8';
+                    var gTextWeight = gCellTier === 'danger' ? '700'
+                                     : gCellTier === 'caution' ? '600' : '500';
+
+                    var gText = chartG.append('text').attr('class', 'ground-value')
+                        .attr('x', cx + 6).attr('y', gy + 1)
+                        .attr('dominant-baseline', 'central')
+                        .attr('font-weight', gTextWeight)
+                        .attr('font-size', '10px')
+                        .style('font-variant-numeric', 'tabular-nums');
+                    gText.append('tspan').attr('fill', gTextColor).text(String(spd));
+                    if (gusts != null) {
+                        gText.append('tspan').attr('fill', gSepColor).text(' / ');
+                        gText.append('tspan').attr('fill', gGustTextColor).text(String(gusts));
+                    }
+                }
             }
 
             // Row 1: Temp + Precip
@@ -1133,9 +1333,24 @@ window.Meteogram = (function () {
             if (my >= GRID_TOP && ri >= 0 && ri < nRows && grid[ri] && grid[ri][ci]) {
                 var dd = grid[ri][ci];
                 var isGroundCell = ri === 0 && hasGroundRow && dd.isGroundRow;
+                // Tier-Zusammenfassung: der wichtigste Info-Block. Zeigt
+                // "● Sportlich — ALOFT-WARN" als Bruecke zum LLM-Rating.
+                var ttWind = dd.wind_speed;
+                var ttGust = dd.wind_gusts != null ? dd.wind_gusts : ttWind;
+                var ttWindTier = classifyTier(ttWind, isGroundCell ? 'ground_wind' : 'aloft_wind', thresholds);
+                var ttGustTier = (ttGust > ttWind) ? classifyTier(ttGust, isGroundCell ? 'ground_gust' : 'aloft_gust', thresholds) : 'calm';
+                var TT_ORDER = { calm: 0, caution: 1, danger: 2 };
+                var ttCellTier = TT_ORDER[ttGustTier] > TT_ORDER[ttWindTier] ? ttGustTier : ttWindTier;
+                var ttTag = deriveDominantTag(isGroundCell, ttWind, ttGust, thresholds);
+                html += '<div class="tooltip-row" style="margin-top:4px;padding-top:4px;border-top:1px solid #E5E7EB">' +
+                    '<span class="tooltip-label">Bewertung</span>' +
+                    '<span class="tooltip-value" style="font-weight:700;display:inline-flex;align-items:center;gap:6px">' +
+                    '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + TIER_DOTS[ttCellTier] + '"></span>' +
+                    TIER_LABELS[ttCellTier] +
+                    (ttTag ? ' <span style="color:#94A3B8;font-weight:500;font-size:10px">[' + ttTag.name + ']</span>' : '') +
+                    '</span></div>';
                 if (isGroundCell) {
-                    // Ground-Row Tooltip: Startplatz-fokussierte Infos
-                    html += '<div class="tooltip-row" style="margin-top:4px;padding-top:4px;border-top:1px solid #F97316"><span class="tooltip-label" style="color:#C2410C;font-weight:700">\u2605 Startplatz</span><span class="tooltip-value" style="color:#C2410C;font-weight:700">' + Math.round(elevation) + 'm</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label" style="color:#C2410C;font-weight:700">\u2605 Startplatz</span><span class="tooltip-value" style="color:#C2410C;font-weight:700">' + Math.round(elevation) + 'm</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">Bodenwind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
                     if (dd.wind_gusts != null && Math.round(dd.wind_gusts) > Math.round(dd.wind_speed)) {
                         html += '<div class="tooltip-row"><span class="tooltip-label">Böen</span><span class="tooltip-value" style="color:' + windColor(dd.wind_gusts) + '">' + Math.round(dd.wind_gusts) + ' km/h</span></div>';
@@ -1215,29 +1430,33 @@ window.Meteogram = (function () {
             })
             .on('mouseleave', hideTooltip);
 
-        // Touch support: tap to show, tap elsewhere to hide
-        var touchActive = false;
+        // Touch: only show tooltip on a genuine tap (no drag). Never preventDefault,
+        // so native vertical page scroll + horizontal overflow scroll keep working.
+        var TAP_MOVE_THRESHOLD = 10;
+        var touchStartX = 0, touchStartY = 0, touchIsTap = false;
         interactRect.node().addEventListener('touchstart', function (e) {
-            e.preventDefault();
             var touch = e.touches[0];
-            var coords = d3.pointer(touch, interactRect.node());
-            showTooltipAt(coords, touch.clientX, touch.clientY);
-            touchActive = true;
-        }, { passive: false });
-        interactRect.node().addEventListener('touchmove', function (e) {
-            if (!touchActive) return;
-            var touch = e.touches[0];
-            var coords = d3.pointer(touch, interactRect.node());
-            showTooltipAt(coords, touch.clientX, touch.clientY);
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            touchIsTap = true;
         }, { passive: true });
-        interactRect.node().addEventListener('touchend', function () {
-            // Keep tooltip visible after touch; next tap elsewhere will hide
+        interactRect.node().addEventListener('touchmove', function (e) {
+            if (!touchIsTap) return;
+            var touch = e.touches[0];
+            if (Math.abs(touch.clientX - touchStartX) > TAP_MOVE_THRESHOLD ||
+                Math.abs(touch.clientY - touchStartY) > TAP_MOVE_THRESHOLD) {
+                touchIsTap = false;
+            }
+        }, { passive: true });
+        interactRect.node().addEventListener('touchend', function (e) {
+            if (!touchIsTap) return;
+            touchIsTap = false;
+            var touch = e.changedTouches[0];
+            var coords = d3.pointer(touch, interactRect.node());
+            showTooltipAt(coords, touch.clientX, touch.clientY);
         }, { passive: true });
         document.addEventListener('touchstart', function (e) {
-            if (touchActive && !interactRect.node().contains(e.target)) {
-                hideTooltip();
-                touchActive = false;
-            }
+            if (!interactRect.node().contains(e.target)) hideTooltip();
         }, { passive: true });
     }
 

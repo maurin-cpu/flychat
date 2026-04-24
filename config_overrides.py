@@ -56,6 +56,16 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
             {"key": "WIND_MODERATE_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
              "help": "Grundwind ab dem [WIND-MODERATE] vergeben wird (sportlich, noch fliegbar). Darunter: WIND-CALM."},
         ],
+        "Start-Fenster (Windrichtung + Gefahrenfreiheit)": [
+            {"key": "CLEAN_WINDOW_MIN_HOURS", "type": "int", "min": 1, "max": 8, "unit": "h",
+             "help": "Mindest-Laenge des zusammenhaengenden sauberen Fensters (WIND-OK + keine DANGER-Tags), damit der Tag ueberhaupt conditional sein darf. Darunter: not_safe."},
+            {"key": "CLEAN_WINDOW_GREEN_HOURS", "type": "int", "min": 2, "max": 12, "unit": "h",
+             "help": "Ab dieser Laenge des sauberen Fensters kann der Tag safe/green sein. Zwischen MIN und GREEN: conditional."},
+            {"key": "WIND_DIRECTION_SWING_NOTE_DEG", "type": "int", "min": 10, "max": 180, "unit": "°",
+             "help": "Winkel-Schwelle fuer Richtungsdreher-Anmerkung in caution_notes. Ab diesem Dreher innerhalb des Swing-Fensters wird erwaehnt, dass der Wind unbestaendig ist. KEIN Status-Downgrade."},
+            {"key": "WIND_DIRECTION_SWING_WINDOW_H", "type": "int", "min": 1, "max": 6, "unit": "h",
+             "help": "Max Fensterbreite fuer Richtungsdreher-Erkennung. Erfasst abrupte 1h-Spruenge genauso wie langsames Drehen ueber mehrere Stunden (z.B. 120° ueber 3h). 1 = nur Stunde-zu-Stunde, 3 = empfohlen."},
+        ],
         "Boeen-Schwellen (Bodenboeen, Spots)": [
             {"key": "GUST_WARN_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
              "help": "Boeen ab dem [GUST-WARN] vergeben wird (sportlich, nicht unfliegbar)."},

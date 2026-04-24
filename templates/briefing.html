@@ -40,14 +40,31 @@
   <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="Tagesauswahl"></nav>
 
   <section class="bf-filters" id="bfFilters">
-    <div class="bf-filter-row">
+    <div class="bf-filter-group bf-filter-group--region">
+      <span class="bf-filter-label">Region</span>
       <div class="bf-filter-chips" id="bfFilterChips"></div>
-      <button type="button" class="bf-filter-reset" id="bfFilterReset" disabled>Alle</button>
-      <button type="button" class="bf-filter-map-btn" id="bfMapToggle" title="Karte ein/aus">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
-      </button>
+      <div class="bf-filter-group-actions">
+        <button type="button" class="bf-filter-reset" id="bfFilterReset" title="Alle Regionen auswählen / abwählen">Alle</button>
+        <button type="button" class="bf-filter-map-btn" id="bfMapToggle" title="Karte ein/aus" aria-label="Regionskarte ein- oder ausblenden">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
+        </button>
+      </div>
     </div>
     <div class="bf-filter-map" id="bfFilterMap" hidden></div>
+
+    <div class="bf-filter-quality-row">
+      <div class="bf-filter-group bf-filter-group--quality">
+        <span class="bf-filter-label" title="Zeigt nur Spots der gewählten Qualitäts-Tiers">Qualität</span>
+        <div class="bf-tier-chips" id="bfTierChips" role="group" aria-label="Filter nach Qualitäts-Tier"></div>
+      </div>
+      <div class="bf-filter-group bf-filter-group--rating">
+        <label class="bf-filter-label" for="bfRatingSlider" title="Blendet Spots unter diesem Rating aus">ab Rating</label>
+        <div class="bf-rating-filter">
+          <span class="bf-rating-value" id="bfRatingValue">alle</span>
+          <input type="range" class="bf-rating-slider" id="bfRatingSlider" min="0" max="10" step="0.5" value="0" aria-label="Minimales Rating">
+        </div>
+      </div>
+    </div>
   </section>
 
   <div class="bf-day-info" id="bfDayInfo"></div>

@@ -78,6 +78,20 @@
     --color-fly-violet-bg: #ede9fe;
     --color-fly-violet-text: #6d28d9;
 
+    /* Weather Tier Tokens — drive meteogram cell coloring per LLM rating.
+       Three tiers map 1:1 to KERNREGEL (_hazard_blocks.md): RUHIG / SPORTLICH / UNFLIEGBAR.
+       Fill intensity is the primary glance channel (empty / 40% / 100%); hue is the
+       secondary channel. Amber ↔ Rose luminance delta keeps tiers distinguishable
+       for red-green and tritanope color vision. */
+    --tier-calm:         #10B981;            /* emerald — RUHIG (text on empty cells) */
+    --tier-calm-strong:  #047857;            /* dark emerald — strong wind number on calm bg */
+    --tier-caution:      #F59E0B;            /* amber hue — SPORTLICH */
+    --tier-caution-bg:   rgba(245, 158, 11, 0.38);  /* 38% fill — distinct from empty */
+    --tier-caution-text: #78350F;            /* amber-900 — 7.2:1 contrast on caution-bg */
+    --tier-danger:       #E11D48;            /* rose — UNFLIEGBAR (distinct from amber for CB) */
+    --tier-danger-bg:    #E11D48;            /* 100% saturated fill */
+    --tier-danger-text:  #FFFFFF;            /* 5.77:1 on danger-bg */
+
     /* Typography Scale (7 steps) */
     --text-xs: 0.6875rem;    /* 11px */
     --text-sm: 0.75rem;      /* 12px */
@@ -1096,6 +1110,38 @@ body.page-fixed-nav {
     min-height: 0;
     min-width: 0;
 }
+
+/* Tier legend — shows what cell colors mean, always visible above meteogram */
+.mg-tier-legend {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 6px 0 10px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.mg-tier-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-light);
+    line-height: 1;
+}
+.mg-tier-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.mg-tier-caution { color: #78350F; }
+.mg-tier-danger  { color: #9f1239; }
 
 /* Föhn diagram should never horizontally scroll on mobile — chart scales to fit */
 @media (max-width: 639px) {

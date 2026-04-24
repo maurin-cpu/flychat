@@ -1295,6 +1295,26 @@ def api_status():
     })
 
 
+def _tier_thresholds():
+    """Single source of truth for meteogram color tiers.
+
+    Four metrics, each with WARN (calm→caution) and DANGER (caution→danger)
+    thresholds in km/h, mirroring the Python tag logic in weather_context.py.
+    Frontend uses these to color cells consistently with the LLM rating.
+    """
+    return {
+        "ground_wind": {"warn": config.WIND_MODERATE_KMH, "danger": config.WIND_STRONG_KMH},
+        "ground_gust": {"warn": config.GUST_WARN_KMH, "danger": config.GUST_DANGER_KMH},
+        "aloft_wind": {"warn": config.ALOFT_WARN_KMH, "danger": config.ALOFT_DANGER_KMH},
+        "aloft_gust": {"warn": config.ALOFT_GUST_WARN_KMH, "danger": config.ALOFT_GUST_DANGER_KMH},
+    }
+
+
+@app.route("/api/thresholds")
+def api_thresholds():
+    return jsonify({"tiers": _tier_thresholds()})
+
+
 # ============================================================================
 # STATIONS API (Bias-Korrektur)
 # ============================================================================
@@ -1480,6 +1500,7 @@ def api_region_weather(region_id):
         "last_updated": last_updated,
         "expected_days": config.FORECAST_DAYS,
         "is_region": True,
+        "thresholds": _tier_thresholds(),
     })
 
 
@@ -1599,6 +1620,7 @@ def api_weather(spot_name):
         "expected_days": config.FORECAST_DAYS,
         "windrichtung": (spot_info.get("windrichtung") if spot_info else None),
         "ideal_wind_max": (spot_info.get("ideal_wind_max") if spot_info else None),
+        "thresholds": _tier_thresholds(),
     })
 
 

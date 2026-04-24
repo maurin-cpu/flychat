@@ -1271,19 +1271,44 @@ class AnalyzersMixin:
         # Zwei Stufen:
         #   - NOTSAFE_HOURS: hart → not_safe (NO-GO), auch wenn LLM 'conditional' gab.
         #   - CONDITIONAL_HOURS (nur wenn NOT triggered): safe → conditional.
+        #
+        # Trend-aware (Apr 2026): Wenn aloft_pattern im Cache liegt, wird die flache
+        # Tages-Summe nicht mehr blind genutzt. Ein sauberes Nachmittagsfenster
+        # (AUFKLAERUNG / VEREINZELT / EINGEKESSELT_KNAPP) darf NICHT in not_safe
+        # degradiert werden, wenn der Gap >= nogo_thresh ist. Skills-Regel:
+        # _hazard_blocks.md BLOCK 4 + EINGEKESSELT Sonderfall 1 (Hoehenwind).
+        # aloft_gd (Turbulenz) bleibt flat — kein separates Pattern verfuegbar.
         if gust_info:
             aloft_d = gust_info.get("aloft_danger_hours", 0)
             aloft_gd = gust_info.get("aloft_gust_danger_hours", 0)
+            aloft_pattern = gust_info.get("aloft_pattern")
             nogo_thresh = config.ALOFT_DANGER_NOTSAFE_HOURS
             cond_thresh = config.ALOFT_DANGER_CONDITIONAL_HOURS
             kmh_thresh = config.ALOFT_DANGER_KMH
 
-            if (aloft_d >= nogo_thresh or aloft_gd >= nogo_thresh) \
+            # Entscheide ob aloft_d allein einen not_safe-Override rechtfertigt.
+            # Default (kein Pattern): alte flache Regel.
+            aloft_triggers_notsafe = (aloft_d >= nogo_thresh)
+            if aloft_pattern:
+                label = aloft_pattern.get("pattern_label", "")
+                calm_gap = aloft_pattern.get("max_calm_gap", 0)
+                if label == "DURCHGEHEND_DANGER":
+                    aloft_triggers_notsafe = True
+                elif label == "EINGEKESSELT" and calm_gap < nogo_thresh:
+                    aloft_triggers_notsafe = True
+                else:
+                    # AUFKLAERUNG / EINGEKESSELT_KNAPP / ZUNEHMEND / VEREINZELT / DURCHGEHEND_WARN
+                    # → sauberes Fenster rechtfertigt conditional statt not_safe.
+                    aloft_triggers_notsafe = False
+
+            if (aloft_triggers_notsafe or aloft_gd >= nogo_thresh) \
                     and result.get("safety_status") != "not_safe":
+                pattern_str = aloft_pattern.get("pattern_label", "-") if aloft_pattern else "-"
                 logger.warning(
                     f"Aloft-Danger-NoGo-Override fuer {name}/{date_str}: LLM gab "
                     f"'{result.get('safety_status')}' trotz ALOFT-DANGER {aloft_d}h / "
-                    f"ALOFT-GUST-DANGER {aloft_gd}h (Schwelle {nogo_thresh}h) → not_safe"
+                    f"ALOFT-GUST-DANGER {aloft_gd}h (Schwelle {nogo_thresh}h, "
+                    f"Trend={pattern_str}) → not_safe"
                 )
                 result["safety_status"] = "not_safe"
                 result["safe_window"] = "keins"
@@ -1569,18 +1594,35 @@ class AnalyzersMixin:
         # Zwei Stufen:
         #   - NOTSAFE_HOURS: hart → not_safe (NO-GO), auch wenn LLM 'conditional' gab.
         #   - CONDITIONAL_HOURS (nur wenn NOT triggered): safe → conditional.
+        #
+        # Trend-aware (Apr 2026): aloft_pattern aus Cache rechtfertigt sauberes
+        # Nachmittagsfenster (AUFKLAERUNG / VEREINZELT / EINGEKESSELT_KNAPP) und
+        # blockiert das not_safe-Override. Skills: _hazard_blocks.md BLOCK 4.
         region_gust_info = self._ctx_gust_cache.get(f"{rname}|{date_str}", {})
         if region_gust_info:
             aloft_d = region_gust_info.get("aloft_danger_hours", 0)
+            aloft_pattern = region_gust_info.get("aloft_pattern")
             nogo_thresh = config.ALOFT_DANGER_NOTSAFE_HOURS
             cond_thresh = config.ALOFT_DANGER_CONDITIONAL_HOURS
             kmh_thresh = config.ALOFT_DANGER_KMH
 
-            if aloft_d >= nogo_thresh and result.get("safety_status") != "not_safe":
+            aloft_triggers_notsafe = (aloft_d >= nogo_thresh)
+            if aloft_pattern:
+                label = aloft_pattern.get("pattern_label", "")
+                calm_gap = aloft_pattern.get("max_calm_gap", 0)
+                if label == "DURCHGEHEND_DANGER":
+                    aloft_triggers_notsafe = True
+                elif label == "EINGEKESSELT" and calm_gap < nogo_thresh:
+                    aloft_triggers_notsafe = True
+                else:
+                    aloft_triggers_notsafe = False
+
+            if aloft_triggers_notsafe and result.get("safety_status") != "not_safe":
+                pattern_str = aloft_pattern.get("pattern_label", "-") if aloft_pattern else "-"
                 logger.warning(
                     f"Region Aloft-Danger-NoGo-Override fuer {rname}/{date_str}: LLM gab "
                     f"'{result.get('safety_status')}' trotz ALOFT-DANGER {aloft_d}h "
-                    f"(Schwelle {nogo_thresh}h) → not_safe"
+                    f"(Schwelle {nogo_thresh}h, Trend={pattern_str}) → not_safe"
                 )
                 result["safety_status"] = "not_safe"
                 result["safe_window"] = "keins"

@@ -57,14 +57,32 @@
 
   const LS_REGION_FILTER_KEY = "gleitcast.briefing.regionFilter";
   const LS_DAY_IDX_KEY = "gleitcast.briefing.dayIdx";
+  const LS_TIER_FILTER_KEY = "gleitcast.briefing.tierFilter";
+  const LS_MIN_RATING_KEY = "gleitcast.briefing.minRating";
+  const LS_COLLAPSED_REGIONS_KEY = "gleitcast.briefing.collapsedRegions";
+  const LS_EXPAND_HINT_SEEN_KEY = "gleitcast.briefing.expandHintSeen";
+  const LS_SHOW_NUMBERS_KEY = "gleitcast.meteogram.showNumbers";
+
+  // Verfuegbare Tiers (top_spots enthaelt nur green+violet, manche mit is_conditional)
+  const TIER_DEFS = [
+    { id: "violet",      label: "Legendär",  short: "Legendär" },
+    { id: "green",       label: "Fliegbar",  short: "Fliegbar" },
+    { id: "conditional", label: "Bedingt",   short: "Bedingt" },
+  ];
+  const DEFAULT_TIERS = ["violet", "green"];
 
   let state = {
     data: null,
     generating: false,
     filterRegions: loadRegionFilter(),
     selectedDayIdx: loadDayIdx(),
+    tierFilters: loadTierFilter(),
+    minRating: loadMinRating(),
     fazitOpen: false,
     mapVisible: false,
+    collapsedRegions: loadCollapsedRegions(),
+    expandHintSeen: loadExpandHintSeen(),
+    showNumbers: loadShowNumbers(),
     // focusSpot: ephemer via URL-Param gesetzt, zeigt nur diesen einen Spot.
     // Nicht persistiert — wird beim Reload geleert wenn URL-Param weg ist.
     focusSpot: null,
@@ -91,9 +109,88 @@
     try { localStorage.setItem(LS_DAY_IDX_KEY, String(idx)); } catch (e) {}
   }
 
+  function loadTierFilter() {
+    try {
+      const raw = localStorage.getItem(LS_TIER_FILTER_KEY);
+      if (raw === null) return new Set(DEFAULT_TIERS);
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return new Set(DEFAULT_TIERS);
+      return new Set(arr.filter((t) => TIER_DEFS.some((d) => d.id === t)));
+    } catch (e) { return new Set(DEFAULT_TIERS); }
+  }
+
+  function saveTierFilter(set) {
+    try { localStorage.setItem(LS_TIER_FILTER_KEY, JSON.stringify(Array.from(set))); } catch (e) {}
+  }
+
+  function loadMinRating() {
+    try {
+      const raw = localStorage.getItem(LS_MIN_RATING_KEY);
+      if (raw === null) return 0;
+      const v = parseFloat(raw);
+      return isFinite(v) && v >= 0 && v <= 10 ? v : 0;
+    } catch (e) { return 0; }
+  }
+
+  function saveMinRating(v) {
+    try { localStorage.setItem(LS_MIN_RATING_KEY, String(v)); } catch (e) {}
+  }
+
+  function loadCollapsedRegions() {
+    try {
+      const raw = localStorage.getItem(LS_COLLAPSED_REGIONS_KEY);
+      if (!raw) return new Set();
+      const arr = JSON.parse(raw);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch (e) { return new Set(); }
+  }
+
+  function saveCollapsedRegions(set) {
+    try { localStorage.setItem(LS_COLLAPSED_REGIONS_KEY, JSON.stringify(Array.from(set))); } catch (e) {}
+  }
+
+  function loadExpandHintSeen() {
+    try { return localStorage.getItem(LS_EXPAND_HINT_SEEN_KEY) === "1"; } catch (e) { return false; }
+  }
+
+  function markExpandHintSeen() {
+    if (state.expandHintSeen) return;
+    state.expandHintSeen = true;
+    try { localStorage.setItem(LS_EXPAND_HINT_SEEN_KEY, "1"); } catch (e) {}
+    document.body.classList.add("bf-hint-seen");
+  }
+
+  function loadShowNumbers() {
+    try { return localStorage.getItem(LS_SHOW_NUMBERS_KEY) === "1"; } catch (e) { return false; }
+  }
+
+  function saveShowNumbers(on) {
+    try { localStorage.setItem(LS_SHOW_NUMBERS_KEY, on ? "1" : "0"); } catch (e) {}
+  }
+
   function regionPassesFilter(regionId) {
     if (!state.filterRegions || state.filterRegions.size === 0) return true;
     return state.filterRegions.has(regionId || "unknown");
+  }
+
+  function spotTierBucket(spot) {
+    // "Bedingt" faellt in eigenen Bucket — unabhaengig von fly_status.
+    if (spot.is_conditional) return "conditional";
+    const fs = spot.fly_status;
+    if (fs === "violet" || fs === "green") return fs;
+    return "green"; // fallback
+  }
+
+  function spotPassesTierFilter(spot) {
+    const tiers = state.tierFilters;
+    if (!tiers || tiers.size === 0) return false;
+    return tiers.has(spotTierBucket(spot));
+  }
+
+  function spotPassesRatingFilter(spot) {
+    const min = state.minRating || 0;
+    if (min <= 0) return true;
+    return Number(spot.rating || 0) >= min;
   }
 
   function collectAllRegions(data) {
@@ -178,8 +275,13 @@
       spots = spots.filter((s) => regionPassesFilter(s.region_id));
     }
     if (state.focusSpot) {
+      // Focus-Modus (Deep-Link): Tier/Rating-Filter ignorieren, damit der Spot
+      // immer sichtbar ist auch wenn der Filter ihn sonst ausblenden wuerde.
       const want = state.focusSpot.toLowerCase();
       spots = spots.filter((s) => (s.spot || "").toLowerCase() === want);
+    } else {
+      spots = spots.filter(spotPassesTierFilter);
+      spots = spots.filter(spotPassesRatingFilter);
     }
     return spots;
   }
@@ -349,12 +451,26 @@
     }
 
     if (resetBtn) {
-      resetBtn.disabled = state.filterRegions.size === 0;
+      // Toggle: wenn bereits alle Regionen aktiv sind -> abwaehlen, sonst alle auswaehlen.
+      // Leeres Set = "kein Region-Filter" (zeigt auch alle) — visuell wie nichts aktiv.
+      const allIds = regions.map((r) => r.id);
+      const allActive = allIds.length > 0 && allIds.every((id) => state.filterRegions.has(id));
+      resetBtn.disabled = allIds.length === 0;
+      resetBtn.textContent = allActive ? "Keine" : "Alle";
+      resetBtn.classList.toggle("is-active", allActive);
+      resetBtn.setAttribute(
+        "aria-label",
+        allActive ? "Alle Regionen abwählen" : "Alle Regionen auswählen",
+      );
       if (!resetBtn._flyBound) {
         resetBtn._flyBound = true;
         resetBtn.addEventListener("click", () => {
-          if (state.filterRegions.size === 0) return;
-          state.filterRegions.clear();
+          const regionsNow = collectAllRegions(state.data);
+          const ids = regionsNow.map((r) => r.id);
+          if (!ids.length) return;
+          const allSel = ids.every((id) => state.filterRegions.has(id));
+          if (allSel) state.filterRegions.clear();
+          else state.filterRegions = new Set(ids);
           applyFilter();
         });
       }
@@ -383,6 +499,67 @@
     renderFilters(state.data);
     renderDayTabs(state.data);
     renderDayContent();
+  }
+
+  // ── Render: Tier + Rating Filter ────────────────────────────
+
+  function renderTierFilter() {
+    const chipsEl = $("bfTierChips");
+    const slider = $("bfRatingSlider");
+    const valueEl = $("bfRatingValue");
+    if (!chipsEl || !slider || !valueEl) return;
+
+    // Tier chips
+    chipsEl.innerHTML = TIER_DEFS.map((t) => {
+      const active = state.tierFilters.has(t.id);
+      return `<button type="button" class="bf-tier-chip bf-tier-chip--${t.id}${active ? " is-active" : ""}" data-tier="${t.id}" aria-pressed="${active}">
+        <span class="bf-tier-dot"></span><span class="bf-tier-label">${escapeHtml(t.label)}</span>
+      </button>`;
+    }).join("");
+
+    if (!chipsEl._flyBound) {
+      chipsEl._flyBound = true;
+      chipsEl.addEventListener("click", (ev) => {
+        const btn = ev.target.closest(".bf-tier-chip");
+        if (!btn) return;
+        const id = btn.dataset.tier;
+        if (!id) return;
+        if (state.tierFilters.has(id)) state.tierFilters.delete(id);
+        else state.tierFilters.add(id);
+        saveTierFilter(state.tierFilters);
+        state.focusSpot = null;
+        renderTierFilter();
+        renderDayContent();
+      });
+    }
+
+    // Rating slider
+    const v = Number(state.minRating || 0);
+    slider.value = String(v);
+    updateSliderVisual(slider, valueEl, v);
+
+    if (!slider._flyBound) {
+      slider._flyBound = true;
+      slider.addEventListener("input", (ev) => {
+        const val = parseFloat(ev.target.value) || 0;
+        state.minRating = val;
+        updateSliderVisual(slider, valueEl, val);
+      });
+      slider.addEventListener("change", () => {
+        saveMinRating(state.minRating);
+        state.focusSpot = null;
+        renderDayContent();
+      });
+    }
+  }
+
+  function updateSliderVisual(slider, valueEl, v) {
+    valueEl.textContent = v > 0 ? v.toFixed(1) : "alle";
+    slider.classList.toggle("is-active", v > 0);
+    const min = parseFloat(slider.min) || 0;
+    const max = parseFloat(slider.max) || 10;
+    const pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
+    slider.style.setProperty("--fill", pct.toFixed(1) + "%");
   }
 
   // ── Filter Map (Leaflet) ────────────────────────────────────
@@ -535,9 +712,16 @@
       : "";
 
     if (!groups.length) {
-      const emptyMsg = state.focusSpot
-        ? `Spot "${escapeHtml(state.focusSpot)}" nicht in diesem Tag gefunden.`
-        : `Keine fliegbaren Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} — ${counts.spots_nogo || 0} NO-GO, ${counts.spots_bronze || 0} Abgleiter.`;
+      let emptyMsg;
+      if (state.focusSpot) {
+        emptyMsg = `Spot "${escapeHtml(state.focusSpot)}" nicht in diesem Tag gefunden.`;
+      } else {
+        const filterActive = (state.tierFilters.size < TIER_DEFS.length) || state.minRating > 0 || state.filterRegions.size > 0;
+        const filterHint = filterActive
+          ? `<button type="button" class="bf-empty-reset" onclick="window.__bf_resetFilters && window.__bf_resetFilters()">Filter zurücksetzen</button>`
+          : "";
+        emptyMsg = `<div class="bf-empty-msg">Keine Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} entsprechen dem aktuellen Filter.</div><div class="bf-empty-counts">${counts.spots_nogo || 0} NO-GO · ${counts.spots_bronze || 0} Abgleiter</div>${filterHint}`;
+      }
       contentEl.innerHTML = focusBanner + `<div class="bf-content-empty">${emptyMsg}</div>`;
       return;
     }
@@ -574,6 +758,7 @@
     const name = (meta && meta.region_name) || group.region_name || (group.region_id === "unknown" ? "Weitere Spots" : group.region_id);
     const rating = meta ? formatRating(meta.rating) : "";
     const spotsHtml = group.spots.map(renderSpotRow).join("");
+    const spotCount = group.spots.length;
     const shareBtn = group.region_id && group.region_id !== "unknown"
       ? `<button type="button" class="bf-share-btn bf-share-btn--region"
                  data-share-kind="region"
@@ -582,12 +767,17 @@
                  data-share-rating="${rating}"
                  title="Region teilen" aria-label="Region teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`
       : "";
+    const isCollapsed = state.collapsedRegions.has(group.region_id);
+    const collapsedCls = isCollapsed ? " is-collapsed" : "";
+    const ariaExpanded = isCollapsed ? "false" : "true";
     return `
-      <div class="bf-region">
-        <div class="bf-region-head">
+      <div class="bf-region${collapsedCls}" data-region-id="${escapeHtml(group.region_id)}">
+        <div class="bf-region-head" role="button" tabindex="0" aria-expanded="${ariaExpanded}" aria-label="Region ${escapeHtml(name)} ein-/ausklappen">
           <span class="bf-region-name">${escapeHtml(name)}</span>
+          <span class="bf-region-count" aria-hidden="true">${spotCount}</span>
           ${rating ? `<span class="bf-region-rating">${rating}</span>` : ""}
           ${shareBtn}
+          <span class="bf-region-chevron" aria-hidden="true">▾</span>
         </div>
         <ul class="bf-spot-list">${spotsHtml}</ul>
       </div>
@@ -670,6 +860,14 @@
             <section class="bf-detail-meteoblock">
               <h4 class="bf-detail-title"><span class="bf-detail-icon">📈</span>Meteogramm</h4>
               <div class="bf-spot-meteogram" data-spot="${escapeHtml(spot.spot)}" data-date="${escapeHtml(spot.date || "")}">
+                <div class="bf-meteogram-toolbar">
+                  <button type="button" class="bf-meteogram-numbers-toggle" data-meteogram-numbers
+                          aria-pressed="${state.showNumbers ? "true" : "false"}"
+                          title="Wind-/Böen-Zahlen ein-/ausblenden">
+                    <span class="bf-meteogram-numbers-toggle-icon" aria-hidden="true">123</span>
+                    <span>Zahlen</span>
+                  </button>
+                </div>
                 <div class="bf-meteogram-chart"></div>
               </div>
             </section>
@@ -792,6 +990,7 @@
     const isOpen = li.classList.toggle("is-expanded");
     toggle.setAttribute("aria-expanded", String(isOpen));
     if (isOpen) {
+      markExpandHintSeen();
       details.removeAttribute("hidden");
       const miniMap = details.querySelector(".bf-spot-minimap");
       if (miniMap && !miniMap.classList.contains("bf-spot-minimap--nodata")) initMiniMap(miniMap);
@@ -815,6 +1014,55 @@
     if (!toggle || toggle !== ev.target) return;
     ev.preventDefault();
     handleSpotToggle(ev);
+  }
+
+  // ── Region Toggle (expand/collapse) ─────────────────────────
+
+  function handleRegionToggle(ev) {
+    if (ev.target.closest(".bf-share-btn")) return;
+    if (ev.target.closest(".bf-spot")) return;
+    const head = ev.target.closest(".bf-region-head");
+    if (!head) return;
+    const region = head.closest(".bf-region");
+    if (!region) return;
+    const rid = region.dataset.regionId || "";
+    const willCollapse = !region.classList.contains("is-collapsed");
+    region.classList.toggle("is-collapsed", willCollapse);
+    head.setAttribute("aria-expanded", String(!willCollapse));
+    if (willCollapse) state.collapsedRegions.add(rid);
+    else state.collapsedRegions.delete(rid);
+    saveCollapsedRegions(state.collapsedRegions);
+    markExpandHintSeen();
+  }
+
+  function handleRegionKeydown(ev) {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    const head = ev.target.closest(".bf-region-head");
+    if (!head || head !== ev.target) return;
+    ev.preventDefault();
+    handleRegionToggle(ev);
+  }
+
+  // ── Meteogram numbers toggle ────────────────────────────────
+
+  function handleNumbersToggle(ev) {
+    const btn = ev.target.closest("[data-meteogram-numbers]");
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    state.showNumbers = !state.showNumbers;
+    saveShowNumbers(state.showNumbers);
+    document.body.classList.toggle("bf-show-numbers", state.showNumbers);
+    document.querySelectorAll("[data-meteogram-numbers]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(state.showNumbers));
+    });
+    // Re-render every currently-open meteogram in place.
+    document.querySelectorAll(".bf-spot.is-expanded .bf-spot-meteogram").forEach((el) => {
+      el._flyInited = false;
+      const chartEl = el.querySelector(".bf-meteogram-chart");
+      if (chartEl) chartEl.innerHTML = "";
+      initMeteogram(el);
+    });
   }
 
   function handleShareClick(ev) {
@@ -1030,6 +1278,7 @@
             windrichtung: weather.windrichtung,
             idealWindMax: weather.ideal_wind_max,
             groundWindByTime: groundWindByTime,
+            showNumbers: state.showNumbers,
           });
         } catch (e) {
           console.warn("[briefing] Meteogram failed", e);
@@ -1087,6 +1336,7 @@
     renderFazit(data);
     renderDayTabs(data);
     renderFilters(data);
+    renderTierFilter();
     renderDayContent();
   }
 
@@ -1152,16 +1402,36 @@
   // Expose fuer onclick im Focus-Banner
   window.__bf_clearFocus = clearFocusSpot;
 
+  function resetAllFilters() {
+    state.filterRegions = new Set();
+    state.tierFilters = new Set(TIER_DEFS.map((t) => t.id));
+    state.minRating = 0;
+    saveRegionFilter(state.filterRegions);
+    saveTierFilter(state.tierFilters);
+    saveMinRating(0);
+    renderFilters(state.data);
+    renderTierFilter();
+    renderDayTabs(state.data);
+    renderDayContent();
+  }
+  window.__bf_resetFilters = resetAllFilters;
+
   // ── Init ────────────────────────────────────────────────────
 
   function init() {
     parseUrlParams();
+
+    if (state.expandHintSeen) document.body.classList.add("bf-hint-seen");
+    if (state.showNumbers) document.body.classList.add("bf-show-numbers");
 
     const btn = $("bfGenerateBtn");
     if (btn) btn.addEventListener("click", generateFazit);
 
     const contentEl = $("bfContent");
     if (contentEl) {
+      contentEl.addEventListener("click", handleNumbersToggle);
+      contentEl.addEventListener("click", handleRegionToggle);
+      contentEl.addEventListener("keydown", handleRegionKeydown);
       contentEl.addEventListener("click", handleSpotToggle);
       contentEl.addEventListener("keydown", handleSpotKeydown);
       contentEl.addEventListener("click", handleShareClick);

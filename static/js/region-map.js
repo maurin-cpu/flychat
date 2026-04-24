@@ -776,6 +776,7 @@
         Meteogram.renderChart(chartEl, meteogramTooltip, wxDay, altDay, {
             elevation: altData.elevation_m || 0,
             isRegion: true,
+            thresholds: wxData.thresholds,
         });
 
         // Wetter-Zeitstempel unter dem Meteogramm

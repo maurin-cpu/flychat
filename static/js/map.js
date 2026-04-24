@@ -403,6 +403,15 @@
                     console.warn('fitBounds fehlgeschlagen:', e);
                 }
             })
+            .then(function () {
+                // Race-Fix: falls /api/analyses VOR /api/spots zurueckkam,
+                // lief updateSpotColors ueber ein leeres markersByName (no-op).
+                // Marker bleiben dann grau (default/no_data) bis User Day-Tab wechselt.
+                // Jetzt sind Marker da → einmal nach-coloren wenn Analyse vorhanden.
+                if (window.analysisData && window.updateSpotColors) {
+                    window.updateSpotColors(window.analysisData, window.currentDate);
+                }
+            })
             .then(openSpotFromUrl)
             .catch(function (err) {
                 console.error('Spots laden fehlgeschlagen:', err);
@@ -733,6 +742,7 @@
             windrichtung: currentWeather.windrichtung,
             idealWindMax: currentWeather.ideal_wind_max,
             groundWindByTime: groundWindByTime,
+            thresholds: currentWeather.thresholds,
         });
 
         // Wetter-Zeitstempel unter dem Spot-Meteogramm

@@ -27,13 +27,37 @@ Im Spot-Modus hat der Startplatz einen erlaubten **Sektor** (Kompassbereich). Di
 Nur saubere Stunden (RUHIG oder SPORTLICH = `[WIND-OK]` UND kein DANGER-Tag) koennen ins `safe_window`. SPORTLICHE Stunden (mit WARN-Tag innen) dort explizit in `caution_notes` mit Uhrzeit markieren.
 
 ═══════════════════════════════════════════════
-SPOT-BEMERKUNGEN (stundenweise pruefen)
+SPOT-BEMERKUNGEN (Override-Layer nach normaler Bewertung)
 ═══════════════════════════════════════════════
 
-Der Datenblock enthaelt **Bemerkungen** (z.B. "Mindestwind 15 km/h fuer Soaring", "bei Suedstau Ablosungsgefahr"). Diese gelten stundenweise und ueberschreiben generische km/h-Regeln:
-- Wenn Bemerkung einen Mindestwind fuer Soaring fordert, pruefe die tatsaechlichen Stunden-Werte.
-- Wenn Bemerkung einen Spot-spezifischen Ausschluss nennt (z.B. "bei Nordlage gesperrt"), beachten.
-- Im Feld `bemerkung_check` kurz beantworten: Bemerkungen erfuellt? Was genau?
+Der Datenblock enthaelt **Bemerkungen** (z.B. "Mindestwind 15 km/h fuer Soaring", "bei Suedstau Abloesungsgefahr", "Landewiese bei Regen gesperrt"). Bemerkungen sind spot-spezifisches Lokalwissen und **ueberschreiben generische Regeln**. Behandle sie als Nachjustierungs-Schritt — erst normal bewerten, dann Bemerkung anwenden:
+
+**Schritt 0 — NORMAL BEWERTEN (wie bisher):**
+Bewerte Safety/Flyability/Sub-Ratings zuerst auf Basis der Tags und generischen Regeln. Fuelle alle Felder normal.
+
+**Schritt 1 — KLASSIFIZIEREN: Was ist durch die Bemerkung betroffen?**
+- **SAFETY** — Bedingung beeinflusst, ob der Flug sicher moeglich ist (Startverbot, Landezone, gefaehrliche Wettersituation). Beispiele: "bei Nordlage gesperrt", "Landewiese bei Regen gesperrt", "bei Suedstau Abloesungsgefahr".
+- **FLYABILITY** — Bedingung beeinflusst, ob/wie gut geflogen werden kann, aber der Flug bleibt grundsaetzlich sicher. Beispiele: "Mindestwind 15 km/h fuer Soaring", "Thermik schwach bis 11h".
+- **BEIDES** — Bedingung hat beide Komponenten getrennt.
+
+**Schritt 2 — EXTRAHIEREN: Was genau?**
+Pro Bemerkungs-Trigger identifiziere: (a) Parameter (Wind/Richtung/Niederschlag/Jahreszeit/Tageszeit/Thermik), (b) Schwellwert, (c) betroffene Phase (Start/Flug/Landung/Soaring/Thermik), (d) welche Tagesstunden triggern im aktuellen Datenblock.
+
+**Schritt 3 — NACHJUSTIEREN: Nur betroffene Felder aendern, Rest bleibt**
+
+| Betroffener Aspekt | Zielfeld(er) |
+|---|---|
+| Startverbot / Landezone / Hangflug-Ausschluss | `no_go_reasons` (wenn ganzer Tag) oder `caution_notes` (Teilstunden), `safe_window` verkuerzen, ggf. `primary_no_go` |
+| Spot-spezifische Turbulenz/Abloesung | `caution_notes` mit Uhrzeit, `wind_shear` oder `wind_summary`, Status mind. `conditional` |
+| Mindestwind fuer Soaring nicht erreicht | `flight_type = "Abgleiter"`, `flight_duration_estimate` kurz (z.B. "20-30min Abgleiter"), `soaring_options` erklaert warum, `recommendation` ehrlich, `fly_status` max `green` (kein `violet`), `xc_potential = "low"` |
+| Mindestwind erreicht → Soaring moeglich | `flight_type = "Soaring"` oder `"Soaring+Thermik"`, `soaring_options` mit konkreter Einschaetzung |
+| Thermik-Einschraenkung (Tageszeit/Saison) | `thermal_quality`, `peak_climb_rate` ggf. runter, `best_window` anpassen |
+| `bemerkung_check` | IMMER: kurze Zusammenfassung welche Bemerkung griff und welche Felder nachjustiert wurden |
+
+**Beispiele:**
+- *Balderen, Prognose 8-12 km/h, Bemerkung "Mindestwind 15 km/h fuer Soaring"*: Schritt 0 haette generisch `flight_type="Soaring"` gesagt → Override rein FLYABILITY: `flight_type="Abgleiter"`, kurze Dauer, `fly_status` max `green`, `recommendation`: "Wind zu schwach fuer Soaring am Balderen — Abgleiter moeglich." Safety-Felder unveraendert.
+- *Spot mit "bei Suedstau Abloesungsgefahr", Foehn-Sued aktiv*: BEIDES. Safety → `caution_notes`, Flyability → `thermal_quality` erwaehnt zerrissene Thermik.
+- *"Landewiese bei Regen gesperrt", RAIN-WARN-Stunden*: SAFETY. → `no_go_reasons`, `safe_window` endet vor Regen.
 
 ═══════════════════════════════════════════════
 REGION-KONTEXT NUTZEN (fuer TEIL 4 Streckenflug)

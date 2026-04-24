@@ -46,7 +46,7 @@ def with_api_key(params):
 # Wettermodell-Hybrid:
 # - WIND_MODEL: Wind/Böen/Leewarnungen -> lokal präziser (CH1)
 # - THERMAL_MODEL: Thermik/Wolken/Strahlung -> robuster für Fliegbarkeit (ICON-D2)
-WIND_MODEL = "icon_d2" #meteoswiss_icon_ch1, icon_d2, icon_eu
+WIND_MODEL = "meteoswiss_icon_ch1" #meteoswiss_icon_ch1, icon_d2, icon_eu
 THERMAL_MODEL = "icon_d2"
 FALLBACK_MODEL = "icon_eu"
 
@@ -547,6 +547,25 @@ ALOFT_WARN_KMH = 20             # Höhenwind 20–30 km/h im Flugbereich → [AL
 WIND_STRONG_KMH = 30            # Grundwind > 30 km/h → [WIND-STRONG] (unfliegbar)
 WIND_MODERATE_KMH = 20          # Grundwind 20–30 km/h → [WIND-MODERATE] (sportlich)
 # < WIND_MODERATE_KMH → [WIND-CALM] (ruhig)
+
+# ─── Start-Fenster-Schwellen (Windrichtung + Gefahrenfreiheit) ───
+# Eine "saubere Stunde" = WIND-OK (Spot-Sektor) UND keine DANGER-Tags.
+# Tag-Status haengt am laengsten zusammenhaengenden Block sauberer Stunden:
+#   < CLEAN_WINDOW_MIN_HOURS  → not_safe (kein ausreichendes Start-Fenster)
+#   = CLEAN_WINDOW_MIN_HOURS  → max conditional (Fenster knapp, Zeitdruck)
+#   >= CLEAN_WINDOW_GREEN_HOURS → safe/green moeglich
+# WIND-WRONG Stunden NACH dem Start-Fenster sind kein Grund fuer UNFLIEGBAR —
+# der Pilot ist bereits in der Luft, Landung i.d.R. auf separatem Landeplatz.
+CLEAN_WINDOW_MIN_HOURS = 2       # h — unterhalb: not_safe
+CLEAN_WINDOW_GREEN_HOURS = 3     # h — ab hier: safe/green moeglich
+
+# Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade):
+# Erfasst den groessten Richtungsdreher innerhalb eines gleitenden Fensters von
+# bis zu WIND_DIRECTION_SWING_WINDOW_H Stunden — sowohl abrupte 1h-Spruenge als
+# auch langsames Drehen ueber 2-3h (z.B. 120° ueber 3h = unbestaendiger Wind).
+# Ab WIND_DIRECTION_SWING_NOTE_DEG° gibt es einen Pilot-Hinweis in caution_notes.
+WIND_DIRECTION_SWING_NOTE_DEG = 45   # Grad — Schwelle fuer caution_notes-Hinweis
+WIND_DIRECTION_SWING_WINDOW_H = 3    # Stunden — max Fensterbreite fuer Drift-Erkennung
 
 # ─── Bodenböen-Schwellen (Spots) ───
 # wind_gusts_10m (nach Bias-Korrektur + Multi-Modell-Merge).

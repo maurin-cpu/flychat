@@ -64,10 +64,117 @@ from engine._common import (
     _pick_key_from_list, _validate_key, _derive_primary_labels,
     COMPASS_POINTS, _compute_wind_trend, _detect_rain_sandwich,
     _detect_gust_trend, _format_gust_trend_text,
+    _detect_aloft_trend, _format_aloft_trend_text,
     _interpolate_wind_at_altitude,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _angular_diff(a: float, b: float) -> float:
+    """Kuerzester Winkel zwischen zwei Richtungen in Grad (0-180).
+    Zirkulaere Differenz: 350° zu 10° = 20°, nicht 340°.
+    """
+    d = abs(float(a) - float(b)) % 360.0
+    return d if d <= 180.0 else 360.0 - d
+
+
+def _list_consecutive_runs(hour_strs: list[str]) -> list[tuple[int, int]]:
+    """Findet ALLE Bloecke zusammenhaengender Stunden.
+    Input: ['10:00','11:00','13:00','14:00','15:00'] → [(10, 11), (13, 15)].
+    Return: Liste von (start_hour, end_hour) Tupeln (beide inklusiv).
+    """
+    if not hour_strs:
+        return []
+    try:
+        hours = sorted(set(int(h.split(":")[0]) for h in hour_strs))
+    except (ValueError, IndexError):
+        return []
+    runs: list[tuple[int, int]] = []
+    run_start = hours[0]
+    prev = hours[0]
+    for h in hours[1:]:
+        if h - prev == 1:
+            prev = h
+        else:
+            runs.append((run_start, prev))
+            run_start = h
+            prev = h
+    runs.append((run_start, prev))
+    return runs
+
+
+def _longest_consecutive_run(hour_strs: list[str]) -> int:
+    """Laenge des laengsten Blocks zusammenhaengender Stunden (in h).
+    Input: ['10:00','11:00','13:00','14:00','15:00'] → 3 (13-15).
+    """
+    runs = _list_consecutive_runs(hour_strs)
+    if not runs:
+        return 0
+    return max(end - start + 1 for start, end in runs)
+
+
+def _format_clean_windows(hour_strs: list[str]) -> str:
+    """Formatiert alle sauberen Fenster als Lesbare Liste.
+    Input: ['10:00','11:00','13:00','14:00','15:00']
+    Output: '10:00-12:00 (2h), 13:00-16:00 (3h)'  (End-Stunde exklusiv dargestellt = Stunden-Anzahl)
+    """
+    runs = _list_consecutive_runs(hour_strs)
+    if not runs:
+        return "KEINE"
+    parts = []
+    for start, end in runs:
+        length = end - start + 1
+        # Ende als "naechste Stunde" fuer intuitive Lesbarkeit (14-16 = 2h Fenster)
+        parts.append(f"{start:02d}:00-{end + 1:02d}:00 ({length}h)")
+    return ", ".join(parts)
+
+
+def _max_wind_direction_swing(
+    hourly_wind_dirs: dict,
+    window_hours: int | None = None,
+) -> tuple[float, str, str, int]:
+    """Groesster Richtungsdreher innerhalb eines beliebigen Fensters von bis zu
+    ``window_hours`` Stunden. Erfasst sowohl abrupte 1h-Spruenge als auch
+    langsames Drehen ueber mehrere Stunden (z.B. 120° ueber 3h, wo keine einzelne
+    Stunde alleine die Schwelle reisst — der Wind ist trotzdem unbestaendig).
+
+    Returns (max_swing_deg, start_hour_str, end_hour_str, span_hours).
+    Bei span_hours == 1 ist es ein klassischer Stunde-zu-Stunde-Dreher.
+    """
+    if not hourly_wind_dirs:
+        return (0.0, "", "", 0)
+    if window_hours is None:
+        try:
+            window_hours = int(getattr(config, "WIND_DIRECTION_SWING_WINDOW_H", 3))
+        except Exception:
+            window_hours = 3
+    window_hours = max(1, window_hours)
+    try:
+        items = sorted(
+            ((int(k.split(":")[0]), k, v) for k, v in hourly_wind_dirs.items() if isinstance(v, (int, float))),
+            key=lambda x: x[0],
+        )
+    except (ValueError, IndexError):
+        return (0.0, "", "", 0)
+    max_swing = 0.0
+    start_hour = ""
+    end_hour = ""
+    span = 0
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            h_diff = items[j][0] - items[i][0]
+            if h_diff <= 0:
+                continue
+            if h_diff > window_hours:
+                break
+            swing = _angular_diff(items[i][2], items[j][2])
+            if swing > max_swing:
+                max_swing = swing
+                start_hour = items[i][1]
+                end_hour = items[j][1]
+                span = h_diff
+    return (max_swing, start_hour, end_hour, span)
 
 
 def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
@@ -1135,9 +1242,12 @@ class WeatherContextMixin:
         clean_hours = []       # WIND-OK ohne harte Warnungen
         warned_hours = []      # WIND-OK aber mit harten Warnungen (GUST/ALOFT/RAIN/CAPE)
         hourly_gusts = {}      # hour_str → gust value für Trend-Analyse
+        hourly_wind_dirs = {}  # hour_str → wind_direction_10m (für Richtungsdreher-Metrik)
         rain_hours = []        # Stunden mit Niederschlag
         gust_hours = []        # Stunden mit GUST/ALOFT-GUST WARN/DANGER (fuer BOEEN-TREND)
         gust_danger_hours = [] # Nur DANGER-Level (>40 km/h Boden oder Flugraum)
+        aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND)
+        aloft_danger_hours_list = []  # Nur [ALOFT-DANGER] (> ALOFT_DANGER_KMH)
         tag_counts = {}        # tag_name -> count über den ganzen Tag (für Tagesprofil)
         safety_timeline = []       # (hour_str, klass, label) - SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter)
         fly_timeline = []          # (hour_str, klass, label) - FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet)
@@ -1249,6 +1359,8 @@ class WeatherContextMixin:
                 rain_hours.append(hour_str)
             if isinstance(wind_gusts, (int, float)):
                 hourly_gusts[hour_str] = wind_gusts
+            if isinstance(wind_dir, (int, float)):
+                hourly_wind_dirs[hour_str] = wind_dir
             if is_ok:
                 wind_ok_hours.append(hour_str)
             else:
@@ -1568,6 +1680,12 @@ class WeatherContextMixin:
                 if gust_danger_tags & warn_set:
                     gust_danger_hours.append(hour_str)
 
+            # Hoehenwind-Trend: Stunden mit ALOFT-WARN/DANGER sammeln
+            if "[ALOFT-WARN]" in warn_set or "[ALOFT-DANGER]" in warn_set:
+                aloft_hours.append(hour_str)
+                if "[ALOFT-DANGER]" in warn_set:
+                    aloft_danger_hours_list.append(hour_str)
+
             # Klassifiziere saubere vs. gewarnte Stunden (nach allen Warnungen)
             # WICHTIG: Die Thermik-Qualitaets-Tags (SHEAR / THERMAL-TORN / THERMAL-ROUGH)
             # gehoeren hier NICHT rein. Sie betreffen die Fliegbarkeit (kann ich Thermik
@@ -1601,21 +1719,62 @@ class WeatherContextMixin:
             return ""
 
         # Wind-Tag-Zusammenfassung (damit die LLM es nicht übersehen kann)
+        longest_clean_run = _longest_consecutive_run(clean_hours)
+        clean_windows_fmt = _format_clean_windows(clean_hours)
+        max_swing_deg, max_swing_start, max_swing_hour, max_swing_span = _max_wind_direction_swing(hourly_wind_dirs)
+
         lines.append("")
         lines.append("═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══")
         lines.append(f"[WIND-OK] Stunden ({len(wind_ok_hours)}): {', '.join(wind_ok_hours) if wind_ok_hours else 'KEINE'}")
-        lines.append(f"[WIND-WRONG] Stunden ({len(wind_wrong_hours)}): {', '.join(wind_wrong_hours) if wind_wrong_hours else 'KEINE'}")
-        lines.append(f"Saubere Stunden ({len(clean_hours)}): {', '.join(clean_hours) if clean_hours else 'KEINE'} (WIND-OK ohne harte Warnungen)")
+        lines.append(f"[WIND-WRONG] Stunden ({len(wind_wrong_hours)}): {', '.join(wind_wrong_hours) if wind_wrong_hours else 'KEINE'}  (= nicht startbar, KEIN UNFLIEGBAR-Grund)")
+        lines.append(f"Saubere Stunden ({len(clean_hours)}): {', '.join(clean_hours) if clean_hours else 'KEINE'} (WIND-OK UND keine DANGER-Tags)")
+        lines.append(f"Saubere Start-Fenster: {clean_windows_fmt}")
+        lines.append(f"Laengstes Fenster (= Status-Basis): {longest_clean_run}h")
         if warned_hours:
             lines.append(f"⚠ Gewarnete WIND-OK Stunden ({len(warned_hours)}): {', '.join(warned_hours)} (WIND-OK aber WIND/GUST/ALOFT/RAIN/CAPE/THUNDERSTORM/PL-WARN!)")
-        if len(clean_hours) >= 3:
-            lines.append(f"→ {len(clean_hours)} saubere Stunden: safety_status eher safe oder conditional (Grün/Orange).")
-        elif clean_hours:
-            lines.append(f"→ Nur {len(clean_hours)} saubere Stunden: Status sollte maximal conditional sein.")
+
+        # Start-Fenster-Regel (konfigurierbar via config.CLEAN_WINDOW_*)
+        if longest_clean_run >= config.CLEAN_WINDOW_GREEN_HOURS:
+            lines.append(
+                f"→ Start-Fenster {longest_clean_run}h >= {config.CLEAN_WINDOW_GREEN_HOURS}h: "
+                f"safety_status safe oder conditional moeglich. "
+                f"WIND-WRONG NACH dem Fenster ist KEIN UNFLIEGBAR-Grund."
+            )
+        elif longest_clean_run >= config.CLEAN_WINDOW_MIN_HOURS:
+            lines.append(
+                f"→ Start-Fenster nur {longest_clean_run}h (Minimum {config.CLEAN_WINDOW_MIN_HOURS}h, "
+                f"Green ab {config.CLEAN_WINDOW_GREEN_HOURS}h): Status maximal conditional."
+            )
         elif wind_ok_hours and not clean_hours:
-            lines.append(f"→ ACHTUNG: Alle {len(wind_ok_hours)} WIND-OK-Stunden haben harte Warnungen (WIND/GUST/ALOFT/RAIN/CAPE/THUNDERSTORM)! Status sollte NOT_SAFE sein!")
+            lines.append(
+                f"→ ACHTUNG: Alle {len(wind_ok_hours)} WIND-OK-Stunden haben harte Warnungen "
+                f"(WIND/GUST/ALOFT/RAIN/CAPE/THUNDERSTORM)! Status sollte NOT_SAFE sein!"
+            )
         else:
-            lines.append(f"→ Kein fliegbares Fenster. Status sollte not_safe sein.")
+            lines.append(
+                f"→ Kein ausreichendes Start-Fenster ({longest_clean_run}h < {config.CLEAN_WINDOW_MIN_HOURS}h). "
+                f"Status sollte not_safe sein."
+            )
+
+        # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade)
+        # Erfasst sowohl abrupte 1h-Spruenge als auch langsames Drehen ueber
+        # bis zu WIND_DIRECTION_SWING_WINDOW_H Stunden (Wind unbestaendig).
+        if max_swing_deg >= config.WIND_DIRECTION_SWING_NOTE_DEG and max_swing_hour:
+            if max_swing_span <= 1:
+                span_txt = f"Max Stunden-Wechsel {int(round(max_swing_deg))}° um {max_swing_hour}"
+            else:
+                span_txt = (
+                    f"Max Richtungsdreher {int(round(max_swing_deg))}° "
+                    f"zwischen {max_swing_start} und {max_swing_hour} "
+                    f"({max_swing_span}h Drift)"
+                )
+            lines.append(
+                f"→ ANMERKUNG Richtungsdreher: {span_txt} "
+                f"(>= {config.WIND_DIRECTION_SWING_NOTE_DEG}°-Schwelle). "
+                f"In caution_notes erwaehnen — KEIN Status-Downgrade, KEINE Tier-Aenderung "
+                f"(safety_status + fly_status/flyability_tier bleiben wie ermittelt: "
+                f"violet bleibt violet, green bleibt green, gray/bronze bleibt gray/bronze)."
+            )
 
         # ─── TAGESPROFIL: Ganzheitliche Sicht für LLM-Bewertung ───
         total_actual = len(wind_ok_hours) + len(wind_wrong_hours)
@@ -1718,6 +1877,11 @@ class WeatherContextMixin:
             "wind_ok_count": len(wind_ok_hours),
             "wind_wrong_count": len(wind_wrong_hours),
             "clean_hours_count": len(clean_hours),
+            "longest_clean_run_hours": longest_clean_run,
+            "max_wind_swing_deg": round(max_swing_deg, 1),
+            "max_wind_swing_hour": max_swing_hour,
+            "max_wind_swing_start": max_swing_start,
+            "max_wind_swing_span_h": max_swing_span,
             "hard_warning_hours": hard_warning_hours,
             "thunderstorm_hours": tag_counts.get("[THUNDERSTORM]", 0),
             "strong_wind_warn_hours": tag_counts.get("[STRONG-WIND-WARN]", 0),
@@ -1928,6 +2092,19 @@ class WeatherContextMixin:
             if gust_trend_text:
                 lines.append(gust_trend_text)
 
+        # Hoehenwind-Trend (analog Boeen-Trend)
+        if aloft_hours and all_hours_sorted:
+            aloft_pattern = _detect_aloft_trend(aloft_hours, all_hours_sorted, aloft_danger_hours_list)
+            aloft_trend_text = _format_aloft_trend_text(
+                aloft_pattern, aloft_hours,
+                danger_kmh=config.ALOFT_DANGER_KMH,
+                warn_kmh=config.ALOFT_WARN_KMH,
+            )
+            if aloft_trend_text:
+                lines.append(aloft_trend_text)
+            # Cache fuer analyzers.py ALOFT-Override
+            self._ctx_gust_cache[f"{name}|{date_str}"]["aloft_pattern"] = aloft_pattern
+
         # Föhn-Info anhängen
         lines.append("")
         krit_foehn = spot.get("kritischer_foehn", "Süd")
@@ -2000,6 +2177,8 @@ class WeatherContextMixin:
         warned_hours = []
         hourly_winds = {}      # hour_str → Windgeschwindigkeit für Trend-Analyse (Regionen haben keine Böen)
         rain_hours = []        # Stunden mit Niederschlag
+        aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND, Region)
+        aloft_danger_hours_list = []  # Nur [ALOFT-DANGER] (> ALOFT_DANGER_KMH)
         tag_counts = {}        # tag_name → count (für Tagesprofil-Histogramm)
         # Thermik-Qualitaets-Zaehler
         thermal_hours_total = 0
@@ -2181,8 +2360,11 @@ class WeatherContextMixin:
 
             if aloft_danger:
                 warnings.append("[ALOFT-DANGER]")
+                aloft_hours.append(hour_str)
+                aloft_danger_hours_list.append(hour_str)
             elif aloft_warn:
                 warnings.append("[ALOFT-WARN]")
+                aloft_hours.append(hour_str)
 
             try:
                 cape = data.get("cape")
@@ -2430,14 +2612,27 @@ class WeatherContextMixin:
             lines.append(f"Gewarnte Stunden ({len(warned_hours)}): {', '.join(warned_hours)}")
 
         flyable = len(calm_hours) + len(moderate_hours)
-        if len(clean_hours) >= 3:
-            lines.append(f"→ {len(clean_hours)} saubere Stunden: safety_status eher safe oder conditional.")
-        elif clean_hours:
-            lines.append(f"→ Nur {len(clean_hours)} saubere Stunden: Status sollte maximal conditional sein.")
+        longest_clean_run_region = _longest_consecutive_run(clean_hours)
+        clean_windows_region_fmt = _format_clean_windows(clean_hours)
+        lines.append(f"Saubere Fenster: {clean_windows_region_fmt}")
+        lines.append(f"Laengstes Fenster (= Status-Basis): {longest_clean_run_region}h")
+        if longest_clean_run_region >= config.CLEAN_WINDOW_GREEN_HOURS:
+            lines.append(
+                f"→ Fenster {longest_clean_run_region}h >= {config.CLEAN_WINDOW_GREEN_HOURS}h: "
+                f"safety_status safe oder conditional moeglich."
+            )
+        elif longest_clean_run_region >= config.CLEAN_WINDOW_MIN_HOURS:
+            lines.append(
+                f"→ Fenster nur {longest_clean_run_region}h (Minimum {config.CLEAN_WINDOW_MIN_HOURS}h, "
+                f"Green ab {config.CLEAN_WINDOW_GREEN_HOURS}h): Status maximal conditional."
+            )
         elif flyable > 0 and not clean_hours:
             lines.append(f"→ ACHTUNG: Alle fliegbaren Stunden haben harte Warnungen! Status sollte NOT_SAFE sein!")
         else:
-            lines.append(f"→ Kein fliegbares Fenster. Status sollte not_safe sein.")
+            lines.append(
+                f"→ Kein ausreichendes Fenster ({longest_clean_run_region}h < {config.CLEAN_WINDOW_MIN_HOURS}h). "
+                f"Status sollte not_safe sein."
+            )
 
         # Cache fuer deterministische Flyability-Override
         # rough_danger_h = NUR THERMAL-ROUGH-UNUSABLE → echter gray-Trigger.
@@ -2467,9 +2662,17 @@ class WeatherContextMixin:
         # Region-Aloft-Cache (Wind-only, keine Böen) für ALOFT-Override in
         # _post_process_combined_region. Regionen haben keine GUST-Tags mehr,
         # der Cache enthält nur wind-basierte Höhenwind-Zähler.
+        # aloft_pattern: trend-aware Klassifikation (AUFKLAERUNG / EINGEKESSELT / ...),
+        # damit der Override sauberes Nachmittagsfenster nicht killt (Bug Apr 2026).
+        aloft_pattern_region = None
+        if aloft_hours and all_hours_sorted_region:
+            aloft_pattern_region = _detect_aloft_trend(
+                aloft_hours, all_hours_sorted_region, aloft_danger_hours_list
+            )
         self._ctx_cache_put(self._ctx_gust_cache, f"{rname}|{date_str}", {
             "aloft_warn_hours": tag_counts.get("[ALOFT-WARN]", 0),
             "aloft_danger_hours": tag_counts.get("[ALOFT-DANGER]", 0),
+            "aloft_pattern": aloft_pattern_region,
         })
 
         # ─── TAGESPROFIL: Ganzheitliche Sicht für LLM-Bewertung ───
@@ -2692,6 +2895,16 @@ class WeatherContextMixin:
                 f"NIEDERSCHLAG-TREND: GANZTAEGIG — Regen in {len(rain_hours)} Stunden. "
                 f"→ not_safe."
             )
+
+        # Hoehenwind-Trend (analog Boeen-Trend in Spots)
+        if aloft_pattern_region:
+            aloft_trend_text = _format_aloft_trend_text(
+                aloft_pattern_region, aloft_hours,
+                danger_kmh=config.ALOFT_DANGER_KMH,
+                warn_kmh=config.ALOFT_WARN_KMH,
+            )
+            if aloft_trend_text:
+                lines.append(aloft_trend_text)
 
         # Foehn: regionsspezifisch (Süd/Nord/Beide)
         krit_foehn = region.get("kritischer_foehn", "Beide")

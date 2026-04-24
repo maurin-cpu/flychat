@@ -2,16 +2,19 @@
 KERNREGEL — Stunden-Klassifikation
 ═══════════════════════════════════════════════
 
-Jede Stunde im TAGESPROFIL gehoert in genau eine von drei Kategorien:
+Jede Stunde hat **zwei unabhaengige Eigenschaften**:
 
-- **RUHIG** — Windrichtung passt (Spot: [WIND-OK] / Region: [WIND-CALM] oder [WIND-MODERATE]) UND **keine WARN-Tags** UND **keine DANGER-Tags**. Komfortabel fliegbar, anfaengerfreundlich.
+**Achse 1 — Flug-Gefahr** (physische Gefahr fuer den Piloten in der Luft):
+- **RUHIG** — keine WARN-Tags, keine DANGER-Tags. Komfortabel, anfaengerfreundlich.
+- **SPORTLICH** — ≥1 WARN-Tag (GUST-WARN, ALOFT-WARN, ALOFT-GUST-WARN, CAPE-WARN), kein DANGER-Tag. Fliegbar fuer Erfahrene.
+- **UNFLIEGBAR** — ≥1 DANGER-Tag (RAIN-WARN, STRONG-WIND-WARN, GUST-DANGER, ALOFT-DANGER, ALOFT-GUST-DANGER, CAPE-DANGER, THUNDERSTORM, OVERCAST-DANGER) ODER Region-`[WIND-STRONG]`. Kein Flug moeglich.
 
-- **SPORTLICH** — Windrichtung passt UND **mindestens 1 WARN-Tag** (GUST-WARN, ALOFT-WARN, ALOFT-GUST-WARN, CAPE-WARN), ABER **kein DANGER-Tag**. Fliegbar fuer erfahrene Piloten.
+**Achse 2 — Start-Moeglichkeit** (nur Startplatz betroffen):
+- **STARTBAR** — Windrichtung passt: Spot `[WIND-OK]` oder Region nicht `[WIND-STRONG]`.
+- **NICHT-STARTBAR** — Spot `[WIND-WRONG]` (falsche Richtung, aber KEINE Gefahr fuer Pilot in der Luft).
 
-- **UNFLIEGBAR** — **mindestens 1 DANGER-Tag** (RAIN-WARN, STRONG-WIND-WARN, GUST-DANGER, ALOFT-DANGER, ALOFT-GUST-DANGER, CAPE-DANGER, THUNDERSTORM, OVERCAST-DANGER) ODER Windrichtung falsch ([WIND-WRONG], [WIND-STRONG]). Kein Flug moeglich.
-
-**Sammelbegriff "saubere Stunde"** = RUHIG ODER SPORTLICH (= alles ausser UNFLIEGBAR).
-**Sauberes Fenster** = mehrere zusammenhaengende saubere Stunden (RUHIG + SPORTLICH gemischt). Per Definition KEINE UNFLIEGBAR-Stunden innen — sonst waere es kein Fenster, sondern die Gefahrenphase.
+**Sammelbegriff "saubere Stunde"** = STARTBAR **UND** nicht UNFLIEGBAR. Nur in sauberen Stunden kann ein Pilot sicher starten.
+**Sauberes Fenster** = mehrere zusammenhaengende saubere Stunden. Stunden mit `[WIND-WRONG]` aussen (z.B. nachmittags Drehung) sind KEIN Fensterbruch — sie bedeuten nur, dass nach dem Fenster kein Start mehr moeglich ist. Der Pilot ist da schon in der Luft.
 
 **Regel fuer `safe_window`:**
 - `safe_window` = das fliegbare Fenster (RUHIG + SPORTLICH zusammen).
@@ -131,17 +134,37 @@ BLOCK 2 — BODENWIND (Richtung & Staerke)
 ─────────────────────────────────
 
 **Tags (Spots):**
-- `[WIND-WRONG]` → Stunde nicht brauchbar (Windrichtung ausserhalb erlaubtem Spot-Sektor).
-- `[STRONG-WIND-WARN]` → Stunde unfliegbar (Grundwind ueber Spot-Maximum).
+- `[WIND-WRONG]` → Stunde **nicht startbar**, ABER **NICHT UNFLIEGBAR**. Windrichtung ausserhalb Spot-Sektor → kein neuer Start moeglich, aber kein Sicherheitsproblem fuer Piloten in der Luft (Landung typ. auf separatem Landeplatz). Siehe Start-Fenster-Regel unten.
+- `[STRONG-WIND-WARN]` → Stunde unfliegbar (Grundwind ueber Spot-Maximum) — **echte** Flug-Gefahr, zaehlt als DANGER.
 
 **Tags (Regionen):** Magnitude-basiert auf Referenzhoehe, kein Sektor-Check.
 - `[WIND-STRONG]` → Stunde unfliegbar (Wind > {{cfg.WIND_STRONG_KMH}} km/h).
 - `[WIND-MODERATE]` → sportlich, fliegbar ({{cfg.WIND_MODERATE_KMH}}-{{cfg.WIND_STRONG_KMH}} km/h).
 - `[WIND-CALM]` → ruhig (< {{cfg.WIND_MODERATE_KMH}} km/h).
 
-**Richtungsdreher im Tagesverlauf (Spots):**
-- Windrichtung dreht weg vom erlaubten Sektor → max **conditional**, in `caution_notes` mit Uhrzeit erwaehnen.
-- Haeufige Richtungswechsel (> 2× am Tag) → Windkonsistenz schlecht.
+**Start-Fenster-Regel (Spots, pflicht):**
+Ein Tag kann **mehrere saubere Start-Fenster** haben (z.B. morgens gut, mittags Drehung, nachmittags wieder gut). Das System listet sie alle in der Zeile `Saubere Start-Fenster: 08:00-11:00 (3h), 15:00-17:00 (2h)`.
+
+**Fuer den Tag-Status zaehlt das laengste Fenster** (= `Laengstes Fenster: Xh`). Kuerzere Fenster bleiben zusaetzliche Start-Optionen und werden in `safe_window` oder `caution_notes` mit Uhrzeit erwaehnt ("Zweites Fenster 15-17h nutzbar nach Mittags-Drehung").
+
+Schwellen (basierend auf dem **laengsten** Fenster):
+- **≥ {{cfg.CLEAN_WINDOW_GREEN_HOURS}}h** zusammenhaengend sauber → `safe`/`green` moeglich.
+- **{{cfg.CLEAN_WINDOW_MIN_HOURS}}h bis < {{cfg.CLEAN_WINDOW_GREEN_HOURS}}h** → max **conditional** (Fenster knapp, Zeitdruck).
+- **< {{cfg.CLEAN_WINDOW_MIN_HOURS}}h** → `not_safe` (kein ausreichendes Start-Fenster).
+
+**Zusammenhaengend** meint direkt aufeinanderfolgende Stunden. Zwei einzelne saubere Stunden mit einer WIND-WRONG- oder DANGER-Stunde dazwischen zaehlen NICHT als 2h-Fenster — sie sind zwei getrennte 1h-Fenster (beide zu kurz fuer den Status).
+
+Das System liefert die Zahlen — **nicht selbst nachzaehlen**.
+
+**Richtungsdreher im Tagesverlauf (Spots) — nur Anmerkung, KEIN Status-Downgrade:**
+Wenn der Wind um ≥ **{{cfg.WIND_DIRECTION_SWING_NOTE_DEG}}°** innerhalb eines beliebigen Fensters von bis zu **{{cfg.WIND_DIRECTION_SWING_WINDOW_H}} Stunden** dreht, erscheint im TAGESPROFIL eine `ANMERKUNG Richtungsdreher`-Zeile. Zwei Varianten:
+- Abrupter Sprung (1h): `Max Stunden-Wechsel X° um HH:00`
+- Drift ueber mehrere Stunden: `Max Richtungsdreher X° zwischen HH:00 und HH:00 (Nh Drift)` — Wind ist unbestaendig.
+
+- Diese Anmerkung MUSS in `caution_notes` mit Uhrzeit/Zeitraum erwaehnt werden ("Wind dreht um 14:00 um 60° — Start danach erschwert" oder "Wind dreht 80° zwischen 12:00 und 15:00 — unbestaendig").
+- Sie fuehrt **NICHT** zu einem Status-Downgrade und **NICHT** zu einer Tier-Aenderung. Der `safety_status` bleibt (safe/conditional/not_safe) und der `fly_status`/`flyability_tier` bleibt ebenfalls unveraendert — violet bleibt violet, green bleibt green, gray/bronze bleibt gray/bronze. Der Richtungsdreher ist reine Piloten-Information in `caution_notes`, kein Bewertungskriterium.
+- Bei Dreher ≥ 90° (Windumkehr) waehle eine deutlichere Formulierung ("Windumkehr um HH:00" bzw. "Windumkehr zwischen HH:00 und HH:00").
+- Wenn das System keine Anmerkung liefert (Dreher unter Schwelle), KEIN Richtungsdreher erwaehnen — auch nicht wenn dir die Stunden-Zeilen auffaellig scheinen.
 
 ─────────────────────────────────
 BLOCK 3 — BOEEN (Bodenboeen, NUR Spots)
@@ -179,7 +202,7 @@ BLOCK 4 — HOEHENWIND (FLUGSCHICHT)
 ─────────────────────────────────
 
 **Tags** (gelten NUR fuer Hoehen mit Marker `*` im Flugbereich):
-- `[ALOFT-DANGER]` → Stunde unfliegbar (Wind in Flugschicht > {{cfg.ALOFT_DANGER_KMH}} km/h). **Ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h pro Tag → hartes NO-GO** (Post-Processing zwingt `not_safe`, auch wenn Bodenwind ruhig ist).
+- `[ALOFT-DANGER]` → Stunde unfliegbar (Wind in Flugschicht > {{cfg.ALOFT_DANGER_KMH}} km/h). **Ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h pro Tag → hartes NO-GO** (Post-Processing zwingt `not_safe`, auch wenn Bodenwind ruhig ist) — **AUSSER** der `HOEHENWIND-TREND` zeigt AUFKLAERUNG / VEREINZELT / EINGEKESSELT_KNAPP mit sauberem Fenster ≥ {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h. In dem Fall bleibt der Status max. `conditional`, und `safe_window` wird auf das saubere Fenster gesetzt.
 - `[ALOFT-GUST-DANGER]` → Stunde unfliegbar (Turbulenz > {{cfg.ALOFT_GUST_DANGER_KMH}} km/h auf Flughoehe — extreme Klapper-Gefahr). **Nur Spots.** Ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h ebenfalls NO-GO.
 - `[ALOFT-WARN]` → Vorsicht, sportlich ({{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h).
 - `[ALOFT-GUST-WARN]` → Vorsicht, Turbulenz wahrscheinlich ({{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h). **Nur Spots.**
@@ -191,6 +214,8 @@ BLOCK 4 — HOEHENWIND (FLUGSCHICHT)
 - Buffer ruhiger als Flugschicht → Entwarnung (kein Risiko von oben).
 
 **Trend-Muster:** siehe TREND-VOKABULAR. Gefahrenschwellen Hoehenwind: WARN-Level = `[ALOFT-WARN]` {{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h / DANGER-Level = `[ALOFT-DANGER]` > {{cfg.ALOFT_DANGER_KMH}} km/h. Fuer Turbulenz (nur Spots): `[ALOFT-GUST-WARN]` {{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h / `[ALOFT-GUST-DANGER]` > {{cfg.ALOFT_GUST_DANGER_KMH}} km/h. Flugschichtgefahr → **Sonderfall 1 (Hoehenwind)** anwenden bei EINGEKESSELT-Mustern (eskalierend vs. symmetrisch pruefen).
+
+**PFLICHT-LESEN — `HOEHENWIND-TREND`-Zeile:** Direkt nach TAGESPROFIL erscheint ggf. eine Zeile `HOEHENWIND-TREND: <Muster> — ...`. Das ist das System-Urteil zu Block 4. Folge der eingebauten Handlungsanweisung (`→ ...`) strikt. Insbesondere: bei **AUFKLAERUNG** ist der Tag NICHT not_safe, auch wenn morgens [ALOFT-DANGER]-Stunden waren — setze `safe_window` auf das saubere Nachfenster und erwaehne die Morgenphase in `caution_notes`.
 
 **Vertikale Wind-Drehung:** Wind dreht in der vertikalen Saeule (z.B. unten Sued, oben West) → Scherung → in `wind_shear` vermerken, eher **conditional**.
 
