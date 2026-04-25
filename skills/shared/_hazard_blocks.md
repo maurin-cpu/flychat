@@ -148,8 +148,7 @@ Ein Tag kann **mehrere saubere Start-Fenster** haben (z.B. morgens gut, mittags 
 **Fuer den Tag-Status zaehlt das laengste Fenster** (= `Laengstes Fenster: Xh`). Kuerzere Fenster bleiben zusaetzliche Start-Optionen und werden in `safe_window` oder `caution_notes` mit Uhrzeit erwaehnt ("Zweites Fenster 15-17h nutzbar nach Mittags-Drehung").
 
 Schwellen (basierend auf dem **laengsten** Fenster):
-- **≥ {{cfg.CLEAN_WINDOW_GREEN_HOURS}}h** zusammenhaengend sauber → `safe`/`green` moeglich.
-- **{{cfg.CLEAN_WINDOW_MIN_HOURS}}h bis < {{cfg.CLEAN_WINDOW_GREEN_HOURS}}h** → max **conditional** (Fenster knapp, Zeitdruck).
+- **≥ {{cfg.CLEAN_WINDOW_MIN_HOURS}}h** zusammenhaengend sauber → `safe`/`green` moeglich. `conditional` darf nur aus *anderen* Gruenden gewaehlt werden (Warnstunden, EINGEKESSELT-Muster, Foehn-WARN, Boeen-FLOOR), NIE wegen kurzer Fenstergroesse.
 - **< {{cfg.CLEAN_WINDOW_MIN_HOURS}}h** → `not_safe` (kein ausreichendes Start-Fenster).
 
 **Zusammenhaengend** meint direkt aufeinanderfolgende Stunden. Zwei einzelne saubere Stunden mit einer WIND-WRONG- oder DANGER-Stunde dazwischen zaehlen NICHT als 2h-Fenster — sie sind zwei getrennte 1h-Fenster (beide zu kurz fuer den Status).

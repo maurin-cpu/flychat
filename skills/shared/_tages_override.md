@@ -25,8 +25,8 @@ STATUS-ABLEITUNG (finaler Schritt Teil 1)
 2. Pro Gefahrenblock: Trend-Muster bestimmen (siehe TREND-VOKABULAR), EINGEKESSELT-Sonderfaelle pruefen.
 3. Wende OVERRIDE A (35%-Regel) an.
 4. Leite Status nach Start-Fenster-Regel ab:
-   - **safe**: Start-Fenster ≥ {{cfg.CLEAN_WINDOW_GREEN_HOURS}}h UND Verhaeltnis ≥ 60% UND kein EINGEKESSELT-Sonderfall greift UND kein Foehn-Verbot. WIND-WRONG-Stunden NACH dem Fenster sind kein Hindernis — sie werden ggf. via Richtungsdreher-Anmerkung in `wind_summary` erwaehnt (nicht `caution_notes`, da keine Sicherheits-Warnung), nicht als Downgrade.
-   - **conditional**: Start-Fenster {{cfg.CLEAN_WINDOW_MIN_HOURS}}h bis < {{cfg.CLEAN_WINDOW_GREEN_HOURS}}h ODER Fenster ≥ {{cfg.CLEAN_WINDOW_GREEN_HOURS}}h aber mehrheitlich SPORTLICH ODER Verhaeltnis 35-60% ODER EINGEKESSELT-WARN-Fall.
+   - **safe**: Start-Fenster ≥ {{cfg.CLEAN_WINDOW_MIN_HOURS}}h UND Verhaeltnis ≥ 60% UND kein EINGEKESSELT-Sonderfall greift UND kein Foehn-Verbot UND Fenster mehrheitlich RUHIG. WIND-WRONG-Stunden NACH dem Fenster sind kein Hindernis — sie werden ggf. via Richtungsdreher-Anmerkung in `wind_summary` erwaehnt (nicht `caution_notes`, da keine Sicherheits-Warnung), nicht als Downgrade.
+   - **conditional**: Start-Fenster ≥ {{cfg.CLEAN_WINDOW_MIN_HOURS}}h, aber Fenster mehrheitlich SPORTLICH ODER Verhaeltnis 35-60% ODER EINGEKESSELT-WARN-Fall ODER aktiver WARN-Tag (GUST-WARN, ALOFT-WARN, CAPE-WARN, BOEEN-FLOOR=conditional, Foehn ΔP 4-7 hPa). **Niemals `conditional` allein wegen kurzer Fenstergroesse** — < {{cfg.CLEAN_WINDOW_MIN_HOURS}}h Fenster ist immer `not_safe`, nicht `conditional`.
      - Thermik in diesen Stunden entscheidet ueber `flight_type`: Peak ≥ 1.0 m/s + productive_thermal_h ≥ 2 → "Thermikflug"; sonst "Abgleiter" (`flyability_tier: "gray"`).
      - Stunden AUSSERHALB des Fensters duerfen UNFLIEGBAR oder WIND-WRONG sein — das Fenster bleibt nutzbar.
    - **not_safe**: Start-Fenster < {{cfg.CLEAN_WINDOW_MIN_HOURS}}h ODER Verhaeltnis < 35% mit EINGEKESSELT-Muster ODER EINGEKESSELT-DANGER-Sonderfall greift ODER Foehn/Gewitter dominiert.

@@ -177,11 +177,19 @@ window.Meteogram = (function () {
     // ===== LAYOUT CONSTANTS =====
     var MARGIN = { top: 12, right: 24, bottom: 0, left: (window.innerWidth <= 480) ? 72 : 96 };
     var CELL_H = 36;
-    // Bodenstrip: 2 Rows — Wind/Böen, Thermik. Temperatur ist fürs Fliegen
-    // nicht relevant, Niederschlag ist bereits prominent im Cloud-Strip oben
-    // (Tropfen + Gewitter-Icons), würde hier nur doppelt erscheinen.
-    const GROUND_ROWS = 2;
-    const GROUND_H = GROUND_ROWS * 24;
+    // Bodenstrip: 3 Rows mit unterschiedlicher Höhe — Wind (24), Böen (16,
+    // schmale "Linie" unter dem Wind), Thermik (24). Wind und Böen sind klar
+    // getrennt damit der Pilot sieht: Mittelwind vs. Spitzenwerte.
+    // Temperatur weggelassen (fürs Fliegen irrelevant), Niederschlag ist im
+    // Cloud-Strip oben (Tropfen + Gewitter-Icons).
+    const GROUND_WIND_H = 24;
+    const GROUND_GUST_H = 16;
+    const GROUND_THERM_H = 24;
+    const GROUND_H = GROUND_WIND_H + GROUND_GUST_H + GROUND_THERM_H;
+    // Y-Offsets relativ zum groundY-Top.
+    const GROUND_WIND_Y = 0;
+    const GROUND_GUST_Y = GROUND_WIND_H;            // 24
+    const GROUND_THERM_Y = GROUND_WIND_H + GROUND_GUST_H; // 40
     const TIME_LABEL_H = 28;
     const CLOUD_ROW_H = 18;
     const PRECIP_ROW_H = 20;
@@ -751,44 +759,35 @@ window.Meteogram = (function () {
                 .attr('stroke-linejoin', 'round');
         }
         function drawDropLightningIcon(g) {
-            // Tropfen + dezenter Blitz dahinter.
+            // Klassisches Wetter-Icon: Gewitterwolke mit Blitz UND Regen-Tropfen.
+            // Wolke oben, darunter zentral der Blitz, links/rechts daneben je
+            // ein Tropfen — Apple-Wetter "Thunderstorm with Rain"-Layout.
+            // Wolke (oben, hellgrau gefüllt mit dunkler Outline):
             g.append('path')
-                .attr('d', 'M12 3 C12 3 5 12 5 16 C5 20 8 22 12 22 C16 22 19 20 19 16 C19 12 12 3 12 3 Z')
-                .attr('fill', '#3B82F6').attr('stroke', '#1E40AF').attr('stroke-width', 1)
+                .attr('d', 'M 4 11 a 4 4 0 0 1 0 -7 a 4.5 4.5 0 0 1 8 -1.5 a 3.5 3.5 0 0 1 6 3 a 2.8 2.8 0 0 1 1 5.5 H 4 z')
+                .attr('fill', '#94A3B8').attr('fill-opacity', 0.95)
+                .attr('stroke', '#475569').attr('stroke-width', 1.2)
                 .attr('stroke-linejoin', 'round');
+            // Tropfen links (kleines Teardrop):
+            g.append('path')
+                .attr('d', 'M 5 12.5 C 3.7 14 3.7 16.5 5 17.8 C 6.3 16.5 6.3 14 5 12.5 Z')
+                .attr('fill', '#3B82F6').attr('stroke', '#1E40AF')
+                .attr('stroke-width', 0.7).attr('stroke-linejoin', 'round');
+            // Tropfen rechts:
+            g.append('path')
+                .attr('d', 'M 20 12.5 C 18.7 14 18.7 16.5 20 17.8 C 21.3 16.5 21.3 14 20 12.5 Z')
+                .attr('fill', '#3B82F6').attr('stroke', '#1E40AF')
+                .attr('stroke-width', 0.7).attr('stroke-linejoin', 'round');
+            // Blitz zentral (kompakter, damit Tropfen Platz haben):
+            g.append('path')
+                .attr('d', 'M 12 11 L 9 17 L 11.5 17 L 10.5 22 L 14 16 L 11.5 16 Z')
+                .attr('fill', '#FBBF24').attr('stroke', '#92400E')
+                .attr('stroke-width', 0.9).attr('stroke-linejoin', 'round')
+                .attr('stroke-linecap', 'round');
         }
-        function drawWindIcon(g) {
-            // Drei horizontale Wind-Streamlines (gleiches Motiv wie Beaufort/Wetter-Icons).
-            g.append('path')
-                .attr('d', 'M3 8 H 14 a 2.5 2.5 0 1 0 -2.5 -2.5')
-                .attr('fill', 'none').attr('stroke', '#475569')
-                .attr('stroke-width', 2).attr('stroke-linecap', 'round')
-                .attr('stroke-linejoin', 'round');
-            g.append('path')
-                .attr('d', 'M3 13 H 19 a 3 3 0 1 0 -3 -3')
-                .attr('fill', 'none').attr('stroke', '#475569')
-                .attr('stroke-width', 2).attr('stroke-linecap', 'round')
-                .attr('stroke-linejoin', 'round');
-            g.append('path')
-                .attr('d', 'M3 18 H 11 a 2.5 2.5 0 1 0 -2.5 -2.5')
-                .attr('fill', 'none').attr('stroke', '#475569')
-                .attr('stroke-width', 2).attr('stroke-linecap', 'round')
-                .attr('stroke-linejoin', 'round');
-        }
-        function drawThermikIcon(g) {
-            // Aufsteigender Pfeil mit Sonne/Wärme oben — Aufwind-Symbolik.
-            // Schaft (Wellenlinie für aufsteigende Luft):
-            g.append('path')
-                .attr('d', 'M12 22 Q 9 17 12 14 Q 15 11 12 6')
-                .attr('fill', 'none').attr('stroke', '#D97706')
-                .attr('stroke-width', 2).attr('stroke-linecap', 'round');
-            // Pfeilspitze:
-            g.append('path')
-                .attr('d', 'M8 8 L 12 3 L 16 8')
-                .attr('fill', 'none').attr('stroke', '#D97706')
-                .attr('stroke-width', 2).attr('stroke-linecap', 'round')
-                .attr('stroke-linejoin', 'round');
-        }
+        // Wind/Böen/Thermik nutzen Mini-Text-Labels statt Icons — Glyphs für
+        // diese Konzepte waren nicht eindeutig genug (Pfeil-mit-Welle = Therm
+        // oder Wind? Spike = Böe oder Stromschlag?). Text ist klarer.
         function drawWarnIcon(g) {
             // Klassisches Warndreieck mit Ausrufezeichen.
             g.append('path')
@@ -1209,7 +1208,10 @@ window.Meteogram = (function () {
                 var rH3 = rowHeight(ri3);
                 var cx = ci3 * CELL_W + CELL_W / 2;
                 var hasThermik = thermikCells[ri3 + ',' + ci3] != null;
-                var cy = rowY(ri3) + rH3 * (hasThermik ? 0.5 : 0.42);
+                // Layer-Reihenfolge: Wind-Zahl (oben) → Wind-Pfeil (mitte) →
+                // Thermik-Zahl (unten). Konsistent unabhängig von Thermik-
+                // Status, damit der Pilot weiss wo welcher Wert sitzt.
+                var cy = rowY(ri3) + rH3 * 0.5;
                 var speed = d.wind_speed;
                 var gusts = d.wind_gusts != null ? d.wind_gusts : speed;
                 var gustDiff = gusts - speed;
@@ -1376,7 +1378,13 @@ window.Meteogram = (function () {
                                 : '500';
                 // Danger-Zellen leicht groesser fuer zusaetzliche Emphase.
                 var tierFontSize = cellTier === 'danger' ? windFontSize + 1 : windFontSize;
-                var windTextY = rowY(ri3) + (hasThermik ? Math.round(10 * scale) : rH3 - Math.round(4 * scale));
+                // Wind-Zahl OBEN, Pfeil mittig (cy = 0.5), Thermik-Zahl UNTEN.
+                // Reihenfolge in der Cell: Zahl → Pfeil → Thermik-Zahl.
+                // Y-Position so gewählt dass die Glyph-Oberkante 2-3px Abstand
+                // zum oberen Cell-Rahmen hat (sonst überlappt der Text bei
+                // alphabetic baseline mit dem Frame).
+                var windTextY = rowY(ri3) + Math.round(rH3 * 0.30) + (isMobileViewport ? 2 : 0);
+                var thermTextY = rowY(ri3) + rH3 - Math.round(4 * scale);
                 // Text-Shadow nur auf Thermik-Zellen (Lesbarkeit ueber gelbem Bg) —
                 // auf gefuellten Tier-Zellen nicht noetig (genug Kontrast).
                 // Bei danger auf Thermik: starker weisser Halo, damit rote Zahl
@@ -1389,27 +1397,12 @@ window.Meteogram = (function () {
                         textShadow = '0 1px 2px rgba(255,255,255,0.8)';
                     }
                 }
-                if (showNumbers && showGusts) {
-                    var windGustText = chartG.append('text').attr('class', 'wind-value')
-                        .attr('x', cx).attr('y', windTextY)
-                        .attr('font-size', tierFontSize + 'px')
-                        .attr('font-weight', tierWeight)
-                        .style('text-shadow', textShadow)
-                        .style('font-variant-numeric', 'tabular-nums');
-                    windGustText.append('tspan').attr('fill', speedColor)
-                        .text(Math.round(speed));
-                    // Separator — Ground-danger weiss (auf rosa Fill), Hoehen-danger
-                    // halbtransparent rot (passend zu roten Zahlen), sonst muted grey.
-                    var sepColor;
-                    if (cellTier === 'danger') {
-                        sepColor = isGround ? 'rgba(255,255,255,0.7)' : 'rgba(159,18,57,0.45)';
-                    } else {
-                        sepColor = '#94A3B8';
-                    }
-                    windGustText.append('tspan').attr('fill', sepColor).text('/');
-                    windGustText.append('tspan').attr('fill', gustColor)
-                        .text(Math.round(gusts));
-                } else if (showNumbers) {
+                // Im Höhengrid nur Wind als Zahl — Böen werden im Bodenstrip
+                // unter dem Meteogramm in der eigenen Böen-Zeile gezeigt.
+                // Wind-Zahl IMMER OBEN (unter dem Pfeil), Thermik-Zahl IMMER
+                // UNTEN. Konsistenz: Pilot weiss wo welcher Wert sitzt, egal ob
+                // Thermik vorhanden ist oder nicht.
+                if (showNumbers) {
                     chartG.append('text').attr('class', 'wind-value')
                         .attr('x', cx).attr('y', windTextY)
                         .attr('font-size', tierFontSize + 'px').attr('fill', speedColor)
@@ -1418,34 +1411,27 @@ window.Meteogram = (function () {
                         .style('text-shadow', textShadow)
                         .style('font-variant-numeric', 'tabular-nums')
                         .text(Math.round(speed));
+
+                    // Thermik-Zahl unten in der Zelle (nur wenn Thermik vorhanden).
+                    // Thermik-Background ist meist hell (xc-therm), dunkler Text
+                    // mit weissem Halo gibt klaren Kontrast.
+                    if (hasThermik) {
+                        var localRate = thermikCells[ri3 + ',' + ci3];
+                        var thermFontSize = Math.round((isNarrow ? 6 : 8) * Math.min(scale, 1.5));
+                        chartG.append('text').attr('class', 'therm-value')
+                            .attr('x', cx).attr('y', thermTextY)
+                            .attr('text-anchor', 'middle')
+                            .attr('font-size', thermFontSize + 'px')
+                            .attr('font-weight', '700').attr('fill', '#1E293B')
+                            .style('font-variant-numeric', 'tabular-nums')
+                            .style('text-shadow', '0 0 2px rgba(255,255,255,0.85)')
+                            .text(localRate.toFixed(1));
+                    }
                 }
 
-                // Böen-/Turbulenz-Strip (vertikaler Farbbalken am rechten Rand).
-                // In Row 0 zeigt er Bodenböen (gustDiff = Böen−Wind). In Row 1+
-                // zeigt er Turbulenz-Risiko (Gauss-Kernel-Exzess über der Höhe).
-                // Bei Row 0 leicht nach innen versetzt, damit Orange-Rahmen
-                // der Kachel nicht überdeckt wird.
-                var tRisk = d.turbulence_risk != null ? d.turbulence_risk : gusts;
-                var tExcess = d.turbulence_excess != null ? d.turbulence_excess : gustDiff;
-                // Turbulenz-Strip am rechten Zellrand. Auf Mobile komplett aus
-                // (visuell zu unruhig in der dichten Mobile-View — Turbulenz
-                // ist via Tooltip + cellTier-Farbe abgedeckt).
-                if (!isMobileViewport && tExcess > 1 && cellTier !== 'danger') {
-                    var stripW = Math.round((isNarrow ? 4 : 6) * Math.min(scale, 1.5));
-                    var stripMargin = isGround ? 3 : 1;
-                    var tStripTier = classifyTier(tRisk, gustMetric, thresholds);
-                    var stripColor = tStripTier === 'calm' ? '#94A3B8'
-                                   : tStripTier === 'caution' ? '#F59E0B'
-                                   : '#E11D48';
-                    chartG.append('rect')
-                        .attr('x', ci3 * CELL_W + CELL_W - stripW - stripMargin)
-                        .attr('y', rowY(ri3) + stripMargin)
-                        .attr('width', stripW)
-                        .attr('height', rH3 - 2 * stripMargin)
-                        .attr('fill', stripColor)
-                        .attr('opacity', tStripTier === 'calm' ? 0.5 : 0.75)
-                        .attr('rx', 2);
-                }
+                // Turbulenz-/Böen-Strip im Höhengrid entfernt — Böen-Info kommt
+                // konsolidiert im Bodenstrip-Böen-Row. Tier-Border bleibt
+                // (zeigt Gefährlichkeit aus max(wind, gust) als Safety-Signal).
 
                 allCells.push({ g: g, ci: ci3, ri: ri3 });
             }
@@ -1466,19 +1452,52 @@ window.Meteogram = (function () {
             .attr('x1', 0).attr('x2', nCols * CELL_W)
             .attr('y1', groundY).attr('y2', groundY);
 
-        // Regionen haben keine Böen (Apr 2026) — Label ohne "/ Böen".
-        // Mobile: Icons (Wind-Streamlines + Aufwind-Pfeil) statt Text.
-        if (isMobileViewport) {
-            appendLeftIcon(groundY + 11, drawWindIcon);
-            appendLeftIcon(groundY + 24 + 11, drawThermikIcon);
-        } else {
-            var groundLabels = [isRegion ? 'Wind' : 'Wind / Böen', 'Thermik'];
-            groundLabels.forEach(function (lbl, i) {
-                chartG.append('text').attr('class', 'ground-label')
-                    .attr('x', -8).attr('y', groundY + i * 24 + 14)
-                    .attr('text-anchor', 'end').text(lbl);
-            });
+        // 3 Rows: Wind (Pfeil + Zahl), Böen (schmale "Linie"), Thermik.
+        // Wind/Böen/Thermik bleiben als kurzer Text (klarer als abstrakte Icons),
+        // Mini-Schrift auf Mobile damit's nicht mehr Platz braucht als Icons.
+        // Cloud-Icons im Cloud-Strip bleiben weil Wolken-Glyphs universell sind.
+        var groundLabelFontSize = isMobileViewport ? '8.5px' : null;
+        function drawGroundLabel(y, text) {
+            var t = chartG.append('text').attr('class', 'ground-label')
+                .attr('x', -8).attr('y', y)
+                .attr('text-anchor', 'end')
+                .attr('dominant-baseline', 'central');
+            if (groundLabelFontSize) {
+                // .style() überschreibt das CSS-Default (font-size: 11px)
+                // aus .ground-label — sonst wird die Mobile-Schrift ignoriert.
+                t.style('font-size', groundLabelFontSize).style('font-weight', '600');
+            }
+            t.text(text);
         }
+        // Wind-Row: Mobile zweizeilig — "Wind" prominent + "Boden" als kleine
+        // Subline drunter macht klar dass es um die Wind-Stärke am Boden geht
+        // (Höhengrid hat eigene Wind-Pfeile pro Höhe). Desktop: "Bodenwind".
+        if (isMobileViewport) {
+            var windRowCenter = groundY + GROUND_WIND_Y + GROUND_WIND_H / 2;
+            // .style() statt .attr(), damit das fontsize aus .ground-label
+            // CSS-Klasse (font-size: 11px) NICHT überschreibt.
+            chartG.append('text').attr('class', 'ground-label')
+                .attr('x', -8).attr('y', windRowCenter - 4)
+                .attr('text-anchor', 'end')
+                .attr('dominant-baseline', 'central')
+                .attr('fill', '#334155')
+                .style('font-size', '9px').style('font-weight', '700')
+                .text('Wind');
+            chartG.append('text').attr('class', 'ground-label')
+                .attr('x', -8).attr('y', windRowCenter + 5)
+                .attr('text-anchor', 'end')
+                .attr('dominant-baseline', 'central')
+                .attr('fill', '#94A3B8')
+                .style('font-size', '6px').style('font-weight', '500')
+                .text('(Boden)');
+        } else {
+            drawGroundLabel(groundY + GROUND_WIND_Y + GROUND_WIND_H / 2, 'Bodenwind');
+        }
+        if (!isRegion) {
+            drawGroundLabel(groundY + GROUND_GUST_Y + GROUND_GUST_H / 2, 'Böen');
+        }
+        drawGroundLabel(groundY + GROUND_THERM_Y + GROUND_THERM_H / 2,
+                        isMobileViewport ? 'Therm' : 'Thermik');
 
         times.forEach(function (t, ci) {
             var wx = wxByTime[t] || {};
@@ -1490,117 +1509,91 @@ window.Meteogram = (function () {
             var gusts = wind.gusts != null ? Math.round(wind.gusts) : null;
             var dir = wind.direction;
             
+            // Auto-suppress: bei sehr engen Cells (Multi-Tag-Ansicht etc.)
+            // sind Zahlen unleserlich → nur Pfeile/Farben rendern.
+            var cellTooNarrowForNumbers = CELL_W < 16;
+            var renderNumbers = showNumbers && !cellTooNarrowForNumbers;
+
+            // ----- Row 0: Wind (nur Zahl, kein Pfeil) -----
+            // Wind-Richtung ist bereits im Höhengrid-Bodenrow (ri=0, ★ Marker)
+            // sichtbar. Hier zeigt der Bodenstrip nur noch die WindSTÄRKE am
+            // Boden — als prominent zentrierte Zahl.
             if (spd != null) {
-                // Tier-Klassifikation fuer die Ground-Strip Wind-Row.
                 var gWindTier = classifyTier(spd, 'ground_wind', thresholds);
-                var gGustTier = (gusts != null && gusts > spd)
-                    ? classifyTier(gusts, 'ground_gust', thresholds) : 'calm';
-                var gORDER = { calm: 0, caution: 1, danger: 2 };
-                var gCellTier = gORDER[gGustTier] > gORDER[gWindTier] ? gGustTier : gWindTier;
+                var windRowTop = groundY + GROUND_WIND_Y;
 
-                // Auto-suppress: bei sehr engen Cells (Multi-Tag-Ansicht etc.)
-                // sind Zahlen unleserlich → nur Pfeil rendern.
-                var cellTooNarrowForNumbers = CELL_W < 16;
-                var renderNumbers = showNumbers && !cellTooNarrowForNumbers;
-
-                // Layout: Desktop bleibt horizontal (Pfeil links, Zahl rechts).
-                // Mobile mit Zahlen: vertikal gestapelt (Pfeil oben, Zahl unten),
-                // damit auch in 22px-engen Cells nichts kollidiert.
-                var verticalStack = isMobileViewport && renderNumbers;
-                var gy, arrowScale, arrowOffsetX;
-                if (verticalStack) {
-                    gy = groundY + 7;          // Pfeil im oberen Drittel (0-13 Bereich)
-                    arrowScale = 0.4;          // Klein, damit Böen-Shadow + Text nicht überlappen
-                    arrowOffsetX = 0;          // Zentriert
-                } else {
-                    gy = groundY + 13;
-                    arrowScale = 0.65;
-                    arrowOffsetX = renderNumbers ? -15 : 0;
-                }
-
-                // Tier-Fill als primaerer Glance-Kanal fuer die Bodenwind-Row.
-                if (gCellTier !== 'calm') {
+                // Tier-Fill nur bei sportlich/gefährlich.
+                if (gWindTier !== 'calm') {
                     chartG.append('rect')
-                        .attr('x', ci * CELL_W + 1).attr('y', groundY + 1)
-                        .attr('width', CELL_W - 2).attr('height', 22).attr('rx', 3)
-                        .attr('fill', tierFillColor(gCellTier));
+                        .attr('x', ci * CELL_W + 1).attr('y', windRowTop + 1)
+                        .attr('width', CELL_W - 2).attr('height', GROUND_WIND_H - 2).attr('rx', 3)
+                        .attr('fill', tierFillColor(gWindTier));
                 }
 
-                // Pfeil: Wind-Tier. Boeen-Shadow: nur farbig wenn Boee in
-                // caution/danger, sonst muted, damit Boeen-Pfeil sich vom Wind
-                // absetzt ohne Warnsignal.
-                var gArrowColor = gCellTier === 'danger' ? '#FFFFFF' : tierTextColor(gWindTier);
-                var gGustArrowColor = gCellTier === 'danger' ? '#FFFFFF'
-                                    : (gGustTier === 'calm' ? '#94A3B8' : tierTextColor(gGustTier));
-
-                // 1. Gust Shadow (wenn Boeen deutlich ueber Wind)
-                if (gusts != null && gusts > spd) {
-                    var gShadow = chartG.append('g')
-                        .attr('transform', 'translate(' + (cx + arrowOffsetX) + ', ' + gy + ')');
-                    gShadow.append('path')
-                        .attr('d', arrowPath(gusts * 0.7))
-                        .attr('fill', gGustArrowColor)
-                        .attr('opacity', gCellTier === 'danger' ? 0.5 : 0.3)
-                        .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(' + arrowScale + ')');
-                }
-
-                // 2. Primary Wind Arrow
-                var gArrow = chartG.append('g')
-                    .attr('transform', 'translate(' + (cx + arrowOffsetX) + ', ' + gy + ')');
-                gArrow.append('path')
-                    .attr('d', arrowPath(spd * 0.7))
-                    .attr('fill', gArrowColor)
-                    .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(' + arrowScale + ')');
-
-                // 3. "Wind / Böen" als tspans, damit Böe eigene Farbe bekommt.
-                if (renderNumbers) {
-                    var gTextColor = gCellTier === 'danger' ? '#FFFFFF' : tierTextColor(gWindTier);
-                    var gGustTextColor = gCellTier === 'danger' ? '#FFFFFF'
-                                       : (gGustTier === 'calm' ? '#64748B' : tierTextColor(gGustTier));
-                    var gSepColor = gCellTier === 'danger' ? 'rgba(255,255,255,0.7)' : '#94A3B8';
-                    var gTextWeight = gCellTier === 'danger' ? '700'
-                                     : gCellTier === 'caution' ? '600' : '500';
-
-                    // Vertikal: Text unter dem Pfeil, klein + zentriert.
-                    // Horizontal (Desktop): Text rechts neben Pfeil, mittig.
-                    var textX = verticalStack ? cx : cx + 6;
-                    var textY = verticalStack ? groundY + 18 : gy + 1;
-                    var textAnchor = verticalStack ? 'middle' : 'start';
-                    var textSize = verticalStack ? '8.5px' : '10px';
-
-                    var gText = chartG.append('text').attr('class', 'ground-value')
-                        .attr('x', textX).attr('y', textY)
-                        .attr('text-anchor', textAnchor)
+                // Bodenstrip-Zahlen IMMER sichtbar (Zusammenfassungs-Zeile),
+                // nicht vom showNumbers-Toggle abhängig — der steuert nur die
+                // Zahlen IM Höhengrid. Auto-suppress nur bei zu engen Cells.
+                if (CELL_W >= 16) {
+                    var gTextColor = gWindTier === 'danger' ? '#FFFFFF' : tierTextColor(gWindTier);
+                    var gTextWeight = gWindTier === 'danger' ? '700'
+                                     : gWindTier === 'caution' ? '600' : '500';
+                    chartG.append('text').attr('class', 'ground-value')
+                        .attr('x', cx).attr('y', windRowTop + GROUND_WIND_H / 2)
+                        .attr('text-anchor', 'middle')
                         .attr('dominant-baseline', 'central')
                         .attr('font-weight', gTextWeight)
-                        .attr('font-size', textSize)
-                        .style('font-variant-numeric', 'tabular-nums');
-                    gText.append('tspan').attr('fill', gTextColor).text(String(spd));
-                    if (gusts != null) {
-                        gText.append('tspan').attr('fill', gSepColor).text('/');
-                        gText.append('tspan').attr('fill', gGustTextColor).text(String(gusts));
-                    }
+                        .attr('font-size', isMobileViewport ? '11px' : '12px')
+                        .attr('fill', gTextColor)
+                        .style('font-variant-numeric', 'tabular-nums')
+                        .text(String(spd));
                 }
             }
 
-            // Row 1: Thermik (Steigrate m/s) with xc-therm color scale.
-            // Temp + Precip-Row entfernt — Niederschlag ist bereits im Cloud-Strip
-            // oben (Tropfen-Icons), Temperatur ist fürs Fliegen nicht relevant.
+            // ----- Row 1: Böen (schmale "Linie" — Tier-Color-Strip + Zahl) -----
+            // Nur wenn Böen-Wert vorhanden UND > Wind (sonst leer = redundant zu Wind).
+            // Regionen haben keine Böen → Row weg (vom Layout ist sie da, bleibt leer).
+            if (!isRegion && gusts != null && spd != null && gusts > spd) {
+                var gustRowTop = groundY + GROUND_GUST_Y;
+                var gGustTier = classifyTier(gusts, 'ground_gust', thresholds);
+
+                // Tier-Color-Strip pro Stunde — die "Linie" über der ganzen Cell.
+                if (gGustTier !== 'calm') {
+                    chartG.append('rect')
+                        .attr('x', ci * CELL_W + 1).attr('y', gustRowTop + 1)
+                        .attr('width', CELL_W - 2).attr('height', GROUND_GUST_H - 2).attr('rx', 2)
+                        .attr('fill', tierFillColor(gGustTier));
+                }
+
+                if (CELL_W >= 16) {
+                    var gustTextColor = gGustTier === 'danger' ? '#FFFFFF'
+                                      : gGustTier === 'caution' ? tierTextColor(gGustTier)
+                                      : '#475569';
+                    var gustTextWeight = gGustTier === 'danger' ? '700'
+                                       : gGustTier === 'caution' ? '600' : '500';
+                    chartG.append('text').attr('class', 'ground-value')
+                        .attr('x', cx).attr('y', gustRowTop + GROUND_GUST_H / 2)
+                        .attr('text-anchor', 'middle')
+                        .attr('dominant-baseline', 'central')
+                        .attr('font-weight', gustTextWeight)
+                        .attr('font-size', isMobileViewport ? '9px' : '10px')
+                        .attr('fill', gustTextColor)
+                        .style('font-variant-numeric', 'tabular-nums')
+                        .text(String(gusts));
+                }
+            }
+
+            // ----- Row 2: Thermik (Steigrate m/s) — xc-therm color scale -----
             var therm = wx.thermik || {};
             if (therm.climb_rate > 0) {
-                var thermBg = thermClimbColor(therm.climb_rate);
+                var thermRowTop = groundY + GROUND_THERM_Y;
                 chartG.append('rect')
-                    .attr('x', ci * CELL_W + 1).attr('y', groundY + 24 + 1)
-                    .attr('width', CELL_W - 2).attr('height', 22).attr('rx', 3)
-                    .attr('fill', thermBg).attr('opacity', 0.4);
+                    .attr('x', ci * CELL_W + 1).attr('y', thermRowTop + 1)
+                    .attr('width', CELL_W - 2).attr('height', GROUND_THERM_H - 2).attr('rx', 3)
+                    .attr('fill', thermClimbColor(therm.climb_rate)).attr('opacity', 0.4);
 
-                // Steigrate als Zahl — auch mobile, gesteuert via showNumbers-Toggle.
-                // thermClimbColor liefert ausschliesslich helle Pastelltöne (Gelb→Cyan)
-                // bei opacity 0.4 → dunkler Text hat immer ausreichend Kontrast (>4.5:1).
-                // Auto-suppress bei sehr engen Cells (Multi-Tag) — Zahl unleserlich.
-                if (showNumbers && CELL_W >= 16) {
+                if (CELL_W >= 16) {
                     chartG.append('text').attr('class', 'ground-value')
-                        .attr('x', cx).attr('y', groundY + 24 + 13)
+                        .attr('x', cx).attr('y', thermRowTop + GROUND_THERM_H / 2)
                         .attr('text-anchor', 'middle')
                         .attr('dominant-baseline', 'central')
                         .attr('font-size', isMobileViewport ? '9px' : '10px')

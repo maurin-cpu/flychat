@@ -551,12 +551,14 @@ WIND_MODERATE_KMH = 20          # Grundwind 20–30 km/h → [WIND-MODERATE] (sp
 # ─── Start-Fenster-Schwellen (Windrichtung + Gefahrenfreiheit) ───
 # Eine "saubere Stunde" = WIND-OK (Spot-Sektor) UND keine DANGER-Tags.
 # Tag-Status haengt am laengsten zusammenhaengenden Block sauberer Stunden:
-#   < CLEAN_WINDOW_MIN_HOURS  → not_safe (kein ausreichendes Start-Fenster)
-#   = CLEAN_WINDOW_MIN_HOURS  → max conditional (Fenster knapp, Zeitdruck)
-#   >= CLEAN_WINDOW_GREEN_HOURS → safe/green moeglich
+#   < CLEAN_WINDOW_MIN_HOURS   → not_safe (kein ausreichendes Start-Fenster)
+#   >= CLEAN_WINDOW_GREEN_HOURS → safe/green moeglich (LLM entscheidet conditional vs safe)
+# Schwellen sind absichtlich identisch: keine Zwischenzone "max conditional" mehr —
+# entweder reicht das Fenster (>=3h) oder nicht (<3h). Pre-Filter wendet dieselbe
+# Schwelle deterministisch auf wind_ok_count an (siehe analyzers._prefilter_not_safe).
 # WIND-WRONG Stunden NACH dem Start-Fenster sind kein Grund fuer UNFLIEGBAR —
 # der Pilot ist bereits in der Luft, Landung i.d.R. auf separatem Landeplatz.
-CLEAN_WINDOW_MIN_HOURS = 2       # h — unterhalb: not_safe
+CLEAN_WINDOW_MIN_HOURS = 3       # h — unterhalb: not_safe
 CLEAN_WINDOW_GREEN_HOURS = 3     # h — ab hier: safe/green moeglich
 
 # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade):

@@ -49,7 +49,7 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 *Kombinierter Begriff:*
 - **Saubere Stunde** = STARTBAR UND nicht UNFLIEGBAR (keine DANGER-Tags). Das ist die einzige Stundenart, in der ein Pilot sicher starten kann.
 - `safe_window` = zusammenhaengender Block sauberer Stunden.
-- Stunden mit `[WIND-WRONG]` aber ohne DANGER-Tags sind **nicht UNFLIEGBAR** — sie sind "nicht startbar". Tag-Status haengt allein am laengsten Block sauberer Stunden (Schwellen: `{{cfg.CLEAN_WINDOW_MIN_HOURS}}h`/`{{cfg.CLEAN_WINDOW_GREEN_HOURS}}h`).
+- Stunden mit `[WIND-WRONG]` aber ohne DANGER-Tags sind **nicht UNFLIEGBAR** — sie sind "nicht startbar". Tag-Status haengt allein am laengsten Block sauberer Stunden (Schwelle: `{{cfg.CLEAN_WINDOW_MIN_HOURS}}h` — darunter `not_safe`, darueber `safe`/`conditional` je nach anderen Faktoren).
 
 **Thermik-Qualitaets-Tags** (gelten NUR fuer Teil 2 Fliegbarkeit, NIE fuer Sicherheit):
 - `[SHEAR-DEGRADED]` / `[SHEAR-UNUSABLE]` — Windscherung: Wind dreht/beschleunigt mit Hoehe, Blase wird gekippt (Spot + Region).

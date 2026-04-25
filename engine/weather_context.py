@@ -1734,16 +1734,12 @@ class WeatherContextMixin:
             lines.append(f"⚠ Gewarnete WIND-OK Stunden ({len(warned_hours)}): {', '.join(warned_hours)} (WIND-OK aber WIND/GUST/ALOFT/RAIN/CAPE/THUNDERSTORM/PL-WARN!)")
 
         # Start-Fenster-Regel (konfigurierbar via config.CLEAN_WINDOW_*)
-        if longest_clean_run >= config.CLEAN_WINDOW_GREEN_HOURS:
+        # Zwei Zonen, keine Zwischenstufe: >= MIN_HOURS = fliegbar, sonst not_safe.
+        if longest_clean_run >= config.CLEAN_WINDOW_MIN_HOURS:
             lines.append(
-                f"→ Start-Fenster {longest_clean_run}h >= {config.CLEAN_WINDOW_GREEN_HOURS}h: "
+                f"→ Start-Fenster {longest_clean_run}h >= {config.CLEAN_WINDOW_MIN_HOURS}h: "
                 f"safety_status safe oder conditional moeglich. "
                 f"WIND-WRONG NACH dem Fenster ist KEIN UNFLIEGBAR-Grund."
-            )
-        elif longest_clean_run >= config.CLEAN_WINDOW_MIN_HOURS:
-            lines.append(
-                f"→ Start-Fenster nur {longest_clean_run}h (Minimum {config.CLEAN_WINDOW_MIN_HOURS}h, "
-                f"Green ab {config.CLEAN_WINDOW_GREEN_HOURS}h): Status maximal conditional."
             )
         elif wind_ok_hours and not clean_hours:
             lines.append(
@@ -2617,15 +2613,10 @@ class WeatherContextMixin:
         clean_windows_region_fmt = _format_clean_windows(clean_hours)
         lines.append(f"Saubere Fenster: {clean_windows_region_fmt}")
         lines.append(f"Laengstes Fenster (= Status-Basis): {longest_clean_run_region}h")
-        if longest_clean_run_region >= config.CLEAN_WINDOW_GREEN_HOURS:
+        if longest_clean_run_region >= config.CLEAN_WINDOW_MIN_HOURS:
             lines.append(
-                f"→ Fenster {longest_clean_run_region}h >= {config.CLEAN_WINDOW_GREEN_HOURS}h: "
+                f"→ Fenster {longest_clean_run_region}h >= {config.CLEAN_WINDOW_MIN_HOURS}h: "
                 f"safety_status safe oder conditional moeglich."
-            )
-        elif longest_clean_run_region >= config.CLEAN_WINDOW_MIN_HOURS:
-            lines.append(
-                f"→ Fenster nur {longest_clean_run_region}h (Minimum {config.CLEAN_WINDOW_MIN_HOURS}h, "
-                f"Green ab {config.CLEAN_WINDOW_GREEN_HOURS}h): Status maximal conditional."
             )
         elif flyable > 0 and not clean_hours:
             lines.append(f"→ ACHTUNG: Alle fliegbaren Stunden haben harte Warnungen! Status sollte NOT_SAFE sein!")

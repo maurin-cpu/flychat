@@ -102,9 +102,10 @@ class AnalyzersMixin:
 
         Bombensichere Kriterien:
         1. Keine einzige WIND-OK Stunde  → Windrichtung ganztaegig falsch
-        2. Ganztaegig Regen               → kein nutzbares Fenster
-        3. Ganztaegig Gewitter            → objektiv nicht fliegbar
-        4. Ganztaegig Sturmwarnung        → objektiv nicht fliegbar
+        2. Weniger als CLEAN_WINDOW_MIN_HOURS WIND-OK Stunden → Start-Fenster zu kurz
+        3. Ganztaegig Regen               → kein nutzbares Fenster
+        4. Ganztaegig Gewitter            → objektiv nicht fliegbar
+        5. Ganztaegig Sturmwarnung        → objektiv nicht fliegbar
         """
         name = spot["name"]
         cache_key = f"{name}|{date_str}"
@@ -131,7 +132,21 @@ class AnalyzersMixin:
                 f"({spot.get('windrichtung', '?')}). Kein fliegbares Fenster."
             )
 
-        # Regel 2: Ganztaegig Regen
+        # Regel 2: Zu wenige WIND-OK Stunden — Start-Fenster reicht nicht.
+        # Spiegelt die Skill-Regel < CLEAN_WINDOW_MIN_HOURS → not_safe (siehe
+        # _hazard_blocks.md Block 2). wind_ok_count ist konservative Obergrenze
+        # fuer das laengste saubere Fenster.
+        elif wind_ok > 0 and wind_ok < config.CLEAN_WINDOW_MIN_HOURS and total_hours > 0:
+            no_go.append(
+                f"Start-Fenster: Nur {wind_ok}h mit Windrichtung im erlaubten Sektor "
+                f"(Minimum {config.CLEAN_WINDOW_MIN_HOURS}h)"
+            )
+            summary_parts.append(
+                f"Nur {wind_ok}h mit passender Windrichtung "
+                f"({spot.get('windrichtung', '?')}) — kein ausreichendes Start-Fenster."
+            )
+
+        # Regel 3: Ganztaegig Regen
         elif total_hours > 0 and rain_cnt >= total_hours - 2 and rain_cnt >= 4:
             no_go.append(f"Niederschlag: Regen in {rain_cnt} von {total_hours} Stunden")
             summary_parts.append(
