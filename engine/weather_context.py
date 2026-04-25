@@ -1756,7 +1756,7 @@ class WeatherContextMixin:
                 f"Status sollte not_safe sein."
             )
 
-        # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade)
+        # Richtungsdreher-Anmerkung (nur wind_summary, KEIN Status-Downgrade)
         # Erfasst sowohl abrupte 1h-Spruenge als auch langsames Drehen ueber
         # bis zu WIND_DIRECTION_SWING_WINDOW_H Stunden (Wind unbestaendig).
         if max_swing_deg >= config.WIND_DIRECTION_SWING_NOTE_DEG and max_swing_hour:
@@ -1771,7 +1771,8 @@ class WeatherContextMixin:
             lines.append(
                 f"→ ANMERKUNG Richtungsdreher: {span_txt} "
                 f"(>= {config.WIND_DIRECTION_SWING_NOTE_DEG}°-Schwelle). "
-                f"In caution_notes erwaehnen — KEIN Status-Downgrade, KEINE Tier-Aenderung "
+                f"In wind_summary erwaehnen (NICHT in caution_notes — Drehung ist Tagesverlauf-Info, "
+                f"keine Sicherheits-Warnung). KEIN Status-Downgrade, KEINE Tier-Aenderung "
                 f"(safety_status + fly_status/flyability_tier bleiben wie ermittelt: "
                 f"violet bleibt violet, green bleibt green, gray/bronze bleibt gray/bronze)."
             )

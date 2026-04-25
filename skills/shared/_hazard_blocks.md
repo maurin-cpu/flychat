@@ -161,8 +161,8 @@ Wenn der Wind um ≥ **{{cfg.WIND_DIRECTION_SWING_NOTE_DEG}}°** innerhalb eines
 - Abrupter Sprung (1h): `Max Stunden-Wechsel X° um HH:00`
 - Drift ueber mehrere Stunden: `Max Richtungsdreher X° zwischen HH:00 und HH:00 (Nh Drift)` — Wind ist unbestaendig.
 
-- Diese Anmerkung MUSS in `caution_notes` mit Uhrzeit/Zeitraum erwaehnt werden ("Wind dreht um 14:00 um 60° — Start danach erschwert" oder "Wind dreht 80° zwischen 12:00 und 15:00 — unbestaendig").
-- Sie fuehrt **NICHT** zu einem Status-Downgrade und **NICHT** zu einer Tier-Aenderung. Der `safety_status` bleibt (safe/conditional/not_safe) und der `fly_status`/`flyability_tier` bleibt ebenfalls unveraendert — violet bleibt violet, green bleibt green, gray/bronze bleibt gray/bronze. Der Richtungsdreher ist reine Piloten-Information in `caution_notes`, kein Bewertungskriterium.
+- Diese Anmerkung MUSS in `wind_summary` mit Uhrzeit/Zeitraum erwaehnt werden ("Wind dreht um 14:00 um 60° aus dem Sektor heraus" oder "Wind dreht 80° zwischen 12:00 und 15:00 — unbestaendig"). NICHT in `caution_notes` — Drehung ist beschreibende Tagesverlauf-Info, keine Sicherheits-Warnung.
+- Sie fuehrt **NICHT** zu einem Status-Downgrade und **NICHT** zu einer Tier-Aenderung. Der `safety_status` bleibt (safe/conditional/not_safe) und der `fly_status`/`flyability_tier` bleibt ebenfalls unveraendert — violet bleibt violet, green bleibt green, gray/bronze bleibt gray/bronze. Der Richtungsdreher ist reine Piloten-Information in `wind_summary`, kein Bewertungskriterium.
 - Bei Dreher ≥ 90° (Windumkehr) waehle eine deutlichere Formulierung ("Windumkehr um HH:00" bzw. "Windumkehr zwischen HH:00 und HH:00").
 - Wenn das System keine Anmerkung liefert (Dreher unter Schwelle), KEIN Richtungsdreher erwaehnen — auch nicht wenn dir die Stunden-Zeilen auffaellig scheinen.
 
@@ -204,8 +204,8 @@ BLOCK 4 — HOEHENWIND (FLUGSCHICHT)
 **Tags** (gelten NUR fuer Hoehen mit Marker `*` im Flugbereich):
 - `[ALOFT-DANGER]` → Stunde unfliegbar (Wind in Flugschicht > {{cfg.ALOFT_DANGER_KMH}} km/h). **Ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h pro Tag → hartes NO-GO** (Post-Processing zwingt `not_safe`, auch wenn Bodenwind ruhig ist) — **AUSSER** der `HOEHENWIND-TREND` zeigt AUFKLAERUNG / VEREINZELT / EINGEKESSELT_KNAPP mit sauberem Fenster ≥ {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h. In dem Fall bleibt der Status max. `conditional`, und `safe_window` wird auf das saubere Fenster gesetzt.
 - `[ALOFT-GUST-DANGER]` → Stunde unfliegbar (Turbulenz > {{cfg.ALOFT_GUST_DANGER_KMH}} km/h auf Flughoehe — extreme Klapper-Gefahr). **Nur Spots.** Ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h ebenfalls NO-GO.
-- `[ALOFT-WARN]` → Vorsicht, sportlich ({{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h).
-- `[ALOFT-GUST-WARN]` → Vorsicht, Turbulenz wahrscheinlich ({{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h). **Nur Spots.**
+- `[ALOFT-WARN]` → Wind in der Flugschicht erhoeht (WARN-Level) — Stunde sportlich.
+- `[ALOFT-GUST-WARN]` → Turbulenz in der Flugschicht erhoeht (WARN-Level) — Stunde sportlich. **Nur Spots.**
 
 **Regionen:** Nur `[ALOFT-WARN]` und `[ALOFT-DANGER]` (reine Windstaerke auf Flughoehe). Hoehenboeen-Tags (`ALOFT-GUST-*`) existieren auf Region-Ebene nicht.
 
@@ -215,7 +215,17 @@ BLOCK 4 — HOEHENWIND (FLUGSCHICHT)
 
 **Trend-Muster:** siehe TREND-VOKABULAR. Gefahrenschwellen Hoehenwind: WARN-Level = `[ALOFT-WARN]` {{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h / DANGER-Level = `[ALOFT-DANGER]` > {{cfg.ALOFT_DANGER_KMH}} km/h. Fuer Turbulenz (nur Spots): `[ALOFT-GUST-WARN]` {{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h / `[ALOFT-GUST-DANGER]` > {{cfg.ALOFT_GUST_DANGER_KMH}} km/h. Flugschichtgefahr → **Sonderfall 1 (Hoehenwind)** anwenden bei EINGEKESSELT-Mustern (eskalierend vs. symmetrisch pruefen).
 
-**PFLICHT-LESEN — `HOEHENWIND-TREND`-Zeile:** Direkt nach TAGESPROFIL erscheint ggf. eine Zeile `HOEHENWIND-TREND: <Muster> — ...`. Das ist das System-Urteil zu Block 4. Folge der eingebauten Handlungsanweisung (`→ ...`) strikt. Insbesondere: bei **AUFKLAERUNG** ist der Tag NICHT not_safe, auch wenn morgens [ALOFT-DANGER]-Stunden waren — setze `safe_window` auf das saubere Nachfenster und erwaehne die Morgenphase in `caution_notes`.
+**PFLICHT-LESEN — `HOEHENWIND-TREND`-Zeile:** Direkt nach TAGESPROFIL erscheint ggf. eine Zeile `HOEHENWIND-TREND: <Muster> — <Fakten>`. Das ist die System-Klassifikation der Hoehenwind-Verteilung ueber den Tag — sie liefert dir nur Muster + Fakten, **keine fertigen Saetze zum Abschreiben**. Du wendest die folgende Muster→Status-Tabelle an:
+
+- **DURCHGEHEND_DANGER** — Hoehenwind ueberwiegend DANGER, kein verlaessliches ruhiges Fenster → `safety_status = not_safe`, `primary_no_go = ALOFT_DANGER`.
+- **DURCHGEHEND_WARN** — Hoehenwind ueberwiegend WARN, keine DANGER-Mehrheit → maximal `conditional`. WARN-Charakter in `caution_notes` erwaehnen, ohne km/h-Zahlen zu erfinden.
+- **EINGEKESSELT (mit DANGER)** — ruhiges Fenster zwischen DANGER-Phasen kuerzer als `{{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h` → `not_safe`, `primary_no_go = EINGEKESSELT-HOEHENWIND`. Pilot wuerde in eskalierende Bedingungen starten.
+- **EINGEKESSELT (WARN-Level)** oder **EINGEKESSELT_KNAPP** — Fenster zwischen WARN-Phasen → maximal `conditional`. Zeitfenster konkret in `caution_notes` nennen.
+- **AUFKLAERUNG** — Hoehenwind morgens, danach ruhig (keine Rueckkehr) → Tag NICHT `not_safe`, auch wenn morgens [ALOFT-DANGER]. `safe_window` auf das saubere Nachfenster setzen, Morgenphase in `caution_notes` erwaehnen.
+- **ZUNEHMEND** — morgens ruhig, danach Hoehenwind → maximal `conditional`. `safe_window` auf den ruhigen Morgen setzen, Verschlechterung in `caution_notes` erwaehnen.
+- **VEREINZELT** — Einzelstunden Hoehenwind verteilt → bei DANGER-Stunden maximal `conditional`. Pruefen ob ruhiges Fenster fuer Flugplan reicht.
+
+Die Trend-Zeile sagt dir das Muster und die Fakten (Stunden, Zeitpunkte). Den Status leitest **du** daraus ab — nicht aus einem mitgelieferten Satz.
 
 **Vertikale Wind-Drehung:** Wind dreht in der vertikalen Saeule (z.B. unten Sued, oben West) → Scherung → in `wind_shear` vermerken, eher **conditional**.
 

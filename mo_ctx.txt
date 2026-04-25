@@ -1,0 +1,38 @@
+WETTERDATEN FUER REGION: Mittelland Ost — TAG: 2026-04-24 (Freitag) (Stand: 2026-04-22T17:01:15.200762)
+═══ REGION: Mittelland Ost (Referenzhoehe: 730m MSL, Kritischer Foehn: Süd) ═══
+2026-04-24 10:00: Temp 11.8°C | Wind 9km/h aus 77° [WIND-CALM] [Ref-Wind 730m: 9km/h aus 77°] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 730–2015m MSL | 925hPa(839m)*: 14km/h aus 77° | 900hPa(1066m)*: 17km/h aus 83° | 850hPa(1538m)*: 14km/h aus 69° | 800hPa(2035m)~: 11km/h aus 66° | 700hPa(3116m): 14km/h aus 13° | THERMIK-PROXY: 0.8 m/s bis 1015m MSL, LCL/Basis 1814m (Guete: 4/10) | TQ 0/1 sauber, 1/1 SHEAR-UNU, 1/1 TORN-UNU
+2026-04-24 11:00: Temp 14.4°C | Wind 7km/h aus 62° [WIND-CALM] [Ref-Wind 730m: 7km/h aus 62°] [SHEAR-DEGRADED] [THERMAL-TORN-UNUSABLE] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 730–2066m MSL | 925hPa(839m)*: 8km/h aus 62° | 900hPa(1066m)*: 16km/h aus 87° | 850hPa(1539m)*: 16km/h aus 75° | 800hPa(2036m)*: 10km/h aus 78° | 700hPa(3119m): 15km/h aus 2° | THERMIK-PROXY: 1.1 m/s bis 1066m MSL, LCL/Basis 2113m (Guete: 4/10) | TQ 0/2 sauber, 1/2 SHEAR-DEG, 1/2 SHEAR-UNU, 2/2 TORN-UNU
+2026-04-24 12:00: Temp 16.5°C | Wind 7km/h aus 9° [WIND-CALM] [Ref-Wind 730m: 7km/h aus 9°] [SHEAR-DEGRADED] [THERMAL-TORN-DEGRADED] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 730–2264m MSL | 925hPa(836m)*: 7km/h aus 9° | 900hPa(1064m)*: 13km/h aus 88° | 850hPa(1538m)*: 15km/h aus 78° | 800hPa(2036m)*: 8km/h aus 90° | 700hPa(3120m): 14km/h aus 7° | THERMIK-PROXY: 1.7 m/s bis 1264m MSL, LCL/Basis 2375m (Guete: 7/10) | TQ 0/2 sauber, 1/2 SHEAR-DEG, 1/2 TORN-DEG, 1/2 TORN-UNU
+2026-04-24 13:00: Temp 18.2°C | Wind 9km/h aus 5° [WIND-CALM] [Ref-Wind 730m: 9km/h aus 5°] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 730–2535m MSL | 925hPa(832m)*: 9km/h aus 5° | 900hPa(1061m)*: 8km/h aus 25° | 850hPa(1535m)*: 12km/h aus 81° | 800hPa(2033m)*: 7km/h aus 99° | 700hPa(3118m): 12km/h aus 18° | THERMIK-PROXY: 2.0 m/s bis 1535m MSL, LCL/Basis 2670m (Guete: 7/10) | TQ 2/3 sauber, 1/3 SHEAR-DEG, 1/3 TORN-UNU
+2026-04-24 14:00: Temp 19.6°C | Wind 11km/h aus 15° [WIND-CALM] [Ref-Wind 730m: 11km/h aus 15°] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 730–2495m MSL | 925hPa(828m)*: 11km/h aus 15° | 900hPa(1058m)*: 11km/h aus 16° | 850hPa(1533m)*: 8km/h aus 80° | 800hPa(2031m)*: 2km/h aus 146° | 700hPa(3116m): 10km/h aus 18° | THERMIK-PROXY: 2.0 m/s bis 1495m MSL, LCL/Basis 3011m (Guete: 7/10) | TQ 1/2 sauber, 1/2 SHEAR-DEG, 1/2 TORN-UNU
+2026-04-24 15:00: Temp 20.6°C | Wind 11km/h aus 24° [WIND-CALM] [Ref-Wind 730m: 11km/h aus 24°] | Wolkenbasis wolkenfrei | Bewoelkung 10% (tief 0%, mittel 0%, hoch 10%) | FLUGBEREICH: 730–2450m MSL | 925hPa(825m)*: 11km/h aus 24° | 900hPa(1056m)*: 11km/h aus 25° | 850hPa(1532m)*: 4km/h aus 97° | 800hPa(2031m)*: 3km/h aus 252° | 700hPa(3116m): 7km/h aus 10° | THERMIK-PROXY: 1.9 m/s bis 1450m MSL, LCL/Basis 3559m (Guete: 7/10) | TQ 1/2 sauber, 1/2 SHEAR-DEG, 1/2 TORN-UNU
+2026-04-24 16:00: Temp 21.1°C | Wind 9km/h aus 20° [WIND-CALM] [Ref-Wind 730m: 9km/h aus 20°] | Wolkenbasis wolkenfrei | Bewoelkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 730–2390m MSL | 925hPa(824m)*: 9km/h aus 20° | 900hPa(1055m)*: 9km/h aus 21° | 850hPa(1532m)*: 4km/h aus 360° | 800hPa(2032m)*: 5km/h aus 283° | 700hPa(3116m): 3km/h aus 338° | THERMIK-PROXY: 1.8 m/s bis 1390m MSL, LCL/Basis 3815m (Guete: 7/10) | TQ 1/2 sauber, 1/2 SHEAR-DEG, 1/2 TORN-UNU
+
+═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══
+[WIND-CALM] Stunden (7): 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00
+[WIND-MODERATE] Stunden (0): KEINE
+[WIND-STRONG] Stunden (0): KEINE (NICHT FLIEGBAR)
+Saubere Stunden (7): 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00
+Saubere Fenster: 10:00-17:00 (7h)
+Laengstes Fenster (= Status-Basis): 7h
+→ Fenster 7h >= 3h: safety_status safe oder conditional moeglich.
+
+═══ TAGESPROFIL (für ganzheitliche Beurteilung) ═══
+Flugfenster ausgewertet: 7h (zwischen 10:00 und 17:00)
+Verhaeltnis sauber/gesamt: 7/7h = 100%
+Hauptgefahren am Tag: THERMAL-TORN-UNUSABLE 1h, SHEAR-DEGRADED 2h, THERMAL-TORN-DEGRADED 1h
+
+═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══
+10:00:clean · 11:00:clean · 12:00:clean · 13:00:clean · 14:00:clean · 15:00:clean · 16:00:clean
+→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen zwei gefaehrlichen = NICHT als stabiles Fenster werten).
+
+═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══
+10:00:soaring(band-flach) · 11:00:UNUSABLE(TORN) · 12:00:produktiv(1.7) · 13:00:produktiv(2.0) · 14:00:produktiv(2.0) · 15:00:produktiv(1.9) · 16:00:produktiv(1.8)
+→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · degraded = ruppig aber fliegbar · unusable = Thermik unbrauchbar (Klapper/Scherung) · keine-thermik = kein Steigen.
+→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): TORN-UNUSABLE 1h, TORN-DEGRADED 1h, SHEAR-DEGRADED 2h, sauber 5h von 7 Thermik-Stunden. ROUGH-UNUSABLE-Anteil: 0% (0/7h), Gesamt-UNUSABLE-Anteil: 14% (1/7h). Peak-Steigen (Proxy): 2.0 m/s.
+  TORN-/SHEAR-UNUSABLE sind reine Qualitaets-Issues (zerrissene/gekippte Thermik). Sie degradieren MAXIMAL violet→green. KEIN gray-Downgrade wegen TORN/SHEAR. Der Tag bleibt Thermikflug-tauglich, Bart-Zentrierung ist nur schwieriger.
+→ PRODUKTIVE-THERMIK: 5h (Climb ≥0.7 m/s, tief ≤80%, mittel ≤90%, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). Min für green-Tag: 4h. HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar).
+WIND-TREND: STABIL — Keine signifikante Verschlechterung nach dem Fenster.
+
+═══ FÖHN-INDIKATOR ═══
+Keine Föhn-Daten verfügbar.

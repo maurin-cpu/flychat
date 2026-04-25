@@ -1103,6 +1103,13 @@ body.page-fixed-nav {
     border-color: rgba(3, 105, 161, 0.2);
 }
 
+/* Desktop: day-name + date inline (single line, space-separated). */
+.tab-btn .day-name,
+.tab-btn .day-date {
+    display: inline;
+}
+.tab-btn .day-date::before { content: ' '; }
+
 .meteogram-chart {
     flex: 1;
     overflow: auto;
@@ -1113,11 +1120,13 @@ body.page-fixed-nav {
     scrollbar-width: thin;
 }
 
-/* MOBILE: Meteogramm passt IMMER ohne Scroll. Keine Scrollbar, keine
-   Möglichkeit zu scrollen — Chart wird via JS auf Container-Größe gerendert. */
+/* MOBILE: Chart wird via JS auf Container-Größe gerendert. Vertikal-Scroll
+   nur als Fallback wenn die Analyse aufgeklappt wird und der Chart nicht
+   mehr in den verbleibenden Platz passt. */
 @media (max-width: 640px) {
     .meteogram-chart {
-        overflow: hidden !important;
+        overflow-x: hidden;
+        overflow-y: auto;
         padding: 8px 10px;
         scrollbar-width: none;
     }
@@ -1159,6 +1168,115 @@ body.page-fixed-nav {
 }
 .mg-tier-caution { color: #78350F; }
 .mg-tier-danger  { color: #9f1239; }
+
+/* Numbers-Toggle: blendet Wind/Böe/Thermik-Zahlen in Cells ein/aus.
+   Mobile-Default ON. Sitzt rechts in der Tier-Legenden-Bar (margin-left: auto).
+   Touch-Target ≥44×44 nach Apple HIG, sichtbarer State über Hintergrund-Farbe. */
+.mg-numbers-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-elevated);
+    color: #1E293B;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.mg-numbers-toggle:hover {
+    background: #E2E8F0;
+}
+.mg-numbers-toggle:focus-visible {
+    outline: 2px solid #2563EB;
+    outline-offset: 2px;
+}
+.mg-numbers-toggle--off {
+    background: transparent;
+    color: #94A3B8;
+    border-style: dashed;
+}
+.mg-numbers-toggle--off:hover {
+    background: #F1F5F9;
+    color: #64748B;
+}
+.mg-numbers-toggle svg {
+    pointer-events: none;
+    overflow: visible;
+}
+
+/* Scrubber-Info: überlagert die Tier-Legende während Touch-Drag.
+   Position absolute innerhalb der relativen Legend-Bar → Zeigt Werte für
+   die aktuell berührte Stunde + Höhe. Finger ist immer UNTER dieser Zeile,
+   verdeckt nichts. Layout-shift = 0 (gleiche Box wie Legend-Pills). */
+.mg-tier-legend {
+    position: relative;
+}
+.mg-legend-content {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+    transition: opacity 120ms ease;
+}
+.mg-tier-legend.mg-scrubbing .mg-legend-content {
+    opacity: 0;
+    pointer-events: none;
+}
+.mg-scrub-info {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(135deg, #F0F9FF 0%, #FFFFFF 60%, var(--color-primary-light) 100%);
+    border: 1px solid var(--color-primary);
+    box-shadow: 0 2px 8px rgba(3, 105, 161, 0.18);
+    color: var(--color-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 140ms ease;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.mg-tier-legend.mg-scrubbing .mg-scrub-info {
+    opacity: 1;
+}
+.mg-scrub-time {
+    font-weight: 700;
+    color: var(--color-primary);
+    flex-shrink: 0;
+}
+.mg-scrub-divider {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+.mg-scrub-vals {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--color-text);
+}
+.mg-scrub-vals b {
+    color: var(--color-primary-vivid);
+    font-weight: 700;
+    margin-right: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .mg-legend-content,
+    .mg-scrub-info { transition: none; }
+}
 
 /* Föhn diagram should never horizontally scroll on mobile — chart scales to fit */
 @media (max-width: 639px) {
@@ -1580,14 +1698,6 @@ body.page-fixed-nav {
     .floating-day-tabs .navbar-day-btn .day-date::before { content: none; }
 }
 
-/* Meteogram tabs scroll fade on mobile */
-@media (max-width: 639px) {
-    .meteogram-tabs {
-        -webkit-mask-image: linear-gradient(to right, black 0%, black 90%, transparent 100%);
-        mask-image: linear-gradient(to right, black 0%, black 90%, transparent 100%);
-    }
-}
-
 /* ===== CUSTOM MARKER & HIGHLIGHT ANIMATION ===== */
 .custom-spot-marker {
     background: transparent;
@@ -1853,44 +1963,65 @@ body.page-fixed-nav {
         padding: 6px 12px;
     }
 
+    /* Day tabs sollen ohne Scroll auf den Bildschirm passen — gleiche
+       Optik wie .floating-day-tabs auf der Karte: Wochentag oben, DD.MM unten. */
     .meteogram-tabs {
-        overflow-x: auto;
         flex-wrap: nowrap;
-        -webkit-overflow-scrolling: touch;
-        padding: 6px 12px;
+        justify-content: center;
+        padding: 6px 8px;
+        gap: 4px;
+        overflow-x: visible;
         scrollbar-width: none;
     }
     .meteogram-tabs::-webkit-scrollbar { display: none; }
 
     .tab-btn {
-        flex-shrink: 0;
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 5px 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        line-height: 1.15;
     }
+    .tab-btn .day-name {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+    }
+    .tab-btn .day-date {
+        display: block;
+        font-size: 10px;
+        opacity: 0.85;
+        font-variant-numeric: tabular-nums;
+    }
+    .tab-btn .day-date::before { content: none; }
 
-    /* Aside Peek-Bar (collapsed): kompakte 44px-Leiste am unteren Rand.
-       Wenn expanded: schwebt als Bottom-Sheet ÜBER dem Chart (position:absolute),
-       damit das Meteogramm nicht zusammengedrückt wird. */
-    .meteogram-body { position: relative; }
+    /* Aside läuft im Flex-Flow (unter dem Chart). Beim Aufklappen schrumpft
+       das Meteogramm nach oben — kein Overlay über dem Chart mehr. */
     .meteogram-aside {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        max-height: 60vh;
+        position: static;
+        flex: 0 0 auto;
+        width: 100%;
+        max-height: 55vh;
         background: var(--color-bg-elevated, #fff);
-        z-index: 5;
-        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
-        border-radius: 16px 16px 0 0;
+        border-top: 1px solid var(--color-border);
+        border-left: none;
+        border-radius: 0;
+        box-shadow: none;
         transition: max-height 250ms cubic-bezier(0.4, 0, 0.2, 1);
     }
     .meteogram-aside.collapsed {
         max-height: 44px;
-        box-shadow: 0 -1px 0 var(--color-border, #e5e7eb);
         border-radius: 0;
     }
-    /* Main bekommt Platz für die Peek-Bar reserviert, damit der Chart nicht
-       direkt am unteren Rand klebt. */
     .meteogram-main {
-        padding-bottom: 44px;
+        flex: 1 1 auto;
+        min-height: 0;
+        padding-bottom: 0;
     }
     .meteogram-aside-header {
         padding: 10px 16px;

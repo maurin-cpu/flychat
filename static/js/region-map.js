@@ -713,7 +713,9 @@
             overlayTabsEl.innerHTML = '';
             dates.forEach(function (d) {
                 var btn = document.createElement('button');
-                btn.textContent = Meteogram.formatDayTabLabel(d);
+                var parts = Meteogram.formatDayTabParts(d);
+                btn.dataset.date = d;
+                btn.innerHTML = '<span class="day-name">' + parts.name + '</span><span class="day-date">' + parts.date + '</span>';
                 btn.className = 'tab-btn' + (d === activeDate ? ' active' : '');
                 btn.addEventListener('click', function () {
                     overlayTabsEl.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
@@ -864,7 +866,7 @@
             var overlayTabsEl = document.getElementById('regionOverlayDayTabs');
             if (overlayTabsEl) {
                 overlayTabsEl.querySelectorAll('.tab-btn').forEach(function (b) {
-                    b.classList.toggle('active', b.textContent === Meteogram.formatDayTabLabel(newDate));
+                    b.classList.toggle('active', b.dataset.date === newDate);
                 });
             }
             // Re-render meteogram for new day

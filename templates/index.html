@@ -634,7 +634,15 @@
                 layout.classList.remove('show-chat', 'show-map');
                 layout.classList.add('show-' + target);
                 if (target === 'map' && window.gleitcastMap) {
-                    setTimeout(function () { window.gleitcastMap.invalidateSize(); }, 50);
+                    setTimeout(function () {
+                        window.gleitcastMap.invalidateSize();
+                        // First reveal: container was display:none when initial
+                        // fitBounds ran → zoom is wrong. Re-fit to all CH spots.
+                        if (!window._gleitcastMobileMapFitted && window.gleitcastFitToSpots) {
+                            window.gleitcastFitToSpots();
+                            window._gleitcastMobileMapFitted = true;
+                        }
+                    }, 50);
                 }
             }
 

@@ -803,9 +803,8 @@
       chips.push(`<span class="bf-chip bf-chip--climb">↑${Number(spot.peak_climb_rate).toFixed(1)} m/s</span>`);
     }
     if (spot.flight_duration) chips.push(`<span class="bf-chip">${escapeHtml(spot.flight_duration)}</span>`);
-    if (spot.is_conditional && spot.conditional_reason) {
-      chips.push(`<span class="bf-chip bf-chip--warn">${escapeHtml(spot.conditional_reason)}</span>`);
-    }
+    // conditional_reason wird nur in der aufgeklappten Detail-Ansicht gezeigt (renderSpotLabels),
+    // damit die Übersicht (Region eingeklappt → Spot-Zeile) ruhig bleibt.
 
     const statusBar = chips.length
       ? `<div class="bf-spot-status">${chips.join("")}</div>`
@@ -815,7 +814,13 @@
 
     // Details (expanded content)
     const analysisForDetails = spot.analysis_full || synthesizeAnalysis(spot);
-    const labelsHtml = renderSpotLabels(analysisForDetails);
+    let labelsHtml = renderSpotLabels(analysisForDetails);
+    if (spot.is_conditional && spot.conditional_reason) {
+      const cr = String(spot.conditional_reason).trim();
+      if (cr && !labelsHtml.toLowerCase().includes(cr.toLowerCase())) {
+        labelsHtml = `<div class="bf-label bf-label--warn"><span class="bf-label-icon">!</span><span class="bf-label-text">${escapeHtml(cr)}</span></div>` + labelsHtml;
+      }
+    }
     const summaryHtml = renderSpotSummary(analysisForDetails);
     const recText = (analysisForDetails.recommendation || (analysisForDetails.flyability || {}).recommendation || "").trim();
     const recHtml = recText ? `<div class="bf-detail-rec"><span class="bf-detail-rec-icon">✍</span> ${escapeHtml(recText)}</div>` : "";

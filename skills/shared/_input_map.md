@@ -21,10 +21,10 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 - `[OVERCAST-DANGER]` — Dichte Wolkendecke nahe Flughoehe
 
 **Weiche Vorsichts-Tags = WARN-Level** (Stunde wird SPORTLICH, bleibt fliegbar fuer erfahrene Piloten, Status mind. conditional):
-- `[GUST-WARN]` — Bodenboeen {{cfg.GUST_WARN_KMH}}-{{cfg.GUST_DANGER_KMH}} km/h *(nur Spots)*
-- `[ALOFT-WARN]` — Flugschicht-Wind {{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h (sportlich, noch fliegbar)
-- `[ALOFT-GUST-WARN]` — Flugschicht-Turbulenz {{cfg.ALOFT_GUST_WARN_KMH}}-{{cfg.ALOFT_GUST_DANGER_KMH}} km/h *(nur Spots)*
-- `[CAPE-WARN]` — CAPE {{cfg.CAPE_WARN_JKG}}-{{cfg.CAPE_DANGER_JKG}} J/kg ohne Trigger
+- `[GUST-WARN]` — Bodenboeen erhoeht (WARN-Level) *(nur Spots)*
+- `[ALOFT-WARN]` — Wind in der Flugschicht erhoeht (WARN-Level)
+- `[ALOFT-GUST-WARN]` — Turbulenz in der Flugschicht erhoeht (WARN-Level) *(nur Spots)*
+- `[CAPE-WARN]` — CAPE erhoeht (WARN-Level) ohne Trigger
 
 **Richtungs-Tags (Spot-Modus) — Start-Bedingung, KEINE Flug-Gefahr:**
 - `[WIND-OK]` — Windrichtung liegt im erlaubten Spot-Sektor (inkl. 10° Buffer) → Start moeglich.
@@ -81,6 +81,6 @@ Hier hat das System bereits alles gezaehlt und geflagged:
 - `→ ACHTUNG Verhaeltnis < 35%: ...` — optionaler Warnhinweis
 - `THERMIK-QUALITAET-Block`: Zaehler fuer SHEAR/TORN/ROUGH-UNUSABLE-Stunden + TQ-Ratio pro Stunde (Regionen: kein ROUGH)
 - **Trend-Labels (falls vorhanden):** AUFKLAERUNG / ZUNEHMEND / EINGEKESSELT / DURCHGEHEND (WARN/DANGER) / VEREINZELT / STABIL — vollstaendige Definitionen siehe TREND-VOKABULAR in `_hazard_blocks.md`. Wende sie pro Gefahrenblock an (Regen, Bodenwind, Boeen, Hoehenwind, CAPE, Wolken). Foehn ist ausgenommen (severity-pauschal, kein Trend).
-- **Eigene Trend-Zeilen:** Direkt nach TAGESPROFIL koennen `NIEDERSCHLAG-TREND`, `BOEEN-TREND` (nur Spots) und `HOEHENWIND-TREND` stehen. Diese Zeilen sind das System-Urteil zum jeweiligen Gefahrenblock — PFLICHT-Input fuer deinen Status. Wenn eine Zeile explizit `→ safety_status sollte not_safe sein` sagt, setze not_safe. Wenn sie `→ Ruhige Stunden normal bewerten` sagt (AUFKLAERUNG), nutze das saubere Fenster fuer `safe_window` — auch wenn morgens DANGER-Stunden waren.
+- **Eigene Trend-Zeilen:** Direkt nach TAGESPROFIL koennen `NIEDERSCHLAG-TREND`, `BOEEN-TREND` (nur Spots) und `HOEHENWIND-TREND` stehen. Diese Zeilen sind das System-Urteil zum jeweiligen Gefahrenblock — sie liefern dir das **Muster** (z.B. AUFKLAERUNG, ZUNEHMEND, DURCHGEHEND_DANGER) und die **Fakten** (Stunden, Zeitpunkte). Sie sind PFLICHT-Input fuer deinen Status. Den Status leitest du aus dem Muster ab (Mapping siehe `_hazard_blocks.md` Block 4 fuer Hoehenwind, Block 3 fuer Boeen, TREND-VOKABULAR fuer den Rest) — nicht aus einem mitgelieferten Satz, denn die Trend-Zeile enthaelt **keine fertigen Handlungs-Saetze** zum Abschreiben.
 
 **Deine Pflicht:** Diese Werte lesen, nicht selber berechnen. Wenn BOEEN-FLOOR steht, ist das verbindlich. Wenn "Verhaeltnis < 35%" steht, MUSS das in `caution_notes` oder `no_go_reasons`.

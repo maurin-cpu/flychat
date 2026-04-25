@@ -13,7 +13,7 @@ Schwyz,Hoch-Ybrig,Tisch,47.0007,8.8118,1954,NO-NW,30,,,Süd,Besserer Einstieg in
 Schwyz,Hoch-Ybrig,Forstberg,47.0014,8.8226,2175,W-NNW,30,,,Süd,Alpiner Startplatz. Nur für tritt- und startsichere Piloten
 Schwyz,Hoch-Ybrig,Steinhüttli,47.0095,8.8175,1582,N-NW,30,,,Süd,
 Schwyz,Euthal,"Waldrand, oberhalb Kreuz",47.0936,8.8231,990,SW-NW,30,,,Süd,Skilift und Stromleitung beachten bei tiefen Landeanflügen. Bei Bise nicht fliegen. In der Mulde oberhalb des Skiliftes ist es sehr turbulent.
-Schwyz,Euthal,Chli Aubrig,47.107,8.8628,1620,S-W,30,,,Süd,Wildschongebiet Studen beachten (Dezember bis April). Tierüberflug nur mit genügend Abstand. Bei Bise nicht fliegen. In der Mulde oberhalb des Skiliftes ist es sehr turbulent. [BEDINGUNG] WENN Wind >= 15 km/h DANN Soaring möglich und man kann fliegen. [BEDINGUNG] WENN Wind < 10 km/h DANN hohes Risiko für Abgleiter (auch bei guter Thermik!)
+Schwyz,Euthal,Chli Aubrig,47.107,8.8628,1620,S-W,30,,,Süd,Der Startplatz ist nur von Oktober bis Mai aktiv. Wildschongebiet Studen beachten (Dezember bis April). Tierüberflug nur mit genügend Abstand. Bei Bise nicht fliegen. In der Mulde oberhalb des Skiliftes ist es sehr turbulent. [BEDINGUNG] WENN Wind >= 15 km/h DANN Soaring möglich und man kann fliegen. [BEDINGUNG] WENN Wind < 10 km/h DANN hohes Risiko für Abgleiter (auch bei guter Thermik!)
 Schwyz,Hummel,Rotmoos,47.10318,8.7743,1045,NO-O,30,,,Süd,[BEDINGUNG] WENN Wind >= 15 km/h DANN Soaring möglich und man kann vom Rotmoos aus fliegen. [BEDINGUNG] WENN Wind < 10 km/h DANN hohes Risiko für Abgleiter (auch bei guter Thermik!)
 Schwyz,Hummel,Hummel,47.09851,8.77263,1317,N-NO,30,,,Süd,
 Schwyz,Fronalpstock / Stoos,Gipfel Fronalpstock,46.9693,8.6372,1900,NO-O,30,,,Süd,
@@ -426,7 +426,7 @@ Zentralschweiz,Brändlen,Brändlen 2,46.902633,8.409892,1219,SSW-SSO,30,,,Süd,
 Zentralschweiz,Brüsti,Brüsti 1,46.843833,8.606158,1540,NNO-ONO,30,,,Süd,
 Zentralschweiz,Brüsti,Brüsti 2,46.843494,8.601186,1592,OSO-SSO,30,,,Süd,
 Zentralschweiz,Buochser Horn,Buochser Horn,46.945039,8.428739,1793,SW-W,30,,,Süd,
-Zentralschweiz,Büelen,Büelen,46.880959,8.365563,1095,O-SO,30,,,Süd,
+Zentralschweiz,Büelen,Büelen,46.880959,8.365563,1095,NO-SO,30,,,Süd,
 Zentralschweiz,Chulm,Chulm,46.945661,8.550864,1838,WNW-WSW,30,,,Süd,
 Zentralschweiz,Dossen,Dossen 1,47.027125,8.498619,1681,NNO-ONO,30,,,Süd,
 Zentralschweiz,Dossen,Dossen 2,47.025449,8.499728,1665,SSW-WSW,30,,,Süd,
@@ -480,10 +480,10 @@ Zentralschweiz,Titlis,Titlis,46.773444,8.434219,3163,WNW-NNW,30,,,Süd,
 Zentralschweiz,Tätsch,Tätsch,46.599219,8.480269,2296,OSO-SSO,30,,,Süd,
 Zentralschweiz,Vitznau-Hinterbergen,Vitznau-Hinterbergen,47.012719,8.498092,1021,SSW-SSO,30,,,Süd,
 Zentralschweiz,Wannelen,Wannelen,46.857061,8.788878,1628,NNW-NNO,30,,,Süd,
-Zentralschweiz,Wirzweli,Wirzweli 1,46.913972,8.366917,1228,NNO-ONO,30,,,Süd,
-Zentralschweiz,Wirzweli,Wirzweli 2,46.90917,8.375272,1474,W-NW,30,,,Süd,
-Zentralschweiz,Wirzweli,Wirzweli 3,46.901659,8.361715,1567,N-NO,30,,,Süd,
-Zentralschweiz,Wirzweli,Wirzweli 4,46.902431,8.365445,1599,SO-S,30,,,Süd,
+Zentralschweiz,Wirzweli,Wirzweli 1,46.913972,8.366917,1228,N-ONO,30,,,Süd,
+Zentralschweiz,Wirzweli,Wirzwelihorn,46.90917,8.375272,1474,W-N,30,,,Süd,
+Zentralschweiz,Wirzweli,Gummen N,46.90294,8.36585,1567,NW-NO,30,,,Süd,
+Zentralschweiz,Wirzweli,Gummen,46.90242,8.36534,1599,S-O,30,,,Süd,
 Zentralschweiz,Wängihorn,Wängihorn,46.858406,8.713169,1923,SW-W,30,,,Süd,
 Zürich,Alp Scheidegg,Alp Scheidegg,47.304667,8.943983,1209,SW-W,30,,,Süd,
 Zürich,Oberrieden,Oberrieden Start-Landeplatz,47.267236,8.575086,576,NNO-ONO,30,,,Süd,

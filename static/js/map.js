@@ -74,8 +74,22 @@
             zoomControl: true,
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        // Basis ohne Labels
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 18,
+        }).addTo(map);
+
+        // Topografie (Schummerung) — zeigt Hügel/Berge ohne das Design zu überladen
+        L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
+            opacity: 0.45,
+            maxZoom: 16,
+        }).addTo(map);
+
+        // Labels über der Schummerung
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 18,
         }).addTo(map);
@@ -85,6 +99,16 @@
         // HTML implicit global pointing to the DIV element, which has no
         // invalidateSize() method and would crash sidebar resize handlers.
         window.gleitcastMap = map;
+
+        // Re-fit to all spots — needed on mobile where #map is initially
+        // display:none and the original fitBounds runs against a 0-size container.
+        window.gleitcastFitToSpots = function () {
+            if (!window.gleitcastMap || !window.gleitcastSpotsBounds) return;
+            if (!window.gleitcastSpotsBounds.isValid()) return;
+            try {
+                window.gleitcastMap.fitBounds(window.gleitcastSpotsBounds, { padding: [20, 20] });
+            } catch (e) { /* ignore */ }
+        };
 
         loadSpots();
 
@@ -397,6 +421,7 @@
                 try {
                     var bounds = geoJsonLayer.getBounds();
                     if (bounds && bounds.isValid()) {
+                        window.gleitcastSpotsBounds = bounds;
                         map.fitBounds(bounds, { padding: [20, 20] });
                     }
                 } catch (e) {

@@ -95,10 +95,21 @@ window.Meteogram = (function () {
         return '#DC262680';                   // gefährlich (50%)
     }
 
-    // Read user pref: show numeric wind/gust labels in cells
+    // Read user pref: show numeric wind/gust/thermik labels in cells.
+    // Default on Mobile = ON, da Piloten Wind/Böe/Thermik-Werte brauchen.
+    // Toggle in der Tier-Legend kann auf OFF stellen wenn unübersichtlich.
+    // Storage-Werte: '1' = on, '0' = off, null/missing = default (on).
     function readShowNumbers() {
-        try { return localStorage.getItem('gleitcast.meteogram.showNumbers') === '1'; }
-        catch (e) { return false; }
+        try {
+            var v = localStorage.getItem('gleitcast.meteogram.showNumbers');
+            if (v === '1') return true;
+            if (v === '0') return false;
+            return true; // Default
+        } catch (e) { return true; }
+    }
+    function writeShowNumbers(on) {
+        try { localStorage.setItem('gleitcast.meteogram.showNumbers', on ? '1' : '0'); }
+        catch (e) { /* ignore */ }
     }
 
     // Turbulence risk color (based on absolute T(z) value)
@@ -164,9 +175,12 @@ window.Meteogram = (function () {
     }
 
     // ===== LAYOUT CONSTANTS =====
-    var MARGIN = { top: 12, right: 24, bottom: 0, left: (window.innerWidth <= 480) ? 56 : 96 };
+    var MARGIN = { top: 12, right: 24, bottom: 0, left: (window.innerWidth <= 480) ? 72 : 96 };
     var CELL_H = 36;
-    const GROUND_ROWS = 3;
+    // Bodenstrip: 2 Rows — Wind/Böen, Thermik. Temperatur ist fürs Fliegen
+    // nicht relevant, Niederschlag ist bereits prominent im Cloud-Strip oben
+    // (Tropfen + Gewitter-Icons), würde hier nur doppelt erscheinen.
+    const GROUND_ROWS = 2;
     const GROUND_H = GROUND_ROWS * 24;
     const TIME_LABEL_H = 28;
     const CLOUD_ROW_H = 18;
@@ -269,14 +283,24 @@ window.Meteogram = (function () {
         return dayNames[d.getDay()] + ' ' + dd + '.' + mm + '.' + yyyy;
     }
 
+    /** Two-line layout (day-name + DD.MM) — matches floating-day-tabs. */
+    function formatDayTabParts(dateStr) {
+        var d = new Date(dateStr + 'T12:00:00');
+        var dayNames = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
+        var dd = String(d.getDate()).padStart(2, '0');
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        return { name: dayNames[d.getDay()], date: dd + '.' + mm };
+    }
+
     // ===== TABS =====
     function buildTabs(container, dates, onSelect) {
         container.innerHTML = '';
         dates.forEach(function (d, idx) {
-            var label = formatDayTabLabel(d);
+            var parts = formatDayTabParts(d);
             var btn = document.createElement('button');
             btn.className = 'tab-btn' + (idx === 0 ? ' active' : '');
-            btn.textContent = label;
+            btn.dataset.date = d;
+            btn.innerHTML = '<span class="day-name">' + parts.name + '</span><span class="day-date">' + parts.date + '</span>';
             btn.onclick = function () {
                 container.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
                 btn.classList.add('active');
@@ -453,8 +477,12 @@ window.Meteogram = (function () {
         // passt IMMER in den Container — kein horizontaler Scroll, egal ob
         // Zahlen an oder aus. Numbers werden bei Bedarf kleiner gerendert.
         var isNarrowScreen = window.innerWidth <= 480;
-        // Mobile-Margin: 56px reicht für "1.5k", "Start 1500m" wird auf Mobile verkürzt.
-        MARGIN.left = isMobileViewport ? 56 : 96;
+        // Mobile-Margin: 72px reicht für die längsten linken Labels
+        // ("Nied./Gew.", "Warnungen") bei 9-11px Schrift ohne Clipping.
+        // Mobile-Margin: Höhenzahlen ("1.5km") brauchen ~32px, Icons (14px breit)
+        // sitzen rechtsbündig wie die Höhenzahlen → nutzen denselben Bereich.
+        // 44px reicht für beides ohne Konflikt und gibt 28px ans Chart zurück.
+        MARGIN.left = isMobileViewport ? 44 : 96;
         MARGIN.right = isMobileViewport ? 12 : 24;
         // clientWidth kann während Layout-Race 0 sein → safer fallback aus
         // Viewport-Breite, damit das Chart NIE die Mobile-Viewport sprengt.
@@ -614,9 +642,14 @@ window.Meteogram = (function () {
         // ===== TIER LEGEND (Pill-Chips) =====
         // 3 Pills zeigen die Bedeutung der Zell-Farben. Bleibt immer sichtbar,
         // damit der Pilot die Logik auf einen Blick versteht.
+        // Während Scrubbing (Mobile) wird der Legenden-Inhalt durch eine
+        // Info-Zeile überlagert (gleiche Höhe → kein Layout-Shift).
         var legendBar = document.createElement('div');
         legendBar.className = 'mg-tier-legend';
         legendBar.setAttribute('aria-label', 'Farb-Legende: Ruhig, Sportlich, Unfliegbar');
+
+        var legendContent = document.createElement('div');
+        legendContent.className = 'mg-legend-content';
         [
             { tier: 'calm',    label: 'Ruhig',     color: '#10B981' },
             { tier: 'caution', label: 'Sportlich', color: '#F59E0B' },
@@ -629,8 +662,55 @@ window.Meteogram = (function () {
             dot.style.background = entry.color;
             pill.appendChild(dot);
             pill.appendChild(document.createTextNode(entry.label));
-            legendBar.appendChild(pill);
+            legendContent.appendChild(pill);
         });
+        legendBar.appendChild(legendContent);
+
+        // Numbers-Toggle: erlaubt Wind/Böe/Therm-Zahlen ein/aus zu schalten.
+        // Touch-Target 44×44 (HIG-Standard), aria-pressed-State für Screen-Reader.
+        // Re-Render via existierendem options.showNumbers-Override, damit der
+        // Wert sofort wirkt ohne Page-Reload. Nur auf Mobile sichtbar — Desktop
+        // hat breite Zellen ohne Crowding-Risiko und forciert Zahlen ohnehin.
+        if (isMobileViewport) {
+        var toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'mg-numbers-toggle';
+        toggleBtn.setAttribute('aria-label', showNumbers ? 'Zahlen ausblenden' : 'Zahlen einblenden');
+        toggleBtn.setAttribute('aria-pressed', showNumbers ? 'true' : 'false');
+        toggleBtn.title = showNumbers ? 'Zahlen ausblenden' : 'Zahlen einblenden';
+        toggleBtn.innerHTML =
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+            '<text x="12" y="16" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" font-weight="700" stroke="none" fill="currentColor">123</text>' +
+            (showNumbers ? '' : '<line x1="4" y1="20" x2="20" y2="4" stroke-width="2.4"/>') +
+            '</svg>';
+        if (!showNumbers) toggleBtn.classList.add('mg-numbers-toggle--off');
+        toggleBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var next = !showNumbers;
+            writeShowNumbers(next);
+            // Re-Render mit neuer Pref. Container/altDay/wxDay/options bleiben gleich,
+            // nur showNumbers-Override wird gesetzt.
+            var nextOpts = Object.assign({}, options, { showNumbers: next });
+            renderChart(container, tooltipEl, wxDay, altDay, nextOpts);
+        });
+        legendContent.appendChild(toggleBtn);
+        } // end if (isMobileViewport)
+
+        // Scrubber-Info: überlagert die Legende während Touch-Drag, damit der
+        // Pilot Werte sieht, OHNE den Finger zu heben oder eine Zelle exakt zu
+        // treffen. Im Ruhezustand opacity:0, pointer-events:none.
+        var scrubInfo = null;
+        if (isMobileViewport) {
+            scrubInfo = document.createElement('div');
+            scrubInfo.className = 'mg-scrub-info';
+            scrubInfo.setAttribute('aria-live', 'polite');
+            scrubInfo.innerHTML =
+                '<span class="mg-scrub-time">--:--</span>' +
+                '<span class="mg-scrub-divider">·</span>' +
+                '<span class="mg-scrub-vals">ziehe zum Lesen</span>';
+            legendBar.appendChild(scrubInfo);
+        }
+
         container.appendChild(legendBar);
 
         var svg = d3.select(container)
@@ -641,6 +721,88 @@ window.Meteogram = (function () {
 
         var chartG = svg.append('g')
             .attr('transform', 'translate(' + MARGIN.left + ', ' + MARGIN.top + ')');
+
+        // ===== LEFT-AXIS ICONS (Mobile only) =====
+        // Auf Mobile ersetzen wir die Text-Labels (Hoch/Mittel/Tief, Nied./Gew.,
+        // Wind/Therm, Warnungen) durch kleine SVG-Icons. Spart Platz, Höhenzahlen
+        // bleiben unverändert. Right-edge bei x=-8 (matched mit text-anchor='end').
+        var ICON_W = 14;
+        var ICON_RIGHT = -8;
+        var ICON_LEFT = ICON_RIGHT - ICON_W;
+        function appendLeftIcon(yCenter, render) {
+            var x = ICON_LEFT;
+            var y = yCenter - ICON_W / 2;
+            var s = ICON_W / 24;
+            var g = chartG.append('g')
+                .attr('transform', 'translate(' + x + ',' + y + ') scale(' + s + ')');
+            render(g);
+            return g;
+        }
+        // Cloud-Silhouette als Pfad in 24×24-viewBox.
+        var CLOUD_PATH = 'M 5 18 a 4 4 0 0 1 0 -8 a 5 5 0 0 1 9 -2 a 4 4 0 0 1 7 4 a 3 3 0 0 1 -1 6 H 5 z';
+        function drawCloudIcon(g, baseColor, density) {
+            // density: 0.3 = high (outline, sehr leicht), 0.6 = mid, 1.0 = low (gefüllt)
+            g.append('path')
+                .attr('d', CLOUD_PATH)
+                .attr('fill', density >= 0.9 ? baseColor : baseColor)
+                .attr('fill-opacity', density >= 0.9 ? 0.95 : (density >= 0.5 ? 0.45 : 0.0))
+                .attr('stroke', baseColor)
+                .attr('stroke-width', 1.6)
+                .attr('stroke-linejoin', 'round');
+        }
+        function drawDropLightningIcon(g) {
+            // Tropfen + dezenter Blitz dahinter.
+            g.append('path')
+                .attr('d', 'M12 3 C12 3 5 12 5 16 C5 20 8 22 12 22 C16 22 19 20 19 16 C19 12 12 3 12 3 Z')
+                .attr('fill', '#3B82F6').attr('stroke', '#1E40AF').attr('stroke-width', 1)
+                .attr('stroke-linejoin', 'round');
+        }
+        function drawWindIcon(g) {
+            // Drei horizontale Wind-Streamlines (gleiches Motiv wie Beaufort/Wetter-Icons).
+            g.append('path')
+                .attr('d', 'M3 8 H 14 a 2.5 2.5 0 1 0 -2.5 -2.5')
+                .attr('fill', 'none').attr('stroke', '#475569')
+                .attr('stroke-width', 2).attr('stroke-linecap', 'round')
+                .attr('stroke-linejoin', 'round');
+            g.append('path')
+                .attr('d', 'M3 13 H 19 a 3 3 0 1 0 -3 -3')
+                .attr('fill', 'none').attr('stroke', '#475569')
+                .attr('stroke-width', 2).attr('stroke-linecap', 'round')
+                .attr('stroke-linejoin', 'round');
+            g.append('path')
+                .attr('d', 'M3 18 H 11 a 2.5 2.5 0 1 0 -2.5 -2.5')
+                .attr('fill', 'none').attr('stroke', '#475569')
+                .attr('stroke-width', 2).attr('stroke-linecap', 'round')
+                .attr('stroke-linejoin', 'round');
+        }
+        function drawThermikIcon(g) {
+            // Aufsteigender Pfeil mit Sonne/Wärme oben — Aufwind-Symbolik.
+            // Schaft (Wellenlinie für aufsteigende Luft):
+            g.append('path')
+                .attr('d', 'M12 22 Q 9 17 12 14 Q 15 11 12 6')
+                .attr('fill', 'none').attr('stroke', '#D97706')
+                .attr('stroke-width', 2).attr('stroke-linecap', 'round');
+            // Pfeilspitze:
+            g.append('path')
+                .attr('d', 'M8 8 L 12 3 L 16 8')
+                .attr('fill', 'none').attr('stroke', '#D97706')
+                .attr('stroke-width', 2).attr('stroke-linecap', 'round')
+                .attr('stroke-linejoin', 'round');
+        }
+        function drawWarnIcon(g) {
+            // Klassisches Warndreieck mit Ausrufezeichen.
+            g.append('path')
+                .attr('d', 'M12 3 L 22 21 L 2 21 Z')
+                .attr('fill', '#FEF3C7').attr('stroke', '#92400E')
+                .attr('stroke-width', 1.8).attr('stroke-linejoin', 'round');
+            g.append('path')
+                .attr('d', 'M12 10 V 16')
+                .attr('stroke', '#92400E').attr('stroke-width', 2)
+                .attr('stroke-linecap', 'round');
+            g.append('circle')
+                .attr('cx', 12).attr('cy', 19).attr('r', 1)
+                .attr('fill', '#92400E');
+        }
 
         var GRID_TOP = CLOUD_STRIP_H + CLOUD_GAP;
         // Alle Rows gleich hoch — Bodenwind ist physikalisch punktuell,
@@ -697,16 +859,28 @@ window.Meteogram = (function () {
             .attr('width', nCols * CELL_W).attr('height', 3 * CLOUD_ROW_H)
             .attr('fill', 'url(#skyGradient)').attr('rx', 4);
 
-        // Legend / Labels for cloud types on the left
+        // Legend / Labels for cloud types on the left.
+        // Mobile: Cloud-Icons mit Dichte-Variation (Hoch=outline, Mittel=halb,
+        // Tief=gefüllt) — selbsterklärend, spart Platz.
+        // Desktop: klassische Text-Labels.
         cloudLayers.forEach(function (layer, li) {
-            chartG.append('text').attr('class', 'axis-label')
-                .attr('x', -8)
-                .attr('y', li * CLOUD_ROW_H + CLOUD_ROW_H / 2) 
-                .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
-                .attr('font-size', '9px').attr('font-weight', '600')
-                .attr('fill', '#64748B')
-                .text(layer.label);
-            
+            var rowYCenter = li * CLOUD_ROW_H + CLOUD_ROW_H / 2;
+            if (isMobileViewport) {
+                // density: hoch=0.3 (nur Outline), mittel=0.6 (halb), tief=1.0 (full)
+                var density = li === 0 ? 0.3 : li === 1 ? 0.6 : 1.0;
+                appendLeftIcon(rowYCenter, function (g) {
+                    drawCloudIcon(g, layer.baseColor, density);
+                });
+            } else {
+                chartG.append('text').attr('class', 'axis-label')
+                    .attr('x', -8)
+                    .attr('y', rowYCenter)
+                    .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
+                    .attr('font-size', '9px').attr('font-weight', '600')
+                    .attr('fill', '#64748B')
+                    .text(layer.label);
+            }
+
             // Subtle horizontal separator between layers
             if (li < cloudLayers.length - 1) {
                 chartG.append('line')
@@ -756,13 +930,17 @@ window.Meteogram = (function () {
             .attr('x1', 0).attr('x2', nCols * CELL_W)
             .attr('y1', precipRowY).attr('y2', precipRowY)
             .attr('stroke', 'rgba(148, 163, 184, 0.2)').attr('stroke-width', 1);
-        chartG.append('text').attr('class', 'axis-label')
-            .attr('x', -8)
-            .attr('y', precipRowY + PRECIP_ROW_H / 2)
-            .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
-            .attr('font-size', '9px').attr('font-weight', '600')
-            .attr('fill', '#64748B')
-            .text('Nied./Gew.');
+        if (isMobileViewport) {
+            appendLeftIcon(precipRowY + PRECIP_ROW_H / 2, drawDropLightningIcon);
+        } else {
+            chartG.append('text').attr('class', 'axis-label')
+                .attr('x', -8)
+                .attr('y', precipRowY + PRECIP_ROW_H / 2)
+                .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
+                .attr('font-size', '9px').attr('font-weight', '600')
+                .attr('fill', '#64748B')
+                .text('Nied./Gew.');
+        }
         times.forEach(function (t, ci) {
             var wx = wxByTime[t];
             if (!wx) return;
@@ -1289,15 +1467,18 @@ window.Meteogram = (function () {
             .attr('y1', groundY).attr('y2', groundY);
 
         // Regionen haben keine Böen (Apr 2026) — Label ohne "/ Böen".
-        // Mobile: kompakte Labels (oder ganz weg), damit linker Margin reicht.
-        var groundLabels = isMobileViewport
-            ? ['Wind', 'Temp', 'Therm']
-            : [isRegion ? 'Wind' : 'Wind / Böen', 'Temp / Regen', 'Thermik'];
-        groundLabels.forEach(function (lbl, i) {
-            chartG.append('text').attr('class', 'ground-label')
-                .attr('x', -8).attr('y', groundY + i * 24 + 14)
-                .attr('text-anchor', 'end').text(lbl);
-        });
+        // Mobile: Icons (Wind-Streamlines + Aufwind-Pfeil) statt Text.
+        if (isMobileViewport) {
+            appendLeftIcon(groundY + 11, drawWindIcon);
+            appendLeftIcon(groundY + 24 + 11, drawThermikIcon);
+        } else {
+            var groundLabels = [isRegion ? 'Wind' : 'Wind / Böen', 'Thermik'];
+            groundLabels.forEach(function (lbl, i) {
+                chartG.append('text').attr('class', 'ground-label')
+                    .attr('x', -8).attr('y', groundY + i * 24 + 14)
+                    .attr('text-anchor', 'end').text(lbl);
+            });
+        }
 
         times.forEach(function (t, ci) {
             var wx = wxByTime[t] || {};
@@ -1317,8 +1498,25 @@ window.Meteogram = (function () {
                 var gORDER = { calm: 0, caution: 1, danger: 2 };
                 var gCellTier = gORDER[gGustTier] > gORDER[gWindTier] ? gGustTier : gWindTier;
 
-                var gy = groundY + 13;
-                var arrowOffsetX = showNumbers ? -15 : 0;
+                // Auto-suppress: bei sehr engen Cells (Multi-Tag-Ansicht etc.)
+                // sind Zahlen unleserlich → nur Pfeil rendern.
+                var cellTooNarrowForNumbers = CELL_W < 16;
+                var renderNumbers = showNumbers && !cellTooNarrowForNumbers;
+
+                // Layout: Desktop bleibt horizontal (Pfeil links, Zahl rechts).
+                // Mobile mit Zahlen: vertikal gestapelt (Pfeil oben, Zahl unten),
+                // damit auch in 22px-engen Cells nichts kollidiert.
+                var verticalStack = isMobileViewport && renderNumbers;
+                var gy, arrowScale, arrowOffsetX;
+                if (verticalStack) {
+                    gy = groundY + 7;          // Pfeil im oberen Drittel (0-13 Bereich)
+                    arrowScale = 0.4;          // Klein, damit Böen-Shadow + Text nicht überlappen
+                    arrowOffsetX = 0;          // Zentriert
+                } else {
+                    gy = groundY + 13;
+                    arrowScale = 0.65;
+                    arrowOffsetX = renderNumbers ? -15 : 0;
+                }
 
                 // Tier-Fill als primaerer Glance-Kanal fuer die Bodenwind-Row.
                 if (gCellTier !== 'calm') {
@@ -1343,7 +1541,7 @@ window.Meteogram = (function () {
                         .attr('d', arrowPath(gusts * 0.7))
                         .attr('fill', gGustArrowColor)
                         .attr('opacity', gCellTier === 'danger' ? 0.5 : 0.3)
-                        .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(0.65)');
+                        .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(' + arrowScale + ')');
                 }
 
                 // 2. Primary Wind Arrow
@@ -1352,10 +1550,10 @@ window.Meteogram = (function () {
                 gArrow.append('path')
                     .attr('d', arrowPath(spd * 0.7))
                     .attr('fill', gArrowColor)
-                    .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(0.65)');
+                    .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(' + arrowScale + ')');
 
                 // 3. "Wind / Böen" als tspans, damit Böe eigene Farbe bekommt.
-                if (showNumbers) {
+                if (renderNumbers) {
                     var gTextColor = gCellTier === 'danger' ? '#FFFFFF' : tierTextColor(gWindTier);
                     var gGustTextColor = gCellTier === 'danger' ? '#FFFFFF'
                                        : (gGustTier === 'calm' ? '#64748B' : tierTextColor(gGustTier));
@@ -1363,53 +1561,51 @@ window.Meteogram = (function () {
                     var gTextWeight = gCellTier === 'danger' ? '700'
                                      : gCellTier === 'caution' ? '600' : '500';
 
+                    // Vertikal: Text unter dem Pfeil, klein + zentriert.
+                    // Horizontal (Desktop): Text rechts neben Pfeil, mittig.
+                    var textX = verticalStack ? cx : cx + 6;
+                    var textY = verticalStack ? groundY + 18 : gy + 1;
+                    var textAnchor = verticalStack ? 'middle' : 'start';
+                    var textSize = verticalStack ? '8.5px' : '10px';
+
                     var gText = chartG.append('text').attr('class', 'ground-value')
-                        .attr('x', cx + 6).attr('y', gy + 1)
+                        .attr('x', textX).attr('y', textY)
+                        .attr('text-anchor', textAnchor)
                         .attr('dominant-baseline', 'central')
                         .attr('font-weight', gTextWeight)
-                        .attr('font-size', '10px')
+                        .attr('font-size', textSize)
                         .style('font-variant-numeric', 'tabular-nums');
                     gText.append('tspan').attr('fill', gTextColor).text(String(spd));
                     if (gusts != null) {
-                        gText.append('tspan').attr('fill', gSepColor).text(' / ');
+                        gText.append('tspan').attr('fill', gSepColor).text('/');
                         gText.append('tspan').attr('fill', gGustTextColor).text(String(gusts));
                     }
                 }
             }
 
-            // Row 1: Temp + Precip
-            var lowestLevel = grid[0] && grid[0][ci];
-            var temp = lowestLevel ? Math.round(lowestLevel.temperature) : null;
-            if (temp != null) {
-                chartG.append('text').attr('class', 'ground-value ground-temp')
-                    .attr('x', cx - 6).attr('y', groundY + 24 + 14)
-                    .attr('dominant-baseline', 'central').attr('font-size', '11px')
-                    .text(temp + '\u00B0');
-            }
-            var precipAmt = precip.amount || 0;
-            if (precipAmt > 0) {
-                var barH = Math.min(20, precipAmt * 5);
-                chartG.append('rect').attr('class', 'ground-precip-bar')
-                    .attr('x', cx + 8).attr('y', groundY + 24 + 14 - barH / 2)
-                    .attr('width', 12).attr('height', barH).attr('rx', 2)
-                    .attr('fill', precipColor(precipAmt));
-            }
-
-            // Row 3: Thermik (Steigrate m/s) with xc-therm color scale
+            // Row 1: Thermik (Steigrate m/s) with xc-therm color scale.
+            // Temp + Precip-Row entfernt — Niederschlag ist bereits im Cloud-Strip
+            // oben (Tropfen-Icons), Temperatur ist fürs Fliegen nicht relevant.
             var therm = wx.thermik || {};
             if (therm.climb_rate > 0) {
                 var thermBg = thermClimbColor(therm.climb_rate);
                 chartG.append('rect')
-                    .attr('x', ci * CELL_W + 1).attr('y', groundY + 48 + 1)
+                    .attr('x', ci * CELL_W + 1).attr('y', groundY + 24 + 1)
                     .attr('width', CELL_W - 2).attr('height', 22).attr('rx', 3)
                     .attr('fill', thermBg).attr('opacity', 0.4);
 
-                // Mobile: nur Farbe, keine Zahl. Desktop: Steigrate als Text.
-                if (!isMobileViewport) {
+                // Steigrate als Zahl — auch mobile, gesteuert via showNumbers-Toggle.
+                // thermClimbColor liefert ausschliesslich helle Pastelltöne (Gelb→Cyan)
+                // bei opacity 0.4 → dunkler Text hat immer ausreichend Kontrast (>4.5:1).
+                // Auto-suppress bei sehr engen Cells (Multi-Tag) — Zahl unleserlich.
+                if (showNumbers && CELL_W >= 16) {
                     chartG.append('text').attr('class', 'ground-value')
-                        .attr('x', cx).attr('y', groundY + 48 + 14)
-                        .attr('dominant-baseline', 'central').attr('font-size', '10px')
+                        .attr('x', cx).attr('y', groundY + 24 + 13)
+                        .attr('text-anchor', 'middle')
+                        .attr('dominant-baseline', 'central')
+                        .attr('font-size', isMobileViewport ? '9px' : '10px')
                         .attr('font-weight', '700').attr('fill', '#1E293B')
+                        .style('font-variant-numeric', 'tabular-nums')
                         .text(therm.climb_rate.toFixed(1));
                 }
             }
@@ -1419,12 +1615,16 @@ window.Meteogram = (function () {
         // Plain-German hour-range pills below the ground strip.
         if (warnBands.length > 0 && WARN_STRIP_H > 0) {
             var warnTop = groundY + GROUND_H + 4;
-            // Row label on the left (only on first row, in muted color)
-            chartG.append('text').attr('class', 'ground-label')
-                .attr('x', -8).attr('y', warnTop + WARN_ROW_H / 2 + 3)
-                .attr('text-anchor', 'end')
-                .attr('fill', '#92400E')
-                .text('Warnungen');
+            // Row label on the left — Icon auf Mobile, Text auf Desktop.
+            if (isMobileViewport) {
+                appendLeftIcon(warnTop + WARN_ROW_H / 2, drawWarnIcon);
+            } else {
+                chartG.append('text').attr('class', 'ground-label')
+                    .attr('x', -8).attr('y', warnTop + WARN_ROW_H / 2 + 3)
+                    .attr('text-anchor', 'end')
+                    .attr('fill', '#92400E')
+                    .text('Warnungen');
+            }
 
             warnBands.forEach(function (band) {
                 if (band.row < 0) return; // dropped due to row overflow
@@ -1622,34 +1822,156 @@ window.Meteogram = (function () {
             })
             .on('mouseleave', hideTooltip);
 
-        // Touch: only show tooltip on a genuine tap (no drag). Never preventDefault,
-        // so native vertical page scroll + horizontal overflow scroll keep working.
+        // ===== TOUCH: Scrubber (Mobile) + Tap-Tooltip (Desktop fallback) =====
+        // Mobile-Strategie: Finger berührt das Chart → vertikale Linie folgt
+        // dem Finger, Werte erscheinen in der Info-Zeile OBERHALB des Charts
+        // (wo der Finger sie nie verdeckt). User muss keine 12px-Zelle treffen,
+        // er zieht einfach durch — Werte updaten live. Pattern aus Apple Stocks
+        // / Apple Wetter / TradingView (touch-target-chart-Regel: ≥44pt indem
+        // ganze Spalte ein Treffer ist).
         var TAP_MOVE_THRESHOLD = 10;
-        var touchStartX = 0, touchStartY = 0, touchIsTap = false;
-        interactRect.node().addEventListener('touchstart', function (e) {
-            var touch = e.touches[0];
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-            touchIsTap = true;
-        }, { passive: true });
-        interactRect.node().addEventListener('touchmove', function (e) {
-            if (!touchIsTap) return;
-            var touch = e.touches[0];
-            if (Math.abs(touch.clientX - touchStartX) > TAP_MOVE_THRESHOLD ||
-                Math.abs(touch.clientY - touchStartY) > TAP_MOVE_THRESHOLD) {
-                touchIsTap = false;
+        var SCRUB_HORIZ_INTENT = 8;  // ab welcher X-Bewegung wir Scrub vermuten
+        var scrubFadeTimer = null;
+
+        function updateScrubFromCoords(coords) {
+            var mx = coords[0], my = coords[1];
+            var ci = Math.max(0, Math.min(nCols - 1, Math.floor(mx / CELL_W)));
+            var colX = ci * CELL_W + CELL_W / 2;
+            crossV.attr('x1', colX).attr('x2', colX).classed('visible', true);
+
+            var t = times[ci];
+            var dt = new Date(t);
+            var hh = String(dt.getHours()).padStart(2, '0');
+            var timeStr = hh + ':00';
+            var wx = wxByTime[t] || {};
+
+            // Höhen-Cell unter Finger (falls im Höhengrid).
+            var altParts = [];
+            var ri;
+            var groundTopY = GRID_TOP + (nRows - 1) * cellH;
+            if (hasGroundRow && my >= groundTopY && my < gridBottom) ri = 0;
+            else ri = nRows - 1 - Math.floor((my - GRID_TOP) / cellH);
+            var inGrid = my >= GRID_TOP && ri >= 0 && ri < nRows && grid[ri] && grid[ri][ci];
+
+            if (inGrid) {
+                var dd = grid[ri][ci];
+                var altLabel = (ri === 0 && hasGroundRow && dd.isGroundRow)
+                    ? Math.round(elevation) + 'm'
+                    : Math.round(dd.altitude) + 'm';
+                altParts.push('<b>' + altLabel + '</b>');
+                altParts.push(Math.round(dd.wind_speed) + ' km/h');
+                var trVal = dd.turbulence_risk != null ? dd.turbulence_risk : dd.wind_gusts;
+                if (trVal != null && Math.round(trVal) > Math.round(dd.wind_speed)) {
+                    altParts.push('Böe ' + Math.round(trVal));
+                }
+            } else if (wx.wind) {
+                // Default: Boden-Werte zeigen
+                altParts.push('<b>Boden</b>');
+                altParts.push(Math.round(wx.wind.speed) + ' km/h');
+                if (wx.wind.gusts != null && wx.wind.gusts > wx.wind.speed) {
+                    altParts.push('Böe ' + Math.round(wx.wind.gusts));
+                }
             }
-        }, { passive: true });
-        interactRect.node().addEventListener('touchend', function (e) {
-            if (!touchIsTap) return;
-            touchIsTap = false;
-            var touch = e.changedTouches[0];
-            var coords = d3.pointer(touch, interactRect.node());
-            showTooltipAt(coords, touch.clientX, touch.clientY);
-        }, { passive: true });
-        document.addEventListener('touchstart', function (e) {
-            if (!interactRect.node().contains(e.target)) hideTooltip();
-        }, { passive: true });
+            if (wx.thermik && wx.thermik.climb_rate > 0) {
+                altParts.push('Therm ' + wx.thermik.climb_rate.toFixed(1) + ' m/s');
+            }
+
+            if (scrubInfo) {
+                var timeEl = scrubInfo.querySelector('.mg-scrub-time');
+                var valsEl = scrubInfo.querySelector('.mg-scrub-vals');
+                if (timeEl) timeEl.textContent = timeStr;
+                if (valsEl) valsEl.innerHTML = altParts.join(' · ');
+                legendBar.classList.add('mg-scrubbing');
+            }
+        }
+
+        function endScrub() {
+            crossV.classed('visible', false);
+            if (scrubFadeTimer) clearTimeout(scrubFadeTimer);
+            scrubFadeTimer = setTimeout(function () {
+                if (legendBar) legendBar.classList.remove('mg-scrubbing');
+            }, 1500);
+        }
+
+        if (isMobileViewport) {
+            // Mobile: combined scrub+tap handler, passive:false damit wir bei
+            // klar horizontalem Drag das Default-Page-Scroll unterdrücken können.
+            // Vertikales Scrollen bleibt ungestört.
+            var tStartX = 0, tStartY = 0, tIsScrub = false, tWasTap = true;
+            interactRect.node().addEventListener('touchstart', function (e) {
+                var touch = e.touches[0];
+                tStartX = touch.clientX;
+                tStartY = touch.clientY;
+                tIsScrub = false;
+                tWasTap = true;
+                if (scrubFadeTimer) { clearTimeout(scrubFadeTimer); scrubFadeTimer = null; }
+            }, { passive: true });
+            interactRect.node().addEventListener('touchmove', function (e) {
+                var touch = e.touches[0];
+                var dx = touch.clientX - tStartX;
+                var dy = touch.clientY - tStartY;
+                if (!tIsScrub) {
+                    // Intent-Detection: erst wenn klar horizontal, scrub starten.
+                    // |dx| > |dy| && |dx| > Threshold → User will scrubben.
+                    // |dy| > |dx| → User will Page scrollen, nicht stören.
+                    if (Math.abs(dx) > SCRUB_HORIZ_INTENT && Math.abs(dx) > Math.abs(dy)) {
+                        tIsScrub = true;
+                        tWasTap = false;
+                    } else if (Math.abs(dx) > TAP_MOVE_THRESHOLD || Math.abs(dy) > TAP_MOVE_THRESHOLD) {
+                        tWasTap = false;
+                    }
+                }
+                if (tIsScrub) {
+                    e.preventDefault(); // Page-Scroll während Scrub blockieren
+                    var coords = d3.pointer(touch, interactRect.node());
+                    updateScrubFromCoords(coords);
+                }
+            }, { passive: false });
+            interactRect.node().addEventListener('touchend', function (e) {
+                if (tIsScrub) {
+                    endScrub();
+                } else if (tWasTap) {
+                    // Tap → klassisches Detail-Tooltip (existierender Pfad)
+                    var touch = e.changedTouches[0];
+                    var coords = d3.pointer(touch, interactRect.node());
+                    showTooltipAt(coords, touch.clientX, touch.clientY);
+                }
+                tIsScrub = false;
+            }, { passive: true });
+            document.addEventListener('touchstart', function (e) {
+                if (!interactRect.node().contains(e.target)) {
+                    hideTooltip();
+                    if (legendBar) legendBar.classList.remove('mg-scrubbing');
+                }
+            }, { passive: true });
+        } else {
+            // Desktop: nur Tap-Tooltip-Pfad (existing behaviour, für Tablets/Touchscreens)
+            var touchStartX = 0, touchStartY = 0, touchIsTap = false;
+            interactRect.node().addEventListener('touchstart', function (e) {
+                var touch = e.touches[0];
+                touchStartX = touch.clientX;
+                touchStartY = touch.clientY;
+                touchIsTap = true;
+            }, { passive: true });
+            interactRect.node().addEventListener('touchmove', function (e) {
+                if (!touchIsTap) return;
+                var touch = e.touches[0];
+                if (Math.abs(touch.clientX - touchStartX) > TAP_MOVE_THRESHOLD ||
+                    Math.abs(touch.clientY - touchStartY) > TAP_MOVE_THRESHOLD) {
+                    touchIsTap = false;
+                }
+            }, { passive: true });
+            interactRect.node().addEventListener('touchend', function (e) {
+                if (!touchIsTap) return;
+                touchIsTap = false;
+                var touch = e.changedTouches[0];
+                var coords = d3.pointer(touch, interactRect.node());
+                showTooltipAt(coords, touch.clientX, touch.clientY);
+            }, { passive: true });
+            document.addEventListener('touchstart', function (e) {
+                if (!interactRect.node().contains(e.target)) hideTooltip();
+            }, { passive: true });
+        }
     }
 
     // ===== TEXT VIEW =====
@@ -2142,6 +2464,7 @@ window.Meteogram = (function () {
         windColor: windColor,
         arrowPath: arrowPath,
         formatDayTabLabel: formatDayTabLabel,
+        formatDayTabParts: formatDayTabParts,
         buildTabs: buildTabs,
         renderChart: renderChart,
         renderTextView: renderTextView,

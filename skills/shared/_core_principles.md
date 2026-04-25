@@ -17,6 +17,9 @@ Tags wie [WIND-OK], [WIND-WRONG], [WIND-CALM], [GUST-DANGER], [ALOFT-WARN] etc. 
 - Gleiche Regel fuer `[ALOFT-*]`, `[RAIN-WARN]`, `[CAPE-*]`, `[THUNDERSTORM]`, `[OVERCAST-DANGER]`, `[STRONG-WIND-WARN]`.
 - Sicherheits-Text muss durch das Histogramm gedeckt sein. Bei Zweifel → Hauptgefahren-Zeile zaehlt, nicht deine Interpretation.
 
+**2a-bis. Trend-Zeilen sind Fakten, keine Floskeln.**
+Zeilen wie `HOEHENWIND-TREND: <Muster> — <Fakten>` oder `BOEEN-TREND: ...` liefern dir Muster + Zahlen. Sie sind **kein Satz-Baukasten**. Du **interpretierst** das Muster anhand der Skill-Regeln (`_hazard_blocks.md`) und formulierst die Begruendung in eigenen Worten. Niemals einen Satz aus diesen Zeilen wortwoertlich oder leicht umformuliert in `caution_notes`/`summary` uebernehmen — und insbesondere keine km/h-Bandbreiten oder Handlungs-Phrasen erfinden, die in der Trend-Zeile gar nicht stehen.
+
 **2b. Zahlen kommen aus dem Datenblock — nichts hochrechnen.**
 Jede km/h-, m/s- oder Stunden-Angabe in Prosa muss 1:1 in den Stunden-Zeilen oder im TAGESPROFIL stehen. Verboten:
 - Werte aus dem **Turbulenzrisiko T(z)** (= `wind_gusts`-Spalte) als "Boeen bis X km/h" in no_go/caution/summary zu formulieren. T(z) ist kein Bodenboeenwert und wird NICHT gegen die 30/40 km/h-Schwellen geprueft. Die Schwellenpruefung steht bereits im Histogramm.
@@ -33,7 +36,7 @@ Ein Tag kann *bedingt sicher* sein und trotzdem *legendaeres XC-Wetter* haben �
 `[WIND-WRONG]` heisst: **in dieser Stunde kann der Pilot am Startplatz nicht starten** — weil der Wind aus der falschen Richtung kommt. Das ist **kein** UNFLIEGBAR-Grund wie Regen, Gewitter oder Sturm. Ist der Pilot einmal in der Luft, ist die Bodenwindrichtung am Startplatz irrelevant (Landung erfolgt typischerweise auf separatem Landeplatz). Deshalb:
 - `[WIND-WRONG]`-Stunden **NACH** einem gueltigen Start-Fenster sind **nicht** UNFLIEGBAR. Sie bedeuten nur: kein weiterer Start moeglich.
 - Tag-Status haengt am **laengsten zusammenhaengenden sauberen Fenster** (WIND-OK + keine DANGER-Tags), nicht an der Summe der WIND-WRONG-Stunden.
-- Ein Richtungsdreher im Tagesverlauf (auch >90°) macht aus einem saubereren Morgen-Fenster **keinen not_safe-Tag** — er ist nur eine Anmerkung in `caution_notes`.
+- Ein Richtungsdreher im Tagesverlauf (auch >90°) macht aus einem saubereren Morgen-Fenster **keinen not_safe-Tag** — er ist nur eine beschreibende Anmerkung in `wind_summary` (nicht in `caution_notes`, da keine Sicherheits-Warnung).
 - `[WIND-STRONG]` bleibt UNFLIEGBAR (zu starker Wind trifft Pilot auch in der Luft).
 
 ═══════════════════════════════════════════════

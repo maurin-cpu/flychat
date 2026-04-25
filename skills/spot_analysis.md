@@ -115,7 +115,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
     "KURZE, strukturierte Eintraege — EIN Eintrag pro Gefahrenkategorie. Format: 'Kategorie: Wert, Zeitfenster'. KEINE Tags. Beispiele: 'Regen: 2.1mm/h, 14:00-18:00', 'Boeen: 46 km/h am Boden, 13:00-16:00', 'Hoehenwind: 42-48 km/h auf 2500m, 10:00-14:00', 'Foehn: Sued, Delta-P 7.2 hPa ab 11:00', 'Ueberentwicklungsgefahr: CAPE 1800 J/kg, 15:00-18:00' (bei CAPE-DANGER), 'Gewitter: Modell explizit, 15:00-18:00' (nur bei THUNDERSTORM). CAPE-WARN gehoert NICHT hier rein (→ caution_notes). Leer [] wenn keine."
   ],
   "caution_notes": [
-    "KURZE Warnhinweise. Format: 'Kategorie: Kerninfo, Zeitbezug'. Beispiele: 'Hoehenboeen: steigend 28→38 km/h, 11:00-16:00', 'Winddrehung: SW→W ab 15:00, Spot-Sektor endet', 'Ueberentwicklung moeglich: CAPE 1100 J/kg, 13:00-16:00 — Himmel beobachten'. Leer [] wenn keine."
+    "KURZE Warnhinweise. Format: 'Kategorie: Kerninfo, Zeitbezug'. Beispiele: 'Hoehenboeen: steigend 28→38 km/h, 11:00-16:00', 'Ueberentwicklung moeglich: CAPE 1100 J/kg, 13:00-16:00 — Himmel beobachten'. Leer [] wenn keine. WICHTIG: Reine Winddrehungen/Richtungsdreher gehoeren NICHT hierher — die kommen ins `wind_summary` als beschreibende Tagesverlauf-Info."
   ],
   "primary_no_go": "NUR bei not_safe. EINER der Keys (Ranking absteigend): FOEHN, GEWITTER, UEBERENTWICKLUNG, STURM, ALOFT_DANGER, STRONG_WIND, REGEN, SCHNEE, OVERCAST, SICHT, VEREISUNG, EINGEKESSELT. GEWITTER nur bei THUNDERSTORM, UEBERENTWICKLUNG bei CAPE-DANGER.",
   "primary_caution": "NUR bei conditional. EINER der Keys: STARKER_WIND, WINDRICHTUNG, TURBULENZ, SHEAR_WIND, GUST_SPREAD, KURZES_FENSTER, TREND_SCHLECHTER.",

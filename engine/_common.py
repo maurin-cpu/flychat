@@ -758,65 +758,48 @@ def _format_gust_trend_text(gust_pattern: dict, gust_hours: list) -> str:
     if gc >= max(1, int(0.75 * tc)) or calm_gap < 2:
         if danger_majority:
             return (
-                f"BOEEN-TREND: DURCHGEHEND (DANGER-Mehrheit) — Boeige Stunden in {gc} von {tc}h, "
-                f"davon {dc}h mit Boeen >40 km/h (Boden oder Flugraum), "
-                f"laengstes ruhiges Fenster nur {calm_gap}h. "
-                f"Kein verlaesslich ruhiges Flugfenster. "
-                f"→ safety_status sollte not_safe sein."
+                f"BOEEN-TREND: DURCHGEHEND_DANGER — Boeige Stunden in {gc} von {tc}h, "
+                f"davon {dc}h DANGER-Level (Boden oder Flugraum). "
+                f"Laengstes ruhiges Fenster {calm_gap}h."
             )
         return (
-            f"BOEEN-TREND: DURCHGEHEND (WARN-Level) — Boeige Stunden in {gc} von {tc}h, "
-            f"laengstes ruhiges Fenster {calm_gap}h. "
-            f"Boeen durchwegs 30-40 km/h (sportlich, aber fliegbar). "
-            f"→ maximal conditional, nicht not_safe. Sportliche Bedingungen in caution_notes erwaehnen."
+            f"BOEEN-TREND: DURCHGEHEND_WARN — Boeige Stunden in {gc} von {tc}h auf WARN-Level, "
+            f"laengstes ruhiges Fenster {calm_gap}h."
         )
 
     if is_sand and calm_gap < 4:
         if danger_majority:
             return (
-                f"BOEEN-TREND: EINGEKESSELT (DANGER) — Ruhiges Fenster nur {calm_gap}h "
+                f"BOEEN-TREND: EINGEKESSELT (mit DANGER) — Ruhiges Fenster {calm_gap}h "
                 f"({calm_start}-{calm_end}) zwischen boeigen Phasen "
-                f"({gc}h boeig, davon {dc}h >40 km/h). "
-                f"Pilot startet in eskalierende Bedingungen — Boeen kommen zurueck! "
-                f"→ safety_status sollte not_safe sein. primary_no_go = EINGEKESSELT-BOEEN"
+                f"({gc}h boeig, davon {dc}h DANGER-Level)."
             )
         return (
             f"BOEEN-TREND: EINGEKESSELT (WARN-Level) — Ruhiges Fenster {calm_gap}h "
-            f"({calm_start}-{calm_end}) zwischen boeigen Phasen "
-            f"({gc}h boeig, 30-40 km/h). "
-            f"Boeen kommen zurueck — Pilot muss vor Ende landen, sportlich. "
-            f"→ maximal conditional. Zeitfenster in caution_notes konkret begruenden."
+            f"({calm_start}-{calm_end}) zwischen boeigen Phasen ({gc}h auf WARN-Level)."
         )
 
     if is_sand:
         return (
-            f"BOEEN-TREND: EINGEKESSELT (knapp) — Ruhiges Fenster {calm_gap}h "
-            f"({calm_start}-{calm_end}) zwischen boeigen Phasen "
-            f"({gc}h boeig insgesamt). Boeen kommen zurueck — Pilot muss vor Ende landen. "
-            f"→ Maximal conditional. In caution_notes konkret begruenden!"
+            f"BOEEN-TREND: EINGEKESSELT_KNAPP — Ruhiges Fenster {calm_gap}h "
+            f"({calm_start}-{calm_end}) zwischen boeigen Phasen ({gc}h insgesamt)."
         )
 
     if gusts_before and not gusts_after:
         return (
             f"BOEEN-TREND: AUFKLAERUNG — Boeig frueh ({gc}h, bis {calm_start}), "
-            f"danach ruhig ({calm_gap}h ab {calm_start}). "
-            f"Boeen ziehen ab, danach stabil ruhig — keine Rueckkehr. "
-            f"→ Ruhige Stunden normal bewerten, safe_window dort setzen. "
-            f"safety_status kann safe oder conditional sein, je nach Wind-Sektor und Restrisiko."
+            f"danach ruhig ({calm_gap}h ab {calm_start})."
         )
 
     if gusts_after and not gusts_before:
         return (
             f"BOEEN-TREND: ZUNEHMEND — Ruhig morgens ({calm_gap}h, bis {calm_end}), "
-            f"danach {gc}h boeig. Pilot muss vor Eskalation landen. "
-            f"→ Maximal conditional. safe_window auf Morgens setzen, "
-            f"in caution_notes auf Verschlechterung hinweisen."
+            f"danach {gc}h boeig."
         )
 
     return (
         f"BOEEN-TREND: VEREINZELT — {gc}h boeige Phasen verteilt, "
-        f"laengstes ruhiges Fenster {calm_gap}h ({calm_start}-{calm_end}). "
-        f"→ Pruefe ob ruhiges Fenster fuer Pilot-Niveau und Sektor reicht."
+        f"laengstes ruhiges Fenster {calm_gap}h ({calm_start}-{calm_end})."
     )
 
 
@@ -947,60 +930,44 @@ def _format_aloft_trend_text(aloft_pattern: dict, aloft_hours: list,
 
     if label == "DURCHGEHEND_DANGER":
         return (
-            f"HOEHENWIND-TREND: DURCHGEHEND (DANGER-Mehrheit) — Hoehenwind in {ac} von {tc}h, "
-            f"davon {dc}h > {danger_kmh:.0f} km/h in der Flugschicht. "
-            f"Laengstes ruhiges Fenster nur {calm_gap}h. "
-            f"Kein verlaesslich ruhiges Flugfenster. "
-            f"→ safety_status sollte not_safe sein. primary_no_go = ALOFT_DANGER"
+            f"HOEHENWIND-TREND: DURCHGEHEND_DANGER — Hoehenwind in {ac} von {tc}h, "
+            f"davon {dc}h DANGER-Level. Laengstes ruhiges Fenster {calm_gap}h."
         )
     if label == "DURCHGEHEND_WARN":
         return (
-            f"HOEHENWIND-TREND: DURCHGEHEND (WARN-Level) — Hoehenwind in {ac} von {tc}h "
-            f"bei {warn_kmh:.0f}-{danger_kmh:.0f} km/h, laengstes ruhiges Fenster {calm_gap}h. "
-            f"→ maximal conditional, nicht not_safe. Sportlich in caution_notes erwaehnen."
+            f"HOEHENWIND-TREND: DURCHGEHEND_WARN — Hoehenwind in {ac} von {tc}h auf WARN-Level, "
+            f"laengstes ruhiges Fenster {calm_gap}h."
         )
     if label == "EINGEKESSELT":
         if dc >= max(1, int(0.3 * ac)):
             return (
-                f"HOEHENWIND-TREND: EINGEKESSELT (DANGER) — Ruhiges Fenster nur {calm_gap}h "
+                f"HOEHENWIND-TREND: EINGEKESSELT (mit DANGER) — Ruhiges Fenster {calm_gap}h "
                 f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen "
-                f"({ac}h Hoehenwind, davon {dc}h > {danger_kmh:.0f} km/h). "
-                f"Pilot startet in eskalierende Bedingungen — Wind kommt zurueck! "
-                f"→ safety_status sollte not_safe sein. primary_no_go = EINGEKESSELT-HOEHENWIND"
+                f"({ac}h Hoehenwind, davon {dc}h DANGER-Level)."
             )
         return (
             f"HOEHENWIND-TREND: EINGEKESSELT (WARN-Level) — Ruhiges Fenster {calm_gap}h "
-            f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen ({ac}h bei {warn_kmh:.0f}-{danger_kmh:.0f} km/h). "
-            f"Wind kommt zurueck — Pilot muss vor Ende landen. "
-            f"→ maximal conditional. Zeitfenster in caution_notes konkret begruenden."
+            f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen ({ac}h auf WARN-Level)."
         )
     if label == "EINGEKESSELT_KNAPP":
         return (
-            f"HOEHENWIND-TREND: EINGEKESSELT (knapp) — Ruhiges Fenster {calm_gap}h "
-            f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen ({ac}h insgesamt). "
-            f"Wind kommt zurueck — Pilot muss vor Ende landen. "
-            f"→ Maximal conditional. In caution_notes konkret begruenden."
+            f"HOEHENWIND-TREND: EINGEKESSELT_KNAPP — Ruhiges Fenster {calm_gap}h "
+            f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen ({ac}h insgesamt)."
         )
     if label == "AUFKLAERUNG":
         return (
             f"HOEHENWIND-TREND: AUFKLAERUNG — Hoehenwind frueh ({ac}h, bis {calm_start}, "
-            f"{dc}h davon > {danger_kmh:.0f} km/h), danach ruhig ({calm_gap}h ab {calm_start}). "
-            f"Wind zieht ab, keine Rueckkehr. "
-            f"→ Ruhige Stunden normal bewerten, safe_window dort setzen. "
-            f"safety_status kann safe oder conditional sein, auch wenn morgens DANGER war."
+            f"davon {dc}h DANGER-Level), danach ruhig ({calm_gap}h ab {calm_start})."
         )
     if label == "ZUNEHMEND":
         return (
             f"HOEHENWIND-TREND: ZUNEHMEND — Ruhig morgens ({calm_gap}h, bis {calm_end}), "
-            f"danach {ac}h Hoehenwind ({dc}h > {danger_kmh:.0f} km/h). Pilot muss vor Eskalation landen. "
-            f"→ Maximal conditional. safe_window auf Morgen setzen, "
-            f"in caution_notes auf Verschlechterung hinweisen."
+            f"danach {ac}h Hoehenwind, davon {dc}h DANGER-Level."
         )
     return (
         f"HOEHENWIND-TREND: VEREINZELT — {ac}h Hoehenwind-Phasen verteilt "
-        f"(davon {dc}h > {danger_kmh:.0f} km/h), laengstes ruhiges Fenster {calm_gap}h "
-        f"({calm_start}-{calm_end}). "
-        f"→ Pruefe ob ruhiges Fenster fuer Flugplan reicht; maximal conditional bei DANGER-Stunden."
+        f"(davon {dc}h DANGER-Level), laengstes ruhiges Fenster {calm_gap}h "
+        f"({calm_start}-{calm_end})."
     )
 
 
