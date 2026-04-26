@@ -1763,6 +1763,10 @@ class AnalyzersMixin:
             )}}
             return
 
+        # Cache leeren — Pre-Filter braucht aktuelle Werte aus _build_single_spot_context
+        self._ctx_gust_cache.clear()
+        self._ctx_tq_cache.clear()
+
         from source_area import find_region_for_point as _find_region
 
         all_regions = get_all_regions()
@@ -1882,6 +1886,7 @@ class AnalyzersMixin:
 
         spot_requests: list = []
         spot_meta: dict = {}
+        prefilter_count = 0
 
         for spot in spots_to_analyze:
             name = spot["name"]
@@ -1899,7 +1904,21 @@ class AnalyzersMixin:
                     region_analysis_result=region_result,
                 )
                 if not ctx:
+                    spot_results.setdefault(name, {})[date_str] = {
+                        "spot": name, "date": date_str,
+                        "safety_status": "no_data", "phase": "combined",
+                        "summary": "Keine Wetterdaten fuer diesen Tag",
+                    }
                     continue
+
+                # Deterministischer Pre-Filter — spart LLM-Calls fuer offensichtliche not_safe.
+                # Identisch zur Logik im Parallel-Modus (_build_and_analyze_spot).
+                prefilter = self._prefilter_not_safe(spot, date_str)
+                if prefilter is not None:
+                    spot_results.setdefault(name, {})[date_str] = prefilter
+                    prefilter_count += 1
+                    continue
+
                 cid = f"spot_combined|{name}|{date_str}"
                 spot_requests.append({
                     "custom_id": cid,
@@ -1918,8 +1937,14 @@ class AnalyzersMixin:
                 })
                 spot_meta[cid] = (name, date_str, spot)
 
-        if not spot_requests and not region_requests:
-            yield {"event": "error", "data": {"message": "Keine Requests aufgebaut"}}
+        if prefilter_count:
+            logger.info(
+                f"[BATCH] Pre-Filter: {prefilter_count} Spots/Tage als not_safe markiert "
+                f"(kein LLM-Call) — {len(spot_requests)} Spots verbleiben fuer Batch-API"
+            )
+
+        if not spot_requests and not region_requests and not spot_results:
+            yield {"event": "error", "data": {"message": "Keine Daten zum Verarbeiten"}}
             return
 
         if spot_requests:
