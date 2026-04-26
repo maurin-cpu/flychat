@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 data/wetterdaten.json
+data/spot_analyses.json
 weather_context_dump.txt
 .venv/
 venv/
