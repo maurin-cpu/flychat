@@ -94,7 +94,7 @@ def _send_briefings_once(engine) -> dict:
 
     mgr = get_manager_from_env()
     if mgr is None:
-        logger.error("Scheduler: SUPABASE_DATABASE_URL nicht gesetzt")
+        logger.error("Scheduler: SubscriberManager konnte nicht initialisiert werden")
         return {"total": 0, "sent": 0, "skipped": 0, "failed": 0}
 
     subscribers = mgr.list_active()
@@ -150,7 +150,7 @@ def _send_accuracy_once() -> dict:
 
     mgr = get_manager_from_env()
     if mgr is None:
-        logger.error("Accuracy-Scheduler: SUPABASE_DATABASE_URL nicht gesetzt")
+        logger.error("Accuracy-Scheduler: SubscriberManager konnte nicht initialisiert werden")
         return {"total": 0, "sent": 0, "skipped": 0, "failed": 0}
 
     subs = mgr.list_active()

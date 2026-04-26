@@ -5,7 +5,7 @@ Die Texte liegen unter skills/*.md (ein Skill = eine Markdown-Datei).
 
 Skill-Texte enthalten Platzhalter der Form `{{cfg.KEY}}`, die beim Zugriff durch
 den aktuellen Wert aus `config.X` ersetzt werden. Beispiel:
-    "Wind > {{cfg.ALOFT_DANGER_KMH}} km/h"  -->  "Wind > 30 km/h"
+    "Wind > {{cfg.WIND_DANGER_KMH}} km/h"  -->  "Wind > 30 km/h"
 
 Da die Prompts lazy via Modul-level `__getattr__` aufgelöst werden, greifen
 Config-Änderungen (z.B. via Admin-UI) **sofort** beim nächsten Prompt-Zugriff —

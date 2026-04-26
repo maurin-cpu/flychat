@@ -117,7 +117,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "caution_notes": [
     "KURZE Warnhinweise. Format: 'Kategorie: Kerninfo, Zeitbezug'. Beispiele: 'Hoehenboeen: steigend 28→38 km/h, 11:00-16:00', 'Ueberentwicklung moeglich: CAPE 1100 J/kg, 13:00-16:00 — Himmel beobachten'. Leer [] wenn keine. WICHTIG: Reine Winddrehungen/Richtungsdreher gehoeren NICHT hierher — die kommen ins `wind_summary` als beschreibende Tagesverlauf-Info."
   ],
-  "primary_no_go": "NUR bei not_safe. EINER der Keys (Ranking absteigend): FOEHN, GEWITTER, UEBERENTWICKLUNG, STURM, ALOFT_DANGER, STRONG_WIND, REGEN, SCHNEE, OVERCAST, SICHT, VEREISUNG, EINGEKESSELT. GEWITTER nur bei THUNDERSTORM, UEBERENTWICKLUNG bei CAPE-DANGER.",
+  "primary_no_go": "NUR bei not_safe. EINER der Keys (Ranking absteigend): FOEHN, GEWITTER, UEBERENTWICKLUNG, STURM, WIND_DANGER, STARKE_BOEEN, REGEN, SCHNEE, OVERCAST, SICHT, VEREISUNG, EINGEKESSELT, EINGEKESSELT-WIND. GEWITTER nur bei THUNDERSTORM, UEBERENTWICKLUNG bei CAPE-DANGER, WIND_DANGER bei WIND-TREND DURCHGEHEND_DANGER, STARKE_BOEEN bei GUST-TREND DURCHGEHEND_DANGER.",
   "primary_caution": "NUR bei conditional. EINER der Keys: STARKER_WIND, WINDRICHTUNG, TURBULENZ, SHEAR_WIND, GUST_SPREAD, KURZES_FENSTER, TREND_SCHLECHTER.",
   "primary_reducer": "Optional (auch bei safe/conditional): Was drueckt die Fliegbarkeit? EINER der Keys oder null: VIEL_BEWOELKUNG, SCHWACHE_THERMIK, TIEFE_BASIS, KURZES_FLUGFENSTER, KALT, FEUCHT, INVERSION.",
   "primary_booster": "Optional: Was hebt die Fliegbarkeit besonders? EINER der Keys oder null: XC_BEDINGUNGEN, STARKE_THERMIK, HOHE_BASIS, GUTE_EINSTRAHLUNG, RUECKENWIND_XC, STABILE_KALTFRONT, LANGES_FENSTER, KONVERGENZ.",

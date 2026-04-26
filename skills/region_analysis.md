@@ -19,11 +19,11 @@ Produziere **eine JSON-Antwort** mit Status, safe_window, no_go_reasons, caution
 REGION-SPEZIFIK: WIND-TAGS MAGNITUDE-BASIERT
 ═══════════════════════════════════════════════
 
-Regionen haben KEINEN erlaubten Sektor (nicht wie Spots) und **KEINE Boeen** (Apr 2026 Refactor). Windwerte werden auf die **Referenzhoehe** der Region interpoliert und in drei Magnitude-Klassen eingeteilt — nur basierend auf Windgeschwindigkeit:
+Regionen haben KEINEN erlaubten Sektor (nicht wie Spots) und **KEINE Boeen** (Apr 2026 Refactor). Windwerte werden auf die **Referenzhoehe** der Region interpoliert und nach gleichen Schwellen wie Spots klassifiziert — nur basierend auf Windgeschwindigkeit:
 
-- `[WIND-CALM]` — Wind < {{cfg.WIND_MODERATE_KMH}} km/h → RUHIG (gute Bedingungen).
-- `[WIND-MODERATE]` — Wind {{cfg.WIND_MODERATE_KMH}}-{{cfg.WIND_STRONG_KMH}} km/h → SPORTLICH (= WARN-Level fuer Regionen, fliegbar fuer erfahrene Piloten).
-- `[WIND-STRONG]` — Wind > {{cfg.WIND_STRONG_KMH}} km/h → UNFLIEGBAR (= DANGER-Level fuer Regionen).
+- Kein Tag — Wind < {{cfg.WIND_WARN_KMH}} km/h → RUHIG (gute Bedingungen).
+- `[WIND-WARN]` — Wind {{cfg.WIND_WARN_KMH}}-{{cfg.WIND_DANGER_KMH}} km/h → SPORTLICH.
+- `[WIND-DANGER]` — Wind > {{cfg.WIND_DANGER_KMH}} km/h → UNFLIEGBAR.
 
 **Stunden-Klassifikation siehe KERNREGEL** in `_hazard_blocks.md`. Saubere Stunden (RUHIG + SPORTLICH) gehoeren ins `safe_window`. SPORTLICHE Stunden in `caution_notes` mit Uhrzeit markieren.
 
@@ -36,7 +36,7 @@ Regionen haben KEINEN erlaubten Sektor (nicht wie Spots) und **KEINE Boeen** (Ap
 
 Wenn du Boeen erwaehnen willst: Schreibe darueber nur, wenn der Nutzer explizit nach einem Spot fragt.
 
-**Saubere Stunde (Region)** = `[WIND-CALM]` oder `[WIND-MODERATE]` OHNE harte No-Go-Tags.
+**Saubere Stunde (Region)** = kein Tag oder `[WIND-WARN]` OHNE harte No-Go-Tags.
 
 ═══════════════════════════════════════════════
 REGION-SPEZIFIK: FOEHN-RICHTUNGS-CHECK
@@ -77,7 +77,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
   "safe_window": "z.B. '10:00-11:00, 14:00-16:00' oder '11:00-15:00' oder 'keins'",
   "no_go_reasons": ["KURZE Eintraege. Format: 'Kategorie: Wert, Zeitfenster'. Keine Tags. Leer [] wenn keine."],
   "caution_notes": ["KURZE Warnhinweise. Format: 'Kategorie: Kerninfo, Zeitbezug'. Leer [] wenn keine."],
-  "primary_no_go": "NUR bei not_safe. EINER der Keys (Ranking absteigend): FOEHN, GEWITTER, UEBERENTWICKLUNG, STURM, ALOFT_DANGER, STRONG_WIND, REGEN, SCHNEE, OVERCAST, SICHT, VEREISUNG, EINGEKESSELT.",
+  "primary_no_go": "NUR bei not_safe. EINER der Keys (Ranking absteigend): FOEHN, GEWITTER, UEBERENTWICKLUNG, STURM, WIND_DANGER, STARKE_BOEEN, REGEN, SCHNEE, OVERCAST, SICHT, VEREISUNG, EINGEKESSELT, EINGEKESSELT-WIND.",
   "primary_caution": "NUR bei conditional. EINER der Keys: STARKER_WIND, WINDRICHTUNG, TURBULENZ, SHEAR_WIND, KURZES_FENSTER, TREND_SCHLECHTER.",
   "primary_reducer": "Optional: EINER der Keys oder null: VIEL_BEWOELKUNG, SCHWACHE_THERMIK, TIEFE_BASIS, KURZES_FLUGFENSTER, KALT, FEUCHT, INVERSION.",
   "primary_booster": "Optional: EINER der Keys oder null: XC_BEDINGUNGEN, STARKE_THERMIK, HOHE_BASIS, GUTE_EINSTRAHLUNG, RUECKENWIND_XC, STABILE_KALTFRONT, LANGES_FENSTER, KONVERGENZ.",

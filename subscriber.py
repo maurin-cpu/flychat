@@ -1,30 +1,30 @@
 """
-Subscriber-Management fuer das E-Mail-Briefing (Stufe 1).
+Subscriber-Management fuer das E-Mail-Briefing.
 
-Spiegelt das Design von supabase_client.py:
-  - Nutzt denselben Postgres-Pool via SUPABASE_DATABASE_URL
-  - Soft-Fail: Fehler werden geloggt, None/leeres Dict zurueckgegeben
-  - Keine Session/Auth — alle User-Aktionen passwordless via Tokens
+Persistenz: SQLite (data/subscribers.db) — gleiches Muster wie station_observations.py.
+Soft-Fail: Fehler werden geloggt, None/leeres Dict zurueckgegeben.
+Keine Session/Auth — alle User-Aktionen passwordless via Tokens.
 
-Schema: migrations/002_subscribers.sql
+Schema-Unterschiede vs. ursprünglicher Postgres-Variante:
+  - regions ist JSON-String statt TEXT[] (SQLite kennt keine Arrays)
+  - Timestamps als ISO-Text (CURRENT_TIMESTAMP), kein TIMESTAMPTZ
+  - Auto-resume verwendet datetime('now') statt CURRENT_DATE
+  - Datums-Arithmetik fuer Feedback: datetime('now', '-N days')
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import secrets
+import sqlite3
+import threading
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
-
-try:
-    import psycopg
-    from psycopg_pool import ConnectionPool
-    _PSYCOPG_AVAILABLE = True
-except ImportError:
-    _PSYCOPG_AVAILABLE = False
 
 
 # Simple RFC-5322-kompatible E-Mail-Validierung (bewusst pragmatisch, nicht vollstaendig).
@@ -42,36 +42,130 @@ def generate_token(nbytes: int = 24) -> str:
     return secrets.token_urlsafe(nbytes)
 
 
+# Schreib-Lock: SQLite serialisiert Writes ohnehin, aber expliziter Lock vermeidet
+# busy-waits und macht das Verhalten unter Threads deterministisch.
+_WRITE_LOCK = threading.Lock()
+
+
 class SubscriberManager:
-    """CRUD fuer subscribers + subscriber_feedback."""
+    """CRUD fuer subscribers + subscriber_feedback (SQLite)."""
 
-    def __init__(self, database_url: str, min_size: int = 1, max_size: int = 3):
-        if not _PSYCOPG_AVAILABLE:
-            raise RuntimeError(
-                "psycopg nicht installiert. Siehe requirements.txt "
-                "(psycopg[binary,pool]>=3.1.0)."
-            )
-        self.database_url = database_url
-        self._pool: Optional[ConnectionPool] = None
-        self._pool_args = dict(min_size=min_size, max_size=max_size)
+    def __init__(self, db_path):
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
 
-    def _get_pool(self) -> "ConnectionPool":
-        if self._pool is None:
-            self._pool = ConnectionPool(
-                self.database_url,
-                min_size=self._pool_args["min_size"],
-                max_size=self._pool_args["max_size"],
-                kwargs={"autocommit": False, "prepare_threshold": None},
-                open=True,
-            )
-        return self._pool
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(str(self.db_path), timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        return conn
 
     @contextmanager
-    def _cursor(self):
-        pool = self._get_pool()
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
-                yield conn, cur
+    def _cursor(self, write: bool = False):
+        """Yields cursor. Commits am Ende, rollback bei Exception.
+        write=True nimmt den globalen Schreib-Lock."""
+        if write:
+            _WRITE_LOCK.acquire()
+        conn = self._connect()
+        try:
+            cur = conn.cursor()
+            yield cur
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+            if write:
+                _WRITE_LOCK.release()
+
+    def _init_db(self):
+        conn = self._connect()
+        try:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS subscribers (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email           TEXT UNIQUE NOT NULL,
+                    -- regions als JSON-Array (SQLite hat keine native Array-Spalte)
+                    regions         TEXT NOT NULL DEFAULT '[]',
+                    skill_level     TEXT NOT NULL DEFAULT 'standard'
+                                    CHECK (skill_level IN ('beginner', 'standard', 'expert')),
+                    status          TEXT NOT NULL DEFAULT 'pending'
+                                    CHECK (status IN ('pending', 'active', 'paused', 'unsubscribed')),
+                    paused_until    TEXT,                                       -- ISO-Date 'YYYY-MM-DD' oder NULL
+                    confirm_token   TEXT UNIQUE,
+                    action_token    TEXT UNIQUE NOT NULL,
+                    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                    confirmed_at    TEXT,
+                    last_sent_at    TEXT,
+                    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_subscribers_status_active
+                    ON subscribers (status) WHERE status = 'active';
+                CREATE INDEX IF NOT EXISTS idx_subscribers_confirm_token
+                    ON subscribers (confirm_token) WHERE confirm_token IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_subscribers_action_token
+                    ON subscribers (action_token);
+
+                CREATE TABLE IF NOT EXISTS subscriber_feedback (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    subscriber_id   INTEGER NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
+                    briefing_date   TEXT NOT NULL,                              -- 'YYYY-MM-DD'
+                    verdict         TEXT NOT NULL CHECK (verdict IN ('correct', 'wrong')),
+                    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_subscriber_feedback_subscriber
+                    ON subscriber_feedback (subscriber_id);
+                CREATE INDEX IF NOT EXISTS idx_subscriber_feedback_date
+                    ON subscriber_feedback (briefing_date);
+
+                -- updated_at automatisch pflegen
+                CREATE TRIGGER IF NOT EXISTS trg_subscribers_updated
+                    AFTER UPDATE ON subscribers FOR EACH ROW
+                BEGIN
+                    UPDATE subscribers SET updated_at = datetime('now') WHERE id = OLD.id;
+                END;
+            """)
+            conn.commit()
+        finally:
+            conn.close()
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _regions_to_db(regions) -> str:
+        return json.dumps(list(regions or []), ensure_ascii=False)
+
+    @staticmethod
+    def _regions_from_db(text) -> list:
+        if not text:
+            return []
+        try:
+            val = json.loads(text)
+            return list(val) if isinstance(val, list) else []
+        except (ValueError, TypeError):
+            return []
+
+    @staticmethod
+    def _date_to_db(d) -> Optional[str]:
+        """Akzeptiert datetime.date / ISO-String 'YYYY-MM-DD' / None."""
+        if d is None:
+            return None
+        if hasattr(d, "isoformat"):
+            return d.isoformat()
+        return str(d)
+
+    def _row_to_subscriber(self, row, keys: tuple) -> Optional[dict]:
+        if row is None:
+            return None
+        out = dict(zip(keys, row))
+        if "regions" in out:
+            out["regions"] = self._regions_from_db(out["regions"])
+        return out
 
     # ------------------------------------------------------------------
     # CREATE / CONFIRM
@@ -79,15 +173,13 @@ class SubscriberManager:
     def create(
         self,
         email: str,
-        regions: list[str],
+        regions: list,
         skill_level: str = "standard",
     ) -> Optional[dict]:
         """
         Legt einen pending-Subscriber an. Wenn E-Mail schon existiert:
           - Status 'unsubscribed' -> resubscribe (neues confirm_token, status='pending')
           - Sonst -> None zurueckgeben (Aufrufer zeigt "bereits registriert")
-
-        Returns dict mit id, email, confirm_token, action_token oder None.
         """
         email_norm = (email or "").strip().lower()
         if not is_valid_email(email_norm):
@@ -101,12 +193,12 @@ class SubscriberManager:
 
         confirm_token = generate_token()
         action_token = generate_token()
+        regions_json = self._regions_to_db(regions)
 
         try:
-            with self._cursor() as (conn, cur):
-                # Resubscribe-Case: wenn schon 'unsubscribed' existiert, ueberschreiben.
+            with self._cursor(write=True) as cur:
                 cur.execute(
-                    "SELECT id, status FROM subscribers WHERE email = %s",
+                    "SELECT id, status FROM subscribers WHERE email = ?",
                     (email_norm,),
                 )
                 existing = cur.fetchone()
@@ -117,37 +209,37 @@ class SubscriberManager:
                         cur.execute(
                             """
                             UPDATE subscribers
-                               SET regions = %s,
-                                   skill_level = %s,
+                               SET regions = ?,
+                                   skill_level = ?,
                                    status = 'pending',
-                                   confirm_token = %s,
-                                   action_token = %s,
+                                   confirm_token = ?,
+                                   action_token = ?,
                                    paused_until = NULL,
                                    confirmed_at = NULL
-                             WHERE id = %s
+                             WHERE id = ?
                          RETURNING id, email, confirm_token, action_token
                             """,
-                            (regions, skill_level, confirm_token, action_token, sub_id),
+                            (regions_json, skill_level, confirm_token, action_token, sub_id),
                         )
                         row = cur.fetchone()
-                        conn.commit()
-                        return _row_to_dict(row, ("id", "email", "confirm_token", "action_token"))
-                    else:
-                        # pending/active/paused -> keine neue Registrierung zulassen
-                        return None
+                        return self._row_to_subscriber(
+                            row, ("id", "email", "confirm_token", "action_token")
+                        )
+                    return None
 
                 cur.execute(
                     """
                     INSERT INTO subscribers
                         (email, regions, skill_level, confirm_token, action_token)
-                    VALUES (%s, %s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?, ?)
                     RETURNING id, email, confirm_token, action_token
                     """,
-                    (email_norm, regions, skill_level, confirm_token, action_token),
+                    (email_norm, regions_json, skill_level, confirm_token, action_token),
                 )
                 row = cur.fetchone()
-                conn.commit()
-                return _row_to_dict(row, ("id", "email", "confirm_token", "action_token"))
+                return self._row_to_subscriber(
+                    row, ("id", "email", "confirm_token", "action_token")
+                )
         except Exception as e:
             logger.error("create(%s) failed: %s", email_norm, e)
             return None
@@ -156,19 +248,17 @@ class SubscriberManager:
         if not token:
             return None
         try:
-            with self._cursor() as (_, cur):
+            with self._cursor() as cur:
                 cur.execute(
                     """
                     SELECT id, email, regions, skill_level, status, action_token
                       FROM subscribers
-                     WHERE confirm_token = %s
+                     WHERE confirm_token = ?
                     """,
                     (token,),
                 )
                 row = cur.fetchone()
-                if not row:
-                    return None
-                return _row_to_dict(
+                return self._row_to_subscriber(
                     row,
                     ("id", "email", "regions", "skill_level", "status", "action_token"),
                 )
@@ -181,23 +271,20 @@ class SubscriberManager:
         if not token:
             return None
         try:
-            with self._cursor() as (conn, cur):
+            with self._cursor(write=True) as cur:
                 cur.execute(
                     """
                     UPDATE subscribers
                        SET status = 'active',
-                           confirmed_at = COALESCE(confirmed_at, NOW()),
+                           confirmed_at = COALESCE(confirmed_at, datetime('now')),
                            confirm_token = NULL
-                     WHERE confirm_token = %s
+                     WHERE confirm_token = ?
                 RETURNING id, email, regions, skill_level, action_token
                     """,
                     (token,),
                 )
                 row = cur.fetchone()
-                conn.commit()
-                if not row:
-                    return None
-                return _row_to_dict(
+                return self._row_to_subscriber(
                     row, ("id", "email", "regions", "skill_level", "action_token")
                 )
         except Exception as e:
@@ -205,25 +292,23 @@ class SubscriberManager:
             return None
 
     # ------------------------------------------------------------------
-    # ACTION TOKEN (persistent, pro Subscriber einer)
+    # ACTION TOKEN
     # ------------------------------------------------------------------
     def get_by_action_token(self, token: str) -> Optional[dict]:
         if not token:
             return None
         try:
-            with self._cursor() as (_, cur):
+            with self._cursor() as cur:
                 cur.execute(
                     """
                     SELECT id, email, regions, skill_level, status, paused_until
                       FROM subscribers
-                     WHERE action_token = %s
+                     WHERE action_token = ?
                     """,
                     (token,),
                 )
                 row = cur.fetchone()
-                if not row:
-                    return None
-                return _row_to_dict(
+                return self._row_to_subscriber(
                     row,
                     ("id", "email", "regions", "skill_level", "status", "paused_until"),
                 )
@@ -235,38 +320,34 @@ class SubscriberManager:
         if not token:
             return False
         try:
-            with self._cursor() as (conn, cur):
+            with self._cursor(write=True) as cur:
                 cur.execute(
-                    "UPDATE subscribers SET status = 'unsubscribed' "
-                    "WHERE action_token = %s",
+                    "UPDATE subscribers SET status = 'unsubscribed' WHERE action_token = ?",
                     (token,),
                 )
-                affected = cur.rowcount
-                conn.commit()
-                return affected > 0
+                return cur.rowcount > 0
         except Exception as e:
             logger.error("unsubscribe failed: %s", e)
             return False
 
     def pause(self, token: str, until_date) -> bool:
         """until_date = datetime.date oder ISO-String 'YYYY-MM-DD'."""
-        if not token or not until_date:
+        until_str = self._date_to_db(until_date)
+        if not token or not until_str:
             return False
         try:
-            with self._cursor() as (conn, cur):
+            with self._cursor(write=True) as cur:
                 cur.execute(
                     """
                     UPDATE subscribers
                        SET status = 'paused',
-                           paused_until = %s
-                     WHERE action_token = %s
+                           paused_until = ?
+                     WHERE action_token = ?
                        AND status IN ('active', 'paused')
                     """,
-                    (until_date, token),
+                    (until_str, token),
                 )
-                affected = cur.rowcount
-                conn.commit()
-                return affected > 0
+                return cur.rowcount > 0
         except Exception as e:
             logger.error("pause failed: %s", e)
             return False
@@ -275,20 +356,18 @@ class SubscriberManager:
         if not token:
             return False
         try:
-            with self._cursor() as (conn, cur):
+            with self._cursor(write=True) as cur:
                 cur.execute(
                     """
                     UPDATE subscribers
                        SET status = 'active',
                            paused_until = NULL
-                     WHERE action_token = %s
+                     WHERE action_token = ?
                        AND status = 'paused'
                     """,
                     (token,),
                 )
-                affected = cur.rowcount
-                conn.commit()
-                return affected > 0
+                return cur.rowcount > 0
         except Exception as e:
             logger.error("resume failed: %s", e)
             return False
@@ -296,20 +375,17 @@ class SubscriberManager:
     # ------------------------------------------------------------------
     # LIST / FEEDBACK
     # ------------------------------------------------------------------
-    def list_active(self) -> list[dict]:
-        """Alle aktiven Subscriber (fuer Versand-Loop).
-        'paused' wird automatisch wieder active wenn paused_until <= heute.
-        """
+    def list_active(self) -> list:
+        """Alle aktiven Subscriber. 'paused' -> 'active' wenn paused_until <= heute."""
         try:
-            with self._cursor() as (conn, cur):
-                # Auto-resume: paused -> active wenn Datum erreicht
+            with self._cursor(write=True) as cur:
                 cur.execute(
                     """
                     UPDATE subscribers
                        SET status = 'active', paused_until = NULL
                      WHERE status = 'paused'
                        AND paused_until IS NOT NULL
-                       AND paused_until <= CURRENT_DATE
+                       AND paused_until <= date('now')
                     """
                 )
                 cur.execute(
@@ -321,11 +397,8 @@ class SubscriberManager:
                     """
                 )
                 rows = cur.fetchall()
-                conn.commit()
-                return [
-                    _row_to_dict(r, ("id", "email", "regions", "skill_level", "action_token"))
-                    for r in rows
-                ]
+                keys = ("id", "email", "regions", "skill_level", "action_token")
+                return [self._row_to_subscriber(r, keys) for r in rows]
         except Exception as e:
             logger.error("list_active failed: %s", e)
             return []
@@ -333,40 +406,37 @@ class SubscriberManager:
     def record_feedback(self, subscriber_id: int, briefing_date, verdict: str) -> bool:
         if verdict not in ("correct", "wrong"):
             return False
+        date_str = self._date_to_db(briefing_date)
         try:
-            with self._cursor() as (conn, cur):
+            with self._cursor(write=True) as cur:
                 cur.execute(
                     """
                     INSERT INTO subscriber_feedback
                         (subscriber_id, briefing_date, verdict)
-                    VALUES (%s, %s, %s)
+                    VALUES (?, ?, ?)
                     """,
-                    (subscriber_id, briefing_date, verdict),
+                    (subscriber_id, date_str, verdict),
                 )
-                conn.commit()
                 return True
         except Exception as e:
             logger.error("record_feedback failed: %s", e)
             return False
 
     def get_feedback_stats(self, subscriber_id: int, days: int = 30) -> dict:
-        """Zaehlt correct/wrong-Feedbacks der letzten `days` Tage.
-        Returns: {"total": N, "correct": N, "wrong": N, "accuracy_pct": 0-100 | None}
-        """
+        """Zaehlt correct/wrong-Feedbacks der letzten `days` Tage."""
         try:
-            with self._cursor() as (_, cur):
+            with self._cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT verdict, COUNT(*)
                       FROM subscriber_feedback
-                     WHERE subscriber_id = %s
-                       AND created_at >= NOW() - (%s || ' days')::interval
+                     WHERE subscriber_id = ?
+                       AND created_at >= datetime('now', '-{int(days)} days')
                      GROUP BY verdict
                     """,
-                    (subscriber_id, str(days)),
+                    (subscriber_id,),
                 )
-                rows = cur.fetchall()
-                counts = {v: n for v, n in rows}
+                counts = {v: n for v, n in cur.fetchall()}
                 correct = counts.get("correct", 0)
                 wrong = counts.get("wrong", 0)
                 total = correct + wrong
@@ -384,57 +454,49 @@ class SubscriberManager:
     # ADMIN-QUERIES
     # ------------------------------------------------------------------
     def count_by_status(self) -> dict:
-        """Returns {'active': N, 'pending': N, 'paused': N, 'unsubscribed': N}.
-        Fehlende Statuswerte sind 0.
-        """
         base = {"active": 0, "pending": 0, "paused": 0, "unsubscribed": 0}
         try:
-            with self._cursor() as (_, cur):
-                cur.execute(
-                    "SELECT status, COUNT(*) FROM subscribers GROUP BY status"
-                )
+            with self._cursor() as cur:
+                cur.execute("SELECT status, COUNT(*) FROM subscribers GROUP BY status")
                 for status, n in cur.fetchall():
-                    base[status] = n
+                    if status in base:
+                        base[status] = n
                 return base
         except Exception as e:
             logger.error("count_by_status failed: %s", e)
             return base
 
-    def list_recent(self, limit: int = 50) -> list[dict]:
-        """Neueste Subscriber zuerst. Fuer Admin-Tabelle."""
+    def list_recent(self, limit: int = 50) -> list:
+        """Neueste Subscriber zuerst."""
         try:
-            with self._cursor() as (_, cur):
+            with self._cursor() as cur:
                 cur.execute(
                     """
                     SELECT id, email, regions, skill_level, status,
                            paused_until, created_at, confirmed_at, last_sent_at
                       FROM subscribers
                      ORDER BY created_at DESC
-                     LIMIT %s
+                     LIMIT ?
                     """,
-                    (limit,),
+                    (int(limit),),
                 )
                 rows = cur.fetchall()
                 keys = ("id", "email", "regions", "skill_level", "status",
                         "paused_until", "created_at", "confirmed_at", "last_sent_at")
-                return [dict(zip(keys, r)) for r in rows]
+                return [self._row_to_subscriber(r, keys) for r in rows]
         except Exception as e:
             logger.error("list_recent failed: %s", e)
             return []
 
     def count_feedback_overall(self, days: int = 30) -> dict:
-        """Aggregierte Feedback-Zahlen ueber ALLE Subscriber.
-        Returns: {'total': N, 'correct': N, 'wrong': N, 'accuracy_pct': 0-100|None}
-        """
         try:
-            with self._cursor() as (_, cur):
+            with self._cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT verdict, COUNT(*) FROM subscriber_feedback
-                     WHERE created_at >= NOW() - (%s || ' days')::interval
+                     WHERE created_at >= datetime('now', '-{int(days)} days')
                      GROUP BY verdict
-                    """,
-                    (str(days),),
+                    """
                 )
                 counts = {v: n for v, n in cur.fetchall()}
                 correct = counts.get("correct", 0)
@@ -452,18 +514,16 @@ class SubscriberManager:
 
     def get_by_id(self, subscriber_id: int) -> Optional[dict]:
         try:
-            with self._cursor() as (_, cur):
+            with self._cursor() as cur:
                 cur.execute(
                     """
                     SELECT id, email, regions, skill_level, status, action_token
-                      FROM subscribers WHERE id = %s
+                      FROM subscribers WHERE id = ?
                     """,
                     (subscriber_id,),
                 )
                 row = cur.fetchone()
-                if not row:
-                    return None
-                return _row_to_dict(
+                return self._row_to_subscriber(
                     row, ("id", "email", "regions", "skill_level", "status", "action_token")
                 )
         except Exception as e:
@@ -471,16 +531,13 @@ class SubscriberManager:
             return None
 
     def block(self, subscriber_id: int) -> bool:
-        """Admin-Aktion: setzt status='unsubscribed' per ID."""
         try:
-            with self._cursor() as (conn, cur):
+            with self._cursor(write=True) as cur:
                 cur.execute(
-                    "UPDATE subscribers SET status='unsubscribed' WHERE id = %s",
+                    "UPDATE subscribers SET status='unsubscribed' WHERE id = ?",
                     (subscriber_id,),
                 )
-                affected = cur.rowcount
-                conn.commit()
-                return affected > 0
+                return cur.rowcount > 0
         except Exception as e:
             logger.error("block(%s) failed: %s", subscriber_id, e)
             return False
@@ -490,18 +547,16 @@ class SubscriberManager:
         if not email_norm:
             return None
         try:
-            with self._cursor() as (_, cur):
+            with self._cursor() as cur:
                 cur.execute(
                     """
                     SELECT id, email, regions, skill_level, status, action_token
-                      FROM subscribers WHERE email = %s
+                      FROM subscribers WHERE email = ?
                     """,
                     (email_norm,),
                 )
                 row = cur.fetchone()
-                if not row:
-                    return None
-                return _row_to_dict(
+                return self._row_to_subscriber(
                     row, ("id", "email", "regions", "skill_level", "status", "action_token")
                 )
         except Exception as e:
@@ -510,40 +565,26 @@ class SubscriberManager:
 
     def mark_sent(self, subscriber_id: int) -> bool:
         try:
-            with self._cursor() as (conn, cur):
+            with self._cursor(write=True) as cur:
                 cur.execute(
-                    "UPDATE subscribers SET last_sent_at = NOW() WHERE id = %s",
+                    "UPDATE subscribers SET last_sent_at = datetime('now') WHERE id = ?",
                     (subscriber_id,),
                 )
-                conn.commit()
                 return True
         except Exception as e:
             logger.error("mark_sent failed: %s", e)
             return False
 
     def close(self):
-        if self._pool is not None:
-            self._pool.close()
-            self._pool = None
-
-
-# ----------------------------------------------------------------------
-# Helpers
-# ----------------------------------------------------------------------
-def _row_to_dict(row, keys):
-    if row is None:
-        return None
-    return dict(zip(keys, row))
+        """Kompatibilitaet — SQLite-Verbindungen werden pro Operation geoeffnet/geschlossen."""
+        return
 
 
 def get_manager_from_env() -> Optional[SubscriberManager]:
-    """Factory analog supabase_client.get_client_from_env()."""
-    import os
-    url = os.environ.get("SUPABASE_DATABASE_URL", "").strip()
-    if not url:
-        return None
+    """Factory: liefert SubscriberManager mit SQLite-Pfad aus config."""
     try:
-        return SubscriberManager(url)
+        import config
+        return SubscriberManager(config.SUBSCRIBERS_DB_PATH)
     except Exception as e:
         logger.error("SubscriberManager init failed: %s", e)
         return None

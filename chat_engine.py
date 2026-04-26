@@ -108,14 +108,17 @@ from engine.chat_orchestrator import ChatOrchestratorMixin
 
 
 class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
-    def __init__(self, instantdb_client=None):
+    def __init__(self):
         self.spots = load_spots()
         self.weather_data = {}
         self.weather_context_str = ""
         self.weather_loaded_at = None
         self.foehn_data = None
         self.conversations = {}
-        self.instantdb = instantdb_client
+        # InstantDB ist deaktiviert — Stub fuer Backwards-Kompat in engine/analyzers.py
+        # und engine/chat_orchestrator.py, die noch `if self.instantdb:` Branches haben.
+        # Diese werden so zu No-Ops, ohne dass die Module umgebaut werden muessen.
+        self.instantdb = None
         self.spot_analyses = {}
         self.analyses_loaded_at = None
         self._analyses_stale = False  # True nach Wetter-Refresh, bis neue Analysen da sind
@@ -222,93 +225,35 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         except Exception as e:
             logger.error(f"Fehler beim Speichern der History {session_id}: {e}")
 
-    def _get_pg_client(self):
-        """Lazy Postgres-Client Getter (identisch zu fetch_weather._get_pg_client)."""
-        try:
-            from fetch_weather import _get_pg_client
-            return _get_pg_client()
-        except Exception:
-            return None
-
     def _load_analyses_cache(self):
-        """Laedt Spot- und Region-Analysen.
-        Primaer aus Postgres, Fallback auf JSON-Files. Pusht bei Erfolg nach InstantDB.
-        """
-        loaded_any = False
-
-        client = self._get_pg_client()
-        pg_loaded = False
-        if client is not None:
+        """Laedt Spot- und Region-Analysen aus den lokalen JSON-Caches."""
+        if self.analyses_file.exists():
             try:
-                spot_pg = client.get_all_spot_analyses()
-                region_pg = client.get_all_region_analyses()
-                if spot_pg:
-                    self.spot_analyses = spot_pg
-                    self.analyses_loaded_at = datetime.now()
-                    print(f"[ENGINE] {len(spot_pg)} Spot-Analysen aus Postgres geladen.")
-                    loaded_any = True
-                    pg_loaded = True
-                if region_pg:
-                    self.region_analyses = region_pg
-                    self.region_analyses_loaded_at = datetime.now()
-                    print(f"[ENGINE] {len(region_pg)} Region-Analysen aus Postgres geladen.")
-                    loaded_any = True
-                    pg_loaded = True
+                with open(self.analyses_file, "r", encoding="utf-8") as f:
+                    self.spot_analyses = json.load(f)
+                    self.analyses_loaded_at = datetime.fromtimestamp(self.analyses_file.stat().st_mtime)
+                print(f"[ENGINE] {len(self.spot_analyses)} Spot-Analysen aus JSON-Cache geladen.")
             except Exception as e:
-                logger.error(f"Postgres-Load Analysen fehlgeschlagen, nutze JSON-Fallback: {e}")
-
-        # Fallback auf JSON wenn Postgres leer oder nicht verfuegbar
-        if not pg_loaded:
-            if self.analyses_file.exists():
-                try:
-                    with open(self.analyses_file, "r", encoding="utf-8") as f:
-                        self.spot_analyses = json.load(f)
-                        self.analyses_loaded_at = datetime.fromtimestamp(self.analyses_file.stat().st_mtime)
-                    print(f"[ENGINE] {len(self.spot_analyses)} Spot-Analysen aus JSON-Cache geladen.")
-                    loaded_any = True
-                except Exception as e:
-                    logger.error(f"Fehler beim Laden des Spot-Analyse-Caches: {e}")
-            if self.region_analyses_file.exists():
-                try:
-                    with open(self.region_analyses_file, "r", encoding="utf-8") as f:
-                        self.region_analyses = json.load(f)
-                        self.region_analyses_loaded_at = datetime.fromtimestamp(
-                            self.region_analyses_file.stat().st_mtime)
-                    print(f"[ENGINE] {len(self.region_analyses)} Region-Analysen aus JSON-Cache geladen.")
-                    loaded_any = True
-                except Exception as e:
-                    logger.error(f"Fehler beim Laden des Region-Analyse-Caches: {e}")
-
-        # Push nach InstantDB damit Frontend-Subscriptions sofort Daten haben
-        if loaded_any and self.instantdb:
-            if self.spot_analyses:
-                threading.Thread(target=self._push_analyses_to_instantdb, daemon=True).start()
-            if self.region_analyses:
-                threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
+                logger.error(f"Fehler beim Laden des Spot-Analyse-Caches: {e}")
+        if self.region_analyses_file.exists():
+            try:
+                with open(self.region_analyses_file, "r", encoding="utf-8") as f:
+                    self.region_analyses = json.load(f)
+                    self.region_analyses_loaded_at = datetime.fromtimestamp(
+                        self.region_analyses_file.stat().st_mtime)
+                print(f"[ENGINE] {len(self.region_analyses)} Region-Analysen aus JSON-Cache geladen.")
+            except Exception as e:
+                logger.error(f"Fehler beim Laden des Region-Analyse-Caches: {e}")
 
     def _save_analyses_cache(self):
-        """Speichert Spot-Analysen (Postgres primaer, JSON-File als Fallback/Backup)."""
-        # 1. Postgres
-        client = self._get_pg_client()
-        if client is not None:
-            try:
-                client.upsert_spot_analyses(self.spot_analyses)
-            except Exception as e:
-                logger.error(f"Postgres-Save Spot-Analysen fehlgeschlagen: {e}")
-        # 2. JSON (Backup/Fallback)
+        """Speichert Spot-Analysen in den lokalen JSON-Cache."""
         try:
             config.atomic_write_json(self.analyses_file, self.spot_analyses)
         except Exception as e:
             logger.error(f"Fehler beim Speichern des Spot-Analyse-Caches: {e}")
 
     def _save_region_analyses_cache(self):
-        """Speichert Region-Analysen (Postgres primaer, JSON-File als Fallback/Backup)."""
-        client = self._get_pg_client()
-        if client is not None:
-            try:
-                client.upsert_region_analyses(self.region_analyses)
-            except Exception as e:
-                logger.error(f"Postgres-Save Region-Analysen fehlgeschlagen: {e}")
+        """Speichert Region-Analysen in den lokalen JSON-Cache."""
         try:
             config.atomic_write_json(self.region_analyses_file, self.region_analyses)
         except Exception as e:
@@ -321,14 +266,6 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
                 self.analyses_file.unlink()
             if self.region_analyses_file.exists():
                 self.region_analyses_file.unlink()
-            # Auch Postgres leeren damit kein Zombie-State zurueckbleibt
-            client = self._get_pg_client()
-            if client is not None:
-                try:
-                    client.delete_spot_analyses()
-                    client.delete_region_analyses()
-                except Exception as e:
-                    logger.error(f"Postgres-Clear Analysen fehlgeschlagen: {e}")
             print("[ENGINE] Analyse-Cache gelöscht (Wetterdaten fehlen)")
         except Exception as e:
             logger.error(f"Fehler beim Löschen des Analyse-Caches: {e}")
@@ -352,7 +289,8 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
             self.foehn_data = None
 
         self.weather_context_str = self._build_weather_context()
-        self.weather_loaded_at = load_cached_weather_timestamp()
+        # Wir haben den Cache bereits geladen — kein erneutes JSON-Parsen.
+        self.weather_loaded_at = load_cached_weather_timestamp(_cached=self.weather_data)
 
         # Analysen-Cache laden
         self._load_analyses_cache()
@@ -371,9 +309,13 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         self.last_refresh_status_reason = None
 
         # 1. Wetterdaten holen (oder Cache nutzen)
-        if not force and is_cache_fresh(max_age_hours=12) and is_cache_complete():
+        # Cache nur EINMAL laden und an is_cache_fresh / is_cache_complete weiterreichen
+        # — vermeidet 3× JSON-Parse (wetterdaten.json ist ~200 MB).
+        cached = None if force else load_cached_weather()
+        if (not force
+                and is_cache_fresh(max_age_hours=12, _cached=cached)
+                and is_cache_complete(_cached=cached)):
             print("[ENGINE] Nutze gecachte Wetterdaten (vollständig)")
-            cached = load_cached_weather()
             self.weather_data = cached
             self.region_weather_data = cached.pop("_regions", {}) if cached else {}
         else:
@@ -457,71 +399,17 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         for conv in self.conversations.values():
              conv["first_question"] = True
 
-        # 6. An InstantDB pushen (non-blocking)
-        if self.instantdb:
-            threading.Thread(target=self._push_to_instantdb, daemon=True).start()
-
         print(f"[ENGINE] Wetterdaten geladen ({len(self.weather_data) - 1} Spots)")
-
-    def _push_to_instantdb(self):
-        """Pusht Wetter-Kontext und Summary nach InstantDB (laeuft im Hintergrund)."""
-        try:
-            timestamp = self.weather_loaded_at.isoformat() if self.weather_loaded_at else datetime.now().isoformat()
-            data = {
-                "matrix_text": self.weather_context_str,
-                "updated_at": timestamp,
-            }
-
-            global_id = self.instantdb.make_id("weather_state.global")
-            self.instantdb.upsert("weather_state", global_id, data)
-            logger.info("InstantDB: weather_state gepusht")
-
-            # Keine automatische Summary mehr
-            # summary = self._generate_summary()
-            # if summary:
-            #     self.instantdb.upsert("weather_state", "global", {"summary_text": summary})
-            #     logger.info("InstantDB: summary_text gepusht")
-
-        except Exception as e:
-            logger.error(f"InstantDB push fehlgeschlagen: {e}")
 
     def analyze_weather(self) -> str:
         """Manuelle Analyse wurde deaktiviert."""
         return "Die Vor-Zusammenfassung wurde deaktiviert. Nutze bitte den Chat für eine direkte Analyse der Daten."
 
     def reload_spots(self):
-        """Laedt Spots neu aus CSV und synchronisiert nach InstantDB."""
+        """Laedt Spots neu aus CSV."""
         self.spots = load_spots()
         logger.info(f"Spots neu geladen: {len(self.spots)} Spots aus CSV")
-        self.sync_spots_to_instantdb()
         return len(self.spots)
-
-    def sync_spots_to_instantdb(self):
-        """Pusht alle Spots einmalig nach InstantDB."""
-        if not self.instantdb:
-            return
-
-        docs = {}
-        for spot in self.spots:
-            spot_id = self.instantdb.make_id(f"spot.{spot['name']}")
-            docs[spot_id] = {
-                "name": spot["name"],
-                "elevation": spot["elevation_m"],
-                "wind_ok": spot["windrichtung"],
-                "ideal_wind_min": spot.get("ideal_wind_min"),
-                "ideal_wind_max": spot.get("ideal_wind_max"),
-                "slope_azimuth": spot["slope_azimuth"],
-                "slope_angle": spot["slope_angle"],
-                "kritischer_foehn": spot["kritischer_foehn"],
-                "lat": spot["latitude"],
-                "lon": spot["longitude"],
-                "bemerkung": spot.get("bemerkung", ""),
-            }
-
-        if self.instantdb.batch_upsert("spots", docs):
-            logger.info(f"InstantDB: {len(docs)} Spots synchronisiert")
-        else:
-            logger.warning("InstantDB: Spots-Sync fehlgeschlagen")
 
     def reset_conversation(self, session_id: str):
         """Conversation zurücksetzen."""

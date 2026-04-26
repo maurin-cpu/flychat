@@ -31,23 +31,16 @@ DEINE REGIONEN · DIESE WOCHE
 Legende:  ## legendaer   OO fliegbar   =! bedingt   -- nichts
 
 {% endif -%}
-{% if top_spots_week -%}
-TOP 5 STARTS DIESE WOCHE
-{% for s in top_spots_week -%}
-{{ loop.index }}. {{ s.spot }} ({{ s.region_name }}) — {{ s.day_short }}{% if s.window %} · {{ s.window }}{% endif %} · {{ s.tier_label }} · {{ s.rating_display }}
-{% endfor %}
-
-{% endif -%}
 DETAILS PRO TAG
-{% for day in days %}
--- {{ day.label.long }} — {{ day.tier_label|upper }} --
-{% if day.shown_spots %}{% for s in day.shown_spots %}  {{ loop.index }}. {{ s.spot }} ({{ s.region_name }}) — {{ s.tier_label }} · {{ s.rating_display }}
-{% if s.window %}     Fenster: {{ s.window }}
-{% endif %}{% if s.safety_sentence %}     Sicherheit: {{ s.safety_sentence }}
-{% endif %}{% if s.flyability_sentence %}     Flug: {{ s.flyability_sentence }}
-{% endif %}{% endfor %}{% if day.more_count > 0 %}  + {{ day.more_count }} weitere Spot{% if day.more_count != 1 %}s{% endif %} im Dashboard
-{% endif %}{% else %}  Keine fliegbaren Spots in deinen Regionen.
-{% endif %}{% endfor %}
+{% for day in days %}{% if day.tier != 'none' and day.region_groups %}
+{{ day.label.long }} — {{ day.tier_label|upper }}{% if day.day_rating_display %} · {{ day.day_rating_display }}{% endif %}
+{% if day.fly_summary %}  Flug: {{ day.fly_summary }}
+{% endif %}{% if day.safety_summary %}  Sicherheit: {{ day.safety_summary }}
+{% endif %}{% for grp in day.region_groups %}
+  {{ grp.region_name|upper }} · {{ grp.region_rating_display }}
+{% for s in grp.spots %}    {{ s.spot }} — {{ s.rating_display }}
+{% endfor %}{% endfor %}{% if day.more_count > 0 %}  + {{ day.more_count }} weitere Spot{% if day.more_count != 1 %}s{% endif %} im Dashboard
+{% endif %}{% endif %}{% endfor %}
 
 ------------------------------------------------------------
 War diese Vorhersage richtig?

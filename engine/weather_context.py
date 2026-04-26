@@ -333,11 +333,11 @@ class WeatherContextMixin:
                     return
                 clean_pct = (state["clean"] / state["total"]) * 100
                 major_tags_order = [
-                    "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                    "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
+                    "[GUST-DANGER]", "[ALOFT-WIND-DANGER]", "[ALOFT-GUST-DANGER]",
+                    "[WIND-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
                     "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]", "[THERMAL-WIND-UNUSABLE]",
                     "[THERMAL-ROUGH-FRAGMENTED]",
-                    "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
+                    "[GUST-WARN]", "[ALOFT-WIND-WARN]", "[ALOFT-GUST-WARN]",
                     "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]", "[THERMAL-WIND-DEGRADED]",
                     "[WIND-WRONG]",
                 ]
@@ -425,13 +425,18 @@ class WeatherContextMixin:
 
                 warnings = []
 
-                # Check absolute base wind limit against spot's recommended maximum
-                ideal_wind_max = spot.get("ideal_wind_max", 30)
-                if isinstance(wind_speed, (int, float)) and wind_speed > ideal_wind_max:
-                    warnings.append("[STRONG-WIND-WARN]")
+                # Bodenwind-Magnitude (universelle Schwellen, Boden + Hoehe gleich).
+                # ideal_wind_max aus CSV wird nicht mehr verwendet (Apr 2026 Harmonisierung).
+                if isinstance(wind_speed, (int, float)):
+                    if wind_speed > config.WIND_DANGER_KMH:
+                        warnings.append("[WIND-DANGER]")
+                    elif wind_speed > config.WIND_WARN_KMH:
+                        warnings.append("[WIND-WARN]")
 
                 if isinstance(wind_gusts, (int, float)) and isinstance(wind_speed, (int, float)):
-                    if (wind_gusts > config.GUST_WARN_KMH and wind_gusts - wind_speed > config.GUST_SPREAD_KMH) or wind_gusts > config.GUST_WARN_ABSOLUTE_KMH:
+                    if wind_gusts > config.GUST_DANGER_KMH:
+                        warnings.append("[GUST-DANGER]")
+                    elif wind_gusts > config.GUST_WARN_KMH:
                         warnings.append("[GUST-WARN]")
 
                 if isinstance(precip, (int, float)) and precip > 0.05:
@@ -495,26 +500,26 @@ class WeatherContextMixin:
                             dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
                             alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
                             if in_range:
-                                if ws_val > config.ALOFT_DANGER_KMH:
+                                if ws_val > config.WIND_DANGER_KMH:
                                     aloft_danger = True
-                                elif ws_val > config.ALOFT_WARN_KMH:
+                                elif ws_val > config.WIND_WARN_KMH:
                                     aloft_warn = True
                                 if g_val is not None:
-                                    # T(z) > ALOFT_GUST_DANGER_KMH im Flugbereich = DANGER,
+                                    # T(z) > GUST_DANGER_KMH im Flugbereich = DANGER,
                                     # unabhängig vom Modellwind W(z).
                                     # Turbulenzrisiko ist ein Sicherheits-
                                     # problem auch bei moderatem Grundwind.
-                                    if g_val > config.ALOFT_GUST_DANGER_KMH:
+                                    if g_val > config.GUST_DANGER_KMH:
                                         aloft_gust_danger = True
-                                    elif g_val > config.ALOFT_GUST_WARN_KMH:
+                                    elif g_val > config.GUST_WARN_KMH:
                                         aloft_gust_warn = True
 
                 if aloft_danger:
-                    if "[ALOFT-DANGER]" not in warnings:
-                        warnings.append("[ALOFT-DANGER]")
+                    if "[ALOFT-WIND-DANGER]" not in warnings:
+                        warnings.append("[ALOFT-WIND-DANGER]")
                 elif aloft_warn:
-                    if "[ALOFT-WARN]" not in warnings:
-                        warnings.append("[ALOFT-WARN]")
+                    if "[ALOFT-WIND-WARN]" not in warnings:
+                        warnings.append("[ALOFT-WIND-WARN]")
 
                 if aloft_gust_danger:
                     if "[ALOFT-GUST-DANGER]" not in warnings:
@@ -559,8 +564,8 @@ class WeatherContextMixin:
                 if not is_ok:
                     day_state["tag_counts"][wind_status] = day_state["tag_counts"].get(wind_status, 0) + 1
                 # "Clean" = WIND-OK ohne harte Warnungen
-                hard_warnings_set = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                                     "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[STRONG-WIND-WARN]", "[OVERCAST-DANGER]"}
+                hard_warnings_set = {"[GUST-DANGER]", "[ALOFT-WIND-DANGER]", "[ALOFT-GUST-DANGER]",
+                                     "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[WIND-DANGER]", "[OVERCAST-DANGER]"}
                 has_hard = bool(hard_warnings_set & set(warnings))
                 if is_ok and not has_hard:
                     day_state["clean"] += 1
@@ -1247,7 +1252,7 @@ class WeatherContextMixin:
         gust_hours = []        # Stunden mit GUST/ALOFT-GUST WARN/DANGER (fuer BOEEN-TREND)
         gust_danger_hours = [] # Nur DANGER-Level (>40 km/h Boden oder Flugraum)
         aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND)
-        aloft_danger_hours_list = []  # Nur [ALOFT-DANGER] (> ALOFT_DANGER_KMH)
+        aloft_danger_hours_list = []  # Nur [ALOFT-WIND-DANGER] (> WIND_DANGER_KMH)
         tag_counts = {}        # tag_name -> count über den ganzen Tag (für Tagesprofil)
         safety_timeline = []       # (hour_str, klass, label) - SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter)
         fly_timeline = []          # (hour_str, klass, label) - FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet)
@@ -1336,15 +1341,18 @@ class WeatherContextMixin:
 
             warnings = []
 
-            # Check absolute base wind limit against spot's recommended maximum
-            ideal_wind_max = spot.get("ideal_wind_max", 30)
-            if isinstance(wind_speed, (int, float)) and wind_speed > ideal_wind_max:
-                warnings.append("[STRONG-WIND-WARN]")
+            # Bodenwind-Magnitude (universelle Schwellen, Boden + Hoehe gleich).
+            # ideal_wind_max aus CSV wird nicht mehr verwendet (Apr 2026 Harmonisierung).
+            if isinstance(wind_speed, (int, float)):
+                if wind_speed > config.WIND_DANGER_KMH:
+                    warnings.append("[WIND-DANGER]")
+                elif wind_speed > config.WIND_WARN_KMH:
+                    warnings.append("[WIND-WARN]")
 
             if isinstance(wind_gusts, (int, float)) and isinstance(wind_speed, (int, float)):
                 if wind_gusts > config.GUST_DANGER_KMH:
                     warnings.append("[GUST-DANGER]")
-                elif (wind_gusts > config.GUST_WARN_KMH and wind_gusts - wind_speed > config.GUST_SPREAD_KMH) or wind_gusts > config.GUST_WARN_KMH:
+                elif wind_gusts > config.GUST_WARN_KMH:
                     warnings.append("[GUST-WARN]")
 
             try:
@@ -1429,24 +1437,24 @@ class WeatherContextMixin:
                         alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
                         # Set ALOFT tags only for in-range (*) levels
                         if in_range:
-                            if ws_val > config.ALOFT_DANGER_KMH:
+                            if ws_val > config.WIND_DANGER_KMH:
                                 aloft_danger = True
-                            elif ws_val > config.ALOFT_WARN_KMH:
+                            elif ws_val > config.WIND_WARN_KMH:
                                 aloft_warn = True
                             if g_val is not None:
-                                # T(z) > ALOFT_GUST_DANGER_KMH im Flugbereich = DANGER,
+                                # T(z) > GUST_DANGER_KMH im Flugbereich = DANGER,
                                 # unabhängig vom Modellwind W(z).
-                                if g_val > config.ALOFT_GUST_DANGER_KMH:
+                                if g_val > config.GUST_DANGER_KMH:
                                     aloft_gust_danger = True
-                                elif g_val > config.ALOFT_GUST_WARN_KMH:
+                                elif g_val > config.GUST_WARN_KMH:
                                     aloft_gust_warn = True
 
             if aloft_danger:
-                if "[ALOFT-DANGER]" not in warnings:
-                    warnings.append("[ALOFT-DANGER]")
+                if "[ALOFT-WIND-DANGER]" not in warnings:
+                    warnings.append("[ALOFT-WIND-DANGER]")
             elif aloft_warn:
-                if "[ALOFT-WARN]" not in warnings:
-                    warnings.append("[ALOFT-WARN]")
+                if "[ALOFT-WIND-WARN]" not in warnings:
+                    warnings.append("[ALOFT-WIND-WARN]")
 
             if aloft_gust_danger:
                 if "[ALOFT-GUST-DANGER]" not in warnings:
@@ -1578,10 +1586,10 @@ class WeatherContextMixin:
 
             # ─── STUNDENVERLAUF: klassifiziere diese Stunde ───
             # ─── SICHERHEITS-VERLAUF: nur Safety-Tags (Wind/Boeen/Regen/CAPE/Gewitter) ───
-            safety_hard_tags = {"[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
+            safety_hard_tags = {"[GUST-DANGER]", "[ALOFT-WIND-DANGER]", "[ALOFT-GUST-DANGER]",
                                 "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]",
-                                "[STRONG-WIND-WARN]", "[OVERCAST-DANGER]"}
-            safety_warn_tags = {"[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
+                                "[WIND-DANGER]", "[OVERCAST-DANGER]"}
+            safety_warn_tags = {"[GUST-WARN]", "[ALOFT-WIND-WARN]", "[ALOFT-GUST-WARN]",
                                 "[CAPE-WARN]"}
             s_hard = [t for t in warnings if t in safety_hard_tags]
             s_warn = [t for t in warnings if t in safety_warn_tags]
@@ -1680,10 +1688,19 @@ class WeatherContextMixin:
                 if gust_danger_tags & warn_set:
                     gust_danger_hours.append(hour_str)
 
-            # Hoehenwind-Trend: Stunden mit ALOFT-WARN/DANGER sammeln
-            if "[ALOFT-WARN]" in warn_set or "[ALOFT-DANGER]" in warn_set:
+            # Wind-Trend: Stunden mit Wind WARN/DANGER (Boden + Hoehe summiert).
+            # Phase 3: Bodenwind und Hoehenwind teilen sich denselben Trend, weil
+            # die Schwellen identisch sind (WIND_WARN_KMH / WIND_DANGER_KMH).
+            wind_warn_hour = (
+                "[WIND-WARN]" in warn_set or "[WIND-DANGER]" in warn_set
+                or "[ALOFT-WIND-WARN]" in warn_set or "[ALOFT-WIND-DANGER]" in warn_set
+            )
+            wind_danger_hour = (
+                "[WIND-DANGER]" in warn_set or "[ALOFT-WIND-DANGER]" in warn_set
+            )
+            if wind_warn_hour:
                 aloft_hours.append(hour_str)
-                if "[ALOFT-DANGER]" in warn_set:
+                if wind_danger_hour:
                     aloft_danger_hours_list.append(hour_str)
 
             # Klassifiziere saubere vs. gewarnte Stunden (nach allen Warnungen)
@@ -1694,8 +1711,8 @@ class WeatherContextMixin:
             # (Abgleiter), sie ist nur thermisch wertlos. Die LLM-Fliegbarkeits-Phase
             # (flyability.md) interpretiert die Tags und degradiert auf gray/green.
             hard_warnings = {
-                "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[STRONG-WIND-WARN]",
+                "[GUST-DANGER]", "[ALOFT-WIND-DANGER]", "[ALOFT-GUST-DANGER]",
+                "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[WIND-DANGER]",
                 "[OVERCAST-DANGER]",
             }
             has_hard_warn = bool(hard_warnings & set(warnings))
@@ -1788,11 +1805,11 @@ class WeatherContextMixin:
             )
             # Histogramm der Hauptgefahren über den ganzen Tag
             major_tags_order = [
-                "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-                "[STRONG-WIND-WARN]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
+                "[GUST-DANGER]", "[ALOFT-WIND-DANGER]", "[ALOFT-GUST-DANGER]",
+                "[WIND-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
                 "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-ROUGH-UNUSABLE]", "[THERMAL-WIND-UNUSABLE]",
                 "[THERMAL-ROUGH-FRAGMENTED]",
-                "[GUST-WARN]", "[ALOFT-WARN]", "[ALOFT-GUST-WARN]",
+                "[GUST-WARN]", "[ALOFT-WIND-WARN]", "[ALOFT-GUST-WARN]",
                 "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]", "[THERMAL-WIND-DEGRADED]",
                 "[WIND-WRONG]",
             ]
@@ -1850,14 +1867,14 @@ class WeatherContextMixin:
         aloft_gust_warn_h = tag_counts.get("[ALOFT-GUST-WARN]", 0)
         gust_danger_h = tag_counts.get("[GUST-DANGER]", 0)
         aloft_gust_danger_h = tag_counts.get("[ALOFT-GUST-DANGER]", 0)
-        aloft_warn_h = tag_counts.get("[ALOFT-WARN]", 0)
-        aloft_danger_h = tag_counts.get("[ALOFT-DANGER]", 0)
+        aloft_warn_h = tag_counts.get("[ALOFT-WIND-WARN]", 0)
+        aloft_danger_h = tag_counts.get("[ALOFT-WIND-DANGER]", 0)
         max_surface_gust = max(hourly_gusts.values()) if hourly_gusts else 0
 
         # "Harte Warnungen" = alles was eine Stunde objektiv unfliegbar macht
         hard_warning_tags = [
-            "[GUST-DANGER]", "[ALOFT-DANGER]", "[ALOFT-GUST-DANGER]",
-            "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
+            "[GUST-DANGER]", "[ALOFT-WIND-DANGER]", "[ALOFT-GUST-DANGER]",
+            "[WIND-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
         ]
         hard_warning_hours = sum(tag_counts.get(t, 0) for t in hard_warning_tags)
 
@@ -1881,7 +1898,10 @@ class WeatherContextMixin:
             "max_wind_swing_span_h": max_swing_span,
             "hard_warning_hours": hard_warning_hours,
             "thunderstorm_hours": tag_counts.get("[THUNDERSTORM]", 0),
-            "strong_wind_warn_hours": tag_counts.get("[STRONG-WIND-WARN]", 0),
+            "wind_danger_hours": tag_counts.get("[WIND-DANGER]", 0),
+            "wind_warn_hours": tag_counts.get("[WIND-WARN]", 0),
+            "aloft_wind_warn_hours": tag_counts.get("[ALOFT-WIND-WARN]", 0),
+            "aloft_wind_danger_hours": tag_counts.get("[ALOFT-WIND-DANGER]", 0),
             "rain_hours": len(rain_hours),
             "rain_hour_list": rain_hours,
         })
@@ -2089,17 +2109,18 @@ class WeatherContextMixin:
             if gust_trend_text:
                 lines.append(gust_trend_text)
 
-        # Hoehenwind-Trend (analog Boeen-Trend)
+        # Wind-Trend (Boden + Hoehe summiert) — siehe weather_context.py-Sammelstelle
+        # weiter oben: aloft_hours enthaelt jetzt auch Bodenwind WARN/DANGER-Stunden.
         if aloft_hours and all_hours_sorted:
             aloft_pattern = _detect_aloft_trend(aloft_hours, all_hours_sorted, aloft_danger_hours_list)
             aloft_trend_text = _format_aloft_trend_text(
                 aloft_pattern, aloft_hours,
-                danger_kmh=config.ALOFT_DANGER_KMH,
-                warn_kmh=config.ALOFT_WARN_KMH,
+                danger_kmh=config.WIND_DANGER_KMH,
+                warn_kmh=config.WIND_WARN_KMH,
             )
             if aloft_trend_text:
                 lines.append(aloft_trend_text)
-            # Cache fuer analyzers.py ALOFT-Override
+            # Cache fuer analyzers.py WIND-TREND-Override
             self._ctx_gust_cache[f"{name}|{date_str}"]["aloft_pattern"] = aloft_pattern
 
         # Föhn-Info anhängen
@@ -2175,7 +2196,7 @@ class WeatherContextMixin:
         hourly_winds = {}      # hour_str → Windgeschwindigkeit für Trend-Analyse (Regionen haben keine Böen)
         rain_hours = []        # Stunden mit Niederschlag
         aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND, Region)
-        aloft_danger_hours_list = []  # Nur [ALOFT-DANGER] (> ALOFT_DANGER_KMH)
+        aloft_danger_hours_list = []  # Nur [ALOFT-WIND-DANGER] (> WIND_DANGER_KMH)
         tag_counts = {}        # tag_name → count (für Tagesprofil-Histogramm)
         # Thermik-Qualitaets-Zaehler
         thermal_hours_total = 0
@@ -2279,11 +2300,11 @@ class WeatherContextMixin:
             hour_str = f"{dt.hour:02d}:00"
             if isinstance(wind_speed, (int, float)):
                 hourly_winds[hour_str] = wind_speed
-                if wind_speed > config.WIND_STRONG_KMH:
-                    wind_status = "[WIND-STRONG]"
+                if wind_speed > config.WIND_DANGER_KMH:
+                    wind_status = "[WIND-DANGER]"
                     strong_hours.append(hour_str)
-                elif wind_speed > config.WIND_MODERATE_KMH:
-                    wind_status = "[WIND-MODERATE]"
+                elif wind_speed > config.WIND_WARN_KMH:
+                    wind_status = "[WIND-WARN]"
                     moderate_hours.append(hour_str)
                 else:
                     wind_status = "[WIND-CALM]"
@@ -2350,18 +2371,29 @@ class WeatherContextMixin:
                         dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
                         alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {ws_val:.0f}km/h{dir_str}"
                         if in_range:
-                            if ws_val > config.ALOFT_DANGER_KMH:
+                            if ws_val > config.WIND_DANGER_KMH:
                                 aloft_danger = True
-                            elif ws_val > config.ALOFT_WARN_KMH:
+                            elif ws_val > config.WIND_WARN_KMH:
                                 aloft_warn = True
 
             if aloft_danger:
-                warnings.append("[ALOFT-DANGER]")
+                warnings.append("[ALOFT-WIND-DANGER]")
                 aloft_hours.append(hour_str)
                 aloft_danger_hours_list.append(hour_str)
             elif aloft_warn:
-                warnings.append("[ALOFT-WARN]")
+                warnings.append("[ALOFT-WIND-WARN]")
                 aloft_hours.append(hour_str)
+
+            # Wind-Trend (Region): Bodenwind-Tags auch in aloft_hours summieren,
+            # damit der Trend Boden + Hoehe gemeinsam abbildet.
+            if wind_status == "[WIND-DANGER]":
+                if hour_str not in aloft_hours:
+                    aloft_hours.append(hour_str)
+                if hour_str not in aloft_danger_hours_list:
+                    aloft_danger_hours_list.append(hour_str)
+            elif wind_status == "[WIND-WARN]":
+                if hour_str not in aloft_hours:
+                    aloft_hours.append(hour_str)
 
             try:
                 cape = data.get("cape")
@@ -2480,29 +2512,29 @@ class WeatherContextMixin:
             # Tag-Histogram für Tagesprofil
             for w in warnings:
                 tag_counts[w] = tag_counts.get(w, 0) + 1
-            if wind_status == "[WIND-STRONG]":
-                tag_counts["[WIND-STRONG]"] = tag_counts.get("[WIND-STRONG]", 0) + 1
-            elif wind_status == "[WIND-MODERATE]":
-                tag_counts["[WIND-MODERATE]"] = tag_counts.get("[WIND-MODERATE]", 0) + 1
+            if wind_status == "[WIND-DANGER]":
+                tag_counts["[WIND-DANGER]"] = tag_counts.get("[WIND-DANGER]", 0) + 1
+            elif wind_status == "[WIND-WARN]":
+                tag_counts["[WIND-WARN]"] = tag_counts.get("[WIND-WARN]", 0) + 1
 
             # ─── SICHERHEITS-VERLAUF (Region) ───
             # Regionen haben keine Böen → keine GUST-*/ALOFT-GUST-* Tags möglich.
-            safety_hard_r = {"[ALOFT-DANGER]",
+            safety_hard_r = {"[ALOFT-WIND-DANGER]",
                              "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]",
-                             "[WIND-STRONG]", "[OVERCAST-DANGER]"}
-            safety_warn_r = {"[ALOFT-WARN]", "[CAPE-WARN]"}
+                             "[WIND-DANGER]", "[OVERCAST-DANGER]"}
+            safety_warn_r = {"[ALOFT-WIND-WARN]", "[CAPE-WARN]"}
             s_hard_r = [t for t in warnings if t in safety_hard_r]
             s_warn_r = [t for t in warnings if t in safety_warn_r]
-            if wind_status == "[WIND-STRONG]" and "[WIND-STRONG]" not in s_hard_r:
-                s_hard_r.append("[WIND-STRONG]")
+            if wind_status == "[WIND-DANGER]" and "[WIND-DANGER]" not in s_hard_r:
+                s_hard_r.append("[WIND-DANGER]")
             if s_hard_r:
                 s_klass_r = "danger"
                 s_label_r = "DANGER(" + "+".join(t.strip("[]").replace("-WARN", "").replace("-DANGER", "") for t in s_hard_r) + ")"
-            elif s_warn_r or wind_status == "[WIND-MODERATE]":
+            elif s_warn_r or wind_status == "[WIND-WARN]":
                 s_klass_r = "warn"
                 bits = [t.strip("[]").replace("-WARN", "").replace("-DANGER", "") for t in s_warn_r]
-                if wind_status == "[WIND-MODERATE]" and "MODERATE" not in bits:
-                    bits.append("WIND-MOD")
+                if wind_status == "[WIND-WARN]" and "WIND" not in bits:
+                    bits.append("WIND")
                 s_label_r = "WARN(" + "+".join(bits) + ")" if bits else "WARN"
             else:
                 s_klass_r = "clean"
@@ -2561,10 +2593,10 @@ class WeatherContextMixin:
                     if not (elev_ref <= alt <= effective_ceiling):
                         continue
                     ws_val = lv["wind_speed"]
-                    if ws_val > config.ALOFT_DANGER_KMH:
+                    if ws_val > config.WIND_DANGER_KMH:
                         cls = "DANGER"
                         any_warn_r = True
-                    elif ws_val > config.ALOFT_WARN_KMH:
+                    elif ws_val > config.WIND_WARN_KMH:
                         cls = "WARN"
                         any_warn_r = True
                     else:
@@ -2579,8 +2611,8 @@ class WeatherContextMixin:
 
             # Klassifiziere saubere vs. gewarnte Stunden
             # Regionen: keine GUST-/ALOFT-GUST-Tags in hard_warnings.
-            hard_warnings = {"[ALOFT-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[WIND-STRONG]", "[OVERCAST-DANGER]"}
-            has_hard_warn = bool(hard_warnings & set(warnings)) or wind_status == "[WIND-STRONG]"
+            hard_warnings = {"[ALOFT-WIND-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[WIND-DANGER]", "[OVERCAST-DANGER]"}
+            has_hard_warn = bool(hard_warnings & set(warnings)) or wind_status == "[WIND-DANGER]"
             if not has_hard_warn:
                 clean_hours.append(hour_str)
             else:
@@ -2590,8 +2622,10 @@ class WeatherContextMixin:
             ws_fmt = f"{wind_speed:.0f}" if isinstance(wind_speed, float) else str(wind_speed)
             wd_fmt = f"{wind_dir:.0f}" if isinstance(wind_dir, float) else str(wind_dir)
 
+            # WIND-CALM ist intern, wird nicht als Tag gezeigt (= keine Tags = ruhig).
+            wind_status_print = "" if wind_status == "[WIND-CALM]" else f" {wind_status}"
             lines.append(
-                f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}° {wind_status}{ref_wind_info}{warning_str} | "
+                f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}°{wind_status_print}{ref_wind_info}{warning_str} | "
                 f"Wolkenbasis {cloud_base} | Bewoelkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | FLUGBEREICH: {elev_ref}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
             )
 
@@ -2601,9 +2635,9 @@ class WeatherContextMixin:
         # Zusammenfassung
         lines.append("")
         lines.append("═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══")
-        lines.append(f"[WIND-CALM] Stunden ({len(calm_hours)}): {', '.join(calm_hours) if calm_hours else 'KEINE'}")
-        lines.append(f"[WIND-MODERATE] Stunden ({len(moderate_hours)}): {', '.join(moderate_hours) if moderate_hours else 'KEINE'}")
-        lines.append(f"[WIND-STRONG] Stunden ({len(strong_hours)}): {', '.join(strong_hours) if strong_hours else 'KEINE'} (NICHT FLIEGBAR)")
+        lines.append(f"Ruhige Stunden ({len(calm_hours)}): {', '.join(calm_hours) if calm_hours else 'KEINE'}")
+        lines.append(f"[WIND-WARN] Stunden ({len(moderate_hours)}): {', '.join(moderate_hours) if moderate_hours else 'KEINE'}")
+        lines.append(f"[WIND-DANGER] Stunden ({len(strong_hours)}): {', '.join(strong_hours) if strong_hours else 'KEINE'} (NICHT FLIEGBAR)")
         lines.append(f"Saubere Stunden ({len(clean_hours)}): {', '.join(clean_hours) if clean_hours else 'KEINE'}")
         if warned_hours:
             lines.append(f"Gewarnte Stunden ({len(warned_hours)}): {', '.join(warned_hours)}")
@@ -2662,8 +2696,8 @@ class WeatherContextMixin:
                 aloft_hours, all_hours_sorted_region, aloft_danger_hours_list
             )
         self._ctx_cache_put(self._ctx_gust_cache, f"{rname}|{date_str}", {
-            "aloft_warn_hours": tag_counts.get("[ALOFT-WARN]", 0),
-            "aloft_danger_hours": tag_counts.get("[ALOFT-DANGER]", 0),
+            "aloft_warn_hours": tag_counts.get("[ALOFT-WIND-WARN]", 0),
+            "aloft_danger_hours": tag_counts.get("[ALOFT-WIND-DANGER]", 0),
             "aloft_pattern": aloft_pattern_region,
         })
 
@@ -2683,12 +2717,12 @@ class WeatherContextMixin:
             # Regionen haben keine Böen → keine GUST-*/ALOFT-GUST-*/THERMAL-ROUGH-* Tags.
             # THERMAL-WIND-* ersetzen ROUGH-* auf Region-Ebene (BL-Mean-Wind statt GF).
             major_tags_order = [
-                "[ALOFT-DANGER]",
-                "[WIND-STRONG]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
+                "[ALOFT-WIND-DANGER]",
+                "[WIND-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
                 "[SHEAR-UNUSABLE]", "[THERMAL-TORN-UNUSABLE]", "[THERMAL-WIND-UNUSABLE]",
-                "[ALOFT-WARN]",
+                "[ALOFT-WIND-WARN]",
                 "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-WIND-DEGRADED]",
-                "[WIND-MODERATE]",
+                "[WIND-WARN]",
             ]
             hist_parts = []
             for t in major_tags_order:
@@ -2892,8 +2926,8 @@ class WeatherContextMixin:
         if aloft_pattern_region:
             aloft_trend_text = _format_aloft_trend_text(
                 aloft_pattern_region, aloft_hours,
-                danger_kmh=config.ALOFT_DANGER_KMH,
-                warn_kmh=config.ALOFT_WARN_KMH,
+                danger_kmh=config.WIND_DANGER_KMH,
+                warn_kmh=config.WIND_WARN_KMH,
             )
             if aloft_trend_text:
                 lines.append(aloft_trend_text)

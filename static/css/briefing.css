@@ -1644,6 +1644,23 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   .bf-logo { font-size: 1.2rem; }
   .bf-date-range { display: none; }
 
+  /* Timestamp: ausserhalb des Flex-Flows in der oberen rechten Ecke
+     der gesamten Briefing-Seite — kein Ueberdecken von Header oder
+     Tagesauswahl, klein und unauffaellig. */
+  .bf { position: relative; }
+  .bf-timestamp {
+    position: absolute !important;
+    top: 4px;
+    right: 8px;
+    font-size: 9px !important;
+    line-height: 1 !important;
+    opacity: 0.55;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    z-index: 5;
+    pointer-events: none;
+  }
+
   .bf-day-tabs { gap: 6px; padding-bottom: var(--space-3); margin-bottom: var(--space-3); }
   .bf-day-tab { min-width: 52px; padding: 10px 10px; border-radius: var(--radius-md); }
   .bf-tab-date { font-size: 1.1rem; }

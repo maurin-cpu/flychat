@@ -82,10 +82,12 @@ def main() -> int:
         text = render_template("email/briefing.txt", **ctx)
 
     # Stats ausgeben
+    flyable_days = [d for d in ctx['days'] if d['tier'] != 'none' and d['region_groups']]
+    total_groups = sum(len(d['region_groups']) for d in flyable_days)
     print("[OK] briefing_context gebaut:")
-    print(f"     - Tage:            {len(ctx['days'])}")
+    print(f"     - Tage:            {len(ctx['days'])} ({len(flyable_days)} fliegbar)")
     print(f"     - Region-Matrix:   {len(ctx['region_matrix'])} Regionen")
-    print(f"     - Top-5 Woche:     {len(ctx['top_spots_week'])} Spots")
+    print(f"     - Region-Gruppen:  {total_groups} (ueber alle fliegbaren Tage)")
     print(f"     - Warnings:        {len(ctx['warnings'])}")
     print(f"     - Verdict:         {ctx['verdict']['headline'] if ctx['verdict'] else '(keiner)'}")
 

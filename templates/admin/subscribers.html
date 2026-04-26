@@ -121,8 +121,8 @@
             <td title="{{ (s.regions or [])|join(', ') }}" style="font-size:var(--text-sm);color:var(--color-text-muted);">
               {{ (s.regions or [])|length }} Region{% if (s.regions or [])|length != 1 %}en{% endif %}
             </td>
-            <td class="sp-tbl__dt">{{ s.created_at.strftime('%Y-%m-%d %H:%M') if s.created_at else '' }}</td>
-            <td class="sp-tbl__dt">{{ s.last_sent_at.strftime('%Y-%m-%d %H:%M') if s.last_sent_at else '—' }}</td>
+            <td class="sp-tbl__dt">{{ (s.created_at|string)[:16] if s.created_at else '' }}</td>
+            <td class="sp-tbl__dt">{{ (s.last_sent_at|string)[:16] if s.last_sent_at else '—' }}</td>
             <td>
               {% if s.status != 'unsubscribed' %}
               <form method="post" action="/admin/subscribers/{{ s.id }}/block"

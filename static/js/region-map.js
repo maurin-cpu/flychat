@@ -171,6 +171,31 @@
             if (currentDate && regionAnalyses) colorRegions(currentDate);
         });
 
+        // Legend (collapsible, bottom-left). Standardmaessig eingeklappt —
+        // Pilot kann via Klick aufklappen wenn Farben unklar sind.
+        var legend = L.control({ position: 'bottomleft' });
+        legend.onAdd = function () {
+            var div = L.DomUtil.create('div', 'map-legend collapsed');
+            div.innerHTML =
+                '<button class="map-legend-toggle" aria-label="Legende ein-/ausblenden">Legende</button>' +
+                '<div class="map-legend-body">' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#16a34a"></span> Sicher / Gut</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#7c3aed"></span> Sicher / Top</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#78716c"></span> Sicher / Abgleiter</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#d97706"></span> Vorsicht</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#b91c1c"></span> Nicht sicher</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#9ca3af"></span> Keine Daten</div>' +
+                '</div>';
+            var toggle = div.querySelector('.map-legend-toggle');
+            toggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                div.classList.toggle('collapsed');
+            });
+            L.DomEvent.disableClickPropagation(div);
+            return div;
+        };
+        legend.addTo(map);
+
         loadRegions();
     }
 

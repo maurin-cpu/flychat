@@ -59,17 +59,6 @@ def _inject_static_v():
     return {"static_v": static_v}
 
 
-@app.context_processor
-def _inject_supabase_creds():
-    """Macht SUPABASE_URL + SUPABASE_ANON_KEY in allen Templates verfuegbar.
-    Leer wenn nicht konfiguriert → Frontend-Code faellt auf /api/* Polling zurueck.
-    """
-    return {
-        "supabase_url": os.environ.get("SUPABASE_URL", "").strip(),
-        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", "").strip(),
-    }
-
-
 # Weather-API responses ändern sich nur beim Refresh (~1x/Tag).
 # 60s Browser-Cache = sofortige Overlays beim Tab-Wechsel, ohne stale-Risiko.
 _CACHEABLE_PREFIXES = ("/api/weather/", "/api/altitude-wind/",
@@ -233,7 +222,7 @@ def subscribe_submit():
 
     mgr = _get_subscriber_manager()
     if mgr is None:
-        logger.error("/subscribe POST: SUPABASE_DATABASE_URL nicht konfiguriert")
+        logger.error("/subscribe POST: SubscriberManager konnte nicht initialisiert werden")
         return _rerender("Der Abo-Service ist gerade nicht verfuegbar. Bitte spaeter nochmal.")
 
     result = mgr.create(email=email, regions=regions, skill_level=skill_level)
@@ -474,7 +463,7 @@ def admin_subscribers():
     mgr = _get_subscriber_manager()
     if mgr is None:
         return _status_page("error", "Admin nicht verfuegbar",
-                            "SUPABASE_DATABASE_URL nicht konfiguriert.",
+                            "SubscriberManager konnte nicht initialisiert werden.",
                             http_code=503)
     return render_template(
         "admin/subscribers.html",
@@ -608,7 +597,6 @@ def admin_config_save():
 def index():
     return render_template(
         "index.html",
-        instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
         show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
@@ -618,7 +606,6 @@ def index():
 def chat_page():
     return render_template(
         "index.html",
-        instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
         show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
@@ -628,7 +615,6 @@ def chat_page():
 def map_page():
     return render_template(
         "index.html",
-        instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
         show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
@@ -638,7 +624,6 @@ def map_page():
 def regionen_page():
     return render_template(
         "regionen.html",
-        instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
     )
 
@@ -769,7 +754,6 @@ def briefing_page():
     og = _build_briefing_og(regions_q, day_q, spot_q)
     return render_template(
         "briefing.html",
-        instantdb_app_id=config.INSTANTDB_APP_ID,
         forecast_days=config.FORECAST_DAYS,
         og=og,
     )
@@ -957,7 +941,7 @@ def api_run_analyses():
 
 @app.route("/api/analyses")
 def api_analyses():
-    """Gibt Spot-Analysen im flachen Format zurück (wie InstantDB-Subscription)."""
+    """Gibt Spot-Analysen im flachen Format zurück."""
     flat = {}
     loaded_at = engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None
     for spot_name, days in engine.spot_analyses.items():
@@ -1208,7 +1192,7 @@ def api_regionen_polygone():
 
 @app.route("/api/refresh-spots", methods=["POST"])
 def api_refresh_spots():
-    """Laedt Spots neu aus CSV und synchronisiert nach InstantDB."""
+    """Laedt Spots neu aus CSV."""
     try:
         count = engine.reload_spots()
         return jsonify({"success": True, "spots_count": count})
@@ -1303,10 +1287,10 @@ def _tier_thresholds():
     Frontend uses these to color cells consistently with the LLM rating.
     """
     return {
-        "ground_wind": {"warn": config.WIND_MODERATE_KMH, "danger": config.WIND_STRONG_KMH},
+        "ground_wind": {"warn": config.WIND_WARN_KMH, "danger": config.WIND_DANGER_KMH},
         "ground_gust": {"warn": config.GUST_WARN_KMH, "danger": config.GUST_DANGER_KMH},
-        "aloft_wind": {"warn": config.ALOFT_WARN_KMH, "danger": config.ALOFT_DANGER_KMH},
-        "aloft_gust": {"warn": config.ALOFT_GUST_WARN_KMH, "danger": config.ALOFT_GUST_DANGER_KMH},
+        "aloft_wind": {"warn": config.WIND_WARN_KMH, "danger": config.WIND_DANGER_KMH},
+        "aloft_gust": {"warn": config.GUST_WARN_KMH, "danger": config.GUST_DANGER_KMH},
     }
 
 

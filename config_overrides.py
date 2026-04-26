@@ -38,23 +38,17 @@ OVERRIDE_PATH: Path = config.DATA_DIR / "config_overrides.json"
 
 SCHEMA: dict[str, dict[str, list[dict]]] = {
     "meteo": {
-        "Wind-Schwellen (Hoehenwind)": [
-            {"key": "ALOFT_DANGER_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Hoehenwind im Flugbereich ab dem die Stunde als gefaehrlich (ALOFT-DANGER) gewertet wird. Wird auch in Skill-Texten verwendet."},
-            {"key": "ALOFT_WARN_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Hoehenwind ab dem ALOFT-WARN vergeben wird (kraeftig, aber noch nicht gefaehrlich)."},
-            {"key": "ALOFT_DANGER_CONDITIONAL_HOURS", "type": "int", "min": 0, "max": 12, "unit": "h",
-             "help": "Anzahl Stunden mit ALOFT-DANGER, ab der der Tag von 'safe' auf 'conditional' herabgestuft wird."},
-            {"key": "ALOFT_DANGER_NOTSAFE_HOURS", "type": "int", "min": 0, "max": 12, "unit": "h",
-             "help": "Anzahl Stunden mit ALOFT-DANGER, ab der der Tag hart auf 'not_safe' gesetzt wird."},
+        "Wind-Schwellen (Boden + Hoehe einheitlich)": [
+            {"key": "WIND_WARN_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
+             "help": "Wind ab dem [WIND-WARN] (Boden) bzw. [ALOFT-WIND-WARN] (Hoehe) vergeben wird. Sportlich, noch fliegbar."},
+            {"key": "WIND_DANGER_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
+             "help": "Wind ab dem [WIND-DANGER] (Boden) bzw. [ALOFT-WIND-DANGER] (Hoehe) vergeben wird. Strukturelles Stopp-Kriterium."},
+            {"key": "WIND_TREND_CONDITIONAL_HOURS", "type": "int", "min": 0, "max": 12, "unit": "h",
+             "help": "Anzahl Stunden mit Wind-DANGER (Boden + Hoehe summiert), ab der der Tag von safe auf conditional herabgestuft wird."},
+            {"key": "WIND_TREND_NOTSAFE_HOURS", "type": "int", "min": 0, "max": 12, "unit": "h",
+             "help": "Anzahl Stunden mit Wind-DANGER + DURCHGEHEND_DANGER/EINGEKESSELT-Pattern, ab der der Tag hart auf not_safe gesetzt wird."},
             {"key": "WIND_DIRECTION_TOLERANCE_PCT", "type": "float", "min": 0.0, "max": 1.0, "step": 0.05,
              "help": "Erlaubte Windrichtungs-Abweichung vom Startplatz-Sektor, als Anteil der Sektorbreite (0.10 = 10%)."},
-        ],
-        "Wind-Schwellen (Bodenwind, Regionen)": [
-            {"key": "WIND_STRONG_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Grundwind ab dem [WIND-STRONG] vergeben wird — Region unfliegbar. Skill-Texte nutzen diesen Wert."},
-            {"key": "WIND_MODERATE_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Grundwind ab dem [WIND-MODERATE] vergeben wird (sportlich, noch fliegbar). Darunter: WIND-CALM."},
         ],
         "Start-Fenster (Windrichtung + Gefahrenfreiheit)": [
             {"key": "CLEAN_WINDOW_MIN_HOURS", "type": "int", "min": 1, "max": 8, "unit": "h",
@@ -66,21 +60,13 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
             {"key": "WIND_DIRECTION_SWING_WINDOW_H", "type": "int", "min": 1, "max": 6, "unit": "h",
              "help": "Max Fensterbreite fuer Richtungsdreher-Erkennung. Erfasst abrupte 1h-Spruenge genauso wie langsames Drehen ueber mehrere Stunden (z.B. 120° ueber 3h). 1 = nur Stunde-zu-Stunde, 3 = empfohlen."},
         ],
-        "Boeen-Schwellen (Bodenboeen, Spots)": [
+        "Boeen-Schwellen (Boden + Hoehe einheitlich, Spots)": [
             {"key": "GUST_WARN_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Boeen ab dem [GUST-WARN] vergeben wird (sportlich, nicht unfliegbar)."},
+             "help": "Boeen ab dem [GUST-WARN] (Boden) bzw. [ALOFT-GUST-WARN] (Hoehe) vergeben wird."},
             {"key": "GUST_DANGER_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Boeen ab dem [GUST-DANGER] vergeben wird — Stunde unfliegbar."},
-            {"key": "GUST_SPREAD_KMH", "type": "int", "min": 0, "max": 50, "unit": "km/h",
-             "help": "Mindest-Exzess (gusts - wind) als zusaetzlicher Trigger fuer [GUST-WARN]."},
-            {"key": "GUST_WARN_ABSOLUTE_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Absolute Boeen-Schwelle (ohne Spread-Check) fuer [GUST-WARN]."},
-        ],
-        "Turbulenz-Schwellen (Hoehenboeen T(z), Spots)": [
-            {"key": "ALOFT_GUST_WARN_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Turbulenzrisiko T(z) im Flugbereich ab dem [ALOFT-GUST-WARN] vergeben wird."},
-            {"key": "ALOFT_GUST_DANGER_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
-             "help": "Turbulenzrisiko T(z) ab dem [ALOFT-GUST-DANGER] vergeben wird — extreme Klapper-Gefahr."},
+             "help": "Boeen ab dem [GUST-DANGER] / [ALOFT-GUST-DANGER] vergeben wird. LLM bevorzugt NoGo bei DURCHGEHEND_DANGER-Trend."},
+            {"key": "GUST_TREND_FLOOR_HOURS", "type": "int", "min": 0, "max": 12, "unit": "h",
+             "help": "Mindeststunden Boeen (WARN oder DANGER, Boden + Hoehe summiert) fuer Boeen-Floor → safe→conditional."},
         ],
         "CAPE-Schwellen (Konvektion)": [
             {"key": "CAPE_WARN_JKG", "type": "int", "min": 0, "max": 5000, "unit": "J/kg",

@@ -378,6 +378,33 @@
     }
 
     /* Floating controls: use shared .floating-control / .floating-day-tabs from style.css */
+
+    /* "Stand: <Datum/Zeit>" oben rechts in der Karte. Desktop dezent,
+       Mobile noch unauffaelliger, damit weder Map-Controls noch
+       Tagesauswahl verdeckt werden. */
+    .floating-status {
+        top: 8px;
+        right: 8px;
+        font-size: 11px;
+        color: #475569;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        pointer-events: none;
+        background: rgba(255, 255, 255, 0.78);
+    }
+    .floating-status:empty { display: none; }
+    @media (max-width: 639px) {
+        .floating-status {
+            top: 4px;
+            right: 6px;
+            font-size: 9px;
+            padding: 2px 6px;
+            opacity: 0.75;
+            background: rgba(255, 255, 255, 0.6);
+        }
+    }
 </style>
 {% endblock %}
 
@@ -434,6 +461,9 @@
 
         <!-- Floating Day Tabs (overlay on map, below navbar) -->
         <div class="floating-control floating-day-tabs" id="navDayTabs"></div>
+
+        <!-- Floating Status: "Stand: <Datum>" oben rechts, klein und dezent -->
+        <div class="floating-control floating-status" id="statusBar"></div>
 
         <!-- Meteogram Overlay -->
         <div class="meteogram-overlay" id="meteogramOverlay" role="dialog" aria-modal="true" aria-label="Meteogramm">
@@ -688,16 +718,8 @@
     })();
 </script>
 
-<!-- Spot/Region-Analysen: Supabase Realtime fuer Live-Updates nach neuen Analyse-Runs -->
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const SUPABASE_URL = '{{ supabase_url }}';
-const SUPABASE_ANON_KEY = '{{ supabase_anon_key }}';
-const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
-    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
-
+<!-- Spot/Region-Analysen: Initial-Fetch + Refresh on tab focus (Polling reicht bei 1x/Tag Analyse-Run) -->
+<script>
 function normalizeFlyTier(ft) {
     if (!ft) return '';
     var k = String(ft).trim().toLowerCase();
@@ -725,10 +747,31 @@ function _normalizeFlyStatusInNested(nested) {
     return nested;
 }
 
+// "Stand: <Datum>" Pill oben rechts auf der Karte. Datum kommt aus dem
+// neuesten updated_at aller Spot-Analysen — gleicher Trick wie regionen.html.
+function _updateStatusBarFromSpotAnalyses(spotAnalyses) {
+    var bar = document.getElementById('statusBar');
+    if (!bar) return;
+    var newest = null;
+    for (var spot in spotAnalyses) {
+        for (var ds in spotAnalyses[spot]) {
+            var ts = spotAnalyses[spot][ds].updated_at;
+            if (ts && (!newest || ts > newest)) newest = ts;
+        }
+    }
+    if (newest) {
+        try {
+            var d = new Date(newest);
+            bar.textContent = 'Stand: ' + d.toLocaleString('de-CH');
+        } catch (e) { bar.textContent = ''; }
+    }
+}
+
 // ── Primary: Load analyses from API (JSON/Postgres via Python backend) ──
 fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
     if (data.spot_analyses && Object.keys(data.spot_analyses).length > 0) {
         window.analysisData = _normalizeFlyStatusInNested(data.spot_analyses);
+        _updateStatusBarFromSpotAnalyses(window.analysisData);
         if (window.updateSpotColors) {
             window.updateSpotColors(window.analysisData, window.currentDate);
         }
@@ -744,60 +787,32 @@ fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(functi
     }
 }).catch(function(e) { console.warn('API region analyses fetch failed:', e); });
 
-// ── Secondary: Supabase Realtime als Trigger fuer Re-Fetch ──
-// Rohe Postgres-Payload hat nested Struktur (safety: {...}, flyability: {...}).
-// /api/analyses flattet das in die Struktur die map.js/updateSpotColors erwartet.
-// Daher: Bei Realtime-Event einfach API neu ziehen (debounced, damit nicht
-// 2430 Events → 2430 Fetches triggern).
-if (supabase) {
-    var _spotRefreshTimer = null;
-    var _regionRefreshTimer = null;
-
-    function _debouncedRefetchSpots() {
-        clearTimeout(_spotRefreshTimer);
-        _spotRefreshTimer = setTimeout(function() {
-            fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
-                if (data.spot_analyses && Object.keys(data.spot_analyses).length > 0) {
-                    window.analysisData = _normalizeFlyStatusInNested(data.spot_analyses);
-                    if (window.updateSpotColors) {
-                        window.updateSpotColors(window.analysisData, window.currentDate);
-                    }
-                    window.dispatchEvent(new CustomEvent('gleitcast-analyses-loaded'));
-                    console.log('[REALTIME] Spot-Analysen refresh:', Object.keys(data.spot_analyses).length);
-                }
-            }).catch(function(e) { console.warn('Refetch /api/analyses failed:', e); });
-        }, 500);
-    }
-
-    function _debouncedRefetchRegions() {
-        clearTimeout(_regionRefreshTimer);
-        _regionRefreshTimer = setTimeout(function() {
-            fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
-                if (data.region_analyses && Object.keys(data.region_analyses).length > 0) {
-                    window.regionAnalysisData = _normalizeFlyStatusInNested(data.region_analyses);
-                    console.log('[REALTIME] Region-Analysen refresh:', Object.keys(data.region_analyses).length);
-                }
-            }).catch(function(e) { console.warn('Refetch /api/region-analyses failed:', e); });
-        }, 500);
-    }
-
-    supabase.channel('spot_analyses_changes')
-        .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'spot_analyses' },
-            _debouncedRefetchSpots)
-        .subscribe(function(status) {
-            if (status === 'SUBSCRIBED') console.log('[REALTIME] spot_analyses subscribed');
-        });
-
-    supabase.channel('region_analyses_changes')
-        .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'region_analyses' },
-            _debouncedRefetchRegions)
-        .subscribe(function(status) {
-            if (status === 'SUBSCRIBED') console.log('[REALTIME] region_analyses subscribed');
-        });
-} else {
-    console.warn('[REALTIME] Supabase URL/Key fehlen — keine Live-Updates, nur Polling via /api/*');
+// ── Refresh on tab focus: holt neue Analysen wenn der User zum Tab zurueckkommt ──
+// Eine Analyse laeuft 1x/Tag — Polling reicht voellig, kein Realtime noetig.
+function _refetchSpots() {
+    fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
+        if (data.spot_analyses && Object.keys(data.spot_analyses).length > 0) {
+            window.analysisData = _normalizeFlyStatusInNested(data.spot_analyses);
+            _updateStatusBarFromSpotAnalyses(window.analysisData);
+            if (window.updateSpotColors) {
+                window.updateSpotColors(window.analysisData, window.currentDate);
+            }
+            window.dispatchEvent(new CustomEvent('gleitcast-analyses-loaded'));
+        }
+    }).catch(function(e) { console.warn('Refetch /api/analyses failed:', e); });
 }
+function _refetchRegions() {
+    fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+        if (data.region_analyses && Object.keys(data.region_analyses).length > 0) {
+            window.regionAnalysisData = _normalizeFlyStatusInNested(data.region_analyses);
+        }
+    }).catch(function(e) { console.warn('Refetch /api/region-analyses failed:', e); });
+}
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+        _refetchSpots();
+        _refetchRegions();
+    }
+});
 </script>
 {% endblock %}

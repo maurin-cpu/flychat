@@ -12,17 +12,18 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 
 **Harte No-Go-Tags = DANGER-Level** (Stunde wird UNFLIEGBAR, gehoert NIEMALS ins safe_window):
 - `[RAIN-WARN]` — Niederschlag ≥ 0.05 mm/h
+- `[WIND-DANGER]` — Bodenwind > {{cfg.WIND_DANGER_KMH}} km/h
+- `[ALOFT-WIND-DANGER]` — Hoehenwind in Flugschicht > {{cfg.WIND_DANGER_KMH}} km/h (Auto-NoGo-Trigger ab {{cfg.WIND_TREND_NOTSAFE_HOURS}}h/Tag bei DURCHGEHEND_DANGER-Trend)
 - `[GUST-DANGER]` — Bodenboeen > {{cfg.GUST_DANGER_KMH}} km/h *(nur Spots)*
-- `[ALOFT-DANGER]` — Wind in Flugschicht > {{cfg.ALOFT_DANGER_KMH}} km/h (= NO-GO-Trigger ab {{cfg.ALOFT_DANGER_NOTSAFE_HOURS}}h/Tag)
-- `[ALOFT-GUST-DANGER]` — Turbulenz in Flugschicht > {{cfg.ALOFT_GUST_DANGER_KMH}} km/h *(nur Spots)*
-- `[STRONG-WIND-WARN]` — Grundwind ueber Spot-Maximum *(nur Spots)*
+- `[ALOFT-GUST-DANGER]` — Turbulenz in Flugschicht > {{cfg.GUST_DANGER_KMH}} km/h *(nur Spots)*
 - `[THUNDERSTORM]` — Modell sagt Gewitter (weather_code 95/96/99)
 - `[CAPE-DANGER]` — CAPE > {{cfg.CAPE_DANGER_JKG}} J/kg ODER CAPE + Regen aktiv
 - `[OVERCAST-DANGER]` — Dichte Wolkendecke nahe Flughoehe
 
 **Weiche Vorsichts-Tags = WARN-Level** (Stunde wird SPORTLICH, bleibt fliegbar fuer erfahrene Piloten, Status mind. conditional):
+- `[WIND-WARN]` — Bodenwind {{cfg.WIND_WARN_KMH}}-{{cfg.WIND_DANGER_KMH}} km/h
+- `[ALOFT-WIND-WARN]` — Hoehenwind in Flugschicht {{cfg.WIND_WARN_KMH}}-{{cfg.WIND_DANGER_KMH}} km/h
 - `[GUST-WARN]` — Bodenboeen erhoeht (WARN-Level) *(nur Spots)*
-- `[ALOFT-WARN]` — Wind in der Flugschicht erhoeht (WARN-Level)
 - `[ALOFT-GUST-WARN]` — Turbulenz in der Flugschicht erhoeht (WARN-Level) *(nur Spots)*
 - `[CAPE-WARN]` — CAPE erhoeht (WARN-Level) ohne Trigger
 
@@ -30,21 +31,21 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 - `[WIND-OK]` — Windrichtung liegt im erlaubten Spot-Sektor (inkl. 10° Buffer) → Start moeglich.
 - `[WIND-WRONG]` — Windrichtung ausserhalb des Spot-Sektors → **Stunde nicht startbar** (NICHT UNFLIEGBAR). Stunden NACH einem gueltigen Start-Fenster sind kein Sicherheitsproblem (Pilot ist in der Luft, Landung separat). Details: `_hazard_blocks.md` Block 2 Start-Fenster-Regel.
 
-**Magnitude-Tags (Region-Modus):** Regionen haben keinen Sektor und keine Boeen, nur Wind-Staerke auf Referenzhoehe.
-- `[WIND-CALM]` — Wind < {{cfg.WIND_MODERATE_KMH}} km/h → RUHIG
-- `[WIND-MODERATE]` — Wind {{cfg.WIND_MODERATE_KMH}}-{{cfg.WIND_STRONG_KMH}} km/h → SPORTLICH (= WARN-Level fuer Regionen)
-- `[WIND-STRONG]` — Wind > {{cfg.WIND_STRONG_KMH}} km/h → UNFLIEGBAR (= DANGER-Level fuer Regionen)
+**Region-Modus:** Regionen haben keinen Sektor und keine Boeen, nur Wind-Staerke auf Referenzhoehe. Tags sind dieselben wie bei Spots:
+- Kein Tag (Wind < {{cfg.WIND_WARN_KMH}} km/h) → RUHIG
+- `[WIND-WARN]` — Wind {{cfg.WIND_WARN_KMH}}-{{cfg.WIND_DANGER_KMH}} km/h → SPORTLICH
+- `[WIND-DANGER]` — Wind > {{cfg.WIND_DANGER_KMH}} km/h → UNFLIEGBAR
 
 **Stunden-Klassifikation** (siehe KERNREGEL in `_hazard_blocks.md`) — **zwei unabhaengige Achsen**:
 
 *Achse 1 — Flug-Gefahr (betrifft Pilot in der Luft):*
 - `RUHIG` = KEINE Tags = komfortabel.
 - `SPORTLICH` = ≥1 WARN-Tag, KEIN DANGER = fliegbar erfahren.
-- `UNFLIEGBAR` = ≥1 DANGER-Tag (RAIN, GUST-DANGER, ALOFT-*, STRONG-WIND-WARN, THUNDERSTORM, CAPE-DANGER, OVERCAST-DANGER) — `[WIND-WRONG]` zaehlt NICHT hier rein.
+- `UNFLIEGBAR` = ≥1 DANGER-Tag (RAIN-WARN, WIND-DANGER, ALOFT-WIND-DANGER, GUST-DANGER, ALOFT-GUST-DANGER, THUNDERSTORM, CAPE-DANGER, OVERCAST-DANGER) — `[WIND-WRONG]` zaehlt NICHT hier rein.
 
 *Achse 2 — Start-Moeglichkeit (betrifft nur Startplatz):*
-- `STARTBAR` = `[WIND-OK]` (Region: `[WIND-CALM]` oder `[WIND-MODERATE]`).
-- `NICHT-STARTBAR` = `[WIND-WRONG]` (Spot) ODER `[WIND-STRONG]` (Region).
+- `STARTBAR` = `[WIND-OK]` (Spot) oder Region nicht `[WIND-DANGER]`.
+- `NICHT-STARTBAR` = `[WIND-WRONG]` (Spot) ODER `[WIND-DANGER]` (Region — Wind zu stark).
 
 *Kombinierter Begriff:*
 - **Saubere Stunde** = STARTBAR UND nicht UNFLIEGBAR (keine DANGER-Tags). Das ist die einzige Stundenart, in der ein Pilot sicher starten kann.
@@ -64,7 +65,7 @@ B) DRUCKLEVEL-WERTE (Flugschicht-Zeile)
 Format: `pressure(altitude_m)MARKER: wind/boeen km/h aus dir°`
 
 **Marker verstehen:**
-- `*` = **Flugbereich** (Spot-Hoehe bis Thermik+1000m, inkl. Lid-Zone) — HIER feuern die [ALOFT-*]-Tags. Trend-Bewertung ({{cfg.ALOFT_WARN_KMH}}-{{cfg.ALOFT_DANGER_KMH}} km/h steigend = WARN, > {{cfg.ALOFT_DANGER_KMH}} km/h = DANGER) gilt voll.
+- `*` = **Flugbereich** (Spot-Hoehe bis Thermik+1000m, inkl. Lid-Zone) — HIER feuern die [ALOFT-*]-Tags. Trend-Bewertung ({{cfg.WIND_WARN_KMH}}-{{cfg.WIND_DANGER_KMH}} km/h = WARN, > {{cfg.WIND_DANGER_KMH}} km/h = DANGER) gilt voll.
 - `~` = **Buffer-Zone** (500m ueber dem Flugbereich) — KEINE harten Tags, aber wenn dort Boeen > 50 km/h: Hinweis in `caution_notes` ("scharfer Hoehensturm direkt ueber Thermikspitze"). Wenn Buffer ruhiger als Flugbereich: Entwarnung.
 - **Kein Marker** = nur 850/700 hPa als Foehn-Anker. Fuer direkte Sicherheit irrelevant ausser als Foehn-Indikator.
 
@@ -80,7 +81,7 @@ Hier hat das System bereits alles gezaehlt und geflagged:
 - `→ BOEEN-FLOOR: MINDEST-STATUS = 'conditional'` oder `'not_safe'` — vom System **erzwungener** Mindeststatus (nicht verhandelbar!) *(nur Spots)*
 - `→ ACHTUNG Verhaeltnis < 35%: ...` — optionaler Warnhinweis
 - `THERMIK-QUALITAET-Block`: Zaehler fuer SHEAR/TORN/ROUGH-UNUSABLE-Stunden + TQ-Ratio pro Stunde (Regionen: kein ROUGH)
-- **Trend-Labels (falls vorhanden):** AUFKLAERUNG / ZUNEHMEND / EINGEKESSELT / DURCHGEHEND (WARN/DANGER) / VEREINZELT / STABIL — vollstaendige Definitionen siehe TREND-VOKABULAR in `_hazard_blocks.md`. Wende sie pro Gefahrenblock an (Regen, Bodenwind, Boeen, Hoehenwind, CAPE, Wolken). Foehn ist ausgenommen (severity-pauschal, kein Trend).
-- **Eigene Trend-Zeilen:** Direkt nach TAGESPROFIL koennen `NIEDERSCHLAG-TREND`, `BOEEN-TREND` (nur Spots) und `HOEHENWIND-TREND` stehen. Diese Zeilen sind das System-Urteil zum jeweiligen Gefahrenblock — sie liefern dir das **Muster** (z.B. AUFKLAERUNG, ZUNEHMEND, DURCHGEHEND_DANGER) und die **Fakten** (Stunden, Zeitpunkte). Sie sind PFLICHT-Input fuer deinen Status. Den Status leitest du aus dem Muster ab (Mapping siehe `_hazard_blocks.md` Block 4 fuer Hoehenwind, Block 3 fuer Boeen, TREND-VOKABULAR fuer den Rest) — nicht aus einem mitgelieferten Satz, denn die Trend-Zeile enthaelt **keine fertigen Handlungs-Saetze** zum Abschreiben.
+- **Trend-Labels (falls vorhanden):** AUFKLAERUNG / ZUNEHMEND / EINGEKESSELT / DURCHGEHEND (WARN/DANGER) / VEREINZELT / STABIL — vollstaendige Definitionen siehe TREND-VOKABULAR in `_hazard_blocks.md`. Wende sie pro Gefahrenblock an (Regen, Wind, Boeen, CAPE, Wolken). Foehn ist ausgenommen (severity-pauschal, kein Trend).
+- **Eigene Trend-Zeilen:** Direkt nach TAGESPROFIL koennen `NIEDERSCHLAG-TREND`, `GUST-TREND` (nur Spots) und `WIND-TREND` stehen. `WIND-TREND` umfasst Bodenwind UND Hoehenwind summiert (gleiche Schwellen WARN/DANGER), `GUST-TREND` umfasst Boden- und Hoehenboeen summiert. Sie liefern dir das **Muster** (z.B. AUFKLAERUNG, ZUNEHMEND, DURCHGEHEND_DANGER) und die **Fakten** (Stunden, Zeitpunkte). Sie sind PFLICHT-Input fuer deinen Status. Den Status leitest du aus dem Muster ab (Mapping siehe `_hazard_blocks.md` Block 4 fuer Wind, Block 3 fuer Boeen, TREND-VOKABULAR fuer den Rest) — nicht aus einem mitgelieferten Satz, denn die Trend-Zeile enthaelt **keine fertigen Handlungs-Saetze** zum Abschreiben.
 
 **Deine Pflicht:** Diese Werte lesen, nicht selber berechnen. Wenn BOEEN-FLOOR steht, ist das verbindlich. Wenn "Verhaeltnis < 35%" steht, MUSS das in `caution_notes` oder `no_go_reasons`.

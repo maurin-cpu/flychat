@@ -277,37 +277,6 @@ def _format_window(best_window: str) -> str:
     return str(best_window).strip()
 
 
-def _spot_safety_sentence(spot: dict) -> str:
-    """Ein-Satz-Sicherheit fuer die Spot-Karte. Fallback auf conditional_reason."""
-    feedback = (spot.get("safety_feedback") or "").strip()
-    if feedback:
-        # Oft Mehrzeilig — erste Zeile nehmen, bis erster Punkt.
-        first = feedback.split("\n", 1)[0]
-        if "." in first:
-            first = first.split(".", 1)[0] + "."
-        return first[:180]
-    if spot.get("is_conditional") and spot.get("conditional_reason"):
-        return f"Bedingt: {spot['conditional_reason'][:180]}"
-    return "Keine akuten Gefahren."
-
-
-def _spot_flyability_sentence(spot: dict) -> str:
-    """Ein-Satz-Fliegbarkeit. Nutzt recommendation, Fallback flight_type."""
-    rec = (spot.get("recommendation") or "").strip()
-    if rec:
-        first = rec.split("\n", 1)[0]
-        if "." in first:
-            first = first.split(".", 1)[0] + "."
-        return first[:180]
-    ft = (spot.get("flight_type") or "").strip()
-    peak = spot.get("peak_climb_rate")
-    if ft and peak:
-        return f"{ft}, Peak {peak} m/s."
-    if ft:
-        return ft
-    return ""
-
-
 def _extract_safety_warnings(days_with_all_my_spots: list) -> list[dict]:
     """Scannt alle Subscriber-Spots aller Tage nach Sicherheits-Keywords und
     baut pro Kategorie ein Warning-Objekt.
@@ -413,33 +382,113 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
     return out
 
 
-def _build_top_spots_week(days_out: list[dict], n: int = 5) -> list[dict]:
-    """Top-N Starts ueber die ganze Woche — Spots aus allen Tagen gemerged.
+def _group_spots_by_region(shown_spots: list[dict],
+                           region_ratings_by_id: dict[str, float],
+                           *, max_regions: int = 3,
+                           max_spots_per_region: int = 3) -> list[dict]:
+    """Gruppiert shown_spots nach region_id, kappt auf top max_regions × max_spots_per_region.
 
-    Sortierung: Tier-Rang DESC, dann Rating DESC.
-    Dedupliziert pro Spot-Name (nimmt den besten Tag).
+    region_tier = bester Spot-Tier der Region (Rang via _TIER_RANK).
+    region_rating = aus region_ratings_by_id (briefing_data.top_regions),
+                    Fallback Max-Rating der Spots in der Region.
+    Spots pro Region nach rating DESC, Regionen nach region_rating DESC.
     """
-    seen_spots = {}  # spot_name -> (rank_tuple, spot_dict_mit_day)
-    for day_idx, day in enumerate(days_out):
-        for s in day.get("shown_spots", []):
-            spot_name = s.get("spot") or ""
-            tier_rank = _TIER_RANK.get(s.get("tier", "none"), -1)
-            rating = float(s.get("rating") or 0)
-            key = (tier_rank, rating)
+    groups: dict[str, dict] = {}
+    for s in shown_spots:
+        rid = s.get("region_id") or ""
+        if rid not in groups:
+            groups[rid] = {
+                "region_id":   rid,
+                "region_name": s.get("region_name") or rid,
+                "spots":       [],
+            }
+        groups[rid]["spots"].append(s)
 
-            prev = seen_spots.get(spot_name)
-            if prev is None or key > prev[0]:
-                enriched = {
-                    **s,
-                    "day_short": day["label"].get("short", ""),
-                    "day_long":  day["label"].get("long", ""),
-                    "day_date":  day.get("date", ""),
-                    "day_idx":   day_idx,
-                }
-                seen_spots[spot_name] = (key, enriched)
+    out = []
+    for rid, g in groups.items():
+        spots = sorted(g["spots"], key=lambda s: float(s.get("rating") or 0), reverse=True)
+        spots = spots[:max_spots_per_region]
+        g["spots"] = spots
+        region_tier = max((sp.get("tier", "gray") for sp in spots),
+                          key=lambda t: _TIER_RANK.get(t, -1))
+        meta = _TIER_META.get(region_tier, _TIER_META["gray"])
+        rating = region_ratings_by_id.get(rid)
+        if rating is None or rating <= 0:
+            rating = max((float(sp.get("rating") or 0) for sp in spots), default=0.0)
+        g["region_rating"] = float(rating)
+        g["region_rating_display"] = f"{float(rating):.1f}"
+        g["region_tier"] = region_tier
+        g["tier_color"] = meta["color"]
+        g["tier_label"] = meta["label"]
+        out.append(g)
 
-    ranked = sorted(seen_spots.values(), key=lambda x: x[0], reverse=True)
-    return [item[1] for item in ranked[:n]]
+    out.sort(key=lambda x: x["region_rating"], reverse=True)
+    return out[:max_regions]
+
+
+def _aggregate_windows(windows: list[str]) -> str:
+    """Min-Start → Max-End ueber mehrere 'HH:MM-HH:MM' Strings."""
+    starts, ends = [], []
+    for w in windows:
+        if not w or "-" not in w:
+            continue
+        try:
+            s, e = w.split("-", 1)
+            s, e = s.strip(), e.strip()
+            if ":" in s and ":" in e:
+                starts.append(s)
+                ends.append(e)
+        except Exception:
+            continue
+    if not starts:
+        return ""
+    return f"{min(starts)}-{max(ends)}"
+
+
+def _day_fly_summary(my_spots: list[dict], day_tier: str) -> str:
+    """Ein-Satz-Fliegbarkeit fuer Day-Header. Aggregiert peak climb + Fenster."""
+    if not my_spots or day_tier == "none":
+        return ""
+    climbs = [float(s.get("peak_climb_rate") or 0) for s in my_spots]
+    peak = max((c for c in climbs if c > 0), default=0.0)
+    span = _aggregate_windows([s.get("best_window") for s in my_spots])
+
+    label_map = {
+        "violet": "Top-Bedingungen",
+        "green": "Solide Thermik",
+        "conditional": "Eingeschraenkt fliegbar",
+    }
+    bits = [label_map.get(day_tier, "")]
+    if peak > 0:
+        bits.append(f"Peak {peak:.1f} m/s")
+    if span:
+        bits.append(f"Fenster {span}")
+    text = ", ".join(b for b in bits if b)
+    return text + "." if text else ""
+
+
+def _day_safety_summary(my_spots: list[dict]) -> str:
+    """Ein-Satz-Sicherheit fuer Day-Header. Nutzt _SAFETY_KEYWORDS.
+
+    Returns 'Stabil, keine Warnungen.' wenn nichts gefunden.
+    """
+    if not my_spots:
+        return ""
+    seen_labels: list[str] = []
+    for s in my_spots:
+        haystack = " ".join([
+            s.get("safety_feedback") or "",
+            s.get("conditional_reason") or "",
+            s.get("recommendation") or "",
+        ]).lower()
+        if not haystack.strip():
+            continue
+        for cat, keywords, label in _SAFETY_KEYWORDS:
+            if any(kw in haystack for kw in keywords) and label not in seen_labels:
+                seen_labels.append(label)
+    if seen_labels:
+        return f"Vorsicht: {', '.join(seen_labels[:2])}."
+    return "Stabil, keine Warnungen."
 
 
 def _date_label(date_str: str) -> dict:
@@ -455,7 +504,8 @@ def _date_label(date_str: str) -> dict:
 
 
 def build_briefing_context(subscriber: dict, briefing_data: dict,
-                           *, top_n_per_day: int = 3) -> dict:
+                           *, top_n_regions_per_day: int = 3,
+                           top_n_spots_per_region: int = 3) -> dict:
     """
     Filtert briefing_data auf Subscriber-Regionen und baut den Template-Kontext
     fuer templates/email/briefing.html.
@@ -463,7 +513,8 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     Args:
       subscriber: {id, email, regions, skill_level, action_token}
       briefing_data: Output von GleitcastEngine.build_briefing_data()
-      top_n_per_day: Maximale Anzahl Spots pro Tag in der Mail (Default 3)
+      top_n_regions_per_day: Maximale Anzahl Regionen pro Tag (Default 3)
+      top_n_spots_per_region: Maximale Anzahl Spots pro Region (Default 3)
 
     Returns:
       dict fuer Jinja2 mit days[], verdict{}, urls{}, tier_meta{} etc.
@@ -472,7 +523,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     action_token = subscriber.get("action_token") or ""
 
     days_out = []
-    days_with_all_my_spots = []  # fuer Safety-Header Scan (ALLE Spots, nicht nur Top-3)
+    days_with_all_my_spots = []  # fuer Safety-Header Scan (ALLE Spots, nicht nur Top-9)
     for day in briefing_data.get("days", []):
         date_str = day.get("date", "")
         all_spots = day.get("top_spots", []) or []
@@ -480,8 +531,9 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         day_label_dict = _date_label(date_str)
         days_with_all_my_spots.append((day_label_dict, my_spots))
 
+        # Spot-Pool fuer Gruppierung: alle my_spots, gekappt erst innerhalb der Gruppen
         shown = []
-        for s in my_spots[:top_n_per_day]:
+        for s in my_spots:
             tier = _spot_tier(s)
             meta = _TIER_META.get(tier, _TIER_META["gray"])
             shown.append({
@@ -492,13 +544,29 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
                 "tier_bg":    meta["bg"],
                 "tier_icon":  meta["icon"],
                 "window":     _format_window(s.get("best_window", "")),
-                "safety_sentence":     _spot_safety_sentence(s),
-                "flyability_sentence": _spot_flyability_sentence(s),
                 "rating_display": f"{float(s.get('rating', 0) or 0):.1f}",
             })
 
         day_tier = _derive_day_tier(my_spots)
         meta = _TIER_META[day_tier]
+
+        # Region-Rating-Lookup aus briefing_data.top_regions, Fallback Max-Spot-Rating
+        day_top_regions = day.get("top_regions") or []
+        region_rating_lookup = {r.get("region_id"): float(r.get("rating") or 0)
+                                for r in day_top_regions if r.get("region_id")}
+        region_groups = _group_spots_by_region(
+            shown, region_rating_lookup,
+            max_regions=top_n_regions_per_day,
+            max_spots_per_region=top_n_spots_per_region,
+        )
+
+        # Day-Rating = Max ueber gezeigte Spots; Day-Summaries
+        displayed_spots = [sp for g in region_groups for sp in g["spots"]]
+        day_rating = max((float(sp.get("rating") or 0) for sp in displayed_spots),
+                         default=0.0)
+        fly_summary = _day_fly_summary(my_spots, day_tier)
+        safety_summary = _day_safety_summary(my_spots)
+
         days_out.append({
             "date": date_str,
             "label": day_label_dict,
@@ -507,8 +575,13 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "tier_color": meta["color"],
             "tier_bg":    meta["bg"],
             "tier_icon":  meta["icon"],
-            "shown_spots": shown,
-            "more_count":  max(0, len(my_spots) - len(shown)),
+            "shown_spots": displayed_spots,
+            "region_groups": region_groups,
+            "day_rating": day_rating,
+            "day_rating_display": f"{day_rating:.1f}" if day_rating > 0 else "",
+            "fly_summary": fly_summary,
+            "safety_summary": safety_summary,
+            "more_count":  max(0, len(my_spots) - len(displayed_spots)),
             # Intern fuer Heatmap-Aggregation (nicht direkt im Template verwendet)
             "_my_spots_all": my_spots,
         })
@@ -549,9 +622,8 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     today = datetime.now()
     warnings = _extract_safety_warnings(days_with_all_my_spots)
 
-    # Neu: Heatmap-Matrix + Top-5 Spots der Woche
+    # Heatmap-Matrix der Subscriber-Regionen
     region_matrix = _build_region_matrix(days_out, subscriber_regions)
-    top_spots_week = _build_top_spots_week(days_out, n=5)
 
     # Kurzlabels fuer Heatmap-Kopfzeile (Mo/Di/Mi/...)
     day_short_labels = [d["label"].get("short", "") for d in days_out]
@@ -571,11 +643,6 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # Spot-Links enthalten zusaetzlich &spot=<name> — das Frontend filtert dann
     # auf genau diesen einen Spot (Focus-Modus mit "Alle anzeigen"-Clear).
     from urllib.parse import quote
-    for s in top_spots_week:
-        spot_q = quote(s.get("spot") or "", safe="")
-        s["url"] = (f"{base}/briefing?regions={s['region_id']}"
-                    f"&day={s['day_idx']}&spot={spot_q}")
-
     for day_idx, day in enumerate(days_out):
         for s in day["shown_spots"]:
             spot_q = quote(s.get("spot") or "", safe="")
@@ -610,7 +677,6 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         "briefing_weekday": _WEEKDAY_DE_LONG[today.weekday()],
         "kw": today.isocalendar().week,
         "region_matrix": region_matrix,
-        "top_spots_week": top_spots_week,
         "day_short_labels": day_short_labels,
         "tier_meta": _TIER_META,
     }
@@ -737,30 +803,13 @@ def _cli_preview(email: str, wet_run: bool = False) -> int:
     # Subscriber nachschlagen
     sub_mgr = get_manager_from_env()
     if sub_mgr is None:
-        print("FEHLER: SUPABASE_DATABASE_URL nicht gesetzt.", file=sys.stderr)
+        print("FEHLER: SubscriberManager konnte nicht initialisiert werden.", file=sys.stderr)
         return 2
 
-    # Dirty-Hack: wir suchen per get_by_action_token nicht. Dafuer kleine Direkt-Query.
-    try:
-        with sub_mgr._cursor() as (_, cur):
-            cur.execute(
-                "SELECT id, email, regions, skill_level, action_token, status "
-                "FROM subscribers WHERE email = %s",
-                (email.strip().lower(),),
-            )
-            row = cur.fetchone()
-    except Exception as e:
-        print(f"FEHLER: Subscriber-Lookup: {e}", file=sys.stderr)
-        return 2
-
-    if not row:
+    subscriber = sub_mgr.get_by_email(email)
+    if not subscriber:
         print(f"FEHLER: Subscriber mit E-Mail '{email}' nicht gefunden.", file=sys.stderr)
         return 3
-
-    subscriber = {
-        "id": row[0], "email": row[1], "regions": row[2],
-        "skill_level": row[3], "action_token": row[4], "status": row[5],
-    }
     print(f"[OK] Subscriber: #{subscriber['id']} {subscriber['email']} "
           f"({subscriber['status']}), Regionen: {subscriber['regions']}")
 

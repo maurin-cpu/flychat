@@ -320,15 +320,13 @@ _TAG_NATURAL = [
     # Wind / Boeen
     ("ALOFT-GUST-DANGER",      "gefaehrliche Hoehenboeen"),
     ("ALOFT-GUST-WARN",        "kraeftige Hoehenboeen"),
-    ("ALOFT-DANGER",           "gefaehrlicher Hoehenwind"),
-    ("ALOFT-WARN",             "kraeftiger Hoehenwind"),
+    ("ALOFT-WIND-DANGER",      "gefaehrlicher Hoehenwind"),
+    ("ALOFT-WIND-WARN",        "kraeftiger Hoehenwind"),
     ("GUST-DANGER",            "gefaehrliche Boeen"),
     ("GUST-WARN",              "starke Boeen"),
-    ("STRONG-WIND-WARN",       "zu starker Grundwind"),
-    ("WIND-STRONG",            "starker Wind"),
-    ("WIND-MODERATE",          "maessiger Wind"),
+    ("WIND-DANGER",            "starker Wind"),
+    ("WIND-WARN",              "maessiger Wind"),
     ("WIND-WRONG",             "falsche Windrichtung"),
-    ("WIND-CALM",              "ruhiger Wind"),
     ("WIND-OK",                "passende Windrichtung"),
     # Sonstiges
     ("RAIN-WARN",              "Regen"),
@@ -645,22 +643,17 @@ def _detect_rain_sandwich(rain_hours: list, all_hours_sorted: list) -> dict:
 
 def _detect_gust_trend(gust_hours: list, all_hours_sorted: list,
                        gust_danger_hours: list = None) -> dict:
-    """Erkennt Boeen-Trendmuster ueber den Tag (analog _detect_rain_sandwich).
+    """Erkennt Boeen-Trendmuster ueber den Tag (Boden + Hoehe summiert).
 
     Boeen-Stunden = Stunden mit irgendeinem der Tags
     [GUST-WARN], [GUST-DANGER], [ALOFT-GUST-WARN], [ALOFT-GUST-DANGER].
     gust_danger_hours: Untermenge mit Tags >40 km/h (DANGER-Level).
 
     Returns dict mit:
-        is_sandwiched: bool — ruhiges Fenster zwischen zwei boeigen Phasen
-        max_calm_gap: int — laengstes zusammenhaengendes ruhiges Fenster (Stunden)
-        calm_start: str — Beginn des laengsten ruhigen Fensters
-        calm_end: str — Ende
-        gusts_before_calm: bool — boeige Stunden vor dem laengsten ruhigen Fenster
-        gusts_after_calm: bool — boeige Stunden nach dem laengsten ruhigen Fenster
-        gust_count: int — Anzahl boeiger Stunden (WARN + DANGER)
-        danger_count: int — Anzahl Stunden mit DANGER-Level (>40 km/h)
-        total_count: int — Gesamtanzahl Stunden im Fenster
+        is_sandwiched, max_calm_gap, calm_start, calm_end,
+        gusts_before_calm, gusts_after_calm, gust_count, danger_count, total_count,
+        pattern_label: AUFKLAERUNG | ZUNEHMEND | EINGEKESSELT | EINGEKESSELT_KNAPP
+                       | DURCHGEHEND_DANGER | DURCHGEHEND_WARN | VEREINZELT | KEIN.
     """
     total = len(all_hours_sorted or [])
     danger_count = len(gust_danger_hours or [])
@@ -675,6 +668,7 @@ def _detect_gust_trend(gust_hours: list, all_hours_sorted: list,
             "gust_count": 0,
             "danger_count": 0,
             "total_count": total,
+            "pattern_label": "KEIN",
         }
 
     gust_set = set(gust_hours)
@@ -690,6 +684,9 @@ def _detect_gust_trend(gust_hours: list, all_hours_sorted: list,
     if current_calm:
         calm_stretches.append(current_calm)
 
+    gc = len(gust_hours)
+    danger_majority = danger_count >= max(3, int(0.5 * gc))
+
     if not calm_stretches:
         return {
             "is_sandwiched": False,
@@ -698,9 +695,10 @@ def _detect_gust_trend(gust_hours: list, all_hours_sorted: list,
             "calm_end": "",
             "gusts_before_calm": False,
             "gusts_after_calm": False,
-            "gust_count": len(gust_hours),
+            "gust_count": gc,
             "danger_count": danger_count,
             "total_count": total,
+            "pattern_label": "DURCHGEHEND_DANGER" if danger_majority else "DURCHGEHEND_WARN",
         }
 
     longest = max(calm_stretches, key=len)
@@ -708,22 +706,38 @@ def _detect_gust_trend(gust_hours: list, all_hours_sorted: list,
     calm_end = longest[-1]
     gusts_before = any(h < calm_start for h in gust_hours)
     gusts_after = any(h > calm_end for h in gust_hours)
+    is_sand = gusts_before and gusts_after
+    calm_gap = len(longest)
+
+    if gc >= max(1, int(0.75 * total)) or calm_gap < 2:
+        label = "DURCHGEHEND_DANGER" if danger_majority else "DURCHGEHEND_WARN"
+    elif is_sand and calm_gap < 4:
+        label = "EINGEKESSELT"
+    elif is_sand:
+        label = "EINGEKESSELT_KNAPP"
+    elif gusts_before and not gusts_after:
+        label = "AUFKLAERUNG"
+    elif gusts_after and not gusts_before:
+        label = "ZUNEHMEND"
+    else:
+        label = "VEREINZELT"
 
     return {
-        "is_sandwiched": gusts_before and gusts_after,
-        "max_calm_gap": len(longest),
+        "is_sandwiched": is_sand,
+        "max_calm_gap": calm_gap,
         "calm_start": calm_start,
         "calm_end": calm_end,
         "gusts_before_calm": gusts_before,
         "gusts_after_calm": gusts_after,
-        "gust_count": len(gust_hours),
+        "gust_count": gc,
         "danger_count": danger_count,
         "total_count": total,
+        "pattern_label": label,
     }
 
 
 def _format_gust_trend_text(gust_pattern: dict, gust_hours: list) -> str:
-    """Erzeugt BOEEN-TREND Text-Zeile fuer LLM-Kontext (analog NIEDERSCHLAG-TREND).
+    """Erzeugt GUST-TREND Text-Zeile fuer LLM-Kontext (analog NIEDERSCHLAG-TREND).
 
     Pattern-Klassifikation:
       DURCHGEHEND  — boeige Stunden >= 75% des Tages oder ruhiges Fenster < 2h
@@ -758,67 +772,68 @@ def _format_gust_trend_text(gust_pattern: dict, gust_hours: list) -> str:
     if gc >= max(1, int(0.75 * tc)) or calm_gap < 2:
         if danger_majority:
             return (
-                f"BOEEN-TREND: DURCHGEHEND_DANGER — Boeige Stunden in {gc} von {tc}h, "
+                f"GUST-TREND: DURCHGEHEND_DANGER — Boeige Stunden in {gc} von {tc}h, "
                 f"davon {dc}h DANGER-Level (Boden oder Flugraum). "
                 f"Laengstes ruhiges Fenster {calm_gap}h."
             )
         return (
-            f"BOEEN-TREND: DURCHGEHEND_WARN — Boeige Stunden in {gc} von {tc}h auf WARN-Level, "
+            f"GUST-TREND: DURCHGEHEND_WARN — Boeige Stunden in {gc} von {tc}h auf WARN-Level, "
             f"laengstes ruhiges Fenster {calm_gap}h."
         )
 
     if is_sand and calm_gap < 4:
         if danger_majority:
             return (
-                f"BOEEN-TREND: EINGEKESSELT (mit DANGER) — Ruhiges Fenster {calm_gap}h "
+                f"GUST-TREND: EINGEKESSELT (mit DANGER) — Ruhiges Fenster {calm_gap}h "
                 f"({calm_start}-{calm_end}) zwischen boeigen Phasen "
                 f"({gc}h boeig, davon {dc}h DANGER-Level)."
             )
         return (
-            f"BOEEN-TREND: EINGEKESSELT (WARN-Level) — Ruhiges Fenster {calm_gap}h "
+            f"GUST-TREND: EINGEKESSELT (WARN-Level) — Ruhiges Fenster {calm_gap}h "
             f"({calm_start}-{calm_end}) zwischen boeigen Phasen ({gc}h auf WARN-Level)."
         )
 
     if is_sand:
         return (
-            f"BOEEN-TREND: EINGEKESSELT_KNAPP — Ruhiges Fenster {calm_gap}h "
+            f"GUST-TREND: EINGEKESSELT_KNAPP — Ruhiges Fenster {calm_gap}h "
             f"({calm_start}-{calm_end}) zwischen boeigen Phasen ({gc}h insgesamt)."
         )
 
     if gusts_before and not gusts_after:
         return (
-            f"BOEEN-TREND: AUFKLAERUNG — Boeig frueh ({gc}h, bis {calm_start}), "
+            f"GUST-TREND: AUFKLAERUNG — Boeig frueh ({gc}h, bis {calm_start}), "
             f"danach ruhig ({calm_gap}h ab {calm_start})."
         )
 
     if gusts_after and not gusts_before:
         return (
-            f"BOEEN-TREND: ZUNEHMEND — Ruhig morgens ({calm_gap}h, bis {calm_end}), "
+            f"GUST-TREND: ZUNEHMEND — Ruhig morgens ({calm_gap}h, bis {calm_end}), "
             f"danach {gc}h boeig."
         )
 
     return (
-        f"BOEEN-TREND: VEREINZELT — {gc}h boeige Phasen verteilt, "
+        f"GUST-TREND: VEREINZELT — {gc}h boeige Phasen verteilt, "
         f"laengstes ruhiges Fenster {calm_gap}h ({calm_start}-{calm_end})."
     )
 
 
 def _detect_aloft_trend(aloft_hours: list, all_hours_sorted: list,
                         aloft_danger_hours: list = None) -> dict:
-    """Erkennt Hoehenwind-Trendmuster ueber den Tag (analog _detect_gust_trend).
+    """Erkennt Wind-Trendmuster ueber den Tag (Boden + Hoehe summiert, analog _detect_gust_trend).
 
-    aloft_hours = Stunden mit [ALOFT-WARN] ODER [ALOFT-DANGER] im Flugbereich.
-    aloft_danger_hours: Untermenge mit [ALOFT-DANGER] (> ALOFT_DANGER_KMH).
+    aloft_hours = Stunden mit [WIND-WARN] / [WIND-DANGER] / [ALOFT-WIND-WARN] / [ALOFT-WIND-DANGER].
+    aloft_danger_hours: Untermenge mit [WIND-DANGER] / [ALOFT-WIND-DANGER] (> WIND_DANGER_KMH).
+    Funktionsname historisch (war frueher nur Hoehenwind), liefert jetzt aber den WIND-TREND.
 
     Returns dict mit:
-        is_sandwiched: bool — ruhiges Fenster zwischen zwei Hoehenwind-Phasen
+        is_sandwiched: bool — ruhiges Fenster zwischen zwei Wind-Phasen (Boden+Hoehe)
         max_calm_gap: int — laengstes zusammenhaengendes ruhiges Fenster (Stunden)
         calm_start: str — Beginn des laengsten ruhigen Fensters
         calm_end: str — Ende
         aloft_before_calm: bool — Hoehenwind-Stunden vor dem laengsten ruhigen Fenster
         aloft_after_calm: bool — Hoehenwind-Stunden nach dem laengsten ruhigen Fenster
         aloft_count: int — Anzahl Hoehenwind-Stunden (WARN + DANGER)
-        danger_count: int — Anzahl Stunden mit DANGER-Level (> ALOFT_DANGER_KMH)
+        danger_count: int — Anzahl Stunden mit DANGER-Level (> WIND_DANGER_KMH)
         total_count: int — Gesamtanzahl Stunden im Fenster
         pattern_label: str — AUFKLAERUNG | ZUNEHMEND | EINGEKESSELT | EINGEKESSELT_KNAPP
                              | DURCHGEHEND_DANGER | DURCHGEHEND_WARN | VEREINZELT | KEIN
@@ -907,7 +922,7 @@ def _detect_aloft_trend(aloft_hours: list, all_hours_sorted: list,
 
 def _format_aloft_trend_text(aloft_pattern: dict, aloft_hours: list,
                              danger_kmh: float = 30, warn_kmh: float = 20) -> str:
-    """Erzeugt HOEHENWIND-TREND Text-Zeile fuer LLM-Kontext (analog BOEEN-TREND).
+    """Erzeugt WIND-TREND Text-Zeile fuer LLM-Kontext (analog GUST-TREND).
 
     Pattern-Klassifikation: siehe _detect_aloft_trend → pattern_label.
     Severitaet: not_safe nur bei DURCHGEHEND_DANGER oder EINGEKESSELT mit DANGER
@@ -930,42 +945,42 @@ def _format_aloft_trend_text(aloft_pattern: dict, aloft_hours: list,
 
     if label == "DURCHGEHEND_DANGER":
         return (
-            f"HOEHENWIND-TREND: DURCHGEHEND_DANGER — Hoehenwind in {ac} von {tc}h, "
+            f"WIND-TREND: DURCHGEHEND_DANGER — Wind (Boden+Hoehe) in {ac} von {tc}h, "
             f"davon {dc}h DANGER-Level. Laengstes ruhiges Fenster {calm_gap}h."
         )
     if label == "DURCHGEHEND_WARN":
         return (
-            f"HOEHENWIND-TREND: DURCHGEHEND_WARN — Hoehenwind in {ac} von {tc}h auf WARN-Level, "
+            f"WIND-TREND: DURCHGEHEND_WARN — Wind (Boden+Hoehe) in {ac} von {tc}h auf WARN-Level, "
             f"laengstes ruhiges Fenster {calm_gap}h."
         )
     if label == "EINGEKESSELT":
         if dc >= max(1, int(0.3 * ac)):
             return (
-                f"HOEHENWIND-TREND: EINGEKESSELT (mit DANGER) — Ruhiges Fenster {calm_gap}h "
-                f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen "
+                f"WIND-TREND: EINGEKESSELT (mit DANGER) — Ruhiges Fenster {calm_gap}h "
+                f"({calm_start}-{calm_end}) zwischen Wind-Phasen (Boden+Hoehe) "
                 f"({ac}h Hoehenwind, davon {dc}h DANGER-Level)."
             )
         return (
-            f"HOEHENWIND-TREND: EINGEKESSELT (WARN-Level) — Ruhiges Fenster {calm_gap}h "
-            f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen ({ac}h auf WARN-Level)."
+            f"WIND-TREND: EINGEKESSELT (WARN-Level) — Ruhiges Fenster {calm_gap}h "
+            f"({calm_start}-{calm_end}) zwischen Wind-Phasen (Boden+Hoehe) ({ac}h auf WARN-Level)."
         )
     if label == "EINGEKESSELT_KNAPP":
         return (
-            f"HOEHENWIND-TREND: EINGEKESSELT_KNAPP — Ruhiges Fenster {calm_gap}h "
-            f"({calm_start}-{calm_end}) zwischen Hoehenwind-Phasen ({ac}h insgesamt)."
+            f"WIND-TREND: EINGEKESSELT_KNAPP — Ruhiges Fenster {calm_gap}h "
+            f"({calm_start}-{calm_end}) zwischen Wind-Phasen (Boden+Hoehe) ({ac}h insgesamt)."
         )
     if label == "AUFKLAERUNG":
         return (
-            f"HOEHENWIND-TREND: AUFKLAERUNG — Hoehenwind frueh ({ac}h, bis {calm_start}, "
+            f"WIND-TREND: AUFKLAERUNG — Wind frueh ({ac}h, bis {calm_start}, "
             f"davon {dc}h DANGER-Level), danach ruhig ({calm_gap}h ab {calm_start})."
         )
     if label == "ZUNEHMEND":
         return (
-            f"HOEHENWIND-TREND: ZUNEHMEND — Ruhig morgens ({calm_gap}h, bis {calm_end}), "
-            f"danach {ac}h Hoehenwind, davon {dc}h DANGER-Level."
+            f"WIND-TREND: ZUNEHMEND — Ruhig morgens ({calm_gap}h, bis {calm_end}), "
+            f"danach {ac}h Wind (Boden+Hoehe), davon {dc}h DANGER-Level."
         )
     return (
-        f"HOEHENWIND-TREND: VEREINZELT — {ac}h Hoehenwind-Phasen verteilt "
+        f"WIND-TREND: VEREINZELT — {ac}h Wind-Phasen (Boden+Hoehe) verteilt "
         f"(davon {dc}h DANGER-Level), laengstes ruhiges Fenster {calm_gap}h "
         f"({calm_start}-{calm_end})."
     )

@@ -51,7 +51,19 @@
       const active = selected.has(r.id);
       return `<button type="button" class="sp-filter-chip${active ? " is-active" : ""}" data-region-id="${escapeHtml(r.id)}" aria-pressed="${active}">${escapeHtml(r.region)}</button>`;
     }).join("");
-    if (resetBtn) resetBtn.disabled = selected.size === 0;
+    if (resetBtn) {
+      // Briefing-Logik: Wenn bereits alle Regionen ausgewaehlt sind ->
+      // Button wechselt auf "Keine" (waehlt alle ab). Sonst "Alle" (waehlt
+      // alle aus). Nur disabled wenn keine Regionen verfuegbar sind.
+      const allActive = regions.length > 0 && regions.every((r) => selected.has(r.id));
+      resetBtn.disabled = regions.length === 0;
+      resetBtn.textContent = allActive ? "Keine" : "Alle";
+      resetBtn.classList.toggle("is-active", allActive);
+      resetBtn.setAttribute(
+        "aria-label",
+        allActive ? "Alle Regionen abwählen" : "Alle Regionen auswählen"
+      );
+    }
   }
 
   function toggle(id) {
@@ -73,8 +85,14 @@
 
   if (resetBtn) {
     resetBtn.addEventListener("click", () => {
-      if (selected.size === 0) return;
-      selected.clear();
+      if (regions.length === 0) return;
+      const allActive = regions.every((r) => selected.has(r.id));
+      if (allActive) {
+        selected.clear();
+      } else {
+        selected.clear();
+        regions.forEach((r) => selected.add(r.id));
+      }
       renderChips();
       syncHiddenInputs();
       updateMapStyles();

@@ -98,6 +98,10 @@ DATA_DIR = PROJECT_ROOT / "data"
 USE_SPOT_CSV = os.environ.get("GLEITCAST_SPOT_CSV", "complete")  # "complete" | "test"
 CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
 REGIONEN_GEOJSON_PATH = DATA_DIR / "regionen_referenzpunkte.geojson"
+# Master-File fuer Region-Properties (Name, terrain_type, elevation_ref,
+# kritischer_foehn, description). Geometrie + reference_points kommen aus
+# der GeoJSON, alle textuellen Felder aus dieser CSV.
+REGIONEN_CSV_PATH = DATA_DIR / "regionen.csv"
 
 # Vercel: Nur /tmp ist schreibbar. Readonly-Daten (CSV, GeoJSON) bleiben in data/
 if os.environ.get("VERCEL"):
@@ -106,10 +110,12 @@ if os.environ.get("VERCEL"):
     WEATHER_JSON_PATH = _WRITABLE_DIR / "wetterdaten.json"
     HISTORY_DIR = _WRITABLE_DIR / "history"
     STATION_DB_PATH = _WRITABLE_DIR / "station_observations.db"
+    SUBSCRIBERS_DB_PATH = _WRITABLE_DIR / "subscribers.db"
 else:
     WEATHER_JSON_PATH = DATA_DIR / "wetterdaten.json"
     HISTORY_DIR = DATA_DIR / "history"
     STATION_DB_PATH = DATA_DIR / "station_observations.db"
+    SUBSCRIBERS_DB_PATH = DATA_DIR / "subscribers.db"
 
 # ============================================================================
 # SPOT SOURCE AREAS (manuelle Overrides fuer Referenzpunkte)
@@ -535,18 +541,13 @@ PRODUCTIVE_BAND_DEPTH_MIN = 400 # m — Mindest-Banddicke (thermal_top - elevati
                                 # Hoehenband zum Kurbeln vorhanden ist (flache Inversions-/
                                 # Mittellandtage, Thermik-Deckel zu nah am Start).
 
-# ─── Höhenwind-Schwellen (einheitlich über Backend, Skills, UI) ───
-# Konservative Auslegung: Ab 30 km/h Höhenwind im Flugbereich ist die Stunde
-# gefährlich (ALOFT-DANGER). Zwischen 20–30 km/h: "kräftig" (ALOFT-WARN, nur Info).
+# ─── Wind-Schwellen (Boden + Hoehe einheitlich, Spot + Region) ───
+# Konservative Auslegung: Ab WIND_DANGER_KMH ist die Stunde gefaehrlich,
+# zwischen WIND_WARN_KMH und WIND_DANGER_KMH "kraeftig" (sportlich).
+# Gilt fuer Bodenwind (10m) UND Hoehenwind W(z) im Flugbereich.
 # Flugbereich = elevation_ref bis thermal_top + 1000m (effective_ceiling).
-ALOFT_DANGER_KMH = 30           # Höhenwind > 30 km/h im Flugbereich → [ALOFT-DANGER]
-ALOFT_WARN_KMH = 20             # Höhenwind 20–30 km/h im Flugbereich → [ALOFT-WARN]
-
-# ─── Bodenwind-Magnitude-Schwellen (Region-Ebene, magnitudenbasiert) ───
-# Regionen haben keinen Sektor-Check, nur Stärke-Klassifikation.
-WIND_STRONG_KMH = 30            # Grundwind > 30 km/h → [WIND-STRONG] (unfliegbar)
-WIND_MODERATE_KMH = 20          # Grundwind 20–30 km/h → [WIND-MODERATE] (sportlich)
-# < WIND_MODERATE_KMH → [WIND-CALM] (ruhig)
+WIND_WARN_KMH = 20              # Wind 20–30 km/h → [WIND-WARN] / [ALOFT-WIND-WARN]
+WIND_DANGER_KMH = 30            # Wind > 30 km/h → [WIND-DANGER] / [ALOFT-WIND-DANGER]
 
 # ─── Start-Fenster-Schwellen (Windrichtung + Gefahrenfreiheit) ───
 # Eine "saubere Stunde" = WIND-OK (Spot-Sektor) UND keine DANGER-Tags.
@@ -569,17 +570,11 @@ CLEAN_WINDOW_GREEN_HOURS = 3     # h — ab hier: safe/green moeglich
 WIND_DIRECTION_SWING_NOTE_DEG = 45   # Grad — Schwelle fuer caution_notes-Hinweis
 WIND_DIRECTION_SWING_WINDOW_H = 3    # Stunden — max Fensterbreite fuer Drift-Erkennung
 
-# ─── Bodenböen-Schwellen (Spots) ───
-# wind_gusts_10m (nach Bias-Korrektur + Multi-Modell-Merge).
-GUST_WARN_KMH = 30              # Böen > 30 km/h mit Spread-Trigger → [GUST-WARN]
-GUST_DANGER_KMH = 40            # Böen > 40 km/h → [GUST-DANGER] (unfliegbar)
-GUST_SPREAD_KMH = 15            # Mindest-Exzess (gusts - wind) für [GUST-WARN]-Trigger
-GUST_WARN_ABSOLUTE_KMH = 35     # Absolut-Böen-Schwelle ohne Spread-Check
-
-# ─── Höhen-Turbulenz-Schwellen (T(z), Spots) ───
-# Turbulenzrisiko = W(z) + exp-Decay vom Bodenboeen-Exzess.
-ALOFT_GUST_WARN_KMH = 30        # T(z) > 30 km/h im Flugbereich → [ALOFT-GUST-WARN]
-ALOFT_GUST_DANGER_KMH = 40      # T(z) > 40 km/h im Flugbereich → [ALOFT-GUST-DANGER]
+# ─── Boeen-Schwellen (Boden + Hoehe einheitlich, nur Spots) ───
+# Boden: wind_gusts_10m (nach Bias-Korrektur + Multi-Modell-Merge).
+# Hoehe: T(z) = W(z) + exp-Decay vom Bodenboeen-Exzess (Turbulenzrisiko).
+GUST_WARN_KMH = 30              # Boeen > 30 km/h → [GUST-WARN] / [ALOFT-GUST-WARN]
+GUST_DANGER_KMH = 40            # Boeen > 40 km/h → [GUST-DANGER] / [ALOFT-GUST-DANGER]
 
 # ─── CAPE-Schwellen (Konvektionsenergie, J/kg) ───
 # CAPE-DANGER (hart): extreme Instabilität ODER CAPE + Regen (aktive Ueberentwicklung).
@@ -587,12 +582,13 @@ ALOFT_GUST_DANGER_KMH = 40      # T(z) > 40 km/h im Flugbereich → [ALOFT-GUST-
 CAPE_WARN_JKG = 800             # CAPE > 800 J/kg → [CAPE-WARN]
 CAPE_DANGER_JKG = 1500          # CAPE > 1500 J/kg → [CAPE-DANGER]
 
-# ALOFT-Override Schwellen (Stunden):
-# - CONDITIONAL_HOURS: safe → conditional (mindestens Vorsicht bei Bodenwind-ruhig).
-# - NOTSAFE_HOURS:    safe/conditional → not_safe (harter NO-GO-Trigger,
-#   deckt "kräftiger Dauerhöhenwind im Flugbereich" auch wenn Bodenwind ok aussieht).
-ALOFT_DANGER_CONDITIONAL_HOURS = 3
-ALOFT_DANGER_NOTSAFE_HOURS = 3
+# Wind/Boeen-Trend Schwellen (Stunden) — gilt fuer Boden + Hoehe summiert:
+# - CONDITIONAL_HOURS: safe → conditional (Trend-Pattern wirft sauberes Fenster).
+# - NOTSAFE_HOURS:    Wind-Trend DURCHGEHEND_DANGER / EINGEKESSELT (Fenster<3h)
+#                     → harter NO-GO. Boeen-Trend → LLM-Empfehlung "bevorzugt NoGo".
+WIND_TREND_CONDITIONAL_HOURS = 3
+WIND_TREND_NOTSAFE_HOURS = 3
+GUST_TREND_FLOOR_HOURS = 3       # Min. Stunden fuer Boeen-Floor (Boden+Hoehe summiert)
 
 # ============================================================================
 # INSTANTDB-KONFIGURATION
@@ -613,14 +609,6 @@ BIAS_ALPHA = 0.85         # Exponentieller Gewichtungsfaktor (jüngere Paare st�
 BIAS_MIN_PAIRS = 5        # Mindestanzahl Paare bevor Bias angewendet wird
 BIAS_MAX_CORRECTION = 15  # Max ±15 km/h Korrektur (Sicherheitslimit)
 BIAS_ELEV_DECAY_HG = 400  # H_g für Höhenkorrektur Station→Spot (m)
-
-# ============================================================================
-# INSTANTDB-KONFIGURATION
-# ============================================================================
-
-INSTANTDB_APP_ID = "325047cb-0c83-4630-8573-3e59e6dafe54"
-INSTANTDB_ADMIN_TOKEN = os.environ.get("INSTANTDB_ADMIN_TOKEN")
-INSTANTDB_API_URL = "https://api.instantdb.com"
 
 # ============================================================================
 # TAEGLICHER ABLAUF (Wetter-Refresh + LLM-Analyse + Briefing-Versand)

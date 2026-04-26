@@ -87,7 +87,7 @@ Wenn du dieses Muster siehst, warne ausdruecklich: *"Am Boden ist es ruhig, aber
 | Druckflaeche | Entspricht ca. | Kritisch | Signal |
 |---|---|---|---|
 | **700 hPa** | ~3000 m (Kammhoehe) | > ~54 km/h aus passender Richtung | Massive Ueberstroemung |
-| **850 hPa** | ~1500 m (Gipfelniveau) | > {{cfg.ALOFT_DANGER_KMH}} km/h aus passender Richtung | Vorsicht, Turbulenz |
+| **850 hPa** | ~1500 m (Gipfelniveau) | > {{cfg.WIND_DANGER_KMH}} km/h aus passender Richtung | Vorsicht, Turbulenz |
 | **10 m** (Boden) | Talboden/Startplatz | > 15 km/h aus Foehn-Richtung | Grenzbereich Starten |
 
 **Wichtig:** **Nur ΔP reicht nicht.** Bei **2–4 hPa** kann **flacher Foehn** sitzen — dann **850/700** und **Boden vs. Hoehe** schwerer wiegen.

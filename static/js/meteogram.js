@@ -55,8 +55,8 @@ window.Meteogram = (function () {
         var gust = _th(thresholds, isGround ? 'ground_gust' : 'aloft_gust');
         var tags = [];
         if (speed != null) {
-            if (speed > wind.danger) tags.push({ tier: 'danger', name: isGround ? 'STRONG-WIND-WARN' : 'ALOFT-DANGER' });
-            else if (speed > wind.warn) tags.push({ tier: 'caution', name: isGround ? 'WIND-MODERATE' : 'ALOFT-WARN' });
+            if (speed > wind.danger) tags.push({ tier: 'danger', name: isGround ? 'WIND-DANGER' : 'ALOFT-WIND-DANGER' });
+            else if (speed > wind.warn) tags.push({ tier: 'caution', name: isGround ? 'WIND-WARN' : 'ALOFT-WIND-WARN' });
         }
         if (gusts != null && gusts > speed) {
             if (gusts > gust.danger) tags.push({ tier: 'danger', name: isGround ? 'GUST-DANGER' : 'ALOFT-GUST-DANGER' });
@@ -96,16 +96,17 @@ window.Meteogram = (function () {
     }
 
     // Read user pref: show numeric wind/gust/thermik labels in cells.
-    // Default on Mobile = ON, da Piloten Wind/Böe/Thermik-Werte brauchen.
-    // Toggle in der Tier-Legend kann auf OFF stellen wenn unübersichtlich.
-    // Storage-Werte: '1' = on, '0' = off, null/missing = default (on).
+    // Default Mobile = OFF (Übersichtlichkeit, Zellen sonst überladen),
+    // Default Desktop = ON (genug Platz fuer alle Werte).
+    // Toggle in der Tier-Legend kann auf Mobile auf ON stellen.
+    // Storage-Werte: '1' = on, '0' = off, null/missing = viewport-default.
     function readShowNumbers() {
         try {
             var v = localStorage.getItem('gleitcast.meteogram.showNumbers');
             if (v === '1') return true;
             if (v === '0') return false;
-            return true; // Default
-        } catch (e) { return true; }
+            return window.innerWidth > 640; // Mobile default OFF, Desktop ON
+        } catch (e) { return window.innerWidth > 640; }
     }
     function writeShowNumbers(on) {
         try { localStorage.setItem('gleitcast.meteogram.showNumbers', on ? '1' : '0'); }
@@ -555,8 +556,11 @@ window.Meteogram = (function () {
             if (thermik.cape != null && thermik.cape > 800) f.cape = true;
 
             // Aloft danger (within flight layer: elevation .. thermal_max + 1000m)
+            // Schwellen aus thresholds-API (config.WIND_*_KMH / GUST_*_KMH).
             if (profile && profile.levels && elevation > 0) {
                 var topLimit = (thermik.max_height || (elevation + 2000)) + 1000;
+                var aloftWindTh = _th(thresholds, 'aloft_wind');
+                var aloftGustTh = _th(thresholds, 'aloft_gust');
                 for (var li = 0; li < profile.levels.length; li++) {
                     var lv = profile.levels[li];
                     if (lv == null || lv.altitude == null) continue;
@@ -564,12 +568,12 @@ window.Meteogram = (function () {
                     var wsA = lv.wind_speed;
                     var wgA = lv.wind_gusts != null ? lv.wind_gusts : wsA;
                     if (wsA != null) {
-                        if (wsA > 40) f.aloftDanger = true;
-                        else if (wsA > 30) f.aloftWarn = true;
+                        if (wsA > aloftWindTh.danger) f.aloftDanger = true;
+                        else if (wsA > aloftWindTh.warn) f.aloftWarn = true;
                     }
                     if (wgA != null) {
-                        if (wgA > 40) f.aloftGustDanger = true;
-                        else if (wgA > 30) f.aloftGustWarn = true;
+                        if (wgA > aloftGustTh.danger) f.aloftGustDanger = true;
+                        else if (wgA > aloftGustTh.warn) f.aloftGustWarn = true;
                     }
                 }
             }
@@ -625,23 +629,30 @@ window.Meteogram = (function () {
 
         // MOBILE COMPACT: Chart MUSS in den verfügbaren Container passen — kein
         // vertikaler Scroll. Strategie: cellH schrumpfen falls nötig, aber Floor
-        // bei 22px halten (Arrows + Tier-Fill bleiben erkennbar). Scale-Floor
-        // bei 0.85, damit Schrift nicht unter ~9px fällt.
+        // bei 20px halten (Arrows + Tier-Fill bleiben erkennbar). Scale-Floor
+        // bei 0.82, damit Schrift nicht unter ~9px fällt.
+        // Reserve = Tier-Legend-Bar (Pills + 44px Toggle-Button + 16px Padding ≈ 60px)
+        //         + .meteogram-chart Wrapper-Padding (8 oben + 8 unten = 16px)
+        //         + Sicherheits-Puffer (6px) damit niemals knapp ueberlaeuft.
+        // Vorher 36px war zu wenig — Numbers-Toggle (min-height 44px) wurde
+        // nicht beruecksichtigt → Pilot musste ~40px scrollen.
         if (isMobileViewport) {
             var containerH = container.clientHeight || 0;
             if (containerH < 100) {
                 containerH = Math.max(280, window.innerHeight - 200);
             }
-            var legendReserve = 36;  // .mg-tier-legend ca. 28px + 8px gap
-            var availableH = containerH - legendReserve;
+            var legendReserve = 60;        // Tier-Legend incl. 44px Toggle-Button + Padding
+            var chartPaddingReserve = 16;  // .meteogram-chart Padding 8px top+bottom
+            var safetyMargin = 6;
+            var availableH = containerH - legendReserve - chartPaddingReserve - safetyMargin;
             if (chartH > availableH) {
                 var fixedH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
                 var availForRows = Math.max(0, availableH - fixedH);
-                var newCellH = Math.max(22, Math.floor(availForRows / Math.max(1, nRows)));
+                var newCellH = Math.max(20, Math.floor(availForRows / Math.max(1, nRows)));
                 if (newCellH < cellH) {
                     cellH = newCellH;
-                    // Scale-Floor: Schrift nie unter ~85% der Originalgrösse → bleibt lesbar.
-                    scale = Math.max(0.85, cellH / CELL_H);
+                    // Scale-Floor: Schrift nie unter ~82% der Originalgrösse → bleibt lesbar.
+                    scale = Math.max(0.82, cellH / CELL_H);
                     chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
                 }
             }
@@ -1098,11 +1109,12 @@ window.Meteogram = (function () {
 
                 // Mobile: nur Farbe, keine Zahl — Steigrate via Farbcode + Tooltip.
                 if (!isMobileViewport) {
-                    var thermFontSize = Math.round((isNarrow ? 8 : 10) * Math.min(scale, 1.8));
+                    // Thermik-Zahl gleich gross wie Wind-Zahl (siehe windFontSize).
+                    var thermFontSize = Math.round((isNarrow ? 7 : 9) * Math.min(scale, 1.8));
                     chartG.append('text').attr('class', 'therm-value')
                         .attr('x', ci * CELL_W + CELL_W / 2)
                         .attr('y', rowY(ri) + cellH - 4 * scale)
-                        .attr('font-size', thermFontSize + 'px')
+                        .style('font-size', thermFontSize + 'px')
                         .text(localRate.toFixed(1));
                 }
 
@@ -1397,31 +1409,40 @@ window.Meteogram = (function () {
                         textShadow = '0 1px 2px rgba(255,255,255,0.8)';
                     }
                 }
-                // Im Höhengrid nur Wind als Zahl — Böen werden im Bodenstrip
-                // unter dem Meteogramm in der eigenen Böen-Zeile gezeigt.
                 // Wind-Zahl IMMER OBEN (unter dem Pfeil), Thermik-Zahl IMMER
                 // UNTEN. Konsistenz: Pilot weiss wo welcher Wert sitzt, egal ob
                 // Thermik vorhanden ist oder nicht.
+                // Desktop-Höhengrid: zusätzlich "/Böe" neben Wind, eigene
+                // Tier-Farbe → Pilot sieht Böen-Stärke pro Höhe auf einen Blick.
+                // Mobile/Ground bleiben bei Single-Wert (Ground hat eigene Böen-Row).
+                var showInlineGust = !isMobileViewport && !isGround && hasRealGust;
                 if (showNumbers) {
-                    chartG.append('text').attr('class', 'wind-value')
+                    var windText = chartG.append('text').attr('class', 'wind-value')
                         .attr('x', cx).attr('y', windTextY)
                         .attr('font-size', tierFontSize + 'px').attr('fill', speedColor)
                         .attr('opacity', (hasThermik || cellTier !== 'calm') ? 1.0 : 0.8)
                         .attr('font-weight', tierWeight)
                         .style('text-shadow', textShadow)
-                        .style('font-variant-numeric', 'tabular-nums')
-                        .text(Math.round(speed));
+                        .style('font-variant-numeric', 'tabular-nums');
+                    if (showInlineGust) {
+                        windText.append('tspan').attr('fill', speedColor).text(Math.round(speed));
+                        windText.append('tspan').attr('fill', '#94A3B8').attr('font-weight', '400').text('/');
+                        windText.append('tspan').attr('fill', gustColor).text(Math.round(gusts));
+                    } else {
+                        windText.text(Math.round(speed));
+                    }
 
                     // Thermik-Zahl unten in der Zelle (nur wenn Thermik vorhanden).
                     // Thermik-Background ist meist hell (xc-therm), dunkler Text
                     // mit weissem Halo gibt klaren Kontrast.
                     if (hasThermik) {
                         var localRate = thermikCells[ri3 + ',' + ci3];
-                        var thermFontSize = Math.round((isNarrow ? 6 : 8) * Math.min(scale, 1.5));
+                        // Thermik-Zahl gleich gross wie Wind-Zahl (windFontSize).
+                        var thermFontSize = Math.round((isNarrow ? 7 : 9) * Math.min(scale, 1.8));
                         chartG.append('text').attr('class', 'therm-value')
                             .attr('x', cx).attr('y', thermTextY)
                             .attr('text-anchor', 'middle')
-                            .attr('font-size', thermFontSize + 'px')
+                            .style('font-size', thermFontSize + 'px')
                             .attr('font-weight', '700').attr('fill', '#1E293B')
                             .style('font-variant-numeric', 'tabular-nums')
                             .style('text-shadow', '0 0 2px rgba(255,255,255,0.85)')

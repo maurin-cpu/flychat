@@ -15,7 +15,6 @@ import config
 import config_overrides
 config_overrides.init()  # Snapshottet Defaults + wendet data/config_overrides.json an
 from chat_engine import GleitcastEngine
-from instantdb_client import InstantDBClient
 from web import app, init_app
 
 logging.basicConfig(
@@ -28,25 +27,8 @@ logger = logging.getLogger(__name__)
 def main():
     logger.info("=== Gleitcast startet ===")
 
-    # InstantDB-Client: abgeschaltet wenn Supabase konfiguriert ist.
-    # Supabase Realtime uebernimmt Frontend-Sync → InstantDB-Push ist redundant.
-    instantdb = None
-    supabase_active = bool(os.environ.get("SUPABASE_URL", "").strip()
-                           and os.environ.get("SUPABASE_ANON_KEY", "").strip())
-    if supabase_active:
-        logger.info("Supabase aktiv → InstantDB deaktiviert (Realtime via Postgres)")
-    elif config.INSTANTDB_ADMIN_TOKEN:
-        instantdb = InstantDBClient(
-            app_id=config.INSTANTDB_APP_ID,
-            admin_token=config.INSTANTDB_ADMIN_TOKEN,
-            api_url=config.INSTANTDB_API_URL,
-        )
-        logger.info("InstantDB-Client initialisiert (Fallback-Modus)")
-    else:
-        logger.info("Weder Supabase noch InstantDB konfiguriert — nur lokale JSON-Caches")
-
     # Engine initialisieren
-    engine = GleitcastEngine(instantdb_client=instantdb)
+    engine = GleitcastEngine()
 
     # Wetterdaten aus lokalem Cache laden (kein API-Call, nur JSON lesen)
     try:
@@ -54,13 +36,6 @@ def main():
     except Exception as e:
         logger.error(f"Cache-Laden fehlgeschlagen: {e}")
         logger.info("Wetterdaten: Manuell via UI laden (Button 'Wetterdaten laden')")
-
-    # Spots nach InstantDB synchronisieren
-    if instantdb:
-        try:
-            engine.sync_spots_to_instantdb()
-        except Exception as e:
-            logger.error(f"InstantDB Spots-Sync fehlgeschlagen: {e}")
 
     # Flask-App mit Engine verbinden
     init_app(engine)

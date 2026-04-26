@@ -21,10 +21,6 @@ from datetime import datetime, timedelta
 
 import config
 
-# Lazy Supabase-Client Singleton (siehe _get_pg_client).
-_pg_client = None
-_pg_client_init = False
-
 # Verzögerung zwischen Batch-Calls (Open-Meteo Rate-Limit)
 API_DELAY_BETWEEN_CALLS = 3.5  # Sekunden zwischen den 4 Batch-Calls
 # Fix D: Retries reduziert von 4 → 2. Vorher: 15+30+60+120 = 225s Wartezeit
@@ -954,53 +950,12 @@ def fetch_all_spots(spots, save_to_file=True):
     if save_to_file:
         # Speichere Regions-Daten unter _regions Key
         all_data["_regions"] = region_data
-        # 1. Postgres-Write (primaer) — falls konfiguriert
-        _write_weather_to_postgres(all_data, region_data)
-        # 2. JSON-Write (Fallback/Backup) — async, blockiert Aufrufer nicht
+        # JSON-Write — async, blockiert Aufrufer nicht.
         # `all_data` wird nach diesem Punkt nicht mehr mutiert → safe fuer pass-by-reference.
         config.queue_atomic_write_json(config.WEATHER_JSON_PATH, all_data)
         print(f"[INFO] Wetterdaten-Write eingereiht: {config.WEATHER_JSON_PATH}")
 
     return all_data, region_data
-
-
-def _get_pg_client():
-    """Lazy Singleton fuer SupabaseClient. None wenn SUPABASE_DATABASE_URL nicht gesetzt."""
-    global _pg_client, _pg_client_init
-    if _pg_client_init:
-        return _pg_client
-    _pg_client_init = True
-    try:
-        from supabase_client import get_client_from_env
-        _pg_client = get_client_from_env()
-        if _pg_client is not None:
-            print("[INFO] Supabase-Client initialisiert (Postgres aktiv)")
-    except Exception as e:
-        print(f"[WARN] Supabase-Client nicht verfuegbar: {e}")
-        _pg_client = None
-    return _pg_client
-
-
-def _write_weather_to_postgres(all_data, region_data):
-    """Dual-Write: Schreibt Wetterdaten zusaetzlich nach Postgres (wenn konfiguriert).
-    Fire-and-log — Fehler blockieren den JSON-Fallback nicht."""
-    client = _get_pg_client()
-    if client is None:
-        return
-    try:
-        import time as _t
-        t0 = _t.time()
-        meta = all_data.get("_meta") or {}
-        if meta:
-            client.upsert_weather_meta(meta)
-        spots = {k: v for k, v in all_data.items() if not k.startswith("_")}
-        if spots:
-            client.upsert_forecasts(spots)
-        if region_data:
-            client.upsert_regions_forecasts(region_data)
-        print(f"[INFO] Postgres-Write: {len(spots)} Spots + {len(region_data)} Regionen in {_t.time()-t0:.1f}s")
-    except Exception as e:
-        print(f"[WARN] Postgres-Write fehlgeschlagen (JSON-Fallback greift): {e}")
 
 
 def get_weather_for_location(location_name, latitude, longitude):
@@ -1105,43 +1060,22 @@ def get_weather_for_location(location_name, latitude, longitude):
 
 
 def load_cached_weather():
-    """Lade gecachte Wetterdaten.
+    """Lade gecachte Wetterdaten aus wetterdaten.json.
 
-    Primaer aus Postgres (supabase). Fallback: wetterdaten.json wenn Postgres
-    leer oder nicht verfuegbar. Rekonstruiert das alte JSON-Format
-    (_meta + _regions + {spot_name: data}) damit Aufrufer unveraendert bleiben.
+    Format: {_meta, _regions, {spot_name: data}}.
     """
-    client = _get_pg_client()
-    if client is not None:
-        try:
-            import time as _t
-            t0 = _t.time()
-            meta = client.get_weather_meta()
-            print(f"[INFO] Postgres-Read: meta in {_t.time()-t0:.1f}s")
-            t0 = _t.time()
-            forecasts = client.get_all_forecasts()
-            print(f"[INFO] Postgres-Read: {len(forecasts)} Spots in {_t.time()-t0:.1f}s")
-            t0 = _t.time()
-            regions = client.get_all_regions_forecasts()
-            print(f"[INFO] Postgres-Read: {len(regions)} Regionen in {_t.time()-t0:.1f}s")
-            if forecasts:
-                data = dict(forecasts)
-                data["_meta"] = meta or {}
-                data["_regions"] = regions or {}
-                return data
-            # Postgres leer → Fallback auf JSON
-        except Exception as e:
-            print(f"[WARN] load_cached_weather: Postgres-Read fehlgeschlagen, nutze JSON-Fallback: {e}")
-
     if not config.WEATHER_JSON_PATH.exists():
         return None
     with open(config.WEATHER_JSON_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def load_cached_weather_timestamp():
-    """Gibt den Zeitpunkt des letzten Cache-Updates zurück (oder None)."""
-    data = load_cached_weather()
+def load_cached_weather_timestamp(_cached=None):
+    """Gibt den Zeitpunkt des letzten Cache-Updates zurück (oder None).
+
+    Optional: `_cached` weiterreichen, um doppeltes JSON-Lesen zu vermeiden.
+    """
+    data = _cached if _cached is not None else load_cached_weather()
     if not data or "_meta" not in data:
         return None
     try:
@@ -1150,11 +1084,14 @@ def load_cached_weather_timestamp():
         return None
 
 
-def is_cache_fresh(max_age_hours=12):
-    """Prüft ob der Cache noch frisch genug ist."""
+def is_cache_fresh(max_age_hours=12, _cached=None):
+    """Prüft ob der Cache noch frisch genug ist.
+
+    Optional: `_cached` weiterreichen, um doppeltes JSON-Lesen zu vermeiden.
+    """
     if not config.WEATHER_JSON_PATH.exists():
         return False
-    data = load_cached_weather()
+    data = _cached if _cached is not None else load_cached_weather()
     if not data or "_meta" not in data:
         return False
     spot_keys = [k for k in data.keys() if k not in ("_meta", "_regions")]
@@ -1206,9 +1143,12 @@ def validate_spot_data(spot_name, hourly_data, forecast_days):
     return missing
 
 
-def is_cache_complete():
-    """Prüft ob ALLE Spots im Cache vollständige Daten für alle Forecast-Tage haben."""
-    data = load_cached_weather()
+def is_cache_complete(_cached=None):
+    """Prüft ob ALLE Spots im Cache vollständige Daten für alle Forecast-Tage haben.
+
+    Optional: `_cached` weiterreichen, um doppeltes JSON-Lesen zu vermeiden.
+    """
+    data = _cached if _cached is not None else load_cached_weather()
     if not data:
         return False
     spot_keys = [k for k in data.keys() if k not in ("_meta", "_regions")]

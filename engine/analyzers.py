@@ -117,9 +117,7 @@ class AnalyzersMixin:
         wind_wrong = gust_info.get("wind_wrong_count", 0)
         rain_cnt = gust_info.get("rain_hours", 0)
         ts_h = gust_info.get("thunderstorm_hours", 0)
-        sw_h = gust_info.get("strong_wind_warn_hours", 0)
         total_hours = wind_ok + wind_wrong if wind_ok >= 0 else 0
-        max_gust = int(gust_info.get("max_surface_gust", 0) or 0)
 
         no_go = []
         summary_parts = []
@@ -162,13 +160,10 @@ class AnalyzersMixin:
                 f"Kein fliegbares Fenster."
             )
 
-        # Regel 4: Ganztaegig Sturmwarnung
-        elif total_hours > 0 and sw_h >= total_hours - 2 and sw_h >= 4:
-            no_go.append(f"Sturmwarnung: STRONG-WIND-WARN in {sw_h} von {total_hours} Stunden")
-            summary_parts.append(
-                f"Praktisch ganztaegig Sturmwarnung ({sw_h} von {total_hours} Stunden, "
-                f"Spitzenboee {max_gust} km/h). Nicht fliegbar."
-            )
+        # Regel 4 entfernt (Apr 2026): "Ganztaegig Sturmwarnung" wird jetzt vom
+        # WIND-TREND-Override (analyzers.py ~L1296, _build_single_spot_context)
+        # abgedeckt. DURCHGEHEND_DANGER und EINGEKESSELT mit Fenster <3h triggern
+        # dort hartes not_safe — symmetrisch fuer Bodenwind und Hoehenwind.
 
         if not no_go:
             return None  # Kein klarer not_safe-Fall → LLM entscheiden lassen
@@ -1297,9 +1292,9 @@ class AnalyzersMixin:
             aloft_d = gust_info.get("aloft_danger_hours", 0)
             aloft_gd = gust_info.get("aloft_gust_danger_hours", 0)
             aloft_pattern = gust_info.get("aloft_pattern")
-            nogo_thresh = config.ALOFT_DANGER_NOTSAFE_HOURS
-            cond_thresh = config.ALOFT_DANGER_CONDITIONAL_HOURS
-            kmh_thresh = config.ALOFT_DANGER_KMH
+            nogo_thresh = config.WIND_TREND_NOTSAFE_HOURS
+            cond_thresh = config.WIND_TREND_CONDITIONAL_HOURS
+            kmh_thresh = config.WIND_DANGER_KMH
 
             # Entscheide ob aloft_d allein einen not_safe-Override rechtfertigt.
             # Default (kein Pattern): alte flache Regel.
@@ -1316,26 +1311,23 @@ class AnalyzersMixin:
                     # → sauberes Fenster rechtfertigt conditional statt not_safe.
                     aloft_triggers_notsafe = False
 
-            if (aloft_triggers_notsafe or aloft_gd >= nogo_thresh) \
-                    and result.get("safety_status") != "not_safe":
+            gust_kmh_thresh = config.GUST_DANGER_KMH
+
+            if aloft_triggers_notsafe and result.get("safety_status") != "not_safe":
                 pattern_str = aloft_pattern.get("pattern_label", "-") if aloft_pattern else "-"
                 logger.warning(
-                    f"Aloft-Danger-NoGo-Override fuer {name}/{date_str}: LLM gab "
-                    f"'{result.get('safety_status')}' trotz ALOFT-DANGER {aloft_d}h / "
-                    f"ALOFT-GUST-DANGER {aloft_gd}h (Schwelle {nogo_thresh}h, "
-                    f"Trend={pattern_str}) → not_safe"
+                    f"Aloft-Wind-NoGo-Override fuer {name}/{date_str}: LLM gab "
+                    f"'{result.get('safety_status')}' trotz ALOFT-DANGER {aloft_d}h "
+                    f"(Schwelle {nogo_thresh}h, Trend={pattern_str}) → not_safe"
                 )
                 result["safety_status"] = "not_safe"
                 result["safe_window"] = "keins"
                 if not result.get("primary_no_go"):
                     result["primary_no_go"] = "ALOFT_DANGER"
                 nogo = result.get("no_go_reasons", []) or []
-                bits = []
-                if aloft_d >= nogo_thresh:
-                    bits.append(f"Hoehenwind >{kmh_thresh} km/h in {aloft_d}h")
-                if aloft_gd >= nogo_thresh:
-                    bits.append(f"Hoehenboeen >{kmh_thresh} km/h in {aloft_gd}h")
-                nogo.append("Kraeftiger Hoehenwind im Flugbereich: " + ", ".join(bits))
+                nogo.append(
+                    f"Kraeftiger Hoehenwind im Flugbereich: >{kmh_thresh} km/h in {aloft_d}h"
+                )
                 result["no_go_reasons"] = nogo
             elif (aloft_d >= cond_thresh or aloft_gd >= cond_thresh) \
                     and result.get("safety_status") == "safe":
@@ -1350,16 +1342,25 @@ class AnalyzersMixin:
                 if aloft_d >= cond_thresh:
                     bits.append(f"Hoehenwind >{kmh_thresh} km/h im Flugbereich in {aloft_d}h")
                 if aloft_gd >= cond_thresh:
-                    bits.append(f"Hoehenboeen >{kmh_thresh} km/h im Flugbereich in {aloft_gd}h")
-                cn.append("Gefahr in der Hoehe: " + ", ".join(bits) + " — auch bei ruhigem Bodenwind pruefen.")
+                    bits.append(f"Hoehenboeen >{gust_kmh_thresh} km/h im Flugbereich in {aloft_gd}h")
+                if aloft_d >= cond_thresh and aloft_gd >= cond_thresh:
+                    label = "Gefahr in der Hoehe (Wind und Boeen)"
+                elif aloft_gd >= cond_thresh:
+                    label = "Kraeftige Hoehenboeen"
+                else:
+                    label = "Gefahr in der Hoehe"
+                cn.append(label + ": " + ", ".join(bits) + " — auch bei ruhigem Bodenwind pruefen.")
                 result["caution_notes"] = cn
 
-        # Boeen-Floor: Mindestens conditional wenn Boeen vorhanden
+        # Boeen-Floor: Mindestens conditional wenn Boeen ueber Schwelle (Boden + Hoehe summiert)
+        # Einheitliche Mindeststunden-Schwelle (3h) — analog zum Hoehen-Override.
+        # Gilt sowohl fuer WARN- als auch DANGER-Stunden. LLM entscheidet ueber NoGo.
         if gust_info:
+            gust_floor_hours = config.WIND_TREND_NOTSAFE_HOURS
             gwarn = gust_info.get("gust_warn_hours", 0) + gust_info.get("aloft_gust_warn_hours", 0)
             gdanger = gust_info.get("gust_danger_hours", 0) + gust_info.get("aloft_gust_danger_hours", 0)
 
-            if (gwarn > 0 or gdanger > 0) and result.get("safety_status") == "safe":
+            if (gwarn >= gust_floor_hours or gdanger >= gust_floor_hours) and result.get("safety_status") == "safe":
                 max_gust = int(gust_info.get("max_surface_gust", 0) or 0)
                 logger.warning(
                     f"Boeen-Floor-Override fuer {name}/{date_str}: LLM gab 'safe' "
@@ -1617,9 +1618,9 @@ class AnalyzersMixin:
         if region_gust_info:
             aloft_d = region_gust_info.get("aloft_danger_hours", 0)
             aloft_pattern = region_gust_info.get("aloft_pattern")
-            nogo_thresh = config.ALOFT_DANGER_NOTSAFE_HOURS
-            cond_thresh = config.ALOFT_DANGER_CONDITIONAL_HOURS
-            kmh_thresh = config.ALOFT_DANGER_KMH
+            nogo_thresh = config.WIND_TREND_NOTSAFE_HOURS
+            cond_thresh = config.WIND_TREND_CONDITIONAL_HOURS
+            kmh_thresh = config.WIND_DANGER_KMH
 
             aloft_triggers_notsafe = (aloft_d >= nogo_thresh)
             if aloft_pattern:
