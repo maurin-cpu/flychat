@@ -170,7 +170,7 @@ class AnalyzersMixin:
 
         logger.info(
             f"Pre-Filter not_safe fuer {name}/{date_str}: "
-            f"wind_ok={wind_ok}, rain={rain_cnt}/{total_hours}, ts={ts_h}, sw={sw_h}"
+            f"wind_ok={wind_ok}, rain={rain_cnt}/{total_hours}, ts={ts_h}"
         )
 
         return {
