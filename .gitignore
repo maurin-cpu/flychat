@@ -1,14 +1,27 @@
 .env
 __pycache__/
 *.pyc
-data/wetterdaten.json
-data/spot_analyses.json
-data/subscribers.db
-weather_context_dump.txt
 .venv/
 venv/
-
 .vercel
-
 .claude/
 nul
+
+# Runtime SQLite (persistiert nur auf Server, nie im Repo)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Runtime data (generated, server-local)
+data/wetterdaten.json
+data/spot_analyses.json
+data/region_analyses.json
+data/weekly_briefing.json
+data/history/
+weather_context_dump.txt
