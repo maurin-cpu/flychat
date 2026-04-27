@@ -68,9 +68,8 @@ logger = logging.getLogger(__name__)
 
 class AnalyzersMixin:
     def _build_and_analyze_spot(self, spot, date_str: str, region_result: dict = None) -> dict:
-        """Worker-Wrapper: Context bauen + kombinierte Safety+Flyability-Analyse.
-        Returns combined result dict.  Includes a deterministic pre-filter that
-        skips the LLM call for clearly not_safe days (saves ~50-60 % of API costs).
+        """Worker-Wrapper: Split-Flow (Safety → Flyability) fuer einen Spot/Tag.
+        Nutzt den 2-Phasen-Ansatz: Safety zuerst, Flyability nur bei safe/conditional.
 
         region_result: vorab berechnete Region-Analyse fuer diesen Tag (kann None sein →
         Spot wird trotzdem analysiert, Streckenflug-Teil laeuft ohne Region-Kontext).
@@ -80,7 +79,7 @@ class AnalyzersMixin:
         if not ctx:
             return {
                 "spot": name, "date": date_str,
-                "safety_status": "no_data", "phase": "combined",
+                "safety_status": "no_data", "phase": "split",
                 "summary": "Keine Wetterdaten fuer diesen Tag",
             }
 
@@ -89,7 +88,15 @@ class AnalyzersMixin:
         if prefilter is not None:
             return prefilter
 
-        return self._combined_analysis_single_spot_day(spot, date_str, ctx, region_result=region_result)
+        # Phase 1: Safety
+        safety_result = self._safety_analysis_single_spot_day(spot, date_str, ctx)
+        if safety_result.get("safety_status") not in ("safe", "conditional"):
+            # not_safe oder error → kein Flyability-Call
+            return self._not_safe_minimal_flyability(safety_result, is_spot=True)
+
+        # Phase 2: Flyability (nur bei safe/conditional)
+        fly_result = self._flyability_analysis_single_spot_day(spot, date_str, ctx, safety_result, region_result=region_result)
+        return self._merge_safety_flyability(safety_result, fly_result)
 
     def _prefilter_not_safe(self, spot, date_str: str):
         """Prueft anhand der deterministischen Cache-Daten ob ein Spot/Tag
@@ -206,16 +213,25 @@ class AnalyzersMixin:
         }
 
     def _build_and_analyze_region(self, region, date_str: str) -> dict:
-        """Worker-Wrapper: Context bauen + kombinierte Safety+Flyability-Analyse.
-        Returns combined result dict."""
+        """Worker-Wrapper: Split-Flow (Safety → Flyability) fuer eine Region/Tag.
+        Nutzt den 2-Phasen-Ansatz: Safety zuerst, Flyability nur bei safe/conditional.
+        """
         ctx = self._build_single_region_context(region, date_str)
         if not ctx:
             return {
                 "region": region["region"], "region_id": region["id"],
-                "date": date_str, "safety_status": "no_data", "phase": "combined",
+                "date": date_str, "safety_status": "no_data", "phase": "split",
                 "summary": "Keine Wetterdaten fuer diesen Tag",
             }
-        return self._combined_analysis_single_region_day(region, date_str, ctx)
+
+        # Phase 1: Safety
+        safety_result = self._safety_analysis_single_region_day(region, date_str, ctx)
+        if safety_result.get("safety_status") not in ("safe", "conditional"):
+            return self._not_safe_minimal_flyability(safety_result, is_spot=False)
+
+        # Phase 2: Flyability (nur bei safe/conditional)
+        fly_result = self._flyability_analysis_single_region_day(region, date_str, ctx, safety_result)
+        return self._merge_safety_flyability(safety_result, fly_result)
 
     def _combined_analysis_single_spot_day(self, spot, date_str: str, context: str, region_result: dict = None) -> dict:
         """Kombinierte Safety+Flyability-Analyse fuer einen Spot/Tag in einem LLM-Call."""
@@ -271,6 +287,321 @@ class AnalyzersMixin:
         except Exception as e:
             logger.error(f"Combined-Analyse fuer {name}/{date_str} fehlgeschlagen (nach 2 Versuchen): {e}")
             return {"spot": name, "date": date_str, "safety_status": "error", "phase": "combined", "error": str(e)}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SPLIT-FLOW: Separate Safety- und Flyability-Calls (Hebel 1 Kostenreduktion)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _safety_analysis_single_spot_day(self, spot, date_str: str, context: str) -> dict:
+        """Safety-only LLM-Call fuer einen Spot/Tag. Kleinerer Prompt (~7K tokens)."""
+        name = spot["name"]
+        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
+            reason = getattr(self, '_api_abort_reason', 'Analyse abgebrochen')
+            return {"spot": name, "date": date_str, "safety_status": "error",
+                    "phase": "safety", "error": reason}
+        try:
+            if not context:
+                return {"spot": name, "date": date_str, "safety_status": "error",
+                        "phase": "safety", "error": "Keine Daten fuer diesen Tag"}
+
+            messages = [
+                {"role": "system", "content": prompts.SPOT_SAFETY_PROMPT},
+                {"role": "user", "content": (
+                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
+                    f"{context}"
+                )},
+            ]
+
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = self.analysis_client.chat.completions.create(
+                        model=self.analysis_model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=600,
+                        response_format={"type": "json_object"},
+                    )
+                    _log_prompt_cache_usage(response, label="spot_safety")
+                    raw = response.choices[0].message.content
+                    result = json.loads(raw)
+                    last_err = None
+                    break
+                except Exception as api_err:
+                    last_err = api_err
+                    if _is_permanent_api_error(api_err):
+                        self._api_abort_reason = _user_friendly_api_error(api_err)
+                        if getattr(self, '_api_abort', None):
+                            self._api_abort.set()
+                        break
+                    if attempt == 0:
+                        logger.warning(f"Safety-Check fuer {name}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
+                        time.sleep(3)
+            if last_err:
+                raise last_err
+            return self._post_process_safety_spot(result, spot, date_str)
+
+        except Exception as e:
+            logger.error(f"Safety-Analyse fuer {name}/{date_str} fehlgeschlagen: {e}")
+            return {"spot": name, "date": date_str, "safety_status": "error", "phase": "safety", "error": str(e)}
+
+    def _flyability_analysis_single_spot_day(self, spot, date_str: str, context: str,
+                                              safety_result: dict, region_result: dict = None) -> dict:
+        """Flyability-only LLM-Call fuer einen Spot/Tag. Nur bei safe/conditional aufrufen.
+        Injiziert das Safety-Ergebnis als immutable Block in den User-Content.
+        """
+        name = spot["name"]
+        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
+            reason = getattr(self, '_api_abort_reason', 'Analyse abgebrochen')
+            return {"spot": name, "date": date_str, "safety_status": safety_result.get("safety_status", "error"),
+                    "phase": "flyability", "error": reason}
+        try:
+            if not context:
+                return {"spot": name, "date": date_str, "safety_status": safety_result.get("safety_status", "error"),
+                        "phase": "flyability", "error": "Keine Daten fuer diesen Tag"}
+
+            # Safety-Result als immutable Block injizieren
+            safety_block = self._format_safety_injection(safety_result)
+
+            messages = [
+                {"role": "system", "content": prompts.SPOT_FLYABILITY_PROMPT},
+                {"role": "user", "content": (
+                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
+                    f"{context}\n\n{safety_block}"
+                )},
+            ]
+
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = self.analysis_client.chat.completions.create(
+                        model=self.analysis_model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=900,
+                        response_format={"type": "json_object"},
+                    )
+                    _log_prompt_cache_usage(response, label="spot_flyability")
+                    raw = response.choices[0].message.content
+                    result = json.loads(raw)
+                    last_err = None
+                    break
+                except Exception as api_err:
+                    last_err = api_err
+                    if _is_permanent_api_error(api_err):
+                        self._api_abort_reason = _user_friendly_api_error(api_err)
+                        if getattr(self, '_api_abort', None):
+                            self._api_abort.set()
+                        break
+                    if attempt == 0:
+                        logger.warning(f"Flyability-Check fuer {name}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
+                        time.sleep(3)
+            if last_err:
+                raise last_err
+
+            # Safety-Felder ins Ergebnis uebernehmen (fuer Post-Processing)
+            result["safety_status"] = safety_result.get("safety_status", "")
+            result["safe_window"] = safety_result.get("safe_window", "")
+            result["spot"] = name
+            result["date"] = date_str
+            result["phase"] = "flyability"
+
+            return self._post_process_flyability_spot(result, spot, date_str, region_result=region_result)
+
+        except Exception as e:
+            logger.error(f"Flyability-Analyse fuer {name}/{date_str} fehlgeschlagen: {e}")
+            return {"spot": name, "date": date_str, "safety_status": safety_result.get("safety_status", "error"),
+                    "phase": "flyability", "error": str(e)}
+
+    def _safety_analysis_single_region_day(self, region, date_str: str, context: str) -> dict:
+        """Safety-only LLM-Call fuer eine Region/Tag."""
+        rname = region["region"]
+        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
+            reason = getattr(self, '_api_abort_reason', 'Analyse abgebrochen')
+            return {"region": rname, "region_id": region["id"], "date": date_str,
+                    "safety_status": "error", "phase": "safety", "error": reason}
+        try:
+            if not context:
+                return {"region": rname, "region_id": region["id"], "date": date_str,
+                        "safety_status": "error", "phase": "safety", "error": "Keine Daten fuer diesen Tag"}
+
+            messages = [
+                {"role": "system", "content": prompts.REGION_SAFETY_PROMPT},
+                {"role": "user", "content": (
+                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
+                    f"{context}"
+                )},
+            ]
+
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = self.analysis_client.chat.completions.create(
+                        model=self.analysis_model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=600,
+                        response_format={"type": "json_object"},
+                    )
+                    _log_prompt_cache_usage(response, label="region_safety")
+                    raw = response.choices[0].message.content
+                    result = json.loads(raw)
+                    last_err = None
+                    break
+                except Exception as api_err:
+                    last_err = api_err
+                    if _is_permanent_api_error(api_err):
+                        self._api_abort_reason = _user_friendly_api_error(api_err)
+                        if getattr(self, '_api_abort', None):
+                            self._api_abort.set()
+                        break
+                    if attempt == 0:
+                        logger.warning(f"Region-Safety fuer {rname}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
+                        time.sleep(3)
+            if last_err:
+                raise last_err
+            return self._post_process_safety_region(result, region, date_str)
+
+        except Exception as e:
+            logger.error(f"Region-Safety-Analyse fuer {rname}/{date_str} fehlgeschlagen: {e}")
+            return {"region": rname, "region_id": region["id"], "date": date_str,
+                    "safety_status": "error", "phase": "safety", "error": str(e)}
+
+    def _flyability_analysis_single_region_day(self, region, date_str: str, context: str,
+                                                safety_result: dict) -> dict:
+        """Flyability-only LLM-Call fuer eine Region/Tag. Nur bei safe/conditional aufrufen."""
+        rname = region["region"]
+        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
+            reason = getattr(self, '_api_abort_reason', 'Analyse abgebrochen')
+            return {"region": rname, "region_id": region["id"], "date": date_str,
+                    "safety_status": safety_result.get("safety_status", "error"),
+                    "phase": "flyability", "error": reason}
+        try:
+            if not context:
+                return {"region": rname, "region_id": region["id"], "date": date_str,
+                        "safety_status": safety_result.get("safety_status", "error"),
+                        "phase": "flyability", "error": "Keine Daten fuer diesen Tag"}
+
+            safety_block = self._format_safety_injection(safety_result)
+
+            messages = [
+                {"role": "system", "content": prompts.REGION_FLYABILITY_PROMPT},
+                {"role": "user", "content": (
+                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
+                    f"{context}\n\n{safety_block}"
+                )},
+            ]
+
+            last_err = None
+            for attempt in range(2):
+                try:
+                    response = self.analysis_client.chat.completions.create(
+                        model=self.analysis_model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=900,
+                        response_format={"type": "json_object"},
+                    )
+                    _log_prompt_cache_usage(response, label="region_flyability")
+                    raw = response.choices[0].message.content
+                    result = json.loads(raw)
+                    last_err = None
+                    break
+                except Exception as api_err:
+                    last_err = api_err
+                    if _is_permanent_api_error(api_err):
+                        self._api_abort_reason = _user_friendly_api_error(api_err)
+                        if getattr(self, '_api_abort', None):
+                            self._api_abort.set()
+                        break
+                    if attempt == 0:
+                        logger.warning(f"Region-Flyability fuer {rname}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
+                        time.sleep(3)
+            if last_err:
+                raise last_err
+
+            # Safety-Felder ins Ergebnis uebernehmen
+            result["safety_status"] = safety_result.get("safety_status", "")
+            result["safe_window"] = safety_result.get("safe_window", "")
+            result["wind_calm_count"] = safety_result.get("wind_calm_count", 0)
+            result["wind_moderate_count"] = safety_result.get("wind_moderate_count", 0)
+            result["wind_strong_count"] = safety_result.get("wind_strong_count", 0)
+            result["region"] = rname
+            result["region_id"] = region["id"]
+            result["date"] = date_str
+            result["phase"] = "flyability"
+
+            return self._post_process_flyability_region(result, region, date_str)
+
+        except Exception as e:
+            logger.error(f"Region-Flyability-Analyse fuer {rname}/{date_str} fehlgeschlagen: {e}")
+            return {"region": rname, "region_id": region["id"], "date": date_str,
+                    "safety_status": safety_result.get("safety_status", "error"),
+                    "phase": "flyability", "error": str(e)}
+
+    @staticmethod
+    def _format_safety_injection(safety_result: dict) -> str:
+        """Formatiert ein Safety-Ergebnis als immutable Block fuer den Flyability-Prompt."""
+        lines = [
+            "### SICHERHEITSBEWERTUNG (IMMUTABLE)",
+            f"safety_status: {safety_result.get('safety_status', '')}",
+            f"safe_window: {safety_result.get('safe_window', '')}",
+            f"no_go_reasons: {json.dumps(safety_result.get('no_go_reasons', []), ensure_ascii=False)}",
+            f"caution_notes: {json.dumps(safety_result.get('caution_notes', []), ensure_ascii=False)}",
+            f"foehn_risk: {safety_result.get('foehn_risk', 'none')}",
+            f"wind_summary: {safety_result.get('wind_summary', '')}",
+        ]
+        # Region-spezifische Wind-Counts
+        if "wind_calm_count" in safety_result:
+            lines.append(f"wind_calm_count: {safety_result.get('wind_calm_count', 0)}")
+            lines.append(f"wind_moderate_count: {safety_result.get('wind_moderate_count', 0)}")
+            lines.append(f"wind_strong_count: {safety_result.get('wind_strong_count', 0)}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _merge_safety_flyability(safety_result: dict, flyability_result: dict) -> dict:
+        """Merged Safety + Flyability Ergebnisse ins Combined-Format fuer Downstream."""
+        merged = {**safety_result}
+        merged.update(flyability_result)
+        # Phase-Marker: zeigt dass aus Split-Flow
+        merged["phase"] = "split"
+        return merged
+
+    @staticmethod
+    def _not_safe_minimal_flyability(safety_result: dict, is_spot: bool = True) -> dict:
+        """Erzeugt Minimal-Flyability-Werte fuer not_safe-Ergebnisse (kein LLM-Call noetig)."""
+        result = {**safety_result}
+        result["fly_status"] = ""
+        result["flyability_tier"] = ""
+        result["flight_type"] = ""
+        result["flight_duration_estimate"] = ""
+        result["thermal_quality"] = ""
+        result["peak_climb_rate"] = 0
+        result["xc_potential"] = ""
+        result["xc_details"] = ""
+        result["best_window"] = ""
+        result["flyability_limits"] = []
+        result["highlights"] = []
+        result["recommendation"] = ""
+        result["confidence"] = ""
+        result["primary_reducer"] = None
+        result["primary_booster"] = None
+        result["thermal_rating"] = 1
+        result["wind_rating"] = 1
+        result["window_rating"] = 1
+        result["xc_rating"] = 1
+        result["is_conditional"] = False
+        result["conditional_reason"] = ""
+        result["rating"] = 0
+        if is_spot:
+            result["soaring_options"] = ""
+            result["bemerkung_check"] = ""
+            result["streckenflug"] = {
+                "tier": "kein_xc", "rating": 0,
+                "summary": "", "limiting_factor": "spot_not_flyable",
+                "region_context_available": False,
+            }
+        return result
 
     def run_spot_analyses(self, spot_names: list = None) -> dict:
         """Wrapper: konsumiert den Stream-Generator und gibt das finale Ergebnis zurueck."""
@@ -1241,24 +1572,15 @@ class AnalyzersMixin:
         logger.info(f"Batch {batch_id}: {len(results)} Ergebnisse geparst")
         return results
 
-    def _post_process_combined_spot(self, result: dict, spot: dict, date_str: str, region_result: dict = None) -> dict:
-        """Wendet ALLE Post-Processing-Schritte auf ein Spot-Combined-Ergebnis an:
-        Safety-Overrides, Foehn-Filter, Flyability-Tier-Normalisierung, Downgrade/Upgrade,
-        Rating + Conditional-Flag. Wird von Single-Call- UND Batch-Pfad genutzt.
-
-        Erwartet `result` als rohes LLM-JSON (bereits mit json.loads geparsed).
-
-        region_result: Region-Analyse fuer diesen Tag (optional). Wird genutzt,
-        um einen 'violet' Spot auf 'green' zu begrenzen, wenn die Region selbst
-        nicht 'violet' ist — ein Spot kann nicht legendaer sein, wenn die
-        umliegende Region es nicht ist.
+    def _post_process_safety_spot(self, result: dict, spot: dict, date_str: str) -> dict:
+        """Safety-only Post-Processing fuer einen Spot.
+        Wendet deterministische Safety-Overrides an (Wind-OK, Aloft, Boeen-Floor,
+        Overclaim-Ceiling, Foehn-Filter). Wird vom Split-Flow (Safety-Phase) genutzt.
         """
         name = spot["name"]
         result["spot"] = name
         result["date"] = date_str
-        result["phase"] = "combined"
-
-        # ═══ SAFETY POST-PROCESSING ═══
+        result["phase"] = "safety"
 
         gust_info = self._ctx_gust_cache.get(f"{name}|{date_str}", {})
         if gust_info:
@@ -1276,18 +1598,7 @@ class AnalyzersMixin:
                 nogo.append("Keine Stunde mit korrekter Windrichtung")
             result["no_go_reasons"] = nogo
 
-        # ALOFT-Override: Hoehenwind-/Boeen-Gefahr >= N Stunden → Safety-Downgrade.
-        # Deckt den Fall "Bodenwind ruhig, aber auf Flughoehe Dauer-Sturm" ab.
-        # Zwei Stufen:
-        #   - NOTSAFE_HOURS: hart → not_safe (NO-GO), auch wenn LLM 'conditional' gab.
-        #   - CONDITIONAL_HOURS (nur wenn NOT triggered): safe → conditional.
-        #
-        # Trend-aware (Apr 2026): Wenn aloft_pattern im Cache liegt, wird die flache
-        # Tages-Summe nicht mehr blind genutzt. Ein sauberes Nachmittagsfenster
-        # (AUFKLAERUNG / VEREINZELT / EINGEKESSELT_KNAPP) darf NICHT in not_safe
-        # degradiert werden, wenn der Gap >= nogo_thresh ist. Skills-Regel:
-        # _hazard_blocks.md BLOCK 4 + EINGEKESSELT Sonderfall 1 (Hoehenwind).
-        # aloft_gd (Turbulenz) bleibt flat — kein separates Pattern verfuegbar.
+        # ALOFT-Override
         if gust_info:
             aloft_d = gust_info.get("aloft_danger_hours", 0)
             aloft_gd = gust_info.get("aloft_gust_danger_hours", 0)
@@ -1296,8 +1607,6 @@ class AnalyzersMixin:
             cond_thresh = config.WIND_TREND_CONDITIONAL_HOURS
             kmh_thresh = config.WIND_DANGER_KMH
 
-            # Entscheide ob aloft_d allein einen not_safe-Override rechtfertigt.
-            # Default (kein Pattern): alte flache Regel.
             aloft_triggers_notsafe = (aloft_d >= nogo_thresh)
             if aloft_pattern:
                 label = aloft_pattern.get("pattern_label", "")
@@ -1307,8 +1616,6 @@ class AnalyzersMixin:
                 elif label == "EINGEKESSELT" and calm_gap < nogo_thresh:
                     aloft_triggers_notsafe = True
                 else:
-                    # AUFKLAERUNG / EINGEKESSELT_KNAPP / ZUNEHMEND / VEREINZELT / DURCHGEHEND_WARN
-                    # → sauberes Fenster rechtfertigt conditional statt not_safe.
                     aloft_triggers_notsafe = False
 
             gust_kmh_thresh = config.GUST_DANGER_KMH
@@ -1352,9 +1659,7 @@ class AnalyzersMixin:
                 cn.append(label + ": " + ", ".join(bits) + " — auch bei ruhigem Bodenwind pruefen.")
                 result["caution_notes"] = cn
 
-        # Boeen-Floor: Mindestens conditional wenn Boeen ueber Schwelle (Boden + Hoehe summiert)
-        # Einheitliche Mindeststunden-Schwelle (3h) — analog zum Hoehen-Override.
-        # Gilt sowohl fuer WARN- als auch DANGER-Stunden. LLM entscheidet ueber NoGo.
+        # Boeen-Floor
         if gust_info:
             gust_floor_hours = config.WIND_TREND_NOTSAFE_HOURS
             gwarn = gust_info.get("gust_warn_hours", 0) + gust_info.get("aloft_gust_warn_hours", 0)
@@ -1392,7 +1697,7 @@ class AnalyzersMixin:
                     )
                 result["caution_notes"] = cn
 
-        # Overclaim-Ceiling: LLM darf nicht grundlos 'not_safe' sagen
+        # Overclaim-Ceiling
         if gust_info and result.get("safety_status") == "not_safe":
             has_hard_warnings = gust_info.get("hard_warning_hours", 0) > 0
             clean_cnt = gust_info.get("clean_hours_count", 0)
@@ -1414,9 +1719,19 @@ class AnalyzersMixin:
         krit_foehn = spot.get("kritischer_foehn", "Süd")
         result = self._strip_irrelevant_foehn(result, krit_foehn)
 
-        # ═══ FLYABILITY POST-PROCESSING ═══
+        return result
 
-        # Wenn not_safe: Flyability- und Streckenflug-Felder leeren
+    def _post_process_flyability_spot(self, result: dict, spot: dict, date_str: str, region_result: dict = None) -> dict:
+        """Flyability-only Post-Processing fuer einen Spot.
+        Wendet Tier-Normalisierung, Downgrade/Upgrade, Region-Gating,
+        Streckenflug-Validierung und Rating-Berechnung an.
+        Wird vom Split-Flow (Flyability-Phase) genutzt.
+
+        result: rohes Flyability-LLM-JSON (ohne Safety-Felder).
+        """
+        name = spot["name"]
+
+        # Wenn not_safe (aus Safety-Phase): Flyability-Felder leeren
         if result.get("safety_status") == "not_safe":
             result["fly_status"] = ""
             result["flyability_tier"] = ""
@@ -1425,7 +1740,6 @@ class AnalyzersMixin:
                 "summary": "", "limiting_factor": "spot_not_flyable",
                 "region_context_available": False,
             }
-            # Rating trotzdem berechnen (für not_safe → 0)
             result["rating"] = _compute_rating_from_subratings(result, "", "not_safe")
             result["is_conditional"] = False
             result["conditional_reason"] = ""
@@ -1497,9 +1811,7 @@ class AnalyzersMixin:
                         f"(peak={peak:.1f}, ROUGH={rough_pct:.0f}%, productive_h={prod_h})"
                     )
 
-        # ═══ REGION-GATING: violet nur wenn Region auch violet ═══
-        # Ein Spot kann nicht 'legendaer' (violet) sein, wenn die umliegende
-        # Region nicht mindestens ebenfalls violet ist. In dem Fall → green.
+        # Region-Gating: violet nur wenn Region auch violet
         current_tier = result.get("flyability_tier") or result.get("fly_status") or ""
         if current_tier == "violet" and region_result:
             region_tier = _normalize_flyability_tier(
@@ -1514,18 +1826,16 @@ class AnalyzersMixin:
                     f"(Region '{rname}' tier={region_tier}, nicht violet)"
                 )
 
-        # ═══ STRECKENFLUG POST-PROCESSING ═══
+        # Streckenflug Post-Processing
         final_tier = result.get("fly_status", result.get("flyability_tier", "gray")) or ""
         final_safety = result.get("safety_status", "")
         sf = result.get("streckenflug")
         if not isinstance(sf, dict):
-            # LLM hat Feld nicht geliefert → Default aus Spot-Daten ableiten
             sf = {
                 "tier": "kein_xc", "rating": 0,
                 "summary": "", "limiting_factor": "none",
                 "region_context_available": False,
             }
-        # Whitelist-Validierung
         valid_tiers = {"kein_xc", "lokal", "moderat", "top"}
         if sf.get("tier") not in valid_tiers:
             sf["tier"] = "kein_xc"
@@ -1543,7 +1853,6 @@ class AnalyzersMixin:
             sf["limiting_factor"] = "none"
         sf["region_context_available"] = bool(sf.get("region_context_available", False))
 
-        # Konsistenz-Check: Spot gray → Streckenflug muss kein_xc sein
         if final_tier == "gray" and sf["tier"] != "kein_xc":
             logger.info(
                 f"Streckenflug-Konsistenz: {name}/{date_str} tier={sf['tier']} → kein_xc "
@@ -1554,7 +1863,6 @@ class AnalyzersMixin:
                 sf["limiting_factor"] = "abgleiter_only"
             sf["rating"] = 0
 
-        # Abgleiter/Soaring → max kein_xc (keine Thermik-Grundlage fuer Strecke)
         if result.get("flight_type") in ("Abgleiter", "Soaring") and sf["tier"] != "kein_xc":
             sf["tier"] = "kein_xc"
             if sf["limiting_factor"] == "none":
@@ -1573,18 +1881,35 @@ class AnalyzersMixin:
 
         return result
 
-    def _post_process_combined_region(self, result: dict, region: dict, date_str: str) -> dict:
-        """Wendet ALLE Post-Processing-Schritte auf ein Region-Combined-Ergebnis an.
-        Analog zu _post_process_combined_spot, aber mit Region-Wind-Tags (CALM/MODERATE/STRONG)
-        statt WIND-OK/WRONG und ohne BOEEN-FLOOR-Override (gilt nur pro Spot).
+    def _post_process_combined_spot(self, result: dict, spot: dict, date_str: str, region_result: dict = None) -> dict:
+        """Wendet ALLE Post-Processing-Schritte auf ein Spot-Combined-Ergebnis an.
+        Wrapper: ruft Safety- und Flyability-Post-Processing nacheinander auf.
+        Wird vom Combined-Flow (Single-Call UND Batch) genutzt.
+        """
+        name = spot["name"]
+        result["spot"] = name
+        result["date"] = date_str
+        result["phase"] = "combined"
+
+        # Safety Post-Processing (Overrides, Foehn-Filter)
+        result = self._post_process_safety_spot(result, spot, date_str)
+        result["phase"] = "combined"  # Restore phase marker
+
+        # Flyability Post-Processing (Tier, Ratings, Streckenflug)
+        result = self._post_process_flyability_spot(result, spot, date_str, region_result=region_result)
+        result["phase"] = "combined"  # Restore phase marker
+
+        return result
+
+    def _post_process_safety_region(self, result: dict, region: dict, date_str: str) -> dict:
+        """Safety-only Post-Processing fuer eine Region.
+        Wendet deterministische Safety-Overrides an (Wind-Strong, Aloft, Foehn-Filter).
         """
         rname = region["region"]
         result["region"] = rname
         result["region_id"] = region["id"]
         result["date"] = date_str
-        result["phase"] = "combined"
-
-        # ═══ SAFETY POST-PROCESSING ═══
+        result["phase"] = "safety"
 
         # Hard override: WIND-STRONG Mehrheit ohne WIND-CALM → not_safe
         strong = result.get("wind_strong_count", 0)
@@ -1605,15 +1930,7 @@ class AnalyzersMixin:
                 nogo.append(f"Durchgehend starker Wind ({strong} von {strong + moderate} Stunden), keine ruhige Phase")
             result["no_go_reasons"] = nogo
 
-        # ALOFT-Override (Region): Höhenwind-Gefahr >= N Stunden → Safety-Downgrade.
-        # Regionen haben keine Böen mehr (Apr 2026), daher nur ALOFT-DANGER (Wind).
-        # Zwei Stufen:
-        #   - NOTSAFE_HOURS: hart → not_safe (NO-GO), auch wenn LLM 'conditional' gab.
-        #   - CONDITIONAL_HOURS (nur wenn NOT triggered): safe → conditional.
-        #
-        # Trend-aware (Apr 2026): aloft_pattern aus Cache rechtfertigt sauberes
-        # Nachmittagsfenster (AUFKLAERUNG / VEREINZELT / EINGEKESSELT_KNAPP) und
-        # blockiert das not_safe-Override. Skills: _hazard_blocks.md BLOCK 4.
+        # ALOFT-Override (Region)
         region_gust_info = self._ctx_gust_cache.get(f"{rname}|{date_str}", {})
         if region_gust_info:
             aloft_d = region_gust_info.get("aloft_danger_hours", 0)
@@ -1666,7 +1983,13 @@ class AnalyzersMixin:
         krit_foehn = region.get("kritischer_foehn", "Beide")
         result = self._strip_irrelevant_foehn(result, krit_foehn)
 
-        # ═══ FLYABILITY POST-PROCESSING ═══
+        return result
+
+    def _post_process_flyability_region(self, result: dict, region: dict, date_str: str) -> dict:
+        """Flyability-only Post-Processing fuer eine Region.
+        Wendet Tier-Normalisierung, Downgrade/Upgrade und Rating-Berechnung an.
+        """
+        rname = region["region"]
 
         if result.get("safety_status") == "not_safe":
             result["fly_status"] = ""
@@ -1748,11 +2071,33 @@ class AnalyzersMixin:
 
         return result
 
+    def _post_process_combined_region(self, result: dict, region: dict, date_str: str) -> dict:
+        """Wendet ALLE Post-Processing-Schritte auf ein Region-Combined-Ergebnis an.
+        Wrapper: ruft Safety- und Flyability-Post-Processing nacheinander auf.
+        """
+        rname = region["region"]
+        result["region"] = rname
+        result["region_id"] = region["id"]
+        result["date"] = date_str
+        result["phase"] = "combined"
+
+        # Safety Post-Processing
+        result = self._post_process_safety_region(result, region, date_str)
+        result["phase"] = "combined"
+
+        # Flyability Post-Processing
+        result = self._post_process_flyability_region(result, region, date_str)
+        result["phase"] = "combined"
+
+        return result
+
     def run_all_analyses_batch_stream(self):
-        """Batch-Modus zweiphasig: Phase 1 Region-Batch → Phase 2 Spot-Batch mit
-        injiziertem Region-Kontext fuer Streckenflug-Synthese. Selbe LLM-Call-Anzahl
-        wie Single-Phase, aber zwei Batch-Roundtrips (Regionen muessen fertig sein
-        bevor Spots gebaut werden koennen).
+        """Batch-Modus vierphasig (Split-Flow):
+        Phase 1: Region-Safety → Phase 2: Region-Flyability (nur safe/conditional)
+        Phase 3: Spot-Safety → Phase 4: Spot-Flyability (nur safe/conditional)
+
+        Spart ~40-50% Kosten gegenueber Combined-Flow, weil der teure Flyability-Prompt
+        nur fuer fliegbare Tage laeuft.
         """
         if not self.analysis_client:
             yield {"event": "error", "data": {"message": f"Kein API-Key fuer Analyse-Provider '{self.analysis_provider}'"}}
@@ -1779,22 +2124,27 @@ class AnalyzersMixin:
 
         total_items = (len(regions_with_data) + len(spots_to_analyze)) * len(forecast_dates)
         yield {"event": "init", "data": {
-            "mode": "batch",
+            "mode": "batch_split",
             "regions_count": len(regions_with_data),
             "spots_count": len(spots_to_analyze),
             "days": len(forecast_dates),
             "total_calls": total_items,
         }}
 
-        region_results: dict = {}
-        spot_results: dict = {}
+        region_safety_results: dict = {}   # {rid: {date_str: safety_result}}
+        region_results: dict = {}           # {rid: {date_str: merged_result}}
+        spot_safety_results: dict = {}      # {name: {date_str: safety_result}}
+        spot_results: dict = {}             # {name: {date_str: merged_result}}
+
+        # Region-Kontexte cachen (werden in Phase 1+2 gebraucht)
+        region_contexts: dict = {}  # {f"{rid}|{date_str}": ctx}
 
         # ══════════════════════════════════════════════════════════════
-        # PHASE 1: Region-Batch
+        # PHASE 1: Region-Safety Batch
         # ══════════════════════════════════════════════════════════════
-        yield {"event": "phase", "data": {"phase": "batch_build_regions", "total": 0}}
-        region_requests: list = []
-        region_meta: dict = {}
+        yield {"event": "phase", "data": {"phase": "batch_region_safety", "total": 0}}
+        region_safety_requests: list = []
+        region_safety_meta: dict = {}
 
         for region in regions_with_data:
             rid = region["id"]
@@ -1802,78 +2152,168 @@ class AnalyzersMixin:
                 ctx = self._build_single_region_context(region, date_str)
                 if not ctx:
                     continue
-                cid = f"region_combined|{rid}|{date_str}"
-                region_requests.append({
+                region_contexts[f"{rid}|{date_str}"] = ctx
+                cid = f"region_safety|{rid}|{date_str}"
+                region_safety_requests.append({
                     "custom_id": cid,
                     "method": "POST",
                     "url": "/v1/chat/completions",
                     "body": {
                         "model": self.analysis_model,
                         "messages": [
-                            {"role": "system", "content": prompts.REGION_COMBINED_PROMPT},
+                            {"role": "system", "content": prompts.REGION_SAFETY_PROMPT},
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 1100,
+                        "max_tokens": 600,
                         "response_format": {"type": "json_object"},
                     },
                 })
-                region_meta[cid] = (rid, date_str, region)
+                region_safety_meta[cid] = (rid, date_str, region)
 
-        if region_requests:
-            yield {"event": "phase", "data": {"phase": "batch_submit_regions", "total": len(region_requests)}}
+        if region_safety_requests:
+            yield {"event": "phase", "data": {"phase": "batch_submit_region_safety", "total": len(region_safety_requests)}}
             try:
-                jsonl = self._build_batch_jsonl(region_requests)
-                region_batch_id = self._submit_batch(jsonl, f"Regions ({len(region_requests)} Requests)")
+                jsonl = self._build_batch_jsonl(region_safety_requests)
+                batch_id = self._submit_batch(jsonl, f"Region-Safety ({len(region_safety_requests)} Requests)")
             except Exception as e:
-                logger.error(f"Region-Batch-Submit fehlgeschlagen: {e}")
-                yield {"event": "error", "data": {"message": f"Region-Batch-Submit fehlgeschlagen: {e}"}}
+                logger.error(f"Region-Safety-Batch-Submit fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Region-Safety-Batch-Submit fehlgeschlagen: {e}"}}
                 return
 
-            yield {"event": "phase", "data": {"phase": "batch_poll_regions",
-                                               "batch_id": region_batch_id,
-                                               "total": len(region_requests)}}
+            yield {"event": "phase", "data": {"phase": "batch_poll_region_safety", "batch_id": batch_id, "total": len(region_safety_requests)}}
             try:
-                region_raw = self._poll_batch(region_batch_id)
+                raw_results = self._poll_batch(batch_id)
             except Exception as e:
-                logger.error(f"Region-Batch-Poll fehlgeschlagen: {e}")
-                yield {"event": "error", "data": {"message": f"Region-Batch fehlgeschlagen: {e}"}}
+                logger.error(f"Region-Safety-Batch-Poll fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Region-Safety-Batch fehlgeschlagen: {e}"}}
                 return
 
-            for cid, raw_result in region_raw.items():
-                m = region_meta.get(cid)
+            for cid, raw_result in raw_results.items():
+                m = region_safety_meta.get(cid)
                 if not m:
                     continue
                 rid, date_str, region = m
                 if raw_result.get("error"):
-                    region_results.setdefault(rid, {})[date_str] = {
-                        "safety_status": "error", "phase": "combined",
+                    region_safety_results.setdefault(rid, {})[date_str] = {
+                        "safety_status": "error", "phase": "safety",
                         "date": date_str, "region": region["region"], "region_id": rid,
                         "error": raw_result["error"],
                     }
                     continue
                 try:
-                    processed = self._post_process_combined_region(raw_result, region, date_str)
-                    region_results.setdefault(rid, {})[date_str] = processed
+                    processed = self._post_process_safety_region(raw_result, region, date_str)
+                    region_safety_results.setdefault(rid, {})[date_str] = processed
                 except Exception as e:
-                    logger.error(f"[BATCH-PHASE1] Post-Processing fuer {rid}/{date_str}: {e}")
-                    region_results.setdefault(rid, {})[date_str] = {
-                        "safety_status": "error", "phase": "combined",
+                    logger.error(f"[BATCH-P1] Region-Safety Post-Processing fuer {rid}/{date_str}: {e}")
+                    region_safety_results.setdefault(rid, {})[date_str] = {
+                        "safety_status": "error", "phase": "safety",
                         "date": date_str, "region": region["region"], "region_id": rid,
                         "error": str(e),
                     }
 
-            yield {"event": "progress", "data": {
-                "phase": "batch_regions_done",
-                "completed": len(region_raw),
-                "total": len(region_requests),
-            }}
-            logger.info(f"[BATCH] Phase 1 fertig: {len(region_results)} Regionen analysiert")
+            yield {"event": "progress", "data": {"phase": "batch_region_safety_done", "completed": len(raw_results), "total": len(region_safety_requests)}}
+            logger.info(f"[BATCH] Phase 1 (Region-Safety) fertig: {sum(len(d) for d in region_safety_results.values())} Ergebnisse")
 
         # ══════════════════════════════════════════════════════════════
-        # PHASE 2: Spot-Batch mit injiziertem Region-Kontext
+        # PHASE 2: Region-Flyability Batch (nur safe/conditional)
         # ══════════════════════════════════════════════════════════════
-        yield {"event": "phase", "data": {"phase": "batch_build_spots", "total": 0}}
+        region_fly_requests: list = []
+        region_fly_meta: dict = {}
+
+        for rid, dates in region_safety_results.items():
+            for date_str, safety_res in dates.items():
+                if safety_res.get("safety_status") not in ("safe", "conditional"):
+                    # not_safe/error → kein Flyability-Call, Minimal-Werte setzen
+                    region_results.setdefault(rid, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+                    continue
+                # Kontext fuer Flyability (gleicher wie Safety + Safety-Injection)
+                ctx = region_contexts.get(f"{rid}|{date_str}", "")
+                if not ctx:
+                    region_results.setdefault(rid, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+                    continue
+                safety_block = self._format_safety_injection(safety_res)
+                # Region-Objekt wiederfinden
+                region_obj = next((r for r in regions_with_data if r["id"] == rid), None)
+                if not region_obj:
+                    continue
+
+                cid = f"region_fly|{rid}|{date_str}"
+                region_fly_requests.append({
+                    "custom_id": cid,
+                    "method": "POST",
+                    "url": "/v1/chat/completions",
+                    "body": {
+                        "model": self.analysis_model,
+                        "messages": [
+                            {"role": "system", "content": prompts.REGION_FLYABILITY_PROMPT},
+                            {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
+                        ],
+                        "temperature": 0.2,
+                        "max_tokens": 900,
+                        "response_format": {"type": "json_object"},
+                    },
+                })
+                region_fly_meta[cid] = (rid, date_str, region_obj, safety_res)
+
+        if region_fly_requests:
+            yield {"event": "phase", "data": {"phase": "batch_submit_region_flyability", "total": len(region_fly_requests)}}
+            try:
+                jsonl = self._build_batch_jsonl(region_fly_requests)
+                batch_id = self._submit_batch(jsonl, f"Region-Flyability ({len(region_fly_requests)} Requests)")
+            except Exception as e:
+                logger.error(f"Region-Flyability-Batch-Submit fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Region-Flyability-Batch-Submit fehlgeschlagen: {e}"}}
+                return
+
+            yield {"event": "phase", "data": {"phase": "batch_poll_region_flyability", "batch_id": batch_id, "total": len(region_fly_requests)}}
+            try:
+                raw_results = self._poll_batch(batch_id)
+            except Exception as e:
+                logger.error(f"Region-Flyability-Batch-Poll fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Region-Flyability-Batch fehlgeschlagen: {e}"}}
+                return
+
+            for cid, raw_result in raw_results.items():
+                m = region_fly_meta.get(cid)
+                if not m:
+                    continue
+                rid, date_str, region_obj, safety_res = m
+                if raw_result.get("error"):
+                    # Fallback: Safety-Ergebnis mit Minimal-Flyability
+                    region_results.setdefault(rid, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+                    continue
+                try:
+                    # Safety-Felder ins Ergebnis uebernehmen
+                    raw_result["safety_status"] = safety_res.get("safety_status", "")
+                    raw_result["safe_window"] = safety_res.get("safe_window", "")
+                    raw_result["wind_calm_count"] = safety_res.get("wind_calm_count", 0)
+                    raw_result["wind_moderate_count"] = safety_res.get("wind_moderate_count", 0)
+                    raw_result["wind_strong_count"] = safety_res.get("wind_strong_count", 0)
+                    raw_result["region"] = region_obj["region"]
+                    raw_result["region_id"] = rid
+                    raw_result["date"] = date_str
+                    processed = self._post_process_flyability_region(raw_result, region_obj, date_str)
+                    # Merge: Safety + Flyability
+                    merged = self._merge_safety_flyability(safety_res, processed)
+                    region_results.setdefault(rid, {})[date_str] = merged
+                except Exception as e:
+                    logger.error(f"[BATCH-P2] Region-Flyability Post-Processing fuer {rid}/{date_str}: {e}")
+                    region_results.setdefault(rid, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+
+            yield {"event": "progress", "data": {"phase": "batch_region_flyability_done", "completed": len(raw_results), "total": len(region_fly_requests)}}
+            logger.info(f"[BATCH] Phase 2 (Region-Flyability) fertig: {len(region_fly_requests)} Calls (uebersprungen: {sum(len(d) for d in region_safety_results.values()) - len(region_fly_requests)} not_safe)")
+
+        # Regionen ohne Flyability-Call (alle not_safe) muessen trotzdem in region_results
+        for rid, dates in region_safety_results.items():
+            for date_str, safety_res in dates.items():
+                if rid not in region_results or date_str not in region_results.get(rid, {}):
+                    region_results.setdefault(rid, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+
+        # ══════════════════════════════════════════════════════════════
+        # PHASE 3: Spot-Safety Batch
+        # ══════════════════════════════════════════════════════════════
+        yield {"event": "phase", "data": {"phase": "batch_spot_safety", "total": 0}}
 
         # Pro-Spot Region-Mapping einmalig vorberechnen
         spot_region_map: dict = {}
@@ -1885,15 +2325,16 @@ class AnalyzersMixin:
                 logger.warning(f"Region-Mapping fuer {spot['name']} fehlgeschlagen: {e}")
                 spot_region_map[spot["name"]] = None
 
-        spot_requests: list = []
-        spot_meta: dict = {}
+        spot_safety_requests: list = []
+        spot_safety_meta: dict = {}
+        spot_contexts: dict = {}  # {f"{name}|{date_str}": ctx}
         prefilter_count = 0
 
         for spot in spots_to_analyze:
             name = spot["name"]
             rid = spot_region_map.get(name)
             for date_str in forecast_dates:
-                # Region-Ergebnis fuer diesen Spot/Tag raussuchen
+                # Region-Ergebnis fuer Kontext-Builder (Streckenflug braucht es spaeter)
                 region_result = None
                 if rid and rid in region_results:
                     rr = region_results[rid].get(date_str)
@@ -1907,102 +2348,197 @@ class AnalyzersMixin:
                 if not ctx:
                     spot_results.setdefault(name, {})[date_str] = {
                         "spot": name, "date": date_str,
-                        "safety_status": "no_data", "phase": "combined",
+                        "safety_status": "no_data", "phase": "split",
                         "summary": "Keine Wetterdaten fuer diesen Tag",
                     }
                     continue
 
-                # Deterministischer Pre-Filter — spart LLM-Calls fuer offensichtliche not_safe.
-                # Identisch zur Logik im Parallel-Modus (_build_and_analyze_spot).
+                spot_contexts[f"{name}|{date_str}"] = ctx
+
+                # Deterministischer Pre-Filter
                 prefilter = self._prefilter_not_safe(spot, date_str)
                 if prefilter is not None:
                     spot_results.setdefault(name, {})[date_str] = prefilter
                     prefilter_count += 1
                     continue
 
-                cid = f"spot_combined|{name}|{date_str}"
-                spot_requests.append({
+                cid = f"spot_safety|{name}|{date_str}"
+                spot_safety_requests.append({
                     "custom_id": cid,
                     "method": "POST",
                     "url": "/v1/chat/completions",
                     "body": {
                         "model": self.analysis_model,
                         "messages": [
-                            {"role": "system", "content": prompts.SPOT_COMBINED_PROMPT},
+                            {"role": "system", "content": prompts.SPOT_SAFETY_PROMPT},
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 1100,
+                        "max_tokens": 600,
                         "response_format": {"type": "json_object"},
                     },
                 })
-                spot_meta[cid] = (name, date_str, spot)
+                spot_safety_meta[cid] = (name, date_str, spot)
 
         if prefilter_count:
             logger.info(
                 f"[BATCH] Pre-Filter: {prefilter_count} Spots/Tage als not_safe markiert "
-                f"(kein LLM-Call) — {len(spot_requests)} Spots verbleiben fuer Batch-API"
+                f"(kein LLM-Call) — {len(spot_safety_requests)} Spots verbleiben fuer Safety-Batch"
             )
 
-        if not spot_requests and not region_requests and not spot_results:
+        if not spot_safety_requests and not region_safety_requests and not spot_results:
             yield {"event": "error", "data": {"message": "Keine Daten zum Verarbeiten"}}
             return
 
-        if spot_requests:
-            yield {"event": "phase", "data": {"phase": "batch_submit_spots", "total": len(spot_requests)}}
+        if spot_safety_requests:
+            yield {"event": "phase", "data": {"phase": "batch_submit_spot_safety", "total": len(spot_safety_requests)}}
             try:
-                jsonl = self._build_batch_jsonl(spot_requests)
-                spot_batch_id = self._submit_batch(jsonl, f"Spots ({len(spot_requests)} Requests)")
+                jsonl = self._build_batch_jsonl(spot_safety_requests)
+                batch_id = self._submit_batch(jsonl, f"Spot-Safety ({len(spot_safety_requests)} Requests)")
             except Exception as e:
-                logger.error(f"Spot-Batch-Submit fehlgeschlagen: {e}")
-                yield {"event": "error", "data": {"message": f"Spot-Batch-Submit fehlgeschlagen: {e}"}}
+                logger.error(f"Spot-Safety-Batch-Submit fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Spot-Safety-Batch-Submit fehlgeschlagen: {e}"}}
                 return
 
-            yield {"event": "phase", "data": {"phase": "batch_poll_spots",
-                                               "batch_id": spot_batch_id,
-                                               "total": len(spot_requests)}}
+            yield {"event": "phase", "data": {"phase": "batch_poll_spot_safety", "batch_id": batch_id, "total": len(spot_safety_requests)}}
             try:
-                spot_raw = self._poll_batch(spot_batch_id)
+                raw_results = self._poll_batch(batch_id)
             except Exception as e:
-                logger.error(f"Spot-Batch-Poll fehlgeschlagen: {e}")
-                yield {"event": "error", "data": {"message": f"Spot-Batch fehlgeschlagen: {e}"}}
+                logger.error(f"Spot-Safety-Batch-Poll fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Spot-Safety-Batch fehlgeschlagen: {e}"}}
                 return
 
-            for cid, raw_result in spot_raw.items():
-                m = spot_meta.get(cid)
+            for cid, raw_result in raw_results.items():
+                m = spot_safety_meta.get(cid)
                 if not m:
                     continue
                 name, date_str, spot = m
                 if raw_result.get("error"):
-                    spot_results.setdefault(name, {})[date_str] = {
-                        "safety_status": "error", "phase": "combined",
+                    spot_safety_results.setdefault(name, {})[date_str] = {
+                        "safety_status": "error", "phase": "safety",
                         "date": date_str, "spot": name,
                         "error": raw_result["error"],
                     }
                     continue
                 try:
+                    processed = self._post_process_safety_spot(raw_result, spot, date_str)
+                    spot_safety_results.setdefault(name, {})[date_str] = processed
+                except Exception as e:
+                    logger.error(f"[BATCH-P3] Spot-Safety Post-Processing fuer {name}/{date_str}: {e}")
+                    spot_safety_results.setdefault(name, {})[date_str] = {
+                        "safety_status": "error", "phase": "safety",
+                        "date": date_str, "spot": name,
+                        "error": str(e),
+                    }
+
+            yield {"event": "progress", "data": {"phase": "batch_spot_safety_done", "completed": len(raw_results), "total": len(spot_safety_requests)}}
+            logger.info(f"[BATCH] Phase 3 (Spot-Safety) fertig: {sum(len(d) for d in spot_safety_results.values())} Ergebnisse")
+
+        # ══════════════════════════════════════════════════════════════
+        # PHASE 4: Spot-Flyability Batch (nur safe/conditional)
+        # ══════════════════════════════════════════════════════════════
+        spot_fly_requests: list = []
+        spot_fly_meta: dict = {}
+
+        for name, dates in spot_safety_results.items():
+            for date_str, safety_res in dates.items():
+                if safety_res.get("safety_status") not in ("safe", "conditional"):
+                    # not_safe/error → Minimal-Flyability
+                    spot_results.setdefault(name, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    continue
+                ctx = spot_contexts.get(f"{name}|{date_str}", "")
+                if not ctx:
+                    spot_results.setdefault(name, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    continue
+                safety_block = self._format_safety_injection(safety_res)
+                # Spot-Objekt wiederfinden
+                spot_obj = next((s for s in spots_to_analyze if s["name"] == name), None)
+                if not spot_obj:
+                    continue
+
+                cid = f"spot_fly|{name}|{date_str}"
+                spot_fly_requests.append({
+                    "custom_id": cid,
+                    "method": "POST",
+                    "url": "/v1/chat/completions",
+                    "body": {
+                        "model": self.analysis_model,
+                        "messages": [
+                            {"role": "system", "content": prompts.SPOT_FLYABILITY_PROMPT},
+                            {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
+                        ],
+                        "temperature": 0.2,
+                        "max_tokens": 900,
+                        "response_format": {"type": "json_object"},
+                    },
+                })
+                spot_fly_meta[cid] = (name, date_str, spot_obj, safety_res)
+
+        if spot_fly_requests:
+            yield {"event": "phase", "data": {"phase": "batch_submit_spot_flyability", "total": len(spot_fly_requests)}}
+            try:
+                jsonl = self._build_batch_jsonl(spot_fly_requests)
+                batch_id = self._submit_batch(jsonl, f"Spot-Flyability ({len(spot_fly_requests)} Requests)")
+            except Exception as e:
+                logger.error(f"Spot-Flyability-Batch-Submit fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Spot-Flyability-Batch-Submit fehlgeschlagen: {e}"}}
+                return
+
+            yield {"event": "phase", "data": {"phase": "batch_poll_spot_flyability", "batch_id": batch_id, "total": len(spot_fly_requests)}}
+            try:
+                raw_results = self._poll_batch(batch_id)
+            except Exception as e:
+                logger.error(f"Spot-Flyability-Batch-Poll fehlgeschlagen: {e}")
+                yield {"event": "error", "data": {"message": f"Spot-Flyability-Batch fehlgeschlagen: {e}"}}
+                return
+
+            for cid, raw_result in raw_results.items():
+                m = spot_fly_meta.get(cid)
+                if not m:
+                    continue
+                name, date_str, spot_obj, safety_res = m
+                if raw_result.get("error"):
+                    spot_results.setdefault(name, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    continue
+                try:
+                    # Safety-Felder ins Ergebnis uebernehmen
+                    raw_result["safety_status"] = safety_res.get("safety_status", "")
+                    raw_result["safe_window"] = safety_res.get("safe_window", "")
+                    raw_result["spot"] = name
+                    raw_result["date"] = date_str
+
+                    # Region-Result fuer Flyability-Post-Processing (Region-Gating)
                     rid = spot_region_map.get(name)
                     region_result = None
                     if rid and rid in region_results:
                         rr = region_results[rid].get(date_str)
                         if rr and rr.get("safety_status") not in ("error", "no_data"):
                             region_result = rr
-                    processed = self._post_process_combined_spot(raw_result, spot, date_str, region_result=region_result)
-                    spot_results.setdefault(name, {})[date_str] = processed
-                except Exception as e:
-                    logger.error(f"[BATCH-PHASE2] Post-Processing fuer {name}/{date_str}: {e}")
-                    spot_results.setdefault(name, {})[date_str] = {
-                        "safety_status": "error", "phase": "combined",
-                        "date": date_str, "spot": name,
-                        "error": str(e),
-                    }
 
-            yield {"event": "progress", "data": {
-                "phase": "batch_spots_done",
-                "completed": len(spot_raw),
-                "total": len(spot_requests),
-            }}
-            logger.info(f"[BATCH] Phase 2 fertig: {sum(len(d) for d in spot_results.values())} Spot-Ergebnisse")
+                    processed = self._post_process_flyability_spot(raw_result, spot_obj, date_str, region_result=region_result)
+                    # Merge: Safety + Flyability
+                    merged = self._merge_safety_flyability(safety_res, processed)
+                    spot_results.setdefault(name, {})[date_str] = merged
+                except Exception as e:
+                    logger.error(f"[BATCH-P4] Spot-Flyability Post-Processing fuer {name}/{date_str}: {e}")
+                    spot_results.setdefault(name, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+
+            yield {"event": "progress", "data": {"phase": "batch_spot_flyability_done", "completed": len(raw_results), "total": len(spot_fly_requests)}}
+            logger.info(
+                f"[BATCH] Phase 4 (Spot-Flyability) fertig: {len(spot_fly_requests)} Calls "
+                f"(uebersprungen: {sum(len(d) for d in spot_safety_results.values()) - len(spot_fly_requests)} not_safe)"
+            )
+
+        # Spots ohne Flyability-Call (alle not_safe) muessen trotzdem in spot_results
+        for name, dates in spot_safety_results.items():
+            for date_str, safety_res in dates.items():
+                if name not in spot_results or date_str not in spot_results.get(name, {}):
+                    spot_results.setdefault(name, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+
+        logger.info(
+            f"[BATCH] Split-Flow komplett: {sum(len(d) for d in spot_results.values())} Spot-Ergebnisse, "
+            f"{sum(len(d) for d in region_results.values())} Region-Ergebnisse"
+        )
 
         # ── Merge: Spot-Ergebnisse (identisch zu run_all_analyses_stream Merge) ──
         spot_merged: dict = {}

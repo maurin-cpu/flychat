@@ -35,7 +35,26 @@ _SHARED_BLOCKS = [
     "_subratings_tables.md",
 ]
 
+# Safety-Phase: nur Gefahren-relevante Blöcke (spart ~10K tokens vs. Combined)
+_SHARED_BLOCKS_SAFETY = [
+    "_core_principles.md",
+    "_input_map.md",
+    "_hazard_blocks.md",
+    "_tages_override.md",
+]
+
+# Flyability-Phase: nur Fliegbarkeits-relevante Blöcke
+_SHARED_BLOCKS_FLYABILITY = [
+    "_core_principles.md",
+    "_input_map.md",
+    "_flyability_tiers.md",
+    "_formulierungs_tabelle.md",
+    "_subratings_tables.md",
+]
+
 _INSERT_MARKER = "<!-- INSERT_SHARED -->"
+_INSERT_MARKER_SAFETY = "<!-- INSERT_SHARED_SAFETY -->"
+_INSERT_MARKER_FLYABILITY = "<!-- INSERT_SHARED_FLYABILITY -->"
 
 # Platzhalter-Regex: {{cfg.KEY}} oder {{cfg.KEY|format}} (format ignoriert fuer jetzt).
 # Namen akzeptiert: Grossbuchstaben + Zahlen + Unterstrich.
@@ -88,25 +107,41 @@ def _load_shared(filename: str) -> str:
     return _render_placeholders(raw)
 
 
-def compose_analysis_prompt(mode: str) -> str:
+def compose_analysis_prompt(mode: str, phase: str = "combined") -> str:
     """Komponiert den Analyse-Prompt aus einem Mode-Template + Shared-Bausteinen.
 
-    mode = 'spot' → skills/spot_analysis.md mit eingefügten Shared-Blöcken.
-    mode = 'region' → skills/region_analysis.md mit eingefügten Shared-Blöcken.
+    mode = 'spot' | 'region'
+    phase = 'combined' | 'safety' | 'flyability'
 
-    Das Template muss den Marker '<!-- INSERT_SHARED -->' enthalten; dort werden die
-    Shared-Bausteine in fester Reihenfolge (siehe _SHARED_BLOCKS) eingesetzt.
+    combined → skills/{mode}_analysis.md + alle Shared-Blöcke (bisheriges Verhalten)
+    safety  → skills/{mode}_safety.md + nur Safety-Blöcke (~7K tokens)
+    flyability → skills/{mode}_flyability.md + nur Flyability-Blöcke (~10K tokens)
 
     Jeder Aufruf re-liest die Datei und re-rendert die Platzhalter — daher
     greifen Config-Aenderungen live.
     """
     if mode not in ("spot", "region"):
         raise ValueError(f"Unbekannter Analyse-Mode: {mode!r}")
-    template = _load_skill(f"{mode}_analysis.md")
-    if _INSERT_MARKER not in template:
-        raise ValueError(f"{mode}_analysis.md enthält keinen {_INSERT_MARKER}-Marker")
-    shared = "\n\n".join(_load_shared(name) for name in _SHARED_BLOCKS)
-    return template.replace(_INSERT_MARKER, shared)
+    if phase not in ("combined", "safety", "flyability"):
+        raise ValueError(f"Unbekannte Analyse-Phase: {phase!r}")
+
+    if phase == "combined":
+        template = _load_skill(f"{mode}_analysis.md")
+        marker = _INSERT_MARKER
+        blocks = _SHARED_BLOCKS
+    elif phase == "safety":
+        template = _load_skill(f"{mode}_safety.md")
+        marker = _INSERT_MARKER_SAFETY
+        blocks = _SHARED_BLOCKS_SAFETY
+    else:  # flyability
+        template = _load_skill(f"{mode}_flyability.md")
+        marker = _INSERT_MARKER_FLYABILITY
+        blocks = _SHARED_BLOCKS_FLYABILITY
+
+    if marker not in template:
+        raise ValueError(f"{mode}_{phase}.md enthält keinen {marker}-Marker")
+    shared = "\n\n".join(_load_shared(name) for name in blocks)
+    return template.replace(marker, shared)
 
 
 def format_foehn_llm_regional_guide() -> str:
@@ -141,12 +176,16 @@ def format_foehn_llm_regional_guide() -> str:
 # ---------------------------------------------------------------------------
 
 _LAZY_ATTRS = {
-    "SYSTEM_PROMPT":          lambda: _load_skill("system_chat.md"),
-    "CAPABILITIES_GUIDE":     lambda: _load_skill("chat_capabilities_guide.md"),
-    "FOEHN_CHAT_KNOWLEDGE":   lambda: _load_skill("foehn_chat_knowledge.md"),
-    "SPOT_COMBINED_PROMPT":   lambda: compose_analysis_prompt("spot"),
-    "REGION_COMBINED_PROMPT": lambda: compose_analysis_prompt("region"),
-    "WEEKLY_BRIEFING_PROMPT": lambda: _load_skill("weekly_briefing.md"),
+    "SYSTEM_PROMPT":            lambda: _load_skill("system_chat.md"),
+    "CAPABILITIES_GUIDE":       lambda: _load_skill("chat_capabilities_guide.md"),
+    "FOEHN_CHAT_KNOWLEDGE":     lambda: _load_skill("foehn_chat_knowledge.md"),
+    "SPOT_COMBINED_PROMPT":     lambda: compose_analysis_prompt("spot"),
+    "REGION_COMBINED_PROMPT":   lambda: compose_analysis_prompt("region"),
+    "SPOT_SAFETY_PROMPT":       lambda: compose_analysis_prompt("spot", "safety"),
+    "SPOT_FLYABILITY_PROMPT":   lambda: compose_analysis_prompt("spot", "flyability"),
+    "REGION_SAFETY_PROMPT":     lambda: compose_analysis_prompt("region", "safety"),
+    "REGION_FLYABILITY_PROMPT": lambda: compose_analysis_prompt("region", "flyability"),
+    "WEEKLY_BRIEFING_PROMPT":   lambda: _load_skill("weekly_briefing.md"),
 }
 
 
