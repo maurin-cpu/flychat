@@ -1145,19 +1145,21 @@ class WeatherContextMixin:
         return "none"
 
     def _strip_irrelevant_foehn(self, result: dict, kritischer_foehn: str) -> dict:
-        """Entfernt Föhn-Warnungen aus LLM-Ergebnis wenn die Richtung nicht zum Standort passt."""
-        if kritischer_foehn == "Beide":
-            return result
+        """Bereinigt Freitext-Felder (summary/wind_summary/wind_shear), wenn aktiver
+        Foehn fuer den Standort irrelevant ist.
 
-        foehn_risk = result.get("foehn_risk", "none")
-        if foehn_risk in ("none", "", None):
+        Strukturierte Felder (foehn_risk, caution_notes, no_go_reasons) werden bereits
+        von engine/decision_engine.apply_foehn_decision() autoritativ verwaltet —
+        diese Methode kuemmert sich nur noch um die LLM-Prosa, weil das LLM Foehn-Hinweise
+        manchmal ueber den Fliesstext leakt, auch wenn die Strukturfelder korrekt sind.
+        """
+        if kritischer_foehn == "Beide":
             return result
 
         active_dir = self._get_active_foehn_direction()
         if active_dir == "none":
             return result
 
-        # Prüfe: Ist die aktive Richtung irrelevant für diesen Standort?
         is_irrelevant = (
             (kritischer_foehn == "Süd" and active_dir == "Nord") or
             (kritischer_foehn == "Nord" and active_dir == "Süd")
@@ -1165,24 +1167,8 @@ class WeatherContextMixin:
         if not is_irrelevant:
             return result
 
-        logger.warning(
-            f"Föhn-Override: {active_dir}föhn aktiv aber Standort nur für "
-            f"{kritischer_foehn}föhn empfindlich → foehn_risk=none"
-        )
-        result["foehn_risk"] = "none"
-
-        # Föhn-Einträge aus caution_notes und no_go_reasons entfernen
-        foehn_keywords = ["föhn", "foehn", "fohn", "δp", "delta-p", "delta_p", "druckgradient"]
-        for key in ("caution_notes", "no_go_reasons"):
-            items = result.get(key, [])
-            if isinstance(items, list):
-                result[key] = [
-                    item for item in items
-                    if not any(kw in (item or "").lower() for kw in foehn_keywords)
-                ]
-
-        # Auch Freitext-Felder bereinigen: einzelne Saetze mit Foehn-Keywords droppen.
-        # Verhindert, dass das LLM die Foehn-Warnung trotz Strip ueber summary leakt.
+        # Sentence-Level-Filter: Saetze mit Foehn-Keywords aus den Prosa-Feldern droppen.
+        from engine.decision_engine import FOEHN_KEYWORDS
         for key in ("summary", "wind_summary", "wind_shear"):
             text = result.get(key)
             if not isinstance(text, str) or not text.strip():
@@ -1190,10 +1176,14 @@ class WeatherContextMixin:
             sentences = re.split(r"(?<=[\.\!\?])\s+", text)
             kept = [
                 s for s in sentences
-                if s.strip() and not any(kw in s.lower() for kw in foehn_keywords)
+                if s.strip() and not any(kw in s.lower() for kw in FOEHN_KEYWORDS)
             ]
             new_text = " ".join(kept).strip()
             if new_text != text.strip():
+                logger.info(
+                    f"Foehn-Strip (Prosa) fuer {result.get('spot') or result.get('region') or '?'}/"
+                    f"{result.get('date', '?')}: {active_dir}foehn irrelevant — Satz aus '{key}' entfernt"
+                )
                 result[key] = new_text
 
         return result

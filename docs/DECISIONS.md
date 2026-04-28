@@ -1,23 +1,52 @@
-# Safety- und Flyability-Overrides
+# Decisions Reference
 
-Diese Datei dokumentiert **alle deterministischen Korrekturen**, die an den Roh-Ergebnissen
-des LLM (oder vor dem LLM-Call) angewendet werden. Sie sind Backstops gegen
-LLM-Compliance-Fehler und Halluzinationen — wenn die Wetterdaten objektiv eine andere
-Bewertung verlangen als das LLM produziert hat, werden Status, Begruendungen und
-Risiko-Felder hier nachjustiert.
+Diese Datei dokumentiert **alle deterministischen Strukturentscheidungen**, die das System
+am Analyse-Result trifft. Es gibt drei Schichten:
 
-> **Sync-Pflicht (an Claude):** Bei jeder Aenderung in `engine/analyzers.py`,
-> `engine/weather_context.py` oder `chat_engine.py` an Logik, die `safety_status`,
-> `fly_status`/`flyability_tier`, `foehn_risk` oder `*_notes/*_reasons`-Listen
-> nachtraeglich modifiziert, **MUSS dieses Dokument aktualisiert werden**:
-> - Neuen Override → Zeile in der passenden Tabelle ergaenzen.
-> - Geaenderter Trigger/Effekt → Spalte aktualisieren, ggf. „Stand"-Zeile bei
->   *Letzte Aktualisierung* nachziehen.
-> - Entfernter Override → Zeile loeschen, Aenderung kurz im Changelog notieren.
-> Suchhilfe: `grep -n "Override" engine/analyzers.py` und `_strip_irrelevant_foehn`
-> in `engine/weather_context.py`. Pre-Filter siehe `_prefilter_not_safe`.
+1. **Pre-Filter** (vor LLM-Call): kann den LLM-Call ueberspringen.
+2. **Decision-Engine** (nach LLM-Call, autoritativ): setzt Strukturfelder unabhaengig
+   davon, was das LLM produziert hat. Single source of truth.
+3. **UI-Backstops**: rendern bestimmte Risiken auch dann, wenn das LLM die Note
+   weggelassen hat.
 
-Letzte Aktualisierung: 2026-04-28 (Foehn-Override + Summary-Sanitierung + UI-Foehn-Badge)
+> **Sync-Pflicht (an Claude):** Bei jeder Aenderung an `engine/decision_engine.py`,
+> `engine/analyzers.py` (Decision-Aufrufe), `engine/weather_context.py`
+> (Cache-Befuellung, Foehn-Strip) oder den UI-Backstops in
+> `static/js/region-map.js`/`meteogram.js`/`briefing.js`:
+> - Neue Decision/Pre-Filter/UI-Backstop → Tabellenzeile in der passenden Sektion
+>   ergaenzen.
+> - Geaenderter Trigger oder Effekt → Tabelle aktualisieren, Datum in
+>   *Letzte Aktualisierung* nachziehen, Changelog-Eintrag.
+> - Entfernter Code → Zeile loeschen, Changelog notieren.
+> Suchhilfen: `grep -n "decide_" engine/decision_engine.py`,
+> `grep -n "_decisions_applied\|_apply_foehn_decision" engine/analyzers.py`,
+> `_prefilter_not_safe`.
+
+Letzte Aktualisierung: 2026-04-28 (vollstaendige Migration der Overrides auf Decision-Engine)
+
+---
+
+## Architektur-Pattern: Stage-Inversion
+
+Das System trennt Strukturentscheidungen (Status, Risk, Tier, Listen-Eintraege)
+deterministisch von der Prosa-Erzeugung:
+
+```
+Wetterdaten → LLM (produziert Strukturfelder + Prosa)
+            → Decision-Engine ueberschreibt Strukturfelder autoritativ
+            → Foehn-Strip bereinigt Prosa-Felder bei irrelevanter Foehn-Richtung
+            → Resultat
+```
+
+Das LLM darf alle Felder weiter setzen, aber alle deterministisch ableitbaren
+Felder (Status, foehn_risk, flyability_tier, kanonische Notes) werden danach
+ueberschrieben. Der Effekt: LLM-Compliance-Bugs koennen die Sicherheits-Bewertung
+nicht mehr verfaelschen.
+
+**Tracking:** Jede gefeuerte Decision schreibt einen Eintrag in
+`result["_decisions_applied"]` (z.B. `["FoehnCaution(4.5)", "GustFloor"]`).
+Beim Debuggen sieht man genau, welche Korrekturen gegenueber dem LLM-Output
+passiert sind.
 
 ---
 
@@ -29,108 +58,170 @@ fuer Regionen.
 
 | Trigger                                                                 | Ergebnis  | Source                          |
 | ----------------------------------------------------------------------- | --------- | ------------------------------- |
-| `wind_ok_count == 0` ganztaegig (Windrichtung immer ausserhalb Sektor)  | not_safe  | `analyzers.py:101` Regel 1      |
-| `0 < wind_ok_count < CLEAN_WINDOW_MIN_HOURS` (Start-Fenster zu kurz)    | not_safe  | `analyzers.py:101` Regel 2      |
-| Regen in mind. `total_hours - 2` Stunden UND mind. 4h                   | not_safe  | `analyzers.py:101` Regel 3a     |
-| THUNDERSTORM in mind. `total_hours - 2` Stunden UND mind. 4h            | not_safe  | `analyzers.py:101` Regel 3b     |
+| `wind_ok_count == 0` ganztaegig (Windrichtung immer ausserhalb Sektor)  | not_safe  | `_prefilter_not_safe` Regel 1   |
+| `0 < wind_ok_count < CLEAN_WINDOW_MIN_HOURS` (Start-Fenster zu kurz)    | not_safe  | `_prefilter_not_safe` Regel 2   |
+| Regen in mind. `total_hours - 2` Stunden UND mind. 4h                   | not_safe  | `_prefilter_not_safe` Regel 3a  |
+| THUNDERSTORM in mind. `total_hours - 2` Stunden UND mind. 4h            | not_safe  | `_prefilter_not_safe` Regel 3b  |
 
 ---
 
-## 2. Safety-Overrides — Spot
+## 2. Decision-Engine — Foehn
 
-`_post_process_safety_spot(result, spot, date_str)` in `engine/analyzers.py`.
-Reihenfolge: hartes Wind-OK → ALOFT → Boeen-Floor → Overclaim → Foehn → Strip.
+`engine/decision_engine.py`: `compute_foehn_decision()` + `apply_foehn_decision()`.
 
-| #  | Override                       | Trigger                                                                                       | Effekt                                                              | Source                                  |
-| -- | ------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------- |
-| S1 | Wind-OK=0                      | `wind_ok_count == 0` und LLM != not_safe                                                      | → `not_safe`, `safe_window=keins`, no_go_reason "Windrichtung"      | `analyzers.py` Wind-OK-Block            |
-| S2 | Aloft-Wind-NoGo                | `aloft_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER aloft-Pattern `DURCHGEHEND_DANGER`/`EINGEKESSELT` mit zu kleinem Calm-Gap | → `not_safe`, `primary_no_go=ALOFT_DANGER`, no_go_reason            | `analyzers.py` Aloft-Block (NoGo-Pfad)  |
-| S3 | Aloft-Danger → conditional     | `aloft_danger_hours >= WIND_TREND_CONDITIONAL_HOURS` ODER `aloft_gust_danger_hours >= cond_thresh`, LLM = safe | → `conditional`, caution_note "Gefahr in der Hoehe …"               | `analyzers.py` Aloft-Block (Cond-Pfad)  |
-| S4 | Boeen-Floor                    | `gust_warn_hours + aloft_gust_warn_hours >= WIND_TREND_NOTSAFE_HOURS` ODER analoges fuer DANGER, LLM = safe | → `conditional`, caution_note mit max. Boeenwert                    | `analyzers.py` Boeen-Floor-Block        |
-| S5 | Overclaim-Ceiling              | LLM = not_safe, `hard_warning_hours == 0`, `clean_hours_count >= 4`                           | → `conditional`, no_go_reasons geleert, caution_note "Auto-Korrektur" | `analyzers.py` Overclaim-Block         |
-| S6 | Foehn-Vorsicht                 | `evaluate_foehn().level == "caution"` (ΔP 4-7 hPa, Richtung passt), LLM = safe                 | → `conditional`, `foehn_risk=moderate` falls bisher none, caution_note "Foehn-Vorsicht" | `analyzers.py` `_apply_foehn_override` |
-| S7 | Foehn-Gefahr                   | `evaluate_foehn().level == "danger"` (ΔP ≥ 8 hPa), LLM != not_safe                             | → `not_safe`, `foehn_risk=high`, `primary_no_go=FOEHN`, no_go_reason | `analyzers.py` `_apply_foehn_override` |
-| S8 | Foehn-Strip irrelevant         | Aktive Foehn-Richtung != `kritischer_foehn` des Spots                                          | `foehn_risk=none`, Foehn-Eintraege aus caution_notes/no_go_reasons UND aus `summary`/`wind_summary`/`wind_shear` entfernt | `weather_context.py` `_strip_irrelevant_foehn` |
+Quelle: `_ctx_foehn_cache[name|date]`, befuellt via
+`_format_foehn_info(cache_key=…)` in `weather_context.py` aus `evaluate_foehn()`.
 
----
+| Cache-Level                         | Decision-Effekt                                                                                | Tracking-Tag           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------- |
+| `none` (kein Foehn ODER irrelevante Richtung) | `foehn_risk=none`, LLM-Foehn-Eintraege in caution_notes/no_go_reasons werden gestrichen, sonst kein Eingriff | (kein Tag)             |
+| `caution` (ΔP 4-7, relevante Richtung) | `foehn_risk=moderate`, Status mind. `conditional`, kanonische `caution_notes`-Eintragung      | `FoehnCaution(ΔP)`     |
+| `danger` (ΔP ≥ 8, relevante Richtung) | `foehn_risk=high`, Status `not_safe`, `safe_window=keins`, `primary_no_go=FOEHN`, kanonische `no_go_reason` | `FoehnDanger(ΔP)`      |
 
-## 3. Safety-Overrides — Region
+> **Richtungs-Filter** (kritisch != aktiv): wird bereits in `_format_foehn_info()`
+> abgefangen — der Cache liefert dann `level="none"`, sodass die Decision-Engine
+> nichts triggert.
 
-`_post_process_safety_region(result, region, date_str)` in `engine/analyzers.py`.
+### Foehn-Strip (Prosa-Saeuberung)
 
-| #  | Override                       | Trigger                                                                                       | Effekt                                                              | Source                                  |
-| -- | ------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------- |
-| R1 | Wind-Strong-Mehrheit           | `calm == 0`, `strong > moderate`, LLM in (safe, conditional)                                   | → `not_safe`, no_go_reason "Durchgehend starker Wind"               | `analyzers.py` Region Wind-Block        |
-| R2 | Aloft-Danger NoGo              | analog S2                                                                                     | → `not_safe`                                                        | `analyzers.py` Region Aloft (NoGo-Pfad) |
-| R3 | Aloft-Danger conditional       | analog S3                                                                                     | → `conditional`, caution_note                                       | `analyzers.py` Region Aloft (Cond-Pfad) |
-| R4 | Foehn-Vorsicht                 | analog S6                                                                                     | → `conditional`, `foehn_risk=moderate`, caution_note                | `analyzers.py` `_apply_foehn_override` |
-| R5 | Foehn-Gefahr                   | analog S7                                                                                     | → `not_safe`, `foehn_risk=high`, no_go_reason                       | `analyzers.py` `_apply_foehn_override` |
-| R6 | Foehn-Strip irrelevant         | analog S8                                                                                     | analog S8                                                           | `weather_context.py` `_strip_irrelevant_foehn` |
+Ergaenzend zur Decision-Engine wirkt `_strip_irrelevant_foehn()` in
+`weather_context.py` ausschliesslich auf die Freitext-Felder
+`summary`/`wind_summary`/`wind_shear`. Saetze mit Foehn-Keywords werden
+entfernt, wenn die Foehn-Richtung fuer den Standort irrelevant ist (verhindert,
+dass das LLM einen Foehn-Hinweis im Fliesstext leakt, obwohl die Strukturfelder
+korrekt geleert sind).
 
 ---
 
-## 4. Flyability-Overrides — Spot
+## 3. Decision-Engine — Spot Safety
 
-`_post_process_flyability_spot(result, spot, date_str, region_result)` in `engine/analyzers.py`.
+Reihenfolge in `_post_process_safety_spot`:
 
-| #  | Override                       | Trigger                                                                                       | Effekt                                                              | Source                                |
-| -- | ------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------- |
-| F1 | not_safe → leeres Flyability   | `safety_status == not_safe`                                                                   | `fly_status=""`, leeres `streckenflug`-Dict, rating per `_compute_rating_from_subratings(..., "not_safe")` | `analyzers.py` Anfang Post-Process    |
-| F2 | Downgrade keine Thermik        | tier in (green, violet) UND (`thermal_hours_total == 0` ODER `peak_climb_proxy < 0.3`)        | tier → `gray`                                                       | `analyzers.py` Flyability-Downgrade   |
-| F3 | Downgrade ROUGH-UNUSABLE>50%   | tier in (green, violet) UND `rough_danger_h / thermal_hours_total > 50%`                       | tier → `gray`                                                       | `analyzers.py` Flyability-Downgrade   |
-| F4 | Downgrade prod_h zu wenig      | tier in (green, violet) UND `productive_thermal_h < PRODUCTIVE_HOURS_DOWNGRADE`                | tier → `gray`                                                       | `analyzers.py` Flyability-Downgrade   |
-| F5 | gray → green Upgrade           | tier == gray UND `productive_thermal_h >= PRODUCTIVE_HOURS_FOR_GREEN` UND `rough_pct < 50`     | tier → `green`, `peak_climb_rate`, `flight_type`, `recommendation` ueberschrieben | `analyzers.py` gray→green-Block      |
-| F6 | Region-Gate violet → green     | Spot-tier = violet UND `region_result.flyability_tier != violet`                              | tier → `green`                                                      | `analyzers.py` Region-Gating-Block    |
+1. `decide_wind_ok_zero`
+2. `decide_aloft_not_safe`
+3. `decide_aloft_conditional`
+4. `decide_gust_floor`
+5. `decide_overclaim_relax`
+6. `_apply_foehn_decision` (Sektion 2)
 
-> Cache-Quellen: `_ctx_tq_cache[name|date]` enthaelt `thermal_hours_total`, `rough_danger_h`,
+| Decision                          | Trigger                                                                                       | Effekt                                                              | Tracking-Tag                  |
+| --------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------- |
+| `decide_wind_ok_zero`             | `wind_ok_count == 0` und Status != not_safe                                                   | `not_safe`, `safe_window=keins`, no_go_reason "Windrichtung"        | `WindOk0`                     |
+| `decide_aloft_not_safe`           | `aloft_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER aloft-Pattern `DURCHGEHEND_DANGER` ODER `EINGEKESSELT` mit zu kleinem Calm-Gap | `not_safe`, `primary_no_go=ALOFT_DANGER`, no_go_reason | `AloftNotSafe(Nh)`           |
+| `decide_aloft_conditional`        | `aloft_danger_hours >= WIND_TREND_CONDITIONAL_HOURS` ODER `aloft_gust_danger_hours >= cond_thresh`, Status = safe | `conditional`, caution_note "Gefahr in der Hoehe …"  | `AloftConditional(Nh)`        |
+| `decide_gust_floor`               | `gust_warn_hours + aloft_gust_warn_hours >= WIND_TREND_NOTSAFE_HOURS` ODER analog DANGER, Status = safe | `conditional`, caution_note mit Boeen-Details                       | `GustFloor`                   |
+| `decide_overclaim_relax`          | Status = not_safe, `hard_warning_hours == 0`, `clean_hours_count >= 4`                       | **DEMOTIERT** zu `conditional`, no_go_reasons geleert, caution_note "Auto-Korrektur" | `OverclaimRelax(Nh)`          |
+
+`decide_overclaim_relax` ist die einzige Decision, die den Status NICHT verschaerft,
+sondern entspannt. Sie hilft, wenn das LLM zu vorsichtig war und keine harten
+Warnungen vorliegen.
+
+---
+
+## 4. Decision-Engine — Region Safety
+
+Reihenfolge in `_post_process_safety_region`:
+
+1. `decide_wind_strong_majority` (region-spezifisch)
+2. `decide_aloft_not_safe`
+3. `decide_aloft_conditional`
+4. `_apply_foehn_decision`
+
+| Decision                          | Trigger                                                                                       | Effekt                                                              | Tracking-Tag                  |
+| --------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------- |
+| `decide_wind_strong_majority`     | `calm == 0`, `strong > moderate`, Status in (safe, conditional)                                | `not_safe`, no_go_reason "Durchgehend starker Wind"                | `WindStrongMajority(N)`       |
+| `decide_aloft_not_safe`           | wie Spot                                                                                       | wie Spot                                                            | wie Spot                      |
+| `decide_aloft_conditional`        | wie Spot                                                                                       | wie Spot                                                            | wie Spot                      |
+
+Region hat **keine** GustFloor- und keine OverclaimRelax-Decision (Region-Resultate
+werden anders aggregiert; diese Decisions sind spot-spezifisch).
+
+---
+
+## 5. Decision-Engine — Flyability
+
+Aufruf in `_post_process_flyability_spot` (Spot) und `_post_process_flyability_region` (Region).
+
+Reihenfolge: Downgrade vor Upgrade vor Region-Gate (sonst koennten Downgrade-Effekte
+durch Upgrade rueckgaengig gemacht werden).
+
+| Decision                          | Trigger                                                                                       | Effekt                                                              | Tracking-Tag                  |
+| --------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------- |
+| `decide_flyability_downgrade`     | tier in (green, violet) UND (`thermal_hours_total == 0` ODER `peak < 0.3` ODER `rough_pct > 50%` ODER `prod_h < PRODUCTIVE_HOURS_DOWNGRADE`) | tier → `gray`                                                       | `FlyabilityDowngrade(...)`    |
+| `decide_flyability_upgrade`       | tier == gray UND `prod_h >= PRODUCTIVE_HOURS_FOR_GREEN` UND `rough_pct < 50%`                  | tier → `green`, ueberschreibt peak_climb_rate, flight_type, recommendation | `FlyabilityUpgrade(...)`      |
+| `decide_flyability_region_gate` (nur Spot) | Spot-tier == violet UND Region-tier in (gray, green)                                  | tier → `green`                                                      | `FlyabilityRegionGate(...)`   |
+
+> Cache-Quelle: `_ctx_tq_cache[name|date]` mit `thermal_hours_total`, `rough_danger_h`,
 > `peak_climb_proxy`, `productive_thermal_h`. Schwellen in `config.py`
 > (`PRODUCTIVE_HOURS_DOWNGRADE`, `PRODUCTIVE_HOURS_FOR_GREEN`).
 
----
-
-## 5. Flyability-Overrides — Region
-
-`_post_process_flyability_region(result, region, date_str)` in `engine/analyzers.py`.
-
-| #  | Override                       | Trigger                                                                                       | Effekt                                                              | Source                                |
-| -- | ------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------- |
-| FR1 | not_safe → leeres Flyability  | analog F1                                                                                     | analog F1                                                           | `analyzers.py` Region-Flyability-Anfang |
-| FR2 | Downgrade keine Thermik       | analog F2                                                                                     | analog F2                                                           | `analyzers.py` Region-Flyability-Downgrade |
-| FR3 | Downgrade ROUGH-UNUSABLE>50%  | analog F3                                                                                     | analog F3                                                           | `analyzers.py` Region-Flyability-Downgrade |
-| FR4 | Downgrade prod_h zu wenig     | analog F4                                                                                     | analog F4                                                           | `analyzers.py` Region-Flyability-Downgrade |
-| FR5 | gray → green Upgrade          | analog F5                                                                                     | analog F5 (kein Streckenflug-Block, da Region keine Spots auflistet) | `analyzers.py` Region-Flyability gray→green |
+Die Spot-Flyability hat zusaetzlich einen `not_safe` → leeres Flyability Schritt am
+Anfang (`_post_process_flyability_spot`): Wenn die Safety-Phase `not_safe` lieferte,
+werden `fly_status`, `flyability_tier` und `streckenflug` direkt geleert; keine
+LLM-Anfrage fuer diese Felder.
 
 ---
 
-## 6. UI-Sicherheits-Backstops
+## 6. UI-Backstops
 
-Selbst wenn das LLM `foehn_risk` korrekt setzt, das LLM aber keinen Eintrag in
-`caution_notes`/`no_go_reasons` schreibt, rendern Spot- und Region-Overlay
-trotzdem ein Foehn-Badge:
+Selbst wenn Decision-Engine + LLM korrekt zusammenarbeiten, rendern die UI-Komponenten
+zusaetzlich ein Foehn-Badge, falls `foehn_risk != none` und keine Foehn-Erwaehnung in
+`caution_notes`/`no_go_reasons` steht — als letzte Sicherung.
 
 | Datei                         | Logik                                                                                       |
 | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| `static/js/region-map.js`     | `foehn_risk != none` UND keine Foehn-Erwaehnung in `caution_notes/no_go_reasons` → eigenes Alert-Badge (`Foehn-Vorsicht`/`Foehn-Gefahr`) |
+| `static/js/region-map.js`     | `foehn_risk != none` AND keine Foehn-Erwaehnung in den Listen → eigenes Alert-Badge        |
 | `static/js/meteogram.js`      | Identische Logik (Spot-Overlay)                                                             |
-| `static/js/briefing.js:912`   | Bestehender Pfad: `safety.foehn_risk` rendert eigene Warn-Zeile                             |
+| `static/js/briefing.js:912`   | Bestehender Pfad: rendert `Foehn: <level>`-Zeile aus `safety.foehn_risk`                   |
+
+Die JS-Seite haelt eine eigene Keyword-Liste fuer Foehn-Erkennung. Bei Aenderungen
+an `engine/decision_engine.FOEHN_KEYWORDS` muss die JS-Logik in beiden Dateien
+mitgezogen werden.
 
 ---
 
 ## 7. Caches
 
-| Cache                        | Init                          | Befuellung                                                | Genutzt von                                                |
-| ---------------------------- | ----------------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
-| `_ctx_gust_cache`            | `chat_engine.py` Konstruktor  | `weather_context.py` (Spot/Region Context-Build)          | Pre-Filter, Wind-OK/Aloft/Boeen-Floor/Overclaim-Overrides  |
-| `_ctx_tq_cache`              | `chat_engine.py` Konstruktor  | `weather_context.py` (Spot/Region Context-Build)          | Flyability-Downgrades + gray→green Upgrade                 |
-| `_ctx_foehn_cache`           | `chat_engine.py` Konstruktor  | `weather_context.py` `_format_foehn_info(cache_key=…)`    | Foehn-Override (Spot/Region Safety-Phase)                  |
+Alle Caches werden in `chat_engine.py` initialisiert und in
+`_post_process_*_safety/_flyability` gelesen. Sie werden zu Beginn jedes
+Analyse-Laufs in `analyzers.py` geleert.
 
-Alle drei werden in `analyzers.py` zu Beginn jedes Analyse-Laufs geleert
-(`_ctx_*_cache.clear()`), damit Daten aus alten Spots/Tagen nicht durchsickern.
+| Cache                  | Init                          | Befuellung (engine/weather_context.py)                    | Genutzt von                                                   |
+| ---------------------- | ----------------------------- | --------------------------------------------------------- | ------------------------------------------------------------- |
+| `_ctx_gust_cache`      | `chat_engine.py` Konstruktor  | Spot/Region Context-Build                                 | Pre-Filter, alle Wind/Aloft/Boeen-Decisions, Overclaim        |
+| `_ctx_tq_cache`        | `chat_engine.py` Konstruktor  | Spot/Region Context-Build                                 | Flyability-Decisions (Downgrade + Upgrade)                    |
+| `_ctx_foehn_cache`     | `chat_engine.py` Konstruktor  | `_format_foehn_info(cache_key=…)`                         | Foehn-Decision (apply_foehn_decision)                         |
+
+---
+
+## Wie eine neue Decision hinzufuegen
+
+1. Funktion `decide_xxx(result, ctx, label) -> Optional[str]` in
+   `engine/decision_engine.py` definieren. Mutiert `result` in-place, liefert
+   Tracking-Tag oder `None`.
+2. Bei Bedarf neuen Cache in `chat_engine.py` initialisieren und in
+   `engine/weather_context.py` befuellen.
+3. Aufruf in der passenden `_post_process_*` Methode in `engine/analyzers.py`
+   einreihen — Reihenfolge bedenken (status-modifizierende Decisions zuerst).
+4. Tag in `result.setdefault("_decisions_applied", []).append(tag)` mitschreiben.
+5. Mindestens 2 Unit-Tests in `tests/test_decision_engine.py` (Trigger feuert,
+   Trigger feuert nicht).
+6. Tabellenzeile in dieser Datei ergaenzen + Changelog.
 
 ---
 
 ## Changelog
 
-- **2026-04-28** — Foehn-Override (S6/S7/R4/R5) hinzugefuegt; `_strip_irrelevant_foehn`
-  bereinigt jetzt auch `summary`/`wind_summary`/`wind_shear` (S8/R6); UI-Backstop
-  in `region-map.js` und `meteogram.js` ergaenzt.
+- **2026-04-28** — **Vollstaendige Stage-Inversion-Migration**:
+  - Alle 9 verbleibenden Overrides aus `analyzers.py` (Wind-OK=0, Aloft-NotSafe,
+    Aloft-Conditional, Gust-Floor, Overclaim, Wind-Strong-Mehrheit,
+    Flyability-Downgrade, Flyability-Upgrade, Region-Gate) in die Decision-Engine
+    migriert.
+  - `_post_process_safety_spot/region` und `_post_process_flyability_spot/region`
+    sind jetzt Decision-Pipes statt Override-Bloecken.
+  - Datei umbenannt von `SAFETY_OVERRIDES.md` zu `DECISIONS.md`.
+  - Tests: 32 Unit-Tests in `tests/test_decision_engine.py`.
+- **2026-04-28 (frueher Eintrag)** — Stage-Inversion-PoC fuer Foehn:
+  `engine/decision_engine.py` mit `compute_foehn_decision` + `apply_foehn_decision`,
+  `_apply_foehn_override` durch `_apply_foehn_decision` ersetzt,
+  `result["_decisions_applied"]` als Tracking-Feld eingefuehrt.

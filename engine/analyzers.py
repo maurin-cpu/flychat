@@ -37,6 +37,13 @@ from gust_calculator import (
     interpolate_gust_from_anchors,
 )
 from station_observations import StationManager
+from engine.decision_engine import (
+    compute_foehn_decision, apply_foehn_decision,
+    decide_wind_ok_zero, decide_aloft_not_safe, decide_aloft_conditional,
+    decide_gust_floor, decide_overclaim_relax, decide_wind_strong_majority,
+    decide_flyability_downgrade, decide_flyability_upgrade,
+    decide_flyability_region_gate,
+)
 from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
     get_all_regions,
@@ -1573,67 +1580,28 @@ class AnalyzersMixin:
         logger.info(f"Batch {batch_id}: {len(results)} Ergebnisse geparst")
         return results
 
-    def _apply_foehn_override(self, result: dict, foehn_eval: dict, label: str) -> None:
-        """Deterministischer Backstop fuer Foehn-Bewertung (LLM-Compliance-Schutz).
+    def _apply_foehn_decision(self, result: dict, cache_key: str, label: str) -> None:
+        """Wendet die deterministische Foehn-Decision (Stage-Inversion) auf das LLM-Result.
 
-        Spiegelt das Verhalten des Aloft-Danger-Override:
-        - evaluate_foehn() level=="caution" + LLM gab "safe" → conditional + caution_note + foehn_risk=moderate
-        - evaluate_foehn() level=="danger" + LLM gab nicht "not_safe" → not_safe + no_go_reason + foehn_risk=high
+        Ersetzt das frueher hier eingebaute `_apply_foehn_override`-Pattern: anstatt das
+        LLM-Result zu PRUEFEN und ggf. zu korrigieren, wird `foehn_risk` und der
+        kanonische Caution/No-Go-Text autoritativ aus dem Cache abgeleitet. Das LLM darf
+        diese Strukturfelder zwar weiter setzen, sie werden aber stets ueberschrieben.
 
-        Wirkt nur, wenn die Foehn-Richtung fuer den Standort relevant ist
-        (level wird in _format_foehn_info bereits auf "none" gesetzt, falls nicht).
-        Mutiert `result` in-place.
+        Mutiert `result` in-place und schreibt einen Tracking-Eintrag in
+        `result["_decisions_applied"]` (Liste).
         """
-        if not foehn_eval:
-            return
-        level = foehn_eval.get("level", "none")
-        if level not in ("caution", "danger"):
-            return
-
-        delta_p = foehn_eval.get("delta_p_hpa")
-        delta_p_str = f"ΔP {delta_p} hPa" if delta_p is not None else "ΔP unbekannt"
-        direction = foehn_eval.get("direction") or "Süd"
-        status = result.get("safety_status")
-
-        if level == "danger" and status != "not_safe":
-            logger.warning(
-                f"Foehn-Override fuer {label}: LLM gab '{status}' "
-                f"trotz Foehn-Gefahr ({delta_p_str}) → not_safe"
-            )
-            result["safety_status"] = "not_safe"
-            result["safe_window"] = "keins"
-            result["foehn_risk"] = "high"
-            if not result.get("primary_no_go"):
-                result["primary_no_go"] = "FOEHN"
-            nogo = result.get("no_go_reasons", []) or []
-            if not any("föhn" in (r or "").lower() or "foehn" in (r or "").lower() for r in nogo):
-                nogo.append(f"Foehn-Gefahr: {direction}foehn {delta_p_str} (Flugverbot-Empfehlung)")
-            result["no_go_reasons"] = nogo
-            return
-
-        if level == "caution" and status == "safe":
-            logger.warning(
-                f"Foehn-Override fuer {label}: LLM gab 'safe' "
-                f"trotz Foehn-Vorsicht ({delta_p_str}) → conditional"
-            )
-            result["safety_status"] = "conditional"
-            # foehn_risk haerten — moderate nur, falls LLM "none" gesetzt hat.
-            if result.get("foehn_risk") in (None, "", "none"):
-                result["foehn_risk"] = "moderate"
-            cn = result.get("caution_notes", []) or []
-            has_foehn_note = any(
-                kw in (n or "").lower()
-                for n in cn
-                for kw in ("föhn", "foehn", "delta-p", "δp")
-            )
-            if not has_foehn_note:
-                cn.append(f"Foehn-Vorsicht: {direction}foehn {delta_p_str} — an exponierten Stellen vorsichtig.")
-            result["caution_notes"] = cn
+        foehn_eval = self._ctx_foehn_cache.get(cache_key, {})
+        decision = compute_foehn_decision(foehn_eval)
+        applied = apply_foehn_decision(result, decision)
+        if applied:
+            result.setdefault("_decisions_applied", []).append(applied)
+            logger.info(f"Decision-Engine fuer {label}: {applied}")
 
     def _post_process_safety_spot(self, result: dict, spot: dict, date_str: str) -> dict:
         """Safety-only Post-Processing fuer einen Spot.
-        Wendet deterministische Safety-Overrides an (Wind-OK, Aloft, Boeen-Floor,
-        Overclaim-Ceiling, Foehn-Filter). Wird vom Split-Flow (Safety-Phase) genutzt.
+        Wendet die Decision-Engine an (WindOk0, Aloft-NotSafe/Conditional, GustFloor,
+        OverclaimRelax, Foehn) plus den Foehn-Prosa-Strip. Siehe docs/DECISIONS.md.
         """
         name = spot["name"]
         result["spot"] = name
@@ -1645,139 +1613,31 @@ class AnalyzersMixin:
             result["wind_ok_count"] = gust_info.get("wind_ok_count", 0)
             result["wind_wrong_count"] = gust_info.get("wind_wrong_count", 0)
 
-        # Hard override: 0 WIND-OK Stunden = immer not_safe
-        wind_ok = result.get("wind_ok_count", -1)
-        if isinstance(wind_ok, int) and wind_ok == 0 and result.get("safety_status") != "not_safe":
-            logger.warning(f"Safety-Override fuer {name}/{date_str}: LLM gab '{result.get('safety_status')}' trotz 0 WIND-OK Stunden → not_safe")
-            result["safety_status"] = "not_safe"
-            result["safe_window"] = "keins"
-            nogo = result.get("no_go_reasons", [])
-            if not any("Windrichtung" in r for r in nogo):
-                nogo.append("Keine Stunde mit korrekter Windrichtung")
-            result["no_go_reasons"] = nogo
+        # Decision-Pipe (Reihenfolge ist semantisch wichtig — nachfolgende Decisions
+        # bauen auf dem Status-Stand der vorherigen auf):
+        # 1. WindOk0 (kann not_safe forcieren)
+        # 2. AloftNotSafe (kann not_safe forcieren)
+        # 3. AloftConditional (nur bei status=safe → conditional)
+        # 4. GustFloor (nur bei status=safe → conditional)
+        # 5. OverclaimRelax (kann not_safe→conditional demoten)
+        # 6. Foehn-Decision (autoritativ: foehn_risk + ggf. Status anheben)
+        decision_label = f"{name}/{date_str}"
+        for fn in (
+            decide_wind_ok_zero,
+            decide_aloft_not_safe,
+            decide_aloft_conditional,
+            decide_gust_floor,
+            decide_overclaim_relax,
+        ):
+            tag = fn(result, gust_info, decision_label)
+            if tag:
+                result.setdefault("_decisions_applied", []).append(tag)
 
-        # ALOFT-Override
-        if gust_info:
-            aloft_d = gust_info.get("aloft_danger_hours", 0)
-            aloft_gd = gust_info.get("aloft_gust_danger_hours", 0)
-            aloft_pattern = gust_info.get("aloft_pattern")
-            nogo_thresh = config.WIND_TREND_NOTSAFE_HOURS
-            cond_thresh = config.WIND_TREND_CONDITIONAL_HOURS
-            kmh_thresh = config.WIND_DANGER_KMH
+        # Foehn (eigene Cache-Quelle, daher separat)
+        self._apply_foehn_decision(result, f"{name}|{date_str}", label=decision_label)
 
-            aloft_triggers_notsafe = (aloft_d >= nogo_thresh)
-            if aloft_pattern:
-                label = aloft_pattern.get("pattern_label", "")
-                calm_gap = aloft_pattern.get("max_calm_gap", 0)
-                if label == "DURCHGEHEND_DANGER":
-                    aloft_triggers_notsafe = True
-                elif label == "EINGEKESSELT" and calm_gap < nogo_thresh:
-                    aloft_triggers_notsafe = True
-                else:
-                    aloft_triggers_notsafe = False
-
-            gust_kmh_thresh = config.GUST_DANGER_KMH
-
-            if aloft_triggers_notsafe and result.get("safety_status") != "not_safe":
-                pattern_str = aloft_pattern.get("pattern_label", "-") if aloft_pattern else "-"
-                logger.warning(
-                    f"Aloft-Wind-NoGo-Override fuer {name}/{date_str}: LLM gab "
-                    f"'{result.get('safety_status')}' trotz ALOFT-DANGER {aloft_d}h "
-                    f"(Schwelle {nogo_thresh}h, Trend={pattern_str}) → not_safe"
-                )
-                result["safety_status"] = "not_safe"
-                result["safe_window"] = "keins"
-                if not result.get("primary_no_go"):
-                    result["primary_no_go"] = "ALOFT_DANGER"
-                nogo = result.get("no_go_reasons", []) or []
-                nogo.append(
-                    f"Kraeftiger Hoehenwind im Flugbereich: >{kmh_thresh} km/h in {aloft_d}h"
-                )
-                result["no_go_reasons"] = nogo
-            elif (aloft_d >= cond_thresh or aloft_gd >= cond_thresh) \
-                    and result.get("safety_status") == "safe":
-                logger.warning(
-                    f"Aloft-Danger-Override fuer {name}/{date_str}: LLM gab 'safe' "
-                    f"trotz ALOFT-DANGER {aloft_d}h / ALOFT-GUST-DANGER {aloft_gd}h "
-                    f"(Schwelle {cond_thresh}h) → conditional"
-                )
-                result["safety_status"] = "conditional"
-                cn = result.get("caution_notes", []) or []
-                bits = []
-                if aloft_d >= cond_thresh:
-                    bits.append(f"Hoehenwind >{kmh_thresh} km/h im Flugbereich in {aloft_d}h")
-                if aloft_gd >= cond_thresh:
-                    bits.append(f"Hoehenboeen >{gust_kmh_thresh} km/h im Flugbereich in {aloft_gd}h")
-                if aloft_d >= cond_thresh and aloft_gd >= cond_thresh:
-                    label = "Gefahr in der Hoehe (Wind und Boeen)"
-                elif aloft_gd >= cond_thresh:
-                    label = "Kraeftige Hoehenboeen"
-                else:
-                    label = "Gefahr in der Hoehe"
-                cn.append(label + ": " + ", ".join(bits) + " — auch bei ruhigem Bodenwind pruefen.")
-                result["caution_notes"] = cn
-
-        # Boeen-Floor
-        if gust_info:
-            gust_floor_hours = config.WIND_TREND_NOTSAFE_HOURS
-            gwarn = gust_info.get("gust_warn_hours", 0) + gust_info.get("aloft_gust_warn_hours", 0)
-            gdanger = gust_info.get("gust_danger_hours", 0) + gust_info.get("aloft_gust_danger_hours", 0)
-
-            if (gwarn >= gust_floor_hours or gdanger >= gust_floor_hours) and result.get("safety_status") == "safe":
-                max_gust = int(gust_info.get("max_surface_gust", 0) or 0)
-                logger.warning(
-                    f"Boeen-Floor-Override fuer {name}/{date_str}: LLM gab 'safe' "
-                    f"trotz GUST-WARN {gwarn}h / GUST-DANGER {gdanger}h → conditional"
-                )
-                result["safety_status"] = "conditional"
-                cn = result.get("caution_notes", []) or []
-                has_gust_note = any(
-                    any(kw in (n or "").lower() for kw in ["böen", "böe", "gust", "turbulenz"])
-                    for n in cn
-                )
-                if not has_gust_note:
-                    bits = []
-                    sfc_warn = gust_info.get("gust_warn_hours", 0)
-                    alo_warn = gust_info.get("aloft_gust_warn_hours", 0)
-                    if sfc_warn > 0 and max_gust > 0:
-                        bits.append(f"Bodenboeen bis ~{max_gust} km/h in {sfc_warn}h")
-                    elif sfc_warn > 0:
-                        bits.append(f"Bodenboeen ueber 30 km/h in {sfc_warn}h")
-                    if alo_warn > 0:
-                        bits.append(f"Hoehenboeen ueber 30 km/h im Flugbereich in {alo_warn}h")
-                    if gust_info.get("gust_danger_hours", 0) > 0:
-                        bits.append(f"Bodenboeen ueber 40 km/h in {gust_info['gust_danger_hours']}h")
-                    if gust_info.get("aloft_gust_danger_hours", 0) > 0:
-                        bits.append(f"Hoehenboeen ueber 40 km/h in {gust_info['aloft_gust_danger_hours']}h")
-                    cn.append(
-                        "Starke Boeen erkannt: " + ", ".join(bits) +
-                        " — Trend und Fenster pruefen."
-                    )
-                result["caution_notes"] = cn
-
-        # Overclaim-Ceiling
-        if gust_info and result.get("safety_status") == "not_safe":
-            has_hard_warnings = gust_info.get("hard_warning_hours", 0) > 0
-            clean_cnt = gust_info.get("clean_hours_count", 0)
-            if not has_hard_warnings and clean_cnt >= 4:
-                logger.warning(
-                    f"Overclaim-Override fuer {name}/{date_str}: LLM gab 'not_safe' "
-                    f"trotz {clean_cnt}h sauberen Stunden und 0 harten Warnungen → conditional"
-                )
-                result["safety_status"] = "conditional"
-                cn = result.get("caution_notes", []) or []
-                cn.append(
-                    f"Automatische Korrektur: Die Wetterdaten zeigen {clean_cnt} saubere "
-                    f"Flugstunden ohne harte Warnungen — bitte Meteogramm selbst pruefen."
-                )
-                result["caution_notes"] = cn
-                result["no_go_reasons"] = []
-
-        # Foehn-Override (deterministischer Backstop bei LLM-Compliance-Fehlern)
-        foehn_eval = self._ctx_foehn_cache.get(f"{name}|{date_str}", {})
-        self._apply_foehn_override(result, foehn_eval, label=f"{name}/{date_str}")
-
-        # Foehn-Richtungs-Override
+        # Foehn-Richtungs-Strip: bereinigt Summary/wind_summary/wind_shear bei
+        # irrelevantem aktivem Foehn (Strukturfelder hat apply_foehn_decision schon erledigt).
         krit_foehn = spot.get("kritischer_foehn", "Süd")
         result = self._strip_irrelevant_foehn(result, krit_foehn)
 
@@ -1817,76 +1677,19 @@ class AnalyzersMixin:
         # Tag-Sanitierung
         _sanitize_llm_result(result)
 
-        # Deterministische Flyability-Overrides
+        # Flyability-Decisions (Decision-Engine):
+        # 1. Downgrade green/violet → gray (3 Sub-Trigger: keine Thermik, ROUGH>50%, prod_h zu niedrig)
+        # 2. gray → green Upgrade (Thermik trotz LLM-gray objektiv tragfaehig)
+        # 3. Region-Gate violet → green (Spot ohne Region-Konsens)
         tq = self._ctx_tq_cache.get(f"{name}|{date_str}", {})
-        if tq:
-            tht = tq.get("thermal_hours_total", 0)
-            rough_h = tq.get("rough_danger_h", 0)
-            peak = tq.get("peak_climb_proxy", 0)
-            prod_h = tq.get("productive_thermal_h", 0)
-
-            # Downgrade: green/violet → gray
-            if tier in ("green", "violet"):
-                downgrade = False
-                reason = ""
-                if tht == 0 or peak < 0.3:
-                    downgrade = True
-                    reason = f"keine Thermik (peak={peak:.1f}, hours={tht})"
-                elif tht > 0:
-                    rough_pct = (rough_h / max(1, tht)) * 100
-                    if rough_pct > 50:
-                        downgrade = True
-                        reason = f"ROUGH-UNUSABLE={rough_pct:.0f}% ({rough_h}/{tht}h, mech. gefaehrlich)"
-                    elif prod_h < config.PRODUCTIVE_HOURS_DOWNGRADE:
-                        downgrade = True
-                        reason = f"Nur {prod_h}h produktive Thermik (min {config.PRODUCTIVE_HOURS_DOWNGRADE}h)"
-                if downgrade:
-                    result["fly_status"] = "gray"
-                    result["flyability_tier"] = "gray"
-                    logger.warning(
-                        f"Flyability-Downgrade: {name}/{date_str} {tier}→gray ({reason})"
-                    )
-
-            # gray→green Upgrade
-            final_tier = result.get("fly_status", result.get("flyability_tier", "gray"))
-            if final_tier == "gray" and tht > 0:
-                rough_pct = (rough_h / max(1, tht)) * 100
-                if prod_h >= config.PRODUCTIVE_HOURS_FOR_GREEN and rough_pct < 50:
-                    result["fly_status"] = "green"
-                    result["flyability_tier"] = "green"
-                    result["peak_climb_rate"] = round(peak, 1)
-                    if peak >= 1.5:
-                        result["flight_type"] = "Thermikflug"
-                        result["flight_duration_estimate"] = f"2-3h Thermikflug (Peak {peak:.1f} m/s)"
-                    else:
-                        result["flight_type"] = "Soaring+Thermik"
-                        result["flight_duration_estimate"] = f"1-2h Soaring/Thermik"
-                    if prod_h >= 5:
-                        result["xc_potential"] = "moderate"
-                    result["recommendation"] = (
-                        f"System-Korrektur: Die Daten zeigen {peak:.1f} m/s Peak-Thermik "
-                        f"mit {prod_h}h produktiver Thermik (ROUGH-UNUSABLE nur {rough_pct:.0f}%). "
-                        f"Gute Bedingungen fuer Thermikfluege."
-                    )
-                    logger.warning(
-                        f"Flyability-Override: {name}/{date_str} gray→green "
-                        f"(peak={peak:.1f}, ROUGH={rough_pct:.0f}%, productive_h={prod_h})"
-                    )
-
-        # Region-Gating: violet nur wenn Region auch violet
-        current_tier = result.get("flyability_tier") or result.get("fly_status") or ""
-        if current_tier == "violet" and region_result:
-            region_tier = _normalize_flyability_tier(
-                region_result.get("flyability_tier") or region_result.get("fly_status") or ""
-            )
-            if region_tier and region_tier != "violet":
-                result["fly_status"] = "green"
-                result["flyability_tier"] = "green"
-                rname = region_result.get("region", "")
-                logger.warning(
-                    f"Flyability-Region-Gate: {name}/{date_str} violet→green "
-                    f"(Region '{rname}' tier={region_tier}, nicht violet)"
-                )
+        decision_label = f"{name}/{date_str}"
+        for tag in (
+            decide_flyability_downgrade(result, tq, decision_label),
+            decide_flyability_upgrade(result, tq, decision_label),
+            decide_flyability_region_gate(result, region_result, decision_label),
+        ):
+            if tag:
+                result.setdefault("_decisions_applied", []).append(tag)
 
         # Streckenflug Post-Processing
         final_tier = result.get("fly_status", result.get("flyability_tier", "gray")) or ""
@@ -1964,88 +1767,33 @@ class AnalyzersMixin:
         return result
 
     def _post_process_safety_region(self, result: dict, region: dict, date_str: str) -> dict:
-        """Safety-only Post-Processing fuer eine Region.
-        Wendet deterministische Safety-Overrides an (Wind-Strong, Aloft, Foehn-Filter).
-        """
+        """Safety-only Post-Processing fuer eine Region (Decision-Pipe + Foehn-Strip)."""
         rname = region["region"]
         result["region"] = rname
         result["region_id"] = region["id"]
         result["date"] = date_str
         result["phase"] = "safety"
 
-        # Hard override: WIND-STRONG Mehrheit ohne WIND-CALM → not_safe
-        strong = result.get("wind_strong_count", 0)
-        calm = result.get("wind_calm_count", 0)
-        moderate = result.get("wind_moderate_count", 0)
-        if (isinstance(strong, int) and isinstance(calm, int) and isinstance(moderate, int)
-                and calm == 0 and strong > moderate
-                and result.get("safety_status") in ("safe", "conditional")):
-            logger.warning(
-                f"Region Safety-Override fuer {rname}/{date_str}: LLM gab "
-                f"'{result.get('safety_status')}' trotz {strong} WIND-STRONG, "
-                f"0 WIND-CALM, {moderate} WIND-MODERATE → not_safe"
-            )
-            result["safety_status"] = "not_safe"
-            result["safe_window"] = "keins"
-            nogo = result.get("no_go_reasons", [])
-            if not any(kw in (r or "").lower() for r in nogo for kw in ["starker wind", "wind-strong", "zu stark"]):
-                nogo.append(f"Durchgehend starker Wind ({strong} von {strong + moderate} Stunden), keine ruhige Phase")
-            result["no_go_reasons"] = nogo
-
-        # ALOFT-Override (Region)
         region_gust_info = self._ctx_gust_cache.get(f"{rname}|{date_str}", {})
-        if region_gust_info:
-            aloft_d = region_gust_info.get("aloft_danger_hours", 0)
-            aloft_pattern = region_gust_info.get("aloft_pattern")
-            nogo_thresh = config.WIND_TREND_NOTSAFE_HOURS
-            cond_thresh = config.WIND_TREND_CONDITIONAL_HOURS
-            kmh_thresh = config.WIND_DANGER_KMH
+        decision_label = f"{rname}/{date_str}"
 
-            aloft_triggers_notsafe = (aloft_d >= nogo_thresh)
-            if aloft_pattern:
-                label = aloft_pattern.get("pattern_label", "")
-                calm_gap = aloft_pattern.get("max_calm_gap", 0)
-                if label == "DURCHGEHEND_DANGER":
-                    aloft_triggers_notsafe = True
-                elif label == "EINGEKESSELT" and calm_gap < nogo_thresh:
-                    aloft_triggers_notsafe = True
-                else:
-                    aloft_triggers_notsafe = False
+        # Decision-Pipe (Reihenfolge wie bei Spot, plus Region-spezifischer Wind-Strong-Check):
+        # 1. WindStrongMajority (kann not_safe forcieren — region-spezifisch)
+        # 2. AloftNotSafe (kann not_safe forcieren)
+        # 3. AloftConditional (nur bei status=safe → conditional)
+        # 4. Foehn (autoritativ)
+        tag = decide_wind_strong_majority(result, decision_label)
+        if tag:
+            result.setdefault("_decisions_applied", []).append(tag)
+        for fn in (decide_aloft_not_safe, decide_aloft_conditional):
+            tag = fn(result, region_gust_info, decision_label)
+            if tag:
+                result.setdefault("_decisions_applied", []).append(tag)
 
-            if aloft_triggers_notsafe and result.get("safety_status") != "not_safe":
-                pattern_str = aloft_pattern.get("pattern_label", "-") if aloft_pattern else "-"
-                logger.warning(
-                    f"Region Aloft-Danger-NoGo-Override fuer {rname}/{date_str}: LLM gab "
-                    f"'{result.get('safety_status')}' trotz ALOFT-DANGER {aloft_d}h "
-                    f"(Schwelle {nogo_thresh}h, Trend={pattern_str}) → not_safe"
-                )
-                result["safety_status"] = "not_safe"
-                result["safe_window"] = "keins"
-                if not result.get("primary_no_go"):
-                    result["primary_no_go"] = "ALOFT_DANGER"
-                nogo = result.get("no_go_reasons", []) or []
-                nogo.append(
-                    f"Kraeftiger Hoehenwind im Flugbereich: >{kmh_thresh} km/h in {aloft_d}h"
-                )
-                result["no_go_reasons"] = nogo
-            elif aloft_d >= cond_thresh and result.get("safety_status") == "safe":
-                logger.warning(
-                    f"Region Aloft-Danger-Override fuer {rname}/{date_str}: LLM gab 'safe' "
-                    f"trotz ALOFT-DANGER {aloft_d}h (Schwelle {cond_thresh}h) → conditional"
-                )
-                result["safety_status"] = "conditional"
-                cn = result.get("caution_notes", []) or []
-                cn.append(
-                    f"Gefahr in der Höhe: Höhenwind >{kmh_thresh} km/h in {aloft_d}h — "
-                    f"auch bei ruhigem Bodenwind prüfen."
-                )
-                result["caution_notes"] = cn
+        # Foehn (eigene Cache-Quelle)
+        self._apply_foehn_decision(result, f"{rname}|{date_str}", label=decision_label)
 
-        # Foehn-Override (deterministischer Backstop bei LLM-Compliance-Fehlern)
-        foehn_eval = self._ctx_foehn_cache.get(f"{rname}|{date_str}", {})
-        self._apply_foehn_override(result, foehn_eval, label=f"{rname}/{date_str}")
-
-        # Foehn-Richtungs-Override
+        # Foehn-Richtungs-Strip: bereinigt Summary-Felder bei irrelevantem aktivem Foehn
         krit_foehn = region.get("kritischer_foehn", "Beide")
         result = self._strip_irrelevant_foehn(result, krit_foehn)
 
@@ -2073,58 +1821,15 @@ class AnalyzersMixin:
 
         _sanitize_llm_result(result)
 
+        # Flyability-Decisions (Region: kein Region-Gate, da Region selbst die Vergleichsbasis)
         tq = self._ctx_tq_cache.get(f"{rname}|{date_str}", {})
-        if tq:
-            tht = tq.get("thermal_hours_total", 0)
-            rough_h = tq.get("rough_danger_h", 0)
-            peak = tq.get("peak_climb_proxy", 0)
-            prod_h = tq.get("productive_thermal_h", 0)
-
-            if tier in ("green", "violet"):
-                downgrade = False
-                reason = ""
-                if tht == 0 or peak < 0.3:
-                    downgrade = True
-                    reason = f"keine Thermik (peak={peak:.1f}, hours={tht})"
-                elif tht > 0:
-                    rough_pct = (rough_h / max(1, tht)) * 100
-                    if rough_pct > 50:
-                        downgrade = True
-                        reason = f"ROUGH-UNUSABLE={rough_pct:.0f}% ({rough_h}/{tht}h, mech. gefaehrlich)"
-                    elif prod_h < config.PRODUCTIVE_HOURS_DOWNGRADE:
-                        downgrade = True
-                        reason = f"Nur {prod_h}h produktive Thermik (min {config.PRODUCTIVE_HOURS_DOWNGRADE}h)"
-                if downgrade:
-                    result["fly_status"] = "gray"
-                    result["flyability_tier"] = "gray"
-                    logger.warning(
-                        f"Flyability-Downgrade: {rname}/{date_str} {tier}→gray ({reason})"
-                    )
-
-            final_tier = result.get("fly_status", result.get("flyability_tier", "gray"))
-            if final_tier == "gray" and tht > 0:
-                rough_pct = (rough_h / max(1, tht)) * 100
-                if prod_h >= config.PRODUCTIVE_HOURS_FOR_GREEN and rough_pct < 50:
-                    result["fly_status"] = "green"
-                    result["flyability_tier"] = "green"
-                    result["peak_climb_rate"] = round(peak, 1)
-                    if peak >= 1.5:
-                        result["flight_type"] = "Thermikflug"
-                        result["flight_duration_estimate"] = f"2-3h Thermikflug (Peak {peak:.1f} m/s)"
-                    else:
-                        result["flight_type"] = "Soaring+Thermik"
-                        result["flight_duration_estimate"] = f"1-2h Soaring/Thermik"
-                    if prod_h >= 5:
-                        result["xc_potential"] = "moderate"
-                    result["recommendation"] = (
-                        f"System-Korrektur: Die Daten zeigen {peak:.1f} m/s Peak-Thermik "
-                        f"mit {prod_h}h produktiver Thermik (ROUGH-UNUSABLE nur {rough_pct:.0f}%). "
-                        f"Gute Bedingungen fuer Thermikfluege in der Region."
-                    )
-                    logger.warning(
-                        f"Flyability-Override: {rname}/{date_str} gray→green "
-                        f"(peak={peak:.1f}, ROUGH={rough_pct:.0f}%, productive_h={prod_h})"
-                    )
+        decision_label = f"{rname}/{date_str}"
+        for tag in (
+            decide_flyability_downgrade(result, tq, decision_label),
+            decide_flyability_upgrade(result, tq, decision_label),
+        ):
+            if tag:
+                result.setdefault("_decisions_applied", []).append(tag)
 
         final_tier = result.get("fly_status", result.get("flyability_tier", "gray")) or ""
         final_safety = result.get("safety_status", "")

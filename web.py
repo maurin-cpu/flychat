@@ -10,6 +10,7 @@ import logging
 import math
 import threading
 from functools import wraps
+from typing import Optional
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, \
     stream_with_context, session
 from datetime import datetime, timedelta
@@ -633,10 +634,6 @@ def _check_login_rate_limit() -> Optional[str]:
 
         attempts.append(now)
     return None
-
-
-# Importiere Optional fuer Type-Hint oben (war vorher nicht im Top-Import)
-from typing import Optional  # noqa: E402
 
 
 @app.route("/login", methods=["POST"])
