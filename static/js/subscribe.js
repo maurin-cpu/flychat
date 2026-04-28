@@ -52,17 +52,18 @@
       return `<button type="button" class="sp-filter-chip${active ? " is-active" : ""}" data-region-id="${escapeHtml(r.id)}" aria-pressed="${active}">${escapeHtml(r.region)}</button>`;
     }).join("");
     if (resetBtn) {
-      // Briefing-Logik: Wenn bereits alle Regionen ausgewaehlt sind ->
-      // Button wechselt auf "Keine" (waehlt alle ab). Sonst "Alle" (waehlt
-      // alle aus). Nur disabled wenn keine Regionen verfuegbar sind.
+      // Beschriftung bleibt immer "Alle" — nur visueller Status (is-active)
+      // zeigt an, ob bereits alle ausgewaehlt sind. Klick togglet trotzdem
+      // (alle <-> keine), damit der Button beide Richtungen kann.
       const allActive = regions.length > 0 && regions.every((r) => selected.has(r.id));
       resetBtn.disabled = regions.length === 0;
-      resetBtn.textContent = allActive ? "Keine" : "Alle";
+      resetBtn.textContent = "Alle";
       resetBtn.classList.toggle("is-active", allActive);
       resetBtn.setAttribute(
         "aria-label",
         allActive ? "Alle Regionen abwählen" : "Alle Regionen auswählen"
       );
+      resetBtn.setAttribute("aria-pressed", allActive ? "true" : "false");
     }
   }
 

@@ -138,6 +138,11 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         # Cache fuer Thermik-Qualitaet (Flyability-Override bei falschem gray):
         # Key = f"{name}|{date_str}", Value = dict mit thermal_hours_total, tq_danger_h, peak_climb_proxy
         self._ctx_tq_cache = {}
+        # Cache fuer Foehn-Override (LLM-Compliance-Backstop):
+        # Key = f"{name}|{date_str}" oder f"{region}|{date_str}",
+        # Value = {"level": "none|caution|danger", "delta_p_hpa": float, "direction": "Süd|Nord|none"}.
+        # Befuellt in _format_foehn_info(), gelesen in _post_process_safety_*.
+        self._ctx_foehn_cache = {}
 
         # LLM-Clients: Chat + Analyse getrennt konfigurierbar (config.py).
         # Hybrid-Setup moeglich (z.B. Chat=anthropic, Analyse=openai).

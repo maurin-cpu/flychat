@@ -1,17 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Dein Abo – Gleitcast{% endblock %}
+{% block title %}Dein Konto – Gleitcast{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/account.css') }}?v={{ static_v('css/account.css') }}">
 {% endblock %}
 
 {% block content %}
 <main class="sp">
 
   <header class="sp-header">
-    <h1 class="sp-logo">Dein Abo</h1>
-    <div class="sp-subtitle">Einstellungen verwalten</div>
+    <div class="sp-hero__eyebrow">Konto &amp; Briefing</div>
+    <h1 class="sp-logo">Deine Einstellungen</h1>
+    <div class="sp-subtitle">{{ subscriber.email }}</div>
   </header>
 
   {% if flash_ok %}
@@ -21,20 +25,55 @@
     <div class="sp-flash sp-flash--error" role="alert">{{ flash_error }}</div>
   {% endif %}
 
+  {% if subscriber.status == 'unsubscribed' %}
+  <section class="sp-card ac-reactivate-card" aria-live="polite">
+    <div class="sp-card__label" style="color: var(--color-primary-vivid);">Briefing pausiert</div>
+    <p style="margin: 6px 0 14px; font-size: 14.5px; line-height: 1.5; color: var(--color-text);">
+      Du bist aktuell <strong>abgemeldet</strong> &mdash; es wird kein Briefing verschickt.
+      Deine Einstellungen sind aber noch da. Klick zum Reaktivieren:
+    </p>
+    <form method="post" action="/account/{{ token }}/reactivate">
+      <button type="submit" class="sp-btn sp-btn--primary">Briefing wieder aktivieren</button>
+    </form>
+  </section>
+  {% elif not subscriber.regions %}
+  <section class="ac-onboarding" aria-live="polite">
+    <div class="ac-onboarding__eyebrow">Du bist eingeloggt &mdash; aber noch nicht abonniert</div>
+    <h2 class="ac-onboarding__title">
+      <span class="ac-onboarding__sparkle" aria-hidden="true">&#10024;</span>
+      Aktiviere dein Briefing
+    </h2>
+    <p class="ac-onboarding__lead">
+      Flugwetter für deine Regionen direkt ins Postfach &mdash; an deinen Wunschtagen, kostenlos.
+    </p>
+    <ol class="ac-onboarding__steps">
+      <li><span>1</span> Regionen wählen</li>
+      <li><span>2</span> Versandtage festlegen</li>
+      <li><span>3</span> Speichern &mdash; fertig</li>
+    </ol>
+    <button type="button" class="ac-onboarding__cta" onclick="document.querySelector('.ac-save-btn').scrollIntoView({behavior:'smooth', block:'center'})">
+      Briefing jetzt abonnieren
+      <span aria-hidden="true">&darr;</span>
+    </button>
+  </section>
+  {% endif %}
+
   <section class="sp-card">
     <div class="sp-card__label">Status</div>
     <dl class="sp-kv">
-      <dt>E-Mail</dt>
-      <dd>{{ subscriber.email }}</dd>
       <dt>Status</dt>
       <dd>
-        <span class="sp-pill sp-pill--{{ subscriber.status }}">
-          {% if subscriber.status == 'active' %}Aktiv
-          {% elif subscriber.status == 'paused' %}Pausiert{% if subscriber.paused_until %} bis {{ subscriber.paused_until }}{% endif %}
-          {% elif subscriber.status == 'pending' %}Nicht bestätigt
-          {% elif subscriber.status == 'unsubscribed' %}Abgemeldet
-          {% else %}{{ subscriber.status }}{% endif %}
-        </span>
+        {% if subscriber.status == 'active' and not subscriber.regions %}
+          <span class="sp-pill sp-pill--no-sub" title="Account existiert, aber noch nicht abonniert">Kein Abo</span>
+        {% else %}
+          <span class="sp-pill sp-pill--{{ subscriber.status }}">
+            {% if subscriber.status == 'active' %}Aktiv
+            {% elif subscriber.status == 'paused' %}Pausiert{% if subscriber.paused_until %} bis {{ subscriber.paused_until }}{% endif %}
+            {% elif subscriber.status == 'pending' %}Nicht bestätigt
+            {% elif subscriber.status == 'unsubscribed' %}Abgemeldet
+            {% else %}{{ subscriber.status }}{% endif %}
+          </span>
+        {% endif %}
       </dd>
       <dt>Level</dt>
       <dd>
@@ -42,50 +81,203 @@
         {% elif subscriber.skill_level == 'expert' %}Profi
         {% else %}Standard{% endif %}
       </dd>
-      <dt>Regionen</dt>
-      <dd>
-        {% for r in region_names %}{{ r }}{% if not loop.last %}, {% endif %}{% endfor %}
-      </dd>
     </dl>
   </section>
 
-  {% if subscriber.status == 'active' %}
-  <section class="sp-card">
-    <div class="sp-card__label">Pause</div>
-    <div class="sp-card__hint">Keine Zeit zum Fliegen? Pausiere deine Briefings vorübergehend.</div>
-    <div class="sp-actions sp-actions--two-col">
-      <form method="post" action="/account/{{ token }}/pause_14d">
-        <button type="submit" class="sp-btn sp-btn--secondary" style="width:100%;">Pause 2 Wochen</button>
-      </form>
-      <form method="post" action="/account/{{ token }}/pause_30d">
-        <button type="submit" class="sp-btn sp-btn--secondary" style="width:100%;">Pause 1 Monat</button>
-      </form>
-    </div>
-  </section>
-  {% endif %}
+  {# ============= EINSTELLUNGEN-FORM (Regions + Tiers + Rating + Wochentage) ============= #}
+  <form class="sp-form" method="post" action="/account/{{ token }}/update" novalidate>
 
-  {% if subscriber.status == 'paused' %}
-  <section class="sp-card">
-    <div class="sp-card__label">Pause beenden</div>
-    <div class="sp-card__hint">
-      Wieder Lust auf Briefings? Deine Pause endet ohnehin automatisch
-      {% if subscriber.paused_until %} am {{ subscriber.paused_until }}{% endif %}.
-    </div>
-    <form method="post" action="/account/{{ token }}/resume">
-      <button type="submit" class="sp-btn sp-btn--primary">Jetzt fortsetzen</button>
-    </form>
-  </section>
-  {% endif %}
+    {# ----- Regionen ----- #}
+    <section class="sp-card" role="group" aria-labelledby="acRegionsLabel">
+      <div class="sp-card__label" id="acRegionsLabel">Regionen</div>
+      <div class="sp-card__hint">Wähle die Regionen, für die du Briefings erhalten willst — per Chip oder Klick auf der Karte.</div>
 
+      <div class="sp-filters" id="spRegionFilters"
+           data-regions='{{ regions|tojson }}'
+           data-prefill='{{ (prefill_regions|list)|tojson }}'>
+        <div class="sp-filter-row">
+          <div class="sp-filter-chips" id="spFilterChips" role="group" aria-label="Regionen"></div>
+          <button type="button" class="sp-filter-reset" id="spFilterReset" title="Alle Regionen auswählen / abwählen">Alle</button>
+          <button type="button" class="sp-filter-map-btn" id="spMapToggle" title="Karte ein/aus" aria-label="Karte ein/aus">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
+          </button>
+        </div>
+        <div class="sp-filter-map" id="spFilterMap"></div>
+        <div class="sp-filter-hidden" id="spRegionInputs" aria-hidden="true"></div>
+      </div>
+
+      <noscript>
+        <div class="sp-checkbox-grid" role="group" aria-label="Regionen">
+          {% for region in regions %}
+          <label class="sp-checkbox-item">
+            <input type="checkbox" name="regions" value="{{ region.id }}"
+              {% if region.id in prefill_regions %}checked{% endif %}>
+            <span>{{ region.region }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </noscript>
+    </section>
+
+    {# ----- Qualitaets-Tiers (welche Spots im Briefing) ----- #}
+    <section class="sp-card" role="group" aria-labelledby="acQualityLabel">
+      <div class="sp-card__label" id="acQualityLabel">Qualität</div>
+      <div class="sp-card__hint">Welche Spot-Stufen sollen im Briefing erscheinen?</div>
+
+      {% set tier_defs = [
+        ('violet',      'Legendär',  'Top-Tage mit grosser Höhe'),
+        ('green',       'Fliegbar',  'Solide Bedingungen'),
+        ('conditional', 'Bedingt',   'Nur in bestimmten Fenstern'),
+        ('gray',        'Bronze',    'Abgleiter / nur Sledder'),
+      ] %}
+      <div class="ac-tier-chips" id="acTierChips" role="group" aria-label="Qualitäts-Tiers">
+        {% for tid, label, hint in tier_defs %}
+        <label class="ac-tier-chip ac-tier-chip--{{ tid }}{% if tid in prefill_tiers %} is-active{% endif %}">
+          <input type="checkbox" name="tiers" value="{{ tid }}"
+                 {% if tid in prefill_tiers %}checked{% endif %}>
+          <span class="ac-tier-chip__dot"></span>
+          <span class="ac-tier-chip__label">{{ label }}</span>
+          <span class="ac-tier-chip__hint">{{ hint }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ----- Mindest-Rating ----- #}
+    <section class="sp-card" role="group" aria-labelledby="acRatingLabel">
+      <div class="sp-card__label" id="acRatingLabel">Mindest-Rating</div>
+      <div class="sp-card__hint">Spots unter diesem Rating bleiben aus dem Briefing.</div>
+
+      <div class="ac-rating-row">
+        <input type="range" id="acRatingSlider" name="min_rating"
+               min="0" max="10" step="0.5"
+               value="{{ '%.1f'|format(prefill_min_rating) }}"
+               class="ac-rating-slider"
+               aria-label="Minimales Rating">
+        <output class="ac-rating-value" id="acRatingValue" for="acRatingSlider">
+          {% if prefill_min_rating <= 0 %}alle{% else %}≥ {{ '%.1f'|format(prefill_min_rating) }}{% endif %}
+        </output>
+      </div>
+    </section>
+
+    {# ----- Wochentage ----- #}
+    <section class="sp-card" role="group" aria-labelledby="acWeekdaysLabel">
+      <div class="sp-card__label" id="acWeekdaysLabel">Versandtage</div>
+      <div class="sp-card__hint">An welchen Wochentagen willst du das Briefing bekommen?</div>
+
+      {% set weekday_labels = [(0,'Mo'), (1,'Di'), (2,'Mi'), (3,'Do'), (4,'Fr'), (5,'Sa'), (6,'So')] %}
+      <div class="ac-weekday-chips" role="group" aria-label="Wochentage">
+        {% for wd, label in weekday_labels %}
+        <label class="ac-weekday-chip{% if wd in active_weekdays %} is-active{% endif %}">
+          <input type="checkbox" name="weekdays" value="{{ wd }}"
+                 {% if wd in active_weekdays %}checked{% endif %}>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ----- Pause-Zeitraum (Von - Bis) ----- #}
+    <section class="sp-card" role="group" aria-labelledby="acPauseLabel">
+      <div class="sp-card__label" id="acPauseLabel">Pause</div>
+      <div class="sp-card__hint">
+        Definiere einen Zeitraum, in dem keine Briefings verschickt werden.
+        {% if subscriber.paused_from and subscriber.paused_until %}
+          Aktuell: <strong>{{ subscriber.paused_from }} bis {{ subscriber.paused_until }}</strong>.
+        {% endif %}
+        Beide Felder leer = keine Pause.
+      </div>
+
+      <div class="ac-pause-rangepicker">
+        <input type="text" id="acPauseRange"
+               class="ac-date-input ac-date-input--range"
+               placeholder="Klicken um Zeitraum zu waehlen"
+               readonly>
+        {# Hidden Felder werden vom flatpickr-onChange gefuellt und vom Form-POST gelesen #}
+        <input type="hidden" id="acPausedFrom" name="paused_from"
+               value="{{ subscriber.paused_from or '' }}">
+        <input type="hidden" id="acPausedUntil" name="paused_until"
+               value="{{ subscriber.paused_until or '' }}">
+      </div>
+
+      <div class="ac-pause-actions">
+        <button type="button" class="sp-btn sp-btn--secondary ac-pause-shortcut" id="acPauseWinter">
+          Winterpause (Nov &ndash; Feb)
+        </button>
+        <button type="button" class="sp-btn sp-btn--ghost ac-pause-clear" id="acPauseClear"
+                aria-label="Pause aufheben">
+          Pause entfernen
+        </button>
+      </div>
+    </section>
+
+    <button type="submit" class="sp-btn sp-btn--primary ac-save-btn">
+      {% if not subscriber.regions %}Briefing abonnieren{% else %}Einstellungen speichern{% endif %}
+    </button>
+  </form>
+
+  {% if subscriber.regions and subscriber.status != 'unsubscribed' %}
   <section class="sp-card">
-    <div class="sp-card__label">Abmelden</div>
+    <div class="sp-card__label">Briefing abmelden</div>
     <div class="sp-card__hint">
-      Keine Lust mehr? Ein Klick und du bist raus. Du kannst dich jederzeit wieder anmelden.
+      Stoppt den Versand &mdash; <strong>dein Account und alle Einstellungen bleiben erhalten</strong>.
+      Du kannst dich jederzeit wieder einloggen und mit einem Klick reaktivieren.
+      <br><br>
+      <em>Nur kurzfristig weg?</em> Nutze stattdessen die <strong>Pause</strong>-Funktion oben mit Datum.
     </div>
     <form method="post" action="/account/{{ token }}/unsubscribe">
-      <button type="submit" class="sp-btn sp-btn--danger">Endgültig abmelden</button>
+      <button type="submit" class="sp-btn sp-btn--secondary ac-unsub-btn">Briefing abmelden</button>
+    </form>
+  </section>
+  {% endif %}
+
+  <section class="sp-card">
+    <div class="sp-card__label">Feedback &amp; Wünsche</div>
+    <div class="sp-card__hint">
+      Was funktioniert gut, was nervt, was würdest du verbessern? Sag's mir &mdash;
+      ich lese jede Nachricht. <strong>Kein E-Mail-Versand</strong>, geht direkt an mich.
+    </div>
+    <form method="post" action="/account/{{ token }}/feedback" class="ac-feedback-form">
+      <textarea name="message" rows="4" maxlength="4000" required
+                class="ac-feedback-textarea"
+                placeholder="Was würdest du dir wünschen? Was funktioniert nicht?"></textarea>
+      <button type="submit" class="sp-btn sp-btn--primary">Feedback senden</button>
     </form>
   </section>
 
+  <section class="sp-card">
+    <div class="sp-card__label">Meine Daten exportieren</div>
+    <div class="sp-card__hint">
+      Lade alle zu deinem Konto gespeicherten Daten als JSON herunter
+      (DSG Art. 28 Datenübertragbarkeit).
+    </div>
+    <form method="post" action="/account/{{ token }}/export">
+      <button type="submit" class="sp-btn sp-btn--secondary ac-unsub-btn">JSON-Export</button>
+    </form>
+  </section>
+
+  <div class="ac-danger-zone">
+    <details>
+      <summary>Account löschen</summary>
+      <p class="ac-danger-zone__hint">
+        Alle deine Daten (E-Mail, Einstellungen, Feedback-Historie) werden
+        <strong>unwiderruflich</strong> aus der Datenbank gelöscht. Du müsstest dich
+        anschliessend wieder neu registrieren.
+      </p>
+      <form method="post" action="/account/{{ token }}/delete-account"
+            onsubmit="return confirm('Account WIRKLICH endgueltig loeschen? Alle Daten werden aus der Datenbank entfernt. Nicht rueckgaengig zu machen.');">
+        <button type="submit" class="ac-danger-zone__btn">Account endgültig löschen</button>
+      </form>
+    </details>
+  </div>
+
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/de.js"></script>
+<script src="{{ url_for('static', filename='js/subscribe.js') }}?v={{ static_v('js/subscribe.js') }}"></script>
+<script src="{{ url_for('static', filename='js/account.js') }}?v={{ static_v('js/account.js') }}"></script>
 {% endblock %}

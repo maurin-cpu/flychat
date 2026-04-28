@@ -1271,6 +1271,7 @@ class AnalyzersMixin:
         # Caches von vorherigem Lauf leeren (sonst wachsen sie unbegrenzt)
         self._ctx_gust_cache.clear()
         self._ctx_tq_cache.clear()
+        self._ctx_foehn_cache.clear()
         if not self.analysis_client:
             yield {"event": "error", "data": {"message": f"Kein API-Key fuer Analyse-Provider '{self.analysis_provider}'"}}
             return
@@ -1572,6 +1573,63 @@ class AnalyzersMixin:
         logger.info(f"Batch {batch_id}: {len(results)} Ergebnisse geparst")
         return results
 
+    def _apply_foehn_override(self, result: dict, foehn_eval: dict, label: str) -> None:
+        """Deterministischer Backstop fuer Foehn-Bewertung (LLM-Compliance-Schutz).
+
+        Spiegelt das Verhalten des Aloft-Danger-Override:
+        - evaluate_foehn() level=="caution" + LLM gab "safe" → conditional + caution_note + foehn_risk=moderate
+        - evaluate_foehn() level=="danger" + LLM gab nicht "not_safe" → not_safe + no_go_reason + foehn_risk=high
+
+        Wirkt nur, wenn die Foehn-Richtung fuer den Standort relevant ist
+        (level wird in _format_foehn_info bereits auf "none" gesetzt, falls nicht).
+        Mutiert `result` in-place.
+        """
+        if not foehn_eval:
+            return
+        level = foehn_eval.get("level", "none")
+        if level not in ("caution", "danger"):
+            return
+
+        delta_p = foehn_eval.get("delta_p_hpa")
+        delta_p_str = f"ΔP {delta_p} hPa" if delta_p is not None else "ΔP unbekannt"
+        direction = foehn_eval.get("direction") or "Süd"
+        status = result.get("safety_status")
+
+        if level == "danger" and status != "not_safe":
+            logger.warning(
+                f"Foehn-Override fuer {label}: LLM gab '{status}' "
+                f"trotz Foehn-Gefahr ({delta_p_str}) → not_safe"
+            )
+            result["safety_status"] = "not_safe"
+            result["safe_window"] = "keins"
+            result["foehn_risk"] = "high"
+            if not result.get("primary_no_go"):
+                result["primary_no_go"] = "FOEHN"
+            nogo = result.get("no_go_reasons", []) or []
+            if not any("föhn" in (r or "").lower() or "foehn" in (r or "").lower() for r in nogo):
+                nogo.append(f"Foehn-Gefahr: {direction}foehn {delta_p_str} (Flugverbot-Empfehlung)")
+            result["no_go_reasons"] = nogo
+            return
+
+        if level == "caution" and status == "safe":
+            logger.warning(
+                f"Foehn-Override fuer {label}: LLM gab 'safe' "
+                f"trotz Foehn-Vorsicht ({delta_p_str}) → conditional"
+            )
+            result["safety_status"] = "conditional"
+            # foehn_risk haerten — moderate nur, falls LLM "none" gesetzt hat.
+            if result.get("foehn_risk") in (None, "", "none"):
+                result["foehn_risk"] = "moderate"
+            cn = result.get("caution_notes", []) or []
+            has_foehn_note = any(
+                kw in (n or "").lower()
+                for n in cn
+                for kw in ("föhn", "foehn", "delta-p", "δp")
+            )
+            if not has_foehn_note:
+                cn.append(f"Foehn-Vorsicht: {direction}foehn {delta_p_str} — an exponierten Stellen vorsichtig.")
+            result["caution_notes"] = cn
+
     def _post_process_safety_spot(self, result: dict, spot: dict, date_str: str) -> dict:
         """Safety-only Post-Processing fuer einen Spot.
         Wendet deterministische Safety-Overrides an (Wind-OK, Aloft, Boeen-Floor,
@@ -1714,6 +1772,10 @@ class AnalyzersMixin:
                 )
                 result["caution_notes"] = cn
                 result["no_go_reasons"] = []
+
+        # Foehn-Override (deterministischer Backstop bei LLM-Compliance-Fehlern)
+        foehn_eval = self._ctx_foehn_cache.get(f"{name}|{date_str}", {})
+        self._apply_foehn_override(result, foehn_eval, label=f"{name}/{date_str}")
 
         # Foehn-Richtungs-Override
         krit_foehn = spot.get("kritischer_foehn", "Süd")
@@ -1979,6 +2041,10 @@ class AnalyzersMixin:
                 )
                 result["caution_notes"] = cn
 
+        # Foehn-Override (deterministischer Backstop bei LLM-Compliance-Fehlern)
+        foehn_eval = self._ctx_foehn_cache.get(f"{rname}|{date_str}", {})
+        self._apply_foehn_override(result, foehn_eval, label=f"{rname}/{date_str}")
+
         # Foehn-Richtungs-Override
         krit_foehn = region.get("kritischer_foehn", "Beide")
         result = self._strip_irrelevant_foehn(result, krit_foehn)
@@ -2112,6 +2178,7 @@ class AnalyzersMixin:
         # Cache leeren — Pre-Filter braucht aktuelle Werte aus _build_single_spot_context
         self._ctx_gust_cache.clear()
         self._ctx_tq_cache.clear()
+        self._ctx_foehn_cache.clear()
 
         from source_area import find_region_for_point as _find_region
 
@@ -2731,6 +2798,7 @@ class AnalyzersMixin:
         self._api_abort_reason = 'Analyse abgebrochen'
         self._ctx_gust_cache.clear()
         self._ctx_tq_cache.clear()
+        self._ctx_foehn_cache.clear()
 
         if not self.analysis_client:
             yield {"event": "error", "data": {"message": f"Kein API-Key fuer Analyse-Provider '{self.analysis_provider}'"}}

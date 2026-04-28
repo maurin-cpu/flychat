@@ -193,14 +193,23 @@ def send_email_async(to: str, subject: str, html: str, text: str = "") -> None:
 # ----------------------------------------------------------------------
 
 def _build_urls(*, confirm_token: Optional[str] = None,
-                action_token: Optional[str] = None) -> dict[str, str]:
+                action_token: Optional[str] = None,
+                login_token: Optional[str] = None) -> dict[str, str]:
     base = config.BASE_URL.rstrip("/")
-    urls = {"base": base}
+    marketing = config.MARKETING_URL.rstrip("/")
+    urls = {
+        "base": base,
+        "marketing": marketing,
+        "datenschutz": f"{marketing}/datenschutz",
+        "impressum": f"{marketing}/impressum",
+    }
     if confirm_token:
         urls["confirm"] = f"{base}/confirm/{confirm_token}"
     if action_token:
         urls["unsubscribe"] = f"{base}/unsubscribe/{action_token}"
-        urls["account"] = f"{base}/account/{action_token}"   # existiert noch nicht, vorbereitet
+        urls["account"] = f"{base}/account/{action_token}"
+    if login_token:
+        urls["login"] = f"{base}/login/{login_token}"
     return urls
 
 
@@ -211,6 +220,18 @@ def send_confirm_email(email: str, confirm_token: str, *, async_send: bool = Tru
     text = render_template("email/confirm.txt", email=email, urls=urls)
     subject = "Bestaetige dein Gleitcast-Abo"
 
+    if async_send:
+        send_email_async(email, subject, html, text)
+        return True
+    return send_email(email, subject, html, text)
+
+
+def send_login_email(email: str, login_token: str, *, async_send: bool = True) -> bool:
+    """Magic-Link Login-Mail. 30 Minuten gueltig, One-Time."""
+    urls = _build_urls(login_token=login_token)
+    html = render_template("email/login.html", email=email, urls=urls)
+    text = render_template("email/login.txt", email=email, urls=urls)
+    subject = "Dein Gleitcast Login-Link"
     if async_send:
         send_email_async(email, subject, html, text)
         return True
@@ -522,14 +543,36 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     subscriber_regions = set(subscriber.get("regions") or [])
     action_token = subscriber.get("action_token") or ""
 
+    # Subscriber-Filter: Tier-Set + Min-Rating. Default = alle Tiers (kein Filter).
+    # Gilt fuer die Day-Details (welche Spots im Briefing gelistet werden).
+    # Region-Matrix + Safety-Scan bleiben unfiltered (informativer Charakter).
+    allowed_tiers = set(subscriber.get("min_tier_set") or ("violet", "green", "conditional", "gray"))
+    try:
+        min_rating = float(subscriber.get("min_rating") or 0.0)
+    except (TypeError, ValueError):
+        min_rating = 0.0
+
+    def _passes_filter(spot: dict) -> bool:
+        if _spot_tier(spot) not in allowed_tiers:
+            return False
+        if min_rating > 0:
+            try:
+                if float(spot.get("rating", 0) or 0) < min_rating:
+                    return False
+            except (TypeError, ValueError):
+                return False
+        return True
+
     days_out = []
     days_with_all_my_spots = []  # fuer Safety-Header Scan (ALLE Spots, nicht nur Top-9)
     for day in briefing_data.get("days", []):
         date_str = day.get("date", "")
         all_spots = day.get("top_spots", []) or []
-        my_spots = [s for s in all_spots if s.get("region_id") in subscriber_regions]
+        my_spots_unfiltered = [s for s in all_spots if s.get("region_id") in subscriber_regions]
+        my_spots = [s for s in my_spots_unfiltered if _passes_filter(s)]
         day_label_dict = _date_label(date_str)
-        days_with_all_my_spots.append((day_label_dict, my_spots))
+        # Safety-Scan auf UNFILTERED (Warnungen sind unabhaengig von Tier/Rating wichtig)
+        days_with_all_my_spots.append((day_label_dict, my_spots_unfiltered))
 
         # Spot-Pool fuer Gruppierung: alle my_spots, gekappt erst innerhalb der Gruppen
         shown = []
@@ -582,8 +625,9 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "fly_summary": fly_summary,
             "safety_summary": safety_summary,
             "more_count":  max(0, len(my_spots) - len(displayed_spots)),
-            # Intern fuer Heatmap-Aggregation (nicht direkt im Template verwendet)
-            "_my_spots_all": my_spots,
+            # Intern fuer Heatmap-Aggregation: UNFILTERED, damit das Region-x-Tag-Raster
+            # immer alle abonnierten Regionen abbildet (auch wenn user 'gray' gefiltert hat).
+            "_my_spots_all": my_spots_unfiltered,
         })
 
     # Verdict = bester Tag (Tier-Rank, dann Rating des Top-Spots)
@@ -610,6 +654,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     deep_link = f"{base}/briefing?regions={regions_csv}&day={best_day_idx}"
 
     # Action-URLs
+    marketing = config.MARKETING_URL.rstrip("/")
     urls = {
         "base": base,
         "dashboard":        deep_link,
@@ -617,6 +662,8 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         "feedback_wrong":   f"{base}/feedback/{action_token}/wrong",
         "unsubscribe":      f"{base}/unsubscribe/{action_token}",
         "account":          f"{base}/account/{action_token}",
+        "datenschutz":      f"{marketing}/datenschutz",
+        "impressum":        f"{marketing}/impressum",
     }
 
     today = datetime.now()

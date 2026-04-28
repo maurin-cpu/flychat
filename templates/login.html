@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Login – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="sp">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Login</h1>
+    <div class="sp-subtitle">Per Magic-Link &mdash; ganz ohne Passwort</div>
+  </header>
+
+  {% if flash_ok %}
+    <div class="sp-flash sp-flash--ok" role="status">{{ flash_ok }}</div>
+  {% endif %}
+  {% if flash_error %}
+    <div class="sp-flash sp-flash--error" role="alert">{{ flash_error }}</div>
+  {% endif %}
+
+  <form class="sp-form sp-card" method="post" action="/login" novalidate>
+    <div class="sp-card__label">E-Mail-Adresse</div>
+    <div class="sp-card__hint">
+      Du bekommst einen einmaligen Login-Link per Mail. Funktioniert nur wenn du
+      bereits ein Briefing-Abo hast.
+    </div>
+
+    <fieldset>
+      <label class="sp-label" for="email">E-Mail</label>
+      <input class="sp-input" id="email" name="email" type="email"
+             required autocomplete="email" inputmode="email"
+             placeholder="du@beispiel.ch">
+    </fieldset>
+
+    <button type="submit" class="sp-btn sp-btn--primary" style="width:100%;margin-top:8px;">
+      Login-Link schicken
+    </button>
+  </form>
+
+</main>
+{% endblock %}

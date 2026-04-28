@@ -554,7 +554,7 @@
   }
 
   function updateSliderVisual(slider, valueEl, v) {
-    valueEl.textContent = v > 0 ? v.toFixed(1) : "alle";
+    valueEl.textContent = v > 0 ? "\u2265 " + v.toFixed(1) : "alle";
     slider.classList.toggle("is-active", v > 0);
     const min = parseFloat(slider.min) || 0;
     const max = parseFloat(slider.max) || 10;

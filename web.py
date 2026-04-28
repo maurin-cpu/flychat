@@ -10,7 +10,8 @@ import logging
 import math
 import threading
 from functools import wraps
-from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, stream_with_context
+from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, \
+    stream_with_context, session
 from datetime import datetime, timedelta
 
 import config
@@ -37,9 +38,61 @@ from source_area import find_region_for_point
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "gleitcast-dev-key")
 
+# Session-Cookie: 1 Jahr persistent (Magic-Link login soll nicht jeden Tag wiederholt werden)
+app.permanent_session_lifetime = timedelta(days=365)
+
 # Ensure JSON responses send raw UTF-8 characters (ä, ö, ü instead of \uXXXX)
 app.config['JSON_AS_ASCII'] = False
 app.json.ensure_ascii = False
+
+
+# ---------------------------------------------------------------------------
+# Day-Gating: anonyme Web-Besucher sehen 2 Tage, eingeloggte Subscriber 5 Tage.
+# Eingeloggt = Session-Cookie 'sub_id' (gesetzt via Magic-Link oder /account/<token>).
+# ---------------------------------------------------------------------------
+ANON_FORECAST_DAYS = 1
+
+def current_max_days() -> int:
+    """Maximale sichtbare Vorhersage-Tage fuer aktuellen Request."""
+    if session.get("sub_id"):
+        return config.FORECAST_DAYS
+    return min(ANON_FORECAST_DAYS, config.FORECAST_DAYS)
+
+
+def _allowed_date_strs(max_days: int) -> set:
+    """ISO-Date-Strings (YYYY-MM-DD) ab heute fuer max_days. Set fuer O(1) Lookup."""
+    today = datetime.now().date()
+    return {(today + timedelta(days=i)).isoformat() for i in range(max(1, int(max_days)))}
+
+
+def _gate_forecast(sorted_dates, *by_day_dicts):
+    """Begrenzt sorted_dates + alle uebergebenen by_day-Dicts auf current_max_days.
+    Returns: (truncated_dates_list, *truncated_dicts).
+    Eingeloggte Subscriber sehen alles, Anonyme nur ANON_FORECAST_DAYS."""
+    max_days = current_max_days()
+    if len(sorted_dates) <= max_days:
+        return (sorted_dates, *by_day_dicts)
+    kept = sorted_dates[:max_days]
+    kept_set = set(kept)
+    truncated = tuple(
+        {k: v for k, v in (bd or {}).items() if k in kept_set}
+        for bd in by_day_dicts
+    )
+    return (kept, *truncated)
+
+
+@app.context_processor
+def _inject_session_flags():
+    """Templates koennen via {% if is_logged_in %} pruefen.
+    Plus: marketing_url + legal_urls fuer Footer-Links."""
+    marketing = config.MARKETING_URL.rstrip("/")
+    return {
+        "is_logged_in": bool(session.get("sub_id")),
+        "session_email": session.get("email", ""),
+        "marketing_url": marketing,
+        "datenschutz_url": f"{marketing}/datenschutz",
+        "impressum_url": f"{marketing}/impressum",
+    }
 
 
 # Cache-Busting für statische Files: liefert mtime des Files als Versions-String,
@@ -186,67 +239,21 @@ def preview_briefing():
 
 @app.route("/subscribe", methods=["GET"])
 def subscribe_form():
-    return render_template(
-        "subscribe.html",
-        regions=_regions_for_form(),
-        prefill_email="",
-        prefill_regions=set(),
-        prefill_level="standard",
-        flash_error=request.args.get("err", ""),
-        flash_ok="",
-    )
+    """Legacy-Route — Subscribe-Formular wurde entfernt. Direkt-URLs gehen zur Login-Seite."""
+    return redirect("/login")
 
 
 @app.route("/subscribe", methods=["POST"])
 def subscribe_submit():
-    email = (request.form.get("email") or "").strip()
-    regions = request.form.getlist("regions")
-    skill_level = request.form.get("skill_level", "standard")
-
-    # Re-render mit Fehlermeldung + Prefill
-    def _rerender(err: str):
-        return render_template(
-            "subscribe.html",
-            regions=_regions_for_form(),
-            prefill_email=email,
-            prefill_regions=set(regions),
-            prefill_level=skill_level,
-            flash_error=err,
-            flash_ok="",
-        ), 400
-
-    if not email:
-        return _rerender("Bitte gib deine E-Mail-Adresse ein.")
-    if not regions:
-        return _rerender("Bitte waehle mindestens eine Region aus.")
-
-    mgr = _get_subscriber_manager()
-    if mgr is None:
-        logger.error("/subscribe POST: SubscriberManager konnte nicht initialisiert werden")
-        return _rerender("Der Abo-Service ist gerade nicht verfuegbar. Bitte spaeter nochmal.")
-
-    result = mgr.create(email=email, regions=regions, skill_level=skill_level)
-    if result is None:
-        # Haeufigster Grund: E-Mail bereits aktiv/pending
-        return _rerender(
-            "Diese E-Mail ist bereits registriert oder ungueltig. "
-            "Falls du den Bestaetigungs-Link nicht findest, schreib uns."
-        )
-
-    # Bestaetigungs-Mail versenden (async, damit der Request nicht auf SMTP wartet)
-    try:
-        send_confirm_email(result["email"], result["confirm_token"])
-    except Exception as e:
-        logger.exception("Confirm-Mail-Versand fehlgeschlagen fuer %s: %s",
-                         result["email"], e)
-        # Subscriber bleibt als 'pending' in der DB. Admin kann Token manuell rausziehen.
-
+    """Legacy-Route — Subscribe-Formular gibt es nicht mehr. Anmeldung laeuft via
+    Magic-Link auf /login. Antwort 410 Gone fuer alte Forms / Bookmarks."""
     return _status_page(
-        state="ok",
-        title="Fast geschafft!",
-        message=f"Wir haben eine Bestaetigungs-E-Mail an {result['email']} geschickt.",
-        submessage="Klicke auf den Link in der E-Mail, um dein Abo zu aktivieren. "
-                   "Kein Mail erhalten? Schau im Spam-Ordner.",
+        state="error",
+        title="Diese Anmeldung gibt es nicht mehr",
+        message="Die Registrierung laeuft jetzt direkt ueber den Login.",
+        submessage="Gib deine E-Mail unter /login ein — beim ersten Klick wird dein "
+                   "Konto automatisch angelegt. Kein zusaetzlicher Schritt noetig.",
+        http_code=410,
     )
 
 
@@ -338,6 +345,23 @@ def subscribe_feedback(token, verdict):
     )
 
 
+@app.route("/account", methods=["GET"])
+def account_dispatch():
+    """Zentrale Konto-Seite — nur fuer eingeloggte User.
+    - Eingeloggt: redirect auf /account/<action_token> (Einstellungen)
+    - Anonym: redirect zur Login-Seite (es gibt keine separate Abo-Seite mehr)"""
+    sub_id = session.get("sub_id")
+    if sub_id:
+        mgr = _get_subscriber_manager()
+        if mgr is not None:
+            sub = mgr.get_session_user(sub_id)
+            if sub and sub.get("action_token"):
+                return redirect(f"/account/{sub['action_token']}")
+        # Session zeigt auf nicht mehr existierenden User → Cookie loeschen
+        session.clear()
+    return redirect("/login")
+
+
 @app.route("/account/<token>", methods=["GET"])
 def account_page(token):
     mgr = _get_subscriber_manager()
@@ -354,11 +378,23 @@ def account_page(token):
             "Dieser Account-Link ist nicht (mehr) gueltig.",
             http_code=404,
         )
+    # Auto-Login: Klick auf /account/<action_token> aus Briefing-Mail = implizite Authentifizierung
+    session.permanent = True
+    session["sub_id"] = sub["id"]
+    session["email"] = sub["email"]
+
+    from datetime import date as _date
     return render_template(
         "account.html",
         subscriber=sub,
         token=token,
         region_names=_region_names(sub.get("regions") or []),
+        regions=_regions_for_form(),
+        prefill_regions=set(sub.get("regions") or []),
+        active_weekdays=set(sub.get("active_weekdays") or []),
+        prefill_tiers=set(sub.get("min_tier_set") or []),
+        prefill_min_rating=float(sub.get("min_rating") or 0.0),
+        today_iso=_date.today().isoformat(),
         flash_ok=request.args.get("ok", ""),
         flash_error=request.args.get("err", ""),
     )
@@ -389,10 +425,155 @@ def account_action(token, action):
         ok = mgr.unsubscribe(token)
         if not ok:
             return redirect(f"/account/{token}?err=Abmelden+fehlgeschlagen")
+        # Session bleibt — User soll auf der Konto-Seite den Reaktivieren-Banner sehen
+        return redirect(f"/account/{token}?ok=Briefing+abgemeldet")
+
+    if action == "update":
+        # Form-Daten: regions[], weekdays[], tiers[] (Checkboxes), min_rating (slider)
+        regions = request.form.getlist("regions")
+        weekdays_raw = request.form.getlist("weekdays")
+        tiers = request.form.getlist("tiers")
+        min_rating_raw = (request.form.get("min_rating") or "").strip()
+
+        try:
+            weekdays = [int(w) for w in weekdays_raw if w.strip().isdigit()]
+        except ValueError:
+            weekdays = []
+
+        if not regions:
+            return redirect(f"/account/{token}?err=Mindestens+eine+Region+waehlen")
+        if not weekdays:
+            return redirect(f"/account/{token}?err=Mindestens+einen+Wochentag+waehlen")
+        if not tiers:
+            return redirect(f"/account/{token}?err=Mindestens+eine+Qualitaets-Stufe+waehlen")
+
+        try:
+            min_rating = float(min_rating_raw) if min_rating_raw else 0.0
+        except ValueError:
+            min_rating = 0.0
+
+        ok = mgr.update_preferences(
+            token,
+            regions=regions,
+            weekdays=weekdays,
+            min_tier_set=tiers,
+            min_rating=min_rating,
+        )
+        if not ok:
+            return redirect(f"/account/{token}?err=Speichern+fehlgeschlagen")
+
+        # Pause-Range: paused_from + paused_until.
+        # Beide leer -> Pause aufheben. Beide gesetzt + valide -> pause(until, from).
+        from datetime import date as _date
+        paused_from_raw = (request.form.get("paused_from") or "").strip()
+        paused_until_raw = (request.form.get("paused_until") or "").strip()
+
+        if paused_until_raw:
+            try:
+                until = _date.fromisoformat(paused_until_raw)
+                from_date = None
+                if paused_from_raw:
+                    from_date = _date.fromisoformat(paused_from_raw)
+                # Vergangenes Bis-Datum: ignorieren (kein Sinn)
+                if until >= _date.today():
+                    mgr.pause(token, until_date=until, from_date=from_date)
+            except ValueError:
+                pass  # Ungueltiges Datum -> ignorieren, andere Settings bleiben gespeichert
+        else:
+            # Bis leer -> Pause aufheben (no-op wenn nicht pausiert)
+            mgr.resume(token)
+
+        return redirect(f"/account/{token}?ok=Einstellungen+gespeichert")
+
+    if action == "logout":
+        session.clear()
+        return redirect("/")
+
+    if action == "reactivate":
+        ok = mgr.reactivate(token)
+        if not ok:
+            return redirect(f"/account/{token}?err=Reaktivierung+fehlgeschlagen")
+        return redirect(f"/account/{token}?ok=Briefing+wieder+aktiviert")
+
+    if action == "feedback":
+        msg = (request.form.get("message") or "").strip()
+        if not msg:
+            return redirect(f"/account/{token}?err=Bitte+eine+Nachricht+eingeben")
+        ok = mgr.record_product_feedback(token, msg)
+        if not ok:
+            return redirect(f"/account/{token}?err=Feedback+konnte+nicht+gespeichert+werden")
+        return redirect(f"/account/{token}?ok=Danke+fuer+dein+Feedback%21")
+
+    if action == "export":
+        # DSG Art. 28: Datenherausgabe in maschinenlesbarem Format.
+        # Liefert alle gespeicherten User-Daten als JSON-Download.
+        sub = mgr.get_by_action_token(token)
+        if sub is None:
+            return redirect(f"/account/{token}?err=Account+nicht+gefunden")
+        # Feedback-Historie dazu
+        feedback = []
+        try:
+            with mgr._cursor() as cur:
+                cur.execute(
+                    """SELECT briefing_date, verdict, created_at
+                         FROM subscriber_feedback
+                        WHERE subscriber_id = ?
+                        ORDER BY created_at DESC""",
+                    (sub["id"],),
+                )
+                for row in cur.fetchall():
+                    feedback.append({
+                        "briefing_date": row[0],
+                        "verdict": row[1],
+                        "created_at": row[2],
+                    })
+        except Exception as e:
+            logger.error("export feedback fetch failed: %s", e)
+
+        # action_token + login_token bewusst NICHT exportieren (Sicherheit)
+        export = {
+            "_exported_at": datetime.now().isoformat(),
+            "_format_version": 1,
+            "account": {
+                "email": sub.get("email"),
+                "status": sub.get("status"),
+                "skill_level": sub.get("skill_level"),
+                "regions": sub.get("regions") or [],
+                "active_weekdays": sub.get("active_weekdays") or [],
+                "min_tier_set": sub.get("min_tier_set") or [],
+                "min_rating": sub.get("min_rating", 0.0),
+                "paused_from": sub.get("paused_from"),
+                "paused_until": sub.get("paused_until"),
+            },
+            "feedback_history": feedback,
+        }
+        body = json.dumps(export, indent=2, ensure_ascii=False, default=str)
+        from datetime import date as _d
+        filename = f"gleitcast-export-{_d.today().isoformat()}.json"
+        return Response(
+            body,
+            mimetype="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-store",
+            },
+        )
+
+    if action == "delete-account":
+        # Self-Service Account-Loeschung: irreversibel, kaskadiert Feedback weg.
+        # Token-Verifikation via DELETE WHERE action_token = ? — kein extra Lookup noetig.
+        ok = mgr.delete_by_token(token)
+        session.clear()
+        if not ok:
+            return _status_page(
+                "error", "Loeschen fehlgeschlagen",
+                "Dein Account konnte nicht geloescht werden.",
+                http_code=500,
+            )
         return _status_page(
-            "ok", "Abgemeldet",
-            "Du bekommst keine Briefings mehr. Schade, dass du gehst!",
-            submessage="Du kannst dich jederzeit wieder anmelden.",
+            "ok", "Account geloescht",
+            "Deine E-Mail und alle Daten wurden aus unserer Datenbank entfernt.",
+            submessage="Du kannst dich jederzeit neu registrieren.",
         )
 
     return _status_page(
@@ -400,6 +581,129 @@ def account_action(token, action):
         "Diese Aktion ist nicht erlaubt.",
         http_code=400,
     )
+
+
+# ---------------------------------------------------------------------------
+# Magic-Link Login (passwordless)
+# ---------------------------------------------------------------------------
+@app.route("/login", methods=["GET"])
+def login_page():
+    return render_template(
+        "login.html",
+        flash_ok=request.args.get("ok", ""),
+        flash_error=request.args.get("err", ""),
+    )
+
+
+# --- Login-Rate-Limit ---------------------------------------------------------
+# In-Memory-Tracker pro IP. Schuetzt vor Auto-Account-Spam und E-Mail-Bombing.
+# Limits konservativ: 5/Min und 20/Stunde pro Client-IP. Reset rolling per Window.
+_LOGIN_RATE_LIMIT_PER_MINUTE = 5
+_LOGIN_RATE_LIMIT_PER_HOUR   = 20
+_login_attempts: dict[str, list[float]] = {}
+_login_attempts_lock = threading.Lock()
+
+
+def _client_ip() -> str:
+    """Client-IP. Vertraut X-Forwarded-For nur wenn unter Reverse-Proxy laeuft.
+    Sonst remote_addr."""
+    fwd = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    return fwd or (request.remote_addr or "unknown")
+
+
+def _check_login_rate_limit() -> Optional[str]:
+    """Liefert Fehler-Message wenn Limit ueberschritten, sonst None.
+    Cleanup nebenbei: alte Eintraege > 1h werden entfernt."""
+    import time
+    ip = _client_ip()
+    now = time.time()
+    with _login_attempts_lock:
+        attempts = _login_attempts.setdefault(ip, [])
+        # Cleanup: nur Eintraege der letzten Stunde behalten
+        cutoff = now - 3600
+        attempts[:] = [t for t in attempts if t > cutoff]
+
+        per_minute = sum(1 for t in attempts if t > now - 60)
+        per_hour = len(attempts)
+
+        if per_minute >= _LOGIN_RATE_LIMIT_PER_MINUTE:
+            return "Zu viele Login-Versuche. Bitte 1 Minute warten."
+        if per_hour >= _LOGIN_RATE_LIMIT_PER_HOUR:
+            return "Zu viele Login-Versuche in der letzten Stunde. Bitte spaeter erneut."
+
+        attempts.append(now)
+    return None
+
+
+# Importiere Optional fuer Type-Hint oben (war vorher nicht im Top-Import)
+from typing import Optional  # noqa: E402
+
+
+@app.route("/login", methods=["POST"])
+def login_request():
+    """E-Mail nehmen, One-Time-Token erzeugen, Magic-Link verschicken.
+    Antwortet mit JSON bei Accept: application/json (fuer Modal/AJAX), sonst Redirect."""
+    wants_json = "application/json" in (request.headers.get("Accept") or "")
+
+    # Rate-Limit zuerst — schuetzt vor Auto-Account-Erstellung-Missbrauch
+    rate_err = _check_login_rate_limit()
+    if rate_err:
+        if wants_json:
+            return jsonify({"ok": False, "error": rate_err, "rate_limited": True}), 429
+        return redirect(f"/login?err={rate_err.replace(' ', '+')}")
+
+    email = (request.form.get("email") or "").strip().lower()
+    if not email:
+        if wants_json:
+            return jsonify({"ok": False, "error": "Bitte E-Mail eingeben"}), 400
+        return redirect("/login?err=Bitte+E-Mail+eingeben")
+
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        if wants_json:
+            return jsonify({"ok": False, "error": "Service nicht verfuegbar"}), 503
+        return redirect("/login?err=Service+nicht+verfuegbar")
+
+    result = mgr.create_login_token(email, ttl_minutes=30)
+    # Bewusst KEIN Hinweis ob E-Mail registriert ist (Privacy / Enumeration-Schutz)
+    if result is not None:
+        try:
+            from email_service import send_login_email
+            send_login_email(email, result["login_token"])
+        except Exception as e:
+            logger.error("send_login_email failed: %s", e)
+
+    msg = "Wenn die E-Mail registriert ist, wurde ein Login-Link geschickt. Schau in dein Postfach."
+    if wants_json:
+        return jsonify({"ok": True, "message": msg})
+    return redirect(f"/login?ok={msg.replace(' ', '+')}")
+
+
+@app.route("/login/<token>", methods=["GET"])
+def login_consume(token):
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return _status_page("error", "Service nicht verfuegbar",
+                            "Bitte spaeter nochmal versuchen.", http_code=503)
+    res = mgr.consume_login_token(token)
+    if res is None:
+        return _status_page(
+            "error", "Login-Link ungueltig",
+            "Der Link ist abgelaufen oder wurde bereits benutzt.",
+            submessage="Fordere einen neuen Login-Link an.",
+            http_code=400,
+        )
+    session.permanent = True
+    session["sub_id"] = res["id"]
+    session["email"] = res["email"]
+    # Nach erfolgreichem Magic-Link-Login direkt auf die Konto-Seite leiten
+    return redirect("/account")
+
+
+@app.route("/logout", methods=["GET", "POST"])
+def logout():
+    session.clear()
+    return redirect("/")
 
 
 @app.route("/unsubscribe/<token>", methods=["GET"])
@@ -529,6 +833,25 @@ def admin_block(sub_id):
     return redirect(f"/admin/subscribers?ok=Subscriber+%23{sub_id}+gesperrt")
 
 
+@app.route("/admin/subscribers/<int:sub_id>/delete", methods=["POST"])
+@_require_admin
+def admin_delete(sub_id):
+    """Hard-Delete eines Subscribers (irreversibel). Loescht auch Feedback-Rows
+    via FK ON DELETE CASCADE. Browser-confirm() im Template ist die einzige
+    Sicherheitsbarriere — bewusst keine Soft-Delete-Logik."""
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return redirect("/admin/subscribers?err=Service+nicht+verfuegbar")
+    sub = mgr.get_by_id(sub_id)
+    if sub is None:
+        return redirect(f"/admin/subscribers?err=Subscriber+%23{sub_id}+nicht+gefunden")
+    email = sub.get("email", "")
+    ok = mgr.delete(sub_id)
+    if not ok:
+        return redirect(f"/admin/subscribers?err=Loeschen+fehlgeschlagen+fuer+%23{sub_id}")
+    return redirect(f"/admin/subscribers?ok=Subscriber+%23{sub_id}+({email})+geloescht")
+
+
 @app.route("/admin/config", methods=["GET"])
 @_require_admin
 def admin_config():
@@ -597,7 +920,7 @@ def admin_config_save():
 def index():
     return render_template(
         "index.html",
-        forecast_days=config.FORECAST_DAYS,
+        forecast_days=current_max_days(),
         show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
 
@@ -606,7 +929,7 @@ def index():
 def chat_page():
     return render_template(
         "index.html",
-        forecast_days=config.FORECAST_DAYS,
+        forecast_days=current_max_days(),
         show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
 
@@ -615,7 +938,7 @@ def chat_page():
 def map_page():
     return render_template(
         "index.html",
-        forecast_days=config.FORECAST_DAYS,
+        forecast_days=current_max_days(),
         show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
 
@@ -624,7 +947,7 @@ def map_page():
 def regionen_page():
     return render_template(
         "regionen.html",
-        forecast_days=config.FORECAST_DAYS,
+        forecast_days=current_max_days(),
     )
 
 
@@ -754,7 +1077,7 @@ def briefing_page():
     og = _build_briefing_og(regions_q, day_q, spot_q)
     return render_template(
         "briefing.html",
-        forecast_days=config.FORECAST_DAYS,
+        forecast_days=current_max_days(),
         og=og,
     )
 
@@ -877,7 +1200,23 @@ def api_briefing_generate():
 # CHAT API
 # ============================================================================
 
+def _require_login_json(view_func):
+    """Decorator: Endpoint nur fuer eingeloggte User. Sonst 401 mit JSON-Body
+    {error: ..., login_required: true} — Frontend kann das auswerten."""
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        if not session.get("sub_id"):
+            return jsonify({
+                "error": "Login erforderlich",
+                "login_required": True,
+                "message": "Logge dich ein, um den Chat-Berater (Beta) zu nutzen.",
+            }), 401
+        return view_func(*args, **kwargs)
+    return wrapper
+
+
 @app.route("/api/chat", methods=["POST"])
+@_require_login_json
 def api_chat():
     data = request.get_json()
     if not data or "message" not in data:
@@ -917,6 +1256,7 @@ def api_chat():
 
 
 @app.route("/api/reset-chat", methods=["POST"])
+@_require_login_json
 def api_reset_chat():
     """Setzt die aktuelle Konversation zurück."""
     data = request.get_json(silent=True) or {}
@@ -944,9 +1284,12 @@ def api_analyses():
     """Gibt Spot-Analysen im flachen Format zurück."""
     flat = {}
     loaded_at = engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None
+    allowed_dates = _allowed_date_strs(current_max_days())
     for spot_name, days in engine.spot_analyses.items():
         flat[spot_name] = {}
         for date_str, entry in days.items():
+            if date_str not in allowed_dates:
+                continue
             safety = entry.get("safety", {})
             fly = entry.get("flyability", {})
             fly_status = entry.get("fly_status", "")
@@ -1014,9 +1357,12 @@ def api_region_analyses():
     """Gibt Region-Analysen im flachen Format zurück."""
     flat = {}
     loaded_at = engine.region_analyses_loaded_at.isoformat() if engine.region_analyses_loaded_at else None
+    allowed_dates = _allowed_date_strs(current_max_days())
     for rid, days in engine.region_analyses.items():
         flat[rid] = {}
         for date_str, entry in days.items():
+            if date_str not in allowed_dates:
+                continue
             safety = entry.get("safety", {})
             fly = entry.get("flyability", {})
             fly_status = entry.get("fly_status", "")
@@ -1473,6 +1819,7 @@ def api_region_weather(region_id):
 
     sorted_dates, by_day = _group_chart_by_day(chart_data)
     last_updated, _ = _stale_meta()
+    sorted_dates, by_day = _gate_forecast(sorted_dates, by_day)
 
     return jsonify({
         "region_id": region_id,
@@ -1480,9 +1827,9 @@ def api_region_weather(region_id):
         "elevation_ref": elevation_ref,
         "dates": sorted_dates,
         "data": by_day,
-        "stale": len(sorted_dates) < config.FORECAST_DAYS,
+        "stale": len(sorted_dates) < current_max_days(),
         "last_updated": last_updated,
-        "expected_days": config.FORECAST_DAYS,
+        "expected_days": current_max_days(),
         "is_region": True,
         "thresholds": _tier_thresholds(),
     })
@@ -1519,6 +1866,7 @@ def api_region_altitude_wind(region_id):
         for e in day_entries:
             e["wind_gusts"] = None
     last_updated, _ = _stale_meta()
+    sorted_dates, by_day, ground_wind = _gate_forecast(sorted_dates, by_day, ground_wind)
 
     return jsonify({
         "region_id": region_id,
@@ -1526,9 +1874,9 @@ def api_region_altitude_wind(region_id):
         "dates": sorted_dates,
         "data": by_day,
         "ground_wind": ground_wind,
-        "stale": len(sorted_dates) < config.FORECAST_DAYS,
+        "stale": len(sorted_dates) < current_max_days(),
         "last_updated": last_updated,
-        "expected_days": config.FORECAST_DAYS,
+        "expected_days": current_max_days(),
         "is_region": True,
     })
 
@@ -1593,15 +1941,16 @@ def api_weather(spot_name):
 
     sorted_dates, by_day = _group_chart_by_day(chart_data)
     last_updated, _ = _stale_meta()
+    sorted_dates, by_day = _gate_forecast(sorted_dates, by_day)
 
     return jsonify({
         "spot_name": spot_name,
         "elevation_m": elevation_m,
         "dates": sorted_dates,
         "data": by_day,
-        "stale": len(sorted_dates) < config.FORECAST_DAYS,
+        "stale": len(sorted_dates) < current_max_days(),
         "last_updated": last_updated,
-        "expected_days": config.FORECAST_DAYS,
+        "expected_days": current_max_days(),
         "windrichtung": (spot_info.get("windrichtung") if spot_info else None),
         "ideal_wind_max": (spot_info.get("ideal_wind_max") if spot_info else None),
         "thresholds": _tier_thresholds(),
@@ -1698,6 +2047,14 @@ def api_altitude_wind(spot_name):
             hourly_data, elevation_m, sorted_dates, ch1=True,
         )
 
+    sorted_dates, by_day, ground_wind, ch1_by_day_g, ch1_ground_wind_g = _gate_forecast(
+        sorted_dates, by_day, ground_wind, ch1_by_day or {}, ch1_ground_wind or {},
+    )
+    if ch1_by_day is not None:
+        ch1_by_day = ch1_by_day_g
+    if ch1_ground_wind is not None:
+        ch1_ground_wind = ch1_ground_wind_g
+
     return jsonify({
         "spot_name": spot_name,
         "elevation_m": elevation_m,
@@ -1706,9 +2063,9 @@ def api_altitude_wind(spot_name):
         "ground_wind": ground_wind,
         "data_ch1": ch1_by_day,
         "ground_wind_ch1": ch1_ground_wind,
-        "stale": len(sorted_dates) < config.FORECAST_DAYS,
+        "stale": len(sorted_dates) < current_max_days(),
         "last_updated": last_updated,
-        "expected_days": config.FORECAST_DAYS,
+        "expected_days": current_max_days(),
     })
 
 
@@ -1777,6 +2134,7 @@ def api_foehn():
         by_day[date_str].append(entry)
 
     sorted_dates = sorted(by_day.keys())
+    sorted_dates, by_day = _gate_forecast(sorted_dates, by_day)
 
     return jsonify({
         "dates": sorted_dates,

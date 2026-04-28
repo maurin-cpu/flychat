@@ -523,6 +523,7 @@
 .sp-pill--pending      { background: var(--color-safety-unknown-bg);   color: var(--color-safety-unknown-text); }
 .sp-pill--paused       { background: var(--color-safety-marginal-bg);  color: var(--color-safety-marginal-text); }
 .sp-pill--unsubscribed { background: var(--color-safety-critical-bg);  color: var(--color-safety-critical-text); }
+.sp-pill--no-sub       { background: #f3f4f6; color: #6b7280; }
 
 /* ── Key-Value-Liste (Account) ─────────────────────────────── */
 .sp-kv {

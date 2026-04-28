@@ -1,7 +1,8 @@
 GLEITCAST — Willkommen an Bord!
 
-Dein Abo ist aktiv. Ab jetzt bekommst du Montag, Mittwoch und Freitag
+Dein Abo ist aktiv. Ab jetzt bekommst du an deinen Wunschtagen
 um 06:30 ein Briefing mit den besten Flugtagen fuer deine Regionen.
+Standardmaessig taeglich — pro Wochentag steuerbar in den Einstellungen.
 
 DEINE EINSTELLUNGEN
 -------------------
@@ -15,10 +16,23 @@ WAS DU ERWARTEN KANNST
 - Warum-Erklaerung: Sicherheit zuerst, dann Fliegbarkeit
 - Foehn- und Gewitter-Warnungen, sobald relevant
 
-Naechstes Briefing: Montag, Mittwoch oder Freitag 06:30
+Naechstes Briefing: naechster Versandtag, 06:30
 
+{% if urls.account -%}
+EINSTELLUNGEN ANPASSEN
+----------------------
+Regionen wechseln, Versandtage waehlen oder pausieren — alles ueber einen
+einzigen Link in jeder Briefing-Mail:
+{{ urls.account }}
+
+{% endif -%}
 --
 Gleitcast ist Decision Support — die finale Entscheidung triffst du.
 Im Zweifel: nicht fliegen.
 
-Abmelden: {{ urls.unsubscribe }}
+{% if urls.account %}Einstellungen: {{ urls.account }}
+{% endif -%}
+Abmelden:    {{ urls.unsubscribe }}
+
+Datenschutz: {{ urls.datenschutz }}
+Impressum:   {{ urls.impressum }}

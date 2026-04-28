@@ -73,40 +73,10 @@
 
   <div class="tooltip" id="bfMeteogramTooltip"></div>
 
-  <div class="bf-cta-subscribe" id="bfCtaSubscribe" hidden>
-    <div class="bf-cta-subscribe__text">
-      <strong>Bekomm dieses Briefing 3× pro Woche per E-Mail.</strong>
-      <span>Montag, Mittwoch, Freitag morgens — nur deine Regionen.</span>
-    </div>
-    <div class="bf-cta-subscribe__actions">
-      <a href="/subscribe" class="bf-cta-subscribe__btn">Kostenlos abonnieren</a>
-      <button type="button" class="bf-cta-subscribe__dismiss" id="bfCtaDismiss" aria-label="Hinweis ausblenden">&times;</button>
-    </div>
-  </div>
-
   <footer class="bf-footer">
     <p>ICON-D2/EU/CH1/CH2 + GFS via Open-Meteo · winds.mobi · Gleitcast-KI</p>
-    <p><a href="/subscribe" class="bf-footer-link">Briefing per E-Mail abonnieren</a></p>
   </footer>
 </div>
-
-<script>
-(function () {
-  var KEY = 'gleitcast.briefing.ctaDismissed';
-  var el = document.getElementById('bfCtaSubscribe');
-  var dismissBtn = document.getElementById('bfCtaDismiss');
-  if (!el) return;
-  try {
-    if (localStorage.getItem(KEY) !== '1') el.hidden = false;
-  } catch (e) { el.hidden = false; }
-  if (dismissBtn) {
-    dismissBtn.addEventListener('click', function () {
-      el.hidden = true;
-      try { localStorage.setItem(KEY, '1'); } catch (e) {}
-    });
-  }
-})();
-</script>
 {% endblock %}
 
 {% block scripts %}

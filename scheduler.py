@@ -117,11 +117,35 @@ def _send_briefings_once(engine) -> dict:
     days_count = len(briefing_data.get("days", []))
     logger.info("Scheduler: briefing_data = %d Tage", days_count)
 
+    from datetime import datetime as _dt
+    today_weekday = _dt.now().weekday()  # 0=Mo, 6=So
+
     sent = 0
     skipped = 0
     failed = 0
     for sub in subscribers:
         email = sub.get("email")
+
+        # Auto-erstellte Accounts (per Magic-Link ohne Region-Auswahl) haben
+        # leere regions -> kein sinnvolles Briefing moeglich, ueberspringen.
+        if not sub.get("regions"):
+            skipped += 1
+            logger.info("[BRIEF] -> %s (#%s) SKIP (keine Regionen ausgewaehlt)",
+                        email, sub["id"])
+            continue
+
+        # Wochentag-Filter: Subscriber kann pro Wochentag opt-in/out
+        # active_weekdays kommt aus list_active(); leere Liste = NIE versenden
+        weekdays = sub.get("active_weekdays")
+        if weekdays is None:
+            # Defensive: alte DB ohne Spalte -> alle Tage
+            weekdays = [0, 1, 2, 3, 4, 5, 6]
+        if today_weekday not in weekdays:
+            skipped += 1
+            logger.info("[BRIEF] -> %s (#%s) SKIP (weekday %d not in %s)",
+                        email, sub["id"], today_weekday, weekdays)
+            continue
+
         try:
             ok = send_briefing_email(sub, briefing_data, async_send=False)
             if ok:

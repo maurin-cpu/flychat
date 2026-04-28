@@ -610,34 +610,34 @@
 
 /* ── Rating slider ──────────────────────────────────────── */
 
+/* Rating-Slider — gleicher Stil wie Account (intuitiver: Pill-Badge fuer Wert,
+   immer sichtbarer Gradient-Fortschritt). HTML-Struktur unveraendert. */
 .bf-rating-filter {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 14px;
-  background: var(--color-bg);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-pill);
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   min-height: 32px;
   box-sizing: border-box;
   flex: 1 1 220px;
   min-width: 0;
-  transition: border-color 180ms ease, box-shadow 180ms ease;
-}
-
-.bf-rating-filter:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(3, 105, 161, 0.12);
 }
 
 .bf-rating-value {
+  display: inline-block;
+  min-width: 60px;
+  padding: 4px 12px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-vivid);
+  border-radius: 999px;
   font-size: 13px;
-  font-weight: 800;
-  color: var(--color-text);
+  font-weight: 600;
+  text-align: center;
   font-variant-numeric: tabular-nums;
-  min-width: 2.4em;
-  text-align: right;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   flex-shrink: 0;
 }
 
@@ -648,16 +648,17 @@
   width: auto;
   min-width: 120px;
   height: 6px;
-  background: linear-gradient(90deg, var(--color-border) 0%, var(--color-border) 100%);
+  /* Gradient-Fill ueber CSS-Variable --fill (von briefing.js gesetzt) */
+  background: linear-gradient(to right,
+      var(--color-primary) 0%,
+      var(--color-primary) var(--fill, 0%),
+      var(--color-border) var(--fill, 0%),
+      var(--color-border) 100%);
   border-radius: 3px;
   outline: none;
   cursor: pointer;
   padding: 0;
   margin: 0;
-}
-
-.bf-rating-slider.is-active {
-  background: linear-gradient(90deg, var(--color-border) 0%, var(--color-border) var(--fill,0%), var(--color-primary) var(--fill,0%), var(--color-primary) 100%);
 }
 
 .bf-rating-slider::-webkit-slider-thumb {
@@ -667,41 +668,35 @@
   height: 20px;
   border-radius: 50%;
   background: #fff;
-  border: 2px solid var(--color-primary);
+  border: 2.5px solid var(--color-primary);
   cursor: grab;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: transform 0.1s ease;
 }
-.bf-rating-slider::-webkit-slider-thumb:hover { transform: scale(1.1); }
-.bf-rating-slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.15); box-shadow: 0 2px 8px rgba(3,105,161,0.35); }
+.bf-rating-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.bf-rating-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.2);
+  box-shadow: 0 2px 8px rgba(3,105,161,0.35);
+}
 
 .bf-rating-slider::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
   background: #fff;
-  border: 2px solid var(--color-primary);
+  border: 2.5px solid var(--color-primary);
   cursor: grab;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-  transition: transform 120ms ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: transform 0.1s ease;
 }
-.bf-rating-slider::-moz-range-thumb:hover { transform: scale(1.1); }
+.bf-rating-slider::-moz-range-thumb:hover { transform: scale(1.15); }
 
 .bf-rating-slider::-moz-range-track {
   height: 6px;
-  background: var(--color-border);
+  background: transparent;
   border-radius: 3px;
   border: none;
-}
-
-.bf-rating-slider::-moz-range-progress {
-  height: 6px;
-  background: transparent;
-  border-radius: 3px;
-}
-
-.bf-rating-slider.is-active::-moz-range-progress {
-  background: transparent;
 }
 
 .bf-rating-slider:focus-visible::-webkit-slider-thumb {

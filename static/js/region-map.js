@@ -448,7 +448,13 @@
         var cautionNotes = parseArray(a.caution_notes);
         var flyabilityLimits = parseArray(a.flyability_limits);
         var highlightNotes = parseArray(a.highlights);
-        if (noGoReasons.length > 0 || cautionNotes.length > 0 || flyabilityLimits.length > 0 || highlightNotes.length > 0) {
+        var foehnRisk = (a.foehn_risk || '').toString().toLowerCase();
+        var hasFoehnInNotes = cautionNotes.concat(noGoReasons).some(function(t) {
+            var s = (t || '').toString().toLowerCase();
+            return s.indexOf('föhn') >= 0 || s.indexOf('foehn') >= 0;
+        });
+        var showFoehnBadge = (foehnRisk && foehnRisk !== 'none') && !hasFoehnInNotes;
+        if (noGoReasons.length > 0 || cautionNotes.length > 0 || flyabilityLimits.length > 0 || highlightNotes.length > 0 || showFoehnBadge) {
             html += '<div class="mga-alerts">';
             noGoReasons.forEach(function(r) {
                 html += '<div class="mga-alert nogo">'
@@ -460,6 +466,14 @@
                     + '<div class="mga-alert-icon">!</div>'
                     + '<div>' + escHtml(n) + '</div></div>';
             });
+            if (showFoehnBadge) {
+                var foehnLabel = foehnRisk === 'high' ? 'Föhn-Gefahr' : 'Föhn-Vorsicht';
+                var foehnCls = foehnRisk === 'high' ? 'nogo' : 'caution';
+                var foehnIcon = foehnRisk === 'high' ? '\u2715' : '!';
+                html += '<div class="mga-alert ' + foehnCls + '">'
+                    + '<div class="mga-alert-icon">' + foehnIcon + '</div>'
+                    + '<div>' + escHtml(foehnLabel) + ' (foehn_risk: ' + escHtml(foehnRisk) + ')</div></div>';
+            }
             if (phase2Ok) {
                 flyabilityLimits.forEach(function(l) {
                     html += '<div class="mga-alert flyability">'

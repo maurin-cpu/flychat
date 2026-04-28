@@ -33,9 +33,196 @@
             <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
             <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Briefing</a>
             <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen" aria-label="Föhndiagramm öffnen">Föhn</button>
-            <a href="/subscribe" class="{% if request.path == '/subscribe' %}active{% endif %}">Abonnieren</a>
+            {% if is_logged_in %}
+            <div class="navbar-avatar-wrap">
+                <button type="button" class="navbar-avatar" id="navAvatarBtn"
+                        aria-haspopup="menu" aria-expanded="false" aria-controls="navAvatarMenu"
+                        title="{{ session_email }}">
+                    <span class="navbar-avatar__initial">{{ session_email[:1]|upper or "?" }}</span>
+                    <svg class="navbar-avatar__chev" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
+                        <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <div class="navbar-menu" id="navAvatarMenu" role="menu" hidden>
+                    <div class="navbar-menu__email" title="{{ session_email }}">{{ session_email }}</div>
+                    <a href="/account" class="navbar-menu__item" role="menuitem">
+                        <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                            <circle cx="10" cy="10" r="3"/><path d="M10 1v2M10 17v2M19 10h-2M3 10H1M16.36 3.64l-1.42 1.42M5.06 14.94l-1.42 1.42M16.36 16.36l-1.42-1.42M5.06 5.06L3.64 3.64"/>
+                        </svg>
+                        Einstellungen
+                    </a>
+                    <a href="/logout" class="navbar-menu__item navbar-menu__item--muted" role="menuitem">
+                        <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M13 14l4-4-4-4M17 10H7M9 4H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h4"/>
+                        </svg>
+                        Logout
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <button type="button" class="navbar-link-btn" id="navLoginBtn" aria-haspopup="dialog" aria-controls="loginModal">Login</button>
+            {% endif %}
         </div>
     </nav>
+
+    {% if is_logged_in %}
+    <script>
+    (function() {
+        var btn = document.getElementById('navAvatarBtn');
+        var menu = document.getElementById('navAvatarMenu');
+        if (!btn || !menu) return;
+        var wrap = btn.parentElement;
+
+        function open() {
+            menu.hidden = false;
+            btn.setAttribute('aria-expanded', 'true');
+            wrap.classList.add('is-open');
+        }
+        function close() {
+            menu.hidden = true;
+            btn.setAttribute('aria-expanded', 'false');
+            wrap.classList.remove('is-open');
+        }
+        function toggle() { menu.hidden ? open() : close(); }
+
+        btn.addEventListener('click', function(e){ e.stopPropagation(); toggle(); });
+        document.addEventListener('click', function(e){
+            if (!menu.hidden && !wrap.contains(e.target)) close();
+        });
+        document.addEventListener('keydown', function(e){
+            if (!menu.hidden && e.key === 'Escape') { close(); btn.focus(); }
+        });
+    })();
+    </script>
+    {% endif %}
+
+    {% if not is_logged_in %}
+    <div class="login-modal" id="loginModal" role="dialog" aria-modal="true"
+         aria-labelledby="loginModalTitle" hidden>
+        <div class="login-modal__backdrop" data-login-close></div>
+        <div class="login-modal__panel" role="document">
+            <button type="button" class="login-modal__close" data-login-close
+                    aria-label="Schliessen">&times;</button>
+            <h2 id="loginModalTitle" class="login-modal__title">Login</h2>
+            <p class="login-modal__hint">
+                Per Magic-Link &mdash; passwordlos. Du bekommst einen einmaligen Link
+                per Mail (30 Min gueltig).
+            </p>
+            <form class="login-modal__form" id="loginModalForm" novalidate>
+                <input type="email" name="email" id="loginModalEmail"
+                       class="login-modal__input"
+                       placeholder="du@beispiel.ch"
+                       autocomplete="email" required>
+                <button type="submit" class="login-modal__submit">Link schicken</button>
+            </form>
+            <div class="login-modal__msg" id="loginModalMsg" role="status"></div>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var btn = document.getElementById('navLoginBtn');
+        var modal = document.getElementById('loginModal');
+        if (!btn || !modal) return;
+        var form = document.getElementById('loginModalForm');
+        var msg = document.getElementById('loginModalMsg');
+        var emailInput = document.getElementById('loginModalEmail');
+
+        function open() {
+            modal.hidden = false;
+            document.body.style.overflow = 'hidden';
+            setTimeout(function(){ emailInput.focus(); }, 50);
+        }
+        function close() {
+            modal.hidden = true;
+            document.body.style.overflow = '';
+            msg.textContent = '';
+            msg.className = 'login-modal__msg';
+        }
+        btn.addEventListener('click', open);
+        modal.querySelectorAll('[data-login-close]').forEach(function(el){
+            el.addEventListener('click', close);
+        });
+        document.addEventListener('keydown', function(e){
+            if (!modal.hidden && e.key === 'Escape') close();
+        });
+
+        var FALLBACK_OK = 'Wenn die E-Mail registriert ist, wurde ein Login-Link geschickt. Schau in dein Postfach.';
+
+        function setMsg(state, text) {
+            msg.textContent = text;
+            msg.className = 'login-modal__msg login-modal__msg--' + state;
+        }
+
+        form.addEventListener('submit', function(e){
+            e.preventDefault();
+            // Client-seitige Plausibilitaet: nur dann Submit-Versuch starten,
+            // wenn das E-Mail-Feld zumindest grob gueltig ist.
+            var emailVal = (emailInput.value || '').trim();
+            if (!emailVal || emailVal.indexOf('@') < 1) {
+                setMsg('err', 'Bitte gueltige E-Mail-Adresse eingeben.');
+                emailInput.focus();
+                return;
+            }
+
+            // Disable Submit waehrend Anfrage laeuft (verhindert Doppel-Klicks)
+            var submitBtn = form.querySelector('.login-modal__submit');
+            if (submitBtn) submitBtn.disabled = true;
+            setMsg('info', 'Sende ...');
+
+            var fd = new FormData(form);
+            // Timeout via AbortController: nach 10s automatisch abbrechen
+            var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            var timeoutId = ctrl ? setTimeout(function(){ ctrl.abort(); }, 10000) : null;
+
+            fetch('/login', {
+                method: 'POST',
+                body: fd,
+                headers: {'Accept': 'application/json'},
+                credentials: 'same-origin',
+                signal: ctrl ? ctrl.signal : undefined,
+            })
+            .then(function(r){
+                if (timeoutId) clearTimeout(timeoutId);
+                // Status zuerst pruefen — JSON-Body ist optional/best-effort
+                var ct = (r.headers.get('Content-Type') || '').toLowerCase();
+                var jsonPromise = ct.indexOf('application/json') >= 0
+                    ? r.json().catch(function(){ return null; })
+                    : Promise.resolve(null);
+                return jsonPromise.then(function(body){ return {status: r.status, ok: r.ok, body: body}; });
+            })
+            .then(function(res){
+                // 4xx/5xx: explizite Fehlermeldung wenn Server eine geliefert hat,
+                // sonst generischer Hinweis
+                if (!res.ok) {
+                    var err = (res.body && res.body.error)
+                        ? res.body.error
+                        : 'Versand fehlgeschlagen (Status ' + res.status + '). Bitte spaeter erneut.';
+                    setMsg('err', err);
+                    return;
+                }
+                // 2xx ohne JSON (z.B. weil Server-seitig redirect zurueckkam):
+                // optimistisch annehmen dass Mail rausging — dasselbe Verhalten
+                // wie wenn der User die /login-Seite besucht haette.
+                var okMsg = (res.body && res.body.message) || FALLBACK_OK;
+                setMsg('ok', okMsg);
+                form.reset();
+            })
+            .catch(function(err){
+                if (timeoutId) clearTimeout(timeoutId);
+                if (err && err.name === 'AbortError') {
+                    setMsg('err', 'Server antwortet nicht. Bitte spaeter erneut.');
+                } else {
+                    // Echter Netzwerk-Abbruch (offline, DNS, CORS) — selten
+                    setMsg('err', 'Verbindung fehlgeschlagen. Internet pruefen und erneut versuchen.');
+                }
+            })
+            .then(function(){
+                if (submitBtn) submitBtn.disabled = false;
+            });
+        });
+    })();
+    </script>
+    {% endif %}
     <script>
     (function() {
         var FORECAST_DAYS = {{ forecast_days|default(5) }};
@@ -313,6 +500,15 @@
             window._setupSwipeDismiss = setupSwipeDismiss;
         })();
     </script>
+
+    {# Globaler dezenter Footer mit Rechtliches-Links — auf jeder Seite sichtbar #}
+    <footer class="app-footer" role="contentinfo">
+        <a href="{{ datenschutz_url }}" rel="noopener">Datenschutz</a>
+        <span aria-hidden="true">·</span>
+        <a href="{{ impressum_url }}" rel="noopener">Impressum</a>
+        <span aria-hidden="true">·</span>
+        <a href="{{ marketing_url }}" rel="noopener">gleitcast.ch</a>
+    </footer>
 </body>
 
 </html>

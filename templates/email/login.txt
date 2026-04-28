@@ -1,0 +1,14 @@
+Hallo {{ email }},
+
+dein Login-Link fuer Gleitcast:
+
+{{ urls.login }}
+
+Der Link ist 30 Minuten gueltig und kann nur einmal verwendet werden.
+
+Du hast keinen Login angefordert? Dann ignoriere diese E-Mail einfach.
+
+--
+Gleitcast
+Datenschutz: {{ urls.datenschutz }}
+Impressum:   {{ urls.impressum }}

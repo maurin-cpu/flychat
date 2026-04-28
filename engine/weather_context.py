@@ -1026,8 +1026,13 @@ class WeatherContextMixin:
             parts.append(f"{count}/{total} {tag}")
         return ", ".join(parts)
 
-    def _format_foehn_info(self, date_str: str = None, kritischer_foehn: str = "Süd") -> str:
-        """Formatiert Föhn-Indikatoren als Text. Sucht bei Angabe eines Datums das Maximum."""
+    def _format_foehn_info(self, date_str: str = None, kritischer_foehn: str = "Süd", cache_key: str = None) -> str:
+        """Formatiert Föhn-Indikatoren als Text. Sucht bei Angabe eines Datums das Maximum.
+
+        Wenn cache_key gesetzt ist, wird das ausgewertete Föhn-Level zusätzlich in
+        self._ctx_foehn_cache abgelegt (Snapshot der worst-case Stunde des Tages) und
+        steht dem deterministischen Föhn-Override im Post-Processing zur Verfügung.
+        """
         if not self.foehn_data:
             return "═══ FÖHN-INDIKATOR ═══\nKeine Föhn-Daten verfügbar."
 
@@ -1071,6 +1076,20 @@ class WeatherContextMixin:
                 (kritischer_foehn == "Nord" and foehn_dir == "Süd")
             )
         )
+
+        # Cache fuer deterministischen Foehn-Override (analyzers.py).
+        # Nur "relevante" Auswertung speichern (= passend zur kritischen Richtung).
+        # Irrelevante Richtung → level "none", damit der Override nichts triggert.
+        if cache_key is not None and hasattr(self, "_ctx_foehn_cache"):
+            cached_level = "none" if direction_irrelevant else ev.get("level", "none")
+            self._ctx_cache_put(self._ctx_foehn_cache, cache_key, {
+                "level": cached_level,
+                "delta_p_hpa": ev.get("delta_p_hpa"),
+                "direction": foehn_dir,
+                "kritischer_foehn": kritischer_foehn,
+                "crest_wind_kmh": ev.get("crest_wind_kmh"),
+                "crest_dir_deg": ev.get("crest_dir_deg"),
+            })
 
         if ev["level"] == "none" and direction_irrelevant:
             # Föhn aktiv aber Richtung NICHT relevant für diesen Standort
@@ -1161,6 +1180,21 @@ class WeatherContextMixin:
                     item for item in items
                     if not any(kw in (item or "").lower() for kw in foehn_keywords)
                 ]
+
+        # Auch Freitext-Felder bereinigen: einzelne Saetze mit Foehn-Keywords droppen.
+        # Verhindert, dass das LLM die Foehn-Warnung trotz Strip ueber summary leakt.
+        for key in ("summary", "wind_summary", "wind_shear"):
+            text = result.get(key)
+            if not isinstance(text, str) or not text.strip():
+                continue
+            sentences = re.split(r"(?<=[\.\!\?])\s+", text)
+            kept = [
+                s for s in sentences
+                if s.strip() and not any(kw in s.lower() for kw in foehn_keywords)
+            ]
+            new_text = " ".join(kept).strip()
+            if new_text != text.strip():
+                result[key] = new_text
 
         return result
 
@@ -2126,7 +2160,11 @@ class WeatherContextMixin:
         # Föhn-Info anhängen
         lines.append("")
         krit_foehn = spot.get("kritischer_foehn", "Süd")
-        lines.append(self._format_foehn_info(date_str=date_str, kritischer_foehn=krit_foehn))
+        lines.append(self._format_foehn_info(
+            date_str=date_str,
+            kritischer_foehn=krit_foehn,
+            cache_key=f"{name}|{date_str}",
+        ))
 
         # Region-Kontext für Streckenflug-Bewertung (TEIL 4)
         lines.append("")
@@ -2935,7 +2973,11 @@ class WeatherContextMixin:
         # Foehn: regionsspezifisch (Süd/Nord/Beide)
         krit_foehn = region.get("kritischer_foehn", "Beide")
         lines.append("")
-        lines.append(self._format_foehn_info(date_str=date_str, kritischer_foehn=krit_foehn))
+        lines.append(self._format_foehn_info(
+            date_str=date_str,
+            kritischer_foehn=krit_foehn,
+            cache_key=f"{rname}|{date_str}",
+        ))
 
         return "\n".join(lines)
 

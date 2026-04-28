@@ -622,9 +622,10 @@ DAILY_RUN_MINUTE   = 0
 # ============================================================================
 # E-MAIL-BRIEFING (SMTP Infomaniak)
 # ============================================================================
-# Alle Werte via ENV ueberschreibbar. BASE_URL noch Platzhalter — sobald
-# Landing-Domain steht (z.B. https://gleitcast.ch) in .env setzen.
-BASE_URL        = os.environ.get("GLEITCAST_BASE_URL", "https://example.invalid")
+# BASE_URL = App-Domain (Flask), MARKETING_URL = Marketing-Webpage (Next.js).
+# In Produktion: BASE_URL=https://app.gleitcast.ch, MARKETING_URL=https://gleitcast.ch
+BASE_URL        = os.environ.get("GLEITCAST_BASE_URL",      "https://app.gleitcast.ch")
+MARKETING_URL   = os.environ.get("GLEITCAST_MARKETING_URL", "https://gleitcast.ch")
 
 # Infomaniak SMTP (Standardwerte aus ihrer Doku; Port 465 SSL oder 587 STARTTLS)
 SMTP_HOST       = os.environ.get("SMTP_HOST", "mail.infomaniak.com")

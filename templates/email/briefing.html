@@ -361,6 +361,38 @@
           </td>
         </tr>
 
+        {# =========== EINSTELLUNGEN-CTA =========== #}
+        {% if urls.account %}
+        <tr>
+          <td style="padding:8px 24px 20px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#f5f3ff;border:1px solid #e9d5ff;border-radius:10px;">
+              <tr>
+                <td style="padding:18px 22px;">
+                  <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#5b21b6;">
+                    &#9881;&nbsp; Briefing anpassen
+                  </p>
+                  <p style="margin:0 0 14px;font-size:13px;line-height:1.5;color:#4b5563;">
+                    Andere Regionen, weniger Versandtage pro Woche oder kurz pausieren?
+                    Du steuerst das alles selbst &mdash; passwordlos via Link.
+                  </p>
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#7c3aed" style="border-radius:6px;">
+                        <a href="{{ urls.account }}"
+                           style="display:inline-block;padding:10px 20px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;background:#7c3aed;">
+                          Einstellungen oeffnen
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        {% endif %}
+
         {# =========== FOOTER =========== #}
         <tr>
           <td class="footer-bg divider" style="padding:16px 24px 24px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
@@ -372,9 +404,15 @@
               Im Zweifel: nicht fliegen. Sicherheit geht vor.
             </p>
             <p class="text-muted" style="margin:8px 0 0;font-size:11px;color:#9ca3af;">
+              {% if urls.account %}<a href="{{ urls.account }}" style="color:#7c3aed;text-decoration:underline;font-weight:600;">Einstellungen</a>&nbsp;&middot;&nbsp;{% endif %}
               <a href="{{ urls.dashboard }}" class="text-muted" style="color:#6b7280;text-decoration:underline;">Dashboard</a>
               &nbsp;&middot;&nbsp;
               <a href="{{ urls.unsubscribe }}" class="text-muted" style="color:#6b7280;text-decoration:underline;">Abmelden</a>
+            </p>
+            <p class="text-xmuted" style="margin:6px 0 0;font-size:10.5px;color:#9ca3af;">
+              <a href="{{ urls.datenschutz }}" style="color:#9ca3af;text-decoration:underline;">Datenschutz</a>
+              &nbsp;&middot;&nbsp;
+              <a href="{{ urls.impressum }}" style="color:#9ca3af;text-decoration:underline;">Impressum</a>
             </p>
           </td>
         </tr>
