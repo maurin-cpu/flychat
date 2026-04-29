@@ -3,425 +3,286 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="x-apple-disable-message-reformatting">
-<meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
 <title>Gleitcast Briefing KW{{ kw }}</title>
 <style>
-  /* ---- Dark Mode Overrides (Apple Mail, iOS Mail, Outlook.com) ---- */
   @media (prefers-color-scheme: dark) {
-    body, .body-bg { background-color: #0f172a !important; }
-    .card-bg       { background-color: #1e293b !important; border-color: #334155 !important; }
-    .text-primary  { color: #f1f5f9 !important; }
-    .text-secondary{ color: #cbd5e1 !important; }
-    .text-muted    { color: #94a3b8 !important; }
-    .text-xmuted   { color: #64748b !important; }
-    .divider       { border-color: #334155 !important; }
-    .footer-bg     { background-color: #0f172a !important; border-color: #334155 !important; }
-    .muted-card    { background-color: #1f2937 !important; border-color: #334155 !important; color: #94a3b8 !important; }
-    .subcard       { background-color: #111827 !important; border-color: #334155 !important; }
-    .legend-bg     { background-color: #1e293b !important; }
-    .cell-none     { background-color: #334155 !important; color: #64748b !important; }
-    .feedback-btn  { background-color: #334155 !important; border-color: #475569 !important; }
-    .feedback-yes  { color: #4ade80 !important; }
-    .feedback-no   { color: #f87171 !important; }
-    /* Verdict-Block: im Dark Mode dunkler Hintergrund statt pastell-tint */
-    .verdict-box   { background-color: #111827 !important; }
+    body { background-color: #0f172a !important; }
+    .ds-card { background-color: #1e293b !important; border-color: #334155 !important; }
+    .ds-text { color: #f1f5f9 !important; }
+    .ds-muted { color: #94a3b8 !important; }
+    .ds-row-bg { background-color: #1e293b !important; }
   }
-
-  /* ---- Gmail Android Dark Mode (attribute selector) ---- */
-  [data-ogsc] .card-bg       { background-color: #1e293b !important; }
-  [data-ogsc] .body-bg       { background-color: #0f172a !important; }
-  [data-ogsc] .text-primary  { color: #f1f5f9 !important; }
-  [data-ogsc] .text-secondary{ color: #cbd5e1 !important; }
-  [data-ogsc] .text-muted    { color: #94a3b8 !important; }
-  [data-ogsc] .cell-none     { background-color: #334155 !important; color: #64748b !important; }
-  [data-ogsc] .muted-card    { background-color: #1f2937 !important; color: #94a3b8 !important; }
-  [data-ogsc] .subcard       { background-color: #111827 !important; }
-  [data-ogsc] .verdict-box   { background-color: #111827 !important; }
-
-  /* ---- Mobile Tweaks ---- */
+  /* Mobile-Tap-Targets fuer Spot-Chips */
   @media only screen and (max-width: 480px) {
-    .heatmap-region { font-size: 12px !important; padding: 8px 8px !important; max-width: 120px !important; }
-    .heatmap-cell   { font-size: 11px !important; padding: 8px 2px !important; }
-    .heatmap-head   { font-size: 10px !important; padding: 6px 2px !important; }
-    .top-spot-name  { font-size: 14px !important; }
-    .top-spot-meta  { font-size: 12px !important; }
-    .hero-headline  { font-size: 18px !important; }
+    .ds-chip-name   { font-size: 13px !important; }
+    .ds-chip-rating { font-size: 16px !important; }
+    .ds-chip-cell   { padding: 9px 8px !important; }
+    .ds-chip-region { font-size: 10px !important; }
   }
+  a.ds-chip-link:hover   td { background-color: #f8fafc !important; }
+  a.ds-chip-link:active  td { background-color: #f1f5f9 !important; }
 </style>
 </head>
-<body class="body-bg text-primary" style="margin:0;padding:0;background-color:#f3f4f6;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<body style="margin:0;padding:0;background-color:#f1f5f9;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',Roboto,Helvetica,Arial,sans-serif;">
 
-<!-- Preheader -->
+<!-- Preheader (versteckt, erscheint in Inbox-Preview) -->
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
 {% if verdict %}{{ verdict.headline }}{% else %}Dein Flugwetter-Briefing{% endif %} &mdash; {{ briefing_weekday }}, {{ briefing_date }}
 </div>
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" style="background-color:#f3f4f6;">
-  <tr>
-    <td align="center" style="padding:24px 12px 40px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1f5f9" style="background-color:#f1f5f9;">
+<tr><td align="center" style="padding:18px 10px 30px;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" class="ds-card" style="width:100%;max-width:640px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:10px;">
 
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="card-bg" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+  {# Compact header bar #}
+  <tr><td bgcolor="#0f172a" style="background-color:#0f172a;padding:12px 18px;border-radius:10px 10px 0 0;">
+    <table width="100%"><tr>
+      <td style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#ffffff;">GLEITCAST &middot; KW {{ kw }}</td>
+      <td align="right" style="font-size:11px;color:#94a3b8;">{{ briefing_weekday }}, {{ briefing_date }}</td>
+    </tr></table>
+  </td></tr>
 
-        {# =========== HEADER =========== #}
-        <tr>
-          <td style="padding:22px 24px 4px;">
-            <div class="text-muted" style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;">Gleitcast &middot; KW {{ kw }}</div>
-            <div class="text-xmuted" style="font-size:13px;color:#9ca3af;margin-top:2px;">{{ briefing_weekday }}, {{ briefing_date }}</div>
-          </td>
-        </tr>
-
-        {# =========== SAFETY-HEADER =========== #}
-        {% if warnings %}
-        <tr>
-          <td style="padding:12px 24px 0;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                   style="background-color:#fef2f2;border:1px solid #b91c1c;border-radius:10px;">
-              <tr>
-                <td style="padding:14px 16px;">
-                  <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#b91c1c;margin-bottom:6px;">
-                    [!] Sicherheits-Hinweis
-                  </div>
-                  <div style="font-size:14px;color:#7f1d1d;line-height:1.5;">
-                    {% for w in warnings %}
-                      <div style="margin-bottom:2px;">
-                        <strong>{{ w.label }}</strong>{% if w.days_short %} an
-                        {% for d in w.days_short %}{{ d }}{% if not loop.last %}, {% endif %}{% endfor %}
-                        {% endif %} erwartet.
-                      </div>
-                    {% endfor %}
-                    <div style="font-size:12px;color:#991b1b;margin-top:6px;">
-                      Details in den Tages-Blocks unten pruefen.
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+  {# Hero — kompakt, einzeilig (full-bleed colored band, keine border, naechste section setzt divider) #}
+  {% if verdict %}
+  <tr><td style="padding:14px 18px;background-color:{{ verdict.day.tier_bg }};">
+    <table width="100%"><tr>
+      <td valign="middle">
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:{{ verdict.day.tier_color }};margin-bottom:2px;">
+          Top &middot; {{ verdict.day.label.long }}
+        </div>
+        <div class="ds-text" style="font-size:17px;font-weight:700;color:#0f172a;line-height:1.25;">
+          {% if verdict.spot %}{{ verdict.spot.spot }}{% if verdict.spot.window %} <span style="font-weight:500;color:#475569;">&middot; {{ verdict.spot.window }}</span>{% endif %}{% endif %}
+        </div>
+      </td>
+      <td align="right" valign="middle" style="white-space:nowrap;padding-left:12px;">
+        {% if verdict.spot %}
+        <span style="display:inline-block;font-size:24px;font-weight:800;color:{{ verdict.day.tier_color }};font-variant-numeric:tabular-nums;line-height:1;">
+          {{ verdict.spot.rating_display }}
+        </span>
         {% endif %}
+        <a href="{{ urls.dashboard }}" style="display:inline-block;margin-left:10px;padding:7px 12px;background-color:{{ verdict.day.tier_color }};color:#ffffff;font-size:12px;font-weight:700;text-decoration:none;border-radius:6px;">
+          Dashboard
+        </a>
+      </td>
+    </tr></table>
+    {% if week_lead %}
+    <div style="margin-top:8px;font-size:13px;color:#475569;line-height:1.45;">
+      {{ week_lead }}
+    </div>
+    {% endif %}
+  </td></tr>
+  {% endif %}
 
-        {# =========== VERDICT (Hero) =========== #}
-        {% if verdict %}
-        <tr>
-          <td style="padding:16px 24px 8px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                   class="verdict-box"
-                   style="background-color:{{ verdict.day.tier_bg }};border-left:4px solid {{ verdict.day.tier_color }};border-radius:10px;">
-              <tr>
-                <td style="padding:20px 20px;">
-                  <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:{{ verdict.day.tier_color }};margin-bottom:6px;">
-                    [{{ verdict.day.tier_icon }}] {{ verdict.day.tier_label }} &middot; {{ verdict.day.label.short }}
-                  </div>
-                  <div class="hero-headline text-primary" style="font-size:20px;font-weight:700;line-height:1.3;color:#111827;margin-bottom:10px;">
-                    {{ verdict.headline }}
-                  </div>
-                  {% if verdict.spot %}
-                  <div class="text-secondary" style="font-size:14px;color:#374151;line-height:1.5;margin-bottom:14px;">
-                    {{ verdict.spot.spot }}
-                    {% if verdict.spot.window %} &middot; {{ verdict.spot.window }}{% endif %}
-                    &middot; Rating {{ verdict.spot.rating_display }}
-                  </div>
-                  {% endif %}
-
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <td align="left" bgcolor="{{ verdict.day.tier_color }}" style="border-radius:8px;">
-                        <a href="{{ urls.dashboard }}"
-                           style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;background-color:{{ verdict.day.tier_color }};">
-                          Im Dashboard ansehen &rsaquo;
-                        </a>
-                      </td>
-                      {% if share %}
-                      <td style="padding-left:8px;">&nbsp;</td>
-                      <td align="left" bgcolor="#25D366" style="border-radius:8px;">
-                        <a href="{{ share.whatsapp }}"
-                           style="display:inline-block;padding:12px 18px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;background-color:#25D366;">
-                          Per WhatsApp teilen
-                        </a>
-                      </td>
-                      {% endif %}
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+  {# === SECTION: Region-Heatmap === #}
+  <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;">
+    <div class="ds-muted" style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;">
+      Woche &middot; {{ region_matrix|length }} Regionen &times; 5 Tage
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+      {# Header-Zeile #}
+      <tr>
+        <td class="ds-muted" style="padding:6px 8px 6px 0;font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.04em;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">
+          Region
+        </td>
+        {% for d in days %}
+        <td align="center" class="ds-muted" style="padding:6px 2px;font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.04em;text-transform:uppercase;border-bottom:1px solid #e2e8f0;{% if d.is_today %}background-color:#fef3c7;{% endif %}">
+          {{ d.label.weekday }}{% if d.is_today %}<br><span style="font-size:8px;color:#b45309;">heute</span>{% endif %}
+        </td>
+        {% endfor %}
+        <td align="right" class="ds-muted" style="padding:6px 0 6px 8px;font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.04em;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">
+          Best
+        </td>
+      </tr>
+      {# Daten-Zeilen #}
+      {% for r in region_matrix %}
+      <tr {% if loop.index0 % 2 == 1 %}class="ds-row-bg" bgcolor="#f8fafc" style="background-color:#f8fafc;"{% endif %}>
+        <td class="ds-text" style="padding:6px 8px 6px 0;font-size:12px;font-weight:500;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">
+          <a href="{{ r.url }}" class="ds-text" style="color:#0f172a;text-decoration:none;">{{ r.region_name }}</a>
+        </td>
+        {% for cell in r.days %}
+        {% if cell.tier == "none" %}
+        <td align="center" style="padding:0;border:2px solid #ffffff;background-color:#f1f5f9;color:#cbd5e1;font-size:10px;border-radius:4px;">
+          <div style="padding:6px 2px;">&ndash;</div>
+        </td>
+        {% else %}
+        <td align="center" bgcolor="{{ cell.tier_color }}" style="padding:0;border:2px solid #ffffff;background-color:{{ cell.tier_color }};border-radius:4px;">
+          <a href="{{ cell.url }}" style="display:block;padding:6px 2px;font-size:11px;font-weight:700;color:#ffffff;text-decoration:none;font-variant-numeric:tabular-nums;line-height:1;">
+            {{ cell.rating_display }}
+          </a>
+        </td>
         {% endif %}
+        {% endfor %}
+        <td align="right" class="ds-text" style="padding:6px 0 6px 8px;font-size:12px;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;">
+          {{ '%.1f'|format(r.best_rating) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td></tr>
 
-        {# =========== HEATMAP: Region x Tag =========== #}
-        {% if region_matrix %}
-        <tr>
-          <td style="padding:20px 24px 0;">
-            <div class="text-xmuted" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9ca3af;margin-bottom:12px;">
-              Deine Regionen &middot; diese Woche
-            </div>
+  {# === SECTION: Pro Tag — bare data layout, KEINE Card-Frames, matched zur Heatmap === #}
+  <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;">
+    <div class="ds-muted" style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;">
+      Pro Tag &middot; Beste Region + Top-Spots
+    </div>
 
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                   style="border-collapse:separate;border-spacing:0;">
-              {# Header-Zeile: Wochentage #}
-              <tr>
-                <td class="heatmap-head text-xmuted"
-                    style="font-size:11px;font-weight:600;color:#9ca3af;text-align:left;padding:0 8px 6px 0;width:38%;">
-                  Region
-                </td>
-                {% for d in day_short_labels %}
-                <td class="heatmap-head text-xmuted"
-                    style="font-size:11px;font-weight:600;color:#9ca3af;text-align:center;padding:0 2px 6px;">
-                  {{ d }}
-                </td>
-                {% endfor %}
-                <td class="heatmap-head text-xmuted"
-                    style="font-size:11px;font-weight:600;color:#9ca3af;text-align:right;padding:0 0 6px 8px;white-space:nowrap;">
-                  Best
-                </td>
-              </tr>
-
-              {# Datenzeilen — jede Region + jede Zelle ist anklickbar #}
-              {% for r in region_matrix %}
-              <tr>
-                <td class="heatmap-region"
-                    style="padding:5px 8px 5px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">
-                  <a href="{{ r.url }}" class="text-primary"
-                     style="display:block;font-size:13px;font-weight:500;color:#111827;text-decoration:none;">
-                    {{ r.region_name }}
-                  </a>
-                </td>
-                {% for cell in r.days %}
-                  {% if cell.tier == "none" %}
-                    <td class="heatmap-cell cell-none"
-                        align="center"
-                        style="font-size:11px;font-weight:600;color:#cbd5e1;background-color:#f1f5f9;border:2px solid #ffffff;border-radius:4px;padding:0;">
-                      <div style="padding:8px 4px;">&ndash;</div>
-                    </td>
-                  {% else %}
-                    <td class="heatmap-cell"
-                        align="center"
-                        bgcolor="{{ cell.tier_color }}"
-                        style="background-color:{{ cell.tier_color }};border:2px solid #ffffff;border-radius:4px;padding:0;">
-                      <a href="{{ cell.url }}"
-                         style="display:block;font-size:12px;font-weight:700;color:#ffffff;text-decoration:none;padding:8px 4px;line-height:1;">
-                        {{ cell.rating_display }}
-                      </a>
-                    </td>
-                  {% endif %}
-                {% endfor %}
-                <td align="right" style="padding:5px 0 5px 8px;white-space:nowrap;">
-                  <a href="{{ r.url }}" class="text-primary"
-                     style="display:block;font-size:13px;font-weight:700;color:#111827;text-decoration:none;">
-                    {{ '%.1f'|format(r.best_rating) }}
-                  </a>
-                </td>
-              </tr>
-              {% endfor %}
-            </table>
-
-            {# Legende #}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
-              <tr>
-                <td style="font-size:11px;color:#6b7280;line-height:1.6;" class="text-muted">
-                  <span style="display:inline-block;width:10px;height:10px;background-color:#6d28d9;border-radius:2px;vertical-align:middle;"></span>
-                  <span style="vertical-align:middle;">&nbsp;legendaer&nbsp;</span>
-                  <span style="display:inline-block;width:10px;height:10px;background-color:#15803d;border-radius:2px;vertical-align:middle;margin-left:6px;"></span>
-                  <span style="vertical-align:middle;">&nbsp;fliegbar&nbsp;</span>
-                  <span style="display:inline-block;width:10px;height:10px;background-color:#b45309;border-radius:2px;vertical-align:middle;margin-left:6px;"></span>
-                  <span style="vertical-align:middle;">&nbsp;bedingt&nbsp;</span>
-                  <span style="display:inline-block;width:10px;height:10px;background-color:#e5e7eb;border-radius:2px;vertical-align:middle;margin-left:6px;"></span>
-                  <span style="vertical-align:middle;">&nbsp;nichts</span>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        {% endif %}
-
-        {# =========== PER-DAY DETAILS =========== #}
-        <tr>
-          <td style="padding:22px 24px 0;">
-            <div class="text-xmuted" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9ca3af;margin-bottom:10px;">
-              Details pro Tag
-            </div>
-          </td>
-        </tr>
-
-        {% for day in days %}{% if day.tier != 'none' and day.region_groups %}
-        <tr>
-          <td style="padding:4px 24px 16px;">
-            {# Day Header — Tier-Badge links, Tag-Name, Day-Rating rechts #}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:6px;border-bottom:2px solid {{ day.tier_color }};padding-bottom:6px;">
-              <tr>
-                <td valign="middle" style="padding-right:10px;width:1%;white-space:nowrap;">
-                  <span style="display:inline-block;padding:3px 9px;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ffffff;background-color:{{ day.tier_color }};border-radius:4px;">
-                    {{ day.tier_label }}
-                  </span>
-                </td>
-                <td valign="middle" class="text-primary" style="font-size:15px;font-weight:700;color:#111827;">
-                  {{ day.label.long }}
-                </td>
-                <td valign="middle" align="right" style="font-size:18px;font-weight:700;color:{{ day.tier_color }};white-space:nowrap;">
-                  {{ day.day_rating_display }}
-                </td>
-              </tr>
-            </table>
-
-            {# Day-Summaries: 1 Zeile Fliegbarkeit + 1 Zeile Sicherheit (kompakt) #}
-            {% if day.fly_summary %}
-            <div class="text-secondary" style="font-size:12px;color:#374151;margin:4px 0 2px;line-height:1.5;">
-              <strong class="text-muted" style="color:#6b7280;font-weight:600;">Flug:</strong> {{ day.fly_summary }}
-            </div>
-            {% endif %}
-            {% if day.safety_summary %}
-            <div class="text-secondary" style="font-size:12px;color:#374151;margin:0 0 8px;line-height:1.5;">
-              <strong class="text-muted" style="color:#6b7280;font-weight:600;">Sicherheit:</strong> {{ day.safety_summary }}
-            </div>
-            {% endif %}
-
-            {# Top 3 Regionen × Top 3 Spots — kompakte Cards (nur Name + Rating) #}
-            {% for grp in day.region_groups %}
-              <div class="text-primary" style="font-size:12px;font-weight:600;color:{{ grp.tier_color }};margin:10px 0 4px;letter-spacing:0.04em;text-transform:uppercase;">
-                {{ grp.region_name }}
-                <span class="text-muted" style="color:#9ca3af;font-weight:500;letter-spacing:0;text-transform:none;">
-                  &middot; {{ grp.region_rating_display }}
-                </span>
-              </div>
-
-              {% for s in grp.spots %}
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                     class="subcard"
-                     style="margin-bottom:4px;background-color:#ffffff;border:1px solid #e5e7eb;border-left:3px solid {{ s.tier_color }};border-radius:5px;">
-                <tr>
-                  <td style="padding:0;">
-                    <a href="{{ s.url }}" style="display:block;text-decoration:none;color:inherit;padding:8px 12px;">
-                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                        <tr>
-                          <td class="text-primary" style="font-size:14px;font-weight:600;color:#111827;">
-                            {{ s.spot }}
-                          </td>
-                          <td align="right" style="font-size:13px;color:{{ s.tier_color }};font-weight:700;white-space:nowrap;">
-                            {{ s.rating_display }}
-                          </td>
-                        </tr>
-                      </table>
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              {% endfor %}
-            {% endfor %}
-
-            {% if day.more_count > 0 %}
-            <div style="font-size:12px;margin-top:6px;margin-bottom:4px;">
-              <a href="{{ urls.dashboard }}" style="color:{{ day.tier_color }};text-decoration:none;">
-                + {{ day.more_count }} weitere Spot{% if day.more_count != 1 %}s{% endif %} im Dashboard &rsaquo;
-              </a>
-            </div>
-            {% endif %}
-          </td>
-        </tr>
-        {% endif %}{% endfor %}
-
-        {# =========== FEEDBACK =========== #}
-        <tr>
-          <td class="divider" style="padding:16px 24px 20px;border-top:1px solid #e5e7eb;">
-            <div class="text-secondary" style="font-size:13px;color:#4b5563;margin-bottom:10px;text-align:center;">
-              War diese Vorhersage richtig?
-            </div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-              <tr>
-                <td width="50%" align="center" style="padding-right:6px;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                    <tr>
-                      <td align="center" bgcolor="#f3f4f6" class="feedback-btn"
-                          style="border-radius:8px;border:1px solid #d1d5db;background-color:#f3f4f6;">
-                        <a href="{{ urls.feedback_correct }}" class="feedback-yes"
-                           style="display:block;padding:10px 14px;font-size:14px;font-weight:600;color:#15803d;text-decoration:none;">
-                          Ja, passte
-                        </a>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-                <td width="50%" align="center" style="padding-left:6px;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                    <tr>
-                      <td align="center" bgcolor="#f3f4f6" class="feedback-btn"
-                          style="border-radius:8px;border:1px solid #d1d5db;background-color:#f3f4f6;">
-                        <a href="{{ urls.feedback_wrong }}" class="feedback-no"
-                           style="display:block;padding:10px 14px;font-size:14px;font-weight:600;color:#b91c1c;text-decoration:none;">
-                          Nein, lag daneben
-                        </a>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-
-        {# =========== EINSTELLUNGEN-CTA =========== #}
-        {% if urls.account %}
-        <tr>
-          <td style="padding:8px 24px 20px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                   style="background:#f5f3ff;border:1px solid #e9d5ff;border-radius:10px;">
-              <tr>
-                <td style="padding:18px 22px;">
-                  <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#5b21b6;">
-                    &#9881;&nbsp; Briefing anpassen
-                  </p>
-                  <p style="margin:0 0 14px;font-size:13px;line-height:1.5;color:#4b5563;">
-                    Andere Regionen, weniger Versandtage pro Woche oder kurz pausieren?
-                    Du steuerst das alles selbst &mdash; passwordlos via Link.
-                  </p>
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <td bgcolor="#7c3aed" style="border-radius:6px;">
-                        <a href="{{ urls.account }}"
-                           style="display:inline-block;padding:10px 20px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;background:#7c3aed;">
-                          Einstellungen oeffnen
-                        </a>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        {% endif %}
-
-        {# =========== FOOTER =========== #}
-        <tr>
-          <td class="footer-bg divider" style="padding:16px 24px 24px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
-            <p class="text-xmuted" style="margin:0 0 6px;font-size:11px;line-height:1.6;color:#9ca3af;">
-              Quellen: ICON-CH1 (1&nbsp;km), ICON-D2, ICON-EU, Open-Meteo, MeteoSwiss.
-            </p>
-            <p class="text-xmuted" style="margin:0 0 10px;font-size:11px;line-height:1.6;color:#9ca3af;">
-              Gleitcast ist Decision Support &mdash; die finale Entscheidung triffst du.
-              Im Zweifel: nicht fliegen. Sicherheit geht vor.
-            </p>
-            <p class="text-muted" style="margin:8px 0 0;font-size:11px;color:#9ca3af;">
-              {% if urls.account %}<a href="{{ urls.account }}" style="color:#7c3aed;text-decoration:underline;font-weight:600;">Einstellungen</a>&nbsp;&middot;&nbsp;{% endif %}
-              <a href="{{ urls.dashboard }}" class="text-muted" style="color:#6b7280;text-decoration:underline;">Dashboard</a>
-              &nbsp;&middot;&nbsp;
-              <a href="{{ urls.unsubscribe }}" class="text-muted" style="color:#6b7280;text-decoration:underline;">Abmelden</a>
-            </p>
-            <p class="text-xmuted" style="margin:6px 0 0;font-size:10.5px;color:#9ca3af;">
-              <a href="{{ urls.datenschutz }}" style="color:#9ca3af;text-decoration:underline;">Datenschutz</a>
-              &nbsp;&middot;&nbsp;
-              <a href="{{ urls.impressum }}" style="color:#9ca3af;text-decoration:underline;">Impressum</a>
-            </p>
-          </td>
-        </tr>
-
+    {% for d in days %}
+    {# Day-Block: Header-Zeile + Chip-Zeile, hairline divider zwischen Tagen #}
+    <div style="{% if not loop.first %}border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;{% endif %}">
+      {# Header — flach, wie eine Heatmap-Row #}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:5px;">
+      <tr>
+        <td valign="middle" align="center" bgcolor="{{ d.tier_bg_strip }}"
+            style="background-color:{{ d.tier_bg_strip }};width:42px;padding:5px 4px;border-radius:4px;">
+          <div style="font-size:10px;font-weight:800;color:{{ d.tier_color_strip }};letter-spacing:0.06em;text-transform:uppercase;line-height:1;">
+            {{ d.label.weekday }}{% if d.is_today %}*{% endif %}
+          </div>
+        </td>
+        <td valign="middle" style="padding:5px 10px;">
+          <span style="font-size:13px;font-weight:700;color:#0f172a;" class="ds-text">{{ d.label.long }}</span>{% if d.is_today %} <span style="font-size:10px;color:{{ d.tier_color_strip }};font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">&middot; heute</span>{% endif %}
+        </td>
+        <td valign="middle" align="right" style="padding:5px 0 5px 6px;width:1%;white-space:nowrap;">
+          <span style="font-size:18px;font-weight:800;color:{{ d.tier_color_strip }};font-variant-numeric:tabular-nums;letter-spacing:-0.02em;line-height:1;">
+            {% if d.day_rating_display %}{{ d.day_rating_display }}{% else %}&mdash;{% endif %}
+          </span>
+        </td>
+      </tr>
       </table>
 
-    </td>
-  </tr>
-</table>
+      {% if d.top_spots_flat %}
+      {# 3 Spot-Pills — gleiche Form-Sprache wie Heatmap-Cells #}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:3px 0;">
+      <tr>
+        {% for s in d.top_spots_flat[:3] %}
+        <td valign="top" bgcolor="{{ s.tier_bg }}" style="background-color:{{ s.tier_bg }};border-radius:4px;width:33%;padding:0;">
+          <a href="{{ s.url }}" class="ds-chip-link" style="display:block;text-decoration:none;color:inherit;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td class="ds-chip-cell" style="padding:6px 9px;">
+                <div class="ds-chip-region" style="font-size:8px;font-weight:700;color:{{ s.tier_color }};letter-spacing:0.05em;text-transform:uppercase;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0.85;">
+                  {{ s.region_name }}
+                </div>
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:2px;"><tr>
+                  <td valign="middle" style="padding-right:3px;">
+                    <span class="ds-chip-name" style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:100%;">
+                      {{ s.spot }}
+                    </span>
+                  </td>
+                  <td valign="middle" align="right" style="white-space:nowrap;">
+                    <span class="ds-chip-rating" style="font-size:13px;font-weight:800;color:{{ s.tier_color }};font-variant-numeric:tabular-nums;letter-spacing:-0.02em;line-height:1;">
+                      {{ s.rating_display }}
+                    </span>
+                  </td>
+                </tr></table>
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:2px;"><tr>
+                  <td valign="middle" style="font-size:9px;color:{{ s.tier_color }};font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;opacity:0.75;">
+                    {% if s.window %}{{ s.window }}{% else %}&mdash;{% endif %}
+                  </td>
+                  <td valign="middle" align="right" style="white-space:nowrap;">
+                    <span style="font-size:12px;color:{{ s.tier_color }};font-weight:600;line-height:1;opacity:0.6;" aria-hidden="true">&rsaquo;</span>
+                  </td>
+                </tr></table>
+              </td>
+            </tr></table>
+          </a>
+        </td>
+        {% endfor %}
+      </tr>
+      </table>
+      {# Stichworte (optional) — inline, kein eigener Container #}
+      {% if d.notable_good or d.notable_bad %}
+      <div style="margin-top:5px;font-size:10px;line-height:1.4;padding-left:46px;">
+        {% if d.notable_good %}<span style="color:#15803d;font-weight:600;">+ {{ d.notable_good }}</span>{% endif %}
+        {% if d.notable_good and d.notable_bad %} &nbsp;&middot;&nbsp; {% endif %}
+        {% if d.notable_bad %}<span style="color:#b45309;font-weight:600;">! {{ d.notable_bad }}</span>{% endif %}
+      </div>
+      {% endif %}
+      {% else %}
+      {# Schwacher Tag: Reason inline #}
+      <div style="font-size:12px;color:#94a3b8;font-style:italic;line-height:1.4;padding-left:46px;" class="ds-muted">
+        {{ d.reason_short or 'Nichts fliegbar in deinen Regionen.' }}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </td></tr>
 
+  {# === SECTION: Feedback === #}
+  <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;">
+    <div class="ds-muted" style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;">
+      Feedback
+    </div>
+    <div style="font-size:12px;color:#64748b;margin-bottom:8px;font-weight:500;" class="ds-muted">
+      War diese Vorhersage richtig?
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td width="50%" align="center" style="padding-right:4px;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+            <td align="center" bgcolor="#f8fafc" style="border-radius:6px;border:1px solid #e2e8f0;">
+              <a href="{{ urls.feedback_correct }}" style="display:block;padding:8px 12px;font-size:12px;font-weight:700;color:#15803d;text-decoration:none;">
+                Ja, passte
+              </a>
+            </td>
+          </tr></table>
+        </td>
+        <td width="50%" align="center" style="padding-left:4px;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+            <td align="center" bgcolor="#f8fafc" style="border-radius:6px;border:1px solid #e2e8f0;">
+              <a href="{{ urls.feedback_wrong }}" style="display:block;padding:8px 12px;font-size:12px;font-weight:700;color:#b91c1c;text-decoration:none;">
+                Nein, lag daneben
+              </a>
+            </td>
+          </tr></table>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  {# === SECTION: Account-CTA === #}
+  {% if urls.account %}
+  <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;">
+    <div class="ds-muted" style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;">
+      Einstellungen
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" class="ds-card" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;">
+      <tr><td style="padding:12px 14px;">
+        <table width="100%"><tr>
+          <td valign="middle">
+            <div class="ds-text" style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">Briefing anpassen</div>
+            <div class="ds-muted" style="font-size:11px;color:#64748b;line-height:1.4;">Andere Regionen, weniger Tage, pausieren?</div>
+          </td>
+          <td align="right" valign="middle" style="white-space:nowrap;padding-left:8px;">
+            <a href="{{ urls.account }}" style="display:inline-block;padding:7px 12px;background:#0f172a;color:#ffffff;font-size:12px;font-weight:700;text-decoration:none;border-radius:6px;">
+              Einstellungen
+            </a>
+          </td>
+        </tr></table>
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endif %}
+
+  {# Footer #}
+  <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;background-color:#f8fafc;border-radius:0 0 10px 10px;">
+    <div style="font-size:10px;color:#64748b;line-height:1.7;" class="ds-muted">
+      Quellen: ICON-CH1 (1km), ICON-D2, ICON-EU, Open-Meteo, MeteoSwiss.<br>
+      Gleitcast ist Decision Support &mdash; im Zweifel: nicht fliegen.
+    </div>
+    <div style="font-size:10px;color:#64748b;line-height:1.6;margin-top:8px;">
+      <a href="{{ urls.account }}" style="color:#0f172a;text-decoration:underline;font-weight:600;">Einstellungen</a>
+      &nbsp; &middot; &nbsp;
+      <a href="{{ urls.dashboard }}" style="color:#64748b;text-decoration:underline;">Dashboard</a>
+      &nbsp; &middot; &nbsp;
+      <a href="{{ urls.unsubscribe }}" style="color:#64748b;text-decoration:underline;">Abmelden</a>
+      &nbsp; &middot; &nbsp;
+      <a href="{{ urls.datenschutz }}" style="color:#64748b;text-decoration:underline;">Datenschutz</a>
+      &nbsp; &middot; &nbsp;
+      <a href="{{ urls.impressum }}" style="color:#64748b;text-decoration:underline;">Impressum</a>
+    </div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
 </body>
 </html>

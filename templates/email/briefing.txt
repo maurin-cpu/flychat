@@ -1,14 +1,6 @@
 GLEITCAST — Dein Flugwetter KW{{ kw }}
 {{ briefing_weekday }}, {{ briefing_date }}
 
-{% if warnings -%}
-!!! SICHERHEITS-HINWEIS
-{% for w in warnings -%}
-* {{ w.label }}{% if w.days_short %} an {% for d in w.days_short %}{{ d }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %} erwartet
-{% endfor -%}
-Details in den Tages-Blocks unten pruefen.
-
-{% endif -%}
 {% if verdict -%}
 ============================================================
 {{ verdict.day.tier_label|upper }}: {{ verdict.headline }}
@@ -21,6 +13,10 @@ Im Dashboard: {{ urls.dashboard }}
 ============================================================
 
 {% endif -%}
+{% if week_lead -%}
+{{ week_lead }}
+
+{% endif -%}
 {% if region_matrix -%}
 DEINE REGIONEN · DIESE WOCHE
 {%- set col_w = 4 %}
@@ -31,16 +27,20 @@ DEINE REGIONEN · DIESE WOCHE
 Legende:  ## legendaer   OO fliegbar   =! bedingt   -- nichts
 
 {% endif -%}
-DETAILS PRO TAG
-{% for day in days %}{% if day.tier != 'none' and day.region_groups %}
-{{ day.label.long }} — {{ day.tier_label|upper }}{% if day.day_rating_display %} · {{ day.day_rating_display }}{% endif %}
-{% if day.fly_summary %}  Flug: {{ day.fly_summary }}
-{% endif %}{% if day.safety_summary %}  Sicherheit: {{ day.safety_summary }}
-{% endif %}{% for grp in day.region_groups %}
-  {{ grp.region_name|upper }} · {{ grp.region_rating_display }}
-{% for s in grp.spots %}    {{ s.spot }} — {{ s.rating_display }}
-{% endfor %}{% endfor %}{% if day.more_count > 0 %}  + {{ day.more_count }} weitere Spot{% if day.more_count != 1 %}s{% endif %} im Dashboard
-{% endif %}{% endif %}{% endfor %}
+DIESE WOCHE AUF EINEN BLICK
+{% for d in days -%}
+{{ d.label.weekday }} {% if d.tier == 'violet' %}LEGENDAER{% elif d.tier == 'green' %}FLIEGBAR{% elif d.tier == 'conditional' %}BEDINGT{% else %}MEIDEN  {% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
+{% endfor %}
+PRO TAG
+{% for d in days %}
+{{ d.label.long }} — {% if d.tier == 'violet' %}LEGENDAER{% elif d.tier == 'green' %}FLIEGBAR{% elif d.tier == 'conditional' %}BEDINGT{% else %}MEIDEN{% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
+{% if d.compact_top_region -%}
+{% for grp in d.region_groups[:3] %}  {{ grp.region_name }} · {% for s in grp.spots[:3] %}{{ s.spot }} {{ s.rating_display }}{% if not loop.last %} · {% endif %}{% endfor %}
+{% endfor %}{% if d.notable_good %}  + {{ d.notable_good }}
+{% endif %}{% if d.notable_bad %}  ! {{ d.notable_bad }}
+{% endif %}{%- else -%}
+  {{ d.reason_short or 'Nichts fliegbar in deinen Regionen.' }}
+{% endif %}{% endfor %}
 
 ------------------------------------------------------------
 War diese Vorhersage richtig?

@@ -404,6 +404,52 @@ def _extract_safety_warnings(days_with_all_my_spots: list) -> list[dict]:
     return result
 
 
+def _week_summary_prose(days_out: list[dict], warnings: list[dict]) -> str:
+    """1-2 Saetze zur Wochen-Gesamtsituation.
+
+    Beispiele:
+      "Mittwoch ist dein Tag der Woche. Freitag meiden wegen Foehn."
+      "Drei starke Tage: Mi, Do, Sa. Sonst bedingt."
+      "Diese Woche bleib am Boden - kein einziger fliegbarer Tag."
+    """
+    strong = [d for d in days_out if d["tier"] in ("violet", "green")]
+    conditional = [d for d in days_out if d["tier"] == "conditional"]
+    none = [d for d in days_out if d["tier"] == "none"]
+
+    if not strong and not conditional:
+        return "Diese Woche bleib am Boden — kein fliegbarer Tag in deinen Regionen."
+
+    parts: list[str] = []
+
+    # Satz 1: Top-Tage
+    if not strong:
+        parts.append("Keine Top-Bedingungen, nur bedingt fliegbar.")
+    elif len(strong) == 1:
+        d = strong[0]
+        wd_long = _WEEKDAY_DE_LONG[datetime.fromisoformat(d["date"]).weekday()]
+        parts.append(f"{wd_long} ist dein Tag der Woche.")
+    elif len(strong) <= 3:
+        wds = ", ".join(d["label"]["short"] for d in strong)
+        parts.append(f"{len(strong)} starke Tage: {wds}.")
+    else:
+        parts.append(f"{len(strong)} starke Tage diese Woche.")
+
+    # Satz 2: Warnungen oder Schlecht-Tage
+    if warnings:
+        # erste Warnung mit Tagen
+        w = warnings[0]
+        if w.get("days_short"):
+            wds = "/".join(w["days_short"])
+            parts.append(f"{w['label']} an {wds} — meiden.")
+        else:
+            parts.append(f"{w['label']} aufziehend — meiden.")
+    elif none:
+        wds = "/".join(d["label"]["short"] for d in none[:2])
+        parts.append(f"{wds} nichts fliegbar.")
+
+    return " ".join(parts)
+
+
 def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[dict]:
     """Region x Tag Heatmap.
 
@@ -668,6 +714,16 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         fly_summary = _day_fly_summary(my_spots, day_tier)
         safety_summary = _day_safety_summary(my_spots)
 
+        # top_spots_flat: 3 beste Spots des Tages regionen-uebergreifend (flach sortiert
+        # nach rating). Fuer Mobile-First Spot-Buttons in v5_dense — 3-Spot-Garantie
+        # auch wenn die Top-Region nur 1-2 Spots hat (faellt auf naechste Regionen
+        # zurueck). region_name bleibt pro Spot erhalten (durch ** s spread aus shown).
+        top_spots_flat = sorted(
+            displayed_spots,
+            key=lambda s: float(s.get('rating') or 0),
+            reverse=True,
+        )[:3]
+
         days_out.append({
             "date": date_str,
             "label": day_label_dict,
@@ -678,6 +734,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "tier_icon":  meta["icon"],
             "shown_spots": displayed_spots,
             "region_groups": region_groups,
+            "top_spots_flat": top_spots_flat,
             "day_rating": day_rating,
             "day_rating_display": f"{day_rating:.1f}" if day_rating > 0 else "",
             "fly_summary": fly_summary,
@@ -697,14 +754,23 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     best_day_idx = days_out.index(best_day) if best_day else 0
 
     # Verdict nur zeigen, wenn bester Tag wenigstens 'conditional' ist
+    # - headline: voll (für Subject/Share/Preheader — muss standalone Sinn machen)
+    # - headline_short: kompakt für E-Mail-Hero (Eyebrow zeigt schon Wochentag,
+    #   Tier-Pill zeigt schon Status — Headline fokussiert auf WAS/WO)
     verdict = None
     if best_day and best_day["tier"] != "none":
         top_spot = best_day["shown_spots"][0] if best_day["shown_spots"] else None
         verdict = {
             "day": best_day,
             "spot": top_spot,
-            "headline": _verdict_headline(best_day, top_spot),
+            "headline":       _verdict_headline(best_day, top_spot),
+            "headline_short": _verdict_headline_short(best_day, top_spot),
         }
+
+    # Heute-Markierung pro Tag (für 5-Tage-Streifen)
+    today_iso = datetime.now().date().isoformat()
+    for day in days_out:
+        day["is_today"] = (day.get("date") == today_iso)
 
     # Deep-Link ins Dashboard
     regions_csv = ",".join(sorted(subscriber_regions))
@@ -727,8 +793,65 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     today = datetime.now()
     warnings = _extract_safety_warnings(days_with_all_my_spots)
 
+    # Per-Day-Compact: 5-Tage-Streifen + One-Liner pro Tag
+    # - reason_short: Warnungs-Label (Föhn/Sturm) ODER fly_summary-Kopf ODER Fallback
+    # - compact_top_region: beste Region-Gruppe (für starke Tage als One-Liner)
+    # - tier_color_strip / tier_bg_strip: rot für "none" (= "meiden") statt grau,
+    #   damit der Streifen Wetter-Stop visuell anders kommuniziert als die
+    #   Heatmap (wo none=grau bleibt = "kein Spot dieser Region").
+    warnings_per_day_short: dict[str, list[str]] = {}
+    for w in warnings:
+        for ds in w.get("days_short", []):
+            warnings_per_day_short.setdefault(ds, []).append(w["label"])
+
+    for day in days_out:
+        wd_short = day["label"].get("short", "")
+        warn_labels = warnings_per_day_short.get(wd_short, [])
+        if warn_labels:
+            day["reason_short"] = " · ".join(warn_labels[:2])
+        elif day["tier"] == "none":
+            day["reason_short"] = "Nichts fliegbar"
+        elif day["tier"] == "conditional":
+            fs = (day.get("fly_summary") or "").rstrip(".")
+            head = fs.split(",")[0].strip() if fs else ""
+            day["reason_short"] = head or "Bedingt fliegbar"
+        else:
+            day["reason_short"] = ""
+
+        if day["tier"] in ("violet", "green") and day.get("region_groups"):
+            day["compact_top_region"] = day["region_groups"][0]
+        else:
+            day["compact_top_region"] = None
+
+        if day["tier"] == "none":
+            day["tier_color_strip"] = "#b91c1c"   # red-700 — "meiden"
+            day["tier_bg_strip"]    = "#fef2f2"
+        else:
+            day["tier_color_strip"] = day["tier_color"]
+            day["tier_bg_strip"]    = day["tier_bg"]
+
+        # Stichworte fuer "Pro Tag"-Cards: + (gut) / ! (schlecht)
+        # Quelle: fly_summary (Peak/Fenster) bzw. safety_summary ("Vorsicht: ...").
+        # Optional — nur setzen wenn nicht-trivial.
+        fs = day.get("fly_summary") or ""
+        if "," in fs:
+            # Prefix "Top-Bedingungen,"/"Solide Thermik," abschneiden,
+            # Rest sind die Stichpunkte (Peak, Fenster).
+            day["notable_good"] = fs.split(",", 1)[1].strip().rstrip(".")
+        else:
+            day["notable_good"] = ""
+
+        ss = day.get("safety_summary") or ""
+        if ss.lower().startswith("vorsicht"):
+            day["notable_bad"] = ss.replace("Vorsicht:", "").strip().rstrip(".")
+        else:
+            day["notable_bad"] = ""
+
     # Heatmap-Matrix der Subscriber-Regionen
     region_matrix = _build_region_matrix(days_out, subscriber_regions)
+
+    # Lead-Prosa (1-2 Saetze zur Wochen-Gesamtsituation)
+    week_lead = _week_summary_prose(days_out, warnings)
 
     # Kurzlabels fuer Heatmap-Kopfzeile (Mo/Di/Mi/...)
     day_short_labels = [d["label"].get("short", "") for d in days_out]
@@ -749,10 +872,13 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # auf genau diesen einen Spot (Focus-Modus mit "Alle anzeigen"-Clear).
     from urllib.parse import quote
     for day_idx, day in enumerate(days_out):
+        # Streifen-Link: Dashboard mit Subscriber-Regionen + diesem Tag
+        day["strip_url"] = f"{base}/briefing?regions={regions_csv}&day={day_idx}"
         for s in day["shown_spots"]:
             spot_q = quote(s.get("spot") or "", safe="")
             s["url"] = (f"{base}/briefing?regions={s['region_id']}"
                         f"&day={day_idx}&spot={spot_q}")
+
 
     # WhatsApp-Share: kurzer Text + Deep-Link. wa.me/?text=<URL-encoded>
     # Der Deep-Link enthaelt schon die Subscriber-Regionen + besten Tag,
@@ -782,13 +908,14 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         "briefing_weekday": _WEEKDAY_DE_LONG[today.weekday()],
         "kw": today.isocalendar().week,
         "region_matrix": region_matrix,
+        "week_lead": week_lead,
         "day_short_labels": day_short_labels,
         "tier_meta": _TIER_META,
     }
 
 
 def _verdict_headline(day: dict, spot: Optional[dict]) -> str:
-    """Ein-Satz-Headline fuer den Verdict-Block."""
+    """Ein-Satz-Headline fuer den Verdict-Block (voll, fuer Subject/Share/Preheader)."""
     weekday_long = _WEEKDAY_DE_LONG[datetime.fromisoformat(day["date"]).weekday()]
     if day["tier"] == "violet":
         if spot:
@@ -803,6 +930,33 @@ def _verdict_headline(day: dict, spot: Optional[dict]) -> str:
             return f"{weekday_long} bedingt — {spot['spot']} nur mit Vorsicht"
         return f"{weekday_long} bedingt fliegbar"
     return "Diese Woche nichts in deinen Regionen"
+
+
+def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
+    """Kompakte Headline fuer E-Mail-Hero.
+
+    Eyebrow zeigt bereits 'BESTER TAG · Donnerstag, 23.04.', die Tier-Pill rechts
+    zeigt 'FLIEGBAR'. Headline soll daher nur WAS/WO sagen — kein Wochentag,
+    kein 'Bester Tag', kein 'fliegbar'.
+    """
+    if not spot:
+        if day["tier"] == "violet":
+            return "Top-Bedingungen erwartet"
+        if day["tier"] == "green":
+            return "Solide Thermik"
+        if day["tier"] == "conditional":
+            return "Nur eingeschraenkt fliegbar"
+        return "Diese Woche nichts in deinen Regionen"
+
+    spot_name = spot.get("spot", "")
+    window = spot.get("window") or _format_window(spot.get("best_window", ""))
+    base = f"{spot_name}, {window}" if window else spot_name
+
+    if day["tier"] == "violet":
+        return f"{base} — legendaer"
+    if day["tier"] == "conditional":
+        return f"{base} — mit Vorsicht"
+    return base  # green: kein Modifier (Tier-Pill sagt schon "Fliegbar")
 
 
 def send_briefing_email(subscriber: dict, briefing_data: dict,
