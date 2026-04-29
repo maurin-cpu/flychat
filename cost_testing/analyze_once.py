@@ -12,12 +12,12 @@ Schreibt nach den ueblichen Pfaden:
 - data/cost_telemetry.jsonl  (eine neue Zeile)
 
 Aufruf:
-    GLEITCAST_SPOT_CSV=test python debug_scripts/analyze_once.py
+    GLEITCAST_SPOT_CSV=test python cost_testing/analyze_once.py
     # oder ohne ENV: nutzt config.py-Default (complete = 487 Spots, dauert lang)
 
 Empfohlene lokale Variante (28 Spots, ~3-5 Min):
     export GLEITCAST_SPOT_CSV=test
-    python debug_scripts/analyze_once.py
+    python cost_testing/analyze_once.py
 """
 from __future__ import annotations
 

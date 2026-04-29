@@ -3,15 +3,15 @@
 **Stand:** 2026-04-29
 **Ziel:** Jede LLM-Optimierung messbar machen — Kosten *und* Qualität — bevor sie produktiv geht.
 
-Schwester-Dokument: [`KOSTEN_REDUKTION_KONZEPT.md`](../KOSTEN_REDUKTION_KONZEPT.md) (Hebel & Strategie).
+Schwester-Dokument: [`strategie.md`](strategie.md) (Hebel & Strategie).
 
 ---
 
 ## TL;DR
 
-- **`debug_scripts/analyze_once.py`** — Smoke-Lauf: Wetter holen + LLM-Analyse einmal durchziehen. Schreibt `data/cost_telemetry.jsonl`.
-- **`debug_scripts/freeze_golden.py`** — friert Cases als Goldstandard ein (Wetter-Input + Output) in `tests/golden/`.
-- **`debug_scripts/score_regression.py`** — vergleicht aktuelles Pipeline-Output gegen Goldstandard, gibt PASS/FAIL.
+- **`cost_testing/analyze_once.py`** — Smoke-Lauf: Wetter holen + LLM-Analyse einmal durchziehen. Schreibt `data/cost_telemetry.jsonl`.
+- **`cost_testing/freeze_golden.py`** — friert Cases als Goldstandard ein (Wetter-Input + Output) in `cost_testing/golden/`.
+- **`cost_testing/score_regression.py`** — vergleicht aktuelles Pipeline-Output gegen Goldstandard, gibt PASS/FAIL.
 - **Lokal IMMER mit `GLEITCAST_SPOT_CSV=test`** (28 statt 487 Spots → ~$0.50 statt ~$8.70 pro Lauf).
 
 ---
@@ -74,7 +74,7 @@ Goldstandard friert **Wetter-Input + Output zusammen** ein. Beim späteren Score
 
 ### Schritt 1 — Daten erzeugen (oder vorhanden lassen)
 ```bash
-python debug_scripts/analyze_once.py
+python cost_testing/analyze_once.py
 ```
 - Schritt 1 (Wetter-Refresh): ~3-4 Min lokal, auch mit Cache (Validierung)
 - Schritt 2 (LLM-Analyse): ~2-3 Min, ~$0.50
@@ -82,9 +82,9 @@ python debug_scripts/analyze_once.py
 
 ### Schritt 2 — Goldstandard einfrieren
 ```bash
-python debug_scripts/freeze_golden.py --limit 20 --force
+python cost_testing/freeze_golden.py --limit 20 --force
 ```
-- Erzeugt `tests/golden/spot_<name>_<datum>.json` (12-20 Files je nach Daten-Vielfalt)
+- Erzeugt `cost_testing/golden/spot_<name>_<datum>.json` (12-20 Files je nach Daten-Vielfalt)
 - Ausgewogen: safe / conditional / not_safe / edge
 - `--force` überschreibt bestehende Files
 - `--dry-run` listet was geschrieben würde, ohne zu schreiben
@@ -106,14 +106,14 @@ Inhalt eines Golden-Files:
 
 **Schnell-Modus** (kein neuer LLM-Call, aktuelles `spot_analyses.json` vs Golden):
 ```bash
-python debug_scripts/score_regression.py --no-llm \
-    --report data/reg_$(date +%F).md
+python cost_testing/score_regression.py --no-llm \
+    --report cost_testing/reports/reg_$(date +%F).md
 ```
 
 **Voller Modus** (eingefrorenen Input durch aktuelle Pipeline schicken — ~$0.05 für 20 Calls):
 ```bash
-python debug_scripts/score_regression.py \
-    --report data/reg_$(date +%F).md
+python cost_testing/score_regression.py \
+    --report cost_testing/reports/reg_$(date +%F).md
 ```
 
 ### Vergleichs-Felder & Schwellen (kalibriert nach gemessener LLM-Jitter)
@@ -134,7 +134,7 @@ python debug_scripts/score_regression.py \
 - Score ≥ 90 %
 
 ### Report lesen
-`data/reg_<datum>.md` enthält pro abweichendem Case die genauen Diffs:
+`cost_testing/reports/reg_<datum>.md` enthält pro abweichendem Case die genauen Diffs:
 ```markdown
 ## Bergstation / 2026-05-01
 Score: 36/39
@@ -150,29 +150,29 @@ Score: 36/39
 export GLEITCAST_SPOT_CSV=test
 
 # 1. Baseline einfrieren (jetzt, vor jeder Änderung)
-python debug_scripts/analyze_once.py
-python debug_scripts/freeze_golden.py --limit 20 --force
+python cost_testing/analyze_once.py
+python cost_testing/freeze_golden.py --limit 20 --force
 
 # 2. CHANGE machen — Code, Prompt, Modus, Schwelle, was auch immer
 
 # 3. Neuer Lauf
-python debug_scripts/analyze_once.py
+python cost_testing/analyze_once.py
 
 # 4. Vergleich
-python debug_scripts/score_regression.py --no-llm \
-    --report data/reg_change_$(date +%F).md
+python cost_testing/score_regression.py --no-llm \
+    --report cost_testing/reports/reg_change_$(date +%F).md
 echo "Exit-Code: $?"
 ```
 
 - Exit `0` → PASS, Änderung qualitätsneutral, in Produktion ausrollen
-- Exit `1` → FAIL, `data/reg_*.md` zeigt welche Felder wandern, Änderung überdenken
+- Exit `1` → FAIL, `cost_testing/reports/reg_*.md` zeigt welche Felder wandern, Änderung überdenken
 
 ---
 
 ## 5. Bekannte Befunde aus dem Setup
 
 ### a) Parallel-Modus nutzt bereits Skill-Split
-Beobachtung aus den Logs: im `parallel`-Modus tauchen Phasen `region_safety`/`region_fly`/`spot_safety`/`spot_fly` auf — *nicht* `spot_combined`. Das heißt: Hebel 1 (Skill-Split) ist auch ohne Modus-Wechsel aktiv. Das `KOSTEN_REDUKTION_KONZEPT.md` war an dieser Stelle ungenau.
+Beobachtung aus den Logs: im `parallel`-Modus tauchen Phasen `region_safety`/`region_fly`/`spot_safety`/`spot_fly` auf — *nicht* `spot_combined`. Das heißt: Hebel 1 (Skill-Split) ist auch ohne Modus-Wechsel aktiv. Das `strategie.md` war an dieser Stelle ungenau.
 
 Konsequenz: Ein Wechsel von `parallel` auf `batch` bringt **nur den 50 %-Batch-API-Rabatt** — nicht zusätzlich Skill-Split-Effekt. Der Skill-Split ist überall gleich aktiv.
 
@@ -211,10 +211,10 @@ Das ist normaler `temperature=0.2` LLM-Jitter und nicht-vermeidbar ohne Code-Än
   cat data/config_overrides.json | grep LLM_ANALYSIS_MODE
   ```
   Falls `parallel` → in der Admin-UI auf `batch` wechseln (50 % Tokens-Rabatt durch Batch-API).
-- [ ] Auf dem Server `python debug_scripts/freeze_golden.py --limit 40` fahren mit der **Complete-CSV** (genug Daten für ein robustes 40-Case-Set). Dann nach jeder Optimierung `score_regression.py --no-llm` als Quality-Gate.
+- [ ] Auf dem Server `python cost_testing/freeze_golden.py --limit 40` fahren mit der **Complete-CSV** (genug Daten für ein robustes 40-Case-Set). Dann nach jeder Optimierung `score_regression.py --no-llm` als Quality-Gate.
 
 ### Tier B — Ersparnis bei niedrigem Risiko
-- [ ] **`temperature=0.0` als ENV/Overlay konfigurierbar machen** (Doku: `KOSTEN_REDUKTION_KONZEPT.md` §6 — eigentlich nicht direkt Kosten, aber Test-Determinismus). Implementierung: ~30 Min, in Produktion default `0.2`, in Tests `0.0`.
+- [ ] **`temperature=0.0` als ENV/Overlay konfigurierbar machen** (Doku: `strategie.md` §6 — eigentlich nicht direkt Kosten, aber Test-Determinismus). Implementierung: ~30 Min, in Produktion default `0.2`, in Tests `0.0`.
 - [ ] **`max_tokens` pro Phase prüfen**: P95/P99 der `completion_tokens` aus `cost_telemetry.jsonl` ablesen, Limits passend setzen.
 - [ ] **Pre-Filter-Regeln erweitern** (`engine/analyzers.py::_prefilter_not_safe`): jede neue Regel mit dem Goldstandard testen.
 
@@ -223,7 +223,7 @@ Das ist normaler `temperature=0.2` LLM-Jitter und nicht-vermeidbar ohne Code-Än
 - [ ] **Anthropic Prompt-Cache A/B**: `ANALYSIS_PROVIDER=anthropic` + `cache_control` einbauen, parallel zur OpenAI-Variante. Score-Vergleich entscheidet.
 
 ### Tier D — später
-- [ ] LLM-as-Judge für `summary`-Freitext-Felder (Konzept §6.3 in `KOSTEN_REDUKTION_KONZEPT.md`)
+- [ ] LLM-as-Judge für `summary`-Freitext-Felder (Konzept §6.3 in `strategie.md`)
 - [ ] Shadow-Test-Mode für riskantere Hebel (5 % Live-Traffic auf neue Variante, Vergleich nightly)
 - [ ] Multi-Provider-Router mit Fallback
 
@@ -235,10 +235,10 @@ Das ist normaler `temperature=0.2` LLM-Jitter und nicht-vermeidbar ohne Code-Än
 → Wetter-Cache nicht geladen. Skript ruft intern `eng.load_weather_from_cache()` — der lädt aus `data/wetterdaten.json`. Prüfen ob die Datei da und nicht leer.
 
 ### `score_regression.py` Exit 2 ("keine Goldstandard-Cases")
-→ `tests/golden/` ist leer. Vorher `freeze_golden.py` laufen lassen.
+→ `cost_testing/golden/` ist leer. Vorher `freeze_golden.py` laufen lassen.
 
 ### `score_regression.py` Exit 1 — FAIL nach Code-Änderung
-→ `data/reg_*.md` öffnen, pro Case die Diffs ansehen.
+→ `cost_testing/reports/reg_*.md` öffnen, pro Case die Diffs ansehen.
 - Nur `caution_notes`-Jitter? → akzeptabel, könnte LLM-Drift sein
 - `safety_status` / `flyability_tier` gewandert? → echter Quality-Loss, Änderung zurückrollen oder nachjustieren
 
@@ -254,19 +254,19 @@ Das ist normaler `temperature=0.2` LLM-Jitter und nicht-vermeidbar ohne Code-Än
 
 | Datei | Rolle |
 |---|---|
-| `debug_scripts/analyze_once.py` | Lokaler Smoke-Lauf (refresh_weather + LLM-Analyse einmal) |
-| `debug_scripts/freeze_golden.py` | Goldstandard einfrieren aus `data/spot_analyses.json` + Wetter-Cache |
-| `debug_scripts/score_regression.py` | Score-Vergleich aktuell vs Goldstandard, PASS/FAIL |
+| `cost_testing/analyze_once.py` | Lokaler Smoke-Lauf (refresh_weather + LLM-Analyse einmal) |
+| `cost_testing/freeze_golden.py` | Goldstandard einfrieren aus `data/spot_analyses.json` + Wetter-Cache |
+| `cost_testing/score_regression.py` | Score-Vergleich aktuell vs Goldstandard, PASS/FAIL |
 | `engine/_common.py::BatchCostTracker` | Aggregiert Tokens pro Phase, schreibt JSONL |
 | `engine/_common.py::extract_usage_from_response` | Liest Tokens aus OpenAI/Anthropic-Response |
 | `engine/analyzers.py::_record_call_usage` | Hook in jedem per-Call zum Tracker reporten |
 | `config.py::MODEL_PRICES` | USD/1M-Tokens, zentral pflegen |
 | `config.py::LLM_COST_CAP_USD` | Notbremse |
 | `config.py::COST_TELEMETRY_PATH` | Output-Pfad JSONL |
-| `tests/golden/*.json` | Eingefrorene Cases (gitignored — pro Branch/Server eigenes Set) |
+| `cost_testing/golden/*.json` | Eingefrorene Cases (gitignored — pro Branch/Server eigenes Set) |
 | `data/cost_telemetry.jsonl` | Telemetrie-Trend (gitignored, append-only) |
-| `data/reg_*.md` | Regressions-Reports pro Lauf (gitignored) |
-| `KOSTEN_REDUKTION_KONZEPT.md` | Übergeordnete Strategie & Hebel |
+| `cost_testing/reports/reg_*.md` | Regressions-Reports pro Lauf (gitignored) |
+| `strategie.md` | Übergeordnete Strategie & Hebel |
 
 ---
 
@@ -281,3 +281,59 @@ Drei `analyze_once`-Läufe wurden gemacht. Daraus:
 - 1 verbleibender Diff (Waldrand/2026-04-29: caution_notes Jaccard 0.00) bleibt absichtlich drin als ehrliches Drift-Signal
 
 **Tooling validiert. Bereit für echte Optimierungs-Tests.**
+
+---
+
+## 10. Hebel-Tests vom 2026-04-29
+
+Alle drei in `strategie.md` skizzierten Haupthebel wurden mit Test-CSV (28 Spots) gegen den 12-Case-Goldstandard getestet. Baseline: `parallel + gpt-4o-mini`, Mittel aus 2 Läufen = **$0.5125 / 158 s / 322 Calls**.
+
+### Ergebnis-Übersicht
+
+| Hebel | Effekt USD | Effekt Dauer | Quality | Empfehlung |
+|---|---|---|---|---|
+| 1 — Batch-API | nicht messbar (Lauf hängengeblieben) | Lauf > 53 Min ohne Verarbeitung | n/a | nachts wiederholen |
+| 2 — Trim Hazard-Blocks (21 KB → 16.5 KB) | **+8 %** ($0.5548) | +32 % (208 s) | **FAIL** 4 krit. | abhaken |
+| 3 — Provider-Wechsel zu Gemini Flash Lite | **-31 %** ($0.3533) | +98 % (314 s) | **FAIL** 5 krit. + 6 hohe + 1 `error`-State | nicht produktiv |
+
+### Hebel 1 — OpenAI Batch-API
+
+- ENV `LLM_ANALYSIS_MODE=batch` setzen reicht — keine Code-Änderung nötig
+- Lauf am Nachmittag eingereicht: 4 Batches sequenziell (region_safety/region_fly/spot_safety/spot_fly)
+- Batch 1 (Region-Safety, 145 Requests) hing **53 Min in OpenAI-Queue mit 0/145 verarbeitet**, dann manuell abgebrochen + via API gecancelled
+- Cache-Discount stapelt sich auf Batch-Discount → theoretisch ~50 % USD-Ersparnis bei freiem Queue-Window
+- **Vermutung:** US-Bürozeiten überlasten Free/Standard-Tier-Queue. Nächtlicher Cron könnte zuverlässig laufen.
+- Action: separater nächtlicher Test, keine Tagesversuche mehr
+
+### Hebel 2 — Hazard-Blocks-Datei trimmen
+
+- `skills/shared/_hazard_blocks.md` von 20'909 → 16'517 Bytes (-21 %) durch Tabellen-Konsolidierung von TREND-VOKABULAR + EINGEKESSELT-Sonderfällen
+- Sicherheits-Schwellen (cfg-Variablen, GROUNDING-REGEL, BÖEN-FLOOR, EINGEKESSELT-Logik) blieben 1:1 erhalten
+- **Quality-Drift trotzdem signifikant:** safety_status wanderte für Hummel 05-01 (safe→conditional), Tisch 05-01 (conditional→safe — *zu nachsichtig, gefährlich*), Weissenstein 05-01 (conditional→not_safe + flyability verloren)
+- **USD-Effekt sogar negativ:** mehr Total-Calls (345 vs 321), Cache-Hit fiel von 69 % → 61 % (Skill-Datei Cache-invalidiert), Lauf wurde 50 s länger
+- **Lehre:** Cache dominiert die Kosten. Strukturelle Änderung am System-Prompt verschiebt sowohl Cache-Hit als auch LLM-Verhalten. Trim-Hebel ist nicht trivial.
+- Datei wurde rückgerollt (`git checkout`)
+
+### Hebel 3 — Provider-Wechsel zu Gemini Flash Lite
+
+- Anthropic Haiku 4.5 wurde *vor* dem Test rechnerisch ausgeschlossen: Basispreise 7× Input / 8× Output gegen gpt-4o-mini → auch mit 90 %-Cache-Rabatt **4× teurer als Baseline**
+- Gemini 2.5 Flash Lite ist in `MODEL_PRICES` mit $0.10/M in / $0.025/M cached / $0.40/M out → -50 % theoretisch
+- `llm_client.py` hat funktionierenden Gemini-Adapter — nur ENV `ANALYSIS_PROVIDER=gemini` + `GEMINI_API_KEY` in `.env` nötig
+- **Real gemessen: -31 %** (cached_pct fiel von 69 % auf 63 %, mehr Output-Tokens 177k vs 109k)
+- **Häufige 503-Errors** ("model experiencing high demand") — Retries fingen sie ab, verdoppelten aber Laufzeit auf 314 s
+- Quality: 5 kritische Regressionen, dazu **1 hartes `error` an Bergstation 05-01** (vermutlich JSON-Parse-Fehler im Adapter)
+- **Pattern:** Tisch und Weissenstein wandern bei JEDEM Modell-/Prompt-Wechsel — sind echte Edge-Cases, nicht Zufalls-Jitter
+- Action: nicht produktiv setzen
+
+### Lehren
+
+1. **Kostenstruktur ist cache-dominiert.** Bei 69 % Cache-Hit auf gpt-4o-mini sind 73 % der Input-Kosten gecacht abgerechnet. Trim-Hebel verlieren dadurch viel ihrer rechnerischen Wirkung — *und* die Strukturänderung killt obendrein den Cache.
+2. **Modellwechsel = echte Quality-Drift.** Auch bei "äquivalenten" Light-Modellen verschieben sich safety_status-Schwellen, vor allem an Edge-Cases. Goldstandard fängt das zuverlässig ab — ohne den hätten wir es nicht gesehen.
+3. **Batch-API ist potenziell der größte Hebel,** aber nur wenn die Queue-Latenz im Cron-Window passt. Tests zu Bürozeiten sind Verschwendung.
+4. **`error`-State im Score-Report war hilfreich** — wird ohne Goldstandard nicht erkannt, weil produktiv nur "es lief halt 1 Spot weniger" auffällt.
+
+### Nächste Schritte
+
+- [ ] Nächtlicher Batch-Test (Hebel 1) via Server-Cron um 03:00. Wenn Queue durchläuft → produktiv schalten.
+- [ ] Tier-B-Hebel aus §6 (max_tokens-Tuning, Pre-Filter-Erweiterung) sind weiterhin offen und risikoarm.
+- [ ] Goldstandard sollte vor produktiven Skill-Edits standardmässig durchlaufen — speziell bei `_hazard_blocks.md`.

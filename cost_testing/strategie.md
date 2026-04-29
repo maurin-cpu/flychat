@@ -266,10 +266,10 @@ git show 396052e:chat_engine.py | sed -n '4250,4480p'
 ### Offen — kritisch vor dem nächsten Optimierungsschritt
 - ✅ **Per-Lauf Kosten-Telemetrie** umgesetzt: `BatchCostTracker` (`engine/_common.py`) loggt nach `data/cost_telemetry.jsonl`, eine Zeile pro `run_all_analyses_stream`-Lauf, mit Tokens/Phase + USD-Schätzung + Pre-Filter-Skip-Count. Funktioniert für Batch- UND Parallel-Modus.
 - ✅ **Cost-Cap als Notbremse**: ENV `LLM_COST_CAP_USD` (default 5.00) bricht Batch sauber ab.
-- ✅ **Goldstandard-Tooling**: `debug_scripts/freeze_golden.py` (Cases einfrieren) + `debug_scripts/score_regression.py` (Field-Level-Score + Acceptance-Gate). Auf dem Server auszuführen, wo `data/spot_analyses.json` + Wetter-Cache vorliegen.
+- ✅ **Goldstandard-Tooling**: `cost_testing/freeze_golden.py` (Cases einfrieren) + `cost_testing/score_regression.py` (Field-Level-Score + Acceptance-Gate). Auf dem Server auszuführen, wo `data/spot_analyses.json` + Wetter-Cache vorliegen.
 - ⚠ **Klarstellung Modus-Schalter:** `LLM_ANALYSIS_MODE` wird **nicht via `.env`** gesteuert, sondern via UI-Overlay (`config_overrides.py` + `data/config_overrides.json`, geschrieben durch den Admin-UI-Schalter "LLM-Analyse: parallel | batch"). `config.py:718` ist nur der Code-Default (`"parallel"`), den `config_overrides.init()` beim App-Start überschreibt. Aktuellen Wert prüfen: Admin-UI öffnen ODER `cat data/config_overrides.json` auf dem Server. Falls dort `"parallel"` steht → in der UI auf `"batch"` wechseln (erwartete Sofort-Ersparnis ~50%, Hebel 1 ist im Code bereits umgesetzt, läuft aber nur im batch-Pfad).
-- [ ] **Qualitäts-Baseline einfrieren**: `python debug_scripts/freeze_golden.py --limit 40` auf dem Server fahren, *bevor* der ENV-Schalter umgelegt wird. So hast du die Pre-Switch-Outputs als Vergleichsbasis.
-- [ ] **Regression-Diff Parallel ↔ Batch** auf Test-Set: nach Umschalten `python debug_scripts/score_regression.py --no-llm --report data/reg_<datum>.md` → bestätigt dass der Split-Flow gleichwertige Outputs liefert.
+- [ ] **Qualitäts-Baseline einfrieren**: `python cost_testing/freeze_golden.py --limit 40` auf dem Server fahren, *bevor* der ENV-Schalter umgelegt wird. So hast du die Pre-Switch-Outputs als Vergleichsbasis.
+- [ ] **Regression-Diff Parallel ↔ Batch** auf Test-Set: nach Umschalten `python cost_testing/score_regression.py --no-llm --report cost_testing/reports/reg_<datum>.md` → bestätigt dass der Split-Flow gleichwertige Outputs liefert.
 
 ### Offen — danach
 - [ ] **Hebel 2** (`shared/`-Trimming): nur nach grünem Quality-Gate, A/B mit LLM-as-Judge.
@@ -286,10 +286,10 @@ git show 396052e:chat_engine.py | sed -n '4250,4480p'
 ### 6.1 Goldstandard-Test-Set
 - **Umfang**: 8 Spots × 5 Tage × beide Modi (spot/region) = 40 Spot-Cases + 5–8 Region-Cases.
 - **Auswahl**: 2 klar `safe` (z.B. Sommer-Westwind-Tag), 2 `conditional` (Foehn-Grenzfall), 2 `not_safe` (Sturm/Gewitter), 2 Edge-Cases (Wechselwetter, Inversion).
-- **Speicherung**: `tests/golden/spot_<name>_<date>.json` — ein File pro Case, enthält:
+- **Speicherung**: `cost_testing/golden/spot_<name>_<date>.json` — ein File pro Case, enthält:
   - vollständiger `weather_context` (Input)
   - vollständiges Combined-Result aus letztem grünen Stand (Pre-Skill-Split)
-- **Erzeugung einmalig**: aus aktuellem `data/spot_analyses.json` extrahieren ODER über `debug_scripts/freeze_golden.py` (siehe §6.5).
+- **Erzeugung einmalig**: aus aktuellem `data/spot_analyses.json` extrahieren ODER über `cost_testing/freeze_golden.py` (siehe §6.5).
 
 ### 6.2 Field-Level Regression-Score (deterministisch)
 
@@ -352,15 +352,15 @@ Implementierung: ENV `SHADOW_PROVIDER=anthropic` + ENV `SHADOW_SAMPLE_RATE=0.1`.
 
 ### 6.5 Konkrete Skripte (Tooling)
 
-Neu zu erstellen unter `debug_scripts/`:
+Neu zu erstellen unter `cost_testing/`:
 
 | Skript | Zweck |
 |---|---|
-| `freeze_golden.py` | Liest 40 Cases aus aktuellem `spot_analyses.json` + matched Wetterkontext aus `weather_context.py`, schreibt `tests/golden/*.json`. Einmal-Lauf nach manueller Sichtung. |
+| `freeze_golden.py` | Liest 40 Cases aus aktuellem `spot_analyses.json` + matched Wetterkontext aus `weather_context.py`, schreibt `cost_testing/golden/*.json`. Einmal-Lauf nach manueller Sichtung. |
 | `score_regression.py` | Lädt Golden-Set, fährt aktuellen Pipeline gegen die gefrorenen Inputs, berechnet Score gemäß §6.2, schreibt Report `data/regression_<date>.md` mit Field-Diffs. |
 | `judge_summaries.py` | Ruft LLM-Judge auf alle `summary`-Diffs aus dem letzten `score_regression`-Lauf, schreibt `data/judge_<date>.jsonl`. |
 
-CLI-Lauf vor jedem Hebel-PR: `python debug_scripts/score_regression.py && python debug_scripts/judge_summaries.py`. Mergen ist blockiert wenn ein Skript exit-code ≠ 0.
+CLI-Lauf vor jedem Hebel-PR: `python cost_testing/score_regression.py && python cost_testing/judge_summaries.py`. Mergen ist blockiert wenn ein Skript exit-code ≠ 0.
 
 ### 6.6 Umsetzungs-Reihenfolge §6
 1. **Goldstandard einfrieren** (jetzt — *bevor* weitere Hebel angefasst werden, sonst gibt es nichts mehr zum Vergleichen).

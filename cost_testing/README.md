@@ -2,7 +2,7 @@
 
 **Letzte Session:** 2026-04-29 — Tooling fertig & validiert. Bereit für echte Optimierungs-Hebel.
 
-> **Für Claude in neuer Session:** Dies ist der Wiedereinstiegspunkt für die laufende Arbeit am LLM-Kostenproblem. Volldoku in [`docs/TESTING_KOSTEN_QUALITAET.md`](docs/TESTING_KOSTEN_QUALITAET.md), Strategie in [`KOSTEN_REDUKTION_KONZEPT.md`](KOSTEN_REDUKTION_KONZEPT.md).
+> **Für Claude in neuer Session:** Dies ist der Wiedereinstiegspunkt für die laufende Arbeit am LLM-Kostenproblem. Volldoku in [`doku.md`](doku.md), Strategie in [`strategie.md`](strategie.md).
 
 ---
 
@@ -28,11 +28,11 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 | Cost-Telemetrie pro Lauf | `engine/_common.py::BatchCostTracker`, `engine/analyzers.py` |
 | Cost-Cap Notbremse | `config.LLM_COST_CAP_USD` (default 5.00) |
 | Modell-Preise | `config.MODEL_PRICES` (7 Modelle) |
-| Smoke-Lauf | `debug_scripts/analyze_once.py` |
-| Goldstandard einfrieren | `debug_scripts/freeze_golden.py` |
-| Regression-Score (kalibriert) | `debug_scripts/score_regression.py` |
-| Konzept-Doku | `KOSTEN_REDUKTION_KONZEPT.md` (Status §5, Quality §6, Cost §7) |
-| Test-Doku | `docs/TESTING_KOSTEN_QUALITAET.md` |
+| Smoke-Lauf | `cost_testing/analyze_once.py` |
+| Goldstandard einfrieren | `cost_testing/freeze_golden.py` |
+| Regression-Score (kalibriert) | `cost_testing/score_regression.py` |
+| Konzept-Doku | `strategie.md` (Status §5, Quality §6, Cost §7) |
+| Test-Doku | `doku.md` |
 
 **Validierungs-Stand:** 2 lokale Läufe gemacht, Score-Schwellen an gemessenen LLM-Jitter angepasst → Re-Run mit kalibrierten Schwellen ergab **99.4 % PASS**. Tooling ist ehrlich.
 
@@ -40,7 +40,7 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 - `data/wetterdaten.json` (warm)
 - `data/spot_analyses.json` (Lauf 2)
 - `data/cost_telemetry.jsonl` (2 Zeilen)
-- `tests/golden/*.json` (12 Cases)
+- `cost_testing/golden/*.json` (12 Cases)
 
 ---
 
@@ -69,8 +69,8 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 - [ ] Erwarteter Effekt: nächster Produktionslauf ~50 % günstiger durch Batch-API-Rabatt
 
 ### Auf dem Server Goldstandard erzeugen (10 Min)
-- [ ] `python debug_scripts/freeze_golden.py --limit 40` (mit Complete-CSV → mehr Variation)
-- [ ] Sanity: `python debug_scripts/score_regression.py --no-llm` → muss PASS sein
+- [ ] `python cost_testing/freeze_golden.py --limit 40` (mit Complete-CSV → mehr Variation)
+- [ ] Sanity: `python cost_testing/score_regression.py --no-llm` → muss PASS sein
 
 ### Tier B — moderate Hebel mit Quality-Gate
 - [ ] **`temperature` konfigurierbar machen** (~30 Min Code)
@@ -105,15 +105,15 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 export GLEITCAST_SPOT_CSV=test
 
 # Baseline einfrieren (vor Änderung)
-python debug_scripts/analyze_once.py
-python debug_scripts/freeze_golden.py --limit 20 --force
+python cost_testing/analyze_once.py
+python cost_testing/freeze_golden.py --limit 20 --force
 
 # CHANGE machen — Code, Prompt, Modus, ...
 
 # Vergleichs-Lauf
-python debug_scripts/analyze_once.py
-python debug_scripts/score_regression.py --no-llm \
-    --report data/reg_change_$(date +%F).md
+python cost_testing/analyze_once.py
+python cost_testing/score_regression.py --no-llm \
+    --report cost_testing/reports/reg_change_$(date +%F).md
 echo "Exit-Code: $?"   # 0 = PASS, 1 = FAIL
 ```
 
@@ -121,5 +121,5 @@ echo "Exit-Code: $?"   # 0 = PASS, 1 = FAIL
 
 ## Bei Problemen
 
-- Detailliertes Troubleshooting in `docs/TESTING_KOSTEN_QUALITAET.md` §7
-- Konzept-Strategie in `KOSTEN_REDUKTION_KONZEPT.md`
+- Detailliertes Troubleshooting in `doku.md` §7
+- Konzept-Strategie in `strategie.md`

@@ -1,10 +1,10 @@
 """Goldstandard-Test-Set einfrieren — fuer Regressions-Pruefung.
 
 Liest aktuelle Analysen (data/spot_analyses.json) + den dazu passenden
-Wetter-Kontext und legt pro Case eine JSON-Datei in tests/golden/ ab.
+Wetter-Kontext und legt pro Case eine JSON-Datei in cost_testing/golden/ ab.
 
 Format:
-    tests/golden/spot_<name>_<date>.json:
+    cost_testing/golden/spot_<name>_<date>.json:
     {
         "spot":   "<name>",
         "date":   "YYYY-MM-DD",
@@ -15,9 +15,9 @@ Format:
     }
 
 Aufruf:
-    python debug_scripts/freeze_golden.py --limit 40
-    python debug_scripts/freeze_golden.py --safety safe --limit 8
-    python debug_scripts/freeze_golden.py --spot Balderen --date 2026-04-30
+    python cost_testing/freeze_golden.py --limit 40
+    python cost_testing/freeze_golden.py --safety safe --limit 8
+    python cost_testing/freeze_golden.py --spot Balderen --date 2026-04-30
 
 Auf dem Server ausfuehren, wo data/spot_analyses.json + frische Wetterdaten
 (weather_data Cache) vorliegen. Lokal ohne diese Daten gibt es ein leeres
@@ -52,7 +52,7 @@ if str(_REPO) not in sys.path:
 
 import config  # noqa: E402
 
-GOLDEN_DIR = _REPO / "tests" / "golden"
+GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 ANALYSES_PATH = _REPO / "data" / "spot_analyses.json"
 
 

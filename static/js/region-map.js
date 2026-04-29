@@ -157,6 +157,13 @@
             zoomControl: true,
         });
 
+        // Expose the Leaflet map instance under a non-colliding name.
+        // `window.regionMap` is otherwise the implicit-global DIV element
+        // (id="regionMap"), which has no invalidateSize() — so the resize/
+        // tab-switch hooks in regionen.html were silent no-ops, leaving the
+        // map blank-white until a later zoom/pan forced a redraw.
+        window.regionMap = map;
+
         // Light map tiles — readable in sunshine
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
@@ -333,9 +340,55 @@
         Object.keys(regionLayersByName).forEach(function (rid) {
             var layer = regionLayersByName[rid];
             var ra = regionAnalyses[rid];
-            if (!ra) return;
-            var dayData = ra[dateStr];
-            if (!dayData) return;
+            var dayData = ra ? ra[dateStr] : null;
+
+            // Polygon existiert, aber keine Analyse fuer dieses Datum (Cache zu alt /
+            // Region neu in CSV / Refresh-Job uebersprungen). No-Data-Fill statt
+            // Default-Outline, damit Pilot sofort sieht "Polygon da, Daten fehlen".
+            if (!dayData) {
+                var ndStyle = mapRegionStyle('no_data', null);
+                layer.setStyle({
+                    fill: true,
+                    fillColor: ndStyle.fill,
+                    fillOpacity: ndStyle.fillOpacity,
+                    color: ndStyle.border,
+                    weight: 1.2,
+                    opacity: ndStyle.borderOpacity,
+                    dashArray: '4, 4'
+                });
+                var zoom = map.getZoom();
+                if (zoom >= 7) {
+                    var ndCenter = layer.getBounds().getCenter();
+                    var ndHtml;
+                    if (zoom < 9) {
+                        ndHtml = '<div style="width:10px;height:10px;border-radius:50%;'
+                            + 'background:#9ca3af;'
+                            + 'box-shadow:0 0 0 2px rgba(255,255,255,0.85),0 1px 3px rgba(0,0,0,0.2);'
+                            + '"></div>';
+                        labelMarkersGroup.addLayer(L.marker(ndCenter, {
+                            icon: L.divIcon({ className: 'region-label', html: ndHtml,
+                                iconSize: [12, 12], iconAnchor: [6, 6] }),
+                            interactive: false
+                        }));
+                    } else {
+                        ndHtml = '<div style="display:inline-block;'
+                            + 'transform:translate(-50%,-50%);'
+                            + 'font-size:11px;font-weight:600;color:#fff;'
+                            + 'background:#6b7280;padding:3px 10px;border-radius:999px;'
+                            + 'white-space:nowrap;'
+                            + 'box-shadow:0 1px 3px rgba(0,0,0,0.18),0 0 0 1.5px rgba(255,255,255,0.7);'
+                            + '">? Keine Daten</div>';
+                        labelMarkersGroup.addLayer(L.marker(ndCenter, {
+                            icon: L.divIcon({ className: 'region-label', html: ndHtml,
+                                iconSize: [0, 0], iconAnchor: [0, 0] }),
+                            interactive: false
+                        }));
+                    }
+                }
+                layer.setTooltipContent('<b>' + layer.regionName + '</b>'
+                    + '<br><span style="color:#6b7280;">Keine Analyse fuer diesen Tag</span>');
+                return;
+            }
 
             var safety = dayData.safety_status;
             var quality = getQuality(dayData);

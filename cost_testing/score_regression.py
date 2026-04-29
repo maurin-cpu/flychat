@@ -1,6 +1,6 @@
 """Regression-Score: aktueller Pipeline gegen eingefrorenen Goldstandard.
 
-Liest tests/golden/*.json (erzeugt von freeze_golden.py) und vergleicht
+Liest cost_testing/golden/*.json (erzeugt von freeze_golden.py) und vergleicht
 das aktuelle Engine-Output mit dem eingefrorenen Output.
 
 Vergleichs-Felder + Gewichte (kalibriert nach gemessener LLM-Jitter mit
@@ -21,9 +21,9 @@ Acceptance-Gate (Exit-Code != 0 wenn verletzt):
   - Gewichteter Score >= 90% des Maximums
 
 Aufruf:
-    python debug_scripts/score_regression.py
-    python debug_scripts/score_regression.py --report data/regression_2026-04-29.md
-    python debug_scripts/score_regression.py --no-llm  # ueberspringt neue Analyse, vergleicht nur Output
+    python cost_testing/score_regression.py
+    python cost_testing/score_regression.py --report data/regression_2026-04-29.md
+    python cost_testing/score_regression.py --no-llm  # ueberspringt neue Analyse, vergleicht nur Output
 
 Modi:
     Default: laedt Engine, sendet input von Golden an Pipeline, vergleicht mit golden output.
@@ -43,7 +43,7 @@ _REPO = Path(__file__).resolve().parent.parent
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
-GOLDEN_DIR = _REPO / "tests" / "golden"
+GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 
 WEIGHTS = {
     "safety_status":   ("kritisch", 10),

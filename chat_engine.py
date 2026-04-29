@@ -231,7 +231,13 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
             logger.error(f"Fehler beim Speichern der History {session_id}: {e}")
 
     def _load_analyses_cache(self):
-        """Laedt Spot- und Region-Analysen aus den lokalen JSON-Caches."""
+        """Laedt Spot- und Region-Analysen aus den lokalen JSON-Caches.
+
+        Beim Laden werden Region-Analysen gegen die aktuelle regionen.csv
+        gefiltert: verwaiste Eintraege (Region-IDs die nicht mehr existieren,
+        z.B. nach einem Rename in der CSV) werden verworfen, damit sie nicht
+        mehr ans Frontend ausgeliefert werden und den Cache aufblaehen.
+        """
         if self.analyses_file.exists():
             try:
                 with open(self.analyses_file, "r", encoding="utf-8") as f:
@@ -243,12 +249,40 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         if self.region_analyses_file.exists():
             try:
                 with open(self.region_analyses_file, "r", encoding="utf-8") as f:
-                    self.region_analyses = json.load(f)
-                    self.region_analyses_loaded_at = datetime.fromtimestamp(
-                        self.region_analyses_file.stat().st_mtime)
-                print(f"[ENGINE] {len(self.region_analyses)} Region-Analysen aus JSON-Cache geladen.")
+                    raw = json.load(f)
+                self.region_analyses = self._filter_stale_region_analyses(raw)
+                self.region_analyses_loaded_at = datetime.fromtimestamp(
+                    self.region_analyses_file.stat().st_mtime)
+                dropped = len(raw) - len(self.region_analyses)
+                if dropped > 0:
+                    print(f"[ENGINE] {len(self.region_analyses)} Region-Analysen aus JSON-Cache geladen "
+                          f"({dropped} verwaiste Eintraege verworfen).")
+                else:
+                    print(f"[ENGINE] {len(self.region_analyses)} Region-Analysen aus JSON-Cache geladen.")
             except Exception as e:
                 logger.error(f"Fehler beim Laden des Region-Analyse-Caches: {e}")
+
+    def _filter_stale_region_analyses(self, raw):
+        """Filtert verwaiste Region-IDs (nicht mehr in regionen.csv) aus dem Cache.
+
+        Wird nur beim Cache-Load aufgerufen — bewahrt die Frontend-Karte davor,
+        graue Default-Outlines fuer Regionen anzuzeigen, deren Polygone gar nicht
+        mehr existieren, oder fuer Polygone, deren Analyse-Daten noch unter alten
+        IDs im Cache liegen. Stale-Bereinigung passiert erst beim naechsten
+        Region-Refresh, der dann die korrekten neuen IDs schreibt.
+        """
+        if not isinstance(raw, dict):
+            return {}
+        try:
+            valid_ids = {r["id"] for r in get_all_regions()}
+        except Exception as e:
+            logger.error(f"regionen.csv Lookup fuer Cache-Filter fehlgeschlagen: {e}")
+            return raw  # Fallback: nicht filtern statt alles zu verlieren
+        filtered = {rid: days for rid, days in raw.items() if rid in valid_ids}
+        stale = set(raw.keys()) - valid_ids
+        if stale:
+            logger.info(f"Verworfene verwaiste Region-IDs im Cache: {sorted(stale)}")
+        return filtered
 
     def _save_analyses_cache(self):
         """Speichert Spot-Analysen in den lokalen JSON-Cache."""
