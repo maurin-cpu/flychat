@@ -333,8 +333,9 @@
 
 {% block content %}
 <div class="unified-layout">
-    <!-- Links: Chat -->
+    <!-- Links: Chat (gesperrt fuer anonyme User) -->
     <aside class="chat-sidebar" id="chatSidebar">
+        {% if is_logged_in %}
         <div class="chat-container">
             <div class="chat-header">
                 <span class="chat-title">Chat-Berater <span class="beta-badge">Beta</span></span>
@@ -373,6 +374,32 @@
                 </button>
             </div>
         </div>
+        {% else %}
+        <div class="chat-locked">
+            <div class="chat-locked__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="11" width="16" height="10" rx="2"/>
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+                </svg>
+            </div>
+            <h2 class="chat-locked__title">5-Tage-Vorhersage freischalten</h2>
+            <p class="chat-locked__lead">
+                Du siehst aktuell nur <strong>heute</strong>.
+                Mit Login bekommst du <strong>volle 5 Tage</strong> &mdash; <strong>kostenlos</strong>.
+            </p>
+            <ul class="chat-locked__list">
+                <li><strong>5 Tage</strong> Vorhersage statt 1</li>
+                <li><strong>Chat-Berater</strong> <span class="beta-badge beta-badge--inline">Beta</span> mit Live-Wetter-Daten</li>
+                <li><strong>E-Mail-Briefing</strong> an deinen Wunschtagen</li>
+            </ul>
+            <button type="button" class="chat-locked__cta" id="chatLockedLoginBtn">
+                Gratis einloggen
+            </button>
+            <p class="chat-locked__hint">
+                Login ist <strong>kostenlos</strong>. Noch kein Konto? Wird automatisch angelegt.
+            </p>
+        </div>
+        {% endif %}
     </aside>
 
     <div class="resizer" id="resizer"></div>
@@ -419,8 +446,21 @@
 <script defer src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/foehn_diagram.js') }}?v={{ static_v('js/foehn_diagram.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/region-map.js') }}?v={{ static_v('js/region-map.js') }}"></script>
+{% if is_logged_in %}
 <script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/chat.js') }}?v={{ static_v('js/chat.js') }}"></script>
+{% else %}
+<script>
+// Anonyme User: Chat-Sperrkarte oeffnet das Login-Modal beim Klick auf den CTA.
+document.addEventListener('DOMContentLoaded', function () {
+    var btn = document.getElementById('chatLockedLoginBtn');
+    var loginBtn = document.getElementById('navLoginBtn');
+    if (btn && loginBtn) {
+        btn.addEventListener('click', function () { loginBtn.click(); });
+    }
+});
+</script>
+{% endif %}
 <script>
 (function () {
     var STORAGE_KEY = 'gleitcast_sidebar_width';

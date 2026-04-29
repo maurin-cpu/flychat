@@ -42,7 +42,9 @@ SUPABASE_URL=https://<ref>.supabase.co
 SUPABASE_ANON_KEY=...
 
 # Domain-URL — zeigt in allen Mail-Links + Deep-Links auf
-GLEITCAST_BASE_URL=https://gleitcast.ch
+# WICHTIG: app.gleitcast.ch (Flask-App), NICHT gleitcast.ch (Marketing-Page)
+GLEITCAST_BASE_URL=https://app.gleitcast.ch
+GLEITCAST_MARKETING_URL=https://gleitcast.ch
 
 # Infomaniak SMTP
 SMTP_HOST=mail.infomaniak.com
@@ -279,6 +281,7 @@ Wenn alle 12 Punkte gruen: MVP ist launch-fertig.
 | `SMTP Auth fehlgeschlagen` | Passwort falsch oder Mailbox nicht freigeschaltet | Infomaniak-Kundenbereich pruefen |
 | `relation "subscribers" does not exist` | Migration `002_subscribers.sql` nicht gelaufen | Teil A1 ausfuehren |
 | Links zeigen auf `https://example.invalid/...` | `GLEITCAST_BASE_URL` nicht gesetzt | `.env` setzen + Server neu starten |
+| Links zeigen auf `http://localhost:5000/...` | `GLEITCAST_BASE_URL` zeigt auf localhost (Dev-Wert) | In `/home/deploy/flychat/.env` auf `https://app.gleitcast.ch` setzen + `sudo systemctl restart gleitcast` |
 | `/preview/briefing` → 503 | Engine noch nicht geladen (Vercel-Kaltstart) | Nach 30s nochmal laden |
 | Scheduler sendet nichts | `GLEITCAST_BRIEFINGS=0` oder keine aktiven Subscriber | Log pruefen, `SELECT * FROM subscribers WHERE status='active';` |
 | Briefing-Link im Dashboard filtert nicht | Browser-Cache | Hard-Reload (Ctrl+Shift+R), static-file-Version pruefen |

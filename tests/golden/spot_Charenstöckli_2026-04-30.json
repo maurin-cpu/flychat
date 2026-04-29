@@ -1,0 +1,75 @@
+{
+  "spot": "Charenstöckli",
+  "date": "2026-04-30",
+  "frozen_at": "2026-04-29T11:11:19+00:00",
+  "frozen_at_commit": "b46ba27",
+  "safety_status": "conditional",
+  "input": "WETTERDATEN FÜR: Charenstöckli — TAG: 2026-04-30 (Donnerstag) (Stand: 2026-04-29T11:28:13.269747)\n═══ SPOT: Charenstöckli (Fronalpstock / Stoos, Schwyz) ═══\nHöhe: 1807m MSL | Windrichtung erlaubt: N-O (0°-90° inkl. 10° Buffer) | Max. Wind: 30 km/h | Kritischer Föhn: Süd\nBemerkung: Alternativstartplatz bei starkem N-NO Wind am Gipfel.\n2026-04-30 10:00: Temp 5.7°C | Wind 3.5km/h aus 66° (Turbulenzrisiko 13.0km/h, Exzess +10km/h) [WIND-OK] [SHEAR-DEGRADED] [THERMAL-TORN-UNUSABLE] | Wolkenbasis wolkenfrei | Bewölkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1807–3314m MSL | 850hPa(1524m): 3/12km/h aus 141° | 800hPa(2021m)*: 9/18km/h aus 158° | 700hPa(3095m)*: 14/16km/h aus 52° | THERMIK-PROXY: 1.3 m/s bis 2314m MSL, LCL/Basis 2506m (Güte: 5/10) | TQ 0/1 sauber, 1/1 ROUGH-DEG, 1/1 SHEAR-DEG, 1/1 TORN-UNU\n2026-04-30 11:00: Temp 6.1°C | Wind 3.2km/h aus 27° (Turbulenzrisiko 13.0km/h, Exzess +10km/h) [WIND-OK] [SHEAR-DEGRADED] [THERMAL-TORN-DEGRADED] | Wolkenbasis wolkenfrei | Bewölkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1807–3339m MSL | 850hPa(1526m): 1/10km/h aus 360° | 800hPa(2024m)*: 8/17km/h aus 153° | 700hPa(3098m)*: 14/16km/h aus 56° | THERMIK-PROXY: 1.5 m/s bis 2339m MSL, LCL/Basis 2339m (Güte: 7/10) | TQ 0/1 sauber, 1/1 SHEAR-DEG, 1/1 TORN-UNU\n2026-04-30 12:00: Temp 7.1°C | Wind 3.1km/h aus 21° (Turbulenzrisiko 13.7km/h, Exzess +11km/h) [WIND-OK] | Wolkenbasis wolkenfrei | Bewölkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1807–3525m MSL | 850hPa(1525m): 4/13km/h aus 337° | 800hPa(2025m)*: 6/16km/h aus 162° | 700hPa(3100m)*: 16/18km/h aus 67° | THERMIK-PROXY: 1.7 m/s bis 2525m MSL, LCL/Basis 2647m (Güte: 7/10) | TQ 0/1 sauber, 1/1 ROUGH-DEG, 1/1 TORN-UNU\n2026-04-30 13:00: Temp 7.5°C | Wind 4.5km/h aus 29° (Turbulenzrisiko 15.8km/h, Exzess +11km/h) [WIND-OK] | Wolkenbasis wolkenfrei | Bewölkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1807–3442m MSL | 850hPa(1524m): 8/18km/h aus 332° | 800hPa(2024m)*: 4/15km/h aus 144° | 700hPa(3100m)*: 14/16km/h aus 74° | THERMIK-PROXY: 1.9 m/s bis 2442m MSL, LCL/Basis 2442m (Güte: 7/10) | TQ 1/1 sauber\n2026-04-30 14:00: Temp 8.0°C | Wind 6.0km/h aus 17° (Turbulenzrisiko 18.0km/h, Exzess +12km/h) [WIND-OK] [SHEAR-DEGRADED] [THERMAL-TORN-DEGRADED] | Wolkenbasis wolkenfrei | Bewölkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1807–3420m MSL | 850hPa(1525m): 8/19km/h aus 341° | 800hPa(2025m)*: 1/13km/h aus 27° | 700hPa(3103m)*: 11/13km/h aus 83° | THERMIK-PROXY: 2.0 m/s bis 2420m MSL, LCL/Basis 2420m (Güte: 7/10) | TQ 0/1 sauber, 1/1 SHEAR-DEG, 1/1 TORN-UNU\n2026-04-30 15:00: Temp 8.4°C | Wind 8.1km/h aus 21° (Turbulenzrisiko 20.9km/h, Exzess +13km/h) [WIND-OK] | Wolkenbasis wolkenfrei | Bewölkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1807–3498m MSL | 850hPa(1527m): 9/21km/h aus 340° | 800hPa(2026m)*: 6/18km/h aus 27° | 700hPa(3105m)*: 5/8km/h aus 111° | THERMIK-PROXY: 2.1 m/s bis 2498m MSL, LCL/Basis 2498m (Güte: 7/10) | TQ 0/1 sauber, 1/1 ROUGH-DEG, 1/1 TORN-DEG\n2026-04-30 16:00: Temp 8.6°C | Wind 8.6km/h aus 15° (Turbulenzrisiko 21.6km/h, Exzess +13km/h) [WIND-OK] | Wolkenbasis wolkenfrei | Bewölkung 0% (tief 0%, mittel 0%, hoch 0%) | FLUGBEREICH: 1807–3577m MSL | 850hPa(1528m): 10/22km/h aus 335° | 800hPa(2027m)*: 8/20km/h aus 27° | 700hPa(3106m)*: 4/7km/h aus 164° | THERMIK-PROXY: 2.0 m/s bis 2577m MSL, LCL/Basis 2577m (Güte: 7/10) | TQ 0/1 sauber, 1/1 ROUGH-DEG\n\n═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══\n[WIND-OK] Stunden (7): 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00\n[WIND-WRONG] Stunden (0): KEINE  (= nicht startbar, KEIN UNFLIEGBAR-Grund)\nSaubere Stunden (7): 10:00, 11:00, 12:00, 13:00, 14:00, 15:00, 16:00 (WIND-OK UND keine DANGER-Tags)\nSaubere Start-Fenster: 10:00-17:00 (7h)\nLaengstes Fenster (= Status-Basis): 7h\n→ Start-Fenster 7h >= 3h: safety_status safe oder conditional moeglich. WIND-WRONG NACH dem Fenster ist KEIN UNFLIEGBAR-Grund.\n→ ANMERKUNG Richtungsdreher: Max Richtungsdreher 45° zwischen 10:00 und 12:00 (2h Drift) (>= 45°-Schwelle). In wind_summary erwaehnen (NICHT in caution_notes — Drehung ist Tagesverlauf-Info, keine Sicherheits-Warnung). KEIN Status-Downgrade, KEINE Tier-Aenderung (safety_status + fly_status/flyability_tier bleiben wie ermittelt: violet bleibt violet, green bleibt green, gray/bronze bleibt gray/bronze).\n\n═══ TAGESPROFIL (für ganzheitliche Beurteilung) ═══\nFlugfenster ausgewertet: 7h (zwischen 10:00 und 17:00)\nVerhältnis sauber/gesamt: 7/7h = 100%\nHauptgefahren am Tag: THERMAL-TORN-UNUSABLE 1h, SHEAR-DEGRADED 3h, THERMAL-TORN-DEGRADED 2h\n\n═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══\n10:00:clean · 11:00:clean · 12:00:clean · 13:00:clean · 14:00:clean · 15:00:clean · 16:00:clean\n→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen zwei gefaehrlichen = NICHT als stabiles Fenster werten).\n\n═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══\n10:00:UNUSABLE(TORN) · 11:00:produktiv(1.5) · 12:00:produktiv(1.7) · 13:00:produktiv(1.9) · 14:00:produktiv(2.0) · 15:00:produktiv(2.1) · 16:00:produktiv(2.0)\n→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · degraded = ruppig aber fliegbar · unusable = Thermik unbrauchbar (Klapper/Scherung) · keine-thermik = kein Steigen.\n→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): TORN-UNUSABLE 1h, TORN-DEGRADED 2h, SHEAR-DEGRADED 3h, sauber 4h von 7 Thermik-Stunden. ROUGH-UNUSABLE-Anteil: 0% (0/7h), Gesamt-UNUSABLE-Anteil: 14% (1/7h). Peak-Steigen (Proxy): 2.1 m/s.\n  TORN-/SHEAR-UNUSABLE sind reine Qualitaets-Issues (zerrissene/gekippte Thermik). Sie degradieren MAXIMAL violet→green. KEIN gray-Downgrade wegen TORN/SHEAR. Der Tag bleibt Thermikflug-tauglich, Bart-Zentrierung ist nur schwieriger.\n→ PRODUKTIVE-THERMIK: 7h (Climb ≥0.7 m/s, tief ≤80%, mittel ≤90%, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). Min für green-Tag: 4h. HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar).\nWIND-TREND: STABIL — Keine signifikante Verschlechterung nach dem Fenster.\n\n═══ FÖHN-INDIKATOR ═══\nLevel: Föhn-Vorsicht | Delta-P: 4.3 hPa | Kammwind: 26.0 km/h aus 83°\nLuftfeuchtigkeit Nord: 29%\nFöhn-Vorsicht: ΔP oder Höhenwind erhöht. An exponierten Stellen vorsichtig sein. Föhn kann unvorhersehbar durchgreifen.\n  - Delta-P (Südföhn): 4.3 hPa\n  - Südföhn Delta-P >= 4 hPa -> Vorsicht\n  - Höhenwind 700 hPa: 26 km/h aus 83°\n  - Luftfeuchtigkeit (Nord): 29%\n  - Trockene Föhnluft im Tal\n  - Böigkeit: 2.2× (turbulent)\n  - Starke Böen → zusätzliche Vorsicht\n\n### REGION-KONTEXT (bereits analysiert) ###\nRegion-Kontext: nicht verfuegbar (Region: Zentralschweizer Voralpen).\n→ Bewerte Streckenflug NUR anhand der Spot-Daten. streckenflug.tier max 'moderat', region_context_available=false, summary erwaehnt explizit: 'Region-Kontext fehlt — reine Spot-Einschaetzung.'",
+  "output": {
+    "safety": {
+      "safety_status": "conditional",
+      "safe_window": "10:00-17:00",
+      "no_go_reasons": [],
+      "caution_notes": [
+        "Wind: Richtungsdreher um 45° zwischen 10:00 und 12:00.",
+        "Foehn-Vorsicht: Südfoehn ΔP 4.3 hPa — an exponierten Stellen vorsichtig."
+      ],
+      "primary_no_go": null,
+      "primary_caution": null,
+      "primary_reducer": null,
+      "primary_booster": null,
+      "wind_summary": "Der Wind bleibt während des Tages stabil und liegt unter 10 km/h. Es gab einen Richtungsdreher von 45° zwischen 10:00 und 12:00, jedoch bleibt die Richtung im erlaubten Sektor. Die Windgeschwindigkeit ist durchgehend moderat und sicher für den Flug.",
+      "wind_shear": "Es wurde keine signifikante Scherung festgestellt, die Bedingungen sind stabil und unauffällig.",
+      "foehn_risk": "moderate",
+      "summary": "Der Sicherheitsstatus für den Tag ist bedingt sicher. Es gibt ein sicheres Zeitfenster von 10:00 bis 17:00 Uhr. Die Hauptgefahr ist der Föhn mit einem Delta-P von 4.3 hPa, was erhöhte Vorsicht erfordert. Zudem gab es einen Richtungsdreher um 45° zwischen 10:00 und 12:00, was in der Windzusammenfassung erwähnt wird. Piloten sollten sich der Möglichkeit unvorhersehbarer Windänderungen bewusst sein.",
+      "spot": "Charenstöckli",
+      "date": "2026-04-30",
+      "wind_ok_count": 7,
+      "wind_wrong_count": 0,
+      "error": ""
+    },
+    "rating": 7.9,
+    "is_conditional": true,
+    "conditional_reason": "Föhn-Vorsicht aufgrund eines Delta-P von 4.3 hPa.",
+    "flyability": {
+      "flyability_tier": "green",
+      "fly_status": "green",
+      "status": "green",
+      "flight_type": "Thermikflug",
+      "flight_duration_estimate": "4-5h Thermikflug",
+      "thermal_quality": "Die Thermik ist solide mit einem Peak von 2.1 m/s und einer hohen Basis. Die Wolken sind wolkenfrei, was optimale Bedingungen für das Steigen bietet.",
+      "peak_climb_rate": 2.1,
+      "xc_potential": "moderate",
+      "xc_details": "Gute Bedingungen für lokale Flüge, jedoch keine langen Strecken zu erwarten.",
+      "soaring_options": "Hangsoaring ist möglich, da der Wind stabil und unter 10 km/h bleibt.",
+      "bemerkung_check": "Die Bemerkung über die Föhn-Vorsicht wurde berücksichtigt, was die Fliegbarkeit nicht negativ beeinflusst.",
+      "best_window": "Das beste Zeitfenster ist von 10:00 bis 17:00 Uhr.",
+      "flyability_limits": [
+        "Föhn-Vorsicht: Delta-P 4.3 hPa, erhöhte Vorsicht an exponierten Stellen"
+      ],
+      "highlights": [
+        "Peak-Steigen von 2.1 m/s um 15:00",
+        "Wolkenfrei während der Thermikstunden",
+        "Stabiler Wind unter 10 km/h"
+      ],
+      "recommendation": "Ein solider Thermiktag mit guten Bedingungen für lokale Flüge. Die Thermik ist stark genug, um längere Flüge zu ermöglichen, jedoch sollten Piloten die Föhn-Vorsicht beachten. Insgesamt ist es ein empfehlenswerter Tag für erfahrene Piloten.",
+      "confidence": "high",
+      "rating": 7.9,
+      "is_conditional": true,
+      "conditional_reason": "Föhn-Vorsicht aufgrund eines Delta-P von 4.3 hPa.",
+      "spot": "Charenstöckli",
+      "date": "2026-04-30"
+    },
+    "fly_status": "green",
+    "status": "green",
+    "streckenflug": {
+      "tier": "lokal",
+      "rating": 0,
+      "summary": "Die Bedingungen sind gut für lokale Flüge, jedoch keine langen Strecken zu erwarten. Region-Kontext zeigt ruhige Windverhältnisse, aber die Föhnwarnung schränkt die XC-Möglichkeiten ein.",
+      "limiting_factor": "region_wind_aloft",
+      "region_context_available": true
+    },
+    "best_window": "Das beste Zeitfenster ist von 10:00 bis 17:00 Uhr.",
+    "recommendation": "Ein solider Thermiktag mit guten Bedingungen für lokale Flüge. Die Thermik ist stark genug, um längere Flüge zu ermöglichen, jedoch sollten Piloten die Föhn-Vorsicht beachten. Insgesamt ist es ein empfehlenswerter Tag für erfahrene Piloten."
+  }
+}

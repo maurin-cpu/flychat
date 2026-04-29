@@ -317,6 +317,19 @@
             body: JSON.stringify({ message: msgToSend, session_id: sessionId })
         })
             .then(function (resp) {
+                // Defense-in-depth: wenn der Server 401 mit login_required liefert,
+                // direkt das Login-Modal oeffnen statt generischen Fehler zeigen.
+                if (resp.status === 401) {
+                    return resp.json().catch(function () { return null; }).then(function (body) {
+                        if (body && body.login_required) {
+                            var loginBtn = document.getElementById('navLoginBtn');
+                            if (loginBtn) loginBtn.click();
+                            var msg = body.message || 'Logge dich ein, um den Chat-Berater zu nutzen.';
+                            throw new Error(msg);
+                        }
+                        throw new Error('Server error: 401');
+                    });
+                }
                 if (!resp.ok) throw new Error('Server error: ' + resp.status);
                 var contentType = resp.headers.get('Content-Type') || '';
                 if (contentType.indexOf('application/x-ndjson') !== -1) {

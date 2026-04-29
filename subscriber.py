@@ -88,6 +88,32 @@ class SubscriberManager:
         if column not in existing:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
+    # Region-ID-Renames (CSV/GeoJSON-Sync 2026-04: alte GeoJSON-IDs ohne CSV-Match
+    # auf gemeinsame snake_case-Form gebracht). Idempotent: WHERE LIKE matcht nichts
+    # mehr, sobald der Rename gelaufen ist.
+    _REGION_ID_RENAMES = (
+        ("urner_alpen",        "bodenseeraum"),
+        ("chur_mittelbuenden", "praettigau_davos"),
+        ("suedbuenden",        "rheintal"),
+    )
+
+    @classmethod
+    def _migrate_rename_region_ids(cls, conn):
+        for old, new in cls._REGION_ID_RENAMES:
+            old_token = f'"{old}"'
+            new_token = f'"{new}"'
+            cur = conn.execute(
+                "UPDATE subscribers "
+                "SET regions = REPLACE(regions, ?, ?) "
+                "WHERE regions LIKE ?",
+                (old_token, new_token, f"%{old_token}%"),
+            )
+            if cur.rowcount:
+                logger.info(
+                    "Region-ID-Migration: %r -> %r in %d subscriber-Zeile(n) ersetzt",
+                    old, new, cur.rowcount,
+                )
+
     def _init_db(self):
         conn = self._connect()
         try:
@@ -177,6 +203,7 @@ class SubscriberManager:
                     UPDATE subscribers SET updated_at = datetime('now') WHERE id = OLD.id;
                 END;
             """)
+            self._migrate_rename_region_ids(conn)
             conn.commit()
         finally:
             conn.close()
@@ -872,9 +899,39 @@ class SubscriberManager:
             logger.error("create_login_token failed: %s", e)
             return None
 
+    def peek_login_token(self, token: str) -> bool:
+        """Read-only: prueft ob Token existiert + nicht abgelaufen ist, OHNE ihn zu
+        verbrauchen. Wird auf der GET-Landing-Page genutzt — verhindert dass
+        Mail-Prefetcher (Microsoft Defender / Safe Links / etc.) den Token
+        durch den initialen Scan-GET unbrauchbar macht. Der eigentliche Login
+        passiert via POST in consume_login_token()."""
+        if not token:
+            return False
+        try:
+            with self._cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1 FROM subscribers
+                     WHERE login_token = ?
+                       AND login_token_expires_at IS NOT NULL
+                       AND login_token_expires_at > datetime('now')
+                       AND status IN ('active', 'paused', 'unsubscribed')
+                     LIMIT 1
+                    """,
+                    (token,),
+                )
+                return cur.fetchone() is not None
+        except Exception as e:
+            logger.error("peek_login_token failed: %s", e)
+            return False
+
     def consume_login_token(self, token: str) -> Optional[dict]:
         """Verifiziert + verbraucht Token (One-Time). Liefert {id, email} oder None.
-        Auch Unsubscribed-User koennen sich einloggen (zur Reaktivierung)."""
+        Auch Unsubscribed-User koennen sich einloggen (zur Reaktivierung).
+
+        WICHTIG: Wird NUR aus POST aufgerufen — GET ist read-only via
+        peek_login_token(), sonst killen Mail-Prefetcher den Token vor dem
+        eigentlichen User-Klick."""
         if not token:
             return None
         try:

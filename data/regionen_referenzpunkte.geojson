@@ -1242,8 +1242,8 @@
         ]
       },
       "properties": {
-        "id": "chur_mittelbuenden",
-        "region": "Chur / Mittelbünden",
+        "id": "praettigau_davos",
+        "region": "Prättigau - Davos",
         "name": "Fanas Eggli",
         "elevation_ref": 1700,
         "reference_points": [
@@ -1349,8 +1349,8 @@
         ]
       },
       "properties": {
-        "id": "suedbuenden",
-        "region": "Südbünden",
+        "id": "rheintal",
+        "region": "Ostschweiz",
         "name": "Santa Maria in Calanca",
         "elevation_ref": 1500,
         "reference_points": [
@@ -3223,8 +3223,8 @@
         ]
       },
       "properties": {
-        "id": "urner_alpen",
-        "region": "Urner Alpen",
+        "id": "bodenseeraum",
+        "region": "Bodenseeraum",
         "name": "Eggberge Altdorf",
         "elevation_ref": 1500,
         "reference_points": [

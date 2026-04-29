@@ -107,6 +107,22 @@ def _dry_run_enabled() -> bool:
     return os.environ.get("GLEITCAST_SMTP_DRY_RUN", "").strip() in ("1", "true", "yes")
 
 
+def _base_url_is_local(url: str) -> bool:
+    u = (url or "").lower()
+    return ("localhost" in u) or ("127.0.0.1" in u) or ("0.0.0.0" in u) or ("://[::1]" in u)
+
+
+# Startup-Sanity: laute Warnung, wenn BASE_URL auf localhost zeigt. Live-Mails
+# mit localhost-Links sind ein bekanntes Fehlbild (Prod-.env nicht gesetzt).
+if _base_url_is_local(config.BASE_URL):
+    logger.warning(
+        "BASE_URL zeigt auf localhost (%r) — reale Mail-Sends werden blockiert. "
+        "Setze GLEITCAST_BASE_URL=https://app.gleitcast.ch in der Prod-.env "
+        "oder GLEITCAST_SMTP_DRY_RUN=1 für lokale Previews.",
+        config.BASE_URL,
+    )
+
+
 def _dry_run_write(to: str, subject: str, html: str) -> Path:
     tmp_dir = Path(tempfile.gettempdir()) / "gleitcast_mail_preview"
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -138,6 +154,26 @@ def send_email(to: str, subject: str, html: str, text: str = "") -> bool:
         logger.info("[SMTP DRY-RUN] -> %s (subject=%r) geschrieben nach %s",
                     to, subject, path)
         return True
+
+    # Safety-Net fuer Prod-Misconfig: blockt nur wenn ausserhalb eines
+    # HTTP-Requests (Scheduler/Cron) UND config.BASE_URL auf localhost zeigt.
+    # In einem Request laufen die URLs jetzt automatisch ueber request.host_url
+    # (siehe _resolve_base_url), das ist in Dev legitim auf localhost.
+    if _base_url_is_local(config.BASE_URL):
+        in_request = False
+        try:
+            from flask import has_request_context
+            in_request = has_request_context()
+        except Exception:
+            pass
+        if not in_request:
+            logger.error(
+                "send_email: kein Request-Kontext und BASE_URL=%r zeigt auf localhost — "
+                "Mail an %s NICHT gesendet (Scheduler/Cron-Pfad). "
+                "Fix: GLEITCAST_BASE_URL in Prod-.env auf https://app.gleitcast.ch setzen.",
+                config.BASE_URL, to,
+            )
+            return False
 
     host = config.SMTP_HOST
     port = config.SMTP_PORT
@@ -192,10 +228,32 @@ def send_email_async(to: str, subject: str, html: str, text: str = "") -> None:
 # High-level: spezifische Mail-Arten
 # ----------------------------------------------------------------------
 
+def _resolve_base_url() -> str:
+    """Liefert die Basis-URL fuer Mail-Links.
+
+    Wenn wir in einem Flask-Request laufen (User triggert /subscribe oder /login):
+      → nimm den aktuellen Host. So bekommt localhost-Entwicklung localhost-Links
+        und Prod (app.gleitcast.ch) bekommt Prod-Links — automatisch.
+
+    Wenn kein Request aktiv ist (Scheduler, CLI-Skript, Daily-Briefing-Job):
+      → config.BASE_URL als Fallback (typischerweise gesetzt via Env-Var
+        GLEITCAST_BASE_URL=https://app.gleitcast.ch).
+    """
+    try:
+        from flask import has_request_context, request
+        if has_request_context():
+            host_url = (request.host_url or "").rstrip("/")
+            if host_url:
+                return host_url
+    except Exception:
+        pass
+    return config.BASE_URL.rstrip("/")
+
+
 def _build_urls(*, confirm_token: Optional[str] = None,
                 action_token: Optional[str] = None,
                 login_token: Optional[str] = None) -> dict[str, str]:
-    base = config.BASE_URL.rstrip("/")
+    base = _resolve_base_url()
     marketing = config.MARKETING_URL.rstrip("/")
     urls = {
         "base": base,
