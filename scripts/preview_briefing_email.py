@@ -78,38 +78,18 @@ def main() -> int:
     from email_service import build_briefing_context
     from flask import render_template
 
-    # Liste aller Template-Varianten (v1 = Standard, v2-v5 = Alternativen)
-    variants = [
-        ("v1_baseline",  "email/briefing.html",                    "V1 — Baseline (aktuell live)"),
-        ("v2_editorial", "email/variants/v2_editorial.html",       "V2 — Editorial / Magazine"),
-        ("v3_minimal",   "email/variants/v3_minimal.html",         "V3 — Minimalist / Mono"),
-        ("v4_bold",      "email/variants/v4_bold.html",            "V4 — Bold Color Blocks"),
-        ("v5_dense",     "email/variants/v5_dense.html",           "V5 — Data Dashboard / Dense"),
-        ("v6_timeline",  "email/variants/v6_timeline.html",        "V6 — Timeline / Vertical Flow"),
-        ("v7_pastel",    "email/variants/v7_pastel.html",          "V7 — Soft Pastel / Friendly"),
-        ("v8_brutalist", "email/variants/v8_brutalist.html",       "V8 — Brutalist / Mono"),
-        ("v9_newspaper", "email/variants/v9_newspaper.html",       "V9 — Newspaper / Multi-Column"),
-        ("v10_sport",    "email/variants/v10_sport.html",          "V10 — Sport / Fitness Stats"),
-    ]
-
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    html_path = out_dir / "briefing_preview.html"
+    txt_path = out_dir / "briefing_preview.txt"
 
-    rendered = []
     with flask_app.app_context(), flask_app.test_request_context():
         ctx = build_briefing_context(subscriber, briefing_data)
-        # TXT nur fuer baseline (Plain-Text-Variante ist nicht designspezifisch)
+        html = render_template("email/briefing.html", **ctx)
         text = render_template("email/briefing.txt", **ctx)
-        (out_dir / "briefing_preview.txt").write_text(text, encoding="utf-8")
 
-        for slug, tpl, label in variants:
-            try:
-                html = render_template(tpl, **ctx)
-                path = out_dir / f"briefing_{slug}.html"
-                path.write_text(html, encoding="utf-8")
-                rendered.append((slug, label, path))
-            except Exception as e:
-                print(f"[WARN] {tpl} failed: {e}")
+    html_path.write_text(html, encoding="utf-8")
+    txt_path.write_text(text, encoding="utf-8")
 
     # Stats
     flyable_days = [d for d in ctx['days'] if d['tier'] != 'none' and d['region_groups']]
@@ -118,20 +98,11 @@ def main() -> int:
     print(f"     - Region-Matrix:   {len(ctx['region_matrix'])} Regionen")
     print(f"     - Verdict:         {ctx['verdict']['headline'] if ctx['verdict'] else '(keiner)'}")
     print()
-
-    # Index-Seite mit Links zu allen Varianten
-    index_html = _build_index_page(rendered, ctx)
-    index_path = out_dir / "index.html"
-    index_path.write_text(index_html, encoding="utf-8")
-
-    for slug, label, path in rendered:
-        print(f"[OK] {label}")
-        print(f"     {path}")
-    print()
-    print(f"[INDEX] {index_path}")
+    print(f"[OK] HTML:  {html_path}")
+    print(f"[OK] TEXT:  {txt_path}")
 
     if not args.no_open:
-        url = index_path.as_uri()
+        url = html_path.as_uri()
         print(f"[OPEN] {url}")
         try:
             webbrowser.open(url)
@@ -139,52 +110,6 @@ def main() -> int:
             print(f"WARN: konnte Browser nicht oeffnen: {e}")
 
     return 0
-
-
-def _build_index_page(rendered: list[tuple], ctx: dict) -> str:
-    """Render eine simple Index-Seite mit iframe-Previews aller Varianten nebeneinander."""
-    cards = []
-    for slug, label, path in rendered:
-        cards.append(f"""
-        <article class="card">
-          <header>
-            <h2>{label}</h2>
-            <a href="{path.name}" target="_blank">In neuem Tab oeffnen &rarr;</a>
-          </header>
-          <iframe src="{path.name}" loading="lazy"></iframe>
-        </article>
-        """)
-    cards_html = "\n".join(cards)
-
-    verdict_line = ctx['verdict']['headline'] if ctx['verdict'] else '(keiner)'
-    return f"""<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Briefing-Mail Varianten</title>
-<style>
-  * {{ box-sizing: border-box; }}
-  body {{ margin:0; font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif; background:#0f172a; color:#f1f5f9; padding:24px; }}
-  h1 {{ font-size:22px; margin:0 0 4px; font-weight:700; letter-spacing:-0.01em; }}
-  .meta {{ color:#94a3b8; font-size:13px; margin-bottom:20px; }}
-  .grid {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(420px, 1fr)); gap:18px; }}
-  article.card {{ background:#1e293b; border:1px solid #334155; border-radius:10px; overflow:hidden; }}
-  article.card header {{ padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; }}
-  article.card h2 {{ font-size:14px; margin:0; font-weight:600; }}
-  article.card a {{ font-size:12px; color:#60a5fa; text-decoration:none; }}
-  article.card a:hover {{ text-decoration:underline; }}
-  iframe {{ width:100%; height:1200px; border:0; background:#fff; display:block; }}
-</style>
-</head>
-<body>
-<h1>Briefing-Mail &mdash; 5 Design-Varianten</h1>
-<div class="meta">Verdict: {verdict_line} &middot; {len(ctx['days'])} Tage &middot; {len(ctx['region_matrix'])} Regionen</div>
-<div class="grid">
-{cards_html}
-</div>
-</body>
-</html>
-"""
 
 
 if __name__ == "__main__":
