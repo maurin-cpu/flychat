@@ -36,7 +36,7 @@ DEFAULT_REGIONS = [
     "berner_voralpen",
     "schwarzsee_gantrisch",
     "waadtlaender_alpen",
-    "urner_alpen",
+    "bodenseeraum",
     "glarnerland_walensee",
     "oberwallis_goms",
 ]

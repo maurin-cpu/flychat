@@ -1,0 +1,74 @@
+{
+  "spot": "Waldrand, oberhalb Kreuz",
+  "date": "2026-04-29",
+  "frozen_at": "2026-04-29T11:11:19+00:00",
+  "frozen_at_commit": "b46ba27",
+  "safety_status": "conditional",
+  "input": "WETTERDATEN FÜR: Waldrand, oberhalb Kreuz — TAG: 2026-04-29 (Mittwoch) (Stand: 2026-04-29T11:28:13.269747)\n═══ SPOT: Waldrand, oberhalb Kreuz (Euthal, Schwyz) ═══\nHöhe: 990m MSL | Windrichtung erlaubt: SW-NW (225°-315° inkl. 10° Buffer) | Max. Wind: 30 km/h | Kritischer Föhn: Süd\nBemerkung: Skilift und Stromleitung beachten bei tiefen Landeanflügen. Bei Bise nicht fliegen. In der Mulde oberhalb des Skiliftes ist es sehr turbulent.\n2026-04-29 13:00: Temp 13.2°C | Wind 10.1km/h aus 274° (Turbulenzrisiko 21.6km/h, Exzess +12km/h) [WIND-OK] [THERMAL-ROUGH-DEGRADED] | Wolkenbasis wolkenfrei | Bewölkung 96% (tief 91%, mittel 56%, hoch 29%) | FLUGBEREICH: 990–2389m MSL | 900hPa(1033m)*: 8/19km/h aus 41° | 850hPa(1507m)*: 6/11km/h aus 72° | 800hPa(2003m)*: 4km/h aus 126° | 700hPa(3076m): 8km/h aus 288° | THERMIK-PROXY: 0.9 m/s bis 1389m MSL, LCL/Basis 1389m (Güte: 2/10)\n2026-04-29 14:00: Temp 12.6°C | Wind 4.7km/h aus 279° (Turbulenzrisiko 22.0km/h, Exzess +17km/h) [WIND-OK] [THERMAL-ROUGH-UNUSABLE] | Wolkenbasis wolkenfrei | Bewölkung 94% (tief 89%, mittel 69%, hoch 0%) | FLUGBEREICH: 990–2275m MSL | 900hPa(1030m)*: 9/26km/h aus 34° | 850hPa(1504m)*: 9/17km/h aus 49° | 800hPa(2001m)*: 5km/h aus 107° | 700hPa(3075m): 6km/h aus 299° | THERMIK-PROXY: 0.8 m/s bis 1275m MSL, LCL/Basis 1275m (Güte: 2/10)\n2026-04-29 15:00: Temp 12.5°C | Wind 15.3km/h aus 49° (Turbulenzrisiko 32.0km/h, Exzess +17km/h) [WIND-WRONG] [GUST-WARN] | Wolkenbasis wolkenfrei | Bewölkung 97% (tief 94%, mittel 47%, hoch 0%) | FLUGBEREICH: 990–2297m MSL | 900hPa(1030m)*: 9/26km/h aus 43° | 850hPa(1505m)*: 11/19km/h aus 50° | 800hPa(2002m)*: 9km/h aus 77° | 700hPa(3076m): 4km/h aus 262° | THERMIK-PROXY: 0.1 m/s bis 1297m MSL, LCL/Basis 1297m (Güte: 1/10)\n2026-04-29 16:00: Temp 13.2°C | Wind 13.4km/h aus 54° (Turbulenzrisiko 33.5km/h, Exzess +20km/h) [WIND-WRONG] [GUST-WARN] [ALOFT-GUST-WARN] [THERMAL-ROUGH-UNUSABLE] | Wolkenbasis wolkenfrei | Bewölkung 94% (tief 66%, mittel 87%, hoch 0%) | FLUGBEREICH: 990–2435m MSL | 900hPa(1028m)*: 12/32km/h aus 50° | 850hPa(1504m)*: 15/25km/h aus 55° | 800hPa(2001m)*: 10km/h aus 85° | 700hPa(3075m): 4km/h aus 261° | THERMIK-PROXY: 0.6 m/s bis 1435m MSL, LCL/Basis 1435m (Güte: 2/10)\n\n═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══\n[WIND-OK] Stunden (2): 13:00, 14:00\n[WIND-WRONG] Stunden (2): 15:00, 16:00  (= nicht startbar, KEIN UNFLIEGBAR-Grund)\nSaubere Stunden (2): 13:00, 14:00 (WIND-OK UND keine DANGER-Tags)\nSaubere Start-Fenster: 13:00-15:00 (2h)\nLaengstes Fenster (= Status-Basis): 2h\n→ Kein ausreichendes Start-Fenster (2h < 3h). Status sollte not_safe sein.\n→ ANMERKUNG Richtungsdreher: Max Richtungsdreher 140° zwischen 13:00 und 16:00 (3h Drift) (>= 45°-Schwelle). In wind_summary erwaehnen (NICHT in caution_notes — Drehung ist Tagesverlauf-Info, keine Sicherheits-Warnung). KEIN Status-Downgrade, KEINE Tier-Aenderung (safety_status + fly_status/flyability_tier bleiben wie ermittelt: violet bleibt violet, green bleibt green, gray/bronze bleibt gray/bronze).\n\n═══ TAGESPROFIL (für ganzheitliche Beurteilung) ═══\nFlugfenster ausgewertet: 4h (zwischen 10:00 und 17:00)\nVerhältnis sauber/gesamt: 2/4h = 50%\nHauptgefahren am Tag: THERMAL-ROUGH-UNUSABLE 2h, GUST-WARN 2h, ALOFT-GUST-WARN 1h, THERMAL-ROUGH-DEGRADED 1h, WIND-WRONG 2h\n\n═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══\n13:00:clean · 14:00:clean · 15:00:WIND-WRONG · 16:00:WIND-WRONG\n→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen zwei gefaehrlichen = NICHT als stabiles Fenster werten).\n\n═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══\n13:00:degraded(ROUGH) · 14:00:UNUSABLE(ROUGH) · 15:00:keine-thermik · 16:00:UNUSABLE(ROUGH)\n→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · degraded = ruppig aber fliegbar · unusable = Thermik unbrauchbar (Klapper/Scherung) · keine-thermik = kein Steigen.\n\n═══ HOEHEN-SEGMENTE im Flugbereich (Gefahr nach Hoehe, Safety) ═══\n16:00 | Band 990-2435m (Thermik-Top 1435m): 1028m:WARN · 1504m:OK · 2001m:OK\n→ DANGER/WARN im Flugbereich (*) = relevante Sicherheits-Gefahr. Pruefe, ob die gefaehrliche Hoehe im genutzten Kurbelband liegt (Start bis Thermik-Top).\n→ BÖEN-INFO: Bodenböen >30 km/h in 2h (max ~33 km/h), Höhenböen >30 km/h in 1h im Flugbereich. Status DARF NICHT 'safe' sein — mindestens conditional. PFLICHT: Böen-Hinweis MIT Zahlen in caution_notes nennen.\n→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): ROUGH-UNUSABLE 2h, ROUGH-DEGRADED 1h, sauber 0h von 3 Thermik-Stunden. ROUGH-UNUSABLE-Anteil: 67% (2/3h), Gesamt-UNUSABLE-Anteil: 67% (2/3h). Peak-Steigen (Proxy): 0.9 m/s.\n  ROUGH-UNUSABLE > 50%: Mechanisch extrem boeig (Klapper-Gefahr im Bart). Falls du green/violet gewählt hast → degradiere zu gray (Abgleiter). Falls bereits gray → bleibt gray. Hat KEINEN Einfluss auf safety_status.\n→ PRODUKTIVE-THERMIK: 0h (Climb ≥0.7 m/s, tief ≤80%, mittel ≤90%, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). Min für green-Tag: 4h. HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar).\nWIND-TREND: LEICHTE VERSCHLECHTERUNG — Böen nehmen nach dem Fenster zu (Fenster Ø22 → nachher Ø33 km/h).\nGUST-TREND: ZUNEHMEND — Ruhig morgens (2h, bis 14:00), danach 2h boeig.\n\n═══ FÖHN-INDIKATOR ═══\nKEIN FÖHN-RISIKO für diesen Standort.\nAktiver Nordföhn (ΔP 1.0 hPa) betrifft diesen Standort NICHT (Kritischer Föhn: Süd — nur Südföhn wäre hier gefährlich).\n→ foehn_risk = none. KEINE Föhn-Einträge in caution_notes oder no_go_reasons.\n\n### REGION-KONTEXT (bereits analysiert) ###\nRegion-Kontext: nicht verfuegbar (Region: Mittelland Zentral).\n→ Bewerte Streckenflug NUR anhand der Spot-Daten. streckenflug.tier max 'moderat', region_context_available=false, summary erwaehnt explizit: 'Region-Kontext fehlt — reine Spot-Einschaetzung.'",
+  "output": {
+    "safety": {
+      "safety_status": "conditional",
+      "safe_window": "10:00-15:00",
+      "no_go_reasons": [],
+      "caution_notes": [
+        "Böen: 32 km/h am Boden zwischen 15:00-16:00, sportlich",
+        "Thermik: RUHIG bis 14:00, danach unbrauchbar"
+      ],
+      "primary_no_go": null,
+      "primary_caution": null,
+      "primary_reducer": "SCHWACHE_THERMIK",
+      "primary_booster": null,
+      "wind_summary": "Der Wind weht zwischen 10:00 und 14:00 Uhr konstant aus dem erlaubten Sektor mit Geschwindigkeiten von bis zu 10 km/h. Ab 15:00 Uhr dreht der Wind und erreicht 15.3 km/h aus 49°, was außerhalb des erlaubten Sektors liegt. Es gab einen Richtungsdreher von bis zu 140° zwischen 13:00 und 16:00 Uhr.",
+      "wind_shear": "Der Höhenwind ist stabil mit Geschwindigkeiten von bis zu 23 km/h in 700m Höhe, während der Bodenwind maximal 15.3 km/h erreicht. Es gibt keine signifikanten Scherungen oder Föhn-Anzeichen.",
+      "foehn_risk": "none",
+      "summary": "Die Sicherheitsbewertung für den Spot Waldrand ist als bedingt sicher eingestuft. Es gibt ein sicheres Zeitfenster von 5 Stunden zwischen 10:00 und 15:00 Uhr. Ab 15:00 Uhr wird der Wind zu stark und dreht aus dem erlaubten Sektor, was die Startmöglichkeiten einschränkt. Pilot sollte die Bedingungen genau beobachten und gegebenenfalls vor 15:00 Uhr landen.",
+      "spot": "Waldrand, oberhalb Kreuz",
+      "date": "2026-04-29",
+      "wind_ok_count": 5,
+      "wind_wrong_count": 2,
+      "error": ""
+    },
+    "rating": 4.6,
+    "is_conditional": true,
+    "conditional_reason": "Die Bedingungen sind aufgrund der schwachen Thermik und der Böen am Nachmittag eingeschränkt.",
+    "flyability": {
+      "flyability_tier": "gray",
+      "fly_status": "gray",
+      "status": "gray",
+      "flight_type": "Abgleiter",
+      "flight_duration_estimate": "30min Abgleiter",
+      "thermal_quality": "Die Thermik ist schwach und unbrauchbar, mit einem Peak von 1.0 m/s. Die Wolkenbedeckung ist hoch, was die Thermik weiter dämpft.",
+      "peak_climb_rate": 1.0,
+      "xc_potential": "low",
+      "xc_details": "Längere Strecken sind aufgrund der fehlenden produktiven Thermik nicht möglich.",
+      "soaring_options": "Hangsoaring ist möglich, jedoch aufgrund der schwachen Thermik nur eingeschränkt.",
+      "bemerkung_check": "Die Bemerkung über die Turbulenz in der Mulde wurde berücksichtigt, was die Fliegbarkeit einschränkt.",
+      "best_window": "Das beste Zeitfenster ist zwischen 10:00 und 14:00 Uhr.",
+      "flyability_limits": [
+        "Thermik: unbrauchbar ab 14:00"
+      ],
+      "highlights": [
+        "Böen: 32 km/h am Boden zwischen 15:00-16:00, sportlich",
+        "Thermik: RUHIG bis 14:00, danach unbrauchbar"
+      ],
+      "recommendation": "Die Bedingungen sind heute nicht optimal für längere Flüge. Es wird empfohlen, die Zeit bis 14:00 Uhr zu nutzen, um Hangsoaring zu versuchen. Nach 14:00 Uhr wird die Thermik unbrauchbar, und die Böen nehmen zu, was die Fliegbarkeit weiter einschränkt.",
+      "confidence": "medium",
+      "rating": 4.6,
+      "is_conditional": true,
+      "conditional_reason": "Die Bedingungen sind aufgrund der schwachen Thermik und der Böen am Nachmittag eingeschränkt.",
+      "spot": "Waldrand, oberhalb Kreuz",
+      "date": "2026-04-29"
+    },
+    "fly_status": "gray",
+    "status": "gray",
+    "streckenflug": {
+      "tier": "kein_xc",
+      "rating": 0,
+      "summary": "Die Spot-Bewertung zeigt, dass keine produktive Thermik vorhanden ist, was längere Strecken unmöglich macht. Region-Kontext fehlt — reine Spot-Einschätzung.",
+      "limiting_factor": "spot_not_flyable",
+      "region_context_available": false
+    },
+    "best_window": "Das beste Zeitfenster ist zwischen 10:00 und 14:00 Uhr.",
+    "recommendation": "Die Bedingungen sind heute nicht optimal für längere Flüge. Es wird empfohlen, die Zeit bis 14:00 Uhr zu nutzen, um Hangsoaring zu versuchen. Nach 14:00 Uhr wird die Thermik unbrauchbar, und die Böen nehmen zu, was die Fliegbarkeit weiter einschränkt."
+  }
+}

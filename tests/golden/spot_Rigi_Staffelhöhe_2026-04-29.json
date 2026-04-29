@@ -1,0 +1,45 @@
+{
+  "spot": "Rigi Staffelhöhe",
+  "date": "2026-04-29",
+  "frozen_at": "2026-04-29T11:11:19+00:00",
+  "frozen_at_commit": "b46ba27",
+  "safety_status": "not_safe",
+  "input": "WETTERDATEN FÜR: Rigi Staffelhöhe — TAG: 2026-04-29 (Mittwoch) (Stand: 2026-04-29T11:28:13.269747)\n═══ SPOT: Rigi Staffelhöhe (Rigi, Schwyz) ═══\nHöhe: 1544m MSL | Windrichtung erlaubt: SSW-SSO (158°-202° inkl. 10° Buffer) | Max. Wind: 30 km/h | Kritischer Föhn: Süd\nBemerkung: SW nur benutzen, wenn Verbotstafel abgedeckt ist. Sonderregelung Lufträume beachten (siehe SHV-Website)\n2026-04-29 13:00: Temp 9.1°C | Wind 0.8km/h aus 153° (Turbulenzrisiko 7.9km/h, Exzess +7km/h) [WIND-OK] | Wolkenbasis wolkenfrei | Bewölkung 96% (tief 91%, mittel 56%, hoch 29%) | FLUGBEREICH: 1544–2821m MSL | 850hPa(1505m): 9/16km/h aus 78° | 800hPa(2001m)*: 3/8km/h aus 59° | 700hPa(3077m)~: 14km/h aus 280° | THERMIK-PROXY: 1.1 m/s bis 1821m MSL, LCL/Basis 1821m (Güte: 2/10)\n2026-04-29 14:00: Temp 9.3°C | Wind 2.8km/h aus 310° (Turbulenzrisiko 8.6km/h, Exzess +6km/h) [WIND-WRONG] | Wolkenbasis wolkenfrei | Bewölkung 94% (tief 89%, mittel 69%, hoch 0%) | FLUGBEREICH: 1544–2738m MSL | 850hPa(1503m): 7/13km/h aus 63° | 800hPa(1999m)*: 6/10km/h aus 85° | 700hPa(3075m)~: 11km/h aus 292° | THERMIK-PROXY: 1.5 m/s bis 1738m MSL, LCL/Basis 1738m (Güte: 2/10)\n2026-04-29 15:00: Temp 8.9°C | Wind 4.6km/h aus 51° (Turbulenzrisiko 12.2km/h, Exzess +8km/h) [WIND-WRONG] | Wolkenbasis wolkenfrei | Bewölkung 97% (tief 94%, mittel 47%, hoch 0%) | FLUGBEREICH: 1544–2738m MSL | 850hPa(1503m): 11/18km/h aus 50° | 800hPa(2000m)*: 8/14km/h aus 75° | 700hPa(3076m)~: 9km/h aus 286° | THERMIK-PROXY: 0.9 m/s bis 1738m MSL, LCL/Basis 1738m (Güte: 2/10)\n2026-04-29 16:00: Temp 8.6°C | Wind 11.6km/h aus 60° (Turbulenzrisiko 26.6km/h, Exzess +15km/h) [WIND-WRONG] | Wolkenbasis wolkenfrei | Bewölkung 94% (tief 66%, mittel 87%, hoch 0%) | FLUGBEREICH: 1544–2677m MSL | 850hPa(1503m): 13/28km/h aus 51° | 800hPa(2000m)*: 9/21km/h aus 68° | 700hPa(3075m)~: 9km/h aus 278° | THERMIK-PROXY: 0.2 m/s bis 1677m MSL, LCL/Basis 1677m (Güte: 2/10)\n\n═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══\n[WIND-OK] Stunden (1): 13:00\n[WIND-WRONG] Stunden (3): 14:00, 15:00, 16:00  (= nicht startbar, KEIN UNFLIEGBAR-Grund)\nSaubere Stunden (1): 13:00 (WIND-OK UND keine DANGER-Tags)\nSaubere Start-Fenster: 13:00-14:00 (1h)\nLaengstes Fenster (= Status-Basis): 1h\n→ Kein ausreichendes Start-Fenster (1h < 3h). Status sollte not_safe sein.\n→ ANMERKUNG Richtungsdreher: Max Stunden-Wechsel 157° um 14:00 (>= 45°-Schwelle). In wind_summary erwaehnen (NICHT in caution_notes — Drehung ist Tagesverlauf-Info, keine Sicherheits-Warnung). KEIN Status-Downgrade, KEINE Tier-Aenderung (safety_status + fly_status/flyability_tier bleiben wie ermittelt: violet bleibt violet, green bleibt green, gray/bronze bleibt gray/bronze).\n\n═══ TAGESPROFIL (für ganzheitliche Beurteilung) ═══\nFlugfenster ausgewertet: 4h (zwischen 10:00 und 17:00)\nVerhältnis sauber/gesamt: 1/4h = 25%\nHauptgefahren am Tag: WIND-WRONG 3h\n→ ACHTUNG Verhältnis < 35%: Tag ist überwiegend gefährlich. Auch wenn ein 4h-Fenster existiert, prüfe ob es eingekesselt ist. Status maximal conditional, oft eher not_safe.\n\n═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══\n13:00:clean · 14:00:WIND-WRONG · 15:00:WIND-WRONG · 16:00:WIND-WRONG\n→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen zwei gefaehrlichen = NICHT als stabiles Fenster werten).\n\n═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══\n13:00:soaring(band-flach+wolken) · 14:00:soaring(band-flach+wolken) · 15:00:soaring(band-flach+wolken) · 16:00:keine-thermik\n→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · degraded = ruppig aber fliegbar · unusable = Thermik unbrauchbar (Klapper/Scherung) · keine-thermik = kein Steigen.\n→ THERMIK-QUALITÄT (NUR Fliegbarkeit/Phase 2, NICHT Sicherheit!): sauber 3h von 3 Thermik-Stunden. ROUGH-UNUSABLE-Anteil: 0% (0/3h), Gesamt-UNUSABLE-Anteil: 0% (0/3h). Peak-Steigen (Proxy): 1.5 m/s.\n→ PRODUKTIVE-THERMIK: 0h (Climb ≥0.7 m/s, tief ≤80%, mittel ≤90%, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). Min für green-Tag: 4h. HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar).\nWIND-TREND: STABIL — Keine signifikante Verschlechterung nach dem Fenster.\n\n═══ FÖHN-INDIKATOR ═══\nKEIN FÖHN-RISIKO für diesen Standort.\nAktiver Nordföhn (ΔP 1.0 hPa) betrifft diesen Standort NICHT (Kritischer Föhn: Süd — nur Südföhn wäre hier gefährlich).\n→ foehn_risk = none. KEINE Föhn-Einträge in caution_notes oder no_go_reasons.\n\n### REGION-KONTEXT (bereits analysiert) ###\nRegion-Kontext: nicht verfuegbar (Region: Mittelland Zentral).\n→ Bewerte Streckenflug NUR anhand der Spot-Daten. streckenflug.tier max 'moderat', region_context_available=false, summary erwaehnt explizit: 'Region-Kontext fehlt — reine Spot-Einschaetzung.'",
+  "output": {
+    "safety": {
+      "safety_status": "not_safe",
+      "safe_window": "keins",
+      "no_go_reasons": [
+        "Start-Fenster: Nur 1h mit Windrichtung im erlaubten Sektor (Minimum 3h)"
+      ],
+      "caution_notes": [],
+      "primary_no_go": null,
+      "primary_caution": null,
+      "primary_reducer": null,
+      "primary_booster": null,
+      "wind_summary": "",
+      "wind_shear": "",
+      "foehn_risk": "none",
+      "summary": "Nur 1h mit passender Windrichtung (SSW-SSO) — kein ausreichendes Start-Fenster.",
+      "spot": "Rigi Staffelhöhe",
+      "date": "2026-04-29",
+      "wind_ok_count": 1,
+      "wind_wrong_count": 6,
+      "error": ""
+    },
+    "rating": 0.0,
+    "is_conditional": false,
+    "conditional_reason": "",
+    "fly_status": "",
+    "status": "not_safe",
+    "streckenflug": {
+      "tier": "kein_xc",
+      "rating": 0,
+      "summary": "",
+      "limiting_factor": "spot_not_flyable",
+      "region_context_available": false
+    },
+    "best_window": "keins",
+    "recommendation": ""
+  }
+}

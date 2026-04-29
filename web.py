@@ -352,12 +352,16 @@ def account_dispatch():
     - Eingeloggt: redirect auf /account/<action_token> (Einstellungen)
     - Anonym: redirect zur Login-Seite (es gibt keine separate Abo-Seite mehr)"""
     sub_id = session.get("sub_id")
+    logger.info("account_dispatch: sub_id=%s session_keys=%s host=%s cookies=%s",
+                sub_id, list(session.keys()), request.host,
+                list(request.cookies.keys()))
     if sub_id:
         mgr = _get_subscriber_manager()
         if mgr is not None:
             sub = mgr.get_session_user(sub_id)
             if sub and sub.get("action_token"):
                 return redirect(f"/account/{sub['action_token']}")
+            logger.warning("account_dispatch: sub_id=%s -> get_session_user None, clearing", sub_id)
         # Session zeigt auf nicht mehr existierenden User → Cookie loeschen
         session.clear()
     return redirect("/login")
@@ -677,6 +681,33 @@ def login_request():
 
 
 @app.route("/login/<token>", methods=["GET"])
+def login_landing(token):
+    """Landing-Page nach Klick auf Magic-Link aus Mail.
+
+    Read-only: Token wird NICHT verbraucht. Grund: Mail-Prefetcher
+    (Microsoft Defender / Safe Links bei Outlook/Hotmail, Mimecast,
+    Proofpoint, Google) machen einen Scan-GET auf jeden Link bevor der
+    User klickt. Wuerde der GET den Token verbrauchen, wuerde der
+    eigentliche User-Klick mit "Link abgelaufen" scheitern.
+
+    Stattdessen rendert dieser Handler eine kleine Bestaetigungsseite
+    mit einem POST-Form-Button. Bots fuehren keine POSTs aus — nur der
+    echte User-Klick verbraucht den Token in login_consume()."""
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return _status_page("error", "Service nicht verfuegbar",
+                            "Bitte spaeter nochmal versuchen.", http_code=503)
+    if not mgr.peek_login_token(token):
+        return _status_page(
+            "error", "Login-Link ungueltig",
+            "Der Link ist abgelaufen oder wurde bereits benutzt.",
+            submessage="Fordere einen neuen Login-Link an.",
+            http_code=400,
+        )
+    return render_template("login_confirm.html", token=token)
+
+
+@app.route("/login/<token>", methods=["POST"])
 def login_consume(token):
     mgr = _get_subscriber_manager()
     if mgr is None:
@@ -684,6 +715,9 @@ def login_consume(token):
                             "Bitte spaeter nochmal versuchen.", http_code=503)
     res = mgr.consume_login_token(token)
     if res is None:
+        logger.warning("login_consume: token NOT consumed (already used or expired) "
+                       "from host=%s ua=%r",
+                       request.host, request.headers.get("User-Agent", "")[:80])
         return _status_page(
             "error", "Login-Link ungueltig",
             "Der Link ist abgelaufen oder wurde bereits benutzt.",
@@ -693,6 +727,8 @@ def login_consume(token):
     session.permanent = True
     session["sub_id"] = res["id"]
     session["email"] = res["email"]
+    logger.info("login_consume: OK sub_id=%s email=%s host=%s",
+                res["id"], res["email"], request.host)
     # Nach erfolgreichem Magic-Link-Login direkt auf die Konto-Seite leiten
     return redirect("/account")
 

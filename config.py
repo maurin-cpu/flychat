@@ -726,6 +726,36 @@ LLM_MAX_WORKERS = int(os.environ.get("LLM_MAX_WORKERS", "20"))
 LLM_BATCH_POLL_INTERVAL = int(os.environ.get("LLM_BATCH_POLL_INTERVAL", "30"))
 
 
+# ============================================================================
+# LLM-Kosten-Telemetrie
+# Preise in USD pro 1 Mio Tokens. Schluessel: Modell-ID.
+# - in / out          : Standard-Tarif (parallel/sync)
+# - in_batch / out_batch : OpenAI Batch-API (50% Rabatt)
+# - cached_in         : Anthropic Prompt-Cache-Hit (10%) bzw. OpenAI auto-cache (50%)
+# Stand: 2026-04. Bei Preisaenderung hier zentral pflegen.
+# ============================================================================
+MODEL_PRICES = {
+    "gpt-4o-mini":      {"in": 0.150, "out": 0.600, "cached_in": 0.075, "in_batch": 0.075, "out_batch": 0.300},
+    "gpt-4o":           {"in": 2.500, "out": 10.000, "cached_in": 1.250, "in_batch": 1.250, "out_batch": 5.000},
+    "gpt-4.1-mini":     {"in": 0.400, "out": 1.600, "cached_in": 0.100, "in_batch": 0.200, "out_batch": 0.800},
+    "claude-haiku-4-5": {"in": 1.000, "out": 5.000, "cached_in": 0.100, "in_batch": 0.500, "out_batch": 2.500},
+    "claude-sonnet-4-6":{"in": 3.000, "out": 15.000, "cached_in": 0.300, "in_batch": 1.500, "out_batch": 7.500},
+    "gemini-2.5-flash": {"in": 0.300, "out": 2.500, "cached_in": 0.075, "in_batch": 0.150, "out_batch": 1.250},
+    "gemini-2.5-flash-lite": {"in": 0.100, "out": 0.400, "cached_in": 0.025, "in_batch": 0.050, "out_batch": 0.200},
+}
+
+# Notbremse: Wenn ein Analyse-Lauf diese Schwelle ueberschreitet, sauber abbrechen.
+# Schuetzt vor Runaway-Szenarien (Bug, versehentlich falscher Worker-Count, etc.).
+LLM_COST_CAP_USD = float(os.environ.get("LLM_COST_CAP_USD", "5.00"))
+
+# Pfad fuer JSONL-Telemetrie (eine Zeile pro Analyse-Lauf).
+import pathlib as _pathlib
+COST_TELEMETRY_PATH = _pathlib.Path(os.environ.get(
+    "COST_TELEMETRY_PATH",
+    str(_pathlib.Path(__file__).parent / "data" / "cost_telemetry.jsonl"),
+))
+
+
 def atomic_write_json(path, data, indent=2, ensure_ascii=False):
     """Schreibt JSON atomar via temp-file + os.replace().
     Verhindert Corruption wenn ein paralleler Reader waehrend des Writes liest.

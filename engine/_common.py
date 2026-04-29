@@ -7,9 +7,12 @@ Nur Konstanten + pure Funktionen. Damit trivial unit-testbar.
 Extrahiert aus chat_engine.py (Phase 2 des Monolith-Splits).
 """
 
+import json
 import logging
 import re
-from datetime import datetime
+import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +72,154 @@ MAX_TOOL_ITERATIONS = 5
 def _estimate_tokens(text: str) -> int:
     """Grobe Token-Schaetzung: ~3.5 Zeichen pro Token fuer DE/Zahlen-Mix."""
     return int(len(text) / 3.5)
+
+
+class BatchCostTracker:
+    """Aggregiert Token-Verbrauch pro Phase eines Analyse-Laufs.
+
+    Nutzung:
+        tracker = BatchCostTracker(mode="batch", provider="openai", model="gpt-4o-mini")
+        tracker.record("region_safety", in_tok=86400, out_tok=3600, cached_tok=0, calls=12)
+        ...
+        tracker.write(Path("data/cost_telemetry.jsonl"))
+
+    Schreibt eine JSONL-Zeile mit Tokens/Phase, Skip-Rate, USD-Schaetzung,
+    Dauer. Preise stammen aus config.MODEL_PRICES.
+    """
+
+    def __init__(self, mode: str, provider: str, model: str, commit: str = ""):
+        self.mode = mode
+        self.provider = provider
+        self.model = model
+        self.commit = commit
+        self.started = time.time()
+        self.phases: dict = {}
+        self.prefilter_skipped = 0
+        self.errors = 0
+        self._cost_cap_tripped = False
+
+    def record(self, phase: str, in_tok: int = 0, out_tok: int = 0,
+               cached_tok: int = 0, calls: int = 1):
+        p = self.phases.setdefault(
+            phase, {"calls": 0, "in_tok": 0, "out_tok": 0, "cached_tok": 0}
+        )
+        p["calls"] += int(calls)
+        p["in_tok"] += int(in_tok or 0)
+        p["out_tok"] += int(out_tok or 0)
+        p["cached_tok"] += int(cached_tok or 0)
+
+    def estimate_usd(self) -> float:
+        try:
+            import config  # late import to avoid circular
+            prices = config.MODEL_PRICES.get(self.model)
+        except Exception:
+            prices = None
+        if not prices:
+            return 0.0
+        in_key = "in_batch" if self.mode == "batch" else "in"
+        out_key = "out_batch" if self.mode == "batch" else "out"
+        total = 0.0
+        for p in self.phases.values():
+            non_cached_in = max(0, p["in_tok"] - p["cached_tok"])
+            total += non_cached_in * prices.get(in_key, 0.0) / 1_000_000
+            total += p["cached_tok"] * prices.get("cached_in", 0.0) / 1_000_000
+            total += p["out_tok"] * prices.get(out_key, 0.0) / 1_000_000
+        return round(total, 4)
+
+    def check_cap(self, cap_usd: float) -> bool:
+        """Returns True wenn Cap ueberschritten. Setzt _cost_cap_tripped flag."""
+        if cap_usd <= 0:
+            return False
+        current = self.estimate_usd()
+        if current > cap_usd:
+            self._cost_cap_tripped = True
+            logger.error(
+                "[COST-BREAKER] Schwelle %s USD ueberschritten (aktuell %.2f USD). "
+                "Lauf wird abgebrochen.", cap_usd, current,
+            )
+            return True
+        return False
+
+    def to_record(self) -> dict:
+        total_in = sum(p["in_tok"] for p in self.phases.values())
+        total_out = sum(p["out_tok"] for p in self.phases.values())
+        total_cached = sum(p["cached_tok"] for p in self.phases.values())
+        total_calls = sum(p["calls"] for p in self.phases.values())
+        return {
+            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "mode": self.mode,
+            "provider": self.provider,
+            "model": self.model,
+            "commit": self.commit,
+            "phases": self.phases,
+            "prefilter_skipped": self.prefilter_skipped,
+            "total_calls": total_calls,
+            "total_in_tok": total_in,
+            "total_out_tok": total_out,
+            "total_cached_tok": total_cached,
+            "est_usd": self.estimate_usd(),
+            "duration_s": round(time.time() - self.started, 1),
+            "errors": self.errors,
+            "cost_cap_tripped": self._cost_cap_tripped,
+        }
+
+    def write(self, path: Path) -> dict:
+        record = self.to_record()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.warning("Konnte Cost-Telemetrie nicht schreiben (%s): %s", path, e)
+        # Kompakte Log-Zeile fuer Quick-Glance im Journal
+        cache_pct = (
+            100.0 * record["total_cached_tok"] / record["total_in_tok"]
+            if record["total_in_tok"] else 0.0
+        )
+        logger.info(
+            "[COST] mode=%s model=%s calls=%d in=%d out=%d cached=%d (%.0f%%) "
+            "skip=%d est=$%.3f dur=%.1fs",
+            self.mode, self.model, record["total_calls"],
+            record["total_in_tok"], record["total_out_tok"],
+            record["total_cached_tok"], cache_pct,
+            self.prefilter_skipped, record["est_usd"], record["duration_s"],
+        )
+        return record
+
+
+def extract_usage_from_response(response) -> dict:
+    """Extrahiert (in_tok, out_tok, cached_tok) aus einer LLM-Response.
+
+    Funktioniert fuer:
+      - OpenAI ChatCompletion: response.usage.prompt_tokens / completion_tokens
+        / prompt_tokens_details.cached_tokens
+      - Anthropic Messages: response.usage.input_tokens / output_tokens
+        / cache_read_input_tokens
+      - Stub via SimpleNamespace (Tests)
+
+    Bei fehlenden Feldern: 0.
+    """
+    out = {"in_tok": 0, "out_tok": 0, "cached_tok": 0}
+    try:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return out
+        # OpenAI-Naming
+        out["in_tok"] = int(getattr(usage, "prompt_tokens", 0) or 0)
+        out["out_tok"] = int(getattr(usage, "completion_tokens", 0) or 0)
+        details = getattr(usage, "prompt_tokens_details", None)
+        if details is not None:
+            out["cached_tok"] = int(getattr(details, "cached_tokens", 0) or 0)
+        # Anthropic-Naming (falls OpenAI-Felder leer waren)
+        if out["in_tok"] == 0:
+            out["in_tok"] = int(getattr(usage, "input_tokens", 0) or 0)
+        if out["out_tok"] == 0:
+            out["out_tok"] = int(getattr(usage, "output_tokens", 0) or 0)
+        if out["cached_tok"] == 0:
+            out["cached_tok"] = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+    except Exception:
+        pass
+    return out
 
 
 def _log_prompt_cache_usage(response, label: str = "llm"):

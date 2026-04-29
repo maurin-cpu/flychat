@@ -21,8 +21,9 @@
     var currentView = 'meteogram';  // 'meteogram' or 'text' (analyse is permanent aside)
     var asideEl = document.getElementById('meteogramAside');
     var asideToggleBtn = document.getElementById('meteogramAsideToggle');
-    var modelToggleEl = document.getElementById('modelToggle');
-    var currentWindModel = 'default';  // 'default' (D2) or 'ch1'
+
+    // Datenquelle für Wind/Höhenwind. ICON-D2 ist der Open-Meteo-Default.
+    var WIND_MODEL_LABEL = 'ICON-D2';
 
     // Safer JSON fetch: prüft r.ok + Content-Type, liefert verständliche Fehlermeldung
     // statt "Unexpected token '<'..." wenn Server HTML (z.B. 500-Page) zurückgibt.
@@ -588,13 +589,6 @@
         currentSpotName = spotName;
         currentSpotProps = props || null;
         currentSpotRating = null;
-        currentWindModel = 'default';
-        if (modelToggleEl) {
-            modelToggleEl.style.display = 'none';
-            modelToggleEl.querySelectorAll('.model-btn').forEach(function (b) {
-                b.classList.toggle('active', b.dataset.model === 'default');
-            });
-        }
         titleEl.textContent = spotName;
         infoEl.textContent = props
             ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + props.windrichtung
@@ -666,7 +660,6 @@
                         if (idx >= 0 && idx !== currentDateIdx) {
                             currentDateIdx = idx;
                             window.currentDate = dateStr;
-                            updateModelToggle();
                             renderCurrentDay();
                             // Sync floating map day tabs + marker colours
                             syncFloatingDayTabs(dateStr);
@@ -680,7 +673,6 @@
                     tabsContainer.style.display = 'none';
                 }
 
-                updateModelToggle();
                 renderCurrentDay();
             })
             .catch(function (err) {
@@ -704,62 +696,12 @@
             });
     }
 
-    /** Show/hide model toggle and enable/disable CH1 button based on current day */
-    function updateModelToggle() {
-        if (!modelToggleEl || !currentWeather) return;
-        // CH1 verfügbar wenn altitude-wind CH1-Profile hat
-        var hasCh1 = !!(currentAltWind && currentAltWind.data_ch1);
-        modelToggleEl.style.display = hasCh1 ? '' : 'none';
-        if (!hasCh1) return;
-        var dateStr = currentDates[currentDateIdx];
-        var ch1Btn = modelToggleEl.querySelector('[data-model="ch1"]');
-        if (ch1Btn) {
-            var available = !!(currentAltWind.data_ch1[dateStr]);
-            ch1Btn.disabled = !available;
-            // If CH1 selected but not available on this day, revert to default
-            if (!available && currentWindModel === 'ch1') {
-                currentWindModel = 'default';
-                modelToggleEl.querySelectorAll('.model-btn').forEach(function (b) {
-                    b.classList.toggle('active', b.dataset.model === 'default');
-                });
-            }
-        }
-    }
-
-    /** Swap wind data to CH1 model values (returns shallow copy of wxDay with replaced wind array) */
-    function applyWindModel(wxDay) {
-        if (currentWindModel !== 'ch1' || !wxDay || !wxDay.wind) return wxDay;
-        var copy = {};
-        for (var k in wxDay) copy[k] = wxDay[k];
-        copy.wind = wxDay.wind.map(function (w) {
-            if (w.gusts_ch1 != null) {
-                return {
-                    time: w.time,
-                    speed: w.speed_ch1 != null ? w.speed_ch1 : w.speed,
-                    gusts: w.gusts_ch1,
-                    direction: w.direction_ch1 != null ? w.direction_ch1 : w.direction,
-                    speed_ch1: w.speed_ch1,
-                    gusts_ch1: w.gusts_ch1,
-                    direction_ch1: w.direction_ch1,
-                };
-            }
-            return w;
-        });
-        return copy;
-    }
-
     function renderCurrentDay() {
         var dateStr = currentDates[currentDateIdx];
         if (!dateStr) return;
 
         var wxDay = currentWeather.data[dateStr] || {};
-        wxDay = applyWindModel(wxDay);
-
-        // Bei CH1-Modell: alternative Höhenprofile + Bodenwind verwenden (falls vorhanden)
-        var useCh1 = currentWindModel === 'ch1';
-        var altSource = useCh1 && currentAltWind.data_ch1 ? currentAltWind.data_ch1 : currentAltWind.data;
-        var gwSource = useCh1 && currentAltWind.ground_wind_ch1 ? currentAltWind.ground_wind_ch1 : currentAltWind.ground_wind;
-        var altProfiles = (altSource && altSource[dateStr]) || [];
+        var altProfiles = (currentAltWind.data && currentAltWind.data[dateStr]) || [];
 
         // renderChart expects altDay = {profiles: [{time, levels: [...]}]}
         var altDay = { profiles: [] };
@@ -773,7 +715,7 @@
         // Bodenwind (10m, terrain-korrigiert) pro Stunde -> Lookup {time: data}
         // Safety-relevanter Startwind, getrennt vom freien Höhenwind.
         var groundWindByTime = {};
-        var gwList = (gwSource && gwSource[dateStr]) || [];
+        var gwList = (currentAltWind.ground_wind && currentAltWind.ground_wind[dateStr]) || [];
         gwList.forEach(function (g) {
             var t = dateStr + 'T' + (g.hour < 10 ? '0' : '') + g.hour + ':00:00';
             groundWindByTime[t] = g;
@@ -787,16 +729,18 @@
             thresholds: currentWeather.thresholds,
         });
 
-        // Wetter-Zeitstempel unter dem Spot-Meteogramm
+        // Wetter-Zeitstempel + Modell unter dem Spot-Meteogramm
         var existingTs = chartContainer.querySelector('.meteogram-weather-ts');
         if (existingTs) existingTs.remove();
+        var tsDiv = document.createElement('div');
+        tsDiv.className = 'meteogram-weather-ts';
+        tsDiv.style.cssText = 'font-size:10px;color:#94a3b8;text-align:right;padding:2px 8px 0;';
+        var parts = ['Modell: ' + WIND_MODEL_LABEL];
         if (currentWeather.last_updated) {
-            var tsDiv = document.createElement('div');
-            tsDiv.className = 'meteogram-weather-ts';
-            tsDiv.style.cssText = 'font-size:10px;color:#94a3b8;text-align:right;padding:2px 8px 0;';
-            tsDiv.textContent = 'Wetter-Stand: ' + currentWeather.last_updated.replace('T', ' ').slice(0, 16);
-            chartContainer.appendChild(tsDiv);
+            parts.push('Wetter-Stand: ' + currentWeather.last_updated.replace('T', ' ').slice(0, 16));
         }
+        tsDiv.textContent = parts.join(' · ');
+        chartContainer.appendChild(tsDiv);
 
         // Analyse panel is always visible in the aside – refresh on every day change.
         renderAnalyseView();
@@ -813,8 +757,6 @@
         tooltipEl.classList.remove('visible');
         currentWeather = null;
         currentAltWind = null;
-        currentWindModel = 'default';
-        if (modelToggleEl) modelToggleEl.style.display = 'none';
         if (window._overlayScrollUnlock) window._overlayScrollUnlock();
     }
 
@@ -846,7 +788,6 @@
         var idx = currentDates.indexOf(newDate);
         if (idx >= 0 && idx !== currentDateIdx) {
             currentDateIdx = idx;
-            updateModelToggle();
             renderCurrentDay();
             // Keep overlay day tabs in sync
             tabsContainer.querySelectorAll('.tab-btn').forEach(function (b, i) {
@@ -888,21 +829,6 @@
             closeMeteogram();
         }
     });
-
-    // Model toggle (D2 / CH1) click handler
-    if (modelToggleEl) {
-        modelToggleEl.addEventListener('click', function (e) {
-            var btn = e.target.closest('.model-btn');
-            if (!btn || btn.disabled) return;
-            var model = btn.dataset.model;
-            if (model === currentWindModel) return;
-            currentWindModel = model;
-            modelToggleEl.querySelectorAll('.model-btn').forEach(function (b) {
-                b.classList.toggle('active', b.dataset.model === model);
-            });
-            renderCurrentDay();
-        });
-    }
 
     // ===== HIGHLIGHTING =====
     window.highlightSpots = function (items) {

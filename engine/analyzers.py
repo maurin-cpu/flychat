@@ -56,6 +56,7 @@ from engine._common import (
     _CTX_CACHE_MAX_ENTRIES,
     _estimate_tokens, _truncate_weather_context, _filter_context_by_days,
     _log_prompt_cache_usage, _weekday_de,
+    BatchCostTracker, extract_usage_from_response,
     _is_permanent_api_error, _user_friendly_api_error,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _TIER_RATING_RANGES, _clamp_rating_to_tier, _compute_rating_from_subratings,
@@ -272,7 +273,7 @@ class AnalyzersMixin:
                         max_tokens=1100,
                         response_format={"type": "json_object"},
                     )
-                    _log_prompt_cache_usage(response, label="spot_combined")
+                    self._record_call_usage(response, "spot_combined")
                     raw = response.choices[0].message.content
                     result = json.loads(raw)
                     last_err = None
@@ -329,7 +330,7 @@ class AnalyzersMixin:
                         max_tokens=600,
                         response_format={"type": "json_object"},
                     )
-                    _log_prompt_cache_usage(response, label="spot_safety")
+                    self._record_call_usage(response, "spot_safety")
                     raw = response.choices[0].message.content
                     result = json.loads(raw)
                     last_err = None
@@ -388,7 +389,7 @@ class AnalyzersMixin:
                         max_tokens=900,
                         response_format={"type": "json_object"},
                     )
-                    _log_prompt_cache_usage(response, label="spot_flyability")
+                    self._record_call_usage(response, "spot_fly")
                     raw = response.choices[0].message.content
                     result = json.loads(raw)
                     last_err = None
@@ -450,7 +451,7 @@ class AnalyzersMixin:
                         max_tokens=600,
                         response_format={"type": "json_object"},
                     )
-                    _log_prompt_cache_usage(response, label="region_safety")
+                    self._record_call_usage(response, "region_safety")
                     raw = response.choices[0].message.content
                     result = json.loads(raw)
                     last_err = None
@@ -509,7 +510,7 @@ class AnalyzersMixin:
                         max_tokens=900,
                         response_format={"type": "json_object"},
                     )
-                    _log_prompt_cache_usage(response, label="region_flyability")
+                    self._record_call_usage(response, "region_fly")
                     raw = response.choices[0].message.content
                     result = json.loads(raw)
                     last_err = None
@@ -741,7 +742,7 @@ class AnalyzersMixin:
                         max_tokens=1100,
                         response_format={"type": "json_object"},
                     )
-                    _log_prompt_cache_usage(response, label="region_combined")
+                    self._record_call_usage(response, "region_combined")
                     raw = response.choices[0].message.content
                     result = json.loads(raw)
                     last_err = None
@@ -1533,8 +1534,13 @@ class AnalyzersMixin:
         logger.info(f"Batch erstellt: {batch.id} ({description}), Status: {batch.status}")
         return batch.id
 
-    def _poll_batch(self, batch_id: str, poll_interval: int = None) -> dict:
-        """Pollt Batch bis abgeschlossen. Gibt {custom_id: parsed_json} zurueck."""
+    def _poll_batch(self, batch_id: str, poll_interval: int = None) -> tuple[dict, dict]:
+        """Pollt Batch bis abgeschlossen.
+
+        Returns: (results, usage_summary)
+          results: {custom_id: parsed_json}
+          usage_summary: {"calls": n, "in_tok": n, "out_tok": n, "cached_tok": n}
+        """
         if poll_interval is None:
             poll_interval = config.LLM_BATCH_POLL_INTERVAL
 
@@ -1561,6 +1567,7 @@ class AnalyzersMixin:
 
         content = self.analysis_client.files.content(output_file_id)
         results = {}
+        usage_sum = {"calls": 0, "in_tok": 0, "out_tok": 0, "cached_tok": 0}
         for line in content.text.strip().split("\n"):
             if not line.strip():
                 continue
@@ -1577,8 +1584,30 @@ class AnalyzersMixin:
             else:
                 err = entry.get("error", {})
                 results[custom_id] = {"error": err.get("message", "Keine Antwort")}
-        logger.info(f"Batch {batch_id}: {len(results)} Ergebnisse geparst")
-        return results
+            # Token-Usage pro Eintrag aufsummieren (auch bei JSON-Parse-Fehlern relevant)
+            usage = resp_body.get("usage") or {}
+            usage_sum["calls"] += 1
+            usage_sum["in_tok"] += int(usage.get("prompt_tokens", 0) or 0)
+            usage_sum["out_tok"] += int(usage.get("completion_tokens", 0) or 0)
+            details = usage.get("prompt_tokens_details") or {}
+            usage_sum["cached_tok"] += int(details.get("cached_tokens", 0) or 0)
+        logger.info(
+            f"Batch {batch_id}: {len(results)} Ergebnisse geparst, "
+            f"in_tok={usage_sum['in_tok']:,} out_tok={usage_sum['out_tok']:,} "
+            f"cached={usage_sum['cached_tok']:,}"
+        )
+        return results, usage_sum
+
+    def _record_call_usage(self, response, phase_label: str) -> None:
+        """Loggt Cache-Hit-Rate UND aggregiert Tokens auf self._cost_tracker
+        (falls gesetzt durch run_all_analyses_stream).
+        """
+        _log_prompt_cache_usage(response, label=phase_label)
+        tracker = getattr(self, "_cost_tracker", None)
+        if tracker is None:
+            return
+        u = extract_usage_from_response(response)
+        tracker.record(phase_label, u["in_tok"], u["out_tok"], u["cached_tok"], calls=1)
 
     def _apply_foehn_decision(self, result: dict, cache_key: str, label: str) -> None:
         """Wendet die deterministische Foehn-Decision (Stage-Inversion) auf das LLM-Result.
@@ -1903,6 +1932,12 @@ class AnalyzersMixin:
             "total_calls": total_items,
         }}
 
+        # Cost-Telemetrie: aggregiert Tokens pro Phase, schreibt am Ende eine
+        # JSONL-Zeile nach config.COST_TELEMETRY_PATH.
+        cost_tracker = BatchCostTracker(
+            mode="batch", provider=self.analysis_provider, model=self.analysis_model,
+        )
+
         region_safety_results: dict = {}   # {rid: {date_str: safety_result}}
         region_results: dict = {}           # {rid: {date_str: merged_result}}
         spot_safety_results: dict = {}      # {name: {date_str: safety_result}}
@@ -1955,9 +1990,20 @@ class AnalyzersMixin:
 
             yield {"event": "phase", "data": {"phase": "batch_poll_region_safety", "batch_id": batch_id, "total": len(region_safety_requests)}}
             try:
-                raw_results = self._poll_batch(batch_id)
+                raw_results, usage = self._poll_batch(batch_id)
+                cost_tracker.record(
+                    "region_safety",
+                    in_tok=usage["in_tok"], out_tok=usage["out_tok"],
+                    cached_tok=usage["cached_tok"], calls=usage["calls"],
+                )
+                if cost_tracker.check_cap(config.LLM_COST_CAP_USD):
+                    cost_tracker.write(config.COST_TELEMETRY_PATH)
+                    yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
+                    return
             except Exception as e:
                 logger.error(f"Region-Safety-Batch-Poll fehlgeschlagen: {e}")
+                cost_tracker.errors += 1
+                cost_tracker.write(config.COST_TELEMETRY_PATH)
                 yield {"event": "error", "data": {"message": f"Region-Safety-Batch fehlgeschlagen: {e}"}}
                 return
 
@@ -2040,9 +2086,20 @@ class AnalyzersMixin:
 
             yield {"event": "phase", "data": {"phase": "batch_poll_region_flyability", "batch_id": batch_id, "total": len(region_fly_requests)}}
             try:
-                raw_results = self._poll_batch(batch_id)
+                raw_results, usage = self._poll_batch(batch_id)
+                cost_tracker.record(
+                    "region_fly",
+                    in_tok=usage["in_tok"], out_tok=usage["out_tok"],
+                    cached_tok=usage["cached_tok"], calls=usage["calls"],
+                )
+                if cost_tracker.check_cap(config.LLM_COST_CAP_USD):
+                    cost_tracker.write(config.COST_TELEMETRY_PATH)
+                    yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
+                    return
             except Exception as e:
                 logger.error(f"Region-Flyability-Batch-Poll fehlgeschlagen: {e}")
+                cost_tracker.errors += 1
+                cost_tracker.write(config.COST_TELEMETRY_PATH)
                 yield {"event": "error", "data": {"message": f"Region-Flyability-Batch fehlgeschlagen: {e}"}}
                 return
 
@@ -2152,6 +2209,7 @@ class AnalyzersMixin:
                 })
                 spot_safety_meta[cid] = (name, date_str, spot)
 
+        cost_tracker.prefilter_skipped = prefilter_count
         if prefilter_count:
             logger.info(
                 f"[BATCH] Pre-Filter: {prefilter_count} Spots/Tage als not_safe markiert "
@@ -2174,9 +2232,20 @@ class AnalyzersMixin:
 
             yield {"event": "phase", "data": {"phase": "batch_poll_spot_safety", "batch_id": batch_id, "total": len(spot_safety_requests)}}
             try:
-                raw_results = self._poll_batch(batch_id)
+                raw_results, usage = self._poll_batch(batch_id)
+                cost_tracker.record(
+                    "spot_safety",
+                    in_tok=usage["in_tok"], out_tok=usage["out_tok"],
+                    cached_tok=usage["cached_tok"], calls=usage["calls"],
+                )
+                if cost_tracker.check_cap(config.LLM_COST_CAP_USD):
+                    cost_tracker.write(config.COST_TELEMETRY_PATH)
+                    yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
+                    return
             except Exception as e:
                 logger.error(f"Spot-Safety-Batch-Poll fehlgeschlagen: {e}")
+                cost_tracker.errors += 1
+                cost_tracker.write(config.COST_TELEMETRY_PATH)
                 yield {"event": "error", "data": {"message": f"Spot-Safety-Batch fehlgeschlagen: {e}"}}
                 return
 
@@ -2258,9 +2327,20 @@ class AnalyzersMixin:
 
             yield {"event": "phase", "data": {"phase": "batch_poll_spot_flyability", "batch_id": batch_id, "total": len(spot_fly_requests)}}
             try:
-                raw_results = self._poll_batch(batch_id)
+                raw_results, usage = self._poll_batch(batch_id)
+                cost_tracker.record(
+                    "spot_fly",
+                    in_tok=usage["in_tok"], out_tok=usage["out_tok"],
+                    cached_tok=usage["cached_tok"], calls=usage["calls"],
+                )
+                if cost_tracker.check_cap(config.LLM_COST_CAP_USD):
+                    cost_tracker.write(config.COST_TELEMETRY_PATH)
+                    yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
+                    return
             except Exception as e:
                 logger.error(f"Spot-Flyability-Batch-Poll fehlgeschlagen: {e}")
+                cost_tracker.errors += 1
+                cost_tracker.write(config.COST_TELEMETRY_PATH)
                 yield {"event": "error", "data": {"message": f"Spot-Flyability-Batch fehlgeschlagen: {e}"}}
                 return
 
@@ -2470,17 +2550,27 @@ class AnalyzersMixin:
         if self.instantdb:
             threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
 
-        total_calls = len(requests)
-        logger.info(f"Batch-Combined-Analysen abgeschlossen: {total_calls} Calls "
-                    f"(Single-Phase, halbiert vs. vorher 2-Phasen)")
+        # Cost-Telemetrie schreiben (immer, auch ohne Fehler).
+        cost_record = cost_tracker.write(config.COST_TELEMETRY_PATH)
+
+        safety_count = sum(p["calls"] for k, p in cost_tracker.phases.items() if k.endswith("_safety"))
+        fly_count    = sum(p["calls"] for k, p in cost_tracker.phases.items() if k.endswith("_fly"))
+        total_calls  = safety_count + fly_count
+        logger.info(
+            f"Batch-Split-Analysen abgeschlossen: {total_calls} Calls "
+            f"(Safety={safety_count}, Flyability={fly_count}, "
+            f"Skip={cost_tracker.prefilter_skipped}, Kosten=${cost_record['est_usd']})"
+        )
 
         yield {"event": "done", "data": {
             "success": True,
             "mode": "batch",
             "total_calls": total_calls,
-            "combined_count": total_calls,
-            "safety_count": total_calls,  # Rueckwaertskompatibilitaet UI
-            "flyability_count": 0,
+            "safety_count": safety_count,
+            "flyability_count": fly_count,
+            "prefilter_skipped": cost_tracker.prefilter_skipped,
+            "est_usd": cost_record["est_usd"],
+            "duration_s": cost_record["duration_s"],
         }}
 
     def run_all_analyses_stream(self):
@@ -2504,6 +2594,12 @@ class AnalyzersMixin:
         self._ctx_gust_cache.clear()
         self._ctx_tq_cache.clear()
         self._ctx_foehn_cache.clear()
+
+        # Cost-Telemetrie fuer Parallel-Pfad. Wird von _record_call_usage()
+        # in den per-Call-Methoden gefuettert.
+        self._cost_tracker = BatchCostTracker(
+            mode="parallel", provider=self.analysis_provider, model=self.analysis_model,
+        )
 
         if not self.analysis_client:
             yield {"event": "error", "data": {"message": f"Kein API-Key fuer Analyse-Provider '{self.analysis_provider}'"}}
@@ -2850,6 +2946,8 @@ class AnalyzersMixin:
                         fly_c[ft] += 1
                 per_day_counts[date_str] = {"safety": safety_c, "fly": fly_c, "error": err_n}
 
+            cost_record = self._cost_tracker.write(config.COST_TELEMETRY_PATH)
+
             yield {"event": "done", "data": {
                 "success": True,
                 "total_calls": actual_calls,
@@ -2862,13 +2960,26 @@ class AnalyzersMixin:
                     "dates": forecast_dates,
                     "per_day_counts": per_day_counts,
                 },
+                "est_usd": cost_record["est_usd"],
+                "duration_s": cost_record["duration_s"],
             }}
 
         except GeneratorExit:
             logger.warning("[UNIFIED] Client hat Verbindung geschlossen (GeneratorExit)")
+            try:
+                self._cost_tracker.write(config.COST_TELEMETRY_PATH)
+            except Exception:
+                pass
         except Exception as e:
             logger.exception("[UNIFIED] run_all_analyses_stream Fehler")
+            try:
+                self._cost_tracker.errors += 1
+                self._cost_tracker.write(config.COST_TELEMETRY_PATH)
+            except Exception:
+                pass
             yield {"event": "error", "data": {"message": str(e)}}
+        finally:
+            self._cost_tracker = None
 
     def _build_analyses_context(self) -> str:
         """Formatiert Voranalysen zweistufig: Sicherheit zuerst, dann Flugtauglichkeit."""

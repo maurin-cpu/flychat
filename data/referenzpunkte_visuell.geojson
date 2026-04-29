@@ -1854,8 +1854,8 @@
         ]
       },
       "properties": {
-        "id": "chur_mittelbuenden",
-        "region": "Chur / Mittelbünden",
+        "id": "praettigau_davos",
+        "region": "Prättigau - Davos",
         "name": "Fanas Eggli",
         "elevation_ref": 1700,
         "reference_points": [
@@ -1890,7 +1890,7 @@
       },
       "properties": {
         "name": "Ref 1: Fanas Eggli",
-        "region_id": "chur_mittelbuenden",
+        "region_id": "praettigau_davos",
         "is_reference_point": true,
         "original_lat": 46.8629,
         "original_lon": 10.0579
@@ -1907,7 +1907,7 @@
       },
       "properties": {
         "name": "Ref 2: Fanas Eggli",
-        "region_id": "chur_mittelbuenden",
+        "region_id": "praettigau_davos",
         "is_reference_point": true,
         "original_lat": 47.0249,
         "original_lon": 9.5896
@@ -1924,7 +1924,7 @@
       },
       "properties": {
         "name": "Ref 3: Fanas Eggli",
-        "region_id": "chur_mittelbuenden",
+        "region_id": "praettigau_davos",
         "is_reference_point": true,
         "original_lat": 46.7548,
         "original_lon": 9.7234
@@ -1941,7 +1941,7 @@
       },
       "properties": {
         "name": "Ref 4: Fanas Eggli",
-        "region_id": "chur_mittelbuenden",
+        "region_id": "praettigau_davos",
         "is_reference_point": true,
         "original_lat": 46.9709,
         "original_lon": 9.8572
@@ -2029,8 +2029,8 @@
         ]
       },
       "properties": {
-        "id": "suedbuenden",
-        "region": "Südbünden",
+        "id": "rheintal",
+        "region": "Ostschweiz",
         "name": "Santa Maria in Calanca",
         "elevation_ref": 1500,
         "reference_points": [
@@ -2065,7 +2065,7 @@
       },
       "properties": {
         "name": "Ref 1: Santa Maria in Calanca",
-        "region_id": "suedbuenden",
+        "region_id": "rheintal",
         "is_reference_point": true,
         "original_lat": 47.5361,
         "original_lon": 9.7541
@@ -2082,7 +2082,7 @@
       },
       "properties": {
         "name": "Ref 2: Santa Maria in Calanca",
-        "region_id": "suedbuenden",
+        "region_id": "rheintal",
         "is_reference_point": true,
         "original_lat": 46.8213,
         "original_lon": 9.4307
@@ -2099,7 +2099,7 @@
       },
       "properties": {
         "name": "Ref 3: Santa Maria in Calanca",
-        "region_id": "suedbuenden",
+        "region_id": "rheintal",
         "is_reference_point": true,
         "original_lat": 47.2297,
         "original_lon": 9.3768
@@ -2116,7 +2116,7 @@
       },
       "properties": {
         "name": "Ref 4: Santa Maria in Calanca",
-        "region_id": "suedbuenden",
+        "region_id": "rheintal",
         "is_reference_point": true,
         "original_lat": 47.2297,
         "original_lon": 9.6463
@@ -5127,8 +5127,8 @@
         ]
       },
       "properties": {
-        "id": "urner_alpen",
-        "region": "Urner Alpen",
+        "id": "bodenseeraum",
+        "region": "Bodenseeraum",
         "name": "Eggberge Altdorf",
         "elevation_ref": 1500,
         "reference_points": [
@@ -5163,7 +5163,7 @@
       },
       "properties": {
         "name": "Ref 1: Eggberge Altdorf",
-        "region_id": "urner_alpen",
+        "region_id": "bodenseeraum",
         "is_reference_point": true,
         "original_lat": 47.598,
         "original_lon": 9.6448
@@ -5180,7 +5180,7 @@
       },
       "properties": {
         "name": "Ref 2: Eggberge Altdorf",
-        "region_id": "urner_alpen",
+        "region_id": "bodenseeraum",
         "is_reference_point": true,
         "original_lat": 47.4727,
         "original_lon": 8.548
@@ -5197,7 +5197,7 @@
       },
       "properties": {
         "name": "Ref 3: Eggberge Altdorf",
-        "region_id": "urner_alpen",
+        "region_id": "bodenseeraum",
         "is_reference_point": true,
         "original_lat": 47.8486,
         "original_lon": 9.0181
@@ -5214,7 +5214,7 @@
       },
       "properties": {
         "name": "Ref 4: Eggberge Altdorf",
-        "region_id": "urner_alpen",
+        "region_id": "bodenseeraum",
         "is_reference_point": true,
         "original_lat": 47.41,
         "original_lon": 9.1747
