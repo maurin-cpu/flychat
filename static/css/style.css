@@ -3380,6 +3380,16 @@ body.overlay-open {
     font-size: 12px;
 }
 .fb-comment__toggle:hover { color: var(--color-text); border-color: var(--color-text-muted); }
+.fb-widget--has-comment .fb-comment__toggle {
+    background: #dcfce7;
+    border: 1px solid #16a34a;
+    color: #15803d;
+    border-style: solid;
+}
+.fb-widget--has-comment .fb-comment__toggle::before {
+    content: '✓ ';
+    font-weight: 700;
+}
 
 .fb-widget__status {
     margin-top: 6px;
@@ -3398,26 +3408,41 @@ body.overlay-open {
 .fb-saved-comment {
     display: none;
     align-items: flex-start;
-    gap: 6px;
-    margin-top: 6px;
-    padding: 6px 10px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: #dcfce7;
+    border-left: 4px solid #16a34a;
     border-radius: var(--radius-sm, 6px);
-    font-size: 12.5px;
-    color: #166534;
+    font-size: 13px;
+    color: #14532d;
+    box-shadow: 0 1px 2px rgba(22,163,74,0.08);
 }
-.fb-saved-comment__icon { font-size: 14px; line-height: 1.4; flex-shrink: 0; }
+.fb-saved-comment__icon { font-size: 16px; line-height: 1.3; flex-shrink: 0; }
 .fb-saved-comment__text {
-    flex: 1; line-height: 1.4;
+    flex: 1; line-height: 1.45;
     word-break: break-word; white-space: pre-wrap;
+    font-weight: 500;
 }
 .fb-saved-comment__edit {
-    background: transparent; border: none; padding: 0;
+    background: transparent; border: 1px solid #16a34a; padding: 3px 10px;
     color: #15803d; cursor: pointer;
-    font-size: 11.5px; text-decoration: underline; flex-shrink: 0;
+    font-size: 11.5px; border-radius: 999px; flex-shrink: 0;
+    font-weight: 500;
 }
-.fb-saved-comment__edit:hover { color: #14532d; }
+.fb-saved-comment__edit:hover {
+    background: #16a34a; color: #fff;
+}
+
+/* Wenn ein Kommentar gespeichert ist, ganze Bar leicht grün hinterlegen */
+.fb-widget--has-comment {
+    background: linear-gradient(to bottom, #f0fdf4, #ecfdf5);
+}
+.meteogram-feedback-bar .fb-widget--has-comment {
+    background: linear-gradient(to bottom, #f0fdf4, #ecfdf5);
+    border-left: 3px solid #16a34a;
+    padding-left: 11px;
+}
 
 .fb-comment__textarea {
     width: 100%;

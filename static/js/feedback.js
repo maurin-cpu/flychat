@@ -185,8 +185,9 @@
             upBtn.classList.toggle('fb-btn--active', state.own && state.own.vote === 'up');
             downBtn.classList.toggle('fb-btn--active', state.own && state.own.vote === 'down');
             // Gespeicherten Kommentar als Preview anzeigen (wenn Box nicht offen)
-            var hasComment = state.own && state.own.comment;
+            var hasComment = !!(state.own && state.own.comment);
             var commentingNow = mountEl.classList.contains('fb-widget--commenting');
+            mountEl.classList.toggle('fb-widget--has-comment', hasComment);
             savedPreview.style.display = (hasComment && !commentingNow) ? '' : 'none';
             if (hasComment) savedText.textContent = state.own.comment;
             if (hasComment) {

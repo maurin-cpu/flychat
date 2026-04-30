@@ -22,7 +22,7 @@
   .fb-pill--wrong   { background:#fde8e8; color:#a32020; }
   .fb-pill--spot   { background:#eef2ff; color:#3b3a9c; }
   .fb-pill--region { background:#f5edff; color:#6b3aa3; }
-  .fb-comment {
+  .fb-comment-text {
     white-space: pre-wrap; word-break: break-word;
     max-width: 380px; font-size: var(--text-sm);
     color: var(--color-text);
@@ -135,7 +135,7 @@
                 {% else %}<span class="fb-meta">—</span>{% endif %}
               </td>
               <td>
-                {% if f.comment %}<div class="fb-comment">{{ f.comment }}</div>
+                {% if f.comment %}<div class="fb-comment-text">{{ f.comment }}</div>
                 {% else %}<span class="fb-meta">—</span>{% endif %}
               </td>
               <td>
@@ -265,7 +265,7 @@
                 {% if f.email %}{{ f.email }}{% else %}<span class="fb-meta">—</span>{% endif %}
                 <br><span class="fb-meta">#{{ f.subscriber_id }}</span>
               </td>
-              <td><div class="fb-comment">{{ f.message }}</div></td>
+              <td><div class="fb-comment-text">{{ f.message }}</div></td>
               <td>
                 <form method="post" action="/admin/feedback/product/{{ f.id }}/delete"
                       onsubmit="return confirm('Nachricht #{{ f.id }} löschen?');" style="display:inline;">
