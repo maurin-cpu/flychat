@@ -27,6 +27,7 @@ from engine.decision_engine import (
     decide_flyability_mech_danger,
     decide_flyability_upgrade,
     decide_flyability_region_gate,
+    compute_safety_band,
 )
 from engine._common import (
     _compute_experience_score,
@@ -607,6 +608,103 @@ class TestSafetyRating(unittest.TestCase):
         self.assertEqual(_compute_safety_score("oops"), 0)
         self.assertEqual(_compute_safety_score(-5.0), 0)
         self.assertEqual(_compute_safety_score(15.0), 100)
+
+
+# ════════════════════════════════════════════════════════════════════
+# Phase 1: compute_safety_band (RATING_CONCEPT v1.3 §3.1)
+# ════════════════════════════════════════════════════════════════════
+# Hybrid: Decision-Engine-Hard-Overrides haben Vorrang vor safety_score.
+# - safety_status="not_safe" oder FoehnDanger/AloftNotSafe → red
+# - safety_status="conditional" oder FoehnCaution/GustFloor/AloftConditional → amber
+# - sonst: safety_score-basierter Fallback (< 40 → amber, sonst green)
+class TestSafetyBand(unittest.TestCase):
+    def _result(self, status="safe", score=80, decisions=None, foehn_risk=0):
+        return {
+            "safety_status": status,
+            "safety_score": score,
+            "_decisions_applied": decisions or [],
+            "foehn_risk": foehn_risk,
+        }
+
+    # ── Hard-Override → red ──
+    def test_not_safe_status_yields_red(self):
+        # safety_status=not_safe ist immer red, egal wie hoch score
+        self.assertEqual(compute_safety_band(self._result(status="not_safe", score=100)), "red")
+
+    def test_foehn_danger_yields_red(self):
+        self.assertEqual(
+            compute_safety_band(self._result(status="safe", score=90, decisions=["FoehnDanger(7.5)"])),
+            "red"
+        )
+
+    def test_aloft_not_safe_yields_red(self):
+        self.assertEqual(
+            compute_safety_band(self._result(status="safe", score=90, decisions=["AloftNotSafe(45)"])),
+            "red"
+        )
+
+    # ── Hard-Override → amber ──
+    def test_conditional_status_yields_amber(self):
+        # safety_status=conditional ist immer amber, egal wie hoch score
+        self.assertEqual(compute_safety_band(self._result(status="conditional", score=85)), "amber")
+
+    def test_foehn_caution_yields_amber(self):
+        self.assertEqual(
+            compute_safety_band(self._result(status="safe", score=85, decisions=["FoehnCaution(4.5)"])),
+            "amber"
+        )
+
+    def test_high_foehn_risk_yields_amber(self):
+        # foehn_risk >= 4.0 → amber auch ohne explizites Decision-Tag
+        self.assertEqual(
+            compute_safety_band(self._result(status="safe", score=85, foehn_risk=4.5)),
+            "amber"
+        )
+
+    def test_gust_floor_yields_amber(self):
+        self.assertEqual(
+            compute_safety_band(self._result(status="safe", score=85, decisions=["GustFloor(3h)"])),
+            "amber"
+        )
+
+    def test_aloft_conditional_yields_amber(self):
+        self.assertEqual(
+            compute_safety_band(self._result(status="safe", score=85, decisions=["AloftConditional(2h)"])),
+            "amber"
+        )
+
+    def test_wind_strong_majority_yields_amber(self):
+        self.assertEqual(
+            compute_safety_band(self._result(status="safe", score=85, decisions=["WindStrongMajority(5)"])),
+            "amber"
+        )
+
+    # ── Score-basiert (kein Override aktiv) ──
+    def test_high_score_yields_green(self):
+        self.assertEqual(compute_safety_band(self._result(status="safe", score=85)), "green")
+
+    def test_low_score_yields_amber(self):
+        # score < 40 → amber auch wenn keine Decision-Tags
+        # Beispiel: weather_safety_rating=3, alle anderen 9 → MIN=3 → score=30
+        self.assertEqual(compute_safety_band(self._result(status="safe", score=30)), "amber")
+
+    def test_boundary_score_40_yields_green(self):
+        # score == 40 → green (untere Schwelle ist exklusiv: score < 40 → amber)
+        self.assertEqual(compute_safety_band(self._result(status="safe", score=40)), "green")
+
+    def test_boundary_score_39_yields_amber(self):
+        self.assertEqual(compute_safety_band(self._result(status="safe", score=39)), "amber")
+
+    # ── Edge Cases ──
+    def test_empty_result_defaults_safe_path(self):
+        # Komplett leerer Result: status defaults to "" → kein Override → score=0 → amber
+        self.assertEqual(compute_safety_band({}), "amber")
+
+    def test_decisions_as_string_handled(self):
+        # _decisions_applied kann manchmal als String kommen (Cache-Quirk)
+        result = self._result(status="safe", score=85)
+        result["_decisions_applied"] = "FoehnDanger(8.0)"  # String, kein List
+        self.assertEqual(compute_safety_band(result), "red")
 
 
 if __name__ == "__main__":

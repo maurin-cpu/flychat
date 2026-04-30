@@ -45,6 +45,7 @@ from engine.decision_engine import (
     decide_flyability_low_reward, decide_flyability_mech_danger,
     decide_flyability_upgrade,
     decide_flyability_region_gate,
+    compute_safety_band,
 )
 from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
@@ -1718,6 +1719,7 @@ class AnalyzersMixin:
             result["experience_stars"] = _compute_experience_stars(result["experience_score"])
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
+            result["safety_band"] = compute_safety_band(result)
             result["is_conditional"] = False
             result["conditional_reason"] = ""
             return result
@@ -1806,6 +1808,9 @@ class AnalyzersMixin:
         # RAIN-WARN, CAPE-DANGER, OVERCAST-DANGER) wirken parallel auf safety_status.
         result["safety_rating"] = _compute_safety_rating(result)
         result["safety_score"] = _compute_safety_score(result["safety_rating"])
+        # safety_band (RATING_CONCEPT v1.3 §3.1, Phase 1): Hybrid aus Hard-Overrides
+        # + Score. Hard-Decisions haben Vorrang vor LLM-Score.
+        result["safety_band"] = compute_safety_band(result)
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False
@@ -1894,6 +1899,7 @@ class AnalyzersMixin:
             result["experience_stars"] = _compute_experience_stars(result["experience_score"])
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
+            result["safety_band"] = compute_safety_band(result)
             result["is_conditional"] = False
             result["conditional_reason"] = ""
             return result
@@ -1926,6 +1932,8 @@ class AnalyzersMixin:
         # safety_rating / safety_score (RATING_CONCEPT v1.3 Vorab-Fix #4): Weakest-Link
         result["safety_rating"] = _compute_safety_rating(result)
         result["safety_score"] = _compute_safety_score(result["safety_rating"])
+        # safety_band (RATING_CONCEPT v1.3 §3.1, Phase 1)
+        result["safety_band"] = compute_safety_band(result)
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False

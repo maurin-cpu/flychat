@@ -366,6 +366,75 @@ def decide_is_conditional(result: dict, label: str) -> Optional[str]:
     return None
 
 
+def compute_safety_band(result: dict) -> str:
+    """Leitet `safety_band` (green/amber/red) aus `safety_score` + Decision-
+    Engine-Hard-Overrides ab.
+
+    RATING_CONCEPT v1.3 §3.1 — Hybrid: Strukturelle Sicherheits-Decisions
+    (Foehn, Aloft, etc.) haben Vorrang vor dem LLM-Score. Wenn ein
+    Foehndurchbruch erkannt wird, ist der Tag rot, egal was das LLM zu Wind
+    und Boeen sagt. Erst wenn keine Hard-Override greift, entscheidet der
+    Score (gebildet via Weakest-Link aus 5 Sub-Ratings, siehe
+    `_compute_safety_rating`).
+
+    Reihenfolge:
+      1. Hard-Override → red:
+         - safety_status == "not_safe"
+         - "FoehnDanger" in _decisions_applied
+         - "AloftNotSafe" in _decisions_applied
+      2. Hard-Override → amber:
+         - safety_status == "conditional"
+         - "FoehnCaution" in _decisions_applied
+         - foehn_risk >= 4.0 (numerisch, falls vorhanden)
+         - GustFloor / AloftConditional / WindStrongMajority in _decisions_applied
+      3. Score-basiert:
+         - safety_score < 40 → amber (LLM-Sub-Ratings selbst sehen Probleme)
+         - sonst → green
+    """
+    # _decisions_applied tolerieren als List ODER String (Cache-Quirk)
+    decisions = result.get("_decisions_applied", [])
+    if isinstance(decisions, str):
+        decisions_str = decisions
+        decisions_list = [decisions]
+    else:
+        decisions_list = list(decisions or [])
+        decisions_str = " ".join(str(d) for d in decisions_list)
+
+    status = result.get("safety_status", "")
+
+    # Hard red
+    if status == "not_safe":
+        return "red"
+    if "FoehnDanger" in decisions_str:
+        return "red"
+    if any(str(d).startswith("AloftNotSafe") for d in decisions_list):
+        return "red"
+
+    # Hard amber
+    if status == "conditional":
+        return "amber"
+    if "FoehnCaution" in decisions_str:
+        return "amber"
+    try:
+        foehn_risk_num = float(result.get("foehn_risk", 0) or 0)
+    except (TypeError, ValueError):
+        foehn_risk_num = 0
+    if foehn_risk_num >= 4.0:
+        return "amber"
+    if any(str(d).startswith(("GustFloor", "AloftConditional", "WindStrongMajority"))
+           for d in decisions_list):
+        return "amber"
+
+    # Score-basierter Fallback
+    try:
+        score = int(result.get("safety_score", 0) or 0)
+    except (TypeError, ValueError):
+        score = 0
+    if score < 40:
+        return "amber"
+    return "green"
+
+
 # ════════════════════════════════════════════════════════════════════
 # REGION — Safety-Decisions
 # ════════════════════════════════════════════════════════════════════
