@@ -12,7 +12,7 @@
 Nach Bau und Review der Preview (`docs/rating_preview.html`) wurden vier Designentscheidungen geaendert:
 
 1. **Pilotenprofil-Filter wird zurueckgestellt** (war §2.2, §8.5 zentraler Pfeiler). Begruendung: vereinfacht Phase 1, vermeidet Profil-Disclaimer-Diskussion. Kann als v1.5 zurueckkommen — siehe §10 Backlog. Im Code keine Hooks.
-2. **Sub-Rating-Symmetrie**: Das bewaehrte 4-Sub-Rating-Pattern (heute nur fuer Fliegbarkeit) wird auf Safety ausgedehnt — siehe neue §3.5. Damit zwei symmetrische Achsen mit identischer Architektur. Bedingt einen vierten Vorab-Fix (§9.4 Fix 4).
+2. **Sub-Rating-Symmetrie**: Das bewaehrte 4-Sub-Rating-Pattern (heute nur fuer Fliegbarkeit) wird auf Safety ausgedehnt — siehe neue §3.5. Symmetrische Achsen mit unterschiedlicher Aggregation: Experience nutzt gewichteten Durchschnitt, Safety nutzt **Weakest-Link (MIN)** weil Sicherheit asymmetrisch ist. **5 Safety-Sub-Ratings** (wind/gust/aloft/foehn/weather — letzteres deckt Niederschlag/Gewitter/CAPE/Sicht ab). Bedingt einen vierten Vorab-Fix (§9.4 Fix 4).
 3. **Region-Tab als Leaflet-Karte** (statt Card-Grid mit 7-Tage-Tabelle aus altem §4.3). Polygone aus `data/regionen_polygone_mapped.geojson`, gefaerbt nach `safety_band`. Klick oeffnet Region-Overlay. 2D-Scatter wird zur **regionen-aggregierten Bubble-Matrix** im Briefing-Tab (war 2D-Scatter mit 488 Spots → unleserlich).
 4. **Rote Spots koennen `noAnalysis`-Zustand haben** — wenn Bedingungen so eindeutig nicht fliegbar sind, dass keine vertiefte Auswertung erstellt wird (z.B. Windrichtung passt grundsaetzlich nicht). Spot-Panel zeigt dann Hero + minimalen "Keine Analyse"-Block, kein Meteogramm. Siehe §8.6 Update.
 
@@ -404,60 +404,65 @@ def compute_comfort_index(spot_day):
 
 Alle Werte werden in den bestehenden Cache-Output (`spot_analyses.json`, `region_analyses.json`) als zusaetzliche Felder geschrieben. Existierende Felder bleiben unveraendert (`rating`, `safety_status`, `flyability_tier` bleiben fuer Backwards-Compat).
 
-### 3.5 Sub-Rating-Symmetrie — Safety-Sub-Ratings (NEU v1.3)
+### 3.5 Sub-Rating-Symmetrie — Safety-Sub-Ratings (NEU v1.3, finalisiert)
 
 **Hintergrund**: Im bestehenden Code (`engine/_common.py:421`) gibt es bereits 4 LLM-Sub-Ratings fuer **Fliegbarkeit/Erlebnis** (thermal/window/wind/xc) mit deterministischer Aggregation. Dieses Pattern hat sich bewaehrt: das LLM ist gut im Einzelbeurteilen, schlecht im Gewichten/Aggregieren.
 
 **Erkenntnis aus Preview-Iteration v1.3**: Das gleiche Pattern fehlt fuer **Safety**. Heute liefert das LLM nur eine kategoriale `safety_status` (safe/conditional/not_safe) — keine numerische Granularitaet, keine Aspekt-Trennung. Wenn das LLM zwischen "leicht vorsichtig" und "stark vorsichtig" unterscheiden will, muss es das in `caution_notes` als Freitext rein. Nicht aggregierbar, nicht ranking-faehig.
 
-**Empfehlung v1.3**: Vier Safety-Sub-Ratings einfuehren, analog zu den 4 Fliegbarkeits-Sub-Ratings:
+**Finalisierung v1.3** (nach Implementation-Iteration mit User-Feedback): **Fuenf** Safety-Sub-Ratings, aggregiert per **Weakest-Link-Prinzip (MIN)**:
 
 | Sub-Rating | Was es bewertet | Skala |
 |------------|-----------------|-------|
-| `wind_safety_rating` | Bodenwind/Mittelwind am Startplatz: zu stark, zu schwach, falsche Richtung | 1–10 |
-| `gust_safety_rating` | Boenfaktor und Boen-Spitzen | 1–10 |
+| `wind_safety_rating` | Bodenwind/Mittelwind am Startplatz: Spot-Bemerkung beachten, Default-Idealbereich `WIND_IDEAL_MIN_KMH`–`WIND_IDEAL_MAX_KMH` | 1–10 |
+| `gust_safety_rating` | Boenfaktor und Boen-Spitzen, Schwellen aus `GUST_WARN_KMH` / `GUST_DANGER_KMH` | 1–10 |
 | `aloft_safety_rating` | Hoehenwind FL050–100 (kann Foehn-Anriss anzeigen, auch wenn boden ruhig) | 1–10 |
 | `foehn_safety_rating` | Foehn-Risiko (synoptisch: Druckgefaelle, Anstroemung, Trigger) | 1–10 |
+| `weather_safety_rating` (NEU) | Niederschlag, Gewitter, CAPE/Ueberentwicklung, Sicht-Beeintraechtigung beim Start/Landen (Wolken-Basis ≤ Startplatzhoehe) | 1–10 |
 
-**Aggregation** (analog zu `_compute_rating_from_subratings`):
+**Trends** sind in jedem Sub-Rating eingerechnet (forward-looking): das LLM bewertet den schlechtesten plausiblen Zustand der produktiven Stunden, nicht den Snapshot.
+
+**Aggregation: Weakest-Link statt gewichteter Durchschnitt**
 ```python
 def _compute_safety_rating(result: dict) -> float:
-    """Berechnet das Safety-Gesamtrating deterministisch aus 4 LLM-Sub-Ratings.
-
-    Gewichte: wind 30%, gust 25%, aloft 25%, foehn 20%.
-    Die hoehere Gewichtung von Bodenwind reflektiert: das ist die unmittelbarste
-    Bedrohung am Startplatz. Foehn ist haeufig durch Hard-Decisions abgedeckt
-    (FoehnDanger → red), deshalb hier nur 20%.
+    """Weakest-Link-Aggregation. Sicherheit ist asymmetrisch — ein perfekter
+    Aspekt darf keinen schlechten kompensieren. Beispiel: Wind 9, Gewitter-CAPE-WARN
+    Rating 2 sollte NICHT als 7/10 daherkommen (gewichteter Durchschnitt), sondern
+    als 2/10 — das einzelne kritische Element bestimmt den Tag.
     """
     def _clamp(v, lo, hi):
         try: v = float(v)
         except (TypeError, ValueError): v = 5.0
         return max(lo, min(hi, v))
-
-    wind  = _clamp(result.get("wind_safety_rating", 5), 1, 10)
-    gust  = _clamp(result.get("gust_safety_rating", 5), 1, 10)
-    aloft = _clamp(result.get("aloft_safety_rating", 5), 1, 10)
-    foehn = _clamp(result.get("foehn_safety_rating", 5), 1, 10)
-    return round(0.30 * wind + 0.25 * gust + 0.25 * aloft + 0.20 * foehn, 1)
+    wind    = _clamp(result.get("wind_safety_rating", 5),    1, 10)
+    gust    = _clamp(result.get("gust_safety_rating", 5),    1, 10)
+    aloft   = _clamp(result.get("aloft_safety_rating", 5),   1, 10)
+    foehn   = _clamp(result.get("foehn_safety_rating", 5),   1, 10)
+    weather = _clamp(result.get("weather_safety_rating", 5), 1, 10)
+    return round(min(wind, gust, aloft, foehn, weather), 1)
 ```
+
+**Begruendung MIN statt Gewichten**: Bei Sicherheit gilt das Weakest-Link-Prinzip — wenn ein einzelner Aspekt akut gefaehrlich ist (z.B. CAPE knapp unter DANGER), ist der Tag entsprechend einzustufen, egal wie gut die anderen 4 Aspekte sind. Gewichteter Durchschnitt wuerde solche kritischen Einzelaspekte "wegmitteln".
 
 **Was sich aendert vs. heute:**
 
 | Heute | v1.3 |
 |-------|------|
-| 1 LLM-Output: `safety_status` (3 Kategorien) | 4 LLM-Outputs: 4 Sub-Ratings (1–10 je) |
+| 1 LLM-Output: `safety_status` (3 Kategorien) | 5 LLM-Outputs: 5 Sub-Ratings (1–10 je) |
 | `safety_status` direkt von LLM | `safety_status` weiterhin von LLM **als Plausibilitaets-Check**, plus Decision-Engine ueberschreibt deterministisch |
 | Keine Granularitaet zwischen "knapp safe" und "komfortabel safe" | `safety_score` 0–100 zeigt diese Differenz |
 | `caution_notes` muss alles tragen | `caution_notes` bleibt fuer Begruendungen, aber Score traegt Quantifizierung |
+| Bewertung von Niederschlag/Gewitter/CAPE nur in `safety_status` und `caution_notes` | Plus numerischer Gradient via `weather_safety_rating` (Hard-Override-Faelle wie THUNDERSTORM, RAIN-WARN-DANGER, CAPE-DANGER bleiben binaer) |
 
 **Architektur-Symmetrie nach v1.3:**
 
 ```
 Experience-Achse:                Safety-Achse:
-  4 LLM-Sub-Ratings              4 LLM-Sub-Ratings
-  (thermal/window/wind/xc)       (wind/gust/aloft/foehn)
+  4 LLM-Sub-Ratings              5 LLM-Sub-Ratings
+  (thermal/window/wind/xc)       (wind/gust/aloft/foehn/weather)
        ↓                              ↓
-  Aggregation (35/25/25/15)      Aggregation (30/25/25/20)
+  Gewichteter Durchschnitt       Weakest-Link (MIN)
+  (35/25/25/15)
        ↓                              ↓
   rating (0-10)                  safety_rating (0-10)
        ↓                              ↓
@@ -469,20 +474,32 @@ Experience-Achse:                Safety-Achse:
                                        ↑
                                  Decision-Engine
                                  Hard-Overrides
-                                 (FoehnDanger/AloftNotSafe etc.)
+                                 (FoehnDanger/AloftNotSafe/THUNDERSTORM/
+                                  RAIN-WARN/CAPE-DANGER/OVERCAST-DANGER)
 ```
 
-**Implementations-Pfad** (siehe §9.4 Vorab-Fix #4 unten):
-1. Prompt erweitern: LLM gibt 4 zusaetzliche Sub-Ratings aus
-2. `_compute_safety_rating()` in `engine/_common.py` ergaenzen, analog zu `_compute_rating_from_subratings`
-3. `safety_score` und `safety_band` (mit Hard-Override-Logik) in Decision-Engine berechnen
-4. Tests fuer alle 4 Sub-Rating-Kombinationen + Hard-Override-Faelle
+**Asymmetrie zwischen den Achsen ist beabsichtigt:**
+- Experience: gewichteter Durchschnitt — gute Aspekte kompensieren weniger gute (Top-Thermik macht maessigen Wind ertraeglich)
+- Safety: MIN — kein Aspekt darf einen anderen kompensieren (ein einzelner kritischer Punkt = der Tag ist eingeschraenkt)
+
+**Wolken-Logik in `weather_safety_rating`** (User-Feedback v1.3): Bewoelkung ist NUR ein Sicherheits-Thema, wenn die Sicht beim Start/Landen blockiert wird — d.h. Wolken-Basis ≤ Startplatzhoehe (Cloud-Entry-Risiko, kein Visual Reference). Hohe oder mittlere Wolken weit ueber dem Spot sind irrelevant und gehoeren zu `thermal_rating` (Fliegbarkeit), nicht zu Safety.
+
+**Spot-Bemerkung-Logik in `wind_safety_rating`** (User-Feedback v1.3): Default-Idealbereich `WIND_IDEAL_MIN_KMH`–`WIND_IDEAL_MAX_KMH` (typisch 5–20 km/h fuer Thermik-Spots). Soaring-Spots wie Balderen brauchen einen MINDESTWIND aus der Spot-Bemerkung — die Bewertung muss diesen Spot-spezifischen Anforderung folgen, nicht dem Default.
+
+**Implementations-Status** (siehe §9.4 Vorab-Fix #4):
+1. ✅ Prompt erweitert: LLM gibt 5 zusaetzliche Sub-Ratings aus
+2. ✅ `_compute_safety_rating()` + `_compute_safety_score()` in `engine/_common.py` (MIN-Aggregation)
+3. ✅ `safety_rating` und `safety_score` werden im Cache geschrieben (`engine/analyzers.py` 4 Sites)
+4. ✅ `_safety_subratings.md` Skill-File mit Trend-Logik, Spot-Bemerkung, Cloud-Entry-Praezisierung
+5. ✅ `WIND_IDEAL_MIN_KMH` / `WIND_IDEAL_MAX_KMH` in `config.py`
+6. ✅ Tests in `TestSafetyRating` (13 Cases — MIN-Verhalten, Defaults, Clamping, Score-Skalierung)
+7. ⏳ `compute_safety_band()` (mit Hard-Override-Logik aus §3.1) — Phase 1 Frontend-Build
 
 **Backwards-Compat:**
 - `safety_status` bleibt unveraendert vom LLM
 - `caution_notes` und `no_go_reasons` bleiben unveraendert
 - Decision-Engine Hard-Overrides bleiben unveraendert
-- Neu hinzu: `safety_rating`, `safety_score`, `wind_safety_rating`, `gust_safety_rating`, `aloft_safety_rating`, `foehn_safety_rating` als zusaetzliche Felder im Cache
+- Neu hinzu: `safety_rating`, `safety_score`, `wind_safety_rating`, `gust_safety_rating`, `aloft_safety_rating`, `foehn_safety_rating`, `weather_safety_rating` als zusaetzliche Felder im Cache
 
 ---
 

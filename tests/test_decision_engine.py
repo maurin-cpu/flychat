@@ -31,6 +31,8 @@ from engine.decision_engine import (
 from engine._common import (
     _compute_experience_score,
     _compute_experience_stars,
+    _compute_safety_rating,
+    _compute_safety_score,
 )
 
 
@@ -529,6 +531,82 @@ class TestExperienceScore(unittest.TestCase):
         stars = _compute_experience_stars(score)
         self.assertEqual(score, 0)
         self.assertEqual(stars, 0)
+
+
+# ════════════════════════════════════════════════════════════════════
+# Vorab-Fix #4: Safety-Sub-Ratings (RATING_CONCEPT v1.3 §3.5)
+# ════════════════════════════════════════════════════════════════════
+# Vier neue LLM-Sub-Ratings (wind/gust/aloft/foehn, je 1-10) werden
+# deterministisch zu 0-10 safety_rating aggregiert (Gewichte 30/25/25/20)
+# und × 10 zu safety_score (0-100).
+class TestSafetyRating(unittest.TestCase):
+    def _result(self, wind=5, gust=5, aloft=5, foehn=5, weather=5):
+        return {
+            "wind_safety_rating": wind,
+            "gust_safety_rating": gust,
+            "aloft_safety_rating": aloft,
+            "foehn_safety_rating": foehn,
+            "weather_safety_rating": weather,
+        }
+
+    # ── Weakest-Link-Aggregation (MIN) ──
+    def test_all_mid_yields_5(self):
+        self.assertEqual(_compute_safety_rating(self._result()), 5.0)
+
+    def test_all_max_yields_10(self):
+        self.assertEqual(_compute_safety_rating(self._result(10, 10, 10, 10, 10)), 10.0)
+
+    def test_all_min_yields_1(self):
+        self.assertEqual(_compute_safety_rating(self._result(1, 1, 1, 1, 1)), 1.0)
+
+    def test_min_dominates_single_low_wind(self):
+        # 4 perfekte Ratings + 1 niedriger Wind → score gefolgt vom niedrigsten
+        self.assertEqual(_compute_safety_rating(self._result(2, 10, 10, 10, 10)), 2.0)
+
+    def test_min_dominates_single_low_weather(self):
+        # Klassischer Fall: Top-Wind, aber CAPE-WARN → safety = 2
+        # Verhindert dass perfekter Wind ein Gewitter-Risiko "wegmittelt"
+        self.assertEqual(_compute_safety_rating(self._result(9, 9, 9, 9, 2)), 2.0)
+
+    def test_min_dominates_single_low_foehn(self):
+        self.assertEqual(_compute_safety_rating(self._result(10, 10, 10, 3, 10)), 3.0)
+
+    # ── Defaults bei fehlenden / ungueltigen Feldern ──
+    def test_missing_fields_default_to_5(self):
+        # Komplett leerer Result → Default 5 fuer jedes → MIN = 5
+        self.assertEqual(_compute_safety_rating({}), 5.0)
+
+    def test_invalid_field_falls_back_to_5(self):
+        result = {"wind_safety_rating": "invalid", "gust_safety_rating": None,
+                  "aloft_safety_rating": 5, "foehn_safety_rating": 5,
+                  "weather_safety_rating": 5}
+        # Invalid → 5, alle anderen 5 → MIN = 5
+        self.assertEqual(_compute_safety_rating(result), 5.0)
+
+    def test_partial_missing_takes_min(self):
+        # nur weather=2, andere fehlen → defaults 5, MIN = 2
+        self.assertEqual(_compute_safety_rating({"weather_safety_rating": 2}), 2.0)
+
+    def test_clamp_below_one(self):
+        # Werte < 1 werden auf 1 geclampt → MIN = 1
+        self.assertEqual(_compute_safety_rating(self._result(0, 0, 0, 0, 0)), 1.0)
+
+    def test_clamp_above_ten(self):
+        # Werte > 10 werden auf 10 geclampt → MIN = 10
+        self.assertEqual(_compute_safety_rating(self._result(15, 15, 15, 15, 15)), 10.0)
+
+    # ── safety_score Skalierung ──
+    def test_score_scaling(self):
+        self.assertEqual(_compute_safety_score(0.0), 0)
+        self.assertEqual(_compute_safety_score(5.0), 50)
+        self.assertEqual(_compute_safety_score(7.5), 75)
+        self.assertEqual(_compute_safety_score(10.0), 100)
+
+    def test_score_clamps_invalid(self):
+        self.assertEqual(_compute_safety_score(None), 0)
+        self.assertEqual(_compute_safety_score("oops"), 0)
+        self.assertEqual(_compute_safety_score(-5.0), 0)
+        self.assertEqual(_compute_safety_score(15.0), 100)
 
 
 if __name__ == "__main__":

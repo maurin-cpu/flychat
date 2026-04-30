@@ -80,5 +80,10 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
   "wind_summary": "3-4 Saetze. Wind-Zusammenfassung (Staerke auf Referenzhoehe, Konsistenz, ggf. Drehung). Regionen: KEINE Boeen — nur Windstaerke und Scherung. Bei vorliegender WIND-TREND-Zeile: Muster nennen (zunehmend / Aufklaerung / stabil) und aus Datenblock-Fakten begruenden (z.B. 'Hoehenwind morgens 18 km/h, ab 13h auf 38 km/h — Nachmittagsverstaerkung'). KEINE Grosswetterlagen erfinden (Regel 2c).",
   "wind_shear": "2-3 Saetze: Hoehenwind vs. Boden, Scherung mit konkreten Werten, Foehn-Anzeichen aus dem Datenblock. Leer wenn unauffaellig. (Regionen: KEINE Boeen.)",
   "foehn_risk": "none|low|moderate|high",
+  "wind_safety_rating": 0,
+  "gust_safety_rating": 0,
+  "aloft_safety_rating": 0,
+  "foehn_safety_rating": 0,
+  "weather_safety_rating": 0,
   "summary": "AUSFUEHRLICH (4-6 Saetze). Satz 1: Einstufung mit Kern-Begruendung aus dem Datenblock. Satz 2-3: Hauptgefahren MIT Ursache aus Datenblock-Fakten (z.B. 'Hoehenwind 42 km/h auf 2500m, Scherung 850 hPa Sued vs. 700 hPa West — Foehn-Hinweis trotz ΔP 5.2'). KEINE Grosswetterlagen, Fronten oder Druckgebilde erfinden (Regel 2c). Satz 4: Tagesentwicklung / Trend — falls Datenblock WIND-TREND oder Foehn-Aufbau zeigt, PFLICHT in eigenen Worten. Satz 5: Sicheres Zeitfenster konkret. Satz 6: Empfehlung. Bei `safe`-Tagen: Begruendung warum sicher (Wind-Werte unter Schwelle, kein Foehn-Druck, ruhige Schichtung). Regionen: NIEMALS Boeen erwaehnen."
 }

@@ -70,7 +70,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
 **Keine Zahlen erfinden**: Nur Werte aus dem Datenblock.
 
 **Bei `safety_status = "not_safe"`**: Alle Flyability-Felder leer/minimal:
-`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `is_conditional=false`, `conditional_reason=""`.
+`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `wind_safety_rating=1`, `gust_safety_rating=1`, `aloft_safety_rating=1`, `foehn_safety_rating=1`, `weather_safety_rating=1`, `is_conditional=false`, `conditional_reason=""`.
 
 {
   "safety_status": "safe|conditional|not_safe",
@@ -87,6 +87,11 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
   "wind_summary": "Kurze Wind-Zusammenfassung (Staerke, Konsistenz).",
   "wind_shear": "Hoehenwind vs. Boden, Scherung, Foehn-Anzeichen. Leer wenn unauffaellig. (Regionen: KEINE Boeen — nur Windstaerke und Scherung.)",
   "foehn_risk": "none|low|moderate|high",
+  "wind_safety_rating": 0,
+  "gust_safety_rating": 0,
+  "aloft_safety_rating": 0,
+  "foehn_safety_rating": 0,
+  "weather_safety_rating": 0,
   "summary": "AUSFUEHRLICH (3-5 Saetze). PFLICHT: Gefahren mit konkreten Zahlen erlaeutern. Klare Einstufung, Zeitfenster, Empfehlung.",
   "fly_status": "gray|green|violet",
   "flight_type": "Thermikflug|Soaring|Soaring+Thermik|Abgleiter",

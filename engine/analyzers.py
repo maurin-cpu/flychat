@@ -63,6 +63,7 @@ from engine._common import (
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _TIER_RATING_RANGES, _clamp_rating_to_tier, _compute_rating_from_subratings,
     _compute_experience_score, _compute_experience_stars,
+    _compute_safety_rating, _compute_safety_score,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
     _LABEL_KEYS_NO_GO, _LABEL_KEYS_CONDITIONAL,
@@ -1715,6 +1716,8 @@ class AnalyzersMixin:
             result["rating"] = _compute_rating_from_subratings(result, "", "not_safe")
             result["experience_score"] = _compute_experience_score(result["rating"])
             result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+            result["safety_rating"] = _compute_safety_rating(result)
+            result["safety_score"] = _compute_safety_score(result["safety_rating"])
             result["is_conditional"] = False
             result["conditional_reason"] = ""
             return result
@@ -1797,6 +1800,12 @@ class AnalyzersMixin:
         # 2-Achsen-UI. Aendert weder LLM-Output noch andere Cache-Felder.
         result["experience_score"] = _compute_experience_score(result["rating"])
         result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+        # safety_rating / safety_score (RATING_CONCEPT v1.3 Vorab-Fix #4): Aggregation
+        # nach Weakest-Link aus 5 LLM-Sub-Ratings (wind/gust/aloft/foehn/weather).
+        # Hard-Overrides der Decision-Engine (FoehnDanger, AloftNotSafe, THUNDERSTORM,
+        # RAIN-WARN, CAPE-DANGER, OVERCAST-DANGER) wirken parallel auf safety_status.
+        result["safety_rating"] = _compute_safety_rating(result)
+        result["safety_score"] = _compute_safety_score(result["safety_rating"])
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False
@@ -1883,6 +1892,8 @@ class AnalyzersMixin:
             result["rating"] = _compute_rating_from_subratings(result, "", "not_safe")
             result["experience_score"] = _compute_experience_score(result["rating"])
             result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+            result["safety_rating"] = _compute_safety_rating(result)
+            result["safety_score"] = _compute_safety_score(result["safety_rating"])
             result["is_conditional"] = False
             result["conditional_reason"] = ""
             return result
@@ -1912,6 +1923,9 @@ class AnalyzersMixin:
         # experience_score / experience_stars (RATING_CONCEPT v1.3 Vorab-Fix #3)
         result["experience_score"] = _compute_experience_score(result["rating"])
         result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+        # safety_rating / safety_score (RATING_CONCEPT v1.3 Vorab-Fix #4): Weakest-Link
+        result["safety_rating"] = _compute_safety_rating(result)
+        result["safety_score"] = _compute_safety_score(result["safety_rating"])
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False

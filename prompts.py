@@ -24,12 +24,14 @@ _SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 _SHARED_DIR = _SKILLS_DIR / "shared"
 
 # Reihenfolge der Shared-Bausteine, wie sie in den Analyse-Prompt eingefügt werden.
-# Pädagogische Ordnung: Prinzipien → Input-Karte → Gefahren → Override → Fliegbarkeit → Formulierung → Sub-Ratings.
+# Pädagogische Ordnung: Prinzipien → Input-Karte → Gefahren → Override → Safety-Sub-Ratings →
+# Fliegbarkeit → Formulierung → Flyability-Sub-Ratings.
 _SHARED_BLOCKS = [
     "_core_principles.md",
     "_input_map.md",
     "_hazard_blocks.md",
     "_tages_override.md",
+    "_safety_subratings.md",
     "_flyability_tiers.md",
     "_formulierungs_tabelle.md",
     "_subratings_tables.md",
@@ -41,6 +43,7 @@ _SHARED_BLOCKS_SAFETY = [
     "_input_map.md",
     "_hazard_blocks.md",
     "_tages_override.md",
+    "_safety_subratings.md",
 ]
 
 # Flyability-Phase: nur Fliegbarkeits-relevante Blöcke

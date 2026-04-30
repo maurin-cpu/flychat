@@ -551,6 +551,13 @@ PRODUCTIVE_BAND_DEPTH_MIN = 400 # m — Mindest-Banddicke (thermal_top - elevati
 WIND_WARN_KMH = 20              # Wind 20–30 km/h → [WIND-WARN] / [ALOFT-WIND-WARN]
 WIND_DANGER_KMH = 30            # Wind > 30 km/h → [WIND-DANGER] / [ALOFT-WIND-DANGER]
 
+# Idealbereich Bodenwind fuer Thermik-Spots (Default-Annahme).
+# Soaring-Spots (z.B. Balderen) brauchen oft mehr — siehe Spot-Bemerkung im
+# Datenblock. Fuer wind_safety_rating in der Sub-Rating-Bewertung (siehe
+# skills/shared/_safety_subratings.md): 9-10 = innerhalb dieses Bereichs.
+WIND_IDEAL_MIN_KMH = 5          # km/h — unter diesem: zu schwach fuer typische Bedingungen
+WIND_IDEAL_MAX_KMH = 20         # km/h — ab diesem: ueber Komfortzone (= WIND_WARN_KMH)
+
 # ─── Start-Fenster-Schwellen (Windrichtung + Gefahrenfreiheit) ───
 # Eine "saubere Stunde" = WIND-OK (Spot-Sektor) UND keine DANGER-Tags.
 # Tag-Status haengt am laengsten zusammenhaengenden Block sauberer Stunden:

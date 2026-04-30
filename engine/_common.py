@@ -443,6 +443,61 @@ def _compute_rating_from_subratings(result: dict, tier: str, safety_status: str 
     return _clamp_rating_to_tier(tier, raw, safety_status)
 
 
+def _compute_safety_rating(result: dict) -> float:
+    """Berechnet das Safety-Gesamtrating aus 5 LLM-Sub-Ratings nach dem
+    **Weakest-Link-Prinzip** — der niedrigste Wert bestimmt das Resultat.
+
+    RATING_CONCEPT v1.3 §3.5: Sicherheit ist asymmetrisch. Anders als bei
+    der Fliegbarkeits-Aggregation (gewichteter Durchschnitt) darf hier ein
+    perfekter Aspekt keinen schlechten kompensieren — sonst wuerde ein
+    Tag mit "Wind 9, Gewitter-CAPE-WARN 2" als grosse 7/10 wirken, obwohl
+    der einzelne kritische Aspekt den Tag definiert.
+
+    5 Sub-Ratings (alle 1-10):
+      - wind_safety_rating     (Bodenwind)
+      - gust_safety_rating     (Boeen)
+      - aloft_safety_rating    (Hoehenwind FL050-100)
+      - foehn_safety_rating    (Foehn-Risiko synoptisch)
+      - weather_safety_rating  (Niederschlag / Gewitter / CAPE / Sicht)
+
+    Aggregation: `min(wind, gust, aloft, foehn, weather)`.
+
+    Bei `safety_status = "not_safe"` setzt der LLM laut Skill alle 5 Werte
+    auf 1 → Resultat 1.0 (analog Fliegbarkeit). Hard-Overrides der Decision-
+    Engine (THUNDERSTORM, RAIN-WARN, CAPE-DANGER, FoehnDanger usw.) erzwingen
+    das auf der Status-Ebene unabhaengig.
+
+    Defaults bei fehlenden / invaliden Feldern: 5 (analog Fliegbarkeits-
+    Sub-Ratings).
+    """
+    def _clamp(v, lo, hi):
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            v = 5.0
+        return max(lo, min(hi, v))
+
+    wind    = _clamp(result.get("wind_safety_rating", 5),    1, 10)
+    gust    = _clamp(result.get("gust_safety_rating", 5),    1, 10)
+    aloft   = _clamp(result.get("aloft_safety_rating", 5),   1, 10)
+    foehn   = _clamp(result.get("foehn_safety_rating", 5),   1, 10)
+    weather = _clamp(result.get("weather_safety_rating", 5), 1, 10)
+    return round(min(wind, gust, aloft, foehn, weather), 1)
+
+
+def _compute_safety_score(rating_0_10) -> int:
+    """Skaliert das `safety_rating` (0-10) auf `safety_score` (0-100).
+
+    Analog zu `_compute_experience_score` — kosmetische Skalierung fuer das
+    UI. Robust gegen None / invalide Werte → liefert 0.
+    """
+    try:
+        r = float(rating_0_10)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(100, round(r * 10)))
+
+
 def _compute_experience_score(rating_0_10) -> int:
     """Skaliert das bestehende 0-10 `rating` auf 0-100 `experience_score`.
 

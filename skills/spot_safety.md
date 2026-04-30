@@ -80,5 +80,10 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "wind_summary": "3-4 Saetze. Tagesverlauf der Richtung, Hauptband der Geschwindigkeit, ob Richtung im Sektor stabil bleibt oder dreht — mit konkreten Zahlen und Stunden. Bei vorliegender WIND-TREND-Zeile: Muster mit eigenem Wort nennen (zunehmend / Aufklaerung / eingekesselt / stabil). Begruendung NUR aus Datenblock-Fakten (z.B. 'Bodenwind schwach 8-12 km/h, Hoehenwind 42 km/h auf 2500m — Verhaeltnis 1:5 zeigt entkoppelte Schichtung'). KEINE Grosswetterlagen erfinden (Regel 2c).",
   "wind_shear": "2-3 Saetze: Hoehenwind vs. Bodenwind, Verhaeltnis, Foehn-Anzeichen, vertikale Richtungsdrehung — alles aus Datenblock-Werten. Leer NUR wenn vollkommen unauffaellig.",
   "foehn_risk": "none|low|moderate|high",
+  "wind_safety_rating": 0,
+  "gust_safety_rating": 0,
+  "aloft_safety_rating": 0,
+  "foehn_safety_rating": 0,
+  "weather_safety_rating": 0,
   "summary": "4-6 Saetze. Satz 1: Einstufung mit Kern-Begruendung aus dem Datenblock (warum safe/conditional/not_safe). Satz 2-3: Hauptgefahren MIT Ursache aus Datenblock-Fakten — z.B. 'Hoehenwind 42 km/h zwischen 13-16h, Bodenwind dabei nur 9 km/h, Verhaeltnis 1:5 entkoppelt' oder 'Foehn ΔP 6.8 hPa Sued ab 11h, 850 hPa Wind 35 km/h Sued bestaetigt die Richtung'. KEINE Grosswetterlagen, Fronten oder Druckgebilde erfinden (Regel 2c). Satz 4: Tagesentwicklung / Trend (zieht ab, baut sich auf, stabil) — falls Datenblock WIND-TREND/GUST-TREND/Foehn-Aufbau zeigt, ist das PFLICHT, in eigenen Worten. Satz 5: Sicheres Zeitfenster konkret. Satz 6: Empfehlung zur Sicherheit. Bei `safe`-Tagen ohne Gefahren: Begruendung warum sicher (z.B. 'Wind-Histogramm leer, ΔP 1.8 hPa unter Foehn-Schwelle, durchgehend WIND-OK 8-12 km/h')."
 }

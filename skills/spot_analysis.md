@@ -106,7 +106,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
 **Keine Zahlen erfinden:** Zahlen in Texten (z.B. "Boeen bis 35 km/h") NUR wenn sie EXPLIZIT im Datenblock stehen. Keine Hochrechnungen.
 
 **Bei `safety_status = "not_safe"`**: Alle Flyability- und Streckenflug-Felder leer/minimal:
-`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `soaring_options=""`, `bemerkung_check=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `is_conditional=false`, `conditional_reason=""`, `streckenflug={"tier":"kein_xc","rating":0,"summary":"","limiting_factor":"spot_not_flyable","region_context_available":false}`.
+`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `soaring_options=""`, `bemerkung_check=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `wind_safety_rating=1`, `gust_safety_rating=1`, `aloft_safety_rating=1`, `foehn_safety_rating=1`, `weather_safety_rating=1`, `is_conditional=false`, `conditional_reason=""`, `streckenflug={"tier":"kein_xc","rating":0,"summary":"","limiting_factor":"spot_not_flyable","region_context_available":false}`.
 
 {
   "safety_status": "safe|conditional|not_safe",
@@ -124,6 +124,11 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "wind_summary": "Wind-Zusammenfassung (2-3 Saetze): Tagesverlauf der Richtung, Hauptband der Geschwindigkeit, ob Richtung im Sektor stabil bleibt oder dreht — mit konkreten Zahlen und Stunden.",
   "wind_shear": "2-3 Saetze: Hoehenwind vs. Bodenwind, Verhaeltnis, Foehn-Anzeichen, vertikale Richtungsdrehung. Leer NUR wenn vollkommen unauffaellig.",
   "foehn_risk": "none|low|moderate|high",
+  "wind_safety_rating": 0,
+  "gust_safety_rating": 0,
+  "aloft_safety_rating": 0,
+  "foehn_safety_rating": 0,
+  "weather_safety_rating": 0,
   "summary": "3-5 Saetze. PFLICHT: Wenn caution_notes oder no_go_reasons nicht leer → konkrete Gefahren mit Zahlen und Zeiten erlaeutern. Satz 1: Einstufung. Satz 2-3: Hauptgefahren. Satz 4: Optimales Zeitfenster. Satz 5: Empfehlung.",
   "fly_status": "gray|green|violet",
   "flight_type": "Thermikflug|Soaring|Soaring+Thermik|Abgleiter",
