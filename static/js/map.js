@@ -111,20 +111,40 @@
 
         loadSpots();
 
-        // Map Legend (collapsible, bottom-left)
+        // Map Legend (RATING_CONCEPT v1.3 §8.4 — 5 Symbole + Mikro-Copy).
+        // Single-Glyph: innerer Kreis = Safety-Band, weisse Ziffer 1-5 = Erlebnis,
+        // weisses Kreuz bei red.
         var legend = L.control({ position: 'bottomleft' });
         legend.onAdd = function () {
             var isMobile = window.innerWidth <= 639;
             var div = L.DomUtil.create('div', 'map-legend' + (isMobile ? ' collapsed' : ''));
+
+            function legendIcon(band, stars) {
+                // Mini-SVG passend zur Marker-Glyphe (skaliert auf 18px)
+                var s = mapSafetyBandToStyle(band);
+                var html = '<svg width="18" height="18" viewBox="0 0 22 22" style="vertical-align:middle;flex-shrink:0;">';
+                html += '<circle cx="11" cy="11" r="7" fill="' + s.fill + '" stroke="' + s.stroke + '" stroke-width="1.5"/>';
+                if (band === 'red') {
+                    html += '<line x1="8" y1="8" x2="14" y2="14" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>';
+                    html += '<line x1="14" y1="8" x2="8" y2="14" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>';
+                } else if (typeof stars === 'number' && stars >= 1) {
+                    html += '<text x="11" y="14" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="9" font-weight="700">' + stars + '</text>';
+                } else if (band !== 'no_data') {
+                    html += '<circle cx="11" cy="11" r="1.5" fill="#fff"/>';
+                }
+                html += '</svg>';
+                return html;
+            }
+
             div.innerHTML =
                 '<button class="map-legend-toggle" aria-label="Legende ein-/ausblenden">Legende</button>' +
                 '<div class="map-legend-body">' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-excellent)"></span> Sicher &amp; Gut</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-fly-violet)"></span> Top / XC</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-fly-gray)"></span> Abgleiter</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-marginal)"></span> Vorsicht</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-critical)"></span> Nicht sicher</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:var(--color-safety-unknown)"></span> Keine Daten</div>' +
+                '<div class="map-legend-item">' + legendIcon('green', 5) + ' Top-Tag</div>' +
+                '<div class="map-legend-item">' + legendIcon('green', 3) + ' Solider Tag</div>' +
+                '<div class="map-legend-item">' + legendIcon('green', 1) + ' Sicher, kurz</div>' +
+                '<div class="map-legend-item">' + legendIcon('amber', 4) + ' Vorsicht — Pro-Tag</div>' +
+                '<div class="map-legend-item">' + legendIcon('red', 0)   + ' Nicht fliegbar</div>' +
+                '<div class="map-legend-item">' + legendIcon('no_data', 0) + ' Keine Daten</div>' +
                 '</div>';
             var toggle = div.querySelector('.map-legend-toggle');
             toggle.addEventListener('click', function (e) {
@@ -168,87 +188,59 @@
         return null;
     }
 
-    // ===== STYLE SYSTEM (Traffic Light + Intensity, Light Map) =====
-    // safety: 'safe' | 'conditional' | 'not_safe' | 'default' | 'no_data' | 'error'
-    // quality: 'gray' (bad) | 'green' (good) | 'violet' (legendary)
-    function mapSafetyAndQualityToStyle(safety, quality) {
-        // Default / unanalyzed
-        if (safety === 'default' || safety === 'no_data') {
-            return {
-                fill: safety === 'no_data' ? '#9ca3af' : '#6b7280',
-                stroke: safety === 'no_data' ? '#6b7280' : '#4b5563',
-                glow: null, showStripes: false, showWarning: false,
-                safetyLabel: safety === 'no_data' ? 'Keine Daten' : '',
-                qualityLabel: ''
-            };
-        }
-
-        // ERROR — analysis failed (e.g. API budget)
-        if (safety === 'error') {
-            return {
-                fill: '#f87171', stroke: '#b91c1c',
-                glow: null, showStripes: false, showWarning: false,
-                safetyLabel: 'Analyse-Fehler', qualityLabel: ''
-            };
-        }
-
-        // NOT SAFE — dark red, stripes
-        if (safety === 'not_safe') {
-            return {
-                fill: '#dc2626', stroke: '#991b1b',
-                glow: null, showStripes: true, showWarning: false,
-                safetyLabel: 'Nicht sicher', qualityLabel: ''
-            };
-        }
-
-        // SAFE — green traffic light, quality = intensity
-        if (safety === 'safe') {
-            if (quality === 'gray') return {
-                fill: '#B08D57', stroke: '#8A6D3B',
-                glow: null, showStripes: false, showWarning: false,
-                safetyLabel: 'Sicher', qualityLabel: 'Abgleiter'
-            };
-            if (quality === 'violet') return {
-                // Legendary spots: violet (matches the "Legendär" / "Top" category in the analysis page)
-                fill: '#8b5cf6', stroke: '#6d28d9',
-                glow: 'rgba(139, 92, 246, 0.45)', showStripes: false, showWarning: false,
-                safetyLabel: 'Sicher', qualityLabel: 'Top'
-            };
-            return { // green = good
-                fill: '#22c55e', stroke: '#15803d',
-                glow: null, showStripes: false, showWarning: false,
-                safetyLabel: 'Sicher', qualityLabel: 'Gut'
-            };
-        }
-
-        // CONDITIONAL — amber
-        if (quality === 'gray') return {
-            fill: '#fbbf24', stroke: '#b45309',
-            glow: null, showStripes: false, showWarning: true,
-            safetyLabel: 'Vorsicht', qualityLabel: 'Abgleiter'
+    // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §8.2 — Single-Glyph) =====
+    // safetyBand: 'green' | 'amber' | 'red' | 'no_data' | 'default'
+    // experienceStars: 0..5 (integer)
+    function mapSafetyBandToStyle(band) {
+        if (band === 'green') return {
+            fill: '#22c55e', stroke: '#15803d',
+            label: 'Sicher'
         };
-        if (quality === 'violet') return {
-            fill: '#d97706', stroke: '#78350f',
-            glow: null, showStripes: false, showWarning: true,
-            safetyLabel: 'Vorsicht', qualityLabel: 'Gut*'
-        };
-        return { // green = good
+        if (band === 'amber') return {
             fill: '#f59e0b', stroke: '#92400e',
-            glow: null, showStripes: false, showWarning: true,
-            safetyLabel: 'Vorsicht', qualityLabel: 'Gut'
+            label: 'Vorsicht'
+        };
+        if (band === 'red') return {
+            fill: '#ef4444', stroke: '#991b1b',
+            label: 'Nicht fliegbar'
+        };
+        if (band === 'no_data') return {
+            fill: '#9ca3af', stroke: '#6b7280',
+            label: 'Keine Daten'
+        };
+        // default / unanalyzed
+        return {
+            fill: '#6b7280', stroke: '#4b5563',
+            label: ''
         };
     }
 
-    // ===== CUSTOM MARKER GENERATOR =====
-    // safety: 'safe' | 'conditional' | 'not_safe' | 'default' | 'no_data'
-    // quality: 'gray' (bad) | 'green' (good) | 'violet' (legendary)
-    function createSpotIcon(props, safety, quality, isHighlighted) {
+    // Legacy-Mapping fuer alte Cache-Daten ohne safety_band-Feld.
+    // Erlaubt graceful migration — entfernt sobald alle Caches reanalysiert sind.
+    function legacySafetyBand(safetyStatus) {
+        if (safetyStatus === 'not_safe') return 'red';
+        if (safetyStatus === 'conditional') return 'amber';
+        if (safetyStatus === 'safe') return 'green';
+        if (safetyStatus === 'no_data' || safetyStatus === 'error') return 'no_data';
+        return 'default';
+    }
+
+    // ===== CUSTOM MARKER GENERATOR (Single-Glyph v1.3) =====
+    // Inner circle = safety band color
+    // Inner glyph:
+    //   - red                 → white X cross (Sperr-Glyphe)
+    //   - stars >= 1          → white digit 1-5 (Erlebnis)
+    //   - stars == 0          → small white dot (sicher aber Abgleiter)
+    //   - no_data / default   → small white dot (faded)
+    function createSpotIcon(props, safetyBand, experienceStars, isHighlighted) {
         var uid = ++_iconUid;
-        var style = mapSafetyAndQualityToStyle(safety, quality);
+        var style = mapSafetyBandToStyle(safetyBand);
         var isMobile = window.innerWidth <= 600;
         var svgSize = 44;
         var center = svgSize / 2;
         var radius = isHighlighted ? (isMobile ? 10 : 8) : (isMobile ? 8 : 6);
+        var stars = (typeof experienceStars === 'number' && experienceStars >= 0 && experienceStars <= 5)
+            ? Math.floor(experienceStars) : 0;
 
         var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">';
         // Invisible hit-area — extends tap target to full 44x44 (mobile only, WCAG)
@@ -256,14 +248,7 @@
             html += '<circle cx="' + center + '" cy="' + center + '" r="' + (svgSize / 2) + '" fill="rgba(0,0,0,0)" pointer-events="all" />';
         }
 
-        // Defs: stripes pattern (unique ID per marker)
-        if (style.showStripes) {
-            html += '<defs><pattern id="st' + uid + '" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">';
-            html += '<line x1="0" y1="0" x2="0" y2="4" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>';
-            html += '</pattern></defs>';
-        }
-
-        // Wind direction sector
+        // Wind direction sector (unchanged)
         if (props && props.windrichtung) {
             var angles = getDirAngles(props.windrichtung);
             if (angles) {
@@ -290,26 +275,34 @@
             }
         }
 
-        // Glow — ONLY for safe + legendary (Rule 3)
-        if (style.glow && (isHighlighted || (safety === 'safe' && quality === 'violet'))) {
-            html += '<circle cx="' + center + '" cy="' + center + '" r="' + (radius + 4) + '" fill="' + style.glow + '" />';
-            html += '<circle cx="' + center + '" cy="' + center + '" r="' + (radius + 7) + '" fill="' + style.glow.replace('0.45', '0.15') + '" />';
+        // Highlight glow (selected spot)
+        if (isHighlighted) {
+            html += '<circle cx="' + center + '" cy="' + center + '" r="' + (radius + 4) + '" fill="' + style.fill + '" opacity="0.25" />';
         }
 
-        // Main circle
-        html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="' + style.fill + '" stroke="' + style.stroke + '" stroke-width="' + (isHighlighted ? '2' : '1.5') + '" />';
+        // Main circle (safety band color)
+        html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="' + style.fill
+                + '" stroke="' + style.stroke + '" stroke-width="' + (isHighlighted ? '2' : '1.5') + '" />';
 
-        // Stripes overlay for not_safe (Rule 1 — accessibility pattern)
-        if (style.showStripes) {
-            html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="url(#st' + uid + ')" />';
-        }
-
-        // Warning triangle for conditional (Rule 2 — accessibility icon)
-        if (style.showWarning) {
-            var tx = center + radius - 1;
-            var ty = center - radius + 1;
-            html += '<polygon points="' + tx + ',' + (ty - 5) + ' ' + (tx - 4) + ',' + (ty + 3) + ' ' + (tx + 4) + ',' + (ty + 3) + '" fill="#eab308" stroke="#854d0e" stroke-width="0.5" />';
-            html += '<text x="' + tx + '" y="' + (ty + 2.5) + '" text-anchor="middle" fill="#854d0e" font-size="6" font-weight="bold" font-family="sans-serif">!</text>';
+        // Inner glyph
+        if (safetyBand === 'red') {
+            // White X cross — Sperr-Glyphe
+            var arm = radius * 0.55;
+            html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
+                  + '" x2="' + (center + arm) + '" y2="' + (center + arm)
+                  + '" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />';
+            html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
+                  + '" x2="' + (center - arm) + '" y2="' + (center + arm)
+                  + '" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />';
+        } else if (stars >= 1 && (safetyBand === 'green' || safetyBand === 'amber')) {
+            // White digit 1-5 — Erlebnis-Sterne als kompakte Ziffer
+            var fontSize = isHighlighted ? 11 : 9;
+            html += '<text x="' + center + '" y="' + (center + fontSize * 0.35)
+                  + '" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif"'
+                  + ' font-size="' + fontSize + '" font-weight="700">' + stars + '</text>';
+        } else if (safetyBand === 'green' || safetyBand === 'amber') {
+            // 0 stars: kleiner weisser Punkt (sicher aber Abgleiter)
+            html += '<circle cx="' + center + '" cy="' + center + '" r="1.8" fill="#ffffff" />';
         }
 
         html += '</svg>';
@@ -323,19 +316,26 @@
         });
     }
 
-    // ===== TOOLTIP BUILDER =====
-    function buildTooltipHtml(p, style) {
+    // ===== TOOLTIP BUILDER (RATING_CONCEPT v1.3 §8.2) =====
+    // Signature: buildTooltipHtml(p, _legacyStyle, safetyBand, experienceStars, dayData)
+    // _legacyStyle bleibt fuer alte Aufrufer, wird ignoriert wenn safetyBand uebergeben wird.
+    function buildTooltipHtml(p, _legacyStyle, safetyBand, experienceStars, dayData) {
         var html = '<b>' + p.name + '</b><br>' +
             p.fluggebiet + ' (' + p.region + ')<br>' +
             p.elevation_m + 'm MSL | Wind: ' + p.windrichtung;
         if (!p.has_weather) {
             html += '<br><span style="color:#F59E0B;">Keine Wetterdaten geladen</span>';
         }
-        if (style && style.safetyLabel) {
-            html += '<br><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + style.fill + ';margin-right:4px;vertical-align:middle;"></span>';
-            html += '<span style="color:' + style.stroke + ';">' + style.safetyLabel + '</span>';
-            if (style.qualityLabel) {
-                html += ' &middot; ' + style.qualityLabel;
+        if (safetyBand && safetyBand !== 'default') {
+            var s = mapSafetyBandToStyle(safetyBand);
+            html += '<br><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'
+                  + s.fill + ';margin-right:4px;vertical-align:middle;"></span>';
+            html += '<span style="color:' + s.stroke + ';">' + s.label + '</span>';
+            if (safetyBand !== 'red' && typeof experienceStars === 'number' && experienceStars >= 1) {
+                html += ' &middot; ' + experienceStars + (experienceStars === 1 ? ' Stern' : ' Sterne');
+            }
+            if (dayData && typeof dayData.comfort_index === 'number') {
+                html += ' &middot; Comfort ' + Math.round(dayData.comfort_index);
             }
         }
         return html;
@@ -348,14 +348,17 @@
             .then(function (geojson) {
                 var geoJsonLayer = L.geoJSON(geojson, {
                     pointToLayer: function (feature, latlng) {
-                        var initSafety = feature.properties.has_weather ? 'default' : 'no_data';
+                        var initBand = feature.properties.has_weather ? 'default' : 'no_data';
                         return L.marker(latlng, {
-                            icon: createSpotIcon(feature.properties, initSafety, 'green', false)
+                            icon: createSpotIcon(feature.properties, initBand, 0, false)
                         });
                     },
                     onEachFeature: function (feature, layer) {
                         var p = feature.properties;
                         layer.featureProperties = p;
+                        layer.currentSafetyBand = p.has_weather ? 'default' : 'no_data';
+                        layer.currentStars = 0;
+                        // Legacy compat-Felder (fuer Highlight/Tooltip-Pfade die noch davon lesen)
                         layer.currentSafety = p.has_weather ? 'default' : 'no_data';
                         layer.currentQuality = 'green';
 
@@ -801,9 +804,9 @@
     window.highlightSpots = function (items) {
         // Reset all markers to their current analysis state
         Object.values(markersByName).forEach(function (marker) {
-            var safety = marker.currentSafety || 'default';
-            var quality = marker.currentQuality || 'green';
-            marker.setIcon(createSpotIcon(marker.featureProperties, safety, quality, false));
+            var band = marker.currentSafetyBand || 'default';
+            var stars = marker.currentStars || 0;
+            marker.setIcon(createSpotIcon(marker.featureProperties, band, stars, false));
             if (marker.getElement()) marker.getElement().style.zIndex = '';
         });
 
@@ -814,18 +817,18 @@
             var name = typeof item === 'string' ? item : item.name;
             var marker = markersByName[name];
             if (marker) {
-                var safety = marker.currentSafety || 'default';
-                var quality = marker.currentQuality || 'green';
-                marker.setIcon(createSpotIcon(marker.featureProperties, safety, quality, true));
+                var band = marker.currentSafetyBand || 'default';
+                var stars = marker.currentStars || 0;
+                marker.setIcon(createSpotIcon(marker.featureProperties, band, stars, true));
                 if (marker.getElement()) marker.getElement().style.zIndex = 1000;
             }
         });
     };
 
-    // ===== SPOT COLORING (from LLM analyses) =====
-    // Traffic light: safety = base color, quality = intensity
+    // ===== SPOT COLORING (from LLM analyses, RATING_CONCEPT v1.3) =====
+    // Reads safety_band + experience_stars (with legacy fallback to safety_status/fly_status).
     window.updateSpotColors = function (analysisData, dateStr) {
-        // analysisData: {spot_name: {date_str: {safety_status, fly_status, ...}}}
+        // analysisData: {spot_name: {date_str: {safety_band, experience_stars, ...}}}
         if (!analysisData || !dateStr) return;
 
         Object.keys(markersByName).forEach(function (name) {
@@ -834,25 +837,28 @@
             var dayData = spotAnalysis && spotAnalysis[dateStr];
 
             if (!dayData) {
-                // No analysis for this date (e.g. Sunday beyond forecast) → reset to no_data
+                // No analysis for this date → reset to no_data
+                marker.currentSafetyBand = 'no_data';
+                marker.currentStars = 0;
                 marker.currentSafety = 'no_data';
                 marker.currentQuality = 'green';
-                marker.setIcon(createSpotIcon(marker.featureProperties, 'no_data', 'green', false));
-                var noDataStyle = mapSafetyAndQualityToStyle('no_data', 'green');
-                marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, noDataStyle));
+                marker.setIcon(createSpotIcon(marker.featureProperties, 'no_data', 0, false));
+                marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, null, 'no_data', 0, dayData));
                 return;
             }
 
-            var safety = dayData.safety_status || 'safe';
-            var quality = dayData.fly_status || 'green';
+            // Prefer new fields, fall back to legacy
+            var band = dayData.safety_band || legacySafetyBand(dayData.safety_status);
+            var stars = (typeof dayData.experience_stars === 'number') ? dayData.experience_stars : 0;
 
-            marker.currentSafety = safety;
-            marker.currentQuality = quality;
-            marker.setIcon(createSpotIcon(marker.featureProperties, safety, quality, false));
+            marker.currentSafetyBand = band;
+            marker.currentStars = stars;
+            // Legacy fields for compat (other code paths may still read these)
+            marker.currentSafety = dayData.safety_status || 'safe';
+            marker.currentQuality = dayData.fly_status || 'green';
 
-            // Update tooltip with analysis info
-            var style = mapSafetyAndQualityToStyle(safety, quality);
-            marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, style));
+            marker.setIcon(createSpotIcon(marker.featureProperties, band, stars, false));
+            marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, null, band, stars, dayData));
         });
     };
 
@@ -867,14 +873,20 @@
                     if (marker) {
                         marker.featureProperties = p;
                         // Don't override analysis data if it exists
-                        if (!marker.currentSafety || marker.currentSafety === 'default' || marker.currentSafety === 'no_data') {
-                            var safety = p.has_weather ? 'default' : 'no_data';
-                            marker.currentSafety = safety;
+                        var hasAnalysis = marker.currentSafetyBand
+                            && marker.currentSafetyBand !== 'default'
+                            && marker.currentSafetyBand !== 'no_data';
+                        if (!hasAnalysis) {
+                            var band = p.has_weather ? 'default' : 'no_data';
+                            marker.currentSafetyBand = band;
+                            marker.currentStars = 0;
+                            marker.currentSafety = band;
                             marker.currentQuality = 'green';
-                            marker.setIcon(createSpotIcon(p, safety, 'green', false));
+                            marker.setIcon(createSpotIcon(p, band, 0, false));
                         }
-                        var style = mapSafetyAndQualityToStyle(marker.currentSafety, marker.currentQuality);
-                        marker.setTooltipContent(buildTooltipHtml(p, style));
+                        marker.setTooltipContent(buildTooltipHtml(
+                            p, null, marker.currentSafetyBand, marker.currentStars, null
+                        ));
                     }
                 });
             })

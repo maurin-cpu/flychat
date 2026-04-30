@@ -2039,9 +2039,127 @@ window.Meteogram = (function () {
         var noGoReasons = parseMaybeList(a.no_go_reasons);
         var cautionNotes = parseMaybeList(a.caution_notes);
 
+        // ── New v1.3 fields (with legacy fallback) ──
+        function _legacyBand(s) {
+            if (s === 'not_safe') return 'red';
+            if (s === 'conditional') return 'amber';
+            if (s === 'safe') return 'green';
+            if (s === 'no_data' || s === 'error') return 'no_data';
+            return 'no_data';
+        }
+        function _verdictText(b) {
+            if (b === 'green') return 'Sicher';
+            if (b === 'amber') return 'Vorsicht';
+            if (b === 'red') return 'Nicht fliegbar';
+            return 'Keine Daten';
+        }
+        function _heroGlyphSvg(band, stars, size) {
+            var s = size || 96;
+            var center = s / 2;
+            var r = s * 0.32;
+            var palette = {
+                green:   { fill: '#22c55e', stroke: '#15803d' },
+                amber:   { fill: '#f59e0b', stroke: '#92400e' },
+                red:     { fill: '#ef4444', stroke: '#991b1b' },
+                no_data: { fill: '#9ca3af', stroke: '#6b7280' }
+            };
+            var c = palette[band] || palette.no_data;
+            var ariaLabel = band === 'red' ? 'Nicht fliegbar' :
+                (_verdictText(band) + (stars >= 1 ? ', ' + stars + ' Sterne' : ''));
+            var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s
+                     + '" role="img" aria-label="' + esc(ariaLabel) + '">';
+            html += '<circle cx="' + center + '" cy="' + center + '" r="' + r
+                  + '" fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="3" />';
+            if (band === 'red') {
+                var arm = r * 0.55;
+                html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
+                      + '" x2="' + (center + arm) + '" y2="' + (center + arm)
+                      + '" stroke="#fff" stroke-width="6" stroke-linecap="round" />';
+                html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
+                      + '" x2="' + (center - arm) + '" y2="' + (center + arm)
+                      + '" stroke="#fff" stroke-width="6" stroke-linecap="round" />';
+            } else if (typeof stars === 'number' && stars >= 1 && band !== 'no_data') {
+                html += '<text x="' + center + '" y="' + (center + r * 0.34)
+                      + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
+                      + (r * 0.85).toFixed(1) + '" font-weight="700">' + stars + '</text>';
+            } else if (band !== 'no_data') {
+                html += '<circle cx="' + center + '" cy="' + center + '" r="3" fill="#fff" />';
+            }
+            html += '</svg>';
+            return html;
+        }
+
+        var safetyBand = a.safety_band || _legacyBand(safetyStatus);
+        var experienceStars = (typeof a.experience_stars === 'number') ? a.experience_stars : 0;
+        var experienceScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
+        var safetyScore = (typeof a.safety_score === 'number') ? a.safety_score : null;
+        var comfortIndex = (typeof a.comfort_index === 'number') ? a.comfort_index : null;
+
         var wrapper = document.createElement('div');
         wrapper.className = 'mg-analysis-view';
         var html = '';
+
+        // ── noAnalysis case (RATING_CONCEPT v1.3 §8.6) ──
+        // Wenn Bedingungen so eindeutig nicht fliegbar sind dass keine vertiefte
+        // Auswertung erstellt wurde (z.B. falsche Windrichtung). UI zeigt Hero +
+        // kompakten Hinweis, kein Decision-Banner / kein Meteogramm.
+        if (a.noAnalysis === true || a.no_analysis === true) {
+            var reason = a.noAnalysisReason || a.no_analysis_reason
+                || 'Bedingungen sind eindeutig nicht fliegbar — keine detaillierte Analyse erstellt.';
+            html += '<div class="mga-hero red">'
+                  + '<div class="mga-hero-glyph">' + _heroGlyphSvg('red', 0, 96) + '</div>'
+                  + '<div class="mga-hero-text">'
+                  + '<div class="mga-hero-verdict red">Nicht fliegbar</div>'
+                  + '<div class="mga-hero-rationale">' + esc(reason) + '</div>'
+                  + '</div></div>';
+            html += '<div class="mga-no-analysis">'
+                  + '<div class="mga-no-analysis-icon">⊘</div>'
+                  + '<div class="mga-no-analysis-text">'
+                  + '<div class="mga-no-analysis-title">Keine Analyse</div>'
+                  + '<div class="mga-no-analysis-reason">' + esc(reason) + '</div>'
+                  + '</div></div>';
+            wrapper.innerHTML = html;
+            container.appendChild(wrapper);
+            appendDatestamp();
+            return;
+        }
+
+        // ── RATING_CONCEPT v1.3 §8.6 — Hero Block ──
+        // Same glyph as the map marker, scaled 96px. Verdict + score pills give
+        // 2-second-recognition: "Yes, that's the marker I clicked."
+        var verdictTxt = _verdictText(safetyBand);
+        if (safetyBand !== 'red' && safetyBand !== 'no_data' && experienceStars >= 1) {
+            verdictTxt += ' · ' + experienceStars + (experienceStars === 1 ? ' Stern' : ' Sterne');
+        }
+        if (experienceScore !== null && safetyBand !== 'red') {
+            verdictTxt += ' · ' + experienceScore + '/100';
+        }
+        var rationale = a.summary || '';
+        var rationaleShort = '';
+        if (rationale) {
+            // First sentence as rationale (up to ~140 chars)
+            var firstDot = rationale.indexOf('.');
+            rationaleShort = firstDot > 30 ? rationale.substring(0, firstDot + 1) : rationale.substring(0, 140);
+        }
+        html += '<div class="mga-hero ' + safetyBand + '">'
+              + '<div class="mga-hero-glyph">' + _heroGlyphSvg(safetyBand, experienceStars, 96) + '</div>'
+              + '<div class="mga-hero-text">'
+              + '<div class="mga-hero-verdict ' + safetyBand + '">' + esc(verdictTxt) + '</div>';
+        if (rationaleShort) {
+            html += '<div class="mga-hero-rationale">' + esc(rationaleShort) + '</div>';
+        }
+        html += '<div class="mga-hero-pills">';
+        html += '<span class="mga-hero-pill ' + safetyBand + '">Safety ' + safetyBand.toUpperCase() + '</span>';
+        if (safetyScore !== null) {
+            html += '<span class="mga-hero-pill">Safety-Score ' + safetyScore + '/100</span>';
+        }
+        if (experienceScore !== null) {
+            html += '<span class="mga-hero-pill">Experience ' + experienceScore + '/100</span>';
+        }
+        if (comfortIndex !== null) {
+            html += '<span class="mga-hero-pill">Comfort ' + Math.round(comfortIndex) + '/100</span>';
+        }
+        html += '</div></div></div>';
 
         // ── Level 1: Decision Hero Banner ──
         var decisionConfig = {

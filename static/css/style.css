@@ -2415,6 +2415,104 @@ body.page-fixed-nav {
     line-height: 1.6;
 }
 
+/* ── RATING_CONCEPT v1.3 §8.6 — Hero Block (Single-Glyph + Verdict + Score Pills) ── */
+.mga-hero {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 16px 16px;
+    margin-bottom: 14px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-elevated);
+}
+.mga-hero.green { background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border-color: #86efac; }
+.mga-hero.amber { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fcd34d; }
+.mga-hero.red   { background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-color: #fca5a5; }
+.mga-hero.no_data { background: #f3f4f6; border-color: #d1d5db; }
+.mga-hero-glyph {
+    flex-shrink: 0;
+    width: 96px; height: 96px;
+    display: flex; align-items: center; justify-content: center;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.12));
+}
+.mga-hero-text { flex: 1; min-width: 0; }
+.mga-hero-verdict {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+.mga-hero-verdict.green { color: var(--color-safety-excellent-text); }
+.mga-hero-verdict.amber { color: var(--color-safety-marginal-text); }
+.mga-hero-verdict.red   { color: var(--color-safety-critical-text); }
+.mga-hero-rationale {
+    font-size: 13px;
+    color: var(--color-text-light);
+    line-height: 1.5;
+    font-style: italic;
+    margin-bottom: 8px;
+}
+.mga-hero-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+}
+.mga-hero-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(0,0,0,0.04);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.mga-hero-pill.green { background: var(--color-safety-excellent-bg); color: var(--color-safety-excellent-text); }
+.mga-hero-pill.amber { background: var(--color-safety-marginal-bg); color: var(--color-safety-marginal-text); }
+.mga-hero-pill.red   { background: var(--color-safety-critical-bg); color: var(--color-safety-critical-text); }
+
+/* noAnalysis state — compact "no detailed analysis" message */
+.mga-no-analysis {
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    border-radius: var(--radius-md);
+    background: var(--color-safety-critical-bg);
+    border: 1px solid #fca5a5;
+    color: var(--color-safety-critical-text);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+.mga-no-analysis-icon {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 28px; text-align: center;
+}
+.mga-no-analysis-text { flex: 1; }
+.mga-no-analysis-title {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+.mga-no-analysis-reason {
+    font-size: 13px;
+    color: var(--color-text-light);
+    line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+    .mga-hero { gap: 12px; padding: 14px 12px; }
+    .mga-hero-glyph { width: 72px; height: 72px; }
+    .mga-hero-glyph svg { width: 72px !important; height: 72px !important; }
+    .mga-hero-verdict { font-size: 16px; }
+}
+
 /* ── Level 1: Decision Hero Banner ─────────────────────── */
 .mga-decision {
     padding: 14px 16px;
