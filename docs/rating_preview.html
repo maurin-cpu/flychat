@@ -1,0 +1,2726 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gleitcast — Rating Preview v1.2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin defer></script>
+<style>
+:root {
+  --color-primary: #0369a1;
+  --color-primary-vivid: #075985;
+  --color-primary-light: #e0f2fe;
+  --color-primary-glow: rgba(3, 105, 161, 0.12);
+  --color-bg: #f7f8fc;
+  --color-bg-elevated: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef2f7;
+  --color-text: #1e293b;
+  --color-text-light: #475569;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+  --color-border: #e5e7eb;
+  --color-border-hover: #d1d5db;
+  --color-card: #ffffff;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-bg-strong: rgba(255, 255, 255, 0.94);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-blur: 14px;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px;
+  --space-4: 16px; --space-5: 20px; --space-6: 24px;
+  --space-8: 32px; --space-12: 48px;
+
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px;
+  --radius-xl: 16px; --radius-pill: 100px;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.04);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.06);
+
+  --color-safety-green: #22c55e;
+  --color-safety-green-stroke: #15803d;
+  --color-safety-green-bg: #dcfce7;
+  --color-safety-green-text: #166534;
+  --color-safety-amber: #f59e0b;
+  --color-safety-amber-stroke: #92400e;
+  --color-safety-amber-bg: #fef3c7;
+  --color-safety-amber-text: #92400e;
+  --color-safety-red: #ef4444;
+  --color-safety-red-stroke: #991b1b;
+  --color-safety-red-bg: #fee2e2;
+  --color-safety-red-text: #991b1b;
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.55;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-image:
+    radial-gradient(circle at 15% 8%, rgba(3, 105, 161, 0.04), transparent 45%),
+    radial-gradient(circle at 85% 92%, rgba(34, 197, 94, 0.03), transparent 45%);
+  padding-bottom: 80px; /* breathing room above mobile bottom nav */
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+/* ===== DEMO BANNER ===== */
+.demo-banner {
+  background: linear-gradient(90deg, #fef3c7, #fde68a);
+  color: #78350f;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-bottom: 1px solid #fcd34d;
+}
+.demo-banner button.dismiss {
+  background: rgba(120, 53, 15, 0.12);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: var(--text-xs);
+  color: #78350f;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.demo-banner button.dismiss:hover { background: rgba(120, 53, 15, 0.2); }
+
+/* ===== HEADER ===== */
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background: var(--glass-bg-strong);
+  border-bottom: 1px solid var(--color-border);
+}
+.appbar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.appbar-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.appbar-brand .logo {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, var(--color-primary), #0284c7);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.appbar-brand .subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.appbar-pill {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #78350f;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.appbar-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: #f59e0b;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ===== TABS (top, desktop) ===== */
+.tabbar {
+  background: var(--glass-bg-strong);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 60px;
+  z-index: 40;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+.tabbar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabbar-inner::-webkit-scrollbar { display: none; }
+.tab-btn {
+  padding: 14px 16px;
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tab-btn:hover { color: var(--color-text); }
+.tab-btn.active {
+  color: var(--color-primary);
+  font-weight: 600;
+  border-bottom-color: var(--color-primary);
+}
+.tab-btn .tab-icon { width: 16px; height: 16px; opacity: 0.7; }
+.tab-btn.active .tab-icon { opacity: 1; }
+
+/* ===== BOTTOM NAV (mobile) ===== */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 100;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-top: 1px solid var(--color-border);
+  padding: 6px 4px max(8px, env(safe-area-inset-bottom));
+  justify-content: space-around;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.05);
+}
+.bottom-nav .tab-btn {
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  font-size: 10px;
+  border-bottom: none;
+  margin-bottom: 0;
+  border-radius: var(--radius-md);
+  flex: 1;
+  min-width: 0;
+}
+.bottom-nav .tab-btn.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary-vivid);
+  border-bottom: none;
+}
+.bottom-nav .tab-btn .tab-icon { width: 22px; height: 22px; }
+
+/* ===== MAIN ===== */
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+.tab-panel { display: none; animation: fadeIn 0.25s ease; }
+.tab-panel.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+.section-title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+.section-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: 20px;
+}
+
+/* ===== MAP CARD ===== */
+.map-card {
+  position: relative;
+  width: 100%;
+  height: 620px;
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(ellipse at 30% 35%, rgba(34, 197, 94, 0.10), transparent 55%),
+    radial-gradient(ellipse at 70% 65%, rgba(245, 158, 11, 0.07), transparent 50%),
+    linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 50%, #ecfdf5 100%);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.map-card::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3 0 0 0 0 0.4 0 0 0 0 0.5 0 0 0 0.04 0'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>");
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+.map-card::after {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 500' fill='none'><path d='M70,320 Q140,250 210,280 T350,260 Q420,230 480,250 T620,230 Q700,210 780,250 T920,260' stroke='%2364748b' stroke-width='1' stroke-dasharray='2 4' opacity='0.35'/><path d='M120,360 Q200,310 290,330 T440,310 Q520,290 600,310 T780,310 Q860,300 940,320' stroke='%2364748b' stroke-width='1' stroke-dasharray='2 4' opacity='0.25'/></svg>");
+  background-size: cover;
+  pointer-events: none;
+}
+
+.map-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  z-index: 2;
+  transition: opacity var(--transition-slow), transform var(--transition-fast), filter var(--transition-fast);
+}
+.map-marker:hover, .map-marker:focus-visible {
+  z-index: 5;
+  transform: translate(-50%, -50%) scale(1.12);
+  outline: none;
+}
+.map-marker.dimmed { opacity: 0.35; }
+.map-marker.dimmed-mid { opacity: 0.62; }
+.map-marker.green:hover { filter: drop-shadow(0 0 12px rgba(34, 197, 94, 0.55)); }
+.map-marker.amber:hover { filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.55)); }
+.map-marker.red:hover { filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.55)); }
+
+.marker-tooltip {
+  position: absolute;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  padding: 10px 12px;
+  min-width: 200px;
+  font-size: var(--text-sm);
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.marker-tooltip.show { opacity: 1; transform: translate(-50%, -16px); }
+.marker-tooltip .name {
+  font-weight: 700;
+  font-size: var(--text-md);
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+.marker-tooltip .meta { color: var(--color-text-secondary); font-size: var(--text-xs); margin-bottom: 6px; }
+.marker-tooltip .verdict { display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: var(--text-xs); }
+.verdict-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.verdict-dot.green { background: var(--color-safety-green); }
+.verdict-dot.amber { background: var(--color-safety-amber); }
+.verdict-dot.red { background: var(--color-safety-red); }
+
+.best-pill {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px 6px 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  z-index: 6;
+  transition: all var(--transition-fast);
+}
+.best-pill:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.best-pill .label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.best-pill .name { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); }
+
+.legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
+  width: 248px;
+  z-index: 6;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+}
+.legend-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+.legend-row .glyph { flex-shrink: 0; }
+.legend-row .lbl { font-weight: 500; }
+.legend-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 10px 0;
+}
+.profile-block .profile-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+.profile-segments {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: rgba(0,0,0,0.04);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
+}
+.profile-segment {
+  padding: 6px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  transition: all var(--transition-fast);
+  min-height: 30px;
+}
+.profile-segment:hover { color: var(--color-text); }
+.profile-segment.active {
+  background: var(--color-bg-elevated);
+  color: var(--color-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.legend-help {
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 500;
+}
+.legend-help:hover { text-decoration: underline; }
+
+/* ===== SPOT PANEL ===== */
+.spot-panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.spot-header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.spot-header h2 {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+.spot-meta { color: var(--color-text-secondary); font-size: var(--text-sm); }
+.spot-meta .sep { margin: 0 6px; color: var(--color-text-muted); }
+.icon-btn {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+.icon-btn:hover { background: rgba(0,0,0,0.04); color: var(--color-text); }
+
+/* Hero */
+.spot-hero {
+  padding: 32px 20px 28px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(3, 105, 161, 0.05), transparent 60%);
+  text-align: center;
+  border-bottom: 1px solid var(--color-border);
+}
+.spot-hero .hero-marker {
+  width: 96px; height: 96px;
+  margin: 0 auto 16px;
+  display: block;
+  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.12));
+}
+.spot-hero .hero-verdict {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.spot-hero .hero-verdict.green { color: var(--color-safety-green-text); }
+.spot-hero .hero-verdict.amber { color: var(--color-safety-amber-text); }
+.spot-hero .hero-verdict.red   { color: var(--color-safety-red-text); }
+.spot-hero .hero-rationale {
+  max-width: 540px;
+  margin: 0 auto;
+  font-size: var(--text-md);
+  color: var(--color-text-light);
+  font-style: italic;
+  line-height: 1.55;
+}
+.score-pills {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  background: rgba(0,0,0,0.04);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.score-pill.green { background: var(--color-safety-green-bg); color: var(--color-safety-green-text); }
+.score-pill.amber { background: var(--color-safety-amber-bg); color: var(--color-safety-amber-text); }
+.score-pill.red   { background: var(--color-safety-red-bg); color: var(--color-safety-red-text); }
+
+/* ===== ANALYSIS BLOCK (matches existing meteogram analysis) ===== */
+.analysis-block { padding: 20px; background: var(--color-bg); }
+.mga-decision {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  margin-bottom: 14px;
+  border: 1px solid;
+}
+.mga-decision.safe {
+  background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+  border-color: #86efac;
+  color: var(--color-safety-green-text);
+}
+.mga-decision.conditional {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border-color: #fcd34d;
+  color: var(--color-safety-amber-text);
+}
+.mga-decision.not_safe {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border-color: #fca5a5;
+  color: var(--color-safety-red-text);
+}
+.mga-decision-icon {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.6);
+}
+.mga-decision-text { flex: 1; min-width: 0; }
+.mga-decision-status {
+  font-weight: 700;
+  font-size: var(--text-md);
+  line-height: 1.2;
+}
+.mga-decision-sub {
+  font-size: var(--text-sm);
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.mga-fly-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.6);
+  white-space: nowrap;
+}
+
+.mga-window {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mga-window-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+.mga-window-time {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mga-alerts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.mga-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  background: var(--color-bg-elevated);
+  border-left: 3px solid var(--color-text-muted);
+}
+.mga-alert.nogo {
+  background: var(--color-safety-red-bg);
+  border-left-color: var(--color-safety-red);
+  color: var(--color-safety-red-text);
+}
+.mga-alert.caution {
+  background: var(--color-safety-amber-bg);
+  border-left-color: var(--color-safety-amber);
+  color: var(--color-safety-amber-text);
+}
+.mga-alert.positive {
+  background: var(--color-safety-green-bg);
+  border-left-color: var(--color-safety-green);
+  color: var(--color-safety-green-text);
+}
+.mga-alert-icon {
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.7);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ===== METEOGRAM ===== */
+.meteogram-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+.meteogram-card h4 {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.meteogram-card h4 .hint { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--color-text-muted); font-size: 11px; }
+
+.mg-grid {
+  display: grid;
+  grid-template-columns: 60px repeat(13, 1fr);
+  gap: 2px;
+  align-items: center;
+}
+.mg-grid .mg-row-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mg-grid .mg-head {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 4px 0 2px;
+}
+.mg-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mg-cell.calm { background: rgba(16, 185, 129, 0.14); color: #047857; }
+.mg-cell.caution { background: rgba(245, 158, 11, 0.38); color: #78350F; }
+.mg-cell.danger { background: #E11D48; color: #fff; }
+.mg-cell.empty { background: rgba(0,0,0,0.04); color: var(--color-text-muted); font-weight: 500; }
+
+.mg-arrow {
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.mg-arrow svg { width: 80%; height: 80%; }
+
+.mg-tier-bar {
+  display: grid;
+  grid-template-columns: 60px repeat(13, 1fr);
+  gap: 2px;
+  align-items: center;
+  margin-top: 4px;
+}
+.mg-tier-cell {
+  height: 6px;
+  border-radius: 2px;
+}
+.mg-tier-cell.calm { background: rgba(16, 185, 129, 0.55); }
+.mg-tier-cell.caution { background: rgba(245, 158, 11, 0.65); }
+.mg-tier-cell.danger { background: #E11D48; }
+.mg-tier-cell.empty { background: rgba(0,0,0,0.06); }
+
+/* Other spots strip */
+.other-spots {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+.other-spots h3 {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  margin-bottom: 12px;
+}
+.other-spots-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 4px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.mini-card {
+  flex: 0 0 200px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--color-bg-elevated);
+}
+.mini-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+}
+.mini-card .body { flex: 1; min-width: 0; }
+.mini-card .name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-card .sub {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== REGIONEN TAB (Leaflet map) ===== */
+.regions-map-card {
+  position: relative;
+  width: 100%;
+  height: 640px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  background: #f0f9ff;
+}
+#regionsMap {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.leaflet-tooltip.region-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: var(--color-text);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+}
+.leaflet-tooltip.region-tooltip::before { display: none; }
+.region-label {
+  background: transparent !important;
+  border: none !important;
+  text-align: center;
+  pointer-events: none;
+  font-family: 'Inter', sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.region-label-text {
+  font-size: 10px;
+  color: var(--color-text);
+  text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 9px #fff;
+}
+.region-label-stars {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-shadow: 0 0 3px #fff, 0 0 6px #fff;
+  margin-top: 1px;
+}
+.region-label-stars.green { color: var(--color-safety-green-text); }
+.region-label-stars.amber { color: var(--color-safety-amber-text); }
+.region-label-stars.red   { color: var(--color-safety-red-text); }
+
+.regions-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 10px 12px;
+  z-index: 500;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.regions-legend .title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+.regions-legend .row { display: flex; align-items: center; gap: 8px; color: var(--color-text); font-weight: 500; }
+.regions-legend .swatch { width: 16px; height: 10px; border-radius: 2px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.15); }
+.regions-legend .swatch.green { background: rgba(34, 197, 94, 0.45); border-color: rgba(21, 128, 61, 0.7); }
+.regions-legend .swatch.amber { background: rgba(245, 158, 11, 0.45); border-color: rgba(146, 64, 14, 0.7); }
+.regions-legend .swatch.red   { background: rgba(239, 68, 68, 0.45); border-color: rgba(153, 27, 27, 0.7); }
+.regions-legend .swatch.gray  { background: rgba(148, 163, 184, 0.35); border-color: rgba(100, 116, 139, 0.6); }
+
+.regions-day-pill {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  z-index: 500;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.regions-day-pill::before {
+  content: "";
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--color-primary);
+  animation: pulse 2s infinite;
+}
+
+/* Region overlay (slide-in panel) */
+.region-overlay {
+  position: absolute;
+  top: 0; right: 0;
+  height: 100%;
+  width: 380px;
+  background: var(--color-bg-elevated);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.12);
+  z-index: 600;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.region-overlay.open { transform: translateX(0); }
+.region-overlay-head {
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.region-overlay-head h3 {
+  font-size: var(--text-md);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.region-overlay-head .sub {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.region-overlay-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+.region-overlay-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+.region-overlay-summary .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+}
+.region-overlay-summary .pill.green { background: var(--color-safety-green-bg); color: var(--color-safety-green-text); }
+.region-overlay-summary .pill.amber { background: var(--color-safety-amber-bg); color: var(--color-safety-amber-text); }
+.region-overlay-summary .pill.red   { background: var(--color-safety-red-bg); color: var(--color-safety-red-text); }
+.region-overlay-summary .stars { font-size: 13px; color: var(--color-text-secondary); letter-spacing: 1px; }
+.region-overlay-summary .score {
+  margin-left: auto;
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.region-overlay-summary .score.green { color: var(--color-safety-green-text); }
+.region-overlay-summary .score.amber { color: var(--color-safety-amber-text); }
+.region-overlay-summary .score.red   { color: var(--color-safety-red-text); }
+
+.region-overlay-spark {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  margin-bottom: 22px;
+}
+.spark-cell {
+  height: 36px;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  position: relative;
+}
+.spark-cell.green { background: var(--color-safety-green); }
+.spark-cell.amber { background: var(--color-safety-amber); }
+.spark-cell.red   { background: var(--color-safety-red); }
+.spark-cell.gray  { background: rgba(148, 163, 184, 0.45); color: rgba(255,255,255,0.85); }
+.spark-cell.today { box-shadow: 0 0 0 2.5px var(--color-primary), 0 4px 12px rgba(3, 105, 161, 0.25); z-index: 2; }
+.spark-cell .day-label {
+  position: absolute;
+  bottom: -16px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.spark-cell.today .day-label { color: var(--color-primary); font-weight: 700; }
+
+.region-overlay h4 {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  margin: 0 0 10px;
+}
+.region-overlay-spots {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.region-overlay-cta {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+.region-overlay-cta:hover { background: var(--color-primary-vivid); transform: translateY(-1px); }
+
+/* Backdrop on mobile */
+.region-overlay-backdrop {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 599;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.region-overlay-backdrop.show { opacity: 1; pointer-events: auto; }
+
+/* ===== BRIEFING ===== */
+.bf-hero {
+  background: linear-gradient(135deg, #ffffff, #f0f9ff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 20px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 16px;
+}
+.bf-hero-left { min-width: 220px; }
+.bf-hero-date {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
+  margin-bottom: 4px;
+}
+.bf-hero-title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+}
+.bf-hero-sub {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+.bf-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 8px;
+  flex: 1 1 360px;
+}
+.kpi {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.kpi-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.kpi-row { display: flex; align-items: center; gap: 8px; }
+.kpi-value {
+  font-size: var(--text-md);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kpi-value.warn { color: var(--color-safety-amber-text); }
+
+/* Fazit (collapsible) */
+.bf-fazit {
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  cursor: pointer;
+  user-select: none;
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+  box-shadow: var(--shadow-sm);
+}
+.bf-fazit:hover { box-shadow: var(--shadow-md); border-color: var(--color-border-hover); }
+.bf-fazit-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.bf-fazit-label {
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  letter-spacing: -0.01em;
+}
+.bf-fazit-best {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+.bf-fazit-chevron {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+.bf-fazit.is-open .bf-fazit-chevron { transform: rotate(180deg); color: var(--color-primary); }
+.bf-fazit-body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  display: none;
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  color: var(--color-text-light);
+}
+.bf-fazit.is-open .bf-fazit-body { display: block; animation: fadeIn 0.2s ease; }
+.bf-fazit-body strong { color: var(--color-text); font-weight: 700; }
+
+/* Day tabs */
+.bf-day-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.bf-day-tabs::-webkit-scrollbar { display: none; }
+.bf-day-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+}
+.bf-day-btn .day-label { font-size: 11px; opacity: 0.85; }
+.bf-day-btn .day-num { font-size: var(--text-md); font-weight: 800; letter-spacing: -0.02em; }
+.bf-day-btn:hover { border-color: var(--color-border-hover); color: var(--color-text); }
+.bf-day-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(3, 105, 161, 0.3);
+}
+.bf-day-btn .day-band {
+  width: 14px; height: 3px; border-radius: 2px; margin-top: 2px;
+}
+.bf-day-btn .day-band.green { background: var(--color-safety-green); }
+.bf-day-btn .day-band.amber { background: var(--color-safety-amber); }
+.bf-day-btn .day-band.red { background: var(--color-safety-red); }
+.bf-day-btn.active .day-band { background: rgba(255,255,255,0.7); }
+
+/* Filter chips */
+.bf-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.bf-filter-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  margin-right: 4px;
+  align-self: center;
+}
+.bf-filter-chip {
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.bf-filter-chip.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+.bf-filter-chip:hover:not(.active) { border-color: var(--color-border-hover); color: var(--color-text); }
+
+/* Region group + spots (existing-style) */
+.bf-region {
+  margin-bottom: 28px;
+}
+.bf-region-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 12px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid var(--color-primary);
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: background 150ms;
+}
+.bf-region-head:hover { background: rgba(0,0,0,0.025); }
+.bf-region-name {
+  flex: 1;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  min-width: 0;
+}
+.bf-region-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.bf-region-summary .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+}
+.bf-region-summary .pill.green { background: var(--color-safety-green-bg); color: var(--color-safety-green-text); }
+.bf-region-summary .pill.amber { background: var(--color-safety-amber-bg); color: var(--color-safety-amber-text); }
+.bf-region-summary .pill.red   { background: var(--color-safety-red-bg);   color: var(--color-safety-red-text); }
+.bf-region-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-pill);
+}
+.bf-region-chevron {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.bf-region.is-collapsed .bf-region-chevron { transform: rotate(-90deg); }
+.bf-region.is-collapsed .bf-spot-list { display: none; }
+.bf-region.is-collapsed .bf-region-head { border-bottom-style: dashed; border-bottom-color: var(--color-border); margin-bottom: 0; }
+
+.bf-spot-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.bf-spot {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: box-shadow 200ms ease, border-color 200ms ease, transform 150ms ease;
+}
+.bf-spot.green { border-left-color: var(--color-safety-green); }
+.bf-spot.amber {
+  border-left-color: var(--color-safety-amber);
+  background: linear-gradient(135deg, var(--color-safety-amber-bg) 0%, #fefdf8 100%);
+}
+.bf-spot.red {
+  border-left-color: var(--color-safety-red);
+  background: linear-gradient(135deg, var(--color-safety-red-bg) 0%, #fffafa 100%);
+}
+.bf-spot:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+  transform: translateY(-1px);
+}
+.bf-spot-toggle {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.bf-spot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.bf-spot-glyph { flex-shrink: 0; }
+.bf-spot-body { flex: 1; min-width: 0; }
+.bf-spot-name {
+  font-weight: 700;
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bf-spot-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.bf-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.bf-chip.window {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1e40af;
+  font-variant-numeric: tabular-nums;
+}
+.bf-chip.climb {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+  font-variant-numeric: tabular-nums;
+}
+.bf-chip.foehn {
+  background: var(--color-safety-amber-bg);
+  border-color: #fcd34d;
+  color: var(--color-safety-amber-text);
+}
+.bf-spot-rating {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  flex-shrink: 0;
+  min-width: 2.2em;
+  text-align: right;
+}
+.bf-spot.green .bf-spot-rating { color: var(--color-safety-green-text); }
+.bf-spot.amber .bf-spot-rating { color: var(--color-safety-amber-text); }
+.bf-spot.red   .bf-spot-rating { color: var(--color-safety-red-text); }
+.bf-spot-stars {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+/* Risk-Reward Matrix (region-aggregated) */
+.matrix-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  margin-bottom: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.matrix-head {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+.matrix-head h3 {
+  font-size: var(--text-md);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.matrix-head p {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.matrix-body { padding: 16px 20px 24px; }
+.matrix-wrap {
+  position: relative;
+  height: 280px;
+  background:
+    linear-gradient(180deg,
+      rgba(34, 197, 94, 0.08) 0%,
+      rgba(34, 197, 94, 0.08) 33.33%,
+      rgba(245, 158, 11, 0.08) 33.33%,
+      rgba(245, 158, 11, 0.08) 66.66%,
+      rgba(239, 68, 68, 0.08) 66.66%,
+      rgba(239, 68, 68, 0.08) 100%);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+.matrix-band-label {
+  position: absolute;
+  left: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+.matrix-band-label.green { top: 10px; color: var(--color-safety-green-text); }
+.matrix-band-label.amber { top: 50%; transform: translateY(-50%); color: var(--color-safety-amber-text); }
+.matrix-band-label.red   { bottom: 10px; color: var(--color-safety-red-text); }
+.matrix-divider {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: rgba(0,0,0,0.08);
+  pointer-events: none;
+}
+.matrix-divider.top { top: 33.33%; }
+.matrix-divider.bot { top: 66.66%; }
+.matrix-x-axis {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: var(--color-text-muted);
+  margin: 6px 4px 0;
+}
+.matrix-axis-title {
+  text-align: center;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+.matrix-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: transform var(--transition-fast);
+}
+.matrix-dot:hover { transform: translate(-50%, -50%) scale(1.12); z-index: 5; }
+.matrix-dot .name {
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 3px;
+  background: rgba(255,255,255,0.92);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.matrix-bubble {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 2.5px solid;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+.matrix-bubble.green { background: var(--color-safety-green); border-color: var(--color-safety-green-stroke); }
+.matrix-bubble.amber { background: var(--color-safety-amber); border-color: var(--color-safety-amber-stroke); }
+.matrix-bubble.red   { background: var(--color-safety-red); border-color: var(--color-safety-red-stroke); }
+
+.matrix-legend {
+  margin-top: 14px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+.matrix-legend .item { display: inline-flex; align-items: center; gap: 6px; }
+.matrix-legend .swatch { width: 12px; height: 12px; border-radius: 50%; }
+.matrix-legend .swatch.green { background: var(--color-safety-green); }
+.matrix-legend .swatch.amber { background: var(--color-safety-amber); }
+.matrix-legend .swatch.red   { background: var(--color-safety-red); }
+
+/* Footer */
+footer.appfoot {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  padding: 14px 16px;
+  margin-top: 32px;
+}
+.appfoot-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.appfoot-inner p { font-size: 11px; color: var(--color-text-muted); }
+.appfoot-inner button.reset {
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+.appfoot-inner button.reset:hover {
+  background: var(--color-card);
+  border-color: var(--color-border-hover);
+  color: var(--color-text);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 880px) {
+  .map-card { height: 480px; }
+  .legend { width: 220px; padding: 12px; }
+  .bf-hero { flex-direction: column; align-items: stretch; padding: 16px 18px; }
+  .bf-hero-left { min-width: 0; }
+  .bf-hero-title { font-size: var(--text-xl); }
+  .bf-kpis { grid-template-columns: repeat(2, 1fr); }
+  .spot-hero { padding: 24px 16px; }
+  .spot-hero .hero-marker { width: 80px; height: 80px; }
+  .spot-header { padding: 14px 16px 10px; }
+  .analysis-block { padding: 16px; }
+  .other-spots { padding: 14px; }
+  .matrix-wrap { height: 240px; }
+}
+@media (max-width: 580px) {
+  .demo-banner { flex-direction: column; gap: 6px; padding: 10px 12px; text-align: center; }
+  .appbar-brand .subtitle { display: none; }
+  .tabbar { display: none; }
+  .bottom-nav { display: flex; }
+  body { padding-bottom: 90px; }
+  main { padding: 16px 12px 24px; }
+  .map-card { height: 420px; }
+  .legend { right: 12px; width: auto; max-width: 280px; padding: 10px; }
+  .legend-row { font-size: var(--text-xs); }
+  .bf-kpis { grid-template-columns: 1fr 1fr; }
+  .kpi { padding: 8px 10px; }
+  .regions-map-card { height: 540px; }
+  .region-overlay { width: 100%; }
+  .region-overlay-backdrop { display: block; }
+  .spot-hero .hero-marker { width: 72px; height: 72px; }
+  .spot-hero .hero-verdict { font-size: var(--text-lg); }
+  .matrix-wrap { height: 220px; }
+  .bf-spot-toggle { padding: 10px 12px; }
+  .bf-spot-name { font-size: var(--text-sm); }
+}
+</style>
+</head>
+<body>
+
+<div class="demo-banner" id="demoBanner">
+  <span>Vorschau mit Mock-Daten · Donnerstag 1.5.2026 · simulierte Föhnsituation</span>
+  <button class="dismiss" onclick="document.getElementById('demoBanner').style.display='none'">verstanden</button>
+</div>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="appbar-brand">
+      <span class="logo">Gleitcast</span>
+      <span class="subtitle">Rating Preview v1.2</span>
+    </div>
+    <span class="appbar-pill">PREVIEW · MOCK</span>
+  </div>
+</header>
+
+<nav class="tabbar">
+  <div class="tabbar-inner">
+    <button class="tab-btn active" data-tab="spots" aria-label="Spots — Kartenansicht">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      Spots
+    </button>
+    <button class="tab-btn" data-tab="spot" aria-label="Spot-Detail">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      Spot-Detail
+    </button>
+    <button class="tab-btn" data-tab="regions" aria-label="Regionen">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6l7-3 4 3 7-3v15l-7 3-4-3-7 3z"/><path d="M10 3v15M14 6v15"/></svg>
+      Regionen
+    </button>
+    <button class="tab-btn" data-tab="briefing" aria-label="Briefing">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></svg>
+      Briefing
+    </button>
+  </div>
+</nav>
+
+<main>
+  <!-- ============ SPOTS TAB ============ -->
+  <section class="tab-panel active" id="panel-spots">
+    <h1 class="section-title">Spots auf einen Blick</h1>
+    <p class="section-subtitle">Farbe = Sicherheit · Zahl = Erlebnis (1–5 Sterne) · Sektor = Wind.</p>
+    <div class="map-card" id="mapCard">
+      <div class="best-pill" id="bestPill" title="Bester Spot heute">
+        <span id="bestGlyph"></span>
+        <div>
+          <div class="label">Beste heute</div>
+          <div class="name" id="bestName">Pfänder</div>
+        </div>
+      </div>
+      <div id="markersLayer"></div>
+      <div class="marker-tooltip" id="markerTooltip"></div>
+      <div class="legend">
+        <div class="legend-title">Legende</div>
+        <div id="legendRows"></div>
+        <a class="legend-help" href="#" onclick="event.preventDefault(); alert('In der echten App öffnet sich ein Modal mit Erklärung des 2-Achsen-Systems (Safety + Experience).');">Wie funktioniert das?</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SPOT DETAIL TAB ============ -->
+  <section class="tab-panel" id="panel-spot">
+    <div class="spot-panel" id="spotPanel"></div>
+    <div class="other-spots">
+      <h3>Andere Spots heute</h3>
+      <div class="other-spots-row" id="otherSpotsRow"></div>
+    </div>
+  </section>
+
+  <!-- ============ REGIONEN TAB ============ -->
+  <section class="tab-panel" id="panel-regions">
+    <h1 class="section-title">Regionen heute</h1>
+    <p class="section-subtitle">Polygone nach Sicherheit gefärbt · Zahl im Label = Sterne · Klick öffnet Tagesübersicht.</p>
+    <div class="regions-map-card">
+      <div class="regions-day-pill">Donnerstag · 1. Mai 2026</div>
+      <div class="regions-legend">
+        <div class="title">Regionen-Sicherheit</div>
+        <div class="row"><span class="swatch green"></span>Sicher</div>
+        <div class="row"><span class="swatch amber"></span>Vorsicht</div>
+        <div class="row"><span class="swatch red"></span>Nicht fliegbar</div>
+        <div class="row"><span class="swatch gray"></span>Keine Daten</div>
+      </div>
+      <div id="regionsMap" role="region" aria-label="Karte aller Regionen mit Sicherheitsbewertung"></div>
+      <div class="region-overlay-backdrop" id="regionOverlayBackdrop" onclick="closeRegionOverlay()"></div>
+      <div class="region-overlay" id="regionOverlay" aria-hidden="true">
+        <div class="region-overlay-head">
+          <div>
+            <h3 id="regionOverlayTitle">Region</h3>
+            <div class="sub" id="regionOverlaySub"></div>
+          </div>
+          <button class="icon-btn" onclick="closeRegionOverlay()" aria-label="Region schliessen">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="region-overlay-body" id="regionOverlayBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BRIEFING TAB ============ -->
+  <section class="tab-panel" id="panel-briefing">
+    <div class="bf-hero">
+      <div class="bf-hero-left">
+        <div class="bf-hero-date">Donnerstag · 1. Mai 2026</div>
+        <div class="bf-hero-title">Tagesbriefing</div>
+        <div class="bf-hero-sub">Föhnsituation prägt den Alpenraum</div>
+      </div>
+      <div class="bf-kpis" id="bfKpis"></div>
+    </div>
+
+    <div class="bf-fazit" id="bfFazit">
+      <div class="bf-fazit-head">
+        <span class="bf-fazit-label">Fazit der Woche</span>
+        <span class="bf-fazit-best" id="bfFazitBest"></span>
+        <span class="bf-fazit-chevron">▼</span>
+      </div>
+      <div class="bf-fazit-body">
+        Föhn dominiert die ersten Tage und schwächt sich gegen Ende der Woche ab. <strong>Mittelland und Vorarlberg</strong> sind durchgehend stabil — heute mit <strong>Pfänder</strong> als Tagesfavorit. <strong>Berner Oberland und Wallis</strong> bleiben für Pro-Piloten interessant, ab Freitag mit Sturmwarnung. Bestes XC-Fenster: <strong>Mittwoch–Freitag in Vorarlberg und Glarus</strong>.
+      </div>
+    </div>
+
+    <div class="bf-day-tabs" id="bfDayTabs"></div>
+
+    <div class="bf-filters">
+      <span class="bf-filter-label">Filter</span>
+      <button class="bf-filter-chip active" data-filter="all">Alle</button>
+      <button class="bf-filter-chip" data-filter="green">Sicher</button>
+      <button class="bf-filter-chip" data-filter="amber">Vorsicht</button>
+      <button class="bf-filter-chip" data-filter="stars3">≥ 3 Sterne</button>
+      <button class="bf-filter-chip" data-filter="stars4">≥ 4 Sterne</button>
+    </div>
+
+    <div class="matrix-card">
+      <div class="matrix-head">
+        <h3>Risk vs Reward · Regionen-Übersicht</h3>
+        <p>Aggregiert über alle Spots der Region. X-Achse Erlebnis · Y-Achse Sicherheit · Bubble-Grösse = Anzahl Spots.</p>
+      </div>
+      <div class="matrix-body">
+        <div class="matrix-wrap" id="matrix">
+          <div class="matrix-band-label green">Sicher</div>
+          <div class="matrix-band-label amber">Vorsicht</div>
+          <div class="matrix-band-label red">Gesperrt</div>
+          <div class="matrix-divider top"></div>
+          <div class="matrix-divider bot"></div>
+        </div>
+        <div class="matrix-x-axis"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+        <div class="matrix-axis-title">Erlebnis-Score (Ø der Region)</div>
+        <div class="matrix-legend">
+          <span class="item"><span class="swatch green"></span>Sicher (Ø green)</span>
+          <span class="item"><span class="swatch amber"></span>Vorsicht (Ø amber)</span>
+          <span class="item"><span class="swatch red"></span>Gesperrt (Ø red)</span>
+          <span class="item">· Zahl in Bubble = Anzahl Spots</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="bfRegionList"></div>
+  </section>
+</main>
+
+<footer class="appfoot">
+  <div class="appfoot-inner">
+    <p>Mock-Daten · Vorschau für Stakeholder-Review · Rating-Konzept v1.2 (Risk × Reward)</p>
+    <button class="reset" onclick="resetDemo()">Demo zurücksetzen</button>
+  </div>
+</footer>
+
+<nav class="bottom-nav">
+  <button class="tab-btn active" data-tab="spots" aria-label="Spots">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    Spots
+  </button>
+  <button class="tab-btn" data-tab="spot" aria-label="Spot-Detail">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    Detail
+  </button>
+  <button class="tab-btn" data-tab="regions" aria-label="Regionen">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6l7-3 4 3 7-3v15l-7 3-4-3-7 3z"/><path d="M10 3v15M14 6v15"/></svg>
+    Regionen
+  </button>
+  <button class="tab-btn" data-tab="briefing" aria-label="Briefing">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></svg>
+    Briefing
+  </button>
+</nav>
+
+<script>
+// ============ MOCK DATA ============
+const MOCK_SPOTS = [
+  { id:'fiesch', name:'Fiesch-Kühboden', region:'Wallis', alt:1071, lat:46.40, lng:8.13,
+    safetyBand:'amber', stars:4, score:82, comfort:45, windDirDeg:225, windKmh:18, foehnRisk:4.5,
+    safetyStatus:'conditional', bestWindow:'13:00–16:00', peakClimb:2.4, productiveH:5,
+    decisions:['FoehnCaution(4.5)','GustFloor'],
+    cautionNotes:['Föhnrisiko 4.5 — fliegbar für Pros','Mechanisch ruppig 12–15 Uhr'],
+    rationale:'Starkes Steigen erwartet (peak 2.4 m/s, 5h produktiv), aber Föhneinfluss aus Süd verlangt aktive Routenwahl.' },
+  { id:'niesen', name:'Niesen', region:'Berner Oberland', alt:2362, lat:46.65, lng:7.65,
+    safetyBand:'red', stars:1, score:35, comfort:20, windDirDeg:180, windKmh:42, foehnRisk:6.2,
+    safetyStatus:'not_safe', bestWindow:'—', peakClimb:1.0, productiveH:0,
+    decisions:['FoehnDanger(6.2)','AloftNotSafe','WindStrongMajority'],
+    cautionNotes:['Föhndurchbruch ab 11 Uhr','Höhenwind 850hPa: 55 km/h'],
+    rationale:'Akuter Föhndurchbruch erwartet. Höhenwind dominiert. Heute nicht fliegen.' },
+  { id:'pfaender', name:'Pfänder', region:'Vorarlberg', alt:1064, lat:47.51, lng:9.78,
+    safetyBand:'green', stars:5, score:91, comfort:80, windDirDeg:45, windKmh:8, foehnRisk:0,
+    safetyStatus:'safe', bestWindow:'11:00–17:30', peakClimb:2.8, productiveH:6,
+    decisions:[], cautionNotes:[],
+    highlights:['Klassische XC-Kondition','Basis bis 2400m','Weite Routenwahl'],
+    rationale:'Top-Tag. Schwach-NO, klassische XC-Kondition mit 6h produktiver Thermik und 2.8 m/s Spitzensteigen.' },
+  { id:'uetliberg', name:'Uetliberg', region:'Mittelland', alt:730, lat:47.35, lng:8.49,
+    safetyBand:'green', stars:1, score:38, comfort:70, windDirDeg:270, windKmh:6, foehnRisk:0,
+    safetyStatus:'safe', bestWindow:'13:00–15:00', peakClimb:0.6, productiveH:1,
+    decisions:[], cautionNotes:[],
+    rationale:'Sicher, aber zu schwach für Thermik. Kurzer Übungsflug möglich.' },
+  { id:'verbier', name:'Verbier — Croix-de-Cœur', region:'Wallis', alt:2200, lat:46.10, lng:7.23,
+    safetyBand:'amber', stars:3, score:70, comfort:50, windDirDeg:200, windKmh:22, foehnRisk:3.8,
+    safetyStatus:'conditional', bestWindow:'12:30–15:30', peakClimb:1.8, productiveH:3,
+    decisions:['FoehnCaution(3.8)','GustFloor'],
+    cautionNotes:['Föhneinfluss moderat','Böen bis 35 km/h'],
+    rationale:'Solide für erfahrene Piloten. Föhn präsent aber nicht durchgreifend.' },
+  { id:'atzmaennig', name:'Atzmännig', region:'Toggenburg', alt:1206, lat:47.27, lng:8.92,
+    safetyBand:'green', stars:3, score:65, comfort:85, windDirDeg:315, windKmh:10, foehnRisk:0,
+    safetyStatus:'safe', bestWindow:'12:00–16:00', peakClimb:1.6, productiveH:4,
+    decisions:[], cautionNotes:[],
+    rationale:'Solider lokaler Tag, gute Thermik bis 1800m, NW schwach.' },
+  { id:'fronalp', name:'Fronalpstock', region:'Glarus', alt:1922, lat:47.05, lng:9.05,
+    safetyBand:'green', stars:4, score:78, comfort:75, windDirDeg:30, windKmh:12, foehnRisk:0,
+    safetyStatus:'safe', bestWindow:'11:30–17:00', peakClimb:2.3, productiveH:5,
+    decisions:[], cautionNotes:[],
+    highlights:['XC Richtung Linthal','Basis bis 2400m'],
+    rationale:'XC-Tag möglich Richtung Linthal. Steigen kräftig, Basis bis 2400m.' },
+  { id:'brienz', name:'Brienzer Rothorn', region:'Berner Oberland', alt:2348, lat:46.79, lng:8.04,
+    safetyBand:'amber', stars:2, score:55, comfort:40, windDirDeg:210, windKmh:25, foehnRisk:3.2,
+    safetyStatus:'conditional', bestWindow:'13:00–14:30', peakClimb:1.4, productiveH:2,
+    decisions:['FoehnCaution(3.2)'],
+    cautionNotes:['Lee-Zone-Risiko bei S-Wind'],
+    rationale:'Föhneinfluss kann lokale Lee-Zonen erzeugen. Vorsichtige Linienwahl.' },
+  { id:'stanser', name:'Stanserhorn', region:'Zentralschweiz', alt:1898, lat:46.96, lng:8.35,
+    safetyBand:'green', stars:4, score:76, comfort:78, windDirDeg:0, windKmh:9, foehnRisk:0,
+    safetyStatus:'safe', bestWindow:'11:30–16:30', peakClimb:2.1, productiveH:5,
+    decisions:[], cautionNotes:[],
+    rationale:'Gute Bedingungen, klassischer Innerschweizer Tag.' },
+  { id:'grindel', name:'Grindelwald-First', region:'Berner Oberland', alt:2168, lat:46.66, lng:8.05,
+    safetyBand:'red', stars:0, score:15, comfort:0, windDirDeg:200, windKmh:48, foehnRisk:6.8,
+    noAnalysis:true,
+    noAnalysisReason:'Windrichtung passt nicht zur Startrichtung — keine detaillierte Analyse erstellt.',
+    rationale:'Spot ist heute nicht fliegbar. Falsche Anströmung kombiniert mit Föhnsturm — keine vertiefte Auswertung.' },
+];
+
+const SAFETY_COLORS = {
+  green: { fill:'#22c55e', stroke:'#15803d' },
+  amber: { fill:'#f59e0b', stroke:'#92400e' },
+  red:   { fill:'#ef4444', stroke:'#991b1b' },
+};
+
+const REGION_ORDER = [
+  'Vorarlberg','Mittelland','Toggenburg','Zentralschweiz','Glarus','Wallis','Berner Oberland'
+];
+
+// 7-day mock per region: [band, stars] for [Mo,Di,Mi,Do,Fr,Sa,So]
+const REGION_WEEK = {
+  'Vorarlberg':      [['green',4],['green',3],['green',5],['green',5],['green',4],['amber',3],['green',2]],
+  'Mittelland':      [['green',2],['green',2],['green',3],['green',1],['green',3],['green',4],['amber',2]],
+  'Toggenburg':      [['green',3],['green',4],['green',3],['green',3],['green',3],['amber',2],['green',1]],
+  'Glarus':          [['green',3],['green',4],['green',4],['green',4],['amber',3],['amber',2],['gray',0]],
+  'Zentralschweiz':  [['green',3],['green',4],['green',4],['green',4],['amber',3],['red',1],['amber',2]],
+  'Berner Oberland': [['amber',2],['amber',2],['amber',2],['red',1],['red',0],['red',0],['amber',1]],
+  'Wallis':          [['amber',3],['amber',3],['amber',3],['amber',4],['red',1],['red',0],['amber',2]],
+};
+const REGION_THEME = {
+  'Vorarlberg':      ['Solid','Solid','Top-XC','Top-Tag','XC','Föhn nähert sich','ruhig'],
+  'Mittelland':      ['ruhig','ruhig','solid','schwach','solid','XC','Westwind'],
+  'Toggenburg':      ['Solid','XC','Solid','Solid','Solid','Föhn','schwach'],
+  'Glarus':          ['Solid','XC','XC','XC','Föhn','Föhn','keine Daten'],
+  'Zentralschweiz':  ['Solid','XC','XC','XC','Föhn','Föhnsturm','Restwind'],
+  'Berner Oberland': ['Föhn','Föhn','Föhn','Sturm','Sturm','Sturm','Restwind'],
+  'Wallis':          ['Föhn-XC','Föhn-XC','Föhn-XC','Pro-XC','Sturm','Sturm','Restwind'],
+};
+const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+const TODAY_INDEX = 3; // Donnerstag
+
+// ============ MARKER RENDERER ============
+function renderMarker({ safetyBand='green', stars=0, windDirDeg=0, size=44 }) {
+  const c = SAFETY_COLORS[safetyBand] || SAFETY_COLORS.green;
+  const cx = 22, cy = 22, radius = 10;
+  const verdictWord = safetyBand === 'green' ? 'Sicher' : safetyBand === 'amber' ? 'Vorsicht' : 'Nicht fliegbar';
+  const ariaLabel = safetyBand === 'red' ? `${verdictWord} — gesperrt` : `${verdictWord}, ${stars} ${stars===1?'Stern':'Sterne'}`;
+
+  const sectorR1 = radius + 1;
+  const sectorR2 = radius + 9;
+  const halfArc = 15;
+  const a1 = (windDirDeg - halfArc - 90) * Math.PI / 180;
+  const a2 = (windDirDeg + halfArc - 90) * Math.PI / 180;
+  const x1i = cx + sectorR1 * Math.cos(a1), y1i = cy + sectorR1 * Math.sin(a1);
+  const x2i = cx + sectorR1 * Math.cos(a2), y2i = cy + sectorR1 * Math.sin(a2);
+  const x1o = cx + sectorR2 * Math.cos(a1), y1o = cy + sectorR2 * Math.sin(a1);
+  const x2o = cx + sectorR2 * Math.cos(a2), y2o = cy + sectorR2 * Math.sin(a2);
+  const sector = `<path d="M ${x1i} ${y1i} L ${x1o} ${y1o} A ${sectorR2} ${sectorR2} 0 0 1 ${x2o} ${y2o} L ${x2i} ${y2i} A ${sectorR1} ${sectorR1} 0 0 0 ${x1i} ${y1i} Z" fill="${c.stroke}" opacity="0.55"/>`;
+  const circle = `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2"/>`;
+  let inner = '';
+  if (safetyBand === 'red') {
+    inner = `<path d="M17 17 L27 27 M27 17 L17 27" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>`;
+  } else if (stars > 0) {
+    inner = `<text x="${cx}" y="${cy + 4}" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="11" font-weight="700">${stars}</text>`;
+  } else {
+    inner = `<circle cx="${cx}" cy="${cy}" r="2" fill="#ffffff"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="${size}" height="${size}" role="img" aria-label="${ariaLabel}">${sector}${circle}${inner}</svg>`;
+}
+
+// ============ HELPERS ============
+function lngToX(lng) { return ((lng - 6.0) / (10.7 - 6.0)) * 100; }
+function latToY(lat) { return ((47.9 - lat) / (47.9 - 45.7)) * 100; }
+function verdictText(b) { return b === 'green' ? 'Sicher' : b === 'amber' ? 'Vorsicht' : 'Nicht fliegbar'; }
+function degreesToCompass(deg) {
+  const dirs = ['N','NO','O','SO','S','SW','W','NW'];
+  return dirs[Math.round(((deg % 360) / 45)) % 8];
+}
+function starString(n) { return '★'.repeat(n) + '☆'.repeat(5 - n); }
+
+// ============ MAP ============
+function renderMap() {
+  const layer = document.getElementById('markersLayer');
+  layer.innerHTML = '';
+  MOCK_SPOTS.forEach(s => {
+    const x = lngToX(s.lng), y = latToY(s.lat);
+    const el = document.createElement('div');
+    el.className = `map-marker ${s.safetyBand}`;
+    el.style.left = `${x}%`;
+    el.style.top  = `${y}%`;
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `${s.name}, ${verdictText(s.safetyBand)}, ${s.stars} Sterne`);
+    el.innerHTML = renderMarker({ safetyBand:s.safetyBand, stars:s.stars, windDirDeg:s.windDirDeg, size:44 });
+    el.addEventListener('mouseenter', e => showTooltip(e, s));
+    el.addEventListener('mouseleave', hideTooltip);
+    el.addEventListener('mousemove', moveTooltip);
+    el.addEventListener('click', () => selectSpot(s.id));
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSpot(s.id); }});
+    layer.appendChild(el);
+  });
+
+  const best = MOCK_SPOTS.reduce((a,b) => a.score > b.score ? a : b);
+  document.getElementById('bestGlyph').innerHTML = renderMarker({ safetyBand:best.safetyBand, stars:best.stars, windDirDeg:best.windDirDeg, size:32 });
+  document.getElementById('bestName').textContent = best.name;
+  document.getElementById('bestPill').onclick = () => selectSpot(best.id);
+}
+
+function showTooltip(e, s) {
+  const tt = document.getElementById('markerTooltip');
+  tt.innerHTML = `
+    <div class="name">${s.name}</div>
+    <div class="meta">${s.region} · ${s.alt}m · Wind ${degreesToCompass(s.windDirDeg)} ${s.windKmh} km/h</div>
+    <div class="verdict">
+      <span class="verdict-dot ${s.safetyBand}"></span>
+      <span>${verdictText(s.safetyBand)} · ${s.stars} ${s.stars===1?'Stern':'Sterne'} · Comfort ${s.comfort}</span>
+    </div>`;
+  tt.classList.add('show');
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  const tt = document.getElementById('markerTooltip');
+  const card = document.getElementById('mapCard').getBoundingClientRect();
+  tt.style.left = `${e.clientX - card.left}px`;
+  tt.style.top = `${e.clientY - card.top - 16}px`;
+}
+function hideTooltip() {
+  document.getElementById('markerTooltip').classList.remove('show');
+}
+
+function renderLegend() {
+  const rows = [
+    { band:'green', stars:5, label:'Top-Tag' },
+    { band:'green', stars:3, label:'Solider Tag' },
+    { band:'green', stars:1, label:'Sicher, kurz' },
+    { band:'amber', stars:4, label:'Vorsicht — Pro-Tag' },
+    { band:'red',   stars:0, label:'Nicht fliegbar' },
+  ];
+  document.getElementById('legendRows').innerHTML = rows.map(r => `
+    <div class="legend-row">
+      <div class="glyph">${renderMarker({ safetyBand:r.band, stars:r.stars, windDirDeg:0, size:32 })}</div>
+      <div class="lbl">${r.label}</div>
+    </div>`).join('');
+}
+
+// ============ TAB SWITCHING ============
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-' + name);
+  });
+  if (name === 'briefing') requestAnimationFrame(renderMatrix);
+  if (name === 'regions') {
+    renderRegions();
+    setTimeout(() => { if (regionsMapInstance) regionsMapInstance.invalidateSize(); }, 320);
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('.tab-btn').forEach(b => {
+  b.addEventListener('click', () => switchTab(b.dataset.tab));
+});
+
+// ============ SPOT DETAIL ============
+let currentSpotId = 'pfaender';
+
+function selectSpot(id) {
+  currentSpotId = id;
+  renderSpotPanel(id);
+  switchTab('spot');
+}
+
+function renderSpotPanel(id) {
+  const s = MOCK_SPOTS.find(x => x.id === id) || MOCK_SPOTS[0];
+  const panel = document.getElementById('spotPanel');
+  const wDir = degreesToCompass(s.windDirDeg);
+  const verdict = verdictText(s.safetyBand);
+
+  panel.innerHTML = `
+    <div class="spot-header">
+      <div>
+        <h2>${s.name}</h2>
+        <div class="spot-meta">${s.region}<span class="sep">·</span>${s.alt}m MSL<span class="sep">·</span>Wind ${wDir} ${s.windKmh} km/h</div>
+      </div>
+      <button class="icon-btn" onclick="switchTab('spots')" aria-label="Schliessen">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="spot-hero">
+      <div class="hero-marker">${renderMarker({ safetyBand:s.safetyBand, stars:s.stars, windDirDeg:s.windDirDeg, size:96 })}</div>
+      <div class="hero-verdict ${s.safetyBand}">${verdict} · ${s.stars} ${s.stars===1?'Stern':'Sterne'} · ${s.score}/100</div>
+      <p class="hero-rationale">${s.rationale}</p>
+      <div class="score-pills">
+        <span class="score-pill ${s.safetyBand}">Safety ${s.safetyBand.toUpperCase()}</span>
+        <span class="score-pill">Experience ${s.score}/100</span>
+        <span class="score-pill">Comfort ${s.comfort}/100</span>
+        ${s.foehnRisk > 0 ? `<span class="score-pill ${s.foehnRisk >= 6 ? 'red' : 'amber'}">Föhn ${s.foehnRisk.toFixed(1)}</span>` : ''}
+      </div>
+    </div>
+    <div class="analysis-block">
+      ${renderAnalysis(s)}
+    </div>
+    ${s.noAnalysis ? '' : `<div style="padding: 0 20px 20px;">${renderMeteogram(s)}</div>`}
+  `;
+
+  // Other spots
+  const other = document.getElementById('otherSpotsRow');
+  other.innerHTML = MOCK_SPOTS.filter(x => x.id !== id).map(x => `
+    <div class="mini-card" onclick="selectSpot('${x.id}')">
+      <div>${renderMarker({ safetyBand:x.safetyBand, stars:x.stars, windDirDeg:x.windDirDeg, size:36 })}</div>
+      <div class="body">
+        <div class="name">${x.name}</div>
+        <div class="sub">${x.region} · ${verdictText(x.safetyBand)} · ${x.stars}★</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderAnalysis(s) {
+  // No-analysis case: red spot where conditions don't warrant a detailed analysis
+  if (s.noAnalysis) {
+    return `
+      <div class="mga-decision not_safe" style="margin-bottom:0">
+        <div class="mga-decision-icon">⊘</div>
+        <div class="mga-decision-text">
+          <div class="mga-decision-status">Keine Analyse</div>
+          <div class="mga-decision-sub">${s.noAnalysisReason || 'Bedingungen sind eindeutig nicht fliegbar — keine detaillierte Analyse erstellt.'}</div>
+        </div>
+      </div>`;
+  }
+
+  const decisionConfig = {
+    safe:        { cls:'safe',        icon:'✓', label:'Fliegbar' },
+    conditional: { cls:'conditional', icon:'!', label:'Bedingt fliegbar', sub:'Einschränkungen beachten' },
+    not_safe:    { cls:'not_safe',    icon:'✕', label:'Nicht fliegbar', sub:'Sicherheitsrisiken vorhanden' },
+  };
+  const dc = decisionConfig[s.safetyStatus] || decisionConfig.safe;
+  const flyLabel = s.score >= 75 ? 'XC-Tag' : s.score >= 45 ? 'Thermik' : s.score >= 25 ? 'Soaring' : 'Abgleiter';
+  const subLine = dc.sub || (s.score >= 60 ? 'Gut fliegbar' : s.score >= 30 ? 'Lokal möglich' : 'Schwach');
+
+  let html = `
+    <div class="mga-decision ${dc.cls}">
+      <div class="mga-decision-icon">${dc.icon}</div>
+      <div class="mga-decision-text">
+        <div class="mga-decision-status">${dc.label}</div>
+        <div class="mga-decision-sub">${subLine}</div>
+      </div>
+      ${s.safetyStatus !== 'not_safe' ? `<span class="mga-fly-badge">${flyLabel}</span>` : ''}
+    </div>
+  `;
+
+  if (s.bestWindow && s.bestWindow !== '—') {
+    html += `
+      <div class="mga-window">
+        <div>
+          <div class="mga-window-label">Bestes Fenster</div>
+          <div class="mga-window-time">${s.bestWindow}</div>
+        </div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-secondary);">
+          ${s.peakClimb ? `Peak ${s.peakClimb} m/s` : ''}${s.productiveH ? ` · ${s.productiveH}h produktiv` : ''}
+        </div>
+      </div>`;
+  }
+
+  const alerts = [];
+  (s.cautionNotes || []).forEach(n => {
+    const cls = s.safetyBand === 'red' ? 'nogo' : 'caution';
+    const icon = s.safetyBand === 'red' ? '✕' : '!';
+    alerts.push({ cls, icon, text: n });
+  });
+  (s.highlights || []).forEach(h => {
+    alerts.push({ cls:'positive', icon:'✓', text: h });
+  });
+  if (alerts.length > 0) {
+    html += '<div class="mga-alerts">' + alerts.map(a => `
+      <div class="mga-alert ${a.cls}">
+        <div class="mga-alert-icon">${a.icon}</div>
+        <div>${a.text}</div>
+      </div>`).join('') + '</div>';
+  }
+
+  return html;
+}
+
+// Meteogramm — basis on existing data display style (wind speed + thermal tier)
+function renderMeteogram(s) {
+  const hours = ['06','07','08','09','10','11','12','13','14','15','16','17','18'];
+  const heads = '<div class="mg-row-label"></div>' + hours.map(h => `<div class="mg-head">${h}</div>`).join('');
+
+  // Wind row: arrows rotated by direction, color by intensity
+  let windRow = '<div class="mg-row-label">Wind</div>';
+  hours.forEach((h, i) => {
+    const dir = (s.windDirDeg + Math.sin(i / 2) * 8) % 360;
+    const intensity = (s.windKmh + i * 1.1) / 50;
+    const color = intensity > 0.8 ? '#ef4444' : intensity > 0.5 ? '#f59e0b' : '#15803d';
+    windRow += `
+      <div class="mg-arrow">
+        <svg viewBox="0 0 24 24" style="transform:rotate(${dir}deg)">
+          <path d="M12 3 L7 13 L11 13 L11 21 L13 21 L13 13 L17 13 Z" fill="${color}"/>
+        </svg>
+      </div>`;
+  });
+
+  // Wind km/h numeric row
+  let kmhRow = '<div class="mg-row-label">km/h</div>';
+  hours.forEach((h, i) => {
+    const v = Math.round(s.windKmh + i * 1.1 + Math.sin(i)*2);
+    let cls = 'calm';
+    if (v >= 35) cls = 'danger';
+    else if (v >= 22) cls = 'caution';
+    kmhRow += `<div class="mg-cell ${cls}">${v}</div>`;
+  });
+
+  // Thermal tier row (calm/caution/danger)
+  let tierBar = '<div class="mg-row-label">Tier</div>';
+  hours.forEach((h, i) => {
+    const hour = parseInt(h, 10);
+    let tier = 'calm';
+    if (s.safetyBand === 'red') {
+      tier = (hour >= 11 && hour <= 16) ? 'danger' : 'caution';
+    } else if (s.safetyBand === 'amber') {
+      tier = (hour >= 12 && hour <= 15) ? 'caution' : 'calm';
+    } else {
+      tier = (hour >= 11 && hour <= 16) ? 'calm' : (hour < 8 || hour > 17 ? 'empty' : 'calm');
+    }
+    if (s.score < 30 && hour < 9) tier = 'empty';
+    tierBar += `<div class="mg-tier-cell ${tier}"></div>`;
+  });
+
+  return `
+    <div class="meteogram-card">
+      <h4>Meteogramm <span class="hint">Mock-Daten · Stundenraster 06–18h</span></h4>
+      <div class="mg-grid">${heads}</div>
+      <div class="mg-grid">${windRow}</div>
+      <div class="mg-grid">${kmhRow}</div>
+      <div class="mg-tier-bar">${tierBar}</div>
+    </div>
+  `;
+}
+
+// ============ REGIONEN TAB ============
+// Mock safety+stars per real region (29 regions from geojson) — today's snapshot
+const REGION_TODAY = {
+  // Föhn-Front: Wallis & Berner Oberland gesperrt/Vorsicht
+  'zentralwallis':              { band:'amber', stars:3, score:68, theme:'Föhn-XC für Pros' },
+  'mattertal_saastal':          { band:'amber', stars:2, score:55, theme:'Föhneinfluss moderat' },
+  'unterwallis':                { band:'amber', stars:3, score:70, theme:'Föhn-XC, Verbier ok' },
+  'waadtlaender_alpen':         { band:'amber', stars:2, score:58, theme:'Lee-Risiko' },
+  'oberwallis_goms':            { band:'amber', stars:4, score:82, theme:'Fiesch — Pro-XC' },
+  'tessin_nord':                { band:'red',   stars:1, score:30, theme:'Südseite — Föhndurchbruch' },
+  'tessin_zentral':             { band:'red',   stars:0, score:18, theme:'Akuter Föhn' },
+  'engadin_unter':              { band:'amber', stars:2, score:50, theme:'Föhneinfluss' },
+  'engadin_ober':               { band:'amber', stars:2, score:52, theme:'Höhenwind erhöht' },
+  'praettigau_davos':           { band:'amber', stars:3, score:62, theme:'Föhneinfluss moderat' },
+  'rheintal':                   { band:'green', stars:3, score:68, theme:'Solid' },
+  'alpstein':                   { band:'green', stars:3, score:66, theme:'Lokal-XC' },
+  'zentralschweizer_voralpen':  { band:'green', stars:4, score:76, theme:'XC Richtung Linthal' },
+  'surselva':                   { band:'amber', stars:2, score:54, theme:'Föhn-Lee-Zonen' },
+  'glarnerland_walensee':       { band:'green', stars:4, score:78, theme:'XC Richtung Linthal' },
+  'berner_voralpen':            { band:'red',   stars:1, score:28, theme:'Föhndurchbruch' },
+  'berner_oberland':            { band:'red',   stars:0, score:15, theme:'Föhnsturm — Niesen, Grindelwald' },
+  'freiburger_voralpen':        { band:'amber', stars:2, score:50, theme:'Lee-Risiko Süd' },
+  'genferseeregion':            { band:'green', stars:3, score:64, theme:'Ruhig' },
+  'mittelland_west':            { band:'green', stars:2, score:55, theme:'Schwach, ruhig' },
+  'jura_west':                  { band:'green', stars:3, score:60, theme:'Solid' },
+  'jura_zentral':               { band:'green', stars:3, score:62, theme:'Solid' },
+  'jura_ost':                   { band:'green', stars:2, score:50, theme:'Schwach' },
+  'schwarzsee_gantrisch':       { band:'amber', stars:2, score:48, theme:'Föhn-Vorsicht' },
+  'berner_voralpen':            { band:'red',   stars:1, score:28, theme:'Föhndurchbruch' },
+  'seeland_emmental':           { band:'green', stars:3, score:62, theme:'Solid' },
+  'mittelland_zentral':         { band:'green', stars:3, score:65, theme:'Solid' },
+  'zentrales_mittelland':       { band:'green', stars:3, score:64, theme:'Solid' },
+  'mittelland_ost':             { band:'green', stars:2, score:48, theme:'Uetliberg — schwach' },
+  'bodenseeraum':               { band:'green', stars:5, score:91, theme:'Top — Pfänder im Lee' },
+};
+
+// Inlined region polygons from data/regionen_polygone_mapped.geojson
+const REGION_GEOJSON = {"type":"FeatureCollection","features":[
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.7116,46.4113],[7.6839,46.3762],[7.7982,46.3757],[7.8808,46.4117],[7.9659,46.4058],[8.0957,46.4511],[8.209,46.5241],[8.0982,46.5499],[8.0586,46.5528],[8.0288,46.5618],[7.997,46.5586],[7.9634,46.5379],[7.9739,46.5215],[7.9451,46.5074],[7.9297,46.5001],[7.8835,46.4796],[7.8475,46.4785],[7.7197,46.4176],[7.7116,46.4113]]]},"properties":{"id":"zentralwallis","region":"Zentralwallis","name":"Leukerbad / Loetschental","elevation_ref":2100}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.8132,46.2386],[7.7672,46.2127],[7.4292,46.1107],[7.2737,46.0861],[7.2181,46.0045],[7.2931,45.9254],[7.3878,45.8965],[7.575,45.9847],[7.8649,45.9183],[7.8787,45.9766],[7.9086,45.9973],[7.9887,45.9968],[8.0404,46.0489],[8.0193,46.0706],[8.0346,46.1009],[7.9916,46.2034],[7.8132,46.2386]]]},"properties":{"id":"mattertal_saastal","region":"Mattertal / Saastal","name":"Graehen","elevation_ref":2000}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.7116,46.4113],[7.6273,46.4439],[7.5368,46.3981],[7.228,46.3449],[7.1357,46.2344],[7.0817,46.1928],[7.0712,46.1439],[7.1267,46.0936],[7.0742,46.0482],[7.0058,46.0673],[6.9495,46.1718],[6.8952,46.1214],[6.8675,46.0507],[6.8794,46.0403],[7.0103,45.996],[7.0959,45.8627],[7.1696,45.8668],[7.2931,45.9254],[7.2181,46.0045],[7.2737,46.0861],[7.4292,46.1107],[7.7672,46.2127],[7.8132,46.2386],[7.7982,46.3757],[7.6839,46.3762],[7.7116,46.4113]]]},"properties":{"id":"unterwallis","region":"Unterwallis","name":"Verbier Les Ruinettes","elevation_ref":2200}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.228,46.3449],[7.1962,46.3787],[7.0121,46.376],[6.9762,46.4312],[6.9784,46.4736],[6.8656,46.4933],[6.7207,46.3874],[6.8607,46.2776],[6.7904,46.1598],[6.8952,46.1214],[6.9495,46.1718],[7.0058,46.0673],[7.0742,46.0482],[7.1267,46.0936],[7.0712,46.1439],[7.0817,46.1928],[7.1357,46.2344],[7.228,46.3449]]]},"properties":{"id":"waadtlaender_alpen","region":"Waadtlaender Alpen","name":"Col du Pillon / Leysin","elevation_ref":1600}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.7982,46.3757],[7.8132,46.2386],[7.9916,46.2034],[8.1081,46.2502],[8.0817,46.2604],[8.1399,46.3011],[8.1762,46.2966],[8.3148,46.3769],[8.3142,46.3994],[8.2909,46.4081],[8.3837,46.453],[8.3911,46.4943],[8.4832,46.5312],[8.4836,46.619],[8.4099,46.6536],[8.3716,46.6325],[8.3434,46.5636],[8.209,46.5241],[8.0957,46.4511],[7.9659,46.4058],[7.8808,46.4117],[7.7982,46.3757]]]},"properties":{"id":"oberwallis_goms","region":"Oberwallis / Goms","name":"Fiescheralp / Kühboden","elevation_ref":2200}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[8.3837,46.453],[8.4498,46.4636],[8.4642,46.447],[8.4652,46.331],[8.3879,46.2469],[8.4617,46.2444],[8.6012,46.286],[8.6715,46.3185],[8.7151,46.3525],[8.7418,46.4054],[8.8059,46.3779],[8.832,46.3665],[8.8631,46.3484],[9.158,46.3404],[9.1713,46.3733],[9.1586,46.4177],[9.1356,46.4658],[9.1115,46.4793],[9.0478,46.4776],[9.0388,46.4927],[9.0226,46.5108],[9.0281,46.5681],[9.0422,46.5848],[9.033,46.6],[8.9194,46.5987],[8.8437,46.5633],[8.6146,46.5786],[8.4832,46.5312],[8.3911,46.4943],[8.3837,46.453]]]},"properties":{"id":"tessin_nord","region":"Tessin Nord","name":"Carì","elevation_ref":2000}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[8.4617,46.2444],[8.4236,46.2182],[8.5079,46.1067],[8.6125,46.1221],[8.6475,46.1237],[8.8006,46.0946],[8.8664,46.1036],[9.0338,46.1465],[9.1047,46.1384],[9.1557,46.1619],[9.1941,46.1778],[9.2009,46.2074],[9.2139,46.2101],[9.2226,46.2241],[9.2969,46.3206],[9.2667,46.4509],[9.2371,46.4879],[9.169284,46.482777],[9.11324,46.479405],[9.1115,46.4793],[9.1356,46.4658],[9.1586,46.4177],[9.1713,46.3733],[9.158,46.3404],[8.8631,46.3484],[8.832,46.3665],[8.8059,46.3779],[8.7418,46.4054],[8.7151,46.3525],[8.6715,46.3185],[8.6012,46.286],[8.4617,46.2444]]]},"properties":{"id":"tessin_zentral","region":"Tessin Zentral","name":"Locarno Cimetta","elevation_ref":1650}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[9.1115,46.4793],[9.11324,46.479405],[9.169284,46.482777],[9.2371,46.4879],[9.2667,46.4509],[9.2833,46.4964],[9.3638,46.5072],[9.4028,46.4137],[9.4215,46.3589],[9.5457,46.3701],[9.5702,46.3996],[9.6672,46.4165],[9.7467,46.4494],[9.7045,46.475],[9.6954,46.5448],[9.8286,46.5714],[9.8785,46.6198],[9.8307,46.6754],[9.7202,46.7541],[9.6491,46.7206],[9.6117,46.7281],[9.5996,46.7608],[9.5698,46.803],[9.379,46.7703],[9.2706,46.5781],[9.118,46.5218],[9.1025,46.5091],[9.0226,46.5108],[9.0388,46.4927],[9.0478,46.4776],[9.1115,46.4793]]]},"properties":{"id":"engadin_unter","region":"Engadin Unter","name":"Scuol Motta Naluns","elevation_ref":2100}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[9.6672,46.4165],[9.7681,46.3389],[9.9581,46.3786],[10.1209,46.4296],[10.1835,46.4449],[10.2175,46.4991],[10.1956,46.566],[10.3899,46.6623],[10.1138,46.7247],[10.0914,46.8578],[9.9886,46.7911],[9.8785,46.6198],[9.8286,46.5714],[9.6954,46.5448],[9.7045,46.475],[9.7467,46.4494],[9.6672,46.4165]]]},"properties":{"id":"engadin_ober","region":"Engadin Ober","name":"Muottas Muragl","elevation_ref":2450}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[9.8785,46.6198],[9.9886,46.7911],[10.0914,46.8578],[10.0165,46.9014],[9.8731,46.9289],[9.8748,47.0198],[9.7093,47.0519],[9.5561,47.0511],[9.6021,47.0102],[9.6141,46.8712],[9.5698,46.803],[9.5996,46.7608],[9.6117,46.7281],[9.6491,46.7206],[9.7202,46.7541],[9.8307,46.6754],[9.8785,46.6198]]]},"properties":{"id":"praettigau_davos","region":"Prättigau - Davos","name":"Fanas Eggli","elevation_ref":1700}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[9.5698,46.803],[9.6141,46.8712],[9.6021,47.0102],[9.5561,47.0511],[9.629,47.1832],[9.7639,47.2833],[9.7811,47.516],[9.7232,47.5871],[9.4804,47.4424],[9.513,47.3099],[9.3498,47.2144],[9.3955,47.1306],[9.4148,47.1099],[9.4267,47.0987],[9.3992,46.9737],[9.3844,46.8977],[9.379,46.7703],[9.5698,46.803]]]},"properties":{"id":"rheintal","region":"Ostschweiz","name":"Santa Maria in Calanca","elevation_ref":1500}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[9.4804,47.4424],[9.2728,47.3787],[8.8215,47.4791],[8.743016,47.457354],[8.8863,47.2942],[9.0127,47.2588],[9.0885,47.1624],[9.2131,47.1476],[9.3132,47.1545],[9.4148,47.1099],[9.3955,47.1306],[9.3498,47.2144],[9.513,47.3099],[9.4804,47.4424]]]},"properties":{"id":"alpstein","region":"Alpstein / Ostschweiz","name":"Ebenalp","elevation_ref":1640}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[8.4832,46.5312],[8.6146,46.5786],[8.6361,46.6834],[8.8766,46.8131],[8.8585,46.8815],[8.9494,46.9696],[8.8844,47.0622],[8.8318,47.0448],[8.6884,47.031],[8.6101,47.0192],[8.2543,46.9791],[8.1856,46.9845],[7.9099,46.8252],[7.9753,46.7899],[8.09,46.7876],[8.2797,46.7521],[8.3688,46.7884],[8.4483,46.7645],[8.4099,46.6536],[8.4836,46.619],[8.4832,46.5312]]]},"properties":{"id":"zentralschweizer_voralpen","region":"Zentralschweizer Voralpen","name":"Engelberg Brunni","elevation_ref":1860}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[9.0226,46.5108],[9.1025,46.5091],[9.118,46.5218],[9.2706,46.5781],[9.379,46.7703],[9.3844,46.8977],[9.2479,46.916],[9.1107,46.8504],[9.095,46.8707],[9.0639,46.8749],[9.0472,46.8666],[9.0218,46.8174],[8.9266,46.7973],[8.8766,46.8131],[8.6361,46.6834],[8.6146,46.5786],[8.8437,46.5633],[8.9194,46.5987],[9.033,46.6],[9.0422,46.5848],[9.0281,46.5681],[9.0226,46.5108]]]},"properties":{"id":"surselva","region":"Surselva","name":"Flims Crap Sogn Gion","elevation_ref":2200}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[9.4148,47.1099],[9.3132,47.1545],[9.2131,47.1476],[9.0885,47.1624],[9.0587,47.1285],[8.9662,47.1204],[8.8844,47.0622],[8.9494,46.9696],[8.8585,46.8815],[8.8766,46.8131],[8.9266,46.7973],[9.0218,46.8174],[9.0472,46.8666],[9.0639,46.8749],[9.095,46.8707],[9.1107,46.8504],[9.2479,46.916],[9.3844,46.8977],[9.3992,46.9737],[9.4267,47.0987],[9.4148,47.1099]]]},"properties":{"id":"glarnerland_walensee","region":"Glarnerland / Walensee","name":"Schrina","elevation_ref":1300}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[8.209,46.5241],[8.3434,46.5636],[8.3716,46.6325],[8.4099,46.6536],[8.4483,46.7645],[8.3688,46.7884],[8.2797,46.7521],[8.09,46.7876],[7.9753,46.7899],[7.9099,46.8252],[7.802,46.7577],[7.7517,46.7172],[7.7937,46.6213],[7.8188,46.5614],[7.803,46.5123],[7.8475,46.4785],[7.8835,46.4796],[7.9297,46.5001],[7.9451,46.5074],[7.9739,46.5215],[7.9634,46.5379],[7.997,46.5586],[8.0288,46.5618],[8.0586,46.5528],[8.0982,46.5499],[8.209,46.5241]]]},"properties":{"id":"berner_voralpen","region":"Berner Voralpen","name":"Niederhorn","elevation_ref":1950}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.8475,46.4785],[7.803,46.5123],[7.8188,46.5614],[7.7937,46.6213],[7.7364,46.6219],[7.558,46.7132],[7.4442,46.7225],[7.2414,46.6439],[7.2113,46.5817],[7.1496,46.5936],[7.1158,46.5796],[7.1003,46.5156],[7.0213,46.5545],[6.9984,46.5483],[6.9859,46.5335],[6.9784,46.4736],[6.9762,46.4312],[7.0121,46.376],[7.1962,46.3787],[7.228,46.3449],[7.5368,46.3981],[7.6273,46.4439],[7.7116,46.4113],[7.7197,46.4176],[7.8475,46.4785]]]},"properties":{"id":"freiburger_voralpen","region":"Freiburger Voralpen","name":"Moléson","elevation_ref":1950}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[6.8656,46.4933],[6.7223,46.5484],[6.4749,46.7166],[6.3542,46.5485],[6.32,46.523],[5.8785,46.202],[5.8588,46.1493],[5.9341,46.0581],[6.0215,46.0917],[6.1315,46.0789],[6.2035,46.1693],[6.3108,46.2118],[6.5331,46.3746],[6.7207,46.3874],[6.8656,46.4933]]]},"properties":{"id":"genferseeregion","region":"Genferseeregion","name":"Lavaux / Jorat","elevation_ref":800}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[6.8656,46.4933],[6.8461,46.6127],[6.8989,46.709],[7.1093,46.75],[7.4395,46.8996],[7.1022,47.086],[6.8313,46.9566],[6.7185,46.8608],[6.6202,46.8427],[6.5262,46.7888],[6.4749,46.7166],[6.7223,46.5484],[6.8656,46.4933]]]},"properties":{"id":"mittelland_west","region":"Mittelland West","name":"Moudon","elevation_ref":700}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.1022,47.086],[6.9557,47.2906],[6.7768,47.1872],[6.3184,47.0313],[6.229,46.9353],[6.1597,46.8673],[6.4749,46.7166],[6.5262,46.7888],[6.6202,46.8427],[6.7185,46.8608],[6.8313,46.9566],[7.1022,47.086]]]},"properties":{"id":"jura_west","region":"Jura West","name":"Mauborget / Suchet","elevation_ref":1200}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.1022,47.086],[7.3532,47.1769],[7.3941,47.2095],[7.5886,47.2484],[7.7574,47.2973],[7.7502,47.3504],[7.7129,47.3758],[7.58,47.3437],[7.5289,47.32],[7.4842,47.36],[7.3604,47.3704],[7.1255,47.3353],[6.9557,47.2906],[7.1022,47.086]]]},"properties":{"id":"jura_zentral","region":"Jura Zentral","name":"Weissenstein","elevation_ref":1280}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.7574,47.2973],[7.9503,47.386],[8.0382,47.4259],[7.9351,47.5309],[7.8737,47.5459],[7.7993,47.5104],[7.7007,47.5083],[7.6386,47.5007],[7.6211,47.4697],[7.4258,47.463],[7.2953,47.4994],[6.9124,47.4897],[6.9557,47.2906],[7.1255,47.3353],[7.3604,47.3704],[7.4842,47.36],[7.5289,47.32],[7.58,47.3437],[7.7129,47.3758],[7.7502,47.3504],[7.7574,47.2973]]]},"properties":{"id":"jura_ost","region":"Jura Ost","name":"Wasserflue / Geissflue","elevation_ref":900}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[6.9784,46.4736],[6.9859,46.5335],[6.9984,46.5483],[7.0213,46.5545],[7.1003,46.5156],[7.1158,46.5796],[7.1496,46.5936],[7.2113,46.5817],[7.2414,46.6439],[7.4442,46.7225],[7.4395,46.8996],[7.1093,46.75],[6.8989,46.709],[6.8461,46.6127],[6.8656,46.4933],[6.9784,46.4736]]]},"properties":{"id":"schwarzsee_gantrisch","region":"Schwarzsee / Gantrisch","name":"Gantrisch / Schwarzsee","elevation_ref":1500}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.9099,46.8252],[7.9378,46.8797],[7.9052,46.9262],[7.9711,47.0762],[7.8528,47.1081],[7.6275,47.0727],[7.4395,46.8996],[7.4442,46.7225],[7.558,46.7132],[7.7364,46.6219],[7.7937,46.6213],[7.7517,46.7172],[7.802,46.7577],[7.9099,46.8252]]]},"properties":{"id":"berner_oberland","region":"Berner Oberland","name":"Interlaken / Niederhorn","elevation_ref":1800}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.4395,46.8996],[7.6275,47.0727],[7.8528,47.1081],[7.9711,47.0762],[7.950323,47.385654],[7.9503,47.386],[7.7574,47.2973],[7.5886,47.2484],[7.3941,47.2095],[7.3532,47.1769],[7.1022,47.086],[7.4395,46.8996]]]},"properties":{"id":"seeland_emmental","region":"Seeland / Emmental","name":"Belp / Bantiger","elevation_ref":600}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[8.8844,47.0622],[8.9662,47.1204],[8.9642,47.1804],[8.7675,47.1782],[8.6632,47.1595],[8.3929,47.1501],[8.3877,47.0846],[8.2886,47.0302],[7.9711,47.0762],[7.9052,46.9262],[7.9378,46.8797],[7.9099,46.8252],[8.1856,46.9845],[8.2543,46.9791],[8.6101,47.0192],[8.6884,47.031],[8.8318,47.0448],[8.8844,47.0622]]]},"properties":{"id":"mittelland_zentral","region":"Mittelland Zentral","name":"Napf","elevation_ref":1400}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[7.9503,47.386],[7.950323,47.385654],[7.9711,47.0762],[8.2886,47.0302],[8.3877,47.0846],[8.3929,47.1501],[8.6632,47.1595],[8.4995,47.2965],[8.4696,47.4318],[8.5606,47.6992],[8.5395,47.7292],[8.4267,47.7556],[8.185,47.6382],[7.9438,47.5709],[7.9351,47.5309],[8.0382,47.4259],[7.9503,47.386]]]},"properties":{"id":"zentrales_mittelland","region":"Zentrales Mittelland","name":"Hasliberg Planplatten","elevation_ref":600}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[8.743016,47.457354],[8.5916,47.4154],[8.4696,47.4318],[8.4995,47.2965],[8.6632,47.1595],[8.7675,47.1782],[8.9642,47.1804],[8.9662,47.1204],[9.0587,47.1285],[9.0885,47.1624],[9.0127,47.2588],[8.8863,47.2942],[8.743016,47.457354]]]},"properties":{"id":"mittelland_ost","region":"Mittelland Ost","name":"Uetliberg Balderen","elevation_ref":730}},
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[9.7232,47.5871],[9.5926,47.611],[9.574,47.6829],[9.4345,47.7183],[9.3909,47.7187],[9.1758,47.8084],[9.1036,47.8344],[8.9016,47.8747],[8.754,47.8799],[8.5606,47.6992],[8.4696,47.4318],[8.5916,47.4154],[8.743016,47.457354],[8.8215,47.4791],[9.2728,47.3787],[9.4804,47.4424],[9.7232,47.5871]]]},"properties":{"id":"bodenseeraum","region":"Bodenseeraum","name":"Eggberge Altdorf","elevation_ref":1500}}
+]};
+
+let regionsMapInstance = null;
+
+function regionStyle(band) {
+  const s = SAFETY_COLORS[band] || SAFETY_COLORS.green;
+  if (band === 'gray' || !band) {
+    return { fillColor:'#94a3b8', fillOpacity:0.30, color:'#64748b', weight:1.2, opacity:0.5, dashArray:'4 4' };
+  }
+  if (band === 'red') {
+    return { fillColor:s.fill, fillOpacity:0.40, color:s.stroke, weight:1.6, opacity:0.85, dashArray:'5 4' };
+  }
+  return { fillColor:s.fill, fillOpacity:0.42, color:s.stroke, weight:1.5, opacity:0.85 };
+}
+
+function renderRegions() {
+  const mapEl = document.getElementById('regionsMap');
+  if (!mapEl || regionsMapInstance) return;
+  if (typeof L === 'undefined') {
+    // Leaflet not yet loaded — retry shortly
+    setTimeout(renderRegions, 80);
+    return;
+  }
+
+  regionsMapInstance = L.map(mapEl, {
+    zoomControl: true,
+    scrollWheelZoom: true,
+    attributionControl: false,
+  }).setView([46.85, 8.3], 7);
+
+  // Subtle light tile layer
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 12,
+    minZoom: 6,
+    subdomains: 'abcd',
+  }).addTo(regionsMapInstance);
+
+  const featuresLayer = L.geoJSON(REGION_GEOJSON, {
+    style: feature => {
+      const props = feature.properties || {};
+      const today = REGION_TODAY[props.id] || { band:'gray', stars:0 };
+      return regionStyle(today.band);
+    },
+    onEachFeature: (feature, layer) => {
+      const props = feature.properties || {};
+      const today = REGION_TODAY[props.id] || { band:'gray', stars:0, score:0, theme:'Keine Daten' };
+      const verdict = verdictText(today.band);
+
+      layer.bindTooltip(`<strong>${props.region}</strong><br>${verdict} · ${today.stars}★ · ${today.score}/100`, {
+        sticky: true,
+        className: 'region-tooltip',
+      });
+
+      // Hover effect
+      layer.on('mouseover', () => {
+        layer.setStyle({ fillOpacity: 0.65, weight: 2.4 });
+      });
+      layer.on('mouseout', () => {
+        featuresLayer.resetStyle(layer);
+      });
+      layer.on('click', () => openRegionOverlay(props));
+    }
+  }).addTo(regionsMapInstance);
+
+  // Add label markers (region name + stars)
+  REGION_GEOJSON.features.forEach(feat => {
+    const props = feat.properties || {};
+    const today = REGION_TODAY[props.id] || { band:'gray', stars:0 };
+    if (!feat.geometry || feat.geometry.type !== 'Polygon') return;
+
+    // Compute centroid
+    const coords = feat.geometry.coordinates[0];
+    let cx = 0, cy = 0;
+    coords.forEach(c => { cx += c[0]; cy += c[1]; });
+    cx /= coords.length; cy /= coords.length;
+
+    const starsTxt = today.band === 'gray' ? '–' : '★'.repeat(today.stars);
+    const html = `
+      <div class="region-label-text">${shortRegionName(props.region)}</div>
+      ${today.band !== 'gray' ? `<div class="region-label-stars ${today.band}">${starsTxt || '·'}</div>` : ''}`;
+    L.marker([cy, cx], {
+      icon: L.divIcon({
+        className: 'region-label',
+        html,
+        iconSize: [110, 32],
+        iconAnchor: [55, 16],
+      }),
+      interactive: false,
+      keyboard: false,
+    }).addTo(regionsMapInstance);
+  });
+
+  // Fit bounds with padding
+  setTimeout(() => {
+    try { regionsMapInstance.fitBounds(featuresLayer.getBounds(), { padding: [20, 20] }); } catch (e) {}
+  }, 100);
+}
+
+function shortRegionName(name) {
+  // Trim slashes for label
+  return name.replace(/\s*\/\s*/g, ' / ').replace('Zentralschweizer Voralpen', 'Zentral-CH').replace('Waadtlaender', 'Waadtländer');
+}
+
+function openRegionOverlay(props) {
+  const today = REGION_TODAY[props.id] || { band:'gray', stars:0, score:0, theme:'Keine Daten' };
+  document.getElementById('regionOverlayTitle').textContent = props.region;
+  document.getElementById('regionOverlaySub').textContent = `${props.name || ''} · ~${props.elevation_ref || '–'}m · ${today.theme}`;
+
+  const verdict = verdictText(today.band);
+  const bandCls = today.band === 'gray' ? 'green' : today.band;
+
+  // Mock 7-day data: use REGION_WEEK if exact match (our 7 anchor regions), else generate variation
+  const week = REGION_WEEK[props.region] || generateMockWeek(today.band);
+  const sparks = week.map((cell, i) => {
+    const [b, st] = cell;
+    const isToday = i === TODAY_INDEX;
+    const txt = b === 'gray' ? '–' : (st > 0 ? st : '·');
+    return `<div class="spark-cell ${b}${isToday ? ' today' : ''}" title="${DAYS[i]}">${txt}<span class="day-label">${DAYS[i]}</span></div>`;
+  }).join('');
+
+  // Spots in this region from MOCK_SPOTS, else generate placeholders
+  const realSpots = MOCK_SPOTS.filter(s => normalizeRegion(s.region) === props.id);
+  const spots = realSpots.length > 0 ? realSpots : generateMockSpots(props.id, today, props.region);
+
+  const spotsHtml = spots.map(s => `
+    <li class="bf-spot ${s.safetyBand}" onclick="selectSpot('${s.id}'); closeRegionOverlay();">
+      <button class="bf-spot-toggle">
+        <div class="bf-spot-row">
+          <div class="bf-spot-glyph">${renderMarker({ safetyBand:s.safetyBand, stars:s.stars, windDirDeg:s.windDirDeg||0, size:32 })}</div>
+          <div class="bf-spot-body">
+            <div class="bf-spot-name">${s.name}</div>
+            <div class="bf-spot-status">
+              <span class="bf-spot-stars">${starString(s.stars)}</span>
+              ${s.alt ? `<span class="bf-chip">${s.alt}m</span>` : ''}
+            </div>
+          </div>
+          <div class="bf-spot-rating">${s.score}</div>
+        </div>
+      </button>
+    </li>`).join('');
+
+  document.getElementById('regionOverlayBody').innerHTML = `
+    <div class="region-overlay-summary">
+      <span class="pill ${bandCls}">${verdict}</span>
+      <span class="stars">${today.band === 'gray' ? '—' : starString(today.stars)}</span>
+      <span class="score ${bandCls}">${today.band === 'gray' ? '–' : today.score}</span>
+    </div>
+
+    <h4>7-Tage Verlauf</h4>
+    <div class="region-overlay-spark">${sparks}</div>
+
+    <h4>Top Spots heute</h4>
+    <ul class="region-overlay-spots">${spotsHtml}</ul>
+
+    <a class="region-overlay-cta" href="#" onclick="event.preventDefault(); goToRegionInBriefing('${props.region.replace(/'/g, '')}')">Im Briefing öffnen →</a>
+  `;
+  document.getElementById('regionOverlay').classList.add('open');
+  document.getElementById('regionOverlay').setAttribute('aria-hidden', 'false');
+  document.getElementById('regionOverlayBackdrop').classList.add('show');
+}
+
+function closeRegionOverlay() {
+  document.getElementById('regionOverlay').classList.remove('open');
+  document.getElementById('regionOverlay').setAttribute('aria-hidden', 'true');
+  document.getElementById('regionOverlayBackdrop').classList.remove('show');
+}
+
+function generateMockWeek(todayBand) {
+  // Deterministic-feeling mock for non-anchor regions
+  const seq = todayBand === 'red' ? ['amber','amber','red','red','red','amber','green']
+            : todayBand === 'amber' ? ['green','amber','amber','amber','amber','green','green']
+            : ['green','green','green','green','amber','green','green'];
+  return seq.map((b, i) => [b, b === 'red' ? 0 : b === 'amber' ? 2 : (i % 2 === 0 ? 3 : 4)]);
+}
+
+function generateMockSpots(regionId, today, regionName) {
+  // 3 placeholder spots for any region not in MOCK_SPOTS
+  const baseScore = today.score || 50;
+  const names = MOCK_REGION_SPOT_NAMES[regionId] || ['Startplatz Nord', 'Hauptgebiet', 'Südhang'];
+  return names.slice(0, 3).map((n, i) => ({
+    id: `mock-${regionId}-${i}`,
+    name: n,
+    region: regionName,
+    alt: 1200 + i * 200,
+    safetyBand: today.band === 'gray' ? 'red' : today.band,
+    stars: Math.max(0, today.stars + (i === 0 ? 0 : -1)),
+    score: Math.max(15, baseScore - i * 8),
+    windDirDeg: 180 + i * 30,
+  }));
+}
+
+function normalizeRegion(name) {
+  // Map MOCK_SPOTS region names to geojson IDs
+  const map = {
+    'Wallis': 'oberwallis_goms',
+    'Berner Oberland': 'berner_oberland',
+    'Vorarlberg': 'bodenseeraum',
+    'Mittelland': 'mittelland_ost',
+    'Toggenburg': 'alpstein',
+    'Glarus': 'glarnerland_walensee',
+    'Zentralschweiz': 'zentralschweizer_voralpen',
+  };
+  return map[name] || name;
+}
+
+const MOCK_REGION_SPOT_NAMES = {
+  'tessin_nord': ['Carì', 'Bedretto', 'Airolo'],
+  'tessin_zentral': ['Locarno Cimetta', 'Mornera', 'Centovalli'],
+  'engadin_ober': ['Muottas Muragl', 'Corviglia', 'Diavolezza'],
+  'engadin_unter': ['Motta Naluns', 'Scuol', 'Ftan'],
+  'praettigau_davos': ['Schatzalp', 'Klosters', 'Fanas Eggli'],
+  'mittelland_west': ['Moudon', 'Mont Pèlerin', 'Chasseron'],
+  'mittelland_zentral': ['Napf', 'Lueg', 'Chuderhüsi'],
+  'zentrales_mittelland': ['Hasliberg', 'Brünig', 'Rigi'],
+  'jura_west': ['Mauborget', 'Suchet', 'Chasseral'],
+  'jura_zentral': ['Weissenstein', 'Hasenmatt', 'Grenchenberg'],
+  'jura_ost': ['Wasserflue', 'Geissflue', 'Belchen'],
+  'genferseeregion': ['Lavaux', 'Jorat', 'Mont Salève'],
+  'schwarzsee_gantrisch': ['Gantrisch', 'Schwarzsee', 'Niederhorn'],
+  'freiburger_voralpen': ['Moléson', 'Dent de Lys', 'Kaiseregg'],
+  'waadtlaender_alpen': ['Col du Pillon', 'Leysin', 'Villars'],
+  'unterwallis': ['Verbier', 'Croix-de-Cœur', 'Crans-Montana'],
+  'zentralwallis': ['Leukerbad', 'Lötschental', 'Anzère'],
+  'mattertal_saastal': ['Grächen', 'Saas-Fee', 'Zermatt'],
+  'rheintal': ['Calanca', 'Pizol', 'Heiden'],
+  'surselva': ['Flims Crap Sogn Gion', 'Disentis', 'Brigels'],
+  'seeland_emmental': ['Belp', 'Bantiger', 'Eriz'],
+  'berner_voralpen': ['Niederhorn', 'Beatenberg', 'Stockhorn'],
+};
+
+function goToRegionInBriefing(name) {
+  closeRegionOverlay();
+  switchTab('briefing');
+  setTimeout(() => {
+    const target = document.querySelector(`[data-region="${name}"]`);
+    if (target) {
+      target.scrollIntoView({ behavior:'smooth', block:'start' });
+      target.classList.remove('is-collapsed');
+    }
+  }, 350);
+}
+
+// ============ BRIEFING ============
+let currentDayIndex = TODAY_INDEX;
+let currentBfFilter = 'all';
+
+function renderBriefing() {
+  // KPIs
+  const best = MOCK_SPOTS.reduce((a,b) => a.score > b.score ? a : b);
+  const greens = MOCK_SPOTS.filter(s => s.safetyBand === 'green');
+  const bestRegion = greens.reduce((a,b) => a.score > b.score ? a : b);
+  const xc = MOCK_SPOTS.filter(s => s.safetyBand !== 'red' && s.stars >= 4).reduce((sum,s) => sum + s.score * 4, 0);
+  const kpis = [
+    { label:'Beste Region', value: bestRegion.region, marker: bestRegion },
+    { label:'Top-Spot', value: best.name, marker: best },
+    { label:'Föhn-Status', value: 'moderat → stark', warn: true },
+    { label:'XC-Potenzial', value: `~${Math.round(xc)} km` },
+  ];
+  document.getElementById('bfKpis').innerHTML = kpis.map(k => `
+    <div class="kpi">
+      <span class="kpi-label">${k.label}</span>
+      <div class="kpi-row">
+        ${k.marker ? renderMarker({ safetyBand:k.marker.safetyBand, stars:k.marker.stars, windDirDeg:k.marker.windDirDeg, size:32 }) : ''}
+        <span class="kpi-value ${k.warn?'warn':''}">${k.value}</span>
+      </div>
+    </div>`).join('');
+
+  // Fazit best line
+  document.getElementById('bfFazitBest').textContent = `${best.name} (${best.region}) · ${best.score}/100`;
+
+  // Day tabs
+  document.getElementById('bfDayTabs').innerHTML = DAYS.map((d, i) => {
+    // mock: aggregate band per day across regions
+    const bands = REGION_ORDER.map(r => REGION_WEEK[r][i][0]).filter(b => b !== 'gray');
+    const band = bands.includes('red') ? 'red' : bands.includes('amber') && bands.filter(b=>b==='amber').length > bands.length/2 ? 'amber' : 'green';
+    const label = i === TODAY_INDEX ? 'Heute' : d;
+    const num = ['28.4','29.4','30.4','01.5','02.5','03.5','04.5'][i];
+    return `
+      <button class="bf-day-btn ${i===currentDayIndex?'active':''}" data-day="${i}">
+        <span class="day-label">${label}</span>
+        <span class="day-num">${num}</span>
+        <span class="day-band ${band}"></span>
+      </button>`;
+  }).join('');
+  document.querySelectorAll('.bf-day-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      currentDayIndex = parseInt(b.dataset.day, 10);
+      renderBriefing();
+    });
+  });
+
+  // Filter chips
+  document.querySelectorAll('.bf-filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.filter === currentBfFilter);
+    c.onclick = () => {
+      currentBfFilter = c.dataset.filter;
+      renderBriefing();
+    };
+  });
+
+  // Fazit toggle
+  const fazit = document.getElementById('bfFazit');
+  fazit.onclick = (e) => {
+    if (e.target.tagName === 'STRONG') return;
+    fazit.classList.toggle('is-open');
+  };
+
+  // Region groups (existing-style with new rating system)
+  const list = document.getElementById('bfRegionList');
+  list.innerHTML = REGION_ORDER.map(regionName => {
+    const regionWeek = REGION_WEEK[regionName];
+    const dayCell = regionWeek[currentDayIndex];
+    const regionBand = dayCell[0];
+    const regionStars = dayCell[1];
+    const theme = REGION_THEME[regionName][currentDayIndex];
+
+    // For today only, use real spot data; other days get mocked variations
+    const spots = MOCK_SPOTS.filter(s => s.region === regionName);
+    const dayOffset = currentDayIndex - TODAY_INDEX;
+    const spotsForDay = spots.length === 0 ? [] : spots.map(s => mutateSpotForDay(s, dayOffset));
+
+    // Apply filter
+    const filtered = spotsForDay.filter(s => {
+      if (currentBfFilter === 'all') return true;
+      if (currentBfFilter === 'green') return s.safetyBand === 'green';
+      if (currentBfFilter === 'amber') return s.safetyBand === 'amber';
+      if (currentBfFilter === 'stars3') return s.stars >= 3;
+      if (currentBfFilter === 'stars4') return s.stars >= 4;
+      return true;
+    });
+
+    if (filtered.length === 0 && spotsForDay.length > 0) return ''; // hide region if no matches
+
+    // Sort: by stars desc, then score desc
+    filtered.sort((a, b) => b.stars - a.stars || b.score - a.score);
+
+    const collapsed = currentDayIndex !== TODAY_INDEX || regionBand === 'red';
+    const collapseClass = collapsed ? 'is-collapsed' : '';
+
+    const spotsHtml = filtered.map(s => `
+      <li class="bf-spot ${s.safetyBand}" onclick="selectSpot('${s.id}')">
+        <button class="bf-spot-toggle">
+          <div class="bf-spot-row">
+            <div class="bf-spot-glyph">${renderMarker({ safetyBand:s.safetyBand, stars:s.stars, windDirDeg:s.windDirDeg, size:36 })}</div>
+            <div class="bf-spot-body">
+              <div class="bf-spot-name">${s.name}</div>
+              <div class="bf-spot-status">
+                ${s.bestWindow && s.bestWindow !== '—' ? `<span class="bf-chip window">⏱ ${s.bestWindow}</span>` : ''}
+                ${s.peakClimb ? `<span class="bf-chip climb">↑ ${s.peakClimb} m/s</span>` : ''}
+                ${s.foehnRisk > 0 ? `<span class="bf-chip foehn">Föhn ${s.foehnRisk.toFixed(1)}</span>` : ''}
+                <span class="bf-spot-stars">${starString(s.stars)}</span>
+              </div>
+            </div>
+            <div class="bf-spot-rating">${s.score}</div>
+          </div>
+        </button>
+      </li>
+    `).join('');
+
+    const totalSpots = spots.length || 35;
+
+    return `
+      <div class="bf-region ${collapseClass}" data-region="${regionName}">
+        <div class="bf-region-head" onclick="this.parentElement.classList.toggle('is-collapsed')">
+          <span class="bf-region-name">${regionName}</span>
+          <span class="bf-region-summary">
+            <span class="pill ${regionBand}">${verdictText(regionBand)} · ${regionStars}★</span>
+            <span class="bf-region-count">${filtered.length}/${totalSpots}</span>
+          </span>
+          <span class="bf-region-chevron">▼</span>
+        </div>
+        <ul class="bf-spot-list">${spotsHtml || '<li style="padding:12px;color:var(--color-text-muted);font-size:var(--text-sm);font-style:italic;">Keine Spots — Region ist gesperrt oder Filter aktiv.</li>'}</ul>
+      </div>
+    `;
+  }).join('');
+}
+
+// Mutate spot data for a different day (mock — only varies safetyBand/stars/score based on REGION_WEEK)
+function mutateSpotForDay(s, dayOffset) {
+  if (dayOffset === 0) return s;
+  const week = REGION_WEEK[s.region];
+  if (!week) return s;
+  const targetDay = TODAY_INDEX + dayOffset;
+  if (targetDay < 0 || targetDay > 6) return s;
+  const [band, stars] = week[targetDay];
+  const score = band === 'red' ? Math.max(15, s.score - 50)
+               : band === 'amber' ? Math.max(40, s.score - 15)
+               : band === 'gray' ? 0
+               : Math.min(95, s.score + (stars - s.stars) * 5);
+  return Object.assign({}, s, {
+    safetyBand: band === 'gray' ? 'red' : band,
+    stars: band === 'gray' ? 0 : stars,
+    score: Math.round(score),
+  });
+}
+
+function renderMatrix() {
+  const wrap = document.getElementById('matrix');
+  wrap.querySelectorAll('.matrix-dot').forEach(d => d.remove());
+
+  // Aggregate per region: avg score, dominant band
+  REGION_ORDER.forEach(regionName => {
+    const week = REGION_WEEK[regionName];
+    const dayCell = week[TODAY_INDEX];
+    const band = dayCell[0] === 'gray' ? 'red' : dayCell[0];
+    // mock aggregate: avg score and spot count
+    const spotsInRegion = MOCK_SPOTS.filter(s => s.region === regionName);
+    const avgScore = spotsInRegion.length > 0
+      ? Math.round(spotsInRegion.reduce((sum, s) => sum + s.score, 0) / spotsInRegion.length)
+      : (band === 'red' ? 25 : band === 'amber' ? 55 : 70);
+    const count = spotsInRegion.length || (15 + Math.floor(Math.random()*50));
+
+    const x = Math.max(4, Math.min(96, avgScore));
+    const y = band === 'green' ? 16 : band === 'amber' ? 50 : 84;
+    const size = Math.max(28, Math.min(48, 24 + count * 0.6));
+
+    const dot = document.createElement('div');
+    dot.className = 'matrix-dot';
+    dot.style.left = `${x}%`;
+    dot.style.top  = `${y}%`;
+    dot.title = `${regionName} — Ø Score ${avgScore}, ${count} Spots`;
+    dot.innerHTML = `
+      <div class="matrix-bubble ${band}" style="width:${size}px;height:${size}px;font-size:${Math.max(10, size/3.5)}px">${count}</div>
+      <span class="name">${regionName.split(' ')[0]}</span>`;
+    dot.addEventListener('click', () => goToRegionInBriefing(regionName));
+    wrap.appendChild(dot);
+  });
+}
+
+// ============ INIT ============
+function resetDemo() {
+  localStorage.removeItem('ratingPreviewProfile');
+  closeRegionOverlay();
+  switchTab('spots');
+}
+
+function init() {
+  renderLegend();
+  renderMap();
+  renderSpotPanel(currentSpotId);
+  renderRegions();
+  renderBriefing();
+}
+init();
+window.addEventListener('resize', () => requestAnimationFrame(renderMatrix));
+</script>
+</body>
+</html>

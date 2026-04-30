@@ -1,9 +1,20 @@
 # Gleitcast Rating-Konzept: Risk vs Reward Trennung
 
-**Status**: Draft v1.2 – Konzept abgeschlossen, bereit fuer Implementation nach Vorab-Fixes
+**Status**: Draft v1.3 – Konzept aktualisiert nach Preview-Iteration, bereit fuer Implementation
 **Autor**: Alex (PM)
 **Datum**: 2026-04-30
-**Version**: 1.2 (v1.0 Konzept, v1.1 UI-Scan-Optimierung, v1.2 Konsistenz-Check)
+**Version**: 1.3 (v1.0 Konzept, v1.1 UI-Scan-Optimierung, v1.2 Konsistenz-Check, v1.3 Preview-Erkenntnisse)
+
+---
+
+## Aenderungen in v1.3 (Preview-Iteration)
+
+Nach Bau und Review der Preview (`docs/rating_preview.html`) wurden vier Designentscheidungen geaendert:
+
+1. **Pilotenprofil-Filter wird zurueckgestellt** (war §2.2, §8.5 zentraler Pfeiler). Begruendung: vereinfacht Phase 1, vermeidet Profil-Disclaimer-Diskussion. Kann als v1.5 zurueckkommen — siehe §10 Backlog. Im Code keine Hooks.
+2. **Sub-Rating-Symmetrie**: Das bewaehrte 4-Sub-Rating-Pattern (heute nur fuer Fliegbarkeit) wird auf Safety ausgedehnt — siehe neue §3.5. Damit zwei symmetrische Achsen mit identischer Architektur. Bedingt einen vierten Vorab-Fix (§9.4 Fix 4).
+3. **Region-Tab als Leaflet-Karte** (statt Card-Grid mit 7-Tage-Tabelle aus altem §4.3). Polygone aus `data/regionen_polygone_mapped.geojson`, gefaerbt nach `safety_band`. Klick oeffnet Region-Overlay. 2D-Scatter wird zur **regionen-aggregierten Bubble-Matrix** im Briefing-Tab (war 2D-Scatter mit 488 Spots → unleserlich).
+4. **Rote Spots koennen `noAnalysis`-Zustand haben** — wenn Bedingungen so eindeutig nicht fliegbar sind, dass keine vertiefte Auswertung erstellt wird (z.B. Windrichtung passt grundsaetzlich nicht). Spot-Panel zeigt dann Hero + minimalen "Keine Analyse"-Block, kein Meteogramm. Siehe §8.6 Update.
 
 ---
 
@@ -20,15 +31,22 @@ Dieser Abschnitt ist der **Wiedereinstieg fuer eine neue Session**. Lies ihn zue
 - **Karten-Marker**: Single-Glyph (Sektion 8.2) — innerer Kreis = Safety-Farbe, weisse Ziffer 1–5 = Stars, bei `red` weisses Kreuz statt Ziffer. Wind-Sektor bleibt unveraendert.
 - **Pilotenprofil**-Schalter (Beginner / Intermediate / Advanced / Pro) lebt in der bestehenden Karten-Legende (`map.js:115`), aendert nur Opacity der Marker — nicht die Rohdaten.
 
-### 3 Vorab-Fixes vor Phase-1-Implementation (BLOCKER)
+### 4 Vorab-Fixes vor Phase-1-Implementation (BLOCKER)
 
-Aus Sektion 9.4 — diese muessen ZUERST passieren, sonst baut Phase 1 auf Sand:
+Aus Sektion 9.4 — diese muessen ZUERST passieren, sonst baut Phase 1 auf Sand. **Reihenfolge v1.3: 2 → 1 → 3 → 4** (von einfach zu komplex, jeder Fix testbar fuer sich).
 
 1. **`decide_flyability_downgrade` aufspalten** (`engine/decision_engine.py:361`):
    - Heute drei verschiedene Trigger im selben Bucket (keine Thermik / Klapper-Gefahr / wenig produktiv).
    - Aufteilen: rough_pct > 50 → wirkt auf `safety_band` (amber/red); restliche Quality-Trigger → wirkt auf `experience_score`.
 2. **`is_conditional` aus LLM-Hand nehmen**: Heute LLM-gesetzt, verletzt Stage-Inversion. Muss von Decision-Engine deterministisch ueberschrieben werden, analog zu `safety_status`.
 3. **`rating`-Feld** (`engine/_common.py:421`) als Quelle fuer `experience_score` wiederverwenden, NICHT neu erfinden. Es existiert bereits ein deterministisches 0–10-Rating aus 4 Sub-Ratings — restrukturieren statt neu bauen.
+4. **NEU v1.3 — Safety-Sub-Ratings einfuehren** (siehe §3.5): Symmetrie-Erweiterung. LLM-Prompt gibt 4 Safety-Sub-Ratings (wind/gust/aloft/foehn, je 1–10), neue Aggregations-Funktion `_compute_safety_rating` in `engine/_common.py`, neue Cache-Felder. Decision-Engine Hard-Overrides bleiben Vorrang vor Score.
+
+**Empfohlene Implementierungs-Reihenfolge** (geaendert v1.3 von 1→2→3 auf 2→1→3→4):
+- Fix 2 zuerst (kleinster Eingriff, klaert Stage-Inversion-Pattern)
+- Fix 1 danach (Refactor mit Tests, baut auf sauberer Stage-Inversion auf)
+- Fix 3 danach (Skalierung des bestehenden Ratings, kein LLM-Eingriff)
+- Fix 4 zuletzt (LLM-Prompt-Aenderung, broaderer Impact, profitiert von etablierten Test-Patterns aus 1-3)
 
 ### Migration in 3 Phasen (aus Sektion 9.6)
 
@@ -228,13 +246,14 @@ Genauer Aufbau:
 - Niedrig = mechanisch ruppig (rough_pct hoch, Scherung)
 - Wirkt sich NICHT auf experience_score aus (sonst Doppelzaehlung)
 
-**Pilot-Profil-Filter** (User-Setting, default = Intermediate):
-- `Beginner`: Karte zeigt nur green; amber-Spots sind ausgegraut, klickbar mit Warnung
-- `Intermediate`: Karte zeigt green normal, amber gedaempft; Filter "Sicherheits-Vorrang"
-- `Advanced`: Karte zeigt green und amber gleichwertig; experience_score-Sort moeglich
-- `Pro`: Karte sortiert primaer nach experience_score; rote Spots klickbar mit voller Detail-Ansicht
+**~~Pilot-Profil-Filter~~** (DEFERRED v1.3 — siehe §10 Backlog)
 
-Profil aendert NUR Visualisierung und Sortierung. Backend-Werte sind fuer alle Profile identisch.
+> **DEFERRED**: Pilotenprofil-Filter (Beginner/Intermediate/Advanced/Pro) wurde nach Preview-Review zurueckgestellt.
+> - **Grund**: vereinfacht v1.0-Launch, vermeidet Profil-Disclaimer-Pflicht (Anwaltsgespraech), reduziert Code-Pfade.
+> - **Wo es zurueckkommen kann**: §10 Backlog. Architektur ist so gebaut, dass Profil-Filter spaeter rein CSS-/Sortier-Layer wird (keine Backend-Aenderungen).
+> - **Konsequenz fuer v1.0**: Karte zeigt alle Marker in voller Saturierung, keine Beginner-Daempfung. User entscheidet selbst.
+
+Profil aenderte NUR Visualisierung und Sortierung. Backend-Werte sind fuer alle Profile identisch.
 
 ### 2.3 Begruendung – Trade-offs
 
@@ -250,84 +269,103 @@ Profil aendert NUR Visualisierung und Sortierung. Backend-Werte sind fuer alle P
 
 ## 3. Mapping bestehender Felder -> neues Konzept
 
-### 3.1 `safety_band` Berechnung (deterministisch im Server)
+### 3.1 `safety_band` Berechnung (v1.3 — Hybrid: Sub-Ratings + Hard-Override)
 
-**Input-Felder:**
-- `safety_status` (`safe` / `conditional` / `not_safe`)
-- `foehn_risk` (numerisch)
-- `_decisions_applied` (Liste der Decision-Tags)
-- `no_go_reasons` (kanonische Liste)
+> **CHANGED v1.3**: Hybrid-Ansatz statt rein kategorial. Die `safety_band`-Ableitung folgt jetzt demselben Sub-Rating-Pattern wie `experience_score` (§3.2), behaelt aber die deterministischen Hard-Overrides der Decision-Engine.
 
-**Mapping:**
+**Zweistufige Berechnung:**
+
+**Stufe 1 — Numerischer `safety_score` (0–100) aus 4 LLM-Sub-Ratings** (siehe §3.5 fuer Definition):
+```python
+def compute_safety_score(spot_day):
+    safety_rating_0_10 = spot_day.get("safety_rating", 0)  # aus _compute_safety_rating
+    return round(safety_rating_0_10 * 10)
+```
+
+**Stufe 2 — `safety_band` aus Score + Hard-Overrides** (deterministisch, Decision-Engine):
 ```python
 def compute_safety_band(spot_day):
-    status = spot_day["safety_status"]
-    foehn = spot_day.get("foehn_risk", 0)
+    score = spot_day.get("safety_score", 0) or 0
     decisions = spot_day.get("_decisions_applied", [])
 
-    # Hard red conditions
-    if status == "not_safe":
+    # Hard red — Decision-Engine ueberschreibt Score
+    if spot_day.get("safety_status") == "not_safe":
         return "red"
     if "FoehnDanger" in str(decisions):
         return "red"
     if any(d.startswith("AloftNotSafe") for d in decisions):
         return "red"
 
-    # Amber conditions
-    if status == "conditional":
+    # Hard amber — Decision-Engine
+    if spot_day.get("safety_status") == "conditional":
         return "amber"
-    if "FoehnCaution" in str(decisions) or foehn >= 4.0:
+    if "FoehnCaution" in str(decisions) or spot_day.get("foehn_risk", 0) >= 4.0:
         return "amber"
     if any(d.startswith(("GustFloor", "AloftConditional", "WindStrongMajority")) for d in decisions):
         return "amber"
 
-    # Default green
+    # Score-basiert (kein Decision-Override aktiv)
+    if score < 40:
+        return "amber"  # LLM-Sub-Ratings selbst sehen Probleme
     return "green"
 ```
 
+**Logik-Begruendung:**
+- **Decision-Engine (Hard-Overrides) hat Vorrang** — strukturelle Sicherheits-Regeln (Foehn, Aloft) sind unabhaengig vom LLM-Urteil. Wenn ein Foehndurchbruch erkannt wird, ist der Spot rot, egal was das LLM zu Wind/Boeen sagt.
+- **Score wirkt nur, wenn keine Hard-Override greift** — ist die letzte Stufe, die das LLM in die Endbewertung einbringt.
+- **Symmetrie zu Experience**: gleiche Architektur, gleiches Pattern — leichter zu erklaeren, leichter zu warten.
+
 **Note**: `OverclaimRelax` wirkt bereits auf `safety_status`, deshalb keine zusaetzliche Logik noetig. `WindOk0` ist ebenfalls bereits verarbeitet.
 
-### 3.2 `experience_score` Berechnung
+### 3.2 `experience_score` Berechnung (v1.3 — bestehendes Sub-Rating-Pattern)
 
-**Input-Felder:**
-- `peak_climb_rate` (m/s)
-- `productive_thermal_h` (Stunden)
-- `tq_danger_h` (Gesamt-TQ-Gefahrenstunden, _ohne_ rough)
-- `flyability_tier` (legacy fallback)
+> **CHANGED v1.3**: Die urspruengliche Formel (climb_pts + prod_pts + xc_bonus - quality_penalty) wird **superseded**. Stattdessen wird das bereits bewaehrte 4-Sub-Rating-Pattern aus `engine/_common.py:421` wiederverwendet. Begruendung: §9.4 Vorab-Fix 3 — "Restrukturieren statt neu bauen", LLM-G-Eval-Prinzip ist im Code etabliert.
 
-**Formel-Skizze:**
+**Quelle**: Bestehendes `rating`-Feld (`engine/_common.py:421`, `_compute_rating_from_subratings`)
+
+**Wie es heute funktioniert (unveraendert):**
+Das LLM vergibt 4 Einzel-Ratings, jedes auf Skala 1–10:
+
+| Sub-Rating | Was es bewertet |
+|------------|-----------------|
+| `thermal_rating` | Qualitaet der Thermik (Steigwerte, Kontinuitaet) |
+| `window_rating` | Groesse des fliegbaren Zeitfensters |
+| `wind_rating` | Wind-Qualitaet (Anstroemung, Konsistenz, nicht zu schwach/stark fuer Genuss) |
+| `xc_rating` | XC-Streckenflug-Potential |
+
+**Aggregation** (deterministisch im Server, kein LLM):
+```
+rating_0_10 = 0.35 × thermal + 0.25 × window + 0.25 × wind + 0.15 × xc
+```
+Anschliessend Clamping auf Tier-Korridor (gray=0–4, green=4–7.5, violet=7.5–10).
+
+**Neu in v1.3 — Skalierung auf experience_score (0–100):**
 ```python
 def compute_experience_score(spot_day):
-    peak = spot_day.get("peak_climb_rate", 0) or 0
-    prod_h = spot_day.get("productive_thermal_h", 0) or 0
-    tq_h = spot_day.get("tq_danger_h", 0) or 0
-
-    # Climb component (0-40 points)
-    # 0.5 m/s = 5pt, 1.0 m/s = 15pt, 1.5 m/s = 25pt, 2.0 m/s = 35pt, 3.0 m/s = 40pt
-    climb_pts = min(40, peak * 14)
-
-    # Productive hours component (0-40 points)
-    # 0h = 0pt, 2h = 15pt, 4h = 30pt, 6h+ = 40pt
-    prod_pts = min(40, prod_h * 7)
-
-    # Quality penalty from non-rough TQ (0-20 deduction)
-    # tq without rough = shear/torn = quality issue, not safety
-    quality_penalty = min(20, tq_h * 3)
-
-    # Bonus: combined consistency (0-20 points)
-    # Long productive day with strong peak = XC potential
-    if peak >= 1.5 and prod_h >= 4:
-        xc_bonus = 20
-    elif peak >= 1.0 and prod_h >= 3:
-        xc_bonus = 10
-    else:
-        xc_bonus = 0
-
-    score = climb_pts + prod_pts + xc_bonus - quality_penalty
-    return max(0, min(100, score))
+    # Bestehendes 0-10 rating wiederverwenden
+    rating_0_10 = spot_day.get("rating", 0) or 0
+    return round(rating_0_10 * 10)  # 0–10 → 0–100
 ```
 
-**Wichtig**: `rough_pct` geht NICHT in experience_score ein. Rough = mechanisches Klappern = Sicherheitsthema = `safety_band`-Sache (bereits via `_decisions_applied` und `safety_status` abgedeckt, da ROUGH-UNUSABLE in `safety_status` bewertet wird).
+**Mapping auf Sterne** (Schwellen aus §8.3, koennen spaeter mit Cache-Daten kalibriert werden):
+- 0–20 = 0 Sterne
+- 21–40 = 1 Stern
+- 41–60 = 2 Sterne
+- 61–75 = 3 Sterne
+- 76–89 = 4 Sterne
+- 90–100 = 5 Sterne
+
+**Vorteile dieser Wahl:**
+- Keine neue LLM-Prompt-Aenderung noetig — Sub-Ratings existieren bereits
+- Bewaehrte Aggregations-Gewichte (35/25/25/15) bleiben
+- Chat-Engine + Mail-Templates lesen weiterhin denselben `rating`-Wert
+- `experience_score` ist nur eine kosmetische Skalierung × 10
+
+**Was NICHT mehr in `experience_score` einfliesst (zur Klarstellung):**
+- `rough_pct` — gehoert zu `comfort_index` (siehe §3.3) bzw. `safety_band` wenn ROUGH-UNUSABLE
+- Direkte `peak_climb_rate` / `productive_thermal_h` — diese sind im `thermal_rating` und `window_rating` des LLM bereits implizit beruecksichtigt
+
+**Backwards-Compat**: Das bestehende `rating`-Feld bleibt erhalten. `experience_score` ist ein **zusaetzliches Feld** (`= rating × 10`), keine Ersetzung.
 
 ### 3.3 `comfort_index` Berechnung
 
@@ -354,16 +392,97 @@ def compute_comfort_index(spot_day):
     return max(0, min(100, base))
 ```
 
-### 3.4 Mapping-Tabelle (Uebersicht)
+### 3.4 Mapping-Tabelle (Uebersicht — v1.3)
 
-| Neues Feld | Quelle (bestehende Strukturfelder) | Berechnungsort |
-|------------|------------------------------------|----------------|
-| `safety_band` | `safety_status`, `foehn_risk`, `_decisions_applied`, `no_go_reasons` | `engine/decision_engine.py` (neu: `compute_safety_band`) |
-| `experience_score` | `peak_climb_rate`, `productive_thermal_h`, `tq_danger_h` | `engine/decision_engine.py` (neu: `compute_experience_score`) |
-| `comfort_index` | `rough_pct`, Turbulenz-Profil, Gust-Factor | `engine/decision_engine.py` (neu: `compute_comfort_index`) |
-| `experience_stars` (1–5) | `experience_score` mit Schwellen | UI (Frontend Mapping) |
+| Neues Feld | Quelle | Berechnungsort |
+|------------|--------|----------------|
+| `safety_score` (0–100) | 4 Safety-Sub-Ratings (§3.5) ueber `_compute_safety_rating` × 10 | `engine/_common.py` (neu: `_compute_safety_rating`) + skaliert in `decision_engine.py` |
+| `safety_band` (green/amber/red) | `safety_score` + Decision-Engine Hard-Overrides | `engine/decision_engine.py` (neu: `compute_safety_band`) |
+| `experience_score` (0–100) | Bestehendes `rating`-Feld × 10 (§3.2) | `engine/decision_engine.py` (neu: `compute_experience_score`) |
+| `experience_stars` (0–5) | `experience_score` mit §8.3-Schwellen | UI (Frontend Mapping) |
+| `comfort_index` (0–100) | `rough_pct`, Turbulenz-Profil, Gust-Factor (§3.3) | `engine/decision_engine.py` (neu: `compute_comfort_index`) |
 
-Alle drei Werte werden in den bestehenden Cache-Output (`spot_analyses.json`, `region_analyses.json`) als zusaetzliche Felder geschrieben. Existierende Felder bleiben unveraendert.
+Alle Werte werden in den bestehenden Cache-Output (`spot_analyses.json`, `region_analyses.json`) als zusaetzliche Felder geschrieben. Existierende Felder bleiben unveraendert (`rating`, `safety_status`, `flyability_tier` bleiben fuer Backwards-Compat).
+
+### 3.5 Sub-Rating-Symmetrie — Safety-Sub-Ratings (NEU v1.3)
+
+**Hintergrund**: Im bestehenden Code (`engine/_common.py:421`) gibt es bereits 4 LLM-Sub-Ratings fuer **Fliegbarkeit/Erlebnis** (thermal/window/wind/xc) mit deterministischer Aggregation. Dieses Pattern hat sich bewaehrt: das LLM ist gut im Einzelbeurteilen, schlecht im Gewichten/Aggregieren.
+
+**Erkenntnis aus Preview-Iteration v1.3**: Das gleiche Pattern fehlt fuer **Safety**. Heute liefert das LLM nur eine kategoriale `safety_status` (safe/conditional/not_safe) — keine numerische Granularitaet, keine Aspekt-Trennung. Wenn das LLM zwischen "leicht vorsichtig" und "stark vorsichtig" unterscheiden will, muss es das in `caution_notes` als Freitext rein. Nicht aggregierbar, nicht ranking-faehig.
+
+**Empfehlung v1.3**: Vier Safety-Sub-Ratings einfuehren, analog zu den 4 Fliegbarkeits-Sub-Ratings:
+
+| Sub-Rating | Was es bewertet | Skala |
+|------------|-----------------|-------|
+| `wind_safety_rating` | Bodenwind/Mittelwind am Startplatz: zu stark, zu schwach, falsche Richtung | 1–10 |
+| `gust_safety_rating` | Boenfaktor und Boen-Spitzen | 1–10 |
+| `aloft_safety_rating` | Hoehenwind FL050–100 (kann Foehn-Anriss anzeigen, auch wenn boden ruhig) | 1–10 |
+| `foehn_safety_rating` | Foehn-Risiko (synoptisch: Druckgefaelle, Anstroemung, Trigger) | 1–10 |
+
+**Aggregation** (analog zu `_compute_rating_from_subratings`):
+```python
+def _compute_safety_rating(result: dict) -> float:
+    """Berechnet das Safety-Gesamtrating deterministisch aus 4 LLM-Sub-Ratings.
+
+    Gewichte: wind 30%, gust 25%, aloft 25%, foehn 20%.
+    Die hoehere Gewichtung von Bodenwind reflektiert: das ist die unmittelbarste
+    Bedrohung am Startplatz. Foehn ist haeufig durch Hard-Decisions abgedeckt
+    (FoehnDanger → red), deshalb hier nur 20%.
+    """
+    def _clamp(v, lo, hi):
+        try: v = float(v)
+        except (TypeError, ValueError): v = 5.0
+        return max(lo, min(hi, v))
+
+    wind  = _clamp(result.get("wind_safety_rating", 5), 1, 10)
+    gust  = _clamp(result.get("gust_safety_rating", 5), 1, 10)
+    aloft = _clamp(result.get("aloft_safety_rating", 5), 1, 10)
+    foehn = _clamp(result.get("foehn_safety_rating", 5), 1, 10)
+    return round(0.30 * wind + 0.25 * gust + 0.25 * aloft + 0.20 * foehn, 1)
+```
+
+**Was sich aendert vs. heute:**
+
+| Heute | v1.3 |
+|-------|------|
+| 1 LLM-Output: `safety_status` (3 Kategorien) | 4 LLM-Outputs: 4 Sub-Ratings (1–10 je) |
+| `safety_status` direkt von LLM | `safety_status` weiterhin von LLM **als Plausibilitaets-Check**, plus Decision-Engine ueberschreibt deterministisch |
+| Keine Granularitaet zwischen "knapp safe" und "komfortabel safe" | `safety_score` 0–100 zeigt diese Differenz |
+| `caution_notes` muss alles tragen | `caution_notes` bleibt fuer Begruendungen, aber Score traegt Quantifizierung |
+
+**Architektur-Symmetrie nach v1.3:**
+
+```
+Experience-Achse:                Safety-Achse:
+  4 LLM-Sub-Ratings              4 LLM-Sub-Ratings
+  (thermal/window/wind/xc)       (wind/gust/aloft/foehn)
+       ↓                              ↓
+  Aggregation (35/25/25/15)      Aggregation (30/25/25/20)
+       ↓                              ↓
+  rating (0-10)                  safety_rating (0-10)
+       ↓                              ↓
+  × 10                           × 10
+       ↓                              ↓
+  experience_score (0-100)       safety_score (0-100)
+       ↓                              ↓
+  experience_stars (0-5)         safety_band (green/amber/red)
+                                       ↑
+                                 Decision-Engine
+                                 Hard-Overrides
+                                 (FoehnDanger/AloftNotSafe etc.)
+```
+
+**Implementations-Pfad** (siehe §9.4 Vorab-Fix #4 unten):
+1. Prompt erweitern: LLM gibt 4 zusaetzliche Sub-Ratings aus
+2. `_compute_safety_rating()` in `engine/_common.py` ergaenzen, analog zu `_compute_rating_from_subratings`
+3. `safety_score` und `safety_band` (mit Hard-Override-Logik) in Decision-Engine berechnen
+4. Tests fuer alle 4 Sub-Rating-Kombinationen + Hard-Override-Faelle
+
+**Backwards-Compat:**
+- `safety_status` bleibt unveraendert vom LLM
+- `caution_notes` und `no_go_reasons` bleiben unveraendert
+- Decision-Engine Hard-Overrides bleiben unveraendert
+- Neu hinzu: `safety_rating`, `safety_score`, `wind_safety_rating`, `gust_safety_rating`, `aloft_safety_rating`, `foehn_safety_rating` als zusaetzliche Felder im Cache
 
 ---
 
@@ -437,37 +556,76 @@ Wenn User einen Spot anklickt, oeffnet sich Side-Panel:
 
 **Tab "Decisions"** (neu): Listet alle gefeuerten Decisions aus `_decisions_applied` mit Klartext-Erklaerung. Diese Transparenz ist USP gegenueber Burnair/Paraglidable.
 
-### 4.3 Region-Panel
+### 4.3 Regionen-Tab — Leaflet-Karte (v1.3)
 
-Wenn User eine Region anklickt: Wochenuebersicht als Tabelle, _zusaetzlich_ ein 2D-Scatter (Geminis Idee, aber nicht als Primaer-UI – nur hier als Detail).
+> **CHANGED v1.3**: Urspruenglich war hier eine 7-Tage-Tabelle + 2D-Scatter geplant. Nach Preview-Iteration: **Regionen-Tab wird zur primaeren Leaflet-Karte** (analog `static/js/region-map.js`). Der 2D-Scatter wandert in den Briefing-Tab und wird **regionen-aggregiert** (Bubble-Matrix mit ~7-10 Bubbles statt 488 Spot-Punkten — siehe §4.4).
 
-```
-REGION ALPEN ZENTRAL  – 7 Tage
+**Konzept**: Regionen-Tab ist eine **interaktive CH-Karte mit allen Region-Polygonen** aus `data/regionen_polygone_mapped.geojson` (29 Regionen). Polygone sind nach `safety_band` der Region (heutiger Tag) eingefaerbt. Klick oeffnet ein Region-Overlay mit Tagesbriefing.
 
-Tag  Safety  Stars   Comfort   Hauptthema
-Do   AMBER   ****-   45        Foehntag, XC fuer Pros
-Fr   GREEN   ***--   80        Moderate Thermik, gemuetlich
-Sa   GREEN   *****   90        Top-Tag, alle Profile
-So   RED     -----   --        Frontdurchgang
-Mo   AMBER   **---   60        Lokal moeglich
-Di   GREEN   ****-   75        Solider XC-Tag
-Mi   GREEN   ****-   85        Solider XC-Tag
-```
+**Layout-Komponenten**:
 
-Plus Scatter daneben fuer Pro-User (X = Experience, Y = Safety-Risk):
-```
-   Sicher
-       |
-   GR  | Fr        Sa
-       |        Di    Mi
-   AM  |              Mo Do
-       |_________________________
-   RD  | So
-        ---------------> Erlebnis
-        0          50         100
-```
+1. **Karte** (full-width Container, ~640px hoch desktop / ~540px mobile)
+   - Leaflet (gleiche Version wie restliche App: 1.9.4)
+   - Tile-Layer dezent: CartoDB Positron Light (passt zum Light-Theme)
+   - Region-Polygone aus GeoJSON, gefaerbt nach `safety_band`:
+     - `green` → fill `#22c55e` 42%, stroke `#15803d`
+     - `amber` → fill `#f59e0b` 42%, stroke `#92400e`
+     - `red`   → fill `#ef4444` 40%, stroke `#991b1b`, dashed border (klare Sperr-Visualisierung)
+     - `gray`/no_data → grau 30%, dashed
+   - **Region-Label im Polygon-Centroid**: Region-Name + Sterne in Safety-Farbe
+   - Hover: erhoehe `fillOpacity` auf 0.65, Tooltip mit Region · Verdict · Stars · Score
 
-Pro-User sieht auf Scatter sofort: "Sa rechts oben = sicher + episch", "Do unten rechts = riskant aber lohnend". Klassische Risk-Reward-Matrix.
+2. **Tag-Pill oben links** (glass effect): zeigt aktuell betrachteten Tag (Default = heute)
+
+3. **Karten-Legende unten links** (glass): 4 Swatches (green/amber/red/gray) + Beschriftung
+
+4. **Region-Overlay** (slide-in von rechts, 380px desktop; full-screen Bottom-Sheet mobile):
+   - Header: Region-Name + Subline (Hauptort + Hoehe + Tagesthema)
+   - Summary: Verdict-Pill, Sterne-Symbole, Score
+   - 7-Tage-Sparkline (analog zu §4.3 alte Tabelle, aber kompakt — 7 farbige Pills in Row, "Heute" hervorgehoben)
+   - **Top Spots heute** in der Region: Liste mit Marker-Glyph + Name + Stars + Score, klickbar (oeffnet Spot-Detail-Tab)
+   - CTA "Im Briefing oeffnen →" (springt in Briefing-Tab + scrollt zur Region)
+   - Backdrop hinter Overlay auf Mobile, klickbar zum Schliessen
+
+5. **Klick-Verhalten**:
+   - Klick auf Polygon → oeffnet Region-Overlay
+   - Klick auf "Im Briefing oeffnen" → wechselt zu Briefing-Tab und scrollt zur Region
+   - ESC/Backdrop-Klick / X-Button → schliesst Overlay
+
+**Code-Anker**:
+- Frontend-Implementierung: neue `static/js/regions-tab.js` (oder Erweiterung von `region-map.js`)
+- Reuse: `region-map.js` Style-Funktionen + Tile-Layer-Konfig
+- Daten-Endpoint: `region_analyses.json` (existiert)
+- GeoJSON: `data/regionen_polygone_mapped.geojson` (existiert, Inline in Preview, in Produktion via Static-Endpoint)
+
+**Mobile-Responsivitaet**:
+- Karte nimmt fast Vollbild ein
+- Region-Overlay = Bottom-Sheet mit Drag-Handle (oder Vollbild-Modal)
+- Tap auf Polygon eindeutig (Polygone sind grossflaechig — keine Tap-Konflikte)
+
+**Was sich vs. bestehender `regionen.html` aendert:**
+- Heute: Karte + Chat-Sidebar (50/50 Split)
+- v1.3: Karte mit Overlay-bei-Klick (kein Chat-Splitscreen) — Chat bleibt in `regionen.html` als separate Page erhalten, der Regionen-Tab in der neuen UI ist eine **Map-only-Variante** fuer den Tagesbriefing-Use-Case.
+
+### 4.4 Risk-Reward-Bubble-Matrix (im Briefing-Tab)
+
+> **NEU v1.3**: Die urspruenglich in §4.3 platzierte 2D-Scatter wandert in den Briefing-Tab. Bei 488 Spots ist Spot-Granularitaet visuell unbrauchbar — daher **Region-Aggregation**.
+
+**Konzept**: Bubble-Chart mit den 29 Regionen statt der 488 Spots.
+
+**Achsen**:
+- X-Achse: Mittlerer `experience_score` der Region heute (0–100)
+- Y-Achse: 3 Sicherheits-Baender (gruen oben, amber mitte, rot unten) — kategorial, mit Hintergrund-Banding
+
+**Bubble**:
+- Position: (Ø-Score, Band)
+- Groesse: proportional zur Spot-Anzahl in der Region (28–48px Durchmesser)
+- Farbe: Safety-Band der Region
+- Beschriftung: Region-Kurzname unter Bubble + Spot-Anzahl als Zahl in Bubble
+- Klick → springt zur Region im Region-Tab oder Region-Block im Briefing
+
+**Nutzen fuer Pro-User**:
+"Welche Region heute hat das beste Verhaeltnis Risiko-zu-Erlebnis?" → die Bubble oben rechts (gruen + Score 80+) ist die Antwort. Klassische Risk-Reward-Matrix, nur regionen-aggregiert.
 
 ### 4.4 Drei Pilot-Beispiele durchgespielt
 
@@ -828,7 +986,9 @@ Mikro-Copy-Regeln (max 5 Worte je Symbol):
 
 **Zusatz im Tooltip** (nicht in Legende, um sie kompakt zu halten): klickbarer Link "Wie funktioniert das?" der ein Modal mit Sektion 1 (Benchmark) und Sektion 2 (Erklaerung) oeffnet — fuer interessierte User.
 
-### 8.5 Pilotenprofil — wo lebt der Schalter?
+### 8.5 ~~Pilotenprofil — wo lebt der Schalter?~~ (DEFERRED v1.3)
+
+> **DEFERRED v1.3** — Der gesamte §8.5-Inhalt wird zurueckgestellt. Begruendung siehe §2.2-Banner. Sektion bleibt erhalten als Referenz fuer die Wieder-Einfuehrung in v1.5 (siehe §10 Backlog).
 
 **Beobachtung aus `index.html`**: Es gibt eine Top-Navbar (60px hoch, fixed) und eine Mobile-Bottom-Nav. Der Header hat heute Day-Tabs und einen Title — aber keinen User-Profil-Bereich. Settings koennten dort einziehen.
 
@@ -914,6 +1074,32 @@ Heutiges Panel zeigt Decision-Notes + Meteogramm + Windverlauf. Mit dem neuen Ko
 - Aktuelles Rating-Badge (`ratingBadgeEl`, `meteogram.js:528`) wird zur Hero-Glyphe — gleicher Renderer wie Karten-Marker, nur skaliert (60×60 statt 14×14).
 - Decision-Notes-Liste wandert in Akkordeon "Erweitert" oder Tab "Details".
 - Comfort-Index erscheint nur im Akkordeon — ist **bewusst nicht prominent**, weil er nicht primaere Score ist (vgl. Sektion 2.2).
+
+#### Sonderfall: Rote Spots ohne Analyse (NEU v1.3)
+
+**Hintergrund**: Nicht jeder rote Spot hat eine vertiefte Analyse. Wenn die Bedingungen so eindeutig nicht fliegbar sind, dass eine Auswertung keinen Mehrwert bringt — z.B. Windrichtung passt grundsaetzlich nicht zum Startplatz — wird **keine detaillierte LLM-Analyse erstellt**. Der Spot ist einfach rot.
+
+**Wie wird das gekennzeichnet?**
+- Cache-Feld `noAnalysis: true` (oder `analysis_skipped: true` — Naming TBD bei Implementation)
+- Optional: `noAnalysisReason` (kanonischer Grund-Tag, z.B. `"wind_direction_mismatch"`, `"out_of_season"`)
+
+**UI-Verhalten im Spot-Panel** (siehe `docs/rating_preview.html` als Referenz):
+- Header bleibt: Name, Region, Hoehe, Wind
+- Hero-Block bleibt: Glyphe, Verdict ("Nicht fliegbar"), Score, Rationale (kann z.B. lauten: "Spot ist heute nicht fliegbar. Falsche Anstroemung — keine vertiefte Auswertung.")
+- **Statt Decision-Hero / Best-Window / Alerts**: ein einzelner kompakter Block:
+  ```
+  ⊘  Keine Analyse
+     Windrichtung passt nicht zur Startrichtung — keine
+     detaillierte Analyse erstellt.
+  ```
+- **Kein Meteogramm** — die Daten sind irrelevant fuer den Use-Case "fliege ich heute"
+- "Andere Spots heute"-Strip bleibt (User soll Alternative finden)
+
+**Abgrenzung zu rotem Spot mit Analyse**:
+- Rot mit Analyse (z.B. Niesen-Foehn): zeigt vollen Decision-Hero + Caution-Notes + Foehn-Risiko-Wert + Meteogramm — User versteht WARUM
+- Rot ohne Analyse: zeigt nur "geht nicht heute, aus diesem grundsaetzlichen Grund" — User braucht keine Detaildiagnose
+
+**Implementierungs-Hinweis**: Der `noAnalysis`-Pfad wird vermutlich in der Engine vor dem LLM-Call entschieden — z.B. wenn Wind-Richtung-Filter den Spot bereits aussortiert. Spart LLM-Calls und macht UI klarer.
 
 ### 8.7 Migration — wie verhindern wir, dass Bestands-User verwirrt sind?
 
@@ -1197,6 +1383,46 @@ ersetzt (Phase 2), die aus `safety_band` + `experience_stars` rueckwaerts
 auf gray/green/violet mappt. Dann werden beide `decide_flyability_*` zur
 reinen View-Logik.
 
+**Bruch 6 (NEU v1.3): Asymmetrie zwischen Experience- und Safety-Achse.**
+
+Heute hat die Experience-Seite ein bewaehrtes 4-Sub-Rating-Pattern
+(`engine/_common.py:421`), die Safety-Seite nur eine kategoriale `safety_status`
+(safe/conditional/not_safe). Konsequenzen:
+
+- **Keine Granularitaet**: Zwischen "knapp safe" und "komfortabel safe" kein
+  numerischer Unterschied. Pro-User koennen nicht nach Safety-Score sortieren.
+- **`safety_status` direkt vom LLM**: Verletzt das fuer Experience etablierte
+  Hybrid-Pattern (LLM beurteilt Aspekte, App aggregiert). Decision-Engine
+  ueberschreibt zwar via Hard-Decisions, aber das LLM-Urteil zwischen den
+  Hard-Faellen bleibt unaggregiert.
+- **`caution_notes` muessen Quantitaet tragen**: "leichter Foehn-Einfluss" vs
+  "deutlicher Foehn-Einfluss" landet als Freitext, nicht als Score.
+
+**Aufloesung**: 4 Safety-Sub-Ratings einfuehren (siehe §3.5), parallel zu den
+4 Fliegbarkeits-Sub-Ratings:
+- `wind_safety_rating`, `gust_safety_rating`, `aloft_safety_rating`,
+  `foehn_safety_rating` — je 1-10 vom LLM
+- Neue Aggregations-Funktion `_compute_safety_rating` (Gewichte 30/25/25/20)
+- Skalierung × 10 → `safety_score` (0-100)
+- `safety_band` aus Score + Decision-Engine-Hard-Overrides (Hard-Override hat
+  Vorrang)
+
+**Code-Aufwand**:
+- LLM-Prompt erweitern (`prompts.py`) — 4 zusaetzliche Output-Felder, ~30 Zeilen
+- `engine/_common.py` — neue Funktion `_compute_safety_rating`, ~20 Zeilen, +
+  4 Tests
+- `engine/decision_engine.py` — `compute_safety_band` integriert Score + Hard-
+  Overrides, ~25 Zeilen, +5 Tests
+- Skill `_flyability_tiers.md` (oder neu `_safety_subratings.md`) — Anweisung an
+  LLM, was die 4 Safety-Sub-Ratings bedeuten, ~50 Zeilen Skill-Doku
+
+**Voraussetzung**: Bruch 1, 2, 3 erst aufgeloest (saubere Stage-Inversion bevor
+neue LLM-Outputs eingefuehrt werden).
+
+**Risiko**: Mehrere LLM-Outputs erhoehen Antwort-Token-Anzahl leicht. Pro Spot
+4 zusaetzliche Felder × ~10 Token ≈ 40 Token mehr. Bei 28 Spots × 7 Tagen ≈
+8000 zusaetzliche Output-Token pro Run. Akzeptabel.
+
 ### 9.5 Chat-Engine + Mail-Subscriber: was passiert mit der Legacy-Sprache?
 
 **Befund aus `skills/chat_capabilities_guide.md`**:
@@ -1304,12 +1530,13 @@ Faellen aequivalent (amber+4 ≈ green) und durch das Welcome-Banner erklaerbar.
    nur noch View-Funktion.
 4. Tests bereinigen.
 
-**Aufwand-Update gegenueber Sektion 8.9**:
-- Phase 1: 8-10 Tage (war 7-8 in 8.9 plus die Bruch-Aufloesungen 1-3, plus
-  zusaetzliche Tests).
-- Phase 2: 3-4 Tage.
-- Phase 3: 1-2 Tage.
-- **Gesamt: 12-16 Tage** ueber 2-3 Kalendermonate.
+**Aufwand-Update v1.3 gegenueber Sektion 8.9**:
+- Vorab-Fixes 2 + 1 + 3 + **4 (NEU)**: 4-5 Tage (Fix 4 ist der groesste, weil LLM-Prompt + neue Aggregation + Skill-Doku)
+- Phase 1: 8-10 Tage (Decision-Engine, Cache-Output, Frontend-Glyphe, Welcome-Banner)
+- Phase 2 (NEU v1.3): Regionen-Tab als Leaflet-Karte (siehe §4.3 v1.3) — 3-4 Tage
+- Phase 3 (war 2): Chat-Engine-Umstellung — 3-4 Tage
+- Phase 4 (war 3): Legacy aufraumen — 1-2 Tage
+- **Gesamt: ~19-25 Tage** ueber 2-3 Kalendermonate (war 12-16, +Safety-Sub-Ratings + Regionen-Tab)
 
 ### 9.7 Empfehlung: Single Source of Truth
 
@@ -1350,6 +1577,41 @@ flyability_tier, safety_status, is_conditional, rating sind abgeleitete
 View-Werte. Damit ist das Konzept v1.1 harmonisch in das bestehende System
 eingebettet — vorausgesetzt, die Brueche 1-5 in 9.4 werden vor der
 Implementation aufgeloest.
+
+---
+
+## 10. Backlog (post-v1.0)
+
+Features, die im urspruenglichen Konzept enthalten waren, aber nach Preview-Iteration v1.3 zurueckgestellt wurden. Hier dokumentiert, damit sie nicht verloren gehen.
+
+### 10.1 Pilotenprofil-Filter (v1.5-Kandidat)
+
+**Ursprung**: §2.2, §8.5 — Beginner / Intermediate / Advanced / Pro mit unterschiedlicher Saturierung/Filterung der Marker.
+
+**Warum zurueckgestellt** (Entscheid 2026-04-30):
+- Vereinfacht v1.0-Launch erheblich (kein Profil-State, kein Onboarding-Tooltip, keine localStorage-Persistenz, keine vier verschiedenen Render-Pfade)
+- Vermeidet Pflicht-Anwaltsgespraech zu Profil-Disclaimer ("ich bin Advanced" als rechtsbindende Selbstdeklaration)
+- Reduziert Test-Matrix (4 Profile × N Spots = viel Edge-Cases)
+- Risiko-Mitigation in v1.0 erfolgt allein ueber `safety_band` (rot ist rot fuer alle)
+
+**Voraussetzungen fuer Wieder-Einfuehrung** (alles separat zu klaeren):
+1. Anwaltsgespraech: ist eine Advanced/Pro-Selbstdeklaration in CH haftungsrechtlich relevant?
+2. User-Research: woher weiss System, dass der User ehrlich angibt? (vgl. offene Frage 6.5)
+3. UX-Test: 5 User mit Mockup, ob sie das Profil bewusst setzen oder ignorieren
+
+**Architektur-Hinweis**: v1.3-Implementierung baut so, dass Profil-Filter **rein im Frontend** als CSS-Saturierung + Sortier-Logik nachgeruestet werden kann. Backend-Werte (`safety_band`, `experience_score`) bleiben profil-unabhaengig — wie urspruenglich in §2.2 dokumentiert. Code-Aufwand fuer spaetere Wieder-Einfuehrung: ~1-2 Tage Frontend.
+
+### 10.2 Pure-Rohdaten-Modus / Pro-Detail-Tab
+
+**Ursprung**: §1.9 Synthese-Tabelle — FATMAP-Pattern (Rohdaten ohne Aggregation, "die Entscheidung gehoert dir").
+
+**Status**: nicht prioritaer fuer v1.0. Spot-Panel hat bereits Meteogramm + Windverlauf + Caution-Notes. Ein zusaetzlicher "Pure Data"-Tab waere nice-to-have fuer Pro-User, aber kein Launch-Blocker.
+
+### 10.3 Lernen aus Klick-Mustern
+
+**Ursprung**: §"Offene Fragen" Punkt 4 — System erschliesst Pilotenprofil aus Verhalten statt User-Setting.
+
+**Status**: setzt voraus, dass Profil-Filter wieder eingefuehrt wird (10.1) und dass es ein User-Account-System gibt, das Klick-Historie persistiert. Bestehende `account.html` deutet auf Account-System hin — vor Implementation: Telemetrie-Strategie kennen (vgl. `cost_telemetry.jsonl`).
 
 ---
 
