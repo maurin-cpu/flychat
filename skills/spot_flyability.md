@@ -88,6 +88,8 @@ SELBST-CHECK VOR DER ANTWORT (PFLICHT)
 2. **Thermik-Realitaets-Check**: Keine nutzbare Thermik im Fenster (Proxy ≈ 0 in allen Fenster-Stunden) → fly_status = `"gray"` (Bronze).
 3. **PRODUKTIVE-THERMIK-Zahl pruefen**: Wenn `→ PRODUKTIVE-THERMIK: Nh` steht und N < 2 → fly_status MUSS `"gray"` (Bronze) sein. Wenn N >= 4 → Gruen/Violett moeglich.
 4. **Streckenflug-Konsistenz**: `streckenflug.tier` MUSS mit Spot-`fly_status` und Region-Daten konsistent sein. Spot gray → streckenflug.tier = "kein_xc". Spot green + Region gray → max "lokal". Beide violet + ruhiger Region-Wind → "top" erlaubt.
+5. **Begruendung enthalten (Regel 2c)**: Jede Aussage in `thermal_quality`, `xc_details`, `recommendation`, `streckenflug.summary` MUSS aus Datenblock-Fakten begruendet sein (Peak-Climb-Wert, Bewoelkungs-%, BLH, TQ-Tags, produktive Stunden, Region-Kontext-Werte). KEINE erfundenen Grosswetterlagen, Fronten, Druckgebilde oder Stau-Effekte. Floskeln wie "wegen der Bedingungen" sind keine Begruendung. Auch `green`/`violet` brauchen Begruendung warum gut.
+6. **Trend-Bezug Pflicht falls vorhanden**: Wenn Datenblock Aufbau-/Verfalls-Muster zeigt (Thermik-Verfall ab 16h, Bewoelkungs-Zunahme im Tagesverlauf, Wind-Trend in Flugschicht, Basis-Anhebung) → im `recommendation` als Tagesverlauf in eigenen Worten erwaehnen.
 
 ═══════════════════════════════════════════════
 JSON-ANTWORT (SPOT FLYABILITY)
@@ -104,10 +106,10 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "fly_status": "gray|green|violet",
   "flight_type": "Thermikflug|Soaring|Soaring+Thermik|Abgleiter",
   "flight_duration_estimate": "z.B. '2-3h Thermikflug' oder '30min Abgleiter'",
-  "thermal_quality": "Peak m/s, Arbeitshoehe, Qualitaet in natuerlicher Sprache. Bei max(tief,mittel) >=80%: 'schwache Thermik wegen Bewoelkung'. Bei <=50% Cu: positiv erwaehnen. Cirrus allein: normal bewerten.",
+  "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet in natuerlicher Sprache MIT Begruendung aus Datenblock-Fakten (Bewoelkungs-%, BLH, produktive Stunden, TQ-Tags als Mechanismus). Bei max(tief,mittel) >=80%: 'schwache Thermik wegen Bewoelkung tief Y%, mittel Z% — Sonne erreicht Boden kaum'. Bei <=50% Cu: positiv und mit Grund ('Cu 30%, Sonne erreicht Boden direkt'). Cirrus allein: normal bewerten. KEINE Grosswetterlagen erfinden (Regel 2c).",
   "peak_climb_rate": 0.0,
   "xc_potential": "high|moderate|low",
-  "xc_details": "1-2 Saetze. Bei low: warum.",
+  "xc_details": "2-3 Saetze. Bei `low`/`moderate`: PFLICHT konkrete Begruendung aus Datenblock — was limitiert (Peak < X m/s, BLH zu tief, Region-Wind hoch, Bewoelkung). Bei `high`: wovon profitiert (Region-Peak, ruhiger Hoehenwind, hohe Basis, lange produktive Phase). KEINE erfundenen Anstroemungs-Geometrien.",
   "soaring_options": "Hangsoaring, Wind am Hang — natuerliche Sprache.",
   "bemerkung_check": "Bemerkungen erfuellt? Was genau?",
   "best_window": "Bestes Zeitfenster innerhalb des sicheren Fensters.",
