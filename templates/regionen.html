@@ -261,21 +261,38 @@
         border-color: #0369a1;
     }
 
-    /* Region overlay layout: analysis + meteogram side by side on wide screens */
+    /* Region overlay layout: meteogram first (primary), analysis as aside.
+       Order matches the Spot-Overlay so the mobile pattern is identical:
+       meteogram on top, analysis as collapsible bottom-sheet below. */
     .region-overlay-content {
         display: flex;
         gap: 24px;
-    }
-
-    .region-overlay-analysis {
-        flex: 0 0 340px;
-        min-width: 280px;
+        align-items: stretch;
     }
 
     .region-overlay-meteogram {
         flex: 1;
         min-width: 0;
         overflow-x: auto;
+        order: 1;
+    }
+
+    .region-overlay-analysis {
+        flex: 0 0 340px;
+        min-width: 280px;
+        order: 2;
+        background: #fafbfc;
+        border: 1px solid var(--color-border, #e5e7eb);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .region-overlay-analysis .meteogram-aside-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
     }
 
     .region-meteogram-chart {
@@ -303,8 +320,12 @@
             flex-direction: column;
         }
         .region-overlay-analysis {
-            flex: none;
+            flex: 0 0 auto;
+            width: 100%;
             min-width: 0;
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
         }
     }
 
@@ -326,7 +347,45 @@
             background: rgba(255, 255, 255, 0.6);
         }
         #regionOverlay .meteogram-panel { max-width: 100vw; width: 100vw; height: 100dvh; border-radius: 0; }
-        #regionOverlayBody { padding: 0 16px 16px; }
+
+        /* Mobile-Sheet-Layout (identisch zum Spot-Overlay):
+           Body ist Flex-Column und fuellt den Panel — Meteogramm waechst,
+           Analyse-Aside klebt am Panel-Boden und klappt nach OBEN auf. */
+        #regionOverlayBody {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+        }
+        .region-overlay-day-tabs {
+            flex: 0 0 auto;
+            padding: 6px 12px 8px;
+            margin: 0;
+        }
+        .region-overlay-content {
+            flex: 1 1 auto;
+            min-height: 0;
+            gap: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .region-overlay-meteogram {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 0 16px;
+        }
+        .region-overlay-analysis {
+            flex: 0 0 auto;
+            width: 100%;
+            border: none;
+            border-top: 1px solid var(--color-border, #e5e7eb);
+            border-radius: 0;
+            background: var(--color-bg-elevated, #fff);
+        }
     }
 </style>
 {% endblock %}
@@ -444,6 +503,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/foehn_diagram.js') }}?v={{ static_v('js/foehn_diagram.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/feedback.js') }}?v={{ static_v('js/feedback.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/region-map.js') }}?v={{ static_v('js/region-map.js') }}"></script>
 {% if is_logged_in %}
 <script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>

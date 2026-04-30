@@ -111,11 +111,13 @@ if os.environ.get("VERCEL"):
     HISTORY_DIR = _WRITABLE_DIR / "history"
     STATION_DB_PATH = _WRITABLE_DIR / "station_observations.db"
     SUBSCRIBERS_DB_PATH = _WRITABLE_DIR / "subscribers.db"
+    FEEDBACK_DB_PATH = _WRITABLE_DIR / "feedback.db"
 else:
     WEATHER_JSON_PATH = DATA_DIR / "wetterdaten.json"
     HISTORY_DIR = DATA_DIR / "history"
     STATION_DB_PATH = DATA_DIR / "station_observations.db"
     SUBSCRIBERS_DB_PATH = DATA_DIR / "subscribers.db"
+    FEEDBACK_DB_PATH = DATA_DIR / "feedback.db"
 
 # ============================================================================
 # SPOT SOURCE AREAS (manuelle Overrides fuer Referenzpunkte)

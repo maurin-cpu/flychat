@@ -7,10 +7,9 @@
     var map;
     var overlay = document.getElementById('meteogramOverlay');
     var chartContainer = document.getElementById('meteogramChart');
-    var textViewContainer = document.getElementById('textViewChart');
     var analyseViewContainer = document.getElementById('analyseViewChart');
     var tabsContainer = document.getElementById('meteogramTabs');
-    var viewTabsContainer = document.getElementById('meteogramViewTabs');
+    var feedbackBar = document.getElementById('meteogramFeedback');
     var titleEl = document.getElementById('meteogramTitle');
     var infoEl = document.getElementById('meteogramInfo');
     var ratingBadgeEl = document.getElementById('meteogramRatingBadge');
@@ -18,7 +17,6 @@
     var closeBtn = document.getElementById('meteogramClose');
     var shareBtn = document.getElementById('meteogramShare');
     var tooltipEl = document.getElementById('tooltip');
-    var currentView = 'meteogram';  // 'meteogram' or 'text' (analyse is permanent aside)
     var asideEl = document.getElementById('meteogramAside');
     var asideToggleBtn = document.getElementById('meteogramAsideToggle');
 
@@ -247,11 +245,16 @@
     function createSpotIcon(props, safety, quality, isHighlighted) {
         var uid = ++_iconUid;
         var style = mapSafetyAndQualityToStyle(safety, quality);
+        var isMobile = window.innerWidth <= 600;
         var svgSize = 44;
         var center = svgSize / 2;
-        var radius = isHighlighted ? 8 : 6;
+        var radius = isHighlighted ? (isMobile ? 10 : 8) : (isMobile ? 8 : 6);
 
         var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">';
+        // Invisible hit-area — extends tap target to full 44x44 (mobile only, WCAG)
+        if (isMobile) {
+            html += '<circle cx="' + center + '" cy="' + center + '" r="' + (svgSize / 2) + '" fill="rgba(0,0,0,0)" pointer-events="all" />';
+        }
 
         // Defs: stripes pattern (unique ID per marker)
         if (style.showStripes) {
@@ -444,7 +447,7 @@
             });
     }
 
-    // Deep-Link: wenn /?spot=<Name> in der URL steht, entsprechenden Spot öffnen
+    // Deep-Link: wenn /?spot=<Name> in der URL steht, Spot zentrieren + Meteogramm öffnen
     function openSpotFromUrl() {
         try {
             var params = new URLSearchParams(window.location.search);
@@ -455,37 +458,13 @@
             if (marker.getLatLng) {
                 map.setView(marker.getLatLng(), Math.max(map.getZoom(), 12));
             }
-            // Nur Tooltip öffnen, NICHT automatisch Meteogramm laden
-            if (marker.openTooltip) marker.openTooltip();
+            var props = marker.featureProperties || (marker.feature && marker.feature.properties) || null;
+            openMeteogram(spotName, props);
         } catch (e) {
             console.warn('[map] Spot aus URL konnte nicht geöffnet werden:', e);
         }
     }
 
-
-    // ===== VIEW TABS (Meteogramm / Text) =====
-    // Analyse is permanently shown in the aside panel next to the chart.
-    if (viewTabsContainer) {
-        viewTabsContainer.querySelectorAll('.view-tab').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var view = btn.dataset.view;
-                if (view === currentView) return;
-                currentView = view;
-                viewTabsContainer.querySelectorAll('.view-tab').forEach(function (b) {
-                    b.classList.toggle('active', b.dataset.view === view);
-                });
-                chartContainer.style.display = 'none';
-                if (textViewContainer) textViewContainer.style.display = 'none';
-
-                if (view === 'meteogram') {
-                    chartContainer.style.display = '';
-                } else if (view === 'text') {
-                    if (textViewContainer) textViewContainer.style.display = '';
-                    renderTextView();
-                }
-            });
-        });
-    }
 
     // ===== ANALYSE ASIDE TOGGLE (mobile collapsible) =====
     // Toggle wird durch Button ODER Header-Tap ausgelöst (grössere Tap-Target).
@@ -523,6 +502,27 @@
             dateStr: dateStr,
         });
         renderRatingBadge(analysis);
+        renderFeedbackBar(currentSpotName, dateStr, analysis);
+    }
+
+    function renderFeedbackBar(spotName, dateStr, analysis) {
+        if (!feedbackBar || !spotName) return;
+        // Bei Analyse-Fehler / no_data kein Feedback-Widget anzeigen
+        var status = analysis && analysis.safety_status;
+        if (!status || status === 'error' || status === 'no_data') {
+            feedbackBar.innerHTML = '';
+            feedbackBar.style.display = 'none';
+            return;
+        }
+        feedbackBar.style.display = '';
+        feedbackBar.innerHTML = '';
+        var mount = document.createElement('div');
+        mount.setAttribute('data-fb-mount', '');
+        mount.setAttribute('data-fb-type', 'spot');
+        mount.setAttribute('data-fb-target', spotName);
+        if (dateStr) mount.setAttribute('data-fb-date', dateStr);
+        feedbackBar.appendChild(mount);
+        if (window.Feedback && window.Feedback.scan) window.Feedback.scan(feedbackBar);
     }
 
     function renderRatingBadge(analysis) {
@@ -564,26 +564,6 @@
         ratingBadgeEl.style.display = '';
     }
 
-    function renderTextView() {
-        if (!currentWeather || !currentDates.length || !textViewContainer) return;
-        var dateStr = currentDates[currentDateIdx];
-        var wxDay = currentWeather.data[dateStr] || {};
-        var altProfiles = (currentAltWind && currentAltWind.data && currentAltWind.data[dateStr]) || [];
-        var altDay = { profiles: [] };
-        altProfiles.forEach(function (p) {
-            altDay.profiles.push({
-                time: dateStr + 'T' + (p.hour < 10 ? '0' : '') + p.hour + ':00:00',
-                levels: p.profiles || [],
-            });
-        });
-        Meteogram.renderTextView(textViewContainer, wxDay, altDay, {
-            elevation: currentWeather.elevation_m,
-            spotName: currentSpotName,
-            dateStr: dateStr,
-            source: 'gleitcast-spot',
-        });
-    }
-
     // ===== METEOGRAM OVERLAY =====
     function openMeteogram(spotName, props) {
         currentSpotName = spotName;
@@ -599,17 +579,14 @@
         }
         chartContainer.innerHTML = '<div class="error-state">Lade Daten...</div>';
         if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">Lade Analyse...</div>';
-        if (textViewContainer) textViewContainer.innerHTML = '';
         tabsContainer.innerHTML = '';
+        if (feedbackBar) { feedbackBar.innerHTML = ''; feedbackBar.style.display = 'none'; }
         overlay.style.display = 'flex';
         overlay.classList.add('visible');
         if (window._overlayScrollLock) window._overlayScrollLock();
         closeBtn.focus();
 
-        // Reset to meteogram view
-        currentView = 'meteogram';
         chartContainer.style.display = '';
-        if (textViewContainer) textViewContainer.style.display = 'none';
         // Aside startet expanded auf Desktop, collapsed auf Mobile (Sheet-Pattern):
         // Auf Mobile sieht der User zuerst das Meteogramm in voller Höhe, kann
         // die Analyse via Toggle-Button ausklappen.
@@ -619,11 +596,6 @@
             if (asideToggleBtn) {
                 asideToggleBtn.setAttribute('aria-expanded', isMobile ? 'false' : 'true');
             }
-        }
-        if (viewTabsContainer) {
-            viewTabsContainer.querySelectorAll('.view-tab').forEach(function (b) {
-                b.classList.toggle('active', b.dataset.view === 'meteogram');
-            });
         }
 
         Promise.all([
@@ -744,11 +716,6 @@
 
         // Analyse panel is always visible in the aside – refresh on every day change.
         renderAnalyseView();
-
-        // Also update text view if that view is currently active
-        if (currentView === 'text') {
-            renderTextView();
-        }
     }
 
     function closeMeteogram() {

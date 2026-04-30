@@ -679,6 +679,74 @@ class SubscriberManager:
             return {"total": 0, "correct": 0, "wrong": 0,
                     "accuracy_pct": None, "window_days": days}
 
+    def list_briefing_feedback(self, limit: int = 100) -> list:
+        """Neueste Briefing-Verdicts (correct/wrong) inkl. Subscriber-E-Mail."""
+        try:
+            with self._cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT f.id, f.subscriber_id, s.email, f.briefing_date,
+                           f.verdict, f.created_at
+                      FROM subscriber_feedback f
+                      LEFT JOIN subscribers s ON s.id = f.subscriber_id
+                     ORDER BY f.created_at DESC
+                     LIMIT ?
+                    """,
+                    (int(limit),),
+                )
+                rows = cur.fetchall()
+                keys = ("id", "subscriber_id", "email", "briefing_date",
+                        "verdict", "created_at")
+                return [dict(zip(keys, r)) for r in rows]
+        except Exception as e:
+            logger.error("list_briefing_feedback failed: %s", e)
+            return []
+
+    def list_product_feedback(self, limit: int = 100) -> list:
+        """Neueste Freitext-Produktfeedbacks inkl. Subscriber-E-Mail."""
+        try:
+            with self._cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT pf.id, pf.subscriber_id, s.email, pf.message, pf.created_at
+                      FROM product_feedback pf
+                      LEFT JOIN subscribers s ON s.id = pf.subscriber_id
+                     ORDER BY pf.created_at DESC
+                     LIMIT ?
+                    """,
+                    (int(limit),),
+                )
+                rows = cur.fetchall()
+                keys = ("id", "subscriber_id", "email", "message", "created_at")
+                return [dict(zip(keys, r)) for r in rows]
+        except Exception as e:
+            logger.error("list_product_feedback failed: %s", e)
+            return []
+
+    def delete_briefing_feedback(self, feedback_id: int) -> bool:
+        try:
+            with self._cursor(write=True) as cur:
+                cur.execute(
+                    "DELETE FROM subscriber_feedback WHERE id = ?",
+                    (int(feedback_id),),
+                )
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.error("delete_briefing_feedback failed: %s", e)
+            return False
+
+    def delete_product_feedback(self, feedback_id: int) -> bool:
+        try:
+            with self._cursor(write=True) as cur:
+                cur.execute(
+                    "DELETE FROM product_feedback WHERE id = ?",
+                    (int(feedback_id),),
+                )
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.error("delete_product_feedback failed: %s", e)
+            return False
+
     def get_by_id(self, subscriber_id: int) -> Optional[dict]:
         try:
             with self._cursor() as cur:

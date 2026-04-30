@@ -5,6 +5,7 @@ Routes: Chat-API, Spots-API, Wetter-API, Meteogramm-API.
 
 import os
 import copy
+import hashlib
 import json
 import logging
 import math
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 from thermik_calculator import compute_daily_thermals
 from source_area import get_all_regions_geojson, get_all_regions
 from subscriber import get_manager_from_env as _get_subscriber_manager
+from feedback import get_manager_from_env as _get_feedback_manager
 from email_service import send_confirm_email, send_welcome_email, build_briefing_context
 from fetch_weather import get_weather_for_location
 from foehn_indicators import fetch_foehn_data, evaluate_foehn, FOEHN_STATIONS, \
@@ -885,6 +887,68 @@ def admin_delete(sub_id):
     return redirect(f"/admin/subscribers?ok=Subscriber+%23{sub_id}+({email})+geloescht")
 
 
+@app.route("/admin/feedback", methods=["GET"])
+@_require_admin
+def admin_feedback():
+    """Übersicht aller drei Feedback-Quellen."""
+    sub_mgr = _get_subscriber_manager()
+    fb_mgr = _get_feedback_manager()
+
+    only_comments = request.args.get("comments_only") == "1"
+    only_dislikes = request.args.get("dislikes_only") == "1"
+
+    return render_template(
+        "admin/feedback.html",
+        # Briefing-Verdict
+        briefing_stats=sub_mgr.count_feedback_overall(days=30) if sub_mgr else None,
+        briefing_list=sub_mgr.list_briefing_feedback(limit=100) if sub_mgr else [],
+        # Produkt-Freitext
+        product_list=sub_mgr.list_product_feedback(limit=100) if sub_mgr else [],
+        # Spot/Region
+        spot_region_stats=fb_mgr.admin_stats(days=30) if fb_mgr else None,
+        spot_region_list=fb_mgr.admin_list(
+            limit=200, only_with_comment=only_comments, only_dislike=only_dislikes,
+        ) if fb_mgr else [],
+        only_comments=only_comments,
+        only_dislikes=only_dislikes,
+        flash_ok=request.args.get("ok", ""),
+        flash_error=request.args.get("err", ""),
+    )
+
+
+@app.route("/admin/feedback/spot-region/<int:fid>/delete", methods=["POST"])
+@_require_admin
+def admin_feedback_sr_delete(fid):
+    mgr = _get_feedback_manager()
+    if mgr is None:
+        return redirect("/admin/feedback?err=Service+nicht+verfuegbar")
+    ok = mgr.admin_delete(fid)
+    qs = "ok=Geloescht" if ok else f"err=Loeschen+fehlgeschlagen+%23{fid}"
+    return redirect(f"/admin/feedback?{qs}")
+
+
+@app.route("/admin/feedback/briefing/<int:fid>/delete", methods=["POST"])
+@_require_admin
+def admin_feedback_briefing_delete(fid):
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return redirect("/admin/feedback?err=Service+nicht+verfuegbar")
+    ok = mgr.delete_briefing_feedback(fid)
+    qs = "ok=Geloescht" if ok else f"err=Loeschen+fehlgeschlagen+%23{fid}"
+    return redirect(f"/admin/feedback?{qs}")
+
+
+@app.route("/admin/feedback/product/<int:fid>/delete", methods=["POST"])
+@_require_admin
+def admin_feedback_product_delete(fid):
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return redirect("/admin/feedback?err=Service+nicht+verfuegbar")
+    ok = mgr.delete_product_feedback(fid)
+    qs = "ok=Geloescht" if ok else f"err=Loeschen+fehlgeschlagen+%23{fid}"
+    return redirect(f"/admin/feedback?{qs}")
+
+
 @app.route("/admin/config", methods=["GET"])
 @_require_admin
 def admin_config():
@@ -943,6 +1007,85 @@ def admin_config_save():
 
     msg = f"Gespeichert+und+sofort+aktiv+%28{len(changed)}+Werte%29"
     return redirect(f"/admin/config?ok={msg}")
+
+
+# ============================================================================
+# FEEDBACK API (Spot/Region — anonym via localStorage client_id)
+# ============================================================================
+
+def _hash_ip(ip: str) -> Optional[str]:
+    """Salted SHA-256 der IP fuer Missbrauchs-Korrelation ohne Klartext-Speicherung."""
+    if not ip:
+        return None
+    salt = (config.ADMIN_PASSWORD or "gleitcast-feedback")[:32]
+    return hashlib.sha256(f"{salt}:{ip}".encode("utf-8")).hexdigest()[:32]
+
+
+@app.route("/api/feedback", methods=["POST"])
+def api_feedback_submit():
+    """Anonymer Feedback-Submit. JSON-Body:
+        target_type: 'spot' | 'region'
+        target_id:   Spot-Name oder Region-Slug
+        target_date: 'YYYY-MM-DD' oder null
+        vote:        'up' | 'down' | null  (mind. eines von vote/comment muss da sein)
+        comment:     string (max 4000 chars) oder null
+        client_id:   localStorage UUID (8-64 Zeichen, [A-Za-z0-9_-])
+    """
+    mgr = _get_feedback_manager()
+    if mgr is None:
+        return jsonify({"error": "Feedback-Service nicht verfuegbar"}), 503
+
+    payload = request.get_json(silent=True) or {}
+    fid = mgr.record(
+        target_type=payload.get("target_type"),
+        target_id=payload.get("target_id"),
+        target_date=payload.get("target_date"),
+        vote=payload.get("vote"),
+        comment=payload.get("comment"),
+        client_id=payload.get("client_id"),
+        subscriber_id=session.get("sub_id"),
+        user_agent=(request.user_agent.string or "")[:300],
+        ip_hash=_hash_ip(_client_ip()),
+    )
+    if fid is None:
+        return jsonify({"error": "Ungueltige Eingabe"}), 400
+
+    agg = mgr.aggregate(
+        payload.get("target_type"),
+        (payload.get("target_id") or "").strip(),
+        (payload.get("target_date") or "").strip() or None,
+    )
+    return jsonify({"id": fid, "aggregate": agg}), 200
+
+
+@app.route("/api/feedback/<target_type>/<path:target_id>", methods=["GET"])
+def api_feedback_get(target_type, target_id):
+    """Liest eigene Stimme + Aggregat. Query: ?date=YYYY-MM-DD&client_id=..."""
+    mgr = _get_feedback_manager()
+    if mgr is None:
+        return jsonify({"error": "Feedback-Service nicht verfuegbar"}), 503
+
+    target_date = (request.args.get("date") or "").strip() or None
+    client_id = (request.args.get("client_id") or "").strip()
+
+    own = mgr.get_own(target_type, target_id, target_date, client_id) if client_id else None
+    agg = mgr.aggregate(target_type, target_id, target_date)
+    return jsonify({"own": own, "aggregate": agg}), 200
+
+
+@app.route("/api/feedback/<int:feedback_id>", methods=["DELETE"])
+def api_feedback_delete(feedback_id):
+    """Eigene Stimme entfernen. Query: ?client_id=..."""
+    mgr = _get_feedback_manager()
+    if mgr is None:
+        return jsonify({"error": "Feedback-Service nicht verfuegbar"}), 503
+    client_id = (request.args.get("client_id") or "").strip()
+    if not client_id:
+        return jsonify({"error": "client_id fehlt"}), 400
+    ok = mgr.delete_own(feedback_id, client_id)
+    if not ok:
+        return jsonify({"error": "Nicht gefunden oder nicht berechtigt"}), 404
+    return jsonify({"ok": True}), 200
 
 
 # ============================================================================

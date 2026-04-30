@@ -614,18 +614,43 @@
     var overlayRid = null;
 
     function updateOverlayAnalysis(rid, dateStr) {
-        var analysisEl = document.querySelector('.region-overlay-analysis');
-        if (!analysisEl) return;
+        var asideEl = document.querySelector('.region-overlay-analysis');
+        if (!asideEl) return;
+        var bodyEl = asideEl.querySelector('.meteogram-aside-body') || asideEl;
         var ra = regionAnalyses ? regionAnalyses[rid] : null;
         var dayData = ra ? ra[dateStr] : null;
         var regionName = (meteogramCache[rid] && meteogramCache[rid].regionName) || rid;
-        analysisEl.innerHTML = buildAnalysisHtml(dayData || { region_name: regionName, safety_status: 'no_data' });
+        bodyEl.innerHTML = buildAnalysisHtml(
+            dayData || { region_name: regionName, safety_status: 'no_data' }
+        );
         // Re-wire expandable insight toggles
-        analysisEl.querySelectorAll('.mga-insight-toggle').forEach(function(btn) {
-            btn.addEventListener('click', function() {
+        bodyEl.querySelectorAll('.mga-insight-toggle').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
                 btn.parentElement.classList.toggle('open');
             });
         });
+        renderRegionFeedbackBar(rid, dateStr, dayData);
+    }
+
+    function renderRegionFeedbackBar(rid, dateStr, dayData) {
+        var bar = document.getElementById('regionFeedbackBar');
+        if (!bar || !rid) return;
+        var status = dayData && dayData.safety_status;
+        if (!status || status === 'error' || status === 'no_data') {
+            bar.innerHTML = '';
+            bar.style.display = 'none';
+            return;
+        }
+        bar.style.display = '';
+        bar.innerHTML = '';
+        var mount = document.createElement('div');
+        mount.setAttribute('data-fb-mount', '');
+        mount.setAttribute('data-fb-type', 'region');
+        mount.setAttribute('data-fb-target', rid);
+        if (dateStr) mount.setAttribute('data-fb-date', dateStr);
+        bar.appendChild(mount);
+        if (window.Feedback && window.Feedback.scan) window.Feedback.scan(bar);
     }
 
     function openRegionOverlay(rid, a) {
@@ -633,108 +658,65 @@
         overlayRid = rid;
 
         var regionName = a.region_name || rid;
-        // Pre-cache region name so renderRegionTextView can include it in JSON payload
         if (!meteogramCache[rid]) meteogramCache[rid] = {};
         meteogramCache[rid].regionName = regionName;
         overlayTitle.textContent = regionName;
 
-        // Build side-by-side layout: analysis left, meteogram right
+        // Layout matches Spot-Overlay: meteogram first, analysis as
+        // collapsible aside below (mobile) / right (desktop). On mobile the
+        // aside starts collapsed so the meteogram is the primary view —
+        // identical pattern to map.js.
+        var initialDate = regionActiveDate[rid] || currentDate || window.currentDate || '';
         var analysisHtml = buildAnalysisHtml(a);
+        var isMobile = window.innerWidth <= 640;
+        var asideClass = 'region-overlay-analysis meteogram-aside' + (isMobile ? ' collapsed' : '');
+        var asideExpanded = isMobile ? 'false' : 'true';
 
         var bodyHtml = '<div class="region-overlay-day-tabs" id="regionOverlayDayTabs"></div>';
+        bodyHtml += '<div class="meteogram-feedback-bar" id="regionFeedbackBar"></div>';
         bodyHtml += '<div class="region-overlay-content">';
-        bodyHtml += '<div class="region-overlay-analysis">' + analysisHtml + '</div>';
         bodyHtml += '<div class="region-overlay-meteogram">';
-        bodyHtml += '<div class="meteogram-view-tabs" id="regionViewTabs">';
-        bodyHtml += '<button class="view-tab active" data-view="meteogram">Meteogramm</button>';
-        bodyHtml += '<button class="view-tab" data-view="text">Text</button>';
-        bodyHtml += '</div>';
         bodyHtml += '<div class="region-meteogram-chart" id="regionMeteogramChart"><div class="region-meteogram-loading">Meteogramm wird geladen...</div></div>';
-        bodyHtml += '<div class="region-meteogram-chart" id="regionTextViewChart" style="display:none;"></div>';
-        bodyHtml += '</div></div>';
+        bodyHtml += '</div>';
+        bodyHtml += '<aside class="' + asideClass + '" id="regionAnalysisAside">';
+        bodyHtml += '<div class="meteogram-aside-header">';
+        bodyHtml += '<span class="meteogram-aside-title">Analyse</span>';
+        bodyHtml += '<span class="meteogram-aside-cta">Tippen zum Aufklappen</span>';
+        bodyHtml += '<button class="meteogram-aside-toggle" type="button" aria-label="Analyse ein-/ausblenden" aria-expanded="' + asideExpanded + '">&#x25BE;</button>';
+        bodyHtml += '</div>';
+        bodyHtml += '<div class="meteogram-aside-body">' + analysisHtml + '</div>';
+        bodyHtml += '</aside>';
+        bodyHtml += '</div>';
 
         overlayBody.innerHTML = bodyHtml;
         showOverlay();
 
+        // Aside toggle (header tap or button) — same pattern as Spot-Overlay.
+        var asideEl = document.getElementById('regionAnalysisAside');
+        if (asideEl) {
+            var asideHeader = asideEl.querySelector('.meteogram-aside-header');
+            var asideBtn = asideEl.querySelector('.meteogram-aside-toggle');
+            var toggleAside = function (ev) {
+                if (ev && ev.target && ev.target.closest && ev.target.closest('.meteogram-aside-body')) return;
+                var collapsed = asideEl.classList.toggle('collapsed');
+                if (asideBtn) asideBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            };
+            if (asideHeader) asideHeader.addEventListener('click', toggleAside);
+        }
+
         // Wire up expandable insight toggles
         overlayBody.querySelectorAll('.mga-insight-toggle').forEach(function(btn) {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
                 btn.parentElement.classList.toggle('open');
             });
         });
 
-        // View tab switching for region overlay
-        var regionViewTabs = document.getElementById('regionViewTabs');
-        var regionMeteogramChart = document.getElementById('regionMeteogramChart');
-        var regionTextView = document.getElementById('regionTextViewChart');
-        var regionCurrentView = 'meteogram';
-
-        if (regionViewTabs) {
-            regionViewTabs.querySelectorAll('.view-tab').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    var view = btn.dataset.view;
-                    if (view === regionCurrentView) return;
-                    regionCurrentView = view;
-                    regionViewTabs.querySelectorAll('.view-tab').forEach(function (b) {
-                        b.classList.toggle('active', b.dataset.view === view);
-                    });
-                    regionMeteogramChart.style.display = 'none';
-                    if (regionTextView) regionTextView.style.display = 'none';
-
-                    if (view === 'meteogram') {
-                        regionMeteogramChart.style.display = '';
-                    } else if (view === 'text') {
-                        if (regionTextView) regionTextView.style.display = '';
-                        renderRegionTextView(rid);
-                    }
-                });
-            });
-        }
+        // Render feedback bar above meteogram
+        renderRegionFeedbackBar(rid, initialDate, a);
 
         // Load meteogram for this region
         loadRegionMeteogram(rid);
-    }
-
-    function renderRegionTextView(rid) {
-        var chartEl = document.getElementById('regionTextViewChart');
-        if (!chartEl) return;
-
-        var cached = meteogramCache[rid];
-        if (!cached) {
-            chartEl.innerHTML = '<p style="color:#64748B;text-align:center;padding:20px">Daten werden geladen...</p>';
-            return;
-        }
-
-        var altData = cached.altData;
-        var wxData = cached.wxData;
-        var dates = wxData.dates || [];
-        var activeDate = regionActiveDate[rid]
-            || ((currentDate && dates.indexOf(currentDate) >= 0) ? currentDate : dates[0]);
-        var altDayRaw = altData.data ? altData.data[activeDate] : null;
-        var wxDay = wxData.data ? wxData.data[activeDate] : null;
-        var elevation = wxData.elevation_ref || 0;
-
-        if (!altDayRaw || !altDayRaw.length) {
-            chartEl.innerHTML = '<p style="color:#64748B;text-align:center;padding:20px">Keine H&ouml;henwinddaten</p>';
-            return;
-        }
-
-        var altDay = {
-            profiles: altDayRaw.map(function (entry) {
-                var paddedHour = String(entry.hour).padStart(2, '0');
-                return {
-                    time: activeDate + 'T' + paddedHour + ':00:00',
-                    levels: entry.profiles
-                };
-            })
-        };
-
-        Meteogram.renderTextView(chartEl, wxDay, altDay, {
-            elevation: elevation,
-            spotName: cached.regionName || rid,
-            dateStr: activeDate,
-            source: 'gleitcast-region',
-        });
     }
 
     function loadRegionMeteogram(rid) {
@@ -817,9 +799,6 @@
                     renderMeteogramDay(wxData, altData, d, chartEl);
                     // Update analysis panel
                     updateOverlayAnalysis(rid, d);
-                    // Update text view if visible
-                    var textEl = document.getElementById('regionTextViewChart');
-                    if (textEl && textEl.style.display !== 'none') renderRegionTextView(rid);
                     // Sync navbar
                     window.currentDate = d;
                     var navTabs = document.getElementById('navDayTabs');
@@ -967,9 +946,6 @@
                 var chartEl = document.getElementById('regionMeteogramChart');
                 if (chartEl) renderMeteogramDay(cache.wxData, cache.altData, newDate, chartEl);
             }
-            // Re-render text view if visible
-            var textEl = document.getElementById('regionTextViewChart');
-            if (textEl && textEl.style.display !== 'none') renderRegionTextView(overlayRid);
         }
     });
 

@@ -56,6 +56,8 @@ SELBST-CHECK VOR DER ANTWORT (PFLICHT)
 1. **safe_window-Konsistenz**: Nur Stunden ohne DANGER-Tag duerfen im `safe_window` sein.
 2. **Boeen-Grounding**: Regionen haben **keine** Boeen-Tags (Apr 2026). Erwaehne **niemals** Boeen in `no_go_reasons`, `caution_notes`, `wind_summary` oder `summary` eines Region-Kontextes.
 3. **not_safe nur bei echtem NoGo**: not_safe nur wenn es KEINE sauberen Flugstunden gibt oder ALLE relevanten Stunden von harten Gefahren betroffen sind.
+4. **Begruendung enthalten (Regel 2c)**: Jede Gefahr in `no_go_reasons`/`caution_notes` MUSS im `summary` eine WARUM-Erklaerung haben — abgeleitet aus Datenblock-Fakten (Tag-Kombinationen, Zahlen-Verhaeltnisse, Trend-Muster, Bewoelkungs-%, ΔP, BLH, Hoehenwind-Werte, Scherung). KEINE erfundenen Grosswetterlagen, Fronten oder Druckgebilde. Auch `safe`-Tage brauchen kurze Begruendung warum sicher.
+5. **Trend-Bezug Pflicht falls vorhanden**: Wenn der Datenblock `WIND-TREND` oder Foehn-Aufbau (ΔP steigend) zeigt → MUSS im `summary` als Tagesentwicklung in eigenen Worten erwaehnt werden. Trend-Zeile NICHT wortwoertlich uebernehmen.
 
 ════════════════════════════════════════════��══
 JSON-ANTWORT (REGION SAFETY)
@@ -75,8 +77,8 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
   "wind_calm_count": 0,
   "wind_moderate_count": 0,
   "wind_strong_count": 0,
-  "wind_summary": "Kurze Wind-Zusammenfassung (Staerke, Konsistenz). Regionen: KEINE Boeen — nur Windstaerke und Scherung.",
-  "wind_shear": "Hoehenwind vs. Boden, Scherung, Foehn-Anzeichen. Leer wenn unauffaellig. (Regionen: KEINE Boeen.)",
+  "wind_summary": "3-4 Saetze. Wind-Zusammenfassung (Staerke auf Referenzhoehe, Konsistenz, ggf. Drehung). Regionen: KEINE Boeen — nur Windstaerke und Scherung. Bei vorliegender WIND-TREND-Zeile: Muster nennen (zunehmend / Aufklaerung / stabil) und aus Datenblock-Fakten begruenden (z.B. 'Hoehenwind morgens 18 km/h, ab 13h auf 38 km/h — Nachmittagsverstaerkung'). KEINE Grosswetterlagen erfinden (Regel 2c).",
+  "wind_shear": "2-3 Saetze: Hoehenwind vs. Boden, Scherung mit konkreten Werten, Foehn-Anzeichen aus dem Datenblock. Leer wenn unauffaellig. (Regionen: KEINE Boeen.)",
   "foehn_risk": "none|low|moderate|high",
-  "summary": "AUSFUEHRLICH (3-5 Saetze). PFLICHT: Gefahren mit konkreten Zahlen erlaeutern. Klare Einstufung, Zeitfenster, Empfehlung."
+  "summary": "AUSFUEHRLICH (4-6 Saetze). Satz 1: Einstufung mit Kern-Begruendung aus dem Datenblock. Satz 2-3: Hauptgefahren MIT Ursache aus Datenblock-Fakten (z.B. 'Hoehenwind 42 km/h auf 2500m, Scherung 850 hPa Sued vs. 700 hPa West — Foehn-Hinweis trotz ΔP 5.2'). KEINE Grosswetterlagen, Fronten oder Druckgebilde erfinden (Regel 2c). Satz 4: Tagesentwicklung / Trend — falls Datenblock WIND-TREND oder Foehn-Aufbau zeigt, PFLICHT in eigenen Worten. Satz 5: Sicheres Zeitfenster konkret. Satz 6: Empfehlung. Bei `safe`-Tagen: Begruendung warum sicher (Wind-Werte unter Schwelle, kein Foehn-Druck, ruhige Schichtung). Regionen: NIEMALS Boeen erwaehnen."
 }

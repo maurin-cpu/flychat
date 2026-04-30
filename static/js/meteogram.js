@@ -35,10 +35,13 @@ window.Meteogram = (function () {
     }
 
     // Tier visual tokens (mirror style.css --tier-* — keep in sync).
+    // Danger: heller Rosa-Fill + dunkler Rotton fuer Text/Pfeil → klare Lesbarkeit
+    // (vorher solid red + weisse Zahl war zu schreiend und Wind-Zahl wirkte
+    // irrefuehrend "danger" wenn nur Boeen die Schwelle reissen).
     var TIER_STYLES = {
         calm:    { text: '#047857', fill: 'transparent',             frame: '#F97316' },  // frame = existing orange launch-frame
         caution: { text: '#78350F', fill: 'rgba(245, 158, 11, 0.38)', frame: '#D97706' },
-        danger:  { text: '#FFFFFF', fill: '#E11D48',                 frame: '#BE123C' },
+        danger:  { text: '#9F1239', fill: 'rgba(225, 29, 72, 0.32)',  frame: '#BE123C' },
     };
 
     function tierTextColor(tier) { return TIER_STYLES[tier].text; }
@@ -1250,16 +1253,9 @@ window.Meteogram = (function () {
 
                 var showGusts = hasRealGust;
                 // Pfeilfarbe: Tier-basiert. WrongDir überschreibt mit Rot (Richtungs-Warnung).
-                // Höhen-Zelle danger: kein roter Fill mehr (Tier ueber Perimeter) →
-                // Pfeil rot statt weiss, damit auf hellem/Thermik-Bg sichtbar.
-                var color;
-                if (isWrongDir) {
-                    color = '#DC2626';
-                } else if (windTier === 'danger' && !isGround) {
-                    color = '#9F1239';
-                } else {
-                    color = tierTextColor(windTier);
-                }
+                // Danger = #9F1239 via TIER_STYLES.danger.text — sichtbar auf
+                // hellem rosa Fill (Bodenrow) UND auf weiss/Thermik (Hoehenrow).
+                var color = isWrongDir ? '#DC2626' : tierTextColor(windTier);
                 // Wind-Zahl Farbe: immer Tier-Farbe der Windstärke (nicht Richtung).
                 var speedColor = tierTextColor(windTier);
 
@@ -1370,18 +1366,15 @@ window.Meteogram = (function () {
                 // Erst bei Tag-ueberschreitender Boee (>30 km/h) wird sie farbig
                 // und sticht als Warnung raus.
                 var gustColor = gustTier === 'calm' ? '#64748B' : tierTextColor(gustTier);
-                // Tier-Override fuer Wind/Boeen-Zahl:
-                // - Ground-Row danger: rosa-Fill bleibt → weisse Zahl fuer Kontrast.
-                // - Hoehen-Zelle danger: kein Fill mehr (Tier ueber Perimeter),
-                //   Zahl bleibt rot → auf Thermik mit weissem Halo (textShadow).
-                if (cellTier === 'danger') {
-                    if (isGround) {
-                        speedColor = '#FFFFFF';
-                        gustColor = '#FFFFFF';
-                    } else {
-                        speedColor = '#9F1239';
-                        gustColor = '#9F1239';
-                    }
+                // Tier-Farben kommen direkt aus TIER_STYLES.danger.text (#9F1239).
+                // Speed = windTier-Farbe, Gust = gustTier-Farbe → Pilot sieht
+                // pro Zahl welche Komponente der Treiber ist (Wind vs Boee).
+                // Ausnahme Hoehen-Zelle: wenn cellTier=danger (egal ob Wind oder
+                // Boee), beide Zahlen rot → einheitlicher Danger-Look der Cell
+                // (Hoehen-Zelle hat keinen Fill, Tier ueber Perimeter + Zahl-Farbe).
+                if (cellTier === 'danger' && !isGround) {
+                    speedColor = '#9F1239';
+                    gustColor = '#9F1239';
                 }
                 var windFontSize = Math.round((isNarrow ? 7 : 9) * Math.min(scale, 1.8));
                 // Font-Weight als 3. Tier-Kanal: 400 / 500 / 700.
@@ -1412,10 +1405,12 @@ window.Meteogram = (function () {
                 // Wind-Zahl IMMER OBEN (unter dem Pfeil), Thermik-Zahl IMMER
                 // UNTEN. Konsistenz: Pilot weiss wo welcher Wert sitzt, egal ob
                 // Thermik vorhanden ist oder nicht.
-                // Desktop-Höhengrid: zusätzlich "/Böe" neben Wind, eigene
-                // Tier-Farbe → Pilot sieht Böen-Stärke pro Höhe auf einen Blick.
-                // Mobile/Ground bleiben bei Single-Wert (Ground hat eigene Böen-Row).
-                var showInlineGust = !isMobileViewport && !isGround && hasRealGust;
+                // Desktop: "Wind/Boee" inline in jeder Zelle (auch Bodenrow =
+                // Startplatzhoehe), eigene Tier-Farbe pro Wert → Pilot sieht
+                // pro Hoehe direkt Wind und Boeenstaerke.
+                // Mobile bleibt bei Single-Wert (Cells zu schmal fuer "15/45");
+                // Boeen-Info auf Mobile via Bodenstrip-Boeen-Row.
+                var showInlineGust = !isMobileViewport && hasRealGust;
                 if (showNumbers) {
                     var windText = chartG.append('text').attr('class', 'wind-value')
                         .attr('x', cx).attr('y', windTextY)
@@ -1555,7 +1550,7 @@ window.Meteogram = (function () {
                 // nicht vom showNumbers-Toggle abhängig — der steuert nur die
                 // Zahlen IM Höhengrid. Auto-suppress nur bei zu engen Cells.
                 if (CELL_W >= 16) {
-                    var gTextColor = gWindTier === 'danger' ? '#FFFFFF' : tierTextColor(gWindTier);
+                    var gTextColor = tierTextColor(gWindTier);
                     var gTextWeight = gWindTier === 'danger' ? '700'
                                      : gWindTier === 'caution' ? '600' : '500';
                     chartG.append('text').attr('class', 'ground-value')
@@ -1586,9 +1581,7 @@ window.Meteogram = (function () {
                 }
 
                 if (CELL_W >= 16) {
-                    var gustTextColor = gGustTier === 'danger' ? '#FFFFFF'
-                                      : gGustTier === 'caution' ? tierTextColor(gGustTier)
-                                      : '#475569';
+                    var gustTextColor = gGustTier === 'calm' ? '#475569' : tierTextColor(gGustTier);
                     var gustTextWeight = gGustTier === 'danger' ? '700'
                                        : gGustTier === 'caution' ? '600' : '500';
                     chartG.append('text').attr('class', 'ground-value')
@@ -1988,216 +1981,6 @@ window.Meteogram = (function () {
         }
     }
 
-    // ===== TEXT VIEW =====
-    // Renders ALL meteogram data as a machine-readable JSON document inside a
-    // <pre> block, with stable data-attributes so a browser extension (e.g. the
-    // Claude browser extension) can locate and parse the payload to compare
-    // forecasts (xctherm, etc.) against Gleitcast. No information from the
-    // graphical meteogram is omitted.
-    function renderTextView(container, wxDay, altDay, options) {
-        container.innerHTML = '';
-        options = options || {};
-        var elevation = options.elevation || 0;
-        var spotName = options.spotName || '';
-        var dateStr = options.dateStr || '';
-        var sourceLabel = options.source || 'gleitcast';
-
-        if (!altDay || !altDay.profiles || altDay.profiles.length === 0) {
-            container.innerHTML = '<div class="error-state">Keine Daten fuer diesen Tag.</div>';
-            return;
-        }
-
-        var MIN_HOUR = 6, MAX_HOUR = 18;
-        function hourFromTime(t) { return new Date(t).getHours(); }
-
-        var profiles = altDay.profiles.filter(function (p) {
-            var h = hourFromTime(p.time);
-            return h >= MIN_HOUR && h <= MAX_HOUR;
-        });
-        if (profiles.length === 0) {
-            container.innerHTML = '<div class="error-state">Keine Daten fuer diesen Tag.</div>';
-            return;
-        }
-
-        // Build wxByTime lookup
-        var wxByTime = {};
-        if (wxDay) {
-            ['wind', 'precipitation', 'thermik', 'cloudbase'].forEach(function (key) {
-                (wxDay[key] || []).forEach(function (item) {
-                    var t = item.time;
-                    if (!wxByTime[t]) wxByTime[t] = {};
-                    wxByTime[t][key] = item;
-                });
-            });
-        }
-
-        // Numeric rounding helper that preserves nulls
-        function num(v, decimals) {
-            if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return null;
-            var n = Number(v);
-            if (isNaN(n)) return null;
-            if (decimals == null) return n;
-            var p = Math.pow(10, decimals);
-            return Math.round(n * p) / p;
-        }
-
-        // Build per-hour structured data
-        var hours = profiles.map(function (p) {
-            var t = p.time;
-            var hh = hourFromTime(t);
-            var wx = wxByTime[t] || {};
-            var wind = wx.wind || {};
-            var precip = wx.precipitation || {};
-            var therm = wx.thermik || {};
-            var cb = wx.cloudbase || {};
-
-            var wc = precip.weather_code != null ? precip.weather_code
-                   : (cb.weather_code != null ? cb.weather_code : null);
-
-            // Sort levels ascending by altitude
-            var levels = (p.levels || []).slice().sort(function (a, b) {
-                return (a.altitude || 0) - (b.altitude || 0);
-            });
-            var aloft = levels.map(function (l) {
-                return {
-                    altitude_m: num(l.altitude, 0),
-                    wind_speed_kmh: num(l.wind_speed, 1),
-                    wind_gusts_kmh: num(l.wind_gusts != null ? l.wind_gusts : l.wind_speed, 1),
-                    wind_direction_deg: num(l.wind_direction, 0),
-                    temperature_c: num(l.temperature, 1),
-                    pressure_hpa: num(l.pressure, 0),
-                    turbulence_risk_kmh: num(l.turbulence_risk, 1),
-                    turbulence_excess_kmh: num(l.turbulence_excess, 1)
-                };
-            });
-
-            return {
-                hour: hh,
-                time: t,
-                surface: {
-                    wind_speed_kmh: num(wind.speed, 1),
-                    wind_gusts_kmh: num(wind.gusts, 1),
-                    wind_direction_deg: num(wind.direction, 0),
-                    precipitation_mm: num(precip.amount, 2),
-                    weather_code: wc,
-                    is_thunderstorm: isThunderstorm(wc),
-                    cloud_cover_high_pct: num(cb.cover_high, 0),
-                    cloud_cover_mid_pct: num(cb.cover_mid, 0),
-                    cloud_cover_low_pct: num(cb.cover_low, 0),
-                    cloud_base_m: num(cb.height, 0)
-                },
-                thermal: {
-                    climb_rate_ms: num(therm.climb_rate, 2),
-                    max_height_m: num(therm.max_height, 0),
-                    rating: num(therm.rating, 1),
-                    cape_jkg: num(therm.cape, 0)
-                },
-                aloft: aloft
-            };
-        });
-
-        var payload = {
-            source: sourceLabel,
-            schema_version: 1,
-            spot: spotName || null,
-            elevation_m: num(elevation, 0),
-            date: dateStr || null,
-            timezone: 'Europe/Zurich',
-            generated_at: new Date().toISOString(),
-            units: {
-                wind: 'km/h',
-                altitude: 'm MSL',
-                temperature: 'degC',
-                precipitation: 'mm/h',
-                climb_rate: 'm/s',
-                cape: 'J/kg',
-                pressure: 'hPa',
-                cloud_cover: 'percent',
-                wind_direction: 'deg (meteorological FROM)'
-            },
-            field_descriptions: {
-                'surface.wind_speed_kmh': 'ICON-D2 10m mean wind speed',
-                'surface.wind_gusts_kmh': 'Multi-model max gusts (D2/CH1/CH2), bias-corrected',
-                'aloft.wind_speed_kmh': 'W(z) - raw ICON-D2 model wind at altitude',
-                'aloft.wind_gusts_kmh': 'T(z) - turbulence risk product (W(z) + Gauss-blended excess)',
-                'aloft.turbulence_excess_kmh': 'T(z) - W(z), surface gust excess attenuated with altitude',
-                'thermal.climb_rate_ms': 'Mean column climb rate',
-                'thermal.max_height_m': 'Working ceiling (MSL)',
-                'thermal.rating': '0-10 thermal quality score'
-            },
-            hours: hours
-        };
-
-        var jsonStr = JSON.stringify(payload, null, 2);
-
-        // Wrapper
-        var wrapper = document.createElement('div');
-        wrapper.className = 'mg-text-view';
-
-        // Human-readable header bar
-        var header = document.createElement('div');
-        header.className = 'mg-text-header';
-        var headerParts = [];
-        if (spotName) headerParts.push('<strong>' + spotName + '</strong>');
-        if (dateStr) headerParts.push(dateStr);
-        if (elevation) headerParts.push(Math.round(elevation) + ' m MSL');
-        headerParts.push(profiles.length + ' Stunden &middot; ' + (profiles[0].levels || []).length + ' Druckniveaus');
-        header.innerHTML = headerParts.join(' &middot; ');
-        wrapper.appendChild(header);
-
-        // Action bar with copy button
-        var actions = document.createElement('div');
-        actions.className = 'mg-text-actions';
-
-        var hint = document.createElement('span');
-        hint.className = 'mg-text-hint';
-        hint.textContent = 'Maschinenlesbar (JSON) - fuer Browser-Extension / xctherm-Vergleich';
-        actions.appendChild(hint);
-
-        var copyBtn = document.createElement('button');
-        copyBtn.type = 'button';
-        copyBtn.className = 'mg-text-copy-btn';
-        copyBtn.textContent = 'JSON kopieren';
-        copyBtn.addEventListener('click', function () {
-            var done = function () {
-                var orig = 'JSON kopieren';
-                copyBtn.textContent = 'Kopiert!';
-                setTimeout(function () { copyBtn.textContent = orig; }, 1500);
-            };
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(jsonStr).then(done, function () {
-                    // fallback to legacy selection
-                    var sel = window.getSelection();
-                    var range = document.createRange();
-                    range.selectNodeContents(pre);
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                });
-            } else {
-                var sel = window.getSelection();
-                var range = document.createRange();
-                range.selectNodeContents(pre);
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
-        });
-        actions.appendChild(copyBtn);
-        wrapper.appendChild(actions);
-
-        // <pre> JSON block — extension reads this via data-gleitcast-textview="json"
-        var pre = document.createElement('pre');
-        pre.className = 'mg-text-json';
-        pre.setAttribute('data-gleitcast-textview', 'json');
-        pre.setAttribute('data-gleitcast-source', sourceLabel);
-        if (spotName) pre.setAttribute('data-gleitcast-spot', spotName);
-        if (dateStr) pre.setAttribute('data-gleitcast-date', dateStr);
-        pre.setAttribute('data-gleitcast-hours', String(hours.length));
-        pre.textContent = jsonStr;
-        wrapper.appendChild(pre);
-
-        container.appendChild(wrapper);
-    }
-
     // ===== ANALYSE VIEW =====
     // Pilot-first decision flow: answers "Can I fly?" immediately, then progressively
     // reveals details. Structure:
@@ -2495,7 +2278,6 @@ window.Meteogram = (function () {
         formatDayTabParts: formatDayTabParts,
         buildTabs: buildTabs,
         renderChart: renderChart,
-        renderTextView: renderTextView,
         renderAnalysisView: renderAnalysisView
     };
 })();

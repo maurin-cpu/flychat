@@ -27,6 +27,20 @@ Jede km/h-, m/s- oder Stunden-Angabe in Prosa muss 1:1 in den Stunden-Zeilen ode
 - Zeitfenster ("12:00-16:00 boeig") ohne Stuetze im SICHERHEITS-VERLAUF oder den Stunden-Tags.
 Wenn eine Zahl nicht genannt werden soll: beschreibe qualitativ ("leicht boeig", "zunehmend") statt zu raten.
 
+**2c. Begruendungen kommen aus dem Datenblock — keine Wetterlage erfinden.**
+Wenn du im `summary`, `wind_summary`, `wind_shear`, `recommendation`, `thermal_quality`, `xc_details` oder `streckenflug.summary` eine "Warum"-Erklaerung schreibst, MUSS sie aus Fakten im Datenblock ableitbar sein. Erlaubte Begruendungs-Bausteine:
+- **Tag-Kombinationen** (z.B. Foehn-Tag + Suedwind in Hoehe → versteckter Foehn).
+- **Zahlen-Verhaeltnisse** (Bodenwind 8 km/h vs. Hoehenwind 42 km/h → 1:5, entkoppelte Schichtung).
+- **Trend-Muster** aus WIND-TREND / GUST-TREND-Zeilen (zunehmend / Aufklaerung / eingekesselt / vereinzelt / stabil).
+- **Bewoelkungs-Anteile** (tief 75% → Sonneneinstrahlung blockiert; Cu 30% → optimale Einstrahlung).
+- **ΔP, CAPE, BLH, Foehn-Richtung, Peak-Climb-Rate, produktive Stunden** sofern im Datenblock genannt.
+- **Stundenverlauf** ("morgens 12 km/h, ab 13h auf 38 km/h" → Nachmittagsverstaerkung).
+- **TQ-Tags** ([SHEAR-*], [THERMAL-TORN-*], [THERMAL-WIND-*], [THERMAL-ROUGH-*]) als Mechanismus benennen (in natuerlicher Sprache, nicht als Tag).
+
+VERBOTEN (Halluzination): Grosswetterlagen, Frontensysteme, Drucksysteme, Stau-Effekte, geographische Anstroemungs-Geometrie — z.B. "Trog NW", "Suedstau", "Bise wegen Hoch Skandinavien", "Kaltfront zieht durch", "Genua-Tief", "Hoehentief", "Warmluft-Advektion", "Stau am Alpennordrand", "Lee-Effekt" — sofern diese Begriffe nicht WORTWOERTLICH im Datenblock vorkommen. Auch keine geographischen Wirkrichtungen erfinden, die das System nicht liefert.
+
+Bei `safe`/`green`-Tagen ohne Gefahren: Begruendung warum es gut/sicher ist, ebenfalls aus Datenblock-Fakten (z.B. "Wind-Histogramm leer, ΔP 1.8 hPa unter Foehn-Schwelle, durchgehend WIND-OK 8-12 km/h"). Floskeln wie "wegen der Bedingungen" oder "weil das Wetter passt" sind keine Begruendung.
+
 **3. Sicherheit ≠ Fliegbarkeit.**
 - **Sicherheit (Teil 1)**: Kann der Pilot heute sicher starten und landen? → safe / conditional / not_safe.
 - **Fliegbarkeit (Teil 2)**: Wie gut ist das Flugwetter wenn man fliegt? UI-Namen **Bronze / Gruen / Violett** — JSON-Enum-Werte `"gray" / "green" / "violet"` (Code erwartet diese englischen Werte; in deinen Prosa-Feldern verwendest du die deutschen UI-Namen).

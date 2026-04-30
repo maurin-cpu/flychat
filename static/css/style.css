@@ -1633,6 +1633,21 @@ body.page-fixed-nav {
     color: var(--color-text-secondary);
 }
 
+/* Inline CTA-Hint, sichtbar nur wenn das Aside auf Mobile collapsed ist —
+   macht klar, dass die ganze Headerzeile ein Tap-Target ist. */
+.meteogram-aside-cta {
+    display: none;
+    flex: 1 1 auto;
+    margin: 0 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-primary, #0369a1);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .meteogram-aside-toggle {
     display: none; /* hidden on desktop, shown on mobile */
     width: 28px;
@@ -2256,11 +2271,6 @@ body.page-fixed-nav {
         height: 32px;
     }
 
-    /* View-Tabs kompakter (Meteogramm/Text) */
-    .meteogram-view-tabs {
-        padding: 6px 12px;
-    }
-
     /* Day tabs sollen ohne Scroll auf den Bildschirm passen — gleiche
        Optik wie .floating-day-tabs auf der Karte: Wochentag oben, DD.MM unten. */
     .meteogram-tabs {
@@ -2313,7 +2323,7 @@ body.page-fixed-nav {
         transition: max-height 250ms cubic-bezier(0.4, 0, 0.2, 1);
     }
     .meteogram-aside.collapsed {
-        max-height: 44px;
+        max-height: 56px;
         border-radius: 0;
     }
     .meteogram-main {
@@ -2321,11 +2331,27 @@ body.page-fixed-nav {
         min-height: 0;
         padding-bottom: 0;
     }
+    /* Collapsed-Header bekommt eine deutliche CTA-Optik damit klar wird,
+       dass man hier draufklicken muss um die Analyse zu sehen. */
     .meteogram-aside-header {
-        padding: 10px 16px;
+        padding: 12px 16px;
         cursor: pointer;
         user-select: none;
         -webkit-tap-highlight-color: transparent;
+        min-height: 56px;
+        box-sizing: border-box;
+    }
+    .meteogram-aside.collapsed .meteogram-aside-header {
+        background: var(--color-primary, #0369a1);
+        border-top: none;
+        box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .meteogram-aside.collapsed .meteogram-aside-title {
+        color: #fff;
+    }
+    .meteogram-aside.collapsed .meteogram-aside-cta {
+        display: inline-block;
+        color: rgba(255, 255, 255, 0.9);
     }
     .meteogram-aside-toggle {
         width: 32px;
@@ -2338,12 +2364,20 @@ body.page-fixed-nav {
         font-weight: 700;
         box-shadow: 0 1px 3px rgba(0,0,0,0.15);
         transition: transform 200ms cubic-bezier(0.4,0,0.2,1);
+        flex-shrink: 0;
     }
     .meteogram-aside.collapsed .meteogram-aside-toggle {
         transform: rotate(0deg);
+        background: #fff;
+        color: var(--color-primary, #0369a1);
+        animation: gleitcast-aside-pulse 2.4s ease-in-out 0.4s 2;
     }
     .meteogram-aside:not(.collapsed) .meteogram-aside-toggle {
         transform: rotate(180deg);
+    }
+    @keyframes gleitcast-aside-pulse {
+        0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+        50%      { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.35), 0 1px 3px rgba(0,0,0,0.15); }
     }
     /* Aside-Body bekommt nur dezenten Scrollbar wenn Inhalt überläuft */
     .meteogram-aside-body {
@@ -2355,136 +2389,6 @@ body.page-fixed-nav {
         background: var(--color-border-hover, #cbd5e1);
         border-radius: 2px;
     }
-}
-
-/* ============================================================================
-   VIEW TABS (Meteogramm / Text)
-   ============================================================================ */
-
-.meteogram-view-tabs {
-    display: flex;
-    gap: 2px;
-    padding: 8px 28px 0;
-    background: #fafbfc;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.view-tab {
-    padding: 6px 16px;
-    border: none;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-    color: var(--color-text-muted);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-family: inherit;
-}
-
-.view-tab:hover {
-    color: var(--color-text-light);
-    background: rgba(0, 0, 0, 0.02);
-}
-
-.view-tab.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
-    font-weight: 600;
-}
-
-/* ============================================================================
-   TEXT VIEW (Meteogramm als Tabelle)
-   ============================================================================ */
-
-.mg-text-view {
-    padding: 12px 16px 16px;
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    color: var(--color-text);
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    box-sizing: border-box;
-}
-
-.mg-text-header {
-    font-size: 13px;
-    color: var(--color-text-secondary);
-    padding: 0 0 8px 0;
-    border-bottom: 1px solid var(--color-border);
-    margin-bottom: 8px;
-}
-
-.mg-text-header strong {
-    color: var(--color-text);
-    font-weight: 700;
-}
-
-.mg-text-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 8px;
-}
-
-.mg-text-hint {
-    font-size: 11px;
-    color: var(--color-text-muted);
-    font-style: italic;
-}
-
-.mg-text-copy-btn {
-    appearance: none;
-    border: 1px solid var(--color-border);
-    background: #f8fafc;
-    color: var(--color-text);
-    font-family: inherit;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 5px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
-}
-
-.mg-text-copy-btn:hover {
-    background: #e2e8f0;
-    border-color: #cbd5e1;
-}
-
-.mg-text-copy-btn:active {
-    background: #cbd5e1;
-}
-
-.mg-text-json {
-    flex: 1 1 auto;
-    min-height: 0;
-    margin: 0;
-    padding: 10px 12px;
-    background: #0f172a;
-    color: #e2e8f0;
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', 'Menlo', monospace;
-    font-size: 11px;
-    line-height: 1.45;
-    border-radius: 6px;
-    overflow: auto;
-    white-space: pre;
-    word-break: normal;
-    user-select: text;
-    -webkit-user-select: text;
-    tab-size: 2;
-}
-
-@media (max-width: 639px) {
-    .mg-text-view {
-        padding: 8px 10px 12px;
-    }
-    .mg-text-header { font-size: 12px; }
-    .mg-text-json { font-size: 10px; padding: 8px 10px; }
-    .mg-text-hint { display: none; }
 }
 
 /* ============================================================================
@@ -2905,18 +2809,6 @@ body.page-fixed-nav {
     .mga-window-time { font-size: 14px; }
 }
 
-
-/* Responsive: view tabs + model toggle on mobile */
-@media (max-width: 639px) {
-    .meteogram-view-tabs {
-        padding: 6px 16px 0;
-    }
-    .view-tab {
-        padding: 5px 10px;
-        font-size: 12px;
-    }
-}
-
 /* ============================================================================
    Stale-Banner für Meteogramm (Fix #3: Cache nicht vollständig refresht)
    ============================================================================ */
@@ -3036,8 +2928,12 @@ body.page-fixed-nav {
         display: flex;
     }
 
-    /* Hide navbar links on mobile — navigation is in bottom nav */
-    .navbar-links {
+    /* Hide page links on mobile — navigation is in bottom nav.
+       Avatar/Login button bleibt sichtbar, sonst kein Login/Logout auf Mobile.
+       Wichtig: nur direkte Kinder verstecken, sonst wird auch das Avatar-Dropdown
+       (Einstellungen/Logout sind <a> innerhalb .navbar-menu) ausgeblendet. */
+    .navbar-links > a,
+    .navbar-links > #navFoehnBtn {
         display: none;
     }
 
@@ -3236,12 +3132,6 @@ textarea.chat-input::placeholder {
     touch-action: manipulation;
 }
 
-.view-tab {
-    padding: 10px 16px;
-    min-height: 44px;
-    touch-action: manipulation;
-}
-
 .floating-day-tab {
     padding: 8px 14px;
     min-height: 40px;
@@ -3406,10 +3296,6 @@ body.overlay-open {
         padding: 12px;
     }
 
-    .meteogram-view-tabs {
-        padding: 6px 16px 0;
-    }
-
     /* Resizer wider touch area on mobile */
     .resizer {
         width: 100%;
@@ -3422,3 +3308,152 @@ body.overlay-open {
         height: 4px;
     }
 }
+
+/* ========================================================================
+   Feedback-Widget (Like/Dislike + Kommentar in Analyse-Karten)
+   ======================================================================== */
+
+/* Container oberhalb des Meteogramms (sofort sichtbar, kein Scrollen) */
+.meteogram-feedback-bar {
+    border-bottom: 1px solid var(--color-border);
+    background: linear-gradient(to bottom, #fafbfc, var(--color-surface));
+}
+.meteogram-feedback-bar:empty { display: none; }
+.meteogram-feedback-bar .fb-widget {
+    margin-top: 0;
+    border-top: none;
+    border-radius: 0;
+    padding: 8px 14px;
+}
+
+.fb-widget {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    font-size: var(--text-sm);
+}
+.fb-widget__header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: var(--space-2);
+}
+.fb-widget__title {
+    color: var(--color-text-muted);
+    font-size: 12.5px;
+    font-weight: 500;
+}
+.fb-widget__btns {
+    display: flex; gap: 6px; align-items: center;
+}
+.fb-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 5px 10px;
+    border: 1px solid var(--color-border);
+    background: #fff;
+    color: var(--color-text);
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.2;
+    transition: background .12s, border-color .12s, transform .08s;
+}
+.fb-btn:hover { background: #f8fafc; }
+.fb-btn:active { transform: scale(0.96); }
+.fb-btn__icon { font-size: 14px; line-height: 1; }
+.fb-btn__count { font-size: 11px; color: var(--color-text-muted); min-width: 8px; }
+.fb-btn--up.fb-btn--active {
+    background: #dcfce7; border-color: #16a34a; color: #166534;
+}
+.fb-btn--up.fb-btn--active .fb-btn__count { color: #166534; }
+.fb-btn--down.fb-btn--active {
+    background: #fee2e2; border-color: #dc2626; color: #991b1b;
+}
+.fb-btn--down.fb-btn--active .fb-btn__count { color: #991b1b; }
+.fb-comment__toggle {
+    background: transparent;
+    border: 1px dashed var(--color-border);
+    color: var(--color-text-muted);
+    padding: 5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.fb-comment__toggle:hover { color: var(--color-text); border-color: var(--color-text-muted); }
+
+.fb-widget__status {
+    margin-top: 6px;
+    font-size: 12px;
+    min-height: 14px;
+}
+.fb-widget__status--ok { color: #166534; }
+.fb-widget__status--err { color: #991b1b; }
+
+.fb-comment {
+    display: none;
+    margin-top: var(--space-2);
+}
+.fb-widget--commenting .fb-comment { display: block; }
+
+.fb-saved-comment {
+    display: none;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius-sm, 6px);
+    font-size: 12.5px;
+    color: #166534;
+}
+.fb-saved-comment__icon { font-size: 14px; line-height: 1.4; flex-shrink: 0; }
+.fb-saved-comment__text {
+    flex: 1; line-height: 1.4;
+    word-break: break-word; white-space: pre-wrap;
+}
+.fb-saved-comment__edit {
+    background: transparent; border: none; padding: 0;
+    color: #15803d; cursor: pointer;
+    font-size: 11.5px; text-decoration: underline; flex-shrink: 0;
+}
+.fb-saved-comment__edit:hover { color: #14532d; }
+
+.fb-comment__textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm, 6px);
+    background: #fff;
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 60px;
+}
+.fb-comment__textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+.fb-comment__actions {
+    display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;
+}
+.fb-comment__submit, .fb-comment__cancel {
+    padding: 6px 14px;
+    border-radius: var(--radius-sm, 6px);
+    font-size: 12.5px;
+    cursor: pointer;
+    border: 1px solid var(--color-border);
+}
+.fb-comment__submit {
+    background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+}
+.fb-comment__submit:hover { background: var(--color-primary-vivid); }
+.fb-comment__submit:disabled { opacity: 0.6; cursor: wait; }
+.fb-comment__cancel {
+    background: #fff; color: var(--color-text-muted);
+}
+.fb-comment__cancel:hover { color: var(--color-text); }
+

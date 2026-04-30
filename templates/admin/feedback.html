@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · Feedback – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+<style>
+  .fb-section { margin-top: var(--space-6); }
+  .fb-section h2 {
+    font-size: var(--text-lg); margin: 0 0 var(--space-2);
+    border-left: 3px solid var(--color-primary); padding-left: 10px;
+  }
+  .fb-section__hint {
+    font-size: var(--text-sm); color: var(--color-text-muted);
+    margin: 0 0 var(--space-3);
+  }
+  .fb-pill { display:inline-block; padding:2px 8px; border-radius:999px;
+    font-size:11px; font-weight:600; line-height:1.6; }
+  .fb-pill--up    { background:#e6f5ec; color:#1a7a3e; }
+  .fb-pill--down  { background:#fde8e8; color:#a32020; }
+  .fb-pill--correct { background:#e6f5ec; color:#1a7a3e; }
+  .fb-pill--wrong   { background:#fde8e8; color:#a32020; }
+  .fb-pill--spot   { background:#eef2ff; color:#3b3a9c; }
+  .fb-pill--region { background:#f5edff; color:#6b3aa3; }
+  .fb-comment {
+    white-space: pre-wrap; word-break: break-word;
+    max-width: 380px; font-size: var(--text-sm);
+    color: var(--color-text);
+  }
+  .fb-meta { font-size: 11px; color: var(--color-text-muted); }
+  .fb-filters {
+    display:flex; gap:8px; flex-wrap:wrap;
+    margin: var(--space-2) 0 var(--space-3);
+  }
+  .fb-filter {
+    padding:6px 12px; border-radius:999px; border:1px solid var(--color-border);
+    background:var(--color-surface); color:var(--color-text);
+    text-decoration:none; font-size:12px; font-weight:500;
+  }
+  .fb-filter.is-active {
+    background: var(--color-primary); color:#fff; border-color: var(--color-primary);
+  }
+  .fb-empty {
+    padding: var(--space-4); text-align:center;
+    color: var(--color-text-muted); font-size: var(--text-sm);
+    border: 1px dashed var(--color-border); border-radius: var(--radius-md);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="sp sp--wide">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Admin · Feedback</h1>
+    <div class="sp-subtitle">Drei Quellen · klar getrennt</div>
+  </header>
+
+  <nav style="display:flex;gap:8px;margin:0 0 var(--space-5);flex-wrap:wrap;">
+    <a href="/admin/subscribers" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Subscribers</a>
+    <a href="/admin/feedback" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-primary);background:var(--color-primary);color:#fff;text-decoration:none;font-size:var(--text-sm);font-weight:500;">Feedback</a>
+    <a href="/admin/config" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Konfiguration</a>
+  </nav>
+
+  {% if flash_ok %}
+    <div class="sp-flash sp-flash--ok" role="status">{{ flash_ok }}</div>
+  {% endif %}
+  {% if flash_error %}
+    <div class="sp-flash sp-flash--error" role="alert">{{ flash_error }}</div>
+  {% endif %}
+
+  <!-- ========================================================== -->
+  <!-- SEKTION 1: Spot- & Region-Feedback (NEU)                    -->
+  <!-- ========================================================== -->
+  <section class="fb-section">
+    <h2>Spot- &amp; Region-Feedback</h2>
+    <p class="fb-section__hint">
+      Like/Dislike + Kommentare aus den Analyse-Karten in Karte und Regionen-Übersicht.
+      Anonym (localStorage-Client-ID). Granular: pro Spot/Region und Tag.
+    </p>
+
+    {% if spot_region_stats %}
+    <div class="sp-stats">
+      <div class="sp-stat sp-stat--active">
+        <div class="sp-stat__label">Likes (30d)</div>
+        <div class="sp-stat__value">{{ spot_region_stats.up }}</div>
+      </div>
+      <div class="sp-stat sp-stat--unsubscribed">
+        <div class="sp-stat__label">Dislikes (30d)</div>
+        <div class="sp-stat__value">{{ spot_region_stats.down }}</div>
+      </div>
+      <div class="sp-stat sp-stat--pending">
+        <div class="sp-stat__label">mit Kommentar</div>
+        <div class="sp-stat__value">{{ spot_region_stats.with_comment }}</div>
+      </div>
+      <div class="sp-stat sp-stat--paused">
+        <div class="sp-stat__label">Gesamt (30d)</div>
+        <div class="sp-stat__value">{{ spot_region_stats.total }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="fb-filters">
+      <a class="fb-filter {% if not only_comments and not only_dislikes %}is-active{% endif %}" href="/admin/feedback">Alle</a>
+      <a class="fb-filter {% if only_comments %}is-active{% endif %}" href="/admin/feedback?comments_only=1">Nur mit Kommentar</a>
+      <a class="fb-filter {% if only_dislikes %}is-active{% endif %}" href="/admin/feedback?dislikes_only=1">Nur Dislikes</a>
+    </div>
+
+    <div class="sp-tbl-card">
+      {% if spot_region_list %}
+      <div class="sp-tbl-scroll">
+        <table class="sp-tbl">
+          <thead>
+            <tr>
+              <th>Eingegangen</th>
+              <th>Typ</th>
+              <th>Ziel</th>
+              <th>Tag</th>
+              <th>Vote</th>
+              <th>Kommentar</th>
+              <th>Client</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for f in spot_region_list %}
+            <tr>
+              <td class="sp-tbl__dt">{{ (f.created_at|string)[:16] }}</td>
+              <td><span class="fb-pill fb-pill--{{ f.target_type }}">{{ f.target_type }}</span></td>
+              <td>{{ f.target_id }}</td>
+              <td class="sp-tbl__dt">{{ f.target_date or '—' }}</td>
+              <td>
+                {% if f.vote == 'up' %}<span class="fb-pill fb-pill--up">👍 Like</span>
+                {% elif f.vote == 'down' %}<span class="fb-pill fb-pill--down">👎 Dislike</span>
+                {% else %}<span class="fb-meta">—</span>{% endif %}
+              </td>
+              <td>
+                {% if f.comment %}<div class="fb-comment">{{ f.comment }}</div>
+                {% else %}<span class="fb-meta">—</span>{% endif %}
+              </td>
+              <td>
+                <span class="fb-meta">{{ f.client_id[:10] }}…</span>
+                {% if f.subscriber_id %}<br><span class="fb-meta">sub #{{ f.subscriber_id }}</span>{% endif %}
+              </td>
+              <td>
+                <form method="post" action="/admin/feedback/spot-region/{{ f.id }}/delete"
+                      onsubmit="return confirm('Feedback #{{ f.id }} löschen?');"
+                      style="display:inline;">
+                  <button class="sp-btn sp-btn--danger sp-btn--xs" type="submit" style="width:auto;">Löschen</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="fb-empty">Noch keine Spot/Region-Feedbacks{% if only_comments or only_dislikes %} mit diesem Filter{% endif %}.</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- SEKTION 2: Briefing-Trefferquote                            -->
+  <!-- ========================================================== -->
+  <section class="fb-section">
+    <h2>Briefing-Trefferquote</h2>
+    <p class="fb-section__hint">
+      "War das Briefing korrekt?" — Klick aus dem täglichen E-Mail-Briefing.
+      Bewertet die ganze Tagesvorhersage als korrekt oder falsch.
+    </p>
+
+    {% if briefing_stats %}
+    <section class="sp-card">
+      <div class="sp-card__label">Letzte {{ briefing_stats.window_days }} Tage</div>
+      <div class="sp-fb-card">
+        {% if briefing_stats.accuracy_pct is none %}
+          <div class="sp-fb-card__value sp-fb-card__value--none">—</div>
+          <div class="sp-fb-card__detail">noch keine Feedbacks</div>
+        {% else %}
+          <div class="sp-fb-card__value
+            {% if briefing_stats.accuracy_pct >= 75 %}sp-fb-card__value--good
+            {% elif briefing_stats.accuracy_pct >= 50 %}sp-fb-card__value--mid
+            {% else %}sp-fb-card__value--low{% endif %}">
+            {{ briefing_stats.accuracy_pct }}%
+          </div>
+          <div class="sp-fb-card__detail">
+            {{ briefing_stats.correct }} korrekt · {{ briefing_stats.wrong }} falsch · {{ briefing_stats.total }} gesamt
+          </div>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    <div class="sp-tbl-card">
+      {% if briefing_list %}
+      <div class="sp-tbl-scroll">
+        <table class="sp-tbl">
+          <thead>
+            <tr>
+              <th>Eingegangen</th>
+              <th>Subscriber</th>
+              <th>Briefing-Tag</th>
+              <th>Verdict</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for f in briefing_list %}
+            <tr>
+              <td class="sp-tbl__dt">{{ (f.created_at|string)[:16] }}</td>
+              <td>
+                {% if f.email %}{{ f.email }}{% else %}<span class="fb-meta">—</span>{% endif %}
+                <br><span class="fb-meta">#{{ f.subscriber_id }}</span>
+              </td>
+              <td class="sp-tbl__dt">{{ f.briefing_date }}</td>
+              <td>
+                {% if f.verdict == 'correct' %}<span class="fb-pill fb-pill--correct">✓ korrekt</span>
+                {% else %}<span class="fb-pill fb-pill--wrong">✗ falsch</span>{% endif %}
+              </td>
+              <td>
+                <form method="post" action="/admin/feedback/briefing/{{ f.id }}/delete"
+                      onsubmit="return confirm('Verdict #{{ f.id }} löschen?');" style="display:inline;">
+                  <button class="sp-btn sp-btn--danger sp-btn--xs" type="submit" style="width:auto;">Löschen</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="fb-empty">Noch keine Briefing-Verdicts.</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ========================================================== -->
+  <!-- SEKTION 3: Produkt-Feedback (Freitext)                      -->
+  <!-- ========================================================== -->
+  <section class="fb-section">
+    <h2>Produkt-Feedback</h2>
+    <p class="fb-section__hint">
+      Freitext-Nachrichten aus dem Account-Bereich (eingeloggte Subscriber).
+      Allgemeines Produkt-Feedback, nicht spot- oder tagesgebunden.
+    </p>
+
+    <div class="sp-tbl-card">
+      {% if product_list %}
+      <div class="sp-tbl-scroll">
+        <table class="sp-tbl">
+          <thead>
+            <tr>
+              <th>Eingegangen</th>
+              <th>Subscriber</th>
+              <th>Nachricht</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for f in product_list %}
+            <tr>
+              <td class="sp-tbl__dt">{{ (f.created_at|string)[:16] }}</td>
+              <td>
+                {% if f.email %}{{ f.email }}{% else %}<span class="fb-meta">—</span>{% endif %}
+                <br><span class="fb-meta">#{{ f.subscriber_id }}</span>
+              </td>
+              <td><div class="fb-comment">{{ f.message }}</div></td>
+              <td>
+                <form method="post" action="/admin/feedback/product/{{ f.id }}/delete"
+                      onsubmit="return confirm('Nachricht #{{ f.id }} löschen?');" style="display:inline;">
+                  <button class="sp-btn sp-btn--danger sp-btn--xs" type="submit" style="width:auto;">Löschen</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="fb-empty">Noch keine Produkt-Feedbacks.</div>
+      {% endif %}
+    </div>
+  </section>
+
+</main>
+{% endblock %}

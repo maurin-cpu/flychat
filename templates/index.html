@@ -526,20 +526,16 @@
                     </button>
                     <button class="meteogram-close" id="meteogramClose" aria-label="Schliessen">&times;</button>
                 </div>
-                <!-- View tabs: Meteogramm / Text (Analyse is always visible in aside) -->
-                <div class="meteogram-view-tabs" id="meteogramViewTabs">
-                    <button class="view-tab active" data-view="meteogram">Meteogramm</button>
-                    <button class="view-tab" data-view="text" style="display:none;">Text</button>
-                </div>
                 <div class="meteogram-tabs" id="meteogramTabs" style="display:none;"></div>
+                <div class="meteogram-feedback-bar" id="meteogramFeedback"></div>
                 <div class="meteogram-body">
                     <div class="meteogram-main">
                         <div class="meteogram-chart" id="meteogramChart"></div>
-                        <div class="meteogram-chart" id="textViewChart" style="display:none;"></div>
                     </div>
                     <aside class="meteogram-aside" id="meteogramAside">
                         <div class="meteogram-aside-header">
                             <span class="meteogram-aside-title">Analyse</span>
+                            <span class="meteogram-aside-cta">Tippen zum Aufklappen</span>
                             <button class="meteogram-aside-toggle" id="meteogramAsideToggle" type="button" aria-label="Analyse ein-/ausblenden">&#x25BE;</button>
                         </div>
                         <div class="meteogram-aside-body" id="analyseViewChart"></div>
@@ -560,6 +556,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/foehn_diagram.js') }}?v={{ static_v('js/foehn_diagram.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/feedback.js') }}?v={{ static_v('js/feedback.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/map.js') }}?v={{ static_v('js/map.js') }}"></script>
 {% if is_logged_in %}
 <script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>
@@ -692,13 +689,18 @@ document.addEventListener('DOMContentLoaded', function () {
         // Mobile toggle (Chat / Karte) via bottom nav
         var mobileNav = document.getElementById('mobileNav');
         if (mobileNav && layout) {
-            // Initial view from ?view=map (arriving from another page's mobile nav),
+            // Initial view from ?view=map or ?spot=<name> (deep-link from briefing pin),
             // otherwise default to chat on phone (with mini-map peek)
             var initialView = 'chat';
             try {
-                if (new URLSearchParams(window.location.search).get('view') === 'map') {
+                var qs = new URLSearchParams(window.location.search);
+                if (qs.get('view') === 'map' || qs.get('spot')) {
                     initialView = 'map';
-                    history.replaceState({}, '', window.location.pathname);
+                    if (qs.get('view') === 'map') {
+                        qs.delete('view');
+                        var rest = qs.toString();
+                        history.replaceState({}, '', window.location.pathname + (rest ? '?' + rest : ''));
+                    }
                 }
             } catch (e) { /* ignore */ }
             if (window.innerWidth < 640) {
