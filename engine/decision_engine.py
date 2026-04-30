@@ -403,14 +403,18 @@ def decide_wind_strong_majority(result: dict, label: str) -> Optional[str]:
 # FLYABILITY — Tier-Decisions
 # ════════════════════════════════════════════════════════════════════
 
-def decide_flyability_downgrade(result: dict, tq: dict, label: str) -> Optional[str]:
+def decide_flyability_low_reward(result: dict, tq: dict, label: str) -> Optional[str]:
     """Spot/Region: tier green/violet → gray, wenn Thermik objektiv schwach
-    oder mechanisch unflyable.
+    (= reine Erlebnis-/Reward-Frage, KEINE Sicherheits-Implikation).
 
-    3 Sub-Trigger:
-      - keine Thermik (peak < 0.3 oder thermal_hours_total == 0)
-      - rough_pct > 50 (mehr als die Haelfte ROUGH-UNUSABLE)
-      - productive_thermal_h < PRODUCTIVE_HOURS_DOWNGRADE
+    Sub-Trigger (RATING_CONCEPT v1.3 §9.4 Bruch 1, Aufgespalten von alter
+    `decide_flyability_downgrade`):
+      A) keine Thermik: peak < 0.3 oder thermal_hours_total == 0
+      C) zu wenig produktiv: prod_h < PRODUCTIVE_HOURS_DOWNGRADE (NUR wenn rough_pct ≤ 50)
+
+    Sub-Trigger B (rough_pct > 50, mech. Klapper) ist NICHT hier — siehe
+    `decide_flyability_mech_danger`. Dadurch: low_reward fasst NIE
+    `safety_status` an.
     """
     if not tq:
         return None
@@ -422,24 +426,77 @@ def decide_flyability_downgrade(result: dict, tq: dict, label: str) -> Optional[
     rough_h = tq.get("rough_danger_h", 0)
     peak = tq.get("peak_climb_proxy", 0)
     prod_h = tq.get("productive_thermal_h", 0)
+    rough_pct = (rough_h / max(1, tht)) * 100 if tht else 0
 
-    reason = ""
+    reason_tag = ""
+    reason_text = ""
     if tht == 0 or peak < 0.3:
-        reason = f"keine Thermik (peak={peak:.1f}, hours={tht})"
-    elif tht > 0:
-        rough_pct = (rough_h / max(1, tht)) * 100
-        if rough_pct > 50:
-            reason = f"ROUGH-UNUSABLE={rough_pct:.0f}% ({rough_h}/{tht}h, mech. gefaehrlich)"
-        elif prod_h < config.PRODUCTIVE_HOURS_DOWNGRADE:
-            reason = f"Nur {prod_h}h produktive Thermik (min {config.PRODUCTIVE_HOURS_DOWNGRADE}h)"
+        reason_tag = "no_thermals"
+        reason_text = f"keine Thermik (peak={peak:.1f}, hours={tht})"
+    elif rough_pct <= 50 and prod_h < config.PRODUCTIVE_HOURS_DOWNGRADE:
+        reason_tag = "low_productive"
+        reason_text = f"Nur {prod_h}h produktive Thermik (min {config.PRODUCTIVE_HOURS_DOWNGRADE}h)"
 
-    if not reason:
+    if not reason_tag:
         return None
 
-    logger.info(f"Decision FlyabilityDowngrade fuer {label}: {tier}→gray ({reason})")
+    logger.info(f"Decision FlyabilityLowReward fuer {label}: {tier}→gray ({reason_text})")
     result["fly_status"] = "gray"
     result["flyability_tier"] = "gray"
-    return f"FlyabilityDowngrade({tier}→gray)"
+    return f"FlyabilityLowReward({tier}→gray, {reason_tag})"
+
+
+def decide_flyability_mech_danger(result: dict, tq: dict, label: str) -> Optional[str]:
+    """Spot/Region: ROUGH-UNUSABLE > 50% der Thermikstunden → mechanische
+    Klapper-Gefahr (= SAFETY-Thema, nicht reine Reward-Frage).
+
+    Sub-Trigger B aus alter `decide_flyability_downgrade`. Cross-cutting Update:
+      - Tier wird auf "gray" gesetzt (war Verhalten der alten Funktion)
+      - safety_status wird von "safe" auf "conditional" eskaliert (NEU v1.3)
+      - caution_note "mechanisches Klappern" wird angehaengt (NEU v1.3)
+
+    Begruendung Cross-Cutting (RATING_CONCEPT v1.3 §3.5 Sub-Rating-Symmetrie):
+    Mechanisches Klappern ist objektiv beides — die Thermik wird unbrauchbar
+    (Reward) UND der Pilot bekommt Klapper (Safety). Ein einziger Decide schreibt
+    beide Achsen, statt doppelte Logik in zwei separaten Funktionen.
+
+    MUSS in der Safety-Pipe (vor `decide_is_conditional`) laufen, damit
+    `is_conditional` automatisch via Stage-Inversion auf True gezogen wird.
+    """
+    if not tq:
+        return None
+    tht = tq.get("thermal_hours_total", 0)
+    rough_h = tq.get("rough_danger_h", 0)
+    if tht == 0:
+        return None
+    rough_pct = (rough_h / tht) * 100
+    if rough_pct <= 50:
+        return None
+
+    logger.info(
+        f"Decision FlyabilityMechDanger fuer {label}: "
+        f"ROUGH-UNUSABLE={rough_pct:.0f}% ({rough_h}/{tht}h)"
+    )
+
+    # Tier-Downgrade (cross-cutting — schreibt fly_status obwohl in Safety-Pipe)
+    tier = result.get("flyability_tier") or result.get("fly_status") or ""
+    if tier in ("green", "violet"):
+        result["fly_status"] = "gray"
+        result["flyability_tier"] = "gray"
+
+    # Safety-Eskalation: nur safe → conditional (kein Demote von not_safe)
+    if result.get("safety_status") == "safe":
+        result["safety_status"] = "conditional"
+
+    # Caution-Note (immer, unabhaengig von vorherigem safety_status — der Pilot
+    # soll auch bei not_safe oder bei bereits conditional die Begruendung sehen)
+    cn = result.get("caution_notes", []) or []
+    note = f"Mechanisches Klappern: ROUGH-UNUSABLE in {rough_pct:.0f}% der Thermikstunden"
+    if not any("Klappern" in (n or "") for n in cn):
+        cn.append(note)
+    result["caution_notes"] = cn
+
+    return f"FlyabilityMechDanger({rough_pct:.0f}%)"
 
 
 def decide_flyability_upgrade(result: dict, tq: dict, label: str) -> Optional[str]:

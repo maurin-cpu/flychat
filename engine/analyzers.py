@@ -42,7 +42,8 @@ from engine.decision_engine import (
     decide_wind_ok_zero, decide_aloft_not_safe, decide_aloft_conditional,
     decide_gust_floor, decide_overclaim_relax, decide_is_conditional,
     decide_wind_strong_majority,
-    decide_flyability_downgrade, decide_flyability_upgrade,
+    decide_flyability_low_reward, decide_flyability_mech_danger,
+    decide_flyability_upgrade,
     decide_flyability_region_gate,
 )
 from source_area import (
@@ -1650,7 +1651,9 @@ class AnalyzersMixin:
         # 3. AloftConditional (nur bei status=safe → conditional)
         # 4. GustFloor (nur bei status=safe → conditional)
         # 5. OverclaimRelax (kann not_safe→conditional demoten)
-        # 6. Foehn-Decision (autoritativ: foehn_risk + ggf. Status anheben)
+        # 6. FlyabilityMechDanger (rough_pct>50 → conditional + tier=gray, cross-cutting)
+        # 7. Foehn-Decision (autoritativ: foehn_risk + ggf. Status anheben)
+        # 8. IsConditional (deterministische Ableitung aus safety_status)
         decision_label = f"{name}/{date_str}"
         for fn in (
             decide_wind_ok_zero,
@@ -1662,6 +1665,15 @@ class AnalyzersMixin:
             tag = fn(result, gust_info, decision_label)
             if tag:
                 result.setdefault("_decisions_applied", []).append(tag)
+
+        # FlyabilityMechDanger — Sub-Trigger B aus alter decide_flyability_downgrade,
+        # umgesiedelt in die Safety-Pipe (RATING_CONCEPT v1.3 Vorab-Fix #1). Cross-cutting:
+        # schreibt fly_status=gray UND flippt safety_status auf conditional. Braucht tq
+        # statt gust_info, daher separater Aufruf.
+        tq = self._ctx_tq_cache.get(f"{name}|{date_str}", {})
+        tag = decide_flyability_mech_danger(result, tq, decision_label)
+        if tag:
+            result.setdefault("_decisions_applied", []).append(tag)
 
         # Foehn (eigene Cache-Quelle, daher separat)
         self._apply_foehn_decision(result, f"{name}|{date_str}", label=decision_label)
@@ -1715,13 +1727,15 @@ class AnalyzersMixin:
         _sanitize_llm_result(result)
 
         # Flyability-Decisions (Decision-Engine):
-        # 1. Downgrade green/violet → gray (3 Sub-Trigger: keine Thermik, ROUGH>50%, prod_h zu niedrig)
+        # 1. LowReward green/violet → gray (Sub-Trigger A: keine Thermik, C: prod_h zu niedrig).
+        #    Sub-Trigger B (rough_pct>50, mech. Klapper) ist bereits in der Safety-Pipe als
+        #    decide_flyability_mech_danger ausgefuehrt (RATING_CONCEPT v1.3 Vorab-Fix #1).
         # 2. gray → green Upgrade (Thermik trotz LLM-gray objektiv tragfaehig)
         # 3. Region-Gate violet → green (Spot ohne Region-Konsens)
         tq = self._ctx_tq_cache.get(f"{name}|{date_str}", {})
         decision_label = f"{name}/{date_str}"
         for tag in (
-            decide_flyability_downgrade(result, tq, decision_label),
+            decide_flyability_low_reward(result, tq, decision_label),
             decide_flyability_upgrade(result, tq, decision_label),
             decide_flyability_region_gate(result, region_result, decision_label),
         ):
@@ -1818,7 +1832,9 @@ class AnalyzersMixin:
         # 1. WindStrongMajority (kann not_safe forcieren — region-spezifisch)
         # 2. AloftNotSafe (kann not_safe forcieren)
         # 3. AloftConditional (nur bei status=safe → conditional)
-        # 4. Foehn (autoritativ)
+        # 4. FlyabilityMechDanger (rough_pct>50 → conditional + tier=gray, cross-cutting)
+        # 5. Foehn (autoritativ)
+        # 6. IsConditional (deterministische Ableitung)
         tag = decide_wind_strong_majority(result, decision_label)
         if tag:
             result.setdefault("_decisions_applied", []).append(tag)
@@ -1826,6 +1842,12 @@ class AnalyzersMixin:
             tag = fn(result, region_gust_info, decision_label)
             if tag:
                 result.setdefault("_decisions_applied", []).append(tag)
+
+        # FlyabilityMechDanger (Sub-Trigger B, RATING_CONCEPT v1.3 Vorab-Fix #1)
+        tq = self._ctx_tq_cache.get(f"{rname}|{date_str}", {})
+        tag = decide_flyability_mech_danger(result, tq, decision_label)
+        if tag:
+            result.setdefault("_decisions_applied", []).append(tag)
 
         # Foehn (eigene Cache-Quelle)
         self._apply_foehn_decision(result, f"{rname}|{date_str}", label=decision_label)
@@ -1863,11 +1885,12 @@ class AnalyzersMixin:
 
         _sanitize_llm_result(result)
 
-        # Flyability-Decisions (Region: kein Region-Gate, da Region selbst die Vergleichsbasis)
+        # Flyability-Decisions (Region: kein Region-Gate, da Region selbst die Vergleichsbasis).
+        # MechDanger ist bereits in der Safety-Pipe gelaufen — hier nur LowReward + Upgrade.
         tq = self._ctx_tq_cache.get(f"{rname}|{date_str}", {})
         decision_label = f"{rname}/{date_str}"
         for tag in (
-            decide_flyability_downgrade(result, tq, decision_label),
+            decide_flyability_low_reward(result, tq, decision_label),
             decide_flyability_upgrade(result, tq, decision_label),
         ):
             if tag:

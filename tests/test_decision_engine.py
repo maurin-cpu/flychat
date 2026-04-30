@@ -23,7 +23,8 @@ from engine.decision_engine import (
     decide_overclaim_relax,
     decide_is_conditional,
     decide_wind_strong_majority,
-    decide_flyability_downgrade,
+    decide_flyability_low_reward,
+    decide_flyability_mech_danger,
     decide_flyability_upgrade,
     decide_flyability_region_gate,
 )
@@ -282,25 +283,86 @@ class TestRegionDecisions(unittest.TestCase):
 
 
 class TestFlyabilityDecisions(unittest.TestCase):
-    def test_downgrade_no_thermals(self):
-        result = {"flyability_tier": "green", "fly_status": "green"}
-        tq = {"thermal_hours_total": 0, "rough_danger_h": 0, "peak_climb_proxy": 0, "productive_thermal_h": 0}
-        tag = decide_flyability_downgrade(result, tq, "X/Y")
+    # ── Low-Reward (Sub-Trigger A: keine Thermik, C: zu wenig produktiv) ──
+    def test_low_reward_no_thermals(self):
+        # Sub-Trigger A: peak < 0.3 ODER thermal_hours_total == 0
+        result = {"flyability_tier": "green", "fly_status": "green",
+                  "safety_status": "safe", "caution_notes": []}
+        tq = {"thermal_hours_total": 0, "rough_danger_h": 0,
+              "peak_climb_proxy": 0, "productive_thermal_h": 0}
+        tag = decide_flyability_low_reward(result, tq, "X/Y")
         self.assertEqual(result["flyability_tier"], "gray")
-        self.assertTrue(tag.startswith("FlyabilityDowngrade"))
+        self.assertEqual(result["fly_status"], "gray")
+        # Low-Reward darf safety NICHT anfassen
+        self.assertEqual(result["safety_status"], "safe")
+        self.assertEqual(result["caution_notes"], [])
+        self.assertTrue(tag.startswith("FlyabilityLowReward"))
+        self.assertIn("no_thermals", tag)
 
-    def test_downgrade_rough_majority(self):
-        result = {"flyability_tier": "green", "fly_status": "green"}
-        tq = {"thermal_hours_total": 6, "rough_danger_h": 4, "peak_climb_proxy": 1.5, "productive_thermal_h": 4}
-        tag = decide_flyability_downgrade(result, tq, "X/Y")
+    def test_low_reward_low_productive(self):
+        # Sub-Trigger C: prod_h < threshold, kein Rough-Problem
+        result = {"flyability_tier": "green", "fly_status": "green",
+                  "safety_status": "safe", "caution_notes": []}
+        tq = {"thermal_hours_total": 6, "rough_danger_h": 1,
+              "peak_climb_proxy": 1.5, "productive_thermal_h": 1}
+        tag = decide_flyability_low_reward(result, tq, "X/Y")
         self.assertEqual(result["flyability_tier"], "gray")
-        self.assertTrue(tag.startswith("FlyabilityDowngrade"))
+        self.assertEqual(result["safety_status"], "safe")  # safety unangetastet
+        self.assertTrue(tag.startswith("FlyabilityLowReward"))
+        self.assertIn("low_productive", tag)
 
-    def test_downgrade_skips_when_data_ok(self):
-        result = {"flyability_tier": "green", "fly_status": "green"}
-        tq = {"thermal_hours_total": 6, "rough_danger_h": 1, "peak_climb_proxy": 1.5, "productive_thermal_h": 5}
-        tag = decide_flyability_downgrade(result, tq, "X/Y")
+    def test_low_reward_skips_on_rough_majority(self):
+        # rough_pct > 50 ist mech_danger-Domain, NICHT low_reward
+        result = {"flyability_tier": "green", "fly_status": "green",
+                  "safety_status": "safe", "caution_notes": []}
+        tq = {"thermal_hours_total": 6, "rough_danger_h": 4,
+              "peak_climb_proxy": 1.5, "productive_thermal_h": 4}
+        tag = decide_flyability_low_reward(result, tq, "X/Y")
         self.assertIsNone(tag)
+        self.assertEqual(result["flyability_tier"], "green")  # tier unveraendert
+
+    def test_low_reward_skips_when_already_gray(self):
+        result = {"flyability_tier": "gray", "fly_status": "gray",
+                  "safety_status": "safe", "caution_notes": []}
+        tq = {"thermal_hours_total": 0, "rough_danger_h": 0,
+              "peak_climb_proxy": 0, "productive_thermal_h": 0}
+        tag = decide_flyability_low_reward(result, tq, "X/Y")
+        self.assertIsNone(tag)
+
+    # ── Mech-Danger (Sub-Trigger B: rough_pct > 50, Safety-Achse) ──
+    def test_mech_danger_fires_and_escalates_safety(self):
+        # rough_pct = 4/6 ≈ 67% > 50 → flippt safety + setzt tier=gray
+        result = {"flyability_tier": "green", "fly_status": "green",
+                  "safety_status": "safe", "caution_notes": []}
+        tq = {"thermal_hours_total": 6, "rough_danger_h": 4,
+              "peak_climb_proxy": 1.5, "productive_thermal_h": 4}
+        tag = decide_flyability_mech_danger(result, tq, "X/Y")
+        # Cross-cutting: tier UND safety werden geaendert
+        self.assertEqual(result["flyability_tier"], "gray")
+        self.assertEqual(result["fly_status"], "gray")
+        self.assertEqual(result["safety_status"], "conditional")
+        self.assertTrue(any("Klappern" in n for n in result["caution_notes"]))
+        self.assertTrue(tag.startswith("FlyabilityMechDanger"))
+
+    def test_mech_danger_skips_at_boundary(self):
+        # rough_pct = 50 exakt → kein Trigger (>50 ist Schwelle)
+        result = {"flyability_tier": "green", "fly_status": "green",
+                  "safety_status": "safe", "caution_notes": []}
+        tq = {"thermal_hours_total": 6, "rough_danger_h": 3,
+              "peak_climb_proxy": 1.5, "productive_thermal_h": 4}
+        tag = decide_flyability_mech_danger(result, tq, "X/Y")
+        self.assertIsNone(tag)
+        self.assertEqual(result["safety_status"], "safe")
+
+    def test_mech_danger_preserves_not_safe(self):
+        # Bereits not_safe → mech_danger eskaliert nicht (kein Demote)
+        result = {"flyability_tier": "gray", "fly_status": "gray",
+                  "safety_status": "not_safe", "caution_notes": []}
+        tq = {"thermal_hours_total": 6, "rough_danger_h": 4,
+              "peak_climb_proxy": 1.5, "productive_thermal_h": 4}
+        tag = decide_flyability_mech_danger(result, tq, "X/Y")
+        # Tag wird trotzdem emittiert (caution_note relevant), aber safety bleibt
+        self.assertEqual(result["safety_status"], "not_safe")
 
     def test_upgrade_gray_to_green(self):
         result = {"flyability_tier": "gray", "fly_status": "gray"}
