@@ -93,11 +93,17 @@ Wenn im TAGESPROFIL `→ PRODUKTIVE-THERMIK: Nh` steht:
 CONDITIONAL-FLAG (visuelles Badge)
 ─────────────────────────────────
 
-Setze `is_conditional = true` wenn **eine** dieser Bedingungen zutrifft (bei not_safe oder Bronze immer false):
+**Hinweis (geaendert 2026-04-30, RATING_CONCEPT v1.3 / Vorab-Fix #2)**: Die Decision-Engine setzt `is_conditional` deterministisch in folgenden Faellen — du musst dich darum **nicht** kuemmern:
+- `safety_status == "conditional"` → `is_conditional = true` (automatisch).
+- `safety_status == "not_safe"` → `is_conditional = false` (automatisch).
 
-1. **Foehn-Vorsicht**: Foehn-Indikator = "caution".
-2. **TQ-Tags mittel**: SHEAR/TORN/ROUGH/WIND-UNUSABLE-Stunden 10-50% der Thermikstunden.
-3. **Tiefe Wolkenbasis**: Basis < Startplatzhoehe + 500m UND Bedeckung ≥ 75%.
-4. **Starke Hoehen-Turbulenz**: Turbulenzrisiko deutlich ueber Grundwind in produktiven Hoehen (T > W + 10 km/h).
+Du setzt `is_conditional = true` nur dann selbst, wenn `safety_status = "safe"` ist UND eine der folgenden **Soft-Warnungen** zutrifft (sonst lass es auf `false`):
 
-Das Rating aendert sich durch `is_conditional` NICHT — nur das Flag sorgt fuer einen ⚠ Hinweis im UI. `conditional_reason` = max 1 Satz Begruendung.
+1. **Tiefe Wolkenbasis**: Basis < Startplatzhoehe + 500m UND Bedeckung ≥ 75%.
+2. **Starke Hoehen-Turbulenz**: Turbulenzrisiko deutlich ueber Grundwind in produktiven Hoehen (T > W + 10 km/h).
+
+Diese zwei Trigger erkennt die Engine nicht — nur dein Wetter-Urteil sieht sie. **Bei Bronze (`fly_status="gray"`) gilt weiterhin: `is_conditional = false`** (Bronze ist keine Bedingt-Fliegbar-Situation, sondern Schwach-Tag).
+
+**Frueher** waren auch Foehn-Vorsicht und TQ-Tags 10-50% in dieser Liste — diese werden jetzt von der Decision-Engine ueber `safety_status` abgedeckt (Foehn-Engine setzt `conditional`, Aloft/Gust-Engines auch). Du musst sie nicht mehr selbst flaggen.
+
+Das Rating aendert sich durch `is_conditional` NICHT — nur das Flag sorgt fuer einen ⚠ Hinweis im UI. `conditional_reason` = max 1 Satz Begruendung wenn `is_conditional = true`, sonst leer.

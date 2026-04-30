@@ -21,6 +21,7 @@ from engine.decision_engine import (
     decide_aloft_conditional,
     decide_gust_floor,
     decide_overclaim_relax,
+    decide_is_conditional,
     decide_wind_strong_majority,
     decide_flyability_downgrade,
     decide_flyability_upgrade,
@@ -334,6 +335,76 @@ class TestFlyabilityDecisions(unittest.TestCase):
         result = {"flyability_tier": "violet", "fly_status": "violet"}
         tag = decide_flyability_region_gate(result, None, "X/Y")
         self.assertIsNone(tag)
+
+
+# ════════════════════════════════════════════════════════════════════
+# Vorab-Fix #2: is_conditional deterministisch (RATING_CONCEPT v1.3, A2-Logik)
+# ════════════════════════════════════════════════════════════════════
+# A2-Logik:
+#   - safety_status == "conditional"  → is_conditional = True  (Engine-Override)
+#   - safety_status == "not_safe"     → is_conditional = False (Sanity-Clamp)
+#   - safety_status == "safe"         → LLM behaelt Hand (Trigger 3+4 aus
+#                                       _flyability_tiers.md: Wolkenbasis,
+#                                       Hoehen-Turbulenz)
+class TestIsConditional(unittest.TestCase):
+    def _baseline(self, safety_status="safe", is_cond=False, reason=""):
+        return {
+            "safety_status": safety_status,
+            "is_conditional": is_cond,
+            "conditional_reason": reason,
+        }
+
+    def test_sets_true_when_safety_conditional(self):
+        result = self._baseline(safety_status="conditional", is_cond=False)
+        tag = decide_is_conditional(result, "X/Y")
+        self.assertTrue(result["is_conditional"])
+        self.assertTrue(tag.startswith("IsConditional"))
+
+    def test_keeps_true_when_already_true_and_conditional(self):
+        # LLM hat is_conditional bereits korrekt gesetzt — Decision idempotent
+        result = self._baseline(safety_status="conditional", is_cond=True, reason="Foehn-Vorsicht")
+        tag = decide_is_conditional(result, "X/Y")
+        self.assertTrue(result["is_conditional"])
+        self.assertEqual(result["conditional_reason"], "Foehn-Vorsicht")
+        self.assertIsNone(tag)  # kein Tag — Engine hat nichts geaendert
+
+    def test_clamps_false_on_not_safe(self):
+        # LLM-Fehler: not_safe + is_conditional=True → Engine korrigiert
+        result = self._baseline(safety_status="not_safe", is_cond=True, reason="LLM-Uebermut")
+        tag = decide_is_conditional(result, "X/Y")
+        self.assertFalse(result["is_conditional"])
+        self.assertEqual(result["conditional_reason"], "")
+        self.assertIsNone(tag)  # Clamp emittiert keinen Tag — ist nur Cleanup
+
+    def test_no_change_on_not_safe_when_already_false(self):
+        result = self._baseline(safety_status="not_safe", is_cond=False)
+        tag = decide_is_conditional(result, "X/Y")
+        self.assertFalse(result["is_conditional"])
+        self.assertIsNone(tag)
+
+    def test_safe_preserves_llm_true(self):
+        # Trigger 3 (Wolkenbasis) oder 4 (Hoehen-Turbulenz): safety_status bleibt
+        # safe, aber LLM flaggt Soft-Warnung. Engine darf NICHT ueberschreiben.
+        result = self._baseline(safety_status="safe", is_cond=True, reason="tiefe Wolkenbasis")
+        tag = decide_is_conditional(result, "X/Y")
+        self.assertTrue(result["is_conditional"])
+        self.assertEqual(result["conditional_reason"], "tiefe Wolkenbasis")
+        self.assertIsNone(tag)
+
+    def test_safe_preserves_llm_false(self):
+        result = self._baseline(safety_status="safe", is_cond=False)
+        tag = decide_is_conditional(result, "X/Y")
+        self.assertFalse(result["is_conditional"])
+        self.assertIsNone(tag)
+
+    def test_idempotent_double_run(self):
+        # Zweiter Aufruf darf keine Aenderung mehr emittieren
+        result = self._baseline(safety_status="conditional", is_cond=False)
+        tag1 = decide_is_conditional(result, "X/Y")
+        tag2 = decide_is_conditional(result, "X/Y")
+        self.assertTrue(result["is_conditional"])
+        self.assertTrue(tag1.startswith("IsConditional"))
+        self.assertIsNone(tag2)  # idempotent
 
 
 if __name__ == "__main__":

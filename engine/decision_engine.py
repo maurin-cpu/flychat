@@ -321,6 +321,51 @@ def decide_overclaim_relax(result: dict, gust_info: dict, label: str) -> Optiona
     return f"OverclaimRelax({clean_cnt}h)"
 
 
+def decide_is_conditional(result: dict, label: str) -> Optional[str]:
+    """Setzt `is_conditional` deterministisch basierend auf `safety_status`.
+
+    A2-Logik (RATING_CONCEPT v1.3, Vorab-Fix #2):
+      - safety_status == "conditional"  → is_conditional = True (Engine-Override).
+        Der LLM darf das Flag bei `safe` weiterhin selbst setzen (Soft-Warnungen
+        wie tiefe Wolkenbasis oder Hoehen-Turbulenz, siehe `_flyability_tiers.md`
+        Trigger 3+4) — die Engine ueberschreibt nur fuer conditional + not_safe.
+      - safety_status == "not_safe"     → is_conditional = False (Sanity-Clamp).
+        Korrigiert LLM-Fehler. `conditional_reason` wird ebenfalls geleert.
+      - safety_status == "safe"         → kein Override. LLM behaelt Hand.
+
+    MUSS nach allen safety-aendernden Decisions laufen (Aloft, Gust, Overclaim,
+    Foehn), damit `safety_status` final ist.
+
+    Returns: Tag-String wenn Engine `is_conditional` von False auf True
+    angehoben hat (= meaningful state change), sonst None. Der Clamp-Pfad
+    (not_safe → False) emittiert keinen Tag, da reines Cleanup.
+    """
+    status = result.get("safety_status")
+
+    if status == "conditional":
+        if not result.get("is_conditional"):
+            result["is_conditional"] = True
+            logger.info(
+                f"Decision IsConditional fuer {label}: safety_status=conditional → "
+                f"is_conditional=True (von LLM nicht gesetzt)"
+            )
+            return f"IsConditional({label})"
+        return None  # bereits True — kein Tag, idempotent
+
+    if status == "not_safe":
+        if result.get("is_conditional"):
+            logger.info(
+                f"Decision IsConditional-Clamp fuer {label}: safety_status=not_safe → "
+                f"is_conditional=False erzwungen (LLM hatte True gesetzt)"
+            )
+            result["is_conditional"] = False
+            result["conditional_reason"] = ""
+        return None  # Clamp emittiert keinen Tag — reines Cleanup
+
+    # status == "safe": LLM-Soft-Warnungen (Trigger 3+4) bleiben unangetastet
+    return None
+
+
 # ════════════════════════════════════════════════════════════════════
 # REGION — Safety-Decisions
 # ════════════════════════════════════════════════════════════════════

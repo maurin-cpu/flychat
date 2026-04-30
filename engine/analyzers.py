@@ -40,7 +40,8 @@ from station_observations import StationManager
 from engine.decision_engine import (
     compute_foehn_decision, apply_foehn_decision,
     decide_wind_ok_zero, decide_aloft_not_safe, decide_aloft_conditional,
-    decide_gust_floor, decide_overclaim_relax, decide_wind_strong_majority,
+    decide_gust_floor, decide_overclaim_relax, decide_is_conditional,
+    decide_wind_strong_majority,
     decide_flyability_downgrade, decide_flyability_upgrade,
     decide_flyability_region_gate,
 )
@@ -1665,6 +1666,13 @@ class AnalyzersMixin:
         # Foehn (eigene Cache-Quelle, daher separat)
         self._apply_foehn_decision(result, f"{name}|{date_str}", label=decision_label)
 
+        # is_conditional deterministisch ableiten (A2: conditional/not_safe overriden,
+        # safe laesst LLM-Soft-Warnungen wie tiefe Wolkenbasis durch). MUSS nach Foehn
+        # laufen, damit safety_status final ist.
+        tag = decide_is_conditional(result, decision_label)
+        if tag:
+            result.setdefault("_decisions_applied", []).append(tag)
+
         # Foehn-Richtungs-Strip: bereinigt Summary/wind_summary/wind_shear bei
         # irrelevantem aktivem Foehn (Strukturfelder hat apply_foehn_decision schon erledigt).
         krit_foehn = spot.get("kritischer_foehn", "Süd")
@@ -1821,6 +1829,11 @@ class AnalyzersMixin:
 
         # Foehn (eigene Cache-Quelle)
         self._apply_foehn_decision(result, f"{rname}|{date_str}", label=decision_label)
+
+        # is_conditional deterministisch ableiten (A2-Logik, siehe decision_engine.decide_is_conditional)
+        tag = decide_is_conditional(result, decision_label)
+        if tag:
+            result.setdefault("_decisions_applied", []).append(tag)
 
         # Foehn-Richtungs-Strip: bereinigt Summary-Felder bei irrelevantem aktivem Foehn
         krit_foehn = region.get("kritischer_foehn", "Beide")
