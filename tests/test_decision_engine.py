@@ -28,6 +28,10 @@ from engine.decision_engine import (
     decide_flyability_upgrade,
     decide_flyability_region_gate,
 )
+from engine._common import (
+    _compute_experience_score,
+    _compute_experience_stars,
+)
 
 
 class TestComputeFoehnDecision(unittest.TestCase):
@@ -467,6 +471,64 @@ class TestIsConditional(unittest.TestCase):
         self.assertTrue(result["is_conditional"])
         self.assertTrue(tag1.startswith("IsConditional"))
         self.assertIsNone(tag2)  # idempotent
+
+
+# ════════════════════════════════════════════════════════════════════
+# Vorab-Fix #3: experience_score + experience_stars (RATING_CONCEPT v1.3 §3.2)
+# ════════════════════════════════════════════════════════════════════
+# Skaliert das bestehende 0-10 rating × 10 → 0-100 experience_score, mappt
+# auf 0-5 Sterne via Schwellen aus §8.3 (untere Stufe gewinnt am Grenzwert).
+class TestExperienceScore(unittest.TestCase):
+    # ── Score-Skalierung (rating × 10) ──
+    def test_score_zero_when_rating_zero(self):
+        self.assertEqual(_compute_experience_score(0.0), 0)
+
+    def test_score_75_when_rating_7_5(self):
+        self.assertEqual(_compute_experience_score(7.5), 75)
+
+    def test_score_100_when_rating_10(self):
+        self.assertEqual(_compute_experience_score(10.0), 100)
+
+    def test_score_clamps_negative_and_overflow(self):
+        self.assertEqual(_compute_experience_score(-1.0), 0)
+        self.assertEqual(_compute_experience_score(11.0), 100)
+
+    def test_score_handles_none_and_invalid(self):
+        self.assertEqual(_compute_experience_score(None), 0)
+        self.assertEqual(_compute_experience_score("invalid"), 0)
+
+    # ── Sterne-Schwellen (§8.3, untere Stufe gewinnt) ──
+    def test_stars_zero_at_boundary(self):
+        self.assertEqual(_compute_experience_stars(0), 0)
+        self.assertEqual(_compute_experience_stars(20), 0)  # 20 → 0★
+        self.assertEqual(_compute_experience_stars(21), 1)  # 21 → 1★
+
+    def test_stars_one_to_two_boundary(self):
+        self.assertEqual(_compute_experience_stars(40), 1)  # 40 → 1★
+        self.assertEqual(_compute_experience_stars(41), 2)  # 41 → 2★
+
+    def test_stars_two_to_three_boundary(self):
+        self.assertEqual(_compute_experience_stars(60), 2)  # 60 → 2★
+        self.assertEqual(_compute_experience_stars(61), 3)  # 61 → 3★
+
+    def test_stars_three_to_four_boundary(self):
+        self.assertEqual(_compute_experience_stars(75), 3)  # 75 → 3★ (konservativ)
+        self.assertEqual(_compute_experience_stars(76), 4)  # 76 → 4★
+
+    def test_stars_four_to_five_boundary(self):
+        self.assertEqual(_compute_experience_stars(89), 4)  # 89 → 4★
+        self.assertEqual(_compute_experience_stars(90), 5)  # 90 → 5★
+
+    def test_stars_at_max(self):
+        self.assertEqual(_compute_experience_stars(100), 5)
+
+    # ── Pipeline-Integration: not_safe Rating=0 → Score=0 → Stars=0 ──
+    def test_not_safe_pipeline_yields_zero_stars(self):
+        rating = 0.0  # _compute_rating_from_subratings forciert das bei not_safe
+        score = _compute_experience_score(rating)
+        stars = _compute_experience_stars(score)
+        self.assertEqual(score, 0)
+        self.assertEqual(stars, 0)
 
 
 if __name__ == "__main__":

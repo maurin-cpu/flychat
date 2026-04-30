@@ -62,6 +62,7 @@ from engine._common import (
     _is_permanent_api_error, _user_friendly_api_error,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _TIER_RATING_RANGES, _clamp_rating_to_tier, _compute_rating_from_subratings,
+    _compute_experience_score, _compute_experience_stars,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
     _LABEL_KEYS_NO_GO, _LABEL_KEYS_CONDITIONAL,
@@ -1712,6 +1713,8 @@ class AnalyzersMixin:
                 "region_context_available": False,
             }
             result["rating"] = _compute_rating_from_subratings(result, "", "not_safe")
+            result["experience_score"] = _compute_experience_score(result["rating"])
+            result["experience_stars"] = _compute_experience_stars(result["experience_score"])
             result["is_conditional"] = False
             result["conditional_reason"] = ""
             return result
@@ -1789,6 +1792,11 @@ class AnalyzersMixin:
 
         # Rating + Conditional-Flag
         result["rating"] = _compute_rating_from_subratings(result, final_tier, final_safety)
+        # experience_score / experience_stars (RATING_CONCEPT v1.3 Vorab-Fix #3): kosmetische
+        # Skalierung des bewaehrten 0-10 ratings auf 0-100 + Sterne-Mapping fuer das neue
+        # 2-Achsen-UI. Aendert weder LLM-Output noch andere Cache-Felder.
+        result["experience_score"] = _compute_experience_score(result["rating"])
+        result["experience_stars"] = _compute_experience_stars(result["experience_score"])
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False
@@ -1873,6 +1881,8 @@ class AnalyzersMixin:
             result["fly_status"] = ""
             result["flyability_tier"] = ""
             result["rating"] = _compute_rating_from_subratings(result, "", "not_safe")
+            result["experience_score"] = _compute_experience_score(result["rating"])
+            result["experience_stars"] = _compute_experience_stars(result["experience_score"])
             result["is_conditional"] = False
             result["conditional_reason"] = ""
             return result
@@ -1899,6 +1909,9 @@ class AnalyzersMixin:
         final_tier = result.get("fly_status", result.get("flyability_tier", "gray")) or ""
         final_safety = result.get("safety_status", "")
         result["rating"] = _compute_rating_from_subratings(result, final_tier, final_safety)
+        # experience_score / experience_stars (RATING_CONCEPT v1.3 Vorab-Fix #3)
+        result["experience_score"] = _compute_experience_score(result["rating"])
+        result["experience_stars"] = _compute_experience_stars(result["experience_score"])
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False

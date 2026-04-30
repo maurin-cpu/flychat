@@ -443,6 +443,55 @@ def _compute_rating_from_subratings(result: dict, tier: str, safety_status: str 
     return _clamp_rating_to_tier(tier, raw, safety_status)
 
 
+def _compute_experience_score(rating_0_10) -> int:
+    """Skaliert das bestehende 0-10 `rating` auf 0-100 `experience_score`.
+
+    RATING_CONCEPT v1.3 §3.2: keine neue Formel, nur kosmetische Skalierung
+    des bewaehrten 4-Sub-Rating-Gesamtwertes auf einen breiteren Wertebereich.
+    Bei not_safe wird `rating` bereits auf 0.0 geclampt — `experience_score`
+    landet dann ebenfalls auf 0.
+
+    Akzeptiert None und invalide Werte robust → liefert 0.
+    """
+    try:
+        r = float(rating_0_10)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(100, round(r * 10)))
+
+
+def _compute_experience_stars(score: int) -> int:
+    """Mappt `experience_score` (0-100) auf `experience_stars` (0-5).
+
+    Schwellen aus RATING_CONCEPT v1.3 §8.3 — untere Stufe gewinnt am Grenzwert
+    (konservative Auslegung):
+       0–20  = 0★ (Abgleiter / kein Flug)
+      21–40  = 1★ (kurzer Flug moeglich)
+      41–60  = 2★ (lokaler Flug)
+      61–75  = 3★ (solide Thermik, lokal-XC)
+      76–89  = 4★ (XC moeglich, gute Bedingungen)
+      90–100 = 5★ (Top-Tag, fettes XC-Potential)
+
+    Bei Score-Lücken (z.B. exakt 75 oder 89) faellt der Wert auf die niedrigere
+    Stufe — reduziert Risiko von zu optimistischer Sterne-Vergabe.
+    """
+    try:
+        s = int(score)
+    except (TypeError, ValueError):
+        return 0
+    if s <= 20:
+        return 0
+    if s <= 40:
+        return 1
+    if s <= 60:
+        return 2
+    if s <= 75:
+        return 3
+    if s <= 89:
+        return 4
+    return 5
+
+
 # ============================================================================
 # TAG-NATURAL MAPPING + SANITIZATION (LLM-Output-Cleanup)
 # ============================================================================
