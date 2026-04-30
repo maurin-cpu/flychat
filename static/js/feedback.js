@@ -250,6 +250,12 @@
                     textarea.value = '';
                 }
                 applyResponse(resp);
+                // Nach dem Voten Kommentar-Box auto-öffnen damit klar ist, dass
+                // man nun zusätzlich kommentieren kann (skip wenn Vote entfernt
+                // oder bereits Kommentar vorhanden)
+                if (nextVote && !nextComment && !typedComment) {
+                    setTimeout(openCommentBox, 80);
+                }
             }).catch(function (e) { showError(e.message); });
         }
 

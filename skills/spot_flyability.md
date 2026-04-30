@@ -115,7 +115,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "best_window": "Bestes Zeitfenster innerhalb des sicheren Fensters.",
   "flyability_limits": ["max 3, Format: 'Kategorie: Kerninfo, Zeitbezug'"],
   "highlights": ["max 3, Format: 'Kategorie: Kerninfo, Zeitbezug'"],
-  "recommendation": "3-5 Saetze: ehrliche Erwartung, kein Schoenreden bei schwacher Thermik. Keine internen Tags!",
+  "recommendation": "4-6 Saetze. Satz 1: Erwartung mit Kern-Begruendung (warum dieser Tier — aus Datenblock-Fakten). Satz 2-3: Was limitiert oder boostert die Fliegbarkeit, MIT Ursache aus Datenblock — z.B. 'Peak 2.6 m/s mit BLH 2400m bei tief-Bewoelkung 15% — Sonne erreicht Boden direkt' oder 'schwach: Peak 0.8 m/s, mittel-Wolken 70% daempfen Einstrahlung, max. produktiv 1h zwischen 12-13h'. Satz 4: Tagesverlauf / Trend falls Datenblock zeigt (Verfall ab 16h, Aufbau ab 11h, Bewoelkungs-Zunahme) — PFLICHT wenn vorhanden, in eigenen Worten. Satz 5: bestes Zeitfenster konkret. Satz 6: ehrliche Erwartung — kein Schoenreden bei schwacher Thermik. KEINE Tags, KEINE erfundenen Grosswetterlagen oder Druckgebilde (Regel 2c).",
   "confidence": "high|medium|low",
   "primary_reducer": "Optional: Was drueckt die Fliegbarkeit? EINER der Keys oder null: VIEL_BEWOELKUNG, SCHWACHE_THERMIK, TIEFE_BASIS, KURZES_FLUGFENSTER, KALT, FEUCHT, INVERSION.",
   "primary_booster": "Optional: Was hebt die Fliegbarkeit besonders? EINER der Keys oder null: XC_BEDINGUNGEN, STARKE_THERMIK, HOHE_BASIS, GUTE_EINSTRAHLUNG, RUECKENWIND_XC, STABILE_KALTFRONT, LANGES_FENSTER, KONVERGENZ.",
@@ -128,7 +128,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "streckenflug": {
     "tier": "kein_xc|lokal|moderat|top",
     "rating": 0,
-    "summary": "1-2 Saetze. Synthese Spot+Region. Bei 'top': XC-Potenzial konkret. Bei 'lokal' + Region-Hoehenwind: die Region-Windzahl mit h erwaehnen. Bei fehlendem Region-Kontext: 'Region-Kontext fehlt — reine Spot-Einschaetzung.' Bei 'kein_xc': kurzer Grund.",
+    "summary": "2-3 Saetze. Synthese Spot+Region MIT Datenblock-Begruendung. Bei 'top': XC-Potenzial konkret aus Region-Daten (Region-Peak, ruhige Hoehenwinde, hohe Basis, realistische km aus xc_details). Bei 'lokal' + Region-Hoehenwind: Region-Windzahl mit h erwaehnen ('Region zeigt 3h WIND-WARN auf Referenzhoehe'). Bei fehlendem Region-Kontext: 'Region-Kontext fehlt — reine Spot-Einschaetzung.' Bei 'kein_xc': konkreter Grund aus Datenblock. KEINE erfundenen Anstroemungen.",
     "limiting_factor": "none|spot_not_flyable|spot_wind_direction|region_wind_aloft|weak_regional_thermals|ceiling_low|abgleiter_only",
     "region_context_available": true
   }

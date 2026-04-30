@@ -49,6 +49,8 @@ SELBST-CHECK VOR DER ANTWORT (PFLICHT)
 2. **Thermik-Realitaets-Check**: Keine nutzbare Thermik im Fenster → fly_status = `"gray"` (Bronze).
 3. **PRODUKTIVE-THERMIK-Zahl pruefen**: Wenn `→ PRODUKTIVE-THERMIK: Nh` steht und N < 2 → fly_status MUSS `"gray"` (Bronze) sein. N >= 4 → Gruen/Violett moeglich.
 4. **Boeen-Grounding**: Regionen haben **keine** Boeen-Tags. Erwaehne **niemals** Boeen.
+5. **Begruendung enthalten (Regel 2c)**: Jede Aussage in `thermal_quality`, `xc_details`, `recommendation` MUSS aus Datenblock-Fakten begruendet sein (Peak-Climb, BLH, Bewoelkungs-%, TQ-Tags wie SHEAR/THERMAL-TORN/THERMAL-WIND als Mechanismus, produktive Stunden). KEINE erfundenen Grosswetterlagen, Fronten oder Druckgebilde. Floskeln wie "wegen der Bedingungen" sind keine Begruendung.
+6. **Trend-Bezug Pflicht falls vorhanden**: Datenblock-Trends (Thermik-Verfall, Aufbau, Bewoelkungszunahme, Wind-Verschlechterung in Flugschicht) im `recommendation` als Tagesverlauf in eigenen Worten erwaehnen.
 
 ═══════════════════════════════════════════════
 JSON-ANTWORT (REGION FLYABILITY)
@@ -65,14 +67,14 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
   "fly_status": "gray|green|violet",
   "flight_type": "Thermikflug|Soaring|Soaring+Thermik|Abgleiter",
   "flight_duration_estimate": "z.B. '2-3h Thermikflug' oder '30min Abgleiter'",
-  "thermal_quality": "Peak m/s, Arbeitshoehe, Qualitaet in natuerlicher Sprache.",
+  "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet in natuerlicher Sprache MIT Begruendung aus Datenblock-Fakten (Bewoelkungs-%, BLH, produktive Stunden, TQ-Tags wie SHEAR/THERMAL-TORN/THERMAL-WIND als Mechanismus). KEINE Grosswetterlagen erfinden (Regel 2c).",
   "peak_climb_rate": 0.0,
   "xc_potential": "high|moderate|low",
-  "xc_details": "1-2 Saetze. Bei low: warum.",
+  "xc_details": "2-3 Saetze. Bei `low`/`moderate`: PFLICHT konkrete Begruendung aus Datenblock — was limitiert (Peak < X m/s, BLH zu tief, Hoehenwind, Bewoelkung, Scherung). Bei `high`: wovon profitiert (Region-Peak, ruhiger Hoehenwind, hohe Basis, lange produktive Phase). KEINE erfundenen Anstroemungen.",
   "best_window": "Bestes Zeitfenster innerhalb des sicheren Fensters.",
   "flyability_limits": ["max 3, Format: 'Kategorie: Kerninfo, Zeitbezug'"],
   "highlights": ["max 3, Format: 'Kategorie: Kerninfo, Zeitbezug'"],
-  "recommendation": "3-5 Saetze: ehrliche Erwartung, keine internen Tags!",
+  "recommendation": "4-6 Saetze. Satz 1: Erwartung mit Kern-Begruendung (warum dieser Tier — aus Datenblock-Fakten). Satz 2-3: Was limitiert oder boostert die Fliegbarkeit, MIT Ursache aus Datenblock-Fakten (Peak-Wert, BLH, Bewoelkungs-%, TQ-Mechanismus). Satz 4: Tagesverlauf / Trend falls Datenblock zeigt (Verfall, Aufbau, Bewoelkungs-Zunahme) — PFLICHT wenn vorhanden, in eigenen Worten. Satz 5: bestes Zeitfenster konkret. Satz 6: ehrliche Erwartung — kein Schoenreden. KEINE Tags, KEINE erfundenen Grosswetterlagen oder Druckgebilde (Regel 2c).",
   "confidence": "high|medium|low",
   "primary_reducer": "Optional: EINER der Keys oder null: VIEL_BEWOELKUNG, SCHWACHE_THERMIK, TIEFE_BASIS, KURZES_FLUGFENSTER, KALT, FEUCHT, INVERSION.",
   "primary_booster": "Optional: EINER der Keys oder null: XC_BEDINGUNGEN, STARKE_THERMIK, HOHE_BASIS, GUTE_EINSTRAHLUNG, RUECKENWIND_XC, STABILE_KALTFRONT, LANGES_FENSTER, KONVERGENZ.",
