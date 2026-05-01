@@ -56,6 +56,9 @@
       </td>
       <td align="right" valign="middle" style="white-space:nowrap;padding-left:12px;">
         {% if verdict.spot %}
+        {% if verdict.spot.stars and verdict.spot.stars > 0 %}
+        <span style="display:inline-block;font-size:13px;letter-spacing:1px;color:{{ verdict.day.tier_color }};vertical-align:middle;margin-right:6px;">{% for _ in range(verdict.spot.stars) %}&#9733;{% endfor %}</span>
+        {% endif %}
         <span style="display:inline-block;font-size:24px;font-weight:800;color:{{ verdict.day.tier_color }};font-variant-numeric:tabular-nums;line-height:1;">
           {{ verdict.spot.rating_display }}
         </span>
@@ -170,6 +173,7 @@
                     </span>
                   </td>
                   <td valign="middle" align="right" style="white-space:nowrap;">
+                    {% if s.stars and s.stars > 0 %}<span style="font-size:9px;letter-spacing:0.5px;color:{{ s.tier_color }};margin-right:4px;opacity:0.85;">{% for _ in range(s.stars) %}&#9733;{% endfor %}</span>{% endif %}
                     <span class="ds-chip-rating" style="font-size:13px;font-weight:800;color:{{ s.tier_color }};font-variant-numeric:tabular-nums;letter-spacing:-0.02em;line-height:1;">
                       {{ s.rating_display }}
                     </span>
