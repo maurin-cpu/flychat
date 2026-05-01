@@ -92,13 +92,6 @@
         if (s === 'not_safe')    return 'red';
         return 'no_data';
     }
-    function starsGlyph(n) {
-        n = Math.max(0, Math.min(5, n || 0));
-        var html = '';
-        for (var i = 0; i < n; i++) html += '\u2605';
-        return html;
-    }
-
     // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §4.3) =====
     // 4 Farben rein nach safety_band — gleiche Hex-Werte wie Spot-Marker.
     // Rot + grau bekommen dashed border (Sperr-Visualisierung).
@@ -200,10 +193,9 @@
         return '#6b7280'; // no_data fallback
     }
 
-    // Region-Label im Polygon-Centroid: dezent, weiss, sanfter Schatten.
-    // - red:                     weisses Kreuz
-    // - safe/conditional + n>=1: Zahl 1-5
-    // - sonst:                   nichts (Polygon-Farbe reicht, Daten fehlen)
+    // Region-Label im Polygon-Centroid: konsistente Glas-Pille (rund) fuer
+    // alle Baender — gleicher Aufbau, nur Ring-Farbe + Inhalt unterscheidet
+    // sich. Family-Look statt zwei verschiedene Stile.
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
         var band = (safety === 'safe')        ? 'green' :
@@ -218,47 +210,43 @@
         } else if (n >= 1) {
             label = String(n);
         } else {
-            // safe/conditional ohne berechnete Stars — Pille mit "—",
-            // damit User sieht: Region wurde analysiert, Rating noch nicht ableitbar
             label = '\u2013';
         }
 
-        // Pille: weisser Glas-Hintergrund + farbiger Rand + Zahl in Safety-Farbe.
-        // Klar lesbar ueber jedem Polygon-Hintergrund, sauberer als nackte Schrift.
+        // Einheitliche Palette: weisse Glas-Pille + farbiger Ring + farbiger Text.
+        // Bei red: gleicher Aufbau, nur roter Ring + rotes Kreuz drin.
         var palette = {
-            green: { color: '#15803d', border: '#22c55e' },
-            amber: { color: '#92400e', border: '#f59e0b' },
-            red:   { color: '#fff',    border: '#dc2626', bg: '#dc2626' }  // bei red: Vollfarbe
+            green: { ink: '#166534', ring: '#22c55e' },
+            amber: { ink: '#92400e', ring: '#f59e0b' },
+            red:   { ink: '#991b1b', ring: '#ef4444' }
         };
         var p = palette[band];
-        var bg = p.bg || 'rgba(255,255,255,0.92)';
-        var color = p.color;
-
-        var fontSize = zoom < 7 ? 16 : zoom < 9 ? 20 : 24;
-        var pad = fontSize * 0.45;
-        var minW = fontSize * 1.6;
+        // Runde Pille (Kreis): weil Inhalt einstellig (Zahl/Kreuz/Strich)
+        var size = zoom < 7 ? 30 : zoom < 9 ? 36 : 42;
+        var fontSize = Math.round(size * 0.5);
         var html = '<div style="'
-            + 'display:inline-flex;'
+            + 'width:' + size + 'px;'
+            + 'height:' + size + 'px;'
+            + 'display:flex;'
             + 'align-items:center;'
             + 'justify-content:center;'
-            + 'min-width:' + minW + 'px;'
-            + 'height:' + (fontSize + pad * 2) + 'px;'
-            + 'padding:0 ' + pad + 'px;'
-            + 'background:' + bg + ';'
-            + 'border:2px solid ' + p.border + ';'
-            + 'border-radius:999px;'
-            + 'box-shadow:0 2px 6px rgba(0,0,0,0.18);'
+            + 'background:rgba(255,255,255,0.9);'
+            + '-webkit-backdrop-filter:blur(6px);'
+            + 'backdrop-filter:blur(6px);'
+            + 'border:1.5px solid ' + p.ring + ';'
+            + 'border-radius:50%;'
+            + 'box-shadow:0 1px 3px rgba(0,0,0,0.12), 0 0 0 4px rgba(255,255,255,0.35);'
             + 'pointer-events:none;'
             + 'font-size:' + fontSize + 'px;'
-            + 'font-weight:800;'
+            + 'font-weight:700;'
             + 'line-height:1;'
-            + 'color:' + color + ';'
+            + 'color:' + p.ink + ';'
             + 'font-variant-numeric:tabular-nums;'
+            + 'letter-spacing:-0.02em;'
             + '">' + label + '</div>';
-        // Container groesser als Pille — Leaflet anchor in Polygon-Mitte
-        var w = minW + pad * 2 + 4;
-        var h = fontSize + pad * 2 + 4;
-        return { html: html, size: [w, h], anchor: [w / 2, h / 2] };
+        // Container etwas grosser fuer den Halo-Schatten
+        var box = size + 10;
+        return { html: html, size: [box, box], anchor: [box / 2, box / 2] };
     }
     // Mini-Helper fuer Label-Text (escHtml ist erst spaeter definiert)
     function escHtmlSafe(s) {
@@ -425,6 +413,12 @@
                 ev.target.setStyle({ fillOpacity: ev.target._baseFillOpacity || baseOpacity });
             });
 
+            // Stars muss VOR buildRegionLabel berechnet sein — mit `var` waere sie
+            // zwar hoisted, aber `undefined`, sodass das Label in den En-Dash-Fallback
+            // fallen wuerde (Pille zeigt "–" statt Rating-Zahl).
+            var stars = getStars(dayData);
+            var expScore = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
+
             // Center-Label — Region-Name + Sterne (RATING_CONCEPT v1.3 §4.3).
             var bounds = layer.getBounds();
             var center = bounds.getCenter();
@@ -442,14 +436,11 @@
                 }));
             }
 
-            // Tooltip — RATING_CONCEPT v1.3: Sterne + Score statt Tier-Wort
-            var stars = getStars(dayData);
-            var expScore = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
+            // Tooltip — Zahl + Score (konsistent zu Pille auf Polygon, keine Sterne)
             var tipHtml = '<b>' + layer.regionName + '</b>';
             tipHtml += '<br><span style="color:' + style.labelColor + ';">' + style.safetyLabel + '</span>';
             if (stars > 0) {
-                tipHtml += ' · <span style="color:' + style.labelColor + ';letter-spacing:1px;">'
-                    + starsGlyph(stars) + '</span> ' + stars + (stars === 1 ? ' Stern' : ' Sterne');
+                tipHtml += ' · <b>Rating ' + stars + '/5</b>';
                 if (expScore !== null) tipHtml += ' (' + expScore + '/100)';
             }
             layer.setTooltipContent(tipHtml);
