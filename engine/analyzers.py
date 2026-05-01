@@ -1017,11 +1017,38 @@ class AnalyzersMixin:
                 })
             region_entries.sort(key=lambda e: e["rating"], reverse=True)
 
+            regions_meteo = []
+            for rid, days in self.region_analyses.items():
+                entry = days.get(date_str)
+                if not entry:
+                    continue
+                safety = entry.get("safety", {})
+                cn = safety.get("caution_notes", entry.get("caution_notes", []))
+                if isinstance(cn, str):
+                    try:
+                        cn = json.loads(cn)
+                    except Exception:
+                        cn = [cn] if cn else []
+                if not isinstance(cn, list):
+                    cn = []
+                regions_meteo.append({
+                    "region_id": rid,
+                    "region_name": entry.get("region_name",
+                                            region_by_id.get(rid, {}).get("region", rid)),
+                    "fly_status": entry.get("fly_status", "")
+                                  or entry.get("flyability", {}).get("fly_status", ""),
+                    "safety_status": safety.get("safety_status", entry.get("safety_status", "")),
+                    "foehn_risk": safety.get("foehn_risk", entry.get("foehn_risk", "none")),
+                    "wind_summary": safety.get("wind_summary", entry.get("wind_summary", "")),
+                    "caution_notes": cn,
+                })
+
             days_data.append({
                 "date": date_str,
                 "weekday": _weekday_de(datetime.fromisoformat(date_str)),
                 "top_spots": spot_entries,
                 "top_regions": region_entries[:10],
+                "regions_meteo": regions_meteo,
                 "counts": {
                     "spots_total": sum(1 for days in self.spot_analyses.values() if date_str in days),
                     "spots_flyable": len(spot_entries),
