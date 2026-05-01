@@ -8,7 +8,7 @@ Der User-Block liefert dir drei Zonen: **Stunden-Zeilen**, **Drucklevel-Werte** 
 A) STUNDEN-ZEILEN (Bodendaten + Tags)
 ─────────────────────────────────
 
-Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE, Wolkenbasis — und eine Liste von **Tags** in eckigen Klammern. Im Spot-Kontext enthaelt die Zeile zusaetzlich Boeen (Turbulenzrisiko). Im Region-Kontext gibt es **keine Boeen-Werte** (Apr 2026 Refactor) — nur Windstaerke.
+Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE, Wolkenbasis — und eine Liste von **Tags** in eckigen Klammern. Im Spot-Kontext enthaelt die Zeile zusaetzlich Boeen (Turbulenzrisiko). Im Region-Kontext gibt es **keine Boeen-Werte** — nur Windstaerke.
 
 **Harte No-Go-Tags = DANGER-Level** (Stunde wird UNFLIEGBAR, gehoert NIEMALS ins safe_window):
 - `[RAIN-WARN]` — Niederschlag ≥ 0.05 mm/h
@@ -29,14 +29,14 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 
 **Richtungs-Tags (Spot-Modus) — Start-Bedingung, KEINE Flug-Gefahr:**
 - `[WIND-OK]` — Windrichtung liegt im erlaubten Spot-Sektor (inkl. 10° Buffer) → Start moeglich.
-- `[WIND-WRONG]` — Windrichtung ausserhalb des Spot-Sektors → **Stunde nicht startbar** (NICHT UNFLIEGBAR). Stunden NACH einem gueltigen Start-Fenster sind kein Sicherheitsproblem (Pilot ist in der Luft, Landung separat). Details: `_hazard_blocks.md` Block 2 Start-Fenster-Regel.
+- `[WIND-WRONG]` — Windrichtung ausserhalb des Spot-Sektors → **Stunde nicht startbar** (NICHT UNFLIEGBAR). Stunden NACH einem gueltigen Start-Fenster sind kein Sicherheitsproblem (Pilot ist in der Luft, Landung separat). Details: `_hazards_*.md` Block 2 Start-Fenster-Regel.
 
 **Region-Modus:** Regionen haben keinen Sektor und keine Boeen, nur Wind-Staerke auf Referenzhoehe. Tags sind dieselben wie bei Spots:
 - Kein Tag (Wind < {{cfg.WIND_WARN_KMH}} km/h) → RUHIG
 - `[WIND-WARN]` — Wind {{cfg.WIND_WARN_KMH}}-{{cfg.WIND_DANGER_KMH}} km/h → SPORTLICH
 - `[WIND-DANGER]` — Wind > {{cfg.WIND_DANGER_KMH}} km/h → UNFLIEGBAR
 
-**Stunden-Klassifikation** (siehe KERNREGEL in `_hazard_blocks.md`) — **zwei unabhaengige Achsen**:
+**Stunden-Klassifikation** (siehe KERNREGEL in `_hazards_*.md`) — **zwei unabhaengige Achsen**:
 
 *Achse 1 — Flug-Gefahr (betrifft Pilot in der Luft):*
 - `RUHIG` = KEINE Tags = komfortabel.
@@ -81,7 +81,7 @@ Hier hat das System bereits alles gezaehlt und geflagged:
 - `→ BOEEN-FLOOR: MINDEST-STATUS = 'conditional'` oder `'not_safe'` — vom System **erzwungener** Mindeststatus (nicht verhandelbar!) *(nur Spots)*
 - `→ ACHTUNG Verhaeltnis < 35%: ...` — optionaler Warnhinweis
 - `THERMIK-QUALITAET-Block`: Zaehler fuer SHEAR/TORN/ROUGH-UNUSABLE-Stunden + TQ-Ratio pro Stunde (Regionen: kein ROUGH)
-- **Trend-Labels (falls vorhanden):** AUFKLAERUNG / ZUNEHMEND / EINGEKESSELT / DURCHGEHEND (WARN/DANGER) / VEREINZELT / STABIL — vollstaendige Definitionen siehe TREND-VOKABULAR in `_hazard_blocks.md`. Wende sie pro Gefahrenblock an (Regen, Wind, Boeen, CAPE, Wolken). Foehn ist ausgenommen (severity-pauschal, kein Trend).
-- **Eigene Trend-Zeilen:** Direkt nach TAGESPROFIL koennen `NIEDERSCHLAG-TREND`, `GUST-TREND` (nur Spots) und `WIND-TREND` stehen. `WIND-TREND` umfasst Bodenwind UND Hoehenwind summiert (gleiche Schwellen WARN/DANGER), `GUST-TREND` umfasst Boden- und Hoehenboeen summiert. Sie liefern dir das **Muster** (z.B. AUFKLAERUNG, ZUNEHMEND, DURCHGEHEND_DANGER) und die **Fakten** (Stunden, Zeitpunkte). Sie sind PFLICHT-Input fuer deinen Status. Den Status leitest du aus dem Muster ab (Mapping siehe `_hazard_blocks.md` Block 4 fuer Wind, Block 3 fuer Boeen, TREND-VOKABULAR fuer den Rest) — nicht aus einem mitgelieferten Satz, denn die Trend-Zeile enthaelt **keine fertigen Handlungs-Saetze** zum Abschreiben.
+- **Trend-Labels (falls vorhanden):** AUFKLAERUNG / ZUNEHMEND / EINGEKESSELT / DURCHGEHEND (WARN/DANGER) / VEREINZELT / STABIL — vollstaendige Definitionen siehe TREND-VOKABULAR in `_hazards_*.md`. Wende sie pro Gefahrenblock an (Regen, Wind, Boeen, CAPE, Wolken). Foehn ist ausgenommen (severity-pauschal, kein Trend).
+- **Eigene Trend-Zeilen:** Direkt nach TAGESPROFIL koennen `NIEDERSCHLAG-TREND`, `GUST-TREND` (nur Spots) und `WIND-TREND` stehen. `WIND-TREND` umfasst Bodenwind UND Hoehenwind summiert (gleiche Schwellen WARN/DANGER), `GUST-TREND` umfasst Boden- und Hoehenboeen summiert. Sie liefern dir das **Muster** (z.B. AUFKLAERUNG, ZUNEHMEND, DURCHGEHEND_DANGER) und die **Fakten** (Stunden, Zeitpunkte). Sie sind PFLICHT-Input fuer deinen Status. Den Status leitest du aus dem Muster ab (Mapping siehe `_hazards_*.md` Block 4 fuer Wind, Block 3 fuer Boeen, TREND-VOKABULAR fuer den Rest) — nicht aus einem mitgelieferten Satz, denn die Trend-Zeile enthaelt **keine fertigen Handlungs-Saetze** zum Abschreiben.
 
 **Deine Pflicht:** Diese Werte lesen, nicht selber berechnen. Wenn BOEEN-FLOOR steht, ist das verbindlich. Wenn "Verhaeltnis < 35%" steht, MUSS das in `caution_notes` oder `no_go_reasons`.

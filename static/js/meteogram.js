@@ -1110,17 +1110,6 @@ window.Meteogram = (function () {
                     .attr('width', CELL_W - 2).attr('height', cellH - 2)
                     .attr('fill', bgColor).attr('rx', 3).attr('opacity', 0.8);
 
-                // Mobile: nur Farbe, keine Zahl — Steigrate via Farbcode + Tooltip.
-                if (!isMobileViewport) {
-                    // Thermik-Zahl gleich gross wie Wind-Zahl (siehe windFontSize).
-                    var thermFontSize = Math.round((isNarrow ? 7 : 9) * Math.min(scale, 1.8));
-                    chartG.append('text').attr('class', 'therm-value')
-                        .attr('x', ci * CELL_W + CELL_W / 2)
-                        .attr('y', rowY(ri) + cellH - 4 * scale)
-                        .style('font-size', thermFontSize + 'px')
-                        .text(localRate.toFixed(1));
-                }
-
                 thermikCells[ri + ',' + ci] = localRate;
             }
         });

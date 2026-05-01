@@ -468,19 +468,29 @@ def _compute_safety_rating(result: dict) -> float:
     Defaults bei fehlenden / invaliden Feldern: 5 (analog Fliegbarkeits-
     Sub-Ratings).
     """
-    def _clamp(v, lo, hi):
+    # Sub-Rating <=0 oder nicht-numerisch ist "nicht bewertbar" (z.B. Regionen
+    # haben keine Gust-Daten → Skill-Schema laesst gust_safety_rating auf 0).
+    # Solche Werte werden aus dem Weakest-Link-Min ausgeschlossen, sonst
+    # wuerde ein "kein Datenmaterial"-Wert den Tag als unsicher markieren.
+    def _maybe(v):
         try:
-            v = float(v)
+            f = float(v)
         except (TypeError, ValueError):
-            v = 5.0
-        return max(lo, min(hi, v))
+            return None
+        if f <= 0:
+            return None
+        return max(1.0, min(10.0, f))
 
-    wind    = _clamp(result.get("wind_safety_rating", 5),    1, 10)
-    gust    = _clamp(result.get("gust_safety_rating", 5),    1, 10)
-    aloft   = _clamp(result.get("aloft_safety_rating", 5),   1, 10)
-    foehn   = _clamp(result.get("foehn_safety_rating", 5),   1, 10)
-    weather = _clamp(result.get("weather_safety_rating", 5), 1, 10)
-    return round(min(wind, gust, aloft, foehn, weather), 1)
+    vals = [v for v in (
+        _maybe(result.get("wind_safety_rating")),
+        _maybe(result.get("gust_safety_rating")),
+        _maybe(result.get("aloft_safety_rating")),
+        _maybe(result.get("foehn_safety_rating")),
+        _maybe(result.get("weather_safety_rating")),
+    ) if v is not None]
+    if not vals:
+        return 5.0
+    return round(min(vals), 1)
 
 
 def _compute_safety_score(rating_0_10) -> int:

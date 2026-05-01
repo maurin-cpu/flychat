@@ -587,9 +587,16 @@ class TestSafetyRating(unittest.TestCase):
         # nur weather=2, andere fehlen → defaults 5, MIN = 2
         self.assertEqual(_compute_safety_rating({"weather_safety_rating": 2}), 2.0)
 
-    def test_clamp_below_one(self):
-        # Werte < 1 werden auf 1 geclampt → MIN = 1
-        self.assertEqual(_compute_safety_rating(self._result(0, 0, 0, 0, 0)), 1.0)
+    def test_zero_or_negative_excluded(self):
+        # Werte <=0 sind "nicht bewertbar" und werden aus dem MIN ausgeschlossen.
+        # Wenn ALLE Sub-Ratings <=0 → Fallback 5.0 (neutral).
+        self.assertEqual(_compute_safety_rating(self._result(0, 0, 0, 0, 0)), 5.0)
+
+    def test_region_no_gust_data(self):
+        # Region-Szenario: Skill-Schema setzt gust_safety_rating=0 weil
+        # Regionen keine Boeen-Daten haben. 0 darf NICHT das Min vergiften.
+        result = self._result(10, 0, 9, 10, 10)  # gust=0 → ignoriert
+        self.assertEqual(_compute_safety_rating(result), 9.0)
 
     def test_clamp_above_ten(self):
         # Werte > 10 werden auf 10 geclampt → MIN = 10

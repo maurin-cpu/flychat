@@ -92,7 +92,7 @@
         if (s === 'safe')        return 'green';
         if (s === 'conditional') return 'amber';
         if (s === 'not_safe')    return 'red';
-        if (s === 'error')       return 'red';  // konsistent zu mapRegionStyle
+        // 'error' faellt durch zu 'no_data' (grau) — Analyse-Fehler sind keine Aussage ueber Fliegbarkeit
         return 'no_data';
     }
     // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §4.3) =====
@@ -101,10 +101,10 @@
     function mapRegionStyle(safety, quality) {
         // Legacy-Signatur beibehalten (quality-Argument wird ignoriert), damit
         // alle Aufrufer unveraendert bleiben. Neue Logik nur ueber safety_band.
+        // 'error' -> 'no_data' (grau): Analyse-Fehler sind keine Aussage ueber Fliegbarkeit.
         var band = (safety === 'safe')        ? 'green' :
                    (safety === 'conditional') ? 'amber' :
-                   (safety === 'not_safe')    ? 'red'   :
-                   (safety === 'error')       ? 'red'   : 'no_data';
+                   (safety === 'not_safe')    ? 'red'   : 'no_data';
 
         // Alle durchgezogen — User-Wunsch: konsistente Optik
         if (band === 'no_data') {
@@ -201,10 +201,10 @@
     // sich. Family-Look statt zwei verschiedene Stile.
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
+        // 'error' -> 'no_data' (kein Label) konsistent zu getSafetyBand/mapRegionStyle.
         var band = (safety === 'safe')        ? 'green' :
                    (safety === 'conditional') ? 'amber' :
-                   (safety === 'not_safe')    ? 'red'   :
-                   (safety === 'error')       ? 'red'   : 'no_data';
+                   (safety === 'not_safe')    ? 'red'   : 'no_data';
 
         if (band === 'no_data') return null;
         var label;

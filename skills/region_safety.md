@@ -16,50 +16,16 @@ Produziere **eine JSON-Antwort** mit safety_status, safe_window, no_go_reasons, 
 <!-- INSERT_SHARED_SAFETY -->
 
 ═══════════════════════════════════════════════
-REGION-SPEZIFIK: WIND-TAGS MAGNITUDE-BASIERT
-═══════════════════════════════════════════════
-
-Regionen haben KEINEN erlaubten Sektor (nicht wie Spots) und **KEINE Boeen** (Apr 2026 Refactor). Windwerte werden auf die **Referenzhoehe** der Region interpoliert und nach gleichen Schwellen wie Spots klassifiziert — nur basierend auf Windgeschwindigkeit:
-
-- Kein Tag — Wind < {{cfg.WIND_WARN_KMH}} km/h → RUHIG (gute Bedingungen).
-- `[WIND-WARN]` — Wind {{cfg.WIND_WARN_KMH}}-{{cfg.WIND_DANGER_KMH}} km/h → SPORTLICH.
-- `[WIND-DANGER]` — Wind > {{cfg.WIND_DANGER_KMH}} km/h → UNFLIEGBAR.
-
-**Stunden-Klassifikation siehe KERNREGEL** in `_hazard_blocks.md`. Saubere Stunden (RUHIG + SPORTLICH) gehoeren ins `safe_window`. SPORTLICHE Stunden in `caution_notes` mit Uhrzeit markieren.
-
-**Wichtig:** Wenn im Datenblock z.B. `[Ref-Wind 1300m: 37km/h]` angezeigt wird, ist das der tatsaechliche Wind auf Flughoehe — NICHT Bodenwind. Die Tags basieren darauf und sind zuverlaessiger als reine Bodenwerte.
-
-**Keine Boeen auf Region-Ebene:** Boeen sind lokale Spitzenwerte und gehoeren auf Spot-Ebene. Fuer Regionen gibt es deshalb **keine** `[GUST-WARN]`, `[GUST-DANGER]`, `[ALOFT-GUST-WARN]`, `[ALOFT-GUST-DANGER]` und keine `[THERMAL-ROUGH-*]` Tags. Thermik-Zerreiss-Signale kommen ueber drei Mechanismen:
-- `[SHEAR-*]` (Windscherung durch die BL)
-- `[THERMAL-TORN-*]` (Buoyancy/Shear-Ratio: Auftrieb vs. Scherung)
-- `[THERMAL-WIND-*]` (mittlerer Grundwind durch die Mischungsschicht).
-
-**Saubere Stunde (Region)** = kein Tag oder `[WIND-WARN]` OHNE harte No-Go-Tags.
-
-═══════════════════════════════════════════════
-REGION-SPEZIFIK: FOEHN-RICHTUNGS-CHECK
-═══════════════════════════════════════════════
-
-Jede Region hat im Header `Kritischer Foehn: Sued | Nord | Beide`:
-- **Sued** = Region noerdlich des Alpenhauptkamms → nur Suedfoehn gefaehrlich.
-- **Nord** = Region suedlich des Hauptkamms → nur Nordfoehn gefaehrlich.
-- **Beide** = Region am/nahe Hauptkamm.
-
-Nordfoehn betrifft **NICHT** Mittelland, Jura, noerdliche Voralpen — die bekommen bei Nordlage kalte Bise.
-
-Wenn Richtung nicht passt: `foehn_risk = "none"` (auch bei hohem Delta-P!).
-
-═══════════════════════════════════════════════
 SELBST-CHECK VOR DER ANTWORT (PFLICHT)
 ═══════════════════════════════════════════════
 
 1. **safe_window-Konsistenz**: Nur Stunden ohne DANGER-Tag duerfen im `safe_window` sein.
-2. **Boeen-Grounding**: Regionen haben **keine** Boeen-Tags (Apr 2026). Erwaehne **niemals** Boeen in `no_go_reasons`, `caution_notes`, `wind_summary` oder `summary` eines Region-Kontextes.
+2. **Boeen-Grounding**: Regionen haben **keine** Boeen-Tags. Erwaehne **niemals** Boeen in `no_go_reasons`, `caution_notes`, `wind_summary` oder `summary`.
 3. **not_safe nur bei echtem NoGo**: not_safe nur wenn es KEINE sauberen Flugstunden gibt oder ALLE relevanten Stunden von harten Gefahren betroffen sind.
 4. **Begruendung enthalten (Regel 2c)**: Jede Gefahr in `no_go_reasons`/`caution_notes` MUSS im `summary` eine WARUM-Erklaerung haben — abgeleitet aus Datenblock-Fakten (Tag-Kombinationen, Zahlen-Verhaeltnisse, Trend-Muster, Bewoelkungs-%, ΔP, BLH, Hoehenwind-Werte, Scherung). KEINE erfundenen Grosswetterlagen, Fronten oder Druckgebilde. Auch `safe`-Tage brauchen kurze Begruendung warum sicher.
 5. **Trend-Bezug Pflicht falls vorhanden**: Wenn der Datenblock `WIND-TREND` oder Foehn-Aufbau (ΔP steigend) zeigt → MUSS im `summary` als Tagesentwicklung in eigenen Worten erwaehnt werden. Trend-Zeile NICHT wortwoertlich uebernehmen.
 
-════════════════════════════════════════════��══
+═══════════════════════════════════════════════
 JSON-ANTWORT (REGION SAFETY)
 ═══════════════════════════════════════════════
 

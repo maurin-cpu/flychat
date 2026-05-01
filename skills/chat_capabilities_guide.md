@@ -82,7 +82,7 @@ Jeder Spot hat: Elevation, erlaubte Windrichtung, idealen Maximalwind, Hangausri
 - Versteckter Foehn-Erkennung
 
 **Voranalysen (pro Spot + Region, pro Tag):**
-Das System hat **2 Achsen** (RATING_CONCEPT v1.3):
+Das System hat **2 Achsen**:
 
 - **Achse 1: `safety_band`** — Sicherheit
   - `"green"` (Sicher), `"amber"` (Vorsicht), `"red"` (Nicht fliegbar), `"no_data"`
@@ -95,7 +95,7 @@ Das System hat **2 Achsen** (RATING_CONCEPT v1.3):
 
 **Legacy-Felder** (existieren weiterhin im Cache, NICHT mehr primaer in der Antwort verwenden):
 - `safety_status`: safe / conditional / not_safe — abgeleitet aus `safety_band`
-- `flyability_tier`: gray / green / violet — seit Phase 4b abgeleitet aus (safety_band, experience_stars). In Prosa frueher "Bronze / Gruen / Violett"; jetzt sprich vom **Rating** (1–5), nicht vom Tier.
+- `flyability_tier`: gray / green / violet — abgeleitet aus (safety_band, experience_stars). Frontend-Glyph; in Prosa sprich vom **Rating** (1–5), nicht vom Tier.
 
 - Sicheres Zeitfenster, No-Go-Gruende, Warnhinweise
 - **4-Tier Alert-Labels:**
@@ -189,7 +189,7 @@ Diese Tags bettest du in deine Text-Antwort ein. Das Frontend rendert sie automa
 [RECOMMENDED: SpotName | safety=green, stars=4]
 ```
 - `SpotName`: Exakter Name wie in den Wetterdaten (z.B. "Rigi Kulm", "Balderen", "First")
-- **Bevorzugt** (RATING_CONCEPT v1.3): `safety=green|amber, stars=N` (N=1–5, technischer Tag-Parameter; in Prosa-Texten sprich vom **Rating** statt von Sternen) aus den neuen Feldern `safety_band` + `experience_stars`
+- **Bevorzugt**: `safety=green|amber, stars=N` (N=1–5, technischer Tag-Parameter; in Prosa-Texten sprich vom **Rating** statt von Sternen) aus den Feldern `safety_band` + `experience_stars`
 - **Legacy** (rueckwaerts-kompatibel): `status="green"`/`"violet"`/`"gray"` — Frontend uebersetzt das auf neue Glyphe
 - **Darstellung**: Visueller Empfehlungs-Badge im Chat + Hervorhebung auf der Karte
 - **Regeln**: NUR fuer Spots mit `safety_band` = `green` oder `amber`. NIE fuer `red`/`no_data`/`error`.

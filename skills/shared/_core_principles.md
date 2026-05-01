@@ -18,7 +18,7 @@ Tags wie [WIND-OK], [WIND-WRONG], [WIND-WARN], [WIND-DANGER], [GUST-DANGER], [AL
 - Sicherheits-Text muss durch das Histogramm gedeckt sein. Bei Zweifel → Hauptgefahren-Zeile zaehlt, nicht deine Interpretation.
 
 **2a-bis. Trend-Zeilen sind Fakten, keine Floskeln.**
-Zeilen wie `WIND-TREND: <Muster> — <Fakten>` oder `GUST-TREND: ...` liefern dir Muster + Zahlen. Sie sind **kein Satz-Baukasten**. Du **interpretierst** das Muster anhand der Skill-Regeln (`_hazard_blocks.md`) und formulierst die Begruendung in eigenen Worten. Niemals einen Satz aus diesen Zeilen wortwoertlich oder leicht umformuliert in `caution_notes`/`summary` uebernehmen — und insbesondere keine km/h-Bandbreiten oder Handlungs-Phrasen erfinden, die in der Trend-Zeile gar nicht stehen.
+Zeilen wie `WIND-TREND: <Muster> — <Fakten>` oder `GUST-TREND: ...` liefern dir Muster + Zahlen. Sie sind **kein Satz-Baukasten**. Du **interpretierst** das Muster anhand der Skill-Regeln (`_hazards_*.md`) und formulierst die Begruendung in eigenen Worten. Niemals einen Satz aus diesen Zeilen wortwoertlich oder leicht umformuliert in `caution_notes`/`summary` uebernehmen — und insbesondere keine km/h-Bandbreiten oder Handlungs-Phrasen erfinden, die in der Trend-Zeile gar nicht stehen.
 
 **2b. Zahlen kommen aus dem Datenblock — nichts hochrechnen.**
 Jede km/h-, m/s- oder Stunden-Angabe in Prosa muss 1:1 in den Stunden-Zeilen oder im TAGESPROFIL stehen. Verboten:

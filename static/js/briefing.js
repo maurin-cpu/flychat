@@ -57,27 +57,30 @@
 
   const LS_REGION_FILTER_KEY = "gleitcast.briefing.regionFilter";
   const LS_DAY_IDX_KEY = "gleitcast.briefing.dayIdx";
-  const LS_TIER_FILTER_KEY = "gleitcast.briefing.tierFilter";
-  const LS_MIN_RATING_KEY = "gleitcast.briefing.minRating";
+  const LS_TIER_FILTER_KEY = "gleitcast.briefing.tierFilter";       // legacy key (read-only fallback)
+  const LS_SAFETY_FILTER_KEY = "gleitcast.briefing.safetyFilter";   // v1.3
+  const LS_MIN_RATING_KEY = "gleitcast.briefing.minRating";         // legacy key (read-only fallback)
+  const LS_MIN_STARS_KEY = "gleitcast.briefing.minStars";           // v1.3
   const LS_COLLAPSED_REGIONS_KEY = "gleitcast.briefing.collapsedRegions";
   const LS_EXPAND_HINT_SEEN_KEY = "gleitcast.briefing.expandHintSeen";
   const LS_SHOW_NUMBERS_KEY = "gleitcast.meteogram.showNumbers";
 
-  // Verfuegbare Tiers (top_spots enthaelt nur green+violet, manche mit is_conditional)
-  const TIER_DEFS = [
-    { id: "violet",      label: "Legendär",  short: "Legendär" },
-    { id: "green",       label: "Fliegbar",  short: "Fliegbar" },
-    { id: "conditional", label: "Bedingt",   short: "Bedingt" },
+  // Safety-Baender (RATING_CONCEPT v1.3 §2.2 / §8.2) — orthogonal zu experience_stars.
+  // Filter-IDs entsprechen safety_band-Werten aus dem Cache.
+  const SAFETY_DEFS = [
+    { id: "green", label: "Sicher",        short: "Sicher" },
+    { id: "amber", label: "Vorsicht",      short: "Vorsicht" },
+    { id: "red",   label: "Nicht fliegbar", short: "Nicht fliegbar" },
   ];
-  const DEFAULT_TIERS = ["violet", "green"];
+  const DEFAULT_SAFETY = ["green", "amber"];
 
   let state = {
     data: null,
     generating: false,
     filterRegions: loadRegionFilter(),
     selectedDayIdx: loadDayIdx(),
-    tierFilters: loadTierFilter(),
-    minRating: loadMinRating(),
+    safetyFilters: loadSafetyFilter(),
+    minStars: loadMinStars(),
     fazitOpen: false,
     mapVisible: false,
     collapsedRegions: loadCollapsedRegions(),
@@ -109,31 +112,31 @@
     try { localStorage.setItem(LS_DAY_IDX_KEY, String(idx)); } catch (e) {}
   }
 
-  function loadTierFilter() {
+  function loadSafetyFilter() {
     try {
-      const raw = localStorage.getItem(LS_TIER_FILTER_KEY);
-      if (raw === null) return new Set(DEFAULT_TIERS);
+      const raw = localStorage.getItem(LS_SAFETY_FILTER_KEY);
+      if (raw === null) return new Set(DEFAULT_SAFETY);
       const arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) return new Set(DEFAULT_TIERS);
-      return new Set(arr.filter((t) => TIER_DEFS.some((d) => d.id === t)));
-    } catch (e) { return new Set(DEFAULT_TIERS); }
+      if (!Array.isArray(arr)) return new Set(DEFAULT_SAFETY);
+      return new Set(arr.filter((t) => SAFETY_DEFS.some((d) => d.id === t)));
+    } catch (e) { return new Set(DEFAULT_SAFETY); }
   }
 
-  function saveTierFilter(set) {
-    try { localStorage.setItem(LS_TIER_FILTER_KEY, JSON.stringify(Array.from(set))); } catch (e) {}
+  function saveSafetyFilter(set) {
+    try { localStorage.setItem(LS_SAFETY_FILTER_KEY, JSON.stringify(Array.from(set))); } catch (e) {}
   }
 
-  function loadMinRating() {
+  function loadMinStars() {
     try {
-      const raw = localStorage.getItem(LS_MIN_RATING_KEY);
+      const raw = localStorage.getItem(LS_MIN_STARS_KEY);
       if (raw === null) return 0;
-      const v = parseFloat(raw);
-      return isFinite(v) && v >= 0 && v <= 10 ? v : 0;
+      const v = parseInt(raw, 10);
+      return isFinite(v) && v >= 0 && v <= 5 ? v : 0;
     } catch (e) { return 0; }
   }
 
-  function saveMinRating(v) {
-    try { localStorage.setItem(LS_MIN_RATING_KEY, String(v)); } catch (e) {}
+  function saveMinStars(v) {
+    try { localStorage.setItem(LS_MIN_STARS_KEY, String(v)); } catch (e) {}
   }
 
   function loadCollapsedRegions() {
@@ -173,24 +176,32 @@
     return state.filterRegions.has(regionId || "unknown");
   }
 
-  function spotTierBucket(spot) {
-    // "Bedingt" faellt in eigenen Bucket — unabhaengig von fly_status.
-    if (spot.is_conditional) return "conditional";
-    const fs = spot.fly_status;
-    if (fs === "violet" || fs === "green") return fs;
-    return "green"; // fallback
+  // RATING_CONCEPT v1.3: zwei orthogonale Achsen.
+  // Safety-Band aus Cache, Legacy-Fallback ueber shared-glyph.
+  function spotSafetyBand(spot) {
+    return (window.gleitcastGlyph && window.gleitcastGlyph.legacyBand)
+      ? window.gleitcastGlyph.legacyBand(spot)
+      : (spot && spot.safety_band) || "no_data";
   }
 
-  function spotPassesTierFilter(spot) {
-    const tiers = state.tierFilters;
-    if (!tiers || tiers.size === 0) return false;
-    return tiers.has(spotTierBucket(spot));
+  function spotStars(spot) {
+    return (window.gleitcastGlyph && window.gleitcastGlyph.legacyStars)
+      ? window.gleitcastGlyph.legacyStars(spot)
+      : (typeof spot.experience_stars === "number" ? Math.floor(spot.experience_stars) : 0);
   }
 
-  function spotPassesRatingFilter(spot) {
-    const min = state.minRating || 0;
+  function spotPassesSafetyFilter(spot) {
+    const bands = state.safetyFilters;
+    if (!bands || bands.size === 0) return false;
+    const band = spotSafetyBand(spot);
+    if (band === "no_data") return bands.has("green") || bands.has("amber") || bands.has("red");
+    return bands.has(band);
+  }
+
+  function spotPassesStarsFilter(spot) {
+    const min = state.minStars || 0;
     if (min <= 0) return true;
-    return Number(spot.rating || 0) >= min;
+    return spotStars(spot) >= min;
   }
 
   function collectAllRegions(data) {
@@ -259,27 +270,13 @@
   // ── Bubble-Matrix (RATING_CONCEPT v1.3 §4.4) ──
   // Risk-Reward-Uebersicht: pro Region 1 Bubble.
   // X = avg experience_score, Y = 3 safety_band-Zonen, Groesse = Spot-Anzahl.
-  function _bandFromSpot(s) {
-    if (s.safety_band === 'green' || s.safety_band === 'amber' || s.safety_band === 'red') return s.safety_band;
-    if (s.safety_status === 'safe')        return 'green';
-    if (s.safety_status === 'conditional') return 'amber';
-    if (s.safety_status === 'not_safe')    return 'red';
-    return 'no_data';
-  }
-  function _starsFromSpot(s) {
-    if (typeof s.experience_stars === 'number') return s.experience_stars;
-    const r = parseFloat(s.rating || 0);
-    if (r >= 9.0)  return 5;
-    if (r >= 7.6)  return 4;
-    if (r >= 6.1)  return 3;
-    if (r >= 4.1)  return 2;
-    if (r >= 2.1)  return 1;
-    return 0;
-  }
+  // Nutzt shared-glyph als Single-Source-Of-Truth fuer Cache-Reads + Legacy-Fallback.
+  function _bandFromSpot(s)  { return spotSafetyBand(s); }
+  function _starsFromSpot(s) { return spotStars(s); }
   function _scoreFromSpot(s) {
-    if (typeof s.experience_score === 'number') return s.experience_score;
-    const r = parseFloat(s.rating || 0);
-    return Math.max(0, Math.min(100, Math.round(r * 10)));
+    return (window.gleitcastGlyph && window.gleitcastGlyph.experienceScore)
+      ? window.gleitcastGlyph.experienceScore(s)
+      : Math.max(0, Math.min(100, Math.round((parseFloat(s.rating || 0) || 0) * 10)));
   }
   function aggregateRegionsForBubbleMatrix(spots) {
     const acc = {};
@@ -410,8 +407,8 @@
       const want = state.focusSpot.toLowerCase();
       spots = spots.filter((s) => (s.spot || "").toLowerCase() === want);
     } else {
-      spots = spots.filter(spotPassesTierFilter);
-      spots = spots.filter(spotPassesRatingFilter);
+      spots = spots.filter(spotPassesSafetyFilter);
+      spots = spots.filter(spotPassesStarsFilter);
     }
     return spots;
   }
@@ -485,20 +482,26 @@
     container.innerHTML = days.map((d, i) => {
       const isActive = i === state.selectedDayIdx;
       const isBest = d.date === bestDate;
-      const counts = computeDayCounts(d);
-      const flyable = counts.spots_flyable || 0;
 
-      // Count violet spots
-      let violet = 0;
+      // RATING_CONCEPT v1.3: Day-Tabs zaehlen safety_band-Verteilung +
+      // Top-Sterne als Hingucker. flyable = green + amber.
+      let topCount = 0, greenCount = 0, amberCount = 0;
       for (const s of (d.top_spots || [])) {
-        if (s.fly_status === "violet") violet++;
+        const b = spotSafetyBand(s);
+        if (b === "red" || b === "no_data") continue;
+        if (spotStars(s) >= 4) topCount++;
+        else if (b === "green") greenCount++;
+        else if (b === "amber") amberCount++;
       }
-      const green = Math.max(0, flyable - violet);
+      const flyable = topCount + greenCount + amberCount;
 
-      // Build dots (max 4)
+      // Build dots (max 4 visuell): Top zuerst, dann green, dann amber
       const dots = [];
-      for (let j = 0; j < Math.min(violet, 2); j++) dots.push('<span class="bf-tab-dot violet"></span>');
-      for (let j = 0; j < Math.min(green, 2); j++) dots.push('<span class="bf-tab-dot green"></span>');
+      for (let j = 0; j < Math.min(topCount, 2); j++) dots.push('<span class="bf-tab-dot top"></span>');
+      for (let j = 0; j < Math.min(greenCount, 2); j++) dots.push('<span class="bf-tab-dot green"></span>');
+      if (dots.length < 4) {
+        for (let j = 0; j < Math.min(amberCount, 4 - dots.length); j++) dots.push('<span class="bf-tab-dot amber"></span>');
+      }
 
       const dateObj = new Date(d.date + "T12:00:00");
       const dayNum = dateObj.getDate();
@@ -631,7 +634,7 @@
     renderDayContent();
   }
 
-  // ── Render: Tier + Rating Filter ────────────────────────────
+  // ── Render: Safety-Band + Stars Filter (RATING_CONCEPT v1.3) ─
 
   function renderTierFilter() {
     const chipsEl = $("bfTierChips");
@@ -639,11 +642,14 @@
     const valueEl = $("bfRatingValue");
     if (!chipsEl || !slider || !valueEl) return;
 
-    // Tier chips
-    chipsEl.innerHTML = TIER_DEFS.map((t) => {
-      const active = state.tierFilters.has(t.id);
-      return `<button type="button" class="bf-tier-chip bf-tier-chip--${t.id}${active ? " is-active" : ""}" data-tier="${t.id}" aria-pressed="${active}">
-        <span class="bf-tier-dot"></span><span class="bf-tier-label">${escapeHtml(t.label)}</span>
+    // Safety-Chips: 3 Baender (gruen/amber/rot) als Toggle.
+    chipsEl.innerHTML = SAFETY_DEFS.map((t) => {
+      const active = state.safetyFilters.has(t.id);
+      const glyph = (window.gleitcastGlyph && window.gleitcastGlyph.svg)
+        ? window.gleitcastGlyph.svg({ band: t.id, stars: 0, size: 16, ariaLabel: t.label })
+        : `<span class="bf-tier-dot"></span>`;
+      return `<button type="button" class="bf-tier-chip bf-tier-chip--${t.id}${active ? " is-active" : ""}" data-band="${t.id}" aria-pressed="${active}">
+        ${glyph}<span class="bf-tier-label">${escapeHtml(t.label)}</span>
       </button>`;
     }).join("");
 
@@ -652,31 +658,36 @@
       chipsEl.addEventListener("click", (ev) => {
         const btn = ev.target.closest(".bf-tier-chip");
         if (!btn) return;
-        const id = btn.dataset.tier;
+        const id = btn.dataset.band;
         if (!id) return;
-        if (state.tierFilters.has(id)) state.tierFilters.delete(id);
-        else state.tierFilters.add(id);
-        saveTierFilter(state.tierFilters);
+        if (state.safetyFilters.has(id)) state.safetyFilters.delete(id);
+        else state.safetyFilters.add(id);
+        saveSafetyFilter(state.safetyFilters);
         state.focusSpot = null;
         renderTierFilter();
         renderDayContent();
       });
     }
 
-    // Rating slider
-    const v = Number(state.minRating || 0);
+    // Stars-Slider (0–5)
+    if (slider.max !== "5" || slider.step !== "1") {
+      slider.min = "0";
+      slider.max = "5";
+      slider.step = "1";
+    }
+    const v = Number(state.minStars || 0);
     slider.value = String(v);
     updateSliderVisual(slider, valueEl, v);
 
     if (!slider._flyBound) {
       slider._flyBound = true;
       slider.addEventListener("input", (ev) => {
-        const val = parseFloat(ev.target.value) || 0;
-        state.minRating = val;
+        const val = parseInt(ev.target.value, 10) || 0;
+        state.minStars = val;
         updateSliderVisual(slider, valueEl, val);
       });
       slider.addEventListener("change", () => {
-        saveMinRating(state.minRating);
+        saveMinStars(state.minStars);
         state.focusSpot = null;
         renderDayContent();
       });
@@ -684,6 +695,16 @@
   }
 
   function updateSliderVisual(slider, valueEl, v) {
+    if (slider.max === "5") {
+      valueEl.textContent = v > 0 ? "≥ " + "★".repeat(v) : "alle";
+      slider.classList.toggle("is-active", v > 0);
+      const min2 = parseFloat(slider.min) || 0;
+      const max2 = parseFloat(slider.max) || 5;
+      const pct2 = max2 > min2 ? ((v - min2) / (max2 - min2)) * 100 : 0;
+      slider.style.setProperty("--fill", pct2.toFixed(1) + "%");
+      return;
+    }
+    // Legacy 0–10 path (kept in case slider attrs not yet upgraded)
     valueEl.textContent = v > 0 ? "\u2265 " + v.toFixed(1) : "alle";
     slider.classList.toggle("is-active", v > 0);
     const min = parseFloat(slider.min) || 0;
@@ -797,22 +818,25 @@
       return;
     }
 
-    // Day info bar
-    const counts = computeDayCounts(day);
-    let violet = 0;
+    // Day info bar — RATING_CONCEPT v1.3: safety_band-Verteilung des gesamten
+    // Tages (Region-Filter respektiert, Safety/Stars-Filter NICHT) — damit der
+    // User sieht, was er gerade per Filter ausblendet.
     const filteredSpots = filterDaySpots(day);
-    for (const s of filteredSpots) {
-      if (s.fly_status === "violet") violet++;
+    const G = window.gleitcastGlyph;
+    const allSpotsRegionFiltered = (day.top_spots || []).filter((s) => regionPassesFilter(s.region_id));
+    const counts = G && G.bandCounts ? G.bandCounts(allSpotsRegionFiltered) : { green: 0, amber: 0, red: 0, no_data: 0 };
+    let topStars = 0;
+    for (const s of allSpotsRegionFiltered) {
+      if (spotStars(s) >= 4 && spotSafetyBand(s) !== "red") topStars++;
     }
-    const green = Math.max(0, (counts.spots_flyable || 0) - violet);
 
     infoEl.innerHTML = `
       <span class="bf-day-title">${escapeHtml(day.weekday || "")} ${formatDateDE(day.date)}</span>
       <span class="bf-day-stats">
-        ${violet > 0 ? `<span class="bf-stat-violet"><strong>${violet}</strong> legendaer</span>` : ""}
-        ${green > 0 ? `<span class="bf-stat-green"><strong>${green}</strong> fliegbar</span>` : ""}
-        ${counts.spots_bronze > 0 ? `<span class="bf-stat-bronze"><strong>${counts.spots_bronze}</strong> Abgleiter</span>` : ""}
-        ${counts.spots_nogo > 0 ? `<span><strong>${counts.spots_nogo}</strong> NO-GO</span>` : ""}
+        ${counts.green > 0 ? `<span class="bf-stat bf-stat--green"><strong>${counts.green}</strong> grün</span>` : ""}
+        ${counts.amber > 0 ? `<span class="bf-stat bf-stat--amber"><strong>${counts.amber}</strong> amber</span>` : ""}
+        ${counts.red > 0 ? `<span class="bf-stat bf-stat--red"><strong>${counts.red}</strong> rot</span>` : ""}
+        ${topStars > 0 ? `<span class="bf-stat bf-stat--top">★ <strong>${topStars}</strong> top</span>` : ""}
       </span>
     `;
 
@@ -829,11 +853,25 @@
       regionsMap[r.region_id] = r;
     }
 
-    // Sort by region rating
+    // Sortierung (RATING_CONCEPT v1.3): primaer safety_band der Region-Analyse
+    // (gruen → amber → rot), sekundaer Region-Rating (hoeher zuerst). Region-
+    // Aussage hat Vorrang vor Spot-Aggregation — konsistent zum Header.
+    const BAND_RANK = { green: 0, amber: 1, no_data: 2, red: 3 };
+    const groupSortKey = (g) => {
+      const meta = regionsMap[g.region_id];
+      const band = (meta && G && G.legacyBand)
+        ? G.legacyBand(meta)
+        : (G && G.aggregateBand ? G.aggregateBand(g.spots) : "no_data");
+      const score = (meta && G && G.experienceScore)
+        ? G.experienceScore(meta)
+        : 0;
+      return { rank: BAND_RANK[band] != null ? BAND_RANK[band] : 4, score: score };
+    };
     groups.sort((a, b) => {
-      const ra = regionsMap[a.region_id] ? regionsMap[a.region_id].rating : (a.spots[0]?.rating || 0);
-      const rb = regionsMap[b.region_id] ? regionsMap[b.region_id].rating : (b.spots[0]?.rating || 0);
-      return rb - ra;
+      const ka = groupSortKey(a);
+      const kb = groupSortKey(b);
+      if (ka.rank !== kb.rank) return ka.rank - kb.rank;
+      return kb.score - ka.score;
     });
 
     // Focus-Banner (wenn Nutzer aus E-Mail auf einen spezifischen Spot kam)
@@ -849,11 +887,13 @@
       if (state.focusSpot) {
         emptyMsg = `Spot "${escapeHtml(state.focusSpot)}" nicht in diesem Tag gefunden.`;
       } else {
-        const filterActive = (state.tierFilters.size < TIER_DEFS.length) || state.minRating > 0 || state.filterRegions.size > 0;
+        const filterActive = (state.safetyFilters.size < SAFETY_DEFS.length) || state.minStars > 0 || state.filterRegions.size > 0;
         const filterHint = filterActive
           ? `<button type="button" class="bf-empty-reset" onclick="window.__bf_resetFilters && window.__bf_resetFilters()">Filter zurücksetzen</button>`
           : "";
-        emptyMsg = `<div class="bf-empty-msg">Keine Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} entsprechen dem aktuellen Filter.</div><div class="bf-empty-counts">${counts.spots_nogo || 0} NO-GO · ${counts.spots_bronze || 0} Abgleiter</div>${filterHint}`;
+        const cRed = counts.red || 0;
+        const cAmber = counts.amber || 0;
+        emptyMsg = `<div class="bf-empty-msg">Keine Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} entsprechen dem aktuellen Filter.</div><div class="bf-empty-counts">${cRed} rot · ${cAmber} amber ausgeblendet</div>${filterHint}`;
       }
       contentEl.innerHTML = focusBanner + `<div class="bf-content-empty">${emptyMsg}</div>`;
       return;
@@ -889,26 +929,52 @@
 
   function renderRegionSection(group, meta) {
     const name = (meta && meta.region_name) || group.region_name || (group.region_id === "unknown" ? "Weitere Spots" : group.region_id);
-    const rating = meta ? formatRating(meta.rating) : "";
     const spotsHtml = group.spots.map(renderSpotRow).join("");
     const spotCount = group.spots.length;
+
+    // Region-Header: Band kommt aus der Region-Analyse (eigenstaendige LLM-
+    // Bewertung), NICHT aus der Spot-Aggregation. Die Region hat ihre eigene
+    // Sicherheits-Aussage; Worst-Band-Wins ueber Spots wuerde eine grobe
+    // Region-Bewertung durch einen kritischen Einzel-Spot ueberschreiben.
+    // Verteilungs-Pill (counts) bleibt aus Spots — als Zusatz-Info "was passiert
+    // in der Region", aber nicht als Header-Farbe.
+    // Fallback auf Spot-Aggregation nur wenn keine Region-Meta vorliegt.
+    const G = window.gleitcastGlyph;
+    const headBand = (meta && G && G.legacyBand)
+      ? G.legacyBand(meta)
+      : (G && G.aggregateBand ? G.aggregateBand(group.spots) : "no_data");
+    const counts = G && G.bandCounts ? G.bandCounts(group.spots) : { green: 0, amber: 0, red: 0, no_data: 0 };
+    const headStars = (meta && G && G.legacyStars)
+      ? G.legacyStars(meta)
+      : (G && G.avgStars ? G.avgStars(group.spots) : 0);
+    const headGlyph = G && G.svg ? G.svg({ band: headBand, stars: headStars, size: 22 }) : "";
+
+    // Verteilungs-Pill: nur Baender mit > 0 anzeigen, in Reihenfolge gruen→amber→rot.
+    const distParts = [];
+    if (counts.green > 0) distParts.push(`<span class="bf-region-dist-item bf-region-dist-item--green">${counts.green} grün</span>`);
+    if (counts.amber > 0) distParts.push(`<span class="bf-region-dist-item bf-region-dist-item--amber">${counts.amber} amber</span>`);
+    if (counts.red > 0)   distParts.push(`<span class="bf-region-dist-item bf-region-dist-item--red">${counts.red} rot</span>`);
+    const distHtml = distParts.length ? `<span class="bf-region-dist">${distParts.join("")}</span>` : "";
+
+    const shareRatingAttr = headStars > 0 && headBand !== "red" ? String(headStars) : "";
     const shareBtn = group.region_id && group.region_id !== "unknown"
       ? `<button type="button" class="bf-share-btn bf-share-btn--region"
                  data-share-kind="region"
                  data-share-region="${escapeHtml(group.region_id)}"
                  data-share-region-name="${escapeHtml(name)}"
-                 data-share-rating="${rating}"
+                 data-share-rating="${shareRatingAttr}"
                  title="Region teilen" aria-label="Region teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`
       : "";
     const isCollapsed = state.collapsedRegions.has(group.region_id);
     const collapsedCls = isCollapsed ? " is-collapsed" : "";
     const ariaExpanded = isCollapsed ? "false" : "true";
     return `
-      <div class="bf-region${collapsedCls}" data-region-id="${escapeHtml(group.region_id)}">
+      <div class="bf-region${collapsedCls} bf-region--${headBand}" data-region-id="${escapeHtml(group.region_id)}" data-band="${headBand}">
         <div class="bf-region-head" role="button" tabindex="0" aria-expanded="${ariaExpanded}" aria-label="Region ${escapeHtml(name)} ein-/ausklappen">
+          <span class="bf-region-glyph" aria-hidden="true">${headGlyph}</span>
           <span class="bf-region-name">${escapeHtml(name)}</span>
           <span class="bf-region-count" aria-hidden="true">${spotCount}</span>
-          ${rating ? `<span class="bf-region-rating">${rating}</span>` : ""}
+          ${distHtml}
           ${shareBtn}
           <span class="bf-region-chevron" aria-hidden="true">▾</span>
         </div>
@@ -921,23 +987,23 @@
 
   function renderSpotRow(spot) {
     if (!spot.spot || !String(spot.spot).trim()) return "";
-    const tier = spot.fly_status === "violet" ? "tier-violet" : spot.fly_status === "gray" ? "tier-bronze" : "tier-green";
+    // RATING_CONCEPT v1.3: safety_band + experience_stars als Primaer-Achsen.
+    const band = spotSafetyBand(spot);
+    const stars = spotStars(spot);
+    const safetyCls = "safety-" + band;
+    const glyphHtml = (window.gleitcastGlyph && window.gleitcastGlyph.svg)
+      ? window.gleitcastGlyph.svg({ band, stars, size: 24 })
+      : "";
 
-    // ── Status-Leiste: kompakte Chips mit Analyse-Infos ──
-    const ss = spot.safety_status || "";
-    const safetyLabel = ss === "safe" ? "Sicher" : ss === "conditional" ? "Bedingt" : "";
-    const safetyCls = ss === "safe" ? "bf-chip--safe" : ss === "conditional" ? "bf-chip--cond" : "";
-
+    // ── Status-Leiste: nur sachliche Chips (Best-Window, Flugtyp, Steigwerte).
+    // Sicherheit + Erlebnis sind im Glyph kodiert — kein zusaetzlicher "Sicher"/"Bedingt"-Chip noetig.
     const chips = [];
-    if (safetyLabel) chips.push(`<span class="bf-chip ${safetyCls}">${escapeHtml(safetyLabel)}</span>`);
     if (spot.best_window) chips.push(`<span class="bf-chip bf-chip--window">${escapeHtml(spot.best_window)}</span>`);
     if (spot.flight_type) chips.push(`<span class="bf-chip bf-chip--type">${escapeHtml(spot.flight_type)}</span>`);
     if (spot.peak_climb_rate && Number(spot.peak_climb_rate) > 0) {
       chips.push(`<span class="bf-chip bf-chip--climb">↑${Number(spot.peak_climb_rate).toFixed(1)} m/s</span>`);
     }
     if (spot.flight_duration) chips.push(`<span class="bf-chip">${escapeHtml(spot.flight_duration)}</span>`);
-    // conditional_reason wird nur in der aufgeklappten Detail-Ansicht gezeigt (renderSpotLabels),
-    // damit die Übersicht (Region eingeklappt → Spot-Zeile) ruhig bleibt.
 
     const statusBar = chips.length
       ? `<div class="bf-spot-status">${chips.join("")}</div>`
@@ -960,26 +1026,26 @@
     const hasCoords = spot.lat != null && spot.lon != null;
 
     const miniMapInner = hasCoords
-      ? `<div class="bf-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-quality="${escapeHtml(spot.fly_status || "")}"></div>`
+      ? `<div class="bf-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-quality="${escapeHtml(spot.fly_status || "")}" data-band="${escapeHtml(band)}" data-stars="${stars}"></div>`
       : `<div class="bf-spot-minimap bf-spot-minimap--nodata">Keine Koordinaten</div>`;
 
-    const ratingStr = formatRating(spot.rating);
+    const shareRatingAttr = stars > 0 && band !== "red" ? String(stars) : "";
     const shareBtn = `<button type="button" class="bf-share-btn bf-share-btn--spot"
              data-share-kind="spot"
              data-share-region="${escapeHtml(spot.region_id || "")}"
              data-share-region-name="${escapeHtml(spot.region_name || "")}"
              data-share-spot="${escapeHtml(spot.spot)}"
-             data-share-rating="${ratingStr}"
+             data-share-rating="${shareRatingAttr}"
              title="Startplatz teilen" aria-label="Startplatz teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`;
     return `
-      <li class="bf-spot ${tier}">
+      <li class="bf-spot ${safetyCls}" data-band="${band}" data-stars="${stars}">
         <div class="bf-spot-toggle" role="button" tabindex="0" aria-expanded="false">
           <div class="bf-spot-row">
+            <span class="bf-spot-glyph" aria-hidden="true">${glyphHtml}</span>
             <span class="bf-spot-name">${escapeHtml(spot.spot)}</span>
             <span class="bf-spot-spacer"></span>
             <a class="bf-spot-map-link" href="${escapeHtml(mapHref)}" title="Karte">📍</a>
             ${shareBtn}
-            <span class="bf-spot-rating">${ratingStr}</span>
             <span class="bf-spot-chevron" aria-hidden="true">▾</span>
           </div>
           ${statusBar}
@@ -1542,11 +1608,11 @@
 
   function resetAllFilters() {
     state.filterRegions = new Set();
-    state.tierFilters = new Set(TIER_DEFS.map((t) => t.id));
-    state.minRating = 0;
+    state.safetyFilters = new Set(SAFETY_DEFS.map((t) => t.id));
+    state.minStars = 0;
     saveRegionFilter(state.filterRegions);
-    saveTierFilter(state.tierFilters);
-    saveMinRating(0);
+    saveSafetyFilter(state.safetyFilters);
+    saveMinStars(0);
     renderFilters(state.data);
     renderTierFilter();
     renderDayTabs(state.data);

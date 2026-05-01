@@ -163,8 +163,14 @@
     {% if status.test_run.exists and status.test_run.meta %}
       <dl class="ts-meta">
         <dt>Letzter Test-Lauf</dt><dd>{{ status.test_run.meta.run_at or '—' }}</dd>
+        <dt>Spot-Set</dt>
+        <dd>
+          {% if status.test_run.meta.spot_set == 'complete' %}Komplett{% elif status.test_run.meta.spot_set == 'test' %}Test-Set{% else %}—{% endif %}
+        </dd>
         <dt>Spots im Lauf</dt><dd>{{ status.test_run.meta.n_spots if status.test_run.meta.n_spots is defined else '—' }}</dd>
         <dt>Regionen im Lauf</dt><dd>{{ status.test_run.meta.n_regions if status.test_run.meta.n_regions is defined else '—' }}</dd>
+        <dt>Tage im Lauf</dt>
+        <dd>{{ status.test_run.meta.n_days if status.test_run.meta.n_days is defined else '—' }}</dd>
         <dt>Verwendete Eingabe</dt>
         <dd>{% if status.test_run.meta.used_frozen_weather %}Frozen Snapshot{% else %}Live API{% endif %}</dd>
       </dl>
@@ -207,12 +213,32 @@
   <section class="sp-card ts-section">
     <h2 class="ts-section__title">3. Test-Analyse starten</h2>
     <p class="ts-section__hint">
-      Laeuft nur ueber die <strong>{{ status.test_csv.spot_count }} Test-Spots</strong>
-      (<code>{{ status.test_csv.path }}</code>) plus alle Regionen.
+      Laeuft wahlweise ueber das <strong>Test-Set</strong> (~{{ status.test_csv.spot_count }} Spots aus
+      <code>{{ status.test_csv.path }}</code>) oder das <strong>Komplett-Set</strong>
+      (alle {{ total_spots }} Spots) plus alle Regionen.
       Ergebnis landet in <code>data/test_runs/latest/</code> — Prod-Analysen bleiben unangetastet.
     </p>
 
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
+
+      <fieldset style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:10px 14px;margin:0;">
+        <legend style="padding:0 6px;font-size:var(--text-sm);font-weight:600;">Spot-Set</legend>
+        <label style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);margin:4px 0;">
+          <input type="radio" name="ts_spot_set" value="test" id="ts-set-test" checked>
+          <span>
+            <strong>Test-Set</strong>
+            ({{ status.test_csv.spot_count }} Spots aus <code>fluggebiete_test.csv</code>)
+          </span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);margin:4px 0;">
+          <input type="radio" name="ts_spot_set" value="complete" id="ts-set-complete">
+          <span>
+            <strong>Komplett</strong>
+            (alle {{ total_spots }} Spots — erzwingt Live API)
+          </span>
+        </label>
+      </fieldset>
+
       <fieldset style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:10px 14px;margin:0;">
         <legend style="padding:0 6px;font-size:var(--text-sm);font-weight:600;">Eingabe-Quelle</legend>
         <label style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);margin:4px 0;">
@@ -231,6 +257,26 @@
           <input type="radio" name="ts_input_source" value="live" id="ts-src-live"
                  {% if not status.frozen_weather.exists %}checked{% endif %}>
           <span><strong>Live API</strong> — nutzt aktuell geladene Wetterdaten (<code>data/wetterdaten.json</code>)</span>
+        </label>
+        <div id="ts-frozen-locked-hint" style="display:none;font-size:var(--text-xs);color:#8b1818;margin-top:4px;padding-left:24px;">
+          Frozen-Snapshot enthaelt nur Test-Spots — bei „Komplett“ ist nur Live API moeglich.
+        </div>
+      </fieldset>
+
+      <fieldset style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:10px 14px;margin:0;">
+        <legend style="padding:0 6px;font-size:var(--text-sm);font-weight:600;">Anzahl Tage</legend>
+        <label style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);">
+          <select name="ts_n_days" id="ts-n-days"
+                  style="padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);">
+            {% for d in range(1, forecast_days_max + 1) %}
+              <option value="{{ d }}" {% if d == forecast_days_max %}selected{% endif %}>
+                {{ d }} {% if d == 1 %}Tag (nur heute){% else %}Tage{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <span style="color:var(--color-text-secondary);font-size:var(--text-xs);">
+            (1 Tag &times; alle Spots = schneller Smoketest)
+          </span>
         </label>
       </fieldset>
     </div>
@@ -273,10 +319,41 @@
         stopBtn.style.display = 'none';
       }
 
+      // Komplett + Frozen ist nicht erlaubt → erzwinge Live wenn Komplett gewaehlt.
+      const setRadios = document.querySelectorAll('input[name="ts_spot_set"]');
+      const srcFrozen = document.getElementById('ts-src-frozen');
+      const srcLive = document.getElementById('ts-src-live');
+      const lockedHint = document.getElementById('ts-frozen-locked-hint');
+      function syncSourceLock() {
+        const sel = document.querySelector('input[name="ts_spot_set"]:checked');
+        const isComplete = sel && sel.value === 'complete';
+        if (isComplete) {
+          if (srcFrozen) { srcFrozen.checked = false; srcFrozen.disabled = true; }
+          if (srcLive) { srcLive.checked = true; }
+          if (lockedHint) { lockedHint.style.display = 'block'; }
+        } else {
+          if (srcFrozen && srcFrozen.dataset.allowed !== '0') { srcFrozen.disabled = false; }
+          if (lockedHint) { lockedHint.style.display = 'none'; }
+        }
+      }
+      // Frozen-Existenz vom Server-Render uebernehmen (disabled-Attribut bleibt erhalten).
+      if (srcFrozen) { srcFrozen.dataset.allowed = srcFrozen.disabled ? '0' : '1'; }
+      setRadios.forEach(r => r.addEventListener('change', syncSourceLock));
+
       btn.addEventListener('click', function() {
         const src = document.querySelector('input[name="ts_input_source"]:checked');
         if (!src) { alert('Bitte Eingabe-Quelle waehlen.'); return; }
         const inputParam = src.value;
+
+        const setSel = document.querySelector('input[name="ts_spot_set"]:checked');
+        const spotSetParam = setSel ? setSel.value : 'test';
+        const nDaysSel = document.getElementById('ts-n-days');
+        const nDaysParam = nDaysSel ? nDaysSel.value : '';
+
+        if (spotSetParam === 'complete' && inputParam === 'frozen') {
+          alert('Komplett-Set + Frozen ist nicht moeglich — bitte Live API waehlen.');
+          return;
+        }
 
         logEl.textContent = '';
         logWrap.style.display = 'block';
@@ -284,12 +361,17 @@
         btn.textContent = 'Laeuft …';
         stopBtn.style.display = '';
 
-        append('› Starte Test-Analyse (input=' + inputParam + ') …', '#7ee787');
-        evtSource = new EventSource('/admin/testing/run-test-analysis?input=' + encodeURIComponent(inputParam));
+        append('› Starte Test-Analyse (input=' + inputParam + ', set=' + spotSetParam + ', tage=' + nDaysParam + ') …', '#7ee787');
+        const qs = 'input=' + encodeURIComponent(inputParam)
+                 + '&spot_set=' + encodeURIComponent(spotSetParam)
+                 + (nDaysParam ? '&n_days=' + encodeURIComponent(nDaysParam) : '');
+        evtSource = new EventSource('/admin/testing/run-test-analysis?' + qs);
 
         evtSource.addEventListener('test_init', function(e) {
           const d = JSON.parse(e.data);
-          append('  Init: ' + d.n_spots + ' Spots, ' + d.n_regions + ' Regionen, frozen=' + d.use_frozen_weather, '#79c0ff');
+          const days = (d.n_days != null) ? (', ' + d.n_days + ' Tag' + (d.n_days === 1 ? '' : 'e')) : '';
+          const setLbl = d.spot_set ? (', set=' + d.spot_set) : '';
+          append('  Init: ' + d.n_spots + ' Spots, ' + d.n_regions + ' Regionen' + days + setLbl + ', frozen=' + d.use_frozen_weather, '#79c0ff');
         });
         evtSource.addEventListener('init', function(e) {
           const d = JSON.parse(e.data);
@@ -310,7 +392,8 @@
         });
         evtSource.addEventListener('test_done', function(e) {
           const d = JSON.parse(e.data);
-          append('✓ Test-Lauf fertig: ' + d.n_spots + ' Spots, ' + d.n_regions + ' Regionen', '#7ee787');
+          const days = (d.n_days != null) ? (', ' + d.n_days + ' Tag' + (d.n_days === 1 ? '' : 'e')) : '';
+          append('✓ Test-Lauf fertig: ' + d.n_spots + ' Spots, ' + d.n_regions + ' Regionen' + days, '#7ee787');
         });
         evtSource.addEventListener('error', function(e) {
           let msg = '';

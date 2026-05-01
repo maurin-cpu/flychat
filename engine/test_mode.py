@@ -284,10 +284,16 @@ def load_test_spot_names() -> set[str]:
 # Status-Bundle (fuer UI)
 # ---------------------------------------------------------------------------
 
-def run_test_analyses_stream(engine, *, use_frozen_input: bool) -> Iterator[dict[str, Any]]:
+def run_test_analyses_stream(
+    engine,
+    *,
+    use_frozen_input: bool,
+    spot_set: str = "test",
+    n_days: int | None = None,
+) -> Iterator[dict[str, Any]]:
     """Stream-Generator fuer einen Test-Lauf mit isoliertem Output.
 
-    Filtert die Spots auf die Eintraege aus `fluggebiete_test.csv`, leitet die
+    Filtert die Spots (default: nur `fluggebiete_test.csv`), leitet die
     Output-Pfade auf `data/test_runs/latest/` um, und (optional) ersetzt das
     Live-Wetter durch den Frozen-Snapshot. Restauriert den Engine-State nach
     dem Lauf — egal ob Erfolg oder Fehler.
@@ -296,10 +302,30 @@ def run_test_analyses_stream(engine, *, use_frozen_input: bool) -> Iterator[dict
         engine: GleitcastEngine-Instanz (typischerweise das globale `engine` aus web.py).
         use_frozen_input: True = Frozen-Snapshot laden; False = aktuell geladene
             `engine.weather_data` weiterverwenden.
+        spot_set: "test" (default, ~28 Spots aus fluggebiete_test.csv) oder
+            "complete" (alle Spots). "complete" + use_frozen_input ist verboten,
+            weil der Frozen-Snapshot nur Test-Spots enthaelt.
+        n_days: Begrenzt die Anzahl Vorhersagetage (1..config.FORECAST_DAYS).
+            None = unveraendert (alle Tage). Patched `_get_forecast_dates` auf
+            der Engine-Instanz fuer die Dauer des Laufs.
 
     Yields die SSE-Events von `engine.run_all_analyses_stream()` plus zwei
     eigene Events am Anfang/Ende: `test_init` und `test_done`.
     """
+    if spot_set not in ("test", "complete"):
+        yield {"event": "error",
+               "data": {"message": f"Ungueltiges spot_set: {spot_set!r} (erlaubt: 'test', 'complete')"}}
+        return
+    if spot_set == "complete" and use_frozen_input:
+        yield {"event": "error",
+               "data": {"message": "Komplett-Set + Frozen-Snapshot nicht moeglich — Snapshot enthaelt nur Test-Spots. Bitte 'Live API' waehlen."}}
+        return
+    if n_days is not None:
+        if not isinstance(n_days, int) or n_days < 1 or n_days > config.FORECAST_DAYS:
+            yield {"event": "error",
+                   "data": {"message": f"Ungueltiges n_days={n_days!r} (erlaubt: 1..{config.FORECAST_DAYS})"}}
+            return
+
     snapshot = {
         "analyses_file": engine.analyses_file,
         "region_analyses_file": engine.region_analyses_file,
@@ -309,6 +335,7 @@ def run_test_analyses_stream(engine, *, use_frozen_input: bool) -> Iterator[dict
         "spot_analyses": engine.spot_analyses,
         "region_analyses": engine.region_analyses,
         "weather_context_str": getattr(engine, "weather_context_str", None),
+        "_get_forecast_dates": engine._get_forecast_dates,
     }
 
     started_at = datetime.now()
@@ -335,32 +362,44 @@ def run_test_analyses_stream(engine, *, use_frozen_input: bool) -> Iterator[dict
             except Exception:
                 logger.exception("weather_context Rebuild aus Frozen-Snapshot fehlgeschlagen")
 
-        test_names = load_test_spot_names()
-        if not test_names:
-            yield {"event": "error",
-                   "data": {"message": "Test-Spot-Liste leer (data/fluggebiete_test.csv)."}}
-            return
+        # Spot-Set anwenden
+        if spot_set == "test":
+            test_names = load_test_spot_names()
+            if not test_names:
+                yield {"event": "error",
+                       "data": {"message": "Test-Spot-Liste leer (data/fluggebiete_test.csv)."}}
+                return
+            engine.spots = [s for s in snapshot["spots"] if s.get("name") in test_names]
+            if engine.weather_data:
+                engine.weather_data = {
+                    k: v for k, v in engine.weather_data.items()
+                    if k.startswith("_") or k in test_names
+                }
+        # spot_set == "complete": kein Filter — engine.spots/weather_data bleiben
 
-        engine.spots = [s for s in snapshot["spots"] if s.get("name") in test_names]
-        if engine.weather_data:
-            engine.weather_data = {
-                k: v for k, v in engine.weather_data.items()
-                if k.startswith("_") or k in test_names
-            }
+        # Tage-Begrenzung: _get_forecast_dates auf der Instanz patchen
+        if n_days is not None:
+            original_dates = snapshot["_get_forecast_dates"]
+            engine._get_forecast_dates = lambda: original_dates()[:n_days]
 
         n_spots = len(engine.spots)
         n_regions = len(engine.region_weather_data) if engine.region_weather_data else 0
+        n_days_effective = len(engine._get_forecast_dates() or [])
 
         yield {"event": "test_init", "data": {
             "n_spots": n_spots,
             "n_regions": n_regions,
+            "n_days": n_days_effective,
+            "spot_set": spot_set,
             "use_frozen_weather": use_frozen_input,
             "started_at": started_at.isoformat(timespec="seconds"),
         }}
 
         if n_spots == 0:
-            yield {"event": "error",
-                   "data": {"message": "Keine Test-Spots im Wetter-Datensatz gefunden — Frozen-Snapshot zu Test-CSV inkompatibel?"}}
+            msg = ("Keine Test-Spots im Wetter-Datensatz gefunden — Frozen-Snapshot zu Test-CSV inkompatibel?"
+                   if spot_set == "test"
+                   else "Keine Spots im Wetter-Datensatz gefunden — Live-Wetter geladen?")
+            yield {"event": "error", "data": {"message": msg}}
             return
 
         engine.spot_analyses = {}
@@ -372,10 +411,14 @@ def run_test_analyses_stream(engine, *, use_frozen_input: bool) -> Iterator[dict
             "run_at": started_at.isoformat(timespec="seconds"),
             "completed_at": datetime.now().isoformat(timespec="seconds"),
             "used_frozen_weather": use_frozen_input,
+            "spot_set": spot_set,
             "n_spots": n_spots,
             "n_regions": n_regions,
+            "n_days": n_days_effective,
         })
-        yield {"event": "test_done", "data": {"n_spots": n_spots, "n_regions": n_regions}}
+        yield {"event": "test_done", "data": {
+            "n_spots": n_spots, "n_regions": n_regions, "n_days": n_days_effective,
+        }}
     finally:
         for k, v in snapshot.items():
             setattr(engine, k, v)

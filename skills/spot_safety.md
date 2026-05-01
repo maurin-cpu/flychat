@@ -16,39 +16,6 @@ Produziere **eine JSON-Antwort** mit safety_status, safe_window, no_go_reasons, 
 <!-- INSERT_SHARED_SAFETY -->
 
 ═══════════════════════════════════════════════
-SPOT-SPEZIFIK: WIND-TAGS RICHTUNGSBASIERT
-═══════════════════════════════════════════════
-
-Im Spot-Modus hat der Startplatz einen erlaubten **Sektor** (Kompassbereich). Die Wind-Tags sind:
-- `[WIND-OK]` — Windrichtung liegt im erlaubten Sektor (inkl. 10° Buffer).
-- `[WIND-WRONG]` — Windrichtung ausserhalb des Sektors → Stunde UNFLIEGBAR, auch wenn sonst alles gut ist.
-
-Nur saubere Stunden (RUHIG oder SPORTLICH = `[WIND-OK]` UND kein DANGER-Tag) koennen ins `safe_window`. SPORTLICHE Stunden (mit WARN-Tag innen) dort explizit in `caution_notes` mit Uhrzeit markieren.
-
-═══════════════════════════════════════════════
-SPOT-BEMERKUNGEN — NUR SAFETY-RELEVANTE
-═══════════════════════════════════════════════
-
-Der Datenblock enthaelt **Bemerkungen** (z.B. "bei Suedstau Abloesungsgefahr", "Landewiese bei Regen gesperrt"). Bemerkungen sind spot-spezifisches Lokalwissen und **ueberschreiben generische Regeln**. Behandle hier NUR die SAFETY-relevanten Bemerkungen:
-
-**Schritt 0 — NORMAL BEWERTEN (wie bisher):**
-Bewerte Safety zuerst auf Basis der Tags und generischen Regeln. Fuelle alle Safety-Felder normal.
-
-**Schritt 1 — KLASSIFIZIEREN: Ist die Bemerkung SAFETY-relevant?**
-- **SAFETY** — Bedingung beeinflusst, ob der Flug sicher moeglich ist (Startverbot, Landezone, gefaehrliche Wettersituation). Beispiele: "bei Nordlage gesperrt", "Landewiese bei Regen gesperrt", "bei Suedstau Abloesungsgefahr".
-- **FLYABILITY** — Bedingung beeinflusst nur Flugqualitaet → IGNORIEREN in dieser Phase.
-
-**Schritt 2 — EXTRAHIEREN (nur SAFETY-Bemerkungen):**
-Pro Bemerkungs-Trigger identifiziere: (a) Parameter (Wind/Richtung/Niederschlag/Jahreszeit/Tageszeit), (b) Schwellwert, (c) betroffene Phase (Start/Flug/Landung), (d) welche Tagesstunden triggern im aktuellen Datenblock.
-
-**Schritt 3 — NACHJUSTIEREN: Nur Safety-Felder aendern**
-
-| Betroffener Aspekt | Zielfeld(er) |
-|---|---|
-| Startverbot / Landezone / Hangflug-Ausschluss | `no_go_reasons` (wenn ganzer Tag) oder `caution_notes` (Teilstunden), `safe_window` verkuerzen, ggf. `primary_no_go` |
-| Spot-spezifische Turbulenz/Abloesung | `caution_notes` mit Uhrzeit, `wind_shear` oder `wind_summary`, Status mind. `conditional` |
-
-═══════════════════════════════════════════════
 SELBST-CHECK VOR DER ANTWORT (PFLICHT)
 ═══════════════════════════════════════════════
 

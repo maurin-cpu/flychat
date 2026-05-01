@@ -309,11 +309,15 @@
   border-radius: 50%;
 }
 
-.bf-tab-dot.violet { background: var(--color-fly-violet); }
-.bf-tab-dot.green { background: var(--color-fly-green); }
+.bf-tab-dot.violet { background: var(--color-fly-violet); } /* legacy: top-stars */
+.bf-tab-dot.top    { background: #1d4ed8; }                 /* RATING_CONCEPT v1.3: ★4+ */
+.bf-tab-dot.green  { background: #22c55e; }
+.bf-tab-dot.amber  { background: #f59e0b; }
 
 .bf-day-tab.is-active .bf-tab-dot.violet { background: #c4b5fd; }
-.bf-day-tab.is-active .bf-tab-dot.green { background: #86efac; }
+.bf-day-tab.is-active .bf-tab-dot.top    { background: #93c5fd; }
+.bf-day-tab.is-active .bf-tab-dot.green  { background: #86efac; }
+.bf-day-tab.is-active .bf-tab-dot.amber  { background: #fcd34d; }
 
 .bf-tab-count {
   font-size: 10px;
@@ -567,9 +571,11 @@
   transition: background 180ms ease, box-shadow 180ms ease;
 }
 
-.bf-tier-chip--violet .bf-tier-dot { background: var(--color-fly-violet); }
-.bf-tier-chip--green  .bf-tier-dot { background: var(--color-fly-green); }
-.bf-tier-chip--conditional .bf-tier-dot { background: #f59e0b; }
+.bf-tier-chip--violet .bf-tier-dot { background: var(--color-fly-violet); } /* legacy */
+.bf-tier-chip--green  .bf-tier-dot { background: var(--color-fly-green); }  /* legacy */
+.bf-tier-chip--conditional .bf-tier-dot { background: #f59e0b; }            /* legacy */
+/* RATING_CONCEPT v1.3 — Glyph-basierte Chips ersetzen Dots */
+.bf-tier-chip .gc-glyph { flex-shrink: 0; }
 
 /* Hover: show the tier accent even when inactive */
 .bf-tier-chip:hover { border-color: var(--color-text-secondary); color: var(--color-text); }
@@ -597,6 +603,17 @@
   background: #f59e0b;
   color: #fff;
   border-color: #f59e0b;
+}
+/* RATING_CONCEPT v1.3 — Safety-Band-Chips */
+.bf-tier-chip--amber.is-active {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #92400e;
+}
+.bf-tier-chip--red.is-active {
+  background: #ef4444;
+  color: #fff;
+  border-color: #991b1b;
 }
 
 /* Inactive state: faded but identifiable by dot colour */
@@ -876,9 +893,21 @@
   color: var(--color-text);
 }
 
-.bf-stat-violet strong { color: var(--color-fly-violet); }
-.bf-stat-green strong { color: var(--color-fly-green); }
-.bf-stat-bronze strong { color: var(--color-fly-gray); }
+.bf-stat-violet strong { color: var(--color-fly-violet); } /* legacy */
+.bf-stat-green strong { color: var(--color-fly-green); }   /* legacy */
+.bf-stat-bronze strong { color: var(--color-fly-gray); }   /* legacy */
+
+/* RATING_CONCEPT v1.3 — Day-Stat-Pills nach safety_band + Top-Sterne */
+.bf-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bf-stat--green strong { color: #15803d; }
+.bf-stat--amber strong { color: #b45309; }
+.bf-stat--red   strong { color: #b91c1c; }
+.bf-stat--top   strong { color: #1d4ed8; }
+.bf-stat--top   { color: #1d4ed8; font-weight: 600; }
 
 /* ── Content Area ────────────────────────────────────────── */
 
@@ -984,13 +1013,53 @@
   flex-shrink: 0;
 }
 
-.bf-region-rating {
+.bf-region-rating { /* legacy — superseded by bf-region-glyph + bf-region-dist */
   font-size: var(--text-lg);
   font-weight: 800;
   color: var(--color-primary);
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
+
+/* RATING_CONCEPT v1.3 — Region-Header: Glyph + Verteilung statt Rating-Zahl */
+.bf-region-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.bf-region-glyph .gc-glyph { display: block; }
+
+.bf-region-dist {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bf-region-dist-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.bf-region-dist-item::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.bf-region-dist-item--green::before { background: #22c55e; }
+.bf-region-dist-item--amber::before { background: #f59e0b; }
+.bf-region-dist-item--red::before   { background: #ef4444; }
+.bf-region-dist-item--green { color: #15803d; }
+.bf-region-dist-item--amber { color: #b45309; }
+.bf-region-dist-item--red   { color: #b91c1c; }
 
 .bf-region-chevron {
   display: inline-flex;
@@ -1048,15 +1117,44 @@
   transition: box-shadow 200ms ease, border-color 200ms ease, transform 150ms ease;
 }
 
-.bf-spot.tier-green { border-left-color: var(--color-fly-green); }
-.bf-spot.tier-violet {
+.bf-spot.tier-green { border-left-color: var(--color-fly-green); }      /* legacy */
+.bf-spot.tier-violet {                                                  /* legacy */
   border-left-color: var(--color-fly-violet);
   background: linear-gradient(135deg, var(--color-fly-violet-bg) 0%, #faf8ff 100%);
 }
-.bf-spot.tier-bronze {
+.bf-spot.tier-bronze {                                                  /* legacy */
   border-left-color: var(--color-fly-gray);
   background: linear-gradient(135deg, var(--color-fly-gray-bg) 0%, #faf8f4 100%);
 }
+
+/* RATING_CONCEPT v1.3 — Spot-Border per safety_band; Sterne ueber Glyph */
+.bf-spot.safety-green   { border-left-color: #22c55e; }
+.bf-spot.safety-amber {
+  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fefce8 100%);
+}
+.bf-spot.safety-red {
+  border-left-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #fff1f1 100%);
+}
+.bf-spot.safety-no_data { border-left-color: #9ca3af; }
+.bf-spot[data-stars="5"] {
+  background: linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%);
+}
+.bf-spot[data-stars="5"].safety-amber {
+  background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%);
+}
+
+/* Glyph in der Spot-Zeile — gleiche Anatomie wie Karte, nur kleiner */
+.bf-spot-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.bf-spot-glyph .gc-glyph { display: block; }
 
 .bf-spot:hover {
   box-shadow: var(--shadow-md);
@@ -1812,6 +1910,9 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   }
   .bf-region-chevron { width: 32px; height: 32px; font-size: 16px; }
   .bf-region-count { min-width: 24px; height: 24px; font-size: 11.5px; }
+  /* Mobile: Verteilungs-Pill kompakter darstellen, lange Listen abkuerzen */
+  .bf-region-dist { gap: 6px; font-size: 10.5px; }
+  .bf-region-dist-item::before { width: 7px; height: 7px; }
   .bf-spot-chevron { width: 30px; height: 30px; font-size: 15px; }
 
   .bf-spot { border-radius: var(--radius-md); }

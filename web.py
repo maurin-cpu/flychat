@@ -1035,6 +1035,8 @@ def admin_testing():
     return render_template(
         "admin/testing.html",
         status=test_mode.status_bundle(),
+        forecast_days_max=config.FORECAST_DAYS,
+        total_spots=len(engine.spots) if engine.spots else 0,
         flash_ok=request.args.get("ok", ""),
         flash_error=request.args.get("err", ""),
     )
@@ -1108,12 +1110,17 @@ def admin_testing_refresh_frozen():
     return redirect(f"/admin/testing?ok={msg}")
 
 
-def _run_test_analysis_in_background(eng, q, *, use_frozen_input: bool):
+def _run_test_analysis_in_background(eng, q, *, use_frozen_input: bool, spot_set: str = "test", n_days: int | None = None):
     """Background-Worker fuer den Test-Analysen-Stream. Schreibt Events in `q`."""
     from engine import test_mode
     global _analysis_running, _analysis_completed, _analysis_error, _analysis_result
     try:
-        for evt in test_mode.run_test_analyses_stream(eng, use_frozen_input=use_frozen_input):
+        for evt in test_mode.run_test_analyses_stream(
+            eng,
+            use_frozen_input=use_frozen_input,
+            spot_set=spot_set,
+            n_days=n_days,
+        ):
             q.put(evt)
             if evt.get("event") == "done":
                 data = evt.get("data", {})
@@ -1143,15 +1150,48 @@ def _run_test_analysis_in_background(eng, q, *, use_frozen_input: bool):
 def admin_testing_run_test_analysis():
     """SSE-Endpoint: startet einen Test-Analysen-Lauf im Background.
 
-    Query: `input=frozen` (default) oder `input=live`.
+    Query:
+        input=frozen|live (default frozen)
+        spot_set=test|complete (default test)
+        n_days=1..FORECAST_DAYS (default = FORECAST_DAYS, also alle Tage)
     Schreibt nach `data/test_runs/latest/`. Nutzt denselben Lock wie die
     Live-Analyse, damit nichts parallel laeuft.
     """
     from engine import test_mode
+
     global _analysis_running, _analysis_completed, _analysis_error, _analysis_result, _analysis_queue
 
     input_source = (request.args.get("input") or "frozen").strip().lower()
     use_frozen = input_source != "live"
+
+    spot_set = (request.args.get("spot_set") or "test").strip().lower()
+    if spot_set not in ("test", "complete"):
+        return Response(
+            f'event: error\ndata: {{"message": "Ungueltiges spot_set: {spot_set}"}}\n\n',
+            mimetype="text/event-stream", headers={"Cache-Control": "no-cache"},
+        )
+
+    n_days_raw = (request.args.get("n_days") or "").strip()
+    n_days: int | None = None
+    if n_days_raw:
+        try:
+            n_days = int(n_days_raw)
+        except ValueError:
+            return Response(
+                f'event: error\ndata: {{"message": "n_days muss Integer sein, war: {n_days_raw}"}}\n\n',
+                mimetype="text/event-stream", headers={"Cache-Control": "no-cache"},
+            )
+        if n_days < 1 or n_days > config.FORECAST_DAYS:
+            return Response(
+                f'event: error\ndata: {{"message": "n_days={n_days} ausserhalb 1..{config.FORECAST_DAYS}"}}\n\n',
+                mimetype="text/event-stream", headers={"Cache-Control": "no-cache"},
+            )
+
+    if spot_set == "complete" and use_frozen:
+        return Response(
+            'event: error\ndata: {"message": "Komplett-Set + Frozen nicht moeglich — Snapshot enthaelt nur Test-Spots."}\n\n',
+            mimetype="text/event-stream", headers={"Cache-Control": "no-cache"},
+        )
 
     with _analysis_lock:
         if _analysis_running:
@@ -1169,7 +1209,11 @@ def admin_testing_run_test_analysis():
     t = threading.Thread(
         target=_run_test_analysis_in_background,
         args=(engine, _analysis_queue),
-        kwargs={"use_frozen_input": use_frozen},
+        kwargs={
+            "use_frozen_input": use_frozen,
+            "spot_set": spot_set,
+            "n_days": n_days,
+        },
         daemon=True,
     )
     t.start()
@@ -1764,9 +1808,22 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
 @app.route("/api/briefing", methods=["GET"])
 def api_briefing_get():
     """Liefert das Wochen-Fazit.  Days/Spots werden immer frisch aus
-    spot_analyses gebaut, das LLM-Fazit kommt aus dem Cache."""
+    spot_analyses gebaut, das LLM-Fazit kommt aus dem Cache.
+
+    Test-View-aware: wenn `test_mode.is_view_active()` aktiv ist, werden
+    Spots/Regionen aus `data/test_runs/latest/` gelesen — gleiche Logik
+    wie /api/analyses und /api/region-analyses.
+    """
+    from engine import test_mode
     cached = engine._load_weekly_briefing()
-    aggregated = engine.build_briefing_data()
+    if test_mode.is_view_active():
+        spot_data, region_data, _ = test_mode.load_test_run_analyses()
+        aggregated = engine.build_briefing_data(
+            spot_analyses=spot_data, region_analyses=region_data
+        )
+        aggregated["_test_view"] = True
+    else:
+        aggregated = engine.build_briefing_data()
     fazit = (cached or {}).get("fazit")
     return jsonify({
         "success": True,
@@ -1774,6 +1831,7 @@ def api_briefing_get():
         "forecast_dates": aggregated.get("forecast_dates", []),
         "generated_at": aggregated.get("generated_at", ""),
         "fazit": fazit,
+        "test_view": aggregated.get("_test_view", False),
     })
 
 

@@ -54,14 +54,14 @@
 
     <div class="bf-filter-quality-row">
       <div class="bf-filter-group bf-filter-group--quality">
-        <span class="bf-filter-label" title="Zeigt nur Spots der gewählten Qualitäts-Tiers">Qualität</span>
-        <div class="bf-tier-chips" id="bfTierChips" role="group" aria-label="Filter nach Qualitäts-Tier"></div>
+        <span class="bf-filter-label" title="Zeigt nur Spots des gewaehlten Sicherheits-Bandes (RATING_CONCEPT v1.3)">Sicherheit</span>
+        <div class="bf-tier-chips" id="bfTierChips" role="group" aria-label="Filter nach Sicherheits-Band"></div>
       </div>
       <div class="bf-filter-group bf-filter-group--rating">
-        <label class="bf-filter-label" for="bfRatingSlider" title="Blendet Spots unter diesem Rating aus">ab Rating</label>
+        <label class="bf-filter-label" for="bfRatingSlider" title="Blendet Spots unter dieser Sterne-Anzahl aus">ab Sternen</label>
         <div class="bf-rating-filter">
           <span class="bf-rating-value" id="bfRatingValue">alle</span>
-          <input type="range" class="bf-rating-slider" id="bfRatingSlider" min="0" max="10" step="0.5" value="0" aria-label="Minimales Rating">
+          <input type="range" class="bf-rating-slider" id="bfRatingSlider" min="0" max="5" step="1" value="0" aria-label="Minimale Sterne-Anzahl">
         </div>
       </div>
     </div>
@@ -84,6 +84,7 @@
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="{{ url_for('static', filename='js/shared-glyph.js') }}?v={{ static_v('js/shared-glyph.js') }}"></script>
 <script src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 <script src="{{ url_for('static', filename='js/briefing.js') }}?v={{ static_v('js/briefing.js') }}"></script>
 {% endblock %}

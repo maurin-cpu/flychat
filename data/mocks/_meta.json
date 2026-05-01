@@ -1,7 +1,7 @@
 {
-  "frozen_at": "2026-05-01T14:17:39",
-  "source_run_at": "2026-05-01T12:04:31.905801",
-  "source_path": "C:\\Users\\user\\OneDrive\\Projekte\\flychat\\data\\wetterdaten.json",
+  "frozen_at": "2026-05-01T18:16:05",
+  "source_run_at": "2026-04-29T11:28:13.269747",
+  "source_path": "C:\\Users\\mutsc\\Projekte\\flychat\\data\\wetterdaten.json",
   "spot_count": 28,
   "region_count": 29,
   "total_source_spots": 487,

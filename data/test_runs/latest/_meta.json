@@ -1,7 +1,9 @@
 {
-  "run_at": "2026-05-01T16:16:03",
-  "completed_at": "2026-05-01T16:20:36",
-  "used_frozen_weather": true,
-  "n_spots": 28,
-  "n_regions": 29
+  "run_at": "2026-05-01T20:15:19",
+  "completed_at": "2026-05-01T20:18:42",
+  "used_frozen_weather": false,
+  "spot_set": "complete",
+  "n_spots": 487,
+  "n_regions": 29,
+  "n_days": 1
 }

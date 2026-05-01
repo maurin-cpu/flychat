@@ -292,7 +292,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=1100,
+                        max_tokens=1800,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "spot_combined")
@@ -349,7 +349,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=600,
+                        max_tokens=800,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "spot_safety")
@@ -408,7 +408,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=900,
+                        max_tokens=1400,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "spot_fly")
@@ -482,7 +482,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=600,
+                        max_tokens=800,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "region_safety")
@@ -541,7 +541,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=900,
+                        max_tokens=1400,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "region_fly")
@@ -815,7 +815,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=1100,
+                        max_tokens=1800,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "region_combined")
@@ -953,10 +953,61 @@ class AnalyzersMixin:
             logger.warning(f"Weekly-Briefing-Cache-Load fehlgeschlagen: {e}")
             return None
 
-    def build_briefing_data(self) -> dict:
+    def build_briefing_data(self, spot_analyses: dict | None = None,
+                            region_analyses: dict | None = None) -> dict:
         """Aggregiert spot_analyses + region_analyses in eine Briefing-Struktur.
-        Filter: zeigt nur green + violet (NO-GO und Abgleiter ausgeblendet).
+
+        Args:
+            spot_analyses: Optionaler Override fuer self.spot_analyses
+                (z. B. Test-Run-Output). Wenn None: nutzt self.spot_analyses.
+            region_analyses: Analog fuer self.region_analyses.
+
+        RATING_CONCEPT v1.3: liefert ALLE analysierten Spots/Regionen mit
+        safety_band/experience_stars als Top-Level-Felder. Das Frontend
+        filtert client-seitig ueber Sicherheits-Band + Stars-Slider.
+
+        Legacy-Counts (spots_flyable/bronze/nogo/conditional) bleiben
+        zusaetzlich erhalten fuer Backwards-Compat.
         """
+        spot_src = spot_analyses if spot_analyses is not None else self.spot_analyses
+        region_src = region_analyses if region_analyses is not None else self.region_analyses
+        # Lokale Helfer fuer v1.3-Felder mit Legacy-Fallback (Cache vor v1.3
+        # hat safety_band/experience_stars/experience_score nicht gesetzt).
+        def _band_from_entry(e: dict) -> str:
+            b = e.get("safety_band")
+            if b in ("green", "amber", "red", "no_data"):
+                return b
+            ss = (e.get("safety") or {}).get("safety_status") or e.get("safety_status") or ""
+            if ss == "not_safe":    return "red"
+            if ss == "conditional": return "amber"
+            if ss == "safe":        return "green"
+            if ss in ("no_data", "error"): return "no_data"
+            return "no_data"
+
+        def _stars_from_entry(e: dict) -> int:
+            v = e.get("experience_stars")
+            if isinstance(v, int) and 0 <= v <= 5:
+                return v
+            try:
+                r = float(e.get("rating") or 0.0)
+            except (TypeError, ValueError):
+                r = 0.0
+            if r >= 9.0:  return 5
+            if r >= 7.6:  return 4
+            if r >= 6.1:  return 3
+            if r >= 4.1:  return 2
+            if r >= 2.1:  return 1
+            return 0
+
+        def _score_from_entry(e: dict) -> int:
+            v = e.get("experience_score")
+            if isinstance(v, (int, float)):
+                return max(0, min(100, int(v)))
+            try:
+                r = float(e.get("rating") or 0.0)
+            except (TypeError, ValueError):
+                r = 0.0
+            return max(0, min(100, int(round(r * 10))))
         from source_area import get_all_regions
         all_regions = get_all_regions()
         region_by_id = {r["id"]: r for r in all_regions}
@@ -992,48 +1043,69 @@ class AnalyzersMixin:
         for date_str in forecast_dates:
             # Spots fuer diesen Tag
             spot_entries = []
+            # Legacy-Counts: bleiben fuer Backwards-Compat erhalten.
             nogo_count = 0
             bronze_count = 0
             conditional_count = 0
+            # v1.3-Counts nach safety_band:
+            band_counts = {"green": 0, "amber": 0, "red": 0, "no_data": 0}
+            top_count = 0  # experience_stars >= 4 AND band != red
+
             # Pro-Region-Counts fuer dynamisches Filtern im Frontend.
-            # Shape: { region_id: {"flyable": n, "bronze": n, "nogo": n, "conditional": n} }
+            # Shape: { region_id: {"flyable","bronze","nogo","conditional",
+            #                       "green","amber","red","no_data","top"} }
             counts_by_region = {}
             def _bump_region(rid, key):
                 c = counts_by_region.setdefault(
                     rid or "unknown",
-                    {"flyable": 0, "bronze": 0, "nogo": 0, "conditional": 0},
+                    {"flyable": 0, "bronze": 0, "nogo": 0, "conditional": 0,
+                     "green": 0, "amber": 0, "red": 0, "no_data": 0, "top": 0},
                 )
                 c[key] = c.get(key, 0) + 1
-            for spot_name, days in self.spot_analyses.items():
+
+            for spot_name, days in spot_src.items():
                 if not spot_name or not str(spot_name).strip():
                     continue  # defensive: skip entries without a name
                 entry = days.get(date_str)
                 if not entry:
                     continue
-                safety = entry.get("safety", {})
-                ss = safety.get("safety_status", "")
+                safety = entry.get("safety", {}) or {}
+                ss = safety.get("safety_status", "") or entry.get("safety_status", "")
                 fly_status = entry.get("fly_status", "") or entry.get("flyability", {}).get("fly_status", "")
-                rating = float(entry.get("rating", 0.0) or 0.0)
+                try:
+                    rating = float(entry.get("rating", 0.0) or 0.0)
+                except (TypeError, ValueError):
+                    rating = 0.0
                 is_cond = bool(entry.get("is_conditional", False))
-                rid_spot_pre = spot_region.get(spot_name, "unknown")
+                rid_spot = spot_region.get(spot_name, "unknown")
 
+                # v1.3-Felder: aus Cache priorisiert, sonst Legacy-Fallback.
+                band = _band_from_entry(entry)
+                stars = _stars_from_entry(entry)
+                exp_score = _score_from_entry(entry)
+
+                # Legacy-Bookkeeping fuer Backwards-Compat
                 if ss == "not_safe":
                     nogo_count += 1
-                    _bump_region(rid_spot_pre, "nogo")
-                    continue
-                if fly_status == "gray":
+                    _bump_region(rid_spot, "nogo")
+                elif fly_status == "gray":
                     bronze_count += 1
-                    _bump_region(rid_spot_pre, "bronze")
-                    continue
-                if ss == "conditional":
-                    conditional_count += 1
-                    _bump_region(rid_spot_pre, "conditional")
-                if fly_status not in ("green", "violet"):
-                    continue
-                _bump_region(rid_spot_pre, "flyable")
+                    _bump_region(rid_spot, "bronze")
+                else:
+                    if ss == "conditional":
+                        conditional_count += 1
+                        _bump_region(rid_spot, "conditional")
+                    if fly_status in ("green", "violet"):
+                        _bump_region(rid_spot, "flyable")
+
+                # v1.3-Bookkeeping
+                band_counts[band] = band_counts.get(band, 0) + 1
+                _bump_region(rid_spot, band)
+                if stars >= 4 and band != "red":
+                    top_count += 1
+                    _bump_region(rid_spot, "top")
 
                 fly = entry.get("flyability", {}) or {}
-                rid_spot = spot_region.get(spot_name, "unknown")
                 region_name_spot = region_by_id.get(rid_spot, {}).get("region", "") if rid_spot != "unknown" else ""
                 coords = spot_coords.get(spot_name)
                 spot_entries.append({
@@ -1056,26 +1128,43 @@ class AnalyzersMixin:
                     "best_window": fly.get("best_window", "") or entry.get("best_window", ""),
                     "recommendation": fly.get("recommendation", ""),
                     "safety_feedback": safety.get("summary", ""),
+                    # RATING_CONCEPT v1.3 — 2-Achsen Top-Level-Felder.
+                    "safety_band": band,
+                    "experience_stars": stars,
+                    "experience_score": exp_score,
+                    "safety_score": entry.get("safety_score"),
+                    "comfort_index": entry.get("comfort_index"),
                     # Volle Voranalyse fuer Ausklapp-Ansicht im Briefing
                     "analysis_full": entry,
                 })
-            spot_entries.sort(key=lambda e: e["rating"], reverse=True)
+            # Sortierung primaer safety_band (gruen → amber → no_data → rot),
+            # sekundaer experience_score absteigend. Frontend wendet Filter an.
+            _BAND_RANK = {"green": 0, "amber": 1, "no_data": 2, "red": 3}
+            spot_entries.sort(key=lambda e: (
+                _BAND_RANK.get(e.get("safety_band", "no_data"), 4),
+                -int(e.get("experience_score") or 0),
+                -float(e.get("rating") or 0.0),
+            ))
 
-            # Regionen fuer diesen Tag
+            # Regionen fuer diesen Tag — RATING_CONCEPT v1.3:
+            # alle analysierten Regionen mit safety_band/experience_stars,
+            # Frontend filtert client-seitig.
             region_entries = []
-            for rid, days in self.region_analyses.items():
+            for rid, days in region_src.items():
                 entry = days.get(date_str)
                 if not entry:
                     continue
-                safety = entry.get("safety", {})
-                ss = safety.get("safety_status", "")
+                safety = entry.get("safety", {}) or {}
+                ss = safety.get("safety_status", "") or entry.get("safety_status", "")
                 fly_status = entry.get("fly_status", "") or entry.get("flyability", {}).get("fly_status", "")
-                rating = float(entry.get("rating", 0.0) or 0.0)
+                try:
+                    rating = float(entry.get("rating", 0.0) or 0.0)
+                except (TypeError, ValueError):
+                    rating = 0.0
 
-                if ss == "not_safe" or fly_status == "gray":
-                    continue
-                if fly_status not in ("green", "violet"):
-                    continue
+                band_r = _band_from_entry(entry)
+                stars_r = _stars_from_entry(entry)
+                score_r = _score_from_entry(entry)
 
                 region_name = entry.get("region_name", region_by_id.get(rid, {}).get("region", rid))
                 region_entries.append({
@@ -1085,11 +1174,21 @@ class AnalyzersMixin:
                     "fly_status": fly_status,
                     "safety_status": ss,
                     "is_conditional": bool(entry.get("is_conditional", False)),
+                    # v1.3 Top-Level-Felder
+                    "safety_band": band_r,
+                    "experience_stars": stars_r,
+                    "experience_score": score_r,
+                    "safety_score": entry.get("safety_score"),
+                    "comfort_index": entry.get("comfort_index"),
                 })
-            region_entries.sort(key=lambda e: e["rating"], reverse=True)
+            region_entries.sort(key=lambda e: (
+                _BAND_RANK.get(e.get("safety_band", "no_data"), 4),
+                -int(e.get("experience_score") or 0),
+                -float(e.get("rating") or 0.0),
+            ))
 
             regions_meteo = []
-            for rid, days in self.region_analyses.items():
+            for rid, days in region_src.items():
                 entry = days.get(date_str)
                 if not entry:
                     continue
@@ -1121,11 +1220,18 @@ class AnalyzersMixin:
                 "top_regions": region_entries[:10],
                 "regions_meteo": regions_meteo,
                 "counts": {
-                    "spots_total": sum(1 for days in self.spot_analyses.values() if date_str in days),
-                    "spots_flyable": len(spot_entries),
+                    "spots_total": sum(1 for days in spot_src.values() if date_str in days),
+                    # Legacy (Backwards-Compat — nicht mehr im Briefing-UI verwendet)
+                    "spots_flyable": sum(1 for s in spot_entries if s.get("fly_status") in ("green", "violet")),
                     "spots_bronze": bronze_count,
                     "spots_nogo": nogo_count,
                     "spots_conditional": conditional_count,
+                    # RATING_CONCEPT v1.3 — Safety-Band-Verteilung + Top-Sterne
+                    "spots_green":   band_counts.get("green", 0),
+                    "spots_amber":   band_counts.get("amber", 0),
+                    "spots_red":     band_counts.get("red", 0),
+                    "spots_no_data": band_counts.get("no_data", 0),
+                    "spots_top":     top_count,
                 },
                 # Pro-Region-Counts — damit das Frontend beim Region-Filter
                 # die Statistiken dynamisch aggregieren kann (fliegbar/abgleiter/no-go/bedingt).
@@ -1354,7 +1460,9 @@ class AnalyzersMixin:
                 elif safety_status == "error":
                     entry["fly_status"] = ""
                     entry["status"] = "error"
-                    entry["fly_error"] = result.get("error", "")
+                    err_msg = result.get("error") or safety.get("error", "")
+                    entry["fly_error"] = err_msg
+                    entry["error"] = err_msg
                 else:
                     entry["fly_status"] = ""
                     entry["status"] = safety_status
@@ -1554,7 +1662,9 @@ class AnalyzersMixin:
                 elif safety_status == "error":
                     entry["fly_status"] = ""
                     entry["status"] = "error"
-                    entry["fly_error"] = result.get("error", "")
+                    err_msg = result.get("error") or safety.get("error", "")
+                    entry["fly_error"] = err_msg
+                    entry["error"] = err_msg
                 else:
                     entry["fly_status"] = ""
                     entry["status"] = safety_status
@@ -2171,7 +2281,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 600,
+                        "max_tokens": 800,
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2267,7 +2377,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 900,
+                        "max_tokens": 1400,
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2402,7 +2512,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 600,
+                        "max_tokens": 800,
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2508,7 +2618,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 900,
+                        "max_tokens": 1400,
                         "response_format": {"type": "json_object"},
                     },
                 })

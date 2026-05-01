@@ -24,25 +24,28 @@ _SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 _SHARED_DIR = _SKILLS_DIR / "shared"
 
 # Reihenfolge der Shared-Bausteine, wie sie in den Analyse-Prompt eingefügt werden.
-# Pädagogische Ordnung: Prinzipien → Input-Karte → Gefahren → Override → Safety-Sub-Ratings →
-# Fliegbarkeit → Formulierung → Flyability-Sub-Ratings.
+# Pädagogische Ordnung: Prinzipien → Daten-Format → Gefahren → Status-Ableitung →
+# Safety-Sub-Ratings → Flyability-Regeln → Sprache → Flight-Sub-Ratings.
+# `_hazards_spot.md` wird mode-conditional zu `_hazards_region.md` ersetzt;
+# `_flight_subratings_region.md` analog zu `_flight_subratings_spot.md` (siehe
+# compose_analysis_prompt unten).
 _SHARED_BLOCKS = [
     "_core_principles.md",
     "_input_map.md",
-    "_hazard_blocks.md",
-    "_tages_override.md",
+    "_hazards_spot.md",
+    "_status_derivation.md",
     "_safety_subratings.md",
-    "_safety_experience.md",
-    "_formulierungs_tabelle.md",
-    "_subratings_tables.md",
+    "_flyability_rules.md",
+    "_prose_style.md",
+    "_flight_subratings_region.md",
 ]
 
 # Safety-Phase: nur Gefahren-relevante Blöcke (spart ~10K tokens vs. Combined)
 _SHARED_BLOCKS_SAFETY = [
     "_core_principles.md",
     "_input_map.md",
-    "_hazard_blocks.md",
-    "_tages_override.md",
+    "_hazards_spot.md",
+    "_status_derivation.md",
     "_safety_subratings.md",
 ]
 
@@ -50,9 +53,9 @@ _SHARED_BLOCKS_SAFETY = [
 _SHARED_BLOCKS_FLYABILITY = [
     "_core_principles.md",
     "_input_map.md",
-    "_safety_experience.md",
-    "_formulierungs_tabelle.md",
-    "_subratings_tables.md",
+    "_flyability_rules.md",
+    "_prose_style.md",
+    "_flight_subratings_region.md",
 ]
 
 _INSERT_MARKER = "<!-- INSERT_SHARED -->"
@@ -129,7 +132,7 @@ def compose_analysis_prompt(mode: str, phase: str = "combined") -> str:
         raise ValueError(f"Unbekannte Analyse-Phase: {phase!r}")
 
     if phase == "combined":
-        template = _load_skill(f"{mode}_analysis.md")
+        template = _load_skill(f"{mode}_combined.md")
         marker = _INSERT_MARKER
         blocks = list(_SHARED_BLOCKS)
     elif phase == "safety":
@@ -141,13 +144,39 @@ def compose_analysis_prompt(mode: str, phase: str = "combined") -> str:
         marker = _INSERT_MARKER_FLYABILITY
         blocks = list(_SHARED_BLOCKS_FLYABILITY)
 
-    # Spots haben 5 Sub-Ratings (inkl. altitude_rating, RATING_CONCEPT v1.4),
-    # Regionen behalten die 4-Sub-Rating-Tabelle (keine Startplatzhoehe).
+    # Spots haben 5 Flight-Sub-Ratings (inkl. altitude_rating),
+    # Regionen behalten die 4-Sub-Rating-Tabelle (keine Startplatzhoehe — Region-Spots
+    # liegen auf verschiedenen Hoehen).
     if mode == "spot":
         blocks = [
-            "_subratings_tables_spot.md" if b == "_subratings_tables.md" else b
+            "_flight_subratings_spot.md" if b == "_flight_subratings_region.md" else b
             for b in blocks
         ]
+
+    # Region-Pfade nutzen die schmalere Hazards-Variante (ohne Block 3 Boeen,
+    # ohne ALOFT-GUST-Anteile). Spart ~1K Token pro Region-Call ohne Inhalts-
+    # verlust — Region-LLMs koennen Boeen-Wissen ohnehin nicht anwenden.
+    if mode == "region":
+        blocks = [
+            "_hazards_region.md" if b == "_hazards_spot.md" else b
+            for b in blocks
+        ]
+
+    # Mode-spezifischer Context-Block (Spot: Sektor + Bemerkungen,
+    # Region: Magnitude-Wind + Foehn-Richtung). Wird direkt nach den
+    # Hazards-Bloecken eingefuegt — semantisch passend, weil er
+    # Hazard-Definitionen mode-spezifisch ergaenzt. Bei Phase=flyability
+    # sind die Hazards-Bloecke nicht in der Liste, dann nach _input_map.md.
+    context_block = "_spot_context.md" if mode == "spot" else "_region_context.md"
+    hazards_block = "_hazards_spot.md" if mode == "spot" else "_hazards_region.md"
+    insert_after = hazards_block if hazards_block in blocks else "_input_map.md"
+    insert_idx = blocks.index(insert_after) + 1
+    blocks.insert(insert_idx, context_block)
+
+    # Streckenflug-Synthese: nur Spot, nur Phasen mit Flyability-Anteil.
+    # Wird ans Ende gehaengt, weil er auf den anderen Bausteinen aufbaut.
+    if mode == "spot" and phase in ("combined", "flyability"):
+        blocks.append("_streckenflug.md")
 
     if marker not in template:
         raise ValueError(f"{mode}_{phase}.md enthält keinen {marker}-Marker")
