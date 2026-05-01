@@ -459,68 +459,6 @@
         });
     }
 
-    // ===== OVERLAY (Pilot Decision Flow) =====
-    // Same 5-level hierarchy as meteogram aside:
-    //   1. Decision Hero Banner
-    //   2. Best Window Highlight
-    //   3. Key Metrics Grid
-    //   4. Safety Alerts (NO-GO, caution, foehn)
-    //   5. AI Insights (expandable)
-    // 7-Tage-Sparkline (RATING_CONCEPT v1.3 §4.3) — kompakte Pills pro Tag.
-    function buildSparklineHtml(rid, currentDateStr) {
-        if (!rid || !regionAnalyses || !regionAnalyses[rid]) return '';
-        var days = regionAnalyses[rid];
-        var dateStrs = Object.keys(days).sort();
-        if (dateStrs.length < 2) return '';
-        var palette = {
-            green: '#22c55e', amber: '#f59e0b', red: '#ef4444', no_data: '#9ca3af'
-        };
-        var html = '<div class="region-overlay-sparkline" style="margin:14px 12px 6px;">'
-            + '<div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">Wochenverlauf</div>'
-            + '<div style="display:flex;gap:4px;">';
-        var weekday = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-        dateStrs.forEach(function (d) {
-            var dd = days[d];
-            var b = getSafetyBand(dd);
-            var s = getStars(dd);
-            var c = palette[b] || palette.no_data;
-            var isToday = d === currentDateStr;
-            var dayObj = new Date(d + 'T12:00:00');
-            var wd = weekday[dayObj.getDay()];
-            var label = (b === 'red') ? '\u2715' : (s >= 1 ? String(s) : '\u2013');
-            var ringWidth = isToday ? 2 : 0;
-            html += '<div data-date="' + d + '" class="region-spark-pill" style="'
-                + 'flex:1;min-width:0;cursor:pointer;'
-                + 'padding:5px 4px;'
-                + 'background:rgba(255,255,255,0.95);'
-                + 'border:1.5px solid ' + c + ';'
-                + 'border-radius:8px;'
-                + 'text-align:center;'
-                + (isToday ? 'box-shadow:0 0 0 ' + ringWidth + 'px rgba(15,23,42,0.15);' : '')
-                + 'transition:transform 120ms;'
-                + '">'
-                + '<div style="font-size:9px;font-weight:700;color:#64748b;letter-spacing:0.4px;text-transform:uppercase;line-height:1;">' + wd + '</div>'
-                + '<div style="font-size:14px;font-weight:800;color:' + c + ';margin-top:3px;line-height:1;">' + label + '</div>'
-                + '</div>';
-        });
-        html += '</div></div>';
-        return html;
-    }
-
-    // Klick-Handler fuer Sparkline-Pills — wechselt aktiven Tag im Overlay.
-    function wireSparklineClicks() {
-        if (!overlayBody) return;
-        overlayBody.querySelectorAll('.region-spark-pill').forEach(function (pill) {
-            pill.addEventListener('click', function () {
-                var d = pill.getAttribute('data-date');
-                if (!d) return;
-                window.dispatchEvent(new CustomEvent('gleitcast-day-change', { detail: { date: d } }));
-            });
-        });
-    }
-
-    // Lazy-Load /api/analyses fuer Top-Spots-Liste. Wird erstmals beim Oeffnen
-    // eines Region-Overlays getriggert, danach gecached.
     function loadSpotAnalysesLazy() {
         if (spotAnalyses) return Promise.resolve(spotAnalyses);
         if (spotAnalysesPromise) return spotAnalysesPromise;
@@ -589,267 +527,37 @@
         return html;
     }
 
-    // CTA-Button "Im Briefing oeffnen" (§4.3)
-    function buildCtaHtml(rid, currentDateStr) {
-        if (!rid) return '';
-        var url = '/briefing?regions=' + encodeURIComponent(rid);
-        return '<div style="margin:10px 12px 0;">'
-            + '<a href="' + url + '" '
-            + 'style="display:flex;align-items:center;justify-content:center;gap:6px;'
-            + 'padding:9px 14px;background:#0f172a;color:#fff;border-radius:8px;'
-            + 'font-size:12.5px;font-weight:600;text-decoration:none;'
-            + 'transition:background 120ms;'
-            + '" '
-            + 'onmouseover="this.style.background=\'#1e293b\'" '
-            + 'onmouseout="this.style.background=\'#0f172a\'">'
-            + 'Im Briefing oeffnen'
-            + '<span style="font-size:14px;line-height:1;">\u2192</span>'
-            + '</a></div>';
-    }
-
-    function buildAnalysisHtml(a) {
-        var safetyStatus = a.safety_status || 'error';
-        var quality = getQuality(a);
-        var phase2Ok = (safetyStatus === 'safe' || safetyStatus === 'conditional');
-
-        var html = '<div class="mg-analysis-view">';
-
-        // ── Hero-Block (RATING_CONCEPT v1.3 §8.6) — identisch zu Spot-Panel.
-        // Ersetzt den alten Decision-Hero-Banner (war doppelt).
-        var stars = getStars(a);
-        var band = getSafetyBand(a);
-        var expScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
-        var safScore = (typeof a.safety_score === 'number') ? a.safety_score : null;
-        var comfortIdx = (typeof a.comfort_index === 'number') ? a.comfort_index : null;
-        // Verdict: nur Status-Wort (analog Spot-Hero). Rating-Ziffer in der Glyph,
-        // Score-Detail in den Pills — keine doppelte Information im Text.
-        var verdictTxt = (band === 'green') ? 'Sicher' :
-                         (band === 'amber') ? 'Vorsicht' :
-                         (band === 'red')   ? 'Nicht fliegbar' : 'Keine Daten';
-        // Rationale: bevorzugt summary; bei error/leerem summary auf safety_feedback,
-        // first no_go_reason oder error-Text zurueckfallen, damit der Hero IMMER
-        // das "Warum" zeigt — keine doppelte "Analyse-Fehler"-Box mehr noetig.
-        var rationale = a.summary || a.safety_feedback || '';
-        if (!rationale) {
-            var firstNoGo = parseArray(a.no_go_reasons)[0];
-            if (firstNoGo) rationale = firstNoGo;
-        }
-        if (!rationale && safetyStatus === 'error') {
-            rationale = a.error || 'Bedingungen sind eindeutig nicht fliegbar — keine detaillierte Analyse erstellt.';
-        }
-        var rationaleShort = '';
-        if (rationale) {
-            var firstDot = rationale.indexOf('.');
-            rationaleShort = firstDot > 30 ? rationale.substring(0, firstDot + 1) : rationale.substring(0, 140);
-        }
-        // Glyph: Kreis in Safety-Farbe, weisse Rating-Ziffer 1-5 oder weisses Kreuz (red)
-        var glyphSize = 96;
-        var gC = glyphSize / 2;
-        var gR = glyphSize * 0.32;
-        var pal = {
-            green:   { fill: '#22c55e', stroke: '#15803d' },
-            amber:   { fill: '#f59e0b', stroke: '#92400e' },
-            red:     { fill: '#ef4444', stroke: '#991b1b' },
-            no_data: { fill: '#9ca3af', stroke: '#6b7280' }
-        };
-        var pc = pal[band] || pal.no_data;
-        var glyphSvg = '<svg width="' + glyphSize + '" height="' + glyphSize + '" viewBox="0 0 ' + glyphSize + ' ' + glyphSize + '" aria-hidden="true">';
-        glyphSvg += '<circle cx="' + gC + '" cy="' + gC + '" r="' + gR + '" fill="' + pc.fill + '" stroke="' + pc.stroke + '" stroke-width="3"/>';
-        if (band === 'red') {
-            var arm = gR * 0.55;
-            glyphSvg += '<line x1="' + (gC - arm) + '" y1="' + (gC - arm)
-                + '" x2="' + (gC + arm) + '" y2="' + (gC + arm)
-                + '" stroke="#fff" stroke-width="6" stroke-linecap="round"/>';
-            glyphSvg += '<line x1="' + (gC + arm) + '" y1="' + (gC - arm)
-                + '" x2="' + (gC - arm) + '" y2="' + (gC + arm)
-                + '" stroke="#fff" stroke-width="6" stroke-linecap="round"/>';
-        } else if (stars >= 1) {
-            glyphSvg += '<text x="' + gC + '" y="' + (gC + gR * 0.34)
-                + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
-                + (gR * 0.85).toFixed(1) + '" font-weight="700">' + stars + '</text>';
-        }
-        glyphSvg += '</svg>';
-
-        html += '<div class="mga-hero ' + band + '">'
-            + '<div class="mga-hero-glyph">' + glyphSvg + '</div>'
-            + '<div class="mga-hero-text">'
-            + '<div class="mga-hero-verdict ' + band + '">' + escHtml(verdictTxt) + '</div>';
-        if (rationaleShort) {
-            html += '<div class="mga-hero-rationale">' + escHtml(rationaleShort) + '</div>';
-        }
-        html += '<div class="mga-hero-pills">';
-        html += '<span class="mga-hero-pill ' + band + '">Safety ' + band.toUpperCase() + '</span>';
-        if (safScore !== null)  html += '<span class="mga-hero-pill">Safety-Score ' + safScore + '/100</span>';
-        if (expScore !== null)  html += '<span class="mga-hero-pill">Experience ' + expScore + '/100</span>';
-        if (comfortIdx !== null) html += '<span class="mga-hero-pill">Comfort ' + Math.round(comfortIdx) + '/100</span>';
-        html += '</div></div></div>';
-
-        // 7-Tage-Sparkline + Top-Spots + CTA (RATING_CONCEPT v1.3 §4.3)
-        html += buildSparklineHtml(overlayRid, a.date)
-              + buildTopSpotsHtml(overlayRid, a.date)
-              + buildCtaHtml(overlayRid, a.date);
-
-        // Bei echtem Daten-Loch (no_data) frueher abbrechen — sonst weiter
-        // zu Alerts (no_go_reasons + caution_notes + Override-Begruendung).
-        // Bei error: Fehler-Hinweis zeigen aber Alerts trotzdem rendern.
-        if (safetyStatus === 'no_data') {
-            var info = a.safety_feedback || a.summary || '';
-            if (info) {
-                html += '<div style="padding:8px 12px;font-size:12.5px;color:var(--color-text-light);line-height:1.5;">'
-                    + escHtml(info) + '</div>';
-            }
-            html += '</div>';
-            return html;
-        }
-        // Frueher: bei safetyStatus === 'error' wurde ein prominenter roter
-        // "Analyse-Fehler / Diese Region konnte nicht zuverlaessig analysiert
-        // werden"-Kasten gezeigt. Entfernt: der Hero traegt den Verdict +
-        // Rationale (mit Fallback auf safety_feedback/no_go/error), und Alerts/
-        // Insights unten zeigen Details. Der rote Kasten war Rauschen ohne
-        // Zusatznutzen.
-
-        // ── Level 2: Best Window ──
-        // Auf nicht-fliegbaren Tagen ist "Bestes Fenster: keins" reines Rauschen
-        // — der Hero sagt schon "Nicht fliegbar". Filter daher leere/keine-Werte.
-        var bestWindow = a.safe_window || a.best_window || '';
-        var bestWindowClean = (bestWindow || '').toString().trim().toLowerCase();
-        var bestWindowEmpty = !bestWindow
-            || bestWindowClean === 'keins' || bestWindowClean === 'kein'
-            || bestWindowClean === '-' || bestWindowClean === '\u2013' || bestWindowClean === '\u2014';
-        if (bestWindow && !bestWindowEmpty) {
-            html += '<div class="mga-window">'
-                + '<div>'
-                + '<div class="mga-window-label">Bestes Fenster</div>'
-                + '<div class="mga-window-time">' + escHtml(bestWindow) + '</div>'
-                + '</div>'
-                + '</div>';
-        }
-
-        // ── Level 4: Safety & Quality Alerts ──
-        var noGoReasons = parseArray(a.no_go_reasons);
-        var cautionNotes = parseArray(a.caution_notes);
-        var flyabilityLimits = parseArray(a.flyability_limits);
-        var highlightNotes = parseArray(a.highlights);
-        var foehnRisk = (a.foehn_risk || '').toString().toLowerCase();
-        var hasFoehnInNotes = cautionNotes.concat(noGoReasons).some(function(t) {
-            var s = (t || '').toString().toLowerCase();
-            return s.indexOf('föhn') >= 0 || s.indexOf('foehn') >= 0;
-        });
-        var showFoehnBadge = (foehnRisk && foehnRisk !== 'none') && !hasFoehnInNotes;
-        if (noGoReasons.length > 0 || cautionNotes.length > 0 || flyabilityLimits.length > 0 || highlightNotes.length > 0 || showFoehnBadge) {
-            html += '<div class="mga-alerts">';
-            noGoReasons.forEach(function(r) {
-                html += '<div class="mga-alert nogo">'
-                    + '<div class="mga-alert-icon">\u2715</div>'
-                    + '<div>' + escHtml(r) + '</div></div>';
-            });
-            cautionNotes.forEach(function(n) {
-                html += '<div class="mga-alert caution">'
-                    + '<div class="mga-alert-icon">!</div>'
-                    + '<div>' + escHtml(n) + '</div></div>';
-            });
-            if (showFoehnBadge) {
-                var foehnLabel = foehnRisk === 'high' ? 'Föhn-Gefahr' : 'Föhn-Vorsicht';
-                var foehnCls = foehnRisk === 'high' ? 'nogo' : 'caution';
-                var foehnIcon = foehnRisk === 'high' ? '\u2715' : '!';
-                html += '<div class="mga-alert ' + foehnCls + '">'
-                    + '<div class="mga-alert-icon">' + foehnIcon + '</div>'
-                    + '<div>' + escHtml(foehnLabel) + ' (foehn_risk: ' + escHtml(foehnRisk) + ')</div></div>';
-            }
-            if (phase2Ok) {
-                flyabilityLimits.forEach(function(l) {
-                    html += '<div class="mga-alert flyability">'
-                        + '<div class="mga-alert-icon">\u2193</div>'
-                        + '<div>' + escHtml(l) + '</div></div>';
-                });
-                highlightNotes.forEach(function(h) {
-                    html += '<div class="mga-alert positive">'
-                        + '<div class="mga-alert-icon">\u2713</div>'
-                        + '<div>' + escHtml(h) + '</div></div>';
-                });
-            }
-            html += '</div>';
-        }
-
-        // ── Level 3: Key Metrics Grid ──
-        // Auf nicht-fliegbaren / fehlerhaften Tagen sind Wind/Flugtyp/XC-Felder
-        // entweder leer ("Wind: -") oder negativ ("Streckenflug: kein XC") — reines
-        // Rauschen, das dem Hero-Verdict widerspricht. Block komplett ueberspringen.
-        var hideMetrics = (safetyStatus === 'not_safe' || safetyStatus === 'error');
-        if (!hideMetrics) {
-        html += '<div class="mga-metrics">';
-        html += '<div class="mga-metric full-width">'
-            + '<div class="mga-metric-label">Wind</div>'
-            + '<div class="mga-metric-value">' + escHtml(a.wind_summary || '-') + '</div>'
-            + '</div>';
-
-        if (phase2Ok) {
-            if (a.flight_type) {
-                html += '<div class="mga-metric">'
-                    + '<div class="mga-metric-label">Flugtyp</div>'
-                    + '<div class="mga-metric-value">' + escHtml(a.flight_type) + '</div>'
-                    + '</div>';
-            }
-            var duration = a.flight_duration_estimate || a.flight_duration || '';
-            if (duration) {
-                html += '<div class="mga-metric">'
-                    + '<div class="mga-metric-label">Dauer</div>'
-                    + '<div class="mga-metric-value">' + escHtml(duration) + '</div>'
-                    + '</div>';
-            }
-            if (a.peak_climb_rate) {
-                html += '<div class="mga-metric">'
-                    + '<div class="mga-metric-label">Peak Thermik</div>'
-                    + '<div class="mga-metric-value">' + escHtml(a.peak_climb_rate) + ' m/s</div>'
-                    + '</div>';
-            }
-            if (a.xc_potential) {
-                html += '<div class="mga-metric">'
-                    + '<div class="mga-metric-label">XC-Potenzial</div>'
-                    + '<div class="mga-metric-value">' + escHtml(a.xc_potential) + '</div>'
-                    + '</div>';
-            }
-        }
-        html += '</div>';
-        }  // ende !hideMetrics
-
-        // ── Level 5: AI Insights (expandable) ──
-        // Auf nicht-fliegbaren Tagen wuerde "Sicherheits-Einschaetzung" nur den
-        // Hero-Rationale-Text wiederholen (beide kommen aus summary/safety_feedback).
-        // Daher unterdruecken — Hero + Alerts genuegen.
-        var safetyFeedback = hideMetrics ? '' : (a.safety_feedback || a.summary || '');
-        var flyFeedback = (hideMetrics || !phase2Ok) ? '' : (a.flyability_feedback || a.recommendation || '');
-
-        if (safetyFeedback || flyFeedback) {
-            html += '<div class="mga-insights">';
-            if (safetyFeedback) {
-                html += '<div class="mga-insight safety open">'
-                    + '<button class="mga-insight-toggle" type="button">Sicherheits-Einschätzung</button>'
-                    + '<div class="mga-insight-body">' + escHtml(safetyFeedback) + '</div>'
-                    + '</div>';
-            }
-            if (flyFeedback) {
-                html += '<div class="mga-insight flyability' + (safetyFeedback ? '' : ' open') + '">'
-                    + '<button class="mga-insight-toggle" type="button">Flug-Einschätzung</button>'
-                    + '<div class="mga-insight-body">' + escHtml(flyFeedback) + '</div>'
-                    + '</div>';
-            }
-            html += '</div>';
-        }
-
-        // Timestamp
-        if (a.updated_at) {
-            var d = new Date(a.updated_at);
-            var ts = d.toLocaleDateString('de-CH') + ' ' + d.toLocaleTimeString('de-CH', {hour:'2-digit', minute:'2-digit'});
-            html += '<div class="mg-analysis-datestamp">Analyse: ' + ts + '</div>';
-        }
-
-        html += '</div>';
-        return html;
-    }
 
     // Track current overlay state for day switching
     var overlayRid = null;
+
+    // Rendert die Analyse-View (shared Modul) plus Region-only Top-Spots-Liste
+    // als separaten Block UNTER der Analyse. Aufrufer: openRegionOverlay (initial)
+    // und updateOverlayAnalysis (Tag-Wechsel).
+    function renderRegionAnalysisInto(bodyEl, dayData, dateStr, rid) {
+        if (!bodyEl) return;
+        var regionName = (meteogramCache[rid] && meteogramCache[rid].regionName) || rid;
+        var data = dayData || { region_name: regionName, safety_status: 'no_data' };
+
+        bodyEl.innerHTML = '';
+        var analysisContainer = document.createElement('div');
+        bodyEl.appendChild(analysisContainer);
+        if (window.AnalysisView && window.AnalysisView.render) {
+            window.AnalysisView.render(analysisContainer, data, { dateStr: dateStr });
+        }
+
+        // Top-Spots-Block — nur sinnvoll wenn die Region fliegbar ist UND Spot-
+        // Daten geladen sind. Bei not_safe / no_data ueberspringen.
+        var ss = data.safety_status;
+        if (rid && dateStr && spotAnalyses && (ss === 'safe' || ss === 'conditional')) {
+            var topHtml = buildTopSpotsHtml(rid, dateStr);
+            if (topHtml) {
+                var sep = document.createElement('div');
+                sep.innerHTML = topHtml;
+                bodyEl.appendChild(sep);
+            }
+        }
+    }
 
     function updateOverlayAnalysis(rid, dateStr) {
         var asideEl = document.querySelector('.region-overlay-analysis');
@@ -857,19 +565,7 @@
         var bodyEl = asideEl.querySelector('.meteogram-aside-body') || asideEl;
         var ra = regionAnalyses ? regionAnalyses[rid] : null;
         var dayData = ra ? ra[dateStr] : null;
-        var regionName = (meteogramCache[rid] && meteogramCache[rid].regionName) || rid;
-        bodyEl.innerHTML = buildAnalysisHtml(
-            dayData || { region_name: regionName, safety_status: 'no_data' }
-        );
-        // Re-wire expandable insight toggles
-        bodyEl.querySelectorAll('.mga-insight-toggle').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                btn.parentElement.classList.toggle('open');
-            });
-        });
-        // Re-wire sparkline pill clicks
-        wireSparklineClicks();
+        renderRegionAnalysisInto(bodyEl, dayData, dateStr, rid);
         renderRegionFeedbackBar(rid, dateStr, dayData);
     }
 
@@ -906,8 +602,7 @@
         // collapsible aside below (mobile) / right (desktop). On mobile the
         // aside starts collapsed so the meteogram is the primary view —
         // identical pattern to map.js.
-        var initialDate = regionActiveDate[rid] || currentDate || window.currentDate || '';
-        var analysisHtml = buildAnalysisHtml(a);
+        var initialDate = regionActiveDate[rid] || currentDate || window.currentDate || a.date || '';
         var isMobile = window.innerWidth <= 640;
         var asideClass = 'region-overlay-analysis meteogram-aside' + (isMobile ? ' collapsed' : '');
         var asideExpanded = isMobile ? 'false' : 'true';
@@ -924,7 +619,7 @@
         bodyHtml += '<span class="meteogram-aside-cta">Tippen zum Aufklappen</span>';
         bodyHtml += '<button class="meteogram-aside-toggle" type="button" aria-label="Analyse ein-/ausblenden" aria-expanded="' + asideExpanded + '">&#x25BE;</button>';
         bodyHtml += '</div>';
-        bodyHtml += '<div class="meteogram-aside-body">' + analysisHtml + '</div>';
+        bodyHtml += '<div class="meteogram-aside-body"></div>';
         bodyHtml += '</aside>';
         bodyHtml += '</div>';
 
@@ -944,18 +639,11 @@
             if (asideHeader) asideHeader.addEventListener('click', toggleAside);
         }
 
-        // Wire up expandable insight toggles
-        overlayBody.querySelectorAll('.mga-insight-toggle').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                btn.parentElement.classList.toggle('open');
-            });
-        });
+        // Initiale Analyse + (sobald da) Top-Spots rendern.
+        var asideBody = asideEl ? asideEl.querySelector('.meteogram-aside-body') : null;
+        renderRegionAnalysisInto(asideBody, a, initialDate, rid);
 
-        // Sparkline-Pills: Klick wechselt den Tag (loest gleitcast-day-change aus)
-        wireSparklineClicks();
-
-        // Top-Spots-Liste lazy nachladen — re-rendert die analyse-aside wenn da
+        // Top-Spots-Liste lazy nachladen — danach Re-Render damit der Block erscheint.
         loadSpotAnalysesLazy().then(function () {
             if (overlayRid === rid && overlay && overlay.classList.contains('visible')) {
                 var d = regionActiveDate[rid] || currentDate || window.currentDate || a.date;

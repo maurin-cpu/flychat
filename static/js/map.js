@@ -117,55 +117,6 @@
         if (typeof window.buildRatingMiniLegend === 'function') {
             window.buildRatingMiniLegend(L, 'bottomleft').addTo(map);
         }
-        _initWelcomeBanner(map);
-    }
-
-    // ===== WELCOME-BANNER =====
-    // Einmaliger Hinweis nach Einfuehrung des 2-Achsen-Ratings (RATING_CONCEPT
-    // v1.3 §8.7). Erscheint beim ersten Karten-Besuch, wird via localStorage
-    // dismissed. Kein Modal, kein blockierender Onboarding-Flow.
-    var _WELCOME_KEY = 'gleitcast_welcome_v1_dismissed';
-    function _initWelcomeBanner(map) {
-        try {
-            if (localStorage.getItem(_WELCOME_KEY)) return;
-        } catch (e) { /* localStorage gesperrt → trotzdem zeigen */ }
-
-        var banner = L.control({ position: 'topright' });
-        banner.onAdd = function () {
-            var div = L.DomUtil.create('div', 'map-welcome-banner');
-            div.innerHTML =
-                '<span class="map-welcome-icon" aria-hidden="true">✦</span>' +
-                '<span class="map-welcome-text">' +
-                  '<b>Neu:</b> Zahl im Marker = Erlebnis (1–5). ' +
-                  'Farbe = Sicherheit (gruen / orange / rot).' +
-                '</span>' +
-                '<button class="map-welcome-link" type="button" data-action="more">Mehr erfahren</button>' +
-                '<button class="map-welcome-close" type="button" aria-label="Schliessen" data-action="close">×</button>';
-
-            div.addEventListener('click', function (e) {
-                var t = e.target;
-                if (!t || !t.dataset || !t.dataset.action) return;
-                e.stopPropagation();
-                if (t.dataset.action === 'more') {
-                    if (typeof window.openRatingInfoOverlay === 'function') window.openRatingInfoOverlay();
-                } else if (t.dataset.action === 'close') {
-                    _dismissWelcomeBanner();
-                }
-            });
-            L.DomEvent.disableClickPropagation(div);
-            return div;
-        };
-        banner.addTo(map);
-        // Reference fuer dismiss
-        _welcomeBannerCtl = banner;
-    }
-    var _welcomeBannerCtl = null;
-    function _dismissWelcomeBanner() {
-        try { localStorage.setItem(_WELCOME_KEY, '1'); } catch (e) {}
-        if (_welcomeBannerCtl) {
-            _welcomeBannerCtl.remove();
-            _welcomeBannerCtl = null;
-        }
     }
 
     // ===== DIRECTION PARSER =====
@@ -247,12 +198,12 @@
         var uid = ++_iconUid;
         var style = mapSafetyBandToStyle(safetyBand);
         var isMobile = window.innerWidth <= 600;
-        // Marker-Groesse hochgezogen: User muss das Rating sofort lesen koennen.
-        // Vorher: 6-10px Radius, Ziffer 9-11px — auf der Karte schwer erkennbar.
-        // Jetzt: 11-15px Radius, Ziffer ~14-18px.
+        // Marker-Groesse: User-Praeferenz "halb so gross" — radius 6-8px.
+        // NICHT vergroessern. Frueher 11-15px war zu dominant; Ziffer skaliert
+        // ueber radius * 1.4 automatisch mit, eine Aenderung hier reicht.
         var svgSize = 44;
         var center = svgSize / 2;
-        var radius = isHighlighted ? (isMobile ? 15 : 13) : (isMobile ? 13 : 11);
+        var radius = isHighlighted ? (isMobile ? 8 : 7) : (isMobile ? 7 : 6);
         var stars = (typeof experienceStars === 'number' && experienceStars >= 0 && experienceStars <= 5)
             ? Math.floor(experienceStars) : 0;
 
