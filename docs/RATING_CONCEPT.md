@@ -1,121 +1,94 @@
 # Gleitcast Rating-Konzept: Risk vs Reward Trennung
 
-**Status**: Draft v1.3 – Konzept aktualisiert nach Preview-Iteration, bereit fuer Implementation
+**Status**: ✅ **v1.3 umgesetzt** (2026-05-01) — Phasen 1+2+3+4a+4b sowie §4.4 Bubble-Matrix vollstaendig implementiert. Aktueller Stand siehe §11 Implementierungs-Status.
 **Autor**: Alex (PM)
-**Datum**: 2026-04-30
+**Datum**: 2026-04-30 (Konzept) / 2026-05-01 (Implementations-Update)
 **Version**: 1.3 (v1.0 Konzept, v1.1 UI-Scan-Optimierung, v1.2 Konsistenz-Check, v1.3 Preview-Erkenntnisse)
 
----
-
-## Aenderungen in v1.3 (Preview-Iteration)
-
-Nach Bau und Review der Preview (`docs/rating_preview.html`) wurden vier Designentscheidungen geaendert:
-
-1. **Pilotenprofil-Filter wird zurueckgestellt** (war §2.2, §8.5 zentraler Pfeiler). Begruendung: vereinfacht Phase 1, vermeidet Profil-Disclaimer-Diskussion. Kann als v1.5 zurueckkommen — siehe §10 Backlog. Im Code keine Hooks.
-2. **Sub-Rating-Symmetrie**: Das bewaehrte 4-Sub-Rating-Pattern (heute nur fuer Fliegbarkeit) wird auf Safety ausgedehnt — siehe neue §3.5. Symmetrische Achsen mit unterschiedlicher Aggregation: Experience nutzt gewichteten Durchschnitt, Safety nutzt **Weakest-Link (MIN)** weil Sicherheit asymmetrisch ist. **5 Safety-Sub-Ratings** (wind/gust/aloft/foehn/weather — letzteres deckt Niederschlag/Gewitter/CAPE/Sicht ab). Bedingt einen vierten Vorab-Fix (§9.4 Fix 4).
-3. **Region-Tab als Leaflet-Karte** (statt Card-Grid mit 7-Tage-Tabelle aus altem §4.3). Polygone aus `data/regionen_polygone_mapped.geojson`, gefaerbt nach `safety_band`. Klick oeffnet Region-Overlay. 2D-Scatter wird zur **regionen-aggregierten Bubble-Matrix** im Briefing-Tab (war 2D-Scatter mit 488 Spots → unleserlich).
-4. **Rote Spots koennen `noAnalysis`-Zustand haben** — wenn Bedingungen so eindeutig nicht fliegbar sind, dass keine vertiefte Auswertung erstellt wird (z.B. Windrichtung passt grundsaetzlich nicht). Spot-Panel zeigt dann Hero + minimalen "Keine Analyse"-Block, kein Meteogramm. Siehe §8.6 Update.
+> **Dokumenten-Charakter**: Dieses Konzept-Dokument enthaelt **Begruendungen** (Benchmarks, Trade-offs, Architektur-Pattern) UND **Migrations-Plaene**. Die Migrations-Plaene (§5, §7, §9.6) sind historisch — sie wurden umgesetzt, siehe §11. Die fachlichen Erklaerungen (§1 Benchmark, §2 Empfehlung, §3 Mapping, §4/§8 UI, §6 Risiken, §10 Backlog) bleiben gueltig als Architektur-Referenz.
 
 ---
 
-## Wie hier weiterarbeiten (Resumption Guide)
+## Aenderungen in v1.3 (alle umgesetzt)
 
-Dieser Abschnitt ist der **Wiedereinstieg fuer eine neue Session**. Lies ihn zuerst, dann TL;DR, dann gezielt die Sektion(en), an denen du arbeitest.
+Nach Bau und Review der Preview (`docs/rating_preview.html`) wurden vier Designentscheidungen geaendert — **alle inzwischen umgesetzt**:
 
-### Was wurde entschieden (kurzfassung)
-
-- **2-Achsen-Modell** fuer Spot-/Region-Bewertung statt heutigem vermischtem `flyability_tier`.
-- Achse 1: **`safety_band`** = `green` / `amber` / `red` — rein Sicherheit (Wind, Boeen, Foehn, Aloft).
-- Achse 2: **`experience_score`** (0–100, dargestellt als 1–5 Sterne) — Erlebniswert (Steigen, produktive Stunden, XC-Potential).
-- Hilfsachse: **`comfort_index`** (0–100) — nur "Texture" im Spot-Panel, nicht Primaer.
-- **Karten-Marker**: Single-Glyph (Sektion 8.2) — innerer Kreis = Safety-Farbe, weisse Ziffer 1–5 = Stars, bei `red` weisses Kreuz statt Ziffer. Wind-Sektor bleibt unveraendert.
-- **Pilotenprofil**-Schalter (Beginner / Intermediate / Advanced / Pro) lebt in der bestehenden Karten-Legende (`map.js:115`), aendert nur Opacity der Marker — nicht die Rohdaten.
-
-### 4 Vorab-Fixes vor Phase-1-Implementation (BLOCKER)
-
-Aus Sektion 9.4 — diese muessen ZUERST passieren, sonst baut Phase 1 auf Sand. **Reihenfolge v1.3: 2 → 1 → 3 → 4** (von einfach zu komplex, jeder Fix testbar fuer sich).
-
-1. **`decide_flyability_downgrade` aufspalten** (`engine/decision_engine.py:361`):
-   - Heute drei verschiedene Trigger im selben Bucket (keine Thermik / Klapper-Gefahr / wenig produktiv).
-   - Aufteilen: rough_pct > 50 → wirkt auf `safety_band` (amber/red); restliche Quality-Trigger → wirkt auf `experience_score`.
-2. **`is_conditional` aus LLM-Hand nehmen**: Heute LLM-gesetzt, verletzt Stage-Inversion. Muss von Decision-Engine deterministisch ueberschrieben werden, analog zu `safety_status`.
-3. **`rating`-Feld** (`engine/_common.py:421`) als Quelle fuer `experience_score` wiederverwenden, NICHT neu erfinden. Es existiert bereits ein deterministisches 0–10-Rating aus 4 Sub-Ratings — restrukturieren statt neu bauen.
-4. **NEU v1.3 — Safety-Sub-Ratings einfuehren** (siehe §3.5): Symmetrie-Erweiterung. LLM-Prompt gibt 4 Safety-Sub-Ratings (wind/gust/aloft/foehn, je 1–10), neue Aggregations-Funktion `_compute_safety_rating` in `engine/_common.py`, neue Cache-Felder. Decision-Engine Hard-Overrides bleiben Vorrang vor Score.
-
-**Empfohlene Implementierungs-Reihenfolge** (geaendert v1.3 von 1→2→3 auf 2→1→3→4):
-- Fix 2 zuerst (kleinster Eingriff, klaert Stage-Inversion-Pattern)
-- Fix 1 danach (Refactor mit Tests, baut auf sauberer Stage-Inversion auf)
-- Fix 3 danach (Skalierung des bestehenden Ratings, kein LLM-Eingriff)
-- Fix 4 zuletzt (LLM-Prompt-Aenderung, broaderer Impact, profitiert von etablierten Test-Patterns aus 1-3)
-
-### Migration in 3 Phasen (aus Sektion 9.6)
-
-| Phase | Inhalt | Aufwand |
-|-------|--------|---------|
-| Vorab-Fixes | 3 Decision-Engine-Refactorings (oben), Tests | 2–3 Tage |
-| Phase 1 | Server liefert `safety_band` + `experience_stars` + `comfort_index`; UI-Karte + Spot-Panel umstellen; `flyability_tier` bleibt im Cache | 5–7 Tage |
-| Phase 2 | Chat-Engine + Mail-Templates auf neue Sprache; `flyability_tier` deprecaten | 4–6 Tage |
-| **Total** | Solo-Entwickler, ueber 2–3 Monate verteilt | **12–16 Tage** |
-
-### Pflicht vor Code (aus Sektion 7 + 8.10)
-
-- 5 User-Interviews mit Mock-Up der neuen Glyphe (Lesbarkeit Ziffer auf 9px Marker, Color-Blind-Test).
-- 1h Anwaltsgespraech zu Disclaimern: "amber/4 Sterne" ist aktivere Empfehlung als heutiges violet — Haftungsperspektive Schweiz.
-- Entscheidung: Soft Cutover oder Klassisch/Neu-Toggle? Empfehlung Soft Cutover (Sektion 8.7), aber Validierung fehlt.
-
-### Wichtigste Dateien fuer die Implementation
-
-- `engine/decision_engine.py` — alle `decide_*`-Funktionen, insbesondere `decide_flyability_downgrade:361`
-- `engine/_common.py:421` — bestehendes `rating`-Feld
-- `engine/analyzers.py` — `_post_process_*`, schreibt `caution_notes` / `no_go_reasons`
-- `engine/weather_context.py` — Cache-Befuellung, productive_thermal_h, rough_pct
-- `engine/chat_orchestrator.py` + `prompts.py` — Chat-Engine-Sprache (Phase 2)
-- `static/js/map.js:174,245,500,528` — `mapSafetyAndQualityToStyle`, `createSpotIcon`, Rating-Badge
-- `static/js/meteogram.js` — `renderAnalysisView` (Spot-Panel)
-- `static/css/style.css:52,86` — `--color-safety-*` Tokens, Tier-Tokens
-- `templates/index.html` — Layout
-- `docs/DECISIONS.md` — kanonische Decision-Tabelle (muss bei Aufspaltung aus Vorab-Fix 1 mitziehen)
-
-### Offene Fragen (zu entscheiden vor Phase 1)
-
-1. Welche Schwellen genau fuer `experience_score` → 1/2/3/4/5 Sterne? Sektion 8.3 nennt Beispiel-Werte, sind aber nicht final.
-2. Wie wird `productive_thermal_h` mit `peak_climb_rate` gewichtet im `experience_score`? Heute gibt es 4 Sub-Ratings im `rating`-Feld — diese behalten oder neu mischen?
-3. Werden `caution_notes` und `no_go_reasons` aufgeteilt nach Achse (safety vs. experience), oder bleiben sie als gemeinsame Liste mit Tag pro Eintrag?
-4. Pilotenprofil-Default: `Intermediate` — ist das richtig, oder sollte das System aus historischen Klick-Mustern lernen (Phase 3)?
-
-### Was NICHT umgekippt wird
-
-- Decision-Engine-Pattern (Stage-Inversion: LLM → Decision-Engine ueberschreibt) bleibt unveraendert.
-- `_decisions_applied`-Tracking bleibt unveraendert, lediglich Decisions wirken auf neue Achsen.
-- Open-Meteo-Datenfluss + Cache-Struktur (`wetterdaten.json`) unveraendert.
-- Wind-Sektor auf Karten-Marker unveraendert.
-
-### Wie weitermachen in einer neuen Session
-
-1. **Diese Datei lesen**, Sektion 8 (UI v1.1) + Sektion 9 (Konsistenz v1.2) im Detail.
-2. `docs/DECISIONS.md` lesen — gibt den Stand der Decision-Engine.
-3. Entscheidung: Beginnen mit Vorab-Fix 1 (`decide_flyability_downgrade` aufspalten)? Wenn ja, Tests in `tests/test_decision_engine.py` ergaenzen, dann implementieren.
-4. Falls die Strategie geaendert werden soll: TL;DR + Sektion 2 + 9.7 sind die "Definition of Concept" — alles andere folgt daraus.
+1. **Pilotenprofil-Filter zurueckgestellt** (war §2.2, §8.5 zentraler Pfeiler). Begruendung: vereinfachte Phase 1, vermied Profil-Disclaimer-Diskussion. Kann als v1.5 zurueckkommen — siehe §10 Backlog. Im Code keine Hooks gebaut.
+2. **Sub-Rating-Symmetrie** ✅ — Das bewaehrte 4-Sub-Rating-Pattern wurde auf Safety ausgedehnt (siehe §3.5). Symmetrische Achsen mit unterschiedlicher Aggregation: Experience nutzt gewichteten Durchschnitt, Safety nutzt **Weakest-Link (MIN)** weil Sicherheit asymmetrisch ist. **5 Safety-Sub-Ratings** (wind/gust/aloft/foehn/weather) sind im Cache.
+3. **Region-Tab als Leaflet-Karte** ✅ — Polygone aus `data/regionen_polygone_mapped.geojson`, gefaerbt nach `safety_band`. Klick oeffnet Region-Overlay. 2D-Scatter ist zur **regionen-aggregierten Bubble-Matrix** im Briefing-Tab geworden (in `static/js/briefing.js` implementiert).
+4. **Rote Spots mit `noAnalysis`-Zustand** ✅ — Spot-Panel zeigt Hero + minimalen "Keine Analyse"-Block, kein Meteogramm. Siehe §8.6.
 
 ---
 
-## TL;DR
+## Architektur-Quickref (Stand 2026-05-01)
 
-Das heutige `flyability_tier` (green/violet/gray) vermischt Sicherheit und Erlebnis und ist deswegen fuer ambitionierte Piloten paternalistisch. Empfehlung:
+> Frueher war hier ein Resumption Guide fuer die Implementation. Das Konzept ist umgesetzt — siehe §11. Dieser Abschnitt fasst stattdessen die finale Architektur kompakt zusammen.
 
-**Zwei-Achsen-Modell mit Pilotenprofil-Filter.** Server liefert deterministisch zwei separate Scores pro Spot/Tag:
+### Was im Cache pro Spot/Region/Tag steht
 
-1. `safety_band` – `green` / `amber` / `red` (Wind, Boeen, Foehn, Aloft – aus bestehendem `safety_status` + Decisions)
-2. `experience_score` – Punktzahl 0–100 (Steigen, produktive Stunden, XC-Potential, Comfort – aus `peak_climb_rate`, `productive_thermal_h`, `tq_danger_h` ohne rough)
+**2-Achsen-Primaer**:
+- `safety_band` ∈ {`green`, `amber`, `red`, `no_data`} — Sicherheits-Achse.
+- `experience_stars` ∈ {0, 1, 2, 3, 4, 5} — Erlebnis-Achse, **User-Sprache: "Rating 1-5"**.
+- `comfort_index` ∈ [0, 100] — Texture-Wert, kein Primaer-Score.
 
-Plus ein dritter Hilfswert:
-3. `comfort_index` – 0–100, getrennt vom Erlebnis (rough_pct, Turbulenz-Profil) – nicht primaerer Score, aber als "Texture" anzeigen.
+**Numerische Sub-Werte** (fuer Sortierung / Praezision):
+- `safety_score` ∈ [0, 100] — `safety_rating × 10` (Weakest-Link aus 5 Sub-Ratings).
+- `experience_score` ∈ [0, 100] — `rating × 10`.
+- `safety_rating`, `rating` (beide 0–10).
 
-**Karte**: Farbe = Safety-Band (Risiko), Sterne 1–5 = Erlebnis (Reward). Doppel-Encoding wie bei Magicseaweed (Sterne fuer Swell + ausgegraute Sterne fuer Wind), aber explizit getrennt: Form/Farbe = Sicherheit, Fuellung = Potential.
+**Compat-Felder** (abgeleitet, fuer Chat / Briefing / Mail):
+- `flyability_tier` ∈ {`gray`, `green`, `violet`, `''`} — abgeleitet aus `(safety_band, experience_stars)` durch `compute_legacy_flyability_tier` (§9.7).
+- `safety_status`, `is_conditional` — bleiben aus LLM + Decision-Engine.
 
-**Pilotenprofil** (Beginner / Intermediate / Advanced / Pro) verschiebt nur Schwellen und Filterung – aendert nichts an den Rohdaten. Pro-Pilot sieht "amber + 5 Sterne" als attraktivsten Tag des Monats; Beginner sieht nur green-Tage.
+### Datenfluss
 
-`flyability_tier` bleibt im Cache als legacy/fallback, ist aber im UI nicht mehr Primaer-Signal.
+```
+LLM Sub-Ratings (4× Flyability + 5× Safety)
+   ↓
+Decision-Engine (deterministisch): Foehn, Aloft, Gust, OverclaimRelax, Flyability-Decisions
+   ↓
+Compute-Funktionen: rating → experience_score/stars; safety_rating → safety_score/band; comfort_index
+   ↓
+compute_legacy_flyability_tier (§9.7) — letzter Schritt, leitet flyability_tier aus 2-Achsen-Werten ab
+   ↓
+Cache (spot_analyses.json / region_analyses.json)
+   ↓
+UI: Karte (Marker-Glyphe), Spot-Panel, Region-Tab (Leaflet), Briefing (mit Bubble-Matrix), Chat
+```
+
+### Wichtigste Files
+
+- `engine/decision_engine.py` — alle `decide_*`-Funktionen + `compute_safety_band`, `compute_comfort_index`, `compute_legacy_flyability_tier`.
+- `engine/_common.py` — `_compute_rating_from_subratings`, `_compute_experience_score/stars`, `_compute_safety_rating/score`.
+- `engine/analyzers.py` — `_post_process_safety_*` und `_post_process_flyability_*` orchestrieren die Pipeline.
+- `prompts.py` + `skills/shared/_safety_subratings.md` + `skills/shared/_safety_experience.md` — LLM-Anweisungen.
+- `static/js/map.js` (Spot-Marker), `static/js/region-map.js` (Region-Polygone), `static/js/briefing.js` (Bubble-Matrix), `static/js/meteogram.js` / `analysis-view.js` (Spot-Panel).
+- `docs/DECISIONS.md` — kanonische Decision- und Compute-Tabelle.
+
+### Was bleibt unangetastet (Architektur-Konstanten)
+
+- Stage-Inversion: LLM → Decision-Engine ueberschreibt deterministisch.
+- `_decisions_applied`-Tracking pro Spot/Tag fuer Debug + Telemetrie.
+- Open-Meteo-Datenfluss + Cache-Struktur (`wetterdaten.json`).
+- Wind-Sektor auf Karten-Marker.
+
+---
+
+## TL;DR (umgesetzt)
+
+Das frueher dominante `flyability_tier` (green/violet/gray) vermischte Sicherheit und Erlebnis und war fuer ambitionierte Piloten paternalistisch. Loesung — jetzt im Code:
+
+**Zwei-Achsen-Modell** ohne Pilotenprofil-Filter (DEFERRED, §10.1). Server liefert deterministisch:
+
+1. `safety_band` – `green` / `amber` / `red` (Wind, Boeen, Foehn, Aloft, Wetter — Hybrid aus 5 LLM-Sub-Ratings + Decision-Engine-Hard-Overrides).
+2. `experience_stars` – 0–5 (User-Sprache: "Rating 1–5"; abgeleitet aus `experience_score` 0–100, der wiederum aus dem `rating`-Feld via 4 LLM-Sub-Ratings stammt).
+
+Plus ein Hilfswert:
+3. `comfort_index` – 0–100, Texture-Wert aus `rough_pct`. Beeinflusst NICHT das Rating.
+
+**Karte**: Single-Glyphe (siehe §8.2) — innerer Kreis = Safety-Farbe, weisse Ziffer 1–5 = Rating, bei `red` weisses Kreuz. Wind-Sektor unveraendert.
+
+`flyability_tier` ist seit Phase 4b **abgeleitet** aus `(safety_band, experience_stars)` via `compute_legacy_flyability_tier` (§9.7) — dient nur noch Chat / Briefing / Mail-Compat.
 
 ---
 
@@ -486,14 +459,14 @@ Experience-Achse:                Safety-Achse:
 
 **Spot-Bemerkung-Logik in `wind_safety_rating`** (User-Feedback v1.3): Default-Idealbereich `WIND_IDEAL_MIN_KMH`–`WIND_IDEAL_MAX_KMH` (typisch 5–20 km/h fuer Thermik-Spots). Soaring-Spots wie Balderen brauchen einen MINDESTWIND aus der Spot-Bemerkung — die Bewertung muss diesen Spot-spezifischen Anforderung folgen, nicht dem Default.
 
-**Implementations-Status** (siehe §9.4 Vorab-Fix #4):
+**Implementations-Status** (alle ✅):
 1. ✅ Prompt erweitert: LLM gibt 5 zusaetzliche Sub-Ratings aus
 2. ✅ `_compute_safety_rating()` + `_compute_safety_score()` in `engine/_common.py` (MIN-Aggregation)
 3. ✅ `safety_rating` und `safety_score` werden im Cache geschrieben (`engine/analyzers.py` 4 Sites)
 4. ✅ `_safety_subratings.md` Skill-File mit Trend-Logik, Spot-Bemerkung, Cloud-Entry-Praezisierung
 5. ✅ `WIND_IDEAL_MIN_KMH` / `WIND_IDEAL_MAX_KMH` in `config.py`
 6. ✅ Tests in `TestSafetyRating` (13 Cases — MIN-Verhalten, Defaults, Clamping, Score-Skalierung)
-7. ⏳ `compute_safety_band()` (mit Hard-Override-Logik aus §3.1) — Phase 1 Frontend-Build
+7. ✅ `compute_safety_band()` mit Hard-Override-Logik aus §3.1 in `engine/decision_engine.py`
 
 **Backwards-Compat:**
 - `safety_status` bleibt unveraendert vom LLM
@@ -676,7 +649,9 @@ Advanced-Pilot vergleicht: Fiesch ist amber, aber 4 Sterne. Atzmaennig ist green
 
 ---
 
-## 5. Migration Path
+## 5. Migration Path (historisch — Plan vor der Umsetzung)
+
+> **Hinweis**: Diese Sektion ist der ursprueng­liche Migrations-Plan vor der Umsetzung. Alle hier genannten Schritte sind durchgefuehrt — siehe §11 fuer den finalen Status. Sektion bleibt erhalten als Dokumentation der schrittweisen Umsetzung.
 
 ### 5.1 Was bleibt
 
@@ -779,24 +754,26 @@ Advanced-Pilot vergleicht: Fiesch ist amber, aber 4 Sterne. Atzmaennig ist green
 
 ---
 
-## 7. Empfohlene naechste Schritte
+## 7. Naechste Schritte (historisch)
 
-1. **User-Interviews** (1 Woche): 5 Piloten aus eigenem Umfeld + Schweizer FB-Gruppen, Mock-Up zeigen, Akzeptanz testen
-2. **Decision-Engine-Erweiterung** (3 Tage): Drei neue Funktionen + Tests + Cache-Felder
-3. **Frontend-Prototyp Beta-Toggle** (5 Tage): Neue Karten-Marker, Spot-Panel-Refactor, Pilot-Profil-Setting
-4. **Skill-Sync + Doku** (1 Tag): `chat_capabilities_guide.md`, `DECISIONS.md`, Help-Center-Eintrag
-5. **Beta-Phase** (4 Wochen): Logging an, Akzeptanz messen, iterieren
-6. **GA-Rollout** (Woche 9+): Default umstellen, alter Tier als Legacy-Toggle
+> **Hinweis**: Dies war der vorgeschlagene Schrittplan vor Implementierungs-Start. Phase-Reihenfolge wurde in §9.6 verfeinert und in den Commits `dfd1618`, `2562920`, `87ae63b`, `6f0049a` umgesetzt. Aktueller Status: §11.
 
-**Erfolgs-Gate fuer GA**: Pro-Profil-User-Anteil >15%, amber-Marker-Klickrate >Beginner-Klickrate (= Profil-Filter funktioniert), Subscriber-Mail-Open-Rate stabil oder besser.
+Ursprünglicher Plan:
+
+1. ~~User-Interviews~~ (zurueckgestellt zusammen mit Pilotenprofil, §10.1).
+2. ✅ Decision-Engine-Erweiterung (mehrere Funktionen + Tests + Cache-Felder).
+3. ✅ Frontend-Anpassung (Karten-Marker, Spot-Panel, Region-Tab — Pilot-Profil-Setting wurde DEFERRED).
+4. ✅ Skill-Sync + Doku (chat_capabilities_guide.md, DECISIONS.md auf 2-Achsen-Sprache).
+5. ⏳ **Live-Validierung steht aus** (User testet im Browser nach Cache-Regen).
+6. — GA-Rollout im Sinne von "Profil-Filter aktiv" entfaellt mangels Profil.
 
 ---
 
 ---
 
-## 8. UI-Optimierung fuer schnellen Scan (Iteration v1.1)
+## 8. UI-Optimierung fuer schnellen Scan (Iteration v1.1 — umgesetzt)
 
-**Status**: Refinement nach User-Feedback 2026-04-30
+**Status**: Refinement nach User-Feedback 2026-04-30 — **alle Loesungen aus §8.2 (Karten-Glyphe), §8.4 (Legende), §8.6 (Spot-Panel) im Code umgesetzt**. §8.5 Pilotenprofil bewusst deferred. §8.7 Migration / §8.8 / §8.9 sind historisch.
 **Trigger**: "Das Ganze muss sich in das bestehende Konzept einbetten, und Flieger muessen schnell und intuitiv sehen koennen, wie gut der Startplatz oder die Region ist."
 
 ### 8.0 Zielbild
@@ -1118,7 +1095,9 @@ Heutiges Panel zeigt Decision-Notes + Meteogramm + Windverlauf. Mit dem neuen Ko
 
 **Implementierungs-Hinweis**: Der `noAnalysis`-Pfad wird vermutlich in der Engine vor dem LLM-Call entschieden — z.B. wenn Wind-Richtung-Filter den Spot bereits aussortiert. Spart LLM-Calls und macht UI klarer.
 
-### 8.7 Migration — wie verhindern wir, dass Bestands-User verwirrt sind?
+### 8.7 Migration — wie verhindern wir, dass Bestands-User verwirrt sind? (historisch)
+
+> **Hinweis**: Migrations-Plan vor der Umsetzung. Die App ist in Entwicklung (kein Produktivbetrieb mit etablierten Subscriber-Erwartungen), deshalb wurde direkt umgestellt — kein Soft-Cutover noetig. Welcome-Banner-Idee wurde im UI-Refactor des Users wieder entfernt.
 
 Heute kennen User die green/violet/gray-Ampel in 3 Levels. v1.1 hat 6 Zustaende (gruen 1–5, amber 1–5, red). Migration muss sanft sein.
 
@@ -1181,9 +1160,9 @@ Diese Stellen in der bestehenden `RATING_CONCEPT.md` sind durch v1.1 superseded 
 
 Der Single-Glyph-Ansatz spart Solo-Entwickler-Zeit, weil er auf der bestehenden `createSpotIcon`-Funktion aufbaut, statt sie zu refaktorieren.
 
-### 8.10 Validation-Checkpoints (vor Build)
+### 8.10 Validation-Checkpoints (historisch — vor Build)
 
-Bevor implementiert wird, muessen folgende Punkte geklaert sein:
+> **Hinweis**: Diese Checkliste war vor der Umsetzung gedacht. Da die App in Entwicklung ist (kein Live-Betrieb), wurde implementiert ohne formelle User-Interviews / Anwaltsgespraech. Falls diese Punkte fuer einen oeffentlichen Launch relevant werden, hier die Original-Liste:
 
 - [ ] **Lesbarkeit der Stern-Ziffer**: Mockup mit 9px Inter-Bold weiss auf `#22c55e` testen (Retina + non-Retina Display, mobiles Squinting). Falls < 4mm Lese-Distanz nicht reicht, auf Sterne als Mini-Glyphen zurueckfallen (5 winzige Punkte).
 - [ ] **Welcome-Banner-Wording**: 5 Bestands-User testen — verstehen sie nach 5 Sekunden was die Glyphe bedeutet?
@@ -1192,7 +1171,9 @@ Bevor implementiert wird, muessen folgende Punkte geklaert sein:
 
 ---
 
-## 9. Konsistenz mit bestehendem Rating-System (Iteration v1.2)
+## 9. Konsistenz mit bestehendem Rating-System (Iteration v1.2 — historisch, alle Brueche geloest)
+
+> **Hinweis**: Diese Sektion war der Konsistenz-Check vor der Umsetzung. Alle 6 Brueche sind in den Commits Phase 1 (Vorab-Fixes) bis Phase 4b geloest. §9.7 (Single Source of Truth) ist die finale Architektur und wurde 1:1 implementiert (`compute_legacy_flyability_tier`).
 
 **Status**: Pflicht-Konsistenzpruefung nach User-Frage 2026-04-30:
 *"Ist das harmonisch in unser bestehendes Rating mit no-go / conditional / gruen etc. eingebettet? Passen diese Konzepte zusammen?"*
@@ -1206,7 +1187,11 @@ Bevor implementiert wird, muessen folgende Punkte geklaert sein:
 **drei Bloss-Stellen** gegenueber dem bestehenden System, die korrigiert
 werden muessen, bevor implementiert wird. Sie sind in 9.4 und 9.5 dokumentiert.
 
-### 9.1 Status quo: was bedeutet was heute?
+### 9.1 Status quo VOR Implementation (historisch)
+
+> **Hinweis**: Diese Tabelle dokumentiert den Stand 2026-04-30 — vor Phase 1. Felder existieren weiterhin im Cache, aber Bedeutungen haben sich gewandelt: `safety_status` ist jetzt 1:1 zu `safety_band` ableitbar, `flyability_tier` ist seit Phase 4b abgeleitet aus 2-Achsen-Werten, `is_conditional` ist seit Vorab-Fix #2 deterministisch, `rating` ist nach Phase 4a orthogonal zum Tier (kein Korridor-Clamp mehr).
+
+**Tabelle "was bedeutet was heute?" (Stand vor Implementation)**:
 
 Das heutige System hat **drei separate Strukturfelder**, die unterschiedlich
 befuellt werden und unterschiedlich wirken. Sie sind nicht so klar getrennt,
@@ -1247,7 +1232,7 @@ die den Tier nach unten zieht. Komfort/Mechanik ist heute also bereits in
 `flyability_tier` mit drin, nicht (wie Sektion 1 implizit andeutet) erst durch
 das neue `comfort_index` zu erfassen.
 
-### 9.2 Mapping bestehend → neu (definitiv)
+### 9.2 Mapping bestehend → neu (definitiv — alle umgesetzt)
 
 | Bestehend (heute)                              | Neu (v1.1/v1.2)                                                                | Mapping-Typ           |
 | ---------------------------------------------- | ------------------------------------------------------------------------------ | --------------------- |
@@ -1273,7 +1258,7 @@ das neue `comfort_index` zu erfassen.
 | `flyability_tier`                              | **Bleibt im Cache als Compatibility-View** fuer Chat + Mail; UI nutzt `safety_band`+`experience_stars` | Legacy-View           |
 | `streckenflug.tier` (kein_xc/lokal/moderat/top) | Bleibt; im Spot-Panel-Detail unter "XC-Potenzial"                              | bleibt                |
 
-### 9.3 Decision-Engine: was wirkt jetzt auf welche Achse?
+### 9.3 Decision-Engine: was wirkt auf welche Achse? (Stand nach Implementation)
 
 Pro Decision: heutige Wirkung → kuenftige Wirkung (v1.2). Reihenfolge wie in
 `docs/DECISIONS.md` Sektion 3-5.
@@ -1297,9 +1282,9 @@ Pro Decision: heutige Wirkung → kuenftige Wirkung (v1.2). Reihenfolge wie in
 | `decide_flyability_region_gate` (Spot violet → green wenn Region nicht violet) | flyability_tier violet → green | experience_stars-Cap fuer Spots ohne Region-Konsens | nur Reward |
 | Hard-Gate `_post_process_flyability_spot:1685` (not_safe → fly_status="") | Flyability-Felder geleert | experience_stars = 0 + Felder geleert | bleibt — safety_band red gibt eh keine Stars |
 
-### 9.4 Brueche und ihre Aufloesung
+### 9.4 Brueche und ihre Aufloesung (alle ✅ umgesetzt)
 
-**Bruch 1: `flyability_tier = gray` ist heute zwei verschiedene Dinge.**
+**Bruch 1: `flyability_tier = gray` ist heute zwei verschiedene Dinge.** ✅ geloest durch `decide_flyability_low_reward` + `decide_flyability_mech_danger` (Vorab-Fix #1).
 
 Ein `gray`-Spot kann aus drei verschiedenen Gruenden grau sein
 (`decide_flyability_downgrade`):
@@ -1321,7 +1306,7 @@ unterschiedlich gemappt werden:
 **Code-Aufwand**: ~20 Zeilen in `decision_engine.py`, +2 Tests.
 
 **Bruch 2: rough_pct ist heute ein Safety-Eingang, im v1.0-Konzept ein
-Comfort-Eingang.**
+Comfort-Eingang.** ✅ geloest durch `decide_flyability_mech_danger` (eskaliert Safety-Status, Vorab-Fix #1).
 
 Sektion 3.2 sagt:
 > *"`rough_pct` geht NICHT in experience_score ein. Rough = mechanisches
@@ -1339,7 +1324,7 @@ schreibt.
 `safety_band = amber` setzt, dann stimmt die Aussage von Sektion 3.2 nachher.
 Voraussetzung: Bruch 1 wird umgesetzt, bevor `comfort_index` produktiv wird.
 
-**Bruch 3: `is_conditional` und `safety_band = amber` ueberlappen.**
+**Bruch 3: `is_conditional` und `safety_band = amber` ueberlappen.** ✅ geloest durch `decide_is_conditional` (deterministisch aus `safety_status`, Vorab-Fix #2).
 
 `is_conditional` wird heute vom LLM gesetzt (Skill-Regeln aus
 `_flyability_tiers.md`), wenn:
@@ -1360,7 +1345,7 @@ darf das Flag setzen, wie er will. Das ist eine Inkonsistenz mit dem Stage-Inver
 - Im Cache bleibt `is_conditional = bool` als Compatibility-Feld
   (Briefing-Frontend liest es).
 
-**Bruch 4: `_TIER_RATING_RANGES` macht Rating und Tier nicht orthogonal.**
+**Bruch 4: `_TIER_RATING_RANGES` macht Rating und Tier nicht orthogonal.** ✅ geloest in Phase 4a — `_TIER_RATING_RANGES` und `_clamp_rating_to_tier` aus `engine/_common.py` entfernt.
 
 Heute clampt `_clamp_rating_to_tier` (`_common.py:402`) das LLM-Rating in
 den Tier-Korridor. Gray-Spots koennen also nie ueber 4.9 sein, violet nie
@@ -1378,7 +1363,7 @@ existiert (bis Mail/Chat umgestellt sind), wird die Tier-Range-Klemme weiter
 angewendet. Nach der Mail/Chat-Migration kann `_clamp_rating_to_tier`
 gestrichen werden.
 
-**Bruch 5: gray→green Override und gray→green Decision-Upgrade sind redundant in v1.2.**
+**Bruch 5: gray→green Override und gray→green Decision-Upgrade sind redundant in v1.2.** ✅ geloest in Phase 4b — `decide_flyability_upgrade` schreibt Tier nicht mehr selbst (Tier wird von der View abgeleitet), korrigiert nur noch Text-Felder (peak_climb_rate, flight_type, recommendation).
 
 Das aktuelle System hat eine Override-Logik (`decide_flyability_upgrade`,
 `decision_engine.py:400`): gray → green wenn `productive_thermal_h ≥
@@ -1400,7 +1385,7 @@ ersetzt (Phase 2), die aus `safety_band` + `experience_stars` rueckwaerts
 auf gray/green/violet mappt. Dann werden beide `decide_flyability_*` zur
 reinen View-Logik.
 
-**Bruch 6 (NEU v1.3): Asymmetrie zwischen Experience- und Safety-Achse.**
+**Bruch 6 (NEU v1.3): Asymmetrie zwischen Experience- und Safety-Achse.** ✅ geloest durch 5 Safety-Sub-Ratings + `_compute_safety_rating` (Weakest-Link MIN, Vorab-Fix #4).
 
 Heute hat die Experience-Seite ein bewaehrtes 4-Sub-Rating-Pattern
 (`engine/_common.py:421`), die Safety-Seite nur eine kategoriale `safety_status`
@@ -1487,7 +1472,11 @@ jede Chat-Antwort.
 auf der Karte amber/4-Sterne, in der Mail steht "violet" — und das ist
 genau der Sprach-Bruch, den der User in seiner Frage befuerchtet.
 
-### 9.6 Migration-Plan v2 (verfeinert nach Konsistenz-Pruefung)
+### 9.6 Migration-Plan v2 (historisch — komplett umgesetzt)
+
+> **Hinweis**: Dieser Plan war Stand vor der Implementierung. Alle Phasen sind durch (siehe §11). Sektion bleibt erhalten als Doku der schrittweisen Umsetzung mit Aufwands-Schaetzungen, die sich im Wesentlichen bestaetigt haben.
+
+**Original-Plan**:
 
 **Ablehnen**: Der "Soft Cutover" aus Sektion 8.7 ist unter Phase 1 alleine
 machbar — der gleichzeitige Cut von UI + Chat + Mail waere ein
@@ -1555,45 +1544,34 @@ Faellen aequivalent (amber+4 ≈ green) und durch das Welcome-Banner erklaerbar.
 - Phase 4 (war 3): Legacy aufraumen — 1-2 Tage
 - **Gesamt: ~19-25 Tage** ueber 2-3 Kalendermonate (war 12-16, +Safety-Sub-Ratings + Regionen-Tab)
 
-### 9.7 Empfehlung: Single Source of Truth
+### 9.7 Single Source of Truth (finale Architektur, ab Phase 4b umgesetzt)
 
-**Neue Default-Architektur (ab Phase 3)**:
+**Default-Architektur seit Phase 4b**:
 
-Decision-Engine produziert **ausschliesslich**:
-1. `safety_band` (`green` / `amber` / `red` / `neutral`)
-2. `experience_score` (0-100)
-3. `experience_stars` (1-5, abgeleitet aus experience_score via Schwellen)
-4. `comfort_index` (0-100)
-5. `_decisions_applied` (Tracking, unveraendert)
-6. `caution_notes`, `no_go_reasons`, `primary_no_go` (Listen, unveraendert)
-7. `foehn_risk` (unveraendert)
+Decision-Engine + Compute-Funktionen produzieren als **primaere Werte**:
+1. `safety_band` (`green` / `amber` / `red`)
+2. `experience_score` (0-100) und `experience_stars` (0-5; User-Sprache: "Rating 1-5")
+3. `comfort_index` (0-100)
+4. `_decisions_applied` (Tracking)
+5. `caution_notes`, `no_go_reasons`, `primary_no_go`
+6. `foehn_risk`
+7. `safety_rating` (0-10, Weakest-Link aus 5 Sub-Ratings) und `safety_score` (= rating × 10)
 
-**Compat-View-Funktionen** (im Cache mit-persistiert, fuer Chat/Mail/Briefing):
-- `flyability_tier`: berechnet aus (safety_band, experience_stars). Regel:
+**Abgeleitete Compat-Felder** (im Cache mit-persistiert, fuer Chat/Mail/Briefing):
+- `flyability_tier`: berechnet via `compute_legacy_flyability_tier` aus `(safety_band, experience_stars)`. Regel:
   `red → ""`, `experience_stars >= 4 AND safety_band == "green" → "violet"`,
-  `experience_stars >= 2 → "green"`, sonst `"gray"`.
-- `safety_status`: 1:1 abgeleitet aus safety_band (green→safe, amber→conditional,
-  red→not_safe).
-- `is_conditional`: `safety_band == "amber"`.
-- `rating`: linear aus experience_score (z.B. `rating = experience_score / 10`),
-  ggf. mit Saturation bei not_safe = 0.
+  `experience_stars >= 2 → "green"`, sonst `"gray"`. **Implementiert** in `engine/decision_engine.py`.
+- `safety_status` und `is_conditional`: bleiben aus LLM + Decision-Engine (nicht 1:1 aus safety_band — Hard-Overrides sind komplexer als linear-mappbar).
+- `rating`: weiterhin aus `_compute_rating_from_subratings` (bewaehrte Aggregation 35/25/25/15 bzw. 30/20/10/15/25 fuer Spot mit altitude_rating).
 
-**Pro Single Source of Truth**: Es ist klar, wer schreibt und wer liest.
-Heute setzt LLM einige Felder, Decision-Engine ueberschreibt einige, andere
-sind LLM-only (`is_conditional`!) — das ist die Quelle des Bruchs 3.
+**Eingehaltene Konsequenzen**:
+- LLM kann `flyability_tier` weiterhin setzen — wird aber von der View ueberschrieben.
+- `decide_flyability_*`-Funktionen schreiben `flyability_tier` nicht mehr direkt; sie tracken via Tag und fuehren Cross-Cutting-Effekte aus (Safety-Eskalation, Text-Korrekturen).
+- `_TIER_RATING_RANGES` und `_clamp_rating_to_tier` sind in Phase 4a entfernt; Rating ist orthogonal zum Tier.
 
-**Contra (ehrlich)**: Der Compat-Layer ist zusaetzlicher Code. Wenn die
-Phase-2-Migration zu lange dauert (z.B. Mail-Templates sind manuell und
-viele Subscriber haben Custom-Konfigurationen), bleibt der Compat-Layer
-laenger als geplant. Das ist akzeptabel, solange er als View-Funktion
-implementiert ist, nicht als doppelte Schreib-Logik.
+**Pro Single Source of Truth**: Klar, wer schreibt und wer liest. Tier-Inkonsistenzen zwischen LLM-Output und Cache-Daten faengt die View automatisch ab.
 
-**Klare Stellungnahme**: **Decision-Engine produziert kuenftig
-safety_band + experience_stars + comfort_index als Source of Truth**;
-flyability_tier, safety_status, is_conditional, rating sind abgeleitete
-View-Werte. Damit ist das Konzept v1.1 harmonisch in das bestehende System
-eingebettet — vorausgesetzt, die Brueche 1-5 in 9.4 werden vor der
-Implementation aufgeloest.
+**Contra**: Wenn das LLM trotz guter Cache-Daten konsistent niedrige Sub-Ratings setzt, fallen Stars niedrig aus → View-Tier wird gray → kein Sicherheits-Net mehr (im Gegensatz zur frueheren `decide_flyability_upgrade`-Tier-Korrektur). Mitigation: `decide_flyability_upgrade` korrigiert weiterhin die Text-Felder (peak_climb_rate, flight_type, recommendation), so dass diese Inkonsistenz im Spot-Panel sichtbar wird.
 
 ---
 
