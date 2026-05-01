@@ -327,8 +327,8 @@ def decide_is_conditional(result: dict, label: str) -> Optional[str]:
     A2-Logik (RATING_CONCEPT v1.3, Vorab-Fix #2):
       - safety_status == "conditional"  → is_conditional = True (Engine-Override).
         Der LLM darf das Flag bei `safe` weiterhin selbst setzen (Soft-Warnungen
-        wie tiefe Wolkenbasis oder Hoehen-Turbulenz, siehe `_flyability_tiers.md`
-        Trigger 3+4) — die Engine ueberschreibt nur fuer conditional + not_safe.
+        wie tiefe Wolkenbasis oder Hoehen-Turbulenz, siehe `_safety_experience.md`
+        Trigger 1+2) — die Engine ueberschreibt nur fuer conditional + not_safe.
       - safety_status == "not_safe"     → is_conditional = False (Sanity-Clamp).
         Korrigiert LLM-Fehler. `conditional_reason` wird ebenfalls geleert.
       - safety_status == "safe"         → kein Override. LLM behaelt Hand.

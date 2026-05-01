@@ -412,8 +412,8 @@ class TestFlyabilityDecisions(unittest.TestCase):
 # A2-Logik:
 #   - safety_status == "conditional"  → is_conditional = True  (Engine-Override)
 #   - safety_status == "not_safe"     → is_conditional = False (Sanity-Clamp)
-#   - safety_status == "safe"         → LLM behaelt Hand (Trigger 3+4 aus
-#                                       _flyability_tiers.md: Wolkenbasis,
+#   - safety_status == "safe"         → LLM behaelt Hand (Trigger 1+2 aus
+#                                       _safety_experience.md: Wolkenbasis,
 #                                       Hoehen-Turbulenz)
 class TestIsConditional(unittest.TestCase):
     def _baseline(self, safety_status="safe", is_cond=False, reason=""):

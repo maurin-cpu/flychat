@@ -101,7 +101,7 @@ skills/spot_analysis.md (Template)
 
 skills/shared/ (656 Lines, ~56 KB)  — komplett in JEDEM Combined-Call drin
   ├─ _hazard_blocks.md     21 KB  → eigentlich nur SAFETY relevant
-  ├─ _flyability_tiers.md   7 KB  → nur FLYABILITY
+  ├─ _safety_experience.md  7 KB  → nur FLYABILITY (war _flyability_tiers.md)
   ├─ _subratings_tables.md  4 KB  → nur FLYABILITY
   ├─ _tages_override.md     4 KB  → nur FLYABILITY
   ├─ _input_map.md          6 KB  → BEIDE
@@ -122,7 +122,7 @@ skills/
     _input_map.md            → in BEIDEN
     _formulierungs_tab.md    → in BEIDEN
     _hazard_blocks.md        → NUR in *_safety.md  ← der dicke Brocken (21 KB)
-    _flyability_tiers.md     → NUR in *_flyability.md
+    _safety_experience.md    → NUR in *_flyability.md
     _subratings_tables.md    → NUR in *_flyability.md
     _tages_override.md       → NUR in *_flyability.md
 ```
@@ -167,7 +167,7 @@ skills/
 
 **Größte Brocken:**
 - `_hazard_blocks.md` — 21 KB (~5,200 tokens) — viele Edge-Case-Erklärungen
-- `_flyability_tiers.md` — 7 KB
+- `_safety_experience.md` — 7 KB
 - `_input_map.md` — 6 KB
 
 **Umsetzung:**

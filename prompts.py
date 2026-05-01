@@ -32,7 +32,7 @@ _SHARED_BLOCKS = [
     "_hazard_blocks.md",
     "_tages_override.md",
     "_safety_subratings.md",
-    "_flyability_tiers.md",
+    "_safety_experience.md",
     "_formulierungs_tabelle.md",
     "_subratings_tables.md",
 ]
@@ -50,7 +50,7 @@ _SHARED_BLOCKS_SAFETY = [
 _SHARED_BLOCKS_FLYABILITY = [
     "_core_principles.md",
     "_input_map.md",
-    "_flyability_tiers.md",
+    "_safety_experience.md",
     "_formulierungs_tabelle.md",
     "_subratings_tables.md",
 ]
