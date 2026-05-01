@@ -404,5 +404,63 @@
     </div>
   </section>
 
+  {# ─────────────────────────────────────────────────────────── #}
+  {# 5. Human-Review-Queue                                        #}
+  {# ─────────────────────────────────────────────────────────── #}
+  <section class="sp-card ts-section">
+    <h2 class="ts-section__title">5. Review-Queue (Mensch beurteilt Diffs)</h2>
+    <p class="ts-section__hint">
+      Wenn die Regression viele Diffs zeigt, koennen die nicht alle automatisch
+      als „schlechter" gelten — ein neuer Output kann auch <strong>besser</strong> sein
+      als der eingefrorene Goldstandard. Hier wird eine stratifizierte Stichprobe
+      aus den Diffs gezogen, du beurteilst jeden Case per Klick (besser/gleich/schlechter),
+      und das Aggregat entscheidet ueber PASS/FAIL.
+    </p>
+
+    {% if status.latest_queue_json %}
+      <div class="ts-meta">
+        <dt>Letzte Queue-Datei</dt>
+        <dd><code>{{ status.latest_queue_json }}</code></dd>
+      </div>
+      <form method="post" action="/admin/testing/review/start" class="ts-actions">
+        <label style="font-size:var(--text-sm);align-self:center;">
+          Stichprobengroesse:
+          <input type="number" name="sample_size" min="1" max="50" value="10"
+                 style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);">
+        </label>
+        <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit">
+          Review-Session starten (aus juengster Queue)
+        </button>
+      </form>
+    {% else %}
+      <div class="ts-meta ts-meta--empty">
+        Noch keine Queue-Datei vorhanden — erst eine Regression in Sektion 4 laufen lassen.
+        Bei Diffs wird automatisch eine Queue-Datei geschrieben.
+      </div>
+    {% endif %}
+
+    {% if status.review_sessions %}
+      <div style="margin-top:18px;">
+        <strong style="font-size:var(--text-sm);">Letzte Review-Sessions</strong>
+        <ul style="list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:4px;">
+          {% for rs in status.review_sessions %}
+            <li style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 10px;background:#f9fafb;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:var(--text-sm);">
+              <a href="/admin/testing/review/{{ rs.session_id }}" style="color:var(--color-primary);font-family:ui-monospace,monospace;text-decoration:none;">{{ rs.session_id }}</a>
+              <span style="color:var(--color-text-secondary);font-size:12px;">
+                {{ rs.created_at }} &middot;
+                {{ rs.n_reviewed }}/{{ rs.n_cases }} reviewt
+                {% if rs.verdict %}
+                  &middot;
+                  <strong style="color:{% if rs.verdict == 'PASS' %}#22863a{% elif rs.verdict == 'FAIL' %}#b71c1c{% else %}#6b4f00{% endif %};">{{ rs.verdict }}</strong>
+                {% endif %}
+                {% if rs.promoted_count %} &middot; {{ rs.promoted_count }} promoted{% endif %}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </section>
+
 </main>
 {% endblock %}

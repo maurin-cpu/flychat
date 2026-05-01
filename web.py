@@ -1291,8 +1291,9 @@ def admin_testing_run_regression():
     ts = _dt.datetime.now().strftime("%Y-%m-%d_%H%M%S")
     report_name = f"reg_{mode}_{ts}.md"
     report_path = test_mode.REPORTS_DIR / report_name
+    queue_path = test_mode.REPORTS_DIR / f"reg_{mode}_{ts}_queue.json"
 
-    args = ["--report", str(report_path)]
+    args = ["--report", str(report_path), "--queue-output", str(queue_path)]
     if mode == "no_llm":
         args.append("--no-llm")
     if max_cases > 0:
@@ -1305,7 +1306,105 @@ def admin_testing_run_regression():
     # rc != 0 bei score_regression.py heisst FAIL — Report wurde trotzdem geschrieben.
     status_word = "PASS" if rc == 0 else "FAIL"
     qs = f"ok=Regression+{status_word}+%28{duration:.1f}s%29+%E2%86%92+{report_name}"
+    if rc != 0 and queue_path.exists():
+        qs += "+-+Review-Queue+verfuegbar"
     return redirect(f"/admin/testing?{qs}")
+
+
+@app.route("/admin/testing/review/start", methods=["POST"])
+@_require_admin
+def admin_testing_review_start():
+    """Startet eine Review-Session aus der juengsten queue-JSON-Datei.
+
+    Form: sample_size (int, default 10).
+    """
+    from engine import test_mode
+    try:
+        sample_size = int(request.form.get("sample_size") or test_mode.REVIEW_DEFAULT_SAMPLE_SIZE)
+    except ValueError:
+        sample_size = test_mode.REVIEW_DEFAULT_SAMPLE_SIZE
+    sample_size = max(1, min(sample_size, 50))
+
+    queue_json = test_mode.latest_queue_json()
+    if queue_json is None:
+        return redirect("/admin/testing?err=Keine+Queue-Datei+gefunden+-+erst+Regression+laufen+lassen")
+
+    try:
+        result = test_mode.start_review_session(queue_json, sample_size=sample_size)
+    except (FileNotFoundError, ValueError) as e:
+        return redirect(f"/admin/testing?err=Review-Start+fehlgeschlagen:+{e}")
+
+    return redirect(f"/admin/testing/review/{result['session_id']}")
+
+
+@app.route("/admin/testing/review/<session_id>", methods=["GET"])
+@_require_admin
+def admin_testing_review_show(session_id):
+    """Rendert die Side-by-Side-Review-UI fuer eine Session."""
+    from engine import test_mode
+    session = test_mode.load_review_session(session_id)
+    if session is None:
+        return ("Review-Session nicht gefunden", 404, {"Content-Type": "text/plain; charset=utf-8"})
+
+    # Vorabaggregation fuer Anzeige (kein finalize, nur Counts)
+    cases = session.get("cases") or []
+    counts = {
+        "better": sum(1 for c in cases if c.get("verdict") == test_mode.VERDICT_BETTER),
+        "same":   sum(1 for c in cases if c.get("verdict") == test_mode.VERDICT_SAME),
+        "worse":  sum(1 for c in cases if c.get("verdict") == test_mode.VERDICT_WORSE),
+        "open":   sum(1 for c in cases if c.get("verdict") is None),
+    }
+    return render_template(
+        "admin/testing_review.html",
+        session=session,
+        counts=counts,
+        flash_ok=request.args.get("ok", ""),
+        flash_error=request.args.get("err", ""),
+    )
+
+
+@app.route("/admin/testing/review/<session_id>/<int:case_idx>/verdict", methods=["POST"])
+@_require_admin
+def admin_testing_review_verdict(session_id, case_idx):
+    """Speichert ein Verdict (better/same/worse) fuer einen einzelnen Case."""
+    from engine import test_mode
+    verdict = (request.form.get("verdict") or "").strip()
+    comment = request.form.get("comment") or ""
+    try:
+        test_mode.save_verdict(session_id, case_idx, verdict, comment)
+    except ValueError as e:
+        return redirect(f"/admin/testing/review/{session_id}?err={e}")
+    return redirect(f"/admin/testing/review/{session_id}?ok=Case+%23{case_idx}+gespeichert#case-{case_idx + 1}")
+
+
+@app.route("/admin/testing/review/<session_id>/finalize", methods=["POST"])
+@_require_admin
+def admin_testing_review_finalize(session_id):
+    """Aggregiert alle Verdicts → PASS/FAIL/AMBIGUOUS."""
+    from engine import test_mode
+    try:
+        result = test_mode.finalize_session(session_id)
+    except ValueError as e:
+        return redirect(f"/admin/testing/review/{session_id}?err={e}")
+    if result["verdict"] == "INCOMPLETE":
+        return redirect(f"/admin/testing/review/{session_id}?err=Noch+{result['n_unreviewed']}+Cases+offen")
+    msg = f"Session+{result['verdict']}+%28{result['n_better']}/{result['n_same']}/{result['n_worse']}%29"
+    return redirect(f"/admin/testing/review/{session_id}?ok={msg}")
+
+
+@app.route("/admin/testing/review/<session_id>/promote", methods=["POST"])
+@_require_admin
+def admin_testing_review_promote(session_id):
+    """Aktualisiert die Goldstandard-Files mit den `better`-Outputs der Session."""
+    from engine import test_mode
+    try:
+        result = test_mode.promote_to_gold(session_id)
+    except ValueError as e:
+        return redirect(f"/admin/testing/review/{session_id}?err={e}")
+    msg = f"{result['n_promoted']}+Cases+in+Goldstandard+uebernommen"
+    if result.get("errors"):
+        msg += f"+%28{len(result['errors'])}+Fehler%29"
+    return redirect(f"/admin/testing/review/{session_id}?ok={msg}")
 
 
 @app.route("/admin/testing/reports/<path:name>", methods=["GET"])

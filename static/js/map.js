@@ -136,7 +136,7 @@
             div.innerHTML =
                 '<span class="map-welcome-icon" aria-hidden="true">✦</span>' +
                 '<span class="map-welcome-text">' +
-                  '<b>Neu:</b> Sterne im Marker = Erlebnis (1–5). ' +
+                  '<b>Neu:</b> Zahl im Marker = Erlebnis (1–5). ' +
                   'Farbe = Sicherheit (gruen / orange / rot).' +
                 '</span>' +
                 '<button class="map-welcome-link" type="button" data-action="more">Mehr erfahren</button>' +
@@ -347,7 +347,7 @@
                   + s.fill + ';margin-right:4px;vertical-align:middle;"></span>';
             html += '<span style="color:' + s.stroke + ';">' + s.label + '</span>';
             if (safetyBand !== 'red' && typeof experienceStars === 'number' && experienceStars >= 1) {
-                html += ' &middot; ' + experienceStars + (experienceStars === 1 ? ' Stern' : ' Sterne');
+                html += ' &middot; Rating ' + experienceStars + '/5';
             }
             if (dayData && typeof dayData.comfort_index === 'number') {
                 html += ' &middot; Comfort ' + Math.round(dayData.comfort_index);
@@ -768,7 +768,7 @@
             var regionName = (currentSpotProps && currentSpotProps.region) || '';
             var rText = '';
             if (currentSpotExperienceStars != null && currentSpotExperienceStars >= 1) {
-                rText = ' — ' + currentSpotExperienceStars + (currentSpotExperienceStars === 1 ? ' Stern' : ' Sterne');
+                rText = ' — Rating ' + currentSpotExperienceStars + '/5';
                 if (currentSpotExperienceScore != null) rText += ' · ' + currentSpotExperienceScore + '/100';
             }
             var dayIdx = 0;

@@ -2065,7 +2065,7 @@ window.Meteogram = (function () {
             };
             var c = palette[band] || palette.no_data;
             var ariaLabel = band === 'red' ? 'Nicht fliegbar' :
-                (_verdictText(band) + (stars >= 1 ? ', ' + stars + ' Sterne' : ''));
+                (_verdictText(band) + (stars >= 1 ? ', Rating ' + stars + ' von 5' : ''));
             var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s
                      + '" role="img" aria-label="' + esc(ariaLabel) + '">';
             html += '<circle cx="' + center + '" cy="' + center + '" r="' + r
@@ -2121,17 +2121,16 @@ window.Meteogram = (function () {
             var reason = noAnaReasonMap[reasonKey]
                 || a.summary  // Server-Summary als Fallback (enthaelt schon Klartext)
                 || 'Bedingungen sind eindeutig nicht fliegbar — keine detaillierte Analyse erstellt.';
+            // Hero traegt schon Verdict + konkreten Grund (rationale).
+            // Frueher folgte hier ein zweiter ⊘-"Keine Analyse"-Block mit dem
+            // exakt gleichen Text — entfernt, weil redundant und irrefuehrend
+            // ("Keine Analyse" suggerierte fehlende Daten, dabei IST das die
+            // Analyse: die Region/der Spot ist eindeutig nicht fliegbar).
             html += '<div class="mga-hero red">'
                   + '<div class="mga-hero-glyph">' + _heroGlyphSvg('red', 0, 96) + '</div>'
                   + '<div class="mga-hero-text">'
                   + '<div class="mga-hero-verdict red">Nicht fliegbar</div>'
                   + '<div class="mga-hero-rationale">' + esc(reason) + '</div>'
-                  + '</div></div>';
-            html += '<div class="mga-no-analysis">'
-                  + '<div class="mga-no-analysis-icon">⊘</div>'
-                  + '<div class="mga-no-analysis-text">'
-                  + '<div class="mga-no-analysis-title">Keine Analyse</div>'
-                  + '<div class="mga-no-analysis-reason">' + esc(reason) + '</div>'
                   + '</div></div>';
             wrapper.innerHTML = html;
             container.appendChild(wrapper);
@@ -2142,7 +2141,7 @@ window.Meteogram = (function () {
         // ── RATING_CONCEPT v1.3 §8.6 — Hero Block ──
         // Same glyph as the map marker, scaled 96px. Verdict + score pills give
         // 2-second-recognition: "Yes, that's the marker I clicked."
-        // Verdict: nur Status-Wort. Sterne-Ziffer ist schon in der Glyph,
+        // Verdict: nur Status-Wort. Rating-Ziffer ist schon in der Glyph,
         // Score-Detail in den Pills — keine doppelte Information im Text.
         var verdictTxt = _verdictText(safetyBand);
         var rationale = a.summary || '';

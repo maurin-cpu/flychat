@@ -314,9 +314,159 @@ nur `.md`-Endung. Versuche wie `../../etc/passwd` werfen 404, nicht 500.
   blockiert bis fertig. Bei `mit-LLM` über 25 Min kann der Browser timeouten. Lösung
   bei Bedarf: SSE-Stream wie für die Test-Analyse in Sektion 3.
 - **Kein automatisches Re-Freezing** nach PASS. Bewusst — das soll man manuell
-  bestätigen, sonst kalibriert man den Test gegen sich selbst.
+  über die Review-Queue (Sektion 11) bestätigen, sonst kalibriert man den Test
+  gegen sich selbst.
 - **Keine LLM-as-Judge** für die Freitext-Felder (`summary`, `recommendation`).
   Caution-Notes werden via Jaccard verglichen — ein semantisch identisches
   Re-Phrasing wird trotzdem als Diff gewertet. Toleranz bewusst auf 0.3 gesetzt.
 - **Keine Per-Provider-Goldstandards.** Wer Provider regelmäßig wechselt, muss
   vor jedem Wechsel einen passenden Goldstandard bereitstellen.
+
+---
+
+## 11. Review-Queue (Mensch beurteilt Diffs)
+
+### 11.1 Das Problem, das diese Sektion löst
+
+Der reine Score-Vergleich aus Abschnitt 4 hat eine **fundamentale Schwäche**: der
+Goldstandard ist „was die alte Pipeline gesagt hat", nicht „was richtig ist".
+Wenn die neue Pipeline einen Case **besser** beurteilt als der alte (z. B. ein
+früher fälschlich als `not_safe` markierter Tag wird korrekt zu `safe`), wertet
+`score_regression.py` das als kritische Regression und blockt den Hebel.
+
+**Lösung**: bei vielen oder kritischen Diffs öffnet sich eine **Review-Queue**, in
+der ein Mensch eine stratifizierte Stichprobe der Diff-Cases per Klick als
+*besser / gleich / schlechter* bewertet. Die Aggregation entscheidet endgültig
+über PASS/FAIL.
+
+### 11.2 Datenfluss im Überblick
+
+```
+[ Sektion 4: Regression starten ]
+            │
+            ▼
+score_regression.py --report X.md --queue-output X_queue.json
+            │
+            ▼
+   X_queue.json (alle Diff-Cases mit input + gold_output + current_output + severities)
+            │
+   [ Sektion 5: Review-Session starten ]
+            │ stratified sampling (max 10)
+            ▼
+cost_testing/review_queue/rv_<timestamp>.json (Session-Datei)
+            │
+            ▼
+[ Side-by-Side Review-UI: pro Case besser/gleich/schlechter klicken ]
+            │
+            ▼
+   Verdict berechnen (aggregiert die N Verdicts)
+            │
+       ┌────┴────┐
+       ▼         ▼
+     PASS      FAIL
+       │
+   [ Optional: Promote-to-Gold ]
+       │
+       ▼
+cost_testing/golden/spot_*.json (Goldstandard-Files mit better-Outputs überschrieben)
+```
+
+### 11.3 Stratified Sampling
+
+Die Review-Stichprobe wird so gewählt, dass Edge-Cases nicht untergehen
+(`engine/test_mode.py::_stratified_sample`):
+
+1. **Pflicht**: alle `kritisch`-Diffs werden zuerst aufgenommen (safety_status- /
+   flyability_tier-Inversionen sind sicherheitsrelevant — kein Auswahlskip).
+2. **Stratifiziert**: max 2 Cases pro `gold_safety_status`-Bucket (`safe`,
+   `conditional`, `not_safe`). Sorgt dafür, dass alle Tier-Bereiche im Sample
+   vertreten sind.
+3. **Auffüllen**: nach `max_severity`-Rang sortiert (kritisch > hoch > mittel),
+   bis Sample-Größe erreicht.
+
+**Default-Sample-Größe: 10**, im UI auf 1–50 einstellbar.
+
+### 11.4 UI — Side-by-Side Review
+
+Pro Case-Karte:
+
+| Bereich            | Inhalt                                                                            |
+| ------------------ | --------------------------------------------------------------------------------- |
+| **Header**         | Spot · Datum, Severity-Badge (kritisch/hoch/mittel), Diff-Felder, aktuelles Verdict |
+| **Wetter-Input**   | Collapsible — exakt der `weather_context_str`, der ans LLM ging                  |
+| **Goldstandard** (links) | Status, Safe-Window, Best-Window, Rating, Foehn, Fly Tier, Flight Type, Peak Climb, Streckenflug, No-Go-Liste, Caution-Liste, Summary |
+| **Neuer Output** (rechts) | Identisches Schema. Diff-Felder sind in der dt-Spalte rot eingefärbt.    |
+| **Action-Bar**     | Drei Buttons: ✓ Neu besser · = Gleichwertig · ✗ Neu schlechter + Kommentarfeld    |
+
+Klick auf einen Verdict-Button **submitted das Form** und springt per
+`#case-N`-Anker direkt zur nächsten Karte — schnelles Durchklicken möglich.
+
+### 11.5 Verdict-Schwellen
+
+Aggregation in `engine/test_mode.py::finalize_session`:
+
+| Bedingung                                             | Verdict        | Bedeutung                                                       |
+| ----------------------------------------------------- | -------------- | --------------------------------------------------------------- |
+| `worse_pct >= 20 %`                                   | **FAIL**       | Hebel zurückrollen — neue Pipeline ist signifikant schlechter.  |
+| `(better + same) / total >= 80 %` und worse_pct < 20% | **PASS**       | Hebel akzeptieren. Promote-to-Gold-Button erscheint.            |
+| dazwischen                                            | **AMBIGUOUS**  | Knapp — Empfehlung: weitere Stichprobe ziehen.                  |
+
+Konstanten in `engine/test_mode.py`: `REVIEW_PASS_THRESHOLD = 0.80`,
+`REVIEW_FAIL_THRESHOLD = 0.20`.
+
+### 11.6 Promote-to-Gold
+
+Nach **PASS** (oder **AMBIGUOUS** wenn man trotzdem will): der Promote-Button
+überschreibt für alle als `better` markierten Cases die zugehörige
+`cost_testing/golden/spot_<name>_<date>.json` mit dem `current_output` des
+Reviews. Die `same`- und `worse`-Cases bleiben unverändert.
+
+Gold-File wird zusätzlich um zwei Felder ergänzt:
+- `promoted_at`: Zeitstempel des Promote-Vorgangs
+- `promoted_from_session`: Session-ID für Audit-Trail
+
+So bleibt nachvollziehbar, welche Cases manuell als Verbesserung bestätigt wurden.
+
+### 11.7 Persistenz & Pfade
+
+| Pfad                                      | Inhalt                                          |
+| ----------------------------------------- | ----------------------------------------------- |
+| `cost_testing/reports/*_queue.json`       | Strukturierte Diff-Datei pro Regression-Lauf    |
+| `cost_testing/review_queue/rv_*.json`     | Session-Datei (Cases + Verdicts + Verdict-Aggregat) |
+| `engine/test_mode.py`                     | Sampling, Session-Lifecycle, Promote-Logik      |
+| `templates/admin/testing_review.html`     | Side-by-Side UI                                 |
+
+### 11.8 Empfohlener Hebel-Test-Loop *mit Review*
+
+```
+1. Live-Analyse läuft sauber durch.
+
+2. Sektion 4 → freeze_golden.py mit Limit 20.
+
+3. Hebel ziehen (z. B. ANALYSIS_PROVIDER auf gemini).
+
+4. Sektion 4 → Regression "mit LLM".
+   Falls FAIL → automatisch eine *_queue.json in cost_testing/reports/.
+
+5. Sektion 5 → Review-Session starten (Stichprobe 10).
+
+6. Side-by-Side UI: pro Case ✓/=/✗ klicken (~1 Min pro Case).
+
+7. "Verdict berechnen":
+   - PASS  → "X Cases → Goldstandard promoten" → fertig, Hebel akzeptiert.
+   - FAIL  → Hebel zurückrollen (z. B. ANALYSIS_PROVIDER zurück auf openai).
+   - AMBIGUOUS → in Sektion 5 erneut Review-Session mit größerem Sample starten.
+```
+
+### 11.9 Was die Review-Queue **nicht** kann
+
+- **Kein LLM-as-Judge-Vorschlag** — du klickst noch komplett selbst. Erweiterung
+  wäre: ein starkes Modell (claude-opus, gpt-4o) bekommt Input + beide Outputs
+  und schlägt ein Verdict vor, du bestätigst nur per Klick. Sinnvoll wenn die
+  Stichprobe regelmäßig groß wird.
+- **Kein Mehr-Personen-Workflow** — eine Session, ein Reviewer. Keine
+  Konflikt-Auflösung wenn zwei Leute parallel reviewen.
+- **Kein Reality-Check** — Verdicts beruhen auf menschlichem Urteil über
+  Forecasts, nicht auf retrospektiven Stationsdaten. Bei strittigen Cases
+  hilft es trotzdem, einen Tag später `data/station_observations.db` zu
+  konsultieren.

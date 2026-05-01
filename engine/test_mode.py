@@ -382,14 +382,17 @@ def run_test_analyses_stream(engine, *, use_frozen_input: bool) -> Iterator[dict
 
 
 # ---------------------------------------------------------------------------
-# Goldstandard / Regression-Reports
+# Goldstandard / Regression-Reports / Review-Queue
 # ---------------------------------------------------------------------------
 
 _COST_TESTING_DIR: Path = Path(__file__).resolve().parent.parent / "cost_testing"
 GOLDEN_DIR: Path = _COST_TESTING_DIR / "golden"
 REPORTS_DIR: Path = _COST_TESTING_DIR / "reports"
+REVIEW_QUEUE_DIR: Path = _COST_TESTING_DIR / "review_queue"
 FREEZE_GOLDEN_SCRIPT: Path = _COST_TESTING_DIR / "freeze_golden.py"
 SCORE_REGRESSION_SCRIPT: Path = _COST_TESTING_DIR / "score_regression.py"
+
+REVIEW_DEFAULT_SAMPLE_SIZE = 10
 
 
 def golden_summary() -> dict[str, Any]:
@@ -449,6 +452,353 @@ def read_report(name: str) -> str | None:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Review-Queue
+# ---------------------------------------------------------------------------
+#
+# Datenfluss:
+#   1. score_regression.py wird mit --queue-output PATH aufgerufen → schreibt
+#      eine JSON mit allen Diff-Cases (input, gold_output, current_output, severities).
+#   2. start_review_session(queue_json_path, sample_size) liest diese Datei,
+#      wendet Stratified Sampling an, schreibt eine Session-Datei nach
+#      `cost_testing/review_queue/<session_id>.json`.
+#   3. UI rendert die Session, der User klickt pro Case "besser/gleich/schlechter".
+#      save_verdict() persistiert in derselben Session-Datei.
+#   4. finalize_session() aggregiert Verdicts → PASS/FAIL.
+#   5. promote_to_gold() ueberschreibt Goldstandard-Files mit den neuen Outputs
+#      fuer Cases, die als "besser" markiert wurden.
+
+VERDICT_BETTER = "better"
+VERDICT_SAME = "same"
+VERDICT_WORSE = "worse"
+_VALID_VERDICTS = (VERDICT_BETTER, VERDICT_SAME, VERDICT_WORSE)
+
+# Anteil "besser+gleich" der reviewten Stichprobe, ab dem die Session als PASS gilt.
+REVIEW_PASS_THRESHOLD = 0.80
+# Anteil "schlechter", ab dem die Session als FAIL gilt.
+REVIEW_FAIL_THRESHOLD = 0.20
+
+
+def _stratified_sample(diff_cases: list[dict[str, Any]], sample_size: int) -> list[dict[str, Any]]:
+    """Waehlt eine Stichprobe aus den Diff-Cases.
+
+    Regeln:
+    - Alle `kritisch`-Cases werden zwingend aufgenommen (Sicherheitskritisch).
+    - Restliche Slots werden stratifiziert nach `gold_safety_status` aufgefuellt
+      (max 2 pro Bucket safe/conditional/not_safe), Rest random.
+    """
+    if not diff_cases or sample_size <= 0:
+        return []
+
+    selected: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str]] = set()
+
+    def _key(c: dict[str, Any]) -> tuple[str, str]:
+        return (c.get("spot", ""), c.get("date", ""))
+
+    # 1. Pflicht: alle kritischen Diffs
+    for c in diff_cases:
+        if c.get("max_severity") == "kritisch":
+            k = _key(c)
+            if k not in seen_keys:
+                selected.append(c)
+                seen_keys.add(k)
+    if len(selected) >= sample_size:
+        return selected[:sample_size]
+
+    # 2. Stratifiziert: max 2 pro safety_status-Bucket
+    buckets: dict[str, list[dict[str, Any]]] = {}
+    for c in diff_cases:
+        if _key(c) in seen_keys:
+            continue
+        bucket = c.get("gold_safety_status") or "unknown"
+        buckets.setdefault(bucket, []).append(c)
+
+    for bucket_name, items in buckets.items():
+        for c in items[:2]:
+            if len(selected) >= sample_size:
+                return selected
+            k = _key(c)
+            if k not in seen_keys:
+                selected.append(c)
+                seen_keys.add(k)
+
+    # 3. Auffuellen mit Rest (nach max_severity sortiert: hoch > mittel)
+    remaining = [c for c in diff_cases if _key(c) not in seen_keys]
+    sev_rank = {"kritisch": 0, "hoch": 1, "mittel": 2, "info": 3}
+    remaining.sort(key=lambda c: sev_rank.get(c.get("max_severity", "info"), 9))
+    for c in remaining:
+        if len(selected) >= sample_size:
+            break
+        selected.append(c)
+        seen_keys.add(_key(c))
+
+    return selected
+
+
+def start_review_session(queue_json_path: Path, sample_size: int = REVIEW_DEFAULT_SAMPLE_SIZE) -> dict[str, Any]:
+    """Liest eine queue-JSON-Datei (Output von score_regression.py --queue-output)
+    und erzeugt eine Review-Session.
+
+    Returns: dict mit `session_id` + `session_path` + `n_cases` + `n_total_diffs`.
+    Wirft FileNotFoundError, wenn die queue-Datei nicht existiert oder leer ist.
+    """
+    if not queue_json_path.exists():
+        raise FileNotFoundError(f"Queue-Datei nicht vorhanden: {queue_json_path}")
+    with open(queue_json_path, "r", encoding="utf-8") as f:
+        queue = json.load(f)
+
+    diff_cases = queue.get("cases") or []
+    if not diff_cases:
+        raise ValueError("Queue-Datei enthaelt keine Diff-Cases — nichts zu reviewen.")
+
+    sampled = _stratified_sample(diff_cases, sample_size)
+
+    REVIEW_QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+    session_id = "rv_" + datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    session_path = REVIEW_QUEUE_DIR / f"{session_id}.json"
+
+    session: dict[str, Any] = {
+        "session_id": session_id,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "queue_source": str(queue_json_path),
+        "report_path": queue.get("report_path"),
+        "regression_mode": queue.get("mode"),
+        "regression_summary": {
+            "total_cases": queue.get("total_cases"),
+            "diff_count": queue.get("diff_count"),
+            "crit_regressions": queue.get("crit_regressions"),
+            "high_regressions": queue.get("high_regressions"),
+            "score_pct": queue.get("score_pct"),
+            "gate_ok": queue.get("gate_ok"),
+        },
+        "sample_size": len(sampled),
+        "total_diffs": len(diff_cases),
+        "finalized_at": None,
+        "verdict": None,
+        "cases": [],
+    }
+    for idx, c in enumerate(sampled):
+        session["cases"].append({
+            "idx": idx,
+            "spot": c.get("spot"),
+            "date": c.get("date"),
+            "max_severity": c.get("max_severity"),
+            "fail_fields": c.get("fail_fields") or [],
+            "gold_safety_status": c.get("gold_safety_status"),
+            "current_safety_status": c.get("current_safety_status"),
+            "input": c.get("input"),
+            "gold_output": c.get("gold_output"),
+            "current_output": c.get("current_output"),
+            "case_path": c.get("case_path"),
+            "verdict": None,
+            "comment": "",
+            "reviewed_at": None,
+        })
+
+    config.atomic_write_json(session_path, session)
+    logger.info("Review-Session gestartet: %s (%d von %d Diffs)",
+                session_id, len(sampled), len(diff_cases))
+    return {
+        "session_id": session_id,
+        "session_path": str(session_path),
+        "n_cases": len(sampled),
+        "n_total_diffs": len(diff_cases),
+    }
+
+
+def load_review_session(session_id: str) -> dict[str, Any] | None:
+    """Liest eine Review-Session. None wenn ungueltig (Path-Traversal-Schutz)."""
+    safe = Path(session_id).name
+    if safe != session_id or not safe.startswith("rv_"):
+        return None
+    p = REVIEW_QUEUE_DIR / f"{safe}.json"
+    if not p.exists():
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _save_review_session(session: dict[str, Any]) -> None:
+    sid = session["session_id"]
+    p = REVIEW_QUEUE_DIR / f"{sid}.json"
+    config.atomic_write_json(p, session)
+
+
+def save_verdict(session_id: str, case_idx: int, verdict: str, comment: str = "") -> dict[str, Any]:
+    """Speichert ein Verdict fuer einen Case in einer Session.
+
+    Wirft ValueError bei ungueltigem session_id, case_idx oder verdict.
+    """
+    if verdict not in _VALID_VERDICTS:
+        raise ValueError(f"Verdict muss in {_VALID_VERDICTS} sein, war: {verdict!r}")
+    session = load_review_session(session_id)
+    if session is None:
+        raise ValueError(f"Session nicht gefunden: {session_id}")
+    cases = session.get("cases") or []
+    if not (0 <= case_idx < len(cases)):
+        raise ValueError(f"case_idx {case_idx} ausserhalb [0,{len(cases)})")
+    cases[case_idx]["verdict"] = verdict
+    cases[case_idx]["comment"] = (comment or "").strip()[:500]
+    cases[case_idx]["reviewed_at"] = datetime.now().isoformat(timespec="seconds")
+    _save_review_session(session)
+    return cases[case_idx]
+
+
+def finalize_session(session_id: str) -> dict[str, Any]:
+    """Aggregiert alle Verdicts der Session zu einem Gesamtergebnis.
+
+    Returns: {
+        verdict: "PASS" | "FAIL" | "AMBIGUOUS",
+        n_better, n_same, n_worse, n_unreviewed,
+        better_pct, worse_pct,
+        rationale: str,
+    }
+    """
+    session = load_review_session(session_id)
+    if session is None:
+        raise ValueError(f"Session nicht gefunden: {session_id}")
+    cases = session.get("cases") or []
+    if not cases:
+        raise ValueError("Session hat keine Cases.")
+
+    n_better = sum(1 for c in cases if c.get("verdict") == VERDICT_BETTER)
+    n_same = sum(1 for c in cases if c.get("verdict") == VERDICT_SAME)
+    n_worse = sum(1 for c in cases if c.get("verdict") == VERDICT_WORSE)
+    n_unreviewed = sum(1 for c in cases if c.get("verdict") is None)
+    n_total = len(cases)
+
+    # Wenn noch Cases unrevidiert sind, koennen wir nicht final sagen
+    if n_unreviewed > 0:
+        return {
+            "verdict": "INCOMPLETE",
+            "n_better": n_better, "n_same": n_same, "n_worse": n_worse,
+            "n_unreviewed": n_unreviewed, "n_total": n_total,
+            "better_pct": 0.0, "worse_pct": 0.0,
+            "rationale": f"{n_unreviewed} von {n_total} Cases noch nicht reviewt.",
+        }
+
+    better_or_same_pct = (n_better + n_same) / n_total
+    worse_pct = n_worse / n_total
+
+    if worse_pct >= REVIEW_FAIL_THRESHOLD:
+        verdict = "FAIL"
+        rationale = (f"{n_worse}/{n_total} Cases als schlechter bewertet "
+                     f"({worse_pct:.0%} >= {REVIEW_FAIL_THRESHOLD:.0%} FAIL-Schwelle).")
+    elif better_or_same_pct >= REVIEW_PASS_THRESHOLD:
+        verdict = "PASS"
+        rationale = (f"{n_better} besser + {n_same} gleich = "
+                     f"{better_or_same_pct:.0%} >= {REVIEW_PASS_THRESHOLD:.0%} PASS-Schwelle.")
+    else:
+        verdict = "AMBIGUOUS"
+        rationale = ("Knapp unter PASS-Schwelle und ueber FAIL-Schwelle. "
+                     "Empfehlung: weitere Stichprobe ziehen.")
+
+    session["verdict"] = verdict
+    session["finalized_at"] = datetime.now().isoformat(timespec="seconds")
+    _save_review_session(session)
+
+    return {
+        "verdict": verdict,
+        "n_better": n_better, "n_same": n_same, "n_worse": n_worse,
+        "n_unreviewed": 0, "n_total": n_total,
+        "better_pct": round(better_or_same_pct, 3),
+        "worse_pct": round(worse_pct, 3),
+        "rationale": rationale,
+    }
+
+
+def promote_to_gold(session_id: str) -> dict[str, Any]:
+    """Aktualisiert den Goldstandard mit den neuen Outputs aller Cases, die als
+    `better` reviewt wurden. Cases mit `same` oder `worse` bleiben unangetastet.
+
+    Returns: {n_promoted, n_skipped, errors: [...]}
+    """
+    session = load_review_session(session_id)
+    if session is None:
+        raise ValueError(f"Session nicht gefunden: {session_id}")
+    if session.get("verdict") not in ("PASS", "AMBIGUOUS"):
+        raise ValueError(f"Promote nur erlaubt wenn Session PASS/AMBIGUOUS ist, war: {session.get('verdict')}")
+
+    n_promoted = 0
+    n_skipped = 0
+    errors: list[str] = []
+
+    for case in session.get("cases") or []:
+        if case.get("verdict") != VERDICT_BETTER:
+            n_skipped += 1
+            continue
+        case_path_str = case.get("case_path")
+        if not case_path_str:
+            errors.append(f"Case {case.get('spot')}/{case.get('date')}: keine case_path")
+            continue
+        case_path = Path(case_path_str)
+        if not case_path.exists():
+            errors.append(f"Goldstandard-Datei nicht mehr da: {case_path}")
+            continue
+        try:
+            with open(case_path, "r", encoding="utf-8") as f:
+                gold_record = json.load(f)
+            gold_record["output"] = case.get("current_output") or {}
+            gold_record["promoted_at"] = datetime.now().isoformat(timespec="seconds")
+            gold_record["promoted_from_session"] = session_id
+            config.atomic_write_json(case_path, gold_record)
+            n_promoted += 1
+        except (OSError, json.JSONDecodeError) as e:
+            errors.append(f"{case_path.name}: {e}")
+
+    # Markieren in der Session
+    session["promoted_at"] = datetime.now().isoformat(timespec="seconds")
+    session["promoted_count"] = n_promoted
+    _save_review_session(session)
+
+    logger.info("Review-Session %s: %d Cases promoted, %d skipped, %d errors",
+                session_id, n_promoted, n_skipped, len(errors))
+    return {"n_promoted": n_promoted, "n_skipped": n_skipped, "errors": errors}
+
+
+def list_review_sessions(limit: int = 20) -> list[dict[str, Any]]:
+    """Listet Review-Sessions, neueste zuerst."""
+    if not REVIEW_QUEUE_DIR.exists():
+        return []
+    files = sorted(
+        REVIEW_QUEUE_DIR.glob("rv_*.json"),
+        key=lambda p: p.stat().st_mtime, reverse=True,
+    )[:limit]
+    out = []
+    for p in files:
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                s = json.load(f)
+            cases = s.get("cases") or []
+            n_reviewed = sum(1 for c in cases if c.get("verdict") is not None)
+            out.append({
+                "session_id": s.get("session_id"),
+                "created_at": s.get("created_at"),
+                "n_cases": len(cases),
+                "n_reviewed": n_reviewed,
+                "verdict": s.get("verdict"),
+                "promoted_count": s.get("promoted_count"),
+            })
+        except (OSError, json.JSONDecodeError):
+            continue
+    return out
+
+
+def latest_queue_json() -> Path | None:
+    """Findet die juengste *_queue.json in REPORTS_DIR (geschrieben von score_regression.py)."""
+    if not REPORTS_DIR.exists():
+        return None
+    candidates = list(REPORTS_DIR.glob("*_queue.json"))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
 def status_bundle() -> dict[str, Any]:
     """Konsolidierter Status fuer das Admin-Testing-Template."""
     fw_meta = frozen_weather_meta()
@@ -483,4 +833,6 @@ def status_bundle() -> dict[str, Any]:
         },
         "golden": golden_summary(),
         "reports": list_reports(limit=15),
+        "review_sessions": list_review_sessions(limit=10),
+        "latest_queue_json": str(latest_queue_json()) if latest_queue_json() else None,
     }

@@ -353,7 +353,12 @@
                 });
                 var zoom = map.getZoom();
                 if (zoom >= 7) {
-                    var ndCenter = layer.getBounds().getCenter();
+                    // Polygon-Centroid statt bbox-Center: bei irregulaeren Shapes
+                    // (Surselva, Mittelland Zentral) liegt der bbox-Center oft am
+                    // Rand oder ausserhalb des Polygons.
+                    var ndCenter;
+                    try { ndCenter = layer.getCenter(); }
+                    catch (e) { ndCenter = layer.getBounds().getCenter(); }
                     var ndHtml;
                     if (zoom < 9) {
                         ndHtml = '<div style="width:10px;height:10px;border-radius:50%;'
@@ -423,8 +428,12 @@
             var expScore = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
 
             // Center-Label — Pille mit Rating-Zahl 1-5 (RATING_CONCEPT v1.3 §4.3).
-            var bounds = layer.getBounds();
-            var center = bounds.getCenter();
+            // Polygon-Centroid (layer.getCenter) statt bbox-Center: bei irregulaeren
+            // Shapes (Surselva, Mittelland Zentral) faellt der bbox-Mittelpunkt
+            // sonst an den Rand oder ausserhalb des Polygons.
+            var center;
+            try { center = layer.getCenter(); }
+            catch (e) { center = layer.getBounds().getCenter(); }
             var label = buildRegionLabel(style, layer.regionName, safety, quality, stars, map.getZoom());
 
             if (label) {
@@ -617,7 +626,17 @@
         var verdictTxt = (band === 'green') ? 'Sicher' :
                          (band === 'amber') ? 'Vorsicht' :
                          (band === 'red')   ? 'Nicht fliegbar' : 'Keine Daten';
-        var rationale = a.summary || '';
+        // Rationale: bevorzugt summary; bei error/leerem summary auf safety_feedback,
+        // first no_go_reason oder error-Text zurueckfallen, damit der Hero IMMER
+        // das "Warum" zeigt — keine doppelte "Analyse-Fehler"-Box mehr noetig.
+        var rationale = a.summary || a.safety_feedback || '';
+        if (!rationale) {
+            var firstNoGo = parseArray(a.no_go_reasons)[0];
+            if (firstNoGo) rationale = firstNoGo;
+        }
+        if (!rationale && safetyStatus === 'error') {
+            rationale = a.error || 'Bedingungen sind eindeutig nicht fliegbar — keine detaillierte Analyse erstellt.';
+        }
         var rationaleShort = '';
         if (rationale) {
             var firstDot = rationale.indexOf('.');
@@ -682,17 +701,22 @@
             html += '</div>';
             return html;
         }
-        if (safetyStatus === 'error') {
-            html += '<div style="margin:10px 12px;padding:10px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;font-size:12.5px;color:#991b1b;line-height:1.45;">'
-                + '<div style="font-weight:700;margin-bottom:3px;">Analyse-Fehler</div>'
-                + '<div>' + escHtml(a.safety_feedback || a.summary || a.error || 'Diese Region konnte nicht zuverlaessig analysiert werden.') + '</div>'
-                + '</div>';
-            // KEIN early-return — Alerts unten zeigen falls Daten partiell da sind
-        }
+        // Frueher: bei safetyStatus === 'error' wurde ein prominenter roter
+        // "Analyse-Fehler / Diese Region konnte nicht zuverlaessig analysiert
+        // werden"-Kasten gezeigt. Entfernt: der Hero traegt den Verdict +
+        // Rationale (mit Fallback auf safety_feedback/no_go/error), und Alerts/
+        // Insights unten zeigen Details. Der rote Kasten war Rauschen ohne
+        // Zusatznutzen.
 
         // ── Level 2: Best Window ──
+        // Auf nicht-fliegbaren Tagen ist "Bestes Fenster: keins" reines Rauschen
+        // — der Hero sagt schon "Nicht fliegbar". Filter daher leere/keine-Werte.
         var bestWindow = a.safe_window || a.best_window || '';
-        if (bestWindow) {
+        var bestWindowClean = (bestWindow || '').toString().trim().toLowerCase();
+        var bestWindowEmpty = !bestWindow
+            || bestWindowClean === 'keins' || bestWindowClean === 'kein'
+            || bestWindowClean === '-' || bestWindowClean === '\u2013' || bestWindowClean === '\u2014';
+        if (bestWindow && !bestWindowEmpty) {
             html += '<div class="mga-window">'
                 + '<div>'
                 + '<div class="mga-window-label">Bestes Fenster</div>'
@@ -748,6 +772,11 @@
         }
 
         // ── Level 3: Key Metrics Grid ──
+        // Auf nicht-fliegbaren / fehlerhaften Tagen sind Wind/Flugtyp/XC-Felder
+        // entweder leer ("Wind: -") oder negativ ("Streckenflug: kein XC") — reines
+        // Rauschen, das dem Hero-Verdict widerspricht. Block komplett ueberspringen.
+        var hideMetrics = (safetyStatus === 'not_safe' || safetyStatus === 'error');
+        if (!hideMetrics) {
         html += '<div class="mga-metrics">';
         html += '<div class="mga-metric full-width">'
             + '<div class="mga-metric-label">Wind</div>'
@@ -782,10 +811,14 @@
             }
         }
         html += '</div>';
+        }  // ende !hideMetrics
 
         // ── Level 5: AI Insights (expandable) ──
-        var safetyFeedback = a.safety_feedback || a.summary || '';
-        var flyFeedback = phase2Ok ? (a.flyability_feedback || a.recommendation || '') : '';
+        // Auf nicht-fliegbaren Tagen wuerde "Sicherheits-Einschaetzung" nur den
+        // Hero-Rationale-Text wiederholen (beide kommen aus summary/safety_feedback).
+        // Daher unterdruecken — Hero + Alerts genuegen.
+        var safetyFeedback = hideMetrics ? '' : (a.safety_feedback || a.summary || '');
+        var flyFeedback = (hideMetrics || !phase2Ok) ? '' : (a.flyability_feedback || a.recommendation || '');
 
         if (safetyFeedback || flyFeedback) {
             html += '<div class="mga-insights">';

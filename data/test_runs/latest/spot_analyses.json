@@ -1,11 +1,11 @@
 {
-  "Balderen": {
-    "2026-05-05": {
+  "Brunnihütte": {
+    "2026-05-03": {
       "safety": {
         "safety_status": "not_safe",
         "safe_window": "keins",
         "no_go_reasons": [
-          "Start-Fenster: Nur 2h mit Windrichtung im erlaubten Sektor (Minimum 3h)"
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
         ],
         "caution_notes": [],
         "primary_no_go": null,
@@ -15,13 +15,15 @@
         "wind_summary": "",
         "wind_shear": "",
         "foehn_risk": "none",
-        "summary": "Nur 2h mit passender Windrichtung (NNO-O) — kein ausreichendes Start-Fenster.",
-        "spot": "Balderen",
-        "date": "2026-05-05",
-        "wind_ok_count": 2,
-        "wind_wrong_count": 5,
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
+        "spot": "Brunnihütte",
+        "date": "2026-05-03",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -37,6 +39,164 @@
       "best_window": "keins",
       "recommendation": ""
     },
+    "2026-05-01": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
+        "spot": "Brunnihütte",
+        "date": "2026-05-01",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-04": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
+        "spot": "Brunnihütte",
+        "date": "2026-05-04",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-02": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
+        "spot": "Brunnihütte",
+        "date": "2026-05-02",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-05": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
+        "spot": "Brunnihütte",
+        "date": "2026-05-05",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    }
+  },
+  "Balderen": {
     "2026-05-03": {
       "safety": {
         "safety_status": "not_safe",
@@ -59,6 +219,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -111,6 +273,43 @@
       "best_window": "keins",
       "recommendation": ""
     },
+    "2026-05-05": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Start-Fenster: Nur 2h mit Windrichtung im erlaubten Sektor (Minimum 3h)"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Nur 2h mit passender Windrichtung (NNO-O) — kein ausreichendes Start-Fenster.",
+        "spot": "Balderen",
+        "date": "2026-05-05",
+        "wind_ok_count": 2,
+        "wind_wrong_count": 5,
+        "error": ""
+      },
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
     "2026-05-02": {
       "safety": {
         "safety_status": "error",
@@ -129,8 +328,12 @@
         "date": "2026-05-02",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Expecting ',' delimiter: line 17 column 27 (char 1615)"
+        "error": "Unterminated string starting at: line 20 column 14 (char 1428)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -164,8 +367,209 @@
         "date": "2026-05-01",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1260)"
+        "error": "503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    }
+  },
+  "Fürenalp": {
+    "2026-05-03": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
+        "spot": "Fürenalp",
+        "date": "2026-05-03",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-05": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
+        "spot": "Fürenalp",
+        "date": "2026-05-05",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-04": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
+        "spot": "Fürenalp",
+        "date": "2026-05-04",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-01": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Fürenalp",
+        "date": "2026-05-01",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 18 column 14 (char 1299)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-02": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Fürenalp",
+        "date": "2026-05-02",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 19 column 14 (char 1137)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -220,6 +624,45 @@
       "best_window": "keins",
       "recommendation": ""
     },
+    "2026-05-02": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-SO). Kein fliegbares Fenster.",
+        "spot": "Tämpfeli",
+        "date": "2026-05-02",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
     "2026-05-01": {
       "safety": {
         "safety_status": "not_safe",
@@ -242,6 +685,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -279,43 +724,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-02": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-SO). Kein fliegbares Fenster.",
-        "spot": "Tämpfeli",
-        "date": "2026-05-02",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -349,200 +759,17 @@
         "date": "2026-05-03",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 23 column 14 (char 1353)"
+        "error": "Unterminated string starting at: line 22 column 14 (char 1273)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
       "fly_status": "",
       "status": "error",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    }
-  },
-  "Brunnihütte": {
-    "2026-05-04": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
-        "spot": "Brunnihütte",
-        "date": "2026-05-04",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-02": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
-        "spot": "Brunnihütte",
-        "date": "2026-05-02",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-05": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
-        "spot": "Brunnihütte",
-        "date": "2026-05-05",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-03": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
-        "spot": "Brunnihütte",
-        "date": "2026-05-03",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-01": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (W-SW). Kein fliegbares Fenster.",
-        "spot": "Brunnihütte",
-        "date": "2026-05-01",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
       "streckenflug": {
         "tier": "kein_xc",
         "rating": 0,
@@ -555,43 +782,6 @@
     }
   },
   "Pilatus Kulm": {
-    "2026-05-03": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
-        "spot": "Pilatus Kulm",
-        "date": "2026-05-03",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
     "2026-05-01": {
       "safety": {
         "safety_status": "not_safe",
@@ -614,43 +804,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-05": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
-        "spot": "Pilatus Kulm",
-        "date": "2026-05-05",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -688,6 +843,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -725,82 +882,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    }
-  },
-  "Fürenalp": {
-    "2026-05-04": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
-        "spot": "Fürenalp",
-        "date": "2026-05-04",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-05": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
-        "spot": "Fürenalp",
-        "date": "2026-05-05",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -832,12 +915,14 @@
         "wind_shear": "",
         "foehn_risk": "none",
         "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
-        "spot": "Fürenalp",
+        "spot": "Pilatus Kulm",
         "date": "2026-05-03",
         "wind_ok_count": 0,
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -853,11 +938,13 @@
       "best_window": "keins",
       "recommendation": ""
     },
-    "2026-05-01": {
+    "2026-05-05": {
       "safety": {
-        "safety_status": "error",
+        "safety_status": "not_safe",
         "safe_window": "keins",
-        "no_go_reasons": [],
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
         "caution_notes": [],
         "primary_no_go": null,
         "primary_caution": null,
@@ -866,53 +953,20 @@
         "wind_summary": "",
         "wind_shear": "",
         "foehn_risk": "none",
-        "summary": "",
-        "spot": "Fürenalp",
-        "date": "2026-05-01",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
+        "spot": "Pilatus Kulm",
+        "date": "2026-05-05",
         "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 3 (char 1761)"
+        "wind_wrong_count": 7,
+        "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
       "fly_status": "",
-      "status": "error",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-02": {
-      "safety": {
-        "safety_status": "error",
-        "safe_window": "keins",
-        "no_go_reasons": [],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "",
-        "spot": "Fürenalp",
-        "date": "2026-05-02",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 18 column 14 (char 1327)"
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "error",
+      "status": "not_safe",
       "streckenflug": {
         "tier": "kein_xc",
         "rating": 0,
@@ -947,6 +1001,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -999,43 +1055,6 @@
       "best_window": "keins",
       "recommendation": ""
     },
-    "2026-05-04": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (SW-NW). Kein fliegbares Fenster.",
-        "spot": "Zugerberg",
-        "date": "2026-05-04",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
     "2026-05-05": {
       "safety": {
         "safety_status": "not_safe",
@@ -1058,6 +1077,47 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-04": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (SW-NW). Kein fliegbares Fenster.",
+        "spot": "Zugerberg",
+        "date": "2026-05-04",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1091,8 +1151,12 @@
         "date": "2026-05-03",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 18 column 17 (char 1075)"
+        "error": "Unterminated string starting at: line 17 column 17 (char 1147)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1132,6 +1196,47 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-04": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-SO). Kein fliegbares Fenster.",
+        "spot": "Weissenstein",
+        "date": "2026-05-04",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1184,78 +1289,6 @@
       "best_window": "keins",
       "recommendation": ""
     },
-    "2026-05-04": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-SO). Kein fliegbares Fenster.",
-        "spot": "Weissenstein",
-        "date": "2026-05-04",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-01": {
-      "safety": {
-        "safety_status": "error",
-        "safe_window": "keins",
-        "no_go_reasons": [],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "",
-        "spot": "Weissenstein",
-        "date": "2026-05-01",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1329)"
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "error",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
     "2026-05-02": {
       "safety": {
         "safety_status": "error",
@@ -1274,8 +1307,51 @@
         "date": "2026-05-02",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 20 column 14 (char 1303)"
+        "error": "Expecting property name enclosed in double quotes: line 20 column 30 (char 1408)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-01": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Weissenstein",
+        "date": "2026-05-01",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 19 column 14 (char 1398)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1293,43 +1369,6 @@
     }
   },
   "Röti": {
-    "2026-05-01": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (N-NO). Kein fliegbares Fenster.",
-        "spot": "Röti",
-        "date": "2026-05-01",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
     "2026-05-02": {
       "safety": {
         "safety_status": "not_safe",
@@ -1352,6 +1391,45 @@
         "wind_wrong_count": 6,
         "error": ""
       },
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-01": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (N-NO). Kein fliegbares Fenster.",
+        "spot": "Röti",
+        "date": "2026-05-01",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1389,43 +1467,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-05": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Start-Fenster: Nur 1h mit Windrichtung im erlaubten Sektor (Minimum 3h)"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Nur 1h mit passender Windrichtung (N-NO) — kein ausreichendes Start-Fenster.",
-        "spot": "Röti",
-        "date": "2026-05-05",
-        "wind_ok_count": 1,
-        "wind_wrong_count": 6,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1461,6 +1504,45 @@
         "date": "2026-05-04",
         "wind_ok_count": 0,
         "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-05": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Start-Fenster: Nur 1h mit Windrichtung im erlaubten Sektor (Minimum 3h)"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Nur 1h mit passender Windrichtung (N-NO) — kein ausreichendes Start-Fenster.",
+        "spot": "Röti",
+        "date": "2026-05-05",
+        "wind_ok_count": 1,
+        "wind_wrong_count": 6,
         "error": ""
       },
       "rating": 0.0,
@@ -1502,43 +1584,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-03": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NNO-NNW). Kein fliegbares Fenster.",
-        "spot": "Grosser Sternen",
-        "date": "2026-05-03",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1576,6 +1623,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1591,12 +1640,12 @@
       "best_window": "keins",
       "recommendation": ""
     },
-    "2026-05-05": {
+    "2026-05-03": {
       "safety": {
         "safety_status": "not_safe",
         "safe_window": "keins",
         "no_go_reasons": [
-          "Start-Fenster: Nur 1h mit Windrichtung im erlaubten Sektor (Minimum 3h)"
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
         ],
         "caution_notes": [],
         "primary_no_go": null,
@@ -1606,13 +1655,15 @@
         "wind_summary": "",
         "wind_shear": "",
         "foehn_risk": "none",
-        "summary": "Nur 1h mit passender Windrichtung (NNO-NNW) — kein ausreichendes Start-Fenster.",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NNO-NNW). Kein fliegbares Fenster.",
         "spot": "Grosser Sternen",
-        "date": "2026-05-05",
-        "wind_ok_count": 1,
-        "wind_wrong_count": 6,
+        "date": "2026-05-03",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1664,15 +1715,13 @@
       },
       "best_window": "keins",
       "recommendation": ""
-    }
-  },
-  "Tritt": {
-    "2026-05-02": {
+    },
+    "2026-05-05": {
       "safety": {
         "safety_status": "not_safe",
         "safe_window": "keins",
         "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+          "Start-Fenster: Nur 1h mit Windrichtung im erlaubten Sektor (Minimum 3h)"
         ],
         "caution_notes": [],
         "primary_no_go": null,
@@ -1682,11 +1731,11 @@
         "wind_summary": "",
         "wind_shear": "",
         "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NNO-N). Kein fliegbares Fenster.",
-        "spot": "Tritt",
-        "date": "2026-05-02",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
+        "summary": "Nur 1h mit passender Windrichtung (NNO-NNW) — kein ausreichendes Start-Fenster.",
+        "spot": "Grosser Sternen",
+        "date": "2026-05-05",
+        "wind_ok_count": 1,
+        "wind_wrong_count": 6,
         "error": ""
       },
       "rating": 0.0,
@@ -1703,7 +1752,9 @@
       },
       "best_window": "keins",
       "recommendation": ""
-    },
+    }
+  },
+  "Tritt": {
     "2026-05-01": {
       "safety": {
         "safety_status": "not_safe",
@@ -1726,6 +1777,47 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-02": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NNO-N). Kein fliegbares Fenster.",
+        "spot": "Tritt",
+        "date": "2026-05-02",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1763,6 +1855,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1800,6 +1894,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1854,43 +1950,6 @@
     }
   },
   "Tisch": {
-    "2026-05-03": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-NW). Kein fliegbares Fenster.",
-        "spot": "Tisch",
-        "date": "2026-05-03",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
     "2026-05-02": {
       "safety": {
         "safety_status": "not_safe",
@@ -1913,6 +1972,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -1965,6 +2026,45 @@
       "best_window": "keins",
       "recommendation": ""
     },
+    "2026-05-03": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-NW). Kein fliegbares Fenster.",
+        "spot": "Tisch",
+        "date": "2026-05-03",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
     "2026-05-05": {
       "safety": {
         "safety_status": "not_safe",
@@ -1987,6 +2087,8 @@
         "wind_wrong_count": 2,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "all_day_rain",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2020,8 +2122,12 @@
         "date": "2026-05-01",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 22 column 5 (char 882)"
+        "error": "Unterminated string starting at: line 20 column 14 (char 1394)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2135,6 +2241,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2172,6 +2280,8 @@
         "wind_wrong_count": 1,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "all_day_rain",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2205,8 +2315,12 @@
         "date": "2026-05-01",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1347)"
+        "error": "Unterminated string starting at: line 19 column 14 (char 1337)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2246,43 +2360,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-04": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (N-NW). Kein fliegbares Fenster.",
-        "spot": "Steinhüttli",
-        "date": "2026-05-04",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2320,115 +2399,8 @@
         "wind_wrong_count": 2,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-01": {
-      "safety": {
-        "safety_status": "error",
-        "safe_window": "keins",
-        "no_go_reasons": [],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "",
-        "spot": "Steinhüttli",
-        "date": "2026-05-01",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 22 column 14 (char 1425)"
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "error",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-02": {
-      "safety": {
-        "safety_status": "error",
-        "safe_window": "keins",
-        "no_go_reasons": [],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "",
-        "spot": "Steinhüttli",
-        "date": "2026-05-02",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1265)"
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "error",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    }
-  },
-  "Waldrand, oberhalb Kreuz": {
-    "2026-05-05": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (SW-NW). Kein fliegbares Fenster.",
-        "spot": "Waldrand, oberhalb Kreuz",
-        "date": "2026-05-05",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "all_day_rain",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2459,13 +2431,15 @@
         "wind_summary": "",
         "wind_shear": "",
         "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (SW-NW). Kein fliegbares Fenster.",
-        "spot": "Waldrand, oberhalb Kreuz",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (N-NW). Kein fliegbares Fenster.",
+        "spot": "Steinhüttli",
         "date": "2026-05-04",
         "wind_ok_count": 0,
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2495,17 +2469,140 @@
         "wind_shear": "",
         "foehn_risk": "none",
         "summary": "",
-        "spot": "Waldrand, oberhalb Kreuz",
+        "spot": "Steinhüttli",
         "date": "2026-05-01",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 20 column 14 (char 1391)"
+        "error": "Unterminated string starting at: line 20 column 3 (char 1410)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
       "fly_status": "",
       "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-02": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Steinhüttli",
+        "date": "2026-05-02",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 20 column 14 (char 1242)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    }
+  },
+  "Waldrand, oberhalb Kreuz": {
+    "2026-05-04": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (SW-NW). Kein fliegbares Fenster.",
+        "spot": "Waldrand, oberhalb Kreuz",
+        "date": "2026-05-04",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-05": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (SW-NW). Kein fliegbares Fenster.",
+        "spot": "Waldrand, oberhalb Kreuz",
+        "date": "2026-05-05",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
       "streckenflug": {
         "tier": "kein_xc",
         "rating": 0,
@@ -2534,8 +2631,51 @@
         "date": "2026-05-03",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 17 (char 996)"
+        "error": "503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-01": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Waldrand, oberhalb Kreuz",
+        "date": "2026-05-01",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 19 column 14 (char 1370)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2569,8 +2709,12 @@
         "date": "2026-05-02",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1120)"
+        "error": "Unterminated string starting at: line 19 column 14 (char 1266)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2610,117 +2754,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-03": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
-        "spot": "Chli Aubrig",
-        "date": "2026-05-03",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-01": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
-        "spot": "Chli Aubrig",
-        "date": "2026-05-01",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-05": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
-        "spot": "Chli Aubrig",
-        "date": "2026-05-05",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2772,10 +2807,127 @@
       },
       "best_window": "keins",
       "recommendation": ""
+    },
+    "2026-05-03": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
+        "spot": "Chli Aubrig",
+        "date": "2026-05-03",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-01": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
+        "spot": "Chli Aubrig",
+        "date": "2026-05-01",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-05": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (S-W). Kein fliegbares Fenster.",
+        "spot": "Chli Aubrig",
+        "date": "2026-05-05",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
     }
   },
   "Rotmoos": {
-    "2026-05-03": {
+    "2026-05-01": {
       "safety": {
         "safety_status": "not_safe",
         "safe_window": "keins",
@@ -2792,11 +2944,13 @@
         "foehn_risk": "none",
         "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-O). Kein fliegbares Fenster.",
         "spot": "Rotmoos",
-        "date": "2026-05-03",
+        "date": "2026-05-01",
         "wind_ok_count": 0,
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2834,80 +2988,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-01": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-O). Kein fliegbares Fenster.",
-        "spot": "Rotmoos",
-        "date": "2026-05-01",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-05": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-O). Kein fliegbares Fenster.",
-        "spot": "Rotmoos",
-        "date": "2026-05-05",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2945,6 +3027,86 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-03": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-O). Kein fliegbares Fenster.",
+        "spot": "Rotmoos",
+        "date": "2026-05-03",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-05": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-O). Kein fliegbares Fenster.",
+        "spot": "Rotmoos",
+        "date": "2026-05-05",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -2984,6 +3146,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3021,6 +3185,8 @@
         "wind_wrong_count": 4,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "all_day_rain",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3054,43 +3220,12 @@
         "date": "2026-05-01",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1254)"
+        "error": "Unterminated string starting at: line 20 column 14 (char 1218)"
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "error",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-04": {
-      "safety": {
-        "safety_status": "error",
-        "safe_window": "keins",
-        "no_go_reasons": [],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "",
-        "spot": "Hummel",
-        "date": "2026-05-04",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 22 column 5 (char 879)"
-      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3124,8 +3259,51 @@
         "date": "2026-05-02",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 20 column 14 (char 1280)"
+        "error": "503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-04": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Hummel",
+        "date": "2026-05-04",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 19 column 3 (char 1281)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3180,6 +3358,45 @@
       "best_window": "keins",
       "recommendation": ""
     },
+    "2026-05-03": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-O). Kein fliegbares Fenster.",
+        "spot": "Gipfel Fronalpstock",
+        "date": "2026-05-03",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
     "2026-05-02": {
       "safety": {
         "safety_status": "not_safe",
@@ -3202,6 +3419,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3239,43 +3458,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-03": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (NO-O). Kein fliegbares Fenster.",
-        "spot": "Gipfel Fronalpstock",
-        "date": "2026-05-03",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3313,6 +3497,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3352,6 +3538,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3459,8 +3647,12 @@
         "date": "2026-05-02",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 21 column 15 (char 1738)"
+        "error": "Unterminated string starting at: line 19 column 14 (char 1094)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3494,8 +3686,12 @@
         "date": "2026-05-05",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 17 (char 1050)"
+        "error": "Unterminated string starting at: line 20 column 17 (char 1109)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3535,43 +3731,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-02": {
-      "safety": {
-        "safety_status": "not_safe",
-        "safe_window": "keins",
-        "no_go_reasons": [
-          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
-        ],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (SO-S). Kein fliegbares Fenster.",
-        "spot": "Südstartplatz",
-        "date": "2026-05-02",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 7,
-        "error": ""
-      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3609,6 +3770,47 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "not_safe",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-02": {
+      "safety": {
+        "safety_status": "not_safe",
+        "safe_window": "keins",
+        "no_go_reasons": [
+          "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+        ],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (SO-S). Kein fliegbares Fenster.",
+        "spot": "Südstartplatz",
+        "date": "2026-05-02",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 7,
+        "error": ""
+      },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3646,6 +3848,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3683,6 +3887,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3722,6 +3928,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3759,6 +3967,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3796,6 +4006,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3813,69 +4025,42 @@
     },
     "2026-05-01": {
       "safety": {
-        "safety_status": "safe",
-        "safe_window": "10:00-17:00",
+        "safety_status": "error",
+        "safe_window": "keins",
         "no_go_reasons": [],
-        "caution_notes": [
-          "Thermik: zerrissen ab 15:00 Uhr (ROUGH-DEG)"
-        ],
+        "caution_notes": [],
         "primary_no_go": null,
         "primary_caution": null,
         "primary_reducer": null,
-        "primary_booster": "STARKE_THERMIK",
-        "wind_summary": "Der Wind am Startplatz ist durchgehend sehr ruhig und stabil. Die Windstaerke liegt zwischen 3.3 km/h und 8.6 km/h und kommt meist aus suedwestlicher bis suedlicher Richtung (77° bis 15°). Es gab einen Richtungsdreher von bis zu 62° zwischen 10:00 und 13:00 Uhr, der jedoch innerhalb des erlaubten Sektors blieb und keine Sicherheitsgefahr darstellt. Der Wind bleibt durchgehend im idealen Bereich fuer den Spot.",
-        "wind_shear": "Der Hoehenwind zeigt eine moderate Scherung. Waerend der Wind in Bodennähe und im unteren Flugbereich (800hPa) aus westlichen Richtungen kommt, dreht er in groesseren Hoehen (700hPa) auf suedliche bis suedostliche Richtungen. Dies deutet auf eine moderate Windscherung hin, die jedoch nicht als kritisch eingestuft wird.",
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
         "foehn_risk": "none",
-        "summary": "Der Tag ist als sicher einzustufen. Der Wind am Startplatz ist durchgehend ruhig und stabil, mit Werten zwischen 3.3 und 8.6 km/h und einer stabilen Richtung innerhalb des erlaubten Sektors. Es gibt keine Anzeichen fuer starke Boeen oder kritische Hoehenwinde. Die Thermik ist den ganzen Tag ueber nutzbar, wird aber ab 15:00 Uhr als leicht zerrissen (ROUGH-DEG) eingestuft, was als leichte Vorsichtsmassnahme vermerkt wird. Es gibt keine Foehn-Anzeichen oder Gewittergefahr. Das sichere Flugfenster erstreckt sich von 10:00 bis 17:00 Uhr. Es wird empfohlen, auf die leicht zerrissene Thermik ab dem Nachmittag zu achten.",
+        "summary": "",
         "spot": "Charenstöckli",
         "date": "2026-05-01",
-        "wind_ok_count": 7,
+        "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": ""
+        "error": "Unterminated string starting at: line 19 column 3 (char 1823)"
       },
-      "rating": 8.3,
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
-      "flyability": {
-        "flyability_tier": "green",
-        "fly_status": "green",
-        "status": "green",
-        "flight_type": "Thermikflug",
-        "flight_duration_estimate": "mehrere Stunden Thermikflug",
-        "thermal_quality": "Die Thermik ist heute sehr gut und konstant. Mit einem Spitzenwert von 2.0 m/s und einer hohen Wolkenbasis von bis zu 3759m MSL sind gute Steigwerte ueber mehrere Stunden zu erwarten. Die Sonne scheint durchgehend, was die Thermik staerkt.",
-        "peak_climb_rate": 2.0,
-        "xc_potential": "high",
-        "xc_details": "Das XC-Potenzial ist hoch. Die Thermik ist stark und konstant, die Wolkenbasis ist hoch und der Wind am Startplatz ist ideal. Die Region bietet ebenfalls gute Bedingungen mit moderater Thermik und ruhigem Wind.",
-        "soaring_options": "Hangsoaring ist bei den aktuellen Windbedingungen moeglich, aber die starke Thermik macht Thermikfluege attraktiver.",
-        "bemerkung_check": "Keine besonderen Bemerkungen relevant fuer die Fliegbarkeit.",
-        "best_window": "10:00-17:00",
-        "flyability_limits": [
-          "Thermik: zerrissen ab 15:00 Uhr (ROUGH-DEG)"
-        ],
-        "highlights": [
-          "Starke Thermik: Peak 2.0 m/s",
-          "Hohe Wolkenbasis: bis 3759m MSL",
-          "Langes Flugfenster: 7h"
-        ],
-        "recommendation": "Heute ist ein Top-Tag fuer Thermikfluege mit hohem XC-Potenzial. Die Thermik steigt bis zu 2.0 m/s und die Wolkenbasis ist bis 3759m MSL hoch, was fuer lange Flugzeiten sorgt. Der Wind am Startplatz ist ruhig und stabil, was ideale Bedingungen schafft. Ab 15:00 Uhr kann die Thermik leicht zerrissen werden, was die Bart-Zentrierung etwas erschwert, aber die Fliegbarkeit nicht wesentlich beeintraechtigt. Das beste Flugfenster ist von 10:00 bis 17:00 Uhr.",
-        "confidence": "high",
-        "rating": 8.3,
-        "is_conditional": false,
-        "conditional_reason": "",
-        "spot": "Charenstöckli",
-        "date": "2026-05-01"
-      },
-      "fly_status": "green",
-      "status": "green",
+      "fly_status": "",
+      "status": "error",
       "streckenflug": {
-        "tier": "moderat",
-        "rating": 7,
-        "summary": "Das XC-Potenzial ist moderat. Die Thermik am Spot ist stark und die Bedingungen sind gut, aber die Region zeigt eine leicht zerrissene Thermik ab dem Nachmittag. Der Wind in der Region ist ruhig, aber die Hoehenwinde zeigen eine moderate Scherung. Das XC-Potenzial wird durch die zerrissene Thermik in der Region leicht eingeschraenkt.",
-        "limiting_factor": "weak_regional_thermals",
-        "region_context_available": true
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
       },
-      "best_window": "10:00-17:00",
-      "recommendation": "Heute ist ein Top-Tag fuer Thermikfluege mit hohem XC-Potenzial. Die Thermik steigt bis zu 2.0 m/s und die Wolkenbasis ist bis 3759m MSL hoch, was fuer lange Flugzeiten sorgt. Der Wind am Startplatz ist ruhig und stabil, was ideale Bedingungen schafft. Ab 15:00 Uhr kann die Thermik leicht zerrissen werden, was die Bart-Zentrierung etwas erschwert, aber die Fliegbarkeit nicht wesentlich beeintraechtigt. Das beste Flugfenster ist von 10:00 bis 17:00 Uhr."
+      "best_window": "keins",
+      "recommendation": ""
     },
     "2026-05-02": {
       "safety": {
@@ -3895,8 +4080,12 @@
         "date": "2026-05-02",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1187)"
+        "error": "Unterminated string starting at: line 19 column 14 (char 1332)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -3973,6 +4162,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4047,6 +4238,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4084,6 +4277,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4123,6 +4318,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4160,6 +4357,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4197,6 +4396,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4234,6 +4435,8 @@
         "wind_wrong_count": 0,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "all_day_rain",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4267,8 +4470,12 @@
         "date": "2026-05-04",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1232)"
+        "error": "Unterminated string starting at: line 20 column 14 (char 1293)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4382,46 +4589,13 @@
         "wind_wrong_count": 0,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "all_day_rain",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
       "fly_status": "",
       "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-02": {
-      "safety": {
-        "safety_status": "error",
-        "safe_window": "keins",
-        "no_go_reasons": [],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "",
-        "spot": "Seebodenalp",
-        "date": "2026-05-02",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 20 column 14 (char 1249)"
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "error",
       "streckenflug": {
         "tier": "kein_xc",
         "rating": 0,
@@ -4450,8 +4624,51 @@
         "date": "2026-05-03",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 18 column 17 (char 989)"
+        "error": "Unterminated string starting at: line 24 column 14 (char 1339)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-02": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Seebodenalp",
+        "date": "2026-05-02",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 19 column 3 (char 1331)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4491,6 +4708,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4528,6 +4747,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4565,6 +4786,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4639,6 +4862,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4752,46 +4977,13 @@
         "wind_wrong_count": 0,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "all_day_rain",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
       "fly_status": "",
       "status": "not_safe",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
-    "2026-05-01": {
-      "safety": {
-        "safety_status": "error",
-        "safe_window": "keins",
-        "no_go_reasons": [],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "",
-        "spot": "Bergstation",
-        "date": "2026-05-01",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 18 column 14 (char 1265)"
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "error",
       "streckenflug": {
         "tier": "kein_xc",
         "rating": 0,
@@ -4820,8 +5012,51 @@
         "date": "2026-05-02",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 19 column 14 (char 1258)"
+        "error": "Unterminated string starting at: line 19 column 14 (char 1279)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-01": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Bergstation",
+        "date": "2026-05-01",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 17 column 3 (char 1467)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4898,6 +5133,8 @@
         "wind_wrong_count": 7,
         "error": ""
       },
+      "noAnalysis": true,
+      "noAnalysisReason": "wind_direction_mismatch",
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -4950,41 +5187,6 @@
       "best_window": "keins",
       "recommendation": ""
     },
-    "2026-05-03": {
-      "safety": {
-        "safety_status": "error",
-        "safe_window": "keins",
-        "no_go_reasons": [],
-        "caution_notes": [],
-        "primary_no_go": null,
-        "primary_caution": null,
-        "primary_reducer": null,
-        "primary_booster": null,
-        "wind_summary": "",
-        "wind_shear": "",
-        "foehn_risk": "none",
-        "summary": "",
-        "spot": "Südwest",
-        "date": "2026-05-03",
-        "wind_ok_count": 0,
-        "wind_wrong_count": 0,
-        "error": "Expecting property name enclosed in double quotes: line 22 column 28 (char 1363)"
-      },
-      "rating": 0.0,
-      "is_conditional": false,
-      "conditional_reason": "",
-      "fly_status": "",
-      "status": "error",
-      "streckenflug": {
-        "tier": "kein_xc",
-        "rating": 0,
-        "summary": "",
-        "limiting_factor": "spot_not_flyable",
-        "region_context_available": false
-      },
-      "best_window": "keins",
-      "recommendation": ""
-    },
     "2026-05-04": {
       "safety": {
         "safety_status": "error",
@@ -5003,8 +5205,51 @@
         "date": "2026-05-04",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Expecting value: line 21 column 25 (char 1390)"
+        "error": "Unterminated string starting at: line 22 column 19 (char 846)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
+      "rating": 0.0,
+      "is_conditional": false,
+      "conditional_reason": "",
+      "fly_status": "",
+      "status": "error",
+      "streckenflug": {
+        "tier": "kein_xc",
+        "rating": 0,
+        "summary": "",
+        "limiting_factor": "spot_not_flyable",
+        "region_context_available": false
+      },
+      "best_window": "keins",
+      "recommendation": ""
+    },
+    "2026-05-03": {
+      "safety": {
+        "safety_status": "error",
+        "safe_window": "keins",
+        "no_go_reasons": [],
+        "caution_notes": [],
+        "primary_no_go": null,
+        "primary_caution": null,
+        "primary_reducer": null,
+        "primary_booster": null,
+        "wind_summary": "",
+        "wind_shear": "",
+        "foehn_risk": "none",
+        "summary": "",
+        "spot": "Südwest",
+        "date": "2026-05-03",
+        "wind_ok_count": 0,
+        "wind_wrong_count": 0,
+        "error": "Unterminated string starting at: line 21 column 3 (char 1458)"
+      },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -5096,7 +5341,7 @@
       "best_window": "keins",
       "recommendation": ""
     },
-    "2026-05-01": {
+    "2026-05-02": {
       "safety": {
         "safety_status": "error",
         "safe_window": "keins",
@@ -5111,11 +5356,15 @@
         "foehn_risk": "none",
         "summary": "",
         "spot": "First",
-        "date": "2026-05-01",
+        "date": "2026-05-02",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 18 column 14 (char 1129)"
+        "error": "Unterminated string starting at: line 19 column 14 (char 1299)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -5149,8 +5398,12 @@
         "date": "2026-05-04",
         "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 23 column 14 (char 1258)"
+        "error": "Unterminated string starting at: line 21 column 3 (char 1295)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
@@ -5166,42 +5419,43 @@
       "best_window": "keins",
       "recommendation": ""
     },
-    "2026-05-02": {
+    "2026-05-01": {
       "safety": {
-        "safety_status": "safe",
-        "safe_window": "10:00-17:00",
+        "safety_status": "error",
+        "safe_window": "keins",
         "no_go_reasons": [],
-        "caution_notes": [
-          "THERMAL-ROUGH-DEGRADED: 10:00-11:00 und 16:00-17:00, ruppig aber fliegbar",
-          "Richtungsdreher: Wind dreht zwischen 13:00 und 16:00 um bis zu 57°"
-        ],
+        "caution_notes": [],
         "primary_no_go": null,
-        "primary_caution": "TREND_STABIL",
+        "primary_caution": null,
         "primary_reducer": null,
         "primary_booster": null,
-        "wind_summary": "Der Wind ist den ganzen Tag über sehr schwach und ruhig. Die Richtung dreht am Nachmittag von Nordost auf Südwest, bleibt aber stets im erlaubten Sektor. Die Geschwindigkeiten bewegen sich zwischen 3.8 km/h und 15.7 km/h. Der Wind ist stabil und zeigt keine Anzeichen einer Verschlechterung.",
-        "wind_shear": "Die Windscherung ist gering. Der Wind in der Flugschicht (bis 700 hPa) ist ebenfalls schwach und folgt der Bodenwindrichtung, mit maximal 14 km/h auf 3141m um 15:00 Uhr. Es gibt keine Anzeichen für Föhn oder signifikante vertikale Windänderungen.",
+        "wind_summary": "",
+        "wind_shear": "",
         "foehn_risk": "none",
-        "summary": "Der Tag ist sicher zum Fliegen. Der Wind ist durchgehend schwach und stabil, mit maximal 15.7 km/h und einer erlaubten Richtung. Es gibt keine Anzeichen für starke Böen, Föhn, Niederschlag oder Gewitter. Die Thermik ist produktiv mit einem Peak-Steigen von 1.9 m/s und einer guten Qualität über 7 Stunden, wobei zwei Stunden als ruppig eingestuft sind. Das sichere Flugfenster erstreckt sich von 10:00 bis 17:00 Uhr. Die Bedingungen sind ideal für entspanntes Fliegen.",
+        "summary": "",
         "spot": "First",
-        "date": "2026-05-02",
-        "wind_ok_count": 7,
+        "date": "2026-05-01",
+        "wind_ok_count": 0,
         "wind_wrong_count": 0,
-        "error": "Unterminated string starting at: line 34 column 16 (char 2792)"
+        "error": "Unterminated string starting at: line 19 column 14 (char 1348)"
       },
+      "thermal_rating": 1,
+      "window_rating": 1,
+      "wind_rating": 1,
+      "xc_rating": 1,
       "rating": 0.0,
       "is_conditional": false,
       "conditional_reason": "",
       "fly_status": "",
-      "status": "safe",
+      "status": "error",
       "streckenflug": {
         "tier": "kein_xc",
         "rating": 0,
         "summary": "",
-        "limiting_factor": "none",
+        "limiting_factor": "spot_not_flyable",
         "region_context_available": false
       },
-      "best_window": "10:00-17:00",
+      "best_window": "keins",
       "recommendation": ""
     }
   }

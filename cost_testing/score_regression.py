@@ -192,6 +192,11 @@ def main():
     ap.add_argument("--no-llm", action="store_true",
                     help="kein neuer LLM-Call, nur aktuelles spot_analyses.json vergleichen")
     ap.add_argument("--max-cases", type=int, default=0, help="auf N Cases beschraenken")
+    ap.add_argument("--queue-output", default=None,
+                    help="Optionaler Pfad fuer strukturierte Diff-Liste (JSON), die das "
+                         "Admin-Review-Queue konsumiert. Enthaelt pro Case mit Diff: "
+                         "input, gold_output (full), current_output (full), "
+                         "fail_fields, severities.")
     args = ap.parse_args()
 
     if not GOLDEN_DIR.is_dir():
@@ -217,6 +222,8 @@ def main():
     max_score = 0
     rows: list[dict] = []
 
+    queue_cases: list[dict] = []  # nur Cases mit Diff, fuer Review-Queue
+
     for case_path in cases:
         gold_record = json.loads(case_path.read_text(encoding="utf-8"))
         spot, date_str = gold_record["spot"], gold_record["date"]
@@ -235,6 +242,8 @@ def main():
         case_score = 0
         case_max = 0
         case_failures: list[str] = []
+        case_severities: list[str] = []
+        case_fail_fields: list[str] = []
         for field, (severity, weight) in WEIGHTS.items():
             case_max += weight
             ok, reason = _score_field(field, gold[field], current[field])
@@ -246,6 +255,8 @@ def main():
                 elif severity == "hoch":
                     high_regressions += 1
                 case_failures.append(f"{field}({severity}): {reason}")
+                case_severities.append(severity)
+                case_fail_fields.append(field)
 
         total_score += case_score
         max_score += case_max
@@ -254,6 +265,29 @@ def main():
             "score": case_score, "max": case_max,
             "failures": case_failures,
         })
+
+        # Bei Diff: vollen Datensatz fuer die Review-Queue mitschreiben.
+        if case_failures:
+            queue_cases.append({
+                "spot": spot,
+                "date": date_str,
+                "case_score": case_score,
+                "case_max": case_max,
+                "fail_fields": case_fail_fields,
+                "severities": case_severities,
+                "max_severity": (
+                    "kritisch" if "kritisch" in case_severities
+                    else "hoch" if "hoch" in case_severities
+                    else "mittel" if "mittel" in case_severities
+                    else "info"
+                ),
+                "gold_safety_status": gold["safety_status"],
+                "current_safety_status": current["safety_status"],
+                "input": gold_record.get("input", ""),
+                "gold_output": gold_record.get("output", {}),
+                "current_output": current_entry,
+                "case_path": str(case_path),
+            })
 
     pct = 100.0 * total_score / max_score if max_score else 0.0
     print(f"\n=== Regression-Score ===")
@@ -289,6 +323,28 @@ def main():
     # Acceptance-Gate (Schwellen kalibriert nach gemessener LLM-Jitter)
     gate_ok = (crit_regressions == 0) and (high_regressions <= 6) and (pct >= 90.0)
     print(f"\nAcceptance-Gate: {'PASS' if gate_ok else 'FAIL'}")
+
+    # Strukturierter Diff-Output fuer das Admin-Review-Queue.
+    # Wird vom Admin-UI immer angefordert; CLI-Nutzer optional.
+    if args.queue_output and queue_cases:
+        q_path = Path(args.queue_output)
+        q_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "report_path": str(args.report) if args.report else None,
+            "mode": "no_llm" if args.no_llm else "with_llm",
+            "total_cases": len(rows),
+            "diff_count": len(queue_cases),
+            "crit_regressions": crit_regressions,
+            "high_regressions": high_regressions,
+            "score_pct": round(pct, 2),
+            "gate_ok": gate_ok,
+            "cases": queue_cases,
+        }
+        with q_path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        print(f"Queue-Datei geschrieben: {q_path} ({len(queue_cases)} Diff-Cases)")
+
     return 0 if gate_ok else 1
 
 

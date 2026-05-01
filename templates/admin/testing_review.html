@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · Review {{ session.session_id }} – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+<style>
+  .rv-header  { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:var(--space-4); flex-wrap:wrap; }
+  .rv-summary { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+  .rv-pill {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 12px; border-radius:var(--radius-pill);
+    font-size:13px; font-weight:600; line-height:1.2;
+    border:1px solid;
+  }
+  .rv-pill--better  { background:#e6f4ea; border-color:#7ec48e; color:#22863a; }
+  .rv-pill--same    { background:#f0f0f0; border-color:#ccc; color:#555; }
+  .rv-pill--worse   { background:#fef0f0; border-color:#e57373; color:#b71c1c; }
+  .rv-pill--open    { background:#fff8e1; border-color:#f0c419; color:#6b4f00; }
+  .rv-pill--total   { background:#eef6ff; border-color:#79c0ff; color:#0c4d8a; }
+  .rv-pill__dot { width:8px; height:8px; border-radius:50%; }
+  .rv-pill--better  .rv-pill__dot { background:#22863a; }
+  .rv-pill--same    .rv-pill__dot { background:#888; }
+  .rv-pill--worse   .rv-pill__dot { background:#b71c1c; }
+  .rv-pill--open    .rv-pill__dot { background:#f0c419; }
+
+  .rv-final {
+    padding:14px 18px; border-radius:var(--radius-lg); margin-bottom:var(--space-4);
+    font-size:var(--text-sm); line-height:1.5; border:1px solid;
+  }
+  .rv-final--PASS    { background:#e6f4ea; border-color:#7ec48e; color:#1a5d2a; }
+  .rv-final--FAIL    { background:#fef0f0; border-color:#e57373; color:#8b1818; }
+  .rv-final--AMBIG   { background:#fff8e1; border-color:#f0c419; color:#6b4f00; }
+
+  .rv-card {
+    border:1px solid var(--color-border);
+    border-radius:var(--radius-lg);
+    padding:0; margin-bottom:var(--space-4);
+    overflow:hidden; background:#fff;
+  }
+  .rv-card__head {
+    display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
+    padding:12px 16px; background:#f6f8fa; border-bottom:1px solid var(--color-border);
+    flex-wrap:wrap;
+  }
+  .rv-card__title {
+    font-size:var(--text-base); font-weight:700; margin:0;
+    font-family:ui-monospace,SFMono-Regular,monospace;
+  }
+  .rv-card__sev {
+    font-size:11px; padding:2px 8px; border-radius:var(--radius-pill);
+    font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
+    border:1px solid;
+  }
+  .rv-card__sev--kritisch { background:#fef0f0; border-color:#e57373; color:#b71c1c; }
+  .rv-card__sev--hoch     { background:#fff3e0; border-color:#ffb74d; color:#a14a00; }
+  .rv-card__sev--mittel   { background:#fffde7; border-color:#f9d246; color:#7a5d00; }
+
+  .rv-card__verdict {
+    display:flex; align-items:center; gap:6px;
+    font-size:12px; font-weight:600;
+  }
+
+  .rv-card__diff-fields {
+    padding:0 16px 8px; background:#f6f8fa;
+    font-size:12px; color:var(--color-text-secondary);
+    border-bottom:1px solid var(--color-border);
+  }
+
+  .rv-side {
+    display:grid; grid-template-columns:1fr 1fr; gap:0;
+    border-bottom:1px solid var(--color-border);
+  }
+  @media (max-width: 900px) { .rv-side { grid-template-columns: 1fr; } }
+  .rv-col { padding:14px 16px; min-width:0; }
+  .rv-col--gold { background:#fafcff; border-right:1px solid var(--color-border); }
+  .rv-col--new  { background:#fffaf6; }
+  .rv-col__lbl  { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--color-text-secondary); margin-bottom:8px; }
+  .rv-col__lbl--gold { color:#0c4d8a; }
+  .rv-col__lbl--new  { color:#a14a00; }
+
+  .rv-field {
+    display:grid; grid-template-columns:max-content 1fr; gap:2px 12px;
+    font-size:13px; line-height:1.45;
+  }
+  .rv-field dt { font-weight:600; color:var(--color-text-secondary); }
+  .rv-field dt.is-diff { color:#b71c1c; }
+  .rv-field dd { margin:0; word-break:break-word; }
+
+  .rv-field__list {
+    margin:2px 0 0; padding:0; list-style:none;
+    font-size:12px; line-height:1.4;
+  }
+  .rv-field__list li {
+    padding:1px 0; border-left:2px solid #e1e4e8; padding-left:8px; margin-bottom:2px;
+  }
+
+  .rv-summary-text {
+    margin-top:8px; padding:8px 10px; background:rgba(255,255,255,0.7);
+    border-radius:var(--radius-sm); font-size:13px; line-height:1.5;
+    white-space:pre-wrap;
+  }
+
+  .rv-input-toggle {
+    padding:6px 16px; font-size:12px; font-weight:600;
+    color:var(--color-primary); background:transparent; border:none; cursor:pointer;
+    border-bottom:1px solid var(--color-border);
+    width:100%; text-align:left;
+  }
+  .rv-input-toggle:hover { background:#f0f6ff; }
+  .rv-input-pre {
+    margin:0; padding:10px 16px; max-height:240px; overflow:auto;
+    background:#0d1117; color:#c9d1d9;
+    font-size:11px; font-family:ui-monospace,monospace; line-height:1.45;
+    border-bottom:1px solid var(--color-border);
+    white-space:pre-wrap;
+  }
+
+  .rv-actions {
+    display:flex; gap:8px; padding:12px 16px; align-items:center; flex-wrap:wrap;
+    background:#fafbfc;
+  }
+  .rv-vbtn {
+    padding:8px 14px; border-radius:var(--radius-md);
+    font-size:13px; font-weight:600; border:1.5px solid; cursor:pointer;
+    background:#fff; transition:transform 80ms ease;
+  }
+  .rv-vbtn:hover { transform:translateY(-1px); }
+  .rv-vbtn--better { border-color:#22863a; color:#22863a; }
+  .rv-vbtn--better.is-set, .rv-vbtn--better:active { background:#22863a; color:#fff; }
+  .rv-vbtn--same   { border-color:#888;    color:#444;    }
+  .rv-vbtn--same.is-set,   .rv-vbtn--same:active   { background:#888;    color:#fff; }
+  .rv-vbtn--worse  { border-color:#b71c1c; color:#b71c1c; }
+  .rv-vbtn--worse.is-set,  .rv-vbtn--worse:active  { background:#b71c1c; color:#fff; }
+  .rv-comment {
+    flex:1; min-width:200px; padding:7px 10px;
+    border:1px solid var(--color-border); border-radius:var(--radius-md);
+    font-size:13px;
+  }
+</style>
+{% endblock %}
+
+{% set verdict_class = {'PASS':'PASS', 'FAIL':'FAIL', 'AMBIGUOUS':'AMBIG'}.get(session.verdict, '') %}
+
+{% macro fmt_field(label, gold_val, new_val, is_list=False) %}
+  {% set is_diff = (gold_val|string) != (new_val|string) %}
+  <dt class="{% if is_diff %}is-diff{% endif %}">{{ label }}</dt>
+  <dd>
+    {% if is_list %}
+      {% if gold_val %}<ul class="rv-field__list">{% for x in gold_val %}<li>{{ x }}</li>{% endfor %}</ul>{% else %}<em style="color:#999;">—</em>{% endif %}
+    {% else %}
+      {% if gold_val is none or gold_val == '' %}<em style="color:#999;">—</em>{% else %}{{ gold_val }}{% endif %}
+    {% endif %}
+  </dd>
+{% endmacro %}
+
+{% block content %}
+<main class="sp sp--wide">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Review · {{ session.session_id }}</h1>
+    <div class="sp-subtitle">
+      <a href="/admin/testing" style="color:var(--color-primary);text-decoration:underline;">&larr; Testing</a>
+      &nbsp;·&nbsp; gestartet {{ session.created_at }}
+      &nbsp;·&nbsp; Stichprobe {{ session.sample_size }} von {{ session.total_diffs }} Diffs
+      {% if session.regression_mode %} &middot; Modus <code>{{ session.regression_mode }}</code>{% endif %}
+    </div>
+  </header>
+
+  {% if flash_ok %}<div class="sp-flash sp-flash--ok">{{ flash_ok }}</div>{% endif %}
+  {% if flash_error %}<div class="sp-flash sp-flash--error">{{ flash_error }}</div>{% endif %}
+
+  <section class="rv-header">
+    <div class="rv-summary">
+      <span class="rv-pill rv-pill--total"><span class="rv-pill__dot"></span> Gesamt {{ session.cases|length }}</span>
+      <span class="rv-pill rv-pill--better"><span class="rv-pill__dot"></span> Besser {{ counts.better }}</span>
+      <span class="rv-pill rv-pill--same"><span class="rv-pill__dot"></span> Gleich {{ counts.same }}</span>
+      <span class="rv-pill rv-pill--worse"><span class="rv-pill__dot"></span> Schlechter {{ counts.worse }}</span>
+      <span class="rv-pill rv-pill--open"><span class="rv-pill__dot"></span> Offen {{ counts.open }}</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <form method="post" action="/admin/testing/review/{{ session.session_id }}/finalize">
+        <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit"
+                {% if counts.open > 0 %}disabled title="Erst alle Cases bewerten"{% endif %}>
+          Verdict berechnen
+        </button>
+      </form>
+      {% if session.verdict in ('PASS', 'AMBIGUOUS') and not session.promoted_at %}
+        <form method="post" action="/admin/testing/review/{{ session.session_id }}/promote"
+              onsubmit="return confirm('{{ counts.better }} Goldstandard-Cases mit den neuen Outputs ueberschreiben?');">
+          <button class="sp-btn sp-btn--ghost sp-btn--sm" type="submit"
+                  {% if counts.better == 0 %}disabled title="Keine besseren Cases"{% endif %}>
+            {{ counts.better }} Cases &rarr; Goldstandard promoten
+          </button>
+        </form>
+      {% elif session.promoted_at %}
+        <span style="align-self:center;font-size:var(--text-sm);color:var(--color-text-secondary);">
+          Promoted: {{ session.promoted_count }} Cases am {{ session.promoted_at }}
+        </span>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if session.verdict %}
+    <div class="rv-final rv-final--{{ verdict_class }}">
+      <strong>Session-Verdict: {{ session.verdict }}</strong>
+      &nbsp; finalisiert {{ session.finalized_at }}
+      &nbsp;·&nbsp; {{ counts.better }} besser / {{ counts.same }} gleich / {{ counts.worse }} schlechter von {{ session.cases|length }}
+    </div>
+  {% endif %}
+
+  {# ── Cards pro Case ───────────────────────────── #}
+  {% for c in session.cases %}
+    {% set go = c.gold_output or {} %}
+    {% set ne = c.current_output or {} %}
+    {% set gs = go.safety or {} %}
+    {% set ns = ne.safety or {} %}
+    {% set gf = go.flyability or {} %}
+    {% set nf = ne.flyability or {} %}
+    {% set gst = go.streckenflug or {} %}
+    {% set nst = ne.streckenflug or {} %}
+
+    <article class="rv-card" id="case-{{ loop.index }}">
+      <header class="rv-card__head">
+        <div>
+          <h3 class="rv-card__title">{{ c.spot }} · {{ c.date }}</h3>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px;">
+            <span class="rv-card__sev rv-card__sev--{{ c.max_severity }}">{{ c.max_severity }}</span>
+            &nbsp; Diff in: {{ c.fail_fields|join(', ') }}
+          </div>
+        </div>
+        <div class="rv-card__verdict">
+          {% if c.verdict == 'better' %}
+            <span class="rv-pill rv-pill--better"><span class="rv-pill__dot"></span> Besser</span>
+          {% elif c.verdict == 'same' %}
+            <span class="rv-pill rv-pill--same"><span class="rv-pill__dot"></span> Gleich</span>
+          {% elif c.verdict == 'worse' %}
+            <span class="rv-pill rv-pill--worse"><span class="rv-pill__dot"></span> Schlechter</span>
+          {% else %}
+            <span class="rv-pill rv-pill--open"><span class="rv-pill__dot"></span> Offen</span>
+          {% endif %}
+          {% if c.reviewed_at %}<span style="color:var(--color-text-secondary);font-weight:400;">{{ c.reviewed_at }}</span>{% endif %}
+        </div>
+      </header>
+
+      <button class="rv-input-toggle" type="button"
+              onclick="var p=this.nextElementSibling;p.style.display=(p.style.display=='none'?'block':'none');this.textContent=(p.style.display=='none'?'▸ Wetter-Input zeigen':'▾ Wetter-Input ausblenden');">
+        ▸ Wetter-Input zeigen
+      </button>
+      <pre class="rv-input-pre" style="display:none;">{{ c.input }}</pre>
+
+      <div class="rv-side">
+        {# Goldstandard #}
+        <div class="rv-col rv-col--gold">
+          <div class="rv-col__lbl rv-col__lbl--gold">▌Goldstandard</div>
+          <dl class="rv-field">
+            {{ fmt_field("Status", go.status or '—', ne.status or '—') }}
+            {{ fmt_field("Safety", gs.safety_status or '—', ns.safety_status or '—') }}
+            {{ fmt_field("Safe Window", gs.safe_window or '—', ns.safe_window or '—') }}
+            {{ fmt_field("Best Window", go.best_window or '—', ne.best_window or '—') }}
+            {{ fmt_field("Rating", go.rating, ne.rating) }}
+            {{ fmt_field("Foehn", gs.foehn_risk or 'none', ns.foehn_risk or 'none') }}
+            {{ fmt_field("Fly Tier", go.fly_status or '—', ne.fly_status or '—') }}
+            {{ fmt_field("Flight Type", gf.flight_type or '—', nf.flight_type or '—') }}
+            {{ fmt_field("Peak Climb", gf.peak_climb_rate, nf.peak_climb_rate) }}
+            {{ fmt_field("Streckenflug", gst.tier or 'kein_xc', nst.tier or 'kein_xc') }}
+            {{ fmt_field("No-Go", gs.no_go_reasons or [], ns.no_go_reasons or [], is_list=true) }}
+            {{ fmt_field("Caution", gs.caution_notes or [], ns.caution_notes or [], is_list=true) }}
+          </dl>
+          {% if gs.summary %}<div class="rv-summary-text"><strong>Summary:</strong> {{ gs.summary }}</div>{% endif %}
+        </div>
+
+        {# Aktueller Output #}
+        <div class="rv-col rv-col--new">
+          <div class="rv-col__lbl rv-col__lbl--new">▌Neuer Output</div>
+          <dl class="rv-field">
+            {{ fmt_field("Status", ne.status or '—', go.status or '—') }}
+            {{ fmt_field("Safety", ns.safety_status or '—', gs.safety_status or '—') }}
+            {{ fmt_field("Safe Window", ns.safe_window or '—', gs.safe_window or '—') }}
+            {{ fmt_field("Best Window", ne.best_window or '—', go.best_window or '—') }}
+            {{ fmt_field("Rating", ne.rating, go.rating) }}
+            {{ fmt_field("Foehn", ns.foehn_risk or 'none', gs.foehn_risk or 'none') }}
+            {{ fmt_field("Fly Tier", ne.fly_status or '—', go.fly_status or '—') }}
+            {{ fmt_field("Flight Type", nf.flight_type or '—', gf.flight_type or '—') }}
+            {{ fmt_field("Peak Climb", nf.peak_climb_rate, gf.peak_climb_rate) }}
+            {{ fmt_field("Streckenflug", nst.tier or 'kein_xc', gst.tier or 'kein_xc') }}
+            {{ fmt_field("No-Go", ns.no_go_reasons or [], gs.no_go_reasons or [], is_list=true) }}
+            {{ fmt_field("Caution", ns.caution_notes or [], gs.caution_notes or [], is_list=true) }}
+          </dl>
+          {% if ns.summary %}<div class="rv-summary-text"><strong>Summary:</strong> {{ ns.summary }}</div>{% endif %}
+        </div>
+      </div>
+
+      <form class="rv-actions" method="post"
+            action="/admin/testing/review/{{ session.session_id }}/{{ c.idx }}/verdict">
+        <button type="submit" name="verdict" value="better"
+                class="rv-vbtn rv-vbtn--better{% if c.verdict == 'better' %} is-set{% endif %}">
+          ✓ Neu besser
+        </button>
+        <button type="submit" name="verdict" value="same"
+                class="rv-vbtn rv-vbtn--same{% if c.verdict == 'same' %} is-set{% endif %}">
+          = Gleichwertig
+        </button>
+        <button type="submit" name="verdict" value="worse"
+                class="rv-vbtn rv-vbtn--worse{% if c.verdict == 'worse' %} is-set{% endif %}">
+          ✗ Neu schlechter
+        </button>
+        <input type="text" name="comment" class="rv-comment" maxlength="500"
+               placeholder="Kommentar (optional)" value="{{ c.comment }}">
+      </form>
+    </article>
+  {% endfor %}
+
+</main>
+{% endblock %}
