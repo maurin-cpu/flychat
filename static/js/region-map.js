@@ -254,48 +254,47 @@
         return '#6b7280'; // no_data fallback
     }
 
-    // Label-Variante je nach Zoom: >=9 volle Pill, 7-8 Farbpunkt, <7 nichts
+    // Region-Marker: identisch zur Spot-Karte (RATING_CONCEPT v1.3 §8.2).
+    // Kreis in Safety-Farbe + weisse Ziffer 1-5 (=Sterne) ODER weisses Kreuz (red).
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         if (zoom < 7) return null;
-
-        var pillBg = getPillBg(safety, quality);
-
-        // Dot-Modus (Zoom 7-8): nur farbiger Punkt, keine Schrift
-        if (zoom < 9) {
-            var dotHtml = '<div style="width:10px;height:10px;border-radius:50%;'
-                + 'background:' + pillBg + ';'
-                + 'box-shadow:0 0 0 2px rgba(255,255,255,0.85),0 1px 3px rgba(0,0,0,0.2);'
-                + '"></div>';
-            return { html: dotHtml, size: [12, 12], anchor: [6, 6] };
+        // Band aus safety_status ableiten (region-map nutzt intern safety, nicht safety_band)
+        var band = (safety === 'safe')        ? 'green' :
+                   (safety === 'conditional') ? 'amber' :
+                   (safety === 'not_safe')    ? 'red'   : 'no_data';
+        var palette = {
+            green:   { fill: '#22c55e', stroke: '#15803d' },
+            amber:   { fill: '#f59e0b', stroke: '#92400e' },
+            red:     { fill: '#ef4444', stroke: '#991b1b' },
+            no_data: { fill: '#9ca3af', stroke: '#6b7280' }
+        };
+        var c = palette[band] || palette.no_data;
+        var size = (zoom < 9) ? 22 : 28;
+        var center = size / 2;
+        var r = size * 0.42;
+        var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
+        var html = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.25));">';
+        // Weisser Aussenring fuer Lesbarkeit auf farbigem Polygon-Hintergrund
+        html += '<circle cx="' + center + '" cy="' + center + '" r="' + r + '" fill="' + c.fill
+              + '" stroke="#fff" stroke-width="2" />';
+        html += '<circle cx="' + center + '" cy="' + center + '" r="' + (r - 1) + '" fill="' + c.fill
+              + '" stroke="' + c.stroke + '" stroke-width="1" />';
+        if (band === 'red') {
+            var arm = r * 0.5;
+            html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
+                  + '" x2="' + (center + arm) + '" y2="' + (center + arm)
+                  + '" stroke="#fff" stroke-width="2" stroke-linecap="round" />';
+            html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
+                  + '" x2="' + (center - arm) + '" y2="' + (center + arm)
+                  + '" stroke="#fff" stroke-width="2" stroke-linecap="round" />';
+        } else if (n >= 1 && band !== 'no_data') {
+            var fontSize = size * 0.45;
+            html += '<text x="' + center + '" y="' + (center + fontSize * 0.34)
+                  + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif"'
+                  + ' font-size="' + fontSize.toFixed(1) + '" font-weight="700">' + n + '</text>';
         }
-
-        // Pill-Modus (Zoom >=9): integrierte Pill, Breite = Textbreite
-        var bg = pillBg, txtColor = '#fff', text;
-        if (safety === 'not_safe') {
-            text = '\u2715 NO-GO';
-        } else if (style.isError) {
-            bg = '#991b1b';
-            text = '\u26A0 Fehler';
-        } else if (style.showWarning) {
-            // Conditional: Warn-Icon + Sterne (RATING_CONCEPT v1.3)
-            text = stars > 0 ? '\u26A0 ' + starsGlyph(stars) : '\u26A0 ' + badge;
-        } else {
-            // Safe: Sterne zeigen Erlebnis (1-5). Bei 0 Sternen Fallback auf altes Quality-Wort.
-            text = stars > 0 ? starsGlyph(stars) + ' ' + stars : badge;
-        }
-
-        // transform:translate(-50%,-50%) zentriert die Pill auf ihre eigene Breite,
-        // size:[0,0] verhindert dass Leaflet das Wrapper-Div auf 120px streckt
-        var pillHtml = '<div style="'
-            + 'display:inline-block;'
-            + 'transform:translate(-50%,-50%);'
-            + 'font-size:11px;font-weight:700;color:' + txtColor + ';'
-            + 'background:' + bg + ';'
-            + 'padding:3px 10px;border-radius:999px;'
-            + 'white-space:nowrap;letter-spacing:0.01em;'
-            + 'box-shadow:0 1px 3px rgba(0,0,0,0.18),0 0 0 1.5px rgba(255,255,255,0.7);'
-            + '">' + text + '</div>';
-        return { html: pillHtml, size: [0, 0], anchor: [0, 0] };
+        html += '</svg>';
+        return { html: html, size: [size, size], anchor: [center, center] };
     }
 
     // ===== LOAD REGIONS =====
@@ -485,15 +484,11 @@
         var expScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
         var safScore = (typeof a.safety_score === 'number') ? a.safety_score : null;
         var comfortIdx = (typeof a.comfort_index === 'number') ? a.comfort_index : null;
+        // Verdict: nur Status-Wort (analog Spot-Hero). Sterne in der Glyph,
+        // Score-Detail in den Pills — keine doppelte Information im Text.
         var verdictTxt = (band === 'green') ? 'Sicher' :
                          (band === 'amber') ? 'Vorsicht' :
                          (band === 'red')   ? 'Nicht fliegbar' : 'Keine Daten';
-        if (band !== 'red' && band !== 'no_data' && stars >= 1) {
-            verdictTxt += ' · ' + stars + (stars === 1 ? ' Stern' : ' Sterne');
-        }
-        if (band !== 'red' && expScore !== null) {
-            verdictTxt += ' · ' + expScore + '/100';
-        }
         var rationale = a.summary || '';
         var rationaleShort = '';
         if (rationale) {

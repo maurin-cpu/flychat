@@ -2142,13 +2142,9 @@ window.Meteogram = (function () {
         // ── RATING_CONCEPT v1.3 §8.6 — Hero Block ──
         // Same glyph as the map marker, scaled 96px. Verdict + score pills give
         // 2-second-recognition: "Yes, that's the marker I clicked."
+        // Verdict: nur Status-Wort. Sterne-Ziffer ist schon in der Glyph,
+        // Score-Detail in den Pills — keine doppelte Information im Text.
         var verdictTxt = _verdictText(safetyBand);
-        if (safetyBand !== 'red' && safetyBand !== 'no_data' && experienceStars >= 1) {
-            verdictTxt += ' · ' + experienceStars + (experienceStars === 1 ? ' Stern' : ' Sterne');
-        }
-        if (experienceScore !== null && safetyBand !== 'red') {
-            verdictTxt += ' · ' + experienceScore + '/100';
-        }
         var rationale = a.summary || '';
         var rationaleShort = '';
         if (rationale) {
