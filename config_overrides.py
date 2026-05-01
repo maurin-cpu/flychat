@@ -158,12 +158,12 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
              "help": "Wochentage, an denen der Daily-Run laeuft. 0=Mo, 6=So."},
         ],
         "LLM-Analyse": [
-            {"key": "LLM_ANALYSIS_MODE", "type": "choice", "choices": ["parallel", "batch"],
-             "help": "parallel = schnell (viele gleichzeitige Calls). batch = guenstig (OpenAI Batch API, 50% billiger, 5-30 Min)."},
+            {"key": "OPENAI_ANALYSIS_MODE", "type": "choice", "choices": ["parallel", "batch"],
+             "help": "Gilt NUR wenn ANALYSIS_PROVIDER=openai. parallel = schnell (viele gleichzeitige Calls). batch = guenstig (OpenAI Batch API, 50% billiger, 5-30 Min). Bei Anthropic/Gemini/DeepSeek wird der Wert ignoriert (immer parallel)."},
             {"key": "LLM_MAX_WORKERS", "type": "int", "min": 1, "max": 100,
              "help": "Anzahl paralleler LLM-Calls im parallel-Modus. Hoeher = schneller, aber mehr Quota-Verbrauch."},
             {"key": "LLM_BATCH_POLL_INTERVAL", "type": "int", "min": 5, "max": 300, "unit": "s",
-             "help": "Poll-Intervall fuer Batch-Status im batch-Modus."},
+             "help": "Poll-Intervall fuer Batch-Status im OpenAI-batch-Modus."},
         ],
     },
 }
@@ -183,6 +183,14 @@ def _flat_keys() -> dict[str, dict]:
     return out
 
 
+# Renames: alter Override-Key → neuer. Bei neuem Rename hier eintragen.
+# Beim Lesen wird der alte Key transparent in den neuen umbenannt; existierende
+# data/config_overrides.json muss nicht von Hand migriert werden.
+_RENAMED_KEYS: dict[str, str] = {
+    "LLM_ANALYSIS_MODE": "OPENAI_ANALYSIS_MODE",  # Apr 2026: Klarstellung dass nur OpenAI betroffen
+}
+
+
 def get_overrides() -> dict[str, Any]:
     """Liest aktuelles Overlay aus data/config_overrides.json. Leer bei fehlender Datei."""
     if not OVERRIDE_PATH.exists():
@@ -190,7 +198,14 @@ def get_overrides() -> dict[str, Any]:
     try:
         with open(OVERRIDE_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        if not isinstance(data, dict):
+            return {}
+        # Transparente Migration alter Key-Namen
+        for old_key, new_key in _RENAMED_KEYS.items():
+            if old_key in data and new_key not in data:
+                data[new_key] = data.pop(old_key)
+                logger.info("config_overrides: Key '%s' umbenannt zu '%s' (in-memory)", old_key, new_key)
+        return data
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("config_overrides.json konnte nicht gelesen werden: %s", e)
         return {}

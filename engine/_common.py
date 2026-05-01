@@ -418,14 +418,28 @@ def _clamp_rating_to_tier(tier: str, rating, safety_status: str = "") -> float:
     return round(r, 1)
 
 
-def _compute_rating_from_subratings(result: dict, tier: str, safety_status: str = "") -> float:
-    """Berechnet das Gesamtrating deterministisch aus 4 LLM-Sub-Ratings.
+def _compute_rating_from_subratings(
+    result: dict,
+    tier: str,
+    safety_status: str = "",
+    *,
+    include_altitude: bool = False,
+) -> float:
+    """Berechnet das Gesamtrating deterministisch aus LLM-Sub-Ratings.
 
-    G-Eval-Ansatz: Das LLM vergibt 4 Einzel-Ratings (thermal, window, wind, xc),
-    die App berechnet daraus gewichtet das Gesamtrating. Das LLM ist gut im
-    Beurteilen einzelner Aspekte, schlecht im Zusammenrechnen.
+    G-Eval-Ansatz: Das LLM vergibt Einzel-Ratings, die App berechnet daraus
+    gewichtet das Gesamtrating. Das LLM ist gut im Beurteilen einzelner
+    Aspekte, schlecht im Zusammenrechnen.
 
-    Gewichte: thermal 35%, window 25%, wind 25%, xc 15%.
+    Zwei Varianten:
+      - **Region** (`include_altitude=False`, default): 4 Sub-Ratings
+        thermal/window/wind/xc, Gewichte 35/25/25/15.
+      - **Spot** (`include_altitude=True`): 5 Sub-Ratings inkl. altitude_rating
+        (Steigraum ueber Startplatz), Gewichte 30/20/10/15/25.
+
+    altitude_rating gibt es nur fuer Spots, weil Regionen keine eindeutige
+    Startplatzhoehe haben (mehrere Spots auf verschiedenen Hoehen).
+
     Ergebnis wird anschliessend auf den Tier-Korridor geclampt.
     """
     def _clamp(v, lo, hi):
@@ -439,7 +453,11 @@ def _compute_rating_from_subratings(result: dict, tier: str, safety_status: str 
     window  = _clamp(result.get("window_rating", 5), 1, 10)
     wind    = _clamp(result.get("wind_rating", 5), 1, 10)
     xc      = _clamp(result.get("xc_rating", 5), 1, 10)
-    raw = 0.35 * thermal + 0.25 * window + 0.25 * wind + 0.15 * xc
+    if include_altitude:
+        altitude = _clamp(result.get("altitude_rating", 5), 1, 10)
+        raw = 0.30 * thermal + 0.20 * window + 0.10 * wind + 0.15 * xc + 0.25 * altitude
+    else:
+        raw = 0.35 * thermal + 0.25 * window + 0.25 * wind + 0.15 * xc
     return _clamp_rating_to_tier(tier, raw, safety_status)
 
 

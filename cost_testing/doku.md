@@ -177,7 +177,7 @@ Beobachtung aus den Logs: im `parallel`-Modus tauchen Phasen `region_safety`/`re
 Konsequenz: Ein Wechsel von `parallel` auf `batch` bringt **nur den 50 %-Batch-API-Rabatt** — nicht zusätzlich Skill-Split-Effekt. Der Skill-Split ist überall gleich aktiv.
 
 ### b) Modus-Schalter sitzt im UI-Overlay
-`LLM_ANALYSIS_MODE` wird **nicht** via `.env` gesetzt, sondern via Admin-UI → speichert in `data/config_overrides.json`. Beim App-Start in `main.py:16` ruft `config_overrides.init()` und überschreibt `config.LLM_ANALYSIS_MODE` per `setattr`.
+`OPENAI_ANALYSIS_MODE` wird **nicht** via `.env` gesetzt, sondern via Admin-UI → speichert in `data/config_overrides.json`. Beim App-Start in `main.py:16` ruft `config_overrides.init()` und überschreibt `config.OPENAI_ANALYSIS_MODE` per `setattr`.
 
 Aktuellen Wert prüfen:
 ```bash
@@ -206,9 +206,9 @@ Das ist normaler `temperature=0.2` LLM-Jitter und nicht-vermeidbar ohne Code-Än
 ## 6. Wo wir weitermachen
 
 ### Sofort verfügbar (ohne Code-Änderung)
-- [ ] Auf dem **Server** prüfen, was `LLM_ANALYSIS_MODE` gerade ist:
+- [ ] Auf dem **Server** prüfen, was `OPENAI_ANALYSIS_MODE` gerade ist:
   ```bash
-  cat data/config_overrides.json | grep LLM_ANALYSIS_MODE
+  cat data/config_overrides.json | grep OPENAI_ANALYSIS_MODE
   ```
   Falls `parallel` → in der Admin-UI auf `batch` wechseln (50 % Tokens-Rabatt durch Batch-API).
 - [ ] Auf dem Server `python cost_testing/freeze_golden.py --limit 40` fahren mit der **Complete-CSV** (genug Daten für ein robustes 40-Case-Set). Dann nach jeder Optimierung `score_regression.py --no-llm` als Quality-Gate.
@@ -298,7 +298,7 @@ Alle drei in `strategie.md` skizzierten Haupthebel wurden mit Test-CSV (28 Spots
 
 ### Hebel 1 — OpenAI Batch-API
 
-- ENV `LLM_ANALYSIS_MODE=batch` setzen reicht — keine Code-Änderung nötig
+- ENV `OPENAI_ANALYSIS_MODE=batch` setzen reicht — keine Code-Änderung nötig
 - Lauf am Nachmittag eingereicht: 4 Batches sequenziell (region_safety/region_fly/spot_safety/spot_fly)
 - Batch 1 (Region-Safety, 145 Requests) hing **53 Min in OpenAI-Queue mit 0/145 verarbeitet**, dann manuell abgebrochen + via API gecancelled
 - Cache-Discount stapelt sich auf Batch-Discount → theoretisch ~50 % USD-Ersparnis bei freiem Queue-Window

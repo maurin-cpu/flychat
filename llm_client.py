@@ -3,7 +3,10 @@ LLM-Adapter fuer Gleitcast.
 
 Stellt einen Provider-agnostischen Wrapper bereit, der die OpenAI-kompatible
 Schnittstelle `client.chat.completions.create(...)` exponiert und intern auf
-OpenAI, Anthropic oder Google Gemini dispatcht.
+OpenAI, Anthropic, Google Gemini oder DeepSeek dispatcht.
+
+DeepSeek nutzt eine OpenAI-kompatible API → dispatcht auf den OpenAI-SDK
+mit `base_url="https://api.deepseek.com"` (kein eigener Adapter noetig).
 
 Vorteile:
   - Engine-Code (chat_orchestrator.py, analyzers.py) bleibt unveraendert,
@@ -444,7 +447,7 @@ class LLMClient:
         text = response.choices[0].message.content
     """
 
-    SUPPORTED_PROVIDERS = ("openai", "anthropic", "gemini")
+    SUPPORTED_PROVIDERS = ("openai", "anthropic", "gemini", "deepseek")
 
     def __init__(self, provider: str, api_key: str, timeout: float = 120.0):
         provider = (provider or "").lower().strip()
@@ -467,6 +470,13 @@ class LLMClient:
         if self.provider == "openai":
             from openai import OpenAI
             return OpenAI(api_key=self.api_key, timeout=self.timeout)
+        if self.provider == "deepseek":
+            from openai import OpenAI
+            return OpenAI(
+                api_key=self.api_key,
+                base_url="https://api.deepseek.com",
+                timeout=self.timeout,
+            )
         if self.provider == "anthropic":
             try:
                 from anthropic import Anthropic
@@ -527,8 +537,9 @@ class _CompletionsAPI:
         **extra,
     ):
         p = self._parent.provider
-        if p == "openai":
-            # OpenAI akzeptiert die Parameter 1:1. None-Werte weglassen.
+        if p in ("openai", "deepseek"):
+            # OpenAI- und DeepSeek-API sind schemakompatibel (DeepSeek dispatcht
+            # ueber den OpenAI-SDK mit base_url-Override). Parameter 1:1, None-Werte weglassen.
             kwargs: dict[str, Any] = {
                 "model": model,
                 "messages": messages,

@@ -100,7 +100,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
 **Keine Zahlen erfinden:** Zahlen in Texten NUR wenn sie EXPLIZIT im Datenblock stehen.
 
 **Bei `safety_status = "not_safe"` (aus IMMUTABLE INPUT)**: Alle Felder auf Minimum:
-`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `soaring_options=""`, `bemerkung_check=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `primary_reducer=null`, `primary_booster=null`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `is_conditional=false`, `conditional_reason=""`, `streckenflug={"tier":"kein_xc","rating":0,"summary":"","limiting_factor":"spot_not_flyable","region_context_available":false}`.
+`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `soaring_options=""`, `bemerkung_check=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `primary_reducer=null`, `primary_booster=null`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `altitude_rating=1`, `is_conditional=false`, `conditional_reason=""`, `streckenflug={"tier":"kein_xc","rating":0,"summary":"","limiting_factor":"spot_not_flyable","region_context_available":false}`.
 
 {
   "fly_status": "gray|green|violet",
@@ -123,6 +123,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "wind_rating": 0,
   "window_rating": 0,
   "xc_rating": 0,
+  "altitude_rating": 0,
   "is_conditional": false,
   "conditional_reason": "Max 1 Satz. Leer wenn is_conditional=false.",
   "streckenflug": {

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · Report {{ report_name }} – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+{% endblock %}
+
+{% block content %}
+<main class="sp sp--wide">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Report · {{ report_name }}</h1>
+    <div class="sp-subtitle">
+      <a href="/admin/testing" style="color:var(--color-primary);text-decoration:underline;">&larr; zurueck zu Testing</a>
+    </div>
+  </header>
+
+  <pre style="background:#f6f8fa;border:1px solid var(--color-border);border-radius:var(--radius-md);padding:16px 20px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-x:auto;">{{ report_text }}</pre>
+
+</main>
+{% endblock %}

@@ -106,7 +106,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
 **Keine Zahlen erfinden:** Zahlen in Texten (z.B. "Boeen bis 35 km/h") NUR wenn sie EXPLIZIT im Datenblock stehen. Keine Hochrechnungen.
 
 **Bei `safety_status = "not_safe"`**: Alle Flyability- und Streckenflug-Felder leer/minimal:
-`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `soaring_options=""`, `bemerkung_check=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `wind_safety_rating=1`, `gust_safety_rating=1`, `aloft_safety_rating=1`, `foehn_safety_rating=1`, `weather_safety_rating=1`, `is_conditional=false`, `conditional_reason=""`, `streckenflug={"tier":"kein_xc","rating":0,"summary":"","limiting_factor":"spot_not_flyable","region_context_available":false}`.
+`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `soaring_options=""`, `bemerkung_check=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `altitude_rating=1`, `wind_safety_rating=1`, `gust_safety_rating=1`, `aloft_safety_rating=1`, `foehn_safety_rating=1`, `weather_safety_rating=1`, `is_conditional=false`, `conditional_reason=""`, `streckenflug={"tier":"kein_xc","rating":0,"summary":"","limiting_factor":"spot_not_flyable","region_context_available":false}`.
 
 {
   "safety_status": "safe|conditional|not_safe",
@@ -148,6 +148,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "wind_rating": 0,
   "window_rating": 0,
   "xc_rating": 0,
+  "altitude_rating": 0,
   "is_conditional": false,
   "conditional_reason": "Max 1 Satz. Leer wenn is_conditional=false.",
   "streckenflug": {

@@ -12,8 +12,9 @@
     var feedbackBar = document.getElementById('meteogramFeedback');
     var titleEl = document.getElementById('meteogramTitle');
     var infoEl = document.getElementById('meteogramInfo');
-    var ratingBadgeEl = document.getElementById('meteogramRatingBadge');
-    var ratingValueEl = document.getElementById('meteogramRatingValue');
+    // ratingBadgeEl / ratingValueEl entfernt (RATING_CONCEPT v1.3 §8.6) —
+    // der Hero-Block im Spot-Panel zeigt Verdict + Stars + Score und macht
+    // das alte 0-10 Tier-Badge redundant.
     var closeBtn = document.getElementById('meteogramClose');
     var shareBtn = document.getElementById('meteogramShare');
     var tooltipEl = document.getElementById('tooltip');
@@ -55,7 +56,8 @@
     var currentDateIdx = 0;
     var currentSpotName = '';
     var currentSpotProps = null;
-    var currentSpotRating = null;
+    var currentSpotExperienceScore = null;
+    var currentSpotExperienceStars = null;
     var markersByName = {}; // Store marker references
     var currentRefLayer = null; // Store reference points overlay
     var _iconUid = 0; // Unique ID counter for SVG defs
@@ -112,50 +114,229 @@
         loadSpots();
 
         // Map Legend (RATING_CONCEPT v1.3 §8.4 — 5 Symbole + Mikro-Copy).
-        // Single-Glyph: innerer Kreis = Safety-Band, weisse Ziffer 1-5 = Erlebnis,
-        // weisses Kreuz bei red.
+        // Mini-Legende: 3 Safety-Pills + Hinweis auf Stern-Zahl.
+        // Tiefere Erklaerung lebt im Rating-Info-Overlay (Klick auf "?").
         var legend = L.control({ position: 'bottomleft' });
         legend.onAdd = function () {
             var isMobile = window.innerWidth <= 639;
             var div = L.DomUtil.create('div', 'map-legend' + (isMobile ? ' collapsed' : ''));
-
-            function legendIcon(band, stars) {
-                // Mini-SVG passend zur Marker-Glyphe (skaliert auf 18px)
-                var s = mapSafetyBandToStyle(band);
-                var html = '<svg width="18" height="18" viewBox="0 0 22 22" style="vertical-align:middle;flex-shrink:0;">';
-                html += '<circle cx="11" cy="11" r="7" fill="' + s.fill + '" stroke="' + s.stroke + '" stroke-width="1.5"/>';
-                if (band === 'red') {
-                    html += '<line x1="8" y1="8" x2="14" y2="14" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>';
-                    html += '<line x1="14" y1="8" x2="8" y2="14" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>';
-                } else if (typeof stars === 'number' && stars >= 1) {
-                    html += '<text x="11" y="14" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="9" font-weight="700">' + stars + '</text>';
-                } else if (band !== 'no_data') {
-                    html += '<circle cx="11" cy="11" r="1.5" fill="#fff"/>';
-                }
-                html += '</svg>';
-                return html;
-            }
-
             div.innerHTML =
                 '<button class="map-legend-toggle" aria-label="Legende ein-/ausblenden">Legende</button>' +
                 '<div class="map-legend-body">' +
-                '<div class="map-legend-item">' + legendIcon('green', 5) + ' Top-Tag</div>' +
-                '<div class="map-legend-item">' + legendIcon('green', 3) + ' Solider Tag</div>' +
-                '<div class="map-legend-item">' + legendIcon('green', 1) + ' Sicher, kurz</div>' +
-                '<div class="map-legend-item">' + legendIcon('amber', 4) + ' Vorsicht — Pro-Tag</div>' +
-                '<div class="map-legend-item">' + legendIcon('red', 0)   + ' Nicht fliegbar</div>' +
-                '<div class="map-legend-item">' + legendIcon('no_data', 0) + ' Keine Daten</div>' +
+                '<div class="map-legend-pills">' +
+                    '<span class="map-legend-pill safety-green">Sicher</span>' +
+                    '<span class="map-legend-pill safety-amber">Vorsicht</span>' +
+                    '<span class="map-legend-pill safety-red">Nicht fliegbar</span>' +
+                '</div>' +
+                '<div class="map-legend-hint">Zahl im Marker = Erlebnis (1–5 Sterne)</div>' +
+                '<button class="map-legend-info-btn" data-action="open-rating-info" type="button">' +
+                    '<span class="map-legend-info-icon" aria-hidden="true">ⓘ</span>' +
+                    '<span>Wie funktioniert das Rating?</span>' +
+                '</button>' +
                 '</div>';
             var toggle = div.querySelector('.map-legend-toggle');
             toggle.addEventListener('click', function (e) {
                 e.stopPropagation();
                 div.classList.toggle('collapsed');
             });
+            var infoBtn = div.querySelector('.map-legend-info-btn');
+            infoBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                openRatingInfoOverlay();
+            });
             L.DomEvent.disableClickPropagation(div);
             return div;
         };
         legend.addTo(map);
+        _initRatingInfoOverlay();
+        _initWelcomeBanner(map);
     }
+
+    // ===== WELCOME-BANNER =====
+    // Einmaliger Hinweis nach Einfuehrung des 2-Achsen-Ratings (RATING_CONCEPT
+    // v1.3 §8.7). Erscheint beim ersten Karten-Besuch, wird via localStorage
+    // dismissed. Kein Modal, kein blockierender Onboarding-Flow.
+    var _WELCOME_KEY = 'gleitcast_welcome_v1_dismissed';
+    function _initWelcomeBanner(map) {
+        try {
+            if (localStorage.getItem(_WELCOME_KEY)) return;
+        } catch (e) { /* localStorage gesperrt → trotzdem zeigen */ }
+
+        var banner = L.control({ position: 'topright' });
+        banner.onAdd = function () {
+            var div = L.DomUtil.create('div', 'map-welcome-banner');
+            div.innerHTML =
+                '<span class="map-welcome-icon" aria-hidden="true">✦</span>' +
+                '<span class="map-welcome-text">' +
+                  '<b>Neu:</b> Sterne im Marker = Erlebnis (1–5). ' +
+                  'Farbe = Sicherheit (gruen / orange / rot).' +
+                '</span>' +
+                '<button class="map-welcome-link" type="button" data-action="more">Mehr erfahren</button>' +
+                '<button class="map-welcome-close" type="button" aria-label="Schliessen" data-action="close">×</button>';
+
+            div.addEventListener('click', function (e) {
+                var t = e.target;
+                if (!t || !t.dataset || !t.dataset.action) return;
+                e.stopPropagation();
+                if (t.dataset.action === 'more') {
+                    openRatingInfoOverlay();
+                } else if (t.dataset.action === 'close') {
+                    _dismissWelcomeBanner();
+                }
+            });
+            L.DomEvent.disableClickPropagation(div);
+            return div;
+        };
+        banner.addTo(map);
+        // Reference fuer dismiss
+        _welcomeBannerCtl = banner;
+    }
+    var _welcomeBannerCtl = null;
+    function _dismissWelcomeBanner() {
+        try { localStorage.setItem(_WELCOME_KEY, '1'); } catch (e) {}
+        if (_welcomeBannerCtl) {
+            _welcomeBannerCtl.remove();
+            _welcomeBannerCtl = null;
+        }
+    }
+
+    // ===== RATING-INFO OVERLAY =====
+    // Erzeugt einmalig ein Modal, das das 2-Achsen-Rating-System erklaert.
+    // Trigger: Klick auf "Wie funktioniert das Rating?" in der Mini-Legende.
+    function _glyphSvg(band, stars, size) {
+        var s = size || 28;
+        var center = s / 2;
+        var r = s * 0.36;
+        var palette = {
+            green:   { fill: '#22c55e', stroke: '#15803d' },
+            amber:   { fill: '#f59e0b', stroke: '#92400e' },
+            red:     { fill: '#ef4444', stroke: '#991b1b' },
+            no_data: { fill: '#9ca3af', stroke: '#6b7280' }
+        };
+        var c = palette[band] || palette.no_data;
+        var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" aria-hidden="true">';
+        html += '<circle cx="' + center + '" cy="' + center + '" r="' + r
+              + '" fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="2"/>';
+        if (band === 'red') {
+            var arm = r * 0.55;
+            html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
+                  + '" x2="' + (center + arm) + '" y2="' + (center + arm)
+                  + '" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>';
+            html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
+                  + '" x2="' + (center - arm) + '" y2="' + (center + arm)
+                  + '" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>';
+        } else if (typeof stars === 'number' && stars >= 1) {
+            html += '<text x="' + center + '" y="' + (center + r * 0.35)
+                  + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
+                  + (r * 0.95).toFixed(1) + '" font-weight="700">' + stars + '</text>';
+        }
+        html += '</svg>';
+        return html;
+    }
+
+    var _ratingInfoBuilt = false;
+    function _initRatingInfoOverlay() {
+        if (_ratingInfoBuilt) return;
+        _ratingInfoBuilt = true;
+        var ov = document.createElement('div');
+        ov.className = 'rating-info-overlay';
+        ov.id = 'ratingInfoOverlay';
+        ov.setAttribute('role', 'dialog');
+        ov.setAttribute('aria-modal', 'true');
+        ov.setAttribute('aria-labelledby', 'ratingInfoTitle');
+        ov.hidden = true;
+
+        var bodyHtml =
+            '<div class="rating-info-backdrop" data-action="close"></div>' +
+            '<div class="rating-info-modal">' +
+              '<div class="rating-info-header">' +
+                '<h2 id="ratingInfoTitle">Wie funktioniert das Rating?</h2>' +
+                '<button class="rating-info-close" data-action="close" aria-label="Schliessen" type="button">×</button>' +
+              '</div>' +
+              '<div class="rating-info-body">' +
+
+                '<div class="rating-info-section">' +
+                  '<p class="rating-info-lead">Jeder Spot wird auf <b>zwei unabhaengigen Achsen</b> bewertet — Sicherheit und Erlebnis. Beides siehst du im selben Marker.</p>' +
+                '</div>' +
+
+                '<div class="rating-info-section">' +
+                  '<div class="rating-info-axes">' +
+                    '<div class="rating-info-axis-card">' +
+                      '<div class="rating-info-axis-title">Farbe = Sicherheit</div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 0, 28) + '<span><b>Gruen</b> — sicher fliegbar</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('amber', 0, 28) + '<span><b>Orange</b> — Vorsicht, Caution-Notes</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('red', 0, 28)   + '<span><b>Rot</b> — nicht fliegbar</span></div>' +
+                    '</div>' +
+                    '<div class="rating-info-axis-card">' +
+                      '<div class="rating-info-axis-title">Zahl = Erlebnis</div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 1, 28) + '<span><b>1 Stern</b> — sicher, kurzer Flug</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 3, 28) + '<span><b>3 Sterne</b> — solider Tag, lokal-XC</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 5, 28) + '<span><b>5 Sterne</b> — Top-Tag, fettes XC</span></div>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+
+                '<div class="rating-info-section">' +
+                  '<h3>Beispiele</h3>' +
+                  '<div class="rating-info-examples">' +
+                    '<div class="rating-info-example">' + _glyphSvg('green', 5, 44) + '<div class="rating-info-example-label">Top-Tag</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('green', 3, 44) + '<div class="rating-info-example-label">Solider Tag</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('amber', 4, 44) + '<div class="rating-info-example-label">Vorsicht — Pro-Tag</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('red', 0, 44)   + '<div class="rating-info-example-label">Nicht fliegbar</div></div>' +
+                  '</div>' +
+                '</div>' +
+
+                '<div class="rating-info-section">' +
+                  '<h3>Im Spot-Panel — die Tiefe</h3>' +
+                  '<div class="rating-info-deeper">' +
+                    '<dl>' +
+                      '<dt>Safety-Score</dt>' +
+                      '<dd>0–100. Aggregat von 5 Sub-Aspekten: Bodenwind, Boeen, Hoehenwind, Foehn, Wetter (Niederschlag/Gewitter/Sicht). Aggregation per <b>Weakest-Link</b> — der schwaechste Aspekt zieht den Score nach unten. Ein einzelnes Gewitter macht den Tag rot, auch wenn alle anderen 4 perfekt sind.</dd>' +
+                      '<dt>Experience-Score</dt>' +
+                      '<dd>0–100. <b>Spot</b>: 5 Sub-Ratings — Thermik (30%), Zeitfenster (20%), Wind (10%), XC-Potential (15%), <b>Hoehe ueber Spot</b> (25%). <b>Region</b>: 4 Sub-Ratings — Thermik (35%), Zeitfenster (25%), Wind (25%), XC-Potential (15%) (Region hat keine eindeutige Startplatzhoehe). Sterne im Marker = grobe Skalierung (1–5).</dd>' +
+                      '<dt>Comfort-Index</dt>' +
+                      '<dd>0–100. Wie glatt (100) oder klapprig (0) der Tag wird. Beeinflusst <b>nicht</b> das Rating — nur dein Wohlbefinden in der Luft.</dd>' +
+                    '</dl>' +
+                  '</div>' +
+                '</div>' +
+
+                '<div class="rating-info-section">' +
+                  '<h3>Wer entscheidet was?</h3>' +
+                  '<p>KI-Modell + deterministische Regel-Engine arbeiten zusammen: das LLM beurteilt einzelne Aspekte, eine Decision-Engine setzt harte Sicherheits-Schwellen durch (Foehn-Durchbruch, Hoehenwind &gt; 30 km/h, Gewitter). Diese Regeln <b>ueberschreiben</b> das LLM — ein gefaehrlicher Tag kann nicht "weggetextet" werden.</p>' +
+                '</div>' +
+
+              '</div>' +
+            '</div>';
+        ov.innerHTML = bodyHtml;
+        document.body.appendChild(ov);
+
+        ov.addEventListener('click', function (e) {
+            var t = e.target;
+            if (t && t.dataset && t.dataset.action === 'close') {
+                closeRatingInfoOverlay();
+            }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !ov.hidden) closeRatingInfoOverlay();
+        });
+    }
+
+    function openRatingInfoOverlay() {
+        _initRatingInfoOverlay();
+        var ov = document.getElementById('ratingInfoOverlay');
+        if (!ov) return;
+        ov.hidden = false;
+        document.body.style.overflow = 'hidden';
+        var closeBtn = ov.querySelector('.rating-info-close');
+        if (closeBtn) closeBtn.focus();
+    }
+    function closeRatingInfoOverlay() {
+        var ov = document.getElementById('ratingInfoOverlay');
+        if (!ov) return;
+        ov.hidden = true;
+        document.body.style.overflow = '';
+    }
+    window.openRatingInfoOverlay = openRatingInfoOverlay;
 
     // ===== DIRECTION PARSER =====
     function getDirAngles(dirStr) {
@@ -504,7 +685,10 @@
             spotName: currentSpotName,
             dateStr: dateStr,
         });
-        renderRatingBadge(analysis);
+        // Capture experience-score + stars fuer Share-Text (Hero-Block zeigt
+        // Rating selbst — kein separates Badge mehr).
+        currentSpotExperienceScore = (analysis && typeof analysis.experience_score === 'number') ? analysis.experience_score : null;
+        currentSpotExperienceStars = (analysis && typeof analysis.experience_stars === 'number') ? analysis.experience_stars : null;
         renderFeedbackBar(currentSpotName, dateStr, analysis);
     }
 
@@ -528,58 +712,16 @@
         if (window.Feedback && window.Feedback.scan) window.Feedback.scan(feedbackBar);
     }
 
-    function renderRatingBadge(analysis) {
-        if (!ratingBadgeEl || !ratingValueEl) return;
-        var rating = analysis && analysis.rating;
-        var r = (rating === null || rating === undefined) ? NaN : Number(rating);
-        currentSpotRating = isFinite(r) && r > 0 ? r : null;
-        var safetyStatus = (analysis && analysis.safety_status) || '';
-        var flyStatus = (analysis && analysis.fly_status) || '';
-        var isCond = !!(analysis && analysis.is_conditional);
-        var condReason = (analysis && analysis.conditional_reason) || '';
-
-        // Reset tier classes
-        ratingBadgeEl.classList.remove('tier-green', 'tier-violet', 'tier-not-safe', 'is-conditional');
-
-        if (!isFinite(r) || r <= 0) {
-            // No rating or NO-GO with 0.0 → either hide or show NO-GO
-            if (safetyStatus === 'not_safe') {
-                ratingValueEl.textContent = '0.0';
-                ratingBadgeEl.classList.add('tier-not-safe');
-                ratingBadgeEl.title = 'NO-GO: ' + ((analysis && analysis.safety && analysis.safety.reasoning) || 'Nicht sicher fliegbar');
-                ratingBadgeEl.style.display = '';
-            } else {
-                ratingBadgeEl.style.display = 'none';
-                ratingBadgeEl.title = '';
-            }
-            return;
-        }
-
-        ratingValueEl.textContent = r.toFixed(1);
-        if (flyStatus === 'violet') ratingBadgeEl.classList.add('tier-violet');
-        else if (flyStatus === 'green') ratingBadgeEl.classList.add('tier-green');
-        // gray tier uses default bronze badge styling
-        if (isCond) ratingBadgeEl.classList.add('is-conditional');
-
-        var tooltip = 'Rating ' + r.toFixed(1) + ' / 10';
-        if (isCond && condReason) tooltip += ' · Bedingt: ' + condReason;
-        ratingBadgeEl.title = tooltip;
-        ratingBadgeEl.style.display = '';
-    }
-
     // ===== METEOGRAM OVERLAY =====
     function openMeteogram(spotName, props) {
         currentSpotName = spotName;
         currentSpotProps = props || null;
-        currentSpotRating = null;
+        currentSpotExperienceScore = null;
+        currentSpotExperienceStars = null;
         titleEl.textContent = spotName;
         infoEl.textContent = props
             ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + props.windrichtung
             : '';
-        if (ratingBadgeEl) {
-            ratingBadgeEl.style.display = 'none';
-            ratingBadgeEl.classList.remove('tier-green', 'tier-violet', 'tier-not-safe', 'is-conditional');
-        }
         chartContainer.innerHTML = '<div class="error-state">Lade Daten...</div>';
         if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">Lade Analyse...</div>';
         tabsContainer.innerHTML = '';
@@ -618,10 +760,26 @@
                     return;
                 }
 
-                currentDates = currentWeather.dates || [];
-                if (currentDates.length === 0) {
-                    chartContainer.innerHTML = '<div class="error-state">Keine Wetterdaten verfuegbar.</div>';
-                    return;
+                // Always render `expected_days` tabs (default 5). Days without
+                // data fall through to the existing "Keine Daten" / "Keine
+                // Analyse" empty states — that way it's always clear WHY a
+                // day is empty (cache stale, analysis missing) instead of
+                // silently dropping the tab.
+                var expected = parseInt(currentWeather.expected_days, 10);
+                if (!isFinite(expected) || expected < 1) {
+                    expected = (currentWeather.dates || []).length || 1;
+                }
+                var _today = new Date();
+                _today.setHours(0, 0, 0, 0);
+                currentDates = [];
+                for (var _i = 0; _i < expected; _i++) {
+                    var _d = new Date(_today);
+                    _d.setDate(_today.getDate() + _i);
+                    currentDates.push(
+                        _d.getFullYear() + '-'
+                        + String(_d.getMonth() + 1).padStart(2, '0') + '-'
+                        + String(_d.getDate()).padStart(2, '0')
+                    );
                 }
 
                 // Build day tabs inside the overlay
@@ -774,7 +932,11 @@
             if (!currentSpotName || typeof window.gleitcastShare !== 'function') return;
             var regionId = (currentSpotProps && currentSpotProps.region_id) || '';
             var regionName = (currentSpotProps && currentSpotProps.region) || '';
-            var rText = currentSpotRating != null ? ' — Rating ' + currentSpotRating.toFixed(1) + '/10' : '';
+            var rText = '';
+            if (currentSpotExperienceStars != null && currentSpotExperienceStars >= 1) {
+                rText = ' — ' + currentSpotExperienceStars + (currentSpotExperienceStars === 1 ? ' Stern' : ' Sterne');
+                if (currentSpotExperienceScore != null) rText += ' · ' + currentSpotExperienceScore + '/100';
+            }
             var dayIdx = 0;
             if (window.currentDate && currentDates && currentDates.length) {
                 var idx = currentDates.indexOf(window.currentDate);

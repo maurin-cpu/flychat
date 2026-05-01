@@ -48,7 +48,7 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 
 1. **Parallel-Modus nutzt bereits den Skill-Split** — Phasen `region_safety`/`region_fly`/`spot_safety`/`spot_fly` (nicht `*_combined`). Hebel 1 ist unabhängig vom Modus aktiv. Konzept-Doku korrigiert.
 
-2. **`LLM_ANALYSIS_MODE` wird via UI-Overlay gesteuert**, nicht via `.env`. Speicherort: `data/config_overrides.json`. Beim App-Start ruft `main.py:16` `config_overrides.init()` und überschreibt `config`-Werte per `setattr`. ENV ist nur Fallback-Default.
+2. **`OPENAI_ANALYSIS_MODE` wird via UI-Overlay gesteuert**, nicht via `.env`. Speicherort: `data/config_overrides.json`. Beim App-Start ruft `main.py:16` `config_overrides.init()` und überschreibt `config`-Werte per `setattr`. ENV ist nur Fallback-Default.
 
 3. **LLM-Jitter bei `temperature=0.2`** ist real:
    - `safety_status`/`flyability_tier` reproduzieren zu 100 %
@@ -64,7 +64,7 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 ## Nächste Schritte (in dieser Reihenfolge)
 
 ### Auf dem Server prüfen (5 Min)
-- [ ] `cat data/config_overrides.json` → was steht bei `LLM_ANALYSIS_MODE`?
+- [ ] `cat data/config_overrides.json` → was steht bei `OPENAI_ANALYSIS_MODE`?
 - [ ] Falls `parallel` → Admin-UI öffnen → "LLM-Analyse" auf `batch` → Save → restart Service
 - [ ] Erwarteter Effekt: nächster Produktionslauf ~50 % günstiger durch Batch-API-Rabatt
 

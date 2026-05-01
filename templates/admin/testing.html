@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · Testing – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+<style>
+  .ts-banner {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4); font-size: var(--text-sm); line-height: 1.5;
+    border: 1px solid;
+  }
+  .ts-banner--off { background: #f5f7fa; border-color: #d0d7de; color: #57606a; }
+  .ts-banner--on  { background: #fff8e1; border-color: #f0c419; color: #6b4f00; font-weight: 600; }
+  .ts-banner--warn{ background: #fef0f0; border-color: #e57373; color: #8b1818; font-weight: 600; }
+  .ts-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .ts-dot--off { background: #8c959f; }
+  .ts-dot--on  { background: #f0c419; box-shadow: 0 0 0 3px rgba(240,196,25,0.25); }
+
+  .ts-section { margin-bottom: var(--space-5); }
+  .ts-section__title {
+    font-size: var(--text-base); font-weight: 700; margin: 0 0 8px;
+    color: var(--color-text);
+  }
+  .ts-section__hint { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 12px; }
+
+  .ts-meta {
+    display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px;
+    font-size: var(--text-sm); color: var(--color-text-secondary);
+    background: #f9fafb; border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 12px;
+  }
+  .ts-meta dt { font-weight: 600; color: var(--color-text); }
+  .ts-meta dd { margin: 0; }
+  .ts-meta--empty { font-style: italic; color: #8c959f; }
+
+  .ts-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="sp sp--wide">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Admin · Testing</h1>
+    <div class="sp-subtitle">Mock-Daten, Test-Analysen, Goldstandard · intern</div>
+  </header>
+
+  <nav style="display:flex;gap:8px;margin:0 0 var(--space-5);flex-wrap:wrap;">
+    <a href="/admin/subscribers" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Subscribers</a>
+    <a href="/admin/feedback" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Feedback</a>
+    <a href="/admin/config" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Konfiguration</a>
+    <a href="/admin/testing" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-primary);background:var(--color-primary);color:#fff;text-decoration:none;font-size:var(--text-sm);font-weight:500;">Testing</a>
+  </nav>
+
+  {% if flash_ok %}
+    <div class="sp-flash sp-flash--ok" role="status">{{ flash_ok }}</div>
+  {% endif %}
+  {% if flash_error %}
+    <div class="sp-flash sp-flash--error" role="alert">{{ flash_error }}</div>
+  {% endif %}
+
+  {# ── Status-Banner ─────────────────────────────────────────── #}
+  {% if status.view_active %}
+    <div class="ts-banner ts-banner--warn">
+      <span class="ts-dot ts-dot--on"></span>
+      <div>
+        <strong>Test-Ansicht ist AKTIV.</strong>
+        Das Frontend zeigt Test-Analysen statt Live-Daten.
+        {% if status.view_set_at %}<span style="font-weight:400;">(seit {{ status.view_set_at }})</span>{% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="ts-banner ts-banner--off">
+      <span class="ts-dot ts-dot--off"></span>
+      <div>Test-Ansicht aus — das Frontend zeigt Live-Analysen.</div>
+    </div>
+  {% endif %}
+
+  {# ─────────────────────────────────────────────────────────── #}
+  {# 1. Mock-Daten (Frozen Weather)                                #}
+  {# ─────────────────────────────────────────────────────────── #}
+  <section class="sp-card ts-section">
+    <h2 class="ts-section__title">1. Mock-Wetterdaten</h2>
+    <p class="ts-section__hint">
+      Friert die aktuelle <code>data/wetterdaten.json</code> als Snapshot ein.
+      Test-Analysen verwenden danach diesen Snapshot statt die Open-Meteo-API zu fragen.
+    </p>
+
+    {% if status.frozen_weather.exists and status.frozen_weather.meta %}
+      <dl class="ts-meta">
+        <dt>Eingefroren am</dt><dd>{{ status.frozen_weather.meta.frozen_at }}</dd>
+        <dt>Quell-Lauf</dt><dd>{{ status.frozen_weather.meta.source_run_at or '—' }}</dd>
+        <dt>Test-Spots im Snapshot</dt>
+        <dd>
+          {{ status.frozen_weather.meta.spot_count }}
+          {% if status.frozen_weather.meta.test_set_size is defined %}
+            / {{ status.frozen_weather.meta.test_set_size }} aus <code>fluggebiete_test.csv</code>
+          {% endif %}
+          {% if status.frozen_weather.meta.total_source_spots is defined %}
+            <span style="color:var(--color-text-secondary);">(gefiltert aus {{ status.frozen_weather.meta.total_source_spots }} Source-Spots)</span>
+          {% endif %}
+        </dd>
+        {% if status.frozen_weather.meta.missing_test_spots %}
+          <dt>Fehlend im Source</dt>
+          <dd style="color:#b71c1c;">{{ status.frozen_weather.meta.missing_test_spots|join(', ') }}</dd>
+        {% endif %}
+        <dt>Regionen</dt><dd>{{ status.frozen_weather.meta.region_count }} (alle)</dd>
+        <dt>Alter</dt>
+        <dd>
+          {% if status.frozen_weather.age_hours is not none %}
+            {{ status.frozen_weather.age_hours }} h
+            {% if status.frozen_weather.age_hours > 168 %}
+              <span style="color:#b71c1c;font-weight:600;">· veraltet (&gt;7 Tage)</span>
+            {% endif %}
+          {% else %} — {% endif %}
+        </dd>
+      </dl>
+    {% else %}
+      <div class="ts-meta ts-meta--empty">Noch keine Mock-Daten eingefroren.</div>
+    {% endif %}
+
+    <div class="ts-actions">
+      <form method="post" action="/admin/testing/freeze-weather"
+            onsubmit="return confirm('Aktuelle Wetterdaten als Mock einfrieren? Vorhandener Snapshot wird ueberschrieben.');">
+        <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit">
+          {% if status.frozen_weather.exists %}Aus aktuellem Cache einfrieren{% else %}Wetterdaten einfrieren{% endif %}
+        </button>
+      </form>
+
+      <form method="post" action="/admin/testing/refresh-frozen"
+            onsubmit="return confirm('Live-API neu abfragen und als Snapshot speichern? Dauert ~15-30s und verbraucht API-Quota.');">
+        <button class="sp-btn sp-btn--ghost sp-btn--sm" type="submit"
+                title="Holt frische Wetterdaten von Open-Meteo und friert sie als neuen Snapshot ein.">
+          Snapshot vom Live aktualisieren
+        </button>
+      </form>
+
+      {% if status.frozen_weather.exists %}
+        <form method="post" action="/admin/testing/discard-frozen"
+              onsubmit="return confirm('Mock-Snapshot wirklich loeschen?');">
+          <button class="sp-btn sp-btn--ghost sp-btn--sm" type="submit">Snapshot loeschen</button>
+        </form>
+      {% endif %}
+    </div>
+    <div style="margin-top:8px;font-size:var(--text-xs);color:var(--color-text-secondary);">
+      <strong>Aus aktuellem Cache</strong>: kopiert <code>data/wetterdaten.json</code> wie sie jetzt ist (kein API-Hit).
+      <strong>Vom Live aktualisieren</strong>: forced Refresh + sofortiges Einfrieren.
+    </div>
+  </section>
+
+  {# ─────────────────────────────────────────────────────────── #}
+  {# 2. Test-Ansicht-Toggle                                       #}
+  {# ─────────────────────────────────────────────────────────── #}
+  <section class="sp-card ts-section">
+    <h2 class="ts-section__title">2. Test-Ansicht</h2>
+    <p class="ts-section__hint">
+      Schaltet im Frontend (Map, Briefing, <code>/api/analyses</code>) zwischen
+      Live-Analysen und Test-Lauf-Output um. Prod-Daten bleiben unangetastet.
+    </p>
+
+    {% if status.test_run.exists and status.test_run.meta %}
+      <dl class="ts-meta">
+        <dt>Letzter Test-Lauf</dt><dd>{{ status.test_run.meta.run_at or '—' }}</dd>
+        <dt>Spots im Lauf</dt><dd>{{ status.test_run.meta.n_spots if status.test_run.meta.n_spots is defined else '—' }}</dd>
+        <dt>Regionen im Lauf</dt><dd>{{ status.test_run.meta.n_regions if status.test_run.meta.n_regions is defined else '—' }}</dd>
+        <dt>Verwendete Eingabe</dt>
+        <dd>{% if status.test_run.meta.used_frozen_weather %}Frozen Snapshot{% else %}Live API{% endif %}</dd>
+      </dl>
+    {% else %}
+      <div class="ts-meta ts-meta--empty">Noch kein Test-Lauf vorhanden — Toggle hat erst nach Phase 2 / erstem Test-Lauf Effekt.</div>
+    {% endif %}
+
+    <form method="post" action="/admin/testing/toggle-view" class="ts-actions">
+      {% if status.view_active %}
+        <input type="hidden" name="active" value="0">
+        <button class="sp-btn sp-btn--ghost sp-btn--sm" type="submit">Test-Ansicht ausschalten</button>
+      {% else %}
+        <input type="hidden" name="active" value="1">
+        <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit"
+                {% if not status.test_run.exists %}disabled title="Erst Test-Lauf starten"{% endif %}>
+          Test-Ansicht aktivieren
+        </button>
+      {% endif %}
+    </form>
+  </section>
+
+  {# ─────────────────────────────────────────────────────────── #}
+  {# 3. Test-Analyse starten                                      #}
+  {# ─────────────────────────────────────────────────────────── #}
+  <section class="sp-card ts-section">
+    <h2 class="ts-section__title">3. Test-Analyse starten</h2>
+    <p class="ts-section__hint">
+      Laeuft nur ueber die <strong>{{ status.test_csv.spot_count }} Test-Spots</strong>
+      (<code>{{ status.test_csv.path }}</code>) plus alle Regionen.
+      Ergebnis landet in <code>data/test_runs/latest/</code> — Prod-Analysen bleiben unangetastet.
+    </p>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
+      <fieldset style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:10px 14px;margin:0;">
+        <legend style="padding:0 6px;font-size:var(--text-sm);font-weight:600;">Eingabe-Quelle</legend>
+        <label style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);margin:4px 0;">
+          <input type="radio" name="ts_input_source" value="frozen" id="ts-src-frozen"
+                 {% if not status.frozen_weather.exists %}disabled{% else %}checked{% endif %}>
+          <span>
+            <strong>Frozen Snapshot</strong>
+            {% if status.frozen_weather.exists %}
+              ({{ status.frozen_weather.meta.spot_count }} Spots, eingefroren {{ status.frozen_weather.meta.frozen_at }})
+            {% else %}
+              <em style="color:#b71c1c;">— kein Snapshot vorhanden</em>
+            {% endif %}
+          </span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);margin:4px 0;">
+          <input type="radio" name="ts_input_source" value="live" id="ts-src-live"
+                 {% if not status.frozen_weather.exists %}checked{% endif %}>
+          <span><strong>Live API</strong> — nutzt aktuell geladene Wetterdaten (<code>data/wetterdaten.json</code>)</span>
+        </label>
+      </fieldset>
+    </div>
+
+    <div class="ts-actions">
+      <button class="sp-btn sp-btn--primary sp-btn--sm" type="button" id="ts-run-btn">
+        Test-Analyse starten
+      </button>
+      <button class="sp-btn sp-btn--ghost sp-btn--sm" type="button" id="ts-stop-btn" style="display:none;">
+        Stream schliessen
+      </button>
+    </div>
+
+    <div id="ts-log-wrap" style="display:none;margin-top:14px;">
+      <div style="font-size:var(--text-sm);font-weight:600;margin-bottom:6px;">Live-Log</div>
+      <pre id="ts-log" style="max-height:300px;overflow:auto;background:#0d1117;color:#c9d1d9;padding:10px 14px;border-radius:var(--radius-md);font-size:12px;font-family:ui-monospace,monospace;line-height:1.5;margin:0;"></pre>
+    </div>
+  </section>
+
+  <script>
+    (function() {
+      const btn = document.getElementById('ts-run-btn');
+      const stopBtn = document.getElementById('ts-stop-btn');
+      const logEl = document.getElementById('ts-log');
+      const logWrap = document.getElementById('ts-log-wrap');
+      let evtSource = null;
+
+      function append(line, cls) {
+        const span = document.createElement('span');
+        if (cls) span.style.color = cls;
+        span.textContent = line + '\n';
+        logEl.appendChild(span);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function closeStream() {
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        btn.disabled = false;
+        btn.textContent = 'Test-Analyse starten';
+        stopBtn.style.display = 'none';
+      }
+
+      btn.addEventListener('click', function() {
+        const src = document.querySelector('input[name="ts_input_source"]:checked');
+        if (!src) { alert('Bitte Eingabe-Quelle waehlen.'); return; }
+        const inputParam = src.value;
+
+        logEl.textContent = '';
+        logWrap.style.display = 'block';
+        btn.disabled = true;
+        btn.textContent = 'Laeuft …';
+        stopBtn.style.display = '';
+
+        append('› Starte Test-Analyse (input=' + inputParam + ') …', '#7ee787');
+        evtSource = new EventSource('/admin/testing/run-test-analysis?input=' + encodeURIComponent(inputParam));
+
+        evtSource.addEventListener('test_init', function(e) {
+          const d = JSON.parse(e.data);
+          append('  Init: ' + d.n_spots + ' Spots, ' + d.n_regions + ' Regionen, frozen=' + d.use_frozen_weather, '#79c0ff');
+        });
+        evtSource.addEventListener('init', function(e) {
+          const d = JSON.parse(e.data);
+          append('  Pipeline-Init: total_calls=' + (d.total_calls||'?'), '#79c0ff');
+        });
+        evtSource.addEventListener('phase', function(e) {
+          const d = JSON.parse(e.data);
+          append('  Phase: ' + d.phase + (d.total ? ' (' + d.total + ' Calls)' : ''), '#d2a8ff');
+        });
+        evtSource.addEventListener('progress', function(e) {
+          const d = JSON.parse(e.data);
+          append('    Progress: ' + d.completed + '/' + d.total + ' (' + (d.phase||'') + ')');
+        });
+        evtSource.addEventListener('done', function(e) {
+          append('✓ Lauf abgeschlossen.', '#7ee787');
+          // Re-load page to show updated meta
+          setTimeout(function() { window.location.href = '/admin/testing?ok=Test-Lauf+abgeschlossen'; }, 1200);
+        });
+        evtSource.addEventListener('test_done', function(e) {
+          const d = JSON.parse(e.data);
+          append('✓ Test-Lauf fertig: ' + d.n_spots + ' Spots, ' + d.n_regions + ' Regionen', '#7ee787');
+        });
+        evtSource.addEventListener('error', function(e) {
+          let msg = '';
+          try { msg = JSON.parse(e.data).message || ''; } catch (_) {}
+          append('✗ Fehler: ' + (msg || '(Stream-Abbruch)'), '#ff7b72');
+          closeStream();
+        });
+        evtSource.addEventListener('heartbeat', function() { /* silent */ });
+      });
+
+      stopBtn.addEventListener('click', closeStream);
+    })();
+  </script>
+
+  {# ─────────────────────────────────────────────────────────── #}
+  {# 4. Goldstandard / Regression                                 #}
+  {# ─────────────────────────────────────────────────────────── #}
+  <section class="sp-card ts-section">
+    <h2 class="ts-section__title">4. Goldstandard &amp; Regression</h2>
+    <p class="ts-section__hint">
+      Wraps <code>cost_testing/freeze_golden.py</code> + <code>cost_testing/score_regression.py</code>.
+      Goldstandard liest die aktuellen Live-Analysen — also <strong>vorher</strong>
+      eine echte Analyse laufen lassen, danach einfrieren.
+    </p>
+
+    <dl class="ts-meta">
+      <dt>Cases im Goldstandard</dt>
+      <dd>{{ status.golden.count }}{% if status.golden.newest %} (juengster Case: {{ status.golden.newest }}){% endif %}</dd>
+    </dl>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;">
+
+      <form method="post" action="/admin/testing/freeze-golden"
+            onsubmit="return confirm('Goldstandard aus aktuellen data/spot_analyses.json einfrieren?');"
+            style="display:flex;flex-direction:column;gap:6px;">
+        <strong style="font-size:var(--text-sm);">Goldstandard einfrieren</strong>
+        <label style="font-size:var(--text-sm);">
+          Limit:
+          <input type="number" name="limit" min="1" max="200" value="20"
+                 style="width:80px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);">
+        </label>
+        <label style="font-size:var(--text-sm);display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" name="force" value="1"> bestehende Cases ueberschreiben
+        </label>
+        <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit" style="margin-top:4px;">
+          freeze_golden.py ausfuehren
+        </button>
+      </form>
+
+      <form method="post" action="/admin/testing/run-regression"
+            onsubmit="return confirm('Regression-Test starten?');"
+            style="display:flex;flex-direction:column;gap:6px;">
+        <strong style="font-size:var(--text-sm);">Regression starten</strong>
+        <label style="font-size:var(--text-sm);">
+          <input type="radio" name="mode" value="no_llm" checked>
+          <code>--no-llm</code> (vergleicht Cache, schnell)
+        </label>
+        <label style="font-size:var(--text-sm);">
+          <input type="radio" name="mode" value="with_llm">
+          mit LLM (faehrt Pipeline neu, Min)
+        </label>
+        <label style="font-size:var(--text-sm);">
+          Max Cases (0 = alle):
+          <input type="number" name="max_cases" min="0" max="200" value="0"
+                 style="width:80px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);">
+        </label>
+        <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit" style="margin-top:4px;"
+                {% if status.golden.count == 0 %}disabled title="Erst Goldstandard einfrieren"{% endif %}>
+          score_regression.py ausfuehren
+        </button>
+      </form>
+    </div>
+
+    <div style="margin-top:18px;">
+      <strong style="font-size:var(--text-sm);">Letzte Reports</strong>
+      {% if status.reports %}
+        <ul style="list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:4px;">
+        {% for r in status.reports %}
+          <li style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 10px;background:#f9fafb;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:var(--text-sm);">
+            <a href="/admin/testing/reports/{{ r.name }}" style="color:var(--color-primary);font-family:ui-monospace,monospace;text-decoration:none;">{{ r.name }}</a>
+            <span style="color:var(--color-text-secondary);font-size:12px;">
+              {{ r.mtime }} &middot; {{ r.size_kb }} KB
+              {% if r.first_line %} &middot; {{ r.first_line }}{% endif %}
+            </span>
+          </li>
+        {% endfor %}
+        </ul>
+      {% else %}
+        <div class="ts-meta ts-meta--empty" style="margin-top:8px;">Noch keine Reports.</div>
+      {% endif %}
+    </div>
+  </section>
+
+</main>
+{% endblock %}

@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import math
+import sys
 import threading
 from functools import wraps
 from typing import Optional
@@ -96,6 +97,20 @@ def _inject_session_flags():
         "datenschutz_url": f"{marketing}/datenschutz",
         "impressum_url": f"{marketing}/impressum",
     }
+
+
+@app.context_processor
+def _inject_test_mode_flag():
+    """Globales Flag fuer den persistenten Test-Mode-Banner in base.html.
+
+    Liest den Toggle bei jedem Request — leichtgewichtig, da nur eine
+    JSON-Datei mit einem Bool-Feld geprueft wird.
+    """
+    try:
+        from engine import test_mode
+        return {"test_view_active": test_mode.is_view_active()}
+    except Exception:
+        return {"test_view_active": False}
 
 
 # Cache-Busting für statische Files: liefert mtime des Files als Versions-String,
@@ -1010,6 +1025,305 @@ def admin_config_save():
 
 
 # ============================================================================
+# ADMIN · TESTING (Mock-Daten, Test-Analysen, Goldstandard)
+# ============================================================================
+
+@app.route("/admin/testing", methods=["GET"])
+@_require_admin
+def admin_testing():
+    from engine import test_mode
+    return render_template(
+        "admin/testing.html",
+        status=test_mode.status_bundle(),
+        flash_ok=request.args.get("ok", ""),
+        flash_error=request.args.get("err", ""),
+    )
+
+
+@app.route("/admin/testing/freeze-weather", methods=["POST"])
+@_require_admin
+def admin_testing_freeze_weather():
+    from engine import test_mode
+    try:
+        meta = test_mode.freeze_current_weather()
+    except FileNotFoundError as e:
+        return redirect(f"/admin/testing?err={str(e).replace(' ', '+')}")
+    except Exception as e:
+        logger.exception("freeze_weather: %s", e)
+        return redirect(f"/admin/testing?err=Einfrieren+fehlgeschlagen:+{e}")
+    msg = f"Snapshot+gesetzt+%28{meta.get('spot_count', 0)}+Spots,+{meta.get('region_count', 0)}+Regionen%29"
+    return redirect(f"/admin/testing?ok={msg}")
+
+
+@app.route("/admin/testing/discard-frozen", methods=["POST"])
+@_require_admin
+def admin_testing_discard_frozen():
+    from engine import test_mode
+    deleted = test_mode.discard_frozen_weather()
+    if deleted:
+        return redirect("/admin/testing?ok=Snapshot+geloescht")
+    return redirect("/admin/testing?err=Kein+Snapshot+vorhanden")
+
+
+@app.route("/admin/testing/toggle-view", methods=["POST"])
+@_require_admin
+def admin_testing_toggle_view():
+    from engine import test_mode
+    active = (request.form.get("active") or "").strip() == "1"
+    if active and not test_mode.TEST_RUN_SPOT_ANALYSES_PATH.exists() \
+       and not test_mode.TEST_RUN_REGION_ANALYSES_PATH.exists():
+        return redirect("/admin/testing?err=Kein+Test-Lauf+vorhanden+-+Toggle+nicht+moeglich")
+    test_mode.set_view_active(active)
+    msg = "Test-Ansicht+aktiviert" if active else "Test-Ansicht+deaktiviert"
+    return redirect(f"/admin/testing?ok={msg}")
+
+
+@app.route("/admin/testing/refresh-frozen", methods=["POST"])
+@_require_admin
+def admin_testing_refresh_frozen():
+    """Holt frische Wetterdaten von der Live-API und friert sie als neuen Snapshot ein.
+
+    Zwei Schritte in einem Klick: `engine.refresh_weather(force=True)` + Freeze.
+    Achtung: API-Weight wird verbraucht. Falls der Refresh fehlschlaegt, bleibt der
+    bestehende Snapshot unangetastet.
+    """
+    from engine import test_mode
+    if engine is None:
+        return redirect("/admin/testing?err=Engine+noch+nicht+geladen")
+    try:
+        engine.refresh_weather(force=True)
+    except Exception as e:
+        logger.exception("refresh-frozen: Wetter-Refresh fehlgeschlagen")
+        return redirect(f"/admin/testing?err=Wetter-Refresh+fehlgeschlagen:+{e}")
+
+    if getattr(engine, "last_refresh_stale", False):
+        return redirect("/admin/testing?err=Live-Refresh+lieferte+nur+Stale-Cache+-+Snapshot+nicht+aktualisiert")
+
+    try:
+        meta = test_mode.freeze_current_weather()
+    except Exception as e:
+        logger.exception("refresh-frozen: Freeze fehlgeschlagen")
+        return redirect(f"/admin/testing?err=Freeze+fehlgeschlagen:+{e}")
+    msg = f"Snapshot+vom+Live+aktualisiert+%28{meta.get('spot_count', 0)}+Spots,+{meta.get('region_count', 0)}+Regionen%29"
+    return redirect(f"/admin/testing?ok={msg}")
+
+
+def _run_test_analysis_in_background(eng, q, *, use_frozen_input: bool):
+    """Background-Worker fuer den Test-Analysen-Stream. Schreibt Events in `q`."""
+    from engine import test_mode
+    global _analysis_running, _analysis_completed, _analysis_error, _analysis_result
+    try:
+        for evt in test_mode.run_test_analyses_stream(eng, use_frozen_input=use_frozen_input):
+            q.put(evt)
+            if evt.get("event") == "done":
+                data = evt.get("data", {})
+                rs = data.get("region_stats") or {}
+                ss = data.get("spot_stats") or {}
+                _analysis_result = {
+                    "regions_count": rs.get("regions_count", 0),
+                    "spots_count": ss.get("spots_count", 0),
+                    "total_calls": data.get("total_calls", 0),
+                    "test_run": True,
+                }
+                _analysis_completed = True
+            elif evt.get("event") == "error":
+                _analysis_error = (evt.get("data", {}) or {}).get("message", "unbekannter Fehler")
+    except Exception as e:
+        logger.exception("[TEST-ANALYSIS-BG] Fehler im Test-Analyse-Thread")
+        q.put({"event": "error", "data": {"message": str(e)}})
+        _analysis_error = str(e)
+    finally:
+        q.put(None)
+        _analysis_running = False
+        logger.info("[TEST-ANALYSIS-BG] Test-Analyse-Thread beendet")
+
+
+@app.route("/admin/testing/run-test-analysis")
+@_require_admin
+def admin_testing_run_test_analysis():
+    """SSE-Endpoint: startet einen Test-Analysen-Lauf im Background.
+
+    Query: `input=frozen` (default) oder `input=live`.
+    Schreibt nach `data/test_runs/latest/`. Nutzt denselben Lock wie die
+    Live-Analyse, damit nichts parallel laeuft.
+    """
+    from engine import test_mode
+    global _analysis_running, _analysis_completed, _analysis_error, _analysis_result, _analysis_queue
+
+    input_source = (request.args.get("input") or "frozen").strip().lower()
+    use_frozen = input_source != "live"
+
+    with _analysis_lock:
+        if _analysis_running:
+            return Response(
+                "event: error\ndata: {\"message\": \"Eine Analyse laeuft bereits\"}\n\n",
+                mimetype="text/event-stream",
+                headers={"Cache-Control": "no-cache"},
+            )
+        _analysis_running = True
+        _analysis_completed = False
+        _analysis_error = None
+        _analysis_result = None
+        _analysis_queue = _queue_mod.Queue()
+
+    t = threading.Thread(
+        target=_run_test_analysis_in_background,
+        args=(engine, _analysis_queue),
+        kwargs={"use_frozen_input": use_frozen},
+        daemon=True,
+    )
+    t.start()
+
+    def generate():
+        yield "retry: 300000\n\n"
+        try:
+            while True:
+                try:
+                    evt = _analysis_queue.get(timeout=15)
+                except _queue_mod.Empty:
+                    if not _analysis_running:
+                        break
+                    yield "event: heartbeat\ndata: {}\n\n"
+                    continue
+                if evt is None:
+                    break
+                event_type = evt.get("event", "message")
+                if event_type == "heartbeat":
+                    yield "event: heartbeat\ndata: {}\n\n"
+                    continue
+                data = evt.get("data", {})
+                yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+        except GeneratorExit:
+            logger.warning("[TEST-SSE] Client disconnected — Test-Analyse laeuft im Background weiter")
+        except Exception as e:
+            logger.exception("[TEST-SSE] stream Fehler")
+            yield f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+def _run_cost_testing_subprocess(script_path, extra_args, timeout=600):
+    """Faehrt ein Skript aus cost_testing/ als Subprocess.
+
+    Returns: (returncode, stdout, stderr, duration_s).
+    """
+    import subprocess
+    import time
+    cmd = [sys.executable, str(script_path)] + list(extra_args)
+    started = time.monotonic()
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(config.PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            encoding="utf-8",
+            errors="replace",
+        )
+        duration = time.monotonic() - started
+        return proc.returncode, proc.stdout, proc.stderr, duration
+    except subprocess.TimeoutExpired as e:
+        duration = time.monotonic() - started
+        return -1, e.stdout or "", f"TIMEOUT nach {timeout}s", duration
+
+
+@app.route("/admin/testing/freeze-golden", methods=["POST"])
+@_require_admin
+def admin_testing_freeze_golden():
+    """Wraps cost_testing/freeze_golden.py als Subprocess.
+
+    Form-Felder: limit (int, default 20), force (checkbox).
+    """
+    from engine import test_mode
+    try:
+        limit = int(request.form.get("limit") or 20)
+    except ValueError:
+        limit = 20
+    limit = max(1, min(limit, 200))
+    force = (request.form.get("force") or "").strip() == "1"
+
+    args = ["--limit", str(limit)]
+    if force:
+        args.append("--force")
+
+    rc, stdout, stderr, duration = _run_cost_testing_subprocess(
+        test_mode.FREEZE_GOLDEN_SCRIPT, args, timeout=180,
+    )
+    if rc != 0:
+        snippet = (stderr or stdout or "")[-300:].replace("\n", " | ").replace("&", "+")
+        return redirect(f"/admin/testing?err=Freeze-Golden+rc%3D{rc}+({duration:.1f}s):+{snippet}")
+
+    summary = test_mode.golden_summary()
+    msg = f"Goldstandard+aktualisiert+%28{summary.get('count', 0)}+Cases,+{duration:.1f}s%29"
+    return redirect(f"/admin/testing?ok={msg}")
+
+
+@app.route("/admin/testing/run-regression", methods=["POST"])
+@_require_admin
+def admin_testing_run_regression():
+    """Wraps cost_testing/score_regression.py als Subprocess.
+
+    Form-Felder:
+      - mode: 'no_llm' (default) = nur Cache vergleichen, schnell.
+              'with_llm' = Pipeline neu fahren, langsam (mehrere Min).
+      - max_cases: int, optional. 0 = alle.
+    """
+    from engine import test_mode
+    import datetime as _dt
+
+    mode = (request.form.get("mode") or "no_llm").strip()
+    try:
+        max_cases = int(request.form.get("max_cases") or 0)
+    except ValueError:
+        max_cases = 0
+    max_cases = max(0, max_cases)
+
+    test_mode.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    ts = _dt.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    report_name = f"reg_{mode}_{ts}.md"
+    report_path = test_mode.REPORTS_DIR / report_name
+
+    args = ["--report", str(report_path)]
+    if mode == "no_llm":
+        args.append("--no-llm")
+    if max_cases > 0:
+        args.extend(["--max-cases", str(max_cases)])
+
+    timeout = 180 if mode == "no_llm" else 1500
+    rc, stdout, stderr, duration = _run_cost_testing_subprocess(
+        test_mode.SCORE_REGRESSION_SCRIPT, args, timeout=timeout,
+    )
+    # rc != 0 bei score_regression.py heisst FAIL — Report wurde trotzdem geschrieben.
+    status_word = "PASS" if rc == 0 else "FAIL"
+    qs = f"ok=Regression+{status_word}+%28{duration:.1f}s%29+%E2%86%92+{report_name}"
+    return redirect(f"/admin/testing?{qs}")
+
+
+@app.route("/admin/testing/reports/<path:name>", methods=["GET"])
+@_require_admin
+def admin_testing_report(name):
+    """Rendert einen Regression-Report als preformatted Text."""
+    from engine import test_mode
+    text = test_mode.read_report(name)
+    if text is None:
+        return ("Report nicht gefunden", 404, {"Content-Type": "text/plain; charset=utf-8"})
+    return render_template(
+        "admin/testing_report.html",
+        report_name=name,
+        report_text=text,
+    )
+
+
+# ============================================================================
 # FEEDBACK API (Spot/Region — anonym via localStorage client_id)
 # ============================================================================
 
@@ -1455,13 +1769,14 @@ def api_run_analyses():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route("/api/analyses")
-def api_analyses():
-    """Gibt Spot-Analysen im flachen Format zurück."""
-    flat = {}
-    loaded_at = engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None
-    allowed_dates = _allowed_date_strs(current_max_days())
-    for spot_name, days in engine.spot_analyses.items():
+def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], allowed_dates: set) -> dict:
+    """Baut die flache Spot-Analysen-Repraesentation fuer /api/analyses.
+
+    Identisches Format fuer Live- und Test-View, damit das Frontend den
+    Unterschied nicht bemerkt — bis auf das `_test_view`-Flag im Wrapper.
+    """
+    flat: dict = {}
+    for spot_name, days in spot_analyses.items():
         flat[spot_name] = {}
         for date_str, entry in days.items():
             if date_str not in allowed_dates:
@@ -1515,6 +1830,32 @@ def api_analyses():
             doc["streckenflug_limiting_factor"] = sf.get("limiting_factor", "none")
             doc["streckenflug_region_context_available"] = bool(sf.get("region_context_available", False))
             flat[spot_name][date_str] = doc
+    return flat
+
+
+@app.route("/api/analyses")
+def api_analyses():
+    """Gibt Spot-Analysen im flachen Format zurück.
+
+    Wenn die Test-Ansicht aktiv ist, werden die Analysen aus
+    `data/test_runs/latest/spot_analyses.json` gelesen statt aus dem
+    Live-Engine-Cache. Prod-Daten bleiben unangetastet.
+    """
+    from engine import test_mode
+    allowed_dates = _allowed_date_strs(current_max_days())
+
+    if test_mode.is_view_active():
+        spot_analyses, _, mtime = test_mode.load_test_run_analyses()
+        loaded_at = mtime.isoformat() if mtime else None
+        flat = _format_spot_analyses_flat(spot_analyses, loaded_at, allowed_dates)
+        return jsonify({
+            "spot_analyses": flat,
+            "analyses_count": len(flat),
+            "_test_view": True,
+        })
+
+    loaded_at = engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None
+    flat = _format_spot_analyses_flat(engine.spot_analyses, loaded_at, allowed_dates)
     return jsonify({"spot_analyses": flat, "analyses_count": len(flat)})
 
 
@@ -1528,13 +1869,10 @@ def api_run_region_analyses():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route("/api/region-analyses")
-def api_region_analyses():
-    """Gibt Region-Analysen im flachen Format zurück."""
-    flat = {}
-    loaded_at = engine.region_analyses_loaded_at.isoformat() if engine.region_analyses_loaded_at else None
-    allowed_dates = _allowed_date_strs(current_max_days())
-    for rid, days in engine.region_analyses.items():
+def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str], allowed_dates: set) -> dict:
+    """Baut die flache Region-Analysen-Repraesentation fuer /api/region-analyses."""
+    flat: dict = {}
+    for rid, days in region_analyses.items():
         flat[rid] = {}
         for date_str, entry in days.items():
             if date_str not in allowed_dates:
@@ -1575,6 +1913,31 @@ def api_region_analyses():
                 doc["flyability_tier"] = ""
                 doc["fly_error"] = entry.get("fly_error", "")
             flat[rid][date_str] = doc
+    return flat
+
+
+@app.route("/api/region-analyses")
+def api_region_analyses():
+    """Gibt Region-Analysen im flachen Format zurück.
+
+    Wenn die Test-Ansicht aktiv ist, kommen die Daten aus
+    `data/test_runs/latest/region_analyses.json` statt aus dem Live-Cache.
+    """
+    from engine import test_mode
+    allowed_dates = _allowed_date_strs(current_max_days())
+
+    if test_mode.is_view_active():
+        _, region_analyses, mtime = test_mode.load_test_run_analyses()
+        loaded_at = mtime.isoformat() if mtime else None
+        flat = _format_region_analyses_flat(region_analyses, loaded_at, allowed_dates)
+        return jsonify({
+            "region_analyses": flat,
+            "analyses_count": len(flat),
+            "_test_view": True,
+        })
+
+    loaded_at = engine.region_analyses_loaded_at.isoformat() if engine.region_analyses_loaded_at else None
+    flat = _format_region_analyses_flat(engine.region_analyses, loaded_at, allowed_dates)
     return jsonify({"region_analyses": flat, "analyses_count": len(flat)})
 
 

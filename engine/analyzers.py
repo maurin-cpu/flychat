@@ -45,7 +45,7 @@ from engine.decision_engine import (
     decide_flyability_low_reward, decide_flyability_mech_danger,
     decide_flyability_upgrade,
     decide_flyability_region_gate,
-    compute_safety_band,
+    compute_safety_band, compute_comfort_index,
 )
 from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
@@ -141,6 +141,10 @@ class AnalyzersMixin:
 
         no_go = []
         summary_parts = []
+        # noAnalysisReason: kanonischer Grund-Tag fuer das schlanke UI-Panel
+        # (RATING_CONCEPT v1.3 §8.6). Bei eindeutigen No-Gos zeigt das Frontend
+        # nur Hero + Reason — kein Meteogramm, kein Detail-Akkordeon.
+        na_reason = None
 
         # Regel 1: Windrichtung ganztaegig falsch
         if wind_ok == 0 and total_hours > 0:
@@ -149,6 +153,7 @@ class AnalyzersMixin:
                 f"Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors "
                 f"({spot.get('windrichtung', '?')}). Kein fliegbares Fenster."
             )
+            na_reason = "wind_direction_mismatch"
 
         # Regel 2: Zu wenige WIND-OK Stunden — Start-Fenster reicht nicht.
         # Spiegelt die Skill-Regel < CLEAN_WINDOW_MIN_HOURS → not_safe (siehe
@@ -163,6 +168,8 @@ class AnalyzersMixin:
                 f"Nur {wind_ok}h mit passender Windrichtung "
                 f"({spot.get('windrichtung', '?')}) — kein ausreichendes Start-Fenster."
             )
+            # Bewusst KEIN noAnalysis: Pilot will sehen, WANN das kurze
+            # Fenster liegt — Meteogramm bleibt sichtbar.
 
         # Regel 3: Ganztaegig Regen
         elif total_hours > 0 and rain_cnt >= total_hours - 2 and rain_cnt >= 4:
@@ -171,6 +178,7 @@ class AnalyzersMixin:
                 f"Nahezu ganztaegiger Niederschlag ({rain_cnt} von {total_hours} Stunden). "
                 f"Kein nutzbares Flugfenster."
             )
+            na_reason = "all_day_rain"
 
         # Regel 3: Ganztaegig Gewitter
         elif total_hours > 0 and ts_h >= total_hours - 2 and ts_h >= 4:
@@ -179,6 +187,7 @@ class AnalyzersMixin:
                 f"Praktisch ganztaegig Gewitter ({ts_h} von {total_hours} Stunden). "
                 f"Kein fliegbares Fenster."
             )
+            na_reason = "all_day_thunderstorm"
 
         # Regel 4 entfernt (Apr 2026): "Ganztaegig Sturmwarnung" wird jetzt vom
         # WIND-TREND-Override (analyzers.py ~L1296, _build_single_spot_context)
@@ -193,7 +202,7 @@ class AnalyzersMixin:
             f"wind_ok={wind_ok}, rain={rain_cnt}/{total_hours}, ts={ts_h}"
         )
 
-        return {
+        result = {
             "spot": name,
             "date": date_str,
             "phase": "combined",
@@ -224,6 +233,13 @@ class AnalyzersMixin:
             "recommendation": "",
             "confidence": "high",
         }
+        # noAnalysis-Flag fuer schlankes UI-Panel (RATING_CONCEPT v1.3 §8.6).
+        # Nur bei eindeutigen No-Gos — Frontend versteckt dann das Meteogramm
+        # und zeigt einen kompakten "Keine Analyse"-Block.
+        if na_reason:
+            result["noAnalysis"] = True
+            result["noAnalysisReason"] = na_reason
+        return result
 
     def _build_and_analyze_region(self, region, date_str: str) -> dict:
         """Worker-Wrapper: Split-Flow (Safety → Flyability) fuer eine Region/Tag.
@@ -1549,7 +1565,7 @@ class AnalyzersMixin:
         if self.analysis_provider != "openai":
             raise RuntimeError(
                 f"Batch-API ist nur fuer OpenAI verfuegbar, nicht fuer "
-                f"'{self.analysis_provider}'. Bitte LLM_ANALYSIS_MODE=parallel setzen."
+                f"'{self.analysis_provider}'. Bitte OPENAI_ANALYSIS_MODE=parallel setzen."
             )
         import io
         file_obj = io.BytesIO(jsonl_content.encode("utf-8"))
@@ -1741,7 +1757,9 @@ class AnalyzersMixin:
                 "summary": "", "limiting_factor": "spot_not_flyable",
                 "region_context_available": False,
             }
-            result["rating"] = _compute_rating_from_subratings(result, "", "not_safe")
+            result["rating"] = _compute_rating_from_subratings(
+                result, "", "not_safe", include_altitude=True
+            )
             result["experience_score"] = _compute_experience_score(result["rating"])
             result["experience_stars"] = _compute_experience_stars(result["experience_score"])
             result["safety_rating"] = _compute_safety_rating(result)
@@ -1823,7 +1841,10 @@ class AnalyzersMixin:
         result["streckenflug"] = sf
 
         # Rating + Conditional-Flag
-        result["rating"] = _compute_rating_from_subratings(result, final_tier, final_safety)
+        # Spot: 5 Sub-Ratings inkl. altitude_rating (RATING_CONCEPT v1.4).
+        result["rating"] = _compute_rating_from_subratings(
+            result, final_tier, final_safety, include_altitude=True
+        )
         # experience_score / experience_stars (RATING_CONCEPT v1.3 Vorab-Fix #3): kosmetische
         # Skalierung des bewaehrten 0-10 ratings auf 0-100 + Sterne-Mapping fuer das neue
         # 2-Achsen-UI. Aendert weder LLM-Output noch andere Cache-Felder.
@@ -1838,6 +1859,9 @@ class AnalyzersMixin:
         # safety_band (RATING_CONCEPT v1.3 §3.1, Phase 1): Hybrid aus Hard-Overrides
         # + Score. Hard-Decisions haben Vorrang vor LLM-Score.
         result["safety_band"] = compute_safety_band(result)
+        # comfort_index (RATING_CONCEPT v1.3 §3.3): Texture-Wert 0-100 aus rough_pct.
+        # Beeinflusst nicht das Rating, nur Anzeige im Spot-Panel.
+        result["comfort_index"] = compute_comfort_index(tq)
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False
@@ -1961,6 +1985,8 @@ class AnalyzersMixin:
         result["safety_score"] = _compute_safety_score(result["safety_rating"])
         # safety_band (RATING_CONCEPT v1.3 §3.1, Phase 1)
         result["safety_band"] = compute_safety_band(result)
+        # comfort_index (RATING_CONCEPT v1.3 §3.3)
+        result["comfort_index"] = compute_comfort_index(tq)
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False
@@ -2003,7 +2029,7 @@ class AnalyzersMixin:
         if self.analysis_provider != "openai":
             yield {"event": "error", "data": {"message": (
                 f"Batch-Modus nur mit ANALYSIS_PROVIDER=openai moeglich (aktuell: "
-                f"'{self.analysis_provider}'). Bitte LLM_ANALYSIS_MODE=parallel setzen."
+                f"'{self.analysis_provider}'). Bitte OPENAI_ANALYSIS_MODE=parallel setzen."
             )}}
             return
 
@@ -2674,15 +2700,16 @@ class AnalyzersMixin:
     def run_all_analyses_stream(self):
         """Orchestrator: Regionen + Spots PARALLEL in einem gemeinsamen Pool.
         Einzelne Phase: kombinierte Safety+Flyability-Calls fuer alle Spots/Regionen.
-        Dispatcht zum Batch-Modus wenn config.LLM_ANALYSIS_MODE == 'batch'.
+        Dispatcht zum Batch-Modus wenn config.OPENAI_ANALYSIS_MODE == 'batch'
+        UND analysis_provider == 'openai'.
         """
         # Batch-API nur mit OpenAI. Bei anderem Provider automatisch auf parallel fallen.
-        if config.LLM_ANALYSIS_MODE == "batch":
+        if config.OPENAI_ANALYSIS_MODE == "batch":
             if self.analysis_provider == "openai":
                 yield from self.run_all_analyses_batch_stream()
                 return
             logger.warning(
-                "LLM_ANALYSIS_MODE=batch ignoriert — Batch-API nur fuer OpenAI verfuegbar, "
+                "OPENAI_ANALYSIS_MODE=batch ignoriert — Batch-API nur fuer OpenAI verfuegbar, "
                 "aktueller Analyse-Provider: '%s'. Falle auf parallel-Modus zurueck.",
                 self.analysis_provider,
             )

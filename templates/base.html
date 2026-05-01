@@ -24,7 +24,20 @@
     {% block head %}{% endblock %}
 </head>
 
-<body>
+<body{% if test_view_active %} class="test-view-active"{% endif %}>
+    {% if test_view_active %}
+    <div role="status" aria-live="polite" style="
+        position:sticky; top:0; z-index:9999;
+        background:repeating-linear-gradient(45deg,#fff8e1 0 12px,#fff3c4 12px 24px);
+        border-bottom:2px solid #f0c419;
+        color:#6b4f00; font-weight:600; font-size:13px; line-height:1.3;
+        padding:6px 14px; display:flex; align-items:center; justify-content:center; gap:10px;
+        font-family:Inter,system-ui,sans-serif;">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f0c419;box-shadow:0 0 0 3px rgba(240,196,25,0.3);"></span>
+      <span>TEST-ANSICHT AKTIV — Analysen kommen aus <code style="background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:3px;">data/test_runs/latest/</code>, nicht aus Live-Daten.</span>
+      <a href="/admin/testing" style="color:#6b4f00;text-decoration:underline;">Verwalten</a>
+    </div>
+    {% endif %}
     <a href="#main-content" class="skip-link">Zum Inhalt springen</a>
     <nav class="navbar" role="navigation" aria-label="Hauptnavigation">
         <a href="/chat" class="navbar-brand">Gleit<span>cast</span></a>

@@ -131,15 +131,23 @@ def compose_analysis_prompt(mode: str, phase: str = "combined") -> str:
     if phase == "combined":
         template = _load_skill(f"{mode}_analysis.md")
         marker = _INSERT_MARKER
-        blocks = _SHARED_BLOCKS
+        blocks = list(_SHARED_BLOCKS)
     elif phase == "safety":
         template = _load_skill(f"{mode}_safety.md")
         marker = _INSERT_MARKER_SAFETY
-        blocks = _SHARED_BLOCKS_SAFETY
+        blocks = list(_SHARED_BLOCKS_SAFETY)
     else:  # flyability
         template = _load_skill(f"{mode}_flyability.md")
         marker = _INSERT_MARKER_FLYABILITY
-        blocks = _SHARED_BLOCKS_FLYABILITY
+        blocks = list(_SHARED_BLOCKS_FLYABILITY)
+
+    # Spots haben 5 Sub-Ratings (inkl. altitude_rating, RATING_CONCEPT v1.4),
+    # Regionen behalten die 4-Sub-Rating-Tabelle (keine Startplatzhoehe).
+    if mode == "spot":
+        blocks = [
+            "_subratings_tables_spot.md" if b == "_subratings_tables.md" else b
+            for b in blocks
+        ]
 
     if marker not in template:
         raise ValueError(f"{mode}_{phase}.md enthält keinen {marker}-Marker")

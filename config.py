@@ -663,12 +663,13 @@ GEOCODE_CACHE_TTL = 24 * 3600  # 24h in-memory cache für Nominatim
 # ============================================================================
 # LLM-PROVIDER + MODELL (Chat + Analyse getrennt konfigurierbar)
 # ============================================================================
-# Drei unterstuetzte Provider: "openai" | "anthropic" | "gemini"
+# Vier unterstuetzte Provider: "openai" | "anthropic" | "gemini" | "deepseek"
 #   - openai    : gpt-4o-mini (guenstig, Batch-API, bekannt stabil)
 #   - anthropic : Claude Haiku 4.5 (beste Tool-Call + DE-Qualitaet)
 #   - gemini    : Gemini 2.5 Flash / Flash-Lite (guenstigste Option)
+#   - deepseek  : DeepSeek-V3 (sehr guenstig, OpenAI-kompatibel, China-gehostet, keine Batch-API)
 #
-# Hybrid-Setup moeglich: z.B. Chat=anthropic, Analyse=openai (Batch).
+# Hybrid-Setup moeglich: z.B. Chat=deepseek (Prosa), Analyse=openai (Batch-Rabatt).
 # Jeder aktive Provider braucht den entsprechenden API-Key als ENV-Variable.
 
 CHAT_PROVIDER = os.environ.get("CHAT_PROVIDER", "openai").lower()
@@ -688,12 +689,18 @@ LLM_MODELS = {
         "chat":     os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash"),
         "analysis": os.environ.get("GEMINI_ANALYSIS_MODEL", "gemini-2.5-flash-lite"),
     },
+    "deepseek": {
+        # deepseek-chat = V3 (general), deepseek-reasoner = R1 (reasoning, teurer)
+        "chat":     os.environ.get("DEEPSEEK_CHAT_MODEL", "deepseek-chat"),
+        "analysis": os.environ.get("DEEPSEEK_ANALYSIS_MODEL", "deepseek-chat"),
+    },
 }
 
 # API-Keys (nur der aktive Provider muss gesetzt sein)
 OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")
+DEEPSEEK_API_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # Rueckwaertskompatibilitaet: OPENAI_MODEL (alter ENV-Name) ueberschreibt beide Defaults
 _legacy_model = os.environ.get("OPENAI_MODEL", "").strip()
@@ -708,6 +715,7 @@ def get_api_key(provider: str) -> str:
         "openai":    OPENAI_API_KEY,
         "anthropic": ANTHROPIC_API_KEY,
         "gemini":    GEMINI_API_KEY,
+        "deepseek":  DEEPSEEK_API_KEY,
     }.get(provider, "")
 
 
@@ -720,11 +728,27 @@ def get_model(provider: str, purpose: str) -> str:
 # LLM-ANALYSE-KONFIGURATION
 # ============================================================================
 
-# Modus: "parallel" = schnell (viele gleichzeitige Calls), "batch" = guenstig
+# OPENAI_ANALYSIS_MODE — gilt AUSSCHLIESSLICH wenn ANALYSIS_PROVIDER=openai.
+# "parallel" = schnell (viele gleichzeitige Calls), "batch" = guenstig
 # (OpenAI Batch API, 50% billiger, dauert 5-30 Min).
-# HINWEIS: Batch wird nur von OpenAI unterstuetzt. Bei ANALYSIS_PROVIDER !=
-# "openai" wird automatisch auf "parallel" gefallen (Warnung im Log).
-LLM_ANALYSIS_MODE = os.environ.get("LLM_ANALYSIS_MODE", "parallel")
+#
+# Anthropic, Gemini und DeepSeek haben KEINE Batch-API → bei diesen Providern
+# wird der Wert zur Laufzeit ignoriert und immer parallel ausgefuehrt
+# (Auto-Fallback unten + Dispatcher in engine/analyzers.py).
+#
+# Wird ueblicherweise via Admin-UI gesetzt (data/config_overrides.json), nicht ENV.
+OPENAI_ANALYSIS_MODE = os.environ.get(
+    "OPENAI_ANALYSIS_MODE",
+    # Backwards-Compat: alter ENV-Name LLM_ANALYSIS_MODE als Fallback
+    os.environ.get("LLM_ANALYSIS_MODE", "parallel"),
+)
+if OPENAI_ANALYSIS_MODE == "batch" and ANALYSIS_PROVIDER != "openai":
+    logging.getLogger(__name__).warning(
+        "OPENAI_ANALYSIS_MODE=batch greift nur mit ANALYSIS_PROVIDER=openai "
+        "(aktuell: '%s'). Wird zur Laufzeit ignoriert → parallel.",
+        ANALYSIS_PROVIDER,
+    )
+    OPENAI_ANALYSIS_MODE = "parallel"
 
 # Anzahl paralleler LLM-Calls im "parallel"-Modus.
 # OpenAI gpt-4o-mini erlaubt bis 500 RPM (Tier 1). Default 10 ist konservativ.
@@ -751,6 +775,10 @@ MODEL_PRICES = {
     "claude-sonnet-4-6":{"in": 3.000, "out": 15.000, "cached_in": 0.300, "in_batch": 1.500, "out_batch": 7.500},
     "gemini-2.5-flash": {"in": 0.300, "out": 2.500, "cached_in": 0.075, "in_batch": 0.150, "out_batch": 1.250},
     "gemini-2.5-flash-lite": {"in": 0.100, "out": 0.400, "cached_in": 0.025, "in_batch": 0.050, "out_batch": 0.200},
+    # DeepSeek: keine Batch-API (in_batch/out_batch == in/out). Cache-Hit-Rabatt automatisch (kein Opt-in).
+    # Preise prueffen unter https://api-docs.deepseek.com/quick_start/pricing — Stand 2026-04.
+    "deepseek-chat":     {"in": 0.270, "out": 1.100, "cached_in": 0.070, "in_batch": 0.270, "out_batch": 1.100},
+    "deepseek-reasoner": {"in": 0.550, "out": 2.190, "cached_in": 0.140, "in_batch": 0.550, "out_batch": 2.190},
 }
 
 # Notbremse: Wenn ein Analyse-Lauf diese Schwelle ueberschreitet, sauber abbrechen.

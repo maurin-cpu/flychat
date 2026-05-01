@@ -435,6 +435,36 @@ def compute_safety_band(result: dict) -> str:
     return "green"
 
 
+def compute_comfort_index(tq: dict) -> int:
+    """Berechnet `comfort_index` (0-100) aus `rough_pct`.
+
+    RATING_CONCEPT v1.3 §3.3: "Texture"-Wert im Spot-Panel — wie glatt (100)
+    oder klapprig (0) sich der Tag anfuehlt. Beeinflusst **nicht** das
+    Experience-Rating — wird nur als zusaetzliche Pill angezeigt.
+
+    Formel:
+      rough_pct = rough_danger_h / thermal_hours_total * 100
+      comfort_index = 100 - rough_pct
+
+    Hinweis: Optional koennte hier zusaetzlich ein gust_factor-Penalty
+    angewendet werden (RATING_CONCEPT §3.3 Skizze). Der Wert ist aber heute
+    nicht im _ctx_tq_cache verfuegbar, daher wird primaer rough_pct verwendet.
+    Erweiterbar wenn avg_gust_factor pro Tag gepflegt wird.
+
+    Returns 100 wenn keine TQ-Daten — optimistischer Fallback (gibt keine
+    falschen "klapprig"-Hinweise bei Datenluecken).
+    """
+    if not tq:
+        return 100
+    tht = tq.get("thermal_hours_total", 0) or 0
+    rough_h = tq.get("rough_danger_h", 0) or 0
+    if tht <= 0:
+        return 100
+    rough_pct = (rough_h / tht) * 100
+    base = 100 - rough_pct
+    return max(0, min(100, round(base)))
+
+
 # ════════════════════════════════════════════════════════════════════
 # REGION — Safety-Decisions
 # ════════════════════════════════════════════════════════════════════

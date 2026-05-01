@@ -2104,7 +2104,22 @@ window.Meteogram = (function () {
         // Auswertung erstellt wurde (z.B. falsche Windrichtung). UI zeigt Hero +
         // kompakten Hinweis, kein Decision-Banner / kein Meteogramm.
         if (a.noAnalysis === true || a.no_analysis === true) {
-            var reason = a.noAnalysisReason || a.no_analysis_reason
+            // Reason-Key → lesbarer Text. Server liefert kanonischen Key
+            // (wind_direction_mismatch / all_day_rain / all_day_thunderstorm),
+            // Frontend mappt fuer die Anzeige.
+            var noAnaReasonMap = {
+                wind_direction_mismatch:
+                    'Windrichtung passt ganztaegig nicht zum Startplatz — kein fliegbares Fenster.',
+                all_day_rain:
+                    'Nahezu ganztaegiger Niederschlag — kein nutzbares Flugfenster.',
+                all_day_thunderstorm:
+                    'Praktisch ganztaegig Gewitter — kein fliegbares Fenster.',
+                out_of_season:
+                    'Spot ist ausserhalb der Saison.'
+            };
+            var reasonKey = a.noAnalysisReason || a.no_analysis_reason || '';
+            var reason = noAnaReasonMap[reasonKey]
+                || a.summary  // Server-Summary als Fallback (enthaelt schon Klartext)
                 || 'Bedingungen sind eindeutig nicht fliegbar — keine detaillierte Analyse erstellt.';
             html += '<div class="mga-hero red">'
                   + '<div class="mga-hero-glyph">' + _heroGlyphSvg('red', 0, 96) + '</div>'
@@ -2161,37 +2176,9 @@ window.Meteogram = (function () {
         }
         html += '</div></div></div>';
 
-        // ── Level 1: Decision Hero Banner ──
-        var decisionConfig = {
-            safe:        { cls: 'safe',    icon: '\u2713', label: 'Fliegbar',     sub: '' },
-            conditional: { cls: 'conditional', icon: '!',  label: 'Bedingt fliegbar', sub: 'Einschränkungen beachten' },
-            not_safe:    { cls: 'not_safe', icon: '\u2715', label: 'Nicht fliegbar', sub: 'Sicherheitsrisiken vorhanden' },
-            no_data:     { cls: 'unknown',  icon: '?',     label: 'Keine Daten',    sub: 'Wetterdaten unvollständig' },
-            error:       { cls: 'unknown',  icon: '?',     label: 'Fehler',         sub: esc(a.error || 'Analyse fehlgeschlagen') }
-        };
-        var dc = decisionConfig[safetyStatus] || decisionConfig.error;
-
-        // For safe/conditional: include fly quality in sub-line
-        if (phase2Ok) {
-            var flyQualLabels = { gray: 'Soaring / Abgleiter', green: 'Gut fliegbar', violet: 'Hervorragend — XC-Tag' };
-            dc.sub = flyQualLabels[flyStatus] || dc.sub;
-        }
-
-        html += '<div class="mga-decision ' + dc.cls + '">'
-            + '<div class="mga-decision-icon">' + dc.icon + '</div>'
-            + '<div class="mga-decision-text">'
-            + '<div class="mga-decision-status">' + esc(dc.label) + '</div>';
-        if (dc.sub) {
-            html += '<div class="mga-decision-sub">' + esc(dc.sub) + '</div>';
-        }
-        html += '</div>';
-        // Fly tier badge (inline, right-side)
-        if (phase2Ok) {
-            var flyBadgeLabels = { gray: 'Abgleiter', green: 'Thermik', violet: 'XC-Tag' };
-            html += '<span class="mga-fly-badge ' + flyStatus + '">'
-                + esc(flyBadgeLabels[flyStatus] || flyStatus) + '</span>';
-        }
-        html += '</div>';
+        // (Old Decision Hero Banner removed — RATING_CONCEPT v1.3 §8.6: the
+        // Hero block above already shows verdict + stars + score, so the
+        // duplicate "Fliegbar / Gut fliegbar / Thermik" row was redundant.)
 
         // Early return for error / no_data
         if (safetyStatus === 'no_data' || safetyStatus === 'error') {
