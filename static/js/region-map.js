@@ -206,8 +206,6 @@
     // - sonst:                   nichts (Polygon-Farbe reicht, Daten fehlen)
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
-        // Identische Band-Ableitung wie mapRegionStyle — sonst landet 'error'
-        // als no_data und das rote Polygon hat kein Kreuz-Label.
         var band = (safety === 'safe')        ? 'green' :
                    (safety === 'conditional') ? 'amber' :
                    (safety === 'not_safe')    ? 'red'   :
@@ -220,27 +218,45 @@
         } else if (n >= 1) {
             label = String(n);
         } else {
-            return null;  // safe/conditional ohne Stars: kein Label — Polygon-Farbe genuegt
+            return null;
         }
 
-        // Dezenter — nicht uebertrieben gross. Polygon traegt schon die Hauptaussage.
-        var fontSize = zoom < 7 ? 18 : zoom < 9 ? 24 : 30;
-        var box = fontSize * 1.4;
+        // Pille: weisser Glas-Hintergrund + farbiger Rand + Zahl in Safety-Farbe.
+        // Klar lesbar ueber jedem Polygon-Hintergrund, sauberer als nackte Schrift.
+        var palette = {
+            green: { color: '#15803d', border: '#22c55e' },
+            amber: { color: '#92400e', border: '#f59e0b' },
+            red:   { color: '#fff',    border: '#dc2626', bg: '#dc2626' }  // bei red: Vollfarbe
+        };
+        var p = palette[band];
+        var bg = p.bg || 'rgba(255,255,255,0.92)';
+        var color = p.color;
+
+        var fontSize = zoom < 7 ? 16 : zoom < 9 ? 20 : 24;
+        var pad = fontSize * 0.45;
+        var minW = fontSize * 1.6;
         var html = '<div style="'
-            + 'width:' + box + 'px;'
-            + 'height:' + box + 'px;'
-            + 'display:flex;'
+            + 'display:inline-flex;'
             + 'align-items:center;'
             + 'justify-content:center;'
+            + 'min-width:' + minW + 'px;'
+            + 'height:' + (fontSize + pad * 2) + 'px;'
+            + 'padding:0 ' + pad + 'px;'
+            + 'background:' + bg + ';'
+            + 'border:2px solid ' + p.border + ';'
+            + 'border-radius:999px;'
+            + 'box-shadow:0 2px 6px rgba(0,0,0,0.18);'
             + 'pointer-events:none;'
             + 'font-size:' + fontSize + 'px;'
             + 'font-weight:800;'
             + 'line-height:1;'
-            + 'color:#fff;'
-            + 'text-shadow:0 1px 2px rgba(0,0,0,0.45), 0 0 4px rgba(0,0,0,0.35);'
+            + 'color:' + color + ';'
             + 'font-variant-numeric:tabular-nums;'
             + '">' + label + '</div>';
-        return { html: html, size: [box, box], anchor: [box / 2, box / 2] };
+        // Container groesser als Pille — Leaflet anchor in Polygon-Mitte
+        var w = minW + pad * 2 + 4;
+        var h = fontSize + pad * 2 + 4;
+        return { html: html, size: [w, h], anchor: [w / 2, h / 2] };
     }
     // Mini-Helper fuer Label-Text (escHtml ist erst spaeter definiert)
     function escHtmlSafe(s) {
