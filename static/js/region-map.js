@@ -218,7 +218,9 @@
         } else if (n >= 1) {
             label = String(n);
         } else {
-            return null;
+            // safe/conditional ohne berechnete Stars — Pille mit "—",
+            // damit User sieht: Region wurde analysiert, Rating noch nicht ableitbar
+            label = '\u2013';
         }
 
         // Pille: weisser Glas-Hintergrund + farbiger Rand + Zahl in Safety-Farbe.
