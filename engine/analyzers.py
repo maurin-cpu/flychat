@@ -62,7 +62,7 @@ from engine._common import (
     BatchCostTracker, extract_usage_from_response,
     _is_permanent_api_error, _user_friendly_api_error,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
-    _TIER_RATING_RANGES, _clamp_rating_to_tier, _compute_rating_from_subratings,
+    _compute_rating_from_subratings,
     _compute_experience_score, _compute_experience_stars,
     _compute_safety_rating, _compute_safety_score,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,

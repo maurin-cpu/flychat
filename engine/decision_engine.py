@@ -465,6 +465,37 @@ def compute_comfort_index(tq: dict) -> int:
     return max(0, min(100, round(base)))
 
 
+def compute_legacy_flyability_tier(result: dict) -> str:
+    """Compat-View: leitet `flyability_tier` (gray/green/violet/'') aus den
+    2-Achsen-Werten `safety_band` + `experience_stars` ab.
+
+    RATING_CONCEPT v1.3 §9.7 Single Source of Truth — Regel:
+      - safety_band == 'red'                     → ''       (keine Empfehlung)
+      - stars >= 4 AND safety_band == 'green'    → 'violet' (Top-XC + sicher)
+      - stars >= 2                               → 'green'  (fliegbar)
+      - sonst                                    → 'gray'   (Abgleiter / mau)
+
+    Heute noch NICHT im post-process-Pfad aktiv — `flyability_tier` wird
+    weiterhin via `decide_flyability_*` gepflegt. Diese View-Funktion existiert
+    fuer den naechsten Migrations-Schritt (LLM-Tier-Output entfernen, dieser
+    Compat-Wert wird dann zur einzigen tier-Quelle).
+    """
+    safety_band = (result.get("safety_band") or "").lower()
+    stars = result.get("experience_stars", 0) or 0
+    try:
+        stars = int(stars)
+    except (TypeError, ValueError):
+        stars = 0
+
+    if safety_band == "red":
+        return ""
+    if stars >= 4 and safety_band == "green":
+        return "violet"
+    if stars >= 2:
+        return "green"
+    return "gray"
+
+
 # ════════════════════════════════════════════════════════════════════
 # REGION — Safety-Decisions
 # ════════════════════════════════════════════════════════════════════

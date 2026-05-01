@@ -390,45 +390,6 @@ def _normalize_flyability_tier(raw: str | None) -> str:
     return legacy.get(r, "")
 
 
-# Phase 3 (RATING_CONCEPT v1.3 §9.4 Bruch 4): _TIER_RATING_RANGES und
-# _clamp_rating_to_tier sind DEPRECATED. In der 2-Achsen-Welt (safety_band +
-# experience_stars) ist `rating` orthogonal zum tier — ein "gray + rating 7.8"
-# soll moeglich sein.
-#
-# Funktion + Konstante bleiben als Compat-View fuer externe Importe (chat_engine,
-# weather_context etc. importieren sie defensiv aber rufen sie nicht auf).
-# Aufruf-Pfad in `_compute_rating_from_subratings` wurde entfernt.
-_TIER_RATING_RANGES = {
-    "gray":   (2.0, 4.9),
-    "green":  (5.0, 8.4),
-    "violet": (8.5, 10.0),
-}
-
-
-def _clamp_rating_to_tier(tier: str, rating, safety_status: str = "") -> float:
-    """DEPRECATED Compat-View — wird vom Engine-Pfad nicht mehr genutzt.
-
-    Bleibt nur fuer externe Importe (chat_engine, weather_context, etc.).
-    Neue Aufrufer sollen direkt `round(rating, 1)` verwenden bzw. bei
-    `safety_status='not_safe'` 0.0 returnen.
-    """
-    if safety_status == "not_safe":
-        return 0.0
-    try:
-        r = float(rating)
-    except (TypeError, ValueError):
-        r = 0.0
-    rng = _TIER_RATING_RANGES.get(tier)
-    if not rng:
-        return 0.0
-    lo, hi = rng
-    if r < lo:
-        r = lo
-    elif r > hi:
-        r = hi
-    return round(r, 1)
-
-
 def _compute_rating_from_subratings(
     result: dict,
     tier: str,

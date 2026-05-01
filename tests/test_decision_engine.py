@@ -28,6 +28,7 @@ from engine.decision_engine import (
     decide_flyability_upgrade,
     decide_flyability_region_gate,
     compute_safety_band,
+    compute_legacy_flyability_tier,
 )
 from engine._common import (
     _compute_experience_score,
@@ -705,6 +706,53 @@ class TestSafetyBand(unittest.TestCase):
         result = self._result(status="safe", score=85)
         result["_decisions_applied"] = "FoehnDanger(8.0)"  # String, kein List
         self.assertEqual(compute_safety_band(result), "red")
+
+
+# ════════════════════════════════════════════════════════════════════
+# Phase 4 (RATING_CONCEPT v1.3 §9.7): compute_legacy_flyability_tier
+# Compat-View — leitet flyability_tier aus (safety_band, experience_stars) ab
+# ════════════════════════════════════════════════════════════════════
+class TestLegacyFlyabilityTier(unittest.TestCase):
+    def test_red_safety_yields_empty(self):
+        # red → "" unabhaengig von Sterne (keine Empfehlung bei not_safe)
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "red", "experience_stars": 5}), "")
+
+    def test_green_5_stars_yields_violet(self):
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 5}), "violet")
+
+    def test_green_4_stars_yields_violet(self):
+        # untere Grenze: stars >= 4 AND green → violet
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 4}), "violet")
+
+    def test_amber_4_stars_yields_green(self):
+        # amber + 4 Sterne ist NICHT violet (violet braucht green); fliegbar → green
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "amber", "experience_stars": 4}), "green")
+
+    def test_green_3_stars_yields_green(self):
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 3}), "green")
+
+    def test_green_2_stars_yields_green(self):
+        # untere Grenze fuer green
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 2}), "green")
+
+    def test_green_1_star_yields_gray(self):
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 1}), "gray")
+
+    def test_amber_0_stars_yields_gray(self):
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "amber", "experience_stars": 0}), "gray")
+
+    def test_missing_fields_default_to_gray(self):
+        # Komplett leeres Result → gray (kein red, keine Sterne)
+        self.assertEqual(compute_legacy_flyability_tier({}), "gray")
+
+    def test_invalid_stars_falls_back_to_zero(self):
+        # nicht-numerische Sterne → 0 → gray
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": "abc"}), "gray")
+
+    def test_safety_band_case_insensitive(self):
+        # Robust gegen unterschiedliche Schreibweisen
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "RED", "experience_stars": 5}), "")
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "GREEN", "experience_stars": 5}), "violet")
 
 
 if __name__ == "__main__":
