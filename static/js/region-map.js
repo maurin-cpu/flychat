@@ -10,6 +10,8 @@
     var regionAnalyses = null;
     var currentDate = null;
     var meteogramCache = {};   // {region_id: {wxData, altData}}
+    var spotAnalyses = null;   // lazy-loaded fuer Top-Spots-Liste pro Region
+    var spotAnalysesPromise = null;
     var regionActiveDate = {}; // {region_id: dateStr} — last selected day per region overlay
 
     var overlay = document.getElementById('regionOverlay');
@@ -90,6 +92,7 @@
         if (s === 'safe')        return 'green';
         if (s === 'conditional') return 'amber';
         if (s === 'not_safe')    return 'red';
+        if (s === 'error')       return 'red';  // konsistent zu mapRegionStyle
         return 'no_data';
     }
     // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §4.3) =====
@@ -507,6 +510,76 @@
         });
     }
 
+    // Lazy-Load /api/analyses fuer Top-Spots-Liste. Wird erstmals beim Oeffnen
+    // eines Region-Overlays getriggert, danach gecached.
+    function loadSpotAnalysesLazy() {
+        if (spotAnalyses) return Promise.resolve(spotAnalyses);
+        if (spotAnalysesPromise) return spotAnalysesPromise;
+        spotAnalysesPromise = fetch('/api/analyses')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                spotAnalyses = data.spot_analyses || data || {};
+                return spotAnalyses;
+            })
+            .catch(function () { spotAnalysesPromise = null; return {}; });
+        return spotAnalysesPromise;
+    }
+
+    // Top-Spots-Liste fuer eine Region/Tag (RATING_CONCEPT v1.3 §4.3).
+    // Zeigt bis zu 5 Spots der Region (sortiert nach experience_score).
+    // Erfordert spotAnalyses geladen — sonst leerer String, wird per Re-Render
+    // ergaenzt sobald Daten da sind.
+    function buildTopSpotsHtml(rid, dateStr) {
+        if (!spotAnalyses || !rid || !dateStr) return '';
+        var entries = [];
+        for (var name in spotAnalyses) {
+            var dayData = spotAnalyses[name] && spotAnalyses[name][dateStr];
+            if (!dayData) continue;
+            if ((dayData.region_id || '') !== rid) continue;
+            var ss = dayData.safety_status;
+            if (ss === 'no_data' || ss === 'error') continue;
+            var stars = getStars(dayData);
+            var band = getSafetyBand(dayData);
+            var score = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
+            entries.push({
+                name: name, band: band, stars: stars,
+                score: score == null ? -1 : score,
+                rating: dayData.rating || 0,
+                window: dayData.best_window || ''
+            });
+        }
+        if (!entries.length) return '';
+        entries.sort(function (a, b) {
+            if (b.score !== a.score) return b.score - a.score;
+            return b.rating - a.rating;
+        });
+        var top = entries.slice(0, 5);
+        var palette = {
+            green: { ink: '#166534', ring: '#22c55e' },
+            amber: { ink: '#92400e', ring: '#f59e0b' },
+            red:   { ink: '#991b1b', ring: '#ef4444' }
+        };
+        var html = '<div class="region-overlay-top-spots" style="margin:14px 12px 6px;">'
+            + '<div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">Top-Spots heute</div>';
+        top.forEach(function (e) {
+            var p = palette[e.band] || palette.green;
+            var label = (e.band === 'red') ? '\u2715' : (e.stars >= 1 ? String(e.stars) : '\u2013');
+            var scoreTxt = e.score >= 0 ? (e.score + '/100') : '';
+            html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f1f5f9;">'
+                + '<div style="flex-shrink:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;'
+                + 'background:rgba(255,255,255,0.95);border:1.5px solid ' + p.ring + ';border-radius:50%;'
+                + 'font-size:13px;font-weight:700;color:' + p.ink + ';line-height:1;font-variant-numeric:tabular-nums;">'
+                + label + '</div>'
+                + '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:#0f172a;'
+                + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(e.name) + '</div>'
+                + (e.window ? '<div style="font-size:11px;color:#64748b;font-variant-numeric:tabular-nums;">' + escHtml(e.window) + '</div>' : '')
+                + (scoreTxt ? '<div style="font-size:11px;color:' + p.ink + ';font-weight:700;font-variant-numeric:tabular-nums;">' + scoreTxt + '</div>' : '')
+                + '</div>';
+        });
+        html += '</div>';
+        return html;
+    }
+
     // CTA-Button "Im Briefing oeffnen" (§4.3)
     function buildCtaHtml(rid, currentDateStr) {
         if (!rid) return '';
@@ -592,11 +665,15 @@
         if (comfortIdx !== null) html += '<span class="mga-hero-pill">Comfort ' + Math.round(comfortIdx) + '/100</span>';
         html += '</div></div></div>';
 
-        // 7-Tage-Sparkline + CTA (RATING_CONCEPT v1.3 §4.3)
-        html += buildSparklineHtml(overlayRid, a.date) + buildCtaHtml(overlayRid, a.date);
+        // 7-Tage-Sparkline + Top-Spots + CTA (RATING_CONCEPT v1.3 §4.3)
+        html += buildSparklineHtml(overlayRid, a.date)
+              + buildTopSpotsHtml(overlayRid, a.date)
+              + buildCtaHtml(overlayRid, a.date);
 
-        // Early return for error / no_data
-        if (safetyStatus === 'no_data' || safetyStatus === 'error') {
+        // Bei echtem Daten-Loch (no_data) frueher abbrechen — sonst weiter
+        // zu Alerts (no_go_reasons + caution_notes + Override-Begruendung).
+        // Bei error: Fehler-Hinweis zeigen aber Alerts trotzdem rendern.
+        if (safetyStatus === 'no_data') {
             var info = a.safety_feedback || a.summary || '';
             if (info) {
                 html += '<div style="padding:8px 12px;font-size:12.5px;color:var(--color-text-light);line-height:1.5;">'
@@ -604,6 +681,13 @@
             }
             html += '</div>';
             return html;
+        }
+        if (safetyStatus === 'error') {
+            html += '<div style="margin:10px 12px;padding:10px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;font-size:12.5px;color:#991b1b;line-height:1.45;">'
+                + '<div style="font-weight:700;margin-bottom:3px;">Analyse-Fehler</div>'
+                + '<div>' + escHtml(a.safety_feedback || a.summary || a.error || 'Diese Region konnte nicht zuverlaessig analysiert werden.') + '</div>'
+                + '</div>';
+            // KEIN early-return — Alerts unten zeigen falls Daten partiell da sind
         }
 
         // ── Level 2: Best Window ──
@@ -837,6 +921,14 @@
 
         // Sparkline-Pills: Klick wechselt den Tag (loest gleitcast-day-change aus)
         wireSparklineClicks();
+
+        // Top-Spots-Liste lazy nachladen — re-rendert die analyse-aside wenn da
+        loadSpotAnalysesLazy().then(function () {
+            if (overlayRid === rid && overlay && overlay.classList.contains('visible')) {
+                var d = regionActiveDate[rid] || currentDate || window.currentDate || a.date;
+                updateOverlayAnalysis(rid, d);
+            }
+        });
 
         // Render feedback bar above meteogram
         renderRegionFeedbackBar(rid, initialDate, a);
