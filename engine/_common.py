@@ -390,8 +390,14 @@ def _normalize_flyability_tier(raw: str | None) -> str:
     return legacy.get(r, "")
 
 
-# Wertebereiche sind VERBINDLICH und werden auf LLM-Output geclampt:
-#   not_safe → 0.0   |  gray → 2.0-4.9  |  green → 5.0-8.4  |  violet → 8.5-10.0
+# Phase 3 (RATING_CONCEPT v1.3 §9.4 Bruch 4): _TIER_RATING_RANGES und
+# _clamp_rating_to_tier sind DEPRECATED. In der 2-Achsen-Welt (safety_band +
+# experience_stars) ist `rating` orthogonal zum tier — ein "gray + rating 7.8"
+# soll moeglich sein.
+#
+# Funktion + Konstante bleiben als Compat-View fuer externe Importe (chat_engine,
+# weather_context etc. importieren sie defensiv aber rufen sie nicht auf).
+# Aufruf-Pfad in `_compute_rating_from_subratings` wurde entfernt.
 _TIER_RATING_RANGES = {
     "gray":   (2.0, 4.9),
     "green":  (5.0, 8.4),
@@ -400,7 +406,12 @@ _TIER_RATING_RANGES = {
 
 
 def _clamp_rating_to_tier(tier: str, rating, safety_status: str = "") -> float:
-    """Clampt das LLM-Rating auf den Tier-Bereich. not_safe → 0.0."""
+    """DEPRECATED Compat-View — wird vom Engine-Pfad nicht mehr genutzt.
+
+    Bleibt nur fuer externe Importe (chat_engine, weather_context, etc.).
+    Neue Aufrufer sollen direkt `round(rating, 1)` verwenden bzw. bei
+    `safety_status='not_safe'` 0.0 returnen.
+    """
     if safety_status == "not_safe":
         return 0.0
     try:
@@ -440,7 +451,12 @@ def _compute_rating_from_subratings(
     altitude_rating gibt es nur fuer Spots, weil Regionen keine eindeutige
     Startplatzhoehe haben (mehrere Spots auf verschiedenen Hoehen).
 
-    Ergebnis wird anschliessend auf den Tier-Korridor geclampt.
+    RATING_CONCEPT v1.3 Phase 3: Rating ist NICHT mehr auf Tier-Korridor
+    geclampt — `rating` und `flyability_tier` sind orthogonal in der
+    2-Achsen-Welt. Bei `safety_status='not_safe'` weiterhin 0.0 als
+    Sicherheitsnetz.
+
+    Der `tier`-Parameter wird ignoriert (kept fuer API-Kompatibilitaet).
     """
     def _clamp(v, lo, hi):
         try:
@@ -448,6 +464,9 @@ def _compute_rating_from_subratings(
         except (TypeError, ValueError):
             v = 5.0
         return max(lo, min(hi, v))
+
+    if safety_status == "not_safe":
+        return 0.0
 
     thermal = _clamp(result.get("thermal_rating", 5), 1, 10)
     window  = _clamp(result.get("window_rating", 5), 1, 10)
@@ -458,7 +477,7 @@ def _compute_rating_from_subratings(
         raw = 0.30 * thermal + 0.20 * window + 0.10 * wind + 0.15 * xc + 0.25 * altitude
     else:
         raw = 0.35 * thermal + 0.25 * window + 0.25 * wind + 0.15 * xc
-    return _clamp_rating_to_tier(tier, raw, safety_status)
+    return round(raw, 1)
 
 
 def _compute_safety_rating(result: dict) -> float:
