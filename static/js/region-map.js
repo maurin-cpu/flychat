@@ -206,9 +206,12 @@
     // - sonst:                   nichts (Polygon-Farbe reicht, Daten fehlen)
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
+        // Identische Band-Ableitung wie mapRegionStyle — sonst landet 'error'
+        // als no_data und das rote Polygon hat kein Kreuz-Label.
         var band = (safety === 'safe')        ? 'green' :
                    (safety === 'conditional') ? 'amber' :
-                   (safety === 'not_safe')    ? 'red'   : 'no_data';
+                   (safety === 'not_safe')    ? 'red'   :
+                   (safety === 'error')       ? 'red'   : 'no_data';
 
         if (band === 'no_data') return null;
         var label;
