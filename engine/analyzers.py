@@ -428,9 +428,21 @@ class AnalyzersMixin:
             if last_err:
                 raise last_err
 
-            # Safety-Felder ins Ergebnis uebernehmen (fuer Post-Processing)
+            # Safety-Felder ins Ergebnis uebernehmen (fuer Post-Processing).
+            # Inkl. Sub-Ratings + safety_rating/score/band (Vorab-Fix #4) + foehn_risk
+            # damit _compute_safety_rating und _decisions_applied im Flyability-
+            # Post-Process die korrekten Werte sehen (Bug: ohne Transfer fallen
+            # Subs auf Default 5 zurueck, MIN ergibt 5 statt 9).
             result["safety_status"] = safety_result.get("safety_status", "")
             result["safe_window"] = safety_result.get("safe_window", "")
+            for f in ("wind_safety_rating", "gust_safety_rating",
+                      "aloft_safety_rating", "foehn_safety_rating",
+                      "weather_safety_rating", "safety_rating", "safety_score",
+                      "safety_band", "foehn_risk", "_decisions_applied",
+                      "no_go_reasons", "caution_notes"):
+                v = safety_result.get(f)
+                if v is not None:
+                    result[f] = v
             result["spot"] = name
             result["date"] = date_str
             result["phase"] = "flyability"
@@ -549,12 +561,22 @@ class AnalyzersMixin:
             if last_err:
                 raise last_err
 
-            # Safety-Felder ins Ergebnis uebernehmen
+            # Safety-Felder ins Ergebnis uebernehmen — inkl. Sub-Ratings + safety_*
+            # damit _compute_safety_rating und compute_safety_band im Flyability-
+            # Post-Process die korrekten Werte sehen (Vorab-Fix #4 Bug-Fix).
             result["safety_status"] = safety_result.get("safety_status", "")
             result["safe_window"] = safety_result.get("safe_window", "")
             result["wind_calm_count"] = safety_result.get("wind_calm_count", 0)
             result["wind_moderate_count"] = safety_result.get("wind_moderate_count", 0)
             result["wind_strong_count"] = safety_result.get("wind_strong_count", 0)
+            for f in ("wind_safety_rating", "gust_safety_rating",
+                      "aloft_safety_rating", "foehn_safety_rating",
+                      "weather_safety_rating", "safety_rating", "safety_score",
+                      "safety_band", "foehn_risk", "_decisions_applied",
+                      "no_go_reasons", "caution_notes"):
+                v = safety_result.get(f)
+                if v is not None:
+                    result[f] = v
             result["region"] = rname
             result["region_id"] = region["id"]
             result["date"] = date_str
@@ -595,6 +617,38 @@ class AnalyzersMixin:
         # Phase-Marker: zeigt dass aus Split-Flow
         merged["phase"] = "split"
         return merged
+
+    @staticmethod
+    def _attach_rating_fields(entry: dict, result: dict) -> None:
+        """Kopiert die RATING_CONCEPT v1.3/v1.4-Felder aus dem Engine-`result`
+        ins persistierte Cache-`entry`. Wird in allen Stream-Cache-Buildern aufgerufen.
+
+        Ohne diese Kopie landen die Werte zwar im LLM-Result, aber das
+        Cache-Top-Level enthaelt nur Legacy-Felder — Frontend faellt auf
+        legacy-Mapping zurueck und der User sieht das alte Rating.
+
+        Nur Felder mit Wert (nicht None) werden uebernommen.
+        """
+        new_fields = (
+            # Phase 1 — 2-Achsen
+            "safety_band", "safety_score", "safety_rating",
+            "experience_score", "experience_stars",
+            "comfort_index",
+            # 5 Safety-Sub-Ratings (Vorab-Fix #4)
+            "wind_safety_rating", "gust_safety_rating",
+            "aloft_safety_rating", "foehn_safety_rating", "weather_safety_rating",
+            # 4-5 Flyability-Sub-Ratings (Vorab-Fix #3 + v1.4 altitude)
+            "thermal_rating", "window_rating", "wind_rating", "xc_rating",
+            "altitude_rating",
+            # noAnalysis-Pfad (§8.6)
+            "noAnalysis", "noAnalysisReason",
+            # Decision-Engine Tracking
+            "_decisions_applied",
+        )
+        for k in new_fields:
+            v = result.get(k)
+            if v is not None:
+                entry[k] = v
 
     @staticmethod
     def _not_safe_minimal_flyability(safety_result: dict, is_spot: bool = True) -> dict:
@@ -1255,6 +1309,7 @@ class AnalyzersMixin:
                     "error": result.get("error", ""),
                 }
                 entry = {"safety": safety}
+                self._attach_rating_fields(entry, result)
 
                 # Rating / Conditional-Flag (Briefing) — top-level fuer einfachen Zugriff
                 entry["rating"] = float(result.get("rating", 0.0) or 0.0)
@@ -1453,6 +1508,7 @@ class AnalyzersMixin:
                     "error": result.get("error", ""),
                 }
                 entry = {"safety": safety}
+                self._attach_rating_fields(entry, result)
 
                 # Rating / Conditional-Flag (Briefing) — top-level fuer einfachen Zugriff
                 entry["rating"] = float(result.get("rating", 0.0) or 0.0)
@@ -1852,10 +1908,15 @@ class AnalyzersMixin:
         result["experience_stars"] = _compute_experience_stars(result["experience_score"])
         # safety_rating / safety_score (RATING_CONCEPT v1.3 Vorab-Fix #4): Aggregation
         # nach Weakest-Link aus 5 LLM-Sub-Ratings (wind/gust/aloft/foehn/weather).
-        # Hard-Overrides der Decision-Engine (FoehnDanger, AloftNotSafe, THUNDERSTORM,
-        # RAIN-WARN, CAPE-DANGER, OVERCAST-DANGER) wirken parallel auf safety_status.
-        result["safety_rating"] = _compute_safety_rating(result)
-        result["safety_score"] = _compute_safety_score(result["safety_rating"])
+        # WICHTIG: Im Split-Flow hat das Flyability-Result die Safety-Subs NICHT —
+        # die wurden in Phase 1 (Safety) erzeugt und sind dort schon berechnet.
+        # Nur ueberschreiben wenn Subs im result vorhanden (Combined-Flow).
+        _safety_subs = ("wind_safety_rating", "gust_safety_rating",
+                        "aloft_safety_rating", "foehn_safety_rating",
+                        "weather_safety_rating")
+        if all(result.get(f) is not None for f in _safety_subs):
+            result["safety_rating"] = _compute_safety_rating(result)
+            result["safety_score"] = _compute_safety_score(result["safety_rating"])
         # safety_band (RATING_CONCEPT v1.3 §3.1, Phase 1): Hybrid aus Hard-Overrides
         # + Score. Hard-Decisions haben Vorrang vor LLM-Score.
         result["safety_band"] = compute_safety_band(result)
@@ -1981,8 +2042,13 @@ class AnalyzersMixin:
         result["experience_score"] = _compute_experience_score(result["rating"])
         result["experience_stars"] = _compute_experience_stars(result["experience_score"])
         # safety_rating / safety_score (RATING_CONCEPT v1.3 Vorab-Fix #4): Weakest-Link
-        result["safety_rating"] = _compute_safety_rating(result)
-        result["safety_score"] = _compute_safety_score(result["safety_rating"])
+        # Im Split-Flow nicht ueberschreiben — Subs liegen nur im Safety-Result.
+        _safety_subs = ("wind_safety_rating", "gust_safety_rating",
+                        "aloft_safety_rating", "foehn_safety_rating",
+                        "weather_safety_rating")
+        if all(result.get(f) is not None for f in _safety_subs):
+            result["safety_rating"] = _compute_safety_rating(result)
+            result["safety_score"] = _compute_safety_score(result["safety_rating"])
         # safety_band (RATING_CONCEPT v1.3 §3.1, Phase 1)
         result["safety_band"] = compute_safety_band(result)
         # comfort_index (RATING_CONCEPT v1.3 §3.3)
@@ -2542,6 +2608,7 @@ class AnalyzersMixin:
                     "error": result.get("error", ""),
                 }
                 entry = {"safety": safety}
+                self._attach_rating_fields(entry, result)
                 entry["rating"] = float(result.get("rating", 0.0) or 0.0)
                 entry["is_conditional"] = bool(result.get("is_conditional", False))
                 entry["conditional_reason"] = result.get("conditional_reason", "") or ""
@@ -2627,6 +2694,7 @@ class AnalyzersMixin:
                     "error": result.get("error", ""),
                 }
                 entry = {"safety": safety}
+                self._attach_rating_fields(entry, result)
                 entry["rating"] = float(result.get("rating", 0.0) or 0.0)
                 entry["is_conditional"] = bool(result.get("is_conditional", False))
                 entry["conditional_reason"] = result.get("conditional_reason", "") or ""
@@ -2911,6 +2979,7 @@ class AnalyzersMixin:
                         "error": result.get("error", ""),
                     }
                     entry = {"safety": safety}
+                    self._attach_rating_fields(entry, result)
                     # Rating / Conditional-Flag (Briefing)
                     entry["rating"] = float(result.get("rating", 0.0) or 0.0)
                     entry["is_conditional"] = bool(result.get("is_conditional", False))
@@ -2998,6 +3067,7 @@ class AnalyzersMixin:
                         "error": result.get("error", ""),
                     }
                     entry = {"safety": safety}
+                    self._attach_rating_fields(entry, result)
                     # Rating / Conditional-Flag (Briefing)
                     entry["rating"] = float(result.get("rating", 0.0) or 0.0)
                     entry["is_conditional"] = bool(result.get("is_conditional", False))
