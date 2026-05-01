@@ -252,6 +252,65 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
     return "\n".join(parts)
 
 
+def _check_aloft_in_band(level_data, lower_alt, upper_alt, has_gusts=True):
+    """
+    Bestimmt max W(z) und max T(z) im Flugband [lower_alt, upper_alt] durch
+    lineare Interpolation zwischen Drucklevels — konsistent mit Meteogramm.
+
+    Statt rohe PL-Punkte zu pruefen (knife-edge: ein Spike auf 600 hPa knapp
+    ueber Thermik-Top kann Tag triggern, ohne im Meteogramm sichtbar zu sein),
+    wird der **interpolierte Wind-Verlauf** innerhalb des Bands ausgewertet.
+    Da W(z) zwischen PLs linear ist, liegt das Maximum zwingend an den
+    Bandgrenzen oder an PL-Knoten innerhalb des Bands → endliche Kandidaten.
+
+    level_data: Liste von Dicts mit 'altitude', 'wind_speed', optional
+    'wind_gusts' (=T(z) aus estimate_altitude_gusts).
+    Returns: (max_wind, max_gust). Beide None, falls Band leer/ungueltig.
+    """
+    if not level_data or upper_alt <= lower_alt:
+        return None, None
+
+    pts = sorted(
+        [(lv["altitude"], lv["wind_speed"], lv.get("wind_gusts")) for lv in level_data
+         if lv.get("altitude") is not None and lv.get("wind_speed") is not None],
+        key=lambda x: x[0]
+    )
+    if not pts:
+        return None, None
+
+    def _interp(z):
+        if z <= pts[0][0]:
+            return pts[0][1], pts[0][2]
+        if z >= pts[-1][0]:
+            return pts[-1][1], pts[-1][2]
+        for i in range(len(pts) - 1):
+            h0, w0, g0 = pts[i]
+            h1, w1, g1 = pts[i + 1]
+            if h0 <= z <= h1:
+                if h1 == h0:
+                    return w0, g0
+                f = (z - h0) / (h1 - h0)
+                w = w0 + f * (w1 - w0)
+                g = None if (g0 is None or g1 is None) else g0 + f * (g1 - g0)
+                return w, g
+        return None, None
+
+    candidates = [lower_alt, upper_alt]
+    for h, _, _ in pts:
+        if lower_alt < h < upper_alt:
+            candidates.append(h)
+
+    max_w = None
+    max_g = None
+    for z in candidates:
+        w, g = _interp(z)
+        if w is not None and (max_w is None or w > max_w):
+            max_w = w
+        if has_gusts and g is not None and (max_g is None or g > max_g):
+            max_g = g
+    return max_w, max_g
+
+
 class WeatherContextMixin:
     def _build_weather_context(self) -> str:
         """Formatiert ALLE Spot-Daten + Thermik + Föhn als einen Text-Block."""
@@ -499,20 +558,33 @@ class WeatherContextMixin:
                                 wind_str = f"{ws_val:.0f}"
                             dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
                             alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
-                            if in_range:
-                                if ws_val > config.WIND_DANGER_KMH:
-                                    aloft_danger = True
-                                elif ws_val > config.WIND_WARN_KMH:
-                                    aloft_warn = True
-                                if g_val is not None:
-                                    # T(z) > GUST_DANGER_KMH im Flugbereich = DANGER,
-                                    # unabhängig vom Modellwind W(z).
-                                    # Turbulenzrisiko ist ein Sicherheits-
-                                    # problem auch bei moderatem Grundwind.
-                                    if g_val > config.GUST_DANGER_KMH:
-                                        aloft_gust_danger = True
-                                    elif g_val > config.GUST_WARN_KMH:
-                                        aloft_gust_warn = True
+
+                        # ALOFT-Tag-Trigger: interpoliertes W(z) und T(z) im
+                        # realistischen Flugband (Thermik-Top + 300m statt
+                        # +1000m). Verhindert false-positives durch PL-Spikes
+                        # weit ueber dem Thermik-Top, die im Meteogramm nicht
+                        # sichtbar sind. Fallback elev+1000m falls keine
+                        # Thermik (entspricht altem Verhalten).
+                        if h_max_h and h_max_h > 0:
+                            real_ceiling = h_max_h + 300
+                        else:
+                            real_ceiling = effective_ceiling
+                        max_w, max_g = _check_aloft_in_band(
+                            display_with_gusts,
+                            spot["elevation_m"],
+                            real_ceiling,
+                            has_gusts=True,
+                        )
+                        if max_w is not None:
+                            if max_w > config.WIND_DANGER_KMH:
+                                aloft_danger = True
+                            elif max_w > config.WIND_WARN_KMH:
+                                aloft_warn = True
+                        if max_g is not None:
+                            if max_g > config.GUST_DANGER_KMH:
+                                aloft_gust_danger = True
+                            elif max_g > config.GUST_WARN_KMH:
+                                aloft_gust_warn = True
 
                 if aloft_danger:
                     if "[ALOFT-WIND-DANGER]" not in warnings:
@@ -1459,19 +1531,33 @@ class WeatherContextMixin:
                             wind_str = f"{ws_val:.0f}"
                         dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
                         alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {wind_str}km/h{dir_str}"
-                        # Set ALOFT tags only for in-range (*) levels
-                        if in_range:
-                            if ws_val > config.WIND_DANGER_KMH:
-                                aloft_danger = True
-                            elif ws_val > config.WIND_WARN_KMH:
-                                aloft_warn = True
-                            if g_val is not None:
-                                # T(z) > GUST_DANGER_KMH im Flugbereich = DANGER,
-                                # unabhängig vom Modellwind W(z).
-                                if g_val > config.GUST_DANGER_KMH:
-                                    aloft_gust_danger = True
-                                elif g_val > config.GUST_WARN_KMH:
-                                    aloft_gust_warn = True
+
+                    # ALOFT-Tag-Trigger: interpoliertes W(z)/T(z) im Flugband.
+                    # Realistisches Band = elev bis Thermik-Top + 300m
+                    # (statt +1000m). Verhindert false-positives durch PL-
+                    # Spikes weit ueber dem Thermik-Top, die im Meteogramm
+                    # nicht sichtbar sind. Fallback elev+1000m falls keine
+                    # Thermik (entspricht altem Verhalten).
+                    if h_max_h and h_max_h > 0:
+                        real_ceiling = h_max_h + 300
+                    else:
+                        real_ceiling = effective_ceiling
+                    max_w, max_g = _check_aloft_in_band(
+                        display_with_gusts,
+                        spot["elevation_m"],
+                        real_ceiling,
+                        has_gusts=True,
+                    )
+                    if max_w is not None:
+                        if max_w > config.WIND_DANGER_KMH:
+                            aloft_danger = True
+                        elif max_w > config.WIND_WARN_KMH:
+                            aloft_warn = True
+                    if max_g is not None:
+                        if max_g > config.GUST_DANGER_KMH:
+                            aloft_gust_danger = True
+                        elif max_g > config.GUST_WARN_KMH:
+                            aloft_gust_warn = True
 
             if aloft_danger:
                 if "[ALOFT-WIND-DANGER]" not in warnings:
@@ -2398,11 +2484,28 @@ class WeatherContextMixin:
                         wd_val = lv.get("wind_direction")
                         dir_str = f" aus {wd_val:.0f}°" if wd_val is not None else ""
                         alt_wind_info += f" | {lv['pressure']}hPa({int(alt)}m){marker}: {ws_val:.0f}km/h{dir_str}"
-                        if in_range:
-                            if ws_val > config.WIND_DANGER_KMH:
-                                aloft_danger = True
-                            elif ws_val > config.WIND_WARN_KMH:
-                                aloft_warn = True
+
+                    # ALOFT-Tag-Trigger: interpoliertes W(z) im Flugband.
+                    # Realistisches Band = elev_ref bis Thermik-Top + 300m
+                    # (statt +1000m). Verhindert false-positives durch PL-
+                    # Spikes weit ueber dem Thermik-Top, die im Meteogramm
+                    # nicht sichtbar sind. Fallback elev_ref+1000m falls
+                    # keine Thermik (entspricht altem Verhalten).
+                    if h_max_h and h_max_h > 0:
+                        real_ceiling = h_max_h + 300
+                    else:
+                        real_ceiling = effective_ceiling
+                    max_w, _ = _check_aloft_in_band(
+                        display_levels_out,
+                        elev_ref,
+                        real_ceiling,
+                        has_gusts=False,
+                    )
+                    if max_w is not None:
+                        if max_w > config.WIND_DANGER_KMH:
+                            aloft_danger = True
+                        elif max_w > config.WIND_WARN_KMH:
+                            aloft_warn = True
 
             if aloft_danger:
                 warnings.append("[ALOFT-WIND-DANGER]")
