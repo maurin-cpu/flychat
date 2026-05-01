@@ -32,22 +32,24 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# Tier-Display-Werte (Accessibility: Farbe + Text + Symbol, WCAG-konform auf weiss)
+# Tier-Display-Werte (Accessibility: Farbe + Text + Symbol, WCAG-konform auf weiss).
+# Phase 2 RATING_CONCEPT v1.3: User-Labels konsistent zur App-Sprache —
+# Sterne-zentriert in den Mails, Tier-Sprache nur intern.
 _TIER_META = {
     "violet": {
-        "label": "Legendaer",
+        "label": "Top-Tag",
         "color": "#6d28d9",      # 5.3:1 auf #fff
         "bg":    "#ede9fe",
-        "icon":  "*",            # stilisiertes Highlight
+        "icon":  "*",
     },
     "green": {
-        "label": "Fliegbar",
+        "label": "Sicher",
         "color": "#15803d",      # 4.7:1 auf #fff
         "bg":    "#dcfce7",
         "icon":  "+",
     },
     "conditional": {
-        "label": "Bedingt",
+        "label": "Vorsicht",
         "color": "#b45309",      # 4.6:1 auf #fff (amber-700)
         "bg":    "#fef3c7",
         "icon":  "!",
@@ -59,7 +61,7 @@ _TIER_META = {
         "icon":  "-",
     },
     "none": {
-        "label": "Nichts fliegbar",
+        "label": "Nicht fliegbar",
         "color": "#64748b",
         "bg":    "#f1f5f9",
         "icon":  "o",
@@ -759,7 +761,7 @@ def _day_fly_summary(my_spots: list[dict], day_tier: str) -> str:
     label_map = {
         "violet": "Top-Bedingungen",
         "green": "Solide Thermik",
-        "conditional": "Eingeschraenkt fliegbar",
+        "conditional": "Mit Vorsicht fliegbar",
     }
     bits = [label_map.get(day_tier, "")]
     if peak > 0:
@@ -1109,16 +1111,16 @@ def _verdict_headline(day: dict, spot: Optional[dict]) -> str:
     weekday_long = _WEEKDAY_DE_LONG[datetime.fromisoformat(day["date"]).weekday()]
     if day["tier"] == "violet":
         if spot:
-            return f"{weekday_long} ist dein Tag — {spot['spot']} legendaer"
-        return f"{weekday_long} wird legendaer"
+            return f"{weekday_long} ist dein Tag — {spot['spot']} ist Top"
+        return f"{weekday_long} wird ein Top-Tag"
     if day["tier"] == "green":
         if spot:
-            return f"Bester Tag: {weekday_long} — {spot['spot']} fliegbar"
-        return f"{weekday_long} ist fliegbar"
+            return f"Bester Tag: {weekday_long} — {spot['spot']} sicher fliegbar"
+        return f"{weekday_long} ist sicher fliegbar"
     if day["tier"] == "conditional":
         if spot:
-            return f"{weekday_long} bedingt — {spot['spot']} nur mit Vorsicht"
-        return f"{weekday_long} bedingt fliegbar"
+            return f"{weekday_long} mit Vorsicht — {spot['spot']}"
+        return f"{weekday_long} nur mit Vorsicht"
     return "Diese Woche nichts in deinen Regionen"
 
 
@@ -1126,8 +1128,8 @@ def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
     """Kompakte Headline fuer E-Mail-Hero.
 
     Eyebrow zeigt bereits 'BESTER TAG · Donnerstag, 23.04.', die Tier-Pill rechts
-    zeigt 'FLIEGBAR'. Headline soll daher nur WAS/WO sagen — kein Wochentag,
-    kein 'Bester Tag', kein 'fliegbar'.
+    zeigt 'SICHER'/'TOP'. Headline soll daher nur WAS/WO sagen — kein Wochentag,
+    keine Tier-Wiederholung.
     """
     if not spot:
         if day["tier"] == "violet":
@@ -1135,7 +1137,7 @@ def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
         if day["tier"] == "green":
             return "Solide Thermik"
         if day["tier"] == "conditional":
-            return "Nur eingeschraenkt fliegbar"
+            return "Nur mit Vorsicht fliegbar"
         return "Diese Woche nichts in deinen Regionen"
 
     spot_name = spot.get("spot", "")
@@ -1143,10 +1145,10 @@ def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
     base = f"{spot_name}, {window}" if window else spot_name
 
     if day["tier"] == "violet":
-        return f"{base} — legendaer"
+        return f"{base} — Top"
     if day["tier"] == "conditional":
         return f"{base} — mit Vorsicht"
-    return base  # green: kein Modifier (Tier-Pill sagt schon "Fliegbar")
+    return base  # green: kein Modifier (Tier-Pill sagt schon "Sicher")
 
 
 def send_briefing_email(subscriber: dict, briefing_data: dict,
