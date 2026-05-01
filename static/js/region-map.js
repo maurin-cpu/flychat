@@ -200,33 +200,38 @@
         return '#6b7280'; // no_data fallback
     }
 
-    // Region-Label im Polygon-Centroid: NUR das Rating als Zahl (1-5)
-    // ODER ein weisses Kreuz bei red — gleiches Prinzip wie Spot-Marker,
-    // aber DEUTLICH groesser, weil Polygone viel Platz haben und der User
-    // das Rating auf den ersten Blick erkennen muss.
+    // Region-Label im Polygon-Centroid: gross, weiss, schwarzer Outline.
+    // - red:        weisses Kreuz
+    // - safe/cond:  Zahl 1-5 (Sterne) oder "?" wenn keine Sterne berechnet
+    // - no_data:    nichts
+    // Explizite iconSize statt [0,0]+CSS-Hack — robust gegen Leaflet-Defaults.
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
         var band = (safety === 'safe')        ? 'green' :
                    (safety === 'conditional') ? 'amber' :
                    (safety === 'not_safe')    ? 'red'   : 'no_data';
 
-        var label = '';
+        if (band === 'no_data') return null;
+
+        var label;
         if (band === 'red') {
             label = '\u2715';
-        } else if (n > 0 && band !== 'no_data') {
+        } else if (n >= 1) {
             label = String(n);
+        } else {
+            label = '?';  // safe/conditional ohne Stars — Daten fehlen, aber Polygon ist bunt
         }
-        if (!label) return null;  // no_data oder 0 → kein Label
 
-        // Skaliert mit Zoom — auch bei kleinem Zoom (< 7) gross genug zum
-        // Lesen, weil das Polygon selbst genuegend Flaeche hat.
-        var fontSize = zoom < 7 ? 22 :
-                       zoom < 9 ? 32 : 40;
+        var fontSize = zoom < 7 ? 24 : zoom < 9 ? 34 : 44;
+        var box = fontSize * 1.4;  // genug Platz fuer das Glyph
         var color = style.labelColor;
         var shadow = style.labelShadow;
         var html = '<div style="'
-            + 'display:inline-block;'
-            + 'transform:translate(-50%,-50%);'
+            + 'width:' + box + 'px;'
+            + 'height:' + box + 'px;'
+            + 'display:flex;'
+            + 'align-items:center;'
+            + 'justify-content:center;'
             + 'pointer-events:none;'
             + 'font-size:' + fontSize + 'px;'
             + 'font-weight:900;'
@@ -235,7 +240,7 @@
             + 'text-shadow:' + shadow + ';'
             + 'font-variant-numeric:tabular-nums;'
             + '">' + label + '</div>';
-        return { html: html, size: [0, 0], anchor: [0, 0] };
+        return { html: html, size: [box, box], anchor: [box / 2, box / 2] };
     }
     // Mini-Helper fuer Label-Text (escHtml ist erst spaeter definiert)
     function escHtmlSafe(s) {
