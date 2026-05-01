@@ -85,7 +85,8 @@
         if (!dayData) return 'no_data';
         var b = dayData.safety_band;
         if (b === 'green' || b === 'amber' || b === 'red' || b === 'no_data') return b;
-        var s = dayData.safety_status;
+        var s = dayData.safety_status
+            || (dayData.safety && dayData.safety.safety_status);
         if (s === 'safe')        return 'green';
         if (s === 'conditional') return 'amber';
         if (s === 'not_safe')    return 'red';
@@ -361,7 +362,11 @@
                 return;
             }
 
-            var safety = dayData.safety_status;
+            // safety_status liegt im Cache mal top-level (post-processed),
+            // mal nur im 'safety'-Sub-Dict (split-phase, halb-fertig). Beide Pfade tolerieren.
+            var safety = dayData.safety_status
+                || (dayData.safety && dayData.safety.safety_status)
+                || 'no_data';
             var quality = getQuality(dayData);
             var style = mapRegionStyle(safety, quality);
 
