@@ -114,7 +114,7 @@
             return {
                 fill: '#9ca3af', fillOpacity: 0.30,
                 border: '#6b7280', borderOpacity: 0.5,
-                labelColor: '#374151', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
+                labelColor: '#374151', labelShadow: '-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 6px #fff',
                 safetyLabel: 'Keine Daten', isError: false
             };
         }
@@ -122,7 +122,7 @@
             return {
                 fill: '#ef4444', fillOpacity: 0.40,
                 border: '#991b1b', borderOpacity: 0.7,
-                labelColor: '#fff', labelShadow: '0 0 2px rgba(0,0,0,0.5)',
+                labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
                 safetyLabel: 'Nicht fliegbar',
                 isError: (safety === 'error')
             };
@@ -131,7 +131,7 @@
             return {
                 fill: '#f59e0b', fillOpacity: 0.42,
                 border: '#92400e', borderOpacity: 0.7,
-                labelColor: '#fff', labelShadow: '0 0 2px rgba(0,0,0,0.5)',
+                labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
                 safetyLabel: 'Vorsicht'
             };
         }
@@ -139,7 +139,7 @@
         return {
             fill: '#22c55e', fillOpacity: 0.42,
             border: '#15803d', borderOpacity: 0.7,
-            labelColor: '#fff', labelShadow: '0 0 2px rgba(0,0,0,0.5)',
+            labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
             safetyLabel: 'Sicher'
         };
     }
@@ -200,9 +200,10 @@
     }
 
     // Region-Label im Polygon-Centroid: NUR das Rating als Zahl (1-5)
-    // ODER ein weisses Kreuz bei red — gleiches Prinzip wie Spot-Marker.
+    // ODER ein weisses Kreuz bei red — gleiches Prinzip wie Spot-Marker,
+    // aber DEUTLICH groesser, weil Polygone viel Platz haben und der User
+    // das Rating auf den ersten Blick erkennen muss.
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
-        if (zoom < 7) return null;
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
         var band = (safety === 'safe')        ? 'green' :
                    (safety === 'conditional') ? 'amber' :
@@ -216,7 +217,10 @@
         }
         if (!label) return null;  // no_data oder 0 → kein Label
 
-        var fontSize = (zoom < 9) ? 18 : 24;
+        // Skaliert mit Zoom — auch bei kleinem Zoom (< 7) gross genug zum
+        // Lesen, weil das Polygon selbst genuegend Flaeche hat.
+        var fontSize = zoom < 7 ? 22 :
+                       zoom < 9 ? 32 : 40;
         var color = style.labelColor;
         var shadow = style.labelShadow;
         var html = '<div style="'
@@ -224,7 +228,7 @@
             + 'transform:translate(-50%,-50%);'
             + 'pointer-events:none;'
             + 'font-size:' + fontSize + 'px;'
-            + 'font-weight:800;'
+            + 'font-weight:900;'
             + 'line-height:1;'
             + 'color:' + color + ';'
             + 'text-shadow:' + shadow + ';'

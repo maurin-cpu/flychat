@@ -247,9 +247,12 @@
         var uid = ++_iconUid;
         var style = mapSafetyBandToStyle(safetyBand);
         var isMobile = window.innerWidth <= 600;
+        // Marker-Groesse hochgezogen: User muss das Rating sofort lesen koennen.
+        // Vorher: 6-10px Radius, Ziffer 9-11px — auf der Karte schwer erkennbar.
+        // Jetzt: 11-15px Radius, Ziffer ~14-18px.
         var svgSize = 44;
         var center = svgSize / 2;
-        var radius = isHighlighted ? (isMobile ? 10 : 8) : (isMobile ? 8 : 6);
+        var radius = isHighlighted ? (isMobile ? 15 : 13) : (isMobile ? 13 : 11);
         var stars = (typeof experienceStars === 'number' && experienceStars >= 0 && experienceStars <= 5)
             ? Math.floor(experienceStars) : 0;
 
@@ -297,20 +300,21 @@
 
         // Inner glyph
         if (safetyBand === 'red') {
-            // White X cross — Sperr-Glyphe
+            // White X cross — Sperr-Glyphe, proportional zur Marker-Groesse
             var arm = radius * 0.55;
+            var crossWidth = Math.max(2, radius * 0.22);
             html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
                   + '" x2="' + (center + arm) + '" y2="' + (center + arm)
-                  + '" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />';
+                  + '" stroke="#ffffff" stroke-width="' + crossWidth + '" stroke-linecap="round" />';
             html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
                   + '" x2="' + (center - arm) + '" y2="' + (center + arm)
-                  + '" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />';
+                  + '" stroke="#ffffff" stroke-width="' + crossWidth + '" stroke-linecap="round" />';
         } else if (stars >= 1 && (safetyBand === 'green' || safetyBand === 'amber')) {
-            // White digit 1-5 — Erlebnis-Sterne als kompakte Ziffer
-            var fontSize = isHighlighted ? 11 : 9;
+            // Weisse Ziffer 1-5 — Erlebnis-Rating, prominent zum sofortigen Erkennen.
+            var fontSize = Math.round(radius * 1.4);
             html += '<text x="' + center + '" y="' + (center + fontSize * 0.35)
                   + '" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif"'
-                  + ' font-size="' + fontSize + '" font-weight="700">' + stars + '</text>';
+                  + ' font-size="' + fontSize + '" font-weight="800">' + stars + '</text>';
         } else if (safetyBand === 'green' || safetyBand === 'amber') {
             // 0 stars: kleiner weisser Punkt (sicher aber Abgleiter)
             html += '<circle cx="' + center + '" cy="' + center + '" r="1.8" fill="#ffffff" />';
