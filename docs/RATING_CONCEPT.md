@@ -1632,6 +1632,63 @@ Features, die im urspruenglichen Konzept enthalten waren, aber nach Preview-Iter
 
 ---
 
+## 11. Implementierungs-Status (Stand 2026-05-01)
+
+Sektion ergänzt nach vollstaendiger Umsetzung der Phasen 1–4. Single Source of Truth fuer "was ist durch, was nicht".
+
+### 11.1 Phasen-Uebersicht
+
+| Phase | Inhalt | Status | Commits |
+|-------|--------|--------|---------|
+| Vorab-Fixes 1–4 | decide_flyability_downgrade-Split, is_conditional deterministisch, experience_score, Safety-Sub-Ratings | ✅ | siehe Memory |
+| Phase 1 | UI-Switch + Decision-Engine-Erweiterung (compute_safety_band, compute_experience_score, compute_comfort_index, neue Cache-Felder, Marker-Glyphe, Spot-Panel-Hero) | ✅ | mehrere Commits |
+| Phase 2 | Region-Tab als Leaflet-Karte mit Region-Overlay, 7-Tage-Sparkline, Top-Spots-Liste, Briefing-CTA | ✅ | `ccaf79a`, `d329c9b`, etc. |
+| Phase 3 | Chat-Engine-Umstellung: Skill `_flyability_tiers.md` → `_safety_experience.md`, chat_capabilities_guide.md auf 2-Achsen-Sprache, RECOMMENDED-Tag-Parser akzeptiert `safety=…, stars=N`, Mail-Templates auf 2-Achsen | ✅ | `dfd1618` |
+| Phase 4a | Legacy-Cleanup: `_TIER_RATING_RANGES` + `_clamp_rating_to_tier` aus _common.py entfernt, defensive Imports in 4 Files weg, neue View-Funktion `compute_legacy_flyability_tier` (§9.7) mit 11 Tests | ✅ | `2562920` |
+| Phase 4b | Pipeline-Restructuring: View-Funktion in Pipeline aktiv, Tier-Schreibe aus allen `decide_flyability_*` raus (Cross-Cutting bleibt: mech_danger eskaliert Safety, upgrade korrigiert Text-Felder); User-Sprache "Rating 1–5" statt "Sterne" in Skill + Capabilities-Guide | ✅ | `87ae63b` |
+| §4.4 | Risk-Reward-Bubble-Matrix im Briefing-Tab: regionen-aggregiert (29 Bubbles, X = Ø-experience_score, Y = safety_band-Bänder, Größe = Spot-Anzahl, Klick → springt zur Region) — `aggregateRegionsForBubbleMatrix` + `renderBubbleMatrix` in `static/js/briefing.js` | ✅ | UI-Refactor |
+
+### 11.2 Nicht umgesetzt / Backlog (alles bewusst zurueckgestellt)
+
+- **§10.1 Pilotenprofil-Filter** — DEFERRED, siehe §10.1.
+- **§10.2 Pure-Rohdaten-Modus / Pro-Detail-Tab** — nicht prioritaer.
+- **§10.3 Lernen aus Klick-Mustern** — setzt Account-System voraus.
+
+### 11.3 Architektur nach Phase 4b (Single Source of Truth, §9.7)
+
+```
+LLM (Spot-/Region-Analyse)
+  │
+  │  produziert: 4 Flyability-Sub-Ratings + 5 Safety-Sub-Ratings
+  │              + LLM-tier (Compat-Hilfe, wird ueberschrieben)
+  │              + Caution-Notes / No-Go-Reasons / Recommendation-Texte
+  ▼
+Decision-Engine (deterministisch)
+  │  - decide_flyability_low_reward / mech_danger / upgrade / region_gate
+  │    → Tags, Safety-Eskalation, Text-Korrekturen
+  │  - decide_aloft_*, decide_gust_floor, decide_overclaim_relax, _apply_foehn_decision
+  │    → safety_status / no_go_reasons / caution_notes
+  ▼
+Compute-Funktionen (View-Layer)
+  │  - _compute_rating_from_subratings → rating (0-10)
+  │  - _compute_experience_score / _compute_experience_stars → 0-100 / 0-5 ("Rating")
+  │  - _compute_safety_rating / _compute_safety_score → MIN-Aggregation 0-10 / 0-100
+  │  - compute_safety_band → green/amber/red (Hybrid)
+  │  - compute_comfort_index → 0-100 (Texture)
+  │  - compute_legacy_flyability_tier → gray/green/violet/'' (abgeleitet)
+  ▼
+Cache (spot_analyses.json / region_analyses.json)
+  │
+  ▼
+Frontend (Karten-Glyphe + Spot-Panel + Region-Tab + Briefing + Chat)
+```
+
+**Eintrittspunkt fuer Aenderungen**: Sub-Ratings (LLM) bzw. Decisions (Engine).
+Tier ist abgeleitet, nicht selbst-entschieden — eine Aenderung am Tier muss
+ueber die zugrundeliegenden Achsen (safety_band, experience_stars) erfolgen.
+
+---
+
 ## Quellen
 
 - [Burnair Meteoservice](https://www.burnair.ch/meteoservice/)

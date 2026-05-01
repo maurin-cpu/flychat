@@ -22,7 +22,7 @@ am Analyse-Result trifft. Es gibt drei Schichten:
 > `grep -n "_decisions_applied\|_apply_foehn_decision" engine/analyzers.py`,
 > `_prefilter_not_safe`.
 
-Letzte Aktualisierung: 2026-04-28 (vollstaendige Migration der Overrides auf Decision-Engine)
+Letzte Aktualisierung: 2026-05-01 (RATING_CONCEPT v1.3 Phase 1+2+3+4a+4b vollstaendig: 2-Achsen-Architektur safety_band + experience_stars; flyability_tier abgeleitet via compute_legacy_flyability_tier)
 
 ---
 
@@ -138,18 +138,28 @@ werden anders aggregiert; diese Decisions sind spot-spezifisch).
 
 ---
 
-## 5. Decision-Engine — Flyability
+## 5. Decision-Engine — Flyability (RATING_CONCEPT v1.3 Phase 4b)
 
 Aufruf in `_post_process_flyability_spot` (Spot) und `_post_process_flyability_region` (Region).
 
-Reihenfolge: Downgrade vor Upgrade vor Region-Gate (sonst koennten Downgrade-Effekte
-durch Upgrade rueckgaengig gemacht werden).
+**Architektur-Wechsel ggue. v1.2:** `decide_flyability_*`-Funktionen schreiben
+`flyability_tier` / `fly_status` **NICHT mehr direkt** (Phase 4b, §9.7). Der
+Tier wird am Ende der Pipeline durch `compute_legacy_flyability_tier` aus den
+2-Achsen-Werten `safety_band` + `experience_stars` abgeleitet. Die alten Decisions
+tracken weiter via `_decisions_applied`-Tag und führen Cross-Cutting-Effekte aus
+(Safety-Eskalation, Text-Korrekturen).
 
-| Decision                          | Trigger                                                                                       | Effekt                                                              | Tracking-Tag                  |
-| --------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------- |
-| `decide_flyability_downgrade`     | tier in (green, violet) UND (`thermal_hours_total == 0` ODER `peak < 0.3` ODER `rough_pct > 50%` ODER `prod_h < PRODUCTIVE_HOURS_DOWNGRADE`) | tier → `gray`                                                       | `FlyabilityDowngrade(...)`    |
-| `decide_flyability_upgrade`       | tier == gray UND `prod_h >= PRODUCTIVE_HOURS_FOR_GREEN` UND `rough_pct < 50%`                  | tier → `green`, ueberschreibt peak_climb_rate, flight_type, recommendation | `FlyabilityUpgrade(...)`      |
-| `decide_flyability_region_gate` (nur Spot) | Spot-tier == violet UND Region-tier in (gray, green)                                  | tier → `green`                                                      | `FlyabilityRegionGate(...)`   |
+Reihenfolge: low_reward → upgrade → region_gate (nur Spot).
+
+| Decision                                | Trigger                                                                                                                    | Effekt                                                                                                                               | Tracking-Tag                  |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| `decide_flyability_low_reward`          | tier in (green, violet) UND (peak < 0.3 / `thermal_hours_total == 0` ODER `prod_h < PRODUCTIVE_HOURS_DOWNGRADE` bei rough ≤ 50%) | Reine Telemetrie — Tag signalisiert Reward-Mangel. Tier wird via View aus niedrigen Sub-Ratings abgeleitet (gray).                  | `FlyabilityLowReward(...)`    |
+| `decide_flyability_upgrade`             | tier == gray UND `prod_h >= PRODUCTIVE_HOURS_FOR_GREEN` UND `rough_pct < 50%`                                              | Korrigiert Text-Felder bei objektiv guten Daten: `peak_climb_rate`, `flight_type`, `flight_duration_estimate`, `xc_potential`, `recommendation`. Tier kommt aus View. | `FlyabilityUpgrade(...)`      |
+| `decide_flyability_region_gate` (Spot)  | Spot-tier == violet UND Region-tier in (gray, green)                                                                       | **Faktisch obsolet** in 2-Achsen-Welt — Tag dient nur Telemetrie. View entscheidet eh aus `(safety_band, experience_stars)`.        | `FlyabilityRegionGate(...)`   |
+
+`decide_flyability_mech_danger` lebt in der Safety-Pipe (Sektion 3) — eskaliert
+`safety_status` von `safe` auf `conditional` und ergänzt `caution_notes`, wenn
+`rough_pct > 50%`. Tier-Schreibe entfällt seit Phase 4b.
 
 > Cache-Quelle: `_ctx_tq_cache[name|date]` mit `thermal_hours_total`, `rough_danger_h`,
 > `peak_climb_proxy`, `productive_thermal_h`. Schwellen in `config.py`
@@ -159,6 +169,25 @@ Die Spot-Flyability hat zusaetzlich einen `not_safe` → leeres Flyability Schri
 Anfang (`_post_process_flyability_spot`): Wenn die Safety-Phase `not_safe` lieferte,
 werden `fly_status`, `flyability_tier` und `streckenflug` direkt geleert; keine
 LLM-Anfrage fuer diese Felder.
+
+---
+
+## 5a. Decision-Engine — Compute-Funktionen (2-Achsen-Architektur)
+
+Diese Funktionen werden am Ende der Flyability-Pipeline aufgerufen. Sie sind
+**ableitende View-Funktionen** ohne LLM-Override-Eigenschaft — sie berechnen
+neue Cache-Felder aus den Sub-Ratings + Decisions.
+
+| Funktion                          | Quelle                                                                                                                | Ergebnis-Feld                                                | Logik (kurz)                                                                                                                  |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `_compute_rating_from_subratings` | LLM-Sub-Ratings thermal/window/wind/xc (+ altitude bei Spot)                                                          | `rating` (0–10)                                              | Gewichteter Durchschnitt: 35/25/25/15 (Region) bzw. 30/20/10/15/25 (Spot). `not_safe` → 0.0.                                  |
+| `_compute_experience_score`       | `rating × 10`                                                                                                         | `experience_score` (0–100)                                   | Kosmetische Skalierung des bewährten Ratings auf 0–100.                                                                       |
+| `_compute_experience_stars`       | `experience_score`-Schwellen                                                                                           | `experience_stars` (0–5) — User-Sprache: **"Rating 1–5"**     | 0–20 → 0, 21–40 → 1, 41–60 → 2, 61–75 → 3, 76–89 → 4, 90–100 → 5.                                                              |
+| `_compute_safety_rating`          | LLM-Sub-Ratings wind/gust/aloft/foehn/weather                                                                          | `safety_rating` (1–10)                                       | **Weakest-Link**: `min(wind, gust, aloft, foehn, weather)` — Sicherheit ist asymmetrisch, kein Mitteln.                       |
+| `_compute_safety_score`           | `safety_rating × 10`                                                                                                  | `safety_score` (0–100)                                       | Skalierung.                                                                                                                   |
+| `compute_safety_band`             | `safety_status` + `_decisions_applied` + `safety_score`                                                                | `safety_band` (green/amber/red)                              | Hard-Overrides (FoehnDanger/AloftNotSafe/THUNDERSTORM/RAIN-WARN/CAPE-DANGER → red; FoehnCaution/GustFloor/AloftConditional → amber) haben Vorrang vor Score (<40 → amber, sonst green). |
+| `compute_comfort_index`           | `tq.rough_danger_h / thermal_hours_total`                                                                              | `comfort_index` (0–100) — Texture-Wert                       | `100 - rough_pct`. Beeinflusst NICHT das Rating, nur Spot-Panel-Anzeige.                                                      |
+| `compute_legacy_flyability_tier`  | `safety_band` + `experience_stars`                                                                                     | `flyability_tier` (gray/green/violet/'') — **abgeleitet**    | red → ''; stars≥4 AND green → violet; stars≥2 → green; sonst gray. Single Source of Truth (§9.7) ab Phase 4b.                 |
 
 ---
 
