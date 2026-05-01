@@ -299,8 +299,9 @@ class TestFlyabilityDecisions(unittest.TestCase):
         tq = {"thermal_hours_total": 0, "rough_danger_h": 0,
               "peak_climb_proxy": 0, "productive_thermal_h": 0}
         tag = decide_flyability_low_reward(result, tq, "X/Y")
-        self.assertEqual(result["flyability_tier"], "gray")
-        self.assertEqual(result["fly_status"], "gray")
+        # Phase 4b: Tier wird NICHT mehr von decide_*-Funktionen geschrieben,
+        # sondern am Ende der Pipeline durch compute_legacy_flyability_tier
+        # abgeleitet. Diese Funktion signalisiert nur noch via Tag.
         # Low-Reward darf safety NICHT anfassen
         self.assertEqual(result["safety_status"], "safe")
         self.assertEqual(result["caution_notes"], [])
@@ -314,7 +315,6 @@ class TestFlyabilityDecisions(unittest.TestCase):
         tq = {"thermal_hours_total": 6, "rough_danger_h": 1,
               "peak_climb_proxy": 1.5, "productive_thermal_h": 1}
         tag = decide_flyability_low_reward(result, tq, "X/Y")
-        self.assertEqual(result["flyability_tier"], "gray")
         self.assertEqual(result["safety_status"], "safe")  # safety unangetastet
         self.assertTrue(tag.startswith("FlyabilityLowReward"))
         self.assertIn("low_productive", tag)
@@ -327,7 +327,6 @@ class TestFlyabilityDecisions(unittest.TestCase):
               "peak_climb_proxy": 1.5, "productive_thermal_h": 4}
         tag = decide_flyability_low_reward(result, tq, "X/Y")
         self.assertIsNone(tag)
-        self.assertEqual(result["flyability_tier"], "green")  # tier unveraendert
 
     def test_low_reward_skips_when_already_gray(self):
         result = {"flyability_tier": "gray", "fly_status": "gray",
@@ -339,15 +338,13 @@ class TestFlyabilityDecisions(unittest.TestCase):
 
     # ── Mech-Danger (Sub-Trigger B: rough_pct > 50, Safety-Achse) ──
     def test_mech_danger_fires_and_escalates_safety(self):
-        # rough_pct = 4/6 ≈ 67% > 50 → flippt safety + setzt tier=gray
+        # Phase 4b: mech_danger eskaliert nur noch safety + caution_note,
+        # Tier-Schreibe entfaellt. Tier wird via View aus safety_band+stars abgeleitet.
         result = {"flyability_tier": "green", "fly_status": "green",
                   "safety_status": "safe", "caution_notes": []}
         tq = {"thermal_hours_total": 6, "rough_danger_h": 4,
               "peak_climb_proxy": 1.5, "productive_thermal_h": 4}
         tag = decide_flyability_mech_danger(result, tq, "X/Y")
-        # Cross-cutting: tier UND safety werden geaendert
-        self.assertEqual(result["flyability_tier"], "gray")
-        self.assertEqual(result["fly_status"], "gray")
         self.assertEqual(result["safety_status"], "conditional")
         self.assertTrue(any("Klappern" in n for n in result["caution_notes"]))
         self.assertTrue(tag.startswith("FlyabilityMechDanger"))
@@ -373,10 +370,11 @@ class TestFlyabilityDecisions(unittest.TestCase):
         self.assertEqual(result["safety_status"], "not_safe")
 
     def test_upgrade_gray_to_green(self):
+        # Phase 4b: Tier-Schreibe entfaellt — Funktion korrigiert nur noch
+        # Text-Felder bei objektiv guten Cache-Daten.
         result = {"flyability_tier": "gray", "fly_status": "gray"}
         tq = {"thermal_hours_total": 6, "rough_danger_h": 1, "peak_climb_proxy": 1.8, "productive_thermal_h": 5}
         tag = decide_flyability_upgrade(result, tq, "X/Y")
-        self.assertEqual(result["flyability_tier"], "green")
         self.assertEqual(result["peak_climb_rate"], 1.8)
         self.assertEqual(result["flight_type"], "Thermikflug")
         self.assertTrue(tag.startswith("FlyabilityUpgrade"))
@@ -388,10 +386,11 @@ class TestFlyabilityDecisions(unittest.TestCase):
         self.assertIsNone(tag)
 
     def test_region_gate_violet_to_green(self):
+        # Phase 4b: Region-Gate ist konzeptionell obsolet — Funktion gibt nur
+        # noch Telemetrie-Tag zurueck, schreibt tier nicht mehr.
         result = {"flyability_tier": "violet", "fly_status": "violet"}
         region_result = {"flyability_tier": "green", "region": "Mittelland"}
         tag = decide_flyability_region_gate(result, region_result, "X/Y")
-        self.assertEqual(result["flyability_tier"], "green")
         self.assertEqual(tag, "FlyabilityRegionGate(violet→green)")
 
     def test_region_gate_keeps_violet_when_region_violet(self):
@@ -399,7 +398,6 @@ class TestFlyabilityDecisions(unittest.TestCase):
         region_result = {"flyability_tier": "violet", "region": "Mittelland"}
         tag = decide_flyability_region_gate(result, region_result, "X/Y")
         self.assertIsNone(tag)
-        self.assertEqual(result["flyability_tier"], "violet")
 
     def test_region_gate_no_region(self):
         result = {"flyability_tier": "violet", "fly_status": "violet"}

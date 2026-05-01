@@ -2,15 +2,21 @@
 TEIL 2: ERLEBNIS / FLIEGBARKEIT (2-Achsen-Welt)
 ═══════════════════════════════════════════════
 
-**Architektur (RATING_CONCEPT v1.3):** Die App hat **zwei orthogonale Achsen**:
+**Architektur (RATING_CONCEPT v1.3 + Phase 4b):** Die App hat **zwei orthogonale Achsen**:
 - `safety_band` (green/amber/red) = Sicherheit (siehe `_safety_subratings.md`).
-- `experience_stars` (0–5) = Erlebnis, abgeleitet aus deinem Gesamt-`rating`
-  (kommt aus den Fliegbarkeits-Sub-Ratings thermal/window/wind/xc, siehe
-  `_subratings_tables.md`).
+- `experience_stars` (0–5) = **Rating** des Tages — abgeleitet aus deinem
+  Gesamt-`rating` (kommt aus den Fliegbarkeits-Sub-Ratings thermal/window/wind/xc,
+  siehe `_subratings_tables.md`). User-Sprache: "Rating 1–5".
 
-`flyability_tier` (gray/green/violet) bleibt als **Compat-Output** im Cache —
-du setzt es weiterhin nach den Regeln unten. Sprich in den Prosa-Feldern aber
-ueber Sterne und Sicherheit, nicht ueber Tier-Farben.
+`flyability_tier` (gray/green/violet) ist seit Phase 4b **abgeleitet** aus
+(safety_band, experience_stars) — die Engine berechnet ihn am Ende der Pipeline
+selbst. Du DARFST `flyability_tier` weiterhin nach den Tier-Regeln unten setzen
+(als Compat-Hilfe), der Wert wird aber von der View ueberschrieben. Wichtig
+fuer dich: vergib **konsistente Sub-Ratings**, dann faellt der Tier automatisch
+richtig raus.
+
+Sprich in den Prosa-Feldern ueber **Rating** und **Sicherheit**, nicht ueber
+Tier-Farben.
 
 **GATE:** Wenn `safety_status = not_safe` → Teil 2 komplett ueberspringen. Setze alle Flyability-Felder auf Minimal-Werte (siehe JSON-Schema der jeweiligen Analyse).
 
@@ -26,24 +32,24 @@ NUMERIK-REGEL (verbindlich)
 - Konservativitaet gilt NUR fuer die Tier-Wahl, NICHT fuer Zahlenfelder.
 - Bei Abweichung zwischen TAGESPROFIL und Meteogramm-Grid → TAGESPROFIL gewinnt.
 
-**Prosa-Sprache (UI vs. Enum):**
-Der `fly_status`-Enum-Wert im JSON heisst `"gray" / "green" / "violet"` (Code-Kompatibilitaet — NICHT aendern!). In deinen Prosa-Feldern (`recommendation`, `thermal_quality`, `summary`) sprich primaer in **Sterne-Sprache** ("1-Stern-Tag", "3-Sterne-Tag", "Top-Tag mit 5 Sternen") oder beschreibe das Erlebnis konkret ("Abgleiter", "solider Thermiktag", "fettes XC-Potential"). Die alte Tier-Prosa ("Bronze-Tag" / "Abgleiter-Tag") bleibt erlaubt fuer Rueckwaertskompatibilitaet — niemals aber "grauer Tag".
+**Prosa-Sprache (User-Sprache):**
+Der `fly_status`-Enum-Wert im JSON heisst `"gray" / "green" / "violet"` (Code-Kompatibilitaet — NICHT aendern!). In deinen Prosa-Feldern (`recommendation`, `thermal_quality`, `summary`) sprich primaer in **Rating-Sprache** ("Rating 1", "Rating 3", "Top-Tag mit Rating 5") oder beschreibe das Erlebnis konkret ("Abgleiter", "solider Thermiktag", "fettes XC-Potential"). Die alte Tier-Prosa ("Bronze-Tag" / "Abgleiter-Tag") bleibt erlaubt fuer Rueckwaertskompatibilitaet — niemals aber "grauer Tag".
 
 ─────────────────────────────────
 TIER-DEFINITIONEN (steuert flyability_tier-Compat-Output)
 ─────────────────────────────────
 
-**BRONZE / 0–1 Sterne (Abgleiter / kaum fliegbar)** — Enum-Wert: `"gray"`. Vier harte Kriterien, nur eines muss erfuellt sein:
+**BRONZE / Rating 0–1 (Abgleiter / kaum fliegbar)** — Enum-Wert: `"gray"`. Vier harte Kriterien, nur eines muss erfuellt sein:
 1. Peak-Thermik < {{cfg.PRODUCTIVE_CLIMB_MIN}} m/s, ODER
 2. tiefe Wolken ≥ {{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}% ODER mittlere Wolken ≥ {{cfg.PRODUCTIVE_MID_CLOUD_MAX}}% waehrend Thermikstunden — Stunde zaehlt nicht als produktiv. Wenn dadurch < {{cfg.PRODUCTIVE_HOURS_DOWNGRADE}} produktive Stunden bleiben → Bronze, ODER
 3. **THERMAL-ROUGH-UNUSABLE** in > 50% der Thermik-Stunden (mechanische Klapper-Gefahr, nur Spots), ODER
 4. **THERMAL-WIND-UNUSABLE** in > 50% der Thermik-Stunden (BL-Grundwind zu stark → Thermikblase organisiert sich nicht, Research Abschnitt 3.1). Gilt fuer Spots UND Regionen.
 
-**GRUEN / 2–3 Sterne (fliegbar, solider Thermiktag)** — Enum-Wert: `"green"`.
+**GRUEN / Rating 2–3 (fliegbar, solider Thermiktag)** — Enum-Wert: `"green"`.
 - Peak-Thermik ca. 1-2.5 m/s, ordentliche bis gute Basis.
 - 1-4h Flug moeglich, lokale Thermikfluege, evtl. kurze Strecken.
 
-**VIOLETT / 4–5 Sterne (legendaer / Top-XC)** — Enum-Wert: `"violet"`. **ALLE** Kriterien muessen erfuellt sein:
+**VIOLETT / Rating 4–5 (legendaer / Top-XC)** — Enum-Wert: `"violet"`. **ALLE** Kriterien muessen erfuellt sein:
 - Peak-Thermik ≥ **{{cfg.VIOLET_PEAK_MIN}} m/s** (aus `Peak-Steigen (Proxy)`).
 - Produktive Thermik ≥ **{{cfg.VIOLET_HOURS_MIN}}h** (aus `PRODUKTIVE-THERMIK`).
 - ROUGH-UNUSABLE < **{{cfg.VIOLET_ROUGH_MAX}}%** der Thermikstunden.

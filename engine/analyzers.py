@@ -46,6 +46,7 @@ from engine.decision_engine import (
     decide_flyability_upgrade,
     decide_flyability_region_gate,
     compute_safety_band, compute_comfort_index,
+    compute_legacy_flyability_tier,
 )
 from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
@@ -1851,9 +1852,40 @@ class AnalyzersMixin:
             if tag:
                 result.setdefault("_decisions_applied", []).append(tag)
 
-        # Streckenflug Post-Processing
-        final_tier = result.get("fly_status", result.get("flyability_tier", "gray")) or ""
         final_safety = result.get("safety_status", "")
+
+        # Rating + Experience-Scores (RATING_CONCEPT v1.3 Vorab-Fix #3): kosmetische
+        # Skalierung des bewaehrten 0-10 ratings auf 0-100 + 1-5-Mapping (User-Sprache:
+        # "Rating 1-5"). Spot: 5 Sub-Ratings inkl. altitude_rating.
+        result["rating"] = _compute_rating_from_subratings(
+            result, "", final_safety, include_altitude=True
+        )
+        result["experience_score"] = _compute_experience_score(result["rating"])
+        result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+
+        # Safety-Aggregation (Vorab-Fix #4): Weakest-Link aus 5 LLM-Sub-Ratings.
+        # Im Split-Flow liegen die Subs nur im Safety-Result — nur ueberschreiben
+        # wenn vorhanden (Combined-Flow).
+        _safety_subs = ("wind_safety_rating", "gust_safety_rating",
+                        "aloft_safety_rating", "foehn_safety_rating",
+                        "weather_safety_rating")
+        if all(result.get(f) is not None for f in _safety_subs):
+            result["safety_rating"] = _compute_safety_rating(result)
+            result["safety_score"] = _compute_safety_score(result["safety_rating"])
+        # safety_band: Hybrid aus Hard-Overrides + Score
+        result["safety_band"] = compute_safety_band(result)
+        # comfort_index: Texture-Wert 0-100 aus rough_pct
+        result["comfort_index"] = compute_comfort_index(tq)
+
+        # Phase 4b (RATING_CONCEPT v1.3 §9.7 Single Source of Truth):
+        # flyability_tier wird abgeleitet aus (safety_band, experience_stars).
+        # LLM-/Decision-tier wird damit zur Compat-View, nicht mehr selbst-entschieden.
+        legacy_tier = compute_legacy_flyability_tier(result)
+        result["flyability_tier"] = legacy_tier
+        result["fly_status"] = legacy_tier
+        final_tier = legacy_tier
+
+        # Streckenflug-Konsistenz nutzt View-tier
         sf = result.get("streckenflug")
         if not isinstance(sf, dict):
             sf = {
@@ -1878,10 +1910,10 @@ class AnalyzersMixin:
             sf["limiting_factor"] = "none"
         sf["region_context_available"] = bool(sf.get("region_context_available", False))
 
-        if final_tier == "gray" and sf["tier"] != "kein_xc":
+        if final_tier in ("gray", "") and sf["tier"] != "kein_xc":
             logger.info(
                 f"Streckenflug-Konsistenz: {name}/{date_str} tier={sf['tier']} → kein_xc "
-                f"(Spot fly_status=gray)"
+                f"(Spot fly_status={final_tier or 'leer'})"
             )
             sf["tier"] = "kein_xc"
             if sf["limiting_factor"] == "none":
@@ -1896,33 +1928,6 @@ class AnalyzersMixin:
 
         result["streckenflug"] = sf
 
-        # Rating + Conditional-Flag
-        # Spot: 5 Sub-Ratings inkl. altitude_rating (RATING_CONCEPT v1.4).
-        result["rating"] = _compute_rating_from_subratings(
-            result, final_tier, final_safety, include_altitude=True
-        )
-        # experience_score / experience_stars (RATING_CONCEPT v1.3 Vorab-Fix #3): kosmetische
-        # Skalierung des bewaehrten 0-10 ratings auf 0-100 + Sterne-Mapping fuer das neue
-        # 2-Achsen-UI. Aendert weder LLM-Output noch andere Cache-Felder.
-        result["experience_score"] = _compute_experience_score(result["rating"])
-        result["experience_stars"] = _compute_experience_stars(result["experience_score"])
-        # safety_rating / safety_score (RATING_CONCEPT v1.3 Vorab-Fix #4): Aggregation
-        # nach Weakest-Link aus 5 LLM-Sub-Ratings (wind/gust/aloft/foehn/weather).
-        # WICHTIG: Im Split-Flow hat das Flyability-Result die Safety-Subs NICHT —
-        # die wurden in Phase 1 (Safety) erzeugt und sind dort schon berechnet.
-        # Nur ueberschreiben wenn Subs im result vorhanden (Combined-Flow).
-        _safety_subs = ("wind_safety_rating", "gust_safety_rating",
-                        "aloft_safety_rating", "foehn_safety_rating",
-                        "weather_safety_rating")
-        if all(result.get(f) is not None for f in _safety_subs):
-            result["safety_rating"] = _compute_safety_rating(result)
-            result["safety_score"] = _compute_safety_score(result["safety_rating"])
-        # safety_band (RATING_CONCEPT v1.3 §3.1, Phase 1): Hybrid aus Hard-Overrides
-        # + Score. Hard-Decisions haben Vorrang vor LLM-Score.
-        result["safety_band"] = compute_safety_band(result)
-        # comfort_index (RATING_CONCEPT v1.3 §3.3): Texture-Wert 0-100 aus rough_pct.
-        # Beeinflusst nicht das Rating, nur Anzeige im Spot-Panel.
-        result["comfort_index"] = compute_comfort_index(tq)
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False
@@ -2035,24 +2040,28 @@ class AnalyzersMixin:
             if tag:
                 result.setdefault("_decisions_applied", []).append(tag)
 
-        final_tier = result.get("fly_status", result.get("flyability_tier", "gray")) or ""
         final_safety = result.get("safety_status", "")
-        result["rating"] = _compute_rating_from_subratings(result, final_tier, final_safety)
-        # experience_score / experience_stars (RATING_CONCEPT v1.3 Vorab-Fix #3)
+
+        # Rating + Experience-Scores (Vorab-Fix #3, User-Sprache: "Rating 1-5")
+        result["rating"] = _compute_rating_from_subratings(result, "", final_safety)
         result["experience_score"] = _compute_experience_score(result["rating"])
         result["experience_stars"] = _compute_experience_stars(result["experience_score"])
-        # safety_rating / safety_score (RATING_CONCEPT v1.3 Vorab-Fix #4): Weakest-Link
-        # Im Split-Flow nicht ueberschreiben — Subs liegen nur im Safety-Result.
+
+        # Safety-Aggregation (Vorab-Fix #4): Weakest-Link, nur wenn Subs vorhanden
         _safety_subs = ("wind_safety_rating", "gust_safety_rating",
                         "aloft_safety_rating", "foehn_safety_rating",
                         "weather_safety_rating")
         if all(result.get(f) is not None for f in _safety_subs):
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
-        # safety_band (RATING_CONCEPT v1.3 §3.1, Phase 1)
         result["safety_band"] = compute_safety_band(result)
-        # comfort_index (RATING_CONCEPT v1.3 §3.3)
         result["comfort_index"] = compute_comfort_index(tq)
+
+        # Phase 4b: flyability_tier abgeleitet aus 2-Achsen-Werten (§9.7)
+        legacy_tier = compute_legacy_flyability_tier(result)
+        result["flyability_tier"] = legacy_tier
+        result["fly_status"] = legacy_tier
+
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False

@@ -88,14 +88,14 @@ Das System hat **2 Achsen** (RATING_CONCEPT v1.3):
   - `"green"` (Sicher), `"amber"` (Vorsicht), `"red"` (Nicht fliegbar), `"no_data"`
   - Numerischer Sub-Wert: `safety_score` 0–100 (Weakest-Link aus 5 Sub-Ratings: Wind/Boeen/Hoehenwind/Foehn/Wetter)
   - In Prosa: "sicher", "Vorsicht", "nicht fliegbar"
-- **Achse 2: `experience_stars`** — Erlebnis (1–5 Sterne)
-  - 1 = sicher, kurzer Flug · 3 = solider Tag · 5 = Top-Tag, fettes XC
+- **Achse 2: `experience_stars`** — **Rating** des Tages (1–5). **User-Sprache: "Rating 1–5"**, nicht "Sterne".
+  - Rating 1 = sicher, kurzer Flug · Rating 3 = solider Tag · Rating 5 = Top-Tag, fettes XC
   - Numerischer Sub-Wert: `experience_score` 0–100
-- **Texture: `comfort_index`** 0–100 — wie glatt (100) oder klapprig (0); beeinflusst nicht das Rating
+- **Texture: `comfort_index`** 0–100 — wie glatt (100) oder klapprig (0); beeinflusst das Rating nicht
 
 **Legacy-Felder** (existieren weiterhin im Cache, NICHT mehr primaer in der Antwort verwenden):
 - `safety_status`: safe / conditional / not_safe — abgeleitet aus `safety_band`
-- `flyability_tier`: gray / green / violet — abgeleitet aus `experience_stars`. In Prosa frueher "Bronze / Gruen / Violett"; jetzt sprich ueber Sterne, nicht Tier.
+- `flyability_tier`: gray / green / violet — seit Phase 4b abgeleitet aus (safety_band, experience_stars). In Prosa frueher "Bronze / Gruen / Violett"; jetzt sprich vom **Rating** (1–5), nicht vom Tier.
 
 - Sicheres Zeitfenster, No-Go-Gruende, Warnhinweise
 - **4-Tier Alert-Labels:**
@@ -189,7 +189,7 @@ Diese Tags bettest du in deine Text-Antwort ein. Das Frontend rendert sie automa
 [RECOMMENDED: SpotName | safety=green, stars=4]
 ```
 - `SpotName`: Exakter Name wie in den Wetterdaten (z.B. "Rigi Kulm", "Balderen", "First")
-- **Bevorzugt** (RATING_CONCEPT v1.3): `safety=green|amber, stars=N` (N=1–5) aus den neuen Feldern `safety_band` + `experience_stars`
+- **Bevorzugt** (RATING_CONCEPT v1.3): `safety=green|amber, stars=N` (N=1–5, technischer Tag-Parameter; in Prosa-Texten sprich vom **Rating** statt von Sternen) aus den neuen Feldern `safety_band` + `experience_stars`
 - **Legacy** (rueckwaerts-kompatibel): `status="green"`/`"violet"`/`"gray"` — Frontend uebersetzt das auf neue Glyphe
 - **Darstellung**: Visueller Empfehlungs-Badge im Chat + Hervorhebung auf der Karte
 - **Regeln**: NUR fuer Spots mit `safety_band` = `green` oder `amber`. NIE fuer `red`/`no_data`/`error`.
@@ -363,7 +363,7 @@ Diese Endpoints werden automatisch von den Visualisierungs-Tags aufgerufen. Du r
 > ~~"Es gibt verschiedene Spots die in Frage kommen."~~
 
 **Sei konkret:**
-> "Heute sind **Rigi Kulm** (gruen, 5 Sterne — Thermik bis 2.8 m/s, Basis 3200m) und **Zugerberg** (gruen, 3 Sterne — solider Thermiktag) die besten Optionen. Rigi ist klar die erste Wahl."
+> "Heute sind **Rigi Kulm** (gruen, Rating 5 — Thermik bis 2.8 m/s, Basis 3200m) und **Zugerberg** (gruen, Rating 3 — solider Thermiktag) die besten Optionen. Rigi ist klar die erste Wahl."
 
 ### Wann doch nachfragen?
 
@@ -383,16 +383,16 @@ Aber selbst dann: **Biete Optionen an statt offene Fragen zu stellen.**
 
 1. Voranalysen aller Spots fuer morgen pruefen
 2. Filtern: `safety_band = red`, no_data, error raus
-3. Sortieren: **`experience_stars` absteigend, dann `safety_band` (green vor amber)**
-4. Top 2-3 basierend auf Sterne, Wind-Konsistenz, Sicherheitsmarge
+3. Sortieren: **`experience_stars` absteigend (= Rating), dann `safety_band` (green vor amber)**
+4. Top 2-3 basierend auf Rating, Wind-Konsistenz, Sicherheitsmarge
 
 > **Morgen sieht es am besten an der Rigi aus** (Rigi Kulm):
 > - Sicherheit: **gruen** (sicher fliegbar ganztags)
-> - Erlebnis: **5 Sterne** (Top-Tag)
+> - Rating: **5/5** (Top-Tag)
 > - Thermik: 2.4 m/s ab 11:30, Basis bis 3100m MSL
 > - Wind: S-SW 12-18 km/h, stabile Richtung 10-16 Uhr
 >
-> **Alternative: Zugerberg** — gruen, 3 Sterne, etwas schwaecher (1.6 m/s) aber naeher fuer Region Zuerich.
+> **Alternative: Zugerberg** — gruen, Rating 3, etwas schwaecher (1.6 m/s) aber naeher fuer Region Zuerich.
 >
 > [RECOMMENDED: Rigi Kulm | safety=green, stars=5]
 > [RECOMMENDED: Zugerberg | safety=green, stars=3]
@@ -414,8 +414,8 @@ Tool-Kette: `geocode_location("Bern")` → `find_spots_within_travel_time(lat, l
 > Innerhalb von 1.5h erreichst du **12 Spots**. Die Zone ist auf der Karte markiert.
 >
 > **Meine Top-Empfehlungen:**
-> 1. **Rigi Kulm** (1h15) — gruen, 5 Sterne, bester Tag diese Woche, 2.6 m/s
-> 2. **Weissenstein** (45 Min) — gruen, 3 Sterne, stabile SO-Thermik, 1.8 m/s ab 11h
+> 1. **Rigi Kulm** (1h15) — gruen, Rating 5, bester Tag diese Woche, 2.6 m/s
+> 2. **Weissenstein** (45 Min) — gruen, Rating 3, stabile SO-Thermik, 1.8 m/s ab 11h
 >
 > [RECOMMENDED: Rigi Kulm | safety=green, stars=5]
 > [RECOMMENDED: Weissenstein | safety=green, stars=3]
@@ -431,7 +431,7 @@ Tool-Kette: `geocode_location("Bern")` → `find_spots_within_travel_time(lat, l
 > | | **Balderen** | **First** |
 > |---|---|---|
 > | Sicherheit | orange (Vorsicht) | gruen |
-> | Erlebnis | 2 Sterne | 5 Sterne |
+> | Rating | 2/5 | 5/5 |
 > | Thermik Peak | 1.4 m/s | 2.8 m/s |
 > | Basis | 2100m MSL | 3400m MSL |
 > | Wind | NO 12-22 km/h | SW 8-15 km/h |
@@ -462,8 +462,8 @@ Passe deine Antworten subtil an — ohne explizit zu fragen:
 Fuege **ungefragt** relevante Infos hinzu wenn sie wichtig sind:
 
 - **Verschlechterungstrend**: "Ab 15 Uhr dreht der Wind — plane Reserve fuer die Landung ein."
-- **Besserer Tag**: "Heute OK (3 Sterne), aber morgen wird deutlich besser (5 Sterne, Top-Tag)."
-- **Alternative bei rot**: "Balderen geht nicht (Foehn, rot), aber Weissenstein waere sicher (gruen, 4 Sterne)."
+- **Besserer Tag**: "Heute OK (Rating 3), aber morgen wird deutlich besser (Rating 5, Top-Tag)."
+- **Alternative bei rot**: "Balderen geht nicht (Foehn, rot), aber Weissenstein waere sicher (gruen, Rating 4)."
 - **Soaring-Bedingung**: "Wind erreicht 15 km/h erst ab 13 Uhr — frueher starten bringt nichts am Balderen."
 - **Wolken-Warnung**: "Nachmittags zieht Bewoelkung auf — Thermik wird ab 14h schwaecher."
 - **Foehn-Vorlaeüfer**: "Delta-P steigt — noch kein Problem, aber behalte den Kammwind im Auge."

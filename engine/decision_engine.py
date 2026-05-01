@@ -571,8 +571,9 @@ def decide_flyability_low_reward(result: dict, tq: dict, label: str) -> Optional
         return None
 
     logger.info(f"Decision FlyabilityLowReward fuer {label}: {tier}→gray ({reason_text})")
-    result["fly_status"] = "gray"
-    result["flyability_tier"] = "gray"
+    # Phase 4b (§9.7): Tier wird am Ende der Pipeline durch
+    # compute_legacy_flyability_tier abgeleitet — diese Funktion signalisiert
+    # via Tag, schreibt aber tier nicht mehr selbst.
     return f"FlyabilityLowReward({tier}→gray, {reason_tag})"
 
 
@@ -608,11 +609,11 @@ def decide_flyability_mech_danger(result: dict, tq: dict, label: str) -> Optiona
         f"ROUGH-UNUSABLE={rough_pct:.0f}% ({rough_h}/{tht}h)"
     )
 
-    # Tier-Downgrade (cross-cutting — schreibt fly_status obwohl in Safety-Pipe)
-    tier = result.get("flyability_tier") or result.get("fly_status") or ""
-    if tier in ("green", "violet"):
-        result["fly_status"] = "gray"
-        result["flyability_tier"] = "gray"
+    # Phase 4b (§9.7): Tier wird am Ende der Pipeline durch
+    # compute_legacy_flyability_tier abgeleitet. Diese Funktion eskaliert nur
+    # noch safety_status + caution_note — die Tier-Auswirkung ergibt sich
+    # automatisch (mech_danger setzt safety_band auf amber via conditional →
+    # View-Tier wird gray bei niedrigen experience_stars).
 
     # Safety-Eskalation: nur safe → conditional (kein Demote von not_safe)
     if result.get("safety_status") == "safe":
@@ -657,8 +658,10 @@ def decide_flyability_upgrade(result: dict, tq: dict, label: str) -> Optional[st
         f"Decision FlyabilityUpgrade fuer {label}: gray→green "
         f"(peak={peak:.1f}, ROUGH={rough_pct:.0f}%, productive_h={prod_h})"
     )
-    result["fly_status"] = "green"
-    result["flyability_tier"] = "green"
+    # Phase 4b (§9.7): Tier-Schreibe entfernt — View leitet aus
+    # (safety_band, experience_stars) ab. Diese Funktion korrigiert nur noch
+    # die Text-Felder (peak_climb_rate, flight_type, recommendation), wenn das
+    # LLM trotz objektiv guter Cache-Daten gray + niedrige Texte gesetzt hat.
     result["peak_climb_rate"] = round(peak, 1)
     if peak >= 1.5:
         result["flight_type"] = "Thermikflug"
@@ -698,6 +701,10 @@ def decide_flyability_region_gate(result: dict, region_result: dict, label: str)
         f"Decision FlyabilityRegionGate fuer {label}: violet→green "
         f"(Region '{rname}' tier={region_tier}, nicht violet)"
     )
-    result["fly_status"] = "green"
-    result["flyability_tier"] = "green"
+    # Phase 4b (§9.7): Tier-Schreibe entfernt — Funktion signalisiert nur noch
+    # Region-Konsens-Bruch im _decisions_applied-Tracking. Tier wird ohnehin
+    # aus (safety_band, experience_stars) abgeleitet. Wenn der Spot trotz
+    # Region-Schwaeche objektiv 4-5 Sterne hat, bleibt er violet — Region-Gate
+    # ist nach 2-Achsen-Architektur konzeptionell obsolet, das Tag dient
+    # nur der Telemetrie.
     return f"FlyabilityRegionGate(violet→green)"
