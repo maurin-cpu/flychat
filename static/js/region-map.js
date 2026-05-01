@@ -200,11 +200,10 @@
         return '#6b7280'; // no_data fallback
     }
 
-    // Region-Label im Polygon-Centroid: gross, weiss, schwarzer Outline.
-    // - red:        weisses Kreuz
-    // - safe/cond:  Zahl 1-5 (Sterne) oder "?" wenn keine Sterne berechnet
-    // - no_data:    nichts
-    // Explizite iconSize statt [0,0]+CSS-Hack — robust gegen Leaflet-Defaults.
+    // Region-Label im Polygon-Centroid: dezent, weiss, sanfter Schatten.
+    // - red:                     weisses Kreuz
+    // - safe/conditional + n>=1: Zahl 1-5
+    // - sonst:                   nichts (Polygon-Farbe reicht, Daten fehlen)
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
         var band = (safety === 'safe')        ? 'green' :
@@ -212,20 +211,18 @@
                    (safety === 'not_safe')    ? 'red'   : 'no_data';
 
         if (band === 'no_data') return null;
-
         var label;
         if (band === 'red') {
             label = '\u2715';
         } else if (n >= 1) {
             label = String(n);
         } else {
-            label = '?';  // safe/conditional ohne Stars — Daten fehlen, aber Polygon ist bunt
+            return null;  // safe/conditional ohne Stars: kein Label — Polygon-Farbe genuegt
         }
 
-        var fontSize = zoom < 7 ? 24 : zoom < 9 ? 34 : 44;
-        var box = fontSize * 1.4;  // genug Platz fuer das Glyph
-        var color = style.labelColor;
-        var shadow = style.labelShadow;
+        // Dezenter — nicht uebertrieben gross. Polygon traegt schon die Hauptaussage.
+        var fontSize = zoom < 7 ? 18 : zoom < 9 ? 24 : 30;
+        var box = fontSize * 1.4;
         var html = '<div style="'
             + 'width:' + box + 'px;'
             + 'height:' + box + 'px;'
@@ -234,10 +231,10 @@
             + 'justify-content:center;'
             + 'pointer-events:none;'
             + 'font-size:' + fontSize + 'px;'
-            + 'font-weight:900;'
+            + 'font-weight:800;'
             + 'line-height:1;'
-            + 'color:' + color + ';'
-            + 'text-shadow:' + shadow + ';'
+            + 'color:#fff;'
+            + 'text-shadow:0 1px 2px rgba(0,0,0,0.45), 0 0 4px rgba(0,0,0,0.35);'
             + 'font-variant-numeric:tabular-nums;'
             + '">' + label + '</div>';
         return { html: html, size: [box, box], anchor: [box / 2, box / 2] };
