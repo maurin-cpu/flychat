@@ -1009,9 +1009,21 @@
                 return;
             }
 
-            // Prefer new fields, fall back to legacy
+            // Prefer new fields, fall back to legacy.
+            // experience_stars: bei Fehlen ableiten aus rating (Schwellen wie
+            // email_service._stars_for_spot + region-map.getStars).
             var band = dayData.safety_band || legacySafetyBand(dayData.safety_status);
-            var stars = (typeof dayData.experience_stars === 'number') ? dayData.experience_stars : 0;
+            var stars = 0;
+            if (typeof dayData.experience_stars === 'number') {
+                stars = dayData.experience_stars;
+            } else {
+                var r = parseFloat(dayData.rating || 0);
+                if (r >= 9.0)       stars = 5;
+                else if (r >= 7.6)  stars = 4;
+                else if (r >= 6.1)  stars = 3;
+                else if (r >= 4.1)  stars = 2;
+                else if (r >= 2.1)  stars = 1;
+            }
 
             marker.currentSafetyBand = band;
             marker.currentStars = stars;

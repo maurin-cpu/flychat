@@ -478,55 +478,69 @@
 
         var html = '<div class="mg-analysis-view">';
 
-        // ── Hero (RATING_CONCEPT v1.3 §8.6) — Sterne + Score-Pills ──
+        // ── Hero-Block (RATING_CONCEPT v1.3 §8.6) — identisch zu Spot-Panel.
+        // Ersetzt den alten Decision-Hero-Banner (war doppelt).
         var stars = getStars(a);
         var band = getSafetyBand(a);
         var expScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
         var safScore = (typeof a.safety_score === 'number') ? a.safety_score : null;
         var comfortIdx = (typeof a.comfort_index === 'number') ? a.comfort_index : null;
-        if (band !== 'no_data' && (stars > 0 || expScore !== null || safScore !== null)) {
-            html += '<div style="padding:10px 12px;background:#f8fafc;border-radius:6px;margin-bottom:10px;">';
-            if (stars > 0) {
-                html += '<div style="font-size:18px;letter-spacing:2px;color:#0f172a;margin-bottom:4px;">'
-                    + starsGlyph(stars) + '</div>';
-            }
-            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px;font-weight:600;">';
-            html += '<span style="padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#0f172a;">Safety ' + band.toUpperCase() + '</span>';
-            if (safScore !== null) html += '<span style="padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#0f172a;">Safety-Score ' + safScore + '/100</span>';
-            if (expScore !== null) html += '<span style="padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#0f172a;">Experience ' + expScore + '/100</span>';
-            if (comfortIdx !== null) html += '<span style="padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#0f172a;">Comfort ' + Math.round(comfortIdx) + '/100</span>';
-            html += '</div></div>';
+        var verdictTxt = (band === 'green') ? 'Sicher' :
+                         (band === 'amber') ? 'Vorsicht' :
+                         (band === 'red')   ? 'Nicht fliegbar' : 'Keine Daten';
+        if (band !== 'red' && band !== 'no_data' && stars >= 1) {
+            verdictTxt += ' · ' + stars + (stars === 1 ? ' Stern' : ' Sterne');
         }
-
-        // ── Level 1: Decision Hero Banner ──
-        var decisionConfig = {
-            safe:        { cls: 'safe',        icon: '\u2713', label: 'Fliegbar',          sub: '' },
-            conditional: { cls: 'conditional',  icon: '!',      label: 'Bedingt fliegbar',  sub: 'Einschränkungen beachten' },
-            not_safe:    { cls: 'not_safe',     icon: '\u2715', label: 'Nicht fliegbar',     sub: 'Sicherheitsrisiken vorhanden' },
-            no_data:     { cls: 'unknown',      icon: '?',      label: 'Keine Daten',        sub: 'Wetterdaten unvollständig' },
-            error:       { cls: 'unknown',      icon: '\u26A0', label: 'Analyse-Fehler',     sub: escHtml(a.error || 'Analyse fehlgeschlagen') }
+        if (band !== 'red' && expScore !== null) {
+            verdictTxt += ' · ' + expScore + '/100';
+        }
+        var rationale = a.summary || '';
+        var rationaleShort = '';
+        if (rationale) {
+            var firstDot = rationale.indexOf('.');
+            rationaleShort = firstDot > 30 ? rationale.substring(0, firstDot + 1) : rationale.substring(0, 140);
+        }
+        // Glyph: Kreis in Safety-Farbe, weisse Ziffer (Sterne) oder weisses Kreuz (red)
+        var glyphSize = 96;
+        var gC = glyphSize / 2;
+        var gR = glyphSize * 0.32;
+        var pal = {
+            green:   { fill: '#22c55e', stroke: '#15803d' },
+            amber:   { fill: '#f59e0b', stroke: '#92400e' },
+            red:     { fill: '#ef4444', stroke: '#991b1b' },
+            no_data: { fill: '#9ca3af', stroke: '#6b7280' }
         };
-        var dc = decisionConfig[safetyStatus] || decisionConfig.error;
+        var pc = pal[band] || pal.no_data;
+        var glyphSvg = '<svg width="' + glyphSize + '" height="' + glyphSize + '" viewBox="0 0 ' + glyphSize + ' ' + glyphSize + '" aria-hidden="true">';
+        glyphSvg += '<circle cx="' + gC + '" cy="' + gC + '" r="' + gR + '" fill="' + pc.fill + '" stroke="' + pc.stroke + '" stroke-width="3"/>';
+        if (band === 'red') {
+            var arm = gR * 0.55;
+            glyphSvg += '<line x1="' + (gC - arm) + '" y1="' + (gC - arm)
+                + '" x2="' + (gC + arm) + '" y2="' + (gC + arm)
+                + '" stroke="#fff" stroke-width="6" stroke-linecap="round"/>';
+            glyphSvg += '<line x1="' + (gC + arm) + '" y1="' + (gC - arm)
+                + '" x2="' + (gC - arm) + '" y2="' + (gC + arm)
+                + '" stroke="#fff" stroke-width="6" stroke-linecap="round"/>';
+        } else if (stars >= 1) {
+            glyphSvg += '<text x="' + gC + '" y="' + (gC + gR * 0.34)
+                + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
+                + (gR * 0.85).toFixed(1) + '" font-weight="700">' + stars + '</text>';
+        }
+        glyphSvg += '</svg>';
 
-        if (phase2Ok) {
-            var flyQualLabels = { gray: 'Soaring / Abgleiter', green: 'Gut fliegbar', violet: 'Hervorragend — XC-Tag' };
-            dc.sub = flyQualLabels[quality] || dc.sub;
+        html += '<div class="mga-hero ' + band + '">'
+            + '<div class="mga-hero-glyph">' + glyphSvg + '</div>'
+            + '<div class="mga-hero-text">'
+            + '<div class="mga-hero-verdict ' + band + '">' + escHtml(verdictTxt) + '</div>';
+        if (rationaleShort) {
+            html += '<div class="mga-hero-rationale">' + escHtml(rationaleShort) + '</div>';
         }
-
-        html += '<div class="mga-decision ' + dc.cls + '">'
-            + '<div class="mga-decision-icon">' + dc.icon + '</div>'
-            + '<div class="mga-decision-text">'
-            + '<div class="mga-decision-status">' + escHtml(dc.label) + '</div>';
-        if (dc.sub) {
-            html += '<div class="mga-decision-sub">' + escHtml(dc.sub) + '</div>';
-        }
-        html += '</div>';
-        if (phase2Ok) {
-            var flyBadgeLabels = { gray: 'Abgleiter', green: 'Thermik', violet: 'XC-Tag' };
-            html += '<span class="mga-fly-badge ' + quality + '">'
-                + escHtml(flyBadgeLabels[quality] || quality) + '</span>';
-        }
-        html += '</div>';
+        html += '<div class="mga-hero-pills">';
+        html += '<span class="mga-hero-pill ' + band + '">Safety ' + band.toUpperCase() + '</span>';
+        if (safScore !== null)  html += '<span class="mga-hero-pill">Safety-Score ' + safScore + '/100</span>';
+        if (expScore !== null)  html += '<span class="mga-hero-pill">Experience ' + expScore + '/100</span>';
+        if (comfortIdx !== null) html += '<span class="mga-hero-pill">Comfort ' + Math.round(comfortIdx) + '/100</span>';
+        html += '</div></div></div>';
 
         // Early return for error / no_data
         if (safetyStatus === 'no_data' || safetyStatus === 'error') {

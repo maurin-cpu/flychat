@@ -256,6 +256,136 @@
     return { spots_flyable: fly, spots_bronze: br, spots_nogo: ng, spots_conditional: co };
   }
 
+  // ── Bubble-Matrix (RATING_CONCEPT v1.3 §4.4) ──
+  // Risk-Reward-Uebersicht: pro Region 1 Bubble.
+  // X = avg experience_score, Y = 3 safety_band-Zonen, Groesse = Spot-Anzahl.
+  function _bandFromSpot(s) {
+    if (s.safety_band === 'green' || s.safety_band === 'amber' || s.safety_band === 'red') return s.safety_band;
+    if (s.safety_status === 'safe')        return 'green';
+    if (s.safety_status === 'conditional') return 'amber';
+    if (s.safety_status === 'not_safe')    return 'red';
+    return 'no_data';
+  }
+  function _starsFromSpot(s) {
+    if (typeof s.experience_stars === 'number') return s.experience_stars;
+    const r = parseFloat(s.rating || 0);
+    if (r >= 9.0)  return 5;
+    if (r >= 7.6)  return 4;
+    if (r >= 6.1)  return 3;
+    if (r >= 4.1)  return 2;
+    if (r >= 2.1)  return 1;
+    return 0;
+  }
+  function _scoreFromSpot(s) {
+    if (typeof s.experience_score === 'number') return s.experience_score;
+    const r = parseFloat(s.rating || 0);
+    return Math.max(0, Math.min(100, Math.round(r * 10)));
+  }
+  function aggregateRegionsForBubbleMatrix(spots) {
+    const acc = {};
+    for (const s of spots || []) {
+      if (!s.spot || !s.region_id) continue;
+      const rid = s.region_id;
+      if (!acc[rid]) acc[rid] = { rid: rid, name: s.region_name || rid, scores: [], bands: { green: 0, amber: 0, red: 0, no_data: 0 }, count: 0 };
+      acc[rid].count++;
+      acc[rid].scores.push(_scoreFromSpot(s));
+      const b = _bandFromSpot(s);
+      acc[rid].bands[b] = (acc[rid].bands[b] || 0) + 1;
+    }
+    const out = [];
+    for (const rid in acc) {
+      const e = acc[rid];
+      const avg = e.scores.length ? e.scores.reduce((a, b) => a + b, 0) / e.scores.length : 0;
+      // Worst-Band wins (Konzept §4.4 — kategorial)
+      let worst = 'green';
+      if (e.bands.red > 0)      worst = 'red';
+      else if (e.bands.amber > 0) worst = 'amber';
+      out.push({ rid: e.rid, name: e.name, avg_score: Math.round(avg), band: worst, count: e.count });
+    }
+    return out;
+  }
+
+  function renderBubbleMatrix(day, filteredSpots) {
+    const host = $("bfBubbleMatrix");
+    if (!host) return;
+    if (!filteredSpots || filteredSpots.length < 2) { host.hidden = true; return; }
+    const data = aggregateRegionsForBubbleMatrix(filteredSpots);
+    if (data.length < 2) { host.hidden = true; return; }
+    host.hidden = false;
+
+    const W = host.clientWidth || 800;
+    const H = host.classList.contains('compact') ? 200 : 200;
+    const margin = { top: 24, right: 16, bottom: 28, left: 70 };
+    const innerW = Math.max(200, W - margin.left - margin.right);
+    const innerH = H - margin.top - margin.bottom;
+
+    const bands = ['green', 'amber', 'red'];
+    const yScale = (b) => margin.top + innerH * (bands.indexOf(b) + 0.5) / bands.length;
+    const xScale = (s) => margin.left + (s / 100) * innerW;
+    const rScale = (n) => Math.max(10, Math.min(28, 8 + Math.sqrt(n) * 4));
+
+    let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">';
+    // Bandbackgrounds
+    bands.forEach((b, i) => {
+      const y0 = margin.top + (innerH * i) / bands.length;
+      const h = innerH / bands.length;
+      svg += '<rect class="band-bg-' + b + '" x="' + margin.left + '" y="' + y0
+          + '" width="' + innerW + '" height="' + h + '" />';
+      const labels = { green: 'GRÜN', amber: 'AMBER', red: 'ROT' };
+      svg += '<text class="band-label" x="' + (margin.left - 6) + '" y="' + (y0 + h / 2 + 3)
+          + '" text-anchor="end">' + labels[b] + '</text>';
+    });
+    // X-Achse (0/50/100)
+    [0, 50, 100].forEach((v) => {
+      const x = xScale(v);
+      svg += '<g class="x-tick">'
+          + '<line x1="' + x + '" y1="' + (margin.top + innerH) + '" x2="' + x + '" y2="' + (margin.top + innerH + 4) + '"/>'
+          + '<text x="' + x + '" y="' + (margin.top + innerH + 16) + '" text-anchor="middle">' + v + '</text>'
+          + '</g>';
+    });
+    svg += '<text x="' + (margin.left + innerW / 2) + '" y="' + H + '" text-anchor="middle" '
+        + 'style="font-size:10px;fill:#94a3b8;">Experience-Score</text>';
+    // Bubbles
+    for (const d of data) {
+      if (d.band === 'no_data') continue;
+      const cx = xScale(d.avg_score);
+      const cy = yScale(d.band);
+      const r = rScale(d.count);
+      svg += '<g class="bubble" data-rid="' + escapeAttr(d.rid) + '">'
+          + '<title>' + escapeHtml(d.name) + ' · ' + d.count + ' Spots · ⌀ ' + d.avg_score + '/100</title>'
+          + '<circle class="bubble-fill-' + d.band + '" cx="' + cx + '" cy="' + cy + '" r="' + r + '" stroke-width="1.5" fill-opacity="0.85" />'
+          + '<text class="bubble-count" x="' + cx + '" y="' + cy + '">' + d.count + '</text>'
+          + '<text class="bubble-label" x="' + cx + '" y="' + (cy + r + 11) + '">' + escapeHtml(d.name.substring(0, 14)) + '</text>'
+          + '</g>';
+    }
+    svg += '</svg>';
+
+    host.innerHTML =
+      '<div class="bf-bubble-matrix-header">'
+      + '<span class="bf-bubble-matrix-title">Risk-Reward · Regionen</span>'
+      + '<span class="bf-bubble-matrix-hint">Bubble-Größe = Spots · Klick → springt zur Region</span>'
+      + '</div>' + svg;
+
+    // Klick-Handler: scrollt zur Region im Briefing
+    host.querySelectorAll('.bubble').forEach((g) => {
+      g.addEventListener('click', () => {
+        const rid = g.getAttribute('data-rid');
+        const target = document.querySelector('[data-region-id="' + escapeAttr(rid) + '"]');
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          target.classList.add('bf-region-flash');
+          setTimeout(() => target.classList.remove('bf-region-flash'), 1200);
+        }
+      });
+    });
+  }
+
+  function escapeAttr(s) {
+    return String(s || '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
   function groupSpotsByRegion(spots) {
     const groups = {};
     for (const s of spots || []) {
@@ -685,6 +815,9 @@
         ${counts.spots_nogo > 0 ? `<span><strong>${counts.spots_nogo}</strong> NO-GO</span>` : ""}
       </span>
     `;
+
+    // Risk-Reward-Bubble-Matrix (RATING_CONCEPT v1.3 §4.4)
+    renderBubbleMatrix(day, filteredSpots);
 
     // Spots grouped by region
     const spotsWithDate = filteredSpots.map((s) => Object.assign({}, s, { date: day.date }));
