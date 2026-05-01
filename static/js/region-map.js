@@ -225,47 +225,40 @@
         return '#6b7280'; // no_data fallback
     }
 
-    // Region-Label im Polygon-Centroid (RATING_CONCEPT v1.3 §4.3):
-    // **Region-Name + Sterne** in Safety-Farbe — kein eigener Marker, weil
-    // das eingefaerbte Polygon SELBST schon die Glyphe ist.
-    //   Zoom < 7: nichts
-    //   Zoom 7-8: Region-Name (kompakt) + Sterne (klein darunter)
-    //   Zoom >= 9: Region-Name (groesser) + Sterne (deutlich)
+    // Region-Label im Polygon-Centroid:
+    // NUR das Rating (Sterne) — kein Region-Name (Tooltip zeigt das).
+    // Bei rot: weisses Kreuz, bei no_data: nichts.
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         if (zoom < 7) return null;
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
         var band = (safety === 'safe')        ? 'green' :
                    (safety === 'conditional') ? 'amber' :
                    (safety === 'not_safe')    ? 'red'   : 'no_data';
-        var nameSize = zoom < 9 ? 10 : 12;
-        var starsSize = zoom < 9 ? 9 : 11;
-        var color = style.labelColor;
-        var shadow = style.labelShadow;
-        // Region-Name + (bei red Kreuz, sonst Sterne)
+
         var label = '';
         if (band === 'red') {
             label = '\u2715';
-            color = '#7f1d1d';
         } else if (n > 0 && band !== 'no_data') {
-            label = '';
             for (var i = 0; i < n; i++) label += '\u2605';
         }
+        if (!label) return null;  // no_data oder 0 Sterne → kein Label
+
+        // Sterne brauchen Platz — fontSize abhaengig von Zoom + Anzahl Sterne
+        var fontSize = (zoom < 9) ? 13 : 16;
+        var color = style.labelColor;
+        var shadow = style.labelShadow;
         var html = '<div style="'
             + 'display:inline-block;'
             + 'transform:translate(-50%,-50%);'
-            + 'text-align:center;'
             + 'pointer-events:none;'
             + 'white-space:nowrap;'
+            + 'font-size:' + fontSize + 'px;'
+            + 'font-weight:700;'
+            + 'line-height:1;'
+            + 'letter-spacing:1.5px;'
             + 'color:' + color + ';'
             + 'text-shadow:' + shadow + ';'
-            + '">'
-            + '<div style="font-size:' + nameSize + 'px;font-weight:700;line-height:1.2;letter-spacing:0.01em;">'
-            + escHtmlSafe(badge) + '</div>';
-        if (label) {
-            html += '<div style="font-size:' + starsSize + 'px;font-weight:700;line-height:1.1;letter-spacing:1px;margin-top:1px;">'
-                + label + '</div>';
-        }
-        html += '</div>';
+            + '">' + label + '</div>';
         return { html: html, size: [0, 0], anchor: [0, 0] };
     }
     // Mini-Helper fuer Label-Text (escHtml ist erst spaeter definiert)
