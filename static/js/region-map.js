@@ -419,7 +419,7 @@
             var stars = getStars(dayData);
             var expScore = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
 
-            // Center-Label — Region-Name + Sterne (RATING_CONCEPT v1.3 §4.3).
+            // Center-Label — Pille mit Rating-Zahl 1-5 (RATING_CONCEPT v1.3 §4.3).
             var bounds = layer.getBounds();
             var center = bounds.getCenter();
             var label = buildRegionLabel(style, layer.regionName, safety, quality, stars, map.getZoom());
@@ -454,6 +454,77 @@
     //   3. Key Metrics Grid
     //   4. Safety Alerts (NO-GO, caution, foehn)
     //   5. AI Insights (expandable)
+    // 7-Tage-Sparkline (RATING_CONCEPT v1.3 §4.3) — kompakte Pills pro Tag.
+    function buildSparklineHtml(rid, currentDateStr) {
+        if (!rid || !regionAnalyses || !regionAnalyses[rid]) return '';
+        var days = regionAnalyses[rid];
+        var dateStrs = Object.keys(days).sort();
+        if (dateStrs.length < 2) return '';
+        var palette = {
+            green: '#22c55e', amber: '#f59e0b', red: '#ef4444', no_data: '#9ca3af'
+        };
+        var html = '<div class="region-overlay-sparkline" style="margin:14px 12px 6px;">'
+            + '<div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">Wochenverlauf</div>'
+            + '<div style="display:flex;gap:4px;">';
+        var weekday = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+        dateStrs.forEach(function (d) {
+            var dd = days[d];
+            var b = getSafetyBand(dd);
+            var s = getStars(dd);
+            var c = palette[b] || palette.no_data;
+            var isToday = d === currentDateStr;
+            var dayObj = new Date(d + 'T12:00:00');
+            var wd = weekday[dayObj.getDay()];
+            var label = (b === 'red') ? '\u2715' : (s >= 1 ? String(s) : '\u2013');
+            var ringWidth = isToday ? 2 : 0;
+            html += '<div data-date="' + d + '" class="region-spark-pill" style="'
+                + 'flex:1;min-width:0;cursor:pointer;'
+                + 'padding:5px 4px;'
+                + 'background:rgba(255,255,255,0.95);'
+                + 'border:1.5px solid ' + c + ';'
+                + 'border-radius:8px;'
+                + 'text-align:center;'
+                + (isToday ? 'box-shadow:0 0 0 ' + ringWidth + 'px rgba(15,23,42,0.15);' : '')
+                + 'transition:transform 120ms;'
+                + '">'
+                + '<div style="font-size:9px;font-weight:700;color:#64748b;letter-spacing:0.4px;text-transform:uppercase;line-height:1;">' + wd + '</div>'
+                + '<div style="font-size:14px;font-weight:800;color:' + c + ';margin-top:3px;line-height:1;">' + label + '</div>'
+                + '</div>';
+        });
+        html += '</div></div>';
+        return html;
+    }
+
+    // Klick-Handler fuer Sparkline-Pills — wechselt aktiven Tag im Overlay.
+    function wireSparklineClicks() {
+        if (!overlayBody) return;
+        overlayBody.querySelectorAll('.region-spark-pill').forEach(function (pill) {
+            pill.addEventListener('click', function () {
+                var d = pill.getAttribute('data-date');
+                if (!d) return;
+                window.dispatchEvent(new CustomEvent('gleitcast-day-change', { detail: { date: d } }));
+            });
+        });
+    }
+
+    // CTA-Button "Im Briefing oeffnen" (§4.3)
+    function buildCtaHtml(rid, currentDateStr) {
+        if (!rid) return '';
+        var url = '/briefing?regions=' + encodeURIComponent(rid);
+        return '<div style="margin:10px 12px 0;">'
+            + '<a href="' + url + '" '
+            + 'style="display:flex;align-items:center;justify-content:center;gap:6px;'
+            + 'padding:9px 14px;background:#0f172a;color:#fff;border-radius:8px;'
+            + 'font-size:12.5px;font-weight:600;text-decoration:none;'
+            + 'transition:background 120ms;'
+            + '" '
+            + 'onmouseover="this.style.background=\'#1e293b\'" '
+            + 'onmouseout="this.style.background=\'#0f172a\'">'
+            + 'Im Briefing oeffnen'
+            + '<span style="font-size:14px;line-height:1;">\u2192</span>'
+            + '</a></div>';
+    }
+
     function buildAnalysisHtml(a) {
         var safetyStatus = a.safety_status || 'error';
         var quality = getQuality(a);
@@ -468,7 +539,7 @@
         var expScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
         var safScore = (typeof a.safety_score === 'number') ? a.safety_score : null;
         var comfortIdx = (typeof a.comfort_index === 'number') ? a.comfort_index : null;
-        // Verdict: nur Status-Wort (analog Spot-Hero). Sterne in der Glyph,
+        // Verdict: nur Status-Wort (analog Spot-Hero). Rating-Ziffer in der Glyph,
         // Score-Detail in den Pills — keine doppelte Information im Text.
         var verdictTxt = (band === 'green') ? 'Sicher' :
                          (band === 'amber') ? 'Vorsicht' :
@@ -479,7 +550,7 @@
             var firstDot = rationale.indexOf('.');
             rationaleShort = firstDot > 30 ? rationale.substring(0, firstDot + 1) : rationale.substring(0, 140);
         }
-        // Glyph: Kreis in Safety-Farbe, weisse Ziffer (Sterne) oder weisses Kreuz (red)
+        // Glyph: Kreis in Safety-Farbe, weisse Rating-Ziffer 1-5 oder weisses Kreuz (red)
         var glyphSize = 96;
         var gC = glyphSize / 2;
         var gR = glyphSize * 0.32;
@@ -520,6 +591,9 @@
         if (expScore !== null)  html += '<span class="mga-hero-pill">Experience ' + expScore + '/100</span>';
         if (comfortIdx !== null) html += '<span class="mga-hero-pill">Comfort ' + Math.round(comfortIdx) + '/100</span>';
         html += '</div></div></div>';
+
+        // 7-Tage-Sparkline + CTA (RATING_CONCEPT v1.3 §4.3)
+        html += buildSparklineHtml(overlayRid, a.date) + buildCtaHtml(overlayRid, a.date);
 
         // Early return for error / no_data
         if (safetyStatus === 'no_data' || safetyStatus === 'error') {
@@ -677,6 +751,8 @@
                 btn.parentElement.classList.toggle('open');
             });
         });
+        // Re-wire sparkline pill clicks
+        wireSparklineClicks();
         renderRegionFeedbackBar(rid, dateStr, dayData);
     }
 
@@ -758,6 +834,9 @@
                 btn.parentElement.classList.toggle('open');
             });
         });
+
+        // Sparkline-Pills: Klick wechselt den Tag (loest gleitcast-day-change aus)
+        wireSparklineClicks();
 
         // Render feedback bar above meteogram
         renderRegionFeedbackBar(rid, initialDate, a);
