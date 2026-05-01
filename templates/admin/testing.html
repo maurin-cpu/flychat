@@ -169,7 +169,15 @@
         <dd>{% if status.test_run.meta.used_frozen_weather %}Frozen Snapshot{% else %}Live API{% endif %}</dd>
       </dl>
     {% else %}
-      <div class="ts-meta ts-meta--empty">Noch kein Test-Lauf vorhanden — Toggle hat erst nach Phase 2 / erstem Test-Lauf Effekt.</div>
+      <div class="ts-meta ts-meta--empty"
+           style="background:#fef0f0;border-color:#e57373;color:#8b1818;">
+        <strong>Noch kein Test-Lauf vorhanden.</strong>
+        Bevor du die Test-Ansicht aktivieren kannst, musst du in
+        <a href="#" onclick="document.querySelector('#ts-run-btn').scrollIntoView({behavior:'smooth',block:'center'});return false;"
+           style="color:#8b1818;text-decoration:underline;font-weight:600;">Sektion 3 &rarr; Test-Analyse starten</a>
+        einen Lauf durchfuehren. Erst dann liegen Daten in
+        <code>data/test_runs/latest/</code>, die das Frontend anzeigen kann.
+      </div>
     {% endif %}
 
     <form method="post" action="/admin/testing/toggle-view" class="ts-actions">
@@ -179,9 +187,16 @@
       {% else %}
         <input type="hidden" name="active" value="1">
         <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit"
-                {% if not status.test_run.exists %}disabled title="Erst Test-Lauf starten"{% endif %}>
+                {% if not status.test_run.exists %}disabled
+                title="Erst eine Test-Analyse in Sektion 3 starten — sonst gibt es nichts anzuzeigen."
+                {% endif %}>
           Test-Ansicht aktivieren
         </button>
+        {% if not status.test_run.exists %}
+          <span style="align-self:center;font-size:var(--text-sm);color:#8b1818;">
+            &larr; gesperrt: erst Test-Analyse laufen lassen
+          </span>
+        {% endif %}
       {% endif %}
     </form>
   </section>
