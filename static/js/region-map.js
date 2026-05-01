@@ -290,7 +290,16 @@
                     console.warn('fitBounds fehlgeschlagen:', e);
                 }
 
-                if (regionAnalyses && currentDate) colorRegions(currentDate);
+                // Fallback auf window.currentDate falls setRegionDate noch nicht
+                // aufgerufen wurde (Race Condition mit /api/region-analyses-Fetch)
+                var d = currentDate || window.currentDate;
+                if (regionAnalyses && d) {
+                    if (!currentDate) currentDate = d;
+                    colorRegions(d);
+                }
+                // Map-invalidateSize fuer den Fall dass Container erst nach Map-Init
+                // sein finales Layout bekommt — sonst rendert Leaflet im falschen Viewport
+                setTimeout(function () { try { map.invalidateSize(); } catch (e) {} }, 50);
             })
             .catch(function (err) {
                 console.error('Regionen laden fehlgeschlagen:', err);
@@ -976,7 +985,12 @@
     // ===== GLOBAL API =====
     window.setRegionAnalyses = function (nested) {
         regionAnalyses = nested;
-        if (currentDate) colorRegions(currentDate);
+        // Fallback auf window.currentDate (Race-Condition mit Day-Tabs)
+        var d = currentDate || window.currentDate;
+        if (d) {
+            if (!currentDate) currentDate = d;
+            colorRegions(d);
+        }
     };
 
     window.setRegionDate = function (dateStr) {
