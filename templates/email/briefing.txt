@@ -19,21 +19,20 @@ Im Dashboard: {{ urls.dashboard }}
 {% endif -%}
 {% if region_matrix -%}
 DEINE REGIONEN · DIESE WOCHE
-{%- set col_w = 4 %}
-            {% for d in day_short_labels %}{{ '%-4s'|format(d) }}{% endfor %} Best
+            {% for d in day_short_labels %}{{ '%-6s'|format(d) }}{% endfor %} Best
 {% for r in region_matrix -%}
-{{ '%-12.12s'|format(r.region_name) }}{% for cell in r.days %}{% if cell.tier == "none" %} --  {% elif cell.tier == "violet" %} ## {% elif cell.tier == "green" %} OO {% elif cell.tier == "conditional" %} =! {% else %} .. {% endif %}{% endfor %}  {{ '%.1f'|format(r.best_rating) }}
+{{ '%-12.12s'|format(r.region_name) }}{% for cell in r.days %}{% if cell.tier == "none" %} ---- {% elif cell.tier == "conditional" %} ! {{ cell.stars_glyph or '·····' }}{% else %}  {{ cell.stars_glyph or '·····' }}{% endif %} {% endfor %} {{ '%.1f'|format(r.best_rating) }}
 {% endfor %}
-Legende:  ## legendaer   OO fliegbar   =! bedingt   -- nichts
+Legende: Sterne (★ 1–5) = Erlebnis · "!" = Vorsicht · "----" = nicht fliegbar
 
 {% endif -%}
 DIESE WOCHE AUF EINEN BLICK
 {% for d in days -%}
-{{ d.label.weekday }} {% if d.tier == 'violet' %}LEGENDAER{% elif d.tier == 'green' %}FLIEGBAR{% elif d.tier == 'conditional' %}BEDINGT{% else %}MEIDEN  {% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
+{{ d.label.weekday }} {% if d.tier == 'conditional' %}VORSICHT {{ d.stars_glyph or '·····' }}{% elif d.tier == 'none' %}NICHT FLIEGBAR{% else %}{{ d.stars_glyph or '·····' }}{% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
 {% endfor %}
 PRO TAG
 {% for d in days %}
-{{ d.label.long }} — {% if d.tier == 'violet' %}LEGENDAER{% elif d.tier == 'green' %}FLIEGBAR{% elif d.tier == 'conditional' %}BEDINGT{% else %}MEIDEN{% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
+{{ d.label.long }} — {% if d.tier == 'conditional' %}VORSICHT {{ d.stars_glyph or '·····' }}{% elif d.tier == 'none' %}NICHT FLIEGBAR{% else %}{{ d.stars_glyph or '·····' }} ({{ d.stars or 0 }} Sterne){% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
 {% if d.compact_top_region -%}
 {% for grp in d.region_groups[:3] %}  {{ grp.region_name }} · {% for s in grp.spots[:3] %}{{ s.spot }} {{ s.rating_display }}{% if not loop.last %} · {% endif %}{% endfor %}
 {% endfor %}{% if d.notable_good %}  + {{ d.notable_good }}

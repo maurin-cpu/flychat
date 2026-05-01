@@ -39,14 +39,35 @@
         var processedText = text;
         var recommendedSpots = [];
 
-        // Extract [RECOMMENDED: SpotName | status] tags
+        // Extract [RECOMMENDED: SpotName] / [RECOMMENDED: SpotName | status]
+        // / [RECOMMENDED: SpotName | safety=green, stars=4]  (RATING_CONCEPT v1.3)
         var regex = /\[RECOMMENDED:\s*([^\]|]+?)(?:\s*\|\s*([^\]]+?))?\]/g;
         var match;
         while ((match = regex.exec(text)) !== null) {
-            recommendedSpots.push({
-                name: match[1].trim(),
-                status: (match[2] || 'green').trim().toLowerCase()
-            });
+            var rawArg = (match[2] || '').trim().toLowerCase();
+            var entry = { name: match[1].trim(), status: 'green', safety: null, stars: null };
+            if (rawArg.indexOf('=') >= 0) {
+                // Neues Format: safety=..., stars=...
+                rawArg.split(',').forEach(function (kv) {
+                    var pair = kv.split('=').map(function (s) { return s.trim(); });
+                    if (pair.length === 2) {
+                        if (pair[0] === 'safety') entry.safety = pair[1];
+                        else if (pair[0] === 'stars') {
+                            var n = parseInt(pair[1], 10);
+                            if (!isNaN(n)) entry.stars = n;
+                        }
+                    }
+                });
+                // Legacy-status fuer Backwards-Compat ableiten
+                if (entry.safety === 'red') entry.status = 'not_safe';
+                else if (entry.safety === 'amber') entry.status = 'amber';
+                else if (entry.stars != null && entry.stars >= 4) entry.status = 'violet';
+                else entry.status = 'green';
+            } else if (rawArg) {
+                // Legacy-Format: nur status
+                entry.status = rawArg;
+            }
+            recommendedSpots.push(entry);
         }
 
         // Remove tags from displayed text (incl. surrounding **bold**, `backtick` markers)

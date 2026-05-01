@@ -106,7 +106,8 @@
         </td>
         {% else %}
         <td align="center" bgcolor="{{ cell.tier_color }}" style="padding:0;border:2px solid #ffffff;background-color:{{ cell.tier_color }};border-radius:4px;">
-          <a href="{{ cell.url }}" style="display:block;padding:6px 2px;font-size:11px;font-weight:700;color:#ffffff;text-decoration:none;font-variant-numeric:tabular-nums;line-height:1;">
+          <a href="{{ cell.url }}" style="display:block;padding:5px 2px;font-size:11px;font-weight:700;color:#ffffff;text-decoration:none;font-variant-numeric:tabular-nums;line-height:1.1;">
+            {% if cell.stars and cell.stars > 0 %}<span style="font-size:9px;letter-spacing:0.5px;display:block;">{% for _ in range(cell.stars) %}&#9733;{% endfor %}</span>{% endif %}
             {{ cell.rating_display }}
           </a>
         </td>
@@ -140,6 +141,7 @@
         </td>
         <td valign="middle" style="padding:5px 10px;">
           <span style="font-size:13px;font-weight:700;color:#0f172a;" class="ds-text">{{ d.label.long }}</span>{% if d.is_today %} <span style="font-size:10px;color:{{ d.tier_color_strip }};font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">&middot; heute</span>{% endif %}
+          {% if d.stars and d.stars > 0 %}<span style="margin-left:6px;font-size:11px;letter-spacing:1px;color:{{ d.tier_color_strip }};">{% for _ in range(d.stars) %}&#9733;{% endfor %}</span>{% endif %}
         </td>
         <td valign="middle" align="right" style="padding:5px 0 5px 6px;width:1%;white-space:nowrap;">
           <span style="font-size:18px;font-weight:800;color:{{ d.tier_color_strip }};font-variant-numeric:tabular-nums;letter-spacing:-0.02em;line-height:1;">

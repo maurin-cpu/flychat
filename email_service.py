@@ -68,6 +68,45 @@ _TIER_META = {
 
 _TIER_RANK = {"violet": 3, "green": 2, "conditional": 1, "gray": 0, "none": -1}
 
+
+def _stars_for_spot(spot: dict) -> int:
+    """Liest experience_stars aus dem Spot-Result, mit Fallback auf rating-basierte
+    Ableitung (RATING_CONCEPT v1.3 §8.3 Schwellen). Fuer Mails verwendet, damit alte
+    Cache-Eintraege ohne experience_stars trotzdem Sterne bekommen.
+    """
+    val = spot.get("experience_stars")
+    if isinstance(val, (int, float)) and val >= 0:
+        return int(val)
+    # Fallback aus rating (0-10)
+    try:
+        r = float(spot.get("rating", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+    if r >= 9.0:  return 5
+    if r >= 7.6: return 4
+    if r >= 6.1: return 3
+    if r >= 4.1: return 2
+    if r >= 2.1: return 1
+    return 0
+
+
+def _safety_band_for_spot(spot: dict) -> str:
+    """Liest safety_band, fallback auf safety_status-Mapping. Fuer Mail-Anzeige."""
+    band = spot.get("safety_band")
+    if band in ("green", "amber", "red", "no_data"):
+        return band
+    s = spot.get("safety_status", "")
+    if s == "safe":        return "green"
+    if s == "conditional": return "amber"
+    if s == "not_safe":    return "red"
+    return "no_data"
+
+
+def _stars_glyph_text(n: int) -> str:
+    """5-Char Stern-Glyphe fuer Plain-Text-Mail (★★★ ··)."""
+    n = max(0, min(5, int(n or 0)))
+    return ("★" * n) + ("·" * (5 - n))
+
 _WEEKDAY_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 _WEEKDAY_DE_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
@@ -609,11 +648,12 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
 
             tier = _spot_tier(spot)
             rating = float(spot.get("rating") or 0)
+            stars = _stars_for_spot(spot)
 
             entry = matrix.setdefault(rid, {
                 "region_id": rid,
                 "region_name": rname,
-                "days": [{"tier": "none", "rating": 0.0, "spot_count": 0}
+                "days": [{"tier": "none", "rating": 0.0, "stars": 0, "spot_count": 0}
                          for _ in range(n_days)],
                 "best_rating": 0.0,
             })
@@ -623,6 +663,9 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
                     or (tier == cell["tier"] and rating > cell["rating"])):
                 cell["tier"] = tier
                 cell["rating"] = rating
+            # Sterne unabhaengig: max ueber alle Spots in dieser Region/Tag
+            if stars > cell["stars"]:
+                cell["stars"] = stars
             cell["spot_count"] += 1
             entry["best_rating"] = max(entry["best_rating"], rating)
 
@@ -635,6 +678,7 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
             cell["tier_bg"]    = meta["bg"]
             cell["tier_label"] = meta["label"]
             cell["rating_display"] = f"{cell['rating']:.1f}" if cell["rating"] > 0 else ""
+            cell["stars_glyph"] = _stars_glyph_text(cell["stars"])
         out.append(entry)
 
     out.sort(key=lambda e: e["best_rating"], reverse=True)
@@ -817,6 +861,8 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         for s in my_spots:
             tier = _spot_tier(s)
             meta = _TIER_META.get(tier, _TIER_META["gray"])
+            stars = _stars_for_spot(s)
+            band = _safety_band_for_spot(s)
             shown.append({
                 **s,
                 "tier": tier,
@@ -824,6 +870,9 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
                 "tier_color": meta["color"],
                 "tier_bg":    meta["bg"],
                 "tier_icon":  meta["icon"],
+                "stars": stars,
+                "stars_glyph": _stars_glyph_text(stars),
+                "safety_band": band,
                 "window":     _format_window(s.get("best_window", "")),
                 "rating_display": f"{float(s.get('rating', 0) or 0):.1f}",
             })
@@ -858,6 +907,8 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             reverse=True,
         )[:3]
 
+        # Day-Sterne = max ueber gezeigte Spots
+        day_stars = max((sp.get("stars", 0) for sp in displayed_spots), default=0)
         days_out.append({
             "date": date_str,
             "label": day_label_dict,
@@ -866,6 +917,8 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "tier_color": meta["color"],
             "tier_bg":    meta["bg"],
             "tier_icon":  meta["icon"],
+            "stars": day_stars,
+            "stars_glyph": _stars_glyph_text(day_stars),
             "shown_spots": displayed_spots,
             "region_groups": region_groups,
             "top_spots_flat": top_spots_flat,
