@@ -1829,6 +1829,14 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
             doc["streckenflug_summary"] = sf.get("summary", "") or ""
             doc["streckenflug_limiting_factor"] = sf.get("limiting_factor", "none")
             doc["streckenflug_region_context_available"] = bool(sf.get("region_context_available", False))
+            # RATING_CONCEPT v1.3 — neue 2-Achsen-Felder ans Frontend
+            for k in ("safety_band", "safety_score", "safety_rating",
+                      "experience_score", "experience_stars",
+                      "comfort_index", "altitude_rating",
+                      "noAnalysis", "noAnalysisReason"):
+                v = entry.get(k)
+                if v is not None:
+                    doc[k] = v
             flat[spot_name][date_str] = doc
     return flat
 
@@ -1897,6 +1905,15 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
                 "is_conditional": bool(entry.get("is_conditional", False)),
                 "conditional_reason": entry.get("conditional_reason", "") or "",
             }
+            # RATING_CONCEPT v1.3 — neue 2-Achsen-Felder ans Frontend
+            # durchreichen. Werte koennen None sein (Cache-Luecke), Frontend
+            # behandelt das per Fallback.
+            for k in ("safety_band", "safety_score", "safety_rating",
+                      "experience_score", "experience_stars",
+                      "comfort_index"):
+                v = entry.get(k)
+                if v is not None:
+                    doc[k] = v
             for key in ("no_go_reasons", "caution_notes"):
                 val = safety.get(key, entry.get(key, []))
                 doc[key] = json.dumps(val, ensure_ascii=False) if isinstance(val, list) else str(val)
