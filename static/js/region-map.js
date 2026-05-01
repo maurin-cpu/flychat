@@ -67,6 +67,37 @@
         return 'Gut';
     }
 
+    // RATING_CONCEPT v1.3: experience_stars bevorzugt, Fallback aus rating
+    function getStars(dayData) {
+        if (!dayData) return 0;
+        var s = dayData.experience_stars;
+        if (typeof s === 'number') return Math.max(0, Math.min(5, Math.round(s)));
+        // Fallback aus rating (gleiche Schwellen wie email_service._stars_for_spot)
+        var r = parseFloat(dayData.rating || 0);
+        if (r >= 9.0)  return 5;
+        if (r >= 7.6)  return 4;
+        if (r >= 6.1)  return 3;
+        if (r >= 4.1)  return 2;
+        if (r >= 2.1)  return 1;
+        return 0;
+    }
+    function getSafetyBand(dayData) {
+        if (!dayData) return 'no_data';
+        var b = dayData.safety_band;
+        if (b === 'green' || b === 'amber' || b === 'red' || b === 'no_data') return b;
+        var s = dayData.safety_status;
+        if (s === 'safe')        return 'green';
+        if (s === 'conditional') return 'amber';
+        if (s === 'not_safe')    return 'red';
+        return 'no_data';
+    }
+    function starsGlyph(n) {
+        n = Math.max(0, Math.min(5, n || 0));
+        var html = '';
+        for (var i = 0; i < n; i++) html += '\u2605';
+        return html;
+    }
+
     // ===== STYLE SYSTEM (Traffic Light + Intensity, Light Map) =====
     function mapRegionStyle(safety, quality) {
         if (!safety || safety === 'no_data') {
@@ -186,12 +217,12 @@
             div.innerHTML =
                 '<button class="map-legend-toggle" aria-label="Legende ein-/ausblenden">Legende</button>' +
                 '<div class="map-legend-body">' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#16a34a"></span> Sicher / Gut</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#7c3aed"></span> Sicher / Top</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#78716c"></span> Sicher / Abgleiter</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#16a34a"></span> Sicher</div>' +
                 '<div class="map-legend-item"><span class="map-legend-dot" style="background:#d97706"></span> Vorsicht</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#b91c1c"></span> Nicht sicher</div>' +
+                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#b91c1c"></span> Nicht fliegbar</div>' +
                 '<div class="map-legend-item"><span class="map-legend-dot" style="background:#9ca3af"></span> Keine Daten</div>' +
+                '<div class="map-legend-item" style="margin-top:4px;font-size:10.5px;color:#64748b;">' +
+                  '\u2605 \u2605 \u2605 = Erlebnis (1\u20135 Sterne)</div>' +
                 '</div>';
             var toggle = div.querySelector('.map-legend-toggle');
             toggle.addEventListener('click', function (e) {
@@ -224,7 +255,7 @@
     }
 
     // Label-Variante je nach Zoom: >=9 volle Pill, 7-8 Farbpunkt, <7 nichts
-    function buildRegionLabel(style, badge, safety, quality, zoom) {
+    function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         if (zoom < 7) return null;
 
         var pillBg = getPillBg(safety, quality);
@@ -246,15 +277,11 @@
             bg = '#991b1b';
             text = '\u26A0 Fehler';
         } else if (style.showWarning) {
-            // Conditional: Warn-Icon hat Priorität
-            text = '\u26A0 ' + badge;
+            // Conditional: Warn-Icon + Sterne (RATING_CONCEPT v1.3)
+            text = stars > 0 ? '\u26A0 ' + starsGlyph(stars) : '\u26A0 ' + badge;
         } else {
-            // Safe: Tier-Icon zeigt Qualitaet (Abgleiter / Gut / Top)
-            var tierIcon = '';
-            if (quality === 'gray')        tierIcon = '\u25CB ';  // \u25CB = Abgleiter
-            else if (quality === 'violet') tierIcon = '\u2605 ';  // \u2605 = Top
-            else                           tierIcon = '\u2713 ';  // \u2713 = Gut
-            text = tierIcon + badge;
+            // Safe: Sterne zeigen Erlebnis (1-5). Bei 0 Sternen Fallback auf altes Quality-Wort.
+            text = stars > 0 ? starsGlyph(stars) + ' ' + stars : badge;
         }
 
         // transform:translate(-50%,-50%) zentriert die Pill auf ihre eigene Breite,
@@ -405,10 +432,11 @@
                 dashArray: ''
             });
 
-            // Center label — zoom-responsive (Pill / Dot / nichts)
+            // Center label — zoom-responsive (Pill / Dot / nichts).
+            // RATING_CONCEPT v1.3: Sterne ersetzen Tier-Wort in der Pill.
             var bounds = layer.getBounds();
             var center = bounds.getCenter();
-            var label = buildRegionLabel(style, badge, safety, quality, map.getZoom());
+            var label = buildRegionLabel(style, badge, safety, quality, stars, map.getZoom());
 
             if (label) {
                 labelMarkersGroup.addLayer(L.marker(center, {
@@ -422,10 +450,16 @@
                 }));
             }
 
-            // Tooltip
+            // Tooltip — RATING_CONCEPT v1.3: Sterne + Score statt Tier-Wort
+            var stars = getStars(dayData);
+            var expScore = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
             var tipHtml = '<b>' + layer.regionName + '</b>';
             tipHtml += '<br><span style="color:' + style.labelColor + ';">' + style.safetyLabel + '</span>';
-            if (style.qualityLabel) tipHtml += ' · ' + style.qualityLabel;
+            if (stars > 0) {
+                tipHtml += ' · <span style="color:' + style.labelColor + ';letter-spacing:1px;">'
+                    + starsGlyph(stars) + '</span> ' + stars + (stars === 1 ? ' Stern' : ' Sterne');
+                if (expScore !== null) tipHtml += ' (' + expScore + '/100)';
+            }
             layer.setTooltipContent(tipHtml);
         });
     }
@@ -443,6 +477,26 @@
         var phase2Ok = (safetyStatus === 'safe' || safetyStatus === 'conditional');
 
         var html = '<div class="mg-analysis-view">';
+
+        // ── Hero (RATING_CONCEPT v1.3 §8.6) — Sterne + Score-Pills ──
+        var stars = getStars(a);
+        var band = getSafetyBand(a);
+        var expScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
+        var safScore = (typeof a.safety_score === 'number') ? a.safety_score : null;
+        var comfortIdx = (typeof a.comfort_index === 'number') ? a.comfort_index : null;
+        if (band !== 'no_data' && (stars > 0 || expScore !== null || safScore !== null)) {
+            html += '<div style="padding:10px 12px;background:#f8fafc;border-radius:6px;margin-bottom:10px;">';
+            if (stars > 0) {
+                html += '<div style="font-size:18px;letter-spacing:2px;color:#0f172a;margin-bottom:4px;">'
+                    + starsGlyph(stars) + '</div>';
+            }
+            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px;font-weight:600;">';
+            html += '<span style="padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#0f172a;">Safety ' + band.toUpperCase() + '</span>';
+            if (safScore !== null) html += '<span style="padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#0f172a;">Safety-Score ' + safScore + '/100</span>';
+            if (expScore !== null) html += '<span style="padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#0f172a;">Experience ' + expScore + '/100</span>';
+            if (comfortIdx !== null) html += '<span style="padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#0f172a;">Comfort ' + Math.round(comfortIdx) + '/100</span>';
+            html += '</div></div>';
+        }
 
         // ── Level 1: Decision Hero Banner ──
         var decisionConfig = {
