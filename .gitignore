@@ -27,3 +27,4 @@ data/history/
 weather_context_dump.txt
 data/preview/
 data/mocks/wetterdaten.json
+data/cost_telemetry.jsonl
