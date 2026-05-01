@@ -109,24 +109,21 @@
                    (safety === 'not_safe')    ? 'red'   :
                    (safety === 'error')       ? 'red'   : 'no_data';
 
+        // Alle durchgezogen — User-Wunsch: konsistente Optik
         if (band === 'no_data') {
             return {
                 fill: '#9ca3af', fillOpacity: 0.30,
                 border: '#6b7280', borderOpacity: 0.5,
                 labelColor: '#374151', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-                showWarning: false, showStripes: false,
-                dashed: true,
-                safetyLabel: 'Keine Daten', qualityLabel: '', isError: false
+                safetyLabel: 'Keine Daten', isError: false
             };
         }
         if (band === 'red') {
             return {
                 fill: '#ef4444', fillOpacity: 0.40,
                 border: '#991b1b', borderOpacity: 0.7,
-                labelColor: '#7f1d1d', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-                showWarning: false, showStripes: false,
-                dashed: true,
-                safetyLabel: 'Nicht fliegbar', qualityLabel: '',
+                labelColor: '#fff', labelShadow: '0 0 2px rgba(0,0,0,0.5)',
+                safetyLabel: 'Nicht fliegbar',
                 isError: (safety === 'error')
             };
         }
@@ -134,20 +131,16 @@
             return {
                 fill: '#f59e0b', fillOpacity: 0.42,
                 border: '#92400e', borderOpacity: 0.7,
-                labelColor: '#78350f', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-                showWarning: true, showStripes: false,
-                dashed: false,
-                safetyLabel: 'Vorsicht', qualityLabel: ''
+                labelColor: '#fff', labelShadow: '0 0 2px rgba(0,0,0,0.5)',
+                safetyLabel: 'Vorsicht'
             };
         }
         // green
         return {
             fill: '#22c55e', fillOpacity: 0.42,
             border: '#15803d', borderOpacity: 0.7,
-            labelColor: '#14532d', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-            showWarning: false, showStripes: false,
-            dashed: false,
-            safetyLabel: 'Sicher', qualityLabel: ''
+            labelColor: '#fff', labelShadow: '0 0 2px rgba(0,0,0,0.5)',
+            safetyLabel: 'Sicher'
         };
     }
 
@@ -180,30 +173,11 @@
             if (currentDate && regionAnalyses) colorRegions(currentDate);
         });
 
-        // Legend (collapsible, bottom-left). Standardmaessig eingeklappt —
-        // Pilot kann via Klick aufklappen wenn Farben unklar sind.
-        var legend = L.control({ position: 'bottomleft' });
-        legend.onAdd = function () {
-            var div = L.DomUtil.create('div', 'map-legend collapsed');
-            div.innerHTML =
-                '<button class="map-legend-toggle" aria-label="Legende ein-/ausblenden">Legende</button>' +
-                '<div class="map-legend-body">' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#16a34a"></span> Sicher</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#d97706"></span> Vorsicht</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#b91c1c"></span> Nicht fliegbar</div>' +
-                '<div class="map-legend-item"><span class="map-legend-dot" style="background:#9ca3af"></span> Keine Daten</div>' +
-                '<div class="map-legend-item" style="margin-top:4px;font-size:10.5px;color:#64748b;">' +
-                  '\u2605 \u2605 \u2605 = Erlebnis (1\u20135 Sterne)</div>' +
-                '</div>';
-            var toggle = div.querySelector('.map-legend-toggle');
-            toggle.addEventListener('click', function (e) {
-                e.stopPropagation();
-                div.classList.toggle('collapsed');
-            });
-            L.DomEvent.disableClickPropagation(div);
-            return div;
-        };
-        legend.addTo(map);
+        // Mini-Legende — identisch zur Spot-Karte. Geteiltes Rating-Info-Overlay
+        // ueber rating-info.js (window.buildRatingMiniLegend + openRatingInfoOverlay).
+        if (typeof window.buildRatingMiniLegend === 'function') {
+            window.buildRatingMiniLegend(L, 'bottomleft').addTo(map);
+        }
 
         loadRegions();
     }
@@ -225,9 +199,8 @@
         return '#6b7280'; // no_data fallback
     }
 
-    // Region-Label im Polygon-Centroid:
-    // NUR das Rating (Sterne) — kein Region-Name (Tooltip zeigt das).
-    // Bei rot: weisses Kreuz, bei no_data: nichts.
+    // Region-Label im Polygon-Centroid: NUR das Rating als Zahl (1-5)
+    // ODER ein weisses Kreuz bei red — gleiches Prinzip wie Spot-Marker.
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         if (zoom < 7) return null;
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
@@ -239,25 +212,23 @@
         if (band === 'red') {
             label = '\u2715';
         } else if (n > 0 && band !== 'no_data') {
-            for (var i = 0; i < n; i++) label += '\u2605';
+            label = String(n);
         }
-        if (!label) return null;  // no_data oder 0 Sterne → kein Label
+        if (!label) return null;  // no_data oder 0 → kein Label
 
-        // Sterne brauchen Platz — fontSize abhaengig von Zoom + Anzahl Sterne
-        var fontSize = (zoom < 9) ? 13 : 16;
+        var fontSize = (zoom < 9) ? 18 : 24;
         var color = style.labelColor;
         var shadow = style.labelShadow;
         var html = '<div style="'
             + 'display:inline-block;'
             + 'transform:translate(-50%,-50%);'
             + 'pointer-events:none;'
-            + 'white-space:nowrap;'
             + 'font-size:' + fontSize + 'px;'
-            + 'font-weight:700;'
+            + 'font-weight:800;'
             + 'line-height:1;'
-            + 'letter-spacing:1.5px;'
             + 'color:' + color + ';'
             + 'text-shadow:' + shadow + ';'
+            + 'font-variant-numeric:tabular-nums;'
             + '">' + label + '</div>';
         return { html: html, size: [0, 0], anchor: [0, 0] };
     }
@@ -327,7 +298,7 @@
 
         Object.keys(regionLayersByName).forEach(function (rid) {
             var layer = regionLayersByName[rid];
-            layer.setStyle({ fill: false, fillOpacity: 0, color: '#9ca3af', weight: 1, opacity: 0.3, dashArray: '4, 4' });
+            layer.setStyle({ fill: false, fillOpacity: 0, color: '#9ca3af', weight: 1, opacity: 0.3, dashArray: '' });
             layer.setTooltipContent(layer.regionName);
         });
 
@@ -350,7 +321,7 @@
                     color: ndStyle.border,
                     weight: 1.2,
                     opacity: ndStyle.borderOpacity,
-                    dashArray: '4, 4'
+                    dashArray: ''
                 });
                 var zoom = map.getZoom();
                 if (zoom >= 7) {
@@ -401,7 +372,7 @@
                 color: style.border,
                 weight: 1.5,
                 opacity: style.borderOpacity,
-                dashArray: style.dashed ? '4, 4' : ''
+                dashArray: ''
             });
 
             // Hover-Effekt §4.3: fillOpacity auf 0.65 hochziehen
