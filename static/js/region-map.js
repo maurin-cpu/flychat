@@ -98,85 +98,56 @@
         return html;
     }
 
-    // ===== STYLE SYSTEM (Traffic Light + Intensity, Light Map) =====
+    // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §4.3) =====
+    // 4 Farben rein nach safety_band — gleiche Hex-Werte wie Spot-Marker.
+    // Rot + grau bekommen dashed border (Sperr-Visualisierung).
     function mapRegionStyle(safety, quality) {
-        if (!safety || safety === 'no_data') {
+        // Legacy-Signatur beibehalten (quality-Argument wird ignoriert), damit
+        // alle Aufrufer unveraendert bleiben. Neue Logik nur ueber safety_band.
+        var band = (safety === 'safe')        ? 'green' :
+                   (safety === 'conditional') ? 'amber' :
+                   (safety === 'not_safe')    ? 'red'   :
+                   (safety === 'error')       ? 'red'   : 'no_data';
+
+        if (band === 'no_data') {
             return {
-                fill: '#d1d5db', fillOpacity: 0.25,
-                border: '#9ca3af', borderOpacity: 0.4,
-                labelColor: '#6b7280', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
+                fill: '#9ca3af', fillOpacity: 0.30,
+                border: '#6b7280', borderOpacity: 0.5,
+                labelColor: '#374151', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
                 showWarning: false, showStripes: false,
+                dashed: true,
                 safetyLabel: 'Keine Daten', qualityLabel: '', isError: false
             };
         }
-        if (safety === 'error') {
+        if (band === 'red') {
             return {
-                fill: '#fee2e2', fillOpacity: 0.3,
-                border: '#f87171', borderOpacity: 0.5,
-                labelColor: '#b91c1c', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
+                fill: '#ef4444', fillOpacity: 0.40,
+                border: '#991b1b', borderOpacity: 0.7,
+                labelColor: '#7f1d1d', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
                 showWarning: false, showStripes: false,
-                safetyLabel: 'Fehler', qualityLabel: '', isError: true
+                dashed: true,
+                safetyLabel: 'Nicht fliegbar', qualityLabel: '',
+                isError: (safety === 'error')
             };
         }
-
-        // NOT SAFE — muted red, stripes
-        if (safety === 'not_safe') {
+        if (band === 'amber') {
             return {
-                fill: '#fca5a5', fillOpacity: 0.35,
-                border: '#dc2626', borderOpacity: 0.6,
-                labelColor: '#b91c1c', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-                showWarning: false, showStripes: true,
-                safetyLabel: 'Nicht sicher', qualityLabel: ''
+                fill: '#f59e0b', fillOpacity: 0.42,
+                border: '#92400e', borderOpacity: 0.7,
+                labelColor: '#78350f', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
+                showWarning: true, showStripes: false,
+                dashed: false,
+                safetyLabel: 'Vorsicht', qualityLabel: ''
             };
         }
-
-        // SAFE — green
-        if (safety === 'safe') {
-            if (quality === 'gray') return {
-                fill: '#E8D5B8', fillOpacity: 0.4,
-                border: '#B08D57', borderOpacity: 0.5,
-                labelColor: '#6B5430', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-                showWarning: false, showStripes: false,
-                safetyLabel: 'Sicher', qualityLabel: 'Abgleiter'
-            };
-            if (quality === 'violet') return {
-                // Legendary regions: violet (consistent with legendary spots on main map)
-                fill: '#c4b5fd', fillOpacity: 0.5,
-                border: '#7c3aed', borderOpacity: 0.8,
-                labelColor: '#6d28d9', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-                showWarning: false, showStripes: false,
-                safetyLabel: 'Sicher', qualityLabel: 'Top'
-            };
-            return { // green = good
-                fill: '#86efac', fillOpacity: 0.4,
-                border: '#16a34a', borderOpacity: 0.6,
-                labelColor: '#15803d', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-                showWarning: false, showStripes: false,
-                safetyLabel: 'Sicher', qualityLabel: 'Gut'
-            };
-        }
-
-        // CONDITIONAL — amber
-        if (quality === 'gray') return {
-            fill: '#fef3c7', fillOpacity: 0.4,
-            border: '#d97706', borderOpacity: 0.5,
-            labelColor: '#92400e', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-            showWarning: true, showStripes: false,
-            safetyLabel: 'Vorsicht', qualityLabel: 'Abgleiter'
-        };
-        if (quality === 'violet') return {
-            fill: '#fde68a', fillOpacity: 0.45,
-            border: '#b45309', borderOpacity: 0.7,
-            labelColor: '#78350f', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-            showWarning: true, showStripes: false,
-            safetyLabel: 'Vorsicht', qualityLabel: 'Gut*'
-        };
+        // green
         return {
-            fill: '#fef08a', fillOpacity: 0.4,
-            border: '#ca8a04', borderOpacity: 0.6,
-            labelColor: '#854d0e', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
-            showWarning: true, showStripes: false,
-            safetyLabel: 'Vorsicht', qualityLabel: 'Gut'
+            fill: '#22c55e', fillOpacity: 0.42,
+            border: '#15803d', borderOpacity: 0.7,
+            labelColor: '#14532d', labelShadow: '0 0 3px #fff, 0 0 6px #fff',
+            showWarning: false, showStripes: false,
+            dashed: false,
+            safetyLabel: 'Sicher', qualityLabel: ''
         };
     }
 
@@ -254,47 +225,53 @@
         return '#6b7280'; // no_data fallback
     }
 
-    // Region-Marker: identisch zur Spot-Karte (RATING_CONCEPT v1.3 §8.2).
-    // Kreis in Safety-Farbe + weisse Ziffer 1-5 (=Sterne) ODER weisses Kreuz (red).
+    // Region-Label im Polygon-Centroid (RATING_CONCEPT v1.3 §4.3):
+    // **Region-Name + Sterne** in Safety-Farbe — kein eigener Marker, weil
+    // das eingefaerbte Polygon SELBST schon die Glyphe ist.
+    //   Zoom < 7: nichts
+    //   Zoom 7-8: Region-Name (kompakt) + Sterne (klein darunter)
+    //   Zoom >= 9: Region-Name (groesser) + Sterne (deutlich)
     function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
         if (zoom < 7) return null;
-        // Band aus safety_status ableiten (region-map nutzt intern safety, nicht safety_band)
+        var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
         var band = (safety === 'safe')        ? 'green' :
                    (safety === 'conditional') ? 'amber' :
                    (safety === 'not_safe')    ? 'red'   : 'no_data';
-        var palette = {
-            green:   { fill: '#22c55e', stroke: '#15803d' },
-            amber:   { fill: '#f59e0b', stroke: '#92400e' },
-            red:     { fill: '#ef4444', stroke: '#991b1b' },
-            no_data: { fill: '#9ca3af', stroke: '#6b7280' }
-        };
-        var c = palette[band] || palette.no_data;
-        var size = (zoom < 9) ? 22 : 28;
-        var center = size / 2;
-        var r = size * 0.42;
-        var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
-        var html = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.25));">';
-        // Weisser Aussenring fuer Lesbarkeit auf farbigem Polygon-Hintergrund
-        html += '<circle cx="' + center + '" cy="' + center + '" r="' + r + '" fill="' + c.fill
-              + '" stroke="#fff" stroke-width="2" />';
-        html += '<circle cx="' + center + '" cy="' + center + '" r="' + (r - 1) + '" fill="' + c.fill
-              + '" stroke="' + c.stroke + '" stroke-width="1" />';
+        var nameSize = zoom < 9 ? 10 : 12;
+        var starsSize = zoom < 9 ? 9 : 11;
+        var color = style.labelColor;
+        var shadow = style.labelShadow;
+        // Region-Name + (bei red Kreuz, sonst Sterne)
+        var label = '';
         if (band === 'red') {
-            var arm = r * 0.5;
-            html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
-                  + '" x2="' + (center + arm) + '" y2="' + (center + arm)
-                  + '" stroke="#fff" stroke-width="2" stroke-linecap="round" />';
-            html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
-                  + '" x2="' + (center - arm) + '" y2="' + (center + arm)
-                  + '" stroke="#fff" stroke-width="2" stroke-linecap="round" />';
-        } else if (n >= 1 && band !== 'no_data') {
-            var fontSize = size * 0.45;
-            html += '<text x="' + center + '" y="' + (center + fontSize * 0.34)
-                  + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif"'
-                  + ' font-size="' + fontSize.toFixed(1) + '" font-weight="700">' + n + '</text>';
+            label = '\u2715';
+            color = '#7f1d1d';
+        } else if (n > 0 && band !== 'no_data') {
+            label = '';
+            for (var i = 0; i < n; i++) label += '\u2605';
         }
-        html += '</svg>';
-        return { html: html, size: [size, size], anchor: [center, center] };
+        var html = '<div style="'
+            + 'display:inline-block;'
+            + 'transform:translate(-50%,-50%);'
+            + 'text-align:center;'
+            + 'pointer-events:none;'
+            + 'white-space:nowrap;'
+            + 'color:' + color + ';'
+            + 'text-shadow:' + shadow + ';'
+            + '">'
+            + '<div style="font-size:' + nameSize + 'px;font-weight:700;line-height:1.2;letter-spacing:0.01em;">'
+            + escHtmlSafe(badge) + '</div>';
+        if (label) {
+            html += '<div style="font-size:' + starsSize + 'px;font-weight:700;line-height:1.1;letter-spacing:1px;margin-top:1px;">'
+                + label + '</div>';
+        }
+        html += '</div>';
+        return { html: html, size: [0, 0], anchor: [0, 0] };
+    }
+    // Mini-Helper fuer Label-Text (escHtml ist erst spaeter definiert)
+    function escHtmlSafe(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     // ===== LOAD REGIONS =====
@@ -418,24 +395,35 @@
 
             var safety = dayData.safety_status;
             var quality = getQuality(dayData);
-            var badge = qualityBadge(quality);
             var style = mapRegionStyle(safety, quality);
 
+            // Polygon-Style nach §4.3: dashed bei red/no_data, solid bei green/amber.
+            // baseFillOpacity wird gespeichert fuer Hover-Effekt.
+            var baseOpacity = style.fillOpacity;
+            layer._baseFillOpacity = baseOpacity;
             layer.setStyle({
                 fill: true,
                 fillColor: style.fill,
-                fillOpacity: style.fillOpacity,
+                fillOpacity: baseOpacity,
                 color: style.border,
                 weight: 1.5,
                 opacity: style.borderOpacity,
-                dashArray: ''
+                dashArray: style.dashed ? '4, 4' : ''
             });
 
-            // Center label — zoom-responsive (Pill / Dot / nichts).
-            // RATING_CONCEPT v1.3: Sterne ersetzen Tier-Wort in der Pill.
+            // Hover-Effekt §4.3: fillOpacity auf 0.65 hochziehen
+            layer.off('mouseover').off('mouseout');
+            layer.on('mouseover', function (ev) {
+                ev.target.setStyle({ fillOpacity: 0.65 });
+            });
+            layer.on('mouseout', function (ev) {
+                ev.target.setStyle({ fillOpacity: ev.target._baseFillOpacity || baseOpacity });
+            });
+
+            // Center-Label — Region-Name + Sterne (RATING_CONCEPT v1.3 §4.3).
             var bounds = layer.getBounds();
             var center = bounds.getCenter();
-            var label = buildRegionLabel(style, badge, safety, quality, stars, map.getZoom());
+            var label = buildRegionLabel(style, layer.regionName, safety, quality, stars, map.getZoom());
 
             if (label) {
                 labelMarkersGroup.addLayer(L.marker(center, {
