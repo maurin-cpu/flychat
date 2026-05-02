@@ -3071,83 +3071,177 @@ class AnalyzersMixin:
             logger.info(f"[UNIFIED] Phase 2 fertig: {completed} Calls total")
 
             # ══════════════════════════════════════════════════════════════
-            # MERGE + PERSIST: Spot-Ergebnisse
+            # MERGE + PERSIST: Region-Ergebnisse ZUERST.
+            # Reihenfolge bewusst Region → Spot: wenn der Spot-Merge crasht,
+            # bleiben Regionen im Cache erhalten (frueher gegenteilig — ein
+            # spaeterer Crash konnte beide Caches inkonsistent machen).
+            # Per-Eintrag-try/except: ein einzelner Bad-Result reisst nicht
+            # die anderen Eintraege mit.
+            # ══════════════════════════════════════════════════════════════
+            region_merged = {}
+            for rid, days_dict in region_results.items():
+                region_merged[rid] = {}
+                for date_str, result in days_dict.items():
+                    try:
+                        safety_status = result.get("safety_status", "error")
+                        safety = {
+                            "safety_status": safety_status,
+                            "safe_window": result.get("safe_window", "keins"),
+                            "no_go_reasons": result.get("no_go_reasons", []),
+                            "caution_notes": result.get("caution_notes", []),
+                            "primary_no_go": result.get("primary_no_go"),
+                            "primary_caution": result.get("primary_caution"),
+                            "primary_reducer": result.get("primary_reducer"),
+                            "primary_booster": result.get("primary_booster"),
+                            "wind_summary": result.get("wind_summary", ""),
+                            "wind_shear": result.get("wind_shear", ""),
+                            "foehn_risk": result.get("foehn_risk", "none"),
+                            "summary": result.get("summary", ""),
+                            "region": result.get("region", ""),
+                            "region_id": result.get("region_id", rid),
+                            "date": date_str,
+                            "wind_calm_count": result.get("wind_calm_count", 0),
+                            "wind_moderate_count": result.get("wind_moderate_count", 0),
+                            "wind_strong_count": result.get("wind_strong_count", 0),
+                            "error": result.get("error", ""),
+                        }
+                        entry = {"safety": safety}
+                        self._attach_rating_fields(entry, result)
+                        # Rating / Conditional-Flag (Briefing)
+                        entry["rating"] = float(result.get("rating", 0.0) or 0.0)
+                        entry["is_conditional"] = bool(result.get("is_conditional", False))
+                        entry["conditional_reason"] = result.get("conditional_reason", "") or ""
+                        tier = result.get("flyability_tier") or result.get("fly_status") or ""
+                        if safety_status in ("safe", "conditional") and tier:
+                            fly = {
+                                "flyability_tier": tier, "fly_status": tier, "status": tier,
+                                "flight_type": result.get("flight_type", ""),
+                                "flight_duration_estimate": result.get("flight_duration_estimate", ""),
+                                "thermal_quality": result.get("thermal_quality", ""),
+                                "peak_climb_rate": result.get("peak_climb_rate", 0),
+                                "xc_potential": result.get("xc_potential", ""),
+                                "xc_details": result.get("xc_details", ""),
+                                "best_window": result.get("best_window", ""),
+                                "flyability_limits": result.get("flyability_limits", []),
+                                "highlights": result.get("highlights", []),
+                                "recommendation": result.get("recommendation", ""),
+                                "confidence": result.get("confidence", ""),
+                                "rating": entry["rating"],
+                                "is_conditional": entry["is_conditional"],
+                                "conditional_reason": entry["conditional_reason"],
+                                "region": result.get("region", ""),
+                                "region_id": result.get("region_id", rid), "date": date_str,
+                            }
+                            entry["flyability"] = fly
+                            entry["fly_status"] = tier
+                            entry["status"] = tier
+                        elif safety_status == "not_safe":
+                            entry["fly_status"] = ""
+                            entry["status"] = "not_safe"
+                        elif safety_status == "no_data":
+                            entry["fly_status"] = ""
+                            entry["status"] = "no_data"
+                        else:
+                            entry["fly_status"] = ""
+                            entry["status"] = safety_status
+                        entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
+                        entry["recommendation"] = result.get("recommendation", "")
+                        entry["region_name"] = result.get("region", regions_by_id.get(rid, {}).get("region", rid))
+                        region_merged[rid][date_str] = entry
+                    except Exception as e:
+                        logger.exception(f"Region-Merge fehlgeschlagen fuer {rid}/{date_str}: {e}")
+                        # Diese Region/Tag-Kombination wird uebersprungen,
+                        # der Rest des Merges laeuft weiter durch.
+
+            self.region_analyses = region_merged
+            self.region_analyses_loaded_at = datetime.now()
+            self._save_region_analyses_cache()
+            if self.instantdb:
+                threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
+
+            # ══════════════════════════════════════════════════════════════
+            # MERGE + PERSIST: Spot-Ergebnisse (NACH Regionen, siehe oben).
             # ══════════════════════════════════════════════════════════════
             spot_merged = {}
             for spot_name, days_dict in spot_results.items():
                 spot_merged[spot_name] = {}
                 for date_str, result in days_dict.items():
-                    safety_status = result.get("safety_status", "error")
-                    safety = {
-                        "safety_status": safety_status,
-                        "safe_window": result.get("safe_window", "keins"),
-                        "no_go_reasons": result.get("no_go_reasons", []),
-                        "caution_notes": result.get("caution_notes", []),
-                        "primary_no_go": result.get("primary_no_go"),
-                        "primary_caution": result.get("primary_caution"),
-                        "primary_reducer": result.get("primary_reducer"),
-                        "primary_booster": result.get("primary_booster"),
-                        "wind_summary": result.get("wind_summary", ""),
-                        "wind_shear": result.get("wind_shear", ""),
-                        "foehn_risk": result.get("foehn_risk", "none"),
-                        "summary": result.get("summary", ""),
-                        "spot": result.get("spot", spot_name),
-                        "date": date_str,
-                        "wind_ok_count": result.get("wind_ok_count", 0),
-                        "wind_wrong_count": result.get("wind_wrong_count", 0),
-                        "error": result.get("error", ""),
-                    }
-                    entry = {"safety": safety}
-                    self._attach_rating_fields(entry, result)
-                    # Rating / Conditional-Flag (Briefing)
-                    entry["rating"] = float(result.get("rating", 0.0) or 0.0)
-                    entry["is_conditional"] = bool(result.get("is_conditional", False))
-                    entry["conditional_reason"] = result.get("conditional_reason", "") or ""
-                    tier = result.get("flyability_tier") or result.get("fly_status") or ""
-                    if safety_status in ("safe", "conditional") and tier:
-                        fly = {
-                            "flyability_tier": tier, "fly_status": tier, "status": tier,
-                            "flight_type": result.get("flight_type", ""),
-                            "flight_duration_estimate": result.get("flight_duration_estimate", ""),
-                            "thermal_quality": result.get("thermal_quality", ""),
-                            "peak_climb_rate": result.get("peak_climb_rate", 0),
-                            "xc_potential": result.get("xc_potential", ""),
-                            "xc_details": result.get("xc_details", ""),
-                            "soaring_options": result.get("soaring_options", ""),
-                            "bemerkung_check": result.get("bemerkung_check", ""),
-                            "best_window": result.get("best_window", ""),
-                            "flyability_limits": result.get("flyability_limits", []),
-                            "highlights": result.get("highlights", []),
-                            "recommendation": result.get("recommendation", ""),
-                            "confidence": result.get("confidence", ""),
-                            "rating": entry["rating"],
-                            "is_conditional": entry["is_conditional"],
-                            "conditional_reason": entry["conditional_reason"],
-                            "spot": result.get("spot", spot_name), "date": date_str,
+                    try:
+                        safety_status = result.get("safety_status", "error")
+                        safety = {
+                            "safety_status": safety_status,
+                            "safe_window": result.get("safe_window", "keins"),
+                            "no_go_reasons": result.get("no_go_reasons", []),
+                            "caution_notes": result.get("caution_notes", []),
+                            "primary_no_go": result.get("primary_no_go"),
+                            "primary_caution": result.get("primary_caution"),
+                            "primary_reducer": result.get("primary_reducer"),
+                            "primary_booster": result.get("primary_booster"),
+                            "wind_summary": result.get("wind_summary", ""),
+                            "wind_shear": result.get("wind_shear", ""),
+                            "foehn_risk": result.get("foehn_risk", "none"),
+                            "summary": result.get("summary", ""),
+                            "spot": result.get("spot", spot_name),
+                            "date": date_str,
+                            "wind_ok_count": result.get("wind_ok_count", 0),
+                            "wind_wrong_count": result.get("wind_wrong_count", 0),
+                            "error": result.get("error", ""),
                         }
-                        entry["flyability"] = fly
-                        entry["fly_status"] = tier
-                        entry["status"] = tier
-                    elif safety_status == "not_safe":
-                        entry["fly_status"] = ""
-                        entry["status"] = "not_safe"
-                    elif safety_status == "no_data":
-                        entry["fly_status"] = ""
-                        entry["status"] = "no_data"
-                    elif safety_status == "error":
-                        entry["fly_status"] = ""
-                        entry["status"] = "error"
-                    else:
-                        entry["fly_status"] = ""
-                        entry["status"] = safety_status
-                    entry["streckenflug"] = result.get("streckenflug") or {
-                        "tier": "kein_xc", "rating": 0,
-                        "summary": "", "limiting_factor": "spot_not_flyable" if safety_status == "not_safe" else "none",
-                        "region_context_available": False,
-                    }
-                    entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
-                    entry["recommendation"] = result.get("recommendation", "")
-                    spot_merged[spot_name][date_str] = entry
+                        entry = {"safety": safety}
+                        self._attach_rating_fields(entry, result)
+                        # Rating / Conditional-Flag (Briefing)
+                        entry["rating"] = float(result.get("rating", 0.0) or 0.0)
+                        entry["is_conditional"] = bool(result.get("is_conditional", False))
+                        entry["conditional_reason"] = result.get("conditional_reason", "") or ""
+                        tier = result.get("flyability_tier") or result.get("fly_status") or ""
+                        if safety_status in ("safe", "conditional") and tier:
+                            fly = {
+                                "flyability_tier": tier, "fly_status": tier, "status": tier,
+                                "flight_type": result.get("flight_type", ""),
+                                "flight_duration_estimate": result.get("flight_duration_estimate", ""),
+                                "thermal_quality": result.get("thermal_quality", ""),
+                                "peak_climb_rate": result.get("peak_climb_rate", 0),
+                                "xc_potential": result.get("xc_potential", ""),
+                                "xc_details": result.get("xc_details", ""),
+                                "soaring_options": result.get("soaring_options", ""),
+                                "bemerkung_check": result.get("bemerkung_check", ""),
+                                "best_window": result.get("best_window", ""),
+                                "flyability_limits": result.get("flyability_limits", []),
+                                "highlights": result.get("highlights", []),
+                                "recommendation": result.get("recommendation", ""),
+                                "confidence": result.get("confidence", ""),
+                                "rating": entry["rating"],
+                                "is_conditional": entry["is_conditional"],
+                                "conditional_reason": entry["conditional_reason"],
+                                "spot": result.get("spot", spot_name), "date": date_str,
+                            }
+                            entry["flyability"] = fly
+                            entry["fly_status"] = tier
+                            entry["status"] = tier
+                        elif safety_status == "not_safe":
+                            entry["fly_status"] = ""
+                            entry["status"] = "not_safe"
+                        elif safety_status == "no_data":
+                            entry["fly_status"] = ""
+                            entry["status"] = "no_data"
+                        elif safety_status == "error":
+                            entry["fly_status"] = ""
+                            entry["status"] = "error"
+                        else:
+                            entry["fly_status"] = ""
+                            entry["status"] = safety_status
+                        entry["streckenflug"] = result.get("streckenflug") or {
+                            "tier": "kein_xc", "rating": 0,
+                            "summary": "", "limiting_factor": "spot_not_flyable" if safety_status == "not_safe" else "none",
+                            "region_context_available": False,
+                        }
+                        entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
+                        entry["recommendation"] = result.get("recommendation", "")
+                        spot_merged[spot_name][date_str] = entry
+                    except Exception as e:
+                        logger.exception(f"Spot-Merge fehlgeschlagen fuer {spot_name}/{date_str}: {e}")
+                        # Diese Spot/Tag-Kombination wird uebersprungen,
+                        # der Rest des Merges laeuft weiter durch.
 
             self.spot_analyses = spot_merged
             self.analyses_loaded_at = datetime.now()
@@ -3155,85 +3249,6 @@ class AnalyzersMixin:
             self._save_analyses_cache()
             if self.instantdb:
                 threading.Thread(target=self._push_analyses_to_instantdb, daemon=True).start()
-
-            # ══════════════════════════════════════════════════════════════
-            # MERGE + PERSIST: Region-Ergebnisse
-            # ══════════════════════════════════════════════════════════════
-            region_merged = {}
-            for rid, days_dict in region_results.items():
-                region_merged[rid] = {}
-                for date_str, result in days_dict.items():
-                    safety_status = result.get("safety_status", "error")
-                    safety = {
-                        "safety_status": safety_status,
-                        "safe_window": result.get("safe_window", "keins"),
-                        "no_go_reasons": result.get("no_go_reasons", []),
-                        "caution_notes": result.get("caution_notes", []),
-                        "primary_no_go": result.get("primary_no_go"),
-                        "primary_caution": result.get("primary_caution"),
-                        "primary_reducer": result.get("primary_reducer"),
-                        "primary_booster": result.get("primary_booster"),
-                        "wind_summary": result.get("wind_summary", ""),
-                        "wind_shear": result.get("wind_shear", ""),
-                        "foehn_risk": result.get("foehn_risk", "none"),
-                        "summary": result.get("summary", ""),
-                        "region": result.get("region", ""),
-                        "region_id": result.get("region_id", rid),
-                        "date": date_str,
-                        "wind_calm_count": result.get("wind_calm_count", 0),
-                        "wind_moderate_count": result.get("wind_moderate_count", 0),
-                        "wind_strong_count": result.get("wind_strong_count", 0),
-                        "error": result.get("error", ""),
-                    }
-                    entry = {"safety": safety}
-                    self._attach_rating_fields(entry, result)
-                    # Rating / Conditional-Flag (Briefing)
-                    entry["rating"] = float(result.get("rating", 0.0) or 0.0)
-                    entry["is_conditional"] = bool(result.get("is_conditional", False))
-                    entry["conditional_reason"] = result.get("conditional_reason", "") or ""
-                    tier = result.get("flyability_tier") or result.get("fly_status") or ""
-                    if safety_status in ("safe", "conditional") and tier:
-                        fly = {
-                            "flyability_tier": tier, "fly_status": tier, "status": tier,
-                            "flight_type": result.get("flight_type", ""),
-                            "flight_duration_estimate": result.get("flight_duration_estimate", ""),
-                            "thermal_quality": result.get("thermal_quality", ""),
-                            "peak_climb_rate": result.get("peak_climb_rate", 0),
-                            "xc_potential": result.get("xc_potential", ""),
-                            "xc_details": result.get("xc_details", ""),
-                            "best_window": result.get("best_window", ""),
-                            "flyability_limits": result.get("flyability_limits", []),
-                            "highlights": result.get("highlights", []),
-                            "recommendation": result.get("recommendation", ""),
-                            "confidence": result.get("confidence", ""),
-                            "rating": entry["rating"],
-                            "is_conditional": entry["is_conditional"],
-                            "conditional_reason": entry["conditional_reason"],
-                            "region": result.get("region", ""),
-                            "region_id": result.get("region_id", rid), "date": date_str,
-                        }
-                        entry["flyability"] = fly
-                        entry["fly_status"] = tier
-                        entry["status"] = tier
-                    elif safety_status == "not_safe":
-                        entry["fly_status"] = ""
-                        entry["status"] = "not_safe"
-                    elif safety_status == "no_data":
-                        entry["fly_status"] = ""
-                        entry["status"] = "no_data"
-                    else:
-                        entry["fly_status"] = ""
-                        entry["status"] = safety_status
-                    entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
-                    entry["recommendation"] = result.get("recommendation", "")
-                    entry["region_name"] = result.get("region", regions_by_id.get(rid, {}).get("region", rid))
-                    region_merged[rid][date_str] = entry
-
-            self.region_analyses = region_merged
-            self.region_analyses_loaded_at = datetime.now()
-            self._save_region_analyses_cache()
-            if self.instantdb:
-                threading.Thread(target=self._push_region_analyses_to_instantdb, daemon=True).start()
 
             # ══════════════════════════════════════════════════════════════
             # DONE

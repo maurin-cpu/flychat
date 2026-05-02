@@ -98,13 +98,17 @@
     // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §4.3) =====
     // 4 Farben rein nach safety_band — gleiche Hex-Werte wie Spot-Marker.
     // Rot + grau bekommen dashed border (Sperr-Visualisierung).
-    function mapRegionStyle(safety, quality) {
-        // Legacy-Signatur beibehalten (quality-Argument wird ignoriert), damit
-        // alle Aufrufer unveraendert bleiben. Neue Logik nur ueber safety_band.
-        // 'error' -> 'no_data' (grau): Analyse-Fehler sind keine Aussage ueber Fliegbarkeit.
-        var band = (safety === 'safe')        ? 'green' :
-                   (safety === 'conditional') ? 'amber' :
-                   (safety === 'not_safe')    ? 'red'   : 'no_data';
+    function mapRegionStyle(band, _legacyQuality) {
+        // Eingang: safety_band (green/amber/red/no_data) — Single Source of Truth
+        // (RATING_CONCEPT v1.3 §3.1). Frueher wurde safety_status uebergeben und
+        // intern auf band gemappt — das umging Decision-Engine-Hard-Overrides
+        // und Sub-Rating-Score, sodass das Karten-Polygon gruen blieb obwohl
+        // safety_band='amber' war (z.B. low Sub-Rating, GustFloor, AloftConditional).
+        // Legacy-Toleranz: alte Aufrufer mit safety_status werden gemappt.
+        if (band === 'safe')             band = 'green';
+        else if (band === 'conditional') band = 'amber';
+        else if (band === 'not_safe')    band = 'red';
+        else if (band !== 'green' && band !== 'amber' && band !== 'red') band = 'no_data';
 
         // Alle durchgezogen — User-Wunsch: konsistente Optik
         if (band === 'no_data') {
@@ -112,7 +116,7 @@
                 fill: '#9ca3af', fillOpacity: 0.30,
                 border: '#6b7280', borderOpacity: 0.5,
                 labelColor: '#374151', labelShadow: '-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 6px #fff',
-                safetyLabel: 'Keine Daten', isError: false
+                safetyLabel: 'Keine Daten'
             };
         }
         if (band === 'red') {
@@ -120,8 +124,7 @@
                 fill: '#ef4444', fillOpacity: 0.40,
                 border: '#991b1b', borderOpacity: 0.7,
                 labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
-                safetyLabel: 'Nicht fliegbar',
-                isError: (safety === 'error')
+                safetyLabel: 'Nicht fliegbar'
             };
         }
         if (band === 'amber') {
@@ -199,12 +202,14 @@
     // Region-Label im Polygon-Centroid: konsistente Glas-Pille (rund) fuer
     // alle Baender — gleicher Aufbau, nur Ring-Farbe + Inhalt unterscheidet
     // sich. Family-Look statt zwei verschiedene Stile.
-    function buildRegionLabel(style, badge, safety, quality, stars, zoom) {
+    function buildRegionLabel(style, badge, band, stars, zoom) {
         var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
-        // 'error' -> 'no_data' (kein Label) konsistent zu getSafetyBand/mapRegionStyle.
-        var band = (safety === 'safe')        ? 'green' :
-                   (safety === 'conditional') ? 'amber' :
-                   (safety === 'not_safe')    ? 'red'   : 'no_data';
+        // band kommt direkt vom Aufrufer (safety_band — Single Source of Truth).
+        // Legacy-Toleranz fuer Aufrufer, die noch safety_status uebergeben.
+        if (band === 'safe')             band = 'green';
+        else if (band === 'conditional') band = 'amber';
+        else if (band === 'not_safe')    band = 'red';
+        else if (band !== 'green' && band !== 'amber' && band !== 'red') band = 'no_data';
 
         if (band === 'no_data') return null;
         var label;
@@ -390,13 +395,13 @@
                 return;
             }
 
-            // safety_status liegt im Cache mal top-level (post-processed),
-            // mal nur im 'safety'-Sub-Dict (split-phase, halb-fertig). Beide Pfade tolerieren.
-            var safety = dayData.safety_status
-                || (dayData.safety && dayData.safety.safety_status)
-                || 'no_data';
-            var quality = getQuality(dayData);
-            var style = mapRegionStyle(safety, quality);
+            // Polygon-Farbe + Label aus safety_band (Decision-Engine-Output,
+            // RATING_CONCEPT v1.3 §3.1) — gleiche Quelle wie Briefing-Region-Header
+            // und Detail-Pille. Frueher wurde safety_status (LLM-Roh) genutzt, was
+            // bei Mismatch zwischen LLM-Aussage und Decision-Engine zu inkonsistenten
+            // Karten-Polygonen fuehrte (gruen statt amber).
+            var band = getSafetyBand(dayData);
+            var style = mapRegionStyle(band);
 
             // Polygon-Style nach §4.3: dashed bei red/no_data, solid bei green/amber.
             // baseFillOpacity wird gespeichert fuer Hover-Effekt.
@@ -434,7 +439,7 @@
             var center;
             try { center = layer.getCenter(); }
             catch (e) { center = layer.getBounds().getCenter(); }
-            var label = buildRegionLabel(style, layer.regionName, safety, quality, stars, map.getZoom());
+            var label = buildRegionLabel(style, layer.regionName, band, stars, map.getZoom());
 
             if (label) {
                 labelMarkersGroup.addLayer(L.marker(center, {
