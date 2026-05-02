@@ -398,7 +398,6 @@ class WeatherContextMixin:
                     "[THERMAL-ROUGH-FRAGMENTED]",
                     "[GUST-WARN]", "[ALOFT-WIND-WARN]", "[ALOFT-GUST-WARN]",
                     "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]", "[THERMAL-WIND-DEGRADED]",
-                    "[WIND-WRONG]",
                 ]
                 hist_parts = []
                 for t in major_tags_order:
@@ -630,11 +629,11 @@ class WeatherContextMixin:
 
                 warning_str = " " + " ".join(warnings) if warnings else ""
 
-                # Tag-Histogram pro Tag für TAGESPROFIL
+                # Tag-Histogram pro Tag für TAGESPROFIL — nur echte Hazard-Tags.
+                # WIND-WRONG ist KEIN Hazard, sondern ein Startbarkeits-Filter
+                # (siehe STARTBARKEIT-Block) und wird hier bewusst nicht gezählt.
                 for w in warnings:
                     day_state["tag_counts"][w] = day_state["tag_counts"].get(w, 0) + 1
-                if not is_ok:
-                    day_state["tag_counts"][wind_status] = day_state["tag_counts"].get(wind_status, 0) + 1
                 # "Clean" = WIND-OK ohne harte Warnungen
                 hard_warnings_set = {"[GUST-DANGER]", "[ALOFT-WIND-DANGER]", "[ALOFT-GUST-DANGER]",
                                      "[RAIN-WARN]", "[CAPE-DANGER]", "[THUNDERSTORM]", "[WIND-DANGER]", "[OVERCAST-DANGER]"}
@@ -1688,11 +1687,13 @@ class WeatherContextMixin:
 
             warning_str = " " + " ".join(warnings) if warnings else ""
 
-            # Tag-Histogram: zähle alle Warnungen + WIND-WRONG für Tagesprofil
+            # Tag-Histogram: zähle nur echte Hazard-Tags für TAGESPROFIL.
+            # WIND-WRONG ist KEIN Hazard, sondern ein Startbarkeits-Filter
+            # (siehe STARTBARKEIT-Block) und wird hier bewusst nicht gezählt —
+            # sonst landet er in "Hauptgefahren am Tag:" und wird vom LLM
+            # als Sicherheits-/Flyability-Warnung fehlinterpretiert.
             for w in warnings:
                 tag_counts[w] = tag_counts.get(w, 0) + 1
-            if not is_ok:
-                tag_counts[wind_status] = tag_counts.get(wind_status, 0) + 1
 
             # ─── STUNDENVERLAUF: klassifiziere diese Stunde ───
             # ─── SICHERHEITS-VERLAUF: nur Safety-Tags (Wind/Boeen/Regen/CAPE/Gewitter) ───
@@ -1851,7 +1852,13 @@ class WeatherContextMixin:
         max_swing_deg, max_swing_start, max_swing_hour, max_swing_span = _max_wind_direction_swing(hourly_wind_dirs)
 
         lines.append("")
-        lines.append("═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══")
+        lines.append("═══ STARTBARKEIT (Windrichtungs-Filter, verbindlich!) ═══")
+        lines.append(
+            "WIND-WRONG ist KEIN Hazard und KEINE Warnung — es ist ein reiner "
+            "Startbarkeits-Filter. Stunden mit [WIND-WRONG] werden fuer Sicherheits- "
+            "und Fliegbarkeits-Bewertung IGNORIERT (zaehlen nicht ins safe_window, "
+            "loesen aber auch keine caution_notes/no_go_reasons aus)."
+        )
         lines.append(f"[WIND-OK] Stunden ({len(wind_ok_hours)}): {', '.join(wind_ok_hours) if wind_ok_hours else 'KEINE'}")
         lines.append(f"[WIND-WRONG] Stunden ({len(wind_wrong_hours)}): {', '.join(wind_wrong_hours) if wind_wrong_hours else 'KEINE'}  (= nicht startbar, KEIN UNFLIEGBAR-Grund)")
         lines.append(f"Saubere Stunden ({len(clean_hours)}): {', '.join(clean_hours) if clean_hours else 'KEINE'} (WIND-OK UND keine DANGER-Tags)")
@@ -1913,7 +1920,9 @@ class WeatherContextMixin:
             lines.append(
                 f"Verhältnis sauber/gesamt: {len(clean_hours)}/{total_actual}h = {clean_pct:.0f}%"
             )
-            # Histogramm der Hauptgefahren über den ganzen Tag
+            # Histogramm der Hauptgefahren über den ganzen Tag.
+            # WIND-WRONG ist hier bewusst NICHT enthalten (Startbarkeits-Filter,
+            # nicht Hazard — wird im STARTBARKEIT-Block separat ausgewiesen).
             major_tags_order = [
                 "[GUST-DANGER]", "[ALOFT-WIND-DANGER]", "[ALOFT-GUST-DANGER]",
                 "[WIND-DANGER]", "[RAIN-WARN]", "[CAPE-DANGER]", "[CAPE-WARN]", "[THUNDERSTORM]", "[OVERCAST-DANGER]",
@@ -1921,7 +1930,6 @@ class WeatherContextMixin:
                 "[THERMAL-ROUGH-FRAGMENTED]",
                 "[GUST-WARN]", "[ALOFT-WIND-WARN]", "[ALOFT-GUST-WARN]",
                 "[SHEAR-DEGRADED]", "[THERMAL-TORN-DEGRADED]", "[THERMAL-ROUGH-DEGRADED]", "[THERMAL-WIND-DEGRADED]",
-                "[WIND-WRONG]",
             ]
             hist_parts = []
             for t in major_tags_order:

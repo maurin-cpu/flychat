@@ -137,7 +137,26 @@
     border:1px solid var(--color-border); border-radius:var(--radius-md);
     font-size:13px;
   }
+
+  .rv-meteo-toggle {
+    margin:8px 16px 0; padding:6px 12px; font-size:13px; cursor:pointer;
+    border:1px solid var(--color-border); border-radius:var(--radius-md);
+    background:#f0f6ff; color:var(--color-primary);
+  }
+  .rv-meteo-toggle:hover { background:#e5efff; }
+  .rv-meteo-wrap { display:none; padding:8px 16px 12px; }
+  .rv-meteo-wrap.is-open { display:block; }
+  .rv-meteo-chart { width:100%; min-height:340px; position:relative; }
+  .rv-meteo-tooltip {
+    position:absolute; pointer-events:none; z-index:10;
+    background:#fff; border:1px solid var(--color-border); border-radius:var(--radius-md);
+    padding:6px 10px; font-size:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1);
+    display:none;
+  }
+  .rv-meteo-status { font-size:12px; color:var(--color-text-secondary); margin:6px 0; }
+  .rv-meteo-status--err { color:#b71c1c; }
 </style>
+<script src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 {% endblock %}
 
 {% set verdict_class = {'PASS':'PASS', 'FAIL':'FAIL', 'AMBIGUOUS':'AMBIG'}.get(session.verdict, '') %}
@@ -213,10 +232,13 @@
   {% for c in session.cases %}
     {% set go = c.gold_output or {} %}
     {% set ne = c.current_output or {} %}
-    {% set gs = go.safety or {} %}
-    {% set ns = ne.safety or {} %}
-    {% set gf = go.flyability or {} %}
-    {% set nf = ne.flyability or {} %}
+    {# Goldstandard ist nested (safety/flyability subkeys), aktuelle Pipeline
+       liefert oft flat (alle Felder am Top-Level). Fallback auf Top-Level,
+       damit die Anzeige in beiden Formaten funktioniert. #}
+    {% set gs = go.safety or go %}
+    {% set ns = ne.safety or ne %}
+    {% set gf = go.flyability or go %}
+    {% set nf = ne.flyability or ne %}
     {% set gst = go.streckenflug or {} %}
     {% set nst = ne.streckenflug or {} %}
 
@@ -249,12 +271,23 @@
       </button>
       <pre class="rv-input-pre" style="display:none;">{{ c.input }}</pre>
 
+      <button class="rv-meteo-toggle" type="button"
+              data-case-idx="{{ c.idx }}"
+              onclick="window.RvMeteo.toggle(this)">
+        📈 Meteogramm laden
+      </button>
+      <div class="rv-meteo-wrap" data-case-idx="{{ c.idx }}">
+        <div class="rv-meteo-status">Klick „Meteogramm laden" um den Wetterverlauf des eingefrorenen Snapshots zu rendern.</div>
+        <div class="rv-meteo-chart" data-rv-chart></div>
+        <div class="rv-meteo-tooltip" data-rv-tooltip></div>
+      </div>
+
       <div class="rv-side">
         {# Goldstandard #}
         <div class="rv-col rv-col--gold">
           <div class="rv-col__lbl rv-col__lbl--gold">▌Goldstandard</div>
           <dl class="rv-field">
-            {{ fmt_field("Status", go.status or '—', ne.status or '—') }}
+            {{ fmt_field("Status", go.status or go.flyability_tier or go.fly_status or '—', ne.status or ne.flyability_tier or ne.fly_status or '—') }}
             {{ fmt_field("Safety", gs.safety_status or '—', ns.safety_status or '—') }}
             {{ fmt_field("Safe Window", gs.safe_window or '—', ns.safe_window or '—') }}
             {{ fmt_field("Best Window", go.best_window or '—', ne.best_window or '—') }}
@@ -274,7 +307,7 @@
         <div class="rv-col rv-col--new">
           <div class="rv-col__lbl rv-col__lbl--new">▌Neuer Output</div>
           <dl class="rv-field">
-            {{ fmt_field("Status", ne.status or '—', go.status or '—') }}
+            {{ fmt_field("Status", ne.status or ne.flyability_tier or ne.fly_status or '—', go.status or go.flyability_tier or go.fly_status or '—') }}
             {{ fmt_field("Safety", ns.safety_status or '—', gs.safety_status or '—') }}
             {{ fmt_field("Safe Window", ns.safe_window or '—', gs.safe_window or '—') }}
             {{ fmt_field("Best Window", ne.best_window or '—', go.best_window or '—') }}
@@ -312,4 +345,76 @@
   {% endfor %}
 
 </main>
+
+<script>
+// Lazy-Load + Render fuer Review-Meteogramme.
+// Snapshot-Daten kommen aus /admin/testing/review/<sid>/<idx>/meteo.json
+// (gefuellt aus weather_snapshot im Goldfile / Session).
+window.RvMeteo = (function () {
+  var SESSION_ID = {{ session.session_id|tojson }};
+  var loaded = {};  // case_idx -> 'loading' | 'done' | 'error'
+
+  function setStatus(wrap, text, isError) {
+    var s = wrap.querySelector('.rv-meteo-status');
+    if (!s) return;
+    s.textContent = text;
+    s.classList.toggle('rv-meteo-status--err', !!isError);
+  }
+
+  async function loadAndRender(caseIdx, wrap) {
+    if (loaded[caseIdx] === 'loading' || loaded[caseIdx] === 'done') return;
+    loaded[caseIdx] = 'loading';
+    setStatus(wrap, 'Lade Snapshot...', false);
+    try {
+      var resp = await fetch('/admin/testing/review/' + SESSION_ID + '/' + caseIdx + '/meteo.json',
+                             { credentials: 'same-origin' });
+      if (!resp.ok) {
+        var msg = 'HTTP ' + resp.status;
+        try { var j = await resp.json(); if (j && j.error) msg = j.error; } catch (_) {}
+        setStatus(wrap, msg, true);
+        loaded[caseIdx] = 'error';
+        return;
+      }
+      var data = await resp.json();
+      if (!window.Meteogram || typeof window.Meteogram.renderChart !== 'function') {
+        setStatus(wrap, 'Meteogram-Modul nicht geladen', true);
+        loaded[caseIdx] = 'error';
+        return;
+      }
+      var chartEl = wrap.querySelector('[data-rv-chart]');
+      var tooltipEl = wrap.querySelector('[data-rv-tooltip]');
+      // Optionen analog zu /api/weather + /api/altitude-wind:
+      window.Meteogram.renderChart(chartEl, tooltipEl,
+        data.wxDay || { wind: [], precipitation: [], thermik: [], cloudbase: [] },
+        { profiles: data.altDay || [] },
+        {
+          elevation: data.elevation_m,
+          windrichtung: data.windrichtung,
+          ideal_wind_max: data.ideal_wind_max,
+          thresholds: data.thresholds,
+          ground_wind: data.ground_wind,
+        }
+      );
+      setStatus(wrap, 'Snapshot geladen (' + (data.wxDay && data.wxDay.wind ? data.wxDay.wind.length : 0) + ' Stunden)', false);
+      loaded[caseIdx] = 'done';
+    } catch (e) {
+      setStatus(wrap, 'Fehler: ' + (e.message || e), true);
+      loaded[caseIdx] = 'error';
+    }
+  }
+
+  function toggle(btn) {
+    var idx = btn.getAttribute('data-case-idx');
+    var wrap = document.querySelector('.rv-meteo-wrap[data-case-idx="' + idx + '"]');
+    if (!wrap) return;
+    var open = wrap.classList.toggle('is-open');
+    btn.textContent = open ? '📈 Meteogramm ausblenden' : '📈 Meteogramm laden';
+    if (open) {
+      loadAndRender(parseInt(idx, 10), wrap);
+    }
+  }
+
+  return { toggle: toggle };
+})();
+</script>
 {% endblock %}

@@ -110,8 +110,7 @@ Jede `[RAIN-WARN]`-Stunde zaehlt direkt als DANGER-Level (kein WARN/DANGER-Split
 BLOCK 2 — BODENWIND (Richtung & Staerke)
 ─────────────────────────────────
 
-**Tags Spots:**
-- `[WIND-WRONG]` → **nicht startbar**, ABER **NICHT UNFLIEGBAR**. Kein neuer Start, aber kein Sicherheitsproblem fuer Piloten in der Luft.
+**Tags Spots (Hazards — Filter `[WIND-OK]`/`[WIND-WRONG]` siehe STARTBARKEITS-FILTER in `_input_map.md`):**
 - `[WIND-WARN]` → sportlich (Bodenwind {{cfg.WIND_WARN_KMH}}-{{cfg.WIND_DANGER_KMH}} km/h).
 - `[WIND-DANGER]` → unfliegbar (Bodenwind > {{cfg.WIND_DANGER_KMH}} km/h) — echte Flug-Gefahr, zaehlt als DANGER.
 

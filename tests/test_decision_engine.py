@@ -760,5 +760,56 @@ class TestLegacyFlyabilityTier(unittest.TestCase):
         self.assertEqual(compute_legacy_flyability_tier({"safety_band": "GREEN", "experience_stars": 5}), "violet")
 
 
+class TestWindWrongIsNotHazard(unittest.TestCase):
+    """Regression: WIND-WRONG ist Startbarkeits-Filter, kein Hazard.
+
+    Es darf NICHT im Hauptgefahren-Histogramm (`major_tags_order`) auftauchen
+    und NICHT in `tag_counts` für die Tagesprofil-Auswertung gezählt werden.
+    Sonst interpretiert das LLM es als Sicherheits- oder Flyability-Warnung
+    und erzeugt falsche caution_notes / no_go_reasons.
+    """
+    def setUp(self):
+        from pathlib import Path
+        self.src = Path("engine/weather_context.py").read_text(encoding="utf-8")
+
+    def test_wind_wrong_not_in_major_tags_order(self):
+        # major_tags_order ist die Liste der Hazards im TAGESPROFIL-Histogramm.
+        # WIND-WRONG gehoert dort nicht hin (ist ein Filter, kein Hazard).
+        # Listenelemente erkennen wir am Trailing-Komma: `"[WIND-WRONG]",`.
+        # Die Definitions-Zeile `wind_status = ... else "[WIND-WRONG]"` ist OK.
+        for line_no, line in enumerate(self.src.splitlines(), start=1):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if stripped == '"[WIND-WRONG]",' or stripped.endswith('"[WIND-WRONG]",'):
+                self.fail(
+                    f"WIND-WRONG darf nicht in major_tags_order/tag_counts-Listen "
+                    f"erscheinen — es ist ein Startbarkeits-Filter, kein Hazard. "
+                    f"Gefunden in Zeile {line_no}: {stripped}"
+                )
+
+    def test_wind_wrong_not_incremented_into_tag_counts(self):
+        # Das Pattern `tag_counts[wind_status]` (oder day_state["tag_counts"][wind_status])
+        # wuerde im Spot-Pfad WIND-WRONG-Stunden ins Histogramm zaehlen.
+        # Nach dem Fix darf dieses Pattern im Spot-Pfad nicht mehr existieren.
+        forbidden_patterns = [
+            "tag_counts[wind_status]",
+            'tag_counts["[WIND-WRONG]"]',
+            'day_state["tag_counts"][wind_status]',
+        ]
+        for pattern in forbidden_patterns:
+            self.assertNotIn(
+                pattern, self.src,
+                f"Pattern `{pattern}` wuerde WIND-WRONG ins Hazard-Histogramm "
+                f"zaehlen. WIND-WRONG ist Startbarkeits-Filter, kein Hazard."
+            )
+
+    def test_startbarkeit_block_present(self):
+        # STARTBARKEIT-Header mit Disclaimer muss im Datenblock-Output stehen,
+        # damit das LLM die Filter/Hazard-Trennung sieht.
+        self.assertIn("═══ STARTBARKEIT", self.src)
+        self.assertIn("KEIN Hazard", self.src)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -286,6 +286,7 @@ def main():
                 "input": gold_record.get("input", ""),
                 "gold_output": gold_record.get("output", {}),
                 "current_output": current_entry,
+                "weather_snapshot": gold_record.get("weather_snapshot", {}),
                 "case_path": str(case_path),
             })
 

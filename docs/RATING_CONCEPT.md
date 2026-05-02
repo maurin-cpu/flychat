@@ -2,10 +2,12 @@
 
 **Status**: ✅ **v1.3 umgesetzt** (2026-05-01) — Phasen 1+2+3+4a+4b sowie §4.4 Bubble-Matrix vollstaendig implementiert. Aktueller Stand siehe §11 Implementierungs-Status.
 **Autor**: Alex (PM)
-**Datum**: 2026-04-30 (Konzept) / 2026-05-01 (Implementations-Update)
+**Datum**: 2026-04-30 (Konzept) / 2026-05-01 (Implementations-Update) / 2026-05-02 (WIND-WRONG-Refactor)
 **Version**: 1.3 (v1.0 Konzept, v1.1 UI-Scan-Optimierung, v1.2 Konsistenz-Check, v1.3 Preview-Erkenntnisse)
 
 > **Dokumenten-Charakter**: Dieses Konzept-Dokument enthaelt **Begruendungen** (Benchmarks, Trade-offs, Architektur-Pattern) UND **Migrations-Plaene**. Die Migrations-Plaene (§5, §7, §9.6) sind historisch — sie wurden umgesetzt, siehe §11. Die fachlichen Erklaerungen (§1 Benchmark, §2 Empfehlung, §3 Mapping, §4/§8 UI, §6 Risiken, §10 Backlog) bleiben gueltig als Architektur-Referenz.
+
+> **Verwandte Dokumente**: [`STARTBARKEIT.md`](STARTBARKEIT.md) — die dritte Kategorie neben Sicherheit und Fliegbarkeit (WIND-WRONG-Behandlung, Datenblock-STARTBARKEIT-Block, Skill-Cleanup vom 2026-05-02).
 
 ---
 

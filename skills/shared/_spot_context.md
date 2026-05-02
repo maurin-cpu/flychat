@@ -2,9 +2,7 @@
 SPOT-SPEZIFIK: WIND-TAGS RICHTUNGSBASIERT
 ═══════════════════════════════════════════════
 
-Im Spot-Modus hat der Startplatz einen erlaubten **Sektor** (Kompassbereich). Die Wind-Tags sind:
-- `[WIND-OK]` — Windrichtung liegt im erlaubten Sektor (inkl. 10° Buffer).
-- `[WIND-WRONG]` — Windrichtung ausserhalb des Sektors → Stunde nicht startbar (NICHT UNFLIEGBAR — siehe `_core_principles.md` Regel 4).
+Im Spot-Modus hat der Startplatz einen erlaubten **Sektor** (Kompassbereich). Die Richtungs-Tags `[WIND-OK]` / `[WIND-WRONG]` sind **Startbarkeits-Filter, keine Hazards** — vollstaendige Regeln im STARTBARKEITS-FILTER-Block in `_input_map.md`.
 
 **Saubere Stunde (Spot)** = `[WIND-OK]` UND kein DANGER-Tag. Nur saubere Stunden gehoeren ins `safe_window`. SPORTLICHE Stunden (mit WARN-Tag innen) dort explizit in `caution_notes` mit Uhrzeit markieren.
 

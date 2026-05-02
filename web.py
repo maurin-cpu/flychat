@@ -1466,6 +1466,118 @@ def admin_testing_report(name):
     )
 
 
+@app.route("/admin/testing/review/<session_id>/<int:case_idx>/meteo.json", methods=["GET"])
+@_require_admin
+def admin_testing_review_meteogram(session_id, case_idx):
+    """Liefert Meteogramm-Daten fuer einen Review-Case.
+
+    Quelle ist der `weather_snapshot` aus dem Goldfile (per
+    cost_testing/freeze_golden.py mitgespeichert) und vom Score-Regression-
+    Lauf in die Session uebernommen. Konvertiert die Roh-Daten via
+    format_data_for_charts / format_altitude_wind_for_charts ins gleiche
+    Format wie /api/weather + /api/altitude-wind, damit das vorhandene
+    Meteogram-Modul (static/js/meteogram.js) sie rendern kann.
+
+    Falls kein Snapshot vorhanden ist (alte Goldfiles vor dem Refactor),
+    wird 410 + Hinweis zurueckgegeben.
+    """
+    from engine import test_mode
+    session = test_mode.load_review_session(session_id)
+    if session is None:
+        return jsonify({"error": "Session nicht gefunden"}), 404
+    cases = session.get("cases") or []
+    if not (0 <= case_idx < len(cases)):
+        return jsonify({"error": "Case-Index ungueltig"}), 404
+    case = cases[case_idx]
+    snap = case.get("weather_snapshot") or {}
+    if not snap or not snap.get("hourly_data"):
+        return jsonify({
+            "error": "Kein Wetter-Snapshot im Goldfile. "
+                     "Mit `python cost_testing/freeze_golden.py --force` neu einfrieren."
+        }), 410
+
+    hourly = snap.get("hourly_data") or {}
+    pressure = snap.get("pressure_level_data") or {}
+    elevation_m = snap.get("elevation_m") or 850
+    date_str = case.get("date") or ""
+
+    chart_data = format_data_for_charts(
+        hourly, pressure,
+        elevation_ref=elevation_m,
+        slope_azimuth=snap.get("slope_azimuth"),
+        slope_angle=snap.get("slope_angle"),
+        region_id=None,
+    )
+
+    # Surface-Anchor fuer Hoehenwind-Profile (analog /api/altitude-wind).
+    surface_anchor_by_time = {}
+    for ts, hd in hourly.items():
+        gust = hd.get("wind_gusts_10m")
+        ws = hd.get("wind_speed_10m")
+        wd = hd.get("wind_direction_10m")
+        if gust is not None and ws is not None:
+            surface_anchor_by_time[ts] = {
+                "elevation_m": elevation_m,
+                "gust_kmh": float(gust),
+                "wind_speed_kmh": float(ws),
+                "wind_direction_10m": float(wd) if wd is not None else None,
+            }
+
+    alt_data = format_altitude_wind_for_charts(
+        pressure, hourly, elevation_m, None,
+        surface_anchor_by_time=surface_anchor_by_time,
+    )
+
+    # Tagesweise Gruppierung — Snapshot enthaelt nur EINEN Tag, deshalb
+    # einfach nach date_str filtern (keine "heute+zukunft"-Logik wie in
+    # _group_chart_by_day, weil unser Datum in der Vergangenheit liegen kann).
+    wx_day = {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}
+    for key in wx_day.keys():
+        for entry in chart_data.get(key, []) or []:
+            t = entry.get("time", "")
+            if isinstance(t, str) and t.startswith(date_str):
+                wx_day[key].append(entry)
+
+    alt_day = []
+    for profile in alt_data.get("profiles", []) or []:
+        t = profile.get("time", "")
+        if isinstance(t, str) and t.startswith(date_str):
+            try:
+                hour = int(t[11:13])
+            except Exception:
+                hour = 0
+            alt_day.append({"hour": hour, "profiles": profile.get("levels", [])})
+
+    # Bodenwind-Serie (terrain-korrigiert) — Meteogram zeichnet damit den
+    # unteren Wind-Track. Wir stellen sie nur fuer den Test-Tag bereit.
+    ground_wind = []
+    for ts, hd in sorted(hourly.items()):
+        if not (isinstance(ts, str) and ts.startswith(date_str)):
+            continue
+        try:
+            hour = int(ts[11:13])
+        except Exception:
+            continue
+        ground_wind.append({
+            "hour": hour,
+            "wind_speed_kmh": _safe_float(hd.get("wind_speed_10m")),
+            "wind_gust_kmh": _safe_float(hd.get("wind_gusts_10m")),
+            "wind_direction_deg": _safe_float(hd.get("wind_direction_10m")),
+        })
+
+    return jsonify({
+        "spot_name": case.get("spot"),
+        "date": date_str,
+        "elevation_m": elevation_m,
+        "windrichtung": snap.get("windrichtung"),
+        "ideal_wind_max": snap.get("ideal_wind_max"),
+        "wxDay": wx_day,
+        "altDay": alt_day,
+        "ground_wind": ground_wind,
+        "thresholds": _tier_thresholds(),
+    })
+
+
 # ============================================================================
 # FEEDBACK API (Spot/Region — anonym via localStorage client_id)
 # ============================================================================

@@ -46,12 +46,8 @@ Bei `safe`/`green`-Tagen ohne Gefahren: Begruendung warum es gut/sicher ist, ebe
 - **Fliegbarkeit (Teil 2)**: Wie gut ist das Flugwetter wenn man fliegt? UI-Namen **Bronze / Gruen / Violett** — JSON-Enum-Werte `"gray" / "green" / "violet"` (Code erwartet diese englischen Werte; in deinen Prosa-Feldern verwendest du die deutschen UI-Namen).
 Ein Tag kann *bedingt sicher* sein und trotzdem *legendaeres XC-Wetter* haben — oder *safe* sein mit nur *Abgleiter*-Niveau. **Thermik-Qualitaets-Tags** ([SHEAR-*], [TORN-*], [ROUGH-*]) betreffen ausschliesslich Teil 2 — NIEMALS als Grund fuer not_safe/conditional verwenden.
 
-**4. WIND-WRONG ist eine Start-Bedingung, keine Flug-Gefahr.**
-`[WIND-WRONG]` heisst: **in dieser Stunde kann der Pilot am Startplatz nicht starten** — weil der Wind aus der falschen Richtung kommt. Das ist **kein** UNFLIEGBAR-Grund wie Regen, Gewitter oder Sturm. Ist der Pilot einmal in der Luft, ist die Bodenwindrichtung am Startplatz irrelevant (Landung erfolgt typischerweise auf separatem Landeplatz). Deshalb:
-- `[WIND-WRONG]`-Stunden **NACH** einem gueltigen Start-Fenster sind **nicht** UNFLIEGBAR. Sie bedeuten nur: kein weiterer Start moeglich.
-- Tag-Status haengt am **laengsten zusammenhaengenden sauberen Fenster** (WIND-OK + keine DANGER-Tags), nicht an der Summe der WIND-WRONG-Stunden.
-- Ein Richtungsdreher im Tagesverlauf (auch >90°) macht aus einem saubereren Morgen-Fenster **keinen not_safe-Tag** — er ist nur eine beschreibende Anmerkung in `wind_summary` (nicht in `caution_notes`, da keine Sicherheits-Warnung).
-- `[WIND-DANGER]` bleibt UNFLIEGBAR (zu starker Wind trifft Pilot auch in der Luft).
+**4. WIND-WRONG ist Startbarkeits-Filter, kein Hazard.**
+Vollstaendige Regeln im STARTBARKEITS-FILTER-Block in `_input_map.md`. Kurz: bei vorhandenem Start-Fenster (≥{{cfg.CLEAN_WINDOW_MIN_HOURS}}h sauber) werden `[WIND-WRONG]`-Stunden ignoriert — nicht als Gefahr framen, nicht in `caution_notes`/`no_go_reasons`. Bei **fehlendem** Start-Fenster (kein ausreichendes WIND-OK) ist es legitime not_safe-Begruendung — sachlich als "Kein Start-Fenster" / "Windrichtung ganztaegig ausserhalb Sektor" formulieren, **nicht** als "Gefahr" / "Risiko". `[WIND-DANGER]` ist davon zu unterscheiden — das bleibt UNFLIEGBAR (zu starker Wind trifft Pilot auch in der Luft).
 
 ═══════════════════════════════════════════════
 GLOSSAR

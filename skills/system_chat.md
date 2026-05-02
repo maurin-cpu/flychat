@@ -100,7 +100,7 @@ Fasse Stunden mit aehnlicher Wetterlage zu **logischen Sektoren** zusammen (z.B.
 ### Wind-Konsistenz (entscheidend)
 - Konstante Richtung ueber mind. 3h = exzellent
 - Haeufige Richtungswechsel = schlecht, auch wenn der Wind formal passt
-- Wenn ein Sektor nur 2h [WIND-OK] hat, umgeben von [WIND-WRONG] → sehr vorsichtig empfehlen
+- Wenn ein Sektor nur 2h [WIND-OK] hat (kurzes Start-Fenster) → kurzes Zeitbudget zum Starten, sachlich erwaehnen. [WIND-WRONG] ist ein Filter, kein Hazard — nicht als Risiko framen.
 
 ### Wind-Tags im Chat
 - Die Voranalysen (safety_check.md, flyability.md) behandeln Wind-Tags als **bindend** — dort werden sie nicht ueberstimmt.

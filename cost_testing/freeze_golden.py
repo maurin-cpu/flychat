@@ -74,6 +74,45 @@ def _safety_of(entry: dict) -> str:
     return safety.get("safety_status") or entry.get("safety_status") or "unknown"
 
 
+def _filter_day(timestamped: dict, date_str: str) -> dict:
+    """Reduziert hourly_data/pressure_level_data auf einen einzelnen Tag.
+
+    Schluessel sind ISO-Timestamps wie '2026-05-01T13:00'. Wir matchen
+    auf den 'YYYY-MM-DD'-Praefix.
+    """
+    if not isinstance(timestamped, dict):
+        return {}
+    return {ts: v for ts, v in timestamped.items() if isinstance(ts, str) and ts.startswith(date_str)}
+
+
+def _build_weather_snapshot(eng, spot_name: str, date_str: str) -> dict:
+    """Baut den minimalen Wetter-Snapshot fuer das Review-Meteogramm.
+
+    Enthaelt nur die Stunden des Test-Tages plus Spot-Geometrie. Wird im
+    Goldfile mitgespeichert, damit das Review-UI das Meteogramm rendern
+    kann — auch wenn der Tag laengst nicht mehr im Live-Forecast liegt.
+    """
+    weather = (eng.weather_data or {}).get(spot_name) or {}
+    if not weather:
+        return {}
+    hourly = _filter_day(weather.get("hourly_data") or {}, date_str)
+    pressure = _filter_day(weather.get("pressure_level_data") or {}, date_str)
+    if not hourly:
+        return {}
+    spot_obj = next((s for s in (eng.spots or []) if s.get("name") == spot_name), {}) or {}
+    return {
+        "elevation_m": weather.get("elevation_m") or spot_obj.get("elevation_m"),
+        "latitude": weather.get("latitude") or spot_obj.get("latitude"),
+        "longitude": weather.get("longitude") or spot_obj.get("longitude"),
+        "slope_azimuth": spot_obj.get("slope_azimuth"),
+        "slope_angle": spot_obj.get("slope_angle"),
+        "windrichtung": spot_obj.get("windrichtung"),
+        "ideal_wind_max": spot_obj.get("ideal_wind_max"),
+        "hourly_data": hourly,
+        "pressure_level_data": pressure,
+    }
+
+
 def _is_edge(entry: dict) -> bool:
     safety = entry.get("safety") or {}
     if (safety.get("foehn_risk") or "none") not in ("none", ""):
@@ -207,6 +246,7 @@ def main():
         if not ctx:
             no_input += 1
 
+        weather_snapshot = _build_weather_snapshot(eng, name, date_str)
         record = {
             "spot": name,
             "date": date_str,
@@ -215,6 +255,7 @@ def main():
             "safety_status": _safety_of(entry),
             "input": ctx,
             "output": entry,
+            "weather_snapshot": weather_snapshot,
         }
         if args.dry_run:
             print(f"[dry-run] would write {out_path.name} "

@@ -4,6 +4,50 @@ INPUT-KARTE — WIE LIEST DU DEN DATENBLOCK?
 
 Der User-Block liefert dir drei Zonen: **Stunden-Zeilen**, **Drucklevel-Werte** und den **TAGESPROFIL-Block** am Ende. Lerne diese zuerst — danach kannst du die Regeln anwenden.
 
+═══════════════════════════════════════════════
+ZWEI TAG-KATEGORIEN (KATEGORISCH GETRENNT!)
+═══════════════════════════════════════════════
+
+Jeder Tag in eckigen Klammern gehoert zu **genau einer** dieser zwei Kategorien:
+
+**KATEGORIE 1 — STARTBARKEITS-FILTER** (Spot only)
+- `[WIND-OK]` — Stunde ist Start-**Kandidat**.
+- `[WIND-WRONG]` — Stunde ist **kein** Start-Kandidat. Wird **IGNORIERT**.
+
+`[WIND-WRONG]` ist KEIN Hazard, KEINE Warnung, KEIN Sicherheitssignal. Es ist ein **Filter**. Aber: wenn der Filter den ganzen Tag wegfiltert, gibt es keinen Start — und genau **das** ist dann der Grund fuer `not_safe`.
+
+Deshalb gibt es zwei Faelle, je nach Start-Fenster-Laenge:
+
+**FALL A — Ausreichendes Start-Fenster vorhanden** (`Laengstes Fenster ≥ {{cfg.CLEAN_WINDOW_MIN_HOURS}}h`):
+- `[WIND-WRONG]`-Stunden werden **ignoriert** wie Stunden ausserhalb des Flugfensters.
+- Kommen **NIEMALS** in `caution_notes` oder `no_go_reasons`.
+- Fuehren **NIEMALS** zu `conditional` oder `not_safe`.
+- Zwischen zwei sauberen Fenstern teilen sie das Fenster auf, **machen aber keines der Teile gefaehrlich**.
+- Ein Richtungsdreher im Tagesverlauf (auch >90°) ist **kein Status-Downgrade** — nur Anmerkung in `wind_summary`.
+
+**SPRACH-VERBOT in Fall A** (PFLICHT, weil Status hier `safe` oder `conditional` ist):
+- Niemals als "Gefahr", "Hauptgefahr", "Risiko", "Warnung", "kritisch", "ungünstig" framen.
+- Niemals als Begründung für den safe/conditional-Status nennen.
+- Auch nicht als "die einzige Gefahr ist die falsche Windrichtung" oder "Hauptgefahren beschränken sich auf eine Stunde mit falscher Windrichtung" schreiben — das ist die verbotene Framing-Falle.
+- Wenn ueberhaupt erwaehnen, dann **rein faktisch ohne Risiko-Wortschatz**: "10:00 nicht startbar (Windrichtung), Start ab 11:00".
+
+**FALL B — Kein ausreichendes Start-Fenster** (`Laengstes Fenster < {{cfg.CLEAN_WINDOW_MIN_HOURS}}h`, ggf. 0):
+- Status = **`not_safe`** (deterministisch, Code erzwingt das).
+- `[WIND-WRONG]` IST jetzt die **legitime Begruendung** — kein Hazard, aber das Fehlen einer startbaren Stunde **ist** der Grund.
+- Gehoert in `no_go_reasons` und `summary` als faktischer Eintrag.
+- Sprache: **kein Risiko-Wortschatz** ("Gefahr", "kritisch", "stürmisch"), sondern **Fakt**: kein Start moeglich.
+- Erlaubte Formulierungen:
+  - `no_go_reasons: ["Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"]`
+  - `no_go_reasons: ["Start-Fenster: Nur Xh mit Windrichtung im erlaubten Sektor (Minimum {{cfg.CLEAN_WINDOW_MIN_HOURS}}h)"]`
+  - `summary: "Nur Xh mit passender Windrichtung (<Sektor>) — kein ausreichendes Start-Fenster."`
+  - `summary: "Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors. Kein fliegbares Fenster."`
+- VERBOTEN bleibt: WIND-WRONG als "Gefahr" bezeichnen, "Risiko" suggerieren, dramatisches Wording. Es ist nuechtern: kein passender Wind = kein Start.
+
+**Bei alten Datenbloecken**: Wenn die Hauptgefahren-Zeile im Datenblock noch `WIND-WRONG Xh` enthaelt (Cache vor STARTBARKEIT-Refactor), **ignoriere diesen Histogramm-Eintrag** als Hazard — er ist veraltetes Format. Im aktuellen Datenblock erscheint `[WIND-WRONG]` **nur** im STARTBARKEIT-Block, **niemals** in `Hauptgefahren am Tag:`.
+
+**KATEGORIE 2 — HAZARD-TAGS** (gelten fuer Kandidaten-Stunden)
+Alle anderen Tags. Diese koennen Status druecken, in `caution_notes`/`no_go_reasons` landen und Sub-Ratings beeinflussen. Liste folgt unten.
+
 ─────────────────────────────────
 A) STUNDEN-ZEILEN (Bodendaten + Tags)
 ─────────────────────────────────
@@ -27,9 +71,9 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 - `[ALOFT-GUST-WARN]` — Turbulenz in der Flugschicht erhoeht (WARN-Level) *(nur Spots)*
 - `[CAPE-WARN]` — CAPE erhoeht (WARN-Level) ohne Trigger
 
-**Richtungs-Tags (Spot-Modus) — Start-Bedingung, KEINE Flug-Gefahr:**
-- `[WIND-OK]` — Windrichtung liegt im erlaubten Spot-Sektor (inkl. 10° Buffer) → Start moeglich.
-- `[WIND-WRONG]` — Windrichtung ausserhalb des Spot-Sektors → **Stunde nicht startbar** (NICHT UNFLIEGBAR). Stunden NACH einem gueltigen Start-Fenster sind kein Sicherheitsproblem (Pilot ist in der Luft, Landung separat). Details: `_hazards_*.md` Block 2 Start-Fenster-Regel.
+**Richtungs-Tags (Spot-Modus) — siehe oben "ZWEI TAG-KATEGORIEN":**
+- `[WIND-OK]` — Windrichtung liegt im erlaubten Spot-Sektor (inkl. 10° Buffer) → Start-Kandidat.
+- `[WIND-WRONG]` — Windrichtung ausserhalb des Spot-Sektors → Filter, **kein Hazard** (Details siehe oben).
 
 **Region-Modus:** Regionen haben keinen Sektor und keine Boeen, nur Wind-Staerke auf Referenzhoehe. Tags sind dieselben wie bei Spots:
 - Kein Tag (Wind < {{cfg.WIND_WARN_KMH}} km/h) → RUHIG
@@ -41,7 +85,7 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 *Achse 1 — Flug-Gefahr (betrifft Pilot in der Luft):*
 - `RUHIG` = KEINE Tags = komfortabel.
 - `SPORTLICH` = ≥1 WARN-Tag, KEIN DANGER = fliegbar erfahren.
-- `UNFLIEGBAR` = ≥1 DANGER-Tag (RAIN-WARN, WIND-DANGER, ALOFT-WIND-DANGER, GUST-DANGER, ALOFT-GUST-DANGER, THUNDERSTORM, CAPE-DANGER, OVERCAST-DANGER) — `[WIND-WRONG]` zaehlt NICHT hier rein.
+- `UNFLIEGBAR` = ≥1 DANGER-Tag (RAIN-WARN, WIND-DANGER, ALOFT-WIND-DANGER, GUST-DANGER, ALOFT-GUST-DANGER, THUNDERSTORM, CAPE-DANGER, OVERCAST-DANGER). `[WIND-WRONG]` ist Filter, kein DANGER.
 
 *Achse 2 — Start-Moeglichkeit (betrifft nur Startplatz):*
 - `STARTBAR` = `[WIND-OK]` (Spot) oder Region nicht `[WIND-DANGER]`.
@@ -50,7 +94,6 @@ Pro Stunde bekommst du eine Zeile mit Bodenwind, Bewoelkung, Niederschlag, CAPE,
 *Kombinierter Begriff:*
 - **Saubere Stunde** = STARTBAR UND nicht UNFLIEGBAR (keine DANGER-Tags). Das ist die einzige Stundenart, in der ein Pilot sicher starten kann.
 - `safe_window` = zusammenhaengender Block sauberer Stunden.
-- Stunden mit `[WIND-WRONG]` aber ohne DANGER-Tags sind **nicht UNFLIEGBAR** — sie sind "nicht startbar". Tag-Status haengt allein am laengsten Block sauberer Stunden (Schwelle: `{{cfg.CLEAN_WINDOW_MIN_HOURS}}h` — darunter `not_safe`, darueber `safe`/`conditional` je nach anderen Faktoren).
 
 **Thermik-Qualitaets-Tags** (gelten NUR fuer Teil 2 Fliegbarkeit, NIE fuer Sicherheit):
 - `[SHEAR-DEGRADED]` / `[SHEAR-UNUSABLE]` — Windscherung: Wind dreht/beschleunigt mit Hoehe, Blase wird gekippt (Spot + Region).

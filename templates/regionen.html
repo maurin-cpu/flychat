@@ -634,6 +634,24 @@ window.addEventListener('gleitcast-day-change', function(e) {
 });
 
 function _applyApiPayload(regionAnalyses) {
+    // Race-Schutz: dieser Inline-Script laeuft waehrend des HTML-Parsens und
+    // feuert /api/region-analyses sofort. Alle Karten-Scripts (region-map.js,
+    // leaflet ...) sind `defer` und laufen erst nach dem Parsen. Bei kaltem
+    // Browser-Cache loest die API auf, bevor die deferred Scripts liefen —
+    // dann waeren window.setRegionAnalyses/setRegionDate noch undefined,
+    // die Guards weiter unten waeren stille No-Ops, und die Karte bliebe
+    // blank bis der User zu /chat und zurueck wechselt (Scripts dann cached,
+    // race verschwindet). Hier auf DOMContentLoaded warten, dann fortfahren.
+    if (!window.setRegionAnalyses || !window.setRegionDate) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () {
+                _applyApiPayload(regionAnalyses);
+            }, { once: true });
+        } else {
+            setTimeout(function () { _applyApiPayload(regionAnalyses); }, 50);
+        }
+        return;
+    }
     var newNested = {};
     var newestTs = null;
     for (var rid in regionAnalyses) {
