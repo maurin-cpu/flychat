@@ -92,6 +92,13 @@ def _stars_for_spot(spot: dict) -> int:
     return 0
 
 
+def _rating_display(spot: dict) -> str:
+    """RATING_CONCEPT v1.4: Integer-1-10 als String fuer Mail-Anzeige.
+    Leerstring fuer 0/not_safe (kein Rating zeigen)."""
+    r = _rating_for_spot(spot)
+    return str(r) if r > 0 else ""
+
+
 def _rating_for_spot(spot: dict) -> int:
     """RATING_CONCEPT v1.4: Liest experience_rating (0-10), Fallback auf
     Score/Stars/Rating fuer Legacy-Caches.
@@ -694,8 +701,13 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
             # Sterne unabhaengig: max ueber alle Spots in dieser Region/Tag
             if stars > cell["stars"]:
                 cell["stars"] = stars
+            # v1.4: Integer-Rating 1-10 (max ueber alle Spots in dieser Region/Tag)
+            r10 = _rating_for_spot(spot)
+            if r10 > cell.get("rating_int", 0):
+                cell["rating_int"] = r10
             cell["spot_count"] += 1
             entry["best_rating"] = max(entry["best_rating"], rating)
+            entry["best_rating_int"] = max(entry.get("best_rating_int", 0), r10)
 
     # Meta pro Zelle einhaengen + Sortierung
     out = []
@@ -705,7 +717,9 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
             cell["tier_color"] = meta["color"]
             cell["tier_bg"]    = meta["bg"]
             cell["tier_label"] = meta["label"]
-            cell["rating_display"] = f"{cell['rating']:.1f}" if cell["rating"] > 0 else ""
+            # v1.4: Integer 1-10 statt Decimal (RATING_CONCEPT v1.4)
+            cell["rating_display"] = (str(cell["rating_int"])
+                                      if cell.get("rating_int", 0) > 0 else "")
             cell["stars_glyph"] = _stars_glyph_text(cell["stars"])
         out.append(entry)
 
@@ -747,7 +761,10 @@ def _group_spots_by_region(shown_spots: list[dict],
         if rating is None or rating <= 0:
             rating = max((float(sp.get("rating") or 0) for sp in spots), default=0.0)
         g["region_rating"] = float(rating)
-        g["region_rating_display"] = f"{float(rating):.1f}"
+        # v1.4: Integer 1-10 — max ueber Spots der Gruppe (nutzt experience_rating, fallback)
+        g["region_rating_int"] = max((_rating_for_spot(sp) for sp in spots), default=0)
+        g["region_rating_display"] = (str(g["region_rating_int"])
+                                      if g["region_rating_int"] > 0 else "")
         g["region_tier"] = region_tier
         g["tier_color"] = meta["color"]
         g["tier_label"] = meta["label"]
@@ -902,7 +919,9 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
                 "stars_glyph": _stars_glyph_text(stars),
                 "safety_band": band,
                 "window":     _format_window(s.get("best_window", "")),
-                "rating_display": f"{float(s.get('rating', 0) or 0):.1f}",
+                # v1.4: Integer 1-10 (RATING_CONCEPT v1.4)
+                "rating_int": _rating_for_spot(s),
+                "rating_display": _rating_display(s),
             })
 
         day_tier = _derive_day_tier(my_spots)
@@ -922,6 +941,9 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         displayed_spots = [sp for g in region_groups for sp in g["spots"]]
         day_rating = max((float(sp.get("rating") or 0) for sp in displayed_spots),
                          default=0.0)
+        # v1.4: Integer 1-10 fuer Display
+        day_rating_int = max((sp.get("rating_int", 0) for sp in displayed_spots),
+                             default=0)
         fly_summary = _day_fly_summary(my_spots, day_tier)
         safety_summary = _day_safety_summary(my_spots)
 
@@ -951,7 +973,9 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "region_groups": region_groups,
             "top_spots_flat": top_spots_flat,
             "day_rating": day_rating,
-            "day_rating_display": f"{day_rating:.1f}" if day_rating > 0 else "",
+            "day_rating_int": day_rating_int,
+            # v1.4: Integer 1-10 statt Decimal
+            "day_rating_display": (str(day_rating_int) if day_rating_int > 0 else ""),
             "fly_summary": fly_summary,
             "safety_summary": safety_summary,
             "more_count":  max(0, len(my_spots) - len(displayed_spots)),
@@ -1102,16 +1126,16 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # Der Deep-Link enthaelt schon die Subscriber-Regionen + besten Tag,
     # Empfaenger landet gefiltert. Rich-Preview kommt per OG-Tags auf /briefing.
     if verdict:
-        share_msg = f"{verdict['headline']} — Gleitcast-Briefing KW{today.isocalendar().week}:"
+        share_msg = f"{verdict['headline']} — Gleitcast Wochencast KW{today.isocalendar().week}:"
     else:
-        share_msg = f"Mein Gleitcast-Briefing für KW{today.isocalendar().week}:"
+        share_msg = f"Mein Gleitcast Wochencast für KW{today.isocalendar().week}:"
     share_payload = f"{share_msg}\n{deep_link}"
     share = {
         "url":          deep_link,
         "text":         share_msg,
         "whatsapp":     f"https://wa.me/?text={quote(share_payload, safe='')}",
         "telegram":     f"https://t.me/share/url?url={quote(deep_link, safe='')}&text={quote(share_msg, safe='')}",
-        "mailto":       f"mailto:?subject={quote('Gleitcast Briefing KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
+        "mailto":       f"mailto:?subject={quote('Gleitcast Wochencast KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
     }
 
     return {

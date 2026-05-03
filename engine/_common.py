@@ -374,6 +374,38 @@ def _user_friendly_api_error(err: Exception) -> str:
 
 
 # ============================================================================
+# Reasoning-Model-Erkennung + Token-Budget
+# Reasoning-Modelle (deepseek-reasoner, deepseek-v4-pro, OpenAI o-Reihe)
+# verbrennen einen Teil des max_tokens-Budgets fuer internes Reasoning,
+# bevor sichtbarer Content erscheint. Mit 1500-2500 max_tokens bleibt nichts
+# fuer den JSON-Output uebrig → finish_reason='length' + content='' →
+# json.loads("") wirft JSONDecodeError. Wir bumpen das Budget pauschal.
+# ============================================================================
+_REASONING_MODEL_PATTERNS = (
+    "reasoner",   # deepseek-reasoner
+    "v4-pro",     # deepseek-v4-pro (Reasoning-Variante)
+    "v4-flash",   # deepseek-v4-flash (Reasoning-Variante, kleineres MoE)
+    "o1-", "o3-", "o4-",  # OpenAI Reasoning-Reihe
+)
+_REASONING_TOKEN_HEADROOM = 6000  # +Tokens fuer Reasoning-Phase, robust gegen lange Kontexte
+
+
+def _is_reasoning_model(model: str) -> bool:
+    if not model:
+        return False
+    m = str(model).lower()
+    return any(p in m for p in _REASONING_MODEL_PATTERNS) or m in ("o1", "o3", "o4")
+
+
+def _resolve_max_tokens(model: str, base: int) -> int:
+    """Bumpt max_tokens fuer Reasoning-Modelle damit der JSON-Output nicht
+    durch den internen Reasoning-Verbrauch abgeschnitten wird."""
+    if _is_reasoning_model(model):
+        return base + _REASONING_TOKEN_HEADROOM
+    return base
+
+
+# ============================================================================
 # FLYABILITY TIER + RATING (Briefing-Logik)
 # ============================================================================
 # Phase-2 Fliegbarkeit: gray / green / violet (Legacy: yellow→gray, orange→green)

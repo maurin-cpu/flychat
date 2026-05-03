@@ -213,6 +213,13 @@ def main():
                 continue
             if args.safety != "any" and _safety_of(entry) != args.safety:
                 continue
+
+            # Nur Cases mit vorhandenen Wetterdaten in den Pool aufnehmen
+            weather = (eng.weather_data or {}).get(name) or {}
+            hourly = _filter_day(weather.get("hourly_data") or {}, date_str)
+            if not hourly:
+                continue
+
             rows.append((name, date_str, entry))
 
     if not rows:
@@ -245,6 +252,9 @@ def main():
                       file=sys.stderr)
         if not ctx:
             no_input += 1
+            print(f"SKIP: Kein Kontext fuer {name}/{date_str} (Wetterdaten fehlen oder unvollstaendig)",
+                  file=sys.stderr)
+            continue
 
         weather_snapshot = _build_weather_snapshot(eng, name, date_str)
         record = {

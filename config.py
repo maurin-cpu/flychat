@@ -701,11 +701,67 @@ LLM_MODELS = {
 }
 
 # Top-Level-Attribute fuer Admin-UI-Override (config_overrides.setattr greift hier).
-# get_model() liest fuer deepseek bevorzugt diese Attribute, damit Aenderungen via
-# Admin-UI ohne Neustart wirken (chat_engine cached pro Init — Neustart trotzdem
-# noetig, damit aktive Engine-Instanzen das neue Modell sehen).
-DEEPSEEK_CHAT_MODEL     = LLM_MODELS["deepseek"]["chat"]
-DEEPSEEK_ANALYSIS_MODEL = LLM_MODELS["deepseek"]["analysis"]
+# get_model() liest bevorzugt diese Attribute, damit Aenderungen via Admin-UI
+# ohne Neustart wirken (chat_engine cached pro Init — Neustart trotzdem noetig,
+# damit aktive Engine-Instanzen das neue Modell sehen).
+OPENAI_CHAT_MODEL        = LLM_MODELS["openai"]["chat"]
+OPENAI_ANALYSIS_MODEL    = LLM_MODELS["openai"]["analysis"]
+ANTHROPIC_CHAT_MODEL     = LLM_MODELS["anthropic"]["chat"]
+ANTHROPIC_ANALYSIS_MODEL = LLM_MODELS["anthropic"]["analysis"]
+GEMINI_CHAT_MODEL        = LLM_MODELS["gemini"]["chat"]
+GEMINI_ANALYSIS_MODEL    = LLM_MODELS["gemini"]["analysis"]
+DEEPSEEK_CHAT_MODEL      = LLM_MODELS["deepseek"]["chat"]
+DEEPSEEK_ANALYSIS_MODEL  = LLM_MODELS["deepseek"]["analysis"]
+
+# Mapping Modellname -> Provider. Wird vom Admin-UI verwendet, um aus einem
+# einzelnen CHAT_MODEL/ANALYSIS_MODEL-Dropdown den Provider abzuleiten.
+# Bei neuen Modellen hier eintragen — sonst greift der Auto-Provider nicht.
+MODEL_PROVIDER_MAP: dict[str, str] = {
+    # OpenAI
+    "gpt-5.5": "openai", "gpt-5.4": "openai", "gpt-5.4-mini": "openai",
+    "gpt-5.4-nano": "openai", "gpt-5.3-codex": "openai",
+    "gpt-4o": "openai", "gpt-4o-mini": "openai",
+    # Anthropic
+    "claude-opus-4-7": "anthropic", "claude-opus-4-6": "anthropic",
+    "claude-sonnet-4-6": "anthropic", "claude-opus-4-5": "anthropic",
+    "claude-sonnet-4-5": "anthropic", "claude-haiku-4-5": "anthropic",
+    # Gemini
+    "gemini-3.1-pro": "gemini", "gemini-3.1-flash": "gemini",
+    "gemini-3.1-flash-lite": "gemini", "gemini-3-flash": "gemini",
+    "gemini-2.5-pro": "gemini", "gemini-2.5-flash": "gemini",
+    "gemini-2.5-flash-lite": "gemini",
+    # DeepSeek
+    "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
+    "deepseek-chat": "deepseek", "deepseek-reasoner": "deepseek",
+}
+
+# Single Source of Truth fuer Admin-UI: ein Modellname pro Anwendung.
+# Provider wird beim Override automatisch via MODEL_PROVIDER_MAP abgeleitet
+# und CHAT_PROVIDER/ANALYSIS_PROVIDER + per-provider-Modell-Attr nachgezogen.
+def _resolve_provider_and_model(name: str, purpose: str) -> tuple[str, str]:
+    """Toleriert wenn jemand einen Modellnamen statt Provider-Namen in ENV
+    geschrieben hat (z.B. ANALYSIS_PROVIDER=deepseek-v4-pro). Liefert immer
+    ein gueltiges (provider, model)-Paar."""
+    if name in LLM_MODELS:
+        return name, LLM_MODELS[name][purpose]
+    if name in MODEL_PROVIDER_MAP:
+        prov = MODEL_PROVIDER_MAP[name]
+        logging.getLogger(__name__).warning(
+            "%s_PROVIDER='%s' ist ein Modellname, kein Provider — interpretiere als provider=%s, model=%s.",
+            purpose.upper(), name, prov, name)
+        return prov, name
+    logging.getLogger(__name__).warning(
+        "%s_PROVIDER='%s' unbekannt — falle zurueck auf 'openai'.", purpose.upper(), name)
+    return "openai", LLM_MODELS["openai"][purpose]
+
+
+CHAT_PROVIDER, CHAT_MODEL         = _resolve_provider_and_model(CHAT_PROVIDER, "chat")
+ANALYSIS_PROVIDER, ANALYSIS_MODEL = _resolve_provider_and_model(ANALYSIS_PROVIDER, "analysis")
+# Per-provider-Attr nachziehen, damit get_model() konsistent bleibt
+LLM_MODELS[CHAT_PROVIDER]["chat"]         = CHAT_MODEL
+LLM_MODELS[ANALYSIS_PROVIDER]["analysis"] = ANALYSIS_MODEL
+globals()[f"{CHAT_PROVIDER.upper()}_CHAT_MODEL"]         = CHAT_MODEL
+globals()[f"{ANALYSIS_PROVIDER.upper()}_ANALYSIS_MODEL"] = ANALYSIS_MODEL
 
 # API-Keys (nur der aktive Provider muss gesetzt sein)
 OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
@@ -731,13 +787,15 @@ def get_api_key(provider: str) -> str:
 
 
 def get_model(provider: str, purpose: str) -> str:
-    """purpose = 'chat' oder 'analysis'."""
-    if provider == "deepseek":
-        # Top-Level-Attribute haben Vorrang (Admin-UI-Override via setattr)
-        if purpose == "chat":
-            return DEEPSEEK_CHAT_MODEL
-        if purpose == "analysis":
-            return DEEPSEEK_ANALYSIS_MODEL
+    """purpose = 'chat' oder 'analysis'.
+
+    Top-Level-Attribute (z.B. OPENAI_CHAT_MODEL) haben Vorrang vor LLM_MODELS,
+    damit Admin-UI-Overrides via setattr(config, ...) sofort greifen.
+    """
+    attr = f"{provider.upper()}_{purpose.upper()}_MODEL"
+    val = globals().get(attr)
+    if val:
+        return val
     return LLM_MODELS.get(provider, {}).get(purpose, "")
 
 

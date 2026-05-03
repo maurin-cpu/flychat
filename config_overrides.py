@@ -157,19 +157,21 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
             {"key": "DAILY_RUN_WEEKDAYS", "type": "weekdays",
              "help": "Wochentage, an denen der Daily-Run laeuft. 0=Mo, 6=So."},
         ],
-        "LLM-Analyse": [
+        "LLM-Modelle (Chat + Analyse)": [
+            {"key": "CHAT_MODEL", "type": "choice",
+             "choices": list(config.MODEL_PROVIDER_MAP.keys()),
+             "help": "Modell fuer den Chat-Berater. Provider wird automatisch erkannt (OpenAI / Anthropic / Gemini / DeepSeek). Der passende API-Key (z.B. OPENAI_API_KEY) muss als ENV-Variable gesetzt sein."},
+            {"key": "ANALYSIS_MODEL", "type": "choice",
+             "choices": list(config.MODEL_PROVIDER_MAP.keys()),
+             "help": "Modell fuer Spot/Region-Analysen. Provider wird automatisch erkannt. Bei OpenAI ist zusaetzlich der Batch-Modus moeglich (siehe OPENAI_ANALYSIS_MODE). Hybrid-Setup moeglich (z.B. Chat=claude-haiku-4-5, Analyse=gpt-5.4-mini)."},
+        ],
+        "LLM-Analyse (technisch)": [
             {"key": "OPENAI_ANALYSIS_MODE", "type": "choice", "choices": ["parallel", "batch"],
              "help": "Gilt NUR wenn ANALYSIS_PROVIDER=openai. parallel = schnell (viele gleichzeitige Calls). batch = guenstig (OpenAI Batch API, 50% billiger, 5-30 Min). Bei Anthropic/Gemini/DeepSeek wird der Wert ignoriert (immer parallel)."},
             {"key": "LLM_MAX_WORKERS", "type": "int", "min": 1, "max": 100,
              "help": "Anzahl paralleler LLM-Calls im parallel-Modus. Hoeher = schneller, aber mehr Quota-Verbrauch."},
             {"key": "LLM_BATCH_POLL_INTERVAL", "type": "int", "min": 5, "max": 300, "unit": "s",
              "help": "Poll-Intervall fuer Batch-Status im OpenAI-batch-Modus."},
-            {"key": "DEEPSEEK_CHAT_MODEL", "type": "choice",
-             "choices": ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"],
-             "help": "DeepSeek-Modell fuer den Chat-Berater. Nur aktiv wenn CHAT_PROVIDER=deepseek. v4-flash ~5x guenstiger als v4-pro, v4-pro deutlich faehiger bei komplexen Multi-Spot-Fragen. Aenderung erfordert Server-Neustart."},
-            {"key": "DEEPSEEK_ANALYSIS_MODEL", "type": "choice",
-             "choices": ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"],
-             "help": "DeepSeek-Modell fuer Spot/Region-Analysen. Nur aktiv wenn ANALYSIS_PROVIDER=deepseek. v4-flash empfohlen (Kosten/Qualitaets-Optimum, Decision-Engine deckt Sicherheitskern ab). v4-pro nur bei sichtbaren Qualitaetsproblemen."},
         ],
     },
 }
@@ -260,6 +262,25 @@ def _coerce(value: Any, field: dict) -> Any:
     raise ValueError(f"Unbekannter Typ: {t}")
 
 
+def _apply_model_choice(key: str, model: str) -> bool:
+    """CHAT_MODEL/ANALYSIS_MODEL-Override: setzt Modell + leitet Provider ab
+    + zieht passenden per-provider-Modell-Attr (OPENAI_CHAT_MODEL etc.) nach.
+
+    Gibt True zurueck wenn erfolgreich angewandt, False bei unbekanntem Modell.
+    """
+    if key not in ("CHAT_MODEL", "ANALYSIS_MODEL"):
+        return False
+    purpose = "chat" if key == "CHAT_MODEL" else "analysis"
+    provider = config.MODEL_PROVIDER_MAP.get(model)
+    if provider is None:
+        logger.warning("Unbekanntes Modell '%s' — Provider nicht ableitbar.", model)
+        return False
+    setattr(config, key, model)
+    setattr(config, f"{purpose.upper()}_PROVIDER", provider)
+    setattr(config, f"{provider.upper()}_{purpose.upper()}_MODEL", model)
+    return True
+
+
 def apply_overrides(overrides: dict[str, Any] | None = None) -> list[str]:
     """Setzt Overlay-Werte auf das config-Modul. Gibt Liste angewandter Keys zurueck.
 
@@ -290,6 +311,12 @@ def apply_overrides(overrides: dict[str, Any] | None = None) -> list[str]:
             setattr(config, sub_keys[0], coerced[0])
             setattr(config, sub_keys[1], coerced[1])
             applied.append(k)
+            continue
+
+        # CHAT_MODEL/ANALYSIS_MODEL: Provider + per-provider-Attr nachziehen
+        if k in ("CHAT_MODEL", "ANALYSIS_MODEL"):
+            if _apply_model_choice(k, coerced):
+                applied.append(k)
             continue
 
         setattr(config, k, coerced)
@@ -397,6 +424,11 @@ def _restore_default(key: str) -> None:
             if sub in _ORIGINAL_DEFAULTS:
                 setattr(config, sub, _ORIGINAL_DEFAULTS[sub])
         logger.info("Config-Override '%s' (composed) auf Default zurueckgesetzt.", key)
+        return
+    # CHAT_MODEL/ANALYSIS_MODEL: Default zurueck + Provider + per-provider-Attr
+    if key in ("CHAT_MODEL", "ANALYSIS_MODEL") and key in _ORIGINAL_DEFAULTS:
+        if _apply_model_choice(key, _ORIGINAL_DEFAULTS[key]):
+            logger.info("Config-Override '%s' (model+provider) auf Default zurueckgesetzt.", key)
         return
     if key in _ORIGINAL_DEFAULTS:
         setattr(config, key, _ORIGINAL_DEFAULTS[key])

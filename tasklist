@@ -1,0 +1,7 @@
+      PID    PPID    PGID     WINPID   TTY         UID    STIME COMMAND
+     1846       1    1846      86692  cons0     197609 18:00:58 /usr/bin/bash
+     1785    1782    1782      41804  ?         197609 17:50:13 /usr/bin/head
+     1895    1846    1895      84852  cons0     197609 18:01:03 /usr/bin/PS
+     1784    1782    1782      62980  ?         197609 17:50:13 /c/Python314/python
+     1896    1846    1895      26764  cons0     197609 18:01:03 /usr/bin/bash
+     1782       1    1782      16732  ?         197609 17:50:13 /usr/bin/bash

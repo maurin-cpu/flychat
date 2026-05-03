@@ -62,6 +62,7 @@ from engine._common import (
     _log_prompt_cache_usage, _weekday_de,
     BatchCostTracker, extract_usage_from_response,
     _is_permanent_api_error, _user_friendly_api_error,
+    _resolve_max_tokens,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _compute_rating_from_subratings,
     _compute_experience_score, _compute_experience_stars, _compute_experience_rating,
@@ -301,11 +302,17 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=1500,
+                        max_tokens=_resolve_max_tokens(self.analysis_model, 1500),
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "spot_safety")
                     raw = response.choices[0].message.content
+                    if not raw:
+                        finish = getattr(response.choices[0], "finish_reason", "?")
+                        raise RuntimeError(
+                            f"LLM lieferte leeren Content (finish_reason={finish}) — "
+                            f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
+                        )
                     result = json.loads(raw)
                     last_err = None
                     break
@@ -360,11 +367,17 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=2500,
+                        max_tokens=_resolve_max_tokens(self.analysis_model, 2500),
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "spot_fly")
                     raw = response.choices[0].message.content
+                    if not raw:
+                        finish = getattr(response.choices[0], "finish_reason", "?")
+                        raise RuntimeError(
+                            f"LLM lieferte leeren Content (finish_reason={finish}) — "
+                            f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
+                        )
                     result = json.loads(raw)
                     last_err = None
                     break
@@ -434,11 +447,17 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=1500,
+                        max_tokens=_resolve_max_tokens(self.analysis_model, 1500),
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "region_safety")
                     raw = response.choices[0].message.content
+                    if not raw:
+                        finish = getattr(response.choices[0], "finish_reason", "?")
+                        raise RuntimeError(
+                            f"LLM lieferte leeren Content (finish_reason={finish}) — "
+                            f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
+                        )
                     result = json.loads(raw)
                     last_err = None
                     break
@@ -493,11 +512,17 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=2500,
+                        max_tokens=_resolve_max_tokens(self.analysis_model, 2500),
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "region_fly")
                     raw = response.choices[0].message.content
+                    if not raw:
+                        finish = getattr(response.choices[0], "finish_reason", "?")
+                        raise RuntimeError(
+                            f"LLM lieferte leeren Content (finish_reason={finish}) — "
+                            f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
+                        )
                     result = json.loads(raw)
                     last_err = None
                     break
@@ -1198,11 +1223,17 @@ class AnalyzersMixin:
                     )},
                 ],
                 temperature=0.4,
-                max_tokens=1500,
+                max_tokens=_resolve_max_tokens(self.analysis_model, 1500),
                 response_format={"type": "json_object"},
             )
             _log_prompt_cache_usage(response, label="weekly_briefing")
             raw = response.choices[0].message.content
+            if not raw:
+                finish = getattr(response.choices[0], "finish_reason", "?")
+                raise RuntimeError(
+                    f"LLM lieferte leeren Content (finish_reason={finish}) — "
+                    f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
+                )
             fazit = json.loads(raw)
             # Clamp week_rating
             wr = fazit.get("week_rating", 0.0)
@@ -2151,7 +2182,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 1500,
+                        "max_tokens": _resolve_max_tokens(self.analysis_model, 1500),
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2247,7 +2278,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 2500,
+                        "max_tokens": _resolve_max_tokens(self.analysis_model, 2500),
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2382,7 +2413,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 1500,
+                        "max_tokens": _resolve_max_tokens(self.analysis_model, 1500),
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2488,7 +2519,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 2500,
+                        "max_tokens": _resolve_max_tokens(self.analysis_model, 2500),
                         "response_format": {"type": "json_object"},
                     },
                 })

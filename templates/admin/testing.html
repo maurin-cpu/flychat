@@ -92,14 +92,22 @@
       <dl class="ts-meta">
         <dt>Eingefroren am</dt><dd>{{ status.frozen_weather.meta.frozen_at }}</dd>
         <dt>Quell-Lauf</dt><dd>{{ status.frozen_weather.meta.source_run_at or '—' }}</dd>
-        <dt>Test-Spots im Snapshot</dt>
+        <dt>Snapshot-Set</dt>
+        <dd>
+          {% if status.frozen_weather.meta.spot_set == 'complete' %}
+            <strong>Komplett</strong> (alle Spots)
+          {% else %}
+            <strong>Test-Set</strong> (nur <code>fluggebiete_test.csv</code>)
+          {% endif %}
+        </dd>
+        <dt>Spots im Snapshot</dt>
         <dd>
           {{ status.frozen_weather.meta.spot_count }}
-          {% if status.frozen_weather.meta.test_set_size is defined %}
+          {% if status.frozen_weather.meta.spot_set != 'complete' and status.frozen_weather.meta.test_set_size is defined %}
             / {{ status.frozen_weather.meta.test_set_size }} aus <code>fluggebiete_test.csv</code>
           {% endif %}
           {% if status.frozen_weather.meta.total_source_spots is defined %}
-            <span style="color:var(--color-text-secondary);">(gefiltert aus {{ status.frozen_weather.meta.total_source_spots }} Source-Spots)</span>
+            <span style="color:var(--color-text-secondary);">({{ status.frozen_weather.meta.total_source_spots }} Source-Spots im Live-Cache)</span>
           {% endif %}
         </dd>
         {% if status.frozen_weather.meta.missing_test_spots %}
@@ -121,16 +129,38 @@
       <div class="ts-meta ts-meta--empty">Noch keine Mock-Daten eingefroren.</div>
     {% endif %}
 
+    <fieldset style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:10px 14px;margin:0 0 10px 0;">
+      <legend style="padding:0 6px;font-size:var(--text-sm);font-weight:600;">Snapshot-Set (gilt fuer beide Einfrier-Buttons)</legend>
+      <label style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);margin:4px 0;">
+        <input type="radio" name="fz_spot_set" value="test" id="fz-set-test"
+               {% if status.frozen_weather.meta.spot_set != 'complete' %}checked{% endif %}>
+        <span>
+          <strong>Test-Set</strong>
+          ({{ status.test_csv.spot_count }} Spots, ~22 MB &mdash; schneller Smoketest)
+        </span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);margin:4px 0;">
+        <input type="radio" name="fz_spot_set" value="complete" id="fz-set-complete"
+               {% if status.frozen_weather.meta.spot_set == 'complete' %}checked{% endif %}>
+        <span>
+          <strong>Komplett</strong>
+          (alle {{ total_spots }} Spots, ~380 MB &mdash; volle Reproduktion)
+        </span>
+      </label>
+    </fieldset>
+
     <div class="ts-actions">
-      <form method="post" action="/admin/testing/freeze-weather"
-            onsubmit="return confirm('Aktuelle Wetterdaten als Mock einfrieren? Vorhandener Snapshot wird ueberschrieben.');">
+      <form method="post" action="/admin/testing/freeze-weather" id="fz-form-cache"
+            onsubmit="document.getElementById('fz-cache-set').value = (document.querySelector('input[name=fz_spot_set]:checked')||{}).value || 'test'; return confirm('Aktuelle Wetterdaten als Mock einfrieren? Vorhandener Snapshot wird ueberschrieben.');">
+        <input type="hidden" name="spot_set" id="fz-cache-set" value="test">
         <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit">
           {% if status.frozen_weather.exists %}Aus aktuellem Cache einfrieren{% else %}Wetterdaten einfrieren{% endif %}
         </button>
       </form>
 
-      <form method="post" action="/admin/testing/refresh-frozen"
-            onsubmit="return confirm('Live-API neu abfragen und als Snapshot speichern? Dauert ~15-30s und verbraucht API-Quota.');">
+      <form method="post" action="/admin/testing/refresh-frozen" id="fz-form-live"
+            onsubmit="document.getElementById('fz-live-set').value = (document.querySelector('input[name=fz_spot_set]:checked')||{}).value || 'test'; return confirm('Live-API neu abfragen und als Snapshot speichern? Dauert ~15-30s und verbraucht API-Quota.');">
+        <input type="hidden" name="spot_set" id="fz-live-set" value="test">
         <button class="sp-btn sp-btn--ghost sp-btn--sm" type="submit"
                 title="Holt frische Wetterdaten von Open-Meteo und friert sie als neuen Snapshot ein.">
           Snapshot vom Live aktualisieren
@@ -147,6 +177,7 @@
     <div style="margin-top:8px;font-size:var(--text-xs);color:var(--color-text-secondary);">
       <strong>Aus aktuellem Cache</strong>: kopiert <code>data/wetterdaten.json</code> wie sie jetzt ist (kein API-Hit).
       <strong>Vom Live aktualisieren</strong>: forced Refresh + sofortiges Einfrieren.
+      <strong>Komplett</strong>: ~17&times; groesser als Test-Set, dafuer alle Spots.
     </div>
   </section>
 
@@ -234,7 +265,8 @@
           <input type="radio" name="ts_spot_set" value="complete" id="ts-set-complete">
           <span>
             <strong>Komplett</strong>
-            (alle {{ total_spots }} Spots — erzwingt Live API)
+            (alle {{ total_spots }} Spots
+            {% if status.frozen_weather.meta.spot_set != 'complete' %} — erzwingt Live API, da Snapshot nur Test-Set{% else %} — Frozen Snapshot enthaelt alle Spots{% endif %})
           </span>
         </label>
       </fieldset>
@@ -319,15 +351,17 @@
         stopBtn.style.display = 'none';
       }
 
-      // Komplett + Frozen ist nicht erlaubt → erzwinge Live wenn Komplett gewaehlt.
+      // Komplett + Frozen ist nur erlaubt, wenn der vorhandene Snapshot ein
+      // Komplett-Snapshot ist. Sonst erzwingen wir Live API bei Komplett.
       const setRadios = document.querySelectorAll('input[name="ts_spot_set"]');
       const srcFrozen = document.getElementById('ts-src-frozen');
       const srcLive = document.getElementById('ts-src-live');
       const lockedHint = document.getElementById('ts-frozen-locked-hint');
+      const frozenIsComplete = {{ 'true' if status.frozen_weather.meta.spot_set == 'complete' else 'false' }};
       function syncSourceLock() {
         const sel = document.querySelector('input[name="ts_spot_set"]:checked');
         const isComplete = sel && sel.value === 'complete';
-        if (isComplete) {
+        if (isComplete && !frozenIsComplete) {
           if (srcFrozen) { srcFrozen.checked = false; srcFrozen.disabled = true; }
           if (srcLive) { srcLive.checked = true; }
           if (lockedHint) { lockedHint.style.display = 'block'; }
@@ -350,8 +384,8 @@
         const nDaysSel = document.getElementById('ts-n-days');
         const nDaysParam = nDaysSel ? nDaysSel.value : '';
 
-        if (spotSetParam === 'complete' && inputParam === 'frozen') {
-          alert('Komplett-Set + Frozen ist nicht moeglich — bitte Live API waehlen.');
+        if (spotSetParam === 'complete' && inputParam === 'frozen' && !frozenIsComplete) {
+          alert('Der vorhandene Snapshot ist nur das Test-Set. Bitte zuerst einen Komplett-Snapshot einfrieren oder Live API waehlen.');
           return;
         }
 
@@ -443,8 +477,8 @@
         </button>
       </form>
 
-      <form method="post" action="/admin/testing/run-regression"
-            onsubmit="return confirm('Regression-Test starten?');"
+      <form id="rg-form" method="post" action="/admin/testing/run-regression"
+            onsubmit="return rgStart(this);"
             style="display:flex;flex-direction:column;gap:6px;">
         <strong style="font-size:var(--text-sm);">Regression starten</strong>
         <label style="font-size:var(--text-sm);">
@@ -460,11 +494,38 @@
           <input type="number" name="max_cases" min="0" max="200" value="0"
                  style="width:80px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);">
         </label>
-        <button class="sp-btn sp-btn--primary sp-btn--sm" type="submit" style="margin-top:4px;"
+        <button id="rg-btn" class="sp-btn sp-btn--primary sp-btn--sm" type="submit" style="margin-top:4px;"
                 {% if status.golden.count == 0 %}disabled title="Erst Goldstandard einfrieren"{% endif %}>
           score_regression.py ausfuehren
         </button>
+        <div id="rg-status" role="status" aria-live="polite"
+             style="display:none;font-size:var(--text-sm);color:var(--color-text-secondary);background:#fef3c7;border:1px solid #fcd34d;border-radius:var(--radius-sm);padding:8px 10px;margin-top:4px;line-height:1.4;">
+        </div>
       </form>
+      <script>
+        function rgStart(form) {
+          if (!confirm('Regression-Test starten?')) return false;
+          var mode = (form.querySelector('input[name="mode"]:checked') || {}).value || 'no_llm';
+          var btn = document.getElementById('rg-btn');
+          var status = document.getElementById('rg-status');
+          var freezeBtn = document.querySelector('form[action="/admin/testing/freeze-golden"] button[type="submit"]');
+          btn.disabled = true;
+          if (freezeBtn) freezeBtn.disabled = true;
+          if (mode === 'with_llm') {
+            btn.textContent = 'Regression laeuft (mit LLM)...';
+            status.innerHTML = '<strong>⏳ Regression laeuft mit LLM</strong><br>'
+              + 'Erwartete Dauer: 3-10 Minuten (alle Cases via DeepSeek/OpenAI). '
+              + 'Tab nicht schliessen — Server arbeitet im Hintergrund. '
+              + 'Werkzeug-Logs erscheinen erst NACH Abschluss.';
+          } else {
+            btn.textContent = 'Regression laeuft...';
+            status.innerHTML = '<strong>⏳ Regression laeuft (Cache-Vergleich)</strong><br>'
+              + 'Erwartete Dauer: wenige Sekunden.';
+          }
+          status.style.display = 'block';
+          return true;
+        }
+      </script>
     </div>
 
     <div style="margin-top:18px;">

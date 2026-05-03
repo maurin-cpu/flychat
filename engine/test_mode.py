@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -107,17 +107,40 @@ def frozen_weather_meta() -> dict[str, Any] | None:
         return None
 
 
-def freeze_current_weather() -> dict[str, Any]:
-    """Kopiert die Test-Spot-Eintraege aus `wetterdaten.json` nach `data/mocks/`.
+def frozen_base_date() -> date | None:
+    """Snapshot-Datum (= source_run_at) als date. Anchor fuer "Heute" im Test-Modus.
 
-    Filtert auf die Spot-Namen aus `fluggebiete_test.csv` — der Snapshot
-    enthaelt damit nur die Test-Spots (~28) statt aller ~487 Spots, was
-    Disk-Platz spart und exakt dem entspricht, was der Test-Lauf nachher
-    auch verwendet. Regionen (`_regions`) und `_meta` bleiben vollstaendig
-    erhalten, weil Regionen alle mitanalysiert werden.
-
-    Wirft FileNotFoundError, wenn keine aktuellen Wetterdaten vorhanden sind.
+    Wird sowohl beim Test-Lauf (`_get_forecast_dates`-Patch) als auch im
+    Frontend-Filter (`/api/analyses` + `/api/region-analyses`) verwendet,
+    damit die Test-Ansicht zeitlich eingefroren bleibt. None wenn kein
+    Snapshot oder source_run_at fehlt/ungueltig.
     """
+    meta = frozen_weather_meta()
+    if not meta:
+        return None
+    raw = meta.get("source_run_at") or meta.get("frozen_at")
+    if not isinstance(raw, str):
+        return None
+    try:
+        return datetime.fromisoformat(raw).date()
+    except ValueError:
+        return None
+
+
+def freeze_current_weather(spot_set: str = "test") -> dict[str, Any]:
+    """Kopiert Wetterdaten aus `wetterdaten.json` nach `data/mocks/`.
+
+    Args:
+        spot_set: "test" (default, nur Spots aus `fluggebiete_test.csv`, ~28 Spots,
+            ~22 MB) oder "complete" (alle Spots, ~487, ~380 MB).
+
+    Regionen (`_regions`) und `_meta` bleiben in beiden Modi vollstaendig erhalten.
+    Wirft FileNotFoundError, wenn keine aktuellen Wetterdaten vorhanden sind.
+    Wirft ValueError bei unbekanntem spot_set.
+    """
+    if spot_set not in ("test", "complete"):
+        raise ValueError(f"Ungueltiges spot_set: {spot_set!r} (erlaubt: 'test', 'complete')")
+
     src = config.WEATHER_JSON_PATH
     if not src.exists():
         raise FileNotFoundError(f"Keine Wetterdaten zum Einfrieren gefunden: {src}")
@@ -133,21 +156,25 @@ def freeze_current_weather() -> dict[str, Any]:
     test_names = load_test_spot_names()
     total_source_spots = sum(1 for k in data.keys() if not k.startswith("_"))
 
-    # Filter: nur Test-Spots + alle `_*`-Specials (`_regions`, `_meta`, ...)
-    filtered: dict[str, Any] = {
-        k: v for k, v in data.items()
-        if k.startswith("_") or k in test_names
-    }
+    if spot_set == "test":
+        # Filter: nur Test-Spots + alle `_*`-Specials (`_regions`, `_meta`, ...)
+        filtered: dict[str, Any] = {
+            k: v for k, v in data.items()
+            if k.startswith("_") or k in test_names
+        }
+        missing = sorted(test_names - set(filtered.keys()))
+    else:
+        filtered = dict(data)
+        missing = []
     kept_spots = sum(1 for k in filtered.keys() if not k.startswith("_"))
-    missing = sorted(test_names - set(filtered.keys()))
 
     regions = filtered.get("_regions") or {}
     regions_count = len(regions) if isinstance(regions, dict) else 0
     src_meta = filtered.get("_meta") or {}
     source_run_at = src_meta.get("last_updated") or src_meta.get("generated_at") if isinstance(src_meta, dict) else None
 
-    # `_meta.spots_count` an gefilterte Realitaet anpassen, damit Konsumenten
-    # nicht denken da seien noch alle Spots drin.
+    # `_meta.spots_count` an Realitaet anpassen, damit Konsumenten nicht denken
+    # da seien (un)gefilterte Spots drin.
     if isinstance(src_meta, dict):
         src_meta = dict(src_meta)
         src_meta["spots_count"] = kept_spots
@@ -160,6 +187,7 @@ def freeze_current_weather() -> dict[str, Any]:
         "frozen_at": datetime.now().isoformat(timespec="seconds"),
         "source_run_at": source_run_at,
         "source_path": str(src),
+        "spot_set": spot_set,
         "spot_count": kept_spots,
         "region_count": regions_count,
         "total_source_spots": total_source_spots,
@@ -168,8 +196,8 @@ def freeze_current_weather() -> dict[str, Any]:
     }
     config.atomic_write_json(FROZEN_META_PATH, meta)
     logger.info(
-        "Frozen Weather (Test-Set) geschrieben: %s (%d von %d Test-Spots, %d Regionen, gefiltert aus %d Source-Spots)",
-        FROZEN_WEATHER_PATH, kept_spots, len(test_names), regions_count, total_source_spots,
+        "Frozen Weather (%s) geschrieben: %s (%d Spots, %d Regionen, gefiltert aus %d Source-Spots)",
+        spot_set, FROZEN_WEATHER_PATH, kept_spots, regions_count, total_source_spots,
     )
     return meta
 
@@ -317,9 +345,11 @@ def run_test_analyses_stream(
                "data": {"message": f"Ungueltiges spot_set: {spot_set!r} (erlaubt: 'test', 'complete')"}}
         return
     if spot_set == "complete" and use_frozen_input:
-        yield {"event": "error",
-               "data": {"message": "Komplett-Set + Frozen-Snapshot nicht moeglich — Snapshot enthaelt nur Test-Spots. Bitte 'Live API' waehlen."}}
-        return
+        fw_meta = frozen_weather_meta() or {}
+        if fw_meta.get("spot_set") != "complete":
+            yield {"event": "error",
+                   "data": {"message": "Komplett-Set + Frozen-Snapshot nicht moeglich — der vorhandene Snapshot ist nur das Test-Set. Bitte zuerst einen Komplett-Snapshot einfrieren oder 'Live API' waehlen."}}
+            return
     if n_days is not None:
         if not isinstance(n_days, int) or n_days < 1 or n_days > config.FORECAST_DAYS:
             yield {"event": "error",
@@ -377,8 +407,17 @@ def run_test_analyses_stream(
                 }
         # spot_set == "complete": kein Filter — engine.spots/weather_data bleiben
 
-        # Tage-Begrenzung: _get_forecast_dates auf der Instanz patchen
-        if n_days is not None:
+        # Datums-Anker: Wenn Frozen-Snapshot verwendet wird, soll "Heute" das
+        # source_run_at-Datum sein (sonst analysieren wir Tage, fuer die der
+        # Snapshot keine Wetterdaten hat). Bei Live-Input bleibt heute = heute.
+        base_date: date | None = frozen_base_date() if use_frozen_input else None
+        days_limit = n_days if n_days is not None else config.FORECAST_DAYS
+        if base_date is not None:
+            engine._get_forecast_dates = lambda: [
+                (base_date + timedelta(days=i)).strftime("%Y-%m-%d")
+                for i in range(days_limit)
+            ]
+        elif n_days is not None:
             original_dates = snapshot["_get_forecast_dates"]
             engine._get_forecast_dates = lambda: original_dates()[:n_days]
 

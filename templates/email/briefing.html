@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gleitcast Briefing KW{{ kw }}</title>
+<title>Gleitcast Wochencast KW{{ kw }}</title>
 <style>
   @media (prefers-color-scheme: dark) {
     body { background-color: #0f172a !important; }
@@ -27,7 +27,7 @@
 
 <!-- Preheader (versteckt, erscheint in Inbox-Preview) -->
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-{% if verdict %}{{ verdict.headline }}{% else %}Dein Flugwetter-Briefing{% endif %} &mdash; {{ briefing_weekday }}, {{ briefing_date }}
+{% if verdict %}{{ verdict.headline }}{% else %}Dein Flugwetter-Wochencast{% endif %} &mdash; {{ briefing_weekday }}, {{ briefing_date }}
 </div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1f5f9" style="background-color:#f1f5f9;">
@@ -113,7 +113,7 @@
         {% endif %}
         {% endfor %}
         <td align="right" class="ds-text" style="padding:6px 0 6px 8px;font-size:12px;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;">
-          {{ '%.1f'|format(r.best_rating) }}
+          {{ r.best_rating_int or '–' }}
         </td>
       </tr>
       {% endfor %}
@@ -248,7 +248,7 @@
       <tr><td style="padding:12px 14px;">
         <table width="100%"><tr>
           <td valign="middle">
-            <div class="ds-text" style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">Briefing anpassen</div>
+            <div class="ds-text" style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">Wochencast anpassen</div>
             <div class="ds-muted" style="font-size:11px;color:#64748b;line-height:1.4;">Andere Regionen, weniger Tage, pausieren?</div>
           </td>
           <td align="right" valign="middle" style="white-space:nowrap;padding-left:8px;">

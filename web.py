@@ -64,9 +64,23 @@ def current_max_days() -> int:
 
 
 def _allowed_date_strs(max_days: int) -> set:
-    """ISO-Date-Strings (YYYY-MM-DD) ab heute fuer max_days. Set fuer O(1) Lookup."""
-    today = datetime.now().date()
-    return {(today + timedelta(days=i)).isoformat() for i in range(max(1, int(max_days)))}
+    """ISO-Date-Strings (YYYY-MM-DD) ab heute fuer max_days. Set fuer O(1) Lookup.
+
+    Im Test-View wird das Snapshot-Datum (source_run_at) als "Heute" verwendet,
+    damit eingefrorene Snapshots zeitlich konsistent bleiben (sonst rutscht das
+    Datumsfenster taeglich weiter, waehrend die Test-Analysen am Snapshot-Tag
+    eingefroren sind).
+    """
+    base = None
+    try:
+        from engine import test_mode
+        if test_mode.is_view_active():
+            base = test_mode.frozen_base_date()
+    except Exception:
+        base = None
+    if base is None:
+        base = datetime.now().date()
+    return {(base + timedelta(days=i)).isoformat() for i in range(max(1, int(max_days)))}
 
 
 def _gate_forecast(sorted_dates, *by_day_dicts):
@@ -220,7 +234,7 @@ def preview_briefing():
     if engine is None:
         return _status_page(
             "error", "Vorschau nicht verfuegbar",
-            "Der Briefing-Service ist gerade nicht geladen.",
+            "Der Wochencast-Service ist gerade nicht geladen.",
             http_code=503,
         )
 
@@ -230,7 +244,7 @@ def preview_briefing():
         logger.exception("preview_briefing: build_briefing_data failed: %s", e)
         return _status_page(
             "error", "Vorschau nicht verfuegbar",
-            "Die Briefing-Daten konnten gerade nicht geladen werden.",
+            "Die Wochencast-Daten konnten gerade nicht geladen werden.",
             http_code=503,
         )
 
@@ -310,7 +324,7 @@ def subscribe_confirm(token):
     return _status_page(
         "ok", "Abo aktiviert!",
         f"Willkommen bei Gleitcast, {result['email']}.",
-        submessage="Dein erstes Briefing kommt am naechsten Montag, Mittwoch oder Freitag um 06:30.",
+        submessage="Dein erster Wochencast kommt am naechsten Montag, Mittwoch oder Freitag um 06:30.",
     )
 
 
@@ -448,7 +462,7 @@ def account_action(token, action):
         if not ok:
             return redirect(f"/account/{token}?err=Abmelden+fehlgeschlagen")
         # Session bleibt — User soll auf der Konto-Seite den Reaktivieren-Banner sehen
-        return redirect(f"/account/{token}?ok=Briefing+abgemeldet")
+        return redirect(f"/account/{token}?ok=Wochencast+abgemeldet")
 
     if action == "update":
         # Form-Daten: regions[], weekdays[], tiers[] (Checkboxes), min_rating (slider)
@@ -515,7 +529,7 @@ def account_action(token, action):
         ok = mgr.reactivate(token)
         if not ok:
             return redirect(f"/account/{token}?err=Reaktivierung+fehlgeschlagen")
-        return redirect(f"/account/{token}?ok=Briefing+wieder+aktiviert")
+        return redirect(f"/account/{token}?ok=Wochencast+wieder+aktiviert")
 
     if action == "feedback":
         msg = (request.form.get("message") or "").strip()
@@ -776,7 +790,7 @@ def subscribe_unsubscribe(token):
 
     return _status_page(
         "ok", "Abgemeldet",
-        "Du bekommst keine Briefings mehr. Schade, dass du gehst!",
+        "Du bekommst keinen Wochencast mehr. Schade, dass du gehst!",
         submessage="Du kannst dich jederzeit wieder anmelden.",
     )
 
@@ -1046,14 +1060,18 @@ def admin_testing():
 @_require_admin
 def admin_testing_freeze_weather():
     from engine import test_mode
+    spot_set = (request.form.get("spot_set") or "test").strip().lower()
+    if spot_set not in ("test", "complete"):
+        return redirect("/admin/testing?err=Ungueltiges+spot_set")
     try:
-        meta = test_mode.freeze_current_weather()
+        meta = test_mode.freeze_current_weather(spot_set=spot_set)
     except FileNotFoundError as e:
         return redirect(f"/admin/testing?err={str(e).replace(' ', '+')}")
     except Exception as e:
         logger.exception("freeze_weather: %s", e)
         return redirect(f"/admin/testing?err=Einfrieren+fehlgeschlagen:+{e}")
-    msg = f"Snapshot+gesetzt+%28{meta.get('spot_count', 0)}+Spots,+{meta.get('region_count', 0)}+Regionen%29"
+    set_lbl = "Komplett" if meta.get("spot_set") == "complete" else "Test-Set"
+    msg = f"Snapshot+gesetzt+%28{set_lbl}:+{meta.get('spot_count', 0)}+Spots,+{meta.get('region_count', 0)}+Regionen%29"
     return redirect(f"/admin/testing?ok={msg}")
 
 
@@ -1090,6 +1108,9 @@ def admin_testing_refresh_frozen():
     bestehende Snapshot unangetastet.
     """
     from engine import test_mode
+    spot_set = (request.form.get("spot_set") or "test").strip().lower()
+    if spot_set not in ("test", "complete"):
+        return redirect("/admin/testing?err=Ungueltiges+spot_set")
     if engine is None:
         return redirect("/admin/testing?err=Engine+noch+nicht+geladen")
     try:
@@ -1102,11 +1123,12 @@ def admin_testing_refresh_frozen():
         return redirect("/admin/testing?err=Live-Refresh+lieferte+nur+Stale-Cache+-+Snapshot+nicht+aktualisiert")
 
     try:
-        meta = test_mode.freeze_current_weather()
+        meta = test_mode.freeze_current_weather(spot_set=spot_set)
     except Exception as e:
         logger.exception("refresh-frozen: Freeze fehlgeschlagen")
         return redirect(f"/admin/testing?err=Freeze+fehlgeschlagen:+{e}")
-    msg = f"Snapshot+vom+Live+aktualisiert+%28{meta.get('spot_count', 0)}+Spots,+{meta.get('region_count', 0)}+Regionen%29"
+    set_lbl = "Komplett" if meta.get("spot_set") == "complete" else "Test-Set"
+    msg = f"Snapshot+vom+Live+aktualisiert+%28{set_lbl}:+{meta.get('spot_count', 0)}+Spots,+{meta.get('region_count', 0)}+Regionen%29"
     return redirect(f"/admin/testing?ok={msg}")
 
 
@@ -1299,9 +1321,11 @@ def admin_testing_freeze_golden():
     if force:
         args.append("--force")
 
+    logger.info("[FREEZE-GOLDEN] START limit=%d, force=%s", limit, force)
     rc, stdout, stderr, duration = _run_cost_testing_subprocess(
         test_mode.FREEZE_GOLDEN_SCRIPT, args, timeout=180,
     )
+    logger.info("[FREEZE-GOLDEN] DONE rc=%d after %.1fs", rc, duration)
     if rc != 0:
         snippet = (stderr or stdout or "")[-300:].replace("\n", " | ").replace("&", "+")
         return redirect(f"/admin/testing?err=Freeze-Golden+rc%3D{rc}+({duration:.1f}s):+{snippet}")
@@ -1344,11 +1368,22 @@ def admin_testing_run_regression():
         args.extend(["--max-cases", str(max_cases)])
 
     timeout = 180 if mode == "no_llm" else 1500
+    case_hint = f"{max_cases} Cases" if max_cases > 0 else "alle Cases"
+    logger.info(
+        "[REGRESSION] START mode=%s, %s, model=%s, timeout=%ds, report=%s",
+        mode, case_hint, config.ANALYSIS_MODEL, timeout, report_name,
+    )
     rc, stdout, stderr, duration = _run_cost_testing_subprocess(
         test_mode.SCORE_REGRESSION_SCRIPT, args, timeout=timeout,
     )
     # rc != 0 bei score_regression.py heisst FAIL — Report wurde trotzdem geschrieben.
     status_word = "PASS" if rc == 0 else "FAIL"
+    logger.info(
+        "[REGRESSION] DONE %s rc=%d after %.1fs, report=%s",
+        status_word, rc, duration, report_name,
+    )
+    if rc != 0 and stderr:
+        logger.warning("[REGRESSION] stderr tail: %s", stderr[-500:])
     qs = f"ok=Regression+{status_word}+%28{duration:.1f}s%29+%E2%86%92+{report_name}"
     if rc != 0 and queue_path.exists():
         qs += "+-+Review-Queue+verfuegbar"
@@ -1891,15 +1926,15 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
         if flat:
             best_day, best_spot = max(flat, key=lambda pair: _spot_rank(pair[1]))
 
-    from email_service import _TIER_META, _spot_tier, _date_label
+    from email_service import _TIER_META, _spot_tier, _date_label, _rating_for_spot
     if best_spot and best_day:
         tier = _spot_tier(best_spot)
         meta = _TIER_META.get(tier, _TIER_META["gray"])
-        rating = float(best_spot.get("rating") or 0)
+        rating = _rating_for_spot(best_spot)  # v1.4: Integer 1-10
         label = _date_label(best_day.get("date", ""))
         day_short = label.get("short", "")
-        title = f"{best_spot.get('spot','')} – {day_short} {meta['label']} {rating:.1f}"
-        desc = f"{region_label} · {meta['label']} · Rating {rating:.1f} · Gleitcast-Briefing"
+        title = f"{best_spot.get('spot','')} – {day_short} {meta['label']} {rating}"
+        desc = f"{region_label} · {meta['label']} · Rating {rating} · Gleitcast Wochencast"
         tier_param = tier
     else:
         tier_param = "none"

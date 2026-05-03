@@ -9,7 +9,7 @@ Link zum Bestaetigen:
 {{ urls.confirm }}
 
 Nach der Bestaetigung bekommst du an deinen gewaehlten Wochentagen morgens
-ein personalisiertes Briefing mit den besten Flugtagen fuer deine Regionen.
+einen personalisierten Wochencast mit den besten Flugtagen fuer deine Regionen.
 
 --
 Du hast dieses Abo nicht angefordert? Dann ignoriere diese E-Mail einfach —
