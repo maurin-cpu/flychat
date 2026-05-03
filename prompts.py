@@ -23,42 +23,29 @@ import config
 _SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 _SHARED_DIR = _SKILLS_DIR / "shared"
 
-# Reihenfolge der Shared-Bausteine, wie sie in den Analyse-Prompt eingefügt werden.
-# Pädagogische Ordnung: Prinzipien → Daten-Format → Gefahren → Status-Ableitung →
-# Safety-Sub-Ratings → Flyability-Regeln → Sprache → Flight-Sub-Ratings.
-# `_hazards_spot.md` wird mode-conditional zu `_hazards_region.md` ersetzt;
-# `_flight_subratings_region.md` analog zu `_flight_subratings_spot.md` (siehe
-# compose_analysis_prompt unten).
-_SHARED_BLOCKS = [
-    "_core_principles.md",
-    "_input_map.md",
-    "_hazards_spot.md",
-    "_status_derivation.md",
-    "_safety_subratings.md",
-    "_flyability_rules.md",
-    "_prose_style.md",
-    "_flight_subratings_region.md",
-]
-
-# Safety-Phase: nur Gefahren-relevante Blöcke (spart ~10K tokens vs. Combined)
+# Reihenfolge der Shared-Bausteine pro Phase. Combined-Pfad wurde entfernt
+# (war Dead Code — alle Aufrufe gehen ueber `_build_and_analyze_*` = Split).
+# Mode-spezifische Files (`_hazards_{mode}.md`, `_flight_subratings_{mode}.md`)
+# werden in compose_analysis_prompt eingesetzt.
 _SHARED_BLOCKS_SAFETY = [
-    "_core_principles.md",
-    "_input_map.md",
-    "_hazards_spot.md",
-    "_status_derivation.md",
-    "_safety_subratings.md",
+    "01_global/01_core_principles.md",
+    "01_global/02_input_format.md",
+    "03_safety/01_tags_safety.md",
+    "02_tagesfenster/01_tagesfenster.md",
+    "03_safety/02_hazards_spot.md",
+    "03_safety/03_status_derivation.md",
+    "03_safety/04_safety_subratings.md",
 ]
 
-# Flyability-Phase: nur Fliegbarkeits-relevante Blöcke
 _SHARED_BLOCKS_FLYABILITY = [
-    "_core_principles.md",
-    "_input_map.md",
-    "_flyability_rules.md",
-    "_prose_style.md",
-    "_flight_subratings_region.md",
+    "01_global/01_core_principles.md",
+    "01_global/02_input_format.md",
+    "04_flyability/01_tags_flyability.md",
+    "04_flyability/02_flyability_rules.md",
+    "04_flyability/03_prose_style.md",
+    "04_flyability/04_flight_subratings_region.md",
 ]
 
-_INSERT_MARKER = "<!-- INSERT_SHARED -->"
 _INSERT_MARKER_SAFETY = "<!-- INSERT_SHARED_SAFETY -->"
 _INSERT_MARKER_FLYABILITY = "<!-- INSERT_SHARED_FLYABILITY -->"
 
@@ -113,34 +100,27 @@ def _load_shared(filename: str) -> str:
     return _render_placeholders(raw)
 
 
-def compose_analysis_prompt(mode: str, phase: str = "combined") -> str:
-    """Komponiert den Analyse-Prompt aus einem Mode-Template + Shared-Bausteinen.
+def compose_analysis_prompt(mode: str, phase: str) -> str:
+    """Komponiert den Analyse-Prompt aus Template (00_template_<mode>.md im
+    jeweiligen Phase-Subordner) + Shared-Bausteinen.
 
     mode = 'spot' | 'region'
-    phase = 'combined' | 'safety' | 'flyability'
-
-    combined → skills/{mode}_analysis.md + alle Shared-Blöcke (bisheriges Verhalten)
-    safety  → skills/{mode}_safety.md + nur Safety-Blöcke (~7K tokens)
-    flyability → skills/{mode}_flyability.md + nur Flyability-Blöcke (~10K tokens)
+    phase = 'safety' | 'flyability'
 
     Jeder Aufruf re-liest die Datei und re-rendert die Platzhalter — daher
     greifen Config-Aenderungen live.
     """
     if mode not in ("spot", "region"):
         raise ValueError(f"Unbekannter Analyse-Mode: {mode!r}")
-    if phase not in ("combined", "safety", "flyability"):
+    if phase not in ("safety", "flyability"):
         raise ValueError(f"Unbekannte Analyse-Phase: {phase!r}")
 
-    if phase == "combined":
-        template = _load_skill(f"{mode}_combined.md")
-        marker = _INSERT_MARKER
-        blocks = list(_SHARED_BLOCKS)
-    elif phase == "safety":
-        template = _load_skill(f"{mode}_safety.md")
+    if phase == "safety":
+        template = _load_shared(f"03_safety/00_template_{mode}.md")
         marker = _INSERT_MARKER_SAFETY
         blocks = list(_SHARED_BLOCKS_SAFETY)
     else:  # flyability
-        template = _load_skill(f"{mode}_flyability.md")
+        template = _load_shared(f"04_flyability/00_template_{mode}.md")
         marker = _INSERT_MARKER_FLYABILITY
         blocks = list(_SHARED_BLOCKS_FLYABILITY)
 
@@ -149,7 +129,7 @@ def compose_analysis_prompt(mode: str, phase: str = "combined") -> str:
     # liegen auf verschiedenen Hoehen).
     if mode == "spot":
         blocks = [
-            "_flight_subratings_spot.md" if b == "_flight_subratings_region.md" else b
+            "04_flyability/04_flight_subratings_spot.md" if b == "04_flyability/04_flight_subratings_region.md" else b
             for b in blocks
         ]
 
@@ -158,28 +138,24 @@ def compose_analysis_prompt(mode: str, phase: str = "combined") -> str:
     # verlust — Region-LLMs koennen Boeen-Wissen ohnehin nicht anwenden.
     if mode == "region":
         blocks = [
-            "_hazards_region.md" if b == "_hazards_spot.md" else b
+            "03_safety/02_hazards_region.md" if b == "03_safety/02_hazards_spot.md" else b
             for b in blocks
         ]
 
-    # Mode-spezifischer Context-Block (Spot: Sektor + Bemerkungen,
-    # Region: Magnitude-Wind + Foehn-Richtung). Wird direkt nach den
-    # Hazards-Bloecken eingefuegt — semantisch passend, weil er
-    # Hazard-Definitionen mode-spezifisch ergaenzt. Bei Phase=flyability
-    # sind die Hazards-Bloecke nicht in der Liste, dann nach _input_map.md.
-    context_block = "_spot_context.md" if mode == "spot" else "_region_context.md"
-    hazards_block = "_hazards_spot.md" if mode == "spot" else "_hazards_region.md"
-    insert_after = hazards_block if hazards_block in blocks else "_input_map.md"
+    # Mode-spezifischer Context-Block. Wird direkt nach den Hazards-Bloecken
+    # eingefuegt; bei Phase=flyability nach _input_format.md.
+    context_block = "05_context/_spot_context.md" if mode == "spot" else "05_context/_region_context.md"
+    hazards_block = "03_safety/02_hazards_spot.md" if mode == "spot" else "03_safety/02_hazards_region.md"
+    insert_after = hazards_block if hazards_block in blocks else "01_global/02_input_format.md"
     insert_idx = blocks.index(insert_after) + 1
     blocks.insert(insert_idx, context_block)
 
-    # Streckenflug-Synthese: nur Spot, nur Phasen mit Flyability-Anteil.
-    # Wird ans Ende gehaengt, weil er auf den anderen Bausteinen aufbaut.
-    if mode == "spot" and phase in ("combined", "flyability"):
-        blocks.append("_streckenflug.md")
+    # Streckenflug-Synthese: nur Spot, nur Flyability-Phase.
+    if mode == "spot" and phase == "flyability":
+        blocks.append("04_flyability/05_streckenflug.md")
 
     if marker not in template:
-        raise ValueError(f"{mode}_{phase}.md enthält keinen {marker}-Marker")
+        raise ValueError(f"00_template_{mode}.md (phase={phase}) enthält keinen {marker}-Marker")
     shared = "\n\n".join(_load_shared(name) for name in blocks)
     return template.replace(marker, shared)
 
@@ -219,8 +195,6 @@ _LAZY_ATTRS = {
     "SYSTEM_PROMPT":            lambda: _load_skill("system_chat.md"),
     "CAPABILITIES_GUIDE":       lambda: _load_skill("chat_capabilities_guide.md"),
     "FOEHN_CHAT_KNOWLEDGE":     lambda: _load_skill("foehn_chat_knowledge.md"),
-    "SPOT_COMBINED_PROMPT":     lambda: compose_analysis_prompt("spot"),
-    "REGION_COMBINED_PROMPT":   lambda: compose_analysis_prompt("region"),
     "SPOT_SAFETY_PROMPT":       lambda: compose_analysis_prompt("spot", "safety"),
     "SPOT_FLYABILITY_PROMPT":   lambda: compose_analysis_prompt("spot", "flyability"),
     "REGION_SAFETY_PROMPT":     lambda: compose_analysis_prompt("region", "safety"),

@@ -64,7 +64,7 @@ from engine._common import (
     _is_permanent_api_error, _user_friendly_api_error,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _compute_rating_from_subratings,
-    _compute_experience_score, _compute_experience_stars,
+    _compute_experience_score, _compute_experience_stars, _compute_experience_rating,
     _compute_safety_rating, _compute_safety_score,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
@@ -117,16 +117,15 @@ class AnalyzersMixin:
         offensichtlich not_safe ist.  Gibt ein fertiges Result-Dict zurueck
         oder None wenn der LLM-Call noetig ist.
 
-        Strategie: NUR bombensichere NO-GOs filtern. Grauzonen (z.B. wenige
-        saubere Stunden, leichte Warnungen) gehen ans LLM — das kann
-        nuanciert bewerten (Abgleiter-Tier, Kurzfenster o.ae.).
+        Strategie: NUR bombensichere NO-GOs filtern. Grauzonen (z.B. kurze
+        Fenster mit leichten Warnungen) gehen ans LLM.
 
         Bombensichere Kriterien:
-        1. Keine einzige WIND-OK Stunde  → Windrichtung ganztaegig falsch
-        2. Weniger als CLEAN_WINDOW_MIN_HOURS WIND-OK Stunden → Start-Fenster zu kurz
-        3. Ganztaegig Regen               → kein nutzbares Fenster
-        4. Ganztaegig Gewitter            → objektiv nicht fliegbar
-        5. Ganztaegig Sturmwarnung        → objektiv nicht fliegbar
+        1. Kein qualifizierendes Tagesfenster (active_window_start is None)
+           → entweder Windrichtung ganztaegig falsch ODER alle WIND-OK-Stunden
+             mit harten Warnungen ODER kein zusammenhaengender Block >= min.
+        2. Ganztaegig Regen               → kein nutzbares Fenster
+        3. Ganztaegig Gewitter            → objektiv nicht fliegbar
         """
         name = spot["name"]
         cache_key = f"{name}|{date_str}"
@@ -136,6 +135,8 @@ class AnalyzersMixin:
 
         wind_ok = gust_info.get("wind_ok_count", -1)
         wind_wrong = gust_info.get("wind_wrong_count", 0)
+        clean_count = gust_info.get("clean_hours_count", 0)
+        active_start = gust_info.get("active_window_start")
         rain_cnt = gust_info.get("rain_hours", 0)
         ts_h = gust_info.get("thunderstorm_hours", 0)
         total_hours = wind_ok + wind_wrong if wind_ok >= 0 else 0
@@ -147,32 +148,38 @@ class AnalyzersMixin:
         # nur Hero + Reason — kein Meteogramm, kein Detail-Akkordeon.
         na_reason = None
 
-        # Regel 1: Windrichtung ganztaegig falsch
-        if wind_ok == 0 and total_hours > 0:
-            no_go.append("Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors")
-            summary_parts.append(
-                f"Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors "
-                f"({spot.get('windrichtung', '?')}). Kein fliegbares Fenster."
-            )
-            na_reason = "wind_direction_mismatch"
+        # Regel 1: Kein qualifizierendes Tagesfenster — drei Unterfaelle fuer
+        # Begruendungs-Differenzierung. active_window_start is None bedeutet:
+        # kein zusammenhaengender Block sauberer Stunden >= CLEAN_WINDOW_MIN_HOURS.
+        if active_start is None and total_hours > 0:
+            if wind_ok == 0:
+                no_go.append("Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors")
+                summary_parts.append(
+                    f"Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors "
+                    f"({spot.get('windrichtung', '?')}). Kein fliegbares Fenster."
+                )
+                na_reason = "wind_direction_mismatch"
+            elif clean_count == 0:
+                no_go.append(
+                    "Start-Fenster: Alle Stunden mit passender Windrichtung haben harte "
+                    "Warnungen (Sturm/Boeen/Regen/Gewitter)"
+                )
+                summary_parts.append(
+                    f"Alle {wind_ok}h mit passender Windrichtung haben harte Warnungen — "
+                    f"kein nutzbares Start-Fenster."
+                )
+                # Bewusst KEIN noAnalysis: Pilot will sehen warum es nicht geht.
+            else:
+                no_go.append(
+                    f"Start-Fenster: Nur {clean_count}h sauber, kein zusammenhaengender Block "
+                    f">= {config.CLEAN_WINDOW_MIN_HOURS}h"
+                )
+                summary_parts.append(
+                    f"Saubere Stunden ({clean_count}h) bilden kein zusammenhaengendes "
+                    f"Start-Fenster (Minimum {config.CLEAN_WINDOW_MIN_HOURS}h)."
+                )
 
-        # Regel 2: Zu wenige WIND-OK Stunden — Start-Fenster reicht nicht.
-        # Spiegelt die Skill-Regel < CLEAN_WINDOW_MIN_HOURS → not_safe (siehe
-        # _hazard_blocks.md Block 2). wind_ok_count ist konservative Obergrenze
-        # fuer das laengste saubere Fenster.
-        elif wind_ok > 0 and wind_ok < config.CLEAN_WINDOW_MIN_HOURS and total_hours > 0:
-            no_go.append(
-                f"Start-Fenster: Nur {wind_ok}h mit Windrichtung im erlaubten Sektor "
-                f"(Minimum {config.CLEAN_WINDOW_MIN_HOURS}h)"
-            )
-            summary_parts.append(
-                f"Nur {wind_ok}h mit passender Windrichtung "
-                f"({spot.get('windrichtung', '?')}) — kein ausreichendes Start-Fenster."
-            )
-            # Bewusst KEIN noAnalysis: Pilot will sehen, WANN das kurze
-            # Fenster liegt — Meteogramm bleibt sichtbar.
-
-        # Regel 3: Ganztaegig Regen
+        # Regel 2: Ganztaegig Regen
         elif total_hours > 0 and rain_cnt >= total_hours - 2 and rain_cnt >= 4:
             no_go.append(f"Niederschlag: Regen in {rain_cnt} von {total_hours} Stunden")
             summary_parts.append(
@@ -263,61 +270,6 @@ class AnalyzersMixin:
         fly_result = self._flyability_analysis_single_region_day(region, date_str, ctx, safety_result)
         return self._merge_safety_flyability(safety_result, fly_result)
 
-    def _combined_analysis_single_spot_day(self, spot, date_str: str, context: str, region_result: dict = None) -> dict:
-        """Kombinierte Safety+Flyability-Analyse fuer einen Spot/Tag in einem LLM-Call."""
-        name = spot["name"]
-        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
-            reason = getattr(self, '_api_abort_reason', 'Analyse abgebrochen')
-            return {"spot": name, "date": date_str, "safety_status": "error",
-                    "phase": "combined",
-                    "error": reason}
-        try:
-            if not context:
-                return {"spot": name, "date": date_str, "safety_status": "error",
-                        "phase": "combined", "error": "Keine Daten fuer diesen Tag"}
-
-            messages = [
-                {"role": "system", "content": prompts.SPOT_COMBINED_PROMPT},
-                {"role": "user", "content": (
-                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
-                    f"{context}"
-                )},
-            ]
-
-            # Retry-Logik: 1 Wiederholung bei Fehler
-            last_err = None
-            for attempt in range(2):
-                try:
-                    response = self.analysis_client.chat.completions.create(
-                        model=self.analysis_model,
-                        messages=messages,
-                        temperature=0.2,
-                        max_tokens=1800,
-                        response_format={"type": "json_object"},
-                    )
-                    self._record_call_usage(response, "spot_combined")
-                    raw = response.choices[0].message.content
-                    result = json.loads(raw)
-                    last_err = None
-                    break
-                except Exception as api_err:
-                    last_err = api_err
-                    if _is_permanent_api_error(api_err):
-                        self._api_abort_reason = _user_friendly_api_error(api_err)
-                        if getattr(self, '_api_abort', None):
-                            self._api_abort.set()
-                        break
-                    if attempt == 0:
-                        logger.warning(f"Combined-Check fuer {name}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
-                        time.sleep(3)
-            if last_err:
-                raise last_err
-            return self._post_process_combined_spot(result, spot, date_str, region_result=region_result)
-
-        except Exception as e:
-            logger.error(f"Combined-Analyse fuer {name}/{date_str} fehlgeschlagen (nach 2 Versuchen): {e}")
-            return {"spot": name, "date": date_str, "safety_status": "error", "phase": "combined", "error": str(e)}
-
     # ═══════════════════════════════════════════════════════════════════════════
     # SPLIT-FLOW: Separate Safety- und Flyability-Calls (Hebel 1 Kostenreduktion)
     # ═══════════════════════════════════════════════════════════════════════════
@@ -349,7 +301,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=800,
+                        max_tokens=1500,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "spot_safety")
@@ -408,7 +360,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=1400,
+                        max_tokens=2500,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "spot_fly")
@@ -482,7 +434,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=800,
+                        max_tokens=1500,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "region_safety")
@@ -541,7 +493,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=1400,
+                        max_tokens=2500,
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "region_fly")
@@ -633,7 +585,7 @@ class AnalyzersMixin:
         new_fields = (
             # Phase 1 — 2-Achsen
             "safety_band", "safety_score", "safety_rating",
-            "experience_score", "experience_stars",
+            "experience_score", "experience_stars", "experience_rating",
             "comfort_index",
             # 5 Safety-Sub-Ratings (Vorab-Fix #4)
             "wind_safety_rating", "gust_safety_rating",
@@ -785,63 +737,6 @@ class AnalyzersMixin:
     # ════════════════════════════════════════════════════════════════════════
     # REGION-ANALYSE (spiegelt Spot-Analyse-Flow)
     # ════════════════════════════════════════════════════════════════════════
-
-    def _combined_analysis_single_region_day(self, region, date_str: str, context: str) -> dict:
-        """Kombinierte Safety+Flyability-Analyse fuer eine Region/Tag in einem LLM-Call."""
-        rname = region["region"]
-        if getattr(self, '_api_abort', None) and self._api_abort.is_set():
-            reason = getattr(self, '_api_abort_reason', 'Analyse abgebrochen')
-            return {"region": rname, "region_id": region["id"], "date": date_str,
-                    "safety_status": "error", "phase": "combined",
-                    "error": reason}
-        try:
-            if not context:
-                return {"region": rname, "date": date_str, "safety_status": "error",
-                        "phase": "combined", "error": "Keine Daten"}
-
-            messages = [
-                {"role": "system", "content": prompts.REGION_COMBINED_PROMPT},
-                {"role": "user", "content": (
-                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
-                    f"{context}"
-                )},
-            ]
-
-            # Retry-Logik: 1 Wiederholung bei Fehler
-            last_err = None
-            for attempt in range(2):
-                try:
-                    response = self.analysis_client.chat.completions.create(
-                        model=self.analysis_model,
-                        messages=messages,
-                        temperature=0.2,
-                        max_tokens=1800,
-                        response_format={"type": "json_object"},
-                    )
-                    self._record_call_usage(response, "region_combined")
-                    raw = response.choices[0].message.content
-                    result = json.loads(raw)
-                    last_err = None
-                    break
-                except Exception as api_err:
-                    last_err = api_err
-                    if _is_permanent_api_error(api_err):
-                        logger.error(f"Region Combined-Check fuer {rname}/{date_str}: permanenter API-Fehler ({api_err}) — kein Retry")
-                        self._api_abort_reason = _user_friendly_api_error(api_err)
-                        if getattr(self, '_api_abort', None):
-                            self._api_abort.set()
-                        break
-                    if attempt == 0:
-                        logger.warning(f"Region Combined-Check fuer {rname}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
-                        time.sleep(3)
-            if last_err:
-                raise last_err
-            return self._post_process_combined_region(result, region, date_str)
-
-        except Exception as e:
-            logger.error(f"Region Combined-Analyse fuer {rname}/{date_str} fehlgeschlagen: {e}")
-            return {"region": rname, "region_id": region["id"], "date": date_str,
-                    "safety_status": "error", "phase": "combined", "error": str(e)}
 
     def run_region_analyses(self) -> dict:
         """Wrapper: konsumiert den Stream-Generator und gibt das finale Ergebnis zurueck."""
@@ -999,6 +894,13 @@ class AnalyzersMixin:
             if r >= 2.1:  return 1
             return 0
 
+        def _rating_from_entry(e: dict) -> int:
+            v = e.get("experience_rating")
+            if isinstance(v, int) and 0 <= v <= 10:
+                return v
+            score = _score_from_entry(e)
+            return _compute_experience_rating(score)
+
         def _score_from_entry(e: dict) -> int:
             v = e.get("experience_score")
             if isinstance(v, (int, float)):
@@ -1083,6 +985,7 @@ class AnalyzersMixin:
                 band = _band_from_entry(entry)
                 stars = _stars_from_entry(entry)
                 exp_score = _score_from_entry(entry)
+                exp_rating = _rating_from_entry(entry)
 
                 # Legacy-Bookkeeping fuer Backwards-Compat
                 if ss == "not_safe":
@@ -1128,10 +1031,11 @@ class AnalyzersMixin:
                     "best_window": fly.get("best_window", "") or entry.get("best_window", ""),
                     "recommendation": fly.get("recommendation", ""),
                     "safety_feedback": safety.get("summary", ""),
-                    # RATING_CONCEPT v1.3 — 2-Achsen Top-Level-Felder.
+                    # RATING_CONCEPT v1.3/v1.4 — 2-Achsen Top-Level-Felder.
                     "safety_band": band,
                     "experience_stars": stars,
                     "experience_score": exp_score,
+                    "experience_rating": exp_rating,
                     "safety_score": entry.get("safety_score"),
                     "comfort_index": entry.get("comfort_index"),
                     # Volle Voranalyse fuer Ausklapp-Ansicht im Briefing
@@ -1165,6 +1069,7 @@ class AnalyzersMixin:
                 band_r = _band_from_entry(entry)
                 stars_r = _stars_from_entry(entry)
                 score_r = _score_from_entry(entry)
+                rating_r = _rating_from_entry(entry)
 
                 region_name = entry.get("region_name", region_by_id.get(rid, {}).get("region", rid))
                 region_entries.append({
@@ -1174,10 +1079,11 @@ class AnalyzersMixin:
                     "fly_status": fly_status,
                     "safety_status": ss,
                     "is_conditional": bool(entry.get("is_conditional", False)),
-                    # v1.3 Top-Level-Felder
+                    # v1.3/v1.4 Top-Level-Felder
                     "safety_band": band_r,
                     "experience_stars": stars_r,
                     "experience_score": score_r,
+                    "experience_rating": rating_r,
                     "safety_score": entry.get("safety_score"),
                     "comfort_index": entry.get("comfort_index"),
                 })
@@ -1929,6 +1835,7 @@ class AnalyzersMixin:
             )
             result["experience_score"] = _compute_experience_score(result["rating"])
             result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+            result["experience_rating"] = _compute_experience_rating(result["experience_score"])
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
             result["safety_band"] = compute_safety_band(result)
@@ -1972,6 +1879,7 @@ class AnalyzersMixin:
         )
         result["experience_score"] = _compute_experience_score(result["rating"])
         result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+        result["experience_rating"] = _compute_experience_rating(result["experience_score"])
 
         # Safety-Aggregation (Vorab-Fix #4): Weakest-Link aus 5 LLM-Sub-Ratings.
         # Im Split-Flow liegen die Subs nur im Safety-Result — nur ueberschreiben
@@ -2046,26 +1954,6 @@ class AnalyzersMixin:
 
         return result
 
-    def _post_process_combined_spot(self, result: dict, spot: dict, date_str: str, region_result: dict = None) -> dict:
-        """Wendet ALLE Post-Processing-Schritte auf ein Spot-Combined-Ergebnis an.
-        Wrapper: ruft Safety- und Flyability-Post-Processing nacheinander auf.
-        Wird vom Combined-Flow (Single-Call UND Batch) genutzt.
-        """
-        name = spot["name"]
-        result["spot"] = name
-        result["date"] = date_str
-        result["phase"] = "combined"
-
-        # Safety Post-Processing (Overrides, Foehn-Filter)
-        result = self._post_process_safety_spot(result, spot, date_str)
-        result["phase"] = "combined"  # Restore phase marker
-
-        # Flyability Post-Processing (Tier, Ratings, Streckenflug)
-        result = self._post_process_flyability_spot(result, spot, date_str, region_result=region_result)
-        result["phase"] = "combined"  # Restore phase marker
-
-        return result
-
     def _post_process_safety_region(self, result: dict, region: dict, date_str: str) -> dict:
         """Safety-only Post-Processing fuer eine Region (Decision-Pipe + Foehn-Strip)."""
         rname = region["region"]
@@ -2124,6 +2012,7 @@ class AnalyzersMixin:
             result["rating"] = _compute_rating_from_subratings(result, "", "not_safe")
             result["experience_score"] = _compute_experience_score(result["rating"])
             result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+            result["experience_rating"] = _compute_experience_rating(result["experience_score"])
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
             result["safety_band"] = compute_safety_band(result)
@@ -2152,10 +2041,11 @@ class AnalyzersMixin:
 
         final_safety = result.get("safety_status", "")
 
-        # Rating + Experience-Scores (Vorab-Fix #3, User-Sprache: "Rating 1-5")
+        # Rating + Experience-Scores (Vorab-Fix #3 / v1.4: Rating 1-10 als Primaeranzeige)
         result["rating"] = _compute_rating_from_subratings(result, "", final_safety)
         result["experience_score"] = _compute_experience_score(result["rating"])
         result["experience_stars"] = _compute_experience_stars(result["experience_score"])
+        result["experience_rating"] = _compute_experience_rating(result["experience_score"])
 
         # Safety-Aggregation (Vorab-Fix #4): Weakest-Link, nur wenn Subs vorhanden
         _safety_subs = ("wind_safety_rating", "gust_safety_rating",
@@ -2177,26 +2067,6 @@ class AnalyzersMixin:
             is_cond = False
         result["is_conditional"] = is_cond
         result["conditional_reason"] = (result.get("conditional_reason", "") or "") if is_cond else ""
-
-        return result
-
-    def _post_process_combined_region(self, result: dict, region: dict, date_str: str) -> dict:
-        """Wendet ALLE Post-Processing-Schritte auf ein Region-Combined-Ergebnis an.
-        Wrapper: ruft Safety- und Flyability-Post-Processing nacheinander auf.
-        """
-        rname = region["region"]
-        result["region"] = rname
-        result["region_id"] = region["id"]
-        result["date"] = date_str
-        result["phase"] = "combined"
-
-        # Safety Post-Processing
-        result = self._post_process_safety_region(result, region, date_str)
-        result["phase"] = "combined"
-
-        # Flyability Post-Processing
-        result = self._post_process_flyability_region(result, region, date_str)
-        result["phase"] = "combined"
 
         return result
 
@@ -2281,7 +2151,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 800,
+                        "max_tokens": 1500,
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2377,7 +2247,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 1400,
+                        "max_tokens": 2500,
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2512,7 +2382,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 800,
+                        "max_tokens": 1500,
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2618,7 +2488,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 1400,
+                        "max_tokens": 2500,
                         "response_format": {"type": "json_object"},
                     },
                 })

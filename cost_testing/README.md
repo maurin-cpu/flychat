@@ -46,6 +46,8 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 
 ## Wichtige Befunde aus der Session
 
+0. **`score_regression.py` benoetigt Reverse-Parsing der Decision-Caches** (Mai 2026 Fix). `_run_current_pipeline` ruft den Split-Flow auf und befuellt `_ctx_foehn_cache` + `_ctx_gust_cache` per Reverse-Parsing aus dem Goldfile-Input — sonst feuern die deterministischen Decisions nicht. Bei neuen Decisions, die weitere Cache-Felder lesen, muss der Parser nachgezogen werden. Details in `doku.md` §5e.
+
 1. **Parallel-Modus nutzt bereits den Skill-Split** — Phasen `region_safety`/`region_fly`/`spot_safety`/`spot_fly` (nicht `*_combined`). Hebel 1 ist unabhängig vom Modus aktiv. Konzept-Doku korrigiert.
 
 2. **`OPENAI_ANALYSIS_MODE` wird via UI-Overlay gesteuert**, nicht via `.env`. Speicherort: `data/config_overrides.json`. Beim App-Start ruft `main.py:16` `config_overrides.init()` und überschreibt `config`-Werte per `setattr`. ENV ist nur Fallback-Default.

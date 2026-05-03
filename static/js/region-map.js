@@ -83,6 +83,24 @@
         if (r >= 2.1)  return 1;
         return 0;
     }
+
+    // RATING_CONCEPT v1.4: experience_rating (1-10) bevorzugt, Fallback Score/Stars/Rating
+    function getRating(dayData) {
+        if (!dayData) return 0;
+        var er = dayData.experience_rating;
+        if (typeof er === 'number') return Math.max(0, Math.min(10, Math.round(er)));
+        var sc = dayData.experience_score;
+        if (typeof sc === 'number') {
+            if (sc <= 0) return 0;
+            if (sc >= 100) return 10;
+            return Math.max(1, Math.min(10, Math.ceil(sc / 10)));
+        }
+        var s = dayData.experience_stars;
+        if (typeof s === 'number') return Math.max(0, Math.min(10, s * 2));
+        var r = parseFloat(dayData.rating || 0);
+        if (r > 0) return Math.max(1, Math.min(10, Math.round(r)));
+        return 0;
+    }
     function getSafetyBand(dayData) {
         if (!dayData) return 'no_data';
         var b = dayData.safety_band;
@@ -202,8 +220,8 @@
     // Region-Label im Polygon-Centroid: konsistente Glas-Pille (rund) fuer
     // alle Baender — gleicher Aufbau, nur Ring-Farbe + Inhalt unterscheidet
     // sich. Family-Look statt zwei verschiedene Stile.
-    function buildRegionLabel(style, badge, band, stars, zoom) {
-        var n = (typeof stars === 'number') ? Math.max(0, Math.min(5, stars)) : 0;
+    function buildRegionLabel(style, badge, band, rating, zoom) {
+        var n = (typeof rating === 'number') ? Math.max(0, Math.min(10, rating)) : 0;
         // band kommt direkt vom Aufrufer (safety_band — Single Source of Truth).
         // Legacy-Toleranz fuer Aufrufer, die noch safety_status uebergeben.
         if (band === 'safe')             band = 'green';
@@ -229,9 +247,10 @@
             red:   { ink: '#991b1b', ring: '#ef4444' }
         };
         var p = palette[band];
-        // Runde Pille (Kreis): weil Inhalt einstellig (Zahl/Kreuz/Strich)
+        // Runde Pille (Kreis). v1.4: zweistellige Zahl "10" bekommt kleinere Schrift.
         var size = zoom < 7 ? 30 : zoom < 9 ? 36 : 42;
-        var fontSize = Math.round(size * 0.5);
+        var twoDigit = label.length >= 2 && label !== '\u2715' && label !== '\u2013';
+        var fontSize = Math.round(size * (twoDigit ? 0.4 : 0.5));
         var html = '<div style="'
             + 'width:' + size + 'px;'
             + 'height:' + size + 'px;'
@@ -426,20 +445,21 @@
                 ev.target.setStyle({ fillOpacity: ev.target._baseFillOpacity || baseOpacity });
             });
 
-            // Stars muss VOR buildRegionLabel berechnet sein — mit `var` waere sie
+            // Rating muss VOR buildRegionLabel berechnet sein — mit `var` waere es
             // zwar hoisted, aber `undefined`, sodass das Label in den En-Dash-Fallback
             // fallen wuerde (Pille zeigt "–" statt Rating-Zahl).
-            var stars = getStars(dayData);
+            var rating = getRating(dayData);
+            var stars = getStars(dayData); // Compat fuer Tooltip-Spots-Liste
             var expScore = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
 
-            // Center-Label — Pille mit Rating-Zahl 1-5 (RATING_CONCEPT v1.3 §4.3).
+            // Center-Label — Pille mit Rating-Zahl 1-10 (RATING_CONCEPT v1.4 §4.3).
             // Polygon-Centroid (layer.getCenter) statt bbox-Center: bei irregulaeren
             // Shapes (Surselva, Mittelland Zentral) faellt der bbox-Mittelpunkt
             // sonst an den Rand oder ausserhalb des Polygons.
             var center;
             try { center = layer.getCenter(); }
             catch (e) { center = layer.getBounds().getCenter(); }
-            var label = buildRegionLabel(style, layer.regionName, band, stars, map.getZoom());
+            var label = buildRegionLabel(style, layer.regionName, band, rating, map.getZoom());
 
             if (label) {
                 labelMarkersGroup.addLayer(L.marker(center, {
@@ -456,8 +476,8 @@
             // Tooltip — Zahl + Score (konsistent zu Pille auf Polygon, keine Sterne)
             var tipHtml = '<b>' + layer.regionName + '</b>';
             tipHtml += '<br><span style="color:' + style.labelColor + ';">' + style.safetyLabel + '</span>';
-            if (stars > 0) {
-                tipHtml += ' · <b>Rating ' + stars + '/5</b>';
+            if (rating > 0) {
+                tipHtml += ' · <b>Rating ' + rating + '/10</b>';
                 if (expScore !== null) tipHtml += ' (' + expScore + '/100)';
             }
             layer.setTooltipContent(tipHtml);

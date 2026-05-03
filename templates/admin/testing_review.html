@@ -156,6 +156,7 @@
   .rv-meteo-status { font-size:12px; color:var(--color-text-secondary); margin:6px 0; }
   .rv-meteo-status--err { color:#b71c1c; }
 </style>
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 {% endblock %}
 
@@ -383,7 +384,14 @@ window.RvMeteo = (function () {
       }
       var chartEl = wrap.querySelector('[data-rv-chart]');
       var tooltipEl = wrap.querySelector('[data-rv-tooltip]');
-      // Optionen analog zu /api/weather + /api/altitude-wind:
+      // ground_wind kommt als Liste {hour, wind_speed_kmh, ...} aus dem
+      // Snapshot-Endpoint. meteogram.js erwartet es zeitlich geschluesselt
+      // als groundWindByTime[ISO-Timestamp] — analog zu briefing.js / map.js.
+      var groundWindByTime = {};
+      (data.ground_wind || []).forEach(function (g) {
+        var hh = (g.hour < 10 ? '0' : '') + g.hour;
+        groundWindByTime[(data.date || '') + 'T' + hh + ':00:00'] = g;
+      });
       window.Meteogram.renderChart(chartEl, tooltipEl,
         data.wxDay || { wind: [], precipitation: [], thermik: [], cloudbase: [] },
         { profiles: data.altDay || [] },
@@ -392,7 +400,7 @@ window.RvMeteo = (function () {
           windrichtung: data.windrichtung,
           ideal_wind_max: data.ideal_wind_max,
           thresholds: data.thresholds,
-          ground_wind: data.ground_wind,
+          groundWindByTime: groundWindByTime,
         }
       );
       setStatus(wrap, 'Snapshot geladen (' + (data.wxDay && data.wxDay.wind ? data.wxDay.wind.length : 0) + ' Stunden)', false);

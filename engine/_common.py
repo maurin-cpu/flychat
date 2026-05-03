@@ -526,17 +526,12 @@ def _compute_experience_score(rating_0_10) -> int:
 def _compute_experience_stars(score: int) -> int:
     """Mappt `experience_score` (0-100) auf `experience_stars` (0-5).
 
-    Schwellen aus RATING_CONCEPT v1.3 §8.3 — untere Stufe gewinnt am Grenzwert
-    (konservative Auslegung):
-       0–20  = 0★ (Abgleiter / kein Flug)
-      21–40  = 1★ (kurzer Flug moeglich)
-      41–60  = 2★ (lokaler Flug)
-      61–75  = 3★ (solide Thermik, lokal-XC)
-      76–89  = 4★ (XC moeglich, gute Bedingungen)
-      90–100 = 5★ (Top-Tag, fettes XC-Potential)
+    DEPRECATED v1.4 — fuer Karten-Glyph + UI wird `experience_rating` (0-10)
+    verwendet, das mehr Granularitaet bietet. Diese Funktion bleibt als
+    Backwards-Compat fuer alte Caches und das Briefing-Bubble-Layout.
 
-    Bei Score-Lücken (z.B. exakt 75 oder 89) faellt der Wert auf die niedrigere
-    Stufe — reduziert Risiko von zu optimistischer Sterne-Vergabe.
+    Schwellen (untere Stufe gewinnt am Grenzwert):
+       0–20  = 0★, 21–40 = 1★, 41–60 = 2★, 61–75 = 3★, 76–89 = 4★, 90–100 = 5★
     """
     try:
         s = int(score)
@@ -553,6 +548,32 @@ def _compute_experience_stars(score: int) -> int:
     if s <= 89:
         return 4
     return 5
+
+
+def _compute_experience_rating(score) -> int:
+    """Mappt `experience_score` (0-100) auf `experience_rating` (0-10) —
+    die neue Primaer-Anzeige (RATING_CONCEPT v1.4).
+
+    0  = not_safe / kein Flug (score == 0)
+    1  = score 1-10
+    ...
+    10 = score 91-100, Klassiker-Tag
+
+    Pro 10 Score-Punkte ein Rating-Schritt, untere Stufe gewinnt am Grenzwert
+    (konservativ — wer 70 erreicht ist eine 7, nicht 8). Zwischenwerte:
+       1: 1-10, 2: 11-20, 3: 21-30, 4: 31-40, 5: 41-50,
+       6: 51-60, 7: 61-70, 8: 71-80, 9: 81-90, 10: 91-100.
+    """
+    try:
+        s = int(score)
+    except (TypeError, ValueError):
+        return 0
+    if s <= 0:
+        return 0
+    if s >= 100:
+        return 10
+    # Konservativ aufrunden auf 1-10: 1-10→1, 11-20→2 ... 91-99→10.
+    return max(1, min(10, (s + 9) // 10))
 
 
 # ============================================================================

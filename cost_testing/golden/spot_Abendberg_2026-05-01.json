@@ -1,0 +1,48 @@
+{
+  "spot": "Abendberg",
+  "date": "2026-05-01",
+  "frozen_at": "2026-05-02T15:10:10+00:00",
+  "frozen_at_commit": "221eec9",
+  "safety_status": "not_safe",
+  "input": "",
+  "output": {
+    "safety": {
+      "safety_status": "not_safe",
+      "safe_window": "keins",
+      "no_go_reasons": [
+        "Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors"
+      ],
+      "caution_notes": [],
+      "primary_no_go": null,
+      "primary_caution": null,
+      "primary_reducer": null,
+      "primary_booster": null,
+      "wind_summary": "",
+      "wind_shear": "",
+      "foehn_risk": "none",
+      "summary": "Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors (WNW-NNW). Kein fliegbares Fenster.",
+      "spot": "Abendberg",
+      "date": "2026-05-01",
+      "wind_ok_count": 0,
+      "wind_wrong_count": 7,
+      "error": ""
+    },
+    "noAnalysis": true,
+    "noAnalysisReason": "wind_direction_mismatch",
+    "rating": 0.0,
+    "is_conditional": false,
+    "conditional_reason": "",
+    "fly_status": "",
+    "status": "not_safe",
+    "streckenflug": {
+      "tier": "kein_xc",
+      "rating": 0,
+      "summary": "",
+      "limiting_factor": "spot_not_flyable",
+      "region_context_available": false
+    },
+    "best_window": "keins",
+    "recommendation": ""
+  },
+  "weather_snapshot": {}
+}

@@ -103,7 +103,7 @@
                       '<dt>Safety-Score</dt>' +
                       '<dd>0–100. Aggregat von 5 Sub-Aspekten: Bodenwind, Boeen, Hoehenwind, Foehn, Wetter (Niederschlag/Gewitter/Sicht). Aggregation per <b>Weakest-Link</b> — der schwaechste Aspekt zieht den Score nach unten. Ein einzelnes Gewitter macht den Tag rot, auch wenn alle anderen 4 perfekt sind.</dd>' +
                       '<dt>Experience-Score</dt>' +
-                      '<dd>0–100. <b>Spot</b>: 5 Sub-Ratings — Thermik (30%), Zeitfenster (20%), Wind (10%), XC-Potential (15%), <b>Hoehe ueber Spot</b> (25%). <b>Region</b>: 4 Sub-Ratings — Thermik (35%), Zeitfenster (25%), Wind (25%), XC-Potential (15%) (Region hat keine eindeutige Startplatzhoehe). Zahl im Marker = grobe Skalierung (1–5).</dd>' +
+                      '<dd>0–100. <b>Spot</b>: 5 Sub-Ratings — Thermik (30%), Zeitfenster (20%), Wind (10%), XC-Potential (15%), <b>Hoehe ueber Spot</b> (25%). <b>Region</b>: 4 Sub-Ratings — Thermik (35%), Zeitfenster (25%), Wind (25%), XC-Potential (15%) (Region hat keine eindeutige Startplatzhoehe). Zahl im Marker = Rating 1–10 (Score / 10).</dd>' +
                       '<dt>Comfort-Index</dt>' +
                       '<dd>0–100. Wie glatt (100) oder klapprig (0) der Tag wird. Beeinflusst <b>nicht</b> das Rating — nur dein Wohlbefinden in der Luft.</dd>' +
                     '</dl>' +

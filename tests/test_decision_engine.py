@@ -33,6 +33,7 @@ from engine.decision_engine import (
 from engine._common import (
     _compute_experience_score,
     _compute_experience_stars,
+    _compute_experience_rating,
     _compute_safety_rating,
     _compute_safety_score,
 )
@@ -534,6 +535,44 @@ class TestExperienceScore(unittest.TestCase):
 
 
 # ════════════════════════════════════════════════════════════════════
+# v1.4: experience_rating (0-10) — neue Primaer-Anzeige
+# ════════════════════════════════════════════════════════════════════
+# Mappt experience_score (0-100) auf 0-10. 0 = not_safe, 1-10 in 10er-Schritten.
+class TestExperienceRating(unittest.TestCase):
+    def test_zero_when_score_zero(self):
+        self.assertEqual(_compute_experience_rating(0), 0)
+
+    def test_ten_at_max(self):
+        self.assertEqual(_compute_experience_rating(100), 10)
+        self.assertEqual(_compute_experience_rating(99), 10)
+        self.assertEqual(_compute_experience_rating(91), 10)
+
+    def test_one_at_low_end(self):
+        self.assertEqual(_compute_experience_rating(1), 1)
+        self.assertEqual(_compute_experience_rating(10), 1)
+
+    def test_two_at_eleven_to_twenty(self):
+        self.assertEqual(_compute_experience_rating(11), 2)
+        self.assertEqual(_compute_experience_rating(20), 2)
+
+    def test_seven_at_seventy(self):
+        # Konservativ: 70 ist immer noch eine 7, 71 ist 8.
+        self.assertEqual(_compute_experience_rating(70), 7)
+        self.assertEqual(_compute_experience_rating(71), 8)
+
+    def test_eight_at_eighty(self):
+        self.assertEqual(_compute_experience_rating(80), 8)
+
+    def test_clamps_negative_and_overflow(self):
+        self.assertEqual(_compute_experience_rating(-5), 0)
+        self.assertEqual(_compute_experience_rating(150), 10)
+
+    def test_handles_none_and_invalid(self):
+        self.assertEqual(_compute_experience_rating(None), 0)
+        self.assertEqual(_compute_experience_rating("invalid"), 0)
+
+
+# ════════════════════════════════════════════════════════════════════
 # Vorab-Fix #4: Safety-Sub-Ratings (RATING_CONCEPT v1.3 §3.5)
 # ════════════════════════════════════════════════════════════════════
 # Vier neue LLM-Sub-Ratings (wind/gust/aloft/foehn, je 1-10) werden
@@ -714,50 +753,68 @@ class TestSafetyBand(unittest.TestCase):
 
 
 # ════════════════════════════════════════════════════════════════════
-# Phase 4 (RATING_CONCEPT v1.3 §9.7): compute_legacy_flyability_tier
-# Compat-View — leitet flyability_tier aus (safety_band, experience_stars) ab
+# Phase 4 (RATING_CONCEPT v1.4 §9.7): compute_legacy_flyability_tier
+# Compat-View — leitet flyability_tier aus (safety_band, experience_rating 0-10) ab
 # ════════════════════════════════════════════════════════════════════
 class TestLegacyFlyabilityTier(unittest.TestCase):
     def test_red_safety_yields_empty(self):
-        # red → "" unabhaengig von Sterne (keine Empfehlung bei not_safe)
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "red", "experience_stars": 5}), "")
+        # red → "" unabhaengig von Rating (keine Empfehlung bei not_safe)
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "red", "experience_rating": 10}), "")
 
-    def test_green_5_stars_yields_violet(self):
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 5}), "violet")
+    def test_green_rating_10_yields_violet(self):
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 10}), "violet")
 
-    def test_green_4_stars_yields_violet(self):
-        # untere Grenze: stars >= 4 AND green → violet
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 4}), "violet")
+    def test_green_rating_8_yields_violet(self):
+        # untere Grenze: rating >= 8 AND green → violet
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 8}), "violet")
 
-    def test_amber_4_stars_yields_green(self):
-        # amber + 4 Sterne ist NICHT violet (violet braucht green); fliegbar → green
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "amber", "experience_stars": 4}), "green")
+    def test_green_rating_7_yields_green(self):
+        # 7 ist noch nicht violet, aber klar green
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 7}), "green")
 
-    def test_green_3_stars_yields_green(self):
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 3}), "green")
+    def test_amber_rating_8_yields_green(self):
+        # amber + Rating 8 ist NICHT violet (violet braucht green); fliegbar → green
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "amber", "experience_rating": 8}), "green")
 
-    def test_green_2_stars_yields_green(self):
-        # untere Grenze fuer green
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 2}), "green")
+    def test_green_rating_4_yields_green(self):
+        # untere Grenze fuer green: rating >= 4
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 4}), "green")
 
-    def test_green_1_star_yields_gray(self):
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 1}), "gray")
+    def test_green_rating_3_yields_gray(self):
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 3}), "gray")
 
-    def test_amber_0_stars_yields_gray(self):
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "amber", "experience_stars": 0}), "gray")
+    def test_amber_rating_0_yields_gray(self):
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "amber", "experience_rating": 0}), "gray")
 
     def test_missing_fields_default_to_gray(self):
-        # Komplett leeres Result → gray (kein red, keine Sterne)
+        # Komplett leeres Result → gray (kein red, kein Rating)
         self.assertEqual(compute_legacy_flyability_tier({}), "gray")
 
-    def test_invalid_stars_falls_back_to_zero(self):
-        # nicht-numerische Sterne → 0 → gray
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": "abc"}), "gray")
+    def test_invalid_rating_falls_back_to_zero(self):
+        # nicht-numerisches Rating → 0 → gray
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": "abc"}), "gray")
 
     def test_safety_band_case_insensitive(self):
         # Robust gegen unterschiedliche Schreibweisen
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "RED", "experience_stars": 5}), "")
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "GREEN", "experience_stars": 5}), "violet")
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "RED", "experience_rating": 10}), "")
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "GREEN", "experience_rating": 10}), "violet")
+
+    # ── Backwards-compat: Falls Cache nur experience_stars hat (vor v1.4)
+    def test_legacy_stars_5_at_green_yields_violet(self):
+        # stars*2 = 10 → violet
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 5}), "violet")
+
+    def test_legacy_stars_4_at_green_yields_violet(self):
+        # stars*2 = 8 → violet (Grenze)
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 4}), "violet")
+
+    def test_legacy_stars_2_at_green_yields_green(self):
+        # stars*2 = 4 → green (untere Grenze)
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 2}), "green")
+
+    def test_legacy_stars_1_at_green_yields_gray(self):
+        # stars*2 = 2 → unter green-Schwelle → gray
+        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 1}), "gray")
 
 
 class TestWindWrongIsNotHazard(unittest.TestCase):
@@ -804,11 +861,13 @@ class TestWindWrongIsNotHazard(unittest.TestCase):
                 f"zaehlen. WIND-WRONG ist Startbarkeits-Filter, kein Hazard."
             )
 
-    def test_startbarkeit_block_present(self):
-        # STARTBARKEIT-Header mit Disclaimer muss im Datenblock-Output stehen,
-        # damit das LLM die Filter/Hazard-Trennung sieht.
-        self.assertIn("═══ STARTBARKEIT", self.src)
-        self.assertIn("KEIN Hazard", self.src)
+    def test_tagesfenster_block_present(self):
+        # TAGESFENSTER-Header muss im Datenblock-Output stehen sobald Stunden
+        # vor Tagesbeginn weggefiltert werden — damit das LLM die Slicing-
+        # Begruendung sieht statt Stunden zu halluzinieren. Filter/Hazard-
+        # Trennung lebt jetzt im Skill `_tagesfenster.md`, nicht im Datenblock.
+        self.assertIn("═══ TAGESFENSTER", self.src)
+        self.assertIn("Tag aktiv ab", self.src)
 
 
 if __name__ == "__main__":

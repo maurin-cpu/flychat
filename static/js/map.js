@@ -58,6 +58,7 @@
     var currentSpotProps = null;
     var currentSpotExperienceScore = null;
     var currentSpotExperienceStars = null;
+    var currentSpotExperienceRating = null;
     var markersByName = {}; // Store marker references
     var currentRefLayer = null; // Store reference points overlay
     var _iconUid = 0; // Unique ID counter for SVG defs
@@ -191,21 +192,21 @@
     // Inner circle = safety band color
     // Inner glyph:
     //   - red                 → white X cross (Sperr-Glyphe)
-    //   - stars >= 1          → white digit 1-5 (Erlebnis)
+    //   - rating >= 1         → white digit 1-10 (Erlebnis, v1.4)
     //   - stars == 0          → small white dot (sicher aber Abgleiter)
     //   - no_data / default   → small white dot (faded)
-    function createSpotIcon(props, safetyBand, experienceStars, isHighlighted) {
+    function createSpotIcon(props, safetyBand, experienceRating, isHighlighted) {
         var uid = ++_iconUid;
         var style = mapSafetyBandToStyle(safetyBand);
         var isMobile = window.innerWidth <= 600;
         // Marker-Groesse: User-Praeferenz "halb so gross" — radius 6-8px.
-        // NICHT vergroessern. Frueher 11-15px war zu dominant; Ziffer skaliert
-        // ueber radius * 1.4 automatisch mit, eine Aenderung hier reicht.
+        // v1.4: leichte Vergroesserung (+1px) damit zweistellige Ratings (10)
+        // lesbar bleiben. Ziffer skaliert ueber radius * fontFactor automatisch mit.
         var svgSize = 44;
         var center = svgSize / 2;
-        var radius = isHighlighted ? (isMobile ? 8 : 7) : (isMobile ? 7 : 6);
-        var stars = (typeof experienceStars === 'number' && experienceStars >= 0 && experienceStars <= 5)
-            ? Math.floor(experienceStars) : 0;
+        var radius = isHighlighted ? (isMobile ? 9 : 8) : (isMobile ? 8 : 7);
+        var rating = (typeof experienceRating === 'number' && experienceRating >= 0 && experienceRating <= 10)
+            ? Math.floor(experienceRating) : 0;
 
         var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">';
         // Invisible hit-area — extends tap target to full 44x44 (mobile only, WCAG)
@@ -260,14 +261,16 @@
             html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
                   + '" x2="' + (center - arm) + '" y2="' + (center + arm)
                   + '" stroke="#ffffff" stroke-width="' + crossWidth + '" stroke-linecap="round" />';
-        } else if (stars >= 1 && (safetyBand === 'green' || safetyBand === 'amber')) {
-            // Weisse Ziffer 1-5 — Erlebnis-Rating, prominent zum sofortigen Erkennen.
-            var fontSize = Math.round(radius * 1.4);
+        } else if (rating >= 1 && (safetyBand === 'green' || safetyBand === 'amber')) {
+            // Weisse Ziffer 1-10 — Erlebnis-Rating, prominent zum sofortigen Erkennen.
+            // Zweistellige "10" braucht kleinere Schrift, damit's in den Kreis passt.
+            var twoDigit = rating >= 10;
+            var fontSize = Math.round(radius * (twoDigit ? 1.1 : 1.5));
             html += '<text x="' + center + '" y="' + (center + fontSize * 0.35)
                   + '" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif"'
-                  + ' font-size="' + fontSize + '" font-weight="800">' + stars + '</text>';
+                  + ' font-size="' + fontSize + '" font-weight="800">' + rating + '</text>';
         } else if (safetyBand === 'green' || safetyBand === 'amber') {
-            // 0 stars: kleiner weisser Punkt (sicher aber Abgleiter)
+            // 0 rating: kleiner weisser Punkt (sicher aber Abgleiter)
             html += '<circle cx="' + center + '" cy="' + center + '" r="1.8" fill="#ffffff" />';
         }
 
@@ -282,10 +285,11 @@
         });
     }
 
-    // ===== TOOLTIP BUILDER (RATING_CONCEPT v1.3 §8.2) =====
-    // Signature: buildTooltipHtml(p, _legacyStyle, safetyBand, experienceStars, dayData)
-    // _legacyStyle bleibt fuer alte Aufrufer, wird ignoriert wenn safetyBand uebergeben wird.
-    function buildTooltipHtml(p, _legacyStyle, safetyBand, experienceStars, dayData) {
+    // ===== TOOLTIP BUILDER (RATING_CONCEPT v1.4 §8.2) =====
+    // Signature: buildTooltipHtml(p, _legacyStyle, safetyBand, experienceRating, dayData)
+    // experienceRating ist 0-10 (0 = kein Flug). _legacyStyle bleibt fuer alte
+    // Aufrufer, wird ignoriert wenn safetyBand uebergeben wird.
+    function buildTooltipHtml(p, _legacyStyle, safetyBand, experienceRating, dayData) {
         var html = '<b>' + p.name + '</b><br>' +
             p.fluggebiet + ' (' + p.region + ')<br>' +
             p.elevation_m + 'm MSL | Wind: ' + p.windrichtung;
@@ -297,8 +301,8 @@
             html += '<br><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'
                   + s.fill + ';margin-right:4px;vertical-align:middle;"></span>';
             html += '<span style="color:' + s.stroke + ';">' + s.label + '</span>';
-            if (safetyBand !== 'red' && typeof experienceStars === 'number' && experienceStars >= 1) {
-                html += ' &middot; Rating ' + experienceStars + '/5';
+            if (safetyBand !== 'red' && typeof experienceRating === 'number' && experienceRating >= 1) {
+                html += ' &middot; Rating ' + experienceRating + '/10';
             }
             if (dayData && typeof dayData.comfort_index === 'number') {
                 html += ' &middot; Comfort ' + Math.round(dayData.comfort_index);
@@ -323,6 +327,7 @@
                         var p = feature.properties;
                         layer.featureProperties = p;
                         layer.currentSafetyBand = p.has_weather ? 'default' : 'no_data';
+                        layer.currentRating = 0;
                         layer.currentStars = 0;
                         // Legacy compat-Felder (fuer Highlight/Tooltip-Pfade die noch davon lesen)
                         layer.currentSafety = p.has_weather ? 'default' : 'no_data';
@@ -474,6 +479,7 @@
         // Rating selbst — kein separates Badge mehr).
         currentSpotExperienceScore = (analysis && typeof analysis.experience_score === 'number') ? analysis.experience_score : null;
         currentSpotExperienceStars = (analysis && typeof analysis.experience_stars === 'number') ? analysis.experience_stars : null;
+        currentSpotExperienceRating = (analysis && typeof analysis.experience_rating === 'number') ? analysis.experience_rating : null;
         renderFeedbackBar(currentSpotName, dateStr, analysis);
     }
 
@@ -503,6 +509,7 @@
         currentSpotProps = props || null;
         currentSpotExperienceScore = null;
         currentSpotExperienceStars = null;
+        currentSpotExperienceRating = null;
         titleEl.textContent = spotName;
         infoEl.textContent = props
             ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + props.windrichtung
@@ -718,8 +725,12 @@
             var regionId = (currentSpotProps && currentSpotProps.region_id) || '';
             var regionName = (currentSpotProps && currentSpotProps.region) || '';
             var rText = '';
-            if (currentSpotExperienceStars != null && currentSpotExperienceStars >= 1) {
-                rText = ' — Rating ' + currentSpotExperienceStars + '/5';
+            if (currentSpotExperienceRating != null && currentSpotExperienceRating >= 1) {
+                rText = ' — Rating ' + currentSpotExperienceRating + '/10';
+                if (currentSpotExperienceScore != null) rText += ' · ' + currentSpotExperienceScore + '/100';
+            } else if (currentSpotExperienceStars != null && currentSpotExperienceStars >= 1) {
+                // Legacy-Cache (vor v1.4): Stars 0-5 als Fallback
+                rText = ' — Rating ' + (currentSpotExperienceStars * 2) + '/10';
                 if (currentSpotExperienceScore != null) rText += ' · ' + currentSpotExperienceScore + '/100';
             }
             var dayIdx = 0;
@@ -752,8 +763,8 @@
         // Reset all markers to their current analysis state
         Object.values(markersByName).forEach(function (marker) {
             var band = marker.currentSafetyBand || 'default';
-            var stars = marker.currentStars || 0;
-            marker.setIcon(createSpotIcon(marker.featureProperties, band, stars, false));
+            var rating = (typeof marker.currentRating === 'number') ? marker.currentRating : 0;
+            marker.setIcon(createSpotIcon(marker.featureProperties, band, rating, false));
             if (marker.getElement()) marker.getElement().style.zIndex = '';
         });
 
@@ -765,17 +776,17 @@
             var marker = markersByName[name];
             if (marker) {
                 var band = marker.currentSafetyBand || 'default';
-                var stars = marker.currentStars || 0;
-                marker.setIcon(createSpotIcon(marker.featureProperties, band, stars, true));
+                var rating = (typeof marker.currentRating === 'number') ? marker.currentRating : 0;
+                marker.setIcon(createSpotIcon(marker.featureProperties, band, rating, true));
                 if (marker.getElement()) marker.getElement().style.zIndex = 1000;
             }
         });
     };
 
-    // ===== SPOT COLORING (from LLM analyses, RATING_CONCEPT v1.3) =====
-    // Reads safety_band + experience_stars (with legacy fallback to safety_status/fly_status).
+    // ===== SPOT COLORING (from LLM analyses, RATING_CONCEPT v1.4) =====
+    // Reads safety_band + experience_rating (1-10), Fallback experience_stars + rating.
     window.updateSpotColors = function (analysisData, dateStr) {
-        // analysisData: {spot_name: {date_str: {safety_band, experience_stars, ...}}}
+        // analysisData: {spot_name: {date_str: {safety_band, experience_rating, ...}}}
         if (!analysisData || !dateStr) return;
 
         Object.keys(markersByName).forEach(function (name) {
@@ -786,6 +797,7 @@
             if (!dayData) {
                 // No analysis for this date → reset to no_data
                 marker.currentSafetyBand = 'no_data';
+                marker.currentRating = 0;
                 marker.currentStars = 0;
                 marker.currentSafety = 'no_data';
                 marker.currentQuality = 'green';
@@ -795,29 +807,34 @@
             }
 
             // Prefer new fields, fall back to legacy.
-            // experience_stars: bei Fehlen ableiten aus rating (Schwellen wie
-            // email_service._stars_for_spot + region-map.getStars).
             var band = dayData.safety_band || legacySafetyBand(dayData.safety_status);
-            var stars = 0;
-            if (typeof dayData.experience_stars === 'number') {
-                stars = dayData.experience_stars;
+            // experience_rating 1-10: bevorzugt Cache, sonst aus score/10 ableiten,
+            // sonst aus stars*2, sonst aus rating runden.
+            var rating = 0;
+            if (typeof dayData.experience_rating === 'number') {
+                rating = dayData.experience_rating;
+            } else if (typeof dayData.experience_score === 'number') {
+                var sc = dayData.experience_score;
+                if (sc <= 0) rating = 0;
+                else if (sc >= 100) rating = 10;
+                else rating = Math.max(1, Math.min(10, Math.ceil(sc / 10)));
+            } else if (typeof dayData.experience_stars === 'number') {
+                rating = Math.max(0, Math.min(10, dayData.experience_stars * 2));
             } else {
                 var r = parseFloat(dayData.rating || 0);
-                if (r >= 9.0)       stars = 5;
-                else if (r >= 7.6)  stars = 4;
-                else if (r >= 6.1)  stars = 3;
-                else if (r >= 4.1)  stars = 2;
-                else if (r >= 2.1)  stars = 1;
+                if (r > 0) rating = Math.max(1, Math.min(10, Math.round(r)));
             }
 
             marker.currentSafetyBand = band;
-            marker.currentStars = stars;
+            marker.currentRating = rating;
             // Legacy fields for compat (other code paths may still read these)
+            marker.currentStars = (typeof dayData.experience_stars === 'number')
+                ? dayData.experience_stars : Math.floor(rating / 2);
             marker.currentSafety = dayData.safety_status || 'safe';
             marker.currentQuality = dayData.fly_status || 'green';
 
-            marker.setIcon(createSpotIcon(marker.featureProperties, band, stars, false));
-            marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, null, band, stars, dayData));
+            marker.setIcon(createSpotIcon(marker.featureProperties, band, rating, false));
+            marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, null, band, rating, dayData));
         });
     };
 
@@ -838,13 +855,15 @@
                         if (!hasAnalysis) {
                             var band = p.has_weather ? 'default' : 'no_data';
                             marker.currentSafetyBand = band;
+                            marker.currentRating = 0;
                             marker.currentStars = 0;
                             marker.currentSafety = band;
                             marker.currentQuality = 'green';
                             marker.setIcon(createSpotIcon(p, band, 0, false));
                         }
+                        var ratingTip = (typeof marker.currentRating === 'number') ? marker.currentRating : 0;
                         marker.setTooltipContent(buildTooltipHtml(
-                            p, null, marker.currentSafetyBand, marker.currentStars, null
+                            p, null, marker.currentSafetyBand, ratingTip, null
                         ));
                     }
                 });

@@ -190,6 +190,13 @@
       : (typeof spot.experience_stars === "number" ? Math.floor(spot.experience_stars) : 0);
   }
 
+  // RATING_CONCEPT v1.4: 0-10 Rating
+  function spotRating(spot) {
+    return (window.gleitcastGlyph && window.gleitcastGlyph.legacyRating)
+      ? window.gleitcastGlyph.legacyRating(spot)
+      : (typeof spot.experience_rating === "number" ? Math.floor(spot.experience_rating) : spotStars(spot) * 2);
+  }
+
   function spotPassesSafetyFilter(spot) {
     const bands = state.safetyFilters;
     if (!bands || bands.size === 0) return false;
@@ -267,10 +274,12 @@
     return { spots_flyable: fly, spots_bronze: br, spots_nogo: ng, spots_conditional: co };
   }
 
-  // ── Bubble-Matrix (RATING_CONCEPT v1.3 §4.4) ──
-  // Risk-Reward-Uebersicht: pro Region 1 Bubble.
-  // X = avg experience_score, Y = 3 safety_band-Zonen, Groesse = Spot-Anzahl.
-  // Nutzt shared-glyph als Single-Source-Of-Truth fuer Cache-Reads + Legacy-Fallback.
+  // ── Risk-Reward-Matrix (echtes 2-Achsen-Scatter, Spot-Ebene) ──
+  // X = Experience-Score (0..100, Reward)
+  // Y = Safety-Score (0..100, höher = sicherer) — invertiert dargestellt:
+  //     Sweet-Spot oben rechts (high reward + high safety).
+  // Bubble-Farbe = Region (kategorial). Bubble-Größe = Sterne.
+  // not_safe/red Spots werden ausgefiltert ("X ausgeblendet"-Hinweis).
   function _bandFromSpot(s)  { return spotSafetyBand(s); }
   function _starsFromSpot(s) { return spotStars(s); }
   function _scoreFromSpot(s) {
@@ -278,95 +287,310 @@
       ? window.gleitcastGlyph.experienceScore(s)
       : Math.max(0, Math.min(100, Math.round((parseFloat(s.rating || 0) || 0) * 10)));
   }
-  function aggregateRegionsForBubbleMatrix(spots) {
-    const acc = {};
+  // Safety-Score: aus Cache, sonst Fallback aus status + foehn_risk.
+  function _safetyScoreFromSpot(s) {
+    if (s && typeof s.safety_score === 'number') {
+      return Math.max(0, Math.min(100, Math.round(s.safety_score)));
+    }
+    const status = String((s && s.safety_status) || '').toLowerCase();
+    const foehn = String((s && s.foehn_risk) || 'none').toLowerCase();
+    let base;
+    if (status === 'safe') base = 85;
+    else if (status === 'conditional') base = 50;
+    else base = 0;
+    let foehnDelta = 0;
+    if (foehn === 'medium') foehnDelta = -15;
+    else if (foehn === 'high' || foehn === 'severe') foehnDelta = -30;
+    return Math.max(0, Math.min(100, base + foehnDelta));
+  }
+  // Deterministischer 2D-Jitter (FNV-1a hash → -1..+1 für x und y).
+  function _spotJitter2D(name) {
+    let h = 2166136261;
+    const s = String(name || '');
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const u = (h >>> 0);
+    const jx = ((u % 2000) / 1000) - 1;            // -1..+1
+    const jy = (((u >>> 11) % 2000) / 1000) - 1;   // -1..+1
+    return { jx, jy };
+  }
+  // Kategorische Region-Palette (10 Töne, gut unterscheidbar im Light-Mode).
+  // Reihenfolge nach Wahrnehmungs-Distanz — Region 1 vs 2 maximaler Kontrast.
+  const REGION_PALETTE = [
+    '#2563eb', // blau
+    '#dc2626', // rot
+    '#059669', // grün
+    '#d97706', // amber
+    '#7c3aed', // violett
+    '#0891b2', // cyan
+    '#db2777', // pink
+    '#65a30d', // lime
+    '#475569', // slate
+    '#c2410c', // orange
+  ];
+  const REGION_PALETTE_FALLBACK = '#94a3b8'; // grau für 11+
+  function buildSpotMatrixData(spots) {
+    let hidden = 0;
+    const items = [];
+    const regionOrder = []; // erste Begegnung → stabile Farb-Zuordnung
+    const regionMap = {};   // rid → { name, color, count }
     for (const s of spots || []) {
       if (!s.spot || !s.region_id) continue;
+      const band = _bandFromSpot(s);
+      if (band !== 'green' && band !== 'amber') { hidden++; continue; }
       const rid = s.region_id;
-      if (!acc[rid]) acc[rid] = { rid: rid, name: s.region_name || rid, scores: [], bands: { green: 0, amber: 0, red: 0, no_data: 0 }, count: 0 };
-      acc[rid].count++;
-      acc[rid].scores.push(_scoreFromSpot(s));
-      const b = _bandFromSpot(s);
-      acc[rid].bands[b] = (acc[rid].bands[b] || 0) + 1;
+      if (!regionMap[rid]) {
+        regionMap[rid] = { rid, name: s.region_name || rid, count: 0, color: '' };
+        regionOrder.push(rid);
+      }
+      regionMap[rid].count++;
+      items.push({
+        rid,
+        region_name: s.region_name || rid,
+        spot: s.spot,
+        band,
+        score: _scoreFromSpot(s),
+        safety: _safetyScoreFromSpot(s),
+        stars: _starsFromSpot(s),
+      });
     }
-    const out = [];
-    for (const rid in acc) {
-      const e = acc[rid];
-      const avg = e.scores.length ? e.scores.reduce((a, b) => a + b, 0) / e.scores.length : 0;
-      // Worst-Band wins (Konzept §4.4 — kategorial)
-      let worst = 'green';
-      if (e.bands.red > 0)      worst = 'red';
-      else if (e.bands.amber > 0) worst = 'amber';
-      out.push({ rid: e.rid, name: e.name, avg_score: Math.round(avg), band: worst, count: e.count });
-    }
-    return out;
+    // Regionen nach Spot-Anzahl sortieren (häufigste zuerst → bekommen kräftige Farben).
+    regionOrder.sort((a, b) => regionMap[b].count - regionMap[a].count);
+    regionOrder.forEach((rid, i) => {
+      regionMap[rid].color = i < REGION_PALETTE.length
+        ? REGION_PALETTE[i]
+        : REGION_PALETTE_FALLBACK;
+    });
+    return {
+      items,
+      hiddenCount: hidden,
+      regions: regionOrder.map((rid) => regionMap[rid]),
+    };
   }
 
   function renderBubbleMatrix(day, filteredSpots) {
     const host = $("bfBubbleMatrix");
     if (!host) return;
     if (!filteredSpots || filteredSpots.length < 2) { host.hidden = true; return; }
-    const data = aggregateRegionsForBubbleMatrix(filteredSpots);
-    if (data.length < 2) { host.hidden = true; return; }
+    const { items, hiddenCount, regions } = buildSpotMatrixData(filteredSpots);
+    if (items.length < 2) { host.hidden = true; return; }
     host.hidden = false;
 
+    // Layout
     const W = host.clientWidth || 800;
-    const H = host.classList.contains('compact') ? 200 : 200;
-    const margin = { top: 24, right: 16, bottom: 28, left: 70 };
+    const isMobile = W < 640;
+    const H = isMobile ? 280 : 320;
+    const margin = { top: 16, right: 16, bottom: 38, left: isMobile ? 48 : 56 };
     const innerW = Math.max(200, W - margin.left - margin.right);
     const innerH = H - margin.top - margin.bottom;
 
-    const bands = ['green', 'amber', 'red'];
-    const yScale = (b) => margin.top + innerH * (bands.indexOf(b) + 0.5) / bands.length;
-    const xScale = (s) => margin.left + (s / 100) * innerW;
-    const rScale = (n) => Math.max(10, Math.min(28, 8 + Math.sqrt(n) * 4));
+    // Skalen
+    const xScale = (v) => margin.left + (Math.max(0, Math.min(100, v)) / 100) * innerW;
+    // Y invertiert: hoher Safety-Score → oben, niedriger → unten
+    const yScale = (v) => margin.top + (1 - Math.max(0, Math.min(100, v)) / 100) * innerH;
+    // Sterne → Radius (6..13px) — kompakt für 2D-Scatter
+    const rScale = (stars) => 6 + Math.max(0, Math.min(5, stars || 0)) * 1.4;
 
-    let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">';
-    // Bandbackgrounds
-    bands.forEach((b, i) => {
-      const y0 = margin.top + (innerH * i) / bands.length;
-      const h = innerH / bands.length;
-      svg += '<rect class="band-bg-' + b + '" x="' + margin.left + '" y="' + y0
-          + '" width="' + innerW + '" height="' + h + '" />';
-      const labels = { green: 'GRÜN', amber: 'AMBER', red: 'ROT' };
-      svg += '<text class="band-label" x="' + (margin.left - 6) + '" y="' + (y0 + h / 2 + 3)
-          + '" text-anchor="end">' + labels[b] + '</text>';
+    // Region-Color-Lookup
+    const colorByRid = {};
+    for (const r of regions) colorByRid[r.rid] = r.color;
+
+    let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" '
+            + 'role="img" aria-label="Risk-Reward-Matrix">';
+
+    // Quadranten-Hintergrund (Sweet-Spot rechts oben hervorgehoben)
+    const midX = xScale(50);
+    const midY = yScale(50);
+    // Sweet-Spot (rechts oben): high reward + high safety
+    svg += '<rect class="quad quad--sweet" x="' + midX + '" y="' + margin.top
+        + '" width="' + (margin.left + innerW - midX) + '" height="' + (midY - margin.top) + '" />';
+    // Niedriger Reward + sicher (links oben): "verschenkt"
+    svg += '<rect class="quad quad--low" x="' + margin.left + '" y="' + margin.top
+        + '" width="' + (midX - margin.left) + '" height="' + (midY - margin.top) + '" />';
+    // High reward + risikant (rechts unten): "Caution-Zone"
+    svg += '<rect class="quad quad--caution" x="' + midX + '" y="' + midY
+        + '" width="' + (margin.left + innerW - midX) + '" height="' + (margin.top + innerH - midY) + '" />';
+    // Links unten: schlecht
+    svg += '<rect class="quad quad--bad" x="' + margin.left + '" y="' + midY
+        + '" width="' + (midX - margin.left) + '" height="' + (margin.top + innerH - midY) + '" />';
+
+    // Quadranten-Label oben rechts (Sweet-Spot Hint)
+    svg += '<text class="quad-label" x="' + (margin.left + innerW - 6) + '" y="' + (margin.top + 14)
+        + '" text-anchor="end">★ Sweet-Spot</text>';
+
+    // Gridlines (25/50/75 auf beiden Achsen)
+    [25, 50, 75].forEach((v) => {
+      const x = xScale(v);
+      const y = yScale(v);
+      svg += '<line class="grid" x1="' + x + '" y1="' + margin.top + '" x2="' + x + '" y2="' + (margin.top + innerH) + '" />';
+      svg += '<line class="grid" x1="' + margin.left + '" y1="' + y + '" x2="' + (margin.left + innerW) + '" y2="' + y + '" />';
     });
-    // X-Achse (0/50/100)
+
+    // Achsen-Tick-Labels (X: 0/50/100, Y: 0/50/100)
     [0, 50, 100].forEach((v) => {
       const x = xScale(v);
-      svg += '<g class="x-tick">'
-          + '<line x1="' + x + '" y1="' + (margin.top + innerH) + '" x2="' + x + '" y2="' + (margin.top + innerH + 4) + '"/>'
-          + '<text x="' + x + '" y="' + (margin.top + innerH + 16) + '" text-anchor="middle">' + v + '</text>'
-          + '</g>';
+      svg += '<text class="tick-label" x="' + x + '" y="' + (margin.top + innerH + 14)
+          + '" text-anchor="middle">' + v + '</text>';
     });
-    svg += '<text x="' + (margin.left + innerW / 2) + '" y="' + H + '" text-anchor="middle" '
-        + 'style="font-size:10px;fill:#94a3b8;">Experience-Score</text>';
-    // Bubbles
-    for (const d of data) {
-      if (d.band === 'no_data') continue;
-      const cx = xScale(d.avg_score);
-      const cy = yScale(d.band);
-      const r = rScale(d.count);
-      svg += '<g class="bubble" data-rid="' + escapeAttr(d.rid) + '">'
-          + '<title>' + escapeHtml(d.name) + ' · ' + d.count + ' Spots · ⌀ ' + d.avg_score + '/100</title>'
-          + '<circle class="bubble-fill-' + d.band + '" cx="' + cx + '" cy="' + cy + '" r="' + r + '" stroke-width="1.5" fill-opacity="0.85" />'
-          + '<text class="bubble-count" x="' + cx + '" y="' + cy + '">' + d.count + '</text>'
-          + '<text class="bubble-label" x="' + cx + '" y="' + (cy + r + 11) + '">' + escapeHtml(d.name.substring(0, 14)) + '</text>'
+    [0, 50, 100].forEach((v) => {
+      const y = yScale(v);
+      svg += '<text class="tick-label" x="' + (margin.left - 6) + '" y="' + (y + 3)
+          + '" text-anchor="end">' + v + '</text>';
+    });
+
+    // Achsen-Titel
+    svg += '<text class="axis-title" x="' + (margin.left + innerW / 2) + '" y="' + (H - 4)
+        + '" text-anchor="middle">Reward · Experience-Score →</text>';
+    svg += '<text class="axis-title" x="' + (margin.left - 36) + '" y="' + (margin.top + innerH / 2)
+        + '" text-anchor="middle" transform="rotate(-90 ' + (margin.left - 36) + ' ' + (margin.top + innerH / 2) + ')">↑ Sicherheit</text>';
+
+    // Bubbles — Sweet-Spot zuletzt zeichnen (überlappen schlechtere)
+    const drawOrder = items.slice().sort((a, b) => {
+      // niedrige Sicherheit zuerst, dann niedriger Score → top-right Bubbles oben
+      const sa = a.safety + a.score;
+      const sb = b.safety + b.score;
+      return sa - sb;
+    });
+    for (const it of drawOrder) {
+      const { jx, jy } = _spotJitter2D(it.spot);
+      const cx = xScale(it.score) + jx * 4;       // ±4px Streuung
+      const cy = yScale(it.safety) + jy * 4;
+      const r = rScale(it.stars);
+      const color = colorByRid[it.rid] || REGION_PALETTE_FALLBACK;
+      // amber-Spots leicht reduzierter Stroke-Kontrast (visuell zurückhaltend)
+      const strokeOpacity = it.band === 'amber' ? 0.5 : 0.85;
+      svg += '<g class="bubble" '
+          + 'data-spot="' + escapeAttr(it.spot) + '" '
+          + 'data-rid="' + escapeAttr(it.rid) + '" '
+          + 'data-region-name="' + escapeAttr(it.region_name) + '" '
+          + 'data-score="' + it.score + '" '
+          + 'data-safety="' + it.safety + '" '
+          + 'data-stars="' + it.stars + '" '
+          + 'data-band="' + it.band + '" '
+          + 'tabindex="0" role="button" '
+          + 'aria-label="' + escapeAttr(it.spot + ', ' + it.region_name + ', Reward ' + it.score + ', Sicherheit ' + it.safety + ', ' + it.stars + ' Sterne') + '">'
+          + '<circle cx="' + cx.toFixed(2) + '" cy="' + cy.toFixed(2) + '" r="' + r.toFixed(2)
+          + '" fill="' + color + '" stroke="' + color + '" stroke-opacity="' + strokeOpacity + '" />'
           + '</g>';
     }
     svg += '</svg>';
 
+    // Region-Legende (kompakte Pills)
+    const legendItems = regions.map((r) => {
+      const dimmed = r.color === REGION_PALETTE_FALLBACK ? ' is-dim' : '';
+      return '<button type="button" class="bf-region-chip' + dimmed
+        + '" data-rid="' + escapeAttr(r.rid) + '" title="' + escapeAttr(r.name) + '">'
+        + '<span class="bf-region-chip-dot" style="background:' + r.color + '"></span>'
+        + '<span class="bf-region-chip-name">' + escapeHtml(r.name) + '</span>'
+        + '<span class="bf-region-chip-count">' + r.count + '</span>'
+        + '</button>';
+    }).join('');
+
+    const hiddenHint = hiddenCount > 0
+      ? '<span class="bf-bubble-matrix-hidden">' + hiddenCount + ' not-safe ausgeblendet</span>'
+      : '';
+
     host.innerHTML =
       '<div class="bf-bubble-matrix-header">'
-      + '<span class="bf-bubble-matrix-title">Risk-Reward · Regionen</span>'
-      + '<span class="bf-bubble-matrix-hint">Bubble-Größe = Spots · Klick → springt zur Region</span>'
-      + '</div>' + svg;
+      + '<span class="bf-bubble-matrix-title">Risk-Reward-Matrix</span>'
+      + '<span class="bf-bubble-matrix-legend-meta">'
+      + '<span class="legend-item legend-item--size">⬤ Größe = Sterne</span>'
+      + hiddenHint
+      + '</span>'
+      + '</div>'
+      + '<div class="bf-bubble-matrix-svg-wrap">' + svg + '</div>'
+      + '<div class="bf-region-legend">' + legendItems + '</div>'
+      + '<div class="bf-bubble-tooltip" hidden></div>';
 
-    // Klick-Handler: scrollt zur Region im Briefing
+    const tooltip = host.querySelector('.bf-bubble-tooltip');
+    const wrap = host.querySelector('.bf-bubble-matrix-svg-wrap');
+    function showTooltip(g, evt) {
+      if (!tooltip || !wrap) return;
+      const spot = g.getAttribute('data-spot') || '';
+      const region = g.getAttribute('data-region-name') || '';
+      const score = g.getAttribute('data-score') || '';
+      const safety = g.getAttribute('data-safety') || '';
+      const stars = parseInt(g.getAttribute('data-stars') || '0', 10);
+      const band = g.getAttribute('data-band') || '';
+      const bandLabel = band === 'green' ? 'safe' : (band === 'amber' ? 'conditional' : band);
+      const starGlyph = '★'.repeat(Math.max(0, Math.min(5, stars))) + '☆'.repeat(5 - Math.max(0, Math.min(5, stars)));
+      tooltip.innerHTML =
+        '<div class="bf-bubble-tooltip-name">' + escapeHtml(spot) + '</div>'
+        + '<div class="bf-bubble-tooltip-region">' + escapeHtml(region) + '</div>'
+        + '<div class="bf-bubble-tooltip-grid">'
+        +   '<div class="bf-bubble-tooltip-cell"><span class="lbl">Reward</span><span class="val">' + score + '</span></div>'
+        +   '<div class="bf-bubble-tooltip-cell"><span class="lbl">Sicherheit</span><span class="val">' + safety + '</span></div>'
+        + '</div>'
+        + '<div class="bf-bubble-tooltip-row"><span class="bf-bubble-tooltip-stars">' + starGlyph + '</span>'
+        + '<span class="bf-bubble-tooltip-band bf-bubble-tooltip-band--' + band + '">' + bandLabel + '</span></div>';
+      tooltip.hidden = false;
+      const wrapRect = wrap.getBoundingClientRect();
+      const circ = g.querySelector('circle');
+      let cx = wrapRect.width / 2, cy = 0;
+      if (circ) {
+        const cr = circ.getBoundingClientRect();
+        cx = cr.left - wrapRect.left + cr.width / 2;
+        cy = cr.top - wrapRect.top;
+      } else if (evt) {
+        cx = evt.clientX - wrapRect.left;
+        cy = evt.clientY - wrapRect.top;
+      }
+      const tw = tooltip.offsetWidth;
+      const th = tooltip.offsetHeight;
+      let left = cx - tw / 2;
+      left = Math.max(4, Math.min(wrapRect.width - tw - 4, left));
+      let top = cy - th - 10;
+      if (top < 4) top = cy + 18;
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    }
+    function hideTooltip() {
+      if (tooltip) tooltip.hidden = true;
+    }
+
+    function activateBubble(g) {
+      const spot = g.getAttribute('data-spot');
+      const rid = g.getAttribute('data-rid');
+      let target = null;
+      const spotEls = document.querySelectorAll('.bf-spot');
+      for (const el of spotEls) {
+        const nameEl = el.querySelector('.bf-spot-name');
+        if (nameEl && nameEl.textContent.trim() === spot) { target = el; break; }
+      }
+      if (!target && rid) target = document.querySelector('[data-region-id="' + escapeAttr(rid) + '"]');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('bf-region-flash');
+        setTimeout(() => target.classList.remove('bf-region-flash'), 1200);
+      }
+      hideTooltip();
+    }
+
     host.querySelectorAll('.bubble').forEach((g) => {
-      g.addEventListener('click', () => {
-        const rid = g.getAttribute('data-rid');
+      g.addEventListener('mouseenter', (e) => showTooltip(g, e));
+      g.addEventListener('mouseleave', hideTooltip);
+      g.addEventListener('focus', () => showTooltip(g, null));
+      g.addEventListener('blur', hideTooltip);
+      g.addEventListener('click', () => activateBubble(g));
+      g.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateBubble(g); }
+      });
+    });
+
+    // Region-Chip-Hover/Klick: alle anderen Regionen ausgrauen + Region-Card scrollen
+    host.querySelectorAll('.bf-region-chip').forEach((chip) => {
+      const rid = chip.getAttribute('data-rid');
+      chip.addEventListener('mouseenter', () => {
+        host.querySelectorAll('.bubble').forEach((g) => {
+          if (g.getAttribute('data-rid') !== rid) g.classList.add('is-faded');
+        });
+      });
+      chip.addEventListener('mouseleave', () => {
+        host.querySelectorAll('.bubble.is-faded').forEach((g) => g.classList.remove('is-faded'));
+      });
+      chip.addEventListener('click', () => {
         const target = document.querySelector('[data-region-id="' + escapeAttr(rid) + '"]');
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -947,7 +1171,10 @@
     const headStars = (meta && G && G.legacyStars)
       ? G.legacyStars(meta)
       : (G && G.avgStars ? G.avgStars(group.spots) : 0);
-    const headGlyph = G && G.svg ? G.svg({ band: headBand, stars: headStars, size: 22 }) : "";
+    const headRating = (meta && G && G.legacyRating)
+      ? G.legacyRating(meta)
+      : (G && G.avgRating ? G.avgRating(group.spots) : headStars * 2);
+    const headGlyph = G && G.svg ? G.svg({ band: headBand, rating: headRating, size: 22 }) : "";
 
     // Verteilungs-Pill: nur Baender mit > 0 anzeigen, in Reihenfolge gruen→amber→rot.
     const distParts = [];
@@ -956,7 +1183,7 @@
     if (counts.red > 0)   distParts.push(`<span class="bf-region-dist-item bf-region-dist-item--red">${counts.red} rot</span>`);
     const distHtml = distParts.length ? `<span class="bf-region-dist">${distParts.join("")}</span>` : "";
 
-    const shareRatingAttr = headStars > 0 && headBand !== "red" ? String(headStars) : "";
+    const shareRatingAttr = headRating > 0 && headBand !== "red" ? String(headRating) : "";
     const shareBtn = group.region_id && group.region_id !== "unknown"
       ? `<button type="button" class="bf-share-btn bf-share-btn--region"
                  data-share-kind="region"
@@ -987,12 +1214,13 @@
 
   function renderSpotRow(spot) {
     if (!spot.spot || !String(spot.spot).trim()) return "";
-    // RATING_CONCEPT v1.3: safety_band + experience_stars als Primaer-Achsen.
+    // RATING_CONCEPT v1.4: safety_band + experience_rating (1-10) als Primaer-Achsen.
     const band = spotSafetyBand(spot);
     const stars = spotStars(spot);
+    const rating = spotRating(spot);
     const safetyCls = "safety-" + band;
     const glyphHtml = (window.gleitcastGlyph && window.gleitcastGlyph.svg)
-      ? window.gleitcastGlyph.svg({ band, stars, size: 24 })
+      ? window.gleitcastGlyph.svg({ band, rating, size: 24 })
       : "";
 
     // ── Status-Leiste: nur sachliche Chips (Best-Window, Flugtyp, Steigwerte).
@@ -1029,7 +1257,7 @@
       ? `<div class="bf-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-quality="${escapeHtml(spot.fly_status || "")}" data-band="${escapeHtml(band)}" data-stars="${stars}"></div>`
       : `<div class="bf-spot-minimap bf-spot-minimap--nodata">Keine Koordinaten</div>`;
 
-    const shareRatingAttr = stars > 0 && band !== "red" ? String(stars) : "";
+    const shareRatingAttr = rating > 0 && band !== "red" ? String(rating) : "";
     const shareBtn = `<button type="button" class="bf-share-btn bf-share-btn--spot"
              data-share-kind="spot"
              data-share-region="${escapeHtml(spot.region_id || "")}"

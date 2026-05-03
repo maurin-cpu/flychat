@@ -57,6 +57,24 @@ window.AnalysisView = (function () {
         return 0;
     }
 
+    // RATING_CONCEPT v1.4: 0-10 Rating
+    function getRating(a) {
+        if (!a) return 0;
+        var er = a.experience_rating;
+        if (typeof er === 'number') return Math.max(0, Math.min(10, Math.round(er)));
+        var sc = a.experience_score;
+        if (typeof sc === 'number') {
+            if (sc <= 0) return 0;
+            if (sc >= 100) return 10;
+            return Math.max(1, Math.min(10, Math.ceil(sc / 10)));
+        }
+        var s = a.experience_stars;
+        if (typeof s === 'number') return Math.max(0, Math.min(10, s * 2));
+        var r = parseFloat(a.rating || 0);
+        if (r > 0) return Math.max(1, Math.min(10, Math.round(r)));
+        return 0;
+    }
+
     function getSafetyBand(a) {
         if (!a) return 'no_data';
         var b = a.safety_band;
@@ -70,7 +88,7 @@ window.AnalysisView = (function () {
     }
 
     // ===== GLYPH =====
-    // Kreis in Safety-Farbe; weisses Kreuz bei red, weisse Rating-Ziffer 1-5 sonst.
+    // Kreis in Safety-Farbe; weisses Kreuz bei red, weisse Rating-Ziffer 1-10 sonst.
     var PALETTE = {
         green:   { fill: '#22c55e', stroke: '#15803d' },
         amber:   { fill: '#f59e0b', stroke: '#92400e' },
@@ -78,14 +96,14 @@ window.AnalysisView = (function () {
         no_data: { fill: '#9ca3af', stroke: '#6b7280' }
     };
 
-    function buildGlyph(band, stars, size) {
+    function buildGlyph(band, rating, size) {
         var s = size || 96;
         var c = s / 2;
         var r = s * 0.32;
         var col = PALETTE[band] || PALETTE.no_data;
         var label = (band === 'red') ? 'Nicht fliegbar' :
                     (band === 'no_data') ? 'Keine Analyse' :
-                    (stars >= 1 ? 'Rating ' + stars + ' von 5' : 'Bewertung');
+                    (rating >= 1 ? 'Rating ' + rating + ' von 10' : 'Bewertung');
         var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s
                  + '" role="img" aria-label="' + esc(label) + '">';
         html += '<circle cx="' + c + '" cy="' + c + '" r="' + r
@@ -103,10 +121,13 @@ window.AnalysisView = (function () {
             html += '<text x="' + c + '" y="' + (c + r * 0.32)
                   + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
                   + (r * 0.85).toFixed(1) + '" font-weight="700">…</text>';
-        } else if (stars >= 1) {
+        } else if (rating >= 1) {
+            // v1.4: zweistellige "10" braucht kleinere Schrift, damit sie reinpasst.
+            var twoDigit = rating >= 10;
+            var fontSize = (r * (twoDigit ? 0.65 : 0.85)).toFixed(1);
             html += '<text x="' + c + '" y="' + (c + r * 0.34)
                   + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
-                  + (r * 0.85).toFixed(1) + '" font-weight="700">' + stars + '</text>';
+                  + fontSize + '" font-weight="700">' + rating + '</text>';
         } else {
             html += '<circle cx="' + c + '" cy="' + c + '" r="3" fill="#fff"/>';
         }
@@ -192,14 +213,14 @@ window.AnalysisView = (function () {
         }
 
         var band = getSafetyBand(a);
-        var stars = getStars(a);
+        var rating = getRating(a);
         var verdictTxt = (band === 'green') ? 'Sicher' :
                          (band === 'amber') ? 'Vorsicht' :
                          (band === 'red')   ? 'Nicht fliegbar' : 'Keine Daten';
         var rationale = shortenRationale(buildRationale(a));
 
         var html = '<div class="mga-hero ' + band + '">'
-                 + '<div class="mga-hero-glyph">' + buildGlyph(band, stars, 96) + '</div>'
+                 + '<div class="mga-hero-glyph">' + buildGlyph(band, rating, 96) + '</div>'
                  + '<div class="mga-hero-text">'
                  + '<div class="mga-hero-verdict ' + band + '">' + esc(verdictTxt) + '</div>';
         if (rationale) {
@@ -471,6 +492,7 @@ window.AnalysisView = (function () {
         render: render,
         // Re-exporte fuer Aufrufer (Region-Map nutzt sie fuer Top-Spots-Liste).
         getStars: getStars,
+        getRating: getRating,
         getSafetyBand: getSafetyBand,
         parseMaybeList: parseMaybeList,
         buildGlyph: buildGlyph

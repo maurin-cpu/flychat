@@ -633,6 +633,7 @@ def start_review_session(queue_json_path: Path, sample_size: int = REVIEW_DEFAUL
             "input": c.get("input"),
             "gold_output": c.get("gold_output"),
             "current_output": c.get("current_output"),
+            "weather_snapshot": c.get("weather_snapshot") or {},
             "case_path": c.get("case_path"),
             "verdict": None,
             "comment": "",

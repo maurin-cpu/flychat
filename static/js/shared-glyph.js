@@ -1,7 +1,8 @@
 /* ══════════════════════════════════════════════════════════════
-   Gleitcast — Shared Glyph Renderer (RATING_CONCEPT v1.3 §8.2)
-   Single source of truth for the safety_band × experience_stars
+   Gleitcast — Shared Glyph Renderer (RATING_CONCEPT v1.4 §8.2)
+   Single source of truth for the safety_band × experience_rating
    marker glyph used on map, briefing, region header, spot panel.
+   Skala 1-10 (0 = not_safe / no flight).
    Exposes window.gleitcastGlyph.
    ══════════════════════════════════════════════════════════════ */
 (function () {
@@ -30,6 +31,28 @@
     return "no_data";
   }
 
+  // Rating 1-10. Bevorzugt experience_rating, fallback auf score/10 oder rating.
+  function legacyRating(spot) {
+    if (!spot) return 0;
+    if (typeof spot.experience_rating === "number") {
+      var r = Math.floor(spot.experience_rating);
+      return r < 0 ? 0 : (r > 10 ? 10 : r);
+    }
+    // Fallback: experience_score (0-100) / 10, conservative ceil.
+    if (typeof spot.experience_score === "number") {
+      var s = spot.experience_score;
+      if (s <= 0) return 0;
+      if (s >= 100) return 10;
+      return Math.max(1, Math.min(10, Math.ceil(s / 10)));
+    }
+    // Legacy-Legacy: rating 0-10 direkt.
+    var rt = parseFloat(spot.rating);
+    if (!isFinite(rt) || rt <= 0) return 0;
+    return Math.max(1, Math.min(10, Math.round(rt)));
+  }
+
+  // Backwards-compat fuer Code, der noch auf 0-5 Sterne basiert
+  // (z.B. Briefing-Bubble-Layout). Buckets aus alter v1.3-Tabelle.
   function legacyStars(spot) {
     if (!spot) return 0;
     if (typeof spot.experience_stars === "number") {
@@ -58,17 +81,25 @@
   }
 
   // SVG-String Generator (no Leaflet dep). Inline-bar in HTML.
-  // opts = { band, stars, size = 24, ariaLabel? }
+  // opts = { band, rating, size = 24, ariaLabel? }
+  // Rating 1-10. 0 wird wie no-flight behandelt (Punkt statt Zahl).
+  // Backwards-Compat: opts.stars (0-5) wird auf rating (stars*2) gemappt.
   function svg(opts) {
     var band = (opts && opts.band) || "no_data";
-    var stars = (opts && typeof opts.stars === "number") ? Math.max(0, Math.min(5, Math.floor(opts.stars))) : 0;
+    var rating = 0;
+    if (opts && typeof opts.rating === "number") {
+      rating = Math.max(0, Math.min(10, Math.floor(opts.rating)));
+    } else if (opts && typeof opts.stars === "number") {
+      rating = Math.max(0, Math.min(10, Math.floor(opts.stars) * 2));
+    }
     var size = (opts && opts.size) || 24;
     var st = styleFor(band);
     var center = size / 2;
-    // Radius proportional zum Marker-Radius im map.js (8px @ 44 svg = 0.18).
-    // Fuer 24px Glyphe ergibt 0.42 → 10px Radius — kompakt aber lesbar.
-    var radius = Math.max(6, Math.round(size * 0.42));
-    var ariaLabel = (opts && opts.ariaLabel) || (st.label + (band !== "red" && stars > 0 ? ", " + stars + " Sterne" : ""));
+    // Marker leicht groesser als v1.3 (0.42 → 0.46), damit zweistellige
+    // Zahl gut lesbar ist.
+    var radius = Math.max(7, Math.round(size * 0.46));
+    var ratingLabel = (rating > 0 && band !== "red") ? (", Rating " + rating + "/10") : "";
+    var ariaLabel = (opts && opts.ariaLabel) || (st.label + ratingLabel);
 
     var s = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size
           + '" class="gc-glyph gc-glyph--' + band + '" role="img" aria-label="' + ariaLabel + '">';
@@ -84,11 +115,14 @@
       s += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
          + '" x2="' + (center - arm) + '" y2="' + (center + arm)
          + '" stroke="#ffffff" stroke-width="' + w + '" stroke-linecap="round" />';
-    } else if (stars >= 1 && (band === "green" || band === "amber")) {
-      var fontSize = Math.round(radius * 1.4);
-      s += '<text x="' + center + '" y="' + (center + fontSize * 0.35)
+    } else if (rating >= 1 && (band === "green" || band === "amber")) {
+      // Zahl 1-10. Zweistellig "10" braucht kleinere Schrift damit's reinpasst.
+      var twoDigit = rating >= 10;
+      var fontSize = Math.round(radius * (twoDigit ? 1.05 : 1.4));
+      var yOffset = fontSize * 0.35;
+      s += '<text x="' + center + '" y="' + (center + yOffset)
          + '" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif"'
-         + ' font-size="' + fontSize + '" font-weight="800">' + stars + '</text>';
+         + ' font-size="' + fontSize + '" font-weight="800">' + rating + '</text>';
     } else if (band === "green" || band === "amber") {
       s += '<circle cx="' + center + '" cy="' + center + '" r="' + Math.max(1.5, radius * 0.18) + '" fill="#ffffff" />';
     }
@@ -128,15 +162,28 @@
     return n ? Math.round(sum / n) : 0;
   }
 
+  // v1.4: Durchschnitts-Rating 1-10 fuer Region-Header.
+  function avgRating(spots) {
+    if (!spots || !spots.length) return 0;
+    var sum = 0, n = 0;
+    for (var i = 0; i < spots.length; i++) {
+      var r = legacyRating(spots[i]);
+      if (r > 0) { sum += r; n++; }
+    }
+    return n ? Math.round(sum / n) : 0;
+  }
+
   window.gleitcastGlyph = {
     styleFor: styleFor,
     legacyBand: legacyBand,
     legacyStars: legacyStars,
+    legacyRating: legacyRating,
     experienceScore: experienceScore,
     svg: svg,
     aggregateBand: aggregateBand,
     bandCounts: bandCounts,
     avgStars: avgStars,
+    avgRating: avgRating,
     BAND_ORDER: BAND_ORDER,
   };
 })();

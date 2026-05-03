@@ -170,20 +170,118 @@ def _extract_for_compare(entry: dict) -> dict:
     }
 
 
+_FOEHN_LEVEL_LABEL = {
+    "Kein Föhn": "none",
+    "Föhn-Vorsicht": "caution",
+    "Föhn-Gefahr": "danger",
+}
+
+
+def _parse_foehn_block(input_ctx: str) -> dict:
+    """Rekonstruiert das `_ctx_foehn_cache`-Dict aus dem FÖHN-INDIKATOR-Block des
+    Goldfile-Inputs. Notwendig, weil der Test-Pfad den weather_context-Builder
+    nicht laufen laesst — ohne diese Rekonstruktion wuerde apply_foehn_decision
+    den LLM-Output unkorrigiert lassen (siehe Bug 2026-05-02).
+    """
+    block = re.search(r"═══ FÖHN-INDIKATOR ═══(.*?)(?:\n═══|\n###|\Z)", input_ctx, re.DOTALL)
+    if not block:
+        return {}
+    text = block.group(1)
+
+    if "Kein Föhn aktiv" in text or "KEIN FÖHN-RISIKO" in text:
+        return {"level": "none", "delta_p_hpa": None, "direction": "none"}
+
+    m = re.search(r"Level:\s*(Kein Föhn|Föhn-Vorsicht|Föhn-Gefahr)\s*\|\s*Delta-P:\s*([\d.]+)\s*hPa", text)
+    if not m:
+        return {}
+    level = _FOEHN_LEVEL_LABEL.get(m.group(1), "none")
+    try:
+        delta_p = float(m.group(2))
+    except ValueError:
+        delta_p = None
+
+    direction = "Süd"
+    if re.search(r"Delta-P\s*\(Nordföhn\)", text):
+        direction = "Nord"
+    elif re.search(r"Delta-P\s*\(Südföhn\)", text):
+        direction = "Süd"
+
+    return {"level": level, "delta_p_hpa": delta_p, "direction": direction}
+
+
+def _parse_gust_block(input_ctx: str) -> dict:
+    """Rekonstruiert minimale `_ctx_gust_cache`-Felder aus WIND-ZUSAMMENFASSUNG +
+    Hauptgefahren-Histogramm. Reicht fuer decide_wind_ok_zero, decide_aloft_*,
+    decide_gust_floor (Stunden-Counts). aloft_pattern bleibt None — Decisions
+    fallen dann auf reine Stunden-Schwellen zurueck.
+    """
+    info: dict = {
+        "wind_ok_count": 0, "wind_wrong_count": 0, "clean_hours_count": 0,
+        "active_window_start": None,
+        "gust_warn_hours": 0, "gust_danger_hours": 0,
+        "aloft_warn_hours": 0, "aloft_danger_hours": 0,
+        "aloft_wind_warn_hours": 0, "aloft_wind_danger_hours": 0,
+        "wind_warn_hours": 0, "wind_danger_hours": 0,
+        "rain_hours": 0, "thunderstorm_hours": 0,
+        "aloft_pattern": None,
+    }
+
+    m = re.search(r"\[WIND-OK\]\s*Stunden\s*\((\d+)\)", input_ctx)
+    if m:
+        info["wind_ok_count"] = int(m.group(1))
+    m = re.search(r"\[WIND-WRONG\]\s*Stunden\s*\((\d+)\)", input_ctx)
+    if m:
+        info["wind_wrong_count"] = int(m.group(1))
+    m = re.search(r"Saubere Stunden\s*\((\d+)\)", input_ctx)
+    if m:
+        info["clean_hours_count"] = int(m.group(1))
+    m = re.search(r"Saubere Start-Fenster:\s*(\d{1,2}):\d{2}", input_ctx)
+    if m:
+        info["active_window_start"] = int(m.group(1))
+
+    haz = re.search(r"Hauptgefahren am Tag:\s*([^\n]+)", input_ctx)
+    if haz:
+        for token in re.finditer(r"([A-Z\-]+)\s+(\d+)h", haz.group(1)):
+            tag, count = token.group(1), int(token.group(2))
+            if tag == "GUST-WARN":             info["gust_warn_hours"] = count
+            elif tag == "GUST-DANGER":         info["gust_danger_hours"] = count
+            elif tag == "ALOFT-WIND-WARN":     info["aloft_wind_warn_hours"] = count
+            elif tag == "ALOFT-WIND-DANGER":   info["aloft_wind_danger_hours"] = count
+            elif tag == "ALOFT-GUST-WARN":     info["aloft_warn_hours"] = count
+            elif tag == "ALOFT-GUST-DANGER":   info["aloft_danger_hours"] = count
+            elif tag == "WIND-WARN":           info["wind_warn_hours"] = count
+            elif tag == "WIND-DANGER":         info["wind_danger_hours"] = count
+            elif tag == "RAIN-WARN":           info["rain_hours"] = count
+            elif tag == "THUNDERSTORM":        info["thunderstorm_hours"] = count
+    return info
+
+
 def _run_current_pipeline(input_ctx: str, spot_name: str, date_str: str) -> dict:
-    """Sendet input_ctx an den Live-LLM-Stack und gibt das prozessierte Result zurueck."""
+    """Sendet input_ctx an den Split-Flow (Safety → Flyability) und gibt das
+    post-prozessierte Result zurueck.
+
+    Befuellt vorher die Decision-Engine-Caches (foehn + gust) per Reverse-Parsing
+    aus dem Goldfile-Input — sonst feuern die deterministischen Decisions nicht,
+    weil der Live-Pfad sie aus dem weather_context-Builder erwartet.
+    """
     from chat_engine import GleitcastEngine
     eng = GleitcastEngine()
-    # spot_obj finden — Pipeline erwartet das volle Dict
     spot_obj = next((s for s in eng.spots if s["name"] == spot_name), None)
     if not spot_obj:
         return {"error": f"Spot {spot_name} nicht in spots.csv"}
-    # Wir umgehen den weather_context-Builder und injizieren input_ctx direkt
-    # ueber einen Monkey-Patch.
-    eng._build_single_spot_context = lambda spot, d, **kw: input_ctx if (spot["name"] == spot_name and d == date_str) else ""
-    # Jetzt rufen wir _combined_analysis_single_spot_day auf — dasselbe wie der
-    # Live-Pfad in run_all_analyses_stream.
-    return eng._combined_analysis_single_spot_day(spot_obj, date_str, input_ctx)
+
+    cache_key = f"{spot_name}|{date_str}"
+    eng._ctx_foehn_cache[cache_key] = _parse_foehn_block(input_ctx)
+    eng._ctx_gust_cache[cache_key] = _parse_gust_block(input_ctx)
+
+    safety_result = eng._safety_analysis_single_spot_day(spot_obj, date_str, input_ctx)
+    if safety_result.get("safety_status") not in ("safe", "conditional"):
+        return eng._not_safe_minimal_flyability(safety_result, is_spot=True)
+
+    fly_result = eng._flyability_analysis_single_spot_day(
+        spot_obj, date_str, input_ctx, safety_result, region_result=None,
+    )
+    return eng._merge_safety_flyability(safety_result, fly_result)
 
 
 def main():

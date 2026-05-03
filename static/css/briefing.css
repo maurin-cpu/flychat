@@ -795,21 +795,25 @@
 
 .bf-day-info:empty { display: none; }
 
-/* ── Bubble-Matrix (RATING_CONCEPT v1.3 §4.4) ──────────────
-   Risk-Reward-Matrix: X = avg experience_score, Y = 3 safety_band-Zonen,
-   Bubble-Groesse = Spot-Anzahl, Klick → springt zur Region. */
+/* ── Risk-Reward-Matrix (2-Achsen Scatter, Spot-Ebene) ──────────────
+   X = Reward (Experience-Score), Y = Sicherheit (Safety-Score, top = sicher).
+   Bubble-Farbe = Region (kategorial), Größe = Sterne.
+   Sweet-Spot rechts oben hervorgehoben. not_safe ausgefiltert. */
 .bf-bubble-matrix {
   margin-bottom: var(--space-5);
   background: var(--color-bg-subtle, #f8fafc);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
+  position: relative;
 }
 .bf-bubble-matrix-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  gap: var(--space-3);
   margin-bottom: var(--space-2);
+  flex-wrap: wrap;
 }
 .bf-bubble-matrix-title {
   font-size: 12px;
@@ -818,58 +822,211 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.bf-bubble-matrix-hint {
+.bf-bubble-matrix-legend-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
   font-size: 10.5px;
   color: var(--color-text-light);
+  flex-wrap: wrap;
+}
+.bf-bubble-matrix-legend-meta .legend-item--size { color: var(--color-text-light); }
+.bf-bubble-matrix-svg-wrap {
+  position: relative;
 }
 .bf-bubble-matrix svg {
   width: 100%;
-  height: 200px;
+  height: auto;
   display: block;
   font-family: inherit;
+  overflow: visible;
 }
-.bf-bubble-matrix .band-bg-green  { fill: rgba(34, 197, 94, 0.07); }
-.bf-bubble-matrix .band-bg-amber  { fill: rgba(245, 158, 11, 0.07); }
-.bf-bubble-matrix .band-bg-red    { fill: rgba(239, 68, 68, 0.07); }
-.bf-bubble-matrix .band-label {
-  font-size: 10.5px;
+/* Quadranten-Hintergrund */
+.bf-bubble-matrix .quad--sweet   { fill: rgba(34, 197, 94, 0.09); }
+.bf-bubble-matrix .quad--low     { fill: rgba(148, 163, 184, 0.05); }
+.bf-bubble-matrix .quad--caution { fill: rgba(245, 158, 11, 0.07); }
+.bf-bubble-matrix .quad--bad     { fill: rgba(15, 23, 42, 0.04); }
+.bf-bubble-matrix .quad-label {
+  font-size: 10px;
   font-weight: 700;
-  fill: var(--color-text-light);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  fill: #16a34a;
+  letter-spacing: 0.3px;
+  pointer-events: none;
 }
-.bf-bubble-matrix .x-tick text {
+/* Achsen */
+.bf-bubble-matrix .grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.5;
+}
+.bf-bubble-matrix .tick-label {
   font-size: 10px;
   fill: var(--color-text-light);
+  font-variant-numeric: tabular-nums;
 }
-.bf-bubble-matrix .x-tick line { stroke: var(--color-border); }
+.bf-bubble-matrix .axis-title {
+  font-size: 10.5px;
+  fill: var(--color-text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+/* Bubbles */
 .bf-bubble-matrix .bubble {
   cursor: pointer;
-  transition: transform 120ms, opacity 120ms;
+  outline: none;
 }
-.bf-bubble-matrix .bubble:hover { transform: scale(1.08); }
-.bf-bubble-matrix .bubble-fill-green { fill: #22c55e; stroke: #15803d; }
-.bf-bubble-matrix .bubble-fill-amber { fill: #f59e0b; stroke: #92400e; }
-.bf-bubble-matrix .bubble-fill-red   { fill: #ef4444; stroke: #991b1b; }
-.bf-bubble-matrix .bubble-count {
+.bf-bubble-matrix .bubble circle {
+  transition: r 140ms ease, stroke-width 140ms ease, filter 140ms ease, opacity 140ms ease;
+  stroke-width: 1.5;
+  fill-opacity: 0.78;
+}
+.bf-bubble-matrix .bubble:hover circle,
+.bf-bubble-matrix .bubble:focus-visible circle {
+  stroke-width: 3;
+  fill-opacity: 1;
+  filter: drop-shadow(0 1px 4px rgba(15, 23, 42, 0.3));
+}
+.bf-bubble-matrix .bubble.is-faded circle { opacity: 0.18; }
+/* Region-Legende */
+.bf-region-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+.bf-region-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 6px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+  font-family: inherit;
+}
+.bf-region-chip:hover {
+  background: var(--color-bg-subtle, #f1f5f9);
+  border-color: var(--color-text-light);
+}
+.bf-region-chip.is-dim { opacity: 0.65; }
+.bf-region-chip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.bf-region-chip-name { font-weight: 500; }
+.bf-region-chip-count {
   font-size: 10px;
-  font-weight: 700;
-  fill: #fff;
-  pointer-events: none;
-  text-anchor: middle;
-  dominant-baseline: central;
+  color: var(--color-text-light);
+  font-variant-numeric: tabular-nums;
+  background: var(--color-bg-subtle, #f1f5f9);
+  padding: 1px 5px;
+  border-radius: 999px;
+  margin-left: 2px;
 }
-.bf-bubble-matrix .bubble-label {
+.bf-bubble-matrix-hidden {
+  color: var(--color-text-secondary);
+  background: rgba(15, 23, 42, 0.04);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 4px);
+  font-weight: 500;
+}
+/* Tooltip */
+.bf-bubble-tooltip {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.96);
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: var(--radius-md, 6px);
+  font-size: 11.5px;
+  line-height: 1.35;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  min-width: 140px;
+  max-width: 220px;
+}
+.bf-bubble-tooltip[hidden] { display: none; }
+.bf-bubble-tooltip-name {
+  font-weight: 700;
+  font-size: 12.5px;
+  margin-bottom: 1px;
+}
+.bf-bubble-tooltip-region {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 6px;
+}
+.bf-bubble-tooltip-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+  padding: 4px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.bf-bubble-tooltip-cell {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.bf-bubble-tooltip-cell .lbl {
+  font-size: 9.5px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.bf-bubble-tooltip-cell .val {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.bf-bubble-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.bf-bubble-tooltip-stars {
+  color: #fbbf24;
+  letter-spacing: 1px;
+  font-size: 11px;
+}
+.bf-bubble-tooltip-score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.bf-bubble-tooltip-band {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
   font-size: 10px;
   font-weight: 600;
-  fill: var(--color-text);
-  pointer-events: none;
-  text-anchor: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.bf-bubble-tooltip-band--green { background: #22c55e; color: #052e16; }
+.bf-bubble-tooltip-band--amber { background: #f59e0b; color: #422006; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-bubble-matrix .bubble circle { transition: none; }
 }
 
 @media (max-width: 640px) {
-  .bf-bubble-matrix svg { height: 240px; }
-  .bf-bubble-matrix-hint { display: none; }
+  .bf-bubble-matrix { padding: var(--space-3); }
+  .bf-bubble-matrix-legend .legend-item--size { display: none; }
 }
 
 .bf-day-title {

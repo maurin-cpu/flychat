@@ -1538,15 +1538,16 @@ def admin_testing_review_meteogram(session_id, case_idx):
             if isinstance(t, str) and t.startswith(date_str):
                 wx_day[key].append(entry)
 
+    # Format-Hinweis: meteogram.js (renderChart) erwartet pro Profil ein
+    # Objekt mit {time, levels}. Hier nur Profile des Test-Tages durchreichen.
     alt_day = []
     for profile in alt_data.get("profiles", []) or []:
         t = profile.get("time", "")
         if isinstance(t, str) and t.startswith(date_str):
-            try:
-                hour = int(t[11:13])
-            except Exception:
-                hour = 0
-            alt_day.append({"hour": hour, "profiles": profile.get("levels", [])})
+            alt_day.append({
+                "time": t,
+                "levels": profile.get("levels", []),
+            })
 
     # Bodenwind-Serie (terrain-korrigiert) — Meteogram zeichnet damit den
     # unteren Wind-Track. Wir stellen sie nur fuer den Test-Tag bereit.
@@ -2100,7 +2101,7 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
             doc["streckenflug_region_context_available"] = bool(sf.get("region_context_available", False))
             # RATING_CONCEPT v1.3 — neue 2-Achsen-Felder ans Frontend
             for k in ("safety_band", "safety_score", "safety_rating",
-                      "experience_score", "experience_stars",
+                      "experience_score", "experience_stars", "experience_rating",
                       "comfort_index", "altitude_rating",
                       "noAnalysis", "noAnalysisReason"):
                 v = entry.get(k)
@@ -2178,7 +2179,7 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
             # durchreichen. Werte koennen None sein (Cache-Luecke), Frontend
             # behandelt das per Fallback.
             for k in ("safety_band", "safety_score", "safety_rating",
-                      "experience_score", "experience_stars",
+                      "experience_score", "experience_stars", "experience_rating",
                       "comfort_index"):
                 v = entry.get(k)
                 if v is not None:

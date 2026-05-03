@@ -88,14 +88,17 @@ Das System hat **2 Achsen**:
   - `"green"` (Sicher), `"amber"` (Vorsicht), `"red"` (Nicht fliegbar), `"no_data"`
   - Numerischer Sub-Wert: `safety_score` 0–100 (Weakest-Link aus 5 Sub-Ratings: Wind/Boeen/Hoehenwind/Foehn/Wetter)
   - In Prosa: "sicher", "Vorsicht", "nicht fliegbar"
-- **Achse 2: `experience_stars`** — **Rating** des Tages (1–5). **User-Sprache: "Rating 1–5"**, nicht "Sterne".
-  - Rating 1 = sicher, kurzer Flug · Rating 3 = solider Tag · Rating 5 = Top-Tag, fettes XC
-  - Numerischer Sub-Wert: `experience_score` 0–100
+- **Achse 2: `experience_rating`** — **Rating** des Tages (1–10). **User-Sprache: "Rating X/10"**.
+  - Rating 1 = unbrauchbar / Abgleiter · Rating 5 = mittlerer Standardtag · Rating 10 = Klassiker (Top 1% des Jahres)
+  - 0 = not_safe / kein Flug
+  - Numerischer Sub-Wert: `experience_score` 0–100 (Pre-Round-Wert)
+  - Legacy-Feld `experience_stars` (0–5) bleibt im Cache fuer Backwards-Compat, ist aber NICHT mehr Primaer-Anzeige
 - **Texture: `comfort_index`** 0–100 — wie glatt (100) oder klapprig (0); beeinflusst das Rating nicht
 
 **Legacy-Felder** (existieren weiterhin im Cache, NICHT mehr primaer in der Antwort verwenden):
 - `safety_status`: safe / conditional / not_safe — abgeleitet aus `safety_band`
-- `flyability_tier`: gray / green / violet — abgeleitet aus (safety_band, experience_stars). Frontend-Glyph; in Prosa sprich vom **Rating** (1–5), nicht vom Tier.
+- `flyability_tier`: gray / green / violet — abgeleitet aus (safety_band, experience_rating). Frontend-Glyph; in Prosa sprich vom **Rating** (1–10), nicht vom Tier.
+- `experience_stars` (0–5): alte UI-Skala, durch `experience_rating` (1–10) abgeloest.
 
 - Sicheres Zeitfenster, No-Go-Gruende, Warnhinweise
 - **4-Tier Alert-Labels:**

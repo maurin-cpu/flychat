@@ -164,6 +164,12 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
              "help": "Anzahl paralleler LLM-Calls im parallel-Modus. Hoeher = schneller, aber mehr Quota-Verbrauch."},
             {"key": "LLM_BATCH_POLL_INTERVAL", "type": "int", "min": 5, "max": 300, "unit": "s",
              "help": "Poll-Intervall fuer Batch-Status im OpenAI-batch-Modus."},
+            {"key": "DEEPSEEK_CHAT_MODEL", "type": "choice",
+             "choices": ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"],
+             "help": "DeepSeek-Modell fuer den Chat-Berater. Nur aktiv wenn CHAT_PROVIDER=deepseek. v4-flash ~5x guenstiger als v4-pro, v4-pro deutlich faehiger bei komplexen Multi-Spot-Fragen. Aenderung erfordert Server-Neustart."},
+            {"key": "DEEPSEEK_ANALYSIS_MODEL", "type": "choice",
+             "choices": ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"],
+             "help": "DeepSeek-Modell fuer Spot/Region-Analysen. Nur aktiv wenn ANALYSIS_PROVIDER=deepseek. v4-flash empfohlen (Kosten/Qualitaets-Optimum, Decision-Engine deckt Sicherheitskern ab). v4-pro nur bei sichtbaren Qualitaetsproblemen."},
         ],
     },
 }

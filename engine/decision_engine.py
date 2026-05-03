@@ -467,31 +467,44 @@ def compute_comfort_index(tq: dict) -> int:
 
 def compute_legacy_flyability_tier(result: dict) -> str:
     """Compat-View: leitet `flyability_tier` (gray/green/violet/'') aus den
-    2-Achsen-Werten `safety_band` + `experience_stars` ab.
+    2-Achsen-Werten `safety_band` + `experience_rating` ab.
 
-    RATING_CONCEPT v1.3 §9.7 Single Source of Truth — Regel:
-      - safety_band == 'red'                     → ''       (keine Empfehlung)
-      - stars >= 4 AND safety_band == 'green'    → 'violet' (Top-XC + sicher)
-      - stars >= 2                               → 'green'  (fliegbar)
-      - sonst                                    → 'gray'   (Abgleiter / mau)
+    RATING_CONCEPT v1.4 — Regel auf 1-10-Skala:
+      - safety_band == 'red'                          → ''       (keine Empfehlung)
+      - rating >= 8 AND safety_band == 'green'        → 'violet' (Top-XC + sicher)
+      - rating >= 4                                   → 'green'  (fliegbar)
+      - sonst                                         → 'gray'   (Abgleiter / mau)
 
-    Heute noch NICHT im post-process-Pfad aktiv — `flyability_tier` wird
-    weiterhin via `decide_flyability_*` gepflegt. Diese View-Funktion existiert
-    fuer den naechsten Migrations-Schritt (LLM-Tier-Output entfernen, dieser
-    Compat-Wert wird dann zur einzigen tier-Quelle).
+    Mapping zur alten Sterne-Schwelle (stars*2 ≈ rating):
+      - stars 4-5 (= rating 7-10) → violet bei green-band
+      - stars 2-3 (= rating 3-6)  → green
+      - stars 0-1 (= rating 0-2)  → gray
+
+    Fallback auf `experience_stars` wenn `experience_rating` nicht im Cache
+    (alte Daten vor v1.4 Migration).
     """
     safety_band = (result.get("safety_band") or "").lower()
-    stars = result.get("experience_stars", 0) or 0
-    try:
-        stars = int(stars)
-    except (TypeError, ValueError):
-        stars = 0
+
+    rating = result.get("experience_rating")
+    if rating is None:
+        # Legacy-Cache: aus stars rekonstruieren (stars*2 ≈ rating).
+        stars = result.get("experience_stars", 0) or 0
+        try:
+            stars = int(stars)
+        except (TypeError, ValueError):
+            stars = 0
+        rating = stars * 2
+    else:
+        try:
+            rating = int(rating)
+        except (TypeError, ValueError):
+            rating = 0
 
     if safety_band == "red":
         return ""
-    if stars >= 4 and safety_band == "green":
+    if rating >= 8 and safety_band == "green":
         return "violet"
-    if stars >= 2:
+    if rating >= 4:
         return "green"
     return "gray"
 

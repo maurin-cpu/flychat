@@ -42,7 +42,6 @@ from source_area import (
 )
 from prompts import (
     SYSTEM_PROMPT,
-    SPOT_COMBINED_PROMPT, REGION_COMBINED_PROMPT,
     WEEKLY_BRIEFING_PROMPT, CAPABILITIES_GUIDE, FOEHN_CHAT_KNOWLEDGE,
     format_foehn_llm_regional_guide,
 )
@@ -112,6 +111,27 @@ def _longest_consecutive_run(hour_strs: list[str]) -> int:
     if not runs:
         return 0
     return max(end - start + 1 for start, end in runs)
+
+
+def _determine_active_window_start(
+    clean_hours: list[str],
+    min_hours: int,
+) -> int | None:
+    """Erste Stunde, ab der ein Start-Fenster >= min_hours beginnt.
+
+    "Sauber" = WIND-OK + ohne DANGER-Tag (vom Caller bereits klassifiziert).
+    Returns: int hour (0-23) der Run-Startstunde, oder None falls kein
+    qualifizierendes Fenster existiert.
+
+    Beispiel:
+      clean_hours=['10:00','12:00','13:00','14:00'], min_hours=3
+      → Erster qualifizierender Run ist 12-14 (3h) → return 12
+    """
+    runs = _list_consecutive_runs(clean_hours)
+    for start, end in runs:
+        if (end - start + 1) >= min_hours:
+            return start
+    return None
 
 
 def _format_clean_windows(hour_strs: list[str]) -> str:
@@ -1337,6 +1357,10 @@ class WeatherContextMixin:
         sorted_times = sorted(hourly_data.keys())
         now = datetime.now()
         has_data = False
+        # Hour-Lines werden gepuffert (mit dt.hour als Sortier-/Filter-Schluessel),
+        # damit nach der Schleife auf das aktive Tagesfenster zugeschnitten werden
+        # kann (Stunden vor erstem Start-Fenster wegfiltern, transparenter Header).
+        hour_lines: list[tuple[int, str]] = []
         wind_ok_hours = []
         wind_wrong_hours = []
         clean_hours = []       # WIND-OK ohne harte Warnungen
@@ -1838,52 +1862,75 @@ class WeatherContextMixin:
                 exc = max(0, wind_gusts - wind_speed)
                 sfc_excess = f", Exzess +{exc:.0f}km/h"
 
-            lines.append(
+            hour_lines.append((
+                dt.hour,
                 f"{time_str}: Temp {temp}°C | Wind {wind_speed}km/h aus {wind_dir}° (Turbulenzrisiko {wind_gusts}km/h{sfc_excess}) {wind_status}{warning_str} | "
                 f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | FLUGBEREICH: {elevation_m}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
-            )
+            ))
 
         if not has_data:
             return ""
 
-        # Wind-Tag-Zusammenfassung (damit die LLM es nicht übersehen kann)
+        # ─── Aktives Tagesfenster bestimmen + Stunden-Slicing ───
+        # Im Dashboard-Modus (Analyse): Stunden vor dem ersten Start-Fenster
+        # weglassen und Header anhaengen, der das transparent macht. Damit sieht
+        # das LLM weder WIND-WRONG-Stunden vor Tagesbeginn noch muss es darueber
+        # spekulieren ("warum fehlen Stunden?"). Im Chat-Modus bleibt alles
+        # sichtbar — der User fragt evtl. retrospektiv nach dem Morgen.
+        active_start: int | None = None
+        if mode == "dashboard":
+            active_start = _determine_active_window_start(
+                clean_hours, config.CLEAN_WINDOW_MIN_HOURS
+            )
+
+        if active_start is not None and active_start > config.FLIGHT_HOURS_START:
+            # Filter: nur Stunden ab active_start
+            kept_lines = [s for h, s in hour_lines if h >= active_start]
+            skipped_until = active_start - 1
+            # Begruendung fuer uebersprungene Stunden: liegt es an Windrichtung
+            # (WIND-WRONG vor active_start) oder an harten Warnungen (WIND-OK
+            # aber DANGER-Tag)? Wir schauen die wind_ok_hours/wind_wrong_hours an.
+            ww_before = [h for h in wind_wrong_hours if int(h.split(":")[0]) < active_start]
+            wo_before = [h for h in wind_ok_hours if int(h.split(":")[0]) < active_start]
+            if ww_before and not wo_before:
+                reason = "Windrichtung ausserhalb Sektor"
+            elif wo_before and not ww_before:
+                reason = "harte Warnungen (WIND/GUST/RAIN/CAPE/THUNDERSTORM)"
+            else:
+                reason = "Mischung aus falscher Windrichtung und harten Warnungen"
+            lines.append("")
+            lines.append(f"═══ TAGESFENSTER ═══")
+            lines.append(
+                f"Tag aktiv ab {active_start:02d}:00 (erstes Start-Fenster "
+                f">= {config.CLEAN_WINDOW_MIN_HOURS}h)."
+            )
+            lines.append(
+                f"Stunden {config.FLIGHT_HOURS_START:02d}:00-{skipped_until:02d}:00 "
+                f"weggelassen: {reason}. Kein Datenfehler — diese Stunden waren "
+                f"nicht startbar und sind fuer die Bewertung irrelevant."
+            )
+            lines.append("")
+            lines.extend(kept_lines)
+        else:
+            # Kein Slicing (Chat-Modus, oder dashboard mit active_start am
+            # Tagesbeginn / kein qualifizierendes Fenster). Alle Hour-Lines
+            # uebernehmen wie bisher.
+            lines.extend(s for _h, s in hour_lines)
+
+        # Fenster-Info fuer LLM-Narrative (kompakt — Filter/Slicing ist bereits
+        # oben im TAGESFENSTER-Header passiert, hier nur Beschreibungs-Material).
         longest_clean_run = _longest_consecutive_run(clean_hours)
         clean_windows_fmt = _format_clean_windows(clean_hours)
         max_swing_deg, max_swing_start, max_swing_hour, max_swing_span = _max_wind_direction_swing(hourly_wind_dirs)
 
         lines.append("")
-        lines.append("═══ STARTBARKEIT (Windrichtungs-Filter, verbindlich!) ═══")
-        lines.append(
-            "WIND-WRONG ist KEIN Hazard und KEINE Warnung — es ist ein reiner "
-            "Startbarkeits-Filter. Stunden mit [WIND-WRONG] werden fuer Sicherheits- "
-            "und Fliegbarkeits-Bewertung IGNORIERT (zaehlen nicht ins safe_window, "
-            "loesen aber auch keine caution_notes/no_go_reasons aus)."
-        )
-        lines.append(f"[WIND-OK] Stunden ({len(wind_ok_hours)}): {', '.join(wind_ok_hours) if wind_ok_hours else 'KEINE'}")
-        lines.append(f"[WIND-WRONG] Stunden ({len(wind_wrong_hours)}): {', '.join(wind_wrong_hours) if wind_wrong_hours else 'KEINE'}  (= nicht startbar, KEIN UNFLIEGBAR-Grund)")
-        lines.append(f"Saubere Stunden ({len(clean_hours)}): {', '.join(clean_hours) if clean_hours else 'KEINE'} (WIND-OK UND keine DANGER-Tags)")
-        lines.append(f"Saubere Start-Fenster: {clean_windows_fmt}")
-        lines.append(f"Laengstes Fenster (= Status-Basis): {longest_clean_run}h")
+        lines.append("═══ FENSTER-INFO (fuer summary/caution_notes) ═══")
+        lines.append(f"Saubere Fenster (WIND-OK + ohne DANGER): {clean_windows_fmt}")
+        lines.append(f"Laengstes Fenster: {longest_clean_run}h")
         if warned_hours:
-            lines.append(f"⚠ Gewarnete WIND-OK Stunden ({len(warned_hours)}): {', '.join(warned_hours)} (WIND-OK aber WIND/GUST/ALOFT/RAIN/CAPE/THUNDERSTORM/PL-WARN!)")
-
-        # Start-Fenster-Regel (konfigurierbar via config.CLEAN_WINDOW_*)
-        # Zwei Zonen, keine Zwischenstufe: >= MIN_HOURS = fliegbar, sonst not_safe.
-        if longest_clean_run >= config.CLEAN_WINDOW_MIN_HOURS:
             lines.append(
-                f"→ Start-Fenster {longest_clean_run}h >= {config.CLEAN_WINDOW_MIN_HOURS}h: "
-                f"safety_status safe oder conditional moeglich. "
-                f"WIND-WRONG NACH dem Fenster ist KEIN UNFLIEGBAR-Grund."
-            )
-        elif wind_ok_hours and not clean_hours:
-            lines.append(
-                f"→ ACHTUNG: Alle {len(wind_ok_hours)} WIND-OK-Stunden haben harte Warnungen "
-                f"(WIND/GUST/ALOFT/RAIN/CAPE/THUNDERSTORM)! Status sollte NOT_SAFE sein!"
-            )
-        else:
-            lines.append(
-                f"→ Kein ausreichendes Start-Fenster ({longest_clean_run}h < {config.CLEAN_WINDOW_MIN_HOURS}h). "
-                f"Status sollte not_safe sein."
+                f"WIND-OK-Stunden mit harten Warnungen ({len(warned_hours)}): "
+                f"{', '.join(warned_hours)} (gehoeren NICHT ins safe_window)"
             )
 
         # Richtungsdreher-Anmerkung (nur wind_summary, KEIN Status-Downgrade)
@@ -1947,10 +1994,22 @@ class WeatherContextMixin:
                 )
 
         # ─── SICHERHEITS-VERLAUF: Sequenz pro Flugstunde (fuer safety_status) ───
-        if safety_timeline:
+        # Wenn der Datenblock auf das aktive Tagesfenster zugeschnitten wurde,
+        # zeigen wir die Verlaeufe ebenfalls nur ab Tagesbeginn — sonst sieht
+        # das LLM "10:00:WIND-WRONG" obwohl die Stunde fuer es gar nicht
+        # existieren soll.
+        def _filter_timeline_entries(timeline):
+            if active_start is None or active_start <= config.FLIGHT_HOURS_START:
+                return timeline
+            return [(h, k, l) for (h, k, l) in timeline if int(h.split(":")[0]) >= active_start]
+
+        safety_timeline_filtered = _filter_timeline_entries(safety_timeline)
+        fly_timeline_filtered = _filter_timeline_entries(fly_timeline)
+
+        if safety_timeline_filtered:
             lines.append("")
             lines.append("═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══")
-            seq_parts = [f"{h}:{lbl}" for (h, _k, lbl) in safety_timeline]
+            seq_parts = [f"{h}:{lbl}" for (h, _k, lbl) in safety_timeline_filtered]
             lines.append(" · ".join(seq_parts))
             lines.append(
                 "→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen "
@@ -1958,10 +2017,10 @@ class WeatherContextMixin:
             )
 
         # ─── FLIEGBARKEITS-VERLAUF: Sequenz pro Flugstunde (fuer fly_status) ───
-        if fly_timeline:
+        if fly_timeline_filtered:
             lines.append("")
             lines.append("═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══")
-            seq_parts_f = [f"{h}:{lbl}" for (h, _k, lbl) in fly_timeline]
+            seq_parts_f = [f"{h}:{lbl}" for (h, _k, lbl) in fly_timeline_filtered]
             lines.append(" · ".join(seq_parts_f))
             lines.append(
                 "→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · "
@@ -1998,6 +2057,12 @@ class WeatherContextMixin:
 
         # Cache fuer deterministische Zahlen-Injektion in _safety_check_single_spot_day.
         # LLM darf diese NICHT selber schreiben (Halluzinations-Schutz).
+        # Aktives Tagesfenster fuer Pre-Filter und Cross-Checks. None = kein
+        # qualifizierendes Fenster → Pre-Filter triggert not_safe.
+        active_window_start = _determine_active_window_start(
+            clean_hours, config.CLEAN_WINDOW_MIN_HOURS
+        )
+
         self._ctx_cache_put(self._ctx_gust_cache, f"{name}|{date_str}", {
             "gust_warn_hours": gust_warn_h,
             "aloft_gust_warn_hours": aloft_gust_warn_h,
@@ -2010,6 +2075,7 @@ class WeatherContextMixin:
             "wind_wrong_count": len(wind_wrong_hours),
             "clean_hours_count": len(clean_hours),
             "longest_clean_run_hours": longest_clean_run,
+            "active_window_start": active_window_start,
             "max_wind_swing_deg": round(max_swing_deg, 1),
             "max_wind_swing_hour": max_swing_hour,
             "max_wind_swing_start": max_swing_start,
@@ -2310,6 +2376,10 @@ class WeatherContextMixin:
 
         sorted_times = sorted(hourly_data.keys())
         has_data = False
+        # Hour-Lines werden gepuffert (mit dt.hour-Schluessel) damit das aktive
+        # Tagesfenster nach der Schleife herausgeschnitten werden kann (Stunden
+        # vor erstem qualifizierenden Fenster weglassen).
+        hour_lines: list[tuple[int, str]] = []
         calm_hours = []
         moderate_hours = []
         strong_hours = []
@@ -2763,40 +2833,52 @@ class WeatherContextMixin:
 
             # WIND-CALM ist intern, wird nicht als Tag gezeigt (= keine Tags = ruhig).
             wind_status_print = "" if wind_status == "[WIND-CALM]" else f" {wind_status}"
-            lines.append(
+            hour_lines.append((
+                dt.hour,
                 f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}°{wind_status_print}{ref_wind_info}{warning_str} | "
                 f"Wolkenbasis {cloud_base} | Bewoelkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | FLUGBEREICH: {elev_ref}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
-            )
+            ))
 
         if not has_data:
             return ""
 
-        # Zusammenfassung
-        lines.append("")
-        lines.append("═══ WIND-ZUSAMMENFASSUNG (verbindlich!) ═══")
-        lines.append(f"Ruhige Stunden ({len(calm_hours)}): {', '.join(calm_hours) if calm_hours else 'KEINE'}")
-        lines.append(f"[WIND-WARN] Stunden ({len(moderate_hours)}): {', '.join(moderate_hours) if moderate_hours else 'KEINE'}")
-        lines.append(f"[WIND-DANGER] Stunden ({len(strong_hours)}): {', '.join(strong_hours) if strong_hours else 'KEINE'} (NICHT FLIEGBAR)")
-        lines.append(f"Saubere Stunden ({len(clean_hours)}): {', '.join(clean_hours) if clean_hours else 'KEINE'}")
-        if warned_hours:
-            lines.append(f"Gewarnte Stunden ({len(warned_hours)}): {', '.join(warned_hours)}")
+        # ─── Aktives Tagesfenster bestimmen + Stunden-Slicing ───
+        # Wie im Spot-Builder: Stunden vor dem ersten qualifizierenden Fenster
+        # (>= CLEAN_WINDOW_MIN_HOURS sauber) weglassen, transparenter Header.
+        active_start = _determine_active_window_start(
+            clean_hours, config.CLEAN_WINDOW_MIN_HOURS
+        )
 
-        flyable = len(calm_hours) + len(moderate_hours)
+        if active_start is not None and active_start > config.FLIGHT_HOURS_START:
+            kept_lines = [s for h, s in hour_lines if h >= active_start]
+            skipped_until = active_start - 1
+            lines.append("")
+            lines.append("═══ TAGESFENSTER ═══")
+            lines.append(
+                f"Tag aktiv ab {active_start:02d}:00 (erstes Fenster "
+                f">= {config.CLEAN_WINDOW_MIN_HOURS}h ohne harte Warnungen)."
+            )
+            lines.append(
+                f"Stunden {config.FLIGHT_HOURS_START:02d}:00-{skipped_until:02d}:00 "
+                f"weggelassen: harte Warnungen (z.B. Wind > {config.WIND_DANGER_KMH} km/h, "
+                f"Regen, Gewitter). Kein Datenfehler — diese Stunden waren nicht nutzbar."
+            )
+            lines.append("")
+            lines.extend(kept_lines)
+        else:
+            lines.extend(s for _h, s in hour_lines)
+
+        # Fenster-Info fuer LLM-Narrative (kompakt — Filter bereits oben passiert).
         longest_clean_run_region = _longest_consecutive_run(clean_hours)
         clean_windows_region_fmt = _format_clean_windows(clean_hours)
-        lines.append(f"Saubere Fenster: {clean_windows_region_fmt}")
-        lines.append(f"Laengstes Fenster (= Status-Basis): {longest_clean_run_region}h")
-        if longest_clean_run_region >= config.CLEAN_WINDOW_MIN_HOURS:
+        lines.append("")
+        lines.append("═══ FENSTER-INFO (fuer summary/caution_notes) ═══")
+        lines.append(f"Saubere Fenster (kein DANGER): {clean_windows_region_fmt}")
+        lines.append(f"Laengstes Fenster: {longest_clean_run_region}h")
+        if warned_hours:
             lines.append(
-                f"→ Fenster {longest_clean_run_region}h >= {config.CLEAN_WINDOW_MIN_HOURS}h: "
-                f"safety_status safe oder conditional moeglich."
-            )
-        elif flyable > 0 and not clean_hours:
-            lines.append(f"→ ACHTUNG: Alle fliegbaren Stunden haben harte Warnungen! Status sollte NOT_SAFE sein!")
-        else:
-            lines.append(
-                f"→ Kein ausreichendes Fenster ({longest_clean_run_region}h < {config.CLEAN_WINDOW_MIN_HOURS}h). "
-                f"Status sollte not_safe sein."
+                f"Stunden mit harten Warnungen ({len(warned_hours)}): "
+                f"{', '.join(warned_hours)} (gehoeren NICHT ins safe_window)"
             )
 
         # Cache fuer deterministische Flyability-Override
@@ -2825,7 +2907,7 @@ class WeatherContextMixin:
         })
 
         # Region-Aloft-Cache (Wind-only, keine Böen) für ALOFT-Override in
-        # _post_process_combined_region. Regionen haben keine GUST-Tags mehr,
+        # _post_process_safety_region. Regionen haben keine GUST-Tags mehr,
         # der Cache enthält nur wind-basierte Höhenwind-Zähler.
         # aloft_pattern: trend-aware Klassifikation (AUFKLAERUNG / EINGEKESSELT / ...),
         # damit der Override sauberes Nachmittagsfenster nicht killt (Bug Apr 2026).
@@ -2834,10 +2916,18 @@ class WeatherContextMixin:
             aloft_pattern_region = _detect_aloft_trend(
                 aloft_hours, all_hours_sorted_region, aloft_danger_hours_list
             )
+        # Aktives Tagesfenster fuer Region (analog Spot — Pre-Filter und
+        # Konsistenz-Check zwischen Code-Slicing und LLM-Sicht).
+        active_window_start_region = _determine_active_window_start(
+            clean_hours, config.CLEAN_WINDOW_MIN_HOURS
+        )
         self._ctx_cache_put(self._ctx_gust_cache, f"{rname}|{date_str}", {
             "aloft_warn_hours": tag_counts.get("[ALOFT-WIND-WARN]", 0),
             "aloft_danger_hours": tag_counts.get("[ALOFT-WIND-DANGER]", 0),
             "aloft_pattern": aloft_pattern_region,
+            "active_window_start": active_window_start_region,
+            "clean_hours_count": len(clean_hours),
+            "longest_clean_run_hours": longest_clean_run_region,
         })
 
         # ─── TAGESPROFIL: Ganzheitliche Sicht für LLM-Bewertung ───
@@ -2878,10 +2968,19 @@ class WeatherContextMixin:
                 )
 
         # ─── SICHERHEITS-VERLAUF (Region) ───
-        if safety_timeline:
+        # Filterung wie im Spot-Builder: Verlaeufe nur ab Tagesbeginn zeigen.
+        def _filter_timeline_entries_region(timeline):
+            if active_start is None or active_start <= config.FLIGHT_HOURS_START:
+                return timeline
+            return [(h, k, l) for (h, k, l) in timeline if int(h.split(":")[0]) >= active_start]
+
+        safety_timeline_filtered = _filter_timeline_entries_region(safety_timeline)
+        fly_timeline_filtered = _filter_timeline_entries_region(fly_timeline)
+
+        if safety_timeline_filtered:
             lines.append("")
             lines.append("═══ SICHERHEITS-VERLAUF (Wind/Boeen/Regen/CAPE/Gewitter — beeinflusst safety_status) ═══")
-            seq_parts = [f"{h}:{lbl}" for (h, _k, lbl) in safety_timeline]
+            seq_parts = [f"{h}:{lbl}" for (h, _k, lbl) in safety_timeline_filtered]
             lines.append(" · ".join(seq_parts))
             lines.append(
                 "→ Erkenne Trends und eingekesselte Stunden (gute Stunde zwischen "
@@ -2889,10 +2988,10 @@ class WeatherContextMixin:
             )
 
         # ─── FLIEGBARKEITS-VERLAUF (Region) ───
-        if fly_timeline:
+        if fly_timeline_filtered:
             lines.append("")
             lines.append("═══ FLIEGBARKEITS-VERLAUF (Thermik-Qualitaet — beeinflusst fly_status, NICHT safety) ═══")
-            seq_parts_f = [f"{h}:{lbl}" for (h, _k, lbl) in fly_timeline]
+            seq_parts_f = [f"{h}:{lbl}" for (h, _k, lbl) in fly_timeline_filtered]
             lines.append(" · ".join(seq_parts_f))
             lines.append(
                 "→ produktiv = nutzbare Thermik · soaring = nur Hangsoaring moeglich · "

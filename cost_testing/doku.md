@@ -201,6 +201,18 @@ Das ist normaler `temperature=0.2` LLM-Jitter und nicht-vermeidbar ohne Code-Än
 - ~$0.50 pro Lauf
 - Hochgerechnet auf Complete-CSV (487 Spots): ~$8.70 pro Lauf
 
+### e) `score_regression.py` benoetigt Reverse-Parsing der Decision-Caches (Mai 2026 Fix)
+**Problem:** Die Decision-Engine (`engine/decision_engine.py`) liest aus drei Caches, die der `weather_context`-Builder normalerweise befuellt — `_ctx_foehn_cache`, `_ctx_gust_cache`, `_ctx_tq_cache`. Im Regressions-Test fuettern wir der Pipeline aber den vorgekauten `input_ctx`-String aus dem Goldfile, ohne den Builder laufen zu lassen. **Folge bis Mai 2026:** Caches blieben leer → `apply_foehn_decision()` setzte `foehn_risk="none"` selbst bei klar aktivem Föhn → Goldstandard-Vergleich produzierte False-Positives.
+
+Zusatzlich rief das Skript `eng._combined_analysis_single_spot_day(...)` auf — eine Methode, die mit dem Split-Flow-Refactor (Commit `4ff5822`, 27. Apr 2026) entfernt worden war.
+
+**Fix (`score_regression.py`):**
+- `_run_current_pipeline()` umgebaut auf den Split-Flow (`_safety_analysis_single_spot_day` → ggf. `_flyability_analysis_single_spot_day` → `_merge_safety_flyability`).
+- Zwei Reverse-Parser ergaenzt: `_parse_foehn_block(input_ctx)` (liest Level/ΔP/Richtung aus dem `═══ FÖHN-INDIKATOR ═══`-Block) und `_parse_gust_block(input_ctx)` (liest WIND-OK/WIND-WRONG-Counts und das Hauptgefahren-Histogramm).
+- Vor dem Pipeline-Lauf werden `_ctx_foehn_cache[key]` und `_ctx_gust_cache[key]` deterministisch befuellt.
+
+**Konsequenz fuer kuenftige Decision-Engine-Aenderungen:** Wer eine neue `decide_*`-Funktion einfuehrt, die einen weiteren Cache (oder ein neues Feld in einem bestehenden Cache) liest, **muss den passenden Parser in `score_regression.py` mitziehen** — sonst ist der Regressions-Vergleich blind fuer die neue Decision. `_ctx_tq_cache` ist aktuell nicht reverse-parsed; Flyability-Decisions, die darauf zugreifen, fallen auf den LLM-Default zurueck.
+
 ---
 
 ## 6. Wo wir weitermachen

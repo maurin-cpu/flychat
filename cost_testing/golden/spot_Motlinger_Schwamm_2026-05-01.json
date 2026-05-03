@@ -1,0 +1,49 @@
+{
+  "spot": "Motlinger Schwamm",
+  "date": "2026-05-01",
+  "frozen_at": "2026-05-02T15:10:10+00:00",
+  "frozen_at_commit": "221eec9",
+  "safety_status": "error",
+  "input": "",
+  "output": {
+    "safety": {
+      "safety_status": "error",
+      "safe_window": "keins",
+      "no_go_reasons": [],
+      "caution_notes": [],
+      "primary_no_go": null,
+      "primary_caution": null,
+      "primary_reducer": null,
+      "primary_booster": null,
+      "wind_summary": "",
+      "wind_shear": "",
+      "foehn_risk": "none",
+      "summary": "",
+      "spot": "Motlinger Schwamm",
+      "date": "2026-05-01",
+      "wind_ok_count": 0,
+      "wind_wrong_count": 0,
+      "error": "Unterminated string starting at: line 18 column 14 (char 1212)"
+    },
+    "thermal_rating": 1,
+    "window_rating": 1,
+    "wind_rating": 1,
+    "xc_rating": 1,
+    "rating": 0.0,
+    "is_conditional": false,
+    "conditional_reason": "",
+    "fly_status": "",
+    "status": "error",
+    "fly_error": "Unterminated string starting at: line 18 column 14 (char 1212)",
+    "streckenflug": {
+      "tier": "kein_xc",
+      "rating": 0,
+      "summary": "",
+      "limiting_factor": "spot_not_flyable",
+      "region_context_available": false
+    },
+    "best_window": "keins",
+    "recommendation": ""
+  },
+  "weather_snapshot": {}
+}

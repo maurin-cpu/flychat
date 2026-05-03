@@ -92,6 +92,32 @@ def _stars_for_spot(spot: dict) -> int:
     return 0
 
 
+def _rating_for_spot(spot: dict) -> int:
+    """RATING_CONCEPT v1.4: Liest experience_rating (0-10), Fallback auf
+    Score/Stars/Rating fuer Legacy-Caches.
+    """
+    val = spot.get("experience_rating")
+    if isinstance(val, (int, float)) and 0 <= val <= 10:
+        return int(val)
+    sc = spot.get("experience_score")
+    if isinstance(sc, (int, float)):
+        if sc <= 0:
+            return 0
+        if sc >= 100:
+            return 10
+        return max(1, min(10, -(-int(sc) // 10)))
+    val = spot.get("experience_stars")
+    if isinstance(val, (int, float)) and val >= 0:
+        return min(10, int(val) * 2)
+    try:
+        r = float(spot.get("rating", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+    if r <= 0:
+        return 0
+    return max(1, min(10, round(r)))
+
+
 def _safety_band_for_spot(spot: dict) -> str:
     """Liest safety_band, fallback auf safety_status-Mapping. Fuer Mail-Anzeige."""
     band = spot.get("safety_band")

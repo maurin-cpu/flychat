@@ -690,11 +690,22 @@ LLM_MODELS = {
         "analysis": os.environ.get("GEMINI_ANALYSIS_MODEL", "gemini-2.5-flash-lite"),
     },
     "deepseek": {
-        # deepseek-chat = V3 (general), deepseek-reasoner = R1 (reasoning, teurer)
-        "chat":     os.environ.get("DEEPSEEK_CHAT_MODEL", "deepseek-chat"),
-        "analysis": os.environ.get("DEEPSEEK_ANALYSIS_MODEL", "deepseek-chat"),
+        # Verfuegbare Modelle:
+        #   deepseek-chat       = V3 (general, billigste Option)
+        #   deepseek-reasoner   = R1 (Reasoning)
+        #   deepseek-v4-flash   = V4 Flash (284B MoE, $0.14/$0.28 per Mtok, 1M context)
+        #   deepseek-v4-pro     = V4 Pro   (1.6T MoE, $1.74/$3.48 per Mtok, 1M context)
+        "chat":     os.environ.get("DEEPSEEK_CHAT_MODEL", "deepseek-v4-flash"),
+        "analysis": os.environ.get("DEEPSEEK_ANALYSIS_MODEL", "deepseek-v4-flash"),
     },
 }
+
+# Top-Level-Attribute fuer Admin-UI-Override (config_overrides.setattr greift hier).
+# get_model() liest fuer deepseek bevorzugt diese Attribute, damit Aenderungen via
+# Admin-UI ohne Neustart wirken (chat_engine cached pro Init — Neustart trotzdem
+# noetig, damit aktive Engine-Instanzen das neue Modell sehen).
+DEEPSEEK_CHAT_MODEL     = LLM_MODELS["deepseek"]["chat"]
+DEEPSEEK_ANALYSIS_MODEL = LLM_MODELS["deepseek"]["analysis"]
 
 # API-Keys (nur der aktive Provider muss gesetzt sein)
 OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
@@ -721,6 +732,12 @@ def get_api_key(provider: str) -> str:
 
 def get_model(provider: str, purpose: str) -> str:
     """purpose = 'chat' oder 'analysis'."""
+    if provider == "deepseek":
+        # Top-Level-Attribute haben Vorrang (Admin-UI-Override via setattr)
+        if purpose == "chat":
+            return DEEPSEEK_CHAT_MODEL
+        if purpose == "analysis":
+            return DEEPSEEK_ANALYSIS_MODEL
     return LLM_MODELS.get(provider, {}).get(purpose, "")
 
 
@@ -779,6 +796,10 @@ MODEL_PRICES = {
     # Preise prueffen unter https://api-docs.deepseek.com/quick_start/pricing — Stand 2026-04.
     "deepseek-chat":     {"in": 0.270, "out": 1.100, "cached_in": 0.070, "in_batch": 0.270, "out_batch": 1.100},
     "deepseek-reasoner": {"in": 0.550, "out": 2.190, "cached_in": 0.140, "in_batch": 0.550, "out_batch": 2.190},
+    # DeepSeek V4 (Apr 2026): 1M-Kontext, MoE, optional Thinking-Mode.
+    # Cache-Hit-Rabatt ~50% (Schaetzung, exakter Wert in DS-Docs pruefen).
+    "deepseek-v4-flash": {"in": 0.140, "out": 0.280, "cached_in": 0.035, "in_batch": 0.140, "out_batch": 0.280},
+    "deepseek-v4-pro":   {"in": 1.740, "out": 3.480, "cached_in": 0.435, "in_batch": 1.740, "out_batch": 3.480},
 }
 
 # Notbremse: Wenn ein Analyse-Lauf diese Schwelle ueberschreitet, sauber abbrechen.
