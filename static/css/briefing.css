@@ -1602,26 +1602,6 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   min-width: 0;
 }
 
-.bf-detail-rec {
-  flex: 0 0 42%;
-  max-width: 42%;
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--color-text-secondary);
-  font-style: italic;
-  box-shadow: var(--shadow-sm);
-}
-
-.bf-detail-rec-icon {
-  font-style: normal;
-  color: var(--color-primary);
-  margin-right: 3px;
-}
-
 /* ── Detail: Structured Labels ─────────────── */
 
 .bf-detail-labels {
@@ -1684,19 +1664,303 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
 .bf-spot.tier-violet .bf-label--info .bf-label-icon { color: #7c3aed; }
 .bf-spot.tier-violet .bf-label--info .bf-label-text { color: #5b21b6; }
 
-/* ── Detail: Summary text (below meteogram) ─────────────── */
+/* ─── Tag-System v4 — siehe docs/TAGS.md ───────────────────────── */
 
-.bf-detail-summary {
-  padding: var(--space-3) var(--space-4);
-  font-size: 12.5px;
-  line-height: 1.7;
-  color: var(--color-text-muted);
-  border-top: 1px solid var(--color-border);
+/* WINDOW (Startfenster-Zeitleiste) */
+.bf-window {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
   background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  margin-bottom: 10px;
 }
 
-.bf-detail-summary p { margin: 0; }
+.bf-window-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.bf-window-icon { font-size: 13px; }
+
+.bf-window-cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(22px, 1fr);
+  gap: 2px;
+  align-items: stretch;
+}
+
+.bf-window-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.bf-window-cell-glyph { font-size: 12px; line-height: 1; margin-bottom: 1px; }
+.bf-window-cell-hour { font-size: 9px; opacity: 0.75; }
+
+.bf-window-cell--startbar {
+  background: #dcfce7;
+  color: #15803d;
+}
+.bf-window-cell--sportlich {
+  background: #fef3c7;
+  color: #92400e;
+}
+.bf-window-cell--blockiert {
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 600;
+}
+.bf-window-cell--neutral {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.bf-window-summary {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+/* TAG GROUPS (STOP/WARN/GOOD/INFO) */
+.bf-tag-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px 8px 14px;
+  border-left: 4px solid transparent;
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  background: transparent;
+}
+
+.bf-tag-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bf-tag-group-icon { font-size: 13px; line-height: 1; }
+.bf-tag-group-label { line-height: 1; }
+
+.bf-tag-rows { display: flex; flex-direction: column; gap: 2px; }
+
+.bf-tag-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 12.5px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-tag-topic {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.bf-tag-value {
+  color: var(--color-text-secondary);
+  min-width: 0;
+}
+
+.bf-tag-time {
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  text-align: right;
+}
+
+/* Severity-Farben */
+.bf-tag-group--stop {
+  background: #fef2f2;
+  border-left-color: #ef4444;
+}
+.bf-tag-group--stop .bf-tag-group-header { color: #dc2626; }
+.bf-tag-group--stop .bf-tag-topic { color: #991b1b; }
+
+.bf-tag-group--warn {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+}
+.bf-tag-group--warn .bf-tag-group-header { color: #d97706; }
+.bf-tag-group--warn .bf-tag-topic { color: #92400e; }
+
+.bf-tag-group--good {
+  background: #f0fdf4;
+  border-left-color: #22c55e;
+}
+.bf-tag-group--good .bf-tag-group-header { color: #16a34a; }
+.bf-tag-group--good .bf-tag-topic { color: #15803d; }
+
+/* INFO/HINWEIS — bewusst dezent, kein Border, keine Hintergrundfarbe */
+.bf-tag-group--info {
+  background: transparent;
+  border-left: none;
+  padding-left: 8px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--color-border);
+  border-radius: 0;
+}
+.bf-tag-group--info .bf-tag-group-header {
+  color: var(--color-text-muted);
+  font-size: 10.5px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+.bf-tag-group--info .bf-tag-row {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+.bf-tag-group--info .bf-tag-topic {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* Mobile (≤480px): kompaktere Window-Cells und Tag-Rows */
+@media (max-width: 480px) {
+  .bf-window-cells {
+    grid-auto-columns: minmax(18px, 1fr);
+    gap: 1px;
+  }
+  .bf-window-cell { padding: 3px 0; }
+  .bf-window-cell-hour { font-size: 8px; }
+  .bf-window-cell-glyph { font-size: 11px; }
+  .bf-tag-row {
+    grid-template-columns: 90px 1fr auto;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .bf-tag-time { font-size: 10.5px; }
+}
+
+/* ── Detail: Assessment sections (Spot-Card-Optik) ─────── */
+
+.bf-detail-assessments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bf-assessment {
+  display: block;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.bf-assessment:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+}
+
+.bf-assessment[open] {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-border-hover);
+}
+
+/* Akzentfarben pro Sektion */
+.bf-assessment--safety { border-left-color: #ef4444; }
+.bf-assessment--fly    { border-left-color: #22c55e; }
+.bf-assessment--xc     { border-left-color: #8b5cf6; }
+
+.bf-assessment-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background 120ms ease;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.bf-assessment-toggle::-webkit-details-marker { display: none; }
+.bf-assessment-toggle::marker { content: ""; }
+
+.bf-assessment-toggle:hover { background: rgba(0, 0, 0, 0.02); }
+
+.bf-assessment-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-lg);
+}
+
+.bf-assessment-name {
+  font-weight: 700;
+  font-size: var(--text-md);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+  letter-spacing: -0.01em;
+}
+
+.bf-assessment-spacer { flex: 1; }
+
+.bf-assessment-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bf-assessment-toggle:hover .bf-assessment-chevron {
+  transform: scale(1.05);
+}
+
+.bf-assessment[open] .bf-assessment-chevron {
+  transform: rotate(180deg);
+}
+
+.bf-assessment-body {
+  padding: 4px 16px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
 
 .bf-detail-empty {
   color: var(--color-text-muted);
@@ -2084,7 +2348,6 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
 
   .bf-spot-details { padding: var(--space-3) var(--space-3) var(--space-4); }
   .bf-detail-top { flex-direction: column; gap: 10px; }
-  .bf-detail-rec { flex: none; max-width: 100%; }
   .bf-label { font-size: 11.5px; padding: 5px 10px; }
   .bf-label-icon { font-size: 12px; width: 14px; }
   .bf-spot-minimap { height: 220px; }

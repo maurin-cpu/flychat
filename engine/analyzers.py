@@ -47,6 +47,7 @@ from engine.decision_engine import (
     decide_flyability_region_gate,
     compute_safety_band, compute_comfort_index,
     compute_legacy_flyability_tier,
+    build_start_window, build_topic_tags, build_region_topic_tags,
 )
 from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
@@ -101,17 +102,24 @@ class AnalyzersMixin:
         # ── Deterministischer Pre-Filter: offensichtliche not_safe ohne LLM ──
         prefilter = self._prefilter_not_safe(spot, date_str)
         if prefilter is not None:
+            self._finalize_tags(prefilter, f"{name}|{date_str}", is_region=False)
             return prefilter
 
         # Phase 1: Safety
         safety_result = self._safety_analysis_single_spot_day(spot, date_str, ctx)
         if safety_result.get("safety_status") not in ("safe", "conditional"):
             # not_safe oder error → kein Flyability-Call
-            return self._not_safe_minimal_flyability(safety_result, is_spot=True)
+            ns_result = self._not_safe_minimal_flyability(safety_result, is_spot=True)
+            self._finalize_tags(ns_result, f"{name}|{date_str}", is_region=False)
+            return ns_result
 
         # Phase 2: Flyability (nur bei safe/conditional)
         fly_result = self._flyability_analysis_single_spot_day(spot, date_str, ctx, safety_result, region_result=region_result)
-        return self._merge_safety_flyability(safety_result, fly_result)
+        merged = self._merge_safety_flyability(safety_result, fly_result)
+        # Tag-System v4: deterministische Tag- und Window-Berechnung NACH allen
+        # Decisions + Flyability-Merge (siehe docs/TAGS.md).
+        self._finalize_tags(merged, f"{name}|{date_str}", is_region=False)
+        return merged
 
     def _prefilter_not_safe(self, spot, date_str: str):
         """Prueft anhand der deterministischen Cache-Daten ob ein Spot/Tag
@@ -191,7 +199,7 @@ class AnalyzersMixin:
 
         # Regel 3: Ganztaegig Gewitter
         elif total_hours > 0 and ts_h >= total_hours - 2 and ts_h >= 4:
-            no_go.append(f"Gewitter: THUNDERSTORM in {ts_h} von {total_hours} Stunden")
+            no_go.append(f"Gewitter: prognostiziert in {ts_h} von {total_hours} Stunden")
             summary_parts.append(
                 f"Praktisch ganztaegig Gewitter ({ts_h} von {total_hours} Stunden). "
                 f"Kein fliegbares Fenster."
@@ -262,14 +270,19 @@ class AnalyzersMixin:
                 "summary": "Keine Wetterdaten fuer diesen Tag",
             }
 
+        rname = region["region"]
         # Phase 1: Safety
         safety_result = self._safety_analysis_single_region_day(region, date_str, ctx)
         if safety_result.get("safety_status") not in ("safe", "conditional"):
-            return self._not_safe_minimal_flyability(safety_result, is_spot=False)
+            ns_result = self._not_safe_minimal_flyability(safety_result, is_spot=False)
+            self._finalize_tags(ns_result, f"{rname}|{date_str}", is_region=True)
+            return ns_result
 
         # Phase 2: Flyability (nur bei safe/conditional)
         fly_result = self._flyability_analysis_single_region_day(region, date_str, ctx, safety_result)
-        return self._merge_safety_flyability(safety_result, fly_result)
+        merged = self._merge_safety_flyability(safety_result, fly_result)
+        self._finalize_tags(merged, f"{rname}|{date_str}", is_region=True)
+        return merged
 
     # ═══════════════════════════════════════════════════════════════════════════
     # SPLIT-FLOW: Separate Safety- und Flyability-Calls (Hebel 1 Kostenreduktion)
@@ -622,11 +635,37 @@ class AnalyzersMixin:
             "noAnalysis", "noAnalysisReason",
             # Decision-Engine Tracking
             "_decisions_applied",
+            # Tag-System v4 (siehe docs/TAGS.md)
+            "tags", "start_window",
         )
         for k in new_fields:
             v = result.get(k)
             if v is not None:
                 entry[k] = v
+
+    def _finalize_tags(self, result: dict, label_key: str, is_region: bool = False) -> None:
+        """Berechnet result["tags"] + result["start_window"] aus den Caches.
+
+        MUSS aufgerufen werden NACH allen Decision-Engine-Schritten (Foehn,
+        IsConditional, Flyability-Merge), damit foehn_risk, peak_climb_rate
+        und xc_potential auf result final sind.
+
+        Doku: docs/TAGS.md (Tag-System v4).
+
+        Args:
+          label_key: f"{name}|{date_str}" — Cache-Key fuer gust/tq.
+          is_region: True fuer Regionen → reduzierte Topic-Liste, kein Window.
+        """
+        gust_info = self._ctx_gust_cache.get(label_key, {}) or {}
+        tq = self._ctx_tq_cache.get(label_key, {}) or {}
+
+        if is_region:
+            result["tags"] = build_region_topic_tags(result, gust_info)
+            # Regionen haben kein Spot-Startfenster (aggregiert ueber mehrere Spots)
+            result["start_window"] = []
+        else:
+            result["tags"] = build_topic_tags(result, gust_info, tq)
+            result["start_window"] = build_start_window(gust_info)
 
     @staticmethod
     def _not_safe_minimal_flyability(safety_result: dict, is_spot: bool = True) -> dict:
@@ -1789,6 +1828,11 @@ class AnalyzersMixin:
         result["date"] = date_str
         result["phase"] = "safety"
 
+        # Tag-Sanitierung VOR den Decisions: damit decide_*-Funktionen keine
+        # bereits durchgesickerten Tag-Strings im Text nochmal finden, und damit
+        # nachgelagerte Foehn-Strips/Backstops auf bereinigte Texte wirken.
+        _sanitize_llm_result(result)
+
         gust_info = self._ctx_gust_cache.get(f"{name}|{date_str}", {})
         if gust_info:
             result["wind_ok_count"] = gust_info.get("wind_ok_count", 0)
@@ -1852,6 +1896,10 @@ class AnalyzersMixin:
         """
         name = spot["name"]
 
+        # Tag-Sanitierung ZUERST — laeuft auch fuer not_safe-Pfad, damit
+        # zurueckgegebene Texte (auch wenn Flyability-Felder leer sind) sauber sind.
+        _sanitize_llm_result(result)
+
         # Wenn not_safe (aus Safety-Phase): Flyability-Felder leeren
         if result.get("safety_status") == "not_safe":
             result["fly_status"] = ""
@@ -1880,9 +1928,6 @@ class AnalyzersMixin:
         )
         result["flyability_tier"] = tier
         result["fly_status"] = tier
-
-        # Tag-Sanitierung
-        _sanitize_llm_result(result)
 
         # Flyability-Decisions (Decision-Engine):
         # 1. LowReward green/violet → gray (Sub-Trigger A: keine Thermik, C: prod_h zu niedrig).
@@ -1993,6 +2038,9 @@ class AnalyzersMixin:
         result["date"] = date_str
         result["phase"] = "safety"
 
+        # Tag-Sanitierung VOR den Decisions (siehe _post_process_safety_spot).
+        _sanitize_llm_result(result)
+
         region_gust_info = self._ctx_gust_cache.get(f"{rname}|{date_str}", {})
         decision_label = f"{rname}/{date_str}"
 
@@ -2037,6 +2085,9 @@ class AnalyzersMixin:
         """
         rname = region["region"]
 
+        # Tag-Sanitierung ZUERST — laeuft auch fuer not_safe-Pfad.
+        _sanitize_llm_result(result)
+
         if result.get("safety_status") == "not_safe":
             result["fly_status"] = ""
             result["flyability_tier"] = ""
@@ -2057,8 +2108,6 @@ class AnalyzersMixin:
         result["flyability_tier"] = tier
         result["fly_status"] = tier
 
-        _sanitize_llm_result(result)
-
         # Flyability-Decisions (Region: kein Region-Gate, da Region selbst die Vergleichsbasis).
         # MechDanger ist bereits in der Safety-Pipe gelaufen — hier nur LowReward + Upgrade.
         tq = self._ctx_tq_cache.get(f"{rname}|{date_str}", {})
@@ -2078,13 +2127,14 @@ class AnalyzersMixin:
         result["experience_stars"] = _compute_experience_stars(result["experience_score"])
         result["experience_rating"] = _compute_experience_rating(result["experience_score"])
 
-        # Safety-Aggregation (Vorab-Fix #4): Weakest-Link, nur wenn Subs vorhanden
-        _safety_subs = ("wind_safety_rating", "gust_safety_rating",
-                        "aloft_safety_rating", "foehn_safety_rating",
-                        "weather_safety_rating")
-        if all(result.get(f) is not None for f in _safety_subs):
-            result["safety_rating"] = _compute_safety_rating(result)
-            result["safety_score"] = _compute_safety_score(result["safety_rating"])
+        # Safety-Aggregation: Weakest-Link ueber 5 Subs.
+        # _compute_safety_rating toleriert fehlende/0-Subs intern via _maybe()
+        # (nimmt min der vorhandenen, default 5.0 falls keiner). Regionen haben
+        # z.B. keine Gust-Daten — gust_safety_rating=None ist Regelfall, kein
+        # Fehler. Vorheriger all()-Guard liess in solchen Faellen safety_score
+        # ungesetzt, sodass compute_safety_band auf 0 → amber zurueckfiel.
+        result["safety_rating"] = _compute_safety_rating(result)
+        result["safety_score"] = _compute_safety_score(result["safety_rating"])
         result["safety_band"] = compute_safety_band(result)
         result["comfort_index"] = compute_comfort_index(tq)
 
@@ -2335,10 +2385,13 @@ class AnalyzersMixin:
                     processed = self._post_process_flyability_region(raw_result, region_obj, date_str)
                     # Merge: Safety + Flyability
                     merged = self._merge_safety_flyability(safety_res, processed)
+                    self._finalize_tags(merged, f"{region_obj['region']}|{date_str}", is_region=True)
                     region_results.setdefault(rid, {})[date_str] = merged
                 except Exception as e:
                     logger.error(f"[BATCH-P2] Region-Flyability Post-Processing fuer {rid}/{date_str}: {e}")
-                    region_results.setdefault(rid, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+                    fallback = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+                    self._finalize_tags(fallback, f"{region_obj['region']}|{date_str}", is_region=True)
+                    region_results.setdefault(rid, {})[date_str] = fallback
 
             yield {"event": "progress", "data": {"phase": "batch_region_flyability_done", "completed": len(raw_results), "total": len(region_fly_requests)}}
             logger.info(f"[BATCH] Phase 2 (Region-Flyability) fertig: {len(region_fly_requests)} Calls (uebersprungen: {sum(len(d) for d in region_safety_results.values()) - len(region_fly_requests)} not_safe)")
@@ -2347,7 +2400,10 @@ class AnalyzersMixin:
         for rid, dates in region_safety_results.items():
             for date_str, safety_res in dates.items():
                 if rid not in region_results or date_str not in region_results.get(rid, {}):
-                    region_results.setdefault(rid, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+                    fallback = self._not_safe_minimal_flyability(safety_res, is_spot=False)
+                    rname = safety_res.get("region", rid)
+                    self._finalize_tags(fallback, f"{rname}|{date_str}", is_region=True)
+                    region_results.setdefault(rid, {})[date_str] = fallback
 
         # ══════════════════════════════════════════════════════════════
         # PHASE 3: Spot-Safety Batch
@@ -2560,7 +2616,9 @@ class AnalyzersMixin:
                     continue
                 name, date_str, spot_obj, safety_res = m
                 if raw_result.get("error"):
-                    spot_results.setdefault(name, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    fallback = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    self._finalize_tags(fallback, f"{name}|{date_str}", is_region=False)
+                    spot_results.setdefault(name, {})[date_str] = fallback
                     continue
                 try:
                     # Safety-Felder ins Ergebnis uebernehmen
@@ -2580,10 +2638,13 @@ class AnalyzersMixin:
                     processed = self._post_process_flyability_spot(raw_result, spot_obj, date_str, region_result=region_result)
                     # Merge: Safety + Flyability
                     merged = self._merge_safety_flyability(safety_res, processed)
+                    self._finalize_tags(merged, f"{name}|{date_str}", is_region=False)
                     spot_results.setdefault(name, {})[date_str] = merged
                 except Exception as e:
                     logger.error(f"[BATCH-P4] Spot-Flyability Post-Processing fuer {name}/{date_str}: {e}")
-                    spot_results.setdefault(name, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    fallback = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    self._finalize_tags(fallback, f"{name}|{date_str}", is_region=False)
+                    spot_results.setdefault(name, {})[date_str] = fallback
 
             yield {"event": "progress", "data": {"phase": "batch_spot_flyability_done", "completed": len(raw_results), "total": len(spot_fly_requests)}}
             logger.info(
@@ -2595,7 +2656,9 @@ class AnalyzersMixin:
         for name, dates in spot_safety_results.items():
             for date_str, safety_res in dates.items():
                 if name not in spot_results or date_str not in spot_results.get(name, {}):
-                    spot_results.setdefault(name, {})[date_str] = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    fallback = self._not_safe_minimal_flyability(safety_res, is_spot=True)
+                    self._finalize_tags(fallback, f"{name}|{date_str}", is_region=False)
+                    spot_results.setdefault(name, {})[date_str] = fallback
 
         logger.info(
             f"[BATCH] Split-Flow komplett: {sum(len(d) for d in spot_results.values())} Spot-Ergebnisse, "

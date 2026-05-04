@@ -57,7 +57,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Einleitung, kein Nachwort.
     "headline": "Max 10 Woerter. Redaktionell, einladend.",
     "reason": "3-4 Saetze: Warum dieser Tag der beste ist. Konkrete Zahlen (Ratings, Spot-Anzahl). Welche Regionen und Spots besonders lohnenswert sind."
   },
-  "week_summary": "5-7 Saetze: Wochen-Charakteristik. Grosses Bild, Wendepunkte, roter Faden. Beschreibe die meteorologische Entwicklung und gib konkrete Empfehlungen wann und wo sich das Fliegen am meisten lohnt.",
+  "week_summary": "5-7 Saetze: Wochen-Charakteristik. Grosses Bild, Wendepunkte, roter Faden. Beschreibe die meteorologische Entwicklung und liefere konkrete Einschaetzungen wann und wo sich das Fliegen am meisten lohnt. KEINE Empfehlungen — nur Einschaetzungen; die Entscheidung liegt beim Piloten.",
   "week_rating": 6.8,
   "top_regions": [
     {"region_id": "zentralschweiz", "region_name": "Zentralschweiz", "avg_rating": 7.4, "reason": "1 Satz Begruendung"},

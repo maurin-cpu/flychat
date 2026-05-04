@@ -432,22 +432,22 @@ def _compute_rating_from_subratings(
     """Berechnet das Gesamtrating deterministisch aus LLM-Sub-Ratings.
 
     G-Eval-Ansatz: Das LLM vergibt Einzel-Ratings, die App berechnet daraus
-    gewichtet das Gesamtrating. Das LLM ist gut im Beurteilen einzelner
+    das Gesamtrating. Das LLM ist gut im Beurteilen einzelner
     Aspekte, schlecht im Zusammenrechnen.
 
+    Modell A (Liebig + Modifier):
+    - Thermik ist der limitierende Faktor (Gate).
+    - Alle anderen Faktoren agieren als Multiplikatoren (heben/senken den
+      Thermik-Ankerwert um bis zu ±50%).
+
     Zwei Varianten:
-      - **Region** (`include_altitude=False`, default): 4 Sub-Ratings
-        thermal/window/wind/xc, Gewichte 35/25/25/15.
-      - **Spot** (`include_altitude=True`): 5 Sub-Ratings inkl. altitude_rating
-        (Steigraum ueber Startplatz), Gewichte 30/20/10/15/25.
+    - **Region** (`include_altitude=False`, default): 3 Sub-Ratings
+      (window, wind, xc) als Modifier.
+    - **Spot** (`include_altitude=True`): 4 Sub-Ratings (window, wind, xc,
+      altitude) als Modifier.
 
-    altitude_rating gibt es nur fuer Spots, weil Regionen keine eindeutige
-    Startplatzhoehe haben (mehrere Spots auf verschiedenen Hoehen).
-
-    RATING_CONCEPT v1.3 Phase 3: Rating ist NICHT mehr auf Tier-Korridor
-    geclampt — `rating` und `flyability_tier` sind orthogonal in der
-    2-Achsen-Welt. Bei `safety_status='not_safe'` weiterhin 0.0 als
-    Sicherheitsnetz.
+    (Bewoelkung ist implizit im thermal_rating und window_rating enthalten,
+    daher kein separates cloud_rating, um Double-Counting zu vermeiden).
 
     Der `tier`-Parameter wird ignoriert (kept fuer API-Kompatibilitaet).
     """
@@ -465,11 +465,16 @@ def _compute_rating_from_subratings(
     window  = _clamp(result.get("window_rating", 5), 1, 10)
     wind    = _clamp(result.get("wind_rating", 5), 1, 10)
     xc      = _clamp(result.get("xc_rating", 5), 1, 10)
+
     if include_altitude:
         altitude = _clamp(result.get("altitude_rating", 5), 1, 10)
-        raw = 0.30 * thermal + 0.20 * window + 0.10 * wind + 0.15 * xc + 0.25 * altitude
+        # Normalisierte Gewichte ohne Cloud (Summe 1.0):
+        modifier_avg = 0.25 * window + 0.15 * wind + 0.20 * xc + 0.40 * altitude
     else:
-        raw = 0.35 * thermal + 0.25 * window + 0.25 * wind + 0.15 * xc
+        # Normalisierte Gewichte ohne Cloud (Summe 1.0):
+        modifier_avg = 0.375 * window + 0.375 * wind + 0.25 * xc
+
+    raw = thermal * (0.5 + 0.5 * (modifier_avg / 10.0))
     return round(raw, 1)
 
 
@@ -638,6 +643,9 @@ _TAG_NATURAL = [
     ("ALOFT-GUST-WARN",        "kraeftige Hoehenboeen"),
     ("ALOFT-WIND-DANGER",      "gefaehrlicher Hoehenwind"),
     ("ALOFT-WIND-WARN",        "kraeftiger Hoehenwind"),
+    # Kurzformen (LLM kuerzt manchmal "ALOFT-WIND" als Sammelbegriff ab)
+    ("ALOFT-GUST",             "Hoehenboeen"),
+    ("ALOFT-WIND",             "Hoehenwind"),
     ("GUST-DANGER",            "gefaehrliche Boeen"),
     ("GUST-WARN",              "starke Boeen"),
     ("WIND-DANGER",            "starker Wind"),
@@ -649,15 +657,40 @@ _TAG_NATURAL = [
     ("CAPE-DANGER",            "Ueberentwicklungsgefahr"),
     ("CAPE-WARN",              "Ueberentwicklung moeglich"),
     ("OVERCAST-DANGER",        "dichte Wolkendecke"),
+    ("THUNDERSTORM",           "Gewitter"),
+    # Trend-Vokabular (interne Pattern-Codes, sollten nicht in der Antwort stehen)
+    ("DURCHGEHEND_DANGER",     "durchgehend gefaehrlich"),
+    ("DURCHGEHEND_WARN",       "durchgehend erhoeht"),
+    ("EINGEKESSELT_KNAPP",     "knapp eingekesselt"),
+    ("EINGEKESSELT",           "eingekesselt"),
+    ("AUFKLAERUNG",            "Aufklaerung"),
+    ("VEREINZELT",             "vereinzelt"),
+    ("ZUNEHMEND",              "zunehmend"),
+    ("ABNEHMEND",              "abnehmend"),
+    ("STABIL",                 "stabil"),
+    ("WIND-TREND",             "Wind-Verlauf"),
+    ("GUST-TREND",             "Boeen-Verlauf"),
 ]
 
 _TAG_NATURAL_MAP = {tag.upper(): natural for tag, natural in _TAG_NATURAL}
 
+# Regex matcht nur Tag (mit optionalen Klammern + optionalem Doppelpunkt).
+# Trailing Stunden-Angaben wie "6h" oder "13-16h" werden BEWUSST nicht gefressen,
+# damit Zeit-/Dauer-Information erhalten bleibt: "ALOFT-WIND-DANGER: 6h"
+# wird zu "gefaehrlicher Hoehenwind: 6h" (lesbar) statt nur "gefaehrlicher Hoehenwind".
 _TAG_SANITIZE_RE = re.compile(
     r'\[?(?:'
     + '|'.join(re.escape(tag) for tag, _ in _TAG_NATURAL)
-    + r')\]?(?:\s+\d+h)?',
+    + r')\]?',
     re.IGNORECASE
+)
+
+# Suffixe in Composita wie "ALOFT-WIND-WARN-Stunden" oder "GUST-Phase".
+# Werden nach dem Tag-Replace zu Leerzeichen, damit "-Stunden" nicht direkt
+# am uebersetzten Begriff klebt: "kraeftiger Hoehenwind-Stunden" -> "kraeftiger Hoehenwind Stunden".
+_COMPOUND_SUFFIX_RE = re.compile(
+    r'(\w)-(Stunden|Phase|Phasen|Periode|Periode|Zeit|Fenster)\b',
+    re.IGNORECASE,
 )
 
 
@@ -669,15 +702,49 @@ def _sanitize_llm_text(text: str) -> str:
     def _replace_tag(m):
         raw = m.group(0)
         core = re.sub(r'[\[\]]', '', raw).strip()
-        core = re.sub(r'\s+\d+h?$', '', core).strip()
         return _TAG_NATURAL_MAP.get(core.upper(), '')
 
     cleaned = _TAG_SANITIZE_RE.sub(_replace_tag, text)
+    # Composita-Suffix entkleben ("Hoehenwind-Stunden" -> "Hoehenwind Stunden").
+    cleaned = _COMPOUND_SUFFIX_RE.sub(r'\1 \2', cleaned)
+    # Doppelpunkt-Ketten zusammenfuehren ("Wind: : 6h" -> "Wind: 6h").
+    cleaned = re.sub(r':\s*:\s*', ': ', cleaned)
     cleaned = re.sub(r'\s{2,}', ' ', cleaned)
     cleaned = re.sub(r',\s*,', ',', cleaned)
     cleaned = re.sub(r'^\s*,\s*', '', cleaned)
     cleaned = re.sub(r'\s*,\s*$', '', cleaned)
+    # Klammer-Reste wie "()" oder "( )" nach komplettem Tag-Replace tilgen.
+    cleaned = re.sub(r'\(\s*\)', '', cleaned)
     return cleaned.strip()
+
+
+# Heuristik fuer Restcheck: GROSSBUCHSTABEN-WORT-MIT-BINDESTRICH (mind. 4 Zeichen),
+# das wie ein interner Code aussieht. Nur zum Loggen — wir mutieren den Text nicht
+# noch einmal, damit echte Eigennamen/Abkuerzungen unberuehrt bleiben.
+_LEFTOVER_TAG_RE = re.compile(r'\b[A-Z]{2,}(?:[-_][A-Z]{2,}){1,}\b')
+
+
+def _warn_leftover_tags(result: dict, label: str = "") -> None:
+    """Loggt eine Warnung, falls nach Sanitierung noch interne Codes in Texten stehen."""
+    fields = ("summary", "recommendation", "thermal_quality", "wind_summary", "wind_shear",
+              "xc_details", "soaring_options", "safety_feedback")
+    list_fields = ("caution_notes", "no_go_reasons", "flyability_limits", "highlights")
+    leftovers = []
+    for key in fields:
+        val = result.get(key)
+        if isinstance(val, str):
+            for m in _LEFTOVER_TAG_RE.findall(val):
+                leftovers.append(f"{key}: {m}")
+    for key in list_fields:
+        val = result.get(key)
+        if isinstance(val, list):
+            for item in val:
+                if isinstance(item, str):
+                    for m in _LEFTOVER_TAG_RE.findall(item):
+                        leftovers.append(f"{key}[]: {m}")
+    if leftovers:
+        prefix = f"[{label}] " if label else ""
+        logger.warning(f"{prefix}Resttags nach Sanitizer: {', '.join(sorted(set(leftovers)))}")
 
 
 def _sanitize_llm_result(result: dict) -> dict:
@@ -689,6 +756,14 @@ def _sanitize_llm_result(result: dict) -> dict:
     for key in ("caution_notes", "no_go_reasons", "flyability_limits", "highlights"):
         if key in result and isinstance(result[key], list):
             result[key] = [_sanitize_llm_text(item) for item in result[key] if _sanitize_llm_text(item)]
+    # Streckenflug-Block (verschachtelt) auch reinigen.
+    sf = result.get("streckenflug")
+    if isinstance(sf, dict):
+        for key in ("summary", "limiting_factor"):
+            if key in sf and isinstance(sf[key], str):
+                sf[key] = _sanitize_llm_text(sf[key])
+    label = f"{result.get('spot') or result.get('region') or '?'}/{result.get('date') or '?'}"
+    _warn_leftover_tags(result, label=label)
     _derive_primary_labels(result)
     return result
 

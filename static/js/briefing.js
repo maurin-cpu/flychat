@@ -1248,9 +1248,7 @@
         labelsHtml = `<div class="bf-label bf-label--warn"><span class="bf-label-icon">!</span><span class="bf-label-text">${escapeHtml(cr)}</span></div>` + labelsHtml;
       }
     }
-    const summaryHtml = renderSpotSummary(analysisForDetails);
-    const recText = (analysisForDetails.recommendation || (analysisForDetails.flyability || {}).recommendation || "").trim();
-    const recHtml = recText ? `<div class="bf-detail-rec"><span class="bf-detail-rec-icon">✍</span> ${escapeHtml(recText)}</div>` : "";
+    const assessmentsHtml = renderAssessmentSections(spot, analysisForDetails);
     const hasCoords = spot.lat != null && spot.lon != null;
 
     const miniMapInner = hasCoords
@@ -1282,8 +1280,8 @@
         <div class="bf-spot-details" hidden>
           <div class="bf-detail-top">
             ${labelsHtml ? `<div class="bf-detail-labels">${labelsHtml}</div>` : ""}
-            ${recHtml}
           </div>
+          ${assessmentsHtml}
           <div class="bf-detail-mapmeteo-row">
             <section class="bf-detail-mapblock">
               <h4 class="bf-detail-title"><span class="bf-detail-icon">🗺</span>Startplatz</h4>
@@ -1304,7 +1302,6 @@
               </div>
             </section>
           </div>
-          ${summaryHtml ? `<div class="bf-detail-summary"><p>${summaryHtml}</p></div>` : ""}
         </div>
       </li>
     `;
@@ -1312,81 +1309,197 @@
 
   // ── Spot Detail Sections ────────────────────────────────────
 
+  // ── Tag-System v4 — siehe docs/TAGS.md ────────────────────────────
+  // Single Source of Truth: analysis.tags[] + analysis.start_window[]
+  // (deterministisch im Backend gebaut). Frontend rendert nur.
+
+  const TAG_SEVERITY_ORDER = ["stop", "warn", "good", "info"];
+  const TAG_SEVERITY_LABEL = { stop: "STOP", warn: "WARN", good: "GOOD", info: "Hinweis" };
+  const TAG_SEVERITY_ICON = { stop: "⛔", warn: "⚠", good: "✓", info: "ℹ" };
+  const TAG_TOPIC_ORDER = [
+    "WIND_GROUND", "WIND_ALOFT", "FOEHN", "RAIN",
+    "THUNDERSTORM", "CLOUDS", "THERMAL", "XC", "TURBULENCE",
+  ];
+  const WINDOW_STATE_GLYPH = {
+    startbar: "▓",
+    sportlich: "▒",
+    blockiert: "⛔",
+    neutral: "·",
+  };
+  const WINDOW_STATE_LABEL = {
+    startbar: "startbar",
+    sportlich: "sportlich",
+    blockiert: "blockiert",
+    neutral: "—",
+  };
+
+  function _topicSortKey(topic) {
+    const idx = TAG_TOPIC_ORDER.indexOf(topic);
+    return idx === -1 ? 999 : idx;
+  }
+
+  function renderStartWindow(startWindow) {
+    if (!Array.isArray(startWindow) || !startWindow.length) return "";
+    // Filter neutral hours at edges, keep contiguous range incl. content
+    const sorted = startWindow
+      .filter((e) => e && typeof e.hour === "number")
+      .sort((a, b) => a.hour - b.hour);
+    if (!sorted.length) return "";
+
+    // Cells
+    const cellsHtml = sorted.map((e) => {
+      const state = e.state || "neutral";
+      const glyph = WINDOW_STATE_GLYPH[state] || "·";
+      const hourLbl = String(e.hour).padStart(2, "0");
+      return `<div class="bf-window-cell bf-window-cell--${state}" title="${hourLbl}:00 — ${WINDOW_STATE_LABEL[state]}">
+        <span class="bf-window-cell-glyph" aria-hidden="true">${glyph}</span>
+        <span class="bf-window-cell-hour">${hourLbl}</span>
+      </div>`;
+    }).join("");
+
+    // Summary: longest run of startbar
+    let bestRun = { state: null, len: 0, start: null, end: null };
+    let cur = { state: null, len: 0, start: null, end: null };
+    for (const e of sorted) {
+      if (e.state === cur.state) {
+        cur.len += 1;
+        cur.end = e.hour;
+      } else {
+        if (cur.state === "startbar" && cur.len > bestRun.len) bestRun = { ...cur };
+        cur = { state: e.state, len: 1, start: e.hour, end: e.hour };
+      }
+    }
+    if (cur.state === "startbar" && cur.len > bestRun.len) bestRun = { ...cur };
+
+    const sportRun = (() => {
+      let best = { len: 0, start: null, end: null };
+      let c = { state: null, len: 0, start: null, end: null };
+      for (const e of sorted) {
+        if (e.state === c.state) { c.len += 1; c.end = e.hour; }
+        else { if (c.state === "sportlich" && c.len > best.len) best = { ...c }; c = { state: e.state, len: 1, start: e.hour, end: e.hour }; }
+      }
+      if (c.state === "sportlich" && c.len > best.len) best = { ...c };
+      return best;
+    })();
+
+    let summary = "";
+    if (bestRun.len > 0) {
+      const s = String(bestRun.start).padStart(2, "0");
+      const e = String(bestRun.end + 1).padStart(2, "0");
+      summary = `startbar ${s}–${e} h (${bestRun.len} h)`;
+      if (sportRun.len > 0) {
+        const ss = String(sportRun.start).padStart(2, "0");
+        const ee = String(sportRun.end + 1).padStart(2, "0");
+        summary += `, sportlich ${ss}–${ee} h`;
+      }
+    } else if (sportRun.len > 0) {
+      const ss = String(sportRun.start).padStart(2, "0");
+      const ee = String(sportRun.end + 1).padStart(2, "0");
+      summary = `nur sportlich ${ss}–${ee} h`;
+    } else {
+      summary = "kein Startfenster heute";
+    }
+
+    return `
+      <section class="bf-window">
+        <div class="bf-window-header">
+          <span class="bf-window-icon" aria-hidden="true">🛫</span>
+          <span class="bf-window-title">Startfenster (Bodenwind)</span>
+        </div>
+        <div class="bf-window-cells">${cellsHtml}</div>
+        <div class="bf-window-summary">${escapeHtml(summary)}</div>
+      </section>
+    `;
+  }
+
+  function renderTagGroups(tags) {
+    if (!Array.isArray(tags) || !tags.length) return "";
+    // Group by severity
+    const byLevel = { stop: [], warn: [], good: [], info: [] };
+    for (const t of tags) {
+      if (!t || !byLevel[t.severity]) continue;
+      byLevel[t.severity].push(t);
+    }
+    // Sort each group by topic order
+    for (const sev of TAG_SEVERITY_ORDER) {
+      byLevel[sev].sort((a, b) => _topicSortKey(a.topic) - _topicSortKey(b.topic));
+    }
+
+    const groupsHtml = TAG_SEVERITY_ORDER
+      .filter((sev) => byLevel[sev].length > 0)
+      .map((sev) => {
+        const rowsHtml = byLevel[sev].map((t) => {
+          const value = t.value ? `<span class="bf-tag-value">${escapeHtml(t.value)}</span>` : `<span class="bf-tag-value"></span>`;
+          const time = t.time ? `<span class="bf-tag-time">${escapeHtml(t.time)}</span>` : `<span class="bf-tag-time"></span>`;
+          return `<div class="bf-tag-row">
+            <span class="bf-tag-topic">${escapeHtml(t.label || t.topic)}</span>
+            ${value}
+            ${time}
+          </div>`;
+        }).join("");
+        return `<div class="bf-tag-group bf-tag-group--${sev}">
+          <div class="bf-tag-group-header">
+            <span class="bf-tag-group-icon" aria-hidden="true">${TAG_SEVERITY_ICON[sev]}</span>
+            <span class="bf-tag-group-label">${TAG_SEVERITY_LABEL[sev]}</span>
+          </div>
+          <div class="bf-tag-rows">${rowsHtml}</div>
+        </div>`;
+      })
+      .join("");
+
+    return groupsHtml;
+  }
+
   function renderSpotLabels(analysis) {
     if (!analysis || typeof analysis !== "object") return "";
     const a = analysis;
-    const saf = a.safety || {};
-    const fly = a.flyability || {};
-    const s = (v) => (v == null ? "" : String(v).trim());
+    // V4: Tag-System aus Backend (siehe docs/TAGS.md). Bevorzugt analysis.tags
+    // und analysis.start_window. Fallback: alte Logik (caution_notes etc.) NICHT
+    // mehr genutzt — Backend befuellt jeden Cache-Eintrag mit tags + start_window.
+    const tags = Array.isArray(a.tags) ? a.tags : (a.safety && Array.isArray(a.safety.tags) ? a.safety.tags : []);
+    const startWindow = Array.isArray(a.start_window) ? a.start_window : (a.safety && Array.isArray(a.safety.start_window) ? a.safety.start_window : []);
 
-    const items = [];
+    const windowHtml = renderStartWindow(startWindow);
+    const tagsHtml = renderTagGroups(tags);
 
-    // ── Info: Best window ──
-    const win = s(a.best_window || fly.best_window || saf.safe_window);
-    if (win && win !== "keins") {
-      items.push({ cls: "info", icon: "⏱", text: `Bestes Fenster: ${win}` });
-    }
-
-    // ── ↓ No-go reasons (most critical first) ──
-    for (const r of (Array.isArray(saf.no_go_reasons) ? saf.no_go_reasons : [])) {
-      if (s(r)) items.push({ cls: "bad", icon: "↓", text: s(r) });
-    }
-
-    // ── ! Caution notes ──
-    for (const c of (Array.isArray(saf.caution_notes) ? saf.caution_notes : [])) {
-      if (s(c)) items.push({ cls: "warn", icon: "!", text: s(c) });
-    }
-    const foehn = s(saf.foehn_risk || a.foehn_risk);
-    if (foehn && foehn !== "none") {
-      items.push({ cls: "warn", icon: "!", text: `Föhn: ${foehn}` });
-    }
-
-    // ── ✓ Positives ──
-    const peak = Number(a.peak_climb_rate || fly.peak_climb_rate);
-    if (isFinite(peak) && peak > 0) {
-      items.push({ cls: "good", icon: "✓", text: `Peak-Thermik ${peak.toFixed(1)} m/s` });
-    }
-
-    const windOk = Number(saf.wind_ok_count) || 0;
-    const windWrong = Number(saf.wind_wrong_count) || 0;
-    if (windOk > 0 && windOk >= windWrong) {
-      items.push({ cls: "good", icon: "✓", text: `Gute Windbedingungen (${windOk}h passend)` });
-    }
-
-    const xc = s(a.xc_potential || fly.xc_potential);
-    if (xc === "high") items.push({ cls: "good", icon: "✓", text: "Hohes XC-Potenzial" });
-    else if (xc === "moderate") items.push({ cls: "good", icon: "✓", text: "XC-Potenzial vorhanden" });
-
-    // Booster
-    const booster = s(saf.primary_booster);
-    if (booster) {
-      const bl = { GUTE_EINSTRAHLUNG: "Gute Einstrahlung", XC_BEDINGUNGEN: "XC-Bedingungen" };
-      items.push({ cls: "good", icon: "✓", text: bl[booster] || booster.replace(/_/g, " ") });
-    }
-
-    // Reducer (only if not already covered in no-go/caution)
-    const reducer = s(saf.primary_reducer);
-    if (reducer) {
-      const existing = [...(saf.no_go_reasons || []), ...(saf.caution_notes || [])].join(" ").toLowerCase();
-      if (!existing.includes(reducer.toLowerCase().replace(/_/g, " "))) {
-        const rl = { VIEL_BEWOELKUNG: "Viel Bewölkung", REGEN: "Niederschlag" };
-        items.push({ cls: "bad", icon: "↓", text: rl[reducer] || reducer.replace(/_/g, " ") });
-      }
-    }
-
-    if (!items.length) return "";
-
-    return items.map((it) =>
-      `<div class="bf-label bf-label--${it.cls}"><span class="bf-label-icon">${it.icon}</span><span class="bf-label-text">${escapeHtml(it.text)}</span></div>`
-    ).join("");
+    if (!windowHtml && !tagsHtml) return "";
+    return windowHtml + tagsHtml;
   }
 
-  function renderSpotSummary(analysis) {
-    if (!analysis || typeof analysis !== "object") return "";
-    const saf = analysis.safety || {};
-    const text = String(analysis.safety_feedback || saf.summary || "").trim();
+  function cleanAssessmentText(value) {
+    const text = String(value == null ? "" : value).trim();
     if (!text || text === "0" || text === "null" || text === "None") return "";
-    return escapeHtml(text);
+    return text;
+  }
+
+  function renderAssessmentSections(spot, analysis) {
+    const a = analysis && typeof analysis === "object" ? analysis : {};
+    const saf = a.safety || {};
+    const fly = a.flyability || {};
+    const sf = a.streckenflug || {};
+
+    const safetyText = cleanAssessmentText(spot.safety_feedback || a.safety_feedback || saf.summary);
+    const flyText = cleanAssessmentText(spot.flyability_feedback || a.recommendation || fly.recommendation);
+    const xcText = cleanAssessmentText(spot.streckenflug_summary || a.streckenflug_summary || sf.summary);
+
+    const sections = [
+      { key: "safety", label: "Sicherheits-Einschätzung", text: safetyText },
+      { key: "fly", label: "Flug-Einschätzung", text: flyText },
+      { key: "xc", label: "Streckenflug-Einschätzung", text: xcText },
+    ].filter((s) => s.text);
+
+    if (!sections.length) return "";
+
+    return `<div class="bf-detail-assessments">${sections.map((s) => `
+      <details class="bf-assessment bf-assessment--${s.key}">
+        <summary class="bf-assessment-toggle">
+          <span class="bf-assessment-name">${s.label}</span>
+          <span class="bf-assessment-spacer"></span>
+          <span class="bf-assessment-chevron" aria-hidden="true">▾</span>
+        </summary>
+        <div class="bf-assessment-body">${escapeHtml(s.text)}</div>
+      </details>
+    `).join("")}</div>`;
   }
 
   function synthesizeAnalysis(spot) {

@@ -36,6 +36,7 @@ from engine._common import (
     _compute_experience_rating,
     _compute_safety_rating,
     _compute_safety_score,
+    _compute_rating_from_subratings,
 )
 
 
@@ -868,6 +869,50 @@ class TestWindWrongIsNotHazard(unittest.TestCase):
         # Trennung lebt jetzt im Skill `_tagesfenster.md`, nicht im Datenblock.
         self.assertIn("═══ TAGESFENSTER", self.src)
         self.assertIn("Tag aktiv ab", self.src)
+
+
+class TestComputeRatingFromSubratings(unittest.TestCase):
+    def test_spot_all_top(self):
+        r = _compute_rating_from_subratings(
+            {"thermal_rating": 10, "window_rating": 10, "wind_rating": 10, "xc_rating": 10, "altitude_rating": 10},
+            tier="gray", include_altitude=True
+        )
+        self.assertEqual(r, 10.0)
+
+    def test_spot_no_thermal_rest_top(self):
+        r = _compute_rating_from_subratings(
+            {"thermal_rating": 1, "window_rating": 10, "wind_rating": 10, "xc_rating": 10, "altitude_rating": 10},
+            tier="gray", include_altitude=True
+        )
+        self.assertEqual(r, 1.0)
+
+    def test_spot_top_thermal_rest_mau(self):
+        r = _compute_rating_from_subratings(
+            {"thermal_rating": 10, "window_rating": 6, "wind_rating": 6, "xc_rating": 6, "altitude_rating": 6},
+            tier="gray", include_altitude=True
+        )
+        self.assertEqual(r, 8.0)
+
+    def test_spot_medium_everywhere(self):
+        r = _compute_rating_from_subratings(
+            {"thermal_rating": 5, "window_rating": 5, "wind_rating": 5, "xc_rating": 5, "altitude_rating": 5},
+            tier="gray", include_altitude=True
+        )
+        self.assertEqual(r, 3.8)
+
+    def test_region_all_top(self):
+        r = _compute_rating_from_subratings(
+            {"thermal_rating": 10, "window_rating": 10, "wind_rating": 10, "xc_rating": 10},
+            tier="gray", include_altitude=False
+        )
+        self.assertEqual(r, 10.0)
+
+    def test_not_safe_yields_zero(self):
+        r = _compute_rating_from_subratings(
+            {"thermal_rating": 10, "window_rating": 10},
+            tier="gray", safety_status="not_safe", include_altitude=True
+        )
+        self.assertEqual(r, 0.0)
 
 
 if __name__ == "__main__":

@@ -106,7 +106,7 @@
         </td>
         {% else %}
         <td align="center" bgcolor="{{ cell.tier_color }}" style="padding:0;border:2px solid #ffffff;background-color:{{ cell.tier_color }};border-radius:4px;">
-          <a href="{{ cell.url }}" style="display:block;padding:5px 2px;font-size:11px;font-weight:700;color:#ffffff;text-decoration:none;font-variant-numeric:tabular-nums;line-height:1.1;">
+          <a href="{{ cell.url }}" style="display:block;padding:5px 2px;font-size:11px;font-weight:700;color:{{ cell.tier_text_color }};text-decoration:none;font-variant-numeric:tabular-nums;line-height:1.1;">
             {{ cell.rating_display }}
           </a>
         </td>

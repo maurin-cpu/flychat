@@ -2984,6 +2984,136 @@ body.page-fixed-nav {
     color: #fff;
 }
 
+/* ── V4 Tag-System (siehe docs/TAGS.md) ─────────────────── */
+
+/* Window-Zeitleiste */
+.mga-window-v4 {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    background: var(--color-bg-elevated, #f9fafb);
+    border: 1px solid var(--color-border, #e5e7eb);
+    border-radius: var(--radius-md);
+    margin-bottom: 10px;
+}
+.mga-window-v4-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-text-muted, #6b7280);
+}
+.mga-window-v4-icon { font-size: 13px; }
+.mga-window-v4-cells {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(22px, 1fr);
+    gap: 2px;
+    align-items: stretch;
+}
+.mga-window-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+    border-radius: 3px;
+    font-variant-numeric: tabular-nums;
+    font-size: 10px;
+    line-height: 1.2;
+}
+.mga-window-cell-glyph { font-size: 12px; line-height: 1; margin-bottom: 1px; }
+.mga-window-cell-hour { font-size: 9px; opacity: 0.75; }
+.mga-window-cell--startbar  { background: #dcfce7; color: #15803d; }
+.mga-window-cell--sportlich { background: #fef3c7; color: #92400e; }
+.mga-window-cell--blockiert { background: #fee2e2; color: #991b1b; font-weight: 600; }
+.mga-window-cell--neutral   { background: #f3f4f6; color: #9ca3af; }
+.mga-window-v4-summary {
+    font-size: 12px;
+    color: var(--color-text-secondary, #4b5563);
+    font-style: italic;
+}
+
+/* Tag-Gruppen STOP/WARN/GOOD/INFO */
+.mga-tag-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px 8px 14px;
+    border-left: 4px solid transparent;
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    background: transparent;
+}
+.mga-tag-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.mga-tag-group-icon { font-size: 13px; line-height: 1; }
+.mga-tag-rows { display: flex; flex-direction: column; gap: 2px; }
+.mga-tag-row {
+    display: grid;
+    grid-template-columns: 110px 1fr auto;
+    gap: 12px;
+    align-items: baseline;
+    font-size: 12.5px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+}
+.mga-tag-topic { font-weight: 600; color: var(--color-text, #111827); }
+.mga-tag-value { color: var(--color-text-secondary, #4b5563); min-width: 0; }
+.mga-tag-time { color: var(--color-text-muted, #6b7280); font-size: 11.5px; text-align: right; }
+
+.mga-tag-group--stop { background: #fef2f2; border-left-color: #ef4444; }
+.mga-tag-group--stop .mga-tag-group-header { color: #dc2626; }
+.mga-tag-group--stop .mga-tag-topic { color: #991b1b; }
+
+.mga-tag-group--warn { background: #fffbeb; border-left-color: #f59e0b; }
+.mga-tag-group--warn .mga-tag-group-header { color: #d97706; }
+.mga-tag-group--warn .mga-tag-topic { color: #92400e; }
+
+.mga-tag-group--good { background: #f0fdf4; border-left-color: #22c55e; }
+.mga-tag-group--good .mga-tag-group-header { color: #16a34a; }
+.mga-tag-group--good .mga-tag-topic { color: #15803d; }
+
+.mga-tag-group--info {
+    background: transparent;
+    border-left: none;
+    padding-left: 8px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    margin-top: 2px;
+    border-top: 1px dashed var(--color-border, #e5e7eb);
+    border-radius: 0;
+}
+.mga-tag-group--info .mga-tag-group-header {
+    color: var(--color-text-muted, #6b7280);
+    font-size: 10.5px;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+}
+.mga-tag-group--info .mga-tag-row { font-size: 11.5px; color: var(--color-text-muted, #6b7280); }
+.mga-tag-group--info .mga-tag-topic { color: var(--color-text-muted, #6b7280); font-weight: 500; }
+
+@media (max-width: 480px) {
+    .mga-window-v4-cells { grid-auto-columns: minmax(18px, 1fr); gap: 1px; }
+    .mga-window-cell { padding: 3px 0; }
+    .mga-window-cell-hour { font-size: 8px; }
+    .mga-window-cell-glyph { font-size: 11px; }
+    .mga-tag-row { grid-template-columns: 90px 1fr auto; gap: 8px; font-size: 12px; }
+    .mga-tag-time { font-size: 10.5px; }
+}
+
 /* ── Level 5: AI Insights (Expandable) ───────────────── */
 .mga-insights {
     margin-bottom: 8px;

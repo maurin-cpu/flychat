@@ -246,9 +246,19 @@
             html += '<circle cx="' + center + '" cy="' + center + '" r="' + (radius + 4) + '" fill="' + style.fill + '" opacity="0.25" />';
         }
 
+        // Weisser Hintergrund-Kreis, damit die Karte bei transparentem Fill nicht durchscheint
+        html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="#ffffff" />';
+
+        // Intensitaet (Deckkraft) basierend auf Rating berechnen
+        var fillOpacity = 1.0;
+        if (rating > 0 && (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet')) {
+            // Rating 1 -> 0.4 Deckkraft, Rating 10 -> 1.0 Deckkraft
+            fillOpacity = 0.4 + (rating / 10) * 0.6;
+        }
+
         // Main circle (safety band color)
         html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="' + style.fill
-                + '" stroke="' + style.stroke + '" stroke-width="' + (isHighlighted ? '2' : '1.5') + '" />';
+                + '" fill-opacity="' + fillOpacity + '" stroke="' + style.stroke + '" stroke-width="' + (isHighlighted ? '2' : '1.5') + '" />';
 
         // Inner glyph
         if (safetyBand === 'red') {
@@ -261,15 +271,16 @@
             html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
                   + '" x2="' + (center - arm) + '" y2="' + (center + arm)
                   + '" stroke="#ffffff" stroke-width="' + crossWidth + '" stroke-linecap="round" />';
-        } else if (rating >= 1 && (safetyBand === 'green' || safetyBand === 'amber')) {
-            // Weisse Ziffer 1-10 — Erlebnis-Rating, prominent zum sofortigen Erkennen.
+        } else if (rating >= 1 && (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet')) {
+            // Ziffer 1-10 — Erlebnis-Rating, prominent zum sofortigen Erkennen.
             // Zweistellige "10" braucht kleinere Schrift, damit's in den Kreis passt.
             var twoDigit = rating >= 10;
             var fontSize = Math.round(radius * (twoDigit ? 1.1 : 1.5));
+            var textFill = (fillOpacity < 0.65) ? style.stroke : '#ffffff';
             html += '<text x="' + center + '" y="' + (center + fontSize * 0.35)
-                  + '" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif"'
+                  + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter, sans-serif"'
                   + ' font-size="' + fontSize + '" font-weight="800">' + rating + '</text>';
-        } else if (safetyBand === 'green' || safetyBand === 'amber') {
+        } else if (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet') {
             // 0 rating: kleiner weisser Punkt (sicher aber Abgleiter)
             html += '<circle cx="' + center + '" cy="' + center + '" r="1.8" fill="#ffffff" />';
         }

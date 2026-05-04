@@ -24,9 +24,17 @@
             no_data: { fill: '#9ca3af', stroke: '#6b7280' }
         };
         var c = palette[band] || palette.no_data;
+        var rating = (typeof stars === 'number') ? stars : 0;
+        
+        var fillOpacity = 1.0;
+        if (rating > 0 && (band === 'green' || band === 'amber' || band === 'violet')) {
+            fillOpacity = 0.4 + (rating / 10) * 0.6;
+        }
+        
         var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" aria-hidden="true">';
+        html += '<circle cx="' + center + '" cy="' + center + '" r="' + r + '" fill="#ffffff" />';
         html += '<circle cx="' + center + '" cy="' + center + '" r="' + r
-              + '" fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="2"/>';
+              + '" fill="' + c.fill + '" fill-opacity="' + fillOpacity + '" stroke="' + c.stroke + '" stroke-width="2"/>';
         if (band === 'red') {
             var arm = r * 0.55;
             html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
@@ -35,10 +43,11 @@
             html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
                   + '" x2="' + (center - arm) + '" y2="' + (center + arm)
                   + '" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>';
-        } else if (typeof stars === 'number' && stars >= 1) {
+        } else if (rating >= 1) {
+            var textFill = (fillOpacity < 0.65) ? c.stroke : '#ffffff';
             html += '<text x="' + center + '" y="' + (center + r * 0.35)
-                  + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
-                  + (r * 0.95).toFixed(1) + '" font-weight="700">' + stars + '</text>';
+                  + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter,sans-serif" font-size="'
+                  + (r * 0.95).toFixed(1) + '" font-weight="700">' + rating + '</text>';
         }
         html += '</svg>';
         return html;
@@ -80,8 +89,8 @@
                     '<div class="rating-info-axis-card">' +
                       '<div class="rating-info-axis-title">Zahl = Erlebnis</div>' +
                       '<div class="rating-info-row">' + _glyphSvg('green', 1, 28) + '<span><b>1</b> — sicher, kurzer Flug</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 3, 28) + '<span><b>3</b> — solider Tag, lokal-XC</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 5, 28) + '<span><b>5</b> — Top-Tag, fettes XC</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 5, 28) + '<span><b>5</b> — solider Tag, lokal-XC</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 10, 28) + '<span><b>10</b> — Top-Tag, fettes XC</span></div>' +
                     '</div>' +
                   '</div>' +
                 '</div>' +
@@ -89,9 +98,9 @@
                 '<div class="rating-info-section">' +
                   '<h3>Beispiele</h3>' +
                   '<div class="rating-info-examples">' +
-                    '<div class="rating-info-example">' + _glyphSvg('green', 5, 44) + '<div class="rating-info-example-label">Top-Tag</div></div>' +
-                    '<div class="rating-info-example">' + _glyphSvg('green', 3, 44) + '<div class="rating-info-example-label">Solider Tag</div></div>' +
-                    '<div class="rating-info-example">' + _glyphSvg('amber', 4, 44) + '<div class="rating-info-example-label">Vorsicht — Pro-Tag</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('green', 10, 44) + '<div class="rating-info-example-label">Top-Tag</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('green', 5, 44) + '<div class="rating-info-example-label">Solider Tag</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('amber', 8, 44) + '<div class="rating-info-example-label">Vorsicht — Pro-Tag</div></div>' +
                     '<div class="rating-info-example">' + _glyphSvg('red', 0, 44)   + '<div class="rating-info-example-label">Nicht fliegbar</div></div>' +
                   '</div>' +
                 '</div>' +

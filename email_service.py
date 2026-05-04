@@ -709,17 +709,35 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
             entry["best_rating"] = max(entry["best_rating"], rating)
             entry["best_rating_int"] = max(entry.get("best_rating_int", 0), r10)
 
+    def _mix_hex_with_white(hex_str: str, alpha: float) -> str:
+        hex_str = hex_str.lstrip('#')
+        r, g, b = int(hex_str[0:2], 16), int(hex_str[2:4], 16), int(hex_str[4:6], 16)
+        r_new = int(r * alpha + 255 * (1 - alpha))
+        g_new = int(g * alpha + 255 * (1 - alpha))
+        b_new = int(b * alpha + 255 * (1 - alpha))
+        return f"#{r_new:02x}{g_new:02x}{b_new:02x}"
+
     # Meta pro Zelle einhaengen + Sortierung
     out = []
     for entry in matrix.values():
         for cell in entry["days"]:
             meta = _TIER_META.get(cell["tier"], _TIER_META["none"])
-            cell["tier_color"] = meta["color"]
+            
+            # v1.4: Integer 1-10 statt Decimal
+            rating_int = cell.get("rating_int", 0)
+            cell["rating_display"] = str(rating_int) if rating_int > 0 else ""
+            
+            # Dynamische Intensitaet:
+            if cell["tier"] in ("green", "amber", "violet") and rating_int > 0:
+                alpha = 0.4 + (rating_int / 10.0) * 0.6
+                cell["tier_color"] = _mix_hex_with_white(meta["color"], alpha)
+                cell["tier_text_color"] = meta["color"] if alpha < 0.65 else "#ffffff"
+            else:
+                cell["tier_color"] = meta["color"]
+                cell["tier_text_color"] = "#ffffff"
+                
             cell["tier_bg"]    = meta["bg"]
             cell["tier_label"] = meta["label"]
-            # v1.4: Integer 1-10 statt Decimal (RATING_CONCEPT v1.4)
-            cell["rating_display"] = (str(cell["rating_int"])
-                                      if cell.get("rating_int", 0) > 0 else "")
             cell["stars_glyph"] = _stars_glyph_text(cell["stars"])
         out.append(entry)
 

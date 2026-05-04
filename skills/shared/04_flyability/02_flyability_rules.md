@@ -18,7 +18,7 @@ der Pipeline aus (`safety_band`, `experience_stars`):
 
 | safety_band | experience_stars | → flyability_tier |
 |---|---|---|
-| `red` | egal | `""` (keine Empfehlung) |
+| `red` | egal | `""` (keine Top-Einschaetzung) |
 | `green` | ≥ 4 (≈ rating ≥ 7.6) | `violet` |
 | `green` oder `amber` | ≥ 2 (≈ rating ≥ 4.1) | `green` |
 | sonst | < 2 | `gray` |

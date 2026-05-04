@@ -178,7 +178,7 @@ BLOCK 4 — HOEHENWIND (FLUGSCHICHT)
 
 **Tags Hoehe** (gelten NUR fuer Hoehen mit Marker `*` im Flugbereich):
 - `[ALOFT-WIND-DANGER]` → unfliegbar (Hoehenwind > {{cfg.WIND_DANGER_KMH}} km/h). **Ab {{cfg.WIND_TREND_NOTSAFE_HOURS}}h pro Tag (oder Bodenwind > {{cfg.WIND_DANGER_KMH}} km/h ≥{{cfg.WIND_TREND_NOTSAFE_HOURS}}h) → hartes NO-GO** (Post-Processing zwingt `not_safe`) — **AUSSER** `WIND-TREND` zeigt AUFKLAERUNG / VEREINZELT / EINGEKESSELT_KNAPP mit sauberem Fenster ≥ {{cfg.WIND_TREND_NOTSAFE_HOURS}}h. Dann max `conditional`, `safe_window` auf das saubere Fenster.
-- `[ALOFT-GUST-DANGER]` → DANGER-Niveau (> {{cfg.GUST_DANGER_KMH}} km/h, extreme Klapper-Gefahr). **Nur Spots.** Kein Auto-NoGo — siehe BLOCK 3 GUST-TREND fuer LLM-Empfehlung.
+- `[ALOFT-GUST-DANGER]` → DANGER-Niveau (> {{cfg.GUST_DANGER_KMH}} km/h, extreme Klapper-Gefahr). **Nur Spots.** Kein Auto-NoGo — siehe BLOCK 3 GUST-TREND fuer LLM-Einschaetzung.
 - `[ALOFT-WIND-WARN]` → Hoehenwind WARN-Level — sportlich.
 - `[ALOFT-GUST-WARN]` → Turbulenz WARN-Level — sportlich. **Nur Spots.**
 

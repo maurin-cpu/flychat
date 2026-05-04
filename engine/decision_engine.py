@@ -721,3 +721,275 @@ def decide_flyability_region_gate(result: dict, region_result: dict, label: str)
     # ist nach 2-Achsen-Architektur konzeptionell obsolet, das Tag dient
     # nur der Telemetrie.
     return f"FlyabilityRegionGate(violet→green)"
+
+
+# ════════════════════════════════════════════════════════════════════
+# TAG-SYSTEM v4 — Start-Fenster + Topic-Tags
+# Doku: docs/TAGS.md (Sync-Pflicht!)
+# ════════════════════════════════════════════════════════════════════
+
+def build_start_window(gust_info: dict) -> list:
+    """Liefert Stundenliste fuer das WINDOW-Visual.
+
+    Das Startfenster nutzt ausschliesslich Boden-Wind/Boeen + Windrichtung —
+    keine Hoehenwerte, kein Foehn, kein Regen. Schwellen aus config.py.
+
+    Die per-hour Klassifikation passiert in weather_context.py waehrend der
+    Stunden-Iteration (dort liegt die Rohdaten-Hand). Diese Funktion liest
+    die vorberechnete Liste aus dem gust_info-Cache und gibt sie zurueck.
+    """
+    if not gust_info:
+        return []
+    raw = gust_info.get("start_window_hours") or []
+    out = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        hour = entry.get("hour")
+        state = entry.get("state")
+        if not isinstance(hour, int) or state not in ("startbar", "sportlich", "blockiert", "neutral"):
+            continue
+        out.append({"hour": hour, "state": state})
+    return out
+
+
+def _fmt_hour_range(hours: list) -> str:
+    """Komprimiert eine Liste von hour-ints/strings zu '13-16 h' oder leer."""
+    if not hours:
+        return ""
+    nums = []
+    for h in hours:
+        if isinstance(h, str) and h.endswith(":00"):
+            try:
+                nums.append(int(h.split(":")[0]))
+            except ValueError:
+                continue
+        elif isinstance(h, int):
+            nums.append(h)
+    if not nums:
+        return ""
+    nums = sorted(set(nums))
+    start, end = nums[0], nums[-1]
+    if start == end:
+        return f"{start:02d} h"
+    return f"{start:02d}-{end + 1:02d} h"
+
+
+def _make_tag(topic: str, severity: str, label: str, value: str = "", time: str = "") -> dict:
+    return {"topic": topic, "severity": severity, "label": label, "value": value, "time": time}
+
+
+def build_topic_tags(result: dict, gust_info: dict, tq: dict) -> list:
+    """Baut die kanonische Tag-Liste fuer einen Spot/Tag.
+
+    Ein Topic = ein Tag = die hoechste zutreffende Severity.
+    Frontend liest aus result["tags"] und rendert deterministisch.
+    Schwellen kommen aus config.py — keine Hardcodes hier.
+
+    Severity-Reihenfolge: stop > warn > good > info.
+    Pro Topic wird genau eine Severity vergeben (oder gar kein Tag).
+
+    Vollstaendige Spec: docs/TAGS.md (Sync-Pflicht!).
+    """
+    tags: list[dict] = []
+    gi = gust_info or {}
+    tq = tq or {}
+    notsafe_h = config.WIND_TREND_NOTSAFE_HOURS
+
+    # ── WIND_GROUND (Bodenwind/Boeen) ────────────────────────────────
+    gust_warn = int(gi.get("gust_warn_hours", 0) or 0)
+    gust_danger = int(gi.get("gust_danger_hours", 0) or 0)
+    wind_warn = int(gi.get("wind_warn_hours", 0) or 0)
+    wind_danger = int(gi.get("wind_danger_hours", 0) or 0)
+    wind_ok = int(gi.get("wind_ok_count", 0) or 0)
+    wind_wrong = int(gi.get("wind_wrong_count", 0) or 0)
+    max_gust = int(gi.get("max_surface_gust", 0) or 0)
+
+    if gust_danger >= notsafe_h or wind_danger >= notsafe_h:
+        # STOP: Boeen oder Wind im DANGER-Bereich ueber Schwellen-Stunden
+        if gust_danger >= notsafe_h:
+            label = "Boeen"
+            value = f"{max_gust} km/h" if max_gust else f">{config.GUST_DANGER_KMH} km/h"
+            time = f"{gust_danger}h"
+        else:
+            label = "Wind"
+            value = f">{config.WIND_DANGER_KMH} km/h"
+            time = f"{wind_danger}h"
+        tags.append(_make_tag("WIND_GROUND", "stop", label, value, time))
+    elif wind_ok == 0 and wind_wrong > 0:
+        # STOP: Richtung ganztaegig falsch
+        tags.append(_make_tag("WIND_GROUND", "stop", "Wind", "Richtung falsch", "ganztags"))
+    elif gust_warn >= 1 or wind_warn >= 1 or gust_danger >= 1 or wind_danger >= 1:
+        # WARN: Boeen/Wind im sportlichen Bereich (oder kurze DANGER-Spitze unter Stunden-Schwelle)
+        if gust_warn + gust_danger >= wind_warn + wind_danger:
+            label = "Boeen"
+            value = f"{max_gust} km/h" if max_gust else f">{config.GUST_WARN_KMH} km/h"
+            time = f"{gust_warn + gust_danger}h"
+        else:
+            label = "Wind"
+            value = f">{config.WIND_WARN_KMH} km/h"
+            time = f"{wind_warn + wind_danger}h"
+        tags.append(_make_tag("WIND_GROUND", "warn", label, value, time))
+    elif wind_ok > wind_wrong and gust_warn == 0 and wind_warn == 0:
+        # GOOD: Richtung passt + ruhig
+        tags.append(_make_tag("WIND_GROUND", "good", "Wind", "Richtung OK, ruhig", ""))
+
+    # ── WIND_ALOFT (Hoehenwind/-boeen) ───────────────────────────────
+    aloft_w = int(gi.get("aloft_warn_hours", 0) or 0)
+    aloft_d = int(gi.get("aloft_danger_hours", 0) or 0)
+    aloft_gw = int(gi.get("aloft_gust_warn_hours", 0) or 0)
+    aloft_gd = int(gi.get("aloft_gust_danger_hours", 0) or 0)
+
+    if aloft_d >= notsafe_h or aloft_gd >= notsafe_h:
+        h = max(aloft_d, aloft_gd)
+        tags.append(_make_tag(
+            "WIND_ALOFT", "stop", "Hoehenwind",
+            f">{config.WIND_DANGER_KMH} km/h", f"{h}h"
+        ))
+    elif aloft_w >= 1 or aloft_gw >= 1 or aloft_d >= 1 or aloft_gd >= 1:
+        h = max(aloft_w + aloft_d, aloft_gw + aloft_gd)
+        tags.append(_make_tag(
+            "WIND_ALOFT", "warn", "Hoehenwind",
+            f">{config.WIND_WARN_KMH} km/h", f"{h}h"
+        ))
+    elif aloft_w == 0 and aloft_d == 0 and aloft_gw == 0 and aloft_gd == 0:
+        tags.append(_make_tag("WIND_ALOFT", "good", "Hoehenwind", "ruhig", ""))
+
+    # ── FOEHN ────────────────────────────────────────────────────────
+    foehn = (result.get("foehn_risk") or "").lower()
+    if foehn == "high":
+        tags.append(_make_tag("FOEHN", "stop", "Foehn", "stark", ""))
+    elif foehn == "moderate":
+        tags.append(_make_tag("FOEHN", "warn", "Foehn", "moderat", ""))
+    # low/none → kein Tag
+
+    # ── RAIN ─────────────────────────────────────────────────────────
+    rain_h = int(gi.get("rain_hours", 0) or 0)
+    if rain_h >= 1:
+        rain_list = gi.get("rain_hour_list") or []
+        tags.append(_make_tag(
+            "RAIN", "stop", "Regen", "Niederschlag", _fmt_hour_range(rain_list)
+        ))
+
+    # ── THUNDERSTORM ─────────────────────────────────────────────────
+    thunder_h = int(gi.get("thunderstorm_hours", 0) or 0)
+    if thunder_h >= 1:
+        tags.append(_make_tag(
+            "THUNDERSTORM", "stop", "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
+        ))
+
+    # ── CLOUDS ───────────────────────────────────────────────────────
+    avg_low_mid = result.get("avg_low_mid")
+    if avg_low_mid is None:
+        # Fallback: aus separaten Feldern, falls vorhanden
+        low = result.get("avg_cloud_low")
+        mid = result.get("avg_cloud_mid")
+        if isinstance(low, (int, float)) and isinstance(mid, (int, float)):
+            avg_low_mid = (low + mid) / 2
+    if isinstance(avg_low_mid, (int, float)):
+        if avg_low_mid >= 85:
+            tags.append(_make_tag(
+                "CLOUDS", "warn", "Bewoelkung", f"{int(avg_low_mid)}% tief+mittel", ""
+            ))
+        elif avg_low_mid <= 40:
+            tags.append(_make_tag(
+                "CLOUDS", "good", "Bewoelkung", f"{int(avg_low_mid)}% tief+mittel", ""
+            ))
+
+    # ── THERMAL (nur GOOD oder gar nichts) ───────────────────────────
+    peak = result.get("peak_climb_rate")
+    if isinstance(peak, (int, float)) and peak >= 1.5:
+        tags.append(_make_tag(
+            "THERMAL", "good", "Thermik", f"peak {peak:.1f} m/s", ""
+        ))
+
+    # ── XC (nur GOOD oder gar nichts) ────────────────────────────────
+    xc = (result.get("xc_potential") or "").lower()
+    if xc == "high":
+        tags.append(_make_tag("XC", "good", "XC", "hohes Potenzial", ""))
+    elif xc == "moderate":
+        tags.append(_make_tag("XC", "good", "XC", "Potenzial vorhanden", ""))
+
+    # ── TURBULENCE (nur INFO — Komfort, kein Sicherheitsthema) ───────
+    rough_h = int(tq.get("rough_danger_h", 0) or 0)
+    if rough_h >= 1:
+        time = "ganztags" if rough_h >= 6 else f"{rough_h}h"
+        tags.append(_make_tag(
+            "TURBULENCE", "info", "Klappern", "mech. ruppig", time
+        ))
+
+    return tags
+
+
+def build_region_topic_tags(result: dict, gust_info: dict) -> list:
+    """Region-Variante (kein TURBULENCE/Boeen — Regionen aggregieren ohne Spot-Boeen).
+
+    Nutzt die gleichen Topic-IDs/Severities wie build_topic_tags, laesst aber
+    Spot-spezifische Topics weg (TURBULENCE braucht tq, Boeen braucht
+    Spot-Bias-Korrektur). WIND_GROUND wird hier auf reine Wind-Geschwindigkeit
+    reduziert.
+    """
+    tags: list[dict] = []
+    gi = gust_info or {}
+    notsafe_h = config.WIND_TREND_NOTSAFE_HOURS
+
+    wind_warn = int(gi.get("wind_warn_hours", 0) or 0)
+    wind_danger = int(gi.get("wind_danger_hours", 0) or 0)
+    wind_ok = int(gi.get("wind_ok_count", 0) or 0)
+    wind_wrong = int(gi.get("wind_wrong_count", 0) or 0)
+
+    if wind_danger >= notsafe_h:
+        tags.append(_make_tag(
+            "WIND_GROUND", "stop", "Wind", f">{config.WIND_DANGER_KMH} km/h", f"{wind_danger}h"
+        ))
+    elif wind_ok == 0 and wind_wrong > 0:
+        tags.append(_make_tag("WIND_GROUND", "stop", "Wind", "Richtung falsch", "ganztags"))
+    elif wind_warn >= 1 or wind_danger >= 1:
+        tags.append(_make_tag(
+            "WIND_GROUND", "warn", "Wind", f">{config.WIND_WARN_KMH} km/h", f"{wind_warn + wind_danger}h"
+        ))
+    elif wind_ok > wind_wrong:
+        tags.append(_make_tag("WIND_GROUND", "good", "Wind", "Richtung OK, ruhig", ""))
+
+    # WIND_ALOFT identisch
+    aloft_w = int(gi.get("aloft_warn_hours", 0) or 0)
+    aloft_d = int(gi.get("aloft_danger_hours", 0) or 0)
+    if aloft_d >= notsafe_h:
+        tags.append(_make_tag(
+            "WIND_ALOFT", "stop", "Hoehenwind", f">{config.WIND_DANGER_KMH} km/h", f"{aloft_d}h"
+        ))
+    elif aloft_w >= 1 or aloft_d >= 1:
+        tags.append(_make_tag(
+            "WIND_ALOFT", "warn", "Hoehenwind", f">{config.WIND_WARN_KMH} km/h", f"{aloft_w + aloft_d}h"
+        ))
+
+    # FOEHN
+    foehn = (result.get("foehn_risk") or "").lower()
+    if foehn == "high":
+        tags.append(_make_tag("FOEHN", "stop", "Foehn", "stark", ""))
+    elif foehn == "moderate":
+        tags.append(_make_tag("FOEHN", "warn", "Foehn", "moderat", ""))
+
+    # RAIN
+    rain_h = int(gi.get("rain_hours", 0) or 0)
+    if rain_h >= 1:
+        rain_list = gi.get("rain_hour_list") or []
+        tags.append(_make_tag(
+            "RAIN", "stop", "Regen", "Niederschlag", _fmt_hour_range(rain_list)
+        ))
+
+    # THUNDERSTORM
+    thunder_h = int(gi.get("thunderstorm_hours", 0) or 0)
+    if thunder_h >= 1:
+        tags.append(_make_tag(
+            "THUNDERSTORM", "stop", "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
+        ))
+
+    # XC (Region zeigt das oft sinnvoll an)
+    xc = (result.get("xc_potential") or "").lower()
+    if xc == "high":
+        tags.append(_make_tag("XC", "good", "XC", "hohes Potenzial", ""))
+    elif xc == "moderate":
+        tags.append(_make_tag("XC", "good", "XC", "Potenzial vorhanden", ""))
+
+    return tags

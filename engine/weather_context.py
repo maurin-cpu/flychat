@@ -1367,6 +1367,9 @@ class WeatherContextMixin:
         warned_hours = []      # WIND-OK aber mit harten Warnungen (GUST/ALOFT/RAIN/CAPE)
         hourly_gusts = {}      # hour_str → gust value für Trend-Analyse
         hourly_wind_dirs = {}  # hour_str → wind_direction_10m (für Richtungsdreher-Metrik)
+        # Startfenster-Klassifikation pro Stunde (siehe docs/TAGS.md, "Startfenster"):
+        # rein bodenbasiert (wind_speed_10m + wind_gusts_10m + Richtung), KEIN Aloft/Foehn/Regen.
+        start_window_hours_list = []   # [{"hour": int, "state": "startbar"|"sportlich"|"blockiert"|"neutral"}]
         rain_hours = []        # Stunden mit Niederschlag
         gust_hours = []        # Stunden mit GUST/ALOFT-GUST WARN/DANGER (fuer BOEEN-TREND)
         gust_danger_hours = [] # Nur DANGER-Level (>40 km/h Boden oder Flugraum)
@@ -1492,6 +1495,20 @@ class WeatherContextMixin:
                 wind_ok_hours.append(hour_str)
             else:
                 wind_wrong_hours.append(hour_str)
+
+            # Startfenster-State pro Stunde (siehe docs/TAGS.md). Schwellen aus config.py.
+            if not isinstance(wind_speed, (int, float)) or not isinstance(wind_gusts, (int, float)):
+                sw_state = "neutral"
+            elif (not is_ok
+                  or wind_speed > config.WIND_DANGER_KMH
+                  or wind_gusts > config.GUST_DANGER_KMH):
+                sw_state = "blockiert"
+            elif (wind_speed > config.WIND_WARN_KMH
+                  or wind_gusts > config.GUST_WARN_KMH):
+                sw_state = "sportlich"
+            else:
+                sw_state = "startbar"
+            start_window_hours_list.append({"hour": dt.hour, "state": sw_state})
 
             # Höhenwind-Info für Föhn-Erkennung und Warnungen (Thermik-basiert)
             alt_wind_info = ""
@@ -2088,6 +2105,7 @@ class WeatherContextMixin:
             "aloft_wind_danger_hours": tag_counts.get("[ALOFT-WIND-DANGER]", 0),
             "rain_hours": len(rain_hours),
             "rain_hour_list": rain_hours,
+            "start_window_hours": start_window_hours_list,
         })
 
         # Rain-Sandwich-Erkennung fuer Prefilter + NIEDERSCHLAG-TREND

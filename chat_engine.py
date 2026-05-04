@@ -144,35 +144,7 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
 
         # LLM-Clients: Chat + Analyse getrennt konfigurierbar (config.py).
         # Hybrid-Setup moeglich (z.B. Chat=anthropic, Analyse=openai).
-        self.chat_provider = config.CHAT_PROVIDER
-        self.analysis_provider = config.ANALYSIS_PROVIDER
-        self.chat_model = config.get_model(self.chat_provider, "chat")
-        self.analysis_model = config.get_model(self.analysis_provider, "analysis")
-        self.chat_client = build_client(
-            self.chat_provider, config.get_api_key(self.chat_provider), timeout=120.0
-        )
-        # Wenn Chat- und Analyse-Provider identisch sind UND gleicher Key → Client teilen
-        if (
-            self.analysis_provider == self.chat_provider
-            and self.chat_client is not None
-        ):
-            self.analysis_client = self.chat_client
-        else:
-            self.analysis_client = build_client(
-                self.analysis_provider,
-                config.get_api_key(self.analysis_provider),
-                timeout=120.0,
-            )
-
-        # Rueckwaertskompatibilitaet: self.client/self.model zeigen auf CHAT-Slot.
-        # Bestehender Code, der self.client/self.model noch direkt nutzt, bleibt funktional.
-        self.client = self.chat_client
-        self.model = self.chat_model
-        logger.info(
-            "LLM-Setup: chat=%s/%s, analysis=%s/%s",
-            self.chat_provider, self.chat_model,
-            self.analysis_provider, self.analysis_model,
-        )
+        self.reload_llm_clients()
 
         # History-Persistenz
         self.history_dir = config.HISTORY_DIR
@@ -447,6 +419,38 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         self.spots = load_spots()
         logger.info(f"Spots neu geladen: {len(self.spots)} Spots aus CSV")
         return len(self.spots)
+
+    def reload_llm_clients(self):
+        """(Re)initialisiert chat- + analysis-Clients aus aktuellen config-Werten.
+
+        Wird von __init__ und nach Admin-UI-Modellwechsel aufgerufen, damit
+        Aenderungen an CHAT_MODEL/ANALYSIS_MODEL ohne Neustart greifen.
+        """
+        self.chat_provider = config.CHAT_PROVIDER
+        self.analysis_provider = config.ANALYSIS_PROVIDER
+        self.chat_model = config.get_model(self.chat_provider, "chat")
+        self.analysis_model = config.get_model(self.analysis_provider, "analysis")
+        self.chat_client = build_client(
+            self.chat_provider, config.get_api_key(self.chat_provider), timeout=120.0
+        )
+        if (
+            self.analysis_provider == self.chat_provider
+            and self.chat_client is not None
+        ):
+            self.analysis_client = self.chat_client
+        else:
+            self.analysis_client = build_client(
+                self.analysis_provider,
+                config.get_api_key(self.analysis_provider),
+                timeout=120.0,
+            )
+        self.client = self.chat_client
+        self.model = self.chat_model
+        logger.info(
+            "LLM-Setup: chat=%s/%s, analysis=%s/%s",
+            self.chat_provider, self.chat_model,
+            self.analysis_provider, self.analysis_model,
+        )
 
     def reset_conversation(self, session_id: str):
         """Conversation zurücksetzen."""

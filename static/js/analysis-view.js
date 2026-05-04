@@ -261,6 +261,137 @@ window.AnalysisView = (function () {
              + '</div></div>';
     }
 
+    // ===== V4 TAG-SYSTEM (siehe docs/TAGS.md) =====
+    // Wenn a.tags vorhanden ist, wird das neue System genutzt.
+    // Fallback: alte renderAlerts-Logik (caution_notes/no_go_reasons) — solange
+    // noch nicht alle Cache-Eintraege migriert sind.
+
+    var TAG_SEVERITY_ORDER_V4 = ['stop', 'warn', 'good', 'info'];
+    var TAG_SEVERITY_LABEL_V4 = { stop: 'STOP', warn: 'WARN', good: 'GOOD', info: 'Hinweis' };
+    var TAG_SEVERITY_ICON_V4  = { stop: '⛔', warn: '⚠', good: '✓', info: 'ℹ' };
+    var TAG_TOPIC_ORDER_V4 = [
+        'WIND_GROUND', 'WIND_ALOFT', 'FOEHN', 'RAIN',
+        'THUNDERSTORM', 'CLOUDS', 'THERMAL', 'XC', 'TURBULENCE'
+    ];
+    var WINDOW_GLYPH_V4 = { startbar: '▓', sportlich: '▒', blockiert: '⛔', neutral: '·' };
+    var WINDOW_LABEL_V4 = { startbar: 'startbar', sportlich: 'sportlich', blockiert: 'blockiert', neutral: '—' };
+
+    function _topicSortKeyV4(topic) {
+        var i = TAG_TOPIC_ORDER_V4.indexOf(topic);
+        return i === -1 ? 999 : i;
+    }
+
+    function renderStartWindowV4(startWindow) {
+        if (!Array.isArray(startWindow) || !startWindow.length) return '';
+        var sorted = startWindow
+            .filter(function (e) { return e && typeof e.hour === 'number'; })
+            .sort(function (a, b) { return a.hour - b.hour; });
+        if (!sorted.length) return '';
+
+        var cells = sorted.map(function (e) {
+            var st = e.state || 'neutral';
+            var glyph = WINDOW_GLYPH_V4[st] || '·';
+            var hr = String(e.hour).padStart ? String(e.hour).padStart(2, '0') : ('0' + e.hour).slice(-2);
+            return '<div class="mga-window-cell mga-window-cell--' + st + '" '
+                 + 'title="' + hr + ':00 — ' + WINDOW_LABEL_V4[st] + '">'
+                 + '<span class="mga-window-cell-glyph" aria-hidden="true">' + glyph + '</span>'
+                 + '<span class="mga-window-cell-hour">' + hr + '</span>'
+                 + '</div>';
+        }).join('');
+
+        // Summary: laengster Run pro Zustand
+        function longestRun(state) {
+            var best = { len: 0, start: null, end: null };
+            var cur = { state: null, len: 0, start: null, end: null };
+            for (var i = 0; i < sorted.length; i++) {
+                var e = sorted[i];
+                if (e.state === cur.state) { cur.len += 1; cur.end = e.hour; }
+                else {
+                    if (cur.state === state && cur.len > best.len) { best = { len: cur.len, start: cur.start, end: cur.end }; }
+                    cur = { state: e.state, len: 1, start: e.hour, end: e.hour };
+                }
+            }
+            if (cur.state === state && cur.len > best.len) { best = { len: cur.len, start: cur.start, end: cur.end }; }
+            return best;
+        }
+        var startbar = longestRun('startbar');
+        var sport = longestRun('sportlich');
+        var summary = '';
+        function fmt(h) { return ('0' + h).slice(-2); }
+        if (startbar.len > 0) {
+            summary = 'startbar ' + fmt(startbar.start) + '–' + fmt(startbar.end + 1) + ' h (' + startbar.len + ' h)';
+            if (sport.len > 0) summary += ', sportlich ' + fmt(sport.start) + '–' + fmt(sport.end + 1) + ' h';
+        } else if (sport.len > 0) {
+            summary = 'nur sportlich ' + fmt(sport.start) + '–' + fmt(sport.end + 1) + ' h';
+        } else {
+            summary = 'kein Startfenster heute';
+        }
+
+        return '<section class="mga-window-v4">'
+             + '<div class="mga-window-v4-header">'
+             + '<span class="mga-window-v4-icon" aria-hidden="true">🛫</span>'
+             + '<span class="mga-window-v4-title">Startfenster (Bodenwind)</span>'
+             + '</div>'
+             + '<div class="mga-window-v4-cells">' + cells + '</div>'
+             + '<div class="mga-window-v4-summary">' + esc(summary) + '</div>'
+             + '</section>';
+    }
+
+    function renderTagGroupsV4(tags) {
+        if (!Array.isArray(tags) || !tags.length) return '';
+        var byLevel = { stop: [], warn: [], good: [], info: [] };
+        for (var i = 0; i < tags.length; i++) {
+            var t = tags[i];
+            if (!t || !byLevel[t.severity]) continue;
+            byLevel[t.severity].push(t);
+        }
+        for (var j = 0; j < TAG_SEVERITY_ORDER_V4.length; j++) {
+            var sev = TAG_SEVERITY_ORDER_V4[j];
+            byLevel[sev].sort(function (a, b) { return _topicSortKeyV4(a.topic) - _topicSortKeyV4(b.topic); });
+        }
+        var groupsHtml = TAG_SEVERITY_ORDER_V4
+            .filter(function (sev) { return byLevel[sev].length > 0; })
+            .map(function (sev) {
+                var rows = byLevel[sev].map(function (t) {
+                    var v = t.value ? '<span class="mga-tag-value">' + esc(t.value) + '</span>' : '<span class="mga-tag-value"></span>';
+                    var tm = t.time ? '<span class="mga-tag-time">' + esc(t.time) + '</span>' : '<span class="mga-tag-time"></span>';
+                    return '<div class="mga-tag-row">'
+                         + '<span class="mga-tag-topic">' + esc(t.label || t.topic) + '</span>'
+                         + v + tm + '</div>';
+                }).join('');
+                return '<div class="mga-tag-group mga-tag-group--' + sev + '">'
+                     + '<div class="mga-tag-group-header">'
+                     + '<span class="mga-tag-group-icon" aria-hidden="true">' + TAG_SEVERITY_ICON_V4[sev] + '</span>'
+                     + '<span class="mga-tag-group-label">' + TAG_SEVERITY_LABEL_V4[sev] + '</span>'
+                     + '</div>'
+                     + '<div class="mga-tag-rows">' + rows + '</div>'
+                     + '</div>';
+            }).join('');
+        return groupsHtml;
+    }
+
+    // Liefert true wenn der Cache-Eintrag das neue Schema hat.
+    function hasV4Tags(a) {
+        if (!a) return false;
+        if (Array.isArray(a.tags)) return true;
+        if (a.safety && Array.isArray(a.safety.tags)) return true;
+        return false;
+    }
+
+    function getV4Tags(a) {
+        if (!a) return [];
+        if (Array.isArray(a.tags)) return a.tags;
+        if (a.safety && Array.isArray(a.safety.tags)) return a.safety.tags;
+        return [];
+    }
+
+    function getV4StartWindow(a) {
+        if (!a) return [];
+        if (Array.isArray(a.start_window)) return a.start_window;
+        if (a.safety && Array.isArray(a.safety.start_window)) return a.safety.start_window;
+        return [];
+    }
+
     // ===== ALERTS =====
     function renderAlerts(a, mode) {
         // mode: 'notsafe' | 'fliegbar'
@@ -461,6 +592,8 @@ window.AnalysisView = (function () {
             return;
         }
 
+        var useV4 = hasV4Tags(a);
+
         // State B: Not-safe (inklusive noAnalysis-Pfad)
         var notSafe = (safetyStatus === 'not_safe')
                    || (a.noAnalysis === true)
@@ -468,7 +601,16 @@ window.AnalysisView = (function () {
                    || (safetyStatus === 'error');
         if (notSafe) {
             var html = renderHero(a, false);
-            html += renderAlerts(a, 'notsafe');
+            if (useV4) {
+                html += renderStartWindowV4(getV4StartWindow(a));
+                html += renderTagGroupsV4(getV4Tags(a));
+                // Bei not_safe: wenn keine V4-Tags vorliegen, Fallback auf alte Alerts
+                if (!getV4Tags(a).length) {
+                    html += renderAlerts(a, 'notsafe');
+                }
+            } else {
+                html += renderAlerts(a, 'notsafe');
+            }
             html += renderFooter(dateStr);
             wrapper.innerHTML = html;
             container.appendChild(wrapper);
@@ -478,8 +620,13 @@ window.AnalysisView = (function () {
 
         // State C/D: conditional / safe
         var html2 = renderHero(a, false);
-        html2 += renderWindow(a);
-        html2 += renderAlerts(a, 'fliegbar');
+        if (useV4) {
+            html2 += renderStartWindowV4(getV4StartWindow(a));
+            html2 += renderTagGroupsV4(getV4Tags(a));
+        } else {
+            html2 += renderWindow(a);
+            html2 += renderAlerts(a, 'fliegbar');
+        }
         html2 += renderMetrics(a);
         html2 += renderInsights(a);
         html2 += renderFooter(dateStr);

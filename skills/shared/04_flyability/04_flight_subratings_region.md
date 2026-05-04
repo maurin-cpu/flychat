@@ -17,14 +17,22 @@ Werte 2-4, 6-9 sind Zwischenstufen — entscheide nach Bauchgefuehl wie nahe der
 thermal_rating (1-10) — Thermik-Qualitaet (Gewicht 35%)
 ─────────────────────────────────
 
-Was bewertet wird: Steigrate (m/s) UND Konsistenz UND Basishoehe ueber den
-produktiven Stunden. Nicht nur den Peak — ein einzelner starker Aufzug
-zaehlt nicht.
+Was bewertet wird: Steigrate (m/s) UND Konsistenz UND Basishoehe UND
+Bewoelkungs-Charakter ueber den produktiven Stunden. Nicht nur den
+Peak — ein einzelner starker Aufzug zaehlt nicht.
+
+Bewoelkungs-Hintergrund (du wertest selbst, kein fester Bonus/Malus):
+Massgeblich ist max(low, mid); reiner Cirrus >6000m ist thermisch irrelevant.
+SCT-Cu (~12-50%) ist die optimale Bedingung — Cu-Marker, Latentwaerme,
+Matuszko-Boost. Blau (0%) liefert Thermik ohne diesen Boost. Ab ~50% beginnt
+Verschattungs-Daempfung; ≥80% blockt Einstrahlung weitgehend, Thermik kollabiert
+(FAA AC 00-6A). Wie stark das in dein Rating einfliesst, entscheidest du anhand
+des Tagesbildes.
 
 Anker:
-  1  — Unfliegbar / abgeschirmt, kaum Steigen (<0.3 m/s)
-  5  — Standard-Tag: ~1.0-1.5 m/s, mittlere Basis, 3-4h nutzbar
-  10 — Klassiker: nachhaltig >2.5 m/s, hohe Basis, 5+h Fenster
+  1  — Unfliegbar / abgeschirmt (z.B. ≥80% Bewoelkung), kaum Steigen (<0.3 m/s)
+  5  — Standard-Tag: ~1.0-1.5 m/s, mittlere Basis, 3-4h nutzbar (z.B. blau oder milde Daempfung)
+  10 — Klassiker: nachhaltig >2.5 m/s, hohe Basis, 5+h Fenster, optimale Cu-Bedeckung (12-50%)
 
 ─────────────────────────────────
 window_rating (1-10) — Flugfenster (Gewicht 25%)
@@ -33,6 +41,11 @@ window_rating (1-10) — Flugfenster (Gewicht 25%)
 Was bewertet wird: Laenge UND Zusammenhang UND Stabilitaet des nutzbaren
 Zeitfensters in der Region. Ein zerrissenes 5h-Fenster zaehlt schlechter als
 ein zusammenhaengendes 4h-Fenster.
+
+Bewoelkung kann das Fenster zerschneiden oder verkuerzen — beruecksichtige sie:
+ein OD-Kollaps mittags macht das effektive Fenster kuerzer als der Stunden-Count;
+stabile SCT-Cu laesst es ungestoert; pendelnde 40-70% Bedeckung erzeugt
+rhythmische Unterbrechungen. Wie stark du gewichtest, liegt bei dir.
 
 Anker:
   1  — Kein nutzbares Fenster oder nur Minuten
@@ -57,7 +70,13 @@ xc_rating (1-10) — XC-Potenzial (Gewicht 15%)
 ─────────────────────────────────
 
 Was bewertet wird: Basishoehe UND Wind aloft (Rueckenwind/Gegenwind) UND
-Fenster-Laenge UND grossraeumige Lufmasse fuer Strecken-Fliegen in der Region.
+Fenster-Laenge UND grossraeumige Lufmasse UND Bewoelkungs-Marker fuer
+Strecken-Fliegen in der Region.
+
+Bewoelkungs-Hintergrund: SCT-Cu (~25-50%) liefert sichtbare Cu-Strassen und
+erleichtert XC-Navigation. Blau-Tage sind XC-tauglich, aber Thermik-Suche ist
+schwieriger. OD-Risiko oder grossflaechige hohe Bedeckung machen lange Schenkel
+riskant. Wie stark das einfliesst, entscheidest du.
 
 Anker:
   1  — Kein XC moeglich, nur lokal/Soaring

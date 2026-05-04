@@ -1026,6 +1026,16 @@ def admin_config_save():
     if not changed:
         return redirect("/admin/config?ok=Keine+Aenderungen")
 
+    # Engine LLM-Clients neu laden, damit Modellwechsel ohne Neustart greifen.
+    # Ohne dieses Reload behaelt die laufende Engine-Instanz die im __init__
+    # gecachten chat_client/analysis_client (inkl. Provider+Modell) → ein
+    # Wechsel auf z.B. claude-haiku-4-5 wuerde erst nach Neustart wirken.
+    if engine is not None and ("CHAT_MODEL" in changed or "ANALYSIS_MODEL" in changed):
+        try:
+            engine.reload_llm_clients()
+        except Exception as e:
+            logger.warning("admin_config_save: reload_llm_clients fehlgeschlagen: %s", e)
+
     # Scheduler-Thread aufwecken, damit DAILY_RUN_* sofort greifen statt erst
     # beim naechsten planmaessigen Aufwachen.
     try:
@@ -2142,6 +2152,11 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
                 v = entry.get(k)
                 if v is not None:
                     doc[k] = v
+            # Tag-System v4 (siehe docs/TAGS.md): tags + start_window durchreichen
+            for k in ("tags", "start_window"):
+                v = entry.get(k)
+                if isinstance(v, list):
+                    doc[k] = v
             flat[spot_name][date_str] = doc
     return flat
 
@@ -2234,6 +2249,11 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
                 doc["fly_status"] = ""
                 doc["flyability_tier"] = ""
                 doc["fly_error"] = entry.get("fly_error", "")
+            # Tag-System v4 (siehe docs/TAGS.md): tags + start_window durchreichen
+            for k in ("tags", "start_window"):
+                v = entry.get(k)
+                if isinstance(v, list):
+                    doc[k] = v
             flat[rid][date_str] = doc
     return flat
 

@@ -421,10 +421,16 @@
             // Karten-Polygonen fuehrte (gruen statt amber).
             var band = getSafetyBand(dayData);
             var style = mapRegionStyle(band);
+            var rating = getRating(dayData);
 
             // Polygon-Style nach §4.3: dashed bei red/no_data, solid bei green/amber.
             // baseFillOpacity wird gespeichert fuer Hover-Effekt.
             var baseOpacity = style.fillOpacity;
+            if (rating > 0 && (band === 'green' || band === 'amber' || band === 'violet')) {
+                // Intensitaet basierend auf Rating: z.B. Rating 1 -> sehr transparent, Rating 10 -> kraeftig
+                baseOpacity = 0.15 + (rating / 10) * 0.45;
+            }
+            
             layer._baseFillOpacity = baseOpacity;
             layer.setStyle({
                 fill: true,
@@ -448,7 +454,7 @@
             // Rating muss VOR buildRegionLabel berechnet sein — mit `var` waere es
             // zwar hoisted, aber `undefined`, sodass das Label in den En-Dash-Fallback
             // fallen wuerde (Pille zeigt "–" statt Rating-Zahl).
-            var rating = getRating(dayData);
+            // (rating wurde oben deklariert fuer intensity)
             var stars = getStars(dayData); // Compat fuer Tooltip-Spots-Liste
             var expScore = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
 
