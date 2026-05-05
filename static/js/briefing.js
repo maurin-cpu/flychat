@@ -1313,12 +1313,19 @@
   // Single Source of Truth: analysis.tags[] + analysis.start_window[]
   // (deterministisch im Backend gebaut). Frontend rendert nur.
 
-  const TAG_SEVERITY_ORDER = ["stop", "warn", "good", "info"];
-  const TAG_SEVERITY_LABEL = { stop: "STOP", warn: "WARN", good: "GOOD", info: "Hinweis" };
-  const TAG_SEVERITY_ICON = { stop: "⛔", warn: "⚠", good: "✓", info: "ℹ" };
+  // Severity-Reihenfolge: STOP > WARN (Sicherheit) > REDUCER (Fliegbarkeits-
+  // Minderer) > GOOD (Pluspunkte). Siehe docs/TAGS.md.
+  const TAG_SEVERITY_ORDER = ["stop", "warn", "reducer", "good"];
+  const TAG_SEVERITY_LABEL = {
+    stop: "STOP", warn: "WARN", reducer: "Reducer", good: "GOOD",
+  };
+  const TAG_SEVERITY_ICON = {
+    stop: "⛔", warn: "⚠", reducer: "↓", good: "✓",
+  };
   const TAG_TOPIC_ORDER = [
-    "WIND_GROUND", "WIND_ALOFT", "FOEHN", "RAIN",
-    "THUNDERSTORM", "CLOUDS", "THERMAL", "XC", "TURBULENCE",
+    "WIND_GROUND", "WIND_ALOFT", "FOEHN", "RAIN", "THUNDERSTORM",
+    "CLOUDS", "BASE", "THERMAL", "XC", "INVERSION", "WINDOW",
+    "SUNSHINE", "CONVERGENCE", "TURBULENCE",
   ];
   const WINDOW_STATE_GLYPH = {
     startbar: "▓",
@@ -1414,11 +1421,14 @@
 
   function renderTagGroups(tags) {
     if (!Array.isArray(tags) || !tags.length) return "";
-    // Group by severity
-    const byLevel = { stop: [], warn: [], good: [], info: [] };
+    // Group by severity. "info" als Legacy-Severity wird auf "reducer" gemappt
+    // (siehe docs/TAGS.md, Migration 2026-05-05).
+    const byLevel = { stop: [], warn: [], reducer: [], good: [] };
     for (const t of tags) {
-      if (!t || !byLevel[t.severity]) continue;
-      byLevel[t.severity].push(t);
+      if (!t) continue;
+      const sev = t.severity === "info" ? "reducer" : t.severity;
+      if (!byLevel[sev]) continue;
+      byLevel[sev].push(t);
     }
     // Sort each group by topic order
     for (const sev of TAG_SEVERITY_ORDER) {

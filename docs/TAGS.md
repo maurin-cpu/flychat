@@ -24,8 +24,10 @@ Letzte Aktualisierung: 2026-05-05 (Tag-Quellen Backend/LLM-Aufteilung dokumentie
    Frontend, keine LLM-Listen direkt anzeigen.
 2. **Ein Topic = ein Tag.** Pro Topic erscheint pro Spot/Tag genau ein Tag,
    mit der hoechsten zutreffenden Severity. Keine Duplikate.
-3. **Severity bedeutet was.** STOP = Flug verhindert. WARN = Sicherheits-Vorsicht.
-   GOOD = aktiver Pluspunkt. INFO = Komfort-Hinweis ohne Sicherheitsbezug.
+3. **Severity bedeutet was.** STOP = Flug verhindert. WARN = Sicherheits-Vorsicht
+   (Pilot kann sich verletzen). REDUCER = Fliegbarkeit-Minderer ohne
+   Sicherheitsbezug (Tag wird unattraktiver, nicht gefaehrlicher). GOOD =
+   aktiver Pluspunkt.
 4. **Wenn nichts zu sagen ist, kein Tag.** Topics ohne klar zutreffende
    Severity werden weggelassen. Schwache Thermik = kein THERMAL-Tag (nicht
    `WARN: Thermik schwach`).
@@ -39,9 +41,15 @@ Letzte Aktualisierung: 2026-05-05 (Tag-Quellen Backend/LLM-Aufteilung dokumentie
 |---|---|---|---|---|
 | **WINDOW** | 🛫 | mehrfarbig | Tageszeitleiste: wann kann ich starten | ganz oben |
 | **STOP** | ⛔ | rot | Flugverhindernd (Sicherheit) | Block 1 |
-| **WARN** | ⚠ | amber | Sicherheits-Vorsicht | Block 2 |
-| **GOOD** | ✓ | gruen | Aktive Pluspunkte | Block 3 |
-| **INFO** | ℹ | grau, dezent | Komfort, kein Sicherheitsthema | Block 4, kompakt |
+| **WARN** | ⚠ | amber | Sicherheits-Vorsicht (Sicherheit, kein STOP) | Block 2 |
+| **REDUCER** | ↓ | grau-blau | Fliegbarkeit-Minderer — drueckt Tagesqualitaet, KEIN Sicherheitsthema (Bewoelkung, schwache Thermik, mech. Klappern, kurzes Fenster) | Block 3 |
+| **GOOD** | ✓ | gruen | Aktive Pluspunkte | Block 4 |
+
+**Trennlinie WARN vs REDUCER**: WARN ist Sicherheits-Vorsicht (Pilot muss
+aufpassen, koennte sich verletzen). REDUCER ist Fliegbarkeits-Minderung (Tag
+wird unattraktiver, aber nicht gefaehrlicher). Bewoelkung, schwache Thermik,
+mech. Klappern und kurze Flugfenster sind keine Sicherheitsthemen — sie
+gehoeren ausdruecklich NICHT in WARN.
 
 ---
 
@@ -49,17 +57,34 @@ Letzte Aktualisierung: 2026-05-05 (Tag-Quellen Backend/LLM-Aufteilung dokumentie
 
 ### Tabelle (autoritativ — Quelle der Severity-Logik)
 
-| Topic ID | Label | STOP wenn | WARN wenn | GOOD wenn | INFO wenn | Sonst |
+WARN ist Sicherheits-Vorsicht. REDUCER ist Fliegbarkeit-Minderer (kein
+Sicherheitsthema). Topics, die Tagesqualitaet druecken, ohne den Piloten zu
+gefaehrden, gehoeren in REDUCER, nicht in WARN.
+
+**Bewoelkung — Sicherheit vs Fliegbarkeit:**
+- Wolken **auf oder unter** Startplatzhoehe mit hoher Bedeckung sind ein
+  Sicherheitsthema (kein Sichtflug, Startplatz im Nebel) → STOP/WARN.
+- Wolken **oberhalb** des Startplatzes sind kein Sicherheitsthema, sondern
+  ein Fliegbarkeits-Minderer (weniger Sonne → schwaechere Thermik) → REDUCER.
+
+**Wolkenbasis-Hoehe (BASE) — eigene Topic:**
+- Tiefe Basis ueber dem Startplatz (`< 600` m AGL) → REDUCER (gedeckelte Thermik).
+- Hohe Basis ueber dem Gipfel (`> 800` m ueber peak) → GOOD (Steigraum,
+  XC-tauglich).
+
+| Topic ID | Label | STOP wenn | WARN wenn (Sicherheit) | REDUCER wenn (Fliegbarkeit) | GOOD wenn | Sonst |
 |---|---|---|---|---|---|---|
-| `WIND_GROUND` | "Boeen" / "Wind" | `gust_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER `wind_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER `wind_ok_count == 0` | `gust_warn_hours >= 1` ODER `wind_warn_hours >= 1` (und kein STOP) | Richtung OK (`wind_ok_count > wind_wrong_count`) UND `gust_warn_hours == 0` UND `wind_warn_hours == 0` | — | — |
-| `WIND_ALOFT` | "Hoehenwind" | `aloft_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER `aloft_gust_danger_hours >= WIND_TREND_NOTSAFE_HOURS` | `aloft_warn_hours >= 1` ODER `aloft_gust_warn_hours >= 1` (und kein STOP) | beide 0 (kein WARN, kein STOP) | — | — |
+| `WIND_GROUND` | "Boeen" / "Wind" | `gust_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER `wind_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER `wind_ok_count == 0` | `gust_warn_hours >= 1` ODER `wind_warn_hours >= 1` (und kein STOP) | — | Richtung OK (`wind_ok_count > wind_wrong_count`) UND `gust_warn_hours == 0` UND `wind_warn_hours == 0` | — |
+| `WIND_ALOFT` | "Hoehenwind" | `aloft_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER `aloft_gust_danger_hours >= WIND_TREND_NOTSAFE_HOURS` | `aloft_warn_hours >= 1` ODER `aloft_gust_warn_hours >= 1` (und kein STOP) | — | beide 0 (kein WARN, kein STOP) | — |
 | `FOEHN` | "Foehn" | `foehn_risk == "high"` | `foehn_risk == "moderate"` | — | — | low/none → kein Tag |
 | `RAIN` | "Regen" | `rain_hours >= 1` | — | — | — | trocken → kein Tag |
 | `THUNDERSTORM` | "Gewitter" | `thunderstorm_hours >= 1` ODER CAPE > `CAPE_DANGER_JKG` | — | — | — | — |
-| `CLOUDS` | "Bewoelkung" | overcast 8/8 ganztags (`avg_low_mid >= 90` und `cloud_total >= 95`) | `avg_low_mid >= 85` ueber Thermikstunden | `avg_low_mid <= 40` ueber Thermikstunden | — | — |
-| `THERMAL` | "Thermik" | — | — | `peak_climb_rate >= 1.5` m/s | — | sonst kein Tag |
-| `XC` | "XC" | — | — | `xc_potential in ("high", "moderate")` | — | "low" → kein Tag |
-| `TURBULENCE` | "Klappern" | — | — | — | `rough_danger_h >= 1` | — |
+| `CLOUDS` | "Bewoelkung" | Basis **auf oder unter Startplatzhoehe** mit hoher Bedeckung (`cloud_base <= elevation_m + 100` UND `avg_low_mid >= 90`) ODER overcast 8/8 ganztags (`avg_low_mid >= 90` und `cloud_total >= 95`) — Sicht/IFR-Risiko, Startplatz "in den Wolken" | Basis nahe Startplatz (`elevation_m + 100 < cloud_base <= elevation_m + 300`) UND `avg_low_mid >= 75` — Sicht-Vorsicht, Wolkenrand am Startplatz | hohe Bedeckung **oberhalb** des Startplatzes (`avg_low_mid >= 85` ueber Thermikstunden, Basis klar ueber Startplatz) — Thermik-Daempfung, KEIN Sicht-Issue | `avg_low_mid <= 40` ueber Thermikstunden | — |
+| `BASE` | "Wolkenbasis" | — | — | LLM: tiefe Basis ueber dem Startplatz (`cloud_base - elevation_m < 600` m) — wenig Steigraum, Thermik gedeckelt | LLM: hohe Basis (`cloud_base - peak_height_m > 800` m) — viel Steigraum / XC-tauglich | `cloud_base == null` → kein Tag |
+| `THERMAL` | "Thermik" | — | — | LLM: schwache aber nutzbare Thermik (`peak_climb_rate < 1.5` UND `productive_thermal_h >= 1`) | `peak_climb_rate >= 1.5` m/s | sonst kein Tag (Abgleiter-Tag) |
+| `XC` | "XC" | — | — | — | `xc_potential in ("high", "moderate")` | "low" → kein Tag |
+| `TURBULENCE` | "Klappern" | — | — | `rough_danger_h >= 1` (war INFO — mech. Klappern ist Komfort-Minderer) | — | — |
+| `WINDOW` | "Flugfenster" | — | — | LLM: Fenster < `CLEAN_WINDOW_MIN_HOURS` ODER stark fragmentiert | LLM: Fenster ≥ 4h zusammenhaengend, Verhaeltnis ≥ 60 % | — |
 
 ### Reihenfolge innerhalb eines Severity-Blocks
 
@@ -71,9 +96,11 @@ Pro Severity-Block werden die Topics in dieser Reihenfolge gerendert:
 4. `RAIN`
 5. `THUNDERSTORM`
 6. `CLOUDS`
-7. `THERMAL`
-8. `XC`
-9. `TURBULENCE`
+7. `BASE`
+8. `THERMAL`
+9. `XC`
+10. `TURBULENCE`
+11. `WINDOW`
 
 So sehen User die wichtigsten Topics oben (Wind/Boeen zuerst, dann Atmosphaere,
 dann Wetter, dann Komfort).
@@ -93,19 +120,36 @@ verhandelbar), weiche Bewertungen vom **LLM** (interpretiert mit Begruendung).
 Beide Quellen werden zu **einem** `tags[]`-Array gemerged — das Frontend
 unterscheidet die Quelle nicht.
 
-### Quellen-Verteilung der bestehenden Topics
+### Quellen-Verteilung — Topic × Severity (autoritativ)
 
-| Topic | Quelle | Begruendung |
-|---|---|---|
-| `WIND_GROUND` | **Backend** | harte Schwellen, keine Interpretation |
-| `WIND_ALOFT` | **Backend** | harte Schwellen |
-| `RAIN` | **Backend** | `rain_hours` zaehlen |
-| `THUNDERSTORM` | **Backend** | hours + CAPE |
-| `FOEHN` | **Backend** (aus Decision-Pipeline) | bereits hybrid mit ΔP-Logik |
-| `TURBULENCE` | **Backend** (aus `tq_ratio`) | deterministische Mechanik-Detection |
-| `CLOUDS` | **LLM** | Tagesverlauf interpretieren ("Cu am Morgen, spaeter Cs") |
-| `THERMAL` | **LLM** | "schwach aber nutzbar" vs "torn" — Interpretation |
-| `XC` | **LLM** | haengt von Hoehenwind-Richtung, Konvergenz-Linien, Wolkenstrasse ab |
+Spalten zeigen pro Severity, **wer den Tag setzen darf** (`B` = Backend
+deterministisch, `L` = LLM interpretiert, `—` = nicht erlaubt). STOP und WARN
+sind ueberall Backend-Hoheit (Sicherheits-Schweregrade nicht verhandelbar).
+
+| Topic ID | STOP | WARN | REDUCER | GOOD | Begruendung Quellenwahl |
+|---|:---:|:---:|:---:|:---:|---|
+| `WIND_GROUND` | B | B | — | B | harte Schwellen aus `config.py` (WIND/GUST_DANGER/WARN, WIND_TREND_NOTSAFE_HOURS) |
+| `WIND_ALOFT` | B | B | — | B | harte Schwellen, gleiche Logik wie Boden |
+| `FOEHN` | B | B | — | — | aus Decision-Pipeline (`foehn_risk` ΔP-Logik) |
+| `RAIN` | B | — | — | — | `rain_hours >= 1` deterministisch |
+| `THUNDERSTORM` | B | — | — | — | `thunderstorm_hours` + CAPE deterministisch |
+| `CLOUDS` | B | B | L | L | STOP/WARN: `cloud_base` vs `elevation_m` deterministisch (Sicht). REDUCER/GOOD: LLM interpretiert Tagesverlauf ("Cu am Morgen, spaeter Cs") |
+| `BASE` | — | — | L | L | LLM bewertet Wolkenbasis-Hoehe relativ zu Spot/Gipfel mit Begruendung |
+| `THERMAL` | — | — | L | L | "schwach aber nutzbar" vs "torn" — pure Interpretation, Backend liefert nur `peak_climb_rate` als Sanity-Schwelle |
+| `XC` | — | — | — | L | haengt von Hoehenwind-Richtung, Konvergenz-Linien, Wolkenstrasse ab |
+| `TURBULENCE` | — | — | B | — | aus `rough_danger_h` / `tq_ratio` — deterministische Mechanik-Detection |
+| `WINDOW` | — | — | L | L | LLM bewertet Fenster-Laenge / Nutzbarkeit qualitativ; Backend liefert die Stunden-Zahl als Input |
+| `INVERSION` | — | — | L | — | LLM erkennt blockierende/limitierende Inversion aus Vertikalprofil |
+| `SUNSHINE` | — | — | L | L | LLM bewertet Einstrahlungs-Qualitaet (Tagesverlauf, Wolkenbedeckung) |
+| `CONVERGENCE` | — | — | — | L | LLM erkennt Konvergenzlinien als XC-Booster aus Wind-Profilen |
+
+**Regel als Zusammenfassung:**
+- **STOP / WARN** → ausschliesslich Backend (Sicherheits-Hoheit).
+- **REDUCER / GOOD** → kann Backend (deterministische Daten wie `TURBULENCE`)
+  oder LLM (Interpretation wie `THERMAL`, `BASE`, `WINDOW`) sein. Pro Topic
+  ist die Quelle in der Tabelle oben fixiert.
+- **Validator** verwirft jeden Tag, der nicht der hier definierten Topic ×
+  Severity × Quelle-Matrix entspricht (siehe `validate_llm_tags()`).
 
 ### Neue LLM-Topics (geplant)
 
@@ -114,11 +158,16 @@ Aktuell in `flyability_limits` / `highlights` / `primary_reducer` /
 
 | Topic ID | Label | Wann | Severity-Range |
 |---|---|---|---|
-| `INVERSION` | "Inversion" | LLM erkennt blockierende oder limitierende Inversion | warn / info |
-| `BASE` | "Basis" | LLM bewertet Wolkenbasis (tief/hoch relativ zu Spot) | warn / good / info |
-| `WINDOW` | "Flugfenster" | LLM bewertet Fenster-Laenge / Nutzbarkeit | warn / good / info |
-| `SUNSHINE` | "Einstrahlung" | LLM bewertet Einstrahlungs-Qualitaet | good / info |
+| `INVERSION` | "Inversion" | LLM erkennt blockierende oder limitierende Inversion (limitiert Steigen, kein Sicherheitsthema) | reducer |
+| `WINDOW` | "Flugfenster" | LLM bewertet Fenster-Laenge / Nutzbarkeit | reducer / good |
+| `SUNSHINE` | "Einstrahlung" | LLM bewertet Einstrahlungs-Qualitaet | reducer / good |
 | `CONVERGENCE` | "Konvergenz" | LLM erkennt Konvergenzlinien als XC-Booster | good |
+
+> `BASE` ist im Hauptkatalog (oben) — eigenes Topic mit reducer/good Severity-Range.
+
+> **Hinweis:** Diese Topics sind ausschliesslich Fliegbarkeits-relevant — sie
+> erzeugen NIE WARN (kein Sicherheitsthema), nur REDUCER oder GOOD. STOP ist
+> Backend-Hoheit und kommt hier nie vor.
 
 ### LLM-Output-Schema (geplant)
 
@@ -136,9 +185,9 @@ LLM produziert ein neues Feld `llm_tags` statt der heutigen Felder
   },
   {
     "topic": "CLOUDS",
-    "severity": "warn",
+    "severity": "reducer",
     "label": "Bewoelkung",
-    "value": "bedeckt 80% Mittag",
+    "value": "bedeckt 80 % Mittag",
     "time": "11-14 h"
   }
 ]
@@ -157,7 +206,11 @@ final_tags = deduplicate_by_topic(keep highest severity)
 
 - **STOP**: nur Backend. Sicherheit ist nicht verhandelbar — das LLM darf
   keine STOP-Tags setzen.
-- **WARN / GOOD / INFO**: LLM darf setzen (interpretierte Bewertung).
+- **WARN**: nur Backend. Sicherheits-Vorsicht hat klare Schwellen — das LLM
+  darf keine WARN-Tags setzen. (Verhindert, dass Bewoelkung/Thermik faelschlich
+  als Sicherheits-Warnung markiert wird.)
+- **REDUCER / GOOD**: LLM darf setzen (interpretierte Bewertung der
+  Fliegbarkeits-Qualitaet bzw. der Pluspunkte).
 
 ### Konflikt- und Sanity-Validierung
 
@@ -165,8 +218,10 @@ Backend validiert LLM-Tags gegen Daten-Plausibilitaet:
 
 - LLM `THERMAL good` aber `peak_climb_rate < 1.5` m/s → Tag wird verworfen + geloggt
 - LLM `CLOUDS good` aber `avg_low_mid > 70` ueber Thermikstunden → verworfen
-- LLM-Topic nicht in Whitelist (`CLOUDS` / `THERMAL` / `XC` / `INVERSION` / `BASE` / `WINDOW` / `SUNSHINE` / `CONVERGENCE`) → verworfen
-- LLM setzt STOP → verworfen (Severity-Hoheit-Verletzung)
+- LLM `BASE good` aber `cloud_base - peak_height_m <= 800` m → verworfen
+- LLM `BASE reducer` aber `cloud_base == null` ODER `cloud_base - elevation_m >= 600` → verworfen
+- LLM-Topic nicht in Whitelist (`CLOUDS` / `BASE` / `THERMAL` / `XC` / `INVERSION` / `WINDOW` / `SUNSHINE` / `CONVERGENCE`) → verworfen
+- LLM setzt STOP oder WARN → verworfen (Severity-Hoheit-Verletzung — nur Backend darf Sicherheits-Schweregrade setzen)
 
 ### Was bleibt unveraendert
 
@@ -203,7 +258,7 @@ erhaelt zwei neue Felder unter `safety`:
     "tags": [
       {
         "topic": "WIND_GROUND",      // Topic ID aus Tabelle oben
-        "severity": "stop",          // "stop" | "warn" | "good" | "info"
+        "severity": "stop",          // "stop" | "warn" | "reducer" | "good"
         "label": "Boeen",            // Label fuer UI-Anzeige
         "value": "41 km/h",          // primaerer Wert (kann leer sein)
         "time": "13-16 h"            // Zeitfenster (kann leer sein)
@@ -226,7 +281,7 @@ erhaelt zwei neue Felder unter `safety`:
 ### Feldformate
 
 - `topic` — Eine der IDs aus Topic-Katalog. Genau einmal pro Tagesresultat.
-- `severity` — `"stop" | "warn" | "good" | "info"`. Maximale Severity gewinnt.
+- `severity` — `"stop" | "warn" | "reducer" | "good"`. Maximale Severity gewinnt.
 - `label` — Topic-Label aus Tabelle (deutsch, fuer Frontend-Anzeige).
 - `value` — Optionaler kurzer Wert. Beispiele: `"41 km/h"`, `"2.1 mm/h"`,
   `"DP 6.1 hPa"`, `"peak 2.3 m/s"`. Wenn nicht sinnvoll: `""`.
@@ -320,10 +375,13 @@ Alle Werte aus `config.py`:
 ⚠ WARN
    Foehn        DP 6.1 hPa Sued
 
+↓ REDUCER
+   Klappern       mech. Klappern ganztags
+   Bewoelkung     bedeckt 85 % Thermikstunden (Basis ueber Startplatz)
+   Wolkenbasis    400 m ueber Startplatz (gedeckelte Thermik)
+
 ✓ GOOD
    —
-
-ℹ Hinweis · ruppig (mech. Klappern ganztags)
 ```
 
 ### Guter Tag
@@ -338,9 +396,10 @@ Alle Werte aus `config.py`:
    Hoehenwind   28 km/h    14-16 h
 
 ✓ GOOD
-   Thermik      peak 2.3 m/s, 12-15 h
-   Bewoelkung   tief 20 %, mittel 30 %
-   XC           hohes Potenzial
+   Thermik       peak 2.3 m/s, 12-15 h
+   Bewoelkung    tief 20 %, mittel 30 %
+   Wolkenbasis   1200 m ueber Gipfel (viel Steigraum)
+   XC            hohes Potenzial
 ```
 
 ### Schwacher Abgleiter-Tag (kein THERMAL-Tag)
@@ -379,6 +438,20 @@ User versteht intuitiv "lohnt sich nicht zum Steigen".
 
 ## Changelog
 
+- **2026-05-05** (spaeter) — INFO-Klasse durch **REDUCER** ersetzt. WARN ist
+  jetzt strikt Sicherheit, REDUCER fasst Fliegbarkeits-Minderer zusammen
+  (Bewoelkung, schwache Thermik, mech. Klappern, kurzes Fenster, Inversion,
+  tiefe Basis). Bisheriges CLOUDS-WARN → REDUCER, TURBULENCE-INFO → REDUCER.
+  THERMAL-REDUCER (schwach aber nutzbar) und WINDOW-Topic (kurzes Fenster)
+  in den Katalog aufgenommen. Severity-Hoheit erweitert: WARN nur Backend
+  (war: WARN auch LLM erlaubt) — verhindert dass Wolken/Thermik faelschlich
+  als Sicherheits-Warnung markiert werden.
+  - **CLOUDS Sicherheits-Branch** ergaenzt: Wolken **auf/unter** Startplatzhoehe
+    mit hoher Bedeckung sind STOP/WARN (Sicht-Risiko), Wolken **ueber** dem
+    Startplatz bleiben REDUCER (Thermik-Daempfung).
+  - **BASE-Topic** in den Hauptkatalog promoviert: Wolkenbasis-Hoehe als
+    eigenes Topic — REDUCER bei tiefer Basis (< 600 m ueber Startplatz),
+    GOOD bei hoher Basis (> 800 m ueber Gipfel).
 - **2026-05-05** — Architektur-Entscheidung Option C (Hybrid v5) dokumentiert:
   Backend liefert deterministische Topics (`WIND_GROUND`, `WIND_ALOFT`, `RAIN`,
   `THUNDERSTORM`, `FOEHN`, `TURBULENCE`), LLM liefert interpretierte Topics

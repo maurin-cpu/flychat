@@ -1398,6 +1398,12 @@ class WeatherContextMixin:
         # Fuer Violett-Check (XC-Tag braucht saubere Sonne).
         cloud_low_sum = 0.0
         cloud_mid_sum = 0.0
+        # CLOUDS-Sicht-Zaehler (alle Flugstunden, nicht nur Thermikstunden):
+        # Wolkenbasis auf/unter Startplatz mit hoher Bedeckung = Sicherheits-STOP/WARN
+        # (siehe docs/TAGS.md — Bewoelkung-Sicherheits-Branch).
+        cloud_at_or_below_takeoff_h = 0   # Basis ≤ elev+100 UND tief+mittel ≥ 90
+        cloud_near_takeoff_h = 0          # elev+100 < Basis ≤ elev+300 UND tief+mittel ≥ 75
+        min_cloud_base_active_h = None    # niedrigste Wolkenbasis ueber Flugstunden (None=wolkenfrei)
 
         for timestamp in sorted_times:
             try:
@@ -1456,6 +1462,17 @@ class WeatherContextMixin:
             low_cl = float(data.get("cloud_cover_low") or 0)
             mid_cl = float(data.get("cloud_cover_mid") or 0)
             high_cl = float(data.get("cloud_cover_high") or 0)
+
+            # CLOUDS-Sicht-Aggregation (siehe docs/TAGS.md):
+            # Wolken auf/unter Startplatz mit hoher Bedeckung = Sicherheitsthema (STOP/WARN).
+            if isinstance(cloud_base_raw, (int, float)):
+                if min_cloud_base_active_h is None or cloud_base_raw < min_cloud_base_active_h:
+                    min_cloud_base_active_h = cloud_base_raw
+                low_mid_cover = low_cl + mid_cl
+                if cloud_base_raw <= elevation_m + 100 and low_mid_cover >= 90:
+                    cloud_at_or_below_takeoff_h += 1
+                elif elevation_m + 100 < cloud_base_raw <= elevation_m + 300 and low_mid_cover >= 75:
+                    cloud_near_takeoff_h += 1
 
             # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG)
             is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"])
@@ -2106,6 +2123,13 @@ class WeatherContextMixin:
             "rain_hours": len(rain_hours),
             "rain_hour_list": rain_hours,
             "start_window_hours": start_window_hours_list,
+            # CLOUDS-Sicht (siehe docs/TAGS.md): Wolken auf/unter Startplatz =
+            # Sicherheitsthema (STOP/WARN). Werte werden in build_topic_tags
+            # gegen Schwellen geprueft — kein Hardcode hier.
+            "elevation_m": elevation_m,
+            "cloud_at_or_below_takeoff_h": cloud_at_or_below_takeoff_h,
+            "cloud_near_takeoff_h": cloud_near_takeoff_h,
+            "min_cloud_base_active_h": min_cloud_base_active_h,
         })
 
         # Rain-Sandwich-Erkennung fuer Prefilter + NIEDERSCHLAG-TREND
@@ -2425,6 +2449,10 @@ class WeatherContextMixin:
         # Cloud-Akkumulatoren NUR ueber Thermikstunden (climb>=0.3) — fuer Violett-Check.
         cloud_low_sum = 0.0
         cloud_mid_sum = 0.0
+        # CLOUDS-Sicht-Zaehler (alle Flugstunden) — Region nutzt elev_ref als Referenz.
+        cloud_at_or_below_takeoff_h = 0
+        cloud_near_takeoff_h = 0
+        min_cloud_base_active_h = None
         safety_timeline = []       # (hour_str, klass, label) - SICHERHEITS-VERLAUF (Region)
         fly_timeline = []          # (hour_str, klass, label) - FLIEGBARKEITS-VERLAUF (Region)
         altitude_segment_lines = []  # Pro Stunde eine Hoehen-Safety-Zeile
@@ -2478,6 +2506,16 @@ class WeatherContextMixin:
             low_cl = float(data.get("cloud_cover_low") or 0)
             mid_cl = float(data.get("cloud_cover_mid") or 0)
             high_cl = float(data.get("cloud_cover_high") or 0)
+
+            # CLOUDS-Sicht-Aggregation (siehe docs/TAGS.md), Region-Pfad:
+            if isinstance(cloud_base_raw, (int, float)):
+                if min_cloud_base_active_h is None or cloud_base_raw < min_cloud_base_active_h:
+                    min_cloud_base_active_h = cloud_base_raw
+                low_mid_cover = low_cl + mid_cl
+                if cloud_base_raw <= elev_ref + 100 and low_mid_cover >= 90:
+                    cloud_at_or_below_takeoff_h += 1
+                elif elev_ref + 100 < cloud_base_raw <= elev_ref + 300 and low_mid_cover >= 75:
+                    cloud_near_takeoff_h += 1
 
             # Regionen: KEINE Böen (Apr 2026 Refactor).
             # Böen sind lokale Spitzenwerte und gehören auf Spot-Ebene.
@@ -2946,6 +2984,11 @@ class WeatherContextMixin:
             "active_window_start": active_window_start_region,
             "clean_hours_count": len(clean_hours),
             "longest_clean_run_hours": longest_clean_run_region,
+            # CLOUDS-Sicht (siehe docs/TAGS.md), Region nutzt elev_ref:
+            "elevation_m": elev_ref,
+            "cloud_at_or_below_takeoff_h": cloud_at_or_below_takeoff_h,
+            "cloud_near_takeoff_h": cloud_near_takeoff_h,
+            "min_cloud_base_active_h": min_cloud_base_active_h,
         })
 
         # ─── TAGESPROFIL: Ganzheitliche Sicht für LLM-Bewertung ───

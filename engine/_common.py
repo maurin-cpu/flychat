@@ -361,6 +361,76 @@ def _is_permanent_api_error(err: Exception) -> bool:
     return any(kw in err_str for kw in _PERMANENT_ERROR_KEYWORDS)
 
 
+# Provider-uebergreifende Retry-Hint-Pattern. Reihenfolge: spezifisch → generisch.
+# - Gemini:    'retryDelay': '36s'  (strukturiertes detail) + "Please retry in 35.9s."
+# - OpenAI:    "Please try again in 1.5s" / "in 250ms" / "in 1m30s"
+# - Anthropic: "rate limited, retry after 30s" (selten im string, meist Header)
+# - HTTP-Header-Style: "Retry-After: 30"
+_RETRY_DELAY_RE = re.compile(r"['\"]retryDelay['\"]\s*:\s*['\"](\d+(?:\.\d+)?)s['\"]")
+_RETRY_AFTER_HEADER_RE = re.compile(r"retry-after['\"]?\s*[:=]\s*['\"]?(\d+(?:\.\d+)?)", re.IGNORECASE)
+_TRY_AGAIN_S_RE = re.compile(r"(?:try again|retry)(?:\s+in)?\s+(\d+(?:\.\d+)?)\s*s\b", re.IGNORECASE)
+_TRY_AGAIN_MS_RE = re.compile(r"(?:try again|retry)(?:\s+in)?\s+(\d+(?:\.\d+)?)\s*ms\b", re.IGNORECASE)
+_TRY_AGAIN_M_S_RE = re.compile(r"(?:try again|retry)(?:\s+in)?\s+(\d+)m(\d+(?:\.\d+)?)s", re.IGNORECASE)
+
+
+def _extract_retry_after_seconds(err: Exception) -> float | None:
+    """Extrahiert serverseitig vorgeschlagene Retry-Wartezeit aus dem Fehler.
+
+    Provider-uebergreifend: Gemini ('retryDelay': '36s'), OpenAI ('try again in 1.5s'),
+    Anthropic + generische HTTP-Header ('Retry-After: 30'). None = kein Hint vorhanden,
+    der Aufrufer faellt auf exponentielles Backoff zurueck."""
+    err_str = str(err)
+    # 1. Gemini-strukturiert
+    m = _RETRY_DELAY_RE.search(err_str)
+    if m:
+        try:
+            return float(m.group(1))
+        except (TypeError, ValueError):
+            pass
+    # 2. OpenAI "in 1m30s" Mischformat
+    m = _TRY_AGAIN_M_S_RE.search(err_str)
+    if m:
+        try:
+            return float(m.group(1)) * 60.0 + float(m.group(2))
+        except (TypeError, ValueError):
+            pass
+    # 3. "try again in Xs" / "retry in Xs"
+    m = _TRY_AGAIN_S_RE.search(err_str)
+    if m:
+        try:
+            return float(m.group(1))
+        except (TypeError, ValueError):
+            pass
+    # 4. Millisekunden
+    m = _TRY_AGAIN_MS_RE.search(err_str)
+    if m:
+        try:
+            return float(m.group(1)) / 1000.0
+        except (TypeError, ValueError):
+            pass
+    # 5. HTTP-Header-Style "Retry-After: 30"
+    m = _RETRY_AFTER_HEADER_RE.search(err_str)
+    if m:
+        try:
+            return float(m.group(1))
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def compute_retry_sleep(err: Exception, attempt: int, base: float = 3.0,
+                        cap: float = 60.0) -> float:
+    """Liefert Sleep-Sekunden fuer den naechsten Retry-Versuch.
+
+    Bevorzugt Server-Hint (Gemini retryDelay, OpenAI 'try again in Xs',
+    Anthropic/HTTP Retry-After), sonst exponentielles Backoff (base × 2^attempt)
+    mit Cap. attempt=0 = nach 1. Fehlversuch."""
+    hint = _extract_retry_after_seconds(err)
+    if hint is not None:
+        return min(max(hint, 1.0), cap) + 1.0  # +1s Puffer
+    return min(base * (2 ** attempt), cap)
+
+
 def _user_friendly_api_error(err: Exception) -> str:
     """Gibt eine benutzerfreundliche Fehlermeldung fuer permanente LLM-Fehler zurueck."""
     err_str = str(err).lower()
@@ -386,6 +456,8 @@ _REASONING_MODEL_PATTERNS = (
     "v4-pro",     # deepseek-v4-pro (Reasoning-Variante)
     "v4-flash",   # deepseek-v4-flash (Reasoning-Variante, kleineres MoE)
     "o1-", "o3-", "o4-",  # OpenAI Reasoning-Reihe
+    "gemini-2.5-flash",   # Thinking standardmaessig aktiviert (nicht in flash-lite)
+    "gemini-2.5-pro",     # Thinking standardmaessig aktiviert
 )
 _REASONING_TOKEN_HEADROOM = 6000  # +Tokens fuer Reasoning-Phase, robust gegen lange Kontexte
 

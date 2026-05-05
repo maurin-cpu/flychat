@@ -14,6 +14,16 @@
     var spotAnalysesPromise = null;
     var regionActiveDate = {}; // {region_id: dateStr} — last selected day per region overlay
 
+    // ResizeObserver-State: re-rendert das Meteogramm wenn sich die
+    // Container-Breite aendert (z.B. Browser-Resize, Aside aufklappen,
+    // Container-Query-Layoutwechsel). Ohne das wuerde das Chart in der
+    // Initial-Render-Breite eingefroren bleiben.
+    var chartResizeObserver = null;
+    var chartResizeContext = null; // { wxData, altData, dateStr, chartEl }
+    var chartResizeLastWidth = 0;
+    var chartResizeLastHeight = 0;
+    var chartResizeTimer = null;
+
     var overlay = document.getElementById('regionOverlay');
     var overlayTitle = document.getElementById('regionOverlayTitle');
     var overlayBody = document.getElementById('regionOverlayBody');
@@ -641,13 +651,14 @@
         overlayTitle.textContent = regionName;
 
         // Layout matches Spot-Overlay: meteogram first, analysis as
-        // collapsible aside below (mobile) / right (desktop). On mobile the
-        // aside starts collapsed so the meteogram is the primary view —
-        // identical pattern to map.js.
+        // collapsible aside below (narrow) / right (wide). Bei schmalem
+        // Fenster (<=1199px, identisch zum CSS-Breakpoint in regionen.html)
+        // startet das Aside collapsed — der Pilot tippt zum Aufklappen,
+        // gleicher Pattern wie Mobile.
         var initialDate = regionActiveDate[rid] || currentDate || window.currentDate || a.date || '';
-        var isMobile = window.innerWidth <= 640;
-        var asideClass = 'region-overlay-analysis meteogram-aside' + (isMobile ? ' collapsed' : '');
-        var asideExpanded = isMobile ? 'false' : 'true';
+        var isNarrowOverlay = window.innerWidth <= 1199;
+        var asideClass = 'region-overlay-analysis meteogram-aside' + (isNarrowOverlay ? ' collapsed' : '');
+        var asideExpanded = isNarrowOverlay ? 'false' : 'true';
 
         var bodyHtml = '<div class="meteogram-tab-row region-overlay-tab-row">';
         bodyHtml += '<div class="region-overlay-day-tabs" id="regionOverlayDayTabs"></div>';
@@ -844,6 +855,54 @@
             tsDiv.textContent = 'Wetter-Stand: ' + weatherTs;
             chartEl.appendChild(tsDiv);
         }
+
+        // Aktuellen Render-Context speichern + Observer aufsetzen, damit
+        // das Chart bei Container-Resize automatisch neu skaliert.
+        chartResizeContext = { wxData: wxData, altData: altData, dateStr: dateStr, chartEl: chartEl };
+        ensureChartResizeObserver();
+    }
+
+    function ensureChartResizeObserver() {
+        if (typeof ResizeObserver === 'undefined') return;
+        if (chartResizeObserver) return; // already wired
+        var target = document.querySelector('.region-overlay-meteogram');
+        if (!target) return;
+        chartResizeLastWidth = target.clientWidth || 0;
+        chartResizeLastHeight = target.clientHeight || 0;
+        chartResizeObserver = new ResizeObserver(function (entries) {
+            if (!chartResizeContext) return;
+            var rect = entries[0] && entries[0].contentRect;
+            if (!rect) return;
+            var w = rect.width;
+            var h = rect.height;
+            // Nur re-rendern wenn sich Breite ODER Hoehe spuerbar geaendert hat
+            // (>=8px) — vermeidet unnoetige Re-Renders durch Sub-Pixel-Drift
+            // und potenzielle Observer-Loops.
+            if (Math.abs(w - chartResizeLastWidth) < 8 && Math.abs(h - chartResizeLastHeight) < 8) return;
+            chartResizeLastWidth = w;
+            chartResizeLastHeight = h;
+            clearTimeout(chartResizeTimer);
+            chartResizeTimer = setTimeout(function () {
+                if (!chartResizeContext) return;
+                var ctx = chartResizeContext;
+                // chartEl ist im DOM nur sichtbar wenn das Overlay offen ist —
+                // sonst nichts tun.
+                if (!ctx.chartEl || !document.body.contains(ctx.chartEl)) return;
+                renderMeteogramDay(ctx.wxData, ctx.altData, ctx.dateStr, ctx.chartEl);
+            }, 120);
+        });
+        chartResizeObserver.observe(target);
+    }
+
+    function teardownChartResizeObserver() {
+        if (chartResizeObserver) {
+            chartResizeObserver.disconnect();
+            chartResizeObserver = null;
+        }
+        chartResizeContext = null;
+        chartResizeLastWidth = 0;
+        chartResizeLastHeight = 0;
+        clearTimeout(chartResizeTimer);
     }
 
     function showOverlay() {
@@ -857,6 +916,7 @@
         if (!overlay) return;
         overlay.style.display = 'none';
         overlay.classList.remove('visible');
+        teardownChartResizeObserver();
         if (window._overlayScrollUnlock) window._overlayScrollUnlock();
     }
 

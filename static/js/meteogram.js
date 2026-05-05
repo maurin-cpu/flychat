@@ -955,14 +955,18 @@ window.Meteogram = (function () {
                     .attr('opacity', 0.15 + (cover / 100) * 0.7)
                     .attr('rx', 2);
                 
-                // Overlay small percentage with high contrast text
-                if (cover > 20 && CELL_W > 25) {
+                // Overlay small percentage with high contrast text.
+                // Auf Mobile ueber den showNumbers-Toggle steuerbar (gleich wie
+                // Wind/Thermik im Hoehengrid). Desktop: showNumbers ist immer
+                // true → Verhalten unveraendert.
+                if (showNumbers && cover > 20 && CELL_W > 16) {
                     var isDark = (cover > 70 && li >= 1); // Darker layers with high cover
+                    var cloudFontSize = isMobileViewport ? '8px' : '9px';
                     chartG.append('text')
                         .attr('x', ci * CELL_W + CELL_W / 2)
                         .attr('y', rowY + CLOUD_ROW_H / 2 + 1)
                         .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-                        .attr('font-size', '9px').attr('font-weight', '700')
+                        .attr('font-size', cloudFontSize).attr('font-weight', '700')
                         .attr('fill', isDark ? '#F8FAFC' : '#1E293B')
                         .style('text-shadow', isDark ? '0 0 2px rgba(0,0,0,0.3)' : '0 0 2px rgba(255,255,255,0.8)')
                         .text(Math.round(cover));

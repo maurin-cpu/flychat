@@ -1813,32 +1813,25 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
 .bf-tag-group--good .bf-tag-group-header { color: #16a34a; }
 .bf-tag-group--good .bf-tag-topic { color: #15803d; }
 
-/* INFO/HINWEIS — bewusst dezent, kein Border, keine Hintergrundfarbe */
+/* REDUCER — Fliegbarkeits-Minderer (kein Sicherheitsthema): grau-blau,
+ * dezenter als WARN aber sichtbar als eigene Klasse. Siehe docs/TAGS.md. */
+.bf-tag-group--reducer {
+  background: #f1f5f9;
+  border-left-color: #64748b;
+}
+.bf-tag-group--reducer .bf-tag-group-header { color: #475569; }
+.bf-tag-group--reducer .bf-tag-topic { color: #334155; }
+
+/* Legacy-Alias: Backend kann waehrend der Cache-Migration noch alte "info"-
+ * Tags liefern (z.B. TURBULENCE info aus altem Cache). Frontend mappt
+ * im Renderer auf reducer; CSS-Alias hier garantiert konsistente Optik
+ * falls .bf-tag-group--info doch irgendwo gerendert werden sollte. */
 .bf-tag-group--info {
-  background: transparent;
-  border-left: none;
-  padding-left: 8px;
-  padding-top: 4px;
-  padding-bottom: 4px;
-  margin-top: 2px;
-  border-top: 1px dashed var(--color-border);
-  border-radius: 0;
+  background: #f1f5f9;
+  border-left-color: #64748b;
 }
-.bf-tag-group--info .bf-tag-group-header {
-  color: var(--color-text-muted);
-  font-size: 10.5px;
-  text-transform: none;
-  letter-spacing: 0.02em;
-  font-weight: 600;
-}
-.bf-tag-group--info .bf-tag-row {
-  font-size: 11.5px;
-  color: var(--color-text-muted);
-}
-.bf-tag-group--info .bf-tag-topic {
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
+.bf-tag-group--info .bf-tag-group-header { color: #475569; }
+.bf-tag-group--info .bf-tag-topic { color: #334155; }
 
 /* Mobile (≤480px): kompaktere Window-Cells und Tag-Rows */
 @media (max-width: 480px) {

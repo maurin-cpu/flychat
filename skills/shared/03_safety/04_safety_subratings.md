@@ -157,11 +157,42 @@ werden in der Telemetrie sichtbar gemacht und gelten als Bug.
   - Wenn `min(subs) <= 3`  → `safety_status` MUSS mindestens `conditional` sein
   - Bei `safety_status = safe` MUESSEN ALLE 5 Sub-Ratings >= 4 sein
 
-**Regel 2** — Prosa muss zum Status passen:
-  - Bei `safety_status = conditional` darf `summary`/`recommendation` den Tag
-    NICHT als "sicher" oder "unauffaellig" beschreiben. Nenne stattdessen
-    den Grund (welches Sub-Rating ist niedrig, warum).
-  - Bei `safety_status = not_safe`: keine Formulierungen, die Fluege empfehlen.
+**Regel 2** — Prosa muss zum Status passen. Der **erste Satz** der Begruendung
+beantwortet IMMER die zum Status passende Frage:
+
+  - Bei `safety_status = not_safe` → Frage: *"Warum nicht sicher?"* → nenne die
+    **dominante Gefahr** (passt zu `primary_no_go`).
+    - VERBOTEN: "nicht sicher, da kein Fenster vorhanden" (Fenster-Abwesenheit
+      ist Symptom, nicht Ursache).
+    - PFLICHT: "nicht sicher wegen Foehn ΔP 8.4 hPa Sued" oder
+      "nicht sicher wegen Gewitter und CAPE 1900 J/kg ab 14 Uhr".
+    Keine Formulierungen, die Fluege empfehlen.
+
+  - Bei `safety_status = conditional` → Frage: *"Warum nicht safe?"* → nenne
+    den **begrenzenden Faktor** (das niedrigste Sub-Rating bzw. die
+    Hazard-Kategorie aus `primary_caution`). NICHT das saubere Fenster, NICHT
+    positive Aspekte des Tages. Den Tag NICHT als "sicher" oder "unauffaellig"
+    beschreiben.
+    - VERBOTEN: "bedingt sicher, da es ein sauberes Fenster von 4 Stunden gibt"
+      (begruendet warum man fliegen kann — nicht warum nicht `safe`).
+    - PFLICHT: "bedingt sicher wegen kraeftiger Boeen 28-34 km/h ab 13 Uhr"
+      oder "bedingt sicher wegen Hoehenwind 42 km/h zwischen 13 und 16 Uhr".
+    Das Fenster darf erst spaeter im Text genannt werden.
+
+  - Bei `safety_status = safe` → Frage: *"Was macht den Tag gut zum Fliegen?"*
+    → beschreibe die **Bedingungen, die fuer einen angenehmen Flug sprechen**
+    in Pilotensprache, nicht als Safety-Audit. Zulaessig sind die Themen, die
+    die Safety-Stage kennt: Wind-Konstellation (Staerke, Richtung, Stabilitaet),
+    ruhige Hoehenstroemung, kein Foehn-Druck, klare Schichtung, sauberer
+    Tagesverlauf. NICHT Thermik/XC/Flyability-Ratings (das gehoert in den
+    Flyability-Schritt).
+    - VERBOTEN: "Tag wird als sicher eingestuft" (nichtssagend).
+    - VERBOTEN: "sicher, weil keine Probleme" (negativ statt konkret).
+    - VERBOTEN: "sicher, weil ΔP 1.8 hPa unter Foehn-Schwelle und
+      Wind-Histogramm leer" (Safety-Jargon, klingt nach Schwellen-Audit).
+    - PFLICHT: "Sauberer Westwind 8-12 km/h durchgehend, ruhige Hoehen-
+      stroemung max 22 km/h und kein Foehn-Druck — fliegerisch entspannte
+      Konstellation."
 
 **Konsequenz fuer dich**: Bevor du den Output finalisierst, lies deine
 Sub-Ratings. Falls eines <=3 ist, korrigiere `safety_status` UND die Prosa,

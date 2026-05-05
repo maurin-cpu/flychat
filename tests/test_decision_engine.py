@@ -1018,6 +1018,24 @@ class TestValidateLlmTags(unittest.TestCase):
         )
         self.assertEqual(out, [])
 
+    def test_drops_warn_severity(self):
+        """WARN ist Sicherheits-Hoheit (Backend-only) — LLM darf nicht."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "CLOUDS", "severity": "warn", "label": "Bewoelkung"}],
+            {},
+        )
+        self.assertEqual(out, [])
+
+    def test_drops_info_severity_legacy(self):
+        """info ist Legacy-Severity — LLM muss reducer nutzen."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "INVERSION", "severity": "info"}],
+            {},
+        )
+        self.assertEqual(out, [])
+
     def test_drops_invalid_severity(self):
         from engine.decision_engine import validate_llm_tags
         out = validate_llm_tags([{"topic": "CLOUDS", "severity": "danger"}], {})
@@ -1032,11 +1050,11 @@ class TestValidateLlmTags(unittest.TestCase):
         )
         self.assertEqual(out, [])
 
-    def test_keeps_thermal_warn_with_low_peak(self):
-        """warn ist erlaubt — schwache Thermik darf als Warnung markiert werden."""
+    def test_keeps_thermal_reducer_with_low_peak(self):
+        """reducer ist erlaubt — schwache Thermik darf als Fliegbarkeits-Minderer markiert werden."""
         from engine.decision_engine import validate_llm_tags
         out = validate_llm_tags(
-            [{"topic": "THERMAL", "severity": "warn", "label": "Thermik"}],
+            [{"topic": "THERMAL", "severity": "reducer", "label": "Thermik"}],
             {"peak_climb_rate": 0.5},
         )
         self.assertEqual(len(out), 1)
@@ -1053,13 +1071,13 @@ class TestValidateLlmTags(unittest.TestCase):
         from engine.decision_engine import validate_llm_tags
         out = validate_llm_tags(
             [
-                {"topic": "INVERSION", "severity": "warn", "label": "Inversion"},
-                {"topic": "INVERSION", "severity": "info", "label": "Inversion"},
+                {"topic": "BASE", "severity": "reducer", "label": "Wolkenbasis"},
+                {"topic": "BASE", "severity": "good", "label": "Wolkenbasis"},
             ],
-            {},
+            {"min_cloud_base_active_h": 1500, "elevation_m": 1100, "peak_height_m": 2000},
         )
         self.assertEqual(len(out), 1)
-        self.assertEqual(out[0]["severity"], "warn")
+        self.assertEqual(out[0]["severity"], "reducer")
 
     def test_handles_non_list(self):
         from engine.decision_engine import validate_llm_tags
@@ -1068,26 +1086,105 @@ class TestValidateLlmTags(unittest.TestCase):
 
     def test_drops_non_dict_items(self):
         from engine.decision_engine import validate_llm_tags
+        # BASE braucht cloud_base/peak_height_m fuer Sanity — daher SUNSHINE
+        # als simpler Whitelist-Tag ohne extra Datenanforderung.
         out = validate_llm_tags(
-            ["not a tag", {"topic": "BASE", "severity": "good"}],
+            ["not a tag", {"topic": "SUNSHINE", "severity": "good"}],
             {},
         )
         self.assertEqual(len(out), 1)
-        self.assertEqual(out[0]["topic"], "BASE")
+        self.assertEqual(out[0]["topic"], "SUNSHINE")
 
     def test_accepts_new_llm_topics(self):
         from engine.decision_engine import validate_llm_tags
         out = validate_llm_tags(
             [
-                {"topic": "INVERSION", "severity": "warn"},
+                {"topic": "INVERSION", "severity": "reducer"},
                 {"topic": "BASE", "severity": "good"},
-                {"topic": "WINDOW", "severity": "info"},
+                {"topic": "WINDOW", "severity": "reducer"},
                 {"topic": "SUNSHINE", "severity": "good"},
                 {"topic": "CONVERGENCE", "severity": "good"},
             ],
-            {},
+            {"min_cloud_base_active_h": 3000, "elevation_m": 800, "peak_height_m": 2000},
         )
         self.assertEqual(len(out), 5)
+
+    # ── Pro-Topic-Severity-Matrix (LLM_TAG_TOPIC_SEVERITY) ────────────
+
+    def test_drops_inversion_good(self):
+        """INVERSION darf nur reducer (limitiert Thermik), nie good."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "INVERSION", "severity": "good"}], {},
+        )
+        self.assertEqual(out, [])
+
+    def test_drops_convergence_reducer(self):
+        """CONVERGENCE ist nur ein Booster — reducer macht keinen Sinn."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "CONVERGENCE", "severity": "reducer"}], {},
+        )
+        self.assertEqual(out, [])
+
+    def test_drops_xc_reducer(self):
+        """XC ist nur Pluspunkt — reducer/warn unzulaessig."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "XC", "severity": "reducer"}], {},
+        )
+        self.assertEqual(out, [])
+
+    def test_accepts_xc_good(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "XC", "severity": "good", "label": "XC"}], {},
+        )
+        self.assertEqual(len(out), 1)
+
+    # ── BASE-Sanity (cloud_base relativ zu elevation_m / peak_height_m) ──
+
+    def test_drops_base_reducer_when_base_high(self):
+        """BASE reducer nur wenn Basis weniger als 600m ueber Startplatz."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "BASE", "severity": "reducer"}],
+            {"min_cloud_base_active_h": 2500, "elevation_m": 1000},  # 1500m Differenz
+        )
+        self.assertEqual(out, [])
+
+    def test_keeps_base_reducer_when_base_low(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "BASE", "severity": "reducer"}],
+            {"min_cloud_base_active_h": 1400, "elevation_m": 1000},  # 400m Differenz
+        )
+        self.assertEqual(len(out), 1)
+
+    def test_drops_base_good_when_base_close_to_peak(self):
+        """BASE good nur wenn Basis mehr als 800m ueber Gipfel."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "BASE", "severity": "good"}],
+            {"min_cloud_base_active_h": 2300, "peak_height_m": 2000},  # 300m
+        )
+        self.assertEqual(out, [])
+
+    def test_keeps_base_good_when_base_high_above_peak(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "BASE", "severity": "good"}],
+            {"min_cloud_base_active_h": 3500, "peak_height_m": 2000},  # 1500m
+        )
+        self.assertEqual(len(out), 1)
+
+    def test_drops_base_when_no_cloud_base_data(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "BASE", "severity": "reducer"}],
+            {"elevation_m": 1000},  # cloud_base fehlt
+        )
+        self.assertEqual(out, [])
 
 
 class TestMergeTopicTags(unittest.TestCase):
@@ -1111,7 +1208,7 @@ class TestMergeTopicTags(unittest.TestCase):
     def test_orders_by_topic_order(self):
         from engine.decision_engine import merge_topic_tags
         out = merge_topic_tags(
-            [{"topic": "TURBULENCE", "severity": "info"}, {"topic": "WIND_GROUND", "severity": "warn"}],
+            [{"topic": "TURBULENCE", "severity": "reducer"}, {"topic": "WIND_GROUND", "severity": "warn"}],
             [{"topic": "THERMAL", "severity": "good"}, {"topic": "FOEHN", "severity": "warn"}],
         )
         self.assertEqual(
@@ -1119,10 +1216,117 @@ class TestMergeTopicTags(unittest.TestCase):
             ["WIND_GROUND", "FOEHN", "THERMAL", "TURBULENCE"],
         )
 
+    def test_legacy_info_severity_outranked_by_reducer(self):
+        """info ist Legacy-Severity. Wenn Backend reducer und Cache info liefert,
+        gewinnt der hoehere Severity-Rang (oder gleich; first wins)."""
+        from engine.decision_engine import merge_topic_tags
+        out = merge_topic_tags(
+            [{"topic": "TURBULENCE", "severity": "info"}],
+            [],
+        )
+        # Legacy "info" wird durchgereicht (Cache-Migration), aber Rang = reducer.
+        self.assertEqual(len(out), 1)
+
     def test_handles_empty_inputs(self):
         from engine.decision_engine import merge_topic_tags
         self.assertEqual(merge_topic_tags([], []), [])
         self.assertEqual(merge_topic_tags(None, None), [])
+
+
+class TestBuildTopicTagsClouds(unittest.TestCase):
+    """Tests fuer CLOUDS-Sicherheits-Branch (siehe docs/TAGS.md)."""
+
+    def _gust(self, **overrides):
+        base = {
+            "gust_warn_hours": 0, "gust_danger_hours": 0,
+            "wind_warn_hours": 0, "wind_danger_hours": 0,
+            "wind_ok_count": 5, "wind_wrong_count": 0,
+            "max_surface_gust": 0,
+            "aloft_warn_hours": 0, "aloft_danger_hours": 0,
+            "aloft_gust_warn_hours": 0, "aloft_gust_danger_hours": 0,
+            "rain_hours": 0, "thunderstorm_hours": 0,
+            "elevation_m": 1500,
+            "cloud_at_or_below_takeoff_h": 0,
+            "cloud_near_takeoff_h": 0,
+            "min_cloud_base_active_h": None,
+        }
+        base.update(overrides)
+        return base
+
+    def test_clouds_stop_when_base_at_or_below_takeoff(self):
+        """Wolkenbasis ≤ Startplatz mit hoher Bedeckung in 2+ Stunden → STOP."""
+        from engine.decision_engine import build_topic_tags
+        tags = build_topic_tags(
+            {"foehn_risk": "none"},
+            self._gust(
+                cloud_at_or_below_takeoff_h=4,
+                min_cloud_base_active_h=1450,  # unter elev 1500
+            ),
+            {},
+        )
+        clouds = [t for t in tags if t["topic"] == "CLOUDS"]
+        self.assertEqual(len(clouds), 1)
+        self.assertEqual(clouds[0]["severity"], "stop")
+
+    def test_clouds_warn_when_base_near_takeoff(self):
+        """Wolkenrand 100-300m ueber Startplatz → WARN."""
+        from engine.decision_engine import build_topic_tags
+        tags = build_topic_tags(
+            {"foehn_risk": "none"},
+            self._gust(
+                cloud_near_takeoff_h=2,
+                min_cloud_base_active_h=1700,  # 200m ueber elev 1500
+            ),
+            {},
+        )
+        clouds = [t for t in tags if t["topic"] == "CLOUDS"]
+        self.assertEqual(len(clouds), 1)
+        self.assertEqual(clouds[0]["severity"], "warn")
+
+    def test_clouds_no_tag_when_base_high(self):
+        """Hohe Basis → kein Backend-CLOUDS-Tag (REDUCER/GOOD ist LLM-Sache)."""
+        from engine.decision_engine import build_topic_tags
+        tags = build_topic_tags(
+            {"foehn_risk": "none"},
+            self._gust(min_cloud_base_active_h=3000),
+            {},
+        )
+        clouds = [t for t in tags if t["topic"] == "CLOUDS"]
+        self.assertEqual(clouds, [])
+
+    def test_clouds_stop_below_2h_does_not_trigger(self):
+        """Unter 2h Schwelle → kein STOP."""
+        from engine.decision_engine import build_topic_tags
+        tags = build_topic_tags(
+            {"foehn_risk": "none"},
+            self._gust(cloud_at_or_below_takeoff_h=1, min_cloud_base_active_h=1450),
+            {},
+        )
+        clouds = [t for t in tags if t["topic"] == "CLOUDS"]
+        self.assertEqual(clouds, [])
+
+
+class TestBuildTopicTagsTurbulence(unittest.TestCase):
+    """TURBULENCE wurde von info → reducer migriert (siehe docs/TAGS.md)."""
+
+    def test_turbulence_severity_is_reducer(self):
+        from engine.decision_engine import build_topic_tags
+        tags = build_topic_tags(
+            {"foehn_risk": "none"},
+            {
+                "wind_ok_count": 5, "wind_wrong_count": 0,
+                "elevation_m": 1500, "min_cloud_base_active_h": None,
+                "cloud_at_or_below_takeoff_h": 0, "cloud_near_takeoff_h": 0,
+                "gust_warn_hours": 0, "gust_danger_hours": 0,
+                "wind_warn_hours": 0, "wind_danger_hours": 0,
+                "aloft_warn_hours": 0, "aloft_danger_hours": 0,
+                "aloft_gust_warn_hours": 0, "aloft_gust_danger_hours": 0,
+            },
+            {"rough_danger_h": 4},
+        )
+        turb = [t for t in tags if t["topic"] == "TURBULENCE"]
+        self.assertEqual(len(turb), 1)
+        self.assertEqual(turb[0]["severity"], "reducer")
 
 
 if __name__ == "__main__":

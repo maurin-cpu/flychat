@@ -746,8 +746,6 @@ MODEL_PROVIDER_MAP: dict[str, str] = {
     "claude-sonnet-4-6": "anthropic", "claude-opus-4-5": "anthropic",
     "claude-sonnet-4-5": "anthropic", "claude-haiku-4-5": "anthropic",
     # Gemini
-    "gemini-3.1-pro": "gemini", "gemini-3.1-flash": "gemini",
-    "gemini-3.1-flash-lite": "gemini", "gemini-3-flash": "gemini",
     "gemini-2.5-pro": "gemini", "gemini-2.5-flash": "gemini",
     "gemini-2.5-flash-lite": "gemini",
     # DeepSeek

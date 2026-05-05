@@ -224,10 +224,21 @@
         color: #fff;
     }
 
+    /* Flex-Hoehen-Kette: Body fuellt das Panel, Content-Row fuellt den
+       Body, Meteogramm-Spalte fuellt die Content-Row, Chart fuellt die
+       Meteogramm-Spalte. Ohne diese Kette bekommt `.region-meteogram-chart`
+       nur seine `min-height: 200px` und das Meteogramm wird vertikal
+       gequetscht (Zellen werden flach wie Briefumschlaege).
+       container-type/-name aktiviert die Container-Queries weiter unten. */
     #regionOverlayBody {
-        max-height: 75vh;
-        overflow-y: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
         padding: 0 24px 20px;
+        container-type: inline-size;
+        container-name: regionOverlay;
     }
 
     /* Overlay-level day tabs */
@@ -266,15 +277,22 @@
        Order matches the Spot-Overlay so the mobile pattern is identical:
        meteogram on top, analysis as collapsible bottom-sheet below. */
     .region-overlay-content {
+        flex: 1 1 auto;
+        min-height: 0;
         display: flex;
         gap: 24px;
         align-items: stretch;
     }
 
     .region-overlay-meteogram {
-        flex: 1;
+        flex: 1 1 auto;
         min-width: 0;
-        overflow-x: auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        /* Kein horizontaler Scroll — Meteogramm passt sich der Container-
+           Breite an (siehe ResizeObserver in region-map.js). */
+        overflow-x: hidden;
         order: 1;
     }
 
@@ -296,7 +314,13 @@
         overflow-y: auto;
     }
 
+    /* Chart fuellt die Meteogramm-Spalte vertikal (flex-Kette aus
+       #regionOverlayBody → .region-overlay-content → .region-overlay-meteogram).
+       Ohne flex:1 + min-height:0 clamped es bei min-height (200px) und Zellen
+       werden flach wie Briefumschlaege. min-height NUR fuer den Loading-State,
+       wenn das Element noch nicht in der Flex-Kette steht. */
     .region-meteogram-chart {
+        flex: 1 1 auto;
         min-height: 200px;
         position: relative;
     }
@@ -316,17 +340,99 @@
         margin-bottom: 8px;
     }
 
-    @media (max-width: 1023px) {
+    /* Mid-width: Aside schmaler, damit das Meteogramm mehr Spaltenbreite
+       behaelt. Greift z.B. auf 1280-1440px Laptops. Viewport-basiert
+       (Fallback fuer alle Browser) — Container-Query weiter unten ueberschreibt
+       wo unterstuetzt. */
+    @media (max-width: 1500px) {
+        .region-overlay-analysis {
+            flex: 0 0 280px;
+            min-width: 240px;
+        }
+    }
+
+    /* Schmaler Viewport: gleiches Konzept wie Mobile — Meteogramm primaer
+       (volle Breite), Aside als kollabierbares Bottom-Sheet mit sichtbarem
+       Toggle. Standardmaessig collapsed (siehe region-map.js Threshold 1199),
+       Pilot tippt zum Aufklappen. */
+    @media (max-width: 1199px) {
         .region-overlay-content {
             flex-direction: column;
+            gap: 0;
         }
         .region-overlay-analysis {
             flex: 0 0 auto;
             width: 100%;
             min-width: 0;
+            max-height: 45vh;
+            border: none;
+            border-top: 1px solid var(--color-border, #e5e7eb);
             border-radius: 0;
-            border-left: none;
-            border-right: none;
+            background: var(--color-bg-elevated, #fff);
+        }
+        /* Toggle-Button sichtbar machen (Default ist display: none auf Desktop) */
+        .region-overlay-analysis .meteogram-aside-toggle {
+            display: flex;
+        }
+        /* Collapsed-State: Body verstecken, Pfeil drehen, Aside auf Header-Hoehe */
+        .region-overlay-analysis.collapsed .meteogram-aside-body {
+            display: none;
+        }
+        .region-overlay-analysis.collapsed {
+            max-height: none;
+            flex: 0 0 auto;
+        }
+        .region-overlay-analysis.collapsed .meteogram-aside-toggle {
+            transform: rotate(180deg);
+        }
+        /* CTA-Hint sichtbar machen, damit klar ist dass die Header-Zeile
+           tap-bar ist (gleicher Pattern wie Spot-Overlay Mobile). */
+        .region-overlay-analysis .meteogram-aside-cta {
+            display: block;
+        }
+    }
+
+    /* Container-Query Enhancement: Praeziser auf die tatsaechliche
+       Overlay-Breite reagieren (statt Viewport). Modern Browser (Chrome 105+,
+       Firefox 110+, Safari 16+). Aelter Browser nutzen die @media-Fallbacks
+       oben. */
+    @container regionOverlay (max-width: 1500px) {
+        .region-overlay-analysis {
+            flex: 0 0 280px;
+            min-width: 240px;
+        }
+    }
+
+    @container regionOverlay (max-width: 1199px) {
+        .region-overlay-content {
+            flex-direction: column;
+            gap: 0;
+        }
+        .region-overlay-analysis {
+            flex: 0 0 auto;
+            width: 100%;
+            min-width: 0;
+            max-height: 45vh;
+            border: none;
+            border-top: 1px solid var(--color-border, #e5e7eb);
+            border-radius: 0;
+            background: var(--color-bg-elevated, #fff);
+        }
+        .region-overlay-analysis .meteogram-aside-toggle {
+            display: flex;
+        }
+        .region-overlay-analysis.collapsed .meteogram-aside-body {
+            display: none;
+        }
+        .region-overlay-analysis.collapsed {
+            max-height: none;
+            flex: 0 0 auto;
+        }
+        .region-overlay-analysis.collapsed .meteogram-aside-toggle {
+            transform: rotate(180deg);
+        }
+        .region-overlay-analysis .meteogram-aside-cta {
+            display: block;
         }
     }
 

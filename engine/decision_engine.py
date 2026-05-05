@@ -787,8 +787,25 @@ LLM_TAG_TOPIC_WHITELIST = frozenset({
     "INVERSION", "BASE", "WINDOW", "SUNSHINE", "CONVERGENCE",
 })
 
-# STOP ist Backend-Hoheit — Sicherheit ist nicht verhandelbar.
-LLM_TAG_SEVERITY_WHITELIST = frozenset({"warn", "good", "info"})
+# STOP und WARN sind Backend-Hoheit — Sicherheits-Schweregrade sind nicht
+# verhandelbar. LLM darf nur REDUCER (Fliegbarkeits-Minderer) und GOOD
+# (Pluspunkte) setzen. Siehe docs/TAGS.md "Severity-Hoheit".
+LLM_TAG_SEVERITY_WHITELIST = frozenset({"reducer", "good"})
+
+# Pro-Topic erlaubte Severities, die das LLM setzen darf. Ergaenzt
+# LLM_TAG_SEVERITY_WHITELIST (welches die globale Obergrenze ist) — z.B. INVERSION
+# darf nur REDUCER, CONVERGENCE nur GOOD, XC nur GOOD. Siehe Quellen-Matrix in
+# docs/TAGS.md.
+LLM_TAG_TOPIC_SEVERITY = {
+    "CLOUDS":      frozenset({"reducer", "good"}),
+    "THERMAL":     frozenset({"reducer", "good"}),
+    "XC":          frozenset({"good"}),
+    "INVERSION":   frozenset({"reducer"}),
+    "BASE":        frozenset({"reducer", "good"}),
+    "WINDOW":      frozenset({"reducer", "good"}),
+    "SUNSHINE":    frozenset({"reducer", "good"}),
+    "CONVERGENCE": frozenset({"good"}),
+}
 
 
 def validate_llm_tags(llm_tags, result: dict, *, log_prefix: str = "") -> list:
@@ -796,12 +813,16 @@ def validate_llm_tags(llm_tags, result: dict, *, log_prefix: str = "") -> list:
 
     Verworfen wird:
     - Topic nicht in LLM_TAG_TOPIC_WHITELIST (Halluzination)
-    - Severity nicht in {warn, good, info} (STOP nur Backend)
+    - Severity nicht in LLM_TAG_SEVERITY_WHITELIST (STOP/WARN nur Backend)
+    - Severity nicht in pro-Topic-Whitelist (z.B. CONVERGENCE darf nur good,
+      INVERSION nur reducer — siehe LLM_TAG_TOPIC_SEVERITY)
     - Falsches Schema (kein dict, kein topic/severity)
     - Duplikat-Topic (erstes Vorkommen gewinnt; finaler Merge dedupliziert nochmal)
     - Daten-Sanity:
         * THERMAL good erfordert peak_climb_rate >= 1.0 m/s
         * CLOUDS good erfordert avg_low_mid <= 60 %
+        * BASE good erfordert min_cloud_base_active_h - peak_height_m > 800 m
+        * BASE reducer erfordert min_cloud_base_active_h - elevation_m < 600 m
 
     Returns: bereinigte Liste (gleicher Schema wie build_topic_tags).
     """
@@ -820,6 +841,11 @@ def validate_llm_tags(llm_tags, result: dict, *, log_prefix: str = "") -> list:
         mid = result.get("avg_cloud_mid")
         if isinstance(low, (int, float)) and isinstance(mid, (int, float)):
             avg_low_mid = (low + mid) / 2
+
+    # BASE-Sanity-Daten (optional — wenn nicht vorhanden, wird Sanity uebersprungen)
+    cloud_base_min = result.get("min_cloud_base_active_h")
+    elevation_m = result.get("elevation_m")
+    peak_height_m = result.get("peak_height_m")
 
     cleaned: list[dict] = []
     seen_topics: set[str] = set()
@@ -842,8 +868,16 @@ def validate_llm_tags(llm_tags, result: dict, *, log_prefix: str = "") -> list:
             continue
         if not isinstance(severity, str) or severity not in LLM_TAG_SEVERITY_WHITELIST:
             logger.info(
-                "%svalidate_llm_tags: drop %s — severity ungueltig: %r",
+                "%svalidate_llm_tags: drop %s — severity ungueltig (STOP/WARN nur Backend): %r",
                 log_prefix, topic, severity,
+            )
+            continue
+        # Pro-Topic-Severity-Matrix (z.B. INVERSION darf nur reducer, nicht good)
+        allowed_for_topic = LLM_TAG_TOPIC_SEVERITY.get(topic)
+        if allowed_for_topic is not None and severity not in allowed_for_topic:
+            logger.info(
+                "%svalidate_llm_tags: drop %s %s — fuer dieses Topic nicht erlaubt (erlaubt: %s)",
+                log_prefix, topic, severity, sorted(allowed_for_topic),
             )
             continue
         if topic in seen_topics:
@@ -868,6 +902,27 @@ def validate_llm_tags(llm_tags, result: dict, *, log_prefix: str = "") -> list:
                     log_prefix, avg_low_mid,
                 )
                 continue
+        if topic == "BASE":
+            if not isinstance(cloud_base_min, (int, float)):
+                logger.info(
+                    "%svalidate_llm_tags: drop BASE %s — cloud_base nicht verfuegbar",
+                    log_prefix, severity,
+                )
+                continue
+            if severity == "reducer" and isinstance(elevation_m, (int, float)):
+                if cloud_base_min - elevation_m >= 600:
+                    logger.info(
+                        "%svalidate_llm_tags: drop BASE reducer — Basis %sm liegt %sm ueber Startplatz (kein Reducer)",
+                        log_prefix, cloud_base_min, cloud_base_min - elevation_m,
+                    )
+                    continue
+            if severity == "good" and isinstance(peak_height_m, (int, float)):
+                if cloud_base_min - peak_height_m <= 800:
+                    logger.info(
+                        "%svalidate_llm_tags: drop BASE good — Basis %sm nur %sm ueber Gipfel (kein Booster)",
+                        log_prefix, cloud_base_min, cloud_base_min - peak_height_m,
+                    )
+                    continue
 
         cleaned.append(_make_tag(topic, severity, str(label), str(value), str(time)))
         seen_topics.add(topic)
@@ -883,7 +938,10 @@ def merge_topic_tags(backend_tags: list, llm_tags: list) -> list:
     - Pro Topic genau ein Tag mit hoechster Severity.
     - Reihenfolge nach TAG_TOPIC_ORDER (siehe docs/TAGS.md).
     """
-    sev_rank = {"stop": 0, "warn": 1, "good": 2, "info": 3}
+    # Severity-Rang: stop > warn > reducer > good (kleinere Zahl = wichtiger).
+    # "info" als Legacy-Severity wird auf "reducer" gemappt (siehe docs/TAGS.md
+    # Migrations-Eintrag 2026-05-05).
+    sev_rank = {"stop": 0, "warn": 1, "reducer": 2, "info": 2, "good": 3}
     by_topic: dict[str, dict] = {}
     for t in (backend_tags or []) + (llm_tags or []):
         if not isinstance(t, dict):
@@ -896,7 +954,7 @@ def merge_topic_tags(backend_tags: list, llm_tags: list) -> list:
             by_topic[topic] = t
     order = [
         "WIND_GROUND", "WIND_ALOFT", "FOEHN", "RAIN", "THUNDERSTORM",
-        "CLOUDS", "THERMAL", "XC", "INVERSION", "BASE", "WINDOW",
+        "CLOUDS", "BASE", "THERMAL", "XC", "INVERSION", "WINDOW",
         "SUNSHINE", "CONVERGENCE", "TURBULENCE",
     ]
     return [by_topic[t] for t in order if t in by_topic] + [
@@ -1003,16 +1061,41 @@ def build_topic_tags(result: dict, gust_info: dict, tq: dict) -> list:
             "THUNDERSTORM", "stop", "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
         ))
 
-    # ── CLOUDS / THERMAL / XC ────────────────────────────────────────
+    # ── CLOUDS — Sicherheits-Branch (STOP/WARN) ──────────────────────
+    # Wolken auf/unter Startplatzhoehe mit hoher Bedeckung sind ein
+    # Sicherheitsthema (Sicht/IFR, Startplatz "in den Wolken").
+    # REDUCER (Bewoelkung daempft Thermik) und GOOD (klarer Himmel) liefert
+    # das LLM via llm_tags — siehe Hybrid-Matrix in docs/TAGS.md.
+    cloud_at_or_below_h = int(gi.get("cloud_at_or_below_takeoff_h", 0) or 0)
+    cloud_near_h = int(gi.get("cloud_near_takeoff_h", 0) or 0)
+    cloud_base_min = gi.get("min_cloud_base_active_h")
+    elev = gi.get("elevation_m")
+    if cloud_at_or_below_h >= 2:
+        time = "ganztags" if cloud_at_or_below_h >= 6 else f"{cloud_at_or_below_h}h"
+        if isinstance(cloud_base_min, (int, float)) and isinstance(elev, (int, float)):
+            value = f"Basis {int(cloud_base_min)}m ≤ Startplatz {int(elev)}m"
+        else:
+            value = "Startplatz in Wolken"
+        tags.append(_make_tag("CLOUDS", "stop", "Bewoelkung", value, time))
+    elif cloud_near_h >= 1:
+        time = f"{cloud_near_h}h"
+        if isinstance(cloud_base_min, (int, float)) and isinstance(elev, (int, float)):
+            value = f"Basis {int(cloud_base_min)}m nahe Startplatz {int(elev)}m"
+        else:
+            value = "Wolkenrand am Startplatz"
+        tags.append(_make_tag("CLOUDS", "warn", "Bewoelkung", value, time))
+    # CLOUDS reducer/good kommen vom LLM (siehe llm_tags-Pipeline).
+
+    # ── THERMAL / XC / BASE / INVERSION / WINDOW / SUNSHINE / CONVERGENCE ─
     # Hybrid v5 (siehe docs/TAGS.md): Diese Topics liefert das LLM via
     # `result["llm_tags"]` und werden im Merge-Schritt eingespeist.
 
-    # ── TURBULENCE (nur INFO — Komfort, kein Sicherheitsthema) ───────
+    # ── TURBULENCE (REDUCER — Fliegbarkeits-Minderer, kein Sicherheitsthema) ─
     rough_h = int(tq.get("rough_danger_h", 0) or 0)
     if rough_h >= 1:
         time = "ganztags" if rough_h >= 6 else f"{rough_h}h"
         tags.append(_make_tag(
-            "TURBULENCE", "info", "Klappern", "mech. ruppig", time
+            "TURBULENCE", "reducer", "Klappern", "mech. ruppig", time
         ))
 
     return tags
@@ -1082,6 +1165,28 @@ def build_region_topic_tags(result: dict, gust_info: dict) -> list:
             "THUNDERSTORM", "stop", "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
         ))
 
-    # XC liefert das LLM via result["llm_tags"] (Hybrid v5).
+    # ── CLOUDS — Sicherheits-Branch (STOP/WARN), Region-Pfad ─────────
+    # Region nutzt elev_ref als Referenz fuer "Startplatz" — gleiche Logik
+    # wie Spot-Pfad. REDUCER/GOOD weiterhin LLM-Sache via llm_tags.
+    cloud_at_or_below_h = int(gi.get("cloud_at_or_below_takeoff_h", 0) or 0)
+    cloud_near_h = int(gi.get("cloud_near_takeoff_h", 0) or 0)
+    cloud_base_min = gi.get("min_cloud_base_active_h")
+    elev = gi.get("elevation_m")
+    if cloud_at_or_below_h >= 2:
+        time = "ganztags" if cloud_at_or_below_h >= 6 else f"{cloud_at_or_below_h}h"
+        if isinstance(cloud_base_min, (int, float)) and isinstance(elev, (int, float)):
+            value = f"Basis {int(cloud_base_min)}m ≤ Region-Ref {int(elev)}m"
+        else:
+            value = "Region in Wolken"
+        tags.append(_make_tag("CLOUDS", "stop", "Bewoelkung", value, time))
+    elif cloud_near_h >= 1:
+        time = f"{cloud_near_h}h"
+        if isinstance(cloud_base_min, (int, float)) and isinstance(elev, (int, float)):
+            value = f"Basis {int(cloud_base_min)}m nahe Region-Ref {int(elev)}m"
+        else:
+            value = "Wolkenrand auf Region-Hoehe"
+        tags.append(_make_tag("CLOUDS", "warn", "Bewoelkung", value, time))
+
+    # XC / BASE / THERMAL etc. liefert das LLM via result["llm_tags"] (Hybrid v5).
 
     return tags

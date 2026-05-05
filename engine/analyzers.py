@@ -64,7 +64,7 @@ from engine._common import (
     _log_prompt_cache_usage, _weekday_de,
     BatchCostTracker, extract_usage_from_response,
     _is_permanent_api_error, _user_friendly_api_error,
-    _resolve_max_tokens,
+    _resolve_max_tokens, compute_retry_sleep,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _compute_rating_from_subratings,
     _compute_experience_score, _compute_experience_stars, _compute_experience_rating,
@@ -309,7 +309,7 @@ class AnalyzersMixin:
             ]
 
             last_err = None
-            for attempt in range(2):
+            for attempt in range(4):
                 try:
                     response = self.analysis_client.chat.completions.create(
                         model=self.analysis_model,
@@ -336,9 +336,10 @@ class AnalyzersMixin:
                         if getattr(self, '_api_abort', None):
                             self._api_abort.set()
                         break
-                    if attempt == 0:
-                        logger.warning(f"Safety-Check fuer {name}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
-                        time.sleep(3)
+                    if attempt < 3:
+                        sleep_s = compute_retry_sleep(api_err, attempt)
+                        logger.warning(f"Safety-Check fuer {name}/{date_str} Versuch {attempt+1} fehlgeschlagen: {api_err} — Retry in {sleep_s:.1f}s")
+                        time.sleep(sleep_s)
             if last_err:
                 raise last_err
             return self._post_process_safety_spot(result, spot, date_str)
@@ -374,7 +375,7 @@ class AnalyzersMixin:
             ]
 
             last_err = None
-            for attempt in range(2):
+            for attempt in range(4):
                 try:
                     response = self.analysis_client.chat.completions.create(
                         model=self.analysis_model,
@@ -401,9 +402,10 @@ class AnalyzersMixin:
                         if getattr(self, '_api_abort', None):
                             self._api_abort.set()
                         break
-                    if attempt == 0:
-                        logger.warning(f"Flyability-Check fuer {name}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
-                        time.sleep(3)
+                    if attempt < 3:
+                        sleep_s = compute_retry_sleep(api_err, attempt)
+                        logger.warning(f"Flyability-Check fuer {name}/{date_str} Versuch {attempt+1} fehlgeschlagen: {api_err} — Retry in {sleep_s:.1f}s")
+                        time.sleep(sleep_s)
             if last_err:
                 raise last_err
 
@@ -454,7 +456,7 @@ class AnalyzersMixin:
             ]
 
             last_err = None
-            for attempt in range(2):
+            for attempt in range(4):
                 try:
                     response = self.analysis_client.chat.completions.create(
                         model=self.analysis_model,
@@ -481,9 +483,10 @@ class AnalyzersMixin:
                         if getattr(self, '_api_abort', None):
                             self._api_abort.set()
                         break
-                    if attempt == 0:
-                        logger.warning(f"Region-Safety fuer {rname}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
-                        time.sleep(3)
+                    if attempt < 3:
+                        sleep_s = compute_retry_sleep(api_err, attempt)
+                        logger.warning(f"Region-Safety fuer {rname}/{date_str} Versuch {attempt+1} fehlgeschlagen: {api_err} — Retry in {sleep_s:.1f}s")
+                        time.sleep(sleep_s)
             if last_err:
                 raise last_err
             return self._post_process_safety_region(result, region, date_str)
@@ -519,7 +522,7 @@ class AnalyzersMixin:
             ]
 
             last_err = None
-            for attempt in range(2):
+            for attempt in range(4):
                 try:
                     response = self.analysis_client.chat.completions.create(
                         model=self.analysis_model,
@@ -546,9 +549,10 @@ class AnalyzersMixin:
                         if getattr(self, '_api_abort', None):
                             self._api_abort.set()
                         break
-                    if attempt == 0:
-                        logger.warning(f"Region-Flyability fuer {rname}/{date_str} Versuch 1 fehlgeschlagen: {api_err} — Retry in 3s")
-                        time.sleep(3)
+                    if attempt < 3:
+                        sleep_s = compute_retry_sleep(api_err, attempt)
+                        logger.warning(f"Region-Flyability fuer {rname}/{date_str} Versuch {attempt+1} fehlgeschlagen: {api_err} — Retry in {sleep_s:.1f}s")
+                        time.sleep(sleep_s)
             if last_err:
                 raise last_err
 
