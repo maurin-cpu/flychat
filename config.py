@@ -600,6 +600,26 @@ WIND_TREND_NOTSAFE_HOURS = 3
 GUST_TREND_FLOOR_HOURS = 3       # Min. Stunden fuer Boeen-Floor (Boden+Hoehe summiert)
 
 # ============================================================================
+# DRIFT-RENARRATE (Konsistenz LLM-Status vs. Sub-Rating-Floor)
+# ============================================================================
+# Wenn das LLM safety_status=safe schreibt aber min(subs)<4, eskaliert die
+# Engine den Status (SubRatingFloor-Decision). Der LLM-Prosa-Text (summary,
+# recommendation) bleibt dann erstmal mit der alten Status-Annahme stehen.
+#
+# Phase 1 (RENARRATE_ON_DRIFT=False): Telemetrie sammeln, kein Re-Narrate.
+#                    Drift ist sichtbar in `_status_telemetry` jeder Analyse,
+#                    summary kann gelegentlich vom Status abweichen.
+# Phase 2 (RENARRATE_ON_DRIFT=True, AKTIV): bei erkanntem Drift kleiner
+#                    Zusatzcall, der summary/recommendation passend zum
+#                    eskalierten Status umschreibt. Sub-Ratings bleiben
+#                    unangetastet (Forschungs-Datenpunkt). Mehrkosten: nur
+#                    fuer Drift-Faelle, geschaetzt <1% Gesamtkosten.
+RENARRATE_ON_DRIFT = True
+# Modell fuer den Re-Narrate-Call. None = analysis_model (gleiches Modell).
+# Setze auf z.B. "gpt-4o-mini" fuer billigeren Re-Narrate.
+RENARRATE_MODEL = None
+
+# ============================================================================
 # INSTANTDB-KONFIGURATION
 # ============================================================================
 

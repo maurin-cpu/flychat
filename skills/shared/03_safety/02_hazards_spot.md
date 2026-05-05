@@ -70,7 +70,7 @@ EINGEKESSELT — Entscheidungsregeln
 
 - **WARN aussen** → mindestens `conditional`. Extrem-Kombi (Fenster <3h UND mit SPORTLICHEN durchsetzt) kann auf `not_safe` rutschen.
 - **DANGER aussen + Fenster ≥4h + RUHIG innen** → `conditional`. Pilot landet strikt vor Rueckkehr. `primary_caution` setzen, `safe_window` eng auf saubere Stunden begrenzen.
-- **DANGER aussen + Fenster 3-4h + RUHIG innen** → `conditional` grenzwertig. Bei Zusatzrisiken (Richtungsdreher, Konvektion, weitere WARN-Tags) → `not_safe`.
+- **DANGER aussen + Fenster 3-4h + RUHIG innen** → `conditional` grenzwertig. Bei Zusatzrisiken (Konvektion, weitere WARN-Tags) → `not_safe`. (Richtungsdreher ist KEIN Eskalator — nur Info im `wind_summary`, siehe weiter unten.)
 - **DANGER aussen + Fenster <3h** ODER **DANGER aussen + Fenster mit SPORTLICHEN durchsetzt** → `not_safe`, `primary_no_go = EINGEKESSELT`.
 
 

@@ -9,6 +9,7 @@
     var chartContainer = document.getElementById('meteogramChart');
     var analyseViewContainer = document.getElementById('analyseViewChart');
     var tabsContainer = document.getElementById('meteogramTabs');
+    var tabRow = document.getElementById('meteogramTabRow');
     var feedbackBar = document.getElementById('meteogramFeedback');
     var titleEl = document.getElementById('meteogramTitle');
     var infoEl = document.getElementById('meteogramInfo');
@@ -496,14 +497,26 @@
 
     function renderFeedbackBar(spotName, dateStr, analysis) {
         if (!feedbackBar || !spotName) return;
-        // Bei Analyse-Fehler / no_data kein Feedback-Widget anzeigen
+        // Widget wird angezeigt sobald ein Spot offen ist — analysis kann
+        // beim Open noch fehlen (race mit /api/spot_analyses), oder
+        // safety_status kann 'no_data' sein. Pilot soll trotzdem Feedback
+        // geben können. Nur bei echtem Backend-Error ('error') macht es
+        // keinen Sinn → Widget hidden.
         var status = analysis && analysis.safety_status;
-        if (!status || status === 'error' || status === 'no_data') {
+        if (status === 'error') {
             feedbackBar.innerHTML = '';
             feedbackBar.style.display = 'none';
             return;
         }
-        feedbackBar.style.display = '';
+        // Re-mount nicht jedesmal — wenn das Widget schon für diesen
+        // Spot+Date gemountet ist, nichts tun (vermeidet __fbBound-Reset).
+        var existing = feedbackBar.querySelector('[data-fb-mount]');
+        if (existing
+            && existing.getAttribute('data-fb-target') === spotName
+            && existing.getAttribute('data-fb-date') === (dateStr || '')) {
+            feedbackBar.style.display = 'flex';
+            return;
+        }
         feedbackBar.innerHTML = '';
         var mount = document.createElement('div');
         mount.setAttribute('data-fb-mount', '');
@@ -511,6 +524,7 @@
         mount.setAttribute('data-fb-target', spotName);
         if (dateStr) mount.setAttribute('data-fb-date', dateStr);
         feedbackBar.appendChild(mount);
+        feedbackBar.style.display = 'flex';
         if (window.Feedback && window.Feedback.scan) window.Feedback.scan(feedbackBar);
     }
 
@@ -528,7 +542,11 @@
         chartContainer.innerHTML = '<div class="error-state">Lade Daten...</div>';
         if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">Lade Analyse...</div>';
         tabsContainer.innerHTML = '';
-        if (feedbackBar) { feedbackBar.innerHTML = ''; feedbackBar.style.display = 'none'; }
+        if (tabRow) tabRow.style.display = 'none';
+        // feedbackBar: nur leeren, Display via CSS (:empty hidden, :not(:empty) shown).
+        // Inline style.display würde sonst das CSS überschreiben und das Widget
+        // unsichtbar lassen, auch wenn renderFeedbackBar später mountet.
+        if (feedbackBar) feedbackBar.innerHTML = '';
         overlay.style.display = 'flex';
         overlay.classList.add('visible');
         if (window._overlayScrollLock) window._overlayScrollLock();
@@ -608,6 +626,10 @@
                 } else {
                     tabsContainer.style.display = 'none';
                 }
+                // Tab-Row IMMER sichtbar wenn Daten geladen — auch bei nur 1 Tag,
+                // damit das Feedback-Widget rechts in der Zeile sichtbar bleibt.
+                // Tabs selbst werden separat hidden wenn nur 1 Tag.
+                if (tabRow) tabRow.style.display = '';
 
                 renderCurrentDay();
             })
@@ -663,6 +685,7 @@
             idealWindMax: currentWeather.ideal_wind_max,
             groundWindByTime: groundWindByTime,
             thresholds: currentWeather.thresholds,
+            fitToContainer: true,
         });
 
         // Wetter-Zeitstempel + Modell unter dem Spot-Meteogramm

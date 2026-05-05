@@ -200,8 +200,13 @@ window.Meteogram = (function () {
     const CLOUD_STRIP_H = 3 * CLOUD_ROW_H + PRECIP_ROW_H; // CH, CM, CL + Niederschlag/Gewitter
     const CLOUD_GAP = 6;
     // Warnings strip: small pills under the ground section summarising hour-ranges
-    const WARN_ROW_H = 16;
-    const WARN_ROW_GAP = 2;
+    // Warn-Pills sollen schmal bleiben — bei vielen Warnungen kann der Strip
+    // sonst >80px hoch werden und das Meteogramm wegdrücken.
+    // Cap bei MAX_WARN_ROWS Reihen; alle weiteren Warnungen werden in der
+    // letzten Reihe als "+N weitere" Indikator am rechten Rand zusammengefasst.
+    const WARN_ROW_H = 13;
+    const WARN_ROW_GAP = 1;
+    const MAX_WARN_ROWS = 4;
 
     // WMO weather_code: 95/96/99 = Gewitter
     function isThunderstorm(code) {
@@ -365,16 +370,24 @@ window.Meteogram = (function () {
         // Fixed altitude grid in 250m steps, starting from launch elevation
         // Mobile: 500m-Steps statt 250m → halbiert Reihenanzahl, Pfeile bleiben
         // gross genug für Touch + lesbare Schrift, ohne dass das Chart vertikal
-        // scrollen muss. Desktop bleibt bei feiner Auflösung.
+        // scrollen muss.
+        // Desktop-Overlay (fitToContainer) auf KLEINEN Bildschirmen (< 950px Höhe,
+        // typisch 13"/14" Laptops): ebenfalls 500m-Schritte. Granularität opfern
+        // für Sichtbarkeit ist UX-konform (data-density: gröbere Skala statt
+        // Scroll). Auf >=950px Höhe bleibt Desktop bei 250m-Auflösung.
         var _isMobile_local = window.innerWidth <= 640;
-        var STEP = _isMobile_local ? 500 : 250;
-        var FULL_ROWS = _isMobile_local ? 9 : 17; // 0-4000m: 9 rows @ 500m, 17 rows @ 250m
+        var _fitToContainer_local = !!(options && options.fitToContainer);
+        var _smallDesktop = !_isMobile_local && _fitToContainer_local && window.innerHeight < 950;
+        var _useCoarse = _isMobile_local || _smallDesktop;
+        var STEP = _useCoarse ? 500 : 250;
+        var FULL_ROWS = _useCoarse ? 9 : 17; // 0-4000m: 9 rows @ 500m, 17 rows @ 250m
         var elevation = (options && options.elevation) || 0;
         var minGridAlt = Math.floor(elevation / STEP) * STEP;
         // Alpine zones (≥1800m, entspricht Terrain-Faktor 1.0) brauchen mehr Headroom
-        // Mobile: deckeln auf elevation + 3000m (deckt 95% der Flüge ab); Desktop bleibt bei 4000-5000m absolut.
+        // Coarse-Mode: deckeln auf elevation + 3000m (deckt 95% der Flüge ab);
+        // Fine-Mode (großer Desktop): bleibt bei 4000-5000m absolut.
         var maxGridAlt;
-        if (_isMobile_local) {
+        if (_useCoarse) {
             maxGridAlt = Math.min(elevation >= 1800 ? 5000 : 4000, minGridAlt + 3000);
         } else {
             maxGridAlt = elevation >= 1800 ? 5000 : 4000;
@@ -506,10 +519,13 @@ window.Meteogram = (function () {
             // Hard-Cap an Viewport: niemals breiter als Bildschirm minus Body-Padding.
             panelWidth = Math.min(panelWidth, window.innerWidth - 24);
         }
-        // Mobile: nie unter Container — kein erzwungener Scroll. Desktop: Original-Floor.
-        var minCellW = isMobileViewport ? 0 : 40;
+        // Mobile + fitToContainer (Desktop-Overlay): nie breiter als Container —
+        // kein horizontaler Scroll. Inline-Briefing/Chat (kein fitToContainer):
+        // Original-Floor 40px pro Zelle (kann breiter als Container werden).
+        var _fitW = !!(options && options.fitToContainer);
+        var minCellW = (isMobileViewport || _fitW) ? 0 : 40;
         var minChartW = MARGIN.left + nCols * minCellW + MARGIN.right;
-        var chartW = isMobileViewport ? panelWidth : Math.max(panelWidth, minChartW);
+        var chartW = (isMobileViewport || _fitW) ? panelWidth : Math.max(panelWidth, minChartW);
         var CELL_W = (chartW - MARGIN.left - MARGIN.right) / nCols;
         var isNarrow = CELL_W < 36;
 
@@ -614,48 +630,65 @@ window.Meteogram = (function () {
         });
 
         // Row-pack (greedy) so non-overlapping bands share a row.
-        // No row cap — strip grows as needed so no warning gets dropped.
+        // Cap bei MAX_WARN_ROWS Reihen — alle weiteren Warnungen werden NICHT
+        // gerendert, sondern als "+N weitere" Overflow-Pill in der letzten
+        // Reihe rechts ausserhalb der Daten zusammengefasst (Tooltip listet
+        // alle gedroppten Warnings auf).
         warnBands.forEach(function (b) { b.row = -1; });
         var rowLastEnd = []; // rowLastEnd[row] = last end col used
+        var droppedWarns = []; // bands die nicht in MAX_WARN_ROWS passen
         warnBands.forEach(function (b) {
             var r = 0;
             while (rowLastEnd[r] != null && rowLastEnd[r] >= b.start) {
                 r++;
             }
+            if (r >= MAX_WARN_ROWS) {
+                droppedWarns.push(b);
+                return; // b.row bleibt -1 → wird beim Render uebersprungen
+            }
             b.row = r;
             rowLastEnd[r] = b.end;
         });
         var usedRows = rowLastEnd.length;
-        var WARN_STRIP_H = usedRows > 0 ? (usedRows * (WARN_ROW_H + WARN_ROW_GAP) + 6) : 0;
+        var WARN_STRIP_H = usedRows > 0 ? (usedRows * (WARN_ROW_H + WARN_ROW_GAP) + 4) : 0;
 
         var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
 
-        // MOBILE COMPACT: Chart MUSS in den verfügbaren Container passen — kein
-        // vertikaler Scroll. Strategie: cellH schrumpfen falls nötig, aber Floor
-        // bei 20px halten (Arrows + Tier-Fill bleiben erkennbar). Scale-Floor
-        // bei 0.82, damit Schrift nicht unter ~9px fällt.
-        // Reserve = Tier-Legend-Bar (Pills + 44px Toggle-Button + 16px Padding ≈ 60px)
-        //         + .meteogram-chart Wrapper-Padding (8 oben + 8 unten = 16px)
-        //         + Sicherheits-Puffer (6px) damit niemals knapp ueberlaeuft.
-        // Vorher 36px war zu wenig — Numbers-Toggle (min-height 44px) wurde
-        // nicht beruecksichtigt → Pilot musste ~40px scrollen.
-        if (isMobileViewport) {
+        // COMPACT-FIT: Chart MUSS in den verfügbaren Container passen — KEIN
+        // Scroll. Strategie: cellH schrumpfen so weit nötig.
+        // - Mobile: immer aktiv (Floor 18px für Touch-Lesbarkeit).
+        // - Desktop-Overlay (fitToContainer): kein Floor — Chart MUSS reinpassen,
+        //   kleinere Schrift > Scroll-Frust. Skaliert automatisch via `scale`.
+        //   Inline-Briefing/Chat-Charts (kein fitToContainer): unverändert.
+        // Reserve = Tier-Legend-Bar (Mobile: 60 mit Toggle; Desktop: 40)
+        //         + .meteogram-chart Wrapper-Padding (Mobile 16, Desktop 24)
+        //         + Sicherheits-Puffer.
+        var fitToContainer = !!(options && options.fitToContainer);
+        if (isMobileViewport || fitToContainer) {
             var containerH = container.clientHeight || 0;
             if (containerH < 100) {
-                containerH = Math.max(280, window.innerHeight - 200);
+                containerH = isMobileViewport
+                    ? Math.max(280, window.innerHeight - 200)
+                    : Math.max(400, window.innerHeight - 200);
             }
-            var legendReserve = 60;        // Tier-Legend incl. 44px Toggle-Button + Padding
-            var chartPaddingReserve = 16;  // .meteogram-chart Padding 8px top+bottom
-            var safetyMargin = 6;
-            var availableH = containerH - legendReserve - chartPaddingReserve - safetyMargin;
+            var legendReserve = isMobileViewport ? 60 : 40;
+            var chartPaddingReserve = isMobileViewport ? 16 : 24;
+            // weather-ts: Modell + Wetter-Stand wird vom Caller (map.js) UNTER
+            // das SVG appended (~14px Höhe inkl. padding). Muss in die Reserve
+            // damit der Footer-Text nicht aus dem Container scrollt.
+            var weatherTsReserve = 16;
+            var safetyMargin = isMobileViewport ? 6 : 8;
+            var availableH = containerH - legendReserve - chartPaddingReserve - weatherTsReserve - safetyMargin;
             if (chartH > availableH) {
                 var fixedH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
                 var availForRows = Math.max(0, availableH - fixedH);
-                var newCellH = Math.max(20, Math.floor(availForRows / Math.max(1, nRows)));
+                // Mobile: Floor 18 (Touch-Hit-Area). Desktop-Overlay: kein Floor —
+                // muss IMMER reinpassen, lieber kleine Schrift als Scroll.
+                var minCellHFloor = isMobileViewport ? 18 : 1;
+                var newCellH = Math.max(minCellHFloor, Math.floor(availForRows / Math.max(1, nRows)));
                 if (newCellH < cellH) {
                     cellH = newCellH;
-                    // Scale-Floor: Schrift nie unter ~82% der Originalgrösse → bleibt lesbar.
-                    scale = Math.max(0.82, cellH / CELL_H);
+                    scale = cellH / CELL_H; // proportional, kein Floor — Schrift schrumpft mit
                     chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
                 }
             }
@@ -1642,8 +1675,8 @@ window.Meteogram = (function () {
                 // Label text — auto-shorten if pill too narrow
                 var rangeStr = formatHourRange(times, band.start, band.end);
                 var fullLabel = band.label + ' ' + rangeStr;
-                // Rough fit: ~5.5px per char at 10px font
-                var maxChars = Math.floor((bw - 6) / 5.5);
+                // Rough fit: ~5px per char at 9px font
+                var maxChars = Math.floor((bw - 6) / 5);
                 var displayLabel;
                 if (fullLabel.length <= maxChars) {
                     displayLabel = fullLabel;
@@ -1660,7 +1693,7 @@ window.Meteogram = (function () {
                     chartG.append('text')
                         .attr('x', bcx).attr('y', by + WARN_ROW_H / 2 + 3)
                         .attr('text-anchor', 'middle')
-                        .attr('font-size', '10px')
+                        .attr('font-size', '9px')
                         .attr('font-weight', '600')
                         .attr('fill', band.color)
                         .text(displayLabel);
@@ -1669,6 +1702,38 @@ window.Meteogram = (function () {
                 // Tooltip on hover (native title, simple + reliable)
                 chartG.append('title').text(fullLabel);
             });
+
+            // Overflow-Indikator: wenn Warnings wegen MAX_WARN_ROWS gedroppt
+            // wurden, in der letzten Reihe rechts eine "+N" Pill mit Tooltip
+            // (komplette Liste der gedroppten Warnings) zeigen.
+            if (droppedWarns.length > 0) {
+                var lastRow = MAX_WARN_ROWS - 1;
+                var oy = warnTop + lastRow * (WARN_ROW_H + WARN_ROW_GAP);
+                var oLabel = '+' + droppedWarns.length;
+                var oW = Math.max(28, oLabel.length * 7 + 8);
+                var oX = nCols * CELL_W - oW - 1;
+                var oG = chartG.append('g');
+                oG.append('rect')
+                    .attr('x', oX).attr('y', oy)
+                    .attr('width', oW).attr('height', WARN_ROW_H)
+                    .attr('rx', 4)
+                    .attr('fill', '#FEE2E2')
+                    .attr('stroke', '#B91C1C')
+                    .attr('stroke-width', 0.75)
+                    .attr('opacity', 0.95);
+                oG.append('text')
+                    .attr('x', oX + oW / 2).attr('y', oy + WARN_ROW_H / 2 + 3)
+                    .attr('text-anchor', 'middle')
+                    .attr('font-size', '9px')
+                    .attr('font-weight', '700')
+                    .attr('fill', '#991B1B')
+                    .text(oLabel);
+                var oTooltip = droppedWarns.map(function (b) {
+                    return b.label + ' ' + formatHourRange(times, b.start, b.end);
+                }).join('\n');
+                oG.append('title').text(droppedWarns.length + ' weitere Warnung'
+                    + (droppedWarns.length === 1 ? '' : 'en') + ':\n' + oTooltip);
+            }
         }
 
         // ===== CROSSHAIR + TOOLTIP =====

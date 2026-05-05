@@ -43,14 +43,16 @@ bewusst zwischen 6, 7, 8.
 wind_safety_rating (1-10) — Bodenwind / Mittelwind
 ─────────────────────────────────
 
-Was bewertet wird: Mittelwind und Anstroemrichtung am Startplatz waehrend der
-produktiven Stunden, inklusive Trend.
+Was bewertet wird: Mittelwind / Wind-Staerke am Startplatz waehrend der
+produktiven Stunden, inklusive Trend. **Anstroemrichtung NICHT bewerten** —
+Richtung ist Startbarkeit (Tagesfenster), nicht Sicherheit. Falscher Sektor
+macht den Tag nicht "gefaehrlich", nur nicht startbar.
 
 **Spot-Bemerkung lesen**: Default-Idealbereich ist {{cfg.WIND_IDEAL_MIN_KMH}}-{{cfg.WIND_IDEAL_MAX_KMH}} km/h fuer Thermik-Spots. Soaring-Spots wie z.B. Balderen brauchen einen MINDESTWIND (oft ab 15 km/h) — die Spot-Bemerkung im Prompt-Kontext nennt diese Anforderung explizit. Beruecksichtige sie aktiv.
 
 Anker:
-  1  — Stuermisch ({{cfg.WIND_DANGER_KMH}}+ km/h), Wind-OK=0, kompletter Wind-Aufbau ueber den Tag
-  5  — Grenzwertig: ueber {{cfg.WIND_WARN_KMH}} km/h ODER unter Spot-Mindestwind ODER schraege Richtung ODER Aufbau-Trend
+  1  — Stuermisch ({{cfg.WIND_DANGER_KMH}}+ km/h), kompletter Wind-Aufbau ueber den Tag
+  5  — Grenzwertig: ueber {{cfg.WIND_WARN_KMH}} km/h ODER unter Spot-Mindestwind ODER Aufbau-Trend
   10 — Wind im idealen Bereich des Spots, stabil ueber den ganzen Tag
 
 ─────────────────────────────────
@@ -140,3 +142,29 @@ sonst ruhigem Wetter).
 
 **Volle Breite nutzen** — wenn der LLM-Run vorher bei "5-7 clustern" stehen
 geblieben ist, ist das ein Bug. Differenziere bewusst zwischen 6, 7, 8.
+
+─────────────────────────────────
+KONSISTENZ-PFLICHT (HART)
+─────────────────────────────────
+
+`safety_status`, die 5 Sub-Ratings UND der Prosa-Text (`summary`,
+`recommendation`) MUESSEN ein konsistentes Bild ergeben. Die Engine pruefte
+dies und korrigiert Verstoesse (`SubRatingFloor`-Decision) — Korrekturen
+werden in der Telemetrie sichtbar gemacht und gelten als Bug.
+
+**Regel 1** — Sub-Ratings binden den Status:
+  - Wenn `min(subs) <= 2`  → `safety_status` MUSS `not_safe` sein
+  - Wenn `min(subs) <= 3`  → `safety_status` MUSS mindestens `conditional` sein
+  - Bei `safety_status = safe` MUESSEN ALLE 5 Sub-Ratings >= 4 sein
+
+**Regel 2** — Prosa muss zum Status passen:
+  - Bei `safety_status = conditional` darf `summary`/`recommendation` den Tag
+    NICHT als "sicher" oder "unauffaellig" beschreiben. Nenne stattdessen
+    den Grund (welches Sub-Rating ist niedrig, warum).
+  - Bei `safety_status = not_safe`: keine Formulierungen, die Fluege empfehlen.
+
+**Konsequenz fuer dich**: Bevor du den Output finalisierst, lies deine
+Sub-Ratings. Falls eines <=3 ist, korrigiere `safety_status` UND die Prosa,
+SO dass beides zusammenpasst. Es ist NICHT zulaessig, ein niedriges
+Sub-Rating zu vergeben und gleichzeitig `safety_status = safe` + "sicherer
+Tag"-Prosa zu schreiben.

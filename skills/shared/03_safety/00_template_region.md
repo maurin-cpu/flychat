@@ -36,7 +36,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
   "no_go_reasons": ["KURZE Eintraege. Format: 'Kategorie: Wert, Zeitfenster'. KEINE Tag-Namen (NICHT 'ALOFT-WIND-DANGER: 6h' — sondern 'Hoehenwind: 42 km/h auf 2500m, 10:00-14:00'). Leer [] wenn keine."],
   "caution_notes": ["KURZE Warnhinweise. Format: 'Kategorie: Kerninfo, Zeitbezug'. KEINE Tag-Namen (NICHT 'WIND-WARN: 13-16h' — sondern 'Hoehenwind 28-35 km/h zwischen 13 und 16 Uhr, sportlich'). Leer [] wenn keine."],
   "primary_no_go": "NUR bei not_safe. EINER der Keys (Ranking absteigend): FOEHN, GEWITTER, UEBERENTWICKLUNG, STURM, WIND_DANGER, STARKE_BOEEN, REGEN, SCHNEE, OVERCAST, SICHT, VEREISUNG, EINGEKESSELT, EINGEKESSELT-WIND.",
-  "primary_caution": "NUR bei conditional. EINER der Keys: STARKER_WIND, WINDRICHTUNG, TURBULENZ, SHEAR_WIND, KURZES_FENSTER, TREND_SCHLECHTER.",
+  "primary_caution": "NUR bei conditional. EINER der Keys: STARKER_WIND, TURBULENZ, SHEAR_WIND, KURZES_FENSTER, TREND_SCHLECHTER. (WINDRICHTUNG ist KEIN Safety-Grund — falsche Richtung = nicht startbar, nicht gefaehrlich.)",
   "wind_calm_count": 0,
   "wind_moderate_count": 0,
   "wind_strong_count": 0,

@@ -1245,22 +1245,42 @@ body.page-fixed-nav {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 28px;
+    padding: 12px 24px;
     border-bottom: 1px solid var(--color-border);
     background: #fafbfc;
 }
 
 .meteogram-header h2 {
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 600;
     letter-spacing: -0.3px;
+    line-height: 1.25;
     color: var(--color-text);
+    /* Inline-Subtitle: spot-info sitzt rechts neben dem Namen statt darunter
+       → spart eine ganze Header-Zeile (~18px) ohne Schriftgrößen-Squeeze. */
+    display: inline;
 }
 
 .meteogram-header .spot-info {
     color: var(--color-text-muted);
     font-size: 12px;
-    margin-top: 2px;
+    line-height: 1.25;
+    /* Inline neben h2 mit "·"-Separator. Wird automatisch nach unten umbrochen
+       wenn der Container schmal ist (kein Overflow). */
+    display: inline;
+    margin-left: 8px;
+}
+
+.meteogram-header .spot-info::before {
+    content: "·";
+    margin-right: 8px;
+    color: var(--color-border-hover);
+    font-weight: 700;
+}
+
+.meteogram-header .spot-info:empty,
+.meteogram-header .spot-info:empty::before {
+    display: none;
 }
 
 .meteogram-header-text {
@@ -1272,7 +1292,7 @@ body.page-fixed-nav {
     display: inline-flex;
     align-items: baseline;
     gap: 2px;
-    padding: 8px 14px;
+    padding: 6px 12px;
     margin-right: 12px;
     border-radius: var(--radius-sm, 6px);
     background: var(--color-fly-gray-bg, #F5EDE0);
@@ -1309,7 +1329,7 @@ body.page-fixed-nav {
 }
 
 .meteogram-rating-value {
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 800;
     letter-spacing: -0.02em;
 }
@@ -1323,13 +1343,13 @@ body.page-fixed-nav {
 }
 
 .meteogram-close {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--color-border);
     background: transparent;
     color: var(--color-text-muted);
-    font-size: 18px;
+    font-size: 17px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1344,8 +1364,8 @@ body.page-fixed-nav {
 }
 
 .meteogram-share {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--color-border);
     background: transparent;
@@ -1372,13 +1392,138 @@ body.page-fixed-nav {
 .meteogram-tabs {
     display: flex;
     gap: 4px;
-    padding: 10px 28px;
+    padding: 6px 24px;
     border-bottom: 1px solid var(--color-border);
     background: #fafbfc;
 }
 
+/* Tab-Row: Tag-Tabs (links) + Feedback-Widget (rechts) in EINER Zeile.
+   Spart eine ganze Overlay-Zeile, weil Feedback nicht mehr unter den
+   Tabs als separater Streifen sitzt. Beide Overlays (Spot + Region)
+   nutzen dieselbe Struktur. */
+.meteogram-tab-row {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--color-border);
+    background: #fafbfc;
+}
+
+.meteogram-tab-row .meteogram-tabs,
+.meteogram-tab-row .region-overlay-day-tabs {
+    /* Padding kommt vom Wrapper — eigenes horizontales Padding raus,
+       Border ebenfalls (Wrapper hat den Trenn-Border).
+       nowrap statt wrap: Tabs scrollen horizontal wenn zu breit, statt
+       die Tab-Row vertikal aufzublähen — sonst wäre der Höhen-Win futsch. */
+    padding: 6px 0;
+    border-bottom: none;
+    background: transparent;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.meteogram-tab-row .meteogram-feedback-bar {
+    border-bottom: none;
+    background: transparent;
+    flex: 0 0 auto;
+    align-items: center;
+}
+.meteogram-tab-row .meteogram-feedback-bar:not(:empty) {
+    display: flex;
+}
+
+/* Inline-Variante des Feedback-Widgets in der Tab-Row: kompakt, ohne
+   Border, ohne extra Padding. Nur Title (klein) + 👍/👎 + Kommentar-Btn
+   sichtbar in Ruhezustand. Comment-Box wenn aktiv: pusht das Layout
+   nicht (absolut positioniert oder akzeptierbar Layout-Shift on demand). */
+.meteogram-tab-row .fb-widget {
+    margin-top: 0;
+    padding: 0;
+    border-top: none;
+    border-radius: 0;
+    background: transparent;
+}
+.meteogram-tab-row .fb-widget__header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 0;
+    border: none;
+}
+.meteogram-tab-row .fb-widget__title {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+.meteogram-tab-row .fb-widget__btns {
+    gap: 4px;
+}
+.meteogram-tab-row .fb-widget__status {
+    font-size: 11px;
+    margin: 0 0 0 4px;
+    line-height: 1;
+}
+.meteogram-tab-row .fb-saved-comment {
+    margin: 0 0 0 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+}
+/* Comment-Box öffnet sich UNTER der Tab-Row (volle Breite des Overlays).
+   Position absolut, damit Tab-Row-Höhe konstant bleibt. */
+.meteogram-tab-row { position: relative; }
+.meteogram-tab-row .fb-comment {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: min(420px, calc(100vw - 48px));
+    z-index: 10;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 10px 12px;
+}
+
+/* Mobile: Tab-Row stackt (Tabs oben, Feedback unten) — wie heute, da die
+   7 Tag-Tabs die Mobile-Breite voll nutzen. */
+@media (max-width: 640px) {
+    .meteogram-tab-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 0;
+    }
+    .meteogram-tab-row .meteogram-tabs,
+    .meteogram-tab-row .region-overlay-day-tabs {
+        padding: 6px 8px;
+        overflow-x: visible;
+    }
+    .meteogram-tab-row .meteogram-feedback-bar {
+        border-top: 1px solid var(--color-border);
+        padding: 4px 12px;
+    }
+    .meteogram-tab-row .fb-widget__title {
+        font-size: 12px;
+    }
+    .meteogram-tab-row .fb-comment {
+        position: static;
+        width: 100%;
+        border: none;
+        box-shadow: none;
+        padding: 8px 10px;
+    }
+}
+
 .tab-btn {
-    padding: 7px 18px;
+    padding: 6px 16px;
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
     background: transparent;
@@ -1410,11 +1555,13 @@ body.page-fixed-nav {
 
 .meteogram-chart {
     flex: 1;
-    overflow: auto;
-    padding: 20px;
+    /* Kein Scroll im Overlay — JS sized das SVG so dass es IMMER reinpasst.
+       hidden statt auto verhindert Scrollbars auch wenn Layout-Race kurz
+       zu großem Chart führt (zb resize während Render). */
+    overflow: hidden;
+    padding: 12px 16px;
     min-height: 0;
     min-width: 0;
-    /* Scrollbar dezent — Desktop kann scrollen wenn nötig, aber subtil */
     scrollbar-width: thin;
 }
 
@@ -2447,15 +2594,15 @@ body.page-fixed-nav {
     }
 
     .meteogram-header {
-        padding: 16px 20px;
+        padding: 10px 18px;
     }
 
     .meteogram-tabs {
-        padding: 8px 20px;
+        padding: 6px 18px;
     }
 
     .meteogram-chart {
-        padding: 12px;
+        padding: 10px 12px;
     }
 }
 

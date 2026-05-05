@@ -543,6 +543,54 @@ def _compute_safety_score(rating_0_10) -> int:
     return max(0, min(100, round(r * 10)))
 
 
+def derive_status_from_subs(result: dict):
+    """Leitet `safety_status` deterministisch aus den 5 Safety-Sub-Ratings ab.
+
+    Schwellen (am bestehenden `compute_safety_band`-Score-Threshold ausgerichtet:
+    score<40 → amber entspricht rating<4):
+      - min(subs) <= 2 → "not_safe"     (akut gefaehrlich, Skill-Anker 1)
+      - min(subs) <= 3 → "conditional"  (grenzwertig kritisch)
+      - min(subs) >= 4 → "safe"
+
+    Sub-Ratings <=0 oder nicht-numerisch werden als "nicht bewertbar" behandelt
+    und ausgeschlossen (analog `_compute_safety_rating`). Wenn keine
+    bewertbaren Subs vorliegen, liefert die Funktion None — der Aufrufer soll
+    dann nichts ueberschreiben.
+
+    Diese Funktion ist die Konsistenz-Bruecke zwischen LLM-Sub-Ratings und
+    LLM-Status: das LLM darf sich nicht selbst widersprechen (z.B. status=safe
+    + wind_safety_rating=3). Aufrufer in `_post_process_safety_*` vergleicht
+    den Output mit dem aktuellen `safety_status` und eskaliert (nie demoten),
+    falls die Subs strenger sind.
+    """
+    def _maybe(v):
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return None
+        if f <= 0:
+            return None
+        return max(1.0, min(10.0, f))
+
+    vals = [v for v in (
+        _maybe(result.get("wind_safety_rating")),
+        _maybe(result.get("gust_safety_rating")),
+        _maybe(result.get("aloft_safety_rating")),
+        _maybe(result.get("foehn_safety_rating")),
+        _maybe(result.get("weather_safety_rating")),
+    ) if v is not None]
+
+    if not vals:
+        return None
+
+    m = min(vals)
+    if m <= 2:
+        return "not_safe"
+    if m <= 3:
+        return "conditional"
+    return "safe"
+
+
 def _compute_experience_score(rating_0_10) -> int:
     """Skaliert das bestehende 0-10 `rating` auf 0-100 `experience_score`.
 
@@ -776,7 +824,7 @@ _LABEL_KEYS_NO_GO = {
     "REGEN", "SCHNEE", "OVERCAST", "SICHT", "VEREISUNG", "EINGEKESSELT"
 }
 _LABEL_KEYS_CONDITIONAL = {
-    "STARKER_WIND", "WINDRICHTUNG", "TURBULENZ", "SHEAR_WIND",
+    "STARKER_WIND", "TURBULENZ", "SHEAR_WIND",
     "GUST_SPREAD", "KURZES_FENSTER", "TREND_SCHLECHTER"
 }
 _LABEL_KEYS_REDUCER = {
@@ -794,7 +842,7 @@ _NO_GO_RANK = [
     "REGEN", "SCHNEE", "OVERCAST", "SICHT", "VEREISUNG", "EINGEKESSELT"
 ]
 _CONDITIONAL_RANK = [
-    "STARKER_WIND", "WINDRICHTUNG", "TURBULENZ", "SHEAR_WIND",
+    "STARKER_WIND", "TURBULENZ", "SHEAR_WIND",
     "GUST_SPREAD", "KURZES_FENSTER", "TREND_SCHLECHTER"
 ]
 
@@ -813,7 +861,6 @@ _KEYWORD_TO_KEY_NO_GO = [
     (r'\beingekesselt|kein fenster|fenster fehlt', "EINGEKESSELT"),
 ]
 _KEYWORD_TO_KEY_CAUTION = [
-    (r'\bwindrichtung|wind.*falsch|grenzwert.*richtung', "WINDRICHTUNG"),
     (r'\b(scherung|shear)', "SHEAR_WIND"),
     (r'\bturbulenz|ruppig|rau(h)?', "TURBULENZ"),
     (r'\bb[oö]ig|gust.?spread|gust.?exzess', "GUST_SPREAD"),

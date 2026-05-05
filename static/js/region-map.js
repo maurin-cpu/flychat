@@ -603,13 +603,23 @@
     function renderRegionFeedbackBar(rid, dateStr, dayData) {
         var bar = document.getElementById('regionFeedbackBar');
         if (!bar || !rid) return;
+        // Widget anzeigen sobald die Region offen ist; nur bei echtem
+        // Backend-Error verstecken. 'no_data' oder fehlendes dayData darf
+        // das Widget NICHT verbergen — Pilot soll trotzdem Feedback geben
+        // können.
         var status = dayData && dayData.safety_status;
-        if (!status || status === 'error' || status === 'no_data') {
+        if (status === 'error') {
             bar.innerHTML = '';
             bar.style.display = 'none';
             return;
         }
-        bar.style.display = '';
+        var existing = bar.querySelector('[data-fb-mount]');
+        if (existing
+            && existing.getAttribute('data-fb-target') === rid
+            && existing.getAttribute('data-fb-date') === (dateStr || '')) {
+            bar.style.display = 'flex';
+            return;
+        }
         bar.innerHTML = '';
         var mount = document.createElement('div');
         mount.setAttribute('data-fb-mount', '');
@@ -617,6 +627,7 @@
         mount.setAttribute('data-fb-target', rid);
         if (dateStr) mount.setAttribute('data-fb-date', dateStr);
         bar.appendChild(mount);
+        bar.style.display = 'flex';
         if (window.Feedback && window.Feedback.scan) window.Feedback.scan(bar);
     }
 
@@ -638,8 +649,10 @@
         var asideClass = 'region-overlay-analysis meteogram-aside' + (isMobile ? ' collapsed' : '');
         var asideExpanded = isMobile ? 'false' : 'true';
 
-        var bodyHtml = '<div class="region-overlay-day-tabs" id="regionOverlayDayTabs"></div>';
+        var bodyHtml = '<div class="meteogram-tab-row region-overlay-tab-row">';
+        bodyHtml += '<div class="region-overlay-day-tabs" id="regionOverlayDayTabs"></div>';
         bodyHtml += '<div class="meteogram-feedback-bar" id="regionFeedbackBar"></div>';
+        bodyHtml += '</div>';
         bodyHtml += '<div class="region-overlay-content">';
         bodyHtml += '<div class="region-overlay-meteogram">';
         bodyHtml += '<div class="region-meteogram-chart" id="regionMeteogramChart"><div class="region-meteogram-loading">Meteogramm wird geladen...</div></div>';
@@ -820,6 +833,7 @@
             elevation: altData.elevation_m || 0,
             isRegion: true,
             thresholds: wxData.thresholds,
+            fitToContainer: true,
         });
 
         // Wetter-Zeitstempel unter dem Meteogramm
