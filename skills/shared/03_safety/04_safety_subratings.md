@@ -45,8 +45,7 @@ wind_safety_rating (1-10) — Bodenwind / Mittelwind
 
 Was bewertet wird: Mittelwind / Wind-Staerke am Startplatz waehrend der
 produktiven Stunden, inklusive Trend. **Anstroemrichtung NICHT bewerten** —
-Richtung ist Startbarkeit (Tagesfenster), nicht Sicherheit. Falscher Sektor
-macht den Tag nicht "gefaehrlich", nur nicht startbar.
+Richtung ist Startbarkeit (Tagesfenster), nicht Sicherheit. Falscher Sektor oder ein Winddreher (`[WIND-WRONG]`) ist KEIN Sicherheitsthema. Du DARFST eine Winddrehung in der Begruendung niemals als "Gefahr" oder "Hauptgefahr" bezeichnen und sie NIEMALS als Grund fuer `conditional` oder `not_safe` anfuehren.
 
 **Spot-Bemerkung lesen**: Default-Idealbereich ist {{cfg.WIND_IDEAL_MIN_KMH}}-{{cfg.WIND_IDEAL_MAX_KMH}} km/h fuer Thermik-Spots. Soaring-Spots wie z.B. Balderen brauchen einen MINDESTWIND (oft ab 15 km/h) — die Spot-Bemerkung im Prompt-Kontext nennt diese Anforderung explizit. Beruecksichtige sie aktiv.
 
@@ -172,7 +171,7 @@ beantwortet IMMER die zum Status passende Frage:
     den **begrenzenden Faktor** (das niedrigste Sub-Rating bzw. die
     Hazard-Kategorie aus `primary_caution`). NICHT das saubere Fenster, NICHT
     positive Aspekte des Tages. Den Tag NICHT als "sicher" oder "unauffaellig"
-    beschreiben.
+    beschreiben. Ein Winddreher / falscher Sektor darf HIER NIEMALS als begrenzender Faktor genannt werden (ist kein Sicherheitsthema, sondern ein reines Flyability-Thema).
     - VERBOTEN: "bedingt sicher, da es ein sauberes Fenster von 4 Stunden gibt"
       (begruendet warum man fliegen kann — nicht warum nicht `safe`).
     - PFLICHT: "bedingt sicher wegen kraeftiger Boeen 28-34 km/h ab 13 Uhr"

@@ -11,12 +11,12 @@ Jede Stunde hat **zwei unabhaengige Eigenschaften**:
 
 **Tagesfenster-Schicht** — siehe `_tagesfenster.md`. Der Datenblock enthaelt nur Stunden ab Tagesbeginn (erstes qualifizierendes Start-Fenster). Du bewertest Sicherheit nur **innerhalb** des aktiven Tages.
 
-**"Saubere Stunde"** = nicht UNFLIEGBAR (keine DANGER-Tags) UND bei Spots zusaetzlich `[WIND-OK]`. **"Sauberes Fenster"** = zusammenhaengende saubere Stunden im aktiven Tag.
+**"Saubere Stunde" (Sicherheits-Sicht)** = nicht UNFLIEGBAR (keine DANGER-Tags). `[WIND-WRONG]` oder die Windrichtung spielen hier absolut keine Rolle! **"Sauberes Fenster"** = zusammenhaengende saubere Stunden im aktiven Tag.
 
 **Regel `safe_window`:**
-- = das fliegbare Fenster (RUHIG + SPORTLICH zusammen).
+- = das fliegbare Fenster (RUHIG + SPORTLICH zusammen, unabhängig von der Windrichtung).
 - SPORTLICHE Stunden im Fenster MUESSEN in `caution_notes` mit Uhrzeit und Grund stehen (z.B. "GUST-WARN 13-16h: Boeen bis 38 km/h, sportlich").
-- UNFLIEGBARE Stunden gehoeren NIEMALS ins `safe_window`.
+- UNFLIEGBARE Stunden gehoeren NIEMALS ins `safe_window`. Ein falscher Windsektor (`[WIND-WRONG]`) ist jedoch KEINE Gefahr und unterbricht das `safe_window` NICHT.
 
 ═══════════════════════════════════════════════
 TREND-VOKABULAR (7 Muster)
@@ -120,26 +120,18 @@ BLOCK 2 — BODENWIND (Richtung & Staerke)
 **WIND-TREND-Pflicht (Boden + Hoehe summiert):**
 Bodenwind und Hoehenwind teilen sich denselben Trend, weil die Schwellen identisch sind. Die `WIND-TREND`-Zeile (siehe Block 4 fuer Pattern-Mapping) deckt beide Quellen gemeinsam ab. **Kein separater Bodenwind-Trend** — nutze ausschliesslich die WIND-TREND-Zeile fuer Status-Ableitungen bei Wind.
 
-**Start-Fenster-Regel (Spots, pflicht):**
-Ein Tag kann **mehrere saubere Start-Fenster** haben (System listet sie als `Saubere Start-Fenster: 08:00-11:00 (3h), 15:00-17:00 (2h)`). **Fuer den Tag-Status zaehlt das laengste Fenster** (= `Laengstes Fenster: Xh`). Kuerzere Fenster bleiben Start-Optionen, in `safe_window`/`caution_notes` mit Uhrzeit erwaehnen.
+**Sicherheits-Fenster-Regel (pflicht):**
+Ein Tag kann **mehrere sichere Flug-Fenster** haben (System listet sie im TAGESPROFIL). **Fuer den Tag-Status zaehlt das laengste Fenster** (= `Laengstes Fenster: Xh`). Kuerzere Fenster bleiben Flug-Optionen, in `safe_window`/`caution_notes` mit Uhrzeit erwaehnen.
 
 Schwellen (laengstes Fenster):
 - **≥ {{cfg.CLEAN_WINDOW_MIN_HOURS}}h** zusammenhaengend sauber → `safe`/`green` moeglich. `conditional` nur aus *anderen* Gruenden (Warnstunden, EINGEKESSELT, Foehn-WARN, Boeen-FLOOR), NIE wegen Fenstergroesse.
 - **< {{cfg.CLEAN_WINDOW_MIN_HOURS}}h** → `not_safe`.
 
-**Zusammenhaengend** = direkt aufeinanderfolgend. Zwei einzelne saubere Stunden mit DANGER-Stunde dazwischen = zwei getrennte 1h-Fenster, KEIN 2h-Fenster. (`[WIND-WRONG]`-Stunden im aktiven Tag sind Lande-Hinweis, kein Fensterbruch — siehe `_tagesfenster.md`.)
+**Zusammenhaengend** = direkt aufeinanderfolgend. Zwei einzelne saubere Stunden mit DANGER-Stunde dazwischen = zwei getrennte 1h-Fenster, KEIN 2h-Fenster. (`[WIND-WRONG]`-Stunden im aktiven Tag sind nur ein Lande-Hinweis, KEIN Fensterbruch! Sie zerschneiden das Sicherheitsfenster NICHT in zwei Teile und duerfen nicht als DANGER gewertet werden.)
 
 System liefert die Zahlen — **nicht selbst nachzaehlen**.
 
-**Richtungsdreher (Spots) — nur Anmerkung, KEIN Status-Downgrade:**
-Wenn Wind ≥ **{{cfg.WIND_DIRECTION_SWING_NOTE_DEG}}°** in einem Fenster ≤ **{{cfg.WIND_DIRECTION_SWING_WINDOW_H}} Stunden** dreht, erscheint im TAGESPROFIL `ANMERKUNG Richtungsdreher`:
-- Abrupt (1h): `Max Stunden-Wechsel X° um HH:00`
-- Drift: `Max Richtungsdreher X° zwischen HH:00 und HH:00 (Nh Drift)`
 
-- MUSS in `wind_summary` mit Uhrzeit/Zeitraum (z.B. "Wind dreht um 14:00 um 60° aus dem Sektor heraus"). NICHT in `caution_notes` — beschreibend, keine Sicherheits-Warnung.
-- KEIN Status-Downgrade, KEINE Tier-Aenderung. Status und `flyability_tier` unveraendert.
-- Bei ≥ 90° (Windumkehr) deutlichere Formulierung ("Windumkehr um HH:00").
-- Wenn System keine Anmerkung liefert: KEIN Richtungsdreher erwaehnen — auch nicht wenn dir Stunden-Zeilen auffaellig scheinen.
 
 ─────────────────────────────────
 BLOCK 3 — BOEEN (Boden + Hoehe)
