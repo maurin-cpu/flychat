@@ -37,6 +37,7 @@ from engine._common import (
     _compute_safety_rating,
     _compute_safety_score,
     _compute_rating_from_subratings,
+    derive_status_from_subs,
 )
 
 
@@ -913,6 +914,215 @@ class TestComputeRatingFromSubratings(unittest.TestCase):
             tier="gray", safety_status="not_safe", include_altitude=True
         )
         self.assertEqual(r, 0.0)
+
+
+# ════════════════════════════════════════════════════════════════════
+# DERIVE_STATUS_FROM_SUBS — Konsistenz-Bruecke LLM-Status ↔ Sub-Ratings
+# ════════════════════════════════════════════════════════════════════
+
+class TestDeriveStatusFromSubs(unittest.TestCase):
+    def _r(self, wind=10, gust=10, aloft=10, foehn=10, weather=10):
+        return {
+            "wind_safety_rating": wind,
+            "gust_safety_rating": gust,
+            "aloft_safety_rating": aloft,
+            "foehn_safety_rating": foehn,
+            "weather_safety_rating": weather,
+        }
+
+    def test_all_high_safe(self):
+        self.assertEqual(derive_status_from_subs(self._r()), "safe")
+
+    def test_min_4_still_safe(self):
+        # Schwelle: m >= 4 -> safe. Bei m == 4 noch safe.
+        self.assertEqual(derive_status_from_subs(self._r(wind=4)), "safe")
+
+    def test_min_3_conditional(self):
+        # m == 3 -> conditional (Skill-Anker: 3 = grenzwertig)
+        self.assertEqual(derive_status_from_subs(self._r(gust=3)), "conditional")
+
+    def test_min_2_not_safe(self):
+        # m <= 2 -> not_safe (akut gefaehrlich, vor Hard-Override)
+        self.assertEqual(derive_status_from_subs(self._r(weather=2)), "not_safe")
+
+    def test_min_1_not_safe(self):
+        self.assertEqual(derive_status_from_subs(self._r(foehn=1)), "not_safe")
+
+    def test_zero_excluded_other_subs_decide(self):
+        # gust=0 (z.B. Region ohne Gust-Daten) wird ignoriert, MIN ueber Rest.
+        self.assertEqual(derive_status_from_subs(self._r(gust=0)), "safe")
+
+    def test_zero_excluded_low_sub_still_wins(self):
+        self.assertEqual(
+            derive_status_from_subs(self._r(gust=0, aloft=2)),
+            "not_safe",
+        )
+
+    def test_all_zero_returns_none(self):
+        # Keine bewertbaren Subs -> None (Aufrufer ueberschreibt nichts).
+        r = self._r(wind=0, gust=0, aloft=0, foehn=0, weather=0)
+        self.assertIsNone(derive_status_from_subs(r))
+
+    def test_missing_subs_returns_none(self):
+        self.assertIsNone(derive_status_from_subs({}))
+
+    def test_partial_subs_works(self):
+        # Region: foehn fehlt, andere vorhanden — funktioniert trotzdem.
+        r = {
+            "wind_safety_rating": 8,
+            "aloft_safety_rating": 3,
+            "weather_safety_rating": 9,
+        }
+        self.assertEqual(derive_status_from_subs(r), "conditional")
+
+    def test_non_numeric_treated_as_missing(self):
+        r = self._r(wind="abc", gust=4)
+        # wind invalid -> ausgeschlossen, gust=4 -> safe
+        self.assertEqual(derive_status_from_subs(r), "safe")
+
+    def test_value_clamped_above_10(self):
+        # Werte ueber 10 werden geklemmt, MIN bleibt min der anderen.
+        self.assertEqual(derive_status_from_subs(self._r(wind=15)), "safe")
+
+    # Monte-Lema-Reproduzent (User-Bug 2026-05-05):
+    # LLM gab status=safe + summary "sicher", aber wind_safety=3 wegen falscher
+    # Richtung. Erwartetes Verhalten: derived = "conditional" -> Engine eskaliert.
+    def test_monte_lema_drift_pattern(self):
+        r = self._r(wind=3, gust=8, aloft=8, foehn=10, weather=9)
+        self.assertEqual(derive_status_from_subs(r), "conditional")
+
+
+class TestValidateLlmTags(unittest.TestCase):
+    """Tests fuer validate_llm_tags — Hybrid v5 (siehe docs/TAGS.md)."""
+
+    def test_accepts_whitelist_topic(self):
+        from engine.decision_engine import validate_llm_tags
+        result = {"peak_climb_rate": 2.0, "avg_low_mid": 30}
+        out = validate_llm_tags(
+            [{"topic": "THERMAL", "severity": "good", "label": "Thermik", "value": "peak 2.0 m/s"}],
+            result,
+        )
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["topic"], "THERMAL")
+
+    def test_drops_topic_not_in_whitelist(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags([{"topic": "WIND_GROUND", "severity": "warn"}], {})
+        self.assertEqual(out, [])
+
+    def test_drops_stop_severity(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "THERMAL", "severity": "stop", "label": "Thermik"}],
+            {"peak_climb_rate": 2.0},
+        )
+        self.assertEqual(out, [])
+
+    def test_drops_invalid_severity(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags([{"topic": "CLOUDS", "severity": "danger"}], {})
+        self.assertEqual(out, [])
+
+    def test_drops_thermal_good_with_low_peak(self):
+        """Sanity: LLM darf nicht THERMAL=good behaupten wenn peak < 1.0."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "THERMAL", "severity": "good", "label": "Thermik"}],
+            {"peak_climb_rate": 0.5},
+        )
+        self.assertEqual(out, [])
+
+    def test_keeps_thermal_warn_with_low_peak(self):
+        """warn ist erlaubt — schwache Thermik darf als Warnung markiert werden."""
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "THERMAL", "severity": "warn", "label": "Thermik"}],
+            {"peak_climb_rate": 0.5},
+        )
+        self.assertEqual(len(out), 1)
+
+    def test_drops_clouds_good_with_high_low_mid(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [{"topic": "CLOUDS", "severity": "good", "label": "Bewoelkung"}],
+            {"avg_low_mid": 80},
+        )
+        self.assertEqual(out, [])
+
+    def test_dedupe_topic_first_wins(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [
+                {"topic": "INVERSION", "severity": "warn", "label": "Inversion"},
+                {"topic": "INVERSION", "severity": "info", "label": "Inversion"},
+            ],
+            {},
+        )
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["severity"], "warn")
+
+    def test_handles_non_list(self):
+        from engine.decision_engine import validate_llm_tags
+        self.assertEqual(validate_llm_tags(None, {}), [])
+        self.assertEqual(validate_llm_tags("nope", {}), [])
+
+    def test_drops_non_dict_items(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            ["not a tag", {"topic": "BASE", "severity": "good"}],
+            {},
+        )
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["topic"], "BASE")
+
+    def test_accepts_new_llm_topics(self):
+        from engine.decision_engine import validate_llm_tags
+        out = validate_llm_tags(
+            [
+                {"topic": "INVERSION", "severity": "warn"},
+                {"topic": "BASE", "severity": "good"},
+                {"topic": "WINDOW", "severity": "info"},
+                {"topic": "SUNSHINE", "severity": "good"},
+                {"topic": "CONVERGENCE", "severity": "good"},
+            ],
+            {},
+        )
+        self.assertEqual(len(out), 5)
+
+
+class TestMergeTopicTags(unittest.TestCase):
+    """Tests fuer merge_topic_tags — Hybrid v5."""
+
+    def test_merges_disjoint(self):
+        from engine.decision_engine import merge_topic_tags
+        backend = [{"topic": "WIND_GROUND", "severity": "warn", "label": "Wind", "value": "", "time": ""}]
+        llm = [{"topic": "THERMAL", "severity": "good", "label": "Thermik", "value": "", "time": ""}]
+        out = merge_topic_tags(backend, llm)
+        self.assertEqual([t["topic"] for t in out], ["WIND_GROUND", "THERMAL"])
+
+    def test_dedupes_topic_max_severity_wins(self):
+        from engine.decision_engine import merge_topic_tags
+        backend = [{"topic": "FOEHN", "severity": "warn", "label": "Foehn", "value": "", "time": ""}]
+        llm = [{"topic": "FOEHN", "severity": "good", "label": "Foehn", "value": "", "time": ""}]
+        out = merge_topic_tags(backend, llm)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["severity"], "warn")
+
+    def test_orders_by_topic_order(self):
+        from engine.decision_engine import merge_topic_tags
+        out = merge_topic_tags(
+            [{"topic": "TURBULENCE", "severity": "info"}, {"topic": "WIND_GROUND", "severity": "warn"}],
+            [{"topic": "THERMAL", "severity": "good"}, {"topic": "FOEHN", "severity": "warn"}],
+        )
+        self.assertEqual(
+            [t["topic"] for t in out],
+            ["WIND_GROUND", "FOEHN", "THERMAL", "TURBULENCE"],
+        )
+
+    def test_handles_empty_inputs(self):
+        from engine.decision_engine import merge_topic_tags
+        self.assertEqual(merge_topic_tags([], []), [])
+        self.assertEqual(merge_topic_tags(None, None), [])
 
 
 if __name__ == "__main__":

@@ -48,6 +48,7 @@ from engine.decision_engine import (
     compute_safety_band, compute_comfort_index,
     compute_legacy_flyability_tier,
     build_start_window, build_topic_tags, build_region_topic_tags,
+    validate_llm_tags, merge_topic_tags,
 )
 from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
@@ -67,7 +68,7 @@ from engine._common import (
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _compute_rating_from_subratings,
     _compute_experience_score, _compute_experience_stars, _compute_experience_rating,
-    _compute_safety_rating, _compute_safety_score,
+    _compute_safety_rating, _compute_safety_score, derive_status_from_subs,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
     _LABEL_KEYS_NO_GO, _LABEL_KEYS_CONDITIONAL,
@@ -245,8 +246,7 @@ class AnalyzersMixin:
             "soaring_options": "",
             "bemerkung_check": "",
             "best_window": "keins",
-            "flyability_limits": [],
-            "highlights": [],
+            "llm_tags": [],
             "recommendation": "",
             "confidence": "high",
         }
@@ -659,12 +659,20 @@ class AnalyzersMixin:
         gust_info = self._ctx_gust_cache.get(label_key, {}) or {}
         tq = self._ctx_tq_cache.get(label_key, {}) or {}
 
+        # Hybrid v5: Backend-Tags + LLM-Tags (validated) mergen.
+        llm_tags_raw = result.get("llm_tags") or []
+        llm_tags_clean = validate_llm_tags(
+            llm_tags_raw, result, log_prefix=f"[{label_key}] ",
+        )
+
         if is_region:
-            result["tags"] = build_region_topic_tags(result, gust_info)
+            backend_tags = build_region_topic_tags(result, gust_info)
+            result["tags"] = merge_topic_tags(backend_tags, llm_tags_clean)
             # Regionen haben kein Spot-Startfenster (aggregiert ueber mehrere Spots)
             result["start_window"] = []
         else:
-            result["tags"] = build_topic_tags(result, gust_info, tq)
+            backend_tags = build_topic_tags(result, gust_info, tq)
+            result["tags"] = merge_topic_tags(backend_tags, llm_tags_clean)
             result["start_window"] = build_start_window(gust_info)
 
     @staticmethod
@@ -680,12 +688,9 @@ class AnalyzersMixin:
         result["xc_potential"] = ""
         result["xc_details"] = ""
         result["best_window"] = ""
-        result["flyability_limits"] = []
-        result["highlights"] = []
+        result["llm_tags"] = []
         result["recommendation"] = ""
         result["confidence"] = ""
-        result["primary_reducer"] = None
-        result["primary_booster"] = None
         result["thermal_rating"] = 1
         result["wind_rating"] = 1
         result["window_rating"] = 1
@@ -1833,6 +1838,9 @@ class AnalyzersMixin:
         # nachgelagerte Foehn-Strips/Backstops auf bereinigte Texte wirken.
         _sanitize_llm_result(result)
 
+        # Initialer LLM-Status fuer Drift-Telemetrie (vor allen Decisions).
+        llm_initial_status = result.get("safety_status")
+
         gust_info = self._ctx_gust_cache.get(f"{name}|{date_str}", {})
         if gust_info:
             result["wind_ok_count"] = gust_info.get("wind_ok_count", 0)
@@ -1847,7 +1855,8 @@ class AnalyzersMixin:
         # 5. OverclaimRelax (kann not_safe→conditional demoten)
         # 6. FlyabilityMechDanger (rough_pct>50 → conditional + tier=gray, cross-cutting)
         # 7. Foehn-Decision (autoritativ: foehn_risk + ggf. Status anheben)
-        # 8. IsConditional (deterministische Ableitung aus safety_status)
+        # 8. SubRatingFloor (NEU: status muss zu min(subs) passen, nur Eskalation)
+        # 9. IsConditional (deterministische Ableitung aus safety_status)
         decision_label = f"{name}/{date_str}"
         for fn in (
             decide_wind_ok_zero,
@@ -1872,9 +1881,14 @@ class AnalyzersMixin:
         # Foehn (eigene Cache-Quelle, daher separat)
         self._apply_foehn_decision(result, f"{name}|{date_str}", label=decision_label)
 
+        # SubRatingFloor — Konsistenz-Bruecke LLM-Subs ↔ LLM-Status. Wenn das LLM
+        # status=safe schreibt aber min(subs)<4, eskaliert hier auf conditional/not_safe.
+        # Nur Eskalation, niemals Demote (Hard-Overrides + OverclaimRelax behalten Vorrang).
+        self._apply_subs_status_floor(result, decision_label, llm_initial_status)
+
         # is_conditional deterministisch ableiten (A2: conditional/not_safe overriden,
         # safe laesst LLM-Soft-Warnungen wie tiefe Wolkenbasis durch). MUSS nach Foehn
-        # laufen, damit safety_status final ist.
+        # und SubRatingFloor laufen, damit safety_status final ist.
         tag = decide_is_conditional(result, decision_label)
         if tag:
             result.setdefault("_decisions_applied", []).append(tag)
@@ -2030,6 +2044,119 @@ class AnalyzersMixin:
 
         return result
 
+    def _apply_subs_status_floor(self, result: dict, label: str, llm_initial_status):
+        """Eskaliert `safety_status` auf das Niveau, das `min(safety-subs)` impliziert.
+
+        Konsistenz-Bruecke: das LLM darf nicht status=safe schreiben und gleichzeitig
+        ein Sub-Rating <4 vergeben. Nur Eskalation (safe→conditional→not_safe), nie
+        Demote — Hard-Overrides + OverclaimRelax bleiben autoritativ.
+
+        Schreibt Telemetrie-Feld `_status_telemetry` fuer KI-Konsistenz-Forschung
+        und triggert optional `_renarrate_on_drift_if_enabled` (Feature-Flag in
+        config.RENARRATE_ON_DRIFT) fuer Prosa-Korrektur.
+        """
+        derived = derive_status_from_subs(result)
+        current = result.get("safety_status")
+
+        severity = {"safe": 0, "conditional": 1, "not_safe": 2}
+        if (derived in severity and current in severity
+                and severity[derived] > severity[current]):
+            logger.info(
+                f"Decision SubRatingFloor fuer {label}: "
+                f"{current} → {derived} (min(subs) impliziert strengeren Status)"
+            )
+            result["safety_status"] = derived
+            result.setdefault("_decisions_applied", []).append(f"SubRatingFloor({derived})")
+
+        final_status = result.get("safety_status")
+        drift = llm_initial_status != final_status
+        result["_status_telemetry"] = {
+            "llm_initial": llm_initial_status,
+            "derived_from_subs": derived,
+            "final": final_status,
+            "drift": drift,
+        }
+
+        if drift:
+            self._renarrate_on_drift_if_enabled(result, label, llm_initial_status, final_status)
+
+    def _renarrate_on_drift_if_enabled(self, result: dict, label: str,
+                                        old_status, new_status):
+        """Optional: Schreibt summary + recommendation neu, wenn der Status
+        durch SubRatingFloor (oder andere Decisions) eskaliert wurde.
+
+        Kosten: ein zusaetzlicher API-Call pro Drift-Fall, kleiner Prompt
+        (~400 tok in / ~200 tok out). Modell-Override moeglich via
+        config.RENARRATE_MODEL (z.B. "gpt-4o-mini" fuer billigeren Call).
+
+        No-op wenn config.RENARRATE_ON_DRIFT=False (Default — Phase 1: nur
+        Telemetrie). Aktivierbar wenn Drift-Rate stabil und Phase 2 gewollt.
+        """
+        if not getattr(config, "RENARRATE_ON_DRIFT", False):
+            return
+        if not self.analysis_client:
+            return
+
+        model = getattr(config, "RENARRATE_MODEL", None) or self.analysis_model
+
+        subs = {
+            "wind": result.get("wind_safety_rating"),
+            "gust": result.get("gust_safety_rating"),
+            "aloft": result.get("aloft_safety_rating"),
+            "foehn": result.get("foehn_safety_rating"),
+            "weather": result.get("weather_safety_rating"),
+        }
+        old_summary = result.get("summary", "") or ""
+        old_reco = result.get("recommendation", "") or ""
+
+        # Niedrigstes Sub-Rating bestimmen — Hauptbegruendung der Korrektur.
+        valid_subs = {k: v for k, v in subs.items()
+                       if isinstance(v, (int, float)) and v >= 1}
+        min_field = min(valid_subs, key=valid_subs.get) if valid_subs else None
+        min_val = valid_subs.get(min_field) if min_field else None
+
+        sys_prompt = (
+            "Du formulierst summary und recommendation einer Paragliding-"
+            "Wetter-Analyse um, weil der Sicherheits-Status nachtraeglich "
+            "korrigiert wurde. Schreibe knapp (1-2 Saetze pro Feld), nutze "
+            "das niedrigste Sub-Rating als Hauptgrund. Antworte als JSON: "
+            '{"summary": "...", "recommendation": "..."}'
+        )
+        user_prompt = (
+            f"Tag: {label}\n"
+            f"Status NEU (autoritativ): {new_status}\n"
+            f"Status ALT (LLM-Initial): {old_status}\n"
+            f"Sub-Ratings: {subs}\n"
+            f"Niedrigstes Sub-Rating: {min_field}={min_val}\n\n"
+            f"Original-Texte (passten zum alten Status):\n"
+            f"summary: {old_summary!r}\n"
+            f"recommendation: {old_reco!r}\n\n"
+            f"Schreibe summary und recommendation neu, passend zum NEUEN Status."
+        )
+
+        try:
+            response = self.analysis_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.2,
+                max_tokens=_resolve_max_tokens(model, 400),
+                response_format={"type": "json_object"},
+            )
+            self._record_call_usage(response, "renarrate_drift")
+            raw = response.choices[0].message.content or "{}"
+            new_text = json.loads(raw)
+            if isinstance(new_text.get("summary"), str) and new_text["summary"].strip():
+                result["summary"] = new_text["summary"].strip()
+            if isinstance(new_text.get("recommendation"), str) and new_text["recommendation"].strip():
+                result["recommendation"] = new_text["recommendation"].strip()
+            result["_renarrated"] = True
+            logger.info(f"Re-narrate drift fuer {label}: {old_status}→{new_status}, model={model}")
+        except Exception as e:
+            logger.warning(f"Re-narrate drift fuer {label} fehlgeschlagen: {e} — alte Texte bleiben.")
+
     def _post_process_safety_region(self, result: dict, region: dict, date_str: str) -> dict:
         """Safety-only Post-Processing fuer eine Region (Decision-Pipe + Foehn-Strip)."""
         rname = region["region"]
@@ -2041,6 +2168,9 @@ class AnalyzersMixin:
         # Tag-Sanitierung VOR den Decisions (siehe _post_process_safety_spot).
         _sanitize_llm_result(result)
 
+        # Initialer LLM-Status fuer Drift-Telemetrie (vor allen Decisions).
+        llm_initial_status = result.get("safety_status")
+
         region_gust_info = self._ctx_gust_cache.get(f"{rname}|{date_str}", {})
         decision_label = f"{rname}/{date_str}"
 
@@ -2050,7 +2180,8 @@ class AnalyzersMixin:
         # 3. AloftConditional (nur bei status=safe → conditional)
         # 4. FlyabilityMechDanger (rough_pct>50 → conditional + tier=gray, cross-cutting)
         # 5. Foehn (autoritativ)
-        # 6. IsConditional (deterministische Ableitung)
+        # 6. SubRatingFloor (NEU: status muss zu min(subs) passen, nur Eskalation)
+        # 7. IsConditional (deterministische Ableitung)
         tag = decide_wind_strong_majority(result, decision_label)
         if tag:
             result.setdefault("_decisions_applied", []).append(tag)
@@ -2067,6 +2198,9 @@ class AnalyzersMixin:
 
         # Foehn (eigene Cache-Quelle)
         self._apply_foehn_decision(result, f"{rname}|{date_str}", label=decision_label)
+
+        # SubRatingFloor — Konsistenz-Bruecke LLM-Subs ↔ LLM-Status (siehe Spot-Variante).
+        self._apply_subs_status_floor(result, decision_label, llm_initial_status)
 
         # is_conditional deterministisch ableiten (A2-Logik, siehe decision_engine.decide_is_conditional)
         tag = decide_is_conditional(result, decision_label)

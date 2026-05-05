@@ -178,27 +178,6 @@ window.AnalysisView = (function () {
         return firstDot > 30 ? text.substring(0, firstDot + 1) : text.substring(0, 140);
     }
 
-    // ===== ALERT-LISTE bei not_safe (PFLICHT) =====
-    // Layer 3 darf bei rotem Hero NIE leer sein. Reihenfolge:
-    //   1) explizite no_go_reasons
-    //   2) gemappter noAnalysisReason
-    //   3) summary / safety_feedback als Klartext
-    //   4) error
-    //   5) generischer Fallback
-    function buildNoGoAlerts(a) {
-        var alerts = parseMaybeList(a.no_go_reasons);
-        if (alerts.length > 0) return alerts;
-
-        var key = a.noAnalysisReason || a.no_analysis_reason || '';
-        if (REASON_MAP[key]) return [REASON_MAP[key]];
-
-        var safety = a.safety || {};
-        var txt = a.summary || safety.summary || a.safety_feedback || a.error;
-        if (txt) return [txt];
-
-        return ['Grund nicht ermittelbar — Analyse erneut starten.'];
-    }
-
     // ===== HERO =====
     function renderHero(a, isEmpty) {
         if (isEmpty) {
@@ -247,24 +226,8 @@ window.AnalysisView = (function () {
         return html;
     }
 
-    // ===== BEST WINDOW =====
-    function renderWindow(a) {
-        var w = a.safe_window || a.best_window || '';
-        var clean = String(w || '').trim().toLowerCase();
-        var empty = !w || clean === 'keins' || clean === 'kein'
-                 || clean === '-' || clean === '–' || clean === '—' || clean === '?';
-        if (empty) return '';
-        return '<div class="mga-window">'
-             + '<div>'
-             + '<div class="mga-window-label">Bestes Fenster</div>'
-             + '<div class="mga-window-time">' + esc(w) + '</div>'
-             + '</div></div>';
-    }
-
-    // ===== V4 TAG-SYSTEM (siehe docs/TAGS.md) =====
-    // Wenn a.tags vorhanden ist, wird das neue System genutzt.
-    // Fallback: alte renderAlerts-Logik (caution_notes/no_go_reasons) — solange
-    // noch nicht alle Cache-Eintraege migriert sind.
+    // ===== V4/V5 TAG-SYSTEM (siehe docs/TAGS.md) =====
+    // Single source of truth: a.tags + a.start_window aus Backend (Hybrid v5).
 
     var TAG_SEVERITY_ORDER_V4 = ['stop', 'warn', 'good', 'info'];
     var TAG_SEVERITY_LABEL_V4 = { stop: 'STOP', warn: 'WARN', good: 'GOOD', info: 'Hinweis' };
@@ -370,14 +333,6 @@ window.AnalysisView = (function () {
         return groupsHtml;
     }
 
-    // Liefert true wenn der Cache-Eintrag das neue Schema hat.
-    function hasV4Tags(a) {
-        if (!a) return false;
-        if (Array.isArray(a.tags)) return true;
-        if (a.safety && Array.isArray(a.safety.tags)) return true;
-        return false;
-    }
-
     function getV4Tags(a) {
         if (!a) return [];
         if (Array.isArray(a.tags)) return a.tags;
@@ -390,68 +345,6 @@ window.AnalysisView = (function () {
         if (Array.isArray(a.start_window)) return a.start_window;
         if (a.safety && Array.isArray(a.safety.start_window)) return a.safety.start_window;
         return [];
-    }
-
-    // ===== ALERTS =====
-    function renderAlerts(a, mode) {
-        // mode: 'notsafe' | 'fliegbar'
-        var html = '';
-        var noGoReasons, cautionNotes, flyabilityLimits, highlightNotes;
-        var foehnRisk = (a.foehn_risk || '').toString().toLowerCase();
-
-        if (mode === 'notsafe') {
-            noGoReasons = buildNoGoAlerts(a);  // immer >= 1 Eintrag
-            cautionNotes = parseMaybeList(a.caution_notes);
-            flyabilityLimits = [];
-            highlightNotes = [];
-        } else {
-            noGoReasons = parseMaybeList(a.no_go_reasons);
-            cautionNotes = parseMaybeList(a.caution_notes);
-            flyabilityLimits = parseMaybeList(a.flyability_limits);
-            highlightNotes = parseMaybeList(a.highlights);
-        }
-
-        var hasFoehnInNotes = cautionNotes.concat(noGoReasons).some(function (t) {
-            var s = (t || '').toString().toLowerCase();
-            return s.indexOf('föhn') >= 0 || s.indexOf('foehn') >= 0;
-        });
-        var showFoehn = (foehnRisk && foehnRisk !== 'none') && !hasFoehnInNotes;
-
-        var any = noGoReasons.length || cautionNotes.length
-               || flyabilityLimits.length || highlightNotes.length || showFoehn;
-        if (!any) return '';
-
-        html += '<div class="mga-alerts">';
-        noGoReasons.forEach(function (r) {
-            html += '<div class="mga-alert nogo">'
-                  + '<div class="mga-alert-icon">✕</div>'
-                  + '<div>' + esc(r) + '</div></div>';
-        });
-        cautionNotes.forEach(function (n) {
-            html += '<div class="mga-alert caution">'
-                  + '<div class="mga-alert-icon">!</div>'
-                  + '<div>' + esc(n) + '</div></div>';
-        });
-        if (showFoehn) {
-            var label = foehnRisk === 'high' ? 'Föhn-Gefahr' : 'Föhn-Vorsicht';
-            var cls = foehnRisk === 'high' ? 'nogo' : 'caution';
-            var icon = foehnRisk === 'high' ? '✕' : '!';
-            html += '<div class="mga-alert ' + cls + '">'
-                  + '<div class="mga-alert-icon">' + icon + '</div>'
-                  + '<div>' + esc(label) + ' (foehn_risk: ' + esc(foehnRisk) + ')</div></div>';
-        }
-        flyabilityLimits.forEach(function (l) {
-            html += '<div class="mga-alert flyability">'
-                  + '<div class="mga-alert-icon">↓</div>'
-                  + '<div>' + esc(l) + '</div></div>';
-        });
-        highlightNotes.forEach(function (h) {
-            html += '<div class="mga-alert positive">'
-                  + '<div class="mga-alert-icon">✓</div>'
-                  + '<div>' + esc(h) + '</div></div>';
-        });
-        html += '</div>';
-        return html;
     }
 
     // ===== METRICS =====
@@ -592,8 +485,6 @@ window.AnalysisView = (function () {
             return;
         }
 
-        var useV4 = hasV4Tags(a);
-
         // State B: Not-safe (inklusive noAnalysis-Pfad)
         var notSafe = (safetyStatus === 'not_safe')
                    || (a.noAnalysis === true)
@@ -601,16 +492,8 @@ window.AnalysisView = (function () {
                    || (safetyStatus === 'error');
         if (notSafe) {
             var html = renderHero(a, false);
-            if (useV4) {
-                html += renderStartWindowV4(getV4StartWindow(a));
-                html += renderTagGroupsV4(getV4Tags(a));
-                // Bei not_safe: wenn keine V4-Tags vorliegen, Fallback auf alte Alerts
-                if (!getV4Tags(a).length) {
-                    html += renderAlerts(a, 'notsafe');
-                }
-            } else {
-                html += renderAlerts(a, 'notsafe');
-            }
+            html += renderStartWindowV4(getV4StartWindow(a));
+            html += renderTagGroupsV4(getV4Tags(a));
             html += renderFooter(dateStr);
             wrapper.innerHTML = html;
             container.appendChild(wrapper);
@@ -620,13 +503,8 @@ window.AnalysisView = (function () {
 
         // State C/D: conditional / safe
         var html2 = renderHero(a, false);
-        if (useV4) {
-            html2 += renderStartWindowV4(getV4StartWindow(a));
-            html2 += renderTagGroupsV4(getV4Tags(a));
-        } else {
-            html2 += renderWindow(a);
-            html2 += renderAlerts(a, 'fliegbar');
-        }
+        html2 += renderStartWindowV4(getV4StartWindow(a));
+        html2 += renderTagGroupsV4(getV4Tags(a));
         html2 += renderMetrics(a);
         html2 += renderInsights(a);
         html2 += renderFooter(dateStr);

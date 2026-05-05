@@ -779,6 +779,131 @@ def _make_tag(topic: str, severity: str, label: str, value: str = "", time: str 
     return {"topic": topic, "severity": severity, "label": label, "value": value, "time": time}
 
 
+# Topics, die das LLM produzieren darf (Hybrid v5 — siehe docs/TAGS.md).
+# Backend-Topics (WIND_GROUND, WIND_ALOFT, RAIN, THUNDERSTORM, FOEHN, TURBULENCE)
+# sind NICHT in dieser Whitelist — das LLM darf sie nicht ueberschreiben.
+LLM_TAG_TOPIC_WHITELIST = frozenset({
+    "CLOUDS", "THERMAL", "XC",
+    "INVERSION", "BASE", "WINDOW", "SUNSHINE", "CONVERGENCE",
+})
+
+# STOP ist Backend-Hoheit — Sicherheit ist nicht verhandelbar.
+LLM_TAG_SEVERITY_WHITELIST = frozenset({"warn", "good", "info"})
+
+
+def validate_llm_tags(llm_tags, result: dict, *, log_prefix: str = "") -> list:
+    """Filtert vom LLM produzierte Tags gegen Whitelist + Daten-Plausibilitaet.
+
+    Verworfen wird:
+    - Topic nicht in LLM_TAG_TOPIC_WHITELIST (Halluzination)
+    - Severity nicht in {warn, good, info} (STOP nur Backend)
+    - Falsches Schema (kein dict, kein topic/severity)
+    - Duplikat-Topic (erstes Vorkommen gewinnt; finaler Merge dedupliziert nochmal)
+    - Daten-Sanity:
+        * THERMAL good erfordert peak_climb_rate >= 1.0 m/s
+        * CLOUDS good erfordert avg_low_mid <= 60 %
+
+    Returns: bereinigte Liste (gleicher Schema wie build_topic_tags).
+    """
+    if not isinstance(llm_tags, list):
+        if llm_tags is not None:
+            logger.warning(
+                "%svalidate_llm_tags: llm_tags ist kein Array (%s) — verworfen",
+                log_prefix, type(llm_tags).__name__,
+            )
+        return []
+
+    peak_climb = result.get("peak_climb_rate")
+    avg_low_mid = result.get("avg_low_mid")
+    if avg_low_mid is None:
+        low = result.get("avg_cloud_low")
+        mid = result.get("avg_cloud_mid")
+        if isinstance(low, (int, float)) and isinstance(mid, (int, float)):
+            avg_low_mid = (low + mid) / 2
+
+    cleaned: list[dict] = []
+    seen_topics: set[str] = set()
+
+    for raw in llm_tags:
+        if not isinstance(raw, dict):
+            logger.info("%svalidate_llm_tags: drop — kein dict: %r", log_prefix, raw)
+            continue
+        topic = raw.get("topic")
+        severity = raw.get("severity")
+        label = raw.get("label") or topic or ""
+        value = raw.get("value") or ""
+        time = raw.get("time") or ""
+
+        if not isinstance(topic, str) or topic not in LLM_TAG_TOPIC_WHITELIST:
+            logger.info(
+                "%svalidate_llm_tags: drop — topic nicht in Whitelist: %r",
+                log_prefix, topic,
+            )
+            continue
+        if not isinstance(severity, str) or severity not in LLM_TAG_SEVERITY_WHITELIST:
+            logger.info(
+                "%svalidate_llm_tags: drop %s — severity ungueltig: %r",
+                log_prefix, topic, severity,
+            )
+            continue
+        if topic in seen_topics:
+            logger.info(
+                "%svalidate_llm_tags: drop %s — Duplikat (first wins)",
+                log_prefix, topic,
+            )
+            continue
+
+        # Daten-Sanity
+        if topic == "THERMAL" and severity == "good":
+            if not isinstance(peak_climb, (int, float)) or peak_climb < 1.0:
+                logger.info(
+                    "%svalidate_llm_tags: drop THERMAL good — peak_climb_rate=%s zu niedrig",
+                    log_prefix, peak_climb,
+                )
+                continue
+        if topic == "CLOUDS" and severity == "good":
+            if isinstance(avg_low_mid, (int, float)) and avg_low_mid > 60:
+                logger.info(
+                    "%svalidate_llm_tags: drop CLOUDS good — avg_low_mid=%s zu hoch",
+                    log_prefix, avg_low_mid,
+                )
+                continue
+
+        cleaned.append(_make_tag(topic, severity, str(label), str(value), str(time)))
+        seen_topics.add(topic)
+
+    return cleaned
+
+
+def merge_topic_tags(backend_tags: list, llm_tags: list) -> list:
+    """Mergt Backend- und LLM-Tags zu kanonischer Liste.
+
+    - Backend-Tags haben Vorrang bei Topic-Konflikt (sollte nicht passieren wenn
+      Whitelist sauber ist, aber als Belt-and-Suspenders).
+    - Pro Topic genau ein Tag mit hoechster Severity.
+    - Reihenfolge nach TAG_TOPIC_ORDER (siehe docs/TAGS.md).
+    """
+    sev_rank = {"stop": 0, "warn": 1, "good": 2, "info": 3}
+    by_topic: dict[str, dict] = {}
+    for t in (backend_tags or []) + (llm_tags or []):
+        if not isinstance(t, dict):
+            continue
+        topic = t.get("topic")
+        if not isinstance(topic, str):
+            continue
+        prev = by_topic.get(topic)
+        if prev is None or sev_rank.get(t.get("severity"), 9) < sev_rank.get(prev.get("severity"), 9):
+            by_topic[topic] = t
+    order = [
+        "WIND_GROUND", "WIND_ALOFT", "FOEHN", "RAIN", "THUNDERSTORM",
+        "CLOUDS", "THERMAL", "XC", "INVERSION", "BASE", "WINDOW",
+        "SUNSHINE", "CONVERGENCE", "TURBULENCE",
+    ]
+    return [by_topic[t] for t in order if t in by_topic] + [
+        by_topic[t] for t in by_topic if t not in order
+    ]
+
+
 def build_topic_tags(result: dict, gust_info: dict, tq: dict) -> list:
     """Baut die kanonische Tag-Liste fuer einen Spot/Tag.
 
@@ -878,37 +1003,9 @@ def build_topic_tags(result: dict, gust_info: dict, tq: dict) -> list:
             "THUNDERSTORM", "stop", "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
         ))
 
-    # ── CLOUDS ───────────────────────────────────────────────────────
-    avg_low_mid = result.get("avg_low_mid")
-    if avg_low_mid is None:
-        # Fallback: aus separaten Feldern, falls vorhanden
-        low = result.get("avg_cloud_low")
-        mid = result.get("avg_cloud_mid")
-        if isinstance(low, (int, float)) and isinstance(mid, (int, float)):
-            avg_low_mid = (low + mid) / 2
-    if isinstance(avg_low_mid, (int, float)):
-        if avg_low_mid >= 85:
-            tags.append(_make_tag(
-                "CLOUDS", "warn", "Bewoelkung", f"{int(avg_low_mid)}% tief+mittel", ""
-            ))
-        elif avg_low_mid <= 40:
-            tags.append(_make_tag(
-                "CLOUDS", "good", "Bewoelkung", f"{int(avg_low_mid)}% tief+mittel", ""
-            ))
-
-    # ── THERMAL (nur GOOD oder gar nichts) ───────────────────────────
-    peak = result.get("peak_climb_rate")
-    if isinstance(peak, (int, float)) and peak >= 1.5:
-        tags.append(_make_tag(
-            "THERMAL", "good", "Thermik", f"peak {peak:.1f} m/s", ""
-        ))
-
-    # ── XC (nur GOOD oder gar nichts) ────────────────────────────────
-    xc = (result.get("xc_potential") or "").lower()
-    if xc == "high":
-        tags.append(_make_tag("XC", "good", "XC", "hohes Potenzial", ""))
-    elif xc == "moderate":
-        tags.append(_make_tag("XC", "good", "XC", "Potenzial vorhanden", ""))
+    # ── CLOUDS / THERMAL / XC ────────────────────────────────────────
+    # Hybrid v5 (siehe docs/TAGS.md): Diese Topics liefert das LLM via
+    # `result["llm_tags"]` und werden im Merge-Schritt eingespeist.
 
     # ── TURBULENCE (nur INFO — Komfort, kein Sicherheitsthema) ───────
     rough_h = int(tq.get("rough_danger_h", 0) or 0)
@@ -985,11 +1082,6 @@ def build_region_topic_tags(result: dict, gust_info: dict) -> list:
             "THUNDERSTORM", "stop", "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
         ))
 
-    # XC (Region zeigt das oft sinnvoll an)
-    xc = (result.get("xc_potential") or "").lower()
-    if xc == "high":
-        tags.append(_make_tag("XC", "good", "XC", "hohes Potenzial", ""))
-    elif xc == "moderate":
-        tags.append(_make_tag("XC", "good", "XC", "Potenzial vorhanden", ""))
+    # XC liefert das LLM via result["llm_tags"] (Hybrid v5).
 
     return tags

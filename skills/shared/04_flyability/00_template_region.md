@@ -33,7 +33,7 @@ SELBST-CHECK VOR DER ANTWORT (PFLICHT)
 3. **PRODUKTIVE-THERMIK-Zahl prüfen**: Wenn `→ PRODUKTIVE-THERMIK: Nh` steht und N < 2 → `thermal_rating` MUSS 1–3, `window_rating` MUSS 1–4. N ≥ 4 → höhere Sub-Ratings möglich.
 4. **Region-Boeen-Verbot**: Regionen haben **keine** Boeen-Tags. Erwähne **niemals** Boeen.
 5. **Trend-Bezug Pflicht falls vorhanden**: Datenblock-Trends (Thermik-Verfall, Aufbau, Bewölkungszunahme, Wind-Verschlechterung in Flugschicht) im `recommendation` als Tagesverlauf in eigenen Worten erwähnen.
-6. **Keine Duplikate aus Safety**: `flyability_limits` darf KEINE Eintraege enthalten, die thematisch schon in `no_go_reasons` oder `caution_notes` (aus IMMUTABLE-Block) stehen — also keine Boeen, Hoehenwind, Foehn, CAPE/Ueberentwicklung, Regen, Gewitter, Wind-Richtungs-Drehungen. Diese werden vom UI bereits unter `!`/Rot angezeigt; eine zweite Zeile unter `↓` ist redundant. `flyability_limits` ist NUR fuer Flugqualitaets-Issues (schwache/zerrissene Thermik, tiefe Basis, kurzes produktives Fenster, viel Bewoelkung, Kalt/Feucht, Inversion, Scherungs-Qualitaet im Sinne von TQ — nicht im Sinne von Sicherheit). Im Zweifel: Eintrag weglassen statt umformulieren.
+6. **Keine Duplikate aus Safety in `llm_tags`**: `llm_tags` darf KEINE Topics enthalten, die das Backend deterministisch produziert: `WIND_GROUND`, `WIND_ALOFT`, `RAIN`, `THUNDERSTORM`, `FOEHN`. Du darfst NUR aus dieser Whitelist wählen: `CLOUDS`, `THERMAL`, `XC`, `INVERSION`, `BASE`, `WINDOW`, `SUNSHINE`, `CONVERGENCE`. Severity nur `warn`/`good`/`info` — STOP ist Backend-Hoheit. Im Zweifel: Tag weglassen statt halluzinieren — Backend verwirft Out-of-Whitelist-Tags ohnehin.
 
 ═══════════════════════════════════════════════
 JSON-ANTWORT (REGION FLYABILITY)
@@ -42,7 +42,7 @@ JSON-ANTWORT (REGION FLYABILITY)
 Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
 
 **Bei `safety_status = "not_safe"` (aus IMMUTABLE INPUT)**: Alle Felder auf Minimum:
-`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `best_window=""`, `flyability_limits=[]`, `highlights=[]`, `recommendation=""`, `confidence=""`, `primary_reducer=null`, `primary_booster=null`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `is_conditional=false`, `conditional_reason=""`.
+`fly_status=""`, `flight_type=""`, `flight_duration_estimate=""`, `thermal_quality=""`, `peak_climb_rate=0`, `xc_potential=""`, `xc_details=""`, `best_window=""`, `llm_tags=[]`, `recommendation=""`, `confidence=""`, `thermal_rating=1`, `wind_rating=1`, `window_rating=1`, `xc_rating=1`, `is_conditional=false`, `conditional_reason=""`.
 
 {
   "fly_status": "gray|green|violet",
@@ -53,12 +53,16 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
   "xc_potential": "high|moderate|low",
   "xc_details": "2-3 Saetze. Bei `low`/`moderate`: PFLICHT konkrete Begruendung aus Datenblock — was limitiert (Peak < X m/s, BLH zu tief, Hoehenwind, Bewoelkung, Scherung). Bei `high`: wovon profitiert (Region-Peak, ruhiger Hoehenwind, hohe Basis, lange produktive Phase).",
   "best_window": "Bestes Zeitfenster innerhalb des sicheren Fensters.",
-  "flyability_limits": ["max 3, Format: 'Kategorie: Kerninfo, Zeitbezug'. NUR Flugqualitaets-Issues (Thermik-Qualitaet, Basis, Bewoelkung, Inversion, kurzes Fenster, TQ-Mechanismen). KEINE Wiederholungen aus `caution_notes`/`no_go_reasons` (Hoehenwind, Foehn, CAPE, Regen, Wind-Richtung)."],
-  "highlights": ["max 3, Format: 'Kategorie: Kerninfo, Zeitbezug'. Positive Faktoren der Fliegbarkeit (starke Thermik, hohe Basis, lange produktive Phase, gute Einstrahlung, ruhiger Hoehenwind). Keine Wiederholungen mit `flyability_limits`."],
+  "llm_tags": [
+    "Strukturierte Tags fuer das Frontend (Hybrid-Tag-System v5 — siehe docs/TAGS.md). Genau ein Tag pro Topic, max ~5 Tags. Schema je Tag: {\"topic\": <ID>, \"severity\": \"warn|good|info\", \"label\": <kurzer DE-Text>, \"value\": <kurzer Wert>, \"time\": <Zeitfenster oder ''>}.",
+    "ERLAUBTE Topics (Whitelist): CLOUDS, THERMAL, XC, INVERSION, BASE, WINDOW, SUNSHINE, CONVERGENCE.",
+    "VERBOTEN sind alle Backend-Topics (WIND_GROUND, WIND_ALOFT, RAIN, THUNDERSTORM, FOEHN) und Severity 'stop'. Backend wirft solche Tags raus.",
+    "Sanity: THERMAL severity='good' nur wenn peak_climb_rate >= 1.0 m/s. CLOUDS 'good' nur wenn tief+mittel <= 60%. Sonst 'warn' oder 'info' nutzen.",
+    "Beispiel: [{\"topic\": \"THERMAL\", \"severity\": \"good\", \"label\": \"Thermik\", \"value\": \"peak 2.8 m/s\", \"time\": \"12-15 h\"}, {\"topic\": \"CLOUDS\", \"severity\": \"warn\", \"label\": \"Bewoelkung\", \"value\": \"bedeckt 80% Mittag\", \"time\": \"11-14 h\"}]",
+    "Im Zweifel WENIGER Tags. Topic weglassen wenn nichts Konkretes zu sagen ist."
+  ],
   "recommendation": "JSON-Key heisst 'recommendation' (technisches Legacy-Feld), Inhalt ist eine **Einschaetzung** — KEINE Empfehlung. 4-6 Saetze. Satz 1: Erwartung mit Kern-Begruendung (warum dieser Tier — aus Datenblock-Fakten). Satz 2-3: Was limitiert oder boostert die Fliegbarkeit, MIT Ursache aus Datenblock-Fakten (Peak-Wert, BLH, Bewoelkungs-%, TQ-Mechanismus). Satz 4: Tagesverlauf / Trend falls Datenblock zeigt (Verfall, Aufbau, Bewoelkungs-Zunahme) — PFLICHT wenn vorhanden, in eigenen Worten. Satz 5: bestes Zeitfenster konkret. Satz 6: ehrliche Erwartung — kein Schoenreden.\n\nFORMULIERUNG (Fliegbarkeit, anders als Safety):\n- Anders als bei der Sicherheits-Summary darfst du hier **aktiver formulieren, was wir denken** — z.B. 'unsere Einschaetzung deutet auf einen guten Flugtag', 'wir schaetzen den Tag als XC-tauglich ein', 'die Daten sprechen fuer einen starken Thermiktag', 'rechnen mit langer produktiver Phase'.\n- ABER weiterhin **keine Aufforderungen / Handlungsempfehlungen**: NICHT 'nutze das Fenster', 'plane deinen Tag', 'geh fliegen', 'lohnt sich definitiv', 'Pflichtprogramm', 'unbedingt fliegen'.\n- Vermeide das Wort 'empfehlen' / 'Empfehlung' — nutze 'einschaetzen' / 'Einschaetzung' / 'wir schaetzen ein'.\n- Beispiel gut: 'Unsere Einschaetzung: ein starker Thermiktag mit langer produktiver Phase und stabiler Basis.'\n- Beispiel schlecht: 'Plane einen XC-Tag — nutze das Fenster zwischen 12 und 16 Uhr.' (Aufforderung)",
   "confidence": "high|medium|low",
-  "primary_reducer": "Optional: EINER der Keys oder null: VIEL_BEWOELKUNG, SCHWACHE_THERMIK, TIEFE_BASIS, KURZES_FLUGFENSTER, KALT, FEUCHT, INVERSION.",
-  "primary_booster": "Optional: EINER der Keys oder null: XC_BEDINGUNGEN, STARKE_THERMIK, HOHE_BASIS, GUTE_EINSTRAHLUNG, RUECKENWIND_XC, STABILE_KALTFRONT, LANGES_FENSTER, KONVERGENZ.",
   "thermal_rating": 0,
   "wind_rating": 0,
   "window_rating": 0,

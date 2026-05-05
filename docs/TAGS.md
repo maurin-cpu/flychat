@@ -13,7 +13,7 @@ deterministisch aus den Cache-Daten abgeleitet werden, und wie das
 > - Frontend-Renderer `briefing.js:renderSpotLabels` muss die gleichen
 >   `topic`/`severity`-Werte erkennen.
 
-Letzte Aktualisierung: 2026-05-04 (initial)
+Letzte Aktualisierung: 2026-05-05 (Tag-Quellen Backend/LLM-Aufteilung dokumentiert)
 
 ---
 
@@ -77,6 +77,116 @@ Pro Severity-Block werden die Topics in dieser Reihenfolge gerendert:
 
 So sehen User die wichtigsten Topics oben (Wind/Boeen zuerst, dann Atmosphaere,
 dann Wetter, dann Komfort).
+
+---
+
+## Tag-Quellen — Backend vs LLM (geplant fuer v5)
+
+> **Status:** Architektur-Entscheidung 2026-05-05, **noch nicht implementiert**.
+> Aktuell (v4) baut das Backend **alle** Topics deterministisch aus Wetterdaten.
+> Diese Sektion beschreibt den Ziel-Zustand (Option C — Hybrid).
+
+### Designziel
+
+Harte Wetter-Fakten kommen vom **Backend** (deterministisch, nicht
+verhandelbar), weiche Bewertungen vom **LLM** (interpretiert mit Begruendung).
+Beide Quellen werden zu **einem** `tags[]`-Array gemerged — das Frontend
+unterscheidet die Quelle nicht.
+
+### Quellen-Verteilung der bestehenden Topics
+
+| Topic | Quelle | Begruendung |
+|---|---|---|
+| `WIND_GROUND` | **Backend** | harte Schwellen, keine Interpretation |
+| `WIND_ALOFT` | **Backend** | harte Schwellen |
+| `RAIN` | **Backend** | `rain_hours` zaehlen |
+| `THUNDERSTORM` | **Backend** | hours + CAPE |
+| `FOEHN` | **Backend** (aus Decision-Pipeline) | bereits hybrid mit ΔP-Logik |
+| `TURBULENCE` | **Backend** (aus `tq_ratio`) | deterministische Mechanik-Detection |
+| `CLOUDS` | **LLM** | Tagesverlauf interpretieren ("Cu am Morgen, spaeter Cs") |
+| `THERMAL` | **LLM** | "schwach aber nutzbar" vs "torn" — Interpretation |
+| `XC` | **LLM** | haengt von Hoehenwind-Richtung, Konvergenz-Linien, Wolkenstrasse ab |
+
+### Neue LLM-Topics (geplant)
+
+Aktuell in `flyability_limits` / `highlights` / `primary_reducer` /
+`primary_booster` versteckt — sollen eigene Topic-IDs werden:
+
+| Topic ID | Label | Wann | Severity-Range |
+|---|---|---|---|
+| `INVERSION` | "Inversion" | LLM erkennt blockierende oder limitierende Inversion | warn / info |
+| `BASE` | "Basis" | LLM bewertet Wolkenbasis (tief/hoch relativ zu Spot) | warn / good / info |
+| `WINDOW` | "Flugfenster" | LLM bewertet Fenster-Laenge / Nutzbarkeit | warn / good / info |
+| `SUNSHINE` | "Einstrahlung" | LLM bewertet Einstrahlungs-Qualitaet | good / info |
+| `CONVERGENCE` | "Konvergenz" | LLM erkennt Konvergenzlinien als XC-Booster | good |
+
+### LLM-Output-Schema (geplant)
+
+LLM produziert ein neues Feld `llm_tags` statt der heutigen Felder
+`flyability_limits` / `highlights` / `primary_reducer` / `primary_booster`:
+
+```json
+"llm_tags": [
+  {
+    "topic": "THERMAL",
+    "severity": "good",
+    "label": "Thermik",
+    "value": "peak 2.8 m/s, 12-15 h",
+    "time": "12-15 h"
+  },
+  {
+    "topic": "CLOUDS",
+    "severity": "warn",
+    "label": "Bewoelkung",
+    "value": "bedeckt 80% Mittag",
+    "time": "11-14 h"
+  }
+]
+```
+
+Backend-Merge-Logik:
+
+```
+final_tags = build_backend_topic_tags(...)        # WIND_*, RAIN, THUNDERSTORM, FOEHN, TURBULENCE
+           + result["llm_tags"]                   # CLOUDS, THERMAL, XC, INVERSION, BASE, WINDOW, SUNSHINE, CONVERGENCE
+final_tags = sort_by(severity, topic_order)
+final_tags = deduplicate_by_topic(keep highest severity)
+```
+
+### Severity-Hoheit
+
+- **STOP**: nur Backend. Sicherheit ist nicht verhandelbar — das LLM darf
+  keine STOP-Tags setzen.
+- **WARN / GOOD / INFO**: LLM darf setzen (interpretierte Bewertung).
+
+### Konflikt- und Sanity-Validierung
+
+Backend validiert LLM-Tags gegen Daten-Plausibilitaet:
+
+- LLM `THERMAL good` aber `peak_climb_rate < 1.5` m/s → Tag wird verworfen + geloggt
+- LLM `CLOUDS good` aber `avg_low_mid > 70` ueber Thermikstunden → verworfen
+- LLM-Topic nicht in Whitelist (`CLOUDS` / `THERMAL` / `XC` / `INVERSION` / `BASE` / `WINDOW` / `SUNSHINE` / `CONVERGENCE`) → verworfen
+- LLM setzt STOP → verworfen (Severity-Hoheit-Verletzung)
+
+### Was bleibt unveraendert
+
+- **Prosa-Felder** (`summary`, `wind_summary`, `safety_feedback`,
+  `recommendation`, `streckenflug_summary`) bleiben — sie liefern den
+  *Erklaerungs-Text* zu den Tags, gerendert in Hero-Rationale + Insights-Akkordeons.
+- **Foehn-Decision-Pipeline** (`apply_foehn_decision`) bleibt — `foehn_risk`
+  ist die Quelle fuer den FOEHN-Tag.
+- **`caution_notes` / `no_go_reasons`** bleiben als LLM-Prosa fuer Hero-Begruendung
+  (erster Satz wird als Rationale gezogen).
+
+### Migration in einem Schritt (geplant)
+
+1. Skill-Templates (`skills/shared/04_flyability/00_template_*.md`,
+   `skills/shared/03_safety/00_template_*.md`) auf `llm_tags` umstellen.
+2. `engine/analyzers.py:_finalize_tags` mergt Backend- + LLM-Tags.
+3. Sanity-Validator in `engine/decision_engine.py:validate_llm_tags()`.
+4. Legacy-Felder (`flyability_limits`, `highlights`, `primary_reducer`,
+   `primary_booster`) ersatzlos entfernen.
+5. Cache regenerieren.
 
 ---
 
@@ -269,5 +379,11 @@ User versteht intuitiv "lohnt sich nicht zum Steigen".
 
 ## Changelog
 
+- **2026-05-05** — Architektur-Entscheidung Option C (Hybrid v5) dokumentiert:
+  Backend liefert deterministische Topics (`WIND_GROUND`, `WIND_ALOFT`, `RAIN`,
+  `THUNDERSTORM`, `FOEHN`, `TURBULENCE`), LLM liefert interpretierte Topics
+  (`CLOUDS`, `THERMAL`, `XC`) plus geplante neue Topics (`INVERSION`, `BASE`,
+  `WINDOW`, `SUNSHINE`, `CONVERGENCE`) ueber neues Feld `llm_tags`. STOP nur
+  vom Backend. Noch nicht implementiert.
 - **2026-05-04** — Initial. V4 Tag-Konzept mit 5 Klassen (WINDOW + STOP + WARN
   + GOOD + INFO), Topic-Katalog, Window-Klassifikation aus `config.py`-Schwellen.
