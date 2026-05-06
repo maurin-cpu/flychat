@@ -12,6 +12,10 @@
     var meteogramCache = {};   // {region_id: {wxData, altData}}
     var spotAnalyses = null;   // lazy-loaded fuer Top-Spots-Liste pro Region
     var spotAnalysesPromise = null;
+    var spotRegionMap = null;  // {spotName: region_id} aus /api/spots-Properties.
+                               // Notwendig weil spot_analyses.json kein region_id-
+                               // Feld persistiert — Region-Zuordnung kommt aus
+                               // find_region_for_point (Backend liefert via GeoJSON).
     var regionActiveDate = {}; // {region_id: dateStr} — last selected day per region overlay
 
     // ResizeObserver-State: re-rendert das Meteogramm wenn sich die
@@ -127,16 +131,21 @@
     // 4 Farben rein nach safety_band — gleiche Hex-Werte wie Spot-Marker.
     // Rot + grau bekommen dashed border (Sperr-Visualisierung).
     function mapRegionStyle(band, _legacyQuality) {
-        // Eingang: safety_band (green/amber/red/no_data) — Single Source of Truth
-        // (RATING_CONCEPT v1.3 §3.1). Frueher wurde safety_status uebergeben und
-        // intern auf band gemappt — das umging Decision-Engine-Hard-Overrides
-        // und Sub-Rating-Score, sodass das Karten-Polygon gruen blieb obwohl
-        // safety_band='amber' war (z.B. low Sub-Rating, GustFloor, AloftConditional).
-        // Legacy-Toleranz: alte Aufrufer mit safety_status werden gemappt.
+        // Eingang: safety_band (green/amber/red/no_data/violet). violet ist der
+        // visuelle Premium-Marker fuer safe + rating>=8 — wird vom Aufrufer gesetzt.
         if (band === 'safe')             band = 'green';
         else if (band === 'conditional') band = 'amber';
         else if (band === 'not_safe')    band = 'red';
-        else if (band !== 'green' && band !== 'amber' && band !== 'red') band = 'no_data';
+        else if (band !== 'green' && band !== 'amber' && band !== 'red' && band !== 'violet') band = 'no_data';
+
+        if (band === 'violet') {
+            return {
+                fill: '#8b5cf6', fillOpacity: 0.42,
+                border: '#6d28d9', borderOpacity: 0.75,
+                labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
+                safetyLabel: 'Top'
+            };
+        }
 
         // Alle durchgezogen — User-Wunsch: konsistente Optik
         if (band === 'no_data') {
@@ -234,10 +243,11 @@
         var n = (typeof rating === 'number') ? Math.max(0, Math.min(10, rating)) : 0;
         // band kommt direkt vom Aufrufer (safety_band — Single Source of Truth).
         // Legacy-Toleranz fuer Aufrufer, die noch safety_status uebergeben.
+        // 'violet' ist Display-Band fuer safe + rating>=8.
         if (band === 'safe')             band = 'green';
         else if (band === 'conditional') band = 'amber';
         else if (band === 'not_safe')    band = 'red';
-        else if (band !== 'green' && band !== 'amber' && band !== 'red') band = 'no_data';
+        else if (band !== 'green' && band !== 'amber' && band !== 'red' && band !== 'violet') band = 'no_data';
 
         if (band === 'no_data') return null;
         var label;
@@ -252,9 +262,10 @@
         // Einheitliche Palette: weisse Glas-Pille + farbiger Ring + farbiger Text.
         // Bei red: gleicher Aufbau, nur roter Ring + rotes Kreuz drin.
         var palette = {
-            green: { ink: '#166534', ring: '#22c55e' },
-            amber: { ink: '#92400e', ring: '#f59e0b' },
-            red:   { ink: '#991b1b', ring: '#ef4444' }
+            green:  { ink: '#166534', ring: '#22c55e' },
+            amber:  { ink: '#92400e', ring: '#f59e0b' },
+            red:    { ink: '#991b1b', ring: '#ef4444' },
+            violet: { ink: '#5b21b6', ring: '#8b5cf6' }
         };
         var p = palette[band];
         // Runde Pille (Kreis). v1.4: zweistellige Zahl "10" bekommt kleinere Schrift.
@@ -430,15 +441,17 @@
             // bei Mismatch zwischen LLM-Aussage und Decision-Engine zu inkonsistenten
             // Karten-Polygonen fuehrte (gruen statt amber).
             var band = getSafetyBand(dayData);
-            var style = mapRegionStyle(band);
             var rating = getRating(dayData);
+            // Premium-Marker: safe + rating>=8 → violett (Display-Band).
+            if (band === 'green' && rating >= 8) band = 'violet';
+            var style = mapRegionStyle(band);
 
             // Polygon-Style nach §4.3: dashed bei red/no_data, solid bei green/amber.
-            // baseFillOpacity wird gespeichert fuer Hover-Effekt.
+            // baseFillOpacity wird gespeichert fuer Hover-Effekt. Linearer Dynamikbereich,
+            // moderat: Rating 1 ~0.135, Rating 5 ~0.375, Rating 10 = 0.65.
             var baseOpacity = style.fillOpacity;
             if (rating > 0 && (band === 'green' || band === 'amber' || band === 'violet')) {
-                // Intensitaet basierend auf Rating: z.B. Rating 1 -> sehr transparent, Rating 10 -> kraeftig
-                baseOpacity = 0.15 + (rating / 10) * 0.45;
+                baseOpacity = 0.10 + (rating / 10) * 0.55;
             }
             
             layer._baseFillOpacity = baseOpacity;
@@ -501,71 +514,131 @@
     }
 
     function loadSpotAnalysesLazy() {
-        if (spotAnalyses) return Promise.resolve(spotAnalyses);
+        if (spotAnalyses && spotRegionMap) return Promise.resolve(spotAnalyses);
         if (spotAnalysesPromise) return spotAnalysesPromise;
-        spotAnalysesPromise = fetch('/api/analyses')
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                spotAnalyses = data.spot_analyses || data || {};
-                return spotAnalyses;
-            })
-            .catch(function () { spotAnalysesPromise = null; return {}; });
+        // Parallel: Analysen + Spot-Properties (fuer name→region_id-Mapping).
+        spotAnalysesPromise = Promise.all([
+            fetch('/api/analyses').then(function (r) { return r.json(); }),
+            fetch('/api/spots').then(function (r) { return r.json(); })
+        ]).then(function (results) {
+            spotAnalyses = results[0].spot_analyses || results[0] || {};
+            var geo = results[1] || {};
+            var features = geo.features || [];
+            var map = {};
+            features.forEach(function (f) {
+                var p = (f && f.properties) || {};
+                if (p.name && p.region_id) map[p.name] = p.region_id;
+            });
+            spotRegionMap = map;
+            return spotAnalyses;
+        }).catch(function () {
+            spotAnalysesPromise = null;
+            return {};
+        });
         return spotAnalysesPromise;
     }
 
-    // Top-Spots-Liste fuer eine Region/Tag (RATING_CONCEPT v1.3 §4.3).
-    // Zeigt bis zu 5 Spots der Region (sortiert nach experience_score).
-    // Erfordert spotAnalyses geladen — sonst leerer String, wird per Re-Render
-    // ergaenzt sobald Daten da sind.
-    function buildTopSpotsHtml(rid, dateStr) {
+    // best_window kann ein Satz sein ("Das beste Zeitfenster ist von 10:00 bis
+    // 13:00 Uhr.") oder bereits kurz ("10-13"). Wir ziehen die ersten zwei
+    // Stundenzahlen als kompakten Range. Falls nichts findbar → ''.
+    function shortenWindow(s) {
+        if (!s) return '';
+        var str = String(s).trim();
+        if (!str || str.toLowerCase() === 'keins') return '';
+        // Bereits kompakt? (z.B. "10-13", "10–13")
+        var m = str.match(/^(\d{1,2})\s*[-–]\s*(\d{1,2})/);
+        if (m) return m[1] + '–' + m[2];
+        // Aus Satz extrahieren: erste zwei Stundenwerte.
+        var nums = str.match(/\b\d{1,2}(?=:\d{2}|\s*Uhr|\s*[-–])/g);
+        if (nums && nums.length >= 2) return nums[0] + '–' + nums[1];
+        return '';
+    }
+
+    // Spot-Strip: horizontale Pill-Reihe mit Rating-Zahl (0-10) je Spot der
+    // Region. Wird UNTER dem Meteogramm gerendert (nicht im Aside) — Pilot
+    // sieht ohne Aufklappen welche Spots heute gehen. Sortiert nach
+    // experience_rating desc. Klick = Deep-Link auf /?spot=<name>.
+    function buildSpotStripHtml(rid, dateStr) {
         if (!spotAnalyses || !rid || !dateStr) return '';
         var entries = [];
         for (var name in spotAnalyses) {
             var dayData = spotAnalyses[name] && spotAnalyses[name][dateStr];
             if (!dayData) continue;
-            if ((dayData.region_id || '') !== rid) continue;
-            var ss = dayData.safety_status;
-            if (ss === 'no_data' || ss === 'error') continue;
-            var stars = getStars(dayData);
+            // Region-Zuordnung aus /api/spots (siehe loadSpotAnalysesLazy).
+            // Fallback auf record.region_id falls Backend das doch liefert.
+            var spotRid = (spotRegionMap && spotRegionMap[name]) || dayData.region_id || '';
+            if (spotRid !== rid) continue;
+            // Status liegt entweder oben (legacy) oder unter safety.safety_status.
+            var ss = dayData.safety_status
+                || (dayData.safety && dayData.safety.safety_status)
+                || dayData.status;
+            if (ss === 'no_data' || ss === 'error' || ss === 'not_safe') continue;
+            var rating = getRating(dayData);
+            if (rating <= 0) continue;
             var band = getSafetyBand(dayData);
-            var score = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
             entries.push({
-                name: name, band: band, stars: stars,
-                score: score == null ? -1 : score,
-                rating: dayData.rating || 0,
-                window: dayData.best_window || ''
+                name: name,
+                band: band,
+                rating: rating,
+                window: shortenWindow(dayData.best_window)
             });
         }
-        if (!entries.length) return '';
-        entries.sort(function (a, b) {
-            if (b.score !== a.score) return b.score - a.score;
-            return b.rating - a.rating;
-        });
-        var top = entries.slice(0, 5);
-        var palette = {
-            green: { ink: '#166534', ring: '#22c55e' },
-            amber: { ink: '#92400e', ring: '#f59e0b' },
-            red:   { ink: '#991b1b', ring: '#ef4444' }
-        };
-        var html = '<div class="region-overlay-top-spots" style="margin:14px 12px 6px;">'
-            + '<div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">Top-Spots heute</div>';
-        top.forEach(function (e) {
-            var p = palette[e.band] || palette.green;
-            var label = (e.band === 'red') ? '\u2715' : (e.stars >= 1 ? String(e.stars) : '\u2013');
-            var scoreTxt = e.score >= 0 ? (e.score + '/100') : '';
-            html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f1f5f9;">'
-                + '<div style="flex-shrink:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;'
-                + 'background:rgba(255,255,255,0.95);border:1.5px solid ' + p.ring + ';border-radius:50%;'
-                + 'font-size:13px;font-weight:700;color:' + p.ink + ';line-height:1;font-variant-numeric:tabular-nums;">'
-                + label + '</div>'
-                + '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:#0f172a;'
-                + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(e.name) + '</div>'
-                + (e.window ? '<div style="font-size:11px;color:#64748b;font-variant-numeric:tabular-nums;">' + escHtml(e.window) + '</div>' : '')
-                + (scoreTxt ? '<div style="font-size:11px;color:' + p.ink + ';font-weight:700;font-variant-numeric:tabular-nums;">' + scoreTxt + '</div>' : '')
-                + '</div>';
+        if (!entries.length) {
+            // Diagnose: wieviele Records gabs ueberhaupt fuer diese Region am
+            // gewaehlten Tag? Wenn 0 → keine Daten. Wenn >0 → alle not_safe.
+            var totalForDay = 0;
+            for (var sn in spotAnalyses) {
+                var dd = spotAnalyses[sn] && spotAnalyses[sn][dateStr];
+                if (!dd) continue;
+                var srid = (spotRegionMap && spotRegionMap[sn]) || dd.region_id || '';
+                if (srid === rid) totalForDay++;
+            }
+            var msg = (totalForDay === 0)
+                ? 'Keine Spot-Daten an diesem Tag'
+                : 'Heute kein fliegbarer Spot in dieser Region';
+            return '<div class="region-spot-strip-empty">' + msg + '</div>';
+        }
+        entries.sort(function (a, b) { return b.rating - a.rating; });
+
+        var html = '<div class="region-spot-strip-header">'
+            + '<span class="region-spot-strip-title">Top-Spots</span>'
+            + '<span class="region-spot-strip-count">' + entries.length + ' fliegbar</span>'
+            + '</div>'
+            + '<div class="region-spot-strip-scroll" role="list">';
+        entries.forEach(function (e) {
+            var bandClass = 'is-' + (e.band || 'green');
+            html += '<button type="button" class="region-spot-pill ' + bandClass + '"'
+                + ' role="listitem"'
+                + ' data-spot-name="' + escHtml(e.name) + '"'
+                + ' aria-label="' + escHtml(e.name) + ', Bewertung ' + e.rating + ' von 10'
+                + (e.window ? ', Fenster ' + escHtml(e.window) : '') + '">'
+                + '<span class="region-spot-pill-rating">' + e.rating + '</span>'
+                + '<span class="region-spot-pill-name">' + escHtml(e.name) + '</span>'
+                + (e.window
+                    ? '<span class="region-spot-pill-window">' + escHtml(e.window) + '</span>'
+                    : '<span class="region-spot-pill-window">&nbsp;</span>')
+                + '</button>';
         });
         html += '</div>';
         return html;
+    }
+
+    function renderSpotStrip(rid, dateStr) {
+        var stripEl = document.getElementById('regionOverlaySpotStrip');
+        if (!stripEl) return;
+        if (!spotAnalyses) {
+            stripEl.innerHTML = '';
+            stripEl.style.display = 'none';
+            return;
+        }
+        var html = buildSpotStripHtml(rid, dateStr);
+        if (!html) {
+            stripEl.innerHTML = '';
+            stripEl.style.display = 'none';
+            return;
+        }
+        stripEl.innerHTML = html;
+        stripEl.style.display = '';
     }
 
 
@@ -584,30 +657,29 @@
         var analysisContainer = document.createElement('div');
         bodyEl.appendChild(analysisContainer);
         if (window.AnalysisView && window.AnalysisView.render) {
-            window.AnalysisView.render(analysisContainer, data, { dateStr: dateStr });
+            window.AnalysisView.render(analysisContainer, data, { dateStr: dateStr, isRegion: true });
         }
-
-        // Top-Spots-Block — nur sinnvoll wenn die Region fliegbar ist UND Spot-
-        // Daten geladen sind. Bei not_safe / no_data ueberspringen.
-        var ss = data.safety_status;
-        if (rid && dateStr && spotAnalyses && (ss === 'safe' || ss === 'conditional')) {
-            var topHtml = buildTopSpotsHtml(rid, dateStr);
-            if (topHtml) {
-                var sep = document.createElement('div');
-                sep.innerHTML = topHtml;
-                bodyEl.appendChild(sep);
-            }
-        }
+        // Top-Spots wandern aus dem Aside in den eigenen Strip unterhalb des
+        // Meteogramms (siehe renderSpotStrip / region-spot-strip).
     }
 
     function updateOverlayAnalysis(rid, dateStr) {
         var asideEl = document.querySelector('.region-overlay-analysis');
-        if (!asideEl) return;
-        var bodyEl = asideEl.querySelector('.meteogram-aside-body') || asideEl;
         var ra = regionAnalyses ? regionAnalyses[rid] : null;
         var dayData = ra ? ra[dateStr] : null;
-        renderRegionAnalysisInto(bodyEl, dayData, dateStr, rid);
+        if (asideEl) {
+            var bodyEl = asideEl.querySelector('.meteogram-aside-body') || asideEl;
+            renderRegionAnalysisInto(bodyEl, dayData, dateStr, rid);
+        }
         renderRegionFeedbackBar(rid, dateStr, dayData);
+        // Spot-Strip unter dem Meteogramm aktualisieren.
+        var ss = dayData && dayData.safety_status;
+        if (ss === 'safe' || ss === 'conditional') {
+            renderSpotStrip(rid, dateStr);
+        } else {
+            var stripEl = document.getElementById('regionOverlaySpotStrip');
+            if (stripEl) { stripEl.innerHTML = ''; stripEl.style.display = 'none'; }
+        }
     }
 
     function renderRegionFeedbackBar(rid, dateStr, dayData) {
@@ -662,11 +734,11 @@
 
         var bodyHtml = '<div class="meteogram-tab-row region-overlay-tab-row">';
         bodyHtml += '<div class="region-overlay-day-tabs" id="regionOverlayDayTabs"></div>';
-        bodyHtml += '<div class="meteogram-feedback-bar" id="regionFeedbackBar"></div>';
         bodyHtml += '</div>';
         bodyHtml += '<div class="region-overlay-content">';
         bodyHtml += '<div class="region-overlay-meteogram">';
         bodyHtml += '<div class="region-meteogram-chart" id="regionMeteogramChart"><div class="region-meteogram-loading">Meteogramm wird geladen...</div></div>';
+        bodyHtml += '<div class="region-overlay-spot-strip" id="regionOverlaySpotStrip" style="display:none"></div>';
         bodyHtml += '</div>';
         bodyHtml += '<aside class="' + asideClass + '" id="regionAnalysisAside">';
         bodyHtml += '<div class="meteogram-aside-header">';
@@ -674,6 +746,7 @@
         bodyHtml += '<span class="meteogram-aside-cta">Tippen zum Aufklappen</span>';
         bodyHtml += '<button class="meteogram-aside-toggle" type="button" aria-label="Analyse ein-/ausblenden" aria-expanded="' + asideExpanded + '">&#x25BE;</button>';
         bodyHtml += '</div>';
+        bodyHtml += '<div class="meteogram-feedback-bar" id="regionFeedbackBar"></div>';
         bodyHtml += '<div class="meteogram-aside-body"></div>';
         bodyHtml += '</aside>';
         bodyHtml += '</div>';
@@ -698,13 +771,27 @@
         var asideBody = asideEl ? asideEl.querySelector('.meteogram-aside-body') : null;
         renderRegionAnalysisInto(asideBody, a, initialDate, rid);
 
-        // Top-Spots-Liste lazy nachladen — danach Re-Render damit der Block erscheint.
+        // Top-Spots-Strip lazy nachladen — danach Re-Render des Strips.
         loadSpotAnalysesLazy().then(function () {
             if (overlayRid === rid && overlay && overlay.classList.contains('visible')) {
                 var d = regionActiveDate[rid] || currentDate || window.currentDate || a.date;
                 updateOverlayAnalysis(rid, d);
             }
         });
+
+        // Klick-Delegation auf den Spot-Strip — tippen auf eine Pill oeffnet
+        // den Spot via Deep-Link (existing /?spot=<name>-Pattern in map.js).
+        var stripEl = document.getElementById('regionOverlaySpotStrip');
+        if (stripEl && !stripEl.dataset.clickBound) {
+            stripEl.dataset.clickBound = '1';
+            stripEl.addEventListener('click', function (ev) {
+                var pill = ev.target.closest && ev.target.closest('.region-spot-pill');
+                if (!pill) return;
+                var name = pill.getAttribute('data-spot-name');
+                if (!name) return;
+                window.location.href = '/?spot=' + encodeURIComponent(name);
+            });
+        }
 
         // Render feedback bar above meteogram
         renderRegionFeedbackBar(rid, initialDate, a);

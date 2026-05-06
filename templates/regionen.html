@@ -340,6 +340,133 @@
         margin-bottom: 8px;
     }
 
+    /* ── Spot-Strip (Top-Spots-Pills unter dem Meteogramm) ──────────
+       Sitzt im .region-overlay-meteogram-Column UNTER dem Chart.
+       Sticky-bottom, damit der Strip auch bei scrollender Mobile-Spalte
+       sichtbar bleibt. Klick auf eine Pill = Deep-Link auf /?spot=<name>. */
+    .region-overlay-spot-strip {
+        flex: 0 0 auto;
+        position: sticky;
+        bottom: 0;
+        background: var(--color-bg-elevated, #fff);
+        border-top: 1px solid var(--color-border, #e5e7eb);
+        padding: 8px 4px 10px;
+        margin-top: 8px;
+        z-index: 5;
+    }
+    .region-spot-strip-header {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 0 4px 6px;
+    }
+    .region-spot-strip-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: #64748b;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+    .region-spot-strip-count {
+        font-size: 11px;
+        color: #94a3b8;
+        font-variant-numeric: tabular-nums;
+    }
+    .region-spot-strip-empty {
+        padding: 12px 4px;
+        font-size: 12px;
+        color: #94a3b8;
+        font-style: italic;
+        text-align: center;
+    }
+    .region-spot-strip-scroll {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        padding: 2px 4px 4px;
+    }
+    .region-spot-strip-scroll::-webkit-scrollbar { height: 6px; }
+    .region-spot-strip-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1; border-radius: 3px;
+    }
+    .region-spot-pill {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+        width: 96px;
+        height: 72px;
+        padding: 6px 8px;
+        background: #fff;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        cursor: pointer;
+        transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+        font: inherit;
+        color: inherit;
+        text-align: center;
+        line-height: 1.1;
+    }
+    .region-spot-pill:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    }
+    .region-spot-pill:active { transform: translateY(0); }
+    .region-spot-pill:focus-visible {
+        outline: 2px solid #0369a1;
+        outline-offset: 2px;
+    }
+    .region-spot-pill.is-green  { border-color: #22c55e; }
+    .region-spot-pill.is-amber  { border-color: #f59e0b; }
+    .region-spot-pill.is-red    { border-color: #ef4444; }
+    .region-spot-pill-rating {
+        font-size: 22px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        color: #0f172a;
+    }
+    .region-spot-pill.is-green .region-spot-pill-rating { color: #166534; }
+    .region-spot-pill.is-amber .region-spot-pill-rating { color: #92400e; }
+    .region-spot-pill.is-red   .region-spot-pill-rating { color: #991b1b; }
+    .region-spot-pill-name {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #0f172a;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .region-spot-pill-window {
+        font-size: 10.5px;
+        color: #64748b;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Mobile: kompaktere Pills, sticky-bottom hat hier den groessten Effekt
+       (Mobile-Spalte hat overflow-y:auto). */
+    @media (max-width: 639px) {
+        .region-overlay-spot-strip {
+            padding: 6px 2px 8px;
+            margin-top: 4px;
+        }
+        .region-spot-pill {
+            width: 84px;
+            height: 64px;
+        }
+        .region-spot-pill-rating { font-size: 20px; }
+        .region-spot-pill-name   { font-size: 11px; }
+        .region-spot-pill-window { font-size: 10px; }
+    }
+
     /* Mid-width: Aside schmaler, damit das Meteogramm mehr Spaltenbreite
        behaelt. Greift z.B. auf 1280-1440px Laptops. Viewport-basiert
        (Fallback fuer alle Browser) — Container-Query weiter unten ueberschreibt

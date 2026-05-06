@@ -384,7 +384,7 @@
 }
 
 .bf-filter-group--rating {
-  flex: 0 1 auto;
+  flex: 1 1 240px;
   min-width: 0;
 }
 
@@ -630,7 +630,7 @@
 /* Rating-Slider — gleicher Stil wie Account (intuitiver: Pill-Badge fuer Wert,
    immer sichtbarer Gradient-Fortschritt). HTML-Struktur unveraendert. */
 .bf-rating-filter {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 12px;
   padding: 0;
@@ -641,11 +641,16 @@
   box-sizing: border-box;
   flex: 1 1 220px;
   min-width: 0;
+  /* Bei langem Wert-Badge ("≥ 6 / 10 · Regionen und Spots") darf der Slider
+     auf eine zweite Zeile umbrechen, statt den Container zu sprengen. */
+  flex-wrap: wrap;
+  row-gap: 6px;
 }
 
 .bf-rating-value {
   display: inline-block;
   min-width: 60px;
+  max-width: 100%;
   padding: 4px 12px;
   background: var(--color-primary-light);
   color: var(--color-primary-vivid);
@@ -655,15 +660,18 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bf-rating-slider {
   -webkit-appearance: none;
   appearance: none;
-  flex: 1 1 auto;
+  flex: 1 1 140px;
   width: auto;
-  min-width: 120px;
+  min-width: 0;
   height: 6px;
   /* Gradient-Fill ueber CSS-Variable --fill (von briefing.js gesetzt) */
   background: linear-gradient(to right,
@@ -1117,22 +1125,70 @@
 
 /* ── Region Section ──────────────────────────────────────── */
 
+/* Bulk-Toggle: alle Regionen mit einem Klick auf-/zuklappen.
+   Diskreter Text-Button rechts, hoehere Touch-Hitfläche per Padding. */
+.bf-bulk-toggle-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 var(--space-3);
+}
+
+.bf-bulk-toggle {
+  appearance: none;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  min-height: 36px;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.bf-bulk-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.bf-bulk-toggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.bf-bulk-toggle-icon {
+  font-size: 14px;
+  line-height: 1;
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+}
+
 .bf-region {
   margin-bottom: var(--space-8);
 }
 
+/* Region-Header bewusst minimal (UI/UX-Pro-Max Prinzipien: visual-hierarchy via
+   Spacing/Typography statt Farbe; whitespace-balance — Region ist struktureller
+   Divider, Spots sind der Inhalt. Bewertung ausschliesslich auf Spot-Ebene). */
 .bf-region-head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-2) var(--space-3);
   margin-bottom: var(--space-3);
-  border-bottom: 2px solid var(--color-primary);
+  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  transition: background 150ms;
+  transition: background 150ms, border-color 150ms;
 }
 
 .bf-region-head:hover {
@@ -1284,23 +1340,44 @@
   background: linear-gradient(135deg, var(--color-fly-gray-bg) 0%, #faf8f4 100%);
 }
 
-/* RATING_CONCEPT v1.3 — Spot-Border per safety_band; Sterne ueber Glyph */
-.bf-spot.safety-green   { border-left-color: #22c55e; }
+/* RATING_CONCEPT v1.4 — Spot-Border + Hintergrund skalieren mit Rating.
+   --bf-rating-fill = rating/10 (linear, 0..1). Moderater Dynamikbereich.
+   Premium-Marker "violet" fuer safe + rating>=8: deutliches Lila statt Gruen. */
+.bf-spot {
+  --bf-rating-fill: 0;
+  /* Border-Breite 3-7 px — sichtbarer Sprung, aber nicht extrem. */
+  border-left-width: calc(3px + var(--bf-rating-fill) * 4px);
+}
+
+.bf-spot.safety-green {
+  border-left-color: rgba(34, 197, 94, calc(0.20 + var(--bf-rating-fill) * 0.80));
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, calc(var(--bf-rating-fill) * 0.30)) 0%,
+    rgba(34, 197, 94, calc(var(--bf-rating-fill) * 0.06)) 100%
+  );
+}
 .bf-spot.safety-amber {
-  border-left-color: #f59e0b;
-  background: linear-gradient(135deg, #fffbeb 0%, #fefce8 100%);
+  border-left-color: rgba(245, 158, 11, calc(0.20 + var(--bf-rating-fill) * 0.80));
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, calc(0.04 + var(--bf-rating-fill) * 0.30)) 0%,
+    rgba(254, 252, 232, calc(0.30 + var(--bf-rating-fill) * 0.30)) 100%
+  );
+}
+.bf-spot.safety-violet {
+  border-left-color: rgba(139, 92, 246, calc(0.30 + var(--bf-rating-fill) * 0.70));
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, calc(var(--bf-rating-fill) * 0.32)) 0%,
+    rgba(139, 92, 246, calc(var(--bf-rating-fill) * 0.08)) 100%
+  );
 }
 .bf-spot.safety-red {
   border-left-color: #ef4444;
   background: linear-gradient(135deg, #fef2f2 0%, #fff1f1 100%);
 }
 .bf-spot.safety-no_data { border-left-color: #9ca3af; }
-.bf-spot[data-stars="5"] {
-  background: linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%);
-}
-.bf-spot[data-stars="5"].safety-amber {
-  background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%);
-}
 
 /* Glyph in der Spot-Zeile — gleiche Anatomie wie Karte, nur kleiner */
 .bf-spot-glyph {
@@ -1666,77 +1743,159 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
 
 /* ─── Tag-System v4 — siehe docs/TAGS.md ───────────────────────── */
 
-/* WINDOW (Startfenster-Zeitleiste) */
+/* WINDOW (Startfenster-Zeitleiste) — Corporate Design:
+   - Karten-Pattern: weisse Surface, Soft Shadow, 12px Radius (passend zu .bf-spot)
+   - Safety-Tokens (--color-safety-*) statt raw Hex
+   - Lucide-SVG-Icons (currentColor) statt Unicode-Glyphs
+   - 8px-Spacing-System (--space-*) */
 .bf-window {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  margin-bottom: 10px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-3);
 }
 
-.bf-window-header {
+.bf-window-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.bf-window-title {
+  font-size: var(--text-xs);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-muted);
-}
-
-.bf-window-icon { font-size: 13px; }
-
-.bf-window-cells {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(22px, 1fr);
-  gap: 2px;
-  align-items: stretch;
-}
-
-.bf-window-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 0;
-  border-radius: 3px;
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
-  line-height: 1.2;
-}
-
-.bf-window-cell-glyph { font-size: 12px; line-height: 1; margin-bottom: 1px; }
-.bf-window-cell-hour { font-size: 9px; opacity: 0.75; }
-
-.bf-window-cell--startbar {
-  background: #dcfce7;
-  color: #15803d;
-}
-.bf-window-cell--sportlich {
-  background: #fef3c7;
-  color: #92400e;
-}
-.bf-window-cell--blockiert {
-  background: #fee2e2;
-  color: #991b1b;
-  font-weight: 600;
-}
-.bf-window-cell--neutral {
-  background: #f3f4f6;
-  color: #9ca3af;
+  flex-shrink: 0;
 }
 
 .bf-window-summary {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-style: italic;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  min-width: 0;
 }
+
+.bf-window-summary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.bf-window-summary-icon svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.bf-window-summary--is-good { color: var(--color-safety-excellent-text); }
+.bf-window-summary--is-good .bf-window-summary-icon { background: var(--color-safety-excellent); }
+
+.bf-window-summary--is-warn { color: var(--color-safety-marginal-text); }
+.bf-window-summary--is-warn .bf-window-summary-icon { background: var(--color-safety-marginal); }
+
+.bf-window-summary--is-bad { color: var(--color-safety-critical-text); }
+.bf-window-summary--is-bad .bf-window-summary-icon { background: var(--color-safety-critical); }
+
+.bf-window-duration {
+  margin-left: var(--space-1);
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-light);
+  color: var(--color-primary-vivid);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Kontinuierliche Farbleiste: ein Segment pro Stunde, kein Gap, gerundete Enden,
+   subtle inset-shadow am Rand fuer "Track"-Wirkung. */
+.bf-window-bar {
+  display: flex;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--color-safety-unknown-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.bf-window-seg {
+  flex: 1 1 0;
+  min-width: 0;
+  transition: filter var(--transition-fast);
+}
+
+.bf-window-seg--startbar  { background: var(--color-safety-excellent); }
+.bf-window-seg--sportlich { background: var(--color-safety-marginal); }
+.bf-window-seg--blockiert { background: var(--color-safety-critical); }
+.bf-window-seg--neutral   { background: transparent; }
+
+.bf-window-seg:hover { filter: brightness(0.92); }
+
+/* Tick-Achse: gleicher Slot-Raster wie der Bar-Slots (1:1 Mapping) */
+.bf-window-axis {
+  display: flex;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+
+.bf-window-tick {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  position: relative;
+  padding-top: 6px;
+}
+
+.bf-window-tick--major::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 4px;
+  background: var(--color-border);
+  transform: translateX(-50%);
+}
+
+/* Sekundaere Info (Sportlich-Hinweis, falls auch Startbar vorhanden) */
+.bf-window-secondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-window-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.bf-window-dot--sportlich { background: var(--color-safety-marginal); }
 
 /* TAG GROUPS (STOP/WARN/GOOD/INFO) */
 .bf-tag-group {
@@ -1833,15 +1992,13 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
 .bf-tag-group--info .bf-tag-group-header { color: #475569; }
 .bf-tag-group--info .bf-tag-topic { color: #334155; }
 
-/* Mobile (≤480px): kompaktere Window-Cells und Tag-Rows */
+/* Mobile (≤480px): kompaktere Window-Visualisierung und Tag-Rows */
 @media (max-width: 480px) {
-  .bf-window-cells {
-    grid-auto-columns: minmax(18px, 1fr);
-    gap: 1px;
-  }
-  .bf-window-cell { padding: 3px 0; }
-  .bf-window-cell-hour { font-size: 8px; }
-  .bf-window-cell-glyph { font-size: 11px; }
+  .bf-window { padding: var(--space-3); gap: var(--space-2); }
+  .bf-window-bar { height: 14px; }
+  .bf-window-summary { font-size: var(--text-base); }
+  .bf-window-summary-icon { width: 20px; height: 20px; }
+  .bf-window-summary-icon svg { width: 12px; height: 12px; }
   .bf-tag-row {
     grid-template-columns: 90px 1fr auto;
     gap: 8px;

@@ -3,24 +3,23 @@ SAFETY-SUB-RATINGS (5 Einzelbewertungen, 1-10)
 ═══════════════════════════════════════════════
 
 Analog zu den Fliegbarkeits-Sub-Ratings vergibst du auch fuer die **Sicherheit**
-Einzel-Ratings — fuenf an der Zahl: Wind, Boeen, Hoehenwind, Foehn, Wetter
-(Niederschlag/Gewitter/CAPE/Sicht).
+Einzel-Ratings — acht an der Zahl: Wind, Boeen, Hoehenwind, Foehn,
+Niederschlag, Gewitter, Konvektion, Sicht.
 
 Das System aggregiert nach dem **Weakest-Link-Prinzip** — der **niedrigste**
-der 5 Werte bestimmt den Safety-Score (0-100). Sicherheit ist asymmetrisch:
+der 8 Werte bestimmt den Safety-Score (0-100). Sicherheit ist asymmetrisch:
 ein perfekter Wind kompensiert kein Gewitter-Risiko. Ein einzelner kritischer
 Aspekt darf nicht durch gute Bewertungen anderer Aspekte verdeckt werden.
 
-Formal: `safety_rating = min(wind, gust, aloft, foehn, weather)`, dann
-`safety_score = safety_rating × 10`. Kombiniert wird das mit den Decision-
-Engine-Hard-Overrides (FoehnDanger, AloftNotSafe, GustFloor, WindOk0, RAIN-
-WARN, THUNDERSTORM, CAPE-DANGER, OVERCAST-DANGER usw.).
+Formal: `safety_rating = min(wind, gust, aloft, foehn, rain, thunderstorm, cape, visibility)`,
+dann `safety_score = safety_rating × 10`.
 
-**Wichtig — Override-Architektur:**
-Die Decision-Engine ueberschreibt den Score in harten Faellen deterministisch
-(z.B. THUNDERSTORM → automatisch `safety_status=not_safe`). Du beurteilst NUR
-den **Gradient zwischen safe und gefaehrlich** — die eindeutigen No-Go-Faelle
-faengt der Override.
+**Override-Architektur:**
+Foehn (`foehn_risk=danger`) und Hoehenwind (`ALOFT-NOT-SAFE`) werden von der
+Decision-Engine deterministisch ueberschrieben. Alle anderen Hazards —
+insbesondere Niederschlag, Gewitter, CAPE und Sicht — bewertest du selbst.
+SubRatingFloor konvertiert automatisch: rating <= 2 → `not_safe`,
+rating <= 3 → `conditional`.
 
 **Trend einrechnen — PFLICHT:**
 Jedes Sub-Rating ist **vorausschauend**. Bewerte den schlechtesten plausiblen
@@ -28,10 +27,10 @@ Zustand waehrend der produktiven Stunden inklusive Trend. Ein Tag mit anfangs
 ruhigem Wind, der ab 14h auf 35 km/h zunimmt, bekommt ein niedrigeres Rating
 als ein Tag mit konstant 18 km/h — auch wenn der Snapshot um 11h gleich
 aussieht. Trend-Vokabular (zunehmend / Aufklaerung / eingekesselt / stabil)
-gehoert wie heute in `wind_summary` und `summary` als Prose.
+gehoert in `wind_summary` und `summary` als Prosa.
 
 **Skala 1-10 — drei Anker, der Rest ist deine Interpretation:**
-- **1** = akut gefaehrlich (vor dem Hard-Override-Schwellenwert)
+- **1** = akut gefaehrlich
 - **5** = grenzwertig, spuerbares Risiko
 - **10** = unauffaellig, alles klar
 
@@ -45,7 +44,9 @@ wind_safety_rating (1-10) — Bodenwind / Mittelwind
 
 Was bewertet wird: Mittelwind / Wind-Staerke am Startplatz waehrend der
 produktiven Stunden, inklusive Trend. **Anstroemrichtung NICHT bewerten** —
-Richtung ist Startbarkeit (Tagesfenster), nicht Sicherheit. Falscher Sektor oder ein Winddreher (`[WIND-WRONG]`) ist KEIN Sicherheitsthema. Du DARFST eine Winddrehung in der Begruendung niemals als "Gefahr" oder "Hauptgefahr" bezeichnen und sie NIEMALS als Grund fuer `conditional` oder `not_safe` anfuehren.
+Richtung ist Startbarkeit (Tagesfenster), nicht Sicherheit. Falscher Sektor
+oder ein Winddreher ist KEIN Sicherheitsthema und darf nie als Grund fuer
+`conditional` oder `not_safe` angefuehrt werden.
 
 **Spot-Bemerkung lesen**: Default-Idealbereich ist {{cfg.WIND_IDEAL_MIN_KMH}}-{{cfg.WIND_IDEAL_MAX_KMH}} km/h fuer Thermik-Spots. Soaring-Spots wie z.B. Balderen brauchen einen MINDESTWIND (oft ab 15 km/h) — die Spot-Bemerkung im Prompt-Kontext nennt diese Anforderung explizit. Beruecksichtige sie aktiv.
 
@@ -88,9 +89,8 @@ Mittag durchbricht zaehlt anders als ein Foehn der schon am Vortag wieder
 abflaut.
 
 **Hinweis**: Bei `foehn_risk=danger` setzt die Decision-Engine automatisch
-`safety_status=not_safe` ueber den Hard-Override. Bei `foehn_risk=moderate`
-ist dein Rating wichtig — es unterscheidet "leicht moderat" von "schon fast
-danger".
+`safety_status=not_safe`. Bei `foehn_risk=moderate` ist dein Rating wichtig
+— es unterscheidet "leicht moderat" von "schon fast danger".
 
 Anker:
   1  — Akuter Foehn-Durchbruch (foehn_risk=high) oder klar bevorstehend
@@ -98,42 +98,77 @@ Anker:
   10 — Keine Foehn-Lage, kein Druckgefaelle, kein Trigger
 
 ─────────────────────────────────
-weather_safety_rating (1-10) — Niederschlag / Gewitter / CAPE / Sicht
+rain_safety_rating (1-10) — Niederschlag
 ─────────────────────────────────
 
-Was bewertet wird: alle "nicht-Wind"-Wetter-Hazards: Niederschlag, Gewitter,
-CAPE/Ueberentwicklung, Sicht beim Start/Landung. Trend eingerechnet — z.B.
-CAPE der ueber den Tag aufbaut zaehlt anders als stabile Bedingungen.
-
-**Wolken-Logik (wichtig)**: Bewoelkung ist NUR ein Sicherheits-Thema, wenn
-sie die **Sicht beim Start oder Landen beeintraechtigt** — d.h. wenn die
-**Wolken-Basis auf oder unter Startplatzhoehe** liegt (Cloud-Entry-Risiko,
-Pilot fliegt blind in Wolke / sieht den Startplatz nicht). Hohe oder
-mittlere Wolken weit ueber dem Spot sind hier IRRELEVANT — die gehoeren
-zur Fliegbarkeit (thermal_rating), nicht zur Sicherheit. Bodennebel oder
-sehr tiefe Stratusbasis ueber dem Spot ist klar problematisch.
-
-**Hinweis Hard-Overrides**: Bei `[THUNDERSTORM]`, `[RAIN-WARN]` als DANGER,
-`[CAPE-DANGER]` oder `[OVERCAST-DANGER]` greift die Decision-Engine
-automatisch und setzt `safety_status=not_safe`. Dein Rating bewertet die
-GRADIENT-Faelle zwischen "alles klar" und "akut gefaehrlich".
+Was bewertet wird: Niederschlag waehrend der Flugstunden. Zeitlicher Verlauf
+und Trend aus dem NIEDERSCHLAG-TREND-Block ablesen. Kein Engine-Override —
+du bewertest selbst. SubRatingFloor: rating <= 2 → not_safe, <= 3 → conditional.
 
 Anker:
-  1  — Vor Hard-Override-Schwelle: CAPE knapp unter DANGER, Wolken-Basis auf/unter Startplatzhoehe, Regen kurz vor RAIN-WARN
-  5  — CAPE-WARN vorhanden ODER kurze Schauer am Rand der produktiven Stunden ODER Wolken-Basis kommt nahe an Startplatzhoehe
-  10 — Keine Niederschlags-/Gewitter-Anzeichen, klare Sicht am Boden, kein CAPE-WARN
+  1  — Eingekesselt: Regen vor UND nach dem Trockenfenster — Regen kehrt
+       zurueck. Trockenfenster < 3h immer 1, Trockenfenster >= 4h → 1-2
+  5  — Spaetreegen: beginnt nach Fenstermitte, Pilot kann noch sicher landen
+       ODER Aufklaerung: Regen endet kurz vor Fensterbeginn
+  10 — Kein Niederschlag, trockener Tag
+
+─────────────────────────────────
+thunderstorm_safety_rating (1-10) — Gewitter
+─────────────────────────────────
+
+Was bewertet wird: Modell-Gewitterprognose im Tagesverlauf. Ablesen aus dem
+SICHERHEITS-VERLAUF. Ein Tag mit Gewitter erreicht hoechstens Rating 4 —
+Gewitter sind nie mit `safe` vereinbar.
+
+Anker:
+  1  — Gewitter aufbauend waehrend Fenster ODER innerhalb Fenster ODER
+       Eingekesselt (Gewitter kehrt zurueck)
+  4  — Nur Abend (deutlich nach Fenster, kein Aufbau-Trend erkennbar)
+       ODER Aufklaerung (Gewitter endet klar vor Fensterbeginn)
+  10 — Keine Gewitteranzeichen im Datenblock
+
+─────────────────────────────────
+cape_safety_rating (1-10) — Konvektionsenergie / Ueberentwicklung
+─────────────────────────────────
+
+Was bewertet wird: CAPE-Werte im Tagesverlauf. Schwellen: 800 J/kg =
+erhoehtes Potenzial, 1500 J/kg = extreme Instabilitaet.
+
+Anker:
+  1  — CAPE > 1500 J/kg aufbauend ODER waehrend Flugfenster aktiv
+  5  — CAPE 800-1500 J/kg mit aktivem Niederschlag (Ueberentwicklung)
+       ODER CAPE > 1500 J/kg mit Aufklaerung klar vor Fenster
+  10 — CAPE unter 800 J/kg, kein Konvektionspotenzial
+
+─────────────────────────────────
+visibility_safety_rating (1-10) — Sicht / Wolkenbasis
+─────────────────────────────────
+
+Was bewertet wird: Wolkenbasis auf oder unter Startplatzhoehe
+(Cloud-Entry-Risiko). Mittlere und hohe Wolken sind kein Sicherheitsthema —
+nur Basis auf/unter Startplatz gefaehrdet Sicht beim Start und Landen.
+
+Anker:
+  1  — Basis stabil auf/unter Startplatz ODER sinkend waehrend Fenster
+  5  — Basis hebt, Aufklaerung laeuft — Startfenster verzoegert sich
+  10 — Wolkenbasis klar ueber Startplatz, keine Sichteinschraenkung
 
 ─────────────────────────────────
 NUTZUNGS-REGELN
 ─────────────────────────────────
 
-**Pflicht**: Vergib alle 5 Safety-Sub-Ratings als ganze Zahlen 1-10.
+**Pflicht**: Vergib alle 8 Safety-Sub-Ratings als ganze Zahlen 1-10.
+
+**Hazard-Erwaehnung Pflicht**: Wenn Regen, Gewitter, CAPE oder Sichteinschraenkung im Datenblock vorkommt — egal ob es den Status beeinflussen oder nicht — MUSS die Prosa (`summary` oder `caution_notes`) diesen Hazard erwaehnen und das **Trend-Muster** benennen. Nutze das Trend-Vokabular direkt: "Aufklaerung", "Spaetreegen", "Eingekesselt", "nur Abend". Beispiele:
+- rain_safety_rating 6, Aufklaerung → "Morgendlicher Regen (08-09h) klaert bis 10h auf — Flugfenster ab 13h trocken."
+- thunderstorm_safety_rating 4, nur Abend → "Gewitterprognose erst ab 19h, deutlich nach Fensterabschluss — kein Einfluss."
+- cape_safety_rating 7, kein Aufbau → "CAPE unter 800 J/kg, kein Entwicklungspotenzial waehrend der Flugstunden."
+VERBOTEN: Hazard im Datenblock, in der Prosa aber komplett verschwiegen.
 
 **Bei `safety_status = not_safe`** (egal welcher Trigger — Wind, Foehn,
-Gewitter, Regen, CAPE, OVERCAST): alle 5 auf `1` setzen. Die Decision-Engine
-erzwingt dann ueber den Hard-Override-Pfad rot — der Score muss numerisch
-ebenfalls tief ausfallen, sonst sieht der User Widersprueche im UI ("alles
-rot, aber wind_safety=8/10").
+Gewitter, Regen, CAPE, OVERCAST): alle 5 auf `1` setzen. Der Score muss
+numerisch tief ausfallen, sonst entstehen Widersprueche im UI
+("alles rot, aber wind_safety=8/10").
 
 **Bei `safety_status = conditional`**: typischerweise mindestens ein Rating
 im Bereich 3-6, andere koennen im 7-8-Bereich liegen (z.B. Foehn-Vorsicht bei
@@ -147,9 +182,9 @@ KONSISTENZ-PFLICHT (HART)
 ─────────────────────────────────
 
 `safety_status`, die 5 Sub-Ratings UND der Prosa-Text (`summary`,
-`recommendation`) MUESSEN ein konsistentes Bild ergeben. Die Engine pruefte
-dies und korrigiert Verstoesse (`SubRatingFloor`-Decision) — Korrekturen
-werden in der Telemetrie sichtbar gemacht und gelten als Bug.
+`wind_summary`, `wind_shear`) MUESSEN ein konsistentes Bild ergeben. Die
+Engine pruefte dies und korrigiert Verstoesse (`SubRatingFloor`-Decision) —
+Korrekturen werden in der Telemetrie sichtbar gemacht und gelten als Bug.
 
 **Regel 1** — Sub-Ratings binden den Status:
   - Wenn `min(subs) <= 2`  → `safety_status` MUSS `not_safe` sein
@@ -157,41 +192,9 @@ werden in der Telemetrie sichtbar gemacht und gelten als Bug.
   - Bei `safety_status = safe` MUESSEN ALLE 5 Sub-Ratings >= 4 sein
 
 **Regel 2** — Prosa muss zum Status passen. Der **erste Satz** der Begruendung
-beantwortet IMMER die zum Status passende Frage:
-
-  - Bei `safety_status = not_safe` → Frage: *"Warum nicht sicher?"* → nenne die
-    **dominante Gefahr** (passt zu `primary_no_go`).
-    - VERBOTEN: "nicht sicher, da kein Fenster vorhanden" (Fenster-Abwesenheit
-      ist Symptom, nicht Ursache).
-    - PFLICHT: "nicht sicher wegen Foehn ΔP 8.4 hPa Sued" oder
-      "nicht sicher wegen Gewitter und CAPE 1900 J/kg ab 14 Uhr".
-    Keine Formulierungen, die Fluege empfehlen.
-
-  - Bei `safety_status = conditional` → Frage: *"Warum nicht safe?"* → nenne
-    den **begrenzenden Faktor** (das niedrigste Sub-Rating bzw. die
-    Hazard-Kategorie aus `primary_caution`). NICHT das saubere Fenster, NICHT
-    positive Aspekte des Tages. Den Tag NICHT als "sicher" oder "unauffaellig"
-    beschreiben. Ein Winddreher / falscher Sektor darf HIER NIEMALS als begrenzender Faktor genannt werden (ist kein Sicherheitsthema, sondern ein reines Flyability-Thema).
-    - VERBOTEN: "bedingt sicher, da es ein sauberes Fenster von 4 Stunden gibt"
-      (begruendet warum man fliegen kann — nicht warum nicht `safe`).
-    - PFLICHT: "bedingt sicher wegen kraeftiger Boeen 28-34 km/h ab 13 Uhr"
-      oder "bedingt sicher wegen Hoehenwind 42 km/h zwischen 13 und 16 Uhr".
-    Das Fenster darf erst spaeter im Text genannt werden.
-
-  - Bei `safety_status = safe` → Frage: *"Was macht den Tag gut zum Fliegen?"*
-    → beschreibe die **Bedingungen, die fuer einen angenehmen Flug sprechen**
-    in Pilotensprache, nicht als Safety-Audit. Zulaessig sind die Themen, die
-    die Safety-Stage kennt: Wind-Konstellation (Staerke, Richtung, Stabilitaet),
-    ruhige Hoehenstroemung, kein Foehn-Druck, klare Schichtung, sauberer
-    Tagesverlauf. NICHT Thermik/XC/Flyability-Ratings (das gehoert in den
-    Flyability-Schritt).
-    - VERBOTEN: "Tag wird als sicher eingestuft" (nichtssagend).
-    - VERBOTEN: "sicher, weil keine Probleme" (negativ statt konkret).
-    - VERBOTEN: "sicher, weil ΔP 1.8 hPa unter Foehn-Schwelle und
-      Wind-Histogramm leer" (Safety-Jargon, klingt nach Schwellen-Audit).
-    - PFLICHT: "Sauberer Westwind 8-12 km/h durchgehend, ruhige Hoehen-
-      stroemung max 22 km/h und kein Foehn-Druck — fliegerisch entspannte
-      Konstellation."
+folgt dem Begruendungs-Prinzip aus `03_status_derivation.md` (Abschnitt
+"Begruendungs-Prinzip fuer Satz 1"). Dort stehen die Status-Fragen, die
+verbotenen Begruendungs-Linien und je ein Beispiel zur Orientierung.
 
 **Konsequenz fuer dich**: Bevor du den Output finalisierst, lies deine
 Sub-Ratings. Falls eines <=3 ist, korrigiere `safety_status` UND die Prosa,

@@ -2052,7 +2052,6 @@ window.Meteogram = (function () {
             container.innerHTML = '<div class="mga-hero no_data">'
                 + '<div class="mga-hero-text">'
                 + '<div class="mga-hero-verdict no_data">Analyse-Ansicht nicht verfuegbar</div>'
-                + '<div class="mga-hero-rationale">analysis-view.js wurde nicht geladen.</div>'
                 + '</div></div>';
         }
     }

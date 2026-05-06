@@ -20,7 +20,8 @@ def repair(path):
         for date, e in days.items():
             if not isinstance(e, dict): continue
             subs = ['wind_safety_rating', 'gust_safety_rating', 'aloft_safety_rating',
-                    'foehn_safety_rating', 'weather_safety_rating']
+                    'foehn_safety_rating', 'rain_safety_rating', 'thunderstorm_safety_rating',
+                    'cape_safety_rating', 'visibility_safety_rating']
             # Fix #4: safety_rating aus Subs neu berechnen
             if all(e.get(f) is not None for f in subs):
                 old = e.get('safety_rating')

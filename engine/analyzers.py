@@ -83,6 +83,13 @@ from engine._common import (
 logger = logging.getLogger(__name__)
 
 
+class BatchStalledError(RuntimeError):
+    """OpenAI-Batch hat zu lange keinen Progress gemacht.
+    Triggert einmaligen Parallel-Fallback fuer den laufenden Run, ohne die
+    persistente Konfiguration (OPENAI_ANALYSIS_MODE) zu aendern."""
+    pass
+
+
 class AnalyzersMixin:
     def _build_and_analyze_spot(self, spot, date_str: str, region_result: dict = None) -> dict:
         """Worker-Wrapper: Split-Flow (Safety → Flyability) fuer einen Spot/Tag.
@@ -418,7 +425,9 @@ class AnalyzersMixin:
             result["safe_window"] = safety_result.get("safe_window", "")
             for f in ("wind_safety_rating", "gust_safety_rating",
                       "aloft_safety_rating", "foehn_safety_rating",
-                      "weather_safety_rating", "safety_rating", "safety_score",
+                      "rain_safety_rating", "thunderstorm_safety_rating",
+                      "cape_safety_rating", "visibility_safety_rating",
+                      "safety_rating", "safety_score",
                       "safety_band", "foehn_risk", "_decisions_applied",
                       "no_go_reasons", "caution_notes"):
                 v = safety_result.get(f)
@@ -566,7 +575,9 @@ class AnalyzersMixin:
             result["wind_strong_count"] = safety_result.get("wind_strong_count", 0)
             for f in ("wind_safety_rating", "gust_safety_rating",
                       "aloft_safety_rating", "foehn_safety_rating",
-                      "weather_safety_rating", "safety_rating", "safety_score",
+                      "rain_safety_rating", "thunderstorm_safety_rating",
+                      "cape_safety_rating", "visibility_safety_rating",
+                      "safety_rating", "safety_score",
                       "safety_band", "foehn_risk", "_decisions_applied",
                       "no_go_reasons", "caution_notes"):
                 v = safety_result.get(f)
@@ -629,9 +640,11 @@ class AnalyzersMixin:
             "safety_band", "safety_score", "safety_rating",
             "experience_score", "experience_stars", "experience_rating",
             "comfort_index",
-            # 5 Safety-Sub-Ratings (Vorab-Fix #4)
+            # 8 Safety-Sub-Ratings
             "wind_safety_rating", "gust_safety_rating",
-            "aloft_safety_rating", "foehn_safety_rating", "weather_safety_rating",
+            "aloft_safety_rating", "foehn_safety_rating",
+            "rain_safety_rating", "thunderstorm_safety_rating",
+            "cape_safety_rating", "visibility_safety_rating",
             # 4-5 Flyability-Sub-Ratings (Vorab-Fix #3 + v1.4 altitude)
             "thermal_rating", "window_rating", "wind_rating", "xc_rating",
             "altitude_rating",
@@ -1734,21 +1747,34 @@ class AnalyzersMixin:
         logger.info(f"Batch erstellt: {batch.id} ({description}), Status: {batch.status}")
         return batch.id
 
-    def _poll_batch(self, batch_id: str, poll_interval: int = None) -> tuple[dict, dict]:
+    def _poll_batch(self, batch_id: str, poll_interval: int = None,
+                    stall_timeout_s: int = None) -> tuple[dict, dict]:
         """Pollt Batch bis abgeschlossen.
 
         Returns: (results, usage_summary)
           results: {custom_id: parsed_json}
           usage_summary: {"calls": n, "in_tok": n, "out_tok": n, "cached_tok": n}
+
+        Wirft BatchStalledError, wenn der `completed`-Counter ueber
+        `stall_timeout_s` Sekunden nicht weiterwaechst — Batch wird dann
+        bei OpenAI gecancelt, damit der Aufrufer sauber auf Parallel-Modus
+        zurueckfallen kann.
         """
         if poll_interval is None:
             poll_interval = config.LLM_BATCH_POLL_INTERVAL
+        if stall_timeout_s is None:
+            stall_timeout_s = config.LLM_BATCH_STALL_TIMEOUT_S
+
+        last_completed = -1
+        last_progress_at = time.time()
 
         while True:
             batch = self.analysis_client.batches.retrieve(batch_id)
             status = batch.status
+            completed = batch.request_counts.completed
+            total = batch.request_counts.total
             logger.info(f"Batch {batch_id}: Status={status}, "
-                        f"completed={batch.request_counts.completed}/{batch.request_counts.total}, "
+                        f"completed={completed}/{total}, "
                         f"failed={batch.request_counts.failed}")
 
             if status == "completed":
@@ -1758,6 +1784,26 @@ class AnalyzersMixin:
                 if batch.errors and batch.errors.data:
                     error_msg += f", Fehler: {batch.errors.data[0].message}"
                 raise RuntimeError(error_msg)
+
+            # Stall-Detection: completed-Counter muss innerhalb stall_timeout_s waxen.
+            if completed > last_completed:
+                last_completed = completed
+                last_progress_at = time.time()
+            elif (time.time() - last_progress_at) > stall_timeout_s:
+                logger.error(
+                    f"Batch {batch_id} stalled: {completed}/{total} fuer "
+                    f"{stall_timeout_s/60:.0f} min ohne Progress — cancele und falle "
+                    f"auf Parallel-Modus zurueck"
+                )
+                try:
+                    self.analysis_client.batches.cancel(batch_id)
+                except Exception as cancel_err:
+                    logger.warning(f"Batch-Cancel fehlgeschlagen (ignoriert): {cancel_err}")
+                raise BatchStalledError(
+                    f"Batch {batch_id} stalled at {completed}/{total} after "
+                    f"{stall_timeout_s/60:.0f} min without progress"
+                )
+
             time.sleep(poll_interval)
 
         # Ergebnisse herunterladen und parsen
@@ -1980,7 +2026,8 @@ class AnalyzersMixin:
         # wenn vorhanden (Combined-Flow).
         _safety_subs = ("wind_safety_rating", "gust_safety_rating",
                         "aloft_safety_rating", "foehn_safety_rating",
-                        "weather_safety_rating")
+                        "rain_safety_rating", "thunderstorm_safety_rating",
+                        "cape_safety_rating", "visibility_safety_rating")
         if all(result.get(f) is not None for f in _safety_subs):
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
@@ -2108,7 +2155,10 @@ class AnalyzersMixin:
             "gust": result.get("gust_safety_rating"),
             "aloft": result.get("aloft_safety_rating"),
             "foehn": result.get("foehn_safety_rating"),
-            "weather": result.get("weather_safety_rating"),
+            "rain": result.get("rain_safety_rating"),
+            "thunderstorm": result.get("thunderstorm_safety_rating"),
+            "cape": result.get("cape_safety_rating"),
+            "visibility": result.get("visibility_safety_rating"),
         }
         old_summary = result.get("summary", "") or ""
         old_reco = result.get("recommendation", "") or ""
@@ -2398,6 +2448,11 @@ class AnalyzersMixin:
                     cost_tracker.write(config.COST_TELEMETRY_PATH)
                     yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
                     return
+            except BatchStalledError:
+                # An run_all_analyses_stream durchreichen → Parallel-Fallback
+                cost_tracker.errors += 1
+                cost_tracker.write(config.COST_TELEMETRY_PATH)
+                raise
             except Exception as e:
                 logger.error(f"Region-Safety-Batch-Poll fehlgeschlagen: {e}")
                 cost_tracker.errors += 1
@@ -2494,6 +2549,10 @@ class AnalyzersMixin:
                     cost_tracker.write(config.COST_TELEMETRY_PATH)
                     yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
                     return
+            except BatchStalledError:
+                cost_tracker.errors += 1
+                cost_tracker.write(config.COST_TELEMETRY_PATH)
+                raise
             except Exception as e:
                 logger.error(f"Region-Flyability-Batch-Poll fehlgeschlagen: {e}")
                 cost_tracker.errors += 1
@@ -2646,6 +2705,10 @@ class AnalyzersMixin:
                     cost_tracker.write(config.COST_TELEMETRY_PATH)
                     yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
                     return
+            except BatchStalledError:
+                cost_tracker.errors += 1
+                cost_tracker.write(config.COST_TELEMETRY_PATH)
+                raise
             except Exception as e:
                 logger.error(f"Spot-Safety-Batch-Poll fehlgeschlagen: {e}")
                 cost_tracker.errors += 1
@@ -2741,6 +2804,10 @@ class AnalyzersMixin:
                     cost_tracker.write(config.COST_TELEMETRY_PATH)
                     yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
                     return
+            except BatchStalledError:
+                cost_tracker.errors += 1
+                cost_tracker.write(config.COST_TELEMETRY_PATH)
+                raise
             except Exception as e:
                 logger.error(f"Spot-Flyability-Batch-Poll fehlgeschlagen: {e}")
                 cost_tracker.errors += 1
@@ -2995,13 +3062,32 @@ class AnalyzersMixin:
         # Batch-API nur mit OpenAI. Bei anderem Provider automatisch auf parallel fallen.
         if config.OPENAI_ANALYSIS_MODE == "batch":
             if self.analysis_provider == "openai":
-                yield from self.run_all_analyses_batch_stream()
-                return
-            logger.warning(
-                "OPENAI_ANALYSIS_MODE=batch ignoriert — Batch-API nur fuer OpenAI verfuegbar, "
-                "aktueller Analyse-Provider: '%s'. Falle auf parallel-Modus zurueck.",
-                self.analysis_provider,
-            )
+                try:
+                    yield from self.run_all_analyses_batch_stream()
+                    return
+                except BatchStalledError as stall_err:
+                    # EINMALIGER Fallback fuer DIESEN Run: Batch hat zu lange nicht
+                    # geantwortet (vermutlich OpenAI-Queue-Verzoegerung). Wir wechseln
+                    # NICHT die persistente Konfiguration — der naechste Daily-Run
+                    # versucht wieder Batch-Modus.
+                    logger.warning(
+                        "OpenAI-Batch stalled (%s) — falle EINMALIG fuer diesen Run "
+                        "auf Parallel-Modus zurueck. config.OPENAI_ANALYSIS_MODE bleibt "
+                        "unveraendert ('%s').",
+                        stall_err, config.OPENAI_ANALYSIS_MODE,
+                    )
+                    yield {"event": "batch_fallback", "data": {
+                        "reason": str(stall_err),
+                        "fallback_mode": "parallel",
+                        "configured_mode": config.OPENAI_ANALYSIS_MODE,
+                    }}
+                    # Fall-through zum Parallel-Pfad unten
+            else:
+                logger.warning(
+                    "OPENAI_ANALYSIS_MODE=batch ignoriert — Batch-API nur fuer OpenAI verfuegbar, "
+                    "aktueller Analyse-Provider: '%s'. Falle auf parallel-Modus zurueck.",
+                    self.analysis_provider,
+                )
 
         self._api_abort = threading.Event()
         self._api_abort_reason = 'Analyse abgebrochen'

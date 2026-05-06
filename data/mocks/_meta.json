@@ -1,8 +1,9 @@
 {
-  "frozen_at": "2026-05-02T17:06:30",
-  "source_run_at": "2026-05-02T17:05:59.911231",
+  "frozen_at": "2026-05-06T15:56:23",
+  "source_run_at": "2026-05-06T15:49:03.006542",
   "source_path": "C:\\Users\\user\\OneDrive\\Projekte\\flychat\\data\\wetterdaten.json",
-  "spot_count": 28,
+  "spot_set": "complete",
+  "spot_count": 487,
   "region_count": 29,
   "total_source_spots": 487,
   "test_set_size": 28,

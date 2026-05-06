@@ -56,6 +56,8 @@ def load_spots(csv_path=None):
             "slope_azimuth": int(row["slope_azimuth"]) if row.get("slope_azimuth") else None,
             "slope_angle": int(row["slope_angle"]) if row.get("slope_angle") else 25,
             "kritischer_foehn": row.get("kritischer_foehn", "Süd").strip() or "Süd",
+            "terrain_type": row.get("terrain_type", "").strip() or None,
+            "analyse_region": row.get("analyse_region", "").strip() or None,
         })
     return spots
 

@@ -135,60 +135,17 @@ window.AnalysisView = (function () {
         return html;
     }
 
-    // ===== REASON-MAP =====
-    // Server liefert kanonische Reason-Keys (nur fuer Spots heute). Wir bilden
-    // zusaetzlich generische Defaults ab, damit Region (ohne noAnalysis-Feld)
-    // ueber den summary-Fallback trotzdem lesbaren Text bekommt.
-    var REASON_MAP = {
-        wind_direction_mismatch:
-            'Windrichtung passt ganztaegig nicht zum Startplatz — kein fliegbares Fenster.',
-        all_day_rain:
-            'Nahezu ganztaegiger Niederschlag — kein nutzbares Flugfenster.',
-        all_day_thunderstorm:
-            'Praktisch ganztaegig Gewitter — kein fliegbares Fenster.',
-        out_of_season:
-            'Spot ist ausserhalb der Saison.'
-    };
-
-    // Rationale-Fallback-Kette — beide Panels gleich.
-    function buildRationale(a) {
-        var safety = a.safety || {};
-        var candidates = [
-            a.summary,
-            safety.summary,
-            a.safety_feedback,
-            parseMaybeList(a.no_go_reasons)[0],
-            REASON_MAP[a.noAnalysisReason || a.no_analysis_reason || ''],
-            a.error
-        ];
-        for (var i = 0; i < candidates.length; i++) {
-            if (candidates[i]) return candidates[i];
-        }
-        // State-Default
-        var band = getSafetyBand(a);
-        if (band === 'red') return 'Bedingungen sind eindeutig nicht fliegbar.';
-        if (band === 'amber') return 'Bedingungen mit Einschraenkungen.';
-        if (band === 'green') return 'Bedingungen sind fliegbar.';
-        return '';
-    }
-
-    function shortenRationale(text) {
-        if (!text) return '';
-        var firstDot = text.indexOf('.');
-        return firstDot > 30 ? text.substring(0, firstDot + 1) : text.substring(0, 140);
-    }
-
     // ===== HERO =====
+    // Hero zeigt Glyph (Rating im Kreis) + Verdict-Label + Pills.
+    // Die textuelle Einschaetzung gehoert NICHT hier rein — sie wird unten in
+    // renderInsights als aufklappbare "Sicherheits-Einschaetzung" gezeigt.
     function renderHero(a, isEmpty) {
         if (isEmpty) {
             return '<div class="mga-hero no_data">'
                  + '<div class="mga-hero-glyph">' + buildGlyph('no_data', 0, 96) + '</div>'
                  + '<div class="mga-hero-text">'
                  + '<div class="mga-hero-verdict no_data">Datenanalyse ausstehend</div>'
-                 + '<div class="mga-hero-rationale">'
-                 + 'Fuer diesen Tag liegt noch keine Bewertung vor. '
-                 + 'Sie wird automatisch erstellt, sobald die naechste Auswertung laeuft.'
-                 + '</div></div></div>';
+                 + '</div></div>';
         }
 
         var band = getSafetyBand(a);
@@ -196,15 +153,11 @@ window.AnalysisView = (function () {
         var verdictTxt = (band === 'green') ? 'Sicher' :
                          (band === 'amber') ? 'Vorsicht' :
                          (band === 'red')   ? 'Nicht fliegbar' : 'Keine Daten';
-        var rationale = shortenRationale(buildRationale(a));
 
         var html = '<div class="mga-hero ' + band + '">'
                  + '<div class="mga-hero-glyph">' + buildGlyph(band, rating, 96) + '</div>'
                  + '<div class="mga-hero-text">'
                  + '<div class="mga-hero-verdict ' + band + '">' + esc(verdictTxt) + '</div>';
-        if (rationale) {
-            html += '<div class="mga-hero-rationale">' + esc(rationale) + '</div>';
-        }
         // Pills: Safety-Band + Safety-Score immer; Experience/Comfort nur wenn nicht red.
         var safScore = (typeof a.safety_score === 'number') ? a.safety_score : null;
         var expScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
@@ -236,33 +189,37 @@ window.AnalysisView = (function () {
         'WIND_GROUND', 'WIND_ALOFT', 'FOEHN', 'RAIN',
         'THUNDERSTORM', 'CLOUDS', 'THERMAL', 'XC', 'TURBULENCE'
     ];
-    var WINDOW_GLYPH_V4 = { startbar: '▓', sportlich: '▒', blockiert: '⛔', neutral: '·' };
-    var WINDOW_LABEL_V4 = { startbar: 'startbar', sportlich: 'sportlich', blockiert: 'blockiert', neutral: '—' };
+    var WINDOW_LABEL_V4 = { startbar: 'Startbar', sportlich: 'Sportlich', blockiert: 'Blockiert', neutral: 'Ausserhalb' };
 
     function _topicSortKeyV4(topic) {
         var i = TAG_TOPIC_ORDER_V4.indexOf(topic);
         return i === -1 ? 999 : i;
     }
 
+    // Fester Anzeige-Rahmen 06:00–21:00 (parallel zum Wochencast).
+    var WINDOW_HOUR_START_V4 = 6;
+    var WINDOW_HOUR_END_V4 = 21;
+
+    // Startfenster — UI/UX-Pro-Max Layout (parallel zum Wochencast):
+    // Antwort zuerst (✓/▲/✕ + Zeitspanne + Dauer-Pille), dann durchgehende
+    // Farbleiste, Tick-Achse alle 3 h, optional Sportlich-Sekundaerinfo.
+    // Achse ist immer 6h-20h, fehlende Stunden = neutral.
     function renderStartWindowV4(startWindow) {
-        if (!Array.isArray(startWindow) || !startWindow.length) return '';
-        var sorted = startWindow
-            .filter(function (e) { return e && typeof e.hour === 'number'; })
-            .sort(function (a, b) { return a.hour - b.hour; });
-        if (!sorted.length) return '';
+        if (!Array.isArray(startWindow)) return '';
+        var byHour = {};
+        for (var bi = 0; bi < startWindow.length; bi++) {
+            var be = startWindow[bi];
+            if (!be || typeof be.hour !== 'number') continue;
+            byHour[be.hour] = be.state || 'neutral';
+        }
+        var sorted = [];
+        for (var h = WINDOW_HOUR_START_V4; h < WINDOW_HOUR_END_V4; h++) {
+            sorted.push({ hour: h, state: byHour[h] || 'neutral' });
+        }
 
-        var cells = sorted.map(function (e) {
-            var st = e.state || 'neutral';
-            var glyph = WINDOW_GLYPH_V4[st] || '·';
-            var hr = String(e.hour).padStart ? String(e.hour).padStart(2, '0') : ('0' + e.hour).slice(-2);
-            return '<div class="mga-window-cell mga-window-cell--' + st + '" '
-                 + 'title="' + hr + ':00 — ' + WINDOW_LABEL_V4[st] + '">'
-                 + '<span class="mga-window-cell-glyph" aria-hidden="true">' + glyph + '</span>'
-                 + '<span class="mga-window-cell-hour">' + hr + '</span>'
-                 + '</div>';
-        }).join('');
+        function fmt(h) { return ('0' + h).slice(-2); }
 
-        // Summary: laengster Run pro Zustand
+        // Laengsten Run pro State suchen.
         function longestRun(state) {
             var best = { len: 0, start: null, end: null };
             var cur = { state: null, len: 0, start: null, end: null };
@@ -277,26 +234,72 @@ window.AnalysisView = (function () {
             if (cur.state === state && cur.len > best.len) { best = { len: cur.len, start: cur.start, end: cur.end }; }
             return best;
         }
-        var startbar = longestRun('startbar');
-        var sport = longestRun('sportlich');
-        var summary = '';
-        function fmt(h) { return ('0' + h).slice(-2); }
-        if (startbar.len > 0) {
-            summary = 'startbar ' + fmt(startbar.start) + '–' + fmt(startbar.end + 1) + ' h (' + startbar.len + ' h)';
-            if (sport.len > 0) summary += ', sportlich ' + fmt(sport.start) + '–' + fmt(sport.end + 1) + ' h';
-        } else if (sport.len > 0) {
-            summary = 'nur sportlich ' + fmt(sport.start) + '–' + fmt(sport.end + 1) + ' h';
+        var bestStartbar = longestRun('startbar');
+        var bestSport = longestRun('sportlich');
+
+        // Kontinuierliche Farbleiste — ein Segment pro Stunde, ohne Glyphs.
+        var segments = sorted.map(function (e) {
+            var st = e.state || 'neutral';
+            var hr = fmt(e.hour);
+            var lbl = WINDOW_LABEL_V4[st] || '—';
+            return '<span class="mga-window-seg mga-window-seg--' + st + '" '
+                 + 'title="' + hr + ':00 Uhr · ' + lbl + '"></span>';
+        }).join('');
+
+        // Tick-Achse — Beschriftung nur alle 3 Stunden.
+        var ticks = sorted.map(function (e) {
+            var show = e.hour % 3 === 0;
+            var lbl = show ? fmt(e.hour) : '';
+            return '<span class="mga-window-tick' + (show ? ' mga-window-tick--major' : '') + '">' + lbl + '</span>';
+        }).join('');
+
+        // Inline-SVG-Icons (Lucide-Style) statt Unicode-Glyphs.
+        var ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+        var ICON_ALERT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        var ICON_X     = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+        // Primaer-Antwort.
+        var primaryIcon, primaryText, primaryClass, durationLen = 0;
+        if (bestStartbar.len > 0) {
+            primaryIcon = ICON_CHECK;
+            primaryClass = 'is-good';
+            primaryText = fmt(bestStartbar.start) + ':00 – ' + fmt(bestStartbar.end + 1) + ':00 Uhr';
+            durationLen = bestStartbar.len;
+        } else if (bestSport.len > 0) {
+            primaryIcon = ICON_ALERT;
+            primaryClass = 'is-warn';
+            primaryText = 'Nur sportlich ' + fmt(bestSport.start) + ':00 – ' + fmt(bestSport.end + 1) + ':00 Uhr';
+            durationLen = bestSport.len;
         } else {
-            summary = 'kein Startfenster heute';
+            primaryIcon = ICON_X;
+            primaryClass = 'is-bad';
+            primaryText = 'Heute nicht startbar';
+        }
+        var durationHtml = durationLen > 0
+            ? '<span class="mga-window-duration">' + durationLen + ' h</span>'
+            : '';
+
+        // Sekundaerinfo (Sportlich-Hinweis, falls auch Startbar vorhanden).
+        var secondary = '';
+        if (bestStartbar.len > 0 && bestSport.len > 0) {
+            secondary = '<div class="mga-window-secondary">'
+                      + '<span class="mga-window-dot mga-window-dot--sportlich"></span>'
+                      + 'Sportlich ' + fmt(bestSport.start) + ':00 – ' + fmt(bestSport.end + 1) + ':00 Uhr'
+                      + '</div>';
         }
 
         return '<section class="mga-window-v4">'
-             + '<div class="mga-window-v4-header">'
-             + '<span class="mga-window-v4-icon" aria-hidden="true">🛫</span>'
-             + '<span class="mga-window-v4-title">Startfenster (Bodenwind)</span>'
-             + '</div>'
-             + '<div class="mga-window-v4-cells">' + cells + '</div>'
-             + '<div class="mga-window-v4-summary">' + esc(summary) + '</div>'
+             + '<header class="mga-window-v4-head">'
+             + '<span class="mga-window-v4-title">Startfenster</span>'
+             + '<span class="mga-window-v4-summary mga-window-v4-summary--' + primaryClass + '">'
+             + '<span class="mga-window-v4-summary-icon" aria-hidden="true">' + primaryIcon + '</span>'
+             + '<span class="mga-window-v4-summary-text">' + esc(primaryText) + '</span>'
+             + durationHtml
+             + '</span>'
+             + '</header>'
+             + '<div class="mga-window-v4-bar" role="img" aria-label="Startfenster-Verlauf ueber den Tag">' + segments + '</div>'
+             + '<div class="mga-window-v4-axis" aria-hidden="true">' + ticks + '</div>'
+             + secondary
              + '</section>';
     }
 
@@ -429,7 +432,7 @@ window.AnalysisView = (function () {
                   + '</div>';
         }
         if (flyFb) {
-            html += '<div class="mga-insight flyability' + (safetyFb ? '' : ' open') + '">'
+            html += '<div class="mga-insight flyability open">'
                   + '<button class="mga-insight-toggle" type="button">Flug-Einschätzung</button>'
                   + '<div class="mga-insight-body">' + esc(flyFb) + '</div>'
                   + '</div>';
@@ -440,9 +443,8 @@ window.AnalysisView = (function () {
             if (limit && limit !== 'none' && SF_LIMIT_LABELS[limit]) {
                 body += '<div class="mga-sf-limit-note">' + esc(SF_LIMIT_LABELS[limit]) + '</div>';
             }
-            var alreadyOpen = (!safetyFb && !flyFb);
             var sfTier = a.streckenflug_tier || 'kein_xc';
-            html += '<div class="mga-insight streckenflug ' + esc(sfTier) + (alreadyOpen ? ' open' : '') + '">'
+            html += '<div class="mga-insight streckenflug ' + esc(sfTier) + ' open">'
                   + '<button class="mga-insight-toggle" type="button">Streckenflug-Einschätzung</button>'
                   + '<div class="mga-insight-body">' + body + '</div>'
                   + '</div>';
@@ -471,6 +473,9 @@ window.AnalysisView = (function () {
         if (!container) return;
         opts = opts || {};
         var dateStr = opts.dateStr || (a && a.date) || '';
+        // Regionen haben kein Startfenster (kein konkreter Startplatz).
+        // Erkennung: explizite Option ODER Feld region_name im Cache-Eintrag.
+        var isRegion = opts.isRegion === true || (a && typeof a.region_name === 'string' && a.region_name.length > 0);
 
         container.innerHTML = '';
         var wrapper = document.createElement('div');
@@ -492,7 +497,7 @@ window.AnalysisView = (function () {
                    || (safetyStatus === 'error');
         if (notSafe) {
             var html = renderHero(a, false);
-            html += renderStartWindowV4(getV4StartWindow(a));
+            if (!isRegion) html += renderStartWindowV4(getV4StartWindow(a));
             html += renderTagGroupsV4(getV4Tags(a));
             html += renderFooter(dateStr);
             wrapper.innerHTML = html;
@@ -503,7 +508,7 @@ window.AnalysisView = (function () {
 
         // State C/D: conditional / safe
         var html2 = renderHero(a, false);
-        html2 += renderStartWindowV4(getV4StartWindow(a));
+        if (!isRegion) html2 += renderStartWindowV4(getV4StartWindow(a));
         html2 += renderTagGroupsV4(getV4Tags(a));
         html2 += renderMetrics(a);
         html2 += renderInsights(a);

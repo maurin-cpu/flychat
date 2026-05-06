@@ -131,7 +131,8 @@ print("FIX 4: 5 Safety-Sub-Ratings + MIN-Aggregation")
 print("=" * 60)
 
 sub_fields = ['wind_safety_rating', 'gust_safety_rating', 'aloft_safety_rating',
-              'foehn_safety_rating', 'weather_safety_rating']
+              'foehn_safety_rating', 'rain_safety_rating', 'thunderstorm_safety_rating',
+              'cape_safety_rating', 'visibility_safety_rating']
 
 with_all_subs = 0
 without_subs = 0

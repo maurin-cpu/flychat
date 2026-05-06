@@ -851,6 +851,11 @@ LLM_MAX_WORKERS = int(os.environ.get("LLM_MAX_WORKERS", "20"))
 # Poll-Intervall (Sekunden) im "batch"-Modus, wie oft der Batch-Status geprüft wird.
 LLM_BATCH_POLL_INTERVAL = int(os.environ.get("LLM_BATCH_POLL_INTERVAL", "30"))
 
+# Stall-Timeout (Sekunden): Wenn ein OpenAI-Batch so lange ohne Progress
+# (completed-Counter unverändert) bleibt, wird er gecancelt und der Daily-Run
+# fällt einmalig auf Parallel-Modus zurück. Default 60 min.
+LLM_BATCH_STALL_TIMEOUT_S = int(os.environ.get("LLM_BATCH_STALL_TIMEOUT_S", "3600"))
+
 
 # ============================================================================
 # LLM-Kosten-Telemetrie

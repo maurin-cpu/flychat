@@ -30,3 +30,26 @@ STATUS-ABLEITUNG (finaler Schritt Teil 1)
      - Thermik in diesen Stunden entscheidet ueber `flight_type`: Peak ≥ 1.0 m/s + productive_thermal_h ≥ 2 → "Thermikflug"; sonst "Abgleiter" (`flyability_tier: "gray"`).
      - DANGER-Stunden im aktiven Tag duerfen das Fenster unterbrechen — das Fenster bleibt aber nutzbar, sofern eine ausreichend lange saubere Kette existiert.
    - **not_safe**: Start-Fenster < {{cfg.CLEAN_WINDOW_MIN_HOURS}}h ODER Verhaeltnis < 35% mit EINGEKESSELT-Muster ODER EINGEKESSELT-DANGER-Sonderfall greift ODER Foehn/Gewitter dominiert. (Der harte Fall "kein Tagesbeginn" ist bereits vom Code als `not_safe` ausgefiltert — du siehst diesen Datenblock gar nicht.)
+
+═══════════════════════════════════════════════
+BEGRUENDUNGS-PRINZIP FUER SATZ 1 IN `summary`
+═══════════════════════════════════════════════
+
+Status-Ableitung und Status-Begruendung sind zwei Dinge:
+- Die Ableitung (oben) sagt **welcher Status** rauskommt.
+- Die Begruendung sagt **womit du Satz 1 in `summary` fuellst** — selbst formuliert in Pilotensprache, mit konkreten Zahlen aus dem Datenblock. Kein Schema, keine Platzhalter — du schreibst den Satz, du entscheidest die Worte.
+
+**Prinzip pro Status — woran sich Satz 1 ausrichtet:**
+
+- **`not_safe`** → nenne **die dominierende Gefahr** (passt zu `primary_no_go`). Was hat den Tag gekippt: Foehn, Gewitter, Sturm, Hoehensturm, EINGEKESSELT-DANGER, Niederschlag/OVERCAST? Mit konkretem Wert + Uhrzeit.
+  - *Beispiel zur Orientierung (nicht abschreiben):* "Nicht sicher wegen Foehn-Durchbruch ΔP 8.4 hPa Sued ab 11 Uhr — Druckgradient klar ueber Verbots-Schwelle."
+
+- **`conditional`** → nenne **den Faktor, der den Tag von `safe` heruntergezogen hat**. Genau einer der Ableitungs-Punkte hat gegriffen (Fenster mehrheitlich sportlich, Verhaeltnis 35-60%, EINGEKESSELT-WARN, GUST-WARN, ALOFT-WARN, CAPE-WARN, Foehn 4-7 hPa, klarer Aufbau-Trend) — diesen nennst du, mit Zahlen.
+  - **Niemals** das Fenster, die ruhigen Stunden oder fehlende Gefahren als Begruendung — die Existenz des Fensters ist Voraussetzung dafuer, dass der Tag ueberhaupt nicht `not_safe` ist, also kein Pluspunkt.
+  - *Beispiel zur Orientierung (nicht abschreiben):* "Bedingt sicher wegen kraeftiger Boeen 28-34 km/h ab 13 Uhr — die ruhigen Stunden bleiben in der Minderheit."
+
+- **`safe`** → nenne **die Konstellation, die den Tag fliegerisch entspannt macht**. Schau auf deine 5 Safety-Sub-Ratings: das (oder die zwei) hoechste/n erzaehlt dir, was den Tag traegt — Wind-Lage, Hoehenstroemung, Foehn-Negativ, Schichtung. Konkret in Pilotensprache.
+  - **Niemals** "Tag wird als sicher eingestuft" (nichtssagend), "weil keine Probleme" (negativ), Schwellen-Audit-Sprache, oder die blosse Existenz eines Fensters. Auch **kein** Thermik/Streckenflug-Inhalt — das gehoert in die Flyability-Stage.
+  - *Beispiel zur Orientierung (nicht abschreiben):* "Sauberer Westwind 8-12 km/h durchgehend in passender Richtung, Hoehenwind moderat um 22 km/h auf 2500 m — fliegerisch ruhige Konstellation ohne Wechsel."
+
+Die Beispiele oben sind **Inspirations-Saetze**, kein Pflicht-Schema. Du formulierst Satz 1 in eigenen Worten — passend zum konkreten Datenblock, mit echten Zahlen, in einem Stil der zum Tag passt. Wichtig ist nur: das **Was** des Satzes (begrenzender Faktor / dominierende Gefahr / tragende Konstellation), nicht das **Wie** der Formulierung.

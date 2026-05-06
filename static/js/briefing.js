@@ -59,20 +59,22 @@
   const LS_DAY_IDX_KEY = "gleitcast.briefing.dayIdx";
   const LS_TIER_FILTER_KEY = "gleitcast.briefing.tierFilter";       // legacy key (read-only fallback)
   const LS_SAFETY_FILTER_KEY = "gleitcast.briefing.safetyFilter";   // v1.3
-  const LS_MIN_RATING_KEY = "gleitcast.briefing.minRating";         // legacy key (read-only fallback)
-  const LS_MIN_STARS_KEY = "gleitcast.briefing.minStars";           // v1.3
+  const LS_MIN_STARS_KEY = "gleitcast.briefing.minStars";           // legacy key (read-only fallback, v1.3 stars)
+  const LS_MIN_RATING_KEY = "gleitcast.briefing.minRating10";       // v1.4 rating 0-10
   const LS_COLLAPSED_REGIONS_KEY = "gleitcast.briefing.collapsedRegions";
   const LS_EXPAND_HINT_SEEN_KEY = "gleitcast.briefing.expandHintSeen";
   const LS_SHOW_NUMBERS_KEY = "gleitcast.meteogram.showNumbers";
 
   // Safety-Baender (RATING_CONCEPT v1.3 §2.2 / §8.2) — orthogonal zu experience_stars.
-  // Filter-IDs entsprechen safety_band-Werten aus dem Cache.
+  // "violet" (Top) ist ein Display-Band: abgeleitet aus safety_band='green' && rating>=8.
+  // Im Cache existiert es nicht — Filter prueft via displayBand().
   const SAFETY_DEFS = [
-    { id: "green", label: "Sicher",        short: "Sicher" },
-    { id: "amber", label: "Vorsicht",      short: "Vorsicht" },
-    { id: "red",   label: "Nicht fliegbar", short: "Nicht fliegbar" },
+    { id: "violet", label: "Top",           short: "Top" },
+    { id: "green",  label: "Sicher",        short: "Sicher" },
+    { id: "amber",  label: "Vorsicht",      short: "Vorsicht" },
+    { id: "red",    label: "Nicht fliegbar", short: "Nicht fliegbar" },
   ];
-  const DEFAULT_SAFETY = ["green", "amber"];
+  const DEFAULT_SAFETY = ["violet", "green", "amber"];
 
   let state = {
     data: null,
@@ -80,7 +82,7 @@
     filterRegions: loadRegionFilter(),
     selectedDayIdx: loadDayIdx(),
     safetyFilters: loadSafetyFilter(),
-    minStars: loadMinStars(),
+    minRating: loadMinRating(),
     fazitOpen: false,
     mapVisible: false,
     collapsedRegions: loadCollapsedRegions(),
@@ -118,7 +120,12 @@
       if (raw === null) return new Set(DEFAULT_SAFETY);
       const arr = JSON.parse(raw);
       if (!Array.isArray(arr)) return new Set(DEFAULT_SAFETY);
-      return new Set(arr.filter((t) => SAFETY_DEFS.some((d) => d.id === t)));
+      const set = new Set(arr.filter((t) => SAFETY_DEFS.some((d) => d.id === t)));
+      // Migration: User mit "green" gespeichert hat das neue "violet" (Top, ein
+      // Display-Band von green) noch nicht — ergaenzen, sonst verschwinden Top-Spots
+      // aus seiner Ansicht ohne dass er etwas geaendert haette.
+      if (set.has("green") && !set.has("violet")) set.add("violet");
+      return set;
     } catch (e) { return new Set(DEFAULT_SAFETY); }
   }
 
@@ -126,17 +133,25 @@
     try { localStorage.setItem(LS_SAFETY_FILTER_KEY, JSON.stringify(Array.from(set))); } catch (e) {}
   }
 
-  function loadMinStars() {
+  function loadMinRating() {
     try {
-      const raw = localStorage.getItem(LS_MIN_STARS_KEY);
-      if (raw === null) return 0;
-      const v = parseInt(raw, 10);
-      return isFinite(v) && v >= 0 && v <= 5 ? v : 0;
+      const raw = localStorage.getItem(LS_MIN_RATING_KEY);
+      if (raw !== null) {
+        const v = parseInt(raw, 10);
+        return isFinite(v) && v >= 0 && v <= 10 ? v : 0;
+      }
+      // Migration: alte stars (0-5) → rating (0-10) via *2
+      const legacy = localStorage.getItem(LS_MIN_STARS_KEY);
+      if (legacy !== null) {
+        const sv = parseInt(legacy, 10);
+        if (isFinite(sv) && sv > 0 && sv <= 5) return sv * 2;
+      }
+      return 0;
     } catch (e) { return 0; }
   }
 
-  function saveMinStars(v) {
-    try { localStorage.setItem(LS_MIN_STARS_KEY, String(v)); } catch (e) {}
+  function saveMinRating(v) {
+    try { localStorage.setItem(LS_MIN_RATING_KEY, String(v)); } catch (e) {}
   }
 
   function loadCollapsedRegions() {
@@ -200,15 +215,22 @@
   function spotPassesSafetyFilter(spot) {
     const bands = state.safetyFilters;
     if (!bands || bands.size === 0) return false;
-    const band = spotSafetyBand(spot);
-    if (band === "no_data") return bands.has("green") || bands.has("amber") || bands.has("red");
-    return bands.has(band);
+    const baseBand = spotSafetyBand(spot);
+    if (baseBand === "no_data") {
+      return bands.has("violet") || bands.has("green") || bands.has("amber") || bands.has("red");
+    }
+    // Display-Band (violet bei safe + rating>=8) ist die Filter-Granularitaet:
+    // ein Top-Spot zaehlt nur als "Top", nicht zusaetzlich als "Sicher".
+    const G = window.gleitcastGlyph;
+    const rating = spotRating(spot);
+    const visBand = (G && G.displayBand) ? G.displayBand(baseBand, rating) : baseBand;
+    return bands.has(visBand);
   }
 
-  function spotPassesStarsFilter(spot) {
-    const min = state.minStars || 0;
+  function spotPassesRatingFilter(spot) {
+    const min = state.minRating || 0;
     if (min <= 0) return true;
-    return spotStars(spot) >= min;
+    return spotRating(spot) >= min;
   }
 
   function collectAllRegions(data) {
@@ -632,7 +654,7 @@
       spots = spots.filter((s) => (s.spot || "").toLowerCase() === want);
     } else {
       spots = spots.filter(spotPassesSafetyFilter);
-      spots = spots.filter(spotPassesStarsFilter);
+      spots = spots.filter(spotPassesRatingFilter);
     }
     return spots;
   }
@@ -893,13 +915,13 @@
       });
     }
 
-    // Stars-Slider (0–5)
-    if (slider.max !== "5" || slider.step !== "1") {
+    // Rating-Slider (0–10)
+    if (slider.max !== "10" || slider.step !== "1") {
       slider.min = "0";
-      slider.max = "5";
+      slider.max = "10";
       slider.step = "1";
     }
-    const v = Number(state.minStars || 0);
+    const v = Number(state.minRating || 0);
     slider.value = String(v);
     updateSliderVisual(slider, valueEl, v);
 
@@ -907,11 +929,11 @@
       slider._flyBound = true;
       slider.addEventListener("input", (ev) => {
         const val = parseInt(ev.target.value, 10) || 0;
-        state.minStars = val;
+        state.minRating = val;
         updateSliderVisual(slider, valueEl, val);
       });
       slider.addEventListener("change", () => {
-        saveMinStars(state.minStars);
+        saveMinRating(state.minRating);
         state.focusSpot = null;
         renderDayContent();
       });
@@ -919,17 +941,7 @@
   }
 
   function updateSliderVisual(slider, valueEl, v) {
-    if (slider.max === "5") {
-      valueEl.textContent = v > 0 ? "≥ " + "★".repeat(v) : "alle";
-      slider.classList.toggle("is-active", v > 0);
-      const min2 = parseFloat(slider.min) || 0;
-      const max2 = parseFloat(slider.max) || 5;
-      const pct2 = max2 > min2 ? ((v - min2) / (max2 - min2)) * 100 : 0;
-      slider.style.setProperty("--fill", pct2.toFixed(1) + "%");
-      return;
-    }
-    // Legacy 0–10 path (kept in case slider attrs not yet upgraded)
-    valueEl.textContent = v > 0 ? "\u2265 " + v.toFixed(1) : "alle";
+    valueEl.textContent = v > 0 ? "\u2265 " + v + " / 10" : "alle";
     slider.classList.toggle("is-active", v > 0);
     const min = parseFloat(slider.min) || 0;
     const max = parseFloat(slider.max) || 10;
@@ -1064,12 +1076,9 @@
       </span>
     `;
 
-    // Risk-Reward-Bubble-Matrix (RATING_CONCEPT v1.3 §4.4)
-    renderBubbleMatrix(day, filteredSpots);
-
     // Spots grouped by region
     const spotsWithDate = filteredSpots.map((s) => Object.assign({}, s, { date: day.date }));
-    const groups = groupSpotsByRegion(spotsWithDate);
+    let groups = groupSpotsByRegion(spotsWithDate);
 
     // Region meta from day data
     const regionsMap = {};
@@ -1077,26 +1086,20 @@
       regionsMap[r.region_id] = r;
     }
 
-    // Sortierung (RATING_CONCEPT v1.3): primaer safety_band der Region-Analyse
-    // (gruen → amber → rot), sekundaer Region-Rating (hoeher zuerst). Region-
-    // Aussage hat Vorrang vor Spot-Aggregation — konsistent zum Header.
-    const BAND_RANK = { green: 0, amber: 1, no_data: 2, red: 3 };
-    const groupSortKey = (g) => {
-      const meta = regionsMap[g.region_id];
-      const band = (meta && G && G.legacyBand)
-        ? G.legacyBand(meta)
-        : (G && G.aggregateBand ? G.aggregateBand(g.spots) : "no_data");
-      const score = (meta && G && G.experienceScore)
-        ? G.experienceScore(meta)
-        : 0;
-      return { rank: BAND_RANK[band] != null ? BAND_RANK[band] : 4, score: score };
+    // Sortierung: Regionen werden im Wochencast NICHT mehr farblich/per-Rating
+    // bewertet (User-Wunsch — "Pilot sucht eine Region und will dann nur die
+    // Spots darin sehen"). Wir sortieren aber Regionen weiter so, dass die mit
+    // den besten Spots oben stehen — abgeleitet aus Spot-Ratings, ohne dass
+    // dies dem User im Region-Header angezeigt werden muss.
+    const groupSpotScore = (g) => {
+      let best = 0;
+      for (const s of g.spots) {
+        const r = spotRating(s);
+        if (r > best) best = r;
+      }
+      return best;
     };
-    groups.sort((a, b) => {
-      const ka = groupSortKey(a);
-      const kb = groupSortKey(b);
-      if (ka.rank !== kb.rank) return ka.rank - kb.rank;
-      return kb.score - ka.score;
-    });
+    groups.sort((a, b) => groupSpotScore(b) - groupSpotScore(a));
 
     // Focus-Banner (wenn Nutzer aus E-Mail auf einen spezifischen Spot kam)
     const focusBanner = state.focusSpot
@@ -1111,7 +1114,7 @@
       if (state.focusSpot) {
         emptyMsg = `Spot "${escapeHtml(state.focusSpot)}" nicht in diesem Tag gefunden.`;
       } else {
-        const filterActive = (state.safetyFilters.size < SAFETY_DEFS.length) || state.minStars > 0 || state.filterRegions.size > 0;
+        const filterActive = (state.safetyFilters.size < SAFETY_DEFS.length) || state.minRating > 0 || state.filterRegions.size > 0;
         const filterHint = filterActive
           ? `<button type="button" class="bf-empty-reset" onclick="window.__bf_resetFilters && window.__bf_resetFilters()">Filter zurücksetzen</button>`
           : "";
@@ -1123,7 +1126,25 @@
       return;
     }
 
-    contentEl.innerHTML = focusBanner + groups.map((g) => renderRegionSection(g, regionsMap[g.region_id])).join("");
+    // Bulk-Toggle-Bar: Pilot soll mit einem Klick alle Regionen auf/zu klappen.
+    // Label spiegelt den naechsten Zustand wider — wenn aktuell ueberwiegend
+    // eingeklappt, zeige "Alle ausklappen", sonst "Alle einklappen".
+    const allRegionIds = groups.map((g) => g.region_id || "");
+    const collapsedCount = allRegionIds.filter((rid) => state.collapsedRegions.has(rid)).length;
+    const willExpandAll = collapsedCount >= allRegionIds.length / 2;
+    const bulkLabel = willExpandAll ? "Alle ausklappen" : "Alle einklappen";
+    const bulkIcon = willExpandAll ? "▾" : "▴";
+    const bulkBar = groups.length > 1
+      ? `<div class="bf-bulk-toggle-bar">
+           <button type="button" class="bf-bulk-toggle" data-bulk-action="${willExpandAll ? "expand" : "collapse"}"
+                   aria-label="${escapeHtml(bulkLabel)}">
+             <span class="bf-bulk-toggle-icon" aria-hidden="true">${bulkIcon}</span>
+             <span class="bf-bulk-toggle-label">${escapeHtml(bulkLabel)}</span>
+           </button>
+         </div>`
+      : "";
+
+    contentEl.innerHTML = focusBanner + bulkBar + groups.map((g) => renderRegionSection(g, regionsMap[g.region_id])).join("");
 
     // Focus-Modus: die eine verbleibende Spot-Kachel direkt aufklappen.
     if (state.focusSpot) {
@@ -1156,52 +1177,25 @@
     const spotsHtml = group.spots.map(renderSpotRow).join("");
     const spotCount = group.spots.length;
 
-    // Region-Header: Band kommt aus der Region-Analyse (eigenstaendige LLM-
-    // Bewertung), NICHT aus der Spot-Aggregation. Die Region hat ihre eigene
-    // Sicherheits-Aussage; Worst-Band-Wins ueber Spots wuerde eine grobe
-    // Region-Bewertung durch einen kritischen Einzel-Spot ueberschreiben.
-    // Verteilungs-Pill (counts) bleibt aus Spots — als Zusatz-Info "was passiert
-    // in der Region", aber nicht als Header-Farbe.
-    // Fallback auf Spot-Aggregation nur wenn keine Region-Meta vorliegt.
-    const G = window.gleitcastGlyph;
-    const headBand = (meta && G && G.legacyBand)
-      ? G.legacyBand(meta)
-      : (G && G.aggregateBand ? G.aggregateBand(group.spots) : "no_data");
-    const counts = G && G.bandCounts ? G.bandCounts(group.spots) : { green: 0, amber: 0, red: 0, no_data: 0 };
-    const headStars = (meta && G && G.legacyStars)
-      ? G.legacyStars(meta)
-      : (G && G.avgStars ? G.avgStars(group.spots) : 0);
-    const headRating = (meta && G && G.legacyRating)
-      ? G.legacyRating(meta)
-      : (G && G.avgRating ? G.avgRating(group.spots) : headStars * 2);
-    const headGlyph = G && G.svg ? G.svg({ band: headBand, rating: headRating, size: 22 }) : "";
-
-    // Verteilungs-Pill: nur Baender mit > 0 anzeigen, in Reihenfolge gruen→amber→rot.
-    const distParts = [];
-    if (counts.green > 0) distParts.push(`<span class="bf-region-dist-item bf-region-dist-item--green">${counts.green} grün</span>`);
-    if (counts.amber > 0) distParts.push(`<span class="bf-region-dist-item bf-region-dist-item--amber">${counts.amber} amber</span>`);
-    if (counts.red > 0)   distParts.push(`<span class="bf-region-dist-item bf-region-dist-item--red">${counts.red} rot</span>`);
-    const distHtml = distParts.length ? `<span class="bf-region-dist">${distParts.join("")}</span>` : "";
-
-    const shareRatingAttr = headRating > 0 && headBand !== "red" ? String(headRating) : "";
+    // Region-Header bewusst minimal: nur Name, Spot-Anzahl, Share, Chevron.
+    // KEIN Glyph, KEIN Rating, KEIN Farb-Band — Bewertung passiert auf Spot-Ebene.
+    // Mental-Modell: Region = struktureller Divider ("Welche Region?"),
+    // Spot = der eigentliche Inhalt ("Wie gut sind die Plaetze?").
     const shareBtn = group.region_id && group.region_id !== "unknown"
       ? `<button type="button" class="bf-share-btn bf-share-btn--region"
                  data-share-kind="region"
                  data-share-region="${escapeHtml(group.region_id)}"
                  data-share-region-name="${escapeHtml(name)}"
-                 data-share-rating="${shareRatingAttr}"
                  title="Region teilen" aria-label="Region teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`
       : "";
     const isCollapsed = state.collapsedRegions.has(group.region_id);
     const collapsedCls = isCollapsed ? " is-collapsed" : "";
     const ariaExpanded = isCollapsed ? "false" : "true";
     return `
-      <div class="bf-region${collapsedCls} bf-region--${headBand}" data-region-id="${escapeHtml(group.region_id)}" data-band="${headBand}">
+      <div class="bf-region${collapsedCls}" data-region-id="${escapeHtml(group.region_id)}">
         <div class="bf-region-head" role="button" tabindex="0" aria-expanded="${ariaExpanded}" aria-label="Region ${escapeHtml(name)} ein-/ausklappen">
-          <span class="bf-region-glyph" aria-hidden="true">${headGlyph}</span>
           <span class="bf-region-name">${escapeHtml(name)}</span>
-          <span class="bf-region-count" aria-hidden="true">${spotCount}</span>
-          ${distHtml}
+          <span class="bf-region-count" aria-hidden="true">${spotCount} ${spotCount === 1 ? "Spot" : "Spots"}</span>
           ${shareBtn}
           <span class="bf-region-chevron" aria-hidden="true">▾</span>
         </div>
@@ -1263,8 +1257,14 @@
              data-share-spot="${escapeHtml(spot.spot)}"
              data-share-rating="${shareRatingAttr}"
              title="Startplatz teilen" aria-label="Startplatz teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`;
+    // RATING_CONCEPT v1.4 §8.6 — Farbintensität skaliert linear mit Rating
+    // (parallel zu Karten). Premium-Marker: safe + rating>=8 → violett.
+    const fillNorm = (rating > 0 && band !== "red" && band !== "no_data") ? rating / 10 : 0;
+    const G2 = window.gleitcastGlyph;
+    const visBand = (G2 && G2.displayBand) ? G2.displayBand(band, rating) : band;
+    const visCls = "safety-" + visBand;
     return `
-      <li class="bf-spot ${safetyCls}" data-band="${band}" data-stars="${stars}">
+      <li class="bf-spot ${visCls}" data-band="${band}" data-display-band="${visBand}" data-stars="${stars}" data-rating="${rating}" style="--bf-rating-fill: ${fillNorm.toFixed(2)};">
         <div class="bf-spot-toggle" role="button" tabindex="0" aria-expanded="false">
           <div class="bf-spot-row">
             <span class="bf-spot-glyph" aria-hidden="true">${glyphHtml}</span>
@@ -1327,17 +1327,11 @@
     "CLOUDS", "BASE", "THERMAL", "XC", "INVERSION", "WINDOW",
     "SUNSHINE", "CONVERGENCE", "TURBULENCE",
   ];
-  const WINDOW_STATE_GLYPH = {
-    startbar: "▓",
-    sportlich: "▒",
-    blockiert: "⛔",
-    neutral: "·",
-  };
   const WINDOW_STATE_LABEL = {
-    startbar: "startbar",
-    sportlich: "sportlich",
-    blockiert: "blockiert",
-    neutral: "—",
+    startbar: "Startbar",
+    sportlich: "Sportlich",
+    blockiert: "Blockiert",
+    neutral: "Ausserhalb",
   };
 
   function _topicSortKey(topic) {
@@ -1345,76 +1339,109 @@
     return idx === -1 ? 999 : idx;
   }
 
-  function renderStartWindow(startWindow) {
-    if (!Array.isArray(startWindow) || !startWindow.length) return "";
-    // Filter neutral hours at edges, keep contiguous range incl. content
-    const sorted = startWindow
-      .filter((e) => e && typeof e.hour === "number")
-      .sort((a, b) => a.hour - b.hour);
-    if (!sorted.length) return "";
+  // Fester Anzeige-Rahmen 06:00–21:00 — Pilot soll IMMER den ganzen Flug-Tag
+  // sehen (gleiche horizontale Achse Tag fuer Tag, gleiche Spot fuer Spot).
+  // Fehlende Stunden im Backend-Output werden als "neutral" aufgefuellt.
+  const WINDOW_HOUR_START = 6;
+  const WINDOW_HOUR_END = 21; // exklusiv — letzte gezeigte Stunde ist 20
 
-    // Cells
-    const cellsHtml = sorted.map((e) => {
+  function renderStartWindow(startWindow) {
+    if (!Array.isArray(startWindow)) return "";
+    const byHour = {};
+    for (const e of startWindow) {
+      if (!e || typeof e.hour !== "number") continue;
+      byHour[e.hour] = e.state || "neutral";
+    }
+    const sorted = [];
+    for (let h = WINDOW_HOUR_START; h < WINDOW_HOUR_END; h++) {
+      sorted.push({ hour: h, state: byHour[h] || "neutral" });
+    }
+
+    // Laengsten zusammenhaengenden Run pro State berechnen.
+    function longestRun(targetState) {
+      let best = { len: 0, start: null, end: null };
+      let cur = { state: null, len: 0, start: null, end: null };
+      for (const e of sorted) {
+        if (e.state === cur.state) { cur.len += 1; cur.end = e.hour; }
+        else {
+          if (cur.state === targetState && cur.len > best.len) best = { ...cur };
+          cur = { state: e.state, len: 1, start: e.hour, end: e.hour };
+        }
+      }
+      if (cur.state === targetState && cur.len > best.len) best = { ...cur };
+      return best;
+    }
+    const bestStartbar = longestRun("startbar");
+    const bestSportlich = longestRun("sportlich");
+
+    // Kontinuierliche Farbleiste: ein Segment pro Stunde, voll-flaechig.
+    // Klar, ruhig, ohne ASCII-Glyphs in jeder Zelle.
+    const segmentsHtml = sorted.map((e) => {
       const state = e.state || "neutral";
-      const glyph = WINDOW_STATE_GLYPH[state] || "·";
       const hourLbl = String(e.hour).padStart(2, "0");
-      return `<div class="bf-window-cell bf-window-cell--${state}" title="${hourLbl}:00 — ${WINDOW_STATE_LABEL[state]}">
-        <span class="bf-window-cell-glyph" aria-hidden="true">${glyph}</span>
-        <span class="bf-window-cell-hour">${hourLbl}</span>
-      </div>`;
+      const lbl = WINDOW_STATE_LABEL[state] || "—";
+      return `<span class="bf-window-seg bf-window-seg--${state}" title="${hourLbl}:00 Uhr · ${lbl}"></span>`;
     }).join("");
 
-    // Summary: longest run of startbar
-    let bestRun = { state: null, len: 0, start: null, end: null };
-    let cur = { state: null, len: 0, start: null, end: null };
-    for (const e of sorted) {
-      if (e.state === cur.state) {
-        cur.len += 1;
-        cur.end = e.hour;
-      } else {
-        if (cur.state === "startbar" && cur.len > bestRun.len) bestRun = { ...cur };
-        cur = { state: e.state, len: 1, start: e.hour, end: e.hour };
-      }
-    }
-    if (cur.state === "startbar" && cur.len > bestRun.len) bestRun = { ...cur };
+    // Tick-Achse: nur alle 3 Stunden (06, 09, 12, 15, 18, 21) damit's ruhig wirkt.
+    const ticksHtml = sorted.map((e) => {
+      const show = e.hour % 3 === 0;
+      const lbl = show ? String(e.hour).padStart(2, "0") : "";
+      return `<span class="bf-window-tick${show ? " bf-window-tick--major" : ""}">${lbl}</span>`;
+    }).join("");
 
-    const sportRun = (() => {
-      let best = { len: 0, start: null, end: null };
-      let c = { state: null, len: 0, start: null, end: null };
-      for (const e of sorted) {
-        if (e.state === c.state) { c.len += 1; c.end = e.hour; }
-        else { if (c.state === "sportlich" && c.len > best.len) best = { ...c }; c = { state: e.state, len: 1, start: e.hour, end: e.hour }; }
-      }
-      if (c.state === "sportlich" && c.len > best.len) best = { ...c };
-      return best;
-    })();
+    // Inline-SVG-Icons (Lucide-Style, currentColor) statt Unicode-Glyphs —
+    // konsistent mit Brand-Sprache, kein Font-Fallback-Risiko.
+    const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+    const ICON_ALERT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    const ICON_X     = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
-    let summary = "";
-    if (bestRun.len > 0) {
-      const s = String(bestRun.start).padStart(2, "0");
-      const e = String(bestRun.end + 1).padStart(2, "0");
-      summary = `startbar ${s}–${e} h (${bestRun.len} h)`;
-      if (sportRun.len > 0) {
-        const ss = String(sportRun.start).padStart(2, "0");
-        const ee = String(sportRun.end + 1).padStart(2, "0");
-        summary += `, sportlich ${ss}–${ee} h`;
-      }
-    } else if (sportRun.len > 0) {
-      const ss = String(sportRun.start).padStart(2, "0");
-      const ee = String(sportRun.end + 1).padStart(2, "0");
-      summary = `nur sportlich ${ss}–${ee} h`;
+    // Primaer-Summary: was der Pilot zuerst sehen muss.
+    let primaryIcon, primaryText, primaryClass;
+    if (bestStartbar.len > 0) {
+      const s = String(bestStartbar.start).padStart(2, "0");
+      const e = String(bestStartbar.end + 1).padStart(2, "0");
+      primaryIcon = ICON_CHECK;
+      primaryClass = "is-good";
+      primaryText = `${s}:00 – ${e}:00 Uhr`;
+    } else if (bestSportlich.len > 0) {
+      const ss = String(bestSportlich.start).padStart(2, "0");
+      const ee = String(bestSportlich.end + 1).padStart(2, "0");
+      primaryIcon = ICON_ALERT;
+      primaryClass = "is-warn";
+      primaryText = `Nur sportlich ${ss}:00 – ${ee}:00 Uhr`;
     } else {
-      summary = "kein Startfenster heute";
+      primaryIcon = ICON_X;
+      primaryClass = "is-bad";
+      primaryText = "Heute nicht startbar";
+    }
+    const durationHtml = bestStartbar.len > 0
+      ? `<span class="bf-window-duration">${bestStartbar.len} h</span>`
+      : (bestSportlich.len > 0
+          ? `<span class="bf-window-duration">${bestSportlich.len} h</span>`
+          : "");
+
+    // Sekundaere Info (nur wenn Startbar UND Sportlich vorhanden)
+    let secondary = "";
+    if (bestStartbar.len > 0 && bestSportlich.len > 0) {
+      const ss = String(bestSportlich.start).padStart(2, "0");
+      const ee = String(bestSportlich.end + 1).padStart(2, "0");
+      secondary = `<div class="bf-window-secondary"><span class="bf-window-dot bf-window-dot--sportlich"></span>Sportlich ${ss}:00 – ${ee}:00 Uhr</div>`;
     }
 
     return `
       <section class="bf-window">
-        <div class="bf-window-header">
-          <span class="bf-window-icon" aria-hidden="true">🛫</span>
-          <span class="bf-window-title">Startfenster (Bodenwind)</span>
-        </div>
-        <div class="bf-window-cells">${cellsHtml}</div>
-        <div class="bf-window-summary">${escapeHtml(summary)}</div>
+        <header class="bf-window-head">
+          <span class="bf-window-title">Startfenster</span>
+          <span class="bf-window-summary bf-window-summary--${primaryClass}">
+            <span class="bf-window-summary-icon" aria-hidden="true">${primaryIcon}</span>
+            <span class="bf-window-summary-text">${escapeHtml(primaryText)}</span>
+            ${durationHtml}
+          </span>
+        </header>
+        <div class="bf-window-bar" role="img" aria-label="Startfenster-Verlauf ueber den Tag">${segmentsHtml}</div>
+        <div class="bf-window-axis" aria-hidden="true">${ticksHtml}</div>
+        ${secondary}
       </section>
     `;
   }
@@ -1573,9 +1600,38 @@
 
   // ── Region Toggle (expand/collapse) ─────────────────────────
 
+  function handleBulkToggle(ev) {
+    const btn = ev.target.closest(".bf-bulk-toggle");
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const expand = btn.dataset.bulkAction === "expand";
+    const contentEl = $("bfContent");
+    if (!contentEl) return;
+    const regions = contentEl.querySelectorAll(".bf-region");
+    regions.forEach((region) => {
+      const rid = region.dataset.regionId || "";
+      const head = region.querySelector(".bf-region-head");
+      region.classList.toggle("is-collapsed", !expand);
+      if (head) head.setAttribute("aria-expanded", String(expand));
+      if (expand) state.collapsedRegions.delete(rid);
+      else state.collapsedRegions.add(rid);
+    });
+    saveCollapsedRegions(state.collapsedRegions);
+    markExpandHintSeen();
+    // Label des Buttons fuer naechsten Toggle-Zustand aktualisieren.
+    btn.dataset.bulkAction = expand ? "collapse" : "expand";
+    const icon = btn.querySelector(".bf-bulk-toggle-icon");
+    const label = btn.querySelector(".bf-bulk-toggle-label");
+    if (icon)  icon.textContent  = expand ? "▴" : "▾";
+    if (label) label.textContent = expand ? "Alle einklappen" : "Alle ausklappen";
+    btn.setAttribute("aria-label", label ? label.textContent : "");
+  }
+
   function handleRegionToggle(ev) {
     if (ev.target.closest(".bf-share-btn")) return;
     if (ev.target.closest(".bf-spot")) return;
+    if (ev.target.closest(".bf-bulk-toggle")) return;
     const head = ev.target.closest(".bf-region-head");
     if (!head) return;
     const region = head.closest(".bf-region");
@@ -1960,10 +2016,10 @@
   function resetAllFilters() {
     state.filterRegions = new Set();
     state.safetyFilters = new Set(SAFETY_DEFS.map((t) => t.id));
-    state.minStars = 0;
+    state.minRating = 0;
     saveRegionFilter(state.filterRegions);
     saveSafetyFilter(state.safetyFilters);
-    saveMinStars(0);
+    saveMinRating(0);
     renderFilters(state.data);
     renderTierFilter();
     renderDayTabs(state.data);
@@ -1985,6 +2041,7 @@
     const contentEl = $("bfContent");
     if (contentEl) {
       contentEl.addEventListener("click", handleNumbersToggle);
+      contentEl.addEventListener("click", handleBulkToggle);
       contentEl.addEventListener("click", handleRegionToggle);
       contentEl.addEventListener("keydown", handleRegionKeydown);
       contentEl.addEventListener("click", handleSpotToggle);

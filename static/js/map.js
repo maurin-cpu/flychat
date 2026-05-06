@@ -156,6 +156,10 @@
     // safetyBand: 'green' | 'amber' | 'red' | 'no_data' | 'default'
     // experienceStars: 0..5 (integer)
     function mapSafetyBandToStyle(band) {
+        if (band === 'violet') return {
+            fill: '#8b5cf6', stroke: '#6d28d9',
+            label: 'Top'
+        };
         if (band === 'green') return {
             fill: '#22c55e', stroke: '#15803d',
             label: 'Sicher'
@@ -209,6 +213,13 @@
         var rating = (typeof experienceRating === 'number' && experienceRating >= 0 && experienceRating <= 10)
             ? Math.floor(experienceRating) : 0;
 
+        // Display-Band Premium-Override: safe + rating>=8 → violett.
+        // Auch fuer Wind-Sektor + Highlight-Glow, damit der Marker konsistent wirkt.
+        if (safetyBand === 'green' && rating >= 8) {
+            safetyBand = 'violet';
+            style = { fill: '#8b5cf6', stroke: '#6d28d9' };
+        }
+
         var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">';
         // Invisible hit-area — extends tap target to full 44x44 (mobile only, WCAG)
         if (isMobile) {
@@ -250,11 +261,11 @@
         // Weisser Hintergrund-Kreis, damit die Karte bei transparentem Fill nicht durchscheint
         html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="#ffffff" />';
 
-        // Intensitaet (Deckkraft) basierend auf Rating berechnen
+        // Intensitaet (Deckkraft) basierend auf Rating — moderater Dynamikbereich.
+        // Rating 1 ~0.28, Rating 5 ~0.60, Rating 10 = 1.0.
         var fillOpacity = 1.0;
         if (rating > 0 && (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet')) {
-            // Rating 1 -> 0.4 Deckkraft, Rating 10 -> 1.0 Deckkraft
-            fillOpacity = 0.4 + (rating / 10) * 0.6;
+            fillOpacity = 0.20 + (rating / 10) * 0.80;
         }
 
         // Main circle (safety band color)

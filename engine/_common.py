@@ -560,19 +560,21 @@ def _compute_safety_rating(result: dict) -> float:
     Tag mit "Wind 9, Gewitter-CAPE-WARN 2" als grosse 7/10 wirken, obwohl
     der einzelne kritische Aspekt den Tag definiert.
 
-    5 Sub-Ratings (alle 1-10):
-      - wind_safety_rating     (Bodenwind)
-      - gust_safety_rating     (Boeen)
-      - aloft_safety_rating    (Hoehenwind FL050-100)
-      - foehn_safety_rating    (Foehn-Risiko synoptisch)
-      - weather_safety_rating  (Niederschlag / Gewitter / CAPE / Sicht)
+    8 Sub-Ratings (alle 1-10):
+      - wind_safety_rating          (Bodenwind)
+      - gust_safety_rating          (Boeen)
+      - aloft_safety_rating         (Hoehenwind FL050-100)
+      - foehn_safety_rating         (Foehn-Risiko synoptisch)
+      - rain_safety_rating          (Niederschlag)
+      - thunderstorm_safety_rating  (Gewitter)
+      - cape_safety_rating          (Konvektionsenergie / Ueberentwicklung)
+      - visibility_safety_rating    (Sicht / Wolkenbasis)
 
-    Aggregation: `min(wind, gust, aloft, foehn, weather)`.
+    Aggregation: `min(wind, gust, aloft, foehn, rain, thunderstorm, cape, visibility)`.
 
-    Bei `safety_status = "not_safe"` setzt der LLM laut Skill alle 5 Werte
-    auf 1 → Resultat 1.0 (analog Fliegbarkeit). Hard-Overrides der Decision-
-    Engine (THUNDERSTORM, RAIN-WARN, CAPE-DANGER, FoehnDanger usw.) erzwingen
-    das auf der Status-Ebene unabhaengig.
+    Bei `safety_status = "not_safe"` setzt der LLM laut Skill alle 8 Werte
+    auf 1 → Resultat 1.0 (analog Fliegbarkeit). Decision-Engine-Hard-Overrides
+    (FoehnDanger, AloftNotSafe) erzwingen das auf der Status-Ebene zusaetzlich.
 
     Defaults bei fehlenden / invaliden Feldern: 5 (analog Fliegbarkeits-
     Sub-Ratings).
@@ -595,7 +597,10 @@ def _compute_safety_rating(result: dict) -> float:
         _maybe(result.get("gust_safety_rating")),
         _maybe(result.get("aloft_safety_rating")),
         _maybe(result.get("foehn_safety_rating")),
-        _maybe(result.get("weather_safety_rating")),
+        _maybe(result.get("rain_safety_rating")),
+        _maybe(result.get("thunderstorm_safety_rating")),
+        _maybe(result.get("cape_safety_rating")),
+        _maybe(result.get("visibility_safety_rating")),
     ) if v is not None]
     if not vals:
         return 5.0
@@ -649,7 +654,10 @@ def derive_status_from_subs(result: dict):
         _maybe(result.get("gust_safety_rating")),
         _maybe(result.get("aloft_safety_rating")),
         _maybe(result.get("foehn_safety_rating")),
-        _maybe(result.get("weather_safety_rating")),
+        _maybe(result.get("rain_safety_rating")),
+        _maybe(result.get("thunderstorm_safety_rating")),
+        _maybe(result.get("cape_safety_rating")),
+        _maybe(result.get("visibility_safety_rating")),
     ) if v is not None]
 
     if not vals:

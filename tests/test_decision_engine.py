@@ -575,19 +575,23 @@ class TestExperienceRating(unittest.TestCase):
 
 
 # ════════════════════════════════════════════════════════════════════
-# Vorab-Fix #4: Safety-Sub-Ratings (RATING_CONCEPT v1.3 §3.5)
+# Vorab-Fix #4: Safety-Sub-Ratings (8 Felder, Weakest-Link-Aggregation)
 # ════════════════════════════════════════════════════════════════════
-# Vier neue LLM-Sub-Ratings (wind/gust/aloft/foehn, je 1-10) werden
-# deterministisch zu 0-10 safety_rating aggregiert (Gewichte 30/25/25/20)
-# und × 10 zu safety_score (0-100).
+# Acht LLM-Sub-Ratings (wind/gust/aloft/foehn/rain/thunderstorm/cape/visibility,
+# je 1-10) werden via MIN zu 0-10 safety_rating aggregiert und × 10 zu
+# safety_score (0-100).
 class TestSafetyRating(unittest.TestCase):
-    def _result(self, wind=5, gust=5, aloft=5, foehn=5, weather=5):
+    def _result(self, wind=5, gust=5, aloft=5, foehn=5,
+                rain=5, thunderstorm=5, cape=5, visibility=5):
         return {
             "wind_safety_rating": wind,
             "gust_safety_rating": gust,
             "aloft_safety_rating": aloft,
             "foehn_safety_rating": foehn,
-            "weather_safety_rating": weather,
+            "rain_safety_rating": rain,
+            "thunderstorm_safety_rating": thunderstorm,
+            "cape_safety_rating": cape,
+            "visibility_safety_rating": visibility,
         }
 
     # ── Weakest-Link-Aggregation (MIN) ──
@@ -595,22 +599,25 @@ class TestSafetyRating(unittest.TestCase):
         self.assertEqual(_compute_safety_rating(self._result()), 5.0)
 
     def test_all_max_yields_10(self):
-        self.assertEqual(_compute_safety_rating(self._result(10, 10, 10, 10, 10)), 10.0)
+        self.assertEqual(_compute_safety_rating(self._result(10, 10, 10, 10, 10, 10, 10, 10)), 10.0)
 
     def test_all_min_yields_1(self):
-        self.assertEqual(_compute_safety_rating(self._result(1, 1, 1, 1, 1)), 1.0)
+        self.assertEqual(_compute_safety_rating(self._result(1, 1, 1, 1, 1, 1, 1, 1)), 1.0)
 
     def test_min_dominates_single_low_wind(self):
-        # 4 perfekte Ratings + 1 niedriger Wind → score gefolgt vom niedrigsten
-        self.assertEqual(_compute_safety_rating(self._result(2, 10, 10, 10, 10)), 2.0)
+        # 7 perfekte Ratings + 1 niedriger Wind → MIN vom niedrigsten
+        self.assertEqual(_compute_safety_rating(self._result(wind=2)), 2.0)
 
-    def test_min_dominates_single_low_weather(self):
-        # Klassischer Fall: Top-Wind, aber CAPE-WARN → safety = 2
-        # Verhindert dass perfekter Wind ein Gewitter-Risiko "wegmittelt"
-        self.assertEqual(_compute_safety_rating(self._result(9, 9, 9, 9, 2)), 2.0)
+    def test_min_dominates_single_low_rain(self):
+        # Klassischer Fall: alles top, aber Regen eingekesselt → safety = 2
+        # Verhindert dass perfekter Wind ein Regen-Risiko "wegmittelt"
+        self.assertEqual(_compute_safety_rating(self._result(rain=2)), 2.0)
+
+    def test_min_dominates_single_low_thunderstorm(self):
+        self.assertEqual(_compute_safety_rating(self._result(thunderstorm=2)), 2.0)
 
     def test_min_dominates_single_low_foehn(self):
-        self.assertEqual(_compute_safety_rating(self._result(10, 10, 10, 3, 10)), 3.0)
+        self.assertEqual(_compute_safety_rating(self._result(foehn=3)), 3.0)
 
     # ── Defaults bei fehlenden / ungueltigen Feldern ──
     def test_missing_fields_default_to_5(self):
@@ -620,28 +627,29 @@ class TestSafetyRating(unittest.TestCase):
     def test_invalid_field_falls_back_to_5(self):
         result = {"wind_safety_rating": "invalid", "gust_safety_rating": None,
                   "aloft_safety_rating": 5, "foehn_safety_rating": 5,
-                  "weather_safety_rating": 5}
-        # Invalid → 5, alle anderen 5 → MIN = 5
+                  "rain_safety_rating": 5}
+        # Invalid/None → ignoriert, Rest 5 → MIN = 5
         self.assertEqual(_compute_safety_rating(result), 5.0)
 
     def test_partial_missing_takes_min(self):
-        # nur weather=2, andere fehlen → defaults 5, MIN = 2
-        self.assertEqual(_compute_safety_rating({"weather_safety_rating": 2}), 2.0)
+        # nur rain=2, andere fehlen → werden ignoriert, MIN = 2
+        self.assertEqual(_compute_safety_rating({"rain_safety_rating": 2}), 2.0)
 
     def test_zero_or_negative_excluded(self):
         # Werte <=0 sind "nicht bewertbar" und werden aus dem MIN ausgeschlossen.
         # Wenn ALLE Sub-Ratings <=0 → Fallback 5.0 (neutral).
-        self.assertEqual(_compute_safety_rating(self._result(0, 0, 0, 0, 0)), 5.0)
+        self.assertEqual(_compute_safety_rating(self._result(0, 0, 0, 0, 0, 0, 0, 0)), 5.0)
 
     def test_region_no_gust_data(self):
         # Region-Szenario: Skill-Schema setzt gust_safety_rating=0 weil
         # Regionen keine Boeen-Daten haben. 0 darf NICHT das Min vergiften.
-        result = self._result(10, 0, 9, 10, 10)  # gust=0 → ignoriert
+        result = self._result(wind=10, gust=0, aloft=9, foehn=10, rain=10,
+                              thunderstorm=10, cape=10, visibility=10)
         self.assertEqual(_compute_safety_rating(result), 9.0)
 
     def test_clamp_above_ten(self):
         # Werte > 10 werden auf 10 geclampt → MIN = 10
-        self.assertEqual(_compute_safety_rating(self._result(15, 15, 15, 15, 15)), 10.0)
+        self.assertEqual(_compute_safety_rating(self._result(15, 15, 15, 15, 15, 15, 15, 15)), 10.0)
 
     # ── safety_score Skalierung ──
     def test_score_scaling(self):
@@ -921,13 +929,17 @@ class TestComputeRatingFromSubratings(unittest.TestCase):
 # ════════════════════════════════════════════════════════════════════
 
 class TestDeriveStatusFromSubs(unittest.TestCase):
-    def _r(self, wind=10, gust=10, aloft=10, foehn=10, weather=10):
+    def _r(self, wind=10, gust=10, aloft=10, foehn=10,
+           rain=10, thunderstorm=10, cape=10, visibility=10):
         return {
             "wind_safety_rating": wind,
             "gust_safety_rating": gust,
             "aloft_safety_rating": aloft,
             "foehn_safety_rating": foehn,
-            "weather_safety_rating": weather,
+            "rain_safety_rating": rain,
+            "thunderstorm_safety_rating": thunderstorm,
+            "cape_safety_rating": cape,
+            "visibility_safety_rating": visibility,
         }
 
     def test_all_high_safe(self):
@@ -943,7 +955,7 @@ class TestDeriveStatusFromSubs(unittest.TestCase):
 
     def test_min_2_not_safe(self):
         # m <= 2 -> not_safe (akut gefaehrlich, vor Hard-Override)
-        self.assertEqual(derive_status_from_subs(self._r(weather=2)), "not_safe")
+        self.assertEqual(derive_status_from_subs(self._r(rain=2)), "not_safe")
 
     def test_min_1_not_safe(self):
         self.assertEqual(derive_status_from_subs(self._r(foehn=1)), "not_safe")
@@ -960,18 +972,19 @@ class TestDeriveStatusFromSubs(unittest.TestCase):
 
     def test_all_zero_returns_none(self):
         # Keine bewertbaren Subs -> None (Aufrufer ueberschreibt nichts).
-        r = self._r(wind=0, gust=0, aloft=0, foehn=0, weather=0)
+        r = self._r(wind=0, gust=0, aloft=0, foehn=0,
+                    rain=0, thunderstorm=0, cape=0, visibility=0)
         self.assertIsNone(derive_status_from_subs(r))
 
     def test_missing_subs_returns_none(self):
         self.assertIsNone(derive_status_from_subs({}))
 
     def test_partial_subs_works(self):
-        # Region: foehn fehlt, andere vorhanden — funktioniert trotzdem.
+        # Region: foehn/gust fehlt, andere vorhanden — funktioniert trotzdem.
         r = {
             "wind_safety_rating": 8,
             "aloft_safety_rating": 3,
-            "weather_safety_rating": 9,
+            "rain_safety_rating": 9,
         }
         self.assertEqual(derive_status_from_subs(r), "conditional")
 
@@ -988,7 +1001,7 @@ class TestDeriveStatusFromSubs(unittest.TestCase):
     # LLM gab status=safe + summary "sicher", aber wind_safety=3 wegen falscher
     # Richtung. Erwartetes Verhalten: derived = "conditional" -> Engine eskaliert.
     def test_monte_lema_drift_pattern(self):
-        r = self._r(wind=3, gust=8, aloft=8, foehn=10, weather=9)
+        r = self._r(wind=3, gust=8, aloft=8, foehn=10, rain=9)
         self.assertEqual(derive_status_from_subs(r), "conditional")
 
 
