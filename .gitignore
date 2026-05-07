@@ -27,6 +27,8 @@ data/history/
 weather_context_dump.txt
 data/preview/
 data/mocks/wetterdaten.json
+data/mocks/_meta.json
+data/test_runs/
 data/cost_telemetry.jsonl
 
 # Runtime config (Admin-UI written, server-local)

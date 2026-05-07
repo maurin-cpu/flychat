@@ -1,9 +1,0 @@
-{
-  "run_at": "2026-05-07T21:10:41",
-  "completed_at": "2026-05-07T21:13:04",
-  "used_frozen_weather": true,
-  "spot_set": "test",
-  "n_spots": 28,
-  "n_regions": 29,
-  "n_days": 2
-}
