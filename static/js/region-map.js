@@ -115,6 +115,20 @@
         if (r > 0) return Math.max(1, Math.min(10, Math.round(r)));
         return 0;
     }
+    function getSafetyScore(dayData) {
+        if (!dayData) return null;
+        if (typeof dayData.safety_score === 'number')
+            return Math.max(0, Math.min(100, Math.round(dayData.safety_score)));
+        var nested = dayData.safety || {};
+        var status = String((dayData.safety_status || nested.safety_status || '')).toLowerCase();
+        var foehn  = String((dayData.foehn_risk   || nested.foehn_risk   || 'none')).toLowerCase();
+        var base;
+        if (status === 'safe') base = 85;
+        else if (status === 'conditional') base = 50;
+        else return null;
+        var delta = (foehn === 'medium') ? -15 : (foehn === 'high' || foehn === 'severe') ? -30 : 0;
+        return Math.max(0, Math.min(100, base + delta));
+    }
     function getSafetyBand(dayData) {
         if (!dayData) return 'no_data';
         var b = dayData.safety_band;
@@ -442,8 +456,8 @@
             // Karten-Polygonen fuehrte (gruen statt amber).
             var band = getSafetyBand(dayData);
             var rating = getRating(dayData);
-            // Premium-Marker: safe + rating>=8 → violett (Display-Band).
-            if (band === 'green' && rating >= 8) band = 'violet';
+            // Premium-Marker: safe + rating>=9 → violett (Display-Band).
+            if (band === 'green' && rating >= 9) band = 'violet';
             var style = mapRegionStyle(band);
 
             // Polygon-Style nach §4.3: dashed bei red/no_data, solid bei green/amber.
@@ -574,28 +588,33 @@
                 || dayData.status;
             if (ss === 'no_data' || ss === 'error' || ss === 'not_safe') continue;
             var rating = getRating(dayData);
-            if (rating <= 0) continue;
+            if (rating < 8) continue;
             var band = getSafetyBand(dayData);
             entries.push({
                 name: name,
                 band: band,
                 rating: rating,
+                safetyScore: getSafetyScore(dayData),
                 window: shortenWindow(dayData.best_window)
             });
         }
         if (!entries.length) {
-            // Diagnose: wieviele Records gabs ueberhaupt fuer diese Region am
-            // gewaehlten Tag? Wenn 0 → keine Daten. Wenn >0 → alle not_safe.
             var totalForDay = 0;
+            var flyableForDay = 0;
             for (var sn in spotAnalyses) {
                 var dd = spotAnalyses[sn] && spotAnalyses[sn][dateStr];
                 if (!dd) continue;
                 var srid = (spotRegionMap && spotRegionMap[sn]) || dd.region_id || '';
-                if (srid === rid) totalForDay++;
+                if (srid !== rid) continue;
+                totalForDay++;
+                var dss = dd.safety_status || (dd.safety && dd.safety.safety_status) || dd.status;
+                if (dss !== 'no_data' && dss !== 'error' && dss !== 'not_safe') flyableForDay++;
             }
             var msg = (totalForDay === 0)
                 ? 'Keine Spot-Daten an diesem Tag'
-                : 'Heute kein fliegbarer Spot in dieser Region';
+                : (flyableForDay === 0)
+                    ? 'Heute kein fliegbarer Spot in dieser Region'
+                    : 'Kein Spot mit Rating ≥ 8 in dieser Region';
             return '<div class="region-spot-strip-empty">' + msg + '</div>';
         }
         entries.sort(function (a, b) { return b.rating - a.rating; });
@@ -607,13 +626,16 @@
             + '<div class="region-spot-strip-scroll" role="list">';
         entries.forEach(function (e) {
             var bandClass = 'is-' + (e.band || 'green');
+            var safetyStr = e.safetyScore !== null ? 'S:' + e.safetyScore : '';
             html += '<button type="button" class="region-spot-pill ' + bandClass + '"'
                 + ' role="listitem"'
                 + ' data-spot-name="' + escHtml(e.name) + '"'
                 + ' aria-label="' + escHtml(e.name) + ', Bewertung ' + e.rating + ' von 10'
+                + (safetyStr ? ', Safety ' + e.safetyScore + ' von 100' : '')
                 + (e.window ? ', Fenster ' + escHtml(e.window) : '') + '">'
                 + '<span class="region-spot-pill-rating">' + e.rating + '</span>'
                 + '<span class="region-spot-pill-name">' + escHtml(e.name) + '</span>'
+                + (safetyStr ? '<span class="region-spot-pill-safety">' + safetyStr + '</span>' : '')
                 + (e.window
                     ? '<span class="region-spot-pill-window">' + escHtml(e.window) + '</span>'
                     : '<span class="region-spot-pill-window">&nbsp;</span>')
@@ -738,7 +760,6 @@
         bodyHtml += '<div class="region-overlay-content">';
         bodyHtml += '<div class="region-overlay-meteogram">';
         bodyHtml += '<div class="region-meteogram-chart" id="regionMeteogramChart"><div class="region-meteogram-loading">Meteogramm wird geladen...</div></div>';
-        bodyHtml += '<div class="region-overlay-spot-strip" id="regionOverlaySpotStrip" style="display:none"></div>';
         bodyHtml += '</div>';
         bodyHtml += '<aside class="' + asideClass + '" id="regionAnalysisAside">';
         bodyHtml += '<div class="meteogram-aside-header">';
@@ -748,6 +769,7 @@
         bodyHtml += '</div>';
         bodyHtml += '<div class="meteogram-feedback-bar" id="regionFeedbackBar"></div>';
         bodyHtml += '<div class="meteogram-aside-body"></div>';
+        bodyHtml += '<div class="region-overlay-spot-strip" id="regionOverlaySpotStrip" style="display:none"></div>';
         bodyHtml += '</aside>';
         bodyHtml += '</div>';
 

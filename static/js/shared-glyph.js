@@ -17,11 +17,11 @@
     return { fill: "#6b7280", stroke: "#4b5563", label: "" };
   }
 
-  // Display-Band: safe + rating>=8 wird visuell als violett dargestellt.
+  // Display-Band: safe + rating>=9 wird visuell als violett dargestellt.
   // Safety-Filter und Filter-Logik bleiben aber bei "green" — violett ist
   // nur ein optischer Premium-Marker fuer top-bewertete sichere Spots/Regionen.
   function displayBand(band, rating) {
-    if (band === "green" && typeof rating === "number" && rating >= 8) return "violet";
+    if (band === "green" && typeof rating === "number" && rating >= 9) return "violet";
     return band;
   }
 

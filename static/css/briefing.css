@@ -1514,6 +1514,35 @@
   border-color: #bbf7d0;
 }
 
+/* Score-Pillen (Safety / Experience / Comfort) */
+.bf-spot-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 5px 0 0;
+}
+
+.bf-score-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary, #f8fafc);
+  color: var(--color-text-muted);
+}
+
+.bf-score-pill--safety {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+
 /* Tier accents on chips */
 .bf-spot.tier-violet .bf-chip--safe {
   background: var(--color-fly-violet-bg);
@@ -2039,6 +2068,14 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
 .bf-assessment--safety { border-left-color: #ef4444; }
 .bf-assessment--fly    { border-left-color: #22c55e; }
 .bf-assessment--xc     { border-left-color: #8b5cf6; }
+.bf-assessment--debug  { border-left-color: #64748b; opacity: 0.85; }
+
+.bf-debug-notes { display: flex; flex-direction: column; gap: 12px; }
+.bf-debug-group { display: flex; flex-direction: column; gap: 4px; }
+.bf-debug-group-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; padding-bottom: 4px; border-bottom: 1px solid #334155; margin-bottom: 2px; }
+.bf-debug-row { display: grid; grid-template-columns: 100px 1fr; gap: 8px; font-size: 12px; line-height: 1.5; }
+.bf-debug-key { color: #94a3b8; font-weight: 500; flex-shrink: 0; }
+.bf-debug-val { color: #cbd5e1; word-break: break-word; }
 
 .bf-assessment-toggle {
   display: flex;
@@ -2493,6 +2530,8 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   .bf-chip { font-size: 10px; padding: 2px 8px; }
   .bf-chip--type { display: none; }
   .bf-chip--warn { max-width: 180px; }
+  .bf-spot-scores { gap: 4px; margin-top: 4px; }
+  .bf-score-pill { font-size: 9.5px; padding: 1px 7px; }
   .bf-spot-rating { font-size: 1.15rem; }
   .bf-spot:hover { transform: none; }
 

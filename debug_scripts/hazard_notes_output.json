@@ -1,0 +1,21 @@
+{
+  "hazard_notes": {
+    "wind": "STABIL — Bodenwind zwischen 5 und 9 km/h, keine signifikante Veränderung.",
+    "gusts": "ZUNEHMEND — Boenfaktor 1.5, Spitzen bis 35 km/h am 16:00.",
+    "aloft": "WARN — ALOFT-GUST-WARN 16:00-17:00, Hoehenwind 30-35 km/h.",
+    "foehn": "KEIN-FOEHN — kein Druckgradient, keine Föhngefahr.",
+    "rain": "KEIN-REGEN — trockener Tag.",
+    "thunderstorm": "KEIN-GEWITTER — keine Gewitterprognose.",
+    "cape": "KEIN-AUFBAU — CAPE unter 400 J/kg.",
+    "visibility": "STABIL — Wolkenbasis klar über Startplatz, keine Sichtprobleme."
+  },
+  "flyability_notes": {
+    "thermal": "Peak 2.1 m/s zwischen 12:00 und 16:00, gute Konsistenz mit Wolkenbasis 1613m.",
+    "window": "5h stabil von 12:00 bis 17:00, keine signifikanten Unterbrechungen.",
+    "wind": "Bodenwind stabil zwischen 5 und 9 km/h, ab 16:00 Uhr aktive Böen.",
+    "xc": "Moderate Basis mit 1613m, stabiler Wind, aber ab 16:00 Uhr sportliche Bedingungen.",
+    "altitude": "AGL-Median über produktive Stunden liegt bei ca. 900m."
+  },
+  "safety_status": "conditional",
+  "summary": "Der Tag wird als bedingt sicher eingestuft, da die Bedingungen durch starke Böen in der Höhe beeinträchtigt werden. Am 16:00 Uhr tritt ein kraeftige Hoehenboeen auf, was die Flugsicherheit einschränkt. Der Bodenwind bleibt stabil und im erlaubten Sektor, während die Thermik durchgehend produktiv ist. Insgesamt sind die Bedingungen für einen sicheren Flugtag gegeben, jedoch sollte auf die Turbulenz geachtet werden."
+}

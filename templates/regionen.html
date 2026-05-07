@@ -346,13 +346,9 @@
        sichtbar bleibt. Klick auf eine Pill = Deep-Link auf /?spot=<name>. */
     .region-overlay-spot-strip {
         flex: 0 0 auto;
-        position: sticky;
-        bottom: 0;
-        background: var(--color-bg-elevated, #fff);
         border-top: 1px solid var(--color-border, #e5e7eb);
-        padding: 8px 4px 10px;
-        margin-top: 8px;
-        z-index: 5;
+        padding: 12px 4px 10px;
+        margin-top: 4px;
     }
     .region-spot-strip-header {
         display: flex;
@@ -397,7 +393,7 @@
         flex: 0 0 auto;
         scroll-snap-align: start;
         width: 96px;
-        height: 72px;
+        height: 84px;
         padding: 6px 8px;
         background: #fff;
         border: 1.5px solid #e5e7eb;
@@ -445,6 +441,15 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    .region-spot-pill-safety {
+        font-size: 10px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: #64748b;
+    }
+    .region-spot-pill.is-green .region-spot-pill-safety { color: #15803d; }
+    .region-spot-pill.is-amber .region-spot-pill-safety { color: #b45309; }
+    .region-spot-pill.is-red   .region-spot-pill-safety { color: #b91c1c; }
     .region-spot-pill-window {
         font-size: 10.5px;
         color: #64748b;
@@ -460,11 +465,12 @@
         }
         .region-spot-pill {
             width: 84px;
-            height: 64px;
+            height: 76px;
         }
-        .region-spot-pill-rating { font-size: 20px; }
-        .region-spot-pill-name   { font-size: 11px; }
-        .region-spot-pill-window { font-size: 10px; }
+        .region-spot-pill-rating  { font-size: 20px; }
+        .region-spot-pill-name    { font-size: 11px; }
+        .region-spot-pill-safety  { font-size: 9.5px; }
+        .region-spot-pill-window  { font-size: 10px; }
     }
 
     /* Mid-width: Aside schmaler, damit das Meteogramm mehr Spaltenbreite

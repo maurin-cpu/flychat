@@ -322,7 +322,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=_resolve_max_tokens(self.analysis_model, 1500),
+                        max_tokens=_resolve_max_tokens(self.analysis_model, 2000),
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "spot_safety")
@@ -471,7 +471,7 @@ class AnalyzersMixin:
                         model=self.analysis_model,
                         messages=messages,
                         temperature=0.2,
-                        max_tokens=_resolve_max_tokens(self.analysis_model, 1500),
+                        max_tokens=_resolve_max_tokens(self.analysis_model, 2000),
                         response_format={"type": "json_object"},
                     )
                     self._record_call_usage(response, "region_safety")
@@ -1284,7 +1284,7 @@ class AnalyzersMixin:
                     )},
                 ],
                 temperature=0.4,
-                max_tokens=_resolve_max_tokens(self.analysis_model, 1500),
+                max_tokens=_resolve_max_tokens(self.analysis_model, 2000),
                 response_format={"type": "json_object"},
             )
             _log_prompt_cache_usage(response, label="weekly_briefing")
@@ -1412,6 +1412,7 @@ class AnalyzersMixin:
                     "wind_moderate_count": result.get("wind_moderate_count", 0),
                     "wind_strong_count": result.get("wind_strong_count", 0),
                     "error": result.get("error", ""),
+                    "hazard_notes": result.get("hazard_notes"),
                 }
                 entry = {"safety": safety}
                 self._attach_rating_fields(entry, result)
@@ -1439,6 +1440,7 @@ class AnalyzersMixin:
                         "highlights": result.get("highlights", []),
                         "recommendation": result.get("recommendation", ""),
                         "confidence": result.get("confidence", ""),
+                        "flyability_notes": result.get("flyability_notes"),
                         "rating": entry["rating"],
                         "is_conditional": entry["is_conditional"],
                         "conditional_reason": entry["conditional_reason"],
@@ -1613,6 +1615,7 @@ class AnalyzersMixin:
                     "wind_ok_count": result.get("wind_ok_count", 0),
                     "wind_wrong_count": result.get("wind_wrong_count", 0),
                     "error": result.get("error", ""),
+                    "hazard_notes": result.get("hazard_notes"),
                 }
                 entry = {"safety": safety}
                 self._attach_rating_fields(entry, result)
@@ -1642,6 +1645,7 @@ class AnalyzersMixin:
                         "highlights": result.get("highlights", []),
                         "recommendation": result.get("recommendation", ""),
                         "confidence": result.get("confidence", ""),
+                        "flyability_notes": result.get("flyability_notes"),
                         "rating": entry["rating"],
                         "is_conditional": entry["is_conditional"],
                         "conditional_reason": entry["conditional_reason"],
@@ -2420,7 +2424,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": _resolve_max_tokens(self.analysis_model, 1500),
+                        "max_tokens": _resolve_max_tokens(self.analysis_model, 2000),
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2666,7 +2670,7 @@ class AnalyzersMixin:
                             {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}"},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": _resolve_max_tokens(self.analysis_model, 1500),
+                        "max_tokens": _resolve_max_tokens(self.analysis_model, 2000),
                         "response_format": {"type": "json_object"},
                     },
                 })
@@ -2894,6 +2898,7 @@ class AnalyzersMixin:
                     "wind_ok_count": result.get("wind_ok_count", 0),
                     "wind_wrong_count": result.get("wind_wrong_count", 0),
                     "error": result.get("error", ""),
+                    "hazard_notes": result.get("hazard_notes"),
                 }
                 entry = {"safety": safety}
                 self._attach_rating_fields(entry, result)
@@ -2980,6 +2985,7 @@ class AnalyzersMixin:
                     "wind_moderate_count": result.get("wind_moderate_count", 0),
                     "wind_strong_count": result.get("wind_strong_count", 0),
                     "error": result.get("error", ""),
+                    "hazard_notes": result.get("hazard_notes"),
                 }
                 entry = {"safety": safety}
                 self._attach_rating_fields(entry, result)

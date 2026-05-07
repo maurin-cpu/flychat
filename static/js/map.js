@@ -21,6 +21,10 @@
     var tooltipEl = document.getElementById('tooltip');
     var asideEl = document.getElementById('meteogramAside');
     var asideToggleBtn = document.getElementById('meteogramAsideToggle');
+    var jsonDebugBtn = document.getElementById('meteogramJsonDebug');
+    var jsonDebugActive = false;
+    var hazardDebugBtn = document.getElementById('meteogramHazardDebug');
+    var hazardDebugActive = false;
 
     // Datenquelle für Wind/Höhenwind. ICON-D2 ist der Open-Meteo-Default.
     var WIND_MODEL_LABEL = 'ICON-D2';
@@ -213,9 +217,9 @@
         var rating = (typeof experienceRating === 'number' && experienceRating >= 0 && experienceRating <= 10)
             ? Math.floor(experienceRating) : 0;
 
-        // Display-Band Premium-Override: safe + rating>=8 → violett.
+        // Display-Band Premium-Override: safe + rating>=9 → violett.
         // Auch fuer Wind-Sektor + Highlight-Glow, damit der Marker konsistent wirkt.
-        if (safetyBand === 'green' && rating >= 8) {
+        if (safetyBand === 'green' && rating >= 9) {
             safetyBand = 'violet';
             style = { fill: '#8b5cf6', stroke: '#6d28d9' };
         }
@@ -326,6 +330,22 @@
             html += '<span style="color:' + s.stroke + ';">' + s.label + '</span>';
             if (safetyBand !== 'red' && typeof experienceRating === 'number' && experienceRating >= 1) {
                 html += ' &middot; Rating ' + experienceRating + '/10';
+            }
+            if (dayData) {
+                var _safScore = null;
+                if (typeof dayData.safety_score === 'number') {
+                    _safScore = Math.round(dayData.safety_score);
+                } else {
+                    var _nested = dayData.safety || {};
+                    var _st = String((dayData.safety_status || _nested.safety_status || '')).toLowerCase();
+                    var _fo = String((dayData.foehn_risk   || _nested.foehn_risk   || 'none')).toLowerCase();
+                    var _base = (_st === 'safe') ? 85 : (_st === 'conditional') ? 50 : -1;
+                    if (_base >= 0) {
+                        var _delta = (_fo === 'medium') ? -15 : (_fo === 'high' || _fo === 'severe') ? -30 : 0;
+                        _safScore = Math.max(0, _base + _delta);
+                    }
+                }
+                if (_safScore !== null) html += ' &middot; Safety ' + _safScore + '/100';
             }
             if (dayData && typeof dayData.comfort_index === 'number') {
                 html += ' &middot; Comfort ' + Math.round(dayData.comfort_index);
@@ -450,6 +470,8 @@
             var params = new URLSearchParams(window.location.search);
             var spotName = params.get('spot');
             if (!spotName) return;
+            var dateParam = params.get('date');
+            if (dateParam) window.currentDate = dateParam;
             var marker = markersByName[spotName];
             if (!marker) return;
             if (marker.getLatLng) {
@@ -478,6 +500,83 @@
         // Header bekommt den Handler (Button bubbled hinauf — kein Doppel-Toggle).
         if (asideHeader) asideHeader.addEventListener('click', toggleAside);
         else if (asideToggleBtn) asideToggleBtn.addEventListener('click', toggleAside);
+    }
+
+    // ===== JSON DEBUG (Testmodus) =====
+    function renderJsonDebug() {
+        if (!chartContainer || !currentSpotName || !currentDates.length) return;
+        var dateStr = currentDates[currentDateIdx];
+        var analysis = (window.analysisData && window.analysisData[currentSpotName] && window.analysisData[currentSpotName][dateStr])
+            ? window.analysisData[currentSpotName][dateStr]
+            : null;
+        chartContainer.innerHTML = '<pre id="jsonDebugPre" style="margin:0;padding:12px;font-size:11px;line-height:1.5;overflow:auto;height:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-all;color:#e2e8f0;background:#0f172a;border-radius:6px;">'
+            + (analysis ? JSON.stringify(analysis, null, 2).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '(keine Analyse für ' + currentSpotName + ' / ' + dateStr + ')')
+            + '</pre>';
+    }
+
+    if (jsonDebugBtn) {
+        jsonDebugBtn.addEventListener('click', function () {
+            jsonDebugActive = !jsonDebugActive;
+            jsonDebugBtn.classList.toggle('active', jsonDebugActive);
+            if (hazardDebugActive) { hazardDebugActive = false; if (hazardDebugBtn) hazardDebugBtn.classList.remove('active'); }
+            if (jsonDebugActive) {
+                renderJsonDebug();
+            } else {
+                renderCurrentDay();
+            }
+        });
+    }
+
+    function _escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function renderHazardDebug() {
+        if (!chartContainer || !currentSpotName || !currentDates.length) return;
+        var dateStr = currentDates[currentDateIdx];
+        chartContainer.innerHTML = '<div id="hazardDebugLoading" style="padding:12px;color:#94a3b8;font-size:12px;">Lade Debug-Daten…</div>';
+        var url = '/api/spot-debug/' + encodeURIComponent(currentSpotName) + '/' + encodeURIComponent(dateStr);
+        fetch(url).then(function(r){ return r.json(); }).then(function(d) {
+            if (d.error) { chartContainer.innerHTML = '<div style="padding:12px;color:#f87171;">'+_escHtml(d.error)+'</div>'; return; }
+            var lines = [];
+            lines.push('=== SAFETY ===');
+            lines.push('Status: ' + (d.safety_status||'?') + '  |  Band: ' + (d.safety_band||'?') + '  |  Score: ' + (d.safety_score!=null?d.safety_score:'?') + '  |  Foehn: ' + (d.foehn_risk||'?'));
+            lines.push('');
+            lines.push('--- Sub-Ratings (1-10) ---');
+            if (d.sub_ratings) Object.keys(d.sub_ratings).forEach(function(k){ lines.push('  ' + k.replace('_safety_rating','').padEnd(15) + ': ' + (d.sub_ratings[k]!=null?d.sub_ratings[k]:'–')); });
+            lines.push('');
+            lines.push('--- Hazard Notes ---');
+            if (d.hazard_notes) Object.keys(d.hazard_notes).forEach(function(k){ lines.push('  [' + k + '] ' + _escHtml(d.hazard_notes[k]||'')); });
+            lines.push('');
+            if (d.wind_summary) { lines.push('--- Wind Summary ---'); lines.push(_escHtml(d.wind_summary)); lines.push(''); }
+            if (d.wind_shear) { lines.push('--- Wind Shear ---'); lines.push(_escHtml(d.wind_shear)); lines.push(''); }
+            lines.push('=== FLYABILITY ===');
+            lines.push('Status: ' + (d.fly_status||'?') + '  |  Experience: ' + (d.experience_rating!=null?d.experience_rating:'?'));
+            lines.push('');
+            if (d.fly_sub_ratings && Object.keys(d.fly_sub_ratings).some(function(k){return d.fly_sub_ratings[k]!=null;})) {
+                lines.push('--- Fly Sub-Ratings (1-10) ---');
+                Object.keys(d.fly_sub_ratings).forEach(function(k){ if(d.fly_sub_ratings[k]!=null) lines.push('  ' + k.replace('_flyability_rating','').padEnd(15) + ': ' + d.fly_sub_ratings[k]); });
+                lines.push('');
+            }
+            if (d.flyability_notes) { lines.push('--- Flyability Notes ---'); Object.keys(d.flyability_notes).forEach(function(k){ lines.push('  [' + k + '] ' + _escHtml(d.flyability_notes[k]||'')); }); lines.push(''); }
+            lines.push('=== DECISIONS APPLIED ===');
+            lines.push((d._decisions_applied && d._decisions_applied.length) ? d._decisions_applied.join(', ') : '(keine)');
+            chartContainer.innerHTML = '<pre style="margin:0;padding:12px;font-size:11px;line-height:1.6;overflow:auto;height:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-all;color:#e2e8f0;background:#0f172a;border-radius:6px;">'
+                + lines.join('\n') + '</pre>';
+        }).catch(function(err){
+            chartContainer.innerHTML = '<div style="padding:12px;color:#f87171;">Fehler: '+_escHtml(err)+'</div>';
+        });
+    }
+
+    if (hazardDebugBtn) {
+        hazardDebugBtn.addEventListener('click', function () {
+            hazardDebugActive = !hazardDebugActive;
+            hazardDebugBtn.classList.toggle('active', hazardDebugActive);
+            if (jsonDebugActive) { jsonDebugActive = false; if (jsonDebugBtn) jsonDebugBtn.classList.remove('active'); }
+            if (hazardDebugActive) {
+                renderHazardDebug();
+            } else {
+                renderCurrentDay();
+            }
+        });
     }
 
     function renderAnalyseView() {
@@ -666,6 +765,8 @@
     }
 
     function renderCurrentDay() {
+        if (hazardDebugActive) { renderHazardDebug(); renderAnalyseView(); return; }
+        if (jsonDebugActive) { renderJsonDebug(); renderAnalyseView(); return; }
         var dateStr = currentDates[currentDateIdx];
         if (!dateStr) return;
 
@@ -723,6 +824,15 @@
         currentWeather = null;
         currentAltWind = null;
         if (window._overlayScrollUnlock) window._overlayScrollUnlock();
+        // Debug-Buttons zurücksetzen
+        if (jsonDebugActive) {
+            jsonDebugActive = false;
+            if (jsonDebugBtn) jsonDebugBtn.classList.remove('active');
+        }
+        if (hazardDebugActive) {
+            hazardDebugActive = false;
+            if (hazardDebugBtn) hazardDebugBtn.classList.remove('active');
+        }
     }
 
     /** Sync the navbar day tabs + marker colours after an

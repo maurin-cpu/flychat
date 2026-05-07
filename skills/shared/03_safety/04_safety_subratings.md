@@ -48,6 +48,8 @@ Richtung ist Startbarkeit (Tagesfenster), nicht Sicherheit. Falscher Sektor
 oder ein Winddreher ist KEIN Sicherheitsthema und darf nie als Grund fuer
 `conditional` oder `not_safe` angefuehrt werden.
 
+**VERBOTEN**: `wind_safety_rating <= 5` wegen `[WIND-WRONG]`-Stunden oder Winddrehung — wenn die Windstaerke selbst im grünen Bereich ist, ist das Minimum **7**. Beispiel falsch: "dreht ab 14h aus Sektor → Rating 3". Beispiel richtig: "dreht ab 14h aus Sektor, Staerke 8-12 km/h stabil → Rating 8, Drehung geht in wind_summary".
+
 **Spot-Bemerkung lesen**: Default-Idealbereich ist {{cfg.WIND_IDEAL_MIN_KMH}}-{{cfg.WIND_IDEAL_MAX_KMH}} km/h fuer Thermik-Spots. Soaring-Spots wie z.B. Balderen brauchen einen MINDESTWIND (oft ab 15 km/h) — die Spot-Bemerkung im Prompt-Kontext nennt diese Anforderung explizit. Beruecksichtige sie aktiv.
 
 Anker:
@@ -159,11 +161,19 @@ NUTZUNGS-REGELN
 
 **Pflicht**: Vergib alle 8 Safety-Sub-Ratings als ganze Zahlen 1-10.
 
-**Hazard-Erwaehnung Pflicht**: Wenn Regen, Gewitter, CAPE oder Sichteinschraenkung im Datenblock vorkommt — egal ob es den Status beeinflussen oder nicht — MUSS die Prosa (`summary` oder `caution_notes`) diesen Hazard erwaehnen und das **Trend-Muster** benennen. Nutze das Trend-Vokabular direkt: "Aufklaerung", "Spaetreegen", "Eingekesselt", "nur Abend". Beispiele:
-- rain_safety_rating 6, Aufklaerung → "Morgendlicher Regen (08-09h) klaert bis 10h auf — Flugfenster ab 13h trocken."
-- thunderstorm_safety_rating 4, nur Abend → "Gewitterprognose erst ab 19h, deutlich nach Fensterabschluss — kein Einfluss."
-- cape_safety_rating 7, kein Aufbau → "CAPE unter 800 J/kg, kein Entwicklungspotenzial waehrend der Flugstunden."
-VERBOTEN: Hazard im Datenblock, in der Prosa aber komplett verschwiegen.
+**`hazard_notes` ZUERST ausfuellen — vor den Ratings, vor der Prosa**: Fuelle alle 8 Felder in `hazard_notes` mit je einem konkreten Satz. Das ist dein strukturiertes Nachdenken: du wirst gezwungen, jeden Hazard explizit zu begruenden, bevor du die Ratings vergibst und die Prosa schreibst. Beispiele:
+- `"wind": "ZUNEHMEND — morgens 12 km/h, ab 14h auf 40 km/h, WIND-DANGER 14-17h."` → wind_safety_rating 2
+- `"wind": "STABIL — 15-20 km/h ganztags, kein Aufbau."` → wind_safety_rating 8
+- `"foehn": "AUFBAUEND — Delta-P 4.2→7.8 hPa Sued bis 14h, 850 hPa 38 km/h Sued bestaetigt."` → foehn_safety_rating 2
+- `"foehn": "KEIN-FOEHN — Delta-P unter 2 hPa, kein synoptischer Trigger."` → foehn_safety_rating 10
+- `"rain": "AUFKLAERUNG — Regen 08-09h, ab 10h trocken, Fenster unbeeintraecht."` → rain_safety_rating 8
+- `"rain": "EINGEKESSELT — Regen 07-09h und wieder 16-18h, Trockenfenster 7h."` → rain_safety_rating 3
+- `"rain": "KEIN-REGEN — trockener Tag."` → rain_safety_rating 10
+- `"thunderstorm": "KEIN-GEWITTER — keine Modell-Prognose, CAPE unter 300 J/kg."` → thunderstorm_safety_rating 10
+- `"thunderstorm": "NUR-ABEND — Prognose erst ab 19h, deutlich nach Fensterabschluss."` → thunderstorm_safety_rating 6
+- `"cape": "AUFBAUEND — CAPE 1200 J/kg 14-16h bei aktivem Niederschlag, Ueberentwicklung."` → cape_safety_rating 3
+- `"cape": "KEIN-AUFBAU — CAPE unter 400 J/kg ganztags."` → cape_safety_rating 10
+VERBOTEN: generische Platzhalter-Saetze wie "unauffaellig" ohne Datenbezug, oder leere Strings.
 
 **Bei `safety_status = not_safe`** (egal welcher Trigger — Wind, Foehn,
 Gewitter, Regen, CAPE, OVERCAST): alle 5 auf `1` setzen. Der Score muss

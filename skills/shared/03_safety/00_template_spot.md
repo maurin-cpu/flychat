@@ -22,7 +22,8 @@ SELBST-CHECK VOR DER ANTWORT (PFLICHT)
 1. **safe_window-Konsistenz**: Nur Stunden mit `[WIND-OK]` und ohne DANGER-Tag duerfen im `safe_window` sein. Pruefe ob die Stunden-Zeilen das bestaetigen.
 2. **not_safe nur bei echtem NoGo**: not_safe nur wenn es KEINE sauberen Flugstunden gibt oder ALLE relevanten Stunden von harten Gefahren betroffen sind.
 3. **Trend-Bezug Pflicht falls vorhanden**: Wenn der Datenblock `WIND-TREND`, `GUST-TREND` oder Foehn-Aufbau (ΔP steigend) zeigt → MUSS im `summary` als Tagesentwicklung in eigenen Worten erwaehnt werden ("zieht ab ab 12h", "verschlechtert sich gegen Abend", "stabil ueber den Tag"). Trend-Zeile NICHT wortwoertlich uebernehmen.
-4. **Wettergefahren immer erwaehnen — Trend-Muster nennen**: Wenn Regen, Gewitter, CAPE oder Sichteinschraenkung im Datenblock vorkommt — selbst wenn ausserhalb des Flugfensters oder zu gering fuer Statusaenderung — MUSS `summary` oder `caution_notes` das erwaehnen und das **Trend-Muster** benennen: "Aufklaerung", "Spaetreegen", "nur Abend", "kein Aufbau" etc. Beispiele: "Morgendlicher Regen (08-09h) — Aufklaerung bis 10h, Flugfenster ab 13h trocken." / "Gewitter erst ab 19h, deutlich nach Fensterabschluss." VERBOTEN: Hazard im Datenblock, in der Prosa komplett verschwiegen.
+4. **Hazard-Review vor Prosa (PFLICHT)**: Lies alle 8 `hazard_notes` nochmals durch. Jeder Eintrag mit Rating ≤ 7 MUSS in `summary` oder `caution_notes` erwaehnt werden — inklusive Trend-Keyword. Erst danach `summary` und `caution_notes` schreiben.
+5. **Windrichtungs-Falle (PFLICHT vor Statusvergabe)**: Wenn du `conditional` schreiben willst — nenne zuerst den echten Hazard: Boeen ueber 30 km/h? Hoehenwind-Tags? Foehn? Regen? Gewitter? Wenn die Antwort auf alle fuenf **Nein** ist und der einzige Grund `[WIND-WRONG]`-Stunden oder eine Winddrehung sind → setze `safe`. Winddrehung und falscher Sektor beschraenken Startoptionen, machen einen Tag aber nie conditional.
 
 ═══════════════════════════════════════════════
 JSON-ANTWORT (SPOT SAFETY)
@@ -44,6 +45,16 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "wind_summary": "3-4 Saetze. Tagesverlauf der Richtung, Hauptband der Geschwindigkeit, ob Richtung im Sektor stabil bleibt oder dreht — mit konkreten Zahlen und Stunden. Bei vorliegender WIND-TREND-Zeile: Muster mit eigenem Wort nennen (zunehmend / Aufklaerung / eingekesselt / stabil). Begruendung NUR aus Datenblock-Fakten (z.B. 'Bodenwind schwach 8-12 km/h, Hoehenwind 42 km/h auf 2500m — Verhaeltnis 1:5 zeigt entkoppelte Schichtung').",
   "wind_shear": "2-3 Saetze: Hoehenwind vs. Bodenwind, Verhaeltnis, Foehn-Anzeichen, vertikale Richtungsdrehung — alles aus Datenblock-Werten. Leer NUR wenn vollkommen unauffaellig.",
   "foehn_risk": "none|low|moderate|high",
+  "hazard_notes": {
+    "wind":         "TREND ZUERST wenn WIND-TREND im Datenblock: 'ZUNEHMEND', 'ABKLINGEND', 'DURCHGEHEND', 'EINGEKESSELT', 'STABIL'. Dann Mittelwind-Band, Spitzen, Timing. Beispiel: 'ZUNEHMEND — morgens 12 km/h, ab 14h auf 38 km/h ansteigend.' oder 'STABIL — 15-20 km/h ganztags.'",
+    "gusts":        "TREND ZUERST wenn GUST-TREND im Datenblock. Dann Boenspitzen, Boenfaktor, Timing. Beispiel: 'ZUNEHMEND — Boenfaktor 1.6, Spitzen bis 44 km/h ab 13h.' oder 'STABIL — Boenfaktor 1.2, max 22 km/h.'",
+    "aloft":        "TREND ZUERST wenn erkennbar (aufbauend / abklingend / stabil). Dann Hoehenwind-Niveau, Tags, Timing. Beispiel: 'AUFBAUEND — 850 hPa 28→45 km/h ab 12h, ALOFT-CONDITIONAL 13-15h.' oder 'STABIL — Hoehenwind 18 km/h, keine Aloft-Tags.'",
+    "foehn":        "TREND ZUERST: 'AUFBAUEND', 'ABKLINGEND', 'STABIL', 'KEIN-FOEHN'. Dann Druckgefaelle, Trigger. Beispiel: 'AUFBAUEND — Delta-P 4.2→7.1 hPa Sued, 850 hPa 32 km/h Sued bestaetigt.' oder 'KEIN-FOEHN — Delta-P unter 2 hPa, kein Trigger.'",
+    "rain":         "TREND ZUERST. Pflicht-Vokabular: 'AUFKLAERUNG', 'EINGEKESSELT', 'SPAETREEGEN', 'REGEN-BIS-ABEND', 'GANZTAEGIG', 'KEIN-REGEN'. Dann Stunden + Fenstereinfluss. Beispiel: 'AUFKLAERUNG — Regen 08-09h, ab 10h trocken, Fenster unbeeintraecht.' oder 'KEIN-REGEN — trockener Tag.'",
+    "thunderstorm": "TREND ZUERST: 'WAEHREND-FENSTER', 'NUR-ABEND', 'AUFKLAERUNG', 'KEIN-GEWITTER'. Dann Zeitlage relativ zum Fenster. Beispiel: 'NUR-ABEND — Prognose erst ab 19h, deutlich nach Fensterabschluss.' oder 'KEIN-GEWITTER — keine Modell-Prognose, CAPE unter 300 J/kg.'",
+    "cape":         "TREND ZUERST: 'AUFBAUEND', 'KEIN-AUFBAU', 'AKTIV'. Dann CAPE-Wert, Entwicklungspotenzial. Beispiel: 'AUFBAUEND — CAPE 900 J/kg 14-16h bei aktivem Niederschlag.' oder 'KEIN-AUFBAU — CAPE unter 400 J/kg ganztags.'",
+    "visibility":   "TREND ZUERST wenn erkennbar (absinkend / hebend / stabil). Dann Wolkenbasis vs. Startplatzhoehe. Beispiel: 'ABSINKEND — Basis von 1800m auf 900m bis 12h, unter Startplatz.' oder 'STABIL — Basis 2600m, 1200m ueber Startplatz.'"}
+  },
   "wind_safety_rating": 0,
   "gust_safety_rating": 0,
   "aloft_safety_rating": 0,

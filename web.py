@@ -113,6 +113,11 @@ def _inject_session_flags():
     }
 
 
+def _is_admin_session() -> bool:
+    """True wenn die aktuelle Session via Admin-Login verifiziert wurde."""
+    return bool(session.get("admin_debug"))
+
+
 @app.context_processor
 def _inject_test_mode_flag():
     """Globales Flag fuer den persistenten Test-Mode-Banner in base.html.
@@ -122,9 +127,12 @@ def _inject_test_mode_flag():
     """
     try:
         from engine import test_mode
-        return {"test_view_active": test_mode.is_view_active()}
+        return {
+            "test_view_active": test_mode.is_view_active(),
+            "admin_debug_active": _is_admin_session(),
+        }
     except Exception:
-        return {"test_view_active": False}
+        return {"test_view_active": False, "admin_debug_active": False}
 
 
 # Cache-Busting für statische Files: liefert mtime des Files als Versions-String,
@@ -817,6 +825,21 @@ def _require_admin(f):
             )
         return f(*args, **kwargs)
     return wrapper
+
+
+@app.route("/admin/enable-debug", methods=["POST"])
+@_require_admin
+def admin_enable_debug():
+    session.permanent = True
+    session["admin_debug"] = True
+    return jsonify({"ok": True, "admin_debug": True})
+
+
+@app.route("/admin/disable-debug", methods=["POST"])
+@_require_admin
+def admin_disable_debug():
+    session.pop("admin_debug", None)
+    return jsonify({"ok": True, "admin_debug": False})
 
 
 @app.route("/admin", methods=["GET"])
@@ -2157,6 +2180,13 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
                 v = entry.get(k)
                 if isinstance(v, list):
                     doc[k] = v
+            # Debug-Felder: hazard_notes + flyability_notes (intern, nur zur Verifikation)
+            hn = safety.get("hazard_notes")
+            if isinstance(hn, dict):
+                doc["hazard_notes"] = hn
+            fn = fly.get("flyability_notes") if fly else None
+            if isinstance(fn, dict):
+                doc["flyability_notes"] = fn
             flat[spot_name][date_str] = doc
     return flat
 
@@ -2185,6 +2215,69 @@ def api_analyses():
     loaded_at = engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None
     flat = _format_spot_analyses_flat(engine.spot_analyses, loaded_at, allowed_dates)
     return jsonify({"spot_analyses": flat, "analyses_count": len(flat)})
+
+
+@app.route("/api/spot-debug/<spot_name>/<date_str>")
+def api_spot_debug(spot_name: str, date_str: str):
+    """Gibt Debug-Felder fuer einen Spot/Tag zurück (Sub-Ratings, hazard_notes, _decisions_applied).
+    Nur im Test-View oder wenn DEBUG-Modus aktiv."""
+    from engine import test_mode
+    if not test_mode.is_view_active() and not _is_admin_session():
+        return jsonify({"error": "Nur im Test- oder Admin-Debug-Modus verfügbar"}), 403
+
+    if test_mode.is_view_active():
+        spot_analyses, _, _ = test_mode.load_test_run_analyses()
+    else:
+        spot_analyses = engine.spot_analyses
+
+    days = spot_analyses.get(spot_name, {})
+    entry = days.get(date_str)
+    if not entry:
+        return jsonify({"error": f"Keine Analyse für {spot_name} / {date_str}"}), 404
+
+    safety = entry.get("safety", {})
+    fly = entry.get("flyability", {})
+
+    # Sub-Ratings koennen je nach Analysepfad oben-level oder in safety-Sub-Dict liegen
+    def _sub(key):
+        v = entry.get(key)
+        if v is None:
+            v = safety.get(key)
+        return v
+
+    sub_ratings = {k: _sub(k) for k in (
+        "wind_safety_rating", "gust_safety_rating", "aloft_safety_rating",
+        "foehn_safety_rating", "rain_safety_rating", "thunderstorm_safety_rating",
+        "cape_safety_rating", "visibility_safety_rating",
+    )}
+    fly_sub_ratings = {k: fly.get(k) for k in (
+        "wind_flyability_rating", "thermal_flyability_rating", "cloud_flyability_rating",
+        "stability_flyability_rating", "xc_flyability_rating",
+    )} if fly else {}
+
+    def _top(key):
+        v = entry.get(key)
+        if v is None:
+            v = safety.get(key)
+        return v
+
+    return jsonify({
+        "spot": spot_name,
+        "date": date_str,
+        "safety_status": _top("safety_status"),
+        "safety_score": _top("safety_score"),
+        "safety_band": _top("safety_band"),
+        "foehn_risk": _top("foehn_risk"),
+        "fly_status": entry.get("fly_status"),
+        "experience_rating": entry.get("experience_rating"),
+        "sub_ratings": sub_ratings,
+        "fly_sub_ratings": fly_sub_ratings,
+        "hazard_notes": safety.get("hazard_notes"),
+        "flyability_notes": fly.get("flyability_notes") if fly else None,
+        "wind_summary": safety.get("wind_summary"),
+        "wind_shear": safety.get("wind_shear"),
+        "_decisions_applied": entry.get("_decisions_applied", []),
+    })
 
 
 @app.route("/api/run-region-analyses", methods=["POST"])

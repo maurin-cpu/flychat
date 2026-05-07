@@ -426,8 +426,13 @@ def compute_safety_band(result: dict) -> str:
         return "amber"
 
     # Score-basierter Fallback
+    # safety_score fehlt (None) + status=safe → green: fehlende Sub-Ratings ≠ schlechter Score.
+    # Nur explizit gesetzter Score < 40 rechtfertigt amber.
+    score_raw = result.get("safety_score")
+    if score_raw is None:
+        return "green" if status == "safe" else "amber"
     try:
-        score = int(result.get("safety_score", 0) or 0)
+        score = int(score_raw or 0)
     except (TypeError, ValueError):
         score = 0
     if score < 40:
@@ -470,15 +475,15 @@ def compute_legacy_flyability_tier(result: dict) -> str:
     2-Achsen-Werten `safety_band` + `experience_rating` ab.
 
     RATING_CONCEPT v1.4 — Regel auf 1-10-Skala:
-      - safety_band == 'red'                          → ''       (keine Empfehlung)
-      - rating >= 8 AND safety_band == 'green'        → 'violet' (Top-XC + sicher)
-      - rating >= 4                                   → 'green'  (fliegbar)
-      - sonst                                         → 'gray'   (Abgleiter / mau)
+      - safety_band == 'red'                                        → ''       (keine Empfehlung)
+      - rating >= VIOLET_RATING_MIN AND safety_band == 'green'      → 'violet' (Ausnahmetag, legendaer)
+      - rating >= 4                                                 → 'green'  (fliegbar)
+      - sonst                                                       → 'gray'   (Abgleiter / mau)
 
     Mapping zur alten Sterne-Schwelle (stars*2 ≈ rating):
-      - stars 4-5 (= rating 7-10) → violet bei green-band
-      - stars 2-3 (= rating 3-6)  → green
-      - stars 0-1 (= rating 0-2)  → gray
+      - stars 4.5-5 (= rating 9-10) → violet bei green-band (VIOLET_RATING_MIN=9)
+      - stars 2-4   (= rating 4-8)  → green
+      - stars 0-1   (= rating 0-2)  → gray
 
     Fallback auf `experience_stars` wenn `experience_rating` nicht im Cache
     (alte Daten vor v1.4 Migration).
@@ -502,7 +507,7 @@ def compute_legacy_flyability_tier(result: dict) -> str:
 
     if safety_band == "red":
         return ""
-    if rating >= 8 and safety_band == "green":
+    if rating >= config.VIOLET_RATING_MIN and safety_band == "green":
         return "violet"
     if rating >= 4:
         return "green"

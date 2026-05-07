@@ -188,12 +188,10 @@ window.Meteogram = (function () {
     // Cloud-Strip oben (Tropfen + Gewitter-Icons).
     const GROUND_WIND_H = 24;
     const GROUND_GUST_H = 16;
-    const GROUND_THERM_H = 24;
-    const GROUND_H = GROUND_WIND_H + GROUND_GUST_H + GROUND_THERM_H;
+    const GROUND_H = GROUND_WIND_H + GROUND_GUST_H;
     // Y-Offsets relativ zum groundY-Top.
     const GROUND_WIND_Y = 0;
     const GROUND_GUST_Y = GROUND_WIND_H;            // 24
-    const GROUND_THERM_Y = GROUND_WIND_H + GROUND_GUST_H; // 40
     const TIME_LABEL_H = 28;
     const CLOUD_ROW_H = 18;
     const PRECIP_ROW_H = 20;
@@ -1494,8 +1492,8 @@ window.Meteogram = (function () {
             .attr('x1', 0).attr('x2', nCols * CELL_W)
             .attr('y1', groundY).attr('y2', groundY);
 
-        // 3 Rows: Wind (Pfeil + Zahl), Böen (schmale "Linie"), Thermik.
-        // Wind/Böen/Thermik bleiben als kurzer Text (klarer als abstrakte Icons),
+        // 2 Rows: Wind (Zahl), Böen (schmale "Linie").
+        // Labels bleiben als kurzer Text (klarer als abstrakte Icons),
         // Mini-Schrift auf Mobile damit's nicht mehr Platz braucht als Icons.
         // Cloud-Icons im Cloud-Strip bleiben weil Wolken-Glyphs universell sind.
         var groundLabelFontSize = isMobileViewport ? '8.5px' : null;
@@ -1538,8 +1536,6 @@ window.Meteogram = (function () {
         if (!isRegion) {
             drawGroundLabel(groundY + GROUND_GUST_Y + GROUND_GUST_H / 2, 'Böen');
         }
-        drawGroundLabel(groundY + GROUND_THERM_Y + GROUND_THERM_H / 2,
-                        isMobileViewport ? 'Therm' : 'Thermik');
 
         times.forEach(function (t, ci) {
             var wx = wxByTime[t] || {};
@@ -1622,26 +1618,6 @@ window.Meteogram = (function () {
                 }
             }
 
-            // ----- Row 2: Thermik (Steigrate m/s) — xc-therm color scale -----
-            var therm = wx.thermik || {};
-            if (therm.climb_rate > 0) {
-                var thermRowTop = groundY + GROUND_THERM_Y;
-                chartG.append('rect')
-                    .attr('x', ci * CELL_W + 1).attr('y', thermRowTop + 1)
-                    .attr('width', CELL_W - 2).attr('height', GROUND_THERM_H - 2).attr('rx', 3)
-                    .attr('fill', thermClimbColor(therm.climb_rate)).attr('opacity', 0.4);
-
-                if (CELL_W >= 16) {
-                    chartG.append('text').attr('class', 'ground-value')
-                        .attr('x', cx).attr('y', thermRowTop + GROUND_THERM_H / 2)
-                        .attr('text-anchor', 'middle')
-                        .attr('dominant-baseline', 'central')
-                        .attr('font-size', isMobileViewport ? '9px' : '10px')
-                        .attr('font-weight', '700').attr('fill', '#1E293B')
-                        .style('font-variant-numeric', 'tabular-nums')
-                        .text(therm.climb_rate.toFixed(1));
-                }
-            }
         });
 
         // ===== WARNINGS STRIP =====

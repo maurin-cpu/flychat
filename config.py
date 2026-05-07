@@ -538,6 +538,7 @@ VIOLET_ROUGH_MAX = 30           # % — Max ROUGH-UNUSABLE-Anteil
 VIOLET_UNUSABLE_MAX = 30        # % — Max Gesamt-UNUSABLE-Anteil
 VIOLET_CLOUD_LOW_MAX = 50       # % — Max Ø tiefe Wolken ueber Thermikstunden
 VIOLET_CLOUD_MID_MAX = 50       # % — Max Ø mittlere Wolken ueber Thermikstunden
+VIOLET_RATING_MIN = 9           # Mindest-Rating (0-10) fuer violet — nur Ausnahmetage
 PRODUCTIVE_BAND_DEPTH_MIN = 400 # m — Mindest-Banddicke (thermal_top - elevation). Unter dieser Tiefe
                                 # zaehlt die Stunde NICHT als produktiv, weil kein nutzbares
                                 # Hoehenband zum Kurbeln vorhanden ist (flache Inversions-/

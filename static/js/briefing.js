@@ -314,8 +314,9 @@
     if (s && typeof s.safety_score === 'number') {
       return Math.max(0, Math.min(100, Math.round(s.safety_score)));
     }
-    const status = String((s && s.safety_status) || '').toLowerCase();
-    const foehn = String((s && s.foehn_risk) || 'none').toLowerCase();
+    const nested = (s && s.safety) || {};
+    const status = String((s && s.safety_status) || nested.safety_status || '').toLowerCase();
+    const foehn = String((s && s.foehn_risk) || nested.foehn_risk || 'none').toLowerCase();
     let base;
     if (status === 'safe') base = 85;
     else if (status === 'conditional') base = 50;
@@ -1174,8 +1175,16 @@
 
   function renderRegionSection(group, meta) {
     const name = (meta && meta.region_name) || group.region_name || (group.region_id === "unknown" ? "Weitere Spots" : group.region_id);
-    const spotsHtml = group.spots.map(renderSpotRow).join("");
-    const spotCount = group.spots.length;
+    // Top-3 Filter: nur Spots mit Rating >= 8, nach Rating absteigend, max 3.
+    // Im Focus-Modus (Deep-Link) wird der Filter übersprungen.
+    let displaySpots = group.spots;
+    if (!state.focusSpot) {
+      displaySpots = group.spots
+        .filter(s => spotRating(s) >= 8)
+        .sort((a, b) => spotRating(b) - spotRating(a));
+    }
+    const spotsHtml = displaySpots.map(renderSpotRow).join("");
+    const spotCount = displaySpots.length;
 
     // Region-Header bewusst minimal: nur Name, Spot-Anzahl, Share, Chevron.
     // KEIN Glyph, KEIN Rating, KEIN Farb-Band — Bewertung passiert auf Spot-Ebene.
@@ -1231,7 +1240,19 @@
       ? `<div class="bf-spot-status">${chips.join("")}</div>`
       : "";
 
-    const mapHref = `/map?spot=${encodeURIComponent(spot.spot)}`;
+    // Score-Pillen: Safety / Experience / Comfort
+    const safScore = typeof spot.safety_score === 'number' ? spot.safety_score : null;
+    const expScore = typeof spot.experience_score === 'number' ? spot.experience_score : null;
+    const comfScore = typeof spot.comfort_index === 'number' ? Math.round(spot.comfort_index) : null;
+    const scorePills = [];
+    if (safScore !== null) scorePills.push(`<span class="bf-score-pill bf-score-pill--safety">Safety ${safScore}/100</span>`);
+    if (band !== 'red' && band !== 'no_data') {
+      if (expScore !== null) scorePills.push(`<span class="bf-score-pill">Experience ${expScore}/100</span>`);
+      if (comfScore !== null) scorePills.push(`<span class="bf-score-pill">Comfort ${comfScore}/100</span>`);
+    }
+    const scoreBar = scorePills.length ? `<div class="bf-spot-scores">${scorePills.join("")}</div>` : "";
+
+    const mapHref = `/map?spot=${encodeURIComponent(spot.spot)}${spot.date ? `&date=${encodeURIComponent(spot.date)}` : ''}`;
 
     // Details (expanded content)
     const analysisForDetails = spot.analysis_full || synthesizeAnalysis(spot);
@@ -1275,6 +1296,7 @@
             <span class="bf-spot-chevron" aria-hidden="true">▾</span>
           </div>
           ${statusBar}
+          ${scoreBar}
         </div>
         <div class="bf-spot-divider"></div>
         <div class="bf-spot-details" hidden>
@@ -1527,6 +1549,8 @@
 
     if (!sections.length) return "";
 
+    const debugHtml = renderDebugNotes(spot);
+
     return `<div class="bf-detail-assessments">${sections.map((s) => `
       <details class="bf-assessment bf-assessment--${s.key}">
         <summary class="bf-assessment-toggle">
@@ -1536,7 +1560,40 @@
         </summary>
         <div class="bf-assessment-body">${escapeHtml(s.text)}</div>
       </details>
-    `).join("")}</div>`;
+    `).join("")}${debugHtml}</div>`;
+  }
+
+  function renderDebugNotes(spot) {
+    const hn = spot.hazard_notes;
+    const fn = spot.flyability_notes;
+    if (!hn && !fn) return "";
+
+    const rows = (obj, label) => {
+      if (!obj || typeof obj !== "object") return "";
+      const entries = Object.entries(obj);
+      if (!entries.length) return "";
+      return `<div class="bf-debug-group">
+        <div class="bf-debug-group-label">${escapeHtml(label)}</div>
+        ${entries.map(([k, v]) => `
+          <div class="bf-debug-row">
+            <span class="bf-debug-key">${escapeHtml(k)}</span>
+            <span class="bf-debug-val">${escapeHtml(v || "—")}</span>
+          </div>`).join("")}
+      </div>`;
+    };
+
+    return `
+      <details class="bf-assessment bf-assessment--debug">
+        <summary class="bf-assessment-toggle">
+          <span class="bf-assessment-name">🔍 Debug: Hazard &amp; Flyability Notes</span>
+          <span class="bf-assessment-spacer"></span>
+          <span class="bf-assessment-chevron" aria-hidden="true">▾</span>
+        </summary>
+        <div class="bf-assessment-body bf-debug-notes">
+          ${rows(hn, "Hazard Notes (Safety)")}
+          ${rows(fn, "Flyability Notes")}
+        </div>
+      </details>`;
   }
 
   function synthesizeAnalysis(spot) {

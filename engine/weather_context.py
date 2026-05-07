@@ -2273,7 +2273,7 @@ class WeatherContextMixin:
                     f"prod≥{config.VIOLET_HOURS_MIN}h, ROUGH<{config.VIOLET_ROUGH_MAX}%, "
                     f"UNUSABLE<{config.VIOLET_UNUSABLE_MAX}%, Ø tief≤{config.VIOLET_CLOUD_LOW_MAX}%, "
                     f"Ø mittel≤{config.VIOLET_CLOUD_MID_MAX}% — optimale Cu-Zone, keine Altostratus-Dämpfung). "
-                    f"fly_status = violet erlaubt."
+                    f"fly_status = violet erlaubt (nur wenn Rating≥{config.VIOLET_RATING_MIN} — Decision-Engine setzt final)."
                 )
 
         # Wind-Trend nach dem sauberen Fenster
@@ -3164,7 +3164,7 @@ class WeatherContextMixin:
                     f"prod≥{config.VIOLET_HOURS_MIN}h, ROUGH<{config.VIOLET_ROUGH_MAX}%, "
                     f"UNUSABLE<{config.VIOLET_UNUSABLE_MAX}%, Ø tief≤{config.VIOLET_CLOUD_LOW_MAX}%, "
                     f"Ø mittel≤{config.VIOLET_CLOUD_MID_MAX}% — optimale Cu-Zone, keine Altostratus-Dämpfung). "
-                    f"fly_status = violet erlaubt."
+                    f"fly_status = violet erlaubt (nur wenn Rating≥{config.VIOLET_RATING_MIN} — Decision-Engine setzt final)."
                 )
 
         # Wind-Trend nach dem sauberen Fenster (Regionen: Windgeschwindigkeit statt Böen)

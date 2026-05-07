@@ -90,5 +90,10 @@ NUTZUNGS-REGELN
 **Pflicht:** Vergib alle 4 Sub-Ratings als ganze Zahlen 1-10. Bei
 `safety_status = not_safe`: alle auf 1 setzen.
 
+**`flyability_notes` ZUERST ausfuellen — vor den Ratings, vor der Prosa**: Fuelle alle 4 Felder mit je einem konkreten Satz aus dem Datenblock. Beispiele:
+- `"thermal": "Peak 1.9 m/s 12-15h, BLH 2200m, SCT-Cu 30% — guter Standard-Tag, optimale Bewoelkung."` → thermal_rating 7
+- `"xc": "Basishoehe 2000m MSL, Hoehenwind 18 km/h Sued — moderates XC moeglich, kein langer Schenkel gegen Wind."` → xc_rating 5
+VERBOTEN: generische Saetze ohne Datenbezug.
+
 **Volle Breite nutzen** — wenn der LLM-Run vorher bei "5-7 clustern" stehen
 geblieben ist, ist das ein Bug. Differenziere bewusst zwischen 6, 7, 8.

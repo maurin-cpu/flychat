@@ -159,7 +159,19 @@ window.AnalysisView = (function () {
                  + '<div class="mga-hero-text">'
                  + '<div class="mga-hero-verdict ' + band + '">' + esc(verdictTxt) + '</div>';
         // Pills: Safety-Band + Safety-Score immer; Experience/Comfort nur wenn nicht red.
-        var safScore = (typeof a.safety_score === 'number') ? a.safety_score : null;
+        var safScore = null;
+        if (typeof a.safety_score === 'number') {
+            safScore = Math.round(a.safety_score);
+        } else {
+            var _nested = a.safety || {};
+            var _st = String((a.safety_status || _nested.safety_status || '')).toLowerCase();
+            var _fo = String((a.foehn_risk   || _nested.foehn_risk   || 'none')).toLowerCase();
+            var _base = (_st === 'safe') ? 85 : (_st === 'conditional') ? 50 : -1;
+            if (_base >= 0) {
+                var _delta = (_fo === 'medium') ? -15 : (_fo === 'high' || _fo === 'severe') ? -30 : 0;
+                safScore = Math.max(0, _base + _delta);
+            }
+        }
         var expScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
         var comfort  = (typeof a.comfort_index === 'number') ? a.comfort_index : null;
         html += '<div class="mga-hero-pills">';
@@ -173,6 +185,36 @@ window.AnalysisView = (function () {
             }
             if (comfort !== null) {
                 html += '<span class="mga-hero-pill">Comfort ' + Math.round(comfort) + '/100</span>';
+            }
+            // Flyability-Tier
+            var fly = a.flyability || {};
+            var flyTier = fly.flyability_tier || a.fly_status || '';
+            var FLY_LABEL = { green: 'Fliegbar', violet: 'Top', gray: 'Abgleiter', red: 'Nicht fliegbar' };
+            if (flyTier && flyTier !== 'no_data') {
+                html += '<span class="mga-hero-pill mga-hero-pill--fly mga-hero-pill--' + flyTier + '">Fly: ' + (FLY_LABEL[flyTier] || flyTier) + '</span>';
+            }
+            // Sub-Ratings (1-10)
+            var SUB = [
+                ['thermal_rating',  'Thermik'],
+                ['window_rating',   'Fenster'],
+                ['wind_rating',     'Wind'],
+                ['xc_rating',       'XC'],
+                ['altitude_rating', 'Basis'],
+            ];
+            var subHtml = '';
+            SUB.forEach(function (pair) {
+                var v = a[pair[0]];
+                if (typeof v === 'number') subHtml += '<span class="mga-sub-rating">' + pair[1] + ' <b>' + v + '</b></span>';
+            });
+            if (subHtml) html += '<div class="mga-sub-ratings">' + subHtml + '</div>';
+            // Key flyability fields
+            if (fly.flight_type)              html += '<span class="mga-hero-pill">Typ: ' + esc(fly.flight_type) + '</span>';
+            if (fly.flight_duration_estimate) html += '<span class="mga-hero-pill">' + esc(fly.flight_duration_estimate) + '</span>';
+            if (typeof fly.peak_climb_rate === 'number' && fly.peak_climb_rate > 0) {
+                html += '<span class="mga-hero-pill">Peak ↑' + fly.peak_climb_rate.toFixed(1) + ' m/s</span>';
+            }
+            if (fly.xc_potential && fly.xc_potential !== 'none') {
+                html += '<span class="mga-hero-pill">XC: ' + esc(fly.xc_potential) + '</span>';
             }
         }
         html += '</div></div></div>';
