@@ -709,8 +709,7 @@ class AnalyzersMixin:
         result["recommendation"] = ""
         result["confidence"] = ""
         result["thermal_rating"] = 1
-        result["wind_rating"] = 1
-        result["window_rating"] = 1
+        result["altitude_rating"] = 1
         result["xc_rating"] = 1
         result["is_conditional"] = False
         result["conditional_reason"] = ""

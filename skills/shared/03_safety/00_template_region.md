@@ -45,6 +45,14 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
   "wind_summary": "3-4 Saetze. Wind-Zusammenfassung (Staerke auf Referenzhoehe, Konsistenz, ggf. Drehung). Regionen: KEINE Boeen — nur Windstaerke und Scherung. Bei vorliegender WIND-TREND-Zeile: Muster nennen (zunehmend / Aufklaerung / stabil) und aus Datenblock-Fakten begruenden (z.B. 'Hoehenwind morgens 18 km/h, ab 13h auf 38 km/h — Nachmittagsverstaerkung').",
   "wind_shear": "2-3 Saetze: Hoehenwind vs. Boden, Scherung mit konkreten Werten, Foehn-Anzeichen aus dem Datenblock. Leer wenn unauffaellig. (Regionen: KEINE Boeen.)",
   "foehn_risk": "none|low|moderate|high",
+  "wind_safety_rating": 0,
+  "gust_safety_rating": 0,
+  "aloft_safety_rating": 0,
+  "foehn_safety_rating": 0,
+  "rain_safety_rating": 0,
+  "thunderstorm_safety_rating": 0,
+  "cape_safety_rating": 0,
+  "visibility_safety_rating": 0,
   "hazard_notes": {
     "wind":         "TREND ZUERST wenn WIND-TREND im Datenblock: 'ZUNEHMEND', 'ABKLINGEND', 'DURCHGEHEND', 'EINGEKESSELT', 'STABIL'. Dann Windstaerke-Band, Scherung, Timing. Beispiel: 'ZUNEHMEND — morgens 14 km/h, ab 14h auf 36 km/h.' oder 'STABIL — 18-24 km/h ganztags.'",
     "gusts":        "Regionen haben keine Boen-Tags — schreibe 'n/a — keine Boen-Daten fuer Regionen' und setze Rating 10.",
@@ -55,13 +63,5 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
     "cape":         "TREND ZUERST: 'AUFBAUEND', 'KEIN-AUFBAU', 'AKTIV'. Dann CAPE-Wert, Entwicklungspotenzial. Beispiel: 'AUFBAUEND — CAPE 900 J/kg 14-16h bei aktivem Niederschlag.' oder 'KEIN-AUFBAU — CAPE unter 400 J/kg ganztags.'",
     "visibility":   "TREND ZUERST wenn erkennbar (absinkend / hebend / stabil). Dann Wolkenbasis vs. Referenzhoehe. Beispiel: 'ABSINKEND — Basis von 1800m auf 900m bis 12h, unter Referenz.' oder 'STABIL — Basis 2600m, klar ueber Region.'"}
   },
-  "wind_safety_rating": 0,
-  "gust_safety_rating": 0,
-  "aloft_safety_rating": 0,
-  "foehn_safety_rating": 0,
-  "rain_safety_rating": 0,
-  "thunderstorm_safety_rating": 0,
-  "cape_safety_rating": 0,
-  "visibility_safety_rating": 0,
   "summary": "AUSFUEHRLICH (4-6 Saetze). (Regionen: Boeen tabu — siehe Region-Boeen-Verbot oben.)\n\n**Satz 1 — Einstufung + Kern-Begruendung**: folge dem 'Begruendungs-Prinzip fuer Satz 1' in `03_status_derivation.md`. Formuliere selbst, mit konkreten Zahlen aus dem Datenblock — kein Schema.\n\nSatz 2-3: Hauptgefahren MIT Ursache aus Datenblock-Fakten (z.B. 'Hoehenwind 42 km/h auf 2500m, Scherung 850 hPa Sued vs. 700 hPa West — Foehn-Hinweis trotz ΔP 5.2'). Satz 4: Tagesentwicklung / Trend — falls Datenblock WIND-TREND oder Foehn-Aufbau zeigt, PFLICHT in eigenen Worten OHNE Code-Namen ('durchgehend gefaehrlich' statt 'DURCHGEHEND_DANGER', 'zunehmend' statt 'ZUNEHMEND'). Satz 5: Sicheres Zeitfenster konkret. Satz 6: Sicherheits-Einschaetzung — **passiv formuliert als Einstufung, NIE als Empfehlung oder Aufforderung zum Fliegen**. Die Entscheidung ueber Start, Flug und Landung liegt allein beim Piloten. Regionen: NIEMALS Boeen erwaehnen. KEINE Tags wie ALOFT-WIND-WARN, ALOFT-WIND-DANGER, SHEAR-UNUSABLE im Fliesstext — schreibe 'kraeftiger Hoehenwind', 'gefaehrlicher Hoehenwind', 'starke Scherung'.\n\nFORMULIERUNGS-REGELN fuer den Abschluss-Satz:\n- VERBOTEN (klingt nach Empfehlung/Aufforderung): 'ideal fuer einen Flugtag', 'perfekt zum Fliegen', 'beste Bedingungen zum Fliegen', 'ein guter Tag um zu fliegen', 'lohnt sich', 'nutze das Fenster', 'plane deinen Flug', 'kann bedenkenlos geflogen werden'.\n- ERLAUBT (passive Einstufung): 'die Bedingungen werden als ideal fuer einen sicheren Flugtag eingeschaetzt', 'aus Sicherheitssicht keine Auffaelligkeiten', 'wird als sicherer Flugtag eingestuft', 'Einschaetzung: stabile, sichere Bedingungen', 'die Voranalyse stuft den Tag als sicher ein'.\n- Beispiel guter Schluss-Satz: 'Insgesamt werden die Bedingungen als ideal fuer einen sicheren Flugtag eingeschaetzt.'\n- Beispiel schlechter Schluss-Satz: 'Insgesamt sind die Bedingungen ideal fuer einen sicheren Flugtag.' (suggeriert Aufforderung)."
 }

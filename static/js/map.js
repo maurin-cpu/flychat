@@ -551,12 +551,12 @@
             lines.push('=== FLYABILITY ===');
             lines.push('Status: ' + (d.fly_status||'?') + '  |  Experience: ' + (d.experience_rating!=null?d.experience_rating:'?'));
             lines.push('');
-            if (d.fly_sub_ratings && Object.keys(d.fly_sub_ratings).some(function(k){return d.fly_sub_ratings[k]!=null;})) {
-                lines.push('--- Fly Sub-Ratings (1-10) ---');
-                Object.keys(d.fly_sub_ratings).forEach(function(k){ if(d.fly_sub_ratings[k]!=null) lines.push('  ' + k.replace('_flyability_rating','').padEnd(15) + ': ' + d.fly_sub_ratings[k]); });
-                lines.push('');
-            }
-            if (d.flyability_notes) { lines.push('--- Flyability Notes ---'); Object.keys(d.flyability_notes).forEach(function(k){ lines.push('  [' + k + '] ' + _escHtml(d.flyability_notes[k]||'')); }); lines.push(''); }
+            lines.push('--- Sub-Ratings (1-10) ---');
+            if (d.fly_sub_ratings) Object.keys(d.fly_sub_ratings).forEach(function(k){ lines.push('  ' + k.replace('_rating','').padEnd(15) + ': ' + (d.fly_sub_ratings[k]!=null?d.fly_sub_ratings[k]:'–')); });
+            lines.push('');
+            lines.push('--- Flyability Notes ---');
+            if (d.flyability_notes) Object.keys(d.flyability_notes).forEach(function(k){ lines.push('  [' + k + '] ' + _escHtml(d.flyability_notes[k]||'')); });
+            lines.push('');
             lines.push('=== DECISIONS APPLIED ===');
             lines.push((d._decisions_applied && d._decisions_applied.length) ? d._decisions_applied.join(', ') : '(keine)');
             chartContainer.innerHTML = '<pre style="margin:0;padding:12px;font-size:11px;line-height:1.6;overflow:auto;height:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-all;color:#e2e8f0;background:#0f172a;border-radius:6px;">'

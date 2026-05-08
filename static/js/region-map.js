@@ -17,6 +17,8 @@
                                // Feld persistiert — Region-Zuordnung kommt aus
                                // find_region_for_point (Backend liefert via GeoJSON).
     var regionActiveDate = {}; // {region_id: dateStr} — last selected day per region overlay
+    var regionJsonDebugActive = false;
+    var regionHazardDebugActive = false;
 
     // ResizeObserver-State: re-rendert das Meteogramm wenn sich die
     // Container-Breite aendert (z.B. Browser-Resize, Aside aufklappen,
@@ -898,8 +900,10 @@
                     overlayTabsEl.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
                     btn.classList.add('active');
                     if (rid) regionActiveDate[rid] = d;
-                    // Update meteogram
-                    renderMeteogramDay(wxData, altData, d, chartEl);
+                    // Update meteogram (oder Debug-View, falls aktiv)
+                    if (regionJsonDebugActive) renderRegionJsonDebug();
+                    else if (regionHazardDebugActive) renderRegionHazardDebug();
+                    else renderMeteogramDay(wxData, altData, d, chartEl);
                     // Update analysis panel
                     updateOverlayAnalysis(rid, d);
                     // Sync navbar
@@ -1027,6 +1031,90 @@
         overlay.classList.remove('visible');
         teardownChartResizeObserver();
         if (window._overlayScrollUnlock) window._overlayScrollUnlock();
+        // Debug-Buttons zuruecksetzen, damit naechste Region wieder Meteogramm zeigt
+        var jsonBtn = document.getElementById('regionJsonDebug');
+        var hazBtn = document.getElementById('regionHazardDebug');
+        if (regionJsonDebugActive) { regionJsonDebugActive = false; if (jsonBtn) jsonBtn.classList.remove('active'); }
+        if (regionHazardDebugActive) { regionHazardDebugActive = false; if (hazBtn) hazBtn.classList.remove('active'); }
+    }
+
+    // ===== REGION DEBUG VIEWS (JSON + Hazard/Flyability Notes) =====
+    function _escDebugHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function renderRegionJsonDebug() {
+        var chartEl = document.getElementById('regionMeteogramChart');
+        if (!chartEl || !overlayRid) return;
+        var dateStr = regionActiveDate[overlayRid] || currentDate || window.currentDate;
+        var entry = (regionAnalyses && regionAnalyses[overlayRid] && dateStr)
+            ? regionAnalyses[overlayRid][dateStr]
+            : null;
+        chartEl.innerHTML = '<pre style="margin:0;padding:12px;font-size:11px;line-height:1.5;overflow:auto;height:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-all;color:#e2e8f0;background:#0f172a;border-radius:6px;">'
+            + (entry ? _escDebugHtml(JSON.stringify(entry, null, 2)) : '(keine Analyse fuer ' + _escDebugHtml(overlayRid) + ' / ' + _escDebugHtml(dateStr || '?') + ')')
+            + '</pre>';
+    }
+
+    function renderRegionHazardDebug() {
+        var chartEl = document.getElementById('regionMeteogramChart');
+        if (!chartEl || !overlayRid) return;
+        var dateStr = regionActiveDate[overlayRid] || currentDate || window.currentDate;
+        if (!dateStr) {
+            chartEl.innerHTML = '<div style="padding:12px;color:#f87171;">Kein Datum aktiv</div>';
+            return;
+        }
+        chartEl.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:12px;">Lade Debug-Daten…</div>';
+        var url = '/api/region-debug/' + encodeURIComponent(overlayRid) + '/' + encodeURIComponent(dateStr);
+        fetchJson(url).then(function (d) {
+            if (d.error) { chartEl.innerHTML = '<div style="padding:12px;color:#f87171;">' + _escDebugHtml(d.error) + '</div>'; return; }
+            var lines = [];
+            lines.push('=== SAFETY ===');
+            lines.push('Status: ' + (d.safety_status || '?') + '  |  Foehn: ' + (d.foehn_risk || '?'));
+            lines.push('');
+            lines.push('--- Sub-Ratings (1-10) ---');
+            if (d.sub_ratings) Object.keys(d.sub_ratings).forEach(function (k) {
+                lines.push('  ' + k.replace('_safety_rating', '').padEnd(15) + ': ' + (d.sub_ratings[k] != null ? d.sub_ratings[k] : '–'));
+            });
+            lines.push('');
+            lines.push('--- Hazard Notes ---');
+            if (d.hazard_notes) Object.keys(d.hazard_notes).forEach(function (k) {
+                lines.push('  [' + k + '] ' + _escDebugHtml(d.hazard_notes[k] || ''));
+            });
+            lines.push('');
+            if (d.wind_summary) { lines.push('--- Wind Summary ---'); lines.push(_escDebugHtml(d.wind_summary)); lines.push(''); }
+            if (d.wind_shear) { lines.push('--- Wind Shear ---'); lines.push(_escDebugHtml(d.wind_shear)); lines.push(''); }
+            lines.push('=== FLYABILITY ===');
+            lines.push('Status: ' + (d.fly_status || '?') + '  |  Experience: ' + (d.experience_rating != null ? d.experience_rating : '?'));
+            lines.push('');
+            lines.push('--- Sub-Ratings (1-10) ---');
+            if (d.fly_sub_ratings) Object.keys(d.fly_sub_ratings).forEach(function (k) {
+                lines.push('  ' + k.replace('_rating', '').padEnd(15) + ': ' + (d.fly_sub_ratings[k] != null ? d.fly_sub_ratings[k] : '–'));
+            });
+            lines.push('');
+            lines.push('--- Flyability Notes ---');
+            if (d.flyability_notes) Object.keys(d.flyability_notes).forEach(function (k) {
+                lines.push('  [' + k + '] ' + _escDebugHtml(d.flyability_notes[k] || ''));
+            });
+            lines.push('');
+            lines.push('=== DECISIONS APPLIED ===');
+            lines.push((d._decisions_applied && d._decisions_applied.length) ? d._decisions_applied.join(', ') : '(keine)');
+            chartEl.innerHTML = '<pre style="margin:0;padding:12px;font-size:11px;line-height:1.6;overflow:auto;height:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-all;color:#e2e8f0;background:#0f172a;border-radius:6px;">'
+                + lines.join('\n') + '</pre>';
+        }).catch(function (err) {
+            chartEl.innerHTML = '<div style="padding:12px;color:#f87171;">Fehler: ' + _escDebugHtml(err.message || err) + '</div>';
+        });
+    }
+
+    function restoreRegionMeteogramFromCache() {
+        if (!overlayRid) return;
+        var chartEl = document.getElementById('regionMeteogramChart');
+        if (!chartEl) return;
+        var cached = meteogramCache[overlayRid];
+        if (!cached || !cached.wxData || !cached.altData) {
+            // Fallback: kompletter Reload (sollte nach Erstoeffnung selten passieren).
+            loadRegionMeteogram(overlayRid);
+            return;
+        }
+        var dateStr = regionActiveDate[overlayRid] || currentDate || window.currentDate || cached.wxData.dates[0];
+        renderMeteogramDay(cached.wxData, cached.altData, dateStr, chartEl);
     }
 
     function parseArray(val) {
@@ -1048,6 +1136,35 @@
 
     // ===== EVENT LISTENERS =====
     if (overlayClose) overlayClose.addEventListener('click', closeRegionOverlay);
+
+    var regionJsonDebugBtn = document.getElementById('regionJsonDebug');
+    if (regionJsonDebugBtn) {
+        regionJsonDebugBtn.addEventListener('click', function () {
+            regionJsonDebugActive = !regionJsonDebugActive;
+            regionJsonDebugBtn.classList.toggle('active', regionJsonDebugActive);
+            if (regionHazardDebugActive) {
+                regionHazardDebugActive = false;
+                var hazBtn = document.getElementById('regionHazardDebug');
+                if (hazBtn) hazBtn.classList.remove('active');
+            }
+            if (regionJsonDebugActive) renderRegionJsonDebug();
+            else restoreRegionMeteogramFromCache();
+        });
+    }
+
+    var regionHazardDebugBtn = document.getElementById('regionHazardDebug');
+    if (regionHazardDebugBtn) {
+        regionHazardDebugBtn.addEventListener('click', function () {
+            regionHazardDebugActive = !regionHazardDebugActive;
+            regionHazardDebugBtn.classList.toggle('active', regionHazardDebugActive);
+            if (regionJsonDebugActive) {
+                regionJsonDebugActive = false;
+                if (regionJsonDebugBtn) regionJsonDebugBtn.classList.remove('active');
+            }
+            if (regionHazardDebugActive) renderRegionHazardDebug();
+            else restoreRegionMeteogramFromCache();
+        });
+    }
 
     var overlayShare = document.getElementById('regionOverlayShare');
     if (overlayShare) {
@@ -1093,11 +1210,17 @@
                     b.classList.toggle('active', b.dataset.date === newDate);
                 });
             }
-            // Re-render meteogram for new day
-            var cache = meteogramCache[overlayRid];
-            if (cache && cache.wxData && cache.altData) {
-                var chartEl = document.getElementById('regionMeteogramChart');
-                if (chartEl) renderMeteogramDay(cache.wxData, cache.altData, newDate, chartEl);
+            // Re-render meteogram for new day (oder Debug-View, falls aktiv)
+            if (regionJsonDebugActive) {
+                renderRegionJsonDebug();
+            } else if (regionHazardDebugActive) {
+                renderRegionHazardDebug();
+            } else {
+                var cache = meteogramCache[overlayRid];
+                if (cache && cache.wxData && cache.altData) {
+                    var chartEl = document.getElementById('regionMeteogramChart');
+                    if (chartEl) renderMeteogramDay(cache.wxData, cache.altData, newDate, chartEl);
+                }
             }
         }
     });

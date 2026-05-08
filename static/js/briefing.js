@@ -1200,6 +1200,7 @@
     const isCollapsed = state.collapsedRegions.has(group.region_id);
     const collapsedCls = isCollapsed ? " is-collapsed" : "";
     const ariaExpanded = isCollapsed ? "false" : "true";
+    const regionDebugHtml = meta ? renderDebugNotes(meta) : "";
     return `
       <div class="bf-region${collapsedCls}" data-region-id="${escapeHtml(group.region_id)}">
         <div class="bf-region-head" role="button" tabindex="0" aria-expanded="${ariaExpanded}" aria-label="Region ${escapeHtml(name)} ein-/ausklappen">
@@ -1209,6 +1210,7 @@
           <span class="bf-region-chevron" aria-hidden="true">▾</span>
         </div>
         <ul class="bf-spot-list">${spotsHtml}</ul>
+        ${regionDebugHtml}
       </div>
     `;
   }
@@ -1564,6 +1566,7 @@
   }
 
   function renderDebugNotes(spot) {
+    if (!window.gleitcastDebugMode) return "";
     const hn = spot.hazard_notes;
     const fn = spot.flyability_notes;
     if (!hn && !fn) return "";

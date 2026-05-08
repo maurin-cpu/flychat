@@ -1889,10 +1889,12 @@ def briefing_page():
     day_q = request.args.get("day")
     spot_q = (request.args.get("spot") or "").strip()
     og = _build_briefing_og(regions_q, day_q, spot_q)
+    from engine import test_mode
     return render_template(
         "briefing.html",
         forecast_days=current_max_days(),
         og=og,
+        debug_mode=test_mode.is_view_active() or _is_admin_session(),
     )
 
 
@@ -2250,10 +2252,10 @@ def api_spot_debug(spot_name: str, date_str: str):
         "foehn_safety_rating", "rain_safety_rating", "thunderstorm_safety_rating",
         "cape_safety_rating", "visibility_safety_rating",
     )}
-    fly_sub_ratings = {k: fly.get(k) for k in (
-        "wind_flyability_rating", "thermal_flyability_rating", "cloud_flyability_rating",
-        "stability_flyability_rating", "xc_flyability_rating",
-    )} if fly else {}
+    fly_sub_ratings = {k: entry.get(k) for k in (
+        "thermal_rating", "altitude_rating", "xc_rating",
+        "window_rating", "wind_rating",
+    )}
 
     def _top(key):
         v = entry.get(key)
@@ -2274,6 +2276,65 @@ def api_spot_debug(spot_name: str, date_str: str):
         "fly_sub_ratings": fly_sub_ratings,
         "hazard_notes": safety.get("hazard_notes"),
         "flyability_notes": fly.get("flyability_notes") if fly else None,
+        "wind_summary": safety.get("wind_summary"),
+        "wind_shear": safety.get("wind_shear"),
+        "_decisions_applied": entry.get("_decisions_applied", []),
+    })
+
+
+@app.route("/api/region-debug/<region_id>/<date_str>")
+def api_region_debug(region_id: str, date_str: str):
+    """Gibt Debug-Felder fuer eine Region/Tag zurück (Sub-Ratings, hazard_notes,
+    flyability_notes, _decisions_applied). Nur im Test-View oder Admin-Debug."""
+    from engine import test_mode
+    if not test_mode.is_view_active() and not _is_admin_session():
+        return jsonify({"error": "Nur im Test- oder Admin-Debug-Modus verfügbar"}), 403
+
+    if test_mode.is_view_active():
+        _, region_analyses, _ = test_mode.load_test_run_analyses()
+    else:
+        region_analyses = engine.region_analyses
+
+    days = region_analyses.get(region_id, {})
+    entry = days.get(date_str)
+    if not entry:
+        return jsonify({"error": f"Keine Analyse für {region_id} / {date_str}"}), 404
+
+    safety = entry.get("safety", {}) or {}
+    fly = entry.get("flyability", {}) or {}
+
+    def _sub(key):
+        v = entry.get(key)
+        if v is None:
+            v = safety.get(key)
+        return v
+
+    sub_ratings = {k: _sub(k) for k in (
+        "wind_safety_rating", "gust_safety_rating", "aloft_safety_rating",
+        "foehn_safety_rating", "rain_safety_rating", "thunderstorm_safety_rating",
+        "cape_safety_rating", "visibility_safety_rating",
+    )}
+    fly_sub_ratings = {k: entry.get(k) for k in (
+        "thermal_rating", "altitude_rating", "xc_rating",
+    )}
+
+    def _top(key):
+        v = entry.get(key)
+        if v is None:
+            v = safety.get(key)
+        return v
+
+    return jsonify({
+        "region_id": region_id,
+        "date": date_str,
+        "safety_status": _top("safety_status"),
+        "foehn_risk": _top("foehn_risk"),
+        "fly_status": entry.get("fly_status"),
+        "experience_rating": entry.get("experience_rating"),
+        "sub_ratings": sub_ratings,
+        "fly_sub_ratings": fly_sub_ratings,
+        "hazard_notes": safety.get("hazard_notes"),
+        "flyability_notes": fly.get("flyability_notes"),
         "wind_summary": safety.get("wind_summary"),
         "wind_shear": safety.get("wind_shear"),
         "_decisions_applied": entry.get("_decisions_applied", []),
@@ -2338,10 +2399,16 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
                 doc["recommendation"] = fly.get("recommendation", "")
                 doc["peak_climb_rate"] = fly.get("peak_climb_rate", 0)
                 doc["flight_type"] = fly.get("flight_type", "")
+                fn = fly.get("flyability_notes")
+                if fn:
+                    doc["flyability_notes"] = fn
             else:
                 doc["fly_status"] = ""
                 doc["flyability_tier"] = ""
                 doc["fly_error"] = entry.get("fly_error", "")
+            hn = safety.get("hazard_notes") or entry.get("hazard_notes")
+            if hn:
+                doc["hazard_notes"] = hn
             # Tag-System v4 (siehe docs/TAGS.md): tags + start_window durchreichen
             for k in ("tags", "start_window"):
                 v = entry.get(k)

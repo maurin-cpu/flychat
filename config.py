@@ -73,8 +73,8 @@ SHOW_REFERENCE_POINTS = False
 # FLUGSTUNDEN-KONFIGURATION
 # ============================================================================
 
-FLIGHT_HOURS_START = 10   # Start-Stunde für Flugstunden (0-23)
-FLIGHT_HOURS_END = 17    # End-Stunde für Flugstunden (0-23, exklusiv)
+FLIGHT_HOURS_START = 6    # Start-Stunde für Flugstunden (0-23)
+FLIGHT_HOURS_END = 18    # End-Stunde für Flugstunden (0-23, exklusiv)
 
 # ============================================================================
 # WINDRICHTUNGS-TOLERANZ

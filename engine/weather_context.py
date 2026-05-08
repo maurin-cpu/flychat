@@ -479,7 +479,7 @@ class WeatherContextMixin:
                             max_climb_h = h_max_h
 
                         lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
-                        thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str} (Güte: {therm['rating']}/10)"
+                        thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str}"
                 except Exception as e:
                     thermal_info = f" | Thermik-Fehler: {e}"
 
@@ -1370,7 +1370,9 @@ class WeatherContextMixin:
         # Startfenster-Klassifikation pro Stunde (siehe docs/TAGS.md, "Startfenster"):
         # rein bodenbasiert (wind_speed_10m + wind_gusts_10m + Richtung), KEIN Aloft/Foehn/Regen.
         start_window_hours_list = []   # [{"hour": int, "state": "startbar"|"sportlich"|"blockiert"|"neutral"}]
-        rain_hours = []        # Stunden mit Niederschlag
+        rain_hours = []        # Stunden mit Niederschlag (innerhalb + nach Flugfenster)
+        rain_in_window_h = 0   # Regen-Stunden strikt INNERHALB des Flugfensters
+        thunderstorm_in_window_h = 0  # Gewitter-Stunden strikt INNERHALB des Flugfensters
         gust_hours = []        # Stunden mit GUST/ALOFT-GUST WARN/DANGER (fuer BOEEN-TREND)
         gust_danger_hours = [] # Nur DANGER-Level (>40 km/h Boden oder Flugraum)
         aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND)
@@ -1448,7 +1450,7 @@ class WeatherContextMixin:
                         h_max_h = thermal_top_raw
                     effective_ceiling = max(effective_ceiling, h_max_h + 1000)
                     lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
-                    thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str} (Güte: {therm['rating']}/10)"
+                    thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str}"
             except Exception as e:
                 thermal_info = f" | Thermik-Fehler: {e}"
 
@@ -1504,6 +1506,7 @@ class WeatherContextMixin:
             hour_str = f"{dt.hour:02d}:00"
             if "[RAIN-WARN]" in warnings:
                 rain_hours.append(hour_str)
+                rain_in_window_h += 1
             if isinstance(wind_gusts, (int, float)):
                 hourly_gusts[hour_str] = wind_gusts
             if isinstance(wind_dir, (int, float)):
@@ -1752,6 +1755,8 @@ class WeatherContextMixin:
             # als Sicherheits-/Flyability-Warnung fehlinterpretiert.
             for w in warnings:
                 tag_counts[w] = tag_counts.get(w, 0) + 1
+            if "[THUNDERSTORM]" in warnings:
+                thunderstorm_in_window_h += 1
 
             # ─── STUNDENVERLAUF: klassifiziere diese Stunde ───
             # ─── SICHERHEITS-VERLAUF: nur Safety-Tags (Wind/Boeen/Regen/CAPE/Gewitter) ───
@@ -2116,11 +2121,13 @@ class WeatherContextMixin:
             "max_wind_swing_span_h": max_swing_span,
             "hard_warning_hours": hard_warning_hours,
             "thunderstorm_hours": tag_counts.get("[THUNDERSTORM]", 0),
+            "thunderstorm_in_window_h": thunderstorm_in_window_h,
             "wind_danger_hours": tag_counts.get("[WIND-DANGER]", 0),
             "wind_warn_hours": tag_counts.get("[WIND-WARN]", 0),
             "aloft_wind_warn_hours": tag_counts.get("[ALOFT-WIND-WARN]", 0),
             "aloft_wind_danger_hours": tag_counts.get("[ALOFT-WIND-DANGER]", 0),
             "rain_hours": len(rain_hours),
+            "rain_in_window_h": rain_in_window_h,
             "rain_hour_list": rain_hours,
             "start_window_hours": start_window_hours_list,
             # CLOUDS-Sicht (siehe docs/TAGS.md): Wolken auf/unter Startplatz =
@@ -2283,8 +2290,25 @@ class WeatherContextMixin:
 
         # Niederschlag-Trend
         # all_hours_sorted already computed above (rain_pattern section)
+        # Regen nur NACH dem Flugfenster (rain_in_window_h == 0): kein Sicherheitsmalus,
+        # aber explizit erwaehnen damit Pilot vorbereitet ist.
+        _all_rain_after_window = (
+            rain_hours
+            and rain_in_window_h == 0
+            and all(int(h.split(":")[0]) >= config.FLIGHT_HOURS_END for h in rain_hours)
+        )
         if rain_hours and all_hours_sorted:
-            if rain_pattern["is_sandwiched"] and rain_pattern["max_dry_gap"] < 4:
+            if _all_rain_after_window:
+                lines.append(
+                    f"NIEDERSCHLAG-TREND: NACH FLUGZEIT — Regen erst ab {min(rain_hours)}, "
+                    f"nach Ende des Flugfensters ({config.FLIGHT_HOURS_END:02d}:00). "
+                    f"Flugfenster selbst bleibt trocken. Kein Sicherheitsmalus fuer das Fenster. "
+                    f"→ safety_status NICHT verschlechtern wegen Regen nach Flugzeit. "
+                    f"In hazard_notes['rain'] PFLICHT erwaehnen: 'NACH-FLUGZEIT — Regen ab "
+                    f"{min(rain_hours)}, nach Flugabschluss. Flugfenster unberührt.' "
+                    f"rain_safety_rating = 8 (kein Einfluss aufs Fenster, aber informieren)."
+                )
+            elif rain_pattern["is_sandwiched"] and rain_pattern["max_dry_gap"] < 4:
                 lines.append(
                     f"NIEDERSCHLAG-TREND: EINGEKESSELT — Trockenes Fenster nur "
                     f"{rain_pattern['max_dry_gap']}h ({rain_pattern['dry_start']}-{rain_pattern['dry_end']}) "
@@ -2318,14 +2342,40 @@ class WeatherContextMixin:
                         f"→ Maximal conditional."
                     )
                 else:
-                    lines.append(
-                        f"NIEDERSCHLAG-TREND: REGEN BIS ABEND — Letzte Regenstunde: {last_rain}. "
-                        f"Kein trockenes Fenster. → not_safe."
-                    )
+                    first_rain = min(rain_hours)
+                    dry_before = [h for h in all_hours_sorted if h < first_rain]
+                    if len(dry_before) >= 4:
+                        lines.append(
+                            f"NIEDERSCHLAG-TREND: ZUNEHMEND — {len(dry_before)} trockene Stunden "
+                            f"({dry_before[0]}–{dry_before[-1]}), dann Regen ab {first_rain}. "
+                            f"→ Maximal conditional. Frühes Fenster nutzbar, Landung vor {first_rain} planen."
+                        )
+                    else:
+                        lines.append(
+                            f"NIEDERSCHLAG-TREND: REGEN BIS ABEND — Letzte Regenstunde: {last_rain}. "
+                            f"Kein trockenes Fenster. → not_safe."
+                        )
         elif rain_hours:
+            if _all_rain_after_window:
+                lines.append(
+                    f"NIEDERSCHLAG-TREND: NACH FLUGZEIT — Regen erst ab {min(rain_hours)}, "
+                    f"nach Ende des Flugfensters ({config.FLIGHT_HOURS_END:02d}:00). "
+                    f"Flugfenster trocken. → safety_status NICHT verschlechtern. "
+                    f"In hazard_notes['rain'] erwaehnen. rain_safety_rating = 8."
+                )
+            else:
+                lines.append(
+                    f"NIEDERSCHLAG-TREND: GANZTÄGIG — Regen in {len(rain_hours)} Stunden. "
+                    f"→ not_safe."
+                )
+
+        # Gewitter-Trend
+        if thunderstorm_in_window_h > 0:
             lines.append(
-                f"NIEDERSCHLAG-TREND: GANZTÄGIG — Regen in {len(rain_hours)} Stunden. "
-                f"→ not_safe."
+                f"GEWITTER-TREND: IM FLUGFENSTER — Modell-Gewitter in {thunderstorm_in_window_h}h "
+                f"im Flugfenster ({config.FLIGHT_HOURS_START:02d}–{config.FLIGHT_HOURS_END:02d}h). "
+                f"DANGER-Niveau. → safety_status mindestens conditional, meist not_safe. "
+                f"In hazard_notes['thunderstorm'] und caution_notes erwaehnen."
             )
 
         # Boeen-Trend (analog Niederschlag-Trend)
@@ -2428,7 +2478,9 @@ class WeatherContextMixin:
         clean_hours = []
         warned_hours = []
         hourly_winds = {}      # hour_str → Windgeschwindigkeit für Trend-Analyse (Regionen haben keine Böen)
-        rain_hours = []        # Stunden mit Niederschlag
+        rain_hours = []        # Stunden mit Niederschlag (innerhalb + nach Flugfenster)
+        rain_in_window_h = 0   # Regen-Stunden strikt INNERHALB des Flugfensters
+        thunderstorm_in_window_h = 0  # Gewitter-Stunden strikt INNERHALB des Flugfensters
         aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND, Region)
         aloft_danger_hours_list = []  # Nur [ALOFT-WIND-DANGER] (> WIND_DANGER_KMH)
         tag_counts = {}        # tag_name → count (für Tagesprofil-Histogramm)
@@ -2493,7 +2545,7 @@ class WeatherContextMixin:
                         h_max_h = thermal_top_raw
                     effective_ceiling = max(effective_ceiling, h_max_h + 1000)
                     lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
-                    thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str} (Guete: {therm['rating']}/10)"
+                    thermal_info = f" | THERMIK-PROXY: {h_climb} m/s bis {h_max_h}m MSL{lcl_str}"
             except Exception as e:
                 thermal_info = f" | Thermik-Fehler: {e}"
 
@@ -2568,6 +2620,7 @@ class WeatherContextMixin:
                 if isinstance(precip, (int, float)) and precip > 0:
                     warnings.append("[RAIN-WARN]")
                     rain_hours.append(hour_str)
+                    rain_in_window_h += 1
             except Exception:
                 pass
 
@@ -2777,6 +2830,8 @@ class WeatherContextMixin:
             # Tag-Histogram für Tagesprofil
             for w in warnings:
                 tag_counts[w] = tag_counts.get(w, 0) + 1
+            if "[THUNDERSTORM]" in warnings:
+                thunderstorm_in_window_h += 1
             if wind_status == "[WIND-DANGER]":
                 tag_counts["[WIND-DANGER]"] = tag_counts.get("[WIND-DANGER]", 0) + 1
             elif wind_status == "[WIND-WARN]":
@@ -2984,6 +3039,11 @@ class WeatherContextMixin:
             "active_window_start": active_window_start_region,
             "clean_hours_count": len(clean_hours),
             "longest_clean_run_hours": longest_clean_run_region,
+            "rain_hours": len(rain_hours),
+            "rain_in_window_h": rain_in_window_h,
+            "rain_hour_list": rain_hours,
+            "thunderstorm_hours": tag_counts.get("[THUNDERSTORM]", 0),
+            "thunderstorm_in_window_h": thunderstorm_in_window_h,
             # CLOUDS-Sicht (siehe docs/TAGS.md), Region nutzt elev_ref:
             "elevation_m": elev_ref,
             "cloud_at_or_below_takeoff_h": cloud_at_or_below_takeoff_h,
@@ -3176,8 +3236,23 @@ class WeatherContextMixin:
             lines.append(trend)
 
         # Niederschlag-Trend (all_hours_sorted_region bereits oben berechnet)
+        _all_rain_after_window_r = (
+            rain_hours
+            and rain_in_window_h == 0
+            and all(int(h.split(":")[0]) >= config.FLIGHT_HOURS_END for h in rain_hours)
+        )
         if rain_hours and all_hours_sorted_region:
-            if rain_pattern["is_sandwiched"] and rain_pattern["max_dry_gap"] < 4:
+            if _all_rain_after_window_r:
+                lines.append(
+                    f"NIEDERSCHLAG-TREND: NACH FLUGZEIT — Regen erst ab {min(rain_hours)}, "
+                    f"nach Ende des Flugfensters ({config.FLIGHT_HOURS_END:02d}:00). "
+                    f"Flugfenster selbst bleibt trocken. Kein Sicherheitsmalus fuer das Fenster. "
+                    f"→ safety_status NICHT verschlechtern wegen Regen nach Flugzeit. "
+                    f"In hazard_notes['rain'] PFLICHT erwaehnen: 'NACH-FLUGZEIT — Regen ab "
+                    f"{min(rain_hours)}, nach Flugabschluss. Flugfenster unberührt.' "
+                    f"rain_safety_rating = 8 (kein Einfluss aufs Fenster, aber informieren)."
+                )
+            elif rain_pattern["is_sandwiched"] and rain_pattern["max_dry_gap"] < 4:
                 lines.append(
                     f"NIEDERSCHLAG-TREND: EINGEKESSELT — Trockenes Fenster nur "
                     f"{rain_pattern['max_dry_gap']}h ({rain_pattern['dry_start']}-{rain_pattern['dry_end']}) "
@@ -3211,14 +3286,40 @@ class WeatherContextMixin:
                         f"→ Maximal conditional."
                     )
                 else:
-                    lines.append(
-                        f"NIEDERSCHLAG-TREND: REGEN BIS ABEND — Letzte Regenstunde: {last_rain}. "
-                        f"Kein trockenes Fenster. → not_safe."
-                    )
+                    first_rain = min(rain_hours)
+                    dry_before = [h for h in all_hours_sorted_region if h < first_rain]
+                    if len(dry_before) >= 4:
+                        lines.append(
+                            f"NIEDERSCHLAG-TREND: ZUNEHMEND — {len(dry_before)} trockene Stunden "
+                            f"({dry_before[0]}–{dry_before[-1]}), dann Regen ab {first_rain}. "
+                            f"→ Maximal conditional. Fruehes Fenster nutzbar, Landung vor {first_rain} planen."
+                        )
+                    else:
+                        lines.append(
+                            f"NIEDERSCHLAG-TREND: REGEN BIS ABEND — Letzte Regenstunde: {last_rain}. "
+                            f"Kein trockenes Fenster. → not_safe."
+                        )
         elif rain_hours:
+            if _all_rain_after_window_r:
+                lines.append(
+                    f"NIEDERSCHLAG-TREND: NACH FLUGZEIT — Regen erst ab {min(rain_hours)}, "
+                    f"nach Ende des Flugfensters ({config.FLIGHT_HOURS_END:02d}:00). "
+                    f"Flugfenster trocken. → safety_status NICHT verschlechtern. "
+                    f"In hazard_notes['rain'] erwaehnen. rain_safety_rating = 8."
+                )
+            else:
+                lines.append(
+                    f"NIEDERSCHLAG-TREND: GANZTAEGIG — Regen in {len(rain_hours)} Stunden. "
+                    f"→ not_safe."
+                )
+
+        # Gewitter-Trend (Region)
+        if thunderstorm_in_window_h > 0:
             lines.append(
-                f"NIEDERSCHLAG-TREND: GANZTAEGIG — Regen in {len(rain_hours)} Stunden. "
-                f"→ not_safe."
+                f"GEWITTER-TREND: IM FLUGFENSTER — Modell-Gewitter in {thunderstorm_in_window_h}h "
+                f"im Flugfenster ({config.FLIGHT_HOURS_START:02d}–{config.FLIGHT_HOURS_END:02d}h). "
+                f"DANGER-Niveau. → safety_status mindestens conditional, meist not_safe. "
+                f"In hazard_notes['thunderstorm'] und caution_notes erwaehnen."
             )
 
         # Hoehenwind-Trend (analog Boeen-Trend in Spots)

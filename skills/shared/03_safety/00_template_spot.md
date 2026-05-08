@@ -45,6 +45,14 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "wind_summary": "3-4 Saetze. Tagesverlauf der Richtung, Hauptband der Geschwindigkeit, ob Richtung im Sektor stabil bleibt oder dreht — mit konkreten Zahlen und Stunden. Bei vorliegender WIND-TREND-Zeile: Muster mit eigenem Wort nennen (zunehmend / Aufklaerung / eingekesselt / stabil). Begruendung NUR aus Datenblock-Fakten (z.B. 'Bodenwind schwach 8-12 km/h, Hoehenwind 42 km/h auf 2500m — Verhaeltnis 1:5 zeigt entkoppelte Schichtung').",
   "wind_shear": "2-3 Saetze: Hoehenwind vs. Bodenwind, Verhaeltnis, Foehn-Anzeichen, vertikale Richtungsdrehung — alles aus Datenblock-Werten. Leer NUR wenn vollkommen unauffaellig.",
   "foehn_risk": "none|low|moderate|high",
+  "wind_safety_rating": 0,
+  "gust_safety_rating": 0,
+  "aloft_safety_rating": 0,
+  "foehn_safety_rating": 0,
+  "rain_safety_rating": 0,
+  "thunderstorm_safety_rating": 0,
+  "cape_safety_rating": 0,
+  "visibility_safety_rating": 0,
   "hazard_notes": {
     "wind":         "TREND ZUERST wenn WIND-TREND im Datenblock: 'ZUNEHMEND', 'ABKLINGEND', 'DURCHGEHEND', 'EINGEKESSELT', 'STABIL'. Dann Mittelwind-Band, Spitzen, Timing. Beispiel: 'ZUNEHMEND — morgens 12 km/h, ab 14h auf 38 km/h ansteigend.' oder 'STABIL — 15-20 km/h ganztags.'",
     "gusts":        "TREND ZUERST wenn GUST-TREND im Datenblock. Dann Boenspitzen, Boenfaktor, Timing. Beispiel: 'ZUNEHMEND — Boenfaktor 1.6, Spitzen bis 44 km/h ab 13h.' oder 'STABIL — Boenfaktor 1.2, max 22 km/h.'",
@@ -55,13 +63,5 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
     "cape":         "TREND ZUERST: 'AUFBAUEND', 'KEIN-AUFBAU', 'AKTIV'. Dann CAPE-Wert, Entwicklungspotenzial. Beispiel: 'AUFBAUEND — CAPE 900 J/kg 14-16h bei aktivem Niederschlag.' oder 'KEIN-AUFBAU — CAPE unter 400 J/kg ganztags.'",
     "visibility":   "TREND ZUERST wenn erkennbar (absinkend / hebend / stabil). Dann Wolkenbasis vs. Startplatzhoehe. Beispiel: 'ABSINKEND — Basis von 1800m auf 900m bis 12h, unter Startplatz.' oder 'STABIL — Basis 2600m, 1200m ueber Startplatz.'"}
   },
-  "wind_safety_rating": 0,
-  "gust_safety_rating": 0,
-  "aloft_safety_rating": 0,
-  "foehn_safety_rating": 0,
-  "rain_safety_rating": 0,
-  "thunderstorm_safety_rating": 0,
-  "cape_safety_rating": 0,
-  "visibility_safety_rating": 0,
   "summary": "4-6 Saetze.\n\n**Satz 1 — Einstufung + Kern-Begruendung**: folge dem 'Begruendungs-Prinzip fuer Satz 1' in `03_status_derivation.md`. Formuliere selbst, mit konkreten Zahlen aus dem Datenblock — kein Schema.\n\nSatz 2-3: Hauptgefahren MIT Ursache aus Datenblock-Fakten — z.B. 'Hoehenwind 42 km/h zwischen 13 und 16 Uhr, Bodenwind dabei nur 9 km/h, Verhaeltnis 1:5 entkoppelt' oder 'Foehn ΔP 6.8 hPa Sued ab 11 Uhr, 850 hPa Wind 35 km/h Sued bestaetigt die Richtung'. Satz 4: Tagesentwicklung / Trend (zieht ab, baut sich auf, stabil) — falls Datenblock WIND-TREND/GUST-TREND/Foehn-Aufbau zeigt, ist das PFLICHT, in eigenen Worten OHNE die Code-Namen ('durchgehend gefaehrlich' statt 'DURCHGEHEND_DANGER', 'eingekesselt' statt 'EINGEKESSELT', 'zunehmend' statt 'ZUNEHMEND'). Satz 5: Sicheres Zeitfenster konkret. Satz 6: Sicherheits-Einschaetzung — **passiv formuliert als Einstufung, NIE als Empfehlung oder Aufforderung zum Fliegen**. Die Entscheidung ueber Start, Flug und Landung liegt allein beim Piloten. KEINE Tags wie ALOFT-WIND-WARN, GUST-DANGER, SHEAR-UNUSABLE im Fliesstext — schreibe 'kraeftiger Hoehenwind', 'gefaehrliche Boeen', 'starke Scherung'.\n\nFORMULIERUNGS-REGELN fuer den Abschluss-Satz:\n- VERBOTEN (klingt nach Empfehlung/Aufforderung): 'ideal fuer einen Flugtag', 'perfekt zum Fliegen', 'beste Bedingungen zum Fliegen', 'ein guter Tag um zu fliegen', 'lohnt sich', 'nutze das Fenster', 'plane deinen Flug', 'kann bedenkenlos geflogen werden'.\n- ERLAUBT (passive Einstufung): 'die Bedingungen werden als ideal fuer einen sicheren Flugtag eingeschaetzt', 'aus Sicherheitssicht keine Auffaelligkeiten', 'wird als sicherer Flugtag eingestuft', 'Einschaetzung: stabile, sichere Bedingungen', 'die Voranalyse stuft den Tag als sicher ein'.\n- Beispiel guter Schluss-Satz: 'Insgesamt werden die Bedingungen als ideal fuer einen sicheren Flugtag eingeschaetzt.'\n- Beispiel schlechter Schluss-Satz: 'Insgesamt sind die Bedingungen ideal fuer einen sicheren Flugtag.' (suggeriert Aufforderung)."
 }

@@ -1824,7 +1824,9 @@ window.Meteogram = (function () {
             if (wx.thermik) {
                 if (wx.thermik.climb_rate > 0) {
                     html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Steigrate</span><span class="tooltip-value">' + wx.thermik.climb_rate.toFixed(1) + ' m/s</span></div>';
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Arbeitsh\u00f6he</span><span class="tooltip-value">' + wx.thermik.max_height + ' m MSL</span></div>';
+                    var _usableTop = (wx.thermik.lcl && wx.thermik.lcl < wx.thermik.max_height) ? wx.thermik.lcl : wx.thermik.max_height;
+                    var _topLabel = (wx.thermik.lcl && wx.thermik.lcl < wx.thermik.max_height) ? 'Arbeitsh\u00f6he (Basis)' : 'Arbeitsh\u00f6he';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">' + _topLabel + '</span><span class="tooltip-value">' + _usableTop + ' m MSL</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">Rating</span><span class="tooltip-value">' + wx.thermik.rating + '/10</span></div>';
                 }
                 if (wx.thermik.cape > 0) html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';

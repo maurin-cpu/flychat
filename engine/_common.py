@@ -499,29 +499,14 @@ def _compute_rating_from_subratings(
     tier: str,
     safety_status: str = "",
     *,
-    include_altitude: bool = False,
+    include_altitude: bool = True,
 ) -> float:
     """Berechnet das Gesamtrating deterministisch aus LLM-Sub-Ratings.
 
-    G-Eval-Ansatz: Das LLM vergibt Einzel-Ratings, die App berechnet daraus
-    das Gesamtrating. Das LLM ist gut im Beurteilen einzelner
-    Aspekte, schlecht im Zusammenrechnen.
-
-    Modell A (Liebig + Modifier):
-    - Thermik ist der limitierende Faktor (Gate).
-    - Alle anderen Faktoren agieren als Multiplikatoren (heben/senken den
-      Thermik-Ankerwert um bis zu ±50%).
-
-    Zwei Varianten:
-    - **Region** (`include_altitude=False`, default): 3 Sub-Ratings
-      (window, wind, xc) als Modifier.
-    - **Spot** (`include_altitude=True`): 4 Sub-Ratings (window, wind, xc,
-      altitude) als Modifier.
-
-    (Bewoelkung ist implizit im thermal_rating und window_rating enthalten,
-    daher kein separates cloud_rating, um Double-Counting zu vermeiden).
-
-    Der `tier`-Parameter wird ignoriert (kept fuer API-Kompatibilitaet).
+    Gewichteter Durchschnitt: thermal (50%) > altitude (30%) > xc (20%).
+    Fehlt altitude_rating (alte Cache-Daten): thermal 70%, xc 30%.
+    Window und Wind sind via Safety-Band abgedeckt, fliessen nicht ein.
+    Gilt fuer Spots und Regionen. `tier`/`include_altitude` werden ignoriert.
     """
     def _clamp(v, lo, hi):
         try:
@@ -533,20 +518,18 @@ def _compute_rating_from_subratings(
     if safety_status == "not_safe":
         return 0.0
 
-    thermal = _clamp(result.get("thermal_rating", 5), 1, 10)
-    window  = _clamp(result.get("window_rating", 5), 1, 10)
-    wind    = _clamp(result.get("wind_rating", 5), 1, 10)
-    xc      = _clamp(result.get("xc_rating", 5), 1, 10)
+    thermal  = _clamp(result.get("thermal_rating", 5), 1, 10)
+    xc       = _clamp(result.get("xc_rating", 5), 1, 10)
 
-    if include_altitude:
-        altitude = _clamp(result.get("altitude_rating", 5), 1, 10)
-        # Normalisierte Gewichte ohne Cloud (Summe 1.0):
-        modifier_avg = 0.25 * window + 0.15 * wind + 0.20 * xc + 0.40 * altitude
+    altitude_raw = result.get("altitude_rating")
+    if altitude_raw is None:
+        # Altitude nicht gesetzt: thermal 70%, xc 30%
+        raw = 0.7 * thermal + 0.3 * xc
     else:
-        # Normalisierte Gewichte ohne Cloud (Summe 1.0):
-        modifier_avg = 0.375 * window + 0.375 * wind + 0.25 * xc
+        altitude = _clamp(altitude_raw, 1, 10)
+        # thermal 50%, altitude 30%, xc 20%
+        raw = 0.5 * thermal + 0.3 * altitude + 0.2 * xc
 
-    raw = thermal * (0.5 + 0.5 * (modifier_avg / 10.0))
     return round(raw, 1)
 
 

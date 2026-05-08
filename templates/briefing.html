@@ -80,6 +80,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script>window.gleitcastDebugMode = {{ 'true' if debug_mode else 'false' }};</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="{{ url_for('static', filename='js/shared-glyph.js') }}?v={{ static_v('js/shared-glyph.js') }}"></script>

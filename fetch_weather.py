@@ -256,6 +256,34 @@ def _aggregate_wind_across_points(data_list):
     return primary
 
 
+def _best_thermal_rp_index(data_list: list) -> int:
+    """Gibt den Index des thermisch repraesentativsten Referenzpunkts zurueck.
+
+    Kriterium: hoechste mittlere shortwave_radiation waehrend Flugstunden.
+    Damit wird sichergestellt, dass nicht blind RP0 als thermischer Anker
+    genutzt wird, sondern der Punkt mit der besten solaren Einstrahlung.
+    Wind- und Wolken-Aggregation sind reihenfolge-unabhaengig (Median/Perzentil),
+    daher hat die Umordnung dort keinen Effekt.
+    """
+    if len(data_list) <= 1:
+        return 0
+    best_idx, best_rad = 0, -1.0
+    for i, d in enumerate(data_list):
+        h = d.get("hourly", {})
+        times = h.get("time", [])
+        rads = h.get("shortwave_radiation", [])
+        vals = [
+            rads[j] for j, t in enumerate(times)
+            if j < len(rads)
+            and rads[j] is not None
+            and config.FLIGHT_HOURS_START <= int(t[11:13]) < config.FLIGHT_HOURS_END
+        ]
+        mean_rad = sum(vals) / len(vals) if vals else 0.0
+        if mean_rad > best_rad:
+            best_rad, best_idx = mean_rad, i
+    return best_idx
+
+
 def _aggregate_regional_data(data_list):
     """
     Generalisierte Source-Area Aggregation:
@@ -899,6 +927,14 @@ def fetch_all_spots(spots, save_to_file=True):
             if entry is not None:
                 thermal_data_list.append(copy.deepcopy(entry))
         if thermal_data_list:
+            # Thermischen Referenzpunkt bestimmen: RP mit hoechster mittlerer
+            # Strahlung waehrend Flugstunden (repraesentativster Punkt der Region).
+            # Wind+Wolken-Aggregation sind reihenfolge-unabhaengig (Median/Perzentil).
+            best_idx = _best_thermal_rp_index(thermal_data_list)
+            if best_idx != 0:
+                thermal_data_list[0], thermal_data_list[best_idx] = (
+                    thermal_data_list[best_idx], thermal_data_list[0]
+                )
             data_thermal_r = _aggregate_regional_data(thermal_data_list)
             # NEU: Wind/Gust/Richtung ueber ALLE RPs aggregieren (Median),
             # sodass kein einzelner alpiner RP die ganze Region dominiert.
@@ -912,6 +948,11 @@ def fetch_all_spots(spots, save_to_file=True):
             if entry is not None:
                 fallback_data_list.append(copy.deepcopy(entry))
         if fallback_data_list:
+            best_idx_fb = _best_thermal_rp_index(fallback_data_list)
+            if best_idx_fb != 0:
+                fallback_data_list[0], fallback_data_list[best_idx_fb] = (
+                    fallback_data_list[best_idx_fb], fallback_data_list[0]
+                )
             data_fallback_r = _aggregate_regional_data(fallback_data_list)
             data_fallback_r = _aggregate_wind_across_points(fallback_data_list)
 

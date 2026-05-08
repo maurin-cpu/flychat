@@ -690,9 +690,8 @@ def decide_flyability_upgrade(result: dict, tq: dict, label: str) -> Optional[st
     if prod_h >= 5:
         result["xc_potential"] = "moderate"
     result["recommendation"] = (
-        f"System-Korrektur: Die Daten zeigen {peak:.1f} m/s Peak-Thermik "
-        f"mit {prod_h}h produktiver Thermik (ROUGH-UNUSABLE nur {rough_pct:.0f}%). "
-        f"Gute Bedingungen fuer Thermikfluege."
+        f"Peak-Steigen {peak:.1f} m/s, {prod_h}h produktive Thermik — "
+        f"gute Bedingungen fuer Thermikfluege."
     )
     return f"FlyabilityUpgrade(gray→green,peak={peak:.1f})"
 
@@ -1055,15 +1054,20 @@ def build_topic_tags(result: dict, gust_info: dict, tq: dict) -> list:
     rain_h = int(gi.get("rain_hours", 0) or 0)
     if rain_h >= 1:
         rain_list = gi.get("rain_hour_list") or []
+        # "warn" wenn Regen NUR nach dem Flugfenster; "stop" wenn Regen im Fenster
+        rain_in_win = int(gi.get("rain_in_window_h", rain_h) or rain_h)
+        rain_sev = "stop" if rain_in_win > 0 else "warn"
         tags.append(_make_tag(
-            "RAIN", "stop", "Regen", "Niederschlag", _fmt_hour_range(rain_list)
+            "RAIN", rain_sev, "Regen", "Niederschlag", _fmt_hour_range(rain_list)
         ))
 
     # ── THUNDERSTORM ─────────────────────────────────────────────────
     thunder_h = int(gi.get("thunderstorm_hours", 0) or 0)
     if thunder_h >= 1:
+        thunder_in_win = int(gi.get("thunderstorm_in_window_h", thunder_h) or thunder_h)
+        thunder_sev = "stop" if thunder_in_win > 0 else "warn"
         tags.append(_make_tag(
-            "THUNDERSTORM", "stop", "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
+            "THUNDERSTORM", thunder_sev, "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
         ))
 
     # ── CLOUDS — Sicherheits-Branch (STOP/WARN) ──────────────────────
@@ -1159,15 +1163,19 @@ def build_region_topic_tags(result: dict, gust_info: dict) -> list:
     rain_h = int(gi.get("rain_hours", 0) or 0)
     if rain_h >= 1:
         rain_list = gi.get("rain_hour_list") or []
+        rain_in_win = int(gi.get("rain_in_window_h", rain_h) or rain_h)
+        rain_sev = "stop" if rain_in_win > 0 else "warn"
         tags.append(_make_tag(
-            "RAIN", "stop", "Regen", "Niederschlag", _fmt_hour_range(rain_list)
+            "RAIN", rain_sev, "Regen", "Niederschlag", _fmt_hour_range(rain_list)
         ))
 
     # THUNDERSTORM
     thunder_h = int(gi.get("thunderstorm_hours", 0) or 0)
     if thunder_h >= 1:
+        thunder_in_win = int(gi.get("thunderstorm_in_window_h", thunder_h) or thunder_h)
+        thunder_sev = "stop" if thunder_in_win > 0 else "warn"
         tags.append(_make_tag(
-            "THUNDERSTORM", "stop", "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
+            "THUNDERSTORM", thunder_sev, "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
         ))
 
     # ── CLOUDS — Sicherheits-Branch (STOP/WARN), Region-Pfad ─────────

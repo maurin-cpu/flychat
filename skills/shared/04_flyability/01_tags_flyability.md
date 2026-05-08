@@ -13,4 +13,4 @@ Diese Tags gelten ausschliesslich fuer **Fliegbarkeit (Teil 2)**. Sie duerfen NI
 
 `THERMAL-ROUGH-FRAGMENTED` (separate Variante) = Thermik zu schwach, nicht gefaehrlich. Geht in Qualitaets-Bewertung ein, aber nicht als Klapper-Trigger.
 
-Die Anwendung dieser Tags auf `flyability_tier`, `peak_climb_rate`, `thermal_quality` und Sub-Ratings steht in `_flyability_rules.md`.
+Diese Tags erscheinen im Kontext-String und fliessen in deine Sub-Rating-Bewertung ein — DEGRADED = sportlich aber fliegbar, UNUSABLE = Thermik praktisch unbrauchbar fuer diese Stunde.
