@@ -178,8 +178,12 @@ BLOCK 5 — KONVEKTION / UEBERENTWICKLUNG (3 Tiers)
 
 **Strikt trennen — nicht als "Gewitter" vermischen:**
 
-- `[THUNDERSTORM]` → unfliegbar. Modell prognostiziert explizit Gewitter (weather_code 95/96/99).
-  → **not_safe**. In `no_go_reasons`/`summary` als **"Gewitter"**. `primary_no_go = GEWITTER`.
+- `[THUNDERSTORM]` → Modell prognostiziert explizit Gewitter (weather_code 95/96/99).
+  **Timing-Regel — pruefe Lage relativ zum Flugfenster ({{cfg.FLIGHT_HOURS_START}}-{{cfg.FLIGHT_HOURS_END}}h):**
+  - Gewitter **im Flugfenster** (waehrend nutzbarer Stunden) → **not_safe**. `primary_no_go = GEWITTER`.
+  - Gewitter **am oder nach Fenster-Ende** ({{cfg.FLIGHT_HOURS_END}}h+) UND saubere Stunden davor verfuegbar → max **conditional**. `safe_window` auf den ruhigen Vormittag/Mittag, Gewitter in `caution_notes` mit Zeit. KEIN `not_safe` allein wegen Abend-Gewitter.
+  - Gleiche Logik bei Regen+Gewitter-Kombi: wenn Trockenfenster vor Regen ≥ {{cfg.CLEAN_WINDOW_MIN_HOURS}}h und Gewitter nach Regen → max **conditional**.
+  In `no_go_reasons`/`summary`/`caution_notes` als **"Gewitter"** mit Uhrzeit.
 
 - `[CAPE-DANGER]` → unfliegbar. CAPE > {{cfg.CAPE_DANGER_JKG}} J/kg ODER CAPE + Regen/Schauer in derselben Stunde (aktive Ueberentwicklung).
   → **not_safe**. Als **"Ueberentwicklungsgefahr"** / **"aktive Ueberentwicklung"** — NICHT als "Gewitter". `primary_no_go = UEBERENTWICKLUNG`.
