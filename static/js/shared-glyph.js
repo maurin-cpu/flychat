@@ -1,12 +1,29 @@
 /* ══════════════════════════════════════════════════════════════
-   Gleitcast — Shared Glyph Renderer (RATING_CONCEPT v1.4 §8.2)
-   Single source of truth for the safety_band × experience_rating
-   marker glyph used on map, briefing, region header, spot panel.
-   Skala 1-10 (0 = not_safe / no flight).
+   Gleitcast — Shared Glyph Renderer (RATING_ARCHITECTURE v2.0)
+   FE leitet Farben aus safety_status + experience_rating ab.
+   Skala 1-6 (1=abgleiter, 2=kurzer, 3=solider, 4=starker, 5=xc_tag, 6=klassiker).
    Exposes window.gleitcastGlyph.
    ══════════════════════════════════════════════════════════════ */
 (function () {
   "use strict";
+
+  // safety_status → Marker-Farbband (green/amber/red/no_data).
+  function bandFromStatus(status) {
+    if (status === "safe") return "green";
+    if (status === "conditional") return "amber";
+    if (status === "not_safe") return "red";
+    return "no_data";
+  }
+
+  // experience_rating (1-6) → Tier (gray/green/violet) fuer Premium-Optik.
+  // 1-2 → gray, 3-5 → green, 6 → violet.
+  function tierFromRating(rating) {
+    var r = parseInt(rating, 10);
+    if (!isFinite(r) || r <= 0) return "gray";
+    if (r >= 6) return "violet";
+    if (r >= 3) return "green";
+    return "gray";
+  }
 
   function styleFor(band) {
     if (band === "violet")  return { fill: "#8b5cf6", stroke: "#6d28d9", label: "Top" };
@@ -17,113 +34,61 @@
     return { fill: "#6b7280", stroke: "#4b5563", label: "" };
   }
 
-  // Display-Band: safe + rating>=9 wird visuell als violett dargestellt.
-  // Safety-Filter und Filter-Logik bleiben aber bei "green" — violett ist
-  // nur ein optischer Premium-Marker fuer top-bewertete sichere Spots/Regionen.
+  // Display-Band: safe + rating 6 (Klassiker) → violett-Premium-Marker.
   function displayBand(band, rating) {
-    if (band === "green" && typeof rating === "number" && rating >= 9) return "violet";
+    if (band === "green" && typeof rating === "number" && rating >= 6) return "violet";
     return band;
   }
 
-  // Legacy-Fallback fuer Spots ohne safety_band-Feld (alte Caches).
+  // Spot/Region → Band aus safety_status (FE-Mapping, kein safety_band-Feld mehr).
   function legacyBand(spot) {
     if (!spot) return "no_data";
-    if (spot.safety_band === "green" || spot.safety_band === "amber"
-        || spot.safety_band === "red" || spot.safety_band === "no_data") {
-      return spot.safety_band;
-    }
-    var s = spot.safety_status;
-    if (s === "not_safe")    return "red";
-    if (s === "conditional") return "amber";
-    if (s === "safe")        return "green";
-    if (s === "no_data" || s === "error") return "no_data";
-    return "no_data";
+    return bandFromStatus(spot.safety_status);
   }
 
-  // Rating 1-10. Bevorzugt experience_rating, fallback auf score/10 oder rating.
+  // experience_rating 1-6. Bei not_safe oder fehlend → 0.
   function legacyRating(spot) {
     if (!spot) return 0;
-    if (typeof spot.experience_rating === "number") {
-      var r = Math.floor(spot.experience_rating);
-      return r < 0 ? 0 : (r > 10 ? 10 : r);
-    }
-    // Fallback: experience_score (0-100) / 10, conservative ceil.
-    if (typeof spot.experience_score === "number") {
-      var s = spot.experience_score;
-      if (s <= 0) return 0;
-      if (s >= 100) return 10;
-      return Math.max(1, Math.min(10, Math.ceil(s / 10)));
-    }
-    // Legacy-Legacy: rating 0-10 direkt.
-    var rt = parseFloat(spot.rating);
-    if (!isFinite(rt) || rt <= 0) return 0;
-    return Math.max(1, Math.min(10, Math.round(rt)));
-  }
-
-  // Backwards-compat fuer Code, der noch auf 0-5 Sterne basiert
-  // (z.B. Briefing-Bubble-Layout). Buckets aus alter v1.3-Tabelle.
-  function legacyStars(spot) {
-    if (!spot) return 0;
-    if (typeof spot.experience_stars === "number") {
-      var s = Math.floor(spot.experience_stars);
-      return s < 0 ? 0 : (s > 5 ? 5 : s);
-    }
-    var r = parseFloat(spot.rating);
+    var r = parseInt(spot.experience_rating, 10);
     if (!isFinite(r) || r <= 0) return 0;
-    if (r >= 9.0) return 5;
-    if (r >= 7.6) return 4;
-    if (r >= 6.1) return 3;
-    if (r >= 4.1) return 2;
-    if (r >= 2.1) return 1;
-    return 0;
+    return Math.max(1, Math.min(6, r));
   }
 
-  function experienceScore(spot) {
-    if (!spot) return 0;
-    if (typeof spot.experience_score === "number") {
-      var v = spot.experience_score;
-      return v < 0 ? 0 : (v > 100 ? 100 : v);
-    }
-    var r = parseFloat(spot.rating);
-    if (!isFinite(r) || r < 0) return 0;
-    return Math.max(0, Math.min(100, Math.round(r * 10)));
+  // Stars 0-5 (Briefing-Bubble Layout). Aus rating 1-6 abgeleitet.
+  function legacyStars(spot) {
+    var r = legacyRating(spot);
+    if (r <= 0) return 0;
+    // Rating 1→1, 2→2, 3→3, 4→4, 5→4, 6→5 (klassiker = Premium)
+    if (r >= 6) return 5;
+    if (r >= 4) return 4;
+    return r;
   }
 
-  // SVG-String Generator (no Leaflet dep). Inline-bar in HTML.
+  // SVG-String Generator (no Leaflet dep).
   // opts = { band, rating, size = 24, ariaLabel? }
-  // Rating 1-10. 0 wird wie no-flight behandelt (Punkt statt Zahl).
-  // Backwards-Compat: opts.stars (0-5) wird auf rating (stars*2) gemappt.
   function svg(opts) {
     var band = (opts && opts.band) || "no_data";
     var rating = 0;
     if (opts && typeof opts.rating === "number") {
-      rating = Math.max(0, Math.min(10, Math.floor(opts.rating)));
-    } else if (opts && typeof opts.stars === "number") {
-      rating = Math.max(0, Math.min(10, Math.floor(opts.stars) * 2));
+      rating = Math.max(0, Math.min(6, Math.floor(opts.rating)));
     }
     var size = (opts && opts.size) || 24;
     var visBand = displayBand(band, rating);
     var st = styleFor(visBand);
     var center = size / 2;
-    // Marker leicht groesser als v1.3 (0.42 → 0.46), damit zweistellige
-    // Zahl gut lesbar ist.
     var radius = Math.max(7, Math.round(size * 0.46));
-    var ratingLabel = (rating > 0 && band !== "red") ? (", Rating " + rating + "/10") : "";
+    var ratingLabel = (rating > 0 && band !== "red") ? (", Rating " + rating + "/6") : "";
     var ariaLabel = (opts && opts.ariaLabel) || (st.label + ratingLabel);
 
-    // Farbintensitaet skaliert linear mit Rating — moderater Dynamikbereich.
-    // Rating 1 ~0.28, Rating 5 ~0.60, Rating 10 = 1.0. Sichtbar abgestuft, aber
-    // nicht so extrem dass schwache Spots fast verschwinden.
+    // Farbintensitaet skaliert mit Rating 1-6.
     var fillOpacity = 1.0;
     if (visBand === "green" || visBand === "amber" || visBand === "violet") {
-      fillOpacity = rating > 0 ? (0.20 + (rating / 10) * 0.80) : 0.20;
+      fillOpacity = rating > 0 ? (0.30 + (rating / 6) * 0.70) : 0.30;
     }
     var fillScales = (visBand === "green" || visBand === "amber" || visBand === "violet");
 
     var s = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size
           + '" class="gc-glyph gc-glyph--' + visBand + '" role="img" aria-label="' + ariaLabel + '">';
-    // Weisser Hintergrund-Kreis bei skalierter Deckkraft, damit die Farbe sauber
-    // wirkt und die Ziffer auch ueber farbigen Karten lesbar bleibt.
     if (fillScales) {
       s += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="#ffffff" />';
     }
@@ -141,12 +106,8 @@
          + '" x2="' + (center - arm) + '" y2="' + (center + arm)
          + '" stroke="#ffffff" stroke-width="' + w + '" stroke-linecap="round" />';
     } else if (rating >= 1 && (visBand === "green" || visBand === "amber" || visBand === "violet")) {
-      // Zahl 1-10. Zweistellig "10" braucht kleinere Schrift damit's reinpasst.
-      var twoDigit = rating >= 10;
-      var fontSize = Math.round(radius * (twoDigit ? 1.05 : 1.4));
+      var fontSize = Math.round(radius * 1.4);
       var yOffset = fontSize * 0.35;
-      // Bei geringer Deckkraft (kleines Rating) ist weisse Schrift unlesbar —
-      // dann auf den dunklen Stroke-Ton wechseln (parallel zu map.js).
       var textFill = (fillOpacity < 0.65) ? st.stroke : "#ffffff";
       s += '<text x="' + center + '" y="' + (center + yOffset)
          + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter, sans-serif"'
@@ -159,7 +120,7 @@
     return s;
   }
 
-  // Worst-Band-Wins (RATING_CONCEPT §3.1): rot > amber > grün > no_data
+  // Worst-Band-Wins: rot > amber > gruen > no_data
   var BAND_ORDER = { red: 3, amber: 2, green: 1, no_data: 0 };
   function aggregateBand(spots) {
     var worst = "no_data";
@@ -170,7 +131,6 @@
     return worst;
   }
 
-  // Verteilungs-Counts pro Band fuer Region/Day-Header.
   function bandCounts(spots) {
     var c = { green: 0, amber: 0, red: 0, no_data: 0 };
     for (var i = 0; i < (spots || []).length; i++) {
@@ -190,7 +150,6 @@
     return n ? Math.round(sum / n) : 0;
   }
 
-  // v1.4: Durchschnitts-Rating 1-10 fuer Region-Header.
   function avgRating(spots) {
     if (!spots || !spots.length) return 0;
     var sum = 0, n = 0;
@@ -202,12 +161,13 @@
   }
 
   window.gleitcastGlyph = {
+    bandFromStatus: bandFromStatus,
+    tierFromRating: tierFromRating,
     styleFor: styleFor,
     displayBand: displayBand,
     legacyBand: legacyBand,
     legacyStars: legacyStars,
     legacyRating: legacyRating,
-    experienceScore: experienceScore,
     svg: svg,
     aggregateBand: aggregateBand,
     bandCounts: bandCounts,

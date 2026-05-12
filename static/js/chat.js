@@ -664,9 +664,9 @@
             Object.keys(details).sort().forEach(function (name) {
                 var d = (details[name] || {})[dateStr];
                 if (!d) return;
-                var ft = d.fly_status || '';
-                var flyLabel = ft
-                    ? (flyTierLabels[ft] || ft)
+                var er = parseInt(d.experience_rating, 10);
+                var flyLabel = (isFinite(er) && er >= 1)
+                    ? ('Rating ' + er + '/6')
                     : (d.safety_status === 'not_safe' ? '\u2014 (keine Fliegbarkeit)' : '?');
                 var safeLabel = safetyLabels[d.safety_status] || d.safety_status || 'unbekannt';
                 var line = '- **' + name + '**: Sicherheit **' + safeLabel + '**, Fliegbarkeit **' + flyLabel + '**';
@@ -1010,13 +1010,14 @@
         // Find best spot for contextual actions
         var bestSpot = null;
         var bestScore = -1;
-        var tierRank = { 'violet': 3, 'green': 2, 'gray': 1 };
         var safeRank = { 'safe': 3, 'conditional': 2, 'not_safe': 1 };
 
         Object.keys(analysisData).forEach(function (name) {
             var d = analysisData[name][todayStr];
             if (!d) return;
-            var score = (safeRank[d.safety_status] || 0) * 10 + (tierRank[d.fly_status] || 0);
+            var er = parseInt(d.experience_rating, 10);
+            if (!isFinite(er)) er = 0;
+            var score = (safeRank[d.safety_status] || 0) * 10 + er;
             if (score > bestScore) {
                 bestScore = score;
                 bestSpot = name;

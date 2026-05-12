@@ -1,5 +1,7 @@
 # Gleitcast Rating-Konzept: Risk vs Reward Trennung
 
+**Status**: ⚠️ **DEPRECATED seit 2026-05-12 — siehe `docs/RATING_ARCHITECTURE.md` (v2.0).** Diese Datei dokumentiert die historische Entwicklung v1.0–v1.5.
+
 **Status**: 🟢 **v1.5 aktiv** (2026-05-11) — LLM-natives Rating. Frueheres v1.3/1.4 (deterministische Aggregation + Tier-Ableitung) wurde durch direktes LLM-Setzen ersetzt.
 **Autor**: Alex (PM)
 **Datum**: 2026-05-11 (v1.5 LLM-nativ) / 2026-05-02 (WIND-WRONG-Refactor) / 2026-04-30 (Konzept v1.0)

@@ -44,41 +44,16 @@ window.AnalysisView = (function () {
         return [];
     }
 
-    function getStars(a) {
-        if (!a) return 0;
-        var s = a.experience_stars;
-        if (typeof s === 'number') return Math.max(0, Math.min(5, Math.round(s)));
-        var r = parseFloat(a.rating || 0);
-        if (r >= 9.0) return 5;
-        if (r >= 7.6) return 4;
-        if (r >= 6.1) return 3;
-        if (r >= 4.1) return 2;
-        if (r >= 2.1) return 1;
-        return 0;
-    }
-
-    // RATING_CONCEPT v1.4: 0-10 Rating
+    // RATING_ARCHITECTURE v2.0: experience_rating 1-6
     function getRating(a) {
         if (!a) return 0;
-        var er = a.experience_rating;
-        if (typeof er === 'number') return Math.max(0, Math.min(10, Math.round(er)));
-        var sc = a.experience_score;
-        if (typeof sc === 'number') {
-            if (sc <= 0) return 0;
-            if (sc >= 100) return 10;
-            return Math.max(1, Math.min(10, Math.ceil(sc / 10)));
-        }
-        var s = a.experience_stars;
-        if (typeof s === 'number') return Math.max(0, Math.min(10, s * 2));
-        var r = parseFloat(a.rating || 0);
-        if (r > 0) return Math.max(1, Math.min(10, Math.round(r)));
+        var er = parseInt(a.experience_rating, 10);
+        if (isFinite(er) && er >= 1) return Math.min(6, er);
         return 0;
     }
 
     function getSafetyBand(a) {
         if (!a) return 'no_data';
-        var b = a.safety_band;
-        if (b === 'green' || b === 'amber' || b === 'red' || b === 'no_data') return b;
         var s = a.safety_status || (a.safety && a.safety.safety_status);
         if (s === 'safe') return 'green';
         if (s === 'conditional') return 'amber';
@@ -103,7 +78,7 @@ window.AnalysisView = (function () {
         var col = PALETTE[band] || PALETTE.no_data;
         var label = (band === 'red') ? 'Nicht fliegbar' :
                     (band === 'no_data') ? 'Keine Analyse' :
-                    (rating >= 1 ? 'Rating ' + rating + ' von 10' : 'Bewertung');
+                    (rating >= 1 ? 'Rating ' + rating + ' von 6' : 'Bewertung');
         var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s
                  + '" role="img" aria-label="' + esc(label) + '">';
         html += '<circle cx="' + c + '" cy="' + c + '" r="' + r
@@ -122,9 +97,8 @@ window.AnalysisView = (function () {
                   + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
                   + (r * 0.85).toFixed(1) + '" font-weight="700">…</text>';
         } else if (rating >= 1) {
-            // v1.4: zweistellige "10" braucht kleinere Schrift, damit sie reinpasst.
-            var twoDigit = rating >= 10;
-            var fontSize = (r * (twoDigit ? 0.65 : 0.85)).toFixed(1);
+            // Rating 1-6 ist immer einstellig.
+            var fontSize = (r * 0.85).toFixed(1);
             html += '<text x="' + c + '" y="' + (c + r * 0.34)
                   + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
                   + fontSize + '" font-weight="700">' + rating + '</text>';
@@ -158,47 +132,23 @@ window.AnalysisView = (function () {
                  + '<div class="mga-hero-glyph">' + buildGlyph(band, rating, 96) + '</div>'
                  + '<div class="mga-hero-text">'
                  + '<div class="mga-hero-verdict ' + band + '">' + esc(verdictTxt) + '</div>';
-        // Pills: Safety-Band + Safety-Score immer; Experience/Comfort nur wenn nicht red.
-        var safScore = null;
-        if (typeof a.safety_score === 'number') {
-            safScore = Math.round(a.safety_score);
-        } else {
-            var _nested = a.safety || {};
-            var _st = String((a.safety_status || _nested.safety_status || '')).toLowerCase();
-            var _fo = String((a.foehn_risk   || _nested.foehn_risk   || 'none')).toLowerCase();
-            var _base = (_st === 'safe') ? 85 : (_st === 'conditional') ? 50 : -1;
-            if (_base >= 0) {
-                var _delta = (_fo === 'medium') ? -15 : (_fo === 'high' || _fo === 'severe') ? -30 : 0;
-                safScore = Math.max(0, _base + _delta);
-            }
-        }
-        var expScore = (typeof a.experience_score === 'number') ? a.experience_score : null;
-        var comfort  = (typeof a.comfort_index === 'number') ? a.comfort_index : null;
+        // Pills: Safety-Band + Rating. RATING_ARCHITECTURE v2.0.
         html += '<div class="mga-hero-pills">';
         html += '<span class="mga-hero-pill ' + band + '">Safety ' + band.toUpperCase() + '</span>';
-        if (safScore !== null) {
-            html += '<span class="mga-hero-pill">Safety-Score ' + safScore + '/100</span>';
-        }
         if (band !== 'red' && band !== 'no_data') {
-            if (expScore !== null) {
-                html += '<span class="mga-hero-pill">Experience ' + expScore + '/100</span>';
+            // Rating-Pill mit Tier-Farbe (1-2 gray, 3-5 green, 6 violet).
+            if (rating >= 1) {
+                var flyTier = (rating >= 6) ? 'violet' : (rating >= 3 ? 'green' : 'gray');
+                var ratingLabels = {
+                    1: 'Abgleiter', 2: 'Kurzer Thermikflug',
+                    3: 'Solider Thermikflug', 4: 'Starker Thermikflug',
+                    5: 'XC-Tag', 6: 'Klassiker'
+                };
+                var pillLabel = ratingLabels[rating] || ('Rating ' + rating);
+                html += '<span class="mga-hero-pill mga-hero-pill--fly mga-hero-pill--' + flyTier + '">'
+                     + esc(pillLabel) + ' (' + rating + '/6)</span>';
             }
-            if (comfort !== null) {
-                html += '<span class="mga-hero-pill">Comfort ' + Math.round(comfort) + '/100</span>';
-            }
-            // Flyability-Tier
             var fly = a.flyability || {};
-            var flyTier = fly.flyability_tier || a.fly_status || '';
-            // RATING_CONCEPT v1.6: flight_category als Pilot-Sprache (z.B. "Solider Thermikflug").
-            // Fallback auf alte tier-Labels bei Caches ohne Kategorie.
-            var catDisplay = a.flight_category_display
-                          || (fly && fly.flight_category_display)
-                          || '';
-            var FLY_LABEL_FALLBACK = { green: 'Fliegbar', violet: 'Top', gray: 'Abgleiter', red: 'Nicht fliegbar' };
-            if (flyTier && flyTier !== 'no_data') {
-                var pillLabel = catDisplay || FLY_LABEL_FALLBACK[flyTier] || flyTier;
-                html += '<span class="mga-hero-pill mga-hero-pill--fly mga-hero-pill--' + flyTier + '">' + esc(pillLabel) + '</span>';
-            }
             // Key flyability fields
             if (fly.flight_type)              html += '<span class="mga-hero-pill">Typ: ' + esc(fly.flight_type) + '</span>';
             if (fly.flight_duration_estimate) html += '<span class="mga-hero-pill">' + esc(fly.flight_duration_estimate) + '</span>';
@@ -385,10 +335,6 @@ window.AnalysisView = (function () {
     }
 
     // ===== METRICS =====
-    var SF_TIER_LABELS = {
-        kein_xc: 'kein XC', lokal: 'Lokal', moderat: 'Moderat', top: 'Top-XC'
-    };
-
     function renderMetrics(a) {
         var html = '<div class="mga-metrics">';
         html += '<div class="mga-metric full-width">'
@@ -420,19 +366,17 @@ window.AnalysisView = (function () {
                   + '<div class="mga-metric-value">' + esc(a.xc_potential) + '</div>'
                   + '</div>';
         }
-        // Streckenflug-Metric — nur wenn das Feld vom Server geliefert wird (Spot).
-        if (a.streckenflug_tier) {
-            var sfTier = a.streckenflug_tier;
-            var sfRating = a.streckenflug_rating;
-            var sfCtxOk = !!a.streckenflug_region_context_available;
-            var sfLabel = SF_TIER_LABELS[sfTier] || sfTier;
-            var sfHtml = '<span class="mga-sf-badge ' + esc(sfTier) + '">' + esc(sfLabel) + '</span>';
-            if (typeof sfRating === 'number' && sfRating > 0) {
-                sfHtml += ' <span class="mga-sf-rating">' + sfRating + '/10</span>';
-            }
-            if (!sfCtxOk && sfTier !== 'kein_xc') {
-                sfHtml += ' <span class="mga-sf-ctx-warn" title="Region-Kontext fehlt — reine Spot-Einschaetzung">⚠</span>';
-            }
+        // Streckenflug-Metric (Spot) — RATING_ARCHITECTURE v2.0: rating 1-6 + limiting_factor.
+        var sfRating = parseInt(a.streckenflug_rating, 10);
+        if (isFinite(sfRating) && sfRating >= 1) {
+            var SF_RATING_LABELS = {
+                1: 'kein XC', 2: 'ganz kurz', 3: 'lokal', 4: 'kurz wegfliegen',
+                5: 'weit', 6: 'klassiker'
+            };
+            var sfLabel = SF_RATING_LABELS[sfRating] || ('Rating ' + sfRating);
+            var sfTierClass = (sfRating >= 5) ? 'top' : (sfRating >= 4 ? 'moderat' : (sfRating >= 3 ? 'lokal' : 'kein_xc'));
+            var sfHtml = '<span class="mga-sf-badge ' + sfTierClass + '">' + esc(sfLabel) + '</span>'
+                       + ' <span class="mga-sf-rating">' + sfRating + '/6</span>';
             html += '<div class="mga-metric full-width streckenflug">'
                   + '<div class="mga-metric-label">Streckenflug</div>'
                   + '<div class="mga-metric-value">' + sfHtml + '</div>'
@@ -455,8 +399,11 @@ window.AnalysisView = (function () {
     function renderInsights(a) {
         var safetyFb = a.safety_feedback || a.summary || '';
         var flyFb = a.flyability_feedback || a.recommendation || '';
-        var sfFb = a.streckenflug_summary || '';
-        if (!safetyFb && !flyFb && !sfFb) return '';
+        var sfLimit = a.streckenflug_limiting_factor || 'none';
+        var sfRating = parseInt(a.streckenflug_rating, 10);
+        var showSf = isFinite(sfRating) && sfRating >= 1 && sfLimit !== 'none';
+
+        if (!safetyFb && !flyFb && !showSf) return '';
 
         var html = '<div class="mga-insights">';
         if (safetyFb) {
@@ -471,16 +418,10 @@ window.AnalysisView = (function () {
                   + '<div class="mga-insight-body">' + esc(flyFb) + '</div>'
                   + '</div>';
         }
-        if (sfFb) {
-            var limit = a.streckenflug_limiting_factor || 'none';
-            var body = esc(sfFb);
-            if (limit && limit !== 'none' && SF_LIMIT_LABELS[limit]) {
-                body += '<div class="mga-sf-limit-note">' + esc(SF_LIMIT_LABELS[limit]) + '</div>';
-            }
-            var sfTier = a.streckenflug_tier || 'kein_xc';
-            html += '<div class="mga-insight streckenflug ' + esc(sfTier) + ' open">'
-                  + '<button class="mga-insight-toggle" type="button">Streckenflug-Einschätzung</button>'
-                  + '<div class="mga-insight-body">' + body + '</div>'
+        if (showSf && SF_LIMIT_LABELS[sfLimit]) {
+            html += '<div class="mga-insight streckenflug open">'
+                  + '<button class="mga-insight-toggle" type="button">Streckenflug-Limit</button>'
+                  + '<div class="mga-insight-body">' + esc(SF_LIMIT_LABELS[sfLimit]) + '</div>'
                   + '</div>';
         }
         html += '</div>';
@@ -554,8 +495,6 @@ window.AnalysisView = (function () {
 
     return {
         render: render,
-        // Re-exporte fuer Aufrufer (Region-Map nutzt sie fuer Top-Spots-Liste).
-        getStars: getStars,
         getRating: getRating,
         getSafetyBand: getSafetyBand,
         parseMaybeList: parseMaybeList,

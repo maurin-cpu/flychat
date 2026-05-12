@@ -633,19 +633,14 @@ class AnalyzersMixin:
         Nur Felder mit Wert (nicht None) werden uebernommen.
         """
         new_fields = (
-            # Phase 1 — 2-Achsen
-            "safety_band", "safety_score", "safety_rating",
-            "experience_score", "experience_stars", "experience_rating",
-            "comfort_index",
-            # 8 Safety-Sub-Ratings
+            # RATING_ARCHITECTURE v2.0
+            "safety_rating", "experience_rating",
+            # 8 Safety-Sub-Ratings (intern fuer Tooltips)
             "wind_safety_rating", "gust_safety_rating",
             "aloft_safety_rating", "foehn_safety_rating",
             "rain_safety_rating", "thunderstorm_safety_rating",
             "cape_safety_rating", "visibility_safety_rating",
-            # 4-5 Flyability-Sub-Ratings (Vorab-Fix #3 + v1.4 altitude)
-            "thermal_rating", "window_rating", "wind_rating", "xc_rating",
-            "altitude_rating",
-            # noAnalysis-Pfad (§8.6)
+            # noAnalysis-Pfad
             "noAnalysis", "noAnalysisReason",
             # Decision-Engine Tracking
             "_decisions_applied",
@@ -693,8 +688,8 @@ class AnalyzersMixin:
     def _not_safe_minimal_flyability(safety_result: dict, is_spot: bool = True) -> dict:
         """Erzeugt Minimal-Flyability-Werte fuer not_safe-Ergebnisse (kein LLM-Call noetig)."""
         result = {**safety_result}
-        result["fly_status"] = ""
-        result["flyability_tier"] = ""
+        # RATING_ARCHITECTURE v2.0: experience_rating immer mindestens 1.
+        result["experience_rating"] = 1
         result["flight_type"] = ""
         result["flight_duration_estimate"] = ""
         result["thermal_quality"] = ""
@@ -705,11 +700,9 @@ class AnalyzersMixin:
         result["llm_tags"] = []
         result["recommendation"] = ""
         result["confidence"] = ""
-        result["thermal_rating"] = 1
-        result["altitude_rating"] = 1
-        result["xc_rating"] = 1
         result["is_conditional"] = False
-        result["conditional_reason"] = ""
+        if is_spot:
+            result["streckenflug"] = {"rating": 1, "limiting_factor": "spot_not_flyable"}
         result["rating"] = 0
         if is_spot:
             result["soaring_options"] = ""
@@ -1974,129 +1967,68 @@ class AnalyzersMixin:
         # bleibt fuer Aufrufer-Kompatibilitaet erhalten.
         _ = region_result
 
-        # Tag-Sanitierung ZUERST — laeuft auch fuer not_safe-Pfad, damit
-        # zurueckgegebene Texte (auch wenn Flyability-Felder leer sind) sauber sind.
+        # Tag-Sanitierung ZUERST — laeuft auch fuer not_safe-Pfad.
         _sanitize_llm_result(result)
 
-        # not_safe Pfad: Flugqualitaet bleibt aus LLM-Output erhalten (Safety
-        # und Flyability sind getrennte Achsen, RATING_CONCEPT v1.6). Nur die
-        # UI-Display-Felder (fly_status, tier) werden geleert — die App zeigt
-        # "kein Flugtag" im UI, aber die Bewertung steht in den Daten.
+        def _clamp_rating(val, lo=1, hi=6):
+            try:
+                return max(lo, min(hi, int(round(float(val or 0)))))
+            except (TypeError, ValueError):
+                return lo
+
+        # not_safe Pfad: experience_rating=1, streckenflug.rating=1 (RATING_ARCHITECTURE v2.0).
         if result.get("safety_status") == "not_safe":
-            cat_ns = _normalize_flight_category(result.get("flight_category", ""))
-            result["flight_category"] = cat_ns or ""
-            result["flight_category_display"] = _category_display(cat_ns) if cat_ns else ""
-            result["experience_rating"] = _category_to_rating(cat_ns) if cat_ns else 0
-            result["experience_score"] = round(result["experience_rating"] * 100 / 7) if cat_ns else 0
-            result["fly_status"] = ""
-            result["flyability_tier"] = ""
+            result["experience_rating"] = 1
             result["streckenflug"] = {
-                "tier": "kein_xc", "rating": 0,
-                "summary": "", "limiting_factor": "spot_not_flyable",
-                "region_context_available": False,
+                "rating": 1,
+                "limiting_factor": "spot_not_flyable",
             }
             result["safety_rating"] = _compute_safety_rating(result)
-            result["safety_score"] = _compute_safety_score(result["safety_rating"])
-            result["safety_band"] = compute_safety_band(result)
             result["is_conditional"] = False
-            result["conditional_reason"] = ""
             return result
 
-        # RATING_CONCEPT v1.6: KI gibt flight_category (Text), Code leitet ab.
-        cat = _normalize_flight_category(result.get("flight_category", ""))
-        if not cat:
-            # Fallback: LLM hat keine valide Kategorie geliefert. Versuche aus
-            # flyability_tier zu rekonstruieren (Legacy-Pfad), sonst gray/Abgleiter.
-            legacy_tier = _normalize_flyability_tier(
-                result.get("flyability_tier") or result.get("fly_status") or ""
-            )
-            cat = {"violet": "starker_thermikflug",
-                   "green":  "solider_thermikflug",
-                   "gray":   "abgleiter"}.get(legacy_tier, "abgleiter")
-            logger.warning(
-                f"Flyability-Spot {name}/{date_str}: kein flight_category vom LLM, "
-                f"Fallback aus tier={legacy_tier!r} → {cat!r}"
-            )
-        result["flight_category"] = cat
-        result["flight_category_display"] = _category_display(cat)
-        result["experience_rating"] = _category_to_rating(cat)
-        # Score 0-100 als skalierte Anzeige (rating 1-7 → 14, 29, 43, 57, 71, 86, 100)
-        result["experience_score"] = round(result["experience_rating"] * 100 / 7)
-        tier = _category_to_tier(cat)
-        result["flyability_tier"] = tier
-        result["fly_status"] = tier
+        # RATING_ARCHITECTURE v2.0: LLM gibt experience_rating (1-6) direkt.
+        result["experience_rating"] = _clamp_rating(result.get("experience_rating", 1))
+
+        # Streckenflug-Block schlank: nur rating (1-6) + limiting_factor.
+        sf = result.get("streckenflug")
+        if not isinstance(sf, dict):
+            sf = {"rating": 1, "limiting_factor": "none"}
+        sf["rating"] = _clamp_rating(sf.get("rating", 1))
+        valid_limits = {
+            "none", "spot_not_flyable", "spot_wind_direction",
+            "region_wind_aloft", "weak_regional_thermals",
+            "ceiling_low", "abgleiter_only", "region_context_missing",
+        }
+        if sf.get("limiting_factor") not in valid_limits:
+            sf["limiting_factor"] = "none"
+        # Alte Felder entfernen falls LLM sie noch liefert.
+        for legacy_key in ("tier", "summary", "region_context_available"):
+            sf.pop(legacy_key, None)
+
+        # Streckenflug-Konsistenz: Spot rating <= 2 → streckenflug max 3.
+        if result["experience_rating"] <= 2 and sf["rating"] > 3:
+            sf["rating"] = 3
+            if sf["limiting_factor"] == "none":
+                sf["limiting_factor"] = "abgleiter_only"
+        if result.get("flight_type") in ("Abgleiter", "Soaring") and sf["rating"] > 3:
+            sf["rating"] = min(sf["rating"], 3)
+        result["streckenflug"] = sf
 
         final_safety = result.get("safety_status", "")
 
-        # Safety-Aggregation (unveraendert): Weakest-Link aus 8 LLM-Safety-Subs.
+        # Safety-Aggregation: Weakest-Link aus 8 LLM-Safety-Subs.
         _safety_subs = ("wind_safety_rating", "gust_safety_rating",
                         "aloft_safety_rating", "foehn_safety_rating",
                         "rain_safety_rating", "thunderstorm_safety_rating",
                         "cape_safety_rating", "visibility_safety_rating")
         if all(result.get(f) is not None for f in _safety_subs):
             result["safety_rating"] = _compute_safety_rating(result)
-            result["safety_score"] = _compute_safety_score(result["safety_rating"])
-        result["safety_band"] = compute_safety_band(result)
-        tq = self._ctx_tq_cache.get(f"{name}|{date_str}", {})
-        result["comfort_index"] = compute_comfort_index(tq)
-
-        # Safety-Gate: red Band leert NUR die UI-Display-Felder
-        # (fly_status, tier). Die Flugqualitaets-Kategorie bleibt erhalten —
-        # Safety und Flyability sind getrennte Achsen (RATING_CONCEPT v1.6).
-        if (result.get("safety_band") or "").lower() == "red":
-            result["flyability_tier"] = ""
-            result["fly_status"] = ""
-
-        final_tier = result.get("flyability_tier", "")
-
-        # Streckenflug-Konsistenz nutzt LLM-Tier
-        sf = result.get("streckenflug")
-        if not isinstance(sf, dict):
-            sf = {
-                "tier": "kein_xc", "rating": 0,
-                "summary": "", "limiting_factor": "none",
-                "region_context_available": False,
-            }
-        valid_tiers = {"kein_xc", "lokal", "moderat", "top"}
-        if sf.get("tier") not in valid_tiers:
-            sf["tier"] = "kein_xc"
-        try:
-            sf["rating"] = max(0, min(10, int(round(float(sf.get("rating", 0) or 0)))))
-        except (TypeError, ValueError):
-            sf["rating"] = 0
-        sf["summary"] = str(sf.get("summary", "") or "")
-        valid_limits = {
-            "none", "spot_not_flyable", "spot_wind_direction",
-            "region_wind_aloft", "weak_regional_thermals",
-            "ceiling_low", "abgleiter_only",
-        }
-        if sf.get("limiting_factor") not in valid_limits:
-            sf["limiting_factor"] = "none"
-        sf["region_context_available"] = bool(sf.get("region_context_available", False))
-
-        if final_tier in ("gray", "") and sf["tier"] != "kein_xc":
-            logger.info(
-                f"Streckenflug-Konsistenz: {name}/{date_str} tier={sf['tier']} → kein_xc "
-                f"(Spot fly_status={final_tier or 'leer'})"
-            )
-            sf["tier"] = "kein_xc"
-            if sf["limiting_factor"] == "none":
-                sf["limiting_factor"] = "abgleiter_only"
-            sf["rating"] = 0
-
-        if result.get("flight_type") in ("Abgleiter", "Soaring") and sf["tier"] != "kein_xc":
-            sf["tier"] = "kein_xc"
-            if sf["limiting_factor"] == "none":
-                sf["limiting_factor"] = "abgleiter_only"
-            sf["rating"] = 0
-
-        result["streckenflug"] = sf
 
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":
             is_cond = False
         result["is_conditional"] = is_cond
-        result["conditional_reason"] = (result.get("conditional_reason", "") or "") if is_cond else ""
 
         return result
 
@@ -2182,70 +2114,35 @@ class AnalyzersMixin:
         return result
 
     def _post_process_flyability_region(self, result: dict, region: dict, date_str: str) -> dict:
-        """Flyability-only Post-Processing fuer eine Region (RATING_CONCEPT v1.5).
+        """Flyability-Post-Processing fuer eine Region (RATING_ARCHITECTURE v2.0).
 
-        LLM-natives Rating: `experience_rating` (1-10) und `flyability_tier`
-        direkt vom LLM. KEINE Aggregation, KEINE Flyability-Decisions, die das
-        Tier ueberschreiben. Nur Sanitierung, Safety-Gate, Safety-Aggregation.
+        LLM gibt experience_rating (1-6) direkt. Region hat keinen streckenflug-Block.
+        Region-Schema ist schlank — fehlende Felder fehlen (kein null).
         """
         rname = region["region"]
 
-        # Tag-Sanitierung ZUERST — laeuft auch fuer not_safe-Pfad.
+        # Tag-Sanitierung ZUERST.
         _sanitize_llm_result(result)
 
+        def _clamp_rating(val, lo=1, hi=6):
+            try:
+                return max(lo, min(hi, int(round(float(val or 0)))))
+            except (TypeError, ValueError):
+                return lo
+
         if result.get("safety_status") == "not_safe":
-            # Flugqualitaet bleibt aus LLM-Output erhalten (RATING_CONCEPT v1.6).
-            cat_ns = _normalize_flight_category(result.get("flight_category", ""))
-            result["flight_category"] = cat_ns or ""
-            result["flight_category_display"] = _category_display(cat_ns) if cat_ns else ""
-            result["experience_rating"] = _category_to_rating(cat_ns) if cat_ns else 0
-            result["experience_score"] = round(result["experience_rating"] * 100 / 7) if cat_ns else 0
-            result["fly_status"] = ""
-            result["flyability_tier"] = ""
+            result["experience_rating"] = 1
             result["safety_rating"] = _compute_safety_rating(result)
-            result["safety_score"] = _compute_safety_score(result["safety_rating"])
-            result["safety_band"] = compute_safety_band(result)
             result["is_conditional"] = False
-            result["conditional_reason"] = ""
             return result
 
-        # RATING_CONCEPT v1.6: KI gibt flight_category (Text), Code leitet ab.
-        cat = _normalize_flight_category(result.get("flight_category", ""))
-        if not cat:
-            legacy_tier = _normalize_flyability_tier(
-                result.get("flyability_tier") or result.get("fly_status") or ""
-            )
-            cat = {"violet": "starker_thermikflug",
-                   "green":  "solider_thermikflug",
-                   "gray":   "abgleiter"}.get(legacy_tier, "abgleiter")
-            logger.warning(
-                f"Flyability-Region {rname}/{date_str}: kein flight_category, "
-                f"Fallback aus tier={legacy_tier!r} → {cat!r}"
-            )
-        result["flight_category"] = cat
-        result["flight_category_display"] = _category_display(cat)
-        result["experience_rating"] = _category_to_rating(cat)
-        # Score 0-100 als skalierte Anzeige (rating 1-7 → 14, 29, 43, 57, 71, 86, 100)
-        result["experience_score"] = round(result["experience_rating"] * 100 / 7)
-        tier = _category_to_tier(cat)
-        result["flyability_tier"] = tier
-        result["fly_status"] = tier
+        # RATING_ARCHITECTURE v2.0: LLM gibt experience_rating direkt.
+        result["experience_rating"] = _clamp_rating(result.get("experience_rating", 1))
 
         final_safety = result.get("safety_status", "")
-        tq = self._ctx_tq_cache.get(f"{rname}|{date_str}", {})
 
-        # Safety-Aggregation (unveraendert): Weakest-Link ueber Subs.
+        # Safety-Aggregation: Weakest-Link.
         result["safety_rating"] = _compute_safety_rating(result)
-        result["safety_score"] = _compute_safety_score(result["safety_rating"])
-        result["safety_band"] = compute_safety_band(result)
-        result["comfort_index"] = compute_comfort_index(tq)
-
-        # Safety-Gate: red Band ueberschreibt LLM-Tier.
-        if (result.get("safety_band") or "").lower() == "red":
-            result["flyability_tier"] = ""
-            result["fly_status"] = ""
-            result["experience_rating"] = 0
-            result["experience_score"] = 0
 
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":

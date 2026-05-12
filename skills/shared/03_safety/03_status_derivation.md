@@ -27,7 +27,7 @@ STATUS-ABLEITUNG (finaler Schritt Teil 1)
 4. Leite Status nach Start-Fenster-Regel ab:
    - **safe**: Start-Fenster ≥ {{cfg.CLEAN_WINDOW_MIN_HOURS}}h UND Verhaeltnis ≥ 60% UND kein EINGEKESSELT-Sonderfall greift UND kein Foehn-Verbot UND Fenster mehrheitlich RUHIG. Der Datenblock enthaelt nur Stunden ab Tagesbeginn (siehe `_tagesfenster.md`) — `[WIND-WRONG]` im aktiven Tag ist Lande-Hinweis, kein Sicherheits-Issue.
    - **conditional**: Start-Fenster ≥ {{cfg.CLEAN_WINDOW_MIN_HOURS}}h, aber Fenster mehrheitlich SPORTLICH ODER Verhaeltnis 35-60% ODER EINGEKESSELT-WARN-Fall ODER aktiver WARN-Tag (GUST-WARN, ALOFT-WARN, CAPE-WARN, BOEEN-FLOOR=conditional, Foehn ΔP 4-7 hPa). **Niemals `conditional` allein wegen kurzer Fenstergroesse** — < {{cfg.CLEAN_WINDOW_MIN_HOURS}}h Fenster ist immer `not_safe`, nicht `conditional`.
-     - Thermik in diesen Stunden entscheidet ueber `flight_type`: Peak ≥ 1.0 m/s + productive_thermal_h ≥ 2 → "Thermikflug"; sonst "Abgleiter" (`flyability_tier: "gray"`).
+     - Thermik in diesen Stunden entscheidet ueber `flight_type`: Peak ≥ 1.0 m/s + productive_thermal_h ≥ 2 → "Thermikflug"; sonst "Abgleiter" (`experience_rating = 1`).
      - DANGER-Stunden im aktiven Tag duerfen das Fenster unterbrechen — das Fenster bleibt aber nutzbar, sofern eine ausreichend lange saubere Kette existiert.
    - **not_safe**: Start-Fenster < {{cfg.CLEAN_WINDOW_MIN_HOURS}}h ODER Verhaeltnis < 35% mit EINGEKESSELT-Muster ODER EINGEKESSELT-DANGER-Sonderfall greift ODER Foehn/Gewitter dominiert. (Der harte Fall "kein Tagesbeginn" ist bereits vom Code als `not_safe` ausgefiltert — du siehst diesen Datenblock gar nicht.)
 

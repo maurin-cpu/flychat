@@ -192,24 +192,23 @@
   }
 
   // RATING_CONCEPT v1.3: zwei orthogonale Achsen.
-  // Safety-Band aus Cache, Legacy-Fallback ueber shared-glyph.
+  // RATING_ARCHITECTURE v2.0: Safety-Band aus safety_status, Rating aus experience_rating 1-6.
   function spotSafetyBand(spot) {
     return (window.gleitcastGlyph && window.gleitcastGlyph.legacyBand)
       ? window.gleitcastGlyph.legacyBand(spot)
-      : (spot && spot.safety_band) || "no_data";
+      : "no_data";
   }
 
   function spotStars(spot) {
     return (window.gleitcastGlyph && window.gleitcastGlyph.legacyStars)
       ? window.gleitcastGlyph.legacyStars(spot)
-      : (typeof spot.experience_stars === "number" ? Math.floor(spot.experience_stars) : 0);
+      : 0;
   }
 
-  // RATING_CONCEPT v1.4: 0-10 Rating
   function spotRating(spot) {
     return (window.gleitcastGlyph && window.gleitcastGlyph.legacyRating)
       ? window.gleitcastGlyph.legacyRating(spot)
-      : (typeof spot.experience_rating === "number" ? Math.floor(spot.experience_rating) : spotStars(spot) * 2);
+      : (typeof spot.experience_rating === "number" ? Math.floor(spot.experience_rating) : 0);
   }
 
   function spotPassesSafetyFilter(spot) {
@@ -1242,15 +1241,15 @@
       ? `<div class="bf-spot-status">${chips.join("")}</div>`
       : "";
 
-    // Score-Pillen: Safety / Experience / Comfort
-    const safScore = typeof spot.safety_score === 'number' ? spot.safety_score : null;
-    const expScore = typeof spot.experience_score === 'number' ? spot.experience_score : null;
-    const comfScore = typeof spot.comfort_index === 'number' ? Math.round(spot.comfort_index) : null;
+    // Score-Pillen RATING_ARCHITECTURE v2.0: nur Rating-Pille (1-6).
     const scorePills = [];
-    if (safScore !== null) scorePills.push(`<span class="bf-score-pill bf-score-pill--safety">Safety ${safScore}/100</span>`);
-    if (band !== 'red' && band !== 'no_data') {
-      if (expScore !== null) scorePills.push(`<span class="bf-score-pill">Experience ${expScore}/100</span>`);
-      if (comfScore !== null) scorePills.push(`<span class="bf-score-pill">Comfort ${comfScore}/100</span>`);
+    if (band !== 'red' && band !== 'no_data' && rating > 0) {
+      const tierClass = rating >= 6 ? 'violet' : (rating >= 3 ? 'green' : 'gray');
+      const ratingLabels = {
+        1: 'Abgleiter', 2: 'Kurzer Thermikflug', 3: 'Solider Thermikflug',
+        4: 'Starker Thermikflug', 5: 'XC-Tag', 6: 'Klassiker'
+      };
+      scorePills.push(`<span class="bf-score-pill bf-score-pill--${tierClass}">${ratingLabels[rating]} ${rating}/6</span>`);
     }
     const scoreBar = scorePills.length ? `<div class="bf-spot-scores">${scorePills.join("")}</div>` : "";
 
@@ -1259,17 +1258,12 @@
     // Details (expanded content)
     const analysisForDetails = spot.analysis_full || synthesizeAnalysis(spot);
     let labelsHtml = renderSpotLabels(analysisForDetails);
-    if (spot.is_conditional && spot.conditional_reason) {
-      const cr = String(spot.conditional_reason).trim();
-      if (cr && !labelsHtml.toLowerCase().includes(cr.toLowerCase())) {
-        labelsHtml = `<div class="bf-label bf-label--warn"><span class="bf-label-icon">!</span><span class="bf-label-text">${escapeHtml(cr)}</span></div>` + labelsHtml;
-      }
-    }
+    // conditional_reason in v2.0 entfernt — primary_caution wird via renderSpotLabels gerendert.
     const assessmentsHtml = renderAssessmentSections(spot, analysisForDetails);
     const hasCoords = spot.lat != null && spot.lon != null;
 
     const miniMapInner = hasCoords
-      ? `<div class="bf-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-quality="${escapeHtml(spot.fly_status || "")}" data-band="${escapeHtml(band)}" data-stars="${stars}"></div>`
+      ? `<div class="bf-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-rating="${rating}" data-band="${escapeHtml(band)}"></div>`
       : `<div class="bf-spot-minimap bf-spot-minimap--nodata">Keine Koordinaten</div>`;
 
     const shareRatingAttr = rating > 0 && band !== "red" ? String(rating) : "";
@@ -1541,7 +1535,7 @@
 
     const safetyText = cleanAssessmentText(spot.safety_feedback || a.safety_feedback || saf.summary);
     const flyText = cleanAssessmentText(spot.flyability_feedback || a.recommendation || fly.recommendation);
-    const xcText = cleanAssessmentText(spot.streckenflug_summary || a.streckenflug_summary || sf.summary);
+    const xcText = "";  // RATING_ARCHITECTURE v2.0: kein streckenflug.summary mehr
 
     const sections = [
       { key: "safety", label: "Sicherheits-Einschätzung", text: safetyText },
@@ -1603,7 +1597,7 @@
     if (!spot) return null;
     return {
       safety_status: spot.safety_status || "",
-      fly_status: spot.fly_status || "",
+      experience_rating: spot.experience_rating || 0,
       flight_type: spot.flight_type || "",
       flight_duration_estimate: spot.flight_duration || "",
       xc_potential: spot.xc_potential || "",
@@ -1612,7 +1606,6 @@
       recommendation: spot.recommendation || "",
       safety_feedback: spot.safety_feedback || "",
       is_conditional: !!spot.is_conditional,
-      conditional_reason: spot.conditional_reason || "",
     };
   }
 

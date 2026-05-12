@@ -2123,7 +2123,6 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
                 continue
             safety = entry.get("safety", {})
             fly = entry.get("flyability", {})
-            fly_status = entry.get("fly_status", "")
             doc = {
                 "spot": spot_name,
                 "date": date_str,
@@ -2136,9 +2135,8 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
                 "foehn_risk": safety.get("foehn_risk", "none"),
                 "wind_summary": safety.get("wind_summary", ""),
                 "updated_at": loaded_at,
-                "rating": float(entry.get("rating", 0.0) or 0.0),
+                "experience_rating": int(entry.get("experience_rating", 1) or 1),
                 "is_conditional": bool(entry.get("is_conditional", False)),
-                "conditional_reason": entry.get("conditional_reason", "") or "",
             }
             for key in ("no_go_reasons", "caution_notes"):
                 val = safety.get(key, [])
@@ -2146,9 +2144,7 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
             for lbl_key in ("primary_no_go", "primary_caution", "primary_reducer", "primary_booster"):
                 doc[lbl_key] = safety.get(lbl_key) or None
             ss = safety.get("safety_status", "error")
-            if fly and fly_status and ss in ("safe", "conditional"):
-                doc["fly_status"] = fly_status
-                doc["flyability_tier"] = fly_status
+            if fly and ss in ("safe", "conditional"):
                 doc["flight_type"] = fly.get("flight_type", "")
                 doc["flight_duration"] = fly.get("flight_duration_estimate", "")
                 doc["xc_potential"] = fly.get("xc_potential", "")
@@ -2160,20 +2156,12 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
                         val = val[:3]
                     doc[lkey] = json.dumps(val if isinstance(val, list) else [], ensure_ascii=False)
             else:
-                doc["fly_status"] = ""
-                doc["flyability_tier"] = ""
                 doc["fly_error"] = entry.get("fly_error", "")
             sf = entry.get("streckenflug") or {}
-            doc["streckenflug_tier"] = sf.get("tier", "kein_xc")
-            doc["streckenflug_rating"] = int(sf.get("rating", 0) or 0)
-            doc["streckenflug_summary"] = sf.get("summary", "") or ""
+            doc["streckenflug_rating"] = int(sf.get("rating", 1) or 1)
             doc["streckenflug_limiting_factor"] = sf.get("limiting_factor", "none")
-            doc["streckenflug_region_context_available"] = bool(sf.get("region_context_available", False))
-            # RATING_CONCEPT v1.6 — kategoriales Rating
-            for k in ("safety_band", "safety_score", "safety_rating",
-                      "experience_score", "experience_rating",
-                      "flight_category", "flight_category_display",
-                      "comfort_index",
+            # RATING_ARCHITECTURE v2.0 — experience_rating (1-6) als Primaerwert
+            for k in ("safety_rating", "experience_rating",
                       "noAnalysis", "noAnalysisReason"):
                 v = entry.get(k)
                 if v is not None:
@@ -2268,13 +2256,10 @@ def api_spot_debug(spot_name: str, date_str: str):
         "spot": spot_name,
         "date": date_str,
         "safety_status": _top("safety_status"),
-        "safety_score": _top("safety_score"),
-        "safety_band": _top("safety_band"),
+        "safety_rating": _top("safety_rating"),
         "foehn_risk": _top("foehn_risk"),
-        "fly_status": entry.get("fly_status"),
         "experience_rating": entry.get("experience_rating"),
         "sub_ratings": sub_ratings,
-        "fly_sub_ratings": fly_sub_ratings,
         "hazard_notes": safety.get("hazard_notes"),
         "flyability_notes": fly.get("flyability_notes") if fly else None,
         "wind_summary": safety.get("wind_summary"),
@@ -2311,12 +2296,9 @@ def api_region_debug(region_id: str, date_str: str):
         return v
 
     sub_ratings = {k: _sub(k) for k in (
-        "wind_safety_rating", "gust_safety_rating", "aloft_safety_rating",
+        "wind_safety_rating", "aloft_safety_rating",
         "foehn_safety_rating", "rain_safety_rating", "thunderstorm_safety_rating",
         "cape_safety_rating", "visibility_safety_rating",
-    )}
-    fly_sub_ratings = {k: entry.get(k) for k in (
-        "thermal_rating", "altitude_rating", "xc_rating",
     )}
 
     def _top(key):
@@ -2329,11 +2311,10 @@ def api_region_debug(region_id: str, date_str: str):
         "region_id": region_id,
         "date": date_str,
         "safety_status": _top("safety_status"),
+        "safety_rating": _top("safety_rating"),
         "foehn_risk": _top("foehn_risk"),
-        "fly_status": entry.get("fly_status"),
         "experience_rating": entry.get("experience_rating"),
         "sub_ratings": sub_ratings,
-        "fly_sub_ratings": fly_sub_ratings,
         "hazard_notes": safety.get("hazard_notes"),
         "flyability_notes": fly.get("flyability_notes"),
         "wind_summary": safety.get("wind_summary"),
@@ -2376,15 +2357,11 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
                 "foehn_risk": safety.get("foehn_risk", entry.get("foehn_risk", "none")),
                 "wind_summary": safety.get("wind_summary", entry.get("wind_summary", "")),
                 "updated_at": loaded_at,
-                "rating": float(entry.get("rating", 0.0) or 0.0),
+                "experience_rating": int(entry.get("experience_rating", 1) or 1),
                 "is_conditional": bool(entry.get("is_conditional", False)),
-                "conditional_reason": entry.get("conditional_reason", "") or "",
             }
-            # RATING_CONCEPT v1.6 — kategoriales Rating
-            for k in ("safety_band", "safety_score", "safety_rating",
-                      "experience_score", "experience_rating",
-                      "flight_category", "flight_category_display",
-                      "comfort_index"):
+            # RATING_ARCHITECTURE v2.0
+            for k in ("safety_rating",):
                 v = entry.get(k)
                 if v is not None:
                     doc[k] = v
@@ -2393,9 +2370,7 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
                 doc[key] = json.dumps(val, ensure_ascii=False) if isinstance(val, list) else str(val)
             for lbl_key in ("primary_no_go", "primary_caution", "primary_reducer", "primary_booster"):
                 doc[lbl_key] = safety.get(lbl_key) or None
-            if fly and fly_status and ss in ("safe", "conditional"):
-                doc["fly_status"] = fly_status
-                doc["flyability_tier"] = fly_status
+            if fly and ss in ("safe", "conditional"):
                 doc["recommendation"] = fly.get("recommendation", "")
                 doc["peak_climb_rate"] = fly.get("peak_climb_rate", 0)
                 doc["flight_type"] = fly.get("flight_type", "")
@@ -2403,8 +2378,6 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
                 if fn:
                     doc["flyability_notes"] = fn
             else:
-                doc["fly_status"] = ""
-                doc["flyability_tier"] = ""
                 doc["fly_error"] = entry.get("fly_error", "")
             hn = safety.get("hazard_notes") or entry.get("hazard_notes")
             if hn:

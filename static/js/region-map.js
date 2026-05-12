@@ -72,75 +72,35 @@
         return 'green';
     }
 
-    // Derive quality from fly_status/flyability_tier, NOT from flyability_stars (which doesn't exist)
+    // RATING_ARCHITECTURE v2.0: experience_rating (1-6) → tier (gray/green/violet)
     function getQuality(dayData) {
-        var tier = dayData.flyability_tier || dayData.fly_status || '';
-        return normalizeFlyTier(tier) || 'green';
+        var er = parseInt(dayData && dayData.experience_rating, 10);
+        if (!isFinite(er) || er <= 0) return 'gray';
+        if (er >= 6) return 'violet';
+        if (er >= 3) return 'green';
+        return 'gray';
     }
 
-    // Short quality label for map display
     function qualityBadge(quality) {
         if (quality === 'gray') return 'Abgleiter';
-        if (quality === 'violet') return 'Top';
-        return 'Gut';
+        if (quality === 'violet') return 'Klassiker';
+        return 'Thermikflug';
     }
 
-    // RATING_CONCEPT v1.3: experience_stars bevorzugt, Fallback aus rating
-    function getStars(dayData) {
-        if (!dayData) return 0;
-        var s = dayData.experience_stars;
-        if (typeof s === 'number') return Math.max(0, Math.min(5, Math.round(s)));
-        // Fallback aus rating (gleiche Schwellen wie email_service._stars_for_spot)
-        var r = parseFloat(dayData.rating || 0);
-        if (r >= 9.0)  return 5;
-        if (r >= 7.6)  return 4;
-        if (r >= 6.1)  return 3;
-        if (r >= 4.1)  return 2;
-        if (r >= 2.1)  return 1;
-        return 0;
-    }
-
-    // RATING_CONCEPT v1.4: experience_rating (1-10) bevorzugt, Fallback Score/Stars/Rating
+    // experience_rating (1-6) direkt.
     function getRating(dayData) {
         if (!dayData) return 0;
-        var er = dayData.experience_rating;
-        if (typeof er === 'number') return Math.max(0, Math.min(10, Math.round(er)));
-        var sc = dayData.experience_score;
-        if (typeof sc === 'number') {
-            if (sc <= 0) return 0;
-            if (sc >= 100) return 10;
-            return Math.max(1, Math.min(10, Math.ceil(sc / 10)));
-        }
-        var s = dayData.experience_stars;
-        if (typeof s === 'number') return Math.max(0, Math.min(10, s * 2));
-        var r = parseFloat(dayData.rating || 0);
-        if (r > 0) return Math.max(1, Math.min(10, Math.round(r)));
+        var er = parseInt(dayData.experience_rating, 10);
+        if (isFinite(er) && er >= 1) return Math.min(6, er);
         return 0;
-    }
-    function getSafetyScore(dayData) {
-        if (!dayData) return null;
-        if (typeof dayData.safety_score === 'number')
-            return Math.max(0, Math.min(100, Math.round(dayData.safety_score)));
-        var nested = dayData.safety || {};
-        var status = String((dayData.safety_status || nested.safety_status || '')).toLowerCase();
-        var foehn  = String((dayData.foehn_risk   || nested.foehn_risk   || 'none')).toLowerCase();
-        var base;
-        if (status === 'safe') base = 85;
-        else if (status === 'conditional') base = 50;
-        else return null;
-        var delta = (foehn === 'medium') ? -15 : (foehn === 'high' || foehn === 'severe') ? -30 : 0;
-        return Math.max(0, Math.min(100, base + delta));
     }
     function getSafetyBand(dayData) {
         if (!dayData) return 'no_data';
-        var b = dayData.safety_band;
-        if (b === 'green' || b === 'amber' || b === 'red' || b === 'no_data') return b;
         var s = dayData.safety_status
             || (dayData.safety && dayData.safety.safety_status);
         if (s === 'safe')        return 'green';
         if (s === 'conditional') return 'amber';
         if (s === 'not_safe')    return 'red';
-        // 'error' faellt durch zu 'no_data' (grau) — Analyse-Fehler sind keine Aussage ueber Fliegbarkeit
         return 'no_data';
     }
     // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §4.3) =====
@@ -494,8 +454,7 @@
             // zwar hoisted, aber `undefined`, sodass das Label in den En-Dash-Fallback
             // fallen wuerde (Pille zeigt "–" statt Rating-Zahl).
             // (rating wurde oben deklariert fuer intensity)
-            var stars = getStars(dayData); // Compat fuer Tooltip-Spots-Liste
-            var expScore = (typeof dayData.experience_score === 'number') ? dayData.experience_score : null;
+            // RATING_ARCHITECTURE v2.0: nur experience_rating (1-6).
 
             // Center-Label — Pille mit Rating-Zahl 1-10 (RATING_CONCEPT v1.4 §4.3).
             // Polygon-Centroid (layer.getCenter) statt bbox-Center: bei irregulaeren
@@ -522,8 +481,7 @@
             var tipHtml = '<b>' + layer.regionName + '</b>';
             tipHtml += '<br><span style="color:' + style.labelColor + ';">' + style.safetyLabel + '</span>';
             if (rating > 0) {
-                tipHtml += ' · <b>Rating ' + rating + '/10</b>';
-                if (expScore !== null) tipHtml += ' (' + expScore + '/100)';
+                tipHtml += ' · <b>Rating ' + rating + '/6</b>';
             }
             layer.setTooltipContent(tipHtml);
         });
@@ -590,13 +548,12 @@
                 || dayData.status;
             if (ss === 'no_data' || ss === 'error' || ss === 'not_safe') continue;
             var rating = getRating(dayData);
-            if (rating < 8) continue;
+            if (rating < 5) continue;
             var band = getSafetyBand(dayData);
             entries.push({
                 name: name,
                 band: band,
                 rating: rating,
-                safetyScore: getSafetyScore(dayData),
                 window: shortenWindow(dayData.best_window)
             });
         }
@@ -1082,12 +1039,7 @@
             if (d.wind_summary) { lines.push('--- Wind Summary ---'); lines.push(_escDebugHtml(d.wind_summary)); lines.push(''); }
             if (d.wind_shear) { lines.push('--- Wind Shear ---'); lines.push(_escDebugHtml(d.wind_shear)); lines.push(''); }
             lines.push('=== FLYABILITY ===');
-            lines.push('Status: ' + (d.fly_status || '?') + '  |  Experience: ' + (d.experience_rating != null ? d.experience_rating : '?'));
-            lines.push('');
-            lines.push('--- Sub-Ratings (1-10) ---');
-            if (d.fly_sub_ratings) Object.keys(d.fly_sub_ratings).forEach(function (k) {
-                lines.push('  ' + k.replace('_rating', '').padEnd(15) + ': ' + (d.fly_sub_ratings[k] != null ? d.fly_sub_ratings[k] : '–'));
-            });
+            lines.push('Experience-Rating: ' + (d.experience_rating != null ? d.experience_rating + '/6' : '?'));
             lines.push('');
             lines.push('--- Flyability Notes ---');
             if (d.flyability_notes) Object.keys(d.flyability_notes).forEach(function (k) {

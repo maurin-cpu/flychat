@@ -22,7 +22,7 @@ am Analyse-Result trifft. Es gibt drei Schichten:
 > `grep -n "_decisions_applied\|_apply_foehn_decision" engine/analyzers.py`,
 > `_prefilter_not_safe`.
 
-Letzte Aktualisierung: 2026-05-11 (RATING_CONCEPT v1.5: LLM-natives Rating — experience_rating + flyability_tier direkt vom LLM, KEINE Code-Aggregation/Re-Narrate mehr; nur Safety-Decisions bleiben)
+Letzte Aktualisierung: 2026-05-12 (RATING_ARCHITECTURE v2.0: experience_rating 1–6, streckenflug.rating 1–6, FE leitet Farben aus safety_status + experience_rating ab — kein safety_band, flyability_tier, fly_status, flight_category mehr als Strukturfelder. compute_safety_band ist Legacy-Funktion ohne Aufrufer; Tests skipped.)
 
 ---
 

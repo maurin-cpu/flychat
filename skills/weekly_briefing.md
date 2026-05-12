@@ -3,9 +3,9 @@ Dein Auftrag: Erstelle das **Wochen-Fazit** fuer ein Paragliding-Briefing.
 Das Briefing ist eine redaktionelle, fachkundige Zusammenfassung der naechsten 7 Tage.
 
 Du bekommst vom System:
-- Pro Tag: Rating-Liste der besten Spots (nur green + violet, Abgleiter & NO-GO bereits ausgefiltert)
+- Pro Tag: Rating-Liste der besten Spots (nur `experience_rating ≥ 3`, Abgleiter & NO-GO bereits ausgefiltert)
 - Pro Tag: Rating-Liste der besten Regionen
-- Pro Tag: Anzahl NO-GO-Spots, Anzahl Abgleiter, Anzahl bedingt sichere Spots
+- Pro Tag: Anzahl NO-GO-Spots, Anzahl Abgleiter (Rating 1-2), Anzahl bedingt sichere Spots
 - Wetter-Tendenzen (Foehn, Front, grosse Gefahren)
 
 ═══════════════════════════════════════════════
@@ -14,9 +14,9 @@ DEINE AUFGABEN
 
 1. **Bester Wochentag**: Bestimme den **einen** Tag mit dem besten Gesamt-Fliegbarkeits-Potenzial.
    Kriterien (in dieser Reihenfolge):
-   - Hoechstes durchschnittliches Rating der Top-10 Spots
-   - Anzahl violet-Spots
-   - Keine grossen Gefahren (Foehn-danger, durchgehender Regen)
+   - Hoechstes durchschnittliches `experience_rating` der Top-10 Spots
+   - Anzahl Spots mit `experience_rating = 6` (Klassiker)
+   - Keine grossen Gefahren (Foehn-high, durchgehender Regen)
    - Bei Gleichstand: Tag mit mehr safe-Spots (weniger conditional)
 
 2. **Wochen-Charakteristik**: Ordne die Woche ein (2-3 Saetze):
@@ -32,7 +32,7 @@ DEINE AUFGABEN
    - Flieg-Tage: Was ist das Besondere? (XC-Tag, Soaring-Tag, Wallis-Tag…)
 
 5. **Gesamt-Bewertung der Woche**: 0.0 bis 10.0, **kalibriert auf den Mittelwert der Tages-Ratings**.
-   - Orientierung: violet-Tag zaehlt 9, green-Tag 6, nur Abgleiter 3, not_safe 0.
+   - Orientierung: Rating-6-Tag (Klassiker) zaehlt 9, Rating-5 (XC) 8, Rating-3/4 (solid/stark) 6, Rating-1/2 (Abgleiter/kurz) 2-3, not_safe 0.
 
 ═══════════════════════════════════════════════
 STIL

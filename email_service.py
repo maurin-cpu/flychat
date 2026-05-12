@@ -72,64 +72,30 @@ _TIER_RANK = {"violet": 3, "green": 2, "conditional": 1, "gray": 0, "none": -1}
 
 
 def _stars_for_spot(spot: dict) -> int:
-    """Liest experience_stars aus dem Spot-Result, mit Fallback auf rating-basierte
-    Ableitung (RATING_CONCEPT v1.3 §8.3 Schwellen). Fuer Mails verwendet, damit alte
-    Cache-Eintraege ohne experience_stars trotzdem Sterne bekommen.
-    """
-    val = spot.get("experience_stars")
-    if isinstance(val, (int, float)) and val >= 0:
-        return int(val)
-    # Fallback aus rating (0-10)
-    try:
-        r = float(spot.get("rating", 0) or 0)
-    except (TypeError, ValueError):
-        return 0
-    if r >= 9.0:  return 5
-    if r >= 7.6: return 4
-    if r >= 6.1: return 3
-    if r >= 4.1: return 2
-    if r >= 2.1: return 1
-    return 0
+    """Mappt experience_rating (1-6) auf 0-5 Sterne fuer Mail-Bubbles."""
+    r = _rating_for_spot(spot)
+    if r <= 0: return 0
+    if r >= 6: return 5
+    if r >= 4: return 4
+    return r  # 1, 2, 3
 
 
 def _rating_display(spot: dict) -> str:
-    """RATING_CONCEPT v1.4: Integer-1-10 als String fuer Mail-Anzeige.
-    Leerstring fuer 0/not_safe (kein Rating zeigen)."""
+    """RATING_ARCHITECTURE v2.0: experience_rating 1-6 als String. Leer bei not_safe."""
     r = _rating_for_spot(spot)
     return str(r) if r > 0 else ""
 
 
 def _rating_for_spot(spot: dict) -> int:
-    """RATING_CONCEPT v1.4: Liest experience_rating (0-10), Fallback auf
-    Score/Stars/Rating fuer Legacy-Caches.
-    """
+    """RATING_ARCHITECTURE v2.0: experience_rating 1-6."""
     val = spot.get("experience_rating")
-    if isinstance(val, (int, float)) and 0 <= val <= 10:
+    if isinstance(val, (int, float)) and 0 <= val <= 6:
         return int(val)
-    sc = spot.get("experience_score")
-    if isinstance(sc, (int, float)):
-        if sc <= 0:
-            return 0
-        if sc >= 100:
-            return 10
-        return max(1, min(10, -(-int(sc) // 10)))
-    val = spot.get("experience_stars")
-    if isinstance(val, (int, float)) and val >= 0:
-        return min(10, int(val) * 2)
-    try:
-        r = float(spot.get("rating", 0) or 0)
-    except (TypeError, ValueError):
-        return 0
-    if r <= 0:
-        return 0
-    return max(1, min(10, round(r)))
+    return 0
 
 
 def _safety_band_for_spot(spot: dict) -> str:
-    """Liest safety_band, fallback auf safety_status-Mapping. Fuer Mail-Anzeige."""
-    band = spot.get("safety_band")
-    if band in ("green", "amber", "red", "no_data"):
-        return band
+    """FE-Mapping aus safety_status (RATING_ARCHITECTURE v2.0)."""
     s = spot.get("safety_status", "")
     if s == "safe":        return "green"
     if s == "conditional": return "amber"
@@ -401,24 +367,23 @@ def _derive_day_tier(my_spots: list[dict]) -> str:
     """
     if not my_spots:
         return "none"
-    has_violet = any(s.get("fly_status") == "violet" and not s.get("is_conditional") for s in my_spots)
+    # RATING_ARCHITECTURE v2.0: tier aus experience_rating ableiten.
+    has_violet = any(_rating_for_spot(s) >= 6 and not s.get("is_conditional") for s in my_spots)
     if has_violet:
         return "violet"
-    has_green = any(s.get("fly_status") == "green" and not s.get("is_conditional") for s in my_spots)
+    has_green = any(_rating_for_spot(s) >= 3 and not s.get("is_conditional") for s in my_spots)
     if has_green:
         return "green"
     return "conditional"
 
 
 def _spot_tier(spot: dict) -> str:
-    """Tier fuer einen einzelnen Spot. Bronze (gray) ist bereits aus briefing_data gefiltert."""
+    """Tier fuer einen einzelnen Spot aus experience_rating (1-6)."""
     if spot.get("is_conditional"):
         return "conditional"
-    fs = spot.get("fly_status", "")
-    if fs == "violet":
-        return "violet"
-    if fs == "green":
-        return "green"
+    r = _rating_for_spot(spot)
+    if r >= 6: return "violet"
+    if r >= 3: return "green"
     return "gray"
 
 
@@ -447,7 +412,6 @@ def _extract_safety_warnings(days_with_all_my_spots: list) -> list[dict]:
         for spot in my_spots:
             text_parts = [
                 spot.get("safety_feedback") or "",
-                spot.get("conditional_reason") or "",
                 spot.get("recommendation") or "",
             ]
             haystack = " ".join(text_parts).lower()
@@ -844,7 +808,6 @@ def _day_safety_summary(my_spots: list[dict]) -> str:
     for s in my_spots:
         haystack = " ".join([
             s.get("safety_feedback") or "",
-            s.get("conditional_reason") or "",
             s.get("recommendation") or "",
         ]).lower()
         if not haystack.strip():

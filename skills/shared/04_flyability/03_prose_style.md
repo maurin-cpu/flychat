@@ -12,14 +12,14 @@ Die Flugqualitaets-Bewertung beruht ausschliesslich auf den RATING-INPUTS
 Pilot-Heuristik aus `_flight_subratings_*.md`.
 
 ─────────────────────────────────
-KONSISTENZ-PFLICHT (Text muss zur flight_category passen!)
+KONSISTENZ-PFLICHT (Text muss zum experience_rating passen!)
 ─────────────────────────────────
 
-- `xc_tag` / `klassiker` → `thermal_quality` und `recommendation` MUESSEN positiv formuliert sein ("starker Tag", "XC-Tag", "fettes Streckenpotenzial", "Klassiker"). NICHT "unbrauchbar", "nicht empfohlen" oder "Region meiden".
-- `starker_thermikflug` → POSITIV ("kraftvoller Thermiktag", "lokal-XC moeglich").
-- `solider_thermikflug` → POSITIV oder NEUTRAL ("solider Thermiktag", "Hausrunden moeglich"). Keine Schwach-Tag-Wortwahl.
-- `kurzer_thermikflug` → ehrlich als kurz/schwach beschreiben ("kurzer Thermikflug", "schwacher Tag", "1-3h").
-- `soaring` / `abgleiter` → ehrlich als unfliegbar fuer Thermik beschreiben ("Abgleiter", "Soaring", "kein Tag"). NIEMALS "grauer Tag" oder Tier-Farben.
+- **Rating 5/6 (xc_tag/klassiker)** → `thermal_quality` und `recommendation` MUESSEN positiv formuliert sein ("starker Tag", "XC-Tag", "fettes Streckenpotenzial", "Klassiker"). NICHT "unbrauchbar", "nicht empfohlen" oder "Region meiden".
+- **Rating 4 (starker_thermikflug)** → POSITIV ("kraftvoller Thermiktag", "lokal-XC moeglich").
+- **Rating 3 (solider_thermikflug)** → POSITIV oder NEUTRAL ("solider Thermiktag", "Hausrunden moeglich"). Keine Schwach-Tag-Wortwahl.
+- **Rating 2 (kurzer_thermikflug)** → ehrlich als kurz/schwach beschreiben ("kurzer Thermikflug", "schwacher Tag", "1-3h").
+- **Rating 1 (abgleiter / reines Soaring)** → ehrlich als unfliegbar fuer Thermik beschreiben ("Abgleiter", "kein Tag"). Bei Soaring-Moeglichkeit das in `soaring_options` erwaehnen, aber Rating bleibt 1. NIEMALS "grauer Tag" oder Tier-Farben.
 - UNUSABLE-Randstunden (typisch morgens/abends mit <1 m/s Steigen) erwähne als "morgens/abends ruppiger" — nicht den ganzen Tag abwerten.
 
 **Abgrenzung:** Boeen-Tags, Scherung, zerrissene Thermik = SAFETY. Schon in

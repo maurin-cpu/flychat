@@ -493,12 +493,11 @@ class TestSafetyRating(unittest.TestCase):
 
 
 # ════════════════════════════════════════════════════════════════════
-# Phase 1: compute_safety_band (RATING_CONCEPT v1.3 §3.1)
+# Phase 1: compute_safety_band — DEPRECATED in RATING_ARCHITECTURE v2.0
 # ════════════════════════════════════════════════════════════════════
-# Hybrid: Decision-Engine-Hard-Overrides haben Vorrang vor safety_score.
-# - safety_status="not_safe" oder FoehnDanger/AloftNotSafe → red
-# - safety_status="conditional" oder FoehnCaution/GustFloor/AloftConditional → amber
-# - sonst: safety_score-basierter Fallback (< 40 → amber, sonst green)
+# safety_band wurde entfernt — FE leitet Farbe direkt aus safety_status ab.
+# Tests bleiben skipped fuer Historie.
+@unittest.skip("RATING_ARCHITECTURE v2.0: safety_band wurde entfernt, FE mappt aus safety_status")
 class TestSafetyBand(unittest.TestCase):
     def _result(self, status="safe", score=80, decisions=None, foehn_risk=0):
         return {

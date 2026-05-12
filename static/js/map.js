@@ -329,26 +329,7 @@
                   + s.fill + ';margin-right:4px;vertical-align:middle;"></span>';
             html += '<span style="color:' + s.stroke + ';">' + s.label + '</span>';
             if (safetyBand !== 'red' && typeof experienceRating === 'number' && experienceRating >= 1) {
-                html += ' &middot; Rating ' + experienceRating + '/10';
-            }
-            if (dayData) {
-                var _safScore = null;
-                if (typeof dayData.safety_score === 'number') {
-                    _safScore = Math.round(dayData.safety_score);
-                } else {
-                    var _nested = dayData.safety || {};
-                    var _st = String((dayData.safety_status || _nested.safety_status || '')).toLowerCase();
-                    var _fo = String((dayData.foehn_risk   || _nested.foehn_risk   || 'none')).toLowerCase();
-                    var _base = (_st === 'safe') ? 85 : (_st === 'conditional') ? 50 : -1;
-                    if (_base >= 0) {
-                        var _delta = (_fo === 'medium') ? -15 : (_fo === 'high' || _fo === 'severe') ? -30 : 0;
-                        _safScore = Math.max(0, _base + _delta);
-                    }
-                }
-                if (_safScore !== null) html += ' &middot; Safety ' + _safScore + '/100';
-            }
-            if (dayData && typeof dayData.comfort_index === 'number') {
-                html += ' &middot; Comfort ' + Math.round(dayData.comfort_index);
+                html += ' &middot; Rating ' + experienceRating + '/6';
             }
         }
         return html;
@@ -549,10 +530,7 @@
             if (d.wind_summary) { lines.push('--- Wind Summary ---'); lines.push(_escHtml(d.wind_summary)); lines.push(''); }
             if (d.wind_shear) { lines.push('--- Wind Shear ---'); lines.push(_escHtml(d.wind_shear)); lines.push(''); }
             lines.push('=== FLYABILITY ===');
-            lines.push('Status: ' + (d.fly_status||'?') + '  |  Experience: ' + (d.experience_rating!=null?d.experience_rating:'?'));
-            lines.push('');
-            lines.push('--- Sub-Ratings (1-10) ---');
-            if (d.fly_sub_ratings) Object.keys(d.fly_sub_ratings).forEach(function(k){ lines.push('  ' + k.replace('_rating','').padEnd(15) + ': ' + (d.fly_sub_ratings[k]!=null?d.fly_sub_ratings[k]:'–')); });
+            lines.push('Experience-Rating: ' + (d.experience_rating!=null?d.experience_rating+'/6':'?'));
             lines.push('');
             lines.push('--- Flyability Notes ---');
             if (d.flyability_notes) Object.keys(d.flyability_notes).forEach(function(k){ lines.push('  [' + k + '] ' + _escHtml(d.flyability_notes[k]||'')); });
@@ -599,8 +577,7 @@
         });
         // Capture experience-score + stars fuer Share-Text (Hero-Block zeigt
         // Rating selbst — kein separates Badge mehr).
-        currentSpotExperienceScore = (analysis && typeof analysis.experience_score === 'number') ? analysis.experience_score : null;
-        currentSpotExperienceStars = (analysis && typeof analysis.experience_stars === 'number') ? analysis.experience_stars : null;
+        // experience_score / experience_stars in v2.0 entfernt
         currentSpotExperienceRating = (analysis && typeof analysis.experience_rating === 'number') ? analysis.experience_rating : null;
         renderFeedbackBar(currentSpotName, dateStr, analysis);
     }
@@ -881,12 +858,7 @@
             var regionName = (currentSpotProps && currentSpotProps.region) || '';
             var rText = '';
             if (currentSpotExperienceRating != null && currentSpotExperienceRating >= 1) {
-                rText = ' — Rating ' + currentSpotExperienceRating + '/10';
-                if (currentSpotExperienceScore != null) rText += ' · ' + currentSpotExperienceScore + '/100';
-            } else if (currentSpotExperienceStars != null && currentSpotExperienceStars >= 1) {
-                // Legacy-Cache (vor v1.4): Stars 0-5 als Fallback
-                rText = ' — Rating ' + (currentSpotExperienceStars * 2) + '/10';
-                if (currentSpotExperienceScore != null) rText += ' · ' + currentSpotExperienceScore + '/100';
+                rText = ' — Rating ' + currentSpotExperienceRating + '/6';
             }
             var dayIdx = 0;
             if (window.currentDate && currentDates && currentDates.length) {
@@ -961,32 +933,15 @@
                 return;
             }
 
-            // Prefer new fields, fall back to legacy.
-            var band = dayData.safety_band || legacySafetyBand(dayData.safety_status);
-            // experience_rating 1-10: bevorzugt Cache, sonst aus score/10 ableiten,
-            // sonst aus stars*2, sonst aus rating runden.
-            var rating = 0;
-            if (typeof dayData.experience_rating === 'number') {
-                rating = dayData.experience_rating;
-            } else if (typeof dayData.experience_score === 'number') {
-                var sc = dayData.experience_score;
-                if (sc <= 0) rating = 0;
-                else if (sc >= 100) rating = 10;
-                else rating = Math.max(1, Math.min(10, Math.ceil(sc / 10)));
-            } else if (typeof dayData.experience_stars === 'number') {
-                rating = Math.max(0, Math.min(10, dayData.experience_stars * 2));
-            } else {
-                var r = parseFloat(dayData.rating || 0);
-                if (r > 0) rating = Math.max(1, Math.min(10, Math.round(r)));
-            }
+            // RATING_ARCHITECTURE v2.0: safety_status → band (FE-Mapping).
+            var band = legacySafetyBand(dayData.safety_status);
+            var rating = parseInt(dayData.experience_rating, 10);
+            if (!isFinite(rating) || rating < 0) rating = 0;
+            rating = Math.min(6, rating);
 
             marker.currentSafetyBand = band;
             marker.currentRating = rating;
-            // Legacy fields for compat (other code paths may still read these)
-            marker.currentStars = (typeof dayData.experience_stars === 'number')
-                ? dayData.experience_stars : Math.floor(rating / 2);
             marker.currentSafety = dayData.safety_status || 'safe';
-            marker.currentQuality = dayData.fly_status || 'green';
 
             marker.setIcon(createSpotIcon(marker.featureProperties, band, rating, false));
             marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, null, band, rating, dayData));

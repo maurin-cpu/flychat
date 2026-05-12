@@ -31,12 +31,12 @@ Pro Bemerkungs-Trigger identifiziere: (a) Parameter (Wind/Richtung/Niederschlag/
 |---|---|
 | Startverbot / Landezone / Hangflug-Ausschluss (SAFETY) | `no_go_reasons` (wenn ganzer Tag) oder `caution_notes` (Teilstunden), `safe_window` verkuerzen, ggf. `primary_no_go` |
 | Spot-spezifische Turbulenz/Abloesung (SAFETY/BEIDES) | `caution_notes` mit Uhrzeit, `wind_shear` oder `wind_summary`, Status mind. `conditional` |
-| Mindestwind fuer Soaring nicht erreicht (FLYABILITY) | `flight_type = "Abgleiter"`, `flight_duration_estimate` kurz, `soaring_options` erklaert warum, `recommendation` ehrlich, `xc_potential = "low"`, `flight_category = "abgleiter"` |
-| Mindestwind erreicht → Soaring moeglich (FLYABILITY) | `flight_type = "Soaring"` oder `"Soaring+Thermik"`, `soaring_options` mit konkreter Einschaetzung, `flight_category = "soaring"` |
-| Thermik-Einschraenkung (Tageszeit/Saison, FLYABILITY) | `thermal_quality`, `peak_climb_rate` ggf. runter, `flight_category` entsprechend tiefer waehlen, `best_window` anpassen |
+| Mindestwind fuer Soaring nicht erreicht (FLYABILITY) | `flight_type = "Abgleiter"`, `flight_duration_estimate` kurz, `soaring_options` erklaert warum, `recommendation` ehrlich, `xc_potential = "low"`, `experience_rating = 1` |
+| Mindestwind erreicht → Soaring moeglich (FLYABILITY) | `flight_type = "Soaring"` oder `"Soaring+Thermik"`, `soaring_options` mit konkreter Einschaetzung, `experience_rating = 1` (reines Soaring zaehlt als abgleiter; Soaring-Moeglichkeit nur in Prosa) |
+| Thermik-Einschraenkung (Tageszeit/Saison, FLYABILITY) | `thermal_quality`, `peak_climb_rate` ggf. runter, `experience_rating` entsprechend tiefer waehlen, `best_window` anpassen |
 | `bemerkung_check` (Flyability-JSON) | IMMER: kurze Zusammenfassung welche Bemerkung griff und welche Felder nachjustiert wurden |
 
 **Beispiele:**
-- *Balderen, Prognose 8-12 km/h, Bemerkung "Mindestwind 15 km/h fuer Soaring"*: FLYABILITY. Override: `flight_type="Abgleiter"`, kurze Dauer, `xc_potential="low"`, `recommendation`: "Wind zu schwach fuer Soaring am Balderen — Abgleiter moeglich." Safety-Felder unveraendert.
+- *Balderen, Prognose 8-12 km/h, Bemerkung "Mindestwind 15 km/h fuer Soaring"*: FLYABILITY. Override: `flight_type="Abgleiter"`, kurze Dauer, `xc_potential="low"`, `experience_rating=1`, `recommendation`: "Wind zu schwach fuer Soaring am Balderen — Abgleiter moeglich." Safety-Felder unveraendert.
 - *Spot mit "bei Suedstau Abloesungsgefahr", Foehn-Sued aktiv*: BEIDES. Safety → `caution_notes`, Flyability → `thermal_quality` erwaehnt zerrissene Thermik.
 - *"Landewiese bei Regen gesperrt", RAIN-WARN-Stunden*: SAFETY. → `no_go_reasons`, `safe_window` endet vor Regen.
