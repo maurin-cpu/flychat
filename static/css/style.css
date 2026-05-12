@@ -2390,6 +2390,13 @@ body.page-fixed-nav {
     .map-legend {
         font-size: var(--text-xs);
     }
+    /* Legenden-Button sitzt unten links in der Ecke. Aufgeklappt waechst er
+       nach oben und muss die mittig-zentrierten .floating-day-tabs (z-index 1000)
+       ueberdecken. Da .leaflet-bottom selbst z-index 1000 hat und im DOM vor
+       .floating-day-tabs steht, wird hier der Container hochgehoben. */
+    .leaflet-bottom.leaflet-left {
+        z-index: 1001;
+    }
 }
 
 /* Mobile: day tabs at the bottom-center (thumb-reach), above the bottom nav,

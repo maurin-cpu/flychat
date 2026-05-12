@@ -199,11 +199,6 @@ window.AnalysisView = (function () {
                 var pillLabel = catDisplay || FLY_LABEL_FALLBACK[flyTier] || flyTier;
                 html += '<span class="mga-hero-pill mga-hero-pill--fly mga-hero-pill--' + flyTier + '">' + esc(pillLabel) + '</span>';
             }
-            // flyability_notes.thermal als Hauptbegruendung anzeigen.
-            var notes = (a.flyability_notes || (a.flyability || {}).flyability_notes || {});
-            if (notes.thermal) {
-                html += '<div class="mga-rating-note">' + esc(notes.thermal) + '</div>';
-            }
             // Key flyability fields
             if (fly.flight_type)              html += '<span class="mga-hero-pill">Typ: ' + esc(fly.flight_type) + '</span>';
             if (fly.flight_duration_estimate) html += '<span class="mga-hero-pill">' + esc(fly.flight_duration_estimate) + '</span>';
