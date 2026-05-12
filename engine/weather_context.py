@@ -53,7 +53,6 @@ from engine._common import (
     _log_prompt_cache_usage, _weekday_de,
     _is_permanent_api_error, _user_friendly_api_error,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
-    _compute_rating_from_subratings,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
     _LABEL_KEYS_NO_GO, _LABEL_KEYS_CONDITIONAL,
@@ -68,6 +67,73 @@ from engine._common import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _classify_cloud_structure(avg_low: float, avg_mid: float, avg_high: float) -> str:
+    """Klassifiziert die Bewoelkungsstruktur fuer das Quality-Rating.
+
+    Quelle: meteo_research/cloud_cover_thermal_impact.md Sektion 6:
+    Cirrus (>6000m, Transmissivitaet 70-85%) ist thermisch irrelevant —
+    nur tief+mittel zaehlen. Massgebliche Metrik: max(tief, mittel).
+
+    Kategorien (RATING_CONCEPT v1.6):
+      - cu_clean_top      : tief 12-50% Cu-Marker, mittel <30% → BONUS-Tag,
+                            hohe Cirrus-Bewoelkung egal (wird ignoriert)
+      - blue              : tief+mittel <15% (klarer Himmel ohne Cu-Marker)
+      - cirrus_overcast   : tief+mittel <30%, hoch >70% (kein Cu unten, aber
+                            Cirrus dominiert oben → Thermik normal)
+      - overdevelopment   : tief+mittel kombiniert >70% (Spread)
+      - overcast          : tief ODER mittel >80% (massive Daempfung)
+      - mixed             : alles andere
+    """
+    low_plus_mid = avg_low + avg_mid
+    if avg_low >= 80 or avg_mid >= 80:
+        return "overcast"
+    if low_plus_mid >= 70:
+        return "overdevelopment"
+    # cu_clean_top zuerst pruefen (hat Vorrang vor cirrus_overcast wenn Cu da):
+    # Hohe Cirrus-Bewoelkung ist egal — solange tief Cu + mittel klar ist, ist es Bonus.
+    if 12 <= avg_low <= 50 and avg_mid < 30:
+        return "cu_clean_top"
+    if low_plus_mid < 30 and avg_high >= 70:
+        return "cirrus_overcast"
+    if low_plus_mid < 15:
+        return "blue"
+    return "mixed"
+
+
+def _median(values: list) -> float:
+    if not values:
+        return 0.0
+    vs = sorted(values)
+    n = len(vs)
+    if n % 2 == 1:
+        return float(vs[n // 2])
+    return (vs[n // 2 - 1] + vs[n // 2]) / 2.0
+
+
+def _compute_sustained_peak(hourly_climbs: list, window: int = 2) -> float:
+    """Sustained Peak = max climb that lasts ≥ `window` consecutive hours.
+
+    Definiert als: max ueber alle Stunden des Minimums der nachfolgenden
+    `window` Stunden. Z.B. window=2 → max(min(h, h+1)) → der hoechste Wert,
+    der mindestens 2 Stunden gehalten wird. Verhindert dass Einzel-Spikes
+    als "Peak" zaehlen.
+
+    RATING_CONCEPT v1.5: Quality-Matrix nutzt sustained_peak statt
+    peak_climb_proxy (Einzelhoechstwert), weil die LLM sonst Spikes als
+    Tageskennzahl interpretiert.
+    """
+    if not hourly_climbs or window < 1:
+        return 0.0
+    if len(hourly_climbs) < window:
+        return float(min(hourly_climbs))
+    best = 0.0
+    for i in range(len(hourly_climbs) - window + 1):
+        seg_min = min(hourly_climbs[i:i + window])
+        if seg_min > best:
+            best = seg_min
+    return round(best, 2)
 
 
 def _angular_diff(a: float, b: float) -> float:
@@ -1395,11 +1461,20 @@ class WeatherContextMixin:
         peak_climb_proxy = 0.0
         productive_thermal_h = 0   # Stunden mit climb>=0.7 + low<=80% + mid<=90% + kein ROUGH-UNUSABLE
         band_too_shallow_h = 0     # Stunden mit climb>=0.7 aber Band zu duenn (<MIN_DEPTH)
+        # Rating-Inputs (RATING_CONCEPT v1.5): pre-computed Werte fuer Quality-Matrix.
+        # Strengere Schwelle als productive_thermal_h, weil das Rating "echte" Thermik
+        # erwartet (≥1.5 m/s), nicht nur die Decision-Schwelle 0.7 m/s.
+        _hourly_climbs = []        # alle climb-Werte im Fly-Fenster (fuer sustained Peak)
+        productive_h_strict = 0    # Stunden mit climb >= 1.5 m/s + Cloud-OK + kein ROUGH-UNUSABLE
         # Cloud-Akkumulatoren NUR ueber Thermikstunden (climb>=0.3) — analog zur Logik
         # bei productive_thermal_h: Morgenwolken ohne Thermik zaehlen nicht mit.
         # Fuer Violett-Check (XC-Tag braucht saubere Sonne).
         cloud_low_sum = 0.0
         cloud_mid_sum = 0.0
+        cloud_high_sum = 0.0      # v1.6: fuer cloud_structure-Klassifikation (Cirrus etc.)
+        _prod_tops_agl = []       # v1.6: Thermik-Top AGL ueber Stunden mit prod_h_strict
+        _prod_climbs = []         # v1.6: climb-Werte waehrend prod_h_strict Stunden (fuer avg)
+        strong_h = 0              # v1.6: Stunden mit climb >= 2.0 m/s (starke Thermik)
         # CLOUDS-Sicht-Zaehler (alle Flugstunden, nicht nur Thermikstunden):
         # Wolkenbasis auf/unter Startplatz mit hoher Bedeckung = Sicherheits-STOP/WARN
         # (siehe docs/TAGS.md — Bewoelkung-Sicherheits-Branch).
@@ -1439,6 +1514,10 @@ class WeatherContextMixin:
                     h_climb = therm["climb_rate"]
                     if isinstance(h_climb, (int, float)) and h_climb > peak_climb_proxy:
                         peak_climb_proxy = h_climb
+                    # Rating v1.5: climb-Verlauf fuer sustained-Peak (Rolling-Min ueber 2h Fenster).
+                    _hourly_climbs.append(
+                        float(h_climb) if isinstance(h_climb, (int, float)) else 0.0
+                    )
                     # h_max_h = FLIEGBARE Thermik-Obergrenze, gecappt bei LCL (Wolkenbasis)
                     # Oberhalb der Wolkenbasis ist VFR-Flug nicht erlaubt → nicht als
                     # fliegbare Thermik zaehlen. Raw-Parcel-Top bleibt in therm["max_height"].
@@ -1694,6 +1773,7 @@ class WeatherContextMixin:
                 thermal_hours_total += 1
                 cloud_low_sum += low_cl
                 cloud_mid_sum += mid_cl
+                cloud_high_sum += high_cl  # v1.6 fuer cloud_structure-Klassifikation
                 tq_tags_this_hour = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-", "[THERMAL-WIND-"))}
                 # THERMAL-ROUGH-UNUSABLE (mechanische Klapper-Gefahr, nur Spots) ODER
                 # THERMAL-WIND-UNUSABLE (Grundwind zu stark, Blase organisiert sich nicht,
@@ -1723,6 +1803,21 @@ class WeatherContextMixin:
                         and not rough_unusable_this_hour
                         and not band_usable):
                     band_too_shallow_h += 1
+                # Rating-Input v1.5: strenge Produktivitaets-Schwelle (≥1.5 m/s)
+                if (h_climb >= 1.5
+                        and cloud_ok
+                        and not rough_unusable_this_hour
+                        and band_usable):
+                    productive_h_strict += 1
+                    _prod_climbs.append(float(h_climb))
+                    # v1.6: Thermik-Top AGL fuer working_height-Median tracken.
+                    # h_max_h ist MSL (bereits LCL-gecappt). AGL = MSL - elevation.
+                    if isinstance(h_max_h, (int, float)):
+                        _agl = max(0, h_max_h - elevation_m)
+                        _prod_tops_agl.append(_agl)
+                # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
+                if h_climb >= 2.0 and cloud_ok and not rough_unusable_this_hour and band_usable:
+                    strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
                 else:
@@ -2157,6 +2252,14 @@ class WeatherContextMixin:
             "wind_danger_h": tq_wind_danger_h,
             "peak_climb_proxy": peak_climb_proxy,
             "productive_thermal_h": productive_thermal_h,
+            "productive_h_strict": productive_h_strict,
+            "sustained_peak_mps": _compute_sustained_peak(_hourly_climbs, window=2),
+            "working_height_agl_m": round(_median(_prod_tops_agl)) if _prod_tops_agl else 0,
+            "cloud_structure": _classify_cloud_structure(
+                (cloud_low_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+                (cloud_mid_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+                (cloud_high_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+            ),
             "avg_low_cloud_thermal_h": (cloud_low_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
             "avg_mid_cloud_thermal_h": (cloud_mid_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
             "band_too_shallow_h": band_too_shallow_h,
@@ -2248,6 +2351,7 @@ class WeatherContextMixin:
 
         # ─── PRODUKTIVE-THERMIK: Stunden mit Climb + klarer Sicht ───
         if thermal_hours_total > 0:
+            _sust_peak = _compute_sustained_peak(_hourly_climbs, window=2)
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
                 f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, tief ≤{config.PRODUCTIVE_LOW_CLOUD_MAX}%, "
@@ -2255,6 +2359,23 @@ class WeatherContextMixin:
                 f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
                 f"HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT "
                 f"(Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
+            )
+            # Rating-Inputs (RATING_CONCEPT v1.6): explizit fuer Kategorien-Wahl.
+            _wh = round(_median(_prod_tops_agl)) if _prod_tops_agl else 0
+            _avg_climb_prod = round(sum(_prod_climbs) / len(_prod_climbs), 1) if _prod_climbs else 0.0
+            _avg_low = (cloud_low_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0
+            _avg_mid = (cloud_mid_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0
+            _avg_high = (cloud_high_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0
+            _cloud_struct = _classify_cloud_structure(_avg_low, _avg_mid, _avg_high)
+            lines.append(
+                f"→ RATING-INPUTS: prod_h_strict={productive_h_strict}h (Climb ≥1.5 m/s), "
+                f"strong_h={strong_h}h (Climb ≥2.0 m/s), "
+                f"avg_climb_prod={_avg_climb_prod:.1f} m/s (Durchschnitt waehrend prod_h_strict), "
+                f"sustained_peak={_sust_peak:.1f} m/s (max über 2h, kein Einzelspike), "
+                f"working_height_agl={_wh}m (Median Thermik-Top ueber produktive Stunden), "
+                f"cloud_structure={_cloud_struct} "
+                f"(tief={_avg_low:.0f}% mittel={_avg_mid:.0f}% hoch={_avg_high:.0f}%). "
+                f"Diese Werte nutzt die Kategorien-Wahl direkt — nicht selbst nachzaehlen."
             )
 
             # ─── VIOLETT-Kandidat-Check (XC-Tag) ───
@@ -2498,9 +2619,18 @@ class WeatherContextMixin:
         peak_climb_proxy = 0.0
         productive_thermal_h = 0   # Stunden mit climb>=0.7 + low<=80% + mid<=90% + kein ROUGH-UNUSABLE
         band_too_shallow_h = 0     # Stunden mit climb>=0.7 aber Band zu duenn (<MIN_DEPTH)
+        # Rating-Inputs (RATING_CONCEPT v1.5): pre-computed Werte fuer Quality-Matrix.
+        # Strengere Schwelle als productive_thermal_h, weil das Rating "echte" Thermik
+        # erwartet (≥1.5 m/s), nicht nur die Decision-Schwelle 0.7 m/s.
+        _hourly_climbs = []        # alle climb-Werte im Fly-Fenster (fuer sustained Peak)
+        productive_h_strict = 0    # Stunden mit climb >= 1.5 m/s + Cloud-OK + kein ROUGH-UNUSABLE
         # Cloud-Akkumulatoren NUR ueber Thermikstunden (climb>=0.3) — fuer Violett-Check.
         cloud_low_sum = 0.0
         cloud_mid_sum = 0.0
+        cloud_high_sum = 0.0      # v1.6: fuer cloud_structure-Klassifikation (Cirrus etc.)
+        _prod_tops_agl = []       # v1.6: Thermik-Top AGL ueber Stunden mit prod_h_strict
+        _prod_climbs = []         # v1.6: climb-Werte waehrend prod_h_strict Stunden (fuer avg)
+        strong_h = 0              # v1.6: Stunden mit climb >= 2.0 m/s (starke Thermik)
         # CLOUDS-Sicht-Zaehler (alle Flugstunden) — Region nutzt elev_ref als Referenz.
         cloud_at_or_below_takeoff_h = 0
         cloud_near_takeoff_h = 0
@@ -2534,6 +2664,10 @@ class WeatherContextMixin:
                     h_climb = therm["climb_rate"]
                     if isinstance(h_climb, (int, float)) and h_climb > peak_climb_proxy:
                         peak_climb_proxy = h_climb
+                    # Rating v1.5: climb-Verlauf fuer sustained-Peak (Rolling-Min ueber 2h Fenster).
+                    _hourly_climbs.append(
+                        float(h_climb) if isinstance(h_climb, (int, float)) else 0.0
+                    )
                     # h_max_h = FLIEGBARE Thermik-Obergrenze, gecappt bei LCL (Wolkenbasis)
                     # Oberhalb der Wolkenbasis ist VFR-Flug nicht erlaubt → nicht als
                     # fliegbare Thermik zaehlen. Raw-Parcel-Top bleibt in therm["max_height"].
@@ -2775,6 +2909,7 @@ class WeatherContextMixin:
                 thermal_hours_total += 1
                 cloud_low_sum += low_cl
                 cloud_mid_sum += mid_cl
+                cloud_high_sum += high_cl  # v1.6 fuer cloud_structure-Klassifikation
                 tq_tags_this_hour = {t for t in warnings if t.startswith(("[SHEAR-", "[THERMAL-TORN-", "[THERMAL-ROUGH-", "[THERMAL-WIND-"))}
                 # THERMAL-ROUGH-UNUSABLE (mechanische Klapper-Gefahr, nur Spots) ODER
                 # THERMAL-WIND-UNUSABLE (Grundwind zu stark, Blase organisiert sich nicht,
@@ -3008,6 +3143,14 @@ class WeatherContextMixin:
             "wind_danger_h": tq_wind_danger_h,
             "peak_climb_proxy": peak_climb_proxy,
             "productive_thermal_h": productive_thermal_h,
+            "productive_h_strict": productive_h_strict,
+            "sustained_peak_mps": _compute_sustained_peak(_hourly_climbs, window=2),
+            "working_height_agl_m": round(_median(_prod_tops_agl)) if _prod_tops_agl else 0,
+            "cloud_structure": _classify_cloud_structure(
+                (cloud_low_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+                (cloud_mid_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+                (cloud_high_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
+            ),
             "avg_low_cloud_thermal_h": (cloud_low_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
             "avg_mid_cloud_thermal_h": (cloud_mid_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0,
             "band_too_shallow_h": band_too_shallow_h,
@@ -3192,6 +3335,7 @@ class WeatherContextMixin:
 
         # ─── PRODUKTIVE-THERMIK: Stunden mit Climb + klarer Sicht ───
         if thermal_hours_total > 0:
+            _sust_peak = _compute_sustained_peak(_hourly_climbs, window=2)
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
                 f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, tief ≤{config.PRODUCTIVE_LOW_CLOUD_MAX}%, "
@@ -3199,6 +3343,23 @@ class WeatherContextMixin:
                 f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
                 f"HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT "
                 f"(Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
+            )
+            # Rating-Inputs (RATING_CONCEPT v1.6): explizit fuer Kategorien-Wahl.
+            _wh = round(_median(_prod_tops_agl)) if _prod_tops_agl else 0
+            _avg_climb_prod = round(sum(_prod_climbs) / len(_prod_climbs), 1) if _prod_climbs else 0.0
+            _avg_low = (cloud_low_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0
+            _avg_mid = (cloud_mid_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0
+            _avg_high = (cloud_high_sum / thermal_hours_total) if thermal_hours_total > 0 else 0.0
+            _cloud_struct = _classify_cloud_structure(_avg_low, _avg_mid, _avg_high)
+            lines.append(
+                f"→ RATING-INPUTS: prod_h_strict={productive_h_strict}h (Climb ≥1.5 m/s), "
+                f"strong_h={strong_h}h (Climb ≥2.0 m/s), "
+                f"avg_climb_prod={_avg_climb_prod:.1f} m/s (Durchschnitt waehrend prod_h_strict), "
+                f"sustained_peak={_sust_peak:.1f} m/s (max über 2h, kein Einzelspike), "
+                f"working_height_agl={_wh}m (Median Thermik-Top ueber produktive Stunden), "
+                f"cloud_structure={_cloud_struct} "
+                f"(tief={_avg_low:.0f}% mittel={_avg_mid:.0f}% hoch={_avg_high:.0f}%). "
+                f"Diese Werte nutzt die Kategorien-Wahl direkt — nicht selbst nachzaehlen."
             )
 
             # ─── VIOLETT-Kandidat-Check (XC-Tag) ───

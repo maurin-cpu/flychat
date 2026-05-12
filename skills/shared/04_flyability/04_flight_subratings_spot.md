@@ -1,88 +1,167 @@
 ═══════════════════════════════════════════════
-TEIL 3: SUB-RATINGS — SPOT (3 Gate-Ratings, 1-10)
+TEIL 3: WIE WUERDE EIN PILOT DEN SPOT-TAG BESCHREIBEN?
 ═══════════════════════════════════════════════
 
-Statt eines Gesamtratings vergibst du **3 Gate-Ratings**. Das System berechnet daraus deterministisch das Gesamtrating. Du bist gut im Beurteilen einzelner Aspekte — das Zusammenrechnen uebernimmt die App.
+Du bist ein erfahrener Pilot. Du schaust den Spot + die Tagesprognose an und
+sagst: "das ist ein <X>." Welches X passt?
 
-**Formel (Liebig-Triple):** `experience_rating = min(thermal, altitude, xc)`
-Alle drei sind gleichwertige Gates — das schwächste Glied limitiert. Ein Klassiker-Tag (10) braucht top Thermik UND top Steigraum UND top XC-Potenzial.
-Window und Wind fliessen **nicht** ins Experience-Rating ein — sie sind ueber das Safety-Band und die Warnungen abgedeckt.
-
-**Skala 1-10 — drei Anker, der Rest ist deine Interpretation:**
-- **1** = unbrauchbar fuer diesen Aspekt
-- **5** = mittlerer Standardtag
-- **10** = Klassiker-Tag, Top 1% des Jahres
-
-Werte 2-4, 6-9 sind Zwischenstufen — entscheide nach Bauchgefuehl wie nahe der Tag am jeweiligen Anker liegt. **Nutze die volle Breite!** Eine 6 ist NICHT "sicherheitshalber 5", sondern ein klar besserer Tag als 5. Differenziere zwischen Spots — gleicher Tag, verschiedene Bewertungen.
+Vergib **eine einzige Kategorie** aus den 7 unten. App leitet rating + tier ab.
 
 ─────────────────────────────────
-thermal_rating (1-10) — Thermik-Qualitaet [GATE]
+WICHTIG: SICHERHEIT BEEINFLUSST DIE KATEGORIE NICHT
 ─────────────────────────────────
 
-Was bewertet wird — alle vier Dimensionen zusammen, nicht nur den Peak:
+Kategorie-Wahl basiert **ausschliesslich** auf der **Flugqualitaet** gegeben
+dass alles sicher waere. Sicherheit ist eine getrennte Achse.
 
-1. **Stunden mit guter Thermik** — wie viele Stunden liegt die Steigrate bei ≥1.5 m/s?
-   Wie viele bei ≥2.0 m/s? Ein langer guter Tag schlaegt einen kurzen Spitzentag.
-2. **Steigrate** — Durchschnitt und Peak ueber die produktiven Stunden.
-   Ein einzelner Aufzug zaehlt nicht — Konsistenz entscheidet.
-3. **Basishoehe** — Durchschnittliche LCL/Wolkenbasis ueber die guten Stunden.
-   Hohe Basis = mehr Spielraum, laengere Schraube.
-4. **Bewoelkungs-Charakter** — max(low, mid) ist massgeblich; reiner Cirrus irrelevant.
-   SCT-Cu (12-50%): optimale Bedingung. Blau: Thermik ohne Cu-Boost. ≥80%: kollabiert.
+**Ignoriere fuer die Kategorie:** `safety_status`, `no_go_reasons`,
+`caution_notes`, Hoehenwind/Boeen-Warnungen, "sportlich", Foehn, Regen,
+Gewitter, TQ-Tags (SHEAR/TORN/ROUGH/WIND-*).
 
-Anker (3 Referenzpunkte, der Rest ist deine Interpretation):
-  1  — Unfliegbar: kaum nutzbare Thermik, <0.3 m/s oder abgeschirmt
-  5  — Standard-Tag: ~1.0-1.5 m/s, mittlere Basis, 3-4h nutzbar
-  10 — Klassiker: nachhaltig >2.5 m/s, hohe Basis, 5+h, optimale Cu, Top 1% des Jahres
+**Nutze NUR:** `prod_h_strict`, `strong_h`, `avg_climb_prod`, `sustained_peak`,
+`working_height_agl`, `cloud_structure`.
+
+Auch bei Hoehenwind WARN: wenn das Steigen Peak 2.5 × 6h + hohe Basis + Cu
+ist, ist es **trotzdem `xc_tag`/`klassiker`**.
 
 ─────────────────────────────────
-xc_rating (1-10) — XC-Potenzial [GATE]
+DIE 7 KATEGORIEN (Pilot-Sprache)
 ─────────────────────────────────
 
-Was bewertet wird: Basishoehe UND Wind aloft (Rueckenwind/Gegenwind) UND
-Fenster-Laenge UND grossraeumige Lufmasse UND Bewoelkungs-Marker fuer
-Strecken-Fliegen.
+### `abgleiter`
+Kaum Steigen, Hike-Back oder gar nicht raus. Peak < 0.5 m/s.
 
-Bewoelkungs-Hintergrund: SCT-Cu (~25-50%) liefert sichtbare Cu-Strassen und
-erleichtert XC-Navigation. Blau-Tage sind XC-tauglich, aber Thermik-Suche ist
-schwieriger. OD-Risiko oder grossflaechige hohe Bedeckung machen lange Schenkel
-riskant. Wie stark das einfliesst, entscheidest du.
+### `soaring`
+Hangwind ja, Thermik nein. Du bleibst oben wo der Wind den Hang traegt,
+kein Hoehengewinn. Peak < 1.0 m/s.
 
-Anker:
-  1  — Kein XC moeglich, nur lokal/Soaring
-  5  — Moderates XC: 20-50 km, lokal-XC bequem, kein langer Schenkel
-  10 — Top-XC: hohe Basis, Rueckenwind, 100+ km realistisch
+### `kurzer_thermikflug`
+Thermik vorhanden aber mau oder kurz. 30-60min was, dann zufrieden runter.
+Peak < 1.5 m/s ODER Peak ok aber nur 1-3h.
+
+### `solider_thermikflug` — **der typische Schweizer Flugtag**
+Peak 1.5-2.0 m/s ueber mehrere Stunden. 2-3h Hausrunden, vielleicht 20km
+lokal. Konsistent, nicht spektakulaer.
+
+### `starker_thermikflug`
+Peak 2.0-2.5 m/s ueber 4-5 Stunden. Steigst zuverlaessig, kommst mit Laecheln
+runter. Lokal-XC bis ~50km moeglich.
+
+### `xc_tag`
+Peak 2.0-2.5 m/s **mindestens 5 Stunden**, hohe Arbeitshoehe (>1500m AGL),
+Bewoelkung traegt bei oder stoert nicht. 50-100km Strecke.
+
+### `klassiker` — **Tag des Jahres**
+Peak ≥2.5 m/s ueber 6+ Stunden, Arbeitshoehe >2000m AGL, `cu_clean_top`.
+100km+. 5-15× pro Saison in CH.
 
 ─────────────────────────────────
-altitude_rating (1-10) — Steigraum ueber Startplatz [GATE]
+KONKRETE VIGNETTEN (typische CH-Spot-Tage)
 ─────────────────────────────────
 
-Was bewertet wird: Wie hoch komme ich ueber den Startplatz (AGL) UND wie
-lange kann ich diese Hoehe halten. Bewertet wird primaer der **Median ueber
-die produktiven Stunden**, nicht der Tagespeak — ein einzelner Aufzug zaehlt
-nicht.
+**`abgleiter`** — Winter-Hausberg, BLH 200m, kalt. 5min Hike-Back.
 
-Im Wetterkontext findest du pro Stunde `THERMIK-PROXY: X m/s bis YYYYm MSL` —
-das ist die fliegbare Thermik-Obergrenze (gecappt bei der Wolkenbasis LCL).
-Ziehe die Startplatzhoehe (`elevation_m`, im Spot-Header) ab, um die Hoehe
-ueber Grund (AGL) zu erhalten.
+**`soaring`** — Westwind-Tag im Voralpen-Spot, 1-2h schweben am Hang, kein Hoehengewinn.
 
-Anker:
-  1  — ≤100m AGL oder nur Soaring/Hangwind, keine echte Thermik
-  5  — ~600m AGL durchschnittlich ueber die produktiven Stunden
-  10 — ≥2000m AGL ueber den Grossteil der produktiven Stunden, volle Alpen-Hoehe
+**`kurzer_thermikflug`** — Voralpenspot Peak 1.3 m/s × 3h, BLH 1800m. 30-60min Schraube, zufrieden runter.
+
+**`solider_thermikflug`** — Standard-Sommertag: Peak 1.5-2.0 m/s × 4-5h, BLH 2500m. 2-3h Hausrunden, ~20km lokal.
+
+**`starker_thermikflug`** — Voralpentag Mai/Juni: Peak 2.0-2.5 m/s × 4-5h, BLH 2800m, SCT-Cu 25%. 40-50km lokal-XC, Laecheln beim Landen.
+
+**`xc_tag`** — Wallis Hochsommer: Peak 2.2-2.5 m/s × 5-6h, BLH 3500m+, Cu sauber. 80-120km Strecke.
+
+**`klassiker`** — Mai-Juli Alpenhoch mit Konvergenz: Peak ≥2.5 m/s × 6h+, BLH ≥3500m, Cu-Strassen. 150km+.
+
+─────────────────────────────────
+HILFSDATEN AUS DEM DATENBLOCK
+─────────────────────────────────
+
+```
+→ RATING-INPUTS: prod_h_strict=Xh, strong_h=Yh, avg_climb_prod=A.B m/s,
+                 sustained_peak=C.D m/s, working_height_agl=ZZZZm,
+                 cloud_structure=<typ>
+```
+
+- **`sustained_peak`** = wichtigster Wert. <1.5 mau, >2.0 ordentlich, >2.5 top.
+- **`prod_h_strict`** = Dauer. Lange Dauer × schwacher Peak = lang-und-mau,
+  NICHT stark.
+- **`working_height_agl`** = Hoehe ueber Spot. <1500m kein XC.
+- **`cloud_structure`**: `cu_clean_top` = Bonus, `blue` = ok, `overcast`/`OD` = killt.
+
+─────────────────────────────────
+HARTE PEAK-OBERGRENZEN (absolut)
+─────────────────────────────────
+
+| sustained_peak | Obergrenze |
+|---|---|
+| < 1.0 m/s        | `soaring`                  |
+| 1.0 - 1.5 m/s    | `kurzer_thermikflug`       |
+| 1.5 - 2.0 m/s    | `solider_thermikflug`      |
+| 2.0 - 2.5 m/s    | `starker_thermikflug`      |
+| ≥ 2.5 m/s        | `klassiker` moeglich       |
+
+**Diese Caps sind hart** — Peak 1.5 × 8h × BLH 3000m = max `kurzer_thermikflug`,
+egal wie viel Dauer/Hoehe. Lange schwache Thermik macht den Tag nicht stark.
+
+**Dauer + Hoehe entscheiden wie nah du an die Obergrenze gehst.**
+
+─────────────────────────────────
+MINDEST-VORAUSSETZUNGEN je Kategorie
+─────────────────────────────────
+
+| Kategorie | Voraussetzungen (alle erfuellt) |
+|---|---|
+| `kurzer_thermikflug` | prod_h ≥ 1h UND peak ≥ 1.0 |
+| `solider_thermikflug` | prod_h ≥ 4h UND peak ≥ 1.5 |
+| `starker_thermikflug` | prod_h ≥ 4h UND peak ≥ 2.0 UND working_height ≥ 1000m |
+| `xc_tag` | prod_h ≥ 5h UND peak ≥ 2.0 UND working_height ≥ 1500m UND cloud NICHT overcast/OD |
+| `klassiker` | prod_h ≥ 6h UND peak ≥ 2.5 UND working_height ≥ 2000m UND cu_clean_top |
+
+Fuer xc_tag reicht **jede** Bewoelkungs-Variante ausser overcast/OD —
+cu_clean_top ist nicht Pflicht (das ist erst fuer klassiker noetig).
+
+─────────────────────────────────
+SANITY-CHECK
+─────────────────────────────────
+
+Frag dich: **wie wuerde ich den Tag einem Freund beschreiben?**
+- "Cooler Tag" → solider/starker
+- "Hammer-Tag, mega geflogen" → xc_tag/klassiker
+- "Bisschen abgestaubt" → kurzer
+- "Hangsoaring" → soaring
+
+Bei Peak <2.0 m/s wuerdest du **nie** "Hammer-Tag" sagen. Niemals `xc_tag`
+oder `klassiker` bei Peak <2.0. Niemals `starker` bei Peak <2.0. Niemals
+`solider` bei Peak <1.5.
 
 ─────────────────────────────────
 NUTZUNGS-REGELN
 ─────────────────────────────────
 
-**Pflicht:** Vergib alle 3 Gate-Ratings (`thermal_rating`, `altitude_rating`, `xc_rating`) als ganze Zahlen 1-10. `window_rating` und `wind_rating` weglassen. Bei `safety_status = not_safe`: alle auf 1 setzen.
+1. `flight_category` exakt einer der 7 Strings.
+2. Bei `safety_status = not_safe` → vergib trotzdem die korrekte Kategorie
+   basierend auf Thermik-Qualitaet. App handhabt UI separat.
+3. **Streckenflug-Konsistenz**: `klassiker`/`xc_tag` → streckenflug `moderat`/`top`.
+   `abgleiter`/`soaring`/`kurzer_thermikflug` → `kein_xc`/`lokal`.
+4. **Spot-Differenzierung**: Spots in derselben Region am gleichen Tag haben
+   oft verschiedene Kategorien (Hoehe, Exposition, Talwind).
+5. **Prosa muss zur Kategorie passen**.
+6. **Safety bleibt strikt draussen.** In `flyability_notes`, `thermal_quality`,
+   `recommendation`, `xc_details`, `soaring_options` erwaehnst du **NIE**:
+   Hoehenwind, Boeen, "sportlich", Scherung, zerrissene Thermik, Foehn, Regen,
+   Gewitter, "Vorsicht ab Stunde X". Diese stehen in der Safety-Pipeline.
 
-**`flyability_notes` ZUERST ausfuellen — vor den Ratings, vor der Prosa**: Fuelle alle 3 Felder (`thermal`, `altitude`, `xc`) mit je einem konkreten Satz aus dem Datenblock. Beispiele:
-- `"thermal": "Peak 2.1 m/s 12-15h, BLH 2400m, Cu 20% — solide Basis, gute Konsistenz."` → thermal_rating 7
-- `"xc": "Basis 1800m MSL = 1000m AGL, ruhiger Hoehenwind — 50-80km realistisch."` → xc_rating 8
-- `"altitude": "Proxy-Durchschnitt ~1700m MSL = ~900m AGL ueber Startplatz 800m — mittlerer Steigraum."` → altitude_rating 5
-VERBOTEN: generische Saetze ohne Datenbezug.
+7. **Flyability-Prosa enthaelt NUR Flugqualitaet:** Steigwerte, produktive
+   Stunden, Arbeitshoehe, Bewoelkung, XC-Potenzial. `best_window` = thermisches
+   Fenster, NICHT durch Hoehenwind/Safety eingeschraenkt.
 
-**Volle Breite nutzen** — wenn der LLM-Run vorher bei "5-7 clustern" stehen
-geblieben ist, ist das ein Bug. Differenziere bewusst zwischen 6, 7, 8.
+8. **Self-check Prosa**: Suche nach `Hoehenwind`, `Wind`, `Scherung`,
+   `sportlich`, `Foehn`, `Regen`, `Gewitter`, `Vorsicht` in deinen Flyability-
+   Prosa-Feldern. Gefunden → loeschen und ohne Safety-Bezug neu formulieren.
+
+9. **Self-check Kategorie-Wahl** (kritisch): Frag dich: Habe ich die
+   Kategorie wegen Hoehenwind/Boeen/sportlich heruntergesetzt? → **FEHLER**,
+   korrigieren. Die Kategorie kommt NUR aus prod_h_strict, sustained_peak,
+   working_height_agl, cloud_structure. Stell dir vor der Tag haette KEIN
+   Safety-Issue — welche Kategorie waere es dann? Genau die vergibst du.

@@ -31,9 +31,9 @@ Pro Bemerkungs-Trigger identifiziere: (a) Parameter (Wind/Richtung/Niederschlag/
 |---|---|
 | Startverbot / Landezone / Hangflug-Ausschluss (SAFETY) | `no_go_reasons` (wenn ganzer Tag) oder `caution_notes` (Teilstunden), `safe_window` verkuerzen, ggf. `primary_no_go` |
 | Spot-spezifische Turbulenz/Abloesung (SAFETY/BEIDES) | `caution_notes` mit Uhrzeit, `wind_shear` oder `wind_summary`, Status mind. `conditional` |
-| Mindestwind fuer Soaring nicht erreicht (FLYABILITY) | `flight_type = "Abgleiter"`, `flight_duration_estimate` kurz, `soaring_options` erklaert warum, `recommendation` ehrlich, `xc_potential = "low"`, `xc_rating` 1–3 |
-| Mindestwind erreicht → Soaring moeglich (FLYABILITY) | `flight_type = "Soaring"` oder `"Soaring+Thermik"`, `soaring_options` mit konkreter Einschaetzung |
-| Thermik-Einschraenkung (Tageszeit/Saison, FLYABILITY) | `thermal_quality`, `peak_climb_rate` ggf. runter, `thermal_rating` anpassen, `best_window` anpassen |
+| Mindestwind fuer Soaring nicht erreicht (FLYABILITY) | `flight_type = "Abgleiter"`, `flight_duration_estimate` kurz, `soaring_options` erklaert warum, `recommendation` ehrlich, `xc_potential = "low"`, `flight_category = "abgleiter"` |
+| Mindestwind erreicht → Soaring moeglich (FLYABILITY) | `flight_type = "Soaring"` oder `"Soaring+Thermik"`, `soaring_options` mit konkreter Einschaetzung, `flight_category = "soaring"` |
+| Thermik-Einschraenkung (Tageszeit/Saison, FLYABILITY) | `thermal_quality`, `peak_climb_rate` ggf. runter, `flight_category` entsprechend tiefer waehlen, `best_window` anpassen |
 | `bemerkung_check` (Flyability-JSON) | IMMER: kurze Zusammenfassung welche Bemerkung griff und welche Felder nachjustiert wurden |
 
 **Beispiele:**

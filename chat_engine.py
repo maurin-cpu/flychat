@@ -84,7 +84,6 @@ from engine.chat_orchestrator import TOOLS  # noqa: F401
 from engine._common import (
     _FLYABILITY_TIERS,
     _normalize_flyability_tier,
-    _compute_rating_from_subratings,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
     _LABEL_KEYS_NO_GO, _LABEL_KEYS_CONDITIONAL,

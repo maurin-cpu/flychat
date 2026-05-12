@@ -189,24 +189,21 @@ window.AnalysisView = (function () {
             // Flyability-Tier
             var fly = a.flyability || {};
             var flyTier = fly.flyability_tier || a.fly_status || '';
-            var FLY_LABEL = { green: 'Fliegbar', violet: 'Top', gray: 'Abgleiter', red: 'Nicht fliegbar' };
+            // RATING_CONCEPT v1.6: flight_category als Pilot-Sprache (z.B. "Solider Thermikflug").
+            // Fallback auf alte tier-Labels bei Caches ohne Kategorie.
+            var catDisplay = a.flight_category_display
+                          || (fly && fly.flight_category_display)
+                          || '';
+            var FLY_LABEL_FALLBACK = { green: 'Fliegbar', violet: 'Top', gray: 'Abgleiter', red: 'Nicht fliegbar' };
             if (flyTier && flyTier !== 'no_data') {
-                html += '<span class="mga-hero-pill mga-hero-pill--fly mga-hero-pill--' + flyTier + '">Fly: ' + (FLY_LABEL[flyTier] || flyTier) + '</span>';
+                var pillLabel = catDisplay || FLY_LABEL_FALLBACK[flyTier] || flyTier;
+                html += '<span class="mga-hero-pill mga-hero-pill--fly mga-hero-pill--' + flyTier + '">' + esc(pillLabel) + '</span>';
             }
-            // Sub-Ratings (1-10)
-            var SUB = [
-                ['thermal_rating',  'Thermik'],
-                ['window_rating',   'Fenster'],
-                ['wind_rating',     'Wind'],
-                ['xc_rating',       'XC'],
-                ['altitude_rating', 'Basis'],
-            ];
-            var subHtml = '';
-            SUB.forEach(function (pair) {
-                var v = a[pair[0]];
-                if (typeof v === 'number') subHtml += '<span class="mga-sub-rating">' + pair[1] + ' <b>' + v + '</b></span>';
-            });
-            if (subHtml) html += '<div class="mga-sub-ratings">' + subHtml + '</div>';
+            // flyability_notes.thermal als Hauptbegruendung anzeigen.
+            var notes = (a.flyability_notes || (a.flyability || {}).flyability_notes || {});
+            if (notes.thermal) {
+                html += '<div class="mga-rating-note">' + esc(notes.thermal) + '</div>';
+            }
             // Key flyability fields
             if (fly.flight_type)              html += '<span class="mga-hero-pill">Typ: ' + esc(fly.flight_type) + '</span>';
             if (fly.flight_duration_estimate) html += '<span class="mga-hero-pill">' + esc(fly.flight_duration_estimate) + '</span>';

@@ -1,41 +1,29 @@
 ═══════════════════════════════════════════════
-FORMULIERUNGS-TABELLE (TQ-Tags → natuerliche Sprache)
+PROSA-STIL (Flyability)
 ═══════════════════════════════════════════════
 
-**WICHTIG:** In der JSON-Antwort NIEMALS die Tags selbst nennen (`[SHEAR-UNUSABLE]` etc.). Uebersetze in natuerliche Saetze, die ein Pilot sofort versteht.
+**Wichtig:** TQ-Tags (`[SHEAR-*]`, `[THERMAL-TORN-*]`, `[THERMAL-ROUGH-*]`,
+`[THERMAL-WIND-*]`) sind **Safety-Domain** und gehoeren NICHT in die Flyability-
+Prosa. Erwaehne sie weder in `thermal_quality`, `recommendation` noch in
+`flyability_notes`.
 
-Nutze diese Tabelle als Vorlage fuer `thermal_quality` und `recommendation`:
-
-| Tag-Kombination                                    | Formulierung                                                                                              |
-|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| `[SHEAR-DEGRADED]` allein                          | "Wind nimmt mit der Hoehe zu, die Thermik wird gekippt — Bart-Zentrierung schwieriger."                   |
-| `[SHEAR-UNUSABLE]` allein                          | "Starke Windscherung zerreisst die Thermik. Die angezeigten Steigwerte sind theoretisch, real nicht nutzbar." |
-| `[THERMAL-TORN-DEGRADED]`                          | "Thermik durch Wind gestoert — kleine, fleckige Baerte, schwer zu zentrieren."                            |
-| `[THERMAL-TORN-UNUSABLE]`                          | "Thermik vom Wind zerrissen. Kein organisiertes Steigen mehr, nur noch Brocken."                          |
-| `[THERMAL-ROUGH-DEGRADED]` *(nur Spots)*           | "Thermik ruppig wegen Boeigkeit. Steigen geht, aber unruhig."                                             |
-| `[THERMAL-ROUGH-UNUSABLE]` *(nur Spots)*           | "Thermik extrem ruppig, Klapper-Gefahr im Bart."                                                          |
-| `[THERMAL-WIND-DEGRADED]`                          | "Starker Grundwind in der Mischungsschicht — Blasen werden versetzt, kleine zerfasern. Bart schwer zu zentrieren." |
-| `[THERMAL-WIND-UNUSABLE]`                          | "Grundwind so stark, dass sich keine organisierte Thermik bildet. Parcel-Steigen ist theoretisch, nicht nutzbar." |
-| `[SHEAR-UNUSABLE]` + `[THERMAL-TORN-UNUSABLE]`     | "Wind zerreisst die Thermik vollstaendig. Trotz guter Parcel-Werte ist Thermikflug nicht sinnvoll; allenfalls Abgleiter im Leebereich." |
-| `[THERMAL-WIND-UNUSABLE]` + `[SHEAR-UNUSABLE]`     | "Starker Grundwind plus Scherung — Thermik weder organisiert noch kohaerent. Abgleiter."                  |
-| `[GUST-WARN]` + `[THERMAL-ROUGH-DEGRADED]` *(nur Spots)* | "Boeig am Boden und in der Thermik — nur erfahrene Piloten, ruhigere Fenster abwarten."             |
+Die Flugqualitaets-Bewertung beruht ausschliesslich auf den RATING-INPUTS
+(prod_h_strict, sustained_peak, working_height_agl, cloud_structure) und der
+Pilot-Heuristik aus `_flight_subratings_*.md`.
 
 ─────────────────────────────────
-KONSISTENZ-PFLICHT (Text muss zu Sub-Ratings passen!)
+KONSISTENZ-PFLICHT (Text muss zur flight_category passen!)
 ─────────────────────────────────
 
-- `thermal_rating ≥ 7` (Top-Tag, View-tier `violet` möglich) → `thermal_quality` und `recommendation` MUESSEN positiv formuliert sein, in Rating-Sprache ("Rating 4–5", "Top-Tag", "fettes XC-Potential"). NICHT "unbrauchbar", "nicht empfohlen" oder "Region meiden" schreiben.
-- `thermal_rating ≥ 5` (solider Tag, View-tier `green` möglich) → `thermal_quality` und `recommendation` POSITIV oder NEUTRAL formulieren ("solider Thermiktag", "lokale Flüge möglich"). Keine Schwach-Tag-Wortwahl.
-- `thermal_rating ≤ 3` (Schwach-Tag, View-tier `gray`) → ehrlich als schwach/unfliegbar beschreiben. Sprachgebrauch: "Abgleiter", "schwacher Tag", "Rating 1" — NIEMALS "grauer Tag", möglichst auch nicht "Bronze-Tag" (UI-interne Farbe, kein User-Begriff).
+- `xc_tag` / `klassiker` → `thermal_quality` und `recommendation` MUESSEN positiv formuliert sein ("starker Tag", "XC-Tag", "fettes Streckenpotenzial", "Klassiker"). NICHT "unbrauchbar", "nicht empfohlen" oder "Region meiden".
+- `starker_thermikflug` → POSITIV ("kraftvoller Thermiktag", "lokal-XC moeglich").
+- `solider_thermikflug` → POSITIV oder NEUTRAL ("solider Thermiktag", "Hausrunden moeglich"). Keine Schwach-Tag-Wortwahl.
+- `kurzer_thermikflug` → ehrlich als kurz/schwach beschreiben ("kurzer Thermikflug", "schwacher Tag", "1-3h").
+- `soaring` / `abgleiter` → ehrlich als unfliegbar fuer Thermik beschreiben ("Abgleiter", "Soaring", "kein Tag"). NIEMALS "grauer Tag" oder Tier-Farben.
 - UNUSABLE-Randstunden (typisch morgens/abends mit <1 m/s Steigen) erwähne als "morgens/abends ruppiger" — nicht den ganzen Tag abwerten.
 
-**Abgrenzung:** Die Boeen-Tags `[GUST-*]` / `[ALOFT-*]` sind schon in Teil 1 behandelt. Die Thermik-Qualitaets-Tags zielen ausschliesslich auf die Nutzbarkeit des Auftriebs.
-
-**Region-Kontext:** Regionen haben keine Boeen, `[THERMAL-ROUGH-*]` Tags existieren dort nicht. Thermik-Zerreiss-Signale kommen ueber drei Mechanismen:
-- `[SHEAR-*]` — Windscherung (dU/dz)
-- `[THERMAL-TORN-*]` — Buoyancy/Shear-Ratio
-- `[THERMAL-WIND-*]` — mittlerer BL-Grundwind zu stark fuer Organisation der Blase
-Erwaehne in Region-Analysen keine Boeigkeit und keine Klapper-Gefahr — nur diese drei Mechanismen.
+**Abgrenzung:** Boeen-Tags, Scherung, zerrissene Thermik = SAFETY. Schon in
+Teil 1 behandelt. NICHT in Flyability-Texten erwaehnen.
 
 ─────────────────────────────────
 BEWOELKUNGS-LABELS (Booster vs. Reducer — Matuszko/FAA)

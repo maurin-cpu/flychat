@@ -1,9 +1,28 @@
 # Gleitcast Rating-Konzept: Risk vs Reward Trennung
 
-**Status**: ✅ **v1.3 umgesetzt** (2026-05-01) — Phasen 1+2+3+4a+4b sowie §4.4 Bubble-Matrix vollstaendig implementiert. Aktueller Stand siehe §11 Implementierungs-Status.
+**Status**: 🟢 **v1.5 aktiv** (2026-05-11) — LLM-natives Rating. Frueheres v1.3/1.4 (deterministische Aggregation + Tier-Ableitung) wurde durch direktes LLM-Setzen ersetzt.
 **Autor**: Alex (PM)
-**Datum**: 2026-04-30 (Konzept) / 2026-05-01 (Implementations-Update) / 2026-05-02 (WIND-WRONG-Refactor)
-**Version**: 1.3 (v1.0 Konzept, v1.1 UI-Scan-Optimierung, v1.2 Konsistenz-Check, v1.3 Preview-Erkenntnisse)
+**Datum**: 2026-05-11 (v1.5 LLM-nativ) / 2026-05-02 (WIND-WRONG-Refactor) / 2026-04-30 (Konzept v1.0)
+**Version**: 1.5 (v1.0 Konzept, v1.1 UI-Scan, v1.2 Konsistenz, v1.3 2-Achsen, v1.4 Rating 1-10, v1.5 LLM-nativ)
+
+> **v1.5 in einem Satz**: LLM setzt `experience_rating` (1-10) und `flyability_tier`
+> (gray/green/violet) direkt. Code aggregiert nichts mehr aus Sub-Achsen, leitet
+> Tier nicht mehr ab, hat keinen Re-Narrate-Pfad mehr. Einziges Code-Override:
+> Safety-Gate (red Band → tier="", rating=0).
+>
+> **Why:** Test ob ein LLM Flugtage ganzheitlich bewerten kann, ohne dass der
+> Code seine Antwort durch Formeln korrigiert. Inkonsistenzen werden bewusst
+> sichtbar statt kaschiert.
+>
+> **Entfernt mit v1.5:** `_compute_rating_from_subratings`,
+> `_compute_experience_score/_stars/_rating`, `compute_legacy_flyability_tier`,
+> `decide_flyability_low_reward/_upgrade/_region_gate`, `_renarrate_on_drift_if_enabled`.
+> Cache-Felder `thermal/altitude/xc/window/wind_rating`, `rating`, `experience_stars`
+> obsolet.
+>
+> Die Sektionen unten dokumentieren die Historie (v1.0-1.4). Lebende Beschreibung
+> der aktuellen Architektur siehe `DECISIONS.md` Sektion 5 und
+> `skills/shared/04_flyability/04_flight_subratings_*.md`.
 
 > **Dokumenten-Charakter**: Dieses Konzept-Dokument enthaelt **Begruendungen** (Benchmarks, Trade-offs, Architektur-Pattern) UND **Migrations-Plaene**. Die Migrations-Plaene (§5, §7, §9.6) sind historisch — sie wurden umgesetzt, siehe §11. Die fachlichen Erklaerungen (§1 Benchmark, §2 Empfehlung, §3 Mapping, §4/§8 UI, §6 Risiken, §10 Backlog) bleiben gueltig als Architektur-Referenz.
 

@@ -111,8 +111,8 @@
                     '<dl>' +
                       '<dt>Safety-Score</dt>' +
                       '<dd>0–100. Aggregat von 5 Sub-Aspekten: Bodenwind, Boeen, Hoehenwind, Foehn, Wetter (Niederschlag/Gewitter/Sicht). Aggregation per <b>Weakest-Link</b> — der schwaechste Aspekt zieht den Score nach unten. Ein einzelnes Gewitter macht den Tag rot, auch wenn alle anderen 4 perfekt sind.</dd>' +
-                      '<dt>Experience-Score</dt>' +
-                      '<dd>0–100. <b>Spot</b>: 5 Sub-Ratings — Thermik (30%), Zeitfenster (20%), Wind (10%), XC-Potential (15%), <b>Hoehe ueber Spot</b> (25%). <b>Region</b>: 4 Sub-Ratings — Thermik (35%), Zeitfenster (25%), Wind (25%), XC-Potential (15%) (Region hat keine eindeutige Startplatzhoehe). Zahl im Marker = Rating 1–10 (Score / 10).</dd>' +
+                      '<dt>Flugqualitaet — Kategorie (1-7)</dt>' +
+                      '<dd>Statt einer Zahl vergibt die KI eine <b>Kategorie</b> die der Pilot kennt: <b>Abgleiter</b> (1, keine Thermik), <b>Soaring</b> (2, Hangwind), <b>Kurzer Thermikflug</b> (3, schwach), <b>Solider Thermikflug</b> (4, Hausrunden), <b>Starker Thermikflug</b> (5, lokal-XC), <b>XC-Tag</b> (6, 50-100km), <b>Klassiker</b> (7, Tag des Jahres). Die Zahl 1-7 ist die interne Skala — die KI selbst waehlt nur die Kategorie.</dd>' +
                       '<dt>Comfort-Index</dt>' +
                       '<dd>0–100. Wie glatt (100) oder klapprig (0) der Tag wird. Beeinflusst <b>nicht</b> das Rating — nur dein Wohlbefinden in der Luft.</dd>' +
                     '</dl>' +
@@ -121,7 +121,8 @@
 
                 '<div class="rating-info-section">' +
                   '<h3>Wer entscheidet was?</h3>' +
-                  '<p>KI-Modell + deterministische Regel-Engine arbeiten zusammen: das LLM beurteilt einzelne Aspekte, eine Decision-Engine setzt harte Sicherheits-Schwellen durch (Foehn-Durchbruch, Hoehenwind &gt; 30 km/h, Gewitter). Diese Regeln <b>ueberschreiben</b> das LLM — ein gefaehrlicher Tag kann nicht "weggetextet" werden.</p>' +
+                  '<p><b>Sicherheit:</b> KI + Decision-Engine. Das LLM beurteilt Aspekte, harte Sicherheits-Schwellen (Foehn-Durchbruch, Hoehenwind &gt; 30 km/h, Gewitter) <b>ueberschreiben</b> das LLM — ein gefaehrlicher Tag kann nicht "weggetextet" werden.</p>' +
+                  '<p><b>Flugqualitaet (Kategorie):</b> reine KI-Einschaetzung. Die KI waehlt eine der 7 Kategorien aus dem Pilot-Vokabular — kein Rechnen, kein Mittelwert. Wir wollen sehen, ob ein Modell ganzheitlich urteilen kann — wenn die Einschaetzung dir falsch erscheint, ist das wertvolles Feedback.</p>' +
                 '</div>' +
 
               '</div>' +

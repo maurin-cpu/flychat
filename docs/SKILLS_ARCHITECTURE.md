@@ -318,30 +318,28 @@ Datenblock → LLM → roher JSON → Engine-Postprocess → finaler Cache-Eintr
 - `streckenflug{}` (Spot only): `tier`, `rating`, `summary`, `limiting_factor`,
   `region_context_available`
 
-### 7.2 Engine-Compute (was die App ableitet)
+### 7.2 Engine-Compute (was die App ableitet) — v1.5
 
 In `engine/_common.py` und `engine/decision_engine.py`:
 
 | Feld | Quelle | Zweck |
 |------|--------|-------|
-| `rating` (0–10) | `_compute_rating_from_subratings` | Gewichteter Mix aus 4–5 Flight-Sub-Ratings |
-| `experience_score` (0–100) | `_compute_experience_score` | rating × 10, kosmetische Skala |
-| `experience_stars` (0–5) | `_compute_experience_stars` | Mapping experience_score → Sterne (§8.3) |
-| `safety_rating` (0–10) | `_compute_safety_rating` | **Weakest-Link** der 5 Safety-Sub-Ratings |
+| `experience_rating` (1–10) | **LLM direkt** | LLM-natives Rating — keine Aggregation |
+| `experience_score` (0–100) | `experience_rating × 10` (inline) | Reine UI-Skalierung, kein Aggregations-Schritt |
+| `flyability_tier` | **LLM direkt** (gray/green/violet) | LLM-natives Tier, keine Code-Ableitung |
+| `fly_status` | identisch mit flyability_tier | Synonym, fuers UI |
+| `safety_rating` (0–10) | `_compute_safety_rating` | **Weakest-Link** der 8 Safety-Sub-Ratings |
 | `safety_score` (0–100) | `_compute_safety_score` | safety_rating × 10 |
 | `safety_band` | `compute_safety_band` | **Hybrid**: Hard-Overrides + safety_score → green/amber/red/no_data |
 | `comfort_index` (0–100) | `compute_comfort_index` | Texture-Wert aus rough_pct (kein Rating-Effekt) |
-| `flyability_tier` | `compute_legacy_flyability_tier` | **§9.7 View**: aus (safety_band, experience_stars) |
-| `fly_status` | identisch mit flyability_tier | Synonym, fuers UI |
 
-**Single Source of Truth (§9.7):** Der LLM-Output von `flyability_tier`/`fly_status`
-wird im Post-Processing ueberschrieben durch `compute_legacy_flyability_tier`:
+**Einziges Code-Override fuer Rating/Tier (v1.5):** Safety-Gate. Wenn
+`safety_band == "red"` ODER `safety_status == "not_safe"`:
 
 ```
-safety_band == 'red'                  → ''
-stars >= 4 AND safety_band == 'green' → 'violet'
-stars >= 2                            → 'green'
-sonst                                 → 'gray'
+flyability_tier   → ""
+experience_rating → 0
+experience_score  → 0
 ```
 
 **Hard-Overrides der Decision-Engine** (THUNDERSTORM, CAPE-DANGER, RAIN-WARN,

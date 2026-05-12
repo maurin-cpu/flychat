@@ -52,7 +52,6 @@ from engine._common import (
     _log_prompt_cache_usage, _weekday_de,
     _is_permanent_api_error, _user_friendly_api_error,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
-    _compute_rating_from_subratings,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
     _LABEL_KEYS_NO_GO, _LABEL_KEYS_CONDITIONAL,

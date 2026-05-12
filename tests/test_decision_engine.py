@@ -7,7 +7,13 @@ Deckt ab:
   - Gust-Floor
   - Overclaim-Relax (DEMOTIERT not_safe → conditional)
   - Wind-Strong-Mehrheit (Region)
-  - Flyability-Downgrade / Upgrade / Region-Gate
+  - Flyability-Mech-Danger (einzige verbleibende Flyability-Decision, v1.5)
+
+Mit RATING_CONCEPT v1.5 entfernt: `decide_flyability_low_reward`,
+`decide_flyability_upgrade`, `decide_flyability_region_gate`,
+`compute_legacy_flyability_tier`, `_compute_rating_from_subratings`,
+`_compute_experience_score`, `_compute_experience_stars`,
+`_compute_experience_rating` — LLM setzt rating + tier direkt.
 """
 import unittest
 
@@ -23,20 +29,12 @@ from engine.decision_engine import (
     decide_overclaim_relax,
     decide_is_conditional,
     decide_wind_strong_majority,
-    decide_flyability_low_reward,
     decide_flyability_mech_danger,
-    decide_flyability_upgrade,
-    decide_flyability_region_gate,
     compute_safety_band,
-    compute_legacy_flyability_tier,
 )
 from engine._common import (
-    _compute_experience_score,
-    _compute_experience_stars,
-    _compute_experience_rating,
     _compute_safety_rating,
     _compute_safety_score,
-    _compute_rating_from_subratings,
     derive_status_from_subs,
 )
 
@@ -293,56 +291,11 @@ class TestRegionDecisions(unittest.TestCase):
         self.assertIsNone(tag)
 
 
-class TestFlyabilityDecisions(unittest.TestCase):
-    # ── Low-Reward (Sub-Trigger A: keine Thermik, C: zu wenig produktiv) ──
-    def test_low_reward_no_thermals(self):
-        # Sub-Trigger A: peak < 0.3 ODER thermal_hours_total == 0
-        result = {"flyability_tier": "green", "fly_status": "green",
-                  "safety_status": "safe", "caution_notes": []}
-        tq = {"thermal_hours_total": 0, "rough_danger_h": 0,
-              "peak_climb_proxy": 0, "productive_thermal_h": 0}
-        tag = decide_flyability_low_reward(result, tq, "X/Y")
-        # Phase 4b: Tier wird NICHT mehr von decide_*-Funktionen geschrieben,
-        # sondern am Ende der Pipeline durch compute_legacy_flyability_tier
-        # abgeleitet. Diese Funktion signalisiert nur noch via Tag.
-        # Low-Reward darf safety NICHT anfassen
-        self.assertEqual(result["safety_status"], "safe")
-        self.assertEqual(result["caution_notes"], [])
-        self.assertTrue(tag.startswith("FlyabilityLowReward"))
-        self.assertIn("no_thermals", tag)
+class TestFlyabilityMechDanger(unittest.TestCase):
+    """RATING_CONCEPT v1.5: nur noch mech_danger als Safety-Eskalation.
+    LowReward / Upgrade / RegionGate entfernt — LLM setzt Tier direkt."""
 
-    def test_low_reward_low_productive(self):
-        # Sub-Trigger C: prod_h < threshold, kein Rough-Problem
-        result = {"flyability_tier": "green", "fly_status": "green",
-                  "safety_status": "safe", "caution_notes": []}
-        tq = {"thermal_hours_total": 6, "rough_danger_h": 1,
-              "peak_climb_proxy": 1.5, "productive_thermal_h": 1}
-        tag = decide_flyability_low_reward(result, tq, "X/Y")
-        self.assertEqual(result["safety_status"], "safe")  # safety unangetastet
-        self.assertTrue(tag.startswith("FlyabilityLowReward"))
-        self.assertIn("low_productive", tag)
-
-    def test_low_reward_skips_on_rough_majority(self):
-        # rough_pct > 50 ist mech_danger-Domain, NICHT low_reward
-        result = {"flyability_tier": "green", "fly_status": "green",
-                  "safety_status": "safe", "caution_notes": []}
-        tq = {"thermal_hours_total": 6, "rough_danger_h": 4,
-              "peak_climb_proxy": 1.5, "productive_thermal_h": 4}
-        tag = decide_flyability_low_reward(result, tq, "X/Y")
-        self.assertIsNone(tag)
-
-    def test_low_reward_skips_when_already_gray(self):
-        result = {"flyability_tier": "gray", "fly_status": "gray",
-                  "safety_status": "safe", "caution_notes": []}
-        tq = {"thermal_hours_total": 0, "rough_danger_h": 0,
-              "peak_climb_proxy": 0, "productive_thermal_h": 0}
-        tag = decide_flyability_low_reward(result, tq, "X/Y")
-        self.assertIsNone(tag)
-
-    # ── Mech-Danger (Sub-Trigger B: rough_pct > 50, Safety-Achse) ──
     def test_mech_danger_fires_and_escalates_safety(self):
-        # Phase 4b: mech_danger eskaliert nur noch safety + caution_note,
-        # Tier-Schreibe entfaellt. Tier wird via View aus safety_band+stars abgeleitet.
         result = {"flyability_tier": "green", "fly_status": "green",
                   "safety_status": "safe", "caution_notes": []}
         tq = {"thermal_hours_total": 6, "rough_danger_h": 4,
@@ -371,41 +324,6 @@ class TestFlyabilityDecisions(unittest.TestCase):
         tag = decide_flyability_mech_danger(result, tq, "X/Y")
         # Tag wird trotzdem emittiert (caution_note relevant), aber safety bleibt
         self.assertEqual(result["safety_status"], "not_safe")
-
-    def test_upgrade_gray_to_green(self):
-        # Phase 4b: Tier-Schreibe entfaellt — Funktion korrigiert nur noch
-        # Text-Felder bei objektiv guten Cache-Daten.
-        result = {"flyability_tier": "gray", "fly_status": "gray"}
-        tq = {"thermal_hours_total": 6, "rough_danger_h": 1, "peak_climb_proxy": 1.8, "productive_thermal_h": 5}
-        tag = decide_flyability_upgrade(result, tq, "X/Y")
-        self.assertEqual(result["peak_climb_rate"], 1.8)
-        self.assertEqual(result["flight_type"], "Thermikflug")
-        self.assertTrue(tag.startswith("FlyabilityUpgrade"))
-
-    def test_upgrade_skips_when_already_green(self):
-        result = {"flyability_tier": "green", "fly_status": "green"}
-        tq = {"thermal_hours_total": 6, "rough_danger_h": 0, "peak_climb_proxy": 1.5, "productive_thermal_h": 5}
-        tag = decide_flyability_upgrade(result, tq, "X/Y")
-        self.assertIsNone(tag)
-
-    def test_region_gate_violet_to_green(self):
-        # Phase 4b: Region-Gate ist konzeptionell obsolet — Funktion gibt nur
-        # noch Telemetrie-Tag zurueck, schreibt tier nicht mehr.
-        result = {"flyability_tier": "violet", "fly_status": "violet"}
-        region_result = {"flyability_tier": "green", "region": "Mittelland"}
-        tag = decide_flyability_region_gate(result, region_result, "X/Y")
-        self.assertEqual(tag, "FlyabilityRegionGate(violet→green)")
-
-    def test_region_gate_keeps_violet_when_region_violet(self):
-        result = {"flyability_tier": "violet", "fly_status": "violet"}
-        region_result = {"flyability_tier": "violet", "region": "Mittelland"}
-        tag = decide_flyability_region_gate(result, region_result, "X/Y")
-        self.assertIsNone(tag)
-
-    def test_region_gate_no_region(self):
-        result = {"flyability_tier": "violet", "fly_status": "violet"}
-        tag = decide_flyability_region_gate(result, None, "X/Y")
-        self.assertIsNone(tag)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -483,97 +401,6 @@ class TestIsConditional(unittest.TestCase):
 # ════════════════════════════════════════════════════════════════════
 # Skaliert das bestehende 0-10 rating × 10 → 0-100 experience_score, mappt
 # auf 0-5 Sterne via Schwellen aus §8.3 (untere Stufe gewinnt am Grenzwert).
-class TestExperienceScore(unittest.TestCase):
-    # ── Score-Skalierung (rating × 10) ──
-    def test_score_zero_when_rating_zero(self):
-        self.assertEqual(_compute_experience_score(0.0), 0)
-
-    def test_score_75_when_rating_7_5(self):
-        self.assertEqual(_compute_experience_score(7.5), 75)
-
-    def test_score_100_when_rating_10(self):
-        self.assertEqual(_compute_experience_score(10.0), 100)
-
-    def test_score_clamps_negative_and_overflow(self):
-        self.assertEqual(_compute_experience_score(-1.0), 0)
-        self.assertEqual(_compute_experience_score(11.0), 100)
-
-    def test_score_handles_none_and_invalid(self):
-        self.assertEqual(_compute_experience_score(None), 0)
-        self.assertEqual(_compute_experience_score("invalid"), 0)
-
-    # ── Sterne-Schwellen (§8.3, untere Stufe gewinnt) ──
-    def test_stars_zero_at_boundary(self):
-        self.assertEqual(_compute_experience_stars(0), 0)
-        self.assertEqual(_compute_experience_stars(20), 0)  # 20 → 0★
-        self.assertEqual(_compute_experience_stars(21), 1)  # 21 → 1★
-
-    def test_stars_one_to_two_boundary(self):
-        self.assertEqual(_compute_experience_stars(40), 1)  # 40 → 1★
-        self.assertEqual(_compute_experience_stars(41), 2)  # 41 → 2★
-
-    def test_stars_two_to_three_boundary(self):
-        self.assertEqual(_compute_experience_stars(60), 2)  # 60 → 2★
-        self.assertEqual(_compute_experience_stars(61), 3)  # 61 → 3★
-
-    def test_stars_three_to_four_boundary(self):
-        self.assertEqual(_compute_experience_stars(75), 3)  # 75 → 3★ (konservativ)
-        self.assertEqual(_compute_experience_stars(76), 4)  # 76 → 4★
-
-    def test_stars_four_to_five_boundary(self):
-        self.assertEqual(_compute_experience_stars(89), 4)  # 89 → 4★
-        self.assertEqual(_compute_experience_stars(90), 5)  # 90 → 5★
-
-    def test_stars_at_max(self):
-        self.assertEqual(_compute_experience_stars(100), 5)
-
-    # ── Pipeline-Integration: not_safe Rating=0 → Score=0 → Stars=0 ──
-    def test_not_safe_pipeline_yields_zero_stars(self):
-        rating = 0.0  # _compute_rating_from_subratings forciert das bei not_safe
-        score = _compute_experience_score(rating)
-        stars = _compute_experience_stars(score)
-        self.assertEqual(score, 0)
-        self.assertEqual(stars, 0)
-
-
-# ════════════════════════════════════════════════════════════════════
-# v1.4: experience_rating (0-10) — neue Primaer-Anzeige
-# ════════════════════════════════════════════════════════════════════
-# Mappt experience_score (0-100) auf 0-10. 0 = not_safe, 1-10 in 10er-Schritten.
-class TestExperienceRating(unittest.TestCase):
-    def test_zero_when_score_zero(self):
-        self.assertEqual(_compute_experience_rating(0), 0)
-
-    def test_ten_at_max(self):
-        self.assertEqual(_compute_experience_rating(100), 10)
-        self.assertEqual(_compute_experience_rating(99), 10)
-        self.assertEqual(_compute_experience_rating(91), 10)
-
-    def test_one_at_low_end(self):
-        self.assertEqual(_compute_experience_rating(1), 1)
-        self.assertEqual(_compute_experience_rating(10), 1)
-
-    def test_two_at_eleven_to_twenty(self):
-        self.assertEqual(_compute_experience_rating(11), 2)
-        self.assertEqual(_compute_experience_rating(20), 2)
-
-    def test_seven_at_seventy(self):
-        # Konservativ: 70 ist immer noch eine 7, 71 ist 8.
-        self.assertEqual(_compute_experience_rating(70), 7)
-        self.assertEqual(_compute_experience_rating(71), 8)
-
-    def test_eight_at_eighty(self):
-        self.assertEqual(_compute_experience_rating(80), 8)
-
-    def test_clamps_negative_and_overflow(self):
-        self.assertEqual(_compute_experience_rating(-5), 0)
-        self.assertEqual(_compute_experience_rating(150), 10)
-
-    def test_handles_none_and_invalid(self):
-        self.assertEqual(_compute_experience_rating(None), 0)
-        self.assertEqual(_compute_experience_rating("invalid"), 0)
-
-
 # ════════════════════════════════════════════════════════════════════
 # Vorab-Fix #4: Safety-Sub-Ratings (8 Felder, Weakest-Link-Aggregation)
 # ════════════════════════════════════════════════════════════════════
@@ -766,67 +593,6 @@ class TestSafetyBand(unittest.TestCase):
 # Phase 4 (RATING_CONCEPT v1.4 §9.7): compute_legacy_flyability_tier
 # Compat-View — leitet flyability_tier aus (safety_band, experience_rating 0-10) ab
 # ════════════════════════════════════════════════════════════════════
-class TestLegacyFlyabilityTier(unittest.TestCase):
-    def test_red_safety_yields_empty(self):
-        # red → "" unabhaengig von Rating (keine Empfehlung bei not_safe)
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "red", "experience_rating": 10}), "")
-
-    def test_green_rating_10_yields_violet(self):
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 10}), "violet")
-
-    def test_green_rating_8_yields_violet(self):
-        # untere Grenze: rating >= 8 AND green → violet
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 8}), "violet")
-
-    def test_green_rating_7_yields_green(self):
-        # 7 ist noch nicht violet, aber klar green
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 7}), "green")
-
-    def test_amber_rating_8_yields_green(self):
-        # amber + Rating 8 ist NICHT violet (violet braucht green); fliegbar → green
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "amber", "experience_rating": 8}), "green")
-
-    def test_green_rating_4_yields_green(self):
-        # untere Grenze fuer green: rating >= 4
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 4}), "green")
-
-    def test_green_rating_3_yields_gray(self):
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": 3}), "gray")
-
-    def test_amber_rating_0_yields_gray(self):
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "amber", "experience_rating": 0}), "gray")
-
-    def test_missing_fields_default_to_gray(self):
-        # Komplett leeres Result → gray (kein red, kein Rating)
-        self.assertEqual(compute_legacy_flyability_tier({}), "gray")
-
-    def test_invalid_rating_falls_back_to_zero(self):
-        # nicht-numerisches Rating → 0 → gray
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_rating": "abc"}), "gray")
-
-    def test_safety_band_case_insensitive(self):
-        # Robust gegen unterschiedliche Schreibweisen
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "RED", "experience_rating": 10}), "")
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "GREEN", "experience_rating": 10}), "violet")
-
-    # ── Backwards-compat: Falls Cache nur experience_stars hat (vor v1.4)
-    def test_legacy_stars_5_at_green_yields_violet(self):
-        # stars*2 = 10 → violet
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 5}), "violet")
-
-    def test_legacy_stars_4_at_green_yields_violet(self):
-        # stars*2 = 8 → violet (Grenze)
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 4}), "violet")
-
-    def test_legacy_stars_2_at_green_yields_green(self):
-        # stars*2 = 4 → green (untere Grenze)
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 2}), "green")
-
-    def test_legacy_stars_1_at_green_yields_gray(self):
-        # stars*2 = 2 → unter green-Schwelle → gray
-        self.assertEqual(compute_legacy_flyability_tier({"safety_band": "green", "experience_stars": 1}), "gray")
-
-
 class TestWindWrongIsNotHazard(unittest.TestCase):
     """Regression: WIND-WRONG ist Startbarkeits-Filter, kein Hazard.
 
@@ -878,50 +644,6 @@ class TestWindWrongIsNotHazard(unittest.TestCase):
         # Trennung lebt jetzt im Skill `_tagesfenster.md`, nicht im Datenblock.
         self.assertIn("═══ TAGESFENSTER", self.src)
         self.assertIn("Tag aktiv ab", self.src)
-
-
-class TestComputeRatingFromSubratings(unittest.TestCase):
-    def test_spot_all_top(self):
-        r = _compute_rating_from_subratings(
-            {"thermal_rating": 10, "window_rating": 10, "wind_rating": 10, "xc_rating": 10, "altitude_rating": 10},
-            tier="gray", include_altitude=True
-        )
-        self.assertEqual(r, 10.0)
-
-    def test_spot_no_thermal_rest_top(self):
-        r = _compute_rating_from_subratings(
-            {"thermal_rating": 1, "window_rating": 10, "wind_rating": 10, "xc_rating": 10, "altitude_rating": 10},
-            tier="gray", include_altitude=True
-        )
-        self.assertEqual(r, 1.0)
-
-    def test_spot_top_thermal_rest_mau(self):
-        r = _compute_rating_from_subratings(
-            {"thermal_rating": 10, "window_rating": 6, "wind_rating": 6, "xc_rating": 6, "altitude_rating": 6},
-            tier="gray", include_altitude=True
-        )
-        self.assertEqual(r, 8.0)
-
-    def test_spot_medium_everywhere(self):
-        r = _compute_rating_from_subratings(
-            {"thermal_rating": 5, "window_rating": 5, "wind_rating": 5, "xc_rating": 5, "altitude_rating": 5},
-            tier="gray", include_altitude=True
-        )
-        self.assertEqual(r, 3.8)
-
-    def test_region_all_top(self):
-        r = _compute_rating_from_subratings(
-            {"thermal_rating": 10, "window_rating": 10, "wind_rating": 10, "xc_rating": 10},
-            tier="gray", include_altitude=False
-        )
-        self.assertEqual(r, 10.0)
-
-    def test_not_safe_yields_zero(self):
-        r = _compute_rating_from_subratings(
-            {"thermal_rating": 10, "window_rating": 10},
-            tier="gray", safety_status="not_safe", include_altitude=True
-        )
-        self.assertEqual(r, 0.0)
 
 
 # ════════════════════════════════════════════════════════════════════

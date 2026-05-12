@@ -42,11 +42,8 @@ from engine.decision_engine import (
     decide_wind_ok_zero, decide_aloft_not_safe, decide_aloft_conditional,
     decide_gust_floor, decide_overclaim_relax, decide_is_conditional,
     decide_wind_strong_majority,
-    decide_flyability_low_reward, decide_flyability_mech_danger,
-    decide_flyability_upgrade,
-    decide_flyability_region_gate,
+    decide_flyability_mech_danger,
     compute_safety_band, compute_comfort_index,
-    compute_legacy_flyability_tier,
     build_start_window, build_topic_tags, build_region_topic_tags,
     validate_llm_tags, merge_topic_tags,
 )
@@ -66,8 +63,8 @@ from engine._common import (
     _is_permanent_api_error, _user_friendly_api_error,
     _resolve_max_tokens, compute_retry_sleep,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
-    _compute_rating_from_subratings,
-    _compute_experience_score, _compute_experience_stars, _compute_experience_rating,
+    _normalize_flight_category, _category_to_rating, _category_to_tier,
+    _category_display,
     _compute_safety_rating, _compute_safety_score, derive_status_from_subs,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
@@ -983,8 +980,13 @@ class AnalyzersMixin:
             v = e.get("experience_rating")
             if isinstance(v, int) and 0 <= v <= 10:
                 return v
+            # Legacy-Cache: aus score ableiten (1-10 → konservativ aufgerundet)
             score = _score_from_entry(e)
-            return _compute_experience_rating(score)
+            if score <= 0:
+                return 0
+            if score >= 100:
+                return 10
+            return max(1, min(10, (score + 9) // 10))
 
         def _score_from_entry(e: dict) -> int:
             v = e.get("experience_score")
@@ -1954,21 +1956,38 @@ class AnalyzersMixin:
         return result
 
     def _post_process_flyability_spot(self, result: dict, spot: dict, date_str: str, region_result: dict = None) -> dict:
-        """Flyability-only Post-Processing fuer einen Spot.
-        Wendet Tier-Normalisierung, Downgrade/Upgrade, Region-Gating,
-        Streckenflug-Validierung und Rating-Berechnung an.
-        Wird vom Split-Flow (Flyability-Phase) genutzt.
+        """Flyability-only Post-Processing fuer einen Spot (RATING_CONCEPT v1.5).
+
+        LLM-natives Rating: `experience_rating` (1-10) und `flyability_tier`
+        kommen direkt vom LLM. KEINE Aggregation aus Sub-Achsen mehr.
+        KEINE Flyability-Decisions, die das Tier ueberschreiben. Nur:
+        - Tag-Sanitierung
+        - Tier-Normalisierung (whitelist)
+        - Safety-Gate: bei not_safe / red Band → rating=0, tier=""
+        - Streckenflug-Konsistenz
+        - Safety-Aggregation (separat, unveraendert)
 
         result: rohes Flyability-LLM-JSON (ohne Safety-Felder).
         """
         name = spot["name"]
+        # region_result wird nicht mehr verwendet (Region-Gate entfernt) — Param
+        # bleibt fuer Aufrufer-Kompatibilitaet erhalten.
+        _ = region_result
 
         # Tag-Sanitierung ZUERST — laeuft auch fuer not_safe-Pfad, damit
         # zurueckgegebene Texte (auch wenn Flyability-Felder leer sind) sauber sind.
         _sanitize_llm_result(result)
 
-        # Wenn not_safe (aus Safety-Phase): Flyability-Felder leeren
+        # not_safe Pfad: Flugqualitaet bleibt aus LLM-Output erhalten (Safety
+        # und Flyability sind getrennte Achsen, RATING_CONCEPT v1.6). Nur die
+        # UI-Display-Felder (fly_status, tier) werden geleert — die App zeigt
+        # "kein Flugtag" im UI, aber die Bewertung steht in den Daten.
         if result.get("safety_status") == "not_safe":
+            cat_ns = _normalize_flight_category(result.get("flight_category", ""))
+            result["flight_category"] = cat_ns or ""
+            result["flight_category_display"] = _category_display(cat_ns) if cat_ns else ""
+            result["experience_rating"] = _category_to_rating(cat_ns) if cat_ns else 0
+            result["experience_score"] = round(result["experience_rating"] * 100 / 7) if cat_ns else 0
             result["fly_status"] = ""
             result["flyability_tier"] = ""
             result["streckenflug"] = {
@@ -1976,12 +1995,6 @@ class AnalyzersMixin:
                 "summary": "", "limiting_factor": "spot_not_flyable",
                 "region_context_available": False,
             }
-            result["rating"] = _compute_rating_from_subratings(
-                result, "", "not_safe", include_altitude=True
-            )
-            result["experience_score"] = _compute_experience_score(result["rating"])
-            result["experience_stars"] = _compute_experience_stars(result["experience_score"])
-            result["experience_rating"] = _compute_experience_rating(result["experience_score"])
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
             result["safety_band"] = compute_safety_band(result)
@@ -1989,44 +2002,33 @@ class AnalyzersMixin:
             result["conditional_reason"] = ""
             return result
 
-        # Tier normalisieren
-        tier = _normalize_flyability_tier(
-            result.get("flyability_tier") or result.get("fly_status") or ""
-        )
+        # RATING_CONCEPT v1.6: KI gibt flight_category (Text), Code leitet ab.
+        cat = _normalize_flight_category(result.get("flight_category", ""))
+        if not cat:
+            # Fallback: LLM hat keine valide Kategorie geliefert. Versuche aus
+            # flyability_tier zu rekonstruieren (Legacy-Pfad), sonst gray/Abgleiter.
+            legacy_tier = _normalize_flyability_tier(
+                result.get("flyability_tier") or result.get("fly_status") or ""
+            )
+            cat = {"violet": "starker_thermikflug",
+                   "green":  "solider_thermikflug",
+                   "gray":   "abgleiter"}.get(legacy_tier, "abgleiter")
+            logger.warning(
+                f"Flyability-Spot {name}/{date_str}: kein flight_category vom LLM, "
+                f"Fallback aus tier={legacy_tier!r} → {cat!r}"
+            )
+        result["flight_category"] = cat
+        result["flight_category_display"] = _category_display(cat)
+        result["experience_rating"] = _category_to_rating(cat)
+        # Score 0-100 als skalierte Anzeige (rating 1-7 → 14, 29, 43, 57, 71, 86, 100)
+        result["experience_score"] = round(result["experience_rating"] * 100 / 7)
+        tier = _category_to_tier(cat)
         result["flyability_tier"] = tier
         result["fly_status"] = tier
 
-        # Flyability-Decisions (Decision-Engine):
-        # 1. LowReward green/violet → gray (Sub-Trigger A: keine Thermik, C: prod_h zu niedrig).
-        #    Sub-Trigger B (rough_pct>50, mech. Klapper) ist bereits in der Safety-Pipe als
-        #    decide_flyability_mech_danger ausgefuehrt (RATING_CONCEPT v1.3 Vorab-Fix #1).
-        # 2. gray → green Upgrade (Thermik trotz LLM-gray objektiv tragfaehig)
-        # 3. Region-Gate violet → green (Spot ohne Region-Konsens)
-        tq = self._ctx_tq_cache.get(f"{name}|{date_str}", {})
-        decision_label = f"{name}/{date_str}"
-        for tag in (
-            decide_flyability_low_reward(result, tq, decision_label),
-            decide_flyability_upgrade(result, tq, decision_label),
-            decide_flyability_region_gate(result, region_result, decision_label),
-        ):
-            if tag:
-                result.setdefault("_decisions_applied", []).append(tag)
-
         final_safety = result.get("safety_status", "")
 
-        # Rating + Experience-Scores (RATING_CONCEPT v1.3 Vorab-Fix #3): kosmetische
-        # Skalierung des bewaehrten 0-10 ratings auf 0-100 + 1-5-Mapping (User-Sprache:
-        # "Rating 1-5"). Spot: 5 Sub-Ratings inkl. altitude_rating.
-        result["rating"] = _compute_rating_from_subratings(
-            result, "", final_safety, include_altitude=True
-        )
-        result["experience_score"] = _compute_experience_score(result["rating"])
-        result["experience_stars"] = _compute_experience_stars(result["experience_score"])
-        result["experience_rating"] = _compute_experience_rating(result["experience_score"])
-
-        # Safety-Aggregation (Vorab-Fix #4): Weakest-Link aus 5 LLM-Sub-Ratings.
-        # Im Split-Flow liegen die Subs nur im Safety-Result — nur ueberschreiben
-        # wenn vorhanden (Combined-Flow).
+        # Safety-Aggregation (unveraendert): Weakest-Link aus 8 LLM-Safety-Subs.
         _safety_subs = ("wind_safety_rating", "gust_safety_rating",
                         "aloft_safety_rating", "foehn_safety_rating",
                         "rain_safety_rating", "thunderstorm_safety_rating",
@@ -2034,20 +2036,20 @@ class AnalyzersMixin:
         if all(result.get(f) is not None for f in _safety_subs):
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
-        # safety_band: Hybrid aus Hard-Overrides + Score
         result["safety_band"] = compute_safety_band(result)
-        # comfort_index: Texture-Wert 0-100 aus rough_pct
+        tq = self._ctx_tq_cache.get(f"{name}|{date_str}", {})
         result["comfort_index"] = compute_comfort_index(tq)
 
-        # Phase 4b (RATING_CONCEPT v1.3 §9.7 Single Source of Truth):
-        # flyability_tier wird abgeleitet aus (safety_band, experience_stars).
-        # LLM-/Decision-tier wird damit zur Compat-View, nicht mehr selbst-entschieden.
-        legacy_tier = compute_legacy_flyability_tier(result)
-        result["flyability_tier"] = legacy_tier
-        result["fly_status"] = legacy_tier
-        final_tier = legacy_tier
+        # Safety-Gate: red Band leert NUR die UI-Display-Felder
+        # (fly_status, tier). Die Flugqualitaets-Kategorie bleibt erhalten —
+        # Safety und Flyability sind getrennte Achsen (RATING_CONCEPT v1.6).
+        if (result.get("safety_band") or "").lower() == "red":
+            result["flyability_tier"] = ""
+            result["fly_status"] = ""
 
-        # Streckenflug-Konsistenz nutzt View-tier
+        final_tier = result.get("flyability_tier", "")
+
+        # Streckenflug-Konsistenz nutzt LLM-Tier
         sf = result.get("streckenflug")
         if not isinstance(sf, dict):
             sf = {
@@ -2105,12 +2107,13 @@ class AnalyzersMixin:
         ein Sub-Rating <4 vergeben. Nur Eskalation (safe→conditional→not_safe), nie
         Demote — Hard-Overrides + OverclaimRelax bleiben autoritativ.
 
-        Schreibt Telemetrie-Feld `_status_telemetry` fuer KI-Konsistenz-Forschung
-        und triggert optional `_renarrate_on_drift_if_enabled` (Feature-Flag in
-        config.RENARRATE_ON_DRIFT) fuer Prosa-Korrektur.
+        Hinweis: Drift-Telemetrie und Re-Narrate-Pfad wurden mit RATING_CONCEPT v1.5
+        entfernt — LLM-Output ist autoritativ; falls Status nachtraeglich eskaliert,
+        bleibt die Prosa wie sie ist. Inkonsistenzen werden bewusst sichtbar.
         """
         derived = derive_status_from_subs(result)
         current = result.get("safety_status")
+        _ = llm_initial_status  # Parameter bleibt fuer Aufrufer-Kompatibilitaet
 
         severity = {"safe": 0, "conditional": 1, "not_safe": 2}
         if (derived in severity and current in severity
@@ -2121,98 +2124,6 @@ class AnalyzersMixin:
             )
             result["safety_status"] = derived
             result.setdefault("_decisions_applied", []).append(f"SubRatingFloor({derived})")
-
-        final_status = result.get("safety_status")
-        drift = llm_initial_status != final_status
-        result["_status_telemetry"] = {
-            "llm_initial": llm_initial_status,
-            "derived_from_subs": derived,
-            "final": final_status,
-            "drift": drift,
-        }
-
-        if drift:
-            self._renarrate_on_drift_if_enabled(result, label, llm_initial_status, final_status)
-
-    def _renarrate_on_drift_if_enabled(self, result: dict, label: str,
-                                        old_status, new_status):
-        """Optional: Schreibt summary + recommendation neu, wenn der Status
-        durch SubRatingFloor (oder andere Decisions) eskaliert wurde.
-
-        Kosten: ein zusaetzlicher API-Call pro Drift-Fall, kleiner Prompt
-        (~400 tok in / ~200 tok out). Modell-Override moeglich via
-        config.RENARRATE_MODEL (z.B. "gpt-4o-mini" fuer billigeren Call).
-
-        No-op wenn config.RENARRATE_ON_DRIFT=False (Default — Phase 1: nur
-        Telemetrie). Aktivierbar wenn Drift-Rate stabil und Phase 2 gewollt.
-        """
-        if not getattr(config, "RENARRATE_ON_DRIFT", False):
-            return
-        if not self.analysis_client:
-            return
-
-        model = getattr(config, "RENARRATE_MODEL", None) or self.analysis_model
-
-        subs = {
-            "wind": result.get("wind_safety_rating"),
-            "gust": result.get("gust_safety_rating"),
-            "aloft": result.get("aloft_safety_rating"),
-            "foehn": result.get("foehn_safety_rating"),
-            "rain": result.get("rain_safety_rating"),
-            "thunderstorm": result.get("thunderstorm_safety_rating"),
-            "cape": result.get("cape_safety_rating"),
-            "visibility": result.get("visibility_safety_rating"),
-        }
-        old_summary = result.get("summary", "") or ""
-        old_reco = result.get("recommendation", "") or ""
-
-        # Niedrigstes Sub-Rating bestimmen — Hauptbegruendung der Korrektur.
-        valid_subs = {k: v for k, v in subs.items()
-                       if isinstance(v, (int, float)) and v >= 1}
-        min_field = min(valid_subs, key=valid_subs.get) if valid_subs else None
-        min_val = valid_subs.get(min_field) if min_field else None
-
-        sys_prompt = (
-            "Du formulierst summary und recommendation einer Paragliding-"
-            "Wetter-Analyse um, weil der Sicherheits-Status nachtraeglich "
-            "korrigiert wurde. Schreibe knapp (1-2 Saetze pro Feld), nutze "
-            "das niedrigste Sub-Rating als Hauptgrund. Antworte als JSON: "
-            '{"summary": "...", "recommendation": "..."}'
-        )
-        user_prompt = (
-            f"Tag: {label}\n"
-            f"Status NEU (autoritativ): {new_status}\n"
-            f"Status ALT (LLM-Initial): {old_status}\n"
-            f"Sub-Ratings: {subs}\n"
-            f"Niedrigstes Sub-Rating: {min_field}={min_val}\n\n"
-            f"Original-Texte (passten zum alten Status):\n"
-            f"summary: {old_summary!r}\n"
-            f"recommendation: {old_reco!r}\n\n"
-            f"Schreibe summary und recommendation neu, passend zum NEUEN Status."
-        )
-
-        try:
-            response = self.analysis_client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.2,
-                max_tokens=_resolve_max_tokens(model, 400),
-                response_format={"type": "json_object"},
-            )
-            self._record_call_usage(response, "renarrate_drift")
-            raw = response.choices[0].message.content or "{}"
-            new_text = json.loads(raw)
-            if isinstance(new_text.get("summary"), str) and new_text["summary"].strip():
-                result["summary"] = new_text["summary"].strip()
-            if isinstance(new_text.get("recommendation"), str) and new_text["recommendation"].strip():
-                result["recommendation"] = new_text["recommendation"].strip()
-            result["_renarrated"] = True
-            logger.info(f"Re-narrate drift fuer {label}: {old_status}→{new_status}, model={model}")
-        except Exception as e:
-            logger.warning(f"Re-narrate drift fuer {label} fehlgeschlagen: {e} — alte Texte bleiben.")
 
     def _post_process_safety_region(self, result: dict, region: dict, date_str: str) -> dict:
         """Safety-only Post-Processing fuer eine Region (Decision-Pipe + Foehn-Strip)."""
@@ -2271,8 +2182,11 @@ class AnalyzersMixin:
         return result
 
     def _post_process_flyability_region(self, result: dict, region: dict, date_str: str) -> dict:
-        """Flyability-only Post-Processing fuer eine Region.
-        Wendet Tier-Normalisierung, Downgrade/Upgrade und Rating-Berechnung an.
+        """Flyability-only Post-Processing fuer eine Region (RATING_CONCEPT v1.5).
+
+        LLM-natives Rating: `experience_rating` (1-10) und `flyability_tier`
+        direkt vom LLM. KEINE Aggregation, KEINE Flyability-Decisions, die das
+        Tier ueberschreiben. Nur Sanitierung, Safety-Gate, Safety-Aggregation.
         """
         rname = region["region"]
 
@@ -2280,12 +2194,14 @@ class AnalyzersMixin:
         _sanitize_llm_result(result)
 
         if result.get("safety_status") == "not_safe":
+            # Flugqualitaet bleibt aus LLM-Output erhalten (RATING_CONCEPT v1.6).
+            cat_ns = _normalize_flight_category(result.get("flight_category", ""))
+            result["flight_category"] = cat_ns or ""
+            result["flight_category_display"] = _category_display(cat_ns) if cat_ns else ""
+            result["experience_rating"] = _category_to_rating(cat_ns) if cat_ns else 0
+            result["experience_score"] = round(result["experience_rating"] * 100 / 7) if cat_ns else 0
             result["fly_status"] = ""
             result["flyability_tier"] = ""
-            result["rating"] = _compute_rating_from_subratings(result, "", "not_safe")
-            result["experience_score"] = _compute_experience_score(result["rating"])
-            result["experience_stars"] = _compute_experience_stars(result["experience_score"])
-            result["experience_rating"] = _compute_experience_rating(result["experience_score"])
             result["safety_rating"] = _compute_safety_rating(result)
             result["safety_score"] = _compute_safety_score(result["safety_rating"])
             result["safety_band"] = compute_safety_band(result)
@@ -2293,46 +2209,43 @@ class AnalyzersMixin:
             result["conditional_reason"] = ""
             return result
 
-        tier = _normalize_flyability_tier(
-            result.get("flyability_tier") or result.get("fly_status") or ""
-        )
+        # RATING_CONCEPT v1.6: KI gibt flight_category (Text), Code leitet ab.
+        cat = _normalize_flight_category(result.get("flight_category", ""))
+        if not cat:
+            legacy_tier = _normalize_flyability_tier(
+                result.get("flyability_tier") or result.get("fly_status") or ""
+            )
+            cat = {"violet": "starker_thermikflug",
+                   "green":  "solider_thermikflug",
+                   "gray":   "abgleiter"}.get(legacy_tier, "abgleiter")
+            logger.warning(
+                f"Flyability-Region {rname}/{date_str}: kein flight_category, "
+                f"Fallback aus tier={legacy_tier!r} → {cat!r}"
+            )
+        result["flight_category"] = cat
+        result["flight_category_display"] = _category_display(cat)
+        result["experience_rating"] = _category_to_rating(cat)
+        # Score 0-100 als skalierte Anzeige (rating 1-7 → 14, 29, 43, 57, 71, 86, 100)
+        result["experience_score"] = round(result["experience_rating"] * 100 / 7)
+        tier = _category_to_tier(cat)
         result["flyability_tier"] = tier
         result["fly_status"] = tier
 
-        # Flyability-Decisions (Region: kein Region-Gate, da Region selbst die Vergleichsbasis).
-        # MechDanger ist bereits in der Safety-Pipe gelaufen — hier nur LowReward + Upgrade.
-        tq = self._ctx_tq_cache.get(f"{rname}|{date_str}", {})
-        decision_label = f"{rname}/{date_str}"
-        for tag in (
-            decide_flyability_low_reward(result, tq, decision_label),
-            decide_flyability_upgrade(result, tq, decision_label),
-        ):
-            if tag:
-                result.setdefault("_decisions_applied", []).append(tag)
-
         final_safety = result.get("safety_status", "")
+        tq = self._ctx_tq_cache.get(f"{rname}|{date_str}", {})
 
-        # Rating + Experience-Scores (Vorab-Fix #3 / v1.4: Rating 1-10 als Primaeranzeige)
-        result["rating"] = _compute_rating_from_subratings(result, "", final_safety)
-        result["experience_score"] = _compute_experience_score(result["rating"])
-        result["experience_stars"] = _compute_experience_stars(result["experience_score"])
-        result["experience_rating"] = _compute_experience_rating(result["experience_score"])
-
-        # Safety-Aggregation: Weakest-Link ueber 5 Subs.
-        # _compute_safety_rating toleriert fehlende/0-Subs intern via _maybe()
-        # (nimmt min der vorhandenen, default 5.0 falls keiner). Regionen haben
-        # z.B. keine Gust-Daten — gust_safety_rating=None ist Regelfall, kein
-        # Fehler. Vorheriger all()-Guard liess in solchen Faellen safety_score
-        # ungesetzt, sodass compute_safety_band auf 0 → amber zurueckfiel.
+        # Safety-Aggregation (unveraendert): Weakest-Link ueber Subs.
         result["safety_rating"] = _compute_safety_rating(result)
         result["safety_score"] = _compute_safety_score(result["safety_rating"])
         result["safety_band"] = compute_safety_band(result)
         result["comfort_index"] = compute_comfort_index(tq)
 
-        # Phase 4b: flyability_tier abgeleitet aus 2-Achsen-Werten (§9.7)
-        legacy_tier = compute_legacy_flyability_tier(result)
-        result["flyability_tier"] = legacy_tier
-        result["fly_status"] = legacy_tier
+        # Safety-Gate: red Band ueberschreibt LLM-Tier.
+        if (result.get("safety_band") or "").lower() == "red":
+            result["flyability_tier"] = ""
+            result["fly_status"] = ""
+            result["experience_rating"] = 0
+            result["experience_score"] = 0
 
         is_cond = bool(result.get("is_conditional", False))
         if final_safety == "not_safe":

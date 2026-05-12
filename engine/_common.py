@@ -494,43 +494,89 @@ def _normalize_flyability_tier(raw: str | None) -> str:
     return legacy.get(r, "")
 
 
-def _compute_rating_from_subratings(
-    result: dict,
-    tier: str,
-    safety_status: str = "",
-    *,
-    include_altitude: bool = True,
-) -> float:
-    """Berechnet das Gesamtrating deterministisch aus LLM-Sub-Ratings.
+# ============================================================================
+# FLIGHT-CATEGORIES (RATING_CONCEPT v1.6 — kategoriales Rating)
+# ============================================================================
+# Die KI vergibt eine Kategorie (Text), Code leitet Rating + Tier ab.
+# Keine Matrix-Berechnung mehr, keine 1-10-Skala fuer das LLM.
+_FLIGHT_CATEGORIES = {
+    # key:                    (display_de,             rating_1_7, tier)
+    # RATING_CONCEPT v1.6: 7 Kategorien → fortlaufende Skala 1-7 (aufeinanderfolgend),
+    # damit jede Kategorie genau einen Rating-Step bekommt und das UI eine
+    # gleichmaessige Stufung zeigt.
+    "abgleiter":              ("Abgleiter",              1,  "gray"),
+    "soaring":                ("Soaring",                2,  "gray"),
+    "kurzer_thermikflug":     ("Kurzer Thermikflug",     3,  "green"),
+    "solider_thermikflug":    ("Solider Thermikflug",    4,  "green"),
+    "starker_thermikflug":    ("Starker Thermikflug",    5,  "green"),
+    "xc_tag":                 ("XC-Tag",                 6,  "violet"),
+    "klassiker":              ("Klassiker",              7,  "violet"),
+}
 
-    Gewichteter Durchschnitt: thermal (50%) > altitude (30%) > xc (20%).
-    Fehlt altitude_rating (alte Cache-Daten): thermal 70%, xc 30%.
-    Window und Wind sind via Safety-Band abgedeckt, fliessen nicht ein.
-    Gilt fuer Spots und Regionen. `tier`/`include_altitude` werden ignoriert.
+_FLIGHT_CATEGORY_ALIASES = {
+    # alte/abweichende Schreibweisen → kanonischer Key
+    "abgleiter": "abgleiter",
+    "sled":      "abgleiter",
+    "soaring":   "soaring",
+    "hangsoaring": "soaring",
+    "kurzer thermikflug": "kurzer_thermikflug",
+    "kurz":      "kurzer_thermikflug",
+    "kurzer":    "kurzer_thermikflug",
+    "solider thermikflug": "solider_thermikflug",
+    "solid":     "solider_thermikflug",
+    "solider":   "solider_thermikflug",
+    "starker thermikflug": "starker_thermikflug",
+    "stark":     "starker_thermikflug",
+    "starker":   "starker_thermikflug",
+    "xc-tag":    "xc_tag",
+    "xc tag":    "xc_tag",
+    "xc":        "xc_tag",
+    "klassiker": "klassiker",
+    "classic":   "klassiker",
+}
+
+
+def _normalize_flight_category(raw) -> str:
+    """Validiert + normalisiert eine LLM-Kategorie auf die kanonische Form.
+    Akzeptiert Aliase und einfache Varianten (Underscore/Bindestrich/Leerzeichen).
+    Leerstring wenn nicht zuordenbar.
     """
-    def _clamp(v, lo, hi):
-        try:
-            v = float(v)
-        except (TypeError, ValueError):
-            v = 5.0
-        return max(lo, min(hi, v))
+    if not raw:
+        return ""
+    r = str(raw).strip().lower()
+    # normalisiere Trenner zu Underscore fuer direkte Map-Lookup
+    r_canon = r.replace("-", "_").replace(" ", "_")
+    if r_canon in _FLIGHT_CATEGORIES:
+        return r_canon
+    if r in _FLIGHT_CATEGORY_ALIASES:
+        return _FLIGHT_CATEGORY_ALIASES[r]
+    if r_canon in _FLIGHT_CATEGORY_ALIASES:
+        return _FLIGHT_CATEGORY_ALIASES[r_canon]
+    return ""
 
-    if safety_status == "not_safe":
-        return 0.0
 
-    thermal  = _clamp(result.get("thermal_rating", 5), 1, 10)
-    xc       = _clamp(result.get("xc_rating", 5), 1, 10)
+def _category_to_rating(category: str) -> int:
+    """Kategorie → experience_rating 1-10. Unbekannt → 0."""
+    cat = _normalize_flight_category(category)
+    if not cat:
+        return 0
+    return _FLIGHT_CATEGORIES[cat][1]
 
-    altitude_raw = result.get("altitude_rating")
-    if altitude_raw is None:
-        # Altitude nicht gesetzt: thermal 70%, xc 30%
-        raw = 0.7 * thermal + 0.3 * xc
-    else:
-        altitude = _clamp(altitude_raw, 1, 10)
-        # thermal 50%, altitude 30%, xc 20%
-        raw = 0.5 * thermal + 0.3 * altitude + 0.2 * xc
 
-    return round(raw, 1)
+def _category_to_tier(category: str) -> str:
+    """Kategorie → flyability_tier (gray/green/violet). Unbekannt → ''."""
+    cat = _normalize_flight_category(category)
+    if not cat:
+        return ""
+    return _FLIGHT_CATEGORIES[cat][2]
+
+
+def _category_display(category: str) -> str:
+    """Kategorie → deutscher Anzeige-Text (UI). Unbekannt → ''."""
+    cat = _normalize_flight_category(category)
+    if not cat:
+        return ""
+    return _FLIGHT_CATEGORIES[cat][0]
 
 
 def _compute_safety_rating(result: dict) -> float:
@@ -652,76 +698,6 @@ def derive_status_from_subs(result: dict):
     if m <= 3:
         return "conditional"
     return "safe"
-
-
-def _compute_experience_score(rating_0_10) -> int:
-    """Skaliert das bestehende 0-10 `rating` auf 0-100 `experience_score`.
-
-    RATING_CONCEPT v1.3 §3.2: keine neue Formel, nur kosmetische Skalierung
-    des bewaehrten 4-Sub-Rating-Gesamtwertes auf einen breiteren Wertebereich.
-    Bei not_safe wird `rating` bereits auf 0.0 geclampt — `experience_score`
-    landet dann ebenfalls auf 0.
-
-    Akzeptiert None und invalide Werte robust → liefert 0.
-    """
-    try:
-        r = float(rating_0_10)
-    except (TypeError, ValueError):
-        return 0
-    return max(0, min(100, round(r * 10)))
-
-
-def _compute_experience_stars(score: int) -> int:
-    """Mappt `experience_score` (0-100) auf `experience_stars` (0-5).
-
-    DEPRECATED v1.4 — fuer Karten-Glyph + UI wird `experience_rating` (0-10)
-    verwendet, das mehr Granularitaet bietet. Diese Funktion bleibt als
-    Backwards-Compat fuer alte Caches und das Briefing-Bubble-Layout.
-
-    Schwellen (untere Stufe gewinnt am Grenzwert):
-       0–20  = 0★, 21–40 = 1★, 41–60 = 2★, 61–75 = 3★, 76–89 = 4★, 90–100 = 5★
-    """
-    try:
-        s = int(score)
-    except (TypeError, ValueError):
-        return 0
-    if s <= 20:
-        return 0
-    if s <= 40:
-        return 1
-    if s <= 60:
-        return 2
-    if s <= 75:
-        return 3
-    if s <= 89:
-        return 4
-    return 5
-
-
-def _compute_experience_rating(score) -> int:
-    """Mappt `experience_score` (0-100) auf `experience_rating` (0-10) —
-    die neue Primaer-Anzeige (RATING_CONCEPT v1.4).
-
-    0  = not_safe / kein Flug (score == 0)
-    1  = score 1-10
-    ...
-    10 = score 91-100, Klassiker-Tag
-
-    Pro 10 Score-Punkte ein Rating-Schritt, untere Stufe gewinnt am Grenzwert
-    (konservativ — wer 70 erreicht ist eine 7, nicht 8). Zwischenwerte:
-       1: 1-10, 2: 11-20, 3: 21-30, 4: 31-40, 5: 41-50,
-       6: 51-60, 7: 61-70, 8: 71-80, 9: 81-90, 10: 91-100.
-    """
-    try:
-        s = int(score)
-    except (TypeError, ValueError):
-        return 0
-    if s <= 0:
-        return 0
-    if s >= 100:
-        return 10
-    # Konservativ aufrunden auf 1-10: 1-10→1, 11-20→2 ... 91-99→10.
-    return max(1, min(10, (s + 9) // 10))
 
 
 # ============================================================================

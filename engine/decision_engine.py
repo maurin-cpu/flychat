@@ -470,50 +470,6 @@ def compute_comfort_index(tq: dict) -> int:
     return max(0, min(100, round(base)))
 
 
-def compute_legacy_flyability_tier(result: dict) -> str:
-    """Compat-View: leitet `flyability_tier` (gray/green/violet/'') aus den
-    2-Achsen-Werten `safety_band` + `experience_rating` ab.
-
-    RATING_CONCEPT v1.4 — Regel auf 1-10-Skala:
-      - safety_band == 'red'                                        → ''       (keine Empfehlung)
-      - rating >= VIOLET_RATING_MIN AND safety_band == 'green'      → 'violet' (Ausnahmetag, legendaer)
-      - rating >= 4                                                 → 'green'  (fliegbar)
-      - sonst                                                       → 'gray'   (Abgleiter / mau)
-
-    Mapping zur alten Sterne-Schwelle (stars*2 ≈ rating):
-      - stars 4.5-5 (= rating 9-10) → violet bei green-band (VIOLET_RATING_MIN=9)
-      - stars 2-4   (= rating 4-8)  → green
-      - stars 0-1   (= rating 0-2)  → gray
-
-    Fallback auf `experience_stars` wenn `experience_rating` nicht im Cache
-    (alte Daten vor v1.4 Migration).
-    """
-    safety_band = (result.get("safety_band") or "").lower()
-
-    rating = result.get("experience_rating")
-    if rating is None:
-        # Legacy-Cache: aus stars rekonstruieren (stars*2 ≈ rating).
-        stars = result.get("experience_stars", 0) or 0
-        try:
-            stars = int(stars)
-        except (TypeError, ValueError):
-            stars = 0
-        rating = stars * 2
-    else:
-        try:
-            rating = int(rating)
-        except (TypeError, ValueError):
-            rating = 0
-
-    if safety_band == "red":
-        return ""
-    if rating >= config.VIOLET_RATING_MIN and safety_band == "green":
-        return "violet"
-    if rating >= 4:
-        return "green"
-    return "gray"
-
-
 # ════════════════════════════════════════════════════════════════════
 # REGION — Safety-Decisions
 # ════════════════════════════════════════════════════════════════════
@@ -548,51 +504,15 @@ def decide_wind_strong_majority(result: dict, label: str) -> Optional[str]:
 
 
 # ════════════════════════════════════════════════════════════════════
-# FLYABILITY — Tier-Decisions
+# FLYABILITY — Safety-Decision (Mech-Danger)
 # ════════════════════════════════════════════════════════════════════
-
-def decide_flyability_low_reward(result: dict, tq: dict, label: str) -> Optional[str]:
-    """Spot/Region: tier green/violet → gray, wenn Thermik objektiv schwach
-    (= reine Erlebnis-/Reward-Frage, KEINE Sicherheits-Implikation).
-
-    Sub-Trigger (RATING_CONCEPT v1.3 §9.4 Bruch 1, Aufgespalten von alter
-    `decide_flyability_downgrade`):
-      A) keine Thermik: peak < 0.3 oder thermal_hours_total == 0
-      C) zu wenig produktiv: prod_h < PRODUCTIVE_HOURS_DOWNGRADE (NUR wenn rough_pct ≤ 50)
-
-    Sub-Trigger B (rough_pct > 50, mech. Klapper) ist NICHT hier — siehe
-    `decide_flyability_mech_danger`. Dadurch: low_reward fasst NIE
-    `safety_status` an.
-    """
-    if not tq:
-        return None
-    tier = result.get("flyability_tier") or result.get("fly_status") or ""
-    if tier not in ("green", "violet"):
-        return None
-
-    tht = tq.get("thermal_hours_total", 0)
-    rough_h = tq.get("rough_danger_h", 0)
-    peak = tq.get("peak_climb_proxy", 0)
-    prod_h = tq.get("productive_thermal_h", 0)
-    rough_pct = (rough_h / max(1, tht)) * 100 if tht else 0
-
-    reason_tag = ""
-    reason_text = ""
-    if tht == 0 or peak < 0.3:
-        reason_tag = "no_thermals"
-        reason_text = f"keine Thermik (peak={peak:.1f}, hours={tht})"
-    elif rough_pct <= 50 and prod_h < config.PRODUCTIVE_HOURS_DOWNGRADE:
-        reason_tag = "low_productive"
-        reason_text = f"Nur {prod_h}h produktive Thermik (min {config.PRODUCTIVE_HOURS_DOWNGRADE}h)"
-
-    if not reason_tag:
-        return None
-
-    logger.info(f"Decision FlyabilityLowReward fuer {label}: {tier}→gray ({reason_text})")
-    # Phase 4b (§9.7): Tier wird am Ende der Pipeline durch
-    # compute_legacy_flyability_tier abgeleitet — diese Funktion signalisiert
-    # via Tag, schreibt aber tier nicht mehr selbst.
-    return f"FlyabilityLowReward({tier}→gray, {reason_tag})"
+# Hinweis (RATING_CONCEPT v1.5): Flyability-Tier wird vom LLM direkt gesetzt.
+# Es gibt keine `decide_flyability_low_reward`, `decide_flyability_upgrade`
+# oder `decide_flyability_region_gate` mehr. Reine Reward-Korrekturen wurden
+# entfernt — der LLM-Output ist autoritativ. Inkonsistenzen (z.B. peak 0.1 m/s
+# bei rating 7) werden bewusst sichtbar, statt sie via Code zu kaschieren.
+# `decide_flyability_mech_danger` bleibt, weil mech. Klappern eine SAFETY-
+# Eskalation ist (safe→conditional), nicht reine Tier-Korrektur.
 
 
 def decide_flyability_mech_danger(result: dict, tq: dict, label: str) -> Optional[str]:
@@ -627,12 +547,6 @@ def decide_flyability_mech_danger(result: dict, tq: dict, label: str) -> Optiona
         f"ROUGH-UNUSABLE={rough_pct:.0f}% ({rough_h}/{tht}h)"
     )
 
-    # Phase 4b (§9.7): Tier wird am Ende der Pipeline durch
-    # compute_legacy_flyability_tier abgeleitet. Diese Funktion eskaliert nur
-    # noch safety_status + caution_note — die Tier-Auswirkung ergibt sich
-    # automatisch (mech_danger setzt safety_band auf amber via conditional →
-    # View-Tier wird gray bei niedrigen experience_stars).
-
     # Safety-Eskalation: nur safe → conditional (kein Demote von not_safe)
     if result.get("safety_status") == "safe":
         result["safety_status"] = "conditional"
@@ -646,85 +560,6 @@ def decide_flyability_mech_danger(result: dict, tq: dict, label: str) -> Optiona
     result["caution_notes"] = cn
 
     return f"FlyabilityMechDanger({rough_pct:.0f}%)"
-
-
-def decide_flyability_upgrade(result: dict, tq: dict, label: str) -> Optional[str]:
-    """Spot/Region: tier gray → green Upgrade, wenn Thermik trotz LLM-gray
-    objektiv ausreichend ist.
-
-    Trigger: productive_thermal_h ≥ PRODUCTIVE_HOURS_FOR_GREEN UND rough_pct < 50.
-    Schreibt zusaetzlich peak_climb_rate, flight_type, recommendation neu.
-    """
-    if not tq:
-        return None
-    final_tier = result.get("fly_status") or result.get("flyability_tier") or ""
-    if final_tier != "gray":
-        return None
-
-    tht = tq.get("thermal_hours_total", 0)
-    if tht <= 0:
-        return None
-    rough_h = tq.get("rough_danger_h", 0)
-    peak = tq.get("peak_climb_proxy", 0)
-    prod_h = tq.get("productive_thermal_h", 0)
-    rough_pct = (rough_h / max(1, tht)) * 100
-
-    if not (prod_h >= config.PRODUCTIVE_HOURS_FOR_GREEN and rough_pct < 50):
-        return None
-
-    logger.info(
-        f"Decision FlyabilityUpgrade fuer {label}: gray→green "
-        f"(peak={peak:.1f}, ROUGH={rough_pct:.0f}%, productive_h={prod_h})"
-    )
-    # Phase 4b (§9.7): Tier-Schreibe entfernt — View leitet aus
-    # (safety_band, experience_stars) ab. Diese Funktion korrigiert nur noch
-    # die Text-Felder (peak_climb_rate, flight_type, recommendation), wenn das
-    # LLM trotz objektiv guter Cache-Daten gray + niedrige Texte gesetzt hat.
-    result["peak_climb_rate"] = round(peak, 1)
-    if peak >= 1.5:
-        result["flight_type"] = "Thermikflug"
-        result["flight_duration_estimate"] = f"2-3h Thermikflug (Peak {peak:.1f} m/s)"
-    else:
-        result["flight_type"] = "Soaring+Thermik"
-        result["flight_duration_estimate"] = "1-2h Soaring/Thermik"
-    if prod_h >= 5:
-        result["xc_potential"] = "moderate"
-    result["recommendation"] = (
-        f"Peak-Steigen {peak:.1f} m/s, {prod_h}h produktive Thermik — "
-        f"gute Bedingungen fuer Thermikfluege."
-    )
-    return f"FlyabilityUpgrade(gray→green,peak={peak:.1f})"
-
-
-def decide_flyability_region_gate(result: dict, region_result: dict, label: str) -> Optional[str]:
-    """Spot: tier violet darf nur stehen, wenn die Region auch violet ist.
-
-    Spot ohne starken Region-Konsens → violet→green.
-    """
-    if not region_result:
-        return None
-    current_tier = result.get("flyability_tier") or result.get("fly_status") or ""
-    if current_tier != "violet":
-        return None
-
-    region_tier_raw = region_result.get("flyability_tier") or region_result.get("fly_status") or ""
-    from engine._common import _normalize_flyability_tier
-    region_tier = _normalize_flyability_tier(region_tier_raw)
-    if not region_tier or region_tier == "violet":
-        return None
-
-    rname = region_result.get("region", "")
-    logger.info(
-        f"Decision FlyabilityRegionGate fuer {label}: violet→green "
-        f"(Region '{rname}' tier={region_tier}, nicht violet)"
-    )
-    # Phase 4b (§9.7): Tier-Schreibe entfernt — Funktion signalisiert nur noch
-    # Region-Konsens-Bruch im _decisions_applied-Tracking. Tier wird ohnehin
-    # aus (safety_band, experience_stars) abgeleitet. Wenn der Spot trotz
-    # Region-Schwaeche objektiv 4-5 Sterne hat, bleibt er violet — Region-Gate
-    # ist nach 2-Achsen-Architektur konzeptionell obsolet, das Tag dient
-    # nur der Telemetrie.
-    return f"FlyabilityRegionGate(violet→green)"
 
 
 # ════════════════════════════════════════════════════════════════════
