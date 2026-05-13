@@ -172,6 +172,67 @@ def _get_terrain_param(key: str, terrain_zone: str, default=None):
     return default
 
 
+# ─── Mindest-Banddicke fuer produktive Stunde ───
+#
+# Physik-Heuristik aus meteo_research/band_depth_calibration.md:
+# Eine Stunde gilt als "produktiv", wenn das Band 3 zentrierbare Kurbeln
+# mit Netto-Hoehengewinn erlaubt.
+#
+# Herleitung (Paragliding, EN-B Schirm):
+#   sink_PG          = 1.0 m/s          (Trim-Sinken Standard-Schirm)
+#   profile_factor   = 0.75             (Avg ueber mittlere Haelfte parabolisches Profil)
+#   turn_seconds     = 7 s/360°         (25 m Radius, 45° Schraege)
+#   turns_needed     = 3                (Mindest-Kurbel-Anzahl fuer "fliegbar")
+#   centering_tol    = 50 m             (Bart-Wandern + Anflug-Fehler, je Seite)
+#   safety_factor    = 1.4              (Turbulenz-Scallop, Anflug-Verlust, Eintritts-Marge)
+#
+# Bedingung: 3 Kurbeln × 7 s × (0.75 × peak − sink_PG)  ≤  0.5 × band − 2 × 50 m
+#   → band_depth ≥ 42 × (0.75 × peak − 1.0) + 200   = 31.5 × peak + 158
+#   → mit Safety:  base = (31.5 × peak + 158) × 1.4
+#
+# Terrain-Faktor: im Gebirge stuetzt der Hang die Thermik, kleinere Baeren reichen.
+# Im Flachland fehlt diese Stuetze. Werte aus Praxis (Martens, Pagen).
+#
+# Quellen: meteo_research/band_depth_calibration.md
+#          Martens "Thermal Flying" Kap. 7; Pagen "Understanding the Sky".
+
+_BAND_DEPTH_TERRAIN_FACTOR = {
+    "mittelland": 1.00,
+    "jura":       0.90,
+    "voralpen":   0.80,
+    "alpen":      0.65,
+    "hochalpin":  0.50,
+}
+
+# Untergrenze fuer Netto-Steigen: avg_climb (= 0.75 × peak) muss > sink_PG (1.0 m/s)
+# sein, damit der Schirm ueberhaupt steigt. Unter dieser Schwelle ist Band-Dicke egal.
+_NET_CLIMB_THRESHOLD = 1.0 / 0.75  # ≈ 1.33 m/s
+
+
+def min_band_depth(climb_peak_ms: float, terrain_zone: str) -> float:
+    """
+    Mindest-Banddicke (m) fuer eine produktive Thermik-Stunde.
+
+    Climb-abhaengig und terrain-differenziert. Ersetzt die alte fixe Konstante
+    PRODUCTIVE_BAND_DEPTH_MIN = 400, die physikalisch unfundiert war.
+
+    Args:
+        climb_peak_ms: Climb-Peak der Stunde (m/s).
+        terrain_zone: Eine der 5 Zonen aus get_terrain_zone().
+
+    Returns:
+        Mindest-Banddicke in m. Inf wenn climb zu schwach fuer Netto-Steigen.
+    """
+    if not isinstance(climb_peak_ms, (int, float)) or climb_peak_ms < _NET_CLIMB_THRESHOLD:
+        return float("inf")  # kein Netto-Steigen → keine Banddicke rettet die Stunde
+
+    physics = 31.5 * climb_peak_ms + 158.0
+    safety = 1.4
+    base = physics * safety
+    terrain_factor = _BAND_DEPTH_TERRAIN_FACTOR.get(terrain_zone, 1.0)
+    return base * terrain_factor
+
+
 def _compute_free_atm_gamma(profile: List[Dict], blh_msl: float, elevation_m: float) -> float:
     """
     Berechnet den potentiellen Temperatur-Gradienten (γ_θ) der freien Atmosphaere

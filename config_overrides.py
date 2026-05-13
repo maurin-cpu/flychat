@@ -85,8 +85,6 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
              "help": "Mindest-Anzahl produktive Stunden fuer gray->green Upgrade (Flyability-Tier)."},
             {"key": "PRODUCTIVE_HOURS_DOWNGRADE", "type": "int", "min": 0, "max": 12, "unit": "h",
              "help": "Unter dieser Anzahl produktiver Stunden wird green/violet -> gray herabgestuft."},
-            {"key": "PRODUCTIVE_BAND_DEPTH_MIN", "type": "int", "min": 0, "max": 2000, "unit": "m",
-             "help": "Mindest-Banddicke (thermal_top - elevation). Unter dieser Tiefe kein nutzbares Hoehenband."},
         ],
         "Violett-Kriterien (XC-Tag)": [
             {"key": "VIOLET_PEAK_MIN", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1, "unit": "m/s",

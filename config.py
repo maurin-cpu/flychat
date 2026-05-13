@@ -539,10 +539,10 @@ VIOLET_UNUSABLE_MAX = 30        # % — Max Gesamt-UNUSABLE-Anteil
 VIOLET_CLOUD_LOW_MAX = 50       # % — Max Ø tiefe Wolken ueber Thermikstunden
 VIOLET_CLOUD_MID_MAX = 50       # % — Max Ø mittlere Wolken ueber Thermikstunden
 VIOLET_RATING_MIN = 9           # Mindest-Rating (0-10) fuer violet — nur Ausnahmetage
-PRODUCTIVE_BAND_DEPTH_MIN = 400 # m — Mindest-Banddicke (thermal_top - elevation). Unter dieser Tiefe
-                                # zaehlt die Stunde NICHT als produktiv, weil kein nutzbares
-                                # Hoehenband zum Kurbeln vorhanden ist (flache Inversions-/
-                                # Mittellandtage, Thermik-Deckel zu nah am Start).
+# PRODUCTIVE_BAND_DEPTH_MIN entfernt (war 400 m, physikalisch unfundiert).
+# Ersetzt durch thermik_calculator.min_band_depth(climb_peak, terrain_zone):
+# climb-abhaengig (3 Kurbeln × 7 s × Netto-Steigen) und terrain-differenziert.
+# Siehe meteo_research/band_depth_calibration.md.
 
 # ─── Wind-Schwellen (Boden + Hoehe einheitlich, Spot + Region) ───
 # Konservative Auslegung: Ab WIND_DANGER_KMH ist die Stunde gefaehrlich,

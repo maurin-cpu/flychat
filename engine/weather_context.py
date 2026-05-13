@@ -28,7 +28,7 @@ from foehn_indicators import (
     fetch_foehn_data, evaluate_foehn, build_foehn_llm_context,
 )
 from thermik_calculator import (
-    get_terrain_zone, compute_daily_thermals,
+    get_terrain_zone, compute_daily_thermals, min_band_depth,
 )
 from gust_calculator import (
     estimate_altitude_gusts, collect_gust_anchors,
@@ -1405,6 +1405,7 @@ class WeatherContextMixin:
         # Region-ID für Terrain-Klassifikation (einmal pro Spot)
         spot_region = find_region_for_point(spot["latitude"], spot["longitude"])
         spot_region_id = spot_region["id"] if spot_region else None
+        spot_terrain_zone = get_terrain_zone(elevation_m, spot_region_id)
 
         # Stateful Thermik-Berechnung über alle Stunden (Single Source of Truth:
         # gleiche climb_rate / max_height wie im Meteogramm). Thermal Inertia,
@@ -1789,10 +1790,12 @@ class WeatherContextMixin:
                 # Wirkung auf Thermik). low=direkte Abschattung, mid=indirekt ueber Einstrahlung.
                 cloud_ok = (low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX
                             and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX)
-                # Band-Tiefe: Thermik-Top muss mindestens PRODUCTIVE_BAND_DEPTH_MIN
-                # ueber Startplatz liegen, sonst kein nutzbares Kurbelband.
+                # Band-Tiefe: Mindest-Banddicke aus Physik-Heuristik (3 zentrierbare
+                # Kurbeln mit Netto-Steigen), climb-abhaengig und terrain-differenziert.
+                # Siehe thermik_calculator.min_band_depth + meteo_research/band_depth_calibration.md.
                 band_depth = (h_max_h - elevation_m) if isinstance(h_max_h, (int, float)) else 0
-                band_usable = band_depth >= config.PRODUCTIVE_BAND_DEPTH_MIN
+                _min_band = min_band_depth(h_climb, spot_terrain_zone)
+                band_usable = band_depth >= _min_band
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
                         and cloud_ok
                         and not rough_unusable_this_hour
@@ -1884,6 +1887,7 @@ class WeatherContextMixin:
             degraded_hits = [t for t in tq_tags_this_hour_fly if t.endswith("-DEGRADED]")]
             has_thermal = isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB
             cloud_ok_tl = low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX
+            _min_band_tl = min_band_depth(h_climb, spot_terrain_zone)
             is_productive = (
                 has_thermal
                 and h_climb >= config.PRODUCTIVE_CLIMB_MIN
@@ -1891,7 +1895,7 @@ class WeatherContextMixin:
                 and "[THERMAL-ROUGH-UNUSABLE]" not in unusable_hits
                 and "[THERMAL-WIND-UNUSABLE]" not in unusable_hits
                 and isinstance(h_max_h, (int, float))
-                and (h_max_h - elevation_m) >= config.PRODUCTIVE_BAND_DEPTH_MIN
+                and (h_max_h - elevation_m) >= _min_band_tl
             )
             if not has_thermal:
                 f_klass = "keine-thermik"
@@ -1911,7 +1915,7 @@ class WeatherContextMixin:
             else:
                 # Thermik vorhanden aber nicht produktiv (z.B. Band zu duenn, Wolken, schwacher Climb)
                 reason = []
-                if isinstance(h_max_h, (int, float)) and (h_max_h - elevation_m) < config.PRODUCTIVE_BAND_DEPTH_MIN:
+                if isinstance(h_max_h, (int, float)) and (h_max_h - elevation_m) < _min_band_tl:
                     reason.append("band-flach")
                 if not cloud_ok_tl:
                     reason.append("wolken")
@@ -2559,6 +2563,7 @@ class WeatherContextMixin:
         rid = region["id"]
         rname = region["region"]
         elev_ref = region.get("elevation_ref", 1200)
+        region_terrain_zone = get_terrain_zone(elev_ref, rid)
 
         region_data = self.region_weather_data.get(rid)
         if not region_data:
@@ -2926,7 +2931,8 @@ class WeatherContextMixin:
                 cloud_ok = (low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX
                             and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX)
                 band_depth_r = (h_max_h - elev_ref) if isinstance(h_max_h, (int, float)) else 0
-                band_usable_r = band_depth_r >= config.PRODUCTIVE_BAND_DEPTH_MIN
+                _min_band_r = min_band_depth(h_climb, region_terrain_zone)
+                band_usable_r = band_depth_r >= _min_band_r
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
                         and cloud_ok
                         and not rough_unusable_this_hour
@@ -3003,6 +3009,7 @@ class WeatherContextMixin:
             degraded_r = [t for t in tq_tags_r if t.endswith("-DEGRADED]")]
             has_thermal_r = isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB
             cloud_ok_r = low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX
+            _min_band_r_tl = min_band_depth(h_climb, region_terrain_zone)
             is_productive_r = (
                 has_thermal_r
                 and h_climb >= config.PRODUCTIVE_CLIMB_MIN
@@ -3010,7 +3017,7 @@ class WeatherContextMixin:
                 and "[THERMAL-ROUGH-UNUSABLE]" not in unusable_r
                 and "[THERMAL-WIND-UNUSABLE]" not in unusable_r
                 and isinstance(h_max_h, (int, float))
-                and (h_max_h - elev_ref) >= config.PRODUCTIVE_BAND_DEPTH_MIN
+                and (h_max_h - elev_ref) >= _min_band_r_tl
             )
             if not has_thermal_r:
                 f_klass_r = "keine-thermik"
@@ -3029,7 +3036,7 @@ class WeatherContextMixin:
                 f_label_r = "degraded(" + "+".join(parts_r) + ")"
             else:
                 reason_r = []
-                if isinstance(h_max_h, (int, float)) and (h_max_h - elev_ref) < config.PRODUCTIVE_BAND_DEPTH_MIN:
+                if isinstance(h_max_h, (int, float)) and (h_max_h - elev_ref) < _min_band_r_tl:
                     reason_r.append("band-flach")
                 if not cloud_ok_r:
                     reason_r.append("wolken")
