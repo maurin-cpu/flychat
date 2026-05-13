@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gleitcast{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
     {% block meta %}
     <meta property="og:site_name" content="Gleitcast">
     <meta property="og:type" content="website">
@@ -240,6 +241,7 @@
     (function() {
         var FORECAST_DAYS = {{ forecast_days|default(5) }};
         window.SHOW_REFERENCE_POINTS = {{ show_reference_points|default(false)|tojson }};
+        window.gleitcastIsAdmin = {{ admin_debug_active|default(false)|tojson }};
         var now = new Date();
         var dates = [];
         for (var i = 0; i < FORECAST_DAYS; i++) {

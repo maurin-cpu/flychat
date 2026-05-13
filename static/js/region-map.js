@@ -638,7 +638,7 @@
         var analysisContainer = document.createElement('div');
         bodyEl.appendChild(analysisContainer);
         if (window.AnalysisView && window.AnalysisView.render) {
-            window.AnalysisView.render(analysisContainer, data, { dateStr: dateStr, isRegion: true });
+            window.AnalysisView.render(analysisContainer, data, { dateStr: dateStr, isRegion: true, regionId: rid });
         }
         // Top-Spots wandern aus dem Aside in den eigenen Strip unterhalb des
         // Meteogramms (siehe renderSpotStrip / region-spot-strip).

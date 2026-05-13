@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · Few-Shot-Pool – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ static_v('css/style.css') }}">
+<style>
+  .lx-section { margin-top: var(--space-6); }
+  .lx-section h2 {
+    font-size: var(--text-lg); margin: 0 0 var(--space-2);
+    border-left: 3px solid var(--color-primary); padding-left: 10px;
+  }
+  .lx-section__hint {
+    font-size: var(--text-sm); color: var(--color-text-muted);
+    margin: 0 0 var(--space-3);
+  }
+  .lx-filters {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin: var(--space-3) 0;
+    padding: 12px; background: #f8fafc; border-radius: var(--radius-md);
+    align-items: center;
+  }
+  .lx-filters label { font-size: 12px; font-weight: 600; color: var(--color-text-muted); }
+  .lx-filters select, .lx-filters input {
+    padding: 6px 10px; border-radius: var(--radius-md);
+    border: 1px solid var(--color-border); font-size: 13px;
+  }
+  .lx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lx-table th, .lx-table td {
+    padding: 8px 10px; text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .lx-table th {
+    background: #f1f5f9; font-weight: 600; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+  }
+  .lx-table tr:hover { background: #f8fafc; }
+  .lx-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+  }
+  .lx-pill--richtig { background: #e6f5ec; color: #1a7a3e; }
+  .lx-pill--zu_optimistisch { background: #fef3c7; color: #92400e; }
+  .lx-pill--zu_pessimistisch { background: #dbeafe; color: #1e40af; }
+  .lx-pill--tier-mittelland { background: #ecfccb; color: #4d7c0f; }
+  .lx-pill--tier-jura { background: #fef3c7; color: #92400e; }
+  .lx-pill--tier-voralpen { background: #dbeafe; color: #1e40af; }
+  .lx-pill--tier-alpen { background: #ede9fe; color: #6d28d9; }
+  .lx-pill--tier-hochalpin { background: #fce7f3; color: #be185d; }
+  .lx-decisions { font-size: 11px; color: var(--color-text-muted); }
+  .lx-decisions code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; margin-right: 2px; }
+  .lx-actions { display: flex; gap: 4px; }
+  .lx-actions button {
+    padding: 4px 10px; font-size: 12px; border-radius: 4px;
+    border: 1px solid var(--color-border); background: #fff;
+    cursor: pointer; color: var(--color-text);
+  }
+  .lx-actions button:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+  .lx-actions button.is-danger:hover { background: #dc2626; border-color: #dc2626; }
+  .lx-empty {
+    padding: 32px; text-align: center;
+    color: var(--color-text-muted);
+    border: 1px dashed var(--color-border); border-radius: var(--radius-md);
+  }
+  /* Modal */
+  .lx-modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.4); z-index: 1000;
+    align-items: flex-start; justify-content: center;
+    overflow-y: auto;
+    padding: 40px 20px;
+  }
+  .lx-modal-backdrop.is-open { display: flex; }
+  .lx-modal {
+    background: #fff; border-radius: 8px; width: 100%; max-width: 720px;
+    padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  }
+  .lx-modal__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .lx-modal__header h3 { margin: 0; font-size: 18px; }
+  .lx-modal__close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text-muted); }
+  .lx-agg-table { width: 100%; font-size: 12px; margin-bottom: 12px; }
+  .lx-agg-table th, .lx-agg-table td { padding: 4px 8px; text-align: left; border-bottom: 1px solid #f1f5f9; }
+  .lx-quote {
+    margin: 12px 0; padding: 10px 14px;
+    border-left: 3px solid var(--color-primary);
+    background: #f8fafc; font-style: italic; font-size: 13px;
+  }
+  .lx-modal label { display: block; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--color-text-muted); }
+  .lx-modal select, .lx-modal textarea {
+    display: block; width: 100%; margin-top: 4px; padding: 8px;
+    border: 1px solid var(--color-border); border-radius: 4px; font-size: 13px;
+  }
+  .lx-modal__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .lx-modal__actions button {
+    padding: 8px 16px; border-radius: var(--radius-md); cursor: pointer; font-weight: 600;
+  }
+  .lx-modal__actions .is-primary { background: var(--color-primary); color: #fff; border: none; }
+  .lx-modal__actions .is-secondary { background: #fff; color: var(--color-text); border: 1px solid var(--color-border); }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="sp sp--wide">
+
+  <header class="sp-header">
+    <h1 class="sp-logo">Admin · Few-Shot-Pool</h1>
+    <div class="sp-subtitle">Labeled Examples für Few-Shot-Kalibrierung der Region-Analysen</div>
+  </header>
+
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin:0 0 var(--space-4);border-radius:var(--radius-md);background:{% if admin_debug_active %}#e6f5ec{% else %}#fef3c7{% endif %};border:1px solid {% if admin_debug_active %}#86efac{% else %}#fde68a{% endif %};">
+    <strong>Admin-Modus (FE-Widgets):</strong>
+    <span>{% if admin_debug_active %}AN — das Few-Shot-Feedback-Panel ist auf Region-Karten sichtbar.{% else %}AUS — Region-Karten zeigen das Feedback-Panel nicht. Aktiviere den Modus, um auf einer Region-Karte zu labeln.{% endif %}</span>
+    <form id="lxDebugToggleForm" method="POST" action="/admin/{% if admin_debug_active %}disable-debug{% else %}enable-debug{% endif %}" style="margin-left:auto;">
+      <button type="submit" style="padding:6px 14px;border-radius:var(--radius-md);border:1px solid var(--color-primary);background:{% if admin_debug_active %}#fff{% else %}var(--color-primary){% endif %};color:{% if admin_debug_active %}var(--color-primary){% else %}#fff{% endif %};font-weight:600;cursor:pointer;">
+        {% if admin_debug_active %}Deaktivieren{% else %}Aktivieren{% endif %}
+      </button>
+    </form>
+    <script>
+      (function () {
+        var f = document.getElementById('lxDebugToggleForm');
+        if (!f) return;
+        f.addEventListener('submit', function (e) {
+          e.preventDefault();
+          fetch(f.action, { method: 'POST' })
+            .then(function () { window.location.reload(); })
+            .catch(function () { window.location.reload(); });
+        });
+      })();
+    </script>
+  </div>
+
+  <nav style="display:flex;gap:8px;margin:0 0 var(--space-5);flex-wrap:wrap;">
+    <a href="/admin/subscribers" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Subscribers</a>
+    <a href="/admin/feedback" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Feedback</a>
+    <a href="/admin/labeled-examples" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-primary);background:var(--color-primary);color:#fff;text-decoration:none;font-size:var(--text-sm);font-weight:500;">Few-Shot-Pool</a>
+    <a href="/admin/config" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Konfiguration</a>
+    <a href="/admin/testing" style="padding:8px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);text-decoration:none;font-size:var(--text-sm);font-weight:500;">Testing</a>
+  </nav>
+
+  <section class="lx-section">
+    <h2>Pool ({{ entries|length }} Einträge)</h2>
+    <p class="lx-section__hint">
+      Daten-Sammlung für Schritt 1 der Few-Shot-Pipeline. Aktuelle Schema-Version: v2.0.
+      Korrekturen wirken sich erst bei Schritt 2 (Retrieval) auf die LLM-Analysen aus.
+    </p>
+
+    <div class="lx-filters">
+      <label>Tier
+        <select id="lxFilterTier">
+          <option value="">alle</option>
+          <option value="mittelland">mittelland</option>
+          <option value="jura">jura</option>
+          <option value="voralpen">voralpen</option>
+          <option value="alpen">alpen</option>
+          <option value="hochalpin">hochalpin</option>
+        </select>
+      </label>
+      <label>Label
+        <select id="lxFilterLabel">
+          <option value="">alle</option>
+          <option value="richtig">richtig</option>
+          <option value="zu_optimistisch">zu_optimistisch</option>
+          <option value="zu_pessimistisch">zu_pessimistisch</option>
+        </select>
+      </label>
+      <label>Region (Suche)
+        <input type="text" id="lxFilterRegion" placeholder="z.B. matter" />
+      </label>
+    </div>
+
+    {% if entries %}
+    <table class="lx-table" id="lxTable">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Region</th>
+          <th>Tier</th>
+          <th>Label</th>
+          <th>Original (Exp/Safety)</th>
+          <th>Korrektur</th>
+          <th>Decisions</th>
+          <th>Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+          {% set fb = e.user_feedback or {} %}
+          {% set llm = e.llm_output_full or {} %}
+          {% set orig_exp = llm.experience_rating %}
+          {% set orig_safety = llm.safety_status or (llm.safety or {}).safety_status %}
+          {% set tier = e.terrain_tier or '' %}
+          {% set region_name = llm.region_name or e.spot_or_region_id %}
+        <tr data-aid="{{ e.analysis_id }}"
+            data-tier="{{ tier }}"
+            data-label="{{ fb.label }}"
+            data-region="{{ e.spot_or_region_id|lower }}">
+          <td>{{ e.target_date }}</td>
+          <td>{{ region_name }}</td>
+          <td><span class="lx-pill lx-pill--tier-{{ tier }}">{{ tier }}</span></td>
+          <td><span class="lx-pill lx-pill--{{ fb.label }}">{{ fb.label }}</span></td>
+          <td>{{ orig_exp }} / {{ orig_safety }}</td>
+          <td>
+            {% if fb.corrected_experience_rating or fb.corrected_safety_status %}
+              {{ fb.corrected_experience_rating or '–' }} / {{ fb.corrected_safety_status or '–' }}
+            {% else %}
+              <span style="color:var(--color-text-muted)">–</span>
+            {% endif %}
+          </td>
+          <td class="lx-decisions">
+            {% for d in e.decisions_applied or [] %}<code>{{ d }}</code>{% endfor %}
+          </td>
+          <td>
+            <div class="lx-actions">
+              <button type="button" data-act="open">Öffnen</button>
+              <button type="button" data-act="patch">Anpassen</button>
+              <button type="button" class="is-danger" data-act="delete">🗑</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="lx-empty">
+      Pool ist leer. Speichere Region-Analysen via „Few-Shot-Feedback"-Block auf der Region-Karte (Admin-Session erforderlich).
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- DETAIL MODAL -->
+  <div class="lx-modal-backdrop" id="lxDetailBackdrop">
+    <div class="lx-modal">
+      <div class="lx-modal__header">
+        <h3>Eintrag-Detail</h3>
+        <button type="button" class="lx-modal__close" data-close-modal>×</button>
+      </div>
+      <div id="lxDetailBody">Lade …</div>
+    </div>
+  </div>
+
+  <!-- PATCH MODAL -->
+  <div class="lx-modal-backdrop" id="lxPatchBackdrop">
+    <div class="lx-modal">
+      <div class="lx-modal__header">
+        <h3>Eintrag anpassen</h3>
+        <button type="button" class="lx-modal__close" data-close-modal>×</button>
+      </div>
+      <form id="lxPatchForm">
+        <input type="hidden" id="lxPatchId" />
+        <label>Label
+          <select id="lxPatchLabel">
+            <option value="richtig">richtig</option>
+            <option value="zu_optimistisch">zu_optimistisch</option>
+            <option value="zu_pessimistisch">zu_pessimistisch</option>
+          </select>
+        </label>
+        <label>experience_rating
+          <select id="lxPatchRating">
+            <option value="">— unverändert (null) —</option>
+            <option value="1">1 — Abgleiter</option>
+            <option value="2">2 — Kurzer Thermikflug</option>
+            <option value="3">3 — Solider Thermikflug</option>
+            <option value="4">4 — Starker Thermikflug</option>
+            <option value="5">5 — XC-Tag</option>
+            <option value="6">6 — Klassiker</option>
+          </select>
+        </label>
+        <label>safety_status
+          <select id="lxPatchSafety">
+            <option value="">— unverändert (null) —</option>
+            <option value="safe">safe</option>
+            <option value="conditional">conditional</option>
+            <option value="not_safe">not_safe</option>
+          </select>
+        </label>
+        <label>Begründung
+          <textarea id="lxPatchText" rows="3" maxlength="500"></textarea>
+        </label>
+        <div class="lx-modal__actions">
+          <button type="button" class="is-secondary" data-close-modal>Abbrechen</button>
+          <button type="submit" class="is-primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</main>
+<script src="{{ url_for('static', filename='js/analysis-view.js') }}?v={{ static_v('js/analysis-view.js') }}"></script>
+<script src="{{ url_for('static', filename='js/labeled-examples.js') }}?v={{ static_v('js/labeled-examples.js') }}"></script>
+{% endblock %}

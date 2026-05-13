@@ -388,22 +388,38 @@ window.AnalysisView = (function () {
 
     // ===== INSIGHTS =====
     var SF_LIMIT_LABELS = {
-        region_wind_aloft:      'Limit: Region-Hoehenwinde',
-        weak_regional_thermals: 'Limit: Region-Thermik schwach',
-        ceiling_low:            'Limit: Basis zu tief',
-        spot_wind_direction:    'Limit: Spot-Windrichtung',
-        abgleiter_only:         'Limit: nur Abgleiter',
-        spot_not_flyable:       'Limit: Spot nicht fliegbar'
+        none:                   '',
+        region_wind_aloft:      'Region-Höhenwinde bremsen den Streckenflug.',
+        weak_regional_thermals: 'Region-Thermik ist zu schwach für Strecke.',
+        ceiling_low:            'Basis bleibt zu tief für längere Strecken.',
+        spot_wind_direction:    'Wind kommt aus falschem Sektor.',
+        abgleiter_only:         'Nur Abgleiter möglich — keine Strecke.',
+        spot_not_flyable:       'Spot heute nicht fliegbar.',
+        region_context_missing: 'Region-Kontext fehlt — reine Spot-Einschätzung.'
+    };
+
+    var SF_RATING_LABELS = {
+        1: 'Kein Streckenflug', 2: 'Nur ganz kurz fliegbar',
+        3: 'Lokal fliegbar (kein Wegfliegen)', 4: 'Kurzes Wegfliegen möglich',
+        5: 'Weite Strecke möglich (~30–150 km)', 6: 'Klassiker (>150 km)'
+    };
+
+    var RATING_LABELS_LONG = {
+        1: 'Abgleiter — kein Thermikflug', 2: 'Kurzer Thermikflug (1–3 h, schwach)',
+        3: 'Solider Thermikflug — typischer Sommertag', 4: 'Starker Thermikflug — lokal-XC möglich',
+        5: 'XC-Tag — 50–100 km realistisch', 6: 'Klassiker — Tag des Jahres'
     };
 
     function renderInsights(a) {
         var safetyFb = a.safety_feedback || a.summary || '';
         var flyFb = a.flyability_feedback || a.recommendation || '';
+        var rating = parseInt(a.experience_rating, 10);
         var sfLimit = a.streckenflug_limiting_factor || 'none';
         var sfRating = parseInt(a.streckenflug_rating, 10);
-        var showSf = isFinite(sfRating) && sfRating >= 1 && sfLimit !== 'none';
+        var hasRating = isFinite(rating) && rating >= 1;
+        var hasSfRating = isFinite(sfRating) && sfRating >= 1;
 
-        if (!safetyFb && !flyFb && !showSf) return '';
+        if (!safetyFb && !flyFb && !hasRating && !hasSfRating) return '';
 
         var html = '<div class="mga-insights">';
         if (safetyFb) {
@@ -412,16 +428,26 @@ window.AnalysisView = (function () {
                   + '<div class="mga-insight-body">' + esc(safetyFb) + '</div>'
                   + '</div>';
         }
-        if (flyFb) {
+        if (flyFb || hasRating) {
+            var flyBody = '';
+            if (hasRating) {
+                flyBody += '<div class="mga-insight-rating"><b>' + esc(RATING_LABELS_LONG[rating] || ('Rating ' + rating))
+                         + '</b> (' + rating + '/6)</div>';
+            }
+            if (flyFb) flyBody += '<div>' + esc(flyFb) + '</div>';
             html += '<div class="mga-insight flyability open">'
                   + '<button class="mga-insight-toggle" type="button">Flug-Einschätzung</button>'
-                  + '<div class="mga-insight-body">' + esc(flyFb) + '</div>'
+                  + '<div class="mga-insight-body">' + flyBody + '</div>'
                   + '</div>';
         }
-        if (showSf && SF_LIMIT_LABELS[sfLimit]) {
+        if (hasSfRating) {
+            var sfBody = '<div class="mga-insight-rating"><b>' + esc(SF_RATING_LABELS[sfRating] || ('Rating ' + sfRating))
+                       + '</b> (' + sfRating + '/6)</div>';
+            var limitText = SF_LIMIT_LABELS[sfLimit] || '';
+            if (limitText) sfBody += '<div>' + esc(limitText) + '</div>';
             html += '<div class="mga-insight streckenflug open">'
-                  + '<button class="mga-insight-toggle" type="button">Streckenflug-Limit</button>'
-                  + '<div class="mga-insight-body">' + esc(SF_LIMIT_LABELS[sfLimit]) + '</div>'
+                  + '<button class="mga-insight-toggle" type="button">Streckenflug-Einschätzung</button>'
+                  + '<div class="mga-insight-body">' + sfBody + '</div>'
                   + '</div>';
         }
         html += '</div>';
@@ -439,6 +465,135 @@ window.AnalysisView = (function () {
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 btn.parentElement.classList.toggle('open');
+            });
+        });
+    }
+
+    // ===== ADMIN-FEEDBACK (Few-Shot-Pipeline Schritt 1) =====
+    var EXPERIENCE_LABELS = [
+        [1, '1 — Abgleiter'],
+        [2, '2 — Kurzer Thermikflug'],
+        [3, '3 — Solider Thermikflug'],
+        [4, '4 — Starker Thermikflug'],
+        [5, '5 — XC-Tag'],
+        [6, '6 — Klassiker']
+    ];
+    var SAFETY_OPTIONS = [
+        ['safe', 'Safe'],
+        ['conditional', 'Conditional'],
+        ['not_safe', 'Not safe']
+    ];
+
+    function _regionIdFor(a) {
+        // Cache verwendet stabilen Slug als Dict-Key; im Frontend liegt der
+        // Slug oft nicht direkt am Analyse-Objekt. region_id wird bei Bedarf
+        // vom Aufrufer via opts.regionId gesetzt; sonst Fallback auf region_name.
+        return (a && (a.region_id || a.regionSlug)) || '';
+    }
+
+    function renderAdminFeedback(a, dateStr, regionId) {
+        var rid = regionId || _regionIdFor(a);
+        var analysisId = 'region_' + rid + '_' + dateStr;
+        var ratingOpts = '<option value="">— unverändert —</option>' +
+            EXPERIENCE_LABELS.map(function (p) {
+                return '<option value="' + p[0] + '">' + esc(p[1]) + '</option>';
+            }).join('');
+        var safetyOpts = '<option value="">— unverändert —</option>' +
+            SAFETY_OPTIONS.map(function (p) {
+                return '<option value="' + p[0] + '">' + esc(p[1]) + '</option>';
+            }).join('');
+        return '' +
+            '<div class="mga-admin-feedback" data-analysis-id="' + esc(analysisId) + '" data-region-id="' + esc(rid) + '">' +
+            '  <div class="mga-admin-feedback__title">Few-Shot-Feedback (Admin)</div>' +
+            '  <div class="mga-admin-feedback__actions">' +
+            '    <button type="button" data-fb-action="good">Als guten Fall speichern</button>' +
+            '    <button type="button" data-fb-action="toggle">Bewertung korrigieren ▾</button>' +
+            '  </div>' +
+            '  <div class="mga-admin-feedback__panel" data-fb-panel>' +
+            '    <label>Korrektur-Typ' +
+            '      <select data-fb-label>' +
+            '        <option value="zu_optimistisch">Zu optimistisch</option>' +
+            '        <option value="zu_pessimistisch">Zu pessimistisch</option>' +
+            '      </select>' +
+            '    </label>' +
+            '    <label>experience_rating' +
+            '      <select data-fb-rating>' + ratingOpts + '</select>' +
+            '    </label>' +
+            '    <label>safety_status' +
+            '      <select data-fb-safety>' + safetyOpts + '</select>' +
+            '    </label>' +
+            '    <label>Begründung (optional, max 500)' +
+            '      <textarea data-fb-text rows="3" maxlength="500"></textarea>' +
+            '    </label>' +
+            '    <button type="button" data-fb-action="send">Senden</button>' +
+            '  </div>' +
+            '  <div class="mga-admin-feedback__toast" data-fb-toast></div>' +
+            '</div>';
+    }
+
+    function wireAdminFeedback(root) {
+        var wrap = root.querySelector('.mga-admin-feedback');
+        if (!wrap) return;
+        var analysisId = wrap.getAttribute('data-analysis-id');
+        var panel = wrap.querySelector('[data-fb-panel]');
+        var toast = wrap.querySelector('[data-fb-toast]');
+
+        function showToast(msg, kind) {
+            toast.textContent = msg;
+            toast.className = 'mga-admin-feedback__toast is-' + (kind || 'ok');
+            setTimeout(function () { toast.textContent = ''; toast.className = 'mga-admin-feedback__toast'; }, 3000);
+        }
+
+        function send(payload) {
+            return fetch('/api/admin/labeled-examples', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); });
+        }
+
+        wrap.querySelectorAll('[data-fb-action]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var action = btn.getAttribute('data-fb-action');
+                if (action === 'toggle') {
+                    panel.classList.toggle('is-open');
+                    return;
+                }
+                if (action === 'good') {
+                    send({ analysis_id: analysisId, label: 'richtig' }).then(function (res) {
+                        if (res.data && res.data.ok) showToast('✓ Gespeichert');
+                        else showToast('✗ ' + ((res.data && res.data.error) || 'Fehler'), 'err');
+                    }).catch(function () { showToast('✗ Netzwerkfehler', 'err'); });
+                    return;
+                }
+                if (action === 'send') {
+                    var labelEl = wrap.querySelector('[data-fb-label]');
+                    var ratingEl = wrap.querySelector('[data-fb-rating]');
+                    var safetyEl = wrap.querySelector('[data-fb-safety]');
+                    var textEl = wrap.querySelector('[data-fb-text]');
+                    var rating = ratingEl.value ? parseInt(ratingEl.value, 10) : null;
+                    var safety = safetyEl.value || null;
+                    if (rating === null && safety === null) {
+                        showToast('Bitte experience_rating oder safety_status setzen', 'err');
+                        return;
+                    }
+                    var payload = {
+                        analysis_id: analysisId,
+                        label: labelEl.value,
+                        correction_text: textEl.value || null
+                    };
+                    if (rating !== null) payload.corrected_experience_rating = rating;
+                    if (safety !== null) payload.corrected_safety_status = safety;
+                    send(payload).then(function (res) {
+                        if (res.data && res.data.ok) {
+                            showToast('✓ Gespeichert');
+                            panel.classList.remove('is-open');
+                        } else {
+                            showToast('✗ ' + ((res.data && res.data.error) || 'Fehler'), 'err');
+                        }
+                    }).catch(function () { showToast('✗ Netzwerkfehler', 'err'); });
+                }
             });
         });
     }
@@ -465,6 +620,8 @@ window.AnalysisView = (function () {
             return;
         }
 
+        var showAdminFb = !!(window.gleitcastIsAdmin && isRegion && dateStr);
+
         // State B: Not-safe (inklusive noAnalysis-Pfad)
         var notSafe = (safetyStatus === 'not_safe')
                    || (a.noAnalysis === true)
@@ -475,9 +632,11 @@ window.AnalysisView = (function () {
             if (!isRegion) html += renderStartWindowV4(getV4StartWindow(a));
             html += renderTagGroupsV4(getV4Tags(a));
             html += renderFooter(dateStr);
+            if (showAdminFb) html += renderAdminFeedback(a, dateStr, opts.regionId);
             wrapper.innerHTML = html;
             container.appendChild(wrapper);
             wireToggles(wrapper);
+            if (showAdminFb) wireAdminFeedback(wrapper);
             return;
         }
 
@@ -488,9 +647,11 @@ window.AnalysisView = (function () {
         html2 += renderMetrics(a);
         html2 += renderInsights(a);
         html2 += renderFooter(dateStr);
+        if (showAdminFb) html2 += renderAdminFeedback(a, dateStr, opts.regionId);
         wrapper.innerHTML = html2;
         container.appendChild(wrapper);
         wireToggles(wrapper);
+        if (showAdminFb) wireAdminFeedback(wrapper);
     }
 
     return {

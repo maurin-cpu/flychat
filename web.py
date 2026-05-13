@@ -1648,6 +1648,96 @@ def admin_testing_review_meteogram(session_id, case_idx):
 
 
 # ============================================================================
+# LABELED EXAMPLES — Few-Shot-Pipeline Schritt 1 (Admin-only, Regionen)
+# ============================================================================
+
+@app.route("/admin/labeled-examples", methods=["GET"])
+@_require_admin
+def admin_labeled_examples():
+    """Verwaltungs-Seite fuer den Few-Shot-Pool."""
+    from engine import labeled_examples as le
+    entries = le.load_all()
+    entries.sort(key=lambda e: e.get("timestamp") or "", reverse=True)
+    return render_template("admin/labeled_examples.html", entries=entries)
+
+
+@app.route("/api/admin/labeled-examples", methods=["POST"])
+@_require_admin
+def api_labeled_examples_create():
+    """Speichert einen Region-Analyse-Fall als Labeled Example."""
+    from engine import labeled_examples as le
+
+    payload = request.get_json(silent=True) or {}
+    ok, err = le.validate_payload(payload)
+    if not ok:
+        return jsonify({"ok": False, "error": err}), 400
+
+    parsed = le.parse_analysis_id(payload["analysis_id"])
+    if parsed is None:
+        return jsonify({"ok": False, "error": "invalid analysis_id"}), 400
+    region_id, target_date = parsed
+
+    if engine is None or not getattr(engine, "region_analyses", None):
+        return jsonify({"ok": False, "error": "engine not ready"}), 503
+
+    region_block = engine.region_analyses.get(region_id) or {}
+    analysis_entry = region_block.get(target_date)
+    if not analysis_entry:
+        return jsonify({"ok": False, "error": "analysis not in cache"}), 404
+
+    snap = le.build_snapshot(region_id, target_date, analysis_entry, payload)
+    le.append_or_replace(snap)
+    return jsonify({
+        "ok": True,
+        "analysis_id": snap["analysis_id"],
+        "stored_at": snap["timestamp"],
+    })
+
+
+@app.route("/api/admin/labeled-examples", methods=["GET"])
+@_require_admin
+def api_labeled_examples_list():
+    """Alle Eintraege (fuer Verwaltungs-Tabelle / Client-Filter)."""
+    from engine import labeled_examples as le
+    entries = le.load_all()
+    entries.sort(key=lambda e: e.get("timestamp") or "", reverse=True)
+    return jsonify({"ok": True, "entries": entries, "count": len(entries)})
+
+
+@app.route("/api/admin/labeled-examples/<analysis_id>", methods=["GET"])
+@_require_admin
+def api_labeled_examples_get(analysis_id):
+    from engine import labeled_examples as le
+    entry = le.load_by_id(analysis_id)
+    if entry is None:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    return jsonify({"ok": True, "entry": entry})
+
+
+@app.route("/api/admin/labeled-examples/<analysis_id>", methods=["PATCH"])
+@_require_admin
+def api_labeled_examples_patch(analysis_id):
+    from engine import labeled_examples as le
+    payload = request.get_json(silent=True) or {}
+    ok, err = le.validate_patch(payload)
+    if not ok:
+        return jsonify({"ok": False, "error": err}), 400
+    updated = le.patch_entry(analysis_id, payload)
+    if updated is None:
+        return jsonify({"ok": False, "error": "not found"}), 404
+    return jsonify({"ok": True, "entry": updated})
+
+
+@app.route("/api/admin/labeled-examples/<analysis_id>", methods=["DELETE"])
+@_require_admin
+def api_labeled_examples_delete(analysis_id):
+    from engine import labeled_examples as le
+    if not le.delete_entry(analysis_id):
+        return jsonify({"ok": False, "error": "not found"}), 404
+    return jsonify({"ok": True})
+
+
+# ============================================================================
 # FEEDBACK API (Spot/Region — anonym via localStorage client_id)
 # ============================================================================
 
@@ -2144,12 +2234,13 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
             for lbl_key in ("primary_no_go", "primary_caution", "primary_reducer", "primary_booster"):
                 doc[lbl_key] = safety.get(lbl_key) or None
             ss = safety.get("safety_status", "error")
-            if fly and ss in ("safe", "conditional"):
-                doc["flight_type"] = fly.get("flight_type", "")
-                doc["flight_duration"] = fly.get("flight_duration_estimate", "")
-                doc["xc_potential"] = fly.get("xc_potential", "")
-                doc["peak_climb_rate"] = fly.get("peak_climb_rate", 0)
-                doc["flyability_feedback"] = fly.get("recommendation", "")
+            if ss in ("safe", "conditional"):
+                # Fallback aus entry top-level wenn fly nested leer/fehlt.
+                doc["flight_type"] = fly.get("flight_type") or entry.get("flight_type", "")
+                doc["flight_duration"] = fly.get("flight_duration_estimate") or entry.get("flight_duration_estimate", "")
+                doc["xc_potential"] = fly.get("xc_potential") or entry.get("xc_potential", "")
+                doc["peak_climb_rate"] = fly.get("peak_climb_rate") or entry.get("peak_climb_rate", 0)
+                doc["flyability_feedback"] = fly.get("recommendation") or entry.get("recommendation", "")
                 for lkey in ("flyability_limits", "highlights"):
                     val = fly.get(lkey, [])
                     if isinstance(val, list):
@@ -2370,11 +2461,14 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
                 doc[key] = json.dumps(val, ensure_ascii=False) if isinstance(val, list) else str(val)
             for lbl_key in ("primary_no_go", "primary_caution", "primary_reducer", "primary_booster"):
                 doc[lbl_key] = safety.get(lbl_key) or None
-            if fly and ss in ("safe", "conditional"):
-                doc["recommendation"] = fly.get("recommendation", "")
-                doc["peak_climb_rate"] = fly.get("peak_climb_rate", 0)
-                doc["flight_type"] = fly.get("flight_type", "")
-                fn = fly.get("flyability_notes")
+            if ss in ("safe", "conditional"):
+                # Fallback aus entry top-level wenn fly leer (Region-Cache hat
+                # recommendation oft direkt top-level, kein flyability nested).
+                doc["recommendation"] = fly.get("recommendation") or entry.get("recommendation", "")
+                doc["flyability_feedback"] = doc["recommendation"]
+                doc["peak_climb_rate"] = fly.get("peak_climb_rate") or entry.get("peak_climb_rate", 0)
+                doc["flight_type"] = fly.get("flight_type") or entry.get("flight_type", "")
+                fn = fly.get("flyability_notes") or entry.get("flyability_notes")
                 if fn:
                     doc["flyability_notes"] = fn
             else:

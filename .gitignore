@@ -31,6 +31,12 @@ data/mocks/_meta.json
 data/test_runs/
 data/cost_telemetry.jsonl
 
+# Few-Shot-Pipeline labeled examples (Admin-curated, server-local)
+data/labeled_examples.jsonl
+data/labeled_examples.jsonl.lock
+data/labeled_examples.jsonl.tmp
+data/labeled_examples.*.jsonl
+
 # Runtime config (Admin-UI written, server-local)
 data/config_overrides.json
 data/test_mode.json
