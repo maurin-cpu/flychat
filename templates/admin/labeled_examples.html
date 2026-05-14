@@ -49,6 +49,8 @@
   .lx-pill--tier-voralpen { background: #dbeafe; color: #1e40af; }
   .lx-pill--tier-alpen { background: #ede9fe; color: #6d28d9; }
   .lx-pill--tier-hochalpin { background: #fce7f3; color: #be185d; }
+  .lx-pill--kind-region { background: #e0e7ff; color: #3730a3; }
+  .lx-pill--kind-spot { background: #fef9c3; color: #854d0e; }
   .lx-decisions { font-size: 11px; color: var(--color-text-muted); }
   .lx-decisions code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; margin-right: 2px; }
   .lx-actions { display: flex; gap: 4px; }
@@ -77,6 +79,21 @@
     background: #fff; border-radius: 8px; width: 100%; max-width: 720px;
     padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
   }
+  .lx-modal--wide { max-width: min(1400px, 96vw); }
+  .lx-meteo-wrap {
+    margin: 12px 0 16px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: #fff; padding: 8px;
+  }
+  .lx-meteo-chart { min-height: 64vh; height: 64vh; }
+  .lx-meteo-tooltip {
+    position: absolute; pointer-events: none; z-index: 1100;
+    background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    padding: 6px 10px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: none;
+  }
+  .lx-meteo-status { font-size: 12px; color: var(--color-text-muted); margin: 4px 0 0; }
+  .lx-meteo-status--err { color: #b71c1c; }
   .lx-modal__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
   .lx-modal__header h3 { margin: 0; font-size: 18px; }
   .lx-modal__close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text-muted); }
@@ -99,6 +116,8 @@
   .lx-modal__actions .is-primary { background: var(--color-primary); color: #fff; border: none; }
   .lx-modal__actions .is-secondary { background: #fff; color: var(--color-text); border: 1px solid var(--color-border); }
 </style>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -111,7 +130,7 @@
 
   <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin:0 0 var(--space-4);border-radius:var(--radius-md);background:{% if admin_debug_active %}#e6f5ec{% else %}#fef3c7{% endif %};border:1px solid {% if admin_debug_active %}#86efac{% else %}#fde68a{% endif %};">
     <strong>Admin-Modus (FE-Widgets):</strong>
-    <span>{% if admin_debug_active %}AN — das Few-Shot-Feedback-Panel ist auf Region-Karten sichtbar.{% else %}AUS — Region-Karten zeigen das Feedback-Panel nicht. Aktiviere den Modus, um auf einer Region-Karte zu labeln.{% endif %}</span>
+    <span>{% if admin_debug_active %}AN — das Few-Shot-Feedback-Panel ist auf Region- und Spot-Analysen sichtbar.{% else %}AUS — Analysen zeigen das Feedback-Panel nicht. Aktiviere den Modus, um auf einer Region- oder Spot-Karte zu labeln.{% endif %}</span>
     <form id="lxDebugToggleForm" method="POST" action="/admin/{% if admin_debug_active %}disable-debug{% else %}enable-debug{% endif %}" style="margin-left:auto;">
       <button type="submit" style="padding:6px 14px;border-radius:var(--radius-md);border:1px solid var(--color-primary);background:{% if admin_debug_active %}#fff{% else %}var(--color-primary){% endif %};color:{% if admin_debug_active %}var(--color-primary){% else %}#fff{% endif %};font-weight:600;cursor:pointer;">
         {% if admin_debug_active %}Deaktivieren{% else %}Aktivieren{% endif %}
@@ -147,6 +166,13 @@
     </p>
 
     <div class="lx-filters">
+      <label>Typ
+        <select id="lxFilterKind">
+          <option value="">alle</option>
+          <option value="region">Region</option>
+          <option value="spot">Spot</option>
+        </select>
+      </label>
       <label>Tier
         <select id="lxFilterTier">
           <option value="">alle</option>
@@ -165,8 +191,8 @@
           <option value="zu_pessimistisch">zu_pessimistisch</option>
         </select>
       </label>
-      <label>Region (Suche)
-        <input type="text" id="lxFilterRegion" placeholder="z.B. matter" />
+      <label>Name (Suche)
+        <input type="text" id="lxFilterRegion" placeholder="z.B. matter, balderen" />
       </label>
     </div>
 
@@ -175,7 +201,8 @@
       <thead>
         <tr>
           <th>Datum</th>
-          <th>Region</th>
+          <th>Typ</th>
+          <th>Name</th>
           <th>Tier</th>
           <th>Label</th>
           <th>Original (Exp/Safety)</th>
@@ -191,13 +218,16 @@
           {% set orig_exp = llm.experience_rating %}
           {% set orig_safety = llm.safety_status or (llm.safety or {}).safety_status %}
           {% set tier = e.terrain_tier or '' %}
-          {% set region_name = llm.region_name or e.spot_or_region_id %}
+          {% set kind = e.entity_type or 'region' %}
+          {% set display_name = (llm.spot if kind == 'spot' else llm.region_name) or e.spot_or_region_id %}
         <tr data-aid="{{ e.analysis_id }}"
+            data-kind="{{ kind }}"
             data-tier="{{ tier }}"
             data-label="{{ fb.label }}"
-            data-region="{{ e.spot_or_region_id|lower }}">
+            data-region="{{ (e.spot_or_region_id or '')|lower }}">
           <td>{{ e.target_date }}</td>
-          <td>{{ region_name }}</td>
+          <td><span class="lx-pill lx-pill--kind-{{ kind }}">{{ 'Spot' if kind == 'spot' else 'Region' }}</span></td>
+          <td>{{ display_name }}</td>
           <td><span class="lx-pill lx-pill--tier-{{ tier }}">{{ tier }}</span></td>
           <td><span class="lx-pill lx-pill--{{ fb.label }}">{{ fb.label }}</span></td>
           <td>{{ orig_exp }} / {{ orig_safety }}</td>
@@ -224,19 +254,20 @@
     </table>
     {% else %}
     <div class="lx-empty">
-      Pool ist leer. Speichere Region-Analysen via „Few-Shot-Feedback"-Block auf der Region-Karte (Admin-Session erforderlich).
+      Pool ist leer. Speichere Region- oder Spot-Analysen via „Few-Shot-Feedback"-Block auf der Analyse-Karte (Admin-Session erforderlich).
     </div>
     {% endif %}
   </section>
 
   <!-- DETAIL MODAL -->
   <div class="lx-modal-backdrop" id="lxDetailBackdrop">
-    <div class="lx-modal">
+    <div class="lx-modal lx-modal--wide">
       <div class="lx-modal__header">
         <h3>Eintrag-Detail</h3>
         <button type="button" class="lx-modal__close" data-close-modal>×</button>
       </div>
       <div id="lxDetailBody">Lade …</div>
+      <div class="lx-meteo-tooltip" id="lxMeteoTooltip"></div>
     </div>
   </div>
 

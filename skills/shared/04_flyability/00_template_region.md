@@ -67,7 +67,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags, keine eckigen Klammern.
     "ERLAUBTE Topics (Whitelist): CLOUDS, THERMAL, XC, INVERSION, BASE, WINDOW, SUNSHINE, CONVERGENCE.",
     "VERBOTEN: Backend-Topics (WIND_GROUND, WIND_ALOFT, RAIN, THUNDERSTORM, FOEHN) und Severity 'stop'/'warn'. CLOUDS-Sicht-Issues sind Backend. Backend wirft solche Tags raus.",
     "Pro-Topic-Severity-Matrix: INVERSION nur 'reducer'; CONVERGENCE/XC nur 'good'; CLOUDS/BASE/THERMAL/WINDOW/SUNSHINE 'reducer' oder 'good'.",
-    "Sanity: THERMAL 'good' nur wenn peak_climb_rate >= 1.0 m/s. CLOUDS 'good' nur wenn tief+mittel <= 60%. BASE 'reducer' wenn Wolkenbasis < 600m ueber Region-Ref; BASE 'good' wenn Basis > 800m ueber Gipfel.",
+    "Sanity: THERMAL 'good' nur wenn peak_climb_rate >= 1.0 m/s. CLOUDS 'good' nur wenn tief ≤ 50% UND mittel ≤ 30% (= cu_clean_top-Niveau, klare Einstrahlung). CLOUDS 'reducer' wenn tief ≥ 80% ODER mittel ≥ 70%. BASE 'reducer' wenn Wolkenbasis < 600m ueber Region-Ref; BASE 'good' wenn Basis > 800m ueber Gipfel.",
     "Beispiel: [{\"topic\": \"THERMAL\", \"severity\": \"good\", \"label\": \"Thermik\", \"value\": \"peak 2.8 m/s\", \"time\": \"12-15 h\"}, {\"topic\": \"CLOUDS\", \"severity\": \"reducer\", \"label\": \"Bewoelkung\", \"value\": \"bedeckt 80% Mittag\", \"time\": \"11-14 h\"}]",
     "Im Zweifel WENIGER Tags. Topic weglassen wenn nichts Konkretes zu sagen ist."
   ],

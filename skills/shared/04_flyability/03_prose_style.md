@@ -29,7 +29,15 @@ Teil 1 behandelt. NICHT in Flyability-Texten erwaehnen.
 BEWOELKUNGS-LABELS (Booster vs. Reducer — Matuszko/FAA)
 ─────────────────────────────────
 
-- **`GUTE_EINSTRAHLUNG` (Booster)**: Optimale Cu-Bedeckung 12-{{cfg.VIOLET_CLOUD_LOW_MAX}}% (SCT) = staerkste Thermik. Latentwaerme-Boost, Cu markiert Einstiege, teils bewoelkter Himmel liefert sogar MEHR Solarenergie als wolkenlos (Streueffekt). Setzen wenn: max(tief, mittel) ≤ {{cfg.VIOLET_CLOUD_LOW_MAX}}% mit Cu-Charakter ODER klarer Himmel (<30%). Auch blauer Himmel (0%) ist Booster.
-- **`VIEL_BEWOELKUNG` (Reducer)**: Ab ~{{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}% max(tief, mittel) wird Sonne weitgehend blockiert, Thermik stirbt. Setzen wenn: max(tief, mittel) ≥ {{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}% waehrend > 50% der Thermikstunden. Starke Ueberentwicklung (OD) mit Abschirmung gehoert auch hierher.
-- **Neutralzone {{cfg.VIOLET_CLOUD_LOW_MAX}}-{{cfg.PRODUCTIVE_LOW_CLOUD_MAX}}%**: Weder Booster noch Reducer — Daempfung beginnt (FAA 5/10-Regel), Thermik noch vorhanden aber abnehmend.
-- **Cirrus ignorieren**: Nur hohe Bewoelkung (tief + mittel <30%) → WEDER Reducer NOCH Booster (Cirrus laesst 70-85% Solarstrahlung durch).
+**WICHTIG — tief und mittel wirken physikalisch UNTERSCHIEDLICH:**
+- **Tief (Cu humilis/mediocris, <3km)** = bimodal: 12-50% = Thermik-Marker (Booster, Latentwaerme-Boost). ≥80% = Sonne blockiert (Killer).
+- **Mittel (Altostratus/Altocumulus, 3-8km)** = monoton daempfend: jedes % reduziert Einstrahlung, KEIN Sweet Spot. Ab 30% spuerbar, ab 70% Thermik stark gedaempft, ab 90% praktisch tot.
+- **Hoch (Cirrus, >8km)** = ignoriert (Transmissivitaet 70-85%).
+
+Wende daher tief und mittel mit getrennten Schwellen an (NICHT `max(tief, mittel)`):
+
+- **`GUTE_EINSTRAHLUNG` (Booster)**: Optimale SCT-Cu unten MIT klarer Sicht nach oben — staerkste Thermik. Setzen wenn: **tief ≤ 50% mit Cu-Charakter UND mittel ≤ 30%** ODER klarer Himmel (tief < 30% UND mittel < 30%). Cu markiert Einstiege, Latentwaerme-Boost, Streueffekt liefert sogar MEHR Solarenergie als wolkenlos. Auch blauer Himmel (0%) ist Booster.
+- **`VIEL_BEWOELKUNG` (Reducer)**: Sonne wird signifikant blockiert. Setzen wenn waehrend > 50% der Thermikstunden gilt: **tief ≥ 80% (Cu-Overcast/Stratus von unten) ODER mittel ≥ 70% (Altostratus-Decke von oben)**. Starke Ueberentwicklung (OD) mit Abschirmung gehoert auch hierher.
+- **Neutralzone**: tief 50-80% ODER mittel 30-70% (und kein Reducer-Trigger) — Daempfung beginnt, Thermik noch vorhanden aber abnehmend.
+- **Top-Tag (klassiker, Rating 6)**: STRENGER als Booster — verlangt `cu_clean_top` = **tief 12-50% Cu UND mittel < 30%**. Mehr Altostratus oben verschattet selbst starke Thermik.
+- **Cirrus ignorieren**: Bei tief < 30% UND mittel < 30% (egal wie viel hoch) → Cirrus ist kein Reducer und kein Booster (laesst 70-85% Solarstrahlung durch).

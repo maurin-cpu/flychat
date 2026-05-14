@@ -130,10 +130,18 @@ MINDEST-VORAUSSETZUNGEN je Rating
 | **3** | prod_h ≥ 4h UND sustained_peak ≥ 1.5 |
 | **4** | prod_h ≥ 4h UND sustained_peak ≥ 2.0 UND working_height ≥ 1000m |
 | **5** | prod_h ≥ 5h UND sustained_peak ≥ 2.0 UND working_height ≥ 1500m UND cloud_structure NICHT overcast/OD |
-| **6** | prod_h ≥ 6h UND sustained_peak ≥ 2.5 UND working_height ≥ 2000m UND cu_clean_top |
+| **6** | prod_h ≥ 6h UND sustained_peak ≥ 2.5 UND working_height ≥ 2000m UND **cu_clean_top** (= tief 12-50% Cu UND mittel < 30%) |
 
 Fuer Rating 5 reicht **jede** Bewoelkungs-Variante ausser overcast/OD —
 cu_clean_top ist nicht Pflicht.
+
+**Bewoelkung fuer Top-Tag (Rating 6 = klassiker):**
+- **tief**: 12-50% mit Cu-Charakter (Schoenwetter-Cu als Thermik-Marker)
+- **mittel**: < 30% (Altostratus-Decke wuerde Einstrahlung daempfen — fuer klassiker MUSS oben klar sein)
+- **hoch**: egal (Cirrus laesst Sonne durch)
+
+Ein Tag mit Cu 30% unten aber 50% Altostratus oben ist KEIN klassiker — er ist
+ein `xc_tag` (5), weil die Mittelbewoelkung die starke Thermik nicht zulaesst.
 
 ─────────────────────────────────
 SANITY-CHECK

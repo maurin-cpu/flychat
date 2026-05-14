@@ -60,21 +60,21 @@
   const LS_TIER_FILTER_KEY = "gleitcast.briefing.tierFilter";       // legacy key (read-only fallback)
   const LS_SAFETY_FILTER_KEY = "gleitcast.briefing.safetyFilter";   // v1.3
   const LS_MIN_STARS_KEY = "gleitcast.briefing.minStars";           // legacy key (read-only fallback, v1.3 stars)
-  const LS_MIN_RATING_KEY = "gleitcast.briefing.minRating10";       // v1.4 rating 0-10
+  const LS_MIN_RATING_KEY = "gleitcast.briefing.minRating6";        // v2.0 rating 0-6 (experience_rating)
+  const LS_MIN_RATING_KEY_LEGACY = "gleitcast.briefing.minRating10"; // v1.4 legacy key (0-10), gets migrated
   const LS_COLLAPSED_REGIONS_KEY = "gleitcast.briefing.collapsedRegions";
   const LS_EXPAND_HINT_SEEN_KEY = "gleitcast.briefing.expandHintSeen";
   const LS_SHOW_NUMBERS_KEY = "gleitcast.meteogram.showNumbers";
 
-  // Safety-Baender (RATING_CONCEPT v1.3 §2.2 / §8.2) — orthogonal zu experience_stars.
-  // "violet" (Top) ist ein Display-Band: abgeleitet aus safety_band='green' && rating>=8.
-  // Im Cache existiert es nicht — Filter prueft via displayBand().
+  // Safety-Baender (RATING_ARCHITECTURE v2.0): genau 3 Filter-Kategorien aus
+  // safety_status (safe/conditional/not_safe). "violet" (Top) ist nur ein
+  // Marker-Effekt fuer Klassiker (rating=6) auf 'green'-Spots — KEIN Filter.
   const SAFETY_DEFS = [
-    { id: "violet", label: "Top",           short: "Top" },
     { id: "green",  label: "Sicher",        short: "Sicher" },
     { id: "amber",  label: "Vorsicht",      short: "Vorsicht" },
     { id: "red",    label: "Nicht fliegbar", short: "Nicht fliegbar" },
   ];
-  const DEFAULT_SAFETY = ["violet", "green", "amber"];
+  const DEFAULT_SAFETY = ["green", "amber"];
 
   let state = {
     data: null,
@@ -121,10 +121,8 @@
       const arr = JSON.parse(raw);
       if (!Array.isArray(arr)) return new Set(DEFAULT_SAFETY);
       const set = new Set(arr.filter((t) => SAFETY_DEFS.some((d) => d.id === t)));
-      // Migration: User mit "green" gespeichert hat das neue "violet" (Top, ein
-      // Display-Band von green) noch nicht — ergaenzen, sonst verschwinden Top-Spots
-      // aus seiner Ansicht ohne dass er etwas geaendert haette.
-      if (set.has("green") && !set.has("violet")) set.add("violet");
+      // Migration v2.0: alter "violet"-Filter wird ignoriert (existiert nicht mehr).
+      // Falls "green" gespeichert ist, ist alles ok — Top-Spots zaehlen jetzt als "Sicher".
       return set;
     } catch (e) { return new Set(DEFAULT_SAFETY); }
   }
@@ -138,13 +136,21 @@
       const raw = localStorage.getItem(LS_MIN_RATING_KEY);
       if (raw !== null) {
         const v = parseInt(raw, 10);
-        return isFinite(v) && v >= 0 && v <= 10 ? v : 0;
+        return isFinite(v) && v >= 0 && v <= 6 ? v : 0;
       }
-      // Migration: alte stars (0-5) → rating (0-10) via *2
-      const legacy = localStorage.getItem(LS_MIN_STARS_KEY);
-      if (legacy !== null) {
-        const sv = parseInt(legacy, 10);
-        if (isFinite(sv) && sv > 0 && sv <= 5) return sv * 2;
+      // Migration v1.4 0-10 → v2.0 0-6: alten Wert auf neue Skala mappen.
+      const legacy10 = localStorage.getItem(LS_MIN_RATING_KEY_LEGACY);
+      if (legacy10 !== null) {
+        const v10 = parseInt(legacy10, 10);
+        if (isFinite(v10) && v10 > 0) {
+          return Math.min(6, Math.max(0, Math.round((v10 / 10) * 6)));
+        }
+      }
+      // Migration v1.3 stars (0-5) → v2.0 rating (0-6): direkter Cap.
+      const legacyStars = localStorage.getItem(LS_MIN_STARS_KEY);
+      if (legacyStars !== null) {
+        const sv = parseInt(legacyStars, 10);
+        if (isFinite(sv) && sv > 0 && sv <= 5) return Math.min(6, sv);
       }
       return 0;
     } catch (e) { return 0; }
@@ -216,14 +222,11 @@
     if (!bands || bands.size === 0) return false;
     const baseBand = spotSafetyBand(spot);
     if (baseBand === "no_data") {
-      return bands.has("violet") || bands.has("green") || bands.has("amber") || bands.has("red");
+      return bands.has("green") || bands.has("amber") || bands.has("red");
     }
-    // Display-Band (violet bei safe + rating>=8) ist die Filter-Granularitaet:
-    // ein Top-Spot zaehlt nur als "Top", nicht zusaetzlich als "Sicher".
-    const G = window.gleitcastGlyph;
-    const rating = spotRating(spot);
-    const visBand = (G && G.displayBand) ? G.displayBand(baseBand, rating) : baseBand;
-    return bands.has(visBand);
+    // RATING_ARCHITECTURE v2.0: Filter genau auf safety_status (green/amber/red).
+    // Marker-Display kann weiterhin "violet" sein (Klassiker), das ist nur Optik.
+    return bands.has(baseBand);
   }
 
   function spotPassesRatingFilter(spot) {
@@ -518,7 +521,7 @@
       '<div class="bf-bubble-matrix-header">'
       + '<span class="bf-bubble-matrix-title">Risk-Reward-Matrix</span>'
       + '<span class="bf-bubble-matrix-legend-meta">'
-      + '<span class="legend-item legend-item--size">⬤ Größe = Sterne</span>'
+      + '<span class="legend-item legend-item--size">⬤ Größe = Fliegbarkeit</span>'
       + hiddenHint
       + '</span>'
       + '</div>'
@@ -915,10 +918,10 @@
       });
     }
 
-    // Rating-Slider (0–10)
-    if (slider.max !== "10" || slider.step !== "1") {
+    // Fliegbarkeit-Slider (0–6, experience_rating-Skala v2.0)
+    if (slider.max !== "6" || slider.step !== "1") {
       slider.min = "0";
-      slider.max = "10";
+      slider.max = "6";
       slider.step = "1";
     }
     const v = Number(state.minRating || 0);
@@ -941,10 +944,10 @@
   }
 
   function updateSliderVisual(slider, valueEl, v) {
-    valueEl.textContent = v > 0 ? "\u2265 " + v + " / 10" : "alle";
+    valueEl.textContent = v > 0 ? "\u2265 " + v + " / 6" : "alle";
     slider.classList.toggle("is-active", v > 0);
     const min = parseFloat(slider.min) || 0;
-    const max = parseFloat(slider.max) || 10;
+    const max = parseFloat(slider.max) || 6;
     const pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
     slider.style.setProperty("--fill", pct.toFixed(1) + "%");
   }
@@ -1174,14 +1177,12 @@
 
   function renderRegionSection(group, meta) {
     const name = (meta && meta.region_name) || group.region_name || (group.region_id === "unknown" ? "Weitere Spots" : group.region_id);
-    // Top-3 Filter: nur Spots mit Rating >= 8, nach Rating absteigend, max 3.
-    // Im Focus-Modus (Deep-Link) wird der Filter übersprungen.
-    let displaySpots = group.spots;
-    if (!state.focusSpot) {
-      displaySpots = group.spots
-        .filter(s => spotRating(s) >= 8)
-        .sort((a, b) => spotRating(b) - spotRating(a));
-    }
+    // Sortierung nach Rating absteigend — Filter kommen vom Slider + Safety-Chips
+    // (filterDaySpots), kein zusaetzlicher Hard-Cutoff hier, damit der Slider-Wert
+    // verlaesslich gilt (User setzt Slider auf 4 → sieht alle 4er-Spots).
+    const displaySpots = state.focusSpot
+      ? group.spots
+      : group.spots.slice().sort((a, b) => spotRating(b) - spotRating(a));
     const spotsHtml = displaySpots.map(renderSpotRow).join("");
     const spotCount = displaySpots.length;
 
@@ -1274,9 +1275,9 @@
              data-share-spot="${escapeHtml(spot.spot)}"
              data-share-rating="${shareRatingAttr}"
              title="Startplatz teilen" aria-label="Startplatz teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`;
-    // RATING_CONCEPT v1.4 §8.6 — Farbintensität skaliert linear mit Rating
-    // (parallel zu Karten). Premium-Marker: safe + rating>=8 → violett.
-    const fillNorm = (rating > 0 && band !== "red" && band !== "no_data") ? rating / 10 : 0;
+    // RATING_ARCHITECTURE v2.0 — Farbintensität skaliert linear mit experience_rating (1-6).
+    // Premium-Marker: safe + rating=6 (Klassiker) → violett (siehe shared-glyph.displayBand).
+    const fillNorm = (rating > 0 && band !== "red" && band !== "no_data") ? rating / 6 : 0;
     const G2 = window.gleitcastGlyph;
     const visBand = (G2 && G2.displayBand) ? G2.displayBand(band, rating) : band;
     const visCls = "safety-" + visBand;
@@ -1742,11 +1743,11 @@
     const dayIdx = state.selectedDayIdx || 0;
     let title, text;
     if (kind === "spot") {
-      const rtxt = rating && rating !== "—" ? ` — Rating ${rating}/10` : "";
+      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}/6` : "";
       title = `${spotName}${rtxt}`;
       text = `${spotName}${regionName ? " (" + regionName + ")" : ""}${rtxt} · Gleitcast Flugwetter`;
     } else {
-      const rtxt = rating && rating !== "—" ? ` — Rating ${rating}/10` : "";
+      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}/6` : "";
       title = `${regionName || "Region"}${rtxt}`;
       text = `${regionName || "Region"}${rtxt} · Gleitcast Flugwetter`;
     }

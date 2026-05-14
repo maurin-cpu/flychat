@@ -491,9 +491,29 @@ window.AnalysisView = (function () {
         return (a && (a.region_id || a.regionSlug)) || '';
     }
 
-    function renderAdminFeedback(a, dateStr, regionId) {
-        var rid = regionId || _regionIdFor(a);
-        var analysisId = 'region_' + rid + '_' + dateStr;
+    // Slugify-Mirror der Python-Funktion engine.labeled_examples.slugify_spot.
+    // Umlaute expandieren (ae/oe/ue/ss), alles Nicht-Alphanumeric zu '_'.
+    function _slugifySpot(name) {
+        if (!name) return '';
+        var s = String(name).toLowerCase()
+            .replace(/\u00e4/g, 'ae').replace(/\u00f6/g, 'oe').replace(/\u00fc/g, 'ue')
+            .replace(/\u00df/g, 'ss');
+        s = s.replace(/[^a-z0-9]+/g, '_');
+        return s.replace(/^_+|_+$/g, '');
+    }
+
+    function renderAdminFeedback(a, dateStr, opts) {
+        // opts: { isRegion, regionId, spotName }
+        opts = opts || {};
+        var kind, entityId;
+        if (opts.isRegion) {
+            kind = 'region';
+            entityId = opts.regionId || _regionIdFor(a);
+        } else {
+            kind = 'spot';
+            entityId = _slugifySpot(opts.spotName || (a && a.spot) || '');
+        }
+        var analysisId = kind + '_' + entityId + '_' + dateStr;
         var ratingOpts = '<option value="">— unverändert —</option>' +
             EXPERIENCE_LABELS.map(function (p) {
                 return '<option value="' + p[0] + '">' + esc(p[1]) + '</option>';
@@ -503,8 +523,8 @@ window.AnalysisView = (function () {
                 return '<option value="' + p[0] + '">' + esc(p[1]) + '</option>';
             }).join('');
         return '' +
-            '<div class="mga-admin-feedback" data-analysis-id="' + esc(analysisId) + '" data-region-id="' + esc(rid) + '">' +
-            '  <div class="mga-admin-feedback__title">Few-Shot-Feedback (Admin)</div>' +
+            '<div class="mga-admin-feedback" data-analysis-id="' + esc(analysisId) + '" data-entity-kind="' + esc(kind) + '" data-entity-id="' + esc(entityId) + '">' +
+            '  <div class="mga-admin-feedback__title">Few-Shot-Feedback (Admin) · ' + esc(kind === 'spot' ? 'Spot' : 'Region') + '</div>' +
             '  <div class="mga-admin-feedback__actions">' +
             '    <button type="button" data-fb-action="good">Als guten Fall speichern</button>' +
             '    <button type="button" data-fb-action="toggle">Bewertung korrigieren ▾</button>' +
@@ -620,7 +640,12 @@ window.AnalysisView = (function () {
             return;
         }
 
-        var showAdminFb = !!(window.gleitcastIsAdmin && isRegion && dateStr);
+        // Few-Shot-Feedback: Region braucht regionId, Spot braucht spotName.
+        // Wenn keiner geliefert ist, kann kein gueltiger analysis_id-Slug
+        // gebildet werden -> Block bleibt versteckt.
+        var fbOpts = { isRegion: isRegion, regionId: opts.regionId, spotName: opts.spotName };
+        var hasEntity = isRegion ? !!opts.regionId : !!opts.spotName;
+        var showAdminFb = !!(window.gleitcastIsAdmin && dateStr && hasEntity);
 
         // State B: Not-safe (inklusive noAnalysis-Pfad)
         var notSafe = (safetyStatus === 'not_safe')
@@ -632,7 +657,7 @@ window.AnalysisView = (function () {
             if (!isRegion) html += renderStartWindowV4(getV4StartWindow(a));
             html += renderTagGroupsV4(getV4Tags(a));
             html += renderFooter(dateStr);
-            if (showAdminFb) html += renderAdminFeedback(a, dateStr, opts.regionId);
+            if (showAdminFb) html += renderAdminFeedback(a, dateStr, fbOpts);
             wrapper.innerHTML = html;
             container.appendChild(wrapper);
             wireToggles(wrapper);
@@ -647,7 +672,7 @@ window.AnalysisView = (function () {
         html2 += renderMetrics(a);
         html2 += renderInsights(a);
         html2 += renderFooter(dateStr);
-        if (showAdminFb) html2 += renderAdminFeedback(a, dateStr, opts.regionId);
+        if (showAdminFb) html2 += renderAdminFeedback(a, dateStr, fbOpts);
         wrapper.innerHTML = html2;
         container.appendChild(wrapper);
         wireToggles(wrapper);

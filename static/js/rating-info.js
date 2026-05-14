@@ -1,5 +1,5 @@
 /**
- * Rating-Info-Overlay (RATING_CONCEPT v1.3 §8.6) — geteilt zwischen
+ * Rating-Info-Overlay (RATING_ARCHITECTURE v2.0) — geteilt zwischen
  * Spot-Karte (map.js) und Region-Karte (region-map.js), damit beide Seiten
  * dieselbe "Wie funktioniert das Rating?"-Erklaerung zeigen.
  *
@@ -28,7 +28,7 @@
         
         var fillOpacity = 1.0;
         if (rating > 0 && (band === 'green' || band === 'amber' || band === 'violet')) {
-            fillOpacity = 0.4 + (rating / 10) * 0.6;
+            fillOpacity = 0.4 + (Math.min(6, rating) / 6) * 0.6;
         }
         
         var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" aria-hidden="true">';
@@ -75,7 +75,7 @@
               '<div class="rating-info-body">' +
 
                 '<div class="rating-info-section">' +
-                  '<p class="rating-info-lead">Jeder Spot oder Region wird auf <b>zwei unabhaengigen Achsen</b> bewertet — Sicherheit und Erlebnis. Beides siehst du im selben Marker.</p>' +
+                  '<p class="rating-info-lead">Jeder Spot oder Region wird auf <b>zwei unabhaengigen Achsen</b> eingeschaetzt — Sicherheit und Fliegbarkeit. Beides siehst du im selben Marker.</p>' +
                 '</div>' +
 
                 '<div class="rating-info-section">' +
@@ -83,14 +83,17 @@
                     '<div class="rating-info-axis-card">' +
                       '<div class="rating-info-axis-title">Farbe = Sicherheit</div>' +
                       '<div class="rating-info-row">' + _glyphSvg('green', 0, 28) + '<span><b>Gruen</b> — sicher fliegbar</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('amber', 0, 28) + '<span><b>Orange</b> — Vorsicht, Caution-Notes</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('amber', 0, 28) + '<span><b>Orange</b> — Vorsicht, Caution-Notes beachten</span></div>' +
                       '<div class="rating-info-row">' + _glyphSvg('red', 0, 28)   + '<span><b>Rot</b> — nicht fliegbar</span></div>' +
                     '</div>' +
                     '<div class="rating-info-axis-card">' +
-                      '<div class="rating-info-axis-title">Zahl = Erlebnis</div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 1, 28) + '<span><b>1</b> — sicher, kurzer Flug</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 5, 28) + '<span><b>5</b> — solider Tag, lokal-XC</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 10, 28) + '<span><b>10</b> — Top-Tag, fettes XC</span></div>' +
+                      '<div class="rating-info-axis-title">Zahl = Fliegbarkeit (1\u20136)</div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 1, 28) + '<span><b>1</b> — Abgleiter</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 2, 28) + '<span><b>2</b> — Kurzer Thermikflug</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 3, 28) + '<span><b>3</b> — Solider Thermikflug</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 4, 28) + '<span><b>4</b> — Starker Thermikflug</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 5, 28) + '<span><b>5</b> — XC-Tag</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 6, 28) + '<span><b>6</b> — Klassiker (Top-Tag)</span></div>' +
                     '</div>' +
                   '</div>' +
                 '</div>' +
@@ -98,9 +101,9 @@
                 '<div class="rating-info-section">' +
                   '<h3>Beispiele</h3>' +
                   '<div class="rating-info-examples">' +
-                    '<div class="rating-info-example">' + _glyphSvg('green', 10, 44) + '<div class="rating-info-example-label">Top-Tag</div></div>' +
-                    '<div class="rating-info-example">' + _glyphSvg('green', 5, 44) + '<div class="rating-info-example-label">Solider Tag</div></div>' +
-                    '<div class="rating-info-example">' + _glyphSvg('amber', 8, 44) + '<div class="rating-info-example-label">Vorsicht — Pro-Tag</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('green', 6, 44) + '<div class="rating-info-example-label">Klassiker</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('green', 4, 44) + '<div class="rating-info-example-label">Starker Thermikflug</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('amber', 3, 44) + '<div class="rating-info-example-label">Vorsicht — solid moeglich</div></div>' +
                     '<div class="rating-info-example">' + _glyphSvg('red', 0, 44)   + '<div class="rating-info-example-label">Nicht fliegbar</div></div>' +
                   '</div>' +
                 '</div>' +
@@ -109,12 +112,12 @@
                   '<h3>Im Detail-Panel — die Tiefe</h3>' +
                   '<div class="rating-info-deeper">' +
                     '<dl>' +
-                      '<dt>Safety-Score</dt>' +
-                      '<dd>0–100. Aggregat von 5 Sub-Aspekten: Bodenwind, Boeen, Hoehenwind, Foehn, Wetter (Niederschlag/Gewitter/Sicht). Aggregation per <b>Weakest-Link</b> — der schwaechste Aspekt zieht den Score nach unten. Ein einzelnes Gewitter macht den Tag rot, auch wenn alle anderen 4 perfekt sind.</dd>' +
-                      '<dt>Flugqualitaet — Kategorie (1-7)</dt>' +
-                      '<dd>Statt einer Zahl vergibt die KI eine <b>Kategorie</b> die der Pilot kennt: <b>Abgleiter</b> (1, keine Thermik), <b>Soaring</b> (2, Hangwind), <b>Kurzer Thermikflug</b> (3, schwach), <b>Solider Thermikflug</b> (4, Hausrunden), <b>Starker Thermikflug</b> (5, lokal-XC), <b>XC-Tag</b> (6, 50-100km), <b>Klassiker</b> (7, Tag des Jahres). Die Zahl 1-7 ist die interne Skala — die KI selbst waehlt nur die Kategorie.</dd>' +
-                      '<dt>Comfort-Index</dt>' +
-                      '<dd>0–100. Wie glatt (100) oder klapprig (0) der Tag wird. Beeinflusst <b>nicht</b> das Rating — nur dein Wohlbefinden in der Luft.</dd>' +
+                      '<dt>Sicherheits-Rating</dt>' +
+                      '<dd>0–10. Aggregat aus bis zu 8 Sub-Aspekten: Bodenwind, Boeen, Hoehenwind, Foehn, Niederschlag, Gewitter, CAPE, Sicht. Aggregation per <b>Weakest-Link</b> — der schwaechste Aspekt zieht das Rating nach unten. Ein einzelnes Gewitter macht den Tag rot, auch wenn alle anderen Aspekte perfekt sind.</dd>' +
+                      '<dt>Fliegbarkeit — Kategorie (1\u20136)</dt>' +
+                      '<dd>Statt einer Zahl vergibt die KI eine <b>Kategorie</b> die der Pilot kennt: <b>Abgleiter</b> (1, keine Thermik), <b>Kurzer Thermikflug</b> (2, schwach), <b>Solider Thermikflug</b> (3, mehrere Stunden), <b>Starker Thermikflug</b> (4, hohe Steigwerte), <b>XC-Tag</b> (5, Strecke moeglich), <b>Klassiker</b> (6, Tag des Jahres). Bei <b>nicht fliegbar</b> wird die Fliegbarkeit auf 1 gesetzt.</dd>' +
+                      '<dt>Streckenflug-Rating (nur Spot)</dt>' +
+                      '<dd>1\u20136 fuer XC-Potenzial. Kann sich stark von der Fliegbarkeit unterscheiden — ein Spot kann lokal stark sein (Fliegbarkeit 4) aber die Region erlaubt kein Wegfliegen (Streckenflug 2).</dd>' +
                     '</dl>' +
                   '</div>' +
                 '</div>' +
@@ -122,7 +125,7 @@
                 '<div class="rating-info-section">' +
                   '<h3>Wer entscheidet was?</h3>' +
                   '<p><b>Sicherheit:</b> KI + Decision-Engine. Das LLM beurteilt Aspekte, harte Sicherheits-Schwellen (Foehn-Durchbruch, Hoehenwind &gt; 30 km/h, Gewitter) <b>ueberschreiben</b> das LLM — ein gefaehrlicher Tag kann nicht "weggetextet" werden.</p>' +
-                  '<p><b>Flugqualitaet (Kategorie):</b> reine KI-Einschaetzung. Die KI waehlt eine der 7 Kategorien aus dem Pilot-Vokabular — kein Rechnen, kein Mittelwert. Wir wollen sehen, ob ein Modell ganzheitlich urteilen kann — wenn die Einschaetzung dir falsch erscheint, ist das wertvolles Feedback.</p>' +
+                  '<p><b>Fliegbarkeit (Kategorie):</b> reine KI-Einschaetzung. Die KI waehlt eine der 6 Kategorien aus dem Pilot-Vokabular — kein Rechnen, kein Mittelwert. Bei <b>nicht sicher</b> faellt die Fliegbarkeit automatisch auf 1 (keine Belohnung ohne Sicherheit).</p>' +
                 '</div>' +
 
               '</div>' +
@@ -174,7 +177,7 @@
                     '<span class="map-legend-pill safety-amber">Vorsicht</span>' +
                     '<span class="map-legend-pill safety-red">Nicht fliegbar</span>' +
                 '</div>' +
-                '<div class="map-legend-hint">Zahl im Marker = Erlebnis (1\u20135)</div>' +
+                '<div class="map-legend-hint">Zahl im Marker = Fliegbarkeit (1\u20136)</div>' +
                 '<button class="map-legend-info-btn" data-action="open-rating-info" type="button">' +
                     '<span class="map-legend-info-icon" aria-hidden="true">\u24D8</span>' +
                     '<span>Wie funktioniert das Rating?</span>' +

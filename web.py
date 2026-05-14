@@ -1664,7 +1664,7 @@ def admin_labeled_examples():
 @app.route("/api/admin/labeled-examples", methods=["POST"])
 @_require_admin
 def api_labeled_examples_create():
-    """Speichert einen Region-Analyse-Fall als Labeled Example."""
+    """Speichert einen Region- oder Spot-Analyse-Fall als Labeled Example."""
     from engine import labeled_examples as le
 
     payload = request.get_json(silent=True) or {}
@@ -1675,17 +1675,27 @@ def api_labeled_examples_create():
     parsed = le.parse_analysis_id(payload["analysis_id"])
     if parsed is None:
         return jsonify({"ok": False, "error": "invalid analysis_id"}), 400
-    region_id, target_date = parsed
+    kind, entity_id, target_date = parsed
 
-    if engine is None or not getattr(engine, "region_analyses", None):
+    if engine is None:
         return jsonify({"ok": False, "error": "engine not ready"}), 503
 
-    region_block = engine.region_analyses.get(region_id) or {}
-    analysis_entry = region_block.get(target_date)
+    if kind == "region":
+        if not getattr(engine, "region_analyses", None):
+            return jsonify({"ok": False, "error": "engine not ready"}), 503
+        analysis_entry = (engine.region_analyses.get(entity_id) or {}).get(target_date)
+    else:  # spot
+        if not getattr(engine, "spot_analyses", None):
+            return jsonify({"ok": False, "error": "engine not ready"}), 503
+        site_name = le.resolve_spot_name(entity_id)
+        if not site_name:
+            return jsonify({"ok": False, "error": f"unknown spot slug '{entity_id}'"}), 404
+        analysis_entry = (engine.spot_analyses.get(site_name) or {}).get(target_date)
+
     if not analysis_entry:
         return jsonify({"ok": False, "error": "analysis not in cache"}), 404
 
-    snap = le.build_snapshot(region_id, target_date, analysis_entry, payload)
+    snap = le.build_snapshot(kind, entity_id, target_date, analysis_entry, payload)
     le.append_or_replace(snap)
     return jsonify({
         "ok": True,

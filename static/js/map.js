@@ -197,29 +197,26 @@
         return 'default';
     }
 
-    // ===== CUSTOM MARKER GENERATOR (Single-Glyph v1.3) =====
+    // ===== CUSTOM MARKER GENERATOR (RATING_ARCHITECTURE v2.0) =====
     // Inner circle = safety band color
     // Inner glyph:
     //   - red                 → white X cross (Sperr-Glyphe)
-    //   - rating >= 1         → white digit 1-10 (Erlebnis, v1.4)
-    //   - stars == 0          → small white dot (sicher aber Abgleiter)
+    //   - rating >= 1         → white digit 1-6 (experience_rating)
+    //   - rating == 0         → small white dot (sicher aber Abgleiter)
     //   - no_data / default   → small white dot (faded)
     function createSpotIcon(props, safetyBand, experienceRating, isHighlighted) {
         var uid = ++_iconUid;
         var style = mapSafetyBandToStyle(safetyBand);
         var isMobile = window.innerWidth <= 600;
-        // Marker-Groesse: User-Praeferenz "halb so gross" — radius 6-8px.
-        // v1.4: leichte Vergroesserung (+1px) damit zweistellige Ratings (10)
-        // lesbar bleiben. Ziffer skaliert ueber radius * fontFactor automatisch mit.
         var svgSize = 44;
         var center = svgSize / 2;
         var radius = isHighlighted ? (isMobile ? 9 : 8) : (isMobile ? 8 : 7);
-        var rating = (typeof experienceRating === 'number' && experienceRating >= 0 && experienceRating <= 10)
+        var rating = (typeof experienceRating === 'number' && experienceRating >= 0 && experienceRating <= 6)
             ? Math.floor(experienceRating) : 0;
 
-        // Display-Band Premium-Override: safe + rating>=9 → violett.
+        // Display-Band Premium-Override: safe + rating=6 (Klassiker) → violett.
         // Auch fuer Wind-Sektor + Highlight-Glow, damit der Marker konsistent wirkt.
-        if (safetyBand === 'green' && rating >= 9) {
+        if (safetyBand === 'green' && rating >= 6) {
             safetyBand = 'violet';
             style = { fill: '#8b5cf6', stroke: '#6d28d9' };
         }
@@ -265,11 +262,11 @@
         // Weisser Hintergrund-Kreis, damit die Karte bei transparentem Fill nicht durchscheint
         html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="#ffffff" />';
 
-        // Intensitaet (Deckkraft) basierend auf Rating — moderater Dynamikbereich.
-        // Rating 1 ~0.28, Rating 5 ~0.60, Rating 10 = 1.0.
+        // Intensitaet (Deckkraft) basierend auf experience_rating 1-6.
+        // Rating 1 ~0.33, Rating 3 ~0.60, Rating 6 = 1.0.
         var fillOpacity = 1.0;
         if (rating > 0 && (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet')) {
-            fillOpacity = 0.20 + (rating / 10) * 0.80;
+            fillOpacity = 0.20 + (rating / 6) * 0.80;
         }
 
         // Main circle (safety band color)
@@ -288,10 +285,8 @@
                   + '" x2="' + (center - arm) + '" y2="' + (center + arm)
                   + '" stroke="#ffffff" stroke-width="' + crossWidth + '" stroke-linecap="round" />';
         } else if (rating >= 1 && (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet')) {
-            // Ziffer 1-10 — Erlebnis-Rating, prominent zum sofortigen Erkennen.
-            // Zweistellige "10" braucht kleinere Schrift, damit's in den Kreis passt.
-            var twoDigit = rating >= 10;
-            var fontSize = Math.round(radius * (twoDigit ? 1.1 : 1.5));
+            // Ziffer 1-6 — experience_rating, prominent zum sofortigen Erkennen.
+            var fontSize = Math.round(radius * 1.5);
             var textFill = (fillOpacity < 0.65) ? style.stroke : '#ffffff';
             html += '<text x="' + center + '" y="' + (center + fontSize * 0.35)
                   + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter, sans-serif"'
@@ -911,7 +906,7 @@
     };
 
     // ===== SPOT COLORING (from LLM analyses, RATING_CONCEPT v1.4) =====
-    // Reads safety_band + experience_rating (1-10), Fallback experience_stars + rating.
+    // Reads safety_status + experience_rating (1-6, RATING_ARCHITECTURE v2.0).
     window.updateSpotColors = function (analysisData, dateStr) {
         // analysisData: {spot_name: {date_str: {safety_band, experience_rating, ...}}}
         if (!analysisData || !dateStr) return;

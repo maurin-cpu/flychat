@@ -29,8 +29,12 @@ REGIONEN_CSV = config.DATA_DIR / "regionen.csv"
 
 VALID_LABELS = ("richtig", "zu_optimistisch", "zu_pessimistisch")
 VALID_SAFETY_STATUS = ("safe", "conditional", "not_safe")
+VALID_ENTITY_TYPES = ("region", "spot")
 
-_ANALYSIS_ID_RE = re.compile(r"^region_([a-z0-9_]+)_(\d{4}-\d{2}-\d{2})$")
+# analysis_id = <kind>_<slug>_<YYYY-MM-DD>. Slug ist lowercase a-z0-9_.
+# Kind unterscheidet region vs. spot — beide nutzen denselben Speicher,
+# Aggregates und Backstops sind aber kind-spezifisch.
+_ANALYSIS_ID_RE = re.compile(r"^(region|spot)_([a-z0-9_]+)_(\d{4}-\d{2}-\d{2})$")
 _FOEHN_DECISION_RE = re.compile(r"^Foehn(?:Caution|Danger)\(([\d.]+)\)$")
 
 _module_lock = threading.Lock()
@@ -77,6 +81,8 @@ class _FileLock:
 # ---------------------------------------------------------------------------
 
 _TIER_CACHE: dict[str, dict[str, str]] | None = None
+_SPOT_META_CACHE: dict[str, dict[str, str]] | None = None  # slug -> meta
+_SPOT_SLUG_TO_NAME: dict[str, str] | None = None  # slug -> original site_name
 
 
 def _load_region_meta() -> dict[str, dict[str, str]]:
@@ -103,39 +109,108 @@ def _load_region_meta() -> dict[str, dict[str, str]]:
     return meta
 
 
-def _terrain_tier_for(region_id: str) -> str:
-    return _load_region_meta().get(region_id, {}).get("terrain_type", "")
+def slugify_spot(name: str) -> str:
+    """site_name -> a-z0-9_-Slug. Mirror in static/js/analysis-view.js halten.
+
+    Umlaute werden expandiert (ae/oe/ue/ss), alle anderen Nicht-Alphanumeric
+    werden zu Underscores zusammengezogen.
+    """
+    if not name:
+        return ""
+    s = name.lower()
+    s = s.replace("\u00e4", "ae").replace("\u00f6", "oe").replace("\u00fc", "ue")
+    s = s.replace("\u00df", "ss")
+    s = re.sub(r"[^a-z0-9]+", "_", s)
+    return s.strip("_")
 
 
-def _elevation_for(region_id: str) -> int | None:
-    raw = _load_region_meta().get(region_id, {}).get("elevation_ref", "")
+def _load_spot_meta() -> dict[str, dict[str, str]]:
+    """slug -> {site_name, terrain_type, elevation_m, kritischer_foehn}. Lazy cached.
+
+    Quelle: fluggebiete_complete.csv via spots.load_spots() — wir
+    importieren lazy um Zirkulaer-Imports zu vermeiden.
+    """
+    global _SPOT_META_CACHE, _SPOT_SLUG_TO_NAME
+    if _SPOT_META_CACHE is not None and _SPOT_SLUG_TO_NAME is not None:
+        return _SPOT_META_CACHE
+    from spots import load_spots
+    meta: dict[str, dict[str, str]] = {}
+    slug_to_name: dict[str, str] = {}
+    try:
+        for spot in load_spots():
+            name = spot.get("name") or ""
+            slug = slugify_spot(name)
+            if not slug:
+                continue
+            slug_to_name[slug] = name
+            meta[slug] = {
+                "site_name": name,
+                "terrain_type": (spot.get("terrain_type") or "").strip(),
+                "elevation_m": str(spot.get("elevation_m") or ""),
+                "kritischer_foehn": (spot.get("kritischer_foehn") or "").strip(),
+                "analyse_region": (spot.get("analyse_region") or "").strip(),
+            }
+    except Exception as exc:
+        logger.warning("Spot-Meta konnte nicht geladen werden: %s", exc)
+    _SPOT_META_CACHE = meta
+    _SPOT_SLUG_TO_NAME = slug_to_name
+    return meta
+
+
+def resolve_spot_name(slug: str) -> str | None:
+    """Slug -> originaler site_name. None falls unbekannt."""
+    _load_spot_meta()
+    return (_SPOT_SLUG_TO_NAME or {}).get(slug)
+
+
+def _terrain_tier_for(kind: str, entity_id: str) -> str:
+    if kind == "spot":
+        return _load_spot_meta().get(entity_id, {}).get("terrain_type", "")
+    return _load_region_meta().get(entity_id, {}).get("terrain_type", "")
+
+
+def _elevation_for(kind: str, entity_id: str) -> int | None:
+    if kind == "spot":
+        raw = _load_spot_meta().get(entity_id, {}).get("elevation_m", "")
+    else:
+        raw = _load_region_meta().get(entity_id, {}).get("elevation_ref", "")
     try:
         return int(raw)
     except (TypeError, ValueError):
         return None
 
 
-def _foehn_direction_for(region_id: str) -> str:
-    return _load_region_meta().get(region_id, {}).get("kritischer_foehn", "")
+def _foehn_direction_for(kind: str, entity_id: str) -> str:
+    if kind == "spot":
+        return _load_spot_meta().get(entity_id, {}).get("kritischer_foehn", "")
+    return _load_region_meta().get(entity_id, {}).get("kritischer_foehn", "")
 
 
 # ---------------------------------------------------------------------------
 # Weather-Slice + Aggregates
 # ---------------------------------------------------------------------------
 
-def _extract_weather_slice(region_id: str, target_date: str) -> dict[str, Any]:
-    """Hourly + pressure-level slice fuer eine Region an einem Datum.
+def _extract_weather_slice(kind: str, entity_id: str, target_date: str) -> dict[str, Any]:
+    """Hourly + pressure-level slice fuer Region oder Spot an einem Datum.
 
     Liest data/wetterdaten.json frisch (kein In-Memory-Cache, da
-    Snapshot-Erzeugung selten). Bei fehlender Region oder fehlendem Datum:
-    leerer Slice. Caller entscheidet wie er damit umgeht.
+    Snapshot-Erzeugung selten). Bei fehlender Entitaet oder fehlendem
+    Datum: leerer Slice.
+
+    Region: liegt unter ``_regions[region_id]``. Spot: liegt direkt auf
+    Top-Level keyed by site_name — wir resolven Slug -> site_name.
     """
     from fetch_weather import load_cached_weather
 
     raw = load_cached_weather() or {}
-    region = (raw.get("_regions") or {}).get(region_id) or {}
-    hourly_all = region.get("hourly_data") or {}
-    plev_all = region.get("pressure_level_data") or {}
+    if kind == "spot":
+        site_name = resolve_spot_name(entity_id)
+        node = raw.get(site_name) if site_name else None
+    else:
+        node = (raw.get("_regions") or {}).get(entity_id)
+    node = node or {}
+    hourly_all = node.get("hourly_data") or {}
+    plev_all = node.get("pressure_level_data") or {}
 
     prefix = f"{target_date}T"
     hourly_day = {ts: v for ts, v in hourly_all.items() if ts.startswith(prefix)}
@@ -174,7 +249,8 @@ def _parse_foehn_peak(decisions: list[str]) -> float | None:
 def _compute_aggregates(
     slice_: dict[str, Any],
     decisions: list[str],
-    region_id: str,
+    kind: str,
+    entity_id: str,
 ) -> dict[str, Any]:
     """11 Aggregat-Felder gemaess Schema. Felder ohne Quelle = None."""
     hourly = slice_.get("hourly") or {}
@@ -198,7 +274,7 @@ def _compute_aggregates(
         "wind_850hpa_mean": _safe_mean(_plev_col("wind_speed_850hPa")),
         "gust_excess_max": _safe_max(gust_excess),
         "foehn_risk_peak": _parse_foehn_peak(decisions),
-        "foehn_direction_dominant": _foehn_direction_for(region_id) or None,
+        "foehn_direction_dominant": _foehn_direction_for(kind, entity_id) or None,
         "climb_peak": None,
         "productive_thermal_h": None,
         "blh_max": _safe_max(_h_col("boundary_layer_height")),
@@ -212,30 +288,46 @@ def _compute_aggregates(
 # Snapshot-Builder
 # ---------------------------------------------------------------------------
 
-def parse_analysis_id(analysis_id: str) -> tuple[str, str] | None:
-    """region_<id>_<YYYY-MM-DD> -> (region_id, date). None bei Mismatch."""
+def parse_analysis_id(analysis_id: str) -> tuple[str, str, str] | None:
+    """``<kind>_<slug>_<YYYY-MM-DD>`` -> (kind, slug, date). None bei Mismatch.
+
+    kind ist entweder "region" oder "spot". Backwards-Compat:
+    bestehende Eintraege haben `analysis_id = region_<slug>_<date>` und
+    matchen weiterhin.
+    """
     m = _ANALYSIS_ID_RE.match(analysis_id or "")
     if not m:
         return None
-    return m.group(1), m.group(2)
+    return m.group(1), m.group(2), m.group(3)
 
 
 def build_snapshot(
-    region_id: str,
+    kind: str,
+    entity_id: str,
     target_date: str,
     analysis_entry: dict[str, Any],
     label_payload: dict[str, Any],
 ) -> dict[str, Any]:
-    """Vollstaendiger JSONL-Eintrag. analysis_entry kommt aus
-    engine.region_analyses[region_id][target_date].
-    """
-    weather = _extract_weather_slice(region_id, target_date)
-    decisions = list(analysis_entry.get("_decisions_applied") or [])
-    aggregates = _compute_aggregates(weather, decisions, region_id)
+    """Vollstaendiger JSONL-Eintrag.
 
-    analysis_id = f"region_{region_id}_{target_date}"
+    Fuer kind="region": analysis_entry kommt aus
+    engine.region_analyses[region_id][target_date].
+    Fuer kind="spot": aus engine.spot_analyses[site_name][target_date].
+    """
+    weather = _extract_weather_slice(kind, entity_id, target_date)
+    decisions = list(analysis_entry.get("_decisions_applied") or [])
+    aggregates = _compute_aggregates(weather, decisions, kind, entity_id)
+
+    analysis_id = f"{kind}_{entity_id}_{target_date}"
     timestamp = datetime.now().isoformat(timespec="seconds")
     model_id = getattr(config, "ANALYSIS_MODEL", "") or "step1-unknown"
+
+    # Fuer Spots speichern wir den originalen site_name als spot_or_region_id,
+    # damit Admin-UI + Detail-Modal direkt auflisten/laden koennen.
+    if kind == "spot":
+        spot_or_region_id = resolve_spot_name(entity_id) or entity_id
+    else:
+        spot_or_region_id = entity_id
 
     return {
         "analysis_id": analysis_id,
@@ -244,14 +336,15 @@ def build_snapshot(
         "schema_version": "v2.0",
         "model_id": model_id,
         "prompt_hash": "step1-pending",
-        "spot_or_region_id": region_id,
-        "entity_type": "region",
-        "terrain_tier": _terrain_tier_for(region_id),
+        "spot_or_region_id": spot_or_region_id,
+        "entity_type": kind,
+        "entity_slug": entity_id,
+        "terrain_tier": _terrain_tier_for(kind, entity_id),
         "target_date": target_date,
         "weather_input": {
             "hourly": weather.get("hourly") or {},
             "aggregates": aggregates,
-            "elevation_m": _elevation_for(region_id),
+            "elevation_m": _elevation_for(kind, entity_id),
             "month": int(target_date.split("-")[1]) if "-" in target_date else None,
         },
         "decisions_applied": decisions,
@@ -287,7 +380,7 @@ def validate_payload(payload: dict[str, Any]) -> tuple[bool, str | None]:
     """Returns (ok, error_message). Erwartet Felder der POST-Payload."""
     analysis_id = payload.get("analysis_id")
     if not parse_analysis_id(analysis_id or ""):
-        return False, "analysis_id must match 'region_<slug>_<YYYY-MM-DD>'"
+        return False, "analysis_id must match '(region|spot)_<slug>_<YYYY-MM-DD>'"
 
     label = payload.get("label")
     if label not in VALID_LABELS:

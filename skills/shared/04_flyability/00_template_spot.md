@@ -29,7 +29,7 @@ SELBST-CHECK VOR DER ANTWORT (PFLICHT)
 
 1. **Text-Rating-Konsistenz**: Lies `recommendation` und `thermal_quality`. Wörter wie "schwach", "kaum Thermik", "nicht realistisch" → `experience_rating` MUSS ≤ 2 sein. Rating ≥ 4 mit negativem Text = FEHLER.
 2. **Thermik-Realitäts-Check**: Keine nutzbare Thermik im Fenster → `experience_rating = 1`.
-3. **RATING-INPUTS prüfen**: Lies prod_h_strict und sustained_peak. prod_h_strict < 2 → max Rating **2**. prod_h_strict ≥ 5 UND sustained_peak ≥ 2.0 → mindestens Rating **4**.
+3. **RATING-INPUTS prüfen**: Lies prod_h_strict und sustained_peak. prod_h_strict < 2 → max Rating **2**. prod_h_strict ≥ 4 UND sustained_peak ≥ 2.0 → mindestens Rating **4**.
 4. **Streckenflug-Konsistenz**: Rating ≥ 5 (xc_tag/klassiker) → `streckenflug.rating` ≥ 4. Rating ≤ 2 → `streckenflug.rating` ≤ 3.
 5. **Anti-Cluster-Regel**: Vermeide Rating **3** als Default. Differenziere bewusst zwischen 2, 3, 4.
 6. **Tagesverlauf-Trend (rein Flugqualitaet)**: Wenn Datenblock Thermik-Aufbau/Verfall oder Bewölkungs-Zunahme zeigt, kannst du das im `recommendation` erwähnen. ABER: Wind-Trends, Hoehenwind-Verschlechterung, Foehn-Aufzug → NICHT erwähnen (Safety-Domain).
@@ -48,7 +48,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
   "experience_rating": 1,
   "flight_type": "Thermikflug|Soaring|Soaring+Thermik|Abgleiter",
   "flight_duration_estimate": "z.B. '2-3h Thermikflug' oder '30min Abgleiter'",
-  "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet in natuerlicher Sprache MIT Begruendung aus Datenblock-Fakten (Bewoelkungs-%, BLH, produktive Stunden, TQ-Tags als Mechanismus). Bei max(tief,mittel) >=80%: 'schwache Thermik wegen Bewoelkung tief Y%, mittel Z% — Sonne erreicht Boden kaum'. Bei <=50% Cu: positiv und mit Grund ('Cu 30%, Sonne erreicht Boden direkt'). Cirrus allein: normal bewerten.",
+  "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet in natuerlicher Sprache MIT Begruendung aus Datenblock-Fakten (Bewoelkungs-%, BLH, produktive Stunden, TQ-Tags als Mechanismus). Tief und mittel getrennt bewerten (tief = Cu-Marker, mittel = Altostratus-Daempfer): Bei tief ≥ 80%: 'Cu-Overcast/Stratus blockiert Sonne von unten'. Bei mittel ≥ 70%: 'Altostratus-Decke daempft Einstrahlung von oben'. Bei tief klar aber mittel 40-60%: 'gedaempft durch Mittelbewoelkung trotz klarer Sicht unten'. Bei tief ≤ 50% Cu UND mittel ≤ 30%: positiv ('Cu 30%, kaum Mittelbewoelkung — volle Einstrahlung'). Cirrus allein (tief+mittel klar): normal bewerten.",
   "peak_climb_rate": 0.0,
   "xc_potential": "high|moderate|low",
   "xc_details": "2-3 Saetze. Bei `low`/`moderate`: PFLICHT konkrete Begruendung aus Datenblock — was limitiert (Peak < X m/s, BLH zu tief, Region-Wind hoch, Bewoelkung). Bei `high`: wovon profitiert (Region-Peak, ruhiger Hoehenwind, hohe Basis, lange produktive Phase).",
@@ -65,7 +65,7 @@ Antworte AUSSCHLIESSLICH als JSON. Keine Tags in der Antwort, keine eckigen Klam
     "ERLAUBTE Topics (Whitelist — alles andere wird verworfen): CLOUDS (Bewoelkung daempft Thermik — NUR oberhalb Startplatz), THERMAL (Thermik-Qualitaet), XC (Streckenflug-Potenzial), INVERSION (blockierende/limitierende Inversion), BASE (Wolkenbasis tief/hoch relativ zu Spot), WINDOW (Flugfenster-Laenge/Nutzbarkeit), SUNSHINE (Einstrahlungs-Qualitaet), CONVERGENCE (Konvergenzlinien als XC-Booster).",
     "VERBOTEN sind alle Backend-Topics (WIND_GROUND, WIND_ALOFT, RAIN, THUNDERSTORM, FOEHN, TURBULENCE) sowie Severity 'stop' und 'warn'. CLOUDS-Sicht-Issues (Wolken auf Startplatzhoehe) sind ebenfalls Backend. Backend wirft solche Tags raus.",
     "Pro-Topic-Severity-Matrix (sonst Tag verworfen): INVERSION nur 'reducer'; CONVERGENCE/XC nur 'good'; CLOUDS/BASE/THERMAL/WINDOW/SUNSHINE 'reducer' oder 'good'.",
-    "Sanity: THERMAL severity='good' nur wenn peak_climb_rate >= 1.0 m/s. CLOUDS 'good' nur wenn tief+mittel <= 60% — Bewoelkung daempft Thermik → 'reducer' nutzen. BASE 'reducer' wenn Wolkenbasis < 600m ueber Startplatz; BASE 'good' wenn Basis > 800m ueber Gipfel.",
+    "Sanity: THERMAL severity='good' nur wenn peak_climb_rate >= 1.0 m/s. CLOUDS 'good' nur wenn tief ≤ 50% UND mittel ≤ 30% (= cu_clean_top-Niveau, klare Einstrahlung). CLOUDS 'reducer' wenn tief ≥ 80% ODER mittel ≥ 70%. BASE 'reducer' wenn Wolkenbasis < 600m ueber Startplatz; BASE 'good' wenn Basis > 800m ueber Gipfel.",
     "Beispiel: [{\"topic\": \"THERMAL\", \"severity\": \"good\", \"label\": \"Thermik\", \"value\": \"peak 2.8 m/s\", \"time\": \"12-15 h\"}, {\"topic\": \"CLOUDS\", \"severity\": \"reducer\", \"label\": \"Bewoelkung\", \"value\": \"bedeckt 80% Mittag (oberhalb Startplatz)\", \"time\": \"11-14 h\"}, {\"topic\": \"INVERSION\", \"severity\": \"reducer\", \"label\": \"Inversion\", \"value\": \"blockiert ueber 1800m\", \"time\": \"\"}, {\"topic\": \"BASE\", \"severity\": \"good\", \"label\": \"Wolkenbasis\", \"value\": \"1200m ueber Gipfel\", \"time\": \"\"}]",
     "Im Zweifel WENIGER Tags. Topic weglassen wenn nichts Konkretes zu sagen ist."
   ],

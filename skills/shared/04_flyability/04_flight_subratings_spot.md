@@ -35,8 +35,8 @@ DIE 6 KATEGORIEN MIT RATING-MAPPING (Pilot-Sprache)
 | **2** | `kurzer_thermikflug` | Thermik vorhanden aber mau oder kurz. 30-60min was, dann zufrieden runter. Peak < 1.5 m/s ODER Peak ok aber nur 1-3h. |
 | **3** | `solider_thermikflug` | Peak 1.5-2.0 m/s ueber mehrere Stunden. 2-3h Hausrunden, vielleicht 20km lokal. *Der typische Schweizer Flugtag.* |
 | **4** | `starker_thermikflug` | Peak 2.0-2.5 m/s ueber 4-5 Stunden. Steigst zuverlaessig, kommst mit Laecheln runter. Lokal-XC bis ~50km moeglich. |
-| **5** | `xc_tag` | Peak 2.0-2.5 m/s mindestens 5h, hohe Arbeitshoehe (>1500m AGL), Bewoelkung passt. 50-100km Strecke. |
-| **6** | `klassiker` | Peak ≥2.5 m/s ueber 6+h, Arbeitshoehe >2000m AGL, `cu_clean_top`. 100km+. *Tag des Jahres — 5-15× pro Saison in CH.* |
+| **5** | `xc_tag` | Peak 2.0-2.5 m/s mindestens 4h, Arbeitshoehe (>1000m AGL), Bewoelkung passt. 50-100km Strecke. |
+| **6** | `klassiker` | Peak ≥2.5 m/s ueber 5+h, Arbeitshoehe >1500m AGL, `cu_clean_top`. 100km+. *Tag des Jahres — 5-15× pro Saison in CH.* |
 
 **Wichtig:** Ein reiner Soaring-Tag (Hangwind ja, Thermik nein) ist **Rating
 1** (kein Thermikflug). Erwaehne Soaring-Moeglichkeit in der Prosa
@@ -54,16 +54,16 @@ kein Thermik = Rating 1, Prosa erwaehnt Soaring-Option.
 30-60min Schraube, zufrieden runter.
 
 **Rating 3 (`solider_thermikflug`)** — Standard-Sommertag: Peak 1.5-2.0 m/s
-× 4-5h, BLH 2500m. 2-3h Hausrunden, ~20km lokal.
+× 3-4h, BLH 2500m. 2-3h Hausrunden, ~20km lokal.
 
 **Rating 4 (`starker_thermikflug`)** — Voralpentag Mai/Juni: Peak 2.0-2.5 m/s
 × 4-5h, BLH 2800m, SCT-Cu 25%. 40-50km lokal-XC, Laecheln beim Landen.
 
-**Rating 5 (`xc_tag`)** — Wallis Hochsommer: Peak 2.2-2.5 m/s × 5-6h,
+**Rating 5 (`xc_tag`)** — Wallis Hochsommer: Peak 2.2-2.5 m/s × 4-5h,
 BLH 3500m+, Cu sauber. 80-120km Strecke.
 
 **Rating 6 (`klassiker`)** — Mai-Juli Alpenhoch mit Konvergenz: Peak ≥2.5 m/s
-× 6h+, BLH ≥3500m, Cu-Strassen. 150km+.
+× 5h+, BLH ≥3500m, Cu-Strassen. 150km+.
 
 ─────────────────────────────────
 HILFSDATEN AUS DEM DATENBLOCK
@@ -78,7 +78,7 @@ HILFSDATEN AUS DEM DATENBLOCK
 - **`sustained_peak`** = wichtigster Wert. <1.5 mau, >2.0 ordentlich, >2.5 top.
 - **`prod_h_strict`** = Dauer. Lange Dauer × schwacher Peak = lang-und-mau,
   NICHT stark.
-- **`working_height_agl`** = Hoehe ueber Spot. <1500m kein XC.
+- **`working_height_agl`** = Hoehe ueber Spot. <1000m kein XC.
 - **`cloud_structure`**: `cu_clean_top` = Bonus, `blue` = ok, `overcast`/`OD` = killt.
 
 ─────────────────────────────────
@@ -105,13 +105,22 @@ MINDEST-VORAUSSETZUNGEN je Rating
 | Rating | Voraussetzungen (alle erfuellt) |
 |---|---|
 | **2** | prod_h ≥ 1h UND sustained_peak ≥ 1.0 |
-| **3** | prod_h ≥ 4h UND sustained_peak ≥ 1.5 |
-| **4** | prod_h ≥ 4h UND sustained_peak ≥ 2.0 UND working_height ≥ 1000m |
-| **5** | prod_h ≥ 5h UND sustained_peak ≥ 2.0 UND working_height ≥ 1500m UND cloud_structure NICHT overcast/OD |
-| **6** | prod_h ≥ 6h UND sustained_peak ≥ 2.5 UND working_height ≥ 2000m UND cu_clean_top |
+| **3** | prod_h ≥ 3h UND sustained_peak ≥ 1.5 |
+| **4** | prod_h ≥ 4h UND sustained_peak ≥ 2.0 UND working_height ≥ 500m |
+| **5** | prod_h ≥ 4h UND sustained_peak ≥ 2.0 UND working_height ≥ 1000m UND cloud_structure NICHT overcast/OD |
+| **6** | prod_h ≥ 5h UND sustained_peak ≥ 2.5 UND working_height ≥ 1500m UND **cu_clean_top** (= tief 12-50% Cu UND mittel < 30%) |
 
 Fuer Rating 5 reicht **jede** Bewoelkungs-Variante ausser overcast/OD —
 cu_clean_top ist nicht Pflicht (das ist erst fuer Rating 6 noetig).
+
+**Bewoelkung fuer Top-Tag (Rating 6 = klassiker):**
+- **tief**: 12-50% mit Cu-Charakter (Schoenwetter-Cu humilis/mediocris als Thermik-Marker)
+- **mittel**: < 30% (Altostratus-Decke wuerde Einstrahlung daempfen — fuer klassiker MUSS oben klar sein)
+- **hoch**: egal (Cirrus laesst Sonne durch)
+
+Ein Tag mit Cu 30% unten aber 50% Altostratus oben ist KEIN klassiker — er ist
+ein guter `starker_thermikflug` (4) oder `xc_tag` (5), weil die Mittelbewoelkung
+die starke Thermik nicht zulaesst, die man fuer 100km+ braucht.
 
 ─────────────────────────────────
 SANITY-CHECK

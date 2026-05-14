@@ -3,24 +3,30 @@
     'use strict';
 
     var tbl = document.getElementById('lxTable');
+    var filterKind = document.getElementById('lxFilterKind');
     var filterTier = document.getElementById('lxFilterTier');
     var filterLabel = document.getElementById('lxFilterLabel');
     var filterRegion = document.getElementById('lxFilterRegion');
 
     function applyFilters() {
         if (!tbl) return;
+        var k = ((filterKind && filterKind.value) || '').toLowerCase();
         var t = (filterTier.value || '').toLowerCase();
         var l = (filterLabel.value || '').toLowerCase();
         var r = (filterRegion.value || '').toLowerCase().trim();
         tbl.querySelectorAll('tbody tr').forEach(function (row) {
+            var rk = (row.dataset.kind || '').toLowerCase();
             var rt = (row.dataset.tier || '').toLowerCase();
             var rl = (row.dataset.label || '').toLowerCase();
             var rr = (row.dataset.region || '').toLowerCase();
-            var show = (!t || rt === t) && (!l || rl === l) && (!r || rr.indexOf(r) !== -1);
+            var show = (!k || rk === k)
+                    && (!t || rt === t)
+                    && (!l || rl === l)
+                    && (!r || rr.indexOf(r) !== -1);
             row.style.display = show ? '' : 'none';
         });
     }
-    [filterTier, filterLabel].forEach(function (s) { if (s) s.addEventListener('change', applyFilters); });
+    [filterKind, filterTier, filterLabel].forEach(function (s) { if (s) s.addEventListener('change', applyFilters); });
     if (filterRegion) filterRegion.addEventListener('input', applyFilters);
 
     // ===== Modal-Helpers =====
@@ -61,6 +67,107 @@
         return '<table class="lx-agg-table">' + rows.join('') + '</table>';
     }
 
+    // Cache-Eintraege sind nested (safety.*, ggf. flyability.*) — AnalysisView
+    // liest aber viele Felder vom Top-Level, insbesondere den Empty-Check
+    // auf safety_status. Funktioniert sowohl fuer Region- als auch fuer
+    // Spot-Eintraege (bei Spots ist `flyability` leer, Fallback-Picks ziehen
+    // die Felder aus dem Top-Level).
+    function flattenAnalysisEntry(entry) {
+        if (!entry || typeof entry !== 'object') return entry;
+        var safety = entry.safety || {};
+        var fly = entry.flyability || {};
+        var flat = Object.assign({}, entry);
+        var picks = [
+            ['safety_status', safety.safety_status],
+            ['safe_window', safety.safe_window],
+            ['safety_feedback', safety.summary],
+            ['foehn_risk', safety.foehn_risk],
+            ['wind_summary', safety.wind_summary],
+            ['hazard_notes', safety.hazard_notes],
+            ['no_go_reasons', safety.no_go_reasons],
+            ['caution_notes', safety.caution_notes],
+            ['primary_no_go', safety.primary_no_go],
+            ['primary_caution', safety.primary_caution],
+            ['primary_reducer', safety.primary_reducer],
+            ['primary_booster', safety.primary_booster],
+            ['flyability_feedback', fly.recommendation || entry.recommendation],
+            ['peak_climb_rate', fly.peak_climb_rate],
+            ['flight_type', fly.flight_type],
+            ['flight_duration_estimate', fly.flight_duration_estimate],
+            ['xc_potential', fly.xc_potential],
+            ['flyability_notes', fly.flyability_notes]
+        ];
+        picks.forEach(function (p) {
+            if (flat[p[0]] == null && p[1] != null) flat[p[0]] = p[1];
+        });
+        if (!Array.isArray(flat.tags) && Array.isArray(safety.tags)) flat.tags = safety.tags;
+        if (!Array.isArray(flat.start_window) && Array.isArray(safety.start_window)) flat.start_window = safety.start_window;
+        return flat;
+    }
+
+    function setMeteoStatus(msg, isErr) {
+        var el = document.getElementById('lxDetailMeteoStatus');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.classList.toggle('lx-meteo-status--err', !!isErr);
+    }
+
+    function loadMeteogram(entityType, entityId, dateStr) {
+        var chartEl = document.getElementById('lxDetailMeteoChart');
+        var tooltipEl = document.getElementById('lxMeteoTooltip');
+        if (!chartEl || !entityId || !dateStr) return;
+        if (typeof d3 === 'undefined' || !window.Meteogram || !window.Meteogram.renderChart) {
+            setMeteoStatus('Meteogram-Modul nicht geladen', true);
+            return;
+        }
+        // Spot nutzt /api/weather/<site_name>, Region /api/region-weather/<slug>.
+        // entityId ist fuer Spots der originale site_name (spot_or_region_id im Snapshot).
+        var isRegion = entityType !== 'spot';
+        var wxUrl = isRegion
+            ? '/api/region-weather/' + encodeURIComponent(entityId)
+            : '/api/weather/' + encodeURIComponent(entityId);
+        var altUrl = isRegion
+            ? '/api/region-altitude-wind/' + encodeURIComponent(entityId)
+            : '/api/altitude-wind/' + encodeURIComponent(entityId);
+        Promise.all([
+            fetch(wxUrl).then(function (r) { return r.json(); }),
+            fetch(altUrl).then(function (r) { return r.json(); })
+        ]).then(function (results) {
+            var wxData = results[0];
+            var altData = results[1];
+            if (wxData.error || altData.error) {
+                setMeteoStatus((isRegion ? 'Region' : 'Spot') + ' nicht gefunden oder keine Wetterdaten', true);
+                return;
+            }
+            var wxDay = wxData.data ? wxData.data[dateStr] : null;
+            var altDayRaw = altData.data ? altData.data[dateStr] : null;
+            if (!wxDay || !altDayRaw || !altDayRaw.length) {
+                var avail = (wxData.dates || []).join(', ') || '–';
+                setMeteoStatus('Datum ' + dateStr + ' nicht (mehr) im Forecast-Fenster. Verfügbar: ' + avail, true);
+                return;
+            }
+            var altDay = {
+                profiles: altDayRaw.map(function (entry) {
+                    var hh = ('0' + entry.hour).slice(-2);
+                    return {
+                        time: dateStr + 'T' + hh + ':00:00',
+                        levels: entry.profiles
+                    };
+                })
+            };
+            window.Meteogram.renderChart(chartEl, tooltipEl, wxDay, altDay, {
+                elevation: altData.elevation_m || 0,
+                isRegion: isRegion,
+                thresholds: wxData.thresholds,
+                fitToContainer: true
+            });
+            setMeteoStatus((wxDay.wind ? wxDay.wind.length : 0) + ' Stunden geladen · Wetter-Stand '
+                + (wxData.last_updated || '').replace('T', ' ').slice(0, 16), false);
+        }).catch(function (err) {
+            setMeteoStatus('Fehler: ' + (err && err.message ? err.message : err), true);
+        });
+    }
+
     function loadDetail(aid) {
         var body = document.getElementById('lxDetailBody');
         body.textContent = 'Lade …';
@@ -75,9 +182,19 @@
                 var e = resp.entry;
                 var fb = e.user_feedback || {};
                 var llm = e.llm_output_full || {};
+                var entityType = e.entity_type || 'region';
+                var entityLabel = entityType === 'spot' ? 'Spot' : 'Region';
+                var displayName = (entityType === 'spot'
+                    ? (llm.spot || e.spot_or_region_id)
+                    : (llm.region_name || e.spot_or_region_id));
                 var html = '';
-                html += '<p><strong>' + escHTML(llm.region_name || e.spot_or_region_id) + '</strong> · '
+                html += '<p><strong>' + escHTML(entityLabel) + ': ' + escHTML(displayName) + '</strong> · '
                      + escHTML(e.target_date) + ' · ' + escHTML(e.terrain_tier) + '</p>';
+                html += '<h4 style="margin-top:14px;">Meteogramm</h4>';
+                html += '<div class="lx-meteo-wrap">'
+                      + '  <div class="lx-meteo-chart" id="lxDetailMeteoChart"></div>'
+                      + '  <div class="lx-meteo-status" id="lxDetailMeteoStatus">Lade Wetterdaten …</div>'
+                      + '</div>';
                 html += '<h4 style="margin-top:14px;">Aggregates</h4>';
                 html += renderAggregates((e.weather_input || {}).aggregates);
                 if (fb.correction_text) {
@@ -95,12 +212,17 @@
                 body.innerHTML = html;
                 var av = document.getElementById('lxDetailAnalysis');
                 if (window.AnalysisView && window.AnalysisView.render && av) {
-                    window.AnalysisView.render(av, llm, {
-                        dateStr: e.target_date,
-                        isRegion: true,
-                        regionId: e.spot_or_region_id
-                    });
+                    var renderOpts = { dateStr: e.target_date };
+                    if (entityType === 'spot') {
+                        renderOpts.isRegion = false;
+                        renderOpts.spotName = e.spot_or_region_id;
+                    } else {
+                        renderOpts.isRegion = true;
+                        renderOpts.regionId = e.spot_or_region_id;
+                    }
+                    window.AnalysisView.render(av, flattenAnalysisEntry(llm), renderOpts);
                 }
+                loadMeteogram(entityType, e.spot_or_region_id, e.target_date);
             })
             .catch(function (err) { body.textContent = 'Netzwerkfehler: ' + err; });
     }

@@ -108,7 +108,7 @@
     // Rot + grau bekommen dashed border (Sperr-Visualisierung).
     function mapRegionStyle(band, _legacyQuality) {
         // Eingang: safety_band (green/amber/red/no_data/violet). violet ist der
-        // visuelle Premium-Marker fuer safe + rating>=8 — wird vom Aufrufer gesetzt.
+        // visuelle Premium-Marker fuer safe + rating=6 (Klassiker, v2.0) — wird vom Aufrufer gesetzt.
         if (band === 'safe')             band = 'green';
         else if (band === 'conditional') band = 'amber';
         else if (band === 'not_safe')    band = 'red';
@@ -216,10 +216,10 @@
     // alle Baender — gleicher Aufbau, nur Ring-Farbe + Inhalt unterscheidet
     // sich. Family-Look statt zwei verschiedene Stile.
     function buildRegionLabel(style, badge, band, rating, zoom) {
-        var n = (typeof rating === 'number') ? Math.max(0, Math.min(10, rating)) : 0;
+        var n = (typeof rating === 'number') ? Math.max(0, Math.min(6, rating)) : 0;
         // band kommt direkt vom Aufrufer (safety_band — Single Source of Truth).
         // Legacy-Toleranz fuer Aufrufer, die noch safety_status uebergeben.
-        // 'violet' ist Display-Band fuer safe + rating>=8.
+        // 'violet' ist Display-Band fuer safe + rating=6 (RATING_ARCHITECTURE v2.0).
         if (band === 'safe')             band = 'green';
         else if (band === 'conditional') band = 'amber';
         else if (band === 'not_safe')    band = 'red';
@@ -244,10 +244,9 @@
             violet: { ink: '#5b21b6', ring: '#8b5cf6' }
         };
         var p = palette[band];
-        // Runde Pille (Kreis). v1.4: zweistellige Zahl "10" bekommt kleinere Schrift.
+        // Runde Pille (Kreis). Ratings 1-6 sind immer einstellig.
         var size = zoom < 7 ? 30 : zoom < 9 ? 36 : 42;
-        var twoDigit = label.length >= 2 && label !== '\u2715' && label !== '\u2013';
-        var fontSize = Math.round(size * (twoDigit ? 0.4 : 0.5));
+        var fontSize = Math.round(size * 0.5);
         var html = '<div style="'
             + 'width:' + size + 'px;'
             + 'height:' + size + 'px;'
@@ -418,16 +417,15 @@
             // Karten-Polygonen fuehrte (gruen statt amber).
             var band = getSafetyBand(dayData);
             var rating = getRating(dayData);
-            // Premium-Marker: safe + rating>=9 → violett (Display-Band).
-            if (band === 'green' && rating >= 9) band = 'violet';
+            // Premium-Marker: safe + rating=6 (Klassiker) → violett (RATING_ARCHITECTURE v2.0).
+            if (band === 'green' && rating >= 6) band = 'violet';
             var style = mapRegionStyle(band);
 
-            // Polygon-Style nach §4.3: dashed bei red/no_data, solid bei green/amber.
-            // baseFillOpacity wird gespeichert fuer Hover-Effekt. Linearer Dynamikbereich,
-            // moderat: Rating 1 ~0.135, Rating 5 ~0.375, Rating 10 = 0.65.
+            // Polygon-Style: solid bei green/amber/violet. baseFillOpacity wird fuer Hover gespeichert.
+            // Linearer Dynamikbereich: Rating 1 ~0.19, Rating 3 ~0.38, Rating 6 = 0.65 (experience_rating 1-6).
             var baseOpacity = style.fillOpacity;
             if (rating > 0 && (band === 'green' || band === 'amber' || band === 'violet')) {
-                baseOpacity = 0.10 + (rating / 10) * 0.55;
+                baseOpacity = 0.10 + (rating / 6) * 0.55;
             }
             
             layer._baseFillOpacity = baseOpacity;
@@ -573,7 +571,7 @@
                 ? 'Keine Spot-Daten an diesem Tag'
                 : (flyableForDay === 0)
                     ? 'Heute kein fliegbarer Spot in dieser Region'
-                    : 'Kein Spot mit Rating ≥ 8 in dieser Region';
+                    : 'Kein Spot mit Rating ≥ 5 in dieser Region';
             return '<div class="region-spot-strip-empty">' + msg + '</div>';
         }
         entries.sort(function (a, b) { return b.rating - a.rating; });
@@ -589,7 +587,7 @@
             html += '<button type="button" class="region-spot-pill ' + bandClass + '"'
                 + ' role="listitem"'
                 + ' data-spot-name="' + escHtml(e.name) + '"'
-                + ' aria-label="' + escHtml(e.name) + ', Bewertung ' + e.rating + ' von 10'
+                + ' aria-label="' + escHtml(e.name) + ', Bewertung ' + e.rating + ' von 6'
                 + (safetyStr ? ', Safety ' + e.safetyScore + ' von 100' : '')
                 + (e.window ? ', Fenster ' + escHtml(e.window) : '') + '">'
                 + '<span class="region-spot-pill-rating">' + e.rating + '</span>'

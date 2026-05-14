@@ -248,8 +248,19 @@ class ChatOrchestratorMixin:
             if context_budget > 0 and _estimate_tokens(context_block) > context_budget:
                 context_block = _truncate_weather_context(context_block, context_budget)
 
+            _now = datetime.now()
+            _today = _now.date()
+            _date_map_lines = []
+            _labels = ("HEUTE", "MORGEN", "ÜBERMORGEN", "+3 Tage", "+4 Tage", "+5 Tage", "+6 Tage")
+            for _i, _lbl in enumerate(_labels):
+                _d = _today + timedelta(days=_i)
+                _date_map_lines.append(f"  {_lbl} = {_d.isoformat()} ({_weekday_de(_d)})")
+            _date_map = "\n".join(_date_map_lines)
+
             user_content = (
-                f"AKTUELZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n"
+                f"AKTUELZEIT: {_now.strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(_now)})\n"
+                f"DATUM-MAPPING (verbindlich — wenn der Pilot 'morgen' sagt, ist immer das hier gemeinte Datum gemeint):\n"
+                f"{_date_map}\n"
                 "Hintergrunddaten für deine Antwort (nicht wörtlich als Gesamtreport ausgeben):\n"
                 "==========================================================\n"
                 f"{context_block}\n"
@@ -273,6 +284,7 @@ class ChatOrchestratorMixin:
             messages[:] = messages[:2] + messages[-(MAX_HISTORY_MESSAGES - 2):]
 
         # LLM Chat Call (Provider abhaengig: OpenAI / Anthropic / Gemini)
+        reply_reasoning = None
         try:
             response = self.chat_client.chat.completions.create(
                 model=self.chat_model,
@@ -281,7 +293,9 @@ class ChatOrchestratorMixin:
                 max_tokens=2000,
             )
             _log_prompt_cache_usage(response, label="chat_answer")
-            reply = response.choices[0].message.content
+            _msg = response.choices[0].message
+            reply = _msg.content
+            reply_reasoning = getattr(_msg, "reasoning_content", None)
         except Exception as e:
             logger.error(f"Chat-LLM ({self.chat_provider}) Fehler: {e}")
             reply = f"Entschuldigung, es gab einen Fehler bei der Verarbeitung: {e}"
@@ -292,7 +306,10 @@ class ChatOrchestratorMixin:
             if last_user.get("role") == "user" and format_hint in last_user.get("content", ""):
                 last_user["content"] = last_user["content"].replace(format_hint, "").rstrip()
 
-        messages.append({"role": "assistant", "content": reply})
+        _assistant_msg = {"role": "assistant", "content": reply}
+        if reply_reasoning:
+            _assistant_msg["reasoning_content"] = reply_reasoning
+        messages.append(_assistant_msg)
         conv["last_activity"] = datetime.now().isoformat()
         self._save_conversation(session_id)
 
@@ -318,7 +335,7 @@ class ChatOrchestratorMixin:
             "latitude": spot.get("latitude"),
             "longitude": spot.get("longitude"),
         }
-        # Voranalysen pro Tag (kompakt)
+        # Voranalysen pro Tag (kompakt) — Rating-Architektur v2.0
         analyses = self.spot_analyses.get(name, {}) if self.spot_analyses else {}
         if analyses:
             days_summary = {}
@@ -326,9 +343,11 @@ class ChatOrchestratorMixin:
                 if not isinstance(day, dict):
                     continue
                 safety = day.get("safety", {}) if isinstance(day.get("safety"), dict) else {}
+                xc = day.get("streckenflug") if isinstance(day.get("streckenflug"), dict) else {}
                 days_summary[date_str] = {
                     "safety_status": safety.get("safety_status") or day.get("safety_status"),
-                    "fly_status": day.get("fly_status"),
+                    "experience_rating": day.get("experience_rating"),
+                    "streckenflug_rating": xc.get("rating"),
                     "best_window": day.get("best_window"),
                     "recommendation": (day.get("recommendation") or "")[:240],
                 }
@@ -495,26 +514,38 @@ class ChatOrchestratorMixin:
         messages = self._get_or_create_conversation(session_id)
         conv = self.conversations[session_id]
 
-        if conv["first_question"]:
+        def _build_full_user_content() -> str:
+            """Volle User-Message: AKTUELZEIT + DATUM-MAPPING + Wetterkontext + Frage.
+            Wird beim ersten Turn UND beim Reset-Retry verwendet."""
             analyses_context = self._build_compact_analyses_for_chat()
             if analyses_context:
                 foehn_snap = self._build_foehn_context_for_ai()
-                context_block = analyses_context + "\n\n" + foehn_snap
+                context_block_local = analyses_context + "\n\n" + foehn_snap
             else:
-                context_block = self.weather_context_str
+                context_block_local = self.weather_context_str
 
-            # Token-Budget: Kontext kürzen falls er das Modell-Limit sprengt
             model_limit = _MODEL_TOKEN_LIMITS.get(self.chat_model, _DEFAULT_TOKEN_LIMIT)
             system_tokens = _estimate_tokens(messages[0]["content"]) if messages else 0
             context_budget = model_limit - _TOKEN_BUDGET_RESERVE - system_tokens
-            if context_budget > 0 and _estimate_tokens(context_block) > context_budget:
-                context_block = _truncate_weather_context(context_block, context_budget)
+            if context_budget > 0 and _estimate_tokens(context_block_local) > context_budget:
+                context_block_local = _truncate_weather_context(context_block_local, context_budget)
 
-            user_content = (
-                f"AKTUELZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n"
+            _now = datetime.now()
+            _today = _now.date()
+            _date_map_lines = []
+            _labels = ("HEUTE", "MORGEN", "ÜBERMORGEN", "+3 Tage", "+4 Tage", "+5 Tage", "+6 Tage")
+            for _i, _lbl in enumerate(_labels):
+                _d = _today + timedelta(days=_i)
+                _date_map_lines.append(f"  {_lbl} = {_d.isoformat()} ({_weekday_de(_d)})")
+            _date_map = "\n".join(_date_map_lines)
+
+            return (
+                f"AKTUELZEIT: {_now.strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(_now)})\n"
+                f"DATUM-MAPPING (verbindlich — wenn der Pilot 'morgen' sagt, ist immer das hier gemeinte Datum gemeint):\n"
+                f"{_date_map}\n"
                 "Hintergrunddaten für deine Antwort (nicht wörtlich als Gesamtreport ausgeben):\n"
                 "==========================================================\n"
-                f"{context_block}\n"
+                f"{context_block_local}\n"
                 "==========================================================\n"
                 "Beantworte die Frage des Piloten **direkt** und in angemessenem Umfang — wie in einem "
                 "kurzen Chat. Keine vollständige Tabelle aller Spots, es sei denn der Pilot verlangt "
@@ -523,6 +554,9 @@ class ChatOrchestratorMixin:
                 'ableiten — nicht aus „alle Spots nicht sicher" schließen, dass es „keinen Föhn" gäbe.\n\n'
                 f"Frage des Piloten: {question_clean}{format_hint}"
             )
+
+        if conv["first_question"]:
+            user_content = _build_full_user_content()
             conv["first_question"] = False
         else:
             user_content = question_clean + format_hint
@@ -537,6 +571,7 @@ class ChatOrchestratorMixin:
         reply_text = ""
         tool_iterations = 0
         emitted_status = False
+        reasoning_retry_done = False
 
         try:
             while True:
@@ -547,14 +582,35 @@ class ChatOrchestratorMixin:
                     }
                     break
 
-                response = self.chat_client.chat.completions.create(
-                    model=self.chat_model,
-                    messages=messages,
-                    tools=TOOLS,
-                    tool_choice="auto",
-                    temperature=0.7,
-                    max_tokens=2000,
-                )
+                try:
+                    response = self.chat_client.chat.completions.create(
+                        model=self.chat_model,
+                        messages=messages,
+                        tools=TOOLS,
+                        tool_choice="auto",
+                        temperature=0.7,
+                        max_tokens=2000,
+                    )
+                except Exception as api_err:
+                    # Recovery: alte Conversation-Files koennen Assistant-Messages ohne
+                    # reasoning_content enthalten (gespeichert vor diesem Fix). DeepSeek
+                    # Thinking-Mode lehnt das mit 400 ab. Einmaliger Reset + Retry mit
+                    # voller Kontext-Message, damit der LLM nicht ohne Wetterdaten antwortet.
+                    err_str = str(api_err)
+                    if not reasoning_retry_done and "reasoning_content" in err_str:
+                        logger.warning(
+                            "Chat-API Error 'reasoning_content' — History wird zurueckgesetzt, retry mit vollem Kontext."
+                        )
+                        sys_msg = messages[0] if messages and messages[0].get("role") == "system" else None
+                        new_messages = []
+                        if sys_msg:
+                            new_messages.append(sys_msg)
+                        new_messages.append({"role": "user", "content": _build_full_user_content()})
+                        messages[:] = new_messages
+                        conv["first_question"] = False
+                        reasoning_retry_done = True
+                        continue
+                    raise
                 _log_prompt_cache_usage(response, label="chat_stream")
                 choice = response.choices[0]
                 msg = choice.message
@@ -563,8 +619,9 @@ class ChatOrchestratorMixin:
                 # Falls Tool-Calls angefordert wurden: dispatchen
                 tool_calls = getattr(msg, "tool_calls", None) or []
                 if tool_calls:
-                    # Assistant-Message mit tool_calls in History anhängen
-                    messages.append({
+                    # DeepSeek-V4 Thinking-Mode: reasoning_content muss zurueck an die API
+                    # (sonst Error 400 "reasoning_content must be passed back").
+                    assistant_msg = {
                         "role": "assistant",
                         "content": msg.content or "",
                         "tool_calls": [
@@ -578,7 +635,11 @@ class ChatOrchestratorMixin:
                             }
                             for tc in tool_calls
                         ],
-                    })
+                    }
+                    reasoning = getattr(msg, "reasoning_content", None)
+                    if reasoning:
+                        assistant_msg["reasoning_content"] = reasoning
+                    messages.append(assistant_msg)
 
                     # Optional: einmaliger Status-Hinweis vor dem ersten Tool
                     if not emitted_status:
@@ -617,7 +678,11 @@ class ChatOrchestratorMixin:
 
                 # Kein Tool-Call mehr → finale Antwort
                 reply_text = msg.content or ""
-                messages.append({"role": "assistant", "content": reply_text})
+                final_msg = {"role": "assistant", "content": reply_text}
+                final_reasoning = getattr(msg, "reasoning_content", None)
+                if final_reasoning:
+                    final_msg["reasoning_content"] = final_reasoning
+                messages.append(final_msg)
                 if reply_text:
                     yield {"type": "text", "content": reply_text}
                 break

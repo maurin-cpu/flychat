@@ -3394,8 +3394,17 @@ class AnalyzersMixin:
             # ── BLOCK 2: FLUGTAUGLICHKEIT (nur sichere Spots) ──
             if safe_spots_today:
                 lines.append("")
-                lines.append("─── PHASE 2: FLIEGBARKEIT (gray/grün/violett — unabhängig von Sicherheitsfarbe) ───")
+                lines.append("─── PHASE 2: FLIEGBARKEIT (experience_rating 1–6, unabhängig von Sicherheits-Status) ───")
                 lines.append("")
+
+                RATING_LABELS_LONG = {
+                    1: "abgleiter (kein Thermikflug)",
+                    2: "kurzer_thermikflug (1–3h schwach)",
+                    3: "solider_thermikflug (3–4h ordentlich, Hausrunden)",
+                    4: "starker_thermikflug (4–5h gut, lokal-XC möglich)",
+                    5: "xc_tag (5h+ stark, 50–100km)",
+                    6: "klassiker (Top-Tag, 100km+ — selten)",
+                }
 
                 for name in safe_spots_today:
                     entry = self.spot_analyses[name].get(date_str, {})
@@ -3405,14 +3414,16 @@ class AnalyzersMixin:
                         lines.append(f"  {name}: Keine Flyability-Daten")
                         continue
 
-                    ft = _normalize_flyability_tier(
-                        fly.get("flyability_tier") or fly.get("fly_status") or fly.get("status")
-                    )
-                    status_label = {
-                        "gray": "GRAU (Abgleiter/mau)",
-                        "green": "GRÜN (fliegbar)",
-                        "violet": "VIOLETT (legendär / starkes XC)",
-                    }.get(ft, ft)
+                    rating = entry.get("experience_rating")
+                    if isinstance(rating, int) and 1 <= rating <= 6:
+                        cat = RATING_LABELS_LONG[rating]
+                        status_label = f"Rating {rating}/6 — {cat}"
+                    else:
+                        status_label = "Rating: (nicht gesetzt)"
+
+                    xc = (entry.get("streckenflug") or {}).get("rating")
+                    if isinstance(xc, int) and xc > 0:
+                        status_label += f" | Streckenflug {xc}/6"
 
                     lines.append(f"  ═══ {name}: {status_label} ═══")
 
@@ -3475,11 +3486,15 @@ class AnalyzersMixin:
             f"Stand: {self.analyses_loaded_at.isoformat() if self.analyses_loaded_at else 'unbekannt'}",
             "",
             "WICHTIG — HARTE REGELN (KEINE AUSNAHMEN):",
-            "  • Die Fliegbarkeits-Einstufung (gray/green/violet) pro Spot+Tag ist das ERGEBNIS",
-            "    einer detaillierten Einzelanalyse und DARF NICHT geändert werden.",
-            "  • NIEMALS einen Spot von green auf violet hochstufen — auch nicht bei hohem Peak!",
-            "    Die Voranalyse hat ALLE Faktoren (Thermik, Wind, Bewölkung, Turbulenztags) berücksichtigt.",
-            "  • Wenn ein Spot als 'green' gelistet ist, nenne ihn 'fliegbar (green)' — NICHT 'legendär'.",
+            "  • Drei orthogonale Achsen pro Spot/Tag (Rating-Architektur v2.0):",
+            "      - safety_status: safe / conditional / not_safe",
+            "      - experience_rating: 1–6 (1=abgleiter, 2=kurzer_thermikflug, 3=solider, 4=starker, 5=xc_tag, 6=klassiker)",
+            "      - streckenflug.rating: 1–6 (XC-Potenzial, nur Spots)",
+            "  • Diese Werte stammen aus der Einzelanalyse und sind BINDEND. NICHT hochstufen.",
+            "  • Sprich gegenüber dem Piloten in den Kategorien (z.B. 'solider Thermikflug', 'XC-Tag', 'Klassiker')",
+            "    oder als 'Rating X/6'. Vermeide Farbnamen wie 'violet', 'grün', 'gray' in der Prosa —",
+            "    die Farben sind eine FE-Darstellung, kein Bewertungswort.",
+            "  • 'Klassiker' (Rating 6) ist die seltene Top-Einstufung. NIEMALS eigenmächtig auf 6 hochstufen.",
             "  • Spots/Tage unter 'SICHERHEIT nicht ok' (not_safe), 'DATEN UNVOLLSTÄNDIG' (no_data)",
             "    und 'Analyse fehlt/Fehler' sind für [RECOMMENDED: …] VERBOTEN.",
             "  • Diese Spots dürfen weder als Top-Pick, Alternative, 'vielleicht später' noch",
@@ -3488,13 +3503,25 @@ class AnalyzersMixin:
             "",
         ]
 
+        # Rating-Kategorien (Memory-Doku: rating_v2_architecture.md)
+        RATING_LABELS = {
+            1: "abgleiter",
+            2: "kurzer_thermikflug",
+            3: "solider_thermikflug",
+            4: "starker_thermikflug",
+            5: "xc_tag",
+            6: "klassiker",
+        }
+
         all_dates = set()
         for days in self.spot_analyses.values():
             all_dates.update(days.keys())
         sorted_dates = sorted(all_dates)
 
         for date_str in sorted_dates:
-            violet, green_f, gray_f = [], [], []
+            # Buckets nach experience_rating (6 = klassiker oben, 1 = abgleiter unten)
+            by_rating: dict[int, list] = {r: [] for r in range(1, 7)}
+            unrated = []
             not_safe, errors, no_data = [], [], []
 
             for name in sorted(self.weather_data.keys()):
@@ -3514,17 +3541,15 @@ class AnalyzersMixin:
                 if ss == "not_safe":
                     not_safe.append(name)
                     continue
-                ft = entry.get("fly_status") or ""
                 fly = entry.get("flyability", {})
                 pcr = fly.get("peak_climb_rate") or entry.get("peak_climb_rate")
-                if ft == "violet":
-                    violet.append((name, bw, pcr))
-                elif ft == "green":
-                    green_f.append((name, bw, pcr))
-                elif ft == "gray":
-                    gray_f.append((name, bw, pcr))
-                elif ft:
-                    green_f.append((name, bw, pcr))
+                rating = entry.get("experience_rating")
+                xc = (entry.get("streckenflug") or {}).get("rating")
+                row = (name, bw, pcr, ss, xc)
+                if isinstance(rating, int) and 1 <= rating <= 6:
+                    by_rating[rating].append(row)
+                else:
+                    unrated.append(row)
 
             lines.append(f"─── {date_str} ({_weekday_de(date_str)}) ───")
 
@@ -3532,16 +3557,22 @@ class AnalyzersMixin:
                 if not items:
                     return
                 parts = []
-                for n, w, pcr in items:
+                for n, w, pcr, ss, xc in items:
+                    bits = [f"Fenster: {w}"]
                     if pcr is not None:
-                        parts.append(f"{n} (Fenster: {w}, Peak: {pcr} m/s)")
-                    else:
-                        parts.append(f"{n} (Fenster: {w})")
+                        bits.append(f"Peak: {pcr} m/s")
+                    if ss == "conditional":
+                        bits.append("Sicherheit: conditional")
+                    if isinstance(xc, int) and xc > 0:
+                        bits.append(f"XC: {xc}/6")
+                    parts.append(f"{n} ({', '.join(bits)})")
                 lines.append(f"  {label}: " + "; ".join(parts))
 
-            _fmt_group("FLIEGBARKEIT legendär (violet)", violet)
-            _fmt_group("FLIEGBARKEIT fliegbar (green)", green_f)
-            _fmt_group("FLIEGBARKEIT Abgleiter/mau (gray)", gray_f)
+            # Reihenfolge: 6 (klassiker) zuerst, dann absteigend
+            for r in (6, 5, 4, 3, 2, 1):
+                cat = RATING_LABELS[r]
+                _fmt_group(f"Rating {r}/6 — {cat}", by_rating[r])
+            _fmt_group("Rating fehlt (kein experience_rating gesetzt)", unrated)
 
             if not_safe:
                 if len(not_safe) <= 12:
@@ -3556,9 +3587,10 @@ class AnalyzersMixin:
             if errors:
                 lines.append(f"  Analyse fehlt/Fehler (NICHT EMPFEHLEN): {', '.join(errors)}")
 
-            # Kurz-Tipps: violet zuerst, dann green
+            # Kurz-Tipps: höchste Ratings zuerst
             tips = []
-            for bucket in (violet, green_f):
+            top_buckets = [by_rating[6], by_rating[5], by_rating[4], by_rating[3]]
+            for bucket in top_buckets:
                 for name, *_ in bucket:
                     if len(tips) >= 3:
                         break
