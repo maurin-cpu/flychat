@@ -1,8 +1,70 @@
 # Few-Shot-Pipeline — Plan
 
-> **Status:** Konzept, noch nicht implementiert.
+> **Status:**
+>   - Schritt 1 (Labels sammeln): **live**.
+>   - Schritt 2 (Retrieval + Prompt-Injection): **live** seit 2026-05-15 (nur Region-Pfad,
+>     Spots haben noch keine Labels).
+>   - Schritt 3 (Eval-Suite): noch nicht implementiert.
 > **Erstellt:** 2026-05-12
 > **Scope:** Schritte 1-3 einer LLM-Kalibrierungs-Strategie. Schritt 4 (Auto-Prompt-Optimization via DSPy) ist ausserhalb dieses Plans.
+
+## Schritt 2 — Wie es konkret arbeitet (Stand 2026-05-15)
+
+**Code-Stellen:**
+- `engine/labeled_examples.py`: `_load_label_index()`, `retrieve_similar()`,
+  `format_for_prompt()`, `build_few_shot_block()` — In-Memory-Index mit
+  mtime-Invalidation, distanz-basierte Top-k-Suche.
+- `engine/analyzers.py::_build_few_shot_for()`: liest Live-Features aus
+  `_ctx_tq_cache`, ruft Retrieval, schreibt Decision-Tag in
+  `_ctx_fewshot_cache`.
+- `engine/analyzers.py::_flyability_analysis_single_region_day` und
+  Batch-Pfad (Z. ~2430): injizieren den Beispiel-Block im User-Prompt
+  **vor** dem Wetter-Kontext.
+- `engine/analyzers.py::_post_process_flyability_region`: haengt den
+  Decision-Tag aus `_ctx_fewshot_cache` an `_decisions_applied`.
+- `chat_engine.py`: `_ctx_fewshot_cache = {}` initialisiert, wird zusammen
+  mit den anderen ctx-Caches geleert.
+
+**Features fuer Similarity-Matching (per Region/Tag):**
+- `terrain_tier` (mittelland | jura | voralpen | alpen | hochalpin)
+- `sustained_peak_mps` (aus `_ctx_tq_cache`)
+- `productive_h_strict` (Stunden mit Climb ≥ 1.5 m/s)
+- `avg_low_cloud_thermal_h` / `avg_mid_cloud_thermal_h` (Schnitt ueber
+  Thermikstunden)
+
+**Distanz-Metrik:**
+```
+dist = 3.0 × |peak_diff| + 0.5 × |prod_h_diff|
+       + 0.05 × |low_diff| + 0.05 × |mid_diff|
+```
+Skill: Peak ist wichtigstes Signal (×3), dann Dauer, dann Wolken.
+
+**Retrieval-Strategie:**
+1. Filter auf `entity_type == "region"` AND gleichen `terrain_tier`.
+2. Wenn Pool < `MIN_TIER_POOL` (3): erweitere auf Nachbar-Tiere
+   (TIER_NEIGHBOURS Mapping).
+3. Wenn immer noch leer: `FewShot:none(tier=X)`, kein Block.
+4. Top-3 nach Distanz, in Prompt injiziert.
+
+**Konfigurations-Konstanten** (engine/labeled_examples.py):
+- `MAX_LABEL_AGE_DAYS = 90` — Saison-Drift-Schutz.
+- `MIN_TIER_POOL = 3` — Schwelle fuer Tier-Nachbarschafts-Fallback.
+- Distanz-Gewichte `_W_PEAK = 3.0`, `_W_PROD_H = 0.5`, `_W_CLOUD = 0.05`.
+
+**Decision-Tags (sichtbar in `_decisions_applied`):**
+- `FewShot:hochalpin,3 examples` — 3 Labels injiziert.
+- `FewShot:none(tier=jura)` — leerer Pool, kein Block.
+- `FewShot:none(no_tq_cache)` — Cache-Miss (sollte nicht passieren).
+- `FewShot:none(incomplete_features)` — peak oder prod_h null.
+
+**Coverage heute (2026-05-15):**
+- 26 von 40 Labels haben vollstaendige Aggregates (peak/prod_h gesetzt).
+- 14 aeltere Labels stammen aus der Zeit vor `_attach_rating_inputs`
+  und werden ignoriert — Backfill via Re-Analyse moeglich.
+- Pool pro Tier: hochalpin 15, mittelland 12, alpen 7, voralpen 3, jura 3.
+- Spots haben 0 Labels — Few-Shot wirkt nur auf Region-Calls.
+
+**Tests:** `tests/test_few_shot.py` (18 Tests).
 
 ## Zweck
 

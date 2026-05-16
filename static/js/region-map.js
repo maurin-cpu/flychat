@@ -7,6 +7,7 @@
     var map;
     var regionLayersByName = {};
     var labelMarkersGroup = null;
+    var currentRefLayer = null; // Reference-Points-Overlay beim Hover
     var regionAnalyses = null;
     var currentDate = null;
     var meteogramCache = {};   // {region_id: {wxData, altData}}
@@ -173,8 +174,22 @@
         window.regionMap = map;
 
         // Light map tiles — readable in sunshine
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        // Topo-Stack identisch zur Spot-Karte: Carto Light + Esri-Hillshade + Labels.
+        // Drei Layer in dieser Reihenfolge ergeben eine topografische Optik
+        // (Huegel/Berge sichtbar) ohne dass Beschriftungen ueberlagert werden.
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 18,
+        }).addTo(map);
+
+        L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
+            opacity: 0.45,
+            maxZoom: 16,
+        }).addTo(map);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 18,
         }).addTo(map);
@@ -311,8 +326,30 @@
                             var dayData = ra ? ra[currentDate] : null;
                             openRegionOverlay(regionId, dayData || { region_name: p.region, safety_status: 'no_data' });
                         });
+
+                        // Referenzpunkte sammeln (permanente Anzeige unten,
+                        // wenn SHOW_REFERENCE_POINTS aktiv ist).
+                        if (window.SHOW_REFERENCE_POINTS && Array.isArray(p.reference_points)) {
+                            p.reference_points.forEach(function (pt) {
+                                if (!currentRefLayer) currentRefLayer = L.layerGroup();
+                                currentRefLayer.addLayer(L.circleMarker(pt, {
+                                    radius: 4,
+                                    color: '#0369a1',
+                                    fillColor: '#fff',
+                                    fillOpacity: 1,
+                                    weight: 2,
+                                    interactive: false
+                                }));
+                            });
+                        }
                     }
                 }).addTo(map);
+
+                // Referenzpunkte-Layer (gesammelt in onEachFeature) der Karte
+                // hinzufuegen. Nur aktiv, wenn SHOW_REFERENCE_POINTS=true.
+                if (currentRefLayer) {
+                    currentRefLayer.addTo(map);
+                }
 
                 // Nach dem Laden an alle Regionen anpassen (Gesamtansicht Schweiz)
                 try {

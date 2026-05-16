@@ -2,8 +2,18 @@
 
 ## Übersicht
 
-Bewölkung beeinflusst die Thermik-Qualität und wird im Label-System in 3 Stufen
-abgebildet. Grundlage: FAA Soaring Weather (AC 00-6A), Matuszko (2012).
+Bewölkung wird im Label-System in 3 Stufen abgebildet als **Sky-Beschreibung** —
+NICHT als Productivity-Gate (Mai 2026). Grundlage: FAA Soaring Weather (AC 00-6A),
+Matuszko (2012).
+
+**Wichtig (Mai 2026):** Die Thermik-Engine berechnet `climb_rate` bereits aus der
+Sonneneinstrahlung (`direct_radiation` + `diffuse_radiation` → H → climb). Die
+Wolken-Dämpfung steckt also physikalisch in der `climb_rate` drin. Cloud-Cover-%
+sind **kein Productivity-Gate mehr** — eine zusätzliche Schwelle wäre Doppel-
+bestrafung der eigenen Engine. Wolken-Labels beschreiben den **Himmel** (Pilot
+will wissen ob's bedeckt ist), beeinflussen aber das Rating nicht direkt. Nur
+`cu_clean_top` (12-50% Cu unten + klar oben) bleibt als Rating-Booster für
+Rating 6 (Cu-Marker + Latentwärme = echter Mehrwert über die Engine).
 
 Detaillierte Forschungsgrundlage: `meteo_research/cloud_cover_thermal_impact.md`
 
@@ -94,14 +104,14 @@ Bei Konflikt gewinnt immer der Reducer (sicherheitsrelevanter).
 
 | Schwelle | Wert | Typ | Wo definiert |
 |----------|------|-----|-------------|
-| Booster-Label (Top) | tief ≤ 50% Cu UND mittel ≤ 30% | LLM-Label | Skills (flyability, system_chat) |
-| Booster-Label (Blau) | tief < 30% UND mittel < 30% | LLM-Label | Skills (flyability, system_chat) |
-| Klassiker / cu_clean_top | tief 12-50% Cu UND mittel < 30% | Deterministisch | `engine/weather_context.py:96` |
-| Produktive Stunde (tief) | ≤80% cloud_cover_low | Deterministisch | config.py `PRODUCTIVE_LOW_CLOUD_MAX = 80` |
-| Produktive Stunde (mittel) | ≤90% cloud_cover_mid | Deterministisch | config.py `PRODUCTIVE_MID_CLOUD_MAX = 90` |
-| Reducer-Label | tief ≥ 80% ODER mittel ≥ 70% | LLM-Label | Skills (flyability, system_chat) |
-| CLOUDS-Tag 'good' | tief ≤ 50% UND mittel ≤ 30% | LLM-Label | Skills (templates) |
-| OVERCAST-DANGER | ≥75% total + Basis tief | Deterministisch | chat_engine.py (3 Stellen) |
+| Booster-Label (Top) | tief ≤ 50% Cu UND mittel ≤ 30% | LLM-Label (Sky-Info) | Skills (flyability, system_chat) |
+| Booster-Label (Blau) | tief < 30% UND mittel < 30% | LLM-Label (Sky-Info) | Skills (flyability, system_chat) |
+| Klassiker / cu_clean_top | tief 12-50% Cu UND mittel < 30% | Deterministisch (Rating-6-Booster) | `engine/weather_context.py:96` |
+| ~~Produktive Stunde (tief)~~ | ~~≤80% cloud_cover_low~~ | **DEPRECATED Mai 2026** | `PRODUCTIVE_LOW_CLOUD_MAX` nicht mehr im Productivity-Pfad |
+| ~~Produktive Stunde (mittel)~~ | ~~≤90% cloud_cover_mid~~ | **DEPRECATED Mai 2026** | `PRODUCTIVE_MID_CLOUD_MAX` nicht mehr im Productivity-Pfad |
+| Reducer-Label | tief ≥ 80% ODER mittel ≥ 70% | LLM-Label (Sky-Info, kein Rating-Cap) | Skills (flyability, system_chat) |
+| CLOUDS-Tag 'good' | tief ≤ 50% UND mittel ≤ 30% | LLM-Label (Sky-Info) | Skills (templates) |
+| OVERCAST-DANGER | ≥75% total + Basis tief | Deterministisch (Safety, nicht Thermik) | chat_engine.py (3 Stellen) |
 
 **Warum tief und mittel getrennt behandeln?** Tief = Cumulus (humilis/mediocris) sind **Thermik-Marker** — bimodal: 12-50% optimal, ≥80% killt. Mittel = Altostratus/Altocumulus sind **Strahlungs-Dämpfer** — monoton: jedes % Bedeckung reduziert Einstrahlung, kein Sweet Spot. Eine `max(tief, mittel)`-Schwelle würde beide Mechanismen symmetrisch behandeln, was physikalisch falsch ist:
 - Tag mit `tief = 25% Cu` + `mittel = 60% Altostratus` → unter `max = 60%` Neutralzone, aber real „mässige Cu-Thermik mit gedämpfter Einstrahlung"
@@ -146,6 +156,39 @@ Hohe Bewölkung (Cirrus, >6000m) wird **ignoriert**:
 ---
 
 ## Änderungshistorie
+
+### Mai 2026 — Strahlung wird Wahrheit, Cloud-% nur noch Sky-Info
+
+- **Grosse Umstellung:** Cloud-Cover-% sind **kein Productivity-Gate mehr**.
+  Die `productive_thermal_h`-Logik in `engine/weather_context.py` wurde von
+  4 Bedingungen (climb + low + mid + band) auf 3 (climb + band + kein UNUSABLE)
+  reduziert. Begründung: `climb_rate` wird in `thermik_calculator.py` bereits
+  aus `direct_radiation` + `diffuse_radiation` berechnet — Wolken-Dämpfung
+  steckt physikalisch in climb drin. Eine zusätzliche Cloud-Schwelle war
+  Doppelbestrafung (siehe Code-Kommentar `thermik_calculator.py:1367-1369`).
+- **Aufgedeckter Bug:** ICON-D2 `cloud_cover_mid` ist flächige Bedeckung, nicht
+  optische Dicke. Bei dünnem Altostratus zeigt mid=100% trotzdem swr=800-980 W/m²
+  am Boden (77% der "hoch bewölkten" Stunden im Cache 16.05.2026 zeigten diese
+  Diskrepanz). Strahlung ist der verlässlichere Proxy.
+- **Skill-Anpassungen:** Rating-Caps wegen Bewölkung ("tief ≥ 80% → max 1-2",
+  "mittel ≥ 70% → max 2-3") wurden aus `system_chat.md` und allen
+  `04_flight_subratings_*.md` entfernt. `cu_clean_top` bleibt einziger
+  cloud-basierter Rating-Booster (für Rating 6, Latentwärme-Mehrwert).
+- **Hour-Lines erweitert:** `Strahlung X W/m² (direkt Y)` ist jetzt in jeder
+  Hour-Line sichtbar (Spot + Region). LLM hat damit den Strahlungswert direkt
+  vor sich. **W/m²-Rohzahlen dürfen NIEMALS an den User durchgereicht werden**
+  — in Fliegersprache übersetzen (`skills/shared/01_global/01_core_principles.md`
+  Punkt 2d).
+- **Region-strict-Bug nebenbei gefixt:** `productive_h_strict` wurde im
+  Region-Loop nie inkrementiert → alle Regionen hatten permanent
+  `working_height_agl_m=0`. Jetzt analog zum Spot-Loop.
+- **Mess-Checkpoint** (145 Region-Tage): +1.67h durchschnittlich, 21 Tier-Kipper
+  (alle in Richtung besser), 0 Demotion. Self-Correction: bei echt schlechter
+  Sonne sinkt climb → Stunde fällt automatisch durch `PRODUCTIVE_CLIMB_MIN`.
+- **Geänderte Dateien:** `engine/weather_context.py` (4 Stellen),
+  `skills/shared/04_flyability/{03_prose_style,00_template_spot,00_template_region,04_flight_subratings_spot,04_flight_subratings_region}.md`,
+  `skills/system_chat.md`, `skills/shared/01_global/01_core_principles.md`,
+  `docs/FLYABILITY_TIER_LOGIK.md`, `docs/BEWOELKUNG_LABELS.md`.
 
 ### Apr 2026 — Bewölkungs-Labels eingeführt
 - **Neu**: `GUTE_EINSTRAHLUNG` Booster-Label (≤50% Cu = optimal)

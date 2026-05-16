@@ -322,7 +322,12 @@ def _aggregate_regional_data(data_list):
 
         if point_cloud_values:
             point_cloud_values.sort(key=lambda x: x["score"])
-            target_idx = 1 if len(point_cloud_values) >= 4 else 0
+            # 30%-Perzentil: findet regionale Sonnenfenster (Blue Holes).
+            # Skaliert mit der Punktzahl — bei 4 RPs Index 1 (=25%), bei 7 RPs
+            # Index 2 (=29%), bei 10 RPs Index 3 (=30%). Konsistente Statistik
+            # unabhaengig davon, wie viele Referenzpunkte pro Region existieren.
+            n = len(point_cloud_values)
+            target_idx = max(0, min(n - 1, int(0.3 * n)))
             rep = point_cloud_values[target_idx]
             primary["hourly"]["cloud_cover_low"][i] = int(rep["low"])
             primary["hourly"]["cloud_cover_mid"][i] = int(rep["mid"])
@@ -338,7 +343,11 @@ def _aggregate_regional_data(data_list):
                 valid_vals = [v for v in vals if v is not None]
                 if valid_vals:
                     points_with_rain = sum(1 for v in valid_vals if v > 0.0)
-                    if points_with_rain >= 2:
+                    # Regionale Signifikanz: mindestens 30% der Punkte muessen
+                    # Niederschlag melden, Untergrenze 2 (gegen Einzel-Ausreisser).
+                    # Bei 4 RPs => 2, bei 7 RPs => 3, bei 10 RPs => 3.
+                    rain_threshold = max(2, int(round(0.3 * len(valid_vals))))
+                    if points_with_rain >= rain_threshold:
                         primary["hourly"][k][i] = max(valid_vals)
                     else:
                         primary["hourly"][k][i] = 0.0

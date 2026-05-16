@@ -42,21 +42,29 @@ Violett erfordert damit die optimale Cu-Zone (oder Blau-Thermik 0 %), nicht den 
 
 ## Die zentrale Metrik: `productive_thermal_h`
 
-Eine Stunde zählt als **produktive Thermik-Stunde**, wenn alle drei Bedingungen erfüllt sind:
+Eine Stunde zählt als **produktive Thermik-Stunde**, wenn alle drei Bedingungen erfüllt sind (Mai 2026):
 
 | Bedingung | Schwelle | Konstante in `config.py` |
 |-----------|----------|--------------------------|
 | Climb-Rate | ≥ 0.7 m/s | `PRODUCTIVE_CLIMB_MIN` |
-| Tiefe Wolken (<3 km) | ≤ 80 % | `PRODUCTIVE_LOW_CLOUD_MAX` |
-| Mittlere Wolken (3–6 km) | ≤ 90 % | `PRODUCTIVE_MID_CLOUD_MAX` |
-| Kein THERMAL-ROUGH-UNUSABLE | — | (SHEAR/TORN/FRAGMENTED zählen MIT) |
+| Höhenband (Thermik-Top über Startplatz/Region-Ref) | ≥ `min_band_depth(climb, terrain)` | berechnet in `thermik_calculator.py` |
+| Kein THERMAL-ROUGH-UNUSABLE / THERMAL-WIND-UNUSABLE | — | (SHEAR/TORN/FRAGMENTED zählen MIT) |
 
-**Wolken-Differenzierung** (Basis: `meteo_research/cloud_cover_thermal_impact.md` Sektion 6): Tiefe Wolken werfen direkt Schatten auf die Quellfläche und werden bei ≥80% harter Blocker (FAA-Soaring-Regel). Mittlere Wolken (Altostratus) sitzen über der Thermik-Arbeitshöhe und dämpfen nur indirekt über reduzierte Einstrahlung — "praktisch tot" laut FAA erst >87%, daher Schwelle 90%. Diese Trennung verhindert, dass hohe Altostratus-Decken bei blauem Himmel-unten einen soliden Thermiktag fälschlich als "nicht produktiv" markieren.
+**Bewölkungs-Schwellen entfallen seit Mai 2026** (war Doppelbestrafung der eigenen Berechnung):
 
-**Warum diese Definition?**
-Frühere Logik nutzte zwei Metriken (`avg_low_mid_cloud` Mittelwert + `flyable_thermal_h` Counter mit ≥0.5 m/s). Problem: Morgenstunden mit dichten Wolken UND nur 0.3-1.0 m/s Climb verzerrten den Wolken-Mittelwert nach oben — obwohl in diesen Stunden eh kein nennenswertes Steigen herrschte. Beispiel Voralpen 16.04.2026: 4-5h klare Mittagsthermik wurde fälschlich als "Abgleiter" eingestuft, weil der Schnitt durch Morgenwolken auf 70-80 % gezogen wurde.
+Die `climb_rate` wird in `thermik_calculator.py` (Funktion `_calculate_climb_rate_for_hour`) bereits aus `direct_radiation` + `diffuse_radiation` über den sensiblen Wärmefluss H abgeleitet. Wolken-Dämpfung steckt also **physikalisch in climb_rate drin** (siehe Code-Kommentar `thermik_calculator.py:1367-1369`: "W*-Deardorff beinhaltet die Bewölkungsdämpfung bereits ... wir dürfen hier nicht nochmals künstlich mit einem sun_factor multiplizieren").
 
-Die neue Single-Metric-Definition ist physikalisch sauber: **Bewölkung wird nur dort gezählt, wo überhaupt eine produktive Stunde möglich wäre.**
+Eine zusätzliche Cloud-Cover-Schwelle wäre Doppelbestrafung — und ICON-D2 `cloud_cover_mid` ist flächige Bedeckung, **nicht** optische Dicke. Bei dünnem Altostratus zeigt mid=100% trotzdem swr=800 W/m² (Beobachtung aus Cache 16.05.2026 für Wallis/Goms, Berner Oberland u.a.). Die Strahlung ist der verlässlichere Proxy und ist in climb bereits eingepreist.
+
+**Wolken-% bleiben weiterhin relevant für:**
+- LLM-Labels (`VIEL_BEWOELKUNG` / `GUTE_EINSTRAHLUNG`) als Sky-Beschreibung
+- `cu_clean_top` als Cu-Marker-Booster (Rating 6) — Latentwärme-Boost ist echter Mehrwert über die Engine
+- `OVERCAST-DANGER` Cloud-Entry-Sicherheit
+- Aber **NICHT** als Productivity-Gate.
+
+Die Konstanten `PRODUCTIVE_LOW_CLOUD_MAX = 80` und `PRODUCTIVE_MID_CLOUD_MAX = 90` in `config.py` sind nicht mehr im Productivity-Pfad verwendet (deprecated, können später entfernt werden).
+
+**Mess-Checkpoint Mai 2026** (über 145 Region-Tage): 57% der Tage bekommen mehr produktive Stunden (Durchschnitt +1.67h, max +7h). 21 Region-Tage ändern den Tier — alle in Richtung "besser". Keine Demotion irgendwo (Self-Correction: wenn die Sonne wirklich weg ist, sinkt climb automatisch → Stunde fällt durch climb-Schwelle).
 
 ---
 
@@ -100,19 +108,25 @@ Das ist nötig, weil die LLM unter `gray` typischerweise pessimistische Textfeld
 
 ## LLM-Hint im Wetter-Kontext
 
-Zur Transparenz für die LLM enthält der TAGESPROFIL-Block einen expliziten Counter:
+Zur Transparenz für die LLM enthält der TAGESPROFIL-Block einen expliziten Counter (seit Mai 2026):
 
 ```
-→ PRODUKTIVE-THERMIK: 4h (Climb ≥0.7 m/s, tief ≤80%, mittel ≤90%, kein ROUGH-UNUSABLE). Min für green-Tag: 4h.
+→ PRODUKTIVE-THERMIK: 4h (Climb ≥0.7 m/s, ausreichendes Höhenband, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). Min für green-Tag: 4h. HINWEIS: Bewölkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — die Sonnen-Dämpfung steckt bereits in climb_rate über die strahlungsbasierte H-Berechnung.
 ```
 
-Der Hint erscheint **nur** wenn `thermal_hours_total > 0`. Die Skill-Prompts (`skills/flyability.md`, `skills/region_flyability.md`, `skills/spot_combined_analysis.md`, `skills/region_combined_analysis.md`) referenzieren diesen Counter im Selbst-Check:
+Der Hint erscheint **nur** wenn `thermal_hours_total > 0`. Die Skill-Prompts referenzieren diesen Counter im Selbst-Check:
 
 - N ≥ 4 → green/violet möglich
 - N < 2 → fly_status MUSS gray sein
 - 2 ≤ N < 4 → Grenzfall, abhängig von Peak und Wind
 
-Die früheren Hints `→ CLOUD-FLOOR (System-erzwungen)` und `→ CLOUD-INFO` sind ersatzlos entfallen — die Wolken-Information ist jetzt im `productive_thermal_h`-Counter integriert.
+Zusätzlich enthalten die Hour-Lines seit Mai 2026 die Strahlungs-Werte direkt:
+
+```
+... Bewoelkung 100% (tief 0%, mittel 100%, hoch 100%) | Strahlung 750 W/m² (direkt 388) | ...
+```
+
+Damit kann der LLM bei Diskrepanz zwischen Cloud-% und Strahlung selbst die Realität erkennen ("dünne Schleier-Bewölkung, Sonne kommt durch"). **WICHTIG:** Die W/m²-Werte sind LLM-intern — dürfen NIEMALS roh an den User durchgereicht werden, sondern in Fliegersprache übersetzt (siehe `skills/shared/01_global/01_core_principles.md` Punkt 2d).
 
 ---
 
@@ -125,7 +139,9 @@ self._ctx_tq_cache[f"{name}|{date_str}"] = {
     "thermal_hours_total": int,        # Stunden mit climb >= 0.3 m/s
     "tq_danger_h": int,                # Stunden mit UNUSABLE-Tag
     "peak_climb_proxy": float,         # Peak Climb-Rate des Tages
-    "productive_thermal_h": int,       # Stunden mit climb >= 0.7 + Wolken <= 70 + kein UNUSABLE
+    "productive_thermal_h": int,       # Stunden mit climb >= 0.7 + Band ok + kein UNUSABLE (Mai 2026: KEIN Cloud-Check mehr)
+    "productive_h_strict": int,        # wie oben, aber climb >= 1.5 m/s
+    "working_height_agl_m": int,       # Median Thermik-Top AGL über strict-Stunden
 }
 ```
 
@@ -139,8 +155,8 @@ Alle Schwellen in `config.py`:
 
 ```python
 PRODUCTIVE_CLIMB_MIN = 0.7       # m/s — Mindest-Climb für "produktive" Stunde
-PRODUCTIVE_LOW_CLOUD_MAX = 80    # % — Max cloud_cover_low (direkter Boden-Shade)
-PRODUCTIVE_MID_CLOUD_MAX = 90    # % — Max cloud_cover_mid (indirekte Dämpfung)
+PRODUCTIVE_LOW_CLOUD_MAX = 80    # DEPRECATED Mai 2026 — nicht mehr im Productivity-Pfad
+PRODUCTIVE_MID_CLOUD_MAX = 90    # DEPRECATED Mai 2026 — nicht mehr im Productivity-Pfad
 PRODUCTIVE_HOURS_FOR_GREEN = 4   # Mindest-Stunden für gray->green Upgrade
 PRODUCTIVE_HOURS_DOWNGRADE = 2   # Untere Schwelle: green/violet -> gray
 

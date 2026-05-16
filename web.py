@@ -1862,6 +1862,7 @@ def regionen_page():
     return render_template(
         "regionen.html",
         forecast_days=current_max_days(),
+        show_reference_points=config.SHOW_REFERENCE_POINTS,
     )
 
 
@@ -2640,6 +2641,107 @@ def api_run_all_analyses_stream():
             "Connection": "keep-alive",
         },
     )
+
+
+def _run_single_stream_in_background(eng, q, stream_attr, done_event):
+    """Konsumiert einen einzelnen Analyse-Stream (Spots ODER Regionen) im Thread.
+
+    stream_attr: 'run_spot_analyses_stream' oder 'run_region_analyses_stream'.
+    done_event:  'spot_done' bzw. 'region_done' — nach dem cachen wir Counts.
+    """
+    global _analysis_running, _analysis_completed, _analysis_error, _analysis_result
+    try:
+        gen = getattr(eng, stream_attr)()
+        for evt in gen:
+            q.put(evt)
+            if evt.get("event") == done_event:
+                data = evt.get("data", {})
+                _analysis_result = {
+                    "spots_count": data.get("spots_count", 0),
+                    "regions_count": data.get("regions_count", 0),
+                    "results_count": data.get("results_count", 0),
+                }
+                _analysis_completed = True
+    except Exception as e:
+        logger.exception("[ANALYSIS-BG] Fehler im Analyse-Thread (%s)", stream_attr)
+        q.put({"event": "error", "data": {"message": str(e)}})
+        _analysis_error = str(e)
+    finally:
+        q.put(None)
+        _analysis_running = False
+        logger.info("[ANALYSIS-BG] %s beendet (completed=%s)", stream_attr, _analysis_completed)
+
+
+def _start_single_analysis_stream(stream_attr, done_event):
+    """Gemeinsame Logik fuer Spot- und Region-SSE-Streams."""
+    global _analysis_running, _analysis_completed, _analysis_error, _analysis_result, _analysis_queue
+
+    with _analysis_lock:
+        if _analysis_running:
+            return Response(
+                "event: error\ndata: {\"message\": \"Eine Analyse laeuft bereits\"}\n\n",
+                mimetype="text/event-stream",
+                headers={"Cache-Control": "no-cache"},
+            )
+        _analysis_running = True
+        _analysis_completed = False
+        _analysis_error = None
+        _analysis_result = None
+        _analysis_queue = _queue_mod.Queue()
+
+    t = threading.Thread(
+        target=_run_single_stream_in_background,
+        args=(engine, _analysis_queue, stream_attr, done_event),
+        daemon=True,
+    )
+    t.start()
+
+    def generate():
+        yield "retry: 300000\n\n"
+        try:
+            while True:
+                try:
+                    evt = _analysis_queue.get(timeout=15)
+                except _queue_mod.Empty:
+                    if not _analysis_running:
+                        break
+                    yield "event: heartbeat\ndata: {}\n\n"
+                    continue
+                if evt is None:
+                    break
+                event_type = evt.get("event", "message")
+                if event_type == "heartbeat":
+                    yield "event: heartbeat\ndata: {}\n\n"
+                    continue
+                data = evt.get("data", {})
+                yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+        except GeneratorExit:
+            logger.warning("[SSE] Client disconnected — Analyse laeuft im Background weiter")
+        except Exception as e:
+            logger.exception("[SSE] single analysis stream Fehler")
+            yield f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.route("/api/run-analyses-stream")
+def api_run_analyses_stream():
+    """SSE-Endpoint: startet Spot-Analyse im Background-Thread, streamt Progress."""
+    return _start_single_analysis_stream("run_spot_analyses_stream", "spot_done")
+
+
+@app.route("/api/run-region-analyses-stream")
+def api_run_region_analyses_stream():
+    """SSE-Endpoint: startet Region-Analyse im Background-Thread, streamt Progress."""
+    return _start_single_analysis_stream("run_region_analyses_stream", "region_done")
 
 
 @app.route("/api/regionen-polygone")

@@ -97,7 +97,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 # Umschalten: USE_SPOT_CSV = "test" oder "complete"
 USE_SPOT_CSV = os.environ.get("GLEITCAST_SPOT_CSV", "complete")  # "complete" | "test"
 CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
+# Region-Referenzpunkte: Default ist CVT-7 (Apr 2026, 7 Punkte im
+# Polygon-Innern via Lloyd-CVT). Legacy-Modus nutzt die alten 4 Punkte
+# am Polygon-Rand (Greedy Max-Min-Distance). Fallback-Option bei Problemen
+# mit der neuen Aggregation. Beide Files muessen in data/ vorliegen.
+USE_LEGACY_REGION_REFPOINTS = False
 REGIONEN_GEOJSON_PATH = DATA_DIR / "regionen_referenzpunkte.geojson"
+REGIONEN_GEOJSON_LEGACY_PATH = DATA_DIR / "regionen_referenzpunkte_legacy4.geojson"
 # Master-File fuer Region-Properties (Name, terrain_type, elevation_ref,
 # kritischer_foehn, description). Geometrie + reference_points kommen aus
 # der GeoJSON, alle textuellen Felder aus dieser CSV.

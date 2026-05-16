@@ -47,6 +47,7 @@ from engine.decision_engine import (
     build_start_window, build_topic_tags, build_region_topic_tags,
     validate_llm_tags, merge_topic_tags,
 )
+from engine.labeled_examples import build_few_shot_block
 from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
     get_all_regions,
@@ -519,12 +520,23 @@ class AnalyzersMixin:
 
             safety_block = self._format_safety_injection(safety_result)
 
+            # Few-Shot Pipeline Schritt 2: aehnliche Pilot-gelabelte Cases injizieren.
+            # Tag wird in _ctx_fewshot_cache abgelegt, Post-Process haengt ihn an.
+            terrain_tier = (region.get("terrain_type") or "").strip()
+            few_shot_block = self._build_few_shot_for(
+                f"{rname}|{date_str}", terrain_tier, entity_type="region",
+            )
+
+            user_msg = (
+                f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
+            )
+            if few_shot_block:
+                user_msg += few_shot_block + "\n"
+            user_msg += f"{context}\n\n{safety_block}"
+
             messages = [
                 {"role": "system", "content": prompts.REGION_FLYABILITY_PROMPT},
-                {"role": "user", "content": (
-                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
-                    f"{context}\n\n{safety_block}"
-                )},
+                {"role": "user", "content": user_msg},
             ]
 
             last_err = None
@@ -1486,6 +1498,8 @@ class AnalyzersMixin:
         self._ctx_gust_cache.clear()
         self._ctx_tq_cache.clear()
         self._ctx_foehn_cache.clear()
+        if hasattr(self, "_ctx_fewshot_cache"):
+            self._ctx_fewshot_cache.clear()
         if not self.analysis_client:
             yield {"event": "error", "data": {"message": f"Kein API-Key fuer Analyse-Provider '{self.analysis_provider}'"}}
             return
@@ -1985,6 +1999,7 @@ class AnalyzersMixin:
             }
             result["safety_rating"] = _compute_safety_rating(result)
             result["is_conditional"] = False
+            self._attach_rating_inputs(result, f"{name}|{date_str}")
             return result
 
         # RATING_ARCHITECTURE v2.0: LLM gibt experience_rating (1-6) direkt.
@@ -2030,7 +2045,71 @@ class AnalyzersMixin:
             is_cond = False
         result["is_conditional"] = is_cond
 
+        self._attach_rating_inputs(result, f"{name}|{date_str}")
         return result
+
+    def _build_few_shot_for(self, cache_key: str, terrain_tier: str,
+                            entity_type: str = "region") -> str:
+        """Liest Live-Features aus _ctx_tq_cache und holt passende Labels.
+
+        Returns prompt_block (leer wenn keine passenden Labels). Der Decision-
+        Tag wird in self._ctx_fewshot_cache[cache_key] abgelegt und im
+        Post-Process an _decisions_applied angehaengt.
+
+        cache_key: f"{name}|{date_str}" wie bei _ctx_tq_cache.put.
+        terrain_tier: aus regionen.csv (region) bzw. fluggebiete.csv (spot).
+        entity_type: "region" oder "spot".
+        """
+        if not hasattr(self, "_ctx_fewshot_cache"):
+            self._ctx_fewshot_cache = {}
+        tq = (self._ctx_tq_cache.get(cache_key) or {}) if hasattr(self, "_ctx_tq_cache") else {}
+        if not tq:
+            self._ctx_fewshot_cache[cache_key] = "FewShot:none(no_tq_cache)"
+            return ""
+        peak = tq.get("sustained_peak_mps")
+        prod_h = tq.get("productive_h_strict")
+        if peak is None or prod_h is None:
+            self._ctx_fewshot_cache[cache_key] = "FewShot:none(incomplete_features)"
+            return ""
+        low = tq.get("avg_low_cloud_thermal_h") or 0
+        mid = tq.get("avg_mid_cloud_thermal_h") or 0
+        current = {
+            "tier": terrain_tier or "",
+            "peak": float(peak),
+            "prod_h": float(prod_h),
+            "low": float(low),
+            "mid": float(mid),
+        }
+        block, tag = build_few_shot_block(current, entity_type=entity_type, top_k=3)
+        self._ctx_fewshot_cache[cache_key] = tag
+        return block
+
+    def _attach_rating_inputs(self, result: dict, cache_key: str) -> None:
+        """Persistiert die Rating-Inputs aus dem TQ-Cache im Analyse-Result.
+
+        Damit haben Few-Shot-Snapshots (engine/labeled_examples.py) Zugriff auf
+        peak_climb, productive_thermal_h, rough_pct etc. — sonst sind diese
+        Felder nach Cache-Clear weg.
+        """
+        tq = self._ctx_tq_cache.get(cache_key) or {}
+        if not tq:
+            return
+        thermal_total = tq.get("thermal_hours_total")
+        rough_h = tq.get("rough_danger_h")
+        rough_pct = None
+        if isinstance(thermal_total, int) and thermal_total > 0 and isinstance(rough_h, int):
+            rough_pct = round(100.0 * rough_h / thermal_total, 1)
+        result["_rating_inputs"] = {
+            "peak_climb_proxy": tq.get("peak_climb_proxy"),
+            "sustained_peak_mps": tq.get("sustained_peak_mps"),
+            "productive_thermal_h": tq.get("productive_thermal_h"),
+            "productive_h_strict": tq.get("productive_h_strict"),
+            "working_height_agl_m": tq.get("working_height_agl_m"),
+            "cloud_structure": tq.get("cloud_structure"),
+            "rough_danger_h": rough_h,
+            "thermal_hours_total": thermal_total,
+            "rough_pct": rough_pct,
+        }
 
     def _apply_subs_status_floor(self, result: dict, label: str, llm_initial_status):
         """Eskaliert `safety_status` auf das Niveau, das `min(safety-subs)` impliziert.
@@ -2134,6 +2213,7 @@ class AnalyzersMixin:
             result["experience_rating"] = 1
             result["safety_rating"] = _compute_safety_rating(result)
             result["is_conditional"] = False
+            self._attach_rating_inputs(result, f"{rname}|{date_str}")
             return result
 
         # RATING_ARCHITECTURE v2.0: LLM gibt experience_rating direkt.
@@ -2149,6 +2229,13 @@ class AnalyzersMixin:
             is_cond = False
         result["is_conditional"] = is_cond
         result["conditional_reason"] = (result.get("conditional_reason", "") or "") if is_cond else ""
+
+        self._attach_rating_inputs(result, f"{rname}|{date_str}")
+
+        # Few-Shot Pipeline Schritt 2: Tag in _decisions_applied uebernehmen.
+        fewshot_tag = (getattr(self, "_ctx_fewshot_cache", {}) or {}).get(f"{rname}|{date_str}")
+        if fewshot_tag:
+            result.setdefault("_decisions_applied", []).append(fewshot_tag)
 
         return result
 
@@ -2174,6 +2261,8 @@ class AnalyzersMixin:
         self._ctx_gust_cache.clear()
         self._ctx_tq_cache.clear()
         self._ctx_foehn_cache.clear()
+        if hasattr(self, "_ctx_fewshot_cache"):
+            self._ctx_fewshot_cache.clear()
 
         from source_area import find_region_for_point as _find_region
 
@@ -2322,6 +2411,17 @@ class AnalyzersMixin:
                 if not region_obj:
                     continue
 
+                # Few-Shot Pipeline Schritt 2 — auch im Batch-Pfad.
+                rname_batch = region_obj.get("region") or rid
+                terrain_tier_batch = (region_obj.get("terrain_type") or "").strip()
+                few_shot_block_batch = self._build_few_shot_for(
+                    f"{rname_batch}|{date_str}", terrain_tier_batch, entity_type="region",
+                )
+                user_content = f"AKTUELLE LOKALZEIT: {now_str}\n\n"
+                if few_shot_block_batch:
+                    user_content += few_shot_block_batch + "\n"
+                user_content += f"{ctx}\n\n{safety_block}"
+
                 cid = f"region_fly|{rid}|{date_str}"
                 region_fly_requests.append({
                     "custom_id": cid,
@@ -2331,7 +2431,7 @@ class AnalyzersMixin:
                         "model": self.analysis_model,
                         "messages": [
                             {"role": "system", "content": prompts.REGION_FLYABILITY_PROMPT},
-                            {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
+                            {"role": "user", "content": user_content},
                         ],
                         "temperature": 0.2,
                         "max_tokens": _resolve_max_tokens(self.analysis_model, 2500),
@@ -2909,6 +3009,8 @@ class AnalyzersMixin:
         self._ctx_gust_cache.clear()
         self._ctx_tq_cache.clear()
         self._ctx_foehn_cache.clear()
+        if hasattr(self, "_ctx_fewshot_cache"):
+            self._ctx_fewshot_cache.clear()
 
         # Cost-Telemetrie fuer Parallel-Pfad. Wird von _record_call_usage()
         # in den per-Call-Methoden gefuettert.

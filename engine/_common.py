@@ -350,6 +350,8 @@ _PERMANENT_ERROR_KEYWORDS = (
     # Gemini / Google
     "permission_denied", "unauthenticated", "api key not valid",
     "api_key_invalid", "invalid_argument: api key",
+    # DeepSeek (und generisch HTTP 402): leeres Guthaben → kein Retry sinnvoll
+    "insufficient balance", "payment required", "payment_required",
 )
 
 
@@ -434,7 +436,9 @@ def compute_retry_sleep(err: Exception, attempt: int, base: float = 3.0,
 def _user_friendly_api_error(err: Exception) -> str:
     """Gibt eine benutzerfreundliche Fehlermeldung fuer permanente LLM-Fehler zurueck."""
     err_str = str(err).lower()
-    if "insufficient_quota" in err_str or "quota" in err_str:
+    if ("insufficient_quota" in err_str or "quota" in err_str
+            or "insufficient balance" in err_str
+            or "payment required" in err_str or "payment_required" in err_str):
         return "API-Budget aufgebraucht — bitte Provider-Guthaben aufladen"
     if any(kw in err_str for kw in ("invalid_api_key", "api_key_invalid", "api key not valid", "invalid api key")):
         return "Ungueltiger API-Key — bitte in den Einstellungen pruefen"

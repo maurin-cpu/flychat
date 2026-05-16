@@ -283,3 +283,17 @@ Wichtige Gruppen:
 - **Entrainment**: `alpine_MU`, `moist_entrainment_factor`
 - **Climb-Factor**: `climb_factor` (jahreszeitabhängig, 0.5–0.85)
 - **Terrain-Schwellen**: `terrain_elev_low` (800m), `terrain_elev_high` (1800m)
+
+---
+
+## Productivity-Gate (Mai 2026)
+
+Das `productive_thermal_h`-Gate in `engine/weather_context.py` basiert seit
+Mai 2026 ausschliesslich auf `climb_rate` (mit `band_usable` und kein
+`*UNUSABLE*`-Tag) — **NICHT mehr auf Cloud-Cover-%**. Begründung: die
+Strahlungs-Dämpfung durch Wolken ist über `direct_radiation` + `diffuse_radiation`
+bereits in `climb_rate` eingerechnet. Ein zusätzliches Cloud-Gate wäre
+Doppelbestrafung (siehe Kommentar im Code `thermik_calculator.py:1367-1369`).
+
+Details: `docs/FLYABILITY_TIER_LOGIK.md`, `docs/BEWOELKUNG_LABELS.md`,
+`meteo_research/cloud_cover_thermal_impact.md` Sektion 7.

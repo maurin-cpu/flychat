@@ -139,7 +139,58 @@ Quelle: Mosailes XC Weather Conditions Guide; Flybubble "Into the Blue" XC Guide
 
 ---
 
-## 7. Quellen
+## 7. Coverage ≠ Optische Dicke: warum Strahlung verlässlicher ist (Mai 2026)
+
+### Beobachtung im eigenen Cache
+
+Bei systematischer Prüfung der ICON-D2-Daten (Open-Meteo) für den 16.05.2026
+über 6 Schweizer Regionen zeigten **77% der Stunden mit `cloud_cover_mid ≥ 90%`
+gleichzeitig `shortwave_radiation ≥ 700 W/m²`** — also fast Klarluft-Niveau am
+Boden trotz nominal "voller" Mittelbewölkung.
+
+Konkrete Beispiele:
+- Wallis/Goms 13:00: `mid=100%`, swr=984 W/m² (direct=862)
+- Engadin Ober 16:00: `mid=100%`, swr=869 W/m²
+- Berner Oberland 14:00: `mid=100%`, swr=750 W/m²
+
+### Erklärung
+
+ICON-D2 `cloud_cover_mid` liefert die **flächige Bedeckung** der mittleren
+Schicht (3-8km), **nicht die optische Dicke**. 100% Coverage mit dünnem
+Altostratus undulatus dämpft die Sonne kaum (Transmission 70-85%) — 100%
+Coverage mit dichtem Altostratus opacus dämpft stark (Transmission 20-30%).
+Beide Fälle erhalten in Open-Meteo dasselbe Coverage-Label.
+
+Die Strahlungsfelder (`shortwave_radiation`, `direct_radiation`,
+`diffuse_radiation`) berechnen Open-Meteo intern unter Berücksichtigung der
+optischen Dicke und sind daher der **physikalisch verlässlichere Proxy** für
+Bodenheizung und damit Thermik-Trigger.
+
+### Konsequenz für Gleitcast (Mai 2026)
+
+Die `productive_thermal_h`-Berechnung in `engine/weather_context.py` verwendet
+**keine Cloud-Cover-Schwellen mehr** (vorher: `low ≤ 80% UND mid ≤ 90%`). Statt
+dessen wird der `climb_rate`-Wert aus `thermik_calculator.py` direkt vertraut —
+dort steckt die Strahlung bereits drin (über `direct_radiation_to_H * 0.25 +
+diffuse_radiation_to_H * 0.10 → H → climb`). Damit wird die Doppelbestrafung
+vermieden, vor der der Code-Kommentar `thermik_calculator.py:1367-1369`
+explizit warnt:
+
+> "W*-Deardorff beinhaltet die Bewölkungsdämpfung bereits physikalisch
+> über den surface_sensible_heat_flux (H), weshalb wir hier nicht nochmals
+> künstlich mit einem 'sun_factor' multiplizieren dürfen (sonst doppelte
+> Bestrafung)."
+
+Wolken-% bleiben relevant für Labels (Sky-Beschreibung), den Cu-Marker-Booster
+(`cu_clean_top`, Rating 6) und die Cloud-Entry-Sicherheit (OVERCAST-DANGER) —
+aber nicht mehr als Productivity-Gate.
+
+Volle Detailbeschreibung der Umstellung: `docs/BEWOELKUNG_LABELS.md` Changelog
+Mai 2026, `docs/FLYABILITY_TIER_LOGIK.md` Abschnitt "Die zentrale Metrik".
+
+---
+
+## 8. Quellen
 
 1. FAA Advisory Circular AC 00-6A, Chapter 16: Soaring Weather
 2. Matuszko, D. (2012). Influence of cloud cover on solar radiation. Int. J. Climatol.
@@ -149,3 +200,9 @@ Quelle: Mosailes XC Weather Conditions Guide; Flybubble "Into the Blue" XC Guide
 6. Flybubble - Into the Blue: Thermaling & Flying XC on Blue Days
 7. NWS Soaring Forecast Documentation
 8. UBC ATSC 113 - Cloud Coverage (Aviation Meteorology)
+9. Stull, R. (1988). An Introduction to Boundary Layer Meteorology — H als
+   Thermik-Treiber, free convection scaling.
+10. Iqbal, M. (1983). An Introduction to Solar Radiation — Sonnenstandsgeometrie,
+    saisonale Maximum-Strahlung.
+11. Open-Meteo API Docs: cloud_cover_* vs. shortwave_radiation / direct_radiation
+    (https://open-meteo.com/en/docs)

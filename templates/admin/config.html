@@ -482,6 +482,15 @@
         </button>
       </div>
       <div class="cfg-actions-status" id="adminActionStatus" role="status" aria-live="polite"></div>
+      <div class="cfg-actions-progress" id="adminActionProgress" hidden>
+        <div class="cfg-actions-progress__meta">
+          <span class="cfg-actions-progress__phase" id="adminActionProgressPhase"></span>
+          <span class="cfg-actions-progress__count" id="adminActionProgressCount"></span>
+        </div>
+        <div class="cfg-actions-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="cfg-actions-progress__fill" id="adminActionProgressFill"></div>
+        </div>
+      </div>
     </div>
   </section>
   <style>
@@ -513,6 +522,20 @@
     }
     .cfg-actions-status.is-ok    { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
     .cfg-actions-status.is-error { color: #7f1d1d; background: #fef2f2; border-color: #fecaca; }
+    .cfg-actions-progress { margin-top: 10px; }
+    .cfg-actions-progress__meta {
+      display: flex; justify-content: space-between; gap: 12px;
+      font-size: 12px; color: var(--color-text-secondary);
+      margin-bottom: 6px; font-variant-numeric: tabular-nums;
+    }
+    .cfg-actions-progress__bar {
+      width: 100%; height: 10px; border-radius: 999px;
+      background: var(--color-border); overflow: hidden;
+    }
+    .cfg-actions-progress__fill {
+      height: 100%; width: 0%; background: #2563eb; border-radius: 999px;
+      transition: width 250ms ease;
+    }
   </style>
 
   <div class="cfg-toolbar">
@@ -937,10 +960,18 @@
   );
   if (!statusEl || !btns.length) return;
 
+  var progressEl   = document.getElementById('adminActionProgress');
+  var progressFill = document.getElementById('adminActionProgressFill');
+  var progressPhase = document.getElementById('adminActionProgressPhase');
+  var progressCount = document.getElementById('adminActionProgressCount');
+  var progressBar  = progressEl ? progressEl.querySelector('.cfg-actions-progress__bar') : null;
+
+  // SSE-Endpoints emittieren `progress`-Events mit completed/total; POST-Endpoints
+  // bleiben fuer Aktionen ohne Fortschrittsanzeige (z. B. Wetter laden).
   var ENDPOINTS = {
-    'refresh-weather':     { url: '/api/refresh-weather',     label: 'Wetter laden' },
-    'run-analyses':        { url: '/api/run-analyses',        label: 'Analyse Spots' },
-    'run-region-analyses': { url: '/api/run-region-analyses', label: 'Analyse Regionen' }
+    'refresh-weather':     { url: '/api/refresh-weather',              label: 'Wetter laden',     mode: 'post' },
+    'run-analyses':        { url: '/api/run-analyses-stream',          label: 'Analyse Spots',    mode: 'sse', doneEvent: 'spot_done' },
+    'run-region-analyses': { url: '/api/run-region-analyses-stream',   label: 'Analyse Regionen', mode: 'sse', doneEvent: 'region_done' }
   };
 
   function setBusy(activeBtn, busy) {
@@ -955,36 +986,118 @@
     statusEl.classList.toggle('is-ok',    state === 'ok');
     statusEl.classList.toggle('is-error', state === 'error');
   }
+  function showProgress(show) {
+    if (!progressEl) return;
+    progressEl.hidden = !show;
+    if (!show) {
+      progressFill.style.width = '0%';
+      progressPhase.textContent = '';
+      progressCount.textContent = '';
+      if (progressBar) progressBar.setAttribute('aria-valuenow', '0');
+    }
+  }
+  function updateProgress(phase, completed, total) {
+    if (!progressEl) return;
+    var pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+    progressFill.style.width = pct + '%';
+    progressPhase.textContent = phase || '';
+    progressCount.textContent = completed + ' / ' + total + ' (' + pct + '%)';
+    if (progressBar) progressBar.setAttribute('aria-valuenow', String(pct));
+  }
+
+  function runSse(btn, cfg) {
+    setBusy(btn, true);
+    setStatus(cfg.label + ' laeuft ...', '');
+    showProgress(true);
+    updateProgress('Initialisierung', 0, 0);
+    var started = Date.now();
+    var evt = new EventSource(cfg.url);
+    var doneSeen = false;
+
+    function finish(state, text) {
+      try { evt.close(); } catch (_) {}
+      setBusy(btn, false);
+      setStatus(text, state);
+      // Progress-Balken nach Erfolg kurz stehen lassen, dann ausblenden.
+      setTimeout(function () { showProgress(false); }, state === 'ok' ? 1500 : 4000);
+    }
+
+    evt.addEventListener('phase', function (e) {
+      try {
+        var d = JSON.parse(e.data);
+        updateProgress(d.phase || '', 0, d.total || 0);
+      } catch (_) {}
+    });
+    evt.addEventListener('progress', function (e) {
+      try {
+        var d = JSON.parse(e.data);
+        updateProgress(d.phase || '', d.completed || 0, d.total || 0);
+      } catch (_) {}
+    });
+    evt.addEventListener(cfg.doneEvent, function (e) {
+      doneSeen = true;
+      var d = {};
+      try { d = JSON.parse(e.data); } catch (_) {}
+      var secs = ((Date.now() - started) / 1000).toFixed(1);
+      var parts = [];
+      if (typeof d.spots_count === 'number')   parts.push(d.spots_count + ' Spots');
+      if (typeof d.regions_count === 'number') parts.push(d.regions_count + ' Regionen');
+      if (Array.isArray(d.dates))              parts.push(d.dates.length + ' Tage');
+      if (typeof d.results_count === 'number') parts.push(d.results_count + ' Analysen');
+      updateProgress('Fertig', d.results_count || 0, d.results_count || 0);
+      finish('ok', cfg.label + ' OK (' + (parts.length ? parts.join(' · ') + ' · ' : '') + secs + 's)');
+    });
+    evt.addEventListener('error', function (e) {
+      if (doneSeen) return;
+      var msg = '';
+      try { msg = JSON.parse(e.data).message || ''; } catch (_) {}
+      // EventSource.readyState: 0=CONNECTING, 1=OPEN, 2=CLOSED
+      var rs = evt.readyState;
+      console.warn('[admin SSE] error', { readyState: rs, data: e.data, url: cfg.url });
+      if (!msg) {
+        if (rs === 0)      msg = 'Server nicht erreichbar (Flask neu starten?)';
+        else if (rs === 2) msg = 'Verbindung beendet — Server-Log pruefen';
+        else               msg = 'Stream abgebrochen';
+      }
+      finish('error', cfg.label + ' Fehler: ' + msg);
+    });
+    evt.addEventListener('heartbeat', function () { /* silent */ });
+  }
+
+  function runPost(btn, cfg) {
+    setBusy(btn, true);
+    setStatus(cfg.label + ' laeuft ...', '');
+    var started = Date.now();
+    fetch(cfg.url, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (result) {
+        var d = result.data || {};
+        var secs = ((Date.now() - started) / 1000).toFixed(1);
+        if (d.success === false || (!d.success && !result.ok)) {
+          setStatus(cfg.label + ' fehlgeschlagen: ' + (d.error || ('HTTP ' + result.status)), 'error');
+          return;
+        }
+        var parts = [];
+        if (typeof d.spots_count === 'number')   parts.push(d.spots_count + ' Spots');
+        if (Array.isArray(d.dates))              parts.push(d.dates.length + ' Tage');
+        if (typeof d.results_count === 'number') parts.push(d.results_count + ' Analysen');
+        setStatus(cfg.label + ' OK ('
+                  + (parts.length ? parts.join(' · ') + ' · ' : '')
+                  + secs + 's)', 'ok');
+      })
+      .catch(function (err) {
+        setStatus(cfg.label + ' Fehler: ' + err.message, 'error');
+      })
+      .finally(function () { setBusy(btn, false); });
+  }
 
   btns.forEach(function (btn) {
     var cfg = ENDPOINTS[btn.dataset.action];
     if (!cfg) return;
     btn.addEventListener('click', function () {
       if (btn.disabled) return;
-      setBusy(btn, true);
-      setStatus(cfg.label + ' laeuft ...', '');
-      var started = Date.now();
-      fetch(cfg.url, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
-        .then(function (result) {
-          var d = result.data || {};
-          var secs = ((Date.now() - started) / 1000).toFixed(1);
-          if (d.success === false || (!d.success && !result.ok)) {
-            setStatus(cfg.label + ' fehlgeschlagen: ' + (d.error || ('HTTP ' + result.status)), 'error');
-            return;
-          }
-          var parts = [];
-          if (typeof d.spots_count === 'number')   parts.push(d.spots_count + ' Spots');
-          if (Array.isArray(d.dates))              parts.push(d.dates.length + ' Tage');
-          if (typeof d.results_count === 'number') parts.push(d.results_count + ' Analysen');
-          setStatus(cfg.label + ' OK ('
-                    + (parts.length ? parts.join(' · ') + ' · ' : '')
-                    + secs + 's)', 'ok');
-        })
-        .catch(function (err) {
-          setStatus(cfg.label + ' Fehler: ' + err.message, 'error');
-        })
-        .finally(function () { setBusy(btn, false); });
+      if (cfg.mode === 'sse') runSse(btn, cfg);
+      else                    runPost(btn, cfg);
     });
   });
 })();

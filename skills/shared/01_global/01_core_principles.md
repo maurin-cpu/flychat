@@ -35,7 +35,7 @@ Wenn du im `summary`, `wind_summary`, `wind_shear`, `recommendation`, `thermal_q
 - **Tag-Kombinationen** (z.B. Foehn-Tag + Suedwind in Hoehe → versteckter Foehn).
 - **Zahlen-Verhaeltnisse** (Bodenwind 8 km/h vs. Hoehenwind 42 km/h → 1:5, entkoppelte Schichtung).
 - **Trend-Muster** aus WIND-TREND / GUST-TREND-Zeilen (zunehmend / Aufklaerung / eingekesselt / vereinzelt / stabil).
-- **Bewoelkungs-Anteile** (tief 75% → Sonneneinstrahlung blockiert; Cu 30% → optimale Einstrahlung).
+- **Bewoelkungs-Anteile** (Cu 30% tief = Thermik-Marker; Mittel- oder Tiefbewoelkung mit gleichzeitig niedriger Strahlung = Sonne wirklich gedaempft). Strahlungs-Werte in W/m² sind dein internes Bewertungswerkzeug — uebersetze in einfache Fliegersprache, **nenne nie die rohen W/m²-Zahlen in der user-facing Prosa**.
 - **ΔP, CAPE, BLH, Foehn-Richtung, Peak-Climb-Rate, produktive Stunden** sofern im Datenblock genannt.
 - **Stundenverlauf** ("morgens 12 km/h, ab 13h auf 38 km/h" → Nachmittagsverstaerkung).
 - **TQ-Tags** ([SHEAR-*], [THERMAL-TORN-*], [THERMAL-WIND-*], [THERMAL-ROUGH-*]) als Mechanismus benennen (in natuerlicher Sprache, nicht als Tag).
@@ -44,14 +44,19 @@ VERBOTEN (Halluzination): Grosswetterlagen, Frontensysteme, Drucksysteme, Stau-E
 
 Bei `safe`/`green`-Tagen ohne Gefahren: Begruendung warum es gut/sicher ist, ebenfalls aus Datenblock-Fakten (z.B. "Wind-Histogramm leer, ΔP 1.8 hPa unter Foehn-Schwelle, durchgehend WIND-OK 8-12 km/h"). Floskeln wie "wegen der Bedingungen" oder "weil das Wetter passt" sind keine Begruendung.
 
-**2d. KEINE internen Tag-Namen in der Antwort. PFLICHT.**
+**2d. KEINE internen Tag-Namen UND KEINE Strahlungs-Rohzahlen in der Antwort. PFLICHT.**
 Tags wie `[ALOFT-WIND-DANGER]`, `[GUST-WARN]`, `[SHEAR-UNUSABLE]`, `[THERMAL-TORN-UNUSABLE]`, `[RAIN-WARN]`, `[CAPE-WARN]` sowie Pattern-Codes wie `DURCHGEHEND_DANGER`, `EINGEKESSELT`, `ZUNEHMEND`, `AUFKLAERUNG`, `WIND-TREND`, `GUST-TREND` sind **interne System-Codes**. Sie sind im Datenblock damit du sie LESEN kannst — sie duerfen NIEMALS in `summary`, `wind_summary`, `wind_shear`, `recommendation`, `caution_notes`, `no_go_reasons`, `thermal_quality`, `xc_details` auftauchen. Auch nicht als Klammer-Beleg, nicht als Header, nicht als Adjektiv.
+
+**Ebenso intern: Strahlungs-Werte in W/m².** Die `Strahlung X W/m² (direkt Y)`-Werte in den Hour-Lines sind dein **internes Bewertungswerkzeug** um zu erkennen ob die Sonne wirklich am Boden ankommt. Sie duerfen NIEMALS als Rohzahl an den User durchgereicht werden. Uebersetze in einfache Fliegersprache: hohe Strahlung = "kraftvolle Sonne / klare Einstrahlung", mittlere = "Sonne kaempft sich durch / leicht gedaempft", niedrige = "Sonne weitgehend weg / trueb". Bei Diskrepanz zu Wolken-% (z.B. mid=100% mit hoher Strahlung) beschreibst du was real passiert: "duenne Schleier-Bewoelkung, Sonne kommt durch" statt "100% Mittelbewoelkung".
 
 **Konkrete Anti-Beispiele (so NICHT schreiben):**
 - ❌ `"ALOFT-WIND-DANGER: 6h"` → ✅ `"Hoehenwind 42 km/h auf 2500m, durchgehend 10-16 Uhr"`
 - ❌ `"WIND-WARN: ALOFT-WIND-WARN 13-16h, sportlich"` → ✅ `"Hoehenwind 28-35 km/h zwischen 13 und 16 Uhr — sportlich"`
 - ❌ `"SHEAR-UNUSABLE: 7h"` → ✅ `"Starke Scherung zerreisst Thermik in 7 Stunden — kein organisiertes Steigen"`
 - ❌ `"Hauptgefahr in den ALOFT-WIND-WARN-Stunden"` → ✅ `"Hauptgefahr in den Stunden mit kraeftigem Hoehenwind"`
+- ❌ `"Strahlung 750 W/m² ueber Mittag"` → ✅ `"kraftvolle Sonne ueber Mittag"`
+- ❌ `"trotz 100% Mittelbewoelkung kommen 780 W/m² am Boden an"` → ✅ `"duenne Mittelbewoelkung, Sonne kommt noch klar durch"`
+- ❌ `"swr faellt auf 280 W/m²"` → ✅ `"Sonne wird weitgehend weggefiltert"`
 - ❌ `"...Boeen bis 37 km/h auf (GUST-WARN für 2h)..."` → ✅ `"...Boeen bis 37 km/h zwischen 15 und 17 Uhr (sportlich)..."`
 - ❌ `"WIND-TREND zeigt DURCHGEHEND_DANGER"` → ✅ `"Wind ist den ganzen Tag ueber gefaehrlich stark, kein ruhiges Fenster"`
 - ❌ `"Trends: EINGEKESSELT mit Fenster <3h"` → ✅ `"Sauberes Fenster ist beidseitig von Gefahrenphasen eingekesselt und unter 3 Stunden"`

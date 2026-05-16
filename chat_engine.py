@@ -140,6 +140,10 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         # Value = {"level": "none|caution|danger", "delta_p_hpa": float, "direction": "Süd|Nord|none"}.
         # Befuellt in _format_foehn_info(), gelesen in _post_process_safety_*.
         self._ctx_foehn_cache = {}
+        # Cache fuer Few-Shot-Decision-Tag (FEW_SHOT_PIPELINE Schritt 2):
+        # Key = f"{name}|{date_str}", Value = "FewShot:hochalpin,3 examples" etc.
+        # Befuellt in _build_few_shot_for(), gelesen im Flyability-Post-Process.
+        self._ctx_fewshot_cache = {}
 
         # LLM-Clients: Chat + Analyse getrennt konfigurierbar (config.py).
         # Hybrid-Setup moeglich (z.B. Chat=anthropic, Analyse=openai).

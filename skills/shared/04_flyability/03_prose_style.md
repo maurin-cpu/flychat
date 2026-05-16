@@ -26,18 +26,64 @@ KONSISTENZ-PFLICHT (Text muss zum experience_rating passen!)
 Teil 1 behandelt. NICHT in Flyability-Texten erwaehnen.
 
 ─────────────────────────────────
-BEWOELKUNGS-LABELS (Booster vs. Reducer — Matuszko/FAA)
+BEWOELKUNG: STRAHLUNG IST WAHRHEIT — WOLKEN-% SIND NUR INFO (Mai 2026)
 ─────────────────────────────────
 
-**WICHTIG — tief und mittel wirken physikalisch UNTERSCHIEDLICH:**
-- **Tief (Cu humilis/mediocris, <3km)** = bimodal: 12-50% = Thermik-Marker (Booster, Latentwaerme-Boost). ≥80% = Sonne blockiert (Killer).
-- **Mittel (Altostratus/Altocumulus, 3-8km)** = monoton daempfend: jedes % reduziert Einstrahlung, KEIN Sweet Spot. Ab 30% spuerbar, ab 70% Thermik stark gedaempft, ab 90% praktisch tot.
-- **Hoch (Cirrus, >8km)** = ignoriert (Transmissivitaet 70-85%).
+**Grundregel:** Fuer die Bewertung der Thermik-Produktivitaet zaehlt die **Sonneneinstrahlung am Boden** (Werte `Strahlung X W/m² (direkt Y)` in jeder Hour-Line), NICHT die Bewoelkungs-Prozente. Begruendung:
 
-Wende daher tief und mittel mit getrennten Schwellen an (NICHT `max(tief, mittel)`):
+- Die `climb_rate` der Thermik-Engine wird bereits aus `direct_radiation` + `diffuse_radiation` ueber den sensiblen Waermefluss H abgeleitet. Wolken-Daempfung steckt also physikalisch in climb_rate drin.
+- ICON-D2 `cloud_cover_mid` ist **flaechige Bedeckung**, nicht **optische Dicke**. Duenner Altostratus kann mid=100% zeigen und trotzdem 750 W/m² durchlassen — die Strahlung sagt was wirklich am Boden ankommt.
+- Eine Bewertung der Thermik nochmal ueber Wolken-% waere Doppelbestrafung der eigenen Engine-Rechnung. Tu das NICHT.
 
-- **`GUTE_EINSTRAHLUNG` (Booster)**: Optimale SCT-Cu unten MIT klarer Sicht nach oben — staerkste Thermik. Setzen wenn: **tief ≤ 50% mit Cu-Charakter UND mittel ≤ 30%** ODER klarer Himmel (tief < 30% UND mittel < 30%). Cu markiert Einstiege, Latentwaerme-Boost, Streueffekt liefert sogar MEHR Solarenergie als wolkenlos. Auch blauer Himmel (0%) ist Booster.
-- **`VIEL_BEWOELKUNG` (Reducer)**: Sonne wird signifikant blockiert. Setzen wenn waehrend > 50% der Thermikstunden gilt: **tief ≥ 80% (Cu-Overcast/Stratus von unten) ODER mittel ≥ 70% (Altostratus-Decke von oben)**. Starke Ueberentwicklung (OD) mit Abschirmung gehoert auch hierher.
-- **Neutralzone**: tief 50-80% ODER mittel 30-70% (und kein Reducer-Trigger) — Daempfung beginnt, Thermik noch vorhanden aber abnehmend.
-- **Top-Tag (klassiker, Rating 6)**: STRENGER als Booster — verlangt `cu_clean_top` = **tief 12-50% Cu UND mittel < 30%**. Mehr Altostratus oben verschattet selbst starke Thermik.
-- **Cirrus ignorieren**: Bei tief < 30% UND mittel < 30% (egal wie viel hoch) → Cirrus ist kein Reducer und kein Booster (laesst 70-85% Solarstrahlung durch).
+**Strahlungs-Referenz (Schweiz Frühling/Sommer, indikativ):**
+- **swr ≥ 600 W/m² ODER direct ≥ 400 W/m²** → Sonne kommt voll durch, Thermik laeuft normal
+- **swr 400-600 W/m² ODER direct 250-400 W/m²** → leichte bis maessige Daempfung, Thermik gedaempft aber arbeitet
+- **swr < 400 W/m² UND direct < 250 W/m²** → Sonne wirklich gedaempft (dichter Altostratus oder Stratus), Thermik schwach bis tot
+- Hinweis: Schwellen sind grobe Orientierung; absoluter Sonnenstand variiert saisonal. Im Winter sind die Werte deutlich niedriger.
+
+**Wolken-% bleiben relevant — aber nur fuer:**
+- **Cu-Marker-Beschreibung** (tief 12-50% = "schoene Cumulus-Tag", Latentwaerme-Boost wird vom Modell nicht voll erfasst → Bonus-Wert fuer Pilot)
+- **Sicht-Beschreibung** ("bedeckter Himmel", "viel Hochbewoelkung")
+- **Cloud-Entry-Sicherheit** (Wolkenbasis-Proximity, OVERCAST-DANGER)
+- Sie sind NICHT Rating-Killer und NICHT Productivity-Gate.
+
+**WICHTIG — Cu als Booster bleibt (LLM-Bonus):**
+- **Tief (Cu humilis/mediocris, <3km)** bei 12-50% = **Thermik-Marker mit Latentwaerme-Boost**. Engine erfasst Marker-Effekt + Latentwaerme nicht voll → der LLM darf das als Plus werten.
+- **Mittel (Altostratus, 3-8km)** = beschreibe was am Himmel los ist, aber **lass die Strahlung entscheiden** ob die Thermik wirklich gedaempft ist.
+- **Hoch (Cirrus, >8km)** = ignoriert (Transmissivitaet 70-85%, kaum Einfluss).
+
+Label-Vergabe (rein informativ, kein Rating-Effekt mehr):
+
+- **`GUTE_EINSTRAHLUNG` (Booster, informativ)**: Setzen wenn klarer Himmel oder SCT-Cu unten mit freier Sicht oben — also tief ≤ 50% mit Cu-Charakter UND mittel ≤ 30%, ODER tief < 30% UND mittel < 30%. Beschreibt das **Pilotengefuehl** (schoener Tag), beeinflusst Rating nicht direkt.
+- **`VIEL_BEWOELKUNG` (Reducer, informativ)**: Setzen wenn waehrend > 50% der Thermikstunden gilt: tief ≥ 80% ODER mittel ≥ 70%. Beschreibt **wie der Himmel aussieht** — Pilot soll wissen dass es bedeckt ist. Aber: die echte Auswirkung auf Thermik liest du aus der Strahlung, nicht aus dem Label.
+- **Top-Tag (klassiker, Rating 6) — der EINZIGE cloud-basierte Rating-Booster der bleibt**: verlangt `cu_clean_top` = **tief 12-50% Cu UND mittel < 30%**. Hier ist der Cu-Marker-Bonus + Latentwaerme der von der Engine nicht erfasste Mehrwert.
+- **Cirrus ignorieren**: Bei tief < 30% UND mittel < 30% (egal wie viel hoch) → kein Reducer, kein Booster.
+
+─────────────────────────────────
+STRAHLUNGS-WERTE: INTERN NUTZEN, NIE AN USER (Mai 2026)
+─────────────────────────────────
+
+Die `Strahlung X W/m² (direkt Y)`-Werte in den Hour-Lines sind **dein internes
+Bewertungswerkzeug**. Sie helfen dir zu erkennen ob die Sonne wirklich
+durchkommt — auch wenn Wolken-% hoch sind.
+
+**REGEL: NIEMALS W/m²-Zahlen in der user-facing Prosa nennen.** Piloten lesen
+"600 W/m²" und verstehen nichts. Du uebersetzt in einfache Fliegersprache:
+
+| Strahlungs-Niveau | Was du intern liest | Wie du es schreibst |
+|---|---|---|
+| swr ≥ 600 oder direct ≥ 400 | Sonne kommt voll durch | "kraftvolle Sonne", "klare Einstrahlung", "Sonne arbeitet voll" |
+| swr 400-600 oder direct 250-400 | leichte bis maessige Daempfung | "Sonne kaempft sich durch", "leicht gedaempfte Einstrahlung", "Sonne hinter duenner Schicht" |
+| swr < 400 und direct < 250 | echt gedaempft | "Sonne weitgehend weg", "trueber Tag", "kaum Einstrahlung" |
+
+**Diskrepanz erklaeren (haeufiger Fall: hohe Wolken-% trotz Sonne):**
+- Beispiel: Hour-Line zeigt `mittel 100%, Strahlung 750 W/m²`. Das ist duenner
+  Altostratus. Du schreibst NICHT "100% mittel Bedeckung" und auch NICHT "750 W/m²" —
+  sondern z.B. "Mittelbewoelkung zieht auf, Sonne kommt aber noch durch" oder
+  "duenne Schleier-Bewoelkung, Thermik bleibt aktiv".
+- Umgekehrt: `mittel 100%, Strahlung 280 W/m²` → "dichte Mittelbewoelkung, Sonne
+  ist weitgehend weg, Thermik schlaeft ein".
+
+**Eine Ausnahme**: in `flyability_notes` (technische Diagnostik, intern fuer
+Debug-Zwecke) darfst du Werte nennen. In `recommendation`, `thermal_quality`,
+und sonst allem was der Pilot liest: nur Fliegersprache.

@@ -562,6 +562,15 @@ class WeatherContextMixin:
                 precip = data.get("precipitation", "N/A")
                 sunshine = data.get("sunshine_duration", "N/A")
                 sunshine_str = f"{sunshine / 3600:.2f}h" if isinstance(sunshine, (int, float)) and sunshine > 0 else "0h"
+                # Strahlung am Boden — die relevante Groesse fuer Thermik (Mai 2026).
+                # Cloud-% beschreiben Bedeckung, swr/direct sagen was am Boden ankommt.
+                swr_raw = data.get("shortwave_radiation")
+                direct_raw = data.get("direct_radiation")
+                if isinstance(swr_raw, (int, float)):
+                    if isinstance(direct_raw, (int, float)):
+                        sunshine_str += f", {int(round(swr_raw))} W/m² (direkt {int(round(direct_raw))})"
+                    else:
+                        sunshine_str += f", {int(round(swr_raw))} W/m²"
 
                 # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG)
                 is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"])
@@ -1544,6 +1553,18 @@ class WeatherContextMixin:
             low_cl = float(data.get("cloud_cover_low") or 0)
             mid_cl = float(data.get("cloud_cover_mid") or 0)
             high_cl = float(data.get("cloud_cover_high") or 0)
+            # Strahlung am Boden — die eigentlich relevante Groesse fuer Thermik
+            # (Mai 2026). Wolken-% beschreiben nur die Bedeckung; Strahlung sagt was
+            # vom Sonnenlicht tatsaechlich am Boden ankommt — bei duennem Altostratus
+            # kann mid=100% trotzdem mit swr>800 W/m² einhergehen.
+            swr_raw = data.get("shortwave_radiation")
+            direct_raw = data.get("direct_radiation")
+            sun_str = "Strahlung n/a"
+            if isinstance(swr_raw, (int, float)):
+                if isinstance(direct_raw, (int, float)):
+                    sun_str = f"Strahlung {int(round(swr_raw))} W/m² (direkt {int(round(direct_raw))})"
+                else:
+                    sun_str = f"Strahlung {int(round(swr_raw))} W/m²"
 
             # CLOUDS-Sicht-Aggregation (siehe docs/TAGS.md):
             # Wolken auf/unter Startplatz mit hoher Bedeckung = Sicherheitsthema (STOP/WARN).
@@ -1786,10 +1807,18 @@ class WeatherContextMixin:
                     "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour
                     or "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour
                 )
-                # Wolken-Check: tief und mittel getrennt (Research-Sektion 6: unterschiedliche
-                # Wirkung auf Thermik). low=direkte Abschattung, mid=indirekt ueber Einstrahlung.
-                cloud_ok = (low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX
-                            and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX)
+                # Bewoelkung wird NICHT mehr als Productivity-Gate verwendet (Mai 2026).
+                # Begruendung: die Thermik-Engine (thermik_calculator.py) berechnet climb_rate
+                # bereits aus direct/diffuse_radiation — die Wolken-Daempfung steckt also
+                # physikalisch ueber H (sensible heat flux) bereits in climb. Ein zusaetzlicher
+                # Cloud-Cover-Gate waere Doppelbestrafung (siehe thermik_calculator.py:1367-1369:
+                # "W*-Deardorff beinhaltet die Bewoelkungsdaempfung bereits ... wir duerfen
+                # hier nicht nochmals kuenstlich mit einem sun_factor multiplizieren").
+                # Zusaetzlich: ICON-D2 cloud_cover_mid ist flaechige Bedeckung, nicht optische
+                # Dicke — bei duennem Altostratus zeigt mid=100% trotz swr>800 W/m². Strahlung
+                # ist der verlaesslichere Proxy und ist in climb bereits eingepreist.
+                # Bewoelkung bleibt fuer Labels (VIEL_BEWOELKUNG/GUTE_EINSTRAHLUNG/cu_clean_top)
+                # und LLM-Prosa relevant — nur nicht als Productivity-Gate.
                 # Band-Tiefe: Mindest-Banddicke aus Physik-Heuristik (3 zentrierbare
                 # Kurbeln mit Netto-Steigen), climb-abhaengig und terrain-differenziert.
                 # Siehe thermik_calculator.min_band_depth + meteo_research/band_depth_calibration.md.
@@ -1797,18 +1826,15 @@ class WeatherContextMixin:
                 _min_band = min_band_depth(h_climb, spot_terrain_zone)
                 band_usable = band_depth >= _min_band
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
-                        and cloud_ok
                         and not rough_unusable_this_hour
                         and band_usable):
                     productive_thermal_h += 1
                 elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
-                        and cloud_ok
                         and not rough_unusable_this_hour
                         and not band_usable):
                     band_too_shallow_h += 1
                 # Rating-Input v1.5: strenge Produktivitaets-Schwelle (≥1.5 m/s)
                 if (h_climb >= 1.5
-                        and cloud_ok
                         and not rough_unusable_this_hour
                         and band_usable):
                     productive_h_strict += 1
@@ -1819,7 +1845,7 @@ class WeatherContextMixin:
                         _agl = max(0, h_max_h - elevation_m)
                         _prod_tops_agl.append(_agl)
                 # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
-                if h_climb >= 2.0 and cloud_ok and not rough_unusable_this_hour and band_usable:
+                if h_climb >= 2.0 and not rough_unusable_this_hour and band_usable:
                     strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
@@ -1886,12 +1912,13 @@ class WeatherContextMixin:
             fragmented_hits = [t for t in tq_tags_this_hour_fly if t.endswith("-FRAGMENTED]")]
             degraded_hits = [t for t in tq_tags_this_hour_fly if t.endswith("-DEGRADED]")]
             has_thermal = isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB
-            cloud_ok_tl = low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX
+            # Bewoelkung NICHT mehr im Productivity-Check (Mai 2026, siehe ausfuehrliche
+            # Begruendung im Spot-Loop oben ~Zeile 1789): climb_rate ist bereits
+            # strahlungsabgeleitet, Cloud-Gate waere Doppelbestrafung.
             _min_band_tl = min_band_depth(h_climb, spot_terrain_zone)
             is_productive = (
                 has_thermal
                 and h_climb >= config.PRODUCTIVE_CLIMB_MIN
-                and cloud_ok_tl
                 and "[THERMAL-ROUGH-UNUSABLE]" not in unusable_hits
                 and "[THERMAL-WIND-UNUSABLE]" not in unusable_hits
                 and isinstance(h_max_h, (int, float))
@@ -1913,12 +1940,11 @@ class WeatherContextMixin:
                 parts += [t.strip("[]").replace("THERMAL-", "").replace("-DEGRADED", "") for t in degraded_hits]
                 f_label = "degraded(" + "+".join(parts) + ")"
             else:
-                # Thermik vorhanden aber nicht produktiv (z.B. Band zu duenn, Wolken, schwacher Climb)
+                # Thermik vorhanden aber nicht produktiv (Band zu duenn oder schwacher Climb).
+                # "wolken" als Ablehnungsgrund entfaellt — Wolken sind kein Productivity-Gate mehr.
                 reason = []
                 if isinstance(h_max_h, (int, float)) and (h_max_h - elevation_m) < _min_band_tl:
                     reason.append("band-flach")
-                if not cloud_ok_tl:
-                    reason.append("wolken")
                 if h_climb < config.PRODUCTIVE_CLIMB_MIN:
                     reason.append("schwach")
                 f_klass = "soaring"
@@ -2003,7 +2029,7 @@ class WeatherContextMixin:
             hour_lines.append((
                 dt.hour,
                 f"{time_str}: Temp {temp}°C | Wind {wind_speed}km/h aus {wind_dir}° (Turbulenzrisiko {wind_gusts}km/h{sfc_excess}) {wind_status}{warning_str} | "
-                f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | FLUGBEREICH: {elevation_m}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
+                f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | {sun_str} | FLUGBEREICH: {elevation_m}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
             ))
 
         if not has_data:
@@ -2353,16 +2379,18 @@ class WeatherContextMixin:
                 "Kein nutzbarer Aufwind im gesamten Flugfenster. fly_status = gray (Abgleiter)."
             )
 
-        # ─── PRODUKTIVE-THERMIK: Stunden mit Climb + klarer Sicht ───
+        # ─── PRODUKTIVE-THERMIK: Stunden mit Climb + ausreichend Band ───
         if thermal_hours_total > 0:
             _sust_peak = _compute_sustained_peak(_hourly_climbs, window=2)
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
-                f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, tief ≤{config.PRODUCTIVE_LOW_CLOUD_MAX}%, "
-                f"mittel ≤{config.PRODUCTIVE_MID_CLOUD_MAX}%, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
+                f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, ausreichendes Höhenband, "
+                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
                 f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
-                f"HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT "
-                f"(Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
+                f"HINWEIS: Bewoelkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — "
+                f"die Sonnen-Daempfung steckt bereits in climb_rate ueber die strahlungs"
+                f"basierte H-Berechnung. TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen "
+                f"MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
             )
             # Rating-Inputs (RATING_CONCEPT v1.6): explizit fuer Kategorien-Wahl.
             _wh = round(_median(_prod_tops_agl)) if _prod_tops_agl else 0
@@ -2696,6 +2724,16 @@ class WeatherContextMixin:
             cloud_cover = data.get("cloud_cover", "N/A")
             low_cl = float(data.get("cloud_cover_low") or 0)
             mid_cl = float(data.get("cloud_cover_mid") or 0)
+            # Strahlung am Boden — die relevante Groesse fuer Thermik (Mai 2026).
+            # Siehe Spot-Context oben fuer ausfuehrliche Begruendung.
+            swr_raw = data.get("shortwave_radiation")
+            direct_raw = data.get("direct_radiation")
+            sun_str = "Strahlung n/a"
+            if isinstance(swr_raw, (int, float)):
+                if isinstance(direct_raw, (int, float)):
+                    sun_str = f"Strahlung {int(round(swr_raw))} W/m² (direkt {int(round(direct_raw))})"
+                else:
+                    sun_str = f"Strahlung {int(round(swr_raw))} W/m²"
             high_cl = float(data.get("cloud_cover_high") or 0)
 
             # CLOUDS-Sicht-Aggregation (siehe docs/TAGS.md), Region-Pfad:
@@ -2926,23 +2964,39 @@ class WeatherContextMixin:
                     "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour
                     or "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour
                 )
-                # Wolken-Check: tief und mittel getrennt (Research-Sektion 6: unterschiedliche
-                # Wirkung auf Thermik). low=direkte Abschattung, mid=indirekt ueber Einstrahlung.
-                cloud_ok = (low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX
-                            and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX)
+                # Bewoelkung wird NICHT mehr als Productivity-Gate verwendet (Mai 2026).
+                # Siehe ausfuehrliche Begruendung im Spot-Loop oben (~Zeile 1789).
+                # Kurz: climb_rate ist bereits strahlungsabgeleitet (H aus direct/diffuse) →
+                # zusaetzlicher Cloud-Gate waere Doppelbestrafung der eigenen Berechnung.
                 band_depth_r = (h_max_h - elev_ref) if isinstance(h_max_h, (int, float)) else 0
                 _min_band_r = min_band_depth(h_climb, region_terrain_zone)
                 band_usable_r = band_depth_r >= _min_band_r
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
-                        and cloud_ok
                         and not rough_unusable_this_hour
                         and band_usable_r):
                     productive_thermal_h += 1
                 elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
-                        and cloud_ok
                         and not rough_unusable_this_hour
                         and not band_usable_r):
                     band_too_shallow_h += 1
+                # Rating-Input v1.5 (Bug-Fix Mai 2026): strenge Produktivitaets-Schwelle
+                # (≥1.5 m/s) wurde im Region-Loop bisher nie inkrementiert — daher hatten
+                # alle Regionen permanent productive_h_strict=0 und working_height_agl_m=0,
+                # was das Skill-Rating fuer Regionen blind machte. Hier analog zum Spot-Loop
+                # nachgezogen (siehe ~Zeile 1810-1828).
+                if (h_climb >= 1.5
+                        and not rough_unusable_this_hour
+                        and band_usable_r):
+                    productive_h_strict += 1
+                    _prod_climbs.append(float(h_climb))
+                    # Thermik-Top AGL fuer working_height-Median tracken.
+                    # h_max_h ist MSL (bereits LCL-gecappt). AGL = MSL - elev_ref.
+                    if isinstance(h_max_h, (int, float)):
+                        _agl = max(0, h_max_h - elev_ref)
+                        _prod_tops_agl.append(_agl)
+                # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
+                if h_climb >= 2.0 and not rough_unusable_this_hour and band_usable_r:
+                    strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
                 else:
@@ -3008,12 +3062,12 @@ class WeatherContextMixin:
             fragmented_r = [t for t in tq_tags_r if t.endswith("-FRAGMENTED]")]
             degraded_r = [t for t in tq_tags_r if t.endswith("-DEGRADED]")]
             has_thermal_r = isinstance(h_climb, (int, float)) and h_climb >= config.THERMAL_QUALITY_MIN_CLIMB
-            cloud_ok_r = low_cl <= config.PRODUCTIVE_LOW_CLOUD_MAX and mid_cl <= config.PRODUCTIVE_MID_CLOUD_MAX
+            # Bewoelkung NICHT mehr im Productivity-Check (Mai 2026, siehe Begruendung im
+            # Spot-Loop oben): climb_rate ist strahlungsabgeleitet → kein Cloud-Doppelgate.
             _min_band_r_tl = min_band_depth(h_climb, region_terrain_zone)
             is_productive_r = (
                 has_thermal_r
                 and h_climb >= config.PRODUCTIVE_CLIMB_MIN
-                and cloud_ok_r
                 and "[THERMAL-ROUGH-UNUSABLE]" not in unusable_r
                 and "[THERMAL-WIND-UNUSABLE]" not in unusable_r
                 and isinstance(h_max_h, (int, float))
@@ -3035,11 +3089,10 @@ class WeatherContextMixin:
                 parts_r += [t.strip("[]").replace("THERMAL-", "").replace("-DEGRADED", "") for t in degraded_r]
                 f_label_r = "degraded(" + "+".join(parts_r) + ")"
             else:
+                # "wolken" als Ablehnungsgrund entfaellt — Wolken sind kein Productivity-Gate mehr.
                 reason_r = []
                 if isinstance(h_max_h, (int, float)) and (h_max_h - elev_ref) < _min_band_r_tl:
                     reason_r.append("band-flach")
-                if not cloud_ok_r:
-                    reason_r.append("wolken")
                 if h_climb < config.PRODUCTIVE_CLIMB_MIN:
                     reason_r.append("schwach")
                 f_klass_r = "soaring"
@@ -3089,7 +3142,7 @@ class WeatherContextMixin:
             hour_lines.append((
                 dt.hour,
                 f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}°{wind_status_print}{ref_wind_info}{warning_str} | "
-                f"Wolkenbasis {cloud_base} | Bewoelkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | FLUGBEREICH: {elev_ref}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
+                f"Wolkenbasis {cloud_base} | Bewoelkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | {sun_str} | FLUGBEREICH: {elev_ref}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
             ))
 
         if not has_data:
@@ -3340,16 +3393,18 @@ class WeatherContextMixin:
                 "Kein nutzbarer Aufwind im gesamten Flugfenster. fly_status = gray (Abgleiter)."
             )
 
-        # ─── PRODUKTIVE-THERMIK: Stunden mit Climb + klarer Sicht ───
+        # ─── PRODUKTIVE-THERMIK: Stunden mit Climb + ausreichend Band ───
         if thermal_hours_total > 0:
             _sust_peak = _compute_sustained_peak(_hourly_climbs, window=2)
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
-                f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, tief ≤{config.PRODUCTIVE_LOW_CLOUD_MAX}%, "
-                f"mittel ≤{config.PRODUCTIVE_MID_CLOUD_MAX}%, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
+                f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, ausreichendes Höhenband, "
+                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
                 f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
-                f"HINWEIS: TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zählen MIT "
-                f"(Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
+                f"HINWEIS: Bewoelkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — "
+                f"die Sonnen-Daempfung steckt bereits in climb_rate ueber die strahlungs"
+                f"basierte H-Berechnung. TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen "
+                f"MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
             )
             # Rating-Inputs (RATING_CONCEPT v1.6): explizit fuer Kategorien-Wahl.
             _wh = round(_median(_prod_tops_agl)) if _prod_tops_agl else 0

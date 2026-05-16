@@ -1,11 +1,13 @@
 """
 Source-Area-Modul fuer Gleitcast.
 
-Bestimmt die 5 Referenzpunkte pro Spot:
-  Punkt 1 = Startplatz (immer)
-  Punkte 2-5 = Regionale Referenzpunkte (aus GeoJSON oder SPOT_CONFIG)
+Bestimmt die Referenzpunkte pro Spot:
+  Punkt 1     = Startplatz (immer)
+  Punkte 2..N = Regionale Referenzpunkte (aus GeoJSON oder SPOT_CONFIG)
 
-Spots in der gleichen Region teilen die Punkte 2-5.
+Standard: 7 regionale Referenzpunkte pro Region, CVT-verteilt im Polygon-
+Innern (Apr 2026, vorher 4 Punkte am Rand via Greedy Max-Min-Distance).
+Spots in der gleichen Region teilen die regionalen Punkte.
 
 Datenquellen:
   - regionen.csv  → MASTER fuer textuelle Properties (region_name,
@@ -27,6 +29,19 @@ import config
 
 _regions_cache = None
 _csv_props_cache = None
+_active_geojson_path = None  # zuletzt geladener Pfad — fuer Cache-Invalidierung
+
+
+def _current_geojson_path():
+    """Gibt den aktiven Pfad zurueck (CVT-7 oder Legacy-4 je nach Config).
+    Wird dynamisch ausgewertet, damit ein Toggle ohne Restart greift —
+    der Cache wird in _load_regions() automatisch invalidiert."""
+    if getattr(config, "USE_LEGACY_REGION_REFPOINTS", False):
+        legacy = getattr(config, "REGIONEN_GEOJSON_LEGACY_PATH", None)
+        if legacy and legacy.exists():
+            return legacy
+        print("[WARN] USE_LEGACY_REGION_REFPOINTS=True aber Legacy-File fehlt — Fallback auf Default")
+    return config.REGIONEN_GEOJSON_PATH
 
 
 def _load_csv_properties():
@@ -75,12 +90,17 @@ def _load_csv_properties():
 
 def _load_regions():
     """Laedt Regionen: Geometrie + reference_points aus GeoJSON, textuelle
-    Properties aus regionen.csv (CSV = Master). Einmalig gecacht."""
-    global _regions_cache
-    if _regions_cache is not None:
-        return _regions_cache
+    Properties aus regionen.csv (CSV = Master). Gecacht — bei Wechsel des
+    aktiven Pfads (Legacy-Toggle) wird der Cache automatisch invalidiert."""
+    global _regions_cache, _active_geojson_path
 
-    path = config.REGIONEN_GEOJSON_PATH
+    path = _current_geojson_path()
+    if _regions_cache is not None and _active_geojson_path == path:
+        return _regions_cache
+    # Pfad hat sich geaendert (Legacy-Toggle) — Cache verwerfen
+    _regions_cache = None
+    _active_geojson_path = path
+
     if not path.exists():
         print(f"[WARN] Regionen-GeoJSON nicht gefunden: {path}")
         _regions_cache = []
@@ -149,8 +169,9 @@ def find_region_for_point(lat, lon):
 
 def get_reference_points(spot_name, lat, lon, quiet=False):
     """
-    Gibt die 5 Referenzpunkte fuer einen Spot zurueck.
-    [spot_coords, ref1, ref2, ref3, ref4]
+    Gibt die Referenzpunkte fuer einen Spot zurueck.
+    Format: [spot_coords, ref1, ref2, ..., refN]
+    Standard: 1 Spot + 7 regionale Referenzpunkte (Apr 2026).
 
     Prioritaet: SPOT_SOURCE_AREAS (Spot-Name) > GeoJSON (Region)
     """
@@ -197,7 +218,7 @@ def get_all_regions_geojson():
     description) aus regionen.csv. Damit erhaelt das Frontend (Karte,
     Tooltips) immer die aktuellen CSV-Werte ohne separates Sync-Skript.
     """
-    path = config.REGIONEN_GEOJSON_PATH
+    path = _current_geojson_path()
     if not path.exists():
         return {"type": "FeatureCollection", "features": []}
 

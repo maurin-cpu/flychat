@@ -251,8 +251,16 @@ def _compute_aggregates(
     decisions: list[str],
     kind: str,
     entity_id: str,
+    analysis_entry: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """11 Aggregat-Felder gemaess Schema. Felder ohne Quelle = None."""
+    """11 Aggregat-Felder gemaess Schema.
+
+    Thermik-Felder (climb_peak, productive_thermal_h, rough_pct) werden aus
+    ``analysis_entry["_rating_inputs"]`` gelesen — dort persistiert
+    `_attach_rating_inputs` in ``engine/analyzers.py`` die Werte aus dem
+    TQ-Cache. Fehlt der Block (Alt-Analysen vor Fix), bleiben die Felder
+    None — Backfill via Re-Analyse.
+    """
     hourly = slice_.get("hourly") or {}
     plev = slice_.get("pressure_levels") or {}
 
@@ -269,18 +277,24 @@ def _compute_aggregates(
         if w is not None and g is not None:
             gust_excess.append(g - w)
 
+    ri = (analysis_entry or {}).get("_rating_inputs") or {}
+
     return {
         "wind_10m_max": _safe_max(wind_10m_vals),
         "wind_850hpa_mean": _safe_mean(_plev_col("wind_speed_850hPa")),
         "gust_excess_max": _safe_max(gust_excess),
         "foehn_risk_peak": _parse_foehn_peak(decisions),
         "foehn_direction_dominant": _foehn_direction_for(kind, entity_id) or None,
-        "climb_peak": None,
-        "productive_thermal_h": None,
+        "climb_peak": ri.get("peak_climb_proxy"),
+        "sustained_peak_mps": ri.get("sustained_peak_mps"),
+        "productive_thermal_h": ri.get("productive_thermal_h"),
+        "productive_h_strict": ri.get("productive_h_strict"),
+        "working_height_agl_m": ri.get("working_height_agl_m"),
+        "cloud_structure": ri.get("cloud_structure"),
         "blh_max": _safe_max(_h_col("boundary_layer_height")),
         "low_cloud_max": _safe_max(_h_col("cloud_cover_low")),
         "mid_cloud_max": _safe_max(_h_col("cloud_cover_mid")),
-        "rough_pct": None,
+        "rough_pct": ri.get("rough_pct"),
     }
 
 
@@ -316,7 +330,7 @@ def build_snapshot(
     """
     weather = _extract_weather_slice(kind, entity_id, target_date)
     decisions = list(analysis_entry.get("_decisions_applied") or [])
-    aggregates = _compute_aggregates(weather, decisions, kind, entity_id)
+    aggregates = _compute_aggregates(weather, decisions, kind, entity_id, analysis_entry)
 
     analysis_id = f"{kind}_{entity_id}_{target_date}"
     timestamp = datetime.now().isoformat(timespec="seconds")
@@ -503,3 +517,238 @@ def delete_entry(analysis_id: str) -> bool:
             return False
         _atomic_write_all(kept)
     return True
+
+
+# ============================================================================
+# FEW-SHOT-PIPELINE Schritt 2: Retrieval + Prompt-Injection
+# ============================================================================
+# Liest gelabelte Cases aus JSONL, baut In-Memory-Index mit Feature-Tupeln,
+# liefert pro Live-Analyse die top-3 aehnlichsten Labels und formatiert sie
+# als System-Prompt-Block. Siehe docs/FEW_SHOT_PIPELINE.md.
+
+# Tier-Nachbarschaft fuer Fallback wenn ein Tier zu wenig Labels hat.
+TIER_NEIGHBOURS = {
+    "mittelland": ["jura"],
+    "jura": ["mittelland", "voralpen"],
+    "voralpen": ["jura", "alpen"],
+    "alpen": ["voralpen", "hochalpin"],
+    "hochalpin": ["alpen"],
+}
+
+MAX_LABEL_AGE_DAYS = 90  # Saison-Drift-Schutz
+MIN_TIER_POOL = 3        # ab hier Fallback auf Nachbar-Tiere
+
+# Distanz-Gewichte (Skill: Peak ist wichtigstes Signal)
+_W_PEAK = 3.0
+_W_PROD_H = 0.5
+_W_CLOUD = 0.05  # je Schicht (low + mid)
+
+# Modul-Cache: laden einmal, invalidate bei mtime-Change.
+_LABEL_INDEX: list[dict[str, Any]] | None = None
+_LABEL_INDEX_MTIME: float | None = None
+
+
+def _extract_features_from_label(entry: dict[str, Any]) -> dict[str, Any] | None:
+    """Liest Feature-Tupel aus weather_input.aggregates eines gespeicherten Labels.
+
+    Returns None falls Pflichtfelder fehlen (terrain_tier, sustained_peak_mps,
+    productive_h_strict) — bei aelteren Labels ohne _rating_inputs-Persistenz.
+    """
+    tier = entry.get("terrain_tier")
+    agg = (entry.get("weather_input") or {}).get("aggregates") or {}
+    peak = agg.get("sustained_peak_mps")
+    prod_h = agg.get("productive_h_strict")
+    if not tier or peak is None or prod_h is None:
+        return None
+    low = agg.get("low_cloud_max") or 0
+    mid = agg.get("mid_cloud_max") or 0
+    return {
+        "tier": tier,
+        "peak": float(peak),
+        "prod_h": float(prod_h),
+        "low": float(low),
+        "mid": float(mid),
+    }
+
+
+def _load_label_index() -> list[dict[str, Any]]:
+    """Lazy-load + mtime-Invalidation. Filtert Labels aelter als MAX_LABEL_AGE_DAYS
+    und Labels ohne komplette Aggregates raus.
+    """
+    global _LABEL_INDEX, _LABEL_INDEX_MTIME
+
+    try:
+        mtime = JSONL_PATH.stat().st_mtime
+    except FileNotFoundError:
+        _LABEL_INDEX = []
+        _LABEL_INDEX_MTIME = None
+        return []
+
+    if _LABEL_INDEX is not None and _LABEL_INDEX_MTIME == mtime:
+        return _LABEL_INDEX
+
+    entries = load_all()
+    now_ts = datetime.now().timestamp()
+    cutoff_ts = now_ts - MAX_LABEL_AGE_DAYS * 86400
+
+    index: list[dict[str, Any]] = []
+    skipped_old = 0
+    skipped_incomplete = 0
+    for e in entries:
+        # Age-Filter
+        ts_str = e.get("timestamp", "") or ""
+        try:
+            ts = datetime.fromisoformat(ts_str).timestamp()
+            if ts < cutoff_ts:
+                skipped_old += 1
+                continue
+        except (ValueError, TypeError):
+            pass  # Timestamp unparseable → behalten
+
+        feats = _extract_features_from_label(e)
+        if feats is None:
+            skipped_incomplete += 1
+            continue
+
+        index.append({"entry": e, "features": feats})
+
+    _LABEL_INDEX = index
+    _LABEL_INDEX_MTIME = mtime
+    logger.info(
+        "Few-Shot Label-Index geladen: %d aktiv, %d zu alt, %d unvollstaendig",
+        len(index), skipped_old, skipped_incomplete,
+    )
+    return index
+
+
+def retrieve_similar(current_features: dict[str, Any], top_k: int = 3,
+                     entity_type: str = "region") -> list[dict[str, Any]]:
+    """Liefert top-k Label-Eintraege, die dem aktuellen Wetter am aehnlichsten sind.
+
+    current_features: {"tier": str, "peak": float, "prod_h": float,
+                       "low": float, "mid": float}
+    entity_type: "region" oder "spot" — Filter, damit Region-Labels nur
+                 Region-Calls beeinflussen.
+    Strategie:
+      1. Filter auf gleichen terrain_tier + entity_type
+      2. Wenn Pool < MIN_TIER_POOL: auf Nachbar-Tiere erweitern
+      3. Wenn immer noch leer: []
+      4. Sortiere nach gewichteter Distanz, nimm top-k
+    """
+    index = _load_label_index()
+    if not index:
+        return []
+
+    tier = current_features.get("tier", "")
+    if not tier:
+        return []
+
+    candidates = [item for item in index
+                  if item["entry"].get("entity_type") == entity_type
+                  and item["features"]["tier"] == tier]
+
+    if len(candidates) < MIN_TIER_POOL:
+        neighbours = set(TIER_NEIGHBOURS.get(tier, []))
+        candidates = [item for item in index
+                      if item["entry"].get("entity_type") == entity_type
+                      and (item["features"]["tier"] == tier
+                           or item["features"]["tier"] in neighbours)]
+
+    if not candidates:
+        return []
+
+    def _dist(item):
+        f = item["features"]
+        return (
+            _W_PEAK * abs(f["peak"] - current_features.get("peak", 0))
+            + _W_PROD_H * abs(f["prod_h"] - current_features.get("prod_h", 0))
+            + _W_CLOUD * abs(f["low"] - current_features.get("low", 0))
+            + _W_CLOUD * abs(f["mid"] - current_features.get("mid", 0))
+        )
+
+    candidates.sort(key=_dist)
+    return [item["entry"] for item in candidates[:top_k]]
+
+
+def format_for_prompt(labels: list[dict[str, Any]]) -> str:
+    """Baut den Beispiel-Block, der vor dem Wetter-Kontext in den User-Prompt
+    injiziert wird. Leerer String bei leerer Liste — Caller injiziert dann
+    nichts.
+    """
+    if not labels:
+        return ""
+
+    lines = [
+        "═══════════════════════════════════════════════════════════════════",
+        "KALIBRIERUNGS-BEISPIELE — echte Pilot-Bewertungen aehnlicher Tage",
+        "═══════════════════════════════════════════════════════════════════",
+        "",
+        "Diese kuerzlich gelabelten Tage zeigen, wie ein Pilot aehnlich",
+        "konfigurierte Tagessubstanz bewertet hat. Lies sie als Kalibrierung,",
+        "bevor du den heutigen Tag bewertest. Wenn der Pilot eine Korrektur",
+        "angegeben hat, gilt diese als Ziel-Rating fuer aehnlich strukturierte",
+        "Tage.",
+        "",
+    ]
+
+    for i, entry in enumerate(labels, 1):
+        agg = (entry.get("weather_input") or {}).get("aggregates") or {}
+        llm_full = entry.get("llm_output_full") or {}
+        fb = entry.get("user_feedback") or {}
+
+        name = entry.get("spot_or_region_id", "?")
+        date = entry.get("target_date", "?")
+        tier = entry.get("terrain_tier", "?")
+        peak = agg.get("sustained_peak_mps")
+        prod_h = agg.get("productive_h_strict")
+        low = agg.get("low_cloud_max")
+        mid = agg.get("mid_cloud_max")
+        cloud_str = agg.get("cloud_structure") or "?"
+
+        original_rating = llm_full.get("experience_rating", "?")
+        label = fb.get("label") or "?"
+        corr = fb.get("corrected_experience_rating")
+
+        peak_s = f"{peak:.1f} m/s" if peak is not None else "n/a"
+        prod_s = f"{prod_h:.0f} h" if prod_h is not None else "n/a"
+        low_s = f"{low:.0f}%" if low is not None else "n/a"
+        mid_s = f"{mid:.0f}%" if mid is not None else "n/a"
+
+        lines.append(f"── BEISPIEL {i} ── {name} — {date} — Tier: {tier}")
+        lines.append(f"  Wetter-Substanz:")
+        lines.append(f"    sustained_peak: {peak_s}    prod_h_strict: {prod_s}")
+        lines.append(f"    cloud tief max: {low_s}    cloud mittel max: {mid_s}")
+        lines.append(f"    cloud_structure: {cloud_str}")
+        lines.append(f"  LLM hatte urspruenglich vergeben: experience_rating = {original_rating}")
+
+        if label == "richtig":
+            lines.append(f"  Pilot-Bewertung:       RICHTIG (keine Korrektur, Rating bleibt)")
+        else:
+            label_disp = "ZU PESSIMISTISCH" if label == "zu_pessimistisch" else "ZU OPTIMISTISCH"
+            lines.append(f"  Pilot-Bewertung:       {label_disp}")
+            if corr is not None:
+                lines.append(f"  Korrigiertes Rating:   {corr}")
+            else:
+                lines.append(f"  (keine konkrete Rating-Korrektur — Richtung beachten)")
+        lines.append("")
+
+    lines.append("Jetzt bewerte den heutigen Tag basierend auf den Wetterdaten unten.")
+    lines.append("Folge den Pilot-Korrekturen wenn der heutige Tag aehnlich strukturiert ist.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_few_shot_block(current_features: dict[str, Any],
+                         entity_type: str = "region",
+                         top_k: int = 3) -> tuple[str, str]:
+    """Convenience-Wrapper fuer den Aufrufer (engine/analyzers.py).
+
+    Returns (prompt_block, decision_tag). prompt_block ist leerer String wenn
+    keine Beispiele gefunden. decision_tag wird in _decisions_applied geloggt.
+    """
+    labels = retrieve_similar(current_features, top_k=top_k, entity_type=entity_type)
+    if not labels:
+        tier = current_features.get("tier", "?")
+        return "", f"FewShot:none(tier={tier})"
+    tier = current_features.get("tier", "?")
+    return format_for_prompt(labels), f"FewShot:{tier},{len(labels)} examples"
