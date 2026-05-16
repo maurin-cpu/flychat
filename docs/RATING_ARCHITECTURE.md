@@ -118,6 +118,16 @@ Wie Spot, **aber**:
 
 Bei `safety_status == "not_safe"`: `experience_rating = 1` (keine Belohnung wenn nicht sicher).
 
+**Harte Peak-Floors** (pilotenkalibriert Mai 2026, in `skills/shared/04_flyability/04_flight_subratings_*.md`):
+
+| `sustained_peak` (≥2h) | Max Rating |
+|---|---|
+| < 1.0 | 1 |
+| 1.0–1.5 | 2 |
+| 1.5–2.0 | 3 |
+| **2.0–2.5** | **4** (Peak 2.5 = XC-Schwelle, niemals 5 darunter) |
+| ≥ 2.5 | 5 (Default), 6 nur mit allen 3 Hammertag-Markern |
+
 ---
 
 ## streckenflug.rating (1–6)

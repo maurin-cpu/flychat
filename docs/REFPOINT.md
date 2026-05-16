@@ -33,7 +33,9 @@ Variable hat eine eigene, physikalisch begründete Aggregationsregel.
 |---|---|---|
 | **Thermik** (Temperatur, Strahlung, Druckniveaus, Feuchte) | **1 Best-Punkt** = höchste mittlere Strahlung während Flugstunden | Thermik wird AM Sonnenpunkt erzeugt, nicht gemittelt |
 | **Wolken** (low/mid/high/total) | **30%-Perzentil** über alle 7 Punkte | NWP überschätzt Bewölkung systematisch in Bergen — Perzentil findet Blue Holes |
-| **Niederschlag** (Regen, Probability) | **Max wenn ≥30% der Punkte regnen, sonst 0** | Regionale Signifikanz statt Einzelausreisser |
+| **Niederschlag** (precipitation, rain) | **Hybrid: Max ohne Quorum wenn Peak ≥ 0.2 mm/h; sonst 30%-Quorum; < 0.05 mm/h = 0** | DWD-Standard (Ebert 2008 Neighborhood Method) — konvektive Einzelzellen kommen durch, Rauschen geclipt |
+| **precipitation_probability** | **Max** über alle Punkte | POP ist bereits eine Wahrscheinlichkeit — höchste regionale Schauer-Chance konservativ |
+| **precipitation_coverage** (neu, abgeleitet) | **Anteil RPs > 0.05 mm/h, 0.0–1.0** | Erlaubt späteres Decision-Tag RAIN-SCATTERED vs RAIN-WIDESPREAD |
 | **Wind 10m** (Speed) | **Median** über alle 7 Punkte | Robust gegen einen einzelnen alpinen RP, der die Region dominiert |
 | **Wind 10m** (Direction) | **Vektorielles Mittel** (zirkulär, geschwindigkeits-gewichtet) | Korrekt für 360°-Variablen |
 | **Böen** (wind_gusts_10m) | **Wird NICHT aggregiert** auf Region-Ebene | Böen sind lokale Spitzen — nicht regional sinnvoll, gehören auf Spot-Ebene |
@@ -94,22 +96,44 @@ nimmt die Aggregation den **drittsonnigsten** (Index 2) = etwa 30-40%. Die
 Region zeigt also Sonne, weil die statistisch existierende Wolkenlücke
 gefunden wird.
 
-### 1.3 Niederschlag: Regionale Signifikanz
+### 1.3 Niederschlag: Hybrid-Filter (Neighborhood Method)
 
-**Code**: `_aggregate_regional_data()` in `fetch_weather.py:343-353`
+**Code**: `_aggregate_regional_data()` in `fetch_weather.py:343-385`
 
-Pro Stunde:
-1. Zählen, wie viele der 7 Punkte Niederschlag > 0.0 mm melden
-2. Schwelle: `max(2, round(0.3 × n))` = mindestens **3 von 7** müssen Regen melden
-3. Wenn Schwelle erreicht: **max** aller Werte übernehmen
-4. Wenn nicht: **0.0 mm** im Output
+**Hintergrund — warum nicht reines Quorum:** ICON-D2 (2.2 km Aufloesung) modelliert
+Konvektion explizit. Eine einzelne Schauerzelle (2-10 km Durchmesser) trifft typisch
+nur 1-2 von N Referenzpunkten. Ein reines 30%-Quorum (alt) hat solche Zellen
+systematisch geclipt — der heutige Fall (16.05.2026, Zentrales Mittelland 1.1 mm an
+1 von 7 RPs → wurde als 0.0 ausgegeben) war die Konsequenz.
 
-**Physik**: Einzelne Niederschlags-Pixel im NWP sind oft Ghost-Echos oder
-übertriebene Konvektions-Trigger. Erst wenn mehrere Punkte unabhängig Regen
-melden, ist das Signal regional belastbar.
+**Industrie-Standard:** Ebert (2008) "Neighborhood Method", DWD operational seit
+2012 fuer COSMO-DE-EPS und ICON-D2: parallel **Maximum** (konservativer Peak) und
+**Fractional Coverage** (Verteilungsinformation) innerhalb der Region-Box berechnen.
 
-**Konsequenz**: 1-2 Punkte Regen werden ignoriert ("falscher Alarm"). Bei 3+
-Punkten Regen → max-Wert (konservativ für Sicherheits-Tags wie `REGEN`).
+**Logik pro Stunde (precipitation, rain in mm/h):**
+1. `peak = max(valid_vals)`, `coverage = n_wet / n_total` (n_wet = RPs mit Wert > NOISE_MM)
+2. Wenn `peak ≥ PRECIP_SIGNIFICANT_MM` (0.2 mm/h) → **peak** ausgeben (echte Zelle, kein Quorum noetig)
+3. Sonst wenn `peak > PRECIP_NOISE_MM` (0.05 mm/h) **UND** `coverage ≥ 30%` → **peak** ausgeben (flaechiger leichter Regen)
+4. Sonst → **0.0** (isolierter Trace-Wert oder reines Modell-Rauschen)
+5. `precipitation_coverage` wird in allen Faellen als 0.0-1.0 gespeichert
+
+**`precipitation_probability` (POP):** Einfach `max()` ueber alle RPs — POP ist
+schon eine Wahrscheinlichkeit, konservativ heisst hier "hoechste regionale
+Schauer-Chance".
+
+**Schwellen-Begruendung (konfigurierbar in `config.py`):**
+- `PRECIP_SIGNIFICANT_MM = 0.2` — WMO/Aviation "light precipitation": ab dieser
+  Intensitaet spuert der Pilot Naesse am Schirm. Bewusst niedriger als die DWD-
+  Operationsschwelle 0.5 (false-negative-averse fuer Aviation).
+- `PRECIP_NOISE_MM = 0.05` — unter Modell-Trace-Niveau, filtert numerische Spikes.
+- `PRECIP_COVERAGE_QUORUM = 0.3` — alter 30%-Schwellwert bleibt als Fallback fuer
+  Werte zwischen NOISE und SIGNIFICANT.
+
+**Konsequenz:**
+- 1 von 7 RPs zeigt 0.8 mm/h → durchgelassen (war vorher 0.0).
+- 1 von 7 RPs zeigt 0.03 mm/h → 0.0 (Rauschen).
+- 5 von 7 RPs zeigen 0.1 mm/h → durchgelassen (Quorum greift).
+- 1 von 7 RPs zeigt 0.1 mm/h → 0.0 (isolierter Trace, kein Quorum).
 
 ### 1.4 Wind: Median + Vektor-Mittel
 
@@ -143,7 +167,8 @@ gemedianiert und am Region-Referenzpunkt als Single-Anchor angesetzt — siehe
    _aggregate_regional_data
    ├─ Thermik-Params: data_list[0] behalten
    ├─ Wolken: 30%-Perzentil-Pick
-   └─ Niederschlag: Max wenn ≥3/7, sonst 0
+   ├─ Niederschlag: Hybrid (Peak≥0.2mm ohne Quorum; sonst 30%; <0.05mm=0)
+   └─ precipitation_coverage: Anteil RPs > 0.05mm (0.0-1.0)
             ↓
    _aggregate_wind_across_points
    ├─ wind_speed_10m: Median
@@ -163,7 +188,7 @@ gemedianiert und am Region-Referenzpunkt als Single-Anchor angesetzt — siehe
 |---|---|
 | Thermik = Best-Strahlungs-RP | Mindestens **1 S-Punkt auf Flughöhe** muss im Set sein — sonst findet der Algorithmus keinen realistischen Anker |
 | Wolken = 30%-Perzentil | Mindestens **2-3 RPs auf verschiedenen Aspekten/Höhen** — sonst kein Perzentil-Spread möglich |
-| Niederschlag-Schwelle 3/7 | Bei 7 Punkten: alle in selber Wetterzelle → Regen wird voll übernommen; verteilt über die Region → Einzelausreisser werden korrekt herausgefiltert |
+| Niederschlag Hybrid-Filter | Eine einzige RP-Zelle mit Peak ≥ 0.2 mm/h reicht bereits — konvektive Schauer kommen durch, egal ob 1 oder 5 von 7 RPs nass sind. Nur Trace-Werte (0.05-0.2 mm/h) brauchen noch das 30%-Quorum |
 | Wind-Median | Höhenstreuung der RPs vermeiden, wenn das Polygon nicht wirklich heterogen ist — sonst dominiert ein hoher RP den Median nach oben |
 | Föhn-Anker | Für Föhn-Wind-Decisions ist der Median wichtig: 4+ von 7 Punkten müssen Föhn-Speed sehen, damit `FoehnCaution` triggert |
 

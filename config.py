@@ -187,6 +187,33 @@ GFS_CROSSCHECK_PARAMS = [
 ]
 
 # ============================================================================
+# NIEDERSCHLAG — REGIONALE AGGREGATION (Hybrid-Filter)
+# ============================================================================
+# Konvektive Schauer (ICON-D2, 2.2km Aufloesung) erzeugen einzelne Zellen,
+# die typisch nur 1-3 von N Referenzpunkten treffen. Reine Quorum-Filter
+# (z.B. "30% der RPs muessen Regen melden") killen konvektive Signale
+# systematisch.
+#
+# Industrie-Standard (DWD operational seit 2012, Ebert 2008 "Neighborhood
+# Method"): Innerhalb einer Region-Box parallel Maximum + Fractional Coverage
+# berechnen. Maximum ist konservativ (worst case), Coverage gibt die
+# Verteilungsinformation.
+#
+# Konservative Schwellen fuer Paragliding (false-negative-averse):
+#   - SIGNIFICANT_MM: Ab dieser Peak-Intensitaet wird der Wert OHNE Quorum
+#     durchgelassen — eine echte Zelle reicht, egal an wie vielen RPs.
+#     WMO/DWD "trace to light precipitation" beginnt bei 0.1 mm/h, in der
+#     Praxis spuert ein Pilot ab 0.2 mm/h die Naesse am Schirm.
+#   - NOISE_MM: Werte unterhalb gelten als Modell-Rauschen (Float-Spikes,
+#     numerische Artefakte) und werden auf 0 geclipt.
+#   - COVERAGE_QUORUM: Bei mittleren Werten (NOISE..SIGNIFICANT) gilt
+#     weiterhin das alte 30%-Quorum als Fallback, damit verstreute leichte
+#     Trace-Werte (z.B. 0.08 mm an 1 RP von 7) nicht zu Fehlalarm fuehren.
+PRECIP_SIGNIFICANT_MM = 0.2     # Peak >= 0.2 mm/h → echte Zelle, durchlassen
+PRECIP_NOISE_MM = 0.05          # Peak < 0.05 mm/h → Rauschen, auf 0 clipen
+PRECIP_COVERAGE_QUORUM = 0.3    # Bei NOISE..SIGNIFICANT: mind. 30% RPs nass
+
+# ============================================================================
 # HÖHENWIND-PARAMETER (Pressure Level Daten)
 # ============================================================================
 

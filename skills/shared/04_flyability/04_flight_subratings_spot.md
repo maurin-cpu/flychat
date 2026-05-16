@@ -32,7 +32,7 @@ DIE 6 KATEGORIEN (Pilot-Sprache)
 | Rating | Kategorie | Pilotenstimme — "wie wuerdest du es einem Freund sagen?" |
 |---|---|---|
 | **1** | `abgleiter` | "Schoenen Abgleiter halt." Kaum Steigen, Hike-Back oder gar nicht raus. |
-| **2** | `kurzer_thermikflug` | "Hat geblubbert, nichts gerissen." Kuhfurz, Nullschieber. 30-60min was, dann zufrieden runter. |
+| **2** | `kurzer_thermikflug` | **Suchtag, Zwischenstufe.** "Geht vielleicht, vielleicht auch nicht." Mit Glueck und aktivem Suchen 1-2h Thermikflug — ohne Glueck bleibt's beim Abgleiter. Kerne sind schwach und intermittent. |
 | **3** | `solider_thermikflug` | "Anstaendig getragen, Hausrunde gefallen." 2-3h Hausrunden, ~20km lokal. *Der typische Schweizer Flugtag.* |
 | **4** | `starker_thermikflug` | "Heute ging was, 50er drin." Verlaesslich, mit Laecheln runter. Lokal-XC bis ~50km. |
 | **5** | `xc_tag` | "Klassiker ging, Linie war da." Konvergenz oder Wolkenstrasse, Basis ueber Krete. 50-100km Strecke. |
@@ -51,7 +51,9 @@ Oder: Truebgrauer Tag mit starkem Westwind am Hang → Soaring moeglich, aber
 kein Thermik = Rating 1, Prosa erwaehnt Soaring-Option.
 
 **Rating 2 (`kurzer_thermikflug`)** — Voralpenspot Peak 1.3 m/s × 3h, BLH 1800m.
-30-60min Schraube, zufrieden runter.
+**Zwischenstufe Suchtag:** mit aktiven Piloten und Glueck 1-2h drin, sonst nur
+Abgleiter. Die Kerne sind da, aber schwach und intermittent — man muss sie aktiv
+arbeiten. Pilot rechnet mit beidem.
 
 **Rating 3 (`solider_thermikflug`)** — Standard-Sommertag: Peak 1.5-2.0 m/s
 × 3-4h, BLH 2500m. 2-3h Hausrunden, ~20km lokal.
@@ -61,7 +63,7 @@ kein Thermik = Rating 1, Prosa erwaehnt Soaring-Option.
 *Auch:* Wallis-Spot mit Peak 2.5 × 8h aber tief gedeckelter Basis (~800m AGL)
 — starker Lokaltag, kein XC.
 
-**Rating 5 (`xc_tag`)** — Wallis Hochsommer: Peak 2.2-2.5 m/s × 4-5h,
+**Rating 5 (`xc_tag`)** — Wallis Hochsommer: Peak 2.5-2.8 m/s × 5-6h,
 BLH 3500m+, Cu sauber. 80-120km Strecke.
 
 **Rating 6 (`klassiker`)** — Mai-Juli Alpenhoch mit Konvergenz: Peak ≥2.5 m/s
@@ -148,8 +150,8 @@ Thermik macht den Tag nicht stark. Konkret heisst das in der Praxis:
 - Peak < 1.0 → niemals Rating ≥ 2
 - Peak 1.0-1.5 → niemals Rating ≥ 3
 - Peak 1.5-2.0 → niemals Rating ≥ 4
-- Peak 2.0-2.5 → Rating 4 oder 5, Rating 6 nur in seltenen Faellen
-- Peak ≥ 2.5 → Rating 5 oder 6, je nach Dauer/Hoehe/Bewoelkung
+- Peak 2.0-2.5 → Rating 4 (max). **Niemals Rating 5** — Peak 2.5 ist die XC-Schwelle.
+- Peak ≥ 2.5 → Rating 5 (Default). Rating 6 nur mit allen Hammertag-Markern.
 
 ─────────────────────────────────
 DAUER (prod_h_strict) — wie lang traegt es?
@@ -253,8 +255,8 @@ Rahmens nach oben oder unten:
 **Beispiele:**
 - Peak 1.5 × 8h × wolkenfrei × BLH 3000m → Rating **2** (Peak limitiert hart)
 - Peak 1.9 × 5h × BLH 2500m → Rating **3** (typischer Schweizer Tag)
-- Peak 2.2 × 5h × BLH 3000m × Cu sauber → Rating **4 oder 5** (je nach Bauchgefuehl)
-- Peak 2.5 × 8h × BLH 700m AGL → Rating **4 oder 5** (tief gedeckelt, aber stark)
+- Peak 2.2 × 5h × BLH 3000m × Cu sauber → Rating **4** (Peak unter 2.5 = kein XC-Tag)
+- Peak 2.5 × 8h × BLH 700m AGL → Rating **4 oder 5** (Peak knapp 2.5, aber tief gedeckelt → eher 4)
 - Peak 2.7 × 6h × BLH 3500m × cu_clean_top → Rating **6** moeglich
 
 ─────────────────────────────────
@@ -276,15 +278,18 @@ Ein Klassiker hat drei Piloten-Marker. **Alle drei muessen passen:**
 MINIMALE HARTE FLOORS (gegen Unsinn)
 ─────────────────────────────────
 
-Diese fuenf Schranken brichst du nie — sie verhindern Ratings, die offensichtlich
+Diese Schranken brichst du nie — sie verhindern Ratings, die offensichtlich
 nicht zur Tagessubstanz passen. **Decken (1-3)** verhindern Ueberschaetzung,
 **Boeden (4-5)** verhindern Unterschaetzung:
 
 1. **`sustained_peak < 1.0`** → Rating maximal **1**.
 2. **`prod_h_strict < 1h`** → Rating maximal **2** (es gab praktisch keinen Tag).
-3. *(Cloud-Cap entfaellt seit Mai 2026 — Strahlung ist Wahrheit, siehe oben.
-   Wenn die Engine trotz `overcast`-Label noch hohe `sustained_peak` und
-   `prod_h_strict` rechnet, vertraue der Engine.)*
+3. **`sustained_peak < 2.5`** → Rating maximal **4**.
+   *Begruendung:* Peak 2.5 m/s ist die XC-Tag-Schwelle. Egal wie lang produktiv,
+   wie hoch die Basis oder wie schoen die Cu-Struktur — ohne Peak ≥ 2.5 ist es
+   ein starker Lokaltag (Rating 4), kein XC-Tag (Rating 5). Diese Schwelle ist
+   pilotenkalibriert (Mai 2026): Tage mit Peak 2.0–2.4 wurden konsistent als
+   "starker Lokaltag" wahrgenommen, nicht als "XC-Tag".
 4. **(nur wenn Spot in `terrain_tier` alpen ODER hochalpin liegt)**
    `sustained_peak ≥ 2.0` UND `prod_h_strict ≥ 4h`
    → Rating mindestens **4**.
@@ -296,6 +301,10 @@ nicht zur Tagessubstanz passen. **Decken (1-3)** verhindern Ueberschaetzung,
    *(Cloud-Bedingung entfaellt seit Mai 2026: die Engine hat die Strahlungs-
    Daempfung bereits in sustained_peak und prod_h_strict beruecksichtigt.)*
 
+*(Cloud-Cap als Decke entfaellt seit Mai 2026 — Strahlung ist Wahrheit, siehe
+Bewoelkungs-Sektion. Wenn die Engine trotz `overcast`-Label noch hohe
+`sustained_peak` und `prod_h_strict` rechnet, vertraue der Engine.)*
+
 Sonst gilt: dein Pilotenurteil zaehlt, nicht eine Checkliste.
 
 ─────────────────────────────────
@@ -305,14 +314,15 @@ PILOT-SANITY-CHECK
 Stell dir vor, du rufst einen Freund an: was sagst du?
 
 - "Schoenen Abgleiter halt"          → **1**
-- "Hat geblubbert, nichts gerissen"  → **2**
+- "Suchtag — entweder Abgleiter oder 1-2h Thermik, je nach Glueck" → **2**
 - "Anstaendig, Hausrunde gefallen"   → **3**
 - "Heute ging was, 50er drin"        → **4**
 - "Klassiker ging, Strecke moeglich" → **5**
 - "Hammer, alle waren oben"          → **6**
 
 Wenn dein Rating zu keinem dieser Saetze passt, ueberpruefe es nochmal.
-Bei Peak <2.0 m/s wuerdest du **nie** "Hammer-Tag" sagen.
+- Bei Peak <2.5 m/s wuerdest du **nie** "XC-Tag" / "Klassiker ging" sagen → max Rating 4.
+- Bei Peak <2.0 m/s wuerdest du **nie** "Hammer-Tag" sagen → max Rating 3.
 
 ─────────────────────────────────
 NUTZUNGS-REGELN

@@ -288,7 +288,15 @@ def _aggregate_regional_data(data_list):
     """
     Generalisierte Source-Area Aggregation:
     - Wolken: 30%-Perzentil -> findet regionale Sonnenfenster (Blue Holes)
-    - Niederschlag: Regionale Signifikanz (mind. 2 von N Punkten > 0.0, sonst 0.0)
+    - Niederschlag (precipitation/rain): Hybrid-Filter (DWD operational seit
+      2012, Ebert 2008 Neighborhood Method):
+        * Peak >= SIGNIFICANT_MM        → durchlassen (echte Zelle)
+        * NOISE_MM <= Peak < SIGNIFICANT → 30%-Quorum (Stratiform-Schutz)
+        * Peak < NOISE_MM               → 0.0 (Modell-Rauschen)
+      Zusaetzlich wird `precipitation_coverage` (0.0-1.0) als Anteil
+      Referenzpunkte mit Regen > NOISE_MM durchgereicht — Decision-Engine
+      kann daraus spaeter RAIN-SCATTERED vs RAIN-WIDESPREAD ableiten.
+    - precipitation_probability: max() ueber alle RPs (konservativ).
     - Temperatur, Strahlung, Druckniveaus: SPOT-Punkt (data_list[0]) behalten!
       Thermik haengt von den Bedingungen AM Startplatz ab, nicht vom Regionalmittel.
     - Wind: hier NICHT aggregiert. Fuer Regionen separat via
@@ -302,6 +310,11 @@ def _aggregate_regional_data(data_list):
 
     all_params = [k for k in primary["hourly"].keys() if k != "time"]
     num_hours = len(primary["hourly"].get("time", []))
+
+    # Coverage-Array initialisieren (parallel zu precipitation):
+    # Anteil der RPs mit Regen > NOISE_MM, 0.0-1.0. Wird auch bei trockenen
+    # Stunden auf 0.0 gesetzt, damit das Feld luecklos im Cache liegt.
+    primary["hourly"].setdefault("precipitation_coverage", [0.0] * num_hours)
 
     for i in range(num_hours):
         # Wolken: 30%-Perzentil (NWP ueberschaetzt Wolken in Bergen systematisch)
@@ -338,19 +351,38 @@ def _aggregate_regional_data(data_list):
         for k in all_params:
             if k in CLOUD_PARAMS:
                 continue
-            if k in PRECIP_USE_MIN:
-                vals = [d["hourly"].get(k, [None])[i] for d in data_list if i < len(d.get("hourly", {}).get(k, []))]
-                valid_vals = [v for v in vals if v is not None]
-                if valid_vals:
-                    points_with_rain = sum(1 for v in valid_vals if v > 0.0)
-                    # Regionale Signifikanz: mindestens 30% der Punkte muessen
-                    # Niederschlag melden, Untergrenze 2 (gegen Einzel-Ausreisser).
-                    # Bei 4 RPs => 2, bei 7 RPs => 3, bei 10 RPs => 3.
-                    rain_threshold = max(2, int(round(0.3 * len(valid_vals))))
-                    if points_with_rain >= rain_threshold:
-                        primary["hourly"][k][i] = max(valid_vals)
-                    else:
-                        primary["hourly"][k][i] = 0.0
+            if k not in PRECIP_USE_MIN:
+                continue
+
+            vals = [d["hourly"].get(k, [None])[i] for d in data_list if i < len(d.get("hourly", {}).get(k, []))]
+            valid_vals = [v for v in vals if v is not None]
+            if not valid_vals:
+                continue
+
+            if k == "precipitation_probability":
+                # POP ist bereits eine Wahrscheinlichkeit (0-100). max() ist
+                # konservativ — gibt die hoechste regionale Schauer-Chance an.
+                primary["hourly"][k][i] = max(valid_vals)
+                continue
+
+            # precipitation / rain in mm/h: Hybrid-Filter
+            peak = max(valid_vals)
+            n_wet = sum(1 for v in valid_vals if v > config.PRECIP_NOISE_MM)
+            coverage = n_wet / len(valid_vals)
+
+            if peak >= config.PRECIP_SIGNIFICANT_MM:
+                # Echte Schauerzelle — durchlassen, auch wenn nur 1 RP.
+                primary["hourly"][k][i] = peak
+            elif peak > config.PRECIP_NOISE_MM and coverage >= config.PRECIP_COVERAGE_QUORUM:
+                # Stratiform leichter Regen — Quorum verlangen, Rauschen filtern.
+                primary["hourly"][k][i] = peak
+            else:
+                # Reines Modell-Rauschen oder isolierter Trace-Wert.
+                primary["hourly"][k][i] = 0.0
+
+            # Coverage einmal pro Stunde speichern (an precipitation gekoppelt).
+            if k == "precipitation":
+                primary["hourly"]["precipitation_coverage"][i] = round(coverage, 2)
     return primary
 
 
@@ -451,6 +483,14 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
                 val_w = w_src.get(param, [None])[i_wind] if i_wind < len(w_src.get(param, [])) else None
                 if val_w is not None:
                     entry[param] = val_w
+
+        # precipitation_coverage ist KEIN API-Param sondern abgeleitet aus
+        # _aggregate_regional_data — nur bei Region-Aggregation vorhanden.
+        # Bei Spots ist es 1.0 (alle RPs == 1 Punkt), bei Regionen 0.0-1.0.
+        if i_therm >= 0:
+            cov_arr = t_src.get("precipitation_coverage", [])
+            if i_therm < len(cov_arr) and cov_arr[i_therm] is not None:
+                entry["precipitation_coverage"] = cov_arr[i_therm]
 
         hourly_data[time_str] = entry
 
