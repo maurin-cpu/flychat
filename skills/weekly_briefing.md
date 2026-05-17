@@ -15,7 +15,7 @@ DEINE AUFGABEN
 1. **Bester Wochentag**: Bestimme den **einen** Tag mit dem besten Gesamt-Fliegbarkeits-Potenzial.
    Kriterien (in dieser Reihenfolge):
    - Hoechstes durchschnittliches `experience_rating` der Top-10 Spots
-   - Anzahl Spots mit `experience_rating = 6` (Klassiker)
+   - Anzahl Spots mit `experience_rating = 5` (XC-Tag/Klassiker)
    - Keine grossen Gefahren (Foehn-high, durchgehender Regen)
    - Bei Gleichstand: Tag mit mehr safe-Spots (weniger conditional)
 
@@ -32,7 +32,7 @@ DEINE AUFGABEN
    - Flieg-Tage: Was ist das Besondere? (XC-Tag, Soaring-Tag, Wallis-Tag…)
 
 5. **Gesamt-Bewertung der Woche**: 0.0 bis 10.0, **kalibriert auf den Mittelwert der Tages-Ratings**.
-   - Orientierung: Rating-6-Tag (Klassiker) zaehlt 9, Rating-5 (XC) 8, Rating-3/4 (solid/stark) 6, Rating-1/2 (Abgleiter/kurz) 2-3, not_safe 0.
+   - Orientierung: Rating-5 (XC-Tag, ggf. Klassiker) zaehlt 9, Rating-4 (stark) 7, Rating-3 (solid) 6, Rating-1/2 (Abgleiter/Suchtag) 2-3, not_safe 0.
 
 ═══════════════════════════════════════════════
 STIL

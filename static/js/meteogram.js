@@ -132,14 +132,14 @@ window.Meteogram = (function () {
         return '#1D4ED8';
     }
 
-    // xc-therm color scale: climb rate (m/s) -> background color
+    // Climb rate color scale aligned to sustained_peak pilot bands:
+    // <1.0 Abgleiter | 1.0-1.5 mau | 1.5-2.0 solide | 2.0-2.5 stark/XC | >=2.5 Klassiker
     function thermClimbColor(rate) {
         if (rate <= 0) return 'transparent';
-        if (rate <= 0.25) return '#FEFCE8';
-        if (rate <= 0.75) return '#FEF08A';
-        if (rate <= 1.25) return '#FDE047';
-        if (rate <= 1.75) return '#BEF264';
-        if (rate <= 2.25) return '#86EFAC';
+        if (rate < 1.0) return '#FEF9C3';
+        if (rate < 1.5) return '#FDE047';
+        if (rate < 2.0) return '#BEF264';
+        if (rate < 2.5) return '#86EFAC';
         return '#67E8F9';
     }
 
@@ -1722,6 +1722,48 @@ window.Meteogram = (function () {
         var crossH = chartG.append('line').attr('class', 'crosshair-h')
             .attr('x1', 0).attr('x2', nCols * CELL_W);
 
+        // Hover-Höhen-Badge: zeigt die exakte Höhe an der Cursor-Y-Position auf der Y-Achse.
+        // Interpoliert linear zwischen den Grid-Höhen, auf 50m gerundet. In der Ground-Row Startplatzhöhe.
+        var altBadge = chartG.append('g').attr('class', 'alt-hover-badge')
+            .style('opacity', 0)
+            .style('pointer-events', 'none');
+        var altBadgeRect = altBadge.append('rect')
+            .attr('rx', 3).attr('ry', 3)
+            .attr('fill', '#0369A1')
+            .attr('opacity', 0.95);
+        var altBadgeText = altBadge.append('text')
+            .attr('text-anchor', 'end')
+            .attr('dominant-baseline', 'central')
+            .attr('font-size', '11px')
+            .attr('font-weight', '700')
+            .attr('fill', '#FFFFFF')
+            .attr('x', -8);
+
+        function updateAltBadge(my) {
+            if (my < GRID_TOP || my > gridBottom) {
+                altBadge.style('opacity', 0);
+                return;
+            }
+            var label;
+            var groundTopY = GRID_TOP + (nRows - 1) * cellH;
+            if (hasGroundRow && my >= groundTopY) {
+                label = '\u2605 ' + Math.round(elevation) + 'm';
+            } else {
+                var frac = (my - GRID_TOP) / (nRows * cellH);
+                var alt = topAlt - frac * (topAlt - bottomAlt);
+                alt = Math.round(alt / 50) * 50;
+                label = alt + 'm';
+            }
+            altBadgeText.text(label).attr('y', my);
+            var bbox = altBadgeText.node().getBBox();
+            altBadgeRect
+                .attr('x', bbox.x - 4)
+                .attr('y', bbox.y - 2)
+                .attr('width', bbox.width + 8)
+                .attr('height', bbox.height + 4);
+            altBadge.style('opacity', 1);
+        }
+
         // Shared tooltip builder for mouse and touch
         function showTooltipAt(coords, clientX, clientY) {
             var mx = coords[0], my = coords[1];
@@ -1731,6 +1773,7 @@ window.Meteogram = (function () {
             var colX = ci * CELL_W + CELL_W / 2;
             crossV.attr('x1', colX).attr('x2', colX).classed('visible', true);
             crossH.attr('y1', my).attr('y2', my).classed('visible', true);
+            updateAltBadge(my);
 
             var t = times[ci];
             var dt = new Date(t);
@@ -1853,6 +1896,7 @@ window.Meteogram = (function () {
         function hideTooltip() {
             crossV.classed('visible', false);
             crossH.classed('visible', false);
+            altBadge.style('opacity', 0);
             tooltipEl.classList.remove('visible');
         }
 
@@ -1881,6 +1925,7 @@ window.Meteogram = (function () {
             var ci = Math.max(0, Math.min(nCols - 1, Math.floor(mx / CELL_W)));
             var colX = ci * CELL_W + CELL_W / 2;
             crossV.attr('x1', colX).attr('x2', colX).classed('visible', true);
+            updateAltBadge(my);
 
             var t = times[ci];
             var dt = new Date(t);
@@ -1930,6 +1975,7 @@ window.Meteogram = (function () {
 
         function endScrub() {
             crossV.classed('visible', false);
+            altBadge.style('opacity', 0);
             if (scrubFadeTimer) clearTimeout(scrubFadeTimer);
             scrubFadeTimer = setTimeout(function () {
                 if (legendBar) legendBar.classList.remove('mg-scrubbing');

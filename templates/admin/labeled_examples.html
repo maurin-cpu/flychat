@@ -36,6 +36,10 @@
     text-transform: uppercase; letter-spacing: 0.04em;
     color: var(--color-text-muted);
   }
+  .lx-table th[data-sort-key] { cursor: pointer; user-select: none; }
+  .lx-table th[data-sort-key]:hover { background: #e2e8f0; color: var(--color-text); }
+  .lx-table th.is-sorted { color: var(--color-text); background: #e2e8f0; }
+  .lx-sort-arrow { display: inline-block; width: 10px; margin-left: 4px; opacity: 0.7; }
   .lx-table tr:hover { background: #f8fafc; }
   .lx-pill {
     display: inline-block; padding: 2px 8px; border-radius: 999px;
@@ -200,14 +204,14 @@
     <table class="lx-table" id="lxTable">
       <thead>
         <tr>
-          <th>Datum</th>
-          <th>Typ</th>
-          <th>Name</th>
-          <th>Tier</th>
-          <th>Label</th>
-          <th>Original (Exp/Safety)</th>
-          <th>Korrektur</th>
-          <th>Decisions</th>
+          <th data-sort-key="date">Datum</th>
+          <th data-sort-key="kind">Typ</th>
+          <th data-sort-key="name">Name</th>
+          <th data-sort-key="tier">Tier</th>
+          <th data-sort-key="label">Label</th>
+          <th data-sort-key="orig">Original (Exp/Safety)</th>
+          <th data-sort-key="corr">Korrektur</th>
+          <th data-sort-key="dec">Decisions</th>
           <th>Aktionen</th>
         </tr>
       </thead>
@@ -291,11 +295,10 @@
           <select id="lxPatchRating">
             <option value="">— unverändert (null) —</option>
             <option value="1">1 — Abgleiter</option>
-            <option value="2">2 — Kurzer Thermikflug</option>
+            <option value="2">2 — Kurzer Thermikflug (Suchtag)</option>
             <option value="3">3 — Solider Thermikflug</option>
             <option value="4">4 — Starker Thermikflug</option>
-            <option value="5">5 — XC-Tag</option>
-            <option value="6">6 — Klassiker</option>
+            <option value="5">5 — XC-Tag / Klassiker</option>
           </select>
         </label>
         <label>safety_status

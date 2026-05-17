@@ -29,6 +29,90 @@
     [filterKind, filterTier, filterLabel].forEach(function (s) { if (s) s.addEventListener('change', applyFilters); });
     if (filterRegion) filterRegion.addEventListener('input', applyFilters);
 
+    // ===== Sortierung =====
+    var tierRank = { mittelland: 1, jura: 2, voralpen: 3, alpen: 4, hochalpin: 5 };
+    var safetyRank = { safe: 1, conditional: 2, not_safe: 3 };
+    var labelRank = { richtig: 1, zu_optimistisch: 2, zu_pessimistisch: 3 };
+    var kindRank = { region: 1, spot: 2 };
+
+    function parseNum(s) {
+        var n = parseFloat(String(s).replace(',', '.'));
+        return isNaN(n) ? null : n;
+    }
+    function cellText(row, idx) {
+        var td = row.cells[idx];
+        return td ? td.textContent.trim() : '';
+    }
+    function rankOf(map, key) {
+        var v = map[(key || '').toLowerCase()];
+        return v == null ? 99 : v;
+    }
+    function getSortValue(row, key) {
+        switch (key) {
+            case 'date':  return cellText(row, 0);
+            case 'kind':  return rankOf(kindRank, row.dataset.kind);
+            case 'name':  return cellText(row, 2).toLowerCase();
+            case 'tier':  return rankOf(tierRank, row.dataset.tier);
+            case 'label': return rankOf(labelRank, row.dataset.label);
+            case 'orig':
+            case 'corr': {
+                var parts = cellText(row, key === 'orig' ? 5 : 6).split('/');
+                var exp = parseNum(parts[0]);
+                var safetyKey = (parts[1] || '').trim().toLowerCase();
+                var safety = rankOf(safetyRank, safetyKey);
+                return [exp == null ? -1 : exp, safety];
+            }
+            case 'dec':   return row.querySelectorAll('.lx-decisions code').length;
+        }
+        return '';
+    }
+    function compareValues(a, b) {
+        if (Array.isArray(a) && Array.isArray(b)) {
+            for (var i = 0; i < a.length; i++) {
+                var c = compareValues(a[i], b[i]);
+                if (c !== 0) return c;
+            }
+            return 0;
+        }
+        if (typeof a === 'number' && typeof b === 'number') return a - b;
+        return String(a).localeCompare(String(b), 'de');
+    }
+    var sortState = { key: null, dir: 1 };
+    function updateSortIndicators() {
+        if (!tbl) return;
+        tbl.querySelectorAll('thead th[data-sort-key]').forEach(function (th) {
+            var arrow = th.querySelector('.lx-sort-arrow');
+            if (!arrow) return;
+            if (th.dataset.sortKey === sortState.key) {
+                arrow.textContent = sortState.dir > 0 ? '▲' : '▼';
+                th.classList.add('is-sorted');
+            } else {
+                arrow.textContent = '';
+                th.classList.remove('is-sorted');
+            }
+        });
+    }
+    function sortBy(key) {
+        if (!tbl) return;
+        if (sortState.key === key) sortState.dir = -sortState.dir;
+        else { sortState.key = key; sortState.dir = 1; }
+        var tbody = tbl.querySelector('tbody');
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+        rows.sort(function (a, b) {
+            return compareValues(getSortValue(a, key), getSortValue(b, key)) * sortState.dir;
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+        updateSortIndicators();
+    }
+    if (tbl) {
+        tbl.querySelectorAll('thead th[data-sort-key]').forEach(function (th) {
+            var arrow = document.createElement('span');
+            arrow.className = 'lx-sort-arrow';
+            th.appendChild(arrow);
+            th.addEventListener('click', function () { sortBy(th.dataset.sortKey); });
+        });
+    }
+
     // ===== Modal-Helpers =====
     function openModal(id) {
         document.getElementById(id).classList.add('is-open');

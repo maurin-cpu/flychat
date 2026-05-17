@@ -139,7 +139,7 @@
     "status": "green",
     "streckenflug": {
       "tier": "moderat",
-      "rating": 6,
+      "rating": 5,
       "summary": "Die Einschätzung für den Streckenflug ist moderat, da die Bedingungen am Spot gut sind, jedoch der Region-Kontext fehlt. Die Thermik ist stabil und die Basis hoch genug für XC-Flüge, aber ohne spezifische regionale Daten bleibt das Potenzial eingeschränkt.",
       "limiting_factor": "none",
       "region_context_available": false

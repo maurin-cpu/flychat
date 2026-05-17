@@ -1,6 +1,6 @@
-# Rating-Architektur (v2.0)
+# Rating-Architektur (v2.1)
 
-**Status:** aktiv ab Refactor 2026-05-12. Ersetzt v1.5 (`RATING_CONCEPT.md`).
+**Status:** aktiv ab Refactor 2026-05-17. Reduktion auf 1–5 Skala (vorher v2.0 mit 1–6, klassiker als eigene Stufe).
 **Prinzip:** Eine Quelle pro Konzept. Keine Doppelungen. Keine verwaisten Felder. FE leitet Darstellung selbst ab.
 
 ---
@@ -12,8 +12,8 @@ Drei orthogonale Achsen pro Spot/Region/Tag:
 | Achse | Kanonisches Feld | Werte | Sichtbar im UI als |
 |---|---|---|---|
 | **Sicherheit** | `safety.safety_status` | `safe` \| `conditional` \| `not_safe` | Pill + Marker-Farbe (green/amber/red), FE-gemappt |
-| **Fliegbarkeit** | `experience_rating` | `1`–`6` | Zahl + Tier-Farbe (gray/green/violet), FE-gemappt |
-| **Streckenflug** (nur Spot) | `streckenflug.rating` | `1`–`6` | Zahl + Limit-Hinweis |
+| **Fliegbarkeit** | `experience_rating` | `1`–`5` | Zahl + Tier-Farbe (gray/green/violet), FE-gemappt |
+| **Streckenflug** (nur Spot) | `streckenflug.rating` | `1`–`5` | Zahl + Limit-Hinweis |
 
 Plus orthogonal: `foehn_risk` (`none` \| `moderate` \| `high`) — kann Sicherheit eskalieren.
 
@@ -95,25 +95,24 @@ Wie Spot, **aber**:
 
 ---
 
-## experience_rating (1–6)
+## experience_rating (1–5)
 
 **Skala** — 1:1 mit Pilot-Kategorien (internes LLM-Reasoning):
 
 | Wert | Kategorie | Beschreibung |
 |---|---|---|
 | 1 | `abgleiter` | Keine Thermik, nur Sinkrate-Flug |
-| 2 | `kurzer_thermikflug` | Kurz/schwach, schnell verbraucht |
-| 3 | `solider_thermikflug` | Mehrere Stunden Thermik möglich |
-| 4 | `starker_thermikflug` | Hohe Steigwerte |
-| 5 | `xc_tag` | Strecken-Tag, XC möglich |
-| 6 | `klassiker` | Top-Tag, alles passt — seltene Auszeichnung |
+| 2 | `kurzer_thermikflug` | Suchtag-Zwischenstufe: 1–2h mit Glück, sonst Abgleiter |
+| 3 | `solider_thermikflug` | Mehrere Stunden Thermik möglich (typischer CH-Sommertag) |
+| 4 | `starker_thermikflug` | Hohe Steigwerte, lokal-XC möglich (Peak 2.0–2.5 + Booster) |
+| 5 | `xc_tag` | Strecken-Tag (Peak ≥ 2.5, 50–150km+). **"Klassiker-Tag"** ist eine Prosa-Auszeichnung in Rating 5 wenn alle 3 Hammertag-Marker erfüllt sind — kein eigenes Rating. |
 
 **Tier-Farbe (FE-Mapping, keine Strukturfeld-Persistierung):**
 
 ```
 1, 2 → gray   (Bronze #B08D57)
-3, 4, 5 → green
-6 → violet
+3, 4 → green
+5 → violet
 ```
 
 Bei `safety_status == "not_safe"`: `experience_rating = 1` (keine Belohnung wenn nicht sicher).
@@ -125,23 +124,22 @@ Bei `safety_status == "not_safe"`: `experience_rating = 1` (keine Belohnung wenn
 | < 1.0 | 1 |
 | 1.0–1.5 | 2 |
 | 1.5–2.0 | 3 |
-| **2.0–2.5** | **4** (Peak 2.5 = XC-Schwelle, niemals 5 darunter) |
-| ≥ 2.5 | 5 (Default), 6 nur mit allen 3 Hammertag-Markern |
+| **2.0–2.5** | **3** Default, **4** wenn ≥1 Booster (working_height ≥ 1200m AGL ODER prod_h ≥ 6h ODER cu_clean_top/blue) |
+| ≥ 2.5 | 5 (Klassiker-Sub-Variante bei allen 3 Hammertag-Markern) |
 
 ---
 
-## streckenflug.rating (1–6)
+## streckenflug.rating (1–5)
 
 **Nur Spot.** Bewertet **Spot + Region kombiniert** für XC-Potenzial.
 
 | Wert | Bedeutung |
 |---|---|
 | 1 | Nichts fliegbar / Abgleiter-Niveau |
-| 2 | Nur ganz kurz fliegbar (wenige Minuten) |
-| 3 | Lokal fliegbar, kein Wegfliegen |
-| 4 | Kurzes Wegfliegen (Talquerung, ~10–30km) |
-| 5 | Weit (~30–150km XC) |
-| 6 | Klassiker (>150km, Top-XC-Tag) |
+| 2 | Lokal fliegbar, kein Wegfliegen |
+| 3 | Kurzes Wegfliegen (Talquerung, ~10–30km) |
+| 4 | Weit (~30–100km XC) |
+| 5 | Klassiker (>100km, Top-XC-Tag) |
 
 Kann sich **stark** von `experience_rating` unterscheiden (z.B. perfekter Hangtag am Spot aber Region zeigt schwache Thermik → `experience_rating=4`, `streckenflug.rating=2`).
 
@@ -171,8 +169,8 @@ const color = {safe:'green', conditional:'amber', not_safe:'red'}[status] || 'no
 ```
 LLM produziert (Skill-Output):
    - safety.safety_status + 7-8 Sub-Ratings + Prosa
-   - experience_rating (1-6)
-   - streckenflug{rating, limiting_factor}    [nur Spot]
+   - experience_rating (1-5)
+   - streckenflug{rating, limiting_factor}    [nur Spot, 1-5]
    - is_conditional, primary_*, summary, recommendation
         ↓
 Decision-Engine (deterministisch, engine/decision_engine.py):

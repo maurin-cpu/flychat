@@ -73,27 +73,31 @@
         return 'green';
     }
 
-    // RATING_ARCHITECTURE v2.0: experience_rating (1-6) → tier (gray/green/violet)
+    // RATING_ARCHITECTURE v2.1: experience_rating (1-5) → tier (gray/green/violet)
     function getQuality(dayData) {
         var er = parseInt(dayData && dayData.experience_rating, 10);
         if (!isFinite(er) || er <= 0) return 'gray';
-        if (er >= 6) return 'violet';
+        // Migration-Tolerance: 6 → 5
+        if (er === 6) er = 5;
+        if (er >= 5) return 'violet';
         if (er >= 3) return 'green';
         return 'gray';
     }
 
     function qualityBadge(quality) {
         if (quality === 'gray') return 'Abgleiter';
-        if (quality === 'violet') return 'Klassiker';
+        if (quality === 'violet') return 'XC-Tag';
         return 'Thermikflug';
     }
 
-    // experience_rating (1-6) direkt.
+    // experience_rating (1-5) direkt.
     function getRating(dayData) {
         if (!dayData) return 0;
         var er = parseInt(dayData.experience_rating, 10);
-        if (isFinite(er) && er >= 1) return Math.min(6, er);
-        return 0;
+        if (!isFinite(er) || er < 1) return 0;
+        // Migration-Tolerance: 6 → 5
+        if (er === 6) return 5;
+        return Math.min(5, er);
     }
     function getSafetyBand(dayData) {
         if (!dayData) return 'no_data';
@@ -231,7 +235,7 @@
     // alle Baender — gleicher Aufbau, nur Ring-Farbe + Inhalt unterscheidet
     // sich. Family-Look statt zwei verschiedene Stile.
     function buildRegionLabel(style, badge, band, rating, zoom) {
-        var n = (typeof rating === 'number') ? Math.max(0, Math.min(6, rating)) : 0;
+        var n = (typeof rating === 'number') ? Math.max(0, Math.min(5, rating)) : 0;
         // band kommt direkt vom Aufrufer (safety_band — Single Source of Truth).
         // Legacy-Toleranz fuer Aufrufer, die noch safety_status uebergeben.
         // 'violet' ist Display-Band fuer safe + rating=6 (RATING_ARCHITECTURE v2.0).
@@ -454,8 +458,8 @@
             // Karten-Polygonen fuehrte (gruen statt amber).
             var band = getSafetyBand(dayData);
             var rating = getRating(dayData);
-            // Premium-Marker: safe + rating=6 (Klassiker) → violett (RATING_ARCHITECTURE v2.0).
-            if (band === 'green' && rating >= 6) band = 'violet';
+            // Premium-Marker: safe + rating=5 (xc_tag/Klassiker) → violett (RATING_ARCHITECTURE v2.1).
+            if (band === 'green' && rating >= 5) band = 'violet';
             var style = mapRegionStyle(band);
 
             // Polygon-Style: solid bei green/amber/violet. baseFillOpacity wird fuer Hover gespeichert.
@@ -1074,7 +1078,7 @@
             if (d.wind_summary) { lines.push('--- Wind Summary ---'); lines.push(_escDebugHtml(d.wind_summary)); lines.push(''); }
             if (d.wind_shear) { lines.push('--- Wind Shear ---'); lines.push(_escDebugHtml(d.wind_shear)); lines.push(''); }
             lines.push('=== FLYABILITY ===');
-            lines.push('Experience-Rating: ' + (d.experience_rating != null ? d.experience_rating + '/6' : '?'));
+            lines.push('Experience-Rating: ' + (d.experience_rating != null ? d.experience_rating + '/5' : '?'));
             lines.push('');
             lines.push('--- Flyability Notes ---');
             if (d.flyability_notes) Object.keys(d.flyability_notes).forEach(function (k) {

@@ -56,13 +56,13 @@ window.ChatCharts = (function () {
         return '#DC2626';
     }
 
+    // Aligned to sustained_peak pilot bands: <1.0 Abgleiter | 1.0-1.5 mau | 1.5-2.0 solide | 2.0-2.5 stark/XC | >=2.5 Klassiker
     function thermClimbColor(rate) {
         if (rate <= 0) return 'transparent';
-        if (rate <= 0.25) return '#FEFCE8';
-        if (rate <= 0.75) return '#FEF08A';
-        if (rate <= 1.25) return '#FDE047';
-        if (rate <= 1.75) return '#BEF264';
-        if (rate <= 2.25) return '#86EFAC';
+        if (rate < 1.0) return '#FEF9C3';
+        if (rate < 1.5) return '#FDE047';
+        if (rate < 2.0) return '#BEF264';
+        if (rate < 2.5) return '#86EFAC';
         return '#67E8F9';
     }
 

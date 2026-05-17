@@ -72,25 +72,26 @@ _TIER_RANK = {"violet": 3, "green": 2, "conditional": 1, "gray": 0, "none": -1}
 
 
 def _stars_for_spot(spot: dict) -> int:
-    """Mappt experience_rating (1-6) auf 0-5 Sterne fuer Mail-Bubbles."""
+    """Mappt experience_rating (1-5) auf 0-5 Sterne fuer Mail-Bubbles."""
     r = _rating_for_spot(spot)
     if r <= 0: return 0
-    if r >= 6: return 5
-    if r >= 4: return 4
-    return r  # 1, 2, 3
+    return min(5, r)  # 1:1 mapping in 1-5 scale
 
 
 def _rating_display(spot: dict) -> str:
-    """RATING_ARCHITECTURE v2.0: experience_rating 1-6 als String. Leer bei not_safe."""
+    """RATING_ARCHITECTURE v2.1: experience_rating 1-5 als String. Leer bei not_safe."""
     r = _rating_for_spot(spot)
     return str(r) if r > 0 else ""
 
 
 def _rating_for_spot(spot: dict) -> int:
-    """RATING_ARCHITECTURE v2.0: experience_rating 1-6."""
+    """RATING_ARCHITECTURE v2.1: experience_rating 1-5."""
     val = spot.get("experience_rating")
-    if isinstance(val, (int, float)) and 0 <= val <= 6:
+    if isinstance(val, (int, float)) and 0 <= val <= 5:
         return int(val)
+    # Migration-Tolerance: alte cached Werte 6 → 5 mappen
+    if isinstance(val, (int, float)) and val == 6:
+        return 5
     return 0
 
 
@@ -367,8 +368,8 @@ def _derive_day_tier(my_spots: list[dict]) -> str:
     """
     if not my_spots:
         return "none"
-    # RATING_ARCHITECTURE v2.0: tier aus experience_rating ableiten.
-    has_violet = any(_rating_for_spot(s) >= 6 and not s.get("is_conditional") for s in my_spots)
+    # RATING_ARCHITECTURE v2.1: tier aus experience_rating ableiten.
+    has_violet = any(_rating_for_spot(s) >= 5 and not s.get("is_conditional") for s in my_spots)
     if has_violet:
         return "violet"
     has_green = any(_rating_for_spot(s) >= 3 and not s.get("is_conditional") for s in my_spots)
@@ -378,11 +379,11 @@ def _derive_day_tier(my_spots: list[dict]) -> str:
 
 
 def _spot_tier(spot: dict) -> str:
-    """Tier fuer einen einzelnen Spot aus experience_rating (1-6)."""
+    """Tier fuer einen einzelnen Spot aus experience_rating (1-5)."""
     if spot.get("is_conditional"):
         return "conditional"
     r = _rating_for_spot(spot)
-    if r >= 6: return "violet"
+    if r >= 5: return "violet"
     if r >= 3: return "green"
     return "gray"
 

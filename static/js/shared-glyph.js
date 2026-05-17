@@ -1,7 +1,7 @@
 /* ══════════════════════════════════════════════════════════════
-   Gleitcast — Shared Glyph Renderer (RATING_ARCHITECTURE v2.0)
+   Gleitcast — Shared Glyph Renderer (RATING_ARCHITECTURE v2.1)
    FE leitet Farben aus safety_status + experience_rating ab.
-   Skala 1-6 (1=abgleiter, 2=kurzer, 3=solider, 4=starker, 5=xc_tag, 6=klassiker).
+   Skala 1-5 (1=abgleiter, 2=kurzer, 3=solider, 4=starker, 5=xc_tag/klassiker).
    Exposes window.gleitcastGlyph.
    ══════════════════════════════════════════════════════════════ */
 (function () {
@@ -15,12 +15,12 @@
     return "no_data";
   }
 
-  // experience_rating (1-6) → Tier (gray/green/violet) fuer Premium-Optik.
-  // 1-2 → gray, 3-5 → green, 6 → violet.
+  // experience_rating (1-5) → Tier (gray/green/violet) fuer Premium-Optik.
+  // 1-2 → gray, 3-4 → green, 5 → violet.
   function tierFromRating(rating) {
     var r = parseInt(rating, 10);
     if (!isFinite(r) || r <= 0) return "gray";
-    if (r >= 6) return "violet";
+    if (r >= 5) return "violet";
     if (r >= 3) return "green";
     return "gray";
   }
@@ -34,9 +34,9 @@
     return { fill: "#6b7280", stroke: "#4b5563", label: "" };
   }
 
-  // Display-Band: safe + rating 6 (Klassiker) → violett-Premium-Marker.
+  // Display-Band: safe + rating 5 (xc_tag/Klassiker) → violett-Premium-Marker.
   function displayBand(band, rating) {
-    if (band === "green" && typeof rating === "number" && rating >= 6) return "violet";
+    if (band === "green" && typeof rating === "number" && rating >= 5) return "violet";
     return band;
   }
 
@@ -46,21 +46,20 @@
     return bandFromStatus(spot.safety_status);
   }
 
-  // experience_rating 1-6. Bei not_safe oder fehlend → 0.
+  // experience_rating 1-5. Bei not_safe oder fehlend → 0.
   function legacyRating(spot) {
     if (!spot) return 0;
     var r = parseInt(spot.experience_rating, 10);
     if (!isFinite(r) || r <= 0) return 0;
-    return Math.max(1, Math.min(6, r));
+    // Migration-Tolerance: alte Cache-Werte 6 → 5 mappen
+    if (r === 6) return 5;
+    return Math.max(1, Math.min(5, r));
   }
 
-  // Stars 0-5 (Briefing-Bubble Layout). Aus rating 1-6 abgeleitet.
+  // Stars 0-5 (Briefing-Bubble Layout). Aus rating 1-5 abgeleitet — 1:1.
   function legacyStars(spot) {
     var r = legacyRating(spot);
     if (r <= 0) return 0;
-    // Rating 1→1, 2→2, 3→3, 4→4, 5→4, 6→5 (klassiker = Premium)
-    if (r >= 6) return 5;
-    if (r >= 4) return 4;
     return r;
   }
 
@@ -70,20 +69,22 @@
     var band = (opts && opts.band) || "no_data";
     var rating = 0;
     if (opts && typeof opts.rating === "number") {
-      rating = Math.max(0, Math.min(6, Math.floor(opts.rating)));
+      var rRaw = Math.max(0, Math.min(6, Math.floor(opts.rating)));
+      // Migration-Tolerance: 6 → 5
+      rating = rRaw === 6 ? 5 : Math.min(5, rRaw);
     }
     var size = (opts && opts.size) || 24;
     var visBand = displayBand(band, rating);
     var st = styleFor(visBand);
     var center = size / 2;
     var radius = Math.max(7, Math.round(size * 0.46));
-    var ratingLabel = (rating > 0 && band !== "red") ? (", Rating " + rating + "/6") : "";
+    var ratingLabel = (rating > 0 && band !== "red") ? (", Rating " + rating + "/5") : "";
     var ariaLabel = (opts && opts.ariaLabel) || (st.label + ratingLabel);
 
-    // Farbintensitaet skaliert mit Rating 1-6.
+    // Farbintensitaet skaliert mit Rating 1-5.
     var fillOpacity = 1.0;
     if (visBand === "green" || visBand === "amber" || visBand === "violet") {
-      fillOpacity = rating > 0 ? (0.30 + (rating / 6) * 0.70) : 0.30;
+      fillOpacity = rating > 0 ? (0.30 + (rating / 5) * 0.70) : 0.30;
     }
     var fillScales = (visBand === "green" || visBand === "amber" || visBand === "violet");
 

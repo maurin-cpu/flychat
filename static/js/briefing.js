@@ -66,9 +66,9 @@
   const LS_EXPAND_HINT_SEEN_KEY = "gleitcast.briefing.expandHintSeen";
   const LS_SHOW_NUMBERS_KEY = "gleitcast.meteogram.showNumbers";
 
-  // Safety-Baender (RATING_ARCHITECTURE v2.0): genau 3 Filter-Kategorien aus
+  // Safety-Baender (RATING_ARCHITECTURE v2.1): genau 3 Filter-Kategorien aus
   // safety_status (safe/conditional/not_safe). "violet" (Top) ist nur ein
-  // Marker-Effekt fuer Klassiker (rating=6) auf 'green'-Spots — KEIN Filter.
+  // Marker-Effekt fuer xc_tag/Klassiker (rating=5) auf 'green'-Spots — KEIN Filter.
   const SAFETY_DEFS = [
     { id: "green",  label: "Sicher",        short: "Sicher" },
     { id: "amber",  label: "Vorsicht",      short: "Vorsicht" },
@@ -138,19 +138,19 @@
         const v = parseInt(raw, 10);
         return isFinite(v) && v >= 0 && v <= 6 ? v : 0;
       }
-      // Migration v1.4 0-10 → v2.0 0-6: alten Wert auf neue Skala mappen.
+      // Migration v1.4 0-10 → v2.1 0-5: alten Wert auf neue Skala mappen.
       const legacy10 = localStorage.getItem(LS_MIN_RATING_KEY_LEGACY);
       if (legacy10 !== null) {
         const v10 = parseInt(legacy10, 10);
         if (isFinite(v10) && v10 > 0) {
-          return Math.min(6, Math.max(0, Math.round((v10 / 10) * 6)));
+          return Math.min(5, Math.max(0, Math.round((v10 / 10) * 5)));
         }
       }
-      // Migration v1.3 stars (0-5) → v2.0 rating (0-6): direkter Cap.
+      // Migration v1.3 stars (0-5) → v2.1 rating (0-5): direkte 1:1.
       const legacyStars = localStorage.getItem(LS_MIN_STARS_KEY);
       if (legacyStars !== null) {
         const sv = parseInt(legacyStars, 10);
-        if (isFinite(sv) && sv > 0 && sv <= 5) return Math.min(6, sv);
+        if (isFinite(sv) && sv > 0 && sv <= 5) return sv;
       }
       return 0;
     } catch (e) { return 0; }
@@ -1242,15 +1242,16 @@
       ? `<div class="bf-spot-status">${chips.join("")}</div>`
       : "";
 
-    // Score-Pillen RATING_ARCHITECTURE v2.0: nur Rating-Pille (1-6).
+    // Score-Pillen RATING_ARCHITECTURE v2.1: nur Rating-Pille (1-5).
     const scorePills = [];
     if (band !== 'red' && band !== 'no_data' && rating > 0) {
-      const tierClass = rating >= 6 ? 'violet' : (rating >= 3 ? 'green' : 'gray');
+      const tierClass = rating >= 5 ? 'violet' : (rating >= 3 ? 'green' : 'gray');
       const ratingLabels = {
         1: 'Abgleiter', 2: 'Kurzer Thermikflug', 3: 'Solider Thermikflug',
-        4: 'Starker Thermikflug', 5: 'XC-Tag', 6: 'Klassiker'
+        4: 'Starker Thermikflug', 5: 'XC-Tag'
       };
-      scorePills.push(`<span class="bf-score-pill bf-score-pill--${tierClass}">${ratingLabels[rating]} ${rating}/6</span>`);
+      const label = ratingLabels[rating] || ('Rating ' + rating);
+      scorePills.push(`<span class="bf-score-pill bf-score-pill--${tierClass}">${label} ${rating}/5</span>`);
     }
     const scoreBar = scorePills.length ? `<div class="bf-spot-scores">${scorePills.join("")}</div>` : "";
 
@@ -1275,9 +1276,9 @@
              data-share-spot="${escapeHtml(spot.spot)}"
              data-share-rating="${shareRatingAttr}"
              title="Startplatz teilen" aria-label="Startplatz teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`;
-    // RATING_ARCHITECTURE v2.0 — Farbintensität skaliert linear mit experience_rating (1-6).
-    // Premium-Marker: safe + rating=6 (Klassiker) → violett (siehe shared-glyph.displayBand).
-    const fillNorm = (rating > 0 && band !== "red" && band !== "no_data") ? rating / 6 : 0;
+    // RATING_ARCHITECTURE v2.1 — Farbintensität skaliert linear mit experience_rating (1-5).
+    // Premium-Marker: safe + rating=5 (xc_tag/Klassiker) → violett (siehe shared-glyph.displayBand).
+    const fillNorm = (rating > 0 && band !== "red" && band !== "no_data") ? rating / 5 : 0;
     const G2 = window.gleitcastGlyph;
     const visBand = (G2 && G2.displayBand) ? G2.displayBand(band, rating) : band;
     const visCls = "safety-" + visBand;
@@ -1743,11 +1744,11 @@
     const dayIdx = state.selectedDayIdx || 0;
     let title, text;
     if (kind === "spot") {
-      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}/6` : "";
+      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}/5` : "";
       title = `${spotName}${rtxt}`;
       text = `${spotName}${regionName ? " (" + regionName + ")" : ""}${rtxt} · Gleitcast Flugwetter`;
     } else {
-      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}/6` : "";
+      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}/5` : "";
       title = `${regionName || "Region"}${rtxt}`;
       text = `${regionName || "Region"}${rtxt} · Gleitcast Flugwetter`;
     }

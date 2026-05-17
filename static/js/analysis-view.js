@@ -44,12 +44,14 @@ window.AnalysisView = (function () {
         return [];
     }
 
-    // RATING_ARCHITECTURE v2.0: experience_rating 1-6
+    // RATING_ARCHITECTURE v2.1: experience_rating 1-5
     function getRating(a) {
         if (!a) return 0;
         var er = parseInt(a.experience_rating, 10);
-        if (isFinite(er) && er >= 1) return Math.min(6, er);
-        return 0;
+        if (!isFinite(er) || er < 1) return 0;
+        // Migration-Tolerance: 6 → 5
+        if (er === 6) return 5;
+        return Math.min(5, er);
     }
 
     function getSafetyBand(a) {
@@ -97,7 +99,7 @@ window.AnalysisView = (function () {
                   + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
                   + (r * 0.85).toFixed(1) + '" font-weight="700">…</text>';
         } else if (rating >= 1) {
-            // Rating 1-6 ist immer einstellig.
+            // Rating 1-5 ist immer einstellig.
             var fontSize = (r * 0.85).toFixed(1);
             html += '<text x="' + c + '" y="' + (c + r * 0.34)
                   + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
@@ -136,17 +138,17 @@ window.AnalysisView = (function () {
         html += '<div class="mga-hero-pills">';
         html += '<span class="mga-hero-pill ' + band + '">Safety ' + band.toUpperCase() + '</span>';
         if (band !== 'red' && band !== 'no_data') {
-            // Rating-Pill mit Tier-Farbe (1-2 gray, 3-5 green, 6 violet).
+            // Rating-Pill mit Tier-Farbe (1-2 gray, 3-4 green, 5 violet).
             if (rating >= 1) {
-                var flyTier = (rating >= 6) ? 'violet' : (rating >= 3 ? 'green' : 'gray');
+                var flyTier = (rating >= 5) ? 'violet' : (rating >= 3 ? 'green' : 'gray');
                 var ratingLabels = {
                     1: 'Abgleiter', 2: 'Kurzer Thermikflug',
                     3: 'Solider Thermikflug', 4: 'Starker Thermikflug',
-                    5: 'XC-Tag', 6: 'Klassiker'
+                    5: 'XC-Tag'
                 };
                 var pillLabel = ratingLabels[rating] || ('Rating ' + rating);
                 html += '<span class="mga-hero-pill mga-hero-pill--fly mga-hero-pill--' + flyTier + '">'
-                     + esc(pillLabel) + ' (' + rating + '/6)</span>';
+                     + esc(pillLabel) + ' (' + rating + '/5)</span>';
             }
             var fly = a.flyability || {};
             // Key flyability fields
@@ -366,7 +368,7 @@ window.AnalysisView = (function () {
                   + '<div class="mga-metric-value">' + esc(a.xc_potential) + '</div>'
                   + '</div>';
         }
-        // Streckenflug-Metric (Spot) — RATING_ARCHITECTURE v2.0: rating 1-6 + limiting_factor.
+        // Streckenflug-Metric (Spot) — RATING_ARCHITECTURE v2.1: rating 1-5 + limiting_factor.
         var sfRating = parseInt(a.streckenflug_rating, 10);
         if (isFinite(sfRating) && sfRating >= 1) {
             var SF_RATING_LABELS = {
@@ -399,15 +401,19 @@ window.AnalysisView = (function () {
     };
 
     var SF_RATING_LABELS = {
-        1: 'Kein Streckenflug', 2: 'Nur ganz kurz fliegbar',
-        3: 'Lokal fliegbar (kein Wegfliegen)', 4: 'Kurzes Wegfliegen möglich',
-        5: 'Weite Strecke möglich (~30–150 km)', 6: 'Klassiker (>150 km)'
+        1: 'Kein Streckenflug',
+        2: 'Lokal fliegbar (kein Wegfliegen)',
+        3: 'Kurzes Wegfliegen möglich (~10–30 km)',
+        4: 'Weite Strecke möglich (~30–100 km)',
+        5: 'Klassiker (>100 km)'
     };
 
     var RATING_LABELS_LONG = {
-        1: 'Abgleiter — kein Thermikflug', 2: 'Kurzer Thermikflug (1–3 h, schwach)',
-        3: 'Solider Thermikflug — typischer Sommertag', 4: 'Starker Thermikflug — lokal-XC möglich',
-        5: 'XC-Tag — 50–100 km realistisch', 6: 'Klassiker — Tag des Jahres'
+        1: 'Abgleiter — kein Thermikflug',
+        2: 'Kurzer Thermikflug — Suchtag (1–2 h mit Glück)',
+        3: 'Solider Thermikflug — typischer Sommertag',
+        4: 'Starker Thermikflug — lokal-XC möglich',
+        5: 'XC-Tag — 50–150 km+ (Top-Tage als "Klassiker")'
     };
 
     function renderInsights(a) {
@@ -432,7 +438,7 @@ window.AnalysisView = (function () {
             var flyBody = '';
             if (hasRating) {
                 flyBody += '<div class="mga-insight-rating"><b>' + esc(RATING_LABELS_LONG[rating] || ('Rating ' + rating))
-                         + '</b> (' + rating + '/6)</div>';
+                         + '</b> (' + rating + '/5)</div>';
             }
             if (flyFb) flyBody += '<div>' + esc(flyFb) + '</div>';
             html += '<div class="mga-insight flyability open">'
@@ -442,7 +448,7 @@ window.AnalysisView = (function () {
         }
         if (hasSfRating) {
             var sfBody = '<div class="mga-insight-rating"><b>' + esc(SF_RATING_LABELS[sfRating] || ('Rating ' + sfRating))
-                       + '</b> (' + sfRating + '/6)</div>';
+                       + '</b> (' + sfRating + '/5)</div>';
             var limitText = SF_LIMIT_LABELS[sfLimit] || '';
             if (limitText) sfBody += '<div>' + esc(limitText) + '</div>';
             html += '<div class="mga-insight streckenflug open">'
@@ -472,11 +478,10 @@ window.AnalysisView = (function () {
     // ===== ADMIN-FEEDBACK (Few-Shot-Pipeline Schritt 1) =====
     var EXPERIENCE_LABELS = [
         [1, '1 — Abgleiter'],
-        [2, '2 — Kurzer Thermikflug'],
+        [2, '2 — Kurzer Thermikflug (Suchtag)'],
         [3, '3 — Solider Thermikflug'],
         [4, '4 — Starker Thermikflug'],
-        [5, '5 — XC-Tag'],
-        [6, '6 — Klassiker']
+        [5, '5 — XC-Tag / Klassiker']
     ];
     var SAFETY_OPTIONS = [
         ['safe', 'Safe'],

@@ -213,10 +213,12 @@
         var radius = isHighlighted ? (isMobile ? 9 : 8) : (isMobile ? 8 : 7);
         var rating = (typeof experienceRating === 'number' && experienceRating >= 0 && experienceRating <= 6)
             ? Math.floor(experienceRating) : 0;
+        // Migration-Tolerance: alter Cache-Wert 6 → 5 mappen
+        if (rating === 6) rating = 5;
 
-        // Display-Band Premium-Override: safe + rating=6 (Klassiker) → violett.
+        // Display-Band Premium-Override: safe + rating=5 (xc_tag/Klassiker) → violett.
         // Auch fuer Wind-Sektor + Highlight-Glow, damit der Marker konsistent wirkt.
-        if (safetyBand === 'green' && rating >= 6) {
+        if (safetyBand === 'green' && rating >= 5) {
             safetyBand = 'violet';
             style = { fill: '#8b5cf6', stroke: '#6d28d9' };
         }
@@ -525,7 +527,7 @@
             if (d.wind_summary) { lines.push('--- Wind Summary ---'); lines.push(_escHtml(d.wind_summary)); lines.push(''); }
             if (d.wind_shear) { lines.push('--- Wind Shear ---'); lines.push(_escHtml(d.wind_shear)); lines.push(''); }
             lines.push('=== FLYABILITY ===');
-            lines.push('Experience-Rating: ' + (d.experience_rating!=null?d.experience_rating+'/6':'?'));
+            lines.push('Experience-Rating: ' + (d.experience_rating!=null?d.experience_rating+'/5':'?'));
             lines.push('');
             lines.push('--- Flyability Notes ---');
             if (d.flyability_notes) Object.keys(d.flyability_notes).forEach(function(k){ lines.push('  [' + k + '] ' + _escHtml(d.flyability_notes[k]||'')); });
@@ -928,11 +930,13 @@
                 return;
             }
 
-            // RATING_ARCHITECTURE v2.0: safety_status → band (FE-Mapping).
+            // RATING_ARCHITECTURE v2.1: safety_status → band (FE-Mapping).
             var band = legacySafetyBand(dayData.safety_status);
             var rating = parseInt(dayData.experience_rating, 10);
             if (!isFinite(rating) || rating < 0) rating = 0;
-            rating = Math.min(6, rating);
+            // Migration-Tolerance: 6 → 5
+            if (rating === 6) rating = 5;
+            rating = Math.min(5, rating);
 
             marker.currentSafetyBand = band;
             marker.currentRating = rating;

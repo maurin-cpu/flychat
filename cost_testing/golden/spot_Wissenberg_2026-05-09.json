@@ -139,7 +139,7 @@
     "status": "violet",
     "streckenflug": {
       "tier": "moderat",
-      "rating": 6,
+      "rating": 5,
       "summary": "Das XC-Potenzial ist moderat, da die Bedingungen für lokale Flüge gut sind, jedoch keine langen Strecken empfohlen werden können. Region-Kontext fehlt — reine Spot-Einschätzung.",
       "limiting_factor": "none",
       "region_context_available": false

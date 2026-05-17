@@ -64,8 +64,6 @@ from engine._common import (
     _is_permanent_api_error, _user_friendly_api_error,
     _resolve_max_tokens, compute_retry_sleep,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
-    _normalize_flight_category, _category_to_rating, _category_to_tier,
-    _category_display,
     _compute_safety_rating, _compute_safety_score, derive_status_from_subs,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
     _sanitize_llm_text, _sanitize_llm_result,
@@ -1965,7 +1963,7 @@ class AnalyzersMixin:
     def _post_process_flyability_spot(self, result: dict, spot: dict, date_str: str, region_result: dict = None) -> dict:
         """Flyability-only Post-Processing fuer einen Spot (RATING_CONCEPT v1.5).
 
-        LLM-natives Rating: `experience_rating` (1-10) und `flyability_tier`
+        LLM-natives Rating: `experience_rating` (1-5) und `flyability_tier`
         kommen direkt vom LLM. KEINE Aggregation aus Sub-Achsen mehr.
         KEINE Flyability-Decisions, die das Tier ueberschreiben. Nur:
         - Tag-Sanitierung
@@ -1984,13 +1982,13 @@ class AnalyzersMixin:
         # Tag-Sanitierung ZUERST — laeuft auch fuer not_safe-Pfad.
         _sanitize_llm_result(result)
 
-        def _clamp_rating(val, lo=1, hi=6):
+        def _clamp_rating(val, lo=1, hi=5):
             try:
                 return max(lo, min(hi, int(round(float(val or 0)))))
             except (TypeError, ValueError):
                 return lo
 
-        # not_safe Pfad: experience_rating=1, streckenflug.rating=1 (RATING_ARCHITECTURE v2.0).
+        # not_safe Pfad: experience_rating=1, streckenflug.rating=1 (RATING_ARCHITECTURE v2.1).
         if result.get("safety_status") == "not_safe":
             result["experience_rating"] = 1
             result["streckenflug"] = {
@@ -2002,10 +2000,10 @@ class AnalyzersMixin:
             self._attach_rating_inputs(result, f"{name}|{date_str}")
             return result
 
-        # RATING_ARCHITECTURE v2.0: LLM gibt experience_rating (1-6) direkt.
+        # RATING_ARCHITECTURE v2.1: LLM gibt experience_rating (1-5) direkt.
         result["experience_rating"] = _clamp_rating(result.get("experience_rating", 1))
 
-        # Streckenflug-Block schlank: nur rating (1-6) + limiting_factor.
+        # Streckenflug-Block schlank: nur rating (1-5) + limiting_factor.
         sf = result.get("streckenflug")
         if not isinstance(sf, dict):
             sf = {"rating": 1, "limiting_factor": "none"}
@@ -2021,13 +2019,13 @@ class AnalyzersMixin:
         for legacy_key in ("tier", "summary", "region_context_available"):
             sf.pop(legacy_key, None)
 
-        # Streckenflug-Konsistenz: Spot rating <= 2 → streckenflug max 3.
-        if result["experience_rating"] <= 2 and sf["rating"] > 3:
-            sf["rating"] = 3
+        # Streckenflug-Konsistenz: Spot rating <= 2 → streckenflug max 2.
+        if result["experience_rating"] <= 2 and sf["rating"] > 2:
+            sf["rating"] = 2
             if sf["limiting_factor"] == "none":
                 sf["limiting_factor"] = "abgleiter_only"
-        if result.get("flight_type") in ("Abgleiter", "Soaring") and sf["rating"] > 3:
-            sf["rating"] = min(sf["rating"], 3)
+        if result.get("flight_type") in ("Abgleiter", "Soaring") and sf["rating"] > 2:
+            sf["rating"] = min(sf["rating"], 2)
         result["streckenflug"] = sf
 
         final_safety = result.get("safety_status", "")
@@ -2195,7 +2193,7 @@ class AnalyzersMixin:
     def _post_process_flyability_region(self, result: dict, region: dict, date_str: str) -> dict:
         """Flyability-Post-Processing fuer eine Region (RATING_ARCHITECTURE v2.0).
 
-        LLM gibt experience_rating (1-6) direkt. Region hat keinen streckenflug-Block.
+        LLM gibt experience_rating (1-5) direkt. Region hat keinen streckenflug-Block.
         Region-Schema ist schlank — fehlende Felder fehlen (kein null).
         """
         rname = region["region"]
@@ -2203,7 +2201,7 @@ class AnalyzersMixin:
         # Tag-Sanitierung ZUERST.
         _sanitize_llm_result(result)
 
-        def _clamp_rating(val, lo=1, hi=6):
+        def _clamp_rating(val, lo=1, hi=5):
             try:
                 return max(lo, min(hi, int(round(float(val or 0)))))
             except (TypeError, ValueError):
@@ -2216,7 +2214,7 @@ class AnalyzersMixin:
             self._attach_rating_inputs(result, f"{rname}|{date_str}")
             return result
 
-        # RATING_ARCHITECTURE v2.0: LLM gibt experience_rating direkt.
+        # RATING_ARCHITECTURE v2.1: LLM gibt experience_rating direkt.
         result["experience_rating"] = _clamp_rating(result.get("experience_rating", 1))
 
         final_safety = result.get("safety_status", "")
@@ -3496,16 +3494,15 @@ class AnalyzersMixin:
             # ── BLOCK 2: FLUGTAUGLICHKEIT (nur sichere Spots) ──
             if safe_spots_today:
                 lines.append("")
-                lines.append("─── PHASE 2: FLIEGBARKEIT (experience_rating 1–6, unabhängig von Sicherheits-Status) ───")
+                lines.append("─── PHASE 2: FLIEGBARKEIT (experience_rating 1–5, unabhängig von Sicherheits-Status) ───")
                 lines.append("")
 
                 RATING_LABELS_LONG = {
                     1: "abgleiter (kein Thermikflug)",
-                    2: "kurzer_thermikflug (1–3h schwach)",
+                    2: "kurzer_thermikflug (Suchtag, 1–2h mit Glück)",
                     3: "solider_thermikflug (3–4h ordentlich, Hausrunden)",
                     4: "starker_thermikflug (4–5h gut, lokal-XC möglich)",
-                    5: "xc_tag (5h+ stark, 50–100km)",
-                    6: "klassiker (Top-Tag, 100km+ — selten)",
+                    5: "xc_tag (Peak ≥ 2.5, 50–150km+, ggf. Klassiker-Tag)",
                 }
 
                 for name in safe_spots_today:
@@ -3517,15 +3514,15 @@ class AnalyzersMixin:
                         continue
 
                     rating = entry.get("experience_rating")
-                    if isinstance(rating, int) and 1 <= rating <= 6:
+                    if isinstance(rating, int) and 1 <= rating <= 5:
                         cat = RATING_LABELS_LONG[rating]
-                        status_label = f"Rating {rating}/6 — {cat}"
+                        status_label = f"Rating {rating}/5 — {cat}"
                     else:
                         status_label = "Rating: (nicht gesetzt)"
 
                     xc = (entry.get("streckenflug") or {}).get("rating")
                     if isinstance(xc, int) and xc > 0:
-                        status_label += f" | Streckenflug {xc}/6"
+                        status_label += f" | Streckenflug {xc}/5"
 
                     lines.append(f"  ═══ {name}: {status_label} ═══")
 
@@ -3588,15 +3585,15 @@ class AnalyzersMixin:
             f"Stand: {self.analyses_loaded_at.isoformat() if self.analyses_loaded_at else 'unbekannt'}",
             "",
             "WICHTIG — HARTE REGELN (KEINE AUSNAHMEN):",
-            "  • Drei orthogonale Achsen pro Spot/Tag (Rating-Architektur v2.0):",
+            "  • Drei orthogonale Achsen pro Spot/Tag (Rating-Architektur v2.1):",
             "      - safety_status: safe / conditional / not_safe",
-            "      - experience_rating: 1–6 (1=abgleiter, 2=kurzer_thermikflug, 3=solider, 4=starker, 5=xc_tag, 6=klassiker)",
-            "      - streckenflug.rating: 1–6 (XC-Potenzial, nur Spots)",
+            "      - experience_rating: 1–5 (1=abgleiter, 2=kurzer_thermikflug, 3=solider, 4=starker, 5=xc_tag)",
+            "      - streckenflug.rating: 1–5 (XC-Potenzial, nur Spots)",
             "  • Diese Werte stammen aus der Einzelanalyse und sind BINDEND. NICHT hochstufen.",
             "  • Sprich gegenüber dem Piloten in den Kategorien (z.B. 'solider Thermikflug', 'XC-Tag', 'Klassiker')",
-            "    oder als 'Rating X/6'. Vermeide Farbnamen wie 'violet', 'grün', 'gray' in der Prosa —",
+            "    oder als 'Rating X/5'. Vermeide Farbnamen wie 'violet', 'grün', 'gray' in der Prosa —",
             "    die Farben sind eine FE-Darstellung, kein Bewertungswort.",
-            "  • 'Klassiker' (Rating 6) ist die seltene Top-Einstufung. NIEMALS eigenmächtig auf 6 hochstufen.",
+            "  • 'Klassiker'/'Tag des Jahres' ist eine Prosa-Auszeichnung innerhalb Rating 5 (alle 3 Hammertag-Marker erfüllt). KEIN eigenes Rating.",
             "  • Spots/Tage unter 'SICHERHEIT nicht ok' (not_safe), 'DATEN UNVOLLSTÄNDIG' (no_data)",
             "    und 'Analyse fehlt/Fehler' sind für [RECOMMENDED: …] VERBOTEN.",
             "  • Diese Spots dürfen weder als Top-Pick, Alternative, 'vielleicht später' noch",
@@ -3612,7 +3609,6 @@ class AnalyzersMixin:
             3: "solider_thermikflug",
             4: "starker_thermikflug",
             5: "xc_tag",
-            6: "klassiker",
         }
 
         all_dates = set()
@@ -3621,8 +3617,8 @@ class AnalyzersMixin:
         sorted_dates = sorted(all_dates)
 
         for date_str in sorted_dates:
-            # Buckets nach experience_rating (6 = klassiker oben, 1 = abgleiter unten)
-            by_rating: dict[int, list] = {r: [] for r in range(1, 7)}
+            # Buckets nach experience_rating (5 = xc_tag oben, 1 = abgleiter unten)
+            by_rating: dict[int, list] = {r: [] for r in range(1, 6)}
             unrated = []
             not_safe, errors, no_data = [], [], []
 
@@ -3648,7 +3644,7 @@ class AnalyzersMixin:
                 rating = entry.get("experience_rating")
                 xc = (entry.get("streckenflug") or {}).get("rating")
                 row = (name, bw, pcr, ss, xc)
-                if isinstance(rating, int) and 1 <= rating <= 6:
+                if isinstance(rating, int) and 1 <= rating <= 5:
                     by_rating[rating].append(row)
                 else:
                     unrated.append(row)
@@ -3666,14 +3662,14 @@ class AnalyzersMixin:
                     if ss == "conditional":
                         bits.append("Sicherheit: conditional")
                     if isinstance(xc, int) and xc > 0:
-                        bits.append(f"XC: {xc}/6")
+                        bits.append(f"XC: {xc}/5")
                     parts.append(f"{n} ({', '.join(bits)})")
                 lines.append(f"  {label}: " + "; ".join(parts))
 
-            # Reihenfolge: 6 (klassiker) zuerst, dann absteigend
-            for r in (6, 5, 4, 3, 2, 1):
+            # Reihenfolge: 5 (xc_tag) zuerst, dann absteigend
+            for r in (5, 4, 3, 2, 1):
                 cat = RATING_LABELS[r]
-                _fmt_group(f"Rating {r}/6 — {cat}", by_rating[r])
+                _fmt_group(f"Rating {r}/5 — {cat}", by_rating[r])
             _fmt_group("Rating fehlt (kein experience_rating gesetzt)", unrated)
 
             if not_safe:

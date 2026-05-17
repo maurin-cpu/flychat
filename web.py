@@ -2262,7 +2262,7 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
             sf = entry.get("streckenflug") or {}
             doc["streckenflug_rating"] = int(sf.get("rating", 1) or 1)
             doc["streckenflug_limiting_factor"] = sf.get("limiting_factor", "none")
-            # RATING_ARCHITECTURE v2.0 — experience_rating (1-6) als Primaerwert
+            # RATING_ARCHITECTURE v2.1 — experience_rating (1-5) als Primaerwert
             for k in ("safety_rating", "experience_rating",
                       "noAnalysis", "noAnalysisReason"):
                 v = entry.get(k)
