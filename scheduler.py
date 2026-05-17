@@ -108,6 +108,26 @@ def _send_briefings_once(engine) -> dict:
         logger.error("Scheduler: keine Engine uebergeben")
         return {"total": total, "sent": 0, "skipped": 0, "failed": total}
 
+    # Wetterlage-Block (Synoptik) 1x/Tag refreshen, bevor build_briefing_data laeuft.
+    # Schlaegt der Refresh fehl, faellt der Block aus dem Cast — kein Fallback-Text.
+    try:
+        from engine.synoptic_llm import refresh_synoptic_overview
+        from fetch_weather import load_cached_weather
+        wcache = load_cached_weather()
+        if wcache and engine.analysis_client:
+            sctx = refresh_synoptic_overview(
+                wcache, engine.analysis_client, engine.analysis_model,
+            )
+            if sctx:
+                logger.info("Scheduler: Wetterlage refreshed (lage=%s, llm_overview=%s)",
+                            sctx.get("lage_label", {}).get("value"),
+                            "ok" if sctx.get("llm_overview") else "fehlt")
+            else:
+                logger.info("Scheduler: Wetterlage konnte nicht erzeugt werden — Block faellt aus")
+    except Exception as e:
+        logger.exception("Scheduler: Wetterlage-Refresh Exception: %s", e)
+        # weiter mit Briefing, ohne Wetterlage-Block
+
     try:
         briefing_data = engine.build_briefing_data()
     except Exception as e:

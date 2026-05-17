@@ -56,14 +56,16 @@ window.ChatCharts = (function () {
         return '#DC2626';
     }
 
-    // Aligned to sustained_peak pilot bands: <1.0 Abgleiter | 1.0-1.5 mau | 1.5-2.0 solide | 2.0-2.5 stark/XC | >=2.5 Klassiker
+    // Aligned to sustained_peak pilot bands — Palette v3.2 Royal Premium (final),
+    // synchron zu meteogram.js:thermClimbColor und docs/RATING_FARBKONZEPT.md.
+    // <1.0 Abgleiter | 1.0-1.5 mau | 1.5-2.0 solide | 2.0-2.5 stark/XC | >=2.5 Klassiker
     function thermClimbColor(rate) {
         if (rate <= 0) return 'transparent';
-        if (rate < 1.0) return '#FEF9C3';
-        if (rate < 1.5) return '#FDE047';
-        if (rate < 2.0) return '#BEF264';
-        if (rate < 2.5) return '#86EFAC';
-        return '#67E8F9';
+        if (rate < 1.0) return '#e0f2fe';  // Sky-100 (Rating 1)
+        if (rate < 1.5) return '#bae6fd';  // Sky-200 (Rating 2)
+        if (rate < 2.0) return '#BEF264';  // Lime-300 (Rating 3)
+        if (rate < 2.5) return '#22c55e';  // Green-500 (Rating 4, klassisches Safety-Green)
+        return '#a78bfa';                   // Violet-400 (Rating 5, Royal Premium)
     }
 
     function thermalRateAtAltitude(climbRate, maxHeight, elevation, altitude) {
@@ -371,8 +373,8 @@ window.ChatCharts = (function () {
         var legend = document.createElement('div');
         legend.className = 'chart-legend';
         legend.innerHTML = [
-            ['#FEF08A', '0.3-0.75'], ['#FDE047', '0.75-1.25'], ['#BEF264', '1.25-1.75'],
-            ['#86EFAC', '1.75-2.25'], ['#67E8F9', '>2.25']
+            ['#e0f2fe', '0.3-0.75'], ['#bae6fd', '0.75-1.25'], ['#BEF264', '1.25-1.75'],
+            ['#22c55e', '1.75-2.25'], ['#a78bfa', '>2.25']
         ].map(function (p) {
             return '<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:' + p[0] + '"></span>' + p[1] + ' m/s</span>';
         }).join('');

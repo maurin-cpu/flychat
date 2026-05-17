@@ -22,6 +22,7 @@ import config
 
 _SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 _SHARED_DIR = _SKILLS_DIR / "shared"
+_METEO_RESEARCH_DIR = Path(__file__).resolve().parent / "meteo_research"
 
 # Reihenfolge der Shared-Bausteine pro Phase. Combined-Pfad wurde entfernt
 # (war Dead Code — alle Aufrufe gehen ueber `_build_and_analyze_*` = Split).
@@ -96,6 +97,21 @@ def _load_shared(filename: str) -> str:
     path = _SHARED_DIR / filename
     if not path.is_file():
         raise FileNotFoundError(f"Shared-Baustein fehlt: {path}")
+    raw = path.read_text(encoding="utf-8")
+    return _render_placeholders(raw)
+
+
+def _load_meteo_research(filename: str) -> str:
+    """Laedt eine Recherche-Datei aus meteo_research/.
+
+    Genutzt fuer Hintergrund-Wissensbasen, die dem LLM als Kontext mitgegeben
+    werden (z.B. wetterlagen_pilotenwissen.md im Synoptik-Block). Diese Files
+    sind reine Knowledge-Quellen — NICHT-determinierend, der LLM darf damit
+    NUR interpretieren/formulieren, nicht Lagen erfinden.
+    """
+    path = _METEO_RESEARCH_DIR / filename
+    if not path.is_file():
+        raise FileNotFoundError(f"Meteo-Research-Datei fehlt: {path}")
     raw = path.read_text(encoding="utf-8")
     return _render_placeholders(raw)
 
@@ -199,7 +215,8 @@ _LAZY_ATTRS = {
     "SPOT_FLYABILITY_PROMPT":   lambda: compose_analysis_prompt("spot", "flyability"),
     "REGION_SAFETY_PROMPT":     lambda: compose_analysis_prompt("region", "safety"),
     "REGION_FLYABILITY_PROMPT": lambda: compose_analysis_prompt("region", "flyability"),
-    "WEEKLY_BRIEFING_PROMPT":   lambda: _load_skill("weekly_briefing.md"),
+    "SYNOPTIC_OVERVIEW_PROMPT": lambda: _load_skill("synoptic_overview.md"),
+    "WETTERLAGEN_PILOTENWISSEN": lambda: _load_meteo_research("wetterlagen_pilotenwissen.md"),
 }
 
 

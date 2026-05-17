@@ -909,29 +909,11 @@ class AnalyzersMixin:
             logger.error(f"InstantDB Region-Analysen-Push fehlgeschlagen: {e}")
 
     # ════════════════════════════════════════════════════════════════════════
-    # WEEKLY BRIEFING — Wochen-Fazit aus Spot- und Region-Analysen
+    # WEEKLY BRIEFING — Tages-Aggregation fuer den Wochencast
+    # Das ehemalige LLM-"Fazit" (best_weekday/week_summary/day_highlights)
+    # wurde durch den synoptik-getriebenen Wetterlage-Block (engine/
+    # synoptic_llm.py + skills/synoptic_overview.md) ersetzt.
     # ════════════════════════════════════════════════════════════════════════
-
-    def _weekly_briefing_cache_path(self) -> Path:
-        return Path("data") / "weekly_briefing.json"
-
-    def _save_weekly_briefing(self, data: dict) -> None:
-        try:
-            p = self._weekly_briefing_cache_path()
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception as e:
-            logger.warning(f"Weekly-Briefing-Cache-Save fehlgeschlagen: {e}")
-
-    def _load_weekly_briefing(self) -> dict | None:
-        try:
-            p = self._weekly_briefing_cache_path()
-            if not p.is_file():
-                return None
-            return json.loads(p.read_text(encoding="utf-8"))
-        except Exception as e:
-            logger.warning(f"Weekly-Briefing-Cache-Load fehlgeschlagen: {e}")
-            return None
 
     def build_briefing_data(self, spot_analyses: dict | None = None,
                             region_analyses: dict | None = None) -> dict:
@@ -1176,6 +1158,8 @@ class AnalyzersMixin:
                     "experience_rating": rating_r,
                     "safety_score": entry.get("safety_score"),
                     "comfort_index": entry.get("comfort_index"),
+                    # LLM-Einschaetzungssatz fuer Wochencast-Region-Header
+                    "recommendation": entry.get("recommendation", "") or "",
                 })
             region_entries.sort(key=lambda e: (
                 _BAND_RANK.get(e.get("safety_band", "no_data"), 4),
@@ -1213,7 +1197,9 @@ class AnalyzersMixin:
                 "date": date_str,
                 "weekday": _weekday_de(datetime.fromisoformat(date_str)),
                 "top_spots": spot_entries,
-                "top_regions": region_entries[:10],
+                # Volle Liste (kein [:10]-Slice mehr) damit das Frontend fuer
+                # jede angezeigte Region die Meta (inkl. recommendation) findet.
+                "top_regions": region_entries,
                 "regions_meteo": regions_meteo,
                 "counts": {
                     "spots_total": sum(1 for days in spot_src.values() if date_str in days),
@@ -1234,92 +1220,23 @@ class AnalyzersMixin:
                 "counts_by_region": counts_by_region,
             })
 
+        # Wetterlage-Block aus synoptic_context.json (deterministisch + LLM-Prosa).
+        # Wird vom Scheduler 1x/Tag via synoptic_llm.refresh_synoptic_overview()
+        # generiert. Kann None sein wenn der Refresh fehlgeschlagen ist — Frontend
+        # blendet den Block dann aus (kein Fallback-Text, keine Halluzination).
+        try:
+            from engine.synoptic_context import load_synoptic_cache
+            wetterlage = load_synoptic_cache()
+        except Exception as e:
+            logger.warning("build_briefing_data: synoptic_cache laden fehlgeschlagen: %s", e)
+            wetterlage = None
+
         return {
             "generated_at": datetime.now().isoformat(),
             "forecast_dates": forecast_dates,
             "days": days_data,
+            "wetterlage": wetterlage,
         }
-
-    def generate_weekly_briefing(self) -> dict:
-        """Erstellt das Wochen-Fazit via LLM (inkl. bester Wochentag, Regionen-Ranking, Tages-Highlights)."""
-        if not self.analysis_client:
-            return {"success": False, "error": f"Kein API-Key fuer Analyse-Provider '{self.analysis_provider}'"}
-        data = self.build_briefing_data()
-        if not data.get("days"):
-            return {"success": False, "error": "Keine Analysedaten vorhanden"}
-
-        # Kompakter LLM-Kontext: pro Tag Top-Spots + Top-Regionen + Counts
-        lines = []
-        for day in data["days"]:
-            d = day["date"]; wd = day["weekday"]
-            c = day["counts"]
-            lines.append(f"\n═══ {wd} {d} ═══")
-            lines.append(
-                f"Counts: {c['spots_flyable']} fliegbar / {c['spots_bronze']} Abgleiter / "
-                f"{c['spots_nogo']} NO-GO / {c['spots_conditional']} bedingt sicher"
-            )
-            if day["top_spots"]:
-                lines.append("Top-Spots (green+violet):")
-                for s in day["top_spots"][:10]:
-                    cond = " [bedingt]" if s["is_conditional"] else ""
-                    lines.append(
-                        f"  {s['spot']} ({s['region_id']}): {s['rating']:.1f} "
-                        f"{s['fly_status']} peak={s['peak_climb_rate']:.1f}m/s{cond}"
-                    )
-            else:
-                lines.append("Top-Spots: keine green/violet Spots")
-            if day["top_regions"]:
-                lines.append("Top-Regionen (green+violet):")
-                for r in day["top_regions"][:5]:
-                    cond = " [bedingt]" if r["is_conditional"] else ""
-                    lines.append(
-                        f"  {r['region_name']}: {r['rating']:.1f} {r['fly_status']}{cond}"
-                    )
-        ctx = "\n".join(lines)
-
-        try:
-            response = self.analysis_client.chat.completions.create(
-                model=self.analysis_model,
-                messages=[
-                    {"role": "system", "content": prompts.WEEKLY_BRIEFING_PROMPT},
-                    {"role": "user", "content": (
-                        f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                        f"WOCHEN-DATEN:\n{ctx}\n"
-                    )},
-                ],
-                temperature=0.4,
-                max_tokens=_resolve_max_tokens(self.analysis_model, 2000),
-                response_format={"type": "json_object"},
-            )
-            _log_prompt_cache_usage(response, label="weekly_briefing")
-            raw = response.choices[0].message.content
-            if not raw:
-                finish = getattr(response.choices[0], "finish_reason", "?")
-                raise RuntimeError(
-                    f"LLM lieferte leeren Content (finish_reason={finish}) — "
-                    f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
-                )
-            fazit = json.loads(raw)
-            # Clamp week_rating
-            wr = fazit.get("week_rating", 0.0)
-            try:
-                wr = float(wr)
-            except (TypeError, ValueError):
-                wr = 0.0
-            fazit["week_rating"] = max(0.0, min(10.0, round(wr, 1)))
-
-            result = {
-                "success": True,
-                "generated_at": data["generated_at"],
-                "forecast_dates": data["forecast_dates"],
-                "days": data["days"],
-                "fazit": fazit,
-            }
-            self._save_weekly_briefing(result)
-            return result
-        except Exception as e:
-            logger.error(f"Weekly-Briefing LLM-Call fehlgeschlagen: {e}")
-            return {"success": False, "error": str(e)}
 
     # ── SSE Streaming generators ────────────────────────────────────────
     # Heartbeat: wait() mit Timeout statt as_completed() — verhindert

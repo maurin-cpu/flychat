@@ -104,7 +104,7 @@ Wie Spot, **aber**:
 | 1 | `abgleiter` | Keine Thermik, nur Sinkrate-Flug |
 | 2 | `kurzer_thermikflug` | Suchtag-Zwischenstufe: 1–2h mit Glück, sonst Abgleiter |
 | 3 | `solider_thermikflug` | Mehrere Stunden Thermik möglich (typischer CH-Sommertag) |
-| 4 | `starker_thermikflug` | Hohe Steigwerte, lokal-XC möglich (Peak 2.0–2.5 + Booster) |
+| 4 | `starker_thermikflug` | Hohe Steigwerte, lokal-XC möglich (Peak 2.0–2.5, LLM-Urteil) |
 | 5 | `xc_tag` | Strecken-Tag (Peak ≥ 2.5, 50–150km+). **"Klassiker-Tag"** ist eine Prosa-Auszeichnung in Rating 5 wenn alle 3 Hammertag-Marker erfüllt sind — kein eigenes Rating. |
 
 **Tier-Farbe (FE-Mapping, keine Strukturfeld-Persistierung):**
@@ -117,15 +117,20 @@ Wie Spot, **aber**:
 
 Bei `safety_status == "not_safe"`: `experience_rating = 1` (keine Belohnung wenn nicht sicher).
 
-**Harte Peak-Floors** (pilotenkalibriert Mai 2026, in `skills/shared/04_flyability/04_flight_subratings_*.md`):
+**Harte Schranken** (pilotenkalibriert Mai 2026 — Variante A, in `skills/shared/04_flyability/04_flight_subratings_*.md`):
 
-| `sustained_peak` (≥2h) | Max Rating |
+Nur 3 universelle Regeln, alles andere ist LLM-Pilotenurteil:
+
+| Bedingung | Konsequenz |
 |---|---|
-| < 1.0 | 1 |
-| 1.0–1.5 | 2 |
-| 1.5–2.0 | 3 |
-| **2.0–2.5** | **3** Default, **4** wenn ≥1 Booster (working_height ≥ 1200m AGL ODER prod_h ≥ 6h ODER cu_clean_top/blue) |
-| ≥ 2.5 | 5 (Klassiker-Sub-Variante bei allen 3 Hammertag-Markern) |
+| `sustained_peak < 1.0` | Rating maximal **1** (Abgleiter ist Abgleiter) |
+| `sustained_peak < 2.5` | Rating maximal **4** (Peak 2.5 m/s ist die XC-Tag-Schwelle) |
+| `sustained_peak ≥ 2.5` UND `prod_h_strict ≥ 6h` UND `cloud_structure ∉ {overcast, overdevelopment}` | Rating mindestens **5** (echte XC-Substanz) |
+
+Frühere AGL-/Tier-Booster wurden verworfen (Mai 2026, "Wack-a-Mole-Spirale").
+Innerhalb der Schranken entscheidet das LLM anhand Peak/prod_h/working_height/cloud_structure
+und Pilot-Vignetten — siehe `skills/shared/04_flyability/04_flight_subratings_spot.md`
+Sektion "Wie du die Werte gegeneinander abwaegst".
 
 ---
 
@@ -228,3 +233,16 @@ Big-Bang-Migration, durchgeführt 2026-05-12:
 - Cache (`spot_analyses.json` + `region_analyses.json`) komplett gelöscht und neu berechnet
 
 Keine externen Consumer betroffen.
+
+---
+
+## Migration v2.0 → v2.1
+
+Durchgeführt 2026-05-17:
+- Skala reduziert von 1–6 auf 1–5 (Klassiker als Prosa-Auszeichnung statt eigenes Rating 6).
+- Rating-Kalibrierung "Variante A": AGL-/Tier-Booster verworfen, ersetzt durch 3 universelle
+  Peak-Schranken (`< 1.0 → max 1`, `< 2.5 → max 4`, `≥ 2.5 + 6h + saubere Wolken → min 5`).
+  Begründung: Booster-Mechanik führte zu "Wack-a-Mole"-Spirale bei Edge-Cases.
+- AGL-Schwellen in Skills auf belegte Pilot-Stützpunkte gehoben (Drury/xcmag, Burnair):
+  `< 400m / 400–800m / 800–1500m / 1500–2000m / > 2000m`.
+  Doku: `meteo_research/working_height_agl_thresholds.md`.

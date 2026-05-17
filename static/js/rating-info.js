@@ -13,6 +13,28 @@
 (function () {
     'use strict';
 
+    // Rating-Tints — Palette v2 (Option C, Mai 2026): green-Band alignt mit
+    // Thermik-Kacheln (Lime/Mint-Green/Cyan), Rating 1+2 in Pastell-Mint/Mint.
+    // amber bleibt Yellow→Brown. Synchron zu map.js, region-map.js, shared-glyph.js,
+    // briefing.js. Source of Truth: docs/RATING_FARBKONZEPT.md.
+    function _ratingTint(band, rating) {
+        var r = Math.max(1, Math.min(5, rating | 0));
+        if (band === 'green') {
+            // v3.2 Royal Premium: Sky-100 → Sky-200 → Lime → Green-500 → Violet
+            return {
+                fill:   ['#e0f2fe', '#bae6fd', '#BEF264', '#22c55e', '#a78bfa'][Math.min(4, r - 1)],
+                stroke: ['#38bdf8', '#0ea5e9', '#65a30d', '#15803d', '#6d28d9'][Math.min(4, r - 1)]
+            };
+        }
+        if (band === 'amber') {
+            return {
+                fill:   ['#fef08a', '#facc15', '#f97316', '#c2410c', '#7c2d12'][Math.min(4, r - 1)],
+                stroke: ['#ca8a04', '#a16207', '#9a3412', '#7c2d12', '#431407'][Math.min(4, r - 1)]
+            };
+        }
+        return null;
+    }
+
     function _glyphSvg(band, stars, size) {
         var s = size || 28;
         var center = s / 2;
@@ -21,20 +43,26 @@
             green:   { fill: '#22c55e', stroke: '#15803d' },
             amber:   { fill: '#f59e0b', stroke: '#92400e' },
             red:     { fill: '#ef4444', stroke: '#991b1b' },
+            // Palette v3 "Royal Premium": violet-Band = Violet-400 (Legendaer).
+            violet:  { fill: '#a78bfa', stroke: '#6d28d9' },
             no_data: { fill: '#9ca3af', stroke: '#6b7280' }
         };
-        var c = palette[band] || palette.no_data;
         var rating = (typeof stars === 'number') ? stars : 0;
-        
-        var fillOpacity = 1.0;
-        if (rating > 0 && (band === 'green' || band === 'amber' || band === 'violet')) {
-            fillOpacity = 0.4 + (Math.min(5, rating) / 5) * 0.6;
+        // Display-Band Premium-Override: safe + rating=5 → violett (analog map.js).
+        if (band === 'green' && rating >= 5) band = 'violet';
+
+        var c = palette[band] || palette.no_data;
+        // Rating-Tint: Hue-Shift fuer 1-4 (green) bzw. 1-5 (amber). Bei violet/red/
+        // no_data bleibt es bei der band-Farbe.
+        if (rating > 0 && (band === 'green' || band === 'amber')) {
+            var tint = _ratingTint(band, rating);
+            if (tint) c = tint;
         }
-        
+
         var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" aria-hidden="true">';
         html += '<circle cx="' + center + '" cy="' + center + '" r="' + r + '" fill="#ffffff" />';
         html += '<circle cx="' + center + '" cy="' + center + '" r="' + r
-              + '" fill="' + c.fill + '" fill-opacity="' + fillOpacity + '" stroke="' + c.stroke + '" stroke-width="2"/>';
+              + '" fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="2"/>';
         if (band === 'red') {
             var arm = r * 0.55;
             html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
@@ -44,7 +72,12 @@
                   + '" x2="' + (center - arm) + '" y2="' + (center + arm)
                   + '" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>';
         } else if (rating >= 1) {
-            var textFill = (fillOpacity < 0.65) ? c.stroke : '#ffffff';
+            // Text-Kontrast (Palette v3.2): amber 3+, violet (Premium) UND
+            // green Rating 4 (Green-500) haben dunkle Bgs → weisser Text.
+            var darkBgHere = (band === 'violet')
+                || (band === 'amber' && rating >= 3)
+                || (band === 'green' && rating >= 4);
+            var textFill = darkBgHere ? '#ffffff' : c.stroke;
             html += '<text x="' + center + '" y="' + (center + r * 0.35)
                   + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter,sans-serif" font-size="'
                   + (r * 0.95).toFixed(1) + '" font-weight="700">' + rating + '</text>';

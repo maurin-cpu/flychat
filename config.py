@@ -163,6 +163,7 @@ HOURLY_PARAMS = [
     "cape",
     "boundary_layer_height",
     "surface_pressure",
+    "pressure_msl",
     "shortwave_radiation",
     "direct_radiation",
     "diffuse_radiation",
@@ -227,6 +228,136 @@ for _level in PRESSURE_LEVELS:
         f"wind_direction_{_level}hPa",
         f"geopotential_height_{_level}hPa"
     ])
+
+# ============================================================================
+# SYNOPTIK / WETTERLAGE-BLOCK
+# ============================================================================
+# Konfiguration fuer engine/synoptic_context.py — der "Wetterlage"-Block
+# im Wochencast und in der E-Mail. Erzeugt deterministisch eine 5-Tages-
+# Einordnung der Grosswetterlage (Druckeinfluss CH, Druckzentren Europa,
+# uebergeordnete Stroemung, Niederschlagsmuster Nord/Sued der Alpen,
+# Phaenomene wie Foehn/Bise/Vb-Tief).
+#
+# Wichtig: Alle Klassifikatoren sind deterministisch (Stage-Inversion-Pattern
+# analog engine/decision_engine.py). Der LLM bekommt nur die fertigen
+# Strukturfelder, keine Rohzahlen. Jedes Feld traegt Provenance (inputs +
+# thresholds + decided_by) fuer Audit-Logs.
+
+# --- Europa-Druckraster (Mini-API-Call fuer Druckzentren) ----------------
+# 15 Punkte ueber Europa fuer Hoch-/Tief-Erkennung via lokale Extrema.
+# Jeder Punkt hat ein statisches Region-Label, das im LLM-Output erscheint.
+# Auswahl deckt synoptisch relevante Bereiche fuer CH-Wetter ab:
+#   - Atlantik / Britische Inseln (Westlage, Sturmtiefs)
+#   - Skandinavien / Mitteleuropa (Bisenlage, Hochdruckbruecken)
+#   - Mittelmeer / Norditalien (Suedfoehn, Vb-/Genua-Tief)
+EUROPE_PRESSURE_GRID = [
+    {"lat": 64.0, "lon": -20.0, "label": "Island"},
+    {"lat": 57.0, "lon":  -4.0, "label": "Schottland"},
+    {"lat": 52.0, "lon": -15.0, "label": "Atlantik vor Irland"},
+    {"lat": 51.0, "lon":   0.0, "label": "England"},
+    {"lat": 47.0, "lon":   2.0, "label": "Frankreich"},        # nahe CH/West
+    {"lat": 40.0, "lon":  -3.0, "label": "Spanien"},
+    {"lat": 65.0, "lon":  15.0, "label": "Nordskandinavien"},
+    {"lat": 58.0, "lon":  14.0, "label": "Suedskandinavien"},
+    {"lat": 50.0, "lon":  13.0, "label": "Mitteleuropa"},
+    {"lat": 44.0, "lon":   9.0, "label": "Norditalien"},
+    {"lat": 41.0, "lon":   6.0, "label": "Westliches Mittelmeer"},
+    {"lat": 42.0, "lon":  16.0, "label": "Adria"},
+    {"lat": 50.0, "lon":  25.0, "label": "Osteuropa"},
+    {"lat": 44.0, "lon":  33.0, "label": "Schwarzes Meer"},
+    {"lat": 38.0, "lon": -25.0, "label": "Azoren"},
+]
+
+# --- Druckzentren-Detektion ---------------------------------------------
+# Mindest-Gradient zur Umgebung fuer eine "echte" Hoch/Tief-Erkennung.
+# Schwaecher = wird verworfen, NICHT erfunden (Halluzinations-Schutz).
+SYNOPTIC_PRESSURE_CENTER_MIN_GRADIENT_HPA = 5.0
+
+# --- CH-Druckeinfluss-Klassifikation ------------------------------------
+# Schwellen fuer "Hochdruck" / "Tiefdruck" / "neutral" aus pressure_msl
+# (CH-Mittel ueber 14 Regionen, 12 UTC).
+SYNOPTIC_HOCH_HPA = 1020.0      # >= 1020 hPa → Hochdruckeinfluss
+SYNOPTIC_TIEF_HPA = 1010.0      # <= 1010 hPa → Tiefdruckeinfluss
+SYNOPTIC_STRONG_TIEF_HPA = 1000.0  # <= 1000 → starker Tiefdruckeinfluss
+# Trend-Schwelle: |ΔP/Tag| ueber dieser Schwelle = signifikante Tendenz
+SYNOPTIC_PRESSURE_TREND_THRESHOLD_HPA = 2.0
+
+# --- Uebergeordnete Stroemung (700 hPa) ---------------------------------
+# Stuerkeklassen fuer 700-hPa-Wind (CH-Mittel)
+SYNOPTIC_FLOW_SCHWACH_KMH = 15      # < 15 km/h → schwach
+SYNOPTIC_FLOW_MAESSIG_KMH = 30      # 15-30 → maessig
+SYNOPTIC_FLOW_KRAEFTIG_KMH = 50     # 30-50 → kraeftig
+                                     # > 50 → stuermisch
+# Richtungs-Sektoren (Hauptwindrichtung)
+SYNOPTIC_FLOW_SECTORS = [
+    (337.5,  22.5, "Nord"),
+    ( 22.5,  67.5, "Nordost"),
+    ( 67.5, 112.5, "Ost"),
+    (112.5, 157.5, "Suedost"),
+    (157.5, 202.5, "Sued"),
+    (202.5, 247.5, "Suedwest"),
+    (247.5, 292.5, "West"),
+    (292.5, 337.5, "Nordwest"),
+]
+
+# --- Bise-Detektion ------------------------------------------------------
+# Bisenlage = Hoch NO-Europa + Tief Mittelmeer + NE-Stroemung ueber CH.
+# Detektion deterministisch aus Druckraster + 700hPa-Wind.
+SYNOPTIC_BISE_DELTA_P_THRESHOLD_HPA = 4.0  # Druckgefaelle NE-Europa <-> Mittelmeer
+SYNOPTIC_BISE_WIND_DIR_MIN = 30            # 700hPa-Wind aus NE-Sektor
+SYNOPTIC_BISE_WIND_DIR_MAX = 90
+SYNOPTIC_BISE_WIND_MIN_KMH = 15            # Mindest-Stroemung fuer Bise-Label
+
+# --- Vb-/Genua-Tief-Erkennung -------------------------------------------
+# Klassisches Vb-Pattern: Tief verlagert sich von Westmittelmeer/Genua
+# nordostwaerts ueber Norditalien Richtung Mitteleuropa → Stau Alpennordseite.
+# Erkennung: Druckzentrum im Norditalien-/Adria-Bereich UND niedriger Druck.
+SYNOPTIC_VB_BOX_LAT_MIN = 40.0
+SYNOPTIC_VB_BOX_LAT_MAX = 46.0
+SYNOPTIC_VB_BOX_LON_MIN = 5.0
+SYNOPTIC_VB_BOX_LON_MAX = 18.0
+SYNOPTIC_VB_MAX_MSL_HPA = 1010.0   # Druck im Zentrum muss unter dieser Schwelle liegen
+
+# --- Niederschlag Nord/Sued der Alpen -----------------------------------
+# Trennlinie: Regionen mit Schwerpunkt noerdlich oder suedlich der
+# Alpenhauptkette. Wird aus regionen.csv abgeleitet (s. synoptic_context.py).
+# Schwellen fuer Niederschlagscharakter pro Tag:
+SYNOPTIC_PRECIP_DRY_MM = 0.5         # Tages-Peak unter dieser Schwelle = trocken
+SYNOPTIC_PRECIP_LIGHT_MM = 2.0       # 0.5-2 mm = leicht
+SYNOPTIC_PRECIP_MODERATE_MM = 8.0    # 2-8 mm = maessig, > 8 = stark
+SYNOPTIC_PRECIP_COVERAGE_FLAECHIG = 0.7   # Coverage >= 70% = flaechig (stratiform)
+SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV = 0.4  # Coverage < 40% + CAPE = konvektiv/Schauer
+SYNOPTIC_PRECIP_CAPE_KONVEKTIV = 300      # J/kg — Mindest-CAPE fuer konvektiv-Label
+SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # J/kg — Schwelle fuer Gewitter-Label
+
+# --- Schneefallgrenze (saisonal) ----------------------------------------
+# Nur Maerz-Mai und Oktober-November ausweisen (im Sommer irrelevant,
+# im Hochwinter erwartbar).
+SYNOPTIC_SNOWLINE_MONTHS = (3, 4, 5, 10, 11)
+
+# --- T850-Trend (Luftmassen-Charakter) ----------------------------------
+# Schwelle fuer "deutlich kuehler/waermer" Aenderung ueber die Woche
+SYNOPTIC_T850_TREND_THRESHOLD_K = 4.0  # |ΔT850| >= 4 K binnen 24-48h = signifikant
+
+# --- Konfidenz-Decay je Forecast-Tag ------------------------------------
+# Sprachhaerte sinkt mit Forecast-Distanz (Pilot-Erwartung aus Recherche).
+SYNOPTIC_CONFIDENCE_BY_DAY = {
+    0: "high",    # Heute
+    1: "high",    # Morgen
+    2: "medium",  # Tag 3
+    3: "low",     # Tag 4
+    4: "low",     # Tag 5
+}
+
+# --- Audit & Cache -------------------------------------------------------
+SYNOPTIC_CACHE_PATH = DATA_DIR / "synoptic_context.json"
+SYNOPTIC_AUDIT_DIR = DATA_DIR / "synoptic_audit"
+SYNOPTIC_AUDIT_KEEP_DAYS = 30   # ältere Audit-Files werden rotiert geloescht
+
+# Vercel-Override (writable nur in /tmp)
+if os.environ.get("VERCEL"):
+    SYNOPTIC_CACHE_PATH = _WRITABLE_DIR / "synoptic_context.json"
+    SYNOPTIC_AUDIT_DIR = _WRITABLE_DIR / "synoptic_audit"
 
 # ============================================================================
 # THERMIK-BERECHNUNGS-PARAMETER
@@ -602,8 +733,8 @@ WIND_IDEAL_MAX_KMH = 20         # km/h — ab diesem: ueber Komfortzone (= WIND_
 # Schwelle deterministisch auf wind_ok_count an (siehe analyzers._prefilter_not_safe).
 # WIND-WRONG Stunden NACH dem Start-Fenster sind kein Grund fuer UNFLIEGBAR —
 # der Pilot ist bereits in der Luft, Landung i.d.R. auf separatem Landeplatz.
-CLEAN_WINDOW_MIN_HOURS = 3       # h — unterhalb: not_safe
-CLEAN_WINDOW_GREEN_HOURS = 3     # h — ab hier: safe/green moeglich
+CLEAN_WINDOW_MIN_HOURS = 2       # h — unterhalb: not_safe
+CLEAN_WINDOW_GREEN_HOURS = 2     # h — ab hier: safe/green moeglich
 
 # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade):
 # Erfasst den groessten Richtungsdreher innerhalb eines gleitenden Fensters von

@@ -108,6 +108,39 @@
         if (s === 'not_safe')    return 'red';
         return 'no_data';
     }
+    // Diskrete Farbstufen innerhalb green/amber-Band. Palette v2 (Option C, Mai
+    // 2026): green-Band alignt mit Thermik-Kacheln fuer Rating 3-5 (Lime/Mint-
+    // Green/Cyan aus meteogram.js), Rating 1+2 in Pastell-Mint/Mint vermeidet
+    // Yellow-Konflikt mit conditional. amber bleibt Yellow→Brown.
+    // Source of Truth: docs/RATING_FARBKONZEPT.md.
+    function getRatingTint(band, rating) {
+        var r = Math.max(1, Math.min(5, rating | 0));
+        if (band === 'green') {
+            // v3.2 Royal Premium: Sky-100 → Sky-200 → Lime → Green-500 → Violet
+            return ['#e0f2fe', '#bae6fd', '#BEF264', '#22c55e', '#a78bfa'][Math.min(4, r - 1)];
+        }
+        if (band === 'amber') {
+            return ['#fef08a', '#facc15', '#f97316', '#c2410c', '#7c2d12'][Math.min(4, r - 1)];
+        }
+        return null;
+    }
+
+    // Border-Stroke skaliert mit Rating als zweiter visueller Kanal — high-rating
+    // Regionen bekommen dickere/dunklere Border, damit Top-Tage auch peripher
+    // ohne Hue-Vergleich auffallen.
+    function getRatingBorder(band, rating) {
+        var r = Math.max(1, Math.min(5, rating | 0));
+        if (band === 'green') {
+            return { color: ['#38bdf8', '#0ea5e9', '#65a30d', '#15803d', '#6d28d9'][Math.min(4, r - 1)],
+                     weight: [1.2, 1.6, 2.2, 2.6, 3.0][Math.min(4, r - 1)] };
+        }
+        if (band === 'amber') {
+            return { color: ['#ca8a04', '#a16207', '#9a3412', '#7c2d12', '#431407'][Math.min(4, r - 1)],
+                     weight: [1.2, 1.6, 2.2, 2.6, 3.0][Math.min(4, r - 1)] };
+        }
+        return null;
+    }
+
     // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §4.3) =====
     // 4 Farben rein nach safety_band — gleiche Hex-Werte wie Spot-Marker.
     // Rot + grau bekommen dashed border (Sperr-Visualisierung).
@@ -120,10 +153,12 @@
         else if (band !== 'green' && band !== 'amber' && band !== 'red' && band !== 'violet') band = 'no_data';
 
         if (band === 'violet') {
+            // Palette v3 "Royal Premium": Rating 5 = Violet-400. Code-Identifier
+            // 'violet' matched jetzt wieder visuell. Premium-Tier-Hierarchie.
             return {
-                fill: '#8b5cf6', fillOpacity: 0.42,
-                border: '#6d28d9', borderOpacity: 0.75,
-                labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
+                fill: '#a78bfa', fillOpacity: 0.65,
+                border: '#6d28d9', borderOpacity: 0.85,
+                labelColor: '#ffffff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
                 safetyLabel: 'Top'
             };
         }
@@ -254,15 +289,34 @@
             label = '\u2013';
         }
 
-        // Einheitliche Palette: weisse Glas-Pille + farbiger Ring + farbiger Text.
-        // Bei red: gleicher Aufbau, nur roter Ring + rotes Kreuz drin.
-        var palette = {
-            green:  { ink: '#166534', ring: '#22c55e' },
-            amber:  { ink: '#92400e', ring: '#f59e0b' },
-            red:    { ink: '#991b1b', ring: '#ef4444' },
-            violet: { ink: '#5b21b6', ring: '#8b5cf6' }
+        // Per-Rating Palette (v3 "Royal Premium" — synchron zu Polygon-Fill/Border):
+        // Ring-Farbe = Polygon-Border-Farbe. Sky → Mint-Green → Cyan → Violet
+        // fuer green-Band Rating 1-5. Ink = dunkler Text fuer Lesbarkeit auf
+        // weisser Glas-Pille. Bei red: rotes Kreuz.
+        var ringByRating = {
+            green: ['#38bdf8', '#0ea5e9', '#65a30d', '#15803d', '#6d28d9'],
+            amber: ['#ca8a04', '#a16207', '#9a3412', '#7c2d12', '#431407']
         };
-        var p = palette[band];
+        var inkByRating = {
+            green: ['#075985', '#075985', '#3f6212', '#14532d', '#5b21b6'],
+            amber: ['#713f12', '#713f12', '#9a3412', '#7c2d12', '#431407']
+        };
+        var fixed = {
+            red:    { ink: '#991b1b', ring: '#ef4444' },
+            violet: { ink: '#5b21b6', ring: '#6d28d9' }  // Premium-Tier = Violet (v3)
+        };
+        var p;
+        if (band === 'red' || band === 'violet') {
+            p = fixed[band];
+        } else if (n >= 1 && (band === 'green' || band === 'amber')) {
+            var idx = Math.min(4, n - 1);
+            p = { ink: inkByRating[band][idx], ring: ringByRating[band][idx] };
+        } else {
+            // Fallback (rating 0 in safe/conditional): generischer mittlerer Ton.
+            p = (band === 'amber')
+                ? { ink: '#92400e', ring: '#f59e0b' }
+                : { ink: '#3f6212', ring: '#65a30d' };
+        }
         // Runde Pille (Kreis). Ratings 1-6 sind immer einstellig.
         var size = zoom < 7 ? 30 : zoom < 9 ? 36 : 42;
         var fontSize = Math.round(size * 0.5);
@@ -462,20 +516,28 @@
             if (band === 'green' && rating >= 5) band = 'violet';
             var style = mapRegionStyle(band);
 
-            // Polygon-Style: solid bei green/amber/violet. baseFillOpacity wird fuer Hover gespeichert.
-            // Linearer Dynamikbereich: Rating 1 ~0.19, Rating 3 ~0.38, Rating 6 = 0.65 (experience_rating 1-6).
+            // Polygon-Style: Rating-Differenz traegt jetzt Hue (Fill) + Border-Weight als
+            // zweiter visueller Kanal. Opazitaet fix bei 0.60 damit Hillshade-Hintergrund
+            // den Farbton nicht verwaschen kann.
+            var fillColor = style.fill;
+            var borderColor = style.border;
+            var borderWeight = 1.5;
             var baseOpacity = style.fillOpacity;
-            if (rating > 0 && (band === 'green' || band === 'amber' || band === 'violet')) {
-                baseOpacity = 0.10 + (rating / 6) * 0.55;
+            if (rating > 0 && (band === 'green' || band === 'amber')) {
+                var tint = getRatingTint(band, rating);
+                if (tint) fillColor = tint;
+                var brd = getRatingBorder(band, rating);
+                if (brd) { borderColor = brd.color; borderWeight = brd.weight; }
+                baseOpacity = 0.60;
             }
-            
+
             layer._baseFillOpacity = baseOpacity;
             layer.setStyle({
                 fill: true,
-                fillColor: style.fill,
+                fillColor: fillColor,
                 fillOpacity: baseOpacity,
-                color: style.border,
-                weight: 1.5,
+                color: borderColor,
+                weight: borderWeight,
                 opacity: style.borderOpacity,
                 dashArray: ''
             });

@@ -42,7 +42,7 @@ from source_area import (
 )
 from prompts import (
     SYSTEM_PROMPT,
-    WEEKLY_BRIEFING_PROMPT, CAPABILITIES_GUIDE, FOEHN_CHAT_KNOWLEDGE,
+    CAPABILITIES_GUIDE, FOEHN_CHAT_KNOWLEDGE,
     format_foehn_llm_regional_guide,
 )
 from engine._common import (

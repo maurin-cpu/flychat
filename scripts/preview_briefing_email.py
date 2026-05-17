@@ -1,6 +1,6 @@
 """
-Rendert das Briefing-Mail mit realen Daten aus data/weekly_briefing.json und
-einem Mock-Subscriber (10 Regionen) und schreibt es als klickbare HTML-Datei
+Rendert das Briefing-Mail mit aktuellen Spot-/Region-Analysen und einem
+Mock-Subscriber (10 Regionen) und schreibt es als klickbare HTML-Datei
 ins Temp-Verzeichnis.
 
 Nutzung:
@@ -14,8 +14,6 @@ Tipp: Der Pfad am Ende kann direkt im Browser geoeffnet werden.
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import sys
 import webbrowser
 from pathlib import Path
@@ -45,8 +43,6 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--regions", default=",".join(DEFAULT_REGIONS),
                     help="Comma-separated region_ids fuer den Mock-Subscriber")
-    ap.add_argument("--briefing-json", default="data/weekly_briefing.json",
-                    help="Pfad zu briefing_data JSON")
     ap.add_argument("--email", default="preview@example.com",
                     help="Mock-Email-Adresse")
     ap.add_argument("--no-open", action="store_true",
@@ -56,13 +52,13 @@ def main() -> int:
                          "(Default: data/preview/ im Projekt)")
     args = ap.parse_args()
 
-    briefing_path = ROOT / args.briefing_json
-    if not briefing_path.exists():
-        print(f"FEHLER: {briefing_path} nicht gefunden", file=sys.stderr)
+    # Briefing-Daten frisch aus Cache + Synoptik bauen (kein LLM-Call noetig)
+    from chat_engine import GleitcastEngine
+    engine = GleitcastEngine()
+    briefing_data = engine.build_briefing_data()
+    if not briefing_data.get("days"):
+        print("FEHLER: keine Spot-/Region-Analysen verfuegbar", file=sys.stderr)
         return 2
-
-    with briefing_path.open("r", encoding="utf-8") as f:
-        briefing_data = json.load(f)
 
     subscriber = {
         "id": 999,

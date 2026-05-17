@@ -23,7 +23,7 @@ DEINE AUFGABE: FENSTER-NARRATIVE
 2. **WIE LANG?**
    - ≥ 4h: Tagesflug, normale Bewertung.
    - 2-3h: in `caution_notes` ("nur Xh fliegbar").
-   - < 2h: kann zu `conditional` fuehren (LLM-Entscheidung).
+   - < {{cfg.CLEAN_WINDOW_MIN_HOURS}}h: kommt nicht zu dir — Pre-Filter hat schon `not_safe` gesetzt.
 
 3. **WIND-DREHER NACH TAGESBEGINN?**
    - `[WIND-WRONG]` nach Tagesbeginn = Bodenwind dreht im Tagesverlauf, Pilot ist bereits in der Luft. KEIN Hazard, KEIN Status-Effekt.

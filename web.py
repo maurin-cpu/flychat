@@ -848,6 +848,45 @@ def admin_index():
     return redirect("/admin/subscribers")
 
 
+@app.route("/admin/wetterlage_audit", methods=["GET"])
+@app.route("/admin/wetterlage_audit/<date>", methods=["GET"])
+@_require_admin
+def admin_wetterlage_audit(date: str = None):
+    """Zeigt das Audit-JSON eines Wetterlage-Casts.
+
+    Ohne Datum: Liste aller verfuegbaren Audit-Files (latest first).
+    Mit Datum: vollstaendiges Strukturfeld inkl. Roh-Snapshots, Decisions,
+    LLM-Prompt-Input, LLM-Output, Post-Filter-Log.
+    """
+    import os, json as _json
+    audit_dir = Path(config.SYNOPTIC_AUDIT_DIR)
+    if not audit_dir.exists():
+        return jsonify({"error": "No audit dir", "path": str(audit_dir)}), 404
+
+    if date is None:
+        # Liste verfuegbarer Dates
+        files = sorted([f.stem for f in audit_dir.glob("*.json")], reverse=True)
+        # Sentinel: latest cache (synoptic_context.json) auch zeigen
+        cache_exists = Path(config.SYNOPTIC_CACHE_PATH).exists()
+        return jsonify({
+            "audit_dir": str(audit_dir),
+            "available_dates": files,
+            "current_cache_present": cache_exists,
+            "view_url_pattern": "/admin/wetterlage_audit/<YYYY-MM-DD>",
+        })
+
+    path = audit_dir / f"{date}.json"
+    if not path.exists():
+        return jsonify({"error": f"No audit file for {date}",
+                        "path": str(path)}), 404
+    try:
+        with open(path, "r", encoding="utf-8") as fp:
+            data = _json.load(fp)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/admin/subscribers", methods=["GET"])
 @_require_admin
 def admin_subscribers():
@@ -2091,15 +2130,15 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
 
 @app.route("/api/briefing", methods=["GET"])
 def api_briefing_get():
-    """Liefert das Wochen-Fazit.  Days/Spots werden immer frisch aus
-    spot_analyses gebaut, das LLM-Fazit kommt aus dem Cache.
+    """Liefert die Tages-Aggregation + Wetterlage-Synoptik fuer den Wochencast.
+    Days/Spots werden immer frisch aus spot_analyses gebaut, der Wetterlage-
+    Block kommt aus dem Synoptik-Cache (1×/Tag refreshed).
 
     Test-View-aware: wenn `test_mode.is_view_active()` aktiv ist, werden
     Spots/Regionen aus `data/test_runs/latest/` gelesen — gleiche Logik
     wie /api/analyses und /api/region-analyses.
     """
     from engine import test_mode
-    cached = engine._load_weekly_briefing()
     if test_mode.is_view_active():
         spot_data, region_data, _ = test_mode.load_test_run_analyses()
         aggregated = engine.build_briefing_data(
@@ -2108,23 +2147,55 @@ def api_briefing_get():
         aggregated["_test_view"] = True
     else:
         aggregated = engine.build_briefing_data()
-    fazit = (cached or {}).get("fazit")
     return jsonify({
         "success": True,
         "days": aggregated.get("days", []),
         "forecast_dates": aggregated.get("forecast_dates", []),
         "generated_at": aggregated.get("generated_at", ""),
-        "fazit": fazit,
+        "wetterlage": aggregated.get("wetterlage"),
         "test_view": aggregated.get("_test_view", False),
     })
 
 
 @app.route("/api/briefing/generate", methods=["POST"])
 def api_briefing_generate():
-    """Triggert die LLM-Wochenzusammenfassung (neu generieren)."""
-    result = engine.generate_weekly_briefing()
-    status = 200 if result.get("success") else 500
-    return jsonify(result), status
+    """Triggert manuell den Wetterlage-Block (Synoptik) refresh
+    (1× extra API-Call ECMWF + optional 1× Foehn-API + 1× LLM-Call).
+    Schlaegt der Refresh fehl oder fehlt der analysis_client, wird der
+    Block einfach uebersprungen — kein Fallback-Text, kein
+    Halluzinationsrisiko.
+    """
+    wetterlage_status = "skipped"
+    try:
+        from engine.synoptic_llm import refresh_synoptic_overview
+        from fetch_weather import load_cached_weather
+        wcache = load_cached_weather()
+        if wcache and engine.analysis_client:
+            sctx = refresh_synoptic_overview(
+                wcache, engine.analysis_client, engine.analysis_model,
+            )
+            if sctx:
+                wetterlage_status = (
+                    "ok" if sctx.get("llm_overview") else "no_llm_overview"
+                )
+            else:
+                wetterlage_status = "build_failed"
+        else:
+            wetterlage_status = (
+                "no_weather_cache" if not wcache else "no_analysis_client"
+            )
+    except Exception as e:
+        logger.exception("api_briefing_generate: Wetterlage-Refresh fehlgeschlagen: %s", e)
+        wetterlage_status = f"error: {e.__class__.__name__}"
+
+    success = wetterlage_status == "ok"
+    payload = {
+        "success": success,
+        "wetterlage_refresh": wetterlage_status,
+    }
+    if not success:
+        payload["error"] = f"Wetterlage-Refresh: {wetterlage_status}"
+    return jsonify(payload), (200 if success else 500)
 
 
 # ============================================================================

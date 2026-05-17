@@ -156,12 +156,35 @@
         return null;
     }
 
+    // Diskrete Rating-Tints — Palette v2 (Option C, Mai 2026): green-Band alignt
+    // mit Thermik-Kacheln fuer Rating 3-5 (Lime/Mint-Green/Cyan), Rating 1+2 in
+    // Pastell-Mint/Mint. amber bleibt Yellow→Brown. Identisch zu region-map.js,
+    // shared-glyph.js, briefing.js. Source of Truth: docs/RATING_FARBKONZEPT.md.
+    function getRatingTint(band, rating) {
+        var r = Math.max(1, Math.min(5, rating | 0));
+        if (band === 'green') {
+            // v3.2 Royal Premium: Sky-100 → Sky-200 → Lime → Green-500 → Violet
+            return {
+                fill:   ['#e0f2fe', '#bae6fd', '#BEF264', '#22c55e', '#a78bfa'][Math.min(4, r - 1)],
+                stroke: ['#38bdf8', '#0ea5e9', '#65a30d', '#15803d', '#6d28d9'][Math.min(4, r - 1)]
+            };
+        }
+        if (band === 'amber') {
+            return {
+                fill:   ['#fef08a', '#facc15', '#f97316', '#c2410c', '#7c2d12'][Math.min(4, r - 1)],
+                stroke: ['#ca8a04', '#a16207', '#9a3412', '#7c2d12', '#431407'][Math.min(4, r - 1)]
+            };
+        }
+        return null;
+    }
+
     // ===== STYLE SYSTEM (RATING_CONCEPT v1.3 §8.2 — Single-Glyph) =====
     // safetyBand: 'green' | 'amber' | 'red' | 'no_data' | 'default'
     // experienceStars: 0..5 (integer)
     function mapSafetyBandToStyle(band) {
         if (band === 'violet') return {
-            fill: '#8b5cf6', stroke: '#6d28d9',
+            // Palette v3 "Royal Premium": Premium-Tier = Violet-400 (Legendaer).
+            fill: '#a78bfa', stroke: '#6d28d9',
             label: 'Top'
         };
         if (band === 'green') return {
@@ -216,11 +239,12 @@
         // Migration-Tolerance: alter Cache-Wert 6 → 5 mappen
         if (rating === 6) rating = 5;
 
-        // Display-Band Premium-Override: safe + rating=5 (xc_tag/Klassiker) → violett.
-        // Auch fuer Wind-Sektor + Highlight-Glow, damit der Marker konsistent wirkt.
+        // Display-Band Premium-Override: safe + rating=5 (xc_tag/Klassiker) →
+        // Violet-400 (Palette v3 Royal Premium). Code-Identifier 'violet'
+        // matched jetzt wieder visuell — Premium = Violet.
         if (safetyBand === 'green' && rating >= 5) {
             safetyBand = 'violet';
-            style = { fill: '#8b5cf6', stroke: '#6d28d9' };
+            style = { fill: '#a78bfa', stroke: '#6d28d9' };
         }
 
         var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">';
@@ -264,16 +288,19 @@
         // Weisser Hintergrund-Kreis, damit die Karte bei transparentem Fill nicht durchscheint
         html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="#ffffff" />';
 
-        // Intensitaet (Deckkraft) basierend auf experience_rating 1-6.
-        // Rating 1 ~0.33, Rating 3 ~0.60, Rating 6 = 1.0.
-        var fillOpacity = 1.0;
-        if (rating > 0 && (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet')) {
-            fillOpacity = 0.20 + (rating / 6) * 0.80;
+        // Rating-Tint: Hue-Shift quer durch verwandte Farbtoene (Lime→Forest fuer green,
+        // Yellow→Burnt fuer amber). Fill-Opazitaet fix bei 1.0 — Differenzierung traegt
+        // jetzt der Farbton, nicht mehr die Transparenz.
+        var markerFill = style.fill;
+        var markerStroke = style.stroke;
+        if (rating > 0 && (safetyBand === 'green' || safetyBand === 'amber')) {
+            var tint = getRatingTint(safetyBand, rating);
+            if (tint) { markerFill = tint.fill; markerStroke = tint.stroke; }
         }
 
         // Main circle (safety band color)
-        html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="' + style.fill
-                + '" fill-opacity="' + fillOpacity + '" stroke="' + style.stroke + '" stroke-width="' + (isHighlighted ? '2' : '1.5') + '" />';
+        html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="' + markerFill
+                + '" stroke="' + markerStroke + '" stroke-width="' + (isHighlighted ? '2' : '1.5') + '" />';
 
         // Inner glyph
         if (safetyBand === 'red') {
@@ -287,9 +314,17 @@
                   + '" x2="' + (center - arm) + '" y2="' + (center + arm)
                   + '" stroke="#ffffff" stroke-width="' + crossWidth + '" stroke-linecap="round" />';
         } else if (rating >= 1 && (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet')) {
-            // Ziffer 1-6 — experience_rating, prominent zum sofortigen Erkennen.
+            // Ziffer 1-5 — experience_rating, prominent zum sofortigen Erkennen.
+            // Palette v3 Royal Premium:
+            // - green Rating 1-4 hat helle Fills (Sky/Mint-Green/Cyan) → dunkler Text
+            // - green Rating 5 wird via Premium-Override zu violet-band geswitcht (weisser Text)
+            // - amber Rating 1+2 hellgelb → dunkler Text, ab Rating 3 saturiert → weisser Text
             var fontSize = Math.round(radius * 1.5);
-            var textFill = (fillOpacity < 0.65) ? style.stroke : '#ffffff';
+            // v3.2: Rating 4 (green-band Green-500) bekommt auch weissen Text.
+            var darkBgHere = (safetyBand === 'violet')
+                || (safetyBand === 'amber' && rating >= 3)
+                || (safetyBand === 'green' && rating >= 4);
+            var textFill = darkBgHere ? '#ffffff' : markerStroke;
             html += '<text x="' + center + '" y="' + (center + fontSize * 0.35)
                   + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter, sans-serif"'
                   + ' font-size="' + fontSize + '" font-weight="800">' + rating + '</text>';

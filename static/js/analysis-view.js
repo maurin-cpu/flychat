@@ -65,26 +65,71 @@ window.AnalysisView = (function () {
     }
 
     // ===== GLYPH =====
-    // Kreis in Safety-Farbe; weisses Kreuz bei red, weisse Rating-Ziffer 1-10 sonst.
+    // Kreis in Rating-Tint-Farbe; weisses Kreuz bei red, Rating-Ziffer 1-5 sonst.
+    // Palette v2 (Option C, Mai 2026) — synchron zu region-map.js, map.js,
+    // shared-glyph.js, briefing.js. Source of Truth: docs/RATING_FARBKONZEPT.md.
     var PALETTE = {
         green:   { fill: '#22c55e', stroke: '#15803d' },
         amber:   { fill: '#f59e0b', stroke: '#92400e' },
         red:     { fill: '#ef4444', stroke: '#991b1b' },
+        // v3 Royal Premium: violet-Band = Violet-400 (Legendaer/Top).
+        violet:  { fill: '#a78bfa', stroke: '#6d28d9' },
         no_data: { fill: '#9ca3af', stroke: '#6b7280' }
     };
+
+    function hexToRgbStr(hex) {
+        if (!hex || hex[0] !== '#') return '0,0,0';
+        var h = hex.slice(1);
+        return parseInt(h.slice(0, 2), 16) + ',' + parseInt(h.slice(2, 4), 16) + ',' + parseInt(h.slice(4, 6), 16);
+    }
+
+    // Rating-Tint analog briefing.js:regionPillSpec — gibt {fill, stroke, text,
+    // darkBg} fuer die {band, rating}-Kombination zurueck. Verwendet fuer
+    // Hero-Glyph + Rating-Pill + Container-Akzent im Spot/Region-Detail.
+    function ratingTintSpec(band, rating) {
+        var r = Math.max(0, Math.min(5, parseInt(rating, 10) || 0));
+        if (band === 'red') {
+            return { label: 'Nicht fliegbar', fill: '#ef4444', stroke: '#991b1b', text: '#ffffff', darkBg: true };
+        }
+        if (band === 'no_data') {
+            return { label: 'Keine Daten', fill: '#9ca3af', stroke: '#6b7280', text: '#374151', darkBg: false };
+        }
+        if (r <= 0) return null;
+        if (band === 'amber') {
+            var aLabels = ['Abgleiter', 'Schwacher Thermiktag', 'Solider Thermiktag', 'Starker Thermiktag', 'XC-Tag'];
+            var aBgs    = ['#fef08a', '#facc15', '#f97316', '#c2410c', '#7c2d12'];
+            var aBorders= ['#ca8a04', '#a16207', '#9a3412', '#7c2d12', '#431407'];
+            var aTexts  = ['#713f12', '#713f12', '#ffffff', '#ffffff', '#ffffff'];
+            var aDark   = [false, false, true, true, true];
+            var ai = Math.min(4, r - 1);
+            return { label: aLabels[ai], fill: aBgs[ai], stroke: aBorders[ai], text: aTexts[ai], darkBg: aDark[ai] };
+        }
+        // safe/green v3.2 Royal Premium: Sky-100 → Sky-200 → Lime → Green-500 → Violet (Top)
+        var gLabels = ['Abgleiter', 'Kurzer Thermikflug', 'Solider Thermiktag', 'Starker Thermiktag', 'XC-Tag'];
+        var gBgs    = ['#e0f2fe', '#bae6fd', '#BEF264', '#22c55e', '#a78bfa'];
+        var gBorders= ['#38bdf8', '#0ea5e9', '#65a30d', '#15803d', '#6d28d9'];
+        var gTexts  = ['#075985', '#075985', '#3f6212', '#ffffff', '#ffffff'];
+        var gDarkBg = [false, false, false, true, true];  // Rating 4 (Green-500) + 5 (Violet) = weisser Text
+        var gi = Math.min(4, r - 1);
+        return { label: gLabels[gi], fill: gBgs[gi], stroke: gBorders[gi], text: gTexts[gi], darkBg: gDarkBg[gi] };
+    }
 
     function buildGlyph(band, rating, size) {
         var s = size || 96;
         var c = s / 2;
         var r = s * 0.32;
-        var col = PALETTE[band] || PALETTE.no_data;
+        // Rating-Tint statt flacher Band-Farbe — synchron zu shared-glyph.js.
+        var tint = ratingTintSpec(band, rating);
+        var fill = tint ? tint.fill : (PALETTE[band] || PALETTE.no_data).fill;
+        var stroke = tint ? tint.stroke : (PALETTE[band] || PALETTE.no_data).stroke;
+        var textFill = (tint && tint.darkBg) ? '#ffffff' : (tint ? tint.stroke : '#ffffff');
         var label = (band === 'red') ? 'Nicht fliegbar' :
                     (band === 'no_data') ? 'Keine Analyse' :
-                    (rating >= 1 ? 'Rating ' + rating + ' von 6' : 'Bewertung');
+                    (rating >= 1 ? 'Rating ' + rating + ' von 5' : 'Bewertung');
         var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s
                  + '" role="img" aria-label="' + esc(label) + '">';
         html += '<circle cx="' + c + '" cy="' + c + '" r="' + r
-              + '" fill="' + col.fill + '" stroke="' + col.stroke + '" stroke-width="3"/>';
+              + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="3"/>';
         if (band === 'red') {
             var arm = r * 0.55;
             html += '<line x1="' + (c - arm) + '" y1="' + (c - arm)
@@ -94,15 +139,13 @@ window.AnalysisView = (function () {
                   + '" x2="' + (c - arm) + '" y2="' + (c + arm)
                   + '" stroke="#fff" stroke-width="6" stroke-linecap="round"/>';
         } else if (band === 'no_data') {
-            // schlichtes Fragezeichen-Substitut: drei Punkte
             html += '<text x="' + c + '" y="' + (c + r * 0.32)
                   + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
                   + (r * 0.85).toFixed(1) + '" font-weight="700">…</text>';
         } else if (rating >= 1) {
-            // Rating 1-5 ist immer einstellig.
             var fontSize = (r * 0.85).toFixed(1);
             html += '<text x="' + c + '" y="' + (c + r * 0.34)
-                  + '" text-anchor="middle" fill="#fff" font-family="Inter,sans-serif" font-size="'
+                  + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter,sans-serif" font-size="'
                   + fontSize + '" font-weight="700">' + rating + '</text>';
         } else {
             html += '<circle cx="' + c + '" cy="' + c + '" r="3" fill="#fff"/>';
@@ -130,25 +173,36 @@ window.AnalysisView = (function () {
                          (band === 'amber') ? 'Vorsicht' :
                          (band === 'red')   ? 'Nicht fliegbar' : 'Keine Daten';
 
-        var html = '<div class="mga-hero ' + band + '">'
+        // Container-Tint aus Rating-Tint-Palette (Option C). Soft bg (12% alpha)
+        // + saturierter Border-Left — gleiche Logik wie Spot-Bg in briefing.js,
+        // damit ein gruener Tag mit Rating 4 hier auch Mint-Green wirkt, nicht
+        // einheitlich "green".
+        var heroTint = ratingTintSpec(band, rating);
+        var heroStyle = '';
+        if (heroTint && band !== 'no_data') {
+            var hRgb = hexToRgbStr(heroTint.fill);
+            heroStyle = 'style="background:rgba(' + hRgb + ',0.12);border-color:' + heroTint.stroke + '"';
+        }
+        var html = '<div class="mga-hero ' + band + '" ' + heroStyle + '>'
                  + '<div class="mga-hero-glyph">' + buildGlyph(band, rating, 96) + '</div>'
                  + '<div class="mga-hero-text">'
                  + '<div class="mga-hero-verdict ' + band + '">' + esc(verdictTxt) + '</div>';
-        // Pills: Safety-Band + Rating. RATING_ARCHITECTURE v2.0.
+        // Pills: Safety-Band + Rating. RATING_ARCHITECTURE v2.0 + Palette v2.
         html += '<div class="mga-hero-pills">';
         html += '<span class="mga-hero-pill ' + band + '">Safety ' + band.toUpperCase() + '</span>';
         if (band !== 'red' && band !== 'no_data') {
-            // Rating-Pill mit Tier-Farbe (1-2 gray, 3-4 green, 5 violet).
+            // Rating-Pill mit Rating-Tint-Farbe (Palette v2 Option C) — inline-style
+            // damit alle 5 Stufen visuell unterscheidbar sind, nicht nur 3 Tiers.
             if (rating >= 1) {
-                var flyTier = (rating >= 5) ? 'violet' : (rating >= 3 ? 'green' : 'gray');
-                var ratingLabels = {
-                    1: 'Abgleiter', 2: 'Kurzer Thermikflug',
-                    3: 'Solider Thermikflug', 4: 'Starker Thermikflug',
-                    5: 'XC-Tag'
-                };
-                var pillLabel = ratingLabels[rating] || ('Rating ' + rating);
-                html += '<span class="mga-hero-pill mga-hero-pill--fly mga-hero-pill--' + flyTier + '">'
-                     + esc(pillLabel) + ' (' + rating + '/5)</span>';
+                var pTint = ratingTintSpec(band, rating);
+                if (pTint) {
+                    var pBg = pTint.fill;
+                    var pBorder = pTint.stroke;
+                    var pText = pTint.text;
+                    html += '<span class="mga-hero-pill mga-hero-pill--fly"'
+                         + ' style="background:' + pBg + ';border:1px solid ' + pBorder + ';color:' + pText + '">'
+                         + esc(pTint.label) + ' (' + rating + '/5)</span>';
+                }
             }
             var fly = a.flyability || {};
             // Key flyability fields

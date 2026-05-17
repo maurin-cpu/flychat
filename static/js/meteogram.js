@@ -132,15 +132,16 @@ window.Meteogram = (function () {
         return '#1D4ED8';
     }
 
-    // Climb rate color scale aligned to sustained_peak pilot bands:
+    // Climb rate color scale — Palette v3.2 "Royal Premium" (final, Mai 2026):
+    // aligned mit Rating-Tints aus docs/RATING_FARBKONZEPT.md.
     // <1.0 Abgleiter | 1.0-1.5 mau | 1.5-2.0 solide | 2.0-2.5 stark/XC | >=2.5 Klassiker
     function thermClimbColor(rate) {
         if (rate <= 0) return 'transparent';
-        if (rate < 1.0) return '#FEF9C3';
-        if (rate < 1.5) return '#FDE047';
-        if (rate < 2.0) return '#BEF264';
-        if (rate < 2.5) return '#86EFAC';
-        return '#67E8F9';
+        if (rate < 1.0) return '#e0f2fe';  // Sky-100 (Rating 1, schwache Thermik)
+        if (rate < 1.5) return '#bae6fd';  // Sky-200 (Rating 2, mauer Tag)
+        if (rate < 2.0) return '#BEF264';  // Lime-300 (Rating 3, solide)
+        if (rate < 2.5) return '#22c55e';  // Green-500 (Rating 4, stark — klassisches Safety-Green)
+        return '#a78bfa';                   // Violet-400 (Rating 5, Klassiker — Royal Premium)
     }
 
     // Parabolic thermal profile: local climb rate at a given altitude.

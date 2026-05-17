@@ -26,12 +26,38 @@
   }
 
   function styleFor(band) {
-    if (band === "violet")  return { fill: "#8b5cf6", stroke: "#6d28d9", label: "Top" };
+    // Palette v3 "Royal Premium": violet-Band = Violet-400 (Legendaer/Top).
+    if (band === "violet")  return { fill: "#a78bfa", stroke: "#6d28d9", label: "Top" };
     if (band === "green")   return { fill: "#22c55e", stroke: "#15803d", label: "Sicher" };
     if (band === "amber")   return { fill: "#f59e0b", stroke: "#92400e", label: "Vorsicht" };
     if (band === "red")     return { fill: "#ef4444", stroke: "#991b1b", label: "Nicht fliegbar" };
     if (band === "no_data") return { fill: "#9ca3af", stroke: "#6b7280", label: "Keine Daten" };
     return { fill: "#6b7280", stroke: "#4b5563", label: "" };
+  }
+
+  // Diskrete Rating-Tints — Palette v2 (Option C, Mai 2026): green-Band alignt mit
+  // Thermik-Kacheln fuer Rating 3-5 (Lime/Mint-Green/Cyan aus meteogram.js).
+  // Rating 1+2 in Pastell-Mint/Mint (kein Yellow-Konflikt mit conditional).
+  // amber bleibt Yellow→Brown. Synchron zu region-map.js, map.js, briefing.js,
+  // rating-info.js. Source of Truth: docs/RATING_FARBKONZEPT.md.
+  function ratingTintFor(visBand, rating) {
+    var r = Math.max(1, Math.min(5, rating | 0));
+    if (visBand === "green") {
+      // Palette v3.2 "Royal Premium" (final): Sky-100 → Sky-200 → Lime →
+      // Green-500 → Violet (Rating 5 hier nicht erreicht — displayBand green+5
+      // → violet umlenkt; trotzdem definiert fuer Palette-Konsistenz).
+      return {
+        fill:   ["#e0f2fe", "#bae6fd", "#BEF264", "#22c55e", "#a78bfa"][Math.min(4, r - 1)],
+        stroke: ["#38bdf8", "#0ea5e9", "#65a30d", "#15803d", "#6d28d9"][Math.min(4, r - 1)]
+      };
+    }
+    if (visBand === "amber") {
+      return {
+        fill:   ["#fef08a", "#facc15", "#f97316", "#c2410c", "#7c2d12"][Math.min(4, r - 1)],
+        stroke: ["#ca8a04", "#a16207", "#9a3412", "#7c2d12", "#431407"][Math.min(4, r - 1)]
+      };
+    }
+    return null;
   }
 
   // Display-Band: safe + rating 5 (xc_tag/Klassiker) → violett-Premium-Marker.
@@ -81,21 +107,25 @@
     var ratingLabel = (rating > 0 && band !== "red") ? (", Rating " + rating + "/5") : "";
     var ariaLabel = (opts && opts.ariaLabel) || (st.label + ratingLabel);
 
-    // Farbintensitaet skaliert mit Rating 1-5.
-    var fillOpacity = 1.0;
-    if (visBand === "green" || visBand === "amber" || visBand === "violet") {
-      fillOpacity = rating > 0 ? (0.30 + (rating / 5) * 0.70) : 0.30;
+    // Rating-Tint statt Opazitaets-Ramp: Hue-Shift quer durch verwandte
+    // Farbtoene (Lime→Forest fuer green, Yellow→Brown fuer amber, Violet fuer
+    // rating 5 in safe). Konsistent zu region-map.js und briefing.js.
+    var fillHex = st.fill;
+    var strokeHex = st.stroke;
+    if (rating > 0 && (visBand === "green" || visBand === "amber")) {
+      var tint = ratingTintFor(visBand, rating);
+      if (tint) { fillHex = tint.fill; strokeHex = tint.stroke; }
     }
-    var fillScales = (visBand === "green" || visBand === "amber" || visBand === "violet");
 
     var s = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size
           + '" class="gc-glyph gc-glyph--' + visBand + '" role="img" aria-label="' + ariaLabel + '">';
-    if (fillScales) {
+    // Weisser Hintergrund-Kreis (verhindert dass Karte durchscheint bei hellem Fill).
+    if (visBand === "green" || visBand === "amber" || visBand === "violet") {
       s += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="#ffffff" />';
     }
     s += '<circle cx="' + center + '" cy="' + center + '" r="' + radius
-       + '" fill="' + st.fill + '" fill-opacity="' + fillOpacity.toFixed(2) + '"'
-       + ' stroke="' + st.stroke + '" stroke-width="1.5" />';
+       + '" fill="' + fillHex + '"'
+       + ' stroke="' + strokeHex + '" stroke-width="1.5" />';
 
     if (band === "red") {
       var arm = radius * 0.55;
@@ -109,7 +139,13 @@
     } else if (rating >= 1 && (visBand === "green" || visBand === "amber" || visBand === "violet")) {
       var fontSize = Math.round(radius * 1.4);
       var yOffset = fontSize * 0.35;
-      var textFill = (fillOpacity < 0.65) ? st.stroke : "#ffffff";
+      // Text-Kontrast (Palette v3.2): saturierte/dunkle Fills bei amber 3+,
+      // violet (Premium) UND green Rating 4 (Green-500 dunkel). Rating 1-3
+      // safe (Sky/Lime) und amber 1-2 sind hell → dunkler Text (stroke).
+      var darkBgHere = (visBand === "violet")
+        || (visBand === "amber" && rating >= 3)
+        || (visBand === "green" && rating >= 4);
+      var textFill = darkBgHere ? "#ffffff" : strokeHex;
       s += '<text x="' + center + '" y="' + (center + yOffset)
          + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter, sans-serif"'
          + ' font-size="' + fontSize + '" font-weight="800">' + rating + '</text>';

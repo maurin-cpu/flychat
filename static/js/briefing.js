@@ -83,7 +83,7 @@
     selectedDayIdx: loadDayIdx(),
     safetyFilters: loadSafetyFilter(),
     minRating: loadMinRating(),
-    fazitOpen: false,
+    wetterlageOpen: false,
     mapVisible: false,
     collapsedRegions: loadCollapsedRegions(),
     expandHintSeen: loadExpandHintSeen(),
@@ -136,7 +136,9 @@
       const raw = localStorage.getItem(LS_MIN_RATING_KEY);
       if (raw !== null) {
         const v = parseInt(raw, 10);
-        return isFinite(v) && v >= 0 && v <= 6 ? v : 0;
+        if (!isFinite(v) || v < 0) return 0;
+        // v2.1: Skala 0-5. Alte persistierte Werte 6 (waren Klassiker) auf 5 mappen.
+        return Math.min(5, v);
       }
       // Migration v1.4 0-10 → v2.1 0-5: alten Wert auf neue Skala mappen.
       const legacy10 = localStorage.getItem(LS_MIN_RATING_KEY_LEGACY);
@@ -676,44 +678,6 @@
     if (tsEl) tsEl.textContent = formatGeneratedAt(data.generated_at);
   }
 
-  // ── Render: Fazit ───────────────────────────────────────────
-
-  function renderFazit(data) {
-    const el = $("bfFazit");
-    if (!el) return;
-    const fazit = data.fazit;
-    if (!fazit) { el.hidden = true; return; }
-
-    el.hidden = false;
-    const bw = fazit.best_weekday || {};
-    const wrating = formatRating(fazit.week_rating);
-    const headline = bw.headline || bw.reason || "";
-    const summary = fazit.week_summary || "";
-
-    el.innerHTML = `
-      <div class="bf-fazit-head">
-        <span class="bf-fazit-label">Wochenfazit${bw.weekday ? ` — Bester Tag: ${escapeHtml(bw.weekday)}` : ""}</span>
-        <span class="bf-fazit-chevron" aria-hidden="true">▾</span>
-      </div>
-      <div class="bf-fazit-body"${state.fazitOpen ? "" : " hidden"}>
-        ${headline ? `<div class="bf-fazit-best">${escapeHtml(headline)}</div>` : ""}
-        ${summary ? `<p class="bf-fazit-text">${escapeHtml(summary)}</p>` : ""}
-        ${wrating !== "—" ? `<span class="bf-fazit-rating">${wrating} / 10</span>` : ""}
-      </div>
-    `;
-    el.className = `bf-fazit${state.fazitOpen ? " is-open" : ""}`;
-
-    if (!el._flyBound) {
-      el._flyBound = true;
-      el.addEventListener("click", () => {
-        state.fazitOpen = !state.fazitOpen;
-        const body = el.querySelector(".bf-fazit-body");
-        if (body) body.hidden = !state.fazitOpen;
-        el.classList.toggle("is-open", state.fazitOpen);
-      });
-    }
-  }
-
   // ── Render: Day Tabs ────────────────────────────────────────
 
   function renderDayTabs(data) {
@@ -722,15 +686,11 @@
     const days = data.days || [];
     if (!days.length) { container.innerHTML = ""; return; }
 
-    const fazit = data.fazit;
-    const bestDate = fazit && fazit.best_weekday && fazit.best_weekday.date;
-
     // Clamp selectedDayIdx
     if (state.selectedDayIdx >= days.length) state.selectedDayIdx = 0;
 
     container.innerHTML = days.map((d, i) => {
       const isActive = i === state.selectedDayIdx;
-      const isBest = d.date === bestDate;
 
       // RATING_CONCEPT v1.3: Day-Tabs zaehlen safety_band-Verteilung +
       // Top-Sterne als Hingucker. flyable = green + amber.
@@ -758,7 +718,6 @@
 
       const cls = ["bf-day-tab"];
       if (isActive) cls.push("is-active");
-      if (isBest) cls.push("is-best");
 
       return `
         <button type="button" class="${cls.join(" ")}" role="tab"
@@ -918,10 +877,10 @@
       });
     }
 
-    // Fliegbarkeit-Slider (0–6, experience_rating-Skala v2.0)
-    if (slider.max !== "6" || slider.step !== "1") {
+    // Fliegbarkeit-Slider (0–5, experience_rating-Skala v2.1)
+    if (slider.max !== "5" || slider.step !== "1") {
       slider.min = "0";
-      slider.max = "6";
+      slider.max = "5";
       slider.step = "1";
     }
     const v = Number(state.minRating || 0);
@@ -944,10 +903,10 @@
   }
 
   function updateSliderVisual(slider, valueEl, v) {
-    valueEl.textContent = v > 0 ? "\u2265 " + v + " / 6" : "alle";
+    valueEl.textContent = v > 0 ? "\u2265 " + v + " / 5" : "alle";
     slider.classList.toggle("is-active", v > 0);
     const min = parseFloat(slider.min) || 0;
-    const max = parseFloat(slider.max) || 6;
+    const max = parseFloat(slider.max) || 5;
     const pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
     slider.style.setProperty("--fill", pct.toFixed(1) + "%");
   }
@@ -1175,6 +1134,69 @@
     });
   }
 
+  // Erste Aussage-Saetze aus der LLM-Region-recommendation extrahieren — voller
+  // Satz als Tooltip-Quelle.
+  function extractRegionSummary(rec) {
+    if (!rec || typeof rec !== "string") return "";
+    let txt = rec.trim().replace(/^Unsere Einsch[aä]tzung:\s*/i, "");
+    const m = txt.match(/^[^.!?]+[.!?]/);
+    let first = m ? m[0].trim() : txt;
+    if (first.length < 40) {
+      const rest = txt.slice(first.length).trim();
+      const m2 = rest.match(/^[^.!?]+[.!?]/);
+      if (m2) first = first + " " + m2[0].trim();
+    }
+    return first;
+  }
+
+  // hex (#rrggbb) → rgba mit alpha — fuer transparente Pill/Spot-Backgrounds.
+  function hexToRgba(hex, alpha) {
+    if (!hex || hex[0] !== "#") return hex;
+    const h = hex.slice(1);
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  // Region-Pill: Label deterministisch aus Rating-Tier, Farbe 1:1 aus der
+  // Karten-Palette (region-map.js getRatingTint) — gleiche Hue+Lightness-Stufen
+  // damit Pill und Polygon konsistent sind. Voller LLM-Satz als Tooltip.
+  function regionPillSpec(meta) {
+    if (!meta) return null;
+    const rawBand = meta.safety_band || meta.safety_status || "";
+    const rating = Math.max(0, Math.min(5, parseInt(meta.experience_rating, 10) || 0));
+
+    if (rawBand === "red" || rawBand === "not_safe") {
+      return { label: "Nicht fliegbar", hex: "#ef4444", border: "#991b1b", text: "#ffffff", darkBg: true };
+    }
+    if (rating <= 0) return null;
+
+    if (rawBand === "amber" || rawBand === "conditional") {
+      // Conditional bleibt Yellow→Gold→Orange→Burnt→Brown (Warnsignal-Spektrum).
+      const labels = ["Abgleiter", "Schwacher Thermiktag", "Solider Thermiktag", "Starker Thermiktag", "XC-Tag"];
+      const bgs    = ["#fef08a", "#facc15", "#f97316", "#c2410c", "#7c2d12"];
+      const borders= ["#ca8a04", "#a16207", "#9a3412", "#7c2d12", "#431407"];
+      const texts  = ["#713f12", "#713f12", "#ffffff", "#ffffff", "#ffffff"];
+      const darkBg = [false, false, true, true, true];
+      const i = Math.min(4, rating - 1);
+      return { label: labels[i], hex: bgs[i], border: borders[i], text: texts[i], darkBg: darkBg[i] };
+    }
+
+    // Safe-Band v3.2 — "Royal Premium" finale Palette (Mai 2026):
+    // Sky-100 → Sky-200 → Lime → Green-500 → Violet-Premium.
+    // Story: blauer Himmel ohne Thermik (1+2) → Lime (3, warmer Start) →
+    // saturiertes Green (4, "klassisches Safety-Green" — starke Thermik) →
+    // Royal Violet (5, Legendary XC-Tag).
+    const labels = ["Abgleiter", "Kurzer Thermikflug", "Solider Thermiktag", "Starker Thermiktag", "XC-Tag"];
+    const bgs    = ["#e0f2fe", "#bae6fd", "#BEF264", "#22c55e", "#a78bfa"];
+    const borders= ["#38bdf8", "#0ea5e9", "#65a30d", "#15803d", "#6d28d9"];
+    const texts  = ["#075985", "#075985", "#3f6212", "#ffffff", "#ffffff"];
+    const darkBg = [false, false, false, true, true];  // Rating 4 (Green-500) + Rating 5 (Violet) = weisser Text
+    const i = Math.min(4, rating - 1);
+    return { label: labels[i], hex: bgs[i], border: borders[i], text: texts[i], darkBg: darkBg[i] };
+  }
+
   function renderRegionSection(group, meta) {
     const name = (meta && meta.region_name) || group.region_name || (group.region_id === "unknown" ? "Weitere Spots" : group.region_id);
     // Sortierung nach Rating absteigend — Filter kommen vom Slider + Safety-Chips
@@ -1201,10 +1223,21 @@
     const collapsedCls = isCollapsed ? " is-collapsed" : "";
     const ariaExpanded = isCollapsed ? "false" : "true";
     const regionDebugHtml = meta ? renderDebugNotes(meta) : "";
+    const fullSummary = extractRegionSummary(meta && meta.recommendation);
+    const pill = regionPillSpec(meta);
+    // Transparenz: dunkle Bgs (white text) brauchen mehr Saettigung fuer Kontrast,
+    // helle Bgs koennen mehr atmen.
+    const pillBg = pill ? hexToRgba(pill.hex, pill.darkBg ? 0.78 : 0.55) : "";
+    const pillBorder = pill ? hexToRgba(pill.border, 0.55) : "";
+    const summaryHtml = pill
+      ? `<span class="bf-region-pill" style="background:${pillBg};border-color:${pillBorder};color:${pill.text}" title="${escapeAttr(fullSummary || pill.label)}">${escapeHtml(pill.label)}</span>`
+      : "";
     return `
       <div class="bf-region${collapsedCls}" data-region-id="${escapeHtml(group.region_id)}">
         <div class="bf-region-head" role="button" tabindex="0" aria-expanded="${ariaExpanded}" aria-label="Region ${escapeHtml(name)} ein-/ausklappen">
           <span class="bf-region-name">${escapeHtml(name)}</span>
+          ${summaryHtml}
+          <span class="bf-region-spacer" aria-hidden="true"></span>
           <span class="bf-region-count" aria-hidden="true">${spotCount} ${spotCount === 1 ? "Spot" : "Spots"}</span>
           ${shareBtn}
           <span class="bf-region-chevron" aria-hidden="true">▾</span>
@@ -1242,16 +1275,16 @@
       ? `<div class="bf-spot-status">${chips.join("")}</div>`
       : "";
 
-    // Score-Pillen RATING_ARCHITECTURE v2.1: nur Rating-Pille (1-5).
+    // Score-Pille: gleiche Rating-Tint-Palette wie Region-Pill (synchron zur
+    // Karte). Alpha-Softening konsistent: helle Bgs 0.55, dunkle 0.78.
     const scorePills = [];
     if (band !== 'red' && band !== 'no_data' && rating > 0) {
-      const tierClass = rating >= 5 ? 'violet' : (rating >= 3 ? 'green' : 'gray');
-      const ratingLabels = {
-        1: 'Abgleiter', 2: 'Kurzer Thermikflug', 3: 'Solider Thermikflug',
-        4: 'Starker Thermikflug', 5: 'XC-Tag'
-      };
-      const label = ratingLabels[rating] || ('Rating ' + rating);
-      scorePills.push(`<span class="bf-score-pill bf-score-pill--${tierClass}">${label} ${rating}/5</span>`);
+      const sp = regionPillSpec({ safety_band: band, experience_rating: rating });
+      if (sp) {
+        const spBg = hexToRgba(sp.hex, sp.darkBg ? 0.78 : 0.55);
+        const spBorder = hexToRgba(sp.border, 0.55);
+        scorePills.push(`<span class="bf-score-pill" style="background:${spBg};border-color:${spBorder};color:${sp.text}">${escapeHtml(sp.label)} ${rating}/5</span>`);
+      }
     }
     const scoreBar = scorePills.length ? `<div class="bf-spot-scores">${scorePills.join("")}</div>` : "";
 
@@ -1282,8 +1315,20 @@
     const G2 = window.gleitcastGlyph;
     const visBand = (G2 && G2.displayBand) ? G2.displayBand(band, rating) : band;
     const visCls = "safety-" + visBand;
+    // Rating-Tint fuer Spot-Hintergrund — gleiche Palette wie Region-Pill,
+    // aber sehr subtil. Bg basiert auf der saturierten Border-Farbe (nicht auf
+    // dem hellen Fill), damit auch niedrige Ratings sichtbar sind. Alpha
+    // skaliert mit Rating.
+    const spotTint = regionPillSpec({ safety_band: band, experience_rating: rating });
+    let spotStyle = `--bf-rating-fill: ${fillNorm.toFixed(2)};`;
+    if (spotTint) {
+      const tintSrc = spotTint.border || spotTint.hex;
+      const bgAlpha = 0.07 + fillNorm * 0.13; // rating 1 ~0.10, rating 5 ~0.20
+      const borderAlpha = 0.35 + fillNorm * 0.55; // rating 1 ~0.46, rating 5 ~0.90
+      spotStyle += ` background: ${hexToRgba(tintSrc, bgAlpha)}; border-left-color: ${hexToRgba(tintSrc, borderAlpha)};`;
+    }
     return `
-      <li class="bf-spot ${visCls}" data-band="${band}" data-display-band="${visBand}" data-stars="${stars}" data-rating="${rating}" style="--bf-rating-fill: ${fillNorm.toFixed(2)};">
+      <li class="bf-spot ${visCls}" data-band="${band}" data-display-band="${visBand}" data-stars="${stars}" data-rating="${rating}" style="${spotStyle}">
         <div class="bf-spot-toggle" role="button" tabindex="0" aria-expanded="false">
           <div class="bf-spot-row">
             <span class="bf-spot-glyph" aria-hidden="true">${glyphHtml}</span>
@@ -1789,25 +1834,33 @@
     return null;
   }
 
-  function bfSafetyQualityStyle(safety, quality) {
+  // Mini-Map Marker-Style nutzt direkt regionPillSpec → identische Rating-Tint-
+  // Palette wie Region-Pill, Spot-Bg und Karten-Polygon.
+  function bfSafetyRatingStyle(safety, rating) {
     if (safety === 'default' || safety === 'no_data' || !safety) {
       return { fill: safety === 'no_data' ? '#9ca3af' : '#6b7280', stroke: safety === 'no_data' ? '#6b7280' : '#4b5563', glow: null, showStripes: false, showWarning: false };
     }
     if (safety === 'error') return { fill: '#f87171', stroke: '#b91c1c', glow: null, showStripes: false, showWarning: false };
     if (safety === 'not_safe') return { fill: '#dc2626', stroke: '#991b1b', glow: null, showStripes: true, showWarning: false };
-    if (safety === 'safe') {
-      if (quality === 'gray') return { fill: '#B08D57', stroke: '#8A6D3B', glow: null, showStripes: false, showWarning: false };
-      if (quality === 'violet') return { fill: '#8b5cf6', stroke: '#6d28d9', glow: 'rgba(139, 92, 246, 0.45)', showStripes: false, showWarning: false };
-      return { fill: '#22c55e', stroke: '#15803d', glow: null, showStripes: false, showWarning: false };
-    }
-    if (quality === 'gray') return { fill: '#fbbf24', stroke: '#b45309', glow: null, showStripes: false, showWarning: true };
-    if (quality === 'violet') return { fill: '#d97706', stroke: '#78350f', glow: null, showStripes: false, showWarning: true };
-    return { fill: '#f59e0b', stroke: '#92400e', glow: null, showStripes: false, showWarning: true };
+    const sp = regionPillSpec({ safety_band: safety === 'safe' ? 'green' : 'amber', experience_rating: rating });
+    if (!sp) return { fill: '#9ca3af', stroke: '#6b7280', glow: null, showStripes: false, showWarning: false };
+    const glow = (rating >= 5) ? hexToRgba(sp.hex, 0.45) : null;
+    return { fill: sp.hex, stroke: sp.border, glow, showStripes: false, showWarning: safety === 'conditional' };
   }
 
-  function bfCreateSpotIcon(windrichtung, safety, quality) {
+  function bfCreateSpotIcon(windrichtung, safety, ratingOrQuality) {
     const uid = ++_bfIcon.uid;
-    const style = bfSafetyQualityStyle(safety, quality);
+    // ratingOrQuality kann Zahl (neu, rating 1-5) oder Legacy-String (gray/green/violet) sein.
+    let rating = 0;
+    if (typeof ratingOrQuality === 'number') rating = ratingOrQuality;
+    else if (typeof ratingOrQuality === 'string') {
+      const n = parseInt(ratingOrQuality, 10);
+      if (isFinite(n)) rating = n;
+      else if (ratingOrQuality === 'violet') rating = 5;
+      else if (ratingOrQuality === 'green') rating = 3;
+      else if (ratingOrQuality === 'gray') rating = 1;
+    }
+    const style = bfSafetyRatingStyle(safety, rating);
     const sz = 44, c = sz / 2, r = 7;
     let h = '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">';
 
@@ -1861,7 +1914,7 @@
         subdomains: 'abcd', maxZoom: 18,
       }).addTo(mapObj);
 
-      const icon = bfCreateSpotIcon(el.dataset.windrichtung || "", el.dataset.safety || "", el.dataset.quality || "");
+      const icon = bfCreateSpotIcon(el.dataset.windrichtung || "", el.dataset.safety || "", parseInt(el.dataset.rating, 10) || 0);
       L.marker([lat, lon], { icon }).addTo(mapObj).bindTooltip(spotName, { direction: "top" });
 
       if (href) {
@@ -1980,10 +2033,20 @@
     btn.disabled = true;
     btn.textContent = "Generiert…";
     try {
+      // POST /api/briefing/generate triggert Wetterlage-Refresh +
+      // Fazit-Neugenerierung serverseitig. Die Response enthaelt das neue
+      // Fazit, aber NICHT das Wetterlage-Strukturfeld (das landet im Cache).
+      // Wir laden danach via loadBriefing() neu — das holt alles frisch
+      // inkl. dem neu generierten Wetterlage-Block.
       const res = await fetch("/api/briefing/generate", { method: "POST", headers: { "Content-Type": "application/json" } });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Fehlgeschlagen");
-      render(data);
+      // Wetterlage-Refresh-Status loggen (kein User-facing Error, Block
+      // wird einfach ausgeblendet wenn er nicht generierbar war).
+      if (data.wetterlage_refresh && data.wetterlage_refresh !== "ok") {
+        console.info("[briefing] wetterlage_refresh:", data.wetterlage_refresh);
+      }
+      await loadBriefing();
     } catch (err) {
       console.error("[briefing] generate failed", err);
       alert(`Fehler: ${err.message}`);
@@ -1999,11 +2062,82 @@
   function render(data) {
     state.data = data;
     renderHeader(data);
-    renderFazit(data);
+    renderWetterlage(data);
     renderDayTabs(data);
     renderFilters(data);
     renderTierFilter();
     renderDayContent();
+  }
+
+  // ── Render: Wetterlage ──────────────────────────────────────
+  // Block fuer die grossraeumige Synoptik (1x/Tag vom Scheduler generiert,
+  // deterministisch + LLM-Prosa). Zeigt die Kurzfassung initial sichtbar;
+  // bei Klick auf Toggle wird die Langfassung eingeblendet.
+
+  function renderWetterlage(data) {
+    const el = $("bfWetterlage");
+    if (!el) return;
+    const wl = data.wetterlage;
+    const overview = wl && wl.llm_overview ? wl.llm_overview : null;
+
+    // Wenn kein LLM-Overview vorhanden (Refresh fehlgeschlagen,
+    // Strukturfeld unvollstaendig, alle Saetze vom Post-Filter verworfen):
+    // Block ausblenden — keine Halluzination, kein Fallback-Text.
+    if (!overview || !overview.short) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+
+    const lageLabel = (wl.lage_label && wl.lage_label.value) || "";
+    const shortText = overview.short || "";
+    const longText = overview.long || "";
+    const longEntries = Array.isArray(overview.long_with_sources)
+      ? overview.long_with_sources.filter(e => e && e.text)
+      : [];
+
+    // Pro Eintrag (Einleitung + per-Tag-Block) ein eigener Paragraph,
+    // damit die MeteoSchweiz-aehnliche Tagesstruktur lesbar wird.
+    // "Wochentag:" am Zeilenanfang wird als <strong> hervorgehoben.
+    const longHtml = longEntries.length
+      ? longEntries.map(e => {
+          const txt = escapeHtml(e.text);
+          const m = txt.match(/^(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag):\s*/);
+          if (m) {
+            return `<p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>`;
+          }
+          return `<p class="bf-wetterlage-lead">${txt}</p>`;
+        }).join("")
+      : `<p>${escapeHtml(longText)}</p>`;
+
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="bf-wetterlage-head">
+        <span class="bf-wetterlage-icon" aria-hidden="true">☼</span>
+        <span class="bf-wetterlage-label">Wetterlage${lageLabel ? ` — ${escapeHtml(lageLabel)}` : ""}</span>
+      </div>
+      <p class="bf-wetterlage-short">${escapeHtml(shortText)}</p>
+      ${longText && longText !== shortText ? `
+        <button type="button" class="bf-wetterlage-toggle" aria-expanded="${state.wetterlageOpen ? "true" : "false"}">
+          ${state.wetterlageOpen ? "Weniger" : "Detail"} <span class="bf-wetterlage-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="bf-wetterlage-long"${state.wetterlageOpen ? "" : " hidden"}>${longHtml}</div>
+      ` : ""}
+    `;
+    el.classList.toggle("is-open", !!state.wetterlageOpen);
+
+    const toggle = el.querySelector(".bf-wetterlage-toggle");
+    if (toggle && !toggle._wlBound) {
+      toggle._wlBound = true;
+      toggle.addEventListener("click", () => {
+        state.wetterlageOpen = !state.wetterlageOpen;
+        const longEl = el.querySelector(".bf-wetterlage-long");
+        if (longEl) longEl.hidden = !state.wetterlageOpen;
+        toggle.setAttribute("aria-expanded", state.wetterlageOpen ? "true" : "false");
+        toggle.firstChild.textContent = (state.wetterlageOpen ? "Weniger" : "Detail") + " ";
+        el.classList.toggle("is-open", state.wetterlageOpen);
+      });
+    }
   }
 
   // ── Deep-Link via URL-Params (E-Mail-Briefing -> Dashboard) ─

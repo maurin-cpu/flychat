@@ -117,90 +117,112 @@
   outline-offset: 2px;
 }
 
-/* ── Fazit (collapsible weekly summary) ──────────────────── */
+/* ── Wetterlage (Synoptik-Block, 1x/Tag generiert) ──────── */
+/* Erscheint zuoberst im Cast (vor Fazit + Tag-Tabs). Initial nur die
+ * Kurzfassung sichtbar; "Detail"-Toggle blendet die Langfassung ein.
+ * Bei fehlendem llm_overview wird der Block ausgeblendet (renderWetterlage). */
 
-.bf-fazit {
+.bf-wetterlage {
   padding: var(--space-4) var(--space-5);
-  margin-bottom: var(--space-5);
-  background: var(--color-bg-elevated);
+  margin-bottom: var(--space-4);
+  /* Palette v3 "Royal Premium" (Mai 2026): Violet-Accent — alignt mit Rating-5-
+     Violet (Premium-Tier). Wetterlage ist der wichtigste Info-Block oben. */
+  background: linear-gradient(135deg, var(--color-bg-elevated) 0%, rgba(167, 139, 250, 0.08) 100%);
   border: 1px solid var(--color-border);
+  border-left: 3px solid #6d28d9;
   border-radius: var(--radius-lg);
   font-size: var(--text-sm);
-  color: var(--color-text-light);
   line-height: 1.6;
-  cursor: pointer;
-  user-select: none;
-  transition: box-shadow 200ms ease, border-color 200ms ease;
   box-shadow: var(--shadow-sm);
-  position: relative;
 }
 
-.bf-fazit:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-border-hover);
-}
+.bf-wetterlage[hidden] { display: none; }
 
-.bf-fazit[hidden] { display: none; }
-
-.bf-fazit-head {
+.bf-wetterlage-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
-.bf-fazit-label {
+.bf-wetterlage-icon {
+  font-size: 16px;
+  color: #6d28d9;
+  opacity: 0.85;
+}
+
+.bf-wetterlage-label {
   font-weight: 700;
   color: var(--color-text);
   font-size: var(--text-md);
   letter-spacing: -0.01em;
 }
 
-.bf-fazit-chevron {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  opacity: 0.5;
-  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms;
-}
-
-.bf-fazit:hover .bf-fazit-chevron { opacity: 0.8; }
-.bf-fazit.is-open .bf-fazit-chevron { transform: rotate(180deg); opacity: 1; color: var(--color-primary); }
-
-.bf-fazit-body {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
-}
-
-.bf-fazit-body[hidden] { display: none; }
-
-.bf-fazit-best {
-  font-size: var(--text-lg);
-  font-weight: 800;
-  color: var(--color-text);
-  margin-bottom: var(--space-1);
-  letter-spacing: -0.02em;
-}
-
-.bf-fazit-text {
-  margin: var(--space-2) 0 0;
+.bf-wetterlage-short {
+  margin: 0;
+  color: var(--color-text-secondary);
   font-size: var(--text-sm);
   line-height: 1.7;
-  color: var(--color-text-secondary);
 }
 
-.bf-fazit-rating {
-  display: inline-block;
-  margin-top: var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  color: var(--color-primary);
-  background: var(--color-primary-light);
-  padding: 4px 14px;
+.bf-wetterlage-toggle {
+  margin-top: var(--space-2);
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
-  letter-spacing: 0.02em;
-  border: 1px solid rgba(3, 105, 161, 0.15);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  transition: border-color 150ms, color 150ms;
 }
+
+.bf-wetterlage-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.bf-wetterlage-chevron {
+  font-size: 10px;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bf-wetterlage.is-open .bf-wetterlage-chevron {
+  transform: rotate(180deg);
+}
+
+.bf-wetterlage-long {
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+.bf-wetterlage-long[hidden] { display: none; }
+
+.bf-wetterlage-long p {
+  margin: 0 0 var(--space-2);
+}
+
+.bf-wetterlage-long p:last-child {
+  margin-bottom: 0;
+}
+
+.bf-wetterlage-lead {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.bf-wetterlage-day strong {
+  color: var(--color-text);
+}
+
 
 /* ── Day Tabs ────────────────────────────────────────────── */
 
@@ -261,24 +283,6 @@
 .bf-day-tab.is-active .bf-tab-count { color: #fff; }
 
 .bf-day-tab.is-active .bf-tab-weekday { opacity: 0.7; }
-
-.bf-day-tab.is-best::after {
-  content: "";
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 10px;
-  height: 10px;
-  background: #f59e0b;
-  border-radius: 50%;
-  border: 2px solid var(--color-bg);
-  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.4);
-}
-
-.bf-day-tab.is-active.is-best::after {
-  border-color: var(--color-primary);
-  background: #fbbf24;
-}
 
 .bf-tab-weekday {
   font-size: 10px;
@@ -1191,6 +1195,35 @@
   transition: background 150ms, border-color 150ms;
 }
 
+/* Inline-Pill direkt nach Region-Name — Landingpage-Stil. Farben inline
+   (regionPillSpec in briefing.js), Palette synchron zu region-map.js. */
+.bf-region-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: rgba(15, 23, 42, 0.04);
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+/* Spacer schiebt Spot-Count + Share + Chevron ans rechte Ende. */
+.bf-region-spacer { flex: 1 1 auto; }
+
+@media (max-width: 640px) {
+  .bf-region-name { flex: 0 1 auto; max-width: 45%; }
+  .bf-region-pill { font-size: 10.5px; padding: 2px 7px; max-width: 16ch; }
+}
+
 .bf-region-head:hover {
   background: var(--color-surface-2, rgba(0, 0, 0, 0.03));
 }
@@ -1201,13 +1234,14 @@
 }
 
 .bf-region-name {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   font-weight: 800;
   color: var(--color-text);
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .bf-region-count {
@@ -2064,10 +2098,12 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   border-color: var(--color-border-hover);
 }
 
-/* Akzentfarben pro Sektion */
+/* Akzentfarben pro Sektion — Palette v3.1 "Royal Premium refined" (Mai 2026):
+   safety = rot (Gefahr-Signal), fly = Lime (Rating-3 Solider Thermiktag), xc =
+   Violet (Rating-5 Premium / Legendaer). */
 .bf-assessment--safety { border-left-color: #ef4444; }
-.bf-assessment--fly    { border-left-color: #22c55e; }
-.bf-assessment--xc     { border-left-color: #8b5cf6; }
+.bf-assessment--fly    { border-left-color: #BEF264; }
+.bf-assessment--xc     { border-left-color: #a78bfa; }
 .bf-assessment--debug  { border-left-color: #64748b; opacity: 0.85; }
 
 .bf-debug-notes { display: flex; flex-direction: column; gap: 12px; }
@@ -2542,14 +2578,6 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   .bf-spot-minimap { height: 220px; }
   .bf-filter-map { height: 220px; }
 
-  .bf-fazit {
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-4);
-  }
-
-  .bf-fazit-label { font-size: var(--text-sm); }
-
   .bf-content-empty { padding: var(--space-12) var(--space-4); }
 }
 
@@ -2567,7 +2595,6 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   .bf-spot-chevron,
   .bf-region-chevron,
   .bf-region-head,
-  .bf-fazit-chevron,
   .bf-spot-details {
     transition: none !important;
     animation: none !important;

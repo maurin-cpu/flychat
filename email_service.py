@@ -1073,9 +1073,18 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # Heatmap-Matrix der Subscriber-Regionen
     region_matrix = _build_region_matrix(days_out, subscriber_regions)
 
-    # Lead-Prosa (1-2 Saetze zur Wochen-Gesamtsituation)
-    # LLM-generiert mit Fallback auf deterministischen Prose-Builder.
-    week_lead = _week_summary_llm(days_out, warnings)
+    # Lead-Prosa: bevorzugt der neue Wetterlage-Block (kurz-Version), sonst
+    # Fallback auf den deterministisch+LLM-generierten 1-2-Satz Week-Lead.
+    # Der Wetterlage-Block enthaelt grossraeumige Synoptik (Druckeinfluss,
+    # Stroemung, Druckzentren, Niederschlag Nord/Sued), generiert 1x/Tag vom
+    # Scheduler. Wenn Refresh oder LLM-Call gescheitert sind, ist
+    # wetterlage.llm_overview = None → wir nehmen den alten Lead.
+    wetterlage = briefing_data.get("wetterlage") or {}
+    wetterlage_overview = wetterlage.get("llm_overview") if isinstance(wetterlage, dict) else None
+    if wetterlage_overview and wetterlage_overview.get("short"):
+        week_lead = wetterlage_overview["short"]
+    else:
+        week_lead = _week_summary_llm(days_out, warnings)
 
     # Kurzlabels fuer Heatmap-Kopfzeile (Mo/Di/Mi/...)
     day_short_labels = [d["label"].get("short", "") for d in days_out]

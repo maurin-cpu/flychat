@@ -92,10 +92,15 @@ ARBEITSHOEHE (working_height_agl) — Charakter des Tages
 Median nutzbare Steighoehe ueber Startplatz. Entscheidet ueber **Charakter**
 (lokal vs. XC), nicht ueber Staerke.
 
-- **< 600m AGL** — sehr tief gedeckelt, Hausrundentag
-- **600-1200m AGL** — solider Arbeitsraum, Lokal-XC bis 30-50km
-- **1200-2000m AGL** — XC-Gelaende offen
+- **< 400m AGL** — sehr tief gedeckelt, Hausrunde nur mit Glueck
+- **400-800m AGL** — Hausrundentag, Soaring + kurze Thermikkreise
+- **800-1500m AGL** — Lokal-XC offen (30-80km drin)
+- **1500-2000m AGL** — echtes XC-Gelaende
 - **> 2000m AGL** — Klassiker-Territorium
+
+Stuetzpunkte aus Pilotenliteratur (Drury/xcmag, Burnair): 450m=Komfortgrenze,
+650m=Decision-Point, 1300m=marginal-fuer-50km, 1700m=nicht-besonders-hoch.
+Bandgrenzen sind Pilot-Uebersetzung. Siehe `meteo_research/working_height_agl_thresholds.md`.
 
 **Wichtig:** Niedrige AGL macht den Tag nicht schlecht — nur lokal. Spot-Tag
 Peak 2.5 × 8h × 700m AGL ist immer noch Rating 4. Die Hoehe gehoert v.a.
