@@ -8,10 +8,10 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 
 ---
 
-## I-001 — not_safe False-Positives bei Voralpen/Jura-Spots
+## I-001 — not_safe False-Positives bei Voralpen/Jura/Walliser Spots
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 1
+**Tage beobachtet**: 2 (17.05, 20.05)
 **Status**: in-untersuchung (Trigger identifiziert, Sub-Issues separieren)
 
 **Betroffene Spots (17.05.)**:
@@ -25,6 +25,12 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 - Scheidegg + Alp Scheidegg (3 Flüge, bis 47 km)
 - Le Suchet (2 Flüge, bis 46 km)
 - Brunnihütte (1 Flug, 45 km)
+
+**Betroffene Spots (20.05.)**:
+- Ramslauen (1 Flug, 4.15 km — Block-Filter)
+- St. Cergue (1 Flug, 8.14 km — Sektor zu eng)
+- Cry d'Er / Aminona (1 Flug 9.60 km, gemeldet als "Crans-Mon..." — Sektor + Mapping)
+- Jeizinen (1 Flug, 2.81 km morgens — Sektor + Wind-Staerke ignoriert)
 
 ### Trigger identifiziert (Code-Pfad: `engine/analyzers.py:128-219`, `_prefilter_not_safe`)
 
@@ -129,13 +135,25 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 ## I-005 — Coverage-Gaps: produktive Spots nicht in unserer DB
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 1
+**Tage beobachtet**: 3 (17.05, 18.05, 20.05) — Tussweid wiederholt 18.05+20.05
 **Status**: offen
 
-**Fehlende Spots (Top-100-Flug-Generatoren)**:
+**Fehlende Spots (Top-100-Flug-Generatoren) 17.05.**:
 - Grindelwald, Riederalp, Albagno, Bözingenberg, Carì, Turren, Verbier,
   Ämsigen, Laubbärgli, Anzère, Crans-Montana, Hinterrugg (Toggenburg),
   Tschenten, Mäggisseren — zusammen ~30 Top-100-Flüge an 1 Tag.
+
+**Fehlende Spots 18.05.**:
+- Tussweid (1 Flug, Ostschweiz/Toggenburg)
+- Gornergrat (1 Flug, Zermatt-Hochalpin)
+
+**Fehlende Spots 20.05.**:
+- **Burgfeldstand** (1 Flug, 14.04 km von C. Boo — hochpriorisiert, Niederhorn-Massiv)
+- **National** (1 Flug, 12.75 km von A. Eberhardt — Name unklar, IGC-Mapping nötig)
+- Crans-Montana (Multi-Sektor-Variante mit W/NW fehlt — Bellalui ist NO-W aber XContest-Pilot bezeichnete Spot anders)
+- Le pont (1 Flug, 3.76 km, Vallee de Joux)
+- Blapbach (1 Flug, 3.71 km, Emmental — niedrige Prio)
+- **Tussweid (wiederholt vom 18.05)** — Pattern: gleicher Pilot, kleiner Spot, fehlt durchgehend
 
 **Vermutete Ursachen**:
 - Spots in `fluggebiete_complete.csv` fehlen
@@ -154,8 +172,8 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 ## I-006 — Sektor-Definition in `fluggebiete_complete.csv` zu eng
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 1
-**Status**: offen
+**Tage beobachtet**: 2 (17.05, 20.05)
+**Status**: offen — heute jedes False-Positive auf diesem Issue
 
 **Beobachtung**: Mehrere Spots haben in der CSV nur **eine** Hauptstart-Richtung,
 real aber mehrere brauchbare Sektoren oder einen breiteren Wind-Sektor als
@@ -168,6 +186,9 @@ angegeben.
 | Weissenstein | S-SO (135-180°) | SSW-SW (195-235°) | 6 Flüge ab dort, 107 km |
 | Brunnihütte | W-SW (270-202°) | WNW-NW (296-321°) | 1 Flug, 45 km |
 | Mont Raimeux Nord | N-NO (0-45°) | NNW dominant (340-350°) | 1 Flug Raimeux, 106 km |
+| St. Cergue (20.05) | SO-S (135-180°) | W (285°) | 1 Flug 8.14 km, 56 min |
+| Cry d'Er / Aminona (20.05) | SSW-SSO (≈150-195°) | NW (308-349°) | 1 Flug 9.60 km — eher von W-Hang |
+| Jeizinen (20.05) | SO-S (135-180°) | W (268°) morgens | 1 Flug 2.81 km, 09 min |
 
 → CSV-Sektoren wurden vermutlich konservativ aus dem Hauptstart definiert, nicht
 aus dem realen Fenster, in dem ein erfahrener Pilot starten würde. Plus: viele
@@ -186,7 +207,7 @@ führt aber nur eine Variante.
 ## I-007 — `CLEAN_WINDOW_MIN_HOURS = 2` blockt 1-Stunden-Starts
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 1
+**Tage beobachtet**: 2 (17.05, 20.05 — Ramslauen-Mechanismus identisch)
 **Status**: offen
 
 **Beobachtung**: Schwelle "zusammenhängender Block ≥ 2h" sperrt Spots aus,
@@ -219,7 +240,7 @@ nachweislich in solchen Fenstern (Streckenflug 60+ km möglich).
 ## I-008 — Pre-Filter ignoriert Wind-Stärke
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 1
+**Tage beobachtet**: 2 (17.05, 20.05)
 **Status**: offen
 
 **Beobachtung**: Sektor-Filter prüft nur Richtung, nicht Stärke. Bei
@@ -230,6 +251,12 @@ Filter den Spot auf not_safe.
 **Beispiel**: Mont Raimeux Nord, 13:00 — Wind 124° aus SO bei 1.3 km/h.
 Sektor wäre N-NO. Real: bei 1.3 km/h startet niemand "gegen den Wind", man
 nimmt was die Thermik gibt.
+
+**Beispiel 20.05.**: Jeizinen, 08:39 — Frueh-Hop. Tagespeak-Gust spaeter 76 km/h,
+aber morgens vermutlich lokales Bergwind-System (Talwind noch nicht eingesetzt).
+Sektor-Filter pruefte nur die dominante Tagesrichtung 268° (W) — die spezifische
+Morgenstunde wurde nicht differenziert betrachtet. 9-min-Flug bestaetigt, dass
+das Morgen-Fenster real andere Bedingungen hatte als der Tages-Aggregat sagt.
 
 **Möglicher Fix**: Wenn Wind < z.B. 5 km/h, Sektor-Check skippen (oder
 Schwelle auf "Sektor irrelevant").
@@ -246,7 +273,7 @@ Schwelle auf "Sektor irrelevant").
 ## I-009 — Spot-Mapping XContest-Bezeichnung → DB-Bezeichnung
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 1
+**Tage beobachtet**: 2 (17.05, 20.05)
 **Status**: offen
 
 **Beobachtung**: XContest verwendet andere Spot-Namen als unsere DB. Wenn das
@@ -261,11 +288,53 @@ Mapping falsch ist, wird der Vergleich falsch.
 - "Mont Raimeux" (XContest) → bei uns als "Mont Raimeux Nord" und "Mont
   Raimeux Süd" — XContest unterscheidet nicht, wir schon. Welcher der
   beiden wurde geflogen?
+- **20.05.** "Crans-Mon..." (XContest) → Cry d'Er + Aminona (beide SSW-SSO,
+  not_safe bei NW-Wind), aber Bellalui (NO-W, conditional) am gleichen Massiv
+  passt zur tatsächlichen Strömung. Plausibel: Pilot startete an einem nicht-DB-
+  gelisteten Launch der Crans-Montana-Bergstation oder von Bellalui-Hang.
+- **20.05.** "Burgfelds..." → XContest-Truncate. Vermutlich Burgfeldstand
+  (Niederhorn-Massiv, Berner Voralpen). Nicht in DB. **Hochpriorisiert**
+  (14 km Strecke).
+- **20.05.** "National" (Andreas Eberhardt) → unklarer Name. IGC-Trackpoint
+  laden zum Identifizieren.
 
 **Nächste Schritte**:
 - Bei zukünftigen XContest-Auszügen Alias-Tabelle führen
 - Klären: ist "Obere Wengi" tatsächlich Niederhorn oder eigener Spot?
   → Spot in DB ergänzen falls Lücke
+
+---
+
+## I-010 — Tages-Niederschlags-Aggregat blockiert Morgen-Fenster
+
+**Erstmals**: 2026-05-18
+**Tage beobachtet**: 2 (18.05, 20.05)
+**Status**: offen
+
+**Beobachtung**: `precip_sum_mm` summiert den gesamten Tag — wenn der Hauptregen
+nachmittags/abends fällt, blockiert die Aggregation faelschlich das trockene
+Morgen-Fenster. Spots werden auf `not_safe` gesetzt, obwohl Piloten morgens
+real geflogen sind.
+
+**Beispiele**:
+
+| Spot | precip_sum (Tag) | Real-Flug | Regen-Zeitpunkt |
+|---|---|---|---|
+| Braunwald (18.05) | 23.0 mm | 19.14 km, Start 09:51 | Hauptmenge nachmittags |
+| Ramslauen (20.05) | 11.9 mm | 4.15 km, Start 13:08 | RAIN-Stop-Tag laut Tags ab 15-18h |
+
+**Mögliche Fixes**:
+- `precip_sum_mm` ersetzen durch `precip_flight_window_mm` (08-20h Summe) oder
+  noch enger 3h-Fenster um den Flug-Zeitpunkt
+- Pre-Filter zusätzlich pro-Stunde-Block-Check: gibt es 2-3h ohne Regen + im Sektor?
+- Decision-Engine könnte Regen als zeit-gebunden ausweisen ("Regen ab 15h",
+  nicht "Tages-Niederschlag 12mm")
+
+**Nächste Schritte**:
+- Prüfen, ob `precip_sum_mm` aktuell in den Pre-Filter eingeht (vs. nur
+  hourly precipitation pro Stunde)
+- Hourly-Regen-Werte für Braunwald 18.05 und Ramslauen 20.05 aus Snapshot
+  extrahieren und gegen Real-Start-Zeit prüfen
 
 ---
 

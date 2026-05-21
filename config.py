@@ -43,22 +43,104 @@ def with_api_key(params):
         params["apikey"] = OPENMETEO_API_KEY
     return params
 
-# Wettermodell-Hybrid:
-# - WIND_MODEL: Wind/Böen/Leewarnungen -> lokal präziser (CH1)
-# - THERMAL_MODEL: Thermik/Wolken/Strahlung -> robuster für Fliegbarkeit (ICON-D2)
-WIND_MODEL = "meteoswiss_icon_ch1" #meteoswiss_icon_ch1, icon_d2, icon_eu
-THERMAL_MODEL = "icon_d2"
-FALLBACK_MODEL = "icon_eu"
+# ============================================================================
+# WETTERMODELLE — zentrale Konfiguration (SoT: docs/WETTERMODELLE.md)
+# ============================================================================
+#
+# Jede Wettergroesse wird vom physikalisch passendsten Modell geliefert.
+# Pro Tag waehlt fetch_weather._process_spot_weather den besten verfuegbaren
+# Tier (Funktion `is_model_valid_for_day`).
+#
+#   Modell  | Aufloesung | Horizont | Kalibrierung    | PL? | BLH?
+#   --------|------------|----------|-----------------|-----|------
+#   CH1     | 1.1 km     | 33 h     | Schweiz (MeteoSwiss) | nein | nein
+#   CH2     | 2.1 km     | 5 d      | Schweiz (MeteoSwiss) | nein | nein
+#   D2      | 2.2 km     | 48 h     | Pan-Europa (DWD)    | ja   | nein
+#   EU      | 13 km      | 5 d      | Pan-Europa (DWD)    | ja   | nein
+#   GFS     | 25 km      | 5 d      | Global (NOAA)       | ja   | ja
+#
+# Open-Meteo-Limit: CH1/CH2 liefern NUR Surface-Variablen. Hoehenwind +
+# T_850/T_700 + Geopotenzial gibt es nur via D2/EU. BLH gibt es seit Mai 2026
+# nur noch via GFS (ICON-BLH-Felder kommen leer zurueck).
+#
+# --- SURFACE-Schicht (Wind, Wolken, Temp, Feuchte, Strahlung, Precip, CAPE) ---
+# Tag-Voting 4-Tier: CH1 -> CH2 -> D2 -> EU. Einheitlich fuer ALLE Surface-
+# Variablen, die CH-Modelle liefern (siehe CH_SURFACE_PARAMS unten).
+#
+# Tier-Logik:
+#   1. CH1 (1.1 km, 33h)  — Schweiz, hoechste Aufloesung Tag 1
+#   2. CH2 (2.1 km, 5d)   — Schweiz, Tag 2-5
+#   3. D2  (2.2 km, 48h)  — Pan-Europa, faengt CH-rand-Spots auf (Tessin Sued,
+#                            Walliser Suedtaeler, suedl. Engadin) wo CH1/CH2
+#                            null liefern. D2 deckt Alpenraum + Norditalien
+#                            grosszuegig ab und hat 2.2 km — deutlich besser
+#                            als EU (13 km) im Grenzgebiet.
+#   4. EU  (13 km, 5d)    — Notfall, nur Tag 3-5 ausserhalb der CH-Coverage.
+SURFACE_PRIMARY_MODEL   = "meteoswiss_icon_ch1"   # Tier 1: Tag 1 (33h), 1.1 km
+SURFACE_SECONDARY_MODEL = "meteoswiss_icon_ch2"   # Tier 2: Tag 2-5 (120h), 2.1 km
+SURFACE_TERTIARY_MODEL  = "icon_d2"               # Tier 3: CH-rand, Tag 1-2 (48h), 2.2 km
+SURFACE_FALLBACK_MODEL  = "icon_eu"               # Tier 4: Notfall, 13 km
 
-# Multi-Modell Böenvergleich: MeteoSwiss ICON-CH1 (1km) und ICON-CH2 (2km)
-CH1_MODEL = "meteoswiss_icon_ch1"
-CH2_MODEL = "meteoswiss_icon_ch2"
-CH_SURFACE_PARAMS = ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"]
-CH1_FORECAST_DAYS = 2  # CH1 hat nur ~33h Horizont
-CH2_FORECAST_DAYS = 5  # CH2 hat 5 Tage Horizont
+# --- D2-SPEZIFISCHE Surface-Variablen + PRESSURE-LEVEL ---
+# Variablen, die CH1/CH2 ueber Open-Meteo NICHT exponieren — bleiben bei D2/EU.
+# soil_moisture/soil_temperature: thermik_calculator nutzt sie fuer LE-Berechnung
+# updraft: D2-spezifischer Mass-Flux-Output
+# alle *_hPa Vars: nur D2 (Tag 1-2) und EU (Tag 3-5)
+PRESSURE_LEVEL_PRIMARY_MODEL  = "icon_d2"          # Tag 1-2 (48h), 2.2 km
+PRESSURE_LEVEL_FALLBACK_MODEL = "icon_eu"          # Tag 3-5, 13 km
 
-# Rückwärtskompatibilität für ältere Skripte
-API_MODEL = WIND_MODEL
+# --- BOUNDARY-LAYER-HEIGHT (Thermik-PBL-Cap) ---
+# Nur GFS liefert BLH via Open-Meteo. Wird in thermik_calculator als optionaler
+# Cap fuer die Parcel-BLH genutzt (Modi: gfs_pbl_cap_mode pro Terrain-Zone).
+BLH_MODEL = "gfs_seamless"                          # 5 d, 25 km
+
+# --- NIEDERSCHLAG dichte 16-RP-Aggregation ---
+# Eigener Batch im Region-Pfad. Konvektionsaufloesend + CH-kalibriert →
+# Schauer-Geographie (Stau/Lee/Foehn) sichtbar. Hybrid-Filter aus
+# meteo_research/precipitation_aggregation.md funktioniert nur auf
+# konvektionsaufloesenden Modellen (CH1/CH2/D2), nicht auf EU.
+PRECIP_DENSE_MODEL = "meteoswiss_icon_ch2"          # 5 d, 2.1 km
+
+# --- BOEEN-MULTI-MAX-MERGE (Sicherheits-Layer) ---
+# Konservatives max(D2, CH1, CH2) auf wind_gusts_10m (siehe BOEEN_MODELL.md).
+GUST_MERGE_MODELS = ["icon_d2", "meteoswiss_icon_ch1", "meteoswiss_icon_ch2"]
+
+# --- HORIZONTE pro Modell (forecast_days fuer Batch-Calls) ---
+FORECAST_DAYS_CH1 = 2   # real ~33h, 2d genuegt
+FORECAST_DAYS_CH2 = 5
+FORECAST_DAYS_D2  = 2   # D2 hat 48h
+FORECAST_DAYS_EU  = 5
+FORECAST_DAYS_GFS = 5
+
+# --- SURFACE-PARAMS die CH1/CH2 ueber Open-Meteo liefern ---
+# Mai 2026 verifiziert. Diese Liste wird im Wind/CH1/CH2-Batch verwendet.
+# Im Tag-Voting (CH1->CH2->EU) gelten diese Variablen als "CH-eligible".
+CH_SURFACE_PARAMS = [
+    "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m",
+    "temperature_2m", "relative_humidity_2m",
+    "cloud_base", "cloud_cover",
+    "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
+    "shortwave_radiation", "direct_radiation", "diffuse_radiation",
+    "sunshine_duration",
+    "precipitation", "precipitation_probability", "rain",
+    "weather_code",
+    "cape", "convective_inhibition",
+    "pressure_msl", "surface_pressure",
+    "et0_fao_evapotranspiration", "vapour_pressure_deficit",
+    "snow_depth",
+]
+
+# --- Legacy-Aliase (Rueckwaertskompatibilitaet fuer Skripte) ---
+# Neuer Code soll die kanonischen Namen oben benutzen.
+WIND_MODEL    = SURFACE_PRIMARY_MODEL
+THERMAL_MODEL = PRESSURE_LEVEL_PRIMARY_MODEL
+FALLBACK_MODEL = PRESSURE_LEVEL_FALLBACK_MODEL
+PRECIP_MODEL  = PRECIP_DENSE_MODEL
+CH1_MODEL = SURFACE_PRIMARY_MODEL
+CH2_MODEL = SURFACE_SECONDARY_MODEL
+CH1_FORECAST_DAYS = FORECAST_DAYS_CH1
+CH2_FORECAST_DAYS = FORECAST_DAYS_CH2
+API_MODEL = SURFACE_PRIMARY_MODEL
 
 API_TIMEOUT = 30
 FORECAST_DAYS = 5
@@ -68,6 +150,17 @@ TIMEZONE = "Europe/Zurich"
 # Referenzpunkte auf der Karte anzeigen (Linien vom Startplatz zu den
 # regionalen Thermik-Referenzpunkten beim Hover). False = ausgeblendet.
 SHOW_REFERENCE_POINTS = False
+
+# Niederschlags-Referenzpunkte (16 pro Region, CVT-verteilt) auf der Karte
+# anzeigen. Visuell klar abgegrenzt von den 7 Haupt-RPs: kleinere blaue
+# Kreise mit Tropfen-Symbolik, halbtransparent, keine Beschriftung. Quelle:
+# data/regionen_referenzpunkte_precip.geojson (siehe scripts/create_precip_refpoints.py).
+SHOW_PRECIP_REFPOINTS = False
+
+# OSM-Peaks/Paesse/Saettel auf allen Karten anzeigen (osm.org-Stil, braune
+# Symbole + Label). Daten aus data/osm_peaks_{major,minor}.geojson, gerendert
+# via static/js/osm-peaks-layer.js mit Viewport-Culling. True = einblenden.
+SHOW_OSM_PEAKS = True
 
 # ============================================================================
 # FLUGSTUNDEN-KONFIGURATION
@@ -104,6 +197,9 @@ CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
 USE_LEGACY_REGION_REFPOINTS = False
 REGIONEN_GEOJSON_PATH = DATA_DIR / "regionen_referenzpunkte.geojson"
 REGIONEN_GEOJSON_LEGACY_PATH = DATA_DIR / "regionen_referenzpunkte_legacy4.geojson"
+# 16 dichte CVT-Punkte pro Region — NUR fuer Niederschlag (Coverage-Statistik).
+# Generiert via scripts/create_precip_refpoints.py.
+REGIONEN_GEOJSON_PRECIP_PATH = DATA_DIR / "regionen_referenzpunkte_precip.geojson"
 # Master-File fuer Region-Properties (Name, terrain_type, elevation_ref,
 # kritischer_foehn, description). Geometrie + reference_points kommen aus
 # der GeoJSON, alle textuellen Felder aus dieser CSV.
@@ -233,7 +329,7 @@ for _level in PRESSURE_LEVELS:
 # SYNOPTIK / WETTERLAGE-BLOCK
 # ============================================================================
 # Konfiguration fuer engine/synoptic_context.py — der "Wetterlage"-Block
-# im Wochencast und in der E-Mail. Erzeugt deterministisch eine 5-Tages-
+# im Gleitcast und in der E-Mail. Erzeugt deterministisch eine 5-Tages-
 # Einordnung der Grosswetterlage (Druckeinfluss CH, Druckzentren Europa,
 # uebergeordnete Stroemung, Niederschlagsmuster Nord/Sued der Alpen,
 # Phaenomene wie Foehn/Bise/Vb-Tief).
@@ -733,8 +829,8 @@ WIND_IDEAL_MAX_KMH = 20         # km/h — ab diesem: ueber Komfortzone (= WIND_
 # Schwelle deterministisch auf wind_ok_count an (siehe analyzers._prefilter_not_safe).
 # WIND-WRONG Stunden NACH dem Start-Fenster sind kein Grund fuer UNFLIEGBAR —
 # der Pilot ist bereits in der Luft, Landung i.d.R. auf separatem Landeplatz.
-CLEAN_WINDOW_MIN_HOURS = 2       # h — unterhalb: not_safe
-CLEAN_WINDOW_GREEN_HOURS = 2     # h — ab hier: safe/green moeglich
+CLEAN_WINDOW_MIN_HOURS = 3       # h — unterhalb: not_safe
+CLEAN_WINDOW_GREEN_HOURS = 3     # h — ab hier: safe/green moeglich
 
 # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade):
 # Erfasst den groessten Richtungsdreher innerhalb eines gleitenden Fensters von

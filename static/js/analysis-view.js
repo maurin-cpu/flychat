@@ -72,7 +72,7 @@ window.AnalysisView = (function () {
         green:   { fill: '#22c55e', stroke: '#15803d' },
         amber:   { fill: '#f59e0b', stroke: '#92400e' },
         red:     { fill: '#ef4444', stroke: '#991b1b' },
-        // v3 Royal Premium: violet-Band = Violet-400 (Legendaer/Top).
+        // v3.2 Royal Premium: violet-Band = Violet-400 (Legendary/Top).
         violet:  { fill: '#a78bfa', stroke: '#6d28d9' },
         no_data: { fill: '#9ca3af', stroke: '#6b7280' }
     };
@@ -104,12 +104,12 @@ window.AnalysisView = (function () {
             var ai = Math.min(4, r - 1);
             return { label: aLabels[ai], fill: aBgs[ai], stroke: aBorders[ai], text: aTexts[ai], darkBg: aDark[ai] };
         }
-        // safe/green v3.2 Royal Premium: Sky-100 → Sky-200 → Lime → Green-500 → Violet (Top)
+        // safe/green v3.2 Royal Premium: Sky-100 → Sky-200 → Lime → Green-500 → Violet
         var gLabels = ['Abgleiter', 'Kurzer Thermikflug', 'Solider Thermiktag', 'Starker Thermiktag', 'XC-Tag'];
         var gBgs    = ['#e0f2fe', '#bae6fd', '#BEF264', '#22c55e', '#a78bfa'];
         var gBorders= ['#38bdf8', '#0ea5e9', '#65a30d', '#15803d', '#6d28d9'];
         var gTexts  = ['#075985', '#075985', '#3f6212', '#ffffff', '#ffffff'];
-        var gDarkBg = [false, false, false, true, true];  // Rating 4 (Green-500) + 5 (Violet) = weisser Text
+        var gDarkBg = [false, false, false, true, true];
         var gi = Math.min(4, r - 1);
         return { label: gLabels[gi], fill: gBgs[gi], stroke: gBorders[gi], text: gTexts[gi], darkBg: gDarkBg[gi] };
     }
@@ -236,11 +236,11 @@ window.AnalysisView = (function () {
         return i === -1 ? 999 : i;
     }
 
-    // Fester Anzeige-Rahmen 06:00–21:00 (parallel zum Wochencast).
+    // Fester Anzeige-Rahmen 06:00–21:00 (parallel zum Gleitcast).
     var WINDOW_HOUR_START_V4 = 6;
     var WINDOW_HOUR_END_V4 = 21;
 
-    // Startfenster — UI/UX-Pro-Max Layout (parallel zum Wochencast):
+    // Startfenster — UI/UX-Pro-Max Layout (parallel zum Gleitcast):
     // Antwort zuerst (✓/▲/✕ + Zeitspanne + Dauer-Pille), dann durchgehende
     // Farbleiste, Tick-Achse alle 3 h, optional Sportlich-Sekundaerinfo.
     // Achse ist immer 6h-20h, fehlende Stunden = neutral.
@@ -343,6 +343,23 @@ window.AnalysisView = (function () {
              + '</section>';
     }
 
+    // Niederschlags-Coverage-Glyph (Tropfen-Cluster) — identisch zu briefing.js.
+    function _rainGlyphSvg(klass) {
+        var drop = function (cx) {
+            return '<path d="M ' + cx + ' 1.5 '
+                 + 'C ' + (cx - 3.2) + ' 5, ' + (cx - 3.6) + ' 8, ' + (cx - 3.6) + ' 9.5 '
+                 + 'A 3.6 3.6 0 1 0 ' + (cx + 3.6) + ' 9.5 '
+                 + 'C ' + (cx + 3.6) + ' 8, ' + (cx + 3.2) + ' 5, ' + cx + ' 1.5 Z" '
+                 + 'fill="currentColor" opacity="0.85"/>';
+        };
+        var drops;
+        if (klass === 'widespread')      drops = drop(6) + drop(18) + drop(30);
+        else if (klass === 'scattered')  drops = drop(10) + drop(26);
+        else if (klass === 'isolated')   drops = drop(18);
+        else                              drops = drop(18);
+        return '<svg class="mga-rain-glyph" width="36" height="14" viewBox="0 0 36 14" role="img" aria-label="Coverage ' + (klass || 'regen') + '">' + drops + '</svg>';
+    }
+
     function renderTagGroupsV4(tags) {
         if (!Array.isArray(tags) || !tags.length) return '';
         var byLevel = { stop: [], warn: [], good: [], info: [] };
@@ -359,7 +376,11 @@ window.AnalysisView = (function () {
             .filter(function (sev) { return byLevel[sev].length > 0; })
             .map(function (sev) {
                 var rows = byLevel[sev].map(function (t) {
-                    var v = t.value ? '<span class="mga-tag-value">' + esc(t.value) + '</span>' : '<span class="mga-tag-value"></span>';
+                    var valueInner = esc(t.value || '');
+                    if (t.topic === 'RAIN' && t.rain_class) {
+                        valueInner = _rainGlyphSvg(t.rain_class) + ' ' + valueInner;
+                    }
+                    var v = (t.value || t.rain_class) ? '<span class="mga-tag-value">' + valueInner + '</span>' : '<span class="mga-tag-value"></span>';
                     var tm = t.time ? '<span class="mga-tag-time">' + esc(t.time) + '</span>' : '<span class="mga-tag-time"></span>';
                     return '<div class="mga-tag-row">'
                          + '<span class="mga-tag-topic">' + esc(t.label || t.topic) + '</span>'

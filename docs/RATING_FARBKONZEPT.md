@@ -33,7 +33,7 @@ Aenderungen am Konzept brechen die Konsistenz, wenn nicht alle Touchpoints angep
 **Prinzip — "Royal Premium" Tier-Hierarchie (final v3.2):**
 - **Sky-Blue** (Rating 1+2 safe): signalisiert "blue thermal day" (Pilot-Mental-Modell: blauer Himmel ohne Cumulus = keine Thermik). Cool, ruhig, "still air".
 - **Aktive Thermik** (Rating 3-4 safe): Lime (warmes Yellow-Gruen, "erste Sonne, Thermik startet") → **Green-500** (klassisches Safety-Green, saturiert, "starke organisierte Thermik"). Lime → satter Green-Sprung = Pilot sieht sofort "es geht aktiv".
-- **Royal Violet** (Rating 5 safe): Premium-Top fuer XC-Tag/Klassiker. Wie Gaming-Tiers (Common→Rare→Epic→**Legendary**). Pilot scrollt durch Wochencast → Violet-Spots = sofort "DER Tag".
+- **Royal Violet** (Rating 5 safe): Premium-Top fuer XC-Tag/Klassiker. Wie Gaming-Tiers (Common→Rare→Epic→**Legendary**). Pilot scrollt durch Gleitcast → Violet-Spots = sofort "DER Tag".
 - **Code-Identifier `violet` matched wieder visuell** (v3 stellte v1-Intent her). Premium = Violet, semantisch konsistent.
 - **Thermik-Alignment** durchgehend: Meteogramm-Kacheln folgen derselben Skala (`meteogram.js:thermClimbColor`) + Chat-Charts (`chat-charts.js:thermClimbColor`).
 - **Conditional bleibt Yellow→Orange→Brown**: Warnsignal-Spektrum klar getrennt.
@@ -41,7 +41,7 @@ Aenderungen am Konzept brechen die Konsistenz, wenn nicht alle Touchpoints angep
 
 **Story:** Pilot-Tagesverlauf vom blauen leeren Himmel (1+2 = "noch nichts da") ueber den ersten warmen Lime-Sonnenstrahl (3 = "Solider Thermiktag") zum saturierten Safety-Green der starken organisierten Thermik (4 = "klassischer guter Flugtag") bis zum Legendary Violet (5 = "Wolkenbasis, XC, magisch").
 
-**Naming-Konsistenz (v3):** Der Band-Name `violet` matched jetzt wieder visuell — Premium-Tier IST Violet. Damit ist die historische Naming-Inkonsistenz aus v2 (`violet` Code = Cyan visuell) aufgeloest.
+**Naming-Konsistenz (v3.2):** Der Band-Name `violet` matched wieder visuell — Premium-Tier IST Violet. Damit ist die historische Naming-Inkonsistenz aus v2 (`violet` Code = Cyan visuell) aufgeloest.
 
 **Alpha-Regeln (Pillen + Spot-Bg):**
 - Helle Bgs (Rating 1+2): alpha 0.55 — atmen lassen
@@ -58,14 +58,14 @@ Aenderungen am Konzept brechen die Konsistenz, wenn nicht alle Touchpoints angep
 | 1a | **Region-Polygon Fill+Border** (Karte regionen.html) | `static/js/region-map.js:111-141` | `getRatingTint(band, rating)` + `getRatingBorder` | Fill + Border-Weight + Border-Color |
 | 1b | **Region-Polygon-Label** (Zahl-Pille im Polygon-Centroid) | `static/js/region-map.js:270-330` | `buildRegionLabel()` Per-Rating ink+ring | Pille-Ring-Farbe + Text-Farbe der Rating-Zahl |
 | 2 | **Spot-Marker** (Hauptkarte map.html) | `static/js/map.js:159-178` | `getRatingTint(band, rating)` | Marker-Fill + Stroke |
-| 3 | **Glyph-Kreis** (Spot-Header im Wochencast, Marker-Inneres) | `static/js/shared-glyph.js:28-58` | `ratingTintFor(visBand, rating)` | Kreis-Fill + Stroke + Text-Farbe |
-| 4 | **Region-Pill** (Wochencast Region-Header) | `static/js/briefing.js:1206-1244` | `regionPillSpec(meta)` | Pill-Bg + Border + Text |
-| 5 | **Spot-Score-Pill** (Wochencast Spot-Header) | `static/js/briefing.js:1322-1334` | `regionPillSpec()` reused | Pill-Bg + Border + Text |
-| 6 | **Spot-Background** (Wochencast Spot-Container) | `static/js/briefing.js:1363-1375` | `regionPillSpec()` reused + Alpha-Skala | Bg-Tint + Border-Left |
-| 7 | **Mini-Map Marker** (aufgeklappter Spot in Wochencast) | `static/js/briefing.js:1882-1900` | `bfSafetyRatingStyle()` → ruft `regionPillSpec()` | Marker-Fill + Stroke + Glow |
+| 3 | **Glyph-Kreis** (Spot-Header im Gleitcast, Marker-Inneres) | `static/js/shared-glyph.js:28-58` | `ratingTintFor(visBand, rating)` | Kreis-Fill + Stroke + Text-Farbe |
+| 4 | **Region-Pill** (Gleitcast Region-Header) | `static/js/briefing.js:1206-1244` | `regionPillSpec(meta)` | Pill-Bg + Border + Text |
+| 5 | **Spot-Score-Pill** (Gleitcast Spot-Header) | `static/js/briefing.js:1322-1334` | `regionPillSpec()` reused | Pill-Bg + Border + Text |
+| 6 | **Spot-Background** (Gleitcast Spot-Container) | `static/js/briefing.js:1363-1375` | `regionPillSpec()` reused + Alpha-Skala | Bg-Tint + Border-Left |
+| 7 | **Mini-Map Marker** (aufgeklappter Spot in Gleitcast) | `static/js/briefing.js:1882-1900` | `bfSafetyRatingStyle()` → ruft `regionPillSpec()` | Marker-Fill + Stroke + Glow |
 | 8 | **Rating-Info-Overlay** (Legenden-Modal) | `static/js/rating-info.js:16-34` | `_ratingTint(band, rating)` | Glyph-Beispiele im Overlay |
-| 9 | **Thermik-Kacheln** (Meteogramm im Wochencast + Detail) | `static/js/meteogram.js:137-150` | `thermClimbColor(rate)` | Zellen-Fill nach climb_rate |
-| 10 | **Wetterlage-Block** (Wochencast Top-Pille) | `static/css/briefing.css:125-140` | `.bf-wetterlage` Border-Left + Bg-Gradient | Cyan-Accent (Premium-Farbe) |
+| 9 | **Thermik-Kacheln** (Meteogramm im Gleitcast + Detail) | `static/js/meteogram.js:137-150` | `thermClimbColor(rate)` | Zellen-Fill nach climb_rate |
+| 10 | **Wetterlage-Block** (Gleitcast Top-Pille) | `static/css/briefing.css:125-140` | `.bf-wetterlage` Border-Left + Bg-Gradient | Cyan-Accent (Premium-Farbe) |
 | 11 | **Spot-Assessment-Sektionen** (aufgeklappte Spot-Details) | `static/css/briefing.css:2202-2207` | `.bf-assessment--safety/fly/xc` | Border-Left-Akzent pro Sektion |
 | 12 | **Spot/Region-Detail-Overlay** (Click auf Marker/Polygon) | `static/js/analysis-view.js:67-110` | `ratingTintSpec(band, rating)` + `buildGlyph()` + `renderHero()` | Hero-Container Bg + Border, Glyph-Fill, Rating-Pill |
 | 13 | **Chat-Charts Thermik-Kacheln** (KI-Berater-Visualisierungen) | `static/js/chat-charts.js:59-67, 374-375` | `thermClimbColor(rate)` + Legend-Array | Thermik-Zellen + Legenden-Swatches im Chat |
@@ -141,14 +141,17 @@ Hard-Reload (Ctrl+Shift+R) auf jeder Route. Pro Punkt **eine konkrete Region ode
 
 **Migration durchgefuehrt** am 2026-05-17.
 
-**Motivation:** v3.1 nutzte Teal-300 fuer Rating 4 — User-Feedback: "zu blau, sollte mehr gruen sein". Erinnerung an das saturierte Green-500 das historisch fuer safety-band-Marker und Pillen verwendet wurde.
+**Motivation:** Premium-Tier-Hierarchie mit Violet-400 als Top + Green-500 fuer Rating 4 als saturiertes Safety-Green. Sky/Sky/Lime/Green-500/Violet ergibt klare visuelle Progression vom blauen Himmel ohne Thermik (1+2) ueber Lime (3) und Safety-Green (4) zum Legendary Violet (5).
 
-**Loesung:** Rating 4 = **Green-500 `#22c55e`** (klassisches Safety-Green, saturiert mid-gruen). Weisser Text (Bg ist dunkel genug). Alle anderen Werte aus v3.1 bleiben.
+**Versuch v4 (Complementary Twilight)** wurde nach Test verworfen — User: "vorhin wars besser" (v3.2 war besser als v4). v3.2 wiederhergestellt.
 
-**Migriert:** 13 Touchpoints inkl. Meteogramm + Chat-Charts. Text-Kontrast-Logik in shared-glyph.js, map.js, rating-info.js, analysis-view.js erweitert um "green Rating 4 = weisser Text".
+**Migriert:** 13 Touchpoints inkl. Meteogramm + Chat-Charts. Text-Kontrast-Logik in shared-glyph.js, map.js, rating-info.js, analysis-view.js: "green Rating 4 = weisser Text".
+
+### v4 (Mai 2026) — Complementary Twilight — uebergangen
+Violet-Pastell → Lime → Mint-Green → Cyan mit Komplementaer-Pop bei 2→3. Konzeptionell stark, aber User: "vorhin (v3.2) wars besser". Zurueckgerollt.
 
 ### v3.1 (Mai 2026) — Royal Premium refined (Teal-300) — uebergangen
-Versuch mit Teal-300 fuer Rating 4 (Tuerkis-Variante). User: "zu blau, mehr gruen". Verworfen.
+Teal-300 fuer Rating 4 — User: "zu blau, mehr gruen". Verworfen.
 
 ### v3 (Mai 2026) — Royal Premium (Mint-Green + Cyan) — uebergangen
 

@@ -1012,15 +1012,23 @@ window.Meteogram = (function () {
                 .attr('rx', 3)
                 .attr('title', hasPrecip ? precipAmt.toFixed(1) + ' mm' + (hasStorm ? ' + Gewitter' : '') : 'Gewitter');
 
+            // Coverage-Klasse fuer Tropfen-Anzahl pro Stunde:
+            //   widespread → 3 Tropfen (flaechig)
+            //   scattered  → 2 Tropfen (verstreut)
+            //   isolated   → 1 Tropfen (vereinzelt)
+            //   sonst       → 1 Tropfen (Legacy / Spot)
+            var precipKlass = precip.klass || precip.precipitation_class || null;
+            var dropCount = precipKlass === 'widespread' ? 3
+                          : precipKlass === 'scattered'  ? 2
+                          : 1;
+
             if (isMobileViewport) {
-                // Mobile: keine Zahlen — Icons zentriert. Regen als Tropfen,
-                // Gewitter als Blitz. Beide selbst gezeichnet (SVG path), damit
-                // sie schriftunabhängig sauber rendern.
+                // Mobile: keine Zahlen — Icons zentriert. Regen als Tropfen-Cluster,
+                // Gewitter als Blitz. Beide selbst gezeichnet (SVG path).
                 var iconSize = Math.min(14, PRECIP_ROW_H - 4);
                 var iconY = precipRowY + (PRECIP_ROW_H - iconSize) / 2;
                 var iconScale = iconSize / 24;
                 if (hasStorm) {
-                    // Klassischer Blitz-Pfad in viewBox 24x24.
                     var boltX = cx - iconSize * 0.32;
                     chartG.append('path')
                         .attr('d', 'M13 2 L4 14 L11 14 L9 22 L20 10 L13 10 Z')
@@ -1030,36 +1038,47 @@ window.Meteogram = (function () {
                         .attr('stroke-width', 0.8 / iconScale)
                         .attr('stroke-linejoin', 'round');
                 } else if (hasPrecip) {
-                    // Tropfen-Pfad: Spitze oben (12,2), Kreisboden unten.
-                    // Bezier-Kurven formen die klassische Tropfen-Silhouette.
-                    var dropX = cx - iconSize * 0.5;
+                    // Tropfen-Cluster mit ueberlappenden Drops + y-Jitter.
+                    var perDropSize = dropCount > 1 ? Math.max(7, Math.floor(iconSize * 0.6)) : iconSize;
+                    var perDropScale = perDropSize / 24;
+                    var dropStep = dropCount > 1 ? Math.round(perDropSize * 0.55) : 0;
+                    var clusterW = perDropSize + (dropCount - 1) * dropStep;
+                    var clusterStartX = cx - clusterW / 2;
+                    var clusterY = precipRowY + (PRECIP_ROW_H - perDropSize) / 2;
                     var dropColor = precipAmt >= 3 ? '#1D4ED8' : precipAmt >= 1 ? '#2563EB' : '#3B82F6';
-                    chartG.append('path')
-                        .attr('d', 'M12 2 C12 2 4 12 4 16 C4 20 7.5 22 12 22 C16.5 22 20 20 20 16 C20 12 12 2 12 2 Z')
-                        .attr('transform', 'translate(' + dropX + ',' + iconY + ') scale(' + iconScale + ')')
-                        .attr('fill', dropColor)
-                        .attr('stroke', '#DBEAFE')
-                        .attr('stroke-width', 0.8 / iconScale)
-                        .attr('stroke-linejoin', 'round');
+                    var mYJitter = [0, 1, 0];
+                    for (var di = 0; di < dropCount; di++) {
+                        chartG.append('path')
+                            .attr('d', 'M12 2 C12 2 4 12 4 16 C4 20 7.5 22 12 22 C16.5 22 20 20 20 16 C20 12 12 2 12 2 Z')
+                            .attr('transform', 'translate(' + (clusterStartX + di * dropStep) + ',' + (clusterY + (mYJitter[di] || 0)) + ') scale(' + perDropScale + ')')
+                            .attr('fill', dropColor)
+                            .attr('stroke', '#DBEAFE')
+                            .attr('stroke-width', 0.8 / perDropScale)
+                            .attr('stroke-linejoin', 'round');
+                    }
                 }
             } else {
-                // Desktop: Self-gezeichnete Icons (gleich wie Mobile) + mm-Wert
-                // daneben — kein Emoji-⚡ mehr (no-emoji-icons Regel).
-                // Layout: icon links, text rechts, gemeinsam zentriert.
+                // Desktop: Tropfen-Cluster (1/2/3 je nach Coverage-Klasse) + mm-Wert.
+                // Tropfen leicht versetzt (y-jitter) — wirkt wie fallender Regen,
+                // nicht wie eine starre Reihe. Schmaler als der ursprueng-
+                // liche Cluster, damit der mm-Text Platz hat.
                 var dIconSize = 12;
                 var dIconY = precipRowY + (PRECIP_ROW_H - dIconSize) / 2;
                 var dIconScale = dIconSize / 24;
                 var dText = hasPrecip ? precipAmt.toFixed(1) + ' mm' : '';
                 var dGap = dText ? 3 : 0;
-                // Approx. Textbreite (font 11px, ~6.2px/char).
+                // Cluster: kleinere Tropfen bei >1, OHNE Gap (ueberlappend statt nebeneinander).
+                var dPerDropSize = (!hasStorm && dropCount > 1) ? 7 : dIconSize;
+                var dPerDropScale = dPerDropSize / 24;
+                var dDropStep = dropCount > 1 ? Math.round(dPerDropSize * 0.55) : 0;  // <Drop-Breite = ueberlappend
+                var dClusterW = hasStorm ? dIconSize : (dPerDropSize + (dropCount - 1) * dDropStep);
                 var dTextW = dText.length * 6.2;
-                var dTotalW = dIconSize + dGap + dTextW;
+                var dTotalW = dClusterW + dGap + dTextW;
                 var dStartX = cx - dTotalW / 2;
                 var dIconX = dStartX;
-                var dTextX = dStartX + dIconSize + dGap;
+                var dTextX = dStartX + dClusterW + dGap;
 
                 if (hasStorm) {
-                    // Blitz (gleicher Pfad wie Mobile).
                     chartG.append('path')
                         .attr('d', 'M13 2 L4 14 L11 14 L9 22 L20 10 L13 10 Z')
                         .attr('transform', 'translate(' + dIconX + ',' + dIconY + ') scale(' + dIconScale + ')')
@@ -1068,15 +1087,20 @@ window.Meteogram = (function () {
                         .attr('stroke-width', 0.8 / dIconScale)
                         .attr('stroke-linejoin', 'round');
                 } else {
-                    // Tropfen (gleicher Pfad wie Mobile).
                     var dDropColor = precipAmt >= 3 ? '#1D4ED8' : precipAmt >= 1 ? '#2563EB' : '#3B82F6';
-                    chartG.append('path')
-                        .attr('d', 'M12 2 C12 2 4 12 4 16 C4 20 7.5 22 12 22 C16.5 22 20 20 20 16 C20 12 12 2 12 2 Z')
-                        .attr('transform', 'translate(' + dIconX + ',' + dIconY + ') scale(' + dIconScale + ')')
-                        .attr('fill', dDropColor)
-                        .attr('stroke', '#DBEAFE')
-                        .attr('stroke-width', 0.8 / dIconScale)
-                        .attr('stroke-linejoin', 'round');
+                    var dClusterY = precipRowY + (PRECIP_ROW_H - dPerDropSize) / 2;
+                    // Tropfen leicht y-versetzt (alternierend hoch/tief) — wirkt
+                    // wie Regenfall, nicht wie eine ausgerichtete Reihe.
+                    var yJitter = [0, 1, 0];
+                    for (var ddi = 0; ddi < dropCount; ddi++) {
+                        chartG.append('path')
+                            .attr('d', 'M12 2 C12 2 4 12 4 16 C4 20 7.5 22 12 22 C16.5 22 20 20 20 16 C20 12 12 2 12 2 Z')
+                            .attr('transform', 'translate(' + (dIconX + ddi * dDropStep) + ',' + (dClusterY + (yJitter[ddi] || 0)) + ') scale(' + dPerDropScale + ')')
+                            .attr('fill', dDropColor)
+                            .attr('stroke', '#DBEAFE')
+                            .attr('stroke-width', 0.8 / dPerDropScale)
+                            .attr('stroke-linejoin', 'round');
+                    }
                 }
 
                 if (dText) {

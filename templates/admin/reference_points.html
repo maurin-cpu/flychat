@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · Referenzpunkte – Gleitcast{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+<style>
+    .rp-page {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: var(--space-5) var(--space-4);
+        font-family: Inter, system-ui, sans-serif;
+    }
+    .rp-header { margin-bottom: var(--space-4); }
+    .rp-header h1 { margin: 0 0 var(--space-1); font-size: 1.5rem; }
+    .rp-header .rp-subtitle { color: var(--color-text-muted, #666); font-size: var(--text-sm); }
+
+    .rp-nav { display: flex; gap: 8px; margin-bottom: var(--space-5); flex-wrap: wrap; }
+    .rp-nav a {
+        padding: 8px 14px; border-radius: var(--radius-md);
+        border: 1px solid var(--color-border); background: var(--color-surface, #fff);
+        color: var(--color-text); text-decoration: none;
+        font-size: var(--text-sm); font-weight: 500;
+    }
+    .rp-nav a.rp-nav--active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+    .rp-toolbar {
+        display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+        margin-bottom: var(--space-4);
+        padding: 12px;
+        background: var(--color-bg-elevated, #fff);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+    }
+    .rp-mode-toggle { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+    .rp-mode-toggle button {
+        padding: 8px 16px; border: 0; background: transparent; color: var(--color-text);
+        cursor: pointer; font-size: var(--text-sm); font-weight: 500;
+    }
+    .rp-mode-toggle button.is-active { background: var(--color-primary); color: #fff; }
+    .rp-select { padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); min-width: 240px; font-size: var(--text-sm); }
+    .rp-spacer { flex: 1; }
+
+    .rp-layout { display: grid; grid-template-columns: 380px 1fr; gap: var(--space-4); }
+    @media (max-width: 1024px) { .rp-layout { grid-template-columns: 1fr; } }
+
+    .rp-panel {
+        background: var(--color-bg-elevated, #fff);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        padding: 14px;
+        max-height: 78vh;
+        overflow-y: auto;
+    }
+    .rp-panel h3 { margin: 0 0 12px; font-size: 1rem; }
+    .rp-panel .rp-hint { font-size: 12px; color: var(--color-text-muted, #777); margin-bottom: 10px; line-height: 1.4; }
+    .rp-point-row {
+        display: grid; grid-template-columns: 28px 1fr 1fr; gap: 6px;
+        align-items: center; margin-bottom: 6px;
+    }
+    .rp-point-row .rp-idx {
+        width: 24px; height: 24px; border-radius: 50%;
+        background: var(--color-primary); color: #fff;
+        font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;
+    }
+    .rp-point-row input {
+        padding: 6px 8px; border: 1px solid var(--color-border);
+        border-radius: 4px; font-size: 12px; font-family: ui-monospace, monospace;
+        width: 100%; box-sizing: border-box;
+    }
+    .rp-point-row input:focus { border-color: var(--color-primary); outline: none; }
+    .rp-point-row.is-active { background: rgba(3,105,161,0.06); border-radius: 4px; padding: 2px; }
+
+    .rp-spot-info { margin-bottom: 10px; padding: 10px; background: rgba(3,105,161,0.04); border-radius: 6px; font-size: 12px; }
+    .rp-spot-info strong { display: block; font-size: 14px; margin-bottom: 4px; }
+
+    .rp-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+    .rp-btn {
+        padding: 8px 14px; border-radius: var(--radius-md); border: 1px solid transparent;
+        cursor: pointer; font-size: var(--text-sm); font-weight: 500;
+    }
+    .rp-btn--primary { background: var(--color-primary); color: #fff; }
+    .rp-btn--primary:disabled { background: #aaa; cursor: not-allowed; }
+    .rp-btn--secondary { background: transparent; color: var(--color-text); border-color: var(--color-border); }
+    .rp-dirty { color: #b45309; font-size: 12px; margin-top: 6px; }
+
+    .rp-map-wrap {
+        background: #f7f7f7;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+    #rp-map { height: 78vh; min-height: 500px; width: 100%; }
+
+    .rp-flash {
+        padding: 10px 14px; border-radius: var(--radius-md);
+        margin-top: 12px; font-size: 13px;
+    }
+    .rp-flash--ok { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+    .rp-flash--err { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+    .rp-empty { padding: 30px 14px; color: #888; text-align: center; font-size: 13px; }
+
+    .rp-refmarker-label {
+        background: rgba(3,105,161,0.92); color: #fff;
+        padding: 2px 6px; border-radius: 10px;
+        font-size: 11px; font-weight: 700;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .rp-bulk { margin-bottom: 12px; padding: 8px 10px; background: rgba(3,105,161,0.04); border-radius: 6px; }
+    .rp-bulk summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--color-text); padding: 2px 0; }
+    .rp-bulk summary code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+    .rp-bulk textarea {
+        width: 100%; box-sizing: border-box; margin-top: 8px;
+        padding: 8px; font-family: ui-monospace, monospace; font-size: 12px;
+        border: 1px solid var(--color-border); border-radius: 4px; resize: vertical;
+    }
+    .rp-bulk-actions { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+    .rp-bulk-actions .rp-btn { padding: 5px 10px; font-size: 12px; }
+    .rp-bulk-msg { font-size: 11px; line-height: 1.3; }
+    .rp-bulk-msg--ok { color: #065f46; }
+    .rp-bulk-msg--warn { color: #b45309; }
+    .rp-bulk-msg--err { color: #991b1b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="rp-page">
+    <header class="rp-header">
+        <h1>Admin · Referenzpunkte</h1>
+        <div class="rp-subtitle">Region-Refpoints (7 pro Region) und Spot-Koordinaten</div>
+    </header>
+
+    <nav class="rp-nav">
+        <a href="/admin/subscribers">Subscribers</a>
+        <a href="/admin/feedback">Feedback</a>
+        <a href="/admin/labeled-examples">Few-Shot-Pool</a>
+        <a href="/admin/config">Konfiguration</a>
+        <a href="/admin/testing">Testing</a>
+        <a href="/admin/reference-points" class="rp-nav--active">Referenzpunkte</a>
+    </nav>
+
+    <div class="rp-toolbar">
+        <div class="rp-mode-toggle" role="tablist" aria-label="Modus">
+            <button type="button" id="rp-mode-regions" class="is-active" role="tab" aria-selected="true">Regionen</button>
+            <button type="button" id="rp-mode-spots" role="tab" aria-selected="false">Spots</button>
+        </div>
+        <select id="rp-selector" class="rp-select" aria-label="Region oder Spot auswählen">
+            <option value="">Wird geladen…</option>
+        </select>
+        <select id="rp-region-filter" class="rp-select" aria-label="Region-Filter" style="display:none;">
+            <option value="">Alle Regionen</option>
+        </select>
+        <div class="rp-spacer"></div>
+        <span id="rp-status-hint" style="font-size:12px;color:#888;"></span>
+    </div>
+
+    <div class="rp-layout">
+        <aside class="rp-panel" id="rp-panel">
+            <div id="rp-panel-content" class="rp-empty">Lade Daten…</div>
+            <div class="rp-actions" id="rp-actions" style="display:none;">
+                <button type="button" class="rp-btn rp-btn--primary" id="rp-save" disabled>💾 Speichern</button>
+                <button type="button" class="rp-btn rp-btn--secondary" id="rp-reset" disabled>↺ Reset</button>
+            </div>
+            <div id="rp-dirty" class="rp-dirty" style="display:none;">Ungespeicherte Änderungen</div>
+            <div id="rp-flash"></div>
+        </aside>
+
+        <section class="rp-map-wrap">
+            <div id="rp-map"></div>
+        </section>
+    </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/osm-peaks-layer.js') }}?v={{ static_v('js/osm-peaks-layer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/precip-refpoints-layer.js') }}?v={{ static_v('js/precip-refpoints-layer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-refpoint-map.js') }}?v={{ static_v('js/admin-refpoint-map.js') }}"></script>
+{% endblock %}

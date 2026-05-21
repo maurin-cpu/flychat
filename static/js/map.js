@@ -26,8 +26,20 @@
     var hazardDebugBtn = document.getElementById('meteogramHazardDebug');
     var hazardDebugActive = false;
 
-    // Datenquelle für Wind/Höhenwind. ICON-D2 ist der Open-Meteo-Default.
-    var WIND_MODEL_LABEL = 'ICON-D2';
+    // Modell-Mapping fuer das Surface-Tier-Voting (siehe docs/WETTERMODELLE.md).
+    // Codes kommen vom Backend (api_weather → data_sources[date]).
+    var MODEL_INFO = {
+        ch1: { label: 'ICON-CH1', resolution: '1.1 km', color: '#2563eb' },
+        ch2: { label: 'ICON-CH2', resolution: '2.1 km', color: '#0891b2' },
+        d2:  { label: 'ICON-D2',  resolution: '2.2 km', color: '#d97706' },
+        eu:  { label: 'ICON-EU',  resolution: '13 km',  color: '#64748b' },
+    };
+    var MODEL_INFO_UNKNOWN = { label: 'unbekannt', resolution: '', color: '#94a3b8' };
+
+    function modelInfoFor(code) {
+        return MODEL_INFO[code] || MODEL_INFO_UNKNOWN;
+    }
+    window.modelInfoFor = modelInfoFor;
 
     // Safer JSON fetch: prüft r.ok + Content-Type, liefert verständliche Fehlermeldung
     // statt "Unexpected token '<'..." wenn Server HTML (z.B. 500-Page) zurückgibt.
@@ -123,6 +135,18 @@
         if (typeof window.buildRatingMiniLegend === 'function') {
             window.buildRatingMiniLegend(L, 'bottomleft').addTo(map);
         }
+
+        // OSM Peaks/Pässe/Sättel — geteiltes Modul (osm-peaks-layer.js).
+        // Steuerbar via Admin-UI: config.SHOW_OSM_PEAKS → window.SHOW_OSM_PEAKS.
+        if (window.SHOW_OSM_PEAKS && window.GleitcastOsmPeaks) {
+            window.GleitcastOsmPeaks.attach(map);
+        }
+
+        // Niederschlags-Referenzpunkte (16 pro Region) — eigener Layer.
+        // Gekoppelt an SHOW_REFERENCE_POINTS — sichtbar sobald die 7 Haupt-RPs aktiv sind.
+        if ((window.SHOW_REFERENCE_POINTS || window.SHOW_PRECIP_REFPOINTS) && window.GleitcastPrecipRefpoints) {
+            window.GleitcastPrecipRefpoints.attach(map);
+        }
     }
 
     // ===== DIRECTION PARSER =====
@@ -183,7 +207,7 @@
     // experienceStars: 0..5 (integer)
     function mapSafetyBandToStyle(band) {
         if (band === 'violet') return {
-            // Palette v3 "Royal Premium": Premium-Tier = Violet-400 (Legendaer).
+            // Palette v3.2 "Royal Premium": Premium-Tier = Violet-400 (Legendary).
             fill: '#a78bfa', stroke: '#6d28d9',
             label: 'Top'
         };
@@ -240,8 +264,7 @@
         if (rating === 6) rating = 5;
 
         // Display-Band Premium-Override: safe + rating=5 (xc_tag/Klassiker) →
-        // Violet-400 (Palette v3 Royal Premium). Code-Identifier 'violet'
-        // matched jetzt wieder visuell — Premium = Violet.
+        // Violet-400 (Palette v3.2 Royal Premium).
         if (safetyBand === 'green' && rating >= 5) {
             safetyBand = 'violet';
             style = { fill: '#a78bfa', stroke: '#6d28d9' };
@@ -415,12 +438,23 @@
                             if (SHOW_REFERENCE_POINTS && p.reference_points && p.reference_points.length > 1) {
                                 var refGroup = L.layerGroup();
                                 var spotPt = p.reference_points[0]; // Point 0 is the spot itself
-                                
+
+                                // Farbe nach aktuellem Surface-Modell fuer Tag 1
+                                // (subtil — siehe docs/WETTERMODELLE.md Tier-Voting).
+                                // Fallback auf Slate wenn data_sources noch nicht geladen.
+                                var srcCode = null;
+                                if (p.data_sources && typeof p.data_sources === 'object') {
+                                    var dsKeys = Object.keys(p.data_sources).sort();
+                                    if (dsKeys.length) srcCode = p.data_sources[dsKeys[0]];
+                                }
+                                var refInfo = (window.modelInfoFor ? window.modelInfoFor(srcCode)
+                                    : { color: '#0369a1' });
+
                                 // Draw lines from spot to each reference point
                                 p.reference_points.slice(1).forEach(function(pt) {
                                     // 1. Connection Line
                                     var line = L.polyline([spotPt, pt], {
-                                        color: '#0369a1',
+                                        color: refInfo.color,
                                         weight: 1.5,
                                         dashArray: '5, 5',
                                         opacity: 0.5
@@ -430,7 +464,7 @@
                                     // 2. Small markers for the grid points
                                     var circle = L.circleMarker(pt, {
                                         radius: 4,
-                                        color: '#0369a1',
+                                        color: refInfo.color,
                                         fillColor: '#fff',
                                         fillOpacity: 1,
                                         weight: 2
@@ -658,6 +692,17 @@
         infoEl.textContent = props
             ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + props.windrichtung
             : '';
+
+        // Modell-Badge neben spot-info — wird in renderCurrentDay pro Tag
+        // befuellt (Surface-Tier-Voting CH1 → CH2 → D2 → EU).
+        var modelBadge = document.getElementById('meteogramModelBadge');
+        if (!modelBadge && infoEl && infoEl.parentNode) {
+            modelBadge = document.createElement('span');
+            modelBadge.id = 'meteogramModelBadge';
+            modelBadge.className = 'meteogram-model-badge';
+            infoEl.parentNode.appendChild(modelBadge);
+        }
+        if (modelBadge) modelBadge.textContent = '';
         chartContainer.innerHTML = '<div class="error-state">Lade Daten...</div>';
         if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">Lade Analyse...</div>';
         tabsContainer.innerHTML = '';
@@ -809,18 +854,33 @@
             fitToContainer: true,
         });
 
-        // Wetter-Zeitstempel + Modell unter dem Spot-Meteogramm
+        // Modell-Badge im Header neben Spot-Info aktualisieren (Surface-Tier-
+        // Voting CH1/CH2/D2/EU pro Tag, siehe docs/WETTERMODELLE.md).
+        var modelBadgeEl = document.getElementById('meteogramModelBadge');
+        if (modelBadgeEl) {
+            var srcCode = (currentWeather.data_sources && currentWeather.data_sources[dateStr]) || null;
+            var info = modelInfoFor(srcCode);
+            modelBadgeEl.innerHTML = '';
+            modelBadgeEl.title = 'Datenquelle Surface fuer diesen Tag. Tier-Voting CH1 → CH2 → D2 → EU.';
+            var dot = document.createElement('span');
+            dot.style.cssText = 'display:inline-block;width:7px;height:7px;border-radius:50%;background:'
+                + info.color + ';margin-right:4px;vertical-align:middle;';
+            modelBadgeEl.appendChild(dot);
+            modelBadgeEl.appendChild(document.createTextNode(
+                info.label + (info.resolution ? ' · ' + info.resolution : '')
+            ));
+        }
+
+        // Footer: nur Wetter-Stand (Modell-Info ist jetzt im Header).
         var existingTs = chartContainer.querySelector('.meteogram-weather-ts');
         if (existingTs) existingTs.remove();
-        var tsDiv = document.createElement('div');
-        tsDiv.className = 'meteogram-weather-ts';
-        tsDiv.style.cssText = 'font-size:10px;color:#94a3b8;text-align:right;padding:2px 8px 0;';
-        var parts = ['Modell: ' + WIND_MODEL_LABEL];
         if (currentWeather.last_updated) {
-            parts.push('Wetter-Stand: ' + currentWeather.last_updated.replace('T', ' ').slice(0, 16));
+            var tsDiv = document.createElement('div');
+            tsDiv.className = 'meteogram-weather-ts';
+            tsDiv.style.cssText = 'font-size:10px;color:#94a3b8;text-align:right;padding:2px 8px 0;';
+            tsDiv.textContent = 'Wetter-Stand: ' + currentWeather.last_updated.replace('T', ' ').slice(0, 16);
+            chartContainer.appendChild(tsDiv);
         }
-        tsDiv.textContent = parts.join(' · ');
-        chartContainer.appendChild(tsDiv);
 
         // Analyse panel is always visible in the aside – refresh on every day change.
         renderAnalyseView();

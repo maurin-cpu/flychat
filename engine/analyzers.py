@@ -153,6 +153,12 @@ class AnalyzersMixin:
         rain_cnt = gust_info.get("rain_hours", 0)
         ts_h = gust_info.get("thunderstorm_hours", 0)
         total_hours = wind_ok + wind_wrong if wind_ok >= 0 else 0
+        # 16-RP Coverage-Klassen (Region-Pfad; Spot-Pfad liefert leere Werte → Fallback unten).
+        rain_widespread_h = gust_info.get("rain_widespread_h", 0)
+        rain_scattered_h = gust_info.get("rain_scattered_h", 0)
+        rain_isolated_h = gust_info.get("rain_isolated_h", 0)
+        # Trend-Felder aus _detect_rain_sandwich (existieren bereits im Cache).
+        max_dry_gap = gust_info.get("max_dry_gap", 0)
 
         no_go = []
         summary_parts = []
@@ -193,10 +199,32 @@ class AnalyzersMixin:
                 )
 
         # Regel 2: Ganztaegig Regen
-        elif total_hours > 0 and rain_cnt >= total_hours - 2 and rain_cnt >= 4:
-            no_go.append(f"Niederschlag: Regen in {rain_cnt} von {total_hours} Stunden")
+        # 16-RP Coverage-Logik (Region): nur flaechige + verstreute Stunden zaehlen.
+        # Isolated (Einzelzelle) bleibt draussen — Pilot kann eine Zelle umfliegen,
+        # das ist kein Hard-Stop. Mai 2026: Schwelle 4→6h, weil dichteres Sampling
+        # mehr Stunden faengt; Trend-Check (max_dry_gap >= Min-Fenster) verhindert
+        # Falsch-Positiv bei Sandwich-Tagen (Regen am Anfang + Ende, Fenster mittig).
+        # Fallback: wenn 16-RP-Daten fehlen (Spots, Legacy-Cache, API-Failure),
+        # nutze rain_cnt wie bisher.
+        elif total_hours > 0 and (
+            (
+                (rain_widespread_h + rain_scattered_h) >= 6
+                and (rain_widespread_h + rain_scattered_h) >= total_hours - 3
+                and max_dry_gap < config.CLEAN_WINDOW_MIN_HOURS
+            )
+            or (
+                # Fallback: keine 16-RP-Daten → alte Binary-Regel, aber 6h Schwelle.
+                rain_widespread_h + rain_scattered_h + rain_isolated_h == 0
+                and rain_cnt >= 6
+                and rain_cnt >= total_hours - 3
+                and max_dry_gap < config.CLEAN_WINDOW_MIN_HOURS
+            )
+        ):
+            effective_h = rain_widespread_h + rain_scattered_h or rain_cnt
+            no_go.append(f"Niederschlag: Regen in {effective_h} von {total_hours} Stunden")
             summary_parts.append(
-                f"Nahezu ganztaegiger Niederschlag ({rain_cnt} von {total_hours} Stunden). "
+                f"Nahezu ganztaegiger Niederschlag ({effective_h} von {total_hours} Stunden) "
+                f"ohne zusammenhaengendes trockenes Fenster (laengste Trockenphase {max_dry_gap}h). "
                 f"Kein nutzbares Flugfenster."
             )
             na_reason = "all_day_rain"
@@ -909,7 +937,7 @@ class AnalyzersMixin:
             logger.error(f"InstantDB Region-Analysen-Push fehlgeschlagen: {e}")
 
     # ════════════════════════════════════════════════════════════════════════
-    # WEEKLY BRIEFING — Tages-Aggregation fuer den Wochencast
+    # WEEKLY BRIEFING — Tages-Aggregation fuer den Gleitcast
     # Das ehemalige LLM-"Fazit" (best_weekday/week_summary/day_highlights)
     # wurde durch den synoptik-getriebenen Wetterlage-Block (engine/
     # synoptic_llm.py + skills/synoptic_overview.md) ersetzt.
@@ -1158,7 +1186,7 @@ class AnalyzersMixin:
                     "experience_rating": rating_r,
                     "safety_score": entry.get("safety_score"),
                     "comfort_index": entry.get("comfort_index"),
-                    # LLM-Einschaetzungssatz fuer Wochencast-Region-Header
+                    # LLM-Einschaetzungssatz fuer Gleitcast-Region-Header
                     "recommendation": entry.get("recommendation", "") or "",
                 })
             region_entries.sort(key=lambda e: (

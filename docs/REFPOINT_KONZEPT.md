@@ -1,8 +1,10 @@
-# Regionale Referenzpunkte
+# Regionale Referenzpunkte — Konzept
 
-Vollständige Dokumentation der regionalen Referenzpunkte: **Aggregations-Logik**
-(wie aus 7 Punkten ein Regions-Wert wird) und **Platzierungs-Guide** (wo die
-Punkte gesetzt werden).
+Dokumentation der **Aggregations-Logik** (wie aus 7 Punkten ein Regions-Wert
+wird) und des **Platzierungs-Guides** (wo die Punkte gesetzt werden).
+
+Die konkrete Liste der 7 empfohlenen Punkte pro Region steht separat in
+`docs/REFPOINT_LISTE.md`.
 
 Forschungsgrundlage: `meteo_research/region_refpoints_research.md`
 
@@ -408,67 +410,17 @@ nennen kannst, setze manuell. Sonst CVT-Hybrid als Default.
 
 ---
 
-## Anhang: S-Flughöhe-Anker pro Region
+## Anhang: S-Flughöhe-Anker pro Region — siehe REFPOINT_LISTE.md
 
-**Zweck**: Der Thermik-Anker einer Region wird vom Algorithmus
+Die früher hier stehende Tabelle mit dem empfohlenen S-Flughöhe-Anker pro
+Region ist Bestandteil der vollständigen 7-Punkte-Liste geworden und steht
+jetzt in `docs/REFPOINT_LISTE.md` (Spalte "Flughöhe" pro Region).
+
+**Zweck (zur Erinnerung)**: Der Thermik-Anker einer Region wird vom Algorithmus
 `_best_thermal_rp_index` (`fetch_weather.py:259`) gewählt — er pickt unter den
 N=7 Referenzpunkten denjenigen mit der höchsten mittleren `shortwave_radiation`
-während der Flugstunden. Damit dieser Pick **realistisch** ausfällt (und nicht
-ein Schattenhang oder Schneefeld als "bester von schlechten" gewinnt), muss
+während der Flugstunden. Damit dieser Pick **realistisch** ausfällt, muss
 mindestens **1 S-exponierter Punkt auf typischer Flughöhe** im Set sein.
 
-Diese Tabelle liefert pro Region einen empfohlenen S-Anker. Wo möglich
-existierender Startplatz aus `fluggebiete_complete.csv`, sonst ein
-repräsentativer S-Flankenpunkt aus der Polygon-Topographie.
-
-| # | Region | Position | Lat, Lon | Höhe | Aspekt | Begründung |
-|---|---|---|---|---|---|---|
-| 1 | seeland_emmental | Bantiger S-Hang | 46.970, 7.490 | 800 m | S | Flachregion → höchster S-exponierter Hügel als Heat-Indikator |
-| 2 | mittelland_west | Belpberg-S | 46.870, 7.500 | 850 m | S | Markantester S-Hang im Polygon, Bauernland S-Seite — Konvektions-Proxy |
-| 3 | mittelland_ost | Albishorn-S | 47.260, 8.520 | 900 m | S | Albis-Südflanke statt Uetliberg-Balderen (NNO-O) — echte S-Exposition |
-| 4 | genferseeregion | Mont-Pèlerin-S | 46.490, 6.850 | 1080 m | S/SSW | Klassischer Vorberg über See, repräsentativ für Jorat-Konvektion |
-| 5 | jura_ost | Wasserflue-S | 47.450, 8.070 | 850 m | S/SSW | Hauptkamm der Jura-Ost-Region, S-Hang fängt Mittagseinstrahlung |
-| 6 | jura_west | Mauborget | 46.854, 6.612 | 1176 m | SO-S | Bekannter S-Startplatz, Höhe = typische Jura-Flugbasis |
-| 7 | jura_zentral | Weissenstein | 47.251, 7.510 | 1233 m | S-SO | Hauptstartplatz Region, exakt auf Höhenkamm S-Hang |
-| 8 | mittelland_zentral | Rigi-Staffelhöhe S | 47.048, 8.460 | 1544 m | SSW-SSO | Sonnenhang Rigi, repräsentativ für Voralpen-Konvektion im Napfgebiet |
-| 9 | glarnerland_walensee | Flumserberg-S | 47.100, 9.300 | 1800 m | S/SSW | S-Flanke über Walensee, klassische Thermik-Aufbauzone, schneefrei ab April |
-| 10 | schwarzsee_gantrisch | Schwyberg | 46.677, 7.261 | 1613 m | SO-SW | Bestätigter S-Startplatz auf typischer Voralpen-Flughöhe |
-| 11 | rheintal | Säntis-SW-Flanke | 47.246, 9.348 | 2375 m | SW-W | Höchster Punkt mit S-Komponente; alternativ Hundwiler Höhi (1297m, SO-SW) tiefer |
-| 12 | bodenseeraum | Hamenberg | 47.644, 8.671 | 485 m | SSW-WSW | Einziger S-exponierter Hügel-Startplatz im Bodensee-Becken |
-| 13 | waadtlaender_alpen | Roc Orsay | 46.322, 7.068 | 1881 m | SSW-SSO | Klassischer Leysin/Diablerets-S-Hang auf Flughöhe |
-| 14 | alpstein | Kronberg-S | 47.291, 9.329 | 1639 m | S-SW | Hauptkamm Alpstein, S-exponiert, typische Voralpen-Flughöhe |
-| 15 | tessin_zentral | Cimetta | 46.200, 8.788 | 1616 m | S-SW | Hausberg Locarno, S-Sonnenhang über Magadinoebene |
-| 16 | praettigau_davos | Schatzalp | 46.805, 9.817 | 1973 m | SO-S | Davoser Sonnenhang, repräsentativ für Tal-Mitte-Konvektion |
-| 17 | berner_oberland | Männlichen-S-Flanke | 46.615, 7.935 | 2200 m | S | Eiger/Mönch/Jungfrau-Region: kein dokumentierter S-Startplatz, repräsentative Schätzung — evtl. mit Lokalwissen feinjustieren |
-| 18 | zentralschweizer_voralpen | Stoos-Südstartplatz | 46.965, 8.640 | 1860 m | SO-S | Bestätigter S-Startplatz Fronalpstock |
-| 19 | berner_voralpen | Niederhorn | 46.711, 7.778 | 1953 m | SSW-SSO | Klassische S-Flanke Thunersee-Nordkamm |
-| 20 | freiburger_voralpen | Stockhorn 1 | 46.693, 7.538 | 2082 m | SO-SW | Hauptkamm Stockhorn, voll S-exponiert auf Flughöhe |
-| 21 | mattertal_saastal | Col de Sorebois 2 | 46.151, 7.586 | 2882 m | SSW-WSW | Höchste verfügbare S-Position im Polygon, schneefrei ab Mai |
-| 22 | tessin_nord | Cari 3 | 46.509, 8.818 | 2145 m | SSW-SSO | Klassischer S-Hang Bleniotal, starke Mittagskonvektion |
-| 23 | zentralwallis | Laucheralp | 46.411, 7.771 | 1981 m | SO-S | Lötschberg-N-Flanke S-exponiert (Tal-Mitte), schneefrei früh |
-| 24 | engadin_unter | Alp Darlux | 46.624, 9.780 | 2283 m | SSW-WSW | Bündner Hochtal-S-Flanke, hochalpine Flughöhe |
-| 25 | unterwallis | Croix de Coeur 1 | 46.122, 7.233 | 2194 m | SSW-SSO | Verbier-Region klassischer S-Startplatz |
-| 26 | oberwallis_goms | Fiescheralp | 46.416, 8.106 | 2238 m | OSO-SSO | Rhonetal-N-Flanke (= S-Hang), Goms-Konvektion |
-| 27 | surselva | Piz Mundaun | 46.742, 9.158 | 2053 m | SO-SW | Vorderrhein-N-Flanke S-exponiert, repräsentative Surselva-Flughöhe |
-| 28 | zentrales_mittelland | Bantiger-S | 47.030, 7.500 | 800 m | S | Flachregion → höchster verfügbarer S-Hügel, Konvektion zwischen Bern und Zürich |
-| 29 | engadin_ober | Muottas Muragl | 46.521, 9.902 | 2240 m | S-SW | Klassische Engadin-S-Flanke über St. Moritz, ideale Flughöhe |
-
-### Sicherheits-Checks zur Tabelle
-
-- **Höhe**: jeder Anker liegt auf typischer Flughöhe seiner Region (Mittelland
-  800m, Voralpen 1500-2000m, Hochalpen 2000-2500m)
-- **Aspekt**: jeder Anker hat S-Komponente (S, SSW, SSO, SW, SO) — keine reinen
-  O- oder W-Hänge
-- **Schneefrei**: hochalpine Picks (>2500m: Säntis, Col de Sorebois) sind erst
-  ab Mai schneefrei → im Winter kann der Thermik-Anker dort durch Snow-Damping
-  schwach werden. Workaround: zweiter S-Punkt tiefer (1500-1800m) setzen
-- **Berner Oberland**: einzige Region ohne dokumentierten S-Startplatz —
-  Männlichen-S-Flanke ist eine repräsentative Schätzung, mit Lokalwissen
-  feinjustieren
-
-### Verwendung dieser Tabelle
-
-Diese Position MUSS einer der 7 Referenzpunkte pro Region sein, damit
-`_best_thermal_rp_index` einen realistischen Thermik-Anker findet. Die anderen
-6 Punkte gemäss Hauptteil dieser Doku verteilen (Talboden, Kamm, Föhn-Anker,
-Schatten-Kontrast etc.).
+→ Die vollständige Tabelle (S-Anker + 6 weitere Punkte pro Region) steht in
+`docs/REFPOINT_LISTE.md`.

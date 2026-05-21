@@ -500,6 +500,12 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
             region_obj = find_region_for_point(spot["latitude"], spot["longitude"])
             region_id = region_obj["id"] if region_obj else None
 
+            # Surface-Tier-Modell pro Tag (siehe docs/WETTERMODELLE.md).
+            # Wird vom Frontend fuer den Refpoint-Hover-Color genutzt.
+            data_sources = None
+            if spot_name in self.weather_data:
+                data_sources = self.weather_data[spot_name].get("data_sources")
+
             features.append({
                 "type": "Feature",
                 "geometry": {
@@ -516,6 +522,7 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
                     "bemerkung": spot.get("bemerkung", ""),
                     "reference_points": ref_points,
                     "has_weather": spot_name in self.weather_data,
+                    "data_sources": data_sources,
                 },
             })
         return {"type": "FeatureCollection", "features": features}

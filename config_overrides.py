@@ -143,6 +143,8 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
              "help": "Zeigt Linien vom Startplatz zu den regionalen Thermik-Referenzpunkten beim Hover auf der Karte."},
             {"key": "USE_LEGACY_REGION_REFPOINTS", "type": "bool",
              "help": "Fallback auf die alten 4 Referenzpunkte pro Region (am Rand). Standard: CVT-7 (7 Punkte im Innern). Wechsel greift beim naechsten Wetter-Refresh."},
+            {"key": "SHOW_OSM_PEAKS", "type": "bool",
+             "help": "OSM-Berge/Paesse/Saettel auf allen Karten anzeigen (osm.org-Stil). Daten aus Overpass-API, Refresh via scripts/fetch_osm_peaks.py."},
         ],
         "Forecast": [
             {"key": "FORECAST_DAYS", "type": "int", "min": 1, "max": 7, "unit": "d",

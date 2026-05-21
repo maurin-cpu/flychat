@@ -14,7 +14,7 @@ import threading
 from functools import wraps
 from typing import Optional
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, \
-    stream_with_context, session
+    stream_with_context, session, send_from_directory
 from datetime import datetime, timedelta
 
 import config
@@ -242,7 +242,7 @@ def preview_briefing():
     if engine is None:
         return _status_page(
             "error", "Vorschau nicht verfuegbar",
-            "Der Wochencast-Service ist gerade nicht geladen.",
+            "Der Gleitcast-Service ist gerade nicht geladen.",
             http_code=503,
         )
 
@@ -252,7 +252,7 @@ def preview_briefing():
         logger.exception("preview_briefing: build_briefing_data failed: %s", e)
         return _status_page(
             "error", "Vorschau nicht verfuegbar",
-            "Die Wochencast-Daten konnten gerade nicht geladen werden.",
+            "Die Gleitcast-Daten konnten gerade nicht geladen werden.",
             http_code=503,
         )
 
@@ -332,7 +332,7 @@ def subscribe_confirm(token):
     return _status_page(
         "ok", "Abo aktiviert!",
         f"Willkommen bei Gleitcast, {result['email']}.",
-        submessage="Dein erster Wochencast kommt am naechsten Montag, Mittwoch oder Freitag um 06:30.",
+        submessage="Dein erster Gleitcast kommt am naechsten Montag, Mittwoch oder Freitag um 06:30.",
     )
 
 
@@ -470,7 +470,7 @@ def account_action(token, action):
         if not ok:
             return redirect(f"/account/{token}?err=Abmelden+fehlgeschlagen")
         # Session bleibt — User soll auf der Konto-Seite den Reaktivieren-Banner sehen
-        return redirect(f"/account/{token}?ok=Wochencast+abgemeldet")
+        return redirect(f"/account/{token}?ok=Gleitcast+abgemeldet")
 
     if action == "update":
         # Form-Daten: regions[], weekdays[], tiers[] (Checkboxes), min_rating (slider)
@@ -537,7 +537,7 @@ def account_action(token, action):
         ok = mgr.reactivate(token)
         if not ok:
             return redirect(f"/account/{token}?err=Reaktivierung+fehlgeschlagen")
-        return redirect(f"/account/{token}?ok=Wochencast+wieder+aktiviert")
+        return redirect(f"/account/{token}?ok=Gleitcast+wieder+aktiviert")
 
     if action == "feedback":
         msg = (request.form.get("message") or "").strip()
@@ -798,7 +798,7 @@ def subscribe_unsubscribe(token):
 
     return _status_page(
         "ok", "Abgemeldet",
-        "Du bekommst keinen Wochencast mehr. Schade, dass du gehst!",
+        "Du bekommst keinen Gleitcast mehr. Schade, dass du gehst!",
         submessage="Du kannst dich jederzeit wieder anmelden.",
     )
 
@@ -1108,6 +1108,157 @@ def admin_config_save():
 
     msg = f"Gespeichert+und+sofort+aktiv+%28{len(changed)}+Werte%29"
     return redirect(f"/admin/config?ok={msg}")
+
+
+# ============================================================================
+# ADMIN · REFERENZPUNKTE (Region-Refpoints + Spot-Koordinaten)
+# ============================================================================
+
+# Plausibilitaets-Grenzen fuer CH-Koordinaten (generoes — Anker duerfen knapp
+# ausserhalb des Polygons liegen, siehe docs/REFPOINT_KONZEPT.md).
+_REFPOINT_LAT_MIN, _REFPOINT_LAT_MAX = 45.0, 48.5
+_REFPOINT_LON_MIN, _REFPOINT_LON_MAX = 5.0, 11.5
+
+
+def _validate_latlon(lat, lon):
+    """Wirft ValueError mit klarer Message wenn lat/lon nicht numerisch oder ausserhalb CH-Bounds."""
+    try:
+        lat_f = float(lat); lon_f = float(lon)
+    except (TypeError, ValueError):
+        raise ValueError(f"lat/lon nicht numerisch: lat={lat!r}, lon={lon!r}")
+    if not (_REFPOINT_LAT_MIN <= lat_f <= _REFPOINT_LAT_MAX):
+        raise ValueError(f"lat={lat_f} ausserhalb [{_REFPOINT_LAT_MIN}, {_REFPOINT_LAT_MAX}]")
+    if not (_REFPOINT_LON_MIN <= lon_f <= _REFPOINT_LON_MAX):
+        raise ValueError(f"lon={lon_f} ausserhalb [{_REFPOINT_LON_MIN}, {_REFPOINT_LON_MAX}]")
+    return lat_f, lon_f
+
+
+@app.route("/admin/reference-points", methods=["GET"])
+@_require_admin
+def admin_reference_points():
+    return render_template(
+        "admin/reference_points.html",
+        show_osm_peaks=config.SHOW_OSM_PEAKS,
+    )
+
+
+@app.route("/api/admin/refpoints/regions", methods=["GET"])
+@_require_admin
+def admin_api_refpoints_regions():
+    """JSON: alle Regionen mit id, name, polygon-GeoJSON, reference_points."""
+    import source_area
+    source_area.invalidate_cache()  # immer frische Werte fuer Editor liefern
+    from shapely.geometry import mapping
+    regions = source_area.get_all_regions()
+    out = []
+    for r in regions:
+        try:
+            geom = mapping(r["polygon"])
+        except Exception:
+            geom = None
+        out.append({
+            "id": r["id"],
+            "name": r.get("region") or r["id"],
+            "terrain_type": r.get("terrain_type"),
+            "elevation_ref": r.get("elevation_ref"),
+            "polygon": geom,
+            "reference_points": r.get("reference_points", []),
+        })
+    out.sort(key=lambda x: (x.get("name") or "").lower())
+    return jsonify({"regions": out})
+
+
+@app.route("/api/admin/refpoints/spots", methods=["GET"])
+@_require_admin
+def admin_api_refpoints_spots():
+    """JSON: alle Spots mit composite ID + lat/lon/elevation."""
+    from spots import load_spots, make_spot_id
+    spots = load_spots()
+    out = []
+    for s in spots:
+        sid = make_spot_id(s["region"], s["fluggebiet"], s["name"])
+        out.append({
+            "id": sid,
+            "region": s["region"],
+            "fluggebiet": s["fluggebiet"],
+            "site_name": s["name"],
+            "lat": s["latitude"],
+            "lon": s["longitude"],
+            "elevation_m": s["elevation_m"],
+            "windrichtung": s.get("windrichtung"),
+            "analyse_region": s.get("analyse_region"),
+        })
+    out.sort(key=lambda x: (x["region"].lower(), x["fluggebiet"].lower(), x["site_name"].lower()))
+    return jsonify({"spots": out})
+
+
+@app.route("/api/admin/refpoints/region/<region_id>", methods=["POST"])
+@_require_admin
+def admin_api_refpoints_save_region(region_id: str):
+    """Body: {points: [[lat,lon], ...×7]}. Persistiert in GeoJSON + invalidiert Cache."""
+    import source_area
+    data = request.get_json(silent=True) or {}
+    points = data.get("points")
+    if not isinstance(points, list) or len(points) != 7:
+        return jsonify({"ok": False, "error": "Erwarte 7 Punkte als 'points'-Liste"}), 400
+
+    validated = []
+    for i, p in enumerate(points):
+        if not isinstance(p, (list, tuple)) or len(p) != 2:
+            return jsonify({"ok": False, "error": f"Punkt {i} muss [lat, lon] sein"}), 400
+        try:
+            lat, lon = _validate_latlon(p[0], p[1])
+        except ValueError as e:
+            return jsonify({"ok": False, "error": f"Punkt {i}: {e}"}), 400
+        validated.append([round(lat, 4), round(lon, 4)])
+
+    try:
+        source_area.update_reference_points(region_id, validated)
+    except (ValueError, FileNotFoundError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.exception("admin refpoints region save: %s", e)
+        return jsonify({"ok": False, "error": f"Server-Fehler: {e}"}), 500
+
+    return jsonify({"ok": True, "region_id": region_id, "points": validated})
+
+
+@app.route("/api/admin/refpoints/spot", methods=["POST"])
+@_require_admin
+def admin_api_refpoints_save_spot():
+    """Body: {id, lat, lon}. Persistiert in CSV + reloadet Spots-Cache."""
+    from spots import update_spot_coords
+    data = request.get_json(silent=True) or {}
+    spot_id = (data.get("id") or "").strip()
+    if not spot_id:
+        return jsonify({"ok": False, "error": "spot id fehlt"}), 400
+    try:
+        lat, lon = _validate_latlon(data.get("lat"), data.get("lon"))
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        updated_row = update_spot_coords(spot_id, lat, lon)
+    except (ValueError, FileNotFoundError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.exception("admin refpoints spot save: %s", e)
+        return jsonify({"ok": False, "error": f"Server-Fehler: {e}"}), 500
+
+    # Engine-Spotliste neu laden, damit naechster Wetter-Lauf neue Koords nutzt.
+    if engine is not None:
+        try:
+            engine.reload_spots()
+        except Exception as e:
+            logger.warning("admin refpoints spot save: reload_spots fehlgeschlagen: %s", e)
+
+    return jsonify({
+        "ok": True,
+        "id": spot_id,
+        "lat": round(lat, 4),
+        "lon": round(lon, 4),
+        "site_name": updated_row.get("site_name"),
+    })
 
 
 # ============================================================================
@@ -1875,6 +2026,8 @@ def index():
         "index.html",
         forecast_days=current_max_days(),
         show_reference_points=config.SHOW_REFERENCE_POINTS,
+        show_precip_refpoints=config.SHOW_PRECIP_REFPOINTS,
+        show_osm_peaks=config.SHOW_OSM_PEAKS,
     )
 
 
@@ -1884,6 +2037,8 @@ def chat_page():
         "index.html",
         forecast_days=current_max_days(),
         show_reference_points=config.SHOW_REFERENCE_POINTS,
+        show_precip_refpoints=config.SHOW_PRECIP_REFPOINTS,
+        show_osm_peaks=config.SHOW_OSM_PEAKS,
     )
 
 
@@ -1893,6 +2048,8 @@ def map_page():
         "index.html",
         forecast_days=current_max_days(),
         show_reference_points=config.SHOW_REFERENCE_POINTS,
+        show_precip_refpoints=config.SHOW_PRECIP_REFPOINTS,
+        show_osm_peaks=config.SHOW_OSM_PEAKS,
     )
 
 
@@ -1902,6 +2059,8 @@ def regionen_page():
         "regionen.html",
         forecast_days=current_max_days(),
         show_reference_points=config.SHOW_REFERENCE_POINTS,
+        show_precip_refpoints=config.SHOW_PRECIP_REFPOINTS,
+        show_osm_peaks=config.SHOW_OSM_PEAKS,
     )
 
 
@@ -2109,7 +2268,7 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
         label = _date_label(best_day.get("date", ""))
         day_short = label.get("short", "")
         title = f"{best_spot.get('spot','')} – {day_short} {meta['label']} {rating}"
-        desc = f"{region_label} · {meta['label']} · Rating {rating} · Gleitcast Wochencast"
+        desc = f"{region_label} · {meta['label']} · Rating {rating} · Gleitcast"
         tier_param = tier
     else:
         tier_param = "none"
@@ -2130,7 +2289,7 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
 
 @app.route("/api/briefing", methods=["GET"])
 def api_briefing_get():
-    """Liefert die Tages-Aggregation + Wetterlage-Synoptik fuer den Wochencast.
+    """Liefert die Tages-Aggregation + Wetterlage-Synoptik fuer den Gleitcast.
     Days/Spots werden immer frisch aus spot_analyses gebaut, der Wetterlage-
     Block kommt aus dem Synoptik-Cache (1×/Tag refreshed).
 
@@ -2827,6 +2986,21 @@ def api_regionen_polygone():
     return jsonify(geojson)
 
 
+@app.route("/api/regionen-precip-refpoints")
+def api_regionen_precip_refpoints():
+    """Niederschlags-Referenzpunkte (16 pro Region, CVT-verteilt).
+
+    Wird nur fuer die Niederschlags-Aggregation verwendet (Coverage-Stat
+    fuer widespread/scattered/isolated). Geometrie und Polygon-Daten stehen
+    NICHT in dieser Datei — nur die Punkte.
+    """
+    path = os.path.join(os.path.dirname(__file__), "data", "regionen_referenzpunkte_precip.geojson")
+    if not os.path.exists(path):
+        return jsonify({"type": "FeatureCollection", "features": []})
+    with open(path, "r", encoding="utf-8") as f:
+        return jsonify(json.load(f))
+
+
 @app.route("/api/refresh-spots", methods=["POST"])
 def api_refresh_spots():
     """Laedt Spots neu aus CSV."""
@@ -2896,6 +3070,57 @@ def api_refresh_weather():
             "last_updated": new_ts,
         })
     except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/snapshot-weather", methods=["POST"])
+@_require_admin
+def api_admin_snapshot_weather():
+    """Friert den Forecast fuer HEUTE in data/weather_archive/YYYY-MM-DD.json ein.
+
+    Default: nur der aktuelle Tag (D=0). Forecast-Tage in der Zukunft werden
+    bewusst NICHT gespeichert — wir validieren was ein Pilot am Flug-Morgen
+    vor sich hatte, kein D+3-Forecast der spaeter revidiert wird.
+
+    Verhalten: ueberschreibt IMMER. Damit reflektiert der Snapshot stets den
+    juengsten Stand von Wetter-Refresh + LLM-Analysen.
+
+    Optionaler Body {"date": "YYYY-MM-DD"} fuer manuelles Backfill eines
+    spezifischen Tags im aktuellen Forecast-Fenster.
+    """
+    try:
+        from scripts.snapshot_weather import build_snapshots, write_snapshots
+
+        body = request.get_json(silent=True) or {}
+        target_date = body.get("date") or None
+
+        snapshots = build_snapshots(target_date=target_date, all_days=False)
+        if not snapshots:
+            return jsonify({
+                "success": False,
+                "error": "Kein Snapshot moeglich — Forecast-Fenster leer oder Datum nicht verfuegbar.",
+            }), 500
+
+        write_snapshots(snapshots)
+
+        first = next(iter(snapshots.values()))
+        spots_count = len(first["spots"])
+        regions_count = len(first["regions"])
+        spots_with_analysis = sum(
+            1 for s in first["spots"].values() if s.get("analysis")
+        )
+
+        return jsonify({
+            "success": True,
+            "message": f"Snapshot aktualisiert fuer {', '.join(sorted(snapshots.keys()))}.",
+            "spots_count": spots_count,
+            "regions_count": regions_count,
+            "spots_with_analysis": spots_with_analysis,
+            "dates": sorted(snapshots.keys()),
+            "results_count": len(snapshots),
+        })
+    except Exception as e:
+        logger.exception("api_admin_snapshot_weather failed")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -2989,6 +3214,23 @@ def api_spots():
 def api_regionen():
     """Gibt alle Regionen als GeoJSON FeatureCollection zurück (für Karten-Overlay)."""
     return jsonify(get_all_regions_geojson())
+
+
+@app.route("/api/osm_peaks/<tier>")
+def api_osm_peaks(tier):
+    """Serviert die OSM-Peaks GeoJSON-Files (major | minor).
+
+    Quelle: scripts/fetch_osm_peaks.py (Overpass-API → data/osm_peaks_*.geojson).
+    Daten aendern sich faktisch nie — long cache.
+    """
+    if tier not in ("major", "minor"):
+        return jsonify({"error": "tier must be 'major' or 'minor'"}), 404
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    resp = send_from_directory(data_dir, f"osm_peaks_{tier}.geojson",
+                               mimetype="application/geo+json")
+    # Berge bewegen sich nicht — aggressiv cachen (1 Woche), Browser nutzt If-Modified-Since
+    resp.headers["Cache-Control"] = "public, max-age=604800"
+    return resp
 
 
 def _group_chart_by_day(chart_data):
@@ -3123,6 +3365,8 @@ def api_region_weather(region_id):
         "expected_days": current_max_days(),
         "is_region": True,
         "thresholds": _tier_thresholds(),
+        # Quellen-Tracking pro Tag (ch1/ch2/d2/eu) — siehe docs/WETTERMODELLE.md.
+        "data_sources": region_data.get("data_sources", {}),
     })
 
 
@@ -3245,6 +3489,10 @@ def api_weather(spot_name):
         "windrichtung": (spot_info.get("windrichtung") if spot_info else None),
         "ideal_wind_max": (spot_info.get("ideal_wind_max") if spot_info else None),
         "thresholds": _tier_thresholds(),
+        # Quellen-Tracking pro Tag (ch1 / ch2 / d2 / eu) — siehe
+        # _process_spot_weather + docs/WETTERMODELLE.md. Frontend rendert
+        # daraus den Modell-Badge im Meteogramm-Header.
+        "data_sources": spot_data.get("data_sources", {}),
     })
 
 
@@ -3501,6 +3749,11 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     "amount": precipitation,
                     "probability": precip_prob if precip_prob is not None else 0,
                     "weather_code": data.get("weather_code"),
+                    # 16-RP Coverage-Klasse (widespread/scattered/isolated/dry)
+                    # damit das Meteogramm pro Stunde die Tropfen-Anzahl variieren kann.
+                    "klass": data.get("precipitation_class"),
+                    "coverage": data.get("precipitation_coverage"),
+                    "n_rps": data.get("precipitation_n_rps"),
                 })
 
             # Thermik — aus stateful daily_thermals lesen

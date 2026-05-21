@@ -26,7 +26,7 @@
   }
 
   function styleFor(band) {
-    // Palette v3 "Royal Premium": violet-Band = Violet-400 (Legendaer/Top).
+    // Palette v3.2 "Royal Premium": violet-Band = Violet-400 (Legendary/Top).
     if (band === "violet")  return { fill: "#a78bfa", stroke: "#6d28d9", label: "Top" };
     if (band === "green")   return { fill: "#22c55e", stroke: "#15803d", label: "Sicher" };
     if (band === "amber")   return { fill: "#f59e0b", stroke: "#92400e", label: "Vorsicht" };
@@ -43,9 +43,9 @@
   function ratingTintFor(visBand, rating) {
     var r = Math.max(1, Math.min(5, rating | 0));
     if (visBand === "green") {
-      // Palette v3.2 "Royal Premium" (final): Sky-100 → Sky-200 → Lime →
-      // Green-500 → Violet (Rating 5 hier nicht erreicht — displayBand green+5
-      // → violet umlenkt; trotzdem definiert fuer Palette-Konsistenz).
+      // Palette v3.2 "Royal Premium": Sky-100 → Sky-200 → Lime → Green-500 →
+      // Violet (Rating 5 hier nicht erreicht — displayBand green+5 → violet
+      // umlenkt; trotzdem definiert fuer Palette-Konsistenz).
       return {
         fill:   ["#e0f2fe", "#bae6fd", "#BEF264", "#22c55e", "#a78bfa"][Math.min(4, r - 1)],
         stroke: ["#38bdf8", "#0ea5e9", "#65a30d", "#15803d", "#6d28d9"][Math.min(4, r - 1)]
@@ -139,9 +139,8 @@
     } else if (rating >= 1 && (visBand === "green" || visBand === "amber" || visBand === "violet")) {
       var fontSize = Math.round(radius * 1.4);
       var yOffset = fontSize * 0.35;
-      // Text-Kontrast (Palette v3.2): saturierte/dunkle Fills bei amber 3+,
-      // violet (Premium) UND green Rating 4 (Green-500 dunkel). Rating 1-3
-      // safe (Sky/Lime) und amber 1-2 sind hell → dunkler Text (stroke).
+      // Text-Kontrast (Palette v3.2): amber 3+, violet (Premium Violet-400)
+      // UND green Rating 4 (Green-500 saturiert) haben dunkle Bgs → weisser Text.
       var darkBgHere = (visBand === "violet")
         || (visBand === "amber" && rating >= 3)
         || (visBand === "green" && rating >= 4);

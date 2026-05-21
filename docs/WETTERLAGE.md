@@ -3,7 +3,7 @@
 Status: Implementation Mai 2026 (v1.0)
 Aufruf: 1×/Tag vom Scheduler im Daily-Cycle, kurz vor Versand des Casts.
 Ziel: Kompakte 5-Tages-Einordnung der Grosswetterlage in Pilotensprache —
-zuoberst im Wochencast und in der E-Mail.
+zuoberst im Gleitcast und in der E-Mail.
 
 **Recherche-Grundlage:**
 - `meteo_research/synoptic_pilot_needs.md` — was Schweizer Piloten aus der

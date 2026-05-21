@@ -1283,6 +1283,30 @@ body.page-fixed-nav {
     display: none;
 }
 
+/* Modell-Badge neben Spot-Info (Surface-Tier-Voting pro Tag, siehe
+   docs/WETTERMODELLE.md). Subtil — gleiche Farbe wie spot-info, nur
+   den Dot farbig nach Modell. Inline-Verhalten + "·"-Trenner identisch
+   zu spot-info, damit der Header bei schmalem Container sauber umbricht. */
+.meteogram-header .meteogram-model-badge {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.25;
+    display: inline;
+    margin-left: 8px;
+}
+
+.meteogram-header .meteogram-model-badge::before {
+    content: "·";
+    margin-right: 8px;
+    color: var(--color-border-hover);
+    font-weight: 700;
+}
+
+.meteogram-header .meteogram-model-badge:empty,
+.meteogram-header .meteogram-model-badge:empty::before {
+    display: none;
+}
+
 .meteogram-header-text {
     min-width: 0;
     flex: 1;
@@ -3369,6 +3393,9 @@ body.page-fixed-nav {
 }
 .mga-tag-topic { font-weight: 600; color: var(--color-text, #111827); }
 .mga-tag-value { color: var(--color-text-secondary, #4b5563); min-width: 0; }
+.mga-rain-glyph { display: inline-block; vertical-align: -2px; margin-right: 4px; color: inherit; }
+.mga-tag-group--stop .mga-tag-value .mga-rain-glyph { color: #b91c1c; }
+.mga-tag-group--warn .mga-tag-value .mga-rain-glyph { color: #c2410c; }
 .mga-tag-time { color: var(--color-text-muted, #6b7280); font-size: 11.5px; text-align: right; }
 
 .mga-tag-group--stop { background: #fef2f2; border-left-color: #ef4444; }

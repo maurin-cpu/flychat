@@ -32,6 +32,58 @@ _csv_props_cache = None
 _active_geojson_path = None  # zuletzt geladener Pfad — fuer Cache-Invalidierung
 
 
+def invalidate_cache():
+    """Erzwingt Neulade von regionen.csv und regionen_referenzpunkte.geojson.
+    Aufgerufen nach einem Admin-Save, damit Aenderungen sofort wirken."""
+    global _regions_cache, _csv_props_cache, _active_geojson_path
+    _regions_cache = None
+    _csv_props_cache = None
+    _active_geojson_path = None
+
+
+def update_reference_points(region_id: str, new_points: list) -> None:
+    """Schreibt 7 reference_points fuer EINE Region atomar zurueck ins GeoJSON.
+
+    new_points: Liste aus 7 [lat, lon] Paaren.
+    Andere Regionen + Polygon-Geometrie bleiben unveraendert.
+    Cache wird danach invalidiert.
+
+    Raises: ValueError wenn Region oder Punkte invalid, FileNotFoundError wenn File fehlt.
+    """
+    if not isinstance(new_points, list) or len(new_points) != 7:
+        raise ValueError(f"Genau 7 Reference Points erwartet, bekommen: {len(new_points) if isinstance(new_points, list) else type(new_points).__name__}")
+    cleaned = []
+    for i, p in enumerate(new_points):
+        if not isinstance(p, (list, tuple)) or len(p) != 2:
+            raise ValueError(f"Punkt {i} muss [lat, lon] sein, bekommen: {p!r}")
+        try:
+            lat = float(p[0]); lon = float(p[1])
+        except (TypeError, ValueError):
+            raise ValueError(f"Punkt {i} hat nicht-numerische Koordinaten: {p!r}")
+        cleaned.append([lat, lon])
+
+    path = _current_geojson_path()
+    if not path.exists():
+        raise FileNotFoundError(f"GeoJSON nicht gefunden: {path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    found = False
+    for feature in data.get("features", []):
+        props = feature.get("properties", {})
+        if str(props.get("id", "")).strip() == region_id.strip():
+            props["reference_points"] = cleaned
+            feature["properties"] = props
+            found = True
+            break
+    if not found:
+        raise ValueError(f"Region nicht gefunden im GeoJSON: {region_id}")
+
+    config.atomic_write_json(path, data)
+    invalidate_cache()
+
+
 def _current_geojson_path():
     """Gibt den aktiven Pfad zurueck (CVT-7 oder Legacy-4 je nach Config).
     Wird dynamisch ausgewertet, damit ein Toggle ohne Restart greift —
@@ -208,6 +260,43 @@ def get_region_name_for_spot(spot_name, lat, lon):
 def get_all_regions():
     """Gibt die gecachte Liste aller Regionen zurueck (fuer Region-Analyse)."""
     return _load_regions()
+
+
+_precip_refpoints_cache: dict[str, list] | None = None
+
+
+def get_precip_reference_points() -> dict[str, list]:
+    """Laedt die 16 dichten Niederschlags-Referenzpunkte pro Region.
+
+    Returns: {region_id: [[lat, lon], ...]} — leer falls Datei fehlt.
+
+    Wird in fetch_weather.py genutzt um Niederschlag mit dichterem Sampling
+    zu aggregieren (Coverage-Klassifikation widespread/scattered/isolated).
+    Die Datei wird via scripts/create_precip_refpoints.py generiert.
+    """
+    global _precip_refpoints_cache
+    if _precip_refpoints_cache is not None:
+        return _precip_refpoints_cache
+
+    path = getattr(config, "REGIONEN_GEOJSON_PRECIP_PATH", None)
+    if path is None or not path.exists():
+        print(f"[WARN] Precip-Refpoint-Datei fehlt: {path} — Fallback auf 7 Haupt-RPs")
+        _precip_refpoints_cache = {}
+        return _precip_refpoints_cache
+
+    with open(path, "r", encoding="utf-8") as f:
+        geojson = json.load(f)
+
+    out: dict[str, list] = {}
+    for feature in geojson.get("features", []):
+        rid = (feature.get("properties") or {}).get("id")
+        pts = (feature.get("properties") or {}).get("reference_points", [])
+        if rid and pts:
+            out[rid] = pts
+
+    _precip_refpoints_cache = out
+    print(f"[INFO] {len(out)} Regionen × {len(next(iter(out.values()), []))} Precip-RPs geladen")
+    return out
 
 
 def get_all_regions_geojson():

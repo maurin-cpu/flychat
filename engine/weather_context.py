@@ -2634,6 +2634,12 @@ class WeatherContextMixin:
         hourly_winds = {}      # hour_str → Windgeschwindigkeit für Trend-Analyse (Regionen haben keine Böen)
         rain_hours = []        # Stunden mit Niederschlag (innerhalb + nach Flugfenster)
         rain_in_window_h = 0   # Regen-Stunden strikt INNERHALB des Flugfensters
+        # Klassen-Stats fuer 16-RP Coverage (widespread/scattered/isolated/dry).
+        # Quelle: precipitation_class-Feld aus _override_precip_with_dense_rps.
+        rain_class_per_hour: dict[str, str] = {}
+        rain_widespread_h = 0
+        rain_scattered_h = 0
+        rain_isolated_h = 0
         thunderstorm_in_window_h = 0  # Gewitter-Stunden strikt INNERHALB des Flugfensters
         aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND, Region)
         aloft_danger_hours_list = []  # Nur [ALOFT-WIND-DANGER] (> WIND_DANGER_KMH)
@@ -2791,13 +2797,33 @@ class WeatherContextMixin:
                 calm_hours.append(hour_str)
 
             warnings = []
+            precip_detail_suffix = ""  # menschenlesbare Zusatzinfo fuer LLM-Datenblock
 
             try:
                 precip = data.get("precipitation")
+                precip_class = data.get("precipitation_class") or "dry"
+                precip_cov = data.get("precipitation_coverage")
+                precip_n = data.get("precipitation_n_rps")
                 if isinstance(precip, (int, float)) and precip > 0:
                     warnings.append("[RAIN-WARN]")
                     rain_hours.append(hour_str)
                     rain_in_window_h += 1
+                    rain_class_per_hour[hour_str] = precip_class
+                    if precip_class == "widespread":
+                        rain_widespread_h += 1
+                    elif precip_class == "scattered":
+                        rain_scattered_h += 1
+                    elif precip_class == "isolated":
+                        rain_isolated_h += 1
+                    # Klassen-Info im hour_line sichtbar machen, damit das LLM
+                    # zwischen Einzelzelle und flaechigem Regen unterscheiden kann.
+                    if isinstance(precip_cov, (int, float)) and isinstance(precip_n, int) and precip_n > 0:
+                        n_wet = round(precip_cov * precip_n)
+                        precip_detail_suffix = (
+                            f" [{precip_class} {n_wet}/{precip_n} RP, Peak {precip:.1f}mm/h]"
+                        )
+                    else:
+                        precip_detail_suffix = f" [{precip_class}, Peak {precip:.1f}mm/h]"
             except Exception:
                 pass
 
@@ -3141,7 +3167,7 @@ class WeatherContextMixin:
             wind_status_print = "" if wind_status == "[WIND-CALM]" else f" {wind_status}"
             hour_lines.append((
                 dt.hour,
-                f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}°{wind_status_print}{ref_wind_info}{warning_str} | "
+                f"{time_str}: Temp {temp}°C | Wind {ws_fmt}km/h aus {wd_fmt}°{wind_status_print}{ref_wind_info}{warning_str}{precip_detail_suffix} | "
                 f"Wolkenbasis {cloud_base} | Bewoelkung {cloud_cover}% (tief {low_cl:.0f}%, mittel {mid_cl:.0f}%, hoch {high_cl:.0f}%) | {sun_str} | FLUGBEREICH: {elev_ref}–{effective_ceiling}m MSL{alt_wind_info}{thermal_info}{tq_info}"
             ))
 
@@ -3245,6 +3271,11 @@ class WeatherContextMixin:
             "rain_hours": len(rain_hours),
             "rain_in_window_h": rain_in_window_h,
             "rain_hour_list": rain_hours,
+            # 16-RP Coverage-Klassen (Quelle: precipitation_class im hourly-Cache):
+            "rain_class_per_hour": rain_class_per_hour,
+            "rain_widespread_h": rain_widespread_h,
+            "rain_scattered_h": rain_scattered_h,
+            "rain_isolated_h": rain_isolated_h,
             "thunderstorm_hours": tag_counts.get("[THUNDERSTORM]", 0),
             "thunderstorm_in_window_h": thunderstorm_in_window_h,
             # CLOUDS-Sicht (siehe docs/TAGS.md), Region nutzt elev_ref:

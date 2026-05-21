@@ -1,6 +1,6 @@
 # Tags & Startfenster — Topic-Konzept
 
-Dieses Dokument beschreibt das **einheitliche Tag-System** der Wochencast-UI:
+Dieses Dokument beschreibt das **einheitliche Tag-System** der Gleitcast-UI:
 welche Topics existieren, welche Severities sie annehmen koennen, wie sie
 deterministisch aus den Cache-Daten abgeleitet werden, und wie das
 **Startfenster-Visual** funktioniert.

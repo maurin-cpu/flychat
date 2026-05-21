@@ -43,7 +43,7 @@
             green:   { fill: '#22c55e', stroke: '#15803d' },
             amber:   { fill: '#f59e0b', stroke: '#92400e' },
             red:     { fill: '#ef4444', stroke: '#991b1b' },
-            // Palette v3 "Royal Premium": violet-Band = Violet-400 (Legendaer).
+            // Palette v3.2 "Royal Premium": violet-Band = Violet-400 (Legendary).
             violet:  { fill: '#a78bfa', stroke: '#6d28d9' },
             no_data: { fill: '#9ca3af', stroke: '#6b7280' }
         };

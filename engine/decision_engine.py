@@ -994,15 +994,57 @@ def build_region_topic_tags(result: dict, gust_info: dict) -> list:
     elif foehn == "moderate":
         tags.append(_make_tag("FOEHN", "warn", "Foehn", "moderat", ""))
 
-    # RAIN
+    # RAIN — Coverage-Klassen (widespread/scattered/isolated) aus 16-RP Aggregation.
+    # Topic-ID bleibt "RAIN" (Frontend-Kompatibilitaet), Differenzierung im value-Feld
+    # und Severity:
+    #   widespread im Fenster → stop ("flaechig")
+    #   scattered  im Fenster → stop ("verstreut")
+    #   isolated   im Fenster → warn ("vereinzelt")  ← Pilot kann eine Zelle umfliegen
+    #   alles nur ausserhalb Fenster → warn (wie bisher)
+    # Fallback wenn 16-RP-Daten fehlen: alte Binary-Logik.
     rain_h = int(gi.get("rain_hours", 0) or 0)
     if rain_h >= 1:
         rain_list = gi.get("rain_hour_list") or []
         rain_in_win = int(gi.get("rain_in_window_h", rain_h) or rain_h)
-        rain_sev = "stop" if rain_in_win > 0 else "warn"
-        tags.append(_make_tag(
-            "RAIN", rain_sev, "Regen", "Niederschlag", _fmt_hour_range(rain_list)
-        ))
+        widespread_h = int(gi.get("rain_widespread_h", 0) or 0)
+        scattered_h = int(gi.get("rain_scattered_h", 0) or 0)
+        isolated_h = int(gi.get("rain_isolated_h", 0) or 0)
+
+        # Dominante Klasse (Tag-Level): hoechste auftretende Klasse gewinnt.
+        # Klasse wird als zusaetzliches Feld im Tag mitgegeben — Frontend rendert
+        # daraus ein eigenes SVG-Icon (siehe static/js/briefing.js, rain-glyph).
+        if widespread_h > 0:
+            klasse_label = "flaechig"
+            klasse = "widespread"
+        elif scattered_h > 0:
+            klasse_label = "verstreut"
+            klasse = "scattered"
+        elif isolated_h > 0:
+            klasse_label = "vereinzelt"
+            klasse = "isolated"
+        else:
+            # Fallback: 16-RP-Daten nicht vorhanden (alte Cache-Eintraege).
+            klasse_label = None
+            klasse = None
+
+        # Severity-Bestimmung
+        if rain_in_win == 0:
+            rain_sev = "warn"
+        elif klasse == "isolated":
+            rain_sev = "warn"
+        else:
+            # widespread, scattered, oder unbekannt (Legacy-Fallback) → stop
+            rain_sev = "stop"
+
+        value_str = klasse_label if klasse_label else "Niederschlag"
+        rain_tag = _make_tag(
+            "RAIN", rain_sev, "Regen", value_str, _fmt_hour_range(rain_list)
+        )
+        # Klassen-Marker fuer Frontend-Icon. Optional — wenn None, rendert das
+        # Frontend einen Default-Tropfen.
+        if klasse:
+            rain_tag["rain_class"] = klasse
+        tags.append(rain_tag)
 
     # THUNDERSTORM
     thunder_h = int(gi.get("thunderstorm_hours", 0) or 0)

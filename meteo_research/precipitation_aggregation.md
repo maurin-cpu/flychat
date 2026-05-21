@@ -210,7 +210,7 @@ Anwendungen (geplant, noch nicht implementiert):
 | `config.py` | L189-217 (neue Sektion) | Schwellen-Konstanten exponiert |
 | `fetch_weather.py` | `_aggregate_regional_data` L287-386 | Hybrid-Filter + Coverage-Befuellung |
 | `fetch_weather.py` | `_process_spot_weather` L474-497 | Coverage ins hourly_data uebernehmen |
-| `docs/REFPOINT.md` | Sektion 1.3 | Operative Kurzbeschreibung |
+| `docs/REFPOINT_KONZEPT.md` | Sektion 1.3 | Operative Kurzbeschreibung |
 
 ---
 

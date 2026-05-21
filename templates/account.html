@@ -13,7 +13,7 @@
 <main class="sp">
 
   <header class="sp-header">
-    <div class="sp-hero__eyebrow">Konto &amp; Wochencast</div>
+    <div class="sp-hero__eyebrow">Konto &amp; Gleitcast</div>
     <h1 class="sp-logo">Deine Einstellungen</h1>
     <div class="sp-subtitle">{{ subscriber.email }}</div>
   </header>
@@ -27,13 +27,13 @@
 
   {% if subscriber.status == 'unsubscribed' %}
   <section class="sp-card ac-reactivate-card" aria-live="polite">
-    <div class="sp-card__label" style="color: var(--color-primary-vivid);">Wochencast pausiert</div>
+    <div class="sp-card__label" style="color: var(--color-primary-vivid);">Gleitcast pausiert</div>
     <p style="margin: 6px 0 14px; font-size: 14.5px; line-height: 1.5; color: var(--color-text);">
-      Du bist aktuell <strong>abgemeldet</strong> &mdash; es wird kein Wochencast verschickt.
+      Du bist aktuell <strong>abgemeldet</strong> &mdash; es wird kein Gleitcast verschickt.
       Deine Einstellungen sind aber noch da. Klick zum Reaktivieren:
     </p>
     <form method="post" action="/account/{{ token }}/reactivate">
-      <button type="submit" class="sp-btn sp-btn--primary">Wochencast wieder aktivieren</button>
+      <button type="submit" class="sp-btn sp-btn--primary">Gleitcast wieder aktivieren</button>
     </form>
   </section>
   {% elif not subscriber.regions %}
@@ -41,7 +41,7 @@
     <div class="ac-onboarding__eyebrow">Du bist eingeloggt &mdash; aber noch nicht abonniert</div>
     <h2 class="ac-onboarding__title">
       <span class="ac-onboarding__sparkle" aria-hidden="true">&#10024;</span>
-      Aktiviere deinen Wochencast
+      Aktiviere deinen Gleitcast
     </h2>
     <p class="ac-onboarding__lead">
       Flugwetter für deine Regionen direkt ins Postfach &mdash; an deinen Wunschtagen, kostenlos.
@@ -52,7 +52,7 @@
       <li><span>3</span> Speichern &mdash; fertig</li>
     </ol>
     <button type="button" class="ac-onboarding__cta" onclick="document.querySelector('.ac-save-btn').scrollIntoView({behavior:'smooth', block:'center'})">
-      Wochencast jetzt abonnieren
+      Gleitcast jetzt abonnieren
       <span aria-hidden="true">&darr;</span>
     </button>
   </section>
@@ -90,7 +90,7 @@
     {# ----- Regionen ----- #}
     <section class="sp-card" role="group" aria-labelledby="acRegionsLabel">
       <div class="sp-card__label" id="acRegionsLabel">Regionen</div>
-      <div class="sp-card__hint">Wähle die Regionen, für die du den Wochencast erhalten willst — per Chip oder Klick auf der Karte.</div>
+      <div class="sp-card__hint">Wähle die Regionen, für die du den Gleitcast erhalten willst — per Chip oder Klick auf der Karte.</div>
 
       <div class="sp-filters" id="spRegionFilters"
            data-regions='{{ regions|tojson }}'
@@ -119,10 +119,10 @@
       </noscript>
     </section>
 
-    {# ----- Qualitaets-Tiers (welche Spots im Wochencast) ----- #}
+    {# ----- Qualitaets-Tiers (welche Spots im Gleitcast) ----- #}
     <section class="sp-card" role="group" aria-labelledby="acQualityLabel">
       <div class="sp-card__label" id="acQualityLabel">Qualität</div>
-      <div class="sp-card__hint">Welche Spot-Stufen sollen im Wochencast erscheinen?</div>
+      <div class="sp-card__hint">Welche Spot-Stufen sollen im Gleitcast erscheinen?</div>
 
       {% set tier_defs = [
         ('violet',      'Legendär',  'Top-Tage mit grosser Höhe'),
@@ -146,7 +146,7 @@
     {# ----- Mindest-Rating ----- #}
     <section class="sp-card" role="group" aria-labelledby="acRatingLabel">
       <div class="sp-card__label" id="acRatingLabel">Mindest-Rating</div>
-      <div class="sp-card__hint">Spots unter diesem Rating bleiben aus dem Wochencast.</div>
+      <div class="sp-card__hint">Spots unter diesem Rating bleiben aus dem Gleitcast.</div>
 
       <div class="ac-rating-row">
         <input type="range" id="acRatingSlider" name="min_rating"
@@ -163,7 +163,7 @@
     {# ----- Wochentage ----- #}
     <section class="sp-card" role="group" aria-labelledby="acWeekdaysLabel">
       <div class="sp-card__label" id="acWeekdaysLabel">Versandtage</div>
-      <div class="sp-card__hint">An welchen Wochentagen willst du den Wochencast bekommen?</div>
+      <div class="sp-card__hint">An welchen Wochentagen willst du den Gleitcast bekommen?</div>
 
       {% set weekday_labels = [(0,'Mo'), (1,'Di'), (2,'Mi'), (3,'Do'), (4,'Fr'), (5,'Sa'), (6,'So')] %}
       <div class="ac-weekday-chips" role="group" aria-label="Wochentage">
@@ -181,7 +181,7 @@
     <section class="sp-card" role="group" aria-labelledby="acPauseLabel">
       <div class="sp-card__label" id="acPauseLabel">Pause</div>
       <div class="sp-card__hint">
-        Definiere einen Zeitraum, in dem kein Wochencast verschickt wird.
+        Definiere einen Zeitraum, in dem kein Gleitcast verschickt wird.
         {% if subscriber.paused_from and subscriber.paused_until %}
           Aktuell: <strong>{{ subscriber.paused_from }} bis {{ subscriber.paused_until }}</strong>.
         {% endif %}
@@ -212,13 +212,13 @@
     </section>
 
     <button type="submit" class="sp-btn sp-btn--primary ac-save-btn">
-      {% if not subscriber.regions %}Wochencast abonnieren{% else %}Einstellungen speichern{% endif %}
+      {% if not subscriber.regions %}Gleitcast abonnieren{% else %}Einstellungen speichern{% endif %}
     </button>
   </form>
 
   {% if subscriber.regions and subscriber.status != 'unsubscribed' %}
   <section class="sp-card">
-    <div class="sp-card__label">Wochencast abmelden</div>
+    <div class="sp-card__label">Gleitcast abmelden</div>
     <div class="sp-card__hint">
       Stoppt den Versand &mdash; <strong>dein Account und alle Einstellungen bleiben erhalten</strong>.
       Du kannst dich jederzeit wieder einloggen und mit einem Klick reaktivieren.
@@ -226,7 +226,7 @@
       <em>Nur kurzfristig weg?</em> Nutze stattdessen die <strong>Pause</strong>-Funktion oben mit Datum.
     </div>
     <form method="post" action="/account/{{ token }}/unsubscribe">
-      <button type="submit" class="sp-btn sp-btn--secondary ac-unsub-btn">Wochencast abmelden</button>
+      <button type="submit" class="sp-btn sp-btn--secondary ac-unsub-btn">Gleitcast abmelden</button>
     </form>
   </section>
   {% endif %}

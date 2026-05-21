@@ -4,6 +4,22 @@
 (function () {
     'use strict';
 
+    // Surface-Tier-Modell-Info fuer Modell-Badge im Meteogramm
+    // (siehe docs/WETTERMODELLE.md). Inline-Duplikat aus map.js, weil
+    // regionen.html map.js NICHT laedt.
+    if (!window.modelInfoFor) {
+        var MODEL_INFO = {
+            ch1: { label: 'ICON-CH1', resolution: '1.1 km', color: '#2563eb' },
+            ch2: { label: 'ICON-CH2', resolution: '2.1 km', color: '#0891b2' },
+            d2:  { label: 'ICON-D2',  resolution: '2.2 km', color: '#d97706' },
+            eu:  { label: 'ICON-EU',  resolution: '13 km',  color: '#64748b' },
+        };
+        var MODEL_INFO_UNKNOWN = { label: 'unbekannt', resolution: '', color: '#94a3b8' };
+        window.modelInfoFor = function (code) {
+            return MODEL_INFO[code] || MODEL_INFO_UNKNOWN;
+        };
+    }
+
     var map;
     var regionLayersByName = {};
     var labelMarkersGroup = null;
@@ -125,9 +141,6 @@
         return null;
     }
 
-    // Border-Stroke skaliert mit Rating als zweiter visueller Kanal — high-rating
-    // Regionen bekommen dickere/dunklere Border, damit Top-Tage auch peripher
-    // ohne Hue-Vergleich auffallen.
     function getRatingBorder(band, rating) {
         var r = Math.max(1, Math.min(5, rating | 0));
         if (band === 'green') {
@@ -153,8 +166,7 @@
         else if (band !== 'green' && band !== 'amber' && band !== 'red' && band !== 'violet') band = 'no_data';
 
         if (band === 'violet') {
-            // Palette v3 "Royal Premium": Rating 5 = Violet-400. Code-Identifier
-            // 'violet' matched jetzt wieder visuell. Premium-Tier-Hierarchie.
+            // Palette v3.2 "Royal Premium": Rating 5 = Violet-400 (Legendary).
             return {
                 fill: '#a78bfa', fillOpacity: 0.65,
                 border: '#6d28d9', borderOpacity: 0.85,
@@ -246,6 +258,20 @@
             window.buildRatingMiniLegend(L, 'bottomleft').addTo(map);
         }
 
+        // OSM Peaks/Pässe/Sättel — geteiltes Modul (osm-peaks-layer.js).
+        // Steuerbar via Admin-UI: config.SHOW_OSM_PEAKS → window.SHOW_OSM_PEAKS.
+        if (window.SHOW_OSM_PEAKS && window.GleitcastOsmPeaks) {
+            window.GleitcastOsmPeaks.attach(map);
+        }
+
+        // Niederschlags-Referenzpunkte (16 pro Region) — eigener Layer,
+        // visuell von den 7 Haupt-RPs abgegrenzt (blau, klein, halbtransparent).
+        // Wird IMMER eingeblendet wenn Referenzpunkte aktiv sind — also gekoppelt
+        // an SHOW_REFERENCE_POINTS. Separater Flag bleibt fuer Sonderfaelle.
+        if ((window.SHOW_REFERENCE_POINTS || window.SHOW_PRECIP_REFPOINTS) && window.GleitcastPrecipRefpoints) {
+            window.GleitcastPrecipRefpoints.attach(map);
+        }
+
         loadRegions();
     }
 
@@ -303,7 +329,7 @@
         };
         var fixed = {
             red:    { ink: '#991b1b', ring: '#ef4444' },
-            violet: { ink: '#5b21b6', ring: '#6d28d9' }  // Premium-Tier = Violet (v3)
+            violet: { ink: '#5b21b6', ring: '#6d28d9' }  // Premium-Tier = Violet (v3.2)
         };
         var p;
         if (band === 'red' || band === 'violet') {
@@ -1018,12 +1044,37 @@
             fitToContainer: true,
         });
 
-        // Wetter-Zeitstempel unter dem Meteogramm
+        // Modell-Badge neben Region-Titel im Header (Surface-Tier-Voting
+        // pro Tag, siehe docs/WETTERMODELLE.md). Wird beim Tab-Wechsel
+        // aktualisiert.
+        var rTitleEl = document.getElementById('regionOverlayTitle');
+        if (rTitleEl && rTitleEl.parentNode) {
+            var rModelBadge = document.getElementById('regionOverlayModelBadge');
+            if (!rModelBadge) {
+                rModelBadge = document.createElement('span');
+                rModelBadge.id = 'regionOverlayModelBadge';
+                rModelBadge.className = 'meteogram-model-badge';
+                rTitleEl.parentNode.appendChild(rModelBadge);
+            }
+            var srcCode = (wxData.data_sources && wxData.data_sources[dateStr]) || null;
+            var info = (window.modelInfoFor ? window.modelInfoFor(srcCode)
+                : { label: 'unbekannt', resolution: '', color: '#94a3b8' });
+            rModelBadge.innerHTML = '';
+            rModelBadge.title = 'Datenquelle Surface fuer diesen Tag. Tier-Voting CH1 → CH2 → D2 → EU.';
+            var rDot = document.createElement('span');
+            rDot.style.cssText = 'display:inline-block;width:7px;height:7px;border-radius:50%;background:'
+                + info.color + ';margin-right:4px;vertical-align:middle;';
+            rModelBadge.appendChild(rDot);
+            rModelBadge.appendChild(document.createTextNode(
+                info.label + (info.resolution ? ' · ' + info.resolution : '')
+            ));
+        }
+
+        // Footer: nur Wetter-Stand (Modell-Info ist jetzt im Header).
         if (wxData.last_updated) {
-            var weatherTs = wxData.last_updated.replace('T', ' ').slice(0, 16);
             var tsDiv = document.createElement('div');
             tsDiv.style.cssText = 'font-size:10px;color:#94a3b8;text-align:right;padding:2px 8px 0;';
-            tsDiv.textContent = 'Wetter-Stand: ' + weatherTs;
+            tsDiv.textContent = 'Wetter-Stand: ' + wxData.last_updated.replace('T', ' ').slice(0, 16);
             chartEl.appendChild(tsDiv);
         }
 

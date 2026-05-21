@@ -4,7 +4,11 @@ Lädt Fluggebiete aus CSV und stellt Such-/Filterfunktionen bereit.
 """
 
 import csv
+import io
+import os
 import re
+import tempfile
+from pathlib import Path
 from config import CSV_PATH
 
 
@@ -85,3 +89,85 @@ def find_spots_by_region(spots, region):
     """Filtert Spots nach Region (case-insensitive, Teilmatch)."""
     region_lower = region.lower()
     return [s for s in spots if region_lower in s["region"].lower()]
+
+
+def make_spot_id(region: str, fluggebiet: str, site_name: str) -> str:
+    """Composite-Key fuer einen Spot, eindeutig ueber (region, fluggebiet, site_name)."""
+    return f"{region.strip()}|{fluggebiet.strip()}|{site_name.strip()}"
+
+
+def _read_csv_text(path: Path) -> str:
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            return f.read()
+    except UnicodeDecodeError:
+        with open(path, encoding="cp1252") as f:
+            return f.read()
+
+
+def update_spot_coords(spot_id: str, new_lat: float, new_lon: float,
+                       csv_path: Path | None = None) -> dict:
+    """Schreibt neue lat/lon fuer EINEN Spot atomar zurueck in fluggebiete CSV.
+
+    spot_id = "<region>|<fluggebiet>|<site_name>" (siehe make_spot_id).
+    Andere Spalten bleiben unveraendert (inkl. Bemerkungen mit Kommata).
+
+    Returns: dict mit updated row data fuer den Caller.
+    Raises: ValueError wenn Spot nicht gefunden, FileNotFoundError wenn CSV fehlt.
+    """
+    path = Path(csv_path or CSV_PATH)
+    if not path.exists():
+        raise FileNotFoundError(f"CSV nicht gefunden: {path}")
+
+    try:
+        parts = spot_id.split("|")
+        if len(parts) != 3:
+            raise ValueError(f"Spot-ID muss Format 'region|fluggebiet|site_name' haben: {spot_id}")
+        target_region, target_flug, target_site = parts[0].strip(), parts[1].strip(), parts[2].strip()
+    except Exception as e:
+        raise ValueError(f"Ungueltige Spot-ID: {spot_id} ({e})")
+
+    raw = _read_csv_text(path)
+    reader = csv.DictReader(io.StringIO(raw))
+    fieldnames = reader.fieldnames
+    if not fieldnames or "latitude" not in fieldnames or "longitude" not in fieldnames:
+        raise ValueError("CSV-Header fehlt latitude/longitude")
+    rows = list(reader)
+
+    matched = None
+    for row in rows:
+        if (row.get("region", "").strip() == target_region
+                and row.get("fluggebiet", "").strip() == target_flug
+                and row.get("site_name", "").strip() == target_site):
+            matched = row
+            break
+    if matched is None:
+        raise ValueError(f"Spot nicht gefunden: {spot_id}")
+
+    matched["latitude"] = f"{float(new_lat):.4f}"
+    matched["longitude"] = f"{float(new_lon):.4f}"
+
+    # Atomar zurueckschreiben: temp-file in selbem Verzeichnis -> os.replace
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=str(path.parent),
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=fieldnames,
+                quoting=csv.QUOTE_MINIMAL,
+                lineterminator="\n",
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+    return matched

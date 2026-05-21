@@ -22,6 +22,7 @@ from typing import Optional
 
 import config
 import prompts
+from engine._common import _weekday_de, _WOCHENTAGE
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +169,30 @@ def generate_synoptic_overview(synoptic_context: dict, analysis_client,
     short_filtered = _filter_statements(short_with_src, valid_centers)
     long_filtered = _filter_statements(long_with_src, valid_centers)
 
+    # Wochentag-Normalisierung NUR fuer long (long_with_sources wird im
+    # Frontend pro Tag gerendert; short ist Fliesstext und braucht das nicht).
+    # Korrigiert "Heute:"/"Morgen:" sowie falsch verschobene Wochentag-Praefixe
+    # auf den aus forecast_dates abgeleiteten korrekten Wochentag — sonst
+    # rendert briefing.js die ersten Eintraege als unbeschriftete Lead-Absaetze.
+    long_filtered = _normalize_weekday_prefixes(
+        long_filtered, synoptic_context.get("forecast_dates") or []
+    )
+
+    # Foehn-Lee-Inversion: pro Tag pruefen, dass die Lee-Seite nicht als
+    # "windgeschuetzt/ruhig" beschrieben wird, wenn der Foehn an dem Tag
+    # aktiv ist (Nordfoehn → Suedseite Lee; Suedfoehn → Nordseite Lee).
+    # Verstoss → text-Satz wird verworfen (analog zum Verbotsbegriff-Filter),
+    # flight_hint mit gleicher Inversion ebenfalls.
+    long_filtered = _filter_foehn_lee_inversion(
+        long_filtered, synoptic_context.get("foehn") or {},
+        synoptic_context.get("forecast_dates") or [],
+    )
+
+    # flight_hint pro long-Eintrag: optionales Pilotensicht-Satz-Feld.
+    # Wird gegen Verbotsbegriffe gefiltert; bei Verstoss wird das Feld
+    # einzeln verworfen, der ganze Eintrag bleibt aber stehen.
+    long_filtered = _sanitize_flight_hints(long_filtered)
+
     if not short_filtered and not long_filtered:
         logger.warning(
             "generate_synoptic_overview: alle Saetze vom Post-Filter "
@@ -253,8 +278,23 @@ def _build_llm_payload(ctx: dict) -> str:
     (ch_snapshots/europe_grid bleiben aussen vor — sie sind im Audit-Log
     fuer Debug, aber nicht im LLM-Input).
     """
+    # forecast_dates: pro Datum vorab den Wochentag berechnen, damit der LLM
+    # nicht selbst Datums-Arithmetik machen muss. Frueher gab es nur die
+    # nackten Date-Strings — LLM hat dann gelegentlich "Heute"/"Morgen" als
+    # Praefix gesetzt oder den Wochentag um 1-2 Tage verschoben, weil er den
+    # Wochentag falsch ableitete. Der briefing.js-Renderer fettstellt nur
+    # Absaetze mit Wochentag-Praefix → fehlerhafte Labels fuehrten zu
+    # luckenhaft wirkenden Wetterlage-Bloecken.
+    raw_dates = ctx.get("forecast_dates") or []
+    forecast_dates_labeled = []
+    for d in raw_dates:
+        try:
+            forecast_dates_labeled.append({"date": d, "weekday": _weekday_de(d)})
+        except Exception:
+            forecast_dates_labeled.append({"date": d, "weekday": None})
+
     out = {
-        "forecast_dates": ctx.get("forecast_dates"),
+        "forecast_dates": forecast_dates_labeled,
         "lage_label": _strip_provenance(ctx.get("lage_label")),
         "pressure_influence": _strip_provenance(ctx.get("pressure_influence")),
         "flow_overhead": _flow_overhead_for_llm(ctx.get("flow_overhead")),
@@ -384,6 +424,211 @@ def _filter_statements(statements: list, valid_centers: set) -> list:
             continue
         filtered.append(st)
     return filtered
+
+
+# Praefix-Regex: "Heute:", "Morgen:", "Uebermorgen:", "Tag 1:" oder Wochentag.
+_WEEKDAY_SET = {w.lower() for w in _WOCHENTAGE}
+_PREFIX_RE = re.compile(
+    r"^(Heute|Morgen|Uebermorgen|Übermorgen|Tag\s*\d+|"
+    r"Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)\s*:\s*",
+    re.IGNORECASE,
+)
+
+
+def _normalize_weekday_prefixes(statements: list, forecast_dates: list) -> list:
+    """Setzt das Wochentag-Praefix jedes Statements auf den korrekten
+    Wochentag aus `forecast_dates`. Der briefing.js-Renderer matcht nur
+    `^(Montag|...|Sonntag):` — Eintraege mit "Heute:"/"Morgen:" oder
+    verschobenen Wochentagen werden sonst als unbeschriftete Lead-Absaetze
+    gerendert, was den Wetterlage-Block luckenhaft wirken laesst.
+
+    Annahme: statements[i] gehoert zum i-ten Forecast-Tag (per Skill-Vertrag).
+    Wir setzen das Praefix anhand der Position autoritativ, unabhaengig
+    davon, was der LLM gewaehlt hat.
+    """
+    if not statements or not forecast_dates:
+        return statements
+    out = []
+    for i, st in enumerate(statements):
+        if i >= len(forecast_dates):
+            out.append(st)
+            continue
+        try:
+            correct_wd = _weekday_de(forecast_dates[i])
+        except Exception:
+            out.append(st)
+            continue
+        text = st.get("text") or ""
+        m = _PREFIX_RE.match(text)
+        if m:
+            existing = m.group(1).strip()
+            if existing.lower() == correct_wd.lower():
+                out.append(st)
+                continue
+            new_text = f"{correct_wd}: {text[m.end():].lstrip()}"
+            logger.info(
+                "Wetterlage-Praefix korrigiert (day %d): '%s' -> '%s'",
+                i + 1, existing, correct_wd,
+            )
+        else:
+            new_text = f"{correct_wd}: {text.lstrip()}"
+            logger.info(
+                "Wetterlage-Praefix ergaenzt (day %d, kein Praefix): '%s'",
+                i + 1, correct_wd,
+            )
+        st2 = dict(st)
+        st2["text"] = new_text
+        out.append(st2)
+    return out
+
+
+# Regex-Pattern fuer "windgeschuetzt/ruhig/geschuetzt"-Behauptungen auf
+# Lee-Seiten. App-Konvention nutzt "ue/ae/oe" — wir matchen beide Varianten
+# defensiv ueber explizite escape-Codes (kein literales ü/ö im Source-File,
+# das im Build/Encoding gelegentlich kaputt geht).
+_U_UMLAUT = "[u\u00fc]"     # u or ü
+_A_UMLAUT = "[a\u00e4]"     # a or ä
+_O_UMLAUT = "[o\u00f6]"     # o or ö
+
+_LEE_SHELTER_TERMS_RE = re.compile(
+    rf"(windgeschuetzt|windgesch{_U_UMLAUT}tzt|"
+    rf"geschuetzt|gesch{_U_UMLAUT}tzt|"
+    rf"windstill|ruhig|windarm|abgeschirmt)",
+    re.IGNORECASE,
+)
+_ALPENNORD_RE = re.compile(
+    rf"alpennord(?:seite|hang|en|h{_A_UMLAUT}ngen)?",
+    re.IGNORECASE,
+)
+_ALPENSUED_RE = re.compile(
+    rf"alpens(?:ued|{_U_UMLAUT}d)(?:seite|hang|en|h{_A_UMLAUT}ngen)?|"
+    rf"tessin|"
+    rf"s(?:ued|{_U_UMLAUT}d)b(?:uenden|{_U_UMLAUT}nden)",
+    re.IGNORECASE,
+)
+
+
+def _text_inverts_foehn_lee(text: str, foehn_side: str) -> bool:
+    """Returns True wenn `text` die Foehn-Lee-Seite (laut `foehn_side`)
+    explizit als geschuetzt/ruhig/windgeschuetzt beschreibt.
+
+    Heuristik: Suche das Lee-Seiten-Token und ein Shelter-Term im selben
+    Satz (gleiches Statement → eine Sentence-Distanz reicht).
+    """
+    if not isinstance(text, str) or not text.strip():
+        return False
+    side = (foehn_side or "").lower()
+    if side not in {"nord", "sued", "süd", "suedfoehn", "südfoehn", "nordfoehn"}:
+        return False
+    is_nord = side.startswith("nord")
+    lee_re = _ALPENSUED_RE if is_nord else _ALPENNORD_RE
+
+    for sentence in re.split(r"(?<=[\.\!\?])\s+", text):
+        if not sentence.strip():
+            continue
+        if not lee_re.search(sentence):
+            continue
+        if _LEE_SHELTER_TERMS_RE.search(sentence):
+            return True
+    return False
+
+
+def _filter_foehn_lee_inversion(statements: list, foehn_struct: dict,
+                                forecast_dates: list) -> list:
+    """Pro long-Statement[i] pruefen, ob es die Foehn-Lee-Seite an dem
+    konkreten Forecast-Tag i als "geschuetzt/windgeschuetzt/ruhig"
+    beschreibt, obwohl `foehn.per_day[i]` aktiven Foehn der entsprechenden
+    Richtung meldet. Verstoss → `text` wird verworfen (Statement faellt
+    raus, da `text` PFLICHT ist). Auch `flight_hint` wird gepruft und
+    bei Verstoss entfernt (Statement bleibt aber stehen).
+
+    Wir matchen den Index aus statements[i] auf forecast_dates[i] und
+    schlagen damit foehn.per_day[i] nach (date-match — robust auch wenn
+    foehn.per_day separat sortiert ist).
+    """
+    if not statements or not foehn_struct or not forecast_dates:
+        return statements
+    per_day = foehn_struct.get("per_day") or []
+    per_day_by_date = {d.get("date"): d for d in per_day if isinstance(d, dict)}
+
+    out = []
+    for i, st in enumerate(statements):
+        if i >= len(forecast_dates):
+            out.append(st)
+            continue
+        date_str = forecast_dates[i]
+        day_foehn = per_day_by_date.get(date_str)
+        if not day_foehn:
+            out.append(st)
+            continue
+        nord_active = bool(day_foehn.get("nord_active"))
+        sued_active = bool(day_foehn.get("sued_active"))
+        if not (nord_active or sued_active):
+            out.append(st)
+            continue
+        active_side = "nord" if nord_active else "sued"
+
+        text = st.get("text") or ""
+        if _text_inverts_foehn_lee(text, active_side):
+            logger.info(
+                "Foehn-Lee-Inversion verworfen (day %s, side=%s): '%s'",
+                date_str, active_side, text,
+            )
+            continue
+
+        # flight_hint mit gleicher Inversion separat pruefen
+        hint = st.get("flight_hint")
+        if hint and _text_inverts_foehn_lee(hint, active_side):
+            logger.info(
+                "Foehn-Lee-Inversion in flight_hint verworfen (day %s, side=%s): '%s'",
+                date_str, active_side, hint,
+            )
+            st = dict(st)
+            st.pop("flight_hint", None)
+
+        out.append(st)
+    return out
+
+
+def _hint_has_forbidden(text: str) -> Optional[str]:
+    """Findet das erste Verbots-Pattern in einem Hint-Text. Liefert das
+    Pattern als Debug-String oder None."""
+    if not isinstance(text, str):
+        return "non_string"
+    for pattern in _FORBIDDEN_PATTERNS:
+        if pattern.search(text):
+            return pattern.pattern
+    return None
+
+
+def _sanitize_flight_hints(statements: list) -> list:
+    """Validiert das optionale `flight_hint`-Feld jedes long-Eintrags
+    gegen die Verbotsbegriffe. Verstoss → flight_hint wird entfernt,
+    der Eintrag selbst bleibt aber stehen. Leere/zu kurze Hints werden
+    ebenfalls entfernt (verhindert leere Zeilen im Frontend).
+    """
+    out = []
+    for st in statements:
+        if "flight_hint" not in st:
+            out.append(st)
+            continue
+        hint = st.get("flight_hint")
+        if not isinstance(hint, str) or len(hint.strip()) < 3:
+            st2 = dict(st)
+            st2.pop("flight_hint", None)
+            out.append(st2)
+            continue
+        bad = _hint_has_forbidden(hint)
+        if bad:
+            logger.info("flight_hint verworfen (forbidden:%s): '%s'", bad, hint)
+            st2 = dict(st)
+            st2.pop("flight_hint", None)
+            out.append(st2)
+            continue
+        st2 = dict(st)
+        st2["flight_hint"] = hint.strip()
+        out.append(st2)
+    return out
 
 
 # Bekannte Region-Labels aus config.EUROPE_PRESSURE_GRID — gegen diese

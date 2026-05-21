@@ -1,7 +1,7 @@
 GLEITCAST — Willkommen an Bord!
 
 Dein Abo ist aktiv. Ab jetzt bekommst du an deinen Wunschtagen
-um 06:30 einen Wochencast mit den besten Flugtagen fuer deine Regionen.
+um 06:30 einen Gleitcast mit den besten Flugtagen fuer deine Regionen.
 Standardmaessig taeglich — pro Wochentag steuerbar in den Einstellungen.
 
 DEINE EINSTELLUNGEN
@@ -16,13 +16,13 @@ WAS DU ERWARTEN KANNST
 - Warum-Erklaerung: Sicherheit zuerst, dann Fliegbarkeit
 - Foehn- und Gewitter-Warnungen, sobald relevant
 
-Naechster Wochencast: naechster Versandtag, 06:30
+Naechster Gleitcast: naechster Versandtag, 06:30
 
 {% if urls.account -%}
 EINSTELLUNGEN ANPASSEN
 ----------------------
 Regionen wechseln, Versandtage waehlen oder pausieren — alles ueber einen
-einzigen Link in jedem Wochencast:
+einzigen Link in jedem Gleitcast:
 {{ urls.account }}
 
 {% endif -%}

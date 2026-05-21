@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-05-17T19:42:11",
+  "generated_at": "2026-05-21T16:29:35",
   "forecast_dates": [
-    "2026-05-17",
-    "2026-05-18",
-    "2026-05-19",
-    "2026-05-20",
-    "2026-05-21"
+    "2026-05-21",
+    "2026-05-22",
+    "2026-05-23",
+    "2026-05-24",
+    "2026-05-25"
   ],
   "lage_label": {
     "value": "Hochdrucklage",
@@ -14,43 +14,43 @@
   },
   "pressure_influence": {
     "value": "Hochdruck",
-    "trend": "aufbauend",
-    "slope_hpa_per_day": 2.77,
+    "trend": "stabil",
+    "slope_hpa_per_day": 0.66,
     "per_day": [
-      {
-        "date": "2026-05-17",
-        "regime": "Hochdruck",
-        "msl_hpa": 1022.8
-      },
-      {
-        "date": "2026-05-18",
-        "regime": "Hochdruck",
-        "msl_hpa": 1022.8
-      },
-      {
-        "date": "2026-05-19",
-        "regime": "Hochdruck",
-        "msl_hpa": 1025.0
-      },
-      {
-        "date": "2026-05-20",
-        "regime": "Hochdruck",
-        "msl_hpa": 1030.3
-      },
       {
         "date": "2026-05-21",
         "regime": "Hochdruck",
-        "msl_hpa": 1032.9
+        "msl_hpa": 1028.6
+      },
+      {
+        "date": "2026-05-22",
+        "regime": "Hochdruck",
+        "msl_hpa": 1028.9
+      },
+      {
+        "date": "2026-05-23",
+        "regime": "Hochdruck",
+        "msl_hpa": 1029.2
+      },
+      {
+        "date": "2026-05-24",
+        "regime": "Hochdruck",
+        "msl_hpa": 1030.5
+      },
+      {
+        "date": "2026-05-25",
+        "regime": "Hochdruck",
+        "msl_hpa": 1031.1
       }
     ],
     "decided_by": "decide_pressure_influence",
     "inputs": {
       "msl_by_day": [
-        1022.8,
-        1022.8,
-        1025.0,
-        1030.3,
-        1032.9
+        1028.6,
+        1028.9,
+        1029.2,
+        1030.5,
+        1031.1
       ]
     },
     "thresholds": {
@@ -61,69 +61,69 @@
     }
   },
   "flow_overhead": {
-    "value": "West",
+    "value": "Nordost",
     "strength": "schwach",
     "trend": "leicht drehend",
     "rotation": null,
     "per_day": [
       {
-        "date": "2026-05-17",
-        "speed_kmh": 11.2,
-        "dir_deg": 234.0,
-        "sector": "Suedwest",
-        "strength": "schwach"
-      },
-      {
-        "date": "2026-05-18",
-        "speed_kmh": 15.9,
-        "dir_deg": 203.0,
-        "sector": "Suedwest",
-        "strength": "maessig"
-      },
-      {
-        "date": "2026-05-19",
-        "speed_kmh": 13.5,
-        "dir_deg": 245.0,
-        "sector": "Suedwest",
-        "strength": "schwach"
-      },
-      {
-        "date": "2026-05-20",
-        "speed_kmh": 26.1,
-        "dir_deg": 265.0,
-        "sector": "West",
-        "strength": "maessig"
-      },
-      {
         "date": "2026-05-21",
-        "speed_kmh": 15.9,
-        "dir_deg": 283.0,
-        "sector": "West",
+        "speed_kmh": 18.3,
+        "dir_deg": 354.0,
+        "sector": "Nord",
         "strength": "maessig"
+      },
+      {
+        "date": "2026-05-22",
+        "speed_kmh": 6.0,
+        "dir_deg": 314.0,
+        "sector": "Nordwest",
+        "strength": "schwach"
+      },
+      {
+        "date": "2026-05-23",
+        "speed_kmh": 9.7,
+        "dir_deg": 25.0,
+        "sector": "Nordost",
+        "strength": "schwach"
+      },
+      {
+        "date": "2026-05-24",
+        "speed_kmh": 12.6,
+        "dir_deg": 68.0,
+        "sector": "Ost",
+        "strength": "schwach"
+      },
+      {
+        "date": "2026-05-25",
+        "speed_kmh": 6.7,
+        "dir_deg": 71.0,
+        "sector": "Ost",
+        "strength": "schwach"
       }
     ],
     "decided_by": "decide_flow_overhead",
     "inputs": {
       "wind_700_by_day": [
         {
-          "speed": 11.2,
-          "dir": 234.0
+          "speed": 18.3,
+          "dir": 354.0
         },
         {
-          "speed": 15.9,
-          "dir": 203.0
+          "speed": 6.0,
+          "dir": 314.0
         },
         {
-          "speed": 13.5,
-          "dir": 245.0
+          "speed": 9.7,
+          "dir": 25.0
         },
         {
-          "speed": 26.1,
-          "dir": 265.0
+          "speed": 12.6,
+          "dir": 68.0
         },
         {
-          "speed": 15.9,
-          "dir": 283.0
+          "speed": 6.7,
+          "dir": 71.0
         }
       ]
     },
@@ -136,23 +136,23 @@
   },
   "t850_trend": {
     "value": "insgesamt waermer",
-    "delta_total_k": 6.6,
+    "delta_total_k": 5.7,
     "change": null,
     "per_day": [
-      3.0,
-      4.4,
-      5.6,
-      7.7,
-      9.6
+      10.8,
+      14.0,
+      14.9,
+      16.1,
+      16.5
     ],
     "decided_by": "decide_t850_trend",
     "inputs": {
       "t850_by_day": [
-        3.0,
-        4.4,
-        5.6,
-        7.7,
-        9.6
+        10.8,
+        14.0,
+        14.9,
+        16.1,
+        16.5
       ]
     },
     "thresholds": {
@@ -161,179 +161,15 @@
   },
   "pressure_centers_per_day": [
     {
-      "date": "2026-05-17",
-      "centers": [
-        {
-          "type": "Tief",
-          "region_label": "Schottland",
-          "lat": 57.0,
-          "lon": -4.0,
-          "msl_hpa": 1002.0,
-          "gradient_hpa": 8.7,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        },
-        {
-          "type": "Tief",
-          "region_label": "Schwarzes Meer",
-          "lat": 44.0,
-          "lon": 33.0,
-          "msl_hpa": 1003.8,
-          "gradient_hpa": 9.3,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        },
-        {
-          "type": "Hoch",
-          "region_label": "Azoren",
-          "lat": 38.0,
-          "lon": -25.0,
-          "msl_hpa": 1026.8,
-          "gradient_hpa": 14.0,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        }
-      ]
-    },
-    {
-      "date": "2026-05-18",
-      "centers": [
-        {
-          "type": "Tief",
-          "region_label": "Atlantik vor Irland",
-          "lat": 52.0,
-          "lon": -15.0,
-          "msl_hpa": 995.2,
-          "gradient_hpa": 16.8,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        },
-        {
-          "type": "Hoch",
-          "region_label": "Suedskandinavien",
-          "lat": 58.0,
-          "lon": 14.0,
-          "msl_hpa": 1018.5,
-          "gradient_hpa": 6.4,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        },
-        {
-          "type": "Tief",
-          "region_label": "Schwarzes Meer",
-          "lat": 44.0,
-          "lon": 33.0,
-          "msl_hpa": 1008.8,
-          "gradient_hpa": 5.1,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        },
-        {
-          "type": "Hoch",
-          "region_label": "Azoren",
-          "lat": 38.0,
-          "lon": -25.0,
-          "msl_hpa": 1022.3,
-          "gradient_hpa": 11.8,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        }
-      ]
-    },
-    {
-      "date": "2026-05-19",
-      "centers": [
-        {
-          "type": "Tief",
-          "region_label": "Atlantik vor Irland",
-          "lat": 52.0,
-          "lon": -15.0,
-          "msl_hpa": 996.2,
-          "gradient_hpa": 11.8,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        },
-        {
-          "type": "Hoch",
-          "region_label": "Nordskandinavien",
-          "lat": 65.0,
-          "lon": 15.0,
-          "msl_hpa": 1018.4,
-          "gradient_hpa": 8.3,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        },
-        {
-          "type": "Tief",
-          "region_label": "Schwarzes Meer",
-          "lat": 44.0,
-          "lon": 33.0,
-          "msl_hpa": 1011.0,
-          "gradient_hpa": 6.1,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        }
-      ]
-    },
-    {
-      "date": "2026-05-20",
-      "centers": [
-        {
-          "type": "Tief",
-          "region_label": "Schottland",
-          "lat": 57.0,
-          "lon": -4.0,
-          "msl_hpa": 1005.9,
-          "gradient_hpa": 8.5,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        },
-        {
-          "type": "Tief",
-          "region_label": "Schwarzes Meer",
-          "lat": 44.0,
-          "lon": 33.0,
-          "msl_hpa": 1007.3,
-          "gradient_hpa": 12.5,
-          "decided_by": "find_pressure_centers",
-          "thresholds": {
-            "min_gradient_hpa": 5.0
-          }
-        }
-      ]
-    },
-    {
       "date": "2026-05-21",
       "centers": [
         {
           "type": "Tief",
-          "region_label": "Island",
-          "lat": 64.0,
-          "lon": -20.0,
-          "msl_hpa": 1008.5,
-          "gradient_hpa": 8.8,
+          "region_label": "Atlantik vor Irland",
+          "lat": 52.0,
+          "lon": -15.0,
+          "msl_hpa": 1009.4,
+          "gradient_hpa": 10.8,
           "decided_by": "find_pressure_centers",
           "thresholds": {
             "min_gradient_hpa": 5.0
@@ -344,8 +180,8 @@
           "region_label": "Mitteleuropa",
           "lat": 50.0,
           "lon": 13.0,
-          "msl_hpa": 1026.8,
-          "gradient_hpa": 5.5,
+          "msl_hpa": 1027.5,
+          "gradient_hpa": 5.4,
           "decided_by": "find_pressure_centers",
           "thresholds": {
             "min_gradient_hpa": 5.0
@@ -356,8 +192,148 @@
           "region_label": "Schwarzes Meer",
           "lat": 44.0,
           "lon": 33.0,
-          "msl_hpa": 1009.3,
-          "gradient_hpa": 12.2,
+          "msl_hpa": 1008.1,
+          "gradient_hpa": 14.8,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-05-22",
+      "centers": [
+        {
+          "type": "Tief",
+          "region_label": "Island",
+          "lat": 64.0,
+          "lon": -20.0,
+          "msl_hpa": 1008.2,
+          "gradient_hpa": 11.0,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Tief",
+          "region_label": "Schwarzes Meer",
+          "lat": 44.0,
+          "lon": 33.0,
+          "msl_hpa": 1015.4,
+          "gradient_hpa": 9.9,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-05-23",
+      "centers": [
+        {
+          "type": "Tief",
+          "region_label": "Island",
+          "lat": 64.0,
+          "lon": -20.0,
+          "msl_hpa": 1003.9,
+          "gradient_hpa": 17.5,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Tief",
+          "region_label": "Schwarzes Meer",
+          "lat": 44.0,
+          "lon": 33.0,
+          "msl_hpa": 1015.2,
+          "gradient_hpa": 9.8,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-05-24",
+      "centers": [
+        {
+          "type": "Tief",
+          "region_label": "Island",
+          "lat": 64.0,
+          "lon": -20.0,
+          "msl_hpa": 1010.8,
+          "gradient_hpa": 13.8,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Tief",
+          "region_label": "Schwarzes Meer",
+          "lat": 44.0,
+          "lon": 33.0,
+          "msl_hpa": 1014.2,
+          "gradient_hpa": 11.1,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-05-25",
+      "centers": [
+        {
+          "type": "Tief",
+          "region_label": "Island",
+          "lat": 64.0,
+          "lon": -20.0,
+          "msl_hpa": 1005.8,
+          "gradient_hpa": 20.4,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Hoch",
+          "region_label": "Atlantik vor Irland",
+          "lat": 52.0,
+          "lon": -15.0,
+          "msl_hpa": 1030.9,
+          "gradient_hpa": 7.9,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Hoch",
+          "region_label": "Mitteleuropa",
+          "lat": 50.0,
+          "lon": 13.0,
+          "msl_hpa": 1030.5,
+          "gradient_hpa": 5.3,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Tief",
+          "region_label": "Schwarzes Meer",
+          "lat": 44.0,
+          "lon": 33.0,
+          "msl_hpa": 1018.1,
+          "gradient_hpa": 8.6,
           "decided_by": "find_pressure_centers",
           "thresholds": {
             "min_gradient_hpa": 5.0
@@ -372,44 +348,44 @@
     "days_active": [],
     "per_day": [
       {
-        "date": "2026-05-17",
-        "active": false,
-        "strength": null,
-        "delta_p_hpa": -3.0,
-        "wind_700_dir_deg": 234.0,
-        "wind_700_speed_kmh": 11.2
-      },
-      {
-        "date": "2026-05-18",
-        "active": false,
-        "strength": null,
-        "delta_p_hpa": -2.9,
-        "wind_700_dir_deg": 203.0,
-        "wind_700_speed_kmh": 15.9
-      },
-      {
-        "date": "2026-05-19",
-        "active": false,
-        "strength": null,
-        "delta_p_hpa": -1.8,
-        "wind_700_dir_deg": 245.0,
-        "wind_700_speed_kmh": 13.5
-      },
-      {
-        "date": "2026-05-20",
-        "active": false,
-        "strength": null,
-        "delta_p_hpa": -3.8,
-        "wind_700_dir_deg": 265.0,
-        "wind_700_speed_kmh": 26.1
-      },
-      {
         "date": "2026-05-21",
         "active": false,
         "strength": null,
-        "delta_p_hpa": -1.5,
-        "wind_700_dir_deg": 283.0,
-        "wind_700_speed_kmh": 15.9
+        "delta_p_hpa": -2.0,
+        "wind_700_dir_deg": 354.0,
+        "wind_700_speed_kmh": 18.3
+      },
+      {
+        "date": "2026-05-22",
+        "active": false,
+        "strength": null,
+        "delta_p_hpa": 0.6,
+        "wind_700_dir_deg": 314.0,
+        "wind_700_speed_kmh": 6.0
+      },
+      {
+        "date": "2026-05-23",
+        "active": false,
+        "strength": null,
+        "delta_p_hpa": 1.3,
+        "wind_700_dir_deg": 25.0,
+        "wind_700_speed_kmh": 9.7
+      },
+      {
+        "date": "2026-05-24",
+        "active": false,
+        "strength": null,
+        "delta_p_hpa": 0.9,
+        "wind_700_dir_deg": 68.0,
+        "wind_700_speed_kmh": 12.6
+      },
+      {
+        "date": "2026-05-25",
+        "active": false,
+        "strength": null,
+        "delta_p_hpa": -0.3,
+        "wind_700_dir_deg": 71.0,
+        "wind_700_speed_kmh": 6.7
       }
     ],
     "decided_by": "decide_bise",
@@ -440,33 +416,33 @@
     "days_active": [],
     "per_day": [
       {
-        "date": "2026-05-17",
-        "active": false,
-        "msl_hpa": 1013.9,
-        "region_label": null
-      },
-      {
-        "date": "2026-05-18",
-        "active": false,
-        "msl_hpa": 1015.9,
-        "region_label": null
-      },
-      {
-        "date": "2026-05-19",
-        "active": false,
-        "msl_hpa": 1017.1,
-        "region_label": null
-      },
-      {
-        "date": "2026-05-20",
-        "active": false,
-        "msl_hpa": 1020.2,
-        "region_label": null
-      },
-      {
         "date": "2026-05-21",
         "active": false,
-        "msl_hpa": 1019.9,
+        "msl_hpa": 1021.0,
+        "region_label": null
+      },
+      {
+        "date": "2026-05-22",
+        "active": false,
+        "msl_hpa": 1022.4,
+        "region_label": null
+      },
+      {
+        "date": "2026-05-23",
+        "active": false,
+        "msl_hpa": 1021.7,
+        "region_label": null
+      },
+      {
+        "date": "2026-05-24",
+        "active": false,
+        "msl_hpa": 1023.3,
+        "region_label": null
+      },
+      {
+        "date": "2026-05-25",
+        "active": false,
+        "msl_hpa": 1025.6,
         "region_label": null
       }
     ],
@@ -492,43 +468,43 @@
     "days_affected": [],
     "per_day": [
       {
-        "date": "2026-05-17",
-        "sued_active": false,
-        "nord_active": false,
-        "peak_sued": "none",
-        "peak_nord": "none",
-        "sued_hours": 0,
-        "nord_hours": 0
-      },
-      {
-        "date": "2026-05-18",
-        "sued_active": false,
-        "nord_active": false,
-        "peak_sued": "none",
-        "peak_nord": "none",
-        "sued_hours": 0,
-        "nord_hours": 0
-      },
-      {
-        "date": "2026-05-19",
-        "sued_active": false,
-        "nord_active": false,
-        "peak_sued": "none",
-        "peak_nord": "none",
-        "sued_hours": 0,
-        "nord_hours": 0
-      },
-      {
-        "date": "2026-05-20",
-        "sued_active": false,
-        "nord_active": false,
-        "peak_sued": "none",
-        "peak_nord": "caution",
-        "sued_hours": 0,
-        "nord_hours": 1
-      },
-      {
         "date": "2026-05-21",
+        "sued_active": false,
+        "nord_active": false,
+        "peak_sued": "none",
+        "peak_nord": "none",
+        "sued_hours": 0,
+        "nord_hours": 0
+      },
+      {
+        "date": "2026-05-22",
+        "sued_active": false,
+        "nord_active": false,
+        "peak_sued": "none",
+        "peak_nord": "none",
+        "sued_hours": 0,
+        "nord_hours": 0
+      },
+      {
+        "date": "2026-05-23",
+        "sued_active": false,
+        "nord_active": false,
+        "peak_sued": "none",
+        "peak_nord": "none",
+        "sued_hours": 0,
+        "nord_hours": 0
+      },
+      {
+        "date": "2026-05-24",
+        "sued_active": false,
+        "nord_active": false,
+        "peak_sued": "none",
+        "peak_nord": "none",
+        "sued_hours": 0,
+        "nord_hours": 0
+      },
+      {
+        "date": "2026-05-25",
         "sued_active": false,
         "nord_active": false,
         "peak_sued": "none",
@@ -541,11 +517,11 @@
     "source": "foehn_indicators.fetch_foehn_data + evaluate_foehn",
     "inputs": {
       "forecast_dates": [
-        "2026-05-17",
-        "2026-05-18",
-        "2026-05-19",
-        "2026-05-20",
-        "2026-05-21"
+        "2026-05-21",
+        "2026-05-22",
+        "2026-05-23",
+        "2026-05-24",
+        "2026-05-25"
       ]
     },
     "thresholds": {
@@ -561,89 +537,32 @@
   "precip_pattern": {
     "per_day": [
       {
-        "date": "2026-05-17",
-        "alpennord": {
-          "value": "leichter Regen",
-          "n_spots": 391,
-          "peak_mm": 3.6,
-          "wet_share": 0.25,
-          "max_cape": 110.0,
-          "max_coverage": 0.5
-        },
-        "alpensued": {
-          "value": "trocken",
-          "n_spots": 96,
-          "peak_mm": 0.1,
-          "wet_share": 0.0,
-          "max_cape": 30.0,
-          "max_coverage": 0.67
-        }
-      },
-      {
-        "date": "2026-05-18",
-        "alpennord": {
-          "value": "Gewitter",
-          "n_spots": 391,
-          "peak_mm": 12.9,
-          "wet_share": 0.99,
-          "max_cape": 240.0,
-          "max_coverage": 1.0
-        },
-        "alpensued": {
-          "value": "Gewitter",
-          "n_spots": 96,
-          "peak_mm": 6.6,
-          "wet_share": 0.95,
-          "max_cape": 280.0,
-          "max_coverage": 1.0
-        }
-      },
-      {
-        "date": "2026-05-19",
-        "alpennord": {
-          "value": "Spuren",
-          "n_spots": 391,
-          "peak_mm": 0.5,
-          "wet_share": 0.07,
-          "max_cape": 80.0,
-          "max_coverage": 1.0
-        },
-        "alpensued": {
-          "value": "trocken",
-          "n_spots": 96,
-          "peak_mm": 0.1,
-          "wet_share": 0.0,
-          "max_cape": 40.0,
-          "max_coverage": 0.38
-        }
-      },
-      {
-        "date": "2026-05-20",
-        "alpennord": {
-          "value": "Gewitter",
-          "n_spots": 391,
-          "peak_mm": 1.7,
-          "wet_share": 0.89,
-          "max_cape": 280.0,
-          "max_coverage": 1.0
-        },
-        "alpensued": {
-          "value": "Schauer",
-          "n_spots": 96,
-          "peak_mm": 0.6,
-          "wet_share": 0.3,
-          "max_cape": 410.0,
-          "max_coverage": 0.67
-        }
-      },
-      {
         "date": "2026-05-21",
         "alpennord": {
           "value": "trocken",
           "n_spots": 391,
           "peak_mm": 0,
           "wet_share": 0.0,
-          "max_cape": 110.0,
+          "max_cape": 320.0,
+          "max_coverage": 0.12
+        },
+        "alpensued": {
+          "value": "trocken",
+          "n_spots": 96,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 60.0,
+          "max_coverage": 0.0
+        }
+      },
+      {
+        "date": "2026-05-22",
+        "alpennord": {
+          "value": "trocken",
+          "n_spots": 391,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 600.0,
           "max_coverage": 0.0
         },
         "alpensued": {
@@ -651,8 +570,65 @@
           "n_spots": 96,
           "peak_mm": 0,
           "wet_share": 0.0,
-          "max_cape": 20.0,
+          "max_cape": 480.0,
           "max_coverage": 0.0
+        }
+      },
+      {
+        "date": "2026-05-23",
+        "alpennord": {
+          "value": "trocken",
+          "n_spots": 391,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 1070.0,
+          "max_coverage": 0.0
+        },
+        "alpensued": {
+          "value": "trocken",
+          "n_spots": 96,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 1800.0,
+          "max_coverage": 0.0
+        }
+      },
+      {
+        "date": "2026-05-24",
+        "alpennord": {
+          "value": "trocken",
+          "n_spots": 391,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 1470.0,
+          "max_coverage": 0.5
+        },
+        "alpensued": {
+          "value": "trocken",
+          "n_spots": 96,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 1820.0,
+          "max_coverage": 0.67
+        }
+      },
+      {
+        "date": "2026-05-25",
+        "alpennord": {
+          "value": "trocken",
+          "n_spots": 391,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 1570.0,
+          "max_coverage": 0.38
+        },
+        "alpensued": {
+          "value": "trocken",
+          "n_spots": 96,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 1060.0,
+          "max_coverage": 0.38
         }
       }
     ],
@@ -669,27 +645,27 @@
     }
   },
   "schneefallgrenze": {
-    "value": 2300,
+    "value": 3700,
     "per_day": [
       {
-        "date": "2026-05-17",
-        "ssg_m": 1800
-      },
-      {
-        "date": "2026-05-18",
-        "ssg_m": 2000
-      },
-      {
-        "date": "2026-05-19",
-        "ssg_m": 2200
-      },
-      {
-        "date": "2026-05-20",
-        "ssg_m": 2600
-      },
-      {
         "date": "2026-05-21",
-        "ssg_m": 2900
+        "ssg_m": 3100
+      },
+      {
+        "date": "2026-05-22",
+        "ssg_m": 3600
+      },
+      {
+        "date": "2026-05-23",
+        "ssg_m": 3800
+      },
+      {
+        "date": "2026-05-24",
+        "ssg_m": 4000
+      },
+      {
+        "date": "2026-05-25",
+        "ssg_m": 4000
       }
     ],
     "decided_by": "decide_schneefallgrenze",
@@ -710,86 +686,86 @@
   },
   "confidence_per_day": [
     {
-      "date": "2026-05-17",
+      "date": "2026-05-21",
       "level": "high"
     },
     {
-      "date": "2026-05-18",
+      "date": "2026-05-22",
       "level": "high"
     },
     {
-      "date": "2026-05-19",
+      "date": "2026-05-23",
       "level": "medium"
     },
     {
-      "date": "2026-05-20",
+      "date": "2026-05-24",
       "level": "low"
     },
     {
-      "date": "2026-05-21",
+      "date": "2026-05-25",
       "level": "low"
     }
   ],
   "ch_snapshots": [
     {
-      "date": "2026-05-17",
-      "n_spots": 487,
-      "msl_hpa": 1022.8,
-      "t850_c": 3.0,
-      "gh850_m": 1476.0,
-      "wind_700": {
-        "speed_kmh": 11.2,
-        "dir_deg": 234.0
-      },
-      "msl_source": "derived_from_surface"
-    },
-    {
-      "date": "2026-05-18",
-      "n_spots": 487,
-      "msl_hpa": 1022.8,
-      "t850_c": 4.4,
-      "gh850_m": 1479.0,
-      "wind_700": {
-        "speed_kmh": 15.9,
-        "dir_deg": 203.0
-      },
-      "msl_source": "derived_from_surface"
-    },
-    {
-      "date": "2026-05-19",
-      "n_spots": 487,
-      "msl_hpa": 1025.0,
-      "t850_c": 5.6,
-      "gh850_m": 1510.0,
-      "wind_700": {
-        "speed_kmh": 13.5,
-        "dir_deg": 245.0
-      },
-      "msl_source": "derived_from_surface"
-    },
-    {
-      "date": "2026-05-20",
-      "n_spots": 487,
-      "msl_hpa": 1030.3,
-      "t850_c": 7.7,
-      "gh850_m": 1564.0,
-      "wind_700": {
-        "speed_kmh": 26.1,
-        "dir_deg": 265.0
-      },
-      "msl_source": "derived_from_surface"
-    },
-    {
       "date": "2026-05-21",
       "n_spots": 487,
-      "msl_hpa": 1032.9,
-      "t850_c": 9.6,
-      "gh850_m": 1592.0,
+      "msl_hpa": 1028.6,
+      "t850_c": 10.8,
+      "gh850_m": 1601.0,
       "wind_700": {
-        "speed_kmh": 15.9,
-        "dir_deg": 283.0
+        "speed_kmh": 18.3,
+        "dir_deg": 354.0
       },
-      "msl_source": "derived_from_surface"
+      "msl_source": "pressure_msl"
+    },
+    {
+      "date": "2026-05-22",
+      "n_spots": 487,
+      "msl_hpa": 1028.9,
+      "t850_c": 14.0,
+      "gh850_m": 1614.0,
+      "wind_700": {
+        "speed_kmh": 6.0,
+        "dir_deg": 314.0
+      },
+      "msl_source": "pressure_msl"
+    },
+    {
+      "date": "2026-05-23",
+      "n_spots": 487,
+      "msl_hpa": 1029.2,
+      "t850_c": 14.9,
+      "gh850_m": 1618.0,
+      "wind_700": {
+        "speed_kmh": 9.7,
+        "dir_deg": 25.0
+      },
+      "msl_source": "pressure_msl"
+    },
+    {
+      "date": "2026-05-24",
+      "n_spots": 487,
+      "msl_hpa": 1030.5,
+      "t850_c": 16.1,
+      "gh850_m": 1629.0,
+      "wind_700": {
+        "speed_kmh": 12.6,
+        "dir_deg": 68.0
+      },
+      "msl_source": "pressure_msl"
+    },
+    {
+      "date": "2026-05-25",
+      "n_spots": 487,
+      "msl_hpa": 1031.1,
+      "t850_c": 16.5,
+      "gh850_m": 1643.0,
+      "wind_700": {
+        "speed_kmh": 6.7,
+        "dir_deg": 71.0
+      },
+      "msl_source": "pressure_msl"
     }
   ],
   "europe_grid": [
@@ -798,11 +774,11 @@
       "lon": -20.0,
       "label": "Island",
       "msl_by_day": {
-        "2026-05-17": 1007.9,
-        "2026-05-18": 1011.0,
-        "2026-05-19": 1006.3,
-        "2026-05-20": 1009.2,
-        "2026-05-21": 1008.5
+        "2026-05-21": 1009.6,
+        "2026-05-22": 1008.2,
+        "2026-05-23": 1003.9,
+        "2026-05-24": 1010.8,
+        "2026-05-25": 1005.8
       }
     },
     {
@@ -810,11 +786,11 @@
       "lon": -4.0,
       "label": "Schottland",
       "msl_by_day": {
-        "2026-05-17": 1002.0,
-        "2026-05-18": 1007.2,
-        "2026-05-19": 998.6,
-        "2026-05-20": 1005.9,
-        "2026-05-21": 1017.2
+        "2026-05-21": 1017.3,
+        "2026-05-22": 1018.1,
+        "2026-05-23": 1023.6,
+        "2026-05-24": 1027.9,
+        "2026-05-25": 1028.2
       }
     },
     {
@@ -822,11 +798,11 @@
       "lon": -15.0,
       "label": "Atlantik vor Irland",
       "msl_by_day": {
-        "2026-05-17": 1010.9,
-        "2026-05-18": 995.2,
-        "2026-05-19": 996.2,
-        "2026-05-20": 1010.5,
-        "2026-05-21": 1010.2
+        "2026-05-21": 1009.4,
+        "2026-05-22": 1014.1,
+        "2026-05-23": 1022.6,
+        "2026-05-24": 1026.1,
+        "2026-05-25": 1030.9
       }
     },
     {
@@ -834,11 +810,11 @@
       "lon": 0.0,
       "label": "England",
       "msl_by_day": {
-        "2026-05-17": 1011.0,
-        "2026-05-18": 1012.7,
-        "2026-05-19": 1009.1,
-        "2026-05-20": 1019.4,
-        "2026-05-21": 1026.8
+        "2026-05-21": 1027.3,
+        "2026-05-22": 1026.1,
+        "2026-05-23": 1027.9,
+        "2026-05-24": 1030.5,
+        "2026-05-25": 1030.7
       }
     },
     {
@@ -846,11 +822,11 @@
       "lon": 2.0,
       "label": "Frankreich",
       "msl_by_day": {
-        "2026-05-17": 1014.4,
-        "2026-05-18": 1017.1,
-        "2026-05-19": 1017.9,
-        "2026-05-20": 1025.9,
-        "2026-05-21": 1026.3
+        "2026-05-21": 1026.4,
+        "2026-05-22": 1026.2,
+        "2026-05-23": 1027.2,
+        "2026-05-24": 1027.3,
+        "2026-05-25": 1027.2
       }
     },
     {
@@ -858,11 +834,11 @@
       "lon": -3.0,
       "label": "Spanien",
       "msl_by_day": {
-        "2026-05-17": 1014.9,
-        "2026-05-18": 1016.8,
-        "2026-05-19": 1020.3,
-        "2026-05-20": 1022.6,
-        "2026-05-21": 1022.1
+        "2026-05-21": 1023.8,
+        "2026-05-22": 1023.5,
+        "2026-05-23": 1022.9,
+        "2026-05-24": 1022.6,
+        "2026-05-25": 1024.5
       }
     },
     {
@@ -870,11 +846,11 @@
       "lon": 15.0,
       "label": "Nordskandinavien",
       "msl_by_day": {
-        "2026-05-17": 1005.2,
-        "2026-05-18": 1017.8,
-        "2026-05-19": 1018.4,
-        "2026-05-20": 1014.7,
-        "2026-05-21": 1015.1
+        "2026-05-21": 1015.4,
+        "2026-05-22": 1018.5,
+        "2026-05-23": 1011.6,
+        "2026-05-24": 1013.7,
+        "2026-05-25": 1014.9
       }
     },
     {
@@ -882,11 +858,11 @@
       "lon": 14.0,
       "label": "Suedskandinavien",
       "msl_by_day": {
-        "2026-05-17": 1013.0,
-        "2026-05-18": 1018.5,
-        "2026-05-19": 1017.8,
-        "2026-05-20": 1018.4,
-        "2026-05-21": 1019.8
+        "2026-05-21": 1019.1,
+        "2026-05-22": 1023.4,
+        "2026-05-23": 1021.7,
+        "2026-05-24": 1023.3,
+        "2026-05-25": 1022.7
       }
     },
     {
@@ -894,11 +870,11 @@
       "lon": 13.0,
       "label": "Mitteleuropa",
       "msl_by_day": {
-        "2026-05-17": 1016.0,
-        "2026-05-18": 1014.2,
-        "2026-05-19": 1017.7,
-        "2026-05-20": 1021.3,
-        "2026-05-21": 1026.8
+        "2026-05-21": 1027.5,
+        "2026-05-22": 1028.9,
+        "2026-05-23": 1027.9,
+        "2026-05-24": 1028.7,
+        "2026-05-25": 1030.5
       }
     },
     {
@@ -906,11 +882,11 @@
       "lon": 9.0,
       "label": "Norditalien",
       "msl_by_day": {
-        "2026-05-17": 1014.6,
-        "2026-05-18": 1015.9,
-        "2026-05-19": 1018.1,
-        "2026-05-20": 1022.1,
-        "2026-05-21": 1023.5
+        "2026-05-21": 1024.7,
+        "2026-05-22": 1025.8,
+        "2026-05-23": 1024.5,
+        "2026-05-24": 1025.4,
+        "2026-05-25": 1026.5
       }
     },
     {
@@ -918,11 +894,11 @@
       "lon": 6.0,
       "label": "Westliches Mittelmeer",
       "msl_by_day": {
-        "2026-05-17": 1017.3,
-        "2026-05-18": 1018.7,
-        "2026-05-19": 1021.0,
-        "2026-05-20": 1024.4,
-        "2026-05-21": 1023.5
+        "2026-05-21": 1025.1,
+        "2026-05-22": 1026.3,
+        "2026-05-23": 1025.4,
+        "2026-05-24": 1024.6,
+        "2026-05-25": 1026.2
       }
     },
     {
@@ -930,11 +906,11 @@
       "lon": 16.0,
       "label": "Adria",
       "msl_by_day": {
-        "2026-05-17": 1013.9,
-        "2026-05-18": 1016.2,
-        "2026-05-19": 1017.1,
-        "2026-05-20": 1020.2,
-        "2026-05-21": 1019.9
+        "2026-05-21": 1021.0,
+        "2026-05-22": 1022.4,
+        "2026-05-23": 1021.7,
+        "2026-05-24": 1023.3,
+        "2026-05-25": 1025.6
       }
     },
     {
@@ -942,11 +918,11 @@
       "lon": 25.0,
       "label": "Osteuropa",
       "msl_by_day": {
-        "2026-05-17": 1007.8,
-        "2026-05-18": 1009.4,
-        "2026-05-19": 1015.4,
-        "2026-05-20": 1015.7,
-        "2026-05-21": 1015.7
+        "2026-05-21": 1018.3,
+        "2026-05-22": 1024.0,
+        "2026-05-23": 1026.0,
+        "2026-05-24": 1024.0,
+        "2026-05-25": 1024.3
       }
     },
     {
@@ -954,11 +930,11 @@
       "lon": 33.0,
       "label": "Schwarzes Meer",
       "msl_by_day": {
-        "2026-05-17": 1003.8,
-        "2026-05-18": 1008.8,
-        "2026-05-19": 1011.0,
-        "2026-05-20": 1007.3,
-        "2026-05-21": 1009.3
+        "2026-05-21": 1008.1,
+        "2026-05-22": 1015.4,
+        "2026-05-23": 1015.2,
+        "2026-05-24": 1014.2,
+        "2026-05-25": 1018.1
       }
     },
     {
@@ -966,11 +942,11 @@
       "lon": -25.0,
       "label": "Azoren",
       "msl_by_day": {
-        "2026-05-17": 1026.8,
-        "2026-05-18": 1022.3,
-        "2026-05-19": 1017.8,
-        "2026-05-20": 1013.7,
-        "2026-05-21": 1017.4
+        "2026-05-21": 1015.4,
+        "2026-05-22": 1020.3,
+        "2026-05-23": 1025.2,
+        "2026-05-24": 1025.3,
+        "2026-05-25": 1024.3
       }
     }
   ],
@@ -989,96 +965,109 @@
     "decide_lage_label"
   ],
   "llm_overview": {
-    "short": "Stabilisierende Hochdrucklage praegt die Woche. Anfangs noch wechselhaft mit verbreiteten Gewittern am Montag, besonders auf der Alpennordseite. Ab Dienstag zunehmend sonnig und trocken, gegen Wochenende auch auf der Alpensuedseite. Schwacher Suedwestwind, ab Mittwoch auf West drehend. Foehn-Tendenz Alpennordseite infolge der Suedweststroemung beobachten.",
-    "long": "Sonntag: Vereinzelter leichter Regen auf der Alpennordseite, Alpensuedseite trocken. Schwacher Suedwestwind. Foehn-Tendenz Alpennordseite, Entwicklung beobachten. Schneefallgrenze um 1800 Meter. Montag: Verbreitet Gewitter auf der Alpennordseite und auf der Alpensuedseite. Maessiger Suedwestwind. Foehn-Tendenz Alpennordseite beachten. Schneefallgrenze um 2000 Meter. Dienstag: Weitgehend trocken, auf der Alpennordseite nur vereinzelt Spuren. Alpensuedseite trocken und sonnig. Schwacher Suedwestwind. Foehn-Tendenz Alpennordseite beachten. Schneefallgrenze um 2200 Meter. Mittwoch: Tendenziell verbreitet Gewitter auf der Alpennordseite, vereinzelte Schauer auf der Alpensuedseite. Maessiger Westwind. Schneefallgrenze um 2600 Meter. Konfidenz fuer den Tag ist geringer. Donnerstag: Ueberwiegend sonnig und trocken auf beiden Alpenseiten. Maessiger Westwind. Schneefallgrenze um 2900 Meter. Tendenz zu stabilem Hochdruckwetter, aber noch unsicher.",
+    "short": "Stabile Hochdrucklage prägt die ganze Woche: trocken, sonnig und zunehmend mild. Hoch über Mitteleuropa dominiert, die Höhenströmung dreht von Nord auf Ost – bleibt aber schwach. Niederschlag fällt keiner, weder auf Alpennord noch Alpensüd. Die leichte Drehung bringt keine Wetteränderung. Donnerstag und Freitag die Top-Tage mit sicherer Thermik, am Wochenende bei nachlassender Konfidenz ebenfalls fliegbar. Ideale XC-Bedingungen, keine Föhn- oder Bisen-Einschränkungen.",
+    "long": "Donnerstag: Stabiler Hochdruck bringt sonniges und trockenes Wetter. Schwacher Nordwind in der Höhe, Schneefallgrenze um 3100 Meter. Thermik nutzbar. Freitag: Weiterhin sonnig und trocken unter Hochdruck. Höhenwind dreht auf schwachen Nordwest, Schneefallgrenze steigt auf rund 3600 Meter. Noch wärmer. Samstag: Sonnig und trocken, Höhenströmung auf Nordost. Schneefallgrenze bei 3800 Metern. Konfidenz für den Tag mittel, wahrscheinlich stabil. Sonntag: Tendenz sonnig und trocken bei schwachem Ostwind. Schneefallgrenze über 4000 Meter. Konfidenz geringer, aber eher fliegbar. Montag: Ähnliche Tendenz: trocken, schwacher Ostwind, Schneefallgrenze hoch. Noch unsicher.",
     "short_with_sources": [
       {
-        "text": "Stabilisierende Hochdrucklage praegt die Woche.",
+        "text": "Stabile Hochdrucklage prägt die ganze Woche: trocken, sonnig und zunehmend mild.",
         "sources": [
           "lage_label",
-          "pressure_influence"
+          "pressure_influence",
+          "precip_pattern.alpennord",
+          "precip_pattern.alpensued"
         ]
       },
       {
-        "text": "Anfangs noch wechselhaft mit verbreiteten Gewittern am Montag, besonders auf der Alpennordseite.",
+        "text": "Hoch über Mitteleuropa dominiert, die Höhenströmung dreht von Nord auf Ost – bleibt aber schwach.",
         "sources": [
-          "precip_pattern.alpennord"
+          "pressure_centers_per_day",
+          "flow_overhead"
         ]
       },
       {
-        "text": "Ab Dienstag zunehmend sonnig und trocken, gegen Wochenende auch auf der Alpensuedseite.",
+        "text": "Niederschlag fällt keiner, weder auf Alpennord noch Alpensüd.",
         "sources": [
           "precip_pattern.alpennord",
           "precip_pattern.alpensued"
         ]
       },
       {
-        "text": "Schwacher Suedwestwind, ab Mittwoch auf West drehend.",
+        "text": "Die leichte Drehung bringt keine Wetteränderung.",
         "sources": [
           "flow_overhead"
         ]
       },
       {
-        "text": "Foehn-Tendenz Alpennordseite infolge der Suedweststroemung beobachten.",
+        "text": "Donnerstag und Freitag die Top-Tage mit sicherer Thermik, am Wochenende bei nachlassender Konfidenz ebenfalls fliegbar.",
+        "sources": [
+          "confidence_per_day",
+          "precip_pattern.alpennord"
+        ]
+      },
+      {
+        "text": "Ideale XC-Bedingungen, keine Föhn- oder Bisen-Einschränkungen.",
         "sources": [
           "foehn",
-          "flow_overhead"
+          "bise"
         ]
       }
     ],
     "long_with_sources": [
       {
-        "text": "Sonntag: Vereinzelter leichter Regen auf der Alpennordseite, Alpensuedseite trocken. Schwacher Suedwestwind. Foehn-Tendenz Alpennordseite, Entwicklung beobachten. Schneefallgrenze um 1800 Meter.",
+        "text": "Donnerstag: Stabiler Hochdruck bringt sonniges und trockenes Wetter. Schwacher Nordwind in der Höhe, Schneefallgrenze um 3100 Meter. Thermik nutzbar.",
         "sources": [
-          "precip_pattern.alpennord",
-          "precip_pattern.alpensued",
+          "pressure_influence",
           "flow_overhead",
-          "foehn",
+          "precip_pattern.alpennord",
           "schneefallgrenze"
-        ]
+        ],
+        "flight_hint": "Klassischer XC-Tag, überall machbar."
       },
       {
-        "text": "Montag: Verbreitet Gewitter auf der Alpennordseite und auf der Alpensuedseite. Maessiger Suedwestwind. Foehn-Tendenz Alpennordseite beachten. Schneefallgrenze um 2000 Meter.",
+        "text": "Freitag: Weiterhin sonnig und trocken unter Hochdruck. Höhenwind dreht auf schwachen Nordwest, Schneefallgrenze steigt auf rund 3600 Meter. Noch wärmer.",
         "sources": [
-          "precip_pattern.alpennord",
-          "precip_pattern.alpensued",
+          "pressure_influence",
           "flow_overhead",
-          "foehn",
+          "precip_pattern.alpennord",
           "schneefallgrenze"
-        ]
+        ],
+        "flight_hint": "Top-Tag, Thermik bis in den Abend."
       },
       {
-        "text": "Dienstag: Weitgehend trocken, auf der Alpennordseite nur vereinzelt Spuren. Alpensuedseite trocken und sonnig. Schwacher Suedwestwind. Foehn-Tendenz Alpennordseite beachten. Schneefallgrenze um 2200 Meter.",
+        "text": "Samstag: Sonnig und trocken, Höhenströmung auf Nordost. Schneefallgrenze bei 3800 Metern. Konfidenz für den Tag mittel, wahrscheinlich stabil.",
         "sources": [
-          "precip_pattern.alpennord",
-          "precip_pattern.alpensued",
+          "pressure_influence",
           "flow_overhead",
-          "foehn",
-          "schneefallgrenze"
-        ]
-      },
-      {
-        "text": "Mittwoch: Tendenziell verbreitet Gewitter auf der Alpennordseite, vereinzelte Schauer auf der Alpensuedseite. Maessiger Westwind. Schneefallgrenze um 2600 Meter. Konfidenz fuer den Tag ist geringer.",
-        "sources": [
           "precip_pattern.alpennord",
-          "precip_pattern.alpensued",
-          "flow_overhead",
           "schneefallgrenze",
           "confidence_per_day"
-        ]
+        ],
+        "flight_hint": "Thermik zu erwarten, Entwicklung beobachten."
       },
       {
-        "text": "Donnerstag: Ueberwiegend sonnig und trocken auf beiden Alpenseiten. Maessiger Westwind. Schneefallgrenze um 2900 Meter. Tendenz zu stabilem Hochdruckwetter, aber noch unsicher.",
+        "text": "Sonntag: Tendenz sonnig und trocken bei schwachem Ostwind. Schneefallgrenze über 4000 Meter. Konfidenz geringer, aber eher fliegbar.",
         "sources": [
-          "precip_pattern.alpennord",
-          "precip_pattern.alpensued",
+          "pressure_influence",
           "flow_overhead",
+          "precip_pattern.alpennord",
           "schneefallgrenze",
           "confidence_per_day"
-        ]
+        ],
+        "flight_hint": "Tendenz fliegbar, vor Ort entscheiden."
+      },
+      {
+        "text": "Montag: Ähnliche Tendenz: trocken, schwacher Ostwind, Schneefallgrenze hoch. Noch unsicher.",
+        "sources": [
+          "pressure_influence",
+          "flow_overhead",
+          "precip_pattern.alpennord",
+          "schneefallgrenze",
+          "confidence_per_day"
+        ],
+        "flight_hint": "Eher fliegbar, aber mit Vorbehalt."
       }
     ],
     "rejected_count": 0,
-    "generated_at": "2026-05-17T19:42:43"
+    "generated_at": "2026-05-21T16:29:56"
   }
 }

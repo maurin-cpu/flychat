@@ -1048,7 +1048,7 @@
       regionsMap[r.region_id] = r;
     }
 
-    // Sortierung: Regionen werden im Wochencast NICHT mehr farblich/per-Rating
+    // Sortierung: Regionen werden im Gleitcast NICHT mehr farblich/per-Rating
     // bewertet (User-Wunsch — "Pilot sucht eine Region und will dann nur die
     // Spots darin sehen"). Wir sortieren aber Regionen weiter so, dass die mit
     // den besten Spots oben stehen — abgeleitet aus Spot-Ratings, ohne dass
@@ -1185,14 +1185,11 @@
 
     // Safe-Band v3.2 — "Royal Premium" finale Palette (Mai 2026):
     // Sky-100 → Sky-200 → Lime → Green-500 → Violet-Premium.
-    // Story: blauer Himmel ohne Thermik (1+2) → Lime (3, warmer Start) →
-    // saturiertes Green (4, "klassisches Safety-Green" — starke Thermik) →
-    // Royal Violet (5, Legendary XC-Tag).
     const labels = ["Abgleiter", "Kurzer Thermikflug", "Solider Thermiktag", "Starker Thermiktag", "XC-Tag"];
     const bgs    = ["#e0f2fe", "#bae6fd", "#BEF264", "#22c55e", "#a78bfa"];
     const borders= ["#38bdf8", "#0ea5e9", "#65a30d", "#15803d", "#6d28d9"];
     const texts  = ["#075985", "#075985", "#3f6212", "#ffffff", "#ffffff"];
-    const darkBg = [false, false, false, true, true];  // Rating 4 (Green-500) + Rating 5 (Violet) = weisser Text
+    const darkBg = [false, false, false, true, true];
     const i = Math.min(4, rating - 1);
     return { label: labels[i], hex: bgs[i], border: borders[i], text: texts[i], darkBg: darkBg[i] };
   }
@@ -1511,6 +1508,36 @@
     `;
   }
 
+  // SVG-Icons fuer Niederschlags-Coverage-Klassen. Eigenes Icon-Set damit
+  // wir unabhaengig von Emoji-Rendering sind und konsistent in jedem
+  // Browser/Email-Client aussehen. Tropfen-Cluster mit zunehmender Dichte:
+  //   widespread (flaechig)  → 3 grosse Tropfen, eng beieinander
+  //   scattered  (verstreut) → 2 Tropfen mit Luecke
+  //   isolated   (vereinzelt) → 1 Tropfen
+  // Stroke + Fill in Tag-Severity-Farbe (rot/orange via CSS-Variable).
+  function rainGlyphSvg(klass) {
+    const W = 36, H = 14;
+    // drop(cx): vereinfachter Wassertropfen mit Spitze oben, breit unten.
+    const drop = (cx) =>
+      `<path d="M ${cx} 1.5
+                C ${cx-3.2} 5, ${cx-3.6} 8, ${cx-3.6} 9.5
+                A 3.6 3.6 0 1 0 ${cx+3.6} 9.5
+                C ${cx+3.6} 8, ${cx+3.2} 5, ${cx} 1.5 Z"
+              fill="currentColor" opacity="0.85"/>`;
+    let drops = "";
+    if (klass === "widespread") {
+      drops = drop(6) + drop(18) + drop(30);
+    } else if (klass === "scattered") {
+      drops = drop(10) + drop(26);
+    } else if (klass === "isolated") {
+      drops = drop(18);
+    } else {
+      drops = drop(18);  // default Tropfen
+    }
+    return `<svg class="bf-rain-glyph" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"
+             role="img" aria-label="Coverage ${klass || 'regen'}">${drops}</svg>`;
+  }
+
   function renderTagGroups(tags) {
     if (!Array.isArray(tags) || !tags.length) return "";
     // Group by severity. "info" als Legacy-Severity wird auf "reducer" gemappt
@@ -1531,7 +1558,12 @@
       .filter((sev) => byLevel[sev].length > 0)
       .map((sev) => {
         const rowsHtml = byLevel[sev].map((t) => {
-          const value = t.value ? `<span class="bf-tag-value">${escapeHtml(t.value)}</span>` : `<span class="bf-tag-value"></span>`;
+          // RAIN-Tag bekommt SVG-Glyph (Tropfen-Cluster) vor dem Klassen-Label.
+          let valueInner = escapeHtml(t.value || "");
+          if (t.topic === "RAIN" && t.rain_class) {
+            valueInner = rainGlyphSvg(t.rain_class) + " " + valueInner;
+          }
+          const value = t.value || t.rain_class ? `<span class="bf-tag-value">${valueInner}</span>` : `<span class="bf-tag-value"></span>`;
           const time = t.time ? `<span class="bf-tag-time">${escapeHtml(t.time)}</span>` : `<span class="bf-tag-time"></span>`;
           return `<div class="bf-tag-row">
             <span class="bf-tag-topic">${escapeHtml(t.label || t.topic)}</span>
@@ -2099,16 +2131,39 @@
     // Pro Eintrag (Einleitung + per-Tag-Block) ein eigener Paragraph,
     // damit die MeteoSchweiz-aehnliche Tagesstruktur lesbar wird.
     // "Wochentag:" am Zeilenanfang wird als <strong> hervorgehoben.
+    // flight_hint (optional) wird darunter als kursive Pilotensicht-Zeile
+    // angefuegt — visuell deutlich von der Wetterbeschreibung getrennt.
     const longHtml = longEntries.length
       ? longEntries.map(e => {
           const txt = escapeHtml(e.text);
+          const hint = e.flight_hint ? escapeHtml(e.flight_hint) : "";
+          const hintHtml = hint
+            ? `<p class="bf-wetterlage-hint"><span class="bf-wetterlage-hint-icon" aria-hidden="true">⏵</span> ${hint}</p>`
+            : "";
           const m = txt.match(/^(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag):\s*/);
           if (m) {
-            return `<p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>`;
+            return `<div class="bf-wetterlage-day-block">
+              <p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>
+              ${hintHtml}
+            </div>`;
           }
-          return `<p class="bf-wetterlage-lead">${txt}</p>`;
+          return `<div class="bf-wetterlage-day-block">
+            <p class="bf-wetterlage-lead">${txt}</p>
+            ${hintHtml}
+          </div>`;
         }).join("")
       : `<p>${escapeHtml(longText)}</p>`;
+
+    // `short` enthaelt jetzt Synoptik + Flug-Bilanz als EINEN Fliesstext
+    // (siehe synoptic_overview.md Skill). Wird als ein Absatz gerendert.
+    // Backward-compat: falls ein alter Cache noch flight_outlook hat,
+    // haengen wir den Text dran — neue Caches haben das Feld nicht.
+    const outlookLegacy = wl.llm_overview && wl.llm_overview.flight_outlook;
+    const outlookLegacyText = outlookLegacy && outlookLegacy.text ? outlookLegacy.text : "";
+    const summaryParas = [
+      shortText ? `<p>${escapeHtml(shortText)}</p>` : "",
+      outlookLegacyText ? `<p>${escapeHtml(outlookLegacyText)}</p>` : "",
+    ].filter(Boolean).join("");
 
     el.hidden = false;
     el.innerHTML = `
@@ -2116,7 +2171,7 @@
         <span class="bf-wetterlage-icon" aria-hidden="true">☼</span>
         <span class="bf-wetterlage-label">Wetterlage${lageLabel ? ` — ${escapeHtml(lageLabel)}` : ""}</span>
       </div>
-      <p class="bf-wetterlage-short">${escapeHtml(shortText)}</p>
+      <div class="bf-wetterlage-summary">${summaryParas}</div>
       ${longText && longText !== shortText ? `
         <button type="button" class="bf-wetterlage-toggle" aria-expanded="${state.wetterlageOpen ? "true" : "false"}">
           ${state.wetterlageOpen ? "Weniger" : "Detail"} <span class="bf-wetterlage-chevron" aria-hidden="true">▾</span>

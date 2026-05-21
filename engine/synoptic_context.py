@@ -1,4 +1,4 @@
-"""Synoptik-Kontext fuer den Wetterlage-Block im Wochencast und in der E-Mail.
+"""Synoptik-Kontext fuer den Wetterlage-Block im Gleitcast und in der E-Mail.
 
 Erzeugt deterministisch eine 5-Tages-Einordnung der Grosswetterlage:
 - CH-Druckeinfluss (Hoch/Tief/neutral) aus pressure_msl-Mittel + Trend
@@ -273,7 +273,7 @@ def _rotate_audit_logs() -> None:
 def load_synoptic_cache() -> Optional[dict]:
     """Laedt das letzte Wetterlage-Strukturfeld aus dem Cache.
 
-    Wird von Web-Layer (Wochencast/Email) verwendet, um den fertig
+    Wird von Web-Layer (Gleitcast/Email) verwendet, um den fertig
     generierten Block anzuzeigen. Kein neuer LLM-Call hier.
     """
     path = Path(config.SYNOPTIC_CACHE_PATH)
@@ -1177,6 +1177,40 @@ def _classify_nord_sued(lat: float, lon: float) -> str:
     if lat < 46.35 and 6.5 < lon < 8.5:
         return "alpensued"
     return "alpennord"
+
+
+def classify_precip_pattern(coverage: float | None, peak_mm: float | None) -> str:
+    """Klassifiziert eine Stunde Niederschlag in 4 Klassen.
+
+    Verwendet die gleichen Schwellen wie der Synoptik-Layer (FLAECHIG/KONVEKTIV),
+    damit beide Konsumenten (Region-Tag + globale Wetterlage) konsistent bleiben.
+
+    Args:
+        coverage: Anteil RPs mit Regen > NOISE_MM (0.0-1.0), None erlaubt
+        peak_mm: Maximum mm/h ueber alle RPs
+
+    Returns:
+        "widespread" — coverage >= SYNOPTIC_PRECIP_COVERAGE_FLAECHIG (0.7), flaechiger Regen
+        "scattered"  — coverage zwischen KONVEKTIV (0.4) und FLAECHIG (0.7), verstreute Zellen
+        "isolated"   — coverage < KONVEKTIV (0.4), aber peak >= SIGNIFICANT_MM (0.2): Einzelzelle
+        "dry"        — peak < NOISE_MM (0.05) oder coverage 0
+
+    Beispiele:
+        16 RPs, 12 nass, peak 1.8mm/h  → coverage=0.75 → "widespread"
+        16 RPs,  5 nass, peak 0.8mm/h  → coverage=0.31 → "isolated" (peak >= 0.2)
+        16 RPs,  8 nass, peak 0.5mm/h  → coverage=0.50 → "scattered"
+        16 RPs,  0 nass, peak 0.0mm/h  → coverage=0.00 → "dry"
+    """
+    if peak_mm is None or peak_mm < config.PRECIP_NOISE_MM:
+        return "dry"
+    cov = coverage if coverage is not None else 0.0
+    if cov >= config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG:
+        return "widespread"
+    if cov >= config.SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV:
+        return "scattered"
+    if peak_mm >= config.PRECIP_SIGNIFICANT_MM:
+        return "isolated"
+    return "dry"
 
 
 def _aggregate_precip_side(spots_day: list[dict]) -> dict:

@@ -32,7 +32,7 @@ API_BATCH_TIMEOUT = 90         # Timeout für Batch-Requests (mehr Punkte = mehr
 API_CHUNK_SIZE = 80            # Max Locations pro API-Call (URL-Länge + Timeout-Schutz)
 
 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
-from source_area import get_reference_points, get_all_regions
+from source_area import get_reference_points, get_all_regions, get_precip_reference_points
 
 # --- Aggregation Constants (Modul-Level) ---
 CLOUD_PARAMS = {"cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"}
@@ -284,6 +284,87 @@ def _best_thermal_rp_index(data_list: list) -> int:
     return best_idx
 
 
+def _override_precip_with_dense_rps(target: dict, dense_data_list: list) -> dict:
+    """Ueberschreibt die Niederschlags-Felder eines aggregierten Region-Results
+    mit einer dichteren RP-Aggregation (typisch 16 statt 7 Punkten).
+
+    Begruendung: Wind/Wolken/Thermik brauchen physikalische Anker an den
+    7 Haupt-RPs (Talwind, Höhenprofile). Niederschlag dagegen ist klein-
+    raeumig konvektiv — bei 7 RPs fallen einzelne Schauerzellen oft
+    zwischen die Punkte durch. 16 dichte CVT-Punkte liefern eine ehrliche
+    Coverage-Statistik (widespread/scattered/isolated) ohne den Rest des
+    Caches zu beruehren.
+
+    Args:
+        target: aggregiertes Region-Dict (Ergebnis von _aggregate_regional_data).
+                Wird IN PLACE modifiziert.
+        dense_data_list: Liste der 16 RP-Antworten (jede mit "hourly").
+
+    Ueberschriebene Felder pro Stunde:
+        precipitation, precipitation_probability, precipitation_coverage,
+        precipitation_class, precipitation_n_rps.
+
+    Returns: target (gleiche Referenz, fuer Chaining).
+    """
+    if not target or "hourly" not in target or not dense_data_list:
+        return target
+
+    th = target["hourly"]
+    num_hours = len(th.get("time", []))
+    if num_hours == 0:
+        return target
+
+    # Spuren initialisieren falls noch nicht vorhanden. precipitation/
+    # precipitation_probability koennen fehlen, wenn `target` der D2-Thermal-
+    # Cache ist — der bezieht seit Mai 2026 keine Precip-Variablen mehr
+    # (CH1/CH2 liefern Precip ueber den Surface-Batch).
+    th.setdefault("precipitation", [0.0] * num_hours)
+    th.setdefault("precipitation_probability", [0] * num_hours)
+    th.setdefault("precipitation_coverage", [0.0] * num_hours)
+    th.setdefault("precipitation_class", ["dry"] * num_hours)
+    th.setdefault("precipitation_n_rps", [0] * num_hours)
+
+    from engine.synoptic_context import classify_precip_pattern
+
+    for i in range(num_hours):
+        # precipitation: Hybrid-Filter ueber dichte RPs.
+        precip_vals = [
+            d["hourly"].get("precipitation", [None])[i]
+            for d in dense_data_list
+            if i < len(d.get("hourly", {}).get("precipitation", []))
+        ]
+        valid_precip = [v for v in precip_vals if v is not None]
+
+        if valid_precip:
+            peak = max(valid_precip)
+            n_wet = sum(1 for v in valid_precip if v > config.PRECIP_NOISE_MM)
+            coverage = n_wet / len(valid_precip)
+
+            if peak >= config.PRECIP_SIGNIFICANT_MM:
+                final_precip = peak
+            elif peak > config.PRECIP_NOISE_MM and coverage >= config.PRECIP_COVERAGE_QUORUM:
+                final_precip = peak
+            else:
+                final_precip = 0.0
+
+            th["precipitation"][i] = final_precip
+            th["precipitation_coverage"][i] = round(coverage, 2)
+            th["precipitation_n_rps"][i] = len(valid_precip)
+            th["precipitation_class"][i] = classify_precip_pattern(coverage, peak)
+
+        # precipitation_probability: konservatives max() ueber dichte RPs.
+        prob_vals = [
+            d["hourly"].get("precipitation_probability", [None])[i]
+            for d in dense_data_list
+            if i < len(d.get("hourly", {}).get("precipitation_probability", []))
+        ]
+        valid_prob = [v for v in prob_vals if v is not None]
+        if valid_prob and "precipitation_probability" in th:
+            th["precipitation_probability"][i] = max(valid_prob)
+
+    return target
+
+
 def _aggregate_regional_data(data_list):
     """
     Generalisierte Source-Area Aggregation:
@@ -315,6 +396,12 @@ def _aggregate_regional_data(data_list):
     # Anteil der RPs mit Regen > NOISE_MM, 0.0-1.0. Wird auch bei trockenen
     # Stunden auf 0.0 gesetzt, damit das Feld luecklos im Cache liegt.
     primary["hourly"].setdefault("precipitation_coverage", [0.0] * num_hours)
+    # Klassen-Spur (widespread/scattered/isolated/dry) — abgeleitet aus
+    # coverage + peak via synoptic_context.classify_precip_pattern.
+    # Defaults auf "dry", damit das Feld luecklos im Cache liegt.
+    primary["hourly"].setdefault("precipitation_class", ["dry"] * num_hours)
+    # Anzahl Referenzpunkte (fuer Transparenz im LLM-Datenblock).
+    primary["hourly"].setdefault("precipitation_n_rps", [0] * num_hours)
 
     for i in range(num_hours):
         # Wolken: 30%-Perzentil (NWP ueberschaetzt Wolken in Bergen systematisch)
@@ -380,9 +467,19 @@ def _aggregate_regional_data(data_list):
                 # Reines Modell-Rauschen oder isolierter Trace-Wert.
                 primary["hourly"][k][i] = 0.0
 
-            # Coverage einmal pro Stunde speichern (an precipitation gekoppelt).
+            # Coverage + Klasse + RP-Anzahl pro Stunde speichern
+            # (nur an precipitation gekoppelt, nicht an rain).
             if k == "precipitation":
                 primary["hourly"]["precipitation_coverage"][i] = round(coverage, 2)
+                primary["hourly"]["precipitation_n_rps"][i] = len(valid_vals)
+                # Klasse aus FINALEM precipitation-Wert + Coverage ableiten.
+                # Wichtig: peak (vor Hybrid-Filter) nicht den durch Filter
+                # gesetzten Wert verwenden — sonst wuerde "isolated" bei
+                # Stratiform-Cut falsch werden.
+                from engine.synoptic_context import classify_precip_pattern
+                primary["hourly"]["precipitation_class"][i] = classify_precip_pattern(
+                    coverage, peak
+                )
     return primary
 
 
@@ -407,6 +504,9 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
     hourly_wind = data_wind.get("hourly", {}) if data_wind else {}
     hourly_thermal = data_thermal.get("hourly", {}) if data_thermal else {}
     hourly_fallback = data_fallback.get("hourly", {}) if data_fallback else {}
+    # CH2 (MeteoSwiss, 2.1km, 5d) als Mid-Tier zwischen CH1 (33h) und EU (13km).
+    # Sowohl Spot- als auch Region-Pfad reichen CH1+CH2 durch (Region seit Mai 2026).
+    hourly_ch2_surface = data_ch2.get("hourly", {}) if data_ch2 else {}
 
     # Basis-Zeitachse: Fallback-Modell (ICON-EU, 120h) hat die längste Reichweite
     times_base = hourly_fallback.get("time", [])
@@ -439,17 +539,42 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
         return found_any
 
     # Pro Tag entscheiden: Welches Modell liefert die Daten? Kein Mischen am selben Tag!
+    # Surface ist 4-Tier: CH1 (1.1km, 33h) → CH2 (2.1km, 5d) → D2 (2.2km, 48h)
+    # → EU (13km, Notfall). D2 als Tier-3 faengt Spots ausserhalb der CH-
+    # Coverage auf (Tessin Sued, Walliser Suedtaeler, suedl. Engadin) — Pan-
+    # Europa-2.2km schlaegt EU-13km im Grenzgebiet deutlich. EU greift nur
+    # noch Tag 3+ wenn weder CH2 noch D2 valide Werte liefern.
     dates = sorted(list(set([t[:10] for t in times_base])))
     thermal_model_by_day = {}
     wind_model_by_day = {}
+    # Quellen-Tracking: Kurzcode pro Tag, exposed via api_weather → Frontend.
+    # Codes: ch1 / ch2 / d2 / eu (siehe docs/WETTERMODELLE.md Tier-Layout).
+    surface_source_by_day = {}
     for d in dates:
         thermal_model_by_day[d] = hourly_thermal if is_model_valid_for_day(hourly_thermal, d, "temperature_2m") else hourly_fallback
-        wind_model_by_day[d] = hourly_wind if is_model_valid_for_day(hourly_wind, d, "wind_speed_10m") else hourly_fallback
+        # 4-Tier Surface-Voting (variable bleibt aus historischen Gruenden
+        # 'wind_model_by_day' — sie steuert aber ALLE CH_SURFACE_PARAMS).
+        if is_model_valid_for_day(hourly_wind, d, "wind_speed_10m"):
+            wind_model_by_day[d] = hourly_wind            # Tier 1: CH1
+            surface_source_by_day[d] = "ch1"
+        elif is_model_valid_for_day(hourly_ch2_surface, d, "wind_speed_10m"):
+            wind_model_by_day[d] = hourly_ch2_surface     # Tier 2: CH2
+            surface_source_by_day[d] = "ch2"
+        elif is_model_valid_for_day(hourly_thermal, d, "wind_speed_10m"):
+            wind_model_by_day[d] = hourly_thermal         # Tier 3: D2 (Grenzgebiet)
+            surface_source_by_day[d] = "d2"
+        else:
+            wind_model_by_day[d] = hourly_fallback        # Tier 4: EU (Notfall)
+            surface_source_by_day[d] = "eu"
 
     hourly_data = {}
     pressure_level_data = {}
 
-    wind_surface_params = ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"]
+    # CH_SURFACE_PARAMS: Variablen, fuer die Tag-Voting CH1->CH2->EU gilt.
+    # Mai 2026 erweitert von 3 Wind-Vars auf alle CH-faehigen Surface-Variablen
+    # (siehe config.CH_SURFACE_PARAMS). Andere Surface-Vars (soil, updraft)
+    # kommen weiterhin aus thermal_model_by_day (D2 -> EU).
+    surface_ch_override_params = list(config.CH_SURFACE_PARAMS)
     wind_pl_params = [
         p for p in config.PRESSURE_LEVEL_PARAMS
         if p.startswith("wind_speed_") or p.startswith("wind_direction_") or p.startswith("geopotential_height_")
@@ -478,19 +603,28 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
                 val = t_src.get(param, [None])[i_therm] if i_therm < len(t_src.get(param, [])) else None
             entry[param] = val
 
+        # Surface-Override: alle CH-faehigen Surface-Variablen aus CH1/CH2/EU
+        # (Tag-Voting w_src). Liegt der Wert vor (nicht None), uebersteuert er
+        # den D2/EU-Wert aus thermal_model_by_day. So bekommen Spots eine
+        # einheitliche CH-Kalibrierung fuer Wind+Wolken+Temp+Strahlung+Precip
+        # statt der frueheren Mischung CH-fuer-Wind / D2-fuer-Rest.
         if i_wind >= 0:
-            for param in wind_surface_params:
+            for param in surface_ch_override_params:
                 val_w = w_src.get(param, [None])[i_wind] if i_wind < len(w_src.get(param, [])) else None
                 if val_w is not None:
                     entry[param] = val_w
 
-        # precipitation_coverage ist KEIN API-Param sondern abgeleitet aus
-        # _aggregate_regional_data — nur bei Region-Aggregation vorhanden.
-        # Bei Spots ist es 1.0 (alle RPs == 1 Punkt), bei Regionen 0.0-1.0.
+        # precipitation_coverage / _class / _n_rps sind KEIN API-Param sondern
+        # abgeleitet aus _aggregate_regional_data + _override_precip_with_dense_rps.
+        # Nur bei Region-Aggregation vorhanden. Bei Spots: coverage=1.0, class="dry",
+        # n_rps=1.
         if i_therm >= 0:
-            cov_arr = t_src.get("precipitation_coverage", [])
-            if i_therm < len(cov_arr) and cov_arr[i_therm] is not None:
-                entry["precipitation_coverage"] = cov_arr[i_therm]
+            for derived_key in ("precipitation_coverage",
+                                "precipitation_class",
+                                "precipitation_n_rps"):
+                arr = t_src.get(derived_key, [])
+                if i_therm < len(arr) and arr[i_therm] is not None:
+                    entry[derived_key] = arr[i_therm]
 
         hourly_data[time_str] = entry
 
@@ -639,29 +773,48 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
             )
 
     print(f"  [OK] {location_name}: {len(hourly_data)} Zeitstempel")
-    return hourly_data, pressure_level_data
+    return hourly_data, pressure_level_data, surface_source_by_day
 
 
 def _build_param_lists():
-    """Baut die Parameter-Listen für jeden Modell-Call."""
-    # Wind: surface wind + pressure level wind/geopotential
-    wind_params = ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"]
-    for level in config.PRESSURE_LEVELS:
-        wind_params.extend([
-            f"wind_speed_{level}hPa",
-            f"wind_direction_{level}hPa",
-            f"geopotential_height_{level}hPa",
-        ])
+    """Baut die Parameter-Listen für jeden Modell-Call.
 
-    # Thermal: Surface + nur Temperatur auf Druckniveaus.
-    # Wind-PL kommt bereits vom Wind-Batch, Geopotential vom Wind-Batch.
-    thermal_pl_params = [f"temperature_{level}hPa" for level in config.PRESSURE_LEVELS]
-    thermal_params = list(config.HOURLY_PARAMS) + thermal_pl_params
+    Modell-Rollen (siehe config.py Wettermodell-Sektion, docs/WETTERMODELLE.md):
+      - wind_params (CH1/CH2): alle Surface-Variablen die MeteoSwiss-Modelle
+        ueber Open-Meteo exponieren. Kein PL (CH1/CH2 liefern keine).
+      - thermal_params (D2): D2-spezifische Surface (soil, updraft) +
+        CH_SURFACE_PARAMS (Tier-3 fuer CH-rand-Spots) + alle PL-Daten.
+        Tag 1-2 hochaufgeloest, ab Tag 3 leer → faellt auf EU.
+      - fallback_params (EU): vollstaendiges Backup (Surface + PL) fuer
+        Tag 3-5 ausserhalb der CH-Coverage.
+      - gfs_params: BLH + lifted_index + convective_inhibition.
+    """
+    # Surface: alle Variablen die CH1/CH2 ueber Open-Meteo liefern (Mai 2026
+    # verifiziert). PL wird NICHT angefragt — CH-Modelle geben dort null zurueck.
+    wind_params = list(config.CH_SURFACE_PARAMS)
 
-    # Fallback: Surface + alle PL-Params (vollständiges Backup für Tag 3-5 / ICON-D2-Ausfall)
+    # Thermal-Batch (D2):
+    # - D2-spezifische Surface (soil, updraft) — CH-Modelle haben sie nicht.
+    # - CH_SURFACE_PARAMS — als Tier-3-Fallback fuer Spots ausserhalb der
+    #   CH1/CH2-Coverage. D2 ist Pan-Europa-2.2km, deutlich besser als EU-13km
+    #   im Grenzgebiet (Tessin Sued, Walliser Suedtaeler, suedl. Engadin).
+    #   Liefert auch Region-Niederschlag-Aggregation auf 2.2 km.
+    # - Alle PL-Variablen (Hoehenwind, T_*hPa, Geopotenzial).
+    thermal_extra_surface = [
+        "soil_moisture_0_to_1cm",
+        "soil_temperature_0cm",
+        "updraft",
+    ]
+    thermal_params = (
+        thermal_extra_surface
+        + list(config.CH_SURFACE_PARAMS)
+        + list(config.PRESSURE_LEVEL_PARAMS)
+    )
+
+    # Fallback (EU): vollstaendig — Notfall fuer Tag 3-5 ausserhalb CH-Coverage.
     fallback_params = list(config.HOURLY_PARAMS) + list(config.PRESSURE_LEVEL_PARAMS)
 
-    # GFS: supplementary only
+    # GFS: BLH + supplementary only.
     gfs_params = list(config.GFS_SUPPLEMENTARY_PARAMS) + list(config.GFS_CROSSCHECK_PARAMS)
 
     return wind_params, thermal_params, fallback_params, gfs_params
@@ -700,9 +853,15 @@ def fetch_all_spots(spots, save_to_file=True):
     # ohnehin schon von Spots abgefragt werden. Nicht-ueberlappende Region-Punkte
     # werden in Phase 4 per eigenem Batch geholt.
     all_regions = get_all_regions()
-    region_refs = {}  # {region_id: [[lat,lon], ...]}
+    region_refs = {}  # {region_id: [[lat,lon], ...]} — 7 Haupt-RPs pro Region
     region_only_points = []  # Punkte die NUR von Regionen gebraucht werden
     region_only_index = {}   # {(lat_r, lon_r): index_in_region_only_points}
+    # Vollstaendige Dedup ALLER Region-RPs (shared + only) fuer den CH1/CH2-
+    # Region-Batch. Wird gebraucht, weil die Spot-Batches batch_wind/batch_ch2
+    # spot_lats-keyed sind (1 Punkt pro Spot) und damit shared Region-Refs
+    # NICHT abdecken. Eigener Index, damit der Batch direkt indizierbar bleibt.
+    region_all_ref_points = []
+    region_all_ref_index = {}  # {(lat_r, lon_r): index_in_region_all_ref_points}
     for region in all_regions:
         rid = region["id"]
         region_refs[rid] = region["reference_points"]
@@ -711,6 +870,23 @@ def fetch_all_spots(spots, save_to_file=True):
             if key not in point_index and key not in region_only_index:
                 region_only_index[key] = len(region_only_points)
                 region_only_points.append([round(pt[0], 4), round(pt[1], 4)])
+            if key not in region_all_ref_index:
+                region_all_ref_index[key] = len(region_all_ref_points)
+                region_all_ref_points.append([round(pt[0], 4), round(pt[1], 4)])
+
+    # Niederschlags-spezifische 16 dichte RPs pro Region (CVT).
+    # Eigener Batch — eigene Indizes, keine Dedup mit Spot-/Region-Haupt-RPs.
+    # Wenn Datei fehlt, bleibt precip_refs leer und der Override wird uebersprungen
+    # (Fallback auf 7-RP-Aggregation).
+    precip_refs = get_precip_reference_points()  # {rid: [[lat,lon], ...]}
+    precip_points_flat: list[list[float]] = []
+    precip_point_index: dict[tuple[float, float], int] = {}
+    for rid, pts in precip_refs.items():
+        for pt in pts:
+            key = (round(pt[0], 4), round(pt[1], 4))
+            if key not in precip_point_index:
+                precip_point_index[key] = len(precip_points_flat)
+                precip_points_flat.append([round(pt[0], 4), round(pt[1], 4)])
 
     spot_lats = [str(s["latitude"]) for s in spots]
     spot_lons = [str(s["longitude"]) for s in spots]
@@ -721,36 +897,50 @@ def fetch_all_spots(spots, save_to_file=True):
                            if (round(pt[0], 4), round(pt[1], 4)) in point_index)
     print(f"[INFO] {len(spots)} Spots, {len(unique_points)} Spot-Punkte (dedup), "
           f"{len(all_regions)} Regionen ({shared_region_pts} geteilte + {len(region_only_points)} eigene Punkte)")
+    if precip_points_flat:
+        print(f"[INFO] +{len(precip_points_flat)} dichte Niederschlags-RPs "
+              f"({len(precip_refs)} Regionen × {len(next(iter(precip_refs.values()), []))})")
 
     wind_params, thermal_params, fallback_params, gfs_params = _build_param_lists()
 
-    # === Phase 2: 6 Batch-API-Calls ===
+    # === Phase 2: 6+1 Batch-API-Calls ===
+    # +1 = optionaler Precip-Dense-Batch (16 RPs pro Region, nur Niederschlag)
     batch_wind = None
     batch_thermal = None
     batch_fallback = None
     batch_gfs = None
     batch_ch1 = None
     batch_ch2 = None
+    batch_precip_dense = None
 
     try:
-        # 1. Wind (Spot-Punkte, nur Wind-Vars) — chunked bei >80 Spots
-        print(f"[API] Batch Wind: {len(spots)} Punkte, {len(wind_params)} Vars, Modell {config.WIND_MODEL}")
+        # 1. CH1-Surface (Spot-Punkte, alle CH-Surface-Vars, 33h Horizont)
+        # Primaerquelle fuer Tag 1: MeteoSwiss ICON-CH1 (1.1 km, CH-kalibriert).
+        # Liefert wind/wolken/temp/strahlung/precip/cape. Kein PL (CH1 hat keine).
+        print(f"[API] Batch CH1-Surface: {len(spots)} Punkte, {len(wind_params)} Vars, "
+              f"Modell {config.SURFACE_PRIMARY_MODEL}")
         batch_wind = _chunked_api_get(spot_lats, spot_lons, {
-            "models": config.WIND_MODEL,
+            "models": config.SURFACE_PRIMARY_MODEL,
             "hourly": ",".join(wind_params),
-            "forecast_days": config.FORECAST_DAYS,
+            "forecast_days": config.FORECAST_DAYS_CH1,
             "timezone": config.TIMEZONE,
-        }, API_BATCH_TIMEOUT, label="Batch-Wind")
-        print(f"  [OK] {len(batch_wind)} Wind-Antworten")
+        }, API_BATCH_TIMEOUT, label="Batch-CH1-Surface")
+        print(f"  [OK] {len(batch_wind)} CH1-Surface-Antworten")
+        # batch_ch1 ist mit batch_wind identisch (gleiches Modell, gleiche Lats,
+        # gleiche Params). Kein zweiter API-Call mehr fuer Multi-Gust-Merge.
+        batch_ch1 = batch_wind
 
         time.sleep(API_DELAY_BETWEEN_CALLS)
 
-        # 2. Thermal (deduplizierte Punkte, Thermik-Vars)
-        print(f"[API] Batch Thermal: {len(unique_points)} Punkte, {len(thermal_params)} Vars, Modell {config.THERMAL_MODEL}")
+        # 2. Thermal (deduplizierte Punkte, D2-spezifische Surface + PL-Daten)
+        # D2 (DWD, 2.2 km, 48h) deckt soil_moisture/soil_temperature/updraft +
+        # Pressure-Level. Surface-Standard-Variablen kommen jetzt aus CH1/CH2.
+        print(f"[API] Batch Thermal/PL: {len(unique_points)} Punkte, "
+              f"{len(thermal_params)} Vars, Modell {config.PRESSURE_LEVEL_PRIMARY_MODEL}")
         batch_thermal = _chunked_api_get(unique_lats, unique_lons, {
-            "models": config.THERMAL_MODEL,
+            "models": config.PRESSURE_LEVEL_PRIMARY_MODEL,
             "hourly": ",".join(thermal_params),
-            "forecast_days": config.FORECAST_DAYS,
+            "forecast_days": config.FORECAST_DAYS_D2,
             "timezone": config.TIMEZONE,
         }, API_BATCH_TIMEOUT, label="Batch-Thermal")
         print(f"  [OK] {len(batch_thermal)} Thermal-Antworten")
@@ -758,59 +948,74 @@ def fetch_all_spots(spots, save_to_file=True):
         time.sleep(API_DELAY_BETWEEN_CALLS)
 
         # 3. Fallback (deduplizierte Punkte, ALLE Vars — Backup für Tag 3-5 + Ausfälle)
-        print(f"[API] Batch Fallback: {len(unique_points)} Punkte, {len(fallback_params)} Vars, Modell {config.FALLBACK_MODEL}")
+        # EU (DWD, 13 km, 5d) als Notfallquelle fuer Surface (CH-Coverage-Rand)
+        # und als Tier-2 fuer PL-Daten ab Tag 3.
+        print(f"[API] Batch Fallback: {len(unique_points)} Punkte, {len(fallback_params)} Vars, "
+              f"Modell {config.SURFACE_FALLBACK_MODEL}")
         batch_fallback = _chunked_api_get(unique_lats, unique_lons, {
-            "models": config.FALLBACK_MODEL,
+            "models": config.SURFACE_FALLBACK_MODEL,
             "hourly": ",".join(fallback_params),
-            "forecast_days": config.FORECAST_DAYS,
+            "forecast_days": config.FORECAST_DAYS_EU,
             "timezone": config.TIMEZONE,
         }, API_BATCH_TIMEOUT, label="Batch-Fallback")
         print(f"  [OK] {len(batch_fallback)} Fallback-Antworten")
 
         time.sleep(API_DELAY_BETWEEN_CALLS)
 
-        # 4. GFS (Spot-Punkte, Supplement-Vars)
-        print(f"[API] Batch GFS: {len(spots)} Punkte, {len(gfs_params)} Vars")
+        # 4. GFS (Spot-Punkte, BLH + Supplement-Vars)
+        # GFS ist seit Mai 2026 die EINZIGE BLH-Quelle (ICON-BLH-Felder
+        # kommen leer zurueck). Plus lifted_index, convective_inhibition.
+        print(f"[API] Batch GFS (BLH+Supplement): {len(spots)} Punkte, "
+              f"{len(gfs_params)} Vars, Modell {config.BLH_MODEL}")
         batch_gfs = _chunked_api_get(spot_lats, spot_lons, {
-            "models": "gfs_seamless",
+            "models": config.BLH_MODEL,
             "hourly": ",".join(gfs_params),
-            "forecast_days": config.FORECAST_DAYS,
+            "forecast_days": config.FORECAST_DAYS_GFS,
             "timezone": config.TIMEZONE,
         }, API_BATCH_TIMEOUT, label="Batch-GFS")
         print(f"  [OK] {len(batch_gfs)} GFS-Antworten")
 
         time.sleep(API_DELAY_BETWEEN_CALLS)
 
-        # 5. CH1 — MeteoSwiss ICON-CH1 (1km, ~33h Horizont, nur Bodenwind)
-        ch_params = config.CH_SURFACE_PARAMS
-        print(f"[API] Batch CH1: {len(spots)} Punkte, {len(ch_params)} Vars, Modell {config.CH1_MODEL}")
-        try:
-            batch_ch1 = _chunked_api_get(spot_lats, spot_lons, {
-                "models": config.CH1_MODEL,
-                "hourly": ",".join(ch_params),
-                "forecast_days": config.CH1_FORECAST_DAYS,
-                "timezone": config.TIMEZONE,
-            }, API_BATCH_TIMEOUT, label="Batch-CH1")
-            print(f"  [OK] {len(batch_ch1)} CH1-Antworten")
-        except Exception as e:
-            print(f"  [WARN] CH1-Batch fehlgeschlagen (nicht kritisch): {e}")
-            batch_ch1 = None
-
-        time.sleep(API_DELAY_BETWEEN_CALLS)
-
-        # 6. CH2 — MeteoSwiss ICON-CH2 (2km, 5 Tage Horizont, nur Bodenwind)
-        print(f"[API] Batch CH2: {len(spots)} Punkte, {len(ch_params)} Vars, Modell {config.CH2_MODEL}")
+        # 5. CH2-Surface (Spot-Punkte, alle CH-Surface-Vars, 5d Horizont)
+        # Tier-2 fuer Tag 2-5: MeteoSwiss ICON-CH2 (2.1 km, CH-kalibriert).
+        # Identische Params wie CH1, deckt aber die kompletten 5 Tage ab.
+        # Wird zusaetzlich fuer Multi-Gust-Merge auf wind_gusts_10m genutzt.
+        print(f"[API] Batch CH2-Surface: {len(spots)} Punkte, {len(wind_params)} Vars, "
+              f"Modell {config.SURFACE_SECONDARY_MODEL}")
         try:
             batch_ch2 = _chunked_api_get(spot_lats, spot_lons, {
-                "models": config.CH2_MODEL,
-                "hourly": ",".join(ch_params),
-                "forecast_days": config.CH2_FORECAST_DAYS,
+                "models": config.SURFACE_SECONDARY_MODEL,
+                "hourly": ",".join(wind_params),
+                "forecast_days": config.FORECAST_DAYS_CH2,
                 "timezone": config.TIMEZONE,
-            }, API_BATCH_TIMEOUT, label="Batch-CH2")
-            print(f"  [OK] {len(batch_ch2)} CH2-Antworten")
+            }, API_BATCH_TIMEOUT, label="Batch-CH2-Surface")
+            print(f"  [OK] {len(batch_ch2)} CH2-Surface-Antworten")
         except Exception as e:
-            print(f"  [WARN] CH2-Batch fehlgeschlagen (nicht kritisch): {e}")
+            print(f"  [WARN] CH2-Surface-Batch fehlgeschlagen (Fallback auf EU fuer Tag 2-5): {e}")
             batch_ch2 = None
+
+        # 7. Precip-Dense (16 RPs pro Region, NUR Niederschlag) — optional.
+        # Schlanker Batch (~16 weighted bei 464 Punkten, 2 Vars), Failure
+        # nicht kritisch: Region-Aggregation fällt automatisch auf 7 RPs zurück.
+        if precip_points_flat:
+            try:
+                time.sleep(API_DELAY_BETWEEN_CALLS)
+                precip_lats = [str(p[0]) for p in precip_points_flat]
+                precip_lons = [str(p[1]) for p in precip_points_flat]
+                precip_params = ["precipitation", "precipitation_probability"]
+                print(f"[API] Batch Precip-Dense: {len(precip_points_flat)} Punkte, "
+                      f"{len(precip_params)} Vars, Modell {config.PRECIP_MODEL}")
+                batch_precip_dense = _chunked_api_get(precip_lats, precip_lons, {
+                    "models": config.PRECIP_MODEL,
+                    "hourly": ",".join(precip_params),
+                    "forecast_days": config.FORECAST_DAYS,
+                    "timezone": config.TIMEZONE,
+                }, API_BATCH_TIMEOUT, label="Batch-Precip-Dense")
+                print(f"  [OK] {len(batch_precip_dense)} Precip-Dense-Antworten")
+            except Exception as e:
+                print(f"  [WARN] Precip-Dense-Batch fehlgeschlagen (nicht kritisch, Fallback 7-RP): {e}")
+                batch_precip_dense = None
 
     except DailyLimitExceeded:
         print("[FEHLER] Tageslimit erreicht während Batch-Calls")
@@ -894,7 +1099,7 @@ def fetch_all_spots(spots, save_to_file=True):
                 print(f"  [WARN] Keine Daten für {name}")
             continue
 
-        hourly_data, pressure_level_data = result
+        hourly_data, pressure_level_data, data_sources = result
 
         missing = validate_spot_data(name, hourly_data, config.FORECAST_DAYS)
         if missing:
@@ -907,12 +1112,20 @@ def fetch_all_spots(spots, save_to_file=True):
             "hourly_data": hourly_data,
             "pressure_level_data": pressure_level_data,
             "reference_points": refs,
+            "data_sources": data_sources,
         }
 
     # === Phase 4: Region-Wetter aggregieren ===
     # Eigene Batch-Calls fuer Region-only Punkte (nicht im Spot-Batch enthalten)
     batch_region_thermal = None
     batch_region_fallback = None
+    # CH1/CH2-Region-Batches: keyed auf ALLE Region-RPs (region_all_ref_points),
+    # nicht nur region_only — die Spot-Surface-Batches (batch_wind=CH1, batch_ch2)
+    # sind spot_lats-keyed und liefern KEINE Daten fuer einzelne Region-Refs.
+    # Damit profitieren Regionen ab Tag 2-5 von CH2 (2.1 km, CH-kalibriert) statt
+    # nur EU (13 km).
+    batch_region_ch1 = None
+    batch_region_ch2 = None
 
     if region_only_points:
         region_lats = [str(p[0]) for p in region_only_points]
@@ -942,6 +1155,43 @@ def fetch_all_spots(spots, save_to_file=True):
             print("[WARN] Tageslimit bei Region-Batch — Regionen werden übersprungen")
         except Exception as e:
             print(f"[WARN] Region-Batch fehlgeschlagen: {e}")
+
+    # CH1/CH2 fuer ALLE Region-Refs (shared + only). Eigene Batches mit eigenem
+    # Index. Failure jeweils nicht kritisch — Tier-Voting faellt automatisch
+    # auf D2/EU zurueck.
+    if region_all_ref_points:
+        ref_lats = [str(p[0]) for p in region_all_ref_points]
+        ref_lons = [str(p[1]) for p in region_all_ref_points]
+
+        try:
+            time.sleep(API_DELAY_BETWEEN_CALLS)
+            print(f"[API] Batch Region-CH1: {len(region_all_ref_points)} Punkte, "
+                  f"Modell {config.SURFACE_PRIMARY_MODEL}")
+            batch_region_ch1 = _chunked_api_get(ref_lats, ref_lons, {
+                "models": config.SURFACE_PRIMARY_MODEL,
+                "hourly": ",".join(wind_params),
+                "forecast_days": config.FORECAST_DAYS_CH1,
+                "timezone": config.TIMEZONE,
+            }, API_BATCH_TIMEOUT, label="Batch-Region-CH1")
+            print(f"  [OK] {len(batch_region_ch1)} Region-CH1-Antworten")
+        except Exception as e:
+            print(f"  [WARN] Region-CH1-Batch fehlgeschlagen (Fallback auf D2/EU): {e}")
+            batch_region_ch1 = None
+
+        try:
+            time.sleep(API_DELAY_BETWEEN_CALLS)
+            print(f"[API] Batch Region-CH2: {len(region_all_ref_points)} Punkte, "
+                  f"Modell {config.SURFACE_SECONDARY_MODEL}")
+            batch_region_ch2 = _chunked_api_get(ref_lats, ref_lons, {
+                "models": config.SURFACE_SECONDARY_MODEL,
+                "hourly": ",".join(wind_params),
+                "forecast_days": config.FORECAST_DAYS_CH2,
+                "timezone": config.TIMEZONE,
+            }, API_BATCH_TIMEOUT, label="Batch-Region-CH2")
+            print(f"  [OK] {len(batch_region_ch2)} Region-CH2-Antworten")
+        except Exception as e:
+            print(f"  [WARN] Region-CH2-Batch fehlgeschlagen (Fallback auf D2/EU): {e}")
+            batch_region_ch2 = None
 
     def _get_batch_entry_for_point(pt, batch_spot, batch_region):
         """Holt Batch-Eintrag: zuerst Spot-Batch, dann Region-Batch."""
@@ -1005,15 +1255,62 @@ def fetch_all_spots(spots, save_to_file=True):
             data_fallback_r = _aggregate_regional_data(fallback_data_list)
             data_fallback_r = _aggregate_wind_across_points(fallback_data_list)
 
-        # Wind: Nutze das thermal-aggregierte Ergebnis (Wind ist Teil der Thermal-Params
-        # via HOURLY_PARAMS). Dadurch hat data_wind_r jetzt Median-Wind ueber alle RPs
-        # statt nur refs[0]. Falls Thermal nicht verfuegbar, Fallback auf Fallback-Batch.
-        data_wind_r = data_thermal_r or data_fallback_r
+        # Niederschlag mit dichten 16 RPs ueberschreiben (falls verfuegbar).
+        # Wirkt auf data_thermal_r UND data_fallback_r — beide werden im
+        # Spot-Merge gelesen. Wenn batch_precip_dense fehlt oder die Region
+        # keine 16 RPs hat, bleibt die 7-RP-Aggregation aktiv (Fallback).
+        if batch_precip_dense and rid in precip_refs:
+            dense_list = []
+            for pt in precip_refs[rid]:
+                key = (round(pt[0], 4), round(pt[1], 4))
+                idx = precip_point_index.get(key)
+                if idx is not None and idx < len(batch_precip_dense):
+                    dense_list.append(batch_precip_dense[idx])
+            if dense_list:
+                if data_thermal_r is not None:
+                    _override_precip_with_dense_rps(data_thermal_r, dense_list)
+                if data_fallback_r is not None:
+                    _override_precip_with_dense_rps(data_fallback_r, dense_list)
+
+        # CH1/CH2 fuer Region — ueber ALLE Refs aggregieren (analog Thermal).
+        # Tier-Voting in _process_spot_weather waehlt dann pro Tag CH1->CH2->D2->EU.
+        data_ch1_r = None
+        if batch_region_ch1:
+            ch1_data_list = []
+            for pt in refs:
+                key = (round(pt[0], 4), round(pt[1], 4))
+                idx = region_all_ref_index.get(key)
+                if idx is not None and idx < len(batch_region_ch1):
+                    ch1_data_list.append(copy.deepcopy(batch_region_ch1[idx]))
+            if ch1_data_list:
+                data_ch1_r = _aggregate_regional_data(ch1_data_list)
+                data_ch1_r = _aggregate_wind_across_points(ch1_data_list)
+
+        data_ch2_r = None
+        if batch_region_ch2:
+            ch2_data_list = []
+            for pt in refs:
+                key = (round(pt[0], 4), round(pt[1], 4))
+                idx = region_all_ref_index.get(key)
+                if idx is not None and idx < len(batch_region_ch2):
+                    ch2_data_list.append(copy.deepcopy(batch_region_ch2[idx]))
+            if ch2_data_list:
+                data_ch2_r = _aggregate_regional_data(ch2_data_list)
+                data_ch2_r = _aggregate_wind_across_points(ch2_data_list)
+
+        # Tier-1-Wind-Quelle (= 'data_wind' fuer _process_spot_weather):
+        # NUR CH1 (region-aggregiert). Wenn CH1 fehlt, bleibt Tier-1 leer und das
+        # Voting faellt sauber durch: Tier-2 CH2 (via data_ch2), Tier-3 D2 (via
+        # data_thermal), Tier-4 EU (via data_fallback). Wichtig: nicht auf D2
+        # zurueckfallen, sonst wuerde data_wind=D2 als "ch1" mislabeled werden
+        # (Bug vor Mai 2026: Region-data_sources zeigte "ch1" obwohl D2 lief).
+        data_wind_r = data_ch1_r
 
         try:
             result = _process_spot_weather(
                 f"Region:{rname}", data_wind_r, data_thermal_r, data_fallback_r,
-                None, elev_ref
+                None, elev_ref,
+                data_ch1=data_ch1_r, data_ch2=data_ch2_r,
             )
         except Exception as e:
             print(f"  [FEHLER] Region {rname}: {e}")
@@ -1022,7 +1319,7 @@ def fetch_all_spots(spots, save_to_file=True):
         if result is None:
             continue
 
-        hourly_data, pressure_level_data = result
+        hourly_data, pressure_level_data, data_sources = result
         region_data[rid] = {
             "region_id": rid,
             "region_name": rname,
@@ -1030,6 +1327,7 @@ def fetch_all_spots(spots, save_to_file=True):
             "hourly_data": hourly_data,
             "pressure_level_data": pressure_level_data,
             "reference_points": refs,
+            "data_sources": data_sources,
         }
 
     print(f"[INFO] {len(region_data)} Regionen verarbeitet")
@@ -1137,7 +1435,9 @@ def get_weather_for_location(location_name, latitude, longitude):
         if result is None:
             return None, None, ref_points
 
-        hourly_data, pressure_level_data = result
+        # data_sources verworfen — Legacy-Einzelabruf wird nur fuer Retries
+        # genutzt; das Tracking laeuft im Hauptpfad fetch_all_spots.
+        hourly_data, pressure_level_data, _ = result
         return hourly_data, pressure_level_data, ref_points
 
     except DailyLimitExceeded:

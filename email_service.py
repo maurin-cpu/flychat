@@ -1117,16 +1117,16 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # Der Deep-Link enthaelt schon die Subscriber-Regionen + besten Tag,
     # Empfaenger landet gefiltert. Rich-Preview kommt per OG-Tags auf /briefing.
     if verdict:
-        share_msg = f"{verdict['headline']} — Gleitcast Wochencast KW{today.isocalendar().week}:"
+        share_msg = f"{verdict['headline']} — Gleitcast KW{today.isocalendar().week}:"
     else:
-        share_msg = f"Mein Gleitcast Wochencast für KW{today.isocalendar().week}:"
+        share_msg = f"Mein Gleitcast für KW{today.isocalendar().week}:"
     share_payload = f"{share_msg}\n{deep_link}"
     share = {
         "url":          deep_link,
         "text":         share_msg,
         "whatsapp":     f"https://wa.me/?text={quote(share_payload, safe='')}",
         "telegram":     f"https://t.me/share/url?url={quote(deep_link, safe='')}&text={quote(share_msg, safe='')}",
-        "mailto":       f"mailto:?subject={quote('Gleitcast Wochencast KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
+        "mailto":       f"mailto:?subject={quote('Gleitcast KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
     }
 
     return {

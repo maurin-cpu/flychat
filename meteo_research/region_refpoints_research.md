@@ -69,7 +69,7 @@ Dynamical Downscaling-Modelle (WRF, CALMET) lösen das durch hohe horizontale Au
 - **SkySight (AUS/global):** Eigenes WRF mit 1.8 km Auflösung und eigenem Land-Surface-Modell für Bodenfeuchte. Punktuell und Karten-Layer, keine Region-Aggregation.
 - **SoaringMeteo (FR open-source):** WRF 2–6 km Alpen + GFS 25 km global, [GitHub soaringmeteo/soaringmeteo](https://github.com/soaringmeteo/soaringmeteo). Punktuell, kein Region-Aggregations-Layer.
 
-**Wesentliche Beobachtung:** Keine der grossen Konkurrenz-Apps macht echte Region-Aggregation — sie zeigen Punkte oder Karten-Layer und überlassen dem User die räumliche Synthese. Gleitcast ist mit dem Region-Konzept *strukturell anders* (und potentiell mehrwertig für Wochencast-Übersichten), aber muss die Aggregation selbst lösen, ohne aus Konkurrenz-Code abkupfern zu können.
+**Wesentliche Beobachtung:** Keine der grossen Konkurrenz-Apps macht echte Region-Aggregation — sie zeigen Punkte oder Karten-Layer und überlassen dem User die räumliche Synthese. Gleitcast ist mit dem Region-Konzept *strukturell anders* (und potentiell mehrwertig für Gleitcast-Übersichten), aber muss die Aggregation selbst lösen, ohne aus Konkurrenz-Code abkupfern zu können.
 
 ### 2.5 Edge vs Interior — Hybrid sinnvoll?
 
