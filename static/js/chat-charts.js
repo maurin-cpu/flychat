@@ -574,14 +574,16 @@ window.ChatCharts = (function () {
 
         var g = svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-        // Collect all altitudes and wind speeds
+        // Collect all altitudes and wind speeds.
+        // API-Felder (api_altitude_wind): altitude, wind_speed, wind_gusts, wind_direction
         var allAlts = [];
         var allSpeeds = [];
         profiles.forEach(function (p) {
             (p.profiles || []).forEach(function (lev) {
-                allAlts.push(lev.altitude_m);
-                allSpeeds.push(lev.speed_kmh || 0);
-                if (lev.gust_kmh) allSpeeds.push(lev.gust_kmh);
+                if (lev.altitude == null) return;
+                allAlts.push(lev.altitude);
+                allSpeeds.push(lev.wind_speed || 0);
+                if (lev.wind_gusts) allSpeeds.push(lev.wind_gusts);
             });
         });
 
@@ -615,12 +617,15 @@ window.ChatCharts = (function () {
         var tip = createTooltip(container);
 
         profiles.forEach(function (p, idx) {
-            var levels = (p.profiles || []).slice().sort(function (a, b) { return a.altitude_m - b.altitude_m; });
+            var levels = (p.profiles || [])
+                .filter(function (d) { return d.altitude != null; })
+                .slice()
+                .sort(function (a, b) { return a.altitude - b.altitude; });
             var color = colors[idx % colors.length];
 
             var line = d3.line()
-                .x(function (d) { return x(d.speed_kmh || 0); })
-                .y(function (d) { return y(d.altitude_m); })
+                .x(function (d) { return x(d.wind_speed || 0); })
+                .y(function (d) { return y(d.altitude); })
                 .curve(d3.curveMonotoneY);
 
             g.append('path').datum(levels)
@@ -630,17 +635,17 @@ window.ChatCharts = (function () {
                 .attr('stroke-width', 2);
 
             g.selectAll('.dot-' + idx).data(levels).enter().append('circle')
-                .attr('cx', function (d) { return x(d.speed_kmh || 0); })
-                .attr('cy', function (d) { return y(d.altitude_m); })
+                .attr('cx', function (d) { return x(d.wind_speed || 0); })
+                .attr('cy', function (d) { return y(d.altitude); })
                 .attr('r', 3)
                 .attr('fill', color)
                 .attr('stroke', 'white').attr('stroke-width', 1)
                 .on('mouseover', function (event, d) {
                     tip.show(event.offsetX, event.offsetY,
-                        '<b>' + p.hour + ':00 / ' + d.altitude_m + 'm</b><br>' +
-                        'Wind: ' + (d.speed_kmh || 0) + ' km/h' +
-                        (d.gust_kmh ? '<br>B\u00f6en: ' + d.gust_kmh + ' km/h' : '') +
-                        (d.direction_deg != null ? '<br>Richtung: ' + d.direction_deg + '\u00b0' : ''));
+                        '<b>' + p.hour + ':00 / ' + d.altitude + 'm</b><br>' +
+                        'Wind: ' + (d.wind_speed || 0) + ' km/h' +
+                        (d.wind_gusts ? '<br>B\u00f6en: ' + d.wind_gusts + ' km/h' : '') +
+                        (d.wind_direction != null ? '<br>Richtung: ' + d.wind_direction + '\u00b0' : ''));
                 })
                 .on('mouseout', function () { tip.hide(); });
         });

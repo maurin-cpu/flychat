@@ -48,6 +48,25 @@ entstehen ~20-50 Zeilen. Über Zeit wird das die Basis für:
 - ML-Postprocessing-Training (XGBoost auf Forecast→Realität-Residuen)
 - Saisonale Muster (Frühling overforecast, Föhn unterforecast?)
 
+### 3. `sector_audit.csv` — Abgeleitetes Arbeitsblatt für Sektor-Diskussion
+
+Filtert alle False-Positives aus `observations.csv` und reichert sie mit dem
+**DB-Sektor des Spots** (aus `data/weather_archive/`) sowie einer geometrischen
+Differenz zur **gemessenen Wind-Richtung** an. Klassifiziert pro Zeile, ob:
+
+- der Sektor zu eng ist (Toleranz erweitern)
+- eine zweite Spot-Variante in DB fehlt (anderer Hang)
+- der Wind eigentlich im Sektor liegt (FILTER-BUG oder I-007 Block)
+- bei schwachem Wind der Sektor-Check irrelevant ist (I-008)
+
+Wird **überschrieben** (nicht appended) per:
+
+```bash
+python scripts/generate_sector_audit.py
+```
+
+→ nach jedem `observations.csv`-Append neu erzeugen. Schema siehe `SCHEMA.md`.
+
 ## Was wir in `PATTERNS.md` akkumulieren
 
 Wiederkehrende Issues über mehrere Tage — pro Issue:
@@ -109,8 +128,13 @@ Snapshot existiert.
 
 ## File-Convention
 
-- `YYYY-MM-DD.md` — eine Datei pro analysiertem XContest-Tag
-- `PATTERNS.md` — akkumulierter Issue-Tracker, wird bei jeder Analyse aktualisiert
+- `YYYY-MM-DD.md` — eine Datei pro analysiertem XContest-Tag (manuell)
+- `observations.csv` — strukturierte Daten, append-only (manuell, pro Tag)
+- `sector_audit.csv` — abgeleitet, überschrieben (`scripts/generate_sector_audit.py`)
+- `PATTERNS.md` — akkumulierter Issue-Tracker (manuell)
 - `README.md` — diese Datei
+- `SCHEMA.md` — Spaltendefinitionen für CSVs
 
-Keine Auto-Generierung, kein Skript. Manuell, aber konsistent dokumentiert.
+Tages-MDs + observations.csv-Zeilen + PATTERNS-Updates sind manuell konsistent zu halten.
+`sector_audit.csv` ist deterministisch ableitbar — neu erzeugen nach jedem
+observations.csv-Append.

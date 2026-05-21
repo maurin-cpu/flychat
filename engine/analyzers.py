@@ -1497,14 +1497,60 @@ class AnalyzersMixin:
                     skipped_no_data += 1
                     completed += 1
 
+        # Region-Mapping einmal vorberechnen (Point-in-Polygon), damit der
+        # Spot-only-Pfad genauso wie der Unified-Flow den vorhandenen Region-
+        # Kontext aus self.region_analyses an die Streckenflug-Bewertung
+        # durchreichen kann. Ohne diese Injektion landet jeder Spot im
+        # "Region-Kontext fehlt"-Branch von _format_region_context_block.
+        from source_area import find_region_for_point as _find_region
+        spot_region_map = {}  # spot_name → region_id oder None
+        for spot in spots_to_analyze:
+            try:
+                reg = _find_region(spot["latitude"], spot["longitude"])
+                spot_region_map[spot["name"]] = reg["id"] if reg else None
+            except Exception as e:
+                logger.warning(f"Region-Mapping fuer {spot['name']} fehlgeschlagen: {e}")
+                spot_region_map[spot["name"]] = None
+
+        def _lookup_region_result(rid: str, date_str: str):
+            """Holt das gespeicherte Region-Ergebnis aus self.region_analyses.
+            Filter analog zum Unified-Flow: error/no_data → None, sonst durchreichen.
+            Akzeptiert sowohl merged ({"safety": {...}}) als auch flache Form."""
+            if not rid:
+                return None
+            entry = (self.region_analyses or {}).get(rid, {}).get(date_str)
+            if not entry:
+                return None
+            safety = entry.get("safety") if isinstance(entry.get("safety"), dict) else {}
+            ss = safety.get("safety_status") or entry.get("safety_status")
+            if ss in ("error", "no_data"):
+                return None
+            return entry
+
+        region_ctx_hits = 0
+        region_ctx_misses = 0
+
         with ThreadPoolExecutor(max_workers=config.LLM_MAX_WORKERS) as executor:
             futures = {}
             for spot in spots_to_analyze:
                 for date_str in forecast_dates:
                     if date_str in incomplete_spot_days.get(spot["name"], set()):
                         continue
-                    future = executor.submit(self._build_and_analyze_spot, spot, date_str)
+                    rid = spot_region_map.get(spot["name"])
+                    region_result = _lookup_region_result(rid, date_str)
+                    if region_result is not None:
+                        region_ctx_hits += 1
+                    else:
+                        region_ctx_misses += 1
+                    future = executor.submit(
+                        self._build_and_analyze_spot, spot, date_str, region_result
+                    )
                     futures[future] = (spot["name"], date_str)
+
+            logger.info(
+                f"[SPOT-STREAM] Region-Kontext-Injection: {region_ctx_hits} Treffer, "
+                f"{region_ctx_misses} ohne Kontext (Spots ohne Region oder Region nicht analysiert)"
+            )
 
             remaining = set(futures.keys())
             while remaining:
@@ -3632,7 +3678,7 @@ class AnalyzersMixin:
 
             # Kurz-Tipps: höchste Ratings zuerst
             tips = []
-            top_buckets = [by_rating[6], by_rating[5], by_rating[4], by_rating[3]]
+            top_buckets = [by_rating[5], by_rating[4], by_rating[3]]
             for bucket in top_buckets:
                 for name, *_ in bucket:
                     if len(tips) >= 3:

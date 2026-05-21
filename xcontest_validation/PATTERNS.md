@@ -11,8 +11,8 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 ## I-001 — not_safe False-Positives bei Voralpen/Jura/Walliser Spots
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 2 (17.05, 20.05)
-**Status**: in-untersuchung (Trigger identifiziert, Sub-Issues separieren)
+**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Status**: in-untersuchung (Trigger identifiziert, Sub-Issues separieren) — **Top-Refactor-Prio**
 
 **Betroffene Spots (17.05.)**:
 - Weissenstein (6 Flüge, bester 107 km)
@@ -31,6 +31,39 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 - St. Cergue (1 Flug, 8.14 km — Sektor zu eng)
 - Cry d'Er / Aminona (1 Flug 9.60 km, gemeldet als "Crans-Mon..." — Sektor + Mapping)
 - Jeizinen (1 Flug, 2.81 km morgens — Sektor + Wind-Staerke ignoriert)
+
+**Betroffene Spots (21.05.)** — MASSIVER Tag mit 240 PG-Eintraegen (Tagessieger 168km Ebenalp):
+- **Obere Wengi** (11 Launches inkl. **97km Haenni**, Andres 87, Bürgi 71, Leu 71, Baumann 65, Hasler 63, Liechti 60, Fassbind 48, Schilling 47)
+- **Scheidegg + Alp Scheidegg** (4 Launches inkl. **113km Erne** Tag-Topflug fuer den Spot — beide Varianten not_safe)
+- **Niesen** (5 Launches inkl. 78km Kaempfer — Wind 72°E bei Gust 17 km/h schwach)
+- **St. Anton** (1× 85km — Wind 36°NE ausserhalb SO-S)
+- **Brunnihuette** (**12 Launches!** inkl. 59km Frommenwiler — Wind 350°N total ausserhalb W-SW; vermutlich N/NE-Variante fehlt in DB)
+- **Rotenfluespitz** (**7 Launches** inkl. 46km Walder — Wind 35°NE ausserhalb WNW-WSW)
+- **Niederhorn** (2 Launches inkl. 49km Hinni — Wind 57°NE)
+- **Weissenstein** (44km Saliba — Wind 72°E exakter Repeat 17.05)
+- **Haldi** (43km Bohren — Wind 282°W knapp ausserhalb SSW-WSW)
+- **Kronberg 1** (5 Launches inkl. 43km — **Sektor NW-NO + Wind 42°NE EXAKT im Sektor, nur Block-Filter blockiert!**)
+- **Le Suchet** (4 Launches inkl. 38km Rod — Wind 70°E ausserhalb NNO-N)
+- **Montoz** (37km Veya — Wind 97°E)
+- **Hohwacht** (5 Launches — Wind 71°E ausserhalb NNW-NNO)
+- **Jaman** (2 Launches inkl. 29km — Wind 24°NNE)
+- **Burst** (24km — Block-Filter)
+- **Buelen** (Wind 56°NE EXAKT in NO-SO Sektor — **2. Tag in Folge** Filter-Bug-Verdacht)
+- viele kleinere Hops (Pilatus Kulm, Niederbauen, Kerenzerberg, Fronalpstock, Vilan, Rorschach, Vounetse, Sonchaux, Stockhorn, Amisbuehl)
+
+**Betroffene Spots (19.05.)** — Tag mit 84 XContest-Top-Eintraegen, Tagessieger 170 km:
+- Monte Tamaro (4 Launches, 46 km — Wind 82° nur 8° vor O-SO bei Gust 18 km/h)
+- Trans (4 Launches, 38 km — Block-Filter + Sektor)
+- Amisbühl oben+unten (5 Launches, 30 km — Wind 198° 18° vor SSO-SO + Block-Filter)
+- Brunnihütte (2 Launches, 29 km — Block-Filter + Sektor)
+- Altwisstock (1 Flug, 25 km — Wind 268° 21° ausserhalb SSW-WSW)
+- Büelen (4 Launches, 19 km — Wind 56° EXAKT in NO-SO! Filter-Bug-Verdacht)
+- Rotenfluespitz (2 Launches, 17 km — Wind 266° EXAKT in WNW-WSW, nur Block-Filter)
+- Niederhorn (1 Flug, 6 km — Block-Filter, borderline)
+- Hasenmatt (1 Flug, 3 km Abend — borderline, Gust 36 + precip 9.7mm)
+- Luegibrüggli (1 Flug, 3 km — Wind 194° 8° vor SSW-SSO)
+- Haldigrat 1+2 (1 Flug, 12 km — Wording-Bug I-011)
+- Bellalui (Crans-Mon-Mapping — Sektor "NO-W" sollte 253° W einschliessen)
 
 ### Trigger identifiziert (Code-Pfad: `engine/analyzers.py:128-219`, `_prefilter_not_safe`)
 
@@ -57,31 +90,92 @@ Alp Scheidegg)
 
 ---
 
-## I-002 — Streckenflug-Rater fällt auf Default 1 bei `region_context_missing`
+## I-002 — Spot-XC-Rating systematisch zu konservativ an Top-XC-Tagen
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 1
-**Status**: offen (vermutlich Bug)
+**Tage beobachtet**: 3 (17.05, 19.05, 21.05)
+**Status**: offen — Architektur-Frage, kein klarer Pipeline-Bug
 
-**Betroffene Spots**:
-- Fiescheralp (Tagessieger 175 km — xc=1)
-- Obere Wengi (107 km — xc=1)
-- Mauborget (65 km — xc=1)
-- Rotenfluespitz (52 km — xc=1)
+**Frühere (falsche) Annahme**: "Region-Kontext fehlt fuer Top-Spots, dadurch Rating auf
+Default 1". Beim Code-Check und Daten-Vergleich (19.05/21.05) hat sich gezeigt: diese
+Annahme war zu eng. Region-Lookup (Polygon via `find_region_for_point`) funktioniert
+sauber, Region-Analyse ist im Snapshot vorhanden, und das tatsaechliche xc-Rating ist
+nicht "Default 1" sondern 2-3 (passend zur Skill-Regel bei Spot-exp 2-4).
 
-**Beobachtung**: `streckenflug.limiting_factor` = `region_context_missing` →
-Rating wird nicht inhaltlich vergeben, sondern fällt auf 1 zurück. Dieser
-Fallback hat den Effekt, dass real exzellente XC-Spots als nicht-streckentauglich
-markiert werden.
+### Was tatsaechlich passiert
 
-**Vermutete Ursachen**:
-- Region-Context wird beim Spot-Rating-Build nicht gefunden (Mapping-Fehler?)
-- Region-Analyse läuft zeitlich nach der Spot-Analyse, Context noch nicht da?
-- Code-Pfad in `engine/analyzers.py` oder Decision-Engine
+**Architektur (laut `skills/shared/04_flyability/05_streckenflug.md`)**:
+- Spot-XC-Rating ist AND-verknuepft mit Region: `Rating 4 = Spot ∈ {4,5} UND Region ∈ {4,5}`,
+  `Rating 5 = Spot=5 UND Region=5`
+- Hartcap in `engine/analyzers.py:1968`: `Spot exp <= 2 → streckenflug max 2`
+- Region kann xc nur **kappen** (region_wind_aloft, weak_regional_thermals), nicht **boosten**
 
-**Nächste Schritte**:
-- Code-Pfad für `region_context_missing` finden
-- Klären: ist der Fallback "default 1" gewollt oder ein Bug?
+**Diskrepanz Region-Aggregat vs. Spot-Aggregat (19.05 Tessin Zentral)**:
+
+| Ebene | climb-peak | XC-Tag | Bewertung |
+|---|---|---|---|
+| Region (CVT+Edge Aggregat) | **2.7 m/s**, XC-Potenzial hoch | exp=**5** |
+| Spot Cimetta (1616m) | 2.3 m/s, top 2496m (=AGL 880m) | exp=**3**, xc=**2** lim=ceiling_low |
+| Spot Mornera (1382m) | 2.4 m/s, top 2628m (=AGL 1246m) | exp=**4**, xc=**3** lim=region_context_missing* |
+
+(*lim=region_context_missing ist hier LLM-Halluzination — Region-Block war im Prompt da,
+LLM hat den Limiter inkonsistent gewaehlt; betrifft das **Label**, nicht den **Wert** xc=3.)
+
+→ Die Region-Bewertung exp=5 ist **inhaltlich richtig** (peak 2.7, ph 10, Region-Tags
+"XC hoch", real 162km Cimetta + 104km Mornera geflogen). Aber das Spot-Meteogramm
+sieht systematisch konservativer aus als die Region-Aggregate, weil:
+- Spot-Punkt nutzt **einen** Koordinatensatz → individuelle, lokale Wolkenbasis/Thermik
+- Region nutzt **7 Referenzpunkte** (4 Edge + 3 CVT-Innen) → glattere XC-Realitaet
+- Pilot startet am Spot, fliegt aber in den Region-Raum → reale XC nutzt
+  Region-Aggregate, nicht Spot-Punkt
+
+Bei Spot-exp ≤ 3 kappt die AND-Regel + der Hartcap dann xc auf 2-3, obwohl die Region
+exp=5 hergibt → die Region kann den Spot nicht heben.
+
+### Beispiele (korrigierte Lesart)
+
+**17.05.** Fiescheralp (175km Tagessieger, xc=1): Damals noch
+`streckenflug_limiting_factor=region_context_missing` und Default 1 — das war damals
+echter Pipeline-Lookup-Fehler ODER LLM-Halluzination, müsste mit dem Snapshot
+verifiziert werden. Heutiger Stand: Pipeline funktioniert, also wahrscheinlich
+LLM-Inkonsistenz bei der Limiter-Wahl.
+
+**19.05.**
+- Fanas 1 (Tagessieger 170km): Spot exp=2 → Hartcap kappt xc auf 2.
+  Warum exp=2? Climb 2.4 + ph 10 sind eigentlich solide, aber Gust 35 + Wind 229° am
+  Sektor-Rand SSW-WSW koennten Safety-Score reduziert haben → Spot-Rating konservativ.
+  Region Praettigau exp=4 hilft nicht wegen Hartcap.
+- Mornera (104km): Spot exp=4, Region exp=5 → laut Regel xc=4 moeglich, bekam aber
+  xc=3 mit (vermutlich falschem) Label `region_context_missing`. Das ist die einzige
+  Stelle, wo das Label-Verhalten echtes Fehlerbild produziert.
+- Cimetta (162km): Spot exp=3 + AGL 880m → ceiling_low + AND-Regel mit Region 5
+  ergibt xc=2-3. Inhaltlich konsistent zur Skill-Regel, aber im Praxistest underrated.
+
+**21.05.** Ebenalp 1 (168km Tagessieger): Spot exp=4, Region Alpstein exp=4 → laut Regel
+xc=3-4 moeglich; bekam xc=3 mit lim=ceiling_low. Konsistent.
+
+### Was hier eigentlich das Problem ist
+
+**Nicht** "Region fehlt" (gibt sie meist nicht), **nicht** "Pipeline kaputt" (ist sie nicht).
+**Sondern**: das Konzept "Spot-XC-Rating = AND(Spot, Region)" misst implizit "wie gut ist
+der Spot **als XC-Start** lokal" — nicht "wie weit kommt ein Pilot ab hier". Real-Fluege
+nutzen die Region-Bedingungen, daher driftet xc-Rating vs. Real-Performance vor allem an
+Tagen, wo der Spot lokal "moderat" aussieht aber die Region traegt.
+
+### Mögliche Richtungen (kein direkter Fix-Vorschlag, eher Entwurf)
+
+1. **Status quo akzeptieren** — XC-Rating misst lokale Spot-XC-Qualitaet, nicht
+   Pilotenperformance. Region-Rating separat kommunizieren.
+2. **Regel umdrehen** — wenn Region exp=5 + ruhig + Spot-safety=safe, darf Spot-xc dem
+   Region-Rating folgen, auch wenn Spot-exp 1 Stufe niedriger ist.
+3. **Spot-Aggregate erweitern** — `max_thermal_height` ueber Spot+Region-Aggregat statt
+   nur Spot-Punkt; reflektiert XC-Reichweite besser.
+4. **Label-Sauberkeit** — Skill-Regel praezisieren, dass `region_context_missing` nur
+   bei tatsaechlich "nicht verfuegbar"-Text gesetzt wird (kein Catch-all-Fallback).
+
+**Naechste Schritte**:
+- Mit User klaeren: welche Richtung passt zum Produktziel?
+- Bis dahin: I-002 als **Konzept-Diskussion** behandeln, nicht als "Bug zum Fixen".
 
 ---
 
@@ -135,7 +229,14 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 ## I-005 — Coverage-Gaps: produktive Spots nicht in unserer DB
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 3 (17.05, 18.05, 20.05) — Tussweid wiederholt 18.05+20.05
+**Tage beobachtet**: 5 (17.05, 18.05, 19.05, 20.05, 21.05). Wiederkehrer:
+- **Saas-Fee** 2 Tage in Folge (19.05 142km, 21.05 132km)
+- **Riederalp** 2 Tage in Folge (19.05 36km, 21.05 110km)
+- **Grindelwald** mind. 2 Tage (heute 9 Launches/59km — wird zur Top-Coverage-Prio)
+- **Tussweid** 3 Tage in Folge (18.05/19.05/20.05)
+- **Galgenen** mind. 2 Tage (20.05 implizit, 21.05 8 Launches)
+- **Burgfeldstand** 2 Tage (20.05, 21.05)
+- **Gornergrat** 2 Tage (18.05, 21.05)
 **Status**: offen
 
 **Fehlende Spots (Top-100-Flug-Generatoren) 17.05.**:
@@ -155,6 +256,36 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 - Blapbach (1 Flug, 3.71 km, Emmental — niedrige Prio)
 - **Tussweid (wiederholt vom 18.05)** — Pattern: gleicher Pilot, kleiner Spot, fehlt durchgehend
 
+**Fehlende Spots 21.05.** — 29 Coverage-Eintraege an einem 240-Launches-Tag:
+- **Saas-Fee** (132km, 2. Tag) — HOECHSTE Prio
+- **Niederwil…** (3 Launches, 111km Von niederhaeusern) — NEW HIGH-PRIO; XContest-Truncate
+- **Riederalp** (4 Launches, 110km Strahm, 2. Tag) — HOCHPRIO
+- **Leysin** (80km CHUN) — NEW HIGH-PRIO Waadtland
+- **Grindelwald** (**9 Launches**, 59km Jaggy) — wiederkehrend, jetzt klare Coverage-Luecke Berner Oberland
+- **Galgenen** (8 Launches, 35km) — wiederkehrend Mittelland Ost
+- **Boettstein** (45km Huppert) — Mittelland AG, neu
+- **Euthal** (38km), **Muerren** (32km), **Tschenten** (17km), **Sarner Alp** (20km),
+  **Torgon** (22km), **Burgfeldstand** (17km, 2. Tag), **Gornergrat** (10km, 2. Tag),
+  **Walalp** (19km), **Schoenboden** (17km), **Grandvillard** (26km), **Chrienseregg** (11km),
+  **Les prelayes** (15km), **Le Cernil** (13km), **Bolberg** (5km), **Vacheresse** (6km),
+  **Cret du Midi** (9km), **Vogelberg** (5km), **Ausserberg** (6km), **Winteregg** (7km),
+  **Ruetiberg** (3km), **Chörnlisegg** (16km), **Wpt001** (20km Hans Huggler — unknown name).
+
+**Fehlende Spots 19.05.** — 12 neue Eintraege bei sehr aktivem Tag:
+- **Saas-Fee** (1 Flug, 141.84 km, O. Prochazka CZ — **HOCHPRIO**, Top-3 Tagesleistung)
+- **Madone** (1 Flug, 110.08 km, E. Sartoris — **HOCHPRIO**, Tessin Nord)
+- **Loeita** (1 Flug, 73.12 km, P. Rothenbuehler — **HOCHPRIO**, Mittelland?)
+- **Ämsigen** (1 Flug, 64.07 km, L. Zumbuehl — HOCHPRIO, Engelberg)
+- **Tussweid (3. Tag in Folge!)** (1 Flug, **57.65 km** Roeleveld — **HOECHSTE PRIO**, echter
+  Strecken-Flug nach zwei Tagen Hops)
+- **Riederalp** (1 Flug, 36 km, S. Bucher — Aletsch/Wallis, MID)
+- **tuffarolas** (1 Flug, 27 km, C. Roner — Surselva/Tujetsch, MID)
+- **Gulmen** (3 Launches, 19 km Top, A. Schlegel — Toggenburg, MID)
+- L'etoile (18 km, Westschweiz/Vallee de Joux?, MID)
+- Lüsis (16 km, Glarnerland, MID)
+- Schafberg (5 km Hop, LOW)
+- H&F Fäsil (7 km Hop, LOW)
+
 **Vermutete Ursachen**:
 - Spots in `fluggebiete_complete.csv` fehlen
 - Spots existieren unter abweichendem Namen (z.B. "Niederhorn" für
@@ -172,8 +303,8 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 ## I-006 — Sektor-Definition in `fluggebiete_complete.csv` zu eng
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 2 (17.05, 20.05)
-**Status**: offen — heute jedes False-Positive auf diesem Issue
+**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Status**: offen — am 21.05 (NE-Wind-Tag) **fast jedes False-Positive auf diesem Issue**
 
 **Beobachtung**: Mehrere Spots haben in der CSV nur **eine** Hauptstart-Richtung,
 real aber mehrere brauchbare Sektoren oder einen breiteren Wind-Sektor als
@@ -189,6 +320,25 @@ angegeben.
 | St. Cergue (20.05) | SO-S (135-180°) | W (285°) | 1 Flug 8.14 km, 56 min |
 | Cry d'Er / Aminona (20.05) | SSW-SSO (≈150-195°) | NW (308-349°) | 1 Flug 9.60 km — eher von W-Hang |
 | Jeizinen (20.05) | SO-S (135-180°) | W (268°) morgens | 1 Flug 2.81 km, 09 min |
+| **Monte Tamaro (19.05)** | O-SO (90-135°) | **82° ONO bei 18 km/h Gust** | 4 Launches, 46 km — Borderline + I-008 |
+| **Amisbühl o/u (19.05)** | SSO-SO (157-180°) | **198° SSW** | 5 Launches, 30 km |
+| **Brunnihütte (19.05)** | W-SW (202-270°) | **320° NW** | 2 Launches, 29 km |
+| **Altwisstock (19.05)** | SSW-WSW (202-247°) | **268° W** | 1 Flug, 25 km |
+| **Büelen (19.05)** | NO-SO (45-135°) | **56° NE — EXAKT IM SEKTOR** | 4 Launches, 19 km — Filter-Bug-Verdacht |
+| **Rotenfluespitz (19.05)** | WNW-WSW (247-292°) | **266° W — EXAKT IM SEKTOR** | 2 Launches, 17 km — nur Block-Filter |
+| **Luegibrüggli (19.05)** | SSW-SSO (180-202°) | **194° SSW** | 1 Flug, 3 km |
+| **Bellalui (19.05)** | NO-W (breit, 45-270°) | **253° W — sollte INNERHALB sein** | Sektor-Parser-Bug-Verdacht |
+| **Obere Wengi (21.05)** | SSW-SSO (158-202°) | **107° E** | **11 Launches**, 97 km Haenni |
+| **Scheidegg (21.05)** | NNO-NO (22-45°) | **64° NE — knapp ausserhalb** | 4 Launches, 113 km Erne |
+| **Niesen (21.05)** | SSW-SSO (158-202°) | **72° E bei Gust 17 km/h** | 5 Launches, 78 km — I-008 ueberlagert |
+| **St. Anton (21.05)** | SO-S (135-180°) | **36° NE** | 1× 85 km |
+| **Brunnihuette (21.05)** | W-SW (202-270°) | **350° N** | **12 Launches**, 59 km — Variante fehlt |
+| **Rotenfluespitz (21.05)** | WNW-WSW (247-292°) | **35° NE** | 7 Launches, 46 km Walder |
+| **Le Suchet (21.05)** | NNO-N (22-0°) | **70° E** | 4 Launches, 38 km |
+| **Niederhorn (21.05)** | SSW-SSO (158-202°) | **57° NE** | 2 Launches, 49 km Hinni |
+| **Jaman (21.05)** | W-NW (270-337°) | **24° NNE** | 2 Launches, 29 km |
+| **Hohwacht (21.05)** | NNW-NNO (337-22°) | **71° E** | 5 Launches, 12 km Top |
+| **Bellalui (21.05)** | NO-W (45-270° via N) | **1° N** | **conditional, status korrekt** — Parser greift heute |
 
 → CSV-Sektoren wurden vermutlich konservativ aus dem Hauptstart definiert, nicht
 aus dem realen Fenster, in dem ein erfahrener Pilot starten würde. Plus: viele
@@ -207,8 +357,11 @@ führt aber nur eine Variante.
 ## I-007 — `CLEAN_WINDOW_MIN_HOURS = 2` blockt 1-Stunden-Starts
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 2 (17.05, 20.05 — Ramslauen-Mechanismus identisch)
-**Status**: offen
+**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Status**: offen — am 21.05 besonders auffaellig: **Kronberg 1 hat Wind 42°NE EXAKT
+im NW-NO Sektor, scheitert NUR am Block-Filter ("Nur 2h sauber"). 5 Launches/43km zeigen
+Spot war fliegbar.** Ebenso Burst, Fiescheralp, Niederbauen, Kerenzerberg, Seebodenalp,
+Fronalpstock, Obere Wengi am 21.05 nur durch Block-Filter blockiert.
 
 **Beobachtung**: Schwelle "zusammenhängender Block ≥ 2h" sperrt Spots aus,
 deren passendes Wind-Fenster real nur 1-2h dauert. Locals starten aber
@@ -240,8 +393,10 @@ nachweislich in solchen Fenstern (Streckenflug 60+ km möglich).
 ## I-008 — Pre-Filter ignoriert Wind-Stärke
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 2 (17.05, 20.05)
-**Status**: offen
+**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Status**: offen — 21.05 Niesen: dir 72°E bei **Gust 17 km/h** (sehr schwach!) trotzdem
+not_safe; 5 Launches inkl. 78km Strecke. Bei <20 km/h Gust ist Sektor fliegerisch fast
+egal. Pilatus Kulm 22 km/h Gust analog.
 
 **Beobachtung**: Sektor-Filter prüft nur Richtung, nicht Stärke. Bei
 **sehr schwachem Wind** (z.B. Mont Raimeux Nord 1-7 km/h bei 13h) ist die
@@ -273,8 +428,12 @@ Schwelle auf "Sektor irrelevant").
 ## I-009 — Spot-Mapping XContest-Bezeichnung → DB-Bezeichnung
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 2 (17.05, 20.05)
-**Status**: offen
+**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Status**: offen — am 21.05 grosser Multi-Variante-Erfolg (Ebenalp 1 von 3, Crans-Mon
+3 Varianten korrekt aufgeloest, Verbier → Ruinettes, Tritt → Ufem Tritt analog vorhin).
+**ABER**: Brunnihütte (12 Launches an `not_safe`-W-SW-Spot bei N-Wind) signalisiert, dass
+der Brunni-Spot real einen N/NE-Hang als Alternative haben muss, der in DB fehlt.
+Bellalui-Sektor-Parser hat heute funktioniert (1°N → in NO-W).
 
 **Beobachtung**: XContest verwendet andere Spot-Namen als unsere DB. Wenn das
 Mapping falsch ist, wird der Vergleich falsch.
@@ -308,7 +467,8 @@ Mapping falsch ist, wird der Vergleich falsch.
 ## I-010 — Tages-Niederschlags-Aggregat blockiert Morgen-Fenster
 
 **Erstmals**: 2026-05-18
-**Tage beobachtet**: 2 (18.05, 20.05)
+**Tage beobachtet**: 2 (18.05, 20.05) — am 19.05 nicht ausgeloest (Forecast-Regen
+mit 1-10mm geringer als am 18./20.05)
 **Status**: offen
 
 **Beobachtung**: `precip_sum_mm` summiert den gesamten Tag — wenn der Hauptregen
@@ -335,6 +495,38 @@ real geflogen sind.
   hourly precipitation pro Stunde)
 - Hourly-Regen-Werte für Braunwald 18.05 und Ramslauen 20.05 aus Snapshot
   extrahieren und gegen Real-Start-Zeit prüfen
+
+---
+
+## I-011 — Wording-/Logic-Bug "Nur Xh sauber, kein zusammenhaengender Block >= 3h"
+
+**Erstmals**: 2026-05-19
+**Tage beobachtet**: 2 (19.05 Haldigrat, 21.05 Niederbauen)
+**Status**: offen — Wording-Inkonsistenz, evtl. nur Text-Bug. Pattern konsistent: 3 saubere
+Stunden verteilt, kein zusammenhaengender 3h-Block. Text korrigieren auf "3 Einzelstunden
+verteilt, kein zusammenhaengender 3h-Block" oder gleichwertig.
+
+**Beobachtung**: Auf Haldigrat 1 + 2 (19.05) lautet das no_go:
+> "Start-Fenster: Nur **3h** sauber, kein zusammenhaengender **Block >= 3h**"
+
+Das widerspricht sich logisch: wenn 3 saubere Stunden existieren und der gesuchte Block
+3h lang sein soll, ist die Anforderung exakt erfuellt — ausser die 3h sind nicht
+zusammenhaengend. In dem Fall sollte der Text klar sagen "3 Einzelstunden verteilt,
+kein 3h-Block" (oder die Anforderung in der CLEAN_WINDOW_MIN_HOURS-Berechnung anpassen).
+
+**Vermutete Ursachen**:
+- Format-String in `_prefilter_not_safe` baut Text aus `wind_ok_count` (3) und
+  `CLEAN_WINDOW_MIN_HOURS`-Logik zusammen — die Variable wird im Text irrefuehrend ohne
+  "kontinuierlich"/"verteilt"-Hinweis verwendet
+- Oder der Block-Check ist tatsaechlich strenger als 3h (z.B. 4h Mindestblock) und der
+  Text holt sich die falsche Konstante
+
+**Naechste Schritte**:
+- Code-Pfad `_prefilter_not_safe` finden: wo wird der "Nur Xh sauber" String gebaut?
+- Pruefen, ob die Schwelle und der angezeigte Wert (`>= 3h`) konsistent sind
+- Falls Block-Schwelle = 3h und 3 saubere Stunden existieren: warum greift es trotzdem?
+  → vermutlich Lueckenbedingung (z.B. 1h Lücke darin)
+- Text anpassen: "Nur Xh sauber, davon keine 3h-Block-Kontinuitaet" oder analog
 
 ---
 

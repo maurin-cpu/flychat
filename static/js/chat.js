@@ -999,41 +999,164 @@
     setTimeout(function () { clearInterval(_analysisCheckInterval); }, 30000);
 
     // ── Context-Aware Quick Actions ──────────────────────────
+    // Strategie: Buttons = Werbung fuer die Chat-Tools. Drei Schichten:
+    //   1. USP-Anker (immer aktiv): Isochrone + Vergleichstabelle — gibt's im Dashboard nicht.
+    //   2. Visualisierungs-Discovery (tageweise Rotation): Meteogramm, Thermik-Heatmap,
+    //      Windverlauf, Hoehenwind & Turbulenz — jeder dieser 4 Buttons bekommt einmal
+    //      pro 4-Tage-Zyklus einen Score-Boost, damit User ueber mehrere Tage hinweg
+    //      alle Haupt-Tools mindestens einmal sieht.
+    //   3. Situative Trigger (live aus analysisData): Klassiker-Tag, Foehn-Risiko,
+    //      Plan B (>=50% unsafe) — tauchen nur auf, wenn die Wetterlage es hergibt.
+    // Labels bleiben neutral, keine konkreten Spotnamen (LLM picked Spot zur Laufzeit).
     function updateQuickActionsFromAnalyses(analysisData) {
         if (!quickActions) return;
 
         var now = new Date();
-        var todayStr = now.getFullYear() + '-' +
-            String(now.getMonth() + 1).padStart(2, '0') + '-' +
-            String(now.getDate()).padStart(2, '0');
+        var pad2 = function (n) { return String(n).padStart(2, '0'); };
+        var fmtDate = function (d) {
+            return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+        };
+        var todayStr = fmtDate(now);
+        var tomorrowStr = fmtDate(new Date(now.getTime() + 86400000));
 
-        // Find best spot for contextual actions
-        var bestSpot = null;
-        var bestScore = -1;
-        var safeRank = { 'safe': 3, 'conditional': 2, 'not_safe': 1 };
+        // Live-Aggregation aus den Voranalysen (echte Werte, nichts hartcodiert)
+        var xcTodayCount = 0;
+        var foehnTodayCount = 0;
+        var notSafeCount = 0;
+        var flyableTodayCount = 0;
+        var totalToday = 0;
+        var bestTomorrowRating = 0;
 
         Object.keys(analysisData).forEach(function (name) {
             var d = analysisData[name][todayStr];
-            if (!d) return;
-            var er = parseInt(d.experience_rating, 10);
-            if (!isFinite(er)) er = 0;
-            var score = (safeRank[d.safety_status] || 0) * 10 + er;
-            if (score > bestScore) {
-                bestScore = score;
-                bestSpot = name;
+            if (d) {
+                totalToday++;
+                var er = parseInt(d.experience_rating, 10);
+                if (!isFinite(er)) er = 0;
+                if (d.safety_status === 'not_safe') {
+                    notSafeCount++;
+                } else {
+                    flyableTodayCount++;
+                }
+                if (er === 5 && d.safety_status !== 'not_safe') xcTodayCount++;
+                var foehnRisk = (d.safety && d.safety.foehn_risk) || d.foehn_risk || 'none';
+                if (foehnRisk && foehnRisk !== 'none') foehnTodayCount++;
+            }
+            var dm = analysisData[name][tomorrowStr];
+            if (dm && dm.safety_status !== 'not_safe') {
+                var emt = parseInt(dm.experience_rating, 10);
+                if (isFinite(emt) && emt > bestTomorrowRating) bestTomorrowRating = emt;
             }
         });
 
-        // Replace quick action buttons with context-aware ones
-        var contextActions = [
-            { msg: 'Welche Region ist heute am besten zum Fliegen?', label: 'Beste Region?' },
-            { msg: 'Wo ist die Thermik am st\u00e4rksten?', label: 'Beste Thermik?' },
-            { msg: 'Welcher Tag diese Woche ist am besten?', label: 'Bester Tag?' },
-            { msg: 'Wie wird das Wetter morgen?', label: 'Morgen?' },
-        ];
+        // 3-Tage-Rotation fuer die rotierenden Visualisierungs-Buttons
+        // (Windverlauf ist KEIN Rotations-Slot mehr, sondern always-on)
+        var dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+        var vizSlot = dayOfYear % 3;
+        var VIZ_BOOST = 3;
+        var VIZ_BASE = 5;
+
+        var candidates = [];
+
+        // === Immer aktiv — USP-Anker ===
+        candidates.push({
+            label: 'Karte: 1h ab Z\u00fcrich',
+            msg: 'Zeichne mir auf der Karte die Region ein, die ich in 1 Stunde Fahrzeit von Z\u00fcrich aus erreiche, und zeig mir die fliegbaren Spots darin.',
+            score: 10
+        });
+
+        candidates.push({
+            label: 'Vergleiche Top 3',
+            msg: 'Vergleiche die drei besten Spots heute in einer Tabelle mit Wind, Thermik und Sicherheit.',
+            score: 9
+        });
+
+        // Windverlauf — always-on (User soll diesen Chart immer sehen koennen)
+        if (flyableTodayCount > 0) {
+            candidates.push({
+                label: 'Windverlauf',
+                msg: 'Zeig mir den Windverlauf vom besten Spot heute als Chart mit Wind und B\u00f6en \u00fcber den Tag.',
+                score: 8
+            });
+        }
+
+        // === Visualisierungs-Discovery (tageweise Rotation, neutral formuliert) ===
+        if (flyableTodayCount > 0) {
+            candidates.push({
+                label: 'Meteogramm zeigen',
+                msg: 'Zeig mir das komplette Meteogramm vom besten Spot heute (Wind, Thermik, Wolken, H\u00f6henwind).',
+                score: VIZ_BASE + (vizSlot === 0 ? VIZ_BOOST : 0)
+            });
+            candidates.push({
+                label: 'Thermik-Heatmap',
+                msg: 'Zeig mir die Thermik-Heatmap vom besten Spot heute mit Steigwerten pro H\u00f6he und Stunde.',
+                score: VIZ_BASE + (vizSlot === 1 ? VIZ_BOOST : 0)
+            });
+            candidates.push({
+                label: 'H\u00f6henwind & Turbulenz',
+                msg: 'Zeig mir das vertikale Windprofil und die Turbulenz vom besten Spot heute.',
+                score: VIZ_BASE + (vizSlot === 2 ? VIZ_BOOST : 0)
+            });
+        }
+
+        // === Situativ — XC / Streckenflug ===
+        if (xcTodayCount > 0) {
+            candidates.push({
+                label: 'Klassiker heute?',
+                msg: 'Wo k\u00f6nnte heute ein XC-Klassiker gehen? Zeig mir Streckenflug-Rating, Wolkenbasis und Wind-Layer.',
+                score: 12
+            });
+        } else if (bestTomorrowRating >= 4) {
+            candidates.push({
+                label: 'Klassiker morgen?',
+                msg: 'Wo k\u00f6nnte morgen ein XC-Klassiker gehen? Zeig mir Streckenflug-Rating und Basis.',
+                score: 11
+            });
+        } else {
+            candidates.push({
+                label: 'Wo geht XC?',
+                msg: 'Wo geht diese Woche der beste Streckenflug? Zeig mir das h\u00f6chste Streckenflug-Rating der n\u00e4chsten Tage.',
+                score: 7
+            });
+        }
+
+        // === Situativ — Foehn ===
+        if (foehnTodayCount > 0) {
+            candidates.push({
+                label: 'F\u00f6hn-Check',
+                msg: 'Wie sieht die F\u00f6hn-Lage aus? Zeig mir das F\u00f6hn-Diagramm und welche Spots betroffen sind.',
+                score: 11
+            });
+        } else {
+            candidates.push({
+                label: 'F\u00f6hn-Lage?',
+                msg: 'Wie entwickelt sich der F\u00f6hn diese Woche? Zeig mir das F\u00f6hn-Diagramm.',
+                score: 5
+            });
+        }
+
+        // === Situativ — Plan B (>=50% Spots unsafe) ===
+        if (totalToday > 0 && notSafeCount / totalToday >= 0.5) {
+            candidates.push({
+                label: 'Plan B heute?',
+                msg: 'Heute sind viele Spots nicht fliegbar — wo gibt es trotzdem eine sichere Option und warum?',
+                score: 10
+            });
+        }
+
+        // === Standard — Wochenuebersicht ===
+        candidates.push({
+            label: 'Bester Tag?',
+            msg: 'Welcher Tag diese Woche ist am besten zum Fliegen?',
+            score: 6
+        });
+
+        // Top 5 nach Score (Tie-Break stabil dank push-Reihenfolge)
+        candidates.sort(function (a, b) { return b.score - a.score; });
+        var picked = candidates.slice(0, 5);
 
         quickActions.innerHTML = '';
-        contextActions.forEach(function (a) {
+        picked.forEach(function (a) {
             var btn = document.createElement('button');
             btn.className = 'quick-btn';
             btn.setAttribute('data-msg', a.msg);

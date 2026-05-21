@@ -1,3 +1,10 @@
+# Schema-Dokumentation
+
+Hier dokumentiert: `observations.csv` (primäre Validierungs-Datenpunkte) +
+`sector_audit.csv` (abgeleitetes Arbeitsblatt für Sektor-Diskussion).
+
+---
+
 # observations.csv — Schema
 
 Akkumulierte XContest-Validierung pro Spot+Tag. Eine Zeile = ein Spot an einem
@@ -81,3 +88,74 @@ Auch wenn derselbe Tag mehrfach analysiert wird (z.B. erst Forecast-Vergleich
 am Morgen, dann Nachbesserung abends), wird **angehängt**. Bei späterer
 Auswertung kann nach `(date, spot)` aggregiert werden — die jüngste Zeile
 gewinnt, oder alle Zeilen werden behalten für Audit-Trail.
+
+---
+
+# sector_audit.csv — Schema
+
+Abgeleitetes Arbeitsblatt für die Sektor-Diskussion. Filtert observations.csv auf
+False-Positives (`finding_type ∈ {false_positive_notsafe, false_positive_caution}`),
+parst den DB-Sektor (`windrichtung` aus weather_archive/`fluggebiete_complete.csv`)
+zu Grad-Range, berechnet die Differenz zur gemessenen Wind-Richtung und klassifiziert
+das Befund.
+
+**Wird nicht manuell gepflegt — wird neu erzeugt aus observations.csv +
+data/weather_archive/ per `python scripts/generate_sector_audit.py`.**
+
+## Spalten
+
+### Identität
+- `date`, `spot`, `region`, `elevation_m`, `terrain_type` — kopiert aus observations.csv
+  bzw. Spot-Stammdaten im Snapshot
+
+### DB-Sektor (Spot-Eigenschaft)
+- `db_sektor_text` — Original-String wie in CSV/DB, z.B. `"NW-NO"`, `"SSW-SSO"`
+- `db_sektor_range_deg` — geparst zu Grad-Range mit Kürzester-Bogen-Konvention,
+  z.B. `"315-45°"` (durch Norden) oder `"157-202°"` (durch Süden)
+- `db_sektor_width_deg` — Breite der Range in Grad (typisch 45-90°)
+
+### Gemessen (Tagesaggregat aus Forecast)
+- `measured_wind_dir_deg` — `wx_wind_dir_dominant_deg` aus observations.csv
+- `measured_gust_kmh` — `wx_wind_gust_max_kmh` aus observations.csv
+
+### Geometrische Analyse
+- `in_sector` — `yes` wenn gemessene Richtung im kürzeren Bogen liegt, sonst `no`
+- `edge_distance_deg` — minimale Winkel-Distanz zur nächsten Sektor-Kante (immer ≥0).
+  Bei `in_sector=yes` ist's die Distanz zum **näheren Sektor-Rand** (= wie tief drin).
+  Bei `in_sector=no` ist's die Distanz **bis zum nächsten Sektor-Rand**.
+
+### Kontext-Reproduktion
+- `no_go_reason`, `launches`, `best_km`, `top_pilot`, `top_start_time`,
+  `finding_type` — wie observations.csv
+
+### Klassifikation
+- `verdict` — heuristische Einordnung. Mögliche Werte:
+  - **`FILTER-BUG (Code)`** — `in_sector=yes` aber no_go sagt "Sektor ausserhalb" →
+    echter Code-Bug, Parser/Filter inkonsistent
+  - **`BLOCK-FILTER (I-007)`** — `in_sector=yes` aber no_go sagt "Nur Xh sauber" →
+    Wind passt, Block-Pflicht scheitert (I-007)
+  - **`HARTE-WARNUNGEN-Filter`** — `in_sector=yes` aber no_go sagt "harte Warnungen"
+  - **`I-008 (Wind schwach, Sektor egal)`** — `in_sector=no` ABER Gust <20 km/h →
+    bei schwachem Wind sollte Sektor-Check nicht hart greifen
+  - **`SEKTOR ZU ENG (<20° ausserhalb)`** — Wind nur knapp ausserhalb, Toleranz
+    ±15-20° würde reichen
+  - **`SEKTOR MITTEL (20-50° ausserhalb)`** — Spot hat evtl. weitere Variante mit
+    anderer Hauptrichtung
+  - **`MULTI-VARIANTE FEHLT (>50° ausserhalb)`** — Spot hat real einen anderen Hang
+    (z.B. Brunnihütte W-SW vs. real N-Hang), DB-Eintrag fehlt
+  - **`PARSE-FAIL (Sektor nicht lesbar)`** — DB-Sektor leer/unbekannt
+- `notes` — gekürzt aus observations.csv (max 120 Zeichen)
+
+## Konvention "Kürzerer Bogen"
+
+Sektor "NW-NO" hat zwei mögliche Interpretationen:
+- 315° → 45° clockwise (durch Norden, 90° breit) — **gewählt**
+- 45° → 315° clockwise (durch Süden, 270° breit) — verworfen
+
+Algorithmus: nimm die schmalere der beiden Bögen. Funktioniert für alle gängigen
+2-Richtungs-Sektoren in unserer DB.
+
+## Wann neu erzeugen?
+
+Nach jedem `observations.csv`-Append → `python scripts/generate_sector_audit.py`.
+Datei wird **überschrieben**, nicht angehängt (im Gegensatz zu observations.csv).

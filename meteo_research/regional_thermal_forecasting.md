@@ -22,6 +22,8 @@ Bis Maerz 2024 lief Regtherm auf DWD-Servern. Danach lizenzierten sowohl XC Ther
    - Grenzschichtobergrenze
 4. **Talwind-Kopplung** (REGTHERM-Innovation): Kompensationsstroemungen aus tiefer gelegenen Nachbarregionen transportieren feuchte Luft in alpine Taeler, veraendern Luftmasseneigenschaften und senken oft die Basis
 
+> **Update Mai 2026**: Die peer-reviewed Literatur seit 2001 hat REGTHERMs Kopplungs-Konzept praezisiert. Siehe `meteo_research/inter_regional_coupling.md` fuer Henne 2005 (Mountain Venting), Lugauer/Winkler & Weissmann 2005 (Alpine Pumping als 42%-Phaenomen), TEAMx-PC22 (Advektion dominiert CBL-Wachstum) und Wagner 2023 (Steepness vs. Niederschlagseffizienz) — plus konkrete Umsetzungs-Optionen fuer unser System.
+
 ### Regionen-Definition
 
 - **Topographische Kohaerenz**: Grenzen folgen Talverlaeufen, Gebirgskaemmen, Paessen
