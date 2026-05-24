@@ -682,6 +682,12 @@ class AnalyzersMixin:
             "noAnalysis", "noAnalysisReason",
             # Decision-Engine Tracking
             "_decisions_applied",
+            # Few-Shot / Label-Pipeline: Substanz-Aggregates aus _ctx_tq_cache.
+            # Ohne diese Kopie landen die Werte zwar im result (via
+            # _attach_rating_inputs), aber das persistierte entry verliert
+            # sie beim Merge in spot_analyses / region_analyses — und damit
+            # bleiben auch labeled_examples.jsonl.aggregates leer.
+            "_rating_inputs",
             # Tag-System v4 (siehe docs/TAGS.md)
             "tags", "start_window",
         )

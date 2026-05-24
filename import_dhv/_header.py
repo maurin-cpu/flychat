@@ -4,7 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 
 KML_PATH = Path(r"C:/Users/user/OneDrive/Projekte/gleitcast/data/dhv_gelaende_2026-04-09_16.27.54.kml")
-CSV_PATH = Path(r"C:/Users/user/OneDrive/Projekte/gleitcast/data/fluggebiete_complete.csv")
+CSV_PATH = Path(r"C:/Users/user/OneDrive/Projekte/gleitcast/data/fluggebiete_dhv.csv")
 KML_NS = {"kml": "http://www.opengis.net/kml/2.2"}
 
 def haversine_m(lat1, lon1, lat2, lon2):

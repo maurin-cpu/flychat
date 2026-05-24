@@ -143,46 +143,32 @@ waere Redundanz. Insgesamt max 180 Woerter.
 2. **PFLICHT: `flight_hint` pro Tag** — zusaetzliches Feld neben `text`
    in jedem `long`-Eintrag. EIN kurzer Satz (max ~15 Woerter)
    ausschliesslich Pilotensicht: was bedeutet die Lage konkret fuers
-   Fliegen an dem Tag? (Thermik nutzbar? Zu unbestaendig? Foehn-bockig?
-   Stabil aber Hochnebel-Risiko? Wochenend-Highlight?). KEINE Empfehlung
-   ("plane einen Flug"), nur Einschaetzung. Beispiele:
-   - "Thermisch nutzbar, aber Foehntaeler werden bockig."
-   - "Eher kein Flugtag — zu nass und labil."
-   - "Klassisches Wochenend-Highlight, stabile Thermik bis spaet."
-   - "Solides Fenster vormittags, ab Mittag wachsam wegen Gewitter."
-   - "Tendenz fliegbar, Konfidenz aber gering — vor Ort entscheiden."
+   Fliegen an dem Tag? KEINE Empfehlung ("plane einen Flug"), nur
+   Einschaetzung. Wording aus den Daten ableiten, nicht aus Beispielen
+   uebernehmen.
 
-Beispiel-Stil pro Tag (Pilotenton, NICHT MeteoSchweiz):
-- "Montag: Vormittags noch ziemlich sonnig auf der Alpennordseite,
-  ab Mittag aufkommende Schauer, vereinzelt Gewitter. Frischer
-  Westwind in der Hoehe, Schneefallgrenze um 1700 Meter."
-  → `flight_hint`: "Solides Fenster vormittags, am Nachmittag besser am Boden."
-- "Donnerstag: Meist sonnig, ueber den Bergen einige Quellwolken,
-  thermisch nutzbar."
-  → `flight_hint`: "Klassischer Thermiktag, ueberall machbar."
+   **PFLICHT-Kalibrierung mit Niederschlag-Coverage** (verhindert dass
+   ein 2%-Schauer-Tag als "kein Flugtag" geframt wird):
+   - `wet_share < 0.10` (= 90%+ der Spots trocken) → der Tag ist faktisch
+     ueberwiegend trocken. VERBOTEN: "kein Flugtag", "zu nass", "Boden-Tag"
+     als Hauptaussage. Ton: "ueberwiegend nutzbar, lokal Schauer beachten".
+   - `wet_share 0.10-0.30` → mittlerer Ton: "Vorsicht vor Gewittern",
+     "Fenster vormittags".
+   - `wet_share >= 0.30` ODER `char` ∈ {flaechiger Regen, Gewitter} →
+     "eher kein Flugtag" darf fallen.
 
-**Beispiele fuer den zusammenhaengenden `short`-Block**
-(Synoptik direkt gefolgt von Flug-Bilanz, ein Fliesstext):
+**Struktur des `short`-Blocks** (Synoptik + Flug-Bilanz als EIN Fliesstext):
 
-> "Hochdruck dominiert ab Donnerstag, schwache westliche Hoehenstroemung.
-> Anfang Woche noch unbestaendig mit Schauern, gegen Wochenende stabilisiert
-> sich's. Erwaermung im Verlauf, zum Wochenende deutlich milder.
-> **Montag und Dienstag Boden-Tage, ab Mittwoch oeffnet sich ein Thermik-
-> Fenster, Donnerstag das Highlight der Woche.**"
+Reihenfolge der Satzbausteine, jeweils 1 Satz, Wording selbst aus dem
+Strukturfeld entwickeln (KEINE Phrasen aus Beispielen uebernehmen):
 
-> "Nordfoehnlage zum Wochenstart, danach Hochdruck-Beruhigung. Hoehenwind
-> dreht von Nord auf Ost, Schneefallgrenze steigt von 2600 auf 3800 m.
-> Tessin am Mittwoch und Donnerstag bockig im Foehn-Lee. **Foehntaeler bis
-> Donnerstag meiden, ab Freitag klassische Thermiktage ueberall.**"
-
-> "Vb-Lage bringt nasse Mitte mit kraeftiger Nordstroemung, Tessin trocken.
-> Erst gegen Wochenende stellt sich's um. **Alpennordseite Mittwoch bis
-> Freitag Boden, im Tessin moeglich. Wochenende Tendenz fliegbar mit
-> Konfidenz-Vorbehalt.**"
-
-> "Bise praegt die Woche, im Mittelland windig und klar, Voralpen
-> ruhiger. **Soaring statt XC im Lee von Jura und Voralpen, Mittelland-
-> Spots meiden. Wochenende laesst Bise nach, klassische Thermiktage.**"
+1. Wochencharakter aus `pressure_influence` + Mehrzahl `precip_pattern`
+2. Hoehenwind-Verlauf aus `flow_overhead` (Anfangs/End-Sektor, ggf. Rotation)
+3. Niederschlag-Charakter raumqualifiziert pro Seite (Alpennord/-sued)
+4. Aktive Phaenomene falls vorhanden, AN den konkreten Wochentag gebunden
+   (`foehn.days_affected`, `bise.days_active` — NIEMALS pauschal "die ganze
+   Woche" oder "zum Wochenstart" wenn nur einzelne Tage betroffen)
+5. Flug-Bilanz: konkrete Wochentage + Pilot-Konsequenz
 
 **Anti-Pattern (NICHT machen)** — getrennte Wetter-Erzaehlung und
 Pilot-Erzaehlung, die sich gegenseitig wiederholen:
@@ -363,58 +349,10 @@ Beispiel der FALSCHEN Nutzung (verboten):
     Bise eindruecklich beschreibt, OBWOHL das Strukturfeld sagt: keine Bise
   → Solche Saetze werden vom Post-Filter verworfen.
 
-═══════════════════════════════════════════════
-BEISPIELE ZUR ORIENTIERUNG (KEINE TEMPLATES!)
-═══════════════════════════════════════════════
-
-Beispiel 1 — Wechselhafte Woche mit Schauern und stabilem Wochenende:
-```
-short:
-  - {"text": "Wechselhafte Wochenmitte mit vereinzelten Schauern, gegen Wochenende stabilisiert sich's deutlich.",
-     "sources": ["precip_pattern.alpennord", "pressure_influence"]}
-  - {"text": "Hochdruck dominiert ab Donnerstag, schwache westliche Hoehenstroemung.",
-     "sources": ["lage_label", "pressure_influence", "flow_overhead"]}
-  - {"text": "Erwaermung im Verlauf, zum Wochenende deutlich milder.",
-     "sources": ["t850_trend"]}
-
-long:
-  - {"text": "Sonntag: Am Nachmittag ziemlich sonnig, ueber dem Jura und den Voralpen einzelne Schauer nicht ausgeschlossen, sonst trocken.",
-     "sources": ["precip_pattern.alpennord"],
-     "flight_hint": "Knappes Fenster vormittags, ab Mittag Augen offen halten."}
-  - {"text": "Montag: Stark bewoelkt, im Verlauf aus Westen aufkommende Schauer, vereinzelt Gewitter auf der Alpennordseite. Frischer Westwind in der Hoehe, Schneefallgrenze um 1700 Meter.",
-     "sources": ["precip_pattern.alpennord", "flow_overhead", "schneefallgrenze"],
-     "flight_hint": "Eher kein Flugtag — zu nass und windig."}
-  - {"text": "Dienstag: Anfangs ziemlich sonnig, ab Mittag Quellwolken ueber den Bergen, am Abend an einzelnen Orten der Alpennordseite Niederschlag wahrscheinlich.",
-     "sources": ["precip_pattern.alpennord"],
-     "flight_hint": "Solides Fenster bis zum frühen Nachmittag."}
-  - {"text": "Mittwoch: Veraenderliche Bewoelkung, im Tagesverlauf vereinzelte Schauer dem Alpennordhang entlang, Alpensueden trocken.",
-     "sources": ["precip_pattern.alpennord", "precip_pattern.alpensued"],
-     "flight_hint": "Alpensued machbar, Nordseite eher nicht."}
-  - {"text": "Donnerstag: Meist sonnig, ueber den Bergen am Nachmittag einige Quellwolken, thermisch gut nutzbar.",
-     "sources": ["precip_pattern.alpennord"],
-     "flight_hint": "Klassischer Thermiktag, ueberall fliegbar."}
-  - {"text": "Freitag: Tendenz sonnig, mit aufkommender Bise — Konfidenz fuer den Tag ist aber geringer.",
-     "sources": ["bise", "confidence_per_day"],
-     "flight_hint": "Tendenz fliegbar, Bise erwartet — vor Ort entscheiden."}
-```
-
-Die `short`-Liste oben enthaelt am Ende die Flug-Bilanz-Saetze direkt
-hinter den Synoptik-Saetzen — beide Teile bilden EINEN Fliesstext, der
-im Frontend zu einem Absatz zusammengefuegt wird. KEIN separates Feld
+Die `short`-Liste enthaelt am Ende die Flug-Bilanz-Saetze direkt hinter
+den Synoptik-Saetzen — beide Teile bilden EINEN Fliesstext, der im
+Frontend zu einem Absatz zusammengefuegt wird. KEIN separates Feld
 fuer die Flug-Bilanz.
-
-Beispiel 2 — Vb-Lage mit Stau:
-```
-short:
-  - {"text": "Ueberwiegend nasse und ungemuetliche Woche auf der Alpennordseite, Suedseite deutlich freundlicher.",
-     "sources": ["precip_pattern.alpennord", "precip_pattern.alpensued"]}
-  - {"text": "Genua-Tief steuert die Woche, mit kraeftiger Nordstroemung ueber die Alpen.",
-     "sources": ["lage_label", "vb_lage", "flow_overhead"]}
-  - {"text": "Alpennordseite Mittwoch bis Freitag flaechiger Regen mit Stau, Tessin und Wallis trocken bis sonnig.",
-     "sources": ["precip_pattern.alpennord", "precip_pattern.alpensued"]}
-  - {"text": "Alpennordseite Mittwoch bis Freitag Boden, im Tessin moeglich. Wochenende Tendenz fliegbar mit Konfidenz-Vorbehalt.",
-     "sources": ["vb_lage", "precip_pattern.alpensued", "confidence_per_day"]}
-```
 
 ═══════════════════════════════════════════════
 ANTWORT-FORMAT
@@ -431,10 +369,10 @@ Antworte AUSSCHLIESSLICH als JSON-Objekt mit dieser Struktur:
      "sources": ["pressure_influence", "foehn"]}
   ],
   "long": [
-    {"text": "Mittwoch: ...", "sources": ["..."],
-     "flight_hint": "Thermisch nutzbar, aber Foehntaeler bockig."},
-    {"text": "Donnerstag: ...", "sources": ["..."],
-     "flight_hint": "Klassischer Thermiktag, ueberall machbar."}
+    {"text": "<Wochentag>: <Lage-Charakter + Hoehenwind + Niederschlag>",
+     "sources": ["..."],
+     "flight_hint": "<Pilot-Konsequenz dieses Tages, kalibriert mit wet_share>"},
+    ...
   ]
 }
 

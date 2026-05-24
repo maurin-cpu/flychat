@@ -1,29 +1,29 @@
-region,fluggebiet,site_name,latitude,longitude,elevation_m,windrichtung,ideal_wind_max_kmh,slope_azimuth,slope_angle,kritischer_foehn,Bemerkungen
-Zürich,Uetliberg,Balderen,47.3226,8.5008,730,NO-O,30,225,30,Süd,"[INFO] Kein klassisches Soaring, Wind drÃ¼ckt Thermik an den Hang. [BEDINGUNG] WENN Wind < 15 km/h DANN hohes Risiko für Abgleiter (auch bei guter Thermik!). [BEDINGUNG] WENN Wind >= 15 km/h DANN Soaring mÃ¶glich (unabhÃ¤ngig von Sonne/BewÃ¶lkung/Thermik). [BEDINGUNG] WENN Wind >= 20 km/h DANN sehr gute Bedingungen. [BEDINGUNG] WENN Wind >= 15 km/h UND gute Thermik DANN Top-Bedingungen."
-Berneroberland,Grindelwald,First,46.6575,8.0551,2120,O-SW,30,,,Süd,
-Zentralschweiz,Engelberg,Tämpfeli,46.838,8.412,1800,S-SO,30,,,Süd,
-Zentralschweiz,Engelberg,Brunnihütte,46.8425,8.4104,1870,W-SW,30,,,Süd,
-Zentralschweiz,Engelberg,Fürenalp,46.805,8.4657,1800,S-W,30,,,Süd,
-Zentralschweiz,Pilatus,Pilatus Kulm,46.9793,8.2552,2059,S-W,30,,,Süd,
-Zentralschweiz,Zug,Zugerberg,47.14793,8.53581,947,NW-SW,30,,,Süd,"Einfach bei Westwind, Mittel bei Nordwest oder SÃ¼dwestwind"
-Solothurn,Weissenstein,Weissenstein,47.25087,7.50999,1233,S-SO,30,,,Süd,"Schon wenige Km/h Westwind sorgen für Leerotoren bei der Baumschneise, die das erfolgreiche Passieren der Baumwipfel zur Glücksache werden lassen. "
-Solothurn,Weissenstein,Röti,47.25813,7.5277,1393,N-NO,30,,,Süd,
-Schwyz,Hoch-Ybrig,Grosser Sternen,46.9996,8.8,1850,NNO-NNW,30,,,Süd,Hauptstartplatz im Sommer. Der meist gepistete Winterstarplatz befindet sich ca. 50 m in Richtung Seilbahn
-Schwyz,Hoch-Ybrig,Tritt,47.0028,8.7969,1714,NNO-N,30,,,Süd,
-Schwyz,Hoch-Ybrig,Tisch,47.0007,8.8118,1954,NO-NW,30,,,Süd,Besserer Einstieg in die Thermikals Tritt und Grosser Sternen
-Schwyz,Hoch-Ybrig,Forstberg,47.0014,8.8226,2175,W-NNW,30,,,Süd,Alpiner Startplatz. Nur für tritt- und startsichere Piloten
-Schwyz,Hoch-Ybrig,Steinhüttli,47.0095,8.8175,1582,N-NW,30,,,Süd,
-Schwyz,Euthal,"Waldrand, oberhalb Kreuz",47.0936,8.8231,990,SW-NW,30,,,Süd,Skilift und Stromleitung beachten bei tiefen Landeanflügen. Bei Bise nicht fliegen. In der Mulde oberhalb des Skiliftes ist es sehr turbulent.
-Schwyz,Euthal,Chli Aubrig,47.107,8.8628,1620,S-W,30,,,Süd,Wildschongebiet Studen beachten (Dezember bis April). Tierüberflug nur mit genügend Abstand. Bei Bise nicht fliegen. In der Mulde oberhalb des Skiliftes ist es sehr turbulent. [BEDINGUNG] WENN Wind >= 15 km/h DANN Soaring mÃ¶glich und man kann fliegen. [BEDINGUNG] WENN Wind < 10 km/h DANN hohes Risiko für Abgleiter (auch bei guter Thermik!)
-Schwyz,Hummel,Rotmoos,47.10318,8.7743,1045,NO-O,30,,,Süd,[BEDINGUNG] WENN Wind >= 15 km/h DANN Soaring mÃ¶glich und man kann vom Rotmoos aus fliegen. [BEDINGUNG] WENN Wind < 10 km/h DANN hohes Risiko für Abgleiter (auch bei guter Thermik!)
-Schwyz,Hummel,Hummel,47.09851,8.77263,1317,NW-NO,30,,,Süd,
-Schwyz,Fronalpstock / Stoos,Gipfel Fronalpstock,46.9693,8.6372,1900,NO-O,30,,,Süd,
-Schwyz,Fronalpstock / Stoos,Bietstöckli,46.97257,8.637,1850,W-N,30,,,Süd,
-Schwyz,Fronalpstock / Stoos,Südstartplatz,46.9653,8.6401,1860,SO-S,30,,,Süd,Nicht geeignet bei Wind > 20 km/h wegen Rotoren!
-Schwyz,Fronalpstock / Stoos,Charenstöckli,46.97339,8.6438,1807,N-O,30,,,Süd,Alternativstartplatz bei starkem N-NO Wind am Gipfel. 
-Schwyz,Rigi,Rigi Kulm,47.0555,8.4866,1765,SO-SW,30,,,Süd,"Vorsicht: Rotor an Felskante NE. Bitte um Rücksichtnahme auf Weidetiere, nicht toplanden."
-Schwyz,Rigi,Rigi Staffelhöhe,47.0477,8.4599,1544,SSW-SSO,30,,,Süd,"SW nur benutzen, wenn Verbotstafel abgedeckt ist. Sonderregelung Lufträume beachten (siehe SHV-Website)"
-Schwyz,Rigi,Seebodenalp,47.0622,8.4575,1035,W-NNW,30,,,Süd,
-Schwyz,Rigi,Scheidegg,47.0277,8.5202,1652,NNO-NO,30,,,Süd,Abbruchzone sehr steil
-Schwyz,Rotenflue,Bergstation,47.0216,8.7042,1550,NW-NO,30,,,Süd,
-Schwyz,Rotenflue,Südwest,47.0177,8.7007,1510,SO-SW,30,,,Süd,
+region,fluggebiet,site_name,latitude,longitude,elevation_m,wind_N,wind_NE,wind_E,wind_SE,wind_S,wind_SW,wind_W,wind_NW,slope_azimuth,slope_angle,kritischer_foehn,terrain_type,analyse_region,bemerkungen_flug,bemerkungen_sicherheit
+Zürich,Uetliberg,Baldern (Uetliberg),47.322400,8.500600,733,0,1,1,1,0,0,0,0,225,30,Süd,mittelland,Mittelland Ost,Kleine Lichtung auf einem Kamm. Nur breit genug für einen Gleitschirm. Wind muss östlich (Bise) zwischen 15 und 25 km/h sein.,
+Berneroberland,Grindelwald,Grindelwald - First,46.657100,8.055270,2111,1,0,1,0,0,1,1,1,,,Beide,alpen,Berner Voralpen,"Großer Startplatz geeignet für alle Niveaus, einfacher Zugang mit Gondel von Grindelwald, auch Landung oben möglich.",
+Zentralschweiz,Engelberg,Engelberg - Brunni - Schonegg,46.838200,8.412410,1797,0,0,0,1,1,1,1,0,,,Süd,alpen,Zentralschweizer Voralpen,"Großes, gut geneigtes Feld mit Windsack. Fortgeschrittene Piloten laufen in den steileren Teil, um früher starten zu können. Thermik liegt meist über den Bäumen links vom Start. Zwei Startplätze: Brunnihütte (1860m) und Schonegg (2080m).",
+Zentralschweiz,Engelberg,Engelberg -Fuerenalp,46.805200,8.465750,1901,0,0,0,0,0,1,0,0,,,Süd,alpen,Zentralschweizer Voralpen,,
+Zentralschweiz,Pilatus,Steiglihorn-1950,46.979600,8.258780,1950,0,0,0,1,0,0,0,0,,,Süd,voralpen,Mittelland Zentral,,
+Zentralschweiz,Zug,Zugerberg,47.147800,8.535730,938,0,0,0,0,0,1,1,1,,,Süd,voralpen,Mittelland Zentral,"Große Wiese, jedoch eher flach. Toplanding möglich.",
+Solothurn,Weissenstein,Weissenstein,47.250700,7.510200,1240,0,0,0,1,0,0,0,0,,,Süd,jura,Jura Zentral,Großer Startplatz für Süd- oder Nullwind.,West- oder Nordostwind (Bise) erzeugen Rotoren. Bei Bise oder Nordwestwind alternativ zum Startplatz Röti gehen.
+Solothurn,Weissenstein,Röti (Weissenstein),47.258200,7.527820,1395,0,1,0,0,0,0,0,0,,,Süd,jura,Jura Zentral,Guter Wind notwendig für problemlosen Start.,Stark geneigter Startplatz.
+Schwyz,Hoch-Ybrig,Hoch-Ybrig,46.999500,8.801800,1813,1,1,0,0,0,0,0,1,,,Süd,alpen,Zentralschweizer Voralpen,,
+Schwyz,Hoch-Ybrig,Forstberg,47.000700,8.823880,2200,0,0,0,0,0,0,1,0,,,Süd,alpen,Zentralschweizer Voralpen,,
+Schwyz,Euthal,Euthal,47.093600,8.823270,988,1,0,0,0,0,0,0,1,,,Süd,voralpen,Mittelland Zentral,Mehrere Startmöglichkeiten; etwa 15 Minuten Fußweg vom Landeplatz.,
+Schwyz,Euthal,Chli Aubrig,47.106900,8.860220,1580,0,0,0,0,0,1,1,0,,,Süd,voralpen,Mittelland Zentral,"Leichter bis mittlerer Schwierigkeitsgrad. Steile Alpwiese, Ausrichtung Südwest.",
+Schwyz,Hummel,Hummel (Oben),47.098500,8.771730,1330,1,1,0,0,0,0,0,0,,,Süd,voralpen,Mittelland Zentral,,
+Schwyz,Fronalpstock / Stoos,Fronalpstock,46.965000,8.638980,1883,0,0,0,0,0,0,1,0,,,Süd,alpen,Zentralschweizer Voralpen,,
+Schwyz,Fronalpstock / Stoos,Charenstoeckli,46.973500,8.643770,1780,0,1,0,0,0,0,0,0,,,Süd,alpen,Zentralschweizer Voralpen,,
+Schwyz,Rigi,Rigi Kulm,47.054900,8.486200,1748,0,1,1,1,1,1,1,0,,,Süd,voralpen,Mittelland Zentral,,
+Schwyz,Rigi,Rigi-Staffelhöhe,47.047600,8.460560,1555,0,0,0,0,0,0,0,1,,,Süd,voralpen,Mittelland Zentral,,
+Schwyz,Rigi,Rigi-Scheidegg,47.027900,8.519830,1649,0,1,0,1,0,0,0,0,,,Süd,voralpen,Mittelland Zentral,,
+Schwyz,Rotenflue,Rotenflue,47.018600,8.701770,1554,0,0,1,1,1,1,1,0,,,Süd,alpen,Zentralschweizer Voralpen,Mehrere Startmöglichkeiten; Rampe für Hängegleiter.,
+Graubünden,Fanas,Fanas -Hörnli -Eggli,47.000500,9.684000,1788,0,0,1,1,1,1,1,0,,,Beide,alpen,Prättigau - Davos,"Hauptstartplätze: 'Eggli' (1650 m) und 'Hoernli' (1800 m), beide einfach und groß. Alternatives: 'Mast 4' (bevorzugt von HG, mit Auto erreichbar) und 'Plandadein' (nur außerhalb der Vegetationsperiode, wird erst am späten Nachmittag aktiv).",'Plandadein' nur außerhalb der Vegetationsperiode nutzbar.
+Schwyz,Klingenstock,Achslen,46.952600,8.749060,1620,1,0,0,0,0,0,0,0,,,Süd,alpen,Zentralschweizer Voralpen,,
+Tessin,Alpe del Caviano,Alpe del Caviano,45.878000,9.008560,1012,0,0,0,0,0,1,0,0,,,Nord,alpen,Tessin Zentral,,
+Zentralschweiz,Mettenen,Alpler Tor,46.890100,8.782970,2340,0,0,0,1,0,0,0,0,,,Süd,alpen,Zentralschweizer Voralpen,,
+Zentralschweiz,Schönbüel,Alpoglerberg-1840,46.817900,8.097100,1840,0,1,0,0,0,1,0,0,,,Süd,alpen,Zentralschweizer Voralpen,,
+Berneroberland,Interlaken,Amisbuehl,46.702200,7.823060,1310,0,0,0,1,0,0,0,0,,,Beide,alpen,Berner Voralpen,,
+Zentralschweiz,Eggbergen,Eggberge (Flüelen),46.903700,8.651390,1580,0,0,0,0,0,0,0,1,,,Süd,alpen,Zentralschweizer Voralpen,,
+Zentralschweiz,Brüsti,Arni,46.784900,8.654610,1290,0,1,0,0,0,0,0,0,,,Süd,alpen,Zentralschweizer Voralpen,,
+Zentralschweiz,Arvialp,Arvialp,46.890500,8.329720,1800,0,0,0,0,0,0,0,1,,,Süd,alpen,Zentralschweizer Voralpen,,

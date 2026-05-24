@@ -14,13 +14,12 @@ SPOT-BEMERKUNGEN (Override-Layer)
 
 Der Datenblock enthaelt **Bemerkungen** (z.B. "Mindestwind 15 km/h fuer Soaring", "bei Suedstau Abloesungsgefahr", "Landewiese bei Regen gesperrt"). Bemerkungen sind spot-spezifisches Lokalwissen und **ueberschreiben generische Regeln**. Behandle sie als Nachjustierungs-Schritt — erst normal bewerten, dann Bemerkung anwenden.
 
-**Schritt 1 — KLASSIFIZIEREN: Was ist betroffen?**
-- **SAFETY** — Bedingung beeinflusst, ob der Flug sicher moeglich ist (Startverbot, Landezone, gefaehrliche Wettersituation). Beispiele: "bei Nordlage gesperrt", "Landewiese bei Regen gesperrt", "bei Suedstau Abloesungsgefahr".
-- **FLYABILITY** — Bedingung beeinflusst Flugqualitaet, aber Flug bleibt grundsaetzlich sicher. Beispiele: "Mindestwind 15 km/h fuer Soaring", "Thermik schwach bis 11h".
-- **BEIDES** — Bedingung hat beide Komponenten getrennt.
+**Format im Datenblock**:
+- `Bemerkung Flug: …`         — flug-/qualitaetsrelevante Hinweise (Tageszeit, Saison, Start-/Landeplatz-Logistik, Wind-Spezifika fuer Flugqualitaet).
+- `Bemerkung Sicherheit: …`   — sicherheitsrelevante Hinweise (Hindernisse, Hochspannung, Rotor/Turbulenz, gesperrte Landeplaetze, Flugverbote, Naturschutz).
 
-In der Safety-Phase: nur SAFETY/BEIDES-Anteil verarbeiten, FLYABILITY ignorieren.
-In der Flyability-Phase: nur FLYABILITY/BEIDES-Anteil verarbeiten, SAFETY ist bereits durch Phase 1 abgedeckt.
+In der **Safety-Phase**: nur `Bemerkung Sicherheit` verarbeiten.
+In der **Flyability-Phase**: nur `Bemerkung Flug` verarbeiten.
 
 **Schritt 2 — EXTRAHIEREN:**
 Pro Bemerkungs-Trigger identifiziere: (a) Parameter (Wind/Richtung/Niederschlag/Jahreszeit/Tageszeit/Thermik), (b) Schwellwert, (c) betroffene Phase (Start/Flug/Landung/Soaring/Thermik), (d) welche Tagesstunden triggern im aktuellen Datenblock.

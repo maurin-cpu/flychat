@@ -23,7 +23,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import math
 import sys
@@ -41,7 +40,7 @@ ARCHIVE_DIR = ROOT / "data" / "weather_archive"
 WETTERDATEN = ROOT / "data" / "wetterdaten.json"
 SPOT_ANALYSES = ROOT / "data" / "spot_analyses.json"
 REGION_ANALYSES = ROOT / "data" / "region_analyses.json"
-FLUGGEBIETE = ROOT / "data" / "fluggebiete_complete.csv"
+FLUGGEBIETE = config.CSV_PATH
 
 FLIGHT_HOUR_START = 8
 FLIGHT_HOUR_END = 20  # inklusiv
@@ -89,33 +88,21 @@ THERMAL_KEEP_FIELDS = [
 
 
 def load_spot_metadata() -> Dict[str, Dict[str, Any]]:
+    """Spot-Meta via spots.load_spots — PGE-Schema."""
     meta: Dict[str, Dict[str, Any]] = {}
     if not FLUGGEBIETE.exists():
         return meta
-    with FLUGGEBIETE.open(encoding="utf-8-sig") as f:
-        for row in csv.DictReader(f):
-            name = (row.get("site_name") or "").strip()
-            if not name:
-                continue
-
-            def _f(key):
-                v = row.get(key)
-                if v is None or v == "":
-                    return None
-                try:
-                    return float(v)
-                except ValueError:
-                    return None
-
-            meta[name] = {
-                "slope_azimuth": _f("slope_azimuth"),
-                "slope_angle": _f("slope_angle"),
-                "analyse_region": (row.get("analyse_region") or "").strip() or None,
-                "windrichtung": (row.get("windrichtung") or "").strip() or None,
-                "terrain_type": (row.get("terrain_type") or "").strip() or None,
-                "ideal_wind_max_kmh": _f("ideal_wind_max_kmh"),
-                "kritischer_foehn": (row.get("kritischer_foehn") or "").strip() or None,
-            }
+    from spots import load_spots
+    for s in load_spots(FLUGGEBIETE):
+        meta[s["name"]] = {
+            "slope_azimuth": s.get("slope_azimuth"),
+            "slope_angle": s.get("slope_angle"),
+            "analyse_region": s.get("analyse_region"),
+            "windrichtung": s.get("windrichtung") or None,
+            "terrain_type": s.get("terrain_type"),
+            "ideal_wind_max_kmh": s.get("ideal_wind_max"),
+            "kritischer_foehn": s.get("kritischer_foehn"),
+        }
     return meta
 
 

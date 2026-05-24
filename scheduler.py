@@ -114,9 +114,9 @@ def _send_briefings_once(engine) -> dict:
         from engine.synoptic_llm import refresh_synoptic_overview
         from fetch_weather import load_cached_weather
         wcache = load_cached_weather()
-        if wcache and engine.analysis_client:
+        if wcache and engine.synoptic_client:
             sctx = refresh_synoptic_overview(
-                wcache, engine.analysis_client, engine.analysis_model,
+                wcache, engine.synoptic_client, engine.synoptic_model,
             )
             if sctx:
                 logger.info("Scheduler: Wetterlage refreshed (lage=%s, llm_overview=%s)",

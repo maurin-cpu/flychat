@@ -1,6 +1,6 @@
 """
 Importiert alle Schweizer Startplätze aus der DHV-Gelände-KML-Datei
-und schreibt sie in data/fluggebiete_complete.csv.
+und schreibt sie in data/fluggebiete_dhv.csv.
 
 Bestehende CSV-Einträge bleiben erhalten (Proximity-Check 500m).
 Neue Einträge werden angehängt.
@@ -20,7 +20,7 @@ import xml.etree.ElementTree as ET
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 KML_PATH = os.path.join(SCRIPT_DIR, "dhv_gelaende_2026-04-09_16.27.54.kml")
-CSV_PATH = os.path.join(PROJECT_ROOT, "data", "fluggebiete_complete.csv")
+CSV_PATH = os.path.join(PROJECT_ROOT, "data", "fluggebiete_dhv.csv")
 
 NS = {"kml": "http://www.opengis.net/kml/2.2"}
 

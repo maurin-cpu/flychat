@@ -1,0 +1,562 @@
+{
+  "6604": {
+    "flug": "Startplätze: 'Heimat' vorwiegend morgens, 'Galvera' nachmittags. HG-Rampe vor der Seilbahnstation.",
+    "sicherheit": ""
+  },
+  "6637": {
+    "flug": "Hauptstartplätze: 'Eggli' (1650 m) und 'Hoernli' (1800 m), beide einfach und groß. Alternatives: 'Mast 4' (bevorzugt von HG, mit Auto erreichbar) und 'Plandadein' (nur außerhalb der Vegetationsperiode, wird erst am späten Nachmittag aktiv).",
+    "sicherheit": "'Plandadein' nur außerhalb der Vegetationsperiode nutzbar."
+  },
+  "6657": {
+    "flug": "Große, leicht geneigte Wiese. Einfacher Start. Thermik 100 Meter links vom Start. An guten Tagen stark frequentiert.",
+    "sicherheit": "Startplatz gehört einem Bauern mit Restaurant; es wird erwartet, vor dem Start etwas zu konsumieren (anstelle einer Startgebühr)."
+  },
+  "6659": {
+    "flug": "Großer Startplatz geeignet für alle Niveaus, einfacher Zugang mit Gondel von Grindelwald, auch Landung oben möglich.",
+    "sicherheit": ""
+  },
+  "6736": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "7312": {
+    "flug": "Kleine Lichtung auf einem Kamm. Nur breit genug für einen Gleitschirm. Wind muss östlich (Bise) zwischen 15 und 25 km/h sein.",
+    "sicherheit": ""
+  },
+  "7331": {
+    "flug": "Startplatz: großes Feld oberhalb einer kleinen Straße, leicht. Nur bei Bise (Ostwind) 15-25 km/h fliegbar.",
+    "sicherheit": ""
+  },
+  "7336": {
+    "flug": "Großes, gut geneigtes Feld mit Windsack. Fortgeschrittene Piloten laufen in den steileren Teil, um früher starten zu können. Thermik liegt meist über den Bäumen links vom Start. Zwei Startplätze: Brunnihütte (1860m) und Schonegg (2080m).",
+    "sicherheit": ""
+  },
+  "7619": {
+    "flug": "Große Wiese als Startplatz, etwa 15-20 Minuten Fußweg von der Gondelstation / Restaurant.",
+    "sicherheit": ""
+  },
+  "7636": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "7669": {
+    "flug": "Startplatz nahe der Seilbahnstation 'Braunwald', nur 2 Minuten Fußweg. Bei starkem Talwind kann es zu Rotor kommen; alternative Startmöglichkeit am Gumengrat.",
+    "sicherheit": "Achtung: Bei starkem Talwind besteht Rotorgefahr. Alternativstartplatz Gumengrat empfohlen."
+  },
+  "7672": {
+    "flug": "Zwei Startplätze: Kamel (weniger als 10 Min. Fußweg vom Bahnhof) und Chrüterwand (sehr steil, heute selten genutzt).",
+    "sicherheit": "Chrüterwand ist sehr steil, Vorsicht beim Start."
+  },
+  "7678": {
+    "flug": "Extrem selten genutzt. Im Winter nur mit Skiern zugänglich. Im Sommer H&F (Hang- und Fußstart) oder Abstieg zu Fuß vom Weisshorn.",
+    "sicherheit": "Im Winter Lawinengefahr beachten!"
+  },
+  "7683": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "7684": {
+    "flug": "Leichter, großer, grasbewachsener Startplatz am Gipfelkreuz. Geeignet bei Süd- bis Westwind.",
+    "sicherheit": "Achtung: Ein kleines Kabel quert das Feld unterhalb des Starts, ist aber gut sichtbar."
+  },
+  "7690": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "7693": {
+    "flug": "Nur zu Fuß erreichbar, Seilbahn abgebaut.",
+    "sicherheit": ""
+  },
+  "7697": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "7698": {
+    "flug": "Leichter bis mittlerer Schwierigkeitsgrad. Steile Alpwiese, Ausrichtung Südwest.",
+    "sicherheit": ""
+  },
+  "7707": {
+    "flug": "Hochalpines Gelände mit anspruchsvollen Thermikbedingungen.",
+    "sicherheit": "Risiken durch Steinschlag, starke Winde und begrenzte Landemöglichkeiten."
+  },
+  "7746": {
+    "flug": "Verschiedene Startplätze: HG-Start direkt unter der Gondel; Süd-Start (47.2837N, 9.4133E); Nord-Start 3 Min. Fußweg von der Gondel.",
+    "sicherheit": ""
+  },
+  "7806": {
+    "flug": "Beide Startplätze sind von der Gondel erreichbar. Süd (2300 m) ca. 7 Min. Gehzeit, leicht. Nord (2280 m) ca. 3 Min., bei mäßigem Nordwind für Dynamik und Toplandung geeignet.",
+    "sicherheit": "Achtung: Seilbahnkabel in der Nähe."
+  },
+  "7813": {
+    "flug": "Startplatz direkt neben der Seilbahnstation, einfacher Zugang.",
+    "sicherheit": "Achtung auf Seilbahnen und Personen in der Nähe."
+  },
+  "7814": {
+    "flug": "Startplatz auf einer Wiese mit Windsack, wenige Minuten Fußweg von der Seilbahn-Bergstation. Hausthermik links vom Start hinter dem letzten Seilbahnmast.",
+    "sicherheit": ""
+  },
+  "7825": {
+    "flug": "Steile Wiese als Startplatz, Windsack vorhanden.",
+    "sicherheit": ""
+  },
+  "7827": {
+    "flug": "",
+    "sicherheit": "Achtung: mehrere Kabel in der Nähe des Starts!"
+  },
+  "7832": {
+    "flug": "Mehrere Startplätze verfügbar.",
+    "sicherheit": ""
+  },
+  "7838": {
+    "flug": "Start auf 2350 m, Osthang. Direkt links von der Seilbahn auf der Straße startbar. Die flache Straße eignet sich gut zum Vorbereiten und Starten. Im Winter sind Skier nicht erlaubt.",
+    "sicherheit": "Im Winter keine Skier erlaubt (Einschränkung)."
+  },
+  "7846": {
+    "flug": "Thermikaufwinde an der Südseite des Hangs. Bester Startplatz ist die steile Wiese westlich der Gondelstation.",
+    "sicherheit": ""
+  },
+  "7857": {
+    "flug": "Verschiedene Startplätze verfügbar. Normalerweise Start im Sattel; bei stärkerem Westwind weiter absteigen. Start nach Osten möglich, aber selten genutzt.",
+    "sicherheit": "Bei Westwindstärkung tieferen Startplatz wählen."
+  },
+  "7860": {
+    "flug": "3 Haupt-Startplätze verfügbar: Ost (morgens), West (nachmittags), Nord bei Bise (N/NO-Wind).",
+    "sicherheit": ""
+  },
+  "7880": {
+    "flug": "Startplatz: kein Parkplatz, Zufahrt mit Shuttle (vom Landeplatz) oder 1,5h Wanderung. Im Juni und September wegen Kühen zeitweise geschlossen.",
+    "sicherheit": "Nur den ausgewiesenen Startplatz nutzen; andere Startplätze oberhalb liegen in Wildschutzzone und sind verboten."
+  },
+  "7883": {
+    "flug": "Drei Startplätze: Jakobshorn Gipfel (3 Min von Seilbahn, Windsack), Jatzhütte (10 Min, Wind S-SW-W, einfach), Brämabüel (Winter Lift, Sommer 20 Min Fußweg vom Gipfel).",
+    "sicherheit": ""
+  },
+  "7888": {
+    "flug": "",
+    "sicherheit": "Hoher Berglandeplatz! Entsprechende Erfahrung ist ein MUSS!"
+  },
+  "7890": {
+    "flug": "Windsack vorhanden.",
+    "sicherheit": "Nur markierte Wege zum Startplatz benutzen. Siehe Bilder."
+  },
+  "7896": {
+    "flug": "Alle Starts sehr nahe an der Gondelstation.",
+    "sicherheit": ""
+  },
+  "7909": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "7942": {
+    "flug": "Günstiger Wind aus West-Nordwest, auch bei Bise (Nordwind) fliegbar.",
+    "sicherheit": "Achtung Rotoren bei auffrischendem Südwestwind."
+  },
+  "7958": {
+    "flug": "Startplatz direkt neben Gondelstation. Windsock und Infotafel vorhanden.",
+    "sicherheit": ""
+  },
+  "7979": {
+    "flug": "Zwei Startplätze: einer oben, Südausrichtung; einer lt. Karte, Südwest-Ausrichtung, mit Seitenwind von rechts.",
+    "sicherheit": "Am SW-Startplatz Seitenwind von rechts beachten."
+  },
+  "7980": {
+    "flug": "Startplatz oben auf dem Berg, 5 Gehminuten von der Bergstation der Seilbahn entfernt.",
+    "sicherheit": ""
+  },
+  "7981": {
+    "flug": "Startplatz liegt 50 m von der Gondelstation entfernt, einfacher Zugang.",
+    "sicherheit": ""
+  },
+  "7983": {
+    "flug": "Bester Startplatz für Streckenflüge im Tessin. Weniger bekannt als Locarno-Cimetta, aber sehr gut geeignet für Dreiecke. Seilbahn muss einen Tag vorher gebucht werden (April-Oktober).",
+    "sicherheit": ""
+  },
+  "7986": {
+    "flug": "Startplatz ist nur 2 Minuten von der Seilbahnstation entfernt, also leicht erreichbar.",
+    "sicherheit": ""
+  },
+  "7988": {
+    "flug": "Zwei Startplätze nahe der Gondelstation, leicht erkennbar. Aufstieg per Gondel möglich.",
+    "sicherheit": ""
+  },
+  "7990": {
+    "flug": "Mehrere Startplätze in verschiedenen Höhen verfügbar.",
+    "sicherheit": ""
+  },
+  "8002": {
+    "flug": "Startplatz auf Gras, Windsack vorhanden.",
+    "sicherheit": ""
+  },
+  "8005": {
+    "flug": "Startplatz: 100 m hinter dem Bergrestaurant Stierenberg. Zugang: Bus ab Solothurn Hauptbahnhof oder Auto zum Balmberg Kurhaus, dann zu Fuss entlang des Grats nach Osten.",
+    "sicherheit": ""
+  },
+  "8006": {
+    "flug": "Großer Startplatz, nur wenige Schritte von Gondel und Restaurant entfernt.",
+    "sicherheit": ""
+  },
+  "8007": {
+    "flug": "Am besten morgens starten, ab Mittag zunehmender Rückenwind.",
+    "sicherheit": "Zunehmender Rückenwind auf dem Startplatz gegen Mittag."
+  },
+  "8010": {
+    "flug": "Steiler Start mit reichlich Platz.",
+    "sicherheit": "Achtung: Windverhältnisse am Start können tückisch sein."
+  },
+  "8015": {
+    "flug": "Einfacher Startplatz bei passendem Wind. Im Lee des Talwinds, aber meist darüber. Thermik setzt etwa um 13:00 ein, kann etwas turbulent sein.",
+    "sicherheit": ""
+  },
+  "8026": {
+    "flug": "Startplatz auf 2200 m, etwa 150 m nördlich der Mittelstation der Parsennbahn. Ganzjährig nutzbar, leichter Start.",
+    "sicherheit": ""
+  },
+  "8044": {
+    "flug": "Winter: Startplatz neben Gondelstation (NW); Sommer: Startplatz auf dem Lagalb (15 min Aufstieg) bei W/SW.",
+    "sicherheit": ""
+  },
+  "8086": {
+    "flug": "Startplatz auf 2600m, Ausrichtung Nordwest und West. Geeignet für Nachmittags- und Abendflüge. Starke Talwinde möglich. Nur im Sommer nutzbar.",
+    "sicherheit": "Starke Talwinde möglich, daher Turbulenzgefahr. Offizieller Landeplatz kann unerreichbar sein, Ausweichlandeplatz einplanen."
+  },
+  "8106": {
+    "flug": "Dieser Startplatz ist eher für Hängegleiter geeignet. Paraglider nutzen bitte den Startplatz Jaman.",
+    "sicherheit": ""
+  },
+  "8115": {
+    "flug": "Guter Wind notwendig für problemlosen Start.",
+    "sicherheit": "Stark geneigter Startplatz."
+  },
+  "8125": {
+    "flug": "Anreise per Bus bis Haltestelle Bivio Calanca, dann 20 min Aufstieg zu Fuss.",
+    "sicherheit": "Bitte Grasgrenzen beachten. Keine Auffahrt mit Fahrzeugen."
+  },
+  "8145": {
+    "flug": "Startplatz am Piz Gloria, über Treppe vom Besucherplateau und ca. 400m Gratweg nach WNW. Steiniger Untergrund mit Matten, nur Platz für einen Gleitschirm.",
+    "sicherheit": "Stark eingeschränkter Platz. Windspion zur Beurteilung der lokalen Windverhältnisse dringend empfohlen."
+  },
+  "8167": {
+    "flug": "Mehrere Startmöglichkeiten auf grasbewachsenen Hängen.",
+    "sicherheit": ""
+  },
+  "8172": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "8188": {
+    "flug": "Startplatz vor einem Restaurant.",
+    "sicherheit": "Achtung auf Hindernisse und Personen im Restaurantbereich."
+  },
+  "8199": {
+    "flug": "Startrampe für Gleitschirme.",
+    "sicherheit": "Achtung: Stromleitungen links beim Flug."
+  },
+  "8206": {
+    "flug": "Besserer Startplatz ist 25 Minuten Aufstieg von einer kleinen Gaststätte, aber je nach Wind kann fast überall gestartet werden.",
+    "sicherheit": ""
+  },
+  "8214": {
+    "flug": "Startplatz wird hauptsächlich von Hängegleitern genutzt.",
+    "sicherheit": "Gleitsegel sollten vorsichtig sein, da der Platz für Hängegleiter ausgelegt ist und möglicherweise nicht optimal für Paraglider."
+  },
+  "8220": {
+    "flug": "Startplatz direkt unterhalb der Straße gelegen.",
+    "sicherheit": "Achtung: Straße oberhalb, mögliche Gefahr durch Fahrzeuge und Personen."
+  },
+  "8221": {
+    "flug": "Rothorn (3100 m) Start nach Nord und Süd, Winter & Sommer, gute Schneelage, leichter Wind, stärker im Frühling und Sommernachmittag. Blauherd (2600 m, West) Sommerstart, 5 Min. Fußweg ab Station, Graspiste, leichter Wind bis Nachmittag. Sunnegga (2200 m) Nebensaison Start, Wind mäßig, aber frühnachmittags zu stark.",
+    "sicherheit": "Rothorn: felsig im Sommer, starke Nachmittagswinde. Sunnegga: Wind wird früh unstartbar. Keine weiteren Gefahren genannt."
+  },
+  "8223": {
+    "flug": "Steile Wiese direkt neben/unter der Seilbahnstation. Geeignet als Startplatz.",
+    "sicherheit": "Startplatz direkt neben/unter Seilbahnstation. Achtung auf Hindernisse wie Seile oder Masten der Seilbahn."
+  },
+  "8244": {
+    "flug": "Großer Startplatz für Süd- oder Nullwind.",
+    "sicherheit": "West- oder Nordostwind (Bise) erzeugen Rotoren. Bei Bise oder Nordwestwind alternativ zum Startplatz Röti gehen."
+  },
+  "8245": {
+    "flug": "Startplatz am Weisshorn. Im Sommer nur SW, im Winter auch NE möglich. Winterstart auf präparierter Skipiste.",
+    "sicherheit": "Start NNW extrem kurz, kein Raum für Startabbruch. Winterstart auf Skipiste nicht offiziell erlaubt, aber geduldet; auf Skifahrer Rücksicht nehmen."
+  },
+  "10643": {
+    "flug": "Startrampe vorhanden.",
+    "sicherheit": ""
+  },
+  "10674": {
+    "flug": "Startplatz für Wind aus Südost bis Süd. Flugbetrieb im Sommer von 9:00 bis 17:00 Uhr, beste Zeit 12:00-14:00 Uhr. Maximalwind 20 km/h. Balise 'The Dole' (1670 m) für aktuelle Winddaten nutzbar.",
+    "sicherheit": ""
+  },
+  "11476": {
+    "flug": "Startplatz oben an der Sesselbahn in Champex, 2192m. Zwei Starts: West- und Ostwind. Im Sommer Ostwind für Thermik empfohlen, im Winter Westwind für einfachen Start und eventuell Hangflug.",
+    "sicherheit": ""
+  },
+  "11995": {
+    "flug": "Kurzer, kleiner Startplatz mit Rampe für Hängegleiter. Nur für erfahrene Piloten geeignet.",
+    "sicherheit": "Sehr kleiner Start, erfordert Erfahrung."
+  },
+  "12126": {
+    "flug": "",
+    "sicherheit": "Kein offizieller Startplatz. Straße gesperrt."
+  },
+  "13497": {
+    "flug": "Grashang mit Platz für mehrere Gleiter. Ein separater Startplatz für Hängegleiter befindet sich einige hundert Meter östlich.",
+    "sicherheit": ""
+  },
+  "13720": {
+    "flug": "",
+    "sicherheit": "Nur den markierten Bereich des Feldes für den Start nutzen. Siehe Informationstafel am Startplatz."
+  },
+  "14004": {
+    "flug": "Mehrere Startplätze, NW-Richtung einfach, SE-Richtung bei Südwind möglich aber steil.",
+    "sicherheit": "SE-Start steil, Vorsicht bei Südwind."
+  },
+  "15163": {
+    "flug": "Startplatz 50 Meter rechts vom Parkplatz am buddhistischen Tempel.",
+    "sicherheit": ""
+  },
+  "15166": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "15333": {
+    "flug": "Steile, grasbewachsene Wiese; auch für Anfänger geeignet.",
+    "sicherheit": "Nicht im Dorf parken!"
+  },
+  "15599": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "16120": {
+    "flug": "Grasstartplatz (ähnlich Wimbledon), aber wenig Platz. Geeignet bei geeigneten Bedingungen.",
+    "sicherheit": "Wenig Platz für Start – Vorsicht bei der Platzwahl."
+  },
+  "17505": {
+    "flug": "Startplatz auf 1205 m Höhe auf dem Gipfel der Hohen Winde. Geeignet bei Wind aus NW, N oder NE.",
+    "sicherheit": ""
+  },
+  "17854": {
+    "flug": "Mehrere Startmöglichkeiten; etwa 15 Minuten Fußweg vom Landeplatz.",
+    "sicherheit": ""
+  },
+  "18345": {
+    "flug": "Startplatz 200 m links der Bergstation der neuen Seilbahn von Siviez. Beste Startrichtung ostwärts. Alternativ westwärts möglich, aber sehr kurze Startbahn und steile Klippen; nur bei stärkerem Wind nutzbar.",
+    "sicherheit": "Westseite: sehr kurze Startbahn mit steilen Klippen, erfordert stärkeren Wind für sicheren Start."
+  },
+  "18864": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "19045": {
+    "flug": "Großes, grasbewachsenes Feld; Topplandung möglich.",
+    "sicherheit": ""
+  },
+  "19311": {
+    "flug": "Startplatz auf einem Feld auf dem Hügelgipfel.",
+    "sicherheit": ""
+  },
+  "19444": {
+    "flug": "Gut geeignete Startwiese, einfacher Start.",
+    "sicherheit": ""
+  },
+  "19564": {
+    "flug": "Große, grasbewachsene Wiese.",
+    "sicherheit": ""
+  },
+  "19582": {
+    "flug": "Startplatz auf 1680 m Höhe, Klippenstart. Nur bei Ost- bis Südostwind startbar.",
+    "sicherheit": "Klippenstart – Achtung vor abruptem Höhenverlust beim Start."
+  },
+  "19846": {
+    "flug": "Startplatz auf einem Pfad zwischen Bäumen, 10m unterhalb des Gipfels. Beste Windrichtung: ONO (ENE).",
+    "sicherheit": "Kein Tandemstart! Vorsicht vor Büschen und Bäumen am Startpfad, Leitungen beachten."
+  },
+  "19859": {
+    "flug": "Startplatz der lokalen Flugschule.",
+    "sicherheit": "Vor dem Fliegen ist eine Genehmigung einzuholen: www.flugschule-jura.ch"
+  },
+  "19860": {
+    "flug": "",
+    "sicherheit": "Startplatz der örtlichen Flugschule. Vor dem Fliegen ist eine Genehmigung erforderlich: www.flugschule-jura.ch"
+  },
+  "21224": {
+    "flug": "Alternativer Startplatz auf der Wispile. Von der Mittelstation der Gondel 200 m nach rechts oben gehen.",
+    "sicherheit": ""
+  },
+  "21269": {
+    "flug": "Start am Hang; keine spezifischen Wind- oder Zeitangaben.",
+    "sicherheit": ""
+  },
+  "21318": {
+    "flug": "Schöner, grasbewachsener Startplatz mit Windsack.",
+    "sicherheit": ""
+  },
+  "21354": {
+    "flug": "Große Wiese direkt unterhalb der Straße, gut geeignet als Startplatz.",
+    "sicherheit": ""
+  },
+  "21355": {
+    "flug": "",
+    "sicherheit": "Nicht nutzen, wenn das Gras nicht gemäht ist."
+  },
+  "21356": {
+    "flug": "Fliegen am Damm.",
+    "sicherheit": ""
+  },
+  "21370": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "21375": {
+    "flug": "Steiler Startplatz mit 40° Neigung, nur bei Gegenwind oder Windstille nutzbar.",
+    "sicherheit": "Aufgrund der Steilheit unbedingt Gegenwind oder Windstille abwarten, sonst hohe Absturzgefahr beim Start."
+  },
+  "21378": {
+    "flug": "Optimal für abendliche dynamische Flüge, bei guten Bedingungen auch mit Sonnenuntergangsblicken. Anreisezeit 35-40 Minuten.",
+    "sicherheit": "Privatgelände, daher besondere Rücksicht und Respekt erforderlich."
+  },
+  "21380": {
+    "flug": "Langer Hike&Fly mit 2000 m Aufstieg, Ausblick auf die Täler von Grono und Cama.",
+    "sicherheit": ""
+  },
+  "21381": {
+    "flug": "Startplatz unterhalb des Kommunikationsgebäudes.",
+    "sicherheit": ""
+  },
+  "21382": {
+    "flug": "Startplatz befindet sich rechts des Gipfels.",
+    "sicherheit": ""
+  },
+  "21384": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "21385": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "21388": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "21400": {
+    "flug": "Große Wiese, jedoch eher flach. Toplanding möglich.",
+    "sicherheit": ""
+  },
+  "21401": {
+    "flug": "Mehrere Startmöglichkeiten; Rampe für Hängegleiter.",
+    "sicherheit": ""
+  },
+  "21463": {
+    "flug": "Start bei Südwest-, West- oder Nordwind.",
+    "sicherheit": ""
+  },
+  "21589": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "21831": {
+    "flug": "Im Dezember bis März einfacher Start im Skigebiet, sonst nur für fortgeschrittene Piloten wegen Felsen.",
+    "sicherheit": "Vorsicht vor großen Felsen, besonders außerhalb der Skisaison."
+  },
+  "21950": {
+    "flug": "Steiler Startplatz, geeignet für dynamische Starts bei geeignetem Wind.",
+    "sicherheit": "Steiler Hang erhöht Risiko bei Fehlstarts und Landungen. Vorsicht geboten."
+  },
+  "22055": {
+    "flug": "Start entweder an der Wasserstation oder besser vom Rasen am Straßenende unter den Bäumen, um Seitenwind zu vermeiden.",
+    "sicherheit": "Seitenwindgefahr bei Start an der Wasserstation."
+  },
+  "22137": {
+    "flug": "Große Almwiesen mit viel Platz.",
+    "sicherheit": "Achtung: hohes Gras und weidende Tiere!"
+  },
+  "22207": {
+    "flug": "Grüner Hang, Nordwest-Exposition. Geeignet bei Nordwestwind, typischerweise nachmittags.",
+    "sicherheit": ""
+  },
+  "22263": {
+    "flug": "",
+    "sicherheit": "Startplatz ist von Dezember bis Juni nicht erlaubt."
+  },
+  "22300": {
+    "flug": "Gute Wiese als Startplatz.",
+    "sicherheit": ""
+  },
+  "22301": {
+    "flug": "",
+    "sicherheit": ""
+  },
+  "22780": {
+    "flug": "Gut am Morgen bis 12:00 Uhr, da Ostausrichtung. Korridor führt zur Haupt-Thermikquelle.",
+    "sicherheit": ""
+  },
+  "22783": {
+    "flug": "Startplatz einfach vom Parkplatz Du Lac erreichbar. Geeignet für Thermikflüge im Sommer am Abend, da man leicht die Westseite der Berge erreicht.",
+    "sicherheit": ""
+  },
+  "22784": {
+    "flug": "",
+    "sicherheit": "Kurze Startbahn, nur für Piloten mit viel Alpinerfahrung empfohlen."
+  },
+  "22785": {
+    "flug": "Morgens gut für Hike & Fly, empfohlene Route über Pässe von San Bernardino.",
+    "sicherheit": ""
+  },
+  "22786": {
+    "flug": "Leichter Grasstartplatz, geeignet für einfache Hike & Flys.",
+    "sicherheit": ""
+  },
+  "22846": {
+    "flug": "Startplatz auf einer grasbewachsenen Kuppe, markiert durch einen Steinmann.",
+    "sicherheit": ""
+  },
+  "23038": {
+    "flug": "Klippenstart, geeignet für erfahrene Piloten.",
+    "sicherheit": "Achtung: Klippenstart erfordert spezielle Technik und Vorsicht, Absturzgefahr bei Fehlern."
+  },
+  "23508": {
+    "flug": "",
+    "sicherheit": "Am Startplatz im Korridor bleiben bis zum Ausgang."
+  },
+  "23665": {
+    "flug": "West-Startplatz. Hauptlandeplatz ist Le Pont. Notlandemöglichkeit links auf Plateau des Croisettes.",
+    "sicherheit": "Wenn das Soaring nicht funktioniert, rechtzeitig nach rechts abdrehen, um Le Pont zu erreichen. Notlandung links auf Plateau des Croisettes möglich."
+  },
+  "23848": {
+    "flug": "Leichter, sanfter Hang.",
+    "sicherheit": ""
+  },
+  "7673": {
+    "flug": "Steiler Startplatz, schwierige Bedingungen, erfordert gute Technik.",
+    "sicherheit": "Steilheit erhöht Sturzrisiko, schwieriger Start."
+  },
+  "8126": {
+    "flug": "Hike-up Start; Start von überall am Hang möglich; Landung am Gipfel möglich.",
+    "sicherheit": ""
+  },
+  "9759": {
+    "flug": "Nur im Winter nutzbar, bei schwachem Wind. Startplatz liegt leicht unterhalb der Parsennbahn-Station neben dem Sessellift Parsenn Rapid.",
+    "sicherheit": "Nur bei schwachem Wind fliegen, da sonst erhöhte Turbulenz oder Gefahr durch den Lift möglich."
+  },
+  "9760": {
+    "flug": "Nordstart: 5 Min von Gondelstation, einfach, bei mäßigem Nordwind dynamisches Fliegen möglich. Flugroute via Gotschnagrat zu LZ Klosters. Südstart: zwischen Gondelstation und Restaurant, schwierig, nur für erfahrene Piloten, Flugroute zu LZ Davos-Bolgen.",
+    "sicherheit": "Südstart ist schwierig und nur für erfahrene Piloten geeignet. Keine weiteren Sicherheitswarnungen erwähnt."
+  },
+  "16090": {
+    "flug": "Startplatz in einem steilen Korridor im Wald, 10 Minuten Fußweg abwärts vom Parkplatz. Maximalwind 15-20 km/h. Windinfo von MeteoSchweiz an der La Dôle.",
+    "sicherheit": "Achtung TMA des Flughafens Genf. Enge, bewaldete Röhre mit möglichen Turbulenzen. Details auf der Club-Website."
+  },
+  "6831": {
+    "flug": "Mehrere Startplätze: Ruinettes – Direktstart aus der Gondel; Fontanets – 15 Min. Fußweg, Ausrichtung SW/W; Attelas – selten genutzt, klein und steil.",
+    "sicherheit": "Attelas ist klein und steil, daher besondere Vorsicht."
+  },
+  "23652": {
+    "flug": "Ost-Startplatz, tief, benötigt Gegenwind, Grasbewuchs teilweise.",
+    "sicherheit": "Felsiger Startplatz, teilweise Grasbewuchs."
+  },
+  "7718": {
+    "flug": "Croix de Coeur: Top-Landung moeglich, beste (spaete) Nachmittagszeit. Savolyeres: grasiger Hang, Startempfehlung am Morgen.",
+    "sicherheit": "Croix de Coeur: Flugplatz direkt dahinter — Vorsicht bei Landeanflug."
+  }
+}

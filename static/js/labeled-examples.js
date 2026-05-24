@@ -196,7 +196,7 @@
         el.classList.toggle('lx-meteo-status--err', !!isErr);
     }
 
-    function loadMeteogram(entityType, entityId, dateStr) {
+    function loadMeteogram(entityType, entityId, dateStr, analysisId) {
         var chartEl = document.getElementById('lxDetailMeteoChart');
         var tooltipEl = document.getElementById('lxMeteoTooltip');
         if (!chartEl || !entityId || !dateStr) return;
@@ -204,31 +204,16 @@
             setMeteoStatus('Meteogram-Modul nicht geladen', true);
             return;
         }
-        // Spot nutzt /api/weather/<site_name>, Region /api/region-weather/<slug>.
-        // entityId ist fuer Spots der originale site_name (spot_or_region_id im Snapshot).
         var isRegion = entityType !== 'spot';
-        var wxUrl = isRegion
-            ? '/api/region-weather/' + encodeURIComponent(entityId)
-            : '/api/weather/' + encodeURIComponent(entityId);
-        var altUrl = isRegion
-            ? '/api/region-altitude-wind/' + encodeURIComponent(entityId)
-            : '/api/altitude-wind/' + encodeURIComponent(entityId);
-        Promise.all([
-            fetch(wxUrl).then(function (r) { return r.json(); }),
-            fetch(altUrl).then(function (r) { return r.json(); })
-        ]).then(function (results) {
-            var wxData = results[0];
-            var altData = results[1];
-            if (wxData.error || altData.error) {
-                setMeteoStatus((isRegion ? 'Region' : 'Spot') + ' nicht gefunden oder keine Wetterdaten', true);
-                return;
-            }
-            var wxDay = wxData.data ? wxData.data[dateStr] : null;
-            var altDayRaw = altData.data ? altData.data[dateStr] : null;
+
+        // Bevorzugt: eingebetteter Snapshot aus dem Label selbst (auch fuer
+        // alte Daten ausserhalb des Live-Forecast-Fensters).
+        // Fallback bei 404 oder fehlendem analysisId: Live-API /api/weather/...
+        function renderFromPayload(wxData, altData) {
+            var wxDay = wxData && wxData.data ? wxData.data[dateStr] : null;
+            var altDayRaw = altData && altData.data ? altData.data[dateStr] : null;
             if (!wxDay || !altDayRaw || !altDayRaw.length) {
-                var avail = (wxData.dates || []).join(', ') || '–';
-                setMeteoStatus('Datum ' + dateStr + ' nicht (mehr) im Forecast-Fenster. Verfügbar: ' + avail, true);
-                return;
+                return false;
             }
             var altDay = {
                 profiles: altDayRaw.map(function (entry) {
@@ -247,9 +232,56 @@
             });
             setMeteoStatus((wxDay.wind ? wxDay.wind.length : 0) + ' Stunden geladen · Wetter-Stand '
                 + (wxData.last_updated || '').replace('T', ' ').slice(0, 16), false);
-        }).catch(function (err) {
-            setMeteoStatus('Fehler: ' + (err && err.message ? err.message : err), true);
-        });
+            return true;
+        }
+
+        function loadFromLive() {
+            var wxUrl = isRegion
+                ? '/api/region-weather/' + encodeURIComponent(entityId)
+                : '/api/weather/' + encodeURIComponent(entityId);
+            var altUrl = isRegion
+                ? '/api/region-altitude-wind/' + encodeURIComponent(entityId)
+                : '/api/altitude-wind/' + encodeURIComponent(entityId);
+            Promise.all([
+                fetch(wxUrl).then(function (r) { return r.json(); }),
+                fetch(altUrl).then(function (r) { return r.json(); })
+            ]).then(function (results) {
+                var wxData = results[0];
+                var altData = results[1];
+                if (wxData.error || altData.error) {
+                    setMeteoStatus((isRegion ? 'Region' : 'Spot') + ' nicht gefunden oder keine Wetterdaten', true);
+                    return;
+                }
+                if (!renderFromPayload(wxData, altData)) {
+                    var avail = (wxData.dates || []).join(', ') || '–';
+                    setMeteoStatus('Datum ' + dateStr + ' nicht (mehr) im Forecast-Fenster. Verfügbar: ' + avail, true);
+                }
+            }).catch(function (err) {
+                setMeteoStatus('Fehler: ' + (err && err.message ? err.message : err), true);
+            });
+        }
+
+        if (!analysisId) {
+            loadFromLive();
+            return;
+        }
+
+        // Versuche zuerst den eingebetteten Snapshot — funktioniert auch fuer
+        // alte Daten, die nicht mehr im Live-Forecast sind.
+        fetch('/api/admin/labeled-examples/' + encodeURIComponent(analysisId) + '/meteogram')
+            .then(function (r) {
+                if (r.status === 404) return null;
+                return r.json();
+            })
+            .then(function (resp) {
+                if (resp && resp.ok && resp.wx && resp.alt && renderFromPayload(resp.wx, resp.alt)) {
+                    return;
+                }
+                loadFromLive();
+            })
+            .catch(function () {
+                loadFromLive();
+            });
     }
 
     function loadDetail(aid) {
@@ -306,7 +338,7 @@
                     }
                     window.AnalysisView.render(av, flattenAnalysisEntry(llm), renderOpts);
                 }
-                loadMeteogram(entityType, e.spot_or_region_id, e.target_date);
+                loadMeteogram(entityType, e.spot_or_region_id, e.target_date, e.analysis_id);
             })
             .catch(function (err) { body.textContent = 'Netzwerkfehler: ' + err; });
     }

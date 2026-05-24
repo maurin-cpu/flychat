@@ -12,7 +12,7 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 KML_PATH = os.path.join(BASE_DIR, "dhv_gelaende_2026-04-09_16.27.54.kml")
-CSV_PATH = os.path.join(BASE_DIR, "fluggebiete_complete.csv")
+CSV_PATH = os.path.join(BASE_DIR, "fluggebiete_dhv.csv")
 NS = {"kml": "http://www.opengis.net/kml/2.2"}
 CSV_COLUMNS = ["region", "fluggebiet", "site_name", "latitude", "longitude",
     "elevation_m", "windrichtung", "ideal_wind_max_kmh", "slope_azimuth",

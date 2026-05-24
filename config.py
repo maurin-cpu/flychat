@@ -186,9 +186,11 @@ WIND_DIRECTION_TOLERANCE_PCT = 0.10
 PROJECT_ROOT = Path(__file__).parent.absolute()
 DATA_DIR = PROJECT_ROOT / "data"
 
-# Spot-CSV: "complete" = alle ~490 Startplätze, "test" = reduziertes Set für Entwicklung
-# Umschalten: USE_SPOT_CSV = "test" oder "complete"
-USE_SPOT_CSV = os.environ.get("GLEITCAST_SPOT_CSV", "complete")  # "complete" | "test"
+# Spot-CSV: "pge" = Paragliding-Earth-Quelle (495 Spots, Default, Mai 2026),
+# "test" = reduziertes Set für Entwicklung (28 Spots, PGE-Schema).
+# Beide CSVs nutzen das PGE-Schema (Sektor-Spalten wind_N..wind_NW,
+# bemerkungen_flug, bemerkungen_sicherheit).
+USE_SPOT_CSV = os.environ.get("GLEITCAST_SPOT_CSV", "pge")
 CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
 # Region-Referenzpunkte: Default ist CVT-7 (Apr 2026, 7 Punkte im
 # Polygon-Innern via Lloyd-CVT). Legacy-Modus nutzt die alten 4 Punkte
@@ -424,6 +426,7 @@ SYNOPTIC_PRECIP_MODERATE_MM = 8.0    # 2-8 mm = maessig, > 8 = stark
 SYNOPTIC_PRECIP_COVERAGE_FLAECHIG = 0.7   # Coverage >= 70% = flaechig (stratiform)
 SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV = 0.4  # Coverage < 40% + CAPE = konvektiv/Schauer
 SYNOPTIC_PRECIP_CAPE_KONVEKTIV = 300      # J/kg — Mindest-CAPE fuer konvektiv-Label
+SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE = 0.10  # min. Anteil nasser Spots fuer "Gewitter wahrscheinlich"; sonst Schauer/Spuren — verhindert dass 1 lokales Gewitter den ganzen Region-Tag als Gewitter-Tag labelt
 SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # J/kg — Schwelle fuer Gewitter-Label
 
 # --- Schneefallgrenze (saisonal) ----------------------------------------
@@ -829,8 +832,8 @@ WIND_IDEAL_MAX_KMH = 20         # km/h — ab diesem: ueber Komfortzone (= WIND_
 # Schwelle deterministisch auf wind_ok_count an (siehe analyzers._prefilter_not_safe).
 # WIND-WRONG Stunden NACH dem Start-Fenster sind kein Grund fuer UNFLIEGBAR —
 # der Pilot ist bereits in der Luft, Landung i.d.R. auf separatem Landeplatz.
-CLEAN_WINDOW_MIN_HOURS = 3       # h — unterhalb: not_safe
-CLEAN_WINDOW_GREEN_HOURS = 3     # h — ab hier: safe/green moeglich
+CLEAN_WINDOW_MIN_HOURS = 2       # h — unterhalb: not_safe
+CLEAN_WINDOW_GREEN_HOURS = 2     # h — ab hier: safe/green moeglich
 
 # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade):
 # Erfasst den groessten Richtungsdreher innerhalb eines gleitenden Fensters von
@@ -859,26 +862,6 @@ CAPE_DANGER_JKG = 1500          # CAPE > 1500 J/kg → [CAPE-DANGER]
 WIND_TREND_CONDITIONAL_HOURS = 3
 WIND_TREND_NOTSAFE_HOURS = 3
 GUST_TREND_FLOOR_HOURS = 3       # Min. Stunden fuer Boeen-Floor (Boden+Hoehe summiert)
-
-# ============================================================================
-# DRIFT-RENARRATE (Konsistenz LLM-Status vs. Sub-Rating-Floor)
-# ============================================================================
-# Wenn das LLM safety_status=safe schreibt aber min(subs)<4, eskaliert die
-# Engine den Status (SubRatingFloor-Decision). Der LLM-Prosa-Text (summary,
-# recommendation) bleibt dann erstmal mit der alten Status-Annahme stehen.
-#
-# Phase 1 (RENARRATE_ON_DRIFT=False): Telemetrie sammeln, kein Re-Narrate.
-#                    Drift ist sichtbar in `_status_telemetry` jeder Analyse,
-#                    summary kann gelegentlich vom Status abweichen.
-# Phase 2 (RENARRATE_ON_DRIFT=True, AKTIV): bei erkanntem Drift kleiner
-#                    Zusatzcall, der summary/recommendation passend zum
-#                    eskalierten Status umschreibt. Sub-Ratings bleiben
-#                    unangetastet (Forschungs-Datenpunkt). Mehrkosten: nur
-#                    fuer Drift-Faelle, geschaetzt <1% Gesamtkosten.
-RENARRATE_ON_DRIFT = True
-# Modell fuer den Re-Narrate-Call. None = analysis_model (gleiches Modell).
-# Setze auf z.B. "gpt-4o-mini" fuer billigeren Re-Narrate.
-RENARRATE_MODEL = None
 
 # ============================================================================
 # INSTANTDB-KONFIGURATION
@@ -1041,6 +1024,18 @@ LLM_MODELS[CHAT_PROVIDER]["chat"]         = CHAT_MODEL
 LLM_MODELS[ANALYSIS_PROVIDER]["analysis"] = ANALYSIS_MODEL
 globals()[f"{CHAT_PROVIDER.upper()}_CHAT_MODEL"]         = CHAT_MODEL
 globals()[f"{ANALYSIS_PROVIDER.upper()}_ANALYSIS_MODEL"] = ANALYSIS_MODEL
+
+# SYNOPTIC_MODEL — separates Modell fuer den Wetterlage-Block (1x/Tag Call).
+# Default = ANALYSIS_MODEL (Rueckwaerts-kompatibel). Ueber ENV `SYNOPTIC_MODEL`
+# oder Admin-UI separat ueberschreibbar (z.B. deepseek-v4-flash mit Reasoning,
+# waehrend ANALYSIS_MODEL fuer die Massen-Spot-Analyse auf deepseek-chat bleibt).
+_synoptic_override = os.environ.get("SYNOPTIC_MODEL", "").strip()
+if _synoptic_override and _synoptic_override in MODEL_PROVIDER_MAP:
+    SYNOPTIC_MODEL    = _synoptic_override
+    SYNOPTIC_PROVIDER = MODEL_PROVIDER_MAP[_synoptic_override]
+else:
+    SYNOPTIC_MODEL    = ANALYSIS_MODEL
+    SYNOPTIC_PROVIDER = ANALYSIS_PROVIDER
 
 # API-Keys (nur der aktive Provider muss gesetzt sein)
 OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")

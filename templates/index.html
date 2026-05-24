@@ -423,6 +423,57 @@
             background: rgba(255, 255, 255, 0.6);
         }
     }
+
+    /* Admin-Only: Spot-Suchfeld */
+    .floating-admin-search {
+        top: 8px;
+        left: 8px;
+        width: 220px;
+        padding: 0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .floating-admin-search input[type="search"] {
+        width: 100%;
+        box-sizing: border-box;
+        border: 0;
+        background: transparent;
+        padding: 6px 10px;
+        font-size: 13px;
+        color: #1e293b;
+        outline: none;
+    }
+    .floating-admin-search input[type="search"]::placeholder { color: #94a3b8; }
+    .floating-admin-search ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 280px;
+        overflow-y: auto;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.96);
+    }
+    .floating-admin-search li {
+        padding: 6px 10px;
+        font-size: 12px;
+        color: #334155;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    }
+    .floating-admin-search li:last-child { border-bottom: none; }
+    .floating-admin-search li:hover,
+    .floating-admin-search li.is-active {
+        background: rgba(59, 130, 246, 0.12);
+        color: #1e293b;
+    }
+    .floating-admin-search li .hit-region {
+        color: #64748b;
+        font-size: 11px;
+        margin-left: 6px;
+    }
+    @media (max-width: 639px) {
+        .floating-admin-search { width: 180px; }
+    }
 </style>
 {% endblock %}
 
@@ -508,6 +559,14 @@
         <!-- Floating Status: "Stand: <Datum>" oben rechts, klein und dezent -->
         <div class="floating-control floating-status" id="statusBar"></div>
 
+        {% if admin_debug_active %}
+        <!-- Admin-Only: Spot-Suchfeld (oben links unter Navbar) -->
+        <div class="floating-control floating-admin-search" id="adminSpotSearch">
+            <input type="search" id="adminSpotSearchInput" placeholder="Spot suchen…" autocomplete="off" spellcheck="false" aria-label="Spot suchen (Admin)">
+            <ul id="adminSpotSearchResults" role="listbox" hidden></ul>
+        </div>
+        {% endif %}
+
         <!-- Meteogram Overlay -->
         <div class="meteogram-overlay" id="meteogramOverlay" role="dialog" aria-modal="true" aria-label="Meteogramm">
             <div class="meteogram-panel">
@@ -566,6 +625,9 @@
 <script defer src="{{ url_for('static', filename='js/osm-peaks-layer.js') }}?v={{ static_v('js/osm-peaks-layer.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/precip-refpoints-layer.js') }}?v={{ static_v('js/precip-refpoints-layer.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/map.js') }}?v={{ static_v('js/map.js') }}"></script>
+{% if admin_debug_active %}
+<script defer src="{{ url_for('static', filename='js/admin-spot-search.js') }}?v={{ static_v('js/admin-spot-search.js') }}"></script>
+{% endif %}
 {% if is_logged_in %}
 <script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/chat.js') }}?v={{ static_v('js/chat.js') }}"></script>

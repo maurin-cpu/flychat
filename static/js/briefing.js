@@ -1844,6 +1844,8 @@
 
   const _bfIcon = { uid: 0 };
 
+  // Liefert Array von [start,end]-Arcs. Unterstuetzt PGE-Mehrfach-Sektoren
+  // ('O-SO-S-SW-W', Wraparound 'NW-N-NO', disjoint 'S/N', 'NO-O/W-NW').
   function bfGetDirAngles(dirStr) {
     if (!dirStr) return null;
     const dirs = {
@@ -1852,18 +1854,28 @@
       'S':180,'SSW':202.5,'SW':225,'WSW':247.5,
       'W':270,'WNW':292.5,'NW':315,'NNW':337.5,
     };
-    const parts = dirStr.toUpperCase().split('-');
-    if (parts.length === 1) {
-      const a = dirs[parts[0]];
-      if (a === undefined) return null;
-      return [a - 22.5, a + 22.5];
-    } else if (parts.length === 2) {
-      let a1 = dirs[parts[0]], a2 = dirs[parts[1]];
-      if (a1 === undefined || a2 === undefined) return null;
-      if (Math.abs(a1 - a2) > 180) { if (a1 < a2) a1 += 360; else a2 += 360; }
-      return [Math.min(a1, a2), Math.max(a1, a2)];
+    const arcs = [];
+    const disjoint = dirStr.toUpperCase().split('/');
+    for (const run of disjoint) {
+      const r = run.trim();
+      if (!r) continue;
+      const parts = r.split('-');
+      const angles = [];
+      for (const p of parts) {
+        const a = dirs[p.trim()];
+        if (a !== undefined) angles.push(a);
+      }
+      if (!angles.length) continue;
+      if (angles.length === 1) {
+        arcs.push([angles[0] - 22.5, angles[0] + 22.5]);
+      } else {
+        let a1 = angles[0] - 22.5;
+        let a2 = angles[angles.length - 1] + 22.5;
+        if (Math.abs(a1 - a2) > 180) { if (a1 < a2) a1 += 360; else a2 += 360; }
+        arcs.push([Math.min(a1, a2), Math.max(a1, a2)]);
+      }
     }
-    return null;
+    return arcs.length ? arcs : null;
   }
 
   // Mini-Map Marker-Style nutzt direkt regionPillSpec → identische Rating-Tint-
@@ -1900,14 +1912,16 @@
       h += '<defs><pattern id="bfs'+uid+'" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/></pattern></defs>';
     }
 
-    const angles = bfGetDirAngles(windrichtung);
-    if (angles) {
+    const arcs = bfGetDirAngles(windrichtung);
+    if (arcs && arcs.length) {
       const si = r+1, so = r+9;
-      const sr = (angles[0]-90)*Math.PI/180, er = (angles[1]-90)*Math.PI/180;
-      const ix1=c+si*Math.cos(sr), iy1=c+si*Math.sin(sr), ix2=c+si*Math.cos(er), iy2=c+si*Math.sin(er);
-      const ox1=c+so*Math.cos(sr), oy1=c+so*Math.sin(sr), ox2=c+so*Math.cos(er), oy2=c+so*Math.sin(er);
-      const la = (angles[1]-angles[0])>180?1:0;
-      h += '<path d="M '+ox1+' '+oy1+' A '+so+' '+so+' 0 '+la+' 1 '+ox2+' '+oy2+' L '+ix2+' '+iy2+' A '+si+' '+si+' 0 '+la+' 0 '+ix1+' '+iy1+' Z" fill="'+style.stroke+'" opacity="0.5" />';
+      for (const angles of arcs) {
+        const sr = (angles[0]-90)*Math.PI/180, er = (angles[1]-90)*Math.PI/180;
+        const ix1=c+si*Math.cos(sr), iy1=c+si*Math.sin(sr), ix2=c+si*Math.cos(er), iy2=c+si*Math.sin(er);
+        const ox1=c+so*Math.cos(sr), oy1=c+so*Math.sin(sr), ox2=c+so*Math.cos(er), oy2=c+so*Math.sin(er);
+        const la = (angles[1]-angles[0])>180?1:0;
+        h += '<path d="M '+ox1+' '+oy1+' A '+so+' '+so+' 0 '+la+' 1 '+ox2+' '+oy2+' L '+ix2+' '+iy2+' A '+si+' '+si+' 0 '+la+' 0 '+ix1+' '+iy1+' Z" fill="'+style.stroke+'" opacity="0.5" />';
+      }
     }
 
     if (style.glow) {

@@ -1234,7 +1234,9 @@ def _aggregate_precip_side(spots_day: list[dict]) -> dict:
         char = "trocken"
     elif wc_max >= 95:  # WMO 95/96/99 = Gewitter
         char = "Gewitter"
-    elif cape_max >= config.SYNOPTIC_PRECIP_CAPE_GEWITTER and peak_max >= 2.0:
+    elif (cape_max >= config.SYNOPTIC_PRECIP_CAPE_GEWITTER
+          and peak_max >= 2.0
+          and nass_anteil >= config.SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE):
         char = "Gewitter wahrscheinlich"
     elif (coverage_max is not None
           and coverage_max >= config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG
@@ -1336,6 +1338,7 @@ def decide_precip_pattern_nord_sued(weather_cache: dict,
             "coverage_flaechig": config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG,
             "cape_konvektiv": config.SYNOPTIC_PRECIP_CAPE_KONVEKTIV,
             "cape_gewitter": config.SYNOPTIC_PRECIP_CAPE_GEWITTER,
+            "gewitter_min_wetshare": config.SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE,
         },
     }
 

@@ -150,6 +150,12 @@
     }
 
     // ===== DIRECTION PARSER =====
+    // Liefert Array von [start, end]-Arcs (mehrere bei disjoint mit '/').
+    // Unterstuetzt PGE-synthetisierte Strings:
+    //   'O-SO-S-SW-W'   → ein Arc 90°-270° (first..last)
+    //   'NW-N-NO'       → ein Arc 315°-45° (Wraparound)
+    //   'S/N'           → zwei Arcs (S-Sektor + N-Sektor)
+    //   'NO-O/W-NW'     → zwei Arcs
     function getDirAngles(dirStr) {
         if (!dirStr) return null;
         var dirs = {
@@ -158,26 +164,38 @@
             'S': 180, 'SSW': 202.5, 'SW': 225, 'WSW': 247.5,
             'W': 270, 'WNW': 292.5, 'NW': 315, 'NNW': 337.5
         };
-        var parts = dirStr.toUpperCase().split('-');
-        if (parts.length === 1) {
-            var a = dirs[parts[0]];
-            if (a === undefined) return null;
-            return [a - 22.5, a + 22.5];
-        } else if (parts.length === 2) {
-            var a1 = dirs[parts[0]];
-            var a2 = dirs[parts[1]];
-            if (a1 === undefined || a2 === undefined) return null;
-
-            // Normalize so the angular difference is <= 180
-            if (Math.abs(a1 - a2) > 180) {
-                if (a1 < a2) a1 += 360;
-                else a2 += 360;
+        var arcs = [];
+        var disjointParts = dirStr.toUpperCase().split('/');
+        for (var d = 0; d < disjointParts.length; d++) {
+            var run = disjointParts[d].trim();
+            if (!run) continue;
+            var parts = run.split('-');
+            var angles = [];
+            for (var i = 0; i < parts.length; i++) {
+                var a = dirs[parts[i].trim()];
+                if (a !== undefined) angles.push(a);
             }
-
-            // Sort so we always draw the shortest arc clockwise
-            return [Math.min(a1, a2), Math.max(a1, a2)];
+            if (angles.length === 0) continue;
+            if (angles.length === 1) {
+                arcs.push([angles[0] - 22.5, angles[0] + 22.5]);
+            } else {
+                // First/last als Arc-Grenzen. Mehrere Zwischenpunkte sind Auflistung
+                // einzelner Sektoren (z.B. 'O-SO-S' = von O bis S contiguous).
+                var a1 = angles[0];
+                var a2 = angles[angles.length - 1];
+                // Sektor-Breite um +/-22.5° auf jeder Seite erweitern, damit der
+                // Arc den gesamten Sektor (nicht nur die Mittel-Linie) abdeckt.
+                a1 -= 22.5;
+                a2 += 22.5;
+                // Wraparound-Normalisierung
+                if (Math.abs(a1 - a2) > 180) {
+                    if (a1 < a2) a1 += 360;
+                    else a2 += 360;
+                }
+                arcs.push([Math.min(a1, a2), Math.max(a1, a2)]);
+            }
         }
-        return null;
+        return arcs.length ? arcs : null;
     }
 
     // Diskrete Rating-Tints — Palette v2 (Option C, Mai 2026): green-Band alignt
@@ -276,30 +294,33 @@
             html += '<circle cx="' + center + '" cy="' + center + '" r="' + (svgSize / 2) + '" fill="rgba(0,0,0,0)" pointer-events="all" />';
         }
 
-        // Wind direction sector (unchanged)
+        // Wind direction sector (PGE: kann mehrere disjunkte Arcs liefern)
         if (props && props.windrichtung) {
-            var angles = getDirAngles(props.windrichtung);
-            if (angles) {
+            var arcs = getDirAngles(props.windrichtung);
+            if (arcs && arcs.length) {
                 var sectorInner = radius + 1;
                 var sectorOuter = radius + 9;
-                var startRad = (angles[0] - 90) * Math.PI / 180;
-                var endRad = (angles[1] - 90) * Math.PI / 180;
-                var ix1 = center + sectorInner * Math.cos(startRad);
-                var iy1 = center + sectorInner * Math.sin(startRad);
-                var ix2 = center + sectorInner * Math.cos(endRad);
-                var iy2 = center + sectorInner * Math.sin(endRad);
-                var ox1 = center + sectorOuter * Math.cos(startRad);
-                var oy1 = center + sectorOuter * Math.sin(startRad);
-                var ox2 = center + sectorOuter * Math.cos(endRad);
-                var oy2 = center + sectorOuter * Math.sin(endRad);
-                var largeArc = (angles[1] - angles[0]) > 180 ? 1 : 0;
+                for (var ai = 0; ai < arcs.length; ai++) {
+                    var angles = arcs[ai];
+                    var startRad = (angles[0] - 90) * Math.PI / 180;
+                    var endRad = (angles[1] - 90) * Math.PI / 180;
+                    var ix1 = center + sectorInner * Math.cos(startRad);
+                    var iy1 = center + sectorInner * Math.sin(startRad);
+                    var ix2 = center + sectorInner * Math.cos(endRad);
+                    var iy2 = center + sectorInner * Math.sin(endRad);
+                    var ox1 = center + sectorOuter * Math.cos(startRad);
+                    var oy1 = center + sectorOuter * Math.sin(startRad);
+                    var ox2 = center + sectorOuter * Math.cos(endRad);
+                    var oy2 = center + sectorOuter * Math.sin(endRad);
+                    var largeArc = (angles[1] - angles[0]) > 180 ? 1 : 0;
 
-                var d = 'M ' + ox1 + ' ' + oy1 +
-                    ' A ' + sectorOuter + ' ' + sectorOuter + ' 0 ' + largeArc + ' 1 ' + ox2 + ' ' + oy2 +
-                    ' L ' + ix2 + ' ' + iy2 +
-                    ' A ' + sectorInner + ' ' + sectorInner + ' 0 ' + largeArc + ' 0 ' + ix1 + ' ' + iy1 + ' Z';
+                    var d = 'M ' + ox1 + ' ' + oy1 +
+                        ' A ' + sectorOuter + ' ' + sectorOuter + ' 0 ' + largeArc + ' 1 ' + ox2 + ' ' + oy2 +
+                        ' L ' + ix2 + ' ' + iy2 +
+                        ' A ' + sectorInner + ' ' + sectorInner + ' 0 ' + largeArc + ' 0 ' + ix1 + ' ' + iy1 + ' Z';
 
-                html += '<path d="' + d + '" fill="' + style.stroke + '" opacity="0.5" />';
+                    html += '<path d="' + d + '" fill="' + style.stroke + '" opacity="0.5" />';
+                }
             }
         }
 

@@ -11,7 +11,7 @@ from collections import defaultdict
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 KML_PATH = os.path.join(SCRIPT_DIR, "dhv_gelaende_2026-04-09_16.27.54.kml")
-CSV_PATH = os.path.join(SCRIPT_DIR, "fluggebiete_complete.csv")
+CSV_PATH = os.path.join(SCRIPT_DIR, "fluggebiete_dhv.csv")
 OUTPUT_PATH = CSV_PATH
 
 KML_NS = {"k": "http://www.opengis.net/kml/2.2"}

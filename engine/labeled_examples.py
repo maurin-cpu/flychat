@@ -127,7 +127,7 @@ def slugify_spot(name: str) -> str:
 def _load_spot_meta() -> dict[str, dict[str, str]]:
     """slug -> {site_name, terrain_type, elevation_m, kritischer_foehn}. Lazy cached.
 
-    Quelle: fluggebiete_complete.csv via spots.load_spots() — wir
+    Quelle: spots.load_spots() (liest aktuelle CSV gem. config.CSV_PATH) — wir
     importieren lazy um Zirkulaer-Imports zu vermeiden.
     """
     global _SPOT_META_CACHE, _SPOT_SLUG_TO_NAME
@@ -357,6 +357,7 @@ def build_snapshot(
         "target_date": target_date,
         "weather_input": {
             "hourly": weather.get("hourly") or {},
+            "pressure_levels": weather.get("pressure_levels") or {},
             "aggregates": aggregates,
             "elevation_m": _elevation_for(kind, entity_id),
             "month": int(target_date.split("-")[1]) if "-" in target_date else None,

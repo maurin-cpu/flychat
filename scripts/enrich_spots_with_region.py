@@ -1,4 +1,4 @@
-"""Enrich fluggebiete_complete.csv with analyse_region, terrain_type, and
+"""Enrich fluggebiete_dhv.csv with analyse_region, terrain_type, and
 overwrite kritischer_foehn from the matched analysis region.
 
 Spots whose lat/lon does not fall into any region polygon get empty values.
@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from source_area import find_region_for_point  # noqa: E402
 
-CSV_PATH = ROOT / "data" / "fluggebiete_complete.csv"
+CSV_PATH = ROOT / "data" / "fluggebiete_dhv.csv"
 
 NEW_COLUMNS = ["terrain_type", "analyse_region"]
 

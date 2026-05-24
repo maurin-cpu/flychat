@@ -166,6 +166,9 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
             {"key": "ANALYSIS_MODEL", "type": "choice",
              "choices": list(config.MODEL_PROVIDER_MAP.keys()),
              "help": "Modell fuer Spot/Region-Analysen. Provider wird automatisch erkannt. Bei OpenAI ist zusaetzlich der Batch-Modus moeglich (siehe OPENAI_ANALYSIS_MODE). Hybrid-Setup moeglich (z.B. Chat=claude-haiku-4-5, Analyse=gpt-5.4-mini)."},
+            {"key": "SYNOPTIC_MODEL", "type": "choice",
+             "choices": list(config.MODEL_PROVIDER_MAP.keys()),
+             "help": "Modell fuer den Wetterlage-Block (Synoptik, 1 Call/Tag). Provider wird automatisch erkannt. Default = ANALYSIS_MODEL. Hier z.B. deepseek-v4-flash setzen, falls Reasoning fuer die taegliche Synoptik gewuenscht ist, waehrend ANALYSIS_MODEL fuer die Massen-Spot-Analyse auf einem schnelleren Modell bleibt."},
         ],
         "LLM-Analyse (technisch)": [
             {"key": "OPENAI_ANALYSIS_MODE", "type": "choice", "choices": ["parallel", "batch"],
@@ -265,21 +268,27 @@ def _coerce(value: Any, field: dict) -> Any:
 
 
 def _apply_model_choice(key: str, model: str) -> bool:
-    """CHAT_MODEL/ANALYSIS_MODEL-Override: setzt Modell + leitet Provider ab
-    + zieht passenden per-provider-Modell-Attr (OPENAI_CHAT_MODEL etc.) nach.
+    """CHAT_MODEL/ANALYSIS_MODEL/SYNOPTIC_MODEL-Override: setzt Modell +
+    leitet Provider ab + zieht passenden per-provider-Modell-Attr nach.
+
+    Bei SYNOPTIC_MODEL existiert kein per-provider-Modell-Slot in LLM_MODELS,
+    deshalb wird nur SYNOPTIC_MODEL + SYNOPTIC_PROVIDER auf config gesetzt.
 
     Gibt True zurueck wenn erfolgreich angewandt, False bei unbekanntem Modell.
     """
-    if key not in ("CHAT_MODEL", "ANALYSIS_MODEL"):
+    if key not in ("CHAT_MODEL", "ANALYSIS_MODEL", "SYNOPTIC_MODEL"):
         return False
-    purpose = "chat" if key == "CHAT_MODEL" else "analysis"
     provider = config.MODEL_PROVIDER_MAP.get(model)
     if provider is None:
         logger.warning("Unbekanntes Modell '%s' — Provider nicht ableitbar.", model)
         return False
     setattr(config, key, model)
-    setattr(config, f"{purpose.upper()}_PROVIDER", provider)
-    setattr(config, f"{provider.upper()}_{purpose.upper()}_MODEL", model)
+    if key == "SYNOPTIC_MODEL":
+        setattr(config, "SYNOPTIC_PROVIDER", provider)
+    else:
+        purpose = "chat" if key == "CHAT_MODEL" else "analysis"
+        setattr(config, f"{purpose.upper()}_PROVIDER", provider)
+        setattr(config, f"{provider.upper()}_{purpose.upper()}_MODEL", model)
     return True
 
 
@@ -315,8 +324,8 @@ def apply_overrides(overrides: dict[str, Any] | None = None) -> list[str]:
             applied.append(k)
             continue
 
-        # CHAT_MODEL/ANALYSIS_MODEL: Provider + per-provider-Attr nachziehen
-        if k in ("CHAT_MODEL", "ANALYSIS_MODEL"):
+        # CHAT_MODEL/ANALYSIS_MODEL/SYNOPTIC_MODEL: Provider + per-provider-Attr nachziehen
+        if k in ("CHAT_MODEL", "ANALYSIS_MODEL", "SYNOPTIC_MODEL"):
             if _apply_model_choice(k, coerced):
                 applied.append(k)
             continue
@@ -427,8 +436,8 @@ def _restore_default(key: str) -> None:
                 setattr(config, sub, _ORIGINAL_DEFAULTS[sub])
         logger.info("Config-Override '%s' (composed) auf Default zurueckgesetzt.", key)
         return
-    # CHAT_MODEL/ANALYSIS_MODEL: Default zurueck + Provider + per-provider-Attr
-    if key in ("CHAT_MODEL", "ANALYSIS_MODEL") and key in _ORIGINAL_DEFAULTS:
+    # CHAT_MODEL/ANALYSIS_MODEL/SYNOPTIC_MODEL: Default zurueck + Provider + per-provider-Attr
+    if key in ("CHAT_MODEL", "ANALYSIS_MODEL", "SYNOPTIC_MODEL") and key in _ORIGINAL_DEFAULTS:
         if _apply_model_choice(key, _ORIGINAL_DEFAULTS[key]):
             logger.info("Config-Override '%s' (model+provider) auf Default zurueckgesetzt.", key)
         return

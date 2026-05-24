@@ -1092,7 +1092,7 @@ def admin_config_save():
     # Ohne dieses Reload behaelt die laufende Engine-Instanz die im __init__
     # gecachten chat_client/analysis_client (inkl. Provider+Modell) → ein
     # Wechsel auf z.B. claude-haiku-4-5 wuerde erst nach Neustart wirken.
-    if engine is not None and ("CHAT_MODEL" in changed or "ANALYSIS_MODEL" in changed):
+    if engine is not None and ("CHAT_MODEL" in changed or "ANALYSIS_MODEL" in changed or "SYNOPTIC_MODEL" in changed):
         try:
             engine.reload_llm_clients()
         except Exception as e:
@@ -1914,6 +1914,144 @@ def api_labeled_examples_get(analysis_id):
     return jsonify({"ok": True, "entry": entry})
 
 
+@app.route("/api/admin/labeled-examples/<analysis_id>/meteogram", methods=["GET"])
+@_require_admin
+def api_labeled_examples_meteogram(analysis_id):
+    """Meteogramm-Daten aus dem eingebetteten Wetter-Snapshot eines Labels.
+
+    Liefert {wx, alt} im selben Format wie /api/weather/<spot> + /api/altitude-wind/<spot>
+    (bzw. Region-Pendants), aber gefiltert auf das target_date des Labels und
+    OHNE today-Filter. Damit funktioniert das Meteogramm auch fuer Labels,
+    deren target_date nicht mehr im Live-Forecast-Fenster liegt.
+
+    Voraussetzung: Label hat weather_input.pressure_levels eingebettet
+    (ab build_snapshot mit Schema-Erweiterung Mai 2026). Alte Labels ohne
+    eingebettete pressure_levels: 404 → Frontend faellt auf Live-API zurueck.
+    """
+    from engine import labeled_examples as le
+    entry = le.load_by_id(analysis_id)
+    if entry is None:
+        return jsonify({"error": "not found"}), 404
+
+    wi = entry.get("weather_input") or {}
+    hourly_data = wi.get("hourly") or {}
+    pressure_level_data = wi.get("pressure_levels") or {}
+    if not hourly_data or not pressure_level_data:
+        return jsonify({"error": "no embedded weather snapshot"}), 404
+
+    target_date = entry.get("target_date") or ""
+    entity_type = entry.get("entity_type")
+    is_region = (entity_type != "spot")
+
+    slope_az = None
+    slope_an = None
+    windrichtung = None
+    ideal_wind_max = None
+    if is_region:
+        region_id = entry.get("entity_slug")
+        from engine.labeled_examples import _load_region_meta
+        rmeta = _load_region_meta().get(region_id, {})
+        try:
+            elevation_m = int(rmeta.get("elevation_ref") or 1200)
+        except (TypeError, ValueError):
+            elevation_m = 1200
+    else:
+        site_name = entry.get("spot_or_region_id")
+        spot_info = None
+        for s in engine.spots:
+            if s.get("name") == site_name:
+                spot_info = s
+                break
+        elevation_m = (spot_info.get("elevation_m") if spot_info else None) or 850
+        slope_az = spot_info.get("slope_azimuth") if spot_info else None
+        slope_an = spot_info.get("slope_angle") if spot_info else None
+        windrichtung = spot_info.get("windrichtung") if spot_info else None
+        ideal_wind_max = spot_info.get("ideal_wind_max") if spot_info else None
+        region = None
+        if spot_info:
+            region = find_region_for_point(spot_info.get("lat") or 0, spot_info.get("lon") or 0)
+        region_id = region["id"] if region else None
+
+    chart_data = format_data_for_charts(
+        hourly_data, pressure_level_data,
+        elevation_ref=elevation_m,
+        slope_azimuth=slope_az,
+        slope_angle=slope_an,
+        region_id=region_id,
+    )
+    if is_region:
+        for w in chart_data.get("wind", []):
+            w["gusts"] = None
+
+    wx_by_day = {target_date: {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}}
+    for key in ("wind", "precipitation", "thermik", "cloudbase"):
+        for ent in chart_data.get(key, []):
+            try:
+                ds = datetime.fromisoformat(ent["time"]).strftime("%Y-%m-%d")
+            except Exception:
+                continue
+            if ds == target_date:
+                wx_by_day[target_date][key].append(ent)
+
+    if is_region:
+        alt_data = format_altitude_wind_for_charts(
+            pressure_level_data, region_id=region_id,
+        )
+    else:
+        surface_anchor_by_time = {}
+        for ts, hd in hourly_data.items():
+            gust = hd.get("wind_gusts_10m")
+            ws = hd.get("wind_speed_10m")
+            wd = hd.get("wind_direction_10m")
+            if gust is not None and ws is not None:
+                surface_anchor_by_time[ts] = {
+                    "elevation_m": elevation_m,
+                    "gust_kmh": float(gust),
+                    "wind_speed_kmh": float(ws),
+                    "wind_direction_10m": float(wd) if wd is not None else None,
+                }
+        alt_data = format_altitude_wind_for_charts(
+            pressure_level_data, hourly_data, elevation_m, region_id,
+            surface_anchor_by_time=surface_anchor_by_time,
+        )
+
+    alt_by_day = {target_date: []}
+    for profile in alt_data.get("profiles", []) if isinstance(alt_data, dict) else []:
+        try:
+            dt = datetime.fromisoformat(profile["time"])
+            ds = dt.strftime("%Y-%m-%d")
+        except Exception:
+            continue
+        if ds == target_date:
+            alt_by_day[target_date].append({"hour": dt.hour, "profiles": profile["levels"]})
+
+    wx_payload = {
+        "elevation_m": elevation_m,
+        "dates": [target_date],
+        "data": wx_by_day,
+        "stale": False,
+        "expected_days": 1,
+        "thresholds": _tier_thresholds(),
+    }
+    if is_region:
+        wx_payload["region_id"] = region_id
+        wx_payload["region_name"] = entry.get("spot_or_region_id") or region_id
+        wx_payload["elevation_ref"] = elevation_m
+        wx_payload["is_region"] = True
+    else:
+        wx_payload["spot_name"] = entry.get("spot_or_region_id")
+        wx_payload["windrichtung"] = windrichtung
+        wx_payload["ideal_wind_max"] = ideal_wind_max
+
+    alt_payload = {
+        "elevation_m": elevation_m,
+        "dates": [target_date],
+        "data": alt_by_day,
+    }
+
+    return jsonify({"ok": True, "wx": wx_payload, "alt": alt_payload})
+
+
 @app.route("/api/admin/labeled-examples/<analysis_id>", methods=["PATCH"])
 @_require_admin
 def api_labeled_examples_patch(analysis_id):
@@ -2329,9 +2467,9 @@ def api_briefing_generate():
         from engine.synoptic_llm import refresh_synoptic_overview
         from fetch_weather import load_cached_weather
         wcache = load_cached_weather()
-        if wcache and engine.analysis_client:
+        if wcache and engine.synoptic_client:
             sctx = refresh_synoptic_overview(
-                wcache, engine.analysis_client, engine.analysis_model,
+                wcache, engine.synoptic_client, engine.synoptic_model,
             )
             if sctx:
                 wetterlage_status = (
@@ -2341,7 +2479,7 @@ def api_briefing_generate():
                 wetterlage_status = "build_failed"
         else:
             wetterlage_status = (
-                "no_weather_cache" if not wcache else "no_analysis_client"
+                "no_weather_cache" if not wcache else "no_synoptic_client"
             )
     except Exception as e:
         logger.exception("api_briefing_generate: Wetterlage-Refresh fehlgeschlagen: %s", e)

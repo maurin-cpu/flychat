@@ -6,6 +6,16 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 
 **Status-Werte**: `offen` / `in-untersuchung` / `gefixt` / `nicht-reproduzierbar`
 
+> ⚠ **Migrations-Bruch 2026-05-22** — Spot-Quelle (DHV → PGE, 487 → 495 Spots),
+> Wind-Sektor-Modell (Text → 8 Binär-Spalten, neuer `/`-disjoint-Separator) und
+> Skill-Eingangs-Format (Bemerkungen vor-klassifiziert in `Flug`/`Sicherheit`)
+> wurden umgestellt. Siehe `2026-05-22.md` (Migrations-Marker). Issue-Tageszähler
+> ab diesem Datum **nicht direkt mit Pre-Migration-Tagen mergen** — viele
+> Pre-Migration-Findings (insb. I-006 Sektor-Drift, I-009 Mapping) können
+> durch die neue Datenbasis aufgelöst sein, müssen aber Tag-zu-Tag re-validiert
+> werden. 71/488 PGE-Spotnamen matchen alte DHV-Schlüssel direkt; der Rest
+> braucht coordinate-based Mapping.
+
 ---
 
 ## I-001 — not_safe False-Positives bei Voralpen/Jura/Walliser Spots

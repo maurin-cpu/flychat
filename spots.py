@@ -1,6 +1,11 @@
 """
 Spot-Verwaltung für Gleitcast.
-Lädt Fluggebiete aus CSV und stellt Such-/Filterfunktionen bereit.
+
+Lädt Fluggebiete aus CSV (PGE-Schema, Mai 2026) und stellt Such-/Filterfunktionen
+bereit. CSV-Spalten: wind_N..wind_NW (binaer 0/1), bemerkungen_flug,
+bemerkungen_sicherheit, plus Geometrie/Terrain-Metadaten. `windrichtung` wird
+aus den Sektor-Spalten in legacy-kompatiblem German-Hyphen-Format synthetisiert
+(z.B. `O-SO-S-SW-W` fuer contiguous, `S/N` fuer disjoint).
 """
 
 import csv
@@ -9,10 +14,55 @@ import os
 import re
 import tempfile
 from pathlib import Path
+import config
 from config import CSV_PATH
 
 
 _URL_UNSAFE_CHARS = re.compile(r"[\\/?#]+")
+
+_PGE_SECTOR_ORDER = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+_PGE_TO_DE = {"N": "N", "NE": "NO", "E": "O", "SE": "SO",
+              "S": "S", "SW": "SW", "W": "W", "NW": "NW"}
+
+
+def _sectors_to_windrichtung(sectors_bin: dict) -> str:
+    """Synthetisiert legacy-kompatibles windrichtung-Format aus PGE 8-Sektor-Dict.
+
+    Contiguous Arc → 'NO-O-SO'. Mehrere disjunkte Runs → 'NO-O/W-NW'
+    ('-' = contiguous, '/' = disjoint). Wraparound (NW-N-NE) wird korrekt
+    behandelt. Leerer String wenn alle Sektoren 0.
+    """
+    flags = []
+    for s in _PGE_SECTOR_ORDER:
+        try:
+            flags.append(int(sectors_bin.get(s, 0)) >= 1)
+        except (TypeError, ValueError):
+            flags.append(False)
+    if not any(flags):
+        return ""
+    if all(flags):
+        return "-".join(_PGE_TO_DE[s] for s in _PGE_SECTOR_ORDER)
+    n = len(_PGE_SECTOR_ORDER)
+    # Anker auf False→True-Boundary, damit Wraparound sauber aufloest
+    anchor = 0
+    for i in range(n):
+        if not flags[i] and flags[(i + 1) % n]:
+            anchor = (i + 1) % n
+            break
+    runs: list[list[int]] = []
+    k = 0
+    while k < n:
+        idx = (anchor + k) % n
+        if flags[idx]:
+            run: list[int] = []
+            while k < n and flags[(anchor + k) % n]:
+                run.append((anchor + k) % n)
+                k += 1
+            runs.append(run)
+        else:
+            k += 1
+    parts = ["-".join(_PGE_TO_DE[_PGE_SECTOR_ORDER[i]] for i in r) for r in runs]
+    return "/".join(parts)
 
 
 def sanitize_spot_name(name: str) -> str:
@@ -31,7 +81,7 @@ def sanitize_spot_name(name: str) -> str:
 
 
 def load_spots(csv_path=None):
-    """Lädt alle Spots aus der CSV-Datei."""
+    """Lädt alle Spots aus der PGE-Schema-CSV."""
     path = csv_path or CSV_PATH
     spots = []
     # UTF-8 (mit BOM-Support), Fallback auf Windows-1252 (Excel-Standard)
@@ -42,11 +92,16 @@ def load_spots(csv_path=None):
         with open(path, encoding="cp1252") as f:
             lines = f.readlines()
 
-    import io
     reader = csv.DictReader(io.StringIO("".join(lines)))
+    default_ideal_wind_max = getattr(config, "WIND_IDEAL_MAX_KMH", 20)
+
     for row in reader:
         if not row.get("site_name", "").strip():
             continue
+
+        sectors = {k: row.get(f"wind_{k}", "0") for k in _PGE_SECTOR_ORDER}
+        windrichtung = _sectors_to_windrichtung(sectors)
+
         spots.append({
             "region": row["region"].strip(),
             "fluggebiet": row["fluggebiet"].strip(),
@@ -54,9 +109,10 @@ def load_spots(csv_path=None):
             "latitude": float(row["latitude"]),
             "longitude": float(row["longitude"]),
             "elevation_m": int(float(row["elevation_m"])),
-            "windrichtung": row["windrichtung"].strip(),
-            "bemerkung": row.get("Bemerkungen", "").strip(),
-            "ideal_wind_max": int(row["ideal_wind_max_kmh"]) if row.get("ideal_wind_max_kmh") else 30,
+            "windrichtung": windrichtung,
+            "bemerkungen_flug": row.get("bemerkungen_flug", "").strip(),
+            "bemerkungen_sicherheit": row.get("bemerkungen_sicherheit", "").strip(),
+            "ideal_wind_max": default_ideal_wind_max,
             "slope_azimuth": int(row["slope_azimuth"]) if row.get("slope_azimuth") else None,
             "slope_angle": int(row["slope_angle"]) if row.get("slope_angle") else 25,
             "kritischer_foehn": row.get("kritischer_foehn", "Süd").strip() or "Süd",

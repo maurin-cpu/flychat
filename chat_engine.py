@@ -431,8 +431,10 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         """
         self.chat_provider = config.CHAT_PROVIDER
         self.analysis_provider = config.ANALYSIS_PROVIDER
+        self.synoptic_provider = config.SYNOPTIC_PROVIDER
         self.chat_model = config.get_model(self.chat_provider, "chat")
         self.analysis_model = config.get_model(self.analysis_provider, "analysis")
+        self.synoptic_model = config.SYNOPTIC_MODEL
         self.chat_client = build_client(
             self.chat_provider, config.get_api_key(self.chat_provider), timeout=120.0
         )
@@ -447,12 +449,24 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
                 config.get_api_key(self.analysis_provider),
                 timeout=120.0,
             )
+        # Synoptik-Client: Reuse, wenn Provider mit chat/analysis identisch.
+        if self.synoptic_provider == self.chat_provider and self.chat_client is not None:
+            self.synoptic_client = self.chat_client
+        elif self.synoptic_provider == self.analysis_provider and self.analysis_client is not None:
+            self.synoptic_client = self.analysis_client
+        else:
+            self.synoptic_client = build_client(
+                self.synoptic_provider,
+                config.get_api_key(self.synoptic_provider),
+                timeout=120.0,
+            )
         self.client = self.chat_client
         self.model = self.chat_model
         logger.info(
-            "LLM-Setup: chat=%s/%s, analysis=%s/%s",
+            "LLM-Setup: chat=%s/%s, analysis=%s/%s, synoptic=%s/%s",
             self.chat_provider, self.chat_model,
             self.analysis_provider, self.analysis_model,
+            self.synoptic_provider, self.synoptic_model,
         )
 
     def reset_conversation(self, session_id: str):
@@ -519,7 +533,8 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
                     "fluggebiet": spot["fluggebiet"],
                     "elevation_m": spot["elevation_m"],
                     "windrichtung": spot["windrichtung"],
-                    "bemerkung": spot.get("bemerkung", ""),
+                    "bemerkungen_flug": spot.get("bemerkungen_flug", ""),
+                    "bemerkungen_sicherheit": spot.get("bemerkungen_sicherheit", ""),
                     "reference_points": ref_points,
                     "has_weather": spot_name in self.weather_data,
                     "data_sources": data_sources,
@@ -564,33 +579,41 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         return False
 
     def _parse_wind_range(self, range_str):
-        """Konvertiert 'NW-SW' oder 'O' in [(Winkel_Start, Winkel_Ende)]."""
-        parts = re.split(r'[-/]', range_str.upper())
-        angles = []
-        for p in parts:
-            p = p.strip()
-            if p in COMPASS_POINTS:
-                angles.append(COMPASS_POINTS[p])
-            else:
-                # Versuche nur Buchstaben zu extrahieren (falls 'NW (leicht)' drinstünde)
-                match = re.search(r'([A-Z]+)', p)
-                if match and match.group(1) in COMPASS_POINTS:
-                    angles.append(COMPASS_POINTS[match.group(1)])
-        
-        if len(angles) == 1:
-            # Einzelsektor: Gib +/- 45 Grad Bereich
-            return [( (angles[0]-45)%360, (angles[0]+45)%360 )]
-        elif len(angles) >= 2:
-            # Mehrere Teile: Erzeuge Sektoren
-            res = []
-            for i in range(len(angles)-1):
-                start, end = angles[i], angles[i+1]
-                # Richtungsentscheidung: Der kleinere Weg (<= 180 Grad)
-                diff = (end - start) % 360
-                if diff > 180:
-                    # Tausche start/end um den kleineren Sektor zu nehmen
-                    res.append((end, start))
+        """Konvertiert 'NW-SW', 'O' oder 'NO-O/W-NW' in [(Winkel_Start, Winkel_Ende), ...].
+
+        Separator-Semantik:
+          '-' = contiguous arc (z.B. 'SO-S-SW' = einzelner Bereich 135°-225°)
+          '/' = disjoint runs   (z.B. 'NO-O/W-NW' = zwei getrennte Bereiche)
+        Damit kann das PGE-Schema sowohl Wraparound (NW-N-NO) als auch
+        disjunkte Sektoren (N/S) ausdruecken.
+        """
+        if not range_str:
+            return []
+        all_ranges = []
+        for disjoint_part in range_str.split("/"):
+            disjoint_part = disjoint_part.strip()
+            if not disjoint_part:
+                continue
+            parts = disjoint_part.upper().split("-")
+            angles = []
+            for p in parts:
+                p = p.strip()
+                if p in COMPASS_POINTS:
+                    angles.append(COMPASS_POINTS[p])
                 else:
-                    res.append((start, end))
-            return res
-        return []
+                    # Versuche nur Buchstaben zu extrahieren (falls 'NW (leicht)' drinstünde)
+                    match = re.search(r'([A-Z]+)', p)
+                    if match and match.group(1) in COMPASS_POINTS:
+                        angles.append(COMPASS_POINTS[match.group(1)])
+            if len(angles) == 1:
+                # Einzelsektor: Gib +/- 45 Grad Bereich
+                all_ranges.append(((angles[0] - 45) % 360, (angles[0] + 45) % 360))
+            elif len(angles) >= 2:
+                for i in range(len(angles) - 1):
+                    start, end = angles[i], angles[i + 1]
+                    diff = (end - start) % 360
+                    if diff > 180:
+                        all_ranges.append((end, start))
+                    else:
+                        all_ranges.append((start, end))
+        return all_ranges

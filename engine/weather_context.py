@@ -440,8 +440,13 @@ class WeatherContextMixin:
                 f"Max. Wind: {spot['ideal_wind_max']} km/h | "
                 f"Kritischer Föhn: {spot['kritischer_foehn']}"
             )
-            if spot.get("bemerkung"):
-                lines.append(f"Bemerkung: {spot['bemerkung']}")
+            # Vor-klassifizierte Bemerkungen (flug/sicherheit getrennt).
+            bem_flug = (spot.get("bemerkungen_flug") or "").strip()
+            bem_sich = (spot.get("bemerkungen_sicherheit") or "").strip()
+            if bem_flug:
+                lines.append(f"Bemerkung Flug: {bem_flug}")
+            if bem_sich:
+                lines.append(f"Bemerkung Sicherheit: {bem_sich}")
 
             hourly_data = spot_data.get("hourly_data", {})
             pressure_level_data = spot_data.get("pressure_level_data", {})
@@ -1404,8 +1409,13 @@ class WeatherContextMixin:
             f"Max. Wind: {spot['ideal_wind_max']} km/h | "
             f"Kritischer Föhn: {spot['kritischer_foehn']}",
         ]
-        if spot.get("bemerkung"):
-            lines.append(f"Bemerkung: {spot['bemerkung']}")
+        # Vor-klassifizierte Bemerkungen (flug/sicherheit getrennt).
+        bem_flug_single = (spot.get("bemerkungen_flug") or "").strip()
+        bem_sich_single = (spot.get("bemerkungen_sicherheit") or "").strip()
+        if bem_flug_single:
+            lines.append(f"Bemerkung Flug: {bem_flug_single}")
+        if bem_sich_single:
+            lines.append(f"Bemerkung Sicherheit: {bem_sich_single}")
 
         hourly_data = spot_data.get("hourly_data", {})
         pressure_level_data = spot_data.get("pressure_level_data", {})
