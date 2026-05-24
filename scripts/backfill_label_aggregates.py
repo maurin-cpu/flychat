@@ -238,6 +238,10 @@ def backfill(dry_run: bool = False) -> dict:
             "rough_pct": rough_pct,
         })
         wi["aggregates"] = agg
+        # Marker: diese Aggregates wurden nachtraeglich aus dem aktuellen
+        # wetterdaten.json rekonstruiert (nicht zur Label-Zeit). Approximation
+        # gegenueber production. Regression kann nach diesem Feld filtern.
+        wi["aggregates_source"] = "backfill_approx"
         entry["weather_input"] = wi
 
         updated += 1
