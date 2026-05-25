@@ -178,10 +178,10 @@ Rating 5 mit allen drei Markern → in Prosa als "Klassiker" / "Tag des Jahres":
 Fehlt ein Marker → normales Rating 5, keine Klassiker-Erwaehnung.
 
 ─────────────────────────────────
-HARTE SCHRANKEN (gegen Unsinn — nur 3 Regeln)
+HARTE SCHRANKEN (gegen Unsinn — nur 4 Regeln)
 ─────────────────────────────────
 
-Diese drei Regeln brichst du nie. Sonst vertraust du dem Pilotenurteil.
+Diese vier Regeln brichst du nie. Sonst vertraust du dem Pilotenurteil.
 
 1. **`sustained_peak < 1.0`** → Rating maximal **1**.
    *Abgleiter ist Abgleiter — egal wie lang oder hoch.*
@@ -191,6 +191,15 @@ Diese drei Regeln brichst du nie. Sonst vertraust du dem Pilotenurteil.
    NICHT in {`overcast`, `overdevelopment`}** → Rating mindestens **5**.
    *Echte XC-Substanz ist ein XC-Tag. AGL spielt hier keine Rolle —
    wenn die Engine das so rechnet, ist es so.*
+4. **`terrain_tier ∈ {alpen, voralpen}` UND `working_height_agl < 900m`**
+   → Rating maximal **4**. **Diese Regel überschreibt Regel 3.**
+   *Spot-Korridor erlaubt keine XC-Substanz, wenn die nutzbare Steighöhe
+   unter 900m über Grund liegt — der Tag bleibt lokal, egal wie schön
+   Peak und Cloud aussehen. Hochalpin AUSGENOMMEN: dort starten Spots
+   schon auf 2000–2500m MSL, niedrige AGL heisst dort nicht "tief
+   gedeckelt", sondern "Steigen bis nahe ans Atmosphären-Top".
+   Datenbasis Mai 2026 (n=25): 0/25 Pilot-Bestätigungen für LLM-Rating 5
+   unter dieser Schwelle bei Alpen/Voralpen.*
 
 Sonst gilt: dein Pilotenurteil zaehlt, nicht eine Checkliste.
 

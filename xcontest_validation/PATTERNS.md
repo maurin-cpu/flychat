@@ -21,8 +21,19 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 ## I-001 — not_safe False-Positives bei Voralpen/Jura/Walliser Spots
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05)
 **Status**: in-untersuchung (Trigger identifiziert, Sub-Issues separieren) — **Top-Refactor-Prio**
+
+**Betroffene Spots (24.05.)** — Wallis-Festival mit 295 PG-Eintraegen (Tagessieger 295km Riederalp/Aeschbach):
+- **Verbier-Trio** (Ruinettes S-SW-W + Croix-de-Coeur SO-S-SW): 6 Launches, **153 km MARET** (Wind 307° NW, beide Varianten ausserhalb)
+- **Niesen** (SW Sektor): **130 km JOHNSTON** (Wind 62° NE)
+- **Grand Chamossaire** (S-SW-W): 3 Launches, **101 km RUDAZ** (no_go=`Ueberentwicklungsgefahr CAPE >1500`, NEU)
+- **Haldigrat** (SW): **9 Launches, 61 km BOHREN** (Wind 62° NE — Single-Sided-Sektor)
+- **Cimetta** (S-SW): 4 Launches, **56 km BOSCACCI** (Wind 168° **IM Sektor**, nur Block-Filter → I-007)
+- **Niederhorn** (SO-S): **7 Launches, 43 km HINNI** (Wind 71° NE, klassischer NE-Tag-Klassiker)
+- **Montlinger Schwamm** (N-NO): 2 Launches, 43 km MARTY (Wind 25° NE **IM Sektor** → I-007)
+- **Hinterrugg/Jaman/Stockberg** je 2× und kleinere 1×-Eintraege bis 26 km
 
 **Betroffene Spots (17.05.)**:
 - Weissenstein (6 Flüge, bester 107 km)
@@ -239,15 +250,31 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 ## I-005 — Coverage-Gaps: produktive Spots nicht in unserer DB
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 5 (17.05, 18.05, 19.05, 20.05, 21.05). Wiederkehrer:
-- **Saas-Fee** 2 Tage in Folge (19.05 142km, 21.05 132km)
-- **Riederalp** 2 Tage in Folge (19.05 36km, 21.05 110km)
-- **Grindelwald** mind. 2 Tage (heute 9 Launches/59km — wird zur Top-Coverage-Prio)
-- **Tussweid** 3 Tage in Folge (18.05/19.05/20.05)
-- **Galgenen** mind. 2 Tage (20.05 implizit, 21.05 8 Launches)
-- **Burgfeldstand** 2 Tage (20.05, 21.05)
-- **Gornergrat** 2 Tage (18.05, 21.05)
-**Status**: offen
+**Tage beobachtet (Pre-Migration)**: 5 (17.05, 18.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05). Wiederkehrer:
+- **Saas-Fee** 2 Tage in Folge (19.05 142km, 21.05 132km) — Pre-Migration
+- **Riederalp** Pre-Migration 2 Tage (19.05, 21.05) — **Post-Migration jetzt in PGE als `Riederalp- Greicheralp` aufgeloest!** safe/5
+- **Grindelwald** Pre-Migration 2 Tage — **Post-Migration jetzt als `Grindelwald - First` aufgeloest!** 24.05 11 Launches CONFIRM
+- **Galgenen** Pre-Migration 2 Tage — **Post-Migration als `Gschwand - Galgenen` aufgeloest!** 24.05 4 Launches CONFIRM
+- **Mentschelen** Pre-Migration als coverage_gap — **Post-Migration als `Möntschelealp` aufgeloest!** 24.05 17 Launches CONFIRM (Mass-Mapping-Fix)
+- **Tussweid** 3 Tage in Folge (18.05/19.05/20.05) — Pre-Migration; Status post-Migration unklar
+- **Burgfeldstand** 2 Tage (20.05, 21.05) — Post-Migration in PGE als `Burgfeldstand` aufgeloest, 24.05 1× 24km CONFIRM
+- **Gornergrat** 2 Tage (18.05, 21.05) — Pre-Migration
+- **Moosfluh** NEU (24.05) — 2× 253km, **HOECHSTE PRIO** (HG-Top-Tier, direkt neben Riederalp, fehlt in PGE)
+- **Walalp** NEU (24.05) — 9 Launches 56km Mike Wicki
+**Status**: offen — **PGE-Migration hat etliche alte gaps aufgeloest (Riederalp, Grindelwald, Galgenen, Mentschelen, Burgfeldstand)**, dafuer neue gaps freigelegt (Moosfluh ist die haerteste).
+
+**Fehlende Spots 24.05.** — 18 Eintraege (davon 9 ≥30 km bedeutsam):
+- **Moosfluh** (2× **253.35 km** Pattou) — HOECHSTE PRIO Goms
+- **Walalp** (**9 Launches** 56 km) — Stoos/Morschach?
+- **Torrentalp** (1× 69 km) — Wallis Leukerbad NEU
+- **Visperterminen** (1× 45 km) — Wallis Visp Heido
+- **Laubbärgli** (1× 43 km) — BO Maennlichen/Wengen NEU
+- **Sembrancher** (1× 41 km) — Unterwallis Catogne NEU
+- **Lauihöchi** (1× 38 km) — ZS Voralpen?
+- **National Park** (1× 30 km) — Engadin S-charl/Lischana NEU
+- **Cabane des Audannes** (1× 28 km) — Wallis Conthey NEU
+- Kleinere: **Rotmoos 3× 12 km** (NEU, wiederkehrendes Pattern beobachten), Leissigbächli, Planachaux, Leiggern, Sarn Alp, Gantrisch, Heruhubil, Schönboden, UNKNOWN 2×
 
 **Fehlende Spots (Top-100-Flug-Generatoren) 17.05.**:
 - Grindelwald, Riederalp, Albagno, Bözingenberg, Carì, Turren, Verbier,
@@ -313,8 +340,18 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 ## I-006 — Sektor-Definition in `fluggebiete_complete.csv` zu eng
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
-**Status**: offen — am 21.05 (NE-Wind-Tag) **fast jedes False-Positive auf diesem Issue**
+**Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05) — auch nach Migration weiterhin Top-FP-Treiber
+**Status**: offen — am 21.05 (NE-Wind-Tag) **fast jedes False-Positive auf diesem Issue**; am 24.05 ebenfalls dominant
+
+**Beobachtungen 24.05.** (Sektor-Drift):
+- **Haldigrat (SW) bei Wind 62° NE — 9 Launches/61 km BOHREN** — HG-Spot mit Single-Sided-Sektor; real O-Hang nutzbar
+- **Niederhorn (SO-S) bei Wind 71° NE — 7 Launches/43 km HINNI** — Klassiker, NE-Wind-Tage immer falsch
+- **Verbier (alle DB-Varianten S-SW-W bzw SO-S-SW) bei Wind 307° NW — 6 Launches/153 km MARET** — 3. Variante fehlt komplett
+- **Niesen (SW) bei Wind 62° NE — 1×/130 km JOHNSTON** — Niesen hat real auch Ost/NE-Variante
+- **Jaman (SW-W-NW) bei Wind 29° NE — 2×/24 km** — Repeat 21.05
+- **Hinterrugg (SO-S-SW/NW-N disjoint) bei Wind 52° NE — 2×/26 km** — zwischen disjoint Sektoren
+- **Stockhorn/Brienzer Rothorn/Mostelegg/Stockberg** je 1× bei NE-Wind ausserhalb der jeweiligen S/SW-Sektoren
 
 **Beobachtung**: Mehrere Spots haben in der CSV nur **eine** Hauptstart-Richtung,
 real aber mehrere brauchbare Sektoren oder einen breiteren Wind-Sektor als
@@ -367,11 +404,17 @@ führt aber nur eine Variante.
 ## I-007 — `CLEAN_WINDOW_MIN_HOURS = 2` blockt 1-Stunden-Starts
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05)
 **Status**: offen — am 21.05 besonders auffaellig: **Kronberg 1 hat Wind 42°NE EXAKT
 im NW-NO Sektor, scheitert NUR am Block-Filter ("Nur 2h sauber"). 5 Launches/43km zeigen
 Spot war fliegbar.** Ebenso Burst, Fiescheralp, Niederbauen, Kerenzerberg, Seebodenalp,
 Fronalpstock, Obere Wengi am 21.05 nur durch Block-Filter blockiert.
+
+**Beobachtungen 24.05.** (Wind IM Sektor, nur Block-Filter blockt):
+- **Cimetta (S-SW) Wind 168° S EXAKT** — 4 Launches/56 km BOSCACCI; no_go "Nur 1h sauber, kein zsh. Block"
+- **Montlinger Schwamm (N-NO) Wind 25° NE EXAKT** — 2 Launches/43 km MARTY; gleicher no_go-Text
+- **Crans-Mon Cry d'Er (SO) Wind 14° N knapp ausserhalb**, aber no_go ist Block-Filter ("Nur 1h sauber"), nicht Sektor → ueberlagert mit I-006
 
 **Beobachtung**: Schwelle "zusammenhängender Block ≥ 2h" sperrt Spots aus,
 deren passendes Wind-Fenster real nur 1-2h dauert. Locals starten aber
@@ -403,10 +446,15 @@ nachweislich in solchen Fenstern (Streckenflug 60+ km möglich).
 ## I-008 — Pre-Filter ignoriert Wind-Stärke
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05)
 **Status**: offen — 21.05 Niesen: dir 72°E bei **Gust 17 km/h** (sehr schwach!) trotzdem
 not_safe; 5 Launches inkl. 78km Strecke. Bei <20 km/h Gust ist Sektor fliegerisch fast
 egal. Pilatus Kulm 22 km/h Gust analog.
+
+**Beobachtungen 24.05.**:
+- **Niesen** wiederholt: Wind 62° NE bei Gust **30 km/h**, Sektor SW → 130 km JOHNSTON (Schwelle hier hoeher als 21.05, aber Sektor-Misfit dominierte)
+- **Grand Chamossaire** Wind 302° NW bei Gust 17 km/h, Sektor W am Rand — 101 km RUDAZ; Gust 17 ist genau die Schwelle, ab der Sektor irrelevant wird
 
 **Beobachtung**: Sektor-Filter prüft nur Richtung, nicht Stärke. Bei
 **sehr schwachem Wind** (z.B. Mont Raimeux Nord 1-7 km/h bei 13h) ist die
@@ -438,12 +486,20 @@ Schwelle auf "Sektor irrelevant").
 ## I-009 — Spot-Mapping XContest-Bezeichnung → DB-Bezeichnung
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05) — **PGE-Migration loest etliche, schafft aber neue**
 **Status**: offen — am 21.05 grosser Multi-Variante-Erfolg (Ebenalp 1 von 3, Crans-Mon
 3 Varianten korrekt aufgeloest, Verbier → Ruinettes, Tritt → Ufem Tritt analog vorhin).
 **ABER**: Brunnihütte (12 Launches an `not_safe`-W-SW-Spot bei N-Wind) signalisiert, dass
 der Brunni-Spot real einen N/NE-Hang als Alternative haben muss, der in DB fehlt.
 Bellalui-Sektor-Parser hat heute funktioniert (1°N → in NO-W).
+
+**Mapping-Drift Post-PGE (24.05)**:
+- **Aufgeloest** (waren coverage_gap Pre-Migration, jetzt PGE-gemappt): Riederalp → `Riederalp- Greicheralp`, Grindelwald → `Grindelwald - First`, Mentschelen → `Möntschelealp` (**Mass-Confirm 17×**), Galgenen → `Gschwand - Galgenen`, Brunni → `Engelberg - Brunni - Schonegg`, Burgfeldstand → `Burgfeldstand`
+- **Naming-Drift** (XContest-Name ≠ PGE-Name): Amisbühl → `Amisbuehl` (ohne Umlaut), Prodchamm → `Prodkamm`, Les Pètis → `Les Pétis`, Grand Chamossaire → `Le Chamossaire-1980`, Crans-Montana → 3 Varianten (Cry d Er, Bella Lui, Aminona)
+- **Verbier-Variante-Loch (NEU)**: beide DB-Varianten (Ruinettes S-SW-W + Croix-de-Coeur SO-S-SW) decken NW-Wind nicht ab — bei 6 Piloten/153 km MARET fehlt 3. Variante
+- **Brunni-Schonegg-Frage**: Sektor SO-S-SW-W bei Wind 354° N — `conditional` Status passt zur Realitaet (10 Launches/56 km), aber Sektor "logisch" ausserhalb. Hypothese: PGE-Schonegg-Variante hat real N-Anbindung am Grat
+- **Sub-Issue Stockberg ≠ Chörnlisegg**: mein Fuzzy-Match war forsch — Chörnlisegg liegt Hundwil/Appenzell, Stockberg ist Toggenburg. 1× 20 km Eintrag im Borderline-Bereich
 
 **Beobachtung**: XContest verwendet andere Spot-Namen als unsere DB. Wenn das
 Mapping falsch ist, wird der Vergleich falsch.
@@ -537,6 +593,30 @@ kein 3h-Block" (oder die Anforderung in der CLEAN_WINDOW_MIN_HOURS-Berechnung an
 - Falls Block-Schwelle = 3h und 3 saubere Stunden existieren: warum greift es trotzdem?
   → vermutlich Lueckenbedingung (z.B. 1h Lücke darin)
 - Text anpassen: "Nur Xh sauber, davon keine 3h-Block-Kontinuitaet" oder analog
+
+---
+
+## I-012 — CAPE-Filter zu konservativ an Top-Thermik-Tagen
+
+**Erstmals**: 2026-05-24
+**Tage beobachtet**: 1 (24.05)
+**Status**: offen — Erstbefund, weitere Tage abwarten bevor Hypothese
+
+**Beobachtung 24.05.**:
+- **Grand Chamossaire** (`Le Chamossaire-1980`, Waadtl. Alpen): no_go = "Ueberentwicklungsgefahr: CAPE >1500 J/kg oder CAPE+Regen aktiv" → status=not_safe
+- Real: **3 Piloten, 101 km RUDAZ + 41 km Boran + 38 km Jeremie DR**
+- Wind 302° NW knapp ausserhalb S-SW-W Sektor (am Rand), aber das war NICHT der Block-Grund — der CAPE-Filter dominierte
+- Tag war ein Wallis-Festival ohne Gewitter-Vorfaelle (CAPE max im Snapshot bei vielen Wallis-Spots 100-300 J/kg, sehr ruhig)
+
+**Vermutete Ursache**:
+- CAPE-Threshold im Pre-Filter scheint absolut auf 1500 J/kg gesetzt zu sein, ohne Kontext (Tageszeit, LI, Wind-Shear)
+- An Top-Thermik-Tagen mit hoher CAPE aber stabilem LI / fehlendem Trigger → keine Ueberentwicklung
+- Filter feuert wohl unabhaengig von der Wahrscheinlichkeit der Aktivierung
+
+**Naechste Schritte**:
+- 1-2 weitere Tage mit Grand-Chamossaire-Daten abwarten, ob Pattern reproduzierbar
+- CAPE-Cutoff im Code finden (vermutlich `engine/decision_engine.py` oder `_prefilter_not_safe`)
+- Konditional gegen LI/Shear/Tagesschnitt CIN pruefen statt absolutes CAPE
 
 ---
 
