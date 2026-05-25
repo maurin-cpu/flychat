@@ -211,14 +211,20 @@ def _extract_weather_slice(kind: str, entity_id: str, target_date: str) -> dict[
     node = node or {}
     hourly_all = node.get("hourly_data") or {}
     plev_all = node.get("pressure_level_data") or {}
+    # Mai 2026: Region-Snapshot soll Spot-Median-Override mitsnapshotten, damit
+    # historische Region-Labels die korrekte Thermik (max_h aus Spot-Median)
+    # zeigen statt die Refpoint-Werte aus pressure_level_data.
+    spotmedian_all = node.get("thermals_spotmedian") or {}
 
     prefix = f"{target_date}T"
     hourly_day = {ts: v for ts, v in hourly_all.items() if ts.startswith(prefix)}
     plev_day = {ts: v for ts, v in plev_all.items() if ts.startswith(prefix)}
+    spotmedian_day = {ts: v for ts, v in spotmedian_all.items() if ts.startswith(prefix)}
 
     return {
         "hourly": hourly_day,
         "pressure_levels": plev_day,
+        "thermals_spotmedian": spotmedian_day,
     }
 
 
@@ -358,6 +364,7 @@ def build_snapshot(
         "weather_input": {
             "hourly": weather.get("hourly") or {},
             "pressure_levels": weather.get("pressure_levels") or {},
+            "thermals_spotmedian": weather.get("thermals_spotmedian") or {},
             "aggregates": aggregates,
             "elevation_m": _elevation_for(kind, entity_id),
             "month": int(target_date.split("-")[1]) if "-" in target_date else None,

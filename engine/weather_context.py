@@ -2618,6 +2618,11 @@ class WeatherContextMixin:
 
         hourly_data = region_data.get("hourly_data", {})
         pressure_level_data = region_data.get("pressure_level_data", {})
+        # Mai 2026: Spot-Median-Override fuer Region-Thermik. Refpoint-Aggregation
+        # traf Pilot-Realitaet schlecht (median |Bias| 794m). Wenn n_spots >= 3,
+        # ueberschreibt max_height/climb_rate/lcl. Siehe fetch_weather.py
+        # _compute_region_spotmedian_thermals fuer Motivation.
+        spotmedian_override = region_data.get("thermals_spotmedian")
 
         # Stateful Thermik-Berechnung über alle Stunden (Single Source of Truth:
         # gleiche climb_rate / max_height wie im Meteogramm). Siehe
@@ -2628,6 +2633,7 @@ class WeatherContextMixin:
             elev_ref,
             config.PRESSURE_LEVELS,
             region_id=rid,
+            spotmedian_override=spotmedian_override,
         )
 
         sorted_times = sorted(hourly_data.keys())

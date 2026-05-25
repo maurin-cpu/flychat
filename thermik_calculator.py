@@ -1532,6 +1532,7 @@ def compute_daily_thermals(
     slope_azimuth: float = None,
     slope_angle: float = None,
     region_id: str = None,
+    spotmedian_override: Optional[Dict[str, Dict]] = None,
 ) -> Dict[str, Dict]:
     """
     Stateful Thermik-Berechnung für alle Stunden.
@@ -1540,6 +1541,14 @@ def compute_daily_thermals(
     lesen aus derselben Berechnung. State (previous_max_height, cumulative_buoyancy,
     peak_H, peak_shortwave) wird pro Kalendertag zurückgesetzt, damit Thermal Inertia,
     Encroachment-Cap und H-skalierte Verfallsrate konsistent wirken.
+
+    spotmedian_override (Mai 2026): nur fuer Regionen genutzt. Wenn pro Stunde gesetzt,
+    werden max_height / climb_rate / lcl mit dem Spot-Median der in-region Spots
+    ueberschrieben — Refpoint-Aggregation traf Pilot-Realitaet schlecht (median |Bias|
+    794m gegen Spot-Median, 16/23 Regionen >100m zu tief). Wind / Wolken / Niederschlag
+    bleiben Refpoint-aggregiert. Format: {ts: {"max_height": int, "climb_rate": float,
+    "lcl": int}}. State (prev_max_h) wird ebenfalls auf override gesetzt, damit
+    Inertia/Encroachment konsistent zur ueberschriebenen Hoehe rechnen.
 
     Returns: {timestamp: therm_result}  (therm_result enthält 'error' bei Fehlschlag)
     """
@@ -1609,6 +1618,17 @@ def compute_daily_thermals(
             peak_shortwave=peak_sw,
             region_id=region_id,
         )
+
+        # Spot-Median Override (Regionen). Ueberschreibt max_height / climb_rate / lcl
+        # nach der Refpoint-Berechnung. State (prev_max_h) wird unten auf override
+        # gesetzt, damit Thermal Inertia / Encroachment-Cap konsistent zur ueber-
+        # schriebenen Hoehe rechnen.
+        if spotmedian_override and therm and "error" not in therm:
+            ov = spotmedian_override.get(timestamp)
+            if ov:
+                for k in ("max_height", "climb_rate", "lcl"):
+                    if k in ov and ov[k] is not None:
+                        therm[k] = ov[k]
 
         results[timestamp] = therm
 

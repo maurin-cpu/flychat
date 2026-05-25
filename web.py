@@ -1972,12 +1972,17 @@ def api_labeled_examples_meteogram(analysis_id):
             region = find_region_for_point(spot_info.get("lat") or 0, spot_info.get("lon") or 0)
         region_id = region["id"] if region else None
 
+    # Mai 2026: Region-Labels reichen Spot-Median-Override aus dem Snapshot weiter,
+    # damit historische Anzeigen die korrekte Thermik (max_h aus Spots) zeigen.
+    spotmedian_override = wi.get("thermals_spotmedian") if is_region else None
+
     chart_data = format_data_for_charts(
         hourly_data, pressure_level_data,
         elevation_ref=elevation_m,
         slope_azimuth=slope_az,
         slope_angle=slope_an,
         region_id=region_id,
+        spotmedian_override=spotmedian_override,
     )
     if is_region:
         for w in chart_data.get("wind", []):
@@ -3478,9 +3483,10 @@ def api_region_weather(region_id):
     hourly_data = region_data.get("hourly_data", {})
     pressure_level_data = region_data.get("pressure_level_data", {})
     elevation_ref = region_data.get("elevation_ref", 1200)
+    spotmedian_override = region_data.get("thermals_spotmedian")
 
     chart_data = format_data_for_charts(hourly_data, pressure_level_data, elevation_ref=elevation_ref,
-                                        region_id=region_id)
+                                        region_id=region_id, spotmedian_override=spotmedian_override)
 
     # Regionen haben keine Böen (Apr 2026): gusts = null.
     # Frontend (meteogram.js) interpretiert null korrekt: hasRealGust=false →
@@ -3837,8 +3843,14 @@ def _safe_get(arr, i):
 # ============================================================================
 
 def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=None,
-                           slope_azimuth=None, slope_angle=None, region_id=None):
-    """Formatiert Daten für D3.js Charts inkl. Thermik-Physik."""
+                           slope_azimuth=None, slope_angle=None, region_id=None,
+                           spotmedian_override=None):
+    """Formatiert Daten für D3.js Charts inkl. Thermik-Physik.
+
+    spotmedian_override (Mai 2026): nur fuer Regionen. Ueberschreibt max_height /
+    climb_rate / lcl pro Stunde mit Spot-Median. Siehe fetch_weather.py
+    _compute_region_spotmedian_thermals fuer Motivation.
+    """
     chart_data = {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}
     sorted_times = sorted(hourly_data.keys())
 
@@ -3855,6 +3867,7 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
         slope_azimuth=slope_azimuth,
         slope_angle=slope_angle,
         region_id=region_id,
+        spotmedian_override=spotmedian_override,
     )
 
     for timestamp in sorted_times:

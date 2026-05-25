@@ -31,8 +31,15 @@ API_RETRY_BASE_WAIT = 15       # Basis-Wartezeit bei 429 (Sekunden), verdoppelt 
 API_BATCH_TIMEOUT = 90         # Timeout für Batch-Requests (mehr Punkte = mehr Verarbeitungszeit)
 API_CHUNK_SIZE = 80            # Max Locations pro API-Call (URL-Länge + Timeout-Schutz)
 
-from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
+from thermik_calculator import calculate_thermal_profile, calculate_dewpoint, compute_daily_thermals
 from source_area import get_reference_points, get_all_regions, get_precip_reference_points
+import statistics
+
+# Schwelle: ab welcher Spot-Anzahl je Region wird der Spot-Median Thermik-Override
+# aktiv? Darunter bleibt der Refpoint-Pfad. Mai 2026: 3 ist Mindest-Median-Robustheit,
+# 7 Regionen heute haben n<3 (Mittelland West/Ost, Bodenseeraum, Jura Ost, Seeland,
+# Zentrales Mittelland, Waadtländer Alpen).
+SPOT_MEDIAN_MIN_SPOTS = 3
 
 # --- Aggregation Constants (Modul-Level) ---
 CLOUD_PARAMS = {"cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"}
@@ -820,6 +827,85 @@ def _build_param_lists():
     return wind_params, thermal_params, fallback_params, gfs_params
 
 
+def _compute_region_spotmedian_thermals(all_data, spots, all_regions):
+    """Berechnet pro Region den Spot-Median fuer Thermik-Output (max_h/climb/lcl).
+
+    Hintergrund: Refpoint-aggregierte Region-Thermik traf Pilot-Realitaet schlecht
+    (median |Bias| 794m gegen Spot-Median, 16/23 Regionen >100m zu tief). Mai 2026
+    Live-Test gegen Wallis 3500-4000m Pilot-Realitaet: nur Spot-Median trifft.
+    Refpoint-Median (B) und Sheridan-Lapse (D) liessen Wallis 0/4 in der Treffer-
+    zone. Spot-Median verschiebt 16 von 23 Regionen >100m, davon 14 um >200m,
+    16/23 Wallis-aehnliche Regionen werden ins richtige Niveau gehoben.
+
+    Wind / Wolken / Niederschlag bleiben Refpoint-aggregiert (funktionieren gut).
+    Nur max_height / climb_rate / lcl werden pro Stunde mit Spot-Median ueber-
+    schrieben — via compute_daily_thermals(..., spotmedian_override=...).
+
+    Schwelle: n_spots >= SPOT_MEDIAN_MIN_SPOTS (3). Darunter Refpoint-Pfad.
+
+    Returns: {rid: {ts: {"max_height": int, "climb_rate": float, "lcl": int}}}
+    """
+    # Map analyse_region (display) -> rid
+    region_display_to_rid = {r["region"]: r["id"] for r in all_regions}
+
+    # Gruppiere Spot-Thermals nach Region
+    thermals_by_region: dict = {}  # {rid: [thermals_dict, ...]}
+    for spot in spots:
+        name = spot["name"]
+        analyse_region = spot.get("analyse_region")
+        if not analyse_region:
+            continue
+        rid = region_display_to_rid.get(analyse_region)
+        if not rid or name not in all_data:
+            continue
+        sdata = all_data[name]
+        hourly = sdata.get("hourly_data") or {}
+        pld = sdata.get("pressure_level_data") or {}
+        elev = sdata.get("elevation_m") or 850
+        try:
+            therm = compute_daily_thermals(
+                hourly, pld, elev, config.PRESSURE_LEVELS,
+                slope_azimuth=spot.get("slope_azimuth"),
+                slope_angle=spot.get("slope_angle"),
+                region_id=analyse_region,
+            )
+        except Exception as exc:
+            print(f"  [WARN] Spot-Thermik {name}: {exc}")
+            continue
+        thermals_by_region.setdefault(rid, []).append(therm)
+
+    # Spot-Median pro Stunde
+    overrides: dict = {}
+    for rid, spot_therms in thermals_by_region.items():
+        if len(spot_therms) < SPOT_MEDIAN_MIN_SPOTS:
+            continue
+        all_ts: set = set()
+        for s in spot_therms:
+            all_ts.update(s.keys())
+        ov_per_ts: dict = {}
+        for ts in all_ts:
+            mh_vals = [s.get(ts, {}).get("max_height") for s in spot_therms]
+            mh_vals = [v for v in mh_vals if isinstance(v, (int, float))]
+            cr_vals = [s.get(ts, {}).get("climb_rate") for s in spot_therms]
+            cr_vals = [v for v in cr_vals if isinstance(v, (int, float))]
+            lcl_vals = [s.get(ts, {}).get("lcl") for s in spot_therms]
+            lcl_vals = [v for v in lcl_vals if isinstance(v, (int, float))]
+            if len(mh_vals) < SPOT_MEDIAN_MIN_SPOTS:
+                continue
+            ov = {"max_height": int(statistics.median(mh_vals))}
+            if cr_vals:
+                ov["climb_rate"] = round(statistics.median(cr_vals), 2)
+            if lcl_vals:
+                ov["lcl"] = int(statistics.median(lcl_vals))
+            ov_per_ts[ts] = ov
+        if ov_per_ts:
+            overrides[rid] = {
+                "override": ov_per_ts,
+                "n_spots": len(spot_therms),
+            }
+    return overrides
+
+
 def fetch_all_spots(spots, save_to_file=True):
     """
     Holt Wetterdaten für ALLE Spots in 4 Batch-Requests (statt 112 Einzel-Calls).
@@ -1331,6 +1417,28 @@ def fetch_all_spots(spots, save_to_file=True):
         }
 
     print(f"[INFO] {len(region_data)} Regionen verarbeitet")
+
+    # === Phase 4b: Spot-Median-Override fuer Region-Thermik ===
+    # Mai 2026: Refpoint-Aggregation traf Pilot-Realitaet schlecht
+    # (median |Bias| 794m, 16/23 Regionen >100m zu tief). Spot-Median ueberschreibt
+    # max_height/climb_rate/lcl pro Stunde. Wind/Wolken/Niederschlag bleiben
+    # Refpoint-aggregiert.
+    print(f"[INFO] Phase 4b: Spot-Median-Override fuer Region-Thermik")
+    try:
+        overrides = _compute_region_spotmedian_thermals(all_data, spots, all_regions)
+        n_applied = 0
+        for rid, info in overrides.items():
+            if rid in region_data:
+                region_data[rid]["thermals_spotmedian"] = info["override"]
+                region_data[rid]["thermals_spotmedian_n_spots"] = info["n_spots"]
+                n_applied += 1
+        n_fallback = len(region_data) - n_applied
+        print(f"  [OK] Spot-Median aktiv: {n_applied}/{len(region_data)} Regionen "
+              f"(Refpoint-Fallback: {n_fallback} Regionen mit <{SPOT_MEDIAN_MIN_SPOTS} Spots)")
+    except Exception as exc:
+        import traceback
+        print(f"  [WARN] Spot-Median-Override fehlgeschlagen: {exc}")
+        traceback.print_exc()
 
     spot_keys = [k for k in all_data if k != "_meta"]
     print(f"[INFO] Fertig: {len(spot_keys)} Spots + {len(region_data)} Regionen verarbeitet")

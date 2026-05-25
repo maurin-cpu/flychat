@@ -1,7 +1,22 @@
 # Hochalpin max_height-Bias gegenüber xc-therm
 
-**Status:** OFFEN — Befund dokumentiert, Ursache hypothetisch, kein Code-Eingriff.
-**Datum:** 2026-05-24
+> **ERRATUM 2026-05-25:** Der hier beschriebene „Bias" war kein Thermik-Berechnungs-Problem
+> sondern ein Region-Aggregations-Problem. Echte Startplatz-Spots (1800–2400m) treffen
+> Pilot-Realität gut; hochalpine Berg-Refpoints zeigen legitim 4000–4500m wegen hoher
+> Spot-Elevation. Was wirklich zu tief war: die Region-Aggregation, weil sie nur 1
+> Refpoint (mit max Strahlung) für das Temperatur-Profil nutzte, während Wolken/Wind
+> über alle 7 RPs aggregiert wurden. Fix Mai 2026: Region-Thermik via Spot-Median.
+> Siehe `memory/region_thermik_spotmedian.md`, `xcontest_validation/SYSTEM_CHANGES.md`,
+> `fetch_weather.py:_compute_region_spotmedian_thermals`.
+>
+> Das untenstehende Material bleibt erhalten als historische Doku — die genannten
+> Datenpunkte (Bietschhorn 2520m → 4083m etc.) sind tatsächlich Spot-Werte und
+> hochalpin korrekt. Die geplante „Tal-Heizung"-Surrogate aus Lugauer/Winkler oder
+> TEAMx-PC22 ist weiterhin relevant für Tieflagen-Spots, aber nicht für den Bias
+> hier in dieser Doku.
+
+**Status:** RESOLVED — Region-Aggregations-Fix Mai 2026.
+**Datum:** 2026-05-24 (Befund), 2026-05-25 (Resolution)
 **Verwandt:** `docs/THERMIK_MODELL.md`, `docs/THERMIK_TERRAIN_KALIBRIERUNG.md`, `meteo_research/inter_regional_coupling.md`, `meteo_research/regional_thermal_forecasting.md`, `meteo_research/thermal_model_calibration.md`
 
 ---
