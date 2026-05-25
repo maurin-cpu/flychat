@@ -29,7 +29,7 @@ DIE 5 KATEGORIEN
 | **2** | `kurzer_thermikflug` | Suchtag-Zwischenstufe. Mit Glueck 1-2h drin, sonst Abgleiter. Kerne schwach + intermittent. |
 | **3** | `solider_thermikflug` | "Anstaendig getragen, Hausrunde gefallen." 2-3h, ~20km lokal. Typischer Schweizer Flugtag. |
 | **4** | `starker_thermikflug` | "Heute ging was, 50er drin." Lokal-XC bis ~50km. Peak ≥ 2.0 m/s, lange/hohe/saubere Bedingungen. |
-| **5** | `xc_tag` | "Klassiker ging, Linie war da." 50–150km+. "Klassiker-Tag" geht in die Prosa, bleibt Rating 5. |
+| **5** | `xc_tag` | "Substanz da, XC-Potenzial." Bei guten Tagen 50–150km drin, aber kein Automatismus — Engine-Proxy ist ungenau. Klassiker-Marker (siehe unten) qualifiziert die echten Hammer-Tage. |
 
 **Typische CH-Spot-Tage:**
 - 1: Winter-Hausberg BLH 200m. Oder Truebgrau + Westwind (Soaring-Tag).
@@ -178,28 +178,46 @@ Rating 5 mit allen drei Markern → in Prosa als "Klassiker" / "Tag des Jahres":
 Fehlt ein Marker → normales Rating 5, keine Klassiker-Erwaehnung.
 
 ─────────────────────────────────
-HARTE SCHRANKEN (gegen Unsinn — nur 4 Regeln)
+HARTE SCHRANKEN (gegen Unsinn — nur 2 Regeln)
 ─────────────────────────────────
 
-Diese vier Regeln brichst du nie. Sonst vertraust du dem Pilotenurteil.
+Diese zwei Regeln brichst du nie. Sonst vertraust du dem Pilotenurteil
+und den Vignetten unten.
 
 1. **`sustained_peak < 1.0`** → Rating maximal **1**.
    *Abgleiter ist Abgleiter — egal wie lang oder hoch.*
 2. **`sustained_peak < 2.5`** → Rating maximal **4**.
    *Peak 2.5 m/s ist die XC-Tag-Schwelle. Ohne echte Steigwerte kein 5er.*
-3. **`sustained_peak ≥ 2.5` UND `prod_h_strict ≥ 6h` UND `cloud_structure`
-   NICHT in {`overcast`, `overdevelopment`}** → Rating mindestens **5**.
-   *Echte XC-Substanz ist ein XC-Tag. AGL spielt hier keine Rolle —
-   wenn die Engine das so rechnet, ist es so.*
-4. **`terrain_tier ∈ {alpen, voralpen}` UND `working_height_agl < 900m`**
-   → Rating maximal **4**. **Diese Regel überschreibt Regel 3.**
-   *Spot-Korridor erlaubt keine XC-Substanz, wenn die nutzbare Steighöhe
-   unter 900m über Grund liegt — der Tag bleibt lokal, egal wie schön
-   Peak und Cloud aussehen. Hochalpin AUSGENOMMEN: dort starten Spots
-   schon auf 2000–2500m MSL, niedrige AGL heisst dort nicht "tief
-   gedeckelt", sondern "Steigen bis nahe ans Atmosphären-Top".
-   Datenbasis Mai 2026 (n=25): 0/25 Pilot-Bestätigungen für LLM-Rating 5
-   unter dieser Schwelle bei Alpen/Voralpen.*
+
+─────────────────────────────────
+PILOTEN-VIGNETTEN — echte Cases als Bauchgefuehl-Anker
+─────────────────────────────────
+
+Diese Cases hat ein Pilot konkret bewertet. Lies sie als Heuristik-Anker,
+NICHT als Praezisionslehre: der Engine-Proxy fuer Peak und Climb ist
+selbst ungenau (validiert an XContest-Performance: Cases mit Proxy ≥2.5
+schaffen nur in 28% einen 50km-Flug). Die Vignetten zeigen dir das
+Pilotenbauchgefuehl — auch wenn die Engine-Zahlen aehnlich aussehen.
+
+**Rating 1 — Abgleiter** *(illustrativ, Winter-Beispiel)*
+- Mittelland-Hausberg, Peak 0.5 m/s × 2h, AGL 200m, overcast → **1**.
+
+**Rating 2 — kurzer Thermikflug** *(aus Labels)*
+- Lungern Schönbüel (alpen), Peak 1.7 m/s × 5h, AGL 493m, cu_clean_top → **2**.
+
+**Rating 3 — solider Thermikflug** *(aus Labels)*
+- Davos-Parsenn (alpen), Peak 1.8 m/s × 7h, AGL 760m, cu_clean_top → **3**.
+
+**Rating 4 — starker Thermikflug** *(aus Labels — Problemzone gegen 5)*
+- Biel-Rämsenberg (alpen), Peak 2.8 m/s × 10h, AGL 757m, blue → **4**.
+  *Engine-Zahlen sehen nach XC-Substanz aus, Pilot sieht lokal-XC.*
+- Bietschhorn (hochalpin), Peak 2.4 m/s × 8h, AGL 1088m, cu_clean_top → **4**.
+  *Auch hochalpin kein Automatik-5 — Peak knapp unter 2.5.*
+
+**Rating 5 — XC-Tag-Kandidat** *(aus Labels — bestaetigt durch Piloten)*
+- Egg (alpen), Peak 2.5 m/s × 9h, AGL 970m, blue → **5**.
+- Bodenberg (voralpen), Peak 2.5 m/s × 9h, AGL 1175m, blue → **5**.
+- Bellwald (hochalpin), Peak 2.6 m/s × 11h, AGL 943m, cu_clean_top → **5**.
 
 Sonst gilt: dein Pilotenurteil zaehlt, nicht eine Checkliste.
 
