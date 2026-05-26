@@ -188,6 +188,23 @@ def generate_synoptic_overview(synoptic_context: dict, analysis_client,
         synoptic_context.get("forecast_dates") or [],
     )
 
+    # Dry-Day-Strip: pro Tag pruefen, dass keine "Schauer/Gewitter/Regen"
+    # Erwaehnungen durchkommen, wenn der Decision-Layer beide Seiten als
+    # "trocken" klassifiziert hat (Isolations-Filter wet_share<10% greift).
+    # Analog zur Foehn-Lee-Inversion: text-Verstoss → Eintrag faellt,
+    # flight_hint-Verstoss → nur Hint entfernt.
+    long_filtered = _filter_dry_day_precip_claims(
+        long_filtered, synoptic_context.get("precip_pattern") or {},
+        synoptic_context.get("forecast_dates") or [],
+    )
+
+    # short-Block hat keine pro-Tag-Zuordnung. Wenn ALLE Tage beidseitig
+    # trocken sind, pauschal Niederschlags-Saetze droppen — sonst entstehen
+    # Aussagen wie "vereinzelt Schauer auf beiden Seiten" trotz 99% trocken.
+    short_filtered = _filter_dry_week_short(
+        short_filtered, synoptic_context.get("precip_pattern") or {},
+    )
+
     # flight_hint pro long-Eintrag: optionales Pilotensicht-Satz-Feld.
     # Wird gegen Verbotsbegriffe gefiltert; bei Verstoss wird das Feld
     # einzeln verworfen, der ganze Eintrag bleibt aber stehen.
@@ -586,6 +603,111 @@ def _filter_foehn_lee_inversion(statements: list, foehn_struct: dict,
             st = dict(st)
             st.pop("flight_hint", None)
 
+        out.append(st)
+    return out
+
+
+# Niederschlags-Begriffe, die bei `char == "trocken"` (beide Seiten) NICHT
+# erlaubt sind. Nur eindeutig konvektive / fluessige-NS-Worte — bewusst
+# NICHT "niederschlag" (passt zu legitimen Negationen wie "weitgehend ohne
+# Niederschlag") und NICHT "schnee" (Schneefallgrenze-Saetze sind erlaubt).
+_PRECIP_MENTION_RE = re.compile(
+    r"\b(schauer|gewitter|regen|regnerisch|regnen|nieselregen|niesel)\w*",
+    re.IGNORECASE,
+)
+
+
+def _is_dry_both_sides(precip_day: Optional[dict]) -> bool:
+    """True wenn `precip_pattern.per_day[i]` beide Seiten als 'trocken'
+    klassifiziert. Decision-Layer ist autoritativ — `wet_share > 0` ist
+    bereits durch Isolations-Filter geprueft worden.
+    """
+    if not isinstance(precip_day, dict):
+        return False
+    nord = precip_day.get("alpennord") or {}
+    sued = precip_day.get("alpensued") or {}
+    return (nord.get("value") == "trocken" and sued.get("value") == "trocken")
+
+
+def _filter_dry_day_precip_claims(statements: list, precip_pattern: dict,
+                                  forecast_dates: list) -> list:
+    """Pro long-Statement[i] pruefen, ob es Niederschlags-Begriffe enthaelt,
+    obwohl `precip_pattern.per_day[i]` beide Seiten als 'trocken' klassifiziert.
+    Verstoss → ganzer Eintrag faellt raus (analog Foehn-Lee-Inversion), weil
+    `text` PFLICHT ist. `flight_hint` mit Niederschlags-Begriffen wird separat
+    entfernt (Eintrag bleibt aber).
+
+    Decision-Layer (`_aggregate_precip_side` mit Isolations-Filter) ist die
+    autoritative Quelle — wenn der `value`/`char` 'trocken' heisst, darf der
+    LLM keine "vereinzelten Schauer" mehr anhaengen.
+    """
+    if not statements or not precip_pattern or not forecast_dates:
+        return statements
+    per_day = precip_pattern.get("per_day") or []
+    per_day_by_date = {d.get("date"): d for d in per_day if isinstance(d, dict)}
+
+    out = []
+    for i, st in enumerate(statements):
+        if i >= len(forecast_dates):
+            out.append(st)
+            continue
+        date_str = forecast_dates[i]
+        day_precip = per_day_by_date.get(date_str)
+        if not _is_dry_both_sides(day_precip):
+            out.append(st)
+            continue
+
+        text = st.get("text") or ""
+        m = _PRECIP_MENTION_RE.search(text)
+        if m:
+            logger.info(
+                "Dry-day Niederschlags-Erwaehnung verworfen (day %s, term=%s): '%s'",
+                date_str, m.group(0), text,
+            )
+            continue
+
+        hint = st.get("flight_hint")
+        if hint and _PRECIP_MENTION_RE.search(hint):
+            logger.info(
+                "Dry-day flight_hint verworfen (day %s): '%s'", date_str, hint,
+            )
+            st = dict(st)
+            st.pop("flight_hint", None)
+
+        out.append(st)
+    return out
+
+
+def _all_days_dry(precip_pattern: Optional[dict]) -> bool:
+    """True wenn ALLE Tage in `precip_pattern.per_day` beidseitig 'trocken'
+    klassifiziert sind. Voraussetzung: per_day non-empty.
+    """
+    if not isinstance(precip_pattern, dict):
+        return False
+    per_day = precip_pattern.get("per_day") or []
+    if not per_day:
+        return False
+    return all(_is_dry_both_sides(d) for d in per_day)
+
+
+def _filter_dry_week_short(statements: list, precip_pattern: dict) -> list:
+    """Wenn ALLE Forecast-Tage beidseitig 'trocken' sind, im `short`-Block
+    Saetze verwerfen, die Niederschlags-Begriffe enthalten. Der short-Block
+    hat keine pro-Tag-Zuordnung, daher Pauschal-Check.
+    """
+    if not statements:
+        return statements
+    if not _all_days_dry(precip_pattern):
+        return statements
+    out = []
+    for st in statements:
+        text = st.get("text") or ""
+        m = _PRECIP_MENTION_RE.search(text)
+        if m:
+            logger.info(
+                "Dry-week short-Satz verworfen (term=%s): '%s'", m.group(0), text,
+            )
+            continue
         out.append(st)
     return out
 

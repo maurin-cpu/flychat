@@ -147,15 +147,22 @@ waere Redundanz. Insgesamt max 180 Woerter.
    Einschaetzung. Wording aus den Daten ableiten, nicht aus Beispielen
    uebernehmen.
 
-   **PFLICHT-Kalibrierung mit Niederschlag-Coverage** (verhindert dass
-   ein 2%-Schauer-Tag als "kein Flugtag" geframt wird):
-   - `wet_share < 0.10` (= 90%+ der Spots trocken) → der Tag ist faktisch
-     ueberwiegend trocken. VERBOTEN: "kein Flugtag", "zu nass", "Boden-Tag"
-     als Hauptaussage. Ton: "ueberwiegend nutzbar, lokal Schauer beachten".
-   - `wet_share 0.10-0.30` → mittlerer Ton: "Vorsicht vor Gewittern",
-     "Fenster vormittags".
-   - `wet_share >= 0.30` ODER `char` ∈ {flaechiger Regen, Gewitter} →
-     "eher kein Flugtag" darf fallen.
+   **PFLICHT-Kalibrierung mit Niederschlag-Klassifikation**:
+   - **Wenn `char == "trocken"` (beide Seiten)**: keine Niederschlags-Begriffe
+     im Hint — kein "Schauer beachten", "Gewitter im Auge behalten", "lokal
+     Regen". Stattdessen Thermik/Wind/Sicht/Foehn-Tendenz hervorheben.
+     Beispiele: "Stabiler Thermiktag", "Soaring an Nordhaengen", "Im Foehn
+     vorsichtig". Der Decision-Layer hat das Feld als trocken klassifiziert
+     — ueberwiegend nutzbar, also Pilot-Aspekt jenseits von Niederschlag.
+   - **Wenn `char` ∈ {Schauer, Gewitter, Gewitter wahrscheinlich}** auf
+     mindestens einer Seite:
+     * `wet_share < 0.30` → der Tag ist ueberwiegend nutzbar. VERBOTEN:
+       "kein Flugtag", "zu nass", "Boden-Tag". Ton: "vereinzelt Schauer,
+       sonst Thermik nutzbar".
+     * `wet_share 0.30-0.60` → mittlerer Ton: "Vorsicht vor Gewittern",
+       "Fenster vormittags".
+     * `wet_share >= 0.60` ODER `char` ∈ {flaechiger Regen, flaechiger
+       starker Regen} → "eher kein Flugtag" darf fallen.
 
 **Struktur des `short`-Blocks** (Synoptik + Flug-Bilanz als EIN Fliesstext):
 
@@ -287,7 +294,21 @@ Seite gleichmaessig zu. Hier NIEMALS "vereinzelt", sondern:
 - "flaechig", "verbreitet ueber", "anhaltender Regen ueber",
   "ueberall regnerisch"
 
-**TROCKEN** = ueberall trocken auf der Seite, keine Qualifikation noetig.
+**TROCKEN** = der Decision-Layer hat die Seite als trocken klassifiziert.
+**STRENG VERBOTEN bei `char == "trocken"`**: jegliche Niederschlags-Erwaehnung
+fuer diese Seite — auch nicht qualifiziert ("vereinzelt", "lokal", "punktuell",
+"einzelne Schauer", "Restschauer", "Schauer beachten"). Decision-Layer hat
+`wet_share` und Coverage bereits geprueft; wenn die Klassifikation "trocken"
+heisst, ist das autoritativ. Auch wenn dir auffaellt dass `wet_share > 0` ist
+oder einzelne Spots Werte haben: NICHT erwaehnen. Stattdessen: "trocken",
+"niederschlagsfrei", "ueberwiegend sonnig" — oder Niederschlag gar nicht
+thematisieren, wenn nicht passend zur Lage.
+
+**Gilt auch fuer `flight_hint`**: wenn beide Seiten `char == "trocken"` am
+selben Tag, darf der `flight_hint` keine Niederschlags-Begriffe enthalten
+(kein "Schauer beachten", "Gewitter im Auge behalten", "lokal Regen").
+Der Hint soll dann andere Aspekte hervorheben (Thermik, Wind, Sicht,
+Foehn-Tendenz).
 
 **Regel kurz**: Sobald `char` ∈ {Schauer, Gewitter, Gewitter wahrscheinlich}
 fallen Begriffe wie "ganz Schweiz Gewitter", "es regnet" oder "Schauer
