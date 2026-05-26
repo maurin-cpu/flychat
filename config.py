@@ -428,6 +428,7 @@ SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV = 0.4  # Coverage < 40% + CAPE = konvektiv/Sc
 SYNOPTIC_PRECIP_CAPE_KONVEKTIV = 300      # J/kg — Mindest-CAPE fuer konvektiv-Label
 SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE = 0.10  # min. Anteil nasser Spots fuer "Gewitter wahrscheinlich"; sonst Schauer/Spuren — verhindert dass 1 lokales Gewitter den ganzen Region-Tag als Gewitter-Tag labelt
 SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # J/kg — Schwelle fuer Gewitter-Label
+SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE = 0.10  # min. Anteil nasser Spots fuer seitenweite "Schauer"/"Regen"-Aussage; sonst trocken — verhindert dass 1-3% lokale Zellen die ganze Alpenseite als nass labeln
 
 # --- Schneefallgrenze (saisonal) ----------------------------------------
 # Nur Maerz-Mai und Oktober-November ausweisen (im Sommer irrelevant,

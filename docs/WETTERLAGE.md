@@ -120,9 +120,10 @@ Spot-Klassifikation:
 
 Charakter pro Seite und Tag:
 - Peak < 0.5 mm → trocken
-- weather_code ≥ 95 → Gewitter
-- CAPE ≥ 800 + Peak ≥ 2 mm → Gewitter wahrscheinlich
+- weather_code ≥ 95 → Gewitter (Safety-Ausnahme, ignoriert Isolations-Filter)
+- CAPE ≥ 800 + Peak ≥ 2 mm + wet_share ≥ 10% → Gewitter wahrscheinlich
 - Coverage ≥ 70% + ≥50% nasse Spots → flächiger Regen (stratiform)
+- **Isolations-Filter:** wet_share < 10% UND Coverage < 70% → trocken (verhindert dass 1-3% lokale Zellen die ganze Alpenseite als nass labeln; SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE, eingef. 2026-05-25)
 - CAPE ≥ 300 + Coverage < 70% → Schauer (konvektiv)
 - sonst leichter / mässiger / starker Regen je nach Peak-mm
 

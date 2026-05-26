@@ -22,8 +22,23 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05)
 **Status**: in-untersuchung (Trigger identifiziert, Sub-Issues separieren) — **Top-Refactor-Prio**
+
+**Betroffene Spots (25.05.)** — **Mega-Wallis-Festival mit 627 PG-Eintraegen** (Tagessieger 308km Riederalp/Kälin):
+- **Brunni / Engelberg-Brunni-Schonegg** (SO-S-SW-W Sektor): **MASSIV 35 Launches, 123km FLURI** (Wind 336°N gegenüber; "Nur 1h sauber" Block-Filter; Schonegg-Variante real N-Hang nutzbar — Repeat 21.05 und 24.05, **Mass-Refactor-Pflicht**)
+- **Hoch Gummen** (SO Sektor): 1 Launch, **193km von wyl!** (Wind 34°NE gegenüber; Single-Sided)
+- **Mäggisseren / Mägisserhorn-2260** (W Sektor): 3 Launches, **132km STUDER** (Wind 1°N gegenüber, Multi-Variante real fehlt)
+- **Haldigrat** (SW Sektor): **9 Launches, 89km MUNOZ** (Wind 350°N gegenüber; Single-Sided — Repeat 24.05 9× und 21.05)
+- **Crans-Mon / Cry d Er** (SO Sektor): 2 Launches, 72km (Wind 349°N; Bella-Lui-Variante hätte gepasst; Gust 53 hoch)
+- **Cimetta** (S-SW Sektor): **7 Launches, 62km FRANSCIONI** (Wind 166°S IM Sektor aber no_go "ausserhalb" — **FILTER-BUG Verdacht**, Verschärfung 24.05)
+- **Niederhorn** (SO-S Sektor): **6 Launches, 61km BOO** (Wind 337°N gegenüber; Klassiker-Repeat 24.05)
+- **Schilthorn** (SW Sektor): 1 Launch, 59km Wille (Wind 35°NE; Mürren-Multi-Variante I-009)
+- **Fronalpstock** (W Sektor): 3 Launches, 56km Fässler (Wind 16°N gegenüber W; Stoos-O-Hang real)
+- **Hinterrugg** (SO-S-SW/NW-N disjoint): 3 Launches, 49km Huber (Wind 71°NE zwischen Disjoints)
+- **Stockhorn** (S Sektor): 1 Launch, 42km Walther (Wind 1°N; Block-Filter)
+- **Brienzer Rothorn** (S Sektor): 1 Launch, 20km Huggler (minor)
+- **insgesamt 12 Spots mit Strecken-Realität**, davon Brunni+Haldigrat+Mäggisseren+Niederhorn+Hoch Gummen+Fronalpstock = **Mass-Repeat-Cluster** (alle voraussichtlich gleicher Filter-Trigger)
 
 **Betroffene Spots (24.05.)** — Wallis-Festival mit 295 PG-Eintraegen (Tagessieger 295km Riederalp/Aeschbach):
 - **Verbier-Trio** (Ruinettes S-SW-W + Croix-de-Coeur SO-S-SW): 6 Launches, **153 km MARET** (Wind 307° NW, beide Varianten ausserhalb)
@@ -251,7 +266,18 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 5 (17.05, 18.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05). Wiederkehrer:
+**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05). Wiederkehrer:
+- **Gotthardpass** NEU (25.05) — 3× **163 km Daverio**, HIGHEST-PRIO Surselva/Uri
+- **Belalp** NEU (25.05) — 1× **102 km Perrucci**, Wallis-Klassiker
+- **Gornergrat** Wiederkehrer (18.05, 21.05, 25.05) — 1× 129 km Schranz, Wallis Zermatt
+- **Hoch Gummen** mehrdeutig (mapped als Gummen aber XC-Name unterschiedlich) — 1× 193 km von wyl
+- **Calmut** NEU (25.05) — 2× 147 km
+- **Hanegg** NEU (25.05) — 1× 146 km BO
+- **Mäggisseren** Pre-Migration coverage_gap, jetzt als `Mägisserhorn-2260` aufgeloest (aber FP) — 3× 132 km
+- **Ruogig** NEU (25.05) — **4× 98 km wiederkehrend**, ZS Voralpen-Pattern
+- **Laubbärgli** Wiederkehrer (24.05, 25.05) — BO Wengen
+- **Planachaux** Wiederkehrer (24.05, 25.05) — Champéry
+- **NATIONAL** Wiederkehrer (24.05, 25.05) — Engadin Nat'l Park
 - **Saas-Fee** 2 Tage in Folge (19.05 142km, 21.05 132km) — Pre-Migration
 - **Riederalp** Pre-Migration 2 Tage (19.05, 21.05) — **Post-Migration jetzt in PGE als `Riederalp- Greicheralp` aufgeloest!** safe/5
 - **Grindelwald** Pre-Migration 2 Tage — **Post-Migration jetzt als `Grindelwald - First` aufgeloest!** 24.05 11 Launches CONFIRM
@@ -341,8 +367,27 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05) — auch nach Migration weiterhin Top-FP-Treiber
-**Status**: offen — am 21.05 (NE-Wind-Tag) **fast jedes False-Positive auf diesem Issue**; am 24.05 ebenfalls dominant
+**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05) — **dominant beide Tage**
+**Status**: offen — am 25.05 (NE-Wind-Tag) Mass-Repeat: **Brunni 35×, Haldigrat 9×, Mäggisseren 3×,
+Niederhorn 6×, Fronalpstock 3×, Hoch Gummen 1× 193 km**. **Brunni-Schonegg-N-Variante** ist
+nachgewiesenermassen die hartnäckigste Lücke (3 Tage in Folge: 21.05 Brunnihütte 12×, 24.05
+Brunni-Schonegg 10×, 25.05 35×).
+
+**Beobachtungen 25.05.** (Mass-Sektor-Drift bei N/NE-Wind-Tag mit Wallis-SO-Wind):
+
+| Spot | DB-Sektor | Real-Wind | Pilot-Realität | Befund |
+|---|---|---|---|---|
+| Brunni / Engelberg-Brunni-Schonegg | SO-S-SW-W | **336° N** | **35× 123km Fluri** | **MASS-FP 3 Tage in Folge** |
+| Haldigrat | SW | **350° N** | 9× 89km Munoz | Single-Sided-Repeat (24.05 9×) |
+| Mäggisseren / Mägisserhorn-2260 | W | **1° N** | 3× 132km Studer | Multi-Variante fehlt |
+| Niederhorn-1920 | SO-S | **337° N** | 6× 61km Boo | Klassiker-Repeat 24.05 |
+| Schilthorn-Mürren | SW | **35° NE** | 1× 59km Wille | Mürren-Variante I-009 |
+| Hoch Gummen / Gummen | SO | **34° NE** | 1× **193km von wyl!** | Single-Sided 193 km! |
+| Fronalpstock (Stoos) | W | **16° N** | 3× 56km Fässler | Stoos-O-Hang real |
+| Hinterrugg | SO-S-SW/NW-N disjoint | **71° NE zwischen** | 3× 49km Huber | Disjoint-Lücke |
+| Crans-Mon / Cry d Er-2250 | SO | **349° N**, Gust 53 | 2× 72km jean | Bella-Lui-Variante hätte gepasst |
+| Stockhorn | S | **1° N** | 1× 42km Walther | minor |
+| Brienzer Rothorn | S | **42° NE** | 1× 20km Huggler | minor |
 
 **Beobachtungen 24.05.** (Sektor-Drift):
 - **Haldigrat (SW) bei Wind 62° NE — 9 Launches/61 km BOHREN** — HG-Spot mit Single-Sided-Sektor; real O-Hang nutzbar
@@ -405,11 +450,18 @@ führt aber nur eine Variante.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05)
-**Status**: offen — am 21.05 besonders auffaellig: **Kronberg 1 hat Wind 42°NE EXAKT
-im NW-NO Sektor, scheitert NUR am Block-Filter ("Nur 2h sauber"). 5 Launches/43km zeigen
-Spot war fliegbar.** Ebenso Burst, Fiescheralp, Niederbauen, Kerenzerberg, Seebodenalp,
-Fronalpstock, Obere Wengi am 21.05 nur durch Block-Filter blockiert.
+**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05)
+**Status**: offen — am 25.05 **verschärfter Filter-Bug-Verdacht** bei Cimetta: Wind 166° S
+liegt IM Sektor S-SW (158-247°), aber no_go feuert "Ganztaegig ausserhalb des erlaubten
+Sektors" — 7 Launches/62 km Franscioni. Stundlicher vs. Tagesaggregat-Wind divergieren?
+
+**Beobachtungen 25.05.** (Wind IM Sektor, Filter blockt trotzdem):
+- **Cimetta (S-SW = 158-247°) Wind Tag-Agg 166° S — 7 Launches/62 km Franscioni**;
+  no_go "Ganztaegig ausserhalb" → **FILTER-BUG-VERDACHT** (Code-Pfad in
+  `engine/analyzers.py:_prefilter_not_safe` und `wind_ok`-Berechnung untersuchen).
+- **Brunni 35× 123 km**: Wind 336° N ausserhalb Sektor, no_go "Nur 1h sauber, kein zsh.
+  Block ≥ 2h" — Klassisches I-007 Block-Filter (Schwelle 2h überschritten).
+- **Niederhorn 6× 61 km**: identisches Pattern wie Brunni (Block-Filter ueberlagert).
 
 **Beobachtungen 24.05.** (Wind IM Sektor, nur Block-Filter blockt):
 - **Cimetta (S-SW) Wind 168° S EXAKT** — 4 Launches/56 km BOSCACCI; no_go "Nur 1h sauber, kein zsh. Block"
@@ -447,10 +499,15 @@ nachweislich in solchen Fenstern (Streckenflug 60+ km möglich).
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 1 (24.05)
-**Status**: offen — 21.05 Niesen: dir 72°E bei **Gust 17 km/h** (sehr schwach!) trotzdem
-not_safe; 5 Launches inkl. 78km Strecke. Bei <20 km/h Gust ist Sektor fliegerisch fast
-egal. Pilatus Kulm 22 km/h Gust analog.
+**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05)
+**Status**: offen — am 25.05 **Haldigrat Gust 21 km/h** (sehr mild) bei Sektor SW + Wind
+350° N → not_safe trotz 9 Launches/89 km Munoz. Schwellen-Logik (<20 km/h) hätte hier
+greifen müssen. Niesen 21.05 mit Gust 17 km/h analog.
+
+**Beobachtungen 25.05.**:
+- **Haldigrat Gust 21 km/h Wind 350° N — 9× 89 km Munoz** (Schwacher Wind + Sektor-Miss; Klassiker)
+- **Brunni Gust 28 km/h** — schon im "stärker"-Bereich, daher I-008 minder zutreffend, aber Block-Filter feuert
+- **Hoch Gummen Gust 26 km/h Wind 34° NE** — 1× 193 km (Mass-Strecke trotz Gust-Border)
 
 **Beobachtungen 24.05.**:
 - **Niesen** wiederholt: Wind 62° NE bei Gust **30 km/h**, Sektor SW → 130 km JOHNSTON (Schwelle hier hoeher als 21.05, aber Sektor-Misfit dominierte)
@@ -599,8 +656,8 @@ kein 3h-Block" (oder die Anforderung in der CLEAN_WINDOW_MIN_HOURS-Berechnung an
 ## I-012 — CAPE-Filter zu konservativ an Top-Thermik-Tagen
 
 **Erstmals**: 2026-05-24
-**Tage beobachtet**: 1 (24.05)
-**Status**: offen — Erstbefund, weitere Tage abwarten bevor Hypothese
+**Tage beobachtet**: 1 (24.05; 25.05 nicht-reproduziert: Le Chamossaire-1980 heute `safe/5` ohne CAPE-Block trotz CAPE=750)
+**Status**: offen — Erstbefund nicht-reproduziert; bei 24.05 hat CAPE-Filter gefeuert, am 25.05 mit ähnlichen Werten nicht
 
 **Beobachtung 24.05.**:
 - **Grand Chamossaire** (`Le Chamossaire-1980`, Waadtl. Alpen): no_go = "Ueberentwicklungsgefahr: CAPE >1500 J/kg oder CAPE+Regen aktiv" → status=not_safe
@@ -608,15 +665,84 @@ kein 3h-Block" (oder die Anforderung in der CLEAN_WINDOW_MIN_HOURS-Berechnung an
 - Wind 302° NW knapp ausserhalb S-SW-W Sektor (am Rand), aber das war NICHT der Block-Grund — der CAPE-Filter dominierte
 - Tag war ein Wallis-Festival ohne Gewitter-Vorfaelle (CAPE max im Snapshot bei vielen Wallis-Spots 100-300 J/kg, sehr ruhig)
 
-**Vermutete Ursache**:
-- CAPE-Threshold im Pre-Filter scheint absolut auf 1500 J/kg gesetzt zu sein, ohne Kontext (Tageszeit, LI, Wind-Shear)
-- An Top-Thermik-Tagen mit hoher CAPE aber stabilem LI / fehlendem Trigger → keine Ueberentwicklung
-- Filter feuert wohl unabhaengig von der Wahrscheinlichkeit der Aktivierung
+**Beobachtung 25.05.** (Gegenbeispiel):
+- **Le Chamossaire-1980** heute status=safe/5/xc=5 mit CAPE=750 — kein CAPE-Block trotz signifikanter CAPE
+- Real: 2 Launches, 50 km Brun — CONFIRM
+- Auch andere Spots mit CAPE 1000+: Vounetz CAPE 1220 conditional/5, Graitery CAPE 1430 conditional/5, Jaman CAPE 1120 safe/5, Monte Tamaro CAPE 1490 safe/5 — alle ohne CAPE-Block
+- → Filter-Trigger ist also kontextabhaengig (LI/Wind-Shear/Tageszeit) oder neu kalibriert
+
+**Vermutete Ursache** (revidiert):
+- CAPE allein triggert nicht — vermutlich Konjunktion mit anderem Faktor (Niederschlag, LI, hochalpin)
+- 24.05 Grand Chamossaire hatte vermutlich Niederschlag oder eine andere Bedingung, die heute nicht da war
+- Filter ist möglicherweise besser kalibriert als beim Erstbefund vermutet
 
 **Naechste Schritte**:
-- 1-2 weitere Tage mit Grand-Chamossaire-Daten abwarten, ob Pattern reproduzierbar
-- CAPE-Cutoff im Code finden (vermutlich `engine/decision_engine.py` oder `_prefilter_not_safe`)
-- Konditional gegen LI/Shear/Tagesschnitt CIN pruefen statt absolutes CAPE
+- Konjunktion-Bedingung im Code identifizieren
+- 24.05 vs. 25.05 Le Chamossaire-1980 stündliche Daten vergleichen
+
+---
+
+## I-013 — Pre-Filter inkonsistent zwischen Spots gleichen Profils (Niesen-Anomalie)
+
+**Erstmals**: 2026-05-25
+**Tage beobachtet**: 1 (25.05)
+**Status**: offen — Erstbefund, weitere Tage abwarten
+
+**Beobachtung 25.05.**:
+- **Niesen-2280** (Sektor SW): status=`conditional/exp=5/xc=4`, Wind 9° N **komplett ausserhalb** SW-Sektor, Gust 35 km/h.
+  Real: **19 Launches, 173 km Schien** — conditional war "angemessen" für Strecke
+- **Brunni** (Sektor SO-S-SW-W, ZS Voralpen): status=`not_safe`, Wind 336° N **ausserhalb**, Gust 28 km/h.
+  Real: 35 Launches, 123 km — false_positive_notsafe
+- **Haldigrat** (Sektor SW, ZS Voralpen): status=`not_safe`, Wind 350° N **komplett ausserhalb**, Gust 21 km/h.
+  Real: 9 Launches, 89 km — false_positive_notsafe
+
+**Inkonsistenz**: Niesen und Haldigrat haben strukturell identische Bedingungen (Single-Sided SW-Sektor,
+Wind 360° dagegen, mildere Gust), aber unterschiedliche Pre-Filter-Behandlung. **Niesen bleibt conditional,
+Haldigrat wird not_safe.**
+
+**Hypothesen**:
+1. Niesen-2280 hat zusätzliche Sektor-Variante in PGE die wir verfehlt haben (Niederhorn-Massiv mit
+   mehreren Hangrichtungen)
+2. Höhenwind-Toleranz für hochalpine Spots (>2000m) anders kalibriert als für 1500-1700m-Spots
+3. Bug in `_prefilter_not_safe` / `wind_ok_count` — Niesen umgeht die strikte Sektor-Pruefung
+4. Region-Kontext (BO-Voralpen safe/5 für Niesen, ZS Voralpen safe/5 für Haldigrat) wirkt unterschiedlich
+
+**Naechste Schritte**:
+- Niesen-2280 Stammdaten (windrichtung, slope_azimuth, terrain_type, elevation) gegen Haldigrat vergleichen
+- `_prefilter_not_safe`-Code-Pfad fuer beide Spots manuell durchgehen mit Snapshot-Daten
+- Falls strukturell gleich: Niesen sollte not_safe sein → sonst Haldigrat conditional
+
+---
+
+## I-014 — Region-Spot-Konsistenz: safe Region + not_safe Spots in Mass
+
+**Erstmals**: 2026-05-25
+**Tage beobachtet**: 1 (25.05)
+**Status**: offen — Konsistenz-Frage zwischen Region- und Spot-Aggregaten
+
+**Beobachtung 25.05.**:
+- **Region Zentralschweizer Voralpen**: status=`safe/5`
+- Spots in der Region, alle `not_safe`:
+  - **Brunni 35 Launches, 123 km**
+  - **Haldigrat 9 Launches, 89 km**
+  - **Gummen (= Hoch Gummen) 1 Launch, 193 km**
+  - **Fronalpstock 3 Launches, 56 km**
+  - **= 48 Launches** an "not_safe"-Spots in einer "safe"-Region
+
+**Inkonsistenz**: Wenn Region wirklich safe ist, sollten zumindest **einige** Spots der Region
+nicht systematisch not_safe sein. 48 reale Launches signalisieren, dass die Region-Bewertung
+besser zur Realitaet passt als das Spot-Aggregat. Spot-Forecast ist **massiv konservativer**
+als Region-Forecast.
+
+**Hypothesen**:
+1. Region-Aggregat nutzt Mehrpunkt-Sampling → bekommt heterogenes Wind-Bild
+2. Spot-Aggregat nutzt Einzelpunkt → harte Sektor-Pruefung kappt
+3. Region "safe" haette Veto-Funktion auf Spot-not_safe-Pre-Filter haben können (nicht implementiert)
+
+**Naechste Schritte**:
+- Quantifizieren: wie oft passiert Region-safe + Spot-not_safe-Cluster in der Validierungs-Reihe?
+- Diskussions-Punkt mit User: sollte Region-Status den Spot-Pre-Filter dämpfen?
+- (siehe auch I-002 Konzeptdiskussion XC-Rating Region vs. Spot)
 
 ---
 

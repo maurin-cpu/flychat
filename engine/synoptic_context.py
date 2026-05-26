@@ -1230,6 +1230,14 @@ def _aggregate_precip_side(spots_day: list[dict]) -> dict:
     coverage_max = max(coverages) if coverages else None
 
     # Charakter-Klassifikation
+    # Isolations-Filter: wenn nur ein winziger Anteil der Spots nass ist UND
+    # kein flaechiger Niederschlag, ist die seitenweite Aussage "trocken".
+    # WMO-Gewitter-Code (>=95) bleibt davon ausgenommen — einzelne Gewitterzellen
+    # sind safety-relevant und werden weiterhin als "Gewitter" gemeldet.
+    isolated = (nass_anteil < config.SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE
+                and (coverage_max is None
+                     or coverage_max < config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG))
+
     if peak_max < config.SYNOPTIC_PRECIP_DRY_MM:
         char = "trocken"
     elif wc_max >= 95:  # WMO 95/96/99 = Gewitter
@@ -1245,6 +1253,8 @@ def _aggregate_precip_side(spots_day: list[dict]) -> dict:
             char = "flaechiger starker Regen"
         else:
             char = "flaechiger Regen"
+    elif isolated:
+        char = "trocken"
     elif (cape_max >= config.SYNOPTIC_PRECIP_CAPE_KONVEKTIV
           and (coverage_max is None or coverage_max < config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG)):
         char = "Schauer"
@@ -1339,6 +1349,7 @@ def decide_precip_pattern_nord_sued(weather_cache: dict,
             "cape_konvektiv": config.SYNOPTIC_PRECIP_CAPE_KONVEKTIV,
             "cape_gewitter": config.SYNOPTIC_PRECIP_CAPE_GEWITTER,
             "gewitter_min_wetshare": config.SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE,
+            "shower_min_wetshare": config.SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE,
         },
     }
 
