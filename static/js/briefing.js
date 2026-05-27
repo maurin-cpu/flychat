@@ -1866,14 +1866,15 @@
         if (a !== undefined) angles.push(a);
       }
       if (!angles.length) continue;
-      if (angles.length === 1) {
-        arcs.push([angles[0] - 22.5, angles[0] + 22.5]);
-      } else {
-        let a1 = angles[0] - 22.5;
-        let a2 = angles[angles.length - 1] + 22.5;
-        if (Math.abs(a1 - a2) > 180) { if (a1 < a2) a1 += 360; else a2 += 360; }
-        arcs.push([Math.min(a1, a2), Math.max(a1, a2)]);
-      }
+      // parts kommen clockwise-geordnet aus spots._sectors_to_windrichtung
+      // (PGE_SECTOR_ORDER). Span = anzahl-sektoren * 45°, beginnend 22.5° vor
+      // dem ersten Mittelpunkt. So bleibt eine Wraparound-Sequenz (z.B.
+      // 'NW-N-NE') als echtes Wraparound erhalten (292.5° -> 427.5°), und
+      // eine breite Nicht-Wraparound-Sequenz (z.B. 'O-SO-S-SW-W') wird NICHT
+      // faelschlich als Wraparound interpretiert (67.5° -> 292.5°).
+      const start = angles[0] - 22.5;
+      const end = start + angles.length * 45;
+      arcs.push([start, end]);
     }
     return arcs.length ? arcs : null;
   }

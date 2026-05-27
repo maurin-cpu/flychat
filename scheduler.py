@@ -248,12 +248,35 @@ def _run_llm_analysis(engine) -> bool:
         return False
 
 
+def _run_snapshot() -> bool:
+    """Friert den heutigen Forecast in data/weather_archive/YYYY-MM-DD.json ein.
+
+    Failure-tolerant: Exception wird geloggt, nicht propagiert. Snapshot ist
+    read-only auf wetterdaten.json + spot_analyses.json + region_analyses.json,
+    laeuft am Ende des Daily-Runs und beeinflusst Briefings nicht.
+    """
+    try:
+        from scripts.snapshot_weather import build_snapshots, write_snapshots
+        snapshots = build_snapshots(target_date=None, all_days=False)
+        if not snapshots:
+            logger.warning("Daily run: Snapshot — keine Snapshots erstellt "
+                           "(heute nicht im Forecast-Fenster?)")
+            return False
+        written = write_snapshots(snapshots)
+        logger.info("Daily run: Snapshot OK (%d Datei(en) geschrieben)", written)
+        return True
+    except Exception as e:
+        logger.exception("Daily run: Snapshot fehlgeschlagen: %s", e)
+        return False
+
+
 def _daily_run(engine) -> dict:
-    """Sequenzieller Daily-Job: refresh_weather -> LLM-Analyse -> Briefings.
+    """Sequenzieller Daily-Job: refresh_weather -> LLM-Analyse -> Briefings -> Snapshot.
 
     Jeder Schritt ist failure-tolerant: Wenn Wetter-Refresh oder LLM-Analyse
     scheitern, werden Briefings trotzdem mit den zuletzt gecachten Daten/Analysen
-    versendet, statt ganz auszufallen.
+    versendet, statt ganz auszufallen. Snapshot laeuft am Ende und friert den
+    Stand fuer XContest-Validierung ein.
     """
     logger.info("Daily run: starte Wetter-Refresh...")
     try:
@@ -267,7 +290,12 @@ def _daily_run(engine) -> dict:
     _run_llm_analysis(engine)
 
     logger.info("Daily run: starte Briefing-Versand...")
-    return _send_briefings_once(engine)
+    stats = _send_briefings_once(engine)
+
+    logger.info("Daily run: starte Snapshot (Forecast einfrieren)...")
+    _run_snapshot()
+
+    return stats
 
 
 def briefing_scheduler(engine) -> None:

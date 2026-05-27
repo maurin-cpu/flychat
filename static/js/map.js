@@ -176,24 +176,14 @@
                 if (a !== undefined) angles.push(a);
             }
             if (angles.length === 0) continue;
-            if (angles.length === 1) {
-                arcs.push([angles[0] - 22.5, angles[0] + 22.5]);
-            } else {
-                // First/last als Arc-Grenzen. Mehrere Zwischenpunkte sind Auflistung
-                // einzelner Sektoren (z.B. 'O-SO-S' = von O bis S contiguous).
-                var a1 = angles[0];
-                var a2 = angles[angles.length - 1];
-                // Sektor-Breite um +/-22.5° auf jeder Seite erweitern, damit der
-                // Arc den gesamten Sektor (nicht nur die Mittel-Linie) abdeckt.
-                a1 -= 22.5;
-                a2 += 22.5;
-                // Wraparound-Normalisierung
-                if (Math.abs(a1 - a2) > 180) {
-                    if (a1 < a2) a1 += 360;
-                    else a2 += 360;
-                }
-                arcs.push([Math.min(a1, a2), Math.max(a1, a2)]);
-            }
+            // parts kommen clockwise-geordnet aus spots._sectors_to_windrichtung
+            // (PGE_SECTOR_ORDER). Span = anzahl-sektoren * 45°, beginnend 22.5°
+            // vor dem ersten Mittelpunkt. Echtes Wraparound (z.B. 'NW-N-NE')
+            // bleibt erhalten (292.5° -> 427.5°), eine breite Nicht-Wraparound-
+            // Sequenz (z.B. 'O-SO-S-SW-W') wird NICHT faelschlich gespiegelt.
+            var start = angles[0] - 22.5;
+            var end = start + angles.length * 45;
+            arcs.push([start, end]);
         }
         return arcs.length ? arcs : null;
     }

@@ -118,14 +118,19 @@ Spot-Klassifikation:
 - `lat < 46.35 AND 6.5 < lon < 8.5` → alpensued (Wallis-Haupttal)
 - alles andere → alpennord
 
-Charakter pro Seite und Tag:
-- Peak < 0.5 mm → trocken
-- weather_code ≥ 95 → Gewitter (Safety-Ausnahme, ignoriert Isolations-Filter)
-- CAPE ≥ 800 + Peak ≥ 2 mm + wet_share ≥ 10% → Gewitter wahrscheinlich
-- Coverage ≥ 70% + ≥50% nasse Spots → flächiger Regen (stratiform)
-- **Isolations-Filter:** wet_share < 10% UND Coverage < 70% → trocken (verhindert dass 1-3% lokale Zellen die ganze Alpenseite als nass labeln; SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE, eingef. 2026-05-25)
-- CAPE ≥ 300 + Coverage < 70% → Schauer (konvektiv)
-- sonst leichter / mässiger / starker Regen je nach Peak-mm
+**Pure-LLM-Variante (Mai 2026):** keine deterministische Charakter-Klassifikation
+mehr. Aggregation liefert pro Seite und Tag nur die Rohwerte:
+- `peak_mm`: max. stündliche Niederschlagsmenge über alle Spots
+- `wet_share`: Anteil Spots mit total_mm >= 0.5 (DRY_MM)
+- `max_cape`: max. CAPE (J/kg) — Konvektions-Indikator
+- `max_coverage`: max. precipitation_coverage (0–1) — DWD-Confidence
+- `n_spots`: Anzahl Spots auf dieser Seite
+
+Bewertung („Hitzegewitter", „Landregen", „trocken") macht der LLM in
+`skills/synoptic_overview.md`. Frühere if/elif-Kaskade mit char-Labels
+(Schauer/Gewitter/flaechig/trocken) wurde im Mai 2026 entfernt, weil
+Edge-Cases (z.B. hohe CAPE + niedriger wet_share = Hitzegewitter) sich
+nicht sauber in starre Schwellen pressen liessen.
 
 ### `decide_schneefallgrenze`
 - Nur Monate `{3, 4, 5, 10, 11}` (sonst `None`)

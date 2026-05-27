@@ -497,31 +497,42 @@ class TestDecidePrecipPatternNordSued(unittest.TestCase):
                    "precipitation_coverage": 0.0} for h in range(6, 21)}
         cache = self._make_cache(dry, dry)
         out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
-        self.assertEqual(out["per_day"][0]["alpennord"]["value"], "trocken")
-        self.assertEqual(out["per_day"][0]["alpensued"]["value"], "trocken")
+        nord = out["per_day"][0]["alpennord"]
+        sued = out["per_day"][0]["alpensued"]
+        # Pure-LLM-Variante: nur Rohwerte, keine Klassifikation
+        self.assertEqual(nord["peak_mm"], 0.0)
+        self.assertEqual(nord["wet_share"], 0.0)
+        self.assertEqual(sued["peak_mm"], 0.0)
+        self.assertNotIn("value", nord)  # kein char/value-Feld mehr
 
-    def test_thunderstorm_nord(self):
-        # Nord: Gewitter-WeatherCode + CAPE; Sued: trocken
+    def test_high_cape_with_rain_returns_raw_values(self):
+        # Konvektive Lage: CAPE 1200, NS bei 14-16 Uhr
         thunder = {h: {"precipitation": 3.0 if h in (14, 15, 16) else 0,
-                       "cape": 1200, "weather_code": 95 if h == 15 else 0,
+                       "cape": 1200, "weather_code": 80 if h == 15 else 0,
                        "precipitation_coverage": 0.5 if h in (14, 15) else 0}
                    for h in range(6, 21)}
         dry = {h: {"precipitation": 0, "cape": 100, "weather_code": 0,
                    "precipitation_coverage": 0.0} for h in range(6, 21)}
         cache = self._make_cache(thunder, dry)
         out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
-        self.assertEqual(out["per_day"][0]["alpennord"]["value"], "Gewitter")
-        self.assertEqual(out["per_day"][0]["alpensued"]["value"], "trocken")
+        nord = out["per_day"][0]["alpennord"]
+        # Rohwerte korrekt aggregiert
+        self.assertEqual(nord["peak_mm"], 3.0)
+        self.assertEqual(nord["max_cape"], 1200)
+        self.assertGreaterEqual(nord["max_coverage"], 0.5)
 
-    def test_flaechiger_regen(self):
-        # Hohe Coverage, niedriger CAPE, mehrere mm verteilt
+    def test_widespread_rain_returns_high_wet_share(self):
+        # Hohe Coverage, mehrere mm verteilt
         rain = {h: {"precipitation": 2.0, "cape": 100, "weather_code": 63,
                     "precipitation_coverage": 0.85}
                 for h in range(8, 20)}
         cache = self._make_cache(rain, rain)
         out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
-        # Coverage hoch + Mehrfach-Spots nass → flaechig
-        self.assertIn("flaechig", out["per_day"][0]["alpennord"]["value"].lower())
+        nord = out["per_day"][0]["alpennord"]
+        # Alle Spots nass → wet_share=1.0
+        self.assertEqual(nord["wet_share"], 1.0)
+        self.assertEqual(nord["peak_mm"], 2.0)
+        self.assertGreaterEqual(nord["max_coverage"], 0.85)
 
     def _make_mixed_nord_cache(self, n_total: int, n_wet: int, wet_pattern: dict):
         """Mixed Nord-Cache: n_wet von n_total Spots haben wet_pattern, Rest trocken."""
@@ -539,8 +550,10 @@ class TestDecidePrecipPatternNordSued(unittest.TestCase):
             }
         return cache
 
-    def test_isolated_convective_cell_classified_trocken(self):
-        # 2/50 Spots (4%) mit CAPE+Niederschlag, Rest trocken → seitenweite Aussage trocken
+    def test_isolated_cell_aggregates_correctly(self):
+        # Pure-LLM-Variante: keine Klassifikation, aber Rohwerte korrekt aggregiert.
+        # 2/50 Spots (4%) mit hohem peak und CAPE — LLM bekommt die Zahlen
+        # und entscheidet selbst, ob "Hitzegewitter" oder "trocken".
         wet = {h: {"precipitation": 13.5 if h == 15 else 0, "cape": 1430,
                    "weather_code": 80 if h == 15 else 0,
                    "precipitation_coverage": 0.12 if h == 15 else 0}
@@ -548,44 +561,25 @@ class TestDecidePrecipPatternNordSued(unittest.TestCase):
         cache = self._make_mixed_nord_cache(n_total=50, n_wet=2, wet_pattern=wet)
         out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
         nord = out["per_day"][0]["alpennord"]
-        self.assertEqual(nord["value"], "trocken")
-        # wet_share unter 0.10 Floor
-        self.assertLess(nord["wet_share"], 0.10)
+        # wet_share korrekt: 2/50 = 0.04
+        self.assertEqual(nord["wet_share"], 0.04)
+        # peak_mm = max der nassen Spots
+        self.assertEqual(nord["peak_mm"], 13.5)
+        # max_cape weitergegeben
+        self.assertEqual(nord["max_cape"], 1430)
 
-    def test_isolated_high_peak_classified_trocken(self):
-        # 1/50 Spots (2%) mit 41 mm Peak ohne hohe Coverage → trocken
-        # (sonst rollt 1 Spot die ganze Seite als "mässiger Regen" hoch)
+    def test_single_high_peak_spot_aggregates(self):
+        # 1/50 Spots mit 41 mm — LLM bekommt peak=41mm bei ws=2%
         wet = {h: {"precipitation": 41.1 if h == 15 else 0, "cape": 1520,
                    "weather_code": 63 if h == 15 else 0,
                    "precipitation_coverage": 0.25 if h == 15 else 0}
                for h in range(6, 21)}
         cache = self._make_mixed_nord_cache(n_total=50, n_wet=1, wet_pattern=wet)
         out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
-        self.assertEqual(out["per_day"][0]["alpennord"]["value"], "trocken")
-
-    def test_shower_wetshare_threshold_met(self):
-        # 6/50 Spots (12%) mit konvektivem CAPE+Schauer → Schauer-Klasse bleibt erhalten
-        # CAPE 500 < Gewitter-Schwelle 800, aber > konvektiv-Schwelle 300
-        wet = {h: {"precipitation": 5.0 if h == 15 else 0, "cape": 500,
-                   "weather_code": 80 if h == 15 else 0,
-                   "precipitation_coverage": 0.3 if h == 15 else 0}
-               for h in range(6, 21)}
-        cache = self._make_mixed_nord_cache(n_total=50, n_wet=6, wet_pattern=wet)
-        out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
         nord = out["per_day"][0]["alpennord"]
-        self.assertEqual(nord["value"], "Schauer")
-        self.assertGreaterEqual(nord["wet_share"], 0.10)
-
-    def test_isolated_thunderstorm_still_flagged(self):
-        # Sicherheits-Ausnahme: 1 Spot mit WMO 95 (Gewitter) → bleibt "Gewitter"
-        # auch wenn wet_share klein — Safety hat Vorrang
-        thunder = {h: {"precipitation": 3.0 if h == 15 else 0, "cape": 1200,
-                       "weather_code": 95 if h == 15 else 0,
-                       "precipitation_coverage": 0.5 if h == 15 else 0}
-                   for h in range(6, 21)}
-        cache = self._make_mixed_nord_cache(n_total=50, n_wet=1, wet_pattern=thunder)
-        out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
-        self.assertEqual(out["per_day"][0]["alpennord"]["value"], "Gewitter")
+        self.assertEqual(nord["peak_mm"], 41.1)
+        self.assertEqual(nord["wet_share"], 0.02)
+        self.assertEqual(nord["max_cape"], 1520)
 
 
 class TestBuildSynopticContext(unittest.TestCase):

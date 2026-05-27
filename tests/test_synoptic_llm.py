@@ -136,8 +136,10 @@ class TestBuildLlmPayload(unittest.TestCase):
             "foehn": {"value": "nicht aktiv"},
             "precip_pattern": {"per_day": [{
                 "date": "2026-05-17",
-                "alpennord": {"value": "trocken"},
-                "alpensued": {"value": "trocken"},
+                "alpennord": {"peak_mm": 0.0, "wet_share": 0.0,
+                              "max_cape": 100, "max_coverage": 0.0, "n_spots": 50},
+                "alpensued": {"peak_mm": 0.0, "wet_share": 0.0,
+                              "max_cape": 80, "max_coverage": 0.0, "n_spots": 30},
             }]},
             "schneefallgrenze": {"value": 2300, "per_day": []},
             "confidence_per_day": [{"date": "2026-05-17", "level": "high"}],
@@ -164,194 +166,34 @@ class TestLabelVariants(unittest.TestCase):
         self.assertIn("genua", v)
 
 
-class TestFilterDryDayPrecipClaims(unittest.TestCase):
-    """Dry-day-Strip: bei `char == "trocken"` beidseitig sind Niederschlags-
-    Begriffe im LLM-Output verboten. Decision-Layer ist autoritativ."""
+class TestPayloadPrecipRawValues(unittest.TestCase):
+    """Pure-LLM-Variante: precip_pattern uebergibt Rohwerte (peak_mm,
+    wet_share, max_cape, max_coverage), KEINE deterministische Klassifikation."""
 
-    def setUp(self):
-        self.forecast_dates = ["2026-05-25", "2026-05-26", "2026-05-27"]
-        self.precip_dry = {"per_day": [
-            {"date": "2026-05-25",
-             "alpennord": {"value": "trocken"},
-             "alpensued": {"value": "trocken"}},
-            {"date": "2026-05-26",
-             "alpennord": {"value": "trocken"},
-             "alpensued": {"value": "trocken"}},
-            {"date": "2026-05-27",
-             "alpennord": {"value": "trocken"},
-             "alpensued": {"value": "trocken"}},
-        ]}
-
-    def test_drops_text_with_schauer_on_dry_day(self):
-        statements = [
-            {"text": "Montag: stabil, vereinzelt Schauer beidseits.",
-             "sources": ["precip_pattern.alpennord"]},
-            {"text": "Dienstag: sonnig und trocken.",
-             "sources": ["pressure_influence"]},
-            {"text": "Mittwoch: Hochdruck haelt.",
-             "sources": ["pressure_influence"]},
-        ]
-        out = sl._filter_dry_day_precip_claims(
-            statements, self.precip_dry, self.forecast_dates,
-        )
-        self.assertEqual(len(out), 2)
-        self.assertNotIn("Schauer", out[0]["text"])
-
-    def test_drops_text_with_gewitter_on_dry_day(self):
-        statements = [
-            {"text": "Montag: Hochdrucklage, lokale Gewitter moeglich.",
-             "sources": ["precip_pattern.alpennord"]},
-        ]
-        out = sl._filter_dry_day_precip_claims(
-            statements, self.precip_dry, self.forecast_dates,
-        )
-        self.assertEqual(out, [])
-
-    def test_drops_text_with_regen_on_dry_day(self):
-        statements = [
-            {"text": "Montag: trocken, aber etwas Regen am Abend.",
-             "sources": ["precip_pattern.alpennord"]},
-        ]
-        out = sl._filter_dry_day_precip_claims(
-            statements, self.precip_dry, self.forecast_dates,
-        )
-        self.assertEqual(out, [])
-
-    def test_drops_flight_hint_but_keeps_entry(self):
-        statements = [
-            {"text": "Montag: stabil und sonnig.",
-             "sources": ["pressure_influence"],
-             "flight_hint": "Thermiktag, nur lokale Schauer beachten."},
-        ]
-        out = sl._filter_dry_day_precip_claims(
-            statements, self.precip_dry, self.forecast_dates,
-        )
-        self.assertEqual(len(out), 1)
-        self.assertNotIn("flight_hint", out[0])
-
-    def test_keeps_clean_text_and_hint(self):
-        statements = [
-            {"text": "Montag: stabil und sonnig.",
-             "sources": ["pressure_influence"],
-             "flight_hint": "Stabiler Thermiktag mit guten Steigwerten."},
-        ]
-        out = sl._filter_dry_day_precip_claims(
-            statements, self.precip_dry, self.forecast_dates,
-        )
-        self.assertEqual(len(out), 1)
-        self.assertEqual(out[0]["flight_hint"], "Stabiler Thermiktag mit guten Steigwerten.")
-
-    def test_keeps_shower_text_on_wet_day(self):
-        precip_wet = {"per_day": [
-            {"date": "2026-05-25",
-             "alpennord": {"value": "Schauer"},
-             "alpensued": {"value": "trocken"}},
-        ]}
-        statements = [
-            {"text": "Montag: vereinzelte Schauer auf der Alpennordseite.",
-             "sources": ["precip_pattern.alpennord"]},
-        ]
-        out = sl._filter_dry_day_precip_claims(
-            statements, precip_wet, ["2026-05-25"],
-        )
-        self.assertEqual(len(out), 1)
-
-    def test_keeps_shower_text_on_one_dry_one_wet(self):
-        # Nur eine Seite trocken — Strip greift nicht
-        precip_mixed = {"per_day": [
-            {"date": "2026-05-25",
-             "alpennord": {"value": "trocken"},
-             "alpensued": {"value": "Gewitter wahrscheinlich"}},
-        ]}
-        statements = [
-            {"text": "Montag: Alpennord trocken, im Tessin lokale Gewitter.",
-             "sources": ["precip_pattern.alpensued"]},
-        ]
-        out = sl._filter_dry_day_precip_claims(
-            statements, precip_mixed, ["2026-05-25"],
-        )
-        self.assertEqual(len(out), 1)
-
-    def test_word_boundary_does_not_strip_segen(self):
-        # "Regen" als Wort matchen, "Regentag" auch — aber "Segen" nicht
-        statements = [
-            {"text": "Montag: ein Segen fuer Piloten, stabile Lage.",
-             "sources": ["pressure_influence"]},
-        ]
-        out = sl._filter_dry_day_precip_claims(
-            statements, self.precip_dry, self.forecast_dates,
-        )
-        self.assertEqual(len(out), 1)
-
-
-class TestFilterDryWeekShort(unittest.TestCase):
-    """short-Block-Strip: wenn ALLE Tage beidseitig trocken sind,
-    pauschal Niederschlags-Saetze droppen."""
-
-    def test_drops_shower_in_short_when_all_dry(self):
-        precip_all_dry = {"per_day": [
-            {"date": "2026-05-25",
-             "alpennord": {"value": "trocken"},
-             "alpensued": {"value": "trocken"}},
-            {"date": "2026-05-26",
-             "alpennord": {"value": "trocken"},
-             "alpensued": {"value": "trocken"}},
-        ]}
-        statements = [
-            {"text": "Hochdrucklage mit Westwind.", "sources": ["pressure_influence"]},
-            {"text": "Vereinzelt Schauer auf beiden Alpenseiten.",
-             "sources": ["precip_pattern.alpennord"]},
-            {"text": "Donnerstag und Freitag die Highlights.",
-             "sources": ["pressure_influence"]},
-        ]
-        out = sl._filter_dry_week_short(statements, precip_all_dry)
-        self.assertEqual(len(out), 2)
-        self.assertNotIn("Schauer", " ".join(s["text"] for s in out))
-
-    def test_keeps_short_when_one_day_wet(self):
-        precip_mixed = {"per_day": [
-            {"date": "2026-05-25",
-             "alpennord": {"value": "trocken"},
-             "alpensued": {"value": "trocken"}},
-            {"date": "2026-05-26",
-             "alpennord": {"value": "Schauer"},
-             "alpensued": {"value": "trocken"}},
-        ]}
-        statements = [
-            {"text": "Vereinzelt Schauer auf der Alpennordseite Dienstag.",
-             "sources": ["precip_pattern.alpennord"]},
-        ]
-        out = sl._filter_dry_week_short(statements, precip_mixed)
-        self.assertEqual(len(out), 1)
-
-    def test_empty_per_day_keeps_statements(self):
-        # Keine per_day-Daten → kein Strip
-        precip_empty = {"per_day": []}
-        statements = [
-            {"text": "Schauer moeglich.", "sources": ["precip_pattern.alpennord"]},
-        ]
-        out = sl._filter_dry_week_short(statements, precip_empty)
-        self.assertEqual(len(out), 1)
-
-
-class TestIsDryBothSides(unittest.TestCase):
-    def test_both_dry(self):
-        self.assertTrue(sl._is_dry_both_sides({
-            "alpennord": {"value": "trocken"},
-            "alpensued": {"value": "trocken"},
-        }))
-
-    def test_one_wet(self):
-        self.assertFalse(sl._is_dry_both_sides({
-            "alpennord": {"value": "Schauer"},
-            "alpensued": {"value": "trocken"},
-        }))
-
-    def test_none_input(self):
-        self.assertFalse(sl._is_dry_both_sides(None))
-
-    def test_missing_keys(self):
-        self.assertFalse(sl._is_dry_both_sides({}))
+    def test_payload_has_raw_precip_values(self):
+        ctx = {
+            "forecast_dates": ["2026-05-17"],
+            "precip_pattern": {"per_day": [{
+                "date": "2026-05-17",
+                "alpennord": {"peak_mm": 3.2, "wet_share": 0.04,
+                              "max_cape": 2300, "max_coverage": 0.67,
+                              "n_spots": 50},
+                "alpensued": {"peak_mm": 0.0, "wet_share": 0.0,
+                              "max_cape": 80, "max_coverage": 0.0,
+                              "n_spots": 30},
+            }]},
+        }
+        payload = sl._build_llm_payload(ctx)
+        # Rohwerte muessen drin sein
+        self.assertIn("peak_mm", payload)
+        self.assertIn("wet_share", payload)
+        self.assertIn("max_cape", payload)
+        # Konkrete Werte
+        self.assertIn("3.2", payload)
+        self.assertIn("2300", payload)
+        # KEIN char-Feld mehr
+        self.assertNotIn('"char"', payload)
+        self.assertNotIn('"value"', payload.split("precip_pattern")[1] if "precip_pattern" in payload else "")
 
 
 if __name__ == "__main__":

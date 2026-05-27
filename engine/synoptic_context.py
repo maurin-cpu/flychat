@@ -1214,59 +1214,36 @@ def classify_precip_pattern(coverage: float | None, peak_mm: float | None) -> st
 
 
 def _aggregate_precip_side(spots_day: list[dict]) -> dict:
-    """Aggregiert Niederschlagscharakter ueber Spots einer Seite und eines Tages."""
+    """Aggregiert Niederschlags-Rohwerte ueber Spots einer Seite und eines Tages.
+
+    Pure-LLM-Variante (Mai 2026): keine deterministische Charakter-Klassifikation
+    mehr — der LLM bekommt die Rohzahlen und bewertet selbst in Pilotensprache.
+    Frueher gab es eine if/elif-Kaskade fuer "trocken/Schauer/Gewitter/flaechig",
+    die Edge-Cases (z.B. Hitzegewitter mit wet_share=4% und cape=2300) faelschlich
+    als "trocken" klassifizierte — der LLM mit Kontext schneidet besser ab.
+
+    Rueckgabe-Felder:
+      - n_spots: Anzahl Spots auf dieser Seite
+      - peak_mm: max. stuendliche Niederschlagsmenge ueber alle Spots
+      - wet_share: Anteil Spots mit total_mm >= DRY_MM (0..1)
+      - max_cape: max. CAPE-Wert (J/kg) ueber alle Spots, Indikator fuer Konvektion
+      - max_coverage: max. precipitation_coverage (0..1) — DWD-Modell-Confidence
+        fuer flaechigen vs. konvektiven NS, None wenn nicht verfuegbar
+    """
     if not spots_day:
-        return {"value": "unbekannt", "n_spots": 0}
+        return {"n_spots": 0, "peak_mm": 0.0, "wet_share": 0.0,
+                "max_cape": 0, "max_coverage": None}
     peaks = [s["peak_mm"] for s in spots_day]
     totals = [s["total_mm"] for s in spots_day]
     capes = [s["max_cape"] for s in spots_day]
-    wcs = [s["max_wc"] for s in spots_day]
     coverages = [s["max_coverage"] for s in spots_day if s["max_coverage"] is not None]
 
     peak_max = max(peaks)
     nass_anteil = sum(1 for t in totals if t >= config.SYNOPTIC_PRECIP_DRY_MM) / len(totals)
     cape_max = max(capes)
-    wc_max = max(wcs)
     coverage_max = max(coverages) if coverages else None
 
-    # Charakter-Klassifikation
-    # Isolations-Filter: wenn nur ein winziger Anteil der Spots nass ist UND
-    # kein flaechiger Niederschlag, ist die seitenweite Aussage "trocken".
-    # WMO-Gewitter-Code (>=95) bleibt davon ausgenommen — einzelne Gewitterzellen
-    # sind safety-relevant und werden weiterhin als "Gewitter" gemeldet.
-    isolated = (nass_anteil < config.SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE
-                and (coverage_max is None
-                     or coverage_max < config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG))
-
-    if peak_max < config.SYNOPTIC_PRECIP_DRY_MM:
-        char = "trocken"
-    elif wc_max >= 95:  # WMO 95/96/99 = Gewitter
-        char = "Gewitter"
-    elif (cape_max >= config.SYNOPTIC_PRECIP_CAPE_GEWITTER
-          and peak_max >= 2.0
-          and nass_anteil >= config.SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE):
-        char = "Gewitter wahrscheinlich"
-    elif (coverage_max is not None
-          and coverage_max >= config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG
-          and nass_anteil >= 0.5):
-        if peak_max >= config.SYNOPTIC_PRECIP_MODERATE_MM:
-            char = "flaechiger starker Regen"
-        else:
-            char = "flaechiger Regen"
-    elif isolated:
-        char = "trocken"
-    elif (cape_max >= config.SYNOPTIC_PRECIP_CAPE_KONVEKTIV
-          and (coverage_max is None or coverage_max < config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG)):
-        char = "Schauer"
-    elif peak_max >= config.SYNOPTIC_PRECIP_MODERATE_MM:
-        char = "maessiger Regen"
-    elif peak_max >= config.SYNOPTIC_PRECIP_LIGHT_MM:
-        char = "leichter Regen"
-    else:
-        char = "Spuren"
-
     return {
-        "value": char,
         "n_spots": len(spots_day),
         "peak_mm": round(peak_max, 1),
         "wet_share": round(nass_anteil, 2),
@@ -1341,16 +1318,7 @@ def decide_precip_pattern_nord_sued(weather_cache: dict,
         "n_nord_spots": n_nord_spots,
         "n_sued_spots": n_sued_spots,
         "decided_by": "decide_precip_pattern_nord_sued",
-        "thresholds": {
-            "dry_mm": config.SYNOPTIC_PRECIP_DRY_MM,
-            "light_mm": config.SYNOPTIC_PRECIP_LIGHT_MM,
-            "moderate_mm": config.SYNOPTIC_PRECIP_MODERATE_MM,
-            "coverage_flaechig": config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG,
-            "cape_konvektiv": config.SYNOPTIC_PRECIP_CAPE_KONVEKTIV,
-            "cape_gewitter": config.SYNOPTIC_PRECIP_CAPE_GEWITTER,
-            "gewitter_min_wetshare": config.SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE,
-            "shower_min_wetshare": config.SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE,
-        },
+        "dry_mm": config.SYNOPTIC_PRECIP_DRY_MM,  # Threshold fuer wet_share-Zaehlung
     }
 
 
