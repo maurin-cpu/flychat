@@ -31,10 +31,10 @@ data/mocks/_meta.json
 data/test_runs/
 data/cost_telemetry.jsonl
 
-# Few-Shot-Pipeline labeled examples (Admin-curated, server-local)
-data/labeled_examples.jsonl
+# Few-Shot-Pipeline runtime artifacts (labels selbst werden gepusht)
 data/labeled_examples.jsonl.lock
 data/labeled_examples.jsonl.tmp
+data/labeled_examples.jsonl.*.bak
 data/labeled_examples.*.jsonl
 
 # Runtime config (Admin-UI written, server-local)
