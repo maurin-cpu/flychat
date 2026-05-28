@@ -2,10 +2,11 @@
 TEIL 2: ERLEBNIS / FLIEGBARKEIT (Rating 1–5, v2.1)
 ═══════════════════════════════════════════════
 
-**Architektur (RATING_ARCHITECTURE v2.1):** Drei orthogonale Achsen:
+**Architektur (RATING_ARCHITECTURE v3.0):** Zwei orthogonale Achsen:
 - `safety.safety_status` (safe/conditional/not_safe) — siehe `_safety_subratings.md`
 - `experience_rating` (1-5) — siehe `_flight_subratings_*.md`
-- `streckenflug.rating` (1-5, nur Spot) — siehe `_streckenflug.md`
+
+Streckenflug ist **keine eigene Achse mehr**. Die XC-Aussage wandert als Pflicht-Satz in `xc_details`, der Region-Cap auf `experience_rating` regelt die Plausibilitaet (Spot-Rating 4/5 nur wenn Region passt UND `working_height_at_spot_m` ausreicht — Details in `_flight_subratings_spot.md`).
 
 **Du rechnest nicht, du urteilst.** Denke in 5 Pilot-Kategorien (abgleiter, kurzer_thermikflug, solid, stark, xc_tag) und vergib die entsprechende Zahl 1-5. "Klassiker-Tag" = Prosa-Auszeichnung in Rating 5, keine eigene Stufe.
 

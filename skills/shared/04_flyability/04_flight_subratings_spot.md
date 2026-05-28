@@ -103,8 +103,9 @@ Stuetzpunkte aus Pilotenliteratur (Drury/xcmag, Burnair): 450m=Komfortgrenze,
 Bandgrenzen sind Pilot-Uebersetzung. Siehe `meteo_research/working_height_agl_thresholds.md`.
 
 **Wichtig:** Niedrige AGL macht den Tag nicht schlecht — nur lokal. Spot-Tag
-Peak 2.5 × 8h × 700m AGL ist immer noch Rating 4. Die Hoehe gehoert v.a.
-ins `streckenflug.rating`.
+Peak 2.5 × 8h × 700m AGL ist immer noch Rating 4 lokal — aber Streckenflug-
+Aussage haengt von `working_height_at_spot_m` ab (siehe Region-Kontext-Block
+und XC-Pflichtsatz unten).
 
 **Spot vs. Region:** Spot-Korridore liegen niedriger als Region — einzelne
 Spots koennen mit knapper Basis lohnend sein (Spotwissen, Talwind,
@@ -222,6 +223,67 @@ Pilotenbauchgefuehl — auch wenn die Engine-Zahlen aehnlich aussehen.
 Sonst gilt: dein Pilotenurteil zaehlt, nicht eine Checkliste.
 
 ─────────────────────────────────
+REGION-CAP & STRECKENFLUG-PFLICHTSATZ (XC im xc_details)
+─────────────────────────────────
+
+Streckenflug ist **keine eigene Achse mehr** — die Aussage gehoert als Pflicht-
+Satz in `xc_details`. Die Bewertung `experience_rating` kombiniert lokales
+Pilotenurteil (Peak/Dauer/AGL) mit einem **Region-Cap fuer hohe Bewertungen**.
+
+**Inputs aus dem Region-Kontext-Block** (vom Spot-Prompt mitgeliefert):
+- `Region.experience_rating` (1-5)
+- `Region.working_height_agl_m` (Median, Min, **Max @ Best-Hour**)
+- `Region.elevation_ref`
+- `spot.elevation_m`
+- **vorberechnetes** `working_height_at_spot_m` (Median + Min + Max @ Best-Hour)
+
+**Du rechnest die Hoehen-Reserve NICHT selbst — der Block liefert sie.**
+
+**Cap-Regel — massgebend ist `working_height_at_spot_m_max` (Best-Stunde):**
+
+| Rating | km-Klasse (XC-Literatur) | Region.experience_rating | working_height_at_spot_m_max |
+|---|---|---|---|
+| 5 (Klassiker >100km) | Burnair-Klassiker | = 5 | >= 2000m |
+| 4 (XC 30-100km / FAI) | xcmag-Standard | >= 4 | >= 1500m |
+| 3 (Talquerung 10-30km / Halbtag) | aus Pilotenliteratur | >= 3 ODER lokales Wohlfuehlen | >= 1000m |
+| 2 (Soaring/Hausrunde) | lokal | egal | >= 500m |
+| 1 (Abgleiter) | nichts | egal | < 500m ODER Spot >= Region-Top |
+
+Werden BEIDE Achsen-Voraussetzungen nicht erfuellt, **kappst du auf die naechst-tiefere Stufe**.
+
+**Sonderfall Region fehlt** (Block sagt "nicht verfuegbar"): max Rating **3**, Pflichtsatz im `xc_details`: "Ohne Region-Kontext keine XC-Aussage — reine Spot-Einschaetzung." `working_height_at_spot_m` darfst du nicht selbst raten.
+
+**Sonderfall Spot >= Region-Top** (Reserve_max <= 0): Pflichtsatz "Spot bereits ueber Region-Thermik-Top, kein Wegfliegen moeglich, allenfalls lokales Soaring." Rating max **2**.
+
+─────────────────────────────────
+STRECKENFLUG-PFLICHTSATZ IN `xc_details`
+─────────────────────────────────
+
+`xc_details` MUSS in JEDEM Fall einen konkreten Satz zur Streckenflug-Tauglichkeit enthalten, der die **Zahl** `working_height_at_spot_m_max` und die km-Klasse benennt.
+
+**Zeitfenster-Pflicht:** Wenn die Spannweite (Max − Min der Region-Arbeitshoehe ueber Productive-Hours) **>= 500m** betraegt — also der Tag eine steile Entwicklung hat —, MUSST du das Best-Hour-Fenster im Pflichtsatz benennen ("Mittagsfenster 13-15 Uhr ..."). Liegt die Spannweite unter 500m, reicht ein allgemeiner XC-Satz.
+
+─────────────────────────────────
+ANKER-BEISPIELE STRECKENFLUG (Pflicht-Lesestoff)
+─────────────────────────────────
+
+**Beispiel 1 — Klassiker, niedriger Spot, stabile Thermik:**
+Region elev_ref=1200, working_height_agl Median 2000m / Max 2050m@14:00 / Min 1900m@10:00 (Spannweite 150m). Spot.elevation_m=1000. Block liefert: working_height_at_spot_m Median 2200m, Max 2250m@14:00, Min 2100m@10:00. Region-Rating 5.
+→ **experience_rating = 5**. xc_details: "Klassiker-Tag mit 2200m Arbeitshoehe ueber Startplatz, Streckenflug >100km ganztaegig moeglich." (Kein Zeitfenster noetig, weil Spannweite < 500m.)
+
+**Beispiel 2 — Hoher Spot, gleicher Tag:**
+Wie Beispiel 1, aber Spot.elevation_m=2700. Block liefert: working_height_at_spot_m Median −500m, Max −450m@14:00, Min −600m@10:00.
+→ **experience_rating = 1-2**. xc_details: "Spot bereits ueber Region-Thermik-Top — kein Wegfliegen moeglich, allenfalls lokales Soaring an Reliefkante."
+
+**Beispiel 3 — Hoher Spot mit Mittagsfenster (Schluesselfall):**
+Region elev_ref=1500, working_height_agl Median 1550m / **Max 2200m@14:00** / Min 800m@10:00 (Spannweite 1400m). Spot.elevation_m=2200. Block liefert: working_height_at_spot_m Median 850m, **Max 1500m@14:00**, Min 100m@10:00. Region-Rating 4.
+→ **experience_rating = 3** (Mittagsfenster reicht fuer Talquerung 10-30km). Spannweite > 500m → **Zeitfenster-Pflichtsatz**: "Mittagsfenster 13-15 Uhr mit 1500m Arbeitshoehe — kurzer Streckenflug 10-30km moeglich. Vormittags und spaeter Nachmittag nur lokales Soaring."
+
+**Beispiel 4 — Region fehlt:**
+Region-Block "nicht verfuegbar".
+→ **experience_rating** max **3** (lokales Pilotenurteil). xc_details: "Ohne Region-Kontext keine XC-Aussage — reine Spot-Einschaetzung."
+
+─────────────────────────────────
 PILOT-SANITY-CHECK
 ─────────────────────────────────
 
@@ -240,14 +302,9 @@ NUTZUNGS-REGELN
 
 1. `experience_rating` als Integer 1–5.
 2. Bei `safety_status = not_safe` → trotzdem korrektes Thermik-Rating; UI handhabt App.
-3. **Streckenflug-Konsistenz:** `experience_rating = 5` → `streckenflug.rating` min 4.
-   `experience_rating ≤ 2` → `streckenflug.rating` ≤ 2.
-4. **Spot-Differenzierung:** Spots in derselben Region am gleichen Tag haben oft
-   verschiedene Ratings (Hoehe, Exposition, Talwind).
-5. Prosa muss zum Rating passen. Rating 5 + "mauer Tag" = FEHLER.
-6. **Safety strikt draussen aus aller Flyability-Prosa** (`flyability_notes`,
-   `thermal_quality`, `recommendation`, `xc_details`, `soaring_options`,
-   `best_window`). Tabu: Hoehenwind, Boeen, Scherung, TQ-Tags, Foehn, Regen,
-   Gewitter, "Vorsicht", "sportlich". Diese Themen sind alle in der Safety-Pipeline.
-7. **Self-Check Rating:** Habe ich wegen Safety runtergesetzt? → FEHLER.
-   Gedankenexperiment: "Tag ohne Safety-Issue — welches Rating?" Genau das.
+3. **Region-Cap PFLICHT pruefen** (siehe Cap-Tabelle oben): Rating 4/5 nur wenn `Region.experience_rating` UND `working_height_at_spot_m_max` die Schwellen erfuellen — sonst kappen.
+4. **Streckenflug-Pflichtsatz in `xc_details`**: konkrete Zahl `working_height_at_spot_m_max` nennen + km-Klasse benennen. Bei Spannweite >= 500m zusaetzlich Best-Hour-Fenster.
+5. **Spot-Differenzierung:** Spots in derselben Region am gleichen Tag haben oft verschiedene Ratings (Hoehe, Exposition, Talwind).
+6. Prosa muss zum Rating passen. Rating 5 + "mauer Tag" = FEHLER.
+7. **Safety strikt draussen aus aller Flyability-Prosa** (`flyability_notes`, `thermal_quality`, `recommendation`, `xc_details`, `soaring_options`, `best_window`). Tabu: Hoehenwind, Boeen, Scherung, TQ-Tags, Foehn, Regen, Gewitter, "Vorsicht", "sportlich". Diese Themen sind alle in der Safety-Pipeline.
+8. **Self-Check Rating:** Habe ich wegen Safety runtergesetzt? → FEHLER. Gedankenexperiment: "Tag ohne Safety-Issue — welches Rating?" Genau das.
