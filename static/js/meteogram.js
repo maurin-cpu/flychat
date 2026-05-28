@@ -1895,7 +1895,7 @@ window.Meteogram = (function () {
                     var _usableTop = (wx.thermik.lcl && wx.thermik.lcl < wx.thermik.max_height) ? wx.thermik.lcl : wx.thermik.max_height;
                     var _topLabel = (wx.thermik.lcl && wx.thermik.lcl < wx.thermik.max_height) ? 'Arbeitsh\u00f6he (Basis)' : 'Arbeitsh\u00f6he';
                     html += '<div class="tooltip-row"><span class="tooltip-label">' + _topLabel + '</span><span class="tooltip-value">' + _usableTop + ' m MSL</span></div>';
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Rating</span><span class="tooltip-value">' + wx.thermik.rating + '/10</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">Rating</span><span class="tooltip-value">' + wx.thermik.rating + '</span></div>';
                 }
                 if (wx.thermik.cape > 0) html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';
             }

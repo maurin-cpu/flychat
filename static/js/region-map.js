@@ -608,7 +608,7 @@
             var tipHtml = '<b>' + layer.regionName + '</b>';
             tipHtml += '<br><span style="color:' + style.labelColor + ';">' + style.safetyLabel + '</span>';
             if (rating > 0) {
-                tipHtml += ' · <b>Rating ' + rating + '/6</b>';
+                tipHtml += ' · <b>Rating ' + rating + '</b>';
             }
             layer.setTooltipContent(tipHtml);
         });
@@ -1191,7 +1191,7 @@
             if (d.wind_summary) { lines.push('--- Wind Summary ---'); lines.push(_escDebugHtml(d.wind_summary)); lines.push(''); }
             if (d.wind_shear) { lines.push('--- Wind Shear ---'); lines.push(_escDebugHtml(d.wind_shear)); lines.push(''); }
             lines.push('=== FLYABILITY ===');
-            lines.push('Experience-Rating: ' + (d.experience_rating != null ? d.experience_rating + '/5' : '?'));
+            lines.push('Experience-Rating: ' + (d.experience_rating != null ? d.experience_rating : '?'));
             lines.push('');
             lines.push('--- Flyability Notes ---');
             if (d.flyability_notes) Object.keys(d.flyability_notes).forEach(function (k) {

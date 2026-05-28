@@ -104,7 +104,7 @@
     var st = styleFor(visBand);
     var center = size / 2;
     var radius = Math.max(7, Math.round(size * 0.46));
-    var ratingLabel = (rating > 0 && band !== "red") ? (", Rating " + rating + "/5") : "";
+    var ratingLabel = (rating > 0 && band !== "red") ? (", Rating " + rating) : "";
     var ariaLabel = (opts && opts.ariaLabel) || (st.label + ratingLabel);
 
     // Rating-Tint statt Opazitaets-Ramp: Hue-Shift quer durch verwandte

@@ -395,7 +395,7 @@
                   + s.fill + ';margin-right:4px;vertical-align:middle;"></span>';
             html += '<span style="color:' + s.stroke + ';">' + s.label + '</span>';
             if (safetyBand !== 'red' && typeof experienceRating === 'number' && experienceRating >= 1) {
-                html += ' &middot; Rating ' + experienceRating + '/6';
+                html += ' &middot; Rating ' + experienceRating;
             }
         }
         return html;
@@ -607,7 +607,7 @@
             if (d.wind_summary) { lines.push('--- Wind Summary ---'); lines.push(_escHtml(d.wind_summary)); lines.push(''); }
             if (d.wind_shear) { lines.push('--- Wind Shear ---'); lines.push(_escHtml(d.wind_shear)); lines.push(''); }
             lines.push('=== FLYABILITY ===');
-            lines.push('Experience-Rating: ' + (d.experience_rating!=null?d.experience_rating+'/5':'?'));
+            lines.push('Experience-Rating: ' + (d.experience_rating!=null?d.experience_rating:'?'));
             lines.push('');
             lines.push('--- Flyability Notes ---');
             if (d.flyability_notes) Object.keys(d.flyability_notes).forEach(function(k){ lines.push('  [' + k + '] ' + _escHtml(d.flyability_notes[k]||'')); });
@@ -961,7 +961,7 @@
             var regionName = (currentSpotProps && currentSpotProps.region) || '';
             var rText = '';
             if (currentSpotExperienceRating != null && currentSpotExperienceRating >= 1) {
-                rText = ' — Rating ' + currentSpotExperienceRating + '/6';
+                rText = ' — Rating ' + currentSpotExperienceRating;
             }
             var dayIdx = 0;
             if (window.currentDate && currentDates && currentDates.length) {

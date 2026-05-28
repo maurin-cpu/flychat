@@ -666,7 +666,7 @@
                 if (!d) return;
                 var er = parseInt(d.experience_rating, 10);
                 var flyLabel = (isFinite(er) && er >= 1)
-                    ? ('Rating ' + er + '/6')
+                    ? ('Rating ' + er)
                     : (d.safety_status === 'not_safe' ? '\u2014 (keine Fliegbarkeit)' : '?');
                 var safeLabel = safetyLabels[d.safety_status] || d.safety_status || 'unbekannt';
                 var line = '- **' + name + '**: Sicherheit **' + safeLabel + '**, Fliegbarkeit **' + flyLabel + '**';

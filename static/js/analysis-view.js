@@ -201,7 +201,7 @@ window.AnalysisView = (function () {
                     var pText = pTint.text;
                     html += '<span class="mga-hero-pill mga-hero-pill--fly"'
                          + ' style="background:' + pBg + ';border:1px solid ' + pBorder + ';color:' + pText + '">'
-                         + esc(pTint.label) + ' (' + rating + '/5)</span>';
+                         + esc(pTint.label) + '</span>';
                 }
             }
             var fly = a.flyability || {};
@@ -452,8 +452,7 @@ window.AnalysisView = (function () {
             };
             var sfLabel = SF_RATING_LABELS[sfRating] || ('Rating ' + sfRating);
             var sfTierClass = (sfRating >= 5) ? 'top' : (sfRating >= 4 ? 'moderat' : (sfRating >= 3 ? 'lokal' : 'kein_xc'));
-            var sfHtml = '<span class="mga-sf-badge ' + sfTierClass + '">' + esc(sfLabel) + '</span>'
-                       + ' <span class="mga-sf-rating">' + sfRating + '/6</span>';
+            var sfHtml = '<span class="mga-sf-badge ' + sfTierClass + '">' + esc(sfLabel) + '</span>';
             html += '<div class="mga-metric full-width streckenflug">'
                   + '<div class="mga-metric-label">Streckenflug</div>'
                   + '<div class="mga-metric-value">' + sfHtml + '</div>'
@@ -513,7 +512,7 @@ window.AnalysisView = (function () {
             var flyBody = '';
             if (hasRating) {
                 flyBody += '<div class="mga-insight-rating"><b>' + esc(RATING_LABELS_LONG[rating] || ('Rating ' + rating))
-                         + '</b> (' + rating + '/5)</div>';
+                         + '</b></div>';
             }
             if (flyFb) flyBody += '<div>' + esc(flyFb) + '</div>';
             html += '<div class="mga-insight flyability open">'
@@ -523,7 +522,7 @@ window.AnalysisView = (function () {
         }
         if (hasSfRating) {
             var sfBody = '<div class="mga-insight-rating"><b>' + esc(SF_RATING_LABELS[sfRating] || ('Rating ' + sfRating))
-                       + '</b> (' + sfRating + '/5)</div>';
+                       + '</b></div>';
             var limitText = SF_LIMIT_LABELS[sfLimit] || '';
             if (limitText) sfBody += '<div>' + esc(limitText) + '</div>';
             html += '<div class="mga-insight streckenflug open">'

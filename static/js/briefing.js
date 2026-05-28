@@ -1280,7 +1280,7 @@
       if (sp) {
         const spBg = hexToRgba(sp.hex, sp.darkBg ? 0.78 : 0.55);
         const spBorder = hexToRgba(sp.border, 0.55);
-        scorePills.push(`<span class="bf-score-pill" style="background:${spBg};border-color:${spBorder};color:${sp.text}">${escapeHtml(sp.label)} ${rating}/5</span>`);
+        scorePills.push(`<span class="bf-score-pill" style="background:${spBg};border-color:${spBorder};color:${sp.text}">${escapeHtml(sp.label)}</span>`);
       }
     }
     const scoreBar = scorePills.length ? `<div class="bf-spot-scores">${scorePills.join("")}</div>` : "";
@@ -1821,11 +1821,11 @@
     const dayIdx = state.selectedDayIdx || 0;
     let title, text;
     if (kind === "spot") {
-      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}/5` : "";
+      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}` : "";
       title = `${spotName}${rtxt}`;
       text = `${spotName}${regionName ? " (" + regionName + ")" : ""}${rtxt} · Gleitcast Flugwetter`;
     } else {
-      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}/5` : "";
+      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}` : "";
       title = `${regionName || "Region"}${rtxt}`;
       text = `${regionName || "Region"}${rtxt} · Gleitcast Flugwetter`;
     }
