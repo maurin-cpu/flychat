@@ -933,13 +933,15 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         fly_summary = _day_fly_summary(my_spots, day_tier)
         safety_summary = _day_safety_summary(my_spots)
 
-        # top_spots_flat: 3 beste Spots des Tages regionen-uebergreifend (flach sortiert
-        # nach rating). Fuer Mobile-First Spot-Buttons in v5_dense — 3-Spot-Garantie
-        # auch wenn die Top-Region nur 1-2 Spots hat (faellt auf naechste Regionen
-        # zurueck). region_name bleibt pro Spot erhalten (durch ** s spread aus shown).
+        # top_spots_flat: 3 beste Spots des Tages regionen-uebergreifend. Primaer
+        # sortiert nach rating, bei Gleichstand gewinnt das hoehere Tier (violet >
+        # green > conditional > gray), d.h. "sicher" schlaegt "conditional" bei
+        # gleicher Zahl. Fuer Mobile-First Spot-Buttons in v5_dense — 3-Spot-Garantie
+        # auch wenn die Top-Region nur 1-2 Spots hat.
         top_spots_flat = sorted(
             displayed_spots,
-            key=lambda s: float(s.get('rating') or 0),
+            key=lambda s: (float(s.get('rating') or 0),
+                           _TIER_RANK.get(_spot_tier(s), -1)),
             reverse=True,
         )[:3]
 
