@@ -693,10 +693,14 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
             cell["rating_display"] = str(rating_int) if rating_int > 0 else ""
             
             # Dynamische Intensitaet:
+            # Text-Farbe ist NICHT dieselbe Hue wie der Hintergrund (sonst
+            # ergibt eine alpha-Mischung des Tier-Tons gegen denselben Tier-Ton
+            # nur ~2:1 Kontrast — Rating wird unsichtbar bei Mittelwerten).
+            # Stattdessen: dunkles Slate auf hellen Tints, Weiss auf kraeftigen.
             if cell["tier"] in ("green", "amber", "violet") and rating_int > 0:
                 alpha = 0.4 + (rating_int / 10.0) * 0.6
                 cell["tier_color"] = _mix_hex_with_white(meta["color"], alpha)
-                cell["tier_text_color"] = meta["color"] if alpha < 0.65 else "#ffffff"
+                cell["tier_text_color"] = "#0f172a" if alpha < 0.85 else "#ffffff"
             else:
                 cell["tier_color"] = meta["color"]
                 cell["tier_text_color"] = "#ffffff"

@@ -3596,6 +3596,11 @@ class AnalyzersMixin:
             "  • Diese Spots dürfen weder als Top-Pick, Alternative, 'vielleicht später' noch",
             "    als 'geht knapp' empfohlen werden. Die Voranalyse hat Veto-Recht.",
             "  • Du darfst diese Einteilung kommentieren und Nuancen benennen, aber niemals überstimmen.",
+            "  • REGIONEN-BLOCK (pro Tag, vor den Spots): Großwetter-Einschätzung der Region",
+            "    inkl. experience_rating 1–5 und Sicherheits-Status. Nutze ihn als Cap-Hinweis:",
+            "    Spot-Rating 4/5 setzt voraus, dass die Region selbst >= dieses Rating hat;",
+            "    sonst weise auf den Konflikt hin (z.B. „Spot lokal stark, aber Region gibt nur",
+            "    Rating 3 her — kein echter XC-Tag, eher Hausrunde\").",
             "",
         ]
 
@@ -3611,7 +3616,18 @@ class AnalyzersMixin:
         all_dates = set()
         for days in self.spot_analyses.values():
             all_dates.update(days.keys())
+        for days in (self.region_analyses or {}).values():
+            if isinstance(days, dict):
+                all_dates.update(days.keys())
         sorted_dates = sorted(all_dates)
+
+        # Region-Name-Lookup (id → Anzeige-Name) aus regionen.csv
+        region_name_by_id: dict[str, str] = {}
+        try:
+            for r in get_all_regions():
+                region_name_by_id[r["id"]] = r.get("region") or r["id"]
+        except Exception:
+            pass
 
         for date_str in sorted_dates:
             # Buckets nach experience_rating (5 = xc_tag oben, 1 = abgleiter unten)
@@ -3647,6 +3663,48 @@ class AnalyzersMixin:
                     unrated.append(row)
 
             lines.append(f"─── {date_str} ({_weekday_de(date_str)}) ───")
+
+            # Regions-Block: Großwetter-Einschätzung pro Region (für Cap-Check
+            # Region vs. Spot, siehe docs/PLAN_eine_bewertung_eine_analyse.md).
+            region_rows = []
+            for rid, days in (self.region_analyses or {}).items():
+                if not isinstance(days, dict):
+                    continue
+                rentry = days.get(date_str)
+                if not isinstance(rentry, dict):
+                    continue
+                rsafety = rentry.get("safety", {}) if isinstance(rentry.get("safety"), dict) else {}
+                rfly = rentry.get("flyability", {}) if isinstance(rentry.get("flyability"), dict) else {}
+                rname = rentry.get("region_name") or region_name_by_id.get(rid, rid)
+                rrating = rentry.get("experience_rating")
+                rss = rsafety.get("safety_status") or "error"
+                rbw = rentry.get("best_window") or rfly.get("best_window") or "?"
+                rpcr = rfly.get("peak_climb_rate") or rentry.get("peak_climb_rate")
+                rrec = (rentry.get("recommendation") or rfly.get("recommendation") or "").strip()
+                region_rows.append((rrating if isinstance(rrating, int) else 0,
+                                    rname, rrating, rss, rbw, rpcr, rrec))
+            if region_rows:
+                # Sortiert: Rating desc, dann Name asc
+                region_rows.sort(key=lambda x: (-x[0], x[1]))
+                lines.append("  REGIONEN (Großwetter — Cap-Check für Spot-Ratings 4/5):")
+                for _, rname, rrating, rss, rbw, rpcr, rrec in region_rows:
+                    bits = []
+                    if isinstance(rrating, int) and 1 <= rrating <= 5:
+                        bits.append(f"Rating {rrating}/5")
+                    else:
+                        bits.append("Rating —")
+                    bits.append(f"Sicherheit: {rss}")
+                    if rbw and rbw != "?":
+                        bits.append(f"Fenster: {rbw}")
+                    if isinstance(rpcr, (int, float)) and rpcr:
+                        bits.append(f"Peak: {rpcr} m/s")
+                    line = f"    {rname} ({', '.join(bits)})"
+                    if rrec:
+                        rec_one = rrec.replace("\n", " ").strip()
+                        if len(rec_one) > 140:
+                            rec_one = rec_one[:137] + "…"
+                        line += f" — {rec_one}"
+                    lines.append(line)
 
             def _fmt_group(label: str, items: list):
                 if not items:

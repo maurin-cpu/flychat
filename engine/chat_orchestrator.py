@@ -335,6 +335,23 @@ class ChatOrchestratorMixin:
             "latitude": spot.get("latitude"),
             "longitude": spot.get("longitude"),
         }
+        # Region des Spots ermitteln (für Region-Analyse-Lookup pro Tag)
+        spot_region_id = None
+        spot_region_name = None
+        try:
+            lat = spot.get("latitude")
+            lon = spot.get("longitude")
+            if lat is not None and lon is not None:
+                region_obj = find_region_for_point(lat, lon)
+                if region_obj:
+                    spot_region_id = region_obj.get("id")
+                    spot_region_name = region_obj.get("region") or spot_region_id
+        except Exception:
+            pass
+        if spot_region_id:
+            entry["region_id"] = spot_region_id
+        region_days = (self.region_analyses or {}).get(spot_region_id, {}) if spot_region_id else {}
+
         # Voranalysen pro Tag (kompakt) — Rating-Architektur v2.0
         analyses = self.spot_analyses.get(name, {}) if self.spot_analyses else {}
         if analyses:
@@ -344,13 +361,27 @@ class ChatOrchestratorMixin:
                     continue
                 safety = day.get("safety", {}) if isinstance(day.get("safety"), dict) else {}
                 xc = day.get("streckenflug") if isinstance(day.get("streckenflug"), dict) else {}
-                days_summary[date_str] = {
+                day_entry = {
                     "safety_status": safety.get("safety_status") or day.get("safety_status"),
                     "experience_rating": day.get("experience_rating"),
                     "streckenflug_rating": xc.get("rating"),
                     "best_window": day.get("best_window"),
                     "recommendation": (day.get("recommendation") or "")[:240],
                 }
+                # Region-Analyse für denselben Tag mitliefern, damit das LLM
+                # Spot vs. Region direkt vergleichen kann (Cap-Check).
+                rday = region_days.get(date_str) if isinstance(region_days, dict) else None
+                if isinstance(rday, dict):
+                    rsafety = rday.get("safety", {}) if isinstance(rday.get("safety"), dict) else {}
+                    rfly = rday.get("flyability", {}) if isinstance(rday.get("flyability"), dict) else {}
+                    day_entry["region_analysis"] = {
+                        "region_name": rday.get("region_name") or spot_region_name,
+                        "experience_rating": rday.get("experience_rating"),
+                        "safety_status": rsafety.get("safety_status"),
+                        "best_window": rday.get("best_window") or rfly.get("best_window"),
+                        "peak_climb_rate": rfly.get("peak_climb_rate") or rday.get("peak_climb_rate"),
+                    }
+                days_summary[date_str] = day_entry
             if days_summary:
                 entry["analyses"] = days_summary
         return entry
