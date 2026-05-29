@@ -166,10 +166,6 @@ def compose_analysis_prompt(mode: str, phase: str) -> str:
     insert_idx = blocks.index(insert_after) + 1
     blocks.insert(insert_idx, context_block)
 
-    # Streckenflug-Synthese: nur Spot, nur Flyability-Phase.
-    if mode == "spot" and phase == "flyability":
-        blocks.append("04_flyability/05_streckenflug.md")
-
     if marker not in template:
         raise ValueError(f"00_template_{mode}.md (phase={phase}) enthält keinen {marker}-Marker")
     shared = "\n\n".join(_load_shared(name) for name in blocks)
