@@ -1610,16 +1610,13 @@
     const a = analysis && typeof analysis === "object" ? analysis : {};
     const saf = a.safety || {};
     const fly = a.flyability || {};
-    const sf = a.streckenflug || {};
 
     const safetyText = cleanAssessmentText(spot.safety_feedback || a.safety_feedback || saf.summary);
     const flyText = cleanAssessmentText(spot.flyability_feedback || a.recommendation || fly.recommendation);
-    const xcText = "";  // RATING_ARCHITECTURE v2.0: kein streckenflug.summary mehr
 
     const sections = [
       { key: "safety", label: "Sicherheits-Einschätzung", text: safetyText },
       { key: "fly", label: "Flug-Einschätzung", text: flyText },
-      { key: "xc", label: "Streckenflug-Einschätzung", text: xcText },
     ].filter((s) => s.text);
 
     if (!sections.length) return "";

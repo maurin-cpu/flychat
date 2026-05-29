@@ -463,25 +463,6 @@ window.AnalysisView = (function () {
     }
 
     // ===== INSIGHTS =====
-    var SF_LIMIT_LABELS = {
-        none:                   '',
-        region_wind_aloft:      'Region-Höhenwinde bremsen den Streckenflug.',
-        weak_regional_thermals: 'Region-Thermik ist zu schwach für Strecke.',
-        ceiling_low:            'Basis bleibt zu tief für längere Strecken.',
-        spot_wind_direction:    'Wind kommt aus falschem Sektor.',
-        abgleiter_only:         'Nur Abgleiter möglich — keine Strecke.',
-        spot_not_flyable:       'Spot heute nicht fliegbar.',
-        region_context_missing: 'Region-Kontext fehlt — reine Spot-Einschätzung.'
-    };
-
-    var SF_RATING_LABELS = {
-        1: 'Kein Streckenflug',
-        2: 'Lokal fliegbar (kein Wegfliegen)',
-        3: 'Kurzes Wegfliegen möglich (~10–30 km)',
-        4: 'Weite Strecke möglich (~30–100 km)',
-        5: 'Klassiker (>100 km)'
-    };
-
     var RATING_LABELS_LONG = {
         1: 'Abgleiter — kein Thermikflug',
         2: 'Kurzer Thermikflug — Suchtag (1–2 h mit Glück)',
@@ -494,12 +475,9 @@ window.AnalysisView = (function () {
         var safetyFb = a.safety_feedback || a.summary || '';
         var flyFb = a.flyability_feedback || a.recommendation || '';
         var rating = parseInt(a.experience_rating, 10);
-        var sfLimit = a.streckenflug_limiting_factor || 'none';
-        var sfRating = parseInt(a.streckenflug_rating, 10);
         var hasRating = isFinite(rating) && rating >= 1;
-        var hasSfRating = isFinite(sfRating) && sfRating >= 1;
 
-        if (!safetyFb && !flyFb && !hasRating && !hasSfRating) return '';
+        if (!safetyFb && !flyFb && !hasRating) return '';
 
         var html = '<div class="mga-insights">';
         if (safetyFb) {
@@ -518,16 +496,6 @@ window.AnalysisView = (function () {
             html += '<div class="mga-insight flyability open">'
                   + '<button class="mga-insight-toggle" type="button">Flug-Einschätzung</button>'
                   + '<div class="mga-insight-body">' + flyBody + '</div>'
-                  + '</div>';
-        }
-        if (hasSfRating) {
-            var sfBody = '<div class="mga-insight-rating"><b>' + esc(SF_RATING_LABELS[sfRating] || ('Rating ' + sfRating))
-                       + '</b></div>';
-            var limitText = SF_LIMIT_LABELS[sfLimit] || '';
-            if (limitText) sfBody += '<div>' + esc(limitText) + '</div>';
-            html += '<div class="mga-insight streckenflug open">'
-                  + '<button class="mga-insight-toggle" type="button">Streckenflug-Einschätzung</button>'
-                  + '<div class="mga-insight-body">' + sfBody + '</div>'
                   + '</div>';
         }
         html += '</div>';
