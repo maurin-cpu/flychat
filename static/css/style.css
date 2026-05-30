@@ -2765,9 +2765,10 @@ body.page-fixed-nav {
        das Meteogramm nach oben — kein Overlay über dem Chart mehr. */
     .meteogram-aside {
         position: static;
-        flex: 0 0 auto;
+        flex: 1 1 auto;
         width: 100%;
-        max-height: 55vh;
+        min-height: 0;
+        max-height: none;
         background: var(--color-bg-elevated, #fff);
         border-top: 1px solid var(--color-border);
         border-left: none;
@@ -2776,6 +2777,7 @@ body.page-fixed-nav {
         transition: max-height 250ms cubic-bezier(0.4, 0, 0.2, 1);
     }
     .meteogram-aside.collapsed {
+        flex: 0 0 56px;
         max-height: 56px;
         border-radius: 0;
     }
@@ -2783,6 +2785,12 @@ body.page-fixed-nav {
         flex: 1 1 auto;
         min-height: 0;
         padding-bottom: 0;
+    }
+    /* Aufgeklappt: Chart weicht komplett, Analyse fuellt das Panel. */
+    .meteogram-body:has(.meteogram-aside:not(.collapsed)) .meteogram-main {
+        flex: 0 0 0;
+        min-height: 0;
+        overflow: hidden;
     }
     /* Collapsed-Header bekommt eine deutliche CTA-Optik damit klar wird,
        dass man hier draufklicken muss um die Analyse zu sehen. */
