@@ -397,12 +397,23 @@ class AnalyzersMixin:
             # Safety-Result als immutable Block injizieren
             safety_block = self._format_safety_injection(safety_result)
 
+            # Few-Shot Pipeline Schritt 2: aehnliche Pilot-gelabelte Cases injizieren.
+            # Tag wird in _ctx_fewshot_cache abgelegt, Post-Process haengt ihn an.
+            terrain_tier = (spot.get("terrain_type") or "").strip()
+            few_shot_block = self._build_few_shot_for(
+                f"{name}|{date_str}", terrain_tier, entity_type="spot",
+            )
+
+            user_msg = (
+                f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
+            )
+            if few_shot_block:
+                user_msg += few_shot_block + "\n"
+            user_msg += f"{context}\n\n{safety_block}"
+
             messages = [
                 {"role": "system", "content": prompts.SPOT_FLYABILITY_PROMPT},
-                {"role": "user", "content": (
-                    f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
-                    f"{context}\n\n{safety_block}"
-                )},
+                {"role": "user", "content": user_msg},
             ]
 
             last_err = None
@@ -2041,6 +2052,12 @@ class AnalyzersMixin:
         result["is_conditional"] = is_cond
 
         self._attach_rating_inputs(result, f"{name}|{date_str}")
+
+        # Few-Shot Pipeline Schritt 2: Tag in _decisions_applied uebernehmen.
+        fewshot_tag = (getattr(self, "_ctx_fewshot_cache", {}) or {}).get(f"{name}|{date_str}")
+        if fewshot_tag:
+            result.setdefault("_decisions_applied", []).append(fewshot_tag)
+
         return result
 
     def _build_few_shot_for(self, cache_key: str, terrain_tier: str,
@@ -2672,6 +2689,16 @@ class AnalyzersMixin:
                 if not spot_obj:
                     continue
 
+                # Few-Shot Pipeline Schritt 2 — auch im Batch-Pfad.
+                terrain_tier_batch = (spot_obj.get("terrain_type") or "").strip()
+                few_shot_block_batch = self._build_few_shot_for(
+                    f"{name}|{date_str}", terrain_tier_batch, entity_type="spot",
+                )
+                user_content = f"AKTUELLE LOKALZEIT: {now_str}\n\n"
+                if few_shot_block_batch:
+                    user_content += few_shot_block_batch + "\n"
+                user_content += f"{ctx}\n\n{safety_block}"
+
                 cid = f"spot_fly|{name}|{date_str}"
                 spot_fly_requests.append({
                     "custom_id": cid,
@@ -2681,7 +2708,7 @@ class AnalyzersMixin:
                         "model": self.analysis_model,
                         "messages": [
                             {"role": "system", "content": prompts.SPOT_FLYABILITY_PROMPT},
-                            {"role": "user", "content": f"AKTUELLE LOKALZEIT: {now_str}\n\n{ctx}\n\n{safety_block}"},
+                            {"role": "user", "content": user_content},
                         ],
                         "temperature": 0.2,
                         "max_tokens": _resolve_max_tokens(self.analysis_model, 2500),
