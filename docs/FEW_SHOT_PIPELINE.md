@@ -2,11 +2,14 @@
 
 > **Status:**
 >   - Schritt 1 (Labels sammeln): **live**.
->   - Schritt 2 (Retrieval + Prompt-Injection): **live** seit 2026-05-15 (nur Region-Pfad,
->     Spots haben noch keine Labels).
+>   - Schritt 2 (Retrieval + Prompt-Injection): **live** seit 2026-05-15 (Region-Pfad).
+>     Spot-Pfad + weiche Regions-Präferenz **implementiert 2026-05-30, noch nicht
+>     deployed** (uncommitted; Engine-Code braucht Service-Restart). Details unten.
 >   - Schritt 3 (Eval-Suite): noch nicht implementiert.
 > **Erstellt:** 2026-05-12
 > **Scope:** Schritte 1-3 einer LLM-Kalibrierungs-Strategie. Schritt 4 (Auto-Prompt-Optimization via DSPy) ist ausserhalb dieses Plans.
+>
+> **Siehe auch den Abschnitt „Update 2026-05-30" weiter unten** — empirischer Nachweis, dass Few-Shot-Labels und die Skill-Vignetten **Substitute** sind.
 
 ## Schritt 2 — Wie es konkret arbeitet (Stand 2026-05-15)
 
@@ -65,6 +68,124 @@ Skill: Peak ist wichtigstes Signal (×3), dann Dauer, dann Wolken.
 - Spots haben 0 Labels — Few-Shot wirkt nur auf Region-Calls.
 
 **Tests:** `tests/test_few_shot.py` (18 Tests).
+
+## Update 2026-05-30 — Spot-Pfad, Regions-Präferenz & Wirksamkeit
+
+> **Code-Stand: implementiert, Tests grün (18), aber NICHT committed/deployed.**
+> Engine-Code → Gleitcast-Service (:5000) braucht Restart, damit es greift.
+
+### A) Spot-Pfad verdrahtet
+
+Die Retrieval-/Storage-Schicht war schon entity-type-fähig (`retrieve_similar(entity_type=…)`,
+`build_few_shot_block(entity_type=…)`), aber im Spot-Flyability-Call nirgends aufgerufen.
+141 Spot-Labels lagen ungenutzt. Drei Stellen in `engine/analyzers.py` ergänzt:
+
+1. `_flyability_analysis_single_spot_day` — injiziert den Block vor dem Kontext
+   (analog Region), `entity_type="spot"`.
+2. Batch-Pfad in `run_all_analyses_batch_stream` (Spot-Flyability-Phase) — dito.
+3. `_post_process_flyability_spot` — hängt den `FewShot:`-Decision-Tag an
+   `_decisions_applied`.
+
+Cache-Key für Spots ist `f"{name}|{date_str}"` (= `_ctx_tq_cache`-Key aus
+`weather_context.py`, identisch zu dem, was `_build_few_shot_for` erwartet).
+
+### B) Weiche Regions-Präferenz für Spots
+
+**Problem:** Ø nur ~1,2 Labels/Spot (120 Spots, max 4) — „5 Labels vom selben Spot"
+gibt es nie. Das Retrieval poolt deshalb über den `terrain_tier`, nicht pro Spot.
+Was fehlte: **Lokalität** (gleiche Region / geografische Nähe floss nicht ins Ranking).
+
+**Lösung:** weicher Distanz-Aufschlag `_W_REGION_PENALTY = 1.5` in `retrieve_similar`,
+**nur für `entity_type=="spot"`** — Kandidaten aus fremder `analyse_region` bekommen
+den Aufschlag, ein deutlich wetter-ähnlicherer Nachbar-Tag schlägt ihn aber weiterhin.
+Kein hartes Region-Filtern (würde dünne Regionen verhungern lassen: nur 13 von 20
+Regionen haben ≥3 Labels). `analyse_region` wandert dazu in den Index
+(`_extract_features_from_label`) und in die Query (`_build_few_shot_for(..., region=…)`,
+Spot-Aufrufer übergeben `spot.get("analyse_region")`).
+
+**Empirisch (Leave-one-out, alle Spot-Labels):** Anteil Nachbarn aus *gleicher* Region
+steigt **39 % → 63 %**, 0 leere Retrievals (Pool unverändert, nur Reihenfolge). Stärke
+über `_W_REGION_PENALTY` justierbar.
+
+### C) Wirkt Few-Shot überhaupt? — und das Vignetten-Verhältnis
+
+Das LLM bewertet **systematisch zu optimistisch** (Region 65 %, Spot 62 % der Labels
+„zu_optimistisch"; Ø ~1 Punkt zu hoch). Untersucht mit zwei Replay-Harnessen gegen das
+Produktionsmodell `deepseek-chat` (Self-Ausschluss des replayten Falls aus dem Retrieval):
+
+- `scripts/ab_fewshot_region.py` — A/B mit/ohne Few-Shot auf Region-Problemfällen
+  (LLM=5, Pilot<5).
+- `scripts/ab_vignette_ablation.py` — 4-Arm V±/F± (Vignetten an/aus × Few-Shot an/aus),
+  Flags `--reps`, `--temp`.
+
+**Kernbefund (über 3 Läufe konsistent, MAE = mittl. Abstand zum Pilot-Ziel, kleiner=besser):**
+
+| Arm | nur Vignetten | nur Labels | beide | weder noch |
+|---|---|---|---|---|
+| MAE | ~0,41 | ~0,44 | ~0,41–0,44 | ~0,6–0,7 |
+
+→ **Vignetten und Few-Shot-Labels sind Substitute, keine Komplemente.** Beide bekämpfen
+denselben Optimismus-Fehler. Few-Shot *auf* den Vignetten draufgesetzt bringt keinen
+messbaren Zusatznutzen (redundant, nicht blockiert). **Mindestens einer** der beiden
+Mechanismen ist nötig — ohne beides bricht die Kalibrierung ein. „Labels statt
+Vignetten" (V−F+ ≈ V+F+) hält die Qualität und ist self-updating; auch bei temp=0
+reproduziert.
+
+Die Vignetten liegen in `skills/shared/04_flyability/04_flight_subratings_{spot,region}.md`
+(Abschnitt „PILOTEN-VIGNETTEN"); die harten Schranken (`peak<2.5 → max 4`,
+`peak<1.0 → max 1`) und die Region-Cap-Tabelle sind **separat** und bleiben.
+
+**Wichtige Einschränkung:** n=27 Region-Fälle, Ganzzahl-Ratings → MAE-Differenzen von
+~0,04 entsprechen *einem* Fall; V+F+/V+F−/V−F+ sind innerhalb des Rauschens
+ununterscheidbar. **Robust** ist nur „mindestens einer nötig" und „Labels können
+Vignetten ersetzen". Spots haben keine Few-Shot-Historie → Substituierbarkeit dort
+strukturell plausibel, aber nicht direkt belegt.
+
+### Offene Fix-Richtungen (analysiert, nicht umgesetzt)
+
+1. **Vignetten verschlanken/streichen, auf Labels setzen** — Handpflege weg,
+   self-updating; Daten sagen, Qualität hält.
+2. **Few-Shot-Block verbindlicher formulieren** (harte aggregierte Anweisung statt
+   weichem „folge … wenn ähnlich", Platzierung näher an der Entscheidung). Gegen
+   Überkorrektur: Streuung der Nachbar-Ratings berücksichtigen.
+
+### Architektur-Frage: Brauchen wir den Rating-Skill noch, oder reicht Labels-only?
+
+Aufgeworfen 2026-05-30: Wenn Labels und Vignetten Substitute sind — könnte man das
+Rating *direkt* aus den Labels machen und den Skill weglassen, weil der Skill die
+Labels „übersteuert"?
+
+**Was die Daten dazu sagen (und was nicht):** Die Ablation entfernte nur die Vignetten,
+nicht „den Skill". Wichtig ist der **V−F−**-Arm (voller Skill ohne Vignetten, ohne
+Labels): das war der **optimistischste** Arm (Ø 4,48, MAE ~0,6–0,7). → Der Rubric
+(Skala + Schranken + Region-Cap) übersteuert die Labels **nicht nach oben**; er ist
+selbst zu optimistisch und *braucht* eine Korrektur. Vignetten und Labels sind beide
+nur Korrektur-Patches darauf. Die Optimismus-Tendenz kommt von großzügigen Schwellen
+(z. B. Peak ≥ 2,5 → 5) + dem Modell-Default, nicht daher, dass der Skill gegen die
+Labels „gewinnt".
+
+**Was der Skill leistet, das Labels nicht ersetzen:**
+1. **Skala-Definition** — was „3" bedeutet (Labels tragen nur die Zahl).
+2. **Harte Caps / Cross-Dependencies** — `peak<2.5→max4`, Region-Cap (hängt von
+   `Region.experience_rating` + `working_height_at_spot_m` ab) — Logik, kein Lookup.
+3. **Strukturierter Output** — `recommendation`, `thermal_quality`, `summary`,
+   `xc_details`, Tags, 8 Safety-Sub-Ratings, `is_conditional`. Labels speichern nichts
+   davon.
+4. **Cold-Start / Abdeckung** — dünne Tiers/Regionen (jura=3, mittelland=2 Labels)
+   hätten im reinen Label-Ansatz kein Signal.
+5. **Zirkularität** — Labels wurden *mit* dem Skill im Loop erzeugt (Korrekturen relativ
+   zu skill-produzierten Ratings).
+
+**Fazit:** Skill komplett ersetzen → nein (Skala, Caps, Output-Schema, Cold-Start). Der
+valide Kern: die *heuristischen* Skill-Teile (Vignetten, evtl. großzügige
+Schwellen-Prosa) sind durch Labels ersetzbar; die *strukturellen/definitorischen* Teile
+bleiben. Die Frage ist nicht „Skill vs. Labels", sondern **„welche Skill-Teile sind
+Heuristik (→ Labels) und welche sind Struktur (→ bleibt)".**
+
+**Testbar:** neuer Ablations-Arm „minimaler Skill" (nur Skala + harte Caps +
+Output-Schema, keine Vignetten/heuristische Prosa) **+ Labels**, gegen heute (voller
+Skill). Trifft er gleich gut, ist der heuristische Mittelteil entbehrlich. Erweiterung
+von `scripts/ab_vignette_ablation.py`.
 
 ## Zweck
 
