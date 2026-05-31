@@ -64,7 +64,7 @@ Ein **Anker** ist ein Punkt, an dem Open-Meteo eine Boden-Böe liefert. Typisch:
 **Wichtig — Regions-Boden­wind aus mehreren Referenzpunkten:**
 Eine Region hat 4 Referenzpunkte (RPs) im GeoJSON. Früher wurde der Anker aus dem **ersten** RP genommen, was bei heterogenen Regionen wie "Mittelland Zentral" zu Verzerrungen führte: lag RP 1 zufällig in einem alpinen Modellpixel (z.B. Eriz auf 1662m), bestimmte dieser eine Punkt den gesamten Regions-Anker, obwohl die anderen 3 RPs im flachen Mittelland (~500m) lagen.
 
-Heute werden `wind_speed_10m` und `wind_gusts_10m` als **Median über alle 4 RPs** gebildet, `wind_direction_10m` vektoriell gemittelt (zirkulär korrekt). Implementiert in `_aggregate_wind_across_points()` in `fetch_weather.py`. Der Median ist robust gegen einen einzelnen Ausreisser-RP. Erst danach läuft die OI/Gauss-Kernel-Pipeline. Für Spots gilt das nicht — Spots nutzen ihren eigenen Punkt direkt.
+Heute wird `wind_speed_10m` als **Median über alle 4 RPs** gebildet und `wind_direction_10m` vektoriell gemittelt (zirkulär korrekt). `wind_gusts_10m` wird auf Region-Ebene **NICHT** aggregiert (Apr 2026) — Böen sind lokale Spitzenwerte und gehören auf Spot-Ebene. Implementiert in `_aggregate_wind_across_points()` in `fetch_weather.py`. Der Median ist robust gegen einen einzelnen Ausreisser-RP. Erst danach läuft die OI/Gauss-Kernel-Pipeline. Für Spots gilt das nicht — Spots nutzen ihren eigenen Punkt direkt.
 
 Für den Anker wird der **Böen-Exzess relativ zum freien Atmosphärenwind** berechnet:
 

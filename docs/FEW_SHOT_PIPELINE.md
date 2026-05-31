@@ -1,10 +1,10 @@
-# Few-Shot-Pipeline — Plan
+# Few-Shot-Pipeline — Konzept & Umsetzungsstand
 
-> **Status:**
+> **Status:** Kern produktiv, ein Schritt offen — daher in `docs/` (nicht in `docs/pläne/`).
 >   - Schritt 1 (Labels sammeln): **live**.
 >   - Schritt 2 (Retrieval + Prompt-Injection): **live** seit 2026-05-15 (nur Region-Pfad,
 >     Spots haben noch keine Labels).
->   - Schritt 3 (Eval-Suite): noch nicht implementiert.
+>   - Schritt 3 (Eval-Suite): **noch nicht implementiert** — einziger offener Punkt.
 > **Erstellt:** 2026-05-12
 > **Scope:** Schritte 1-3 einer LLM-Kalibrierungs-Strategie. Schritt 4 (Auto-Prompt-Optimization via DSPy) ist ausserhalb dieses Plans.
 

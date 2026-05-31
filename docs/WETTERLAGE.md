@@ -32,7 +32,7 @@ Jede Aussage muss bis zur Rohzahl rückverfolgbar sein. Architektur folgt dem
 ```
 wetterdaten.json
     ↓
-aggregate_ch_daily_snapshot()           ← CH-Mittel über 487 Spots (12:00 lokal)
+aggregate_ch_daily_snapshot()           ← CH-Mittel über ~495 Spots (12:00 lokal)
     ↓ snapshots [{date, msl_hpa, t850_c, gh850_m, wind_700}]
     │
     ├─ decide_pressure_influence()      ← Hoch/Tief/Übergang + Linear-Trend

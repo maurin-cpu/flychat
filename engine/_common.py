@@ -48,6 +48,13 @@ _MODEL_TOKEN_LIMITS = {
     "gemini-2.5-flash":      1_000_000,
     "gemini-2.5-flash-lite": 1_000_000,
     "gemini-2.5-pro":        1_000_000,
+    # DeepSeek — V4-Reihe nativ 1M Context (V3/R1 nur 128k).
+    # Ohne diese Einträge fiele V4 auf _DEFAULT_TOKEN_LIMIT (128k) zurück und der
+    # Wetterkontext würde unnötig gekürzt, obwohl das Modell 1M aufnehmen kann.
+    "deepseek-chat":      128_000,
+    "deepseek-reasoner":  128_000,
+    "deepseek-v4-flash":  1_000_000,
+    "deepseek-v4-pro":    1_000_000,
 }
 _DEFAULT_TOKEN_LIMIT = 128_000
 # Reserve fuer System-Prompt, Tools, User-Frage, Response-Tokens, History

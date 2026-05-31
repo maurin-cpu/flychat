@@ -75,7 +75,7 @@ Berechnung (wenn H nicht direkt von der API kommt):
 H = (Direktstrahlung × Koeffizient × Topo-Bonus + Diffusstrahlung × Koeffizient) × Vegetationsfaktor
 ```
 
-- **Topo-Bonus**: Ein Südhang bekommt mehr Sonne als Flachland (bis 1.3x).
+- **Topo-Bonus**: Ein Südhang bekommt mehr Sonne als Flachland (bis 1.45x).
   Nur ein gedämpfter Anteil (40%) wirkt auf die Thermik, weil die Hangthermik
   schmaler und turbulenter ist als Flachland-Thermik.
 - **Vegetationsfaktor**: Im Frühling (April–Mai) verdunsten Pflanzen viel Wasser.
