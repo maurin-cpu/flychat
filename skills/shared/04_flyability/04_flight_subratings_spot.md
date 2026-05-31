@@ -182,45 +182,14 @@ Fehlt ein Marker → normales Rating 5, keine Klassiker-Erwaehnung.
 HARTE SCHRANKEN (gegen Unsinn — nur 2 Regeln)
 ─────────────────────────────────
 
-Diese zwei Regeln brichst du nie. Sonst vertraust du dem Pilotenurteil
-und den Vignetten unten.
+Diese zwei Regeln brichst du nie. Sonst vertraust du deinem Pilotenurteil
+und — falls eingespielt — den Kalibrierungs-Beispielen (echte Pilot-
+Bewertungen aehnlicher Tage, oben im Kontext).
 
 1. **`sustained_peak < 1.0`** → Rating maximal **1**.
    *Abgleiter ist Abgleiter — egal wie lang oder hoch.*
 2. **`sustained_peak < 2.5`** → Rating maximal **4**.
    *Peak 2.5 m/s ist die XC-Tag-Schwelle. Ohne echte Steigwerte kein 5er.*
-
-─────────────────────────────────
-PILOTEN-VIGNETTEN — echte Cases als Bauchgefuehl-Anker
-─────────────────────────────────
-
-Diese Cases hat ein Pilot konkret bewertet. Lies sie als Heuristik-Anker,
-NICHT als Praezisionslehre: der Engine-Proxy fuer Peak und Climb ist
-selbst ungenau (validiert an XContest-Performance: Cases mit Proxy ≥2.5
-schaffen nur in 28% einen 50km-Flug). Die Vignetten zeigen dir das
-Pilotenbauchgefuehl — auch wenn die Engine-Zahlen aehnlich aussehen.
-
-**Rating 1 — Abgleiter** *(illustrativ, Winter-Beispiel)*
-- Mittelland-Hausberg, Peak 0.5 m/s × 2h, AGL 200m, overcast → **1**.
-
-**Rating 2 — kurzer Thermikflug** *(aus Labels)*
-- Lungern Schönbüel (alpen), Peak 1.7 m/s × 5h, AGL 493m, cu_clean_top → **2**.
-
-**Rating 3 — solider Thermikflug** *(aus Labels)*
-- Davos-Parsenn (alpen), Peak 1.8 m/s × 7h, AGL 760m, cu_clean_top → **3**.
-
-**Rating 4 — starker Thermikflug** *(aus Labels — Problemzone gegen 5)*
-- Biel-Rämsenberg (alpen), Peak 2.8 m/s × 10h, AGL 757m, blue → **4**.
-  *Engine-Zahlen sehen nach XC-Substanz aus, Pilot sieht lokal-XC.*
-- Bietschhorn (hochalpin), Peak 2.4 m/s × 8h, AGL 1088m, cu_clean_top → **4**.
-  *Auch hochalpin kein Automatik-5 — Peak knapp unter 2.5.*
-
-**Rating 5 — XC-Tag-Kandidat** *(aus Labels — bestaetigt durch Piloten)*
-- Egg (alpen), Peak 2.5 m/s × 9h, AGL 970m, blue → **5**.
-- Bodenberg (voralpen), Peak 2.5 m/s × 9h, AGL 1175m, blue → **5**.
-- Bellwald (hochalpin), Peak 2.6 m/s × 11h, AGL 943m, cu_clean_top → **5**.
-
-Sonst gilt: dein Pilotenurteil zaehlt, nicht eine Checkliste.
 
 ─────────────────────────────────
 REGION-CAP & STRECKENFLUG-PFLICHTSATZ (XC im xc_details)

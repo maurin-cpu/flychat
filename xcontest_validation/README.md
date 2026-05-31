@@ -128,12 +128,28 @@ Snapshot existiert.
 
 ## File-Convention
 
-- `YYYY-MM-DD.md` — eine Datei pro analysiertem XContest-Tag (manuell)
-- `observations.csv` — strukturierte Daten, append-only (manuell, pro Tag)
+- `YYYY-MM-DD.md` — eine Datei pro analysiertem XContest-Tag (manuell/kuratiert)
+- `observations.csv` — strukturierte Daten, append-only
 - `sector_audit.csv` — abgeleitet, überschrieben (`scripts/generate_sector_audit.py`)
 - `PATTERNS.md` — akkumulierter Issue-Tracker (manuell)
-- `README.md` — diese Datei
-- `SCHEMA.md` — Spaltendefinitionen für CSVs
+- `_raw/YYYY-MM-DD.tsv` — kompakte Rohdaten pro Tag (`launch⇥km⇥start⇥airtime⇥pilot`), Provenance
+- `_raw/_obs_YYYY-MM-DD.csv` — vom Aggregator erzeugte Kandidaten-Zeilen (vor Append in observations.csv)
+- `README.md` / `SCHEMA.md` — diese Datei / Spaltendefinitionen
+
+## Halb-automatische Aggregation (ab 27.05.2026)
+
+`scripts/xc_aggregate.py` ersetzt das manuelle Auszaehlen bei Gross-Tagen:
+1. XContest-Paste → kompakte TSV in `_raw/YYYY-MM-DD.tsv` (eine Zeile pro Flug).
+2. `PYTHONUTF8=1 python scripts/xc_aggregate.py 2026-05-27 ...` aggregiert pro Spot
+   (launches, best_km, top_pilot), mappt XContest→PGE (Dict im Script), joint `our_*`/`wx_*`
+   aus `weather_archive` und klassifiziert `finding_type`. Output: `_raw/_obs_*.csv` + Konsolen-Digest.
+3. Review der `_obs_*.csv`, dann append in `observations.csv`, dann `generate_sector_audit.py`.
+
+> ⚠ **Snapshot-Vollstaendigkeit pruefen (I-015)**: Frueh-Morgen-Snapshots (~06:15) koennen den
+> XC-/Experience-LLM-Pass noch nicht enthalten (`streckenflug_rating` 0 oder auf 0/1 gedeckelt).
+> `DATE_FLAGS` im Aggregator blankt dann `our_xc_rating`/`our_experience_rating` und unterdrueckt
+> `underrated_spot`. **Nur Safety/Status ist an solchen Tagen validierbar.** Pruefe pro neuem Tag
+> die xc-Verteilung im Snapshot, bevor du `DATE_FLAGS` setzt.
 
 Tages-MDs + observations.csv-Zeilen + PATTERNS-Updates sind manuell konsistent zu halten.
 `sector_audit.csv` ist deterministisch ableitbar — neu erzeugen nach jedem

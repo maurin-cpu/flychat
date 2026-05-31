@@ -3,13 +3,15 @@
 > **Status:** Kern produktiv, ein Schritt offen — daher in `docs/` (nicht in `docs/pläne/`).
 >   - Schritt 1 (Labels sammeln): **live**.
 >   - Schritt 2 (Retrieval + Prompt-Injection): **live** seit 2026-05-15 (Region-Pfad).
->     Spot-Pfad + weiche Regions-Präferenz **implementiert 2026-05-30, noch nicht
->     deployed** (uncommitted; Engine-Code braucht Service-Restart). Details unten.
+>     Spot-Pfad + weiche Regions-Präferenz **committed** (`e3c7b1e`), greift aber erst
+>     nach **Service-Restart** der Engine (:5000) — bis dahin nicht wirksam. Details unten.
 >   - Schritt 3 (Eval-Suite): noch nicht implementiert.
 > **Erstellt:** 2026-05-12
 > **Scope:** Schritte 1-3 einer LLM-Kalibrierungs-Strategie. Schritt 4 (Auto-Prompt-Optimization via DSPy) ist ausserhalb dieses Plans.
 >
-> **Siehe auch den Abschnitt „Update 2026-05-30" weiter unten** — empirischer Nachweis, dass Few-Shot-Labels und die Skill-Vignetten **Substitute** sind.
+> **Siehe „Update 2026-05-30" + „Update 2026-05-31" unten** — empirischer Nachweis, dass
+> Few-Shot-Labels und Skill-Vignetten **Substitute** sind (Region), und dass die
+> **Spot-Vignetten sogar schaden** → für Spots gestrichen.
 
 ## Schritt 2 — Wie es konkret arbeitet (Stand 2026-05-15)
 
@@ -186,6 +188,48 @@ Heuristik (→ Labels) und welche sind Struktur (→ bleibt)".**
 Output-Schema, keine Vignetten/heuristische Prosa) **+ Labels**, gegen heute (voller
 Skill). Trifft er gleich gut, ist der heuristische Mittelteil entbehrlich. Erweiterung
 von `scripts/ab_vignette_ablation.py`.
+
+## Update 2026-05-31 — Spot-Ablation: offene Spot-Lücke geschlossen
+
+Das Update 2026-05-30 hatte für Spots ausdrücklich offen gelassen: „Substituierbarkeit
+dort strukturell plausibel, aber **nicht direkt belegt**" (kein Spot-Arm im A/B). Diese
+Lücke ist jetzt geschlossen — neues Script `scripts/ab_vignette_ablation_spot.py`
+(Spot-Pendant der Region-Ablation: Spot-Problemfälle aus `replay_problem_cases.py`,
+`SPOT_FLYABILITY_PROMPT`, Few-Shot mit `entity_type="spot"` inkl. Regions-Präferenz,
+Self-Ausschluss).
+
+**Setup:** 35 Spot-Problem-Cases (LLM=5, Pilot<5), tier ∈ {alpen 28, voralpen 7},
+working_height < 900 m. Few-Shot-Block für alle 35 verfügbar. `deepseek-chat`, temp=0,
+3 Reps. Pilot-Ziel Ø=3,89.
+
+| Arm | nur Vignetten (V+F−) | nur Labels (V−F+) | beide (V+F+) | weder (V−F−) |
+|---|---|---|---|---|
+| **Spot**-MAE | **0,343** | **0,238** | 0,219 | 0,295 |
+| Region-MAE (Vergleich) | 0,400 | 0,344 | 0,333 | 0,533 |
+
+**Befunde (Spot):**
+1. **`V−F+` (nur Labels) ≈ `V+F+` (heute):** 0,238 vs 0,219, Δ +0,019 = <1 Fall von 35.
+   Labels alleine halten die Spot-Kalibrierung. → Substituierbarkeit jetzt **belegt**
+   (für alpen/voralpen), nicht nur plausibel.
+2. **Labels schlagen Vignetten klar:** `V−F+` 0,238 < `V+F−` 0,343 — anders als bei
+   Regionen (dort Gleichstand). Stützt „Labels sind spot-spezifischer".
+3. **NEU & wichtig — Vignetten schaden bei Spots:** `V+F−` (nur Vignetten, 0,343) ist
+   der **schlechteste** Arm, schlechter als `V−F−` (weder, 0,295). Der 5er-Anker bei
+   Peak ~2,6 in den Spot-Vignetten drückt mehrere echte 4er auf 5 (Über-Optimismus).
+   Die dynamischen Labels machen diesen Fehler nicht. → Spot-Vignetten zu streichen ist
+   kein „gefahrlos", sondern eine **Verbesserung**.
+
+**Vorbehalte:** nur alpen/voralpen — jura/mittelland/hochalpin-Spots ungetestet (im
+Problemset nicht vertreten; haben aber auch kaum Labels → dort ist *kein* Mechanismus
+stark). n=35, Ganzzahl-Ratings → 0,02 MAE ≈ 1 Fall; robust sind die zwei Richtungs-
+Befunde, nicht die dritte Nachkommastelle. Kosten der beiden Läufe: Region $1,51 +
+Spot $2,06.
+
+**Konsequenz (umgesetzt 2026-05-31):** Spot-Vignetten aus
+`skills/shared/04_flyability/04_flight_subratings_spot.md` entfernt; harte Schranken
+(`peak<1.0→max1`, `peak<2.5→max4`), Region-Cap und Output-Schema **bleiben** (Struktur,
+keine Heuristik). Greift erst nach Service-Restart. Region-Vignetten vorerst belassen
+(dort Gleichstand, kein Schadenssignal).
 
 ## Zweck
 
