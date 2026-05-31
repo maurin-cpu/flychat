@@ -551,6 +551,14 @@ _W_PEAK = 3.0
 _W_PROD_H = 0.5
 _W_CLOUD = 0.05  # je Schicht (low + mid)
 
+# Weiche Lokalitaets-Praeferenz fuer SPOTS: Spots haben ~1.2 Labels/Spot, daher
+# poolt das Retrieval ueber den Tier. Damit "gleiche Region" bevorzugt wird ohne
+# duenne Regionen verhungern zu lassen, bekommt ein Kandidat aus einer ANDEREN
+# analyse_region einen Distanz-Aufschlag — ein deutlich wetter-aehnlicherer Tag
+# aus einer Nachbarregion kann ihn aber weiterhin schlagen. Nur fuer entity_type
+# == "spot" aktiv (Regionen unveraendert).
+_W_REGION_PENALTY = 1.5
+
 # Modul-Cache: laden einmal, invalidate bei mtime-Change.
 _LABEL_INDEX: list[dict[str, Any]] | None = None
 _LABEL_INDEX_MTIME: float | None = None
@@ -570,12 +578,19 @@ def _extract_features_from_label(entry: dict[str, Any]) -> dict[str, Any] | None
         return None
     low = agg.get("low_cloud_max") or 0
     mid = agg.get("mid_cloud_max") or 0
+    # analyse_region nur fuer Spots (weiche Lokalitaets-Praeferenz). Aufgeloest
+    # ueber Spot-Meta (name -> slug -> analyse_region); leer falls unbekannt.
+    region = ""
+    if entry.get("entity_type") == "spot":
+        sid = entry.get("spot_or_region_id") or ""
+        region = _load_spot_meta().get(slugify_spot(sid), {}).get("analyse_region", "") or ""
     return {
         "tier": tier,
         "peak": float(peak),
         "prod_h": float(prod_h),
         "low": float(low),
         "mid": float(mid),
+        "region": region,
     }
 
 
@@ -665,14 +680,23 @@ def retrieve_similar(current_features: dict[str, Any], top_k: int = 3,
     if not candidates:
         return []
 
+    cur_region = (current_features.get("region") or "").strip()
+
     def _dist(item):
         f = item["features"]
-        return (
+        d = (
             _W_PEAK * abs(f["peak"] - current_features.get("peak", 0))
             + _W_PROD_H * abs(f["prod_h"] - current_features.get("prod_h", 0))
             + _W_CLOUD * abs(f["low"] - current_features.get("low", 0))
             + _W_CLOUD * abs(f["mid"] - current_features.get("mid", 0))
         )
+        # Weiche Regions-Praeferenz (nur Spots): Aufschlag fuer fremde Region.
+        # Nur wenn beide Regionen bekannt sind — sonst neutral.
+        if entity_type == "spot" and cur_region:
+            cand_region = (f.get("region") or "").strip()
+            if cand_region and cand_region != cur_region:
+                d += _W_REGION_PENALTY
+        return d
 
     candidates.sort(key=_dist)
     return [item["entry"] for item in candidates[:top_k]]
