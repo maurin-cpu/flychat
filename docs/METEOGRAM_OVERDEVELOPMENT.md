@@ -2,10 +2,10 @@
 
 **Status:** ✅ **Umgesetzt & live** — der Code aus Phase 1 ist vollständig in
 `static/js/meteogram.js` (`hasOverdev`/`capeStrong`, Schwellen 800/1500, hohler vs.
-gefüllter Blitz in Mobile- und Desktop-Zweig). Offen sind nur noch zwei **nutzer-seitige**
-Folgepunkte ohne weitere Code-Arbeit: visuelle Abnahme im Browser (Phase 2) und die
-UX-Entscheidung über das redundante Warnband in `WARN_TYPES` (Phase 3). Weil das Feature
-umgesetzt ist, liegt dieses Dokument in `docs/` (Doku) und nicht in `docs/pläne/`.
+gefüllter Blitz in Mobile- und Desktop-Zweig). Phase 3 (redundantes Warnband) ist
+erledigt — Band entfernt, Symbol ist einzige CAPE-Quelle. Offen ist nur noch der
+**nutzer-seitige** Punkt ohne Code-Arbeit: visuelle Abnahme im Browser (Phase 2).
+Weil das Feature umgesetzt ist, liegt dieses Dokument in `docs/` (Doku) und nicht in `docs/pläne/`.
 **Erstellt:** 2026-05-29
 **Betroffene Datei:** `static/js/meteogram.js`
 
@@ -77,14 +77,13 @@ JS ist gecached → **Hard-Reload** (Strg+Shift+R) nötig.
 - [ ] Tooltip-Text prüfen (Hover Desktop / Touch Mobile)
 - [ ] Gegencheck: Stunde, in der der Analysetext „Überentwicklung" sagt → jetzt auch Symbol vorhanden
 
-### Phase 3 — Folge-Entscheidung: redundantes Warnband (OFFEN, User)
+### Phase 3 — Folge-Entscheidung: redundantes Warnband (ERLEDIGT)
 
-Das alte Band „Überentwicklung (CAPE)" in `WARN_TYPES` (`meteogram.js:612`) existiert weiter → Signal jetzt an **zwei** Stellen.
-
-- [ ] **Entscheidung A — Band entfernen:** Zeile aus `WARN_TYPES` streichen. Zeile oben ist einzige, klare Quelle. Weniger Redundanz, mehr Platz im Warn-Strip für andere Bänder.
-- [ ] **Entscheidung B — Band behalten:** liefert die zeitliche Spanne als beschriftetes Band zusätzlich zum Symbol. Dann ggf. CAPE in der Prioritätsliste höher ziehen, damit es nicht weiter in die Overflow-Pille fällt.
-- [ ] Nach Entscheidung: passender **Commit**, z.B.
-  `feat(meteogram): Überentwicklungsgefahr (CAPE) als stündliches Symbol`
+**Entscheidung A umgesetzt (2026-05-31):** Das redundante Band „Überentwicklung
+(CAPE)" wurde aus `WARN_TYPES` entfernt. Das stündliche Symbol (hohler Blitz) ist
+jetzt die einzige, klare CAPE-Quelle — kein Doppelsignal, nichts versteckt sich
+mehr in der „+N weitere"-Overflow-Pille. Das verwaiste `f.cape = true`-Flag wurde
+mitentfernt. Tooltip-Detail-Panel (CAPE-Zahl) bleibt unberührt.
 
 ---
 

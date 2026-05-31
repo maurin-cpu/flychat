@@ -570,8 +570,8 @@ window.Meteogram = (function () {
             var wcAll = (precip.weather_code != null) ? precip.weather_code
                       : ((wx.cloudbase && wx.cloudbase.weather_code != null) ? wx.cloudbase.weather_code : null);
             if (isThunderstorm(wcAll)) f.storm = true;
-            // CAPE
-            if (thermik.cape != null && thermik.cape > 800) f.cape = true;
+            // CAPE-Überentwicklung wird stündlich als hohler Blitz in der
+            // Wetterzeile gezeigt (siehe hasOverdev), nicht mehr als Warnband.
 
             // Aloft danger (within flight layer: elevation .. thermal_max + 1000m)
             // Schwellen aus thresholds-API (config.WIND_*_KMH / GUST_*_KMH).
@@ -608,8 +608,7 @@ window.Meteogram = (function () {
             { key: 'wrong',            label: 'Wind falsche Richtung',  color: '#9A3412', bg: '#FFEDD5' },
             { key: 'gustWarn',         label: 'Böen stark',             color: '#9A3412', bg: '#FFEDD5' },
             { key: 'aloftWarn',        label: 'Höhenwind kräftig',      color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'aloftGustWarn',    label: 'Höhenböen kräftig',      color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'cape',             label: 'Überentwicklung (CAPE)', color: '#92400E', bg: '#FEF3C7' }
+            { key: 'aloftGustWarn',    label: 'Höhenböen kräftig',      color: '#9A3412', bg: '#FFEDD5' }
         ];
 
         // Build groups per warning type
