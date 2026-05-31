@@ -30,7 +30,7 @@ SELBST-CHECK (PFLICHT)
 2. **Thermik-Realitaet**: Keine nutzbare Thermik → `experience_rating = 1`.
 3. **RATING-INPUTS pruefen**: `prod_h_strict < 2` → max **2**. `prod_h_strict ≥ 4` UND `sustained_peak ≥ 2.0` → min **4**.
 4. **Region-Cap (siehe `_flight_subratings_spot.md`)**: Rating 5 nur wenn Region=5 UND `working_height_at_spot_m_max >= 2000m`. Rating 4 nur wenn Region>=4 UND `working_height_at_spot_m_max >= 1500m`. Sonst kappen.
-5. **XC-Pflichtsatz im `xc_details`**: konkrete Zahl `working_height_at_spot_m_max` + km-Klasse. Bei Spannweite (max-min) >= 500m zusaetzlich Best-Hour-Zeitfenster.
+5. **XC-Pflichtsatz im `xc_details`**: Region als Quelle mit `weil`/`weshalb` begruenden (Region-Thermik / Region-Rating / Region-Basis) + konkrete Zahl `working_height_at_spot_m_max` + km-Klasse. Bei Spannweite (max-min) >= 500m zusaetzlich Best-Hour-Zeitfenster.
 6. **Anti-Cluster**: Vermeide Rating **3** als Default. Differenziere bewusst.
 7. **Tagesverlauf-Trend (NUR Flugqualitaet)**: Thermik-Aufbau/Verfall, Bewoelkungs-Zunahme erlaubt. Wind-Trends/Hoehenwind/Foehn → NICHT erwaehnen (Safety).
 8. **`llm_tags` Whitelist**: NUR aus {CLOUDS, THERMAL, XC, INVERSION, BASE, WINDOW, SUNSHINE, CONVERGENCE}. VERBOTEN: Backend-Topics (WIND_GROUND, WIND_ALOFT, RAIN, THUNDERSTORM, FOEHN, TURBULENCE), Severity `stop`/`warn`. Pro-Topic-Severity: INVERSION nur `reducer`; CONVERGENCE/XC nur `good`; BASE/THERMAL/CLOUDS/WINDOW/SUNSHINE jeweils `reducer` oder `good`. Im Zweifel weglassen.
@@ -51,7 +51,7 @@ AUSSCHLIESSLICH JSON, keine Tags, keine eckigen Klammern.
   "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet MIT Begruendung aus Datenblock (Bewoelkung-%, BLH, prod_h). Tief vs. mittel getrennt: tief ≥80% = 'Cu-Overcast blockiert Sonne von unten'; mittel ≥70% = 'Altostratus daempft von oben'; tief klar + mittel 40-60% = 'gedaempft durch Mittelbewoelkung'; tief ≤50% Cu + mittel ≤30% = positiv. Cirrus allein = normal.",
   "peak_climb_rate": 0.0,
   "xc_potential": "high|moderate|low",
-  "xc_details": "PFLICHT — 2-3 Saetze mit konkretem Streckenflug-Satz: working_height_at_spot_m_max-Zahl + km-Klasse nennen. Bei Spannweite (max-min) >= 500m zusaetzlich Best-Hour-Fenster ('Mittagsfenster 13-15 Uhr ...'). Wenn Region-Kontext fehlt: 'Ohne Region-Kontext keine XC-Aussage — reine Spot-Einschaetzung.' Bei Spot >= Region-Top: 'Spot bereits ueber Region-Thermik-Top, kein Wegfliegen moeglich.'",
+  "xc_details": "PFLICHT — 2-3 Saetze. Streckenflug ist die verdichtete Region-Flugeinschaetzung auf den Spot projiziert: deshalb IMMER mit 'weil'/'weshalb' aus der Region heraus begruenden (Region-Thermik / Region.experience_rating / Region-Basis), dann die working_height_at_spot_m_max-Zahl + km-Klasse nennen. Beispiel: 'Weil die Region starke Thermik und hohe Basis liefert (Region-Rating 5), traegt es ab 2200m ueber Start — Streckenflug >100km moeglich.' Bei Spannweite (max-min) >= 500m zusaetzlich Best-Hour-Fenster ('Mittagsfenster 13-15 Uhr ...'). Wenn Region-Kontext fehlt: 'Ohne Region-Kontext keine XC-Aussage — reine Spot-Einschaetzung.' Bei Spot >= Region-Top: 'Spot bereits ueber Region-Thermik-Top, kein Wegfliegen moeglich.'",
   "soaring_options": "Hangsoaring, Wind am Hang — natuerliche Sprache.",
   "bemerkung_check": "Bemerkungen erfuellt? Was genau?",
   "best_window": "Bestes Zeitfenster innerhalb safe_window.",
