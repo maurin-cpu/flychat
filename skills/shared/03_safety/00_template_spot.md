@@ -13,6 +13,62 @@ JSON-Antwort mit safety_status, safe_window, no_go_reasons, caution_notes + Pros
 <!-- INSERT_SHARED_SAFETY -->
 
 ═══════════════════════════════════════════════
+REGION-SAFETY-CAP (Grosswetter begrenzt Spot-Sicherheit)
+═══════════════════════════════════════════════
+
+Im Kontext steht ein `### REGION-KONTEXT (bereits analysiert) ###`-Block mit
+`Safety-Status` und den **Region-Safety-Sub-Ratings**. Synoptische Gefahren treffen
+den **ganzen Luftraum** — ein einzelner Startplatz kann ihnen kaum entkommen. Die
+Region wirkt deshalb auf zwei Arten: als **Cap** (Rating) und als **Pflicht-Referenz**
+(Prosa). Beides NUR vorsichtiger machend, nie lockerer.
+
+─────────────────────────────────
+1) CAP — aber HOECHSTENS bis `conditional`, NIE bis `not_safe`
+─────────────────────────────────
+
+Dein synoptisches Spot-Sub-Rating darf nicht BESSER (hoeher) sein als das der Region:
+- `aloft_safety_rating`        ≤ Region-Hoehenwind
+- `foehn_safety_rating`        ≤ Region-Foehn
+- `thunderstorm_safety_rating` ≤ Region-Gewitter
+- `cape_safety_rating`         ≤ Region-CAPE
+- `rain_safety_rating`         ≤ Region-Regen
+- `visibility_safety_rating`   ≤ Region-Sicht
+
+**ABER der Region-Cap zieht dich hoechstens auf `conditional` (Sub-Rating 3) herunter,
+NIE auf `not_safe` (≤2).** Formel: ist dein eigenes Rating hoeher als das der Region,
+senke es auf `max(Region-Wert, 3)` — also nie unter 3 allein wegen der Region.
+
+> Auf ≤2 (= `not_safe`) gehst du NUR, wenn deine **eigenen Spot-Daten** die Gefahr
+> bestaetigen. Eine `not_safe`-Region allein macht aus einem lokal gruenen Spot
+> maximal `conditional` — der Spot behaelt das letzte Wort fuer `not_safe`.
+
+Der Weakest-Link-`min()` zieht `safety_status` automatisch nach.
+
+**Spot-autonom (NICHT kappen):** `wind_safety_rating`, `gust_safety_rating`. Bodenwind
+& Boeen sind terrain-/spotspezifisch; die Region hat dafuer keine Daten. Ein
+geschuetzter Spot darf trotz region-weitem Bodenwind ruhig bewertet werden.
+
+─────────────────────────────────
+2) PFLICHT-REFERENZ in `summary` — IMMER wenn Region conditional/not_safe
+─────────────────────────────────
+
+Ist die Region `conditional` oder `not_safe`, MUSST du sie im `summary` benennen —
+**immer, additiv**, mit konkreten Region-Meteodaten (m/s, km/h, ΔP, m), NIE abstrakt
+"Region-Rating X". Drei Faelle:
+
+- **Spot lokal gruen, Region-Gefahr** → 1 Satz Vorsicht: "Am Startplatz selbst ruhig,
+  aber die Region zeigt kraeftigen Hoehenwind (52 km/h auf 2500m) — daher als bedingt
+  sicher eingestuft."
+- **Spot schon conditional (lokal) + Region conditional/not_safe** → Region-Grund
+  ergaenzen: "... Zudem ist die Region selbst nur bedingt sicher (Hoehenwind 38 km/h,
+  Regen ab 16h)." / "... und die ganze Region gilt wegen Foehn (ΔP 7 hPa Sued) als
+  nicht sicher."
+- **Region safe** → keine Region-Referenz noetig.
+
+Der Leser muss verstehen, dass ein Teil der Vorsicht aus der **Grosswetterlage** kommt,
+nicht nur vom lokalen Startplatz.
+
+═══════════════════════════════════════════════
 SELBST-CHECK (PFLICHT)
 ═══════════════════════════════════════════════
 
@@ -21,6 +77,7 @@ SELBST-CHECK (PFLICHT)
 3. **Trend-Bezug**: Wenn `WIND-TREND`/`GUST-TREND`/Foehn-Aufbau → MUSS im `summary` als Tagesentwicklung in eigenen Worten erwaehnt ("zieht ab ab 12h", "verschlechtert sich gegen Abend"). Trend-Zeile NICHT wortwoertlich.
 4. **Hazard-Review vor Prosa**: Alle 8 `hazard_notes` lesen. Jeder Eintrag mit Rating ≤7 MUSS in `summary` oder `caution_notes` erwaehnt werden.
 5. **Windrichtungs-Falle**: Bevor du `conditional` schreibst, nenne den echten Hazard: Boeen >30 km/h? Hoehenwind/Foehn/Regen/Gewitter? Wenn alle fuenf Nein und nur `[WIND-WRONG]` oder Drehung → setze `safe`. Winddrehung und falscher Sektor beschraenken Startoptionen, machen NIE conditional.
+6. **Region-Safety-Cap** (siehe Abschnitt oben): (a) Synoptische Sub-Ratings (`aloft`/`foehn`/`thunderstorm`/`cape`/`rain`/`visibility`) ≤ Region — aber der Region-Cap zieht **hoechstens auf 3 (`conditional`), NIE auf ≤2 (`not_safe`)**; `not_safe` nur aus eigenen Spot-Daten. `wind`/`gust` spotautonom. (b) Ist die Region `conditional`/`not_safe`, MUSS `summary` ihren Status + Grund **datenbelegt** (m/s, km/h, ΔP, m) referenzieren — additiv, auch wenn der Spot lokal gruen oder schon conditional ist. **Fehlende Region-Referenz bei conditional/not_safe-Region = FEHLER. Region zieht Spot auf not_safe = FEHLER. Abstraktes 'Region-Rating X' = FEHLER.**
 
 ═══════════════════════════════════════════════
 JSON-ANTWORT (SPOT SAFETY)
@@ -57,6 +114,6 @@ AUSSCHLIESSLICH JSON, keine Tags, keine eckigen Klammern, keine Codes.
     "cape":         "TREND ('AUFBAUEND'/'KEIN-AUFBAU'/'AKTIV') + CAPE-Wert + Entwicklungspotenzial.",
     "visibility":   "TREND ('ABSINKEND'/'HEBEND'/'STABIL') + Wolkenbasis vs. Startplatzhoehe."
   },
-  "summary": "4-6 Saetze. Satz 1: Einstufung + Kern-Begruendung (folge 'Begruendungs-Prinzip fuer Satz 1' in `03_status_derivation.md`). Satz 2-3: Hauptgefahren MIT Ursache aus Datenblock. Satz 4: Tagesentwicklung/Trend (PFLICHT bei WIND-/GUST-TREND/Foehn-Aufbau, OHNE Code-Namen). Satz 5: sicheres Fenster konkret. Satz 6: Sicherheits-Einschaetzung — **passiv, NIE Aufforderung**. KEINE Tags wie ALOFT-WIND-WARN — schreibe 'kraeftiger Hoehenwind'.\n\nSchluss-Satz VERBOTEN: 'ideal fuer Flugtag', 'nutze das Fenster', 'plane Flug'. ERLAUBT: 'wird als sicherer Flugtag eingestuft', 'die Voranalyse stuft den Tag als sicher ein', 'Einschaetzung: stabile Bedingungen'."
+  "summary": "4-6 Saetze. Satz 1: Einstufung + Kern-Begruendung (folge 'Begruendungs-Prinzip fuer Satz 1' in `03_status_derivation.md`). Satz 2-3: Hauptgefahren MIT Ursache aus Datenblock. Satz 4: Tagesentwicklung/Trend (PFLICHT bei WIND-/GUST-TREND/Foehn-Aufbau, OHNE Code-Namen). Satz 5: sicheres Fenster konkret. Satz 6: Sicherheits-Einschaetzung — **passiv, NIE Aufforderung**. KEINE Tags wie ALOFT-WIND-WARN — schreibe 'kraeftiger Hoehenwind'.\n\n**PFLICHT-Region-Referenz (siehe Abschnitt REGION-SAFETY-CAP):** Ist die Region `conditional` oder `not_safe`, MUSS das `summary` sie IMMER additiv benennen — mit konkreten Region-Meteodaten (km/h, m/s, ΔP, m), auch wenn der Spot lokal gruen ist ('Am Startplatz selbst ruhig, aber die Region zeigt kraeftigen Hoehenwind 52 km/h auf 2500m — daher bedingt sicher') und auch wenn der Spot schon aus eigenen Gruenden conditional ist ('... zudem ist die ganze Region wegen Foehn ΔP 7 hPa Sued nicht sicher'). Beachte: der Region-Cap zieht NIE auf `not_safe` — ein lokal gruener Spot wird durch eine not_safe-Region hoechstens `conditional`. VERBOTEN: nur lokal begruenden wenn die Region eine Gefahr zeigt; abstraktes 'Region-Rating X' statt Meteodaten.\n\nSchluss-Satz VERBOTEN: 'ideal fuer Flugtag', 'nutze das Fenster', 'plane Flug'. ERLAUBT: 'wird als sicherer Flugtag eingestuft', 'die Voranalyse stuft den Tag als sicher ein', 'Einschaetzung: stabile Bedingungen'."
 }
 ```

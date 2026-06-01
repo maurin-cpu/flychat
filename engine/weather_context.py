@@ -304,6 +304,22 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         ),
         f"Foehn-Risiko: {_g('foehn_risk', 'none')}",
     ]
+    # Synoptische Safety-Sub-Ratings (1-10) → CAP fuer die Spot-Safety (Safety-Pass).
+    # Grossraeumige Gefahren treffen den ganzen Luftraum; ein Spot darf dafuer nicht
+    # sicherer bewertet werden als seine Region. Boeen/Bodenwind bewusst NICHT hier —
+    # die bleiben spotautonom (Region hat keine Boeen-Daten).
+    parts.append(
+        "Region-Safety-Sub-Ratings (1-10, tiefer=gefaehrlicher): "
+        f"Hoehenwind={_g('aloft_safety_rating', '?')}, "
+        f"Foehn={_g('foehn_safety_rating', '?')}, "
+        f"Gewitter={_g('thunderstorm_safety_rating', '?')}, "
+        f"CAPE={_g('cape_safety_rating', '?')}, "
+        f"Regen={_g('rain_safety_rating', '?')}, "
+        f"Sicht={_g('visibility_safety_rating', '?')}"
+    )
+    pno = _g("primary_no_go")
+    if pno:
+        parts.append(f"Region-Haupt-NoGo: {pno}")
     if _g("wind_summary"):
         parts.append(f"Wind-Zusammenfassung: {_g('wind_summary')}")
     if _g("wind_shear"):
@@ -331,7 +347,13 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         parts.append(f"Region-Summary: {summary}")
 
     parts.append(
-        "→ Nutze diesen Block, um in der Flug-Einschaetzung (`recommendation`) das "
+        "→ SAFETY-Pass: Nutze die Region-Safety-Sub-Ratings als CAP fuer die synoptischen "
+        "Spot-Sub-Ratings (Hoehenwind/Foehn/Gewitter/CAPE/Regen/Sicht) — dein Spot-Wert darf "
+        "nicht besser sein als der Region-Wert (Details: Abschnitt REGION-SAFETY-CAP im Template). "
+        "Boeen/Bodenwind bleiben spotautonom."
+    )
+    parts.append(
+        "→ FLYABILITY-Pass: Nutze diesen Block, um in der Flug-Einschaetzung (`recommendation`) das "
         "Streckenpotenzial in 1-2 Saetzen aus der Region-Einschaetzung herzuleiten: "
         "begruende lokal vs. Strecke mit den Region-Meteodaten (Region-Thermik in m/s, "
         "Region-Basis/Arbeitshoehe in m AGL) — KEIN abstraktes Region-Rating nennen. "
