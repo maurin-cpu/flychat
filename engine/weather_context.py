@@ -331,9 +331,12 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         parts.append(f"Region-Summary: {summary}")
 
     parts.append(
-        "→ Nutze diesen Block AUSSCHLIESSLICH fuer TEIL 4 (Streckenflug). "
+        "→ Nutze diesen Block, um in der Flug-Einschaetzung (`recommendation`) das "
+        "Streckenpotenzial in 1-2 Saetzen aus der Region-Einschaetzung herzuleiten: "
+        "begruende lokal vs. Strecke mit den Region-Meteodaten (Region-Thermik in m/s, "
+        "Region-Basis/Arbeitshoehe in m AGL) — KEIN abstraktes Region-Rating nennen. "
         "Konflikt-Check: Spot fliegbar + Region WIND-STRONG>=2h oder Foehn → "
-        "streckenflug.tier max 'lokal', limiting_factor='region_wind_aloft'."
+        "Streckenpotenzial max 'lokal' (limiting_factor='region_wind_aloft')."
     )
     return "\n".join(parts)
 
