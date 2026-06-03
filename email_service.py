@@ -56,8 +56,8 @@ _TIER_META = {
     },
     "gray": {
         "label": "Abgleiter",
-        "color": "#78716c",      # 5.3:1 — selten genutzt im Mail (gefiltert)
-        "bg":    "#f5f5f4",
+        "color": "#075985",      # Sky-800, 7.4:1 (Royal Premium; war stone #78716c)
+        "bg":    "#e0f2fe",      # Sky-100
         "icon":  "-",
     },
     "none": {

@@ -1837,11 +1837,11 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
 .bf-label--info .bf-label-text { color: #1e40af; font-weight: 600; }
 
 /* Tier accents */
-.bf-spot.tier-violet .bf-label--good { background: #f5f3ff; border-left-color: #8b5cf6; }
+.bf-spot.tier-violet .bf-label--good { background: #f5f3ff; border-left-color: #a78bfa; }
 .bf-spot.tier-violet .bf-label--good .bf-label-icon { color: #7c3aed; }
 .bf-spot.tier-violet .bf-label--good .bf-label-text { color: #5b21b6; }
 
-.bf-spot.tier-violet .bf-label--info { background: #f5f3ff; border-left-color: #8b5cf6; }
+.bf-spot.tier-violet .bf-label--info { background: #f5f3ff; border-left-color: #a78bfa; }
 .bf-spot.tier-violet .bf-label--info .bf-label-icon { color: #7c3aed; }
 .bf-spot.tier-violet .bf-label--info .bf-label-text { color: #5b21b6; }
 
@@ -2447,7 +2447,7 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.bf-footer-link:hover { color: #8b5cf6; }
+.bf-footer-link:hover { color: #a78bfa; }
 
 /* ── Discovery-CTA: E-Mail-Briefing abonnieren ────────── */
 .bf-cta-subscribe {
@@ -2484,7 +2484,7 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
   min-height: 40px;
   display: inline-flex; align-items: center;
 }
-.bf-cta-subscribe__btn:hover { background: #8b5cf6; }
+.bf-cta-subscribe__btn:hover { background: #a78bfa; }
 .bf-cta-subscribe__dismiss {
   background: transparent; border: 0;
   color: var(--color-text-muted);

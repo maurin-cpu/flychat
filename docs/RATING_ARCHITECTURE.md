@@ -110,10 +110,12 @@ Wie Spot, **aber**:
 **Tier-Farbe (FE-Mapping, keine Strukturfeld-Persistierung):**
 
 ```
-1, 2 → gray   (Bronze #B08D57)
+1, 2 → gray   (Sky-Blue — Abgleiter; Royal Premium)
 3, 4 → green
 5 → violet
 ```
+
+Hex-Werte pro Rating: siehe `docs/RATING_FARBKONZEPT.md` §2 (Single Source of Truth). „Bronze" ist abgelöst — Abgleiter = Sky-Blue.
 
 Bei `safety_status == "not_safe"`: `experience_rating = 1` (keine Belohnung wenn nicht sicher).
 
@@ -217,10 +219,12 @@ Wenn ein neues Strukturfeld eingeführt oder ein bestehendes geändert wird:
 
 1. **Backend** — `engine/_common.py`, `engine/decision_engine.py`, `engine/analyzers.py`
 2. **Skills** — `skills/shared/03_safety/*`, `skills/shared/04_flyability/*`, kombi-Skills
-3. **Frontend** — `static/js/analysis-view.js`, `region-map.js`, `briefing.js`, `shared-glyph.js`
-4. **Tests** — `tests/test_decision_engine.py`, `score_regression.py` Reverse-Parser
-5. **Diese Doku** — `docs/RATING_ARCHITECTURE.md` aktualisieren
-6. **Memory** — `memory/MEMORY.md` Index ggf. anpassen
+3. **Frontend** — `static/js/analysis-view.js`, `region-map.js`, `briefing.js`, `shared-glyph.js`, `rating-info.js`
+4. **E-Mail & Abo-UI** — `email_service.py` (`_TIER_META`: Tier-**Labels** + Tier-**Farben**, `_spot_tier`/`_derive_day_tier`-Mapping), `templates/account.html` (Qualität-Chips: Labels + Hints), `static/css/account.css` (Chip-Farben). **Liest die Rating-Tiers — bei Label-, Skala- oder Tier-Farb-Änderung zwingend mitziehen.** (Diese Schicht wurde beim v1.5→v2.1-Umbau vergessen → Alt-Labels „Legendär/Bronze" überlebten bis 2026-06-03.)
+5. **Tests** — `tests/test_decision_engine.py`, `score_regression.py` Reverse-Parser
+6. **Farb-Konzept** — `docs/RATING_FARBKONZEPT.md` (Touchpoint-Liste + Mail/Account) bei Tier-Farb-Änderung
+7. **Diese Doku** — `docs/RATING_ARCHITECTURE.md` aktualisieren
+8. **Memory** — `memory/MEMORY.md` Index ggf. anpassen
 
 ---
 

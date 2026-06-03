@@ -125,10 +125,10 @@
       <div class="sp-card__hint">Welche Spot-Stufen sollen im Gleitcast erscheinen?</div>
 
       {% set tier_defs = [
-        ('violet',      'Legendär',  'Top-Tage mit grosser Höhe'),
-        ('green',       'Fliegbar',  'Solide Bedingungen'),
-        ('conditional', 'Bedingt',   'Nur in bestimmten Fenstern'),
-        ('gray',        'Bronze',    'Abgleiter / nur Sledder'),
+        ('violet',      'XC-Tag',       'Strecken-/Top-Tage (Rating 5)'),
+        ('green',       'Thermikflug',  'Solide bis starke Thermik (Rating 3–4)'),
+        ('conditional', 'Bedingt',      'Nur in bestimmten Fenstern'),
+        ('gray',        'Abgleiter',    'Keine Thermik (Rating 1–2)'),
       ] %}
       <div class="ac-tier-chips" id="acTierChips" role="group" aria-label="Qualitäts-Tiers">
         {% for tid, label, hint in tier_defs %}

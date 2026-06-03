@@ -48,7 +48,7 @@ AUSSCHLIESSLICH JSON, keine Tags, keine eckigen Klammern.
   "experience_rating": 1,
   "flight_type": "Thermikflug|Soaring|Soaring+Thermik|Abgleiter",
   "flight_duration_estimate": "z.B. '2-3h Thermikflug'",
-  "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet MIT Begruendung aus Datenblock (Bewoelkung-%, BLH, prod_h). KEINE TQ-Tags.",
+  "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet MIT Begruendung aus Datenblock. PFLICHT: Bewoelkung IMMER explizit benennen (tief-% UND mittel-%; bei klarem Himmel 'wolkenfrei/blau'), dann BLH, prod_h. KEINE TQ-Tags.",
   "peak_climb_rate": 0.0,
   "xc_potential": "high|moderate|low",
   "xc_details": "2-3 Saetze. Bei low/moderate: PFLICHT Begruendung (Peak <X, BLH zu tief, Bewoelkung, kurzes Fenster). Bei high: wovon profitiert. KEINE Scherung erwaehnen.",
@@ -63,7 +63,7 @@ AUSSCHLIESSLICH JSON, keine Tags, keine eckigen Klammern.
     "Sanity: THERMAL 'good' nur wenn peak_climb_rate >= 1.0. CLOUDS 'good' wenn tief ≤50% UND mittel ≤30% (= cu_clean_top). CLOUDS 'reducer' wenn tief ≥80% ODER mittel ≥70% — beschreibt nur Himmel, nicht Thermik. BASE 'reducer' wenn Basis <600m ueber Region-Ref; 'good' wenn >800m ueber Gipfel.",
     "Beispiel: [{topic:THERMAL, severity:good, label:Thermik, value:'peak 2.8 m/s', time:'12-15 h'}, {topic:CLOUDS, severity:reducer, label:Bewoelkung, value:'bedeckt 80% Mittag', time:'11-14 h'}]"
   ],
-  "recommendation": "**Einschaetzung** (KEINE Empfehlung). 4-6 Saetze. NUR Flugqualitaet, KEIN Safety-Bezug (Hoehenwind, Boeen, Scherung, Foehn, Regen, Gewitter, 'sportlich' tabu). Satz 1: Was fuer ein Tag (aus rating). Satz 2-3: Begruendung aus RATING-INPUTS. Satz 4: thermisches Fenster. Satz 5: ehrliche Erwartung. KEINE Aufforderungen ('nutze das', 'geh fliegen'). 'einschaetzen' statt 'empfehlen'. GUT: 'Unsere Einschaetzung: ein starker Thermiktag mit langer produktiver Phase.' SCHLECHT: 'Starker Tag, jedoch koennte Hoehenwind...' (Safety-Mischung verboten).",
+  "recommendation": "**Einschaetzung** (KEINE Empfehlung). 4-6 Saetze. NUR Flugqualitaet, KEIN Safety-Bezug (Hoehenwind, Boeen, Scherung, Foehn, Regen, Gewitter, 'sportlich' tabu). Satz 1: Was fuer ein Tag (aus rating). Satz 2-3: Begruendung aus RATING-INPUTS. Satz 4: thermisches Fenster. **PFLICHT — Bewoelkung benennen:** Mindestens ein Halbsatz zum Himmel (z.B. 'Cu sauber bei 30%', 'gedaempft durch Mittelbewoelkung ~60%', 'tief 80% bedeckt', oder 'wolkenfrei/blau') — niemals ganz weglassen. Satz 5: ehrliche Erwartung. KEINE Aufforderungen ('nutze das', 'geh fliegen'). 'einschaetzen' statt 'empfehlen'. GUT: 'Unsere Einschaetzung: ein starker Thermiktag mit langer produktiver Phase.' SCHLECHT: 'Starker Tag, jedoch koennte Hoehenwind...' (Safety-Mischung verboten).",
   "confidence": "high|medium|low",
   "is_conditional": false
 }

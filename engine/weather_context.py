@@ -335,6 +335,17 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         tq = _g("thermal_quality")
         if tq:
             parts.append(f"Region-Thermik: {tq}")
+        # Bewoelkung explizit durchreichen: aus dem CLOUDS-llm_tag der Region.
+        # Faellt sonst nur implizit ueber den thermal_quality-Freitext durch.
+        cloud_tags = _g("llm_tags") or []
+        cloud_val = None
+        if isinstance(cloud_tags, list):
+            for t in cloud_tags:
+                if isinstance(t, dict) and str(t.get("topic", "")).upper() == "CLOUDS":
+                    cloud_val = t.get("value") or t.get("label")
+                    break
+        if cloud_val:
+            parts.append(f"Region-Bewoelkung: {cloud_val}")
         xc_pot = _g("xc_potential")
         xc_det = _g("xc_details")
         if xc_pot or xc_det:
@@ -356,7 +367,8 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         "→ FLYABILITY-Pass: Nutze diesen Block, um in der Flug-Einschaetzung (`recommendation`) das "
         "Streckenpotenzial in 1-2 Saetzen aus der Region-Einschaetzung herzuleiten: "
         "begruende lokal vs. Strecke mit den Region-Meteodaten (Region-Thermik in m/s, "
-        "Region-Basis/Arbeitshoehe in m AGL) — KEIN abstraktes Region-Rating nennen. "
+        "Region-Basis/Arbeitshoehe in m AGL, Region-Bewoelkung) — KEIN abstraktes Region-Rating nennen. "
+        "Die Bewoelkung MUSS in der Flug-Einschaetzung vorkommen (siehe recommendation-PFLICHT). "
         "Konflikt-Check: Spot fliegbar + Region WIND-STRONG>=2h oder Foehn → "
         "Streckenpotenzial max 'lokal' (limiting_factor='region_wind_aloft')."
     )

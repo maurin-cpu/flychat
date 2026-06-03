@@ -624,7 +624,7 @@
         var details = data.results_summary || {};
         var summary = '';
         var flyTierLabels = {
-            gray: 'Bronze (Abgleiter)',
+            gray: 'Abgleiter',
             green: 'Gr\u00fcn',
             violet: 'Violett',
             not_safe: '\u2014',

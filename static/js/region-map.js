@@ -277,10 +277,10 @@
 
     // Dedizierte Pill-Palette: maximiert Kontrast zwischen den 6 (safety × quality) Kombinationen
     // Polygon-Farben (style.border) bleiben dabei unverändert; nur die Label-Pill nutzt diese Tabelle,
-    // damit "Bronze safe-Abgleiter" nicht mit den Conditional-Gelbtönen verwechselt wird.
+    // damit "safe-Abgleiter" (Sky-Blue) nicht mit den Conditional-Gelbtönen verwechselt wird.
     function getPillBg(safety, quality) {
         if (safety === 'safe') {
-            if (quality === 'gray')   return '#78716c'; // stone — Abgleiter/so-so
+            if (quality === 'gray')   return '#0369a1'; // Sky-700 — Abgleiter (Royal Premium, weisse Pill-Schrift)
             if (quality === 'violet') return '#7c3aed'; // violet — Top
             return '#16a34a';                            // green — Gut
         }

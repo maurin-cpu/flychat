@@ -68,13 +68,13 @@
     --color-safety-nodata-text: #9a3412;
 
     /* Fly Tier Colors */
-    --color-fly-gray: #B08D57;          /* Bronze — Abgleiter (was slate #94a3b8) */
-    --color-fly-gray-bg: #F5EDE0;       /* warm cream bg */
-    --color-fly-gray-text: #6B5430;     /* dark bronze text */
+    --color-fly-gray: #0ea5e9;          /* Sky — Abgleiter (Royal Premium, FARBKONZEPT v3.2; was bronze #B08D57) */
+    --color-fly-gray-bg: #e0f2fe;       /* Sky-100 bg */
+    --color-fly-gray-text: #075985;     /* Sky-800 text */
     --color-fly-green: #22c55e;
     --color-fly-green-bg: #dcfce7;
     --color-fly-green-text: #166534;
-    --color-fly-violet: #8b5cf6;
+    --color-fly-violet: #a78bfa;        /* Violet-400 (Royal Premium, FARBKONZEPT v3.2; was #8b5cf6) */
     --color-fly-violet-bg: #ede9fe;
     --color-fly-violet-text: #6d28d9;
 
@@ -1319,9 +1319,9 @@ body.page-fixed-nav {
     padding: 6px 12px;
     margin-right: 12px;
     border-radius: var(--radius-sm, 6px);
-    background: var(--color-fly-gray-bg, #F5EDE0);
-    color: var(--color-fly-gray-text, #6B5430);
-    border: 1px solid var(--color-fly-gray, #B08D57);
+    background: var(--color-fly-gray-bg, #e0f2fe);
+    color: var(--color-fly-gray-text, #075985);
+    border: 1px solid var(--color-fly-gray, #0ea5e9);
     font-weight: 700;
     line-height: 1;
     white-space: nowrap;
@@ -1335,9 +1335,9 @@ body.page-fixed-nav {
 }
 
 .meteogram-rating-badge.tier-violet {
-    background: rgba(139, 92, 246, 0.14);
+    background: rgba(167, 139, 250, 0.14);
     color: #5b21b6;
-    border-color: #8b5cf6;
+    border-color: #a78bfa;
 }
 
 .meteogram-rating-badge.tier-not-safe {

@@ -6,9 +6,9 @@ Pro Spot und Tag ordnet Gleitcast ein **Tier** zu, das die thermische Flugqualit
 
 | Tier | Bedeutung | Frontend-Farbe |
 |------|-----------|----------------|
-| `gray` | Abgleiter / kaum nutzbare Thermik | Bronze (#B08D57) |
+| `gray` | Abgleiter / kaum nutzbare Thermik | Sky-Blue (#0ea5e9) — Royal Premium, früher Bronze #B08D57 |
 | `green` | Solider Thermiktag, lokale Flüge möglich | Grün |
-| `violet` | Top-XC-Bedingungen, legendärer Tag | Violett |
+| `violet` | Top-XC-Bedingungen, XC-Tag | Violett (#a78bfa) |
 
 Zusätzlich `no_data` (echtes Grau #9ca3af) wenn keine Daten verfügbar.
 
