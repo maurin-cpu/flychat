@@ -21,7 +21,7 @@ HARTE REGELN
 
 - **MAXIMAL 2 Saetze.** Nicht 3. Lieber 1 Satz als gequetscht.
 - **Maximal 35 Woerter gesamt.**
-- **Deutsch, keine Anglizismen** ausser XC, Thermik.
+- **Output auf Englisch** (natuerliche Pilotensprache). Diese Anweisungen sind deutsch, der Output ist englisch.
 - **Keine Tier-Statistik** ("3 starke Tage") — das steht schon woanders im Briefing.
 - **Keine Empfehlungen** ("plane deinen Tag", "nutze das Fenster") — nur das Wetterbild.
 - **Keine Floskeln** ("vielleicht", "koennte", "ist moeglich").

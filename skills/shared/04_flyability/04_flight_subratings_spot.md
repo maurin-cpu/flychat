@@ -13,8 +13,11 @@ Das Rating haengt AUSSCHLIESSLICH von: `sustained_peak`, `prod_h_strict`,
 `working_height_agl`, `cloud_structure`.
 
 Du **ignorierst** fuers Rating: `safety_status`, `no_go_reasons`,
-`caution_notes`, TQ-Tags (SHEAR/TORN/ROUGH/WIND-*), Hoehenwind-Marker
+`caution_notes`, [SHEAR-*]/[THERMAL-ROUGH-*]/[THERMAL-WIND-*], Hoehenwind-Marker
 ("!", "sportlich"), Foehn, Regen, Gewitter. Alles davon ist Safety-Domain.
+**[THERMAL-TORN-UNUSABLE] ist KEINE Safety-Domain:** seine Rating-Wirkung steckt
+schon in prod_h_strict (zerrissene Stunden zaehlen nicht) — manuell NICHT nochmal
+abwerten, aber in `thermal_quality` benennen (siehe `01_tags_flyability.md`).
 
 Auch bei Hoehenwind WARN: wenn das Steigen Peak 2.5 × 6h + hohe Basis + Cu
 ist, ist es trotzdem `experience_rating = 5`.
@@ -289,5 +292,5 @@ NUTZUNGS-REGELN
 4. **Streckenflug-Pflichtsatz in `xc_details`**: Region als Quelle mit `weil`/`weshalb` begruenden (Region-Thermik / `Region.experience_rating` / Region-Basis) + konkrete Zahl `working_height_at_spot_m_max` + km-Klasse benennen. Bei Spannweite >= 500m zusaetzlich Best-Hour-Fenster.
 5. **Spot-Differenzierung:** Spots in derselben Region am gleichen Tag haben oft verschiedene Ratings (Hoehe, Exposition, Talwind).
 6. Prosa muss zum Rating passen. Rating 5 + "mauer Tag" = FEHLER.
-7. **Safety strikt draussen aus aller Flyability-Prosa** (`flyability_notes`, `thermal_quality`, `recommendation`, `xc_details`, `soaring_options`, `best_window`). Tabu: Hoehenwind, Boeen, Scherung, TQ-Tags, Foehn, Regen, Gewitter, "Vorsicht", "sportlich". Diese Themen sind alle in der Safety-Pipeline.
+7. **Safety strikt draussen aus aller Flyability-Prosa** (`flyability_notes`, `thermal_quality`, `recommendation`, `xc_details`, `soaring_options`, `best_window`). Tabu: Hoehenwind, Boeen, rohe Scherungszahlen, ROUGH/WIND-Boeigkeit, Foehn, Regen, Gewitter, "Vorsicht", "sportlich" — alle Safety-Pipeline. **AUSNAHME: zerrissene Thermik (TORN-UNUSABLE)** gehoert als Thermik-Qualitaet in `thermal_quality` (Bart nicht zentrierbar) — siehe `01_tags_flyability.md`.
 8. **Self-Check Rating:** Habe ich wegen Safety runtergesetzt? → FEHLER. Gedankenexperiment: "Tag ohne Safety-Issue — welches Rating?" Genau das.

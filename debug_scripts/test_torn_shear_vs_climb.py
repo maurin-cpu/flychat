@@ -1,5 +1,5 @@
 """
-TQ Band-Cap — Schritt: shear-getrieben vs. climb-getrieben (Next Step aus TQ_RATING_PLAN).
+TQ Band-Cap — Schritt: shear-getrieben vs. climb-getrieben (Next Step aus TQ_TORN_FLYABILITY.md).
 
 Frage: Die echten PL-only TORN-UNU-Faelle (~118 / 1% laut Schritt 0) — sind sie
 von ECHTER Scherung getrieben (du_dz hoch genug, dass auch ein starker Kern zerreisst)

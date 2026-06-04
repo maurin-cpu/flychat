@@ -135,10 +135,13 @@ Diese Erkenntnisse begründen den Niederschlags-**Fliegbarkeits**-Gate (siehe
   (`[THUNDERSTORM]`) gated unabhängig von der Menge.
 - **Bewusste Grenze:** Trockene Microbursts/Virga (starker Abwind, kein Bodenregen) werden vom
   Regen-Gate **nicht** erfasst — das bleibt Safety-Domäne (CAPE/Gewitter-Signale).
-- **Spot vs. Region:** Spot-`precipitation` = Regen am Spot (Schwelle wirkt sauber). Region-
-  `precipitation` = Peak über die Referenzpunkte → eine kräftige Einzelzelle kann die ganze Region
-  gaten, obwohl daneben (versetzter Inflow) real gestiegen wird. Im Replay beobachten, ggf.
-  Coverage-Bedingung nachrüsten.
+- **Spot vs. Region (Coverage zählt):** Spot-`precipitation` = Regen am Spot → Mengen-Schwelle
+  wirkt direkt. Region-`precipitation` = **Peak über die Referenzpunkte** → eine kräftige
+  Einzelzelle würde sonst die ganze Region gaten, obwohl daneben (versetzter Inflow / trockene,
+  sonnige Lücken) real gestiegen wird. Deshalb gated die Region nur bei **flächendeckendem** Regen
+  (`precipitation_class == "widespread"`, ≥70 % der RPs nass); isolierte/verstreute Zellen
+  (isolated/scattered) gaten die Region NICHT. Das ist die direkte Anwendung des Inflow-Befunds aus
+  §1: bei aufgelockertem Schauer existiert Steigen in den Lücken. Gewitter gated immer.
 
 ---
 

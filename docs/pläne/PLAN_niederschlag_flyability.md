@@ -14,7 +14,11 @@
 
 **Kurz-Summary der finalen Lösung:**
 Produktiv-Zähler (`productive_thermal_h`, `productive_h_strict`, `strong_h`) + FLIEGBARKEITS-VERLAUF
-in beiden Schleifen gaten mit `weather_unflyable = [THUNDERSTORM] OR precip >= 0.5 mm/h`.
+in beiden Schleifen gaten mit:
+- **Spot:** `weather_unflyable = [THUNDERSTORM] OR precip >= 0.5 mm/h`
+- **Region:** `weather_unflyable = [THUNDERSTORM] OR (precip >= 0.5 mm/h AND class == "widespread")`
+  — isolierte/verstreute Zellen gaten die Region NICHT (Peak-über-RPs, Steigen in den Lücken).
+
 KEIN CAPE-DANGER, KEIN Wind. Safety bleibt komplett unverändert. **Der Gate ist NICHT still**
 (User-Vorgabe 2026-06-04): ausgeschlossene Stunden werden dem LLM sichtbar gemacht (Hint
 `WETTER-GATE: Nh …` + Timeline-Label `nicht-fliegbar(Regen/Gewitter)`) und der Skill erlaubt dem
@@ -50,12 +54,17 @@ Grenze ohne mechanistische Basis als Steig-Kollaps-Punkt** und ließe genau die 
 Schauer (0.5–2.5) als „produktiv" durch, in denen der Spot schon im Abwind sein kann.
 
 **Entscheidung (User 2026-06-04):** `PRECIP_UNFLYABLE_MM = 0.5` mm/h (DWD light-shower = echter
-Schauer vs. Niesel/Rauschen), **einheitlich** für Spot und Region.
-- *Spot-`precipitation`* = Regen AM Spot → 0.5 trifft „echter Regen auf diesen Punkt" sauber.
-- *Region-`precipitation`* = Hybrid-gefilterter **Peak über die RPs** → ein einzelner nasser RP
-  könnte hier gaten, obwohl daneben (versetzter Inflow) real gestiegen wird. Bewusst trotzdem
-  einheitlich 0.5 gewählt (Simplizität, eine Konstante); im Replay beobachten, ob Region dadurch
-  zu aggressiv degradiert — falls ja, später Coverage-Bedingung oder höherer Region-Wert.
+Schauer vs. Niesel/Rauschen). Mengen-Schwelle gleich für Spot und Region — aber die **Region**
+bekommt zusätzlich eine **Coverage-Bedingung** (entschieden 2026-06-04):
+- *Spot-`precipitation`* = Regen AM Spot → `precip >= 0.5` gated den Spot sauber („echter Regen auf
+  diesen Punkt").
+- *Region-`precipitation`* = Hybrid-gefilterter **Peak über die RPs** → ein einzelner nasser RP darf
+  NICHT die ganze Region gaten (daneben steigt der versetzte Inflow). Daher gated die Region nur bei
+  **`precip >= 0.5` UND `precipitation_class == "widespread"`** (Coverage ≥ 70 % der RPs nass).
+  `isolated` (<40 %) und `scattered` (40–70 %) gaten die Region NICHT — dort gibt es trockene/
+  sonnige Lücken mit nutzbarem Steigen. **Gewitter (`[THUNDERSTORM]`) gated die Region immer**,
+  unabhängig von Coverage und Menge. (User-Prinzip: „einzelne Regenfelder = kein Einfluss,
+  flächendeckend = Einfluss".)
 
 ---
 
@@ -152,10 +161,18 @@ PRECIP_UNFLYABLE_MM = 0.5   # mm/h — "echter Regen erreicht den Boden am Spot"
                             # Steigen sitzt am versetzten Inflow NEBEN dem Regen — nicht dort wo
                             # precip gemessen wird. Quelle: memory rain-thermals-research.
 
-# weather_context.py — in beiden Schleifen, precip ist lokal vorhanden
+# weather_context.py — SPOT-Schleife (precip = Regen am Spot)
 weather_unflyable = (
     "[THUNDERSTORM]" in warnings
     or (isinstance(precip, (int, float)) and precip >= config.PRECIP_UNFLYABLE_MM)
+)
+
+# weather_context.py — REGION-Schleife (precip = Peak über RPs → Coverage-Bedingung,
+# precip_class ist lokal bereits vorhanden, Z.2893)
+weather_unflyable_r = (
+    "[THUNDERSTORM]" in warnings
+    or (isinstance(precip, (int, float)) and precip >= config.PRECIP_UNFLYABLE_MM
+        and precip_class == "widespread")   # isolated/scattered gaten die Region NICHT
 )
 ```
 
@@ -220,15 +237,20 @@ eine Stunde unfliegbar machen (User-Vorgabe 2026-06-04) — aber nicht als doppe
 
 ### Phase 2 — Region-Schleife (`_build_region_context`)
 
-Spiegelbildlich — inkl. der LLM-Sichtbarkeit aus Schritt 2+3:
-4. Produktiv-Gate (~Z.3050–3078): `productive_thermal_h`, `productive_h_strict`, `strong_h`.
+Spiegelbildlich — inkl. der LLM-Sichtbarkeit aus Schritt 2+3, aber mit `weather_unflyable_r`
+(Coverage-Bedingung, D2):
+4. Produktiv-Gate (~Z.3050–3078): `weather_unflyable_r` (= `[THUNDERSTORM]` ODER `precip >= 0.5`
+   UND `precip_class == "widespread"`) an `productive_thermal_h`, `productive_h_strict`, `strong_h`.
 5. `is_productive_r` Timeline (~Z.3147): Gate + explizites `nicht-fliegbar(Regen/Gewitter)`-Label.
 6. Hint-Text (~Z.3484): Bedingungs-Klammer erweitern + `WETTER-GATE: Nh ausgeschlossen (…)`-Zeile.
 
-> Region-Sonderfall (D2): Region-`precipitation` ist der Hybrid-gefilterte **Peak über die RPs**
-> (`fetch_weather.py`), nicht die Fläche. Die Mengen-Schwelle `>= PRECIP_UNFLYABLE_MM` wirkt damit
-> auch hier sinnvoll: eine 0.1-mm-Einzelzelle gated nicht, eine kräftige Zelle (auch wenn nur am
-> Peak-RP) schon. Bewusst KEINE extra `precipitation_class`-Logik — die Menge regelt es.
+> **Region-Sonderfall (D2 — entschieden): Coverage-bedingt.** Region-`precipitation` ist der Peak
+> über die RPs (`fetch_weather.py`), nicht die Fläche. Ein hoher Peak kann eine **Einzelzelle**
+> (isolated/scattered) sein, während der Rest der Region trocken/sonnig ist — dort steigt der
+> versetzte Inflow. Deshalb gated die Region nur bei `precip_class == "widespread"` (≥70 % RPs nass).
+> `precip_class`, `precip_cov`, `precip_n` sind im Region-Loop bereits vorhanden (Z.2893) und die
+> Klassen-Zähler `rain_widespread_h`/`rain_scattered_h`/`rain_isolated_h` existieren schon (Z.2901).
+> Gewitter gated unabhängig von Coverage/Menge.
 
 ### Phase 3 — Skill-Prompt (LLM-Sichtbarkeit, D4) + Doku
 
@@ -260,11 +282,13 @@ Spiegelbildlich — inkl. der LLM-Sichtbarkeit aus Schritt 2+3:
   ✅ **entschieden 2026-06-04** nach Deep-Research (s. „Schwellen-Entscheidung" oben). Revidiert
   von der früheren 2.5 — die war eine umgedeutete Safety/Abbruch-Grenze; es gibt keinen
   mechanistisch fundierten mm/h-Steig-Kollaps-Punkt, das Signal ist „Regen am Boden" (≈ binär).
-- **D2 — Region-Granularität (offen, klein):** Region-`precipitation` ist der Hybrid-gefilterte
-  Peak über RPs → mit 0.5 gated bereits ein einzelner kräftigerer nasser RP die ganze Region,
-  obwohl der versetzte Inflow daneben real steigen könnte. Bewusst trotzdem einheitlich 0.5
-  (Simplizität). *Im Replay beobachten:* falls Region zu aggressiv auf gray degradiert → später
-  Coverage-Bedingung (`precipitation_coverage`) oder höherer Region-Wert. Vorerst keine extra Logik.
+- **D2 — Region-Granularität:** ✅ **entschieden 2026-06-04 → Coverage-bedingt.** Region-
+  `precipitation` ist der Peak über RPs → eine Einzelzelle darf die Region nicht gaten. Region gated
+  daher nur bei `precip >= 0.5` UND `precipitation_class == "widespread"` (Coverage ≥ 70 %);
+  `isolated`/`scattered` gaten NICHT. `[THUNDERSTORM]` gated immer. Daten existieren bereits im
+  Region-Loop (`precip_class`, `precip_cov`, `precip_n`, Zähler `rain_widespread_h` etc.,
+  `weather_context.py:2893-2906`) — keine neue Aggregation nötig. (User-Prinzip: einzelne
+  Regenfelder = kein Einfluss, flächendeckend = Einfluss.)
 - **D3 — Timeline-Label:** ✅ **entschieden 2026-06-04 → Option (b)** (umgekehrt zur früheren
   Empfehlung, wegen LLM-Sichtbarkeits-Vorgabe). Gegatete Stunde bekommt ein **explizites Label mit
   Grund** statt des irreführenden `soaring`: `nicht-fliegbar(Regen)` bzw. `nicht-fliegbar(Gewitter)`

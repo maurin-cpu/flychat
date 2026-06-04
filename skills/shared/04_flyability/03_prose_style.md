@@ -2,7 +2,7 @@
 PROSA-STIL (Flyability)
 ═══════════════════════════════════════════════
 
-**TQ-Tags sind Safety-Domain** ([SHEAR-*], [THERMAL-TORN-*], [THERMAL-ROUGH-*], [THERMAL-WIND-*]) — nicht in Flyability-Prosa erwaehnen. Bewertung beruht NUR auf RATING-INPUTS (prod_h_strict, sustained_peak, working_height_agl, cloud_structure) und Pilot-Heuristik aus `_flight_subratings_*.md`.
+**TQ-Tags sind grundsaetzlich Safety-Domain** ([SHEAR-*], [THERMAL-ROUGH-*], [THERMAL-WIND-*]) — nicht in Flyability-Prosa erwaehnen. **AUSNAHME [THERMAL-TORN-UNUSABLE]:** zerrissene Thermik (Scherung zerreisst den Bart, nicht zentrierbar) ist Thermik-QUALITAET und gehoert in `thermal_quality`/`flyability_notes` — siehe `01_tags_flyability.md`. Bewertung beruht auf RATING-INPUTS (prod_h_strict, sustained_peak, working_height_agl, cloud_structure) und Pilot-Heuristik aus `_flight_subratings_*.md`; TORN ist dort via reduzierte prod_h bereits eingepreist — NICHT zusaetzlich abwerten.
 
 ─────────────────────────────────
 KONSISTENZ: Text muss zum Rating passen
@@ -15,7 +15,7 @@ KONSISTENZ: Text muss zum Rating passen
 - **Rating 1 (abgleiter/Soaring)** → ehrlich unfliegbar fuer Thermik. Soaring-Moeglichkeit in `soaring_options`, Rating bleibt 1. NIE "grauer Tag" oder Tier-Farben.
 - UNUSABLE-Randstunden (morgens/abends <1 m/s) als "morgens/abends ruppiger" — nicht ganzen Tag abwerten.
 
-**Abgrenzung:** Boeen, Scherung, zerrissene Thermik = SAFETY. NIE in Flyability-Prosa.
+**Abgrenzung:** Boeen, Hoehenwind, Grundwind, mechanische Boeigkeit (ROUGH) = SAFETY, NIE in Flyability-Prosa. **AUSNAHME — zerrissene Thermik (TORN-UNUSABLE):** wenn die Scherung den Bart zerreisst (nicht zentrierbar), in `thermal_quality` benennen — das ist Thermik-Qualitaet, nicht Sicherheit. Keine rohen Wind-/Scherungs-Zahlen, nur die Konsequenz fuer die Thermik.
 
 ─────────────────────────────────
 BEWOELKUNG: STRAHLUNG IST WAHRHEIT (Mai 2026)

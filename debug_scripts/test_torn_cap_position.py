@@ -1,5 +1,5 @@
 """
-GO/NO-GO Test (a) + Wind-Filter fuer TQ_RATING_PLAN Band-Cap-Modell.
+GO/NO-GO Test (a) + Wind-Filter fuer TQ_TORN_FLYABILITY.md Band-Cap-Modell.
 
 Frage: Taucht nach Abzug des 10m-Bodenankers echtes TORN-UNUSABLE auf —
 besonders an STARK-WIND-Stunden (max Hoehenwind in der Schicht >= 30 / 40 km/h)?

@@ -48,7 +48,7 @@ AUSSCHLIESSLICH JSON, keine Tags, keine eckigen Klammern.
   "experience_rating": 1,
   "flight_type": "Thermikflug|Soaring|Soaring+Thermik|Abgleiter",
   "flight_duration_estimate": "z.B. '2-3h Thermikflug'",
-  "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet MIT Begruendung aus Datenblock. PFLICHT: Bewoelkung IMMER explizit benennen (tief-% UND mittel-%; bei klarem Himmel 'wolkenfrei/blau'), dann BLH, prod_h. KEINE TQ-Tags.",
+  "thermal_quality": "2-3 Saetze. Peak m/s, Arbeitshoehe, Qualitaet MIT Begruendung aus Datenblock. PFLICHT: Bewoelkung IMMER explizit benennen (tief-% UND mittel-%; bei klarem Himmel 'wolkenfrei/blau'), dann BLH, prod_h. KEINE TQ-Tags AUSSER [THERMAL-TORN-UNUSABLE]: dieses PFLICHT benennen (Scherung zerreisst den Bart, nicht zentrierbar — Thermik-Qualitaet, keine rohen Windzahlen).",
   "peak_climb_rate": 0.0,
   "xc_potential": "high|moderate|low",
   "xc_details": "2-3 Saetze. Bei low/moderate: PFLICHT Begruendung (Peak <X, BLH zu tief, Bewoelkung, kurzes Fenster). Bei high: wovon profitiert. KEINE Scherung erwaehnen.",

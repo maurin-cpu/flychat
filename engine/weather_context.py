@@ -863,13 +863,19 @@ class WeatherContextMixin:
         du_dz_kmh_per_100m = (du_kmh / dz_m) * 100.0
         return (du_dz_kmh_per_100m, u_top, wind_speed_10m)
 
-    def _calculate_segment_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m):
+    def _calculate_segment_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m,
+                                 include_surface_anchor=True):
         """
         Berechnet Windscherung pro Segment zwischen konsekutiven Levels.
 
         Sammelt Surface-Anker (elevation_m, wind_speed_10m) + alle PL-Windpunkte
         innerhalb [elevation_m, thermal_top_m]. Berechnet dU/dz zwischen
         aufeinanderfolgenden Levels.
+
+        include_surface_anchor=False laesst den 10m-Bodenwind-Anker weg — fuer die
+        SHEAR/TORN-Auswertung, wo der reibungsgebremste 10m-Wind eine Schein-Scherung
+        direkt ueber dem Start erzeugt (43% Fehlalarm, siehe TQ_TORN_FLYABILITY.md).
+        ROUGH (Boeen), WIND (BL-Mittel) und Startbarkeit nutzen den Anker unveraendert.
 
         Returns: (segments, column_shear)
             segments: list of dicts with keys: alt_lo, alt_hi, du_dz, wind_lo, wind_hi
@@ -883,8 +889,8 @@ class WeatherContextMixin:
         if thermal_top_m <= elevation_m:
             return empty
 
-        # Sammle Windpunkte: Surface-Anker + pressure levels in der Schicht
-        points = [(elevation_m, wind_speed_10m)]
+        # Sammle Windpunkte: Surface-Anker (optional) + pressure levels in der Schicht
+        points = [(elevation_m, wind_speed_10m)] if include_surface_anchor else []
         for level in config.PRESSURE_LEVELS:
             h_val = pl_data.get(f"geopotential_height_{level}hPa")
             ws_val = pl_data.get(f"wind_speed_{level}hPa")
@@ -1061,8 +1067,14 @@ class WeatherContextMixin:
         shear_cfg = config.SHEAR_THRESHOLDS.get(
             terrain_zone, config.SHEAR_THRESHOLDS["alpen"]
         )
+        # Anker-Fix (TQ_TORN_FLYABILITY.md): Den 10m-Bodenwind-Anker fuer die
+        # SHEAR/TORN-Auswertung weglassen — sonst erzeugt die reibungsgebremste
+        # Boden-Scherung ein Schein-TORN direkt ueber dem Start (43% Fehlalarm).
+        # ROUGH (worst_gf) und WIND (bl_mean_wind) nutzen den Anker weiter (eigene
+        # Pfade unten, unberuehrt von dieser segments-Liste).
         segments, column_shear = self._calculate_segment_shear(
-            wind_speed_10m, pl_data, elevation_m, thermal_top_m
+            wind_speed_10m, pl_data, elevation_m, thermal_top_m,
+            include_surface_anchor=False,
         )
         du_dz = column_shear[0]
         debug["du_dz"] = du_dz
@@ -1848,12 +1860,15 @@ class WeatherContextMixin:
                 # THERMAL-WIND-UNUSABLE (Grundwind zu stark, Blase organisiert sich nicht,
                 # Research 3.1) blockieren den Produktiv-Zaehler. FRAGMENTED ist "zu schwach,
                 # nicht gefaehrlich" — gehoert damit nicht in den Gefahren-Topf.
-                # SHEAR/TORN bleiben reine Qualitaets-Issues (Bart schwer zentrierbar,
-                # aber Thermik existiert) und blockieren produktive Stunden nicht.
+                # TORN-UNUSABLE blockiert seit dem 10m-Anker-Fix ebenfalls (TQ_TORN_FLYABILITY.md
+                # Schritt 2): die Scherung zerreisst die organisierte Blase, kein zentrierbares
+                # Steigen. Anker-frei → kein Reibungs-Fehlalarm mehr (Befund 1/3). SHEAR bleibt
+                # reine Prosa (wuerde dU/dz doppelt zaehlen, B/S enthaelt es schon).
                 rough_unusable_this_hour = (
                     "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour
                     or "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour
                 )
+                torn_unusable_this_hour = "[THERMAL-TORN-UNUSABLE]" in tq_tags_this_hour
                 # Bewoelkung wird NICHT mehr als Productivity-Gate verwendet (Mai 2026).
                 # Begruendung: die Thermik-Engine (thermik_calculator.py) berechnet climb_rate
                 # bereits aus direct/diffuse_radiation — die Wolken-Daempfung steckt also
@@ -1874,6 +1889,7 @@ class WeatherContextMixin:
                 band_usable = band_depth >= _min_band
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
                         and not rough_unusable_this_hour
+                        and not torn_unusable_this_hour
                         and band_usable):
                     productive_thermal_h += 1
                 elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
@@ -1883,6 +1899,7 @@ class WeatherContextMixin:
                 # Rating-Input v1.5: strenge Produktivitaets-Schwelle (≥1.5 m/s)
                 if (h_climb >= 1.5
                         and not rough_unusable_this_hour
+                        and not torn_unusable_this_hour
                         and band_usable):
                     productive_h_strict += 1
                     _prod_climbs.append(float(h_climb))
@@ -1892,7 +1909,8 @@ class WeatherContextMixin:
                         _agl = max(0, h_max_h - elevation_m)
                         _prod_tops_agl.append(_agl)
                 # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
-                if h_climb >= 2.0 and not rough_unusable_this_hour and band_usable:
+                if (h_climb >= 2.0 and not rough_unusable_this_hour
+                        and not torn_unusable_this_hour and band_usable):
                     strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
@@ -2404,11 +2422,28 @@ class WeatherContextMixin:
                     f"Falls du green/violet gewählt hast → degradiere zu gray (Abgleiter). "
                     f"Falls bereits gray → bleibt gray. Hat KEINEN Einfluss auf safety_status."
                 )
-            if (tq_torn_danger_h > 0 or tq_shear_danger_h > 0):
+            if tq_torn_danger_h > 0:
                 lines.append(
-                    f"  TORN-/SHEAR-UNUSABLE sind reine Qualitaets-Issues (zerrissene/gekippte Thermik). "
-                    f"Sie degradieren MAXIMAL violet→green. KEIN gray-Downgrade wegen TORN/SHEAR. "
-                    f"Der Tag bleibt Thermikflug-tauglich, Bart-Zentrierung ist nur schwieriger."
+                    f"  TORN-UNUSABLE in {tq_torn_danger_h}h: Scherung zerreisst die organisierte "
+                    f"Thermikblase (anker-korrigiert → kein Reibungs-Fehlalarm). Zaehlt WIE "
+                    f"ROUGH/WIND-UNUSABLE NICHT in den Produktiv-Zaehler — productive_thermal_h "
+                    f"ist bereits bereinigt, du straffst NICHT zusaetzlich am Tier. "
+                    f"PFLICHT: Benenne in der Flyability-Prosa (thermal_quality/flyability_notes) "
+                    f"ehrlich, dass die Scherung die Thermik in diesen Stunden zerreisst (Bart "
+                    f"nicht zentrierbar) — das ist Thermik-Qualitaet = Flyability-Domaene, NICHT "
+                    f"verschweigen. (Regen/Gewitter bleiben dagegen aus der Flyability-Prosa raus.)"
+                )
+            elif tq_torn_warn_h > 0:
+                lines.append(
+                    f"  TORN-DEGRADED in {tq_torn_warn_h}h: Scherung DROHT die Thermik zu zerreissen "
+                    f"(Grenzbereich). Zaehlt noch MIT (Bart schwer zentrierbar). Erwaehne den "
+                    f"Scher-Vorbehalt in der Flyability-Prosa, wenn nennenswert."
+                )
+            if tq_shear_danger_h > 0:
+                lines.append(
+                    f"  SHEAR-UNUSABLE in {tq_shear_danger_h}h: geneigte Blase, reines Komfort-Issue. "
+                    f"Zaehlt MIT in den Produktiv-Zaehler — B/S (=TORN) enthaelt den Scher-Effekt "
+                    f"bereits, SHEAR nicht doppelt straffen. Nur Prosa, kein Gate."
                 )
             if tq_wind_danger_h > 0:
                 wind_pct = round(100 * tq_wind_danger_h / thermal_hours_total)
@@ -2432,12 +2467,13 @@ class WeatherContextMixin:
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
                 f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, ausreichendes Höhenband, "
-                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
+                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE, kein TORN-UNUSABLE). "
                 f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
                 f"HINWEIS: Bewoelkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — "
                 f"die Sonnen-Daempfung steckt bereits in climb_rate ueber die strahlungs"
-                f"basierte H-Berechnung. TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen "
-                f"MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
+                f"basierte H-Berechnung. SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen MIT "
+                f"(geneigt bzw. schwach, aber fliegbar). TORN-UNUSABLE zaehlt NICHT mehr mit "
+                f"(Scherung zerreisst die Blase) — bereits aus productive_thermal_h entfernt."
             )
             # Rating-Inputs (RATING_CONCEPT v1.6): explizit fuer Kategorien-Wahl.
             _wh = round(_median(_prod_tops_agl)) if _prod_tops_agl else 0
@@ -3037,12 +3073,15 @@ class WeatherContextMixin:
                 # THERMAL-WIND-UNUSABLE (Grundwind zu stark, Blase organisiert sich nicht,
                 # Research 3.1) blockieren den Produktiv-Zaehler. FRAGMENTED ist "zu schwach,
                 # nicht gefaehrlich" — gehoert damit nicht in den Gefahren-Topf.
-                # SHEAR/TORN bleiben reine Qualitaets-Issues (Bart schwer zentrierbar,
-                # aber Thermik existiert) und blockieren produktive Stunden nicht.
+                # TORN-UNUSABLE blockiert seit dem 10m-Anker-Fix ebenfalls (TQ_TORN_FLYABILITY.md
+                # Schritt 2): die Scherung zerreisst die organisierte Blase, kein zentrierbares
+                # Steigen. Anker-frei → kein Reibungs-Fehlalarm mehr (Befund 1/3). SHEAR bleibt
+                # reine Prosa (wuerde dU/dz doppelt zaehlen, B/S enthaelt es schon).
                 rough_unusable_this_hour = (
                     "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour
                     or "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour
                 )
+                torn_unusable_this_hour = "[THERMAL-TORN-UNUSABLE]" in tq_tags_this_hour
                 # Bewoelkung wird NICHT mehr als Productivity-Gate verwendet (Mai 2026).
                 # Siehe ausfuehrliche Begruendung im Spot-Loop oben (~Zeile 1789).
                 # Kurz: climb_rate ist bereits strahlungsabgeleitet (H aus direct/diffuse) →
@@ -3052,6 +3091,7 @@ class WeatherContextMixin:
                 band_usable_r = band_depth_r >= _min_band_r
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
                         and not rough_unusable_this_hour
+                        and not torn_unusable_this_hour
                         and band_usable_r):
                     productive_thermal_h += 1
                 elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
@@ -3065,6 +3105,7 @@ class WeatherContextMixin:
                 # nachgezogen (siehe ~Zeile 1810-1828).
                 if (h_climb >= 1.5
                         and not rough_unusable_this_hour
+                        and not torn_unusable_this_hour
                         and band_usable_r):
                     productive_h_strict += 1
                     _prod_climbs.append(float(h_climb))
@@ -3074,7 +3115,8 @@ class WeatherContextMixin:
                         _agl = max(0, h_max_h - elev_ref)
                         _prod_tops_agl.append(_agl)
                 # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
-                if h_climb >= 2.0 and not rough_unusable_this_hour and band_usable_r:
+                if (h_climb >= 2.0 and not rough_unusable_this_hour
+                        and not torn_unusable_this_hour and band_usable_r):
                     strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
@@ -3455,11 +3497,28 @@ class WeatherContextMixin:
                     f"Falls du green/violet gewählt hast → degradiere zu gray (Abgleiter). "
                     f"Falls bereits gray → bleibt gray. Hat KEINEN Einfluss auf safety_status."
                 )
-            if (tq_torn_danger_h > 0 or tq_shear_danger_h > 0):
+            if tq_torn_danger_h > 0:
                 lines.append(
-                    f"  TORN-/SHEAR-UNUSABLE sind reine Qualitaets-Issues (zerrissene/gekippte Thermik). "
-                    f"Sie degradieren MAXIMAL violet→green. KEIN gray-Downgrade wegen TORN/SHEAR. "
-                    f"Der Tag bleibt Thermikflug-tauglich, Bart-Zentrierung ist nur schwieriger."
+                    f"  TORN-UNUSABLE in {tq_torn_danger_h}h: Scherung zerreisst die organisierte "
+                    f"Thermikblase (anker-korrigiert → kein Reibungs-Fehlalarm). Zaehlt WIE "
+                    f"ROUGH/WIND-UNUSABLE NICHT in den Produktiv-Zaehler — productive_thermal_h "
+                    f"ist bereits bereinigt, du straffst NICHT zusaetzlich am Tier. "
+                    f"PFLICHT: Benenne in der Flyability-Prosa (thermal_quality/flyability_notes) "
+                    f"ehrlich, dass die Scherung die Thermik in diesen Stunden zerreisst (Bart "
+                    f"nicht zentrierbar) — das ist Thermik-Qualitaet = Flyability-Domaene, NICHT "
+                    f"verschweigen. (Regen/Gewitter bleiben dagegen aus der Flyability-Prosa raus.)"
+                )
+            elif tq_torn_warn_h > 0:
+                lines.append(
+                    f"  TORN-DEGRADED in {tq_torn_warn_h}h: Scherung DROHT die Thermik zu zerreissen "
+                    f"(Grenzbereich). Zaehlt noch MIT (Bart schwer zentrierbar). Erwaehne den "
+                    f"Scher-Vorbehalt in der Flyability-Prosa, wenn nennenswert."
+                )
+            if tq_shear_danger_h > 0:
+                lines.append(
+                    f"  SHEAR-UNUSABLE in {tq_shear_danger_h}h: geneigte Blase, reines Komfort-Issue. "
+                    f"Zaehlt MIT in den Produktiv-Zaehler — B/S (=TORN) enthaelt den Scher-Effekt "
+                    f"bereits, SHEAR nicht doppelt straffen. Nur Prosa, kein Gate."
                 )
             if tq_wind_danger_h > 0:
                 wind_pct = round(100 * tq_wind_danger_h / thermal_hours_total)
@@ -3483,12 +3542,13 @@ class WeatherContextMixin:
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
                 f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, ausreichendes Höhenband, "
-                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
+                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE, kein TORN-UNUSABLE). "
                 f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
                 f"HINWEIS: Bewoelkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — "
                 f"die Sonnen-Daempfung steckt bereits in climb_rate ueber die strahlungs"
-                f"basierte H-Berechnung. TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen "
-                f"MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
+                f"basierte H-Berechnung. SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen MIT "
+                f"(geneigt bzw. schwach, aber fliegbar). TORN-UNUSABLE zaehlt NICHT mehr mit "
+                f"(Scherung zerreisst die Blase) — bereits aus productive_thermal_h entfernt."
             )
             # Rating-Inputs (RATING_CONCEPT v1.6): explizit fuer Kategorien-Wahl.
             _wh = round(_median(_prod_tops_agl)) if _prod_tops_agl else 0
