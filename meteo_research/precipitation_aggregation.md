@@ -135,7 +135,14 @@ flugbeschraenkend sind.
 
 ### 3.1 WMO/Aviation-Intensitaetsklassen
 
-| Intensitaet (mm/h) | WMO/Aviation-Bezeichnung | Flug-Relevanz |
+> **Wichtig (Abgrenzung):** Diese Tabelle bewertet **Naesse und Flugabbruch-SICHERHEIT**, NICHT
+> den **Thermik-/Steig-Kollaps**. Die Spalte „Flug-Relevanz" ist safety-orientiert (Schirm nass,
+> Outflow, Abbruch). Fuer die Frage „ab wann steigt es nicht mehr" ist sie die FALSCHE Linse:
+> Steigen kollabiert am Regenschacht stadien-basiert, sobald Regen den Boden erreicht — nicht erst
+> bei „Moderate shower". Siehe `precipitation_thermal_interaction.md`. Die Fliegbarkeits-Schwelle
+> `PRECIP_UNFLYABLE_MM = 0.5` leitet sich aus jenem Dokument ab, NICHT aus der 2.5-Zeile hier.
+
+| Intensitaet (mm/h) | WMO/Aviation-Bezeichnung | Flug-Relevanz (Safety, nicht Thermik) |
 |---|---|---|
 | 0.00 - 0.05 | "Trace" (numerisches Rauschen) | Irrelevant |
 | 0.05 - 0.20 | Drizzle / Spritzer | Sichtbar, kaum nass |
