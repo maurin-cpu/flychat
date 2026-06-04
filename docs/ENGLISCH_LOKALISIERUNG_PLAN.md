@@ -49,11 +49,17 @@ Jeder deutsche String fällt in **genau eine** von drei Klassen:
 
 ---
 
-## Plan 1 — LLM-Kern: Analysen + Chat (½ Tag, ~0 $) — ✅ ERLEDIGT 2026-06-04
+## Plan 1 — LLM-Kern: Analysen + Chat (½ Tag, ~0 $) — ⏸️ AUF HOLD (nur Planung)
 
-> **Status:** Alle Output-Sprach-Anker auf Englisch geflippt (Skill-Bodies bleiben deutsch). Verifiziert: alle 6 zusammengebauten Prompts tragen den EN-Befehl, kein „Sprache: Deutsch"-Rest. Few-Shot-Block prüft = nur numerisch, kein deutscher Prosa-Leak. **Offen: echter LLM-Smoke-Test** (kostet ~$0.50, braucht Keys+Wetterdaten) zur Sichtprüfung des realen englischen Outputs.
+> **Status 2026-06-04:** Probe-Edits gemacht → auf User-Wunsch **wieder zurückgerollt**. Codebase ist auf Deutsch, Prompts verifiziert (kein EN-Rest). **Phase = Planung-only.**
+> ⚠️ **Git-Detail:** Die EN-Edits waren via Auto-Commit in `main` gelandet (`8e9cb10`/`fa1af92`, gebündelt mit fremder TORN-/weather_context-Arbeit). Der Rollback liegt **als uncommitteter Working-Tree-Change** vor (nur die 5 Sprach-Dateien + diese Plan-Doku). Wenn `main` selbst sauber-deutsch sein soll, muss dieser Revert noch **committet** werden — steht aus, NICHT eigenmächtig getan.
 >
-> Geänderte Dateien: `01_core_principles.md` (Punkt 0 + Anti-Beispiele + Begriffs-Regel), `system_chat.md` (Punkt 7 + Z.163), `synoptic_overview.md`, `email_week_lead.md`, `templates/base.html` (`lang="en"` + og:title/description).
+> **Was umzusetzen ist, wenn grünes Licht kommt** (konkrete Anker, beim Probelauf verifiziert — alle 6 Prompts trugen danach den EN-Befehl, Few-Shot-Block ist rein numerisch → kein Prosa-Leak):
+> - `01_core_principles.md` — Punkt 0 (Output-Sprache), Anti-Beispiele, Begriffs-Regel (dt.→engl. Termini)
+> - `system_chat.md` — Punkt 7 + Z.163 (Tag-Übersetzung)
+> - `synoptic_overview.md` + `email_week_lead.md` — Prosa-Sprach-Anker
+> - `templates/base.html` — `lang="en"` + og:title/description (Link-Vorschau fürs Forum)
+> - **Smoke-Test danach:** `python cost_testing/analyze_once.py` (~$0.50) zur Sichtprüfung.
 
 
 **Ziel:** Der eigentliche Produkt-Output (Spot-/Region-Analysen + Chat) erscheint englisch. **Skills bleiben deutsch.**

@@ -372,7 +372,7 @@ STIL & TONALITAET
 - **Einschaetzung, niemals Empfehlung** ("plane deinen Tag" und Aehnliches ist
   verboten — Haftungstrennung).
 - Aktive Verben, kurze Saetze. Lange Saetze in zwei kurze splitten.
-- **Output auf Englisch** (natuerliche Pilotensprache). Diese Anweisungen sind deutsch, der Output ist englisch.
+- Deutsch, keine Anglizismen ausser XC und Thermik.
 - KEINE Anrede, KEINE Begruessung, KEIN Schluss.
 - KEINE Floskeln ("vielleicht", "koennte sein") — entweder klare Aussage oder
   ehrliches "Tendenz" (siehe Konfidenz).
