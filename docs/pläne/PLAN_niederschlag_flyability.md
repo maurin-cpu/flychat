@@ -5,12 +5,18 @@
 **Erstellt:** 2026-06-03 — **Schwelle final entschieden:** 2026-06-04
 **Branch:** `main` (Single-Branch-Workflow)
 
-**Wiederaufnahme (HIER starten):**
-1. Diese Datei lesen — alle Konzept-Entscheidungen sind getroffen (siehe „Entscheidungen").
-2. Direkt mit Phase 1 (Spot-Schleife) beginnen. Reihenfolge: Spot → Region → Doku → Validierung.
-3. Schwelle ist entschieden: `PRECIP_UNFLYABLE_MM` = **0.5** (einheitlich Spot + Region).
-   Begründung siehe „Schwellen-Entscheidung (Deep-Research 2026-06-04)" unten — NICHT neu
-   aufrollen. Im Replay (Phase 4) nur noch verifizieren, nicht den Wert suchen.
+**Wiederaufnahme (HIER starten — Stand 2026-06-04 Abend):**
+1. Diese Datei lesen — **alle 3 Konzept-Entscheidungen sind getroffen**, NICHT neu aufrollen:
+   - **Schwelle:** `PRECIP_UNFLYABLE_MM = 0.5` mm/h (Deep-Research, s.u.).
+   - **Region Coverage-bedingt (D2):** Region gated nur bei `class == "widespread"` (≥70 %),
+     Spot bei jeder Menge ≥0.5. Gewitter gated immer.
+   - **Gate NICHT still (D3+D4):** LLM-sichtbar machen (WETTER-GATE-Hint + `nicht-fliegbar`-Label)
+     + Skill-Prompt erlaubt Regen als Fliegbarkeits-Grund.
+2. Code ist **noch komplett unangetastet** (config.py + weather_context.py = Original-Stand,
+   frühere Probe-Edits wurden zurückgesetzt). Mit Phase 1 (Spot-Schleife) beginnen.
+   Reihenfolge: Spot → Region → Skill+Doku → Validierung.
+3. Touch-Points mit Zeilennummern stehen unter „Touch-Points". Im Replay (Phase 4) nur noch
+   verifizieren, KEINE Konzept-Frage neu öffnen.
 
 **Kurz-Summary der finalen Lösung:**
 Produktiv-Zähler (`productive_thermal_h`, `productive_h_strict`, `strong_h`) + FLIEGBARKEITS-VERLAUF
