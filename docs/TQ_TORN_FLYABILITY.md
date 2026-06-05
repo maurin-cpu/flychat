@@ -1,6 +1,6 @@
 # TORN: Scherung zerreißt die Thermik → wirkt auf die Fliegbarkeit
 
-**Status:** Umgesetzt 2026-06-04. Beschreibt das **laufende** Verhalten.
+**Status:** Umgesetzt 2026-06-04, erweitert 2026-06-05 (Shear-Guard + Band-Cap). Beschreibt das **laufende** Verhalten.
 **Code:** `engine/weather_context.py` (`_calculate_segment_shear`, `_thermal_quality_tags`,
 beide Kontext-Loops), Skills `skills/shared/04_flyability/*`.
 **Vorgeschichte:** ging aus dem verworfenen „Band-Cap"-Plan hervor (siehe Anhang).
@@ -11,11 +11,13 @@ beide Kontext-Loops), Skills `skills/shared/04_flyability/*`.
 
 Wenn der Wind die Thermik in der Höhe **zerreißt** (`[THERMAL-TORN-UNUSABLE]`), gilt diese
 Stunde nicht mehr als produktive Thermik-Stunde, und das LLM benennt die Scherung ehrlich
-in der Flyability-Prosa. Drei Bausteine:
+in der Flyability-Prosa. Fünf Bausteine:
 
 1. **10m-Anker-Fix** — die Scherungs-Berechnung lässt den reibungsverfälschten Bodenwind weg.
 2. **Binär-Gate** — tiefes echtes TORN zählt nicht als produktiv (wie ROUGH/WIND).
 3. **Prosa-Pflicht** — das LLM erwähnt „Scherung zerreißt den Bart" in `thermal_quality`.
+4. **Shear-Guard** (2026-06-05) — TORN feuert nur bei `du_dz ≥ warn`, nicht bei schwacher Thermik.
+5. **Band-Cap** (2026-06-05) — reißt es erst oben, zählt das fliegbare Band darunter (gedeckelt).
 
 ---
 
@@ -139,22 +141,62 @@ End-to-end (Hasenmatt 2026-06-06): `THERMIK-QUALITÄT … TORN-UNUSABLE 2h`, Hin
 
 ---
 
-## Offen
+## Baustein 4 — Shear-Guard auf den TORN-Tag (umgesetzt 2026-06-05)
 
-- **Replay über mehr Wetterlagen** (Föhn + Schwachwind) vor endgültiger Abnahme.
-- Optionale **Peak-Kern-Verschärfung** (`peak_climb/du_dz·100 ≤ 60` zusätzlich zur
-  Gate-Bedingung) — siebt die ~10 % Grenzfälle aus; beim Replay entscheiden, ob nötig.
+`[THERMAL-TORN-UNUSABLE]`/`-DEGRADED` feuern jetzt nur noch, wenn `du_dz >= shear_cfg["warn"]`
+— dieselbe Schwelle, ab der `[SHEAR-DEGRADED]` greift. Grund: `B/S = climb / du_dz` kippt auch
+bei **vernachlässigbarer** Scherung unter die Grenze, wenn die Thermik einfach schwach ist
+(flache Mittelland-Säulen). Das ist kein Zerreißen, sondern eine schwache Thermik — und die
+fängt der Produktiv-Floor (`PRODUCTIVE_CLIMB_MIN`) schon ab. Sitzt am Source (B/S-Block in
+`_thermal_quality_tags`), wirkt damit auf Spalten-Tag **und** Segment-Floor.
+
+**Ehrliche Messung:** Der Effekt aufs Produktiv-**Gate** ist klein (−2 Region-Std von 40, 0
+Spot-Std). Die „28 % Artefakt" aus `test_torn_regions_echtheit.py` waren ein **Segment**-Level-
+Diagnose-Wert — das Gate läuft aber auf **Spalten**-Scherung, die meist schon ≥ warn liegt.
+Der Guard schließt trotzdem eine echte Logiklücke (Doppelzählung schwach + „zerrissen") und
+ist die Vorbedingung für den sauberen Band-Cap-Floor.
 
 ---
 
-## Anhang — VERWORFEN: Band-Cap-Modell
+## Baustein 5 — Band-Cap (minimal umgesetzt 2026-06-05, Spot + Region)
 
-Die ursprüngliche Idee: nicht binär killen, sondern das **nutzbare Band** rechnen (saubere
-Höhe von unten bis zur ersten Zerreiß-Decke `usable_top_m`, verglichen gegen `min_band_depth`).
-TORN hätte die erreichbare Höhe **gedeckelt** statt die Stunde zu streichen.
+Statt die Stunde binär zu streichen: reißt die Thermik **erst weiter oben**, bleibt UNTER dem
+Riss oft ein fliegbares Band. Ist das saubere Band `torn_floor_m − elevation ≥ min_band_depth`,
+zählt die Stunde als **produktiv** (gedeckelt auf `torn_floor_m`) statt gestrichen.
 
-**Verworfen, weil** das echte TORN bei rel ~0.12–0.15 sitzt — so tief, dass unter der Decke
-fast nie `≥ min_band_depth` bleibt. Der Cap killt die Stunde praktisch ohnehin → identisch zur
-Binär-Regel, nur mit deutlich mehr Code (4 Touch-Points, `usable_top_m`-Felder, Cap-Aggregate,
-Reverse-Parser, LLM-Cap-Prosa). Falls echte Vignetten später ein *abgestuftes* Verhalten
-beweisen (TORN hoch oben, das nur die Höhe senkt), kann der Cap reaktiviert werden.
+- `_thermal_quality_tags` schreibt die **unterste shear-signifikante Riss-Höhe** (`du_dz ≥ warn`
+  **und** lokales B/S ≤ danger) als `debug["torn_floor_m"]`.
+- Beide Gate-Loops: `torn_kills_hour = torn_unusable_this_hour and not torn_band_cap_saves`.
+  **Strikt nur relaxierend** — kann nie eine produktive Stunde killen. Der `working_height`-
+  Tracker zählt nur bis `torn_floor_m` (sonst Überzeichnung).
+
+**Warum jetzt doch (nicht mehr verworfen):** Der alte Verwurf war **Spot-Logik** (Riss rel
+~0.12–0.15 direkt über dem Startplatz → kein Band darunter). **Für Regionen nie gemessen** —
+und Regionen haben **keinen echten Startplatz** (`elev_ref` ist eine Referenz). Messung:
+
+| Säulen-Tiefe | % gerissene Std mit fliegbarem Band darunter |
+|---|---|
+| flach <1000 m | 7 % |
+| mittel 1000–1800 m | **38 %** |
+| tief >1800 m | (im Cache 0 Fälle — Föhn-Lücke) |
+
+Der Nutzen **steigt klar mit der Säulen-Tiefe** (= Föhn-Geometrie). **Reale Wirkung auf dem
+aktuellen (windigen Flachland-)Cache:** Region **1** gerettete Std (Jura West, Riss@1512m,
+312 m fliegbar, roh-Top 2010 m), Spot **0** (wie erwartet, Riss am Startplatz). Die Logik
+liegt bereit; der wahre Wert zeigt sich erst bei tiefen Säulen.
+
+**Deferred:** Display-Cap + LLM-Cap-Prosa („sauber bis X, darüber zerrissen") bewusst später.
+
+---
+
+## Offen
+
+- **Föhn-Replay (entscheidend für Band-Cap-Wert).** Der Tief-Bucket (>1800 m Säulen) ist im
+  Forecast-Cache leer; ein echter Föhntag würde ihn füllen. Erwartung laut Tiefe-Trend:
+  „% fliegbar darunter" springt deutlich → Band-Cap zündet öfter. Forecast-API liefert keine
+  historischen Föhntage; Föhn-Detektor (`foehn_indicators.py`) existiert → bei nächstem
+  Föhn-Forecast `region_band_cap_potential.py` / `verify_band_cap.py` nachfahren.
+- **Replay über Schwachwind-Lage** vor endgültiger Abnahme (TORN sollte dann →0 gehen).
+- Diagnostik-Skripte: `list_torn_spots.py`, `list_torn_regions.py`, `test_torn_regions_echtheit.py`,
+  `region_band_cap_potential.py` (Föhn-Proxy nach Tiefe), `spot_band_cap_potential.py`,
+  `verify_band_cap.py`, `inspect_mittelland_ost.py`.

@@ -1053,7 +1053,7 @@ class WeatherContextMixin:
         """
         tags = []
         debug = {"du_dz": None, "bs": None, "gf": None, "zone": None,
-                 "tq_ratio": None, "bl_mean_wind": None}
+                 "tq_ratio": None, "bl_mean_wind": None, "torn_floor_m": None}
 
         # Gate: keine Thermik -> keine Qualitaets-Tags
         if (not isinstance(climb_rate_ms, (int, float))
@@ -1090,9 +1090,19 @@ class WeatherContextMixin:
         bs = self._calculate_bs_ratio(climb_rate_ms, du_dz)
         debug["bs"] = bs
         if bs is not None:
-            if bs <= config.BS_RATIO_THRESHOLDS["danger"]:
+            # Scherungs-Guard (TQ_TORN_FLYABILITY.md, "Offen" → umgesetzt 2026-06-05):
+            # B/S = climb / du_dz kippt auch dann unter die Schwelle, wenn NICHT der
+            # Wind stark schert, sondern die Thermik einfach schwach ist (flache,
+            # niedrige Mittelland-Blasen → kleine parabol. Steigrate). Das ist KEIN
+            # Zerreissen, sondern eine schwache Thermik — und die faengt der
+            # Produktiv-Floor (PRODUCTIVE_CLIMB_MIN) bereits ab. TORN daher nur, wenn
+            # die Scherung ueberhaupt die WARN-Schwelle erreicht — dieselbe Grenze,
+            # ab der [SHEAR-DEGRADED] greift (in sich konsistent, keine neue Zahl).
+            # Entfernt die Flachland-Schwachwind-Fehlalarme (Befund: ~28% Region-TORN).
+            shear_significant = du_dz >= shear_cfg["warn"]
+            if bs <= config.BS_RATIO_THRESHOLDS["danger"] and shear_significant:
                 tags.append("[THERMAL-TORN-UNUSABLE]")
-            elif bs <= config.BS_RATIO_THRESHOLDS["warn"]:
+            elif bs <= config.BS_RATIO_THRESHOLDS["warn"] and shear_significant:
                 tags.append("[THERMAL-TORN-DEGRADED]")
 
         # --- BL-Mean-Wind (Thermik-Organisation durch Grundwind gestoert) ---
@@ -1157,6 +1167,10 @@ class WeatherContextMixin:
         # lokaler B/S-Ratio (mit parabolischer Steigrate) und worst GF im Segment.
         CLIMB_FLOOR = 0.3  # m/s — verhindert false-positives am Saeulenrand
         seg_results = []
+        # Band-Cap-Input (Regionen, TQ_TORN_FLYABILITY.md): unterste Hoehe, ab
+        # der die Thermik ECHT zerrissen ist (shear-signifikant). Darunter ist
+        # das Band sauber/fliegbar. Bleibt None, wenn kein echter Riss im Band.
+        torn_floor_m = None
         for seg in segments:
             seg_tags = []
             # Lokale Scherung
@@ -1175,6 +1189,11 @@ class WeatherContextMixin:
                 local_bs = (local_climb / seg["du_dz"]) * 100.0
                 if local_bs <= config.BS_RATIO_THRESHOLDS["danger"]:
                     seg_tags.append("TORN-UNU")
+                    # Nur shear-signifikante Risse zaehlen als Band-Decke
+                    # (gleicher Guard wie der Spalten-TORN-Tag oben).
+                    if seg["du_dz"] >= shear_cfg["warn"]:
+                        torn_floor_m = (seg["alt_lo"] if torn_floor_m is None
+                                        else min(torn_floor_m, seg["alt_lo"]))
                 elif local_bs <= config.BS_RATIO_THRESHOLDS["warn"]:
                     seg_tags.append("TORN-DEG")
 
@@ -1221,6 +1240,8 @@ class WeatherContextMixin:
                 for t in s["tags"]:
                     tag_counts[t] = tag_counts.get(t, 0) + 1
             debug["tq_ratio"] = {"total": n_total, "clean": n_clean, "tags": tag_counts}
+
+        debug["torn_floor_m"] = torn_floor_m
 
         return (tags, debug)
 
@@ -1826,6 +1847,7 @@ class WeatherContextMixin:
             # Nur aktiv wenn Thermik existiert — ohne climb_rate sind die
             # Boeen-Risiken bereits durch [GUST-*] und [ALOFT-*] abgedeckt.
             tq_info = ""
+            quality_debug = {}  # Fallback, falls TQ-Aufruf wirft (Band-Cap liest torn_floor_m)
             try:
                 quality_tags, quality_debug = self._thermal_quality_tags(
                     wind_speed_10m=wind_speed,
@@ -1887,9 +1909,24 @@ class WeatherContextMixin:
                 band_depth = (h_max_h - elevation_m) if isinstance(h_max_h, (int, float)) else 0
                 _min_band = min_band_depth(h_climb, spot_terrain_zone)
                 band_usable = band_depth >= _min_band
+                # --- Band-Cap (Spots, Konsistenz mit Region-Loop, TQ_TORN_FLYABILITY.md) ---
+                # Identische Logik wie im Region-Loop. Bei Spots ist elevation_m der
+                # ECHTE Startplatz; der Riss sitzt meist direkt drueber (gemessen rel
+                # ~0.13) → fast nie ein fliegbares Band darunter, der Cap zuendet hier
+                # selten (belegt: ~7% der gerissenen Stunden, fast 0 nach Spalten-Gate-
+                # Schnitt). Trotzdem dieselbe Regel: strikt nur relaxierend (kann nie
+                # eine produktive Stunde killen), nur eben hier praktisch wirkungslos.
+                torn_floor_m = quality_debug.get("torn_floor_m")
+                torn_cap_top = None
+                torn_band_cap_saves = False
+                if torn_unusable_this_hour and isinstance(torn_floor_m, (int, float)):
+                    if (torn_floor_m - elevation_m) >= _min_band:
+                        torn_band_cap_saves = True
+                        torn_cap_top = torn_floor_m
+                torn_kills_hour = torn_unusable_this_hour and not torn_band_cap_saves
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
                         and not rough_unusable_this_hour
-                        and not torn_unusable_this_hour
+                        and not torn_kills_hour
                         and band_usable):
                     productive_thermal_h += 1
                 elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
@@ -1899,18 +1936,22 @@ class WeatherContextMixin:
                 # Rating-Input v1.5: strenge Produktivitaets-Schwelle (≥1.5 m/s)
                 if (h_climb >= 1.5
                         and not rough_unusable_this_hour
-                        and not torn_unusable_this_hour
+                        and not torn_kills_hour
                         and band_usable):
                     productive_h_strict += 1
                     _prod_climbs.append(float(h_climb))
                     # v1.6: Thermik-Top AGL fuer working_height-Median tracken.
                     # h_max_h ist MSL (bereits LCL-gecappt). AGL = MSL - elevation.
+                    # Band-Cap: gerettet-gedeckelte Stunde nur bis zum Riss zaehlen.
                     if isinstance(h_max_h, (int, float)):
-                        _agl = max(0, h_max_h - elevation_m)
+                        _top_msl = h_max_h
+                        if torn_band_cap_saves and isinstance(torn_cap_top, (int, float)):
+                            _top_msl = min(_top_msl, torn_cap_top)
+                        _agl = max(0, _top_msl - elevation_m)
                         _prod_tops_agl.append(_agl)
                 # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
                 if (h_climb >= 2.0 and not rough_unusable_this_hour
-                        and not torn_unusable_this_hour and band_usable):
+                        and not torn_kills_hour and band_usable):
                     strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
@@ -3039,6 +3080,7 @@ class WeatherContextMixin:
             # effektiven wind_speed (kann Hoehenwind enthalten).
             # Scherung = Windaenderung mit Hoehe, braucht echten Surface-Anker.
             tq_info = ""
+            quality_debug = {}  # Fallback, falls TQ-Aufruf wirft (Band-Cap liest torn_floor_m)
             try:
                 quality_tags, quality_debug = self._thermal_quality_tags(
                     wind_speed_10m=wind_speed_surface,
@@ -3089,9 +3131,27 @@ class WeatherContextMixin:
                 band_depth_r = (h_max_h - elev_ref) if isinstance(h_max_h, (int, float)) else 0
                 _min_band_r = min_band_depth(h_climb, region_terrain_zone)
                 band_usable_r = band_depth_r >= _min_band_r
+                # --- Band-Cap (NUR Regionen, TQ_TORN_FLYABILITY.md) ---
+                # Regionen haben keinen echten Startplatz (elev_ref ist eine
+                # Referenz-Hoehe). Reisst die Thermik erst weiter oben, bleibt
+                # UNTER dem Riss oft ein fliegbares Band. Statt die Stunde wie
+                # bei Spots komplett zu streichen, zaehlt sie als produktiv
+                # (gedeckelt auf die Riss-Hoehe), wenn das saubere Band unten
+                # >= min_band_depth ist. Messung: 7% (flach) -> 38% (mittel-
+                # tiefe Saeulen) der gerissenen Stunden haben so noch Substanz.
+                # Strikt nur relaxierend: kann nie eine produktive Stunde killen.
+                torn_floor_m = quality_debug.get("torn_floor_m")
+                torn_cap_top = None
+                torn_band_cap_saves = False
+                if torn_unusable_this_hour and isinstance(torn_floor_m, (int, float)):
+                    usable_below = torn_floor_m - elev_ref
+                    if usable_below >= _min_band_r:
+                        torn_band_cap_saves = True
+                        torn_cap_top = torn_floor_m
+                torn_kills_hour = torn_unusable_this_hour and not torn_band_cap_saves
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
                         and not rough_unusable_this_hour
-                        and not torn_unusable_this_hour
+                        and not torn_kills_hour
                         and band_usable_r):
                     productive_thermal_h += 1
                 elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
@@ -3105,18 +3165,23 @@ class WeatherContextMixin:
                 # nachgezogen (siehe ~Zeile 1810-1828).
                 if (h_climb >= 1.5
                         and not rough_unusable_this_hour
-                        and not torn_unusable_this_hour
+                        and not torn_kills_hour
                         and band_usable_r):
                     productive_h_strict += 1
                     _prod_climbs.append(float(h_climb))
                     # Thermik-Top AGL fuer working_height-Median tracken.
                     # h_max_h ist MSL (bereits LCL-gecappt). AGL = MSL - elev_ref.
+                    # Band-Cap: bei gerettet-gedeckelter Stunde nur bis zum Riss
+                    # zaehlen, sonst wuerde working_height die torn-Hoehe ueberzeichnen.
                     if isinstance(h_max_h, (int, float)):
-                        _agl = max(0, h_max_h - elev_ref)
+                        _top_msl = h_max_h
+                        if torn_band_cap_saves and isinstance(torn_cap_top, (int, float)):
+                            _top_msl = min(_top_msl, torn_cap_top)
+                        _agl = max(0, _top_msl - elev_ref)
                         _prod_tops_agl.append(_agl)
                 # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
                 if (h_climb >= 2.0 and not rough_unusable_this_hour
-                        and not torn_unusable_this_hour and band_usable_r):
+                        and not torn_kills_hour and band_usable_r):
                     strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
