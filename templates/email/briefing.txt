@@ -19,7 +19,7 @@ Im Dashboard: {{ urls.dashboard }}
 {% endif -%}
 {% if region_matrix -%}
 DEINE REGIONEN · DIESE WOCHE
-            {% for d in day_short_labels %}{{ '%-6s'|format(d) }}{% endfor %} Best
+            {% for d in day_short_labels %}{{ '%-6s'|format(d) }}{% endfor %} Beste
 {% for r in region_matrix -%}
 {{ '%-12.12s'|format(r.region_name) }}{% for cell in r.days %}{% if cell.tier == "none" %} ----  {% elif cell.tier == "conditional" %} ! {{ cell.rating_display or ' --  ' }}{% else %}   {{ cell.rating_display or ' --  ' }}{% endif %} {% endfor %} {{ r.best_rating_int or '–' }}
 {% endfor %}
