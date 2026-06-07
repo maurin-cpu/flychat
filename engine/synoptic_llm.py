@@ -173,6 +173,12 @@ def generate_synoptic_overview(synoptic_context: dict, analysis_client,
     short_filtered = _filter_statements(short_with_src, valid_centers)
     long_filtered = _filter_statements(long_with_src, valid_centers)
 
+    # Kalenderwochen-Begriffe ("Wochenmitte", "zum Wochenstart", ...) → zeitraum-
+    # neutral. Sicherheitsnetz zum Skill-Verbot; der Cast ist ein rollierender
+    # 5-Tage-Block ab heute, keine Kalenderwoche.
+    short_filtered = _neutralize_calendar_week_terms(short_filtered)
+    long_filtered = _neutralize_calendar_week_terms(long_filtered)
+
     # Wochentag-Normalisierung NUR fuer long (long_with_sources wird im
     # Frontend pro Tag gerendert; short ist Fliesstext und braucht das nicht).
     # Korrigiert "Heute:"/"Morgen:" sowie falsch verschobene Wochentag-Praefixe
@@ -497,6 +503,50 @@ def _normalize_weekday_prefixes(statements: list, forecast_dates: list) -> list:
             )
         st2 = dict(st)
         st2["text"] = new_text
+        out.append(st2)
+    return out
+
+
+# Kalenderwochen-Begriffe → zeitraum-neutral. Der Cast ist ein rollierender
+# 5-Tage-Block ab HEUTE, KEINE Kalenderwoche (forecast_dates[0] kann jeder
+# Wochentag sein). Begriffe wie "Wochenmitte"/"zum Wochenstart" unterstellen
+# einen Montag-Start und sind irrefuehrend. Der Skill verbietet sie bereits;
+# dieser Normalizer ist das deterministische Sicherheitsnetz fuer den Fall,
+# dass der LLM sie trotzdem verwendet. WICHTIG: greift NICHT auf "Wochentag"
+# /"Wochentage" (Tagesnamen-Bezug, voellig korrekt) — die Patterns matchen
+# nur die Positions-/Zeitraum-Begriffe.
+_CALENDAR_WEEK_SUBS = [
+    (re.compile(r"\bdie\s+Woche\s+startet\b", re.IGNORECASE), "die kommenden Tage starten"),
+    (re.compile(r"\bzum\s+Wochen(start|beginn)\b", re.IGNORECASE), "zu Beginn"),
+    (re.compile(r"\bzu\s+Wochenbeginn\b", re.IGNORECASE), "zu Beginn"),
+    (re.compile(r"\b(gegen|zum|am)\s+Wochenende\b", re.IGNORECASE), "zum Ende des Zeitraums"),
+    (re.compile(r"\bin\s+der\s+Wochenmitte\b", re.IGNORECASE), "in der Mitte des Zeitraums"),
+    (re.compile(r"\bzur\s+Wochenmitte\b", re.IGNORECASE), "zur Mitte des Zeitraums"),
+    (re.compile(r"\bWochenmitte\b", re.IGNORECASE), "Mitte des Zeitraums"),
+    (re.compile(r"\bdie\s+ganze\s+Woche\b", re.IGNORECASE), "den ganzen Zeitraum"),
+    (re.compile(r"\b(ue?ber|über)\s+die\s+Woche\b", re.IGNORECASE), "über den Zeitraum"),
+]
+
+
+def _neutralize_calendar_week_terms(statements: list) -> list:
+    """Ersetzt Kalenderwochen-Begriffe in `text` und `flight_hint` durch
+    zeitraum-neutrale Formulierungen. Belt-and-suspenders zum Skill-Verbot.
+    """
+    if not statements:
+        return statements
+    out = []
+    for st in statements:
+        st2 = dict(st)
+        for field in ("text", "flight_hint"):
+            val = st2.get(field)
+            if not val:
+                continue
+            new_val = val
+            for pat, repl in _CALENDAR_WEEK_SUBS:
+                new_val = pat.sub(repl, new_val)
+            if new_val != val:
+                logger.info("Kalenderwochen-Begriff neutralisiert: %r -> %r", val, new_val)
+                st2[field] = new_val
         out.append(st2)
     return out
 
