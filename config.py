@@ -804,6 +804,14 @@ OVERCAST_DANGER_BASE_BUFFER_M = 100   # m — Decke gilt als "auf Platzhoehe" bi
 OVERCAST_DANGER_COVER_PCT = 80        # % — ab dieser Bedeckung = geschlossene Decke
 OVERCAST_MID_BAND_MIN_M = 3000        # m — ab hier liegt der Platz in der mittleren Schicht
 
+# ─── CLOUDS-Reducer-Zone (Flyability, KEIN Stop) ───
+# Wolkenbasis ueber dem Startplatz, aber nicht hoch (BASE_BUFFER..REDUCER_BASE_MAX):
+# fliegbar, aber eingeschraenkte Arbeitshoehe → CLOUDS-`reducer`-Tag (Label
+# "Basis nahe Startplatz"), Status bleibt gruen. Darueber: kein Effekt. Darunter
+# (auf/unter Platz, dicht): OVERCAST-DANGER (Stop). Nur wenn tiefe Decke vorhanden.
+OVERCAST_REDUCER_BASE_MAX_M = 400     # m — obere Grenze der Reducer-Zone ueber Platz
+OVERCAST_REDUCER_COVER_PCT = 75       # % — Mindest-tiefe-Bedeckung fuer Reducer
+
 # Violett-Kriterien (XC-Tag). LLM entscheidet final, aber TAGESPROFIL zeigt diese
 # Schwellen als Violett-Kandidat-Hint. Research: meteo_research/cloud_cover_thermal_impact.md
 # - Wolken-Maxima 50/50 matchen FAA-Daempfungsgrenze: darueber beginnt signifikante

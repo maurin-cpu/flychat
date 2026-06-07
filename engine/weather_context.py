@@ -1655,15 +1655,17 @@ class WeatherContextMixin:
                 if min_cloud_base_active_h is None or cloud_base_raw < min_cloud_base_active_h:
                     min_cloud_base_active_h = cloud_base_raw
                 # STOP-Zähler deckungsgleich mit OVERCAST-DANGER-Gate (dichte Decke
-                # auf/unter Platz). WARN = dichte tiefe Wolke knapp über Platz (Hinweis,
-                # kein Stop). low_cl statt low+mid (kein Additions-Artefakt >100%).
+                # auf/unter Platz). REDUCER = tiefe Decke knapp ÜBER Platz
+                # (BUFFER..REDUCER_BASE_MAX) → eingeschränkte Arbeitshöhe, fliegbar.
+                # low_cl statt low+mid (kein Additions-Artefakt >100%).
                 buf = config.OVERCAST_DANGER_BASE_BUFFER_M
                 dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
                     elevation_m >= config.OVERCAST_MID_BAND_MIN_M
                     and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
                 if cloud_base_raw <= elevation_m + buf and dense_deck:
                     cloud_at_or_below_takeoff_h += 1
-                elif elevation_m + buf < cloud_base_raw <= elevation_m + 300 and low_cl >= 75:
+                elif (elevation_m + buf < cloud_base_raw <= elevation_m + config.OVERCAST_REDUCER_BASE_MAX_M
+                        and low_cl >= config.OVERCAST_REDUCER_COVER_PCT):
                     cloud_near_takeoff_h += 1
 
             # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG)
@@ -2901,7 +2903,8 @@ class WeatherContextMixin:
                     and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
                 if cloud_base_raw <= elev_ref + buf and dense_deck:
                     cloud_at_or_below_takeoff_h += 1
-                elif elev_ref + buf < cloud_base_raw <= elev_ref + 300 and low_cl >= 75:
+                elif (elev_ref + buf < cloud_base_raw <= elev_ref + config.OVERCAST_REDUCER_BASE_MAX_M
+                        and low_cl >= config.OVERCAST_REDUCER_COVER_PCT):
                     cloud_near_takeoff_h += 1
 
             # Regionen: KEINE Böen (Apr 2026 Refactor).
