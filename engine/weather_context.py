@@ -756,13 +756,16 @@ class WeatherContextMixin:
                 except Exception:
                     pass
 
-                # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
-                if (cloud_base_raw is not None
-                        and isinstance(cloud_base_raw, (int, float))
-                        and isinstance(cloud_cover, (int, float))
-                        and cloud_cover >= 75
-                        and cloud_base_raw < spot["elevation_m"] + 500):
-                    warnings.append("[OVERCAST-DANGER]")
+                # OVERCAST-DANGER: dichte, geschlossene Wolkendecke AUF oder UNTER
+                # Startplatzhöhe (Start in die Wolke ODER Decke unter mir). Wolken
+                # darüber = nur Reducer. Siehe config.OVERCAST_DANGER_*.
+                if (isinstance(cloud_base_raw, (int, float))
+                        and cloud_base_raw <= spot["elevation_m"] + config.OVERCAST_DANGER_BASE_BUFFER_M):
+                    dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
+                        spot["elevation_m"] >= config.OVERCAST_MID_BAND_MIN_M
+                        and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
+                    if dense_deck:
+                        warnings.append("[OVERCAST-DANGER]")
 
                 warning_str = " " + " ".join(warnings) if warnings else ""
 
@@ -1651,10 +1654,16 @@ class WeatherContextMixin:
             if isinstance(cloud_base_raw, (int, float)):
                 if min_cloud_base_active_h is None or cloud_base_raw < min_cloud_base_active_h:
                     min_cloud_base_active_h = cloud_base_raw
-                low_mid_cover = low_cl + mid_cl
-                if cloud_base_raw <= elevation_m + 100 and low_mid_cover >= 90:
+                # STOP-Zähler deckungsgleich mit OVERCAST-DANGER-Gate (dichte Decke
+                # auf/unter Platz). WARN = dichte tiefe Wolke knapp über Platz (Hinweis,
+                # kein Stop). low_cl statt low+mid (kein Additions-Artefakt >100%).
+                buf = config.OVERCAST_DANGER_BASE_BUFFER_M
+                dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
+                    elevation_m >= config.OVERCAST_MID_BAND_MIN_M
+                    and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
+                if cloud_base_raw <= elevation_m + buf and dense_deck:
                     cloud_at_or_below_takeoff_h += 1
-                elif elevation_m + 100 < cloud_base_raw <= elevation_m + 300 and low_mid_cover >= 75:
+                elif elevation_m + buf < cloud_base_raw <= elevation_m + 300 and low_cl >= 75:
                     cloud_near_takeoff_h += 1
 
             # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG)
@@ -1834,13 +1843,21 @@ class WeatherContextMixin:
             except Exception:
                 pass
 
-            # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
-            if (cloud_base_raw is not None
-                    and isinstance(cloud_base_raw, (int, float))
-                    and isinstance(cloud_cover, (int, float))
-                    and cloud_cover >= 75
-                    and cloud_base_raw < elevation_m + 500):
-                warnings.append("[OVERCAST-DANGER]")
+            # OVERCAST-DANGER: dichte, geschlossene Wolkendecke AUF oder UNTER
+            # Startplatzhöhe (Start in die Wolke ODER geschlossene Decke unter mir,
+            # durch die ich zum Landeplatz absteigen müsste). Wolken OBERHALB des
+            # Platzes sind keine Gefahr (nur Thermik-Reducer). Siehe config.py
+            # OVERCAST_DANGER_* + meteo: Open-Meteo low=0-3km, mid=3-8km (MSL).
+            if (isinstance(cloud_base_raw, (int, float))
+                    and cloud_base_raw <= elevation_m + config.OVERCAST_DANGER_BASE_BUFFER_M):
+                # "Decke unter mir" ist immer die tiefe Schicht (Talstratus);
+                # bei hochalpinem Platz liegt der Platz selbst in der mittleren.
+                dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT
+                if (elevation_m >= config.OVERCAST_MID_BAND_MIN_M
+                        and mid_cl >= config.OVERCAST_DANGER_COVER_PCT):
+                    dense_deck = True
+                if dense_deck:
+                    warnings.append("[OVERCAST-DANGER]")
 
             # Thermik-Qualitaets-Tags (Scherung / Zerrissenheit / Boeigkeit).
             # Basis: meteo_research/wind_shear_thermal_quality.md
@@ -2873,13 +2890,18 @@ class WeatherContextMixin:
             high_cl = float(data.get("cloud_cover_high") or 0)
 
             # CLOUDS-Sicht-Aggregation (siehe docs/TAGS.md), Region-Pfad:
+            # STOP-Zähler deckungsgleich mit OVERCAST-DANGER-Gate (dichte Decke
+            # auf/unter Referenzhöhe), WARN = dichte tiefe Wolke knapp darüber.
             if isinstance(cloud_base_raw, (int, float)):
                 if min_cloud_base_active_h is None or cloud_base_raw < min_cloud_base_active_h:
                     min_cloud_base_active_h = cloud_base_raw
-                low_mid_cover = low_cl + mid_cl
-                if cloud_base_raw <= elev_ref + 100 and low_mid_cover >= 90:
+                buf = config.OVERCAST_DANGER_BASE_BUFFER_M
+                dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
+                    elev_ref >= config.OVERCAST_MID_BAND_MIN_M
+                    and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
+                if cloud_base_raw <= elev_ref + buf and dense_deck:
                     cloud_at_or_below_takeoff_h += 1
-                elif elev_ref + 100 < cloud_base_raw <= elev_ref + 300 and low_mid_cover >= 75:
+                elif elev_ref + buf < cloud_base_raw <= elev_ref + 300 and low_cl >= 75:
                     cloud_near_takeoff_h += 1
 
             # Regionen: KEINE Böen (Apr 2026 Refactor).
@@ -3066,13 +3088,16 @@ class WeatherContextMixin:
             except Exception:
                 pass
 
-            # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
-            if (cloud_base_raw is not None
-                    and isinstance(cloud_base_raw, (int, float))
-                    and isinstance(cloud_cover, (int, float))
-                    and cloud_cover >= 75
-                    and cloud_base_raw < elev_ref + 500):
-                warnings.append("[OVERCAST-DANGER]")
+            # OVERCAST-DANGER: dichte, geschlossene Wolkendecke AUF oder UNTER
+            # Referenzhöhe (Decke unter mir = tiefe Schicht; hochalpin zusätzlich
+            # mittlere). Wolken darüber = nur Reducer. Siehe config.OVERCAST_DANGER_*.
+            if (isinstance(cloud_base_raw, (int, float))
+                    and cloud_base_raw <= elev_ref + config.OVERCAST_DANGER_BASE_BUFFER_M):
+                dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
+                    elev_ref >= config.OVERCAST_MID_BAND_MIN_M
+                    and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
+                if dense_deck:
+                    warnings.append("[OVERCAST-DANGER]")
 
             # Thermik-Qualitaets-Tags (Scherung / Zerrissenheit).
             # Regionen: keine Böen → keine ROUGH-Tags, nur SHEAR + TORN.

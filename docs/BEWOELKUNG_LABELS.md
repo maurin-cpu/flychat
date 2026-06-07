@@ -81,12 +81,22 @@ Während >50% der Thermikstunden gilt:
 - Thermik noch vorhanden aber abnehmend
 - Weder Booster noch Reducer — gemischte Bedingungen
 
-### OVERCAST (No-Go, rot) — unverändert
+### OVERCAST (No-Go, rot) — überarbeitet Juni 2026
 
-**Trigger** (deterministisch in chat_engine.py):
-- cloud_cover ≥75% UND cloud_base < elevation + 500m
-- Sicherheits-Tag: Cloud Entry Gefahr, Sicht eingeschränkt
-- Hat nichts mit Thermik-Qualität zu tun, rein Safety
+**Trigger** (deterministisch in `engine/weather_context.py`, 3 Stellen):
+- **Dichte, geschlossene Wolkendecke AUF oder UNTER Startplatzhöhe:**
+  `cloud_base ≤ elevation + 100m` UND geschlossene Decke
+  (`cloud_cover_low ≥ 80%`, bei hochalpinem Platz `elevation ≥ 3000m` zusätzlich `cloud_cover_mid ≥ 80%`).
+- Deckt zwei Gefahren ab: Start direkt in die Wolke **und** geschlossene Decke
+  unter dem Piloten, durch die er zum Landeplatz absteigen müsste.
+- Wolken **oberhalb** des Startplatzes sind KEINE Gefahr (nur Thermik-Reducer) → kein Stop.
+- Schwellen in `config.py`: `OVERCAST_DANGER_BASE_BUFFER_M=100`, `OVERCAST_DANGER_COVER_PCT=80`, `OVERCAST_MID_BAND_MIN_M=3000`.
+- Open-Meteo-Schichten: low 0–3km, mid 3–8km, high >8km (MSL).
+- Hat nichts mit Thermik-Qualität zu tun, rein Safety.
+
+**Frühere Regel (bis Mai 2026):** `cloud_cover ≥75% UND cloud_base < elevation + 500m` —
+flaggte Luftraum bis 500m ÜBER dem Platz fälschlich als not_safe (Confound, siehe
+Scheidegg-2026-06-05-Analyse) und zählte hohe Schichten (high/cirrus) über `cloud_cover` mit.
 
 ---
 
@@ -111,7 +121,7 @@ Bei Konflikt gewinnt immer der Reducer (sicherheitsrelevanter).
 | ~~Produktive Stunde (mittel)~~ | ~~≤90% cloud_cover_mid~~ | **DEPRECATED Mai 2026** | `PRODUCTIVE_MID_CLOUD_MAX` nicht mehr im Productivity-Pfad |
 | Reducer-Label | tief ≥ 80% ODER mittel ≥ 70% | LLM-Label (Sky-Info, kein Rating-Cap) | Skills (flyability, system_chat) |
 | CLOUDS-Tag 'good' | tief ≤ 50% UND mittel ≤ 30% | LLM-Label (Sky-Info) | Skills (templates) |
-| OVERCAST-DANGER | ≥75% total + Basis tief | Deterministisch (Safety, nicht Thermik) | chat_engine.py (3 Stellen) |
+| OVERCAST-DANGER | Basis ≤ elev+100m UND tief ≥80% (hochalpin auch mittel ≥80%) | Deterministisch (Safety, nicht Thermik) | `engine/weather_context.py` (3 Stellen), `config.OVERCAST_DANGER_*` |
 
 **Warum tief und mittel getrennt behandeln?** Tief = Cumulus (humilis/mediocris) sind **Thermik-Marker** — bimodal: 12-50% optimal, ≥80% killt. Mittel = Altostratus/Altocumulus sind **Strahlungs-Dämpfer** — monoton: jedes % Bedeckung reduziert Einstrahlung, kein Sweet Spot. Eine `max(tief, mittel)`-Schwelle würde beide Mechanismen symmetrisch behandeln, was physikalisch falsch ist:
 - Tag mit `tief = 25% Cu` + `mittel = 60% Altostratus` → unter `max = 60%` Neutralzone, aber real „mässige Cu-Thermik mit gedämpfter Einstrahlung"
