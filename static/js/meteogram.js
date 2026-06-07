@@ -772,6 +772,22 @@ window.Meteogram = (function () {
             .attr('height', chartH)
             .style('display', 'block');
 
+        // Diagonal-Schraffur für "Thermik zerrissen" (TORN). Die Säule bleibt
+        // auf voller Höhe; die Schraffur signalisiert nur, dass der Höhenwind
+        // die Thermik zerreisst (siehe weather_context._thermal_quality_tags).
+        var _defs = svg.append('defs');
+        function _tornHatch(id, stroke) {
+            var p = _defs.append('pattern')
+                .attr('id', id).attr('patternUnits', 'userSpaceOnUse')
+                .attr('width', 6).attr('height', 6)
+                .attr('patternTransform', 'rotate(45)');
+            p.append('line')
+                .attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 6)
+                .attr('stroke', stroke).attr('stroke-width', 1.6);
+        }
+        _tornHatch('torn-hatch-deg', 'rgba(180, 83, 9, 0.55)');   // degraded: amber
+        _tornHatch('torn-hatch-unu', 'rgba(159, 18, 57, 0.65)');  // unusable: rose
+
         var chartG = svg.append('g')
             .attr('transform', 'translate(' + MARGIN.left + ', ' + MARGIN.top + ')');
 
@@ -1187,7 +1203,9 @@ window.Meteogram = (function () {
             if (climb <= 0) return;
             var maxAlt = wx.thermik.max_height || (altitudes[altitudes.length - 1] + 200);
             var lclAlt = wx.thermik.lcl || null;  // Wolkenbasis (MSL), ab hier VFR nicht mehr fliegbar
+            var tornLevel = wx.thermik.torn_level || null;  // null | "degraded" | "unusable"
 
+            var thermRiLo = null, thermRiHi = null;  // Vertikale Ausdehnung der Säule (für TORN-Schraffur)
             for (var ri = 0; ri < nRows; ri++) {
                 var alt = altitudes[ri];
                 // Row 0 bei Spots = Startplatz-Kachel. Verwende `elevation` für
@@ -1205,6 +1223,21 @@ window.Meteogram = (function () {
                     .attr('fill', bgColor).attr('rx', 3).attr('opacity', 0.8);
 
                 thermikCells[ri + ',' + ci] = localRate;
+                if (thermRiLo === null) thermRiLo = ri;
+                thermRiHi = ri;
+            }
+
+            // TORN-Schraffur über die volle Säule legen (Höhe unverändert).
+            if (tornLevel && thermRiLo !== null) {
+                var hatchId = tornLevel === 'unusable' ? 'torn-hatch-unu' : 'torn-hatch-deg';
+                var yTop = rowY(thermRiLo) + 1;
+                var yBot = rowY(thermRiHi) + cellH - 1;
+                chartG.append('rect').attr('class', 'therm-torn-overlay')
+                    .attr('x', ci * CELL_W + 1).attr('y', yTop)
+                    .attr('width', CELL_W - 2).attr('height', yBot - yTop)
+                    .attr('fill', 'url(#' + hatchId + ')').attr('rx', 3)
+                    .style('pointer-events', 'none')
+                    .append('title').text('Thermik zerrissen (Höhenwind-Scherung)');
             }
         });
 
@@ -1930,6 +1963,13 @@ window.Meteogram = (function () {
                     var _topLabel = (wx.thermik.lcl && wx.thermik.lcl < wx.thermik.max_height) ? 'Arbeitsh\u00f6he (Basis)' : 'Arbeitsh\u00f6he';
                     html += '<div class="tooltip-row"><span class="tooltip-label">' + _topLabel + '</span><span class="tooltip-value">' + _usableTop + ' m MSL</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">Rating</span><span class="tooltip-value">' + wx.thermik.rating + '</span></div>';
+                    if (wx.thermik.torn_level) {
+                        var _tornTxt = wx.thermik.torn_level === 'unusable'
+                            ? '⚠ zerrissen (Scherung)'
+                            : '⚠ angerissen (Scherung)';
+                        var _tornCol = wx.thermik.torn_level === 'unusable' ? '#9F1239' : '#B45309';
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Thermik</span><span class="tooltip-value" style="color:' + _tornCol + ';font-weight:600">' + _tornTxt + '</span></div>';
+                    }
                 }
                 if (wx.thermik.cape > 0) html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';
             }

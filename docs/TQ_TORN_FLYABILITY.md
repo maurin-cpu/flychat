@@ -189,14 +189,52 @@ liegt bereit; der wahre Wert zeigt sich erst bei tiefen Säulen.
 
 ---
 
-## Offen
+## Offen / Handoff (Stand 2026-06-07)
 
-- **Föhn-Replay (entscheidend für Band-Cap-Wert).** Der Tief-Bucket (>1800 m Säulen) ist im
-  Forecast-Cache leer; ein echter Föhntag würde ihn füllen. Erwartung laut Tiefe-Trend:
-  „% fliegbar darunter" springt deutlich → Band-Cap zündet öfter. Forecast-API liefert keine
-  historischen Föhntage; Föhn-Detektor (`foehn_indicators.py`) existiert → bei nächstem
-  Föhn-Forecast `region_band_cap_potential.py` / `verify_band_cap.py` nachfahren.
-- **Replay über Schwachwind-Lage** vor endgültiger Abnahme (TORN sollte dann →0 gehen).
+### Display: ERLEDIGT (2026-06-07)
+Thermik-Säulen bleiben auf **voller roher Höhe**, KEIN Höhen-Cap im Display. Die Zerrissenheit
+wird als **Diagonal-Schraffur** über die volle Säule gelegt (amber = DEGRADED, rosa = UNUSABLE)
+plus Tooltip „Thermik zerrissen/angerissen (Scherung)". Der Cap wirkt weiterhin NUR rechnerisch
+auf `productive_thermal_h`/`working_height`.
+- Backend: `web.py::format_data_for_charts` ruft `engine._thermal_quality_tags(...)` pro Stunde
+  auf der ROHEN `max_height` (vor Wolken-Cap), try/except-guarded, und setzt
+  `torn`(bool)/`torn_level`(`None|"degraded"|"unusable"`) auf jeden `chart_data["thermik"]`-Eintrag.
+- Frontend: `static/js/meteogram.js` (Pattern-defs `torn-hatch-deg/-unu`, Overlay-Rect in der
+  Thermik-Background-Schleife, Tooltip-Zeile) + `static/js/chat-charts.js` (`drawThermalTimeline`,
+  Pattern `ct-torn-deg/-unu`, Overlay pro Säule). Alte/eingefrorene Caches ohne Feld →
+  `torn_level` undefined → Overlay aus (graceful). Schraffur erscheint erst nach einem neuen
+  Wetterlauf, der das Feld erzeugt.
+
+### NÄCHSTER SCHRITT — Föhn-Test (auf dem Server ausführen, ENTSCHIEDEN: Weg 2 = ERA5-Archiv)
+**Ziel:** Den Band-Cap an einem echten Föhntag mit tiefen Thermiksäulen validieren — der
+entscheidende Fall, der im Forecast-Cache fehlt (Tief-Bucket >1800 m Säulen = leer, Föhn-Lücke).
+
+**Warum blockiert:** Weder `data/weather_archive/*.json` (= Analyse-OUTPUT: Ratings/Tags/foehn_risk,
+KEINE Höhenwinde) noch die Few-Shot `weather_input` (nur Boden-Parameter, kein `*hPa`) speichern die
+rohen Druckflächen-Winde, die der Band-Cap braucht. Föhn-Labels existieren (58 FoehnCaution in
+`data/labeled_examples.jsonl`, stärkster **28.05.** Score 5.9), aber deren Snapshot ist von VOR dem
+10m-Anker-Fix → unbrauchbar.
+
+**Auftrag (Server-Session):**
+1. **ERA5-Druckflächen ziehen:** Open-Meteo `archive-api` (Reanalyse) mit Druckflächen-Winden
+   (mind. 850/700/600/500 hPa; `wind_speed_*hPa` + `geopotential_height_*hPa`, das Format das
+   `_calculate_segment_shear` in `engine/weather_context.py` erwartet) für den **28.05.2026** über
+   die Schweizer Föhn-Spots/-Regionen.
+2. **Föhn-Cache bauen** im selben Format, das der Kontext-/Rating-Pfad und die Capture-Hook-Debug-
+   Skripte lesen (Live-Cache-Shape). Die Diagnostik-Skripte hooken alle auf `_thermal_quality_tags`.
+3. **Band-Cap nachfahren** mit: `region_band_cap_potential.py` (Föhn-Proxy nach Säulen-Tiefe),
+   `spot_band_cap_potential.py`, `verify_band_cap.py`, `test_torn_regions_echtheit.py`.
+4. **Prüfziel:** Bei echtem Föhn → tiefe Säulen → tief sitzender shear-signifikanter Riss
+   (`debug["torn_floor_m"]`) → Band-Cap **rettet** Stunden (senkt `working_height` auf den Riss,
+   statt die Stunde zu killen). Gegencheck: `torn_floor_m` plausibel tief, `torn_kills_hour` selten.
+   Caveat: **ERA5 ≠ ICON** (anderes Modell) → qualitativ, nicht 1:1.
+
+**Branch:** `feat/tq-shear-guard-band-cap` (NICHT auf main gemergt). Server-Session auf diesem Branch
+arbeiten.
+
+### Weitere offene Punkte
+- **Replay über Schwachwind-Lage** vor endgültiger Abnahme (TORN sollte dann → 0 gehen).
+- Doku-Sync: `DECISIONS.md` / `TAGS.md` / `RATING_ARCHITECTURE.md` nachziehen.
 - Diagnostik-Skripte: `list_torn_spots.py`, `list_torn_regions.py`, `test_torn_regions_echtheit.py`,
   `region_band_cap_potential.py` (Föhn-Proxy nach Tiefe), `spot_band_cap_potential.py`,
   `verify_band_cap.py`, `inspect_mittelland_ost.py`.

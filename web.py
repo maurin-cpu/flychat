@@ -3925,6 +3925,31 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                 therm_diagnostics = therm.get("diagnostics", {})
                 therm_warnings = therm.get("data_warnings", [])
 
+            # TORN-Status (Thermik vom Höhenwind zerrissen) für die Anzeige.
+            # Spiegelt die TQ-Tag-Logik der Rating-Pipeline (_thermal_quality_tags,
+            # weather_context.py) auf der ROHEN max_height (vor dem Wolkenbasis-Cap
+            # unten). Reine Anzeige: die Säule bleibt auf voller Höhe, das
+            # Meteogramm markiert nur die zerrissenen Stunden. Die Produktiv-/
+            # Working-Height-Kappung passiert unverändert im Rating-Pfad.
+            torn_level = None
+            if engine is not None and therm_climb and therm_max_h:
+                try:
+                    tq_tags, _tq_dbg = engine._thermal_quality_tags(
+                        wind_speed_10m=data.get("wind_speed_10m"),
+                        wind_gusts_10m=data.get("wind_gusts_10m"),
+                        pl_data=(pressure_level_data or {}).get(timestamp, {}),
+                        elevation_m=elev_ref,
+                        thermal_top_m=therm_max_h,
+                        climb_rate_ms=therm_climb,
+                        region_id=region_id,
+                    )
+                    if "[THERMAL-TORN-UNUSABLE]" in tq_tags:
+                        torn_level = "unusable"
+                    elif "[THERMAL-TORN-DEGRADED]" in tq_tags:
+                        torn_level = "degraded"
+                except Exception:
+                    torn_level = None
+
             # Wolkenbasis + Schichten
             cloud_base = data.get("cloud_base")
             cloud_cover = data.get("cloud_cover")
@@ -3954,6 +3979,10 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     "lcl": therm_lcl,
                     "diagnostics": therm_diagnostics,
                     "data_warnings": therm_warnings,
+                    # Thermik zerrissen (Höhenwind-Scherung) — nur Anzeige-Flag,
+                    # Höhe bleibt unangetastet. None | "degraded" | "unusable".
+                    "torn": torn_level is not None,
+                    "torn_level": torn_level,
                 })
 
             if cloud_base is not None or cloud_cover is not None:

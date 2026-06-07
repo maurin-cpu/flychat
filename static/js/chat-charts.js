@@ -317,6 +317,19 @@ window.ChatCharts = (function () {
             .attr('viewBox', '0 0 ' + width + ' ' + height)
             .attr('preserveAspectRatio', 'xMidYMid meet');
 
+        // Diagonal-Schraffur für "Thermik zerrissen" (TORN) — Säule bleibt voll,
+        // Schraffur signalisiert nur die Höhenwind-Scherung.
+        var defs = svg.append('defs');
+        [['ct-torn-deg', 'rgba(180, 83, 9, 0.55)'], ['ct-torn-unu', 'rgba(159, 18, 57, 0.65)']]
+            .forEach(function (h) {
+                var p = defs.append('pattern').attr('id', h[0])
+                    .attr('patternUnits', 'userSpaceOnUse')
+                    .attr('width', 6).attr('height', 6)
+                    .attr('patternTransform', 'rotate(45)');
+                p.append('line').attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 6)
+                    .attr('stroke', h[1]).attr('stroke-width', 1.6);
+            });
+
         var g = svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
         // X labels
@@ -367,6 +380,24 @@ window.ChatCharts = (function () {
                         .text(rate.toFixed(1));
                 }
             });
+
+            // TORN-Schraffur über die volle Säule dieser Stunde (Höhe bleibt voll).
+            if (d.torn_level) {
+                var rates = altSteps.filter(function (alt) {
+                    return thermalRateAtAltitude(d.climb_rate, d.max_height || maxH, elevation, alt) > 0;
+                });
+                if (rates.length) {
+                    var topAlt = d3.max(rates), botAlt = d3.min(rates);
+                    var yTop = y(topAlt), yBot = y(botAlt) + y.bandwidth();
+                    var hatchId = d.torn_level === 'unusable' ? 'ct-torn-unu' : 'ct-torn-deg';
+                    g.append('rect')
+                        .attr('x', x(d.time)).attr('y', yTop)
+                        .attr('width', x.bandwidth()).attr('height', yBot - yTop)
+                        .attr('fill', 'url(#' + hatchId + ')').attr('rx', 2)
+                        .style('pointer-events', 'none')
+                        .append('title').text('Thermik zerrissen (Höhenwind-Scherung)');
+                }
+            }
         });
 
         // Legend
