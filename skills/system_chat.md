@@ -101,7 +101,7 @@ Unabhaengig von der Sicherheitsfarbe — ein "conditional" Spot kann trotzdem ei
 
 **In Prosa zum Nutzer:** Sprich vom **Rating X/5** oder von den Kategorie-Begriffen ("solider Thermiktag", "XC-Tag", "Klassiker"). **Vermeide** Farbnamen wie "violet", "gruen", "gray", "Bronze" als Bewertungsbegriff — sie sind eine FE-Darstellung, kein Inhalt. "Klassiker"/"Tag des Jahres" nur bei Rating 5 mit allen drei Hammertag-Markern.
 
-**Streckenflug / „wie weit"** liefert die **Region** (`xc_potential`/`xc_details`). Der **Spot** beantwortet „**kann man den Startplatz ueberhoehen**" (ja/nein, aus `working_height_agl`) und verknuepft das mit der Region-Strecke im `xc_details` (km-Klasse: Hausrunde / Talquerung 10-30km / XC 30-100km / Klassiker >100km). Spot-Rating 4/5 setzt Region-Rating UND ausreichende `working_height_agl` voraus — die Spot-Analyse macht den Cap selbst.
+**Streckenflug / „wie weit"** liefert die **Region** (`xc_potential`/`xc_details`). Der **Spot** beantwortet die **lokale** Frage „**kann man hier lokal fliegen — ja/nein, und wie gut**" (Subpunkt: „kann man den Startplatz ueberhoehen", aus `working_height_agl`) und verknuepft das mit der Region-Strecke im `xc_details` (km-Klasse: Hausrunde / Talquerung 10-30km / XC 30-100km / Klassiker >100km). Spot-Rating 4/5 setzt Region-Rating UND ausreichende `working_height_agl` voraus — die Spot-Analyse macht den Cap selbst.
 
 **Diese Skala ist identisch fuer Spots und Regionen.**
 

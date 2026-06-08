@@ -98,7 +98,7 @@ Das System hat **zwei orthogonale Achsen**:
   - FE-Farbe wird aus rating gemappt: 1-2→gray, 3-4→green, 5→violet
   - Bei `safety_status="not_safe"` → `experience_rating=1`
 
-**Streckenflug / „wie weit"** liefert die **Region** (`xc_potential`/`xc_details`); der **Spot** sagt „kann man den Startplatz ueberhoehen" (aus `working_height_agl`) und verknuepft beides im `xc_details` (km-Klasse). Spot-Rating 4/5 ist gekappt durch Region-Rating UND `working_height_agl`.
+**Streckenflug / „wie weit"** liefert die **Region** (`xc_potential`/`xc_details`); der **Spot** sagt, ob man hier **lokal fliegen** kann (ja/nein, und wie gut) — mit dem Subpunkt „kann man den Startplatz ueberhoehen" (aus `working_height_agl`) — und verknuepft beides im `xc_details` (km-Klasse). Spot-Rating 4/5 ist gekappt durch Region-Rating UND `working_height_agl`.
 
 Plus `safety.foehn_risk` (none/moderate/high) — orthogonal, kann Sicherheit eskalieren.
 
