@@ -836,6 +836,13 @@ WIND_IDEAL_MAX_KMH = 20         # km/h — ab diesem: ueber Komfortzone (= WIND_
 CLEAN_WINDOW_MIN_HOURS = 2       # h — unterhalb: not_safe
 CLEAN_WINDOW_GREEN_HOURS = 2     # h — ab hier: safe/green moeglich
 
+# Bei Flaute ist die Windrichtung bedeutungsloses Rauschen (Thermik-/Talwind-
+# Drehen, kein Gradient) — unter dieser Schwelle kann man aus jeder Richtung
+# starten, die Sektor-Pruefung wird uebersprungen (immer WIND-OK). Deckt sich mit
+# der Nullwind-Grenze (Abhebe-Airspeed ~30 km/h; <5 km/h aendert das Laufen kaum)
+# und WIND_IDEAL_MIN_KMH. Siehe xcontest_validation/I013_DIAGNOSE.md (Hebel A).
+WIND_DIRECTION_IRRELEVANT_BELOW_KMH = 5   # km/h — darunter: Richtung egal, immer WIND-OK
+
 # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade):
 # Erfasst den groessten Richtungsdreher innerhalb eines gleitenden Fensters von
 # bis zu WIND_DIRECTION_SWING_WINDOW_H Stunden — sowohl abrupte 1h-Spruenge als

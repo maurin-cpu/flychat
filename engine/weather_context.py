@@ -614,8 +614,8 @@ class WeatherContextMixin:
                     else:
                         sunshine_str += f", {int(round(swr_raw))} W/m²"
 
-                # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG)
-                is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"])
+                # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG; bei Flaute Richtung egal)
+                is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"], wind_speed=wind_speed)
                 wind_status = "[WIND-OK]" if is_ok else "[WIND-WRONG]"
 
                 warnings = []
@@ -1519,6 +1519,7 @@ class WeatherContextMixin:
         hour_lines: list[tuple[int, str]] = []
         wind_ok_hours = []
         wind_wrong_hours = []
+        calm_dir_hours = []    # WIND-OK NUR weil Flaute (Richtung passt eigentlich nicht)
         clean_hours = []       # WIND-OK ohne harte Warnungen
         warned_hours = []      # WIND-OK aber mit harten Warnungen (GUST/ALOFT/RAIN/CAPE)
         hourly_gusts = {}      # hour_str → gust value für Trend-Analyse
@@ -1657,9 +1658,20 @@ class WeatherContextMixin:
                 elif elevation_m + 100 < cloud_base_raw <= elevation_m + 300 and low_mid_cover >= 75:
                     cloud_near_takeoff_h += 1
 
-            # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG)
-            is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"])
+            # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG; bei Flaute Richtung egal)
+            is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"], wind_speed=wind_speed)
             wind_status = "[WIND-OK]" if is_ok else "[WIND-WRONG]"
+            # Flaute-Override sichtbar machen (I-013 Hebel A): Stunde ist NUR startbar,
+            # weil der Wind zu schwach ist — die Richtung passt eigentlich nicht. Fuer
+            # die Flugeinschaetzung relevant (Boeen koennen aus beliebiger Richtung kommen).
+            calm_dir_override = (
+                is_ok
+                and isinstance(wind_speed, (int, float))
+                and wind_speed < config.WIND_DIRECTION_IRRELEVANT_BELOW_KMH
+                and not self._is_wind_in_range(wind_dir, spot["windrichtung"])
+            )
+            if calm_dir_override:
+                wind_status += " [WIND-CALM]"
 
             warnings = []
 
@@ -1694,6 +1706,8 @@ class WeatherContextMixin:
                 hourly_wind_dirs[hour_str] = wind_dir
             if is_ok:
                 wind_ok_hours.append(hour_str)
+                if calm_dir_override:
+                    calm_dir_hours.append(hour_str)
             else:
                 wind_wrong_hours.append(hour_str)
 
@@ -2201,6 +2215,19 @@ class WeatherContextMixin:
             lines.append(
                 f"WIND-OK-Stunden mit harten Warnungen ({len(warned_hours)}): "
                 f"{', '.join(warned_hours)} (gehoeren NICHT ins safe_window)"
+            )
+
+        # Flaute-Startbarkeit (I-013 Hebel A): Stunden, die NUR startbar sind, weil der
+        # Wind zu schwach ist (Richtung passt eigentlich nicht). Muss in der
+        # Flugeinschaetzung erwaehnt werden (analog Richtungsdreher-Anmerkung).
+        if calm_dir_hours:
+            lines.append(
+                f"→ FLAUTE-STARTBAR ({len(calm_dir_hours)}h): {', '.join(calm_dir_hours)} "
+                f"sind startbar NUR weil der Wind < {config.WIND_DIRECTION_IRRELEVANT_BELOW_KMH} km/h ist "
+                f"(Richtung waere sonst ausserhalb des Sektors). In der Flugeinschaetzung/summary "
+                f"ERWAEHNEN: Start bei (nahezu) Flaute moeglich, aber Boeen und Thermik koennen "
+                f"aus beliebiger Richtung kommen — beim Aufziehen/Start besonders aufpassen. "
+                f"KEIN Status-Downgrade, reine Hinweis-Info."
             )
 
         # Richtungsdreher-Anmerkung (nur wind_summary, KEIN Status-Downgrade)

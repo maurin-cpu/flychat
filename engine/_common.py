@@ -664,6 +664,7 @@ _TAG_NATURAL = [
     ("WIND-DANGER",            "starker Wind"),
     ("WIND-WARN",              "maessiger Wind"),
     ("WIND-WRONG",             "falsche Windrichtung"),
+    ("WIND-CALM",              "Wind zu schwach – Richtung egal, Start moeglich"),
     ("WIND-OK",                "passende Windrichtung"),
     # Sonstiges
     ("RAIN-WARN",              "Regen"),

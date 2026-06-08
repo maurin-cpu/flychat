@@ -542,13 +542,21 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
             })
         return {"type": "FeatureCollection", "features": features}
 
-    def _is_wind_in_range(self, wind_dir, sector_str, buffer=None):
+    def _is_wind_in_range(self, wind_dir, sector_str, buffer=None, wind_speed=None):
         """Prüft ob Windrichtung im erlaubten Sektor liegt.
 
         buffer: Absolute Toleranz in Grad pro Sektorgrenze. `None` (default) →
         Toleranz wird aus `config.WIND_DIRECTION_TOLERANCE_PCT` (Prozent der
         Sektorbreite) berechnet und für jeden Sektor separat skaliert.
+
+        wind_speed: Bodenwind (km/h). Bei Flaute (< WIND_DIRECTION_IRRELEVANT_
+        BELOW_KMH) ist die Richtung bedeutungsloses Rauschen — man kann aus jeder
+        Richtung starten → immer WIND-OK. Siehe I013_DIAGNOSE.md (Hebel A).
         """
+        if (isinstance(wind_speed, (int, float))
+                and wind_speed < config.WIND_DIRECTION_IRRELEVANT_BELOW_KMH):
+            return True
+
         if not isinstance(wind_dir, (int, float)) or not sector_str:
             return True # Fallback: LLM soll entscheiden wenn Daten fehlen
 

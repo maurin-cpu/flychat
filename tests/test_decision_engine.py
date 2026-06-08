@@ -1063,5 +1063,41 @@ class TestBuildTopicTagsTurbulence(unittest.TestCase):
         self.assertEqual(turb[0]["severity"], "reducer")
 
 
+class TestCalmWindDirectionBypass(unittest.TestCase):
+    """I-013 Hebel A: bei Flaute (< WIND_DIRECTION_IRRELEVANT_BELOW_KMH km/h) ist
+    die Windrichtung bedeutungsloses Rauschen -> immer WIND-OK. Sichtbar gemacht
+    via [WIND-CALM]-Marker + FLAUTE-STARTBAR-Hinweis, damit die Flugeinschaetzung
+    es erwaehnt (Boeen koennen aus beliebiger Richtung kommen).
+    """
+    def setUp(self):
+        from pathlib import Path
+        from chat_engine import GleitcastEngine
+        # __new__: _is_wind_in_range braucht nur config + _parse_wind_range,
+        # kein teurer __init__/CSV-Load noetig.
+        self.eng = GleitcastEngine.__new__(GleitcastEngine)
+        self.src = Path("engine/weather_context.py").read_text(encoding="utf-8")
+
+    def test_calm_wind_overrides_wrong_direction(self):
+        import config
+        sector = "SW"  # ~180-270 grad
+        thr = config.WIND_DIRECTION_IRRELEVANT_BELOW_KMH
+        # Richtung klar ausserhalb (N=0 grad), aber Flaute -> WIND-OK
+        self.assertTrue(self.eng._is_wind_in_range(0, sector, wind_speed=thr - 1))
+        # gleiche falsche Richtung, aber Wind >= Schwelle -> WIND-WRONG (altes Verhalten)
+        self.assertFalse(self.eng._is_wind_in_range(0, sector, wind_speed=thr + 1))
+        # Schwelle ist strikt (<): genau thr zaehlt die Richtung schon wieder
+        self.assertFalse(self.eng._is_wind_in_range(0, sector, wind_speed=thr))
+        # ohne wind_speed -> unveraendertes Richtungs-only-Verhalten
+        self.assertFalse(self.eng._is_wind_in_range(0, sector))
+        self.assertTrue(self.eng._is_wind_in_range(225, sector))
+
+    def test_calm_override_surfaced_for_flight_assessment(self):
+        # Der Flaute-Override muss LLM-sichtbar sein (Marker + Hinweis), sonst
+        # kann die Flugeinschaetzung ihn nicht erwaehnen.
+        self.assertIn("calm_dir_override", self.src)
+        self.assertIn("[WIND-CALM]", self.src)
+        self.assertIn("FLAUTE-STARTBAR", self.src)
+
+
 if __name__ == "__main__":
     unittest.main()
