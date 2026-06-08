@@ -51,7 +51,12 @@ Decision-Engine setzt `is_conditional` deterministisch:
 - `safety_status == "not_safe"` → `is_conditional = false`
 
 Du setzt `is_conditional = true` selbst NUR wenn `safety_status = "safe"` UND:
-1. **Tiefe Wolkenbasis**: Basis < Startplatz + 500m UND Bedeckung ≥ 75%
-2. **Starke Hoehen-Turbulenz**: T > W + 10 km/h in produktiven Hoehen
+1. **Starke Hoehen-Turbulenz**: T > W + 10 km/h in produktiven Hoehen
+
+Wolkenbasis nahe/über dem Startplatz ist KEIN conditional-Grund mehr (Status bleibt
+grün). Eine tiefe Decke knapp über Platz erzeugt deterministisch ein CLOUDS-`reducer`-
+Tag ("Basis nahe Startplatz") — fliegbar, nur eingeschränkte Arbeitshöhe; die Abstufung
+machst du über das Rating, nicht über den Status. Eine geschlossene Decke AUF/UNTER
+Platz ist bereits deterministisch `not_safe` (OVERCAST-DANGER), kommt hier nicht an.
 
 Bei `experience_rating ≤ 2`: `is_conditional = false` (Schwach-Tag ist keine Bedingt-Fliegbar-Situation).

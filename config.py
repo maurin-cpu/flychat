@@ -789,6 +789,29 @@ PRODUCTIVE_CLOUD_MAX = 80       # % — DEPRECATED, behalten fuer Abwaertskompat
 PRODUCTIVE_HOURS_FOR_GREEN = 4  # Mindest-Stunden fuer gray->green Upgrade
 PRODUCTIVE_HOURS_DOWNGRADE = 2  # Untere Schwelle: green/violet -> gray
 
+# ─── OVERCAST-DANGER (Sicherheits-Gate, killt clean_hours → not_safe) ───
+# Gefahr = dichte, geschlossene Wolkendecke AUF oder UNTER Startplatzhoehe:
+#   - "Start in die Wolke" (Decke auf Platzhoehe) ODER
+#   - "Decke unter mir, komme nicht sicher zum Landeplatz runter" (Talstratus).
+# Wolken OBERHALB des Platzes sind KEINE Gefahr (nur Thermik-Reducer) → kein Stop.
+# Open-Meteo-Schichten (verifiziert): low 0-3km, mid 3-8km, high >8km, MSL.
+# Fuer "Decke unter mir" zaehlt immer die TIEFE Schicht (Talstratus ist low);
+# bei hochalpinem Startplatz (elev >= MID_BAND_MIN) liegt der Platz selbst in der
+# mittleren Schicht → dann zaehlt zusaetzlich cloud_cover_mid.
+# Hergeleitet aus Scheidegg-2026-06-05-Analyse: alte Regel (base<elev+500 AND
+# total_cover>=75) flaggte Luftraum 464m UEBER dem Platz faelschlich als not_safe.
+OVERCAST_DANGER_BASE_BUFFER_M = 100   # m — Decke gilt als "auf Platzhoehe" bis elev+dies
+OVERCAST_DANGER_COVER_PCT = 80        # % — ab dieser Bedeckung = geschlossene Decke
+OVERCAST_MID_BAND_MIN_M = 3000        # m — ab hier liegt der Platz in der mittleren Schicht
+
+# ─── CLOUDS-Reducer-Zone (Flyability, KEIN Stop) ───
+# Wolkenbasis ueber dem Startplatz, aber nicht hoch (BASE_BUFFER..REDUCER_BASE_MAX):
+# fliegbar, aber eingeschraenkte Arbeitshoehe → CLOUDS-`reducer`-Tag (Label
+# "Basis nahe Startplatz"), Status bleibt gruen. Darueber: kein Effekt. Darunter
+# (auf/unter Platz, dicht): OVERCAST-DANGER (Stop). Nur wenn tiefe Decke vorhanden.
+OVERCAST_REDUCER_BASE_MAX_M = 400     # m — obere Grenze der Reducer-Zone ueber Platz
+OVERCAST_REDUCER_COVER_PCT = 75       # % — Mindest-tiefe-Bedeckung fuer Reducer
+
 # Violett-Kriterien (XC-Tag). LLM entscheidet final, aber TAGESPROFIL zeigt diese
 # Schwellen als Violett-Kandidat-Hint. Research: meteo_research/cloud_cover_thermal_impact.md
 # - Wolken-Maxima 50/50 matchen FAA-Daempfungsgrenze: darueber beginnt signifikante

@@ -132,7 +132,7 @@ Quelle: Mosailes XC Weather Conditions Guide; Flybubble "Into the Blue" XC Guide
 ### Cumulus/Stratus (tief, <3000m)
 - **Qualitäts-Effekt**: Cu 12-50% = Thermik-Booster (siehe oben)
 - **Qualitäts-Effekt**: >80% = Sonne blockiert, Thermik stirbt
-- **Sicherheits-Effekt**: Wolkenbasis < Elevation + 500m = OVERCAST-DANGER (Cloud Entry)
+- **Sicherheits-Effekt**: geschlossene Decke (tief ≥80%) mit Basis ≤ Elevation + 100m = OVERCAST-DANGER (Cloud Entry / Decke unter Pilot; überarbeitet Juni 2026, vorher base<elev+500 & total≥75)
 
 ### Entscheidende Metrik
 **max(tief, mittel)** — nicht die Gesamtbewölkung! Hohe Bewölkung wird ignoriert.

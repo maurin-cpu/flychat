@@ -48,7 +48,7 @@
     <table width="100%"><tr>
       <td valign="middle">
         <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:{{ verdict.day.tier_color }};margin-bottom:2px;">
-          Top &middot; {{ verdict.day.label.long }}
+          Bester Tag &middot; {{ verdict.day.label.long }}
         </div>
         <div class="ds-text" style="font-size:17px;font-weight:700;color:#0f172a;line-height:1.25;">
           {% if verdict.spot %}{{ verdict.spot.spot }}{% if verdict.spot.window %} <span style="font-weight:500;color:#475569;">&middot; {{ verdict.spot.window }}</span>{% endif %}{% endif %}
@@ -90,7 +90,7 @@
         </td>
         {% endfor %}
         <td align="right" class="ds-muted" style="padding:6px 0 6px 8px;font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.04em;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">
-          Best
+          Beste
         </td>
       </tr>
       {# Daten-Zeilen #}

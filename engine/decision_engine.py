@@ -905,11 +905,12 @@ def build_topic_tags(result: dict, gust_info: dict, tq: dict) -> list:
             "THUNDERSTORM", thunder_sev, "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
         ))
 
-    # ── CLOUDS — Sicherheits-Branch (STOP/WARN) ──────────────────────
-    # Wolken auf/unter Startplatzhoehe mit hoher Bedeckung sind ein
-    # Sicherheitsthema (Sicht/IFR, Startplatz "in den Wolken").
-    # REDUCER (Bewoelkung daempft Thermik) und GOOD (klarer Himmel) liefert
-    # das LLM via llm_tags — siehe Hybrid-Matrix in docs/TAGS.md.
+    # ── CLOUDS — STOP (Safety) + REDUCER (Basis nahe Platz) ──────────
+    # STOP: dichte Decke auf/unter Startplatz (Sicht/IFR, "in den Wolken").
+    # REDUCER: tiefe Decke knapp ÜBER Platz (Basis nahe Startplatz) →
+    # eingeschränkte Arbeitshöhe, fliegbar/grün, KEIN Status-Downgrade.
+    # CLOUDS-REDUCER (Bedeckung daempft Thermik) und GOOD liefert zusätzlich
+    # das LLM via llm_tags — Merge nimmt pro Topic die höchste Severity.
     cloud_at_or_below_h = int(gi.get("cloud_at_or_below_takeoff_h", 0) or 0)
     cloud_near_h = int(gi.get("cloud_near_takeoff_h", 0) or 0)
     cloud_base_min = gi.get("min_cloud_base_active_h")
@@ -927,8 +928,8 @@ def build_topic_tags(result: dict, gust_info: dict, tq: dict) -> list:
             value = f"Basis {int(cloud_base_min)}m nahe Startplatz {int(elev)}m"
         else:
             value = "Wolkenrand am Startplatz"
-        tags.append(_make_tag("CLOUDS", "warn", "Bewoelkung", value, time))
-    # CLOUDS reducer/good kommen vom LLM (siehe llm_tags-Pipeline).
+        tags.append(_make_tag("CLOUDS", "reducer", "Bewoelkung", value, time))
+    # CLOUDS good (+ Bedeckungs-reducer) kommen zusätzlich vom LLM (llm_tags).
 
     # ── THERMAL / XC / BASE / INVERSION / WINDOW / SUNSHINE / CONVERGENCE ─
     # Hybrid v5 (siehe docs/TAGS.md): Diese Topics liefert das LLM via
@@ -1055,9 +1056,9 @@ def build_region_topic_tags(result: dict, gust_info: dict) -> list:
             "THUNDERSTORM", thunder_sev, "Gewitter", "Modell-Gewitter", f"{thunder_h}h"
         ))
 
-    # ── CLOUDS — Sicherheits-Branch (STOP/WARN), Region-Pfad ─────────
+    # ── CLOUDS — STOP (Safety) + REDUCER (Basis nahe Ref), Region-Pfad ─
     # Region nutzt elev_ref als Referenz fuer "Startplatz" — gleiche Logik
-    # wie Spot-Pfad. REDUCER/GOOD weiterhin LLM-Sache via llm_tags.
+    # wie Spot-Pfad. CLOUDS-Bedeckungs-reducer/GOOD zusätzlich via llm_tags.
     cloud_at_or_below_h = int(gi.get("cloud_at_or_below_takeoff_h", 0) or 0)
     cloud_near_h = int(gi.get("cloud_near_takeoff_h", 0) or 0)
     cloud_base_min = gi.get("min_cloud_base_active_h")
@@ -1075,7 +1076,7 @@ def build_region_topic_tags(result: dict, gust_info: dict) -> list:
             value = f"Basis {int(cloud_base_min)}m nahe Region-Ref {int(elev)}m"
         else:
             value = "Wolkenrand auf Region-Hoehe"
-        tags.append(_make_tag("CLOUDS", "warn", "Bewoelkung", value, time))
+        tags.append(_make_tag("CLOUDS", "reducer", "Bewoelkung", value, time))
 
     # XC / BASE / THERMAL etc. liefert das LLM via result["llm_tags"] (Hybrid v5).
 

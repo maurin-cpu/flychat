@@ -205,7 +205,39 @@ auf `productive_thermal_h`/`working_height`.
   `torn_level` undefined → Overlay aus (graceful). Schraffur erscheint erst nach einem neuen
   Wetterlauf, der das Feld erzeugt.
 
-### NÄCHSTER SCHRITT — Föhn-Test (auf dem Server ausführen, ENTSCHIEDEN: Weg 2 = ERA5-Archiv)
+### Föhn-Test: ERLEDIGT (2026-06-07, Server-Session) — Band-Cap auf echtem Föhn validiert ✅
+
+**Ergebnis:** Der Band-Cap rettet auf einem echten Föhntag (2026-06-04, 29 Regionen) **6 von 37**
+TORN-gegateten Produktiv-Region-Stunden (Prättigau-Davos ×5, Berner Oberland ×1; z.B. Riss@1965m,
+265 m fliegbar darunter, Roh-Top 2324 m, climb 1.8). 19 % (11/59) der gerissenen Stunden haben ein
+fliegbares Band darunter (am windstillen Kontrolltag: 0 %), Riss sitzt höher (median rel 0.23, teils
+0.5–0.58) — genau die Föhn-Geometrie, die der Band-Cap adressiert. TORN-Echtheit auf der 2. (Föhn-)
+Wetterlage bestätigt: 72 Fälle, **92 % shear-getrieben**. Band-Cap strikt relaxierend (nur kills→saves).
+
+**Kontrolltag windstill (2026-05-26, max Höhenwind 19 km/h):** **0 TORN-Fälle, 0 Saves** — kein
+Fehlalarm bei Flaute. Signal skaliert sauber mit der Wetterlage (Föhn 72 / Flaute 0).
+
+**Zwei Abweichungen vom ursprünglichen Plan (beide nötig, geprüft):**
+1. **ERA5-Archiv ist eine Sackgasse:** open-meteo `archive-api` liefert für aktuelle Tage NULL
+   Druckflächen-Winde (Reanalyse-Lag, null sogar zurück bis Jan 2026). Stattdessen **Forecast-API**
+   (`api.open-meteo.com`) mit explizitem start/end_date → volle non-null Höhenwinde (best_match,
+   ~ICON/IFS, qualitativ). 
+2. **28.05 ist KEIN Föhntag:** der FoehnCaution-Score 5.9 war ein Forecast, der sich nicht
+   bewahrheitete — reale Höhenwinde schwach aus N/NE, CAPE 80, 0 Föhn-Stunden. Echter Föhntag der
+   letzten 3 Monate = **2026-06-04** (700 hPa Süd, 40 km/h).
+
+**Caveat (konservativ):** Die Test-Caches lassen das P75-`thermals_spotmedian`-Override weg → Region-
+Säulen ~370 m flacher als live → die 6 Saves / 19 % sind ein **Unterwert**. 06-04 war zudem nur
+moderater Föhn — Sturm-Föhn (60–100 km/h) dürfte mehr/höhere Risse liefern.
+
+**Tooling (reproduzierbar, Live-Cache `wetterdaten.json` unangetastet):**
+`debug_scripts/build_foehn_cache.py <DATE> [regions-only]` baut `data/foehn_cache_<DATE>.json` im
+Live-Cache-Format (Median über reference_points, TZ Europe/Zurich). `run_foehn_diagnostics.py <DATE>`
+biegt `config.WEATHER_JSON_PATH` darauf um und fährt die 4 Skripte. Mit `.venv/bin/python` laufen.
+
+---
+
+### (Original-Auftrag, zur Nachvollziehbarkeit) Föhn-Test — Weg 2 = ERA5-Archiv (verworfen, s.o.)
 **Ziel:** Den Band-Cap an einem echten Föhntag mit tiefen Thermiksäulen validieren — der
 entscheidende Fall, der im Forecast-Cache fehlt (Tief-Bucket >1800 m Säulen = leer, Föhn-Lücke).
 
@@ -233,7 +265,8 @@ rohen Druckflächen-Winde, die der Band-Cap braucht. Föhn-Labels existieren (58
 arbeiten.
 
 ### Weitere offene Punkte
-- **Replay über Schwachwind-Lage** vor endgültiger Abnahme (TORN sollte dann → 0 gehen).
+- **Replay über Schwachwind-Lage:** ERLEDIGT (2026-05-26, TORN → 0, s.o.). Optional noch ein
+  Sturm-Föhntag (60–100 km/h) für den oberen Nutzwert.
 - Doku-Sync: `DECISIONS.md` / `TAGS.md` / `RATING_ARCHITECTURE.md` nachziehen.
 - Diagnostik-Skripte: `list_torn_spots.py`, `list_torn_regions.py`, `test_torn_regions_echtheit.py`,
   `region_band_cap_potential.py` (Föhn-Proxy nach Tiefe), `spot_band_cap_potential.py`,
