@@ -1,0 +1,118 @@
+# wahrscheinliche not_safe->safe Flips (trocken, kein Hoehenwind-Stop)
+2026-06-07  Allmenalp (Kandersteg)                      1758m
+2026-06-07  Artelengrat-2180                            2180m
+2026-06-07  Axalp                                       1590m
+2026-06-07  Beichlen-1730                               1730m
+2026-06-07  Biel-Raemsenberg-1620                       1620m
+2026-06-07  Brigels                                     2171m
+2026-06-07  Bruniswald                                  1580m
+2026-06-07  Chur - Montalin -2260                       2260m
+2026-06-07  Davos - Schiahorn -2700                     2700m
+2026-06-07  Davos - Strela -2440                        2440m
+2026-06-07  Davos - Weissfluhgipfel -2820               2808m
+2026-06-07  Ebenalp (Appenzell- Wasserauen)             1598m
+2026-06-07  Elsighorn-2100                              2100m
+2026-06-07  Engelberg -Fuerenalp                        1901m
+2026-06-07  Engelberg -Titlis                           2543m
+2026-06-07  Gamperstock                                 2270m
+2026-06-07  Garmil                                      2000m
+2026-06-07  Geissstock-1960                             1960m
+2026-06-07  Gibel-2030                                  2030m
+2026-06-07  Graitery                                    1188m
+2026-06-07  Grammont                                    2147m
+2026-06-07  Grindelwald - First                         2111m
+2026-06-07  Grosse Chrinne                              1830m
+2026-06-07  Gsteig-1450                                 1450m
+2026-06-07  Hochstuckli                                 1480m
+2026-06-07  Hoher Kasten                                1671m
+2026-06-07  Hohmad                                      1920m
+2026-06-07  Hohmattli-1770                              1770m
+2026-06-07  Hohwald                                     1585m
+2026-06-07  Ilgisalp                                    1680m
+2026-06-07  Iselten                                     1830m
+2026-06-07  Kronberg (Appenzell- Jakobsbad)             1636m
+2026-06-07  Käserstatt                                  1820m
+2026-06-07  La Videmanette-2120                         2120m
+2026-06-07  La Videmanette-2180                         2180m
+2026-06-07  Lally                                       1236m
+2026-06-07  Laubersgrat                                 2300m
+2026-06-07  Linderenalp-1540                            1540m
+2026-06-07  Lungern Hütstett                            1720m
+2026-06-07  Monte Bar                                   1587m
+2026-06-07  Mostelegg                                   1270m
+2026-06-07  Musenalp                                    1750m
+2026-06-07  Muttnerhorn                                 2400m
+2026-06-07  Männlichen Station                          2220m
+2026-06-07  Möntschelealp                               1410m
+2026-06-07  Niesen-2280                                 2254m
+2026-06-07  Ob Mus                                      1360m
+2026-06-07  Ober Egg                                    1580m
+2026-06-07  Obsaum                                      1800m
+2026-06-07  Palfries                                    1746m
+2026-06-07  Pfaffen                                     1930m
+2026-06-07  Pischa                                      2570m
+2026-06-07  Pra de Cray                                 2083m
+2026-06-07  Riedersegg                                  2200m
+2026-06-07  Riein                                       1710m
+2026-06-07  Riggisalp                                   1450m
+2026-06-07  Rigi-Staffelhöhe                            1555m
+2026-06-07  Rinderalp-1820                              1820m
+2026-06-07  Ryharts                                     1850m
+2026-06-07  Sasso della Guardia                         2040m
+2026-06-07  Schallenberg                                1208m
+2026-06-07  Scharti                                     1570m
+2026-06-07  Tsermont                                    2139m
+2026-06-07  Turren                                      1560m
+2026-06-07  Vanil du Van                                1966m
+2026-06-07  Vilan -Gipfel                               2350m
+2026-06-07  Vilan -Älpli                                1861m
+2026-06-07  Vounetz-1620                                1620m
+2026-06-07  Walegg                                      1980m
+2026-06-07  Walpersbärgli                               1900m
+2026-06-07  Wandelen-2100                               2100m
+2026-06-07  Wangs -Pizolbahn Endstation                 2139m
+2026-06-07  Wannelen                                    1620m
+2026-06-07  Widdersgrind-2020                           2020m
+2026-06-07  Wirzweli-Horn                               1470m
+2026-06-07  Wissberg                                    2200m
+2026-06-07  Wängihorn                                   1920m
+2026-06-07  Ziebeln                                     1900m
+2026-06-08  Braemabuehl                                 2490m
+2026-06-08  Capanna Albagno                             1858m
+2026-06-08  Carì, Lago di Pro da Lèi                    2293m
+2026-06-08  Corno di Gesero                             2181m
+2026-06-08  Laghet de Sambrog                           2067m
+2026-06-08  Monte Tamaro -Alpe Foppa                    1520m
+2026-06-09  Arni                                        1290m
+2026-06-09  Artelengrat-2180                            2180m
+2026-06-09  Campel Alt, Passo di                        2039m
+2026-06-09  Capanna Albagno                             1858m
+2026-06-09  Carì, Lago di Pro da Lèi                    2293m
+2026-06-09  Corno di Gesero                             2181m
+2026-06-09  Crete de Thyon-2060 (Veysonnaz)             2060m
+2026-06-09  Crete de Thyon-2380                         2380m
+2026-06-09  Elsighorn-2100                              2100m
+2026-06-09  Engstligenalp                               1960m
+2026-06-09  Gastlosen                                   1555m
+2026-06-09  Grap Neir-2430                              2430m
+2026-06-09  Göscheneralpsee                             1725m
+2026-06-09  Hotel Weisshorn (St.Luc)                    2320m
+2026-06-09  Laghet de Sambrog                           2067m
+2026-06-09  Mont Noble-2440                             2440m
+2026-06-09  Montana - Bella Lui                         2510m
+2026-06-09  Männlichen Station                          2220m
+2026-06-09  Platta Cotschna-1580                        1580m
+2026-06-09  Sasso della Guardia                         2040m
+2026-06-09  Tgant Son Martegn-2330                      2330m
+2026-06-09  Tgant Son Martegn-2460                      2460m
+2026-06-09  Ulrichergale-2100                           2140m
+2026-06-09  Verbier - Croix de Coeur_Savolyeres         2166m
+2026-06-09  Wispile Mitte                               1640m
+2026-06-09  Wispile-1900 (Saanen- Gstaad)               1870m
+2026-06-10  Crete de Thyon-2380                         2380m
+2026-06-10  Dent de Jaman (Rochers de Naye)             1738m
+2026-06-10  Rinderhalte                                 2660m
+2026-06-10  Rinderhütte-2500                            2500m
+2026-06-10  Spielboden                                  2500m
+2026-06-11  Darlux-2020                                 2020m
+2026-06-11  Gamperstock                                 2270m

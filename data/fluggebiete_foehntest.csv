@@ -1,0 +1,5 @@
+region,fluggebiet,site_name,latitude,longitude,elevation_m,wind_N,wind_NE,wind_E,wind_SE,wind_S,wind_SW,wind_W,wind_NW,slope_azimuth,slope_angle,kritischer_foehn,terrain_type,analyse_region,bemerkungen_flug,bemerkungen_sicherheit
+Berneroberland,Grindelwald,Grindelwald - First,46.657100,8.055270,2111,1,0,1,0,0,1,1,1,,,Beide,alpen,Berner Voralpen,"Großer Startplatz geeignet für alle Niveaus, einfacher Zugang mit Gondel von Grindelwald, auch Landung oben möglich.",
+Graubünden,Fanas,Fanas -Hörnli -Eggli,47.000500,9.684000,1788,0,0,1,1,1,1,1,0,,,Beide,alpen,Prättigau - Davos,"Hauptstartplätze: 'Eggli' (1650 m) und 'Hoernli' (1800 m), beide einfach und groß. Alternatives: 'Mast 4' (bevorzugt von HG, mit Auto erreichbar) und 'Plandadein' (nur außerhalb der Vegetationsperiode, wird erst am späten Nachmittag aktiv).",'Plandadein' nur außerhalb der Vegetationsperiode nutzbar.
+Tessin,Alpe del Caviano,Alpe del Caviano,45.878000,9.008560,1012,0,0,0,0,0,1,0,0,,,Nord,alpen,Tessin Zentral,,
+Berneroberland,Interlaken,Amisbuehl,46.702200,7.823060,1310,0,0,0,1,0,0,0,0,,,Beide,alpen,Berner Voralpen,,
