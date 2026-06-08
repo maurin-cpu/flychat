@@ -1,4 +1,4 @@
-GLEITCAST — Bestaetige dein Abo
+WINGCAST — Bestaetige dein Abo
 
 Hallo {{ email }},
 
@@ -9,7 +9,7 @@ Link zum Bestaetigen:
 {{ urls.confirm }}
 
 Nach der Bestaetigung bekommst du an deinen gewaehlten Wochentagen morgens
-einen personalisierten Gleitcast mit den besten Flugtagen fuer deine Regionen.
+einen personalisierten Wingcast mit den besten Flugtagen fuer deine Regionen.
 
 --
 Du hast dieses Abo nicht angefordert? Dann ignoriere diese E-Mail einfach —

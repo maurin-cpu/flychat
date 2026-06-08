@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gleitcast KW{{ kw }}</title>
+<title>Wingcast KW{{ kw }}</title>
 <style>
   @media (prefers-color-scheme: dark) {
     body { background-color: #0f172a !important; }
@@ -27,7 +27,7 @@
 
 <!-- Preheader (versteckt, erscheint in Inbox-Preview) -->
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-{% if verdict %}{{ verdict.headline }}{% else %}Dein Flugwetter-Gleitcast{% endif %} &mdash; {{ briefing_weekday }}, {{ briefing_date }}
+{% if verdict %}{{ verdict.headline }}{% else %}Dein Flugwetter-Wingcast{% endif %} &mdash; {{ briefing_weekday }}, {{ briefing_date }}
 </div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1f5f9" style="background-color:#f1f5f9;">
@@ -37,7 +37,7 @@
   {# Compact header bar #}
   <tr><td bgcolor="#0f172a" style="background-color:#0f172a;padding:12px 18px;border-radius:10px 10px 0 0;">
     <table width="100%"><tr>
-      <td style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#ffffff;">GLEITCAST &middot; KW {{ kw }}</td>
+      <td style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#ffffff;">WINGCAST &middot; KW {{ kw }}</td>
       <td align="right" style="font-size:11px;color:#94a3b8;">{{ briefing_weekday }}, {{ briefing_date }}</td>
     </tr></table>
   </td></tr>
@@ -248,7 +248,7 @@
       <tr><td style="padding:12px 14px;">
         <table width="100%"><tr>
           <td valign="middle">
-            <div class="ds-text" style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">Gleitcast anpassen</div>
+            <div class="ds-text" style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">Wingcast anpassen</div>
             <div class="ds-muted" style="font-size:11px;color:#64748b;line-height:1.4;">Andere Regionen, weniger Tage, pausieren?</div>
           </td>
           <td align="right" valign="middle" style="white-space:nowrap;padding-left:8px;">
@@ -266,7 +266,7 @@
   <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;background-color:#f8fafc;border-radius:0 0 10px 10px;">
     <div style="font-size:10px;color:#64748b;line-height:1.7;" class="ds-muted">
       Quellen: ICON-CH1 (1km), ICON-D2, ICON-EU, Open-Meteo, MeteoSwiss.<br>
-      Gleitcast ist Decision Support &mdash; im Zweifel: nicht fliegen.
+      Wingcast ist Decision Support &mdash; im Zweifel: nicht fliegen.
     </div>
     <div style="font-size:10px;color:#64748b;line-height:1.6;margin-top:8px;">
       <a href="{{ urls.account }}" style="color:#0f172a;text-decoration:underline;font-weight:600;">Einstellungen</a>

@@ -1,6 +1,6 @@
 Hallo {{ email }},
 
-dein Login-Link fuer Gleitcast:
+dein Login-Link fuer Wingcast:
 
 {{ urls.login }}
 
@@ -9,6 +9,6 @@ Der Link ist 30 Minuten gueltig und kann nur einmal verwendet werden.
 Du hast keinen Login angefordert? Dann ignoriere diese E-Mail einfach.
 
 --
-Gleitcast
+Wingcast
 Datenschutz: {{ urls.datenschutz }}
 Impressum:   {{ urls.impressum }}

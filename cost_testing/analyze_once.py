@@ -12,11 +12,11 @@ Schreibt nach den ueblichen Pfaden:
 - data/cost_telemetry.jsonl  (eine neue Zeile)
 
 Aufruf:
-    GLEITCAST_SPOT_CSV=test python cost_testing/analyze_once.py
+    WINGCAST_SPOT_CSV=test python cost_testing/analyze_once.py
     # oder ohne ENV: nutzt config.py-Default (complete = 487 Spots, dauert lang)
 
 Empfohlene lokale Variante (28 Spots, ~3-5 Min):
-    export GLEITCAST_SPOT_CSV=test
+    export WINGCAST_SPOT_CSV=test
     python cost_testing/analyze_once.py
 """
 from __future__ import annotations
@@ -54,8 +54,8 @@ def main() -> int:
     logger.info("Spot-CSV: %s", config.CSV_PATH)
     logger.info("Cost-Telemetry-Datei: %s", config.COST_TELEMETRY_PATH)
 
-    from chat_engine import GleitcastEngine
-    eng = GleitcastEngine()
+    from chat_engine import WingcastEngine
+    eng = WingcastEngine()
 
     logger.info("=== Schritt 1: Wetterdaten holen ===")
     try:

@@ -1,5 +1,5 @@
 """
-Chat-Engine für Gleitcast.
+Chat-Engine für Wingcast.
 Zentrale Klasse die Pilotenfragen beantwortet.
 Globaler Wetterdaten-Kontext + Per-User Conversation History.
 """
@@ -104,7 +104,7 @@ from engine.analyzers import AnalyzersMixin
 from engine.chat_orchestrator import ChatOrchestratorMixin
 
 
-class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
+class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
     def __init__(self):
         self.spots = load_spots()
         self.weather_data = {}

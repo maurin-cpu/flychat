@@ -20,7 +20,7 @@ load_dotenv()
 
 from openai import OpenAI
 from prompts import SPOT_COMBINED_PROMPT, REGION_COMBINED_PROMPT
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 from source_area import get_all_regions
 from spots import load_spots
 
@@ -39,7 +39,7 @@ print()
 
 # --- Engine laden ---
 print("Lade Engine + gecachte Wetterdaten...")
-engine = GleitcastEngine()
+engine = WingcastEngine()
 engine.load_weather_from_cache()
 
 date_str = datetime.now().strftime("%Y-%m-%d")

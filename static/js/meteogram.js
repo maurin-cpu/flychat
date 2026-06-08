@@ -105,14 +105,14 @@ window.Meteogram = (function () {
     // Storage-Werte: '1' = on, '0' = off, null/missing = viewport-default.
     function readShowNumbers() {
         try {
-            var v = localStorage.getItem('gleitcast.meteogram.showNumbers');
+            var v = localStorage.getItem('wingcast.meteogram.showNumbers');
             if (v === '1') return true;
             if (v === '0') return false;
             return window.innerWidth > 640; // Mobile default OFF, Desktop ON
         } catch (e) { return window.innerWidth > 640; }
     }
     function writeShowNumbers(on) {
-        try { localStorage.setItem('gleitcast.meteogram.showNumbers', on ? '1' : '0'); }
+        try { localStorage.setItem('wingcast.meteogram.showNumbers', on ? '1' : '0'); }
         catch (e) { /* ignore */ }
     }
 

@@ -1,8 +1,8 @@
 """
-Gleitcast Engine — Mixin: WeatherContextMixin.
+Wingcast Engine — Mixin: WeatherContextMixin.
 
 Ausgeschnitten aus chat_engine.py (Monolith-Split). Methoden-Signaturen
-unveraendert, Klasse wird via Mehrfachvererbung in GleitcastEngine eingebunden.
+unveraendert, Klasse wird via Mehrfachvererbung in WingcastEngine eingebunden.
 """
 
 import copy

@@ -282,7 +282,7 @@ Validiert anhand der DI 07.04.2026 Vergleichsdaten:
 | Jura West | 1.8 m/s | unverändert | 1.8 m/s |
 
 \* Mittelland Zentral bei XCT bleibt eine offene Diskrepanz — XCT könnte hier
-ein Gain haben, der mit dem Volumeneffekt zusammenhängt, den Gleitcast nicht
+ein Gain haben, der mit dem Volumeneffekt zusammenhängt, den Wingcast nicht
 modelliert (siehe Recherche-Dokument, Abschnitt „Limitierungen").
 
 **Working-Ceiling-Erwartungen:**
@@ -537,7 +537,7 @@ Rampe wiederverwendet.
 
 ### Vergleich: XC-Therm Valais Central Do 16.04
 
-| Uhrzeit | XC-Therm | Gleitcast vorher | Gleitcast nachher |
+| Uhrzeit | XC-Therm | Wingcast vorher | Wingcast nachher |
 |---|---|---|---|
 | 07:00 | 0.4 m/s | 0.0 m/s | ~0.3–0.5 m/s |
 | 09:00 | 0.8 m/s | 0.0 m/s | ~0.6–0.9 m/s |

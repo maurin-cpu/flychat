@@ -1,5 +1,5 @@
 """
-Chat- und Analyse-Prompts für Gleitcast.
+Chat- und Analyse-Prompts für Wingcast.
 
 Die Texte liegen unter skills/*.md (ein Skill = eine Markdown-Datei).
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Gleitcast - Regionen{% endblock %}
+{% block title %}Wingcast - Regionen{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -668,7 +668,7 @@
             </div>
             <div class="chat-messages" id="chatMessages" style="overflow-x: hidden;" aria-live="polite" aria-relevant="additions">
                 <div class="chat-message bot">
-                    Hallo! Ich bin dein Gleitcast-Berater (Beta — Antworten können noch Fehler enthalten). Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
+                    Hallo! Ich bin dein Wingcast-Berater (Beta — Antworten können noch Fehler enthalten). Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
                 </div>
             </div>
 
@@ -709,7 +709,7 @@
             <ul class="chat-locked__list">
                 <li><strong>5 Tage</strong> Vorhersage statt 1</li>
                 <li><strong>Chat-Berater</strong> <span class="beta-badge beta-badge--inline">Beta</span> mit Live-Wetter-Daten</li>
-                <li><strong>E-Mail-Gleitcast</strong> an deinen Wunschtagen</li>
+                <li><strong>E-Mail-Wingcast</strong> an deinen Wunschtagen</li>
             </ul>
             <button type="button" class="chat-locked__cta" id="chatLockedLoginBtn">
                 Gratis einloggen
@@ -793,7 +793,7 @@ document.addEventListener('DOMContentLoaded', function () {
 {% endif %}
 <script>
 (function () {
-    var STORAGE_KEY = 'gleitcast_sidebar_width';
+    var STORAGE_KEY = 'wingcast_sidebar_width';
     var resizer = document.getElementById('resizer');
     var sidebar = document.getElementById('chatSidebar');
     var layout = document.querySelector('.unified-layout');
@@ -896,7 +896,7 @@ var currentDate = window.currentDate;
 var _nested = {};
 var _latestUpdatedAt = null;
 
-window.addEventListener('gleitcast-day-change', function(e) {
+window.addEventListener('wingcast-day-change', function(e) {
     currentDate = e.detail.date;
     if (window.setRegionDate) window.setRegionDate(currentDate);
 });

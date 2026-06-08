@@ -1,5 +1,5 @@
 """
-Gleitcast Engine Package — aufgeteilt aus dem ehemaligen 6500-Zeilen-Monolith chat_engine.py.
+Wingcast Engine Package — aufgeteilt aus dem ehemaligen 6500-Zeilen-Monolith chat_engine.py.
 
 Struktur:
     _common.py          — Konstanten + Pure-Helpers (keine Engine-State-Abhaengigkeit)
@@ -11,8 +11,8 @@ Struktur:
                           (geocode, isochrone, map-actions)
 
 Backwards-Kompatibilitaet:
-    `from chat_engine import GleitcastEngine` funktioniert weiterhin — chat_engine.py
+    `from chat_engine import WingcastEngine` funktioniert weiterhin — chat_engine.py
     kombiniert die Mixins via Mehrfachvererbung:
-        class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
+        class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
             ...
 """

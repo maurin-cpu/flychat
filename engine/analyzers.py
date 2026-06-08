@@ -1,8 +1,8 @@
 """
-Gleitcast Engine — Mixin: AnalyzersMixin.
+Wingcast Engine — Mixin: AnalyzersMixin.
 
 Ausgeschnitten aus chat_engine.py (Monolith-Split). Methoden-Signaturen
-unveraendert, Klasse wird via Mehrfachvererbung in GleitcastEngine eingebunden.
+unveraendert, Klasse wird via Mehrfachvererbung in WingcastEngine eingebunden.
 """
 
 import copy
@@ -956,7 +956,7 @@ class AnalyzersMixin:
             logger.error(f"InstantDB Region-Analysen-Push fehlgeschlagen: {e}")
 
     # ════════════════════════════════════════════════════════════════════════
-    # WEEKLY BRIEFING — Tages-Aggregation fuer den Gleitcast
+    # WEEKLY BRIEFING — Tages-Aggregation fuer den Wingcast
     # Das ehemalige LLM-"Fazit" (best_weekday/week_summary/day_highlights)
     # wurde durch den synoptik-getriebenen Wetterlage-Block (engine/
     # synoptic_llm.py + skills/synoptic_overview.md) ersetzt.
@@ -1205,7 +1205,7 @@ class AnalyzersMixin:
                     "experience_rating": rating_r,
                     "safety_score": entry.get("safety_score"),
                     "comfort_index": entry.get("comfort_index"),
-                    # LLM-Einschaetzungssatz fuer Gleitcast-Region-Header
+                    # LLM-Einschaetzungssatz fuer Wingcast-Region-Header
                     "recommendation": entry.get("recommendation", "") or "",
                 })
             region_entries.sort(key=lambda e: (

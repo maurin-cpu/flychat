@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Gleitcast abonnieren{% endblock %}
+{% block title %}Wingcast abonnieren{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
@@ -11,7 +11,7 @@
 <main class="sp">
 
   <div class="sp-hero">
-    <div class="sp-hero__eyebrow">E-Mail-Gleitcast</div>
+    <div class="sp-hero__eyebrow">E-Mail-Wingcast</div>
     <h1>Dein Flugwetter in 3 E-Mails pro Woche</h1>
     <p>Schluss mit 5 Apps checken. Montag, Mittwoch, Freitag — du weisst wann, wo und warum.</p>
   </div>
@@ -26,7 +26,7 @@
 
   <div class="sp-preview-link">
     <a href="/preview/briefing" target="_blank" rel="noopener">
-      So sieht der Gleitcast aus →
+      So sieht der Wingcast aus →
     </a>
   </div>
 
@@ -55,7 +55,7 @@
 
     <fieldset>
       <legend>Deine Regionen</legend>
-      <div class="sp-hint">Wähle die Regionen, für die du den Gleitcast erhalten willst. Mehrfachauswahl möglich — per Chip oder direkt auf der Karte.</div>
+      <div class="sp-hint">Wähle die Regionen, für die du den Wingcast erhalten willst. Mehrfachauswahl möglich — per Chip oder direkt auf der Karte.</div>
 
       <div class="sp-filters" id="spRegionFilters"
            data-regions='{{ regions|tojson }}'

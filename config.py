@@ -1,5 +1,5 @@
 """
-Konfigurationsdatei für Gleitcast
+Konfigurationsdatei für Wingcast
 Adaptiert von uetliberg_ticker/config.py - Multi-Spot, Chat-basiert.
 """
 
@@ -190,7 +190,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 # "test" = reduziertes Set für Entwicklung (28 Spots, PGE-Schema).
 # Beide CSVs nutzen das PGE-Schema (Sektor-Spalten wind_N..wind_NW,
 # bemerkungen_flug, bemerkungen_sicherheit).
-USE_SPOT_CSV = os.environ.get("GLEITCAST_SPOT_CSV", "pge")
+USE_SPOT_CSV = os.environ.get("WINGCAST_SPOT_CSV", "pge")
 CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
 # Region-Referenzpunkte: Default ist CVT-7 (Apr 2026, 7 Punkte im
 # Polygon-Innern via Lloyd-CVT). Legacy-Modus nutzt die alten 4 Punkte
@@ -209,7 +209,7 @@ REGIONEN_CSV_PATH = DATA_DIR / "regionen.csv"
 
 # Vercel: Nur /tmp ist schreibbar. Readonly-Daten (CSV, GeoJSON) bleiben in data/
 if os.environ.get("VERCEL"):
-    _WRITABLE_DIR = Path("/tmp/gleitcast")
+    _WRITABLE_DIR = Path("/tmp/wingcast")
     _WRITABLE_DIR.mkdir(parents=True, exist_ok=True)
     WEATHER_JSON_PATH = _WRITABLE_DIR / "wetterdaten.json"
     HISTORY_DIR = _WRITABLE_DIR / "history"
@@ -331,7 +331,7 @@ for _level in PRESSURE_LEVELS:
 # SYNOPTIK / WETTERLAGE-BLOCK
 # ============================================================================
 # Konfiguration fuer engine/synoptic_context.py — der "Wetterlage"-Block
-# im Gleitcast und in der E-Mail. Erzeugt deterministisch eine 5-Tages-
+# im Wingcast und in der E-Mail. Erzeugt deterministisch eine 5-Tages-
 # Einordnung der Grosswetterlage (Druckeinfluss CH, Druckzentren Europa,
 # uebergeordnete Stroemung, Niederschlagsmuster Nord/Sued der Alpen,
 # Phaenomene wie Foehn/Bise/Vb-Tief).
@@ -927,9 +927,9 @@ DAILY_RUN_MINUTE   = 0
 # E-MAIL-BRIEFING (SMTP Infomaniak)
 # ============================================================================
 # BASE_URL = App-Domain (Flask), MARKETING_URL = Marketing-Webpage (Next.js).
-# In Produktion: BASE_URL=https://app.gleitcast.ch, MARKETING_URL=https://gleitcast.ch
-BASE_URL        = os.environ.get("GLEITCAST_BASE_URL",      "https://app.gleitcast.ch")
-MARKETING_URL   = os.environ.get("GLEITCAST_MARKETING_URL", "https://gleitcast.ch")
+# In Produktion: BASE_URL=https://app.wingcast.ch, MARKETING_URL=https://wingcast.ch
+BASE_URL        = os.environ.get("WINGCAST_BASE_URL",      "https://app.wingcast.ch")
+MARKETING_URL   = os.environ.get("WINGCAST_MARKETING_URL", "https://wingcast.ch")
 
 # Infomaniak SMTP (Standardwerte aus ihrer Doku; Port 465 SSL oder 587 STARTTLS)
 SMTP_HOST       = os.environ.get("SMTP_HOST", "mail.infomaniak.com")
@@ -938,7 +938,7 @@ SMTP_USE_SSL    = os.environ.get("SMTP_USE_SSL", "1") == "1"   # True = SSL:465,
 SMTP_USER       = os.environ.get("SMTP_USER", "")               # meist = SENDER_EMAIL
 SMTP_PASSWORD   = os.environ.get("SMTP_PASSWORD", "")
 SENDER_EMAIL    = os.environ.get("SENDER_EMAIL", "briefing@example.invalid")
-SENDER_NAME     = os.environ.get("SENDER_NAME", "Gleitcast")
+SENDER_NAME     = os.environ.get("SENDER_NAME", "Wingcast")
 
 # Admin-Dashboard: HTTP Basic Auth (nur Password-Check, User ignoriert).
 # Leer = Admin-Routen geben 503 zurueck (deaktiviert).
@@ -952,7 +952,7 @@ ADMIN_PASSWORD  = os.environ.get("ADMIN_PASSWORD", "")
 VALHALLA_URL = os.environ.get("VALHALLA_URL", "https://valhalla1.openstreetmap.de")
 NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
 ROUTING_TIMEOUT = 15  # seconds (Valhalla + Nominatim HTTP)
-ROUTING_USER_AGENT = "Gleitcast/1.0 (paragliding weather app)"
+ROUTING_USER_AGENT = "Wingcast/1.0 (paragliding weather app)"
 GEOCODE_CACHE_TTL = 24 * 3600  # 24h in-memory cache für Nominatim
 
 # ============================================================================

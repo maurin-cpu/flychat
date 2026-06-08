@@ -1,4 +1,4 @@
-"""Synoptik-Kontext fuer den Wetterlage-Block im Gleitcast und in der E-Mail.
+"""Synoptik-Kontext fuer den Wetterlage-Block im Wingcast und in der E-Mail.
 
 Erzeugt deterministisch eine 5-Tages-Einordnung der Grosswetterlage:
 - CH-Druckeinfluss (Hoch/Tief/neutral) aus pressure_msl-Mittel + Trend
@@ -273,7 +273,7 @@ def _rotate_audit_logs() -> None:
 def load_synoptic_cache() -> Optional[dict]:
     """Laedt das letzte Wetterlage-Strukturfeld aus dem Cache.
 
-    Wird von Web-Layer (Gleitcast/Email) verwendet, um den fertig
+    Wird von Web-Layer (Wingcast/Email) verwendet, um den fertig
     generierten Block anzuzeigen. Kein neuer LLM-Call hier.
     """
     path = Path(config.SYNOPTIC_CACHE_PATH)

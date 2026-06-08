@@ -1,4 +1,4 @@
-GLEITCAST — Dein Flugwetter KW{{ kw }}
+WINGCAST — Dein Flugwetter KW{{ kw }}
 {{ briefing_weekday }}, {{ briefing_date }}
 
 {% if verdict -%}
@@ -56,7 +56,7 @@ Andere Regionen, weniger Versandtage oder pausieren?
 
 {% endif -%}
 Quellen: ICON-CH1 (1 km), ICON-D2, ICON-EU, Open-Meteo.
-Gleitcast ist Decision Support — du entscheidest.
+Wingcast ist Decision Support — du entscheidest.
 Im Zweifel: nicht fliegen.
 
 {% if urls.account %}Einstellungen: {{ urls.account }}

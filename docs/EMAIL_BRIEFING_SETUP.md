@@ -42,9 +42,9 @@ SUPABASE_URL=https://<ref>.supabase.co
 SUPABASE_ANON_KEY=...
 
 # Domain-URL — zeigt in allen Mail-Links + Deep-Links auf
-# WICHTIG: app.gleitcast.ch (Flask-App), NICHT gleitcast.ch (Marketing-Page)
-GLEITCAST_BASE_URL=https://app.gleitcast.ch
-GLEITCAST_MARKETING_URL=https://gleitcast.ch
+# WICHTIG: app.wingcast.ch (Flask-App), NICHT wingcast.ch (Marketing-Page)
+WINGCAST_BASE_URL=https://app.wingcast.ch
+WINGCAST_MARKETING_URL=https://wingcast.ch
 
 # Infomaniak SMTP
 SMTP_HOST=mail.infomaniak.com
@@ -53,7 +53,7 @@ SMTP_USE_SSL=1
 SMTP_USER=briefing@deine-domain.ch
 SMTP_PASSWORD=<infomaniak-mailpasswort>
 SENDER_EMAIL=briefing@deine-domain.ch
-SENDER_NAME=Gleitcast
+SENDER_NAME=Wingcast
 ```
 
 **Test:**
@@ -99,9 +99,9 @@ SELECT id, email, status, regions, confirm_token FROM subscribers ORDER BY id DE
 
 Zuerst **ohne** echten SMTP testen — HTML-Preview in Tempdir.
 
-- [ ] `GLEITCAST_SMTP_DRY_RUN=1 python main.py` (auf Windows: vorher `set GLEITCAST_SMTP_DRY_RUN=1`)
+- [ ] `WINGCAST_SMTP_DRY_RUN=1 python main.py` (auf Windows: vorher `set WINGCAST_SMTP_DRY_RUN=1`)
 - [ ] Landing ausfuellen und submitten
-- [ ] In der Python-Konsole erscheint: `[SMTP DRY-RUN] -> ... geschrieben nach %TEMP%\gleitcast_mail_preview\...`
+- [ ] In der Python-Konsole erscheint: `[SMTP DRY-RUN] -> ... geschrieben nach %TEMP%\wingcast_mail_preview\...`
 - [ ] HTML-Datei oeffnen: Button „Abo bestaetigen" sichtbar + Fallback-Link
 
 #### B2.2 Confirm-Mail echt per SMTP
@@ -109,8 +109,8 @@ Zuerst **ohne** echten SMTP testen — HTML-Preview in Tempdir.
 - [ ] `python main.py` (ohne DRY_RUN)
 - [ ] Subscribe mit **eigener** E-Mail
 - [ ] Bestaetigungs-Mail kommt in ~5 Sekunden an
-- [ ] Betreff: `Bestaetige dein Gleitcast-Abo`
-- [ ] Absender: `Gleitcast <briefing@...>`
+- [ ] Betreff: `Bestaetige dein Wingcast-Abo`
+- [ ] Absender: `Wingcast <briefing@...>`
 - [ ] Mail rendert in Gmail, Apple Mail, Outlook Web (oder wo du testest)
 - [ ] Button klicken → fuehrt auf `/confirm/<token>`
 
@@ -137,7 +137,7 @@ Zuerst **ohne** echten SMTP testen — HTML-Preview in Tempdir.
 - [ ] Voraussetzung: mindestens 1 aktiver Subscriber in der DB
 - [ ] `python email_service.py --preview deine@mail`
 - [ ] Output zeigt: Subscriber gefunden + briefing_data geladen + OK
-- [ ] HTML oeffnen aus `%TEMP%\gleitcast_mail_preview\...__Gleitcast_KW...html`
+- [ ] HTML oeffnen aus `%TEMP%\wingcast_mail_preview\...__Wingcast_KW...html`
 - [ ] Pruefen: Verdict-Block oben (wenn >=1 fliegbarer Tag in deinen Regionen), Tages-Sektionen, Spot-Karten mit Sicherheit + Flug, Feedback-Buttons
 
 #### B3.2 Briefing echt versenden
@@ -171,13 +171,13 @@ Zuerst **ohne** echten SMTP testen — HTML-Preview in Tempdir.
 
 #### B4.2 Sofort-Versand testen (Dry-Run)
 
-- [ ] `GLEITCAST_SMTP_DRY_RUN=1 python scheduler.py --now`
+- [ ] `WINGCAST_SMTP_DRY_RUN=1 python scheduler.py --now`
 - [ ] Output: `[DONE] total=N sent=N skipped=0 failed=0`
-- [ ] Fuer jeden aktiven Subscriber liegt HTML in `%TEMP%\gleitcast_mail_preview\`
+- [ ] Fuer jeden aktiven Subscriber liegt HTML in `%TEMP%\wingcast_mail_preview\`
 
 #### B4.3 Scheduler-Thread im Production-Modus
 
-- [ ] `SCHEDULER_TEST_MODE=1 GLEITCAST_SMTP_DRY_RUN=1 python main.py`
+- [ ] `SCHEDULER_TEST_MODE=1 WINGCAST_SMTP_DRY_RUN=1 python main.py`
 - [ ] Log zeigt: „Scheduler: test-mode Wartezeit 30s"
 - [ ] Nach 30s: „Scheduler: ... sent=N ..."
 - [ ] Danach: „Scheduler: naechstes Event=briefing um <Datum>"
@@ -253,7 +253,7 @@ Zuerst **ohne** echten SMTP testen — HTML-Preview in Tempdir.
 
 ## Teil C — End-to-End-Test (empfohlener Ablauf vor Launch)
 
-**Stelle dich als neuer Pilot vor, der Gleitcast entdeckt.**
+**Stelle dich als neuer Pilot vor, der Wingcast entdeckt.**
 
 1. - [ ] Landing `/subscribe` oeffnen — Hero klar? Preview-Link funktioniert?
 2. - [ ] Preview-Mail anschauen — wirkt vertrauenswuerdig?
@@ -280,10 +280,10 @@ Wenn alle 12 Punkte gruen: MVP ist launch-fertig.
 | Mail kommt nicht an, kein Log-Fehler | Mail im Spam gelandet | SPF/DKIM bei Infomaniak pruefen |
 | `SMTP Auth fehlgeschlagen` | Passwort falsch oder Mailbox nicht freigeschaltet | Infomaniak-Kundenbereich pruefen |
 | `relation "subscribers" does not exist` | Migration `002_subscribers.sql` nicht gelaufen | Teil A1 ausfuehren |
-| Links zeigen auf `https://example.invalid/...` | `GLEITCAST_BASE_URL` nicht gesetzt | `.env` setzen + Server neu starten |
-| Links zeigen auf `http://localhost:5000/...` | `GLEITCAST_BASE_URL` zeigt auf localhost (Dev-Wert) | In `/home/deploy/flychat/.env` auf `https://app.gleitcast.ch` setzen + `sudo systemctl restart gleitcast` |
+| Links zeigen auf `https://example.invalid/...` | `WINGCAST_BASE_URL` nicht gesetzt | `.env` setzen + Server neu starten |
+| Links zeigen auf `http://localhost:5000/...` | `WINGCAST_BASE_URL` zeigt auf localhost (Dev-Wert) | In `/home/deploy/flychat/.env` auf `https://app.wingcast.ch` setzen + `sudo systemctl restart wingcast` |
 | `/preview/briefing` → 503 | Engine noch nicht geladen (Vercel-Kaltstart) | Nach 30s nochmal laden |
-| Scheduler sendet nichts | `GLEITCAST_BRIEFINGS=0` oder keine aktiven Subscriber | Log pruefen, `SELECT * FROM subscribers WHERE status='active';` |
+| Scheduler sendet nichts | `WINGCAST_BRIEFINGS=0` oder keine aktiven Subscriber | Log pruefen, `SELECT * FROM subscribers WHERE status='active';` |
 | Briefing-Link im Dashboard filtert nicht | Browser-Cache | Hard-Reload (Ctrl+Shift+R), static-file-Version pruefen |
 | Accuracy-Mail wird nicht gesendet | <3 Feedbacks in 30 Tagen | Mehr Feedback sammeln oder Window erhoehen |
 
@@ -293,7 +293,7 @@ Wenn alle 12 Punkte gruen: MVP ist launch-fertig.
 
 ### Monitoring
 
-- Log-Tail: `python main.py 2>&1 | tee -a /var/log/gleitcast.log`
+- Log-Tail: `python main.py 2>&1 | tee -a /var/log/wingcast.log`
 - Kritische Keywords: `SMTP send fehlgeschlagen`, `list_active failed`, `EXCEPTION`
 
 ### Regelmaessige Checks
@@ -308,7 +308,7 @@ Wenn alle 12 Punkte gruen: MVP ist launch-fertig.
 
 ### Scheduler-Kontrolle
 
-- Scheduler deaktivieren: `GLEITCAST_BRIEFINGS=0 python main.py`
+- Scheduler deaktivieren: `WINGCAST_BRIEFINGS=0 python main.py`
 - Scheduler manuell triggern:
   - `python scheduler.py --now` (Briefing sofort)
   - `python scheduler.py --accuracy-now` (Accuracy sofort)

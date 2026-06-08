@@ -166,7 +166,7 @@ Die Strahlungsfelder (`shortwave_radiation`, `direct_radiation`,
 optischen Dicke und sind daher der **physikalisch verlässlichere Proxy** für
 Bodenheizung und damit Thermik-Trigger.
 
-### Konsequenz für Gleitcast (Mai 2026)
+### Konsequenz für Wingcast (Mai 2026)
 
 Die `productive_thermal_h`-Berechnung in `engine/weather_context.py` verwendet
 **keine Cloud-Cover-Schwellen mehr** (vorher: `low ≤ 80% UND mid ≤ 90%`). Statt

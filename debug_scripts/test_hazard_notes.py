@@ -20,10 +20,10 @@ import config_overrides
 config_overrides.init()
 
 import datetime
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 from spots import load_spots
 
-eng = GleitcastEngine()
+eng = WingcastEngine()
 eng.load_weather_from_cache()
 
 # Spot laden

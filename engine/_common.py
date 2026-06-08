@@ -1,5 +1,5 @@
 """
-Gleitcast Engine — Konstanten + Pure-Helpers.
+Wingcast Engine — Konstanten + Pure-Helpers.
 
 Alles in dieser Datei hat KEINE Abhaengigkeit zur Engine-Klasse/State.
 Nur Konstanten + pure Funktionen. Damit trivial unit-testbar.

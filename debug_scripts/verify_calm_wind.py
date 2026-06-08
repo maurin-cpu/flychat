@@ -20,11 +20,11 @@ except Exception:
 
 from collections import defaultdict
 import config
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 THR = config.WIND_DIRECTION_IRRELEVANT_BELOW_KMH
 
-engine = GleitcastEngine()
+engine = WingcastEngine()
 wd = engine.weather_data or {}
 if not wd:
     print("weather_data ist LEER — vermutlich lokal ohne Live-Fetch. "

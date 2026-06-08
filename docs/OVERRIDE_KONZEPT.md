@@ -1,6 +1,6 @@
 # Override-Konzept
 
-Gleitcast verwendet ein **zweistufiges Analyseprinzip**: Das LLM produziert eine
+Wingcast verwendet ein **zweistufiges Analyseprinzip**: Das LLM produziert eine
 initiale Einschätzung, die Decision-Engine korrigiert und ergänzt sie deterministisch.
 Overrides sind die Mechanismen dieser Korrekturen.
 

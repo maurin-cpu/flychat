@@ -1,8 +1,8 @@
 import json
 import os
 
-input_file = r'c:\Users\user\OneDrive\Projekte\gleitcast\data\regionen_referenzpunkte.geojson'
-output_file = r'c:\Users\user\OneDrive\Projekte\gleitcast\data\referenzpunkte_visuell.geojson'
+input_file = r'c:\Users\user\OneDrive\Projekte\wingcast\data\regionen_referenzpunkte.geojson'
+output_file = r'c:\Users\user\OneDrive\Projekte\wingcast\data\referenzpunkte_visuell.geojson'
 
 # Lade die Originaldatei
 with open(input_file, 'r', encoding='utf-8') as f:

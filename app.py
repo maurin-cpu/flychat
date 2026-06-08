@@ -1,5 +1,5 @@
 """
-Vercel Entry Point für Gleitcast.
+Vercel Entry Point für Wingcast.
 Lazy-Initialisierung der Engine beim ersten Request (kein langer Cold-Start).
 """
 
@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from web import app, init_app
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 _engine = None
 
@@ -17,7 +17,7 @@ _engine = None
 def _get_engine():
     global _engine
     if _engine is None:
-        _engine = GleitcastEngine()
+        _engine = WingcastEngine()
         init_app(_engine)
         # Kein refresh_weather() beim Cold-Start - verhindert Timeout (viele API-Calls).
         # Nutzer triggert /api/refresh-weather manuell.

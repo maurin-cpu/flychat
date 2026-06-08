@@ -6,9 +6,9 @@ import sys, os, io
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
-engine = GleitcastEngine()
+engine = WingcastEngine()
 engine.load_weather_from_cache()
 
 rwd = engine.region_weather_data

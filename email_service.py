@@ -1,5 +1,5 @@
 """
-E-Mail-Versand fuer Gleitcast-Briefings (Stufe 2).
+E-Mail-Versand fuer Wingcast-Briefings (Stufe 2).
 
 Nutzt stdlib smtplib gegen Infomaniak SMTP. Keine externe Dependency.
 
@@ -8,7 +8,7 @@ Konfiguration (config.py / .env):
   SENDER_EMAIL, SENDER_NAME, BASE_URL
 
 Dry-Run:
-  Env GLEITCAST_SMTP_DRY_RUN=1  -> schreibt HTML-Preview nach /tmp (bzw. %TEMP%)
+  Env WINGCAST_SMTP_DRY_RUN=1  -> schreibt HTML-Preview nach /tmp (bzw. %TEMP%)
                                     statt einen echten SMTP-Call zu machen.
 """
 
@@ -145,7 +145,7 @@ def _sender_domain() -> str:
 
 
 def _dry_run_enabled() -> bool:
-    return os.environ.get("GLEITCAST_SMTP_DRY_RUN", "").strip() in ("1", "true", "yes")
+    return os.environ.get("WINGCAST_SMTP_DRY_RUN", "").strip() in ("1", "true", "yes")
 
 
 def _base_url_is_local(url: str) -> bool:
@@ -158,14 +158,14 @@ def _base_url_is_local(url: str) -> bool:
 if _base_url_is_local(config.BASE_URL):
     logger.warning(
         "BASE_URL zeigt auf localhost (%r) — reale Mail-Sends werden blockiert. "
-        "Setze GLEITCAST_BASE_URL=https://app.gleitcast.ch in der Prod-.env "
-        "oder GLEITCAST_SMTP_DRY_RUN=1 für lokale Previews.",
+        "Setze WINGCAST_BASE_URL=https://app.wingcast.ch in der Prod-.env "
+        "oder WINGCAST_SMTP_DRY_RUN=1 für lokale Previews.",
         config.BASE_URL,
     )
 
 
 def _dry_run_write(to: str, subject: str, html: str) -> Path:
-    tmp_dir = Path(tempfile.gettempdir()) / "gleitcast_mail_preview"
+    tmp_dir = Path(tempfile.gettempdir()) / "wingcast_mail_preview"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     # Windows verbietet: <>:"/\|?* und trailing . / Leerzeichen
     import re
@@ -211,7 +211,7 @@ def send_email(to: str, subject: str, html: str, text: str = "") -> bool:
             logger.error(
                 "send_email: kein Request-Kontext und BASE_URL=%r zeigt auf localhost — "
                 "Mail an %s NICHT gesendet (Scheduler/Cron-Pfad). "
-                "Fix: GLEITCAST_BASE_URL in Prod-.env auf https://app.gleitcast.ch setzen.",
+                "Fix: WINGCAST_BASE_URL in Prod-.env auf https://app.wingcast.ch setzen.",
                 config.BASE_URL, to,
             )
             return False
@@ -274,11 +274,11 @@ def _resolve_base_url() -> str:
 
     Wenn wir in einem Flask-Request laufen (User triggert /subscribe oder /login):
       → nimm den aktuellen Host. So bekommt localhost-Entwicklung localhost-Links
-        und Prod (app.gleitcast.ch) bekommt Prod-Links — automatisch.
+        und Prod (app.wingcast.ch) bekommt Prod-Links — automatisch.
 
     Wenn kein Request aktiv ist (Scheduler, CLI-Skript, Daily-Briefing-Job):
       → config.BASE_URL als Fallback (typischerweise gesetzt via Env-Var
-        GLEITCAST_BASE_URL=https://app.gleitcast.ch).
+        WINGCAST_BASE_URL=https://app.wingcast.ch).
     """
     try:
         from flask import has_request_context, request
@@ -317,7 +317,7 @@ def send_confirm_email(email: str, confirm_token: str, *, async_send: bool = Tru
     urls = _build_urls(confirm_token=confirm_token)
     html = render_template("email/confirm.html", email=email, urls=urls)
     text = render_template("email/confirm.txt", email=email, urls=urls)
-    subject = "Bestaetige dein Gleitcast-Abo"
+    subject = "Bestaetige dein Wingcast-Abo"
 
     if async_send:
         send_email_async(email, subject, html, text)
@@ -330,7 +330,7 @@ def send_login_email(email: str, login_token: str, *, async_send: bool = True) -
     urls = _build_urls(login_token=login_token)
     html = render_template("email/login.html", email=email, urls=urls)
     text = render_template("email/login.txt", email=email, urls=urls)
-    subject = "Dein Gleitcast Login-Link"
+    subject = "Dein Wingcast Login-Link"
     if async_send:
         send_email_async(email, subject, html, text)
         return True
@@ -349,7 +349,7 @@ def send_welcome_email(email: str, action_token: str, regions: list[str],
         "email/welcome.txt",
         email=email, urls=urls, regions=regions, skill_level=skill_level,
     )
-    subject = "Willkommen bei Gleitcast"
+    subject = "Willkommen bei Wingcast"
 
     if async_send:
         send_email_async(email, subject, html, text)
@@ -846,7 +846,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
 
     Args:
       subscriber: {id, email, regions, skill_level, action_token}
-      briefing_data: Output von GleitcastEngine.build_briefing_data()
+      briefing_data: Output von WingcastEngine.build_briefing_data()
       top_n_regions_per_day: Maximale Anzahl Regionen pro Tag (Default 3)
       top_n_spots_per_region: Maximale Anzahl Spots pro Region (Default 3)
 
@@ -1123,16 +1123,16 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # Der Deep-Link enthaelt schon die Subscriber-Regionen + besten Tag,
     # Empfaenger landet gefiltert. Rich-Preview kommt per OG-Tags auf /briefing.
     if verdict:
-        share_msg = f"{verdict['headline']} — Gleitcast KW{today.isocalendar().week}:"
+        share_msg = f"{verdict['headline']} — Wingcast KW{today.isocalendar().week}:"
     else:
-        share_msg = f"Mein Gleitcast für KW{today.isocalendar().week}:"
+        share_msg = f"Mein Wingcast für KW{today.isocalendar().week}:"
     share_payload = f"{share_msg}\n{deep_link}"
     share = {
         "url":          deep_link,
         "text":         share_msg,
         "whatsapp":     f"https://wa.me/?text={quote(share_payload, safe='')}",
         "telegram":     f"https://t.me/share/url?url={quote(deep_link, safe='')}&text={quote(share_msg, safe='')}",
-        "mailto":       f"mailto:?subject={quote('Gleitcast KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
+        "mailto":       f"mailto:?subject={quote('Wingcast KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
     }
 
     return {
@@ -1210,13 +1210,13 @@ def send_briefing_email(subscriber: dict, briefing_data: dict,
     today = datetime.now()
     kw = today.isocalendar().week
     if verdict and verdict["day"]["tier"] == "violet":
-        subject = f"Gleitcast KW{kw}: {verdict['headline']}"
+        subject = f"Wingcast KW{kw}: {verdict['headline']}"
     elif verdict and verdict["day"]["tier"] == "green":
-        subject = f"Gleitcast KW{kw}: {verdict['headline']}"
+        subject = f"Wingcast KW{kw}: {verdict['headline']}"
     elif verdict:
-        subject = f"Gleitcast KW{kw}: Bedingte Woche"
+        subject = f"Wingcast KW{kw}: Bedingte Woche"
     else:
-        subject = f"Gleitcast KW{kw}: Diese Woche nichts in deinen Regionen"
+        subject = f"Wingcast KW{kw}: Diese Woche nichts in deinen Regionen"
 
     to = subscriber.get("email")
     if not to:
@@ -1277,7 +1277,7 @@ def send_accuracy_email(subscriber: dict, stats: dict, *, async_send: bool = Tru
     html = render_template("email/accuracy.html", **ctx)
     text = render_template("email/accuracy.txt", **ctx)
 
-    subject = f"Gleitcast {month_label}: Deine Vorhersage zu {stats['accuracy_pct']}% korrekt"
+    subject = f"Wingcast {month_label}: Deine Vorhersage zu {stats['accuracy_pct']}% korrekt"
     to = subscriber.get("email")
     if not to:
         return False
@@ -1312,8 +1312,8 @@ def _cli_preview(email: str, wet_run: bool = False) -> int:
           f"({subscriber['status']}), Regionen: {subscriber['regions']}")
 
     # Engine + briefing_data
-    from chat_engine import GleitcastEngine
-    eng = GleitcastEngine()
+    from chat_engine import WingcastEngine
+    eng = WingcastEngine()
     try:
         eng.load_weather_from_cache()
     except Exception as e:
@@ -1324,7 +1324,7 @@ def _cli_preview(email: str, wet_run: bool = False) -> int:
 
     # Render + Send (in Dry-Run standardmaessig)
     if not wet_run:
-        os.environ["GLEITCAST_SMTP_DRY_RUN"] = "1"
+        os.environ["WINGCAST_SMTP_DRY_RUN"] = "1"
 
     # Flask app_context fuer render_template
     from web import app as flask_app
@@ -1332,7 +1332,7 @@ def _cli_preview(email: str, wet_run: bool = False) -> int:
         ok = send_briefing_email(subscriber, briefing_data, async_send=False)
     print(f"[{'OK' if ok else 'FEHLER'}] send_briefing_email -> {subscriber['email']}")
     if not wet_run:
-        preview_dir = Path(tempfile.gettempdir()) / "gleitcast_mail_preview"
+        preview_dir = Path(tempfile.gettempdir()) / "wingcast_mail_preview"
         print(f"Preview-HTML liegt in: {preview_dir}")
     return 0 if ok else 1
 
@@ -1343,7 +1343,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    ap = argparse.ArgumentParser(description="Gleitcast Mail CLI")
+    ap = argparse.ArgumentParser(description="Wingcast Mail CLI")
     ap.add_argument("--preview", metavar="EMAIL",
                     help="Rendert das Briefing fuer den Subscriber mit dieser E-Mail "
                          "(Dry-Run: schreibt HTML nach tempdir).")

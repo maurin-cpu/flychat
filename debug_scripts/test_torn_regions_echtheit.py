@@ -7,7 +7,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 from source_area import _load_regions
 from thermik_calculator import get_terrain_zone
 
@@ -15,7 +15,7 @@ CLIMB_FLOOR = 0.3
 BS_DANGER = config.BS_RATIO_THRESHOLDS["danger"]
 MIN_CLIMB = config.THERMAL_QUALITY_MIN_CLIMB
 
-engine = GleitcastEngine()
+engine = WingcastEngine()
 engine.load_weather_from_cache()
 orig_tq = engine._thermal_quality_tags
 records = []

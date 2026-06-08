@@ -1,8 +1,8 @@
-# Thermik-Modell: Wie Gleitcast die Thermik berechnet
+# Thermik-Modell: Wie Wingcast die Thermik berechnet
 
 ## Was berechnen wir?
 
-Gleitcast schätzt für jeden Flugspot stündlich drei Werte:
+Wingcast schätzt für jeden Flugspot stündlich drei Werte:
 
 1. **Thermikhöhe** (m MSL) — Bis wohin reicht die nutzbare Thermik?
 2. **Steigrate** (m/s) — Wie stark trägt es im Kern?
@@ -21,7 +21,7 @@ Diese Werte sind *Schätzungen* auf Basis physikalischer Modelle, keine Messunge
   **ein** gemeinsamer Dämpfungsfaktor verwendet: das **Minimum** von H/Peak und SW/Peak —
   nicht das Produkt (das würde denselben Effekt zweimal zählen).
 - **Regen / sehr feuchte Tage:** Niederschlag und Feuchte wirken im ICON über weniger Sonne,
-  latenten Fluss und Grenzschicht. Gleitcast fügt **kein** separates „Regen-Veto“ auf H hinzu.
+  latenten Fluss und Grenzschicht. Wingcast fügt **kein** separates „Regen-Veto“ auf H hinzu.
   Andere Dienste (z. B. XC Therm, Burnair) zeigen an solchen Tagen oft noch **sehr schwache**
   Thermikwerte — das ist mit kleinem **H** und den übrigen Modellgrenzen vereinbar.
 - **Bewölkungs-Index (Sun Index):** dient der Einordnung und kann das **Rating** bei extremer
@@ -43,7 +43,7 @@ Alle Daten sind stündlich aufgelöst. Druckniveau-Daten (Temperaturprofil) komm
 
 ### Zeitzone (Schweiz)
 
-Alle Vorhersage-Zeitstempel in Gleitcast sind **Lokalzeit für die Schweiz**:
+Alle Vorhersage-Zeitstempel in Wingcast sind **Lokalzeit für die Schweiz**:
 
 - In `config.py` ist `TIMEZONE = "Europe/Zurich"` gesetzt.
 - Jeder Open-Meteo-Aufruf übergibt diese Timezone. Open-Meteo liefert die `time`-Achse dann als **Wanduhrzeit in dieser Zone** (MESZ im Sommer, MEZ im Winter), nicht als UTC.
@@ -268,7 +268,7 @@ Der Schlüssel: Um 18:00 greift der **GFS-Cap** (1065m < 1504m). Um 19:00 greift
 | **RASP / DrJack** | WRF-Modell intern (YSU-PBL) | Deardorff w* aus Modell-BLH |
 | **AlpTherm** | Energiebudget (≈ Encroachment) | Sounding + Vorwärts-Integration |
 | **Soaringmeteo** | GFS/WRF-Modell-BLH | w* aus vorgegebener BLH |
-| **Gleitcast** | Hybrid: Parcel + Encroachment + GFS-Cap | Triple-Constraint + Deardorff w* |
+| **Wingcast** | Hybrid: Parcel + Encroachment + GFS-Cap | Triple-Constraint + Deardorff w* |
 
 ---
 

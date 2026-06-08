@@ -1,5 +1,5 @@
 /**
- * Gleitcast - Map + Meteogram Overlay
+ * Wingcast - Map + Meteogram Overlay
  */
 (function () {
     'use strict';
@@ -117,15 +117,15 @@
         // `window.map` is unusable because `<div id="map">` auto-creates an
         // HTML implicit global pointing to the DIV element, which has no
         // invalidateSize() method and would crash sidebar resize handlers.
-        window.gleitcastMap = map;
+        window.wingcastMap = map;
 
         // Re-fit to all spots — needed on mobile where #map is initially
         // display:none and the original fitBounds runs against a 0-size container.
-        window.gleitcastFitToSpots = function () {
-            if (!window.gleitcastMap || !window.gleitcastSpotsBounds) return;
-            if (!window.gleitcastSpotsBounds.isValid()) return;
+        window.wingcastFitToSpots = function () {
+            if (!window.wingcastMap || !window.wingcastSpotsBounds) return;
+            if (!window.wingcastSpotsBounds.isValid()) return;
             try {
-                window.gleitcastMap.fitBounds(window.gleitcastSpotsBounds, { padding: [20, 20] });
+                window.wingcastMap.fitBounds(window.wingcastSpotsBounds, { padding: [20, 20] });
             } catch (e) { /* ignore */ }
         };
 
@@ -138,14 +138,14 @@
 
         // OSM Peaks/Pässe/Sättel — geteiltes Modul (osm-peaks-layer.js).
         // Steuerbar via Admin-UI: config.SHOW_OSM_PEAKS → window.SHOW_OSM_PEAKS.
-        if (window.SHOW_OSM_PEAKS && window.GleitcastOsmPeaks) {
-            window.GleitcastOsmPeaks.attach(map);
+        if (window.SHOW_OSM_PEAKS && window.WingcastOsmPeaks) {
+            window.WingcastOsmPeaks.attach(map);
         }
 
         // Niederschlags-Referenzpunkte (16 pro Region) — eigener Layer.
         // Gekoppelt an SHOW_REFERENCE_POINTS — sichtbar sobald die 7 Haupt-RPs aktiv sind.
-        if ((window.SHOW_REFERENCE_POINTS || window.SHOW_PRECIP_REFPOINTS) && window.GleitcastPrecipRefpoints) {
-            window.GleitcastPrecipRefpoints.attach(map);
+        if ((window.SHOW_REFERENCE_POINTS || window.SHOW_PRECIP_REFPOINTS) && window.WingcastPrecipRefpoints) {
+            window.WingcastPrecipRefpoints.attach(map);
         }
     }
 
@@ -500,7 +500,7 @@
                 try {
                     var bounds = geoJsonLayer.getBounds();
                     if (bounds && bounds.isValid()) {
-                        window.gleitcastSpotsBounds = bounds;
+                        window.wingcastSpotsBounds = bounds;
                         map.fitBounds(bounds, { padding: [20, 20] });
                     }
                 } catch (e) {
@@ -931,12 +931,12 @@
     }
 
     // Re-render analysis view when analyses are loaded (API fetch after page load)
-    window.addEventListener('gleitcast-analyses-loaded', function () {
+    window.addEventListener('wingcast-analyses-loaded', function () {
         renderAnalyseView();
     });
 
     // Listen for day changes from the floating map tabs
-    window.addEventListener('gleitcast-day-change', function (e) {
+    window.addEventListener('wingcast-day-change', function (e) {
         if (!currentWeather || !currentDates.length) return;
         var newDate = e.detail && e.detail.date;
         if (!newDate) return;
@@ -956,7 +956,7 @@
 
     if (shareBtn) {
         shareBtn.addEventListener('click', function () {
-            if (!currentSpotName || typeof window.gleitcastShare !== 'function') return;
+            if (!currentSpotName || typeof window.wingcastShare !== 'function') return;
             var regionId = (currentSpotProps && currentSpotProps.region_id) || '';
             var regionName = (currentSpotProps && currentSpotProps.region) || '';
             var rText = '';
@@ -968,12 +968,12 @@
                 var idx = currentDates.indexOf(window.currentDate);
                 if (idx >= 0) dayIdx = idx;
             }
-            window.gleitcastShare({
+            window.wingcastShare({
                 region_id: regionId,
                 day_idx: dayIdx,
                 spot: currentSpotName,
                 title: currentSpotName + rText,
-                text: currentSpotName + (regionName ? ' (' + regionName + ')' : '') + rText + ' · Gleitcast Flugwetter',
+                text: currentSpotName + (regionName ? ' (' + regionName + ')' : '') + rText + ' · Wingcast Flugwetter',
             });
         });
     }

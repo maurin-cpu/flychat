@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}{% if og and og.title %}{{ og.title }}{% else %}Flugwetter – Gleitcast{% endif %}{% endblock %}
+{% block title %}{% if og and og.title %}{{ og.title }}{% else %}Flugwetter – Wingcast{% endif %}{% endblock %}
 
 {% block meta %}
-<meta property="og:site_name" content="Gleitcast">
+<meta property="og:site_name" content="Wingcast">
 <meta property="og:type" content="website">
-<meta property="og:title" content="{{ og.title if og else 'Gleitcast – Flugwetter' }}">
+<meta property="og:title" content="{{ og.title if og else 'Wingcast – Flugwetter' }}">
 <meta property="og:description" content="{{ og.description if og else 'Präzise Thermik- und Wind-Prognose für die Schweizer Berge.' }}">
 <meta property="og:url" content="{{ og.url if og else request.url }}">
 <meta property="og:image" content="{{ og.image if og else (request.url_root.rstrip('/') + '/og-image/briefing.png') }}">
@@ -74,13 +74,13 @@
   <div class="tooltip" id="bfMeteogramTooltip"></div>
 
   <footer class="bf-footer">
-    <p>ICON-D2/EU/CH1/CH2 + GFS via Open-Meteo · winds.mobi · Gleitcast-KI</p>
+    <p>ICON-D2/EU/CH1/CH2 + GFS via Open-Meteo · winds.mobi · Wingcast-KI</p>
   </footer>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script>window.gleitcastDebugMode = {{ 'true' if debug_mode else 'false' }};</script>
+<script>window.wingcastDebugMode = {{ 'true' if debug_mode else 'false' }};</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="{{ url_for('static', filename='js/shared-glyph.js') }}?v={{ static_v('js/shared-glyph.js') }}"></script>

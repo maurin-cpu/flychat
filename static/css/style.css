@@ -1,4 +1,4 @@
-/* Gleitcast - Light Theme (City Guide Style) */
+/* Wingcast - Light Theme (City Guide Style) */
 
 :root {
     /* Colors - Light palette (Aviation Blue) */
@@ -2837,12 +2837,12 @@ body.page-fixed-nav {
         transform: rotate(0deg);
         background: #fff;
         color: var(--color-primary, #0369a1);
-        animation: gleitcast-aside-pulse 2.4s ease-in-out 0.4s 2;
+        animation: wingcast-aside-pulse 2.4s ease-in-out 0.4s 2;
     }
     .meteogram-aside:not(.collapsed) .meteogram-aside-toggle {
         transform: rotate(180deg);
     }
-    @keyframes gleitcast-aside-pulse {
+    @keyframes wingcast-aside-pulse {
         0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
         50%      { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.35), 0 1px 3px rgba(0,0,0,0.15); }
     }

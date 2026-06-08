@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Gleitcast{% endblock %}</title>
+    <title>{% block title %}Wingcast{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='logo.svg') }}">
     {% block meta %}
-    <meta property="og:site_name" content="Gleitcast">
+    <meta property="og:site_name" content="Wingcast">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Gleitcast – Flugwetter für Gleitschirmpiloten">
+    <meta property="og:title" content="Wingcast – Flugwetter für Gleitschirmpiloten">
     <meta property="og:description" content="Präzise Thermik- und Wind-Prognose für die Schweizer Berge.">
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/og-image/briefing.png">
@@ -45,7 +45,7 @@
         <div class="navbar-links">
             <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Startplätze</a>
             <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
-            <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Gleitcast</a>
+            <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Wingcast</a>
             <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen" aria-label="Föhndiagramm öffnen">Föhn</button>
             {% if is_logged_in %}
             <div class="navbar-avatar-wrap">
@@ -243,7 +243,7 @@
         window.SHOW_REFERENCE_POINTS = {{ show_reference_points|default(false)|tojson }};
         window.SHOW_PRECIP_REFPOINTS = {{ show_precip_refpoints|default(false)|tojson }};
         window.SHOW_OSM_PEAKS = {{ show_osm_peaks|default(true)|tojson }};
-        window.gleitcastIsAdmin = {{ admin_debug_active|default(false)|tojson }};
+        window.wingcastIsAdmin = {{ admin_debug_active|default(false)|tojson }};
         var now = new Date();
         var dates = [];
         for (var i = 0; i < FORECAST_DAYS; i++) {
@@ -269,7 +269,7 @@
                     window.currentDate = dateStr;
                     container.querySelectorAll('.navbar-day-btn').forEach(function(b) { b.classList.remove('active'); });
                     btn.classList.add('active');
-                    window.dispatchEvent(new CustomEvent('gleitcast-day-change', { detail: { date: dateStr } }));
+                    window.dispatchEvent(new CustomEvent('wingcast-day-change', { detail: { date: dateStr } }));
                 });
                 container.appendChild(btn);
             });
@@ -282,10 +282,10 @@
         }
     })();
 
-    /* Gleitcast Share: native share sheet (mobile) mit WhatsApp-Fallback (wa.me).
+    /* Wingcast Share: native share sheet (mobile) mit WhatsApp-Fallback (wa.me).
        Der Ziel-Link geht immer auf /briefing — dort liefert _build_briefing_og
        Title / Description / tier-farbiges OG-Bild für Rich-Preview in WhatsApp. */
-    window.gleitcastShare = function (opts) {
+    window.wingcastShare = function (opts) {
         opts = opts || {};
         var origin = window.location.origin;
         var params = [];
@@ -293,7 +293,7 @@
         if (opts.day_idx != null) params.push('day=' + encodeURIComponent(opts.day_idx));
         if (opts.spot) params.push('spot=' + encodeURIComponent(opts.spot));
         var url = origin + '/briefing' + (params.length ? '?' + params.join('&') : '');
-        var title = opts.title || 'Gleitcast Flugwetter';
+        var title = opts.title || 'Wingcast Flugwetter';
         var text = opts.text || title;
 
         if (navigator.share) {
@@ -308,7 +308,7 @@
     };
 
     /* Shared WhatsApp-icon SVG (used by share buttons in briefing + overlays) */
-    window.gleitcastShareIconSVG =
+    window.wingcastShareIconSVG =
         '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
         '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>' +
         '<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
@@ -360,9 +360,9 @@
             <span>Regionen</span>
         </a>
         {% endif %}
-        <a href="/briefing" class="mobile-nav-item {% if request.path == '/briefing' %}active{% endif %}" aria-label="Gleitcast">
+        <a href="/briefing" class="mobile-nav-item {% if request.path == '/briefing' %}active{% endif %}" aria-label="Wingcast">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
-            <span>Gleitcast</span>
+            <span>Wingcast</span>
         </a>
         <button class="mobile-nav-item" id="mobileNavFoehnBtn" aria-label="Föhndiagramm öffnen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
@@ -524,7 +524,7 @@
         <span aria-hidden="true">·</span>
         <a href="{{ impressum_url }}" rel="noopener">Impressum</a>
         <span aria-hidden="true">·</span>
-        <a href="{{ marketing_url }}" rel="noopener">gleitcast.ch</a>
+        <a href="{{ marketing_url }}" rel="noopener">wingcast.ch</a>
     </footer>
 </body>
 

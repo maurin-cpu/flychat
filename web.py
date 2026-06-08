@@ -1,5 +1,5 @@
 """
-Flask Web-Server für Gleitcast.
+Flask Web-Server für Wingcast.
 Routes: Chat-API, Spots-API, Wetter-API, Meteogramm-API.
 """
 
@@ -40,7 +40,7 @@ from gust_calculator import (
 from source_area import find_region_for_point
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "gleitcast-dev-key")
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "wingcast-dev-key")
 
 # Session-Cookie: 1 Jahr persistent (Magic-Link login soll nicht jeden Tag wiederholt werden)
 app.permanent_session_lifetime = timedelta(days=365)
@@ -201,10 +201,10 @@ def _handle_unexpected_exception(e):
 engine = None
 
 
-def init_app(gleitcast_engine):
+def init_app(wingcast_engine):
     """Setzt die globale Engine-Instanz."""
     global engine
-    engine = gleitcast_engine
+    engine = wingcast_engine
 
 
 # ============================================================================
@@ -242,7 +242,7 @@ def preview_briefing():
     if engine is None:
         return _status_page(
             "error", "Vorschau nicht verfuegbar",
-            "Der Gleitcast-Service ist gerade nicht geladen.",
+            "Der Wingcast-Service ist gerade nicht geladen.",
             http_code=503,
         )
 
@@ -252,7 +252,7 @@ def preview_briefing():
         logger.exception("preview_briefing: build_briefing_data failed: %s", e)
         return _status_page(
             "error", "Vorschau nicht verfuegbar",
-            "Die Gleitcast-Daten konnten gerade nicht geladen werden.",
+            "Die Wingcast-Daten konnten gerade nicht geladen werden.",
             http_code=503,
         )
 
@@ -260,7 +260,7 @@ def preview_briefing():
     all_region_ids = [r["id"] for r in get_all_regions()]
     demo_subscriber = {
         "id": 0,
-        "email": "vorschau@gleitcast.ch",
+        "email": "vorschau@wingcast.ch",
         "regions": all_region_ids,
         "skill_level": "standard",
         "action_token": "demo",
@@ -331,8 +331,8 @@ def subscribe_confirm(token):
 
     return _status_page(
         "ok", "Abo aktiviert!",
-        f"Willkommen bei Gleitcast, {result['email']}.",
-        submessage="Dein erster Gleitcast kommt am naechsten Montag, Mittwoch oder Freitag um 06:30.",
+        f"Willkommen bei Wingcast, {result['email']}.",
+        submessage="Dein erster Wingcast kommt am naechsten Montag, Mittwoch oder Freitag um 06:30.",
     )
 
 
@@ -470,7 +470,7 @@ def account_action(token, action):
         if not ok:
             return redirect(f"/account/{token}?err=Abmelden+fehlgeschlagen")
         # Session bleibt — User soll auf der Konto-Seite den Reaktivieren-Banner sehen
-        return redirect(f"/account/{token}?ok=Gleitcast+abgemeldet")
+        return redirect(f"/account/{token}?ok=Wingcast+abgemeldet")
 
     if action == "update":
         # Form-Daten: regions[], weekdays[], tiers[] (Checkboxes), min_rating (slider)
@@ -537,7 +537,7 @@ def account_action(token, action):
         ok = mgr.reactivate(token)
         if not ok:
             return redirect(f"/account/{token}?err=Reaktivierung+fehlgeschlagen")
-        return redirect(f"/account/{token}?ok=Gleitcast+wieder+aktiviert")
+        return redirect(f"/account/{token}?ok=Wingcast+wieder+aktiviert")
 
     if action == "feedback":
         msg = (request.form.get("message") or "").strip()
@@ -593,7 +593,7 @@ def account_action(token, action):
         }
         body = json.dumps(export, indent=2, ensure_ascii=False, default=str)
         from datetime import date as _d
-        filename = f"gleitcast-export-{_d.today().isoformat()}.json"
+        filename = f"wingcast-export-{_d.today().isoformat()}.json"
         return Response(
             body,
             mimetype="application/json",
@@ -798,7 +798,7 @@ def subscribe_unsubscribe(token):
 
     return _status_page(
         "ok", "Abgemeldet",
-        "Du bekommst keinen Gleitcast mehr. Schade, dass du gehst!",
+        "Du bekommst keinen Wingcast mehr. Schade, dass du gehst!",
         submessage="Du kannst dich jederzeit wieder anmelden.",
     )
 
@@ -820,7 +820,7 @@ def _require_admin(f):
             return Response(
                 "Admin-Bereich — Zugriff nur mit Passwort.\n",
                 401,
-                {"WWW-Authenticate": 'Basic realm="Gleitcast Admin"',
+                {"WWW-Authenticate": 'Basic realm="Wingcast Admin"',
                  "Content-Type": "text/plain; charset=utf-8"},
             )
         return f(*args, **kwargs)
@@ -2088,7 +2088,7 @@ def _hash_ip(ip: str) -> Optional[str]:
     """Salted SHA-256 der IP fuer Missbrauchs-Korrelation ohne Klartext-Speicherung."""
     if not ip:
         return None
-    salt = (config.ADMIN_PASSWORD or "gleitcast-feedback")[:32]
+    salt = (config.ADMIN_PASSWORD or "wingcast-feedback")[:32]
     return hashlib.sha256(f"{salt}:{ip}".encode("utf-8")).hexdigest()[:32]
 
 
@@ -2212,7 +2212,7 @@ def og_image_briefing():
     """Dynamisches OpenGraph-Bild fuer Link-Previews.
 
     Query-Params: tier (violet|green|conditional|gray|none), title, subtitle.
-    Rendert ein 1200x630 PNG mit Tier-Farbverlauf + Gleitcast-Branding + Text.
+    Rendert ein 1200x630 PNG mit Tier-Farbverlauf + Wingcast-Branding + Text.
     Fallback auf statisches Default-Design wenn keine Params.
     """
     try:
@@ -2223,7 +2223,7 @@ def og_image_briefing():
                         status=502, mimetype="text/plain")
 
     tier = (request.args.get("tier") or "none").lower()
-    title = (request.args.get("title") or "Gleitcast – Flugwetter").strip()
+    title = (request.args.get("title") or "Wingcast – Flugwetter").strip()
     subtitle = (request.args.get("subtitle") or
                 "Praezise Thermik- und Wind-Prognose fuer die Schweizer Berge.").strip()
 
@@ -2284,7 +2284,7 @@ def og_image_briefing():
     sub_font   = _load_font(36)
 
     # Brand-Header oben links
-    draw.text((60, 50), "GLEITCAST", font=brand_font, fill=(255, 255, 255))
+    draw.text((60, 50), "WINGCAST", font=brand_font, fill=(255, 255, 255))
     draw.line([(60, 110), (260, 110)], fill=(255, 255, 255, 200), width=4)
 
     # Titel mittig-unten — Zeilenumbruch bei >30 Zeichen
@@ -2347,7 +2347,7 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
     - Mit Filter: peekt briefing_data und baut Title aus bestem Spot / Tag-Tier.
     """
     base_url = request.url_root.rstrip("/")
-    title = "Gleitcast – Flugwetter für Gleitschirmpiloten"
+    title = "Wingcast – Flugwetter für Gleitschirmpiloten"
     desc  = "Präzise Thermik- und Wind-Prognose für die Schweizer Berge."
     img   = f"{base_url}/og-image/briefing.png"
 
@@ -2411,11 +2411,11 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
         label = _date_label(best_day.get("date", ""))
         day_short = label.get("short", "")
         title = f"{best_spot.get('spot','')} – {day_short} {meta['label']} {rating}"
-        desc = f"{region_label} · {meta['label']} · Rating {rating} · Gleitcast"
+        desc = f"{region_label} · {meta['label']} · Rating {rating} · Wingcast"
         tier_param = tier
     else:
         tier_param = "none"
-        title = f"Gleitcast – {region_label}"
+        title = f"Wingcast – {region_label}"
         desc = "Kein fliegbares Fenster in dieser Region im aktuellen Zeitraum."
 
     # Dynamisches OG-Image mit Tier-Farbe + Headline
@@ -2432,7 +2432,7 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
 
 @app.route("/api/briefing", methods=["GET"])
 def api_briefing_get():
-    """Liefert die Tages-Aggregation + Wetterlage-Synoptik fuer den Gleitcast.
+    """Liefert die Tages-Aggregation + Wetterlage-Synoptik fuer den Wingcast.
     Days/Spots werden immer frisch aus spot_analyses gebaut, der Wetterlage-
     Block kommt aus dem Synoptik-Cache (1×/Tag refreshed).
 

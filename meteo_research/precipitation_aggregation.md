@@ -10,7 +10,7 @@ Zellen systematisch heraus. Industrie-Standard ist die **Neighborhood Method**
 (Verteilungsinformation). DWD verwendet diesen Ansatz operationell seit 2012
 fuer COSMO-DE-EPS und ICON-D2.
 
-Gleitcast nutzt seit Mai 2026 einen **Hybrid-Filter**: hohe Peak-Werte
+Wingcast nutzt seit Mai 2026 einen **Hybrid-Filter**: hohe Peak-Werte
 (≥ 0.2 mm/h) werden ohne Quorum durchgelassen, mittlere Werte unterliegen
 weiterhin einem 30%-Quorum (Rauschunterdrueckung), Werte < 0.05 mm/h werden
 auf 0 geclipt. `precipitation_coverage` (0.0-1.0) wird als zusaetzliches
@@ -131,7 +131,7 @@ flugbeschraenkend sind.
 
 ---
 
-## 3. Schwellenbegruendung fuer Gleitcast
+## 3. Schwellenbegruendung fuer Wingcast
 
 ### 3.1 WMO/Aviation-Intensitaetsklassen
 

@@ -16,7 +16,7 @@ from statistics import median
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 from source_area import _load_regions
 from thermik_calculator import get_terrain_zone, min_band_depth
 
@@ -25,7 +25,7 @@ PROD_MIN = config.PRODUCTIVE_CLIMB_MIN
 BS_DANGER = config.BS_RATIO_THRESHOLDS["danger"]
 CLIMB_FLOOR = 0.3
 
-engine = GleitcastEngine()
+engine = WingcastEngine()
 engine.load_weather_from_cache()
 orig_tq = engine._thermal_quality_tags
 recs = []

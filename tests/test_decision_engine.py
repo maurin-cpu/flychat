@@ -1071,10 +1071,10 @@ class TestCalmWindDirectionBypass(unittest.TestCase):
     """
     def setUp(self):
         from pathlib import Path
-        from chat_engine import GleitcastEngine
+        from chat_engine import WingcastEngine
         # __new__: _is_wind_in_range braucht nur config + _parse_wind_range,
         # kein teurer __init__/CSV-Load noetig.
-        self.eng = GleitcastEngine.__new__(GleitcastEngine)
+        self.eng = WingcastEngine.__new__(WingcastEngine)
         self.src = Path("engine/weather_context.py").read_text(encoding="utf-8")
 
     def test_calm_wind_overrides_wrong_direction(self):

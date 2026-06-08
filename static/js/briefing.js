@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   Gleitcast – Flugwetter Dashboard
+   Wingcast – Flugwetter Dashboard
    Tab-based day selector, region filter chips, compact spot rows.
    ══════════════════════════════════════════════════════════════ */
 
@@ -55,16 +55,16 @@
 
   // ── State ───────────────────────────────────────────────────
 
-  const LS_REGION_FILTER_KEY = "gleitcast.briefing.regionFilter";
-  const LS_DAY_IDX_KEY = "gleitcast.briefing.dayIdx";
-  const LS_TIER_FILTER_KEY = "gleitcast.briefing.tierFilter";       // legacy key (read-only fallback)
-  const LS_SAFETY_FILTER_KEY = "gleitcast.briefing.safetyFilter";   // v1.3
-  const LS_MIN_STARS_KEY = "gleitcast.briefing.minStars";           // legacy key (read-only fallback, v1.3 stars)
-  const LS_MIN_RATING_KEY = "gleitcast.briefing.minRating6";        // v2.0 rating 0-6 (experience_rating)
-  const LS_MIN_RATING_KEY_LEGACY = "gleitcast.briefing.minRating10"; // v1.4 legacy key (0-10), gets migrated
-  const LS_COLLAPSED_REGIONS_KEY = "gleitcast.briefing.collapsedRegions";
-  const LS_EXPAND_HINT_SEEN_KEY = "gleitcast.briefing.expandHintSeen";
-  const LS_SHOW_NUMBERS_KEY = "gleitcast.meteogram.showNumbers";
+  const LS_REGION_FILTER_KEY = "wingcast.briefing.regionFilter";
+  const LS_DAY_IDX_KEY = "wingcast.briefing.dayIdx";
+  const LS_TIER_FILTER_KEY = "wingcast.briefing.tierFilter";       // legacy key (read-only fallback)
+  const LS_SAFETY_FILTER_KEY = "wingcast.briefing.safetyFilter";   // v1.3
+  const LS_MIN_STARS_KEY = "wingcast.briefing.minStars";           // legacy key (read-only fallback, v1.3 stars)
+  const LS_MIN_RATING_KEY = "wingcast.briefing.minRating6";        // v2.0 rating 0-6 (experience_rating)
+  const LS_MIN_RATING_KEY_LEGACY = "wingcast.briefing.minRating10"; // v1.4 legacy key (0-10), gets migrated
+  const LS_COLLAPSED_REGIONS_KEY = "wingcast.briefing.collapsedRegions";
+  const LS_EXPAND_HINT_SEEN_KEY = "wingcast.briefing.expandHintSeen";
+  const LS_SHOW_NUMBERS_KEY = "wingcast.meteogram.showNumbers";
 
   // Safety-Baender (RATING_ARCHITECTURE v2.1): genau 3 Filter-Kategorien aus
   // safety_status (safe/conditional/not_safe). "violet" (Top) ist nur ein
@@ -202,20 +202,20 @@
   // RATING_CONCEPT v1.3: zwei orthogonale Achsen.
   // RATING_ARCHITECTURE v2.0: Safety-Band aus safety_status, Rating aus experience_rating 1-6.
   function spotSafetyBand(spot) {
-    return (window.gleitcastGlyph && window.gleitcastGlyph.legacyBand)
-      ? window.gleitcastGlyph.legacyBand(spot)
+    return (window.wingcastGlyph && window.wingcastGlyph.legacyBand)
+      ? window.wingcastGlyph.legacyBand(spot)
       : "no_data";
   }
 
   function spotStars(spot) {
-    return (window.gleitcastGlyph && window.gleitcastGlyph.legacyStars)
-      ? window.gleitcastGlyph.legacyStars(spot)
+    return (window.wingcastGlyph && window.wingcastGlyph.legacyStars)
+      ? window.wingcastGlyph.legacyStars(spot)
       : 0;
   }
 
   function spotRating(spot) {
-    return (window.gleitcastGlyph && window.gleitcastGlyph.legacyRating)
-      ? window.gleitcastGlyph.legacyRating(spot)
+    return (window.wingcastGlyph && window.wingcastGlyph.legacyRating)
+      ? window.wingcastGlyph.legacyRating(spot)
       : (typeof spot.experience_rating === "number" ? Math.floor(spot.experience_rating) : 0);
   }
 
@@ -309,8 +309,8 @@
   function _bandFromSpot(s)  { return spotSafetyBand(s); }
   function _starsFromSpot(s) { return spotStars(s); }
   function _scoreFromSpot(s) {
-    return (window.gleitcastGlyph && window.gleitcastGlyph.experienceScore)
-      ? window.gleitcastGlyph.experienceScore(s)
+    return (window.wingcastGlyph && window.wingcastGlyph.experienceScore)
+      ? window.wingcastGlyph.experienceScore(s)
       : Math.max(0, Math.min(100, Math.round((parseFloat(s.rating || 0) || 0) * 10)));
   }
   // Safety-Score: aus Cache, sonst Fallback aus status + foehn_risk.
@@ -853,8 +853,8 @@
     // Safety-Chips: 3 Baender (gruen/amber/rot) als Toggle.
     chipsEl.innerHTML = SAFETY_DEFS.map((t) => {
       const active = state.safetyFilters.has(t.id);
-      const glyph = (window.gleitcastGlyph && window.gleitcastGlyph.svg)
-        ? window.gleitcastGlyph.svg({ band: t.id, stars: 0, size: 16, ariaLabel: t.label })
+      const glyph = (window.wingcastGlyph && window.wingcastGlyph.svg)
+        ? window.wingcastGlyph.svg({ band: t.id, stars: 0, size: 16, ariaLabel: t.label })
         : `<span class="bf-tier-dot"></span>`;
       return `<button type="button" class="bf-tier-chip bf-tier-chip--${t.id}${active ? " is-active" : ""}" data-band="${t.id}" aria-pressed="${active}">
         ${glyph}<span class="bf-tier-label">${escapeHtml(t.label)}</span>
@@ -1020,7 +1020,7 @@
     // Tages (Region-Filter respektiert, Safety/Stars-Filter NICHT) — damit der
     // User sieht, was er gerade per Filter ausblendet.
     const filteredSpots = filterDaySpots(day);
-    const G = window.gleitcastGlyph;
+    const G = window.wingcastGlyph;
     const allSpotsRegionFiltered = (day.top_spots || []).filter((s) => regionPassesFilter(s.region_id));
     const counts = G && G.bandCounts ? G.bandCounts(allSpotsRegionFiltered) : { green: 0, amber: 0, red: 0, no_data: 0 };
     let topStars = 0;
@@ -1048,7 +1048,7 @@
       regionsMap[r.region_id] = r;
     }
 
-    // Sortierung: Regionen werden im Gleitcast NICHT mehr farblich/per-Rating
+    // Sortierung: Regionen werden im Wingcast NICHT mehr farblich/per-Rating
     // bewertet (User-Wunsch — "Pilot sucht eine Region und will dann nur die
     // Spots darin sehen"). Wir sortieren aber Regionen weiter so, dass die mit
     // den besten Spots oben stehen — abgeleitet aus Spot-Ratings, ohne dass
@@ -1214,7 +1214,7 @@
                  data-share-kind="region"
                  data-share-region="${escapeHtml(group.region_id)}"
                  data-share-region-name="${escapeHtml(name)}"
-                 title="Region teilen" aria-label="Region teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`
+                 title="Region teilen" aria-label="Region teilen">${window.wingcastShareIconSVG || "⇪"}</button>`
       : "";
     const isCollapsed = state.collapsedRegions.has(group.region_id);
     const collapsedCls = isCollapsed ? " is-collapsed" : "";
@@ -1254,8 +1254,8 @@
     const stars = spotStars(spot);
     const rating = spotRating(spot);
     const safetyCls = "safety-" + band;
-    const glyphHtml = (window.gleitcastGlyph && window.gleitcastGlyph.svg)
-      ? window.gleitcastGlyph.svg({ band, rating, size: 24 })
+    const glyphHtml = (window.wingcastGlyph && window.wingcastGlyph.svg)
+      ? window.wingcastGlyph.svg({ band, rating, size: 24 })
       : "";
 
     // ── Status-Leiste: nur sachliche Chips (Best-Window, Flugtyp, Steigwerte).
@@ -1305,11 +1305,11 @@
              data-share-region-name="${escapeHtml(spot.region_name || "")}"
              data-share-spot="${escapeHtml(spot.spot)}"
              data-share-rating="${shareRatingAttr}"
-             title="Startplatz teilen" aria-label="Startplatz teilen">${window.gleitcastShareIconSVG || "⇪"}</button>`;
+             title="Startplatz teilen" aria-label="Startplatz teilen">${window.wingcastShareIconSVG || "⇪"}</button>`;
     // RATING_ARCHITECTURE v2.1 — Farbintensität skaliert linear mit experience_rating (1-5).
     // Premium-Marker: safe + rating=5 (xc_tag/Klassiker) → violett (siehe shared-glyph.displayBand).
     const fillNorm = (rating > 0 && band !== "red" && band !== "no_data") ? rating / 5 : 0;
-    const G2 = window.gleitcastGlyph;
+    const G2 = window.wingcastGlyph;
     const visBand = (G2 && G2.displayBand) ? G2.displayBand(band, rating) : band;
     const visCls = "safety-" + visBand;
     // Rating-Tint fuer Spot-Hintergrund — gleiche Palette wie Region-Pill,
@@ -1636,7 +1636,7 @@
   }
 
   function renderDebugNotes(spot) {
-    if (!window.gleitcastDebugMode) return "";
+    if (!window.wingcastDebugMode) return "";
     const hn = spot.hazard_notes;
     const fn = spot.flyability_notes;
     if (!hn && !fn) return "";
@@ -1820,14 +1820,14 @@
     if (kind === "spot") {
       const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}` : "";
       title = `${spotName}${rtxt}`;
-      text = `${spotName}${regionName ? " (" + regionName + ")" : ""}${rtxt} · Gleitcast Flugwetter`;
+      text = `${spotName}${regionName ? " (" + regionName + ")" : ""}${rtxt} · Wingcast Flugwetter`;
     } else {
       const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}` : "";
       title = `${regionName || "Region"}${rtxt}`;
-      text = `${regionName || "Region"}${rtxt} · Gleitcast Flugwetter`;
+      text = `${regionName || "Region"}${rtxt} · Wingcast Flugwetter`;
     }
-    if (typeof window.gleitcastShare === "function") {
-      window.gleitcastShare({
+    if (typeof window.wingcastShare === "function") {
+      window.wingcastShare({
         region_id: regionId,
         day_idx: dayIdx,
         spot: kind === "spot" ? spotName : undefined,

@@ -1,5 +1,5 @@
 """
-Spot-Verwaltung für Gleitcast.
+Spot-Verwaltung für Wingcast.
 
 Lädt Fluggebiete aus CSV (PGE-Schema, Mai 2026) und stellt Such-/Filterfunktionen
 bereit. CSV-Spalten: wind_N..wind_NW (binaer 0/1), bemerkungen_flug,

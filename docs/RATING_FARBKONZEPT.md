@@ -33,7 +33,7 @@ Aenderungen am Konzept brechen die Konsistenz, wenn nicht alle Touchpoints angep
 **Prinzip — "Royal Premium" Tier-Hierarchie (final v3.2):**
 - **Sky-Blue** (Rating 1+2 safe): signalisiert "blue thermal day" (Pilot-Mental-Modell: blauer Himmel ohne Cumulus = keine Thermik). Cool, ruhig, "still air".
 - **Aktive Thermik** (Rating 3-4 safe): Lime (warmes Yellow-Gruen, "erste Sonne, Thermik startet") → **Green-500** (klassisches Safety-Green, saturiert, "starke organisierte Thermik"). Lime → satter Green-Sprung = Pilot sieht sofort "es geht aktiv".
-- **Royal Violet** (Rating 5 safe): Premium-Top fuer XC-Tag/Klassiker. Wie Gaming-Tiers (Common→Rare→Epic→**Legendary**). Pilot scrollt durch Gleitcast → Violet-Spots = sofort "DER Tag".
+- **Royal Violet** (Rating 5 safe): Premium-Top fuer XC-Tag/Klassiker. Wie Gaming-Tiers (Common→Rare→Epic→**Legendary**). Pilot scrollt durch Wingcast → Violet-Spots = sofort "DER Tag".
 - **Code-Identifier `violet` matched wieder visuell** (v3 stellte v1-Intent her). Premium = Violet, semantisch konsistent.
 - **Thermik-Alignment** durchgehend: Meteogramm-Kacheln folgen derselben Skala (`meteogram.js:thermClimbColor`) + Chat-Charts (`chat-charts.js:thermClimbColor`).
 - **Conditional bleibt Yellow→Orange→Brown**: Warnsignal-Spektrum klar getrennt.
@@ -58,14 +58,14 @@ Aenderungen am Konzept brechen die Konsistenz, wenn nicht alle Touchpoints angep
 | 1a | **Region-Polygon Fill+Border** (Karte regionen.html) | `static/js/region-map.js:111-141` | `getRatingTint(band, rating)` + `getRatingBorder` | Fill + Border-Weight + Border-Color |
 | 1b | **Region-Polygon-Label** (Zahl-Pille im Polygon-Centroid) | `static/js/region-map.js:270-330` | `buildRegionLabel()` Per-Rating ink+ring | Pille-Ring-Farbe + Text-Farbe der Rating-Zahl |
 | 2 | **Spot-Marker** (Hauptkarte map.html) | `static/js/map.js:159-178` | `getRatingTint(band, rating)` | Marker-Fill + Stroke |
-| 3 | **Glyph-Kreis** (Spot-Header im Gleitcast, Marker-Inneres) | `static/js/shared-glyph.js:28-58` | `ratingTintFor(visBand, rating)` | Kreis-Fill + Stroke + Text-Farbe |
-| 4 | **Region-Pill** (Gleitcast Region-Header) | `static/js/briefing.js:1206-1244` | `regionPillSpec(meta)` | Pill-Bg + Border + Text |
-| 5 | **Spot-Score-Pill** (Gleitcast Spot-Header) | `static/js/briefing.js:1322-1334` | `regionPillSpec()` reused | Pill-Bg + Border + Text |
-| 6 | **Spot-Background** (Gleitcast Spot-Container) | `static/js/briefing.js:1363-1375` | `regionPillSpec()` reused + Alpha-Skala | Bg-Tint + Border-Left |
-| 7 | **Mini-Map Marker** (aufgeklappter Spot in Gleitcast) | `static/js/briefing.js:1882-1900` | `bfSafetyRatingStyle()` → ruft `regionPillSpec()` | Marker-Fill + Stroke + Glow |
+| 3 | **Glyph-Kreis** (Spot-Header im Wingcast, Marker-Inneres) | `static/js/shared-glyph.js:28-58` | `ratingTintFor(visBand, rating)` | Kreis-Fill + Stroke + Text-Farbe |
+| 4 | **Region-Pill** (Wingcast Region-Header) | `static/js/briefing.js:1206-1244` | `regionPillSpec(meta)` | Pill-Bg + Border + Text |
+| 5 | **Spot-Score-Pill** (Wingcast Spot-Header) | `static/js/briefing.js:1322-1334` | `regionPillSpec()` reused | Pill-Bg + Border + Text |
+| 6 | **Spot-Background** (Wingcast Spot-Container) | `static/js/briefing.js:1363-1375` | `regionPillSpec()` reused + Alpha-Skala | Bg-Tint + Border-Left |
+| 7 | **Mini-Map Marker** (aufgeklappter Spot in Wingcast) | `static/js/briefing.js:1882-1900` | `bfSafetyRatingStyle()` → ruft `regionPillSpec()` | Marker-Fill + Stroke + Glow |
 | 8 | **Rating-Info-Overlay** (Legenden-Modal) | `static/js/rating-info.js:16-34` | `_ratingTint(band, rating)` | Glyph-Beispiele im Overlay |
-| 9 | **Thermik-Kacheln** (Meteogramm im Gleitcast + Detail) | `static/js/meteogram.js:137-150` | `thermClimbColor(rate)` | Zellen-Fill nach climb_rate |
-| 10 | **Wetterlage-Block** (Gleitcast Top-Pille) | `static/css/briefing.css:125-140` | `.bf-wetterlage` Border-Left + Bg-Gradient | Cyan-Accent (Premium-Farbe) |
+| 9 | **Thermik-Kacheln** (Meteogramm im Wingcast + Detail) | `static/js/meteogram.js:137-150` | `thermClimbColor(rate)` | Zellen-Fill nach climb_rate |
+| 10 | **Wetterlage-Block** (Wingcast Top-Pille) | `static/css/briefing.css:125-140` | `.bf-wetterlage` Border-Left + Bg-Gradient | Cyan-Accent (Premium-Farbe) |
 | 11 | **Spot-Assessment-Sektionen** (aufgeklappte Spot-Details) | `static/css/briefing.css:2202-2207` | `.bf-assessment--safety/fly/xc` | Border-Left-Akzent pro Sektion |
 | 12 | **Spot/Region-Detail-Overlay** (Click auf Marker/Polygon) | `static/js/analysis-view.js:67-110` | `ratingTintSpec(band, rating)` + `buildGlyph()` + `renderHero()` | Hero-Container Bg + Border, Glyph-Fill, Rating-Pill |
 | 13 | **Chat-Charts Thermik-Kacheln** (KI-Berater-Visualisierungen) | `static/js/chat-charts.js:59-67, 374-375` | `thermClimbColor(rate)` + Legend-Array | Thermik-Zellen + Legenden-Swatches im Chat |

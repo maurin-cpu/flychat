@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Gleitcast - Cockpit{% endblock %}
+{% block title %}Wingcast - Cockpit{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
@@ -494,7 +494,7 @@
             </div>
             <div class="chat-messages" id="chatMessages" style="overflow-x: hidden;" aria-live="polite" aria-relevant="additions">
                 <div class="chat-message bot">
-                    Hallo! Ich bin dein Gleitcast-Berater (Beta — Antworten können noch Fehler enthalten). Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
+                    Hallo! Ich bin dein Wingcast-Berater (Beta — Antworten können noch Fehler enthalten). Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
                 </div>
             </div>
 
@@ -535,7 +535,7 @@
             <ul class="chat-locked__list">
                 <li><strong>5 Tage</strong> Vorhersage statt 1</li>
                 <li><strong>Chat-Berater</strong> <span class="beta-badge beta-badge--inline">Beta</span> mit Live-Wetter-Daten</li>
-                <li><strong>E-Mail-Gleitcast</strong> an deinen Wunschtagen</li>
+                <li><strong>E-Mail-Wingcast</strong> an deinen Wunschtagen</li>
             </ul>
             <button type="button" class="chat-locked__cta" id="chatLockedLoginBtn">
                 Gratis einloggen
@@ -645,7 +645,7 @@ document.addEventListener('DOMContentLoaded', function () {
 {% endif %}
 <script>
     (function () {
-        var STORAGE_KEY = 'gleitcast_sidebar_width';
+        var STORAGE_KEY = 'wingcast_sidebar_width';
         var resizer = document.getElementById('resizer');
         var sidebar = document.getElementById('chatSidebar');
         var layout = document.querySelector('.unified-layout');
@@ -703,7 +703,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 sidebar.style.height = newWidth + 'px';
             }
 
-            if (window.gleitcastMap) window.gleitcastMap.invalidateSize();
+            if (window.wingcastMap) window.wingcastMap.invalidateSize();
         });
 
         document.addEventListener('mouseup', function () {
@@ -716,7 +716,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
                 } catch (err) { /* ignore */ }
             }
-            if (window.gleitcastMap) window.gleitcastMap.invalidateSize();
+            if (window.wingcastMap) window.wingcastMap.invalidateSize();
         });
 
         // Touch drag (tablets)
@@ -741,7 +741,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 newWidth = touch.clientY - 60;
                 sidebar.style.height = newWidth + 'px';
             }
-            if (window.gleitcastMap) window.gleitcastMap.invalidateSize();
+            if (window.wingcastMap) window.wingcastMap.invalidateSize();
         }, { passive: true });
 
         document.addEventListener('touchend', function () {
@@ -753,7 +753,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     localStorage.setItem(STORAGE_KEY, String(sidebar.offsetWidth));
                 } catch (err) { /* ignore */ }
             }
-            if (window.gleitcastMap) window.gleitcastMap.invalidateSize();
+            if (window.wingcastMap) window.wingcastMap.invalidateSize();
         });
 
         // Mobile toggle (Chat / Karte) via bottom nav
@@ -786,14 +786,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (activeBtn) activeBtn.classList.add('active');
                 layout.classList.remove('show-chat', 'show-map');
                 layout.classList.add('show-' + target);
-                if (target === 'map' && window.gleitcastMap) {
+                if (target === 'map' && window.wingcastMap) {
                     setTimeout(function () {
-                        window.gleitcastMap.invalidateSize();
+                        window.wingcastMap.invalidateSize();
                         // First reveal: container was display:none when initial
                         // fitBounds ran → zoom is wrong. Re-fit to all CH spots.
-                        if (!window._gleitcastMobileMapFitted && window.gleitcastFitToSpots) {
-                            window.gleitcastFitToSpots();
-                            window._gleitcastMobileMapFitted = true;
+                        if (!window._wingcastMobileMapFitted && window.wingcastFitToSpots) {
+                            window.wingcastFitToSpots();
+                            window._wingcastMobileMapFitted = true;
                         }
                     }, 50);
                 }
@@ -809,11 +809,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         window.addEventListener('load', function () {
-            if (window.gleitcastMap) {
-                window.gleitcastMap.invalidateSize();
+            if (window.wingcastMap) {
+                window.wingcastMap.invalidateSize();
                 // On mobile, invalidate again after a short delay for the mini-map peek
                 if (window.innerWidth < 640) {
-                    setTimeout(function () { window.gleitcastMap.invalidateSize(); }, 200);
+                    setTimeout(function () { window.wingcastMap.invalidateSize(); }, 200);
                 }
             }
         });
@@ -853,7 +853,7 @@ function normalizeFlyTier(ft) {
 }
 
 // Re-color markers when day changes via navbar tabs
-window.addEventListener('gleitcast-day-change', function(e) {
+window.addEventListener('wingcast-day-change', function(e) {
     if (window.analysisData && window.updateSpotColors) {
         window.updateSpotColors(window.analysisData, e.detail.date);
     }
@@ -898,7 +898,7 @@ fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data
         if (window.updateSpotColors) {
             window.updateSpotColors(window.analysisData, window.currentDate);
         }
-        window.dispatchEvent(new CustomEvent('gleitcast-analyses-loaded'));
+        window.dispatchEvent(new CustomEvent('wingcast-analyses-loaded'));
         console.log('[INIT] Spot-Analysen via API geladen:', Object.keys(data.spot_analyses).length);
     }
 }).catch(function(e) { console.warn('API spot analyses fetch failed:', e); });
@@ -920,7 +920,7 @@ function _refetchSpots() {
             if (window.updateSpotColors) {
                 window.updateSpotColors(window.analysisData, window.currentDate);
             }
-            window.dispatchEvent(new CustomEvent('gleitcast-analyses-loaded'));
+            window.dispatchEvent(new CustomEvent('wingcast-analyses-loaded'));
         }
     }).catch(function(e) { console.warn('Refetch /api/analyses failed:', e); });
 }

@@ -7,7 +7,7 @@ Gewitterwolke nur am **Wolkenbasis-Inflow (cloud suck)**, räumlich **versetzt**
 **Unter dem aktiven Regen** dominiert der **Abwind** (Niederschlags-Drag + evaporative Kühlung →
 Cold Pool / Outflow / Gust Front). Der Übergang von Auf- zu Abwind ist primär **stadien-basiert**
 (Entwicklungsstadium der Zelle), **nicht** an eine saubere Niederschlagsrate (mm/h) gebunden.
-Folge für Gleitcast: Regenrate ist nur ein **Proxy** für „aktiver Schauerschacht am Boden", kein
+Folge für Wingcast: Regenrate ist nur ein **Proxy** für „aktiver Schauerschacht am Boden", kein
 fundierter Steig-Kollaps-Schwellwert. Das verlässliche Signal ist „erreicht Regen den Boden"
 (≈ binär), nicht die Menge.
 
@@ -82,7 +82,7 @@ aussagekräftiger als „wie viele mm/h".
 
 ## 4. Schwelle / Grad — es gibt KEINEN sauberen mm/h-Wert
 
-Das wichtigste (und für Gleitcast unbequeme) Ergebnis: **Kein belastbarer mm/h-Schwellwert** für
+Das wichtigste (und für Wingcast unbequeme) Ergebnis: **Kein belastbarer mm/h-Schwellwert** für
 den Steig-Kollaps ließ sich belegen.
 
 **Gekillte Schwellen-Claims (damit hier nichts überzogen wird):**
@@ -122,7 +122,7 @@ bereits, sobald Regen den Boden erreicht — also näher am unteren Ende der Ska
 
 ---
 
-## 6. Konsequenz für Gleitcast (Anwendung)
+## 6. Konsequenz für Wingcast (Anwendung)
 
 Diese Erkenntnisse begründen den Niederschlags-**Fliegbarkeits**-Gate (siehe
 `docs/pläne/PLAN_niederschlag_flyability.md`):
@@ -162,7 +162,7 @@ Diese Erkenntnisse begründen den Niederschlags-**Fliegbarkeits**-Gate (siehe
 - Cb mit sauber getrennter niederschlagsfreier Aufwind- vs. Regen-Abwind-Zone — 0-3
 
 **Offene Unsicherheit:** Keine Quelle liefert einen validierten mm/h-Schwellwert für den
-Steig-Kollaps. Das robuste Signal ist stadien-/binär-basiert, nicht numerisch — bei der Gleitcast-
+Steig-Kollaps. Das robuste Signal ist stadien-/binär-basiert, nicht numerisch — bei der Wingcast-
 Schwelle (0.5 mm/h) bewusst als Proxy gewählt, im Replay an Realfällen zu verifizieren.
 
 Verwandt: `precipitation_aggregation.md` (Mengen-/Coverage-Aggregation, Safety-Schwellen),

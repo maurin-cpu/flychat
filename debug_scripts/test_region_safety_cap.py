@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import config
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 from source_area import get_all_regions, find_region_for_point
 from foehn_indicators import fetch_foehn_data
 import fetch_weather
@@ -32,7 +32,7 @@ SPOTS_PER_REGION_FETCH = 6  # Puffer, damit >=4 mit Wetter uebrigbleiben
 
 print(f"Analysis: provider={config.ANALYSIS_PROVIDER} model={config.ANALYSIS_MODEL}")
 
-eng = GleitcastEngine()
+eng = WingcastEngine()
 all_spots = eng.spots
 
 # --- Spots je Kandidatenregion sammeln (per analyse_region-Name) ---

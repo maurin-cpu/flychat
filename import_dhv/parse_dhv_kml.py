@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 import re
 import html
 
-KML_FILE = r"C:\Users\user\OneDrive\Projekte\gleitcast\data\dhv_gelaende_2026-04-09_16.27.54.kml"
+KML_FILE = r"C:\Users\user\OneDrive\Projekte\wingcast\data\dhv_gelaende_2026-04-09_16.27.54.kml"
 NS = {"kml": "http://www.opengis.net/kml/2.2"}
 
 

@@ -233,7 +233,7 @@ schwach, gedeckelt).
 
 ---
 
-## 11. Anwendung im Gleitcast-Rating
+## 11. Anwendung im Wingcast-Rating
 
 Diese Erkenntnisse fliessen in folgende Skill-Templates ein:
 

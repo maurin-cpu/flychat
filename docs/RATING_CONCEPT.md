@@ -1,4 +1,4 @@
-# Gleitcast Rating-Konzept: Risk vs Reward Trennung
+# Wingcast Rating-Konzept: Risk vs Reward Trennung
 
 **Status**: ⚠️ **DEPRECATED seit 2026-05-12 — siehe `docs/RATING_ARCHITECTURE.md` (v2.0).** Diese Datei dokumentiert die historische Entwicklung v1.0–v1.5.
 
@@ -123,7 +123,7 @@ Plus ein Hilfswert:
 - **Wind**: separat dargestellt – Pfeil mit innerer Fuellfarbe (Mittelwind) + Rand (Boeen). Trennung Mittelwind/Boeen ist visuell sauber.
 - **Algorithmus**: ueber 40 Faktoren, eigene "Thermikeinschaetzung", aber weiterhin **ein** Gesamt-Tier
 - **Disclaimer**: "Farben entsprechen dem Skill-Level eines durchschnittlichen Piloten, saisonal angepasst"
-- **Schwaeche** (aus Sicht Gleitcast-User): Auch Burnair vermischt Safety + Quality in einem Tier, sagt aber explizit "fuer durchschnittlichen Piloten" – keine Pilot-Profil-Adaption
+- **Schwaeche** (aus Sicht Wingcast-User): Auch Burnair vermischt Safety + Quality in einem Tier, sagt aber explizit "fuer durchschnittlichen Piloten" – keine Pilot-Profil-Adaption
 - Kein expliziter Sicherheit-vs-Erlebnis-Split sichtbar
 
 Quelle: [burnair.ch/meteoservice](https://www.burnair.ch/meteoservice/), [burnair Help Center – Farben in der Wolkenprognose](https://help.burnair.cloud/hc/de/articles/360018676938-Was-bedeuten-die-Farben-in-der-Wolkenprognose)
@@ -133,7 +133,7 @@ Quelle: [burnair.ch/meteoservice](https://www.burnair.ch/meteoservice/), [burnai
 - **Zwei explizite Achsen**: `Flyability` (kann man fliegen?) und `Crossability` (XC-Tag?)
 - Neuronales Netz, ~200 Wetterparameter, trainiert auf 2 Mio Fluegen aus 10 Jahren XContest-Datenbank
 - Macht Risiko-vs-Erlebnis nicht explizit, aber **trennt** "kann ich fliegen" (= eher Safety/Conditions) von "lohnt es sich" (= XC-Potential)
-- Schwaeche: ML-Black-Box, schwer erklaerbar warum ein Tag schlecht ist – Gleitcast hat hier mit Decision-Engine-Tags (`_decisions_applied`) einen klaren Vorteil
+- Schwaeche: ML-Black-Box, schwer erklaerbar warum ein Tag schlecht ist – Wingcast hat hier mit Decision-Engine-Tags (`_decisions_applied`) einen klaren Vorteil
 
 Quelle: [paraglidable.com](https://paraglidable.com/), [GitHub AntoineMeler/Paraglidable](https://github.com/AntoineMeler/Paraglidable)
 
@@ -141,7 +141,7 @@ Quelle: [paraglidable.com](https://paraglidable.com/), [GitHub AntoineMeler/Para
 
 - **Gefahrenstufe 1–5** (Risiko) ist **getrennt** von der **Schneequalitaet** (Erlebnis)
 - Subdivision der Gefahrenstufen mit `+` `=` `-` ab Stufe 2 – feinere Aufloesung wo es zaehlt
-- **Wichtige Erkenntnis fuer Gleitcast**: SLF subdividiert NICHT bei Nassschnee – wenn die Aussage unzuverlaessig ist, lassen sie die Praezision weg, statt Schein-Genauigkeit zu liefern. Lehre: Bei Foehn-Tagen (sehr unsichere Modelle) sollten wir auch eher zu konservativen Bands greifen.
+- **Wichtige Erkenntnis fuer Wingcast**: SLF subdividiert NICHT bei Nassschnee – wenn die Aussage unzuverlaessig ist, lassen sie die Praezision weg, statt Schein-Genauigkeit zu liefern. Lehre: Bei Foehn-Tagen (sehr unsichere Modelle) sollten wir auch eher zu konservativen Bands greifen.
 - White Risk app + Schneeprofil getrennt – aehnlich der Trennung die wir wollen
 
 Quelle: [SLF Danger Levels](https://www.slf.ch/en/avalanche-bulletin-and-snow-situation/about-the-avalanche-bulletin/danger-levels/), [SLF Subdivision of Danger Levels](https://www.slf.ch/en/news/subdivision-of-danger-levels-in-the-avalanche-bulletin/)
@@ -150,7 +150,7 @@ Quelle: [SLF Danger Levels](https://www.slf.ch/en/avalanche-bulletin-and-snow-si
 
 - Berechnet **pro Streckenabschnitt** Risiko – nicht ein Wert pro Tour
 - **Gibt Bergfuehrer-Niveau-Beratung** statt one-size-fits-all – schliesst weniger Routen pauschal aus, weist auf kritische Stellen hin
-- Lehre fuer Gleitcast: Pro-User wollen die kritischen Stellen sehen, nicht ein Gesamt-NoGo. Im Gleitcast-Aequivalent waere das pro Stunde / pro Hoehenstufe – haben wir bereits in der Engine, aber im UI nur als Meteogramm.
+- Lehre fuer Wingcast: Pro-User wollen die kritischen Stellen sehen, nicht ein Gesamt-NoGo. Im Wingcast-Aequivalent waere das pro Stunde / pro Hoehenstufe – haben wir bereits in der Engine, aber im UI nur als Meteogramm.
 
 Quelle: [skitourenguru.ch/rating-view](https://www.skitourenguru.ch/rating-view), [Bluewin – Skitourenguru](https://www.bluewin.ch/en/news/skitourenguru-tool-helps-to-choose-safe-ski-touring-routes-3069477.html)
 
@@ -159,7 +159,7 @@ Quelle: [skitourenguru.ch/rating-view](https://www.skitourenguru.ch/rating-view)
 - **Doppel-Encoding mit Sternen**: Gefuellte Sterne = Swell-Power, ausgegraute Sterne = Wind-Penalty
 - Beispiel: 2 gefuellte + 2 ausgegraute = "guter Swell aber Onshore-Wind" – Pilot sieht beides auf einen Blick
 - Black star fuer Big-Wave-Spots = anderer Massstab
-- **Stark fuer Gleitcast**: Visualisiert Wind als Modifier auf Erlebnis, ohne ein einzelnes Gesamt-Tier zu erzwingen. Genau das, was wir wollen – Erlebnis-Sterne + Sicherheits-Modifier separat sichtbar.
+- **Stark fuer Wingcast**: Visualisiert Wind als Modifier auf Erlebnis, ohne ein einzelnes Gesamt-Tier zu erzwingen. Genau das, was wir wollen – Erlebnis-Sterne + Sicherheits-Modifier separat sichtbar.
 
 Quelle: [Magicseaweed Star Rating](https://magicseaweed.com/docs/forecasting/66/star-rating/10134/)
 
@@ -180,7 +180,7 @@ Quelle: [Surfline Ratings & Colors](https://support.surfline.com/hc/en-us/articl
   - `E1 4c` = einfache Bewegungen mit miserabler Absicherung (unangenehm)
   - `E5 6a` = gleiche Bewegung wie E1 6a aber Sturz = Tod
 - **Goldstandard fuer Risk-vs-Reward-Trennung**, weil beide Achsen unabhaengig sind und Kletterer gelernt haben, beide zu lesen.
-- Lehre fuer Gleitcast: Ein Tag wird vollstaendig durch zwei Achsen beschrieben – `safety_band x experience_score`. "Amber 4 Sterne" = unser Aequivalent zu "E5 6a".
+- Lehre fuer Wingcast: Ein Tag wird vollstaendig durch zwei Achsen beschrieben – `safety_band x experience_score`. "Amber 4 Sterne" = unser Aequivalent zu "E5 6a".
 
 Quelle: [Wikipedia Grade (climbing)](https://en.wikipedia.org/wiki/Grade_(climbing)), [BMC UK Trad Grades](https://www.thebmc.co.uk/en/a-brief-explanation-of-uk-traditional-climbing-grades), [UKC Articles – Extending the UK Grading System](https://www.ukclimbing.com/articles/features/extending_the_uk_grading_system-3068)
 
@@ -188,13 +188,13 @@ Quelle: [Wikipedia Grade (climbing)](https://en.wikipedia.org/wiki/Grade_(climbi
 
 - Reine **Rohdaten-Visualisierung**: Slope-Angle 25°–45°+ farbcodiert, Aspect, Elevation – keine Aggregation, keine Empfehlung
 - Bewusste Designentscheidung: "Wir geben dir die Daten, die Entscheidung gehoert dir"
-- Lehre fuer Gleitcast: Pro-User wollen die Rohdaten sehen koennen (haben wir im Meteogramm, gut). Aggregation darf nicht der einzige Pfad sein.
+- Lehre fuer Wingcast: Pro-User wollen die Rohdaten sehen koennen (haben wir im Meteogramm, gut). Aggregation darf nicht der einzige Pfad sein.
 
 Quelle: [FATMAP Avalanche Tool](https://fatmap.zendesk.com/hc/en-us/articles/115001419425-Avalanche-Tool-Terrain-Layer-)
 
 ### 1.9 Synthese – Was funktioniert, was nicht
 
-| Pattern | Vorteil | Nachteil | Fuer Gleitcast geeignet? |
+| Pattern | Vorteil | Nachteil | Fuer Wingcast geeignet? |
 |---------|---------|----------|--------------------------|
 | Single Score (Burnair Tier) | Schneller Scan | Paternalistisch, vermischt Achsen | Nur als Default fuer Beginner |
 | Zwei Sterne-Sets (Magicseaweed) | Beides sichtbar | Begrenzte Aufloesung (5 Steps) | Sehr gut – als Karten-Visualisierung |
@@ -725,7 +725,7 @@ Advanced-Pilot vergleicht: Fiesch ist amber, aber 4 Sterne. Atzmaennig ist green
 
 ### 6.1 Haftung Schweizer Kontext
 
-**Risiko**: Pro-Pilot fliegt amber-Tag, Vorfall, klagt Gleitcast wegen "Empfehlung".
+**Risiko**: Pro-Pilot fliegt amber-Tag, Vorfall, klagt Wingcast wegen "Empfehlung".
 
 **Mitigation**:
 - AGB / Disclaimer beim ersten Pilot-Profil-Setup ("Ich bestaetige, dass ich Pilot mit Brevet/Schein bin und Eigenverantwortung trage")
@@ -764,7 +764,7 @@ Advanced-Pilot vergleicht: Fiesch ist amber, aber 4 Sterne. Atzmaennig ist green
 
 **Konflikt 1**: Magicseaweed nutzt _kombinierte_ Sterne (Wind reduziert Sterne), waehrend wir _trennen_ wollen. Stellungnahme: Magicseaweed-Pattern war richtig fuer Surf, weil Onshore-Wind Wellenqualitaet _direkt_ ruiniert. Beim Fliegen ist amber-Wind nicht "schlechtere Thermik", sondern "gleiche Thermik aber gefaehrlicher". Daher Trennung berechtigt.
 
-**Konflikt 2**: Burnair macht One-Tier-System gut, hat zufriedene Nutzerbasis. Stellungnahme: Burnair-User sind durchschnittlich erfahrener (Brevetierte) und akzeptieren paternalistische Defaults. Gleitcast positioniert sich als _adaptiver_ – User-Profil ist USP. Wenn Gleitcast nur "Burnair done better" werden will, ist das Konzept kein Gewinn. Aber wenn "Burnair fuer Pros + Beginner gleichzeitig", dann schon.
+**Konflikt 2**: Burnair macht One-Tier-System gut, hat zufriedene Nutzerbasis. Stellungnahme: Burnair-User sind durchschnittlich erfahrener (Brevetierte) und akzeptieren paternalistische Defaults. Wingcast positioniert sich als _adaptiver_ – User-Profil ist USP. Wenn Wingcast nur "Burnair done better" werden will, ist das Konzept kein Gewinn. Aber wenn "Burnair fuer Pros + Beginner gleichzeitig", dann schon.
 
 **Konflikt 3**: Paraglidable hat 2 Achsen (Flyability + Crossability). Crossability ueberschneidet sich konzeptionell mit unserem `experience_score`. Stellungnahme: Crossability ist _XC-spezifisch_ (Distanz). Wir wollen `experience_score` breiter (Genuss + XC). Bewusst breiter, weil 80% der CH-Piloten kein XC fliegen, aber lange thermische Stunden trotzdem geniessen.
 

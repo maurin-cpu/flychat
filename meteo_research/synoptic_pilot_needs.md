@@ -220,7 +220,7 @@ im Wallis ≠ Westwind im Tessin ≠ Westwind im Mittelland.
 
 ---
 
-## 10. Anwendung in Gleitcast
+## 10. Anwendung in Wingcast
 
 Direkter Bezug zu Entscheidungen in `engine/synoptic_context.py`:
 

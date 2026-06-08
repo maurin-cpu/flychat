@@ -1,5 +1,5 @@
 /**
- * Gleitcast - Region Map + Analysis Overlay (Traffic Light System, Light Theme)
+ * Wingcast - Region Map + Analysis Overlay (Traffic Light System, Light Theme)
  */
 (function () {
     'use strict';
@@ -260,16 +260,16 @@
 
         // OSM Peaks/Pässe/Sättel — geteiltes Modul (osm-peaks-layer.js).
         // Steuerbar via Admin-UI: config.SHOW_OSM_PEAKS → window.SHOW_OSM_PEAKS.
-        if (window.SHOW_OSM_PEAKS && window.GleitcastOsmPeaks) {
-            window.GleitcastOsmPeaks.attach(map);
+        if (window.SHOW_OSM_PEAKS && window.WingcastOsmPeaks) {
+            window.WingcastOsmPeaks.attach(map);
         }
 
         // Niederschlags-Referenzpunkte (16 pro Region) — eigener Layer,
         // visuell von den 7 Haupt-RPs abgegrenzt (blau, klein, halbtransparent).
         // Wird IMMER eingeblendet wenn Referenzpunkte aktiv sind — also gekoppelt
         // an SHOW_REFERENCE_POINTS. Separater Flag bleibt fuer Sonderfaelle.
-        if ((window.SHOW_REFERENCE_POINTS || window.SHOW_PRECIP_REFPOINTS) && window.GleitcastPrecipRefpoints) {
-            window.GleitcastPrecipRefpoints.attach(map);
+        if ((window.SHOW_REFERENCE_POINTS || window.SHOW_PRECIP_REFPOINTS) && window.WingcastPrecipRefpoints) {
+            window.WingcastPrecipRefpoints.attach(map);
         }
 
         loadRegions();
@@ -1273,7 +1273,7 @@
     var overlayShare = document.getElementById('regionOverlayShare');
     if (overlayShare) {
         overlayShare.addEventListener('click', function () {
-            if (!overlayRid || typeof window.gleitcastShare !== 'function') return;
+            if (!overlayRid || typeof window.wingcastShare !== 'function') return;
             var regionName = (meteogramCache[overlayRid] && meteogramCache[overlayRid].regionName) || overlayRid;
             var dateStr = regionActiveDate[overlayRid] || currentDate || window.currentDate;
             var dayIdx = 0;
@@ -1283,11 +1283,11 @@
                 var target = new Date(dateStr + 'T12:00:00');
                 dayIdx = Math.max(0, Math.round((target - today) / 86400000));
             }
-            window.gleitcastShare({
+            window.wingcastShare({
                 region_id: overlayRid,
                 day_idx: dayIdx,
-                title: regionName + ' · Gleitcast',
-                text: regionName + ' · Gleitcast Flugwetter',
+                title: regionName + ' · Wingcast',
+                text: regionName + ' · Wingcast Flugwetter',
             });
         });
     }
@@ -1297,7 +1297,7 @@
     });
 
     // Listen for navbar day changes — update open overlay + map coloring
-    window.addEventListener('gleitcast-day-change', function (e) {
+    window.addEventListener('wingcast-day-change', function (e) {
         var newDate = e.detail && e.detail.date;
         if (!newDate) return;
         currentDate = newDate;

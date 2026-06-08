@@ -16,7 +16,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 CLIMB_FLOOR = 0.3
 BS_DANGER = config.BS_RATIO_THRESHOLDS["danger"]   # 60
@@ -28,7 +28,7 @@ per_spot = defaultdict(lambda: [0, 0, 0])
 total = [0, 0, 0]   # thermik_std, torn_std, torn_peak_std
 CURRENT = {"spot": "?"}
 
-engine = GleitcastEngine()
+engine = WingcastEngine()
 engine.load_weather_from_cache()
 orig_tq = engine._thermal_quality_tags
 

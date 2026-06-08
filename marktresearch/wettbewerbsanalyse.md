@@ -1,6 +1,6 @@
 # Wettbewerbsanalyse: Gleitschirm-Wetter-App mit KI/LLM
 
-**Produkt:** Gleitcast -- KI/LLM-Integration in eine Gleitschirm-Wetter-App zur Gebietsfindung und Flugplanung
+**Produkt:** Wingcast -- KI/LLM-Integration in eine Gleitschirm-Wetter-App zur Gebietsfindung und Flugplanung
 **Zielgruppe:** Gleitschirmpiloten
 **Erstellt:** 2026-03-06
 **Methodik:** Competitor & Alternative Pages Framework (Deep Research)
@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-Burnair ist ein starkes Ökosystem, aber teuer und Alpen-zentrisch. Windy ist der Industriestandard, aber ein reines Rohdaten-Tool ohne Interpretation. Paraglidable bietet die simpelste Antwort ("Kann ich fliegen?"), aber ohne Transparenz oder Details. Meteo-Parapente hat das beste Wettermodell, aber eine veraltete UI und keine Empfehlungen. **Kein einziges Tool beantwortet aktuell die zentrale Pilotenfrage: "Wo genau soll ich heute fliegen und warum?"** -- und genau das ist der USP von Gleitcast.
+Burnair ist ein starkes Ökosystem, aber teuer und Alpen-zentrisch. Windy ist der Industriestandard, aber ein reines Rohdaten-Tool ohne Interpretation. Paraglidable bietet die simpelste Antwort ("Kann ich fliegen?"), aber ohne Transparenz oder Details. Meteo-Parapente hat das beste Wettermodell, aber eine veraltete UI und keine Empfehlungen. **Kein einziges Tool beantwortet aktuell die zentrale Pilotenfrage: "Wo genau soll ich heute fliegen und warum?"** -- und genau das ist der USP von Wingcast.
 
 ---
 
@@ -178,7 +178,7 @@ Burnair ist ein starkes Ökosystem, aber teuer und Alpen-zentrisch. Windy ist de
 ```
                     HOHE INTERPRETATION
                           |
-                    [GLEITCAST]
+                    [WINGCAST]
                      KI + LLM
                     "Wo & Warum"
                           |
@@ -213,25 +213,25 @@ EINFACH --------+----------+----------+-------- KOMPLEX
 |---|---|---|
 | **Personalisierte Gebietsempfehlung** | "Fliege heute ab 13 Uhr am Brauneck -- SW-Wind 15 km/h, Thermik bis 2.200m, Basis bei 2.500m" | Burnair zeigt Daten pro Gebiet, empfiehlt aber nicht DAS Gebiet. Paraglidable zeigt einen Score, aber nicht WO. |
 | **Natürlichsprachliche Erklärung (LLM)** | "Die Südwestlage bringt heute trockene Luft in die Nordalpen. Das Brauneck profitiert von der Hangexposition und dem Talwind aus dem Isartal." | Kein Tool erklärt das "Warum" in verständlicher Sprache. Alle zeigen Karten/Zahlen. |
-| **Transparente KI** | Zeigt die Datenbasis hinter der Empfehlung + Konfidenz-Level | Paraglidable ist eine Black Box. Gleitcast sagt "85% sicher, weil 3 von 4 Modellen übereinstimmen." |
+| **Transparente KI** | Zeigt die Datenbasis hinter der Empfehlung + Konfidenz-Level | Paraglidable ist eine Black Box. Wingcast sagt "85% sicher, weil 3 von 4 Modellen übereinstimmen." |
 | **Kontextuelle Entscheidungshilfe** | Berücksichtigt Pilot-Level, Fahrtstrecke, Tageszeit-Präferenzen | Kein Tool berücksichtigt den individuellen Piloten. Alle zeigen allen dasselbe. |
 
 ---
 
 ## Positioning Statement
 
-> **Gleitcast ist der KI-Co-Pilot für Gleitschirmflieger. Während andere Apps dir Wetterdaten zeigen, sagt dir Gleitcast wo du heute fliegen sollst -- und erklärt dir warum. Statt 7 Webseiten in 30 Sekunden zur besten Entscheidung.**
+> **Wingcast ist der KI-Co-Pilot für Gleitschirmflieger. Während andere Apps dir Wetterdaten zeigen, sagt dir Wingcast wo du heute fliegen sollst -- und erklärt dir warum. Statt 7 Webseiten in 30 Sekunden zur besten Entscheidung.**
 
 ---
 
 ## Strategische Positionierung
 
-### Wer Gleitcast NICHT sein sollte:
+### Wer Wingcast NICHT sein sollte:
 - Kein zweites Windy (Rohdaten-Visualisierung)
 - Kein zweites Burnair (All-in-One-Ökosystem mit Live-Tracking)
 - Kein zweites Meteo-Parapente (eigenes Wettermodell)
 
-### Wer Gleitcast sein sollte:
+### Wer Wingcast sein sollte:
 - Die **Intelligenz-Schicht** die auf bestehenden Datenquellen aufbaut
 - Das **ChatGPT für Flugwetter** -- natürlichsprachliche Interaktion
 - Der **Entscheidungs-Beschleuniger** der 45 Minuten Analyse auf 30 Sekunden reduziert
@@ -239,7 +239,7 @@ EINFACH --------+----------+----------+-------- KOMPLEX
 ### Komplementäre Positionierung statt Konfrontation:
 Stärkster strategischer Zug: Sich NICHT als Ersatz, sondern als **Ergänzungsschicht** positionieren, die bestehende Daten intelligent zusammenführt.
 
-> "Gleitcast nutzt Daten von Meteo-Parapente, ECMWF, GFS und mehr -- und macht daraus eine klare Empfehlung."
+> "Wingcast nutzt Daten von Meteo-Parapente, ECMWF, GFS und mehr -- und macht daraus eine klare Empfehlung."
 
 ---
 

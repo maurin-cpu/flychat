@@ -327,7 +327,7 @@ def run_test_analyses_stream(
     dem Lauf — egal ob Erfolg oder Fehler.
 
     Args:
-        engine: GleitcastEngine-Instanz (typischerweise das globale `engine` aus web.py).
+        engine: WingcastEngine-Instanz (typischerweise das globale `engine` aus web.py).
         use_frozen_input: True = Frozen-Snapshot laden; False = aktuell geladene
             `engine.weather_data` weiterverwenden.
         spot_set: "test" (default, ~28 Spots aus fluggebiete_test.csv) oder

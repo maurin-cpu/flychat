@@ -74,7 +74,7 @@ Skill: Peak ist wichtigstes Signal (×3), dann Dauer, dann Wolken.
 ## Update 2026-05-30 — Spot-Pfad, Regions-Präferenz & Wirksamkeit
 
 > **Code-Stand: implementiert, Tests grün (18), aber NICHT committed/deployed.**
-> Engine-Code → Gleitcast-Service (:5000) braucht Restart, damit es greift.
+> Engine-Code → Wingcast-Service (:5000) braucht Restart, damit es greift.
 
 ### A) Spot-Pfad verdrahtet
 

@@ -73,7 +73,7 @@ besonders gefährlich (abnehmender Gegenwind → Strömungsabriss).
 Bei 800hPa erscheinen Föhnströme als "fingerartige Streifen mit deutlichen Windspitzen"
 in hochaufgelösten Modelldaten (ICON-D2). Am besten sichtbar auf Windy.com bei 800hPa.
 
-## Relevanz für Gleitcast
+## Relevanz für Wingcast
 
 ### Was bereits implementiert ist (`foehn_indicators.py`)
 - Druckgradient (Lugano/Zürich)

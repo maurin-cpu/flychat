@@ -14,10 +14,10 @@ Laufzeit-Modi:
   - als CLI (`python scheduler.py --now`): sendet sofort einmal, Exit
 
 Umgebungsvariablen:
-  GLEITCAST_BRIEFINGS=0          -> Scheduler-Thread startet nicht
+  WINGCAST_BRIEFINGS=0          -> Scheduler-Thread startet nicht
   SCHEDULER_TEST_MODE=1          -> Thread wartet nur 30s bis zum ersten Lauf
                                     (fuer Integrations-Tests)
-  GLEITCAST_SMTP_DRY_RUN=1       -> Mails werden als HTML in tempdir geschrieben
+  WINGCAST_SMTP_DRY_RUN=1       -> Mails werden als HTML in tempdir geschrieben
                                     statt per SMTP gesendet (von email_service)
 """
 
@@ -363,8 +363,8 @@ def _cli_now() -> int:
     except ImportError:
         pass
 
-    from chat_engine import GleitcastEngine
-    eng = GleitcastEngine()
+    from chat_engine import WingcastEngine
+    eng = WingcastEngine()
     try:
         eng.load_weather_from_cache()
     except Exception as e:
@@ -384,7 +384,7 @@ if __name__ == "__main__":
     import argparse
     import sys
 
-    ap = argparse.ArgumentParser(description="Gleitcast Briefing-Scheduler")
+    ap = argparse.ArgumentParser(description="Wingcast Briefing-Scheduler")
     ap.add_argument("--now", action="store_true",
                     help="Einmaliger Sofort-Versand der Briefings.")
     ap.add_argument("--accuracy-now", action="store_true",

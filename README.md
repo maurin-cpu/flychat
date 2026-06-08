@@ -1,4 +1,4 @@
-# Gleitcast - Thermik & Wetter Assistant
+# Wingcast - Thermik & Wetter Assistant
 
 Dieses Projekt dient der Analyse und Vorhersage von Thermikbedingungen für Gleitschirmflieger.
 

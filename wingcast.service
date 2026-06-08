@@ -1,5 +1,5 @@
 [Unit]
-Description=Gleitcast Flask App
+Description=Wingcast Flask App
 After=network.target
 
 [Service]

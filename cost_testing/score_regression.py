@@ -264,8 +264,8 @@ def _run_current_pipeline(input_ctx: str, spot_name: str, date_str: str) -> dict
     aus dem Goldfile-Input — sonst feuern die deterministischen Decisions nicht,
     weil der Live-Pfad sie aus dem weather_context-Builder erwartet.
     """
-    from chat_engine import GleitcastEngine
-    eng = GleitcastEngine()
+    from chat_engine import WingcastEngine
+    eng = WingcastEngine()
     spot_obj = next((s for s in eng.spots if s["name"] == spot_name), None)
     if not spot_obj:
         return {"error": f"Spot {spot_name} nicht in spots.csv"}

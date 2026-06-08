@@ -1,5 +1,5 @@
 """
-Gleitcast E2E Smoke Tests
+Wingcast E2E Smoke Tests
 ========================
 
 Prüft, ob die Meteogramme auf der Haupt-Seite (/) und der Regionen-Seite (/regionen)
@@ -195,7 +195,7 @@ def test_no_console_errors(errors: list) -> tuple[bool, str]:
 # ============================================================================
 
 def main() -> int:
-    print("Gleitcast E2E Smoke Tests")
+    print("Wingcast E2E Smoke Tests")
     print("=" * 60)
 
     if not check_server_up():

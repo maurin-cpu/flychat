@@ -1,8 +1,8 @@
-# Böen-Modell: Wie Gleitcast Höhenböen berechnet
+# Böen-Modell: Wie Wingcast Höhenböen berechnet
 
 ## Was berechnen wir?
 
-Gleitcast schätzt für jede Region und jeden Spot ein vertikales Böenprofil von 0 bis 4000m MSL in 250m-Schritten. Das Profil zeigt, wie stark die Böen auf jeder Höhe sind — entscheidend für die Flugplanung (Startplatzwahl, Sicherheit in der Höhe).
+Wingcast schätzt für jede Region und jeden Spot ein vertikales Böenprofil von 0 bis 4000m MSL in 250m-Schritten. Das Profil zeigt, wie stark die Böen auf jeder Höhe sind — entscheidend für die Flugplanung (Startplatzwahl, Sicherheit in der Höhe).
 
 Das Ergebnis ist **monoton steigend**: Böen nehmen mit der Höhe nie ab. Physik: Mehr Höhe = mehr Exposition, weniger Terrain-Abschirmung.
 

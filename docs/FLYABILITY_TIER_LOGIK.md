@@ -2,7 +2,7 @@
 
 ## Was ist das Flyability-Tier?
 
-Pro Spot und Tag ordnet Gleitcast ein **Tier** zu, das die thermische Flugqualität in 3 Stufen klassifiziert (orthogonal zur Sicherheit aus Phase 1):
+Pro Spot und Tag ordnet Wingcast ein **Tier** zu, das die thermische Flugqualität in 3 Stufen klassifiziert (orthogonal zur Sicherheit aus Phase 1):
 
 | Tier | Bedeutung | Frontend-Farbe |
 |------|-----------|----------------|

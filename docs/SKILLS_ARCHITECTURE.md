@@ -31,7 +31,7 @@ Platzhalter `{{cfg.KEY}}` in den Files werden beim Laden gegen
 ┌──────────────────────────────────────────────────────────────┐
 │ SCHICHT 0 — DETERMINISTISCH (Code, keine LLM-Verantwortung)  │
 ├──────────────────────────────────────────────────────────────┤
-│ • Tag aktiv? (active_window_start oder None) — gleitcast/    │
+│ • Tag aktiv? (active_window_start oder None) — wingcast/    │
 │   engine/weather_context.py:_determine_active_window_start   │
 │ • Datenblock-Slicing (Stunden vor Tagesbeginn weg)           │
 │ • Pre-Filter not_safe (kein Fenster, ganztaegig Regen, …)    │

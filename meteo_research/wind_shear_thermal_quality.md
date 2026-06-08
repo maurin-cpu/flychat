@@ -5,7 +5,7 @@
 > oder unfliegbar wird. Basis fuer ein neues Label-System in `chat_engine.py`
 > analog zu `[GUST-WARN]`, `[RAIN-WARN]`, `[ALOFT-DANGER]`.
 >
-> **Kontext:** Das Gleitcast-Modell berechnet heute ein Thermik-Rating
+> **Kontext:** Das Wingcast-Modell berechnet heute ein Thermik-Rating
 > (`rating 1..10`, `climb_rate` in m/s) ueber `thermik_calculator.py` rein
 > aus der parcel-based Auftriebsenergie und Senkel-Gradienten. Der Effekt
 > von Windscherung — also das mechanische Zerreissen der Blase — wird
@@ -167,7 +167,7 @@ waechst. Das erklaert, warum:
   Scherung aushalten.
 
 Dieses Skalen-Argument deckt sich 1:1 mit den Terrain-Zonen des
-Gleitcast-Modells: `L_up` aus `gust_calculator.py` (mittelland=350 m,
+Wingcast-Modells: `L_up` aus `gust_calculator.py` (mittelland=350 m,
 hochalpin=750 m) ist die Turbulenz-Zerfallsskala (≈1.0–1.5×H_g,
 Letson et al. 2019), nicht die Schwerewellen-Kohärenzskala.
 
@@ -206,7 +206,7 @@ Beispiel: Bodenwind 10 km/h, 850-hPa-Wind (ca 1500 m) 40 km/h.
 Differenz = 30 km/h, Distanz = 1500 m. `dU/dz = 2 km/h / 100 m`.
 Exakt der Grenzwert.
 
-### 3.3 B/S-Ratio aus Gleitcast-Daten
+### 3.3 B/S-Ratio aus Wingcast-Daten
 
 Konkrete Formel, die mit den heute verfuegbaren Groessen berechenbar
 ist:
@@ -498,7 +498,7 @@ clean/warned-Zaehler einzuordnen.
 
 - **Kalibrierung der Zonen-Schwellen** in Abschnitt 4 ist ein
   Literatur-Transfer, kein direkter Messwert. Eine Validierung gegen
-  eigene winds.mobi-Daten und Gleitcast-Historie waere wuenschenswert.
+  eigene winds.mobi-Daten und Wingcast-Historie waere wuenschenswert.
 - **Unabhaengigkeit der Tags**: Wenn `dU/dz` hoch ist, ist B/S meist
   auch klein. Die drei Tags koennten korrelieren und zu doppelter
   Bestrafung fuehren. Empfehlung: in einer ersten Iteration alle drei

@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   Gleitcast – Subscribe: Region-Filter mit Chips + Karte
+   Wingcast – Subscribe: Region-Filter mit Chips + Karte
    Spiegelt die Briefing-UX (static/js/briefing.js) auf dem
    Abo-Formular. Auswahl via Chip oder Klick aufs Polygon.
    Hidden <input>s werden für den POST synchronisiert.

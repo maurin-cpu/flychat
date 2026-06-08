@@ -1,12 +1,12 @@
 # Region-Referenzpunkte: Forschung zu optimalem Spatial Sampling für Gleitschirm-Regionen
 
-Stand: Mai 2026. Bezug: Gleitcast verwendet derzeit pro Flugregion 7 Punkte (4 Edge-Anker via Greedy Max-Min, 3 Innen-Punkte via Lloyd-CVT auf negativ-buffered Polygon) und aggregiert daraus Wolken, Niederschlag, Wind, Böen, Thermik.
+Stand: Mai 2026. Bezug: Wingcast verwendet derzeit pro Flugregion 7 Punkte (4 Edge-Anker via Greedy Max-Min, 3 Innen-Punkte via Lloyd-CVT auf negativ-buffered Polygon) und aggregiert daraus Wolken, Niederschlag, Wind, Böen, Thermik.
 
 ---
 
 ## 1. Executive Summary
 
-Die Recherche über zehn Web-Quellen aus Geostatistik, NWP-Subgrid-Theorie, Alpiner Föhnforschung und Soaring-Forecasting bestätigt, dass der aktuelle Gleitcast-Hybridansatz (4 Edge + 3 CVT-Innen, N=7) für Schweizer Flugregionen in der oberen Hälfte der publizierten Best-Practice liegt. CVT ist nachweislich optimal für räumliche Mittelwerte unter quadratischer Fehlerannahme (Du/Faber/Gunzburger 1999; Mishra et al. 2020 für Rain Gauges). Die Punktzahl N=7 liegt im plausiblen Bereich: bei einer Dekorrelations-Distanz von 27 km für Niederschlag (Beck et al. 2021) und 10–100 km für lokale Alpine Zirkulationen sind in einer typischen Gleitcast-Region (~500–2000 km²) zwischen 5 und 12 unabhängige Stützpunkte gerechtfertigt. Die wichtigste Schwäche des aktuellen Setups ist nicht die Punktzahl, sondern die fehlende **topographische Stratifikation**: die 7 Punkte sind rein geometrisch verteilt und ignorieren Höhen-, Aspekt- und Rauhigkeitsverteilung der Region, obwohl die Literatur (TopoSUB, Fiddes & Gruber 2012; TopoSCALE 2014) klar zeigt, dass diese drei Dimensionen die meteorologische Heterogenität in komplexem Terrain dominieren. Empfehlung: N bleibt bei 6–8, aber Punkte stratifiziert auswählen statt rein CVT-geometrisch.
+Die Recherche über zehn Web-Quellen aus Geostatistik, NWP-Subgrid-Theorie, Alpiner Föhnforschung und Soaring-Forecasting bestätigt, dass der aktuelle Wingcast-Hybridansatz (4 Edge + 3 CVT-Innen, N=7) für Schweizer Flugregionen in der oberen Hälfte der publizierten Best-Practice liegt. CVT ist nachweislich optimal für räumliche Mittelwerte unter quadratischer Fehlerannahme (Du/Faber/Gunzburger 1999; Mishra et al. 2020 für Rain Gauges). Die Punktzahl N=7 liegt im plausiblen Bereich: bei einer Dekorrelations-Distanz von 27 km für Niederschlag (Beck et al. 2021) und 10–100 km für lokale Alpine Zirkulationen sind in einer typischen Wingcast-Region (~500–2000 km²) zwischen 5 und 12 unabhängige Stützpunkte gerechtfertigt. Die wichtigste Schwäche des aktuellen Setups ist nicht die Punktzahl, sondern die fehlende **topographische Stratifikation**: die 7 Punkte sind rein geometrisch verteilt und ignorieren Höhen-, Aspekt- und Rauhigkeitsverteilung der Region, obwohl die Literatur (TopoSUB, Fiddes & Gruber 2012; TopoSCALE 2014) klar zeigt, dass diese drei Dimensionen die meteorologische Heterogenität in komplexem Terrain dominieren. Empfehlung: N bleibt bei 6–8, aber Punkte stratifiziert auswählen statt rein CVT-geometrisch.
 
 ---
 
@@ -38,7 +38,7 @@ Vier Hauptstrategien aus der Literatur sind relevant:
 | Niederschlag (decorrelation) | ~27 km in mittleren Breiten | Beck et al., Nature Sci Data 2021 |
 | Bewölkung gesamt | smooth >>20 km bei stratiform, <2 km bei broken Cu | Vergleich der gleichen Quellen |
 
-Für eine typische Gleitcast-Region (Durchmesser ~30 km, Fläche ~500–1500 km²) bedeutet das:
+Für eine typische Wingcast-Region (Durchmesser ~30 km, Fläche ~500–1500 km²) bedeutet das:
 - Niederschlag ist nahe einer Dekorrelations-Länge → 1–3 Punkte würden statistisch ausreichen
 - Cumulus-Bewölkung kann zwischen Tal A und Tal B um 50 % differieren → braucht ≥4 Punkte
 - Föhn-Durchbruch ist topographisch fixiert (Pässe, Talausläufer) → Edge-Sampling sinnvoll
@@ -54,7 +54,7 @@ Die mit Abstand stärkste Empfehlung aus der Literatur ist topographische Strati
 - **Aspekt:** S-/SW-exponierte Hänge heizen früher und stärker auf, N-Hänge bleiben länger stabil. Föhnstrich ist auspektabhängig (Nordseite vs. Südseite des Hauptkamms).
 - **Slope/Rauhigkeit:** Mechanische Turbulenz und Hangauflösungs-Effekte sind slope-getrieben.
 
-TopoSUB (Fiddes & Gruber 2012) hat das für glaziologisch-hydrologisches Downscaling formalisiert: K-Means-Cluster über (z, slope, aspect, svf), dann pro Cluster ein repräsentativer Punkt. Für eine Region mit z. B. 5 Höhenstufen × 4 Aspekt-Klassen = 20 Cluster — aber praktisch reichen 6–8 Cluster für Gleitcast-Granularität.
+TopoSUB (Fiddes & Gruber 2012) hat das für glaziologisch-hydrologisches Downscaling formalisiert: K-Means-Cluster über (z, slope, aspect, svf), dann pro Cluster ein repräsentativer Punkt. Für eine Region mit z. B. 5 Höhenstufen × 4 Aspekt-Klassen = 20 Cluster — aber praktisch reichen 6–8 Cluster für Wingcast-Granularität.
 
 Dynamical Downscaling-Modelle (WRF, CALMET) lösen das durch hohe horizontale Auflösung statt explizites Sampling, sind aber rechenintensiv. Statistisches Downscaling mit topo-stratified Sampling ist der praktikable Mittelweg.
 
@@ -62,14 +62,14 @@ Dynamical Downscaling-Modelle (WRF, CALMET) lösen das durch hohe horizontale Au
 
 Öffentliche technische Details sind dünn, aber das Recherche-Bild ist:
 
-- **Burnair (CH):** Greift auf ICON-D2/CH-Daten zurück und zeigt punktuelle Spot-Forecasts plus Wetterstations-Layer. Keine öffentliche Region-Aggregations-Methode publiziert. Die App ist primär Spot-zentriert mit Map-Overlay, nicht regional-aggregiert wie Gleitcast.
+- **Burnair (CH):** Greift auf ICON-D2/CH-Daten zurück und zeigt punktuelle Spot-Forecasts plus Wetterstations-Layer. Keine öffentliche Region-Aggregations-Methode publiziert. Die App ist primär Spot-zentriert mit Map-Overlay, nicht regional-aggregiert wie Wingcast.
 - **MeteoParapente (FR):** Eigenes 2.5-km-Modell für Europa, an Paragliding-Bedürfnisse getunt ([portal.meteo-parapente.com/about](https://portal.meteo-parapente.com/about/)). Forecasts werden punktuell ausgegeben, keine explizite Region-Aggregation. Pilot-Bewertungen ([airetaventure.com](https://www.airetaventure.com/en/content/123-paragliding-weather)) sind in Frankreich sehr positiv für Lokalprognosen.
 - **MeteoBlue MultiModel:** Pro Punkt werden mehrere globale + regionale Modelle gemittelt; pro Punkt eine Gridzelle 4–40 km. Keine Multi-Punkt-Aggregation innerhalb einer Region — der User pickt den Punkt manuell.
 - **XCSkies (US/global):** GFS + Regional, parameterisiert für Soaring. Layer-basiert, punktbasiert. Pilot-Reviews (Cloudbase Mayhem Ep. 120) loben Cloudbase und Lift-Genauigkeit, kritisieren Wind im Hochgebirge.
 - **SkySight (AUS/global):** Eigenes WRF mit 1.8 km Auflösung und eigenem Land-Surface-Modell für Bodenfeuchte. Punktuell und Karten-Layer, keine Region-Aggregation.
 - **SoaringMeteo (FR open-source):** WRF 2–6 km Alpen + GFS 25 km global, [GitHub soaringmeteo/soaringmeteo](https://github.com/soaringmeteo/soaringmeteo). Punktuell, kein Region-Aggregations-Layer.
 
-**Wesentliche Beobachtung:** Keine der grossen Konkurrenz-Apps macht echte Region-Aggregation — sie zeigen Punkte oder Karten-Layer und überlassen dem User die räumliche Synthese. Gleitcast ist mit dem Region-Konzept *strukturell anders* (und potentiell mehrwertig für Gleitcast-Übersichten), aber muss die Aggregation selbst lösen, ohne aus Konkurrenz-Code abkupfern zu können.
+**Wesentliche Beobachtung:** Keine der grossen Konkurrenz-Apps macht echte Region-Aggregation — sie zeigen Punkte oder Karten-Layer und überlassen dem User die räumliche Synthese. Wingcast ist mit dem Region-Konzept *strukturell anders* (und potentiell mehrwertig für Wingcast-Übersichten), aber muss die Aggregation selbst lösen, ohne aus Konkurrenz-Code abkupfern zu können.
 
 ### 2.5 Edge vs Interior — Hybrid sinnvoll?
 
@@ -79,7 +79,7 @@ Die Literatur spricht nicht direkt von "Edge-Anker für Föhn, Interior für Kon
 2. **Lee-Effekte** treten am Windschatten von Bergketten auf — typischerweise Polygon-Rand zum Hauptkamm.
 3. **Innere Konvektion / Wolkenlücken / Talwinde** sind Polygon-internen Heterogenitäten — CVT-Innen-Punkte sind ideal.
 
-CVT alleine (Lloyd auf gesamtem Polygon) würde die Punkte zum Centroid hin verdichten und Edge-Phänomene unterabtasten. Reines Edge-Sampling würde die Mitte ignorieren. Der **Hybrid 4+3 von Gleitcast ist also konzeptionell sauber begründbar** — er folgt der gleichen Logik wie Boundary-Layer-Methoden im Finite-Element-Bereich, wo Randpunkte und Centroide explizit getrennt werden.
+CVT alleine (Lloyd auf gesamtem Polygon) würde die Punkte zum Centroid hin verdichten und Edge-Phänomene unterabtasten. Reines Edge-Sampling würde die Mitte ignorieren. Der **Hybrid 4+3 von Wingcast ist also konzeptionell sauber begründbar** — er folgt der gleichen Logik wie Boundary-Layer-Methoden im Finite-Element-Bereich, wo Randpunkte und Centroide explizit getrennt werden.
 
 Kritikpunkt: 4 Edge-Punkte via Greedy Max-Min sind *geometrisch* maximal verteilt, nicht *physikalisch* an den relevanten Edge-Phänomenen orientiert. Eine physikalisch geleitete Wahl würde Edge-Punkte an Pässen, Lee-Kanten und Hauptkamm-Auslässen platzieren — was aber pro Region manuell oder via Geländeanalyse erfolgen müsste.
 
@@ -87,11 +87,11 @@ Kritikpunkt: 4 Edge-Punkte via Greedy Max-Min sind *geometrisch* maximal verteil
 
 Aus der Geostatistik gibt es zwei Faustregeln:
 
-**Pixel-Formel (Klinkenberg, Rules of Thumb for Spatial Data, [UBC](https://ibis.geog.ubc.ca/~brian/rules_of_thumb/index.html)):** `pixel = sqrt(F × area / N)` mit F=2.5. Umgestellt: `N = F × area / pixel²`. Für eine 1000 km² Region und gewünschte "Pixel" von ~13 km (= halbe Dekorrelations-Distanz Niederschlag): N = 2.5 × 1000 / 169 ≈ 15. Bei pixel=20 km: N ≈ 6. Gleitcast mit N=7 liegt damit nahe der praktischen Untergrenze für Niederschlags-getriebene Auflösung.
+**Pixel-Formel (Klinkenberg, Rules of Thumb for Spatial Data, [UBC](https://ibis.geog.ubc.ca/~brian/rules_of_thumb/index.html)):** `pixel = sqrt(F × area / N)` mit F=2.5. Umgestellt: `N = F × area / pixel²`. Für eine 1000 km² Region und gewünschte "Pixel" von ~13 km (= halbe Dekorrelations-Distanz Niederschlag): N = 2.5 × 1000 / 169 ≈ 15. Bei pixel=20 km: N ≈ 6. Wingcast mit N=7 liegt damit nahe der praktischen Untergrenze für Niederschlags-getriebene Auflösung.
 
-**Variogramm-basiert (McBratney & Webster, optimal sampling for kriging, [ScienceDirect S0016706100000409](https://www.sciencedirect.com/science/article/abs/pii/S0016706100000409)):** Die optimale Punktzahl skaliert mit (Range/Polygon-Diagonale)⁻¹. Bei Range ≈ 20–30 km und Polygon-Diagonale ~40 km ergibt das ein N=2–4 für reine Schätzung des Mittelwerts, aber N=6–12 wenn auch das Variogramm geschätzt werden soll (was Gleitcast effektiv tut, indem es Wolkenheterogenität als 30-%-Perzentil aufnimmt).
+**Variogramm-basiert (McBratney & Webster, optimal sampling for kriging, [ScienceDirect S0016706100000409](https://www.sciencedirect.com/science/article/abs/pii/S0016706100000409)):** Die optimale Punktzahl skaliert mit (Range/Polygon-Diagonale)⁻¹. Bei Range ≈ 20–30 km und Polygon-Diagonale ~40 km ergibt das ein N=2–4 für reine Schätzung des Mittelwerts, aber N=6–12 wenn auch das Variogramm geschätzt werden soll (was Wingcast effektiv tut, indem es Wolkenheterogenität als 30-%-Perzentil aufnimmt).
 
-**Effective Sample Size unter Autokorrelation (Griffith 2005, [Academia.edu](https://www.academia.edu/25157865/Effective_Geographic_Sample_Size_in_the_Presence_of_Spatial_Autocorrelation)):** Bei starker positiver räumlicher Autokorrelation kann ESS << N sein. Bei Cloud-Cover mit Autokorrelation ρ ≈ 0.7 (typisch für Bewölkung über 10 km) sinkt ESS für N=7 auf etwa 3–4. Das ist die *real* nutzbare Information — das deckt sich gut mit Gleitcasts 30-%-Perzentil-Aggregation, die robust mit 3–4 unabhängigen Stützen ist.
+**Effective Sample Size unter Autokorrelation (Griffith 2005, [Academia.edu](https://www.academia.edu/25157865/Effective_Geographic_Sample_Size_in_the_Presence_of_Spatial_Autocorrelation)):** Bei starker positiver räumlicher Autokorrelation kann ESS << N sein. Bei Cloud-Cover mit Autokorrelation ρ ≈ 0.7 (typisch für Bewölkung über 10 km) sinkt ESS für N=7 auf etwa 3–4. Das ist die *real* nutzbare Information — das deckt sich gut mit Wingcasts 30-%-Perzentil-Aggregation, die robust mit 3–4 unabhängigen Stützen ist.
 
 **Marginalrendite:** Empirische Studien zu Rain-Gauge-Netzen zeigen einen Plateau-Effekt: ab N>~10 nimmt die Verbesserung im Mittelwertfehler stark ab. N=7 liegt im steilen Bereich der Lernkurve. N=12 würde wahrscheinlich noch 10–15 % Genauigkeit bringen, N=20 nur noch 3–5 %.
 
@@ -113,7 +113,7 @@ Die theoretisch saubere Lösung für einen Gleitschirm-Forecaster wäre:
 
 ---
 
-## 3. Bewertung des aktuellen Gleitcast-Setups
+## 3. Bewertung des aktuellen Wingcast-Setups
 
 | Aspekt | Bewertung | Begründung |
 |---|---|---|

@@ -1,4 +1,4 @@
-GLEITCAST — Monatsrueckblick {{ month_label }}
+WINGCAST — Monatsrueckblick {{ month_label }}
 
 Deine Prognose war zu {{ stats.accuracy_pct }}% richtig.
 
@@ -11,7 +11,7 @@ Basierend auf {{ stats.total }} Feedbacks der letzten {{ stats.window_days }} Ta
 Einstellungen anpassen: {{ urls.account }}
 
 --
-Gleitcast ist Decision Support — die finale Entscheidung triffst du.
+Wingcast ist Decision Support — die finale Entscheidung triffst du.
 Im Zweifel: nicht fliegen.
 
 Abmelden: {{ urls.unsubscribe }}

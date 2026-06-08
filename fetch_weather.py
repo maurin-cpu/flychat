@@ -1,5 +1,5 @@
 """
-Wetterdaten-Aggregation für Gleitcast.
+Wetterdaten-Aggregation für Wingcast.
 Adaptiert von uetliberg_ticker/fetch_weather.py - Multi-Spot Support.
 
 Batch-Modus: Alle Spots in 6 API-Calls (D2+Thermal+Fallback+GFS+CH1+CH2).

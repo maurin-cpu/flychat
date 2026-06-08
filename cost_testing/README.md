@@ -10,7 +10,7 @@
 
 ```bash
 cd /c/Users/mutsc/Projekte/flychat
-export GLEITCAST_SPOT_CSV=test     # 28 Spots, ~$0.50/Lauf statt 487/$8.70
+export WINGCAST_SPOT_CSV=test     # 28 Spots, ~$0.50/Lauf statt 487/$8.70
 ```
 
 Verifizieren:
@@ -104,7 +104,7 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 ## Standard-Test-Loop (Copy-Paste)
 
 ```bash
-export GLEITCAST_SPOT_CSV=test
+export WINGCAST_SPOT_CSV=test
 
 # Baseline einfrieren (vor Änderung)
 python cost_testing/analyze_once.py

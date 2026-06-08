@@ -1,5 +1,5 @@
 /**
- * Gleitcast - Chat Frontend Logic
+ * Wingcast - Chat Frontend Logic
  */
 (function () {
     'use strict';
@@ -20,10 +20,10 @@
     var isLoading = false;
 
     function getSessionId() {
-        var id = localStorage.getItem('gleitcast_session');
+        var id = localStorage.getItem('wingcast_session');
         if (!id) {
             id = 'sess_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-            localStorage.setItem('gleitcast_session', id);
+            localStorage.setItem('wingcast_session', id);
         }
         return id;
     }
@@ -448,7 +448,7 @@
                     if (data.success) {
                         // UI zurücksetzen
                         messagesEl.innerHTML = '';
-                        appendMessage('bot', 'Hallo! Ich bin dein Gleitcast-Berater (Beta — Antworten können noch Fehler enthalten). Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.');
+                        appendMessage('bot', 'Hallo! Ich bin dein Wingcast-Berater (Beta — Antworten können noch Fehler enthalten). Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.');
                         if (quickActions) {
                             quickActions.classList.remove('compact');
                         }
@@ -967,7 +967,7 @@
 
     // ── Onboarding Hints (first visit only) ──────────────
     (function () {
-        var key = 'gleitcast_onboarded';
+        var key = 'wingcast_onboarded';
         if (localStorage.getItem(key)) return;
         localStorage.setItem(key, '1');
         var qa = document.getElementById('quickActions');

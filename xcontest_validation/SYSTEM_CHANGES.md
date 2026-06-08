@@ -1,6 +1,6 @@
 # System-Aenderungen waehrend XContest-Validierungs-Periode
 
-Diese Datei dokumentiert grundsaetzliche Aenderungen am Gleitcast-Vorhersage-System,
+Diese Datei dokumentiert grundsaetzliche Aenderungen am Wingcast-Vorhersage-System,
 die waehrend des laufenden XContest-Validierungs-Workflows passiert sind. Wichtig
 fuer die Interpretation von Validierungs-Ergebnissen ueber die Zeit: ein Drift
 oder Sprung in der Treffer-Quote koennte ein System-Aenderung sein, nicht ein

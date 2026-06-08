@@ -12,7 +12,7 @@ Schwester-Dokument: [`strategie.md`](strategie.md) (Hebel & Strategie).
 - **`cost_testing/analyze_once.py`** — Smoke-Lauf: Wetter holen + LLM-Analyse einmal durchziehen. Schreibt `data/cost_telemetry.jsonl`.
 - **`cost_testing/freeze_golden.py`** — friert Cases als Goldstandard ein (Wetter-Input + Output) in `cost_testing/golden/`.
 - **`cost_testing/score_regression.py`** — vergleicht aktuelles Pipeline-Output gegen Goldstandard, gibt PASS/FAIL.
-- **Lokal IMMER mit `GLEITCAST_SPOT_CSV=test`** (28 statt 487 Spots → ~$0.50 statt ~$8.70 pro Lauf).
+- **Lokal IMMER mit `WINGCAST_SPOT_CSV=test`** (28 statt 487 Spots → ~$0.50 statt ~$8.70 pro Lauf).
 
 ---
 
@@ -20,7 +20,7 @@ Schwester-Dokument: [`strategie.md`](strategie.md) (Hebel & Strategie).
 
 ```bash
 cd /c/Users/mutsc/Projekte/flychat
-export GLEITCAST_SPOT_CSV=test     # 28 Spots statt 487
+export WINGCAST_SPOT_CSV=test     # 28 Spots statt 487
 ```
 
 Verifizieren:
@@ -147,7 +147,7 @@ Score: 36/39
 ## 4. Standard-Test-Loop für eine Optimierung
 
 ```bash
-export GLEITCAST_SPOT_CSV=test
+export WINGCAST_SPOT_CSV=test
 
 # 1. Baseline einfrieren (jetzt, vor jeder Änderung)
 python cost_testing/analyze_once.py

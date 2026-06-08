@@ -1,4 +1,4 @@
-# Faehigkeiten-Guide fuer den Gleitcast-Berater
+# Faehigkeiten-Guide fuer den Wingcast-Berater
 
 <!--
   SYNC-HINWEIS FUER ENTWICKLER (Claude Code / manuell):

@@ -1,5 +1,5 @@
 /**
- * Gleitcast - Shared Analysis View Renderer
+ * Wingcast - Shared Analysis View Renderer
  *
  * Eine Analyse-Darstellung fuer Spot UND Region. Identisches Layout, identische
  * Reihenfolge, identische Wortwahl. Region-Spezifika (Top-Spots-Liste) werden
@@ -236,11 +236,11 @@ window.AnalysisView = (function () {
         return i === -1 ? 999 : i;
     }
 
-    // Fester Anzeige-Rahmen 06:00–21:00 (parallel zum Gleitcast).
+    // Fester Anzeige-Rahmen 06:00–21:00 (parallel zum Wingcast).
     var WINDOW_HOUR_START_V4 = 6;
     var WINDOW_HOUR_END_V4 = 21;
 
-    // Startfenster — UI/UX-Pro-Max Layout (parallel zum Gleitcast):
+    // Startfenster — UI/UX-Pro-Max Layout (parallel zum Wingcast):
     // Antwort zuerst (✓/▲/✕ + Zeitspanne + Dauer-Pille), dann durchgehende
     // Farbleiste, Tick-Achse alle 3 h, optional Sportlich-Sekundaerinfo.
     // Achse ist immer 6h-20h, fehlende Stunden = neutral.
@@ -692,7 +692,7 @@ window.AnalysisView = (function () {
         // gebildet werden -> Block bleibt versteckt.
         var fbOpts = { isRegion: isRegion, regionId: opts.regionId, spotName: opts.spotName };
         var hasEntity = isRegion ? !!opts.regionId : !!opts.spotName;
-        var showAdminFb = !!(window.gleitcastIsAdmin && dateStr && hasEntity);
+        var showAdminFb = !!(window.wingcastIsAdmin && dateStr && hasEntity);
 
         // State B: Not-safe (inklusive noAnalysis-Pfad)
         var notSafe = (safetyStatus === 'not_safe')
