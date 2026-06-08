@@ -58,3 +58,16 @@ W/m²-Werte sind **dein internes Tool**. **NIEMALS Roh-Zahlen in user-facing Pro
 - `mittel 100%, Strahlung 280 W/m²` → "dichte Mittelbewoelkung, Sonne weitgehend weg"
 
 **Ausnahme:** In `flyability_notes` (technische Diagnostik) duerfen Werte stehen. In `recommendation`/`thermal_quality`: nur Fliegersprache.
+
+─────────────────────────────────
+FELD-NAMEN: NIE AUSSCHREIBEN
+─────────────────────────────────
+
+`sustained_peak`, `prod_h_strict`, `working_height_agl`, `cloud_structure`, `climb_rate` usw. sind **interne Variablennamen**. **NIEMALS den Identifier wörtlich in user-facing Prosa** — auch nicht in `flyability_notes`. Der Leser kennt den Code nicht; benenne immer die Sache, nicht das Feld. Falsch: "Der sustained_peak von 1.8 m/s". Richtig: "Das Steigen haelt bei 1.8 m/s".
+
+| Feld | Schreibweise |
+|---|---|
+| `sustained_peak` | "anhaltendes Steigen", "das Steigen haelt bei X m/s", "Steigwerte um X m/s" |
+| `prod_h_strict` | "produktive Stunden", "X produktive Thermikstunden", "X h tragend" |
+| `working_height_agl` | "Arbeitshoehe", "Arbeitshoehe knapp X m ueber Grund" |
+| `cloud_structure` | "Wolkenbild", "Bewoelkung" |
