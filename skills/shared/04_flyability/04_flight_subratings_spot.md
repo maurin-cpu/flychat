@@ -106,9 +106,9 @@ Stuetzpunkte aus Pilotenliteratur (Drury/xcmag, Burnair): 450m=Komfortgrenze,
 Bandgrenzen sind Pilot-Uebersetzung. Siehe `meteo_research/working_height_agl_thresholds.md`.
 
 **Wichtig:** Niedrige AGL macht den Tag nicht schlecht — nur lokal. Spot-Tag
-Peak 2.5 × 8h × 700m AGL ist immer noch Rating 4 lokal — aber Streckenflug-
-Aussage haengt von `working_height_at_spot_m` ab (siehe Region-Kontext-Block
-und XC-Pflichtsatz unten).
+Peak 2.5 × 8h × 700m AGL ist immer noch Rating 4 lokal. `working_height_agl` ist
+zugleich der Ueberhoehen-Befund (>= ~400m = ueberhoehbar); die Wie-weit-/km-Aussage
+kommt aus `Region-XC` (siehe XC-Abschnitt unten).
 
 **Spot vs. Region:** Spot-Korridore liegen niedriger als Region — einzelne
 Spots koennen mit knapper Basis lohnend sein (Spotwissen, Talwind,
@@ -198,76 +198,80 @@ Bewertungen aehnlicher Tage, oben im Kontext).
 REGION-CAP & STRECKENFLUG-PFLICHTSATZ (XC im xc_details)
 ─────────────────────────────────
 
-Streckenflug ist **keine eigene Achse mehr** — die Aussage gehoert als Pflicht-
-Satz in `xc_details`. Die Bewertung `experience_rating` kombiniert lokales
-Pilotenurteil (Peak/Dauer/AGL) mit einem **Region-Cap fuer hohe Bewertungen**.
+Die **Wie-weit-/Strecken-Aussage liefert die Region** (`Region-XC:`) — der Spot
+hat keine eigene XC-Achse. Deine Spot-Aufgabe ist der **Ueberhoehen-Befund**:
+kann man ueber den Startplatz hinaus steigen? Die Bewertung `experience_rating`
+kombiniert lokales Pilotenurteil (Peak/Dauer/AGL) mit einem **Region-Cap fuer
+hohe Bewertungen**.
 
-**Inputs aus dem Region-Kontext-Block** (vom Spot-Prompt mitgeliefert):
-- `Region.experience_rating` (1-5)
-- `Region.working_height_agl_m` (Median, Min, **Max @ Best-Hour**)
-- `Region.elevation_ref`
-- `spot.elevation_m`
-- **vorberechnetes** `working_height_at_spot_m` (Median + Min + Max @ Best-Hour)
+**Ueberhoehen-Quelle = `working_height_agl` (RATING-INPUTS, spot-eigen).**
+`working_height_agl` ist die nutzbare Steighoehe **ueber dem Startplatz** — genau
+"wie weit kann ich ueber Start hinaus steigen". Sie steht im Datenblock, du
+rechnest nichts selbst:
+- **>= ~400m** → **JA**, ueberhoehbar; nenne die Zahl (z.B. "+1800m ueber Start").
+- **< ~400m** → **NEIN/kaum**: Deckel knapp ueber Platz, kaum Steigen ueber Start, nur Hausrunde/Soaring.
 
-**Du rechnest die Hoehen-Reserve NICHT selbst — der Block liefert sie.**
+**Cap-Regel — Region-Rating UND `working_height_agl` muessen beide passen:**
 
-**Cap-Regel — massgebend ist `working_height_at_spot_m_max` (Best-Stunde):**
-
-| Rating | km-Klasse (XC-Literatur) | Region.experience_rating | working_height_at_spot_m_max |
+| Rating | km-Klasse (XC-Literatur) | Region (Region-XC / Region-Rating) | working_height_agl |
 |---|---|---|---|
-| 5 (Klassiker >100km) | Burnair-Klassiker | = 5 | >= 2000m |
-| 4 (XC 30-100km / FAI) | xcmag-Standard | >= 4 | >= 1500m |
-| 3 (Talquerung 10-30km / Halbtag) | aus Pilotenliteratur | >= 3 ODER lokales Wohlfuehlen | >= 1000m |
-| 2 (Soaring/Hausrunde) | lokal | egal | >= 500m |
-| 1 (Abgleiter) | nichts | egal | < 500m ODER Spot >= Region-Top |
+| 5 (Klassiker >100km) | Burnair-Klassiker | high / = 5 | >= 2000m |
+| 4 (XC 30-100km / FAI) | xcmag-Standard | high-moderate / >= 4 | >= 1500m |
+| 3 (Talquerung 10-30km / Halbtag) | aus Pilotenliteratur | moderate / >= 3 ODER lokales Wohlfuehlen | >= 800m |
+| 2 (Soaring/Hausrunde) | egal | egal | >= 400m |
+| 1 (Abgleiter) | egal | egal | < 400m |
 
-Werden BEIDE Achsen-Voraussetzungen nicht erfuellt, **kappst du auf die naechst-tiefere Stufe**.
+Werden BEIDE Voraussetzungen nicht erfuellt, **kappst du auf die naechst-tiefere Stufe**.
 
-**Sonderfall Region fehlt** (Block sagt "nicht verfuegbar"): max Rating **3**, Pflichtsatz im `xc_details`: "Ohne Region-Kontext keine XC-Aussage — reine Spot-Einschaetzung." `working_height_at_spot_m` darfst du nicht selbst raten.
-
-**Sonderfall Spot >= Region-Top** (Reserve_max <= 0): Pflichtsatz "Spot bereits ueber Region-Thermik-Top, kein Wegfliegen moeglich, allenfalls lokales Soaring." Rating max **2**.
+**Sonderfall Region fehlt** (Block sagt "nicht verfuegbar"): max Rating **3**, im `xc_details`: Ueberhoehen-Befund (aus `working_height_agl`) + "Ohne Region-Kontext keine Strecken-Aussage — reine Spot-Einschaetzung."
 
 ─────────────────────────────────
-STRECKENFLUG-PFLICHTSATZ IN `xc_details`
+`xc_details`: UEBERHOEHEN ZUERST, DANN WIE-WEIT
 ─────────────────────────────────
 
-Streckenflug ist die **verdichtete Zusammenfassung der Region-Flugeinschaetzung**,
-auf den Spot projiziert. Die XC-Aussage kommt NICHT aus dem Nichts — sie leitet
-sich aus dem REGION-KONTEXT-BLOCK ab (`Region-Thermik`, `Region.experience_rating`,
-Region-Arbeitshoehe → `working_height_at_spot_m`). Deshalb MUSST du sie immer
-**aus der Region heraus begruenden** — der Leser soll sehen, *weshalb* du darauf
-kommst.
+Zwei Dinge, in dieser Reihenfolge:
 
-`xc_details` MUSS in JEDEM Fall:
-1. die **Region als Quelle mit `weil`/`weshalb` benennen** — also WORAUS sich die
-   XC-Tauglichkeit ergibt: Region-Thermik-Qualitaet, `Region.experience_rating`
-   und/oder Region-Basis. Beispiele:
-   - "**weil** die Region starke Thermik und hohe Basis liefert (Region-Rating 5) ..."
-   - "**weil** die Region nur schwache Thermik und tiefe Basis hat (Region-Rating 2) ..."
-   Nie eine nackte km-Zahl ohne diese Region-Begruendung.
-2. die **Zahl** `working_height_at_spot_m_max` und die **km-Klasse** benennen.
+**(1) UEBERHOEHEN — deine Spot-Kernfrage, IMMER zuerst.** Kann man den Startplatz
+ueberhoehen? Quelle ist **AUSSCHLIESSLICH `working_height_agl`** (Steighoehe ueber
+Start, im Datenblock). **Uebernimm die `working_height_agl`-Zahl WORTWOERTLICH aus
+RATING-INPUTS — runde/senke sie NIE, auch nicht bei schwacher Region:**
+- **>= ~400m** → **JA**; nenne exakt die working_height_agl-Zahl ("ueber Start bis +900m steigbar"). „Deckel knapp ueber Platz" ist hier VERBOTEN.
+- **< ~400m** → **NEIN/kaum**: "Deckel knapp ueber Platz — kaum Steigen ueber Start, nur Hausrunde/Soaring."
 
-**Zeitfenster-Pflicht:** Wenn die Spannweite (Max − Min der Region-Arbeitshoehe ueber Productive-Hours) **>= 500m** betraegt — also der Tag eine steile Entwicklung hat —, MUSST du das Best-Hour-Fenster im Pflichtsatz benennen ("Mittagsfenster 13-15 Uhr ..."). Liegt die Spannweite unter 500m, reicht ein allgemeiner XC-Satz.
+⚠️ **NICHT verwechseln:** Eine **schwache Region** (Region-XC: low) macht nur die
+**Strecke kurz** — sie macht den Startplatz NICHT unueberhoehbar. Solange
+`working_height_agl >= ~400m`, lautet der Befund **JA** (mit Zahl), auch bei mauem
+Tag. Der Ueberhoehen-Befund kommt NIE aus Region-XC.
+
+**(2) WIE WEIT — kommt aus der Region, nicht von dir.** Die Strecken-/km-Aussage
+lieferte die Region als `Region-XC:` im Kontext-Block. Du uebernimmst deren
+km-Klasse und verknuepfst sie mit dem Ueberhoehen-Befund — mit `weil`/`weshalb`
+sichtbar gemacht, nie eine nackte km-Zahl:
+- "Ueber Start bis +2000m steigbar, klar ueberhoehbar — und **weil** die Region einen XC-Tag liefert (Region-XC: high), ist Streckenflug >100km drin."
+- "Ueber Start gut +900m steigbar (ueberhoehbar), aber **weil** die Region nur schwach traegt (Region-XC: low), bleibt es Hausrunde/Soaring statt Strecke."
+
+Fehlt `Region-XC` (Region nicht verfuegbar): nur der Ueberhoehen-Befund +
+"Ohne Region-Kontext keine Strecken-Aussage — reine Spot-Einschaetzung."
 
 ─────────────────────────────────
 ANKER-BEISPIELE STRECKENFLUG (Pflicht-Lesestoff)
 ─────────────────────────────────
 
-**Beispiel 1 — Klassiker, niedriger Spot, stabile Thermik:**
-Region elev_ref=1200, working_height_agl Median 2000m / Max 2050m@14:00 / Min 1900m@10:00 (Spannweite 150m). Spot.elevation_m=1000. Block liefert: working_height_at_spot_m Median 2200m, Max 2250m@14:00, Min 2100m@10:00. Region-Rating 5.
-→ **experience_rating = 5**. xc_details: "**Weil** die Region einen Klassiker-Tag mit starker Thermik und hoher Basis liefert (Region-Rating 5), traegt es auch ab diesem tiefen Startplatz: 2200m Arbeitshoehe ueber Start, Streckenflug >100km ganztaegig moeglich." (Kein Zeitfenster noetig, weil Spannweite < 500m.)
+**Beispiel 1 — Starke Region, gut ueberhoehbar:**
+`working_height_agl=2050m`, Peak 2.7 × 6h, cu_clean_top. Region-XC: high.
+→ **experience_rating = 5**. xc_details: "Ueber Start bis +2050m steigbar — klar ueberhoehbar. Und **weil** die Region einen Klassiker-Tag liefert (Region-XC: high), ist Streckenflug >100km drin."
 
-**Beispiel 2 — Hoher Spot, gleicher Tag:**
-Wie Beispiel 1, aber Spot.elevation_m=2700. Block liefert: working_height_at_spot_m Median −500m, Max −450m@14:00, Min −600m@10:00.
-→ **experience_rating = 1-2**. xc_details: "Spot bereits ueber Region-Thermik-Top — kein Wegfliegen moeglich, allenfalls lokales Soaring an Reliefkante."
+**Beispiel 2 — Gut ueberhoehbar, aber schwache Region (Confound-Anker):**
+`working_height_agl=900m`, Peak 1.3 × 3h, mixed. Region-XC: low.
+→ **experience_rating = 2**. xc_details: "Ueber Start gut +900m steigbar, also ueberhoehbar — aber **weil** die Region nur schwach traegt (Region-XC: low), bleibt es Hausrunde/Soaring, keine Strecke." (Ueberhoehen = JA trotz schwacher Region!)
 
-**Beispiel 3 — Hoher Spot mit Mittagsfenster (Schluesselfall):**
-Region elev_ref=1500, working_height_agl Median 1550m / **Max 2200m@14:00** / Min 800m@10:00 (Spannweite 1400m). Spot.elevation_m=2200. Block liefert: working_height_at_spot_m Median 850m, **Max 1500m@14:00**, Min 100m@10:00. Region-Rating 4.
-→ **experience_rating = 3** (Mittagsfenster reicht fuer Talquerung 10-30km). Spannweite > 500m → **Zeitfenster-Pflichtsatz**: "**Weil** die Region erst zur Tagesmitte genug Thermik aufbaut (Region-Rating 4, Basis steigt steil), reicht nur das Mittagsfenster 13-15 Uhr mit 1500m Arbeitshoehe ueber Start — kurzer Streckenflug 10-30km moeglich. Vormittags und spaeter Nachmittag nur lokales Soaring."
+**Beispiel 3 — Deckel knapp ueber Platz:**
+`working_height_agl=250m`, Peak 1.6 × 2h. Region-XC: moderate.
+→ **experience_rating = 1-2**. xc_details: "Deckel knapp ueber Platz — kaum Steigen ueber Start, nicht ueberhoehbar; nur Hausrunde/Soaring. Auch die Region traegt nur maessig, also keine Strecke."
 
 **Beispiel 4 — Region fehlt:**
-Region-Block "nicht verfuegbar".
-→ **experience_rating** max **3** (lokales Pilotenurteil). xc_details: "Ohne Region-Kontext keine XC-Aussage — reine Spot-Einschaetzung."
+`working_height_agl=1400m`, Region-Block "nicht verfuegbar".
+→ **experience_rating** max **3** (lokales Pilotenurteil). xc_details: "Ueber Start bis +1400m steigbar (ueberhoehbar). Ohne Region-Kontext keine Strecken-Aussage — reine Spot-Einschaetzung."
 
 ─────────────────────────────────
 PILOT-SANITY-CHECK
@@ -288,8 +292,8 @@ NUTZUNGS-REGELN
 
 1. `experience_rating` als Integer 1–5.
 2. Bei `safety_status = not_safe` → trotzdem korrektes Thermik-Rating; UI handhabt App.
-3. **Region-Cap PFLICHT pruefen** (siehe Cap-Tabelle oben): Rating 4/5 nur wenn `Region.experience_rating` UND `working_height_at_spot_m_max` die Schwellen erfuellen — sonst kappen.
-4. **Streckenflug-Pflichtsatz in `xc_details`**: Region als Quelle mit `weil`/`weshalb` begruenden (Region-Thermik / `Region.experience_rating` / Region-Basis) + konkrete Zahl `working_height_at_spot_m_max` + km-Klasse benennen. Bei Spannweite >= 500m zusaetzlich Best-Hour-Fenster.
+3. **Region-Cap PFLICHT pruefen** (siehe Cap-Tabelle oben): Rating 4/5 nur wenn Region (Region-XC/Region-Rating) UND `working_height_agl` die Schwellen erfuellen — sonst kappen.
+4. **`xc_details`-Pflicht**: Satz 1 IMMER der Ueberhoehen-Befund (ja/nein + Zahl aus `working_height_agl`, NIE aus Region-XC); die km-/Wie-weit-Aussage danach aus `Region-XC` uebernehmen und mit `weil`/`weshalb` an den Ueberhoehen-Befund knuepfen. Ueberhoehen-Befund zusaetzlich knapp in `flyability_notes.altitude`.
 5. **Spot-Differenzierung:** Spots in derselben Region am gleichen Tag haben oft verschiedene Ratings (Hoehe, Exposition, Talwind).
 6. Prosa muss zum Rating passen. Rating 5 + "mauer Tag" = FEHLER.
 7. **Safety strikt draussen aus aller Flyability-Prosa** (`flyability_notes`, `thermal_quality`, `recommendation`, `xc_details`, `soaring_options`, `best_window`). Tabu: Hoehenwind, Boeen, rohe Scherungszahlen, ROUGH/WIND-Boeigkeit, Foehn, Regen, Gewitter, "Vorsicht", "sportlich" — alle Safety-Pipeline. **AUSNAHME: zerrissene Thermik (TORN-UNUSABLE)** gehoert als Thermik-Qualitaet in `thermal_quality` (Bart nicht zentrierbar) — siehe `01_tags_flyability.md`.

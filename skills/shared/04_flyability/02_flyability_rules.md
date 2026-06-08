@@ -6,7 +6,7 @@ TEIL 2: ERLEBNIS / FLIEGBARKEIT (Rating 1–5, v2.1)
 - `safety.safety_status` (safe/conditional/not_safe) — siehe `_safety_subratings.md`
 - `experience_rating` (1-5) — siehe `_flight_subratings_*.md`
 
-Streckenflug ist **keine eigene Achse mehr**. Die XC-Aussage wandert als Pflicht-Satz in `xc_details`, der Region-Cap auf `experience_rating` regelt die Plausibilitaet (Spot-Rating 4/5 nur wenn Region passt UND `working_height_at_spot_m` ausreicht — Details in `_flight_subratings_spot.md`).
+**Aufgabenteilung Spot ↔ Region:** Die Strecken-/„Wie-weit"-Aussage **gehoert der Region** (`xc_potential`/`xc_details`) und wird dem Spot als `Region-XC:` durchgereicht. Der **Spot** beantwortet seine Kernfrage **„kann man den Startplatz ueberhoehen" (ja/nein)** aus der spot-eigenen `working_height_agl` (Steighoehe ueber Start) und verknuepft sie mit der Region-XC zur Gesamt-Einschaetzung. Der Region-Cap auf das Spot-`experience_rating` regelt die Plausibilitaet (Spot-Rating 4/5 nur wenn Region passt UND `working_height_agl` ausreicht — Details in `_flight_subratings_spot.md`).
 
 **Du rechnest nicht, du urteilst.** Denke in 5 Pilot-Kategorien (abgleiter, kurzer_thermikflug, solid, stark, xc_tag) und vergib die entsprechende Zahl 1-5. "Klassiker-Tag" = Prosa-Auszeichnung in Rating 5, keine eigene Stufe.
 
