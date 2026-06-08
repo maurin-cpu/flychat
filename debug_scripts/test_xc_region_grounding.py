@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import config
+import config_overrides
+config_overrides.apply_overrides()  # Produktions-Provider/Modell (DeepSeek) wie im Live-Service
 import prompts
 from llm_client import build_client
 from engine.weather_context import _format_region_context_block
@@ -70,10 +72,12 @@ def run_case(title, spot_user_block, region_result, spot_region):
         print(f"JSON-Fehler: {e}\nRAW:\n{raw}")
         return
 
+    fn = r.get("flyability_notes") or {}
     print(f"  experience_rating : {r.get('experience_rating')}")
     print(f"  xc_potential      : {r.get('xc_potential')}")
-    print(f"  streckenflug      : {r.get('streckenflug')}")
+    print(f"  >> UEBERHOEHEN (flyability_notes.altitude): {fn.get('altitude')}")
     print(f"  >> xc_details     : {r.get('xc_details')}")
+    print(f"  recommendation    : {r.get('recommendation')}")
     print()
 
 
@@ -100,8 +104,7 @@ run_case(
         "Fiesch (Talstart)", 1050,
         "→ RATING-INPUTS: prod_h_strict=6h, strong_h=4h, avg_climb_prod=2.4 m/s, "
         "sustained_peak=2.7 m/s, working_height_agl=2050m, cloud_structure=cu_clean_top",
-        "→ Region-Arbeitshoehe ueber diesem Startplatz (working_height_at_spot_m): "
-        "Median 2550m, Max 2600m@14:00, Min 2500m@11:00 (Spannweite 100m).",
+        "",
     ),
     region_strong,
     {"region": "Zentralwallis", "id": "zentralwallis"},
@@ -130,9 +133,24 @@ run_case(
         "Hausberg", 700,
         "→ RATING-INPUTS: prod_h_strict=3h, strong_h=1h, avg_climb_prod=1.2 m/s, "
         "sustained_peak=1.3 m/s, working_height_agl=900m, cloud_structure=mixed",
-        "→ Region-Arbeitshoehe ueber diesem Startplatz (working_height_at_spot_m): "
-        "Median 950m, Max 1000m@14:00, Min 850m@12:00 (Spannweite 150m).",
+        "",
     ),
     region_weak,
     {"region": "Mittelland West", "id": "mittelland_west"},
+)
+
+# ─────────────────────────────────────────────────────────────────────
+# FALL C — Starke Region, aber Deckel knapp ueber Platz (working_height_agl
+# niedrig). Erwartung: Ueberhoehen-Befund = NEIN, trotz starker Region.
+# ─────────────────────────────────────────────────────────────────────
+run_case(
+    "FALL C — Starke Region (Rating 5), aber Deckel knapp ueber Platz (working_height_agl=250m)",
+    spot_block(
+        "Hochalpiner Grat", 2800,
+        "→ RATING-INPUTS: prod_h_strict=2h, strong_h=1h, avg_climb_prod=1.5 m/s, "
+        "sustained_peak=1.6 m/s, working_height_agl=250m, cloud_structure=cu_clean_top",
+        "",
+    ),
+    region_strong,
+    {"region": "Zentralwallis", "id": "zentralwallis"},
 )
