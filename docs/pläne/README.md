@@ -9,7 +9,7 @@ umgeschrieben.
 |---|---|
 | [`PLAN_safety_region_cap.md`](PLAN_safety_region_cap.md) | **Nicht begonnen.** Keine Telemetrie/Caution-/Eskalations-Logik in `engine/analyzers.py`, kein `scripts/extract_safety_mismatch_telemetry.py`. `region_result` wird nur in der Flyability genutzt, nicht im Safety-Post-Processing. |
 | [`PLAN_startrichtung_faecher.md`](PLAN_startrichtung_faecher.md) | **Nicht begonnen.** `scripts/build_pge_csv.py` kollabiert die Sektoren weiterhin auf 0/1, `windrichtung_optimal` existiert nirgends. |
-| [`PLAN_code_analyse_2026-06.md`](PLAN_code_analyse_2026-06.md) | **Nicht begonnen** (erstellt 2026-06-10). Maßnahmenplan aus der Code-Analyse: 3 Logik-Fixes (CIN-Vorzeichen, Region-Wind-Cache, Aloft-Trigger), Testsuite-Reparatur, Speicher/Kosten, Aufräumen. Managertauglich geschrieben, technischer Anhang am Ende. |
+| [`PLAN_code_analyse_2026-06.md`](PLAN_code_analyse_2026-06.md) | **In Arbeit** (erstellt 2026-06-10, Paket 3 am 10.06. abends im Code/Live-Daten verifiziert — inkl. Korrektur: Vorfilter funktioniert, nur Telemetrie-Zähler kaputt; 7 statt 2 ungeschützte Endpoints). Code noch unverändert; Umsetzung startet mit Paket 3, Reihenfolge im Abschnitt „Stand der Umsetzung". |
 
 ## Verwandte, aber **umgesetzte** Themen (liegen in `docs/`)
 

@@ -1,6 +1,13 @@
 # Plan: Verbesserungen aus der Code-Analyse (Juni 2026)
 
-**Stand:** 2026-06-10 · **Status:** Nicht begonnen · **Zielgruppe dieses Dokuments:** Management / Nicht-Techniker
+**Stand:** 2026-06-10 (Abend) · **Status:** Befunde verifiziert, Umsetzung startet mit Paket 3 · **Zielgruppe dieses Dokuments:** Management / Nicht-Techniker
+
+> **Update 2026-06-10 Abend:** Die vier Server-/Kosten-Punkte (Paket 3) wurden im Code
+> und an den Live-Daten nachgeprüft. Drei bestätigt, **einer war falsch**: Der Vorfilter
+> funktioniert in Wahrheit einwandfrei (er spart bereits ~1.200 KI-Aufrufe pro Tag) —
+> nur sein Statistik-Zähler zeigt fälschlich null an. Die geschätzte Ersparnis von
+> ~120 $/Monat entfällt damit; sie ist schon realisiert. Details unten im Abschnitt
+> „Stand der Umsetzung". Noch wurde **nichts am Code geändert**.
 
 ---
 
@@ -43,11 +50,18 @@ die uns schon die aufwendigen Einzelfall-Untersuchungen (Scheidegg, Föhn) besch
   (Swap) braucht** und zeitweise langsam wird.
 - Die Startseite lädt bei jedem Aufruf **9 MB** unkomprimierte Daten — für Handynutzer
   spürbar langsam. Eine Komprimierung (eine Zeile Konfiguration) reduziert das um ~90 %.
-- Die KI-Analysen kosten aktuell **~8,50 $ pro Tag** (~250 $/Monat). Der eingebaute
-  Vorfilter, der aussichtslose Tage überspringen soll, überspringt derzeit **null**
-  Analysen. Mit funktionierendem Filter sparen wir geschätzt **~120 $/Monat**.
-- Zwei kostenintensive Funktionen (Wetter-Neuladen, kompletter Analyse-Lauf) sind
-  **ohne Anmeldung** von außen aufrufbar — jemand könnte uns damit Kosten verursachen.
+- Die KI-Analysen kosten aktuell **~8,50 $ pro Tag** (~250 $/Monat).
+  ~~Der Vorfilter überspringt null Analysen → ~120 $/Monat Ersparnis~~ — **Korrektur
+  nach Prüfung (10.06.):** Der Vorfilter arbeitet korrekt und spart bereits ~1.200
+  KI-Aufrufe pro Tag. Kaputt ist nur sein **Statistik-Zähler** (er wird in dem
+  Programmpfad, den der tägliche Lauf nutzt, nie hochgezählt) — die Kostenstatistik
+  lügt also, nicht der Filter. Fix: Zähler reparieren, damit wir den Kosten echten
+  Zahlen trauen können.
+- **Sieben** kostenintensive bzw. zustandsändernde Funktionen (Wetter-Neuladen,
+  Spot-/Region-Analyse-Läufe in je zwei Varianten, Wetterlage-Refresh, Spot-Reload)
+  sind **ohne Anmeldung** von außen aufrufbar — jemand könnte uns damit pro Aufruf
+  bis zu ~8 $ Kosten verursachen. Der restliche Admin-Bereich ist sauber geschützt
+  (alle 40+ Admin-Routen geprüft).
 
 ### 3. Unser Sicherheitsnetz hängt durch
 
@@ -85,11 +99,14 @@ die uns schon die aufwendigen Einzelfall-Untersuchungen (Scheidegg, Föhn) besch
 ### Paket 3 — Server entlasten & Kosten senken
 **Aufwand: ~2–3 Tage · Nutzen: schnellere App, kein Swap, ~120 $/Monat weniger KI-Kosten**
 
-1. Komprimierung im Webserver aktivieren (Sofortmaßnahme, eine Zeile).
-2. Doppeltes Laden der Wetterdaten abstellen; Reserve-Kopie nur bei Bedarf laden.
-3. Vorfilter scharf stellen: aussichtslose Tage ohne KI-Analyse abhandeln,
-   Regions-Ergebnis für Spots in „roten" Regionen wiederverwenden.
-4. Die zwei offenen Admin-Funktionen hinter die Anmeldung legen.
+1. Die sieben offenen Admin-Funktionen hinter die Anmeldung legen.
+2. Komprimierung im Webserver aktivieren (Sofortmaßnahme, eine Zeile).
+3. Doppeltes Laden der Wetterdaten abstellen; Reserve-Kopie nur bei Bedarf laden
+   (Speicherspitze sinkt von 3 auf 2 Datenkopien, ~700 MB weniger).
+4. Vorfilter-Statistik-Zähler reparieren (Filter selbst funktioniert — siehe
+   Korrektur oben). *Optionale spätere Idee:* Regions-Ergebnis für Spots in
+   „roten" Regionen wiederverwenden — das wäre aber eine inhaltliche
+   Design-Entscheidung, kein Bugfix, und wird separat entschieden.
 5. Alte Archivdateien automatisch aufräumen (wachsen derzeit unbegrenzt).
 
 ### Paket 4 — Aufräumen für die Zukunft (kein Zeitdruck)
@@ -120,6 +137,38 @@ Folgefehler abfängt, bevor Nutzer sie sehen.
 
 ---
 
+## Stand der Umsetzung
+
+**2026-06-10 Abend — Paket 3 vollständig verifiziert, noch nichts geändert.**
+Beschlossene Reihenfolge für die Umsetzung (morgen weiter):
+
+1. **Auth:** Alle 7 offenen Endpoints mit `@_require_admin` versehen (Liste im Anhang).
+   Risiko geprüft: Einzige lebende Aufrufer sind die Admin-Config-Seite (selbst
+   Basic-Auth-geschützt, gleiche Realm → Browser schickt Credentials nach
+   401-Challenge automatisch nach) und ein **toter** Handler in `chat.js:716`
+   (`refreshWeatherBtn` existiert in keinem Template mehr). Keine Cronjobs /
+   n8n-Workflows / Hermes-Aufrufer — geprüft. Nach Deploy: Buttons auf
+   `/admin/config` einmal durchklicken.
+2. **Caddy:** `encode zstd gzip` in Repo-`caddyfile` **und** `/etc/caddy/Caddyfile`
+   (beide aktuell identisch, Caddy v2.11.2), dann `systemctl reload caddy`.
+3. **Speicher:** (a) `fetch_weather.py:946` Fallback-Cache lazy laden,
+   (b) `web.py` (`api_briefing_generate`) + `scheduler.py:116` auf
+   `engine.weather_data` umstellen (verifiziert: Synoptik liest nur Spot-Dicts,
+   überspringt `_`-Keys — das gepoppte `_regions` stört nicht).
+4. **Telemetrie:** `prefilter_skipped`-Zähler im Parallel-Pfad inkrementieren.
+5. Danach: Tests laufen lassen, deployen (`deploy.sh` stasht Uncommitted —
+   Few-Shot-Arbeit bleibt erhalten).
+
+**Verifikation Vorfilter (Beleg für die Korrektur):** Live-Daten vom 10.06.:
+2.440 Spot-Tage, 1.618 not_safe, davon **1.226 mit deterministischen
+Pre-Filter-Begründungen** (u. a. 556× `wind_direction_mismatch`). Der Zähler wird
+nur im Batch-Pfad gesetzt (`engine/analyzers.py:2603`); der tägliche Lauf nutzt
+aber den Parallel-Pfad (`run_all_analyses_stream` via `scheduler.py:283`), der
+ihn nie inkrementiert. Telemetrie aller letzten 6 Tage: `mode=parallel,
+prefilter_skipped=0` bei 1.810–2.283 Calls/Tag.
+
+---
+
 ## Anhang für die Umsetzung (technisch)
 
 Kurzreferenzen zu den Fundstellen — Details stehen in der Analyse vom 2026-06-10.
@@ -142,11 +191,12 @@ Kurzreferenzen zu den Fundstellen — Details stehen in der Analyse vom 2026-06-
 - `pip freeze > requirements.lock`, Installation aus Lock
 - Analysis-Audit: `{ctx, raw_llm_json, decisions_applied}` gzipped nach `data/analysis_audit/<date>/` (Aufbau analog `data/synoptic_audit/`); Einstieg `engine/analyzers.py:98`
 
-**Paket 3 (Performance/Kosten):**
-- Caddyfile: `encode zstd gzip`
-- `fetch_weather.py:946`: Fallback-Cache lazy; `web.py:2474` + `scheduler.py:116`: `engine.weather_data` nutzen statt Re-Parse
-- Vorfilter: `prefilter_skipped` in `data/cost_telemetry.jsonl` beobachten; Region-Verdict-Reuse via `analyzers.py:1552`
-- Auth: `web.py:3157` (`/api/refresh-weather`), `web.py:2576` (`/api/run-analyses`) → `@_require_admin`
+**Paket 3 (Performance/Kosten)** — verifiziert 2026-06-10:
+- Caddyfile: `encode zstd gzip` — Repo-`caddyfile` UND `/etc/caddy/Caddyfile` (identisch, v2.11.2), `systemctl reload caddy`
+- `fetch_weather.py:946`: Fallback-Cache lazy laden — Nutzstellen sind nur die Fehlerpfade Zeilen 1133/1137 (`_mark_stale_cache`) und 1201/1206 (per-Spot-Fallback); memoisierter Helper, Verhalten identisch
+- `web.py` `api_briefing_generate` (~Z. 2474) + `scheduler.py:116`: `engine.weather_data` durchreichen statt `load_cached_weather()`-Re-Parse (2,4 s + ~700 MB transient); Disk-Fallback behalten, falls `engine.weather_data` leer. Verifiziert: alle Synoptik-Funktionen (`synoptic_context.py`) iterieren nur Spot-Dicts und skippen `_`-Keys
+- Vorfilter-Zähler: Parallel-Pfad (`run_all_analyses_stream`, `analyzers.py:2997` ff. / `_build_and_analyze_spot` Z. 107-110) inkrementiert `cost_tracker.prefilter_skipped` nie — nur Batch-Pfad tut es (Z. 2603). **Filter selbst funktioniert** (1.226/1.618 not_safe am 10.06. deterministisch). Region-Verdict-Reuse = separate Design-Entscheidung, nicht Teil dieses Pakets
+- Auth → `@_require_admin` für 7 Routen: `web.py:2462` (`/api/briefing/generate`), `:2576` (`/api/run-analyses`, kein lebender Aufrufer), `:2801` (`/api/run-region-analyses`, kein lebender Aufrufer), `:3108` (`/api/run-analyses-stream`, Aufrufer: admin/config), `:3114` (`/api/run-region-analyses-stream`, Aufrufer: admin/config), `:3147` (`/api/refresh-spots`), `:3157` (`/api/refresh-weather`, Aufrufer: admin/config + toter Code `chat.js:716`)
 - Retention: `scheduler.py:251` (weather_archive ~60 Tage), `data/*.bak*`, alte `foehn_cache_*.json`
 - Optional: `wetterdaten.json` ohne `indent=2` schreiben (`config.py:1185`); langfristig Stunden-Arrays statt Dict-of-Dicts
 
