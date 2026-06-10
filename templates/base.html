@@ -46,7 +46,9 @@
             <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Startplätze</a>
             <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
             <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Wingcast</a>
+            {% if is_admin %}
             <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen" aria-label="Föhndiagramm öffnen">Föhn</button>
+            {% endif %}
             {% if is_logged_in %}
             <div class="navbar-avatar-wrap">
                 <button type="button" class="navbar-avatar" id="navAvatarBtn"
@@ -364,10 +366,12 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
             <span>Wingcast</span>
         </a>
+        {% if is_admin %}
         <button class="mobile-nav-item" id="mobileNavFoehnBtn" aria-label="Föhndiagramm öffnen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
             <span>Föhn</span>
         </button>
+        {% endif %}
     </nav>
 
     <!-- Foehn Diagram Overlay (shared across all pages) -->

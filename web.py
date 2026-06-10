@@ -106,11 +106,21 @@ def _inject_session_flags():
     marketing = config.MARKETING_URL.rstrip("/")
     return {
         "is_logged_in": bool(session.get("sub_id")),
+        "is_admin": _is_admin(),
         "session_email": session.get("email", ""),
         "marketing_url": marketing,
         "datenschutz_url": f"{marketing}/datenschutz",
         "impressum_url": f"{marketing}/impressum",
     }
+
+
+def _is_admin() -> bool:
+    """True wenn die Session mit der Admin-E-Mail eingeloggt ist (passwortlos).
+
+    Admin = wer per Magic-Link als config.ADMIN_EMAIL eingeloggt ist.
+    """
+    email = (session.get("email") or "").strip().lower()
+    return bool(email) and email == (config.ADMIN_EMAIL or "").strip().lower()
 
 
 def _is_admin_session() -> bool:
@@ -804,26 +814,25 @@ def subscribe_unsubscribe(token):
 
 
 # ============================================================================
-# ADMIN-DASHBOARD (HTTP Basic Auth via ADMIN_PASSWORD env)
+# ADMIN-DASHBOARD (passwortlos: Admin = Session-E-Mail == config.ADMIN_EMAIL)
 # ============================================================================
 
 def _require_admin(f):
-    """HTTP-Basic-Auth-Decorator. Nur Password-Check, User-Feld ignoriert."""
+    """Admin-Gate ohne Passwort: Zugriff nur fuer die Admin-E-Mail-Session.
+
+    Nicht eingeloggt -> /login. Eingeloggt, aber falsche E-Mail -> 403.
+    API-Requests bekommen immer JSON 403.
+    """
     @wraps(f)
     def wrapper(*args, **kwargs):
-        expected = (config.ADMIN_PASSWORD or "").strip()
-        if not expected:
-            return ("Admin deaktiviert (ADMIN_PASSWORD nicht gesetzt)",
-                    503, {"Content-Type": "text/plain; charset=utf-8"})
-        auth = request.authorization
-        if not auth or (auth.password or "") != expected:
-            return Response(
-                "Admin-Bereich — Zugriff nur mit Passwort.\n",
-                401,
-                {"WWW-Authenticate": 'Basic realm="Wingcast Admin"',
-                 "Content-Type": "text/plain; charset=utf-8"},
-            )
-        return f(*args, **kwargs)
+        if _is_admin():
+            return f(*args, **kwargs)
+        if _is_api_request():
+            return jsonify({"error": "Admin-Zugriff erforderlich"}), 403
+        if not session.get("sub_id"):
+            return redirect("/login?err=Bitte+als+Admin+einloggen")
+        return ("Kein Admin-Zugriff.", 403,
+                {"Content-Type": "text/plain; charset=utf-8"})
     return wrapper
 
 
@@ -2088,7 +2097,7 @@ def _hash_ip(ip: str) -> Optional[str]:
     """Salted SHA-256 der IP fuer Missbrauchs-Korrelation ohne Klartext-Speicherung."""
     if not ip:
         return None
-    salt = (config.ADMIN_PASSWORD or "wingcast-feedback")[:32]
+    salt = (config.FEEDBACK_SALT or "wingcast-feedback")[:32]
     return hashlib.sha256(f"{salt}:{ip}".encode("utf-8")).hexdigest()[:32]
 
 
@@ -3758,7 +3767,11 @@ def api_altitude_wind(spot_name):
 
 @app.route("/api/foehn")
 def api_foehn():
-    """Föhn-Zeitreihe: stündliche Delta-P, Kammwind, Feuchte für Diagramm."""
+    """Föhn-Zeitreihe: stündliche Delta-P, Kammwind, Feuchte für Diagramm.
+
+    Admin-only (passwortlos via config.ADMIN_EMAIL-Session)."""
+    if not _is_admin():
+        return jsonify({"error": "Föhndiagramm nur für Admin"}), 403
     raw = None
     if engine and engine.foehn_data:
         raw = engine.foehn_data

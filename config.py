@@ -940,9 +940,13 @@ SMTP_PASSWORD   = os.environ.get("SMTP_PASSWORD", "")
 SENDER_EMAIL    = os.environ.get("SENDER_EMAIL", "briefing@example.invalid")
 SENDER_NAME     = os.environ.get("SENDER_NAME", "Wingcast")
 
-# Admin-Dashboard: HTTP Basic Auth (nur Password-Check, User ignoriert).
-# Leer = Admin-Routen geben 503 zurueck (deaktiviert).
-ADMIN_PASSWORD  = os.environ.get("ADMIN_PASSWORD", "")
+# Admin = passwortlos: Admin ist, wer mit dieser E-Mail eingeloggt ist
+# (Magic-Link-Session). Kein Passwort mehr.
+ADMIN_EMAIL     = os.environ.get("ADMIN_EMAIL", "mutschgito@hotmail.com")
+
+# Salt fuer die IP-Anonymisierung im Feedback (SHA-256). Reiner Hash-Salt,
+# keine Auth-Funktion.
+FEEDBACK_SALT   = os.environ.get("FEEDBACK_SALT", "wingcast-feedback")
 
 # ============================================================================
 # ROUTING / GEOCODING (Phase 1)
