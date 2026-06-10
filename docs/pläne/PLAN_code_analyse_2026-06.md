@@ -143,11 +143,13 @@ Folgefehler abfängt, bevor Nutzer sie sehen.
 Beschlossene Reihenfolge für die Umsetzung (morgen weiter):
 
 1. **Auth:** Alle 7 offenen Endpoints mit `@_require_admin` versehen (Liste im Anhang).
-   Risiko geprüft: Einzige lebende Aufrufer sind die Admin-Config-Seite (selbst
-   Basic-Auth-geschützt, gleiche Realm → Browser schickt Credentials nach
-   401-Challenge automatisch nach) und ein **toter** Handler in `chat.js:716`
-   (`refreshWeatherBtn` existiert in keinem Template mehr). Keine Cronjobs /
-   n8n-Workflows / Hermes-Aufrufer — geprüft. Nach Deploy: Buttons auf
+   Risiko geprüft: Einzige lebende Aufrufer sind die Admin-Config-Seite und ein
+   **toter** Handler in `chat.js:716` (`refreshWeatherBtn` existiert in keinem
+   Template mehr). Keine Cronjobs / n8n-Workflows / Hermes-Aufrufer — geprüft.
+   **Update 10.06. spät:** `_require_admin` wurde inzwischen auf Session-E-Mail-Check
+   umgestellt (Magic-Link als `ADMIN_EMAIL`, Commit `376d1ab`, kein Basic-Auth mehr) —
+   same-origin-Fetches der Admin-Seite schicken das Session-Cookie automatisch mit,
+   der Decorator ist also gefahrlos ergänzbar. Nach Deploy: Buttons auf
    `/admin/config` einmal durchklicken.
 2. **Caddy:** `encode zstd gzip` in Repo-`caddyfile` **und** `/etc/caddy/Caddyfile`
    (beide aktuell identisch, Caddy v2.11.2), dann `systemctl reload caddy`.
