@@ -9,6 +9,7 @@ umgeschrieben.
 |---|---|
 | [`PLAN_safety_region_cap.md`](PLAN_safety_region_cap.md) | **Nicht begonnen.** Keine Telemetrie/Caution-/Eskalations-Logik in `engine/analyzers.py`, kein `scripts/extract_safety_mismatch_telemetry.py`. `region_result` wird nur in der Flyability genutzt, nicht im Safety-Post-Processing. |
 | [`PLAN_startrichtung_faecher.md`](PLAN_startrichtung_faecher.md) | **Nicht begonnen.** `scripts/build_pge_csv.py` kollabiert die Sektoren weiterhin auf 0/1, `windrichtung_optimal` existiert nirgends. |
+| [`PLAN_code_analyse_2026-06.md`](PLAN_code_analyse_2026-06.md) | **Nicht begonnen** (erstellt 2026-06-10). Maßnahmenplan aus der Code-Analyse: 3 Logik-Fixes (CIN-Vorzeichen, Region-Wind-Cache, Aloft-Trigger), Testsuite-Reparatur, Speicher/Kosten, Aufräumen. Managertauglich geschrieben, technischer Anhang am Ende. |
 
 ## Verwandte, aber **umgesetzte** Themen (liegen in `docs/`)
 
