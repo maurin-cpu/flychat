@@ -665,9 +665,23 @@ class AnalyzersMixin:
 
     @staticmethod
     def _merge_safety_flyability(safety_result: dict, flyability_result: dict) -> dict:
-        """Merged Safety + Flyability Ergebnisse ins Combined-Format fuer Downstream."""
+        """Merged Safety + Flyability Ergebnisse ins Combined-Format fuer Downstream.
+
+        Safety ist autoritativ fuer den Sicherheits-Status. Die Flyability-Phase
+        ist ein separater LLM-Call, der `conditional` nicht kennt und
+        `is_conditional` aus seinem eigenen Rating setzt (bei einem selbstsicheren
+        5er-Tag → False, siehe _post_process_flyability_spot). Ohne Schutz wuerde
+        `merged.update(flyability_result)` das korrekte `is_conditional=True` aus
+        der Safety-Decision-Pipe (decide_is_conditional) ueberschreiben — ein
+        conditional-Spot landete dann faelschlich als safe (Tier violet/green) im
+        Briefing. Daher: safety-autoritative Felder nach dem Update zurueckschreiben.
+        """
         merged = {**safety_result}
         merged.update(flyability_result)
+        # Safety besitzt diese Felder — Flyability darf sie nicht clobbern.
+        for k in ("safety_status", "is_conditional", "conditional_reason"):
+            if k in safety_result:
+                merged[k] = safety_result[k]
         # Phase-Marker: zeigt dass aus Split-Flow
         merged["phase"] = "split"
         return merged
