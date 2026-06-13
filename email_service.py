@@ -623,56 +623,80 @@ def _week_summary_llm(days_out: list[dict], warnings: list[dict]) -> str:
     return text
 
 
-def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[dict]:
-    """Region x Tag Heatmap.
+def _matrix_tier_for_band(band: str, rating_int: int) -> str:
+    """Mappt das Region-safety_band auf das Heatmap-Tier-Vokabular.
 
-    Pro Subscriber-Region: fuer jeden Tag besten Tier + Rating bestimmen
-    (ueber ALLE my_spots des Tages, nicht nur Top-3).
-    Leere Tage kriegen tier='none'. Regionen ohne einen einzigen fliegbaren
-    Tag werden ausgefiltert. Sortiert nach best_rating descending.
+    green → violet (rating>=5) / green, amber → conditional, red → not_safe,
+    sonst none. 'not_safe' ist ein Matrix-eigenes Tier (rot), das es im
+    Spot-Tier-System nicht gibt — die Region kann no-go sein (kein XC), waehrend
+    einzelne Spots lokal conditional fliegbar bleiben.
+    """
+    if band == "green":
+        return "violet" if rating_int >= 5 else "green"
+    if band == "amber":
+        return "conditional"
+    if band == "red":
+        return "not_safe"
+    return "none"
+
+
+def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[dict]:
+    """Region x Tag Heatmap — Region-Level-Verdikt (= Web /api/region-analyses).
+
+    Jede Zelle = das Region-XC-Verdikt aus region_analyses (experience_rating
+    1-5 + safety_band), NICHT mehr das beste Spot-Rating. Damit ist die Matrix
+    konsistent mit der Web-Regionsansicht: eine Region kann rot/not_safe sein
+    (kein XC, kein Hochsteigen), waehrend einzelne Spots darunter ('Pro Tag ·
+    Top-Spots') lokal conditional fliegbar bleiben.
 
     Args:
-      days_out: die bereits aufbereiteten Day-Dicts mit my_spots_all
+      days_out: Day-Dicts mit `_top_regions_by_id` (Region-Verdikt pro Region)
       subscriber_regions: Menge der abonnierten region_ids
     """
-    # region_id -> {name, days: [{tier, rating} per day], best_rating}
+    # region_id -> {name, days: [{tier, rating, band} per day], best_rating}
     matrix = {}
     n_days = len(days_out)
 
     for day_idx, day in enumerate(days_out):
-        for spot in day.get("_my_spots_all", []):
-            rid = spot.get("region_id")
+        for rid, rentry in (day.get("_top_regions_by_id") or {}).items():
             if not rid or rid not in subscriber_regions:
                 continue
-            rname = spot.get("region_name") or rid
+            rname = rentry.get("region_name") or rid
 
-            tier = _spot_tier(spot)
-            rating = float(spot.get("rating") or 0)
-            stars = _stars_for_spot(spot)
+            band = rentry.get("safety_band") or "no_data"
+            try:
+                rating_int = int(rentry.get("experience_rating") or 0)
+            except (TypeError, ValueError):
+                rating_int = 0
+            try:
+                rating = float(rentry.get("rating") or 0.0)
+            except (TypeError, ValueError):
+                rating = 0.0
+            try:
+                stars = int(rentry.get("experience_stars") or 0)
+            except (TypeError, ValueError):
+                stars = 0
 
             entry = matrix.setdefault(rid, {
                 "region_id": rid,
                 "region_name": rname,
-                "days": [{"tier": "none", "rating": 0.0, "stars": 0, "spot_count": 0}
+                "days": [{"tier": "none", "rating": 0.0, "stars": 0,
+                          "spot_count": 0, "rating_int": 0, "band": "no_data"}
                          for _ in range(n_days)],
                 "best_rating": 0.0,
+                "best_rating_int": 0,
             })
             cell = entry["days"][day_idx]
-            # Bester Tier gewinnt, bei Gleichstand besseres Rating
-            if (_TIER_RANK.get(tier, -1) > _TIER_RANK.get(cell["tier"], -1)
-                    or (tier == cell["tier"] and rating > cell["rating"])):
-                cell["tier"] = tier
-                cell["rating"] = rating
-            # Sterne unabhaengig: max ueber alle Spots in dieser Region/Tag
-            if stars > cell["stars"]:
-                cell["stars"] = stars
-            # v1.4: Integer-Rating 1-10 (max ueber alle Spots in dieser Region/Tag)
-            r10 = _rating_for_spot(spot)
-            if r10 > cell.get("rating_int", 0):
-                cell["rating_int"] = r10
-            cell["spot_count"] += 1
+            cell["band"] = band
+            cell["tier"] = _matrix_tier_for_band(band, rating_int)
+            cell["rating"] = rating
+            cell["rating_int"] = rating_int
+            cell["stars"] = stars
             entry["best_rating"] = max(entry["best_rating"], rating)
-            entry["best_rating_int"] = max(entry.get("best_rating_int", 0), r10)
+            # best_rating_int (Wochen-Bestwert) zaehlt nur fliegbare Tage —
+            # rote/no_data Tage liefern keinen "besten" Wert.
+            if band in ("green", "amber"):
+                entry["best_rating_int"] = max(entry["best_rating_int"], rating_int)
 
     def _mix_hex_with_white(hex_str: str, alpha: float) -> str:
         hex_str = hex_str.lstrip('#')
@@ -682,35 +706,49 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
         b_new = int(b * alpha + 255 * (1 - alpha))
         return f"#{r_new:02x}{g_new:02x}{b_new:02x}"
 
+    # Farb-Hues je Band (Source of Truth: docs/RATING_FARBKONZEPT.md + map.js).
+    _BAND_HUE = {"green": "#15803d", "amber": "#b45309",
+                 "violet": "#6d28d9", "red": "#b91c1c"}
+
     # Meta pro Zelle einhaengen + Sortierung
     out = []
     for entry in matrix.values():
         for cell in entry["days"]:
-            meta = _TIER_META.get(cell["tier"], _TIER_META["none"])
-            
-            # v1.4: Integer 1-10 statt Decimal
+            band = cell.get("band", "no_data")
+            tier = cell["tier"]
             rating_int = cell.get("rating_int", 0)
             cell["rating_display"] = str(rating_int) if rating_int > 0 else ""
-            
-            # Dynamische Intensitaet:
-            # Text-Farbe ist NICHT dieselbe Hue wie der Hintergrund (sonst
-            # ergibt eine alpha-Mischung des Tier-Tons gegen denselben Tier-Ton
-            # nur ~2:1 Kontrast — Rating wird unsichtbar bei Mittelwerten).
-            # Stattdessen: dunkles Slate auf hellen Tints, Weiss auf kraeftigen.
-            if cell["tier"] in ("green", "amber", "violet") and rating_int > 0:
-                alpha = 0.4 + (rating_int / 10.0) * 0.6
-                cell["tier_color"] = _mix_hex_with_white(meta["color"], alpha)
-                cell["tier_text_color"] = "#0f172a" if alpha < 0.85 else "#ffffff"
-            else:
+            cell["stars_glyph"] = _stars_glyph_text(cell.get("stars", 0))
+
+            if tier == "none":
+                # no_data: Template rendert ohnehin die graue '–'-Zelle.
+                meta = _TIER_META["none"]
                 cell["tier_color"] = meta["color"]
                 cell["tier_text_color"] = "#ffffff"
-                
-            cell["tier_bg"]    = meta["bg"]
-            cell["tier_label"] = meta["label"]
-            cell["stars_glyph"] = _stars_glyph_text(cell["stars"])
+                cell["tier_bg"] = meta["bg"]
+                cell["tier_label"] = meta["label"]
+                continue
+
+            if band == "red":
+                # not_safe: solides Rot, weisser Text (wie Web-Sperr-Glyphe).
+                cell["tier_color"] = _BAND_HUE["red"]
+                cell["tier_text_color"] = "#ffffff"
+                cell["tier_bg"] = "#fef2f2"
+                cell["tier_label"] = "Nicht sicher"
+            else:
+                # green/violet/conditional(amber): Intensitaet ~ rating_int.
+                # Dunkles Slate auf hellen Tints, Weiss auf kraeftigen.
+                hue = _BAND_HUE["violet"] if tier == "violet" else _BAND_HUE.get(band, _BAND_HUE["green"])
+                alpha = 0.4 + (rating_int / 10.0) * 0.6
+                cell["tier_color"] = _mix_hex_with_white(hue, alpha)
+                cell["tier_text_color"] = "#0f172a" if alpha < 0.85 else "#ffffff"
+                meta = _TIER_META.get(tier, _TIER_META["gray"])
+                cell["tier_bg"] = meta["bg"]
+                cell["tier_label"] = meta["label"]
         out.append(entry)
 
-    out.sort(key=lambda e: e["best_rating"], reverse=True)
+    # Sortierung: bester fliegbarer Wochenwert zuerst, dann Roh-Rating.
+    out.sort(key=lambda e: (e.get("best_rating_int", 0), e["best_rating"]), reverse=True)
     return out
 
 
@@ -972,6 +1010,12 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "_my_spots_all": my_spots_unfiltered,
             "_regions_meteo": [r for r in (day.get("regions_meteo") or [])
                                if r.get("region_id") in subscriber_regions],
+            # Region-Level-Verdikt pro Region (Quelle: briefing top_regions =
+            # region_analyses). Fuer die Heatmap-Matrix, damit diese dasselbe
+            # XC-Verdikt wie die Web-Regionsansicht zeigt — NICHT das Spot-Aggregat.
+            "_top_regions_by_id": {r.get("region_id"): r
+                                   for r in (day.get("top_regions") or [])
+                                   if r.get("region_id") in subscriber_regions},
         })
 
     # Verdict = bester Tag (Tier-Rank, dann Rating des Top-Spots)
