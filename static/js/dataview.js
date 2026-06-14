@@ -155,44 +155,80 @@ window.WxDataView = (function () {
 
     function num(re, s) { var m = s.match(re); return m ? m[1] : null; }
 
-    // Eine Stundenzeile in strukturierte Felder zerlegen.
+    // Eine Stundenzeile in strukturierte Felder zerlegen. Ziel: JEDES Segment,
+    // das an die KI geht, landet auch in der Tabelle — Unbekanntes in o.extra,
+    // damit nie still etwas verloren geht.
     function parseHour(time, rest) {
         var segs = rest.split(' | ');
-        var o = { time: time, tags: [] };
+        var o = { time: time, tags: [], aloft: [], extra: [] };
         segs.forEach(function (seg) {
             // Tags aus dem Segment ziehen (überall möglich, meist im Wind-Segment).
             var tagMatch = seg.match(/\[[^\]]+\]/g);
             if (tagMatch) {
                 tagMatch.forEach(function (t) {
                     var inner = t.slice(1, -1);
-                    if (/^Ref-Wind/i.test(inner)) { o.refWind = inner; return; } // Info, nicht Warnung
+                    if (/^Ref-Wind/i.test(inner)) {   // Referenzhöhen-Wind (Region), Info
+                        var rm = inner.match(/Ref-Wind\s*(\d+)m:\s*([\d.]+)\s*km\/h\s*aus\s*(\d+)/);
+                        o.refWind = rm ? { alt: rm[1], speed: rm[2], dir: rm[3] } : { raw: inner };
+                        return;
+                    }
                     o.tags.push(inner);
                 });
             }
             var bare = seg.replace(/\[[^\]]+\]/g, '').trim();
+            if (!bare) return;
             if (/^Temp /.test(bare)) o.temp = num(/Temp ([\d.\-]+)/, bare);
             else if (/^Wind /.test(bare)) {
                 o.windSpeed = num(/Wind ([\d.]+)km\/h/, bare);
                 o.windDir = num(/aus (\d+)°/, bare);
                 o.turb = num(/Turbulenzrisiko ([\d.]+)km\/h/, bare);   // Spot
+                o.excess = num(/Exzess ([+\-\d.]+)km\/h/, bare);       // Spot
+            }
+            else if (/^\d+hPa\(/.test(bare)) {
+                // Höhenwind je Druckniveau: "700hPa(3138m)*: 21/26km/h aus 304°"
+                // Flag * = im Flugbereich, ~ = darüber. gust optional (nur "60km/h").
+                var am = bare.match(/^(\d+)hPa\((\d+)m\)([*~]?):\s*([\d.]+)(?:\/([\d.]+))?\s*km\/h\s*aus\s*(\d+)/);
+                if (am) o.aloft.push({ level: am[1], alt: am[2], flag: am[3], speed: am[4], gust: am[5] || null, dir: am[6] });
+                else o.extra.push(bare);
             }
             else if (/^Wolkenbasis/.test(bare)) o.cloudBase = bare.replace(/^Wolkenbasis\s*/, '');
-            else if (/^Bew/.test(bare)) o.cloudCover = num(/(\d+)%/, bare);
+            else if (/^Bew/.test(bare)) {
+                o.cloudCover = num(/(\d+)%/, bare);
+                o.cloudLow = num(/tief (\d+)%/, bare);
+                o.cloudMid = num(/mittel (\d+)%/, bare);
+                o.cloudHigh = num(/hoch (\d+)%/, bare);
+            }
+            else if (/^Strahlung/.test(bare)) {
+                o.radGlobal = num(/Strahlung (\d+)/, bare);
+                o.radDirect = num(/direkt (\d+)/, bare);
+            }
+            else if (/^FLUGBEREICH/.test(bare)) {
+                var fb = bare.match(/FLUGBEREICH:\s*(.+)$/);
+                o.flightBand = fb ? fb[1].replace(/\s*MSL\s*$/, '').trim() : null;
+            }
             else if (/^THERMIK-PROXY/.test(bare)) {
                 o.climb = num(/([\d.]+) m\/s/, bare);
                 o.thermTop = num(/bis (\d+)m/, bare);
+                o.lcl = num(/LCL\/Basis (\d+)/, bare);
             }
+            else o.extra.push(bare);   // alles Übrige: nichts geht verloren
         });
         return o;
     }
 
     function fmtKmh(v) { return v == null ? '–' : Math.round(parseFloat(v)) + ''; }
 
-    function windClass(o) {
-        // Wind-Zelle nach härtester Wind/Böen-Warnung einfärben.
+    // Wind/Böen-Tags nach härtester Stufe einfärben. kind='ground' = nur
+    // Bodenwind ([WIND-*]/[GUST-*]), kind='aloft' = nur Höhenwind ([ALOFT-*]).
+    // Wichtig: Bodenwind-Zelle darf NICHT rot werden, nur weil oben Föhn weht.
+    function windClass(o, kind) {
         var sev = 'ok';
         o.tags.forEach(function (t) {
-            if (!/WIND|GUST|ALOFT/.test(t.toUpperCase())) return;
+            var up = t.toUpperCase();
+            if (!/WIND|GUST/.test(up)) return;
+            var isAloft = /ALOFT/.test(up);
+            if (kind === 'ground' && isAloft) return;
+            if (kind === 'aloft' && !isAloft) return;
             var s = tagSeverity(t);
             if (s === 'danger') sev = 'danger';
             else if (s === 'warn' && sev !== 'danger') sev = 'warn';
@@ -200,30 +236,81 @@ window.WxDataView = (function () {
         return 'dv-v-' + sev;
     }
 
+    // Höhenwind-Zelle: ein Block je Druckniveau (850/700/600 hPa), aufsteigend.
+    // Das im Flugbereich liegende Niveau (*) wird hervorgehoben + nach ALOFT-
+    // Warnstufe gefärbt; Niveaus darüber/darunter bleiben neutral.
+    function buildAloft(o) {
+        if (!o.aloft || !o.aloft.length) return '<span class="dv-muted">–</span>';
+        var aloftSev = windClass(o, 'aloft');
+        return o.aloft.map(function (a) {
+            var inBand = a.flag === '*';
+            var cls = inBand ? aloftSev : 'dv-v-ok';
+            var spd = a.gust ? esc(a.speed) + '/' + esc(a.gust) : esc(a.speed);
+            return '<div class="dv-alvl' + (inBand ? ' dv-alvl-band' : '') + '"'
+                + (inBand ? ' title="im Flugbereich"' : (a.flag === '~' ? ' title="oberhalb Flugbereich"' : '')) + '>'
+                + '<span class="dv-alvl-h">' + esc(a.level) + '<small>hPa</small></span>'
+                + '<span class="dv-val ' + cls + '">' + spd + '<span class="dv-unit"> km/h</span></span>'
+                + '<span class="dv-sub">' + esc(a.dir) + '° · ' + esc(a.alt) + 'm</span>'
+                + '</div>';
+        }).join('');
+    }
+
     function buildTable(rows) {
         var head = '<thead><tr>'
-            + '<th>Zeit</th><th>Wind</th><th>Thermik</th><th>Wolken</th><th>Temp</th><th>Warnungen</th>'
+            + '<th>Zeit</th><th>Wind<small>Boden</small></th><th>Höhenwind<small>Wind/Böen · Richtung · Höhe</small></th>'
+            + '<th>Thermik</th><th>Wolken<small>% · tief/mittel/hoch · Basis</small></th>'
+            + '<th>Strahlung<small>global · direkt</small></th><th>Flugbereich<small>MSL</small></th>'
+            + '<th>Temp</th><th>Warnungen</th>'
             + '</tr></thead>';
         var body = rows.map(function (o) {
-            var windSub = '';
-            if (o.turb != null) windSub = '<span class="dv-sub">Turb ' + fmtKmh(o.turb) + '</span>';
-            var wind = '<span class="dv-val ' + windClass(o) + '">' + fmtKmh(o.windSpeed) + '<span class="dv-unit"> km/h</span></span>'
-                + (o.windDir != null ? '<span class="dv-sub">' + esc(o.windDir) + '°</span>' : '') + windSub;
+            // Wind (Boden) + alle Sub-Infos: Richtung, Turbulenz, Exzess, Ref-Wind.
+            var windSub = (o.windDir != null ? '<span class="dv-sub">' + esc(o.windDir) + '°</span>' : '');
+            if (o.turb != null) windSub += '<span class="dv-sub">Turb ' + fmtKmh(o.turb) + ' km/h</span>';
+            if (o.excess != null) windSub += '<span class="dv-sub">Exzess ' + esc(o.excess) + ' km/h</span>';
+            if (o.refWind) windSub += '<span class="dv-sub">Ref ' +
+                (o.refWind.raw ? esc(o.refWind.raw)
+                    : fmtKmh(o.refWind.speed) + ' km/h ' + esc(o.refWind.dir) + '° @' + esc(o.refWind.alt) + 'm')
+                + '</span>';
+            var wind = '<span class="dv-val ' + windClass(o, 'ground') + '">' + fmtKmh(o.windSpeed) + '<span class="dv-unit"> km/h</span></span>' + windSub;
+
             var therm = (o.climb != null)
                 ? '<span class="dv-val">' + esc(o.climb) + '<span class="dv-unit"> m/s</span></span>'
                   + (o.thermTop ? '<span class="dv-sub">bis ' + esc(o.thermTop) + 'm</span>' : '')
+                  + (o.lcl ? '<span class="dv-sub">LCL ' + esc(o.lcl) + 'm</span>' : '')
                 : '<span class="dv-muted">–</span>';
-            var cloud = (o.cloudCover != null ? '<span class="dv-val">' + esc(o.cloudCover) + '<span class="dv-unit">%</span></span>' : '')
-                + (o.cloudBase ? '<span class="dv-sub">' + esc(o.cloudBase) + '</span>' : '');
-            var temp = o.temp != null ? '<span class="dv-val">' + esc(o.temp) + '<span class="dv-unit">°C</span></span>' : '–';
-            var chips = o.tags.length
-                ? o.tags.map(function (t) { return '<span class="dv-tag dv-tag-' + tagSeverity(t) + '">' + esc(t) + '</span>'; }).join('')
+
+            var cloud = (o.cloudCover != null ? '<span class="dv-val">' + esc(o.cloudCover) + '<span class="dv-unit">%</span></span>' : '');
+            if (o.cloudLow != null || o.cloudMid != null || o.cloudHigh != null) {
+                cloud += '<span class="dv-sub" title="tief / mittel / hoch">'
+                    + esc(o.cloudLow == null ? '–' : o.cloudLow) + '/' + esc(o.cloudMid == null ? '–' : o.cloudMid)
+                    + '/' + esc(o.cloudHigh == null ? '–' : o.cloudHigh) + '%</span>';
+            }
+            if (o.cloudBase) cloud += '<span class="dv-sub">' + esc(o.cloudBase) + '</span>';
+            if (!cloud) cloud = '<span class="dv-muted">–</span>';
+
+            var rad = (o.radGlobal != null)
+                ? '<span class="dv-val">' + esc(o.radGlobal) + '<span class="dv-unit"> W/m²</span></span>'
+                  + (o.radDirect != null ? '<span class="dv-sub">direkt ' + esc(o.radDirect) + '</span>' : '')
                 : '<span class="dv-muted">–</span>';
+
+            var band = o.flightBand
+                ? '<span class="dv-val dv-band">' + esc(o.flightBand) + '</span>'
+                : '<span class="dv-muted">–</span>';
+
+            var temp = o.temp != null ? '<span class="dv-val">' + esc(o.temp) + '<span class="dv-unit">°C</span></span>' : '<span class="dv-muted">–</span>';
+
+            var chipArr = o.tags.map(function (t) { return '<span class="dv-tag dv-tag-' + tagSeverity(t) + '">' + esc(t) + '</span>'; });
+            o.extra.forEach(function (e) { chipArr.push('<span class="dv-tag dv-tag-info" title="ungeparstes Feld">' + esc(e) + '</span>'); });
+            var chips = chipArr.length ? chipArr.join('') : '<span class="dv-muted">–</span>';
+
             return '<tr>'
                 + '<td class="dv-time">' + esc(o.time) + '</td>'
                 + '<td>' + wind + '</td>'
+                + '<td class="dv-aloft-cell">' + buildAloft(o) + '</td>'
                 + '<td>' + therm + '</td>'
                 + '<td>' + cloud + '</td>'
+                + '<td>' + rad + '</td>'
+                + '<td>' + band + '</td>'
                 + '<td>' + temp + '</td>'
                 + '<td class="dv-warn-cell">' + chips + '</td>'
                 + '</tr>';

@@ -4567,6 +4567,47 @@ body.overlay-open {
 .dv-v-danger { color: #b91c1c; }
 .dv-warn-cell { display: flex; flex-wrap: wrap; gap: 3px; min-width: 120px; }
 
+/* Spalten-Untertitel im Header (z. B. Wind „Boden", Höhenwind „Wind/Böen") */
+.dv-table th small {
+    display: block;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--color-text-muted);
+    opacity: 0.85;
+}
+
+/* Höhenwind-Spalte: ein Block je Druckniveau (850/700/600 hPa). */
+.dv-aloft-cell { min-width: 92px; }
+.dv-alvl {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 1px 0;
+}
+.dv-alvl + .dv-alvl { border-top: 1px dashed var(--color-border); margin-top: 2px; padding-top: 3px; }
+.dv-alvl-h {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    min-width: 30px;
+}
+.dv-alvl-h small { font-size: 8px; font-weight: 600; opacity: 0.7; }
+/* Das im Flugbereich liegende Niveau (*) hervorheben — das ist das relevante. */
+.dv-alvl-band {
+    background: rgba(15, 23, 42, 0.05);
+    border-left: 3px solid var(--color-primary, #2563eb);
+    border-radius: 0 4px 4px 0;
+    padding-left: 5px;
+    margin-left: -2px;
+}
+.dv-alvl-band .dv-alvl-h { color: var(--color-text); }
+
+/* Flugbereich-Band (z. B. 2163–3942m) etwas schmaler setzen. */
+.dv-band { font-size: 12px; white-space: nowrap; }
+
 /* Tag-Chips (Badge-Atoms) */
 .dv-tag {
     display: inline-block;
