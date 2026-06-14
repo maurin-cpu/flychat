@@ -9,6 +9,7 @@ umgeschrieben.
 |---|---|
 | [`PLAN_safety_region_cap.md`](PLAN_safety_region_cap.md) | **Nicht begonnen.** Keine Telemetrie/Caution-/Eskalations-Logik in `engine/analyzers.py`, kein `scripts/extract_safety_mismatch_telemetry.py`. `region_result` wird nur in der Flyability genutzt, nicht im Safety-Post-Processing. |
 | [`PLAN_startrichtung_faecher.md`](PLAN_startrichtung_faecher.md) | **Nicht begonnen.** `scripts/build_pge_csv.py` kollabiert die Sektoren weiterhin auf 0/1, `windrichtung_optimal` existiert nirgends. |
+| [`PLAN_ogn_validation.md`](PLAN_ogn_validation.md) | **Nicht begonnen** (erstellt 2026-06-14). Real-Flug-Validierung via OpenGliderNetwork (Live-APRS-Stream, FANET-Gleitschirme). Eigenständig, NICHT mit `xcontest_validation` zu vermischen. Noch kein Code (`ogn_collector.py`/`ogn_tracks.db`/`ogn_validation/` existieren nicht). Einstieg = Phase 0 Adoptions-Check als Gate. |
 | [`PLAN_code_analyse_2026-06.md`](PLAN_code_analyse_2026-06.md) | **In Arbeit** (erstellt 2026-06-10, Paket 3 am 10.06. abends im Code/Live-Daten verifiziert — inkl. Korrektur: Vorfilter funktioniert, nur Telemetrie-Zähler kaputt; 7 statt 2 ungeschützte Endpoints). Code noch unverändert; Umsetzung startet mit Paket 3, Reihenfolge im Abschnitt „Stand der Umsetzung". |
 
 ## Verwandte, aber **umgesetzte** Themen (liegen in `docs/`)
