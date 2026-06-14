@@ -745,6 +745,10 @@
                         <div>
                             <h2 id="regionOverlayTitle">Region</h2>
                         </div>
+                        <div class="dv-toggle" id="regionViewToggle" role="tablist" aria-label="Ansicht">
+                            <button class="dv-toggle-btn active" data-view="meteo" type="button" role="tab" aria-selected="true">📊 Meteo</button>
+                            <button class="dv-toggle-btn" data-view="daten" type="button" role="tab" aria-selected="false" title="Welche Daten die KI sieht">📄 Daten</button>
+                        </div>
                         {% if test_view_active %}
                         <button class="meteogram-json-debug" id="regionJsonDebug" type="button" title="JSON-Debug (Testmodus)">JSON</button>
                         {% endif %}
@@ -775,6 +779,7 @@
 <script defer src="{{ url_for('static', filename='js/rating-info.js') }}?v={{ static_v('js/rating-info.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/osm-peaks-layer.js') }}?v={{ static_v('js/osm-peaks-layer.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/precip-refpoints-layer.js') }}?v={{ static_v('js/precip-refpoints-layer.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/dataview.js') }}?v={{ static_v('js/dataview.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/region-map.js') }}?v={{ static_v('js/region-map.js') }}"></script>
 {% if is_logged_in %}
 <script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>

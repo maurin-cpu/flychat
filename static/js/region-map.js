@@ -36,6 +36,7 @@
     var regionActiveDate = {}; // {region_id: dateStr} — last selected day per region overlay
     var regionJsonDebugActive = false;
     var regionHazardDebugActive = false;
+    var regionDataViewActive = false;
 
     // ResizeObserver-State: re-rendert das Meteogramm wenn sich die
     // Container-Breite aendert (z.B. Browser-Resize, Aside aufklappen,
@@ -824,6 +825,7 @@
     function openRegionOverlay(rid, a) {
         if (!overlay) return;
         overlayRid = rid;
+        setRegionDataView(false, true);  // neue Region startet im Meteogramm
 
         var regionName = a.region_name || rid;
         if (!meteogramCache[rid]) meteogramCache[rid] = {};
@@ -987,6 +989,7 @@
                     // Update meteogram (oder Debug-View, falls aktiv)
                     if (regionJsonDebugActive) renderRegionJsonDebug();
                     else if (regionHazardDebugActive) renderRegionHazardDebug();
+                    else if (regionDataViewActive) renderRegionDataView();
                     else renderMeteogramDay(wxData, altData, d, chartEl);
                     // Update analysis panel
                     updateOverlayAnalysis(rid, d);
@@ -1003,7 +1006,8 @@
             });
         }
 
-        renderMeteogramDay(wxData, altData, activeDate, chartEl);
+        if (regionDataViewActive) renderRegionDataView();
+        else renderMeteogramDay(wxData, altData, activeDate, chartEl);
     }
 
     function renderMeteogramDay(wxData, altData, dateStr, chartEl) {
@@ -1145,6 +1149,7 @@
         var hazBtn = document.getElementById('regionHazardDebug');
         if (regionJsonDebugActive) { regionJsonDebugActive = false; if (jsonBtn) jsonBtn.classList.remove('active'); }
         if (regionHazardDebugActive) { regionHazardDebugActive = false; if (hazBtn) hazBtn.classList.remove('active'); }
+        if (regionDataViewActive) setRegionDataView(false, true);
     }
 
     // ===== REGION DEBUG VIEWS (JSON + Hazard/Flyability Notes) =====
@@ -1160,6 +1165,42 @@
         chartEl.innerHTML = '<pre style="margin:0;padding:12px;font-size:11px;line-height:1.5;overflow:auto;height:100%;box-sizing:border-box;white-space:pre-wrap;word-break:break-all;color:#e2e8f0;background:#0f172a;border-radius:6px;">'
             + (entry ? _escDebugHtml(JSON.stringify(entry, null, 2)) : '(keine Analyse fuer ' + _escDebugHtml(overlayRid) + ' / ' + _escDebugHtml(dateStr || '?') + ')')
             + '</pre>';
+    }
+
+    // ===== DATAVIEW (Meteogramm ⇄ Daten) — fuer alle Flieger =====
+    function renderRegionDataView() {
+        var chartEl = document.getElementById('regionMeteogramChart');
+        if (!chartEl || !overlayRid) return;
+        var dateStr = regionActiveDate[overlayRid] || currentDate || window.currentDate;
+        WxDataView.render(chartEl, 'region', overlayRid, dateStr);
+    }
+
+    function setRegionDataView(active, skipRender) {
+        regionDataViewActive = active;
+        if (active) {
+            if (regionJsonDebugActive) {
+                regionJsonDebugActive = false;
+                var jb = document.getElementById('regionJsonDebug');
+                if (jb) jb.classList.remove('active');
+            }
+            if (regionHazardDebugActive) {
+                regionHazardDebugActive = false;
+                var hb = document.getElementById('regionHazardDebug');
+                if (hb) hb.classList.remove('active');
+            }
+        }
+        var toggle = document.getElementById('regionViewToggle');
+        if (toggle) {
+            toggle.querySelectorAll('.dv-toggle-btn').forEach(function (b) {
+                var on = (b.dataset.view === 'daten') === active;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+        }
+        if (!skipRender) {
+            if (active) renderRegionDataView();
+            else restoreRegionMeteogramFromCache();
+        }
     }
 
     function renderRegionHazardDebug() {
@@ -1267,6 +1308,13 @@
             }
             if (regionHazardDebugActive) renderRegionHazardDebug();
             else restoreRegionMeteogramFromCache();
+        });
+    }
+
+    var regionViewToggle = document.getElementById('regionViewToggle');
+    if (regionViewToggle) {
+        regionViewToggle.querySelectorAll('.dv-toggle-btn').forEach(function (b) {
+            b.addEventListener('click', function () { setRegionDataView(b.dataset.view === 'daten'); });
         });
     }
 

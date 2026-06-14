@@ -25,6 +25,8 @@
     var jsonDebugActive = false;
     var hazardDebugBtn = document.getElementById('meteogramHazardDebug');
     var hazardDebugActive = false;
+    var viewToggleEl = document.getElementById('meteogramViewToggle');
+    var dataViewActive = false;
 
     // Modell-Mapping fuer das Surface-Tier-Voting (siehe docs/WETTERMODELLE.md).
     // Codes kommen vom Backend (api_weather → data_sources[date]).
@@ -585,6 +587,35 @@
         });
     }
 
+    // ===== DATAVIEW (Meteogramm ⇄ Daten) — fuer alle Flieger =====
+    function renderDataView() {
+        if (!chartContainer || !currentSpotName || !currentDates.length) return;
+        WxDataView.render(chartContainer, 'spot', currentSpotName, currentDates[currentDateIdx]);
+    }
+
+    function setDataView(active, skipRender) {
+        dataViewActive = active;
+        if (active) {
+            // Andere (Test-)Debug-Ansichten deaktivieren.
+            if (jsonDebugActive) { jsonDebugActive = false; if (jsonDebugBtn) jsonDebugBtn.classList.remove('active'); }
+            if (hazardDebugActive) { hazardDebugActive = false; if (hazardDebugBtn) hazardDebugBtn.classList.remove('active'); }
+        }
+        if (viewToggleEl) {
+            viewToggleEl.querySelectorAll('.dv-toggle-btn').forEach(function (b) {
+                var on = (b.dataset.view === 'daten') === active;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+        }
+        if (!skipRender) renderCurrentDay();
+    }
+
+    if (viewToggleEl) {
+        viewToggleEl.querySelectorAll('.dv-toggle-btn').forEach(function (b) {
+            b.addEventListener('click', function () { setDataView(b.dataset.view === 'daten'); });
+        });
+    }
+
     function _escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     function renderHazardDebug() {
@@ -696,6 +727,7 @@
     function openMeteogram(spotName, props) {
         currentSpotName = spotName;
         currentSpotProps = props || null;
+        setDataView(false, true);  // neuer Spot startet im Meteogramm
         currentSpotExperienceScore = null;
         currentSpotExperienceStars = null;
         currentSpotExperienceRating = null;
@@ -832,6 +864,7 @@
     function renderCurrentDay() {
         if (hazardDebugActive) { renderHazardDebug(); renderAnalyseView(); return; }
         if (jsonDebugActive) { renderJsonDebug(); renderAnalyseView(); return; }
+        if (dataViewActive) { renderDataView(); renderAnalyseView(); return; }
         var dateStr = currentDates[currentDateIdx];
         if (!dateStr) return;
 

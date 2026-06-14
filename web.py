@@ -2818,6 +2818,48 @@ def api_region_debug(region_id: str, date_str: str):
     })
 
 
+@app.route("/api/spot-context/<spot_name>/<date_str>")
+def api_spot_context(spot_name: str, date_str: str):
+    """Liefert den EXAKTEN Wetter-Kontext-Text, den die KI fuer diesen Spot/Tag
+    sieht (Dataview). Ruft denselben Builder wie die Analyse auf
+    (_build_single_spot_context, mode="dashboard") — Single Source of Truth.
+    Oeffentlich: zeigt nur Wetterdaten, kein test/admin-Gate."""
+    spot = next((s for s in engine.spots if s["name"] == spot_name), None)
+    if not spot:
+        return jsonify({"error": f"Spot '{spot_name}' nicht gefunden"}), 404
+
+    # Gecachte Region-Analyse fuer diesen Tag mitgeben, damit der Text 1:1 dem
+    # entspricht, was die KI bei der Spot-Analyse gesehen hat (inkl. Region-Block).
+    region_result = None
+    region = find_region_for_point(spot["latitude"], spot["longitude"])
+    if region:
+        region_result = (engine.region_analyses.get(region["id"]) or {}).get(date_str)
+
+    text = engine._build_single_spot_context(
+        spot, date_str, mode="dashboard", region_analysis_result=region_result
+    )
+    if not text:
+        return jsonify({"error": f"Keine Wetterdaten fuer {spot_name} / {date_str}"}), 404
+
+    return jsonify({"spot": spot_name, "date": date_str, "text": text})
+
+
+@app.route("/api/region-context/<region_id>/<date_str>")
+def api_region_context(region_id: str, date_str: str):
+    """Liefert den EXAKTEN Wetter-Kontext-Text, den die KI fuer diese Region/Tag
+    sieht (Dataview). Ruft denselben Builder wie die Analyse auf
+    (_build_single_region_context) — Single Source of Truth. Oeffentlich."""
+    region = next((r for r in get_all_regions() if r["id"] == region_id), None)
+    if not region:
+        return jsonify({"error": f"Region '{region_id}' nicht gefunden"}), 404
+
+    text = engine._build_single_region_context(region, date_str)
+    if not text:
+        return jsonify({"error": f"Keine Wetterdaten fuer {region_id} / {date_str}"}), 404
+
+    return jsonify({"region_id": region_id, "date": date_str, "text": text})
+
+
 @app.route("/api/run-region-analyses", methods=["POST"])
 def api_run_region_analyses():
     """Startet die LLM Region-Analyse fuer alle Regionen."""
