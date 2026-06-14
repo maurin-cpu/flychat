@@ -1230,8 +1230,12 @@ window.Meteogram = (function () {
             // TORN-Schraffur über die volle Säule legen (Höhe unverändert).
             if (tornLevel && thermRiLo !== null) {
                 var hatchId = tornLevel === 'unusable' ? 'torn-hatch-unu' : 'torn-hatch-deg';
-                var yTop = rowY(thermRiLo) + 1;
-                var yBot = rowY(thermRiHi) + cellH - 1;
+                // rowY(ri) nimmt mit steigendem ri AB (höhere Row = weiter oben).
+                // thermRiLo ist der kleinste Index (tiefste Höhe → unten),
+                // thermRiHi der grösste (höchste Höhe → oben). Die Schraffur
+                // muss vom obersten bis untersten Thermik-Cell reichen.
+                var yTop = rowY(thermRiHi) + 1;
+                var yBot = rowY(thermRiLo) + cellH - 1;
                 chartG.append('rect').attr('class', 'therm-torn-overlay')
                     .attr('x', ci * CELL_W + 1).attr('y', yTop)
                     .attr('width', CELL_W - 2).attr('height', yBot - yTop)
@@ -1969,6 +1973,11 @@ window.Meteogram = (function () {
                             : '⚠ angerissen (Scherung)';
                         var _tornCol = wx.thermik.torn_level === 'unusable' ? '#9F1239' : '#B45309';
                         html += '<div class="tooltip-row"><span class="tooltip-label">Thermik</span><span class="tooltip-value" style="color:' + _tornCol + ';font-weight:600">' + _tornTxt + '</span></div>';
+                        // Erklärt die Diagonal-Schraffur über der Thermik-Säule.
+                        var _tornHint = wx.thermik.torn_level === 'unusable'
+                            ? 'Schraffur: Höhenwind zerreisst die Thermik — Steigen unbrauchbar, turbulent, abgerissene Bärte.'
+                            : 'Schraffur: Höhenwind reisst die Thermik an — Steigen brüchig und ruppig, schwer zentrierbar.';
+                        html += '<div style="margin-top:3px;font-size:11px;color:#6B7280;line-height:1.35;white-space:normal;max-width:230px">' + _tornHint + '</div>';
                     }
                 }
                 if (wx.thermik.cape > 0) html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';
@@ -1984,10 +1993,19 @@ window.Meteogram = (function () {
             tooltipEl.innerHTML = html;
             tooltipEl.classList.add('visible');
 
+            // Position: rechts neben dem Cursor, sonst nach links/oben kippen.
+            // Echte Tooltip-Grösse messen (Inhalt variiert stark, z.B. ~268×443)
+            // statt zu schätzen — und am Schluss HART in den Viewport klemmen,
+            // damit der Tooltip nie aus dem Fenster läuft (oben/unten/links/rechts).
+            var PAD = 8;
+            var tw = tooltipEl.offsetWidth;
+            var th = tooltipEl.offsetHeight;
             var tx = clientX + 16;
             var ty = clientY - 10;
-            if (tx + 200 > window.innerWidth) tx = clientX - 200;
-            if (ty + 250 > window.innerHeight) ty = clientY - 250;
+            if (tx + tw + PAD > window.innerWidth) tx = clientX - tw - 16;  // nach links kippen
+            if (ty + th + PAD > window.innerHeight) ty = clientY - th + 10;  // nach oben kippen
+            tx = Math.max(PAD, Math.min(tx, window.innerWidth - tw - PAD));
+            ty = Math.max(PAD, Math.min(ty, window.innerHeight - th - PAD));
             tooltipEl.style.left = tx + 'px';
             tooltipEl.style.top = ty + 'px';
         }

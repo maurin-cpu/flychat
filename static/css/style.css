@@ -2047,6 +2047,17 @@ body.page-fixed-nav {
     opacity: 1;
 }
 
+/* Desktop-Hover-Tooltip MUSS über dem Meteogramm-Overlay (z-index 10000) liegen.
+   Der Tooltip ist ein DOM-Geschwister AUSSERHALB des Overlays (siehe index.html /
+   regionen.html) und lag mit z-index 300 sonst dahinter → auf Desktop unsichtbar.
+   Nur Desktop (>640px): Mobile nutzt die Scrub-Info-Leiste IM Overlay und bleibt
+   unberührt. Tooltip hat pointer-events:none, blockiert also nichts. */
+@media (min-width: 641px) {
+    .tooltip {
+        z-index: 10050;
+    }
+}
+
 .tooltip-title {
     font-weight: 600;
     margin-bottom: 10px;
