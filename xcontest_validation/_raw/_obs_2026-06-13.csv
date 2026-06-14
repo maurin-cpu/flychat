@@ -1,0 +1,71 @@
+date,spot,region,launches,best_km,top_pilot,top_start_time,top_airtime,our_safety_rating,our_experience_rating,our_xc_rating,our_status,our_streckenflug_tier,our_streckenflug_limiting_factor,decisions_applied,no_go_reasons,wx_climb_rate_max_ms,wx_max_thermal_height_m,wx_blh_max_m,wx_wind_gust_max_kmh,wx_wind_dir_dominant_deg,wx_t2m_max,wx_precip_sum_mm,wx_cloud_low_mean_pct,wx_cape_max,wx_lifted_index_min,wx_productive_thermal_h,finding_type,notes
+2026-06-13,Moléson,,6,146.18,Jakub Ludma,10:52,6:19,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Moléson).
+2026-06-13,Dent de Jaman (Rochers de Naye),Waadtländer Alpen,23,142.52,Sebastian Benz,14:27,4:52,0.0,5,1,,,none,"IsConditional(Dent de Jaman (Rochers de Naye)/2026-06-13)|FewShot:alpen,3 examples",,2.8,3103,1490.0,24.8,255,18.0,0.0,13.46,130.0,-1.1,12,underrated_spot,
+2026-06-13,Vounetz-1620,Schwarzsee / Gantrisch,40,116.84,Mike Wicki,12:41,4:57,0.0,4,1,,,none,"IsConditional(Vounetz-1620/2026-06-13)|FewShot:voralpen,3 examples",,2.7,2905,1860.0,38.9,270,18.9,0.0,0.38,0.0,-0.2,12,underrated_spot,
+2026-06-13,Col du Rawyl,,1,108.37,Antton Arretz,14:23,3:32,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Col du Rawyl).
+2026-06-13,Le Chamossaire-1980,Waadtländer Alpen,2,101.56,Loïc Pachoud,11:58,4:22,0.0,4,1,,,none,"IsConditional(Le Chamossaire-1980/2026-06-13)|FewShot:alpen,3 examples",,3.2,3837,1540.0,18.4,250,15.9,0.0,11.23,130.0,0.6,13,underrated_spot,
+2026-06-13,Parc des ...,,1,94.37,KURT HÄNNI,14:32,4:11,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Parc des ...).
+2026-06-13,Wispile-1900 (Saanen- Gstaad),Freiburger Voralpen,11,92.75,Axel Rieben,13:14,5:02,0.0,4,1,,,none,"IsConditional(Wispile-1900 (Saanen- Gstaad)/2026-06-13)|FewShot:voralpen,3 examples",,2.8,3301,1805.0,30.2,311,17.6,0.0,1.69,0.0,-0.2,12,underrated_spot,
+2026-06-13,Bovonne,,1,87.81,David Hasko,14:30,5:15,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Bovonne).
+2026-06-13,Salzmatt,,1,86.63,Marc Favrod-Coune,14:36,4:33,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Salzmatt).
+2026-06-13,Saint-Cergue,Genferseeregion,6,84.36,Lionel Moret,12:15,4:23,0.0,3,1,,,none,"IsConditional(Saint-Cergue/2026-06-13)|FewShot:mittelland,3 examples",,2.4,2399,1560.0,36.4,221,23.6,0.0,3.08,100.0,0.6,12,underrated_spot,
+2026-06-13,Berneuse-2020,Waadtländer Alpen,7,82.14,Michel Phillot,11:51,3:52,0.0,4,1,,,none,"IsConditional(Berneuse-2020/2026-06-13)|FewShot:alpen,3 examples",,3.2,3744,1540.0,30.6,301,15.7,0.0,0.23,0.0,0.6,13,underrated_spot,
+2026-06-13,Grande Ch...,,1,74.37,Stefan Ruider,13:00,4:10,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Grande Ch...).
+2026-06-13,Rochers d...,,1,67.18,Lia Sutter,12:59,3:40,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Rochers d...).
+2026-06-13,Mauborget,Jura West,3,61.01,Yvan DAVID,13:24,2:48,0.0,4,1,,,none,"IsConditional(Mauborget/2026-06-13)|FewShot:jura,3 examples",,2.6,2915,1875.0,47.9,264,21.3,0.0,19.15,250.0,-0.1,12,underrated_spot,
+2026-06-13,Le Suchet,Jura West,4,43.15,Samuel Buchler,12:28,2:55,0.0,3,1,,,none,"IsConditional(Le Suchet/2026-06-13)|FewShot:jura,3 examples",,2.8,3407,1825.0,46.8,280,18.9,0.0,5.38,430.0,-0.1,12,confirm,
+2026-06-13,Planachaux,,4,41.82,Guy Dubosson,11:33,2:08,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Planachaux).
+2026-06-13,Verbier - Ruinettes _ Fontanets_Attelas,Unterwallis,7,39.08,Loïc Houtart,13:18,1:47,0.0,5,1,,,none,"IsConditional(Verbier - Ruinettes _ Fontanets_Attelas/2026-06-13)|FewShot:hochalpin,3 examples",,2.9,3412,1595.0,30.6,272,15.8,0.0,1.0,10.0,1.7,13,confirm,
+2026-06-13,Pleiades,Waadtländer Alpen,9,37.34,Dominique Brun,14:51,2:31,0.0,5,1,,,none,"IsConditional(Pleiades/2026-06-13)|FewShot:alpen,3 examples",,2.5,2525,1140.0,20.9,294,21.6,0.0,2.92,30.0,-1.1,12,confirm,
+2026-06-13,Grandvillard,,7,36.48,Laurent Pürro,14:32,2:14,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Grandvillard).
+2026-06-13,Homad,,2,32.04,Benjamin Bühlmann,13:30,1:44,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Homad).
+2026-06-13,Schynige ...,,2,29.08,Martina Hauri,17:58,2:17,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Schynige ...).
+2026-06-13,Le Rosy d...,,1,25.41,Pascal Oberson,13:48,3:22,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Le Rosy d...).
+2026-06-13,Sonchaux (Villeneuve),Waadtländer Alpen,3,23.22,Julien Christe,15:02,1:30,0.0,4,1,,,none,"FewShot:alpen,3 examples",,2.6,2621,1140.0,27.0,261,20.7,0.0,7.15,70.0,-1.1,12,confirm,
+2026-06-13,Grimer,,3,22.66,Carola Steffen,14:41,1:19,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Grimer).
+2026-06-13,Riffelberg-2700,Mattertal / Saastal,2,21.79,Dominik Schranz,15:25,1:08,0.0,1,0,,kein_xc,spot_not_flyable,,"Hoehenwind: 44-49 km/h auf 4400-4500m, 12:00-17:00|Boeen: 41 km/h am Boden, 17:00|Hoehenboeen: 41-49 km/h auf 4400-4500m, 15:00-17:00",2.7,3708,1435.0,41.0,309,13.5,0.0,0.0,0.0,2.3,13,false_positive_notsafe,
+2026-06-13,Mägisserhorn-2260,Freiburger Voralpen,1,20.71,Fritz Wäfler,12:11,2:02,0.0,1,0,,kein_xc,spot_not_flyable,,"Hoehenwind: 32-48 km/h auf 3200m, 09:00-16:00|Hoehenboeen: 38-48 km/h auf 3200m, 09:00-16:00",3.3,4427,1670.0,43.2,282,14.2,0.0,0.15,10.0,-0.2,13,false_positive_notsafe,
+2026-06-13,Tschentenegg,Freiburger Voralpen,2,19.63,Micha Gempeler,11:20,0:54,0.0,4,1,,,none,"IsConditional(Tschentenegg/2026-06-13)|FewShot:voralpen,3 examples",,2.8,3122,1580.0,25.9,353,17.1,0.0,6.62,60.0,-0.2,13,confirm,
+2026-06-13,Blüemlisa...,,1,18.59,Pascal Gebert,11:17,1:17,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Blüemlisa...).
+2026-06-13,Roc d'Orz...,,1,18.06,Laurent Borella,11:57,1:07,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Roc d'Orz...).
+2026-06-13,Marbachegg-1480,Berner Oberland,1,16.96,Benjamin Sommer,16:51,0:50,0.0,1,0,,kein_xc,spot_not_flyable,AloftNotSafe(6h),Kraeftiger Hoehenwind im Flugbereich: >30 km/h in 6h,2.8,3193,1615.0,30.2,279,20.2,0.0,6.69,110.0,-0.3,11,false_positive_notsafe,
+2026-06-13,Ob Lucken,Bodenseeraum,1,16.92,Ziegler Rolf,20:05,1:08,0.0,,0,,kein_xc,spot_not_flyable,,Start-Fenster: Alle Stunden mit passender Windrichtung haben harte Warnungen (Sturm/Boeen/Regen/Gewitter),2.1,1777,2030.0,65.5,254,22.8,0.0,34.77,110.0,-0.6,11,false_positive_notsafe,
+2026-06-13,Crêt-du-Midi,Unterwallis,3,16.20,Michel Hallenbarter,10:23,0:32,0.0,5,1,,,none,"IsConditional(Crêt-du-Midi/2026-06-13)|FewShot:hochalpin,3 examples",,2.9,3553,1930.0,40.3,282,15.1,0.0,0.0,0.0,0.0,13,confirm,
+2026-06-13,Zugerberg,Mittelland Zentral,4,16.16,Lukas Gafner,14:23,2:48,0.0,,0,,kein_xc,spot_not_flyable,,Start-Fenster: Alle Stunden mit passender Windrichtung haben harte Warnungen (Sturm/Boeen/Regen/Gewitter),2.4,2198,2155.0,56.9,270,23.5,0.0,1.46,50.0,-1.6,11,false_positive_notsafe,
+2026-06-13,Brändlen-1240,Zentralschweizer Voralpen,6,15.53,Sven Zangerl,17:16,1:26,0.0,,0,,kein_xc,spot_not_flyable,,"Start-Fenster: Nur 1h sauber, kein zusammenhaengender Block >= 2h",2.6,3161,2060.0,28.8,311,22.3,0.0,0.0,30.0,-2.1,12,false_positive_notsafe,
+2026-06-13,Hohmattli-1770,Freiburger Voralpen,3,15.41,Suresh Fuster,13:44,0:55,0.0,1,0,,kein_xc,spot_not_flyable,AloftNotSafe(5h),Kraeftiger Hoehenwind im Flugbereich: >30 km/h in 5h,2.8,3106,1565.0,40.0,276,16.7,0.0,0.46,0.0,-1.7,13,false_positive_notsafe,
+2026-06-13,ruinettes,,1,15.36,Wim Slangen,13:05,1:11,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: ruinettes).
+2026-06-13,Marnex,,1,13.28,Julien Bonardot,15:42,0:51,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Marnex).
+2026-06-13,Niederhorn-1920,Berner Voralpen,2,13.25,Frank Sauter,15:24,0:44,0.0,,0,,kein_xc,spot_not_flyable,,Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors,3.2,3618,1580.0,41.8,290,16.5,0.0,2.23,130.0,-1.0,13,false_positive_notsafe,
+2026-06-13,Metschstand,,2,13.00,Peter Schmutz,11:40,0:59,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Metschstand).
+2026-06-13,La Dôle,Genferseeregion,1,12.93,Jean Joseph Gillet,16:31,0:36,0.0,4,1,,,none,"IsConditional(La Dôle/2026-06-13)|FewShot:mittelland,3 examples",,3.1,3540,1810.0,39.6,321,18.0,0.0,4.38,30.0,0.4,12,confirm,
+2026-06-13,Schildgrat,,1,12.77,Daniel Schober,12:23,1:45,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Schildgrat).
+2026-06-13,Pente du ...,,1,12.50,Fabien Bovigny,18:26,1:38,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Pente du ...).
+2026-06-13,Skilift H...,,2,12.48,Manuel Zurbuchen,10:46,2:08,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Skilift H...).
+2026-06-13,SP (SW) B...,,1,12.44,Stéphane Zufferey,10:39,1:03,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: SP (SW) B...).
+2026-06-13,Locarno- Cardada - Cimetta -1570,Tessin Zentral,2,11.85,Eric Weibel,13:10,0:56,0.0,1,0,,kein_xc,spot_not_flyable,,"Hoehenwind: 24-26 km/h auf 3200m, 16-17h|Hoehenwind: durchgehend DANGER-Level in 10 von 12 Stunden, kein ruhiges Fenster|Boeen: Hoehenboeen >40 km/h in 9 Stunden, durchgehend gefaehrlich-Trend",2.9,3145,2840.0,21.6,207,20.6,0.0,0.0,140.0,-2.5,13,false_positive_notsafe,
+2026-06-13,Niesen-2280,Freiburger Voralpen,1,11.29,Martin Grundbacher,13:09,0:31,0.0,1,0,,kein_xc,spot_not_flyable,,"Hoehenwind: 32-48 km/h auf 3200m, 09:00-17:00|Hoehenboeen: 40-48 km/h auf 3200m, 09:00-12:00",3.2,4345,1580.0,37.8,291,13.8,0.0,0.77,140.0,0.3,13,false_positive_notsafe,
+2026-06-13,Amisbuehl,Berner Voralpen,8,10.79,Rafał Manhart,16:50,1:19,0.0,,0,,kein_xc,spot_not_flyable,,"Start-Fenster: Nur 1h sauber, kein zusammenhaengender Block >= 2h",2.8,3074,1610.0,37.1,230,21.5,0.0,1.31,220.0,-1.0,12,false_positive_notsafe,
+2026-06-13,Dalenwil - Haldigrat,Zentralschweizer Voralpen,1,10.77,Nando Käslin,17:16,1:00,0.0,,0,,kein_xc,spot_not_flyable,,Start-Fenster: Alle Stunden mit passender Windrichtung haben harte Warnungen (Sturm/Boeen/Regen/Gewitter),3.2,4099,1640.0,45.4,264,15.4,0.0,0.0,40.0,0.0,13,false_positive_notsafe,
+2026-06-13,Winteregg,,2,10.08,Michael Keller,14:28,1:50,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Winteregg).
+2026-06-13,Fanas -Hörnli -Eggli,Prättigau - Davos,2,9.46,Jörn Birkel,14:58,0:54,0.0,1,0,,kein_xc,spot_not_flyable,,"Hoehenwind: 36-52 km/h auf 3200m, durchgehend 06:00-17:00|Boeen: Bodenboeen >40 km/h, 14:00-17:00; Hoehenboeen >40 km/h, 08:00-17:00",3.1,3840,2255.0,45.0,253,16.7,0.0,2.31,140.0,0.1,12,false_positive_notsafe,
+2026-06-13,Gornergrat,,3,9.27,Jan Necas,11:17,0:26,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Gornergrat).
+2026-06-13,Mervelier,,3,9.25,pierre-yves schlup,14:41,0:54,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Mervelier).
+2026-06-13,Crete de Thyon-2060 (Veysonnaz),Unterwallis,1,8.91,david jouanneau,18:08,0:56,0.0,5,1,,,none,"IsConditional(Crete de Thyon-2060 (Veysonnaz)/2026-06-13)|FewShot:hochalpin,3 examples","Hoehenwind: 44-50 km/h auf 4400m, 14:00-17:00|Boeen: 44-54 km/h am Boden, 15:00-17:00",3.1,3609,1430.0,54.0,277,16.6,0.0,0.0,0.0,0.5,13,confirm,
+2026-06-13,Rotenflue,Zentralschweizer Voralpen,1,8.79,Bernd Dressler,13:23,0:47,0.0,1,0,,kein_xc,spot_not_flyable,,"Hoehenwind: 31-50 km/h auf 2000-3200m, 09:00-17:00|Hoehenboeen: 37-50 km/h auf 2000-3200m, 09:00-17:00",3.0,3416,1895.0,36.7,250,18.4,0.0,1.46,20.0,-1.6,13,false_positive_notsafe,
+2026-06-13,Rothorn,,1,8.34,Jan Necas,08:57,0:24,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Rothorn).
+2026-06-13,Chaumont,Jura West,2,8.15,Stéphane Liechti,16:59,1:08,0.0,3,1,,,none,"IsConditional(Chaumont/2026-06-13)|FewShot:jura,3 examples",,1.9,1809,2010.0,56.2,283,21.7,0.0,11.54,60.0,-0.3,11,confirm,
+2026-06-13,Fronalpstock,Zentralschweizer Voralpen,1,7.96,David Maury,18:49,0:37,0.0,,0,,kein_xc,spot_not_flyable,,Start-Fenster: Alle Stunden mit passender Windrichtung haben harte Warnungen (Sturm/Boeen/Regen/Gewitter),3.1,3724,1895.0,38.9,272,15.7,0.0,2.23,10.0,-1.6,13,false_positive_notsafe,
+2026-06-13,Doldenhor...,,2,7.72,Michelle Roth,15:42,1:38,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Doldenhor...).
+2026-06-13,fontanet,,1,6.82,Wim Slangen,10:49,0:20,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: fontanet).
+2026-06-13,Engelberg - Brunni - Schonegg,Zentralschweizer Voralpen,1,6.44,Thibaut Coutelou,12:09,0:12,0.0,,0,,kein_xc,spot_not_flyable,,Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors,3.0,3387,1640.0,46.1,301,16.8,0.0,0.0,10.0,0.0,13,false_positive_notsafe,
+2026-06-13,Allmenalp (Kandersteg),Freiburger Voralpen,3,6.40,Birgit Standhartinger,16:03,1:25,0.0,4,1,,,none,"IsConditional(Allmenalp (Kandersteg)/2026-06-13)|FewShot:voralpen,3 examples",,2.8,3471,1410.0,28.1,59,17.2,0.0,4.0,130.0,0.3,13,confirm,
+2026-06-13,P Bergbah...,,2,5.66,Marc Filot,15:43,1:36,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: P Bergbah...).
+2026-06-13,Büelen - Bueelen,Zentralschweizer Voralpen,5,5.18,Pedro Schläppi,14:21,0:30,0.0,5,1,,,none,"IsConditional(Büelen - Bueelen/2026-06-13)|FewShot:alpen,3 examples",,2.7,2992,2225.0,23.0,80,22.2,0.0,0.23,140.0,-2.3,11,confirm,
+2026-06-13,Les Pétis,Waadtländer Alpen,1,4.89,Titouan Lelievre,15:11,0:18,0.0,4,1,,,none,"IsConditional(Les Pétis/2026-06-13)|FewShot:alpen,3 examples",,2.8,3195,1530.0,23.0,66,19.3,0.0,13.0,0.0,0.7,12,confirm,
+2026-06-13,Sta.Maria...,,2,3.70,Damien Carrara,10:48,0:14,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Sta.Maria...).
+2026-06-13,Doldendor...,,1,3.36,Birgit Standhartinger,13:51,0:13,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Doldendor...).
+2026-06-13,Chaudzerya,,1,3.16,Marcello Ancarola,07:17,0:05,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Chaudzerya).
+2026-06-13,Le Pont-Vallée de Joux,Genferseeregion,1,2.38,Christophe Leuenberger,15:06,0:10,0.0,4,1,,,none,"IsConditional(Le Pont-Vallée de Joux/2026-06-13)|FewShot:mittelland,3 examples",,2.6,2603,1905.0,36.7,273,23.1,0.0,0.15,10.0,0.1,12,confirm,
+2026-06-13,Stiereber...,,1,2.12,Andreas Richard,13:39,0:07,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Stiereber...).
+2026-06-13,Galm_Chiley,,1,2.10,Andreas Richard,16:08,0:12,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Galm_Chiley).
