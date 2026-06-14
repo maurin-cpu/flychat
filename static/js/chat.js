@@ -1210,5 +1210,23 @@
     // Update after successful weather refresh
     window.updateDataFreshness = updateFreshness;
 
+    // Beim Öffnen den (user-gebundenen) Chat-Verlauf laden und anzeigen.
+    function loadHistory() {
+        fetch('/api/chat-history', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                if (!d || !d.messages || !d.messages.length) return;
+                var welcome = document.getElementById('chatWelcome');
+                if (welcome) welcome.remove();
+                d.messages.forEach(function (m) {
+                    appendMessage(m.role === 'assistant' ? 'bot' : 'user', m.content || '');
+                });
+                if (quickActions) quickActions.classList.add('compact');
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            })
+            .catch(function () { /* ignore */ });
+    }
+    loadHistory();
+
     inputEl.focus();
 })();

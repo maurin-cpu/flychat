@@ -909,27 +909,5 @@
     "decide_foehn_summary",
     "decide_precip_pattern_nord_sued",
     "decide_lage_label"
-  ],
-  "llm_overview": {
-    "short": "Die kommenden Tage starten mit Nordfoehn, der ab Dienstag einer stabilen Hochdrucklage weicht. Die Hoehenstroemung weht anfangs kraeftig aus Nordwest, wird aber schwaecher und dreht zum Donnerstag auf West.",
-    "long": "",
-    "short_with_sources": [
-      {
-        "text": "Die kommenden Tage starten mit Nordfoehn, der ab Dienstag einer stabilen Hochdrucklage weicht.",
-        "sources": [
-          "lage_label",
-          "pressure_influence"
-        ]
-      },
-      {
-        "text": "Die Hoehenstroemung weht anfangs kraeftig aus Nordwest, wird aber schwaecher und dreht zum Donnerstag auf West.",
-        "sources": [
-          "flow_overhead"
-        ]
-      }
-    ],
-    "long_with_sources": [],
-    "rejected_count": 8,
-    "generated_at": "2026-06-14T06:44:49"
-  }
+  ]
 }

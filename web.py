@@ -2528,6 +2528,13 @@ def _require_login_json(view_func):
     return wrapper
 
 
+def _chat_session_id():
+    """Chat-History ist an den eingeloggten User gebunden — nicht an eine
+    Client-/localStorage-ID. Dadurch ist der Verlauf geräteübergreifend,
+    isoliert pro User und nur für den jeweiligen User sichtbar."""
+    return f"user_{session['sub_id']}"
+
+
 @app.route("/api/chat", methods=["POST"])
 @_require_login_json
 def api_chat():
@@ -2536,7 +2543,7 @@ def api_chat():
         return jsonify({"error": "Keine Nachricht"}), 400
 
     message = data["message"].strip()
-    session_id = data.get("session_id", "default")
+    session_id = _chat_session_id()
 
     if not message:
         return jsonify({"error": "Leere Nachricht"}), 400
@@ -2571,13 +2578,17 @@ def api_chat():
 @app.route("/api/reset-chat", methods=["POST"])
 @_require_login_json
 def api_reset_chat():
-    """Setzt die aktuelle Konversation zurück."""
-    data = request.get_json(silent=True) or {}
-    session_id = data.get("session_id")
-    if session_id:
-        engine.reset_conversation(session_id)
-        return jsonify({"success": True})
-    return jsonify({"success": False, "error": "Keine Session-ID"}), 400
+    """Setzt die Konversation des eingeloggten Users zurück."""
+    engine.reset_conversation(_chat_session_id())
+    return jsonify({"success": True})
+
+
+@app.route("/api/chat-history", methods=["GET"])
+@_require_login_json
+def api_chat_history():
+    """Gibt dem eingeloggten User seinen eigenen Chat-Verlauf zurück
+    (nur user/assistant, ohne System-Prompt und internes Wetter-Prelude)."""
+    return jsonify({"messages": engine.public_history(_chat_session_id())})
 
 
 

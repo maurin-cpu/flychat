@@ -469,6 +469,27 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
             self.synoptic_provider, self.synoptic_model,
         )
 
+    def public_history(self, session_id: str) -> list:
+        """Bereitet eine Conversation für die Anzeige im Frontend auf.
+
+        Liefert nur user/assistant-Nachrichten — ohne System-Prompt und ohne
+        das intern vorangestellte AKTUELZEIT/DATUM-MAPPING/Wetter-Prelude der
+        ersten User-Nachricht (vgl. ChatOrchestratorMixin)."""
+        conv = self.conversations.get(session_id)
+        if not conv:
+            return []
+        marker = "Frage des Piloten: "
+        out = []
+        for m in conv.get("messages", []):
+            role = m.get("role")
+            if role not in ("user", "assistant"):
+                continue
+            content = m.get("content", "") or ""
+            if role == "user" and marker in content:
+                content = content.split(marker, 1)[1].strip()
+            out.append({"role": role, "content": content})
+        return out
+
     def reset_conversation(self, session_id: str):
         """Conversation zurücksetzen."""
         if session_id in self.conversations:
