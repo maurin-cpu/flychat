@@ -86,7 +86,7 @@ def classify(in_sec, edge_dist, gust, no_go, launches, best_km):
 
 # Load weather_archive snapshots to enrich with DB-sector per spot
 archives = {}
-for arch in Path('data/weather_archive').glob('2026-05-*.json'):
+for arch in Path('data/weather_archive').glob('2026-*.json'):
     date_str = arch.stem
     try:
         d = json.load(open(arch, encoding='utf-8'))
