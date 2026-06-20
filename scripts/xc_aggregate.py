@@ -145,11 +145,21 @@ SKIP = {"?", "Inconnu", "unknown", "TO (N-NW)...", "TO (WNW)...", "Talstatio..."
 #   exp_ok  = experience_rating ist valide
 # 29.05 06:15-Snapshot: XC+exp-Pass NICHT gelaufen (xc=0 ueberall, exp nur 33/488)
 # 30.05 06:18-Snapshot: XC gecappt auf 0/1 (Artefakt), exp ok
+# 14.-19.06 ~06:40-Snapshots: XC gecappt auf 0/1 (xc>=2: 0/494, vor XC-LLM-Pass),
+#   exp hat echte Streuung 1-5 -> xc_ok=False, exp_ok=True (wie 30.05).
+# 20.06 06:05-Snapshot: KAPUTT (status=error 487/494, exp+xc gedeckelt) -> nicht
+#   validierbar, NICHT aggregieren (siehe README Daten-Luecken).
 DATE_FLAGS = {
     "2026-05-27": {"xc_ok": True, "exp_ok": True},
     "2026-05-28": {"xc_ok": True, "exp_ok": True},
     "2026-05-29": {"xc_ok": False, "exp_ok": False},
     "2026-05-30": {"xc_ok": False, "exp_ok": True},
+    "2026-06-14": {"xc_ok": False, "exp_ok": True},
+    "2026-06-15": {"xc_ok": False, "exp_ok": True},
+    "2026-06-16": {"xc_ok": False, "exp_ok": True},
+    "2026-06-17": {"xc_ok": False, "exp_ok": True},
+    "2026-06-18": {"xc_ok": False, "exp_ok": True},
+    "2026-06-19": {"xc_ok": False, "exp_ok": True},
 }
 ARTIFACT_NOTE = ("snapshot_xc_unvollstaendig: 06:15-Run vor XC-LLM-Pass, "
                  "streckenflug/exp-Rating Artefakt (nicht validierbar)")

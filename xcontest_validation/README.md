@@ -125,6 +125,19 @@ Snapshot existiert.
 | Tag | Status | Grund |
 |---|---|---|
 | **2026-06-11** | ⚠ nicht analysiert | Kein `weather_archive/2026-06-11.json`-Snapshot |
+| **2026-06-20** | ⚠ nicht analysiert | Snapshot kaputt: `status=error` 487/494 (06:05-Run vor Analyse-Pass) |
+
+**2026-06-20** — Snapshot existiert, ist aber **vor dem Analyse-Pass** gezogen
+(`snapshot_at` 06:05): `status=error` bei 487/494 Spots, `experience_rating` und
+`streckenflug_rating` komplett gedeckelt. Weder Safety, Exp noch XC validierbar →
+`xc_aggregate.py` für 20.06 **nicht** ausgeführt, keine Zeilen in `observations.csv`.
+Rohdaten `_raw/2026-06-20.tsv` (15 Flüge) als Provenance erhalten.
+
+> **I-015 generell (14.–19.06):** Diese Snapshots (~06:40) entstanden **vor dem
+> XC-LLM-Pass** → `streckenflug_rating` auf 0/1 gedeckelt (xc≥2: 0/494 an allen 6
+> Tagen, inkl. Rekord-Streckentag 18.06). `DATE_FLAGS={xc_ok:False, exp_ok:True}`
+> blankt `our_xc_rating` und unterdrückt `underrated_spot`. **Nur Safety/Status +
+> Experience sind an diesen Tagen validierbar, XC nicht.**
 
 **11.06.2026** — Rohdaten vorhanden (`_raw/2026-06-11.tsv`, 81 Flüge), aber **kein
 Wetter-Snapshot**: `snapshot_weather.py` wurde an dem Tag nicht ausgeführt, und
