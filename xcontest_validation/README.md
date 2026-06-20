@@ -120,6 +120,28 @@ von `wetterdaten.json` morgens), damit der eingefrorene Stand möglichst nah am
 problemlos analysiert werden, solange für den entsprechenden Tag ein
 Snapshot existiert.
 
+## Bekannte Daten-Lücken
+
+| Tag | Status | Grund |
+|---|---|---|
+| **2026-06-11** | ⚠ nicht analysiert | Kein `weather_archive/2026-06-11.json`-Snapshot |
+
+**11.06.2026** — Rohdaten vorhanden (`_raw/2026-06-11.tsv`, 81 Flüge), aber **kein
+Wetter-Snapshot**: `snapshot_weather.py` wurde an dem Tag nicht ausgeführt, und
+`wetterdaten.json` (rollend) sowie `spot_analyses.json` wurden seither überschrieben
+(nie committet). Ohne Snapshot kann `xc_aggregate.py` die `our_*`/`wx_*`-Spalten
+nicht joinen → keine Zeilen in `observations.csv`.
+
+**Rekonstruktion geprüft (2026-06-20): nicht faithful möglich.** Die zwei nötigen
+Inputs — der Forecast-Stand und die Modell-Ratings vom Flug-Morgen — existieren
+nirgends mehr (kein wetterdaten/spot_analyses-Backup vom 11.06, nicht in Git-History,
+`data/history/` leer, kein foehn_cache). `station_observations.db` hat nur 35 Mess-
+Zeilen vom 11.06 — Punktmessungen, nicht das 494-Spot-Grid mit Status/Ratings.
+ERA5-Reanalyse + Neu-Lauf wäre möglich, ist aber methodisch unsauber: vergleicht
+*heutiges* Modell auf *tatsächlichem* Wetter statt den as-issued Forecast vom
+11.06-Morgen — kein vergleichbarer Validierungspunkt. **11.06 bleibt Lücke**;
+TSV als Provenance erhalten. Lehre: `snapshot_weather.py` täglich sicherstellen.
+
 ## Sample-Größe Roadmap
 
 - ≥10 Tage: erste belastbare Muster sichtbar
