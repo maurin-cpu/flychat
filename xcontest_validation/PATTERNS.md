@@ -22,8 +22,18 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 6 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 10 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05, **14.06, 15.06, 18.06, 19.06**)
 **Status**: in-untersuchung (Trigger identifiziert, Sub-Issues separieren) — **Top-Refactor-Prio**
+
+**Betroffene Spots (14.–19.06.)** — West/NW-Wind-Wochenanfang + Rekordtag 18.06:
+- **Dent de Jaman** (14.06): **not_safe bei 113.86 km / 6× und Böen nur 30.6** — klarster FP der Woche.
+- **Vounetz** (14.06): not_safe, **15 Launches / 59 km** (Böen 48). **Marbachegg** (15.06): not_safe,
+  **8 Launches / 43 km bei Böen nur 34** — Übervorsicht trotz moderatem Wind.
+- **Ebenalp** (18.06, Rekordtag): **not_safe bei 214 km / 26 Launches und Böen nur 26** — herausragender
+  Einzel-FP an einem ansonsten exzellent kalibrierten Tag (59 confirm / 6 FP). → Kopplung **I-013**-Pendel.
+- 19.06 (Starkwind, Böen 56–120): 26 not_safe-FP, aber **überwiegend korrekte Vorsicht** (kurze Flüge),
+  kein zusätzliches I-001-Gewicht. Echter Grenzfall nur Niesen (81 km / Böen 38).
+- Die FP an 16./17.06 sind marginal (je 2, Hops/Einzelflüge) — ruhige, gut kalibrierte Tage.
 
 **Betroffene Spots (27.–30.05.)** — 4 Tage am Stueck, ~60 FP-Zeilen. Wechselnde Wind-Lagen
 (27. NW-Jura / 28. NE-Alpstein / 29. SO-Wallis / 30. N-Voralpen) → je nach Lage andere Spots:
@@ -281,7 +291,20 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 5 (17.05, 18.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 6 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05). Wiederkehrer:
+**Tage beobachtet (Post-Migration ≥22.05)**: 12 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05, **14.–19.06**).
+
+**NEU/Wiederkehrer (14.–19.06.)** — der **18.06 (Rekordtag) brachte 82 Coverage-Gaps**, viele groß:
+- **LSPL** (18.06) — 1× **359 km** (RW2, Mittelland-Flach wie Langenthal — Sonderfall kein Berg-Launch)
+- **Madrisa** (18.06) — 2× **216 km**, Prättigau — **HOCH-PRIO** (Strecken-Spot, nicht in PGE)
+- **Schänis** (18.06) — 1× **202 km** (RW2); **Diavolezza** (18.06) — 1× **194 km**, Engadin
+- **Faido** (18.06) — 1× 152 km; **Gotthard** Wiederkehrer (18.06 5×/207 km — schon I-005 25.05)
+- **Ruogig** Wiederkehrer (18.06 3×/185 km — schon 25./30.05, ZS Voralpen, bleibt HOCH)
+- **Moron/Calmut** Wiederkehrer (18.06, ~172 km); **Bella Lui** (17.06 1×/**114 km**, Wallis)
+- **Winteregg** Wiederkehrer (15.06 127 km, 17.06); **Moléson/Grandvillard** (14.06, 125/102 km)
+- 19.06: Pfunds (58), Sorvilier (52), Bözingenberg (28). — Gesamthebel: Madrisa + Diavolezza + Faido
+  (Engadin/Prättigau-Strecken-Spots) sind die wertvollsten DB-Ergänzungen aus dieser Woche.
+
+**Bisherige Wiederkehrer (≤30.05):**
 - **Le Cernil** NEU (27.05) — **22 Launches / 71 km**, **HOECHSTE PRIO** (Jura-Strecken-Spot, nicht in PGE)
 - **Ruogig** Wiederkehrer (25.05 4×, 30.05 2× **148 km Walker**) — ZS Voralpen, HOCH
 - **Moron** NEU (27.05) — 1× **236 km Gafner**, Jura/Moutier
@@ -822,8 +845,9 @@ als Region-Forecast.
 ## I-015 — Snapshot unvollstaendig bei frueher Morgen-Triggerung (XC/exp-LLM-Pass fehlt)
 
 **Erstmals**: 2026-05-29
-**Tage beobachtet**: 2 (29.05, 30.05) — am 27.05 (16:50-Snapshot) und 28.05 (06:27) NICHT aufgetreten
-**Status**: offen — **Daten-Pipeline-Issue, betrifft die Validierbarkeit, nicht den Forecast selbst**
+**Tage beobachtet**: 8 (29.05, 30.05, **14.–19.06**) — am 27.05 (16:50-Snapshot) und 28.05 (06:27) NICHT aufgetreten
+**Status**: offen — **Daten-Pipeline-Issue, betrifft die Validierbarkeit, nicht den Forecast selbst.
+Systematisch: ALLE 6 Juni-Tage (14.–19.) mit ~06:40-Snapshot waren xc-gedeckelt.**
 
 **Beobachtung**: `scripts/snapshot_weather.py` friert pro Tag Safety + Streckenflug + Experience ein.
 Wird der Snapshot **frueh morgens (~06:15)** gezogen, ist die **Safety-Pipeline vollstaendig**
@@ -836,9 +860,14 @@ Pass war noch nicht durchgelaufen**:
 | 28.05 | 06:27 | valide (203 nonzero) | 239/488 | voll validierbar |
 | **29.05** | **06:15** | **0 fuer ALLE 488** | **nur 33/488** | nur Safety validierbar |
 | **30.05** | **06:18** | **gedeckelt 0/1 (kein Spot >1)** | 354/488 | Safety + exp validierbar |
+| **14.–19.06** | **~06:40** | **gedeckelt 0/1 (xc≥2: 0/494 an ALLEN 6 Tagen)** | echte Streuung 1–5 | Safety + exp validierbar |
 
 Am 29.05 ist jeder Spot `streckenflug_rating=0` / `tier=kein_xc` (auch Riederalp am 328-km-Tag);
 am 30.05 ist xc auf 0/1 gedeckelt (kein Spot >1 trotz 232 km Riederalp / 180 km Tschenten).
+**14.–19.06**: dasselbe Deckelungs-Muster wie 30.05 (xc 0/1, exp valide). Besonders eklatant am
+**18.06 (Rekord-Streckentag, Strecken bis 366 km)** — xc≥2: 0/494, der Tag mit der höchsten
+XC-Aussagekraft ist durch den Früh-Snapshot blind. 20.06 war noch schlimmer (`status=error` 487/494,
+06:05 vor jedem Analyse-Pass) → gar nicht aggregierbar (Daten-Lücke, siehe README).
 
 **Konsequenz fuer die Validierung**:
 - `observations.csv`-Zeilen vom 29./30.05 haben `our_xc_rating` (29. auch `our_experience_rating`)
