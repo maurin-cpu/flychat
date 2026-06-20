@@ -173,6 +173,14 @@ DATE_FLAGS = {
 ARTIFACT_NOTE = ("snapshot_xc_unvollstaendig: 06:15-Run vor XC-LLM-Pass, "
                  "streckenflug/exp-Rating Artefakt (nicht validierbar)")
 
+# Ab diesem Datum ist die separate streckenflug-Note abgekuendigt und in die
+# Flugeinschaetzung integriert -> XC-Signal = experience_rating. Davor (<=28.05)
+# war streckenflug ein eigenes Feld (rating 0-5). Belegt durch Snapshot-Scan:
+# <=28.05 streckenflug mit Spread 0-5, ab 30.05 nur noch 0/1-Stub, exp mit Spread.
+XC_FROM_EXPERIENCE_SINCE = "2026-05-30"
+EXP_XC_NOTE = ("xc_aus_flugeinschaetzung: streckenflug-Feld ab 2026-05-30 "
+               "abgekuendigt, XC-Signal=experience_rating")
+
 
 def parse_airtime(s):
     return s.strip()
@@ -284,15 +292,25 @@ def build_rows(date, agg, arch):
         ana = s.get("analysis") or {}
         agg_wx = s.get("daily_aggregates") or {}
         status = ana.get("status") or ""
-        xc = ana.get("streckenflug_rating")
+        exp_val = ana.get("experience_rating")
+        xc_legacy = ana.get("streckenflug_rating")
         row["our_safety_rating"] = ana.get("rating", "")
-        row["our_experience_rating"] = (ana.get("experience_rating", "") if exp_ok else "")
-        # xc/tier/limiting nur wenn Snapshot-XC-Pass gelaufen; sonst Artefakt -> blank
-        if xc_ok:
-            row["our_xc_rating"] = xc if xc is not None else ""
+        row["our_experience_rating"] = (exp_val if (exp_val is not None and exp_ok) else "")
+        # Ab 2026-05-30: streckenflug abgekuendigt -> XC-Signal = experience_rating
+        # (in die Flugeinschaetzung integriert). Davor: eigenes streckenflug-Feld.
+        xc_in_exp = date >= XC_FROM_EXPERIENCE_SINCE
+        if xc_in_exp:
+            xc_signal = exp_val if exp_ok else None
+            row["our_xc_rating"] = xc_signal if xc_signal is not None else ""
+            row["our_streckenflug_tier"] = ""
+            row["our_streckenflug_limiting_factor"] = ""
+        elif xc_ok:
+            xc_signal = xc_legacy
+            row["our_xc_rating"] = xc_legacy if xc_legacy is not None else ""
             row["our_streckenflug_tier"] = ana.get("streckenflug_tier") or ""
             row["our_streckenflug_limiting_factor"] = ana.get("streckenflug_limiting_factor") or ""
         else:
+            xc_signal = None
             row["our_xc_rating"] = ""
             row["our_streckenflug_tier"] = ""
             row["our_streckenflug_limiting_factor"] = ""
@@ -313,13 +331,15 @@ def build_rows(date, agg, arch):
             row["finding_type"] = "bug"
             row["notes"] = "Spot in PGE, aber analysis fehlt im Snapshot."
         else:
-            # Bei unvollstaendigem XC-Snapshot: nur Status-basierte Klassifikation
-            # (kein underrated_spot, da xc-Rating Artefakt)
-            cls_xc = xc if xc_ok else None
-            ft = classify(status, cls_xc, a["best_km"]) if xc_ok else (
-                "false_positive_notsafe" if status == "not_safe" else "confirm")
-            row["finding_type"] = ft
-            row["notes"] = "" if xc_ok else ARTIFACT_NOTE
+            # XC-Signal validierbar? Ab Cutoff via exp_ok, davor via xc_ok.
+            xc_valid = exp_ok if xc_in_exp else xc_ok
+            if xc_valid:
+                row["finding_type"] = classify(status, xc_signal, a["best_km"])
+                row["notes"] = EXP_XC_NOTE if xc_in_exp else ""
+            else:
+                row["finding_type"] = (
+                    "false_positive_notsafe" if status == "not_safe" else "confirm")
+                row["notes"] = ARTIFACT_NOTE
         rows.append(row)
     return rows, diag
 

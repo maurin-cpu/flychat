@@ -133,11 +133,11 @@ Snapshot existiert.
 `xc_aggregate.py` für 20.06 **nicht** ausgeführt, keine Zeilen in `observations.csv`.
 Rohdaten `_raw/2026-06-20.tsv` (15 Flüge) als Provenance erhalten.
 
-> **I-015 generell (14.–19.06):** Diese Snapshots (~06:40) entstanden **vor dem
-> XC-LLM-Pass** → `streckenflug_rating` auf 0/1 gedeckelt (xc≥2: 0/494 an allen 6
-> Tagen, inkl. Rekord-Streckentag 18.06). `DATE_FLAGS={xc_ok:False, exp_ok:True}`
-> blankt `our_xc_rating` und unterdrückt `underrated_spot`. **Nur Safety/Status +
-> Experience sind an diesen Tagen validierbar, XC nicht.**
+> **XC-Feld ab 30.05 abgekündigt (I-015, richtiggestellt):** Das separate `streckenflug_rating`
+> wurde ab **30.05.2026** in die Flugeinschätzung integriert → ab dann nur noch 0/1-Stub, das
+> **XC-Signal steckt in `experience_rating`**. `xc_aggregate.py` liest XC ab diesem Datum aus
+> `experience_rating` (`XC_FROM_EXPERIENCE_SINCE`). XC ist damit ab 30.05 **validierbar** — nur
+> Tage mit Stub-Flugeinschätzung (29.05/09.06/10.06/20.06) bleiben XC-blind. Details: PATTERNS I-015.
 
 **11.06.2026** — Rohdaten vorhanden (`_raw/2026-06-11.tsv`, 81 Flüge), aber **kein
 Wetter-Snapshot**: `snapshot_weather.py` wurde an dem Tag nicht ausgeführt, und
@@ -180,11 +180,12 @@ TSV als Provenance erhalten. Lehre: `snapshot_weather.py` täglich sicherstellen
    aus `weather_archive` und klassifiziert `finding_type`. Output: `_raw/_obs_*.csv` + Konsolen-Digest.
 3. Review der `_obs_*.csv`, dann append in `observations.csv`, dann `generate_sector_audit.py`.
 
-> ⚠ **Snapshot-Vollstaendigkeit pruefen (I-015)**: Frueh-Morgen-Snapshots (~06:15) koennen den
-> XC-/Experience-LLM-Pass noch nicht enthalten (`streckenflug_rating` 0 oder auf 0/1 gedeckelt).
-> `DATE_FLAGS` im Aggregator blankt dann `our_xc_rating`/`our_experience_rating` und unterdrueckt
-> `underrated_spot`. **Nur Safety/Status ist an solchen Tagen validierbar.** Pruefe pro neuem Tag
-> die xc-Verteilung im Snapshot, bevor du `DATE_FLAGS` setzt.
+> ⚠ **XC-Quelle & Stub-Tage (I-015)**: Ab **30.05.2026** ist `streckenflug_rating` abgekündigt
+> (nur noch 0/1-Stub) — der Aggregator liest XC dann automatisch aus `experience_rating`
+> (`XC_FROM_EXPERIENCE_SINCE`). Pro neuem Tag prüfen, ob die **Flugeinschätzung** echt ist
+> (`experience_rating` mit Spread 1–5) oder ein Stub (alle 1) — bei Stub `DATE_FLAGS` mit
+> `exp_ok:False` setzen, dann ist der Tag XC-/Exp-blind (nur Safety/Status validierbar).
+> Solche Stub-Tage: 29.05, 09.06, 10.06, 20.06.
 
 Tages-MDs + observations.csv-Zeilen + PATTERNS-Updates sind manuell konsistent zu halten.
 `sector_audit.csv` ist deterministisch ableitbar — neu erzeugen nach jedem

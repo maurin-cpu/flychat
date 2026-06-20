@@ -854,12 +854,24 @@ als Region-Forecast.
 
 ---
 
-## I-015 — Snapshot unvollstaendig bei frueher Morgen-Triggerung (XC/exp-LLM-Pass fehlt)
+## I-015 — `streckenflug`-Feld ab 30.05 abgekündigt → XC steckt in der Flugeinschätzung
 
-**Erstmals**: 2026-05-29
-**Tage beobachtet**: 15 (29.05, 30.05, **06.–10.06, 12.–13.06, 14.–19.06**) — am 27.05 (16:50-Snapshot) und 28.05 (06:27) NICHT aufgetreten
-**Status**: offen — **Daten-Pipeline-Issue, betrifft die Validierbarkeit, nicht den Forecast selbst.
-Systematisch: JEDER Juni-Tag mit Früh-Snapshot (~06:18–06:40) war xc-gedeckelt (06.–19.06 durchgehend).**
+> **RICHTIGSTELLUNG (2026-06-20):** Die ursprüngliche Deutung „Snapshot zu früh, vor dem
+> XC-LLM-Pass" war **falsch**. Tatsächlich wurde die **separate streckenflug-Note per Code-Änderung
+> abgekündigt und in die Flugeinschätzung (`experience_rating`) integriert** — Stichtag **30.05.2026**.
+> Belegt durch Snapshot-Scan: ≤28.05 hat `streckenflug_rating` echten Spread 0–5; **ab 30.05 nur noch
+> 0/1-Stub**, während `experience_rating` den Spread trägt. Das alte Feld ist seither ein toter
+> Platzhalter (`{rating:1}`), auch in den Live-Analysen (Stand 20.06). **Konsequenz für die Validierung:
+> XC-Signal ab 30.05 aus `experience_rating` lesen** (`xc_aggregate.py` `XC_FROM_EXPERIENCE_SINCE`).
+> Damit ist XC ab 30.05 sehr wohl validierbar (Beispiel-Befund 07.06: Saint-Cergue 158 km / Le Suchet
+> 95 km bei exp 2 = echtes underrated). Nur Tage mit **Stub-Flugeinschätzung** (29.05/09.06/10.06/20.06)
+> bleiben XC-blind.
+
+**Erstmals**: 2026-05-29 (echter Stub) / Feld-Abkündigung ab 2026-05-30
+**Tage betroffen**: streckenflug-Stub ab 30.05 durchgehend; echte Stub-Snapshots (auch exp leer):
+29.05, 09.06, 10.06, 20.06
+**Status**: **GEKLÄRT** — Ursache = Feld-Abkündigung (kein Timing-Bug). Validierungs-Tooling angepasst.
+Offen nur noch: die echten Stub-Tage (exp leer) bleiben unvalidierbar.
 
 **Beobachtung**: `scripts/snapshot_weather.py` friert pro Tag Safety + Streckenflug + Experience ein.
 Wird der Snapshot **frueh morgens (~06:15)** gezogen, ist die **Safety-Pipeline vollstaendig**

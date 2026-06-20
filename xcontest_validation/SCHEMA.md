@@ -36,10 +36,14 @@ History-Update bei besserem Wetterdaten-Match).
 ### Unser Forecast (Snapshot-Stand)
 - `our_safety_rating` — `safety_rating` 0-10 (0 = not_safe)
 - `our_experience_rating` — 1-5
-- `our_xc_rating` — `streckenflug.rating` 1-5
+- `our_xc_rating` — XC-Signal 1-5. **≤2026-05-29**: `streckenflug.rating` (eigenes Feld).
+  **≥2026-05-30**: `experience_rating` — die separate streckenflug-Note wurde abgekündigt
+  und in die Flugeinschätzung integriert (XC steckt seither dort). Leer, wenn die
+  Flugeinschätzung am Tag ein Stub war (29.05/09.06/10.06/20.06). Note-Feld trägt dann
+  `xc_aus_flugeinschaetzung`.
 - `our_status` — `safe` | `conditional` | `not_safe`
-- `our_streckenflug_tier` — z.B. `xc_high`, `local_only`, …
-- `our_streckenflug_limiting_factor` — z.B. `region_context_missing`, `wind_aloft_high`
+- `our_streckenflug_tier` / `our_streckenflug_limiting_factor` — nur ≤2026-05-29 befüllt
+  (Feld danach abgekündigt → leer).
 - `decisions_applied` — Pipe-getrennte Liste (`FoehnCaution(4.5)|GustFloor`)
 - `no_go_reasons` — Pipe-getrennte Liste der Kanonischen No-Go-Strings
 
