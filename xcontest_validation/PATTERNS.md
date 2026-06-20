@@ -22,8 +22,15 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 10 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05, **14.06, 15.06, 18.06, 19.06**)
+**Tage beobachtet (Post-Migration ≥22.05)**: 14 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05, **06.06, 07.06, 08.06, 13.06, 14.06, 15.06, 18.06, 19.06**)
 **Status**: in-untersuchung (Trigger identifiziert, Sub-Issues separieren) — **Top-Refactor-Prio**
+
+**Betroffene Spots (06.–13.06.)** — West/SW-Lagen:
+- **Weissenstein** (07.06): **not_safe bei 85 km / 12 Launches** (W-Lage); **Rotenflue** (07.06): not_safe,
+  43 km / 15× bei **Böen nur 25** — klassische Jura/Voralpen-FP (→ I-001). Auch Grindelwald 40, Möntschelealp 36.
+- **Marbachegg** (06.06): not_safe bei 67 km / Böen 27. **Gummen** (08.06): not_safe bei 50 km.
+- 13.06 (West-Streckentag): 16 FP an windexponierten Voralpen-Hops (Riffelberg, Zugerberg/Böen 57) —
+  überwiegend defensibel, kein Übervorsicht-Highlight.
 
 **Betroffene Spots (14.–19.06.)** — West/NW-Wind-Wochenanfang + Rekordtag 18.06:
 - **Dent de Jaman** (14.06): **not_safe bei 113.86 km / 6× und Böen nur 30.6** — klarster FP der Woche.
@@ -291,7 +298,12 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 5 (17.05, 18.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 12 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05, **14.–19.06**).
+**Tage beobachtet (Post-Migration ≥22.05)**: 14 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05, **06.–10.06, 12.–19.06**).
+
+**NEU/Wiederkehrer (06.–13.06.):**
+- **Gotthard** (07.06 142 km — Wiederkehrer, schon 25.05) bleibt HOCH-PRIO; **Le Cernil** (07.06, Wiederkehrer).
+- **Moléson** (13.06 **146 km** — Wiederkehrer 14.06 125 km), **Col du Rawyl** (13.06 108 km), Bovonne/Salzmatt (13.06 ~87).
+- 07.06 großer Gap-Tag (56 Gaps): La Roche 69, Mornera 53, Bözingenberg 49.
 
 **NEU/Wiederkehrer (14.–19.06.)** — der **18.06 (Rekordtag) brachte 82 Coverage-Gaps**, viele groß:
 - **LSPL** (18.06) — 1× **359 km** (RW2, Mittelland-Flach wie Langenthal — Sonderfall kein Berg-Launch)
@@ -845,9 +857,9 @@ als Region-Forecast.
 ## I-015 — Snapshot unvollstaendig bei frueher Morgen-Triggerung (XC/exp-LLM-Pass fehlt)
 
 **Erstmals**: 2026-05-29
-**Tage beobachtet**: 8 (29.05, 30.05, **14.–19.06**) — am 27.05 (16:50-Snapshot) und 28.05 (06:27) NICHT aufgetreten
+**Tage beobachtet**: 15 (29.05, 30.05, **06.–10.06, 12.–13.06, 14.–19.06**) — am 27.05 (16:50-Snapshot) und 28.05 (06:27) NICHT aufgetreten
 **Status**: offen — **Daten-Pipeline-Issue, betrifft die Validierbarkeit, nicht den Forecast selbst.
-Systematisch: ALLE 6 Juni-Tage (14.–19.) mit ~06:40-Snapshot waren xc-gedeckelt.**
+Systematisch: JEDER Juni-Tag mit Früh-Snapshot (~06:18–06:40) war xc-gedeckelt (06.–19.06 durchgehend).**
 
 **Beobachtung**: `scripts/snapshot_weather.py` friert pro Tag Safety + Streckenflug + Experience ein.
 Wird der Snapshot **frueh morgens (~06:15)** gezogen, ist die **Safety-Pipeline vollstaendig**
@@ -860,11 +872,14 @@ Pass war noch nicht durchgelaufen**:
 | 28.05 | 06:27 | valide (203 nonzero) | 239/488 | voll validierbar |
 | **29.05** | **06:15** | **0 fuer ALLE 488** | **nur 33/488** | nur Safety validierbar |
 | **30.05** | **06:18** | **gedeckelt 0/1 (kein Spot >1)** | 354/488 | Safety + exp validierbar |
+| **06.–08.06, 12.–13.06** | **~06:20** | **gedeckelt 0/1 (xc≥2: 0/488)** | echte Streuung 1–5 | Safety + exp validierbar |
+| **09.06, 10.06** | **~06:21** | **gedeckelt 0/1** | **auch gedeckelt (exp≥3: 0–2/163)** | nur Safety validierbar (wie 29.05) |
 | **14.–19.06** | **~06:40** | **gedeckelt 0/1 (xc≥2: 0/494 an ALLEN 6 Tagen)** | echte Streuung 1–5 | Safety + exp validierbar |
 
 Am 29.05 ist jeder Spot `streckenflug_rating=0` / `tier=kein_xc` (auch Riederalp am 328-km-Tag);
 am 30.05 ist xc auf 0/1 gedeckelt (kein Spot >1 trotz 232 km Riederalp / 180 km Tschenten).
-**14.–19.06**: dasselbe Deckelungs-Muster wie 30.05 (xc 0/1, exp valide). Besonders eklatant am
+**06.–19.06 durchgehend** dasselbe Deckelungs-Muster (xc 0/1); exp valide ausser 09./10.06 (gedeckelt).
+**14.–19.06**: wie 30.05 (xc 0/1, exp valide). Besonders eklatant am
 **18.06 (Rekord-Streckentag, Strecken bis 366 km)** — xc≥2: 0/494, der Tag mit der höchsten
 XC-Aussagekraft ist durch den Früh-Snapshot blind. 20.06 war noch schlimmer (`status=error` 487/494,
 06:05 vor jedem Analyse-Pass) → gar nicht aggregierbar (Daten-Lücke, siehe README).

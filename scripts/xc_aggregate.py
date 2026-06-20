@@ -154,6 +154,15 @@ DATE_FLAGS = {
     "2026-05-28": {"xc_ok": True, "exp_ok": True},
     "2026-05-29": {"xc_ok": False, "exp_ok": False},
     "2026-05-30": {"xc_ok": False, "exp_ok": True},
+    # 06.-13.06 ~06:20-Snapshots: xc gedeckelt 0/1 (xc>=2: 0/488 ueberall).
+    # exp valide ausser 09./10.06 (exp>=3: 0-2/163 -> gedeckelt wie 29.05).
+    "2026-06-06": {"xc_ok": False, "exp_ok": True},
+    "2026-06-07": {"xc_ok": False, "exp_ok": True},
+    "2026-06-08": {"xc_ok": False, "exp_ok": True},
+    "2026-06-09": {"xc_ok": False, "exp_ok": False},
+    "2026-06-10": {"xc_ok": False, "exp_ok": False},
+    "2026-06-12": {"xc_ok": False, "exp_ok": True},
+    "2026-06-13": {"xc_ok": False, "exp_ok": True},
     "2026-06-14": {"xc_ok": False, "exp_ok": True},
     "2026-06-15": {"xc_ok": False, "exp_ok": True},
     "2026-06-16": {"xc_ok": False, "exp_ok": True},
