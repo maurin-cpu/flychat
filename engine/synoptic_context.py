@@ -86,7 +86,7 @@ def build_synoptic_context(weather_cache: dict,
     decisions_applied: list[str] = []
 
     # 1. Forecast-Dates aus Cache extrahieren
-    forecast_dates = _extract_forecast_dates(weather_cache, max_days=5)
+    forecast_dates = _extract_forecast_dates(weather_cache, max_days=config.FORECAST_DAYS)
     if not forecast_dates:
         logger.warning("build_synoptic_context: keine Forecast-Dates im Cache")
         return None
