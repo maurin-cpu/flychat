@@ -325,6 +325,9 @@ class AnalyzersMixin:
                 {"role": "user", "content": (
                     f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}"
+                    # EN: Sprach-Anweisung direkt vor der Generierung (staerkster Hebel);
+                    # DE: leerer String -> Prompt byte-identisch.
+                    + i18n.llm_lang_instruction()
                 )},
             ]
 
@@ -401,6 +404,9 @@ class AnalyzersMixin:
             if few_shot_block:
                 user_msg += few_shot_block + "\n"
             user_msg += f"{context}\n\n{safety_block}"
+            # EN: Sprach-Anweisung als letztes (nach den dt. Few-Shots, die sonst
+            # auf Deutsch ziehen); DE: leerer String -> byte-identisch.
+            user_msg += i18n.llm_lang_instruction()
 
             messages = [
                 {"role": "system", "content": prompts.SPOT_FLYABILITY_PROMPT},
@@ -487,6 +493,9 @@ class AnalyzersMixin:
                 {"role": "user", "content": (
                     f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}"
+                    # EN: Sprach-Anweisung direkt vor der Generierung (staerkster Hebel);
+                    # DE: leerer String -> Prompt byte-identisch.
+                    + i18n.llm_lang_instruction()
                 )},
             ]
 
@@ -561,6 +570,9 @@ class AnalyzersMixin:
             if few_shot_block:
                 user_msg += few_shot_block + "\n"
             user_msg += f"{context}\n\n{safety_block}"
+            # EN: Sprach-Anweisung als letztes (nach den dt. Few-Shots, die sonst
+            # auf Deutsch ziehen); DE: leerer String -> byte-identisch.
+            user_msg += i18n.llm_lang_instruction()
 
             messages = [
                 {"role": "system", "content": prompts.REGION_FLYABILITY_PROMPT},

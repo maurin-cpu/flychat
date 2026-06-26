@@ -213,13 +213,27 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
 
     @property
     def analyses_file(self):
+        # Override (z.B. Test-Mode -> test_runs/) hat Vorrang; sonst sprach-
+        # dynamisch aus dem aktiven LANG-Cache. Override via Setter, Reset = None.
+        if getattr(self, "_analyses_file_override", None) is not None:
+            return self._analyses_file_override
         import i18n
         return config.DATA_DIR / self._analyses_filenames(i18n.get_current_lang())[0]
 
+    @analyses_file.setter
+    def analyses_file(self, value):
+        self._analyses_file_override = value
+
     @property
     def region_analyses_file(self):
+        if getattr(self, "_region_analyses_file_override", None) is not None:
+            return self._region_analyses_file_override
         import i18n
         return config.DATA_DIR / self._analyses_filenames(i18n.get_current_lang())[1]
+
+    @region_analyses_file.setter
+    def region_analyses_file(self, value):
+        self._region_analyses_file_override = value
 
     def reload_analyses_for_lang(self):
         """Nach einem Sprachwechsel: In-Memory-Analysen aus dem jetzt aktiven

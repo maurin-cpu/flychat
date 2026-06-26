@@ -357,8 +357,11 @@ def run_test_analyses_stream(
             return
 
     snapshot = {
-        "analyses_file": engine.analyses_file,
-        "region_analyses_file": engine.region_analyses_file,
+        # analyses_file/region_analyses_file sind sprach-dynamische Properties mit
+        # Override-Setter. Test-Mode setzt unten einen Test-Pfad-Override; Restore =
+        # None -> Property rechnet wieder aus dem aktiven LANG-Cache (kein Pinnen).
+        "analyses_file": None,
+        "region_analyses_file": None,
         "spots": engine.spots,
         "weather_data": engine.weather_data,
         "region_weather_data": engine.region_weather_data,
