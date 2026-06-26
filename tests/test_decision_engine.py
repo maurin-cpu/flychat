@@ -1002,8 +1002,8 @@ class TestBuildTopicTagsClouds(unittest.TestCase):
         self.assertEqual(len(clouds), 1)
         self.assertEqual(clouds[0]["severity"], "stop")
 
-    def test_clouds_warn_when_base_near_takeoff(self):
-        """Wolkenrand 100-300m ueber Startplatz → WARN."""
+    def test_clouds_reducer_when_base_near_takeoff(self):
+        """Wolkenrand knapp ueber Startplatz → REDUCER (fliegbar/gruen, kein Downgrade)."""
         from engine.decision_engine import build_topic_tags
         tags = build_topic_tags(
             {"foehn_risk": "none"},
@@ -1015,7 +1015,7 @@ class TestBuildTopicTagsClouds(unittest.TestCase):
         )
         clouds = [t for t in tags if t["topic"] == "CLOUDS"]
         self.assertEqual(len(clouds), 1)
-        self.assertEqual(clouds[0]["severity"], "warn")
+        self.assertEqual(clouds[0]["severity"], "reducer")
 
     def test_clouds_no_tag_when_base_high(self):
         """Hohe Basis → kein Backend-CLOUDS-Tag (REDUCER/GOOD ist LLM-Sache)."""
