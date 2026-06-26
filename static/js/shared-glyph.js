@@ -1,8 +1,8 @@
 /* ══════════════════════════════════════════════════════════════
-   Gleitcast — Shared Glyph Renderer (RATING_ARCHITECTURE v2.1)
+   Wingcast — Shared Glyph Renderer (RATING_ARCHITECTURE v2.1)
    FE leitet Farben aus safety_status + experience_rating ab.
    Skala 1-5 (1=abgleiter, 2=kurzer, 3=solider, 4=starker, 5=xc_tag/klassiker).
-   Exposes window.gleitcastGlyph.
+   Exposes window.wingcastGlyph.
    ══════════════════════════════════════════════════════════════ */
 (function () {
   "use strict";
@@ -196,7 +196,7 @@
     return n ? Math.round(sum / n) : 0;
   }
 
-  window.gleitcastGlyph = {
+  window.wingcastGlyph = {
     bandFromStatus: bandFromStatus,
     tierFromRating: tierFromRating,
     styleFor: styleFor,

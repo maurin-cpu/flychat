@@ -120,6 +120,41 @@ von `wetterdaten.json` morgens), damit der eingefrorene Stand möglichst nah am
 problemlos analysiert werden, solange für den entsprechenden Tag ein
 Snapshot existiert.
 
+## Bekannte Daten-Lücken
+
+| Tag | Status | Grund |
+|---|---|---|
+| **2026-06-11** | ⚠ nicht analysiert | Kein `weather_archive/2026-06-11.json`-Snapshot |
+| **2026-06-20** | ⚠ nicht analysiert | Snapshot kaputt: `status=error` 487/494 (06:05-Run vor Analyse-Pass) |
+
+**2026-06-20** — Snapshot existiert, ist aber **vor dem Analyse-Pass** gezogen
+(`snapshot_at` 06:05): `status=error` bei 487/494 Spots, `experience_rating` und
+`streckenflug_rating` komplett gedeckelt. Weder Safety, Exp noch XC validierbar →
+`xc_aggregate.py` für 20.06 **nicht** ausgeführt, keine Zeilen in `observations.csv`.
+Rohdaten `_raw/2026-06-20.tsv` (15 Flüge) als Provenance erhalten.
+
+> **XC-Feld ab 30.05 abgekündigt (I-015, richtiggestellt):** Das separate `streckenflug_rating`
+> wurde ab **30.05.2026** in die Flugeinschätzung integriert → ab dann nur noch 0/1-Stub, das
+> **XC-Signal steckt in `experience_rating`**. `xc_aggregate.py` liest XC ab diesem Datum aus
+> `experience_rating` (`XC_FROM_EXPERIENCE_SINCE`). XC ist damit ab 30.05 **validierbar** — nur
+> Tage mit Stub-Flugeinschätzung (29.05/09.06/10.06/20.06) bleiben XC-blind. Details: PATTERNS I-015.
+
+**11.06.2026** — Rohdaten vorhanden (`_raw/2026-06-11.tsv`, 81 Flüge), aber **kein
+Wetter-Snapshot**: `snapshot_weather.py` wurde an dem Tag nicht ausgeführt, und
+`wetterdaten.json` (rollend) sowie `spot_analyses.json` wurden seither überschrieben
+(nie committet). Ohne Snapshot kann `xc_aggregate.py` die `our_*`/`wx_*`-Spalten
+nicht joinen → keine Zeilen in `observations.csv`.
+
+**Rekonstruktion geprüft (2026-06-20): nicht faithful möglich.** Die zwei nötigen
+Inputs — der Forecast-Stand und die Modell-Ratings vom Flug-Morgen — existieren
+nirgends mehr (kein wetterdaten/spot_analyses-Backup vom 11.06, nicht in Git-History,
+`data/history/` leer, kein foehn_cache). `station_observations.db` hat nur 35 Mess-
+Zeilen vom 11.06 — Punktmessungen, nicht das 494-Spot-Grid mit Status/Ratings.
+ERA5-Reanalyse + Neu-Lauf wäre möglich, ist aber methodisch unsauber: vergleicht
+*heutiges* Modell auf *tatsächlichem* Wetter statt den as-issued Forecast vom
+11.06-Morgen — kein vergleichbarer Validierungspunkt. **11.06 bleibt Lücke**;
+TSV als Provenance erhalten. Lehre: `snapshot_weather.py` täglich sicherstellen.
+
 ## Sample-Größe Roadmap
 
 - ≥10 Tage: erste belastbare Muster sichtbar
@@ -128,12 +163,29 @@ Snapshot existiert.
 
 ## File-Convention
 
-- `YYYY-MM-DD.md` — eine Datei pro analysiertem XContest-Tag (manuell)
-- `observations.csv` — strukturierte Daten, append-only (manuell, pro Tag)
+- `YYYY-MM-DD.md` — eine Datei pro analysiertem XContest-Tag (manuell/kuratiert)
+- `observations.csv` — strukturierte Daten, append-only
 - `sector_audit.csv` — abgeleitet, überschrieben (`scripts/generate_sector_audit.py`)
 - `PATTERNS.md` — akkumulierter Issue-Tracker (manuell)
-- `README.md` — diese Datei
-- `SCHEMA.md` — Spaltendefinitionen für CSVs
+- `_raw/YYYY-MM-DD.tsv` — kompakte Rohdaten pro Tag (`launch⇥km⇥start⇥airtime⇥pilot`), Provenance
+- `_raw/_obs_YYYY-MM-DD.csv` — vom Aggregator erzeugte Kandidaten-Zeilen (vor Append in observations.csv)
+- `README.md` / `SCHEMA.md` — diese Datei / Spaltendefinitionen
+
+## Halb-automatische Aggregation (ab 27.05.2026)
+
+`scripts/xc_aggregate.py` ersetzt das manuelle Auszaehlen bei Gross-Tagen:
+1. XContest-Paste → kompakte TSV in `_raw/YYYY-MM-DD.tsv` (eine Zeile pro Flug).
+2. `PYTHONUTF8=1 python scripts/xc_aggregate.py 2026-05-27 ...` aggregiert pro Spot
+   (launches, best_km, top_pilot), mappt XContest→PGE (Dict im Script), joint `our_*`/`wx_*`
+   aus `weather_archive` und klassifiziert `finding_type`. Output: `_raw/_obs_*.csv` + Konsolen-Digest.
+3. Review der `_obs_*.csv`, dann append in `observations.csv`, dann `generate_sector_audit.py`.
+
+> ⚠ **XC-Quelle & Stub-Tage (I-015)**: Ab **30.05.2026** ist `streckenflug_rating` abgekündigt
+> (nur noch 0/1-Stub) — der Aggregator liest XC dann automatisch aus `experience_rating`
+> (`XC_FROM_EXPERIENCE_SINCE`). Pro neuem Tag prüfen, ob die **Flugeinschätzung** echt ist
+> (`experience_rating` mit Spread 1–5) oder ein Stub (alle 1) — bei Stub `DATE_FLAGS` mit
+> `exp_ok:False` setzen, dann ist der Tag XC-/Exp-blind (nur Safety/Status validierbar).
+> Solche Stub-Tage: 29.05, 09.06, 10.06, 20.06.
 
 Tages-MDs + observations.csv-Zeilen + PATTERNS-Updates sind manuell konsistent zu halten.
 `sector_audit.csv` ist deterministisch ableitbar — neu erzeugen nach jedem

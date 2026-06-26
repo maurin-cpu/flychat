@@ -138,6 +138,13 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
         ],
     },
     "technisch": {
+        "Sprache": [
+            {"key": "LANG", "type": "choice", "choices": ["de", "en"],
+             "help": "Aktive Sprache der gesamten App (Oberflaeche, Chat, E-Mails, Analysen). "
+                     "de = wie bisher (validiert). en = alles englisch; Oberflaeche/Chat sofort, "
+                     "die vorberechneten Spot-/Region-Analysen erst nach dem naechsten Neu-Berechnen "
+                     "(Button 'Analysen neu berechnen'). Immer nur EINE Sprache aktiv."},
+        ],
         "Darstellung": [
             {"key": "SHOW_REFERENCE_POINTS", "type": "bool",
              "help": "Zeigt Linien vom Startplatz zu den regionalen Thermik-Referenzpunkten beim Hover auf der Karte."},

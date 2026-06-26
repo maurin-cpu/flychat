@@ -1,5 +1,5 @@
 /**
- * Gleitcast - Shared Analysis View Renderer
+ * Wingcast - Shared Analysis View Renderer
  *
  * Eine Analyse-Darstellung fuer Spot UND Region. Identisches Layout, identische
  * Reihenfolge, identische Wortwahl. Region-Spezifika (Top-Spots-Liste) werden
@@ -89,14 +89,14 @@ window.AnalysisView = (function () {
     function ratingTintSpec(band, rating) {
         var r = Math.max(0, Math.min(5, parseInt(rating, 10) || 0));
         if (band === 'red') {
-            return { label: 'Nicht fliegbar', fill: '#ef4444', stroke: '#991b1b', text: '#ffffff', darkBg: true };
+            return { label: wcT('js.safety.not_flyable'), fill: '#ef4444', stroke: '#991b1b', text: '#ffffff', darkBg: true };
         }
         if (band === 'no_data') {
-            return { label: 'Keine Daten', fill: '#9ca3af', stroke: '#6b7280', text: '#374151', darkBg: false };
+            return { label: wcT('js.av.no_data'), fill: '#9ca3af', stroke: '#6b7280', text: '#374151', darkBg: false };
         }
         if (r <= 0) return null;
         if (band === 'amber') {
-            var aLabels = ['Abgleiter', 'Schwacher Thermiktag', 'Solider Thermiktag', 'Starker Thermiktag', 'XC-Tag'];
+            var aLabels = [wcT('js.pill.tier0'), wcT('js.pill.tier1'), wcT('js.pill.tier2'), wcT('js.pill.tier3'), wcT('js.pill.tier4')];
             var aBgs    = ['#fef08a', '#facc15', '#f97316', '#c2410c', '#7c2d12'];
             var aBorders= ['#ca8a04', '#a16207', '#9a3412', '#7c2d12', '#431407'];
             var aTexts  = ['#713f12', '#713f12', '#ffffff', '#ffffff', '#ffffff'];
@@ -105,7 +105,7 @@ window.AnalysisView = (function () {
             return { label: aLabels[ai], fill: aBgs[ai], stroke: aBorders[ai], text: aTexts[ai], darkBg: aDark[ai] };
         }
         // safe/green v3.2 Royal Premium: Sky-100 → Sky-200 → Lime → Green-500 → Violet
-        var gLabels = ['Abgleiter', 'Kurzer Thermikflug', 'Solider Thermiktag', 'Starker Thermiktag', 'XC-Tag'];
+        var gLabels = [wcT('js.pill.tier0'), wcT('js.pill.safe_tier1'), wcT('js.pill.tier2'), wcT('js.pill.tier3'), wcT('js.pill.tier4')];
         var gBgs    = ['#e0f2fe', '#bae6fd', '#BEF264', '#22c55e', '#a78bfa'];
         var gBorders= ['#38bdf8', '#0ea5e9', '#65a30d', '#15803d', '#6d28d9'];
         var gTexts  = ['#075985', '#075985', '#3f6212', '#ffffff', '#ffffff'];
@@ -123,9 +123,9 @@ window.AnalysisView = (function () {
         var fill = tint ? tint.fill : (PALETTE[band] || PALETTE.no_data).fill;
         var stroke = tint ? tint.stroke : (PALETTE[band] || PALETTE.no_data).stroke;
         var textFill = (tint && tint.darkBg) ? '#ffffff' : (tint ? tint.stroke : '#ffffff');
-        var label = (band === 'red') ? 'Nicht fliegbar' :
-                    (band === 'no_data') ? 'Keine Analyse' :
-                    (rating >= 1 ? 'Rating ' + rating + ' von 5' : 'Bewertung');
+        var label = (band === 'red') ? wcT('js.safety.not_flyable') :
+                    (band === 'no_data') ? wcT('js.av.no_analysis') :
+                    (rating >= 1 ? wcT('js.av.rating_of5', { n: rating }) : wcT('js.av.rating_word'));
         var html = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s
                  + '" role="img" aria-label="' + esc(label) + '">';
         html += '<circle cx="' + c + '" cy="' + c + '" r="' + r
@@ -163,15 +163,15 @@ window.AnalysisView = (function () {
             return '<div class="mga-hero no_data">'
                  + '<div class="mga-hero-glyph">' + buildGlyph('no_data', 0, 96) + '</div>'
                  + '<div class="mga-hero-text">'
-                 + '<div class="mga-hero-verdict no_data">Datenanalyse ausstehend</div>'
+                 + '<div class="mga-hero-verdict no_data">' + wcT('js.av.analysis_pending') + '</div>'
                  + '</div></div>';
         }
 
         var band = getSafetyBand(a);
         var rating = getRating(a);
-        var verdictTxt = (band === 'green') ? 'Sicher' :
-                         (band === 'amber') ? 'Vorsicht' :
-                         (band === 'red')   ? 'Nicht fliegbar' : 'Keine Daten';
+        var verdictTxt = (band === 'green') ? wcT('js.safety.safe') :
+                         (band === 'amber') ? wcT('js.safety.caution') :
+                         (band === 'red')   ? wcT('js.safety.not_flyable') : wcT('js.av.no_data');
 
         // Container-Tint aus Rating-Tint-Palette (Option C). Soft bg (12% alpha)
         // + saturierter Border-Left — gleiche Logik wie Spot-Bg in briefing.js,
@@ -206,7 +206,7 @@ window.AnalysisView = (function () {
             }
             var fly = a.flyability || {};
             // Key flyability fields
-            if (fly.flight_type)              html += '<span class="mga-hero-pill">Typ: ' + esc(fly.flight_type) + '</span>';
+            if (fly.flight_type)              html += '<span class="mga-hero-pill">' + wcT('js.av.type_prefix') + esc(fly.flight_type) + '</span>';
             if (fly.flight_duration_estimate) html += '<span class="mga-hero-pill">' + esc(fly.flight_duration_estimate) + '</span>';
             if (typeof fly.peak_climb_rate === 'number' && fly.peak_climb_rate > 0) {
                 html += '<span class="mga-hero-pill">Peak ↑' + fly.peak_climb_rate.toFixed(1) + ' m/s</span>';
@@ -223,24 +223,24 @@ window.AnalysisView = (function () {
     // Single source of truth: a.tags + a.start_window aus Backend (Hybrid v5).
 
     var TAG_SEVERITY_ORDER_V4 = ['stop', 'warn', 'good', 'info'];
-    var TAG_SEVERITY_LABEL_V4 = { stop: 'STOP', warn: 'WARN', good: 'GOOD', info: 'Hinweis' };
+    var TAG_SEVERITY_LABEL_V4 = { stop: 'STOP', warn: 'WARN', good: 'GOOD', info: wcT('js.av.tag_info') };
     var TAG_SEVERITY_ICON_V4  = { stop: '⛔', warn: '⚠', good: '✓', info: 'ℹ' };
     var TAG_TOPIC_ORDER_V4 = [
         'WIND_GROUND', 'WIND_ALOFT', 'FOEHN', 'RAIN',
         'THUNDERSTORM', 'CLOUDS', 'THERMAL', 'XC', 'TURBULENCE'
     ];
-    var WINDOW_LABEL_V4 = { startbar: 'Startbar', sportlich: 'Sportlich', blockiert: 'Blockiert', neutral: 'Ausserhalb' };
+    var WINDOW_LABEL_V4 = { startbar: wcT('js.window.state_startbar'), sportlich: wcT('js.window.state_sportlich'), blockiert: wcT('js.window.state_blockiert'), neutral: wcT('js.window.state_neutral') };
 
     function _topicSortKeyV4(topic) {
         var i = TAG_TOPIC_ORDER_V4.indexOf(topic);
         return i === -1 ? 999 : i;
     }
 
-    // Fester Anzeige-Rahmen 06:00–21:00 (parallel zum Gleitcast).
+    // Fester Anzeige-Rahmen 06:00–21:00 (parallel zum Wingcast).
     var WINDOW_HOUR_START_V4 = 6;
     var WINDOW_HOUR_END_V4 = 21;
 
-    // Startfenster — UI/UX-Pro-Max Layout (parallel zum Gleitcast):
+    // Startfenster — UI/UX-Pro-Max Layout (parallel zum Wingcast):
     // Antwort zuerst (✓/▲/✕ + Zeitspanne + Dauer-Pille), dann durchgehende
     // Farbleiste, Tick-Achse alle 3 h, optional Sportlich-Sekundaerinfo.
     // Achse ist immer 6h-20h, fehlende Stunden = neutral.
@@ -283,7 +283,7 @@ window.AnalysisView = (function () {
             var hr = fmt(e.hour);
             var lbl = WINDOW_LABEL_V4[st] || '—';
             return '<span class="mga-window-seg mga-window-seg--' + st + '" '
-                 + 'title="' + hr + ':00 Uhr · ' + lbl + '"></span>';
+                 + 'title="' + wcT('js.window.hour_tooltip', { h: hr, lbl: lbl }) + '"></span>';
         }).join('');
 
         // Tick-Achse — Beschriftung nur alle 3 Stunden.
@@ -303,17 +303,17 @@ window.AnalysisView = (function () {
         if (bestStartbar.len > 0) {
             primaryIcon = ICON_CHECK;
             primaryClass = 'is-good';
-            primaryText = fmt(bestStartbar.start) + ':00 – ' + fmt(bestStartbar.end + 1) + ':00 Uhr';
+            primaryText = wcT('js.window.time_range', { s: fmt(bestStartbar.start), e: fmt(bestStartbar.end + 1) });
             durationLen = bestStartbar.len;
         } else if (bestSport.len > 0) {
             primaryIcon = ICON_ALERT;
             primaryClass = 'is-warn';
-            primaryText = 'Nur sportlich ' + fmt(bestSport.start) + ':00 – ' + fmt(bestSport.end + 1) + ':00 Uhr';
+            primaryText = wcT('js.window.sporty_only', { s: fmt(bestSport.start), e: fmt(bestSport.end + 1) });
             durationLen = bestSport.len;
         } else {
             primaryIcon = ICON_X;
             primaryClass = 'is-bad';
-            primaryText = 'Heute nicht startbar';
+            primaryText = wcT('js.window.not_launchable');
         }
         var durationHtml = durationLen > 0
             ? '<span class="mga-window-duration">' + durationLen + ' h</span>'
@@ -324,20 +324,20 @@ window.AnalysisView = (function () {
         if (bestStartbar.len > 0 && bestSport.len > 0) {
             secondary = '<div class="mga-window-secondary">'
                       + '<span class="mga-window-dot mga-window-dot--sportlich"></span>'
-                      + 'Sportlich ' + fmt(bestSport.start) + ':00 – ' + fmt(bestSport.end + 1) + ':00 Uhr'
+                      + wcT('js.window.sporty_secondary', { s: fmt(bestSport.start), e: fmt(bestSport.end + 1) })
                       + '</div>';
         }
 
         return '<section class="mga-window-v4">'
              + '<header class="mga-window-v4-head">'
-             + '<span class="mga-window-v4-title">Startfenster</span>'
+             + '<span class="mga-window-v4-title">' + wcT('js.av.start_window') + '</span>'
              + '<span class="mga-window-v4-summary mga-window-v4-summary--' + primaryClass + '">'
              + '<span class="mga-window-v4-summary-icon" aria-hidden="true">' + primaryIcon + '</span>'
              + '<span class="mga-window-v4-summary-text">' + esc(primaryText) + '</span>'
              + durationHtml
              + '</span>'
              + '</header>'
-             + '<div class="mga-window-v4-bar" role="img" aria-label="Startfenster-Verlauf ueber den Tag">' + segments + '</div>'
+             + '<div class="mga-window-v4-bar" role="img" aria-label="' + wcT('js.av.start_window_aria') + '">' + segments + '</div>'
              + '<div class="mga-window-v4-axis" aria-hidden="true">' + ticks + '</div>'
              + secondary
              + '</section>';
@@ -420,26 +420,26 @@ window.AnalysisView = (function () {
               + '</div>';
         if (a.flight_type) {
             html += '<div class="mga-metric">'
-                  + '<div class="mga-metric-label">Flugtyp</div>'
+                  + '<div class="mga-metric-label">' + wcT('js.av.flighttype') + '</div>'
                   + '<div class="mga-metric-value">' + esc(a.flight_type) + '</div>'
                   + '</div>';
         }
         var duration = a.flight_duration_estimate || a.flight_duration || '';
         if (duration) {
             html += '<div class="mga-metric">'
-                  + '<div class="mga-metric-label">Dauer</div>'
+                  + '<div class="mga-metric-label">' + wcT('js.av.duration') + '</div>'
                   + '<div class="mga-metric-value">' + esc(duration) + '</div>'
                   + '</div>';
         }
         if (a.peak_climb_rate) {
             html += '<div class="mga-metric">'
-                  + '<div class="mga-metric-label">Peak Thermik</div>'
+                  + '<div class="mga-metric-label">' + wcT('js.av.peak_thermik') + '</div>'
                   + '<div class="mga-metric-value">' + esc(a.peak_climb_rate) + ' m/s</div>'
                   + '</div>';
         }
         if (a.xc_potential) {
             html += '<div class="mga-metric">'
-                  + '<div class="mga-metric-label">XC-Potenzial</div>'
+                  + '<div class="mga-metric-label">' + wcT('js.av.xc_potential') + '</div>'
                   + '<div class="mga-metric-value">' + esc(a.xc_potential) + '</div>'
                   + '</div>';
         }
@@ -447,14 +447,14 @@ window.AnalysisView = (function () {
         var sfRating = parseInt(a.streckenflug_rating, 10);
         if (isFinite(sfRating) && sfRating >= 1) {
             var SF_RATING_LABELS = {
-                1: 'kein XC', 2: 'ganz kurz', 3: 'lokal', 4: 'kurz wegfliegen',
-                5: 'weit', 6: 'klassiker'
+                1: wcT('js.av.sf_1'), 2: wcT('js.av.sf_2'), 3: wcT('js.av.sf_3'), 4: wcT('js.av.sf_4'),
+                5: wcT('js.av.sf_5'), 6: wcT('js.av.sf_6')
             };
             var sfLabel = SF_RATING_LABELS[sfRating] || ('Rating ' + sfRating);
             var sfTierClass = (sfRating >= 5) ? 'top' : (sfRating >= 4 ? 'moderat' : (sfRating >= 3 ? 'lokal' : 'kein_xc'));
             var sfHtml = '<span class="mga-sf-badge ' + sfTierClass + '">' + esc(sfLabel) + '</span>';
             html += '<div class="mga-metric full-width streckenflug">'
-                  + '<div class="mga-metric-label">Streckenflug</div>'
+                  + '<div class="mga-metric-label">' + wcT('js.av.streckenflug') + '</div>'
                   + '<div class="mga-metric-value">' + sfHtml + '</div>'
                   + '</div>';
         }
@@ -464,11 +464,11 @@ window.AnalysisView = (function () {
 
     // ===== INSIGHTS =====
     var RATING_LABELS_LONG = {
-        1: 'Abgleiter — kein Thermikflug',
-        2: 'Kurzer Thermikflug — Suchtag (1–2 h mit Glück)',
-        3: 'Solider Thermikflug — typischer Sommertag',
-        4: 'Starker Thermikflug — lokal-XC möglich',
-        5: 'XC-Tag — 50–150 km+ (Top-Tage als "Klassiker")'
+        1: wcT('js.av.rating_long_1'),
+        2: wcT('js.av.rating_long_2'),
+        3: wcT('js.av.rating_long_3'),
+        4: wcT('js.av.rating_long_4'),
+        5: wcT('js.av.rating_long_5')
     };
 
     function renderInsights(a) {
@@ -482,7 +482,7 @@ window.AnalysisView = (function () {
         var html = '<div class="mga-insights">';
         if (safetyFb) {
             html += '<div class="mga-insight safety open">'
-                  + '<button class="mga-insight-toggle" type="button">Sicherheits-Einschätzung</button>'
+                  + '<button class="mga-insight-toggle" type="button">' + wcT('js.assess.safety') + '</button>'
                   + '<div class="mga-insight-body">' + esc(safetyFb) + '</div>'
                   + '</div>';
         }
@@ -494,7 +494,7 @@ window.AnalysisView = (function () {
             }
             if (flyFb) flyBody += '<div>' + esc(flyFb) + '</div>';
             html += '<div class="mga-insight flyability open">'
-                  + '<button class="mga-insight-toggle" type="button">Flug-Einschätzung</button>'
+                  + '<button class="mga-insight-toggle" type="button">' + wcT('js.assess.flight') + '</button>'
                   + '<div class="mga-insight-body">' + flyBody + '</div>'
                   + '</div>';
         }
@@ -505,7 +505,7 @@ window.AnalysisView = (function () {
     // ===== FOOTER =====
     function renderFooter(dateStr) {
         if (!dateStr) return '';
-        return '<div class="mg-analysis-datestamp">Analyse: ' + esc(dateStr) + '</div>';
+        return '<div class="mg-analysis-datestamp">' + wcT('js.av.analysis_prefix') + esc(dateStr) + '</div>';
     }
 
     function wireToggles(root) {
@@ -692,7 +692,7 @@ window.AnalysisView = (function () {
         // gebildet werden -> Block bleibt versteckt.
         var fbOpts = { isRegion: isRegion, regionId: opts.regionId, spotName: opts.spotName };
         var hasEntity = isRegion ? !!opts.regionId : !!opts.spotName;
-        var showAdminFb = !!(window.gleitcastIsAdmin && dateStr && hasEntity);
+        var showAdminFb = !!(window.wingcastIsAdmin && dateStr && hasEntity);
 
         // State B: Not-safe (inklusive noAnalysis-Pfad)
         var notSafe = (safetyStatus === 'not_safe')

@@ -12,7 +12,7 @@
  *  scripts/create_precip_refpoints.py)
  *
  * API:
- *   window.GleitcastPrecipRefpoints.attach(map)
+ *   window.WingcastPrecipRefpoints.attach(map)
  *     → returns { remove() }
  */
 (function () {
@@ -81,5 +81,5 @@
         };
     }
 
-    window.GleitcastPrecipRefpoints = { attach: attach };
+    window.WingcastPrecipRefpoints = { attach: attach };
 })();

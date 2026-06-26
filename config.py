@@ -1,5 +1,5 @@
 """
-Konfigurationsdatei für Gleitcast
+Konfigurationsdatei für Wingcast
 Adaptiert von uetliberg_ticker/config.py - Multi-Spot, Chat-basiert.
 """
 
@@ -144,6 +144,12 @@ API_MODEL = SURFACE_PRIMARY_MODEL
 
 API_TIMEOUT = 30
 FORECAST_DAYS = 5
+
+# Aktive Oberflaechen-/Ausgabesprache (global, vom Admin umstellbar).
+# "de" = exakt wie bisher (validiert, keine Zusatz-Anweisung an die LLMs).
+# "en" = Oberflaeche/Chat sofort englisch; Spot-/Region-Analysen werden beim
+# naechsten Neu-Berechnen englisch erzeugt (bestehender Run-Button).
+LANG = "de"
 # Vorhersage-Zeitachse: Wanduhrzeit Schweiz (MESZ/MEZ). Open-Meteo liefert `time` in dieser Zone.
 TIMEZONE = "Europe/Zurich"
 
@@ -190,7 +196,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 # "test" = reduziertes Set für Entwicklung (28 Spots, PGE-Schema).
 # Beide CSVs nutzen das PGE-Schema (Sektor-Spalten wind_N..wind_NW,
 # bemerkungen_flug, bemerkungen_sicherheit).
-USE_SPOT_CSV = os.environ.get("GLEITCAST_SPOT_CSV", "pge")
+USE_SPOT_CSV = os.environ.get("WINGCAST_SPOT_CSV", "pge")
 CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
 # Region-Referenzpunkte: Default ist CVT-7 (Apr 2026, 7 Punkte im
 # Polygon-Innern via Lloyd-CVT). Legacy-Modus nutzt die alten 4 Punkte
@@ -209,7 +215,7 @@ REGIONEN_CSV_PATH = DATA_DIR / "regionen.csv"
 
 # Vercel: Nur /tmp ist schreibbar. Readonly-Daten (CSV, GeoJSON) bleiben in data/
 if os.environ.get("VERCEL"):
-    _WRITABLE_DIR = Path("/tmp/gleitcast")
+    _WRITABLE_DIR = Path("/tmp/wingcast")
     _WRITABLE_DIR.mkdir(parents=True, exist_ok=True)
     WEATHER_JSON_PATH = _WRITABLE_DIR / "wetterdaten.json"
     HISTORY_DIR = _WRITABLE_DIR / "history"
@@ -331,7 +337,7 @@ for _level in PRESSURE_LEVELS:
 # SYNOPTIK / WETTERLAGE-BLOCK
 # ============================================================================
 # Konfiguration fuer engine/synoptic_context.py — der "Wetterlage"-Block
-# im Gleitcast und in der E-Mail. Erzeugt deterministisch eine 5-Tages-
+# im Wingcast und in der E-Mail. Erzeugt deterministisch eine 5-Tages-
 # Einordnung der Grosswetterlage (Druckeinfluss CH, Druckzentren Europa,
 # uebergeordnete Stroemung, Niederschlagsmuster Nord/Sued der Alpen,
 # Phaenomene wie Foehn/Bise/Vb-Tief).
@@ -789,6 +795,29 @@ PRODUCTIVE_CLOUD_MAX = 80       # % — DEPRECATED, behalten fuer Abwaertskompat
 PRODUCTIVE_HOURS_FOR_GREEN = 4  # Mindest-Stunden fuer gray->green Upgrade
 PRODUCTIVE_HOURS_DOWNGRADE = 2  # Untere Schwelle: green/violet -> gray
 
+# ─── OVERCAST-DANGER (Sicherheits-Gate, killt clean_hours → not_safe) ───
+# Gefahr = dichte, geschlossene Wolkendecke AUF oder UNTER Startplatzhoehe:
+#   - "Start in die Wolke" (Decke auf Platzhoehe) ODER
+#   - "Decke unter mir, komme nicht sicher zum Landeplatz runter" (Talstratus).
+# Wolken OBERHALB des Platzes sind KEINE Gefahr (nur Thermik-Reducer) → kein Stop.
+# Open-Meteo-Schichten (verifiziert): low 0-3km, mid 3-8km, high >8km, MSL.
+# Fuer "Decke unter mir" zaehlt immer die TIEFE Schicht (Talstratus ist low);
+# bei hochalpinem Startplatz (elev >= MID_BAND_MIN) liegt der Platz selbst in der
+# mittleren Schicht → dann zaehlt zusaetzlich cloud_cover_mid.
+# Hergeleitet aus Scheidegg-2026-06-05-Analyse: alte Regel (base<elev+500 AND
+# total_cover>=75) flaggte Luftraum 464m UEBER dem Platz faelschlich als not_safe.
+OVERCAST_DANGER_BASE_BUFFER_M = 100   # m — Decke gilt als "auf Platzhoehe" bis elev+dies
+OVERCAST_DANGER_COVER_PCT = 80        # % — ab dieser Bedeckung = geschlossene Decke
+OVERCAST_MID_BAND_MIN_M = 3000        # m — ab hier liegt der Platz in der mittleren Schicht
+
+# ─── CLOUDS-Reducer-Zone (Flyability, KEIN Stop) ───
+# Wolkenbasis ueber dem Startplatz, aber nicht hoch (BASE_BUFFER..REDUCER_BASE_MAX):
+# fliegbar, aber eingeschraenkte Arbeitshoehe → CLOUDS-`reducer`-Tag (Label
+# "Basis nahe Startplatz"), Status bleibt gruen. Darueber: kein Effekt. Darunter
+# (auf/unter Platz, dicht): OVERCAST-DANGER (Stop). Nur wenn tiefe Decke vorhanden.
+OVERCAST_REDUCER_BASE_MAX_M = 400     # m — obere Grenze der Reducer-Zone ueber Platz
+OVERCAST_REDUCER_COVER_PCT = 75       # % — Mindest-tiefe-Bedeckung fuer Reducer
+
 # Violett-Kriterien (XC-Tag). LLM entscheidet final, aber TAGESPROFIL zeigt diese
 # Schwellen als Violett-Kandidat-Hint. Research: meteo_research/cloud_cover_thermal_impact.md
 # - Wolken-Maxima 50/50 matchen FAA-Daempfungsgrenze: darueber beginnt signifikante
@@ -835,6 +864,13 @@ WIND_IDEAL_MAX_KMH = 20         # km/h — ab diesem: ueber Komfortzone (= WIND_
 # der Pilot ist bereits in der Luft, Landung i.d.R. auf separatem Landeplatz.
 CLEAN_WINDOW_MIN_HOURS = 2       # h — unterhalb: not_safe
 CLEAN_WINDOW_GREEN_HOURS = 2     # h — ab hier: safe/green moeglich
+
+# Bei Flaute ist die Windrichtung bedeutungsloses Rauschen (Thermik-/Talwind-
+# Drehen, kein Gradient) — unter dieser Schwelle kann man aus jeder Richtung
+# starten, die Sektor-Pruefung wird uebersprungen (immer WIND-OK). Deckt sich mit
+# der Nullwind-Grenze (Abhebe-Airspeed ~30 km/h; <5 km/h aendert das Laufen kaum)
+# und WIND_IDEAL_MIN_KMH. Siehe xcontest_validation/I013_DIAGNOSE.md (Hebel A).
+WIND_DIRECTION_IRRELEVANT_BELOW_KMH = 5   # km/h — darunter: Richtung egal, immer WIND-OK
 
 # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade):
 # Erfasst den groessten Richtungsdreher innerhalb eines gleitenden Fensters von
@@ -897,9 +933,9 @@ DAILY_RUN_MINUTE   = 0
 # E-MAIL-BRIEFING (SMTP Infomaniak)
 # ============================================================================
 # BASE_URL = App-Domain (Flask), MARKETING_URL = Marketing-Webpage (Next.js).
-# In Produktion: BASE_URL=https://app.gleitcast.ch, MARKETING_URL=https://gleitcast.ch
-BASE_URL        = os.environ.get("GLEITCAST_BASE_URL",      "https://app.gleitcast.ch")
-MARKETING_URL   = os.environ.get("GLEITCAST_MARKETING_URL", "https://gleitcast.ch")
+# In Produktion: BASE_URL=https://app.wingcast.ch, MARKETING_URL=https://wingcast.ch
+BASE_URL        = os.environ.get("WINGCAST_BASE_URL",      "https://app.wingcast.ch")
+MARKETING_URL   = os.environ.get("WINGCAST_MARKETING_URL", "https://wingcast.ch")
 
 # Infomaniak SMTP (Standardwerte aus ihrer Doku; Port 465 SSL oder 587 STARTTLS)
 SMTP_HOST       = os.environ.get("SMTP_HOST", "mail.infomaniak.com")
@@ -908,11 +944,15 @@ SMTP_USE_SSL    = os.environ.get("SMTP_USE_SSL", "1") == "1"   # True = SSL:465,
 SMTP_USER       = os.environ.get("SMTP_USER", "")               # meist = SENDER_EMAIL
 SMTP_PASSWORD   = os.environ.get("SMTP_PASSWORD", "")
 SENDER_EMAIL    = os.environ.get("SENDER_EMAIL", "briefing@example.invalid")
-SENDER_NAME     = os.environ.get("SENDER_NAME", "Gleitcast")
+SENDER_NAME     = os.environ.get("SENDER_NAME", "Wingcast")
 
-# Admin-Dashboard: HTTP Basic Auth (nur Password-Check, User ignoriert).
-# Leer = Admin-Routen geben 503 zurueck (deaktiviert).
-ADMIN_PASSWORD  = os.environ.get("ADMIN_PASSWORD", "")
+# Admin = passwortlos: Admin ist, wer mit dieser E-Mail eingeloggt ist
+# (Magic-Link-Session). Kein Passwort mehr.
+ADMIN_EMAIL     = os.environ.get("ADMIN_EMAIL", "mutschgito@hotmail.com")
+
+# Salt fuer die IP-Anonymisierung im Feedback (SHA-256). Reiner Hash-Salt,
+# keine Auth-Funktion.
+FEEDBACK_SALT   = os.environ.get("FEEDBACK_SALT", "wingcast-feedback")
 
 # ============================================================================
 # ROUTING / GEOCODING (Phase 1)
@@ -922,7 +962,7 @@ ADMIN_PASSWORD  = os.environ.get("ADMIN_PASSWORD", "")
 VALHALLA_URL = os.environ.get("VALHALLA_URL", "https://valhalla1.openstreetmap.de")
 NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
 ROUTING_TIMEOUT = 15  # seconds (Valhalla + Nominatim HTTP)
-ROUTING_USER_AGENT = "Gleitcast/1.0 (paragliding weather app)"
+ROUTING_USER_AGENT = "Wingcast/1.0 (paragliding weather app)"
 GEOCODE_CACHE_TTL = 24 * 3600  # 24h in-memory cache für Nominatim
 
 # ============================================================================

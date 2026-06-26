@@ -53,8 +53,8 @@ def main() -> int:
     args = ap.parse_args()
 
     # Briefing-Daten frisch aus Cache + Synoptik bauen (kein LLM-Call noetig)
-    from chat_engine import GleitcastEngine
-    engine = GleitcastEngine()
+    from chat_engine import WingcastEngine
+    engine = WingcastEngine()
     briefing_data = engine.build_briefing_data()
     if not briefing_data.get("days"):
         print("FEHLER: keine Spot-/Region-Analysen verfuegbar", file=sys.stderr)

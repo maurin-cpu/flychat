@@ -1,4 +1,4 @@
-GLEITCAST — Dein Flugwetter KW{{ kw }}
+WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr') }}{{ kw }}
 {{ briefing_weekday }}, {{ briefing_date }}
 
 {% if verdict -%}
@@ -7,8 +7,8 @@ GLEITCAST — Dein Flugwetter KW{{ kw }}
 {%- if verdict.spot %}
 {{ verdict.spot.spot }}{% if verdict.spot.window %} · {{ verdict.spot.window }}{% endif %} · Rating {{ verdict.spot.rating_display }}
 {%- endif %}
-Im Dashboard: {{ urls.dashboard }}
-{% if share -%}Per WhatsApp teilen: {{ share.whatsapp }}
+{{ t('email.briefing.txt_in_dashboard') }} {{ urls.dashboard }}
+{% if share -%}{{ t('email.briefing.txt_share_whatsapp') }} {{ share.whatsapp }}
 {% endif -%}
 ============================================================
 
@@ -18,51 +18,51 @@ Im Dashboard: {{ urls.dashboard }}
 
 {% endif -%}
 {% if region_matrix -%}
-DEINE REGIONEN · DIESE WOCHE
-            {% for d in day_short_labels %}{{ '%-6s'|format(d) }}{% endfor %} Best
+{{ t('email.briefing.txt_regions_header') }}
+            {% for d in day_short_labels %}{{ '%-6s'|format(d) }}{% endfor %} {{ t('email.briefing.best_col') }}
 {% for r in region_matrix -%}
-{{ '%-12.12s'|format(r.region_name) }}{% for cell in r.days %}{% if cell.tier == "none" %} ----  {% elif cell.tier == "conditional" %} ! {{ cell.rating_display or ' --  ' }}{% else %}   {{ cell.rating_display or ' --  ' }}{% endif %} {% endfor %} {{ r.best_rating_int or '–' }}
+{{ '%-12.12s'|format(r.region_name) }}{% for cell in r.days %}{% if cell.tier == "none" %} ----  {% elif cell.tier == "not_safe" %} x {{ cell.rating_display or ' --  ' }}{% elif cell.tier == "conditional" %} ! {{ cell.rating_display or ' --  ' }}{% else %}   {{ cell.rating_display or ' --  ' }}{% endif %} {% endfor %} {{ r.best_rating_int or '–' }}
 {% endfor %}
-Legende: Zahl = Tages-Rating · "!" = Vorsicht · "----" = nicht fliegbar
+{{ t('email.briefing.txt_legend') }}
 
 {% endif -%}
-DIESE WOCHE AUF EINEN BLICK
+{{ t('email.briefing.txt_week_glance') }}
 {% for d in days -%}
-{{ d.label.weekday }} {% if d.tier == 'conditional' %}VORSICHT{% elif d.tier == 'none' %}NICHT FLIEGBAR{% else %}OK{% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
+{{ d.label.weekday }} {% if d.tier == 'conditional' %}{{ t('email.briefing.txt_caution') }}{% elif d.tier == 'none' %}{{ t('email.briefing.txt_not_flyable') }}{% else %}{{ t('email.briefing.txt_ok') }}{% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
 {% endfor %}
-PRO TAG
+{{ t('email.briefing.txt_per_day') }}
 {% for d in days %}
-{{ d.label.long }} — {% if d.tier == 'conditional' %}VORSICHT{% elif d.tier == 'none' %}NICHT FLIEGBAR{% else %}OK{% endif %}{% if d.day_rating_display %} · Rating {{ d.day_rating_display }}{% endif %}
+{{ d.label.long }} — {% if d.tier == 'conditional' %}{{ t('email.briefing.txt_caution') }}{% elif d.tier == 'none' %}{{ t('email.briefing.txt_not_flyable') }}{% else %}{{ t('email.briefing.txt_ok') }}{% endif %}{% if d.day_rating_display %} · Rating {{ d.day_rating_display }}{% endif %}
 {% if d.compact_top_region -%}
 {% for grp in d.region_groups[:3] %}  {{ grp.region_name }} · {% for s in grp.spots[:3] %}{{ s.spot }} {{ s.rating_display }}{% if not loop.last %} · {% endif %}{% endfor %}
 {% endfor %}{% if d.notable_good %}  + {{ d.notable_good }}
 {% endif %}{% if d.notable_bad %}  ! {{ d.notable_bad }}
 {% endif %}{%- else -%}
-  {{ d.reason_short or 'Nichts fliegbar in deinen Regionen.' }}
+  {{ d.reason_short or t('email.briefing.nothing_flyable') }}
 {% endif %}{% endfor %}
 
 ------------------------------------------------------------
-War diese Vorhersage richtig?
- Ja:   {{ urls.feedback_correct }}
- Nein: {{ urls.feedback_wrong }}
+{{ t('email.briefing.feedback_q') }}
+ {{ t('email.briefing.txt_yes') }}   {{ urls.feedback_correct }}
+ {{ t('email.briefing.txt_no') }} {{ urls.feedback_wrong }}
 ------------------------------------------------------------
 
 {% if urls.account -%}
 ============================================================
-EINSTELLUNGEN ANPASSEN
-Andere Regionen, weniger Versandtage oder pausieren?
+{{ t('email.welcome.txt_settings_cta_header') }}
+{{ t('email.briefing.txt_adjust_sub') }}
 {{ urls.account }}
 ============================================================
 
 {% endif -%}
-Quellen: ICON-CH1 (1 km), ICON-D2, ICON-EU, Open-Meteo.
-Gleitcast ist Decision Support — du entscheidest.
-Im Zweifel: nicht fliegen.
+{{ t('email.briefing.txt_sources') }}
+{{ t('email.briefing.txt_disclaimer') }}
+{{ t('email.in_doubt') }}
 
-{% if urls.account %}Einstellungen: {{ urls.account }}
+{% if urls.account %}{{ t('email.txt_settings_label') }} {{ urls.account }}
 {% endif -%}
 Dashboard: {{ urls.dashboard }}
-Abmelden:  {{ urls.unsubscribe }}
+{{ t('email.txt_account_label') }}  {{ urls.unsubscribe }}
 
-Datenschutz: {{ urls.datenschutz }}
-Impressum:   {{ urls.impressum }}
+{{ t('email.txt_privacy_label') }} {{ urls.datenschutz }}
+{{ t('email.txt_imprint_label') }}   {{ urls.impressum }}

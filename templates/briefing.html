@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}{% if og and og.title %}{{ og.title }}{% else %}Flugwetter – Gleitcast{% endif %}{% endblock %}
+{% block title %}{% if og and og.title %}{{ og.title }}{% else %}{{ t('briefing.title') }}{% endif %}{% endblock %}
 
 {% block meta %}
-<meta property="og:site_name" content="Gleitcast">
+<meta property="og:site_name" content="Wingcast">
 <meta property="og:type" content="website">
-<meta property="og:title" content="{{ og.title if og else 'Gleitcast – Flugwetter' }}">
-<meta property="og:description" content="{{ og.description if og else 'Präzise Thermik- und Wind-Prognose für die Schweizer Berge.' }}">
+<meta property="og:title" content="{{ og.title if og else t('briefing.og_title') }}">
+<meta property="og:description" content="{{ og.description if og else t('meta.og_description') }}">
 <meta property="og:url" content="{{ og.url if og else request.url }}">
 <meta property="og:image" content="{{ og.image if og else (request.url_root.rstrip('/') + '/og-image/briefing.png') }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:type" content="image/png">
-<meta property="og:locale" content="de_CH">
+<meta property="og:locale" content="{% if lang == 'en' %}en{% else %}de_CH{% endif %}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="description" content="{{ og.description if og else 'Präzise Thermik- und Wind-Prognose für die Schweizer Berge.' }}">
+<meta name="description" content="{{ og.description if og else t('meta.og_description') }}">
 {% endblock %}
 
 {% block head %}
@@ -26,26 +26,26 @@
 <div class="bf" id="briefingRoot">
   <header class="bf-header">
     <div class="bf-header-left">
-      <h1 class="bf-logo">Flugwetter</h1>
-      <span class="bf-date-range" id="bfDateRange">wird geladen…</span>
+      <h1 class="bf-logo">{{ t('briefing.heading') }}</h1>
+      <span class="bf-date-range" id="bfDateRange">{{ t('briefing.loading') }}</span>
     </div>
     <div class="bf-header-right">
       <span class="bf-timestamp" id="bfGeneratedAt"></span>
-      <button type="button" class="bf-btn-gen" id="bfGenerateBtn">Aktualisieren</button>
+      <button type="button" class="bf-btn-gen" id="bfGenerateBtn">{{ t('briefing.refresh') }}</button>
     </div>
   </header>
 
   <section class="bf-wetterlage" id="bfWetterlage" hidden></section>
 
-  <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="Tagesauswahl"></nav>
+  <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="{{ t('briefing.day_tabs_aria') }}"></nav>
 
   <section class="bf-filters" id="bfFilters">
     <div class="bf-filter-group bf-filter-group--region">
-      <span class="bf-filter-label">Region</span>
+      <span class="bf-filter-label">{{ t('briefing.region_label') }}</span>
       <div class="bf-filter-chips" id="bfFilterChips"></div>
       <div class="bf-filter-group-actions">
-        <button type="button" class="bf-filter-reset" id="bfFilterReset" title="Alle Regionen auswählen / abwählen">Alle</button>
-        <button type="button" class="bf-filter-map-btn" id="bfMapToggle" title="Karte ein/aus" aria-label="Regionskarte ein- oder ausblenden">
+        <button type="button" class="bf-filter-reset" id="bfFilterReset" title="{{ t('account.regions_all_title') }}">{{ t('account.regions_all') }}</button>
+        <button type="button" class="bf-filter-map-btn" id="bfMapToggle" title="{{ t('account.map_toggle') }}" aria-label="{{ t('briefing.map_toggle_aria') }}">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
         </button>
       </div>
@@ -54,14 +54,14 @@
 
     <div class="bf-filter-quality-row">
       <div class="bf-filter-group bf-filter-group--quality">
-        <span class="bf-filter-label" title="Zeigt nur Spots des gewaehlten Sicherheits-Bandes (RATING_CONCEPT v1.3)">Sicherheit</span>
-        <div class="bf-tier-chips" id="bfTierChips" role="group" aria-label="Filter nach Sicherheits-Band"></div>
+        <span class="bf-filter-label" title="{{ t('briefing.safety_title') }}">{{ t('briefing.safety_label') }}</span>
+        <div class="bf-tier-chips" id="bfTierChips" role="group" aria-label="{{ t('briefing.safety_filter_aria') }}"></div>
       </div>
       <div class="bf-filter-group bf-filter-group--rating">
-        <label class="bf-filter-label" for="bfRatingSlider" title="Blendet Spots unter diesem Fliegbarkeits-Rating aus">ab Fliegbarkeit</label>
+        <label class="bf-filter-label" for="bfRatingSlider" title="{{ t('briefing.flyability_title') }}">{{ t('briefing.flyability_label') }}</label>
         <div class="bf-rating-filter">
-          <span class="bf-rating-value" id="bfRatingValue">alle</span>
-          <input type="range" class="bf-rating-slider" id="bfRatingSlider" min="0" max="5" step="1" value="0" aria-label="Minimale Fliegbarkeit">
+          <span class="bf-rating-value" id="bfRatingValue">{{ t('account.min_rating_all') }}</span>
+          <input type="range" class="bf-rating-slider" id="bfRatingSlider" min="0" max="5" step="1" value="0" aria-label="{{ t('briefing.flyability_aria') }}">
         </div>
       </div>
     </div>
@@ -74,13 +74,13 @@
   <div class="tooltip" id="bfMeteogramTooltip"></div>
 
   <footer class="bf-footer">
-    <p>ICON-D2/EU/CH1/CH2 + GFS via Open-Meteo · winds.mobi · Gleitcast-KI</p>
+    <p>{{ t('briefing.footer') }}</p>
   </footer>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script>window.gleitcastDebugMode = {{ 'true' if debug_mode else 'false' }};</script>
+<script>window.wingcastDebugMode = {{ 'true' if debug_mode else 'false' }};</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="{{ url_for('static', filename='js/shared-glyph.js') }}?v={{ static_v('js/shared-glyph.js') }}"></script>

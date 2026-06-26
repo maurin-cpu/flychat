@@ -1,5 +1,5 @@
 """
-Source-Area-Modul fuer Gleitcast.
+Source-Area-Modul fuer Wingcast.
 
 Bestimmt die Referenzpunkte pro Spot:
   Punkt 1     = Startplatz (immer)

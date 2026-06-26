@@ -51,15 +51,15 @@
 
         // OSM Peaks/Pässe/Sättel — geteiltes Modul (osm-peaks-layer.js).
         // Steuerbar via Admin-UI: config.SHOW_OSM_PEAKS → window.SHOW_OSM_PEAKS.
-        if (window.SHOW_OSM_PEAKS && window.GleitcastOsmPeaks) {
-            window.GleitcastOsmPeaks.attach(map);
+        if (window.SHOW_OSM_PEAKS && window.WingcastOsmPeaks) {
+            window.WingcastOsmPeaks.attach(map);
         }
 
         // Niederschlags-Referenzpunkte (16 pro Region) — im Admin-Editor
         // IMMER eingeblendet (read-only), damit der Editor die Verteilung
         // sieht, auch wenn das globale SHOW_PRECIP_REFPOINTS Flag aus ist.
-        if (window.GleitcastPrecipRefpoints) {
-            window.GleitcastPrecipRefpoints.attach(map);
+        if (window.WingcastPrecipRefpoints) {
+            window.WingcastPrecipRefpoints.attach(map);
         }
     }
 

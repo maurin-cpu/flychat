@@ -1,14 +1,18 @@
 # Thermik-Terrain-Kalibrierung: 5-Zonen-System
 
-> **Zweck:** Praktischer Entwickler-Leitfaden für die geplante Umstellung des
-> `thermik_calculator.py` auf eine **terrain-differenzierte Parametrisierung**
-> nach den 5 Klassen aus `data/regionen.csv`.
+> **Zweck:** Entwickler-Leitfaden zur **terrain-differenzierten Parametrisierung**
+> des `thermik_calculator.py` nach den 5 Klassen aus `data/regionen.csv`.
 >
 > **Wissenschaftlicher Hintergrund:** Siehe das tiefe Recherchedokument
 > [`meteo_research/thermal_model_calibration.md`](../meteo_research/thermal_model_calibration.md).
 >
-> **Status:** Dokument beschreibt die *geplante* Konfiguration. Implementierung
-> in `thermik_calculator.py` und `config.py` folgt nach Freigabe.
+> **Status:** ✅ **Umgesetzt (Stand Mai 2026).** Alle Schritte 1–8 sind in
+> `thermik_calculator.py` und `config.py` produktiv aktiv — die 5-Zonen-Parameter
+> liegen in `config.py` (`min_thermal_depth_agl`, `gfs_pbl_cap_mode`,
+> `snow_damping_factor`, `h_ramp_*`, `entrainment_mu`, `climb_factor_terrain`,
+> `rock_face_*`), die Zonen-Lookups in `thermik_calculator.py`
+> (`get_terrain_zone()`, `_get_terrain_param()`). Dieses Dokument ist damit
+> beschreibende Doku, kein offener Plan mehr.
 
 ---
 
@@ -278,7 +282,7 @@ Validiert anhand der DI 07.04.2026 Vergleichsdaten:
 | Jura West | 1.8 m/s | unverändert | 1.8 m/s |
 
 \* Mittelland Zentral bei XCT bleibt eine offene Diskrepanz — XCT könnte hier
-ein Gain haben, der mit dem Volumeneffekt zusammenhängt, den Gleitcast nicht
+ein Gain haben, der mit dem Volumeneffekt zusammenhängt, den Wingcast nicht
 modelliert (siehe Recherche-Dokument, Abschnitt „Limitierungen").
 
 **Working-Ceiling-Erwartungen:**
@@ -533,7 +537,7 @@ Rampe wiederverwendet.
 
 ### Vergleich: XC-Therm Valais Central Do 16.04
 
-| Uhrzeit | XC-Therm | Gleitcast vorher | Gleitcast nachher |
+| Uhrzeit | XC-Therm | Wingcast vorher | Wingcast nachher |
 |---|---|---|---|
 | 07:00 | 0.4 m/s | 0.0 m/s | ~0.3–0.5 m/s |
 | 09:00 | 0.8 m/s | 0.0 m/s | ~0.6–0.9 m/s |

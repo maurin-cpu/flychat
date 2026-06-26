@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ lang }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gleitcast KW{{ kw }}</title>
+<title>Wingcast {{ t('email.briefing.week_abbr') }}{{ kw }}</title>
 <style>
   @media (prefers-color-scheme: dark) {
     body { background-color: #0f172a !important; }
@@ -27,7 +27,7 @@
 
 <!-- Preheader (versteckt, erscheint in Inbox-Preview) -->
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-{% if verdict %}{{ verdict.headline }}{% else %}Dein Flugwetter-Gleitcast{% endif %} &mdash; {{ briefing_weekday }}, {{ briefing_date }}
+{% if verdict %}{{ verdict.headline }}{% else %}{{ t('email.briefing.preheader_fallback') }}{% endif %} &mdash; {{ briefing_weekday }}, {{ briefing_date }}
 </div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1f5f9" style="background-color:#f1f5f9;">
@@ -37,7 +37,7 @@
   {# Compact header bar #}
   <tr><td bgcolor="#0f172a" style="background-color:#0f172a;padding:12px 18px;border-radius:10px 10px 0 0;">
     <table width="100%"><tr>
-      <td style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#ffffff;">GLEITCAST &middot; KW {{ kw }}</td>
+      <td style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#ffffff;">WINGCAST &middot; {{ t('email.briefing.week_abbr') }} {{ kw }}</td>
       <td align="right" style="font-size:11px;color:#94a3b8;">{{ briefing_weekday }}, {{ briefing_date }}</td>
     </tr></table>
   </td></tr>
@@ -48,7 +48,7 @@
     <table width="100%"><tr>
       <td valign="middle">
         <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:{{ verdict.day.tier_color }};margin-bottom:2px;">
-          Top &middot; {{ verdict.day.label.long }}
+          {{ t('email.briefing.best_day') }} &middot; {{ verdict.day.label.long }}
         </div>
         <div class="ds-text" style="font-size:17px;font-weight:700;color:#0f172a;line-height:1.25;">
           {% if verdict.spot %}{{ verdict.spot.spot }}{% if verdict.spot.window %} <span style="font-weight:500;color:#475569;">&middot; {{ verdict.spot.window }}</span>{% endif %}{% endif %}
@@ -76,21 +76,21 @@
   {# === SECTION: Region-Heatmap === #}
   <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;">
     <div class="ds-muted" style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;">
-      Woche &middot; {{ region_matrix|length }} Regionen &times; 5 Tage
+      {{ t('email.briefing.week_word') }} &middot; {{ region_matrix|length }} {{ t('email.briefing.regions_word') }} &times; 5 {{ t('email.briefing.days_word') }}
     </div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
       {# Header-Zeile #}
       <tr>
         <td class="ds-muted" style="padding:6px 8px 6px 0;font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.04em;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">
-          Region
+          {{ t('briefing.region_label') }}
         </td>
         {% for d in days %}
         <td align="center" class="ds-muted" style="padding:6px 2px;font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.04em;text-transform:uppercase;border-bottom:1px solid #e2e8f0;{% if d.is_today %}background-color:#fef3c7;{% endif %}">
-          {{ d.label.weekday }}{% if d.is_today %}<br><span style="font-size:8px;color:#b45309;">heute</span>{% endif %}
+          {{ d.label.weekday }}{% if d.is_today %}<br><span style="font-size:8px;color:#b45309;">{{ t('email.briefing.today') }}</span>{% endif %}
         </td>
         {% endfor %}
         <td align="right" class="ds-muted" style="padding:6px 0 6px 8px;font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.04em;text-transform:uppercase;border-bottom:1px solid #e2e8f0;">
-          Best
+          {{ t('email.briefing.best_col') }}
         </td>
       </tr>
       {# Daten-Zeilen #}
@@ -123,7 +123,7 @@
   {# === SECTION: Pro Tag — bare data layout, KEINE Card-Frames, matched zur Heatmap === #}
   <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;">
     <div class="ds-muted" style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;">
-      Pro Tag &middot; Beste Region + Top-Spots
+      {{ t('email.briefing.per_day') }} &middot; {{ t('email.briefing.per_day_sub') }}
     </div>
 
     {% for d in days %}
@@ -139,7 +139,7 @@
           </div>
         </td>
         <td valign="middle" style="padding:5px 10px;">
-          <span style="font-size:13px;font-weight:700;color:#0f172a;" class="ds-text">{{ d.label.long }}</span>{% if d.is_today %} <span style="font-size:10px;color:{{ d.tier_color_strip }};font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">&middot; heute</span>{% endif %}
+          <span style="font-size:13px;font-weight:700;color:#0f172a;" class="ds-text">{{ d.label.long }}</span>{% if d.is_today %} <span style="font-size:10px;color:{{ d.tier_color_strip }};font-weight:700;letter-spacing:0.04em;text-transform:uppercase;">&middot; {{ t('email.briefing.today') }}</span>{% endif %}
         </td>
         <td valign="middle" align="right" style="padding:5px 0 5px 6px;width:1%;white-space:nowrap;">
           <span style="font-size:18px;font-weight:800;color:{{ d.tier_color_strip }};font-variant-numeric:tabular-nums;letter-spacing:-0.02em;line-height:1;">
@@ -199,7 +199,7 @@
       {% else %}
       {# Schwacher Tag: Reason inline #}
       <div style="font-size:12px;color:#94a3b8;font-style:italic;line-height:1.4;padding-left:46px;" class="ds-muted">
-        {{ d.reason_short or 'Nichts fliegbar in deinen Regionen.' }}
+        {{ d.reason_short or t('email.briefing.nothing_flyable') }}
       </div>
       {% endif %}
     </div>
@@ -212,7 +212,7 @@
       Feedback
     </div>
     <div style="font-size:12px;color:#64748b;margin-bottom:8px;font-weight:500;" class="ds-muted">
-      War diese Vorhersage richtig?
+      {{ t('email.briefing.feedback_q') }}
     </div>
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
       <tr>
@@ -220,7 +220,7 @@
           <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
             <td align="center" bgcolor="#f8fafc" style="border-radius:6px;border:1px solid #e2e8f0;">
               <a href="{{ urls.feedback_correct }}" style="display:block;padding:8px 12px;font-size:12px;font-weight:700;color:#15803d;text-decoration:none;">
-                Ja, passte
+                {{ t('email.briefing.feedback_yes') }}
               </a>
             </td>
           </tr></table>
@@ -229,7 +229,7 @@
           <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
             <td align="center" bgcolor="#f8fafc" style="border-radius:6px;border:1px solid #e2e8f0;">
               <a href="{{ urls.feedback_wrong }}" style="display:block;padding:8px 12px;font-size:12px;font-weight:700;color:#b91c1c;text-decoration:none;">
-                Nein, lag daneben
+                {{ t('email.briefing.feedback_no') }}
               </a>
             </td>
           </tr></table>
@@ -242,18 +242,18 @@
   {% if urls.account %}
   <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;">
     <div class="ds-muted" style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;">
-      Einstellungen
+      {{ t('nav.settings') }}
     </div>
     <table width="100%" cellpadding="0" cellspacing="0" border="0" class="ds-card" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;">
       <tr><td style="padding:12px 14px;">
         <table width="100%"><tr>
           <td valign="middle">
-            <div class="ds-text" style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">Gleitcast anpassen</div>
-            <div class="ds-muted" style="font-size:11px;color:#64748b;line-height:1.4;">Andere Regionen, weniger Tage, pausieren?</div>
+            <div class="ds-text" style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">{{ t('email.briefing.adjust_title') }}</div>
+            <div class="ds-muted" style="font-size:11px;color:#64748b;line-height:1.4;">{{ t('email.briefing.adjust_sub') }}</div>
           </td>
           <td align="right" valign="middle" style="white-space:nowrap;padding-left:8px;">
             <a href="{{ urls.account }}" style="display:inline-block;padding:7px 12px;background:#0f172a;color:#ffffff;font-size:12px;font-weight:700;text-decoration:none;border-radius:6px;">
-              Einstellungen
+              {{ t('nav.settings') }}
             </a>
           </td>
         </tr></table>
@@ -265,19 +265,19 @@
   {# Footer #}
   <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;background-color:#f8fafc;border-radius:0 0 10px 10px;">
     <div style="font-size:10px;color:#64748b;line-height:1.7;" class="ds-muted">
-      Quellen: ICON-CH1 (1km), ICON-D2, ICON-EU, Open-Meteo, MeteoSwiss.<br>
-      Gleitcast ist Decision Support &mdash; im Zweifel: nicht fliegen.
+      {{ t('email.briefing.sources_label') }} ICON-CH1 (1km), ICON-D2, ICON-EU, Open-Meteo, MeteoSwiss.<br>
+      {{ t('email.briefing.disclaimer_short_html')|safe }}
     </div>
     <div style="font-size:10px;color:#64748b;line-height:1.6;margin-top:8px;">
-      <a href="{{ urls.account }}" style="color:#0f172a;text-decoration:underline;font-weight:600;">Einstellungen</a>
+      <a href="{{ urls.account }}" style="color:#0f172a;text-decoration:underline;font-weight:600;">{{ t('nav.settings') }}</a>
       &nbsp; &middot; &nbsp;
       <a href="{{ urls.dashboard }}" style="color:#64748b;text-decoration:underline;">Dashboard</a>
       &nbsp; &middot; &nbsp;
-      <a href="{{ urls.unsubscribe }}" style="color:#64748b;text-decoration:underline;">Abmelden</a>
+      <a href="{{ urls.unsubscribe }}" style="color:#64748b;text-decoration:underline;">{{ t('email.unsubscribe_link') }}</a>
       &nbsp; &middot; &nbsp;
-      <a href="{{ urls.datenschutz }}" style="color:#64748b;text-decoration:underline;">Datenschutz</a>
+      <a href="{{ urls.datenschutz }}" style="color:#64748b;text-decoration:underline;">{{ t('footer.privacy') }}</a>
       &nbsp; &middot; &nbsp;
-      <a href="{{ urls.impressum }}" style="color:#64748b;text-decoration:underline;">Impressum</a>
+      <a href="{{ urls.impressum }}" style="color:#64748b;text-decoration:underline;">{{ t('footer.imprint') }}</a>
     </div>
   </td></tr>
 

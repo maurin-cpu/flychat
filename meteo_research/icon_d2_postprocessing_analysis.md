@@ -34,9 +34,9 @@ Spezialisierte Dienste nutzen oft statistisch veredelte Daten (z.B. *MOSMIX* vom
 
 ---
 
-## 3. Strategie für Gleitcast: Der "Smart Burn-Off" Workaround
+## 3. Strategie für Wingcast: Der "Smart Burn-Off" Workaround
 
-In Gleitcast beziehen wir unsere Daten von der Open-Meteo API. Um das "Ghost-Cloud"-Problem zu beheben und uns qualitativ an XC Therm/Burnair anzugleichen, implementieren wir ein künstliches Post-Processing in Python (Datei: `fetch_weather.py`), welches zwei Konzepte nachstellt:
+In Wingcast beziehen wir unsere Daten von der Open-Meteo API. Um das "Ghost-Cloud"-Problem zu beheben und uns qualitativ an XC Therm/Burnair anzugleichen, implementieren wir ein künstliches Post-Processing in Python (Datei: `fetch_weather.py`), welches zwei Konzepte nachstellt:
 
 1.  **Topographische Glättung (Regional Averaging):** Anstatt einen einzigen GPS-Punkt abzufragen (der für den Balderen genau über dem feuchten Zürichsee im Gitter liegen kann), rufen wir ein 3-Punkte-Raster im Umkreis ab und bilden den Mittelwert der Wolkendichte.
 2.  **Inversionsbruch & Thermik-Filter:** Wir überprüfen die thermische Komponente über `thermik_calculator.py` und den GFS-Parameter `boundary_layer_height` (Grenzschichthöhe). Wenn:

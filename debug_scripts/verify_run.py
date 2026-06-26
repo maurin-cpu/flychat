@@ -13,7 +13,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 wd = json.load(open('data/wetterdaten.json', encoding='utf-8'))
 all_spots = sorted([k for k in wd.keys() if k != "_meta"])
@@ -22,7 +22,7 @@ spots_with_data = all_spots[::step][:30]
 print(f"Subset: {len(spots_with_data)} of {len(all_spots)} spots", flush=True)
 
 print("Init engine...", flush=True)
-engine = GleitcastEngine()
+engine = WingcastEngine()
 engine.load_weather_from_cache()
 print("Engine ready", flush=True)
 

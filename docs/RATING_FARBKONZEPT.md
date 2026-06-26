@@ -33,7 +33,7 @@ Aenderungen am Konzept brechen die Konsistenz, wenn nicht alle Touchpoints angep
 **Prinzip — "Royal Premium" Tier-Hierarchie (final v3.2):**
 - **Sky-Blue** (Rating 1+2 safe): signalisiert "blue thermal day" (Pilot-Mental-Modell: blauer Himmel ohne Cumulus = keine Thermik). Cool, ruhig, "still air".
 - **Aktive Thermik** (Rating 3-4 safe): Lime (warmes Yellow-Gruen, "erste Sonne, Thermik startet") → **Green-500** (klassisches Safety-Green, saturiert, "starke organisierte Thermik"). Lime → satter Green-Sprung = Pilot sieht sofort "es geht aktiv".
-- **Royal Violet** (Rating 5 safe): Premium-Top fuer XC-Tag/Klassiker. Wie Gaming-Tiers (Common→Rare→Epic→**Legendary**). Pilot scrollt durch Gleitcast → Violet-Spots = sofort "DER Tag".
+- **Royal Violet** (Rating 5 safe): Premium-Top fuer XC-Tag/Klassiker. Wie Gaming-Tiers (Common→Rare→Epic→**Legendary**). Pilot scrollt durch Wingcast → Violet-Spots = sofort "DER Tag".
 - **Code-Identifier `violet` matched wieder visuell** (v3 stellte v1-Intent her). Premium = Violet, semantisch konsistent.
 - **Thermik-Alignment** durchgehend: Meteogramm-Kacheln folgen derselben Skala (`meteogram.js:thermClimbColor`) + Chat-Charts (`chat-charts.js:thermClimbColor`).
 - **Conditional bleibt Yellow→Orange→Brown**: Warnsignal-Spektrum klar getrennt.
@@ -58,17 +58,21 @@ Aenderungen am Konzept brechen die Konsistenz, wenn nicht alle Touchpoints angep
 | 1a | **Region-Polygon Fill+Border** (Karte regionen.html) | `static/js/region-map.js:111-141` | `getRatingTint(band, rating)` + `getRatingBorder` | Fill + Border-Weight + Border-Color |
 | 1b | **Region-Polygon-Label** (Zahl-Pille im Polygon-Centroid) | `static/js/region-map.js:270-330` | `buildRegionLabel()` Per-Rating ink+ring | Pille-Ring-Farbe + Text-Farbe der Rating-Zahl |
 | 2 | **Spot-Marker** (Hauptkarte map.html) | `static/js/map.js:159-178` | `getRatingTint(band, rating)` | Marker-Fill + Stroke |
-| 3 | **Glyph-Kreis** (Spot-Header im Gleitcast, Marker-Inneres) | `static/js/shared-glyph.js:28-58` | `ratingTintFor(visBand, rating)` | Kreis-Fill + Stroke + Text-Farbe |
-| 4 | **Region-Pill** (Gleitcast Region-Header) | `static/js/briefing.js:1206-1244` | `regionPillSpec(meta)` | Pill-Bg + Border + Text |
-| 5 | **Spot-Score-Pill** (Gleitcast Spot-Header) | `static/js/briefing.js:1322-1334` | `regionPillSpec()` reused | Pill-Bg + Border + Text |
-| 6 | **Spot-Background** (Gleitcast Spot-Container) | `static/js/briefing.js:1363-1375` | `regionPillSpec()` reused + Alpha-Skala | Bg-Tint + Border-Left |
-| 7 | **Mini-Map Marker** (aufgeklappter Spot in Gleitcast) | `static/js/briefing.js:1882-1900` | `bfSafetyRatingStyle()` → ruft `regionPillSpec()` | Marker-Fill + Stroke + Glow |
+| 3 | **Glyph-Kreis** (Spot-Header im Wingcast, Marker-Inneres) | `static/js/shared-glyph.js:28-58` | `ratingTintFor(visBand, rating)` | Kreis-Fill + Stroke + Text-Farbe |
+| 4 | **Region-Pill** (Wingcast Region-Header) | `static/js/briefing.js:1206-1244` | `regionPillSpec(meta)` | Pill-Bg + Border + Text |
+| 5 | **Spot-Score-Pill** (Wingcast Spot-Header) | `static/js/briefing.js:1322-1334` | `regionPillSpec()` reused | Pill-Bg + Border + Text |
+| 6 | **Spot-Background** (Wingcast Spot-Container) | `static/js/briefing.js:1363-1375` | `regionPillSpec()` reused + Alpha-Skala | Bg-Tint + Border-Left |
+| 7 | **Mini-Map Marker** (aufgeklappter Spot in Wingcast) | `static/js/briefing.js:1882-1900` | `bfSafetyRatingStyle()` → ruft `regionPillSpec()` | Marker-Fill + Stroke + Glow |
 | 8 | **Rating-Info-Overlay** (Legenden-Modal) | `static/js/rating-info.js:16-34` | `_ratingTint(band, rating)` | Glyph-Beispiele im Overlay |
-| 9 | **Thermik-Kacheln** (Meteogramm im Gleitcast + Detail) | `static/js/meteogram.js:137-150` | `thermClimbColor(rate)` | Zellen-Fill nach climb_rate |
-| 10 | **Wetterlage-Block** (Gleitcast Top-Pille) | `static/css/briefing.css:125-140` | `.bf-wetterlage` Border-Left + Bg-Gradient | Cyan-Accent (Premium-Farbe) |
+| 9 | **Thermik-Kacheln** (Meteogramm im Wingcast + Detail) | `static/js/meteogram.js:137-150` | `thermClimbColor(rate)` | Zellen-Fill nach climb_rate |
+| 10 | **Wetterlage-Block** (Wingcast Top-Pille) | `static/css/briefing.css:125-140` | `.bf-wetterlage` Border-Left + Bg-Gradient | Cyan-Accent (Premium-Farbe) |
 | 11 | **Spot-Assessment-Sektionen** (aufgeklappte Spot-Details) | `static/css/briefing.css:2202-2207` | `.bf-assessment--safety/fly/xc` | Border-Left-Akzent pro Sektion |
 | 12 | **Spot/Region-Detail-Overlay** (Click auf Marker/Polygon) | `static/js/analysis-view.js:67-110` | `ratingTintSpec(band, rating)` + `buildGlyph()` + `renderHero()` | Hero-Container Bg + Border, Glyph-Fill, Rating-Pill |
 | 13 | **Chat-Charts Thermik-Kacheln** (KI-Berater-Visualisierungen) | `static/js/chat-charts.js:59-67, 374-375` | `thermClimbColor(rate)` + Legend-Array | Thermik-Zellen + Legenden-Swatches im Chat |
+| 14 | **E-Mail-Briefing-Body** (versendete Mail) | `email_service.py:38-69` | `_TIER_META` (eigene Hex-Kopie!) | Tier-Pill-Bg + Text + Label pro Tag/Spot |
+| 15 | **Abo-/Account-Seite — Qualität-Chips** (aus Mail verlinkt) | `templates/account.html:127-132` + `static/css/account.css:385-393` | `tier_defs` Labels + `.ac-tier-chip--*` Farben | Chip-Dot + aktiver Bg + Border |
+
+> ⚠ **Touchpoints 14+15 nutzen NICHT die JS-Anker-Funktion.** Die Mail (`_TIER_META`) hält eine **eigene Hex-Kopie** (WCAG-Border-Töne für Text auf Weiss), die Account-Chips lesen die `--color-fly-*` CSS-Variablen. **Beide driften leicht ab** — genau hier überlebten die Alt-Labels „Legendär/Bronze" bis 2026-06-03. Bei Tier-Farb- oder Label-Änderung mit prüfen. Siehe auch `RATING_ARCHITECTURE.md` §Sync-Pflicht Punkt 4.
 
 **Anker-Funktion = `regionPillSpec` in `briefing.js`** — liefert `{ label, hex, border, text, darkBg }` und wird von Touchpoints 4–7 direkt importiert. Touchpoints 1–3 + 8 haben eigene parallele Implementationen, die bei jeder Aenderung **identisch** angepasst werden muessen.
 
@@ -87,7 +91,7 @@ Aenderungen am Konzept brechen die Konsistenz, wenn nicht alle Touchpoints angep
 
 ## 4. Sync-Protokoll bei Palette-Aenderungen
 
-Wenn eine Hex-Farbe oder eine Mapping-Regel (z.B. "Rating 5 → Cyan") geaendert wird, **MUESSEN alle 13 Touchpoints** im selben Commit aktualisiert werden:
+Wenn eine Hex-Farbe oder eine Mapping-Regel (z.B. "Rating 5 → Cyan") geaendert wird, **MUESSEN alle 15 Touchpoints** im selben Commit aktualisiert werden (13 rating-driven JS/CSS + Mail-Body + Account-Chips, siehe §3 Touchpoints 14+15):
 
 **JS-Anchor-Files (Rating-driven):**
 1. `region-map.js:getRatingTint` + `getRatingBorder` + `mapRegionStyle('violet')` + **`buildRegionLabel`** (Zahl-Pille im Polygon-Centroid mit per-Rating ring+ink)
@@ -127,9 +131,11 @@ Hard-Reload (Ctrl+Shift+R) auf jeder Route. Pro Punkt **eine konkrete Region ode
 
 ---
 
-## 5. Noch NICHT migriert (Stand 2026-05-17)
+## 5. Migrations-Stand (Update 2026-06-03)
 
-- Email-Briefing (`email_service.py`) — verwendet noch alte 3-Tier-Klassen (gray/green/violet). Bei naechster Palette-Migration mit anpassen.
+- **Migriert (2026-06-03):** Account-/Einstellungsseite (`templates/account.html` Qualität-Chips + `static/css/account.css`) — Labels „Legendär"/„Bronze" → „XC-Tag"/„Abgleiter", Abgleiter-Farbe Bronze `#B08D57` → Sky-Blue (Royal Premium). Die `--color-fly-*` Tokens in `static/css/style.css` führen kein Bronze mehr (gray = Sky `#0ea5e9`, violet = Violet-400 `#a78bfa`). Hartkodierte `#8b5cf6`-Violet in `briefing.css` + Meteogramm-Badge auf `#a78bfa` gezogen.
+- **Migriert (2026-06-03):** Email-Briefing-**Body** (`email_service.py` `_TIER_META`) — nutzt die 3-Tier-Gruppierung (gray/green/violet, konzept-konform laut `RATING_ARCHITECTURE.md`) mit WCAG-tauglichen Border-Hexes: violet `#6d28d9`, green `#15803d`, conditional `#b45309`, gray jetzt Sky `#075985`/`#e0f2fe` (war stone `#78716c`).
+- Offen: ggf. weitere Stellen, die `--color-fly-*` CSS-Variablen lesen (Suche: `grep -rn "color-fly" static/css/`).
 - Streckenflug-Pille (falls separat gerendert) — Streckenflug ist eigene Achse, ggf. eigenes Konzept-Doku.
 - Eventuell weitere Stellen die `--color-fly-*` CSS-Variablen lesen (Suche: `grep -rn "color-fly" static/css/`). Bei kompletter Migration auch CSS-Vars in `:root` aktualisieren.
 

@@ -1,9 +1,9 @@
 import unittest
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 class TestLLMControl(unittest.TestCase):
     def setUp(self):
-        self.engine = GleitcastEngine()
+        self.engine = WingcastEngine()
 
     def test_initial_no_weather_context(self):
         """Testet, ob initial kein Wetter-Kontext vorhanden ist."""

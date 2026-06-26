@@ -1,8 +1,8 @@
 """
-Gleitcast Engine — Mixin: WeatherContextMixin.
+Wingcast Engine — Mixin: WeatherContextMixin.
 
 Ausgeschnitten aus chat_engine.py (Monolith-Split). Methoden-Signaturen
-unveraendert, Klasse wird via Mehrfachvererbung in GleitcastEngine eingebunden.
+unveraendert, Klasse wird via Mehrfachvererbung in WingcastEngine eingebunden.
 """
 
 import copy
@@ -304,6 +304,22 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         ),
         f"Foehn-Risiko: {_g('foehn_risk', 'none')}",
     ]
+    # Synoptische Safety-Sub-Ratings (1-10) → CAP fuer die Spot-Safety (Safety-Pass).
+    # Grossraeumige Gefahren treffen den ganzen Luftraum; ein Spot darf dafuer nicht
+    # sicherer bewertet werden als seine Region. Boeen/Bodenwind bewusst NICHT hier —
+    # die bleiben spotautonom (Region hat keine Boeen-Daten).
+    parts.append(
+        "Region-Safety-Sub-Ratings (1-10, tiefer=gefaehrlicher): "
+        f"Hoehenwind={_g('aloft_safety_rating', '?')}, "
+        f"Foehn={_g('foehn_safety_rating', '?')}, "
+        f"Gewitter={_g('thunderstorm_safety_rating', '?')}, "
+        f"CAPE={_g('cape_safety_rating', '?')}, "
+        f"Regen={_g('rain_safety_rating', '?')}, "
+        f"Sicht={_g('visibility_safety_rating', '?')}"
+    )
+    pno = _g("primary_no_go")
+    if pno:
+        parts.append(f"Region-Haupt-NoGo: {pno}")
     if _g("wind_summary"):
         parts.append(f"Wind-Zusammenfassung: {_g('wind_summary')}")
     if _g("wind_shear"):
@@ -319,6 +335,17 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         tq = _g("thermal_quality")
         if tq:
             parts.append(f"Region-Thermik: {tq}")
+        # Bewoelkung explizit durchreichen: aus dem CLOUDS-llm_tag der Region.
+        # Faellt sonst nur implizit ueber den thermal_quality-Freitext durch.
+        cloud_tags = _g("llm_tags") or []
+        cloud_val = None
+        if isinstance(cloud_tags, list):
+            for t in cloud_tags:
+                if isinstance(t, dict) and str(t.get("topic", "")).upper() == "CLOUDS":
+                    cloud_val = t.get("value") or t.get("label")
+                    break
+        if cloud_val:
+            parts.append(f"Region-Bewoelkung: {cloud_val}")
         xc_pot = _g("xc_potential")
         xc_det = _g("xc_details")
         if xc_pot or xc_det:
@@ -331,9 +358,19 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         parts.append(f"Region-Summary: {summary}")
 
     parts.append(
-        "→ Nutze diesen Block AUSSCHLIESSLICH fuer TEIL 4 (Streckenflug). "
+        "→ SAFETY-Pass: Nutze die Region-Safety-Sub-Ratings als CAP fuer die synoptischen "
+        "Spot-Sub-Ratings (Hoehenwind/Foehn/Gewitter/CAPE/Regen/Sicht) — dein Spot-Wert darf "
+        "nicht besser sein als der Region-Wert (Details: Abschnitt REGION-SAFETY-CAP im Template). "
+        "Boeen/Bodenwind bleiben spotautonom."
+    )
+    parts.append(
+        "→ FLYABILITY-Pass: Nutze diesen Block, um in der Flug-Einschaetzung (`recommendation`) das "
+        "Streckenpotenzial in 1-2 Saetzen aus der Region-Einschaetzung herzuleiten: "
+        "begruende lokal vs. Strecke mit den Region-Meteodaten (Region-Thermik in m/s, "
+        "Region-Basis/Arbeitshoehe in m AGL, Region-Bewoelkung) — KEIN abstraktes Region-Rating nennen. "
+        "Die Bewoelkung MUSS in der Flug-Einschaetzung vorkommen (siehe recommendation-PFLICHT). "
         "Konflikt-Check: Spot fliegbar + Region WIND-STRONG>=2h oder Foehn → "
-        "streckenflug.tier max 'lokal', limiting_factor='region_wind_aloft'."
+        "Streckenpotenzial max 'lokal' (limiting_factor='region_wind_aloft')."
     )
     return "\n".join(parts)
 
@@ -577,8 +614,8 @@ class WeatherContextMixin:
                     else:
                         sunshine_str += f", {int(round(swr_raw))} W/m²"
 
-                # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG)
-                is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"])
+                # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG; bei Flaute Richtung egal)
+                is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"], wind_speed=wind_speed)
                 wind_status = "[WIND-OK]" if is_ok else "[WIND-WRONG]"
 
                 warnings = []
@@ -719,13 +756,16 @@ class WeatherContextMixin:
                 except Exception:
                     pass
 
-                # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
-                if (cloud_base_raw is not None
-                        and isinstance(cloud_base_raw, (int, float))
-                        and isinstance(cloud_cover, (int, float))
-                        and cloud_cover >= 75
-                        and cloud_base_raw < spot["elevation_m"] + 500):
-                    warnings.append("[OVERCAST-DANGER]")
+                # OVERCAST-DANGER: dichte, geschlossene Wolkendecke AUF oder UNTER
+                # Startplatzhöhe (Start in die Wolke ODER Decke unter mir). Wolken
+                # darüber = nur Reducer. Siehe config.OVERCAST_DANGER_*.
+                if (isinstance(cloud_base_raw, (int, float))
+                        and cloud_base_raw <= spot["elevation_m"] + config.OVERCAST_DANGER_BASE_BUFFER_M):
+                    dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
+                        spot["elevation_m"] >= config.OVERCAST_MID_BAND_MIN_M
+                        and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
+                    if dense_deck:
+                        warnings.append("[OVERCAST-DANGER]")
 
                 warning_str = " " + " ".join(warnings) if warnings else ""
 
@@ -826,13 +866,19 @@ class WeatherContextMixin:
         du_dz_kmh_per_100m = (du_kmh / dz_m) * 100.0
         return (du_dz_kmh_per_100m, u_top, wind_speed_10m)
 
-    def _calculate_segment_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m):
+    def _calculate_segment_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m,
+                                 include_surface_anchor=True):
         """
         Berechnet Windscherung pro Segment zwischen konsekutiven Levels.
 
         Sammelt Surface-Anker (elevation_m, wind_speed_10m) + alle PL-Windpunkte
         innerhalb [elevation_m, thermal_top_m]. Berechnet dU/dz zwischen
         aufeinanderfolgenden Levels.
+
+        include_surface_anchor=False laesst den 10m-Bodenwind-Anker weg — fuer die
+        SHEAR/TORN-Auswertung, wo der reibungsgebremste 10m-Wind eine Schein-Scherung
+        direkt ueber dem Start erzeugt (43% Fehlalarm, siehe TQ_TORN_FLYABILITY.md).
+        ROUGH (Boeen), WIND (BL-Mittel) und Startbarkeit nutzen den Anker unveraendert.
 
         Returns: (segments, column_shear)
             segments: list of dicts with keys: alt_lo, alt_hi, du_dz, wind_lo, wind_hi
@@ -846,8 +892,8 @@ class WeatherContextMixin:
         if thermal_top_m <= elevation_m:
             return empty
 
-        # Sammle Windpunkte: Surface-Anker + pressure levels in der Schicht
-        points = [(elevation_m, wind_speed_10m)]
+        # Sammle Windpunkte: Surface-Anker (optional) + pressure levels in der Schicht
+        points = [(elevation_m, wind_speed_10m)] if include_surface_anchor else []
         for level in config.PRESSURE_LEVELS:
             h_val = pl_data.get(f"geopotential_height_{level}hPa")
             ws_val = pl_data.get(f"wind_speed_{level}hPa")
@@ -1010,7 +1056,7 @@ class WeatherContextMixin:
         """
         tags = []
         debug = {"du_dz": None, "bs": None, "gf": None, "zone": None,
-                 "tq_ratio": None, "bl_mean_wind": None}
+                 "tq_ratio": None, "bl_mean_wind": None, "torn_floor_m": None}
 
         # Gate: keine Thermik -> keine Qualitaets-Tags
         if (not isinstance(climb_rate_ms, (int, float))
@@ -1024,8 +1070,14 @@ class WeatherContextMixin:
         shear_cfg = config.SHEAR_THRESHOLDS.get(
             terrain_zone, config.SHEAR_THRESHOLDS["alpen"]
         )
+        # Anker-Fix (TQ_TORN_FLYABILITY.md): Den 10m-Bodenwind-Anker fuer die
+        # SHEAR/TORN-Auswertung weglassen — sonst erzeugt die reibungsgebremste
+        # Boden-Scherung ein Schein-TORN direkt ueber dem Start (43% Fehlalarm).
+        # ROUGH (worst_gf) und WIND (bl_mean_wind) nutzen den Anker weiter (eigene
+        # Pfade unten, unberuehrt von dieser segments-Liste).
         segments, column_shear = self._calculate_segment_shear(
-            wind_speed_10m, pl_data, elevation_m, thermal_top_m
+            wind_speed_10m, pl_data, elevation_m, thermal_top_m,
+            include_surface_anchor=False,
         )
         du_dz = column_shear[0]
         debug["du_dz"] = du_dz
@@ -1041,9 +1093,19 @@ class WeatherContextMixin:
         bs = self._calculate_bs_ratio(climb_rate_ms, du_dz)
         debug["bs"] = bs
         if bs is not None:
-            if bs <= config.BS_RATIO_THRESHOLDS["danger"]:
+            # Scherungs-Guard (TQ_TORN_FLYABILITY.md, "Offen" → umgesetzt 2026-06-05):
+            # B/S = climb / du_dz kippt auch dann unter die Schwelle, wenn NICHT der
+            # Wind stark schert, sondern die Thermik einfach schwach ist (flache,
+            # niedrige Mittelland-Blasen → kleine parabol. Steigrate). Das ist KEIN
+            # Zerreissen, sondern eine schwache Thermik — und die faengt der
+            # Produktiv-Floor (PRODUCTIVE_CLIMB_MIN) bereits ab. TORN daher nur, wenn
+            # die Scherung ueberhaupt die WARN-Schwelle erreicht — dieselbe Grenze,
+            # ab der [SHEAR-DEGRADED] greift (in sich konsistent, keine neue Zahl).
+            # Entfernt die Flachland-Schwachwind-Fehlalarme (Befund: ~28% Region-TORN).
+            shear_significant = du_dz >= shear_cfg["warn"]
+            if bs <= config.BS_RATIO_THRESHOLDS["danger"] and shear_significant:
                 tags.append("[THERMAL-TORN-UNUSABLE]")
-            elif bs <= config.BS_RATIO_THRESHOLDS["warn"]:
+            elif bs <= config.BS_RATIO_THRESHOLDS["warn"] and shear_significant:
                 tags.append("[THERMAL-TORN-DEGRADED]")
 
         # --- BL-Mean-Wind (Thermik-Organisation durch Grundwind gestoert) ---
@@ -1108,6 +1170,10 @@ class WeatherContextMixin:
         # lokaler B/S-Ratio (mit parabolischer Steigrate) und worst GF im Segment.
         CLIMB_FLOOR = 0.3  # m/s — verhindert false-positives am Saeulenrand
         seg_results = []
+        # Band-Cap-Input (Regionen, TQ_TORN_FLYABILITY.md): unterste Hoehe, ab
+        # der die Thermik ECHT zerrissen ist (shear-signifikant). Darunter ist
+        # das Band sauber/fliegbar. Bleibt None, wenn kein echter Riss im Band.
+        torn_floor_m = None
         for seg in segments:
             seg_tags = []
             # Lokale Scherung
@@ -1126,6 +1192,11 @@ class WeatherContextMixin:
                 local_bs = (local_climb / seg["du_dz"]) * 100.0
                 if local_bs <= config.BS_RATIO_THRESHOLDS["danger"]:
                     seg_tags.append("TORN-UNU")
+                    # Nur shear-signifikante Risse zaehlen als Band-Decke
+                    # (gleicher Guard wie der Spalten-TORN-Tag oben).
+                    if seg["du_dz"] >= shear_cfg["warn"]:
+                        torn_floor_m = (seg["alt_lo"] if torn_floor_m is None
+                                        else min(torn_floor_m, seg["alt_lo"]))
                 elif local_bs <= config.BS_RATIO_THRESHOLDS["warn"]:
                     seg_tags.append("TORN-DEG")
 
@@ -1172,6 +1243,8 @@ class WeatherContextMixin:
                 for t in s["tags"]:
                     tag_counts[t] = tag_counts.get(t, 0) + 1
             debug["tq_ratio"] = {"total": n_total, "clean": n_clean, "tags": tag_counts}
+
+        debug["torn_floor_m"] = torn_floor_m
 
         return (tags, debug)
 
@@ -1449,6 +1522,7 @@ class WeatherContextMixin:
         hour_lines: list[tuple[int, str]] = []
         wind_ok_hours = []
         wind_wrong_hours = []
+        calm_dir_hours = []    # WIND-OK NUR weil Flaute (Richtung passt eigentlich nicht)
         clean_hours = []       # WIND-OK ohne harte Warnungen
         warned_hours = []      # WIND-OK aber mit harten Warnungen (GUST/ALOFT/RAIN/CAPE)
         hourly_gusts = {}      # hour_str → gust value für Trend-Analyse
@@ -1581,15 +1655,34 @@ class WeatherContextMixin:
             if isinstance(cloud_base_raw, (int, float)):
                 if min_cloud_base_active_h is None or cloud_base_raw < min_cloud_base_active_h:
                     min_cloud_base_active_h = cloud_base_raw
-                low_mid_cover = low_cl + mid_cl
-                if cloud_base_raw <= elevation_m + 100 and low_mid_cover >= 90:
+                # STOP-Zähler deckungsgleich mit OVERCAST-DANGER-Gate (dichte Decke
+                # auf/unter Platz). REDUCER = tiefe Decke knapp ÜBER Platz
+                # (BUFFER..REDUCER_BASE_MAX) → eingeschränkte Arbeitshöhe, fliegbar.
+                # low_cl statt low+mid (kein Additions-Artefakt >100%).
+                buf = config.OVERCAST_DANGER_BASE_BUFFER_M
+                dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
+                    elevation_m >= config.OVERCAST_MID_BAND_MIN_M
+                    and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
+                if cloud_base_raw <= elevation_m + buf and dense_deck:
                     cloud_at_or_below_takeoff_h += 1
-                elif elevation_m + 100 < cloud_base_raw <= elevation_m + 300 and low_mid_cover >= 75:
+                elif (elevation_m + buf < cloud_base_raw <= elevation_m + config.OVERCAST_REDUCER_BASE_MAX_M
+                        and low_cl >= config.OVERCAST_REDUCER_COVER_PCT):
                     cloud_near_takeoff_h += 1
 
-            # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG)
-            is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"])
+            # Wind-Check (Boden-10m bestimmt WIND-OK/WRONG; bei Flaute Richtung egal)
+            is_ok = self._is_wind_in_range(wind_dir, spot["windrichtung"], wind_speed=wind_speed)
             wind_status = "[WIND-OK]" if is_ok else "[WIND-WRONG]"
+            # Flaute-Override sichtbar machen (I-013 Hebel A): Stunde ist NUR startbar,
+            # weil der Wind zu schwach ist — die Richtung passt eigentlich nicht. Fuer
+            # die Flugeinschaetzung relevant (Boeen koennen aus beliebiger Richtung kommen).
+            calm_dir_override = (
+                is_ok
+                and isinstance(wind_speed, (int, float))
+                and wind_speed < config.WIND_DIRECTION_IRRELEVANT_BELOW_KMH
+                and not self._is_wind_in_range(wind_dir, spot["windrichtung"])
+            )
+            if calm_dir_override:
+                wind_status += " [WIND-CALM]"
 
             warnings = []
 
@@ -1624,6 +1717,8 @@ class WeatherContextMixin:
                 hourly_wind_dirs[hour_str] = wind_dir
             if is_ok:
                 wind_ok_hours.append(hour_str)
+                if calm_dir_override:
+                    calm_dir_hours.append(hour_str)
             else:
                 wind_wrong_hours.append(hour_str)
 
@@ -1764,19 +1859,28 @@ class WeatherContextMixin:
             except Exception:
                 pass
 
-            # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
-            if (cloud_base_raw is not None
-                    and isinstance(cloud_base_raw, (int, float))
-                    and isinstance(cloud_cover, (int, float))
-                    and cloud_cover >= 75
-                    and cloud_base_raw < elevation_m + 500):
-                warnings.append("[OVERCAST-DANGER]")
+            # OVERCAST-DANGER: dichte, geschlossene Wolkendecke AUF oder UNTER
+            # Startplatzhöhe (Start in die Wolke ODER geschlossene Decke unter mir,
+            # durch die ich zum Landeplatz absteigen müsste). Wolken OBERHALB des
+            # Platzes sind keine Gefahr (nur Thermik-Reducer). Siehe config.py
+            # OVERCAST_DANGER_* + meteo: Open-Meteo low=0-3km, mid=3-8km (MSL).
+            if (isinstance(cloud_base_raw, (int, float))
+                    and cloud_base_raw <= elevation_m + config.OVERCAST_DANGER_BASE_BUFFER_M):
+                # "Decke unter mir" ist immer die tiefe Schicht (Talstratus);
+                # bei hochalpinem Platz liegt der Platz selbst in der mittleren.
+                dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT
+                if (elevation_m >= config.OVERCAST_MID_BAND_MIN_M
+                        and mid_cl >= config.OVERCAST_DANGER_COVER_PCT):
+                    dense_deck = True
+                if dense_deck:
+                    warnings.append("[OVERCAST-DANGER]")
 
             # Thermik-Qualitaets-Tags (Scherung / Zerrissenheit / Boeigkeit).
             # Basis: meteo_research/wind_shear_thermal_quality.md
             # Nur aktiv wenn Thermik existiert — ohne climb_rate sind die
             # Boeen-Risiken bereits durch [GUST-*] und [ALOFT-*] abgedeckt.
             tq_info = ""
+            quality_debug = {}  # Fallback, falls TQ-Aufruf wirft (Band-Cap liest torn_floor_m)
             try:
                 quality_tags, quality_debug = self._thermal_quality_tags(
                     wind_speed_10m=wind_speed,
@@ -1811,12 +1915,15 @@ class WeatherContextMixin:
                 # THERMAL-WIND-UNUSABLE (Grundwind zu stark, Blase organisiert sich nicht,
                 # Research 3.1) blockieren den Produktiv-Zaehler. FRAGMENTED ist "zu schwach,
                 # nicht gefaehrlich" — gehoert damit nicht in den Gefahren-Topf.
-                # SHEAR/TORN bleiben reine Qualitaets-Issues (Bart schwer zentrierbar,
-                # aber Thermik existiert) und blockieren produktive Stunden nicht.
+                # TORN-UNUSABLE blockiert seit dem 10m-Anker-Fix ebenfalls (TQ_TORN_FLYABILITY.md
+                # Schritt 2): die Scherung zerreisst die organisierte Blase, kein zentrierbares
+                # Steigen. Anker-frei → kein Reibungs-Fehlalarm mehr (Befund 1/3). SHEAR bleibt
+                # reine Prosa (wuerde dU/dz doppelt zaehlen, B/S enthaelt es schon).
                 rough_unusable_this_hour = (
                     "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour
                     or "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour
                 )
+                torn_unusable_this_hour = "[THERMAL-TORN-UNUSABLE]" in tq_tags_this_hour
                 # Bewoelkung wird NICHT mehr als Productivity-Gate verwendet (Mai 2026).
                 # Begruendung: die Thermik-Engine (thermik_calculator.py) berechnet climb_rate
                 # bereits aus direct/diffuse_radiation — die Wolken-Daempfung steckt also
@@ -1835,8 +1942,24 @@ class WeatherContextMixin:
                 band_depth = (h_max_h - elevation_m) if isinstance(h_max_h, (int, float)) else 0
                 _min_band = min_band_depth(h_climb, spot_terrain_zone)
                 band_usable = band_depth >= _min_band
+                # --- Band-Cap (Spots, Konsistenz mit Region-Loop, TQ_TORN_FLYABILITY.md) ---
+                # Identische Logik wie im Region-Loop. Bei Spots ist elevation_m der
+                # ECHTE Startplatz; der Riss sitzt meist direkt drueber (gemessen rel
+                # ~0.13) → fast nie ein fliegbares Band darunter, der Cap zuendet hier
+                # selten (belegt: ~7% der gerissenen Stunden, fast 0 nach Spalten-Gate-
+                # Schnitt). Trotzdem dieselbe Regel: strikt nur relaxierend (kann nie
+                # eine produktive Stunde killen), nur eben hier praktisch wirkungslos.
+                torn_floor_m = quality_debug.get("torn_floor_m")
+                torn_cap_top = None
+                torn_band_cap_saves = False
+                if torn_unusable_this_hour and isinstance(torn_floor_m, (int, float)):
+                    if (torn_floor_m - elevation_m) >= _min_band:
+                        torn_band_cap_saves = True
+                        torn_cap_top = torn_floor_m
+                torn_kills_hour = torn_unusable_this_hour and not torn_band_cap_saves
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
                         and not rough_unusable_this_hour
+                        and not torn_kills_hour
                         and band_usable):
                     productive_thermal_h += 1
                 elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
@@ -1846,16 +1969,22 @@ class WeatherContextMixin:
                 # Rating-Input v1.5: strenge Produktivitaets-Schwelle (≥1.5 m/s)
                 if (h_climb >= 1.5
                         and not rough_unusable_this_hour
+                        and not torn_kills_hour
                         and band_usable):
                     productive_h_strict += 1
                     _prod_climbs.append(float(h_climb))
                     # v1.6: Thermik-Top AGL fuer working_height-Median tracken.
                     # h_max_h ist MSL (bereits LCL-gecappt). AGL = MSL - elevation.
+                    # Band-Cap: gerettet-gedeckelte Stunde nur bis zum Riss zaehlen.
                     if isinstance(h_max_h, (int, float)):
-                        _agl = max(0, h_max_h - elevation_m)
+                        _top_msl = h_max_h
+                        if torn_band_cap_saves and isinstance(torn_cap_top, (int, float)):
+                            _top_msl = min(_top_msl, torn_cap_top)
+                        _agl = max(0, _top_msl - elevation_m)
                         _prod_tops_agl.append(_agl)
                 # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
-                if h_climb >= 2.0 and not rough_unusable_this_hour and band_usable:
+                if (h_climb >= 2.0 and not rough_unusable_this_hour
+                        and not torn_kills_hour and band_usable):
                     strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
@@ -2105,6 +2234,19 @@ class WeatherContextMixin:
             lines.append(
                 f"WIND-OK-Stunden mit harten Warnungen ({len(warned_hours)}): "
                 f"{', '.join(warned_hours)} (gehoeren NICHT ins safe_window)"
+            )
+
+        # Flaute-Startbarkeit (I-013 Hebel A): Stunden, die NUR startbar sind, weil der
+        # Wind zu schwach ist (Richtung passt eigentlich nicht). Muss in der
+        # Flugeinschaetzung erwaehnt werden (analog Richtungsdreher-Anmerkung).
+        if calm_dir_hours:
+            lines.append(
+                f"→ FLAUTE-STARTBAR ({len(calm_dir_hours)}h): {', '.join(calm_dir_hours)} "
+                f"sind startbar NUR weil der Wind < {config.WIND_DIRECTION_IRRELEVANT_BELOW_KMH} km/h ist "
+                f"(Richtung waere sonst ausserhalb des Sektors). In der Flugeinschaetzung/summary "
+                f"ERWAEHNEN: Start bei (nahezu) Flaute moeglich, aber Boeen und Thermik koennen "
+                f"aus beliebiger Richtung kommen — beim Aufziehen/Start besonders aufpassen. "
+                f"KEIN Status-Downgrade, reine Hinweis-Info."
             )
 
         # Richtungsdreher-Anmerkung (nur wind_summary, KEIN Status-Downgrade)
@@ -2367,11 +2509,28 @@ class WeatherContextMixin:
                     f"Falls du green/violet gewählt hast → degradiere zu gray (Abgleiter). "
                     f"Falls bereits gray → bleibt gray. Hat KEINEN Einfluss auf safety_status."
                 )
-            if (tq_torn_danger_h > 0 or tq_shear_danger_h > 0):
+            if tq_torn_danger_h > 0:
                 lines.append(
-                    f"  TORN-/SHEAR-UNUSABLE sind reine Qualitaets-Issues (zerrissene/gekippte Thermik). "
-                    f"Sie degradieren MAXIMAL violet→green. KEIN gray-Downgrade wegen TORN/SHEAR. "
-                    f"Der Tag bleibt Thermikflug-tauglich, Bart-Zentrierung ist nur schwieriger."
+                    f"  TORN-UNUSABLE in {tq_torn_danger_h}h: Scherung zerreisst die organisierte "
+                    f"Thermikblase (anker-korrigiert → kein Reibungs-Fehlalarm). Zaehlt WIE "
+                    f"ROUGH/WIND-UNUSABLE NICHT in den Produktiv-Zaehler — productive_thermal_h "
+                    f"ist bereits bereinigt, du straffst NICHT zusaetzlich am Tier. "
+                    f"PFLICHT: Benenne in der Flyability-Prosa (thermal_quality/flyability_notes) "
+                    f"ehrlich, dass die Scherung die Thermik in diesen Stunden zerreisst (Bart "
+                    f"nicht zentrierbar) — das ist Thermik-Qualitaet = Flyability-Domaene, NICHT "
+                    f"verschweigen. (Regen/Gewitter bleiben dagegen aus der Flyability-Prosa raus.)"
+                )
+            elif tq_torn_warn_h > 0:
+                lines.append(
+                    f"  TORN-DEGRADED in {tq_torn_warn_h}h: Scherung DROHT die Thermik zu zerreissen "
+                    f"(Grenzbereich). Zaehlt noch MIT (Bart schwer zentrierbar). Erwaehne den "
+                    f"Scher-Vorbehalt in der Flyability-Prosa, wenn nennenswert."
+                )
+            if tq_shear_danger_h > 0:
+                lines.append(
+                    f"  SHEAR-UNUSABLE in {tq_shear_danger_h}h: geneigte Blase, reines Komfort-Issue. "
+                    f"Zaehlt MIT in den Produktiv-Zaehler — B/S (=TORN) enthaelt den Scher-Effekt "
+                    f"bereits, SHEAR nicht doppelt straffen. Nur Prosa, kein Gate."
                 )
             if tq_wind_danger_h > 0:
                 wind_pct = round(100 * tq_wind_danger_h / thermal_hours_total)
@@ -2395,12 +2554,13 @@ class WeatherContextMixin:
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
                 f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, ausreichendes Höhenband, "
-                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
+                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE, kein TORN-UNUSABLE). "
                 f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
                 f"HINWEIS: Bewoelkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — "
                 f"die Sonnen-Daempfung steckt bereits in climb_rate ueber die strahlungs"
-                f"basierte H-Berechnung. TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen "
-                f"MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
+                f"basierte H-Berechnung. SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen MIT "
+                f"(geneigt bzw. schwach, aber fliegbar). TORN-UNUSABLE zaehlt NICHT mehr mit "
+                f"(Scherung zerreisst die Blase) — bereits aus productive_thermal_h entfernt."
             )
             # Rating-Inputs (RATING_CONCEPT v1.6): explizit fuer Kategorien-Wahl.
             _wh = round(_median(_prod_tops_agl)) if _prod_tops_agl else 0
@@ -2759,13 +2919,19 @@ class WeatherContextMixin:
             high_cl = float(data.get("cloud_cover_high") or 0)
 
             # CLOUDS-Sicht-Aggregation (siehe docs/TAGS.md), Region-Pfad:
+            # STOP-Zähler deckungsgleich mit OVERCAST-DANGER-Gate (dichte Decke
+            # auf/unter Referenzhöhe), WARN = dichte tiefe Wolke knapp darüber.
             if isinstance(cloud_base_raw, (int, float)):
                 if min_cloud_base_active_h is None or cloud_base_raw < min_cloud_base_active_h:
                     min_cloud_base_active_h = cloud_base_raw
-                low_mid_cover = low_cl + mid_cl
-                if cloud_base_raw <= elev_ref + 100 and low_mid_cover >= 90:
+                buf = config.OVERCAST_DANGER_BASE_BUFFER_M
+                dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
+                    elev_ref >= config.OVERCAST_MID_BAND_MIN_M
+                    and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
+                if cloud_base_raw <= elev_ref + buf and dense_deck:
                     cloud_at_or_below_takeoff_h += 1
-                elif elev_ref + 100 < cloud_base_raw <= elev_ref + 300 and low_mid_cover >= 75:
+                elif (elev_ref + buf < cloud_base_raw <= elev_ref + config.OVERCAST_REDUCER_BASE_MAX_M
+                        and low_cl >= config.OVERCAST_REDUCER_COVER_PCT):
                     cloud_near_takeoff_h += 1
 
             # Regionen: KEINE Böen (Apr 2026 Refactor).
@@ -2952,13 +3118,16 @@ class WeatherContextMixin:
             except Exception:
                 pass
 
-            # OVERCAST-DANGER: nur wenn Wolkenbasis gefährlich nahe an Flughöhe
-            if (cloud_base_raw is not None
-                    and isinstance(cloud_base_raw, (int, float))
-                    and isinstance(cloud_cover, (int, float))
-                    and cloud_cover >= 75
-                    and cloud_base_raw < elev_ref + 500):
-                warnings.append("[OVERCAST-DANGER]")
+            # OVERCAST-DANGER: dichte, geschlossene Wolkendecke AUF oder UNTER
+            # Referenzhöhe (Decke unter mir = tiefe Schicht; hochalpin zusätzlich
+            # mittlere). Wolken darüber = nur Reducer. Siehe config.OVERCAST_DANGER_*.
+            if (isinstance(cloud_base_raw, (int, float))
+                    and cloud_base_raw <= elev_ref + config.OVERCAST_DANGER_BASE_BUFFER_M):
+                dense_deck = low_cl >= config.OVERCAST_DANGER_COVER_PCT or (
+                    elev_ref >= config.OVERCAST_MID_BAND_MIN_M
+                    and mid_cl >= config.OVERCAST_DANGER_COVER_PCT)
+                if dense_deck:
+                    warnings.append("[OVERCAST-DANGER]")
 
             # Thermik-Qualitaets-Tags (Scherung / Zerrissenheit).
             # Regionen: keine Böen → keine ROUGH-Tags, nur SHEAR + TORN.
@@ -2966,6 +3135,7 @@ class WeatherContextMixin:
             # effektiven wind_speed (kann Hoehenwind enthalten).
             # Scherung = Windaenderung mit Hoehe, braucht echten Surface-Anker.
             tq_info = ""
+            quality_debug = {}  # Fallback, falls TQ-Aufruf wirft (Band-Cap liest torn_floor_m)
             try:
                 quality_tags, quality_debug = self._thermal_quality_tags(
                     wind_speed_10m=wind_speed_surface,
@@ -3000,12 +3170,15 @@ class WeatherContextMixin:
                 # THERMAL-WIND-UNUSABLE (Grundwind zu stark, Blase organisiert sich nicht,
                 # Research 3.1) blockieren den Produktiv-Zaehler. FRAGMENTED ist "zu schwach,
                 # nicht gefaehrlich" — gehoert damit nicht in den Gefahren-Topf.
-                # SHEAR/TORN bleiben reine Qualitaets-Issues (Bart schwer zentrierbar,
-                # aber Thermik existiert) und blockieren produktive Stunden nicht.
+                # TORN-UNUSABLE blockiert seit dem 10m-Anker-Fix ebenfalls (TQ_TORN_FLYABILITY.md
+                # Schritt 2): die Scherung zerreisst die organisierte Blase, kein zentrierbares
+                # Steigen. Anker-frei → kein Reibungs-Fehlalarm mehr (Befund 1/3). SHEAR bleibt
+                # reine Prosa (wuerde dU/dz doppelt zaehlen, B/S enthaelt es schon).
                 rough_unusable_this_hour = (
                     "[THERMAL-ROUGH-UNUSABLE]" in tq_tags_this_hour
                     or "[THERMAL-WIND-UNUSABLE]" in tq_tags_this_hour
                 )
+                torn_unusable_this_hour = "[THERMAL-TORN-UNUSABLE]" in tq_tags_this_hour
                 # Bewoelkung wird NICHT mehr als Productivity-Gate verwendet (Mai 2026).
                 # Siehe ausfuehrliche Begruendung im Spot-Loop oben (~Zeile 1789).
                 # Kurz: climb_rate ist bereits strahlungsabgeleitet (H aus direct/diffuse) →
@@ -3013,8 +3186,27 @@ class WeatherContextMixin:
                 band_depth_r = (h_max_h - elev_ref) if isinstance(h_max_h, (int, float)) else 0
                 _min_band_r = min_band_depth(h_climb, region_terrain_zone)
                 band_usable_r = band_depth_r >= _min_band_r
+                # --- Band-Cap (NUR Regionen, TQ_TORN_FLYABILITY.md) ---
+                # Regionen haben keinen echten Startplatz (elev_ref ist eine
+                # Referenz-Hoehe). Reisst die Thermik erst weiter oben, bleibt
+                # UNTER dem Riss oft ein fliegbares Band. Statt die Stunde wie
+                # bei Spots komplett zu streichen, zaehlt sie als produktiv
+                # (gedeckelt auf die Riss-Hoehe), wenn das saubere Band unten
+                # >= min_band_depth ist. Messung: 7% (flach) -> 38% (mittel-
+                # tiefe Saeulen) der gerissenen Stunden haben so noch Substanz.
+                # Strikt nur relaxierend: kann nie eine produktive Stunde killen.
+                torn_floor_m = quality_debug.get("torn_floor_m")
+                torn_cap_top = None
+                torn_band_cap_saves = False
+                if torn_unusable_this_hour and isinstance(torn_floor_m, (int, float)):
+                    usable_below = torn_floor_m - elev_ref
+                    if usable_below >= _min_band_r:
+                        torn_band_cap_saves = True
+                        torn_cap_top = torn_floor_m
+                torn_kills_hour = torn_unusable_this_hour and not torn_band_cap_saves
                 if (h_climb >= config.PRODUCTIVE_CLIMB_MIN
                         and not rough_unusable_this_hour
+                        and not torn_kills_hour
                         and band_usable_r):
                     productive_thermal_h += 1
                 elif (h_climb >= config.PRODUCTIVE_CLIMB_MIN
@@ -3028,16 +3220,23 @@ class WeatherContextMixin:
                 # nachgezogen (siehe ~Zeile 1810-1828).
                 if (h_climb >= 1.5
                         and not rough_unusable_this_hour
+                        and not torn_kills_hour
                         and band_usable_r):
                     productive_h_strict += 1
                     _prod_climbs.append(float(h_climb))
                     # Thermik-Top AGL fuer working_height-Median tracken.
                     # h_max_h ist MSL (bereits LCL-gecappt). AGL = MSL - elev_ref.
+                    # Band-Cap: bei gerettet-gedeckelter Stunde nur bis zum Riss
+                    # zaehlen, sonst wuerde working_height die torn-Hoehe ueberzeichnen.
                     if isinstance(h_max_h, (int, float)):
-                        _agl = max(0, h_max_h - elev_ref)
+                        _top_msl = h_max_h
+                        if torn_band_cap_saves and isinstance(torn_cap_top, (int, float)):
+                            _top_msl = min(_top_msl, torn_cap_top)
+                        _agl = max(0, _top_msl - elev_ref)
                         _prod_tops_agl.append(_agl)
                 # v1.6: zusaetzlich Stunden mit starker Thermik (≥2.0 m/s) zaehlen
-                if h_climb >= 2.0 and not rough_unusable_this_hour and band_usable_r:
+                if (h_climb >= 2.0 and not rough_unusable_this_hour
+                        and not torn_kills_hour and band_usable_r):
                     strong_h += 1
                 if not tq_tags_this_hour:
                     thermal_clean_h += 1
@@ -3418,11 +3617,28 @@ class WeatherContextMixin:
                     f"Falls du green/violet gewählt hast → degradiere zu gray (Abgleiter). "
                     f"Falls bereits gray → bleibt gray. Hat KEINEN Einfluss auf safety_status."
                 )
-            if (tq_torn_danger_h > 0 or tq_shear_danger_h > 0):
+            if tq_torn_danger_h > 0:
                 lines.append(
-                    f"  TORN-/SHEAR-UNUSABLE sind reine Qualitaets-Issues (zerrissene/gekippte Thermik). "
-                    f"Sie degradieren MAXIMAL violet→green. KEIN gray-Downgrade wegen TORN/SHEAR. "
-                    f"Der Tag bleibt Thermikflug-tauglich, Bart-Zentrierung ist nur schwieriger."
+                    f"  TORN-UNUSABLE in {tq_torn_danger_h}h: Scherung zerreisst die organisierte "
+                    f"Thermikblase (anker-korrigiert → kein Reibungs-Fehlalarm). Zaehlt WIE "
+                    f"ROUGH/WIND-UNUSABLE NICHT in den Produktiv-Zaehler — productive_thermal_h "
+                    f"ist bereits bereinigt, du straffst NICHT zusaetzlich am Tier. "
+                    f"PFLICHT: Benenne in der Flyability-Prosa (thermal_quality/flyability_notes) "
+                    f"ehrlich, dass die Scherung die Thermik in diesen Stunden zerreisst (Bart "
+                    f"nicht zentrierbar) — das ist Thermik-Qualitaet = Flyability-Domaene, NICHT "
+                    f"verschweigen. (Regen/Gewitter bleiben dagegen aus der Flyability-Prosa raus.)"
+                )
+            elif tq_torn_warn_h > 0:
+                lines.append(
+                    f"  TORN-DEGRADED in {tq_torn_warn_h}h: Scherung DROHT die Thermik zu zerreissen "
+                    f"(Grenzbereich). Zaehlt noch MIT (Bart schwer zentrierbar). Erwaehne den "
+                    f"Scher-Vorbehalt in der Flyability-Prosa, wenn nennenswert."
+                )
+            if tq_shear_danger_h > 0:
+                lines.append(
+                    f"  SHEAR-UNUSABLE in {tq_shear_danger_h}h: geneigte Blase, reines Komfort-Issue. "
+                    f"Zaehlt MIT in den Produktiv-Zaehler — B/S (=TORN) enthaelt den Scher-Effekt "
+                    f"bereits, SHEAR nicht doppelt straffen. Nur Prosa, kein Gate."
                 )
             if tq_wind_danger_h > 0:
                 wind_pct = round(100 * tq_wind_danger_h / thermal_hours_total)
@@ -3446,12 +3662,13 @@ class WeatherContextMixin:
             lines.append(
                 f"→ PRODUKTIVE-THERMIK: {productive_thermal_h}h "
                 f"(Climb ≥{config.PRODUCTIVE_CLIMB_MIN} m/s, ausreichendes Höhenband, "
-                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). "
+                f"kein ROUGH-UNUSABLE, kein WIND-UNUSABLE, kein TORN-UNUSABLE). "
                 f"Min für green-Tag: {config.PRODUCTIVE_HOURS_FOR_GREEN}h. "
                 f"HINWEIS: Bewoelkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — "
                 f"die Sonnen-Daempfung steckt bereits in climb_rate ueber die strahlungs"
-                f"basierte H-Berechnung. TORN-/SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen "
-                f"MIT (Bart-Zentrierung schwieriger bzw. schwache Thermik, aber fliegbar)."
+                f"basierte H-Berechnung. SHEAR-UNUSABLE und ROUGH-FRAGMENTED zaehlen MIT "
+                f"(geneigt bzw. schwach, aber fliegbar). TORN-UNUSABLE zaehlt NICHT mehr mit "
+                f"(Scherung zerreisst die Blase) — bereits aus productive_thermal_h entfernt."
             )
             # Rating-Inputs (RATING_CONCEPT v1.6): explizit fuer Kategorien-Wahl.
             _wh = round(_median(_prod_tops_agl)) if _prod_tops_agl else 0

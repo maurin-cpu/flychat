@@ -132,7 +132,7 @@ Quelle: Mosailes XC Weather Conditions Guide; Flybubble "Into the Blue" XC Guide
 ### Cumulus/Stratus (tief, <3000m)
 - **Qualitäts-Effekt**: Cu 12-50% = Thermik-Booster (siehe oben)
 - **Qualitäts-Effekt**: >80% = Sonne blockiert, Thermik stirbt
-- **Sicherheits-Effekt**: Wolkenbasis < Elevation + 500m = OVERCAST-DANGER (Cloud Entry)
+- **Sicherheits-Effekt**: geschlossene Decke (tief ≥80%) mit Basis ≤ Elevation + 100m = OVERCAST-DANGER (Cloud Entry / Decke unter Pilot; überarbeitet Juni 2026, vorher base<elev+500 & total≥75)
 
 ### Entscheidende Metrik
 **max(tief, mittel)** — nicht die Gesamtbewölkung! Hohe Bewölkung wird ignoriert.
@@ -166,7 +166,7 @@ Die Strahlungsfelder (`shortwave_radiation`, `direct_radiation`,
 optischen Dicke und sind daher der **physikalisch verlässlichere Proxy** für
 Bodenheizung und damit Thermik-Trigger.
 
-### Konsequenz für Gleitcast (Mai 2026)
+### Konsequenz für Wingcast (Mai 2026)
 
 Die `productive_thermal_h`-Berechnung in `engine/weather_context.py` verwendet
 **keine Cloud-Cover-Schwellen mehr** (vorher: `low ≤ 80% UND mid ≤ 90%`). Statt

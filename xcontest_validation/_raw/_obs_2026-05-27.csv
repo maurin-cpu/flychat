@@ -1,0 +1,82 @@
+date,spot,region,launches,best_km,top_pilot,top_start_time,top_airtime,our_safety_rating,our_experience_rating,our_xc_rating,our_status,our_streckenflug_tier,our_streckenflug_limiting_factor,decisions_applied,no_go_reasons,wx_climb_rate_max_ms,wx_max_thermal_height_m,wx_blh_max_m,wx_wind_gust_max_kmh,wx_wind_dir_dominant_deg,wx_t2m_max,wx_precip_sum_mm,wx_cloud_low_mean_pct,wx_cape_max,wx_lifted_index_min,wx_productive_thermal_h,finding_type,notes
+2026-05-27,Niesen-2280,Freiburger Voralpen,11,336.02,Noah Kiener,09:10,10:54,0.0,4,3,,,ceiling_low,IsConditional(Niesen-2280/2026-05-27),,2.5,3719,2040.0,37.8,334,14.6,0.0,60.77,810.0,-2.7,12,confirm,
+2026-05-27,Langenthal,,1,315.83,Bruno Stuber,11:37,7:50,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Langenthal).
+2026-05-27,Riederalp- Greicheralp,Oberwallis / Goms,15,263.95,Julien Avanthay,09:31,10:23,0.0,5,5,,,none,FoehnCaution(4.0)|IsConditional(Riederalp- Greicheralp/2026-05-27),,2.7,3335,2295.0,41.8,200,20.0,0.0,30.15,650.0,-2.9,12,confirm,
+2026-05-27,Moron,,1,236.21,Francis Gafner,11:15,7:20,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Moron).
+2026-05-27,Le Suchet,Jura West,6,214.13,Noé Court,11:01,7:58,0.0,4,4,,,none,IsConditional(Le Suchet/2026-05-27),,2.5,2707,2400.0,31.3,320,21.4,0.0,32.69,370.0,-3.6,12,confirm,
+2026-05-27,Werdtberg-1240 (Montoz nord),Jura Zentral,7,201.13,Julio Munoz,12:13,5:37,0.0,3,1,,,abgleiter_only,IsConditional(Werdtberg-1240 (Montoz nord)/2026-05-27),,2.1,2245,2390.0,34.6,344,23.3,0.0,17.08,880.0,-4.0,11,underrated_spot,
+2026-05-27,Les Pétis,Waadtländer Alpen,3,183.08,Albert Caillet-Bois,10:09,8:31,0.0,4,3,,,spot_wind_direction,IsConditional(Les Pétis/2026-05-27),,2.2,2629,2265.0,28.8,70,20.5,0.0,39.92,890.0,-2.9,12,confirm,
+2026-05-27,Mauborget,Jura West,13,178.14,Yvan DAVID,12:22,4:55,0.0,4,4,,,none,IsConditional(Mauborget/2026-05-27),,2.3,2600,2425.0,27.4,14,23.9,0.0,20.85,970.0,-3.6,10,confirm,
+2026-05-27,Weissenstein,Jura Zentral,10,158.13,Dieter Lutz,10:53,6:53,0.0,1,0,,kein_xc,spot_not_flyable,,Verhältnis sauber/gesamt: 17% — Tag überwiegend gefährlich,2.3,2433,2480.0,30.6,354,22.7,0.0,20.77,830.0,-3.4,11,false_positive_notsafe,
+2026-05-27,Mont-Soleil,Jura West,1,153.03,Romain Journot,11:06,6:07,0.0,,0,,kein_xc,spot_not_flyable,,"Start-Fenster: Nur 2h sauber, kein zusammenhaengender Block >= 2h",2.5,2799,2360.0,27.0,314,23.7,0.0,13.54,420.0,-3.6,11,false_positive_notsafe,
+2026-05-27,Berneuse-2020,Waadtländer Alpen,4,135.85,Loïc Vallat,10:01,7:54,0.0,4,3,,,region_wind_aloft,IsConditional(Berneuse-2020/2026-05-27),,3.1,4223,2105.0,33.5,317,16.7,0.0,47.92,610.0,-2.3,13,confirm,
+2026-05-27,Pino,,1,115.80,Elia Sartoris,11:40,5:02,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Pino).
+2026-05-27,Amisbuehl,Berner Voralpen,4,102.33,Fabrice Pini,10:45,4:55,0.0,4,3,,,region_wind_aloft,FoehnCaution(4.0)|IsConditional(Amisbuehl/2026-05-27),,2.2,2660,2325.0,28.4,160,23.2,0.0,54.85,770.0,-4.1,11,confirm,
+2026-05-27,Chasseral,Jura West,4,99.13,Stephan Leiser,11:35,6:24,0.0,4,4,,,none,IsConditional(Chasseral/2026-05-27),,2.5,2703,2360.0,37.1,337,20.5,0.0,27.54,110.0,-3.6,11,confirm,
+2026-05-27,Montana - Cry d Er-2250,Unterwallis,2,90.94,Sven Buffat,12:15,4:23,0.0,,0,,kein_xc,spot_not_flyable,,Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors,2.5,3414,2615.0,55.8,339,15.5,0.0,40.0,770.0,-2.9,13,false_positive_notsafe,
+2026-05-27,Walalp,,2,88.79,Daniel Würsten,11:36,6:05,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Walalp).
+2026-05-27,Zugerberg,Mittelland Zentral,21,87.76,Joe Staub,13:28,3:49,0.0,4,4,,,none,IsConditional(Zugerberg/2026-05-27),,2.5,2303,2540.0,35.6,299,26.3,0.0,3.69,390.0,-4.1,10,confirm,
+2026-05-27,Marbachegg-1480,Berner Oberland,4,80.64,Adrian Vogel,10:21,4:04,0.0,5,5,,,none,FoehnCaution(4.0)|IsConditional(Marbachegg-1480/2026-05-27),,2.7,2937,2410.0,29.5,353,22.3,0.0,37.23,920.0,-3.2,10,confirm,
+2026-05-27,Rotenflue,Zentralschweizer Voralpen,5,77.49,Christian Erne,12:58,4:39,0.0,5,4,,,none,IsConditional(Rotenflue/2026-05-27),,2.5,2661,1825.0,26.6,299,21.0,0.0,40.62,730.0,-3.5,12,confirm,
+2026-05-27,Le Cernil,,22,71.92,Damien Jacquetton,14:11,4:35,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Le Cernil).
+2026-05-27,Le Chamossaire-1980,Waadtländer Alpen,1,68.98,Fred Meylan,10:10,4:40,0.0,5,5,,,none,,,2.8,3364,2105.0,25.6,292,17.3,0.0,50.69,850.0,-2.3,12,confirm,
+2026-05-27,Riggisalp,Freiburger Voralpen,2,64.70,Mario Hanhart,12:52,3:32,0.0,5,5,,,none,IsConditional(Riggisalp/2026-05-27),,2.6,2999,2235.0,38.9,328,22.0,0.0,28.69,870.0,-4.4,11,confirm,
+2026-05-27,Cousimbert,Schwarzsee / Gantrisch,1,61.91,Daniel Rebetez,13:22,3:18,0.0,5,4,,,none,IsConditional(Cousimbert/2026-05-27),,2.6,2954,2210.0,41.8,325,20.3,0.0,22.69,660.0,-4.4,12,confirm,
+2026-05-27,Vounetz-1620,Schwarzsee / Gantrisch,14,60.47,Daniel Von niederhäusern,10:46,4:02,0.0,1,0,,kein_xc,spot_not_flyable,,"Böen: Turbulenzrisiko 35-40 km/h am Boden, 14:00-17:00|Höhenböen: 31-33 km/h in Flugschicht, 14:00-16:00|Verhältnis sauber/gesamt: 17% - Tag überwiegend gefährlich",2.6,2768,2325.0,40.0,319,20.9,0.0,21.38,720.0,-3.2,12,false_positive_notsafe,
+2026-05-27,Pleiades,Waadtländer Alpen,11,57.51,Alexandre Blaser,13:20,3:39,0.0,5,4,,,none,IsConditional(Pleiades/2026-05-27),,2.4,2405,1715.0,40.3,342,23.9,0.0,17.38,1170.0,-3.7,11,confirm,
+2026-05-27,Dent de Jaman (Rochers de Naye),Waadtländer Alpen,6,52.16,Jeremias Blaser,13:40,5:13,0.0,5,4,,,none,,,2.8,3276,1990.0,26.3,283,19.2,0.0,51.77,950.0,-3.7,13,confirm,
+2026-05-27,Schwaengimatt,Jura Zentral,6,51.03,Roger Grossenbacher,13:11,1:47,0.0,3,2,,,ceiling_low,IsConditional(Schwaengimatt/2026-05-27),,2.1,2482,2600.0,28.1,328,23.8,1.1,21.0,1200.0,-3.6,10,confirm,
+2026-05-27,Schänis - Hüsliberg,Alpstein / Ostschweiz,8,47.08,Bruno Wiget,13:43,3:39,0.0,5,4,,,region_wind_aloft,IsConditional(Schänis - Hüsliberg/2026-05-27),,2.8,2899,2940.0,45.0,307,25.9,0.0,1.54,600.0,-4.7,9,confirm,
+2026-05-27,Les Verneys,Waadtländer Alpen,1,46.75,Terrettaz Jolan,16:49,2:55,0.0,5,5,,,none,IsConditional(Les Verneys/2026-05-27),,2.5,2709,2375.0,37.1,281,24.7,0.0,21.69,510.0,-2.3,10,confirm,
+2026-05-27,Rigi-Scheidegg,Mittelland Zentral,2,45.74,Josef Schuler,13:16,2:42,0.0,,0,,kein_xc,spot_not_flyable,,Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors,2.5,2975,1715.0,19.1,286,20.2,0.0,43.38,820.0,-3.5,11,false_positive_notsafe,
+2026-05-27,Crêt-du-Midi,Unterwallis,1,42.90,Yves Gavoldi,10:21,2:32,0.0,5,5,,,none,FoehnCaution(4.0)|IsConditional(Crêt-du-Midi/2026-05-27),,3.1,4060,2535.0,41.8,303,16.0,0.0,37.54,480.0,-2.9,12,confirm,
+2026-05-27,Engelberg - Brunni - Schonegg,Zentralschweizer Voralpen,2,40.43,Cyrill Balderer,11:32,2:45,0.0,,0,,kein_xc,spot_not_flyable,,Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors,2.4,3047,1390.0,40.3,327,17.5,0.0,53.0,660.0,-2.6,11,false_positive_notsafe,
+2026-05-27,Chaumont,Jura West,4,39.64,Markus Schwab,14:49,2:07,0.0,1,0,,kein_xc,spot_not_flyable,,"Böen: 42-43 km/h am Boden, 16:00-17:00|Verhältnis sauber/gesamt: 25% — Tag überwiegend gefährlich",1.7,1689,2495.0,42.8,324,25.6,0.0,22.38,530.0,-3.0,10,false_positive_notsafe,
+2026-05-27,Winteregg,,3,39.33,Stefano Schnappenberger,16:55,2:43,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Winteregg).
+2026-05-27,Lungern Schönbüel,Zentralschweizer Voralpen,1,37.00,Philippe Carruzzo,10:59,2:46,0.0,2,1,,,abgleiter_only,IsConditional(Lungern Schönbüel/2026-05-27),,1.8,2911,2275.0,27.4,3,15.7,0.0,78.92,920.0,-3.2,13,confirm,
+2026-05-27,Obere Wengi,Jura Zentral,3,35.34,Reto Hammer,12:23,1:52,0.0,3,2,,,ceiling_low,IsConditional(Obere Wengi/2026-05-27),"Ueberentwicklungsgefahr: CAPE >1500 J/kg, 11:00",1.8,1589,2600.0,29.2,2,25.4,0.0,18.31,1590.0,-3.6,11,confirm,
+2026-05-27,Rigi Kulm,Mittelland Zentral,1,34.69,Fabio Bertuzzi,17:05,1:49,0.0,,0,,kein_xc,spot_not_flyable,,"Start-Fenster: Nur 1h sauber, kein zusammenhaengender Block >= 2h",2.6,2978,1715.0,27.0,344,19.3,0.0,46.85,600.0,-3.5,11,false_positive_notsafe,
+2026-05-27,Hohwacht,Jura Ost,2,34.08,Thomas von Arx,13:48,1:59,0.0,2,1,,,region_context_missing,IsConditional(Hohwacht/2026-05-27),"Böen: 43 km/h am Boden, 14:00-17:00|Höhenböen: 46 km/h auf 1100m, 16:00-17:00",1.8,1726,2180.0,43.9,360,25.3,0.0,22.0,2220.0,-3.3,11,confirm,
+2026-05-27,Grindelwald - First,Berner Voralpen,12,32.80,Stefan Feldmann,11:21,1:47,0.0,4,3,,,region_wind_aloft,FoehnCaution(4.0)|IsConditional(Grindelwald - First/2026-05-27),,2.6,3365,2275.0,37.4,205,15.8,0.0,56.46,820.0,-3.2,12,confirm,
+2026-05-27,Gurli,Schwarzsee / Gantrisch,2,32.43,Andreas Beyeler,17:17,1:47,0.0,5,5,,,none,IsConditional(Gurli/2026-05-27),,2.7,3000,2235.0,33.8,0,21.8,0.0,36.38,1480.0,-4.4,11,confirm,
+2026-05-27,Crete de Thyon-2060 (Veysonnaz),Unterwallis,1,32.34,Hubert Monnet,17:22,3:28,0.0,5,5,,,none,FoehnCaution(4.0)|IsConditional(Crete de Thyon-2060 (Veysonnaz)/2026-05-27),,3.0,3888,1960.0,52.6,287,17.6,0.0,23.38,540.0,-2.2,12,confirm,
+2026-05-27,Möntschelealp,Freiburger Voralpen,5,30.99,Pascal Vögeli,18:07,2:15,0.0,4,2,,,region_wind_aloft,IsConditional(Möntschelealp/2026-05-27),,2.4,2896,2150.0,37.1,11,20.4,0.0,48.92,770.0,-3.5,11,confirm,
+2026-05-27,Fiesch -Kuehboden (Heimat- Galfera),Oberwallis / Goms,1,30.62,Jacek Bak,10:43,2:36,0.0,5,5,,,none,FoehnCaution(4.0)|IsConditional(Fiesch -Kuehboden (Heimat- Galfera)/2026-05-27),,2.5,3103,1410.0,58.3,323,17.0,0.0,38.92,410.0,-2.9,13,confirm,
+2026-05-27,La Robella,Jura West,1,29.89,Claude Ramel,17:45,2:12,0.0,4,4,,,none,IsConditional(La Robella/2026-05-27),,2.6,2706,2300.0,41.0,329,22.3,0.0,24.23,110.0,-3.6,12,confirm,
+2026-05-27,Verbier - Ruinettes _ Fontanets_Attelas,Unterwallis,6,26.48,Samuel Dorsaz,10:30,1:48,0.0,5,5,,,none,FoehnCaution(4.0)|IsConditional(Verbier - Ruinettes _ Fontanets_Attelas/2026-05-27),,3.2,3963,2265.0,37.4,264,16.2,0.0,15.38,440.0,-2.4,13,confirm,
+2026-05-27,Pilatus K...,,1,25.68,Guido Bonacina,17:50,1:17,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Pilatus K...).
+2026-05-27,Schwalmis,,1,23.02,Philippe Carruzzo,14:46,1:09,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Schwalmis).
+2026-05-27,La Vudalla-1620,Schwarzsee / Gantrisch,1,21.91,Gremaud Lucas,18:40,1:06,0.0,,0,,kein_xc,spot_not_flyable,,Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors,2.5,2806,2345.0,38.5,20,20.7,0.0,42.08,1460.0,-3.7,12,false_positive_notsafe,
+2026-05-27,Tritt,,1,21.45,Hugo Camenzind,11:07,1:25,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Tritt).
+2026-05-27,Laubbärgli,,1,19.64,Urs Turtschi,11:55,1:24,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Laubbärgli).
+2026-05-27,Emmetten - Niederbauen,Zentralschweizer Voralpen,5,19.38,Marco Kunz,19:22,1:53,0.0,5,4,,,none,IsConditional(Emmetten - Niederbauen/2026-05-27),,2.7,2843,1715.0,39.2,313,20.6,0.0,26.77,380.0,-3.5,12,confirm,
+2026-05-27,Grimer,,1,19.32,Mias Schnidrig,18:24,1:25,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Grimer).
+2026-05-27,Hohmattli-1770,Freiburger Voralpen,1,18.84,Dimitri Compagnon,19:35,1:16,0.0,4,3,,,ceiling_low,IsConditional(Hohmattli-1770/2026-05-27),,2.6,3149,2235.0,36.7,328,18.3,0.0,40.77,760.0,-4.4,12,confirm,
+2026-05-27,Sarn Alp,,1,18.53,Mario Werth,11:17,1:19,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Sarn Alp).
+2026-05-27,Schiltgrat Muerren,Berner Voralpen,1,17.97,Eric Newlin,11:54,2:05,0.0,3,2,,,ceiling_low,FoehnCaution(4.0)|IsConditional(Schiltgrat Muerren/2026-05-27),,1.9,3187,1605.0,25.2,110,14.9,0.0,72.46,910.0,-2.7,12,confirm,
+2026-05-27,Locarno- Cardada - Cimetta -1570,Tessin Zentral,1,17.25,Damien Carrara,11:50,1:05,0.0,5,5,,,none,FoehnCaution(4.0)|IsConditional(Locarno- Cardada - Cimetta -1570/2026-05-27),,2.6,2791,2580.0,27.0,203,22.8,0.1,5.46,1800.0,-5.8,10,confirm,
+2026-05-27,Monte Generoso -1600,Tessin Zentral,1,14.23,Daniele Ticozzi,15:40,0:47,0.0,,0,,kein_xc,spot_not_flyable,,"Start-Fenster: Nur 1h sauber, kein zusammenhaengender Block >= 2h",2.8,3086,2120.0,31.3,245,22.6,0.0,14.69,1670.0,-6.1,10,false_positive_notsafe,
+2026-05-27,Alp Scheidegg (Wald),Alpstein / Ostschweiz,3,14.07,Erich Bockstaller,11:58,0:37,0.0,3,2,,,ceiling_low,IsConditional(Alp Scheidegg (Wald)/2026-05-27),,2.1,2097,3330.0,35.6,316,24.0,0.0,30.15,870.0,-4.7,8,confirm,
+2026-05-27,Niederhorn-1920,Berner Voralpen,1,13.12,Julian Dänzer,09:22,1:28,0.0,,0,,kein_xc,spot_not_flyable,,Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors,2.2,2924,2040.0,37.1,311,18.4,0.0,64.77,780.0,-4.1,13,false_positive_notsafe,
+2026-05-27,Gornergrat,,2,12.21,Aurélien Guien,08:56,0:34,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Gornergrat).
+2026-05-27,Rigi-Staffelhöhe,Mittelland Zentral,1,11.57,Stephen Oliver,14:20,0:38,0.0,5,5,,,none,,,2.7,2920,1715.0,28.4,324,21.8,0.0,34.0,500.0,-3.5,11,confirm,
+2026-05-27,Tschentenegg,Freiburger Voralpen,2,11.28,Sylvia Brunek,11:36,0:41,0.0,,0,,kein_xc,spot_not_flyable,,Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors,2.2,2839,1980.0,22.3,24,17.9,0.0,61.77,1070.0,-2.9,13,false_positive_notsafe,
+2026-05-27,Gunggalp,,1,10.90,Nils Trachsel,10:39,0:48,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Gunggalp).
+2026-05-27,Schildgrat,,1,10.11,Marc Mischler,12:45,0:34,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Schildgrat).
+2026-05-27,Ragenau,,1,9.77,Erich Ruetsche,17:55,0:32,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Ragenau).
+2026-05-27,Sonchaux (Villeneuve),Waadtländer Alpen,2,9.15,Minh Hai Pham,17:41,0:40,0.0,5,5,,,none,IsConditional(Sonchaux (Villeneuve)/2026-05-27),,2.7,2901,1715.0,38.5,256,22.5,0.0,25.69,1280.0,-3.7,12,confirm,
+2026-05-27,Kronberg (Appenzell- Jakobsbad),Alpstein / Ostschweiz,1,8.85,Othmar Hauser,16:56,0:24,0.0,2,2,,,ceiling_low,FlyabilityMechDanger(60%)|IsConditional(Kronberg (Appenzell- Jakobsbad)/2026-05-27),,1.8,2221,2890.0,64.8,315,19.1,0.9,49.62,1090.0,-4.4,11,confirm,
+2026-05-27,Pierre à ...,,1,8.85,Petzi,12:42,1:00,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Pierre à ...).
+2026-05-27,Buochserhorn,Zentralschweizer Voralpen,1,8.30,Olaf Habicht,10:18,0:20,0.0,4,4,,,none,,,2.6,3009,2320.0,31.0,325,19.2,0.0,34.62,660.0,-3.5,12,confirm,
+2026-05-27,Le Moléson-2000,Freiburger Voralpen,1,7.51,Luc Fragnière,17:32,0:21,0.0,5,5,,,none,IsConditional(Le Moléson-2000/2026-05-27),,2.7,3409,2345.0,23.0,345,18.2,0.0,33.15,1040.0,-3.7,12,confirm,
+2026-05-27,Valerette,Waadtländer Alpen,1,7.18,Jean Morisod,13:51,0:28,0.0,4,4,,,none,,,2.7,3274,2265.0,28.4,318,17.1,0.0,40.46,690.0,-2.3,13,confirm,
+2026-05-27,Gnipen,,4,7.04,Tom Payne,20:20,0:16,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Gnipen).
+2026-05-27,Caquerelle,,4,6.93,Valerie Groux,17:28,0:42,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Caquerelle).
+2026-05-27,Piz Mezdi,,1,6.86,Rubén del Campo Núñez,11:23,0:24,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Piz Mezdi).
+2026-05-27,Monte Lema,Tessin Zentral,1,5.07,Daniel Gerber,10:19,0:16,0.0,,0,,kein_xc,spot_not_flyable,,"Start-Fenster: Nur 1h sauber, kein zusammenhaengender Block >= 2h",2.9,3115,2085.0,28.4,245,22.1,0.2,10.77,2910.0,-8.2,10,false_positive_notsafe,
+2026-05-27,Schmadrih...,,1,4.94,Cristian Giacometti,15:13,0:20,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Schmadrih...).
+2026-05-27,Flums -Schönhalden (Schoenhalden),Glarnerland / Walensee,1,3.99,mark bugmann,12:15,0:11,0.0,,0,,kein_xc,spot_not_flyable,,"Start-Fenster: Nur 2h sauber, kein zusammenhaengender Block >= 2h",2.5,2813,2395.0,50.0,340,21.0,0.0,28.31,500.0,-3.3,11,false_positive_notsafe,
+2026-05-27,Büelen - Bueelen,Zentralschweizer Voralpen,1,2.94,jon strauss,12:47,0:59,0.0,3,3,,,ceiling_low,,,2.0,2199,2375.0,28.1,58,22.7,0.0,55.23,860.0,-3.4,9,confirm,
+2026-05-27,Falkenflue,,1,2.56,Marius Strässle,18:02,0:12,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Falkenflue).
+2026-05-27,Le Pont-Vallée de Joux,Genferseeregion,1,2.06,Christophe Leuenberger,15:49,0:08,0.0,,0,,kein_xc,spot_not_flyable,,"Start-Fenster: Nur 2h sauber, kein zusammenhaengender Block >= 2h",2.4,2405,2420.0,37.8,314,25.0,0.0,23.54,1100.0,-2.5,11,false_positive_notsafe,
+2026-05-27,Hochhamm,,1,1.88,Othmar Hauser,18:27,0:12,,,,,,,,,,,,,,,,,,,,coverage_gap,Nicht in PGE-DB (XContest: Hochhamm).

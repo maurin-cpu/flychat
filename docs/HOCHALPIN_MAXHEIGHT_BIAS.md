@@ -74,7 +74,7 @@ REGTHERM (Liechti 2001, von xc-therm lizenziert) modelliert zwei Mechanismen exp
 
 **Smoking Gun in eigener Doku:**
 
-- `meteo_research/regional_thermal_forecasting.md:199-200` listet beide Effekte **explizit als Gleitcast-Limitierung** vs. Konkurrenz auf.
+- `meteo_research/regional_thermal_forecasting.md:199-200` listet beide Effekte **explizit als Wingcast-Limitierung** vs. Konkurrenz auf.
 - `meteo_research/thermal_model_calibration.md:614-621` notiert beide bereits als _offene Frage_ — eingestuft als "vermutlich sekundär". **Dieser Befund zeigt: nicht sekundär für Hochalpin-Wallis.**
 
 **Smoking Gun im Code:**
@@ -124,7 +124,7 @@ REGTHERM (Liechti 2001, von xc-therm lizenziert) modelliert zwei Mechanismen exp
 
 ## 7. Quellen
 
-- `meteo_research/regional_thermal_forecasting.md` — REGTHERM, Vergleich xc-therm/Burnair/Gleitcast
+- `meteo_research/regional_thermal_forecasting.md` — REGTHERM, Vergleich xc-therm/Burnair/Wingcast
 - `meteo_research/inter_regional_coupling.md` — peer-reviewed Lit zu Alpine Pumping / Mountain Venting / TEAMx-PC22
 - `meteo_research/thermal_model_calibration.md` — offene Fragen Section
 - `meteo_research/cloudbase_terrain_tiers.md` — Hochalpin Hammer-Klassifikation 4000–5000 m+

@@ -1,6 +1,6 @@
-# Gleitcast Smoke Tests
+# Wingcast Smoke Tests
 
-End-to-End Smoke Tests stellen sicher, dass die wichtigsten Frontend-Flows der Gleitcast-App tatsächlich funktionieren — nicht nur die Backend-Endpoints, sondern der vollständige Pfad **Browser → Map-Klick → Overlay → SVG-Render**.
+End-to-End Smoke Tests stellen sicher, dass die wichtigsten Frontend-Flows der Wingcast-App tatsächlich funktionieren — nicht nur die Backend-Endpoints, sondern der vollständige Pfad **Browser → Map-Klick → Overlay → SVG-Render**.
 
 Die Tests laufen mit [Playwright](https://playwright.dev/python/) (Chromium, headless) gegen einen lokal laufenden Flask-Server.
 
@@ -102,7 +102,7 @@ python -m pytest tests/test_e2e_meteogram.py -v
 ### Output
 
 ```
-Gleitcast E2E Smoke Tests
+Wingcast E2E Smoke Tests
 ============================================================
 Server erreichbar unter http://127.0.0.1:5000
 
@@ -161,7 +161,7 @@ TypeError: window.map.invalidateSize is not a function
 
 **Root Cause:** In `templates/index.html` existiert `<div id="map">`. Der Browser erzeugt daraufhin automatisch einen HTML implicit global `window.map`, der auf das DIV-Element zeigt. Parallel dazu deklariert `static/js/map.js` die Leaflet-Map-Instanz nur lokal innerhalb einer IIFE (`var map;`), ohne sie an `window` zu exportieren. Die sechs `if (window.map) window.map.invalidateSize()` Aufrufe in den Sidebar-Resize-Handlern griffen also auf das DIV-Element zu — das hat keine `invalidateSize()` Methode → TypeError. Der `if (window.map)` Guard greift, weil das DIV truthy ist.
 
-**Fix:** `initMap()` in `map.js` exportiert die Leaflet-Instanz explizit als `window.gleitcastMap`, und alle sechs Call-Sites in `index.html` verwenden jetzt diesen kollisionsfreien Namen.
+**Fix:** `initMap()` in `map.js` exportiert die Leaflet-Instanz explizit als `window.wingcastMap`, und alle sechs Call-Sites in `index.html` verwenden jetzt diesen kollisionsfreien Namen.
 
 Solche Bugs sind ohne automatisches Klicken praktisch unsichtbar, weil sie nur bei Layout-Events (Drag-Resize, Touch, Window-Load) auftreten und still in der Browser-Konsole sterben. Nach dem Fix: 3/3 Tests grün.
 

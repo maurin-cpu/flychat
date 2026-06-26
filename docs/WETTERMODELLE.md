@@ -7,7 +7,7 @@
 
 ## Übersicht
 
-Gleitcast nutzt **fünf numerische Wettermodelle** parallel, jedes für die
+Wingcast nutzt **fünf numerische Wettermodelle** parallel, jedes für die
 Parameter, bei denen es physikalisch am ehrlichsten ist. Die Modell-Auswahl
 ist nicht statisch — pro Tag wird das beste verfügbare Modell gewählt
 (Tag-Voting / Tiering).

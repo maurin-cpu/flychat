@@ -1,6 +1,6 @@
 # Tags & Startfenster — Topic-Konzept
 
-Dieses Dokument beschreibt das **einheitliche Tag-System** der Gleitcast-UI:
+Dieses Dokument beschreibt das **einheitliche Tag-System** der Wingcast-UI:
 welche Topics existieren, welche Severities sie annehmen koennen, wie sie
 deterministisch aus den Cache-Daten abgeleitet werden, und wie das
 **Startfenster-Visual** funktioniert.
@@ -79,7 +79,7 @@ gefaehrden, gehoeren in REDUCER, nicht in WARN.
 | `FOEHN` | "Foehn" | `foehn_risk == "high"` | `foehn_risk == "moderate"` | — | — | low/none → kein Tag |
 | `RAIN` | "Regen" | `rain_hours >= 1` | — | — | — | trocken → kein Tag |
 | `THUNDERSTORM` | "Gewitter" | `thunderstorm_hours >= 1` ODER CAPE > `CAPE_DANGER_JKG` | — | — | — | — |
-| `CLOUDS` | "Bewoelkung" | Basis **auf oder unter Startplatzhoehe** mit hoher Bedeckung (`cloud_base <= elevation_m + 100` UND `avg_low_mid >= 90`) ODER overcast 8/8 ganztags (`avg_low_mid >= 90` und `cloud_total >= 95`) — Sicht/IFR-Risiko, Startplatz "in den Wolken" | Basis nahe Startplatz (`elevation_m + 100 < cloud_base <= elevation_m + 300`) UND `avg_low_mid >= 75` — Sicht-Vorsicht, Wolkenrand am Startplatz | hohe Bedeckung **oberhalb** des Startplatzes (`avg_low_mid >= 85` ueber Thermikstunden, Basis klar ueber Startplatz) — Thermik-Daempfung, KEIN Sicht-Issue | `avg_low_mid <= 40` ueber Thermikstunden | — |
+| `CLOUDS` | "Bewoelkung" | **geschlossene Decke auf/unter Startplatz** (`cloud_base <= elevation_m + OVERCAST_DANGER_BASE_BUFFER_M(100)` UND `cloud_cover_low >= OVERCAST_DANGER_COVER_PCT(80)`; bei `elevation_m >= 3000` zusätzlich `cloud_cover_mid >= 80`) — Sicht/IFR, Start in die Wolke ODER Abstieg durch geschlossene Decke. Identisch mit OVERCAST-DANGER-Gate | — | **(deterministisch)** tiefe Decke knapp ÜBER Platz: `elevation_m + 100 < cloud_base <= elevation_m + OVERCAST_REDUCER_BASE_MAX_M(400)` UND `cloud_cover_low >= OVERCAST_REDUCER_COVER_PCT(75)` — "Basis nahe Startplatz", eingeschränkte Arbeitshöhe, fliegbar/grün. **(LLM)** zusätzlich hohe Bedeckung oberhalb (Thermik-Dämpfung) | `avg_low_mid <= 40` ueber Thermikstunden | STOP=OVERCAST-DANGER, REDUCER ist KEIN Status-Downgrade |
 | `BASE` | "Wolkenbasis" | — | — | LLM: tiefe Basis ueber dem Startplatz (`cloud_base - elevation_m < 600` m) — wenig Steigraum, Thermik gedeckelt | LLM: hohe Basis (`cloud_base - peak_height_m > 800` m) — viel Steigraum / XC-tauglich | `cloud_base == null` → kein Tag |
 | `THERMAL` | "Thermik" | — | — | LLM: schwache aber nutzbare Thermik (`peak_climb_rate < 1.5` UND `productive_thermal_h >= 1`) | `peak_climb_rate >= 1.5` m/s | sonst kein Tag (Abgleiter-Tag) |
 | `XC` | "XC" | — | — | — | `xc_potential in ("high", "moderate")` | "low" → kein Tag |
@@ -133,7 +133,7 @@ sind ueberall Backend-Hoheit (Sicherheits-Schweregrade nicht verhandelbar).
 | `FOEHN` | B | B | — | — | aus Decision-Pipeline (`foehn_risk` ΔP-Logik) |
 | `RAIN` | B | — | — | — | `rain_hours >= 1` deterministisch |
 | `THUNDERSTORM` | B | — | — | — | `thunderstorm_hours` + CAPE deterministisch |
-| `CLOUDS` | B | B | L | L | STOP/WARN: `cloud_base` vs `elevation_m` deterministisch (Sicht). REDUCER/GOOD: LLM interpretiert Tagesverlauf ("Cu am Morgen, spaeter Cs") |
+| `CLOUDS` | B | — | B+L | L | STOP: `cloud_base` vs `elevation_m` deterministisch (= OVERCAST-DANGER). REDUCER: deterministisch (Basis nahe Platz) UND LLM (Bedeckungs-Dämpfung); Merge nimmt höchste Severity. GOOD: LLM |
 | `BASE` | — | — | L | L | LLM bewertet Wolkenbasis-Hoehe relativ zu Spot/Gipfel mit Begruendung |
 | `THERMAL` | — | — | L | L | "schwach aber nutzbar" vs "torn" — pure Interpretation, Backend liefert nur `peak_climb_rate` als Sanity-Schwelle |
 | `XC` | — | — | — | L | haengt von Hoehenwind-Richtung, Konvergenz-Linien, Wolkenstrasse ab |

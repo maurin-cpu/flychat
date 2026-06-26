@@ -7,10 +7,10 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 import config
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 def test_weather_context_filtering():
-    engine = GleitcastEngine()
+    engine = WingcastEngine()
     engine.refresh_weather()
     
     context = engine._build_weather_context()

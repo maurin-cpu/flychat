@@ -22,8 +22,35 @@ konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 14 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05, **06.06, 07.06, 08.06, 13.06, 14.06, 15.06, 18.06, 19.06**)
 **Status**: in-untersuchung (Trigger identifiziert, Sub-Issues separieren) — **Top-Refactor-Prio**
+
+**Betroffene Spots (06.–13.06.)** — West/SW-Lagen:
+- **Weissenstein** (07.06): **not_safe bei 85 km / 12 Launches** (W-Lage); **Rotenflue** (07.06): not_safe,
+  43 km / 15× bei **Böen nur 25** — klassische Jura/Voralpen-FP (→ I-001). Auch Grindelwald 40, Möntschelealp 36.
+- **Marbachegg** (06.06): not_safe bei 67 km / Böen 27. **Gummen** (08.06): not_safe bei 50 km.
+- 13.06 (West-Streckentag): 16 FP an windexponierten Voralpen-Hops (Riffelberg, Zugerberg/Böen 57) —
+  überwiegend defensibel, kein Übervorsicht-Highlight.
+
+**Betroffene Spots (14.–19.06.)** — West/NW-Wind-Wochenanfang + Rekordtag 18.06:
+- **Dent de Jaman** (14.06): **not_safe bei 113.86 km / 6× und Böen nur 30.6** — klarster FP der Woche.
+- **Vounetz** (14.06): not_safe, **15 Launches / 59 km** (Böen 48). **Marbachegg** (15.06): not_safe,
+  **8 Launches / 43 km bei Böen nur 34** — Übervorsicht trotz moderatem Wind.
+- **Ebenalp** (18.06, Rekordtag): **not_safe bei 214 km / 26 Launches und Böen nur 26** — herausragender
+  Einzel-FP an einem ansonsten exzellent kalibrierten Tag (59 confirm / 6 FP). → Kopplung **I-013**-Pendel.
+- 19.06 (Starkwind, Böen 56–120): 26 not_safe-FP, aber **überwiegend korrekte Vorsicht** (kurze Flüge),
+  kein zusätzliches I-001-Gewicht. Echter Grenzfall nur Niesen (81 km / Böen 38).
+- Die FP an 16./17.06 sind marginal (je 2, Hops/Einzelflüge) — ruhige, gut kalibrierte Tage.
+
+**Betroffene Spots (27.–30.05.)** — 4 Tage am Stueck, ~60 FP-Zeilen. Wechselnde Wind-Lagen
+(27. NW-Jura / 28. NE-Alpstein / 29. SO-Wallis / 30. N-Voralpen) → je nach Lage andere Spots:
+- **Weissenstein** (Sektor SO): 27.05 **`not_safe` bei 158 km/10×** (Tagesbefund!) — neuer no_go
+  „Verhältnis sauber/gesamt: 17%". Am 30.05 **`conditional`** → Pendel (s. I-013).
+- **Niesen** (SW): 27.05 conditional (336 km!), 28.05 **not_safe (256 km)**, 30.05 not_safe (52 km) — instabil.
+- **Verbier** (S-SW-W): 29.05 **not_safe 160 km/10×** (Boeen-Block), 30.05 conditional. 
+- **Mont-Soleil 153**, **Maennlichen 107**, **Haldigrat 87**, **Niederhorn 72×5**, **Mägisserhorn 66×6**,
+  **Stanserhorn 81**, **Lai Alv 167**, **Schilthorn 112**, **Montoz 66** (30.) — alle `not_safe`, geflogen.
+- **Brunni**: 27./28. not_safe, **29. conditional (6×)**, **30. conditional (71×!)** — selbe N-Wind-Lage.
 
 **Betroffene Spots (25.05.)** — **Mega-Wallis-Festival mit 627 PG-Eintraegen** (Tagessieger 308km Riederalp/Kälin):
 - **Brunni / Engelberg-Brunni-Schonegg** (SO-S-SW-W Sektor): **MASSIV 35 Launches, 123km FLURI** (Wind 336°N gegenüber; "Nur 1h sauber" Block-Filter; Schonegg-Variante real N-Hang nutzbar — Repeat 21.05 und 24.05, **Mass-Refactor-Pflicht**)
@@ -129,8 +156,13 @@ Alp Scheidegg)
 ## I-002 — Spot-XC-Rating systematisch zu konservativ an Top-XC-Tagen
 
 **Erstmals**: 2026-05-17
-**Tage beobachtet**: 3 (17.05, 19.05, 21.05)
+**Tage beobachtet**: 4 (17.05, 19.05, 21.05, 27.05)
 **Status**: offen — Architektur-Frage, kein klarer Pipeline-Bug
+
+**Neu 27.05 (vollstaendiger Snapshot)**: **Montoz (Werdtberg-1240)** conditional, Wind 344°NW im
+Sektor, **xc=1** — aber **201 km Munoz + 7 Launches**. xc=1 an einem 200-km-Tag ist klar zu tief
+(Spot-XC vs. Region/Real-Performance). Anmerkung: 29./30.05 NICHT als Underrating gezaehlt, da
+Snapshot-XC unvollstaendig (→ I-015).
 
 **Frühere (falsche) Annahme**: "Region-Kontext fehlt fuer Top-Spots, dadurch Rating auf
 Default 1". Beim Code-Check und Daten-Vergleich (19.05/21.05) hat sich gezeigt: diese
@@ -266,7 +298,32 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 5 (17.05, 18.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05). Wiederkehrer:
+**Tage beobachtet (Post-Migration ≥22.05)**: 14 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05, **06.–10.06, 12.–19.06**).
+
+**NEU/Wiederkehrer (06.–13.06.):**
+- **Gotthard** (07.06 142 km — Wiederkehrer, schon 25.05) bleibt HOCH-PRIO; **Le Cernil** (07.06, Wiederkehrer).
+- **Moléson** (13.06 **146 km** — Wiederkehrer 14.06 125 km), **Col du Rawyl** (13.06 108 km), Bovonne/Salzmatt (13.06 ~87).
+- 07.06 großer Gap-Tag (56 Gaps): La Roche 69, Mornera 53, Bözingenberg 49.
+
+**NEU/Wiederkehrer (14.–19.06.)** — der **18.06 (Rekordtag) brachte 82 Coverage-Gaps**, viele groß:
+- **LSPL** (18.06) — 1× **359 km** (RW2, Mittelland-Flach wie Langenthal — Sonderfall kein Berg-Launch)
+- **Madrisa** (18.06) — 2× **216 km**, Prättigau — **HOCH-PRIO** (Strecken-Spot, nicht in PGE)
+- **Schänis** (18.06) — 1× **202 km** (RW2); **Diavolezza** (18.06) — 1× **194 km**, Engadin
+- **Faido** (18.06) — 1× 152 km; **Gotthard** Wiederkehrer (18.06 5×/207 km — schon I-005 25.05)
+- **Ruogig** Wiederkehrer (18.06 3×/185 km — schon 25./30.05, ZS Voralpen, bleibt HOCH)
+- **Moron/Calmut** Wiederkehrer (18.06, ~172 km); **Bella Lui** (17.06 1×/**114 km**, Wallis)
+- **Winteregg** Wiederkehrer (15.06 127 km, 17.06); **Moléson/Grandvillard** (14.06, 125/102 km)
+- 19.06: Pfunds (58), Sorvilier (52), Bözingenberg (28). — Gesamthebel: Madrisa + Diavolezza + Faido
+  (Engadin/Prättigau-Strecken-Spots) sind die wertvollsten DB-Ergänzungen aus dieser Woche.
+
+**Bisherige Wiederkehrer (≤30.05):**
+- **Le Cernil** NEU (27.05) — **22 Launches / 71 km**, **HOECHSTE PRIO** (Jura-Strecken-Spot, nicht in PGE)
+- **Ruogig** Wiederkehrer (25.05 4×, 30.05 2× **148 km Walker**) — ZS Voralpen, HOCH
+- **Moron** NEU (27.05) — 1× **236 km Gafner**, Jura/Moutier
+- **Langenthal** NEU (27.05) — 1× **315 km Stuber** (Mittelland-Flach/RW2, Sonderfall kein Berg-Launch)
+- **Torgon** Wiederkehrer (21.05, 29.05 136 km), **Hirzli** NEU (29.05 101 km), **Pilatus Kulm** (30.05 3×/96 km)
+- **GEHEILT durch Mapping-Fix**: Balderen→Baldern (Uetliberg), Les Pètis→Les Pétis (183 km!),
+  Saas-Fee→Saas Fee-Plattjen (228 km), Brienz→Brienzer Rothorn, Brändlen→Brändlen-1240
 - **Gotthardpass** NEU (25.05) — 3× **163 km Daverio**, HIGHEST-PRIO Surselva/Uri
 - **Belalp** NEU (25.05) — 1× **102 km Perrucci**, Wallis-Klassiker
 - **Gornergrat** Wiederkehrer (18.05, 21.05, 25.05) — 1× 129 km Schranz, Wallis Zermatt
@@ -367,7 +424,10 @@ Süd-Komponente). Möglicher Tuning-Bedarf in der FoehnCaution-Schwelle.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05) — **dominant beide Tage**
+**Tage beobachtet (Post-Migration ≥22.05)**: 6 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05) — **dominant**
+> 27.–30.05: Single-Sided-Sektoren kippen lageabhaengig (Weissenstein SO, Niesen SW, Haldigrat SW,
+> Mägisserhorn W, Stanserhorn SO, Maennlichen O-SO-S, Le Moléson SW). Eng gekoppelt an **I-013**
+> (Pre-Filter-Instabilitaet): dieselben engen Sektoren sind genau die, die zwischen Tagen pendeln.
 **Status**: offen — am 25.05 (NE-Wind-Tag) Mass-Repeat: **Brunni 35×, Haldigrat 9×, Mäggisseren 3×,
 Niederhorn 6×, Fronalpstock 3×, Hoch Gummen 1× 193 km**. **Brunni-Schonegg-N-Variante** ist
 nachgewiesenermassen die hartnäckigste Lücke (3 Tage in Folge: 21.05 Brunnihütte 12×, 24.05
@@ -450,7 +510,9 @@ führt aber nur eine Variante.
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 6 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05)
+> 27.–30.05: Block-Filter „Nur 1–2h sauber" feuerte u.a. bei **Mont-Soleil 153, Rigi Kulm, Lai Alv 167,
+> Niederhorn 72×5**. Am Rand (1–2 saubere Stunden) entscheidet er mit ueber die I-013-Pendel-Kippung.
 **Status**: offen — am 25.05 **verschärfter Filter-Bug-Verdacht** bei Cimetta: Wind 166° S
 liegt IM Sektor S-SW (158-247°), aber no_go feuert "Ganztaegig ausserhalb des erlaubten
 Sektors" — 7 Launches/62 km Franscioni. Stundlicher vs. Tagesaggregat-Wind divergieren?
@@ -499,7 +561,10 @@ nachweislich in solchen Fenstern (Streckenflug 60+ km möglich).
 
 **Erstmals**: 2026-05-17
 **Tage beobachtet (Pre-Migration)**: 4 (17.05, 19.05, 20.05, 21.05)
-**Tage beobachtet (Post-Migration ≥22.05)**: 2 (24.05, 25.05)
+**Tage beobachtet (Post-Migration ≥22.05)**: 6 (24.05, 25.05, 27.05, 28.05, 29.05, 30.05)
+> 30.05: **Haldigrat Gust 22 (87 km/3×)**, **Le Moléson Gust 18 (57 km)** — `not_safe` trotz mildem
+> Wind ausserhalb Sektor. 29.05 **Verbier**: Wind 270°W **IM** S-SW-W-Sektor, geblockt durch Nachmittags-
+> Boeen 41–44 → Gust-Block kappt fruehes fliegbares Fenster (Kopplung I-010-Logik).
 **Status**: offen — am 25.05 **Haldigrat Gust 21 km/h** (sehr mild) bei Sektor SW + Wind
 350° N → not_safe trotz 9 Launches/89 km Munoz. Schwellen-Logik (<20 km/h) hätte hier
 greifen müssen. Niesen 21.05 mit Gust 17 km/h analog.
@@ -682,11 +747,54 @@ kein 3h-Block" (oder die Anforderung in der CLEAN_WINDOW_MIN_HOURS-Berechnung an
 
 ---
 
-## I-013 — Pre-Filter inkonsistent zwischen Spots gleichen Profils (Niesen-Anomalie)
+## I-013 — Pre-Filter richtungs-/schwellen-INSTABIL (generalisiert; war: Niesen-Anomalie)
 
 **Erstmals**: 2026-05-25
-**Tage beobachtet**: 1 (25.05)
-**Status**: offen — Erstbefund, weitere Tage abwarten
+**Tage beobachtet**: 5 (25.05, 27.05, 28.05, 29.05, 30.05)
+**Status**: **ROOT-CAUSE IDENTIFIZIERT (Diagnose, kein Fix).** Voller Code-Pfad + Replay-Beleg in
+**`I013_DIAGNOSE.md`**. Ursprünglich „Niesen inkonsistent zu Brunni" (25.05). Der 27.–30.05-Block
+zeigt: das Phänomen ist **nicht spot-spezifisch**, sondern ein **instabiler Pre-Filter**.
+
+**Ursache (belegt)**: Die `not_safe`-Entscheidung kippt allein an ≥2 zusammenhängenden **windschwachen
+Morgenstunden** (0.7–5 km/h), deren bedeutungslose Richtung zufällig den Sektor streift —
+`_is_wind_in_range` (`chat_engine.py:545`) hat **kein Wind-Stärke-Gate**, und `_prefilter_not_safe`
+(`analyzers.py:173`) ist ein **binäres Hard-Gate bei `CLEAN_WINDOW_MIN_HOURS=2` ohne Hysterese**.
+Das reale Nachmittags-Flugfenster (an allen Tagen ~identisch) geht nicht ins Gate ein. Belege:
+Brunni 0/0/2/2 in-Sektor-Std → not_safe/not_safe/cond/cond; Niesen 3/0/0 → cond/not_safe/not_safe.
+Zwei Wurzel-Hebel: **(A)** Wind-Stärke-Gate auf Richtungs-Check (= I-008), **(B)** Hysterese statt
+binärem Gate. Sekundär: Single-Sided-±45°-Sektoren (I-006).
+
+### Cross-Day-Pendel (gleicher Spot, ähnliche Lage, anderer Status)
+
+| Spot | DB-Sektor | 27.05 | 28.05 | 29.05 | 30.05 |
+|---|---|---|---|---|---|
+| **Brunni** | SO-S-SW-W | not_safe (2×) | not_safe (2×) | **conditional (6×)** | **conditional (71×!)** |
+| **Niesen** | SW | **conditional (336 km!)** | **not_safe (256 km)** | – | not_safe (52 km) |
+| **Weissenstein** | SO | **not_safe (158 km!)** | – | – | **conditional (43 km)** |
+| **Verbier** | S-SW-W | – | – | **not_safe (160 km, 10×)** | **conditional (48 km)** |
+| **Montoz** | NW-N | **conditional (201 km!)** | – | – | **not_safe (66 km)** |
+
+→ Brunni bei N-Wind 337–352° an allen 4 Tagen, aber 2× not_safe / 2× conditional. Niesen bei Wind
+komplett gegenueber SW: 27. conditional, 28. not_safe. **Die Sektor-/Block-Schwellen liegen so, dass
+kleine Wind-/Boeen-Aenderungen die Klassifikation kippen** — obwohl die Spots real durchgehend
+fliegbar sind (Mega-Strecken an allen Tagen). Das erklaert rueckwirkend auch die Brunni-Mass-FP der
+Vortage (21./24./25.05): es war kein dauerhafter Bug, sondern die instabile Seite des Pendels.
+
+### Hypothesen (verfeinert)
+1. **Block-Filter (`CLEAN_WINDOW_MIN_HOURS=2`) am Rand**: an Tagen mit „genau 1–2 sauberen Stunden"
+   kippt der Spot; minimale Wind-Drehung entscheidet ueber not_safe vs. conditional. (vgl. I-007)
+2. **Sektor-Rand ± Boeen-Schwelle**: Wind am Sektor-Rand + Gust nahe Schwelle → binäres Umschlagen.
+3. **Single-Sided-Sektoren** (Niesen SW, Weissenstein SO, Haldigrat SW) sind grundsaetzlich zu eng;
+   der Pre-Filter ist dort am instabilsten (jede Drehung ist „komplett ausserhalb" oder knapp drin).
+
+### Naechste Schritte
+- Hysterese / weichere Schwellen im Pre-Filter pruefen (statt hartem binärem not_safe).
+- `_prefilter_not_safe` mit Brunni-Stundenwerten 27. vs. 30.05 durchgehen (was kippte?).
+- Single-Sided-Sektoren (Niesen, Weissenstein, Haldigrat, Mägisserhorn) verbreitern (→ I-006-Kopplung).
+
+---
+
+### Original-Erstbefund (25.05)
 
 **Beobachtung 25.05.**:
 - **Niesen-2280** (Sektor SW): status=`conditional/exp=5/xc=4`, Wind 9° N **komplett ausserhalb** SW-Sektor, Gust 35 km/h.
@@ -743,6 +851,66 @@ als Region-Forecast.
 - Quantifizieren: wie oft passiert Region-safe + Spot-not_safe-Cluster in der Validierungs-Reihe?
 - Diskussions-Punkt mit User: sollte Region-Status den Spot-Pre-Filter dämpfen?
 - (siehe auch I-002 Konzeptdiskussion XC-Rating Region vs. Spot)
+
+---
+
+## I-015 — `streckenflug`-Feld ab 30.05 abgekündigt → XC steckt in der Flugeinschätzung
+
+> **RICHTIGSTELLUNG (2026-06-20):** Die ursprüngliche Deutung „Snapshot zu früh, vor dem
+> XC-LLM-Pass" war **falsch**. Tatsächlich wurde die **separate streckenflug-Note per Code-Änderung
+> abgekündigt und in die Flugeinschätzung (`experience_rating`) integriert** — Stichtag **30.05.2026**.
+> Belegt durch Snapshot-Scan: ≤28.05 hat `streckenflug_rating` echten Spread 0–5; **ab 30.05 nur noch
+> 0/1-Stub**, während `experience_rating` den Spread trägt. Das alte Feld ist seither ein toter
+> Platzhalter (`{rating:1}`), auch in den Live-Analysen (Stand 20.06). **Konsequenz für die Validierung:
+> XC-Signal ab 30.05 aus `experience_rating` lesen** (`xc_aggregate.py` `XC_FROM_EXPERIENCE_SINCE`).
+> Damit ist XC ab 30.05 sehr wohl validierbar (Beispiel-Befund 07.06: Saint-Cergue 158 km / Le Suchet
+> 95 km bei exp 2 = echtes underrated). Nur Tage mit **Stub-Flugeinschätzung** (29.05/09.06/10.06/20.06)
+> bleiben XC-blind.
+
+**Erstmals**: 2026-05-29 (echter Stub) / Feld-Abkündigung ab 2026-05-30
+**Tage betroffen**: streckenflug-Stub ab 30.05 durchgehend; echte Stub-Snapshots (auch exp leer):
+29.05, 09.06, 10.06, 20.06
+**Status**: **GEKLÄRT** — Ursache = Feld-Abkündigung (kein Timing-Bug). Validierungs-Tooling angepasst.
+Offen nur noch: die echten Stub-Tage (exp leer) bleiben unvalidierbar.
+
+**Beobachtung**: `scripts/snapshot_weather.py` friert pro Tag Safety + Streckenflug + Experience ein.
+Wird der Snapshot **frueh morgens (~06:15)** gezogen, ist die **Safety-Pipeline vollstaendig**
+(deterministisch: status, no_go_reasons, decisions_applied), aber der **LLM-basierte XC-/Experience-
+Pass war noch nicht durchgelaufen**:
+
+| Tag | snapshot_at | streckenflug_rating | experience_rating | Folge |
+|---|---|---|---|---|
+| 27.05 | 16:50 | valide (0–5 verteilt, 297 nonzero) | 330/488 | voll validierbar |
+| 28.05 | 06:27 | valide (203 nonzero) | 239/488 | voll validierbar |
+| **29.05** | **06:15** | **0 fuer ALLE 488** | **nur 33/488** | nur Safety validierbar |
+| **30.05** | **06:18** | **gedeckelt 0/1 (kein Spot >1)** | 354/488 | Safety + exp validierbar |
+| **06.–08.06, 12.–13.06** | **~06:20** | **gedeckelt 0/1 (xc≥2: 0/488)** | echte Streuung 1–5 | Safety + exp validierbar |
+| **09.06, 10.06** | **~06:21** | **gedeckelt 0/1** | **auch gedeckelt (exp≥3: 0–2/163)** | nur Safety validierbar (wie 29.05) |
+| **14.–19.06** | **~06:40** | **gedeckelt 0/1 (xc≥2: 0/494 an ALLEN 6 Tagen)** | echte Streuung 1–5 | Safety + exp validierbar |
+
+Am 29.05 ist jeder Spot `streckenflug_rating=0` / `tier=kein_xc` (auch Riederalp am 328-km-Tag);
+am 30.05 ist xc auf 0/1 gedeckelt (kein Spot >1 trotz 232 km Riederalp / 180 km Tschenten).
+**06.–19.06 durchgehend** dasselbe Deckelungs-Muster (xc 0/1); exp valide ausser 09./10.06 (gedeckelt).
+**14.–19.06**: wie 30.05 (xc 0/1, exp valide). Besonders eklatant am
+**18.06 (Rekord-Streckentag, Strecken bis 366 km)** — xc≥2: 0/494, der Tag mit der höchsten
+XC-Aussagekraft ist durch den Früh-Snapshot blind. 20.06 war noch schlimmer (`status=error` 487/494,
+06:05 vor jedem Analyse-Pass) → gar nicht aggregierbar (Daten-Lücke, siehe README).
+
+**Konsequenz fuer die Validierung**:
+- `observations.csv`-Zeilen vom 29./30.05 haben `our_xc_rating` (29. auch `our_experience_rating`)
+  **bewusst geblankt** + Note `snapshot_xc_unvollstaendig`. **Keine `underrated_spot`-Klassifikation**
+  an diesen Tagen (sonst ~50 falsche Underrating-Zeilen → Korpus-Korruption).
+- `finding_type` 29./30. ist rein status-basiert (confirm / false_positive_notsafe).
+
+**Vermutete Ursache**: Snapshot wurde getriggert, bevor `spot_analyses.json` / `region_analyses.json`
+fuer den Tag fertig berechnet waren (LLM-Pass laeuft asynchron nach dem Wetter-Refresh um 06:03).
+
+**Naechste Schritte**:
+- In `snapshot_weather.py` einen **Completeness-Guard** ergaenzen: wenn `streckenflug_rating` fuer
+  >X% der Spots 0/null ist → WARN ins `_meta` schreiben (`xc_pass_complete: false`), damit
+  Validierungs-Tools (xc_aggregate.py) das automatisch erkennen statt manuell.
+- Snapshot-Trigger zeitlich nach den LLM-Pass legen (oder zweistufig: Safety frueh, XC nachziehen).
+- `xc_aggregate.py` `DATE_FLAGS` ist die aktuelle manuelle Krücke dafuer.
 
 ---
 

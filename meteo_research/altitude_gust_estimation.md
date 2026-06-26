@@ -3,7 +3,7 @@
 ## 1. Ausgangslage
 
 Burnair zeigt Böen auf verschiedenen Höhenstufen (10m, 250m, 1500m, 2000m, 3000m, 4000m ASL).
-Gleitcast zeigt aktuell nur Bodenböen (`wind_gusts_10m`) — in der Höhe nur mittleren Wind.
+Wingcast zeigt aktuell nur Bodenböen (`wind_gusts_10m`) — in der Höhe nur mittleren Wind.
 
 **Kernfrage:** Können Höhenböen direkt bezogen oder müssen sie berechnet werden?
 
@@ -117,7 +117,7 @@ U_gust_conv = α_mix × max(0, U_850 - U_950)
 - α_mix = 0.6 (original), 0.3 (ab Cy47r3, konservativer)
 - Kann mit CAPE skaliert werden: `G_conv_scale = √(CAPE / CAPE_ref)`
 
-**Für Gleitcast relevant bei:**
+**Für Wingcast relevant bei:**
 - CAPE > 100 J/kg (Thermiktage)
 - Gewitterlagen (CAPE > 800 J/kg)
 
@@ -170,7 +170,7 @@ Messungen an Masten (z.B. Høvsøre):
 
 ---
 
-## 4. Methodenvergleich für Gleitcast
+## 4. Methodenvergleich für Wingcast
 
 ### 4.1 Eurocode (logarithmisch) vs. Exponential
 
@@ -201,7 +201,7 @@ Bodennah (100m) etwas höhere Werte — realistischer, da dort die Turbulenz am 
 
 ### 4.2 Bewertung aller Methoden
 
-| Methode | Stärke | Schwäche | Für Gleitcast |
+| Methode | Stärke | Schwäche | Für Wingcast |
 |---------|--------|----------|-------------|
 | Eurocode (log) | Gut dokumentiert, robust bis 200m | Konvergiert zu langsam über 1000m | ❌ Ungeeignet für Flughöhen |
 | Exponential | Natürliche Konvergenz, einfach | Kein konvektiver Term | ✅ **Gewählt** |

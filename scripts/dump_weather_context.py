@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 
 def main() -> None:
@@ -41,7 +41,7 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    engine = GleitcastEngine()
+    engine = WingcastEngine()
     engine.refresh_weather(force=args.force)
     text = engine._build_weather_context()
 

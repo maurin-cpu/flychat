@@ -15,7 +15,7 @@ load_dotenv()
 from openai import OpenAI
 from prompts import REGION_COMBINED_PROMPT
 import config
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 # --- Init Engine mit echten Wetterdaten ---
 api_key = os.environ.get("OPENAI_API_KEY")
@@ -31,8 +31,8 @@ print(f"Shear-Schwellen Mittelland: {config.SHEAR_THRESHOLDS['mittelland']}")
 print()
 
 # --- Engine laden um echten Kontext zu bauen ---
-print("Lade GleitcastEngine mit gecachten Wetterdaten...")
-engine = GleitcastEngine()
+print("Lade WingcastEngine mit gecachten Wetterdaten...")
+engine = WingcastEngine()
 engine.load_weather_from_cache()
 
 from source_area import get_all_regions

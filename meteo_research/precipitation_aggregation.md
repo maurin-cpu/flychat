@@ -10,7 +10,7 @@ Zellen systematisch heraus. Industrie-Standard ist die **Neighborhood Method**
 (Verteilungsinformation). DWD verwendet diesen Ansatz operationell seit 2012
 fuer COSMO-DE-EPS und ICON-D2.
 
-Gleitcast nutzt seit Mai 2026 einen **Hybrid-Filter**: hohe Peak-Werte
+Wingcast nutzt seit Mai 2026 einen **Hybrid-Filter**: hohe Peak-Werte
 (≥ 0.2 mm/h) werden ohne Quorum durchgelassen, mittlere Werte unterliegen
 weiterhin einem 30%-Quorum (Rauschunterdrueckung), Werte < 0.05 mm/h werden
 auf 0 geclipt. `precipitation_coverage` (0.0-1.0) wird als zusaetzliches
@@ -131,11 +131,18 @@ flugbeschraenkend sind.
 
 ---
 
-## 3. Schwellenbegruendung fuer Gleitcast
+## 3. Schwellenbegruendung fuer Wingcast
 
 ### 3.1 WMO/Aviation-Intensitaetsklassen
 
-| Intensitaet (mm/h) | WMO/Aviation-Bezeichnung | Flug-Relevanz |
+> **Wichtig (Abgrenzung):** Diese Tabelle bewertet **Naesse und Flugabbruch-SICHERHEIT**, NICHT
+> den **Thermik-/Steig-Kollaps**. Die Spalte „Flug-Relevanz" ist safety-orientiert (Schirm nass,
+> Outflow, Abbruch). Fuer die Frage „ab wann steigt es nicht mehr" ist sie die FALSCHE Linse:
+> Steigen kollabiert am Regenschacht stadien-basiert, sobald Regen den Boden erreicht — nicht erst
+> bei „Moderate shower". Siehe `precipitation_thermal_interaction.md`. Die Fliegbarkeits-Schwelle
+> `PRECIP_UNFLYABLE_MM = 0.5` leitet sich aus jenem Dokument ab, NICHT aus der 2.5-Zeile hier.
+
+| Intensitaet (mm/h) | WMO/Aviation-Bezeichnung | Flug-Relevanz (Safety, nicht Thermik) |
 |---|---|---|
 | 0.00 - 0.05 | "Trace" (numerisches Rauschen) | Irrelevant |
 | 0.05 - 0.20 | Drizzle / Spritzer | Sichtbar, kaum nass |

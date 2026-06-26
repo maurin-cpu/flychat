@@ -160,7 +160,7 @@ window.FoehnDiagram = (function () {
     function renderChart(container, tooltipEl, allData, thresholds) {
         container.innerHTML = '';
         if (!allData || allData.length === 0) {
-            container.innerHTML = '<div class="error-state">Keine F\u00f6hn-Daten verf\u00fcgbar.</div>';
+            container.innerHTML = '<div class="error-state">' + wcT('foehn.no_data') + '</div>';
             return;
         }
 
@@ -309,7 +309,7 @@ window.FoehnDiagram = (function () {
         } else {
             g1.append('text').attr('class', 'foehn-axis-label')
                 .attr('x', -MARGIN.left + 8).attr('y', -20)
-                .text('Druckdifferenz (S\u00fcd \u2212 Nord)');
+                .text(wcT('js.foehn.axis_pressure'));
             // Legend (desktop: inside panel, top-left)
             g1.append('text').attr('x', 4).attr('y', yDp(dpMax * 0.9) + 4)
                 .attr('font-size', '10px').attr('fill', '#EF4444').attr('opacity', 0.7)

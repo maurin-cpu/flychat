@@ -145,7 +145,7 @@
         var commentBox = el('div', { class: 'fb-comment' });
         var textarea = el('textarea', {
             class: 'fb-comment__textarea',
-            placeholder: 'Was passt nicht? (z.B. Wind war stärker, Thermik viel früher, Bisenrichtung falsch …)',
+            placeholder: wcT('js.fb.placeholder'),
             rows: '3', maxlength: '4000',
         });
         var submitBtn = el('button', {
@@ -194,7 +194,7 @@
                 statusLine.textContent = '';
                 statusLine.className = 'fb-widget__status';
             } else if (state.own && state.own.vote) {
-                statusLine.textContent = 'Danke für deine Bewertung.';
+                statusLine.textContent = wcT('js.fb.thanks');
                 statusLine.className = 'fb-widget__status fb-widget__status--ok';
             } else {
                 statusLine.textContent = '';
@@ -212,7 +212,7 @@
         }
 
         function showError(msg) {
-            statusLine.textContent = msg || 'Fehler beim Senden';
+            statusLine.textContent = msg || wcT('js.fb.send_error');
             statusLine.className = 'fb-widget__status fb-widget__status--err';
         }
 
@@ -289,7 +289,7 @@
         submitBtn.addEventListener('click', function () {
             var msg = (textarea.value || '').trim();
             if (!msg && (!state.own || !state.own.vote)) {
-                showError('Bitte Kommentar eingeben oder Bewertung wählen.');
+                showError(wcT('js.fb.need_input'));
                 return;
             }
             submitBtn.disabled = true;

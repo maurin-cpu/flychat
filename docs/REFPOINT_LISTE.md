@@ -1,5 +1,12 @@
 # Regionale Referenzpunkte — Liste
 
+> ⚠️ **Koordinaten sind ein Snapshot und teilweise veraltet.** Die **Source of Truth** ist
+> `data/regionen_referenzpunkte.geojson` (`properties.reference_points` je Region). Die unten
+> gelisteten Koordinaten weichen davon ab — Stichprobe `seeland_emmental`: 5 von 7 Punkten
+> verschoben (Punkt 2 um ~7 km). Das frühere Generator-Skript `scripts/_write_refpoint_liste.py`
+> **existiert nicht mehr**, daher wird diese Liste derzeit nicht automatisch nachgezogen. Für
+> exakte Werte die GeoJSON lesen; die Tabellen unten dienen nur der groben Orientierung.
+
 Vollständige Liste der **7 empfohlenen Referenzpunkte pro Region** (29 Regionen).
 Die meteorologische Logik dahinter (Aggregation, Platzierungsregeln, 5 Funktionen)
 steht in `docs/REFPOINT_KONZEPT.md`.

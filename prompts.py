@@ -1,5 +1,5 @@
 """
-Chat- und Analyse-Prompts für Gleitcast.
+Chat- und Analyse-Prompts für Wingcast.
 
 Die Texte liegen unter skills/*.md (ein Skill = eine Markdown-Datei).
 
@@ -84,7 +84,16 @@ def _render_placeholders(text: str) -> str:
 
 
 def _load_skill(filename: str) -> str:
-    """Laedt eine Skill-Datei und rendert alle {{cfg.KEY}}-Platzhalter."""
+    """Laedt eine Skill-Datei (sprach-aware) und rendert {{cfg.KEY}}-Platzhalter.
+
+    EN: skills/en/<file> falls vorhanden, sonst Fallback auf skills/<file> (DE,
+    kanonisch). DE bleibt am angestammten Ort unangetastet (byte-identisch).
+    """
+    import i18n
+    if i18n.get_current_lang() == "en":
+        en_path = _SKILLS_DIR / "en" / filename
+        if en_path.is_file():
+            return _render_placeholders(en_path.read_text(encoding="utf-8"))
     path = _SKILLS_DIR / filename
     if not path.is_file():
         raise FileNotFoundError(f"Skill-Datei fehlt: {path}")
@@ -93,8 +102,19 @@ def _load_skill(filename: str) -> str:
 
 
 def _load_shared(filename: str) -> str:
-    """Laedt einen Shared-Baustein und rendert Platzhalter."""
-    path = _SHARED_DIR / filename
+    """Laedt einen Shared-Baustein (sprach-aware) und rendert Platzhalter.
+
+    Struktur: skills/shared/de/<file> (kanonisch, validiert) und
+    skills/shared/en/<file> (Uebersetzung). Im EN-Modus wird die en/-Variante
+    geladen, falls vorhanden — sonst Fallback auf de/ (unuebersetzte Bloecke
+    bleiben so automatisch deutsch, statt zu fehlen). DE-Output byte-identisch.
+    """
+    import i18n
+    if i18n.get_current_lang() == "en":
+        en_path = _SHARED_DIR / "en" / filename
+        if en_path.is_file():
+            return _render_placeholders(en_path.read_text(encoding="utf-8"))
+    path = _SHARED_DIR / "de" / filename
     if not path.is_file():
         raise FileNotFoundError(f"Shared-Baustein fehlt: {path}")
     raw = path.read_text(encoding="utf-8")
@@ -166,10 +186,17 @@ def compose_analysis_prompt(mode: str, phase: str) -> str:
     insert_idx = blocks.index(insert_after) + 1
     blocks.insert(insert_idx, context_block)
 
+    # Sprach-Auswahl der Bloecke passiert zentral in _load_shared (en/ mit de/-
+    # Fallback) — hier keine Sonderbehandlung mehr noetig.
     if marker not in template:
         raise ValueError(f"00_template_{mode}.md (phase={phase}) enthält keinen {marker}-Marker")
     shared = "\n\n".join(_load_shared(name) for name in blocks)
-    return template.replace(marker, shared)
+    composed = template.replace(marker, shared)
+
+    # Sprach-Anweisung ans Ende (DE -> leer, Logik/Reasoning bleiben deutsch;
+    # EN -> finale Ausgabe auf Englisch neu generiert). Siehe i18n.llm_lang_instruction.
+    import i18n
+    return composed + i18n.llm_lang_instruction()
 
 
 def format_foehn_llm_regional_guide() -> str:

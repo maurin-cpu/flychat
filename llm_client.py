@@ -1,5 +1,5 @@
 """
-LLM-Adapter fuer Gleitcast.
+LLM-Adapter fuer Wingcast.
 
 Stellt einen Provider-agnostischen Wrapper bereit, der die OpenAI-kompatible
 Schnittstelle `client.chat.completions.create(...)` exponiert und intern auf

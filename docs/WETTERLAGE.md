@@ -3,7 +3,7 @@
 Status: Implementation Mai 2026 (v1.0)
 Aufruf: 1×/Tag vom Scheduler im Daily-Cycle, kurz vor Versand des Casts.
 Ziel: Kompakte 5-Tages-Einordnung der Grosswetterlage in Pilotensprache —
-zuoberst im Gleitcast und in der E-Mail.
+zuoberst im Wingcast und in der E-Mail.
 
 **Recherche-Grundlage:**
 - `meteo_research/synoptic_pilot_needs.md` — was Schweizer Piloten aus der
@@ -32,7 +32,7 @@ Jede Aussage muss bis zur Rohzahl rückverfolgbar sein. Architektur folgt dem
 ```
 wetterdaten.json
     ↓
-aggregate_ch_daily_snapshot()           ← CH-Mittel über 487 Spots (12:00 lokal)
+aggregate_ch_daily_snapshot()           ← CH-Mittel über ~495 Spots (12:00 lokal)
     ↓ snapshots [{date, msl_hpa, t850_c, gh850_m, wind_700}]
     │
     ├─ decide_pressure_influence()      ← Hoch/Tief/Übergang + Linear-Trend

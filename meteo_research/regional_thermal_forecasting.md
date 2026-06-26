@@ -134,7 +134,7 @@ Quellen: [burnair Thermik-Prognosen](https://www.burnair.ch/portfolio-item/therm
 |--------|--------------|-----|--------|
 | Regtherm | 1 (Talboden) | Einfach, bewaehrt | Ungenau bei untypischem Referenzpunkt |
 | Burnair | 2 (ICON-D2 + EU) | Besser, modellspezifisch | Immer noch potenziell ungenau |
-| **Gleitcast** | **4 (raeumlich verteilt)** | Beste Wolken-/Niederschlagsaggregation | Mehr Datenpunkte im Batch |
+| **Wingcast** | **4 (raeumlich verteilt)** | Beste Wolken-/Niederschlagsaggregation | Mehr Datenpunkte im Batch |
 
 ### Referenzpunkt-Verteilung
 
@@ -147,7 +147,7 @@ Quellen: [burnair Thermik-Prognosen](https://www.burnair.ch/portfolio-item/therm
 
 **Wolken**: 30th-Perzentil ueber alle Referenzpunkte → findet regionale "Blue Holes" (bewaehrter Regtherm-Ansatz)
 
-**Thermik**: Am Referenzpunkt berechnen, NICHT raeumlich mitteln. Thermik haengt stark von der lokalen Elevation und dem Temperaturprofil ab. Gleitcast nutzt korrekterweise die `elevation_ref` der Region als Startpunkt fuer Parcel-Ascent.
+**Thermik**: Am Referenzpunkt berechnen, NICHT raeumlich mitteln. Thermik haengt stark von der lokalen Elevation und dem Temperaturprofil ab. Wingcast nutzt korrekterweise die `elevation_ref` der Region als Startpunkt fuer Parcel-Ascent.
 
 **Niederschlag**: Regionale Signifikanz — nur wenn >= 2 von N Punkten Niederschlag melden (vermeidet isolierte Modell-Artefakte).
 
@@ -174,9 +174,9 @@ Regtherm argumentiert explizit, dass **regionale Aggregation besser als rohe Git
 
 ---
 
-## Gleitcast-Positionierung im Vergleich
+## Wingcast-Positionierung im Vergleich
 
-| Feature | XC Therm | Burnair | **Gleitcast** |
+| Feature | XC Therm | Burnair | **Wingcast** |
 |---------|----------|---------|-------------|
 | Kern-Modell | Regtherm (lizenziert) | Regtherm + 40-Param-Algo | Eigenes Parcel-Ascent + Encroachment |
 | Referenzpunkte/Region | 1 | 2 | **4** (raeumlich verteilt) |
@@ -187,14 +187,14 @@ Regtherm argumentiert explizit, dass **regionale Aggregation besser als rohe Git
 | CH-Regionen | 44 | ~50-60 (feiner unterteilt) | **29** (unsere Polygone) |
 | Update-Frequenz | 3-6x taeglich | 3-6x taeglich | On-Demand (Nutzer-gesteuert) |
 
-### Gleitcast-Vorteile
+### Wingcast-Vorteile
 
 1. **Mehr Referenzpunkte** als beide Konkurrenten → bessere raeumliche Abdeckung
 2. **Explizite Safety-Flyability-Trennung** → Region kann "conditional + violet" sein (starke Thermik trotz Vorsicht)
 3. **LLM-basierte Analyse** → natuerlichsprachliche Erklaerungen statt nur Zahlen/Farben
 4. **Transparente Methodik** → Nutzer sieht Stuendliche Daten + KI-Erklaerung
 
-### Gleitcast-Limitierungen vs. Konkurrenz
+### Wingcast-Limitierungen vs. Konkurrenz
 
 1. **Kein Volumeneffekt** — Regtherm modelliert Tal-Volumen-Heizung explizit
 2. **Keine Talwind-Kopplung** — Regtherm beruecksichtigt horizontale Kompensationsstroemungen

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dein Konto – Gleitcast{% endblock %}
+{% block title %}{{ t('account.title') }}{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
@@ -13,8 +13,8 @@
 <main class="sp">
 
   <header class="sp-header">
-    <div class="sp-hero__eyebrow">Konto &amp; Gleitcast</div>
-    <h1 class="sp-logo">Deine Einstellungen</h1>
+    <div class="sp-hero__eyebrow">{{ t('account.eyebrow') }}</div>
+    <h1 class="sp-logo">{{ t('account.heading') }}</h1>
     <div class="sp-subtitle">{{ subscriber.email }}</div>
   </header>
 
@@ -27,59 +27,58 @@
 
   {% if subscriber.status == 'unsubscribed' %}
   <section class="sp-card ac-reactivate-card" aria-live="polite">
-    <div class="sp-card__label" style="color: var(--color-primary-vivid);">Gleitcast pausiert</div>
+    <div class="sp-card__label" style="color: var(--color-primary-vivid);">{{ t('account.reactivate_label') }}</div>
     <p style="margin: 6px 0 14px; font-size: 14.5px; line-height: 1.5; color: var(--color-text);">
-      Du bist aktuell <strong>abgemeldet</strong> &mdash; es wird kein Gleitcast verschickt.
-      Deine Einstellungen sind aber noch da. Klick zum Reaktivieren:
+      {{ t('account.reactivate_text_html')|safe }}
     </p>
     <form method="post" action="/account/{{ token }}/reactivate">
-      <button type="submit" class="sp-btn sp-btn--primary">Gleitcast wieder aktivieren</button>
+      <button type="submit" class="sp-btn sp-btn--primary">{{ t('account.reactivate_btn') }}</button>
     </form>
   </section>
   {% elif not subscriber.regions %}
   <section class="ac-onboarding" aria-live="polite">
-    <div class="ac-onboarding__eyebrow">Du bist eingeloggt &mdash; aber noch nicht abonniert</div>
+    <div class="ac-onboarding__eyebrow">{{ t('account.onboarding_eyebrow')|safe }}</div>
     <h2 class="ac-onboarding__title">
       <span class="ac-onboarding__sparkle" aria-hidden="true">&#10024;</span>
-      Aktiviere deinen Gleitcast
+      {{ t('account.onboarding_title') }}
     </h2>
     <p class="ac-onboarding__lead">
-      Flugwetter für deine Regionen direkt ins Postfach &mdash; an deinen Wunschtagen, kostenlos.
+      {{ t('account.onboarding_lead')|safe }}
     </p>
     <ol class="ac-onboarding__steps">
-      <li><span>1</span> Regionen wählen</li>
-      <li><span>2</span> Versandtage festlegen</li>
-      <li><span>3</span> Speichern &mdash; fertig</li>
+      <li><span>1</span> {{ t('account.onboarding_step1') }}</li>
+      <li><span>2</span> {{ t('account.onboarding_step2') }}</li>
+      <li><span>3</span> {{ t('account.onboarding_step3')|safe }}</li>
     </ol>
     <button type="button" class="ac-onboarding__cta" onclick="document.querySelector('.ac-save-btn').scrollIntoView({behavior:'smooth', block:'center'})">
-      Gleitcast jetzt abonnieren
+      {{ t('account.onboarding_cta') }}
       <span aria-hidden="true">&darr;</span>
     </button>
   </section>
   {% endif %}
 
   <section class="sp-card">
-    <div class="sp-card__label">Status</div>
+    <div class="sp-card__label">{{ t('account.status') }}</div>
     <dl class="sp-kv">
-      <dt>Status</dt>
+      <dt>{{ t('account.status') }}</dt>
       <dd>
         {% if subscriber.status == 'active' and not subscriber.regions %}
-          <span class="sp-pill sp-pill--no-sub" title="Account existiert, aber noch nicht abonniert">Kein Abo</span>
+          <span class="sp-pill sp-pill--no-sub" title="{{ t('account.pill_no_sub_title') }}">{{ t('account.pill_no_sub') }}</span>
         {% else %}
           <span class="sp-pill sp-pill--{{ subscriber.status }}">
-            {% if subscriber.status == 'active' %}Aktiv
-            {% elif subscriber.status == 'paused' %}Pausiert{% if subscriber.paused_until %} bis {{ subscriber.paused_until }}{% endif %}
-            {% elif subscriber.status == 'pending' %}Nicht bestätigt
-            {% elif subscriber.status == 'unsubscribed' %}Abgemeldet
+            {% if subscriber.status == 'active' %}{{ t('account.status_active') }}
+            {% elif subscriber.status == 'paused' %}{{ t('account.status_paused') }}{% if subscriber.paused_until %}{{ t('account.status_paused_until') }}{{ subscriber.paused_until }}{% endif %}
+            {% elif subscriber.status == 'pending' %}{{ t('account.status_pending') }}
+            {% elif subscriber.status == 'unsubscribed' %}{{ t('account.status_unsubscribed') }}
             {% else %}{{ subscriber.status }}{% endif %}
           </span>
         {% endif %}
       </dd>
-      <dt>Level</dt>
+      <dt>{{ t('account.level') }}</dt>
       <dd>
-        {% if subscriber.skill_level == 'beginner' %}Anfänger
-        {% elif subscriber.skill_level == 'expert' %}Profi
-        {% else %}Standard{% endif %}
+        {% if subscriber.skill_level == 'beginner' %}{{ t('account.level_beginner') }}
+        {% elif subscriber.skill_level == 'expert' %}{{ t('account.level_expert') }}
+        {% else %}{{ t('account.level_standard') }}{% endif %}
       </dd>
     </dl>
   </section>
@@ -89,16 +88,16 @@
 
     {# ----- Regionen ----- #}
     <section class="sp-card" role="group" aria-labelledby="acRegionsLabel">
-      <div class="sp-card__label" id="acRegionsLabel">Regionen</div>
-      <div class="sp-card__hint">Wähle die Regionen, für die du den Gleitcast erhalten willst — per Chip oder Klick auf der Karte.</div>
+      <div class="sp-card__label" id="acRegionsLabel">{{ t('nav.regions') }}</div>
+      <div class="sp-card__hint">{{ t('account.regions_hint') }}</div>
 
       <div class="sp-filters" id="spRegionFilters"
            data-regions='{{ regions|tojson }}'
            data-prefill='{{ (prefill_regions|list)|tojson }}'>
         <div class="sp-filter-row">
-          <div class="sp-filter-chips" id="spFilterChips" role="group" aria-label="Regionen"></div>
-          <button type="button" class="sp-filter-reset" id="spFilterReset" title="Alle Regionen auswählen / abwählen">Alle</button>
-          <button type="button" class="sp-filter-map-btn" id="spMapToggle" title="Karte ein/aus" aria-label="Karte ein/aus">
+          <div class="sp-filter-chips" id="spFilterChips" role="group" aria-label="{{ t('nav.regions') }}"></div>
+          <button type="button" class="sp-filter-reset" id="spFilterReset" title="{{ t('account.regions_all_title') }}">{{ t('account.regions_all') }}</button>
+          <button type="button" class="sp-filter-map-btn" id="spMapToggle" title="{{ t('account.map_toggle') }}" aria-label="{{ t('account.map_toggle') }}">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
           </button>
         </div>
@@ -107,7 +106,7 @@
       </div>
 
       <noscript>
-        <div class="sp-checkbox-grid" role="group" aria-label="Regionen">
+        <div class="sp-checkbox-grid" role="group" aria-label="{{ t('nav.regions') }}">
           {% for region in regions %}
           <label class="sp-checkbox-item">
             <input type="checkbox" name="regions" value="{{ region.id }}"
@@ -119,18 +118,18 @@
       </noscript>
     </section>
 
-    {# ----- Qualitaets-Tiers (welche Spots im Gleitcast) ----- #}
+    {# ----- Qualitaets-Tiers (welche Spots im Wingcast) ----- #}
     <section class="sp-card" role="group" aria-labelledby="acQualityLabel">
-      <div class="sp-card__label" id="acQualityLabel">Qualität</div>
-      <div class="sp-card__hint">Welche Spot-Stufen sollen im Gleitcast erscheinen?</div>
+      <div class="sp-card__label" id="acQualityLabel">{{ t('account.quality_label') }}</div>
+      <div class="sp-card__hint">{{ t('account.quality_hint') }}</div>
 
       {% set tier_defs = [
-        ('violet',      'Legendär',  'Top-Tage mit grosser Höhe'),
-        ('green',       'Fliegbar',  'Solide Bedingungen'),
-        ('conditional', 'Bedingt',   'Nur in bestimmten Fenstern'),
-        ('gray',        'Bronze',    'Abgleiter / nur Sledder'),
+        ('violet',      t('account.tier_violet_label'),      t('account.tier_violet_hint')),
+        ('green',       t('account.tier_green_label'),       t('account.tier_green_hint')),
+        ('conditional', t('account.tier_conditional_label'), t('account.tier_conditional_hint')),
+        ('gray',        t('account.tier_gray_label'),        t('account.tier_gray_hint')),
       ] %}
-      <div class="ac-tier-chips" id="acTierChips" role="group" aria-label="Qualitäts-Tiers">
+      <div class="ac-tier-chips" id="acTierChips" role="group" aria-label="{{ t('account.quality_tiers_aria') }}">
         {% for tid, label, hint in tier_defs %}
         <label class="ac-tier-chip ac-tier-chip--{{ tid }}{% if tid in prefill_tiers %} is-active{% endif %}">
           <input type="checkbox" name="tiers" value="{{ tid }}"
@@ -145,28 +144,28 @@
 
     {# ----- Mindest-Rating ----- #}
     <section class="sp-card" role="group" aria-labelledby="acRatingLabel">
-      <div class="sp-card__label" id="acRatingLabel">Mindest-Rating</div>
-      <div class="sp-card__hint">Spots unter diesem Rating bleiben aus dem Gleitcast.</div>
+      <div class="sp-card__label" id="acRatingLabel">{{ t('account.min_rating_label') }}</div>
+      <div class="sp-card__hint">{{ t('account.min_rating_hint') }}</div>
 
       <div class="ac-rating-row">
         <input type="range" id="acRatingSlider" name="min_rating"
                min="0" max="10" step="0.5"
                value="{{ '%.1f'|format(prefill_min_rating) }}"
                class="ac-rating-slider"
-               aria-label="Minimales Rating">
+               aria-label="{{ t('account.min_rating_aria') }}">
         <output class="ac-rating-value" id="acRatingValue" for="acRatingSlider">
-          {% if prefill_min_rating <= 0 %}alle{% else %}≥ {{ '%.1f'|format(prefill_min_rating) }}{% endif %}
+          {% if prefill_min_rating <= 0 %}{{ t('account.min_rating_all') }}{% else %}≥ {{ '%.1f'|format(prefill_min_rating) }}{% endif %}
         </output>
       </div>
     </section>
 
     {# ----- Wochentage ----- #}
     <section class="sp-card" role="group" aria-labelledby="acWeekdaysLabel">
-      <div class="sp-card__label" id="acWeekdaysLabel">Versandtage</div>
-      <div class="sp-card__hint">An welchen Wochentagen willst du den Gleitcast bekommen?</div>
+      <div class="sp-card__label" id="acWeekdaysLabel">{{ t('account.weekdays_label') }}</div>
+      <div class="sp-card__hint">{{ t('account.weekdays_hint') }}</div>
 
-      {% set weekday_labels = [(0,'Mo'), (1,'Di'), (2,'Mi'), (3,'Do'), (4,'Fr'), (5,'Sa'), (6,'So')] %}
-      <div class="ac-weekday-chips" role="group" aria-label="Wochentage">
+      {% set weekday_labels = [(0, t('account.wd_mon')), (1, t('account.wd_tue')), (2, t('account.wd_wed')), (3, t('account.wd_thu')), (4, t('account.wd_fri')), (5, t('account.wd_sat')), (6, t('account.wd_sun'))] %}
+      <div class="ac-weekday-chips" role="group" aria-label="{{ t('account.weekdays_aria') }}">
         {% for wd, label in weekday_labels %}
         <label class="ac-weekday-chip{% if wd in active_weekdays %} is-active{% endif %}">
           <input type="checkbox" name="weekdays" value="{{ wd }}"
@@ -179,19 +178,19 @@
 
     {# ----- Pause-Zeitraum (Von - Bis) ----- #}
     <section class="sp-card" role="group" aria-labelledby="acPauseLabel">
-      <div class="sp-card__label" id="acPauseLabel">Pause</div>
+      <div class="sp-card__label" id="acPauseLabel">{{ t('account.pause_label') }}</div>
       <div class="sp-card__hint">
-        Definiere einen Zeitraum, in dem kein Gleitcast verschickt wird.
+        {{ t('account.pause_hint') }}
         {% if subscriber.paused_from and subscriber.paused_until %}
-          Aktuell: <strong>{{ subscriber.paused_from }} bis {{ subscriber.paused_until }}</strong>.
+          {{ t('account.pause_current_label') }} <strong>{{ subscriber.paused_from }} {{ t('account.pause_to') }} {{ subscriber.paused_until }}</strong>.
         {% endif %}
-        Beide Felder leer = keine Pause.
+        {{ t('account.pause_both_empty') }}
       </div>
 
       <div class="ac-pause-rangepicker">
         <input type="text" id="acPauseRange"
                class="ac-date-input ac-date-input--range"
-               placeholder="Klicken um Zeitraum zu waehlen"
+               placeholder="{{ t('account.pause_placeholder') }}"
                readonly>
         {# Hidden Felder werden vom flatpickr-onChange gefuellt und vom Form-POST gelesen #}
         <input type="hidden" id="acPausedFrom" name="paused_from"
@@ -202,71 +201,64 @@
 
       <div class="ac-pause-actions">
         <button type="button" class="sp-btn sp-btn--secondary ac-pause-shortcut" id="acPauseWinter">
-          Winterpause (Nov &ndash; Feb)
+          {{ t('account.pause_winter')|safe }}
         </button>
         <button type="button" class="sp-btn sp-btn--ghost ac-pause-clear" id="acPauseClear"
-                aria-label="Pause aufheben">
-          Pause entfernen
+                aria-label="{{ t('account.pause_clear_aria') }}">
+          {{ t('account.pause_clear') }}
         </button>
       </div>
     </section>
 
     <button type="submit" class="sp-btn sp-btn--primary ac-save-btn">
-      {% if not subscriber.regions %}Gleitcast abonnieren{% else %}Einstellungen speichern{% endif %}
+      {% if not subscriber.regions %}{{ t('account.save_subscribe') }}{% else %}{{ t('account.save_settings') }}{% endif %}
     </button>
   </form>
 
   {% if subscriber.regions and subscriber.status != 'unsubscribed' %}
   <section class="sp-card">
-    <div class="sp-card__label">Gleitcast abmelden</div>
+    <div class="sp-card__label">{{ t('account.unsub_label') }}</div>
     <div class="sp-card__hint">
-      Stoppt den Versand &mdash; <strong>dein Account und alle Einstellungen bleiben erhalten</strong>.
-      Du kannst dich jederzeit wieder einloggen und mit einem Klick reaktivieren.
-      <br><br>
-      <em>Nur kurzfristig weg?</em> Nutze stattdessen die <strong>Pause</strong>-Funktion oben mit Datum.
+      {{ t('account.unsub_hint_html')|safe }}
     </div>
     <form method="post" action="/account/{{ token }}/unsubscribe">
-      <button type="submit" class="sp-btn sp-btn--secondary ac-unsub-btn">Gleitcast abmelden</button>
+      <button type="submit" class="sp-btn sp-btn--secondary ac-unsub-btn">{{ t('account.unsub_label') }}</button>
     </form>
   </section>
   {% endif %}
 
   <section class="sp-card">
-    <div class="sp-card__label">Feedback &amp; Wünsche</div>
+    <div class="sp-card__label">{{ t('account.feedback_label') }}</div>
     <div class="sp-card__hint">
-      Was funktioniert gut, was nervt, was würdest du verbessern? Sag's mir &mdash;
-      ich lese jede Nachricht. <strong>Kein E-Mail-Versand</strong>, geht direkt an mich.
+      {{ t('account.feedback_hint_html')|safe }}
     </div>
     <form method="post" action="/account/{{ token }}/feedback" class="ac-feedback-form">
       <textarea name="message" rows="4" maxlength="4000" required
                 class="ac-feedback-textarea"
-                placeholder="Was würdest du dir wünschen? Was funktioniert nicht?"></textarea>
-      <button type="submit" class="sp-btn sp-btn--primary">Feedback senden</button>
+                placeholder="{{ t('account.feedback_placeholder') }}"></textarea>
+      <button type="submit" class="sp-btn sp-btn--primary">{{ t('account.feedback_btn') }}</button>
     </form>
   </section>
 
   <section class="sp-card">
-    <div class="sp-card__label">Meine Daten exportieren</div>
+    <div class="sp-card__label">{{ t('account.export_label') }}</div>
     <div class="sp-card__hint">
-      Lade alle zu deinem Konto gespeicherten Daten als JSON herunter
-      (DSG Art. 28 Datenübertragbarkeit).
+      {{ t('account.export_hint') }}
     </div>
     <form method="post" action="/account/{{ token }}/export">
-      <button type="submit" class="sp-btn sp-btn--secondary ac-unsub-btn">JSON-Export</button>
+      <button type="submit" class="sp-btn sp-btn--secondary ac-unsub-btn">{{ t('account.export_btn') }}</button>
     </form>
   </section>
 
   <div class="ac-danger-zone">
     <details>
-      <summary>Account löschen</summary>
+      <summary>{{ t('account.delete_summary') }}</summary>
       <p class="ac-danger-zone__hint">
-        Alle deine Daten (E-Mail, Einstellungen, Feedback-Historie) werden
-        <strong>unwiderruflich</strong> aus der Datenbank gelöscht. Du müsstest dich
-        anschliessend wieder neu registrieren.
+        {{ t('account.delete_hint_html')|safe }}
       </p>
       <form method="post" action="/account/{{ token }}/delete-account"
-            onsubmit="return confirm('Account WIRKLICH endgueltig loeschen? Alle Daten werden aus der Datenbank entfernt. Nicht rueckgaengig zu machen.');">
-        <button type="submit" class="ac-danger-zone__btn">Account endgültig löschen</button>
+            onsubmit="return confirm('{{ t('account.delete_confirm') }}');">
+        <button type="submit" class="ac-danger-zone__btn">{{ t('account.delete_btn') }}</button>
       </form>
     </details>
   </div>
@@ -277,7 +269,7 @@
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/de.js"></script>
+{% if lang != 'en' %}<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/de.js"></script>{% endif %}
 <script src="{{ url_for('static', filename='js/subscribe.js') }}?v={{ static_v('js/subscribe.js') }}"></script>
 <script src="{{ url_for('static', filename='js/account.js') }}?v={{ static_v('js/account.js') }}"></script>
 {% endblock %}

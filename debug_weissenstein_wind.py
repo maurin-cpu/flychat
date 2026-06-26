@@ -3,10 +3,10 @@
 import sys
 sys.path.insert(0, '.')
 
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
 # Initialize engine
-engine = GleitcastEngine()
+engine = WingcastEngine()
 
 # Get Weissenstein spot
 spot = None

@@ -9,10 +9,10 @@ Baut exakt den Kontext wie _build_single_region_context und zeigt:
 import sys, os, json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 from source_area import get_all_regions
 
-engine = GleitcastEngine()
+engine = WingcastEngine()
 engine.load_weather_from_cache()
 
 target = None

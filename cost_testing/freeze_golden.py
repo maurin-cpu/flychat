@@ -158,11 +158,11 @@ def _select_balanced(rows: list[tuple], n: int) -> list[tuple]:
 
 
 def _build_engine():
-    """Instanziert GleitcastEngine mit gecachten Wetterdaten (kein neuer Fetch).
+    """Instanziert WingcastEngine mit gecachten Wetterdaten (kein neuer Fetch).
     Erfordert dass weather_data lokal verfuegbar ist (z.B. fetch_weather hat es schon geladen).
     """
-    from chat_engine import GleitcastEngine
-    eng = GleitcastEngine()
+    from chat_engine import WingcastEngine
+    eng = WingcastEngine()
     # Wetterdaten laden (gecacht). Wenn das fehlschlaegt, ist input leer.
     try:
         loaded = eng.load_weather_from_cache()

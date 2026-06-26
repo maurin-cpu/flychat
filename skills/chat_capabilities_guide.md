@@ -1,4 +1,4 @@
-# Faehigkeiten-Guide fuer den Gleitcast-Berater
+# Faehigkeiten-Guide fuer den Wingcast-Berater
 
 <!--
   SYNC-HINWEIS FUER ENTWICKLER (Claude Code / manuell):
@@ -94,11 +94,11 @@ Das System hat **zwei orthogonale Achsen**:
   - 2 = kurzer Thermikflug / Soaring / Hausrunde
   - 3 = solider Thermikflug / Talquerung 10-30km
   - 4 = starker Thermikflug / XC 30-100km (FAI-Dreiecke)
-  - 5 = XC-Tag / Klassiker >100km (Region=5 und ausreichende Hoehen-Reserve am Spot)
+  - 5 = XC-Tag / Klassiker >100km (Region=5 und `working_height_agl` am Spot ausreichend)
   - FE-Farbe wird aus rating gemappt: 1-2→gray, 3-4→green, 5→violet
   - Bei `safety_status="not_safe"` → `experience_rating=1`
 
-**Streckenflug** ist keine eigene Achse — die XC-Aussage steht als Pflicht-Satz im `xc_details` der Spot-Analyse (konkret: Arbeitshoehe ueber Startplatz + km-Klasse). Spot-Rating 4/5 ist gekappt durch Region.experience_rating und working_height_at_spot_m_max (Best-Stunde).
+**Streckenflug / „wie weit"** liefert die **Region** (`xc_potential`/`xc_details`); der **Spot** sagt, ob man hier **lokal fliegen** kann (ja/nein, und wie gut) — mit dem Subpunkt „kann man den Startplatz ueberhoehen" (aus `working_height_agl`) — und verknuepft beides im `xc_details` (km-Klasse). Spot-Rating 4/5 ist gekappt durch Region-Rating UND `working_height_agl`.
 
 Plus `safety.foehn_risk` (none/moderate/high) — orthogonal, kann Sicherheit eskalieren.
 

@@ -1,14 +1,14 @@
-Hallo {{ email }},
+{{ t('email.greeting_hi') }} {{ email }},
 
-dein Login-Link fuer Gleitcast:
+{{ t('email.login.txt_body') }}
 
 {{ urls.login }}
 
-Der Link ist 30 Minuten gueltig und kann nur einmal verwendet werden.
+{{ t('email.login.txt_validity') }}
 
-Du hast keinen Login angefordert? Dann ignoriere diese E-Mail einfach.
+{{ t('email.login.txt_footer_note') }}
 
 --
-Gleitcast
-Datenschutz: {{ urls.datenschutz }}
-Impressum:   {{ urls.impressum }}
+Wingcast
+{{ t('email.txt_privacy_label') }} {{ urls.datenschutz }}
+{{ t('email.txt_imprint_label') }}   {{ urls.impressum }}

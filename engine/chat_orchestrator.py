@@ -1,8 +1,8 @@
 """
-Gleitcast Engine — Mixin: ChatOrchestratorMixin.
+Wingcast Engine — Mixin: ChatOrchestratorMixin.
 
 Ausgeschnitten aus chat_engine.py (Monolith-Split). Methoden-Signaturen
-unveraendert, Klasse wird via Mehrfachvererbung in GleitcastEngine eingebunden.
+unveraendert, Klasse wird via Mehrfachvererbung in WingcastEngine eingebunden.
 """
 
 import copy
@@ -42,6 +42,7 @@ from source_area import (
     get_all_regions,
 )
 import prompts
+import i18n
 from prompts import format_foehn_llm_regional_guide
 import routing
 from engine._common import (
@@ -73,6 +74,10 @@ logger = logging.getLogger(__name__)
 #   1. geocode_location               — Adresse/Stadt → Koordinaten
 #   2. find_spots_within_travel_time  — Isochrone + Spot-Filter (Hauptfunktion)
 #   3. clear_map_overlays             — Map-Overlays zuruecksetzen
+#   4. get_spot_analysis              — Volle Einzel-Voranalyse (Spot + Tag)
+#   5. get_spot_weather               — Rohe stuendliche Wetterdaten (Spot + Tag)
+#   6. get_region_analysis            — Volle Großwetter-Voranalyse (Region + Tag)
+#   7. get_region_weather             — Rohe stuendliche Wetterdaten (Region + Tag)
 # Nach Erhalt eines Tool-Calls dispatcht answer_stream() an _dispatch_tool(),
 # yieldet Map-Action-Events sofort ans Frontend und ruft danach erneut das LLM.
 TOOLS: list = [
@@ -161,7 +166,152 @@ TOOLS: list = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_spot_analysis",
+            "description": (
+                "Liefert die VOLLSTÄNDIGE Einzel-Voranalyse für EINEN Spot an EINEM Tag "
+                "(no_go_reasons, caution_notes, primary_no_go, wind_summary, voller "
+                "Empfehlungstext, Flyability-Details, XC-Potenzial). Nutze dieses Tool, "
+                "wenn der Pilot nach Details/Begründung zu einem konkreten Spot fragt "
+                "(z.B. 'Warum ist Niederbauen morgen nur conditional?'), denn die "
+                "Kurzübersicht im Kontext enthält pro Spot nur Rating/Fenster/Status, "
+                "nicht die ausführliche Begründung."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "spot_name": {
+                        "type": "string",
+                        "description": "Exakter Spot-Name wie in der Kurzübersicht (z.B. 'Niederbauen').",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Datum im Format YYYY-MM-DD (siehe DATUM-MAPPING in der Anfrage).",
+                    },
+                },
+                "required": ["spot_name", "date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_spot_weather",
+            "description": (
+                "Liefert die ROHEN, stündlichen Wetterdaten für EINEN Spot an EINEM Tag "
+                "(Wind/Böen am Boden + Höhenwind pro Druckfläche, Wolken, Niederschlag, "
+                "Strahlung, Thermik-Proxy mit Steigwerten und Basis pro Stunde). Nutze "
+                "dieses Tool, wenn der Pilot konkrete meteorologische Werte/Verläufe will "
+                "(z.B. 'Wie stark wird der Wind um 14 Uhr am Brienzer Rothorn?', "
+                "'Wann kippt der Wind?', 'Wie hoch geht die Basis?') — also Daten, die "
+                "über die bewertete Voranalyse hinausgehen."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "spot_name": {
+                        "type": "string",
+                        "description": "Exakter Spot-Name wie in der Kurzübersicht (z.B. 'Brienzer Rothorn').",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Datum im Format YYYY-MM-DD (siehe DATUM-MAPPING in der Anfrage).",
+                    },
+                },
+                "required": ["spot_name", "date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_region_analysis",
+            "description": (
+                "Liefert die VOLLSTÄNDIGE Großwetter-Voranalyse für EINE Region an EINEM "
+                "Tag (Sicherheits-Status, experience_rating, bestes Fenster, Peak-Steigen, "
+                "voller Empfehlungstext, Föhn-Lage der Region). Nutze dieses Tool für "
+                "Fragen zur Gesamtlage eines Gebiets (z.B. 'Wie ist die Großwetterlage im "
+                "Berner Oberland morgen?' oder 'Lohnt sich die Region Tessin überhaupt?'). "
+                "Für einen konkreten Startplatz stattdessen get_spot_analysis nehmen."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "region_name": {
+                        "type": "string",
+                        "description": "Regionsname wie in der Kurzübersicht (z.B. 'Berner Oberland').",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Datum im Format YYYY-MM-DD (siehe DATUM-MAPPING in der Anfrage).",
+                    },
+                },
+                "required": ["region_name", "date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_region_weather",
+            "description": (
+                "Liefert die ROHEN, stündlichen Wetterdaten für EINE Region an EINEM Tag "
+                "(Wind/Böen am Boden + Höhenwind pro Druckfläche, Wolken, Niederschlag, "
+                "Strahlung, regionale Thermik mit Basis — aggregiert über die Region, "
+                "ohne Spot-Windrichtungs-Check). Nutze dieses Tool für meteorologische "
+                "Detailfragen zur Großwetterlage eines Gebiets (z.B. 'Wie entwickelt sich "
+                "der Höhenwind über dem Wallis?')."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "region_name": {
+                        "type": "string",
+                        "description": "Regionsname wie in der Kurzübersicht (z.B. 'Wallis').",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Datum im Format YYYY-MM-DD (siehe DATUM-MAPPING in der Anfrage).",
+                    },
+                },
+                "required": ["region_name", "date"],
+            },
+        },
+    },
 ]
+
+
+def _tool_status_message(name: str, args: dict) -> str:
+    """Verständliche Statusmeldung in Alltagssprache für einen Tool-Aufruf.
+
+    Wird während des Tool-Loops ans Frontend gestreamt, damit der Pilot sieht,
+    was der Assistent gerade tut — nie technische Namen wie 'orchestrator'.
+    """
+    spot = (args.get("spot_name") or "").strip()
+    region = (args.get("region_name") or "").strip()
+    if name == "geocode_location":
+        q = (args.get("query") or "").strip()
+        return i18n.t("chat.tool.geocode", q=q) if q else i18n.t("chat.tool.geocode_noarg")
+    if name == "find_spots_within_travel_time":
+        mins = args.get("minutes")
+        return (i18n.t("chat.tool.find_spots", mins=mins)
+                if mins else i18n.t("chat.tool.find_spots_noarg"))
+    if name == "clear_map_overlays":
+        return i18n.t("chat.tool.clear_map")
+    if name == "get_spot_analysis":
+        return (i18n.t("chat.tool.spot_analysis", spot=spot)
+                if spot else i18n.t("chat.tool.spot_analysis_noarg"))
+    if name == "get_spot_weather":
+        return i18n.t("chat.tool.spot_weather", spot=spot) if spot else i18n.t("chat.tool.spot_weather_noarg")
+    if name == "get_region_analysis":
+        return (i18n.t("chat.tool.region_analysis", region=region)
+                if region else i18n.t("chat.tool.region_analysis_noarg"))
+    if name == "get_region_weather":
+        return (i18n.t("chat.tool.region_weather", region=region)
+                if region else i18n.t("chat.tool.region_weather_noarg"))
+    return i18n.t("chat.tool.default")
 
 
 class ChatOrchestratorMixin:
@@ -173,7 +323,8 @@ class ChatOrchestratorMixin:
         messages = [
             {
                 "role": "system",
-                "content": prompts.SYSTEM_PROMPT + "\n\n" + prompts.CAPABILITIES_GUIDE + "\n\n" + prompts.FOEHN_CHAT_KNOWLEDGE,
+                "content": prompts.SYSTEM_PROMPT + "\n\n" + prompts.CAPABILITIES_GUIDE + "\n\n" + prompts.FOEHN_CHAT_KNOWLEDGE
+                           + i18n.llm_lang_instruction(),
             },
         ]
         self.conversations[session_id] = {
@@ -386,6 +537,53 @@ class ChatOrchestratorMixin:
                 entry["analyses"] = days_summary
         return entry
 
+    def _resolve_spot_by_name(self, query: str) -> dict | None:
+        """Findet den Spot-Dict zu einem (ggf. ungenauen) Namen aus self.spots.
+
+        Reihenfolge: exakt → case-insensitive → Teilstring. None wenn nichts passt.
+        """
+        q = (query or "").strip()
+        if not q:
+            return None
+        for s in self.spots:
+            if s.get("name") == q:
+                return s
+        q_low = q.lower()
+        for s in self.spots:
+            if (s.get("name") or "").lower() == q_low:
+                return s
+        for s in self.spots:
+            if q_low in (s.get("name") or "").lower():
+                return s
+        return None
+
+    def _resolve_region_by_name(self, query: str) -> dict | None:
+        """Findet den Region-Dict zu einem (ggf. ungenauen) Namen via get_all_regions().
+
+        Match auf Anzeigename ODER id: exakt → case-insensitive → Teilstring.
+        """
+        q = (query or "").strip()
+        if not q:
+            return None
+        try:
+            regions = get_all_regions()
+        except Exception:
+            return None
+        q_low = q.lower()
+        # exakt (Name oder id)
+        for r in regions:
+            if r.get("region") == q or r.get("id") == q:
+                return r
+        # case-insensitive
+        for r in regions:
+            if (r.get("region") or "").lower() == q_low or (r.get("id") or "").lower() == q_low:
+                return r
+        # Teilstring
+        for r in regions:
+            if q_low in (r.get("region") or "").lower() or q_low in (r.get("id") or "").lower():
+                return r
+        return None
+
     def _dispatch_tool(self, name: str, args: dict) -> dict:
         """Führt einen Tool-Call aus und gibt ein dispatch-Resultat zurück.
 
@@ -497,6 +695,101 @@ class ChatOrchestratorMixin:
                 ],
             }
 
+        if name == "get_spot_analysis":
+            spot_query = (args.get("spot_name") or "").strip()
+            date_str = (args.get("date") or "").strip()
+            if not spot_query or not date_str:
+                return {"content": {"error": "spot_name und date sind erforderlich"}, "map_actions": []}
+            spot = self._resolve_spot_by_name(spot_query)
+            if not spot:
+                return {"content": {"error": f"Spot '{spot_query}' nicht gefunden"}, "map_actions": []}
+            canonical = spot["name"]
+            days = self.spot_analyses.get(canonical)
+            if not days:
+                return {"content": {"error": f"Keine Voranalyse für '{canonical}' vorhanden"}, "map_actions": []}
+            entry = days.get(date_str)
+            if not entry:
+                return {
+                    "content": {
+                        "error": f"Keine Analyse für '{canonical}' am {date_str}",
+                        "available_dates": sorted(days.keys()),
+                    },
+                    "map_actions": [],
+                }
+            return {
+                "content": {"spot": canonical, "date": date_str, "analysis": entry},
+                "map_actions": [],
+            }
+
+        if name == "get_spot_weather":
+            spot_query = (args.get("spot_name") or "").strip()
+            date_str = (args.get("date") or "").strip()
+            if not spot_query or not date_str:
+                return {"content": {"error": "spot_name und date sind erforderlich"}, "map_actions": []}
+            spot = self._resolve_spot_by_name(spot_query)
+            if not spot:
+                return {"content": {"error": f"Spot '{spot_query}' nicht gefunden"}, "map_actions": []}
+            canonical = spot["name"]
+            try:
+                ctx = self._build_single_spot_context(spot, date_str, mode="chat")
+            except Exception as e:
+                logger.error(f"get_spot_weather Fehler für {canonical}/{date_str}: {e}")
+                return {"content": {"error": f"Wetterdaten konnten nicht aufbereitet werden: {e}"}, "map_actions": []}
+            if not ctx or not ctx.strip():
+                return {"content": {"error": f"Keine Wetterdaten für '{canonical}' am {date_str}"}, "map_actions": []}
+            return {
+                "content": {"spot": canonical, "date": date_str, "weather": ctx},
+                "map_actions": [],
+            }
+
+        if name == "get_region_analysis":
+            region_query = (args.get("region_name") or "").strip()
+            date_str = (args.get("date") or "").strip()
+            if not region_query or not date_str:
+                return {"content": {"error": "region_name und date sind erforderlich"}, "map_actions": []}
+            region = self._resolve_region_by_name(region_query)
+            if not region:
+                return {"content": {"error": f"Region '{region_query}' nicht gefunden"}, "map_actions": []}
+            rid = region["id"]
+            rname = region.get("region", rid)
+            days = (self.region_analyses or {}).get(rid)
+            if not days:
+                return {"content": {"error": f"Keine Voranalyse für Region '{rname}' vorhanden"}, "map_actions": []}
+            entry = days.get(date_str)
+            if not entry:
+                return {
+                    "content": {
+                        "error": f"Keine Analyse für Region '{rname}' am {date_str}",
+                        "available_dates": sorted(days.keys()),
+                    },
+                    "map_actions": [],
+                }
+            return {
+                "content": {"region": rname, "date": date_str, "analysis": entry},
+                "map_actions": [],
+            }
+
+        if name == "get_region_weather":
+            region_query = (args.get("region_name") or "").strip()
+            date_str = (args.get("date") or "").strip()
+            if not region_query or not date_str:
+                return {"content": {"error": "region_name und date sind erforderlich"}, "map_actions": []}
+            region = self._resolve_region_by_name(region_query)
+            if not region:
+                return {"content": {"error": f"Region '{region_query}' nicht gefunden"}, "map_actions": []}
+            rname = region.get("region", region["id"])
+            try:
+                ctx = self._build_single_region_context(region, date_str)
+            except Exception as e:
+                logger.error(f"get_region_weather Fehler für {rname}/{date_str}: {e}")
+                return {"content": {"error": f"Wetterdaten konnten nicht aufbereitet werden: {e}"}, "map_actions": []}
+            if not ctx or not ctx.strip():
+                return {"content": {"error": f"Keine Wetterdaten für Region '{rname}' am {date_str}"}, "map_actions": []}
+            return {
+                "content": {"region": rname, "date": date_str, "weather": ctx},
+                "map_actions": [],
+            }
+
         return {
             "content": {"error": f"Unbekanntes Tool '{name}'"},
             "map_actions": [],
@@ -601,7 +894,7 @@ class ChatOrchestratorMixin:
         # ───── Tool-Call-Loop ────────────────────────────────────────────────
         reply_text = ""
         tool_iterations = 0
-        emitted_status = False
+        last_status = None  # letzte gestreamte Statusmeldung (gegen Doppelungen)
         reasoning_retry_done = False
 
         try:
@@ -672,14 +965,6 @@ class ChatOrchestratorMixin:
                         assistant_msg["reasoning_content"] = reasoning
                     messages.append(assistant_msg)
 
-                    # Optional: einmaliger Status-Hinweis vor dem ersten Tool
-                    if not emitted_status:
-                        yield {
-                            "type": "status",
-                            "content": "Ich suche erreichbare Spots…",
-                        }
-                        emitted_status = True
-
                     for tc in tool_calls:
                         fn_name = tc.function.name
                         try:
@@ -687,6 +972,27 @@ class ChatOrchestratorMixin:
                         except json.JSONDecodeError as e:
                             fn_args = {}
                             logger.warning(f"Tool {fn_name} arguments JSON invalid: {e}")
+
+                        # Verständlicher Status in Alltagssprache, passend zum Tool.
+                        # Spot-/Regionsnamen auf die kanonische Schreibweise auflösen,
+                        # damit der Status nicht die (evtl. klein/ungenau) getippte
+                        # Modell-Eingabe zeigt. Standort (geocode) bleibt der genannte
+                        # Ort — vor dem Geocoding gibt es noch keine aufgelöste Form.
+                        display_args = fn_args
+                        _sp = fn_args.get("spot_name")
+                        _rg = fn_args.get("region_name")
+                        if _sp:
+                            _r = self._resolve_spot_by_name(_sp)
+                            if _r:
+                                display_args = {**fn_args, "spot_name": _r["name"]}
+                        elif _rg:
+                            _r = self._resolve_region_by_name(_rg)
+                            if _r:
+                                display_args = {**fn_args, "region_name": _r.get("region", _rg)}
+                        status_msg = _tool_status_message(fn_name, display_args)
+                        if status_msg and status_msg != last_status:
+                            yield {"type": "status", "content": status_msg}
+                            last_status = status_msg
 
                         dispatch = self._dispatch_tool(fn_name, fn_args)
 

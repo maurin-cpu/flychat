@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Login – Gleitcast{% endblock %}
+{% block title %}{{ t('login.page_title') }}{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
@@ -12,8 +12,8 @@
 <main class="sp">
   <div class="sp-status">
     <div class="sp-status__icon sp-status__icon--ok" aria-hidden="true">&check;</div>
-    <h1 id="loginConfirmTitle">Anmeldung laeuft...</h1>
-    <p id="loginConfirmHint">Du wirst gleich eingeloggt.</p>
+    <h1 id="loginConfirmTitle">{{ t('login_confirm.title') }}</h1>
+    <p id="loginConfirmHint">{{ t('login_confirm.hint') }}</p>
 
     {# Form wird per JS automatisch submitted (siehe unten). Echte Browser
        fuehren das aus und loggen sofort ein; Mail-Prefetcher (Defender,
@@ -22,10 +22,10 @@
        als <noscript>-Fallback bei deaktiviertem JavaScript. #}
     <form id="loginConfirmForm" method="post" action="/login/{{ token }}" style="margin-top:24px;">
       <noscript>
-        <p>JavaScript ist deaktiviert. Bitte klicke zum Einloggen:</p>
+        <p>{{ t('login_confirm.noscript') }}</p>
       </noscript>
       <button type="submit" class="sp-form__submit" id="loginConfirmBtn">
-        Jetzt einloggen
+        {{ t('locked.cta') }}
       </button>
     </form>
   </div>

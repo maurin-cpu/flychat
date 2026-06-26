@@ -1,4 +1,4 @@
-/* Gleitcast - Light Theme (City Guide Style) */
+/* Wingcast - Light Theme (City Guide Style) */
 
 :root {
     /* Colors - Light palette (Aviation Blue) */
@@ -68,13 +68,13 @@
     --color-safety-nodata-text: #9a3412;
 
     /* Fly Tier Colors */
-    --color-fly-gray: #B08D57;          /* Bronze — Abgleiter (was slate #94a3b8) */
-    --color-fly-gray-bg: #F5EDE0;       /* warm cream bg */
-    --color-fly-gray-text: #6B5430;     /* dark bronze text */
+    --color-fly-gray: #0ea5e9;          /* Sky — Abgleiter (Royal Premium, FARBKONZEPT v3.2; was bronze #B08D57) */
+    --color-fly-gray-bg: #e0f2fe;       /* Sky-100 bg */
+    --color-fly-gray-text: #075985;     /* Sky-800 text */
     --color-fly-green: #22c55e;
     --color-fly-green-bg: #dcfce7;
     --color-fly-green-text: #166534;
-    --color-fly-violet: #8b5cf6;
+    --color-fly-violet: #a78bfa;        /* Violet-400 (Royal Premium, FARBKONZEPT v3.2; was #8b5cf6) */
     --color-fly-violet-bg: #ede9fe;
     --color-fly-violet-text: #6d28d9;
 
@@ -1319,9 +1319,9 @@ body.page-fixed-nav {
     padding: 6px 12px;
     margin-right: 12px;
     border-radius: var(--radius-sm, 6px);
-    background: var(--color-fly-gray-bg, #F5EDE0);
-    color: var(--color-fly-gray-text, #6B5430);
-    border: 1px solid var(--color-fly-gray, #B08D57);
+    background: var(--color-fly-gray-bg, #e0f2fe);
+    color: var(--color-fly-gray-text, #075985);
+    border: 1px solid var(--color-fly-gray, #0ea5e9);
     font-weight: 700;
     line-height: 1;
     white-space: nowrap;
@@ -1335,9 +1335,9 @@ body.page-fixed-nav {
 }
 
 .meteogram-rating-badge.tier-violet {
-    background: rgba(139, 92, 246, 0.14);
+    background: rgba(167, 139, 250, 0.14);
     color: #5b21b6;
-    border-color: #8b5cf6;
+    border-color: #a78bfa;
 }
 
 .meteogram-rating-badge.tier-not-safe {
@@ -2047,6 +2047,17 @@ body.page-fixed-nav {
 
 .tooltip.visible {
     opacity: 1;
+}
+
+/* Desktop-Hover-Tooltip MUSS über dem Meteogramm-Overlay (z-index 10000) liegen.
+   Der Tooltip ist ein DOM-Geschwister AUSSERHALB des Overlays (siehe index.html /
+   regionen.html) und lag mit z-index 300 sonst dahinter → auf Desktop unsichtbar.
+   Nur Desktop (>640px): Mobile nutzt die Scrub-Info-Leiste IM Overlay und bleibt
+   unberührt. Tooltip hat pointer-events:none, blockiert also nichts. */
+@media (min-width: 641px) {
+    .tooltip {
+        z-index: 10050;
+    }
 }
 
 .tooltip-title {
@@ -2771,13 +2782,13 @@ body.page-fixed-nav {
         position: static;
         flex: 1 1 auto;
         width: 100%;
+        min-height: 0;
         max-height: none;
         background: var(--color-bg-elevated, #fff);
         border-top: 1px solid var(--color-border);
         border-left: none;
         border-radius: 0;
         box-shadow: none;
-        transition: flex-basis 250ms cubic-bezier(0.4, 0, 0.2, 1);
     }
     .meteogram-aside.collapsed {
         flex: 0 0 56px;
@@ -2789,12 +2800,18 @@ body.page-fixed-nav {
         min-height: 0;
         padding-bottom: 0;
     }
-    /* Aufgeklappt: Chart raus, Aside nimmt alles. :has() ist noetig weil
-       .meteogram-main vor .meteogram-aside im DOM steht und CSS keinen
-       Rueckwaerts-Geschwister-Selektor hat. */
-    .meteogram-body:has(.meteogram-aside:not(.collapsed)) .meteogram-main {
-        flex: 0 0 0;
-        overflow: hidden;
+    /* Aufgeklappt: Analyse fuellt das PANEL (Sheet) — ueber Tag-Tabs UND
+       Titel, aber NICHT den Viewport: der Karten-Spalt oben bleibt sichtbar.
+       Daher am Panel verankert (absolute), nicht fixed. Tap auf Header klappt zu. */
+    .meteogram-panel { position: relative; }
+    .meteogram-body:has(.meteogram-aside:not(.collapsed)) { position: static; }
+    .meteogram-aside:not(.collapsed) {
+        position: absolute;
+        inset: 0;
+        z-index: 60;
+        max-height: none;
+        border-top: none;
+        box-shadow: none;
     }
     /* Collapsed-Header bekommt eine deutliche CTA-Optik damit klar wird,
        dass man hier draufklicken muss um die Analyse zu sehen. */
@@ -2835,12 +2852,12 @@ body.page-fixed-nav {
         transform: rotate(0deg);
         background: #fff;
         color: var(--color-primary, #0369a1);
-        animation: gleitcast-aside-pulse 2.4s ease-in-out 0.4s 2;
+        animation: wingcast-aside-pulse 2.4s ease-in-out 0.4s 2;
     }
     .meteogram-aside:not(.collapsed) .meteogram-aside-toggle {
         transform: rotate(180deg);
     }
-    @keyframes gleitcast-aside-pulse {
+    @keyframes wingcast-aside-pulse {
         0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
         50%      { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.35), 0 1px 3px rgba(0,0,0,0.15); }
     }
@@ -4365,3 +4382,281 @@ body.overlay-open {
 .mga-admin-feedback__toast.is-ok { color: #1a7a3e; }
 .mga-admin-feedback__toast.is-err { color: #a32020; }
 
+
+/* ============================================================================
+   DATAVIEW — Toggle Meteogramm ⇄ Daten + KI-Kontext-Anzeige (dataview.js)
+   ============================================================================ */
+.dv-toggle {
+    display: inline-flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-surface, #fff);
+    margin-left: auto;
+}
+.dv-toggle-btn {
+    border: none;
+    background: transparent;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+.dv-toggle-btn + .dv-toggle-btn { border-left: 1px solid var(--color-border); }
+.dv-toggle-btn:hover { background: rgba(0,0,0,0.04); }
+.dv-toggle-btn.active { background: var(--color-primary, #2563eb); color: #fff; }
+
+/* KI-Kontext-Anzeige (ersetzt das Chart im selben Container).
+   8pt-Spacing, bestehende Tokens, Typescale. Tabelle = Lesehilfe des Rohtexts. */
+.dv-wrap {
+    height: 100%;
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 12px 14px 16px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--color-text);
+}
+.dv-note {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    background: rgba(37,99,235,0.06);
+    border: 1px solid rgba(37,99,235,0.15);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    align-items: center;
+}
+
+.dv-meta-top {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-bottom: 6px;
+}
+
+/* Abschnitt als Karte (aus "═══ TITEL ═══" / "### TITEL ###") */
+.dv-section {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt, #f8fafc);
+    padding: 10px 12px 12px;
+    margin: 10px 0;
+}
+.dv-h {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 5px;
+}
+
+.dv-line {
+    font-size: 12.5px;
+    color: var(--color-text);
+    padding: 2px 0;
+    line-height: 1.5;
+}
+.dv-line-k { color: var(--color-text-muted); font-weight: 700; }
+
+/* KV-Tabelle: Label links gedaempft, Wert rechts. Macht "Label: Wert"-Zeilen
+   (Saubere Fenster, Delta-P, Verhaeltnis …) auf einen Blick scanbar. */
+.dv-kv {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0;
+    font-size: 12.5px;
+}
+.dv-kv td {
+    padding: 4px 8px 4px 0;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+}
+.dv-kv tr:last-child td { border-bottom: none; }
+.dv-kv-k {
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    width: 1%;
+    padding-right: 16px;
+}
+.dv-kv-v { color: var(--color-text); }
+
+/* Zahlen-Chip: Messwerte aus der Prosa heraus sofort erkennbar. */
+.dv-num {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text);
+    background: rgba(15, 23, 42, 0.06);
+    border-radius: 4px;
+    padding: 0 3px;
+}
+.dv-callout {
+    font-size: 12px;
+    color: var(--color-text);
+    background: var(--color-surface, #fff);
+    border-left: 3px solid var(--color-border);
+    border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+    padding: 6px 10px;
+    margin: 6px 0;
+}
+
+/* Föhn-/Detail-Bullets */
+.dv-bullets {
+    margin: 4px 0;
+    padding-left: 18px;
+    font-size: 12px;
+    color: var(--color-text);
+}
+.dv-bullets li { padding: 1px 0; }
+
+/* Verlaufs-Strip (Zeit:Status-Chips) */
+.dv-vstrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 4px 0;
+}
+.dv-vchip {
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    color: #374151;
+    white-space: nowrap;
+}
+.dv-vchip b { font-variant-numeric: tabular-nums; font-weight: 700; }
+.dv-vchip-ok     { background: #dcfce7; color: #166534; }
+.dv-vchip-warn   { background: #fef3c7; color: #92400e; }
+.dv-vchip-danger { background: #fee2e2; color: #991b1b; }
+.dv-vchip-info   { background: #e5e7eb; color: #374151; }
+
+/* ===== Stunden-Tabelle ===== */
+.dv-table-scroll { overflow-x: auto; margin: 8px 0 4px; }
+.dv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+.dv-table th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+}
+.dv-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: top;
+}
+.dv-table tbody tr:hover { background: rgba(0,0,0,0.025); }
+.dv-time { font-weight: 700; white-space: nowrap; color: var(--color-text); }
+.dv-val { font-weight: 600; font-size: 13px; color: var(--color-text); white-space: nowrap; }
+.dv-unit { font-weight: 400; font-size: 11px; color: var(--color-text-muted); }
+.dv-sub { display: block; font-size: 11px; color: var(--color-text-muted); white-space: nowrap; }
+.dv-muted { color: var(--color-text-muted); }
+.dv-v-warn { color: #b45309; }
+.dv-v-danger { color: #b91c1c; }
+.dv-warn-cell { display: flex; flex-wrap: wrap; gap: 3px; min-width: 120px; }
+
+/* Spalten-Untertitel im Header (z. B. Wind „Boden", Höhenwind „Wind/Böen") */
+.dv-table th small {
+    display: block;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--color-text-muted);
+    opacity: 0.85;
+}
+
+/* Höhenwind-Spalte: ein Block je Druckniveau (850/700/600 hPa). */
+.dv-aloft-cell { min-width: 92px; }
+.dv-alvl {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 1px 0;
+}
+.dv-alvl + .dv-alvl { border-top: 1px dashed var(--color-border); margin-top: 2px; padding-top: 3px; }
+.dv-alvl-h {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    min-width: 30px;
+}
+.dv-alvl-h small { font-size: 8px; font-weight: 600; opacity: 0.7; }
+/* Das im Flugbereich liegende Niveau (*) hervorheben — das ist das relevante. */
+.dv-alvl-band {
+    background: rgba(15, 23, 42, 0.05);
+    border-left: 3px solid var(--color-primary, #2563eb);
+    border-radius: 0 4px 4px 0;
+    padding-left: 5px;
+    margin-left: -2px;
+}
+.dv-alvl-band .dv-alvl-h { color: var(--color-text); }
+
+/* Flugbereich-Band (z. B. 2163–3942m) etwas schmaler setzen. */
+.dv-band { font-size: 12px; white-space: nowrap; }
+
+/* Tag-Chips (Badge-Atoms) */
+.dv-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 1px 6px;
+    border-radius: 999px;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+.dv-tag-info   { background: #e5e7eb; color: #374151; }
+.dv-tag-ok     { background: #dcfce7; color: #166534; }
+.dv-tag-warn   { background: #fef3c7; color: #92400e; }
+.dv-tag-danger { background: #fee2e2; color: #991b1b; }
+
+/* Rohtext (Wahrheitsanker) */
+.dv-raw { margin-top: 14px; }
+.dv-raw > summary {
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    padding: 6px 0;
+    user-select: none;
+}
+.dv-raw > summary:hover { color: var(--color-text); }
+.dv-pre {
+    margin: 6px 0 0;
+    padding: 12px;
+    font-size: 11px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #e2e8f0;
+    background: #0f172a;
+    border-radius: 6px;
+}
+.dv-loading { padding: 16px; color: var(--color-text-muted); font-size: 13px; }
+.dv-error { padding: 16px; color: #dc2626; font-size: 13px; }
+
+/* Schmal (Overlay auf Mobile): kompaktere Tabelle */
+@media (max-width: 560px) {
+    .dv-wrap { padding: 10px 10px 14px; }
+    .dv-table th, .dv-table td { padding: 5px 5px; }
+    .dv-val { font-size: 12px; }
+    .dv-warn-cell { min-width: 84px; }
+}

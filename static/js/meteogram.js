@@ -105,14 +105,14 @@ window.Meteogram = (function () {
     // Storage-Werte: '1' = on, '0' = off, null/missing = viewport-default.
     function readShowNumbers() {
         try {
-            var v = localStorage.getItem('gleitcast.meteogram.showNumbers');
+            var v = localStorage.getItem('wingcast.meteogram.showNumbers');
             if (v === '1') return true;
             if (v === '0') return false;
             return window.innerWidth > 640; // Mobile default OFF, Desktop ON
         } catch (e) { return window.innerWidth > 640; }
     }
     function writeShowNumbers(on) {
-        try { localStorage.setItem('gleitcast.meteogram.showNumbers', on ? '1' : '0'); }
+        try { localStorage.setItem('wingcast.meteogram.showNumbers', on ? '1' : '0'); }
         catch (e) { /* ignore */ }
     }
 
@@ -332,7 +332,7 @@ window.Meteogram = (function () {
         options = options || {};
 
         if (!altDay || !altDay.profiles || altDay.profiles.length === 0) {
-            container.innerHTML = '<div class="error-state">Keine Daten fuer diesen Tag.</div>';
+            container.innerHTML = '<div class="error-state">' + wcT('js.mg.no_data_day') + '</div>';
             return;
         }
 
@@ -345,7 +345,7 @@ window.Meteogram = (function () {
             return h >= MIN_HOUR && h <= MAX_HOUR;
         });
         if (profiles.length === 0) {
-            container.innerHTML = '<div class="error-state">Keine Daten fuer diesen Tag.</div>';
+            container.innerHTML = '<div class="error-state">' + wcT('js.mg.no_data_day') + '</div>';
             return;
         }
 
@@ -570,8 +570,8 @@ window.Meteogram = (function () {
             var wcAll = (precip.weather_code != null) ? precip.weather_code
                       : ((wx.cloudbase && wx.cloudbase.weather_code != null) ? wx.cloudbase.weather_code : null);
             if (isThunderstorm(wcAll)) f.storm = true;
-            // CAPE
-            if (thermik.cape != null && thermik.cape > 800) f.cape = true;
+            // CAPE-Überentwicklung wird stündlich als hohler Blitz in der
+            // Wetterzeile gezeigt (siehe hasOverdev), nicht mehr als Warnband.
 
             // Aloft danger (within flight layer: elevation .. thermal_max + 1000m)
             // Schwellen aus thresholds-API (config.WIND_*_KMH / GUST_*_KMH).
@@ -599,17 +599,16 @@ window.Meteogram = (function () {
 
         // Warning type configuration, in priority order
         var WARN_TYPES = [
-            { key: 'storm',            label: 'Gewitter',               color: '#92400E', bg: '#FEF3C7' },
-            { key: 'rain',             label: 'Regen',                  color: '#1E3A8A', bg: '#DBEAFE' },
-            { key: 'gustDanger',       label: 'Böen gefährlich',        color: '#991B1B', bg: '#FEE2E2' },
-            { key: 'aloftDanger',      label: 'Höhenwind gefährlich',   color: '#991B1B', bg: '#FEE2E2' },
-            { key: 'aloftGustDanger',  label: 'Höhenböen gefährlich',   color: '#991B1B', bg: '#FEE2E2' },
-            { key: 'strong',           label: 'Grundwind zu stark',     color: '#991B1B', bg: '#FEE2E2' },
-            { key: 'wrong',            label: 'Wind falsche Richtung',  color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'gustWarn',         label: 'Böen stark',             color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'aloftWarn',        label: 'Höhenwind kräftig',      color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'aloftGustWarn',    label: 'Höhenböen kräftig',      color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'cape',             label: 'Überentwicklung (CAPE)', color: '#92400E', bg: '#FEF3C7' }
+            { key: 'storm',            label: wcT('js.mg.warn_storm'),               color: '#92400E', bg: '#FEF3C7' },
+            { key: 'rain',             label: wcT('js.mg.warn_rain'),                  color: '#1E3A8A', bg: '#DBEAFE' },
+            { key: 'gustDanger',       label: wcT('js.mg.warn_gust_danger'),        color: '#991B1B', bg: '#FEE2E2' },
+            { key: 'aloftDanger',      label: wcT('js.mg.warn_aloft_danger'),   color: '#991B1B', bg: '#FEE2E2' },
+            { key: 'aloftGustDanger',  label: wcT('js.mg.warn_aloftgust_danger'),   color: '#991B1B', bg: '#FEE2E2' },
+            { key: 'strong',           label: wcT('js.mg.warn_strong'),     color: '#991B1B', bg: '#FEE2E2' },
+            { key: 'wrong',            label: wcT('js.mg.warn_wrong'),  color: '#9A3412', bg: '#FFEDD5' },
+            { key: 'gustWarn',         label: wcT('js.mg.warn_gust_warn'),             color: '#9A3412', bg: '#FFEDD5' },
+            { key: 'aloftWarn',        label: wcT('js.mg.warn_aloft_warn'),      color: '#9A3412', bg: '#FFEDD5' },
+            { key: 'aloftGustWarn',    label: wcT('js.mg.warn_aloftgust_warn'),      color: '#9A3412', bg: '#FFEDD5' }
         ];
 
         // Build groups per warning type
@@ -772,6 +771,22 @@ window.Meteogram = (function () {
             .attr('width', chartW)
             .attr('height', chartH)
             .style('display', 'block');
+
+        // Diagonal-Schraffur für "Thermik zerrissen" (TORN). Die Säule bleibt
+        // auf voller Höhe; die Schraffur signalisiert nur, dass der Höhenwind
+        // die Thermik zerreisst (siehe weather_context._thermal_quality_tags).
+        var _defs = svg.append('defs');
+        function _tornHatch(id, stroke) {
+            var p = _defs.append('pattern')
+                .attr('id', id).attr('patternUnits', 'userSpaceOnUse')
+                .attr('width', 6).attr('height', 6)
+                .attr('patternTransform', 'rotate(45)');
+            p.append('line')
+                .attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 6)
+                .attr('stroke', stroke).attr('stroke-width', 1.6);
+        }
+        _tornHatch('torn-hatch-deg', 'rgba(180, 83, 9, 0.55)');   // degraded: amber
+        _tornHatch('torn-hatch-unu', 'rgba(159, 18, 57, 0.65)');  // unusable: rose
 
         var chartG = svg.append('g')
             .attr('transform', 'translate(' + MARGIN.left + ', ' + MARGIN.top + ')');
@@ -988,7 +1003,7 @@ window.Meteogram = (function () {
                 .attr('text-anchor', 'end').attr('dominant-baseline', 'central')
                 .attr('font-size', '9px').attr('font-weight', '600')
                 .attr('fill', '#64748B')
-                .text('Nied./Gew.');
+                .text(wcT('js.mg.axis_precip'));
         }
         times.forEach(function (t, ci) {
             var wx = wxByTime[t];
@@ -1014,8 +1029,8 @@ window.Meteogram = (function () {
             var fillColor = hasStorm ? 'rgba(245, 158, 11, 0.5)'
                           : hasOverdev ? (capeStrong ? 'rgba(245, 158, 11, 0.32)' : 'rgba(245, 158, 11, 0.16)')
                           : (precipColor(precipAmt) + '99');
-            var titleTxt = hasStorm ? (hasPrecip ? precipAmt.toFixed(1) + ' mm + Gewitter' : 'Gewitter')
-                         : hasOverdev ? 'Überentwicklungsgefahr' + (capeStrong ? ' (hoch)' : ' (möglich)')
+            var titleTxt = hasStorm ? (hasPrecip ? wcT('js.mg.precip_storm', { mm: precipAmt.toFixed(1) }) : wcT('js.mg.warn_storm'))
+                         : hasOverdev ? wcT('js.mg.overdev') + (capeStrong ? wcT('js.mg.overdev_high') : wcT('js.mg.overdev_possible'))
                                         + (hasPrecip ? ' + ' + precipAmt.toFixed(1) + ' mm' : '')
                                         + ' · CAPE ' + Math.round(cape) + ' J/kg'
                          : precipAmt.toFixed(1) + ' mm';
@@ -1188,7 +1203,9 @@ window.Meteogram = (function () {
             if (climb <= 0) return;
             var maxAlt = wx.thermik.max_height || (altitudes[altitudes.length - 1] + 200);
             var lclAlt = wx.thermik.lcl || null;  // Wolkenbasis (MSL), ab hier VFR nicht mehr fliegbar
+            var tornLevel = wx.thermik.torn_level || null;  // null | "degraded" | "unusable"
 
+            var thermRiLo = null, thermRiHi = null;  // Vertikale Ausdehnung der Säule (für TORN-Schraffur)
             for (var ri = 0; ri < nRows; ri++) {
                 var alt = altitudes[ri];
                 // Row 0 bei Spots = Startplatz-Kachel. Verwende `elevation` für
@@ -1206,6 +1223,25 @@ window.Meteogram = (function () {
                     .attr('fill', bgColor).attr('rx', 3).attr('opacity', 0.8);
 
                 thermikCells[ri + ',' + ci] = localRate;
+                if (thermRiLo === null) thermRiLo = ri;
+                thermRiHi = ri;
+            }
+
+            // TORN-Schraffur über die volle Säule legen (Höhe unverändert).
+            if (tornLevel && thermRiLo !== null) {
+                var hatchId = tornLevel === 'unusable' ? 'torn-hatch-unu' : 'torn-hatch-deg';
+                // rowY(ri) nimmt mit steigendem ri AB (höhere Row = weiter oben).
+                // thermRiLo ist der kleinste Index (tiefste Höhe → unten),
+                // thermRiHi der grösste (höchste Höhe → oben). Die Schraffur
+                // muss vom obersten bis untersten Thermik-Cell reichen.
+                var yTop = rowY(thermRiHi) + 1;
+                var yBot = rowY(thermRiLo) + cellH - 1;
+                chartG.append('rect').attr('class', 'therm-torn-overlay')
+                    .attr('x', ci * CELL_W + 1).attr('y', yTop)
+                    .attr('width', CELL_W - 2).attr('height', yBot - yTop)
+                    .attr('fill', 'url(#' + hatchId + ')').attr('rx', 3)
+                    .style('pointer-events', 'none')
+                    .append('title').text(wcT('js.chart.thermal_torn'));
             }
         });
 
@@ -1589,12 +1625,12 @@ window.Meteogram = (function () {
                 .attr('dominant-baseline', 'central')
                 .attr('fill', '#94A3B8')
                 .style('font-size', '6px').style('font-weight', '500')
-                .text('(Boden)');
+                .text(wcT('js.mg.ground_paren'));
         } else {
             drawGroundLabel(groundY + GROUND_WIND_Y + GROUND_WIND_H / 2, 'Bodenwind');
         }
         if (!isRegion) {
-            drawGroundLabel(groundY + GROUND_GUST_Y + GROUND_GUST_H / 2, 'Böen');
+            drawGroundLabel(groundY + GROUND_GUST_Y + GROUND_GUST_H / 2, wcT('js.chart.legend_gusts'));
         }
 
         times.forEach(function (t, ci) {
@@ -1692,7 +1728,7 @@ window.Meteogram = (function () {
                     .attr('x', -8).attr('y', warnTop + WARN_ROW_H / 2 + 3)
                     .attr('text-anchor', 'end')
                     .attr('fill', '#92400E')
-                    .text('Warnungen');
+                    .text(wcT('js.mg.warnings'));
             }
 
             warnBands.forEach(function (band) {
@@ -1771,8 +1807,8 @@ window.Meteogram = (function () {
                 var oTooltip = droppedWarns.map(function (b) {
                     return b.label + ' ' + formatHourRange(times, b.start, b.end);
                 }).join('\n');
-                oG.append('title').text(droppedWarns.length + ' weitere Warnung'
-                    + (droppedWarns.length === 1 ? '' : 'en') + ':\n' + oTooltip);
+                oG.append('title').text(wcT(droppedWarns.length === 1 ? 'js.mg.more_warnings_one' : 'js.mg.more_warnings_many', { n: droppedWarns.length })
+                    + '\n' + oTooltip);
             }
         }
 
@@ -1847,14 +1883,14 @@ window.Meteogram = (function () {
                 var cb = wx.cloudbase;
                 var hasCloud = (cb.cover_low > 0) || (cb.cover_mid > 0) || (cb.cover_high > 0);
                 if (hasCloud) {
-                    html += '<div class="tooltip-row" style="margin-bottom:4px"><span class="tooltip-label">Wolken</span><span class="tooltip-value" style="font-size:10px">';
+                    html += '<div class="tooltip-row" style="margin-bottom:4px"><span class="tooltip-label">' + wcT('js.mg.tt_clouds') + '</span><span class="tooltip-value" style="font-size:10px">';
                     if (cb.cover_high > 0) html += 'H:' + Math.round(cb.cover_high) + '% ';
                     if (cb.cover_mid > 0) html += 'M:' + Math.round(cb.cover_mid) + '% ';
-                    if (cb.cover_low > 0) html += 'T:' + Math.round(cb.cover_low) + '%';
+                    if (cb.cover_low > 0) html += wcT('js.mg.cloud_low') + Math.round(cb.cover_low) + '%';
                     html += '</span></div>';
                 }
                 if (cb.height != null) {
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Wolkenbasis</span><span class="tooltip-value">' + Math.round(cb.height) + 'm</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_cloudbase') + '</span><span class="tooltip-value">' + Math.round(cb.height) + 'm</span></div>';
                 }
             }
 
@@ -1887,14 +1923,14 @@ window.Meteogram = (function () {
                     '</span></div>';
                 if (isGroundCell) {
                     html += '<div class="tooltip-row"><span class="tooltip-label" style="color:#C2410C;font-weight:700">\u2605 Startplatz</span><span class="tooltip-value" style="color:#C2410C;font-weight:700">' + Math.round(elevation) + 'm</span></div>';
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Bodenwind</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_groundwind') + '</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
                     if (dd.wind_gusts != null && Math.round(dd.wind_gusts) > Math.round(dd.wind_speed)) {
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Böen</span><span class="tooltip-value" style="color:' + windColor(dd.wind_gusts) + '">' + Math.round(dd.wind_gusts) + ' km/h</span></div>';
+                        html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.chart.legend_gusts') + '</span><span class="tooltip-value" style="color:' + windColor(dd.wind_gusts) + '">' + Math.round(dd.wind_gusts) + ' km/h</span></div>';
                     }
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_direction') + '</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0</span></div>';
                     if (windSectors && dd.wind_direction != null && dd.wind_speed >= 3) {
                         var dirOk = isDirInSectors(dd.wind_direction, windSectors, 10);
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Start-Check</span><span class="tooltip-value" style="color:' + (dirOk ? '#059669' : '#DC2626') + ';font-weight:700">' + (dirOk ? '\u2713 OK' : '\u2715 Falsche Richtung') + '</span></div>';
+                        html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_launchcheck') + '</span><span class="tooltip-value" style="color:' + (dirOk ? '#059669' : '#DC2626') + ';font-weight:700">' + (dirOk ? wcT('js.mg.dir_ok') : wcT('js.mg.dir_wrong')) + '</span></div>';
                     }
                 } else {
                     html += '<div class="tooltip-row"><span class="tooltip-label">Hoehe</span><span class="tooltip-value">' + Math.round(dd.altitude) + 'm</span></div>';
@@ -1907,35 +1943,47 @@ window.Meteogram = (function () {
                             html += '<div class="tooltip-row"><span class="tooltip-label">Exzess</span><span class="tooltip-value" style="color:' + turbulenceColor(tRiskVal) + '">+' + Math.round(tExcessVal) + ' km/h</span></div>';
                         }
                     }
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0 <span style="color:#94A3B8;font-size:10px">(freie Atm.)</span></span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_direction') + '</span><span class="tooltip-value">' + Math.round(dd.wind_direction) + '\u00B0 <span style="color:#94A3B8;font-size:10px">' + wcT('js.mg.free_atm') + '</span></span></div>';
                     if (dd.temperature != null) {
                         html += '<div class="tooltip-row"><span class="tooltip-label">Temp</span><span class="tooltip-value">' + dd.temperature.toFixed(1) + '\u00B0C</span></div>';
                     }
                     // Thermik rate at this altitude
                     var localThermRate = thermikCells[ri + ',' + ci];
                     if (localThermRate != null && localThermRate > 0) {
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Steigrate hier</span><span class="tooltip-value" style="color:' + thermClimbColor(localThermRate) + '">' + localThermRate.toFixed(1) + ' m/s</span></div>';
+                        html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_climbrate_here') + '</span><span class="tooltip-value" style="color:' + thermClimbColor(localThermRate) + '">' + localThermRate.toFixed(1) + ' m/s</span></div>';
                     }
                 }
             }
             if (wx.wind) {
-                html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Boden</span><span class="tooltip-value" style="color:' + windColor(wx.wind.speed) + '">' + Math.round(wx.wind.speed) + ' km/h</span></div>';
+                html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">' + wcT('js.mg.tt_ground') + '</span><span class="tooltip-value" style="color:' + windColor(wx.wind.speed) + '">' + Math.round(wx.wind.speed) + ' km/h</span></div>';
                 if (wx.wind.gusts != null) {
-                    html += '<div class="tooltip-row"><span class="tooltip-label">Boeen</span><span class="tooltip-value" style="color:' + windColor(wx.wind.gusts) + '">' + Math.round(wx.wind.gusts) + ' km/h</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_gusts_ascii') + '</span><span class="tooltip-value" style="color:' + windColor(wx.wind.gusts) + '">' + Math.round(wx.wind.gusts) + ' km/h</span></div>';
                 }
             }
             if (wx.thermik) {
                 if (wx.thermik.climb_rate > 0) {
-                    html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Steigrate</span><span class="tooltip-value">' + wx.thermik.climb_rate.toFixed(1) + ' m/s</span></div>';
+                    html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">' + wcT('js.mg.tt_climbrate') + '</span><span class="tooltip-value">' + wx.thermik.climb_rate.toFixed(1) + ' m/s</span></div>';
                     var _usableTop = (wx.thermik.lcl && wx.thermik.lcl < wx.thermik.max_height) ? wx.thermik.lcl : wx.thermik.max_height;
-                    var _topLabel = (wx.thermik.lcl && wx.thermik.lcl < wx.thermik.max_height) ? 'Arbeitsh\u00f6he (Basis)' : 'Arbeitsh\u00f6he';
+                    var _topLabel = (wx.thermik.lcl && wx.thermik.lcl < wx.thermik.max_height) ? wcT('js.mg.tt_workheight_base') : wcT('js.mg.tt_workheight');
                     html += '<div class="tooltip-row"><span class="tooltip-label">' + _topLabel + '</span><span class="tooltip-value">' + _usableTop + ' m MSL</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">Rating</span><span class="tooltip-value">' + wx.thermik.rating + '</span></div>';
+                    if (wx.thermik.torn_level) {
+                        var _tornTxt = wx.thermik.torn_level === 'unusable'
+                            ? wcT('js.mg.torn_unusable')
+                            : wcT('js.mg.torn_partial');
+                        var _tornCol = wx.thermik.torn_level === 'unusable' ? '#9F1239' : '#B45309';
+                        html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_thermik') + '</span><span class="tooltip-value" style="color:' + _tornCol + ';font-weight:600">' + _tornTxt + '</span></div>';
+                        // Erklärt die Diagonal-Schraffur über der Thermik-Säule.
+                        var _tornHint = wx.thermik.torn_level === 'unusable'
+                            ? wcT('js.mg.torn_hint_unusable')
+                            : wcT('js.mg.torn_hint_partial');
+                        html += '<div style="margin-top:3px;font-size:11px;color:#6B7280;line-height:1.35;white-space:normal;max-width:230px">' + _tornHint + '</div>';
+                    }
                 }
                 if (wx.thermik.cape > 0) html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';
             }
             if (wx.precipitation && wx.precipitation.amount > 0) {
-                html += '<div class="tooltip-row"><span class="tooltip-label">Regen</span><span class="tooltip-value">' + wx.precipitation.amount.toFixed(1) + ' mm</span></div>';
+                html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.warn_rain') + '</span><span class="tooltip-value">' + wx.precipitation.amount.toFixed(1) + ' mm</span></div>';
             }
             var wc = (wx.precipitation && wx.precipitation.weather_code != null) ? wx.precipitation.weather_code : (wx.cloudbase && wx.cloudbase.weather_code);
             if (isThunderstorm(wc)) {
@@ -1945,10 +1993,19 @@ window.Meteogram = (function () {
             tooltipEl.innerHTML = html;
             tooltipEl.classList.add('visible');
 
+            // Position: rechts neben dem Cursor, sonst nach links/oben kippen.
+            // Echte Tooltip-Grösse messen (Inhalt variiert stark, z.B. ~268×443)
+            // statt zu schätzen — und am Schluss HART in den Viewport klemmen,
+            // damit der Tooltip nie aus dem Fenster läuft (oben/unten/links/rechts).
+            var PAD = 8;
+            var tw = tooltipEl.offsetWidth;
+            var th = tooltipEl.offsetHeight;
             var tx = clientX + 16;
             var ty = clientY - 10;
-            if (tx + 200 > window.innerWidth) tx = clientX - 200;
-            if (ty + 250 > window.innerHeight) ty = clientY - 250;
+            if (tx + tw + PAD > window.innerWidth) tx = clientX - tw - 16;  // nach links kippen
+            if (ty + th + PAD > window.innerHeight) ty = clientY - th + 10;  // nach oben kippen
+            tx = Math.max(PAD, Math.min(tx, window.innerWidth - tw - PAD));
+            ty = Math.max(PAD, Math.min(ty, window.innerHeight - th - PAD));
             tooltipEl.style.left = tx + 'px';
             tooltipEl.style.top = ty + 'px';
         }
@@ -2010,14 +2067,14 @@ window.Meteogram = (function () {
                 altParts.push(Math.round(dd.wind_speed) + ' km/h');
                 var trVal = dd.turbulence_risk != null ? dd.turbulence_risk : dd.wind_gusts;
                 if (trVal != null && Math.round(trVal) > Math.round(dd.wind_speed)) {
-                    altParts.push('Böe ' + Math.round(trVal));
+                    altParts.push(wcT('js.mg.alt_gust') + Math.round(trVal));
                 }
             } else if (wx.wind) {
                 // Default: Boden-Werte zeigen
-                altParts.push('<b>Boden</b>');
+                altParts.push('<b>' + wcT('js.mg.tt_ground') + '</b>');
                 altParts.push(Math.round(wx.wind.speed) + ' km/h');
                 if (wx.wind.gusts != null && wx.wind.gusts > wx.wind.speed) {
-                    altParts.push('Böe ' + Math.round(wx.wind.gusts));
+                    altParts.push(wcT('js.mg.alt_gust') + Math.round(wx.wind.gusts));
                 }
             }
             if (wx.thermik && wx.thermik.climb_rate > 0) {
@@ -2135,7 +2192,7 @@ window.Meteogram = (function () {
         if (container) {
             container.innerHTML = '<div class="mga-hero no_data">'
                 + '<div class="mga-hero-text">'
-                + '<div class="mga-hero-verdict no_data">Analyse-Ansicht nicht verfuegbar</div>'
+                + '<div class="mga-hero-verdict no_data">' + wcT('js.mg.analysis_unavailable') + '</div>'
                 + '</div></div>';
         }
     }

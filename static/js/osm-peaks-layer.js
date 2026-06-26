@@ -7,7 +7,7 @@
  *        Generiert via scripts/fetch_osm_peaks.py
  *
  * API:
- *   window.GleitcastOsmPeaks.attach(map, options)
+ *   window.WingcastOsmPeaks.attach(map, options)
  *     options = {
  *       minZoomMajor: 9,    // ab welchem Zoom Major-Layer geladen wird
  *       minZoomMinor: 12,   // ab welchem Zoom Minor-Layer geladen wird
@@ -257,5 +257,5 @@
         };
     }
 
-    window.GleitcastOsmPeaks = { attach: attach };
+    window.WingcastOsmPeaks = { attach: attach };
 })();

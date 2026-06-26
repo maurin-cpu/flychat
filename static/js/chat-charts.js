@@ -22,7 +22,7 @@ window.ChatCharts = (function () {
     }
 
     function showLoading(el) {
-        el.innerHTML = '<div class="chart-loading">Daten werden geladen\u2026</div>';
+        el.innerHTML = '<div class="chart-loading">' + wcT('js.chart.loading') + '</div>';
     }
 
     function showError(el, msg) {
@@ -113,7 +113,7 @@ window.ChatCharts = (function () {
                 case 'thermal_timeline': renderThermalTimeline(el, params); break;
                 case 'foehn': renderFoehn(el, params); break;
                 case 'wind_profile': renderWindProfile(el, params); break;
-                default: showError(el, 'Unbekannter Chart-Typ: ' + type);
+                default: showError(el, wcT('js.chart.unknown_type', { type: type }));
             }
         });
     }
@@ -123,13 +123,13 @@ window.ChatCharts = (function () {
     function renderWindTimeline(el, params) {
         var spot = params.spot;
         var date = resolveDate(params);
-        if (!spot) { showError(el, 'Kein Spot angegeben'); return; }
+        if (!spot) { showError(el, wcT('js.chart.no_spot')); return; }
         showLoading(el);
 
         fetchJSON('/api/weather/' + encodeURIComponent(spot)).then(function (resp) {
             var dayData = (resp.data || {})[date];
             if (!dayData || !dayData.wind || dayData.wind.length === 0) {
-                showError(el, 'Keine Winddaten f\u00fcr ' + spot + ' am ' + date);
+                showError(el, wcT('js.chart.no_wind_data', { spot: spot, date: date }));
                 return;
             }
             el.innerHTML = '';
@@ -140,7 +140,7 @@ window.ChatCharts = (function () {
                 el.appendChild(titleEl);
             }
             drawWindTimeline(el, dayData.wind);
-        }).catch(function (err) { showError(el, 'Fehler: ' + err.message); });
+        }).catch(function (err) { showError(el, wcT('js.error.prefix', { msg: err.message })); });
     }
 
     function drawWindTimeline(container, windData) {
@@ -161,7 +161,7 @@ window.ChatCharts = (function () {
             var h = new Date(d.time).getHours();
             return h >= 6 && h <= 18;
         });
-        if (data.length === 0) { showError(container, 'Keine Daten 06-18h'); return; }
+        if (data.length === 0) { showError(container, wcT('js.chart.no_data_0618')); return; }
 
         var x = d3.scalePoint().domain(data.map(function (d) { return d.time; })).range([0, innerW]).padding(0.3);
         var maxVal = d3.max(data, function (d) { return Math.max(d.speed || 0, d.gusts || 0); }) || 30;
@@ -242,11 +242,11 @@ window.ChatCharts = (function () {
             .on('mouseover', function (event, d) {
                 var h = new Date(d.time).getHours();
                 var gustLine = (d.gusts != null && d.gusts > d.speed)
-                    ? '<br>B\u00f6en: ' + d.gusts + ' km/h'
+                    ? '<br>' + wcT('js.chart.tt_gusts') + d.gusts + ' km/h'
                     : '';
                 tip.show(event.offsetX, event.offsetY,
                     '<b>' + h + ':00</b><br>Wind: ' + (d.speed || 0) + ' km/h' + gustLine +
-                    (d.direction_label ? '<br>Richtung: ' + d.direction_label : ''));
+                    (d.direction_label ? '<br>' + wcT('js.chart.tt_direction') + d.direction_label : ''));
             })
             .on('mouseout', function () { tip.hide(); });
 
@@ -255,7 +255,7 @@ window.ChatCharts = (function () {
         legend.className = 'chart-legend';
         legend.innerHTML =
             '<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:#10B981"></span> Wind</span>' +
-            '<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:#EA580C"></span> B\u00f6en</span>';
+            '<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:#EA580C"></span> ' + wcT('js.chart.legend_gusts') + '</span>';
         container.appendChild(legend);
     }
 
@@ -264,14 +264,14 @@ window.ChatCharts = (function () {
     function renderThermalTimeline(el, params) {
         var spot = params.spot;
         var date = resolveDate(params);
-        if (!spot) { showError(el, 'Kein Spot angegeben'); return; }
+        if (!spot) { showError(el, wcT('js.chart.no_spot')); return; }
         showLoading(el);
 
         fetchJSON('/api/weather/' + encodeURIComponent(spot)).then(function (resp) {
             var dayData = (resp.data || {})[date];
             var elevation = resp.elevation_m || 850;
             if (!dayData || !dayData.thermik || dayData.thermik.length === 0) {
-                showError(el, 'Keine Thermikdaten f\u00fcr ' + spot + ' am ' + date);
+                showError(el, wcT('js.chart.no_thermal_data', { spot: spot, date: date }));
                 return;
             }
             el.innerHTML = '';
@@ -282,7 +282,7 @@ window.ChatCharts = (function () {
                 el.appendChild(titleEl);
             }
             drawThermalTimeline(el, dayData.thermik, elevation);
-        }).catch(function (err) { showError(el, 'Fehler: ' + err.message); });
+        }).catch(function (err) { showError(el, wcT('js.error.prefix', { msg: err.message })); });
     }
 
     function drawThermalTimeline(container, thermikData, elevation) {
@@ -292,7 +292,7 @@ window.ChatCharts = (function () {
             return h >= 6 && h <= 18 && d.climb_rate > 0;
         });
         if (data.length === 0) {
-            showError(container, 'Keine Thermik an diesem Tag');
+            showError(container, wcT('js.chart.no_thermal_day'));
             return;
         }
 
@@ -316,6 +316,19 @@ window.ChatCharts = (function () {
         var svg = d3.select(container).append('svg')
             .attr('viewBox', '0 0 ' + width + ' ' + height)
             .attr('preserveAspectRatio', 'xMidYMid meet');
+
+        // Diagonal-Schraffur für "Thermik zerrissen" (TORN) — Säule bleibt voll,
+        // Schraffur signalisiert nur die Höhenwind-Scherung.
+        var defs = svg.append('defs');
+        [['ct-torn-deg', 'rgba(180, 83, 9, 0.55)'], ['ct-torn-unu', 'rgba(159, 18, 57, 0.65)']]
+            .forEach(function (h) {
+                var p = defs.append('pattern').attr('id', h[0])
+                    .attr('patternUnits', 'userSpaceOnUse')
+                    .attr('width', 6).attr('height', 6)
+                    .attr('patternTransform', 'rotate(45)');
+                p.append('line').attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 6)
+                    .attr('stroke', h[1]).attr('stroke-width', 1.6);
+            });
 
         var g = svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
@@ -351,7 +364,7 @@ window.ChatCharts = (function () {
                     .on('mouseover', function (event) {
                         tip.show(event.offsetX, event.offsetY,
                             '<b>' + new Date(d.time).getHours() + ':00 / ' + alt + 'm</b><br>' +
-                            'Steigen: ' + rate + ' m/s');
+                            wcT('js.chart.tt_climb') + rate + ' m/s');
                     })
                     .on('mouseout', function () { tip.hide(); });
 
@@ -367,6 +380,24 @@ window.ChatCharts = (function () {
                         .text(rate.toFixed(1));
                 }
             });
+
+            // TORN-Schraffur über die volle Säule dieser Stunde (Höhe bleibt voll).
+            if (d.torn_level) {
+                var rates = altSteps.filter(function (alt) {
+                    return thermalRateAtAltitude(d.climb_rate, d.max_height || maxH, elevation, alt) > 0;
+                });
+                if (rates.length) {
+                    var topAlt = d3.max(rates), botAlt = d3.min(rates);
+                    var yTop = y(topAlt), yBot = y(botAlt) + y.bandwidth();
+                    var hatchId = d.torn_level === 'unusable' ? 'ct-torn-unu' : 'ct-torn-deg';
+                    g.append('rect')
+                        .attr('x', x(d.time)).attr('y', yTop)
+                        .attr('width', x.bandwidth()).attr('height', yBot - yTop)
+                        .attr('fill', 'url(#' + hatchId + ')').attr('rx', 2)
+                        .style('pointer-events', 'none')
+                        .append('title').text(wcT('js.chart.thermal_torn'));
+                }
+            }
         });
 
         // Legend
@@ -390,7 +421,7 @@ window.ChatCharts = (function () {
         fetchJSON('/api/foehn').then(function (resp) {
             var dayData = (resp.data || resp)[date];
             if (!dayData || dayData.length === 0) {
-                showError(el, 'Keine F\u00f6hndaten f\u00fcr ' + date);
+                showError(el, wcT('js.chart.no_foehn_data', { date: date }));
                 return;
             }
             el.innerHTML = '';
@@ -401,7 +432,7 @@ window.ChatCharts = (function () {
                 el.appendChild(titleEl);
             }
             drawFoehn(el, dayData);
-        }).catch(function (err) { showError(el, 'Fehler: ' + err.message); });
+        }).catch(function (err) { showError(el, wcT('js.error.prefix', { msg: err.message })); });
     }
 
     function drawFoehn(container, data) {
@@ -517,7 +548,7 @@ window.ChatCharts = (function () {
             .on('mouseover', function (event, d) {
                 tip.show(event.offsetX, event.offsetY,
                     '<b>' + d.hour + ':00</b><br>\u0394P: ' + (d.delta_p != null ? d.delta_p + ' hPa' : '-') +
-                    '<br>Kammwind: ' + (d.crest_wind_kmh || '-') + ' km/h' +
+                    '<br>' + wcT('js.chart.tt_crestwind') + (d.crest_wind_kmh || '-') + ' km/h' +
                     '<br>Level: ' + (d.level || '-'));
             })
             .on('mouseout', function () { tip.hide(); });
@@ -527,7 +558,7 @@ window.ChatCharts = (function () {
         legend.className = 'chart-legend';
         legend.innerHTML =
             '<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:#0369a1"></span> \u0394P (hPa)</span>' +
-            '<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:#EA580C"></span> Kammwind</span>';
+            '<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:#EA580C"></span> ' + wcT('js.chart.legend_crestwind') + '</span>';
         container.appendChild(legend);
     }
 
@@ -537,13 +568,13 @@ window.ChatCharts = (function () {
         var spot = params.spot;
         var date = resolveDate(params);
         var hours = (params.hours || '10,12,14,16').split(',').map(Number);
-        if (!spot) { showError(el, 'Kein Spot angegeben'); return; }
+        if (!spot) { showError(el, wcT('js.chart.no_spot')); return; }
         showLoading(el);
 
         fetchJSON('/api/altitude-wind/' + encodeURIComponent(spot)).then(function (resp) {
             var dayProfiles = (resp.data || {})[date];
             if (!dayProfiles || dayProfiles.length === 0) {
-                showError(el, 'Keine H\u00f6henwinddaten f\u00fcr ' + spot + ' am ' + date);
+                showError(el, wcT('js.chart.no_upperwind_data', { spot: spot, date: date }));
                 return;
             }
             el.innerHTML = '';
@@ -554,7 +585,7 @@ window.ChatCharts = (function () {
                 el.appendChild(titleEl);
             }
             drawWindProfile(el, dayProfiles, hours);
-        }).catch(function (err) { showError(el, 'Fehler: ' + err.message); });
+        }).catch(function (err) { showError(el, wcT('js.error.prefix', { msg: err.message })); });
     }
 
     function drawWindProfile(container, dayProfiles, selectedHours) {
@@ -587,7 +618,7 @@ window.ChatCharts = (function () {
             });
         });
 
-        if (allAlts.length === 0) { showError(container, 'Keine Profildaten'); return; }
+        if (allAlts.length === 0) { showError(container, wcT('js.chart.no_profile_data')); return; }
 
         var x = d3.scaleLinear().domain([0, d3.max(allSpeeds) * 1.15 || 50]).range([0, innerW]);
         var y = d3.scaleLinear().domain([d3.min(allAlts), d3.max(allAlts)]).range([innerH, 0]);
@@ -644,8 +675,8 @@ window.ChatCharts = (function () {
                     tip.show(event.offsetX, event.offsetY,
                         '<b>' + p.hour + ':00 / ' + d.altitude + 'm</b><br>' +
                         'Wind: ' + (d.wind_speed || 0) + ' km/h' +
-                        (d.wind_gusts ? '<br>B\u00f6en: ' + d.wind_gusts + ' km/h' : '') +
-                        (d.wind_direction != null ? '<br>Richtung: ' + d.wind_direction + '\u00b0' : ''));
+                        (d.wind_gusts ? '<br>' + wcT('js.chart.tt_gusts') + d.wind_gusts + ' km/h' : '') +
+                        (d.wind_direction != null ? '<br>' + wcT('js.chart.tt_direction') + d.wind_direction + '\u00b0' : ''));
                 })
                 .on('mouseout', function () { tip.hide(); });
         });
@@ -672,7 +703,7 @@ window.ChatCharts = (function () {
             } else if (params.region) {
                 renderRegionMeteogram(el, params);
             } else {
-                showError(el, 'Kein Spot oder Region angegeben');
+                showError(el, wcT('js.chart.no_spot_or_region'));
             }
         });
     }
@@ -694,7 +725,7 @@ window.ChatCharts = (function () {
             var elevation = wxResp.elevation_m || 850;
 
             if (!altProfiles || altProfiles.length === 0) {
-                showError(el, 'Keine Daten f\u00fcr ' + spot + ' am ' + date);
+                showError(el, wcT('js.chart.no_data', { spot: spot, date: date }));
                 return;
             }
 
@@ -720,9 +751,9 @@ window.ChatCharts = (function () {
             if (window.Meteogram && window.Meteogram.renderChart) {
                 window.Meteogram.renderChart(chartDiv, tooltipDiv, wxDay || {}, altDay, { elevation: elevation });
             } else {
-                showError(el, 'Meteogram-Modul nicht geladen');
+                showError(el, wcT('js.chart.meteogram_module'));
             }
-        }).catch(function (err) { showError(el, 'Fehler: ' + err.message); });
+        }).catch(function (err) { showError(el, wcT('js.error.prefix', { msg: err.message })); });
     }
 
     function renderRegionMeteogram(el, params) {
@@ -742,7 +773,7 @@ window.ChatCharts = (function () {
             var elevation = wxResp.elevation_ref || wxResp.elevation_m || 1200;
 
             if (!altProfiles || altProfiles.length === 0) {
-                showError(el, 'Keine Daten f\u00fcr Region ' + region + ' am ' + date);
+                showError(el, wcT('js.chart.no_data_region', { region: region, date: date }));
                 return;
             }
 
@@ -767,9 +798,9 @@ window.ChatCharts = (function () {
             if (window.Meteogram && window.Meteogram.renderChart) {
                 window.Meteogram.renderChart(chartDiv, tooltipDiv, wxDay || {}, altDay, { elevation: elevation });
             } else {
-                showError(el, 'Meteogram-Modul nicht geladen');
+                showError(el, wcT('js.chart.meteogram_module'));
             }
-        }).catch(function (err) { showError(el, 'Fehler: ' + err.message); });
+        }).catch(function (err) { showError(el, wcT('js.error.prefix', { msg: err.message })); });
     }
 
     // ================================================================
@@ -795,7 +826,7 @@ window.ChatCharts = (function () {
         if (regionId) fetches.push(fetchJSON('/api/regionen'));
 
         if (fetches.length === 0) {
-            showError(el, 'Keine Spots oder Region angegeben');
+            showError(el, wcT('js.chart.no_spots_or_region'));
             return;
         }
 
@@ -879,7 +910,7 @@ window.ChatCharts = (function () {
             // Fix Leaflet rendering in dynamic containers
             setTimeout(function () { map.invalidateSize(); }, 100);
 
-        }).catch(function (err) { showError(el, 'Kartenfehler: ' + err.message); });
+        }).catch(function (err) { showError(el, wcT('js.chart.map_error', { msg: err.message })); });
     }
 
     // ================================================================
@@ -896,7 +927,7 @@ window.ChatCharts = (function () {
             var script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
             script.onload = function () { chartjsLoaded = true; resolve(); };
-            script.onerror = function () { reject(new Error('Chart.js konnte nicht geladen werden')); };
+            script.onerror = function () { reject(new Error(wcT('js.chart.chartjs_load_failed'))); };
             document.head.appendChild(script);
         });
         return chartjsLoadPromise;
@@ -910,7 +941,7 @@ window.ChatCharts = (function () {
             var preEl = codeEl.parentElement;
             var wrapper = document.createElement('div');
             wrapper.className = 'chartjs-container';
-            wrapper.innerHTML = '<div class="chart-loading">Chart wird geladen\u2026</div>';
+            wrapper.innerHTML = '<div class="chart-loading">' + wcT('js.chart.loading_chart') + '</div>';
             preEl.parentNode.replaceChild(wrapper, preEl);
 
             var jsonStr = codeEl.textContent.trim();
@@ -931,7 +962,7 @@ window.ChatCharts = (function () {
             try {
                 config = JSON.parse(jsonStr);
             } catch (e) {
-                showError(wrapper, 'Ung\u00fcltiges JSON f\u00fcr Chart');
+                showError(wrapper, wcT('js.chart.invalid_json'));
                 return;
             }
 
@@ -942,7 +973,7 @@ window.ChatCharts = (function () {
                 try {
                     new Chart(canvas.getContext('2d'), config);
                 } catch (e) {
-                    showError(wrapper, 'Chart-Fehler: ' + e.message);
+                    showError(wrapper, wcT('js.chart.chart_error', { msg: e.message }));
                 }
             }).catch(function (err) { showError(wrapper, err.message); });
         });

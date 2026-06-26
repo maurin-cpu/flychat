@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   Gleitcast – Subscribe: Region-Filter mit Chips + Karte
+   Wingcast – Subscribe: Region-Filter mit Chips + Karte
    Spiegelt die Briefing-UX (static/js/briefing.js) auf dem
    Abo-Formular. Auswahl via Chip oder Klick aufs Polygon.
    Hidden <input>s werden für den POST synchronisiert.
@@ -57,11 +57,11 @@
       // (alle <-> keine), damit der Button beide Richtungen kann.
       const allActive = regions.length > 0 && regions.every((r) => selected.has(r.id));
       resetBtn.disabled = regions.length === 0;
-      resetBtn.textContent = "Alle";
+      resetBtn.textContent = wcT("js.regions.all");
       resetBtn.classList.toggle("is-active", allActive);
       resetBtn.setAttribute(
         "aria-label",
-        allActive ? "Alle Regionen abwählen" : "Alle Regionen auswählen"
+        allActive ? wcT("js.regions.deselect_all") : wcT("js.regions.select_all")
       );
       resetBtn.setAttribute("aria-pressed", allActive ? "true" : "false");
     }
@@ -121,7 +121,7 @@
       return;
     }
     if (typeof L === "undefined") {
-      mapEl.innerHTML = '<div class="sp-minimap-fallback">Karte nicht verfuegbar</div>';
+      mapEl.innerHTML = '<div class="sp-minimap-fallback">' + wcT('js.map.unavailable') + '</div>';
       return;
     }
 
@@ -180,7 +180,7 @@
         .catch((err) => console.warn("[subscribe] filter-map fetch failed", err));
     } catch (e) {
       console.warn("[subscribe] filter-map init failed", e);
-      mapEl.innerHTML = '<div class="sp-minimap-fallback">Karte nicht verfuegbar</div>';
+      mapEl.innerHTML = '<div class="sp-minimap-fallback">' + wcT('js.map.unavailable') + '</div>';
     }
   }
 

@@ -1,5 +1,5 @@
 """
-Wetterdaten-Aggregation für Gleitcast.
+Wetterdaten-Aggregation für Wingcast.
 Adaptiert von uetliberg_ticker/fetch_weather.py - Multi-Spot Support.
 
 Batch-Modus: Alle Spots in 6 API-Calls (D2+Thermal+Fallback+GFS+CH1+CH2).
@@ -40,6 +40,24 @@ import statistics
 # 7 Regionen heute haben n<3 (Mittelland West/Ost, Bodenseeraum, Jura Ost, Seeland,
 # Zentrales Mittelland, Waadtländer Alpen).
 SPOT_MEDIAN_MIN_SPOTS = 3
+
+
+def _spot_p75(vals):
+    """75. Perzentil (lineare Interpolation, = statistics.quantiles method='exclusive').
+
+    2026-06-07: Region-Hoehen-Aggregation von Median (P50) auf P75 umgestellt.
+    Beleg: 16 echte XContest-Topouts (28.-30.05.2026) gegen Region-Vorhersage —
+    P50 unterschaetzte die erreichte Decke median 371m (13/16 Fluege ueber Vorhersage,
+    7/16 mit Basis UNTER erflogener Hoehe = physikalisch unmoeglich). P75 nahezu
+    bias-frei (median +96m), kleinster |Bias| (321m). Siehe xcontest_validation/
+    SYSTEM_CHANGES.md (2026-06-07) und debug_scripts/topout_vs_percentile.py.
+    Gilt nur fuer max_height/lcl (Hoehen-Groessen, durch Topout validiert);
+    climb_rate bleibt Median (Steig-Groesse, nicht gegen Topout pruefbar).
+    """
+    if len(vals) == 1:
+        return vals[0]
+    return statistics.quantiles(vals, n=4)[2]
+
 
 # --- Aggregation Constants (Modul-Level) ---
 CLOUD_PARAMS = {"cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"}
@@ -838,8 +856,13 @@ def _compute_region_spotmedian_thermals(all_data, spots, all_regions):
     16/23 Wallis-aehnliche Regionen werden ins richtige Niveau gehoben.
 
     Wind / Wolken / Niederschlag bleiben Refpoint-aggregiert (funktionieren gut).
-    Nur max_height / climb_rate / lcl werden pro Stunde mit Spot-Median ueber-
-    schrieben — via compute_daily_thermals(..., spotmedian_override=...).
+    Nur max_height / climb_rate / lcl werden pro Stunde aus den in-region Spots
+    aggregiert — via compute_daily_thermals(..., spotmedian_override=...).
+
+    2026-06-07: Hoehen-Groessen (max_height/lcl) nutzen jetzt P75 statt Median
+    (Topout-validiert, siehe _spot_p75 + SYSTEM_CHANGES.md). climb_rate bleibt
+    Median. Der Override-Key heisst aus Kompat-Gruenden weiter "thermals_spotmedian"
+    (in Snapshots/Archiven persistiert) — der Name ist seither ein Misnomer.
 
     Schwelle: n_spots >= SPOT_MEDIAN_MIN_SPOTS (3). Darunter Refpoint-Pfad.
 
@@ -892,11 +915,13 @@ def _compute_region_spotmedian_thermals(all_data, spots, all_regions):
             lcl_vals = [v for v in lcl_vals if isinstance(v, (int, float))]
             if len(mh_vals) < SPOT_MEDIAN_MIN_SPOTS:
                 continue
-            ov = {"max_height": int(statistics.median(mh_vals))}
+            # 2026-06-07: max_height/lcl auf P75 umgestellt (Topout-validiert,
+            # siehe _spot_p75). climb_rate bleibt Median (nicht Topout-pruefbar).
+            ov = {"max_height": int(_spot_p75(mh_vals))}
             if cr_vals:
                 ov["climb_rate"] = round(statistics.median(cr_vals), 2)
             if lcl_vals:
-                ov["lcl"] = int(statistics.median(lcl_vals))
+                ov["lcl"] = int(_spot_p75(lcl_vals))
             ov_per_ts[ts] = ov
         if ov_per_ts:
             overrides[rid] = {

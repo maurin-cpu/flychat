@@ -18,6 +18,9 @@ nul
 # Logs
 *.log
 
+# Node deps (nur fuer lokale Playwright-Debug-Screenshots)
+node_modules/
+
 # Runtime data (generated, server-local)
 data/wetterdaten.json
 data/spot_analyses.json
@@ -40,3 +43,6 @@ data/labeled_examples.*.jsonl
 # Runtime config (Admin-UI written, server-local)
 data/config_overrides.json
 data/test_mode.json
+
+# Föhn-Test Wegwerf-Caches (debug_scripts/build_foehn_cache.py)
+data/foehn_cache_*.json

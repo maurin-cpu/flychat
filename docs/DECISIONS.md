@@ -143,7 +143,7 @@ werden anders aggregiert; diese Decisions sind spot-spezifisch).
 Aufruf in `_post_process_flyability_spot` (Spot) und `_post_process_flyability_region` (Region).
 
 **Architektur-Wechsel ggue. v1.4:** Es gibt **keine Flyability-Tier-Decisions
-mehr**. `experience_rating` (1-10) und `flyability_tier` werden direkt vom LLM
+mehr**. `experience_rating` (1-5) und `flyability_tier` werden direkt vom LLM
 gesetzt — der Code rechnet nichts mehr nach, aggregiert nichts mehr aus
 Sub-Achsen, ueberschreibt das Tier nicht mehr durch Reward-Korrekturen.
 
@@ -189,7 +189,7 @@ neue Cache-Felder aus den Sub-Ratings + Decisions.
 
 Hinweis (v1.5): `_compute_rating_from_subratings`, `_compute_experience_score`,
 `_compute_experience_stars`, `_compute_experience_rating` und
-`compute_legacy_flyability_tier` wurden entfernt. `experience_rating` (1-10)
+`compute_legacy_flyability_tier` wurden entfernt. `experience_rating` (1-5)
 und `flyability_tier` kommen direkt vom LLM. `experience_score = experience_rating × 10`
 ist eine reine Unit-Conversion fuer UI-Compat und kein Aggregations-Schritt.
 

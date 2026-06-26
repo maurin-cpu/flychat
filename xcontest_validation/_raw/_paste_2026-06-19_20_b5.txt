@@ -1,0 +1,639 @@
+19.06.2026
+№    start time    pilot    launch    route    length    points    airtime    glider    info    ⁕
+1
+19.06.26 12:52=UTC+02:00
+CHRaphael Renzi
+CHMauborget
+36.46 km    51.05 p.    3 : 15 h
+2
+19.06.26 10:34=UTC+02:00
+CHMatthias Pfister
+CHRiederalp
+22.65 km    27.18 p.    1 : 19 h
+3
+19.06.26 14:02=UTC+02:00
+CHLaurent Holenweg
+CHLe Suchet
+2.67 km    2.67 p.    0 : 08 h
+4
+19.06.26 11:05=UTC+02:00
+CHJoel Meier
+CHEbenalp
+24.90 km    24.90 p.    2 : 14 h
+5
+19.06.26 09:16=UTC+02:00
+CHSusann Küpfer
+CHBrambrüesch
+4.55 km    4.55 p.    0 : 14 h
+6
+19.06.26 11:39=UTC+02:00
+CHManuel Bär
+CHScheidegg
+33.46 km    33.46 p.    2 : 30 h
+7
+19.06.26 11:35=UTC+02:00
+CHErnst Hinterberger
+CHGnipen
+25.33 km    25.33 p.    2 : 14 h
+8
+19.06.26 11:00=UTC+02:00
+CHBasil Reinhard
+CHSchwyberg
+25.94 km    36.31 p.    1 : 50 h
+9
+19.06.26 20:13=UTC+02:00
+CHSimon Steiner
+CHGnipen
+4.29 km    4.29 p.    0 : 12 h
+10
+19.06.26 10:58=UTC+02:00
+CHPeter Pünter
+CHEbenalp
+31.03 km    31.03 p.    2 : 51 h
+11
+19.06.26 10:06=UTC+02:00
+CHPeter Nold
+CHCalandahütte
+7.33 km    7.33 p.    0 : 27 h
+12
+19.06.26 14:38=UTC+02:00
+CHFrederik Traber
+CHScheidegg
+3.48 km    3.47 p.    0 : 09 h
+13
+19.06.26 11:46=UTC+02:00
+CHMats Stauffacher
+CHWeissenstein
+47.72 km    47.72 p.    2 : 47 h
+14
+19.06.26 10:27=UTC+02:00
+USPhilip Russman
+CHMotta Naluns
+179.85 km    179.85 p.    7 : 29 h
+15
+19.06.26 13:12=UTC+02:00
+PLAdam Staszkiewicz
+CHMornera
+6.66 km    6.66 p.    0 : 35 h
+16
+19.06.26 11:28=UTC+02:00
+CHUrs Zahner
+CHEbenalp
+26.03 km    36.44 p.    3 : 09 h
+17
+19.06.26 17:44=UTC+02:00
+CHReto Paganini
+CHMonte Lema
+5.42 km    5.42 p.    0 : 18 h
+18
+19.06.26 17:32=UTC+02:00
+CHDaniele Tessaro
+CHMonte Gen...
+11.70 km    11.70 p.    0 : 42 h
+19
+19.06.26 12:10=UTC+02:00
+CHDieter Lutz
+CHWeissenstein
+80.49 km    80.49 p.    3 : 50 h
+20
+19.06.26 11:54=UTC+02:00
+CHErich Blättler
+CHScheidegg
+14.46 km    14.46 p.    0 : 48 h
+21
+19.06.26 11:56=UTC+02:00
+CHYvan Corminboeuf
+CHVounetz
+4.53 km    4.53 p.    0 : 30 h
+22
+19.06.26 11:54=UTC+02:00
+CHRolf Eichenberger
+CHScheidegg
+19.77 km    23.73 p.    1 : 09 h
+23
+19.06.26 11:37=UTC+02:00
+CHIrene Homberger
+CHEbenalp
+21.34 km    29.87 p.    2 : 01 h
+24
+19.06.26 11:38=UTC+02:00
+CHRoman Belloli
+CHEbenalp
+12.81 km    17.93 p.    1 : 43 h
+25
+19.06.26 12:07=UTC+02:00
+CHTom Bahr
+CHEbenalp
+20.06 km    28.08 p.    2 : 00 h
+26
+19.06.26 12:49=UTC+02:00
+DEHendric Schmidt
+CHPfunds
+58.37 km    58.37 p.    3 : 46 h
+27
+19.06.26 14:48=UTC+02:00
+CHFritz Hodel
+CHWeissenstein
+18.42 km    25.79 p.    1 : 17 h
+28
+19.06.26 13:08=UTC+02:00
+CHFred Racle
+CHSorvilier
+51.55 km    72.17 p.    2 : 29 h
+29
+19.06.26 12:11=UTC+02:00
+CHBlaise Duvernay
+CHTête-de-Ran
+35.00 km    49.00 p.    2 : 38 h
+30
+19.06.26 14:27=UTC+02:00
+CHFrançois Udressy
+CHGrandvillard
+2.98 km    2.98 p.    0 : 18 h
+31
+19.06.26 11:40=UTC+02:00
+CHMarco Boscacci
+CHMonte Tamaro
+28.41 km    39.77 p.    2 : 06 h
+32
+19.06.26 15:45=UTC+02:00
+CHBenedikt Imbach
+CHPilatus K...
+6.68 km    6.68 p.    0 : 15 h
+33
+19.06.26 10:15=UTC+02:00
+CHChristoph Läser
+CHNiesen
+81.49 km    114.09 p.    4 : 03 h
+34
+19.06.26 13:56=UTC+02:00
+CHReto Wicki
+CHMarbachegg
+5.51 km    5.51 p.    1 : 06 h
+35
+19.06.26 12:15=UTC+02:00
+CHFabrizio Bisi
+CHCimetta
+16.01 km    16.01 p.    1 : 24 h
+36
+19.06.26 10:44=UTC+02:00
+CHSylvia Brunek
+CHNiederhorn
+18.79 km    18.79 p.    1 : 05 h
+37
+19.06.26 12:18=UTC+02:00
+CHAaron Coulin
+CHWeissenstein
+24.06 km    24.06 p.    2 : 16 h
+38
+19.06.26 13:41=UTC+02:00
+CHMichael Urfer
+CHWinteregg
+31.80 km    31.80 p.    1 : 50 h
+39
+19.06.26 13:43=UTC+02:00
+CHLoïc Mercerat
+CHBözingenberg
+27.70 km    27.70 p.    2 : 15 h
+40
+19.06.26 11:43=UTC+02:00
+CHGebi Abächerli
+CHWeissenstein
+71.28 km    71.28 p.    4 : 14 h
+41
+19.06.26 11:50=UTC+02:00
+CHMario Ammann
+CHHasenmatt
+49.84 km    69.77 p.    3 : 54 h
+42
+19.06.26 13:44=UTC+02:00
+CHAndi Wyder
+CHBrandberg
+2.58 km    2.58 p.    0 : 13 h
+43
+19.06.26 15:02=UTC+02:00
+CHAndi Wyder
+CHBrandberg
+7.24 km    10.14 p.    0 : 33 h
+44
+19.06.26 11:56=UTC+02:00
+CHRoland Huber
+CHWeissenstein
+60.69 km    60.68 p.    3 : 39 h
+45
+19.06.26 10:52=UTC+02:00
+FRPaul Leclerc
+CHTorgon
+1.92 km    1.92 p.    0 : 07 h
+46
+19.06.26 10:24=UTC+02:00
+FRPaul Leclerc
+CHTorgon
+3.24 km    3.24 p.    0 : 25 h
+47
+19.06.26 11:47=UTC+02:00
+CHMarco Meier
+CHScheidegg
+46.18 km    46.18 p.    3 : 10 h
+48
+19.06.26 13:32=UTC+02:00
+CHJürg Zweifel
+CHBüelen
+29.08 km    46.53 p.    1 : 46 h
+49
+19.06.26 12:10=UTC+02:00
+CHAndreas Lehner
+CHWeissenstein
+53.42 km    53.42 p.    3 : 03 h
+50
+19.06.26 11:33=UTC+02:00
+CHOliver Fluck
+CHEbenalp
+24.84 km    39.74 p.    3 : 08 h
+51
+19.06.26 11:39=UTC+02:00
+CHHansueli Hirschi
+CHWeissenstein
+73.45 km    88.14 p.    3 : 23 h
+52
+19.06.26 11:50=UTC+02:00
+CHMartin Jung
+CHAmisbühl
+15.96 km    22.34 p.    2 : 36 h
+53
+19.06.26 11:42=UTC+02:00
+CHJonas Gfeller
+CHWeissenstein
+28.19 km    28.19 p.    1 : 53 h
+54
+19.06.26 11:09=UTC+02:00
+NOmarkus foerst
+CHWeissenstein
+44.68 km    62.56 p.    3 : 37 h
+55
+19.06.26 12:11=UTC+02:00
+CHMichael Leuba
+CHTête-de-Ran
+37.30 km    52.22 p.    2 : 36 h
+56
+19.06.26 12:28=UTC+02:00
+CHAndreas Richard
+CHWeissenstein
+24.35 km    24.35 p.    1 : 51 h
+57
+19.06.26 12:47=UTC+02:00
+CHMyk Mik
+CHBrändlen
+22.39 km    35.82 p.    1 : 46 h
+58
+19.06.26 10:39=UTC+02:00
+CHSimon Gantenbein
+CHEbenalp
+18.16 km    18.16 p.    1 : 38 h
+59
+19.06.26 13:29=UTC+02:00
+CHHans Furrer
+CHRotenflue
+17.91 km    25.07 p.    1 : 01 h
+60
+19.06.26 13:18=UTC+02:00
+CHDamien Carrara
+CHCimetta
+10.49 km    10.49 p.    0 : 50 h
+61
+19.06.26 13:00=UTC+02:00
+CHBruno Jans
+CHMonte Lema
+28.16 km    33.79 p.    1 : 29 h
+62
+19.06.26 11:53=UTC+02:00
+CHDamien Carrara
+CHCimetta
+4.67 km    4.67 p.    0 : 57 h
+63
+19.06.26 12:51=UTC+02:00
+CHAndreas Klostermann
+CHWeissenstein
+25.42 km    25.42 p.    1 : 34 h
+64
+19.06.26 12:26=UTC+02:00
+FRJulien Malzac
+CHSchildgrat
+23.77 km    23.77 p.    1 : 58 h
+65
+19.06.26 13:44=UTC+02:00
+CHNils Hänni
+CHLuegibrue...
+3.07 km    3.07 p.    0 : 10 h
+66
+19.06.26 12:35=UTC+02:00
+CHNils Hänni
+CHLuegibrue...
+2.94 km    2.94 p.    0 : 07 h
+67
+19.06.26 10:27=UTC+02:00
+CHPetzi 🥳
+CHLes Pètis
+18.10 km    28.97 p.    1 : 25 h
+68
+19.06.26 13:14=UTC+02:00
+PLTomasz Rusak
+CHMornera
+5.16 km    5.15 p.    0 : 49 h
+69
+19.06.26 13:58=UTC+02:00
+CHRomano Loehrer
+CHMonte Lema
+4.31 km    4.31 p.    0 : 17 h
+70
+19.06.26 11:02=UTC+02:00
+USPeter Fisher
+CHFiesch
+17.01 km    23.81 p.    1 : 24 h
+71
+19.06.26 14:00=UTC+02:00
+DEFred Chamberlain
+CH?
+4.15 km    4.15 p.    0 : 10 h
+72
+19.06.26 13:07=UTC+02:00
+CHFabio Reghenzani
+CHScheidegg
+5.13 km    8.21 p.    1 : 02 h
+73
+19.06.26 13:35=UTC+02:00
+CHBruno Jäger
+CHBrunni
+7.14 km    7.14 p.    0 : 31 h
+74
+19.06.26 11:56=UTC+02:00
+CHMathys Bruno
+CHTschenten
+19.32 km    23.19 p.    1 : 32 h
+75
+19.06.26 10:49=UTC+02:00
+CHRomana Brand
+CHEbenalp
+24.81 km    24.81 p.    2 : 04 h
+76
+19.06.26 10:49=UTC+02:00
+CHFrancesco Kliner
+CHMonte Lema
+24.79 km    29.75 p.    1 : 25 h
+77
+19.06.26 11:13=UTC+02:00
+SKMichal Sandanus
+CHHinterrugg
+6.52 km    6.52 p.    0 : 14 h
+78
+19.06.26 11:58=UTC+02:00
+CHIrene Lang
+CHScheidegg
+16.11 km    19.34 p.    1 : 11 h
+79
+19.06.26 11:51=UTC+02:00
+CHMarkus Gygax
+CHEbenalp
+31.19 km    31.19 p.    1 : 42 h
+80
+19.06.26 11:19=UTC+02:00
+FRHugo Dherbey
+CH?
+45.11 km    45.11 p.    2 : 19 h
+81
+19.06.26 12:28=UTC+02:00
+CHKris Eggleton
+CHMännlichen
+17.85 km    17.85 p.    1 : 05 h
+82
+19.06.26 12:40=UTC+02:00
+CHThomas Schlaubitz
+CHRatoser Stei
+17.00 km    17.00 p.    0 : 45 h
+83
+19.06.26 12:40=UTC+02:00
+CHThomas Wilhelm
+CHRatoser Stei
+16.94 km    16.94 p.    0 : 44 h
+84
+19.06.26 12:57=UTC+02:00
+CHYvan Corminboeuf
+CHVounetz
+3.83 km    3.83 p.    0 : 17 h
+85
+19.06.26 11:44=UTC+02:00
+CHFrédéric Légeret
+CHTorgon
+4.41 km    6.18 p.    1 : 26 h
+86
+19.06.26 11:33=UTC+02:00
+CHClaudio Leibacher
+CHEbenalp
+17.82 km    28.51 p.    1 : 14 h
+87
+19.06.26 12:16=UTC+02:00
+CHSimon Amoser
+CHAmisbühl
+13.45 km    16.14 p.    0 : 47 h
+88
+19.06.26 10:28=UTC+02:00
+CHDominik Berchtold
+CHEbenalp
+21.21 km    21.21 p.    1 : 54 h
+89
+19.06.26 12:15=UTC+02:00
+CHDisu Müller
+CHObere Wengi
+16.30 km    16.30 p.    0 : 40 h
+90
+19.06.26 11:17=UTC+02:00
+CHLukas Pfister
+CHKronberg
+10.93 km    10.93 p.    0 : 31 h
+91
+19.06.26 12:23=UTC+02:00
+CHPhilip De Boer
+CHSaint-Cergue
+3.41 km    3.41 p.    0 : 16 h
+92
+19.06.26 11:04=UTC+02:00
+CHDaniel Gerber
+CHMonte Lema
+17.14 km    23.99 p.    1 : 32 h
+93
+19.06.26 10:30=UTC+02:00
+CHKatharina Hausherr
+CHEbenalp
+21.04 km    21.04 p.    1 : 53 h
+94
+19.06.26 11:08=UTC+02:00
+CHMichi Müller
+CHBraunwald
+19.01 km    22.81 p.    1 : 04 h
+T
+95
+19.06.26 11:01=UTC+02:00
+CHOliver Bochsler
+CHBraunwald
+17.40 km    17.40 p.    0 : 51 h
+96
+19.06.26 12:01=UTC+02:00
+CHDaniel Loritz
+CH?
+0.91 km    0.91 p.    0 : 04 h
+97
+19.06.26 10:04=UTC+02:00
+CHDaniel Loritz
+CH?
+58.57 km    82.00 p.    1 : 57 h
+98
+19.06.26 11:30=UTC+02:00
+CHBruno Jäger
+CHBrunni
+5.27 km    5.27 p.    0 : 17 h
+99
+19.06.26 09:54=UTC+02:00
+CHRené Kaufmann
+CHFanas
+17.61 km    24.65 p.    0 : 56 h
+100
+19.06.26 10:39=UTC+02:00
+CHRoger Brunner
+CHMarbachegg
+7.82 km    12.51 p.    0 : 48 h
+101
+19.06.26 11:00=UTC+02:00
+CHYvan Corminboeuf
+CHVounetz
+4.23 km    4.23 p.    0 : 17 h
+102
+19.06.26 10:58=UTC+02:00
+DKPaw Moller
+CH?
+5.24 km    5.24 p.    0 : 19 h
+103
+19.06.26 10:37=UTC+02:00
+CHBarbara Lehnhoff
+CHMonte Tamaro
+5.07 km    5.07 p.    0 : 18 h
+104
+19.06.26 10:18=UTC+02:00
+FRRemy Esclangon
+CHMotta Naluns
+6.46 km    9.04 p.    0 : 39 h
+105
+19.06.26 10:11=UTC+02:00
+CHMonika Kurz
+CHNiederhorn
+9.82 km    9.82 p.    0 : 41 h
+106
+19.06.26 10:40=UTC+02:00
+CHArendt Stefan
+CHVilan
+4.61 km    4.61 p.    0 : 15 h
+107
+19.06.26 10:24=UTC+02:00
+BELoïc Houtart
+CHcraistas
+4.85 km    4.85 p.    0 : 16 h
+108
+19.06.26 09:38=UTC+02:00
+CZJan Necas
+CH?
+6.70 km    6.70 p.    0 : 24 h
+T
+109
+19.06.26 09:25=UTC+02:00
+CHSim Top
+CHGrandvillard
+2.65 km    2.65 p.    0 : 06 h
+110
+19.06.26 06:57=UTC+02:00
+CHThomas Kalbermatter
+CHJeizinen
+0.13 km    0.13 p.    0 : 00 h
+111
+19.06.26 07:04=UTC+02:00
+BRPaulo Gustavo Mourão d...
+CHAmisbühl
+5.26 km    5.26 p.    0 : 12 h
+
+20.06.2026
+№    start time    pilot    launch    route    length    points    airtime    glider    info    ⁕
+1
+20.06.26 11:05=UTC+02:00
+CHElischa Meier
+CHLuegibrue...
+2.13 km    2.13 p.    0 : 05 h
+HG
+2
+20.06.26 10:19=UTC+02:00
+CHDaniel Gutekunst
+CHNiederhorn
+10.04 km    10.04 p.    0 : 37 h
+3
+20.06.26 10:42=UTC+02:00
+DKPaw Moller
+CHGornergrat
+9.59 km    9.58 p.    0 : 43 h
+4
+20.06.26 10:20=UTC+02:00
+ATPia Ruttner
+CHSchönboden
+15.64 km    18.77 p.    0 : 51 h
+5
+20.06.26 10:23=UTC+02:00
+FRThibaut Fortané
+CH?
+3.42 km    3.42 p.    0 : 38 h
+6
+20.06.26 10:21=UTC+02:00
+CHJoachim Pellissier
+CHVerbier
+7.27 km    7.27 p.    0 : 37 h
+7
+20.06.26 10:49=UTC+02:00
+CHAlbino Azeredo
+CHScheidegg
+2.78 km    2.78 p.    0 : 06 h
+8
+20.06.26 10:44=UTC+02:00
+CHBruno Jäger
+CHScheidegg
+3.08 km    3.09 p.    0 : 08 h
+9
+20.06.26 10:27=UTC+02:00
+CHKatrin Klaus
+CHSonchaux
+5.72 km    5.72 p.    0 : 16 h
+10
+20.06.26 10:18=UTC+02:00
+ITFrancesco Lazari
+CHLeysin
+2.59 km    2.59 p.    0 : 06 h
+11
+20.06.26 10:08=UTC+02:00
+ESCristina Fernandez Men...
+CHSchilthorn
+10.22 km    10.22 p.    0 : 28 h
+12
+20.06.26 09:43=UTC+02:00
+CHMarlies Meier-Pfosi
+CHCalandahütte
+7.85 km    7.85 p.    0 : 23 h
+13
+20.06.26 09:39=UTC+02:00
+CZJan Necas
+CHRiffelberg
+8.07 km    8.07 p.    0 : 27 h
+T
+14
+20.06.26 09:39=UTC+02:00
+CHAlbino Azeredo
+CHScheidegg
+2.88 km    2.88 p.    0 : 06 h
+15
+20.06.26 07:52=UTC+02:00
+CHThomas Kalbermatter
+CHH&F Fäsil...
+7.93 km    7.93 p.    0 : 17 h

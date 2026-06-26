@@ -1,38 +1,34 @@
-GLEITCAST — Willkommen an Bord!
+{{ t('email.welcome.txt_header') }}
 
-Dein Abo ist aktiv. Ab jetzt bekommst du an deinen Wunschtagen
-um 06:30 einen Gleitcast mit den besten Flugtagen fuer deine Regionen.
-Standardmaessig taeglich — pro Wochentag steuerbar in den Einstellungen.
+{{ t('email.welcome.txt_body') }}
 
-DEINE EINSTELLUNGEN
+{{ t('email.welcome.txt_settings_header') }}
 -------------------
-Regionen: {% for r in regions %}{{ r }}{% if not loop.last %}, {% endif %}{% endfor %}
-Level:    {% if skill_level == 'beginner' %}Anfaenger{% elif skill_level == 'expert' %}Profi{% else %}Standard{% endif %}
+{{ t('email.welcome.regions_label') }} {% for r in regions %}{{ r }}{% if not loop.last %}, {% endif %}{% endfor %}
+{{ t('account.level') }}:    {% if skill_level == 'beginner' %}{{ t('account.level_beginner') }}{% elif skill_level == 'expert' %}{{ t('account.level_expert') }}{% else %}{{ t('account.level_standard') }}{% endif %}
 
-WAS DU ERWARTEN KANNST
+{{ t('email.welcome.txt_expect_header') }}
 ----------------------
-- 5-Tage-Vorhersage mit Ampel pro Tag
-- Top-Startplaetze in deinen Regionen, nach Rating sortiert
-- Warum-Erklaerung: Sicherheit zuerst, dann Fliegbarkeit
-- Foehn- und Gewitter-Warnungen, sobald relevant
+- {{ t('email.welcome.bullet1') }}
+- {{ t('email.welcome.bullet2') }}
+- {{ t('email.welcome.bullet3') }}
+- {{ t('email.welcome.bullet4') }}
 
-Naechster Gleitcast: naechster Versandtag, 06:30
+{{ t('email.welcome.next_label') }} {{ t('email.welcome.next_value') }}
 
 {% if urls.account -%}
-EINSTELLUNGEN ANPASSEN
+{{ t('email.welcome.txt_settings_cta_header') }}
 ----------------------
-Regionen wechseln, Versandtage waehlen oder pausieren — alles ueber einen
-einzigen Link in jedem Gleitcast:
+{{ t('email.welcome.txt_settings_cta_body') }}
 {{ urls.account }}
 
 {% endif -%}
 --
-Gleitcast ist Decision Support — die finale Entscheidung triffst du.
-Im Zweifel: nicht fliegen.
+{{ t('email.welcome.txt_disclaimer') }}
 
-{% if urls.account %}Einstellungen: {{ urls.account }}
+{% if urls.account %}{{ t('email.txt_settings_label') }} {{ urls.account }}
 {% endif -%}
-Abmelden:    {{ urls.unsubscribe }}
+{{ t('email.txt_account_label') }}    {{ urls.unsubscribe }}
 
-Datenschutz: {{ urls.datenschutz }}
-Impressum:   {{ urls.impressum }}
+{{ t('email.txt_privacy_label') }} {{ urls.datenschutz }}
+{{ t('email.txt_imprint_label') }}   {{ urls.impressum }}

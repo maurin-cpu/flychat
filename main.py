@@ -1,5 +1,5 @@
 """
-Gleitcast - Entry Point.
+Wingcast - Entry Point.
 Wetterdaten laden, Engine initialisieren, Flask starten.
 """
 
@@ -14,7 +14,7 @@ load_dotenv()
 import config
 import config_overrides
 config_overrides.init()  # Snapshottet Defaults + wendet data/config_overrides.json an
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 from web import app, init_app
 
 logging.basicConfig(
@@ -25,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    logger.info("=== Gleitcast startet ===")
+    logger.info("=== Wingcast startet ===")
 
     # Engine initialisieren
-    engine = GleitcastEngine()
+    engine = WingcastEngine()
 
     # Aktive LLM-Konfiguration prominent ausgeben (nach Override-Anwendung).
     logger.info("=" * 60)
@@ -51,9 +51,9 @@ def main():
 
     # Hintergrund-Thread fuer Daily-Run (Wetter-Refresh -> LLM-Analyse -> Mails).
     # Zeitplan via config.DAILY_RUN_{WEEKDAYS,HOUR,MINUTE}.
-    # Mit GLEITCAST_BRIEFINGS=0 deaktivierbar — dann findet AUCH KEIN taeglicher
+    # Mit WINGCAST_BRIEFINGS=0 deaktivierbar — dann findet AUCH KEIN taeglicher
     # Wetter-Refresh mehr statt (Cache bleibt stale bis zum naechsten Restart).
-    briefings_enabled = os.environ.get("GLEITCAST_BRIEFINGS", "1").strip() != "0"
+    briefings_enabled = os.environ.get("WINGCAST_BRIEFINGS", "1").strip() != "0"
     if briefings_enabled:
         from scheduler import briefing_scheduler
         scheduler_thread = threading.Thread(
@@ -67,7 +67,7 @@ def main():
             config.DAILY_RUN_HOUR, config.DAILY_RUN_MINUTE,
         )
     else:
-        logger.info("Daily-Scheduler deaktiviert (GLEITCAST_BRIEFINGS=0)")
+        logger.info("Daily-Scheduler deaktiviert (WINGCAST_BRIEFINGS=0)")
 
     # Flask starten
     port = int(os.environ.get("PORT", 5000))

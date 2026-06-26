@@ -31,7 +31,7 @@ Platzhalter `{{cfg.KEY}}` in den Files werden beim Laden gegen
 ┌──────────────────────────────────────────────────────────────┐
 │ SCHICHT 0 — DETERMINISTISCH (Code, keine LLM-Verantwortung)  │
 ├──────────────────────────────────────────────────────────────┤
-│ • Tag aktiv? (active_window_start oder None) — gleitcast/    │
+│ • Tag aktiv? (active_window_start oder None) — wingcast/    │
 │   engine/weather_context.py:_determine_active_window_start   │
 │ • Datenblock-Slicing (Stunden vor Tagesbeginn weg)           │
 │ • Pre-Filter not_safe (kein Fenster, ganztaegig Regen, …)    │
@@ -100,9 +100,8 @@ skills/shared/
 │   ├── 01_tags_flyability.md
 │   ├── 02_flyability_rules.md
 │   ├── 03_prose_style.md
-│   ├── 04_flight_subratings_spot.md (mode-alternativ)
-│   ├── 04_flight_subratings_region.md
-│   └── 05_streckenflug.md           (nur Spot+Flyability)
+│   ├── 04_flight_subratings_spot.md (mode-alternativ; enthält seit Mai 2026 den Streckenflug-Pflichtsatz)
+│   └── 04_flight_subratings_region.md
 └── 05_context/                      mode-spezifisch, kontextuell eingefuegt
     ├── _spot_context.md
     └── _region_context.md
@@ -154,9 +153,8 @@ Die Reihenfolge entspricht 1:1 den Numerik-Praefixen.
 | 10 | `04_flyability/03_prose_style.md` | — | ✓ | — | ✓ |
 | 11 | `04_flyability/04_flight_subratings_spot.md` | — | ✓ | — | — |
 | 11 | `04_flyability/04_flight_subratings_region.md` | — | — | — | ✓ |
-| 12 | `04_flyability/05_streckenflug.md` | — | ✓ | — | — |
 
-**Pro Call: 8–9 Skills** (Region: 8, Spot: 9 wegen Streckenflug). Kein Phase-1-Material in Phase-2-Calls und umgekehrt.
+**Pro Call** werden die in der jeweiligen Spalte mit ✓ markierten Skills geladen (plus den `00_template_*`-Wrapper). Streckenflug ist seit Mai 2026 **kein eigenes File mehr**, sondern als „STRECKENFLUG-PFLICHTSATZ" in `04_flight_subratings_spot.md` integriert — daher kein Spot-Extra-Skill. Kein Phase-1-Material in Phase-2-Calls und umgekehrt.
 
 ### 4.3 Composer-Logik (Pseudocode)
 
@@ -185,9 +183,8 @@ FLYABILITY = [
 ```
 
 **Mode-Conditionals:**
-- `mode == "spot"` → `04_flight_subratings_region.md` wird zu `_spot.md`
+- `mode == "spot"` → `04_flight_subratings_region.md` wird zu `_spot.md` (enthält den Streckenflug-Pflichtsatz)
 - `mode == "region"` → `02_hazards_spot.md` wird zu `_region.md`
-- `mode == "spot" and phase == "flyability"` → `05_streckenflug.md` ans Ende
 
 **Context-Insertion:** `05_context/_<mode>_context.md` wird nach den Hazards eingefuegt (Safety-Phase) oder nach `02_input_format.md` (Flyability-Phase).
 
@@ -273,7 +270,7 @@ wind / gust / aloft / foehn / weather. Weakest-Link-Aggregation, Override-Archit
 
 **`04_flight_subratings_region.md`** — 4 Subs (thermal 35 %, window 25 %, wind 25 %, xc 15 %).
 
-**`05_streckenflug.md`** — XC-Synthese (kein_xc / lokal / moderat / top). Konflikt-Check fuer Region-Hoehenwind. Nur Spot+Flyability.
+**Streckenflug** — XC-Synthese (kein_xc / lokal / moderat / top), Konflikt-Check fuer Region-Hoehenwind. Seit Mai 2026 **kein eigenes File mehr** (`05_streckenflug.md` entfernt), sondern als „STRECKENFLUG-PFLICHTSATZ" in `04_flight_subratings_spot.md` integriert. Nur Spot+Flyability.
 
 ### 6.5 `05_context/` — mode-spezifisch
 
@@ -324,7 +321,7 @@ In `engine/_common.py` und `engine/decision_engine.py`:
 
 | Feld | Quelle | Zweck |
 |------|--------|-------|
-| `experience_rating` (1–10) | **LLM direkt** | LLM-natives Rating — keine Aggregation |
+| `experience_rating` (1–5) | **LLM direkt** | LLM-natives Rating — keine Aggregation |
 | `experience_score` (0–100) | `experience_rating × 10` (inline) | Reine UI-Skalierung, kein Aggregations-Schritt |
 | `flyability_tier` | **LLM direkt** (gray/green/violet) | LLM-natives Tier, keine Code-Ableitung |
 | `fly_status` | identisch mit flyability_tier | Synonym, fuers UI |

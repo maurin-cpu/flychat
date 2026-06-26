@@ -1,5 +1,5 @@
 """
-Chat-Engine für Gleitcast.
+Chat-Engine für Wingcast.
 Zentrale Klasse die Pilotenfragen beantwortet.
 Globaler Wetterdaten-Kontext + Per-User Conversation History.
 """
@@ -104,7 +104,7 @@ from engine.analyzers import AnalyzersMixin
 from engine.chat_orchestrator import ChatOrchestratorMixin
 
 
-class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
+class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin):
     def __init__(self):
         self.spots = load_spots()
         self.weather_data = {}
@@ -154,9 +154,9 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
         self.history_dir.mkdir(parents=True, exist_ok=True)
         self._load_all_conversations()
 
-        # Analyse-Persistenz
-        self.analyses_file = config.DATA_DIR / "spot_analyses.json"
-        self.region_analyses_file = config.DATA_DIR / "region_analyses.json"
+        # Analyse-Persistenz — sprachspezifisch (s. analyses_file-Property):
+        # DE behaelt die kanonischen Dateinamen (validierter Cache unangetastet),
+        # EN schreibt/liest *_en.json. Beim Sprachwechsel reload_analyses_for_lang().
         self._load_analyses_cache()
 
         # Stationsdaten + Bias-Korrektur
@@ -202,6 +202,49 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
                 json.dump(self.conversations[session_id], f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Fehler beim Speichern der History {session_id}: {e}")
+
+    @staticmethod
+    def _analyses_filenames(lang: str) -> tuple[str, str]:
+        """(spot_file, region_file) je Sprache. DE = kanonisch (validierter Cache
+        unangetastet), EN = eigener *_en.json-Cache (kein Ueberschreiben von DE)."""
+        if lang == "en":
+            return "spot_analyses_en.json", "region_analyses_en.json"
+        return "spot_analyses.json", "region_analyses.json"
+
+    @property
+    def analyses_file(self):
+        # Override (z.B. Test-Mode -> test_runs/) hat Vorrang; sonst sprach-
+        # dynamisch aus dem aktiven LANG-Cache. Override via Setter, Reset = None.
+        if getattr(self, "_analyses_file_override", None) is not None:
+            return self._analyses_file_override
+        import i18n
+        return config.DATA_DIR / self._analyses_filenames(i18n.get_current_lang())[0]
+
+    @analyses_file.setter
+    def analyses_file(self, value):
+        self._analyses_file_override = value
+
+    @property
+    def region_analyses_file(self):
+        if getattr(self, "_region_analyses_file_override", None) is not None:
+            return self._region_analyses_file_override
+        import i18n
+        return config.DATA_DIR / self._analyses_filenames(i18n.get_current_lang())[1]
+
+    @region_analyses_file.setter
+    def region_analyses_file(self, value):
+        self._region_analyses_file_override = value
+
+    def reload_analyses_for_lang(self):
+        """Nach einem Sprachwechsel: In-Memory-Analysen aus dem jetzt aktiven
+        sprachspezifischen Cache neu laden (DE- und EN-Cache liegen getrennt)."""
+        self.spot_analyses = {}
+        self.region_analyses = {}
+        self.analyses_loaded_at = None
+        self.region_analyses_loaded_at = None
+        self._load_analyses_cache()
+        print(f"[ENGINE] Analyse-Cache fuer Sprachwechsel neu geladen "
+              f"({len(self.spot_analyses)} Spots, {len(self.region_analyses)} Regionen).")
 
     def _load_analyses_cache(self):
         """Laedt Spot- und Region-Analysen aus den lokalen JSON-Caches.
@@ -469,6 +512,27 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
             self.synoptic_provider, self.synoptic_model,
         )
 
+    def public_history(self, session_id: str) -> list:
+        """Bereitet eine Conversation für die Anzeige im Frontend auf.
+
+        Liefert nur user/assistant-Nachrichten — ohne System-Prompt und ohne
+        das intern vorangestellte AKTUELZEIT/DATUM-MAPPING/Wetter-Prelude der
+        ersten User-Nachricht (vgl. ChatOrchestratorMixin)."""
+        conv = self.conversations.get(session_id)
+        if not conv:
+            return []
+        marker = "Frage des Piloten: "
+        out = []
+        for m in conv.get("messages", []):
+            role = m.get("role")
+            if role not in ("user", "assistant"):
+                continue
+            content = m.get("content", "") or ""
+            if role == "user" and marker in content:
+                content = content.split(marker, 1)[1].strip()
+            out.append({"role": role, "content": content})
+        return out
+
     def reset_conversation(self, session_id: str):
         """Conversation zurücksetzen."""
         if session_id in self.conversations:
@@ -542,13 +606,21 @@ class GleitcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin
             })
         return {"type": "FeatureCollection", "features": features}
 
-    def _is_wind_in_range(self, wind_dir, sector_str, buffer=None):
+    def _is_wind_in_range(self, wind_dir, sector_str, buffer=None, wind_speed=None):
         """Prüft ob Windrichtung im erlaubten Sektor liegt.
 
         buffer: Absolute Toleranz in Grad pro Sektorgrenze. `None` (default) →
         Toleranz wird aus `config.WIND_DIRECTION_TOLERANCE_PCT` (Prozent der
         Sektorbreite) berechnet und für jeden Sektor separat skaliert.
+
+        wind_speed: Bodenwind (km/h). Bei Flaute (< WIND_DIRECTION_IRRELEVANT_
+        BELOW_KMH) ist die Richtung bedeutungsloses Rauschen — man kann aus jeder
+        Richtung starten → immer WIND-OK. Siehe I013_DIAGNOSE.md (Hebel A).
         """
+        if (isinstance(wind_speed, (int, float))
+                and wind_speed < config.WIND_DIRECTION_IRRELEVANT_BELOW_KMH):
+            return True
+
         if not isinstance(wind_dir, (int, float)) or not sector_str:
             return True # Fallback: LLM soll entscheiden wenn Daten fehlen
 

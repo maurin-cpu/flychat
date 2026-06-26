@@ -10,11 +10,11 @@ try:
         b_data = d.get('Balderen', {}).get('hourly_data', {})
         p_data = d.get('Balderen', {}).get('pressure_level_data', {})
 
-        from chat_engine import GleitcastEngine
+        from chat_engine import WingcastEngine
         from thermik_calculator import compute_daily_thermals
         import config
 
-        eng = GleitcastEngine()
+        eng = WingcastEngine()
         spot = [s for s in eng.spots if s['name'] == 'Balderen'][0]
 
         daily = compute_daily_thermals(

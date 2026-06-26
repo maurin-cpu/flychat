@@ -9,9 +9,9 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from chat_engine import GleitcastEngine
+from chat_engine import WingcastEngine
 
-engine = GleitcastEngine.__new__(GleitcastEngine)
+engine = WingcastEngine.__new__(WingcastEngine)
 
 # ─── Echte Meteogramm-Daten Mittelland West, 09.04.2026 ───
 # Aus dem User-Screenshot (safe window 10:00-16:00)

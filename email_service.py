@@ -1,5 +1,5 @@
 """
-E-Mail-Versand fuer Gleitcast-Briefings (Stufe 2).
+E-Mail-Versand fuer Wingcast-Briefings (Stufe 2).
 
 Nutzt stdlib smtplib gegen Infomaniak SMTP. Keine externe Dependency.
 
@@ -8,7 +8,7 @@ Konfiguration (config.py / .env):
   SENDER_EMAIL, SENDER_NAME, BASE_URL
 
 Dry-Run:
-  Env GLEITCAST_SMTP_DRY_RUN=1  -> schreibt HTML-Preview nach /tmp (bzw. %TEMP%)
+  Env WINGCAST_SMTP_DRY_RUN=1  -> schreibt HTML-Preview nach /tmp (bzw. %TEMP%)
                                     statt einen echten SMTP-Call zu machen.
 """
 
@@ -29,6 +29,7 @@ from typing import Any, Optional
 from flask import render_template
 
 import config
+import i18n
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,8 @@ _TIER_META = {
     },
     "gray": {
         "label": "Abgleiter",
-        "color": "#78716c",      # 5.3:1 — selten genutzt im Mail (gefiltert)
-        "bg":    "#f5f5f4",
+        "color": "#075985",      # Sky-800, 7.4:1 (Royal Premium; war stone #78716c)
+        "bg":    "#e0f2fe",      # Sky-100
         "icon":  "-",
     },
     "none": {
@@ -111,6 +112,28 @@ def _stars_glyph_text(n: int) -> str:
 
 _WEEKDAY_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 _WEEKDAY_DE_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+_WEEKDAY_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+_WEEKDAY_EN_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+
+def _weekday_short_list() -> list[str]:
+    """Wochentags-Kurzlabels in aktiver Sprache. EINE Quelle fuer Anzeige UND
+    Sortier-Keys (days_short) — beide muessen dieselbe Liste nutzen."""
+    return _WEEKDAY_EN if i18n.get_current_lang() == "en" else _WEEKDAY_DE
+
+
+def _weekday_long_list() -> list[str]:
+    return _WEEKDAY_EN_LONG if i18n.get_current_lang() == "en" else _WEEKDAY_DE_LONG
+
+
+_TIER_LABEL_KEYS = {"violet", "green", "conditional", "gray", "none", "not_safe"}
+
+
+def _tier_label(tier: str) -> str:
+    """Sprachabhaengiges Tier-Label (DE exakt wie _TIER_META, EN via i18n).
+    Unbekannter Tier -> 'gray' (spiegelt _TIER_META.get(tier, _TIER_META['gray']))."""
+    key = tier if tier in _TIER_LABEL_KEYS else "gray"
+    return i18n.t(f"tier.{key}")
 
 # Sicherheits-Keywords fuer Safety-Header (case-insensitive).
 # Reihenfolge = Schweregrad (hoechste zuerst).
@@ -120,6 +143,12 @@ _SAFETY_KEYWORDS = [
     ("storm",        ["sturm", "starker wind", "orkan"],            "Sturm"),
     ("shear",        ["windscherung", "scherung", "shear"],         "Windscherung"),
 ]
+
+
+def _phenomenon_label(category: str, fallback: str = "") -> str:
+    """Sprachabhaengiges Phaenomen-Label (DE exakt wie _SAFETY_KEYWORDS)."""
+    key = f"phenom.{category}"
+    return i18n.t(key) if key in i18n.STRINGS else fallback
 
 
 # ----------------------------------------------------------------------
@@ -145,7 +174,7 @@ def _sender_domain() -> str:
 
 
 def _dry_run_enabled() -> bool:
-    return os.environ.get("GLEITCAST_SMTP_DRY_RUN", "").strip() in ("1", "true", "yes")
+    return os.environ.get("WINGCAST_SMTP_DRY_RUN", "").strip() in ("1", "true", "yes")
 
 
 def _base_url_is_local(url: str) -> bool:
@@ -158,14 +187,14 @@ def _base_url_is_local(url: str) -> bool:
 if _base_url_is_local(config.BASE_URL):
     logger.warning(
         "BASE_URL zeigt auf localhost (%r) — reale Mail-Sends werden blockiert. "
-        "Setze GLEITCAST_BASE_URL=https://app.gleitcast.ch in der Prod-.env "
-        "oder GLEITCAST_SMTP_DRY_RUN=1 für lokale Previews.",
+        "Setze WINGCAST_BASE_URL=https://app.wingcast.ch in der Prod-.env "
+        "oder WINGCAST_SMTP_DRY_RUN=1 für lokale Previews.",
         config.BASE_URL,
     )
 
 
 def _dry_run_write(to: str, subject: str, html: str) -> Path:
-    tmp_dir = Path(tempfile.gettempdir()) / "gleitcast_mail_preview"
+    tmp_dir = Path(tempfile.gettempdir()) / "wingcast_mail_preview"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     # Windows verbietet: <>:"/\|?* und trailing . / Leerzeichen
     import re
@@ -211,7 +240,7 @@ def send_email(to: str, subject: str, html: str, text: str = "") -> bool:
             logger.error(
                 "send_email: kein Request-Kontext und BASE_URL=%r zeigt auf localhost — "
                 "Mail an %s NICHT gesendet (Scheduler/Cron-Pfad). "
-                "Fix: GLEITCAST_BASE_URL in Prod-.env auf https://app.gleitcast.ch setzen.",
+                "Fix: WINGCAST_BASE_URL in Prod-.env auf https://app.wingcast.ch setzen.",
                 config.BASE_URL, to,
             )
             return False
@@ -274,11 +303,11 @@ def _resolve_base_url() -> str:
 
     Wenn wir in einem Flask-Request laufen (User triggert /subscribe oder /login):
       → nimm den aktuellen Host. So bekommt localhost-Entwicklung localhost-Links
-        und Prod (app.gleitcast.ch) bekommt Prod-Links — automatisch.
+        und Prod (app.wingcast.ch) bekommt Prod-Links — automatisch.
 
     Wenn kein Request aktiv ist (Scheduler, CLI-Skript, Daily-Briefing-Job):
       → config.BASE_URL als Fallback (typischerweise gesetzt via Env-Var
-        GLEITCAST_BASE_URL=https://app.gleitcast.ch).
+        WINGCAST_BASE_URL=https://app.wingcast.ch).
     """
     try:
         from flask import has_request_context, request
@@ -317,7 +346,7 @@ def send_confirm_email(email: str, confirm_token: str, *, async_send: bool = Tru
     urls = _build_urls(confirm_token=confirm_token)
     html = render_template("email/confirm.html", email=email, urls=urls)
     text = render_template("email/confirm.txt", email=email, urls=urls)
-    subject = "Bestaetige dein Gleitcast-Abo"
+    subject = i18n.t("email.confirm.title")
 
     if async_send:
         send_email_async(email, subject, html, text)
@@ -330,7 +359,7 @@ def send_login_email(email: str, login_token: str, *, async_send: bool = True) -
     urls = _build_urls(login_token=login_token)
     html = render_template("email/login.html", email=email, urls=urls)
     text = render_template("email/login.txt", email=email, urls=urls)
-    subject = "Dein Gleitcast Login-Link"
+    subject = i18n.t("email.login.title")
     if async_send:
         send_email_async(email, subject, html, text)
         return True
@@ -349,7 +378,7 @@ def send_welcome_email(email: str, action_token: str, regions: list[str],
         "email/welcome.txt",
         email=email, urls=urls, regions=regions, skill_level=skill_level,
     )
-    subject = "Willkommen bei Gleitcast"
+    subject = i18n.t("email.welcome.title")
 
     if async_send:
         send_email_async(email, subject, html, text)
@@ -434,10 +463,10 @@ def _extract_safety_warnings(days_with_all_my_spots: list) -> list[dict]:
         e = seen[cat]
         result.append({
             "category": e["category"],
-            "label":    e["label"],
+            "label":    _phenomenon_label(e["category"], e["label"]),
             "days_short": sorted(
                 e["days_short"],
-                key=lambda d: _WEEKDAY_DE.index(d) if d in _WEEKDAY_DE else 99,
+                key=lambda d, _wd=_weekday_short_list(): _wd.index(d) if d in _wd else 99,
             ),
         })
     return result
@@ -456,22 +485,22 @@ def _week_summary_prose(days_out: list[dict], warnings: list[dict]) -> str:
     none = [d for d in days_out if d["tier"] == "none"]
 
     if not strong and not conditional:
-        return "Diese Woche bleib am Boden — kein fliegbarer Tag in deinen Regionen."
+        return i18n.t("ws.grounded")
 
     parts: list[str] = []
 
     # Satz 1: Top-Tage
     if not strong:
-        parts.append("Keine Top-Bedingungen, nur bedingt fliegbar.")
+        parts.append(i18n.t("ws.no_top"))
     elif len(strong) == 1:
         d = strong[0]
-        wd_long = _WEEKDAY_DE_LONG[datetime.fromisoformat(d["date"]).weekday()]
-        parts.append(f"{wd_long} ist dein Tag der Woche.")
+        wd_long = _weekday_long_list()[datetime.fromisoformat(d["date"]).weekday()]
+        parts.append(i18n.t("ws.one_strong", weekday=wd_long))
     elif len(strong) <= 3:
         wds = ", ".join(d["label"]["short"] for d in strong)
-        parts.append(f"{len(strong)} starke Tage: {wds}.")
+        parts.append(i18n.t("ws.few_strong", n=len(strong), days=wds))
     else:
-        parts.append(f"{len(strong)} starke Tage diese Woche.")
+        parts.append(i18n.t("ws.many_strong", n=len(strong)))
 
     # Satz 2: Warnungen oder Schlecht-Tage
     if warnings:
@@ -479,12 +508,12 @@ def _week_summary_prose(days_out: list[dict], warnings: list[dict]) -> str:
         w = warnings[0]
         if w.get("days_short"):
             wds = "/".join(w["days_short"])
-            parts.append(f"{w['label']} an {wds} — meiden.")
+            parts.append(i18n.t("ws.warn_days", label=w["label"], days=wds))
         else:
-            parts.append(f"{w['label']} aufziehend — meiden.")
+            parts.append(i18n.t("ws.warn_coming", label=w["label"]))
     elif none:
         wds = "/".join(d["label"]["short"] for d in none[:2])
-        parts.append(f"{wds} nichts fliegbar.")
+        parts.append(i18n.t("ws.none_days", days=wds))
 
     return " ".join(parts)
 
@@ -590,7 +619,7 @@ def _week_summary_llm(days_out: list[dict], warnings: list[dict]) -> str:
         return fallback
 
     try:
-        system_prompt = _load_skill("email_week_lead.md")
+        system_prompt = _load_skill("email_week_lead.md") + i18n.llm_lang_instruction()
     except Exception as e:
         logger.warning("week_lead LLM: Skill-Datei fehlt (%s) — Fallback.", e)
         return fallback
@@ -623,56 +652,80 @@ def _week_summary_llm(days_out: list[dict], warnings: list[dict]) -> str:
     return text
 
 
-def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[dict]:
-    """Region x Tag Heatmap.
+def _matrix_tier_for_band(band: str, rating_int: int) -> str:
+    """Mappt das Region-safety_band auf das Heatmap-Tier-Vokabular.
 
-    Pro Subscriber-Region: fuer jeden Tag besten Tier + Rating bestimmen
-    (ueber ALLE my_spots des Tages, nicht nur Top-3).
-    Leere Tage kriegen tier='none'. Regionen ohne einen einzigen fliegbaren
-    Tag werden ausgefiltert. Sortiert nach best_rating descending.
+    green → violet (rating>=5) / green, amber → conditional, red → not_safe,
+    sonst none. 'not_safe' ist ein Matrix-eigenes Tier (rot), das es im
+    Spot-Tier-System nicht gibt — die Region kann no-go sein (kein XC), waehrend
+    einzelne Spots lokal conditional fliegbar bleiben.
+    """
+    if band == "green":
+        return "violet" if rating_int >= 5 else "green"
+    if band == "amber":
+        return "conditional"
+    if band == "red":
+        return "not_safe"
+    return "none"
+
+
+def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[dict]:
+    """Region x Tag Heatmap — Region-Level-Verdikt (= Web /api/region-analyses).
+
+    Jede Zelle = das Region-XC-Verdikt aus region_analyses (experience_rating
+    1-5 + safety_band), NICHT mehr das beste Spot-Rating. Damit ist die Matrix
+    konsistent mit der Web-Regionsansicht: eine Region kann rot/not_safe sein
+    (kein XC, kein Hochsteigen), waehrend einzelne Spots darunter ('Pro Tag ·
+    Top-Spots') lokal conditional fliegbar bleiben.
 
     Args:
-      days_out: die bereits aufbereiteten Day-Dicts mit my_spots_all
+      days_out: Day-Dicts mit `_top_regions_by_id` (Region-Verdikt pro Region)
       subscriber_regions: Menge der abonnierten region_ids
     """
-    # region_id -> {name, days: [{tier, rating} per day], best_rating}
+    # region_id -> {name, days: [{tier, rating, band} per day], best_rating}
     matrix = {}
     n_days = len(days_out)
 
     for day_idx, day in enumerate(days_out):
-        for spot in day.get("_my_spots_all", []):
-            rid = spot.get("region_id")
+        for rid, rentry in (day.get("_top_regions_by_id") or {}).items():
             if not rid or rid not in subscriber_regions:
                 continue
-            rname = spot.get("region_name") or rid
+            rname = rentry.get("region_name") or rid
 
-            tier = _spot_tier(spot)
-            rating = float(spot.get("rating") or 0)
-            stars = _stars_for_spot(spot)
+            band = rentry.get("safety_band") or "no_data"
+            try:
+                rating_int = int(rentry.get("experience_rating") or 0)
+            except (TypeError, ValueError):
+                rating_int = 0
+            try:
+                rating = float(rentry.get("rating") or 0.0)
+            except (TypeError, ValueError):
+                rating = 0.0
+            try:
+                stars = int(rentry.get("experience_stars") or 0)
+            except (TypeError, ValueError):
+                stars = 0
 
             entry = matrix.setdefault(rid, {
                 "region_id": rid,
                 "region_name": rname,
-                "days": [{"tier": "none", "rating": 0.0, "stars": 0, "spot_count": 0}
+                "days": [{"tier": "none", "rating": 0.0, "stars": 0,
+                          "spot_count": 0, "rating_int": 0, "band": "no_data"}
                          for _ in range(n_days)],
                 "best_rating": 0.0,
+                "best_rating_int": 0,
             })
             cell = entry["days"][day_idx]
-            # Bester Tier gewinnt, bei Gleichstand besseres Rating
-            if (_TIER_RANK.get(tier, -1) > _TIER_RANK.get(cell["tier"], -1)
-                    or (tier == cell["tier"] and rating > cell["rating"])):
-                cell["tier"] = tier
-                cell["rating"] = rating
-            # Sterne unabhaengig: max ueber alle Spots in dieser Region/Tag
-            if stars > cell["stars"]:
-                cell["stars"] = stars
-            # v1.4: Integer-Rating 1-10 (max ueber alle Spots in dieser Region/Tag)
-            r10 = _rating_for_spot(spot)
-            if r10 > cell.get("rating_int", 0):
-                cell["rating_int"] = r10
-            cell["spot_count"] += 1
+            cell["band"] = band
+            cell["tier"] = _matrix_tier_for_band(band, rating_int)
+            cell["rating"] = rating
+            cell["rating_int"] = rating_int
+            cell["stars"] = stars
             entry["best_rating"] = max(entry["best_rating"], rating)
-            entry["best_rating_int"] = max(entry.get("best_rating_int", 0), r10)
+            # best_rating_int (Wochen-Bestwert) zaehlt nur fliegbare Tage —
+            # rote/no_data Tage liefern keinen "besten" Wert.
+            if band in ("green", "amber"):
+                entry["best_rating_int"] = max(entry["best_rating_int"], rating_int)
 
     def _mix_hex_with_white(hex_str: str, alpha: float) -> str:
         hex_str = hex_str.lstrip('#')
@@ -682,35 +735,49 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
         b_new = int(b * alpha + 255 * (1 - alpha))
         return f"#{r_new:02x}{g_new:02x}{b_new:02x}"
 
+    # Farb-Hues je Band (Source of Truth: docs/RATING_FARBKONZEPT.md + map.js).
+    _BAND_HUE = {"green": "#15803d", "amber": "#b45309",
+                 "violet": "#6d28d9", "red": "#b91c1c"}
+
     # Meta pro Zelle einhaengen + Sortierung
     out = []
     for entry in matrix.values():
         for cell in entry["days"]:
-            meta = _TIER_META.get(cell["tier"], _TIER_META["none"])
-            
-            # v1.4: Integer 1-10 statt Decimal
+            band = cell.get("band", "no_data")
+            tier = cell["tier"]
             rating_int = cell.get("rating_int", 0)
             cell["rating_display"] = str(rating_int) if rating_int > 0 else ""
-            
-            # Dynamische Intensitaet:
-            # Text-Farbe ist NICHT dieselbe Hue wie der Hintergrund (sonst
-            # ergibt eine alpha-Mischung des Tier-Tons gegen denselben Tier-Ton
-            # nur ~2:1 Kontrast — Rating wird unsichtbar bei Mittelwerten).
-            # Stattdessen: dunkles Slate auf hellen Tints, Weiss auf kraeftigen.
-            if cell["tier"] in ("green", "amber", "violet") and rating_int > 0:
-                alpha = 0.4 + (rating_int / 10.0) * 0.6
-                cell["tier_color"] = _mix_hex_with_white(meta["color"], alpha)
-                cell["tier_text_color"] = "#0f172a" if alpha < 0.85 else "#ffffff"
-            else:
+            cell["stars_glyph"] = _stars_glyph_text(cell.get("stars", 0))
+
+            if tier == "none":
+                # no_data: Template rendert ohnehin die graue '–'-Zelle.
+                meta = _TIER_META["none"]
                 cell["tier_color"] = meta["color"]
                 cell["tier_text_color"] = "#ffffff"
-                
-            cell["tier_bg"]    = meta["bg"]
-            cell["tier_label"] = meta["label"]
-            cell["stars_glyph"] = _stars_glyph_text(cell["stars"])
+                cell["tier_bg"] = meta["bg"]
+                cell["tier_label"] = _tier_label("none")
+                continue
+
+            if band == "red":
+                # not_safe: solides Rot, weisser Text (wie Web-Sperr-Glyphe).
+                cell["tier_color"] = _BAND_HUE["red"]
+                cell["tier_text_color"] = "#ffffff"
+                cell["tier_bg"] = "#fef2f2"
+                cell["tier_label"] = _tier_label("not_safe")
+            else:
+                # green/violet/conditional(amber): Intensitaet ~ rating_int.
+                # Dunkles Slate auf hellen Tints, Weiss auf kraeftigen.
+                hue = _BAND_HUE["violet"] if tier == "violet" else _BAND_HUE.get(band, _BAND_HUE["green"])
+                alpha = 0.4 + (rating_int / 10.0) * 0.6
+                cell["tier_color"] = _mix_hex_with_white(hue, alpha)
+                cell["tier_text_color"] = "#0f172a" if alpha < 0.85 else "#ffffff"
+                meta = _TIER_META.get(tier, _TIER_META["gray"])
+                cell["tier_bg"] = meta["bg"]
+                cell["tier_label"] = _tier_label(tier)
         out.append(entry)
 
-    out.sort(key=lambda e: e["best_rating"], reverse=True)
+    # Sortierung: bester fliegbarer Wochenwert zuerst, dann Roh-Rating.
+    out.sort(key=lambda e: (e.get("best_rating_int", 0), e["best_rating"]), reverse=True)
     return out
 
 
@@ -754,7 +821,7 @@ def _group_spots_by_region(shown_spots: list[dict],
                                       if g["region_rating_int"] > 0 else "")
         g["region_tier"] = region_tier
         g["tier_color"] = meta["color"]
-        g["tier_label"] = meta["label"]
+        g["tier_label"] = _tier_label(region_tier)
         out.append(g)
 
     out.sort(key=lambda x: x["region_rating"], reverse=True)
@@ -832,8 +899,8 @@ def _date_label(date_str: str) -> dict:
     except Exception:
         return {"short": date_str, "long": date_str, "weekday": ""}
     wd_idx = dt.weekday()
-    short = _WEEKDAY_DE[wd_idx]
-    long_ = f"{_WEEKDAY_DE_LONG[wd_idx]}, {dt.strftime('%d.%m.')}"
+    short = _weekday_short_list()[wd_idx]
+    long_ = f"{_weekday_long_list()[wd_idx]}, {dt.strftime('%d.%m.')}"
     return {"short": short, "long": long_, "weekday": short, "date": date_str}
 
 
@@ -846,7 +913,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
 
     Args:
       subscriber: {id, email, regions, skill_level, action_token}
-      briefing_data: Output von GleitcastEngine.build_briefing_data()
+      briefing_data: Output von WingcastEngine.build_briefing_data()
       top_n_regions_per_day: Maximale Anzahl Regionen pro Tag (Default 3)
       top_n_spots_per_region: Maximale Anzahl Spots pro Region (Default 3)
 
@@ -897,7 +964,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             shown.append({
                 **s,
                 "tier": tier,
-                "tier_label": meta["label"],
+                "tier_label": _tier_label(tier),
                 "tier_color": meta["color"],
                 "tier_bg":    meta["bg"],
                 "tier_icon":  meta["icon"],
@@ -951,7 +1018,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "date": date_str,
             "label": day_label_dict,
             "tier": day_tier,
-            "tier_label": meta["label"],
+            "tier_label": _tier_label(day_tier),
             "tier_color": meta["color"],
             "tier_bg":    meta["bg"],
             "tier_icon":  meta["icon"],
@@ -972,6 +1039,12 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "_my_spots_all": my_spots_unfiltered,
             "_regions_meteo": [r for r in (day.get("regions_meteo") or [])
                                if r.get("region_id") in subscriber_regions],
+            # Region-Level-Verdikt pro Region (Quelle: briefing top_regions =
+            # region_analyses). Fuer die Heatmap-Matrix, damit diese dasselbe
+            # XC-Verdikt wie die Web-Regionsansicht zeigt — NICHT das Spot-Aggregat.
+            "_top_regions_by_id": {r.get("region_id"): r
+                                   for r in (day.get("top_regions") or [])
+                                   if r.get("region_id") in subscriber_regions},
         })
 
     # Verdict = bester Tag (Tier-Rank, dann Rating des Top-Spots)
@@ -1071,8 +1144,10 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             day["notable_good"] = ""
 
         ss = day.get("safety_summary") or ""
-        if ss.lower().startswith("vorsicht"):
-            day["notable_bad"] = ss.replace("Vorsicht:", "").strip().rstrip(".")
+        # Prefix sprachabhaengig: "Vorsicht:" (DE) / "Caution:" (EN). Generisch
+        # bis zum ersten Doppelpunkt strippen, damit beide Sprachen greifen.
+        if ss.lower().startswith(("vorsicht", "caution")):
+            day["notable_bad"] = (ss.split(":", 1)[1] if ":" in ss else ss).strip().rstrip(".")
         else:
             day["notable_bad"] = ""
 
@@ -1123,16 +1198,16 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # Der Deep-Link enthaelt schon die Subscriber-Regionen + besten Tag,
     # Empfaenger landet gefiltert. Rich-Preview kommt per OG-Tags auf /briefing.
     if verdict:
-        share_msg = f"{verdict['headline']} — Gleitcast KW{today.isocalendar().week}:"
+        share_msg = f"{verdict['headline']} — Wingcast KW{today.isocalendar().week}:"
     else:
-        share_msg = f"Mein Gleitcast für KW{today.isocalendar().week}:"
+        share_msg = f"Mein Wingcast für KW{today.isocalendar().week}:"
     share_payload = f"{share_msg}\n{deep_link}"
     share = {
         "url":          deep_link,
         "text":         share_msg,
         "whatsapp":     f"https://wa.me/?text={quote(share_payload, safe='')}",
         "telegram":     f"https://t.me/share/url?url={quote(deep_link, safe='')}&text={quote(share_msg, safe='')}",
-        "mailto":       f"mailto:?subject={quote('Gleitcast KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
+        "mailto":       f"mailto:?subject={quote('Wingcast KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
     }
 
     return {
@@ -1144,7 +1219,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         "share": share,
         "warnings": warnings,
         "briefing_date": today.strftime("%d.%m.%Y"),
-        "briefing_weekday": _WEEKDAY_DE_LONG[today.weekday()],
+        "briefing_weekday": _weekday_long_list()[today.weekday()],
         "kw": today.isocalendar().week,
         "region_matrix": region_matrix,
         "week_lead": week_lead,
@@ -1155,20 +1230,20 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
 
 def _verdict_headline(day: dict, spot: Optional[dict]) -> str:
     """Ein-Satz-Headline fuer den Verdict-Block (voll, fuer Subject/Share/Preheader)."""
-    weekday_long = _WEEKDAY_DE_LONG[datetime.fromisoformat(day["date"]).weekday()]
+    weekday_long = _weekday_long_list()[datetime.fromisoformat(day["date"]).weekday()]
     if day["tier"] == "violet":
         if spot:
-            return f"{weekday_long} ist dein Tag — {spot['spot']} ist Top"
-        return f"{weekday_long} wird ein Top-Tag"
+            return i18n.t("email.briefing.hl_violet_spot", weekday=weekday_long, spot=spot["spot"])
+        return i18n.t("email.briefing.hl_violet", weekday=weekday_long)
     if day["tier"] == "green":
         if spot:
-            return f"Bester Tag: {weekday_long} — {spot['spot']} sicher fliegbar"
-        return f"{weekday_long} ist sicher fliegbar"
+            return i18n.t("email.briefing.hl_green_spot", weekday=weekday_long, spot=spot["spot"])
+        return i18n.t("email.briefing.hl_green", weekday=weekday_long)
     if day["tier"] == "conditional":
         if spot:
-            return f"{weekday_long} mit Vorsicht — {spot['spot']}"
-        return f"{weekday_long} nur mit Vorsicht"
-    return "Diese Woche nichts in deinen Regionen"
+            return i18n.t("email.briefing.hl_cond_spot", weekday=weekday_long, spot=spot["spot"])
+        return i18n.t("email.briefing.hl_cond", weekday=weekday_long)
+    return i18n.t("email.briefing.subject_nothing")
 
 
 def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
@@ -1180,21 +1255,21 @@ def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
     """
     if not spot:
         if day["tier"] == "violet":
-            return "Top-Bedingungen erwartet"
+            return i18n.t("email.briefing.hls_violet")
         if day["tier"] == "green":
-            return "Solide Thermik"
+            return i18n.t("email.briefing.hls_green")
         if day["tier"] == "conditional":
-            return "Nur mit Vorsicht fliegbar"
-        return "Diese Woche nichts in deinen Regionen"
+            return i18n.t("email.briefing.hls_cond")
+        return i18n.t("email.briefing.subject_nothing")
 
     spot_name = spot.get("spot", "")
     window = spot.get("window") or _format_window(spot.get("best_window", ""))
     base = f"{spot_name}, {window}" if window else spot_name
 
     if day["tier"] == "violet":
-        return f"{base} — Top"
+        return i18n.t("email.briefing.hls_violet_base", base=base)
     if day["tier"] == "conditional":
-        return f"{base} — mit Vorsicht"
+        return i18n.t("email.briefing.hls_cond_base", base=base)
     return base  # green: kein Modifier (Tier-Pill sagt schon "Sicher")
 
 
@@ -1209,14 +1284,15 @@ def send_briefing_email(subscriber: dict, briefing_data: dict,
     verdict = ctx.get("verdict")
     today = datetime.now()
     kw = today.isocalendar().week
+    kw_pfx = f"Wingcast {i18n.t('email.briefing.week_abbr')}{kw}: "
     if verdict and verdict["day"]["tier"] == "violet":
-        subject = f"Gleitcast KW{kw}: {verdict['headline']}"
+        subject = f"{kw_pfx}{verdict['headline']}"
     elif verdict and verdict["day"]["tier"] == "green":
-        subject = f"Gleitcast KW{kw}: {verdict['headline']}"
+        subject = f"{kw_pfx}{verdict['headline']}"
     elif verdict:
-        subject = f"Gleitcast KW{kw}: Bedingte Woche"
+        subject = f"{kw_pfx}{i18n.t('email.briefing.subject_conditional')}"
     else:
-        subject = f"Gleitcast KW{kw}: Diese Woche nichts in deinen Regionen"
+        subject = f"{kw_pfx}{i18n.t('email.briefing.subject_nothing')}"
 
     to = subscriber.get("email")
     if not to:
@@ -1240,19 +1316,10 @@ _MONTH_DE = ["", "Januar", "Februar", "Maerz", "April", "Mai", "Juni",
 def _accuracy_framing(pct: int) -> tuple[str, str]:
     """Liefert (hex_color, message) passend zum Accuracy-Wert."""
     if pct >= 80:
-        return ("#15803d",
-                "Sehr gute Trefferquote! Die Modell-Kombination scheint fuer deine "
-                "Regionen gut kalibriert zu sein. Danke fuer dein Feedback — "
-                "das hilft uns, die Prognose weiter zu schaerfen.")
+        return ("#15803d", i18n.t("email.accuracy.msg_high"))
     if pct >= 60:
-        return ("#b45309",
-                "Solide Trefferquote. Es gibt noch Luft nach oben — oft liegen "
-                "Abweichungen an lokalen Effekten, die selbst die besten Modelle "
-                "nicht vollstaendig erfassen. Dein Feedback hilft uns dabei.")
-    return ("#b91c1c",
-            "Die Vorhersage hat dir letzten Monat oft nicht gepasst. Das tut uns leid. "
-            "Vielleicht sind die gewaehlten Regionen fuer dein Home-Terrain zu grob — "
-            "du kannst sie in den Einstellungen anpassen.")
+        return ("#b45309", i18n.t("email.accuracy.msg_mid"))
+    return ("#b91c1c", i18n.t("email.accuracy.msg_low"))
 
 
 def send_accuracy_email(subscriber: dict, stats: dict, *, async_send: bool = True) -> bool:
@@ -1264,7 +1331,7 @@ def send_accuracy_email(subscriber: dict, stats: dict, *, async_send: bool = Tru
 
     color, message = _accuracy_framing(stats["accuracy_pct"])
     last_month = datetime.now().replace(day=1) - timedelta(seconds=1)
-    month_label = f"{_MONTH_DE[last_month.month]} {last_month.year}"
+    month_label = f"{i18n.t(f'month.{last_month.month}')} {last_month.year}"
 
     urls = _build_urls(action_token=subscriber.get("action_token", ""))
     ctx = {
@@ -1277,7 +1344,7 @@ def send_accuracy_email(subscriber: dict, stats: dict, *, async_send: bool = Tru
     html = render_template("email/accuracy.html", **ctx)
     text = render_template("email/accuracy.txt", **ctx)
 
-    subject = f"Gleitcast {month_label}: Deine Vorhersage zu {stats['accuracy_pct']}% korrekt"
+    subject = i18n.t("email.accuracy.subject", month=month_label, pct=stats["accuracy_pct"])
     to = subscriber.get("email")
     if not to:
         return False
@@ -1312,8 +1379,8 @@ def _cli_preview(email: str, wet_run: bool = False) -> int:
           f"({subscriber['status']}), Regionen: {subscriber['regions']}")
 
     # Engine + briefing_data
-    from chat_engine import GleitcastEngine
-    eng = GleitcastEngine()
+    from chat_engine import WingcastEngine
+    eng = WingcastEngine()
     try:
         eng.load_weather_from_cache()
     except Exception as e:
@@ -1324,7 +1391,7 @@ def _cli_preview(email: str, wet_run: bool = False) -> int:
 
     # Render + Send (in Dry-Run standardmaessig)
     if not wet_run:
-        os.environ["GLEITCAST_SMTP_DRY_RUN"] = "1"
+        os.environ["WINGCAST_SMTP_DRY_RUN"] = "1"
 
     # Flask app_context fuer render_template
     from web import app as flask_app
@@ -1332,7 +1399,7 @@ def _cli_preview(email: str, wet_run: bool = False) -> int:
         ok = send_briefing_email(subscriber, briefing_data, async_send=False)
     print(f"[{'OK' if ok else 'FEHLER'}] send_briefing_email -> {subscriber['email']}")
     if not wet_run:
-        preview_dir = Path(tempfile.gettempdir()) / "gleitcast_mail_preview"
+        preview_dir = Path(tempfile.gettempdir()) / "wingcast_mail_preview"
         print(f"Preview-HTML liegt in: {preview_dir}")
     return 0 if ok else 1
 
@@ -1343,7 +1410,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    ap = argparse.ArgumentParser(description="Gleitcast Mail CLI")
+    ap = argparse.ArgumentParser(description="Wingcast Mail CLI")
     ap.add_argument("--preview", metavar="EMAIL",
                     help="Rendert das Briefing fuer den Subscriber mit dieser E-Mail "
                          "(Dry-Run: schreibt HTML nach tempdir).")

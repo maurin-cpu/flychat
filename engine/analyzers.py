@@ -1,8 +1,8 @@
 """
-Gleitcast Engine — Mixin: AnalyzersMixin.
+Wingcast Engine — Mixin: AnalyzersMixin.
 
 Ausgeschnitten aus chat_engine.py (Monolith-Split). Methoden-Signaturen
-unveraendert, Klasse wird via Mehrfachvererbung in GleitcastEngine eingebunden.
+unveraendert, Klasse wird via Mehrfachvererbung in WingcastEngine eingebunden.
 """
 
 import copy
@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import config
+import i18n
 from spots import load_spots
 from fetch_weather import (
     fetch_all_spots, load_cached_weather, load_cached_weather_timestamp,
@@ -100,7 +101,7 @@ class AnalyzersMixin:
             return {
                 "spot": name, "date": date_str,
                 "safety_status": "no_data", "phase": "split",
-                "summary": "Keine Wetterdaten fuer diesen Tag",
+                "summary": i18n.t("analysis.no_weather_data"),
             }
 
         # ── Deterministischer Pre-Filter: offensichtliche not_safe ohne LLM ──
@@ -172,30 +173,21 @@ class AnalyzersMixin:
         # kein zusammenhaengender Block sauberer Stunden >= CLEAN_WINDOW_MIN_HOURS.
         if active_start is None and total_hours > 0:
             if wind_ok == 0:
-                no_go.append("Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors")
+                no_go.append(i18n.t("analysis.nogo.wind_all_day"))
                 summary_parts.append(
-                    f"Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors "
-                    f"({spot.get('windrichtung', '?')}). Kein fliegbares Fenster."
+                    i18n.t("analysis.summary.wind_all_day", dir=spot.get("windrichtung", "?"))
                 )
                 na_reason = "wind_direction_mismatch"
             elif clean_count == 0:
-                no_go.append(
-                    "Start-Fenster: Alle Stunden mit passender Windrichtung haben harte "
-                    "Warnungen (Sturm/Boeen/Regen/Gewitter)"
-                )
-                summary_parts.append(
-                    f"Alle {wind_ok}h mit passender Windrichtung haben harte Warnungen — "
-                    f"kein nutzbares Start-Fenster."
-                )
+                no_go.append(i18n.t("analysis.nogo.all_warnings"))
+                summary_parts.append(i18n.t("analysis.summary.all_warnings", wind_ok=wind_ok))
                 # Bewusst KEIN noAnalysis: Pilot will sehen warum es nicht geht.
             else:
                 no_go.append(
-                    f"Start-Fenster: Nur {clean_count}h sauber, kein zusammenhaengender Block "
-                    f">= {config.CLEAN_WINDOW_MIN_HOURS}h"
+                    i18n.t("analysis.nogo.no_block", clean=clean_count, min=config.CLEAN_WINDOW_MIN_HOURS)
                 )
                 summary_parts.append(
-                    f"Saubere Stunden ({clean_count}h) bilden kein zusammenhaengendes "
-                    f"Start-Fenster (Minimum {config.CLEAN_WINDOW_MIN_HOURS}h)."
+                    i18n.t("analysis.summary.no_block", clean=clean_count, min=config.CLEAN_WINDOW_MIN_HOURS)
                 )
 
         # Regel 2: Ganztaegig Regen
@@ -221,20 +213,17 @@ class AnalyzersMixin:
             )
         ):
             effective_h = rain_widespread_h + rain_scattered_h or rain_cnt
-            no_go.append(f"Niederschlag: Regen in {effective_h} von {total_hours} Stunden")
+            no_go.append(i18n.t("analysis.nogo.rain", h=effective_h, total=total_hours))
             summary_parts.append(
-                f"Nahezu ganztaegiger Niederschlag ({effective_h} von {total_hours} Stunden) "
-                f"ohne zusammenhaengendes trockenes Fenster (laengste Trockenphase {max_dry_gap}h). "
-                f"Kein nutzbares Flugfenster."
+                i18n.t("analysis.summary.rain", h=effective_h, total=total_hours, gap=max_dry_gap)
             )
             na_reason = "all_day_rain"
 
         # Regel 3: Ganztaegig Gewitter
         elif total_hours > 0 and ts_h >= total_hours - 2 and ts_h >= 4:
-            no_go.append(f"Gewitter: prognostiziert in {ts_h} von {total_hours} Stunden")
+            no_go.append(i18n.t("analysis.nogo.thunderstorm", ts=ts_h, total=total_hours))
             summary_parts.append(
-                f"Praktisch ganztaegig Gewitter ({ts_h} von {total_hours} Stunden). "
-                f"Kein fliegbares Fenster."
+                i18n.t("analysis.summary.thunderstorm", ts=ts_h, total=total_hours)
             )
             na_reason = "all_day_thunderstorm"
 
@@ -256,7 +245,7 @@ class AnalyzersMixin:
             "date": date_str,
             "phase": "combined",
             "safety_status": "not_safe",
-            "safe_window": "keins",
+            "safe_window": i18n.t("analysis.window_none"),
             "no_go_reasons": no_go,
             "caution_notes": [],
             "wind_summary": "",
@@ -276,7 +265,7 @@ class AnalyzersMixin:
             "xc_details": "",
             "soaring_options": "",
             "bemerkung_check": "",
-            "best_window": "keins",
+            "best_window": i18n.t("analysis.window_none"),
             "llm_tags": [],
             "recommendation": "",
             "confidence": "high",
@@ -298,7 +287,7 @@ class AnalyzersMixin:
             return {
                 "region": region["region"], "region_id": region["id"],
                 "date": date_str, "safety_status": "no_data", "phase": "split",
-                "summary": "Keine Wetterdaten fuer diesen Tag",
+                "summary": i18n.t("analysis.no_weather_data"),
             }
 
         rname = region["region"]
@@ -336,6 +325,9 @@ class AnalyzersMixin:
                 {"role": "user", "content": (
                     f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}"
+                    # EN: Sprach-Anweisung direkt vor der Generierung (staerkster Hebel);
+                    # DE: leerer String -> Prompt byte-identisch.
+                    + i18n.llm_lang_instruction()
                 )},
             ]
 
@@ -397,11 +389,13 @@ class AnalyzersMixin:
             # Safety-Result als immutable Block injizieren
             safety_block = self._format_safety_injection(safety_result)
 
-            # Few-Shot Pipeline Schritt 2: aehnliche Pilot-gelabelte Cases injizieren.
-            # Tag wird in _ctx_fewshot_cache abgelegt, Post-Process haengt ihn an.
+            # Few-Shot Pipeline Schritt 2: aehnliche Pilot-gelabelte Spot-Cases
+            # injizieren. Tag wird in _ctx_fewshot_cache abgelegt, Post-Process
+            # haengt ihn an.
             terrain_tier = (spot.get("terrain_type") or "").strip()
             few_shot_block = self._build_few_shot_for(
                 f"{name}|{date_str}", terrain_tier, entity_type="spot",
+                region=(spot.get("analyse_region") or "").strip(),
             )
 
             user_msg = (
@@ -410,6 +404,9 @@ class AnalyzersMixin:
             if few_shot_block:
                 user_msg += few_shot_block + "\n"
             user_msg += f"{context}\n\n{safety_block}"
+            # EN: Sprach-Anweisung als letztes (nach den dt. Few-Shots, die sonst
+            # auf Deutsch ziehen); DE: leerer String -> byte-identisch.
+            user_msg += i18n.llm_lang_instruction()
 
             messages = [
                 {"role": "system", "content": prompts.SPOT_FLYABILITY_PROMPT},
@@ -496,6 +493,9 @@ class AnalyzersMixin:
                 {"role": "user", "content": (
                     f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(datetime.now())})\n\n"
                     f"{context}"
+                    # EN: Sprach-Anweisung direkt vor der Generierung (staerkster Hebel);
+                    # DE: leerer String -> Prompt byte-identisch.
+                    + i18n.llm_lang_instruction()
                 )},
             ]
 
@@ -570,6 +570,9 @@ class AnalyzersMixin:
             if few_shot_block:
                 user_msg += few_shot_block + "\n"
             user_msg += f"{context}\n\n{safety_block}"
+            # EN: Sprach-Anweisung als letztes (nach den dt. Few-Shots, die sonst
+            # auf Deutsch ziehen); DE: leerer String -> byte-identisch.
+            user_msg += i18n.llm_lang_instruction()
 
             messages = [
                 {"role": "system", "content": prompts.REGION_FLYABILITY_PROMPT},
@@ -663,9 +666,23 @@ class AnalyzersMixin:
 
     @staticmethod
     def _merge_safety_flyability(safety_result: dict, flyability_result: dict) -> dict:
-        """Merged Safety + Flyability Ergebnisse ins Combined-Format fuer Downstream."""
+        """Merged Safety + Flyability Ergebnisse ins Combined-Format fuer Downstream.
+
+        Safety ist autoritativ fuer den Sicherheits-Status. Die Flyability-Phase
+        ist ein separater LLM-Call, der `conditional` nicht kennt und
+        `is_conditional` aus seinem eigenen Rating setzt (bei einem selbstsicheren
+        5er-Tag → False, siehe _post_process_flyability_spot). Ohne Schutz wuerde
+        `merged.update(flyability_result)` das korrekte `is_conditional=True` aus
+        der Safety-Decision-Pipe (decide_is_conditional) ueberschreiben — ein
+        conditional-Spot landete dann faelschlich als safe (Tier violet/green) im
+        Briefing. Daher: safety-autoritative Felder nach dem Update zurueckschreiben.
+        """
         merged = {**safety_result}
         merged.update(flyability_result)
+        # Safety besitzt diese Felder — Flyability darf sie nicht clobbern.
+        for k in ("safety_status", "is_conditional", "conditional_reason"):
+            if k in safety_result:
+                merged[k] = safety_result[k]
         # Phase-Marker: zeigt dass aus Split-Flow
         merged["phase"] = "split"
         return merged
@@ -954,7 +971,7 @@ class AnalyzersMixin:
             logger.error(f"InstantDB Region-Analysen-Push fehlgeschlagen: {e}")
 
     # ════════════════════════════════════════════════════════════════════════
-    # WEEKLY BRIEFING — Tages-Aggregation fuer den Gleitcast
+    # WEEKLY BRIEFING — Tages-Aggregation fuer den Wingcast
     # Das ehemalige LLM-"Fazit" (best_weekday/week_summary/day_highlights)
     # wurde durch den synoptik-getriebenen Wetterlage-Block (engine/
     # synoptic_llm.py + skills/synoptic_overview.md) ersetzt.
@@ -1203,7 +1220,7 @@ class AnalyzersMixin:
                     "experience_rating": rating_r,
                     "safety_score": entry.get("safety_score"),
                     "comfort_index": entry.get("comfort_index"),
-                    # LLM-Einschaetzungssatz fuer Gleitcast-Region-Header
+                    # LLM-Einschaetzungssatz fuer Wingcast-Region-Header
                     "recommendation": entry.get("recommendation", "") or "",
                 })
             region_entries.sort(key=lambda e: (
@@ -1600,7 +1617,7 @@ class AnalyzersMixin:
                     "safety": result,
                     "fly_status": "",
                     "status": "no_data",
-                    "best_window": "keins",
+                    "best_window": i18n.t("analysis.window_none"),
                     "recommendation": "",
                 }
                 merged.setdefault(spot_name, {})[date_str] = entry
@@ -2053,7 +2070,6 @@ class AnalyzersMixin:
 
         self._attach_rating_inputs(result, f"{name}|{date_str}")
 
-        # Few-Shot Pipeline Schritt 2: Tag in _decisions_applied uebernehmen.
         fewshot_tag = (getattr(self, "_ctx_fewshot_cache", {}) or {}).get(f"{name}|{date_str}")
         if fewshot_tag:
             result.setdefault("_decisions_applied", []).append(fewshot_tag)
@@ -2061,7 +2077,7 @@ class AnalyzersMixin:
         return result
 
     def _build_few_shot_for(self, cache_key: str, terrain_tier: str,
-                            entity_type: str = "region") -> str:
+                            entity_type: str = "region", region: str = "") -> str:
         """Liest Live-Features aus _ctx_tq_cache und holt passende Labels.
 
         Returns prompt_block (leer wenn keine passenden Labels). Der Decision-
@@ -2071,6 +2087,7 @@ class AnalyzersMixin:
         cache_key: f"{name}|{date_str}" wie bei _ctx_tq_cache.put.
         terrain_tier: aus regionen.csv (region) bzw. fluggebiete.csv (spot).
         entity_type: "region" oder "spot".
+        region: analyse_region des Spots (weiche Lokalitaets-Praeferenz; nur Spots).
         """
         if not hasattr(self, "_ctx_fewshot_cache"):
             self._ctx_fewshot_cache = {}
@@ -2091,6 +2108,7 @@ class AnalyzersMixin:
             "prod_h": float(prod_h),
             "low": float(low),
             "mid": float(mid),
+            "region": region or "",
         }
         block, tag = build_few_shot_block(current, entity_type=entity_type, top_k=3)
         self._ctx_fewshot_cache[cache_key] = tag
@@ -2566,7 +2584,7 @@ class AnalyzersMixin:
                     spot_results.setdefault(name, {})[date_str] = {
                         "spot": name, "date": date_str,
                         "safety_status": "no_data", "phase": "split",
-                        "summary": "Keine Wetterdaten fuer diesen Tag",
+                        "summary": i18n.t("analysis.no_weather_data"),
                     }
                     continue
 
@@ -2693,6 +2711,7 @@ class AnalyzersMixin:
                 terrain_tier_batch = (spot_obj.get("terrain_type") or "").strip()
                 few_shot_block_batch = self._build_few_shot_for(
                     f"{name}|{date_str}", terrain_tier_batch, entity_type="spot",
+                    region=(spot_obj.get("analyse_region") or "").strip(),
                 )
                 user_content = f"AKTUELLE LOKALZEIT: {now_str}\n\n"
                 if few_shot_block_batch:

@@ -2,13 +2,13 @@
 
 ## Was ist das Flyability-Tier?
 
-Pro Spot und Tag ordnet Gleitcast ein **Tier** zu, das die thermische Flugqualität in 3 Stufen klassifiziert (orthogonal zur Sicherheit aus Phase 1):
+Pro Spot und Tag ordnet Wingcast ein **Tier** zu, das die thermische Flugqualität in 3 Stufen klassifiziert (orthogonal zur Sicherheit aus Phase 1):
 
 | Tier | Bedeutung | Frontend-Farbe |
 |------|-----------|----------------|
-| `gray` | Abgleiter / kaum nutzbare Thermik | Bronze (#B08D57) |
+| `gray` | Abgleiter / kaum nutzbare Thermik | Sky-Blue (#0ea5e9) — Royal Premium, früher Bronze #B08D57 |
 | `green` | Solider Thermiktag, lokale Flüge möglich | Grün |
-| `violet` | Top-XC-Bedingungen, legendärer Tag | Violett |
+| `violet` | Top-XC-Bedingungen, XC-Tag | Violett (#a78bfa) |
 
 Zusätzlich `no_data` (echtes Grau #9ca3af) wenn keine Daten verfügbar.
 
@@ -48,7 +48,7 @@ Eine Stunde zählt als **produktive Thermik-Stunde**, wenn alle drei Bedingungen
 |-----------|----------|--------------------------|
 | Climb-Rate | ≥ 0.7 m/s | `PRODUCTIVE_CLIMB_MIN` |
 | Höhenband (Thermik-Top über Startplatz/Region-Ref) | ≥ `min_band_depth(climb, terrain)` | berechnet in `thermik_calculator.py` |
-| Kein THERMAL-ROUGH-UNUSABLE / THERMAL-WIND-UNUSABLE | — | (SHEAR/TORN/FRAGMENTED zählen MIT) |
+| Kein THERMAL-ROUGH-UNUSABLE / -WIND-UNUSABLE / -TORN-UNUSABLE | — | (SHEAR/FRAGMENTED zählen MIT; **TORN gated seit 2026-06-04**, anker-korrigiert — siehe `TQ_TORN_FLYABILITY.md`) |
 
 **Bewölkungs-Schwellen entfallen seit Mai 2026** (war Doppelbestrafung der eigenen Berechnung):
 
@@ -111,7 +111,7 @@ Das ist nötig, weil die LLM unter `gray` typischerweise pessimistische Textfeld
 Zur Transparenz für die LLM enthält der TAGESPROFIL-Block einen expliziten Counter (seit Mai 2026):
 
 ```
-→ PRODUKTIVE-THERMIK: 4h (Climb ≥0.7 m/s, ausreichendes Höhenband, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE). Min für green-Tag: 4h. HINWEIS: Bewölkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — die Sonnen-Dämpfung steckt bereits in climb_rate über die strahlungsbasierte H-Berechnung.
+→ PRODUKTIVE-THERMIK: 4h (Climb ≥0.7 m/s, ausreichendes Höhenband, kein ROUGH-UNUSABLE, kein WIND-UNUSABLE, kein TORN-UNUSABLE). Min für green-Tag: 4h. HINWEIS: Bewölkungs-% sind KEIN Productivity-Gate mehr (Mai 2026) — die Sonnen-Dämpfung steckt bereits in climb_rate über die strahlungsbasierte H-Berechnung.
 ```
 
 Der Hint erscheint **nur** wenn `thermal_hours_total > 0`. Die Skill-Prompts referenzieren diesen Counter im Selbst-Check:

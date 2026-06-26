@@ -1,4 +1,4 @@
-# Modern UI/UX Design Guide for Gleitcast (2025-2026)
+# Modern UI/UX Design Guide for Wingcast (2025-2026)
 
 A comprehensive, actionable reference for building a premium dark-themed, map-based paragliding weather dashboard. Based on extensive research of current design systems (Linear, Vercel/Geist, Raycast, Arc Browser), design trend publications, and UX guidelines.
 
@@ -16,7 +16,7 @@ A comprehensive, actionable reference for building a premium dark-themed, map-ba
 8. [Data Visualization on Maps](#8-data-visualization-on-maps)
 9. [Micro-Interactions and Transitions](#9-micro-interactions-and-transitions)
 10. [Common Mistakes That Scream "Amateur"](#10-common-mistakes-that-scream-amateur)
-11. [Gleitcast-Specific Recommendations](#11-gleitcast-specific-recommendations)
+11. [Wingcast-Specific Recommendations](#11-wingcast-specific-recommendations)
 
 ---
 
@@ -161,7 +161,7 @@ Glassmorphism is not only alive -- it is maturing into a permanent part of the U
 - Don't forget **-webkit-backdrop-filter** prefix for Safari
 - Don't apply to **every element** -- reserve for 1-3 key UI surfaces
 
-### Gleitcast Application
+### Wingcast Application
 
 - **Map sidebar/panel**: Perfect candidate for glassmorphism
 - **Spot info popups**: Glass panel over the map
@@ -192,7 +192,7 @@ Colors behave differently in dark environments. Bright hues appear neon or overs
 **Step 2: Define your accent system.**
 Reduce saturation by 20-30% compared to light-mode colors. Increase lightness slightly.
 
-For Gleitcast (weather/paragliding), recommended accent colors:
+For Wingcast (weather/paragliding), recommended accent colors:
 
 | Purpose | Color | Hex | Notes |
 |---------|-------|-----|-------|
@@ -292,7 +292,7 @@ Inside each card, establish clear hierarchy:
 4. **Supporting text** -- smaller, secondary color
 5. **Action area** -- bottom of card, subtle divider or just spacing
 
-### Card Variations for Gleitcast
+### Card Variations for Wingcast
 
 - **Spot card** (in list): Compact, shows spot name + key wind/thermal metric + colored status dot
 - **Analysis card** (expanded): Taller, shows multi-day data, uses internal sections
@@ -393,7 +393,7 @@ Vercel's Geist design system is the purest expression of "less is more":
 - **Typography is the entire design.** Geist font, spacing, and occasional gradient -- nothing else
 - **0px border-radius** on many components -- a deliberate anti-trend that creates distinction
 
-Takeaway: Vercel's approach is NOT recommended for data-heavy apps like Gleitcast. It works for marketing/developer tools, not for weather dashboards with many data states.
+Takeaway: Vercel's approach is NOT recommended for data-heavy apps like Wingcast. It works for marketing/developer tools, not for weather dashboards with many data states.
 
 ### Raycast
 
@@ -535,7 +535,7 @@ Excellent:    #06D6A0 with 30% opacity fill, 80% border
 }
 ```
 
-### Specific Micro-Interactions for Gleitcast
+### Specific Micro-Interactions for Wingcast
 
 **Map marker hover:**
 ```css
@@ -663,7 +663,7 @@ Before shipping any UI change, check:
 
 ---
 
-## 11. Gleitcast-Specific Recommendations
+## 11. Wingcast-Specific Recommendations
 
 ### Recommended Design Token System
 
@@ -744,7 +744,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
 });
 ```
 
-### Component Hierarchy for Gleitcast
+### Component Hierarchy for Wingcast
 
 ```
 [Map fills entire viewport]

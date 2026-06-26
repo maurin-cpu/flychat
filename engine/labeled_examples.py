@@ -551,6 +551,14 @@ _W_PEAK = 3.0
 _W_PROD_H = 0.5
 _W_CLOUD = 0.05  # je Schicht (low + mid)
 
+# Weiche Lokalitaets-Praeferenz fuer SPOTS: Spots haben ~1.2 Labels/Spot, daher
+# poolt das Retrieval ueber den Tier. Damit "gleiche Region" bevorzugt wird ohne
+# duenne Regionen verhungern zu lassen, bekommt ein Kandidat aus einer ANDEREN
+# analyse_region einen Distanz-Aufschlag — ein deutlich wetter-aehnlicherer Tag
+# aus einer Nachbarregion kann ihn aber weiterhin schlagen. Nur fuer entity_type
+# == "spot" aktiv (Regionen unveraendert).
+_W_REGION_PENALTY = 1.5
+
 # Modul-Cache: laden einmal, invalidate bei mtime-Change.
 _LABEL_INDEX: list[dict[str, Any]] | None = None
 _LABEL_INDEX_MTIME: float | None = None
@@ -570,12 +578,19 @@ def _extract_features_from_label(entry: dict[str, Any]) -> dict[str, Any] | None
         return None
     low = agg.get("low_cloud_max") or 0
     mid = agg.get("mid_cloud_max") or 0
+    # analyse_region nur fuer Spots (weiche Lokalitaets-Praeferenz). Aufgeloest
+    # ueber Spot-Meta (name -> slug -> analyse_region); leer falls unbekannt.
+    region = ""
+    if entry.get("entity_type") == "spot":
+        sid = entry.get("spot_or_region_id") or ""
+        region = _load_spot_meta().get(slugify_spot(sid), {}).get("analyse_region", "") or ""
     return {
         "tier": tier,
         "peak": float(peak),
         "prod_h": float(prod_h),
         "low": float(low),
         "mid": float(mid),
+        "region": region,
     }
 
 
@@ -665,14 +680,23 @@ def retrieve_similar(current_features: dict[str, Any], top_k: int = 3,
     if not candidates:
         return []
 
+    cur_region = (current_features.get("region") or "").strip()
+
     def _dist(item):
         f = item["features"]
-        return (
+        d = (
             _W_PEAK * abs(f["peak"] - current_features.get("peak", 0))
             + _W_PROD_H * abs(f["prod_h"] - current_features.get("prod_h", 0))
             + _W_CLOUD * abs(f["low"] - current_features.get("low", 0))
             + _W_CLOUD * abs(f["mid"] - current_features.get("mid", 0))
         )
+        # Weiche Regions-Praeferenz (nur Spots): Aufschlag fuer fremde Region.
+        # Nur wenn beide Regionen bekannt sind — sonst neutral.
+        if entity_type == "spot" and cur_region:
+            cand_region = (f.get("region") or "").strip()
+            if cand_region and cand_region != cur_region:
+                d += _W_REGION_PENALTY
+        return d
 
     candidates.sort(key=_dist)
     return [item["entry"] for item in candidates[:top_k]]
@@ -686,18 +710,37 @@ def format_for_prompt(labels: list[dict[str, Any]]) -> str:
     if not labels:
         return ""
 
-    lines = [
-        "═══════════════════════════════════════════════════════════════════",
-        "KALIBRIERUNGS-BEISPIELE — echte Pilot-Bewertungen aehnlicher Tage",
-        "═══════════════════════════════════════════════════════════════════",
-        "",
-        "Diese kuerzlich gelabelten Tage zeigen, wie ein Pilot aehnlich",
-        "konfigurierte Tagessubstanz bewertet hat. Lies sie als Kalibrierung,",
-        "bevor du den heutigen Tag bewertest. Wenn der Pilot eine Korrektur",
-        "angegeben hat, gilt diese als Ziel-Rating fuer aehnlich strukturierte",
-        "Tage.",
-        "",
-    ]
+    # Sprach-aware: Die Kalibrierung ist Zahlen + Ziel-Rating (sprachneutral);
+    # nur die Etiketten kippen. EN-Beispiele verhindern, dass das LLM die dt.
+    # Muster nachahmt und deutsch antwortet. DE-Zweige byte-identisch zum Original.
+    import i18n
+    en = i18n.get_current_lang() == "en"
+
+    if en:
+        lines = [
+            "═══════════════════════════════════════════════════════════════════",
+            "CALIBRATION EXAMPLES — real pilot ratings of similar days",
+            "═══════════════════════════════════════════════════════════════════",
+            "",
+            "These recently labelled days show how a pilot rated similarly",
+            "configured day-substance. Read them as calibration before you rate",
+            "today. If the pilot gave a correction, treat it as the target rating",
+            "for similarly structured days.",
+            "",
+        ]
+    else:
+        lines = [
+            "═══════════════════════════════════════════════════════════════════",
+            "KALIBRIERUNGS-BEISPIELE — echte Pilot-Bewertungen aehnlicher Tage",
+            "═══════════════════════════════════════════════════════════════════",
+            "",
+            "Diese kuerzlich gelabelten Tage zeigen, wie ein Pilot aehnlich",
+            "konfigurierte Tagessubstanz bewertet hat. Lies sie als Kalibrierung,",
+            "bevor du den heutigen Tag bewertest. Wenn der Pilot eine Korrektur",
+            "angegeben hat, gilt diese als Ziel-Rating fuer aehnlich strukturierte",
+            "Tage.",
+            "",
+        ]
 
     for i, entry in enumerate(labels, 1):
         agg = (entry.get("weather_input") or {}).get("aggregates") or {}
@@ -722,26 +765,46 @@ def format_for_prompt(labels: list[dict[str, Any]]) -> str:
         low_s = f"{low:.0f}%" if low is not None else "n/a"
         mid_s = f"{mid:.0f}%" if mid is not None else "n/a"
 
-        lines.append(f"── BEISPIEL {i} ── {name} — {date} — Tier: {tier}")
-        lines.append(f"  Wetter-Substanz:")
-        lines.append(f"    sustained_peak: {peak_s}    prod_h_strict: {prod_s}")
-        lines.append(f"    cloud tief max: {low_s}    cloud mittel max: {mid_s}")
-        lines.append(f"    cloud_structure: {cloud_str}")
-        lines.append(f"  LLM hatte urspruenglich vergeben: experience_rating = {original_rating}")
-
-        if label == "richtig":
-            lines.append(f"  Pilot-Bewertung:       RICHTIG (keine Korrektur, Rating bleibt)")
-        else:
-            label_disp = "ZU PESSIMISTISCH" if label == "zu_pessimistisch" else "ZU OPTIMISTISCH"
-            lines.append(f"  Pilot-Bewertung:       {label_disp}")
-            if corr is not None:
-                lines.append(f"  Korrigiertes Rating:   {corr}")
+        if en:
+            lines.append(f"── EXAMPLE {i} ── {name} — {date} — Tier: {tier}")
+            lines.append(f"  Weather substance:")
+            lines.append(f"    sustained_peak: {peak_s}    prod_h_strict: {prod_s}")
+            lines.append(f"    cloud low max: {low_s}    cloud mid max: {mid_s}")
+            lines.append(f"    cloud_structure: {cloud_str}")
+            lines.append(f"  LLM originally gave: experience_rating = {original_rating}")
+            if label == "richtig":
+                lines.append(f"  Pilot rating:          CORRECT (no correction, rating stays)")
             else:
-                lines.append(f"  (keine konkrete Rating-Korrektur — Richtung beachten)")
+                label_disp = "TOO PESSIMISTIC" if label == "zu_pessimistisch" else "TOO OPTIMISTIC"
+                lines.append(f"  Pilot rating:          {label_disp}")
+                if corr is not None:
+                    lines.append(f"  Corrected rating:      {corr}")
+                else:
+                    lines.append(f"  (no concrete rating correction — note the direction)")
+        else:
+            lines.append(f"── BEISPIEL {i} ── {name} — {date} — Tier: {tier}")
+            lines.append(f"  Wetter-Substanz:")
+            lines.append(f"    sustained_peak: {peak_s}    prod_h_strict: {prod_s}")
+            lines.append(f"    cloud tief max: {low_s}    cloud mittel max: {mid_s}")
+            lines.append(f"    cloud_structure: {cloud_str}")
+            lines.append(f"  LLM hatte urspruenglich vergeben: experience_rating = {original_rating}")
+            if label == "richtig":
+                lines.append(f"  Pilot-Bewertung:       RICHTIG (keine Korrektur, Rating bleibt)")
+            else:
+                label_disp = "ZU PESSIMISTISCH" if label == "zu_pessimistisch" else "ZU OPTIMISTISCH"
+                lines.append(f"  Pilot-Bewertung:       {label_disp}")
+                if corr is not None:
+                    lines.append(f"  Korrigiertes Rating:   {corr}")
+                else:
+                    lines.append(f"  (keine konkrete Rating-Korrektur — Richtung beachten)")
         lines.append("")
 
-    lines.append("Jetzt bewerte den heutigen Tag basierend auf den Wetterdaten unten.")
-    lines.append("Folge den Pilot-Korrekturen wenn der heutige Tag aehnlich strukturiert ist.")
+    if en:
+        lines.append("Now rate today based on the weather data below.")
+        lines.append("Follow the pilot corrections if today is similarly structured.")
+    else:
+        lines.append("Jetzt bewerte den heutigen Tag basierend auf den Wetterdaten unten.")
+        lines.append("Folge den Pilot-Korrekturen wenn der heutige Tag aehnlich strukturiert ist.")
     lines.append("")
     return "\n".join(lines)
 
