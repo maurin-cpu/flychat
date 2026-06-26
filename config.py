@@ -144,6 +144,12 @@ API_MODEL = SURFACE_PRIMARY_MODEL
 
 API_TIMEOUT = 30
 FORECAST_DAYS = 5
+
+# Aktive Oberflaechen-/Ausgabesprache (global, vom Admin umstellbar).
+# "de" = exakt wie bisher (validiert, keine Zusatz-Anweisung an die LLMs).
+# "en" = Oberflaeche/Chat sofort englisch; Spot-/Region-Analysen werden beim
+# naechsten Neu-Berechnen englisch erzeugt (bestehender Run-Button).
+LANG = "de"
 # Vorhersage-Zeitachse: Wanduhrzeit Schweiz (MESZ/MEZ). Open-Meteo liefert `time` in dieser Zone.
 TIMEZONE = "Europe/Zurich"
 

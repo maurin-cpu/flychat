@@ -23,7 +23,7 @@
   function formatDateDE(dateStr) {
     try {
       const d = new Date(dateStr + "T12:00:00");
-      const months = ["Januar","Februar","Maerz","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+      const months = [wcT("month.1"),wcT("month.2"),wcT("month.3"),wcT("month.4"),wcT("month.5"),wcT("month.6"),wcT("month.7"),wcT("month.8"),wcT("month.9"),wcT("month.10"),wcT("month.11"),wcT("month.12")];
       return `${d.getDate()}. ${months[d.getMonth()]}`;
     } catch (e) { return dateStr; }
   }
@@ -70,9 +70,9 @@
   // safety_status (safe/conditional/not_safe). "violet" (Top) ist nur ein
   // Marker-Effekt fuer xc_tag/Klassiker (rating=5) auf 'green'-Spots — KEIN Filter.
   const SAFETY_DEFS = [
-    { id: "green",  label: "Sicher",        short: "Sicher" },
-    { id: "amber",  label: "Vorsicht",      short: "Vorsicht" },
-    { id: "red",    label: "Nicht fliegbar", short: "Nicht fliegbar" },
+    { id: "green",  label: wcT("js.safety.safe"),        short: wcT("js.safety.safe") },
+    { id: "amber",  label: wcT("js.safety.caution"),      short: wcT("js.safety.caution") },
+    { id: "red",    label: wcT("js.safety.not_flyable"), short: wcT("js.safety.not_flyable") },
   ];
   const DEFAULT_SAFETY = ["green", "amber"];
 
@@ -471,7 +471,7 @@
     svg += '<text class="axis-title" x="' + (margin.left + innerW / 2) + '" y="' + (H - 4)
         + '" text-anchor="middle">Reward · Experience-Score →</text>';
     svg += '<text class="axis-title" x="' + (margin.left - 36) + '" y="' + (margin.top + innerH / 2)
-        + '" text-anchor="middle" transform="rotate(-90 ' + (margin.left - 36) + ' ' + (margin.top + innerH / 2) + ')">↑ Sicherheit</text>';
+        + '" text-anchor="middle" transform="rotate(-90 ' + (margin.left - 36) + ' ' + (margin.top + innerH / 2) + ')">' + escapeHtml(wcT('js.matrix.axis_safety')) + '</text>';
 
     // Bubbles — Sweet-Spot zuletzt zeichnen (überlappen schlechtere)
     const drawOrder = items.slice().sort((a, b) => {
@@ -497,7 +497,7 @@
           + 'data-stars="' + it.stars + '" '
           + 'data-band="' + it.band + '" '
           + 'tabindex="0" role="button" '
-          + 'aria-label="' + escapeAttr(it.spot + ', ' + it.region_name + ', Reward ' + it.score + ', Sicherheit ' + it.safety + ', ' + it.stars + ' Sterne') + '">'
+          + 'aria-label="' + escapeAttr(wcT('js.matrix.bubble_aria', { spot: it.spot, region: it.region_name, score: it.score, safety: it.safety, stars: it.stars })) + '">'
           + '<circle cx="' + cx.toFixed(2) + '" cy="' + cy.toFixed(2) + '" r="' + r.toFixed(2)
           + '" fill="' + color + '" stroke="' + color + '" stroke-opacity="' + strokeOpacity + '" />'
           + '</g>';
@@ -516,14 +516,14 @@
     }).join('');
 
     const hiddenHint = hiddenCount > 0
-      ? '<span class="bf-bubble-matrix-hidden">' + hiddenCount + ' not-safe ausgeblendet</span>'
+      ? '<span class="bf-bubble-matrix-hidden">' + escapeHtml(wcT('js.matrix.hidden', { n: hiddenCount })) + '</span>'
       : '';
 
     host.innerHTML =
       '<div class="bf-bubble-matrix-header">'
       + '<span class="bf-bubble-matrix-title">Risk-Reward-Matrix</span>'
       + '<span class="bf-bubble-matrix-legend-meta">'
-      + '<span class="legend-item legend-item--size">⬤ Größe = Fliegbarkeit</span>'
+      + '<span class="legend-item legend-item--size">' + escapeHtml(wcT('js.matrix.legend_size')) + '</span>'
       + hiddenHint
       + '</span>'
       + '</div>'
@@ -548,7 +548,7 @@
         + '<div class="bf-bubble-tooltip-region">' + escapeHtml(region) + '</div>'
         + '<div class="bf-bubble-tooltip-grid">'
         +   '<div class="bf-bubble-tooltip-cell"><span class="lbl">Reward</span><span class="val">' + score + '</span></div>'
-        +   '<div class="bf-bubble-tooltip-cell"><span class="lbl">Sicherheit</span><span class="val">' + safety + '</span></div>'
+        +   '<div class="bf-bubble-tooltip-cell"><span class="lbl">' + escapeHtml(wcT('js.matrix.tt_safety')) + '</span><span class="val">' + safety + '</span></div>'
         + '</div>'
         + '<div class="bf-bubble-tooltip-row"><span class="bf-bubble-tooltip-stars">' + starGlyph + '</span>'
         + '<span class="bf-bubble-tooltip-band bf-bubble-tooltip-band--' + band + '">' + bandLabel + '</span></div>';
@@ -797,11 +797,11 @@
       const allIds = regions.map((r) => r.id);
       const allActive = allIds.length > 0 && allIds.every((id) => state.filterRegions.has(id));
       resetBtn.disabled = allIds.length === 0;
-      resetBtn.textContent = allActive ? "Keine" : "Alle";
+      resetBtn.textContent = allActive ? wcT("js.regions.none") : wcT("js.regions.all");
       resetBtn.classList.toggle("is-active", allActive);
       resetBtn.setAttribute(
         "aria-label",
-        allActive ? "Alle Regionen abwählen" : "Alle Regionen auswählen",
+        allActive ? wcT("js.regions.deselect_all") : wcT("js.regions.select_all"),
       );
       if (!resetBtn._flyBound) {
         resetBtn._flyBound = true;
@@ -939,7 +939,7 @@
       return;
     }
     if (typeof L === "undefined") {
-      el.innerHTML = '<div class="bf-minimap-fallback">Karte nicht verfuegbar</div>';
+      el.innerHTML = '<div class="bf-minimap-fallback">' + wcT('js.map.unavailable') + '</div>';
       return;
     }
 
@@ -998,7 +998,7 @@
       setTimeout(() => { try { mapObj.invalidateSize(); } catch (_) {} }, 300);
     } catch (e) {
       console.warn("[briefing] filter-map init failed", e);
-      el.innerHTML = '<div class="bf-minimap-fallback">Karte nicht verfuegbar</div>';
+      el.innerHTML = '<div class="bf-minimap-fallback">' + wcT('js.map.unavailable') + '</div>';
     }
   }
 
@@ -1012,7 +1012,7 @@
     const day = getSelectedDay();
     if (!day) {
       infoEl.innerHTML = "";
-      contentEl.innerHTML = '<div class="bf-content-empty">Noch keine Prognosedaten vorhanden.</div>';
+      contentEl.innerHTML = '<div class="bf-content-empty">' + escapeHtml(wcT('js.empty.no_forecast')) + '</div>';
       return;
     }
 
@@ -1031,10 +1031,10 @@
     infoEl.innerHTML = `
       <span class="bf-day-title">${escapeHtml(day.weekday || "")} ${formatDateDE(day.date)}</span>
       <span class="bf-day-stats">
-        ${counts.green > 0 ? `<span class="bf-stat bf-stat--green"><strong>${counts.green}</strong> grün</span>` : ""}
-        ${counts.amber > 0 ? `<span class="bf-stat bf-stat--amber"><strong>${counts.amber}</strong> amber</span>` : ""}
-        ${counts.red > 0 ? `<span class="bf-stat bf-stat--red"><strong>${counts.red}</strong> rot</span>` : ""}
-        ${topStars > 0 ? `<span class="bf-stat bf-stat--top">★ <strong>${topStars}</strong> top</span>` : ""}
+        ${counts.green > 0 ? `<span class="bf-stat bf-stat--green"><strong>${counts.green}</strong> ${wcT('js.stat.green')}</span>` : ""}
+        ${counts.amber > 0 ? `<span class="bf-stat bf-stat--amber"><strong>${counts.amber}</strong> ${wcT('js.stat.amber')}</span>` : ""}
+        ${counts.red > 0 ? `<span class="bf-stat bf-stat--red"><strong>${counts.red}</strong> ${wcT('js.stat.red')}</span>` : ""}
+        ${topStars > 0 ? `<span class="bf-stat bf-stat--top">★ <strong>${topStars}</strong> ${wcT('js.stat.top')}</span>` : ""}
       </span>
     `;
 
@@ -1066,23 +1066,23 @@
     // Focus-Banner (wenn Nutzer aus E-Mail auf einen spezifischen Spot kam)
     const focusBanner = state.focusSpot
       ? `<div class="bf-focus-banner" role="status">
-           <span class="bf-focus-text">Zeige nur <strong>${escapeHtml(state.focusSpot)}</strong></span>
-           <button type="button" class="bf-focus-clear" onclick="window.__bf_clearFocus && window.__bf_clearFocus()">Alle Spots zeigen</button>
+           <span class="bf-focus-text">${wcT('js.focus.show_only_pre')} <strong>${escapeHtml(state.focusSpot)}</strong></span>
+           <button type="button" class="bf-focus-clear" onclick="window.__bf_clearFocus && window.__bf_clearFocus()">${wcT('js.focus.show_all')}</button>
          </div>`
       : "";
 
     if (!groups.length) {
       let emptyMsg;
       if (state.focusSpot) {
-        emptyMsg = `Spot "${escapeHtml(state.focusSpot)}" nicht in diesem Tag gefunden.`;
+        emptyMsg = wcT('js.empty.spot_not_found', { spot: escapeHtml(state.focusSpot) });
       } else {
         const filterActive = (state.safetyFilters.size < SAFETY_DEFS.length) || state.minRating > 0 || state.filterRegions.size > 0;
         const filterHint = filterActive
-          ? `<button type="button" class="bf-empty-reset" onclick="window.__bf_resetFilters && window.__bf_resetFilters()">Filter zurücksetzen</button>`
+          ? `<button type="button" class="bf-empty-reset" onclick="window.__bf_resetFilters && window.__bf_resetFilters()">${wcT('js.filter.reset')}</button>`
           : "";
         const cRed = counts.red || 0;
         const cAmber = counts.amber || 0;
-        emptyMsg = `<div class="bf-empty-msg">Keine Spots${state.filterRegions.size ? " in den gefilterten Regionen" : ""} entsprechen dem aktuellen Filter.</div><div class="bf-empty-counts">${cRed} rot · ${cAmber} amber ausgeblendet</div>${filterHint}`;
+        emptyMsg = `<div class="bf-empty-msg">${wcT('js.empty.no_match_pre')}${state.filterRegions.size ? wcT('js.empty.in_filtered_regions') : ""}${wcT('js.empty.no_match_post')}</div><div class="bf-empty-counts">${wcT('js.empty.counts_hidden', { red: cRed, amber: cAmber })}</div>${filterHint}`;
       }
       contentEl.innerHTML = focusBanner + `<div class="bf-content-empty">${emptyMsg}</div>`;
       return;
@@ -1094,7 +1094,7 @@
     const allRegionIds = groups.map((g) => g.region_id || "");
     const collapsedCount = allRegionIds.filter((rid) => state.collapsedRegions.has(rid)).length;
     const willExpandAll = collapsedCount >= allRegionIds.length / 2;
-    const bulkLabel = willExpandAll ? "Alle ausklappen" : "Alle einklappen";
+    const bulkLabel = willExpandAll ? wcT("js.bulk.expand_all") : wcT("js.bulk.collapse_all");
     const bulkIcon = willExpandAll ? "▾" : "▴";
     const bulkBar = groups.length > 1
       ? `<div class="bf-bulk-toggle-bar">
@@ -1168,13 +1168,13 @@
     const rating = Math.max(0, Math.min(5, parseInt(meta.experience_rating, 10) || 0));
 
     if (rawBand === "red" || rawBand === "not_safe") {
-      return { label: "Nicht fliegbar", hex: "#ef4444", border: "#991b1b", text: "#ffffff", darkBg: true };
+      return { label: wcT("js.safety.not_flyable"), hex: "#ef4444", border: "#991b1b", text: "#ffffff", darkBg: true };
     }
     if (rating <= 0) return null;
 
     if (rawBand === "amber" || rawBand === "conditional") {
       // Conditional bleibt Yellow→Gold→Orange→Burnt→Brown (Warnsignal-Spektrum).
-      const labels = ["Abgleiter", "Schwacher Thermiktag", "Solider Thermiktag", "Starker Thermiktag", "XC-Tag"];
+      const labels = [wcT("js.pill.tier0"), wcT("js.pill.tier1"), wcT("js.pill.tier2"), wcT("js.pill.tier3"), wcT("js.pill.tier4")];
       const bgs    = ["#fef08a", "#facc15", "#f97316", "#c2410c", "#7c2d12"];
       const borders= ["#ca8a04", "#a16207", "#9a3412", "#7c2d12", "#431407"];
       const texts  = ["#713f12", "#713f12", "#ffffff", "#ffffff", "#ffffff"];
@@ -1185,7 +1185,7 @@
 
     // Safe-Band v3.2 — "Royal Premium" finale Palette (Mai 2026):
     // Sky-100 → Sky-200 → Lime → Green-500 → Violet-Premium.
-    const labels = ["Abgleiter", "Kurzer Thermikflug", "Solider Thermiktag", "Starker Thermiktag", "XC-Tag"];
+    const labels = [wcT("js.pill.tier0"), wcT("js.pill.safe_tier1"), wcT("js.pill.tier2"), wcT("js.pill.tier3"), wcT("js.pill.tier4")];
     const bgs    = ["#e0f2fe", "#bae6fd", "#BEF264", "#22c55e", "#a78bfa"];
     const borders= ["#38bdf8", "#0ea5e9", "#65a30d", "#15803d", "#6d28d9"];
     const texts  = ["#075985", "#075985", "#3f6212", "#ffffff", "#ffffff"];
@@ -1296,7 +1296,7 @@
 
     const miniMapInner = hasCoords
       ? `<div class="bf-spot-minimap" data-lat="${spot.lat}" data-lon="${spot.lon}" data-spot="${escapeHtml(spot.spot)}" data-href="${escapeHtml(mapHref)}" data-windrichtung="${escapeHtml(spot.windrichtung || "")}" data-safety="${escapeHtml(spot.safety_status || "")}" data-rating="${rating}" data-band="${escapeHtml(band)}"></div>`
-      : `<div class="bf-spot-minimap bf-spot-minimap--nodata">Keine Koordinaten</div>`;
+      : `<div class="bf-spot-minimap bf-spot-minimap--nodata">${wcT('js.spot.no_coords')}</div>`;
 
     const shareRatingAttr = rating > 0 && band !== "red" ? String(rating) : "";
     const shareBtn = `<button type="button" class="bf-share-btn bf-share-btn--spot"
@@ -1350,14 +1350,14 @@
               ${miniMapInner}
             </section>
             <section class="bf-detail-meteoblock">
-              <h4 class="bf-detail-title"><span class="bf-detail-icon">📈</span>Meteogramm</h4>
+              <h4 class="bf-detail-title"><span class="bf-detail-icon">📈</span>${wcT('js.meteogram.title')}</h4>
               <div class="bf-spot-meteogram" data-spot="${escapeHtml(spot.spot)}" data-date="${escapeHtml(spot.date || "")}">
                 <div class="bf-meteogram-toolbar">
                   <button type="button" class="bf-meteogram-numbers-toggle" data-meteogram-numbers
                           aria-pressed="${state.showNumbers ? "true" : "false"}"
-                          title="Wind-/Böen-Zahlen ein-/ausblenden">
+                          title="${wcT('js.meteogram.numbers_toggle')}">
                     <span class="bf-meteogram-numbers-toggle-icon" aria-hidden="true">123</span>
-                    <span>Zahlen</span>
+                    <span>${wcT('js.meteogram.numbers')}</span>
                   </button>
                 </div>
                 <div class="bf-meteogram-chart"></div>
@@ -1390,10 +1390,10 @@
     "SUNSHINE", "CONVERGENCE", "TURBULENCE",
   ];
   const WINDOW_STATE_LABEL = {
-    startbar: "Startbar",
-    sportlich: "Sportlich",
-    blockiert: "Blockiert",
-    neutral: "Ausserhalb",
+    startbar: wcT("js.window.state_startbar"),
+    sportlich: wcT("js.window.state_sportlich"),
+    blockiert: wcT("js.window.state_blockiert"),
+    neutral: wcT("js.window.state_neutral"),
   };
 
   function _topicSortKey(topic) {
@@ -1442,7 +1442,7 @@
       const state = e.state || "neutral";
       const hourLbl = String(e.hour).padStart(2, "0");
       const lbl = WINDOW_STATE_LABEL[state] || "—";
-      return `<span class="bf-window-seg bf-window-seg--${state}" title="${hourLbl}:00 Uhr · ${lbl}"></span>`;
+      return `<span class="bf-window-seg bf-window-seg--${state}" title="${wcT('js.window.hour_tooltip', { h: hourLbl, lbl: lbl })}"></span>`;
     }).join("");
 
     // Tick-Achse: nur alle 3 Stunden (06, 09, 12, 15, 18, 21) damit's ruhig wirkt.
@@ -1465,17 +1465,17 @@
       const e = String(bestStartbar.end + 1).padStart(2, "0");
       primaryIcon = ICON_CHECK;
       primaryClass = "is-good";
-      primaryText = `${s}:00 – ${e}:00 Uhr`;
+      primaryText = wcT('js.window.time_range', { s: s, e: e });
     } else if (bestSportlich.len > 0) {
       const ss = String(bestSportlich.start).padStart(2, "0");
       const ee = String(bestSportlich.end + 1).padStart(2, "0");
       primaryIcon = ICON_ALERT;
       primaryClass = "is-warn";
-      primaryText = `Nur sportlich ${ss}:00 – ${ee}:00 Uhr`;
+      primaryText = wcT('js.window.sporty_only', { s: ss, e: ee });
     } else {
       primaryIcon = ICON_X;
       primaryClass = "is-bad";
-      primaryText = "Heute nicht startbar";
+      primaryText = wcT('js.window.not_launchable');
     }
     const durationHtml = bestStartbar.len > 0
       ? `<span class="bf-window-duration">${bestStartbar.len} h</span>`
@@ -1488,7 +1488,7 @@
     if (bestStartbar.len > 0 && bestSportlich.len > 0) {
       const ss = String(bestSportlich.start).padStart(2, "0");
       const ee = String(bestSportlich.end + 1).padStart(2, "0");
-      secondary = `<div class="bf-window-secondary"><span class="bf-window-dot bf-window-dot--sportlich"></span>Sportlich ${ss}:00 – ${ee}:00 Uhr</div>`;
+      secondary = `<div class="bf-window-secondary"><span class="bf-window-dot bf-window-dot--sportlich"></span>${wcT('js.window.sporty_secondary', { s: ss, e: ee })}</div>`;
     }
 
     return `
@@ -1615,8 +1615,8 @@
     const flyText = cleanAssessmentText(spot.flyability_feedback || a.recommendation || fly.recommendation);
 
     const sections = [
-      { key: "safety", label: "Sicherheits-Einschätzung", text: safetyText },
-      { key: "fly", label: "Flug-Einschätzung", text: flyText },
+      { key: "safety", label: wcT("js.assess.safety"), text: safetyText },
+      { key: "fly", label: wcT("js.assess.flight"), text: flyText },
     ].filter((s) => s.text);
 
     if (!sections.length) return "";
@@ -1753,7 +1753,7 @@
     const icon = btn.querySelector(".bf-bulk-toggle-icon");
     const label = btn.querySelector(".bf-bulk-toggle-label");
     if (icon)  icon.textContent  = expand ? "▴" : "▾";
-    if (label) label.textContent = expand ? "Alle einklappen" : "Alle ausklappen";
+    if (label) label.textContent = expand ? wcT("js.bulk.collapse_all") : wcT("js.bulk.expand_all");
     btn.setAttribute("aria-label", label ? label.textContent : "");
   }
 
@@ -1818,13 +1818,13 @@
     const dayIdx = state.selectedDayIdx || 0;
     let title, text;
     if (kind === "spot") {
-      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}` : "";
+      const rtxt = rating && rating !== "—" ? wcT('js.share.flyability_suffix', { rating: rating }) : "";
       title = `${spotName}${rtxt}`;
-      text = `${spotName}${regionName ? " (" + regionName + ")" : ""}${rtxt} · Wingcast Flugwetter`;
+      text = `${spotName}${regionName ? " (" + regionName + ")" : ""}${rtxt}${wcT('js.share.brand_suffix')}`;
     } else {
-      const rtxt = rating && rating !== "—" ? ` — Fliegbarkeit ${rating}` : "";
-      title = `${regionName || "Region"}${rtxt}`;
-      text = `${regionName || "Region"}${rtxt} · Wingcast Flugwetter`;
+      const rtxt = rating && rating !== "—" ? wcT('js.share.flyability_suffix', { rating: rating }) : "";
+      title = `${regionName || wcT("js.share.region")}${rtxt}`;
+      text = `${regionName || wcT("js.share.region")}${rtxt}${wcT('js.share.brand_suffix')}`;
     }
     if (typeof window.wingcastShare === "function") {
       window.wingcastShare({
@@ -1945,7 +1945,7 @@
     const href = el.dataset.href || "";
 
     if (typeof L === "undefined" || !isFinite(lat) || !isFinite(lon)) {
-      el.innerHTML = '<div class="bf-minimap-fallback">Karte nicht verfuegbar</div>';
+      el.innerHTML = '<div class="bf-minimap-fallback">' + wcT('js.map.unavailable') + '</div>';
       return;
     }
     try {
@@ -1978,7 +1978,7 @@
       setTimeout(() => { try { mapObj.invalidateSize(); } catch (_) {} }, 250);
     } catch (e) {
       console.warn("[briefing] mini-map init failed", e);
-      el.innerHTML = '<div class="bf-minimap-fallback">Karte nicht verfuegbar</div>';
+      el.innerHTML = '<div class="bf-minimap-fallback">' + wcT('js.map.unavailable') + '</div>';
     }
   }
 
@@ -2006,10 +2006,10 @@
     if (!chartEl || !spotName || !dateStr) return;
 
     if (typeof window.Meteogram === "undefined" || typeof d3 === "undefined") {
-      chartEl.innerHTML = '<div class="bf-meteogram-fallback">Meteogramm nicht verfuegbar</div>';
+      chartEl.innerHTML = '<div class="bf-meteogram-fallback">' + escapeHtml(wcT('js.meteogram.unavailable')) + '</div>';
       return;
     }
-    chartEl.innerHTML = '<div class="bf-meteogram-loading">Lade Meteogramm…</div>';
+    chartEl.innerHTML = '<div class="bf-meteogram-loading">' + escapeHtml(wcT('js.meteogram.loading')) + '</div>';
 
     fetchMeteogramData(spotName)
       .then((data) => {
@@ -2020,7 +2020,7 @@
         const wxDay = (weather.data || {})[dateStr] || {};
         const altProfiles = (altWind.data || {})[dateStr] || [];
         if (!wxDay || !altProfiles.length) {
-          chartEl.innerHTML = '<div class="bf-meteogram-fallback">Keine Daten fuer ' + escapeHtml(dateStr) + '</div>';
+          chartEl.innerHTML = '<div class="bf-meteogram-fallback">' + escapeHtml(wcT('js.meteogram.no_data_for', { date: dateStr })) + '</div>';
           return;
         }
         const altDay = { profiles: [] };
@@ -2045,12 +2045,12 @@
           });
         } catch (e) {
           console.warn("[briefing] Meteogram failed", e);
-          chartEl.innerHTML = '<div class="bf-meteogram-fallback">Render-Fehler</div>';
+          chartEl.innerHTML = '<div class="bf-meteogram-fallback">' + escapeHtml(wcT('js.meteogram.render_error')) + '</div>';
         }
       })
       .catch((err) => {
         console.warn("[briefing] meteogram fetch failed", err);
-        chartEl.innerHTML = '<div class="bf-meteogram-fallback">Daten nicht verfuegbar</div>';
+        chartEl.innerHTML = '<div class="bf-meteogram-fallback">' + escapeHtml(wcT('js.meteogram.data_unavailable')) + '</div>';
       });
   }
 
@@ -2065,7 +2065,7 @@
     } catch (err) {
       console.error("[briefing] load failed", err);
       const el = $("bfContent");
-      if (el) el.innerHTML = `<div class="bf-content-empty">Fehler: ${escapeHtml(err.message)}</div>`;
+      if (el) el.innerHTML = `<div class="bf-content-empty">${escapeHtml(wcT('js.error.prefix', { msg: err.message }))}</div>`;
     }
   }
 
@@ -2075,7 +2075,7 @@
     const btn = $("bfGenerateBtn");
     const orig = btn.textContent;
     btn.disabled = true;
-    btn.textContent = "Generiert…";
+    btn.textContent = wcT("js.generating");
     try {
       // POST /api/briefing/generate triggert Wetterlage-Refresh +
       // Fazit-Neugenerierung serverseitig. Die Response enthaelt das neue
@@ -2084,7 +2084,7 @@
       // inkl. dem neu generierten Wetterlage-Block.
       const res = await fetch("/api/briefing/generate", { method: "POST", headers: { "Content-Type": "application/json" } });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Fehlgeschlagen");
+      if (!data.success) throw new Error(data.error || wcT("js.failed"));
       // Wetterlage-Refresh-Status loggen (kein User-facing Error, Block
       // wird einfach ausgeblendet wenn er nicht generierbar war).
       if (data.wetterlage_refresh && data.wetterlage_refresh !== "ok") {
@@ -2093,7 +2093,7 @@
       await loadBriefing();
     } catch (err) {
       console.error("[briefing] generate failed", err);
-      alert(`Fehler: ${err.message}`);
+      alert(wcT('js.error.prefix', { msg: err.message }));
     } finally {
       state.generating = false;
       btn.disabled = false;

@@ -42,6 +42,7 @@ from source_area import (
     get_all_regions,
 )
 import prompts
+import i18n
 from prompts import format_foehn_llm_regional_guide
 import routing
 from engine._common import (
@@ -292,25 +293,25 @@ def _tool_status_message(name: str, args: dict) -> str:
     region = (args.get("region_name") or "").strip()
     if name == "geocode_location":
         q = (args.get("query") or "").strip()
-        return f"Ich suche den Standort „{q}“…" if q else "Ich suche den Standort…"
+        return i18n.t("chat.tool.geocode", q=q) if q else i18n.t("chat.tool.geocode_noarg")
     if name == "find_spots_within_travel_time":
         mins = args.get("minutes")
-        return (f"Ich suche erreichbare Spots im Umkreis von {mins} Min…"
-                if mins else "Ich suche erreichbare Spots…")
+        return (i18n.t("chat.tool.find_spots", mins=mins)
+                if mins else i18n.t("chat.tool.find_spots_noarg"))
     if name == "clear_map_overlays":
-        return "Ich räume die Karte auf…"
+        return i18n.t("chat.tool.clear_map")
     if name == "get_spot_analysis":
-        return (f"Ich schaue mir die Einschätzung für {spot} genauer an…"
-                if spot else "Ich schaue mir die Detail-Einschätzung an…")
+        return (i18n.t("chat.tool.spot_analysis", spot=spot)
+                if spot else i18n.t("chat.tool.spot_analysis_noarg"))
     if name == "get_spot_weather":
-        return f"Ich hole die Wetterdaten für {spot}…" if spot else "Ich hole die Wetterdaten…"
+        return i18n.t("chat.tool.spot_weather", spot=spot) if spot else i18n.t("chat.tool.spot_weather_noarg")
     if name == "get_region_analysis":
-        return (f"Ich schaue mir die Großwetterlage im Gebiet {region} an…"
-                if region else "Ich schaue mir die Großwetterlage an…")
+        return (i18n.t("chat.tool.region_analysis", region=region)
+                if region else i18n.t("chat.tool.region_analysis_noarg"))
     if name == "get_region_weather":
-        return (f"Ich hole die Wetterdaten für das Gebiet {region}…"
-                if region else "Ich hole die regionalen Wetterdaten…")
-    return "Einen Moment, ich schaue nach…"
+        return (i18n.t("chat.tool.region_weather", region=region)
+                if region else i18n.t("chat.tool.region_weather_noarg"))
+    return i18n.t("chat.tool.default")
 
 
 class ChatOrchestratorMixin:
@@ -322,7 +323,8 @@ class ChatOrchestratorMixin:
         messages = [
             {
                 "role": "system",
-                "content": prompts.SYSTEM_PROMPT + "\n\n" + prompts.CAPABILITIES_GUIDE + "\n\n" + prompts.FOEHN_CHAT_KNOWLEDGE,
+                "content": prompts.SYSTEM_PROMPT + "\n\n" + prompts.CAPABILITIES_GUIDE + "\n\n" + prompts.FOEHN_CHAT_KNOWLEDGE
+                           + i18n.llm_lang_instruction(),
             },
         ]
         self.conversations[session_id] = {

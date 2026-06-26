@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import config
+import i18n
 from spots import load_spots
 from fetch_weather import (
     fetch_all_spots, load_cached_weather, load_cached_weather_timestamp,
@@ -100,7 +101,7 @@ class AnalyzersMixin:
             return {
                 "spot": name, "date": date_str,
                 "safety_status": "no_data", "phase": "split",
-                "summary": "Keine Wetterdaten fuer diesen Tag",
+                "summary": i18n.t("analysis.no_weather_data"),
             }
 
         # ── Deterministischer Pre-Filter: offensichtliche not_safe ohne LLM ──
@@ -172,30 +173,21 @@ class AnalyzersMixin:
         # kein zusammenhaengender Block sauberer Stunden >= CLEAN_WINDOW_MIN_HOURS.
         if active_start is None and total_hours > 0:
             if wind_ok == 0:
-                no_go.append("Windrichtung: Ganztaegig ausserhalb des erlaubten Sektors")
+                no_go.append(i18n.t("analysis.nogo.wind_all_day"))
                 summary_parts.append(
-                    f"Die Windrichtung liegt den ganzen Tag ausserhalb des erlaubten Sektors "
-                    f"({spot.get('windrichtung', '?')}). Kein fliegbares Fenster."
+                    i18n.t("analysis.summary.wind_all_day", dir=spot.get("windrichtung", "?"))
                 )
                 na_reason = "wind_direction_mismatch"
             elif clean_count == 0:
-                no_go.append(
-                    "Start-Fenster: Alle Stunden mit passender Windrichtung haben harte "
-                    "Warnungen (Sturm/Boeen/Regen/Gewitter)"
-                )
-                summary_parts.append(
-                    f"Alle {wind_ok}h mit passender Windrichtung haben harte Warnungen — "
-                    f"kein nutzbares Start-Fenster."
-                )
+                no_go.append(i18n.t("analysis.nogo.all_warnings"))
+                summary_parts.append(i18n.t("analysis.summary.all_warnings", wind_ok=wind_ok))
                 # Bewusst KEIN noAnalysis: Pilot will sehen warum es nicht geht.
             else:
                 no_go.append(
-                    f"Start-Fenster: Nur {clean_count}h sauber, kein zusammenhaengender Block "
-                    f">= {config.CLEAN_WINDOW_MIN_HOURS}h"
+                    i18n.t("analysis.nogo.no_block", clean=clean_count, min=config.CLEAN_WINDOW_MIN_HOURS)
                 )
                 summary_parts.append(
-                    f"Saubere Stunden ({clean_count}h) bilden kein zusammenhaengendes "
-                    f"Start-Fenster (Minimum {config.CLEAN_WINDOW_MIN_HOURS}h)."
+                    i18n.t("analysis.summary.no_block", clean=clean_count, min=config.CLEAN_WINDOW_MIN_HOURS)
                 )
 
         # Regel 2: Ganztaegig Regen
@@ -221,20 +213,17 @@ class AnalyzersMixin:
             )
         ):
             effective_h = rain_widespread_h + rain_scattered_h or rain_cnt
-            no_go.append(f"Niederschlag: Regen in {effective_h} von {total_hours} Stunden")
+            no_go.append(i18n.t("analysis.nogo.rain", h=effective_h, total=total_hours))
             summary_parts.append(
-                f"Nahezu ganztaegiger Niederschlag ({effective_h} von {total_hours} Stunden) "
-                f"ohne zusammenhaengendes trockenes Fenster (laengste Trockenphase {max_dry_gap}h). "
-                f"Kein nutzbares Flugfenster."
+                i18n.t("analysis.summary.rain", h=effective_h, total=total_hours, gap=max_dry_gap)
             )
             na_reason = "all_day_rain"
 
         # Regel 3: Ganztaegig Gewitter
         elif total_hours > 0 and ts_h >= total_hours - 2 and ts_h >= 4:
-            no_go.append(f"Gewitter: prognostiziert in {ts_h} von {total_hours} Stunden")
+            no_go.append(i18n.t("analysis.nogo.thunderstorm", ts=ts_h, total=total_hours))
             summary_parts.append(
-                f"Praktisch ganztaegig Gewitter ({ts_h} von {total_hours} Stunden). "
-                f"Kein fliegbares Fenster."
+                i18n.t("analysis.summary.thunderstorm", ts=ts_h, total=total_hours)
             )
             na_reason = "all_day_thunderstorm"
 
@@ -256,7 +245,7 @@ class AnalyzersMixin:
             "date": date_str,
             "phase": "combined",
             "safety_status": "not_safe",
-            "safe_window": "keins",
+            "safe_window": i18n.t("analysis.window_none"),
             "no_go_reasons": no_go,
             "caution_notes": [],
             "wind_summary": "",
@@ -276,7 +265,7 @@ class AnalyzersMixin:
             "xc_details": "",
             "soaring_options": "",
             "bemerkung_check": "",
-            "best_window": "keins",
+            "best_window": i18n.t("analysis.window_none"),
             "llm_tags": [],
             "recommendation": "",
             "confidence": "high",
@@ -298,7 +287,7 @@ class AnalyzersMixin:
             return {
                 "region": region["region"], "region_id": region["id"],
                 "date": date_str, "safety_status": "no_data", "phase": "split",
-                "summary": "Keine Wetterdaten fuer diesen Tag",
+                "summary": i18n.t("analysis.no_weather_data"),
             }
 
         rname = region["region"]
@@ -1616,7 +1605,7 @@ class AnalyzersMixin:
                     "safety": result,
                     "fly_status": "",
                     "status": "no_data",
-                    "best_window": "keins",
+                    "best_window": i18n.t("analysis.window_none"),
                     "recommendation": "",
                 }
                 merged.setdefault(spot_name, {})[date_str] = entry
@@ -2583,7 +2572,7 @@ class AnalyzersMixin:
                     spot_results.setdefault(name, {})[date_str] = {
                         "spot": name, "date": date_str,
                         "safety_status": "no_data", "phase": "split",
-                        "summary": "Keine Wetterdaten fuer diesen Tag",
+                        "summary": i18n.t("analysis.no_weather_data"),
                     }
                     continue
 

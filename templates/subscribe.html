@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Wingcast abonnieren{% endblock %}
+{% block title %}{{ t('subscribe.title') }}{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
@@ -11,22 +11,22 @@
 <main class="sp">
 
   <div class="sp-hero">
-    <div class="sp-hero__eyebrow">E-Mail-Wingcast</div>
-    <h1>Dein Flugwetter in 3 E-Mails pro Woche</h1>
-    <p>Schluss mit 5 Apps checken. Montag, Mittwoch, Freitag — du weisst wann, wo und warum.</p>
+    <div class="sp-hero__eyebrow">{{ t('subscribe.eyebrow') }}</div>
+    <h1>{{ t('subscribe.heading') }}</h1>
+    <p>{{ t('subscribe.lead') }}</p>
   </div>
 
-  <div class="sp-proof" aria-label="Produkt-Kennzahlen">
-    <span>488 Startplätze</span>
+  <div class="sp-proof" aria-label="{{ t('subscribe.proof_aria') }}">
+    <span>{{ t('subscribe.proof_sites') }}</span>
     <span>·</span>
-    <span>5 Wettermodelle</span>
+    <span>{{ t('subscribe.proof_models') }}</span>
     <span>·</span>
-    <span>Gratis im MVP</span>
+    <span>{{ t('subscribe.proof_free') }}</span>
   </div>
 
   <div class="sp-preview-link">
     <a href="/preview/briefing" target="_blank" rel="noopener">
-      So sieht der Wingcast aus →
+      {{ t('subscribe.preview_link') }} →
     </a>
   </div>
 
@@ -40,7 +40,7 @@
   <form class="sp-form sp-card" method="post" action="/subscribe" novalidate>
 
     <fieldset>
-      <label class="sp-label" for="email">Deine E-Mail-Adresse</label>
+      <label class="sp-label" for="email">{{ t('subscribe.email_label') }}</label>
       <input class="sp-input"
         id="email"
         name="email"
@@ -48,22 +48,22 @@
         required
         autocomplete="email"
         inputmode="email"
-        placeholder="pilot@example.ch"
+        placeholder="{{ t('subscribe.email_placeholder') }}"
         value="{{ prefill_email or '' }}"
       >
     </fieldset>
 
     <fieldset>
-      <legend>Deine Regionen</legend>
-      <div class="sp-hint">Wähle die Regionen, für die du den Wingcast erhalten willst. Mehrfachauswahl möglich — per Chip oder direkt auf der Karte.</div>
+      <legend>{{ t('subscribe.regions_legend') }}</legend>
+      <div class="sp-hint">{{ t('subscribe.regions_hint') }}</div>
 
       <div class="sp-filters" id="spRegionFilters"
            data-regions='{{ regions|tojson }}'
            data-prefill='{{ (prefill_regions|list)|tojson }}'>
         <div class="sp-filter-row">
-          <div class="sp-filter-chips" id="spFilterChips" role="group" aria-label="Regionen"></div>
-          <button type="button" class="sp-filter-reset" id="spFilterReset" title="Alle Regionen auswählen / abwählen">Alle</button>
-          <button type="button" class="sp-filter-map-btn" id="spMapToggle" title="Karte ein/aus" aria-label="Karte ein/aus">
+          <div class="sp-filter-chips" id="spFilterChips" role="group" aria-label="{{ t('nav.regions') }}"></div>
+          <button type="button" class="sp-filter-reset" id="spFilterReset" title="{{ t('account.regions_all_title') }}">{{ t('account.regions_all') }}</button>
+          <button type="button" class="sp-filter-map-btn" id="spMapToggle" title="{{ t('account.map_toggle') }}" aria-label="{{ t('account.map_toggle') }}">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
           </button>
         </div>
@@ -72,7 +72,7 @@
       </div>
 
       <noscript>
-        <div class="sp-checkbox-grid" role="group" aria-label="Regionen">
+        <div class="sp-checkbox-grid" role="group" aria-label="{{ t('nav.regions') }}">
           {% for region in regions %}
           <label class="sp-checkbox-item">
             <input type="checkbox" name="regions" value="{{ region.id }}"
@@ -84,13 +84,12 @@
       </noscript>
     </fieldset>
 
-    <button type="submit" class="sp-btn sp-btn--primary">Kostenlos abonnieren</button>
+    <button type="submit" class="sp-btn sp-btn--primary">{{ t('subscribe.submit') }}</button>
 
   </form>
 
   <div class="sp-foot">
-    Mit dem Abonnieren erhältst du eine Bestätigungs-E-Mail.<br>
-    Du kannst dich jederzeit mit einem Klick abmelden.
+    {{ t('subscribe.foot_html')|safe }}
   </div>
 
 </main>

@@ -283,7 +283,7 @@
                     break;
                 case 'error':
                     clearStatus();
-                    appendMessage('bot', 'Fehler: ' + (event.content || 'Unbekannter Fehler'));
+                    appendMessage('bot', wcT('js.error.prefix', { msg: event.content || wcT('js.chat.unknown_error') }));
                     break;
                 case 'done':
                     clearStatus();
@@ -345,7 +345,7 @@
                         if (body && body.login_required) {
                             var loginBtn = document.getElementById('navLoginBtn');
                             if (loginBtn) loginBtn.click();
-                            var msg = body.message || 'Logge dich ein, um den Chat-Berater zu nutzen.';
+                            var msg = body.message || wcT('js.chat.login_required');
                             throw new Error(msg);
                         }
                         throw new Error('Server error: 401');
@@ -358,7 +358,7 @@
                 }
                 // Legacy fallback (Server unterstützt kein Streaming)
                 return resp.json().then(function (data) {
-                    appendMessage('bot', data.reply || 'Keine Antwort erhalten.');
+                    appendMessage('bot', data.reply || wcT('js.chat.no_reply'));
                 });
             })
             .catch(function (err) {
@@ -433,7 +433,7 @@
     var resetBtn = document.getElementById('resetChatBtn');
     if (resetBtn) {
         resetBtn.addEventListener('click', function () {
-            if (!confirm('Gesamte Konversation zurücksetzen?')) return;
+            if (!confirm(wcT('js.chat.reset_confirm'))) return;
 
             fetch('/api/reset-chat', {
                 method: 'POST',
@@ -448,7 +448,7 @@
                     if (data.success) {
                         // UI zurücksetzen
                         messagesEl.innerHTML = '';
-                        appendMessage('bot', 'Hallo! Ich bin dein Wingcast-Berater (Beta — Antworten können noch Fehler enthalten). Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.');
+                        appendMessage('bot', wcT('chat.welcome'));
                         if (quickActions) {
                             quickActions.classList.remove('compact');
                         }
@@ -1060,22 +1060,22 @@
 
         // === Immer aktiv — USP-Anker ===
         candidates.push({
-            label: 'Karte: 1h ab Z\u00fcrich',
-            msg: 'Zeichne mir auf der Karte die Region ein, die ich in 1 Stunde Fahrzeit von Z\u00fcrich aus erreiche, und zeig mir die fliegbaren Spots darin.',
+            label: wcT('chat.quick_map_label'),
+            msg: wcT('chat.quick_map_msg'),
             score: 10
         });
 
         candidates.push({
-            label: 'Vergleiche Top 3',
-            msg: 'Vergleiche die drei besten Spots heute in einer Tabelle mit Wind, Thermik und Sicherheit.',
+            label: wcT('chat.quick_top3_label'),
+            msg: wcT('chat.quick_top3_msg'),
             score: 9
         });
 
         // Windverlauf — always-on (User soll diesen Chart immer sehen koennen)
         if (flyableTodayCount > 0) {
             candidates.push({
-                label: 'Windverlauf',
-                msg: 'Zeig mir den Windverlauf vom besten Spot heute als Chart mit Wind und B\u00f6en \u00fcber den Tag.',
+                label: wcT('chat.quick_wind_label'),
+                msg: wcT('chat.quick_wind_msg'),
                 score: 8
             });
         }
@@ -1083,18 +1083,18 @@
         // === Visualisierungs-Discovery (tageweise Rotation, neutral formuliert) ===
         if (flyableTodayCount > 0) {
             candidates.push({
-                label: 'Meteogramm zeigen',
-                msg: 'Zeig mir das komplette Meteogramm vom besten Spot heute (Wind, Thermik, Wolken, H\u00f6henwind).',
+                label: wcT('js.chat.q_meteogram_label'),
+                msg: wcT('js.chat.q_meteogram_msg'),
                 score: VIZ_BASE + (vizSlot === 0 ? VIZ_BOOST : 0)
             });
             candidates.push({
-                label: 'Thermik-Heatmap',
-                msg: 'Zeig mir die Thermik-Heatmap vom besten Spot heute mit Steigwerten pro H\u00f6he und Stunde.',
+                label: wcT('js.chat.q_heatmap_label'),
+                msg: wcT('js.chat.q_heatmap_msg'),
                 score: VIZ_BASE + (vizSlot === 1 ? VIZ_BOOST : 0)
             });
             candidates.push({
-                label: 'H\u00f6henwind & Turbulenz',
-                msg: 'Zeig mir das vertikale Windprofil und die Turbulenz vom besten Spot heute.',
+                label: wcT('js.chat.q_upperwind_label'),
+                msg: wcT('js.chat.q_upperwind_msg'),
                 score: VIZ_BASE + (vizSlot === 2 ? VIZ_BOOST : 0)
             });
         }
@@ -1102,20 +1102,20 @@
         // === Situativ — XC / Streckenflug ===
         if (xcTodayCount > 0) {
             candidates.push({
-                label: 'Klassiker heute?',
-                msg: 'Wo k\u00f6nnte heute ein XC-Klassiker gehen? Zeig mir Streckenflug-Rating, Wolkenbasis und Wind-Layer.',
+                label: wcT('js.chat.q_xc_today_label'),
+                msg: wcT('js.chat.q_xc_today_msg'),
                 score: 12
             });
         } else if (bestTomorrowRating >= 4) {
             candidates.push({
-                label: 'Klassiker morgen?',
-                msg: 'Wo k\u00f6nnte morgen ein XC-Klassiker gehen? Zeig mir Streckenflug-Rating und Basis.',
+                label: wcT('js.chat.q_xc_tomorrow_label'),
+                msg: wcT('js.chat.q_xc_tomorrow_msg'),
                 score: 11
             });
         } else {
             candidates.push({
-                label: 'Wo geht XC?',
-                msg: 'Wo geht diese Woche der beste Streckenflug? Zeig mir das h\u00f6chste Streckenflug-Rating der n\u00e4chsten Tage.',
+                label: wcT('js.chat.q_xc_week_label'),
+                msg: wcT('js.chat.q_xc_week_msg'),
                 score: 7
             });
         }
@@ -1123,14 +1123,14 @@
         // === Situativ — Foehn ===
         if (foehnTodayCount > 0) {
             candidates.push({
-                label: 'F\u00f6hn-Check',
-                msg: 'Wie sieht die F\u00f6hn-Lage aus? Zeig mir das F\u00f6hn-Diagramm und welche Spots betroffen sind.',
+                label: wcT('js.chat.q_foehn_today_label'),
+                msg: wcT('js.chat.q_foehn_today_msg'),
                 score: 11
             });
         } else {
             candidates.push({
-                label: 'F\u00f6hn-Lage?',
-                msg: 'Wie entwickelt sich der F\u00f6hn diese Woche? Zeig mir das F\u00f6hn-Diagramm.',
+                label: wcT('js.chat.q_foehn_week_label'),
+                msg: wcT('js.chat.q_foehn_week_msg'),
                 score: 5
             });
         }
@@ -1138,16 +1138,16 @@
         // === Situativ — Plan B (>=50% Spots unsafe) ===
         if (totalToday > 0 && notSafeCount / totalToday >= 0.5) {
             candidates.push({
-                label: 'Plan B heute?',
-                msg: 'Heute sind viele Spots nicht fliegbar — wo gibt es trotzdem eine sichere Option und warum?',
+                label: wcT('js.chat.q_planb_label'),
+                msg: wcT('js.chat.q_planb_msg'),
                 score: 10
             });
         }
 
         // === Standard — Wochenuebersicht ===
         candidates.push({
-            label: 'Bester Tag?',
-            msg: 'Welcher Tag diese Woche ist am besten zum Fliegen?',
+            label: wcT('js.chat.q_bestday_label'),
+            msg: wcT('js.chat.q_bestday_msg'),
             score: 6
         });
 

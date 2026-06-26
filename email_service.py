@@ -29,6 +29,7 @@ from typing import Any, Optional
 from flask import render_template
 
 import config
+import i18n
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,28 @@ def _stars_glyph_text(n: int) -> str:
 
 _WEEKDAY_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 _WEEKDAY_DE_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+_WEEKDAY_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+_WEEKDAY_EN_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+
+def _weekday_short_list() -> list[str]:
+    """Wochentags-Kurzlabels in aktiver Sprache. EINE Quelle fuer Anzeige UND
+    Sortier-Keys (days_short) — beide muessen dieselbe Liste nutzen."""
+    return _WEEKDAY_EN if i18n.get_current_lang() == "en" else _WEEKDAY_DE
+
+
+def _weekday_long_list() -> list[str]:
+    return _WEEKDAY_EN_LONG if i18n.get_current_lang() == "en" else _WEEKDAY_DE_LONG
+
+
+_TIER_LABEL_KEYS = {"violet", "green", "conditional", "gray", "none", "not_safe"}
+
+
+def _tier_label(tier: str) -> str:
+    """Sprachabhaengiges Tier-Label (DE exakt wie _TIER_META, EN via i18n).
+    Unbekannter Tier -> 'gray' (spiegelt _TIER_META.get(tier, _TIER_META['gray']))."""
+    key = tier if tier in _TIER_LABEL_KEYS else "gray"
+    return i18n.t(f"tier.{key}")
 
 # Sicherheits-Keywords fuer Safety-Header (case-insensitive).
 # Reihenfolge = Schweregrad (hoechste zuerst).
@@ -120,6 +143,12 @@ _SAFETY_KEYWORDS = [
     ("storm",        ["sturm", "starker wind", "orkan"],            "Sturm"),
     ("shear",        ["windscherung", "scherung", "shear"],         "Windscherung"),
 ]
+
+
+def _phenomenon_label(category: str, fallback: str = "") -> str:
+    """Sprachabhaengiges Phaenomen-Label (DE exakt wie _SAFETY_KEYWORDS)."""
+    key = f"phenom.{category}"
+    return i18n.t(key) if key in i18n.STRINGS else fallback
 
 
 # ----------------------------------------------------------------------
@@ -317,7 +346,7 @@ def send_confirm_email(email: str, confirm_token: str, *, async_send: bool = Tru
     urls = _build_urls(confirm_token=confirm_token)
     html = render_template("email/confirm.html", email=email, urls=urls)
     text = render_template("email/confirm.txt", email=email, urls=urls)
-    subject = "Bestaetige dein Wingcast-Abo"
+    subject = i18n.t("email.confirm.title")
 
     if async_send:
         send_email_async(email, subject, html, text)
@@ -330,7 +359,7 @@ def send_login_email(email: str, login_token: str, *, async_send: bool = True) -
     urls = _build_urls(login_token=login_token)
     html = render_template("email/login.html", email=email, urls=urls)
     text = render_template("email/login.txt", email=email, urls=urls)
-    subject = "Dein Wingcast Login-Link"
+    subject = i18n.t("email.login.title")
     if async_send:
         send_email_async(email, subject, html, text)
         return True
@@ -349,7 +378,7 @@ def send_welcome_email(email: str, action_token: str, regions: list[str],
         "email/welcome.txt",
         email=email, urls=urls, regions=regions, skill_level=skill_level,
     )
-    subject = "Willkommen bei Wingcast"
+    subject = i18n.t("email.welcome.title")
 
     if async_send:
         send_email_async(email, subject, html, text)
@@ -434,10 +463,10 @@ def _extract_safety_warnings(days_with_all_my_spots: list) -> list[dict]:
         e = seen[cat]
         result.append({
             "category": e["category"],
-            "label":    e["label"],
+            "label":    _phenomenon_label(e["category"], e["label"]),
             "days_short": sorted(
                 e["days_short"],
-                key=lambda d: _WEEKDAY_DE.index(d) if d in _WEEKDAY_DE else 99,
+                key=lambda d, _wd=_weekday_short_list(): _wd.index(d) if d in _wd else 99,
             ),
         })
     return result
@@ -456,22 +485,22 @@ def _week_summary_prose(days_out: list[dict], warnings: list[dict]) -> str:
     none = [d for d in days_out if d["tier"] == "none"]
 
     if not strong and not conditional:
-        return "Diese Woche bleib am Boden — kein fliegbarer Tag in deinen Regionen."
+        return i18n.t("ws.grounded")
 
     parts: list[str] = []
 
     # Satz 1: Top-Tage
     if not strong:
-        parts.append("Keine Top-Bedingungen, nur bedingt fliegbar.")
+        parts.append(i18n.t("ws.no_top"))
     elif len(strong) == 1:
         d = strong[0]
-        wd_long = _WEEKDAY_DE_LONG[datetime.fromisoformat(d["date"]).weekday()]
-        parts.append(f"{wd_long} ist dein Tag der Woche.")
+        wd_long = _weekday_long_list()[datetime.fromisoformat(d["date"]).weekday()]
+        parts.append(i18n.t("ws.one_strong", weekday=wd_long))
     elif len(strong) <= 3:
         wds = ", ".join(d["label"]["short"] for d in strong)
-        parts.append(f"{len(strong)} starke Tage: {wds}.")
+        parts.append(i18n.t("ws.few_strong", n=len(strong), days=wds))
     else:
-        parts.append(f"{len(strong)} starke Tage diese Woche.")
+        parts.append(i18n.t("ws.many_strong", n=len(strong)))
 
     # Satz 2: Warnungen oder Schlecht-Tage
     if warnings:
@@ -479,12 +508,12 @@ def _week_summary_prose(days_out: list[dict], warnings: list[dict]) -> str:
         w = warnings[0]
         if w.get("days_short"):
             wds = "/".join(w["days_short"])
-            parts.append(f"{w['label']} an {wds} — meiden.")
+            parts.append(i18n.t("ws.warn_days", label=w["label"], days=wds))
         else:
-            parts.append(f"{w['label']} aufziehend — meiden.")
+            parts.append(i18n.t("ws.warn_coming", label=w["label"]))
     elif none:
         wds = "/".join(d["label"]["short"] for d in none[:2])
-        parts.append(f"{wds} nichts fliegbar.")
+        parts.append(i18n.t("ws.none_days", days=wds))
 
     return " ".join(parts)
 
@@ -590,7 +619,7 @@ def _week_summary_llm(days_out: list[dict], warnings: list[dict]) -> str:
         return fallback
 
     try:
-        system_prompt = _load_skill("email_week_lead.md")
+        system_prompt = _load_skill("email_week_lead.md") + i18n.llm_lang_instruction()
     except Exception as e:
         logger.warning("week_lead LLM: Skill-Datei fehlt (%s) — Fallback.", e)
         return fallback
@@ -726,7 +755,7 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
                 cell["tier_color"] = meta["color"]
                 cell["tier_text_color"] = "#ffffff"
                 cell["tier_bg"] = meta["bg"]
-                cell["tier_label"] = meta["label"]
+                cell["tier_label"] = _tier_label("none")
                 continue
 
             if band == "red":
@@ -734,7 +763,7 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
                 cell["tier_color"] = _BAND_HUE["red"]
                 cell["tier_text_color"] = "#ffffff"
                 cell["tier_bg"] = "#fef2f2"
-                cell["tier_label"] = "Nicht sicher"
+                cell["tier_label"] = _tier_label("not_safe")
             else:
                 # green/violet/conditional(amber): Intensitaet ~ rating_int.
                 # Dunkles Slate auf hellen Tints, Weiss auf kraeftigen.
@@ -744,7 +773,7 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
                 cell["tier_text_color"] = "#0f172a" if alpha < 0.85 else "#ffffff"
                 meta = _TIER_META.get(tier, _TIER_META["gray"])
                 cell["tier_bg"] = meta["bg"]
-                cell["tier_label"] = meta["label"]
+                cell["tier_label"] = _tier_label(tier)
         out.append(entry)
 
     # Sortierung: bester fliegbarer Wochenwert zuerst, dann Roh-Rating.
@@ -792,7 +821,7 @@ def _group_spots_by_region(shown_spots: list[dict],
                                       if g["region_rating_int"] > 0 else "")
         g["region_tier"] = region_tier
         g["tier_color"] = meta["color"]
-        g["tier_label"] = meta["label"]
+        g["tier_label"] = _tier_label(region_tier)
         out.append(g)
 
     out.sort(key=lambda x: x["region_rating"], reverse=True)
@@ -870,8 +899,8 @@ def _date_label(date_str: str) -> dict:
     except Exception:
         return {"short": date_str, "long": date_str, "weekday": ""}
     wd_idx = dt.weekday()
-    short = _WEEKDAY_DE[wd_idx]
-    long_ = f"{_WEEKDAY_DE_LONG[wd_idx]}, {dt.strftime('%d.%m.')}"
+    short = _weekday_short_list()[wd_idx]
+    long_ = f"{_weekday_long_list()[wd_idx]}, {dt.strftime('%d.%m.')}"
     return {"short": short, "long": long_, "weekday": short, "date": date_str}
 
 
@@ -935,7 +964,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             shown.append({
                 **s,
                 "tier": tier,
-                "tier_label": meta["label"],
+                "tier_label": _tier_label(tier),
                 "tier_color": meta["color"],
                 "tier_bg":    meta["bg"],
                 "tier_icon":  meta["icon"],
@@ -989,7 +1018,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "date": date_str,
             "label": day_label_dict,
             "tier": day_tier,
-            "tier_label": meta["label"],
+            "tier_label": _tier_label(day_tier),
             "tier_color": meta["color"],
             "tier_bg":    meta["bg"],
             "tier_icon":  meta["icon"],
@@ -1115,8 +1144,10 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             day["notable_good"] = ""
 
         ss = day.get("safety_summary") or ""
-        if ss.lower().startswith("vorsicht"):
-            day["notable_bad"] = ss.replace("Vorsicht:", "").strip().rstrip(".")
+        # Prefix sprachabhaengig: "Vorsicht:" (DE) / "Caution:" (EN). Generisch
+        # bis zum ersten Doppelpunkt strippen, damit beide Sprachen greifen.
+        if ss.lower().startswith(("vorsicht", "caution")):
+            day["notable_bad"] = (ss.split(":", 1)[1] if ":" in ss else ss).strip().rstrip(".")
         else:
             day["notable_bad"] = ""
 
@@ -1188,7 +1219,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         "share": share,
         "warnings": warnings,
         "briefing_date": today.strftime("%d.%m.%Y"),
-        "briefing_weekday": _WEEKDAY_DE_LONG[today.weekday()],
+        "briefing_weekday": _weekday_long_list()[today.weekday()],
         "kw": today.isocalendar().week,
         "region_matrix": region_matrix,
         "week_lead": week_lead,
@@ -1199,20 +1230,20 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
 
 def _verdict_headline(day: dict, spot: Optional[dict]) -> str:
     """Ein-Satz-Headline fuer den Verdict-Block (voll, fuer Subject/Share/Preheader)."""
-    weekday_long = _WEEKDAY_DE_LONG[datetime.fromisoformat(day["date"]).weekday()]
+    weekday_long = _weekday_long_list()[datetime.fromisoformat(day["date"]).weekday()]
     if day["tier"] == "violet":
         if spot:
-            return f"{weekday_long} ist dein Tag — {spot['spot']} ist Top"
-        return f"{weekday_long} wird ein Top-Tag"
+            return i18n.t("email.briefing.hl_violet_spot", weekday=weekday_long, spot=spot["spot"])
+        return i18n.t("email.briefing.hl_violet", weekday=weekday_long)
     if day["tier"] == "green":
         if spot:
-            return f"Bester Tag: {weekday_long} — {spot['spot']} sicher fliegbar"
-        return f"{weekday_long} ist sicher fliegbar"
+            return i18n.t("email.briefing.hl_green_spot", weekday=weekday_long, spot=spot["spot"])
+        return i18n.t("email.briefing.hl_green", weekday=weekday_long)
     if day["tier"] == "conditional":
         if spot:
-            return f"{weekday_long} mit Vorsicht — {spot['spot']}"
-        return f"{weekday_long} nur mit Vorsicht"
-    return "Diese Woche nichts in deinen Regionen"
+            return i18n.t("email.briefing.hl_cond_spot", weekday=weekday_long, spot=spot["spot"])
+        return i18n.t("email.briefing.hl_cond", weekday=weekday_long)
+    return i18n.t("email.briefing.subject_nothing")
 
 
 def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
@@ -1224,21 +1255,21 @@ def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
     """
     if not spot:
         if day["tier"] == "violet":
-            return "Top-Bedingungen erwartet"
+            return i18n.t("email.briefing.hls_violet")
         if day["tier"] == "green":
-            return "Solide Thermik"
+            return i18n.t("email.briefing.hls_green")
         if day["tier"] == "conditional":
-            return "Nur mit Vorsicht fliegbar"
-        return "Diese Woche nichts in deinen Regionen"
+            return i18n.t("email.briefing.hls_cond")
+        return i18n.t("email.briefing.subject_nothing")
 
     spot_name = spot.get("spot", "")
     window = spot.get("window") or _format_window(spot.get("best_window", ""))
     base = f"{spot_name}, {window}" if window else spot_name
 
     if day["tier"] == "violet":
-        return f"{base} — Top"
+        return i18n.t("email.briefing.hls_violet_base", base=base)
     if day["tier"] == "conditional":
-        return f"{base} — mit Vorsicht"
+        return i18n.t("email.briefing.hls_cond_base", base=base)
     return base  # green: kein Modifier (Tier-Pill sagt schon "Sicher")
 
 
@@ -1253,14 +1284,15 @@ def send_briefing_email(subscriber: dict, briefing_data: dict,
     verdict = ctx.get("verdict")
     today = datetime.now()
     kw = today.isocalendar().week
+    kw_pfx = f"Wingcast {i18n.t('email.briefing.week_abbr')}{kw}: "
     if verdict and verdict["day"]["tier"] == "violet":
-        subject = f"Wingcast KW{kw}: {verdict['headline']}"
+        subject = f"{kw_pfx}{verdict['headline']}"
     elif verdict and verdict["day"]["tier"] == "green":
-        subject = f"Wingcast KW{kw}: {verdict['headline']}"
+        subject = f"{kw_pfx}{verdict['headline']}"
     elif verdict:
-        subject = f"Wingcast KW{kw}: Bedingte Woche"
+        subject = f"{kw_pfx}{i18n.t('email.briefing.subject_conditional')}"
     else:
-        subject = f"Wingcast KW{kw}: Diese Woche nichts in deinen Regionen"
+        subject = f"{kw_pfx}{i18n.t('email.briefing.subject_nothing')}"
 
     to = subscriber.get("email")
     if not to:
@@ -1284,19 +1316,10 @@ _MONTH_DE = ["", "Januar", "Februar", "Maerz", "April", "Mai", "Juni",
 def _accuracy_framing(pct: int) -> tuple[str, str]:
     """Liefert (hex_color, message) passend zum Accuracy-Wert."""
     if pct >= 80:
-        return ("#15803d",
-                "Sehr gute Trefferquote! Die Modell-Kombination scheint fuer deine "
-                "Regionen gut kalibriert zu sein. Danke fuer dein Feedback — "
-                "das hilft uns, die Prognose weiter zu schaerfen.")
+        return ("#15803d", i18n.t("email.accuracy.msg_high"))
     if pct >= 60:
-        return ("#b45309",
-                "Solide Trefferquote. Es gibt noch Luft nach oben — oft liegen "
-                "Abweichungen an lokalen Effekten, die selbst die besten Modelle "
-                "nicht vollstaendig erfassen. Dein Feedback hilft uns dabei.")
-    return ("#b91c1c",
-            "Die Vorhersage hat dir letzten Monat oft nicht gepasst. Das tut uns leid. "
-            "Vielleicht sind die gewaehlten Regionen fuer dein Home-Terrain zu grob — "
-            "du kannst sie in den Einstellungen anpassen.")
+        return ("#b45309", i18n.t("email.accuracy.msg_mid"))
+    return ("#b91c1c", i18n.t("email.accuracy.msg_low"))
 
 
 def send_accuracy_email(subscriber: dict, stats: dict, *, async_send: bool = True) -> bool:
@@ -1308,7 +1331,7 @@ def send_accuracy_email(subscriber: dict, stats: dict, *, async_send: bool = Tru
 
     color, message = _accuracy_framing(stats["accuracy_pct"])
     last_month = datetime.now().replace(day=1) - timedelta(seconds=1)
-    month_label = f"{_MONTH_DE[last_month.month]} {last_month.year}"
+    month_label = f"{i18n.t(f'month.{last_month.month}')} {last_month.year}"
 
     urls = _build_urls(action_token=subscriber.get("action_token", ""))
     ctx = {
@@ -1321,7 +1344,7 @@ def send_accuracy_email(subscriber: dict, stats: dict, *, async_send: bool = Tru
     html = render_template("email/accuracy.html", **ctx)
     text = render_template("email/accuracy.txt", **ctx)
 
-    subject = f"Wingcast {month_label}: Deine Vorhersage zu {stats['accuracy_pct']}% korrekt"
+    subject = i18n.t("email.accuracy.subject", month=month_label, pct=stats["accuracy_pct"])
     to = subscriber.get("email")
     if not to:
         return False

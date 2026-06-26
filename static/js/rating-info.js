@@ -102,62 +102,62 @@
             '<div class="rating-info-backdrop" data-action="close"></div>' +
             '<div class="rating-info-modal">' +
               '<div class="rating-info-header">' +
-                '<h2 id="ratingInfoTitle">Wie funktioniert das Rating?</h2>' +
-                '<button class="rating-info-close" data-action="close" aria-label="Schliessen" type="button">×</button>' +
+                '<h2 id="ratingInfoTitle">' + wcT('js.ri.title') + '</h2>' +
+                '<button class="rating-info-close" data-action="close" aria-label="' + wcT('js.ri.close') + '" type="button">×</button>' +
               '</div>' +
               '<div class="rating-info-body">' +
 
                 '<div class="rating-info-section">' +
-                  '<p class="rating-info-lead">Jeder Spot oder Region wird auf <b>zwei unabhaengigen Achsen</b> eingeschaetzt — Sicherheit und Fliegbarkeit. Beides siehst du im selben Marker.</p>' +
+                  '<p class="rating-info-lead">' + wcT('js.ri.lead') + '</p>' +
                 '</div>' +
 
                 '<div class="rating-info-section">' +
                   '<div class="rating-info-axes">' +
                     '<div class="rating-info-axis-card">' +
-                      '<div class="rating-info-axis-title">Farbe = Sicherheit</div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 0, 28) + '<span><b>Gruen</b> — sicher fliegbar</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('amber', 0, 28) + '<span><b>Orange</b> — Vorsicht, Caution-Notes beachten</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('red', 0, 28)   + '<span><b>Rot</b> — nicht fliegbar</span></div>' +
+                      '<div class="rating-info-axis-title">' + wcT('js.ri.axis_color') + '</div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 0, 28) + '<span>' + wcT('js.ri.color_green') + '</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('amber', 0, 28) + '<span>' + wcT('js.ri.color_amber') + '</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('red', 0, 28)   + '<span>' + wcT('js.ri.color_red') + '</span></div>' +
                     '</div>' +
                     '<div class="rating-info-axis-card">' +
-                      '<div class="rating-info-axis-title">Zahl = Fliegbarkeit (1\u20135)</div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 1, 28) + '<span><b>1</b> — Abgleiter</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 2, 28) + '<span><b>2</b> — Kurzer Thermikflug (Suchtag)</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 3, 28) + '<span><b>3</b> — Solider Thermikflug</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 4, 28) + '<span><b>4</b> — Starker Thermikflug</span></div>' +
-                      '<div class="rating-info-row">' + _glyphSvg('green', 5, 28) + '<span><b>5</b> — XC-Tag (Top-Tage als "Klassiker")</span></div>' +
+                      '<div class="rating-info-axis-title">' + wcT('js.ri.axis_number') + '</div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 1, 28) + '<span>' + wcT('js.ri.fly1') + '</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 2, 28) + '<span>' + wcT('js.ri.fly2') + '</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 3, 28) + '<span>' + wcT('js.ri.fly3') + '</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 4, 28) + '<span>' + wcT('js.ri.fly4') + '</span></div>' +
+                      '<div class="rating-info-row">' + _glyphSvg('green', 5, 28) + '<span>' + wcT('js.ri.fly5') + '</span></div>' +
                     '</div>' +
                   '</div>' +
                 '</div>' +
 
                 '<div class="rating-info-section">' +
-                  '<h3>Beispiele</h3>' +
+                  '<h3>' + wcT('js.ri.examples') + '</h3>' +
                   '<div class="rating-info-examples">' +
-                    '<div class="rating-info-example">' + _glyphSvg('green', 5, 44) + '<div class="rating-info-example-label">XC-Tag / Klassiker</div></div>' +
-                    '<div class="rating-info-example">' + _glyphSvg('green', 4, 44) + '<div class="rating-info-example-label">Starker Thermikflug</div></div>' +
-                    '<div class="rating-info-example">' + _glyphSvg('amber', 3, 44) + '<div class="rating-info-example-label">Vorsicht — solid moeglich</div></div>' +
-                    '<div class="rating-info-example">' + _glyphSvg('red', 0, 44)   + '<div class="rating-info-example-label">Nicht fliegbar</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('green', 5, 44) + '<div class="rating-info-example-label">' + wcT('js.ri.ex_xc') + '</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('green', 4, 44) + '<div class="rating-info-example-label">' + wcT('js.ri.ex_strong') + '</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('amber', 3, 44) + '<div class="rating-info-example-label">' + wcT('js.ri.ex_caution') + '</div></div>' +
+                    '<div class="rating-info-example">' + _glyphSvg('red', 0, 44)   + '<div class="rating-info-example-label">' + wcT('js.ri.ex_notfly') + '</div></div>' +
                   '</div>' +
                 '</div>' +
 
                 '<div class="rating-info-section">' +
-                  '<h3>Im Detail-Panel — die Tiefe</h3>' +
+                  '<h3>' + wcT('js.ri.detail_title') + '</h3>' +
                   '<div class="rating-info-deeper">' +
                     '<dl>' +
-                      '<dt>Sicherheits-Rating</dt>' +
-                      '<dd>0–10. Aggregat aus bis zu 8 Sub-Aspekten: Bodenwind, Boeen, Hoehenwind, Foehn, Niederschlag, Gewitter, CAPE, Sicht. Aggregation per <b>Weakest-Link</b> — der schwaechste Aspekt zieht das Rating nach unten. Ein einzelnes Gewitter macht den Tag rot, auch wenn alle anderen Aspekte perfekt sind.</dd>' +
-                      '<dt>Fliegbarkeit — Kategorie (1\u20135)</dt>' +
-                      '<dd>Statt einer Zahl vergibt die KI eine <b>Kategorie</b> die der Pilot kennt: <b>Abgleiter</b> (1, keine Thermik), <b>Kurzer Thermikflug</b> (2, Suchtag mit 1\u20132h Thermik wenn Glueck), <b>Solider Thermikflug</b> (3, mehrere Stunden), <b>Starker Thermikflug</b> (4, lokal-XC), <b>XC-Tag</b> (5, Strecke 50\u2013150km+; "Klassiker" als Auszeichnung an Top-Tagen). Bei <b>nicht fliegbar</b> wird die Fliegbarkeit auf 1 gesetzt.</dd>' +
-                      '<dt>Streckenflug-Rating (nur Spot)</dt>' +
-                      '<dd>1\u20135 fuer XC-Potenzial. Kann sich stark von der Fliegbarkeit unterscheiden — ein Spot kann lokal stark sein (Fliegbarkeit 4) aber die Region erlaubt kein Wegfliegen (Streckenflug 2).</dd>' +
+                      '<dt>' + wcT('js.ri.dt_safety') + '</dt>' +
+                      '<dd>' + wcT('js.ri.dd_safety') + '</dd>' +
+                      '<dt>' + wcT('js.ri.dt_fly') + '</dt>' +
+                      '<dd>' + wcT('js.ri.dd_fly') + '</dd>' +
+                      '<dt>' + wcT('js.ri.dt_xc') + '</dt>' +
+                      '<dd>' + wcT('js.ri.dd_xc') + '</dd>' +
                     '</dl>' +
                   '</div>' +
                 '</div>' +
 
                 '<div class="rating-info-section">' +
-                  '<h3>Wer entscheidet was?</h3>' +
-                  '<p><b>Sicherheit:</b> KI + Decision-Engine. Das LLM beurteilt Aspekte, harte Sicherheits-Schwellen (Foehn-Durchbruch, Hoehenwind &gt; 30 km/h, Gewitter) <b>ueberschreiben</b> das LLM — ein gefaehrlicher Tag kann nicht "weggetextet" werden.</p>' +
-                  '<p><b>Fliegbarkeit (Kategorie):</b> reine KI-Einschaetzung. Die KI waehlt eine der 5 Kategorien aus dem Pilot-Vokabular — kein Rechnen, kein Mittelwert. Bei <b>nicht sicher</b> faellt die Fliegbarkeit automatisch auf 1 (keine Belohnung ohne Sicherheit).</p>' +
+                  '<h3>' + wcT('js.ri.who_title') + '</h3>' +
+                  '<p>' + wcT('js.ri.who_safety') + '</p>' +
+                  '<p>' + wcT('js.ri.who_fly') + '</p>' +
                 '</div>' +
 
               '</div>' +
@@ -202,17 +202,17 @@
             var isMobile = window.innerWidth <= 639;
             var div = L.DomUtil.create('div', 'map-legend' + (isMobile ? ' collapsed' : ''));
             div.innerHTML =
-                '<button class="map-legend-toggle" aria-label="Legende ein-/ausblenden">Legende</button>' +
+                '<button class="map-legend-toggle" aria-label="' + wcT('js.ri.legend_toggle_aria') + '">' + wcT('js.ri.legend_toggle') + '</button>' +
                 '<div class="map-legend-body">' +
                 '<div class="map-legend-pills">' +
-                    '<span class="map-legend-pill safety-green">Sicher</span>' +
-                    '<span class="map-legend-pill safety-amber">Vorsicht</span>' +
-                    '<span class="map-legend-pill safety-red">Nicht fliegbar</span>' +
+                    '<span class="map-legend-pill safety-green">' + wcT('js.safety.safe') + '</span>' +
+                    '<span class="map-legend-pill safety-amber">' + wcT('js.safety.caution') + '</span>' +
+                    '<span class="map-legend-pill safety-red">' + wcT('js.safety.not_flyable') + '</span>' +
                 '</div>' +
-                '<div class="map-legend-hint">Zahl im Marker = Fliegbarkeit (1\u20135)</div>' +
+                '<div class="map-legend-hint">' + wcT('js.ri.legend_hint') + '</div>' +
                 '<button class="map-legend-info-btn" data-action="open-rating-info" type="button">' +
                     '<span class="map-legend-info-icon" aria-hidden="true">\u24D8</span>' +
-                    '<span>Wie funktioniert das Rating?</span>' +
+                    '<span>' + wcT('js.ri.title') + '</span>' +
                 '</button>' +
                 '</div>';
             var toggle = div.querySelector('.map-legend-toggle');

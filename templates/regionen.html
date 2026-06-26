@@ -658,17 +658,17 @@
         {% if is_logged_in %}
         <div class="chat-container">
             <div class="chat-header">
-                <span class="chat-title">Chat-Berater <span class="beta-badge">Beta</span></span>
-                <span class="data-freshness" id="dataFreshness" title="Alter der Wetterdaten"></span>
+                <span class="chat-title">{{ t('chat.advisor_title') }} <span class="beta-badge">Beta</span></span>
+                <span class="data-freshness" id="dataFreshness" title="{{ t('chat.data_age') }}"></span>
                 <div class="chat-header-actions">
-                    <button id="resetChatBtn" class="btn btn-danger btn-sm" aria-label="Neuen Chat starten">
-                        <span>↺</span> Neuer Chat
+                    <button id="resetChatBtn" class="btn btn-danger btn-sm" aria-label="{{ t('chat.new_chat_aria') }}">
+                        <span>↺</span> {{ t('chat.new_chat') }}
                     </button>
                 </div>
             </div>
             <div class="chat-messages" id="chatMessages" style="overflow-x: hidden;" aria-live="polite" aria-relevant="additions">
                 <div class="chat-message bot">
-                    Hallo! Ich bin dein Wingcast-Berater (Beta — Antworten können noch Fehler enthalten). Frag mich zu Flugbedingungen, Gebietswahl oder Sicherheit.
+                    {{ t('chat.welcome') }}
                 </div>
             </div>
 
@@ -679,17 +679,17 @@
             </div>
 
             <div class="quick-actions" id="quickActions">
-                <button class="quick-btn" data-msg="Zeichne mir auf der Karte die Region ein, die ich in 1 Stunde Fahrzeit von Zürich aus erreiche, und zeig mir die fliegbaren Spots darin.">Karte: 1h ab Zürich</button>
-                <button class="quick-btn" data-msg="Vergleiche die drei besten Spots heute in einer Tabelle mit Wind, Thermik und Sicherheit.">Vergleiche Top 3</button>
-                <button class="quick-btn" data-msg="Zeig mir den Windverlauf vom besten Spot heute als Chart mit Wind und Böen über den Tag.">Windverlauf</button>
+                <button class="quick-btn" data-msg="{{ t('chat.quick_map_msg') }}">{{ t('chat.quick_map_label') }}</button>
+                <button class="quick-btn" data-msg="{{ t('chat.quick_top3_msg') }}">{{ t('chat.quick_top3_label') }}</button>
+                <button class="quick-btn" data-msg="{{ t('chat.quick_wind_msg') }}">{{ t('chat.quick_wind_label') }}</button>
             </div>
 
             <div class="chat-input-area">
-                <label for="chatInput" class="sr-only">Nachricht eingeben</label>
-                <textarea rows="1" class="chat-input" id="chatInput" placeholder="Frag mich..." autocomplete="off"></textarea>
-                <button class="chat-send-btn" id="chatSendBtn" aria-label="Nachricht senden">
+                <label for="chatInput" class="sr-only">{{ t('chat.input_label') }}</label>
+                <textarea rows="1" class="chat-input" id="chatInput" placeholder="{{ t('chat.input_placeholder') }}" autocomplete="off"></textarea>
+                <button class="chat-send-btn" id="chatSendBtn" aria-label="{{ t('chat.send_aria') }}">
                     <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    <span class="send-label">Senden</span>
+                    <span class="send-label">{{ t('chat.send') }}</span>
                 </button>
             </div>
         </div>
@@ -701,21 +701,20 @@
                     <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
                 </svg>
             </div>
-            <h2 class="chat-locked__title">5-Tage-Vorhersage freischalten</h2>
+            <h2 class="chat-locked__title">{{ t('locked.title') }}</h2>
             <p class="chat-locked__lead">
-                Du siehst aktuell nur <strong>heute</strong>.
-                Mit Login bekommst du <strong>volle 5 Tage</strong> &mdash; <strong>kostenlos</strong>.
+                {{ t('locked.lead_html')|safe }}
             </p>
             <ul class="chat-locked__list">
-                <li><strong>5 Tage</strong> Vorhersage statt 1</li>
-                <li><strong>Chat-Berater</strong> <span class="beta-badge beta-badge--inline">Beta</span> mit Live-Wetter-Daten</li>
-                <li><strong>E-Mail-Wingcast</strong> an deinen Wunschtagen</li>
+                <li>{{ t('locked.item1_html')|safe }}</li>
+                <li>{{ t('locked.item2_html')|safe }}</li>
+                <li>{{ t('locked.item3_html')|safe }}</li>
             </ul>
             <button type="button" class="chat-locked__cta" id="chatLockedLoginBtn">
-                Jetzt einloggen
+                {{ t('locked.cta') }}
             </button>
             <p class="chat-locked__hint">
-                Kein Konto? Wird automatisch angelegt.
+                {{ t('locked.hint') }}
             </p>
         </div>
         {% endif %}
@@ -738,16 +737,16 @@
             <div class="tooltip" id="regionMeteogramTooltip"></div>
 
             <!-- Region Analysis Overlay -->
-            <div class="meteogram-overlay" id="regionOverlay" role="dialog" aria-modal="true" aria-label="Region-Analyse">
+            <div class="meteogram-overlay" id="regionOverlay" role="dialog" aria-modal="true" aria-label="{{ t('region.overlay_aria') }}">
                 <div class="meteogram-panel">
                     <div class="overlay-swipe-handle"></div>
                     <div class="meteogram-header">
                         <div>
                             <h2 id="regionOverlayTitle">Region</h2>
                         </div>
-                        <div class="dv-toggle" id="regionViewToggle" role="tablist" aria-label="Ansicht">
+                        <div class="dv-toggle" id="regionViewToggle" role="tablist" aria-label="{{ t('meteogram.view_aria') }}">
                             <button class="dv-toggle-btn active" data-view="meteo" type="button" role="tab" aria-selected="true">📊 Meteo</button>
-                            <button class="dv-toggle-btn" data-view="daten" type="button" role="tab" aria-selected="false" title="Welche Daten die KI sieht">📄 Daten</button>
+                            <button class="dv-toggle-btn" data-view="daten" type="button" role="tab" aria-selected="false" title="{{ t('meteogram.tab_data_title') }}">📄 {{ t('meteogram.tab_data') }}</button>
                         </div>
                         {% if test_view_active %}
                         <button class="meteogram-json-debug" id="regionJsonDebug" type="button" title="JSON-Debug (Testmodus)">JSON</button>
@@ -755,10 +754,10 @@
                         {% if test_view_active or admin_debug_active %}
                         <button class="meteogram-json-debug" id="regionHazardDebug" type="button" title="Hazard- und Flyability-Debug">⚙</button>
                         {% endif %}
-                        <button class="meteogram-share" id="regionOverlayShare" type="button" aria-label="Region teilen" title="Teilen (WhatsApp)">
+                        <button class="meteogram-share" id="regionOverlayShare" type="button" aria-label="{{ t('region.share_aria') }}" title="{{ t('meteogram.share_title') }}">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                         </button>
-                        <button class="meteogram-close" id="regionOverlayClose" aria-label="Schliessen">&times;</button>
+                        <button class="meteogram-close" id="regionOverlayClose" aria-label="{{ t('common.close') }}">&times;</button>
                     </div>
                     <div id="regionOverlayBody"></div>
                 </div>
@@ -942,7 +941,7 @@ function _applyApiPayload(regionAnalyses) {
     if (newestTs) {
         _latestUpdatedAt = newestTs;
         var d = new Date(newestTs);
-        statusBar.textContent = 'Stand: ' + d.toLocaleString('de-CH');
+        statusBar.textContent = {{ t('status.as_of')|tojson }} + d.toLocaleString({% if lang == 'en' %}'en-GB'{% else %}'de-CH'{% endif %});
     }
     if (window.setRegionAnalyses) window.setRegionAnalyses(_nested);
     if (window.setRegionDate) window.setRegionDate(currentDate);
@@ -952,12 +951,12 @@ function _applyApiPayload(regionAnalyses) {
 fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
     var regionAnalyses = data.region_analyses || {};
     if (Object.keys(regionAnalyses).length === 0) {
-        statusBar.textContent = 'Keine Region-Analysen vorhanden';
+        statusBar.textContent = {{ t('region.no_analyses')|tojson }};
         return;
     }
     _applyApiPayload(regionAnalyses);
 }).catch(function(err) {
-    statusBar.textContent = 'Fehler: ' + err.message;
+    statusBar.textContent = {{ t('foehn.error_prefix')|tojson }} + err.message;
 });
 
 // 2) Refresh on tab focus: holt neue Region-Analysen wenn der User zum Tab zurueckkommt.

@@ -1,17 +1,16 @@
-WINGCAST — Monatsrueckblick {{ month_label }}
+{{ t('email.accuracy.txt_header') }} {{ month_label }}
 
-Deine Prognose war zu {{ stats.accuracy_pct }}% richtig.
+{{ t('email.accuracy.hero_pre') }} {{ stats.accuracy_pct }}% {{ t('email.accuracy.hero_post') }}
 
-Basierend auf {{ stats.total }} Feedbacks der letzten {{ stats.window_days }} Tage:
-  - {{ stats.correct }} mal passte die Vorhersage
-  - {{ stats.wrong }} mal lag sie daneben
+{{ t('email.accuracy.based_on_pre') }} {{ stats.total }} {{ t('email.accuracy.txt_based_mid') }} {{ stats.window_days }} {{ t('email.accuracy.txt_based_post') }}
+  - {{ stats.correct }} {{ t('email.accuracy.times_correct') }}
+  - {{ stats.wrong }} {{ t('email.accuracy.times_wrong') }}
 
 {{ message }}
 
-Einstellungen anpassen: {{ urls.account }}
+{{ t('email.settings_adjust_cta') }}: {{ urls.account }}
 
 --
-Wingcast ist Decision Support — die finale Entscheidung triffst du.
-Im Zweifel: nicht fliegen.
+{{ t('email.accuracy.txt_disclaimer') }}
 
-Abmelden: {{ urls.unsubscribe }}
+{{ t('email.txt_account_label') }} {{ urls.unsubscribe }}

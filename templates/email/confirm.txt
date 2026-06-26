@@ -1,19 +1,16 @@
-WINGCAST — Bestaetige dein Abo
+{{ t('email.confirm.txt_header') }}
 
-Hallo {{ email }},
+{{ t('email.greeting_hi') }} {{ email }},
 
-bitte bestaetige deine E-Mail-Adresse, um dein kostenloses Flugwetter-Abo
-zu aktivieren.
+{{ t('email.confirm.txt_body1') }}
 
-Link zum Bestaetigen:
+{{ t('email.confirm.txt_link_label') }}
 {{ urls.confirm }}
 
-Nach der Bestaetigung bekommst du an deinen gewaehlten Wochentagen morgens
-einen personalisierten Wingcast mit den besten Flugtagen fuer deine Regionen.
+{{ t('email.confirm.txt_body2') }}
 
 --
-Du hast dieses Abo nicht angefordert? Dann ignoriere diese E-Mail einfach —
-ohne Bestaetigung wird nichts aktiviert.
+{{ t('email.confirm.txt_footer_note') }}
 
-Datenschutz: {{ urls.datenschutz }}
-Impressum:   {{ urls.impressum }}
+{{ t('email.txt_privacy_label') }} {{ urls.datenschutz }}
+{{ t('email.txt_imprint_label') }}   {{ urls.impressum }}

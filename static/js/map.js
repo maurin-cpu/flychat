@@ -54,10 +54,10 @@
                     if (ctype.indexOf('application/json') >= 0) {
                         try { msg = (JSON.parse(txt) || {}).error; } catch (e) { msg = null; }
                     }
-                    throw new Error(msg || ('HTTP ' + r.status + ' beim Laden der Wetterdaten'));
+                    throw new Error(msg || wcT('js.map.http_loading', { status: r.status }));
                 }
                 if (ctype.indexOf('application/json') < 0) {
-                    throw new Error('Server lieferte keine JSON-Daten (vermutlich Fehlerseite). Bitte kurz warten und erneut versuchen.');
+                    throw new Error(wcT('js.map.no_json_long'));
                 }
                 try {
                     return JSON.parse(txt);
@@ -223,19 +223,19 @@
         };
         if (band === 'green') return {
             fill: '#22c55e', stroke: '#15803d',
-            label: 'Sicher'
+            label: wcT('js.safety.safe')
         };
         if (band === 'amber') return {
             fill: '#f59e0b', stroke: '#92400e',
-            label: 'Vorsicht'
+            label: wcT('js.safety.caution')
         };
         if (band === 'red') return {
             fill: '#ef4444', stroke: '#991b1b',
-            label: 'Nicht fliegbar'
+            label: wcT('js.safety.not_flyable')
         };
         if (band === 'no_data') return {
             fill: '#9ca3af', stroke: '#6b7280',
-            label: 'Keine Daten'
+            label: wcT('js.av.no_data')
         };
         // default / unanalyzed
         return {
@@ -389,7 +389,7 @@
             p.fluggebiet + ' (' + p.region + ')<br>' +
             p.elevation_m + 'm MSL | Wind: ' + p.windrichtung;
         if (!p.has_weather) {
-            html += '<br><span style="color:#F59E0B;">Keine Wetterdaten geladen</span>';
+            html += '<br><span style="color:#F59E0B;">' + wcT('js.map.no_weather_loaded') + '</span>';
         }
         if (safetyBand && safetyBand !== 'default') {
             var s = mapSafetyBandToStyle(safetyBand);
@@ -676,7 +676,7 @@
             analysis = window.analysisData[currentSpotName][dateStr];
         }
         if (!Meteogram.renderAnalysisView) {
-            analyseViewContainer.innerHTML = '<div class="error-state">Analyse-Ansicht nicht verfügbar.</div>';
+            analyseViewContainer.innerHTML = '<div class="error-state">' + wcT('js.map.analysis_unavailable') + '</div>';
             return;
         }
         Meteogram.renderAnalysisView(analyseViewContainer, analysis, {
@@ -746,8 +746,8 @@
             infoEl.parentNode.appendChild(modelBadge);
         }
         if (modelBadge) modelBadge.textContent = '';
-        chartContainer.innerHTML = '<div class="error-state">Lade Daten...</div>';
-        if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">Lade Analyse...</div>';
+        chartContainer.innerHTML = '<div class="error-state">' + wcT('js.map.loading_data') + '</div>';
+        if (analyseViewContainer) analyseViewContainer.innerHTML = '<div class="mg-analysis-empty">' + wcT('js.map.loading_analysis') + '</div>';
         tabsContainer.innerHTML = '';
         if (tabRow) tabRow.style.display = 'none';
         // feedbackBar: nur leeren, Display via CSS (:empty hidden, :not(:empty) shown).
@@ -922,7 +922,7 @@
             var tsDiv = document.createElement('div');
             tsDiv.className = 'meteogram-weather-ts';
             tsDiv.style.cssText = 'font-size:10px;color:#94a3b8;text-align:right;padding:2px 8px 0;';
-            tsDiv.textContent = 'Wetter-Stand: ' + currentWeather.last_updated.replace('T', ' ').slice(0, 16);
+            tsDiv.textContent = wcT('js.map.weather_as_of') + currentWeather.last_updated.replace('T', ' ').slice(0, 16);
             chartContainer.appendChild(tsDiv);
         }
 

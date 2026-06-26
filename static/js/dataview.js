@@ -247,7 +247,7 @@ window.WxDataView = (function () {
             var cls = inBand ? aloftSev : 'dv-v-ok';
             var spd = a.gust ? esc(a.speed) + '/' + esc(a.gust) : esc(a.speed);
             return '<div class="dv-alvl' + (inBand ? ' dv-alvl-band' : '') + '"'
-                + (inBand ? ' title="im Flugbereich"' : (a.flag === '~' ? ' title="oberhalb Flugbereich"' : '')) + '>'
+                + (inBand ? ' title="' + wcT('js.dv.in_band') + '"' : (a.flag === '~' ? ' title="' + wcT('js.dv.above_band') + '"' : '')) + '>'
                 + '<span class="dv-alvl-h">' + esc(a.level) + '<small>hPa</small></span>'
                 + '<span class="dv-val ' + cls + '">' + spd + '<span class="dv-unit"> km/h</span></span>'
                 + '<span class="dv-sub">' + esc(a.dir) + '° · ' + esc(a.alt) + 'm</span>'
@@ -257,10 +257,7 @@ window.WxDataView = (function () {
 
     function buildTable(rows) {
         var head = '<thead><tr>'
-            + '<th>Zeit</th><th>Wind<small>Boden</small></th><th>Höhenwind<small>Wind/Böen · Richtung · Höhe</small></th>'
-            + '<th>Thermik</th><th>Wolken<small>% · tief/mittel/hoch · Basis</small></th>'
-            + '<th>Strahlung<small>global · direkt</small></th><th>Flugbereich<small>MSL</small></th>'
-            + '<th>Temp</th><th>Warnungen</th>'
+            + wcT('js.dv.table_head')
             + '</tr></thead>';
         var body = rows.map(function (o) {
             // Wind (Boden) + alle Sub-Infos: Richtung, Turbulenz, Exzess, Ref-Wind.
@@ -370,19 +367,19 @@ window.WxDataView = (function () {
             container.innerHTML = '<div class="dv-error">Kein ' + (kind === 'region' ? 'Region' : 'Spot') + '/Datum aktiv</div>';
             return;
         }
-        container.innerHTML = '<div class="dv-loading">Lade Daten…</div>';
+        container.innerHTML = '<div class="dv-loading">' + wcT('js.dv.loading') + '</div>';
         var url = '/api/' + kind + '-context/' + encodeURIComponent(id) + '/' + encodeURIComponent(dateStr);
         fetch(url, { headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d || d.error) {
-                    container.innerHTML = '<div class="dv-error">' + esc((d && d.error) || 'Keine Daten') + '</div>';
+                    container.innerHTML = '<div class="dv-error">' + esc((d && d.error) || wcT('js.av.no_data')) + '</div>';
                     return;
                 }
                 container.innerHTML = buildHtml(d.text || '');
             })
             .catch(function (err) {
-                container.innerHTML = '<div class="dv-error">Fehler: ' + esc((err && err.message) || err) + '</div>';
+                container.innerHTML = '<div class="dv-error">' + esc(wcT('js.error.prefix', { msg: (err && err.message) || err })) + '</div>';
             });
     }
 

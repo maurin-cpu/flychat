@@ -54,7 +54,7 @@
     var overlayClose = document.getElementById('regionOverlayClose');
     var meteogramTooltip = document.getElementById('regionMeteogramTooltip');
 
-    var safetyLabels = { safe: 'Sicher', conditional: 'Vorsicht', not_safe: 'Nicht sicher', no_data: 'Keine Daten', error: 'Fehler' };
+    var safetyLabels = { safe: wcT('js.safety.safe'), conditional: wcT('js.safety.caution'), not_safe: wcT('js.rm.not_safe'), no_data: wcT('js.av.no_data'), error: wcT('js.rm.error') };
     var qualityLabels = { gray: 'Abgleiter', green: 'Gut', violet: 'Top' };
 
     // Safer JSON fetch: verhindert "Unexpected token '<'..."-Fehler bei HTML-Responses
@@ -70,7 +70,7 @@
                     throw new Error(msg || ('HTTP ' + r.status));
                 }
                 if (ctype.indexOf('application/json') < 0) {
-                    throw new Error('Server lieferte keine JSON-Daten');
+                    throw new Error(wcT('js.rm.no_json'));
                 }
                 try {
                     return JSON.parse(txt);
@@ -182,7 +182,7 @@
                 fill: '#9ca3af', fillOpacity: 0.30,
                 border: '#6b7280', borderOpacity: 0.5,
                 labelColor: '#374151', labelShadow: '-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 6px #fff',
-                safetyLabel: 'Keine Daten'
+                safetyLabel: wcT('js.av.no_data')
             };
         }
         if (band === 'red') {
@@ -190,7 +190,7 @@
                 fill: '#ef4444', fillOpacity: 0.40,
                 border: '#991b1b', borderOpacity: 0.7,
                 labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
-                safetyLabel: 'Nicht fliegbar'
+                safetyLabel: wcT('js.safety.not_flyable')
             };
         }
         if (band === 'amber') {
@@ -519,7 +519,7 @@
                             + 'background:#6b7280;padding:3px 10px;border-radius:999px;'
                             + 'white-space:nowrap;'
                             + 'box-shadow:0 1px 3px rgba(0,0,0,0.18),0 0 0 1.5px rgba(255,255,255,0.7);'
-                            + '">? Keine Daten</div>';
+                            + '">' + wcT('js.rm.q_no_data') + '</div>';
                         labelMarkersGroup.addLayer(L.marker(ndCenter, {
                             icon: L.divIcon({ className: 'region-label', html: ndHtml,
                                 iconSize: [0, 0], iconAnchor: [0, 0] }),
@@ -528,7 +528,7 @@
                     }
                 }
                 layer.setTooltipContent('<b>' + layer.regionName + '</b>'
-                    + '<br><span style="color:#6b7280;">Keine Analyse fuer diesen Tag</span>');
+                    + '<br><span style="color:#6b7280;">' + wcT('js.rm.no_analysis_day') + '</span>');
                 return;
             }
 
@@ -698,17 +698,17 @@
                 if (dss !== 'no_data' && dss !== 'error' && dss !== 'not_safe') flyableForDay++;
             }
             var msg = (totalForDay === 0)
-                ? 'Keine Spot-Daten an diesem Tag'
+                ? wcT('js.rm.no_spot_data')
                 : (flyableForDay === 0)
-                    ? 'Heute kein fliegbarer Spot in dieser Region'
-                    : 'Kein Spot mit Rating ≥ 5 in dieser Region';
+                    ? wcT('js.rm.no_flyable_spot')
+                    : wcT('js.rm.no_xc_spot');
             return '<div class="region-spot-strip-empty">' + msg + '</div>';
         }
         entries.sort(function (a, b) { return b.rating - a.rating; });
 
         var html = '<div class="region-spot-strip-header">'
-            + '<span class="region-spot-strip-title">Top-Spots</span>'
-            + '<span class="region-spot-strip-count">' + entries.length + ' fliegbar</span>'
+            + '<span class="region-spot-strip-title">' + wcT('js.rm.top_spots') + '</span>'
+            + '<span class="region-spot-strip-count">' + entries.length + wcT('js.rm.flyable_suffix') + '</span>'
             + '</div>'
             + '<div class="region-spot-strip-scroll" role="list">';
         entries.forEach(function (e) {
@@ -847,7 +847,7 @@
         bodyHtml += '</div>';
         bodyHtml += '<div class="region-overlay-content">';
         bodyHtml += '<div class="region-overlay-meteogram">';
-        bodyHtml += '<div class="region-meteogram-chart" id="regionMeteogramChart"><div class="region-meteogram-loading">Meteogramm wird geladen...</div></div>';
+        bodyHtml += '<div class="region-meteogram-chart" id="regionMeteogramChart"><div class="region-meteogram-loading">' + wcT('js.rm.meteogram_loading') + '</div></div>';
         bodyHtml += '</div>';
         bodyHtml += '<aside class="' + asideClass + '" id="regionAnalysisAside">';
         bodyHtml += '<div class="meteogram-aside-header">';
@@ -931,7 +931,7 @@
                 var altData = results[1];
 
                 if (wxData.error || altData.error) {
-                    chartEl.innerHTML = '<div class="region-meteogram-loading">Keine Wetterdaten verfuegbar</div>';
+                    chartEl.innerHTML = '<div class="region-meteogram-loading">' + wcT('js.rm.no_weather') + '</div>';
                     return;
                 }
 
@@ -940,13 +940,13 @@
                 renderRegionMeteogram(rid, wxData, altData, chartEl);
             })
             .catch(function (err) {
-                chartEl.innerHTML = '<div class="region-meteogram-loading">Fehler: ' + escHtml(err.message) + '</div>';
+                chartEl.innerHTML = '<div class="region-meteogram-loading">' + escHtml(wcT('js.error.prefix', { msg: err.message })) + '</div>';
             });
     }
 
     function renderRegionMeteogram(rid, wxData, altData, chartEl) {
         if (!wxData.dates || wxData.dates.length === 0) {
-            chartEl.innerHTML = '<div class="region-meteogram-loading">Keine Wetterdaten verfuegbar</div>';
+            chartEl.innerHTML = '<div class="region-meteogram-loading">' + wcT('js.rm.no_weather') + '</div>';
             return;
         }
 
@@ -961,9 +961,9 @@
             var bannerDiv = document.createElement('div');
             bannerDiv.className = 'meteogram-stale-banner';
             bannerDiv.innerHTML =
-                '<strong>Wetterdaten veraltet:</strong> ' +
-                'Nur ' + have + ' von ' + expected + ' Vorhersagetagen verfügbar. ' +
-                'Letztes erfolgreiches Update: ' + escHtml(lastUpd) + '.';
+                '<strong>' + wcT('js.rm.stale_title') + '</strong> ' +
+                wcT('js.rm.partial_days', { have: have, expected: expected }) +
+                wcT('js.rm.last_update', { date: escHtml(lastUpd) });
             if (bannerContainer) bannerContainer.insertBefore(bannerDiv, chartEl);
         }
 
@@ -1031,7 +1031,7 @@
         }
 
         if (!altDay || !altDay.profiles || altDay.profiles.length === 0) {
-            chartEl.innerHTML = '<div class="region-meteogram-loading">Keine Daten fuer diesen Tag</div>';
+            chartEl.innerHTML = '<div class="region-meteogram-loading">' + wcT('js.rm.no_data_day') + '</div>';
             return;
         }
 
@@ -1078,7 +1078,7 @@
         if (wxData.last_updated) {
             var tsDiv = document.createElement('div');
             tsDiv.style.cssText = 'font-size:10px;color:#94a3b8;text-align:right;padding:2px 8px 0;';
-            tsDiv.textContent = 'Wetter-Stand: ' + wxData.last_updated.replace('T', ' ').slice(0, 16);
+            tsDiv.textContent = wcT('js.map.weather_as_of') + wxData.last_updated.replace('T', ' ').slice(0, 16);
             chartEl.appendChild(tsDiv);
         }
 

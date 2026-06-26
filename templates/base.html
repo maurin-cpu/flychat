@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ lang }}">
 
 <head>
     <meta charset="UTF-8">
@@ -9,8 +9,8 @@
     {% block meta %}
     <meta property="og:site_name" content="Wingcast">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Wingcast – Flugwetter für Gleitschirmpiloten">
-    <meta property="og:description" content="Präzise Thermik- und Wind-Prognose für die Schweizer Berge.">
+    <meta property="og:title" content="{{ t('meta.og_title') }}">
+    <meta property="og:description" content="{{ t('meta.og_description') }}">
     <meta property="og:url" content="{{ request.url }}">
     <meta property="og:image" content="{{ request.url_root.rstrip('/') }}/og-image/briefing.png">
     <meta property="og:image:width" content="1200">
@@ -22,6 +22,24 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ static_v('css/style.css') }}">
     <!-- Error Monitor: muss als ERSTES JS laden, damit es Errors aller späteren Scripts abfängt -->
     <script src="{{ url_for('static', filename='js/error-monitor.js') }}?v={{ static_v('js/error-monitor.js') }}"></script>
+    <!-- i18n fürs Frontend-JS: aktive Sprache + kuratiertes String-Subset (i18n.js_i18n()).
+         Muss VOR allen Page-Scripts laden. wcT(key, vars) = JS-Pendant zu Python t(). -->
+    <script>
+        window.WC_LANG = {{ lang|tojson }};
+        window.WC_I18N = {{ js_i18n|tojson }};
+        window.wcT = function (key, vars) {
+            var s = (window.WC_I18N && window.WC_I18N[key]);
+            if (s == null) return key;
+            if (vars) {
+                for (var k in vars) {
+                    if (Object.prototype.hasOwnProperty.call(vars, k)) {
+                        s = s.split('{' + k + '}').join(String(vars[k]));
+                    }
+                }
+            }
+            return s;
+        };
+    </script>
     {% block head %}{% endblock %}
 </head>
 
@@ -35,19 +53,19 @@
         padding:6px 14px; display:flex; align-items:center; justify-content:center; gap:10px;
         font-family:Inter,system-ui,sans-serif;">
       <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f0c419;box-shadow:0 0 0 3px rgba(240,196,25,0.3);"></span>
-      <span>TEST-ANSICHT AKTIV — Analysen kommen aus <code style="background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:3px;">data/test_runs/latest/</code>, nicht aus Live-Daten.</span>
-      <a href="/admin/testing" style="color:#6b4f00;text-decoration:underline;">Verwalten</a>
+      <span>{{ t('test_banner.text_pre') }} <code style="background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:3px;">data/test_runs/latest/</code>{{ t('test_banner.text_post') }}</span>
+      <a href="/admin/testing" style="color:#6b4f00;text-decoration:underline;">{{ t('test_banner.manage') }}</a>
     </div>
     {% endif %}
-    <a href="#main-content" class="skip-link">Zum Inhalt springen</a>
-    <nav class="navbar" role="navigation" aria-label="Hauptnavigation">
+    <a href="#main-content" class="skip-link">{{ t('nav.skip_to_content') }}</a>
+    <nav class="navbar" role="navigation" aria-label="{{ t('nav.aria_main') }}">
         <a href="/chat" class="navbar-brand">Wing<span>cast</span></a>
         <div class="navbar-links">
-            <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">Startplätze</a>
-            <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">Regionen</a>
+            <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">{{ t('nav.spots') }}</a>
+            <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">{{ t('nav.regions') }}</a>
             <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Wingcast</a>
             {% if is_admin %}
-            <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="Föhndiagramm öffnen" aria-label="Föhndiagramm öffnen">Föhn</button>
+            <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="{{ t('nav.foehn_open') }}" aria-label="{{ t('nav.foehn_open') }}">{{ t('nav.foehn') }}</button>
             {% endif %}
             {% if is_logged_in %}
             <div class="navbar-avatar-wrap">
@@ -65,18 +83,18 @@
                         <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
                             <circle cx="10" cy="10" r="3"/><path d="M10 1v2M10 17v2M19 10h-2M3 10H1M16.36 3.64l-1.42 1.42M5.06 14.94l-1.42 1.42M16.36 16.36l-1.42-1.42M5.06 5.06L3.64 3.64"/>
                         </svg>
-                        Einstellungen
+                        {{ t('nav.settings') }}
                     </a>
                     <a href="/logout" class="navbar-menu__item navbar-menu__item--muted" role="menuitem">
                         <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M13 14l4-4-4-4M17 10H7M9 4H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h4"/>
                         </svg>
-                        Logout
+                        {{ t('nav.logout') }}
                     </a>
                 </div>
             </div>
             {% else %}
-            <button type="button" class="navbar-link-btn" id="navLoginBtn" aria-haspopup="dialog" aria-controls="loginModal">Login</button>
+            <button type="button" class="navbar-link-btn" id="navLoginBtn" aria-haspopup="dialog" aria-controls="loginModal">{{ t('nav.login') }}</button>
             {% endif %}
         </div>
     </nav>
@@ -118,18 +136,17 @@
         <div class="login-modal__backdrop" data-login-close></div>
         <div class="login-modal__panel" role="document">
             <button type="button" class="login-modal__close" data-login-close
-                    aria-label="Schliessen">&times;</button>
-            <h2 id="loginModalTitle" class="login-modal__title">Login</h2>
+                    aria-label="{{ t('common.close') }}">&times;</button>
+            <h2 id="loginModalTitle" class="login-modal__title">{{ t('login.title') }}</h2>
             <p class="login-modal__hint">
-                Per Magic-Link &mdash; passwordlos. Du bekommst einen einmaligen Link
-                per Mail (30 Min gueltig).
+                {{ t('login.hint') }}
             </p>
             <form class="login-modal__form" id="loginModalForm" novalidate>
                 <input type="email" name="email" id="loginModalEmail"
                        class="login-modal__input"
-                       placeholder="du@beispiel.ch"
+                       placeholder="{{ t('login.email_placeholder') }}"
                        autocomplete="email" required>
-                <button type="submit" class="login-modal__submit">Link schicken</button>
+                <button type="submit" class="login-modal__submit">{{ t('login.submit') }}</button>
             </form>
             <div class="login-modal__msg" id="loginModalMsg" role="status"></div>
         </div>
@@ -162,7 +179,7 @@
             if (!modal.hidden && e.key === 'Escape') close();
         });
 
-        var FALLBACK_OK = 'Wenn die E-Mail registriert ist, wurde ein Login-Link geschickt. Schau in dein Postfach.';
+        var FALLBACK_OK = {{ t('login.fallback_ok')|tojson }};
 
         function setMsg(state, text) {
             msg.textContent = text;
@@ -175,7 +192,7 @@
             // wenn das E-Mail-Feld zumindest grob gueltig ist.
             var emailVal = (emailInput.value || '').trim();
             if (!emailVal || emailVal.indexOf('@') < 1) {
-                setMsg('err', 'Bitte gueltige E-Mail-Adresse eingeben.');
+                setMsg('err', {{ t('login.invalid_email')|tojson }});
                 emailInput.focus();
                 return;
             }
@@ -183,7 +200,7 @@
             // Disable Submit waehrend Anfrage laeuft (verhindert Doppel-Klicks)
             var submitBtn = form.querySelector('.login-modal__submit');
             if (submitBtn) submitBtn.disabled = true;
-            setMsg('info', 'Sende ...');
+            setMsg('info', {{ t('login.sending')|tojson }});
 
             var fd = new FormData(form);
             // Timeout via AbortController: nach 10s automatisch abbrechen
@@ -212,7 +229,7 @@
                 if (!res.ok) {
                     var err = (res.body && res.body.error)
                         ? res.body.error
-                        : 'Versand fehlgeschlagen (Status ' + res.status + '). Bitte spaeter erneut.';
+                        : {{ t('login.send_failed_pre')|tojson }} + res.status + {{ t('login.send_failed_post')|tojson }};
                     setMsg('err', err);
                     return;
                 }
@@ -226,10 +243,10 @@
             .catch(function(err){
                 if (timeoutId) clearTimeout(timeoutId);
                 if (err && err.name === 'AbortError') {
-                    setMsg('err', 'Server antwortet nicht. Bitte spaeter erneut.');
+                    setMsg('err', {{ t('login.no_response')|tojson }});
                 } else {
                     // Echter Netzwerk-Abbruch (offline, DNS, CORS) — selten
-                    setMsg('err', 'Verbindung fehlgeschlagen. Internet pruefen und erneut versuchen.');
+                    setMsg('err', {{ t('login.connection_failed')|tojson }});
                 }
             })
             .then(function(){
@@ -252,7 +269,7 @@
             var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
             dates.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
         }
-        var dayNames = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'];
+        var dayNames = {% if lang == 'en' %}['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']{% else %}['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA']{% endif %};
         window.currentDate = dates[0];
 
         function renderDayTabs() {
@@ -295,7 +312,7 @@
         if (opts.day_idx != null) params.push('day=' + encodeURIComponent(opts.day_idx));
         if (opts.spot) params.push('spot=' + encodeURIComponent(opts.spot));
         var url = origin + '/briefing' + (params.length ? '?' + params.join('&') : '');
-        var title = opts.title || 'Wingcast Flugwetter';
+        var title = opts.title || {{ t('common.share_title')|tojson }};
         var text = opts.text || title;
 
         if (navigator.share) {
@@ -320,46 +337,46 @@
     </div>
 
     <!-- Mobile Bottom Navigation -->
-    <nav class="mobile-nav" id="mobileNav" role="navigation" aria-label="Mobile Navigation">
+    <nav class="mobile-nav" id="mobileNav" role="navigation" aria-label="{{ t('mobile.aria_nav') }}">
         {% set is_chat = request.path == '/' or request.path == '/chat' %}
         {% set is_regionen = request.path == '/regionen' %}
         {% if is_chat %}
-        <button class="mobile-nav-item active" data-target="chat" aria-label="Chat anzeigen">
+        <button class="mobile-nav-item active" data-target="chat" aria-label="{{ t('mobile.show_chat') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span>Chat</span>
+            <span>{{ t('mobile.chat') }}</span>
         </button>
-        <button class="mobile-nav-item" data-target="map" aria-label="Spots anzeigen">
+        <button class="mobile-nav-item" data-target="map" aria-label="{{ t('mobile.show_spots') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span>Spots</span>
+            <span>{{ t('mobile.spots') }}</span>
         </button>
         {% elif is_regionen %}
-        <button class="mobile-nav-item" data-target="chat" aria-label="Chat anzeigen">
+        <button class="mobile-nav-item" data-target="chat" aria-label="{{ t('mobile.show_chat') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span>Chat</span>
+            <span>{{ t('mobile.chat') }}</span>
         </button>
-        <a href="/chat?view=map" class="mobile-nav-item" aria-label="Spots anzeigen">
+        <a href="/chat?view=map" class="mobile-nav-item" aria-label="{{ t('mobile.show_spots') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span>Spots</span>
+            <span>{{ t('mobile.spots') }}</span>
         </a>
         {% else %}
-        <a href="/chat" class="mobile-nav-item" aria-label="Chat anzeigen">
+        <a href="/chat" class="mobile-nav-item" aria-label="{{ t('mobile.show_chat') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span>Chat</span>
+            <span>{{ t('mobile.chat') }}</span>
         </a>
-        <a href="/chat?view=map" class="mobile-nav-item" aria-label="Spots anzeigen">
+        <a href="/chat?view=map" class="mobile-nav-item" aria-label="{{ t('mobile.show_spots') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span>Spots</span>
+            <span>{{ t('mobile.spots') }}</span>
         </a>
         {% endif %}
         {% if is_regionen %}
-        <button class="mobile-nav-item active" data-target="map" aria-label="Regionen anzeigen">
+        <button class="mobile-nav-item active" data-target="map" aria-label="{{ t('mobile.show_regions') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            <span>Regionen</span>
+            <span>{{ t('nav.regions') }}</span>
         </button>
         {% else %}
-        <a href="/regionen" class="mobile-nav-item" aria-label="Regionen">
+        <a href="/regionen" class="mobile-nav-item" aria-label="{{ t('nav.regions') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            <span>Regionen</span>
+            <span>{{ t('nav.regions') }}</span>
         </a>
         {% endif %}
         <a href="/briefing" class="mobile-nav-item {% if request.path == '/briefing' %}active{% endif %}" aria-label="Wingcast">
@@ -367,23 +384,23 @@
             <span>Wingcast</span>
         </a>
         {% if is_admin %}
-        <button class="mobile-nav-item" id="mobileNavFoehnBtn" aria-label="Föhndiagramm öffnen">
+        <button class="mobile-nav-item" id="mobileNavFoehnBtn" aria-label="{{ t('nav.foehn_open') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
-            <span>Föhn</span>
+            <span>{{ t('nav.foehn') }}</span>
         </button>
         {% endif %}
     </nav>
 
     <!-- Foehn Diagram Overlay (shared across all pages) -->
-    <div class="meteogram-overlay" id="foehnOverlay" role="dialog" aria-modal="true" aria-label="Föhndiagramm">
+    <div class="meteogram-overlay" id="foehnOverlay" role="dialog" aria-modal="true" aria-label="{{ t('foehn.title') }}">
         <div class="meteogram-panel">
             <div class="overlay-swipe-handle"></div>
             <div class="meteogram-header">
                 <div>
-                    <h2>Föhndiagramm</h2>
-                    <span class="spot-info">Druckdifferenz Lugano – Zürich | 5-Tage-Prognose</span>
+                    <h2>{{ t('foehn.title') }}</h2>
+                    <span class="spot-info">{{ t('foehn.subtitle') }}</span>
                 </div>
-                <button class="meteogram-close" id="foehnClose" aria-label="Schliessen">&times;</button>
+                <button class="meteogram-close" id="foehnClose" aria-label="{{ t('common.close') }}">&times;</button>
             </div>
             <div class="meteogram-chart" id="foehnChart"></div>
         </div>
@@ -418,7 +435,7 @@
                     window.location.href = '/chat?foehn=1';
                     return;
                 }
-                foehnChart.innerHTML = '<div class="error-state">Lade Föhn-Daten...</div>';
+                foehnChart.innerHTML = '<div class="error-state">' + {{ t('foehn.loading')|tojson }} + '</div>';
                 foehnOverlay.style.display = 'flex';
                 foehnOverlay.classList.add('visible');
                 window._overlayScrollLock();
@@ -433,7 +450,7 @@
                         }
                         var dates = data.dates || [];
                         if (dates.length === 0) {
-                            foehnChart.innerHTML = '<div class="error-state">Keine Föhn-Daten verfügbar.</div>';
+                            foehnChart.innerHTML = '<div class="error-state">' + {{ t('foehn.no_data')|tojson }} + '</div>';
                             return;
                         }
                         var allData = [];
@@ -444,7 +461,7 @@
                         FoehnDiagram.renderChart(foehnChart, foehnTooltip, allData, data.thresholds);
                     })
                     .catch(function (err) {
-                        foehnChart.innerHTML = '<div class="error-state">Fehler: ' + err.message + '</div>';
+                        foehnChart.innerHTML = '<div class="error-state">' + {{ t('foehn.error_prefix')|tojson }} + err.message + '</div>';
                     });
             }
 
@@ -524,9 +541,9 @@
 
     {# Globaler dezenter Footer mit Rechtliches-Links — auf jeder Seite sichtbar #}
     <footer class="app-footer" role="contentinfo">
-        <a href="{{ datenschutz_url }}" rel="noopener">Datenschutz</a>
+        <a href="{{ datenschutz_url }}" rel="noopener">{{ t('footer.privacy') }}</a>
         <span aria-hidden="true">·</span>
-        <a href="{{ impressum_url }}" rel="noopener">Impressum</a>
+        <a href="{{ impressum_url }}" rel="noopener">{{ t('footer.imprint') }}</a>
         <span aria-hidden="true">·</span>
         <a href="{{ marketing_url }}" rel="noopener">wingcast.ch</a>
     </footer>

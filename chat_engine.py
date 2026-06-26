@@ -154,9 +154,9 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
         self.history_dir.mkdir(parents=True, exist_ok=True)
         self._load_all_conversations()
 
-        # Analyse-Persistenz
-        self.analyses_file = config.DATA_DIR / "spot_analyses.json"
-        self.region_analyses_file = config.DATA_DIR / "region_analyses.json"
+        # Analyse-Persistenz — sprachspezifisch (s. analyses_file-Property):
+        # DE behaelt die kanonischen Dateinamen (validierter Cache unangetastet),
+        # EN schreibt/liest *_en.json. Beim Sprachwechsel reload_analyses_for_lang().
         self._load_analyses_cache()
 
         # Stationsdaten + Bias-Korrektur
@@ -202,6 +202,35 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
                 json.dump(self.conversations[session_id], f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Fehler beim Speichern der History {session_id}: {e}")
+
+    @staticmethod
+    def _analyses_filenames(lang: str) -> tuple[str, str]:
+        """(spot_file, region_file) je Sprache. DE = kanonisch (validierter Cache
+        unangetastet), EN = eigener *_en.json-Cache (kein Ueberschreiben von DE)."""
+        if lang == "en":
+            return "spot_analyses_en.json", "region_analyses_en.json"
+        return "spot_analyses.json", "region_analyses.json"
+
+    @property
+    def analyses_file(self):
+        import i18n
+        return config.DATA_DIR / self._analyses_filenames(i18n.get_current_lang())[0]
+
+    @property
+    def region_analyses_file(self):
+        import i18n
+        return config.DATA_DIR / self._analyses_filenames(i18n.get_current_lang())[1]
+
+    def reload_analyses_for_lang(self):
+        """Nach einem Sprachwechsel: In-Memory-Analysen aus dem jetzt aktiven
+        sprachspezifischen Cache neu laden (DE- und EN-Cache liegen getrennt)."""
+        self.spot_analyses = {}
+        self.region_analyses = {}
+        self.analyses_loaded_at = None
+        self.region_analyses_loaded_at = None
+        self._load_analyses_cache()
+        print(f"[ENGINE] Analyse-Cache fuer Sprachwechsel neu geladen "
+              f"({len(self.spot_analyses)} Spots, {len(self.region_analyses)} Regionen).")
 
     def _load_analyses_cache(self):
         """Laedt Spot- und Region-Analysen aus den lokalen JSON-Caches.

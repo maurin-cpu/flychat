@@ -169,7 +169,12 @@ def compose_analysis_prompt(mode: str, phase: str) -> str:
     if marker not in template:
         raise ValueError(f"00_template_{mode}.md (phase={phase}) enthält keinen {marker}-Marker")
     shared = "\n\n".join(_load_shared(name) for name in blocks)
-    return template.replace(marker, shared)
+    composed = template.replace(marker, shared)
+
+    # Sprach-Anweisung ans Ende (DE -> leer, Logik/Reasoning bleiben deutsch;
+    # EN -> finale Ausgabe auf Englisch neu generiert). Siehe i18n.llm_lang_instruction.
+    import i18n
+    return composed + i18n.llm_lang_instruction()
 
 
 def format_foehn_llm_regional_guide() -> str:

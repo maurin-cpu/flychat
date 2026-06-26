@@ -18,8 +18,17 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, R
 from datetime import datetime, timedelta
 
 import config
+import i18n
 
 logger = logging.getLogger(__name__)
+
+
+def _fm(key: str, **kwargs) -> str:
+    """Flash-Message: uebersetzt key (DE/EN) und URL-encodet ihn fuer redirect ?ok=/?err=."""
+    from urllib.parse import quote_plus
+    return quote_plus(i18n.t(key, **kwargs))
+
+
 from thermik_calculator import compute_daily_thermals
 from source_area import get_all_regions_geojson, get_all_regions
 from subscriber import get_manager_from_env as _get_subscriber_manager
@@ -97,6 +106,14 @@ def _gate_forecast(sorted_dates, *by_day_dicts):
         for bd in by_day_dicts
     )
     return (kept, *truncated)
+
+
+@app.context_processor
+def _inject_i18n():
+    """Stellt {{ t("key") }} und {{ lang }} in allen Templates bereit.
+    lang = aktive globale Sprache (config.LANG), t = Uebersetzung mit DE-Fallback."""
+    import i18n
+    return {"t": i18n.t, "lang": i18n.get_current_lang(), "js_i18n": i18n.js_i18n()}
 
 
 @app.context_processor
@@ -299,10 +316,9 @@ def subscribe_submit():
     Magic-Link auf /login. Antwort 410 Gone fuer alte Forms / Bookmarks."""
     return _status_page(
         state="error",
-        title="Diese Anmeldung gibt es nicht mehr",
-        message="Die Registrierung laeuft jetzt direkt ueber den Login.",
-        submessage="Gib deine E-Mail unter /login ein — beim ersten Klick wird dein "
-                   "Konto automatisch angelegt. Kein zusaetzlicher Schritt noetig.",
+        title=i18n.t("status.gone_title"),
+        message=i18n.t("status.gone_msg"),
+        submessage=i18n.t("status.gone_sub"),
         http_code=410,
     )
 
@@ -312,8 +328,8 @@ def subscribe_confirm(token):
     mgr = _get_subscriber_manager()
     if mgr is None:
         return _status_page(
-            "error", "Bestaetigung fehlgeschlagen",
-            "Der Service ist gerade nicht verfuegbar. Bitte spaeter nochmal.",
+            "error", i18n.t("status.confirm_fail_title"),
+            i18n.t("status.service_unavail_retry"),
             http_code=503,
         )
 
@@ -322,8 +338,8 @@ def subscribe_confirm(token):
         # Vielleicht schon bestaetigt? Dann ist confirm_token NULL -> get_by_action_token wuerde gehen,
         # aber der Link kommt nicht vom Action-Token. Wir zeigen einfach "ungueltig/abgelaufen".
         return _status_page(
-            "error", "Link ungueltig oder bereits verwendet",
-            "Dieser Bestaetigungs-Link ist abgelaufen oder wurde bereits benutzt.",
+            "error", i18n.t("status.link_invalid_used_title"),
+            i18n.t("status.link_invalid_used_msg"),
             http_code=404,
         )
 
@@ -340,9 +356,9 @@ def subscribe_confirm(token):
                          result["email"], e)
 
     return _status_page(
-        "ok", "Abo aktiviert!",
-        f"Willkommen bei Wingcast, {result['email']}.",
-        submessage="Dein erster Wingcast kommt am naechsten Montag, Mittwoch oder Freitag um 06:30.",
+        "ok", i18n.t("status.sub_activated_title"),
+        i18n.t("status.welcome_msg", email=result["email"]),
+        submessage=i18n.t("status.first_wingcast_sub"),
     )
 
 
@@ -353,24 +369,24 @@ def subscribe_feedback(token, verdict):
     """
     if verdict not in ("correct", "wrong"):
         return _status_page(
-            "error", "Ungueltige Bewertung",
-            "Dieser Link ist ungueltig.",
+            "error", i18n.t("status.invalid_rating_title"),
+            i18n.t("status.invalid_link_msg"),
             http_code=400,
         )
 
     mgr = _get_subscriber_manager()
     if mgr is None:
         return _status_page(
-            "error", "Feedback fehlgeschlagen",
-            "Der Service ist gerade nicht verfuegbar.",
+            "error", i18n.t("status.feedback_fail_title"),
+            i18n.t("status.service_unavail"),
             http_code=503,
         )
 
     sub = mgr.get_by_action_token(token)
     if sub is None:
         return _status_page(
-            "error", "Link ungueltig",
-            "Dieser Feedback-Link ist nicht (mehr) gueltig.",
+            "error", i18n.t("status.link_invalid_title"),
+            i18n.t("status.feedback_link_invalid_msg"),
             http_code=404,
         )
 
@@ -378,20 +394,20 @@ def subscribe_feedback(token, verdict):
     ok = mgr.record_feedback(sub["id"], date.today(), verdict)
     if not ok:
         return _status_page(
-            "error", "Feedback fehlgeschlagen",
-            "Dein Feedback konnte nicht gespeichert werden. Versuch's spaeter nochmal.",
+            "error", i18n.t("status.feedback_fail_title"),
+            i18n.t("status.feedback_save_fail_msg"),
             http_code=500,
         )
 
     if verdict == "correct":
         return _status_page(
-            "ok", "Danke fuer die Bestaetigung!",
-            "Dein Feedback hilft uns, die Vorhersage zu verbessern.",
+            "ok", i18n.t("status.feedback_confirm_title"),
+            i18n.t("status.feedback_confirm_msg"),
         )
     return _status_page(
-        "ok", "Danke fuer dein Feedback!",
-        "Schade, dass die Vorhersage nicht gepasst hat. Wir lernen daraus.",
-        submessage="Mehr Details kannst du uns gerne per E-Mail-Antwort schicken.",
+        "ok", i18n.t("status.feedback_thanks_title"),
+        i18n.t("status.feedback_wrong_msg"),
+        submessage=i18n.t("status.feedback_wrong_sub"),
     )
 
 
@@ -458,7 +474,7 @@ def account_page(token):
 def account_action(token, action):
     mgr = _get_subscriber_manager()
     if mgr is None:
-        return redirect(f"/account/{token}?err=Service+nicht+verfuegbar")
+        return redirect(f"/account/{token}?err={_fm('flash.service_unavailable')}")
 
     if action == "pause_14d" or action == "pause_30d":
         from datetime import date, timedelta
@@ -466,21 +482,21 @@ def account_action(token, action):
         until = date.today() + timedelta(days=days)
         ok = mgr.pause(token, until)
         if not ok:
-            return redirect(f"/account/{token}?err=Pause+fehlgeschlagen")
-        return redirect(f"/account/{token}?ok=Pausiert+bis+{until.isoformat()}")
+            return redirect(f"/account/{token}?err={_fm('flash.pause_failed')}")
+        return redirect(f"/account/{token}?ok={_fm('flash.paused_until', until=until.isoformat())}")
 
     if action == "resume":
         ok = mgr.resume(token)
         if not ok:
-            return redirect(f"/account/{token}?err=Fortsetzen+fehlgeschlagen")
-        return redirect(f"/account/{token}?ok=Abo+wieder+aktiv")
+            return redirect(f"/account/{token}?err={_fm('flash.resume_failed')}")
+        return redirect(f"/account/{token}?ok={_fm('flash.sub_active_again')}")
 
     if action == "unsubscribe":
         ok = mgr.unsubscribe(token)
         if not ok:
-            return redirect(f"/account/{token}?err=Abmelden+fehlgeschlagen")
+            return redirect(f"/account/{token}?err={_fm('flash.unsub_failed')}")
         # Session bleibt — User soll auf der Konto-Seite den Reaktivieren-Banner sehen
-        return redirect(f"/account/{token}?ok=Wingcast+abgemeldet")
+        return redirect(f"/account/{token}?ok={_fm('flash.unsubscribed')}")
 
     if action == "update":
         # Form-Daten: regions[], weekdays[], tiers[] (Checkboxes), min_rating (slider)
@@ -495,11 +511,11 @@ def account_action(token, action):
             weekdays = []
 
         if not regions:
-            return redirect(f"/account/{token}?err=Mindestens+eine+Region+waehlen")
+            return redirect(f"/account/{token}?err={_fm('flash.need_region')}")
         if not weekdays:
-            return redirect(f"/account/{token}?err=Mindestens+einen+Wochentag+waehlen")
+            return redirect(f"/account/{token}?err={_fm('flash.need_weekday')}")
         if not tiers:
-            return redirect(f"/account/{token}?err=Mindestens+eine+Qualitaets-Stufe+waehlen")
+            return redirect(f"/account/{token}?err={_fm('flash.need_tier')}")
 
         try:
             min_rating = float(min_rating_raw) if min_rating_raw else 0.0
@@ -514,7 +530,7 @@ def account_action(token, action):
             min_rating=min_rating,
         )
         if not ok:
-            return redirect(f"/account/{token}?err=Speichern+fehlgeschlagen")
+            return redirect(f"/account/{token}?err={_fm('flash.save_failed')}")
 
         # Pause-Range: paused_from + paused_until.
         # Beide leer -> Pause aufheben. Beide gesetzt + valide -> pause(until, from).
@@ -537,7 +553,7 @@ def account_action(token, action):
             # Bis leer -> Pause aufheben (no-op wenn nicht pausiert)
             mgr.resume(token)
 
-        return redirect(f"/account/{token}?ok=Einstellungen+gespeichert")
+        return redirect(f"/account/{token}?ok={_fm('flash.settings_saved')}")
 
     if action == "logout":
         session.clear()
@@ -546,24 +562,24 @@ def account_action(token, action):
     if action == "reactivate":
         ok = mgr.reactivate(token)
         if not ok:
-            return redirect(f"/account/{token}?err=Reaktivierung+fehlgeschlagen")
-        return redirect(f"/account/{token}?ok=Wingcast+wieder+aktiviert")
+            return redirect(f"/account/{token}?err={_fm('flash.reactivate_failed')}")
+        return redirect(f"/account/{token}?ok={_fm('flash.reactivated')}")
 
     if action == "feedback":
         msg = (request.form.get("message") or "").strip()
         if not msg:
-            return redirect(f"/account/{token}?err=Bitte+eine+Nachricht+eingeben")
+            return redirect(f"/account/{token}?err={_fm('flash.need_message')}")
         ok = mgr.record_product_feedback(token, msg)
         if not ok:
-            return redirect(f"/account/{token}?err=Feedback+konnte+nicht+gespeichert+werden")
-        return redirect(f"/account/{token}?ok=Danke+fuer+dein+Feedback%21")
+            return redirect(f"/account/{token}?err={_fm('flash.feedback_save_failed')}")
+        return redirect(f"/account/{token}?ok={_fm('flash.feedback_thanks')}")
 
     if action == "export":
         # DSG Art. 28: Datenherausgabe in maschinenlesbarem Format.
         # Liefert alle gespeicherten User-Daten als JSON-Download.
         sub = mgr.get_by_action_token(token)
         if sub is None:
-            return redirect(f"/account/{token}?err=Account+nicht+gefunden")
+            return redirect(f"/account/{token}?err={_fm('flash.account_not_found')}")
         # Feedback-Historie dazu
         feedback = []
         try:
@@ -620,19 +636,19 @@ def account_action(token, action):
         session.clear()
         if not ok:
             return _status_page(
-                "error", "Loeschen fehlgeschlagen",
-                "Dein Account konnte nicht geloescht werden.",
+                "error", i18n.t("status.delete_fail_title"),
+                i18n.t("status.delete_fail_msg"),
                 http_code=500,
             )
         return _status_page(
-            "ok", "Account geloescht",
-            "Deine E-Mail und alle Daten wurden aus unserer Datenbank entfernt.",
-            submessage="Du kannst dich jederzeit neu registrieren.",
+            "ok", i18n.t("status.account_deleted_title"),
+            i18n.t("status.account_deleted_msg"),
+            submessage=i18n.t("status.account_deleted_sub"),
         )
 
     return _status_page(
-        "error", "Unbekannte Aktion",
-        "Diese Aktion ist nicht erlaubt.",
+        "error", i18n.t("status.unknown_action_title"),
+        i18n.t("status.unknown_action_msg"),
         http_code=400,
     )
 
@@ -705,14 +721,14 @@ def login_request():
     email = (request.form.get("email") or "").strip().lower()
     if not email:
         if wants_json:
-            return jsonify({"ok": False, "error": "Bitte E-Mail eingeben"}), 400
-        return redirect("/login?err=Bitte+E-Mail+eingeben")
+            return jsonify({"ok": False, "error": i18n.t("flash.login_need_email")}), 400
+        return redirect(f"/login?err={_fm('flash.login_need_email')}")
 
     mgr = _get_subscriber_manager()
     if mgr is None:
         if wants_json:
-            return jsonify({"ok": False, "error": "Service nicht verfuegbar"}), 503
-        return redirect("/login?err=Service+nicht+verfuegbar")
+            return jsonify({"ok": False, "error": i18n.t("flash.service_unavailable")}), 503
+        return redirect(f"/login?err={_fm('flash.service_unavailable')}")
 
     result = mgr.create_login_token(email, ttl_minutes=30)
     # Bewusst KEIN Hinweis ob E-Mail registriert ist (Privacy / Enumeration-Schutz)
@@ -723,10 +739,10 @@ def login_request():
         except Exception as e:
             logger.error("send_login_email failed: %s", e)
 
-    msg = "Wenn die E-Mail registriert ist, wurde ein Login-Link geschickt. Schau in dein Postfach."
+    msg = i18n.t("login.fallback_ok")
     if wants_json:
         return jsonify({"ok": True, "message": msg})
-    return redirect(f"/login?ok={msg.replace(' ', '+')}")
+    return redirect(f"/login?ok={_fm('login.fallback_ok')}")
 
 
 @app.route("/login/<token>", methods=["GET"])
@@ -744,13 +760,13 @@ def login_landing(token):
     echte User-Klick verbraucht den Token in login_consume()."""
     mgr = _get_subscriber_manager()
     if mgr is None:
-        return _status_page("error", "Service nicht verfuegbar",
-                            "Bitte spaeter nochmal versuchen.", http_code=503)
+        return _status_page("error", i18n.t("status.service_unavail_title"),
+                            i18n.t("status.try_later"), http_code=503)
     if not mgr.peek_login_token(token):
         return _status_page(
-            "error", "Login-Link ungueltig",
-            "Der Link ist abgelaufen oder wurde bereits benutzt.",
-            submessage="Fordere einen neuen Login-Link an.",
+            "error", i18n.t("status.login_link_invalid_title"),
+            i18n.t("status.login_link_invalid_msg"),
+            submessage=i18n.t("status.request_new_link_sub"),
             http_code=400,
         )
     return render_template("login_confirm.html", token=token)
@@ -760,17 +776,17 @@ def login_landing(token):
 def login_consume(token):
     mgr = _get_subscriber_manager()
     if mgr is None:
-        return _status_page("error", "Service nicht verfuegbar",
-                            "Bitte spaeter nochmal versuchen.", http_code=503)
+        return _status_page("error", i18n.t("status.service_unavail_title"),
+                            i18n.t("status.try_later"), http_code=503)
     res = mgr.consume_login_token(token)
     if res is None:
         logger.warning("login_consume: token NOT consumed (already used or expired) "
                        "from host=%s ua=%r",
                        request.host, request.headers.get("User-Agent", "")[:80])
         return _status_page(
-            "error", "Login-Link ungueltig",
-            "Der Link ist abgelaufen oder wurde bereits benutzt.",
-            submessage="Fordere einen neuen Login-Link an.",
+            "error", i18n.t("status.login_link_invalid_title"),
+            i18n.t("status.login_link_invalid_msg"),
+            submessage=i18n.t("status.request_new_link_sub"),
             http_code=400,
         )
     session.permanent = True
@@ -793,23 +809,23 @@ def subscribe_unsubscribe(token):
     mgr = _get_subscriber_manager()
     if mgr is None:
         return _status_page(
-            "error", "Abmeldung fehlgeschlagen",
-            "Der Service ist gerade nicht verfuegbar. Bitte spaeter nochmal.",
+            "error", i18n.t("status.unsub_fail_title"),
+            i18n.t("status.service_unavail_retry"),
             http_code=503,
         )
 
     ok = mgr.unsubscribe(token)
     if not ok:
         return _status_page(
-            "error", "Link ungueltig",
-            "Dieser Abmelde-Link ist nicht (mehr) gueltig.",
+            "error", i18n.t("status.link_invalid_title"),
+            i18n.t("status.unsub_link_invalid_msg"),
             http_code=404,
         )
 
     return _status_page(
-        "ok", "Abgemeldet",
-        "Du bekommst keinen Wingcast mehr. Schade, dass du gehst!",
-        submessage="Du kannst dich jederzeit wieder anmelden.",
+        "ok", i18n.t("status.unsubscribed_title"),
+        i18n.t("status.unsubscribed_msg"),
+        submessage=i18n.t("status.unsubscribed_sub"),
     )
 
 
@@ -1106,6 +1122,15 @@ def admin_config_save():
             engine.reload_llm_clients()
         except Exception as e:
             logger.warning("admin_config_save: reload_llm_clients fehlgeschlagen: %s", e)
+
+    # Sprachwechsel: In-Memory-Analysen aus dem jetzt aktiven sprachspezifischen
+    # Cache neu laden (DE/EN getrennt). UI/Chat schalten sofort via t()/lang;
+    # die Analyse-Texte kommen in der neuen Sprache beim naechsten Neu-Berechnen.
+    if engine is not None and "LANG" in changed:
+        try:
+            engine.reload_analyses_for_lang()
+        except Exception as e:
+            logger.warning("admin_config_save: reload_analyses_for_lang fehlgeschlagen: %s", e)
 
     # Scheduler-Thread aufwecken, damit DAILY_RUN_* sofort greifen statt erst
     # beim naechsten planmaessigen Aufwachen.
@@ -2540,13 +2565,13 @@ def _chat_session_id():
 def api_chat():
     data = request.get_json()
     if not data or "message" not in data:
-        return jsonify({"error": "Keine Nachricht"}), 400
+        return jsonify({"error": i18n.t("chat.err.no_message")}), 400
 
     message = data["message"].strip()
     session_id = _chat_session_id()
 
     if not message:
-        return jsonify({"error": "Leere Nachricht"}), 400
+        return jsonify({"error": i18n.t("chat.err.empty_message")}), 400
 
     # Phase 1: Streaming-Variante (Tool-Use + Map-Actions) wenn Client opt-in
     accept = request.headers.get("Accept", "")
