@@ -1880,7 +1880,9 @@ body.page-fixed-nav {
     }
 }
 
-/* Tablet & Mobile: stack vertically, aside becomes collapsible panel below chart */
+/* Tablet & Mobile: stack vertically, aside becomes collapsible panel below chart.
+   Tablet (641-1023): JS laesst Aside default offen → balanced 45vh/45vh.
+   Mobile (<640) hat im 639er-Block sein eigenes Sheet-Pattern. */
 @media (max-width: 1023px) {
     .meteogram-panel {
         width: 100vw;
@@ -1916,8 +1918,8 @@ body.page-fixed-nav {
     }
 
     .meteogram-aside.collapsed {
-        max-height: none;
-        flex: 0 0 auto;
+        flex: 0 0 56px;
+        max-height: 56px;
     }
 
     .meteogram-aside.collapsed .meteogram-aside-toggle {
@@ -2761,21 +2763,24 @@ body.page-fixed-nav {
     }
     .tab-btn .day-date::before { content: none; }
 
-    /* Aside läuft im Flex-Flow (unter dem Chart). Beim Aufklappen schrumpft
-       das Meteogramm nach oben — kein Overlay über dem Chart mehr. */
+    /* Sheet-Pattern: Aside klebt am Panel-Boden, klappt nach oben auf.
+       Aufgeklappt = Aside fuellt den Body komplett, Chart verschwindet
+       (User-Reklamation 2026-05-30: vorher cappte max-height: 55vh die
+       Aside auf die halbe Hoehe). Eingeklappt = nur Header sichtbar. */
     .meteogram-aside {
         position: static;
-        flex: 0 0 auto;
+        flex: 1 1 auto;
         width: 100%;
-        max-height: 55vh;
+        max-height: none;
         background: var(--color-bg-elevated, #fff);
         border-top: 1px solid var(--color-border);
         border-left: none;
         border-radius: 0;
         box-shadow: none;
-        transition: max-height 250ms cubic-bezier(0.4, 0, 0.2, 1);
+        transition: flex-basis 250ms cubic-bezier(0.4, 0, 0.2, 1);
     }
     .meteogram-aside.collapsed {
+        flex: 0 0 56px;
         max-height: 56px;
         border-radius: 0;
     }
@@ -2783,6 +2788,13 @@ body.page-fixed-nav {
         flex: 1 1 auto;
         min-height: 0;
         padding-bottom: 0;
+    }
+    /* Aufgeklappt: Chart raus, Aside nimmt alles. :has() ist noetig weil
+       .meteogram-main vor .meteogram-aside im DOM steht und CSS keinen
+       Rueckwaerts-Geschwister-Selektor hat. */
+    .meteogram-body:has(.meteogram-aside:not(.collapsed)) .meteogram-main {
+        flex: 0 0 0;
+        overflow: hidden;
     }
     /* Collapsed-Header bekommt eine deutliche CTA-Optik damit klar wird,
        dass man hier draufklicken muss um die Analyse zu sehen. */
