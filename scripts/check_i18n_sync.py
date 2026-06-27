@@ -182,11 +182,62 @@ def cmd_update() -> int:
     return 0
 
 
+def cmd_hook() -> int:
+    """PostToolUse-Hook-Modus: liest die Hook-JSON von stdin, prueft ob eine
+    DE-Quelle mit EN-Zwilling editiert wurde, und meldet die nachzuziehende(n)
+    EN-Datei(en) via hookSpecificOutput.additionalContext zurueck an Claude.
+
+    Bei nicht-relevanten Edits: still (exit 0, keine Ausgabe).
+    """
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except (json.JSONDecodeError, ValueError):
+        return 0
+    fp = (payload.get("tool_input") or {}).get("file_path") or ""
+    if not fp:
+        return 0
+    try:
+        edited = Path(fp).resolve()
+    except (OSError, ValueError):
+        return 0
+
+    # Editierte Datei = DE-Quelle eines bekannten Paares?
+    twins = []  # EN-Dateien, deren DE-Quelle gerade editiert wurde
+    for p in discover_pairs():
+        de_abs = (REPO / p["de"]).resolve()
+        if de_abs == edited:
+            twins.append(p)
+    if not twins:
+        return 0  # keine DE-Quelle mit EN-Zwilling -> nichts zu melden
+
+    lines = [
+        "⚠️ i18n-Sync: Du hast eine deutsche Prompt-Quelle geaendert, die eine "
+        "englische Uebersetzung hat. Damit EN nicht driftet, muss die/den "
+        "folgende(n) EN-Datei(en) inhaltlich nachgezogen werden:",
+    ]
+    for p in twins:
+        lines.append(f"  • DE: {p['de']}  ->  EN nachziehen: {p['en']}")
+    lines.append("Danach stempeln: python scripts/check_i18n_sync.py --update")
+
+    out = {
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": "\n".join(lines),
+        }
+    }
+    print(json.dumps(out, ensure_ascii=False))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="DE->EN Prompt-Baustein Sync-Waechter")
     ap.add_argument("--update", action="store_true",
                     help="Aktuelle DE-Hashes stempeln (nach dem Nachziehen der EN-Dateien).")
+    ap.add_argument("--hook", action="store_true",
+                    help="PostToolUse-Hook-Modus: liest Hook-JSON von stdin, meldet betroffene EN-Datei(en).")
     args = ap.parse_args()
+    if args.hook:
+        return cmd_hook()
     return cmd_update() if args.update else cmd_check()
 
 
