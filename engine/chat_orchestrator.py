@@ -49,7 +49,7 @@ from engine._common import (
     MAX_HISTORY_MESSAGES, MAX_TOOL_ITERATIONS,
     _MODEL_TOKEN_LIMITS, _DEFAULT_TOKEN_LIMIT, _TOKEN_BUDGET_RESERVE,
     _CTX_CACHE_MAX_ENTRIES,
-    _estimate_tokens, _truncate_weather_context, _filter_context_by_days,
+    _estimate_tokens,
     _log_prompt_cache_usage, _weekday_de,
     _is_permanent_api_error, _user_friendly_api_error,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
@@ -372,32 +372,40 @@ class ChatOrchestratorMixin:
         self._ensure_weather_context()
 
         if not self.weather_context_str:
-            return "Wetterdaten werden geladen... Bitte versuche es gleich nochmal."
+            return i18n.t("chat.loading_weather")
 
         # Spot-Analysen aus InstantDB laden falls lokal nicht vorhanden
         self._ensure_spot_analyses()
+
+        # Kompakte Voranalysen-Uebersicht (alle Spots, vollstaendig aber kurz) ist der
+        # Chat-Kontext. Fehlt sie, ehrlich "wird geladen" antworten — nicht die Roh-
+        # Wetterdaten kippen (sprengt das Token-Limit).
+        analyses_context = self._build_compact_analyses_for_chat()
+        if not analyses_context:
+            return i18n.t("chat.loading_analyses")
 
         messages = self._get_or_create_conversation(session_id)
         conv = self.conversations[session_id]
 
         # Erste Frage: Kontext automatisch mitsenden
         if conv["first_question"]:
-            # Voranalysen vorhanden? → Kurzübersicht (Chat-tauglich), sonst Roh-Wetterkontext
-            analyses_context = self._build_compact_analyses_for_chat()
-            if analyses_context:
-                # Kompakte Analyse enthält keinen globalen Föhn-Block — immer anhängen, sonst
-                # antwortet das Modell bei „Föhn?" ohne ΔP/Kammwind und rät falsch.
-                foehn_snap = self._build_foehn_context_for_ai()
-                context_block = analyses_context + "\n\n" + foehn_snap
-            else:
-                context_block = self.weather_context_str
+            # Kompakte Analyse enthält keinen globalen Föhn-Block — immer anhängen, sonst
+            # antwortet das Modell bei „Föhn?" ohne ΔP/Kammwind und rät falsch.
+            foehn_snap = self._build_foehn_context_for_ai()
+            context_block = analyses_context + "\n\n" + foehn_snap
 
-            # Token-Budget: Kontext kürzen falls er das Modell-Limit sprengt
+            # Sicherheitsnetz: passt fuer das konfigurierte 1M-Modell muehelos. Bei zu
+            # kleinem Modell-Limit NICHT still kuerzen (sonst fehlen Spots unbemerkt),
+            # sondern sichtbar warnen.
             model_limit = _MODEL_TOKEN_LIMITS.get(self.chat_model, _DEFAULT_TOKEN_LIMIT)
             system_tokens = _estimate_tokens(messages[0]["content"]) if messages else 0
             context_budget = model_limit - _TOKEN_BUDGET_RESERVE - system_tokens
             if context_budget > 0 and _estimate_tokens(context_block) > context_budget:
-                context_block = _truncate_weather_context(context_block, context_budget)
+                logger.warning(
+                    "Chat-Kontext (%d geschaetzte Tokens) ueberschreitet das Budget (%d) "
+                    "fuer Modell %s — Antwort kann fehlschlagen. Groesseres Kontextmodell waehlen.",
+                    _estimate_tokens(context_block), context_budget, self.chat_model,
+                )
 
             _now = datetime.now()
             _today = _now.date()
@@ -449,7 +457,7 @@ class ChatOrchestratorMixin:
             reply_reasoning = getattr(_msg, "reasoning_content", None)
         except Exception as e:
             logger.error(f"Chat-LLM ({self.chat_provider}) Fehler: {e}")
-            reply = f"Entschuldigung, es gab einen Fehler bei der Verarbeitung: {e}"
+            reply = i18n.t("chat.err.processing", error=e)
 
         # Strip FORMAT-HINT from stored user message to keep history clean
         if format_hint and messages:
@@ -828,31 +836,48 @@ class ChatOrchestratorMixin:
         if not self.weather_context_str:
             yield {
                 "type": "text",
-                "content": "Wetterdaten werden geladen... Bitte versuche es gleich nochmal.",
+                "content": i18n.t("chat.loading_weather"),
             }
             yield {"type": "done"}
             return
 
         self._ensure_spot_analyses()
 
+        # Der Chat braucht die kompakte Voranalysen-Uebersicht (alle Spots, vollstaendig
+        # aber kurz) als Kontext. Fehlt sie (Cache noch nicht geladen), antworten wir
+        # ehrlich mit "wird geladen" — statt die kompletten Roh-Wetterdaten zu kippen,
+        # die das Token-Limit des Modells sprengen.
+        analyses_context = self._build_compact_analyses_for_chat()
+        if not analyses_context:
+            yield {
+                "type": "text",
+                "content": i18n.t("chat.loading_analyses"),
+            }
+            yield {"type": "done"}
+            return
+
         messages = self._get_or_create_conversation(session_id)
         conv = self.conversations[session_id]
 
         def _build_full_user_content() -> str:
-            """Volle User-Message: AKTUELZEIT + DATUM-MAPPING + Wetterkontext + Frage.
+            """Volle User-Message: AKTUELZEIT + DATUM-MAPPING + Voranalysen-Kontext + Frage.
             Wird beim ersten Turn UND beim Reset-Retry verwendet."""
-            analyses_context = self._build_compact_analyses_for_chat()
-            if analyses_context:
-                foehn_snap = self._build_foehn_context_for_ai()
-                context_block_local = analyses_context + "\n\n" + foehn_snap
-            else:
-                context_block_local = self.weather_context_str
+            foehn_snap = self._build_foehn_context_for_ai()
+            context_block_local = analyses_context + "\n\n" + foehn_snap
 
+            # Sicherheitsnetz: Die kompakte Uebersicht passt fuer das konfigurierte
+            # Modell (1M Kontext) muehelos. Sollte sie ein kleineres Modell-Limit doch
+            # sprengen, NICHT still kuerzen (sonst fehlen dem Berater Spots, ohne dass
+            # es jemand merkt) — sondern sichtbar warnen.
             model_limit = _MODEL_TOKEN_LIMITS.get(self.chat_model, _DEFAULT_TOKEN_LIMIT)
             system_tokens = _estimate_tokens(messages[0]["content"]) if messages else 0
             context_budget = model_limit - _TOKEN_BUDGET_RESERVE - system_tokens
             if context_budget > 0 and _estimate_tokens(context_block_local) > context_budget:
-                context_block_local = _truncate_weather_context(context_block_local, context_budget)
+                logger.warning(
+                    "Chat-Kontext (%d geschaetzte Tokens) ueberschreitet das Budget (%d) "
+                    "fuer Modell %s — Antwort kann fehlschlagen. Groesseres Kontextmodell waehlen.",
+                    _estimate_tokens(context_block_local), context_budget, self.chat_model,
+                )
 
             _now = datetime.now()
             _today = _now.date()
@@ -1028,7 +1053,7 @@ class ChatOrchestratorMixin:
             logger.error(f"Chat-LLM ({self.chat_provider}) Fehler (stream): {e}")
             yield {
                 "type": "error",
-                "content": f"Fehler bei der Verarbeitung: {e}",
+                "content": i18n.t("chat.err.processing", error=e),
             }
 
         # FORMAT-HINT aus letzter user-message strippen (analog answer())

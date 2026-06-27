@@ -550,6 +550,12 @@ STRINGS: dict[str, dict[str, str]] = {
     # Chat-Fehler (api_chat)
     "chat.err.no_message": {"de": "Keine Nachricht", "en": "No message"},
     "chat.err.empty_message": {"de": "Leere Nachricht", "en": "Empty message"},
+    "chat.err.processing": {"de": "Entschuldigung, es gab einen Fehler bei der Verarbeitung: {error}",
+                            "en": "Sorry, there was an error while processing: {error}"},
+    "chat.loading_weather": {"de": "Wetterdaten werden geladen… Bitte versuche es gleich nochmal.",
+                             "en": "Weather data is loading… Please try again in a moment."},
+    "chat.loading_analyses": {"de": "Die Voranalysen werden gerade geladen… Bitte versuche es gleich nochmal.",
+                              "en": "The pre-analyses are loading… Please try again in a moment."},
 
     # ======================= Flash-Messages (Account-/Login-Flow, user-facing) =======================
     "flash.service_unavailable": {"de": "Service nicht verfuegbar", "en": "Service unavailable"},

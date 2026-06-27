@@ -59,7 +59,7 @@ from engine._common import (
     MAX_HISTORY_MESSAGES, MAX_TOOL_ITERATIONS,
     _MODEL_TOKEN_LIMITS, _DEFAULT_TOKEN_LIMIT, _TOKEN_BUDGET_RESERVE,
     _CTX_CACHE_MAX_ENTRIES,
-    _estimate_tokens, _truncate_weather_context, _filter_context_by_days,
+    _estimate_tokens,
     _log_prompt_cache_usage, _weekday_de,
     BatchCostTracker, extract_usage_from_response,
     _is_permanent_api_error, _user_friendly_api_error,
