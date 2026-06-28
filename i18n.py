@@ -85,6 +85,26 @@ STRINGS: dict[str, dict[str, str]] = {
     "footer.privacy": {"de": "Datenschutz", "en": "Privacy"},
     "footer.imprint": {"de": "Impressum", "en": "Imprint"},
 
+    # Erstbesuch-Disclaimer (Haftungshinweis, einmalig vor erster Nutzung)
+    "disclaimer.title": {"de": "Bevor du loslegst", "en": "Before you start"},
+    "disclaimer.intro": {
+        "de": "Wingcast liefert KI-gestützte Wetter-Einschätzungen — <strong>keine verbindlichen Flugempfehlungen, Freigaben oder Garantien</strong>.",
+        "en": "Wingcast provides AI-based weather assessments — <strong>not binding flight recommendations, clearances or guarantees</strong>.",
+    },
+    "disclaimer.p_ki": {
+        "de": "Die KI kann Fehler machen. Prognosen können falsch, veraltet oder unvollständig sein.",
+        "en": "The AI can make mistakes. Forecasts may be wrong, outdated or incomplete.",
+    },
+    "disclaimer.p_responsibility": {
+        "de": "Du allein trägst die Verantwortung für deine Flugentscheidung. Prüfe immer aktuelle, offizielle Wetterquellen und beurteile die Bedingungen vor Ort selbst.",
+        "en": "You alone are responsible for your decision to fly. Always check current, official weather sources and assess the conditions on site yourself.",
+    },
+    "disclaimer.p_risk": {
+        "de": "Gleitschirm- und Drachenfliegen ist gefährlich und erfolgt auf eigene Gefahr.",
+        "en": "Paragliding and hang gliding are dangerous and undertaken at your own risk.",
+    },
+    "disclaimer.accept": {"de": "Verstanden", "en": "Got it"},
+
     # ======================= index.html (Cockpit) =======================
     # Chat-Sidebar
     "chat.advisor_title": {"de": "Chat-Berater", "en": "Chat advisor"},

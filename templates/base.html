@@ -539,6 +539,47 @@
         })();
     </script>
 
+    {# Erstbesuch-Disclaimer: Haftungshinweis, einmalig vor erster Nutzung.
+       Server-gerendert (wie loginModal); JS blendet ihn nur beim ersten Besuch
+       ein (localStorage-Flag) und merkt sich das Wegklicken. #}
+    <div class="disclaimer-modal" id="disclaimerModal" role="dialog" aria-modal="true"
+         aria-labelledby="disclaimerTitle" hidden>
+        <div class="disclaimer-modal__backdrop"></div>
+        <div class="disclaimer-modal__panel" role="document">
+            <h2 id="disclaimerTitle" class="disclaimer-modal__title">{{ t('disclaimer.title') }}</h2>
+            <div class="disclaimer-modal__body">
+                <p>{{ t('disclaimer.intro')|safe }}</p>
+                <p>{{ t('disclaimer.p_ki') }}</p>
+                <p>{{ t('disclaimer.p_responsibility') }}</p>
+                <p>{{ t('disclaimer.p_risk') }}</p>
+            </div>
+            <button type="button" class="disclaimer-modal__accept" id="disclaimerAccept">{{ t('disclaimer.accept') }}</button>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var KEY = 'wingcast_disclaimer_v1_accepted';
+        var modal = document.getElementById('disclaimerModal');
+        if (!modal) return;
+        var accept = document.getElementById('disclaimerAccept');
+        var stored;
+        try { stored = localStorage.getItem(KEY); } catch (e) { stored = '1'; }
+        if (stored) return; // schon akzeptiert — nicht erneut zeigen
+
+        function close() {
+            modal.hidden = true;
+            document.body.style.overflow = '';
+            try { localStorage.setItem(KEY, '1'); } catch (e) {}
+        }
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        if (accept) { accept.focus(); accept.addEventListener('click', close); }
+        document.addEventListener('keydown', function (e) {
+            if (!modal.hidden && e.key === 'Escape') close();
+        });
+    })();
+    </script>
+
     {# Globaler dezenter Footer mit Rechtliches-Links — auf jeder Seite sichtbar #}
     <footer class="app-footer" role="contentinfo">
         <a href="{{ datenschutz_url }}" rel="noopener">{{ t('footer.privacy') }}</a>
