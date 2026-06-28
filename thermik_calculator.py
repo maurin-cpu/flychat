@@ -1420,18 +1420,15 @@ def calculate_thermal_profile(
     if sun_index < 10:
         rating = min(2, rating)
 
-    # CIN-Bremse: Konvektive Hemmung reduziert Rating
-    if convective_inhibition is not None:
-        if convective_inhibition < -100:
-            rating = max(0, rating - 2)
-            data_warnings.append(
-                f"CIN-Bremse: CIN={convective_inhibition:.0f} J/kg (stark) → Rating -2"
-            )
-        elif convective_inhibition < -50:
-            rating = max(0, rating - 1)
-            data_warnings.append(
-                f"CIN-Bremse: CIN={convective_inhibition:.0f} J/kg (mässig) → Rating -1"
-            )
+    # KEINE separate CIN-Bremse mehr: Der konvektive Deckel (Inversion/CIN) wird
+    # bereits hochaufgeloest in calculate_thermal_profile modelliert — die
+    # Penetrative-Convection-Logik (Overshoot-Budget vs. CIN-Kosten, s.o.) stoppt
+    # die Blase an der Inversion und senkt damit max_thermal_height direkt.
+    # Ein zusaetzlicher Pauschalabzug aus dem Modell-CIN waere Doppelzaehlung
+    # desselben Effekts. Der frueher hier stehende Block prueefte ueberdies auf
+    # negatives CIN (< -100/-50), Open-Meteo liefert CIN aber positiv → er war
+    # toter Code und hat nie gefeuert. convective_inhibition bleibt als
+    # Diagnose-Wert im Output (s.u.).
 
     # Minimale Thermikhöhe — Soft-Ramp statt Hard-Cutoff (Schritt 8 Terrain-Kalibrierung):
     # Deardorff w* ist eine stetige Kubikwurzel-Funktion: flache Thermik erzeugt

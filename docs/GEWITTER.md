@@ -82,7 +82,8 @@ Das `[THUNDERSTORM]`-Tag (`weather_context.py:751`) basiert bereits auf
   `safety_status`/`flyability_tier` gleich. Der Synoptik-Prompt selbst ist nicht
   Teil des Golden-Scorings.
 
-Offen: Commit (auf `main` → branchen). CIN-Bremse-Bug (§8 Bonus) separat.
+Status: committet auf `feat/gewitter-weather-code`. Tote CIN-Bremse
+(§8 Bonus) im selben Branch entfernt (Deckel schon via Parcel-Methode modelliert).
 
 ---
 
@@ -194,7 +195,7 @@ Gegen die Live-Open-Meteo-API und `data/weather_archive/2026-06-27.json` geprüf
 |---|---|
 | **CIN von ICON-CH** | ✅ **`meteoswiss_icon_ch1` UND `_ch2` liefern `convective_inhibition` voll** (24/24, echte Werte). Merge füllt GFS nur bei `None` (`fetch_weather.py:758-762`) → unser CIN kommt **primär aus ICON-CH**. `-1`-Sentinel trat nicht auf (Werte 0 oder positiv), trotzdem abfangen. |
 | **CIN-Vorzeichen** | ⚠️ Open-Meteo liefert CIN **positiv** (z. B. 154, 29, 105 J/kg; je grösser, desto stärker der Deckel). |
-| **CIN-Bremse im Thermik** | 🐛 `thermik_calculator.py:1425` prüft `convective_inhibition < -100` / `< -50` → **feuert nie** bei positiven Werten = totes Codestück. Muss `> 100` / `> 50` sein. Das Deckel-Gate (§8 A1) ebenfalls mit **positiver** Schwelle (`CIN > ~150`). |
+| **CIN-Bremse im Thermik** | 🗑️ **entfernt 2026-06-28** (`thermik_calculator.py`): Block prüfte `convective_inhibition < -100` / `< -50` → feuerte nie (Open-Meteo liefert CIN positiv, empirisch 10 525 Archiv-Werte alle positiv 1–431 J/kg). **Statt das Vorzeichen zu fixen ganz entfernt**, weil der Deckel bereits in `calculate_thermal_profile` modelliert wird (Penetrative Convection: Overshoot-Budget vs. CIN-Kosten stoppt die Blase an der Inversion → senkt `max_thermal_height`). Ein separater Modell-CIN-Abzug wäre Doppelzählung. Das Deckel-**Gate** für CAPE-Tags (§8 A1) ist davon unberührt (positive Schwelle `CIN > ~150`). |
 | **`lightning_potential` (LPI)** | ✅ `icon_d2` liefert Werte (heute 0.0 = kein Gewitter, korrekt). Einbaubar — Modell fragen wir für PL schon ab. |
 | **`thunderstorm_probability`** | ❌ `gfs_seamless` / `gfs_global` / `gfs_graphcast025` → **alle `None`**. Für unsere Koordinaten nicht verfügbar → **gestrichen** (Paket B2 entfällt). |
 | **`lifted_index`, CIN bei `icon_d2`** | ❌ `icon_d2` liefert beide **leer** → bestätigt, dass das GFS-Supplement für LI nötig ist. |
@@ -269,8 +270,11 @@ Sicherheits-App.
   aktiver Regen. DANGER-Level.
 - **`[CAPE-WARN]`** — CAPE erhöht (`CAPE_WARN_JKG` = 800 J/kg) **ohne Trigger**.
   WARN-Level, bleibt fliegbar — korrekt als reines Potenzial gelabelt.
-- **CIN-Bremse** — `thermik_calculator.py` (CIN < −100 → Rating −2). Existiert
-  **nur im Thermik-Rating**, nicht bei den Safety-CAPE-Tags.
+- **CIN/Deckel im Thermik** — kein separater Rating-Abzug mehr (Block am
+  2026-06-28 entfernt). Der Deckel wirkt über `calculate_thermal_profile`
+  (Penetrative Convection: Overshoot-Budget vs. CIN-Kosten) direkt auf
+  `max_thermal_height`. Greift **nur im Thermik-Rating**, nicht bei den
+  Safety-CAPE-Tags.
 - **Synoptik** — `config.py` `SYNOPTIC_PRECIP_CAPE_KONVEKTIV` (300) /
   `SYNOPTIC_PRECIP_CAPE_GEWITTER` (800) für Niederschlags-Charakterisierung.
 
@@ -293,8 +297,10 @@ fälschlich als **„Gewitter"**. Reiner Quick-Fix, unabhängig vom Rest.
 3. **B1 — `lightning_potential` (ICON-D2)** dazunehmen (`config.py:276` /
    `fetch_weather.py:831`), als **unabhängige Stimme** neben `weather_code`,
    fail-safe & flächig (§5).
-4. **Bonus — CIN-Bremse-Bug fixen** (`thermik_calculator.py:1425`): `< -100` /
-   `< -50` → `> 100` / `> 50` (greift aktuell nie, §4a).
+4. ~~**Bonus — CIN-Bremse-Bug fixen**~~ ✅ **erledigt 2026-06-28 — Block entfernt**
+   statt Vorzeichen gefixt (`thermik_calculator.py`): griff vorher nie (§4a), und
+   der Deckel wird ohnehin schon in `calculate_thermal_profile` modelliert
+   (Penetrative Convection) → separater Abzug = Doppelzählung. Kein Rating-Effekt.
 
 **~~B2 `thunderstorm_probability`~~ — GESTRICHEN:** Open-Meteo liefert für unsere
 Koordinaten nur `None` (§4a).
