@@ -895,6 +895,11 @@ GUST_DANGER_KMH = 40            # Boeen > 40 km/h → [GUST-DANGER] / [ALOFT-GUS
 # CAPE-WARN (soft):   Potenzial vorhanden, Modell prognostiziert keinen Trigger.
 CAPE_WARN_JKG = 800             # CAPE > 800 J/kg → [CAPE-WARN]
 CAPE_DANGER_JKG = 1500          # CAPE > 1500 J/kg → [CAPE-DANGER]
+# Deckel-Gate (docs/GEWITTER.md §8 A1): Konvektive Hemmung (CIN, positiv) ueber
+# dieser Schwelle ohne Trigger deckelt die Konvektion → das weiche [CAPE-WARN]
+# wird unterdrueckt (verhindert "CAPE bei blauem Himmel"-Fehlalarme). Greift NUR
+# beim weichen WARN, nie bei [CAPE-DANGER]; ohne CIN-Wert keine Unterdrueckung.
+CAPE_LID_CIN_JKG = 150          # CIN > 150 J/kg (positiv!) = geschlossener Deckel
 
 # Wind/Boeen-Trend Schwellen (Stunden) — gilt fuer Boden + Hoehe summiert:
 # - CONDITIONAL_HOURS: safe → conditional (Trend-Pattern wirft sauberes Fenster).

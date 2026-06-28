@@ -741,8 +741,15 @@ class WeatherContextMixin:
                     if isinstance(cape, (int, float)) and cape > config.CAPE_WARN_JKG:
                         # CAPE-DANGER (hart): extreme Instabilitaet oder CAPE + Regen/Schauer (aktive Ueberentwicklung)
                         # CAPE-WARN (soft): Potenzial vorhanden, aber Modell prognostiziert keinen Trigger → conditional
+                        cin = data.get("convective_inhibition")
+                        capped = (isinstance(cin, (int, float))
+                                  and cin > config.CAPE_LID_CIN_JKG)
                         if cape > config.CAPE_DANGER_JKG or "[RAIN-WARN]" in warnings:
                             warnings.append("[CAPE-DANGER]")
+                        elif capped:
+                            # Deckel-Gate (§8 A1): starke CIN ohne Trigger → Konvektion
+                            # blockiert (blauer Himmel trotz CAPE), kein WARN-Fehlalarm.
+                            pass
                         else:
                             warnings.append("[CAPE-WARN]")
                 except Exception:
@@ -1844,8 +1851,15 @@ class WeatherContextMixin:
                 if isinstance(cape, (int, float)) and cape > config.CAPE_WARN_JKG:
                     # CAPE-DANGER (hart): extreme Instabilitaet oder CAPE + Regen (aktive Ueberentwicklung)
                     # CAPE-WARN (soft): Potenzial vorhanden, aber kein Trigger → conditional
+                    cin = data.get("convective_inhibition")
+                    capped = (isinstance(cin, (int, float))
+                              and cin > config.CAPE_LID_CIN_JKG)
                     if cape > config.CAPE_DANGER_JKG or "[RAIN-WARN]" in warnings:
                         warnings.append("[CAPE-DANGER]")
+                    elif capped:
+                        # Deckel-Gate (§8 A1): starke CIN ohne Trigger → Konvektion
+                        # blockiert (blauer Himmel trotz CAPE), kein WARN-Fehlalarm.
+                        pass
                     else:
                         warnings.append("[CAPE-WARN]")
             except Exception:
@@ -3103,8 +3117,15 @@ class WeatherContextMixin:
                 if isinstance(cape, (int, float)) and cape > config.CAPE_WARN_JKG:
                     # CAPE-DANGER (hart): extreme Instabilitaet oder CAPE + Regen (aktive Ueberentwicklung)
                     # CAPE-WARN (soft): Potenzial vorhanden, aber kein Trigger → conditional
+                    cin = data.get("convective_inhibition")
+                    capped = (isinstance(cin, (int, float))
+                              and cin > config.CAPE_LID_CIN_JKG)
                     if cape > config.CAPE_DANGER_JKG or "[RAIN-WARN]" in warnings:
                         warnings.append("[CAPE-DANGER]")
+                    elif capped:
+                        # Deckel-Gate (§8 A1): starke CIN ohne Trigger → Konvektion
+                        # blockiert (blauer Himmel trotz CAPE), kein WARN-Fehlalarm.
+                        pass
                     else:
                         warnings.append("[CAPE-WARN]")
             except Exception:

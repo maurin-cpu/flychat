@@ -278,22 +278,25 @@ Sicherheits-App.
 - **Synoptik** — `config.py` `SYNOPTIC_PRECIP_CAPE_KONVEKTIV` (300) /
   `SYNOPTIC_PRECIP_CAPE_GEWITTER` (800) für Niederschlags-Charakterisierung.
 
-**Bekannter Etiketten-Bug:** `email_service.py:141` bucketet das Keyword
-`"cape "` in denselben „Gewitter"-Topf wie ein echtes Gewitter. → Reines
-CAPE-WARN (klarer Himmel, nur Potenzial) erscheint im E-Mail-Header
-fälschlich als **„Gewitter"**. Reiner Quick-Fix, unabhängig vom Rest.
+**~~Bekannter Etiketten-Bug~~ ✅ behoben 2026-06-28:** `email_service.py`
+bucketete `"cape "` in denselben „Gewitter"-Topf. → Reines CAPE-WARN erschien
+fälschlich als **„Gewitter"**. Fix: `"cape "` aus den Gewitter-Buckets entfernt
+(Gewitter-Umbau) **+ eigenes „Überentwicklung"-Label** in `_SAFETY_KEYWORDS` /
+`_PHENOMENON_KEYWORDS` (A2).
 
 ---
 
 ## 8. Empfohlene Schritte (gestuft)
 
 **Beschlossener Umfang (A+B, nach Daten-Check §4a angepasst):**
-1. **A1 — Deckel-Gate für CAPE-Tags** (`weather_context.py:741-749`, 3×):
-   naked-CAPE-Fehlalarme killen. CAPE-WARN nur, wenn Deckel offen —
-   **`CIN > ~150` (positiv!) ohne Trigger → kein Tag** (gedeckelt). CIN-Daten
-   aus ICON-CH bestätigt vorhanden (§4a).
-2. **A2 — E-Mail-Bucket entkoppeln** (`email_service.py:141`): CAPE-WARN ≠
-   „Gewitter", eigenes Label „Überentwicklung möglich".
+1. ~~**A1 — Deckel-Gate für CAPE-Tags**~~ ✅ **erledigt 2026-06-28**
+   (`weather_context.py`, 3× CAPE-Block): naked-CAPE-Fehlalarme gekillt. Das
+   weiche `[CAPE-WARN]` wird unterdrückt, wenn **`CIN > config.CAPE_LID_CIN_JKG`
+   (150, positiv!) ohne Trigger** (gedeckelt). `[CAPE-DANGER]` unangetastet;
+   ohne CIN-Wert keine Unterdrückung (fail-safe). CIN-Daten aus ICON-CH (§4a).
+2. ~~**A2 — E-Mail-Bucket entkoppeln**~~ ✅ **erledigt 2026-06-28**
+   (`email_service.py`): CAPE-WARN ≠ „Gewitter", eigenes Label „Überentwicklung"
+   in `_SAFETY_KEYWORDS` + `_PHENOMENON_KEYWORDS`.
 3. **B1 — `lightning_potential` (ICON-D2)** dazunehmen (`config.py:276` /
    `fetch_weather.py:831`), als **unabhängige Stimme** neben `weather_code`,
    fail-safe & flächig (§5).
