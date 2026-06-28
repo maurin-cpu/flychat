@@ -581,6 +581,41 @@ class TestDecidePrecipPatternNordSued(unittest.TestCase):
         self.assertEqual(nord["wet_share"], 0.02)
         self.assertEqual(nord["max_cape"], 1520)
 
+    def test_high_cape_alone_is_no_gewitter(self):
+        # Gewitter-Umbau: hohes CAPE OHNE weather_code 95/96/99 darf
+        # gewitter_share NICHT erhoehen. CAPE = nur Ueberentwicklungs-Signal.
+        cape_only = {h: {"precipitation": 4.0 if h == 15 else 0, "cape": 3000,
+                         "weather_code": 80 if h == 15 else 0,  # Schauer, kein Gewitter
+                         "precipitation_coverage": 0.4 if h == 15 else 0}
+                     for h in range(6, 21)}
+        cache = self._make_cache(cape_only, cape_only)
+        out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
+        nord = out["per_day"][0]["alpennord"]
+        # CAPE landet als Rohwert, aber gewitter_share bleibt 0.
+        self.assertEqual(nord["max_cape"], 3000)
+        self.assertEqual(nord["gewitter_share"], 0.0)
+        self.assertEqual(nord["max_wc"], 80)
+
+    def test_weather_code_drives_gewitter_share(self):
+        # weather_code 96 (Gewitter mit Hagel) auf den Nord-Spots,
+        # niedriges CAPE -> gewitter_share=1.0 kommt rein aus weather_code.
+        ts = {h: {"precipitation": 9.0 if h == 15 else 0, "cape": 350,
+                  "weather_code": 96 if h == 15 else 0,
+                  "precipitation_coverage": 0.6 if h == 15 else 0}
+              for h in range(6, 21)}
+        dry = {h: {"precipitation": 0.0, "cape": 50, "weather_code": 0,
+                   "precipitation_coverage": 0.0} for h in range(6, 21)}
+        cache = self._make_cache(ts, dry)
+        out = sc.decide_precip_pattern_nord_sued(cache, ["2026-05-17"])
+        nord = out["per_day"][0]["alpennord"]
+        sued = out["per_day"][0]["alpensued"]
+        # Beide Nord-Spots haben wc 96 -> gewitter_share=1.0, max_wc=96
+        self.assertEqual(nord["gewitter_share"], 1.0)
+        self.assertEqual(nord["max_wc"], 96)
+        # Trockene Sued-Seite: kein Gewitter trotz vorhandener CAPE-Basis
+        self.assertEqual(sued["gewitter_share"], 0.0)
+        self.assertEqual(sued["max_wc"], 0)
+
 
 class TestBuildSynopticContext(unittest.TestCase):
     def test_empty_cache_returns_none(self):

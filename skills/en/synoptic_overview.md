@@ -205,10 +205,11 @@ would be redundant. Max 180 words total.
      aspect beyond precipitation (thermals, wind, visibility,
      foehn tendency). Don't plaster every day with "watch for showers"
      when the data looks mostly dry.
-   - with a clearly convective situation (high CAPE + precipitation traces) →
-     "local thunderstorms" / "heat thunderstorms over the mountains" as a typical
-     summer statement. Even when wet_share is only 3-5%, high CAPE values
-     are a clear thunderstorm signal.
+   - Only call it a "thunderstorm" when `gewitter_share` > 0 (model
+     weather_code 95/96/99) OR precipitation traces with high CAPE. High CAPE
+     ALONE (gewitter_share=0, dry) = "unstable air / overdevelopment possible",
+     NOT a thunderstorm — even at CAPE > 1500. With `gewitter_share` > 0 →
+     "local thunderstorms" / "heat thunderstorms over the mountains".
    - with widespread precipitation (high coverage + high wet_share) → "not really
      a flying day" may be said. Tone: "rainy", "persistently wet".
    - middling situations → "watch out for thunderstorms", "morning window",
@@ -344,13 +345,25 @@ pilot language.
   - 0.15–0.40 = widespread, but not areawide
   - 0.40+ = a large part of the side affected
 
+- `gewitter_share`: share of spots on this side with a model thunderstorm
+  (WMO weather_code 95/96/99) (0.0–1.0). **This is the decisive thunderstorm
+  signal** — only speak of a "thunderstorm" when this value is > 0.
+  - 0.00      = no model thunderstorm → do NOT say "thunderstorm"
+  - 0.01–0.10 = locally isolated thunderstorms (typical heat thunderstorms)
+  - 0.10+     = widespread thunderstorms on this side
+- `max_wc`: highest weather_code on the side. 95 = thunderstorm, 96/99 =
+  thunderstorm with hail (vigorous cells).
+
 - `max_cape`: max convective energy on this side (J/kg). Says: how
-  unstable is the air? Indicator of thunderstorm potential.
-  - 0–300 = stable air, no thunderstorm
-  - 300–800 = unstable air, showers/light thunderstorms possible
-  - 800–1500 = clearly thundery
-  - 1500+ = high thunderstorm probability (even when wet_share is small —
-    heat thunderstorms hit locally by definition)
+  unstable / build-up-prone the air is — **instability / overdevelopment
+  potential, NOT a thunderstorm by itself.** High CAPE without
+  `gewitter_share`/precipitation = a loaded but (not yet) triggered situation.
+  - 0–300   = stable air
+  - 300–800 = slightly unstable, cumulus/showers possible
+  - 800–1500 = clearly unstable, overdevelopment possible
+  - 1500+   = very unstable ("loaded") — overdevelopment POSSIBLE, but only
+    call it a thunderstorm when `gewitter_share` > 0 OR precipitation is
+    present. Otherwise: "unstable air, watch convection".
 
 - `max_coverage`: max precipitation coverage in the DWD model (0.0–1.0).
   Says: how areawide is the precipitation area?
@@ -363,23 +376,24 @@ pilot language.
 The art is reading the numbers TOGETHER correctly. Examples of how you can
 interpret typical combinations:
 
-- **All values low** (peak<0.5, ws<0.05, cape<400) → dry /
+- **All values low** (peak<0.5, ws<0.05, cape<400, gewitter_share=0) → dry /
   sunny, do not raise precipitation as a topic.
-- **Low values but high CAPE** (peak<2, ws<0.05, cape>1500) →
-  "unstable air, heat thunderstorms possible over the mountains" — even when
-  wet_share is small, this is NOT a dry day in the pilot sense.
-- **High CAPE + precipitation traces** (cape>800, peak 3-10mm, ws 5-15%)
-  → "local thunderstorms", "heat thunderstorms over the mountains", "isolated
-  thunderstorms in Ticino".
+- **High CAPE, but gewitter_share=0 and dry** (peak<2, ws<0.05, cape>1500) →
+  "unstable air, overdevelopment possible over the mountains — watch
+  convection". NOT a "thunderstorm" (the model sees none), but also not a
+  carefree fair-weather day.
+- **gewitter_share > 0** (weather_code 95/96/99 at one/several spots)
+  → "local thunderstorms", "heat thunderstorms over the mountains"; with
+  max_wc 96/99 mention hail/vigorous cells.
 - **High coverage + high wet_share + low CAPE**
   (cov>0.70, ws>0.40, cape<500) → "areawide steady rain", "widespread
   rain over the whole side".
-- **1 spot with a high peak, but ws<5% and moderate cape** (peak=15mm,
-  ws=0.02, cape=600) → "locally heavy showers / an isolated thunderstorm cell",
-  do NOT phrase it as areawide rain.
-- **Very high CAPE WITHOUT precipitation** (cape>2000, peak=0)
-  → "unstable air, no precipitation expected — watch for evening convection over
-  the mountains".
+- **1 spot with a high peak, but ws<5%** (peak=15mm, ws=0.02) → "locally
+  heavy showers / an isolated cell"; only phrase it as a "thunderstorm cell"
+  when gewitter_share > 0.
+- **Very high CAPE WITHOUT precipitation/thunderstorm** (cape>2000, peak=0,
+  gewitter_share=0) → "unstable air, no precipitation expected — watch for
+  evening convection over the mountains".
 
 **Spatial language rule:**
 

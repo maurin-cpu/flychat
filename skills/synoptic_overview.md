@@ -206,10 +206,11 @@ waere Redundanz. Insgesamt max 180 Woerter.
      Aspekt jenseits von Niederschlag hervorheben (Thermik, Wind, Sicht,
      Foehn-Tendenz). Nicht jeden Tag mit "Schauer beachten" zukleistern,
      wenn die Daten ueberwiegend trocken aussehen.
-   - Bei klar konvektiver Lage (hohes CAPE + Niederschlag-Spuren) →
-     "lokale Gewitter" / "Hitzegewitter ueber den Bergen" als typische
-     Sommer-Aussage. Auch wenn wet_share nur 3-5% ist, sind hohe CAPE-Werte
-     ein klares Gewittersignal.
+   - "Gewitter" NUR benennen, wenn `gewitter_share` > 0 (Modell-weather_code
+     95/96/99) ODER Niederschlag-Spuren bei hohem CAPE. Hohes CAPE ALLEIN
+     (gewitter_share=0, trocken) = "labile Luft / Ueberentwicklung moeglich",
+     KEIN Gewitter — auch bei CAPE > 1500. Bei `gewitter_share` > 0 →
+     "lokale Gewitter" / "Hitzegewitter ueber den Bergen".
    - Bei flaechigem Niederschlag (hohe Coverage + hoher wet_share) → "eher
      kein Flugtag" darf fallen. Ton: "verregnet", "anhaltend nass".
    - Mittlere Lagen → "Vorsicht vor Gewittern", "Fenster vormittags",
@@ -345,13 +346,26 @@ Pilotensprache.
   - 0.15–0.40 = verbreitet, aber nicht flaechig
   - 0.40+ = grosser Teil der Seite betroffen
 
+- `gewitter_share`: Anteil der Spots auf dieser Seite mit Modell-Gewitter
+  (WMO weather_code 95/96/99) (0.0–1.0). **Das ist das massgebliche
+  Gewitter-Signal** — nur wenn dieser Wert > 0 ist, darfst du von "Gewitter"
+  sprechen.
+  - 0.00      = kein Modell-Gewitter → NICHT von "Gewitter" sprechen
+  - 0.01–0.10 = lokal einzelne Gewitter (typisch Hitzegewitter)
+  - 0.10+     = verbreitet Gewitter auf dieser Seite
+- `max_wc`: hoechster weather_code der Seite. 95 = Gewitter, 96/99 = Gewitter
+  mit Hagel (kraeftige Zellen).
+
 - `max_cape`: Max. Konvektionsenergie auf dieser Seite (J/kg). Sagt: wie
-  labil ist die Luft? Indikator fuer Gewitter-Potenzial.
-  - 0–300 = stabile Luft, kein Gewitter
-  - 300–800 = labile Luft, Schauer/leichte Gewitter moeglich
-  - 800–1500 = klar gewittertraechtig
-  - 1500+ = hohe Gewitter-Wahrscheinlichkeit (auch wenn wet_share klein —
-    Hitzegewitter treffen per Definition lokal)
+  labil/aufbau-faehig ist die Luft — **Instabilitaets-/Ueberentwicklungs-
+  Potenzial, NICHT gleich Gewitter.** Hohes CAPE ohne `gewitter_share`/
+  Niederschlag = geladene, aber (noch) nicht ausgeloeste Lage.
+  - 0–300   = stabile Luft
+  - 300–800 = leicht labil, Quellwolken/Schauer moeglich
+  - 800–1500 = deutlich labil, Ueberentwicklung moeglich
+  - 1500+   = sehr labil ("geladen") — Ueberentwicklung MOEGLICH, aber nur
+    dann als Gewitter benennen, wenn `gewitter_share` > 0 ODER Niederschlag
+    vorhanden. Sonst: "labile Luft, Konvektion beobachten".
 
 - `max_coverage`: Max. Niederschlags-Abdeckung im DWD-Modell (0.0–1.0).
   Sagt: wie flaechig ist das Niederschlagsgebiet?
@@ -364,23 +378,24 @@ Pilotensprache.
 Die Kunst ist die Zahlen RICHTIG ZUSAMMEN zu lesen. Beispiele wie du
 typische Kombinationen interpretieren kannst:
 
-- **Alle Werte niedrig** (peak<0.5, ws<0.05, cape<400) → trocken /
-  sonnig, kein Niederschlag thematisieren.
-- **Niedrige Werte aber hohes CAPE** (peak<2, ws<0.05, cape>1500) →
-  "labile Luft, ueber den Bergen Hitzegewitter moeglich" — auch wenn
-  wet_share klein ist, ist das KEIN trockener Tag im Pilotensinn.
-- **Hohes CAPE + Niederschlag-Spuren** (cape>800, peak 3-10mm, ws 5-15%)
-  → "lokale Gewitter", "Hitzegewitter ueber den Bergen", "im Tessin
-  einzelne Gewitter".
+- **Alle Werte niedrig** (peak<0.5, ws<0.05, cape<400, gewitter_share=0) →
+  trocken / sonnig, kein Niederschlag thematisieren.
+- **Hohes CAPE, aber gewitter_share=0 und trocken** (peak<2, ws<0.05,
+  cape>1500) → "labile Luft, ueber den Bergen Ueberentwicklung moeglich —
+  Konvektion beobachten". KEIN "Gewitter" (das Modell sieht keins), aber
+  auch kein sorgloser Schoenwettertag.
+- **gewitter_share > 0** (weather_code 95/96/99 an einzelnen/mehreren Spots)
+  → "lokale Gewitter", "Hitzegewitter ueber den Bergen"; bei max_wc 96/99
+  Hagel/kraeftige Zellen erwaehnen.
 - **Hohe Coverage + hoher wet_share + niedrigem CAPE**
   (cov>0.70, ws>0.40, cape<500) → "flaechiger Landregen", "verbreitet
   Regen ueber die ganze Seite".
-- **1 Spot mit hohem Peak, aber ws<5% und cape moderat** (peak=15mm,
-  ws=0.02, cape=600) → "lokal kraeftige Schauer / einzelne Gewitterzelle",
-  NICHT als flaechiger Regen formulieren.
-- **Sehr hohes CAPE OHNE Niederschlag** (cape>2000, peak=0)
-  → "labile Luft, kein Niederschlag erwartet — abendliche Konvektion ueber
-  den Bergen beobachten".
+- **1 Spot mit hohem Peak, aber ws<5%** (peak=15mm, ws=0.02) → "lokal
+  kraeftige Schauer / einzelne Zelle"; nur "Gewitterzelle" formulieren,
+  wenn gewitter_share > 0.
+- **Sehr hohes CAPE OHNE Niederschlag/Gewitter** (cape>2000, peak=0,
+  gewitter_share=0) → "labile Luft, kein Niederschlag erwartet — abendliche
+  Konvektion ueber den Bergen beobachten".
 
 **Raeumliche Sprachregel:**
 

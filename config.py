@@ -431,9 +431,13 @@ SYNOPTIC_PRECIP_LIGHT_MM = 2.0       # 0.5-2 mm = leicht
 SYNOPTIC_PRECIP_MODERATE_MM = 8.0    # 2-8 mm = maessig, > 8 = stark
 SYNOPTIC_PRECIP_COVERAGE_FLAECHIG = 0.7   # Coverage >= 70% = flaechig (stratiform)
 SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV = 0.4  # Coverage < 40% + CAPE = konvektiv/Schauer
-SYNOPTIC_PRECIP_CAPE_KONVEKTIV = 300      # J/kg — Mindest-CAPE fuer konvektiv-Label
-SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE = 0.10  # min. Anteil nasser Spots fuer "Gewitter wahrscheinlich"; sonst Schauer/Spuren — verhindert dass 1 lokales Gewitter den ganzen Region-Tag als Gewitter-Tag labelt
-SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # J/kg — Schwelle fuer Gewitter-Label
+# DEPRECATED (ungenutzt seit Pure-LLM-Synoptik, Mai 2026): CAPE ist KEIN
+# Gewitter-Signal mehr. Gewitter = weather_code 95/96/99 (gewitter_share,
+# s. synoptic_context.py / skills/synoptic_overview.md). CAPE = nur noch
+# Ueberentwicklungs-Indikator. Siehe docs/GEWITTER.md.
+SYNOPTIC_PRECIP_CAPE_KONVEKTIV = 300      # DEPRECATED — ungenutzt
+SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE = 0.10  # DEPRECATED — ungenutzt
+SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # DEPRECATED — ungenutzt (CAPE ≠ Gewitter)
 SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE = 0.10  # min. Anteil nasser Spots fuer seitenweite "Schauer"/"Regen"-Aussage; sonst trocken — verhindert dass 1-3% lokale Zellen die ganze Alpenseite als nass labeln
 
 # --- Schneefallgrenze (saisonal) ----------------------------------------

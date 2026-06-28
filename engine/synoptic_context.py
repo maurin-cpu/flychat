@@ -1232,15 +1232,21 @@ def _aggregate_precip_side(spots_day: list[dict]) -> dict:
     """
     if not spots_day:
         return {"n_spots": 0, "peak_mm": 0.0, "wet_share": 0.0,
-                "max_cape": 0, "max_coverage": None}
+                "max_cape": 0, "max_wc": 0, "gewitter_share": 0.0,
+                "max_coverage": None}
     peaks = [s["peak_mm"] for s in spots_day]
     totals = [s["total_mm"] for s in spots_day]
     capes = [s["max_cape"] for s in spots_day]
+    wcs = [s.get("max_wc", 0) for s in spots_day]
     coverages = [s["max_coverage"] for s in spots_day if s["max_coverage"] is not None]
 
     peak_max = max(peaks)
     nass_anteil = sum(1 for t in totals if t >= config.SYNOPTIC_PRECIP_DRY_MM) / len(totals)
     cape_max = max(capes)
+    wc_max = max(wcs)
+    # Gewitter-Anteil = Spots mit weather_code 95/96/99 (Modell-Gewitter).
+    # Das ist das massgebliche Gewitter-Signal — NICHT max_cape.
+    ts_anteil = sum(1 for s in spots_day if s.get("has_ts")) / len(spots_day)
     coverage_max = max(coverages) if coverages else None
 
     return {
@@ -1248,6 +1254,8 @@ def _aggregate_precip_side(spots_day: list[dict]) -> dict:
         "peak_mm": round(peak_max, 1),
         "wet_share": round(nass_anteil, 2),
         "max_cape": round(cape_max, 0) if cape_max else 0,
+        "max_wc": wc_max,
+        "gewitter_share": round(ts_anteil, 2),
         "max_coverage": round(coverage_max, 2) if coverage_max is not None else None,
     }
 
@@ -1292,6 +1300,10 @@ def decide_precip_pattern_nord_sued(weather_cache: dict,
             total = sum((r.get("precipitation") or 0) for r in day_recs)
             max_cape = max((r.get("cape") or 0) for r in day_recs)
             max_wc = max((r.get("weather_code") or 0) for r in day_recs)
+            # Gewitter-Signal = WMO weather_code 95/96/99 (Modell-Urteil).
+            # CAPE ist NUR Konvektions-/Instabilitaets-Indikator, kein Gewitter.
+            has_ts = any(int(r.get("weather_code") or 0) in (95, 96, 99)
+                         for r in day_recs)
             covs = [r.get("precipitation_coverage") for r in day_recs
                     if r.get("precipitation_coverage") is not None]
             max_cov = max(covs) if covs else None
@@ -1300,6 +1312,7 @@ def decide_precip_pattern_nord_sued(weather_cache: dict,
                 "total_mm": total,
                 "max_cape": max_cape,
                 "max_wc": max_wc,
+                "has_ts": has_ts,
                 "max_coverage": max_cov,
             }
             if side == "alpennord":

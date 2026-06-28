@@ -335,6 +335,8 @@ def _build_llm_payload(ctx: dict) -> str:
                  "alpennord": {
                      "peak_mm": d["alpennord"].get("peak_mm"),
                      "wet_share": d["alpennord"].get("wet_share"),
+                     "gewitter_share": d["alpennord"].get("gewitter_share"),
+                     "max_wc": d["alpennord"].get("max_wc"),
                      "max_cape": d["alpennord"].get("max_cape"),
                      "max_coverage": d["alpennord"].get("max_coverage"),
                      "n_spots": d["alpennord"].get("n_spots"),
@@ -342,6 +344,8 @@ def _build_llm_payload(ctx: dict) -> str:
                  "alpensued": {
                      "peak_mm": d["alpensued"].get("peak_mm"),
                      "wet_share": d["alpensued"].get("wet_share"),
+                     "gewitter_share": d["alpensued"].get("gewitter_share"),
+                     "max_wc": d["alpensued"].get("max_wc"),
                      "max_cape": d["alpensued"].get("max_cape"),
                      "max_coverage": d["alpensued"].get("max_coverage"),
                      "n_spots": d["alpensued"].get("n_spots"),

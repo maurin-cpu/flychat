@@ -570,8 +570,8 @@ window.Meteogram = (function () {
             var wcAll = (precip.weather_code != null) ? precip.weather_code
                       : ((wx.cloudbase && wx.cloudbase.weather_code != null) ? wx.cloudbase.weather_code : null);
             if (isThunderstorm(wcAll)) f.storm = true;
-            // CAPE-Überentwicklung wird stündlich als hohler Blitz in der
-            // Wetterzeile gezeigt (siehe hasOverdev), nicht mehr als Warnband.
+            // CAPE-Überentwicklung ist KEIN Gewitter und KEIN Blitz mehr —
+            // bleibt ein Safety-Aspekt in der Analyse, nicht im Wetter-Strip.
 
             // Aloft danger (within flight layer: elevation .. thermal_max + 1000m)
             // Schwellen aus thresholds-API (config.WIND_*_KMH / GUST_*_KMH).
@@ -1011,28 +1011,19 @@ window.Meteogram = (function () {
             var precip = wx.precipitation || {};
             var precipAmt = precip.amount || 0;
             var wc = precip.weather_code != null ? precip.weather_code : (wx.cloudbase && wx.cloudbase.weather_code);
-            var cape = (wx.thermik && wx.thermik.cape != null) ? wx.thermik.cape : 0;
             var cx = ci * CELL_W + CELL_W / 2;
             var hasPrecip = precipAmt > 0;
             var hasStorm = isThunderstorm(wc);
-            // Überentwicklungsgefahr (CAPE) — eigenes Signal, NICHT dasselbe wie ein
-            // echtes Modell-Gewitter (weather_code 95/96/99). Als "hohler" Blitz
-            // gezeigt, damit der User sieht WANN sich etwas aufbauen kann, auch wenn
-            // (noch) kein Gewitter/Regen prognostiziert ist. Echtes Gewitter hat
-            // Vorrang (gefuellter Blitz). Schwellen wie Engine (config.py):
-            // CAPE_WARN_JKG=800 → moeglich, CAPE_DANGER_JKG=1500 → hoch.
-            var hasOverdev = !hasStorm && cape > 800;
-            var capeStrong = cape > 1500;
-            if (!hasPrecip && !hasStorm && !hasOverdev) return;
+            // Gewitter = ausschliesslich weather_code 95/96/99 (ICON-CH). Die
+            // CAPE-Ueberentwicklung wird hier NICHT mehr als (hohler) Blitz
+            // gezeigt — sie bleibt ein Safety-Aspekt in der Analyse, ist aber
+            // kein Blitz-Symbol mehr (ein Blitz statt zwei).
+            if (!hasPrecip && !hasStorm) return;
 
             // Gefuellter Hintergrund – sofort sichtbar
             var fillColor = hasStorm ? 'rgba(245, 158, 11, 0.5)'
-                          : hasOverdev ? (capeStrong ? 'rgba(245, 158, 11, 0.32)' : 'rgba(245, 158, 11, 0.16)')
                           : (precipColor(precipAmt) + '99');
             var titleTxt = hasStorm ? (hasPrecip ? wcT('js.mg.precip_storm', { mm: precipAmt.toFixed(1) }) : wcT('js.mg.warn_storm'))
-                         : hasOverdev ? wcT('js.mg.overdev') + (capeStrong ? wcT('js.mg.overdev_high') : wcT('js.mg.overdev_possible'))
-                                        + (hasPrecip ? ' + ' + precipAmt.toFixed(1) + ' mm' : '')
-                                        + ' · CAPE ' + Math.round(cape) + ' J/kg'
                          : precipAmt.toFixed(1) + ' mm';
             chartG.append('rect')
                 .attr('x', ci * CELL_W + 1)
@@ -1068,16 +1059,6 @@ window.Meteogram = (function () {
                         .attr('stroke', '#FBBF24')
                         .attr('stroke-width', 0.8 / iconScale)
                         .attr('stroke-linejoin', 'round');
-                } else if (hasOverdev) {
-                    // Hohler Blitz = Überentwicklungsgefahr (noch kein bestätigtes Gewitter)
-                    var oBoltX = cx - iconSize * 0.32;
-                    chartG.append('path')
-                        .attr('d', 'M13 2 L4 14 L11 14 L9 22 L20 10 L13 10 Z')
-                        .attr('transform', 'translate(' + oBoltX + ',' + iconY + ') scale(' + iconScale + ')')
-                        .attr('fill', capeStrong ? 'rgba(180, 83, 9, 0.45)' : 'none')
-                        .attr('stroke', '#B45309')
-                        .attr('stroke-width', 1.6 / iconScale)
-                        .attr('stroke-linejoin', 'round');
                 } else if (hasPrecip) {
                     // Tropfen-Cluster mit ueberlappenden Drops + y-Jitter.
                     var perDropSize = dropCount > 1 ? Math.max(7, Math.floor(iconSize * 0.6)) : iconSize;
@@ -1109,10 +1090,10 @@ window.Meteogram = (function () {
                 var dText = hasPrecip ? precipAmt.toFixed(1) + ' mm' : '';
                 var dGap = dText ? 3 : 0;
                 // Cluster: kleinere Tropfen bei >1, OHNE Gap (ueberlappend statt nebeneinander).
-                var dPerDropSize = (!hasStorm && !hasOverdev && dropCount > 1) ? 7 : dIconSize;
+                var dPerDropSize = (!hasStorm && dropCount > 1) ? 7 : dIconSize;
                 var dPerDropScale = dPerDropSize / 24;
                 var dDropStep = dropCount > 1 ? Math.round(dPerDropSize * 0.55) : 0;  // <Drop-Breite = ueberlappend
-                var dClusterW = (hasStorm || hasOverdev) ? dIconSize : (dPerDropSize + (dropCount - 1) * dDropStep);
+                var dClusterW = hasStorm ? dIconSize : (dPerDropSize + (dropCount - 1) * dDropStep);
                 var dTextW = dText.length * 6.2;
                 var dTotalW = dClusterW + dGap + dTextW;
                 var dStartX = cx - dTotalW / 2;
@@ -1126,15 +1107,6 @@ window.Meteogram = (function () {
                         .attr('fill', '#92400E')
                         .attr('stroke', '#FBBF24')
                         .attr('stroke-width', 0.8 / dIconScale)
-                        .attr('stroke-linejoin', 'round');
-                } else if (hasOverdev) {
-                    // Hohler Blitz = Überentwicklungsgefahr (noch kein bestätigtes Gewitter)
-                    chartG.append('path')
-                        .attr('d', 'M13 2 L4 14 L11 14 L9 22 L20 10 L13 10 Z')
-                        .attr('transform', 'translate(' + dIconX + ',' + dIconY + ') scale(' + dIconScale + ')')
-                        .attr('fill', capeStrong ? 'rgba(180, 83, 9, 0.45)' : 'none')
-                        .attr('stroke', '#B45309')
-                        .attr('stroke-width', 1.6 / dIconScale)
                         .attr('stroke-linejoin', 'round');
                 } else {
                     var dDropColor = precipAmt >= 3 ? '#1D4ED8' : precipAmt >= 1 ? '#2563EB' : '#3B82F6';
@@ -1159,7 +1131,7 @@ window.Meteogram = (function () {
                         .attr('y', precipRowY + PRECIP_ROW_H / 2 + 1)
                         .attr('text-anchor', 'start').attr('dominant-baseline', 'central')
                         .attr('font-size', '11px').attr('font-weight', '700')
-                        .attr('fill', (hasStorm || hasOverdev) ? '#92400E' : '#1E3A5F')
+                        .attr('fill', hasStorm ? '#92400E' : '#1E3A5F')
                         .text(dText);
                 }
             }

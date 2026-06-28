@@ -138,7 +138,7 @@ def _tier_label(tier: str) -> str:
 # Sicherheits-Keywords fuer Safety-Header (case-insensitive).
 # Reihenfolge = Schweregrad (hoechste zuerst).
 _SAFETY_KEYWORDS = [
-    ("thunderstorm", ["gewitter", "thunderstorm", "cape ", "blitz"], "Gewitter"),
+    ("thunderstorm", ["gewitter", "thunderstorm", "blitz"], "Gewitter"),
     ("foehn",        ["föhn", "foehn", "fön"],                      "Föhn"),
     ("storm",        ["sturm", "starker wind", "orkan"],            "Sturm"),
     ("shear",        ["windscherung", "scherung", "shear"],         "Windscherung"),
@@ -520,7 +520,7 @@ def _week_summary_prose(days_out: list[dict], warnings: list[dict]) -> str:
 
 _FOEHN_RANK = {"none": 0, "low": 1, "moderate": 2, "high": 3}
 _PHENOMENON_KEYWORDS = [
-    ("Gewitter",     ["gewitter", "thunderstorm", "blitz", "cape "]),
+    ("Gewitter",     ["gewitter", "thunderstorm", "blitz"]),
     ("Schauer",      ["schauer", "regen", "niederschlag", "precip"]),
     ("Sturm",        ["sturm", "orkan", "starker wind", "boeen", "starke boe"]),
     ("Windscherung", ["windscherung", "scherung", "shear"]),

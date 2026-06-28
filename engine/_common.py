@@ -705,7 +705,7 @@ def _sanitize_llm_result(result: dict) -> dict:
 # PRIMARY-LABEL SYSTEM
 # ============================================================================
 _LABEL_KEYS_NO_GO = {
-    "FOEHN", "GEWITTER", "STURM", "ALOFT_DANGER", "STRONG_WIND",
+    "FOEHN", "GEWITTER", "UEBERENTWICKLUNG", "STURM", "ALOFT_DANGER", "STRONG_WIND",
     "REGEN", "SCHNEE", "OVERCAST", "SICHT", "VEREISUNG", "EINGEKESSELT"
 }
 _LABEL_KEYS_CONDITIONAL = {
@@ -723,7 +723,7 @@ _LABEL_KEYS_BOOSTER = {
 
 # Ranking fuer Heuristik-Fallback (niedriger = wichtiger)
 _NO_GO_RANK = [
-    "FOEHN", "GEWITTER", "STURM", "ALOFT_DANGER", "STRONG_WIND",
+    "FOEHN", "GEWITTER", "UEBERENTWICKLUNG", "STURM", "ALOFT_DANGER", "STRONG_WIND",
     "REGEN", "SCHNEE", "OVERCAST", "SICHT", "VEREISUNG", "EINGEKESSELT"
 ]
 _CONDITIONAL_RANK = [
@@ -734,7 +734,8 @@ _CONDITIONAL_RANK = [
 # Keyword → Key Mapping fuer Heuristik-Fallback (aus no_go_reasons/caution_notes)
 _KEYWORD_TO_KEY_NO_GO = [
     (r'\bf[oö]hn', "FOEHN"),
-    (r'\bgewitter|blitz|cape', "GEWITTER"),
+    (r'\bgewitter|blitz', "GEWITTER"),
+    (r'\b[uü]berentwicklung|\bcape', "UEBERENTWICKLUNG"),
     (r'\bsturm', "STURM"),
     (r'\bh[oö]henwind|h[oö]henboee|aloft', "ALOFT_DANGER"),
     (r'\b(starker? wind|wind.*stark|grundwind.*hoch|strong.?wind)', "STRONG_WIND"),
