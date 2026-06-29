@@ -1599,7 +1599,7 @@ window.Meteogram = (function () {
                 .style('font-size', '6px').style('font-weight', '500')
                 .text(wcT('js.mg.ground_paren'));
         } else {
-            drawGroundLabel(groundY + GROUND_WIND_Y + GROUND_WIND_H / 2, 'Bodenwind');
+            drawGroundLabel(groundY + GROUND_WIND_Y + GROUND_WIND_H / 2, wcT('js.mg.tt_groundwind'));
         }
         if (!isRegion) {
             drawGroundLabel(groundY + GROUND_GUST_Y + GROUND_GUST_H / 2, wcT('js.chart.legend_gusts'));

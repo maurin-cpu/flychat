@@ -690,6 +690,40 @@ STRINGS: dict[str, dict[str, str]] = {
                                       "en": "Thunderstorms practically all day ({ts} of {total} hours). No flyable window."},
     "analysis.window_none": {"de": "keins", "en": "none"},
 
+    # ======================= Topic-Tags (build_topic_tags / build_region_topic_tags) =======================
+    # Deterministische Backend-Tags (label/value/time) — werden zur Analyse-Bauzeit
+    # in der aktiven Sprache erzeugt und in *_en.json / *.json persistiert.
+    "tag.label.gusts": {"de": "Boeen", "en": "Gusts"},
+    "tag.label.wind": {"de": "Wind", "en": "Wind"},
+    "tag.label.aloft": {"de": "Hoehenwind", "en": "Upper wind"},
+    "tag.label.foehn": {"de": "Foehn", "en": "Foehn"},
+    "tag.label.rain": {"de": "Regen", "en": "Rain"},
+    "tag.label.thunderstorm": {"de": "Gewitter", "en": "Thunderstorm"},
+    "tag.label.clouds": {"de": "Bewoelkung", "en": "Clouds"},
+    "tag.label.turbulence": {"de": "Klappern", "en": "Chop"},
+
+    "tag.val.dir_wrong": {"de": "Richtung falsch", "en": "Wrong direction"},
+    "tag.val.dir_ok_calm": {"de": "Richtung OK, ruhig", "en": "Direction OK, calm"},
+    "tag.val.calm": {"de": "ruhig", "en": "calm"},
+    "tag.val.foehn_strong": {"de": "stark", "en": "strong"},
+    "tag.val.foehn_moderate": {"de": "moderat", "en": "moderate"},
+    "tag.val.precip": {"de": "Niederschlag", "en": "Precipitation"},
+    "tag.val.model_storm": {"de": "Modell-Gewitter", "en": "Model storm"},
+    "tag.val.mech_rough": {"de": "mech. ruppig", "en": "mech. rough"},
+    "tag.val.rain_widespread": {"de": "flaechig", "en": "widespread"},
+    "tag.val.rain_scattered": {"de": "verstreut", "en": "scattered"},
+    "tag.val.rain_isolated": {"de": "vereinzelt", "en": "isolated"},
+    "tag.val.launch_in_clouds": {"de": "Startplatz in Wolken", "en": "Launch in clouds"},
+    "tag.val.cloud_edge_launch": {"de": "Wolkenrand am Startplatz", "en": "Cloud edge at launch"},
+    "tag.val.base_le_launch": {"de": "Basis {base}m ≤ Startplatz {elev}m", "en": "Base {base}m ≤ launch {elev}m"},
+    "tag.val.base_near_launch": {"de": "Basis {base}m nahe Startplatz {elev}m", "en": "Base {base}m near launch {elev}m"},
+    "tag.val.region_in_clouds": {"de": "Region in Wolken", "en": "Region in clouds"},
+    "tag.val.cloud_edge_region": {"de": "Wolkenrand auf Region-Hoehe", "en": "Cloud edge at region level"},
+    "tag.val.base_le_region": {"de": "Basis {base}m ≤ Region-Ref {elev}m", "en": "Base {base}m ≤ region ref {elev}m"},
+    "tag.val.base_near_region": {"de": "Basis {base}m nahe Region-Ref {elev}m", "en": "Base {base}m near region ref {elev}m"},
+
+    "tag.time.all_day": {"de": "ganztags", "en": "all day"},
+
     # ======================= JS-Strings (briefing.js + subscribe.js, user-facing) =======================
     # Werden via window.WC_I18N (siehe js_i18n()) in den Browser injiziert und mit
     # wcT(key, vars) abgerufen. DE-Werte sind VERBATIM aus dem bisherigen JS-Code
