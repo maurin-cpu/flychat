@@ -325,19 +325,49 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
     if _g("wind_shear"):
         parts.append(f"Wind-Shear: {_g('wind_shear')}")
 
+    # Fliegbarkeit/Streckenflug-Kontext für den Spot-Prompt.
+    # WICHTIG: "nicht fliegbar (not_safe)" NUR bei tatsaechlich unsicherer Region
+    # ausgeben — niemals aus einem leeren Fliegbarkeits-Feld ableiten.
+    # Historie: fly_status/flyability_tier/flight_type/peak_climb_rate/llm_tags sind
+    # Alt-Felder aus der Prä-v2.1-Architektur und werden nicht mehr befuellt. Der
+    # alte "and fly_tier"-Guard fiel dadurch fuer JEDE safe-Region in den else-Zweig
+    # und meldete faelschlich "not_safe / kein_xc" — Wurzel widerspruechlicher
+    # Spot-Analysen (region safe vs. Text "region not_safe for XC").
     fly_tier = _g("fly_status") or _g("flyability_tier") or ""
-    if ss in ("safe", "conditional") and fly_tier:
-        parts.append(
-            f"Region-Fly-Status: {fly_tier} | "
-            f"Flugtyp: {_g('flight_type', '?')} | "
-            f"Peak-Climb: {_g('peak_climb_rate', 0)} m/s"
-        )
+    if ss == "not_safe":
+        parts.append("Region-Fliegbarkeit: nicht fliegbar (not_safe) — Streckenflug.tier muss 'kein_xc' sein.")
+    else:
+        # Region safe/conditional → fliegbar. Fliegbarkeit aus der aktuellen
+        # Rating-Architektur ableiten (experience_rating 1-5 als Primaerwert).
+        er = _g("experience_rating")
+        fly_line = "Region-Fliegbarkeit: fliegbar (Region safe/conditional)"
+        if er is not None:
+            fly_line += f" | Fliegbarkeits-Rating (1-5): {er}"
+        if fly_tier:
+            fly_line += f" | Fly-Status: {fly_tier}"
+        ft = _g("flight_type")
+        if ft:
+            fly_line += f" | Flugtyp: {ft}"
+        parts.append(fly_line)
+
+        # Thermik: bevorzugt _rating_inputs (v2.1), Fallback auf Alt-Feld.
+        ri = region_result.get("_rating_inputs")
+        ri = ri if isinstance(ri, dict) else {}
+        peak = _g("peak_climb_rate") or ri.get("sustained_peak_mps") or ri.get("peak_climb_proxy")
+        prod_h = ri.get("productive_thermal_h")
+        therm_bits = []
+        if peak:
+            therm_bits.append(f"Peak-Climb ~{peak} m/s")
+        if prod_h:
+            therm_bits.append(f"produktive Thermik ~{prod_h}h")
         tq = _g("thermal_quality")
         if tq:
-            parts.append(f"Region-Thermik: {tq}")
-        # Bewoelkung explizit durchreichen: aus dem CLOUDS-llm_tag der Region.
-        # Faellt sonst nur implizit ueber den thermal_quality-Freitext durch.
-        cloud_tags = _g("llm_tags") or []
+            therm_bits.append(str(tq))
+        if therm_bits:
+            parts.append("Region-Thermik: " + ", ".join(therm_bits))
+
+        # Bewoelkung: CLOUDS-Tag. Aktuelles Feld heisst 'tags' (alt: 'llm_tags').
+        cloud_tags = _g("tags") or _g("llm_tags") or []
         cloud_val = None
         if isinstance(cloud_tags, list):
             for t in cloud_tags:
@@ -346,12 +376,19 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
                     break
         if cloud_val:
             parts.append(f"Region-Bewoelkung: {cloud_val}")
+
         xc_pot = _g("xc_potential")
         xc_det = _g("xc_details")
         if xc_pot or xc_det:
             parts.append(f"Region-XC: {xc_pot or '?'} — {xc_det or ''}")
-    else:
-        parts.append("Region-Fliegbarkeit: nicht fliegbar (not_safe) — Streckenflug.tier muss 'kein_xc' sein.")
+
+        # Streckenflug-Tier NICHT hart forcieren — die KI leitet es via FLYABILITY-Pass
+        # aus den Region-Meteodaten ab. Nur bei schwacher Thermik einen Deckel setzen.
+        if er is not None and er <= 2:
+            parts.append(
+                "→ Region-Thermik schwach (Rating <=2): Streckenpotenzial max 'lokal', "
+                "eher 'kein_xc'."
+            )
 
     summary = _g("summary")
     if summary:
