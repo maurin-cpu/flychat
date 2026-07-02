@@ -377,7 +377,12 @@ window.Meteogram = (function () {
         var _isMobile_local = window.innerWidth <= 640;
         var _fitToContainer_local = !!(options && options.fitToContainer);
         var _smallDesktop = !_isMobile_local && _fitToContainer_local && window.innerHeight < 950;
-        var _useCoarse = _isMobile_local || _smallDesktop;
+        // Handy nutzt jetzt dieselbe 250m-Auflösung (17 Reihen) wie der Desktop
+        // (User-Wunsch: gleiche Höhen-Zeilen auf beiden Geräten, damit "gleiche
+        // Zeile" auch "gleiche Höhe" bedeutet). Scrollen bzw. kleinere Zellen sind
+        // akzeptiert; COMPACT-FIT (unten) schrumpft cellH bis Touch-Floor 18px.
+        // NUR das kleine Desktop-Overlay (<950px Höhe) bleibt aus Platzgründen grob.
+        var _useCoarse = _smallDesktop;
         var STEP = _useCoarse ? 500 : 250;
         var FULL_ROWS = _useCoarse ? 9 : 17; // 0-4000m: 9 rows @ 500m, 17 rows @ 250m
         var elevation = (options && options.elevation) || 0;
