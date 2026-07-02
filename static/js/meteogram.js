@@ -407,8 +407,13 @@ window.Meteogram = (function () {
         // Bei Regionen ist `elevation` nur ein Referenzpunkt, kein Startplatz.
         // Thermik darf dann auch in den Grid-Zeilen UNTER dem Referenzpunkt
         // rendern (Region-Einzugsgebiet umfasst verschiedene Höhen).
+        // WICHTIG: Basis STEP-UNABHÄNGIG halten. Früher `minGridAlt`, das mit der
+        // Auflösung wandert (Desktop 250m→750m, Mobile 500m→500m) → die Thermik-
+        // Parabel (thermalRateAtAltitude) lieferte bei GLEICHER Höhe verschiedene
+        // Werte auf Handy vs. Desktop. Fixes 250m-Raster == bisheriges Desktop-
+        // Verhalten; nur Mobile wird darauf angeglichen.
         var isRegion = !!(options && options.isRegion);
-        var thermalBaseAlt = isRegion ? minGridAlt : elevation;
+        var thermalBaseAlt = isRegion ? (Math.floor(elevation / 250) * 250) : elevation;
         // Numbers toggle (mobile only): when off, wind/gust digits in cells are
         // hidden and speed is encoded as cell background tint. The toggle pill
         // above the chart flips this preference (persisted in localStorage).
