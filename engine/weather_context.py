@@ -366,6 +366,19 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         if therm_bits:
             parts.append("Region-Thermik: " + ", ".join(therm_bits))
 
+        # Region-Arbeitshoehe/Basis EXPLIZIT ausgeben. Das Spot-Template verlangt,
+        # dass die recommendation die Region-Basis in m AGL zitiert — fehlt der Wert
+        # hier, kopiert das LLM die Beispielzahl (~450m AGL, "schwache Thermik") aus
+        # dem Few-Shot wortwoertlich, auch bei STARKER Region. Wurzel widerspruechlicher
+        # Spot-Texte (Region "classic XC day", 1329m AGL, aber Spot-Text "Region baut
+        # nur tiefe Basis ~450m + schwache Thermik auf").
+        wh = ri.get("working_height_agl_m")
+        if wh:
+            parts.append(
+                f"Region-Arbeitshoehe/Basis: ~{round(wh)}m AGL "
+                f"(diesen realen Wert zitieren, NICHT die Beispielzahl aus dem Template)"
+            )
+
         # Bewoelkung: CLOUDS-Tag. Aktuelles Feld heisst 'tags' (alt: 'llm_tags').
         cloud_tags = _g("tags") or _g("llm_tags") or []
         cloud_val = None
