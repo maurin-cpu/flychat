@@ -275,8 +275,8 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         return (
             f"{header}\n"
             f"Region-Kontext: nicht verfuegbar (Region: {region_name}).\n"
-            f"→ Bewerte Streckenflug NUR anhand der Spot-Daten. "
-            f"streckenflug.tier max 'moderat', region_context_available=false, "
+            f"→ Bewerte Streckenflug NUR anhand der Spot-Daten: streckenflug.rating "
+            f"hoechstens 3, streckenflug.limiting_factor='region_context_missing'. "
             f"summary erwaehnt explizit: 'Region-Kontext fehlt — reine Spot-Einschaetzung.'"
         )
 
@@ -326,28 +326,31 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         parts.append(f"Wind-Shear: {_g('wind_shear')}")
 
     # Fliegbarkeit/Streckenflug-Kontext für den Spot-Prompt.
-    # WICHTIG: "nicht fliegbar (not_safe)" NUR bei tatsaechlich unsicherer Region
-    # ausgeben — niemals aus einem leeren Fliegbarkeits-Feld ableiten.
-    # Historie: fly_status/flyability_tier/flight_type/peak_climb_rate/llm_tags sind
-    # Alt-Felder aus der Prä-v2.1-Architektur und werden nicht mehr befuellt. Der
-    # alte "and fly_tier"-Guard fiel dadurch fuer JEDE safe-Region in den else-Zweig
-    # und meldete faelschlich "not_safe / kein_xc" — Wurzel widerspruechlicher
-    # Spot-Analysen (region safe vs. Text "region not_safe for XC").
-    fly_tier = _g("fly_status") or _g("flyability_tier") or ""
+    # "not_safe" ist ein SAFETY-Status, KEIN Fliegbarkeits-/Streckenflug-Feld. Die
+    # alten Kategorie-Felder (fly_status/flyability_tier/flight_type sowie das
+    # Streckenflug-"tier" kein_xc/moderat) stammen aus der Prä-v2.1-Architektur und
+    # existieren nicht mehr: sie sind leer bzw. werden in _post_process_flyability_spot
+    # aktiv geloescht. Live ist ausschliesslich das numerische Rating (1-5). Daher
+    # KEINE tier-Kommandos und KEIN Auslesen der toten Kategorie-Felder mehr.
+    er = _g("experience_rating")
     if ss == "not_safe":
-        parts.append("Region-Fliegbarkeit: nicht fliegbar (not_safe) — Streckenflug.tier muss 'kein_xc' sein.")
+        # Ganztags not_safe. Die XC-Begrenzung passiert ohnehin spot-seitig
+        # (Spot not_safe → streckenflug.rating=1), daher hier kein hartes
+        # "kein_xc"-Kommando. Ein evtl. Morgen-Fenster ehrlich durchreichen, damit
+        # ein im Fenster fliegbarer Spot nicht faelschlich pauschal gesperrt wird.
+        sw = _g("safe_window")
+        if sw and str(sw).strip().lower() not in ("keins", "none", "", "-", "?"):
+            parts.append(
+                f"Region-Fliegbarkeit: Region ganztags not_safe, ABER fliegbares "
+                f"Fenster {sw} — im Fenster lokal fliegbar, ausserhalb kein Streckenflug."
+            )
+        else:
+            parts.append("Region-Fliegbarkeit: nicht fliegbar (not_safe, kein sicheres Fenster).")
     else:
-        # Region safe/conditional → fliegbar. Fliegbarkeit aus der aktuellen
-        # Rating-Architektur ableiten (experience_rating 1-5 als Primaerwert).
-        er = _g("experience_rating")
+        # Region safe/conditional → fliegbar. Primaerwert experience_rating (1-5).
         fly_line = "Region-Fliegbarkeit: fliegbar (Region safe/conditional)"
         if er is not None:
             fly_line += f" | Fliegbarkeits-Rating (1-5): {er}"
-        if fly_tier:
-            fly_line += f" | Fly-Status: {fly_tier}"
-        ft = _g("flight_type")
-        if ft:
-            fly_line += f" | Flugtyp: {ft}"
         parts.append(fly_line)
 
         # Thermik: bevorzugt _rating_inputs (v2.1), Fallback auf Alt-Feld.
@@ -395,12 +398,13 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
         if xc_pot or xc_det:
             parts.append(f"Region-XC: {xc_pot or '?'} — {xc_det or ''}")
 
-        # Streckenflug-Tier NICHT hart forcieren — die KI leitet es via FLYABILITY-Pass
-        # aus den Region-Meteodaten ab. Nur bei schwacher Thermik einen Deckel setzen.
+        # Streckenflug NICHT hart forcieren — die KI leitet streckenflug.rating im
+        # FLYABILITY-Pass aus den Region-Meteodaten ab. Nur bei schwacher Region-
+        # Thermik einen Hinweis auf niedriges Potenzial geben.
         if er is not None and er <= 2:
             parts.append(
-                "→ Region-Thermik schwach (Rating <=2): Streckenpotenzial max 'lokal', "
-                "eher 'kein_xc'."
+                "→ Region-Thermik schwach (Rating <=2): geringes Streckenpotenzial "
+                "(streckenflug.rating niedrig ansetzen)."
             )
 
     summary = _g("summary")
