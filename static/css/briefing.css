@@ -1261,8 +1261,14 @@
 .bf-region-spacer { flex: 1 1 auto; }
 
 @media (max-width: 640px) {
-  .bf-region-name { flex: 0 1 auto; max-width: 45%; }
-  .bf-region-pill { font-size: 10.5px; padding: 2px 7px; max-width: 16ch; }
+  /* Mobile: Region-Name IMMER voll auf Zeile 1 (nimmt die ganze Breite, Count/
+     Share/Chevron rechts). Die Pill rutscht darunter auf Zeile 2 — der Spacer
+     wird zum unsichtbaren 100%-Umbruch, damit die Pill nie den Namen ueberlagert
+     und trotzdem in ihrer natuerlichen Breite (kein Vollbreiten-Balken) bleibt. */
+  .bf-region-head { flex-wrap: wrap; }
+  .bf-region-name { flex: 1 1 auto; }
+  .bf-region-spacer { flex-basis: 100%; height: 0; margin: 0; order: 1; }
+  .bf-region-pill { order: 2; margin-top: 3px; font-size: 10.5px; padding: 2px 8px; }
 }
 
 .bf-region-head:hover {
@@ -1283,6 +1289,8 @@
   font-size: 12px;
   letter-spacing: 0.05em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bf-region-count {
