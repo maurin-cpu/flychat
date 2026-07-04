@@ -1,0 +1,671 @@
+{
+  "generated_at": "2026-06-30T06:18:39",
+  "forecast_dates": [
+    "2026-06-30",
+    "2026-07-01",
+    "2026-07-02"
+  ],
+  "lage_label": {
+    "value": "Nordfoehnlage",
+    "decided_by": "decide_lage_label",
+    "trigger": "foehn.side=Nord"
+  },
+  "pressure_influence": {
+    "value": "Hochdruck",
+    "trend": "stabil",
+    "slope_hpa_per_day": 0.7,
+    "per_day": [
+      {
+        "date": "2026-06-30",
+        "regime": "Hochdruck",
+        "msl_hpa": 1024.0
+      },
+      {
+        "date": "2026-07-01",
+        "regime": "Hochdruck",
+        "msl_hpa": 1022.9
+      },
+      {
+        "date": "2026-07-02",
+        "regime": "Hochdruck",
+        "msl_hpa": 1025.4
+      }
+    ],
+    "decided_by": "decide_pressure_influence",
+    "inputs": {
+      "msl_by_day": [
+        1024.0,
+        1022.9,
+        1025.4
+      ]
+    },
+    "thresholds": {
+      "hoch_hpa": 1020.0,
+      "tief_hpa": 1010.0,
+      "strong_tief_hpa": 1000.0,
+      "trend_hpa_per_day": 2.0
+    }
+  },
+  "flow_overhead": {
+    "value": "Nordwest",
+    "strength": "schwach",
+    "trend": "leicht drehend",
+    "rotation": null,
+    "per_day": [
+      {
+        "date": "2026-06-30",
+        "speed_kmh": 10.5,
+        "dir_deg": 204.0,
+        "sector": "Suedwest",
+        "strength": "schwach"
+      },
+      {
+        "date": "2026-07-01",
+        "speed_kmh": 18.6,
+        "dir_deg": 291.0,
+        "sector": "West",
+        "strength": "maessig"
+      },
+      {
+        "date": "2026-07-02",
+        "speed_kmh": 25.1,
+        "dir_deg": 11.0,
+        "sector": "Nord",
+        "strength": "maessig"
+      }
+    ],
+    "decided_by": "decide_flow_overhead",
+    "inputs": {
+      "wind_700_by_day": [
+        {
+          "speed": 10.5,
+          "dir": 204.0
+        },
+        {
+          "speed": 18.6,
+          "dir": 291.0
+        },
+        {
+          "speed": 25.1,
+          "dir": 11.0
+        }
+      ]
+    },
+    "thresholds": {
+      "schwach_kmh": 15,
+      "maessig_kmh": 30,
+      "kraeftig_kmh": 50,
+      "rotation_deg": 90
+    }
+  },
+  "t850_trend": {
+    "value": "insgesamt kuehler",
+    "delta_total_k": -4.6,
+    "change": null,
+    "per_day": [
+      17.0,
+      13.8,
+      12.4
+    ],
+    "decided_by": "decide_t850_trend",
+    "inputs": {
+      "t850_by_day": [
+        17.0,
+        13.8,
+        12.4
+      ]
+    },
+    "thresholds": {
+      "threshold_k": 4.0
+    }
+  },
+  "pressure_centers_per_day": [
+    {
+      "date": "2026-06-30",
+      "centers": [
+        {
+          "type": "Tief",
+          "region_label": "Island",
+          "lat": 64.0,
+          "lon": -20.0,
+          "msl_hpa": 1013.0,
+          "gradient_hpa": 9.1,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Hoch",
+          "region_label": "Atlantik vor Irland",
+          "lat": 52.0,
+          "lon": -15.0,
+          "msl_hpa": 1026.0,
+          "gradient_hpa": 6.7,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Hoch",
+          "region_label": "Azoren",
+          "lat": 38.0,
+          "lon": -25.0,
+          "msl_hpa": 1031.4,
+          "gradient_hpa": 8.9,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-07-01",
+      "centers": [
+        {
+          "type": "Tief",
+          "region_label": "Island",
+          "lat": 64.0,
+          "lon": -20.0,
+          "msl_hpa": 1006.2,
+          "gradient_hpa": 15.3,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Hoch",
+          "region_label": "Azoren",
+          "lat": 38.0,
+          "lon": -25.0,
+          "msl_hpa": 1030.9,
+          "gradient_hpa": 8.7,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-07-02",
+      "centers": [
+        {
+          "type": "Tief",
+          "region_label": "Island",
+          "lat": 64.0,
+          "lon": -20.0,
+          "msl_hpa": 1003.5,
+          "gradient_hpa": 16.5,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Hoch",
+          "region_label": "Atlantik vor Irland",
+          "lat": 52.0,
+          "lon": -15.0,
+          "msl_hpa": 1031.1,
+          "gradient_hpa": 12.6,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        },
+        {
+          "type": "Hoch",
+          "region_label": "Frankreich",
+          "lat": 47.0,
+          "lon": 2.0,
+          "msl_hpa": 1025.9,
+          "gradient_hpa": 6.7,
+          "decided_by": "find_pressure_centers",
+          "thresholds": {
+            "min_gradient_hpa": 5.0
+          }
+        }
+      ]
+    }
+  ],
+  "bise": {
+    "value": "nicht aktiv",
+    "active_any_day": false,
+    "days_active": [],
+    "per_day": [
+      {
+        "date": "2026-06-30",
+        "active": false,
+        "strength": null,
+        "delta_p_hpa": 4.2,
+        "wind_700_dir_deg": 204.0,
+        "wind_700_speed_kmh": 10.5
+      },
+      {
+        "date": "2026-07-01",
+        "active": false,
+        "strength": null,
+        "delta_p_hpa": 2.4,
+        "wind_700_dir_deg": 291.0,
+        "wind_700_speed_kmh": 18.6
+      },
+      {
+        "date": "2026-07-02",
+        "active": false,
+        "strength": null,
+        "delta_p_hpa": 0.1,
+        "wind_700_dir_deg": 11.0,
+        "wind_700_speed_kmh": 25.1
+      }
+    ],
+    "decided_by": "decide_bise",
+    "inputs": {
+      "ne_pole_labels": [
+        "Suedskandinavien",
+        "Mitteleuropa",
+        "Osteuropa"
+      ],
+      "s_pole_labels": [
+        "Westliches Mittelmeer",
+        "Adria",
+        "Norditalien"
+      ]
+    },
+    "thresholds": {
+      "delta_p_hpa": 4.0,
+      "wind_dir_sector": [
+        30,
+        90
+      ],
+      "wind_min_kmh": 15
+    }
+  },
+  "vb_lage": {
+    "value": "nicht aktiv",
+    "active_any_day": false,
+    "days_active": [],
+    "per_day": [
+      {
+        "date": "2026-06-30",
+        "active": false,
+        "msl_hpa": 1015.5,
+        "region_label": null
+      },
+      {
+        "date": "2026-07-01",
+        "active": false,
+        "msl_hpa": 1011.2,
+        "region_label": null
+      },
+      {
+        "date": "2026-07-02",
+        "active": false,
+        "msl_hpa": 1011.5,
+        "region_label": null
+      }
+    ],
+    "decided_by": "decide_vb_lage",
+    "inputs": {
+      "box_lat": [
+        40.0,
+        46.0
+      ],
+      "box_lon": [
+        5.0,
+        18.0
+      ]
+    },
+    "thresholds": {
+      "max_msl_hpa": 1010.0
+    }
+  },
+  "foehn": {
+    "value": "Nordfoehn (stark)",
+    "active": true,
+    "side": "Nord",
+    "days_affected": [
+      "2026-07-01",
+      "2026-07-02"
+    ],
+    "per_day": [
+      {
+        "date": "2026-06-30",
+        "sued_active": false,
+        "nord_active": false,
+        "peak_sued": "none",
+        "peak_nord": "none",
+        "sued_hours": 0,
+        "nord_hours": 0
+      },
+      {
+        "date": "2026-07-01",
+        "sued_active": false,
+        "nord_active": true,
+        "peak_sued": "none",
+        "peak_nord": "danger",
+        "sued_hours": 0,
+        "nord_hours": 7
+      },
+      {
+        "date": "2026-07-02",
+        "sued_active": false,
+        "nord_active": true,
+        "peak_sued": "none",
+        "peak_nord": "caution",
+        "sued_hours": 0,
+        "nord_hours": 7
+      }
+    ],
+    "decided_by": "decide_foehn_summary",
+    "source": "foehn_indicators.fetch_foehn_data + evaluate_foehn",
+    "inputs": {
+      "forecast_dates": [
+        "2026-06-30",
+        "2026-07-01",
+        "2026-07-02"
+      ]
+    },
+    "thresholds": {
+      "delta_p_caution_hpa": 4,
+      "delta_p_danger_hpa": 8,
+      "active_min_hours": 2,
+      "day_hours_checked": [
+        10,
+        16
+      ]
+    }
+  },
+  "precip_pattern": {
+    "per_day": [
+      {
+        "date": "2026-06-30",
+        "alpennord": {
+          "n_spots": 397,
+          "peak_mm": 58.5,
+          "wet_share": 0.63,
+          "max_cape": 2020.0,
+          "max_wc": 96,
+          "gewitter_share": 0.36,
+          "max_coverage": 1.0
+        },
+        "alpensued": {
+          "n_spots": 97,
+          "peak_mm": 42.3,
+          "wet_share": 0.41,
+          "max_cape": 1630.0,
+          "max_wc": 95,
+          "gewitter_share": 0.11,
+          "max_coverage": 1.0
+        }
+      },
+      {
+        "date": "2026-07-01",
+        "alpennord": {
+          "n_spots": 397,
+          "peak_mm": 35.9,
+          "wet_share": 0.99,
+          "max_cape": 1420.0,
+          "max_wc": 95,
+          "gewitter_share": 0.12,
+          "max_coverage": 1.0
+        },
+        "alpensued": {
+          "n_spots": 97,
+          "peak_mm": 25.7,
+          "wet_share": 0.77,
+          "max_cape": 1900.0,
+          "max_wc": 95,
+          "gewitter_share": 0.1,
+          "max_coverage": 1.0
+        }
+      },
+      {
+        "date": "2026-07-02",
+        "alpennord": {
+          "n_spots": 397,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 270.0,
+          "max_wc": 3,
+          "gewitter_share": 0.0,
+          "max_coverage": 0.25
+        },
+        "alpensued": {
+          "n_spots": 97,
+          "peak_mm": 0,
+          "wet_share": 0.0,
+          "max_cape": 30.0,
+          "max_wc": 3,
+          "gewitter_share": 0.0,
+          "max_coverage": 0.0
+        }
+      }
+    ],
+    "n_nord_spots": 397,
+    "n_sued_spots": 97,
+    "decided_by": "decide_precip_pattern_nord_sued",
+    "dry_mm": 0.5
+  },
+  "schneefallgrenze": null,
+  "confidence_per_day": [
+    {
+      "date": "2026-06-30",
+      "level": "high"
+    },
+    {
+      "date": "2026-07-01",
+      "level": "high"
+    },
+    {
+      "date": "2026-07-02",
+      "level": "medium"
+    }
+  ],
+  "ch_snapshots": [
+    {
+      "date": "2026-06-30",
+      "n_spots": 494,
+      "msl_hpa": 1024.0,
+      "t850_c": 17.0,
+      "gh850_m": 1585.0,
+      "wind_700": {
+        "speed_kmh": 10.5,
+        "dir_deg": 204.0
+      },
+      "msl_source": "pressure_msl"
+    },
+    {
+      "date": "2026-07-01",
+      "n_spots": 494,
+      "msl_hpa": 1022.9,
+      "t850_c": 13.8,
+      "gh850_m": 1569.0,
+      "wind_700": {
+        "speed_kmh": 18.6,
+        "dir_deg": 291.0
+      },
+      "msl_source": "pressure_msl"
+    },
+    {
+      "date": "2026-07-02",
+      "n_spots": 494,
+      "msl_hpa": 1025.4,
+      "t850_c": 12.4,
+      "gh850_m": 1584.0,
+      "wind_700": {
+        "speed_kmh": 25.1,
+        "dir_deg": 11.0
+      },
+      "msl_source": "pressure_msl"
+    }
+  ],
+  "europe_grid": [
+    {
+      "lat": 64.0,
+      "lon": -20.0,
+      "label": "Island",
+      "msl_by_day": {
+        "2026-06-30": 1013.0,
+        "2026-07-01": 1006.2,
+        "2026-07-02": 1003.5
+      }
+    },
+    {
+      "lat": 57.0,
+      "lon": -4.0,
+      "label": "Schottland",
+      "msl_by_day": {
+        "2026-06-30": 1019.6,
+        "2026-07-01": 1019.8,
+        "2026-07-02": 1020.4
+      }
+    },
+    {
+      "lat": 52.0,
+      "lon": -15.0,
+      "label": "Atlantik vor Irland",
+      "msl_by_day": {
+        "2026-06-30": 1026.0,
+        "2026-07-01": 1022.3,
+        "2026-07-02": 1031.1
+      }
+    },
+    {
+      "lat": 51.0,
+      "lon": 0.0,
+      "label": "England",
+      "msl_by_day": {
+        "2026-06-30": 1023.1,
+        "2026-07-01": 1024.3,
+        "2026-07-02": 1024.0
+      }
+    },
+    {
+      "lat": 47.0,
+      "lon": 2.0,
+      "label": "Frankreich",
+      "msl_by_day": {
+        "2026-06-30": 1021.4,
+        "2026-07-01": 1024.3,
+        "2026-07-02": 1025.9
+      }
+    },
+    {
+      "lat": 40.0,
+      "lon": -3.0,
+      "label": "Spanien",
+      "msl_by_day": {
+        "2026-06-30": 1019.6,
+        "2026-07-01": 1018.1,
+        "2026-07-02": 1019.7
+      }
+    },
+    {
+      "lat": 65.0,
+      "lon": 15.0,
+      "label": "Nordskandinavien",
+      "msl_by_day": {
+        "2026-06-30": 1019.8,
+        "2026-07-01": 1019.5,
+        "2026-07-02": 1004.5
+      }
+    },
+    {
+      "lat": 58.0,
+      "lon": 14.0,
+      "label": "Suedskandinavien",
+      "msl_by_day": {
+        "2026-06-30": 1022.4,
+        "2026-07-01": 1017.8,
+        "2026-07-02": 1011.3
+      }
+    },
+    {
+      "lat": 50.0,
+      "lon": 13.0,
+      "label": "Mitteleuropa",
+      "msl_by_day": {
+        "2026-06-30": 1022.1,
+        "2026-07-01": 1017.5,
+        "2026-07-02": 1021.5
+      }
+    },
+    {
+      "lat": 44.0,
+      "lon": 9.0,
+      "label": "Norditalien",
+      "msl_by_day": {
+        "2026-06-30": 1016.6,
+        "2026-07-01": 1012.7,
+        "2026-07-02": 1014.7
+      }
+    },
+    {
+      "lat": 41.0,
+      "lon": 6.0,
+      "label": "Westliches Mittelmeer",
+      "msl_by_day": {
+        "2026-06-30": 1017.9,
+        "2026-07-01": 1017.1,
+        "2026-07-02": 1016.8
+      }
+    },
+    {
+      "lat": 42.0,
+      "lon": 16.0,
+      "label": "Adria",
+      "msl_by_day": {
+        "2026-06-30": 1015.5,
+        "2026-07-01": 1011.2,
+        "2026-07-02": 1011.5
+      }
+    },
+    {
+      "lat": 50.0,
+      "lon": 25.0,
+      "label": "Osteuropa",
+      "msl_by_day": {
+        "2026-06-30": 1018.2,
+        "2026-07-01": 1012.9,
+        "2026-07-02": 1010.5
+      }
+    },
+    {
+      "lat": 44.0,
+      "lon": 33.0,
+      "label": "Schwarzes Meer",
+      "msl_by_day": {
+        "2026-06-30": 1015.5,
+        "2026-07-01": 1012.5,
+        "2026-07-02": 1009.8
+      }
+    },
+    {
+      "lat": 38.0,
+      "lon": -25.0,
+      "label": "Azoren",
+      "msl_by_day": {
+        "2026-06-30": 1031.4,
+        "2026-07-01": 1030.9,
+        "2026-07-02": 1028.7
+      }
+    }
+  ],
+  "_synoptic_decisions_applied": [
+    "aggregate_ch_daily_snapshot",
+    "fetch_europe_pressure_grid",
+    "decide_pressure_influence",
+    "decide_flow_overhead",
+    "decide_t850_trend",
+    "find_pressure_centers",
+    "decide_bise",
+    "decide_vb_lage",
+    "decide_foehn_summary",
+    "decide_precip_pattern_nord_sued",
+    "decide_lage_label"
+  ]
+}
