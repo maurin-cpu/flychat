@@ -621,13 +621,27 @@ class SubscriberManager:
     # ADMIN-QUERIES
     # ------------------------------------------------------------------
     def count_by_status(self) -> dict:
-        base = {"active": 0, "pending": 0, "paused": 0, "unsubscribed": 0}
+        # registered_no_sub: Account existiert (status='active'), aber keine
+        # Regionen gewaehlt -> registriert, aber kein Briefing-Abo.
+        # subscribed: aktive Accounts MIT mindestens einer Region (echtes Abo).
+        base = {"active": 0, "pending": 0, "paused": 0, "unsubscribed": 0,
+                "registered_no_sub": 0, "subscribed": 0}
         try:
             with self._cursor() as cur:
                 cur.execute("SELECT status, COUNT(*) FROM subscribers GROUP BY status")
                 for status, n in cur.fetchall():
                     if status in base:
                         base[status] = n
+                # Aktive ohne Regionen (leer / NULL / '[]') = nur registriert
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM subscribers
+                     WHERE status = 'active'
+                       AND (regions IS NULL OR regions = '' OR regions = '[]')
+                    """
+                )
+                base["registered_no_sub"] = cur.fetchone()[0]
+                base["subscribed"] = base["active"] - base["registered_no_sub"]
                 return base
         except Exception as e:
             logger.error("count_by_status failed: %s", e)

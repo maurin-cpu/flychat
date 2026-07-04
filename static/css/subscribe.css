@@ -579,6 +579,7 @@
   color: var(--color-text);
 }
 .sp-stat--active       .sp-stat__value { color: var(--color-safety-excellent-text); }
+.sp-stat--registered   .sp-stat__value { color: var(--color-primary); }
 .sp-stat--pending      .sp-stat__value { color: var(--color-text-secondary); }
 .sp-stat--paused       .sp-stat__value { color: var(--color-safety-marginal-text); }
 .sp-stat--unsubscribed .sp-stat__value { color: var(--color-safety-critical-text); }

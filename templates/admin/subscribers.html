@@ -33,8 +33,12 @@
   <!-- Stat-Kacheln -->
   <div class="sp-stats">
     <div class="sp-stat sp-stat--active">
-      <div class="sp-stat__label">Aktiv</div>
-      <div class="sp-stat__value">{{ stats_counts.active }}</div>
+      <div class="sp-stat__label">Abonnenten</div>
+      <div class="sp-stat__value">{{ stats_counts.subscribed }}</div>
+    </div>
+    <div class="sp-stat sp-stat--registered">
+      <div class="sp-stat__label">Registriert (kein Abo)</div>
+      <div class="sp-stat__value">{{ stats_counts.registered_no_sub }}</div>
     </div>
     <div class="sp-stat sp-stat--pending">
       <div class="sp-stat__label">Pending</div>
