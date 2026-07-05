@@ -35,9 +35,10 @@ if (-not $Server) {
 if (-not $Server) { $Server = $SERVER_DEFAULT }
 
 $RUNTIME_FILES = @(
+  "data/config_overrides.json",  # LANG/FORECAST_DAYS/Modelle -> gleiche Ansicht wie Server
   "data/region_analyses.json",
   "data/spot_analyses.json",
-  "data/wetterdaten.json"      # gross (~200 MB) -> zuletzt
+  "data/wetterdaten.json"        # gross (~200 MB) -> zuletzt
 )
 
 Write-Host "== 1) git pull (Code + getrackte Analysen) =="

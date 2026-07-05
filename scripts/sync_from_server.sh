@@ -36,6 +36,7 @@ REMOTE_DIR="/home/deploy/flychat"
 
 # Gitignorte Runtime-Daten, die die App zur Laufzeit liest:
 RUNTIME_FILES=(
+  data/config_overrides.json   # LANG/FORECAST_DAYS/Modelle -> gleiche Ansicht wie Server
   data/wetterdaten.json
   data/spot_analyses.json
   data/region_analyses.json
