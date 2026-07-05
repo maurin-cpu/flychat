@@ -178,6 +178,23 @@ class TestFinalize(unittest.TestCase):
         self.assertEqual(out["long_with_sources"][0]["text"], "Sonntag: sunny.")
         self.assertEqual(out["long_with_sources"][1]["text"], "Montag: windy.")
 
+    def test_en_mode_uses_english_weekdays(self):
+        # Im EN-Modus (config.LANG=en) muessen Payload-Wochentage und
+        # autoritatives Praefix englisch sein — sonst entstehen Mischformen
+        # wie "Sonntag (Sunday):" (Vorfall 05.07.2026).
+        old_lang = getattr(config, "LANG", "de")
+        config.LANG = "en"
+        try:
+            days = [{"text": "Sonntag (Sunday): sunny.", "flight_hint": "Gut."},
+                    {"text": "stable.", "flight_hint": "Gut."}]
+            out = sl._finalize(_parsed(days=days), _ctx(), attempts=1, unresolved=[])
+            self.assertEqual(out["long_with_sources"][0]["text"], "Sunday: sunny.")
+            self.assertEqual(out["long_with_sources"][1]["text"], "Monday: stable.")
+            payload = sl._build_llm_payload(_ctx())
+            self.assertIn('"weekday": "Sunday"', payload)
+        finally:
+            config.LANG = old_lang
+
     def test_prune_removes_violating_day_keeps_rest(self):
         days = [{"text": "Eine Kaltfront zieht durch.", "flight_hint": "Gut."},
                 {"text": "Stabil und sonnig.", "flight_hint": "Gut fliegbar."}]

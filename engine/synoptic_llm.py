@@ -35,6 +35,24 @@ logger = logging.getLogger(__name__)
 # Max. LLM-Versuche pro Overview (1 Erstversuch + 2 Korrektur-Runden).
 _MAX_ATTEMPTS = 3
 
+_WEEKDAYS_EN = ("Monday", "Tuesday", "Wednesday", "Thursday",
+                "Friday", "Saturday", "Sunday")
+
+
+def _weekday_label(date_str: str) -> str:
+    """Wochentagname in der aktiven UI-Sprache (i18n.get_current_lang()).
+
+    Wird fuer das LLM-Payload UND das autoritative days-Praefix verwendet —
+    beide muessen zusammenpassen, sonst schreibt der LLM im EN-Modus
+    Mischformen wie "Sonntag (Sunday):" (Vorfall 05.07.2026: Payload
+    lieferte deutsche Wochentage, Skill/Output waren englisch).
+    """
+    import i18n
+    if i18n.get_current_lang() == "en":
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        return _WEEKDAYS_EN[d.weekday()]
+    return _weekday_de(date_str)
+
 
 # ============================================================================
 # VERBOTENE BEGRIFFE — synoptische Etiketten ohne Daten-Backing
@@ -596,7 +614,7 @@ def _build_llm_payload(ctx: dict) -> str:
     forecast_dates_labeled = []
     for d in raw_dates:
         try:
-            forecast_dates_labeled.append({"date": d, "weekday": _weekday_de(d)})
+            forecast_dates_labeled.append({"date": d, "weekday": _weekday_label(d)})
         except Exception:
             forecast_dates_labeled.append({"date": d, "weekday": None})
 
@@ -740,7 +758,7 @@ def _apply_weekday_prefix(text: str, forecast_dates: list, i: int) -> str:
     if i >= len(forecast_dates):
         return text
     try:
-        correct_wd = _weekday_de(forecast_dates[i])
+        correct_wd = _weekday_label(forecast_dates[i])
     except Exception:
         return text
     # ALLE fuehrenden Praefix-Varianten abraeumen (auch gestapelte wie

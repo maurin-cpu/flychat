@@ -2133,7 +2133,12 @@
       return;
     }
 
-    const lageLabel = (wl.lage_label && wl.lage_label.value) || "";
+    // Lage-Label: Strukturfeld liefert den kanonischen DE-Wert; Anzeige
+    // uebersetzt via i18n ("js.lage.<value>"), Fallback = DE-Wert.
+    const lageRaw = (wl.lage_label && wl.lage_label.value) || "";
+    const lageLabel = lageRaw
+      ? ((window.WC_I18N && window.WC_I18N["js.lage." + lageRaw]) || lageRaw)
+      : "";
     const shortText = overview.short || "";
     const longText = overview.long || "";
     const longEntries = Array.isArray(overview.long_with_sources)
@@ -2152,7 +2157,7 @@
           const hintHtml = hint
             ? `<p class="bf-wetterlage-hint"><span class="bf-wetterlage-hint-icon" aria-hidden="true">⏵</span> ${hint}</p>`
             : "";
-          const m = txt.match(/^(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag):\s*/);
+          const m = txt.match(/^(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*/);
           if (m) {
             return `<div class="bf-wetterlage-day-block">
               <p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>
@@ -2181,12 +2186,12 @@
     el.innerHTML = `
       <div class="bf-wetterlage-head">
         <span class="bf-wetterlage-icon" aria-hidden="true">☼</span>
-        <span class="bf-wetterlage-label">Wetterlage${lageLabel ? ` — ${escapeHtml(lageLabel)}` : ""}</span>
+        <span class="bf-wetterlage-label">${escapeHtml(wcT("js.wetterlage.heading"))}${lageLabel ? ` — ${escapeHtml(lageLabel)}` : ""}</span>
       </div>
       <div class="bf-wetterlage-summary">${summaryParas}</div>
       ${longText && longText !== shortText ? `
         <button type="button" class="bf-wetterlage-toggle" aria-expanded="${state.wetterlageOpen ? "true" : "false"}">
-          ${state.wetterlageOpen ? "Weniger" : "Detail"} <span class="bf-wetterlage-chevron" aria-hidden="true">▾</span>
+          ${state.wetterlageOpen ? wcT("js.wetterlage.less") : wcT("js.wetterlage.detail")} <span class="bf-wetterlage-chevron" aria-hidden="true">▾</span>
         </button>
         <div class="bf-wetterlage-long"${state.wetterlageOpen ? "" : " hidden"}>${longHtml}</div>
       ` : ""}
@@ -2201,7 +2206,7 @@
         const longEl = el.querySelector(".bf-wetterlage-long");
         if (longEl) longEl.hidden = !state.wetterlageOpen;
         toggle.setAttribute("aria-expanded", state.wetterlageOpen ? "true" : "false");
-        toggle.firstChild.textContent = (state.wetterlageOpen ? "Weniger" : "Detail") + " ";
+        toggle.firstChild.textContent = (state.wetterlageOpen ? wcT("js.wetterlage.less") : wcT("js.wetterlage.detail")) + " ";
         el.classList.toggle("is-open", state.wetterlageOpen);
       });
     }
