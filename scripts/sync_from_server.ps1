@@ -41,8 +41,13 @@ $FROM_DISK = @(
   "data/region_analyses_en.json",
   "data/wetterdaten.json"          # gross (~200 MB) -> zuletzt
 )
-# davon sind getrackt (muessen fuer sauberen git pull kurz freigegeben werden):
-$TRACKED_DISK = @("data/spot_analyses_en.json","data/region_analyses_en.json")
+# getrackte Analyse-Dateien: vor git pull lokale Aenderungen verwerfen, damit
+# pull nicht mit "clean your working tree" abbricht (auch DE, falls frueher mal
+# per scp ueberschrieben). Werden danach ggf. per scp neu geholt.
+$TRACKED_DISK = @(
+  "data/spot_analyses_en.json","data/region_analyses_en.json",
+  "data/spot_analyses.json","data/region_analyses.json"
+)
 
 # getrackte Server-Daten, die lokal NIE gepusht werden duerfen (skip-worktree):
 $NO_PUSH = @(
