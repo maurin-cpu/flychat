@@ -684,5 +684,42 @@ class TestDecideSchneefallgrenze(unittest.TestCase):
         self.assertLessEqual(ssg["per_day"][0]["ssg_m"], 700)
 
 
+class TestAggregateWindSide(unittest.TestCase):
+    def test_distribution_driver_and_class(self):
+        # 4 Spots: 2x Hoehenwind kritisch, 0x Boeen kritisch → driver=hoehenwind
+        entries = [
+            {"aloft_max": 45.0, "gust_max": 25.0},
+            {"aloft_max": 35.0, "gust_max": 20.0},
+            {"aloft_max": 22.0, "gust_max": 15.0},
+            {"aloft_max": 12.0, "gust_max": 10.0},
+        ]
+        out = sc._aggregate_wind_side(entries)
+        self.assertEqual(out["n_spots"], 4)
+        self.assertEqual(out["share_aloft_crit"], 0.5)
+        self.assertEqual(out["share_gust_crit"], 0.0)
+        self.assertEqual(out["wind_driver"], "hoehenwind")
+        self.assertEqual(out["wind_class"], "stark_eingeschraenkt")
+        # Kumulative Verteilung: >10 → 4/4, >20 → 3/4, >30 → 2/4, >40 → 1/4
+        self.assertEqual(out["aloft_over_kmh"]["10"], 1.0)
+        self.assertEqual(out["aloft_over_kmh"]["20"], 0.75)
+        self.assertEqual(out["aloft_over_kmh"]["30"], 0.5)
+        self.assertEqual(out["aloft_over_kmh"]["40"], 0.25)
+        self.assertEqual(out["aloft_over_kmh"]["60"], 0.0)
+        self.assertEqual(out["gust_over_kmh"]["20"], 0.25)
+
+    def test_calm_side_has_null_driver(self):
+        entries = [{"aloft_max": 12.0, "gust_max": 10.0},
+                   {"aloft_max": 8.0, "gust_max": 12.0}]
+        out = sc._aggregate_wind_side(entries)
+        self.assertIsNone(out["wind_driver"])
+        self.assertEqual(out["wind_class"], "unauffaellig")
+
+    def test_empty_side(self):
+        out = sc._aggregate_wind_side([])
+        self.assertEqual(out["n_spots"], 0)
+        self.assertIsNone(out["aloft_over_kmh"])
+        self.assertIsNone(out["wind_class"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1415,16 +1415,28 @@ def _aggregate_wind_side(entries: list) -> dict:
     n = len(entries)
     if n == 0:
         return {"n_spots": 0, "share_wind_crit": None, "share_wind_warn": None,
+                "share_aloft_crit": None, "share_gust_crit": None,
+                "aloft_over_kmh": None, "gust_over_kmh": None,
+                "wind_driver": None,
                 "max_aloft_kmh": None, "median_aloft_kmh": None,
                 "wind_class": None}
     crit = 0
     warn = 0
+    aloft_crit = 0
+    gust_crit = 0
     alofts = []
+    gusts = []
     for e in entries:
         a = e.get("aloft_max")
         g = e.get("gust_max")
         if a is not None:
             alofts.append(a)
+            if a > config.WIND_DANGER_KMH:
+                aloft_crit += 1
+        if g is not None:
+            gusts.append(g)
+            if g > config.GUST_DANGER_KMH:
+                gust_crit += 1
         is_crit = ((a is not None and a > config.WIND_DANGER_KMH)
                    or (g is not None and g > config.GUST_DANGER_KMH))
         is_warn = is_crit or ((a is not None and a > config.WIND_WARN_KMH)
@@ -1435,6 +1447,31 @@ def _aggregate_wind_side(entries: list) -> dict:
             warn += 1
     share_crit = crit / n
     share_warn = warn / n
+    share_aloft_crit = aloft_crit / n
+    share_gust_crit = gust_crit / n
+
+    # Kumulative Verteilung — Anteil der Spots ueber 10/20/.../60 km/h.
+    # Gibt dem LLM das VOLLE Windbild statt eines einzelnen Schwellen-Flags
+    # ("gut die Haelfte ueber 30, vereinzelt ueber 50" ist eine andere Lage
+    # als "alle knapp ueber 30").
+    def _cum_dist(values: list) -> Optional[dict]:
+        if not values:
+            return None
+        m = len(values)
+        return {str(t): round(sum(1 for v in values if v > t) / m, 2)
+                for t in config.SYNOPTIC_WIND_DIST_BANDS_KMH}
+
+    # Dominante Ursache der Wind-Kritikalitaet — Hoehenwind und Boden-Boeen
+    # haben verschiedene Pilot-Konsequenzen (keine Basis oben vs. Start/
+    # Landung kritisch) und muessen im Text unterscheidbar sein.
+    if share_aloft_crit < 0.15 and share_gust_crit < 0.15:
+        wind_driver = None
+    elif share_aloft_crit >= 2 * share_gust_crit:
+        wind_driver = "hoehenwind"
+    elif share_gust_crit >= 2 * share_aloft_crit:
+        wind_driver = "boeen"
+    else:
+        wind_driver = "beide"
     # Deterministisches Klassen-Label — autoritativ fuer die LLM-Wortwahl.
     # Zahlen-Kalibrierung allein befolgt der LLM unzuverlaessig; ein
     # explizites Label pro Tag/Seite haelt er ein (und der Post-Validator
@@ -1451,6 +1488,11 @@ def _aggregate_wind_side(entries: list) -> dict:
         "n_spots": n,
         "share_wind_crit": round(share_crit, 2),
         "share_wind_warn": round(share_warn, 2),
+        "share_aloft_crit": round(share_aloft_crit, 2),
+        "share_gust_crit": round(share_gust_crit, 2),
+        "aloft_over_kmh": _cum_dist(alofts),
+        "gust_over_kmh": _cum_dist(gusts),
+        "wind_driver": wind_driver,
         "max_aloft_kmh": round(max(alofts), 1) if alofts else None,
         "median_aloft_kmh": round(statistics.median(alofts), 1) if alofts else None,
         "wind_class": wind_class,

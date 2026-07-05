@@ -437,6 +437,28 @@ are actually wind-critical on that day?
 - `share_wind_warn`: share of spots above `wind_warn_kmh` (~20 km/h)
   or `gust_warn_kmh` (~30 km/h) — noticeably windy, restrictions.
   Includes the crit spots (warn >= crit).
+- `aloft_over_kmh`: **the cumulative upper-wind distribution** — share of
+  spots whose flight-band maximum exceeds 10/20/30/40/50/60 km/h.
+  Example: `{"10": 0.99, "20": 0.85, "30": 0.55, "40": 0.20, "50": 0.04,
+  "60": 0.0}` = noticeable wind practically everywhere, a good half above
+  30, a fifth above 40, isolated spots up to 50 — a DIFFERENT situation
+  than "everyone just above 30". Read the full picture from it and phrase
+  it concretely ("above 30 km/h in the flight band at a good half of
+  the spots").
+- `gust_over_kmh`: the same distribution for surface gusts (10 m gusts).
+- `share_aloft_crit` / `share_gust_crit`: share of critical spots due to
+  upper wind ONLY or surface gusts ONLY.
+- `wind_driver`: **the dominant cause** — `"hoehenwind"` (upper wind),
+  `"boeen"` (gusts), `"beide"` (both) or null (wind non-critical).
+  MANDATORY: the wind statement must name the cause, because the pilot
+  consequence differs:
+  * `"hoehenwind"` → too strong aloft, often calm below: "the upper wind
+    is the problem — above 30 km/h in the flight band in many places,
+    moderate at the surface. No usable ceiling, at best wind-sheltered
+    soaring."
+  * `"boeen"` → launch/landing critical: "gusty valley wind, launches
+    tricky — aloft it would work."
+  * `"beide"` → windy throughout, a clear no.
 - `median_aloft_kmh` / `max_aloft_kmh`: median/maximum of the
   flight-band upper wind across the side's spots.
 - `wind_class`: **the authoritative label** per side/day, deterministically

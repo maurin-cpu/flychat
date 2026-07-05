@@ -439,6 +439,25 @@ Fluggebiete sind an dem Tag tatsaechlich windkritisch?
 - `share_wind_warn`: Anteil der Spots ueber `wind_warn_kmh` (~20 km/h)
   bzw. `gust_warn_kmh` (~30 km/h) — spuerbar windig, Einschraenkungen.
   Enthaelt die crit-Spots (warn >= crit).
+- `aloft_over_kmh`: **die kumulative Hoehenwind-Verteilung** — Anteil der
+  Spots, deren Flugband-Maximum ueber 10/20/30/40/50/60 km/h liegt.
+  Beispiel: `{"10": 0.99, "20": 0.85, "30": 0.55, "40": 0.20, "50": 0.04,
+  "60": 0.0}` = praktisch ueberall spuerbarer Wind, gut die Haelfte ueber
+  30, ein Fuenftel ueber 40, vereinzelt bis 50 — eine ANDERE Lage als
+  "alle knapp ueber 30". Lies daraus das volle Bild und formuliere es
+  konkret ("an gut der Haelfte der Spots ueber 30 km/h im Flugband").
+- `gust_over_kmh`: dieselbe Verteilung fuer Boden-Boeen (10-m-Boeen).
+- `share_aloft_crit` / `share_gust_crit`: Anteil kritischer Spots NUR
+  wegen Hoehenwind bzw. NUR wegen Boden-Boeen.
+- `wind_driver`: **die dominante Ursache** — `"hoehenwind"`, `"boeen"`,
+  `"beide"` oder null (Wind unkritisch). PFLICHT: die Wind-Aussage muss
+  die Ursache benennen, denn die Pilot-Konsequenz ist verschieden:
+  * `"hoehenwind"` → oben zu stark, unten oft ruhig: "Hoehenwind ist das
+    Problem — im Flugband verbreitet ueber 30 km/h, am Boden maessig.
+    Keine nutzbare Basis, allenfalls windgeschuetztes Soaring."
+  * `"boeen"` → Start/Landung kritisch: "boeiger Talwind, Starts heikel —
+    in der Hoehe ginge es."
+  * `"beide"` → durchgehend windig, klare Absage.
 - `median_aloft_kmh` / `max_aloft_kmh`: Median/Maximum des
   Flugband-Hoehenwinds ueber die Spots der Seite.
 - `wind_class`: **das autoritative Label** pro Seite/Tag, deterministisch

@@ -448,6 +448,9 @@ SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE = 0.10  # DEPRECATED — ungenutzt
 SYNOPTIC_WIND_BAND_LOWER_M = 200     # Band-Unterkante: Spot-Hoehe + 200 m
 SYNOPTIC_WIND_BAND_UPPER_M = 2000    # Band-Oberkante: Spot-Hoehe + 2000 m
 SYNOPTIC_WIND_HOURS = (10, 17)       # Kern-Flugfenster (lokale Stunden)
+# Kumulative Verteilungs-Baender: Anteil Spots ueber X km/h (Flugband/Boeen).
+# Gibt dem Synoptik-LLM das volle Windbild statt eines Schwellen-Flags.
+SYNOPTIC_WIND_DIST_BANDS_KMH = (10, 20, 30, 40, 50, 60)
 # Kritisch-Schwellen: bewusst identisch zu WIND_WARN_KMH/WIND_DANGER_KMH
 # bzw. GUST_WARN_KMH/GUST_DANGER_KMH (dort definiert) — kein zweites Regime.
 SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # DEPRECATED — ungenutzt (CAPE ≠ Gewitter)
