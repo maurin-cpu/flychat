@@ -2,56 +2,73 @@
 # --------------------
 # NUR auf dem LOKALEN WINDOWS-DEV-PC ausfuehren (PowerShell).
 #
-# Holt in EINEM Befehl den kompletten Server-Stand, damit man lokal exakt die
-# gleiche Ansicht hat wie der Server - OHNE lokal die Analyse-/Wetter-Pipeline
-# laufen zu lassen:
-#   1. git pull            -> Code + getrackte Analysen (region_analyses_en.json ...)
-#   2. scp vom Server      -> die gitignorten Runtime-Daten (wetterdaten.json ~200 MB,
-#                             spot_analyses.json, region_analyses.json, data/history/)
+# Holt in EINEM Befehl den kompletten AKTUELLEN Server-Stand, damit man lokal
+# exakt die gleiche Ansicht hat wie der Server - OHNE lokal die Pipeline laufen
+# zu lassen.
+#
+# WICHTIG: Die App liest zur Laufzeit Dateien, die auf dem Server-DATENTRAEGER
+# oft NEUER sind als der letzte git-Commit (der Analyse-Job schreibt taeglich,
+# committet aber nur ~1x/Tag mit Versatz). Deshalb holen wir die
+# view-relevanten Dateien direkt per scp vom Datentraeger - NICHT ueber git:
+#   - config_overrides.json  (LANG=en etc. -> sonst laueft lokal Default-Deutsch)
+#   - spot_analyses_en.json / region_analyses_en.json  (aktuelle Fliegbarkeit)
+#   - wetterdaten.json  (~200 MB, Rohwetter fuer Meteogramme)
+# git pull liefert nur den Code (+ die evtl. hinterherhinkenden getrackten Daten).
 #
 # Voraussetzung: Windows-OpenSSH (ssh/scp). Test:  ssh deploy@178.105.39.152 "echo ok"
-#
-# Server-Adresse festlegen (eine der drei Varianten):
-#   a) Datei .dev_server im Repo-Root:            deploy@178.105.39.152
-#   b) Argument:   .\scripts\sync_from_server.ps1 deploy@178.105.39.152
-#   c) Default unten (SERVER_DEFAULT).
+# Server-Adresse: Argument > .dev_server-Datei > Default unten.
 #
 param(
   [string]$Server = ""
 )
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 $SERVER_DEFAULT = "deploy@178.105.39.152"
 $REMOTE_DIR     = "/home/deploy/flychat"
 
-# Repo-Root ermitteln und dorthin wechseln
 $root = (git rev-parse --show-toplevel).Trim()
 Set-Location $root
 
-# Server-Adresse: Argument > .dev_server > Default
 if (-not $Server) {
   if (Test-Path ".dev_server") { $Server = (Get-Content ".dev_server" -First 1).Trim() }
 }
 if (-not $Server) { $Server = $SERVER_DEFAULT }
 
-$RUNTIME_FILES = @(
-  "data/config_overrides.json",  # LANG/FORECAST_DAYS/Modelle -> gleiche Ansicht wie Server
-  "data/region_analyses.json",
-  "data/spot_analyses.json",
-  "data/wetterdaten.json"        # gross (~200 MB) -> zuletzt
+# view-relevante Dateien, die wir vom Server-DATENTRAEGER holen (git hinkt hinterher):
+$FROM_DISK = @(
+  "data/config_overrides.json",
+  "data/spot_analyses_en.json",
+  "data/region_analyses_en.json",
+  "data/wetterdaten.json"          # gross (~200 MB) -> zuletzt
 )
+# davon sind getrackt (muessen fuer sauberen git pull kurz freigegeben werden):
+$TRACKED_DISK = @("data/spot_analyses_en.json","data/region_analyses_en.json")
 
-Write-Host "== 1) git pull (Code + getrackte Analysen) =="
+# getrackte Server-Daten, die lokal NIE gepusht werden duerfen (skip-worktree):
+$NO_PUSH = @(
+  "data/spot_analyses_en.json","data/region_analyses_en.json",
+  "data/spot_analyses.json","data/region_analyses.json",
+  "data/synoptic_context.json","data/labeled_examples.jsonl"
+)
+$extra = (git ls-files data/synoptic_audit data/weather_archive) 2>$null
+if ($extra) { $NO_PUSH += ($extra -split "`n" | Where-Object { $_ }) }
+
+Write-Host "== 0) getrackte Analysen fuer sauberen git pull freigeben =="
+git update-index --no-skip-worktree $TRACKED_DISK 2>$null
+git checkout -- $TRACKED_DISK 2>$null
+
+Write-Host "== 1) git pull (nur Code relevant; Daten kommen unten frisch per scp) =="
 git pull --no-rebase
 
-Write-Host "== 2) Runtime-Daten vom Server holen ($Server) =="
-foreach ($f in $RUNTIME_FILES) {
+Write-Host "== 2) skip-worktree setzen -> lokale Daten werden nie gepusht =="
+git update-index --skip-worktree $NO_PUSH 2>$null
+
+Write-Host "== 3) aktuelle view-Daten vom Server-Datentraeger holen ($Server) =="
+foreach ($f in $FROM_DISK) {
   Write-Host "   scp $f ..."
   scp "${Server}:$REMOTE_DIR/$f" $f
 }
-Write-Host "   scp data/history/ ..."
-New-Item -ItemType Directory -Force -Path "data" | Out-Null
-scp -r "${Server}:$REMOTE_DIR/data/history" "data/"
 
 Write-Host ""
-Write-Host "FERTIG. Lokal ist jetzt der Server-Stand da (Code + Analysen + Wetterdaten)."
+Write-Host "FERTIG. Lokal = aktueller Server-Stand (Analysen inkl. Tag 3 + Wetterdaten)."
+Write-Host "App neu starten, dann stimmt die Ansicht."
