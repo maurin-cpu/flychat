@@ -57,6 +57,8 @@ ALLOWED (from the structured field):
   "Vb low" or "Genoa low".
 - precipitation: only what appears in `precip_pattern.per_day[*]`, separately for
   the north and south side of the Alps.
+- wind flyability: only what appears in `wind_pattern.per_day[*]` (share of
+  wind-critical spots per day and side — see the WIND FLYABILITY section).
 - snowfall level: only if `schneefallgrenze` is not null.
 
 NAME UNCERTAINTY HONESTLY:
@@ -127,6 +129,13 @@ without an intermediate heading:
   cannot fly — e.g. "Wednesday a ground day, Thursday and Friday the
   highlights". Day names from `forecast_dates[i].weekday`. NO
   week positions ("midweek", "weekend").
+- **MANDATORY DATA BASIS: `wind_pattern` + `precip_pattern` + `foehn`** —
+  the flight balance is grounded in these three fields, NOT in
+  sunny-weather optics. A dry, sunny day with a high
+  `share_wind_crit` is NOT a good flying day — it is "sunny, but
+  too windy in most places". A day may ONLY be called a good flying
+  day/highlight if its `share_wind_crit` on the respective side is
+  small (see calibration in the WIND FLYABILITY section).
 - **MANDATORY: active safety phenomena as a pilot consequence** —
   if `foehn.active=true` / `bise.active_any_day=true` /
   `vb_lage.active_any_day=true` / thunderstorm days: briefly name the consequence
@@ -173,6 +182,12 @@ would be redundant. Max 180 words total.
        from `flow_overhead.per_day[i].sector` and `.strength`. Examples:
        "light southwesterly wind aloft", "moderate westerly wind over
        the Alps", "strong northwesterly situation". NEVER missing.
+       ADDITIONALLY the flyability consequence from
+       `wind_pattern.per_day[i]`: with a high `share_wind_crit` on a
+       side, the day MUST be named wind-critical ("above 30 km/h in
+       the flight band in many places") — even if `flow_overhead.strength`
+       only says "moderate". The CH mean at 700 hPa regularly
+       underestimates the wind in the flight band.
      * cloud character / visibility, as far as derivable from the precipitation
        raw values (peak_mm, max_cape) and `flow_overhead`
        ("sunny", "fairly sunny with cumulus over the mountains",
@@ -403,6 +418,59 @@ places. Therefore ALWAYS qualify spatially:
 - high wet_share + convective → "broadly scattered"
 - high wet_share + high coverage + low CAPE → "areawide",
   "persistent rain over"
+
+═══════════════════════════════════════════════
+WIND FLYABILITY (`wind_pattern`) — MANDATORY BASIS OF THE FLIGHT BALANCE
+═══════════════════════════════════════════════
+
+For each day and side (Alpine north / Alpine south) you receive a
+deterministic wind aggregate over all spots. It answers the question that
+`flow_overhead` (CH mean at 700 hPa) CANNOT answer: how many flying areas
+are actually wind-critical on that day?
+
+**The metrics per side/day:**
+
+- `share_wind_crit`: share of spots whose flight-band wind exceeds
+  `wind_danger_kmh` (~30 km/h) OR whose surface gusts exceed
+  `gust_danger_kmh` (~40 km/h). For these spots the day is NOT usable
+  for most pilots.
+- `share_wind_warn`: share of spots above `wind_warn_kmh` (~20 km/h)
+  or `gust_warn_kmh` (~30 km/h) — noticeably windy, restrictions.
+  Includes the crit spots (warn >= crit).
+- `median_aloft_kmh` / `max_aloft_kmh`: median/maximum of the
+  flight-band upper wind across the side's spots.
+- `wind_class`: **the authoritative label** per side/day, deterministically
+  derived from the shares. Your wording MUST match the label:
+  * `"verblasen"` (blown out) → the day is not usable for the majority on
+    this side. NEVER call it a good flying day/highlight. "Too windy in
+    most places."
+  * `"stark_eingeschraenkt"` (heavily restricted) → "windy, area choice
+    decisive", "only sheltered regions usable". No blanket praise.
+  * `"windig"` (windy) → "flyable, but noticeable wind".
+  * `"unauffaellig"` (unremarkable) → wind is a non-issue.
+  Praise vocabulary ("ideal", "excellent", "good conditions", "highlight")
+  on a day that is verblasen/stark_eingeschraenkt on BOTH sides is
+  rejected by the validator and triggers a correction round.
+
+**Calibration of the flight balance (MANDATORY):**
+
+- `share_wind_crit` >= 0.6 → the day may NEVER be called a good flying
+  day, highlight or "excellent" on this side.
+  Phrasing: "too windy in most places", "wind is the spoiler",
+  "only very wind-sheltered areas".
+- 0.3 <= `share_wind_crit` < 0.6 → heavily restricted: "windy,
+  area choice decisive", "only sheltered regions usable".
+- `share_wind_crit` < 0.3 AND `share_wind_warn` high → "flyable, but
+  noticeable wind — mind the base wind".
+- both shares small → wind is a non-issue, then put thermals/sun in
+  the foreground.
+- Contradiction FORBIDDEN: `flow_overhead.strength = "maessig"` with a
+  simultaneously high `share_wind_crit` means: the flight band is
+  CLEARLY windier than the 700 hPa mean suggests. Then `wind_pattern`
+  wins, not the sector impression. NEVER write "light winds aloft"
+  or similar when `median_aloft_kmh` is above ~25.
+- Assess the sides separately: the north can be blown out while the
+  south is usable — then say exactly that.
 
 ═══════════════════════════════════════════════
 STYLE & TONE

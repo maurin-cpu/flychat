@@ -147,6 +147,11 @@ def build_synoptic_context(weather_cache: dict,
     precip = decide_precip_pattern_nord_sued(weather_cache, forecast_dates)
     decisions_applied.append("decide_precip_pattern_nord_sued")
 
+    # 8b. Wind-Fliegbarkeit (Anteile windkritischer Spots pro Tag/Seite) —
+    # autoritative Basis fuer die Flug-Bilanz des LLM-Overviews.
+    wind_pattern = decide_wind_pattern_nord_sued(weather_cache, forecast_dates)
+    decisions_applied.append("decide_wind_pattern_nord_sued")
+
     current_month = datetime.now().month
     ssg = decide_schneefallgrenze(snapshots, current_month)
     if ssg:
@@ -172,6 +177,7 @@ def build_synoptic_context(weather_cache: dict,
         "vb_lage": vb_lage,
         "foehn": foehn,
         "precip_pattern": precip,
+        "wind_pattern": wind_pattern,
         "schneefallgrenze": ssg,
         "confidence_per_day": [
             {"date": forecast_dates[i], "level": confidence[i]}
@@ -1332,6 +1338,174 @@ def decide_precip_pattern_nord_sued(weather_cache: dict,
         "n_sued_spots": n_sued_spots,
         "decided_by": "decide_precip_pattern_nord_sued",
         "dry_mm": config.SYNOPTIC_PRECIP_DRY_MM,  # Threshold fuer wet_share-Zaehlung
+    }
+
+
+# Drucklevels, aus denen das Flugband interpolationsfrei bedient wird —
+# identisch zur fetch_weather-Levelliste (600 hPa deckt ~4200 m ab).
+_WIND_PL_LEVELS = (1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 600)
+
+
+def _spot_day_wind(spot: dict, date: str) -> Optional[dict]:
+    """Max. Flugband-Hoehenwind + Boden-Boeen eines Spots am Tag (Kernstunden).
+
+    Flugband = Spot-Hoehe + [SYNOPTIC_WIND_BAND_LOWER_M, SYNOPTIC_WIND_BAND_UPPER_M].
+    Vereinfachung gegenueber der Spot-Analyse (_check_aloft_in_band nutzt das
+    Thermik-Top-Band mit Interpolation): hier zaehlen die PL-Knoten, deren
+    geopotential_height im Band liegt — fuers CH-weite Anteils-Aggregat genug.
+
+    Returns {"aloft_max": kmh, "gust_max": kmh} oder None ohne Daten.
+    """
+    elev = spot.get("elevation_m")
+    if elev is None:
+        return None
+    band_lo = elev + config.SYNOPTIC_WIND_BAND_LOWER_M
+    band_hi = elev + config.SYNOPTIC_WIND_BAND_UPPER_M
+    h_lo, h_hi = config.SYNOPTIC_WIND_HOURS
+
+    pld = spot.get("pressure_level_data") or {}
+    hd = spot.get("hourly_data") or {}
+
+    aloft_max = None
+    gust_max = None
+    for t, rec in pld.items():
+        if not t.startswith(date):
+            continue
+        try:
+            hour = int(t[11:13])
+        except (ValueError, IndexError):
+            continue
+        if not (h_lo <= hour <= h_hi):
+            continue
+        for lvl in _WIND_PL_LEVELS:
+            gh = rec.get(f"geopotential_height_{lvl}hPa")
+            ws = rec.get(f"wind_speed_{lvl}hPa")
+            if gh is None or ws is None:
+                continue
+            if band_lo <= gh <= band_hi:
+                if aloft_max is None or ws > aloft_max:
+                    aloft_max = ws
+    for t, rec in hd.items():
+        if not t.startswith(date):
+            continue
+        try:
+            hour = int(t[11:13])
+        except (ValueError, IndexError):
+            continue
+        if not (h_lo <= hour <= h_hi):
+            continue
+        g = rec.get("wind_gusts_10m")
+        if g is not None and (gust_max is None or g > gust_max):
+            gust_max = g
+
+    if aloft_max is None and gust_max is None:
+        return None
+    return {"aloft_max": aloft_max, "gust_max": gust_max}
+
+
+def _aggregate_wind_side(entries: list) -> dict:
+    """Aggregiert Spot-Windwerte einer Alpenseite zu Anteils-Kennzahlen.
+
+    crit  = Hoehenwind > WIND_DANGER_KMH ODER Boeen > GUST_DANGER_KMH
+            (fuer die meisten Piloten kein nutzbarer Tag)
+    warn  = Hoehenwind > WIND_WARN_KMH ODER Boeen > GUST_WARN_KMH
+            (spuerbar windig, Einschraenkungen) — enthaelt crit NICHT doppelt,
+            share_warn zaehlt inkl. crit-Spots (monotone Lesart: warn >= crit).
+    """
+    n = len(entries)
+    if n == 0:
+        return {"n_spots": 0, "share_wind_crit": None, "share_wind_warn": None,
+                "max_aloft_kmh": None, "median_aloft_kmh": None,
+                "wind_class": None}
+    crit = 0
+    warn = 0
+    alofts = []
+    for e in entries:
+        a = e.get("aloft_max")
+        g = e.get("gust_max")
+        if a is not None:
+            alofts.append(a)
+        is_crit = ((a is not None and a > config.WIND_DANGER_KMH)
+                   or (g is not None and g > config.GUST_DANGER_KMH))
+        is_warn = is_crit or ((a is not None and a > config.WIND_WARN_KMH)
+                              or (g is not None and g > config.GUST_WARN_KMH))
+        if is_crit:
+            crit += 1
+        if is_warn:
+            warn += 1
+    share_crit = crit / n
+    share_warn = warn / n
+    # Deterministisches Klassen-Label — autoritativ fuer die LLM-Wortwahl.
+    # Zahlen-Kalibrierung allein befolgt der LLM unzuverlaessig; ein
+    # explizites Label pro Tag/Seite haelt er ein (und der Post-Validator
+    # prueft Lob-Vokabular dagegen).
+    if share_crit >= 0.6:
+        wind_class = "verblasen"
+    elif share_crit >= 0.3:
+        wind_class = "stark_eingeschraenkt"
+    elif share_warn >= 0.5:
+        wind_class = "windig"
+    else:
+        wind_class = "unauffaellig"
+    return {
+        "n_spots": n,
+        "share_wind_crit": round(share_crit, 2),
+        "share_wind_warn": round(share_warn, 2),
+        "max_aloft_kmh": round(max(alofts), 1) if alofts else None,
+        "median_aloft_kmh": round(statistics.median(alofts), 1) if alofts else None,
+        "wind_class": wind_class,
+    }
+
+
+def decide_wind_pattern_nord_sued(weather_cache: dict,
+                                  forecast_dates: list[str]) -> dict:
+    """Aggregiert Wind-Fliegbarkeit pro Tag separat fuer Alpennord und -sued.
+
+    Pro Spot pro Tag: max. Hoehenwind im vereinfachten Flugband + max.
+    Boden-Boeen im Kern-Flugfenster. Aggregation pro Seite zu Anteilen
+    (share_wind_crit/share_wind_warn) — die autoritative Datenbasis fuer
+    die Flug-Bilanz des Synoptik-Blocks. Hintergrund: 05.07.2026 nannte
+    die Synoptik einen Tag "excellent", an dem 23/29 Regionen am
+    Hoehenwind scheiterten — sie hatte schlicht keine Wind-Fliegbarkeits-
+    Daten im Input.
+    """
+    per_day = []
+    spot_class = {}
+    for spot_name, spot in weather_cache.items():
+        if spot_name.startswith("_"):
+            continue
+        spot_class[spot_name] = _classify_nord_sued(
+            spot.get("latitude"), spot.get("longitude"))
+
+    for date in forecast_dates:
+        nord_day = []
+        sued_day = []
+        for spot_name, side in spot_class.items():
+            w = _spot_day_wind(weather_cache[spot_name], date)
+            if w is None:
+                continue
+            if side == "alpennord":
+                nord_day.append(w)
+            elif side == "alpensued":
+                sued_day.append(w)
+        per_day.append({
+            "date": date,
+            "alpennord": _aggregate_wind_side(nord_day),
+            "alpensued": _aggregate_wind_side(sued_day),
+        })
+
+    return {
+        "per_day": per_day,
+        "decided_by": "decide_wind_pattern_nord_sued",
+        "thresholds": {
+            "wind_warn_kmh": config.WIND_WARN_KMH,
+            "wind_danger_kmh": config.WIND_DANGER_KMH,
+            "gust_warn_kmh": config.GUST_WARN_KMH,
+            "gust_danger_kmh": config.GUST_DANGER_KMH,
+            "band_above_spot_m": [config.SYNOPTIC_WIND_BAND_LOWER_M,
+                                  config.SYNOPTIC_WIND_BAND_UPPER_M],
+            "hours": list(config.SYNOPTIC_WIND_HOURS),
+        },
     }
 
 

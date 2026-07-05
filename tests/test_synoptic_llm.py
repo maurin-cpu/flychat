@@ -91,6 +91,42 @@ class TestValidate(unittest.TestCase):
         errors = sl._validate(_parsed(lead="Wort " * 200), _ctx())
         self.assertTrue(any(e["kind"] == "too_long" for e in errors))
 
+    def test_reject_praise_on_blown_out_day(self):
+        ctx = _ctx()
+        ctx["wind_pattern"] = {"per_day": [
+            {"date": "2026-07-05",
+             "alpennord": {"wind_class": "verblasen"},
+             "alpensued": {"wind_class": "stark_eingeschraenkt"}},
+            {"date": "2026-07-06",
+             "alpennord": {"wind_class": "unauffaellig"},
+             "alpensued": {"wind_class": "unauffaellig"}},
+        ]}
+        days = [{"text": "Sonnig und trocken.",
+                 "flight_hint": "Gute Flugbedingungen, ideal für XC."},
+                {"text": "Stabil.", "flight_hint": "Gut fliegbar."}]
+        errors = sl._validate(_parsed(days=days), ctx)
+        self.assertTrue(any(e["kind"] == "wind_contradiction"
+                            and e["scope"] == "days[0]" for e in errors))
+        # Tag 2 ist unauffaellig — Lob dort erlaubt
+        self.assertFalse(any(e["kind"] == "wind_contradiction"
+                             and e["scope"] == "days[1]" for e in errors))
+
+    def test_praise_allowed_when_one_side_ok(self):
+        ctx = _ctx()
+        ctx["wind_pattern"] = {"per_day": [
+            {"date": "2026-07-05",
+             "alpennord": {"wind_class": "verblasen"},
+             "alpensued": {"wind_class": "unauffaellig"}},
+            {"date": "2026-07-06",
+             "alpennord": {"wind_class": "windig"},
+             "alpensued": {"wind_class": "windig"}},
+        ]}
+        days = [{"text": "Nordseite verblasen, Tessin ideal.",
+                 "flight_hint": "Suedseite gute Flugbedingungen."},
+                {"text": "Stabil.", "flight_hint": "Gut fliegbar."}]
+        errors = sl._validate(_parsed(days=days), ctx)
+        self.assertFalse(any(e["kind"] == "wind_contradiction" for e in errors))
+
     def test_reject_foehn_lee_inversion(self):
         foehn = {"per_day": [
             {"date": "2026-07-05", "nord_active": False, "sued_active": False},
@@ -121,6 +157,26 @@ class TestFinalize(unittest.TestCase):
         out = sl._finalize(_parsed(days=days), _ctx(), attempts=1, unresolved=[])
         self.assertTrue(out["long_with_sources"][0]["text"].startswith("Sonntag: "))
         self.assertTrue(out["long_with_sources"][1]["text"].startswith("Montag: "))
+
+    def test_parenthetical_and_stacked_prefixes_stripped(self):
+        # Der 05.07.-Fall: LLM schrieb "Sonntag (Sunday):" → frueher wurde
+        # "Sonntag: " nochmal davor gesetzt. Auch gestapelte + EN-Praefixe.
+        days = [{"text": "Sonntag (Sunday): High pressure settles in.",
+                 "flight_hint": "Gut."},
+                {"text": "Montag: Montag (Monday): A foehn affects the south.",
+                 "flight_hint": "Gut."}]
+        out = sl._finalize(_parsed(days=days), _ctx(), attempts=1, unresolved=[])
+        self.assertEqual(out["long_with_sources"][0]["text"],
+                         "Sonntag: High pressure settles in.")
+        self.assertEqual(out["long_with_sources"][1]["text"],
+                         "Montag: A foehn affects the south.")
+
+    def test_english_prefix_replaced(self):
+        days = [{"text": "Sunday: sunny.", "flight_hint": "Gut."},
+                {"text": "Tomorrow: windy.", "flight_hint": "Gut."}]
+        out = sl._finalize(_parsed(days=days), _ctx(), attempts=1, unresolved=[])
+        self.assertEqual(out["long_with_sources"][0]["text"], "Sonntag: sunny.")
+        self.assertEqual(out["long_with_sources"][1]["text"], "Montag: windy.")
 
     def test_prune_removes_violating_day_keeps_rest(self):
         days = [{"text": "Eine Kaltfront zieht durch.", "flight_hint": "Gut."},

@@ -260,6 +260,31 @@ def _find_forbidden_term(text: str) -> Optional[str]:
     return None
 
 
+# Lob-Vokabular, das an beidseitig windkritischen Tagen (wind_class
+# verblasen/stark_eingeschraenkt auf BEIDEN Seiten) verboten ist —
+# DE + EN, bewusst kurze Liste mit eindeutigen Gesamturteils-Phrasen.
+_PRAISE_RE = re.compile(
+    r"(ideal|excellent|exzellent|hervorragend|perfekt|perfect|highlight|"
+    r"top-?tag|beste[rn]?\s+(flug)?tag|best\s+day|"
+    r"gute[rn]?\s+flug(tag|bedingungen)|good\s+(flying\s+day|conditions)|"
+    r"great\s+(day|conditions))",
+    re.IGNORECASE,
+)
+
+_WINDY_CLASSES = {"verblasen", "stark_eingeschraenkt"}
+
+
+def _day_wind_classes(ctx: dict, i: int) -> tuple:
+    """(nord_class, sued_class) fuer Forecast-Tag i, oder (None, None)."""
+    wp = ctx.get("wind_pattern") or {}
+    per_day = wp.get("per_day") or []
+    if i >= len(per_day):
+        return None, None
+    d = per_day[i]
+    return ((d.get("alpennord") or {}).get("wind_class"),
+            (d.get("alpensued") or {}).get("wind_class"))
+
+
 def _validate(parsed: dict, ctx: dict) -> list:
     """Prueft den LLM-Output inhaltlich und strukturell.
 
@@ -342,6 +367,22 @@ def _validate(parsed: dict, ctx: dict) -> list:
                                 f"aktiv — die {lee} ist die boeige LEE-Seite und "
                                 f"darf NICHT als geschuetzt/ruhig beschrieben "
                                 f"werden."))
+
+        # Wind-Konsistenz: an Tagen, die auf BEIDEN Seiten windkritisch
+        # klassifiziert sind, darf der Tag nicht pauschal gelobt werden.
+        nord_cls, sued_cls = _day_wind_classes(ctx, i)
+        both_windy = (nord_cls in _WINDY_CLASSES and sued_cls in _WINDY_CLASSES)
+        if both_windy:
+            hint_str = d.get("flight_hint") if isinstance(d.get("flight_hint"), str) else ""
+            praise = _PRAISE_RE.search(text) or _PRAISE_RE.search(hint_str)
+            if praise:
+                errors.append(_verr(scope, "wind_contradiction",
+                                    f"Der Tag ist laut `wind_pattern` auf beiden "
+                                    f"Alpenseiten windkritisch (Nord: {nord_cls}, "
+                                    f"Sued: {sued_cls}), wird aber gelobt "
+                                    f"('{praise.group(0)}'). Wortwahl muss die "
+                                    f"Windlage widerspiegeln: 'vielerorts zu "
+                                    f"windig' / 'nur windgeschuetzte Lagen'."))
 
         hint = d.get("flight_hint")
         if not isinstance(hint, str) or len(hint.strip()) < 3:
@@ -598,6 +639,7 @@ def _build_llm_payload(ctx: dict) -> str:
                 for d in (ctx.get("precip_pattern") or {}).get("per_day", [])
             ],
         },
+        "wind_pattern": _wind_pattern_for_llm(ctx.get("wind_pattern")),
         "schneefallgrenze": (
             None if ctx.get("schneefallgrenze") is None
             else {
@@ -622,6 +664,19 @@ def _strip_provenance(field: Optional[dict]) -> Optional[dict]:
         return None
     return {k: v for k, v in field.items()
             if k not in ("decided_by", "inputs", "thresholds", "source")}
+
+
+def _wind_pattern_for_llm(wp: Optional[dict]) -> Optional[dict]:
+    """Wind-Fliegbarkeits-Aggregat fuer den LLM-Input: per_day + Schwellen,
+    ohne decided_by. Das ist die autoritative Basis der Flug-Bilanz —
+    ohne diese Daten hat der LLM Tage als "excellent" verkauft, an denen
+    die Mehrheit der Spots am Hoehenwind scheiterte (05.07.2026)."""
+    if wp is None:
+        return None
+    return {
+        "per_day": wp.get("per_day") or [],
+        "thresholds": wp.get("thresholds") or {},
+    }
 
 
 def _flow_overhead_for_llm(fo: Optional[dict]) -> Optional[dict]:
@@ -657,11 +712,16 @@ def _collect_valid_center_labels(ctx: dict) -> set:
     return labels
 
 
-# Praefix-Regex: "Heute:", "Morgen:", "Uebermorgen:", "Tag 1:" oder Wochentag.
+# Praefix-Regex: "Heute:", "Morgen:", "Uebermorgen:", "Tag 1:" oder Wochentag
+# (DE + EN, optional mit Klammer-Zusatz wie "Sonntag (Sunday):" — der LLM
+# haengt im EN-Modus gerne die Uebersetzung an; ohne Klammer-Support wurde
+# daraus "Sonntag: Sonntag (Sunday): ..." mit Doppel-Praefix, 05.07.2026).
 _WEEKDAY_SET = {w.lower() for w in _WOCHENTAGE}
 _PREFIX_RE = re.compile(
-    r"^(Heute|Morgen|Uebermorgen|Übermorgen|Tag\s*\d+|"
-    r"Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)\s*:\s*",
+    r"^(Heute|Morgen|Uebermorgen|Übermorgen|Tag\s*\d+|Today|Tomorrow|Day\s*\d+|"
+    r"Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|"
+    r"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
+    r"\s*(?:\([^)]{0,30}\))?\s*:\s*",
     re.IGNORECASE,
 )
 
@@ -683,17 +743,19 @@ def _apply_weekday_prefix(text: str, forecast_dates: list, i: int) -> str:
         correct_wd = _weekday_de(forecast_dates[i])
     except Exception:
         return text
-    m = _PREFIX_RE.match(text)
-    if m:
-        existing = m.group(1).strip()
-        if existing.lower() == correct_wd.lower():
-            return text
-        logger.info("Wetterlage-Praefix korrigiert (day %d): '%s' -> '%s'",
-                    i + 1, existing, correct_wd)
-        return f"{correct_wd}: {text[m.end():].lstrip()}"
-    logger.info("Wetterlage-Praefix ergaenzt (day %d, kein Praefix): '%s'",
-                i + 1, correct_wd)
-    return f"{correct_wd}: {text.lstrip()}"
+    # ALLE fuehrenden Praefix-Varianten abraeumen (auch gestapelte wie
+    # "Sonntag: Sonntag (Sunday):"), dann kanonisch neu setzen.
+    stripped = text
+    for _ in range(3):
+        m = _PREFIX_RE.match(stripped)
+        if not m:
+            break
+        stripped = stripped[m.end():].lstrip()
+    new_text = f"{correct_wd}: {stripped}"
+    if new_text != text:
+        logger.info("Wetterlage-Praefix normalisiert (day %d) -> '%s'",
+                    i + 1, correct_wd)
+    return new_text
 
 
 # Kalenderwochen-Begriffe → zeitraum-neutral. Der Cast ist ein rollierender
