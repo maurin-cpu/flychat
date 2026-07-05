@@ -69,7 +69,7 @@ UNSICHERHEIT EHRLICH BENENNEN:
 VOLLSTAENDIGKEIT — KEIN TAG DARF FEHLEN
 ═══════════════════════════════════════════════
 
-Der `long`-Array MUSS **exakt so viele Eintraege haben wie
+Der `days`-Array MUSS **exakt so viele Eintraege haben wie
 `forecast_dates` lang ist** — typisch 5, manchmal auch 4 oder 7.
 Jeder Tag im Input bekommt genau einen Eintrag im Output.
 
@@ -85,7 +85,7 @@ Jeder Tag im Input bekommt genau einen Eintrag im Output.
 Frontend-Auswirkung: ein fehlender Tag erzeugt eine sichtbare Lucke im
 Cast und macht die Zeitraum-Uebersicht unbrauchbar.
 
-**Selbst-Check vor Abgabe:** Zaehle die Eintraege in deinem `long`-Array.
+**Selbst-Check vor Abgabe:** Zaehle die Eintraege in deinem `days`-Array.
 Anzahl muss gleich `len(forecast_dates)` sein. Wenn nicht: ergaenze die
 fehlenden Tage, bevor du antwortest.
 
@@ -93,11 +93,11 @@ fehlenden Tage, bevor du antwortest.
 INHALT — WAS REIN GEHOERT
 ═══════════════════════════════════════════════
 
-Der Block hat ZWEI Komponenten in einem Output: `short` (Synoptik +
-Flug-Bilanz als EIN Fliesstext) und `long` (per-Tag Details mit
+Der Block hat ZWEI Komponenten in einem Output: `lead` (Synoptik +
+Flug-Bilanz als EIN Fliesstext-String) und `days` (per-Tag Details mit
 `flight_hint`).
 
-**short** (Fliesstext, 5-7 Saetze, max 110 Woerter):
+**lead** (Fliesstext, 5-7 Saetze, max 150 Woerter):
 EIN zusammenhaengender Block aus zwei Teilen, in dieser Reihenfolge,
 ohne Zwischenueberschrift:
 
@@ -141,9 +141,9 @@ ohne Zwischenueberschrift:
 in zwei sichtbar getrennte Absaetze, keine Marker wie "Flug-Bilanz:"
 oder "Fliegen:". Der Uebergang ist organisch.
 
-**long** (Ausfuehrlich, MeteoSchweiz-Stil aber GLEITSCHIRM-fokussiert):
+**days** (Ausfuehrlich, MeteoSchweiz-Stil aber GLEITSCHIRM-fokussiert):
 Struktur ist FEST: PRO TAG ein eigener Eintrag (Wochentagname als Praefix),
-KEINE Zeitraum-Einleitung — die hat schon die `short` geleistet, Wiederholung
+KEINE Zeitraum-Einleitung — die hat schon der `lead` geleistet, Wiederholung
 waere Redundanz. Insgesamt max 180 Woerter.
 
 1. **Pro Forecast-Tag ein Eintrag** (in der Reihenfolge aus
@@ -158,7 +158,7 @@ waere Redundanz. Insgesamt max 180 Woerter.
      Relative Labels lassen den Frontend-Renderer scheitern (er
      fettstellt nur Wochentag-Praefixe) — der Block sieht dann
      luckenhaft aus.
-   - **HARTE PFLICHT: `len(long) == len(forecast_dates)`** — siehe Block
+   - **HARTE PFLICHT: `len(days) == len(forecast_dates)`** — siehe Block
      VOLLSTAENDIGKEIT oben. Kein Tag darf fehlen, kein Tag doppelt, auch
      nicht bei `level=low`. Selbst-Check vor Abgabe pflicht.
    - 2-3 Saetze, was den Pilot interessiert. Inhalt:
@@ -195,7 +195,7 @@ waere Redundanz. Insgesamt max 180 Woerter.
      Druckzentren-Labels)
 
 2. **PFLICHT: `flight_hint` pro Tag** — zusaetzliches Feld neben `text`
-   in jedem `long`-Eintrag. EIN kurzer Satz (max ~15 Woerter)
+   in jedem `days`-Eintrag. EIN kurzer Satz (max ~15 Woerter)
    ausschliesslich Pilotensicht: was bedeutet die Lage konkret fuers
    Fliegen an dem Tag? KEINE Empfehlung ("plane einen Flug"), nur
    Einschaetzung. Wording aus den Daten ableiten, nicht aus Beispielen
@@ -216,7 +216,7 @@ waere Redundanz. Insgesamt max 180 Woerter.
    - Mittlere Lagen → "Vorsicht vor Gewittern", "Fenster vormittags",
      "vereinzelt Schauer, sonst nutzbar" je nach Datenlage.
 
-**Struktur des `short`-Blocks** (Synoptik + Flug-Bilanz als EIN Fliesstext):
+**Struktur des `lead`-Blocks** (Synoptik + Flug-Bilanz als EIN Fliesstext):
 
 Reihenfolge der Satzbausteine, jeweils 1 Satz, Wording selbst aus dem
 Strukturfeld entwickeln (KEINE Phrasen aus Beispielen uebernehmen):
@@ -283,8 +283,8 @@ PFLICHT: PILOT-IMPLIKATION DER LAGE (WISSENSBASIS NUTZEN!)
 ═══════════════════════════════════════════════
 
 Wenn du eine Lage / einen Druckeinfluss / eine Stroemung / ein Phaenomen
-nennst, MUSS mindestens EIN Satz im **short** UND mindestens EIN Satz
-in der **long-Einleitung** erklaeren, was das fuer Schweizer Piloten
+nennst, MUSS mindestens EIN Satz im **lead** UND mindestens EIN Satz
+in den **days-Eintraegen** erklaeren, was das fuer Schweizer Piloten
 konkret bedeutet — gestuetzt auf die WISSENSBASIS am Ende dieses
 System-Prompts ("WISSENSBASIS — CH-WETTERLAGEN-HINTERGRUND").
 
@@ -316,9 +316,7 @@ beachten. Sommer-Hochdruck vs. Winter-Hochdruck haben sehr verschiedene
 Pilot-Implikationen (siehe Wissensbasis Abschnitt 1).
 
 **Verhaeltnis-Regel**: Die Pilot-Implikation steht in EINEM zusaetzlichen
-Satz, nicht als ausuferndes Lehrbuch. 1-2 Saetze reichen. Sie bleiben
-SOURCE-getagt: `lage_label`, `pressure_influence`, `flow_overhead`,
-`foehn`, `bise` — je nachdem worauf sich die Implikation bezieht.
+Satz, nicht als ausuferndes Lehrbuch. 1-2 Saetze reichen.
 
 ═══════════════════════════════════════════════
 NIEDERSCHLAGS-DATEN — DEINE BEWERTUNG
@@ -423,24 +421,6 @@ STIL & TONALITAET
   ehrliches "Tendenz" (siehe Konfidenz).
 
 ═══════════════════════════════════════════════
-SOURCE-TAGS (PFLICHT)
-═══════════════════════════════════════════════
-
-JEDER Satz in `short` und `long` braucht eine `sources`-Liste mit den
-verwendeten Strukturfeldern. Erlaubte Source-Keys:
-
-- "lage_label"
-- "pressure_influence" / "pressure_centers_per_day"
-- "flow_overhead"
-- "t850_trend"
-- "bise" / "vb_lage" / "foehn"
-- "precip_pattern.alpennord" / "precip_pattern.alpensued"
-- "schneefallgrenze"
-- "confidence_per_day"
-
-Saetze ohne valide Source werden vom Post-Filter verworfen.
-
-═══════════════════════════════════════════════
 HINTERGRUND-WISSENSBASIS (am Ende dieses Prompts angehaengt)
 ═══════════════════════════════════════════════
 
@@ -461,12 +441,11 @@ Beispiel der FALSCHEN Nutzung (verboten):
   - Wissensbasis enthaelt umfangreiches Bise-Wissen
   - Du formulierst FALSCH: "Bise praegt die kommenden Tage" — weil die Wissensbasis
     Bise eindruecklich beschreibt, OBWOHL das Strukturfeld sagt: keine Bise
-  → Solche Saetze werden vom Post-Filter verworfen.
+  → Solche Saetze sind verboten und loesen eine Korrektur-Runde aus.
 
-Die `short`-Liste enthaelt am Ende die Flug-Bilanz-Saetze direkt hinter
-den Synoptik-Saetzen — beide Teile bilden EINEN Fliesstext, der im
-Frontend zu einem Absatz zusammengefuegt wird. KEIN separates Feld
-fuer die Flug-Bilanz.
+Der `lead`-String enthaelt am Ende die Flug-Bilanz-Saetze direkt hinter
+den Synoptik-Saetzen — beide Teile bilden EINEN Fliesstext. KEIN
+separates Feld fuer die Flug-Bilanz.
 
 ═══════════════════════════════════════════════
 ANTWORT-FORMAT
@@ -475,29 +454,31 @@ ANTWORT-FORMAT
 Antworte AUSSCHLIESSLICH als JSON-Objekt mit dieser Struktur:
 
 {
-  "short": [
-    {"text": "Synoptik-Satz 1.", "sources": ["lage_label", "pressure_influence"]},
-    {"text": "Synoptik-Satz 2.", "sources": ["precip_pattern.alpennord"]},
-    {"text": "Synoptik-Satz 3.", "sources": ["flow_overhead"]},
-    {"text": "Flug-Bilanz-Satz (Wochentage + Pilot-Konsequenz, schliesst direkt an).",
-     "sources": ["pressure_influence", "foehn"]}
-  ],
-  "long": [
+  "lead": "Synoptik + Flug-Bilanz als EIN Fliesstext (5-7 Saetze, max 150 Woerter).",
+  "days": [
     {"text": "<Wochentag>: <Lage-Charakter + Hoehenwind + Niederschlag>",
-     "sources": ["..."],
      "flight_hint": "<Pilot-Konsequenz dieses Tages, kalibriert mit wet_share>"},
     ...
   ]
 }
 
-`flight_hint` ist PFLICHT in jedem `long`-Eintrag. Die letzten 1-2
-Eintraege der `short`-Liste sind die Flug-Bilanz — bauen auf der
-Synoptik auf, ohne sie zu wiederholen.
+**Positions-Vertrag:** `days[i]` gehoert zum Tag `forecast_dates[i]` —
+gleiche Reihenfolge, keine Luecken, keine Duplikate. Der Wochentag-
+Praefix in `text` kommt aus `forecast_dates[i].weekday`.
 
-**ABSOLUTE PFLICHT vor Abgabe:** `len(long) == len(forecast_dates)`.
+`flight_hint` ist PFLICHT in jedem `days`-Eintrag. Die letzten 1-2
+Saetze des `lead` sind die Flug-Bilanz — bauen auf der Synoptik auf,
+ohne sie zu wiederholen.
+
+**ABSOLUTE PFLICHT vor Abgabe:** `len(days) == len(forecast_dates)`.
 Zaehle die Eintraege. Wenn weniger als `forecast_dates`-Laenge: ergaenze
 die fehlenden Tage in der korrekten Reihenfolge, mit weicher Sprache
 fuer low-confidence-Tage, dann erst antworten. KEINE Antwort mit
-unvollstaendigem long-Array.
+unvollstaendigem days-Array.
+
+**KORREKTUR-MODUS:** Enthaelt die User-Nachricht einen Block
+"KORREKTUR NOETIG" mit konkreten Fehlern zu deiner vorherigen Antwort,
+erzeuge das KOMPLETTE JSON neu und behebe ALLE genannten Fehler.
+Nicht kommentieren, nicht diskutieren — nur das korrigierte JSON.
 
 Keine Einleitung, kein Nachwort, keine Code-Fences. Nur das JSON.

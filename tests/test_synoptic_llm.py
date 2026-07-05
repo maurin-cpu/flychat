@@ -1,9 +1,11 @@
-"""Tests fuer engine/synoptic_llm.py — Post-Filter und Payload-Builder.
+"""Tests fuer engine/synoptic_llm.py — Validierung, Finalisierung, Payload.
 
-Deckt Halluzinations-Schutz ab:
-  - Verbotsbegriffe werden verworfen (Kaltfront, Trog, hPa-Werte, ...)
-  - Ungueltige Source-Tags fuehren zur Ablehnung
-  - Erfundene Region-Labels werden erkannt
+Deckt Halluzinations-Schutz und den Korrektur-Loop-Vertrag ab:
+  - _validate erkennt Verbotsbegriffe, erfundene Regionen, Schema-Fehler,
+    fehlende flight_hints, Foehn-Lee-Inversionen — und liefert eine
+    Fehlerliste (loescht selbst NICHTS)
+  - _finalize baut das Kompatibilitaets-Format (short/long/long_with_sources),
+    setzt Wochentag-Praefixe autoritativ, prune=True entfernt chirurgisch
   - Provenance wird vor LLM-Uebergabe gestrippt
 
 LLM-Calls selbst werden NICHT getestet (Integration).
@@ -14,87 +16,151 @@ import config
 from engine import synoptic_llm as sl
 
 
-class TestFilterStatements(unittest.TestCase):
-    def setUp(self):
-        self.valid_centers = {"Schottland", "Azoren"}
+def _ctx(dates=("2026-07-05", "2026-07-06"), centers=("Azoren",), foehn=None):
+    """Minimales Strukturfeld fuer Validierungs-Tests."""
+    return {
+        "forecast_dates": list(dates),
+        "pressure_centers_per_day": [{
+            "date": dates[0],
+            "centers": [{"type": "Hoch", "region_label": c} for c in centers],
+        }],
+        "foehn": foehn or {},
+    }
 
-    def test_accept_clean_statement(self):
-        statements = [{
-            "text": "Hochdruck dominiert die Woche.",
-            "sources": ["pressure_influence"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(len(out), 1)
 
-    def test_reject_kaltfront(self):
-        statements = [{
-            "text": "Eine Kaltfront zieht Mittwoch durch.",
-            "sources": ["pressure_influence"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(out, [])
+def _parsed(lead="Ruhige Hochdrucklage praegt die Tage.", days=None, n_days=2):
+    if days is None:
+        days = [{"text": f"Tag {i+1} stabil und sonnig.",
+                 "flight_hint": "Gute Thermik erwartet."} for i in range(n_days)]
+    return {"lead": lead, "days": days}
 
-    def test_reject_hpa_value(self):
-        statements = [{
-            "text": "Der Druck steigt auf 1025 hPa.",
-            "sources": ["pressure_influence"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(out, [])
 
-    def test_reject_trog(self):
-        statements = [{
-            "text": "Ein Trog ueber Westeuropa bringt Wechsel.",
-            "sources": ["pressure_centers_per_day"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(out, [])
+class TestValidate(unittest.TestCase):
+    def test_accept_clean_output(self):
+        errors = sl._validate(_parsed(), _ctx())
+        self.assertEqual(errors, [])
 
-    def test_reject_geopotential(self):
-        statements = [{
-            "text": "Das Geopotential auf 500 hPa zeigt einen Trog.",
-            "sources": ["flow_overhead"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(out, [])
+    def test_reject_kaltfront_in_lead(self):
+        errors = sl._validate(_parsed(lead="Eine Kaltfront zieht durch."), _ctx())
+        self.assertTrue(any(e["kind"] == "forbidden_term" and e["scope"] == "lead"
+                            for e in errors))
 
-    def test_reject_invalid_source(self):
-        statements = [{
-            "text": "Hochdruck dominiert.",
-            "sources": ["pressure_influence", "made_up_source"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(out, [])
+    def test_reject_hpa_value_in_day(self):
+        days = [{"text": "Der Druck steigt auf 1025 hPa.",
+                 "flight_hint": "Ruhiger Tag."},
+                {"text": "Stabil.", "flight_hint": "Gut fliegbar."}]
+        errors = sl._validate(_parsed(days=days), _ctx())
+        self.assertTrue(any(e["kind"] == "forbidden_term"
+                            and e["scope"] == "days[0]" for e in errors))
 
-    def test_reject_no_sources(self):
-        statements = [{"text": "Schoenes Wetter.", "sources": []}]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(out, [])
+    def test_reject_trog_and_geopotential(self):
+        errors = sl._validate(
+            _parsed(lead="Das Geopotential zeigt einen Trog."), _ctx())
+        self.assertTrue(any(e["kind"] == "forbidden_term" for e in errors))
 
     def test_reject_invalid_region(self):
-        # "Island" ist im Grid, aber NICHT in valid_centers (nicht detektiert)
-        statements = [{
-            "text": "Ein Hoch ueber Island setzt sich durch.",
-            "sources": ["pressure_centers_per_day"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(out, [])
+        # "Island" ist im Grid, aber NICHT detektiert
+        errors = sl._validate(
+            _parsed(lead="Ein Hoch ueber Island setzt sich durch."), _ctx())
+        self.assertTrue(any(e["kind"] == "invalid_region" for e in errors))
 
     def test_accept_valid_region(self):
-        statements = [{
-            "text": "Ein Hoch ueber den Azoren reicht zur Schweiz.",
-            "sources": ["pressure_centers_per_day"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(len(out), 1)
+        errors = sl._validate(
+            _parsed(lead="Ein Hoch ueber den Azoren reicht zur Schweiz."),
+            _ctx(centers=("Azoren",)))
+        self.assertEqual(errors, [])
 
-    def test_accept_multiple_sources(self):
-        statements = [{
-            "text": "Hochdruck bleibt stabil mit Westströmung.",
-            "sources": ["pressure_influence", "flow_overhead"],
-        }]
-        out = sl._filter_statements(statements, self.valid_centers)
-        self.assertEqual(len(out), 1)
+    def test_reject_missing_lead(self):
+        errors = sl._validate({"days": _parsed()["days"]}, _ctx())
+        self.assertTrue(any(e["scope"] == "lead" and e["kind"] == "schema"
+                            for e in errors))
+
+    def test_reject_day_count_mismatch(self):
+        errors = sl._validate(_parsed(n_days=1), _ctx())
+        self.assertTrue(any(e["scope"] == "days" and e["kind"] == "schema"
+                            for e in errors))
+
+    def test_reject_missing_flight_hint(self):
+        days = [{"text": "Stabil und sonnig."},
+                {"text": "Weiter stabil.", "flight_hint": "Gut fliegbar."}]
+        errors = sl._validate(_parsed(days=days), _ctx())
+        self.assertTrue(any(e["scope"] == "days[0]" and e["kind"] == "schema"
+                            for e in errors))
+
+    def test_reject_lead_too_long(self):
+        errors = sl._validate(_parsed(lead="Wort " * 200), _ctx())
+        self.assertTrue(any(e["kind"] == "too_long" for e in errors))
+
+    def test_reject_foehn_lee_inversion(self):
+        foehn = {"per_day": [
+            {"date": "2026-07-05", "nord_active": False, "sued_active": False},
+            {"date": "2026-07-06", "nord_active": True, "sued_active": False},
+        ]}
+        days = [{"text": "Stabil.", "flight_hint": "Gut fliegbar."},
+                {"text": "Das Tessin bleibt windgeschuetzt und ruhig.",
+                 "flight_hint": "Gut fliegbar."}]
+        errors = sl._validate(_parsed(days=days), _ctx(foehn=foehn))
+        self.assertTrue(any(e["kind"] == "foehn_lee_inversion"
+                            and e["scope"] == "days[1]" for e in errors))
+
+
+class TestFinalize(unittest.TestCase):
+    def test_compat_format_and_weekday_prefixes(self):
+        out = sl._finalize(_parsed(), _ctx(), attempts=1, unresolved=[])
+        self.assertEqual(out["short"], "Ruhige Hochdrucklage praegt die Tage.")
+        self.assertEqual(len(out["long_with_sources"]), 2)
+        # 2026-07-05 = Sonntag, 2026-07-06 = Montag — autoritativ gesetzt
+        self.assertTrue(out["long_with_sources"][0]["text"].startswith("Sonntag: "))
+        self.assertTrue(out["long_with_sources"][1]["text"].startswith("Montag: "))
+        self.assertEqual(out["attempts"], 1)
+        self.assertEqual(out["unresolved"], [])
+
+    def test_wrong_prefix_corrected(self):
+        days = [{"text": "Heute: stabil.", "flight_hint": "Gut."},
+                {"text": "Dienstag: stabil.", "flight_hint": "Gut."}]
+        out = sl._finalize(_parsed(days=days), _ctx(), attempts=1, unresolved=[])
+        self.assertTrue(out["long_with_sources"][0]["text"].startswith("Sonntag: "))
+        self.assertTrue(out["long_with_sources"][1]["text"].startswith("Montag: "))
+
+    def test_prune_removes_violating_day_keeps_rest(self):
+        days = [{"text": "Eine Kaltfront zieht durch.", "flight_hint": "Gut."},
+                {"text": "Stabil und sonnig.", "flight_hint": "Gut fliegbar."}]
+        out = sl._finalize(_parsed(days=days), _ctx(), attempts=3,
+                           unresolved=[sl._verr("days[0]", "forbidden_term", "x")],
+                           prune=True)
+        self.assertEqual(len(out["long_with_sources"]), 1)
+        # Der ueberlebende Eintrag behaelt seinen korrekten Wochentag (Montag)
+        self.assertTrue(out["long_with_sources"][0]["text"].startswith("Montag: "))
+        self.assertEqual(len(out["unresolved"]), 1)
+
+    def test_prune_strips_bad_hint_keeps_entry(self):
+        days = [{"text": "Stabil.", "flight_hint": "Kaltfront beachten."},
+                {"text": "Sonnig.", "flight_hint": "Gut fliegbar."}]
+        out = sl._finalize(_parsed(days=days), _ctx(), attempts=3,
+                           unresolved=[], prune=True)
+        self.assertEqual(len(out["long_with_sources"]), 2)
+        self.assertNotIn("flight_hint", out["long_with_sources"][0])
+        self.assertEqual(out["long_with_sources"][1]["flight_hint"],
+                         "Gut fliegbar.")
+
+    def test_all_invalid_returns_none(self):
+        days = [{"text": "Kaltfront!", "flight_hint": "x"}]
+        out = sl._finalize({"lead": "Trog ueber Europa.", "days": days},
+                           _ctx(dates=("2026-07-05",)), attempts=3,
+                           unresolved=[], prune=True)
+        self.assertIsNone(out)
+
+
+class TestCorrectionMessage(unittest.TestCase):
+    def test_contains_errors_and_keywords(self):
+        errors = [sl._verr("lead", "forbidden_term", "enthaelt Kaltfront"),
+                  sl._verr("days[2]", "schema", "flight_hint fehlt")]
+        msg = sl._build_correction_message(errors)
+        self.assertIn("KORREKTUR NOETIG", msg)
+        self.assertIn("CORRECTION REQUIRED", msg)
+        self.assertIn("[lead]", msg)
+        self.assertIn("[days[2]]", msg)
+        self.assertIn("KOMPLETTE JSON", msg)
 
 
 class TestStripProvenance(unittest.TestCase):

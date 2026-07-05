@@ -1,23 +1,29 @@
-"""LLM-Caller + Post-Filter fuer den Wetterlage-Block.
+"""LLM-Caller + Validierungs-/Korrektur-Loop fuer den Wetterlage-Block.
 
 Nimmt das deterministisch erzeugte Strukturfeld aus synoptic_context.build_*
-und laesst den LLM daraus eine Prosa-Version generieren (short + long).
+und laesst den LLM daraus eine Prosa-Version generieren (lead + days).
 
-Halluzinations-Schutz-Pipeline:
+Architektur (ersetzt den alten Loesch-Post-Filter):
   1. LLM bekommt nur das fertige Strukturfeld, keine Rohzahlen.
-  2. Skill-Prompt enthaelt Whitelist + Verbotsliste (siehe synoptic_overview.md).
-  3. Post-Filter prueft pro Satz:
-     a) Verbotsbegriffe (Kaltfront, Trog, hPa-Werte, ...) → Satz wird verworfen
-     b) Source-Tags valide? → ungueltige Sources → Satz wird verworfen
-     c) Erwaehnte Druckzentren-Region-Labels muessen im Strukturfeld stehen
-  4. Bei API-Fehler oder leerem Output → return None, Block wird ausgelassen.
+  2. Output-Format ist flach: {"lead": str, "days": [{text, flight_hint}]}
+     — Zuordnung days[i] <-> forecast_dates[i] per POSITION. Die alte
+     Source-Tag-Pflicht ist abgeschafft: sie hat nur Formfehler produziert
+     (invalid_source loeschte am 05.07.2026 den halben Ueberblick) und
+     keine echte Halluzinations-Sicherheit gebracht.
+  3. _validate() prueft INHALTLICH (Verbotsbegriffe, erfundene Regionen,
+     Foehn-Lee-Inversion, Schema/Vollstaendigkeit) — und loescht NICHTS.
+  4. Bei Fehlern bekommt der LLM eine Korrektur-Nachricht mit der konkreten
+     Fehlerliste und erzeugt neu — max. _MAX_ATTEMPTS Versuche.
+  5. Nach erschoepften Versuchen: beste Version chirurgisch bereinigen
+     (nur verletzende Teile entfernen, nie alles verwerfen) und
+     Admin-Alarm per Mail (config.ADMIN_EMAIL) — kein stilles Loeschen mehr.
+  6. Bei API-Fehler ueber alle Versuche → return None, Block wird ausgelassen.
 """
 
 import json
 import logging
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import config
@@ -25,6 +31,9 @@ import prompts
 from engine._common import _weekday_de, _WOCHENTAGE
 
 logger = logging.getLogger(__name__)
+
+# Max. LLM-Versuche pro Overview (1 Erstversuch + 2 Korrektur-Runden).
+_MAX_ATTEMPTS = 3
 
 
 # ============================================================================
@@ -49,21 +58,6 @@ _FORBIDDEN_PATTERNS = [
     re.compile(r"\btrog\b", re.IGNORECASE),
     re.compile(r"\bruecken\b", re.IGNORECASE),
 ]
-
-_VALID_SOURCE_KEYS = {
-    "lage_label",
-    "pressure_influence",
-    "pressure_centers_per_day",
-    "flow_overhead",
-    "t850_trend",
-    "bise",
-    "vb_lage",
-    "foehn",
-    "precip_pattern.alpennord",
-    "precip_pattern.alpensued",
-    "schneefallgrenze",
-    "confidence_per_day",
-}
 
 
 # ============================================================================
@@ -105,16 +99,20 @@ def refresh_synoptic_overview(weather_cache: dict, analysis_client,
 
 def generate_synoptic_overview(synoptic_context: dict, analysis_client,
                                analysis_model: str) -> Optional[dict]:
-    """Ruft den LLM auf, generiert short + long Versionen.
+    """Generiert den Wetterlage-Block mit Validierungs-/Korrektur-Loop.
 
-    Args:
-        synoptic_context: Output von synoptic_context.build_synoptic_context()
-        analysis_client: LLM-Client (chat.completions.create-Interface)
-        analysis_model: Model-Name, z.B. "gpt-4o-mini"
+    Ablauf: LLM-Call → _validate() → bei Fehlern Korrektur-Nachricht mit
+    konkreter Fehlerliste anhaengen und neu generieren (max _MAX_ATTEMPTS).
+    Nach erschoepften Versuchen wird die beste Version chirurgisch bereinigt
+    ausgeliefert (nie leer, solange irgendetwas Valides da ist) und der
+    Admin per Mail alarmiert.
 
     Returns:
-        {"short": str, "long": str, "short_with_sources": [...], "long_with_sources": [...]}
-        oder None bei Fehler / leerem Output nach Post-Filter.
+        {"short": str, "long": str, "long_with_sources": [{text, flight_hint}],
+         "attempts": int, "unresolved": [str], "generated_at": str}
+        — Feldnamen short/long/long_with_sources bleiben aus Kompatibilitaet
+        zu briefing.js / email_service erhalten (lead -> short, days -> long).
+        None nur bei API-Totalausfall oder wenn gar nichts Valides uebrig ist.
     """
     if not synoptic_context:
         return None
@@ -122,119 +120,366 @@ def generate_synoptic_overview(synoptic_context: dict, analysis_client,
         logger.warning("generate_synoptic_overview: kein analysis_client")
         return None
 
-    user_payload = _build_llm_payload(synoptic_context)
-    system_prompt = _compose_system_prompt()
+    messages = [
+        {"role": "system", "content": _compose_system_prompt()},
+        {"role": "user", "content": _build_llm_payload(synoptic_context)},
+    ]
 
+    best = None  # (n_errors, parsed, errors) — beste bisherige Version
+    last_errors = []
+    attempts_done = 0
+
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        attempts_done = attempt
+        raw = _call_llm(analysis_client, analysis_model, messages)
+        if raw is None:
+            # API-Fehler / leerer Output — Retry mit unveraenderter Konversation
+            last_errors = [_verr("api", "api_error",
+                                 "LLM-Call fehlgeschlagen oder leerer Output")]
+            continue
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as e:
+            logger.warning("generate_synoptic_overview: JSON parse failed "
+                           "(Versuch %d): %s — raw[:300]=%r", attempt, e, raw[:300])
+            parsed = None
+
+        if parsed is None or not isinstance(parsed, dict):
+            errors = [_verr("format", "invalid_json",
+                            "Die Antwort war kein gueltiges JSON-Objekt. "
+                            "Nur das JSON-Objekt liefern, keine Code-Fences.")]
+        else:
+            errors = _validate(parsed, synoptic_context)
+            if best is None or len(errors) < best[0]:
+                best = (len(errors), parsed, errors)
+
+        if not errors:
+            return _finalize(parsed, synoptic_context,
+                             attempts=attempt, unresolved=[])
+
+        logger.warning(
+            "Wetterlage-Overview Versuch %d/%d: %d Fehler — %s",
+            attempt, _MAX_ATTEMPTS, len(errors),
+            "; ".join(f"[{e['scope']}] {e['message']}" for e in errors),
+        )
+        last_errors = errors
+
+        if attempt < _MAX_ATTEMPTS:
+            # Korrektur-Runde: vorherige Antwort + konkrete Fehlerliste anhaengen
+            messages = messages + [
+                {"role": "assistant", "content": raw},
+                {"role": "user", "content": _build_correction_message(errors)},
+            ]
+
+    # ------------------------------------------------------------------
+    # Versuche erschoepft — Schicht 2: beste Version chirurgisch bereinigen
+    # (nie alles verwerfen), Schicht 3: Admin alarmieren.
+    # ------------------------------------------------------------------
+    if best is None:
+        logger.error("generate_synoptic_overview: kein parsebarer Output "
+                     "nach %d Versuchen", attempts_done)
+        _notify_admin(last_errors, attempts_done, delivered=False)
+        return None
+
+    _, parsed, errors = best
+    result = _finalize(parsed, synoptic_context,
+                       attempts=attempts_done, unresolved=errors, prune=True)
+    _notify_admin(errors, attempts_done, delivered=result is not None)
+    return result
+
+
+# ============================================================================
+# INTERNAL: LLM-Call + Korrektur-Nachricht
+# ============================================================================
+
+def _call_llm(analysis_client, analysis_model: str,
+              messages: list) -> Optional[str]:
+    """Ein LLM-Versuch. Liefert den rohen Antwort-String oder None."""
     try:
         response = analysis_client.chat.completions.create(
             model=analysis_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_payload},
-            ],
+            messages=messages,
             temperature=0.4,
             # v4-flash laeuft im Thinking-Mode — Reasoning-Tokens VOR der
-            # Antwort. Plus 5-Tage-Output (short + long mit flight_hint +
-            # sources) sprengt 4000. Bei Truncation kommt finish_reason=length
-            # und das JSON ist mittendrin abgeschnitten → llm_overview=None.
+            # Antwort. Plus 5-Tage-Output (lead + days mit flight_hint)
+            # sprengt 4000. Bei Truncation kommt finish_reason=length
+            # und das JSON ist mittendrin abgeschnitten.
             max_tokens=12000,
             response_format={"type": "json_object"},
         )
         finish = getattr(response.choices[0], "finish_reason", None)
         raw = response.choices[0].message.content
         if not raw:
-            logger.warning("generate_synoptic_overview: leerer LLM-Output (finish_reason=%s)", finish)
+            logger.warning("_call_llm: leerer LLM-Output (finish_reason=%s)", finish)
             return None
         if finish == "length":
-            logger.warning("generate_synoptic_overview: Output truncated bei max_tokens "
+            logger.warning("_call_llm: Output truncated bei max_tokens "
                            "— JSON ggf. unvollstaendig (finish_reason=length)")
+        return raw
     except Exception as e:
-        logger.error("generate_synoptic_overview LLM-Call fehlgeschlagen: %s", e)
+        logger.error("_call_llm fehlgeschlagen: %s", e)
         return None
 
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error("generate_synoptic_overview: JSON parse failed: %s — raw[:300]=%r",
-                     e, raw[:300] if raw else None)
-        return None
 
-    short_with_src = parsed.get("short") or []
-    long_with_src = parsed.get("long") or []
+def _build_correction_message(errors: list) -> str:
+    """Baut die Korrektur-Nachricht fuer die naechste LLM-Runde.
 
-    if not isinstance(short_with_src, list) or not isinstance(long_with_src, list):
-        logger.warning("generate_synoptic_overview: short/long keine Liste")
-        return None
-
-    # Post-Filter: Saetze verwerfen, die Verbotsbegriffe oder ungueltige Sources
-    # enthalten ODER Druckzentren erwaehnen, die nicht im Strukturfeld stehen.
-    valid_centers = _collect_valid_center_labels(synoptic_context)
-
-    short_filtered = _filter_statements(short_with_src, valid_centers)
-    long_filtered = _filter_statements(long_with_src, valid_centers)
-
-    # Kalenderwochen-Begriffe ("Wochenmitte", "zum Wochenstart", ...) → zeitraum-
-    # neutral. Sicherheitsnetz zum Skill-Verbot; der Cast ist ein rollierender
-    # 5-Tage-Block ab heute, keine Kalenderwoche.
-    short_filtered = _neutralize_calendar_week_terms(short_filtered)
-    long_filtered = _neutralize_calendar_week_terms(long_filtered)
-
-    # Wochentag-Normalisierung NUR fuer long (long_with_sources wird im
-    # Frontend pro Tag gerendert; short ist Fliesstext und braucht das nicht).
-    # Korrigiert "Heute:"/"Morgen:" sowie falsch verschobene Wochentag-Praefixe
-    # auf den aus forecast_dates abgeleiteten korrekten Wochentag — sonst
-    # rendert briefing.js die ersten Eintraege als unbeschriftete Lead-Absaetze.
-    long_filtered = _normalize_weekday_prefixes(
-        long_filtered, synoptic_context.get("forecast_dates") or []
+    Der Header enthaelt beide Keywords (DE-Skill: "KORREKTUR NOETIG",
+    EN-Skill: "CORRECTION REQUIRED") — der Block funktioniert damit in
+    beiden Sprachmodi ohne i18n-Weiche.
+    """
+    lines = "\n".join(f"- [{e['scope']}] {e['message']}" for e in errors)
+    return (
+        "KORREKTUR NOETIG / CORRECTION REQUIRED\n\n"
+        "Deine letzte Antwort hatte folgende Fehler:\n"
+        f"{lines}\n\n"
+        "Erzeuge das KOMPLETTE JSON neu (gleiches Format: "
+        '{"lead": "...", "days": [{"text": "...", "flight_hint": "..."}]}) '
+        "und behebe ALLE genannten Punkte. Alle uebrigen Regeln aus dem "
+        "System-Prompt gelten unveraendert. Nur das JSON, kein Kommentar."
     )
 
-    # Foehn-Lee-Inversion: pro Tag pruefen, dass die Lee-Seite nicht als
-    # "windgeschuetzt/ruhig" beschrieben wird, wenn der Foehn an dem Tag
-    # aktiv ist (Nordfoehn → Suedseite Lee; Suedfoehn → Nordseite Lee).
-    # Verstoss → text-Satz wird verworfen (analog zum Verbotsbegriff-Filter),
-    # flight_hint mit gleicher Inversion ebenfalls.
-    long_filtered = _filter_foehn_lee_inversion(
-        long_filtered, synoptic_context.get("foehn") or {},
-        synoptic_context.get("forecast_dates") or [],
-    )
 
-    # flight_hint pro long-Eintrag: optionales Pilotensicht-Satz-Feld.
-    # Wird gegen Verbotsbegriffe gefiltert; bei Verstoss wird das Feld
-    # einzeln verworfen, der ganze Eintrag bleibt aber stehen.
-    long_filtered = _sanitize_flight_hints(long_filtered)
+# ============================================================================
+# INTERNAL: Validierung (prueft, loescht NICHTS)
+# ============================================================================
 
-    # Vollstaendigkeits-Check: nur loggen, kein Fallback. LLM ist im Skill
-    # auf Pflicht-Vollstaendigkeit verpflichtet — Lueckenwerden via
-    # Skill-Compliance geloest, nicht durch Code-Synthese.
-    fc_dates = synoptic_context.get("forecast_dates") or []
-    if fc_dates and len(long_filtered) < len(fc_dates):
-        logger.warning(
-            "long_filtered hat nur %d Eintraege, erwartet %d (forecast_dates=%s). "
-            "Skill-Compliance pruefen.",
-            len(long_filtered), len(fc_dates), fc_dates,
-        )
+def _verr(scope: str, kind: str, message: str) -> dict:
+    return {"scope": scope, "kind": kind, "message": message}
 
-    if not short_filtered and not long_filtered:
-        logger.warning(
-            "generate_synoptic_overview: alle Saetze vom Post-Filter "
-            "verworfen — Block wird ausgelassen (short_in=%d, long_in=%d)",
-            len(short_with_src), len(long_with_src),
-        )
+
+def _find_forbidden_term(text: str) -> Optional[str]:
+    """Findet das erste Verbots-Pattern in einem Text. Liefert das
+    Pattern als Debug-String oder None."""
+    if not isinstance(text, str):
+        return "non_string"
+    for pattern in _FORBIDDEN_PATTERNS:
+        if pattern.search(text):
+            return pattern.pattern
+    return None
+
+
+def _validate(parsed: dict, ctx: dict) -> list:
+    """Prueft den LLM-Output inhaltlich und strukturell.
+
+    Liefert eine Fehlerliste [{scope, kind, message}] — leere Liste = OK.
+    Loescht bewusst NICHTS: die Reaktion (Korrektur-Runde / chirurgisches
+    Bereinigen / Alarm) entscheidet der Aufrufer.
+    """
+    errors = []
+    fc_dates = ctx.get("forecast_dates") or []
+    valid_centers = _collect_valid_center_labels(ctx)
+    foehn = ctx.get("foehn") or {}
+
+    # --- lead -----------------------------------------------------------
+    lead = parsed.get("lead")
+    if not isinstance(lead, str) or not lead.strip():
+        errors.append(_verr("lead", "schema",
+                            "`lead` fehlt oder ist leer — Pflichtfeld "
+                            "(Fliesstext-String, 5-7 Saetze, max 150 Woerter)."))
+    else:
+        bad = _find_forbidden_term(lead)
+        if bad:
+            errors.append(_verr("lead", "forbidden_term",
+                                f"`lead` enthaelt einen verbotenen Begriff "
+                                f"(Muster: {bad}). Umformulieren ohne "
+                                f"Front-/Trog-Jargon und ohne hPa-/°C-Zahlen."))
+        invalid_regions = _check_pressure_region_mentions(lead, valid_centers)
+        if invalid_regions:
+            errors.append(_verr("lead", "invalid_region",
+                                f"`lead` nennt Druckzentren-Regionen, die im "
+                                f"Strukturfeld NICHT detektiert sind: "
+                                f"{invalid_regions}. Nur die gelieferten "
+                                f"region_label verwenden."))
+        n_words = len(lead.split())
+        if n_words > 170:
+            errors.append(_verr("lead", "too_long",
+                                f"`lead` hat {n_words} Woerter — erlaubt sind "
+                                f"max 150. Kuerzen."))
+
+    # --- days: Schema + Vollstaendigkeit ---------------------------------
+    days = parsed.get("days")
+    if not isinstance(days, list):
+        errors.append(_verr("days", "schema",
+                            "`days` fehlt oder ist keine Liste — Pflichtfeld "
+                            "(ein Eintrag pro forecast_date, gleiche Reihenfolge)."))
+        return errors
+    if fc_dates and len(days) != len(fc_dates):
+        errors.append(_verr("days", "schema",
+                            f"`days` hat {len(days)} Eintraege, erwartet "
+                            f"{len(fc_dates)} — exakt einer pro Tag in "
+                            f"forecast_dates-Reihenfolge, keiner fehlt, "
+                            f"keiner doppelt."))
+
+    # --- days: Inhalt pro Eintrag ----------------------------------------
+    for i, d in enumerate(days):
+        scope = f"days[{i}]"
+        if not isinstance(d, dict) or not isinstance(d.get("text"), str) \
+                or not d["text"].strip():
+            errors.append(_verr(scope, "schema",
+                                "Eintrag braucht ein nicht-leeres `text`-Feld."))
+            continue
+        text = d["text"]
+
+        bad = _find_forbidden_term(text)
+        if bad:
+            errors.append(_verr(scope, "forbidden_term",
+                                f"`text` enthaelt einen verbotenen Begriff "
+                                f"(Muster: {bad})."))
+
+        invalid_regions = _check_pressure_region_mentions(text, valid_centers)
+        if invalid_regions:
+            errors.append(_verr(scope, "invalid_region",
+                                f"`text` nennt nicht detektierte Regionen: "
+                                f"{invalid_regions}."))
+
+        active_side = _foehn_active_side(foehn, fc_dates, i)
+        if active_side and _text_inverts_foehn_lee(text, active_side):
+            lee = "Alpensuedseite" if active_side == "nord" else "Alpennordseite"
+            errors.append(_verr(scope, "foehn_lee_inversion",
+                                f"An diesem Tag ist {active_side.capitalize()}foehn "
+                                f"aktiv — die {lee} ist die boeige LEE-Seite und "
+                                f"darf NICHT als geschuetzt/ruhig beschrieben "
+                                f"werden."))
+
+        hint = d.get("flight_hint")
+        if not isinstance(hint, str) or len(hint.strip()) < 3:
+            errors.append(_verr(scope, "schema",
+                                "`flight_hint` fehlt — Pflichtfeld (EIN kurzer "
+                                "Satz Pilotensicht, max ~15 Woerter)."))
+        else:
+            bad = _find_forbidden_term(hint)
+            if bad:
+                errors.append(_verr(scope, "forbidden_term",
+                                    f"`flight_hint` enthaelt einen verbotenen "
+                                    f"Begriff (Muster: {bad})."))
+            if active_side and _text_inverts_foehn_lee(hint, active_side):
+                errors.append(_verr(scope, "foehn_lee_inversion",
+                                    f"`flight_hint` beschreibt die Foehn-Lee-"
+                                    f"Seite als geschuetzt/ruhig, obwohl "
+                                    f"{active_side.capitalize()}foehn aktiv ist."))
+
+    return errors
+
+
+# ============================================================================
+# INTERNAL: Finalisierung (Praefixe, Neutralisierung, optionales Bereinigen)
+# ============================================================================
+
+def _finalize(parsed: dict, ctx: dict, attempts: int,
+              unresolved: list, prune: bool = False) -> Optional[dict]:
+    """Baut aus dem (validierten oder besten) LLM-Output das Cache-Format.
+
+    prune=True (nur nach erschoepften Versuchen): verletzende Teile werden
+    chirurgisch entfernt — verletzender lead faellt weg, verletzende
+    days-Eintraege fallen einzeln weg, verletzende flight_hints werden
+    gestrippt. Alles andere bleibt erhalten (Nie-leer-Garantie, soweit
+    irgendetwas Valides existiert).
+
+    Feldnamen im Rueckgabewert bleiben aus Kompatibilitaet zum Frontend
+    (briefing.js) und zur Mail (email_service) short/long/long_with_sources.
+    """
+    fc_dates = ctx.get("forecast_dates") or []
+    valid_centers = _collect_valid_center_labels(ctx)
+    foehn = ctx.get("foehn") or {}
+
+    lead = parsed.get("lead") if isinstance(parsed.get("lead"), str) else ""
+    lead = lead.strip()
+    days_raw = parsed.get("days") if isinstance(parsed.get("days"), list) else []
+
+    if prune and lead:
+        if _find_forbidden_term(lead) or \
+                _check_pressure_region_mentions(lead, valid_centers):
+            logger.warning("Nicht behebbarer lead entfernt: '%s'", lead)
+            lead = ""
+
+    entries = []
+    for i, d in enumerate(days_raw):
+        if not isinstance(d, dict):
+            continue
+        text = d.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        text = text.strip()
+
+        # Wochentag-Praefix VOR dem Prune autoritativ setzen — Position i
+        # gilt fuer forecast_dates[i], unabhaengig davon was spaeter faellt.
+        text = _apply_weekday_prefix(text, fc_dates, i)
+
+        active_side = _foehn_active_side(foehn, fc_dates, i)
+        if prune:
+            if _find_forbidden_term(text) or \
+                    _check_pressure_region_mentions(text, valid_centers) or \
+                    (active_side and _text_inverts_foehn_lee(text, active_side)):
+                logger.warning("Nicht behebbarer days-Eintrag entfernt "
+                               "(day %d): '%s'", i + 1, text)
+                continue
+
+        entry = {"text": text}
+        hint = d.get("flight_hint")
+        if isinstance(hint, str) and len(hint.strip()) >= 3:
+            hint = hint.strip()
+            if prune and (_find_forbidden_term(hint) or
+                          (active_side and
+                           _text_inverts_foehn_lee(hint, active_side))):
+                logger.warning("Nicht behebbarer flight_hint entfernt "
+                               "(day %d): '%s'", i + 1, hint)
+            else:
+                entry["flight_hint"] = hint
+        entries.append(entry)
+
+    # Kalenderwochen-Begriffe → zeitraum-neutral. Sicherheitsnetz zum
+    # Skill-Verbot; der Cast ist ein rollierender Block ab heute.
+    lead = _neutralize_calendar_week_text(lead)
+    for e in entries:
+        e["text"] = _neutralize_calendar_week_text(e["text"])
+        if "flight_hint" in e:
+            e["flight_hint"] = _neutralize_calendar_week_text(e["flight_hint"])
+
+    if not lead and not entries:
+        logger.warning("generate_synoptic_overview: nach Bereinigung nichts "
+                       "Valides uebrig — Block wird ausgelassen")
         return None
 
-    # Wenn ALLE short-Saetze verworfen wurden, aber long noch was hat → trotzdem
-    # ausgeben, aber min. eine Variante muss Inhalt haben
     return {
-        "short": " ".join(s["text"] for s in short_filtered),
-        "long": " ".join(s["text"] for s in long_filtered),
-        "short_with_sources": short_filtered,
-        "long_with_sources": long_filtered,
-        "rejected_count": (
-            len(short_with_src) - len(short_filtered)
-            + len(long_with_src) - len(long_filtered)
-        ),
+        "short": lead,
+        "long": " ".join(e["text"] for e in entries),
+        "short_with_sources": [{"text": lead}] if lead else [],
+        "long_with_sources": entries,
+        "attempts": attempts,
+        "unresolved": [f"[{e['scope']}] {e['message']}" for e in unresolved],
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
+
+
+# ============================================================================
+# INTERNAL: Admin-Alarm (Schicht 3)
+# ============================================================================
+
+def _notify_admin(errors: list, attempts: int, delivered: bool) -> None:
+    """Alarmiert den Admin per Mail, wenn der Overview nach allen
+    Korrektur-Runden nicht fehlerfrei wurde. Kein stilles Loeschen mehr —
+    Ausfaelle muessen sichtbar sein."""
+    try:
+        import email_service
+        status = ("bereinigte Bestversion ausgeliefert" if delivered
+                  else "NICHTS ausgeliefert — Wetterlage-Block fehlt")
+        lines = "\n".join(f"- [{e['scope']}] {e['message']}" for e in errors) or "-"
+        subject = (f"[Wingcast] Wetterlage-Block nach {attempts} "
+                   f"LLM-Versuchen nicht fehlerfrei")
+        text = (
+            f"Der Synoptik-Ueberblick konnte nach {attempts} Versuchen nicht "
+            f"fehlerfrei erzeugt werden.\n\n"
+            f"Status: {status}\n\n"
+            f"Verbleibende Fehler:\n{lines}\n\n"
+            f"Zeitpunkt: {datetime.now().isoformat(timespec='seconds')}\n"
+        )
+        html = "<pre>" + text.replace("<", "&lt;").replace(">", "&gt;") + "</pre>"
+        email_service.send_email_async(config.ADMIN_EMAIL, subject, html, text)
+        logger.warning("Admin-Alarm gesendet: %s (%s)", subject, status)
+    except Exception as e:
+        logger.error("Admin-Alarm fehlgeschlagen: %s", e)
 
 
 # ============================================================================
@@ -398,61 +643,18 @@ def _flow_overhead_for_llm(fo: Optional[dict]) -> Optional[dict]:
 
 
 # ============================================================================
-# INTERNAL: Post-Filter
+# INTERNAL: Pruef-Helfer (Regionen, Wochentage, Kalenderwoche, Foehn-Lee)
 # ============================================================================
 
 def _collect_valid_center_labels(ctx: dict) -> set:
     """Sammelt alle Region-Labels, die im Strukturfeld detektiert wurden.
-    Saetze, die andere (erfundene) Regionen nennen, werden verworfen.
+    Saetze, die andere (erfundene) Regionen nennen, sind Fehler.
     """
     labels = set()
     for d in ctx.get("pressure_centers_per_day") or []:
         for c in d.get("centers") or []:
             labels.add(c.get("region_label"))
     return labels
-
-
-def _filter_statements(statements: list, valid_centers: set) -> list:
-    """Filtert Saetze nach Verbotsbegriffen + Source-Validierung."""
-    filtered = []
-    for st in statements:
-        if not isinstance(st, dict):
-            continue
-        text = st.get("text") or ""
-        sources = st.get("sources") or []
-        if not isinstance(text, str) or not text.strip():
-            continue
-        if not isinstance(sources, list):
-            continue
-
-        # Verbotsbegriffe?
-        rejected_reason = None
-        for pattern in _FORBIDDEN_PATTERNS:
-            if pattern.search(text):
-                rejected_reason = f"forbidden_term:{pattern.pattern}"
-                break
-
-        # Sources valide?
-        if rejected_reason is None:
-            invalid = [s for s in sources if s not in _VALID_SOURCE_KEYS]
-            if invalid:
-                rejected_reason = f"invalid_source:{invalid}"
-
-        # Saetze ohne mindestens eine valide Source verwerfen
-        if rejected_reason is None and not sources:
-            rejected_reason = "no_sources"
-
-        # Erwaehnte Druckzentren-Labels muessen im Strukturfeld stehen
-        if rejected_reason is None and "pressure_centers_per_day" in sources:
-            mentioned_invalid = _check_pressure_region_mentions(text, valid_centers)
-            if mentioned_invalid:
-                rejected_reason = f"invalid_region:{mentioned_invalid}"
-
-        if rejected_reason:
-            logger.info("Post-Filter verworfen: %s — '%s'", rejected_reason, text)
-            continue
-        filtered.append(st)
-    return filtered
 
 
 # Praefix-Regex: "Heute:", "Morgen:", "Uebermorgen:", "Tag 1:" oder Wochentag.
@@ -464,51 +666,34 @@ _PREFIX_RE = re.compile(
 )
 
 
-def _normalize_weekday_prefixes(statements: list, forecast_dates: list) -> list:
-    """Setzt das Wochentag-Praefix jedes Statements auf den korrekten
-    Wochentag aus `forecast_dates`. Der briefing.js-Renderer matcht nur
-    `^(Montag|...|Sonntag):` — Eintraege mit "Heute:"/"Morgen:" oder
-    verschobenen Wochentagen werden sonst als unbeschriftete Lead-Absaetze
-    gerendert, was den Wetterlage-Block luckenhaft wirken laesst.
+def _apply_weekday_prefix(text: str, forecast_dates: list, i: int) -> str:
+    """Setzt das Wochentag-Praefix eines days-Eintrags autoritativ auf den
+    korrekten Wochentag aus `forecast_dates[i]`. Der briefing.js-Renderer
+    matcht nur `^(Montag|...|Sonntag):` — Eintraege mit "Heute:"/"Morgen:"
+    oder verschobenen Wochentagen wuerden sonst als unbeschriftete
+    Lead-Absaetze gerendert.
 
-    Annahme: statements[i] gehoert zum i-ten Forecast-Tag (per Skill-Vertrag).
-    Wir setzen das Praefix anhand der Position autoritativ, unabhaengig
-    davon, was der LLM gewaehlt hat.
+    Positions-Vertrag: days[i] gehoert zu forecast_dates[i] (Skill).
+    Wir setzen das Praefix anhand der Position, unabhaengig davon, was
+    der LLM gewaehlt hat.
     """
-    if not statements or not forecast_dates:
-        return statements
-    out = []
-    for i, st in enumerate(statements):
-        if i >= len(forecast_dates):
-            out.append(st)
-            continue
-        try:
-            correct_wd = _weekday_de(forecast_dates[i])
-        except Exception:
-            out.append(st)
-            continue
-        text = st.get("text") or ""
-        m = _PREFIX_RE.match(text)
-        if m:
-            existing = m.group(1).strip()
-            if existing.lower() == correct_wd.lower():
-                out.append(st)
-                continue
-            new_text = f"{correct_wd}: {text[m.end():].lstrip()}"
-            logger.info(
-                "Wetterlage-Praefix korrigiert (day %d): '%s' -> '%s'",
-                i + 1, existing, correct_wd,
-            )
-        else:
-            new_text = f"{correct_wd}: {text.lstrip()}"
-            logger.info(
-                "Wetterlage-Praefix ergaenzt (day %d, kein Praefix): '%s'",
-                i + 1, correct_wd,
-            )
-        st2 = dict(st)
-        st2["text"] = new_text
-        out.append(st2)
-    return out
+    if i >= len(forecast_dates):
+        return text
+    try:
+        correct_wd = _weekday_de(forecast_dates[i])
+    except Exception:
+        return text
+    m = _PREFIX_RE.match(text)
+    if m:
+        existing = m.group(1).strip()
+        if existing.lower() == correct_wd.lower():
+            return text
+        logger.info("Wetterlage-Praefix korrigiert (day %d): '%s' -> '%s'",
+                    i + 1, existing, correct_wd)
+        return f"{correct_wd}: {text[m.end():].lstrip()}"
+    logger.info("Wetterlage-Praefix ergaenzt (day %d, kein Praefix): '%s'",
+                i + 1, correct_wd)
+    return f"{correct_wd}: {text.lstrip()}"
 
 
 # Kalenderwochen-Begriffe → zeitraum-neutral. Der Cast ist ein rollierender
@@ -532,27 +717,18 @@ _CALENDAR_WEEK_SUBS = [
 ]
 
 
-def _neutralize_calendar_week_terms(statements: list) -> list:
-    """Ersetzt Kalenderwochen-Begriffe in `text` und `flight_hint` durch
-    zeitraum-neutrale Formulierungen. Belt-and-suspenders zum Skill-Verbot.
+def _neutralize_calendar_week_text(text: str) -> str:
+    """Ersetzt Kalenderwochen-Begriffe in einem Text durch zeitraum-neutrale
+    Formulierungen. Belt-and-suspenders zum Skill-Verbot.
     """
-    if not statements:
-        return statements
-    out = []
-    for st in statements:
-        st2 = dict(st)
-        for field in ("text", "flight_hint"):
-            val = st2.get(field)
-            if not val:
-                continue
-            new_val = val
-            for pat, repl in _CALENDAR_WEEK_SUBS:
-                new_val = pat.sub(repl, new_val)
-            if new_val != val:
-                logger.info("Kalenderwochen-Begriff neutralisiert: %r -> %r", val, new_val)
-                st2[field] = new_val
-        out.append(st2)
-    return out
+    if not text:
+        return text
+    new_text = text
+    for pat, repl in _CALENDAR_WEEK_SUBS:
+        new_text = pat.sub(repl, new_text)
+    if new_text != text:
+        logger.info("Kalenderwochen-Begriff neutralisiert: %r -> %r", text, new_text)
+    return new_text
 
 
 # Regex-Pattern fuer "windgeschuetzt/ruhig/geschuetzt"-Behauptungen auf
@@ -606,102 +782,26 @@ def _text_inverts_foehn_lee(text: str, foehn_side: str) -> bool:
     return False
 
 
-def _filter_foehn_lee_inversion(statements: list, foehn_struct: dict,
-                                forecast_dates: list) -> list:
-    """Pro long-Statement[i] pruefen, ob es die Foehn-Lee-Seite an dem
-    konkreten Forecast-Tag i als "geschuetzt/windgeschuetzt/ruhig"
-    beschreibt, obwohl `foehn.per_day[i]` aktiven Foehn der entsprechenden
-    Richtung meldet. Verstoss → `text` wird verworfen (Statement faellt
-    raus, da `text` PFLICHT ist). Auch `flight_hint` wird gepruft und
-    bei Verstoss entfernt (Statement bleibt aber stehen).
+def _foehn_active_side(foehn_struct: dict, forecast_dates: list,
+                       i: int) -> Optional[str]:
+    """Liefert die aktive Foehn-Seite ("nord"/"sued") am Forecast-Tag i,
+    oder None wenn an dem Tag kein Foehn aktiv ist.
 
-    Wir matchen den Index aus statements[i] auf forecast_dates[i] und
-    schlagen damit foehn.per_day[i] nach (date-match — robust auch wenn
-    foehn.per_day separat sortiert ist).
+    Matcht forecast_dates[i] gegen foehn.per_day per date — robust auch
+    wenn per_day separat sortiert ist.
     """
-    if not statements or not foehn_struct or not forecast_dates:
-        return statements
+    if not foehn_struct or i >= len(forecast_dates):
+        return None
     per_day = foehn_struct.get("per_day") or []
     per_day_by_date = {d.get("date"): d for d in per_day if isinstance(d, dict)}
-
-    out = []
-    for i, st in enumerate(statements):
-        if i >= len(forecast_dates):
-            out.append(st)
-            continue
-        date_str = forecast_dates[i]
-        day_foehn = per_day_by_date.get(date_str)
-        if not day_foehn:
-            out.append(st)
-            continue
-        nord_active = bool(day_foehn.get("nord_active"))
-        sued_active = bool(day_foehn.get("sued_active"))
-        if not (nord_active or sued_active):
-            out.append(st)
-            continue
-        active_side = "nord" if nord_active else "sued"
-
-        text = st.get("text") or ""
-        if _text_inverts_foehn_lee(text, active_side):
-            logger.info(
-                "Foehn-Lee-Inversion verworfen (day %s, side=%s): '%s'",
-                date_str, active_side, text,
-            )
-            continue
-
-        # flight_hint mit gleicher Inversion separat pruefen
-        hint = st.get("flight_hint")
-        if hint and _text_inverts_foehn_lee(hint, active_side):
-            logger.info(
-                "Foehn-Lee-Inversion in flight_hint verworfen (day %s, side=%s): '%s'",
-                date_str, active_side, hint,
-            )
-            st = dict(st)
-            st.pop("flight_hint", None)
-
-        out.append(st)
-    return out
-
-
-def _hint_has_forbidden(text: str) -> Optional[str]:
-    """Findet das erste Verbots-Pattern in einem Hint-Text. Liefert das
-    Pattern als Debug-String oder None."""
-    if not isinstance(text, str):
-        return "non_string"
-    for pattern in _FORBIDDEN_PATTERNS:
-        if pattern.search(text):
-            return pattern.pattern
+    day_foehn = per_day_by_date.get(forecast_dates[i])
+    if not day_foehn:
+        return None
+    if day_foehn.get("nord_active"):
+        return "nord"
+    if day_foehn.get("sued_active"):
+        return "sued"
     return None
-
-
-def _sanitize_flight_hints(statements: list) -> list:
-    """Validiert das optionale `flight_hint`-Feld jedes long-Eintrags
-    gegen die Verbotsbegriffe. Verstoss → flight_hint wird entfernt,
-    der Eintrag selbst bleibt aber stehen. Leere/zu kurze Hints werden
-    ebenfalls entfernt (verhindert leere Zeilen im Frontend).
-    """
-    out = []
-    for st in statements:
-        if "flight_hint" not in st:
-            out.append(st)
-            continue
-        hint = st.get("flight_hint")
-        if not isinstance(hint, str) or len(hint.strip()) < 3:
-            st2 = dict(st)
-            st2.pop("flight_hint", None)
-            out.append(st2)
-            continue
-        bad = _hint_has_forbidden(hint)
-        if bad:
-            logger.info("flight_hint verworfen (forbidden:%s): '%s'", bad, hint)
-            st2 = dict(st)
-            st2.pop("flight_hint", None)
-            out.append(st2)
-            continue
-        st2 = dict(st)
-        st2["flight_hint"] = hint.strip()
-        out.append(st2)
-    return out
 
 
 # Bekannte Region-Labels aus config.EUROPE_PRESSURE_GRID — gegen diese
@@ -712,6 +812,10 @@ _KNOWN_GRID_LABELS = {p["label"] for p in config.EUROPE_PRESSURE_GRID}
 def _check_pressure_region_mentions(text: str, valid_centers: set) -> list:
     """Findet Region-Labels im Text, die im Grid existieren aber NICHT
     fuer den aktuellen Cast detektiert wurden.
+
+    Anders als frueher wird IMMER geprueft (nicht nur bei Source-Tag
+    pressure_centers_per_day) — der Skill verbietet nicht detektierte
+    Regionen generell.
 
     Returns: Liste der ungueltigen Region-Erwaehnungen.
     """
