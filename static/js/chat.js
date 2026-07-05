@@ -314,6 +314,8 @@
     function sendMessage(text) {
         if (!text.trim() || isLoading) return;
 
+        if (window.wcTrack) wcTrack('chat_message_sent');
+
         appendMessage('user', text);
 
         // Reset highlights on new user message

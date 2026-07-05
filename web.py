@@ -146,6 +146,19 @@ def _is_admin_session() -> bool:
 
 
 @app.context_processor
+def _inject_analytics():
+    """PostHog-Config fuer base.html. posthog_enabled steuert, ob Banner +
+    Loader ueberhaupt gerendert werden (nur wenn ein Key konfiguriert ist).
+    Das Script wird clientseitig erst nach Opt-in-Consent initialisiert."""
+    return {
+        "posthog_enabled": bool(config.POSTHOG_KEY),
+        "posthog_key": config.POSTHOG_KEY,
+        "posthog_host": config.POSTHOG_HOST,
+        "posthog_ui_host": config.POSTHOG_UI_HOST,
+    }
+
+
+@app.context_processor
 def _inject_test_mode_flag():
     """Globales Flag fuer den persistenten Test-Mode-Banner in base.html.
 

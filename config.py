@@ -946,6 +946,12 @@ DAILY_RUN_MINUTE   = 0
 BASE_URL        = os.environ.get("WINGCAST_BASE_URL",      "https://app.wingcast.ch")
 MARKETING_URL   = os.environ.get("WINGCAST_MARKETING_URL", "https://wingcast.ch")
 
+# PostHog Product-Analytics (nur nach Opt-in-Consent im Browser geladen).
+# Leerer KEY => Analytics komplett deaktiviert (Banner erscheint dann nicht).
+POSTHOG_KEY     = os.environ.get("POSTHOG_KEY", "").strip()
+POSTHOG_HOST    = os.environ.get("POSTHOG_HOST", "https://eu.i.posthog.com").strip()
+POSTHOG_UI_HOST = os.environ.get("POSTHOG_UI_HOST", "https://eu.posthog.com").strip()
+
 # Infomaniak SMTP (Standardwerte aus ihrer Doku; Port 465 SSL oder 587 STARTTLS)
 SMTP_HOST       = os.environ.get("SMTP_HOST", "mail.infomaniak.com")
 SMTP_PORT       = int(os.environ.get("SMTP_PORT", "465"))

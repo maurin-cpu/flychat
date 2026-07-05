@@ -39,6 +39,11 @@
             }
             return s;
         };
+        /* Sicherer Analytics-Helfer: sendet ein PostHog-Custom-Event, wenn PostHog
+           geladen ist — sonst No-op (z.B. Admin, oder Analytics deaktiviert). */
+        window.wcTrack = function (event, props) {
+            try { if (window.posthog && posthog.capture) posthog.capture(event, props || {}); } catch (e) {}
+        };
     </script>
     {% block head %}{% endblock %}
 </head>
@@ -201,6 +206,7 @@
             var submitBtn = form.querySelector('.login-modal__submit');
             if (submitBtn) submitBtn.disabled = true;
             setMsg('info', {{ t('login.sending')|tojson }});
+            if (window.wcTrack) wcTrack('login_requested');
 
             var fd = new FormData(form);
             // Timeout via AbortController: nach 10s automatisch abbrechen
@@ -306,6 +312,10 @@
        Title / Description / tier-farbiges OG-Bild für Rich-Preview in WhatsApp. */
     window.wingcastShare = function (opts) {
         opts = opts || {};
+        if (window.wcTrack) wcTrack('briefing_shared', {
+            spot: opts.spot || null,
+            region_id: opts.region_id || null
+        });
         var origin = window.location.origin;
         var params = [];
         if (opts.region_id) params.push('regions=' + encodeURIComponent(opts.region_id));
@@ -579,6 +589,40 @@
         });
     })();
     </script>
+
+    {% if posthog_enabled and not is_admin %}
+    {# PostHog Product-Analytics — COOKIELOS (persistence: 'memory'). Setzt keine
+       Cookies und keinen Geraetespeicher => kein Consent-Banner noetig (CH revDSG
+       transparenzbasiert, EU ePrivacy greift ohne Geraetespeicher nicht). Laedt
+       direkt bei jedem Seitenaufruf. Session-Recording ist aus (waere einwilligungs-
+       pflichtig). Datenschutzerklaerung sollte die anonyme Nutzungsstatistik nennen.
+       Admin (config.ADMIN_EMAIL, eingeloggt) wird NICHT getrackt => is_admin-Guard. #}
+    <script>
+    (function () {
+        var PH_KEY = {{ posthog_key|tojson }};
+        var PH_HOST = {{ posthog_host|tojson }};
+        var PH_UI_HOST = {{ posthog_ui_host|tojson }};
+        if (!PH_KEY) return;
+        !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug getPageViewId captureTraceFeedback captureTraceMetric".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+        posthog.init(PH_KEY, {
+            api_host: PH_HOST,
+            ui_host: PH_UI_HOST,
+            persistence: 'memory',           // keine Cookies / kein localStorage
+            disable_session_recording: true, // Session-Replay aus (Consent-pflichtig)
+            capture_pageview: true,
+            autocapture: true,
+            person_profiles: 'identified_only'
+        });
+        // Super-Property: App-Events von Marketing-Events (gleiches Projekt) trennen.
+        posthog.register({ app: 'application' });
+        // Eingeloggte Nutzer identifizieren (distinct_id kommt aus dem Login, nicht
+        // aus einem Cookie) => sitzungsuebergreifende Auswertung fuer bekannte User.
+        {% if is_logged_in and session_email %}
+        try { posthog.identify({{ session_email|tojson }}, { email: {{ session_email|tojson }} }); } catch (e) {}
+        {% endif %}
+    })();
+    </script>
+    {% endif %}
 
     {# Globaler dezenter Footer mit Rechtliches-Links — auf jeder Seite sichtbar #}
     <footer class="app-footer" role="contentinfo">
