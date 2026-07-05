@@ -46,3 +46,6 @@ data/test_mode.json
 
 # Föhn-Test Wegwerf-Caches (debug_scripts/build_foehn_cache.py)
 data/foehn_cache_*.json
+
+# Lokale Dev-Server-Adresse fuer scripts/sync_from_server.sh
+.dev_server
