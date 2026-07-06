@@ -437,6 +437,22 @@ SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV = 0.4  # Coverage < 40% + CAPE = konvektiv/Sc
 # Ueberentwicklungs-Indikator. Siehe docs/GEWITTER.md.
 SYNOPTIC_PRECIP_CAPE_KONVEKTIV = 300      # DEPRECATED — ungenutzt
 SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE = 0.10  # DEPRECATED — ungenutzt
+
+# --- Wind-Fliegbarkeit Nord/Sued der Alpen (wind_pattern) -----------------
+# Deterministisches Wind-Aggregat pro Tag/Seite fuer den Synoptik-Block —
+# damit die Flug-Bilanz nicht "excellent flying day" sagt, waehrend die
+# Region-Analysen am Hoehenwind scheitern (Vorfall 05.07.2026: 23/29
+# Regionen Rating 1 wg. Hoehenwind, Synoptik nannte den Tag "excellent").
+# Vereinfachtes Flugband relativ zur Spot-Hoehe (die Spot-Analyse nutzt das
+# Thermik-Top-Band; fuers CH-weite Aggregat reicht die feste Naeherung):
+SYNOPTIC_WIND_BAND_LOWER_M = 200     # Band-Unterkante: Spot-Hoehe + 200 m
+SYNOPTIC_WIND_BAND_UPPER_M = 2000    # Band-Oberkante: Spot-Hoehe + 2000 m
+SYNOPTIC_WIND_HOURS = (10, 17)       # Kern-Flugfenster (lokale Stunden)
+# Kumulative Verteilungs-Baender: Anteil Spots ueber X km/h (Flugband/Boeen).
+# Gibt dem Synoptik-LLM das volle Windbild statt eines Schwellen-Flags.
+SYNOPTIC_WIND_DIST_BANDS_KMH = (10, 20, 30, 40, 50, 60)
+# Kritisch-Schwellen: bewusst identisch zu WIND_WARN_KMH/WIND_DANGER_KMH
+# bzw. GUST_WARN_KMH/GUST_DANGER_KMH (dort definiert) — kein zweites Regime.
 SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # DEPRECATED — ungenutzt (CAPE ≠ Gewitter)
 SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE = 0.10  # min. Anteil nasser Spots fuer seitenweite "Schauer"/"Regen"-Aussage; sonst trocken — verhindert dass 1-3% lokale Zellen die ganze Alpenseite als nass labeln
 

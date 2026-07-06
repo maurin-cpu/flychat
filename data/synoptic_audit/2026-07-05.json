@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-05T19:48:35",
+  "generated_at": "2026-07-05T19:04:05",
   "forecast_dates": [
     "2026-07-05",
     "2026-07-06",
@@ -401,6 +401,82 @@
     "decided_by": "decide_precip_pattern_nord_sued",
     "dry_mm": 0.5
   },
+  "wind_pattern": {
+    "per_day": [
+      {
+        "date": "2026-07-05",
+        "alpennord": {
+          "n_spots": 397,
+          "share_wind_crit": 0.96,
+          "share_wind_warn": 1.0,
+          "max_aloft_kmh": 73.7,
+          "median_aloft_kmh": 37.8,
+          "wind_class": "verblasen"
+        },
+        "alpensued": {
+          "n_spots": 97,
+          "share_wind_crit": 0.82,
+          "share_wind_warn": 1.0,
+          "max_aloft_kmh": 68.5,
+          "median_aloft_kmh": 37.7,
+          "wind_class": "verblasen"
+        }
+      },
+      {
+        "date": "2026-07-06",
+        "alpennord": {
+          "n_spots": 397,
+          "share_wind_crit": 0.51,
+          "share_wind_warn": 1.0,
+          "max_aloft_kmh": 64.3,
+          "median_aloft_kmh": 29.7,
+          "wind_class": "stark_eingeschraenkt"
+        },
+        "alpensued": {
+          "n_spots": 97,
+          "share_wind_crit": 0.69,
+          "share_wind_warn": 0.95,
+          "max_aloft_kmh": 64.9,
+          "median_aloft_kmh": 40.6,
+          "wind_class": "verblasen"
+        }
+      },
+      {
+        "date": "2026-07-07",
+        "alpennord": {
+          "n_spots": 397,
+          "share_wind_crit": 0.81,
+          "share_wind_warn": 1.0,
+          "max_aloft_kmh": 61.9,
+          "median_aloft_kmh": 39.2,
+          "wind_class": "verblasen"
+        },
+        "alpensued": {
+          "n_spots": 97,
+          "share_wind_crit": 0.68,
+          "share_wind_warn": 0.98,
+          "max_aloft_kmh": 56.1,
+          "median_aloft_kmh": 30.3,
+          "wind_class": "verblasen"
+        }
+      }
+    ],
+    "decided_by": "decide_wind_pattern_nord_sued",
+    "thresholds": {
+      "wind_warn_kmh": 20,
+      "wind_danger_kmh": 30,
+      "gust_warn_kmh": 30,
+      "gust_danger_kmh": 40,
+      "band_above_spot_m": [
+        200,
+        2000
+      ],
+      "hours": [
+        10,
+        17
+      ]
+    }
+  },
   "schneefallgrenze": null,
   "confidence_per_day": [
     {
@@ -617,6 +693,7 @@
     "decide_vb_lage",
     "decide_foehn_summary",
     "decide_precip_pattern_nord_sued",
+    "decide_wind_pattern_nord_sued",
     "decide_lage_label"
   ]
 }

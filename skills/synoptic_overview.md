@@ -57,6 +57,8 @@ ERLAUBT (aus Strukturfeld):
   darfst du "Vb-Tief" oder "Genua-Tief" verwenden.
 - Niederschlag: nur was in `precip_pattern.per_day[*]` steht, getrennt fuer
   Alpennordseite und Alpensuedseite.
+- Wind-Fliegbarkeit: nur was in `wind_pattern.per_day[*]` steht (Anteil
+  windkritischer Spots pro Tag und Seite — siehe Abschnitt WIND-FLIEGBARKEIT).
 - Schneefallgrenze: nur wenn `schneefallgrenze` nicht null ist.
 
 UNSICHERHEIT EHRLICH BENENNEN:
@@ -127,6 +129,13 @@ ohne Zwischenueberschrift:
   kann bzw. nicht — z.B. "Mittwoch Boden-Tag, Donnerstag und Freitag die
   Highlights". Tagesnamen aus `forecast_dates[i].weekday`. KEINE
   Wochen-Positionen ("Wochenmitte", "Wochenende").
+- **PFLICHT-DATENBASIS: `wind_pattern` + `precip_pattern` + `foehn`** —
+  die Flug-Bilanz gruendet auf diesen drei Feldern, NICHT auf
+  Sonnenschein-Optik. Ein trockener, sonniger Tag mit hohem
+  `share_wind_crit` ist KEIN guter Flugtag — er ist "sonnig, aber
+  vielerorts zu windig". Ein Tag darf NUR als guter Flugtag/Highlight
+  genannt werden, wenn sein `share_wind_crit` auf der jeweiligen Seite
+  klein ist (siehe Kalibrierung im Abschnitt WIND-FLIEGBARKEIT).
 - **PFLICHT: aktive Safety-Phaenomene als Pilot-Konsequenz** —
   wenn `foehn.active=true` / `bise.active_any_day=true` /
   `vb_lage.active_any_day=true` / Gewitter-Tage: kurz die Konsequenz
@@ -173,6 +182,12 @@ waere Redundanz. Insgesamt max 180 Woerter.
        aus `flow_overhead.per_day[i].sector` und `.strength`. Beispiele:
        "schwacher Suedwestwind in der Hoehe", "maessiger Westwind ueber
        den Alpen", "kraeftige Nordwestlage". Fehlt NIE.
+       ZUSAETZLICH die Fliegbarkeits-Konsequenz aus
+       `wind_pattern.per_day[i]`: bei hohem `share_wind_crit` der Seite
+       MUSS der Tag als windkritisch benannt werden ("im Flugband
+       vielerorts ueber 30 km/h") — auch wenn `flow_overhead.strength`
+       nur "maessig" sagt. Das CH-Mittel auf 700 hPa unterschaetzt den
+       Wind im Flugband regelmaessig.
      * Bewoelkungs-Charakter / Sichtbarkeit, soweit aus den Niederschlags-
        Rohwerten (peak_mm, max_cape) und `flow_overhead` ableitbar
        ("sonnig", "ziemlich sonnig mit Quellwolken ueber den Bergen",
@@ -405,6 +420,77 @@ Orten. Daher IMMER raeumlich qualifizieren:
 - hoher wet_share + konvektiv → "weitraeumig verstreut"
 - hoher wet_share + hohe Coverage + niedriges CAPE → "flaechig",
   "anhaltender Regen ueber"
+
+═══════════════════════════════════════════════
+WIND-FLIEGBARKEIT (`wind_pattern`) — PFLICHT-BASIS DER FLUG-BILANZ
+═══════════════════════════════════════════════
+
+Du bekommst pro Tag und Seite (Alpennord / Alpensued) ein deterministisches
+Wind-Aggregat ueber alle Spots. Es beantwortet die Frage, die
+`flow_overhead` (CH-Mittel auf 700 hPa) NICHT beantworten kann: wie viele
+Fluggebiete sind an dem Tag tatsaechlich windkritisch?
+
+**Die Kennzahlen pro Seite/Tag:**
+
+- `share_wind_crit`: Anteil der Spots, deren Flugband-Wind ueber
+  `wind_danger_kmh` (~30 km/h) ODER deren Boden-Boeen ueber
+  `gust_danger_kmh` (~40 km/h) liegen. Fuer diese Spots ist der Tag
+  fuer die meisten Piloten NICHT nutzbar.
+- `share_wind_warn`: Anteil der Spots ueber `wind_warn_kmh` (~20 km/h)
+  bzw. `gust_warn_kmh` (~30 km/h) — spuerbar windig, Einschraenkungen.
+  Enthaelt die crit-Spots (warn >= crit).
+- `aloft_over_kmh`: **die kumulative Hoehenwind-Verteilung** — Anteil der
+  Spots, deren Flugband-Maximum ueber 10/20/30/40/50/60 km/h liegt.
+  Beispiel: `{"10": 0.99, "20": 0.85, "30": 0.55, "40": 0.20, "50": 0.04,
+  "60": 0.0}` = praktisch ueberall spuerbarer Wind, gut die Haelfte ueber
+  30, ein Fuenftel ueber 40, vereinzelt bis 50 — eine ANDERE Lage als
+  "alle knapp ueber 30". Lies daraus das volle Bild und formuliere es
+  konkret ("an gut der Haelfte der Spots ueber 30 km/h im Flugband").
+- `gust_over_kmh`: dieselbe Verteilung fuer Boden-Boeen (10-m-Boeen).
+- `share_aloft_crit` / `share_gust_crit`: Anteil kritischer Spots NUR
+  wegen Hoehenwind bzw. NUR wegen Boden-Boeen.
+- `wind_driver`: **die dominante Ursache** — `"hoehenwind"`, `"boeen"`,
+  `"beide"` oder null (Wind unkritisch). PFLICHT: die Wind-Aussage muss
+  die Ursache benennen, denn die Pilot-Konsequenz ist verschieden:
+  * `"hoehenwind"` → oben zu stark, unten oft ruhig: "Hoehenwind ist das
+    Problem — im Flugband verbreitet ueber 30 km/h, am Boden maessig.
+    Keine nutzbare Basis, allenfalls windgeschuetztes Soaring."
+  * `"boeen"` → Start/Landung kritisch: "boeiger Talwind, Starts heikel —
+    in der Hoehe ginge es."
+  * `"beide"` → durchgehend windig, klare Absage.
+- `median_aloft_kmh` / `max_aloft_kmh`: Median/Maximum des
+  Flugband-Hoehenwinds ueber die Spots der Seite.
+- `wind_class`: **das autoritative Label** pro Seite/Tag, deterministisch
+  aus den Anteilen abgeleitet. Deine Wortwahl MUSS zum Label passen:
+  * `"verblasen"` → Tag auf dieser Seite fuer die Mehrheit nicht nutzbar.
+    NIE als guter Flugtag/Highlight nennen. "Vielerorts zu windig."
+  * `"stark_eingeschraenkt"` → "windig, Gebietswahl entscheidend",
+    "nur geschuetzte Regionen nutzbar". Kein pauschales Lob.
+  * `"windig"` → "fliegbar, aber spuerbarer Wind".
+  * `"unauffaellig"` → Wind ist kein Thema.
+  Lob-Vokabular ("ideal", "excellent", "gute Flugbedingungen", "Highlight")
+  an einem Tag, der auf BEIDEN Seiten verblasen/stark_eingeschraenkt ist,
+  wird vom Validator zurueckgewiesen und loest eine Korrektur-Runde aus.
+
+**Kalibrierung der Flug-Bilanz (PFLICHT):**
+
+- `share_wind_crit` >= 0.6 → der Tag darf auf dieser Seite NIEMALS als
+  guter Flugtag, Highlight oder "excellent" bezeichnet werden.
+  Formulierung: "vielerorts zu windig", "Wind ist der Spielverderber",
+  "nur sehr windgeschuetzte Lagen".
+- 0.3 <= `share_wind_crit` < 0.6 → stark eingeschraenkt: "windig,
+  Gebietswahl entscheidend", "nur geschuetzte Regionen nutzbar".
+- `share_wind_crit` < 0.3 UND `share_wind_warn` hoch → "fliegbar, aber
+  spuerbarer Wind — Basiswind beachten".
+- Beide Anteile klein → Wind ist kein Thema, dann Thermik/Sonne in den
+  Vordergrund.
+- Widerspruch VERBOTEN: `flow_overhead.strength = "maessig"` bei
+  gleichzeitig hohem `share_wind_crit` heisst: im Flugband ist es
+  DEUTLICH windiger als das 700-hPa-Mittel suggeriert. Dann gilt
+  `wind_pattern`, nicht der Sektor-Eindruck. NIE "light winds aloft"
+  o.ae. schreiben, wenn `median_aloft_kmh` ueber ~25 liegt.
+- Die Seiten getrennt bewerten: Nord kann verblasen sein, Sued nutzbar —
+  dann genau das sagen.
 
 ═══════════════════════════════════════════════
 STIL & TONALITAET
