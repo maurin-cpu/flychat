@@ -28,9 +28,11 @@ import json
 import logging
 import os
 import tempfile
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -38,6 +40,10 @@ import config
 from engine.synoptic_context import _haversine_km
 
 logger = logging.getLogger(__name__)
+
+# Verhindert parallele Fetches (Thundering-Herd bei leerem Cache / Erst-Deploy):
+# es laeuft immer nur EIN Refresh gleichzeitig.
+_refresh_lock = threading.Lock()
 
 
 # ============================================================================
@@ -298,38 +304,52 @@ def _atomic_write_json_compact(path: Path, data: dict) -> None:
 
 def refresh_synoptic_grid() -> Optional[dict]:
     """Holt das Raster fuer heute..heute+FORECAST_DAYS-1, detektiert Zentren
-    pro Timestep und schreibt den Cache. Returns das Ergebnis oder None."""
-    today = datetime.now().date()
-    forecast_dates = [
-        (today + timedelta(days=k)).isoformat()
-        for k in range(config.FORECAST_DAYS)
-    ]
+    pro Timestep und schreibt den Cache. Returns das Ergebnis oder None.
 
-    meta = build_grid_meta()
-    fetched = fetch_grid_pressure(forecast_dates)
-    if fetched is None:
-        return None
+    Serialisiert ueber _refresh_lock: laeuft schon ein Refresh, warten wir
+    darauf und liefern den frisch geschriebenen Cache, statt selbst erneut die
+    (teuren) Open-Meteo-Calls abzufeuern.
+    """
+    if not _refresh_lock.acquire(blocking=False):
+        with _refresh_lock:  # auf den laufenden Refresh warten
+            return load_synoptic_grid_cache()
+    try:
+        # "today" in config.TIMEZONE (nicht Server-Lokalzeit): die Timestep-Keys
+        # sind Lokalzeit; auf UTC-Servern kippt "today" sonst nahe Mitternacht
+        # um einen Tag und das Tagesset waere versetzt.
+        today = datetime.now(ZoneInfo(config.TIMEZONE)).date()
+        forecast_dates = [
+            (today + timedelta(days=k)).isoformat()
+            for k in range(config.FORECAST_DAYS)
+        ]
 
-    centers = {
-        ts: find_grid_pressure_centers(meta, fetched["values"][ts])
-        for ts in fetched["timesteps"]
-    }
+        meta = build_grid_meta()
+        fetched = fetch_grid_pressure(forecast_dates)
+        if fetched is None:
+            return None
 
-    result = {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "model": "ecmwf_ifs025",
-        "attribution": "Open-Meteo",
-        "timezone": config.TIMEZONE,
-        "meta": meta,
-        "timesteps": fetched["timesteps"],
-        "values": fetched["values"],
-        "centers": centers,
-    }
-    _atomic_write_json_compact(config.SYNOPTIC_GRID_CACHE_PATH, result)
-    logger.info("refresh_synoptic_grid: %d Timesteps, %d Punkte, Cache %s",
-                len(result["timesteps"]), meta["ny"] * meta["nx"],
-                config.SYNOPTIC_GRID_CACHE_PATH)
-    return result
+        centers = {
+            ts: find_grid_pressure_centers(meta, fetched["values"][ts])
+            for ts in fetched["timesteps"]
+        }
+
+        result = {
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "model": "ecmwf_ifs025",
+            "attribution": "Open-Meteo",
+            "timezone": config.TIMEZONE,
+            "meta": meta,
+            "timesteps": fetched["timesteps"],
+            "values": fetched["values"],
+            "centers": centers,
+        }
+        _atomic_write_json_compact(config.SYNOPTIC_GRID_CACHE_PATH, result)
+        logger.info("refresh_synoptic_grid: %d Timesteps, %d Punkte, Cache %s",
+                    len(result["timesteps"]), meta["ny"] * meta["nx"],
+                    config.SYNOPTIC_GRID_CACHE_PATH)
+        return result
+    finally:
+        _refresh_lock.release()
 
 
 def load_synoptic_grid_cache() -> Optional[dict]:

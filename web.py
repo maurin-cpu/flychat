@@ -2584,11 +2584,16 @@ def api_synoptic_grid():
     # Bewusst KEIN Login-Gating wie im Briefing: die Synoptik ist grobe
     # Uebersichtsinfo, kein Premium-Spot-Detail.
     allowed = _allowed_date_strs(config.FORECAST_DAYS)
-    kept = [ts for ts in grid.get("timesteps", []) if ts[:10] in allowed]
+    gvals = grid.get("values", {})
+    gcenters = grid.get("centers", {})
+    # Nur Timesteps behalten, fuer die es auch wirklich Werte gibt -> ein
+    # truncierter/legacy Cache fuehrt zu 503 statt KeyError-500.
+    kept = [ts for ts in grid.get("timesteps", [])
+            if ts[:10] in allowed and ts in gvals]
     grid = dict(grid,
                 timesteps=kept,
-                values={ts: grid["values"][ts] for ts in kept},
-                centers={ts: grid.get("centers", {}).get(ts, []) for ts in kept})
+                values={ts: gvals[ts] for ts in kept},
+                centers={ts: gcenters.get(ts, []) for ts in kept})
 
     wetterlage = None
     sctx = load_synoptic_cache()
@@ -2604,17 +2609,22 @@ def api_synoptic_grid():
 
 
 @app.route("/api/synoptic/grid/refresh", methods=["POST"])
+@_require_admin
 def api_synoptic_grid_refresh():
-    """Triggert manuell den Grid-Refresh (5 gebatchte Open-Meteo-Calls)."""
+    """Triggert manuell den Grid-Refresh (5 gebatchte Open-Meteo-Calls).
+
+    Admin-only: der Refresh feuert ~10 Open-Meteo-Multi-Location-Calls und darf
+    nicht unauthentifiziert als Kosten-/Last-Verstaerker missbrauchbar sein.
+    """
     from engine.synoptic_grid import refresh_synoptic_grid
     status = "ok"
     try:
         result = refresh_synoptic_grid()
         if result is None:
             status = "fetch_failed"
-    except Exception as e:
-        logger.exception("api_synoptic_grid_refresh: %s", e)
-        status = f"error: {e.__class__.__name__}"
+    except Exception:
+        logger.exception("api_synoptic_grid_refresh fehlgeschlagen")
+        status = "error"
 
     success = status == "ok"
     payload = {"success": success, "grid_refresh": status}

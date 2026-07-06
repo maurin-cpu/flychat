@@ -141,6 +141,19 @@
       }
       if (!missing) break;
     }
+    // Falls nach 3 Paessen noch Loecher bleiben (praktisch nie): mit dem
+    // Feld-Mittel fuellen. Sonst wuerde upsampleBilinear null*x=0 rechnen und
+    // eine ~1000-hPa-Kante einschleusen.
+    var sum = 0, cnt = 0;
+    for (var k = 0; k < out.length; k++) {
+      if (out[k] != null) { sum += out[k]; cnt++; }
+    }
+    if (cnt) {
+      var mean = sum / cnt;
+      for (var m = 0; m < out.length; m++) {
+        if (out[m] == null) out[m] = mean;
+      }
+    }
     return out;
   }
 
