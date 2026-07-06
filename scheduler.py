@@ -128,6 +128,19 @@ def _send_briefings_once(engine) -> dict:
         logger.exception("Scheduler: Wetterlage-Refresh Exception: %s", e)
         # weiter mit Briefing, ohne Wetterlage-Block
 
+    # Synoptik-Grid (/synoptik-Druckkarte) 1x/Tag refreshen — eigenes
+    # try/except: ein Grid-Fehler darf Briefing-Mails nie blockieren.
+    try:
+        from engine.synoptic_grid import refresh_synoptic_grid
+        grid = refresh_synoptic_grid()
+        if grid:
+            logger.info("Scheduler: Synoptik-Grid refreshed (%d Timesteps)",
+                        len(grid.get("timesteps", [])))
+        else:
+            logger.info("Scheduler: Synoptik-Grid-Refresh fehlgeschlagen — alter Cache bleibt")
+    except Exception as e:
+        logger.exception("Scheduler: Synoptik-Grid-Refresh Exception: %s", e)
+
     try:
         briefing_data = engine.build_briefing_data()
     except Exception as e:

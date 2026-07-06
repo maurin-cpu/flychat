@@ -2548,6 +2548,82 @@ def api_briefing_generate():
 
 
 # ============================================================================
+# SYNOPTIK-KARTE (/synoptik)
+# ============================================================================
+
+@app.route("/synoptik")
+def synoptik_page():
+    """Interaktive Bodendruckkarte (Isobaren + H/T-Zentren, Met-Office-Stil)."""
+    return render_template("synoptik.html", forecast_days=current_max_days())
+
+
+@app.route("/api/synoptic/grid", methods=["GET"])
+def api_synoptic_grid():
+    """Liefert das dichte Druckraster + Zentren fuer die Synoptik-Karte.
+
+    Grid kommt aus data/synoptic_grid.json (1x/Tag vom Scheduler refreshed).
+    Fehlt der Cache (Erst-Deploy), wird EIN Inline-Refresh versucht.
+    Dazu der Wetterlage-Textblock aus dem Synoptik-Cache (nur die fuer die
+    Seite noetigen Felder — nicht das ganze Strukturfeld).
+    """
+    from engine.synoptic_grid import load_synoptic_grid_cache, refresh_synoptic_grid
+    from engine.synoptic_context import load_synoptic_cache
+
+    grid = load_synoptic_grid_cache()
+    if grid is None:
+        try:
+            grid = refresh_synoptic_grid()
+        except Exception:
+            logger.exception("api_synoptic_grid: Inline-Refresh fehlgeschlagen")
+            grid = None
+    if grid is None:
+        return jsonify({"success": False,
+                        "error": "Kein Synoptik-Grid verfuegbar"}), 503
+
+    # Nur die konfigurierten Tage ausliefern (FORECAST_DAYS inkl. Override).
+    # Bewusst KEIN Login-Gating wie im Briefing: die Synoptik ist grobe
+    # Uebersichtsinfo, kein Premium-Spot-Detail.
+    allowed = _allowed_date_strs(config.FORECAST_DAYS)
+    kept = [ts for ts in grid.get("timesteps", []) if ts[:10] in allowed]
+    grid = dict(grid,
+                timesteps=kept,
+                values={ts: grid["values"][ts] for ts in kept},
+                centers={ts: grid.get("centers", {}).get(ts, []) for ts in kept})
+
+    wetterlage = None
+    sctx = load_synoptic_cache()
+    if sctx:
+        wetterlage = {
+            "lage_label": sctx.get("lage_label"),
+            "llm_overview": sctx.get("llm_overview"),
+            "forecast_dates": sctx.get("forecast_dates"),
+            "generated_at": sctx.get("generated_at"),
+        }
+
+    return jsonify({"success": True, "grid": grid, "wetterlage": wetterlage})
+
+
+@app.route("/api/synoptic/grid/refresh", methods=["POST"])
+def api_synoptic_grid_refresh():
+    """Triggert manuell den Grid-Refresh (5 gebatchte Open-Meteo-Calls)."""
+    from engine.synoptic_grid import refresh_synoptic_grid
+    status = "ok"
+    try:
+        result = refresh_synoptic_grid()
+        if result is None:
+            status = "fetch_failed"
+    except Exception as e:
+        logger.exception("api_synoptic_grid_refresh: %s", e)
+        status = f"error: {e.__class__.__name__}"
+
+    success = status == "ok"
+    payload = {"success": success, "grid_refresh": status}
+    if not success:
+        payload["error"] = f"Grid-Refresh: {status}"
+    return jsonify(payload), (200 if success else 500)
+
+
+# ============================================================================
 # CHAT API
 # ============================================================================
 

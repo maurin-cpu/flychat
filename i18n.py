@@ -40,6 +40,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "nav.aria_main": {"de": "Hauptnavigation", "en": "Main navigation"},
     "nav.spots": {"de": "Startplätze", "en": "Launch sites"},
     "nav.regions": {"de": "Regionen", "en": "Regions"},
+    "nav.synoptic": {"de": "Synoptik", "en": "Synoptic"},
     "nav.foehn": {"de": "Föhn", "en": "Foehn"},
     "nav.foehn_open": {"de": "Föhndiagramm öffnen", "en": "Open foehn chart"},
     "nav.settings": {"de": "Einstellungen", "en": "Settings"},
@@ -288,6 +289,16 @@ STRINGS: dict[str, dict[str, str]] = {
     "subscribe.submit": {"de": "Kostenlos abonnieren", "en": "Subscribe for free"},
     "subscribe.foot_html": {"de": "Mit dem Abonnieren erhältst du eine Bestätigungs-E-Mail.<br>Du kannst dich jederzeit mit einem Klick abmelden.",
                             "en": "On subscribing you'll receive a confirmation email.<br>You can unsubscribe any time with one click."},
+
+    # ======================= synoptik.html =======================
+    "synoptik.title": {"de": "Synoptik – Wingcast", "en": "Synoptic – Wingcast"},
+    "synoptik.heading": {"de": "Synoptische Analyse", "en": "Synoptic analysis"},
+    "synoptik.subtitle": {"de": "Bodendruck, Isobaren und Druckzentren über Europa",
+                          "en": "Surface pressure, isobars and pressure centres over Europe"},
+    "synoptik.loading": {"de": "wird geladen…", "en": "loading…"},
+    "synoptik.refresh": {"de": "Aktualisieren", "en": "Refresh"},
+    "synoptik.day_tabs_aria": {"de": "Tagesauswahl", "en": "Day selection"},
+    "synoptik.time_chips_aria": {"de": "Uhrzeit (UTC)", "en": "Time (UTC)"},
 
     # ======================= briefing.html =======================
     "briefing.title": {"de": "Flugwetter – Wingcast", "en": "Flight weather – Wingcast"},
@@ -808,6 +819,26 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.error.prefix": {"de": "Fehler: {msg}", "en": "Error: {msg}"},
     "js.generating": {"de": "Generiert…", "en": "Generating…"},
     "js.failed": {"de": "Fehlgeschlagen", "en": "Failed"},
+    # Link Wetterlage-Block -> Synoptik-Karte
+    "js.wetterlage.to_map": {"de": "Zur Druckkarte", "en": "Open pressure chart"},
+
+    # ======================= synoptic-map.js (Synoptik-Karte, user-facing) =======================
+    "js.syn.high_letter": {"de": "H", "en": "H"},
+    "js.syn.low_letter": {"de": "T", "en": "L"},
+    "js.syn.high_aria": {"de": "Hochdruckzentrum {p} hPa", "en": "High pressure centre {p} hPa"},
+    "js.syn.low_aria": {"de": "Tiefdruckzentrum {p} hPa", "en": "Low pressure centre {p} hPa"},
+    "js.syn.updated": {"de": "Stand: {ts}", "en": "Updated: {ts}"},
+    "js.syn.no_data": {"de": "Keine Druckdaten verfuegbar.", "en": "No pressure data available."},
+    "js.syn.no_text": {"de": "Kein Wetterlage-Text verfuegbar.", "en": "No weather situation text available."},
+    "js.syn.load_failed": {"de": "Laden fehlgeschlagen", "en": "Loading failed"},
+    "js.syn.isobars_hint": {"de": "Isobaren alle 4 hPa, gestrichelt = 2-hPa-Zwischenisobaren · {model}",
+                            "en": "Isobars every 4 hPa, dashed = 2 hPa intermediates · {model}"},
+    # Timeline-Animation (Redesign 07/2026): Play/Pause + Scrubber statt Tabs/Chips
+    "js.syn.play": {"de": "Animation abspielen", "en": "Play animation"},
+    "js.syn.pause": {"de": "Animation anhalten", "en": "Pause animation"},
+    "js.syn.timeline_aria": {"de": "Zeitleiste: Zeitpunkt waehlen", "en": "Timeline: choose a time"},
+    "js.syn.tick_aria": {"de": "{d}, {t} Uhr", "en": "{d}, {t}"},
+    "js.syn.wetterlage_title": {"de": "Wetterlage", "en": "Weather situation"},
 
     # ======================= chat.js (user-facing; Admin-Analyse/Debug bleibt DE) =======================
     "js.chat.unknown_error": {"de": "Unbekannter Fehler", "en": "Unknown error"},

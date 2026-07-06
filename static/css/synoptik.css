@@ -1,0 +1,542 @@
+/* Synoptik-Karte (/synoptik) — Layout, Timeline-Animation, Isobaren-/Zentren-
+   Styles. Folgt den style.css-Design-Tokens (--color-*, --space-*, --radius-*,
+   --text-*, --shadow-*); Wetterlage-Panel alignt mit .bf-wetterlage
+   (briefing.css, Violet-Accent #6d28d9, Palette v3.2 "Royal Premium"). */
+
+.syn {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-12);
+  color: var(--color-text);
+  animation: synFadeIn 0.45s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes synFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+
+.syn-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.syn-heading {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-primary);
+}
+
+.syn-subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+
+.syn-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.syn-timestamp {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.syn-btn-refresh {
+  padding: 7px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elevated);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.syn-btn-refresh:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.syn-btn-refresh:disabled { opacity: 0.55; cursor: default; }
+.syn-btn-refresh:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* ── Timeline-Card: Play/Pause + Readout + Scrubber ─────────── */
+
+.syn-timeline-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.syn-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.syn-play {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-vivid) 100%);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--color-primary-glow), var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+}
+
+.syn-play:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 6px 18px rgba(3, 105, 161, 0.28), var(--shadow-md);
+}
+
+.syn-play:active:not(:disabled) { transform: scale(0.97); }
+.syn-play:disabled { opacity: 0.45; cursor: default; }
+.syn-play:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+/* Play-Dreieck optisch zentrieren (leicht nach rechts) */
+.syn-play .syn-play-ic--play { display: block; margin-left: 2px; }
+.syn-play .syn-play-ic--pause { display: none; }
+.syn-play.is-playing .syn-play-ic--play { display: none; }
+.syn-play.is-playing .syn-play-ic--pause { display: block; }
+
+/* Prominentes Readout des aktuellen Zeitpunkts ("Mo., 6. Juli · 12:00") */
+.syn-readout {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  min-height: 1.4em;
+}
+
+.syn-readout-loading {
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+/* ── Timeline / Scrubber ────────────────────────────────────── */
+
+.syn-timeline { position: relative; }
+
+/* Skeleton vor dem Datenladen */
+.syn-tl-skeleton {
+  height: 58px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg,
+    var(--color-bg) 25%, var(--color-primary-light) 50%, var(--color-bg) 75%);
+  background-size: 200% 100%;
+  animation: synShimmer 1.4s ease infinite;
+}
+
+@keyframes synShimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Tageszeile: Label pro Tag, flex-grow = Anzahl Ticks des Tags (inline) */
+.syn-tl-days {
+  display: flex;
+  margin-bottom: 2px;
+}
+
+.syn-tl-day-label {
+  flex-basis: 0;
+  min-width: 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Track: Linie + Fortschritts-Fill + Tick-Buttons */
+.syn-tl-track {
+  position: relative;
+  display: flex;
+  height: 46px;
+}
+
+.syn-tl-line,
+.syn-tl-fill {
+  position: absolute;
+  top: 11px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  pointer-events: none;
+}
+
+.syn-tl-line {
+  background: var(--color-border);
+}
+
+.syn-tl-fill {
+  background: linear-gradient(90deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Waehrend der Wiedergabe laeuft der Fill quasi-kontinuierlich mit
+   (Transition-Dauer ~ STEP_MS in synoptic-map.js, linear) */
+.syn-timeline.is-playing .syn-tl-fill {
+  transition: width 1.15s linear;
+}
+
+.syn-notransition { transition: none !important; }
+
+.syn-tl-tick {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.syn-tl-tick:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; border-radius: var(--radius-sm); }
+
+/* Feiner Tagestrenner am ersten Tick eines neuen Tages */
+.syn-tl-tick.is-day-start::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 10px;
+  width: 1px;
+  background: var(--color-border);
+}
+
+/* Dot: fixe 16px-Box, innerer Kreis skaliert — Dot-Zentrum bleibt stabil
+   (Linie/Fill sind darauf ausgerichtet: top 11px + 1.5px = 12.5 ~ 4 + 8) */
+.syn-tl-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.syn-tl-dot::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-border-hover);
+  box-sizing: border-box;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.syn-tl-tick:hover .syn-tl-dot::after {
+  border-color: var(--color-primary);
+  transform: scale(1.15);
+}
+
+.syn-tl-tick.is-past .syn-tl-dot::after {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  opacity: 0.75;
+}
+
+.syn-tl-tick.is-active .syn-tl-dot::after {
+  width: 15px;
+  height: 15px;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px var(--color-primary-glow);
+}
+
+.syn-tl-time {
+  margin-top: 3px;
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  transition: color var(--transition-fast);
+}
+
+.syn-tl-tick:hover .syn-tl-time { color: var(--color-primary); }
+
+.syn-tl-tick.is-active .syn-tl-time {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* ── Layout: Karte + Textpanel ──────────────────────────────── */
+
+.syn-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.syn-map-col { min-width: 0; }
+
+.syn-map-card {
+  position: relative;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  background: var(--color-bg-elevated);
+}
+
+.syn-map {
+  height: min(68vh, 640px);
+}
+
+/* Crossfade-Panes (isobarsA/isobarsB) — FADE_MS in synoptic-map.js muss
+   zur Dauer hier passen */
+.syn-fade-pane {
+  transition: opacity 0.42s ease;
+  will-change: opacity;
+}
+
+.syn-pane-notransition { transition: none !important; }
+
+/* Lade-Overlay ueber der Karte (Skeleton-State) */
+.syn-map-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1100; /* ueber allen Leaflet-Panes/Controls (max ~1000) */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-primary-light) 130%);
+  color: var(--color-text-secondary);
+  font-size: var(--text-md);
+  font-weight: 500;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.syn-map-loading.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.syn-map-loading.is-error .syn-spinner { display: none; }
+
+.syn-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid var(--color-primary-light);
+  border-top-color: var(--color-primary);
+  animation: synSpin 0.9s linear infinite;
+}
+
+@keyframes synSpin { to { transform: rotate(360deg); } }
+
+.syn-map-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+/* ── Isobaren-Labels + H/T-Zentren (Leaflet divIcons) ───────── */
+
+.syn-isobar-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 15px;
+  text-align: center;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(51, 65, 85, 0.22);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+
+.syn-center-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
+}
+
+.syn-center-letter {
+  font-size: 27px;
+  font-weight: 800;
+  font-family: Georgia, "Times New Roman", serif;
+  /* Halo, damit der Buchstabe ueber den Isobaren lesbar bleibt */
+  text-shadow: 0 0 5px #fff, 0 0 5px #fff, 0 0 5px #fff, 0 0 8px #fff;
+}
+
+.syn-center-value {
+  margin-top: 1px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Meteorologische Konvention: Hoch blau, Tief rot */
+.syn-center-icon--hoch .syn-center-letter { color: #1d4ed8; }
+.syn-center-icon--tief .syn-center-letter { color: #dc2626; }
+
+/* ── Wetterlage-Textpanel (alignt mit .bf-wetterlage) ───────── */
+
+.syn-text {
+  background: linear-gradient(135deg, var(--color-bg-elevated) 0%, rgba(167, 139, 250, 0.08) 100%);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid #6d28d9;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+
+.syn-text[hidden] { display: none; }
+
+.syn-text-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.syn-text-icon {
+  font-size: 16px;
+  color: #6d28d9;
+  opacity: 0.85;
+}
+
+.syn-text-title {
+  font-weight: 700;
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.syn-text-lage {
+  padding: 2px 10px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: #6d28d9;
+  background: rgba(167, 139, 250, 0.16);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.syn-text-summary p {
+  margin: 0 0 var(--space-3);
+  font-weight: 500;
+  color: var(--color-text-light);
+}
+
+.syn-text-long {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.syn-text-day-block {
+  padding: var(--space-2) var(--space-3);
+  margin: 0 calc(-1 * var(--space-2)) var(--space-1);
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-md);
+  transition: background-color 0.35s ease, border-color 0.35s ease;
+}
+
+.syn-text-day-block p {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-secondary);
+}
+
+.syn-text-day-block strong { color: var(--color-text); }
+
+/* Tagesblock des laufenden Animations-Frames */
+.syn-text-day-block.is-active {
+  background: rgba(167, 139, 250, 0.14);
+  border-left-color: #6d28d9;
+}
+
+.syn-text-day-block.is-active p { color: var(--color-text); }
+
+.syn-text-hint {
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.syn-text-empty { color: var(--color-text-muted); margin: 0; }
+
+/* ── Mobil ──────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .syn-layout { grid-template-columns: 1fr; }
+  .syn-map { height: 55vh; }
+  .syn-timeline-card { padding: var(--space-3) var(--space-4) var(--space-2); }
+  .syn-readout { font-size: 1rem; }
+}
+
+@media (max-width: 560px) {
+  .syn-heading { font-size: 1.3rem; }
+  .syn-play { width: 42px; height: 42px; }
+  /* Zwischenzeiten (06/18) nur am aktiven Tick beschriften — Layouthoehe
+     bleibt erhalten (visibility statt display) */
+  .syn-tl-tick[data-hour="06:00"]:not(.is-active) .syn-tl-time,
+  .syn-tl-tick[data-hour="18:00"]:not(.is-active) .syn-tl-time {
+    visibility: hidden;
+  }
+}
+
+/* ── Reduzierte Bewegung ────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .syn { animation: none; }
+  .syn-fade-pane,
+  .syn-tl-fill,
+  .syn-tl-dot::after,
+  .syn-play,
+  .syn-text-day-block { transition: none !important; }
+  .syn-tl-skeleton { animation: none; }
+}

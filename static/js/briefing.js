@@ -2182,6 +2182,7 @@
       <div class="bf-wetterlage-head">
         <span class="bf-wetterlage-icon" aria-hidden="true">☼</span>
         <span class="bf-wetterlage-label">Wetterlage${lageLabel ? ` — ${escapeHtml(lageLabel)}` : ""}</span>
+        <a class="bf-wetterlage-maplink" href="/synoptik">${escapeHtml(wcT("js.wetterlage.to_map"))} →</a>
       </div>
       <div class="bf-wetterlage-summary">${summaryParas}</div>
       ${longText && longText !== shortText ? `

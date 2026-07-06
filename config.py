@@ -459,6 +459,34 @@ SYNOPTIC_CONFIDENCE_BY_DAY = {
     4: "low",     # Tag 5
 }
 
+# --- Synoptik-Karte (/synoptik): dichtes NE-Atlantik/Europa-Druckraster ---
+# Grundlage der interaktiven Bodendruckkarte (Isobaren + H/T-Zentren im
+# Met-Office-Stil). Eigenes, dichtes Raster — unabhaengig vom 15-Punkte-Grid
+# oben, das nur der Label-Detektion fuer den LLM-Text dient.
+# Domain wie die Met-Office-Bodendruckkarten: Neufundland bis Osteuropa,
+# Kanaren bis Spitzbergen — Sturmtiefs entstehen weit draussen im Atlantik.
+# Modell: ecmwf_ifs025 (global) — icon_eu endet bei 23.5°W und faellt damit aus.
+# Wichtig: Domain muss DEUTLICH groesser sein als der sichtbare Karten-
+# ausschnitt (VIEW_BOUNDS in synoptic-map.js, 30W-35E / 30-67N) — die Karte
+# fuellt je nach Seitenverhaeltnis mehr Flaeche, und an der Domaingrenze
+# enden die Isobaren als sichtbarer "Schnitt".
+SYNOPTIC_GRID_LAT_MAX = 75.0    # Nordrand (Spitzbergen/Groenland-See)
+SYNOPTIC_GRID_LAT_MIN = 20.0    # Suedrand (Sahara)
+SYNOPTIC_GRID_LON_MIN = -65.0   # Westrand (Neufundland)
+SYNOPTIC_GRID_LON_MAX = 57.5    # Ostrand (Ural/Kaspisches Meer)
+SYNOPTIC_GRID_DLAT = 2.5
+SYNOPTIC_GRID_DLON = 3.5        # 3.5° lon ≈ 2.2° lat-Aequivalent bei 50°N -> 23 x 36 = 828 Punkte
+SYNOPTIC_GRID_HOURS_LOCAL = (0, 6, 12, 18)  # Ausgabezeiten in Lokalzeit (TIMEZONE),
+                                            # konsistent mit den Meteogramm-Zeiten
+SYNOPTIC_GRID_CHUNK_SIZE = 90   # Punkte pro Open-Meteo Multi-Location-Call (URL-Laenge)
+# Zentren-Detektion auf dem dichten Raster (find_grid_pressure_centers):
+# kleinere Gradient-Schwelle als beim 15-Punkte-Grid, weil das Fenster
+# raeumlich enger ist; Suppression verhindert Zentren-Cluster.
+SYNOPTIC_GRID_CENTER_MIN_GRADIENT_HPA = 2.0
+SYNOPTIC_GRID_CENTER_WINDOW_CELLS = 3        # Extrema-Fenster-Radius (~600 km)
+SYNOPTIC_GRID_CENTER_MIN_DIST_KM = 500.0     # Mindestabstand zwischen Zentren
+SYNOPTIC_GRID_CACHE_PATH = DATA_DIR / "synoptic_grid.json"
+
 # --- Audit & Cache -------------------------------------------------------
 SYNOPTIC_CACHE_PATH = DATA_DIR / "synoptic_context.json"
 SYNOPTIC_AUDIT_DIR = DATA_DIR / "synoptic_audit"
@@ -468,6 +496,7 @@ SYNOPTIC_AUDIT_KEEP_DAYS = 30   # ältere Audit-Files werden rotiert geloescht
 if os.environ.get("VERCEL"):
     SYNOPTIC_CACHE_PATH = _WRITABLE_DIR / "synoptic_context.json"
     SYNOPTIC_AUDIT_DIR = _WRITABLE_DIR / "synoptic_audit"
+    SYNOPTIC_GRID_CACHE_PATH = _WRITABLE_DIR / "synoptic_grid.json"
 
 # ============================================================================
 # THERMIK-BERECHNUNGS-PARAMETER

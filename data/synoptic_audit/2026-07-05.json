@@ -618,31 +618,5 @@
     "decide_foehn_summary",
     "decide_precip_pattern_nord_sued",
     "decide_lage_label"
-  ],
-  "llm_overview": {
-    "short": "The coming days will be characterized by stable high pressure, providing mostly dry conditions. A moderate northwesterly flow persists throughout the window. On Sunday, some light showers may occur on the Alpine north side, while the south remains dry. Monday sees the introduction of moderate north foehn, particularly affecting the Alpine north side, which could lead to gusty conditions. Tuesday likely remains dry with stable conditions, although some uncertainty exists. Sunday is a cautious flying day, while Monday offers better opportunities for soaring, especially in the lee areas of the Alps.",
-    "long": "Sonntag: Stable high pressure with a moderate northwesterly flow. Light showers possible on the Alpine north side, dry in the south. Montag: High pressure continues with moderate north foehn. Mostly dry conditions on both sides of the Alps. Dienstag: High pressure persists, dry and stable with a moderate northwesterly flow. Some uncertainty remains.",
-    "short_with_sources": [
-      {
-        "text": "The coming days will be characterized by stable high pressure, providing mostly dry conditions. A moderate northwesterly flow persists throughout the window. On Sunday, some light showers may occur on the Alpine north side, while the south remains dry. Monday sees the introduction of moderate north foehn, particularly affecting the Alpine north side, which could lead to gusty conditions. Tuesday likely remains dry with stable conditions, although some uncertainty exists. Sunday is a cautious flying day, while Monday offers better opportunities for soaring, especially in the lee areas of the Alps."
-      }
-    ],
-    "long_with_sources": [
-      {
-        "text": "Sonntag: Stable high pressure with a moderate northwesterly flow. Light showers possible on the Alpine north side, dry in the south.",
-        "flight_hint": "Cautious flying day; watch for light showers."
-      },
-      {
-        "text": "Montag: High pressure continues with moderate north foehn. Mostly dry conditions on both sides of the Alps.",
-        "flight_hint": "Good soaring conditions, especially in the lee."
-      },
-      {
-        "text": "Dienstag: High pressure persists, dry and stable with a moderate northwesterly flow. Some uncertainty remains.",
-        "flight_hint": "Likely a good flying day, but check conditions."
-      }
-    ],
-    "attempts": 1,
-    "unresolved": [],
-    "generated_at": "2026-07-05T19:48:55"
-  }
+  ]
 }
