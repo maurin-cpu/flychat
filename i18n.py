@@ -856,14 +856,18 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.syn.no_data": {"de": "Keine Druckdaten verfuegbar.", "en": "No pressure data available."},
     "js.syn.no_text": {"de": "Kein Wetterlage-Text verfuegbar.", "en": "No weather situation text available."},
     "js.syn.load_failed": {"de": "Laden fehlgeschlagen", "en": "Loading failed"},
-    "js.syn.isobars_hint": {"de": "Isobaren alle 4 hPa, gestrichelt = 2-hPa-Zwischenisobaren · {model}",
-                            "en": "Isobars every 4 hPa, dashed = 2 hPa intermediates · {model}"},
+    "js.syn.isobars_hint": {"de": "Isobaren alle 4 hPa · Fläche = Bodendruck · {model}",
+                            "en": "Isobars every 4 hPa · shading = surface pressure · {model}"},
     # Timeline-Animation (Redesign 07/2026): Play/Pause + Scrubber statt Tabs/Chips
     "js.syn.play": {"de": "Animation abspielen", "en": "Play animation"},
     "js.syn.pause": {"de": "Animation anhalten", "en": "Pause animation"},
     "js.syn.timeline_aria": {"de": "Zeitleiste: Zeitpunkt waehlen", "en": "Timeline: choose a time"},
     "js.syn.tick_aria": {"de": "{d}, {t} Uhr", "en": "{d}, {t}"},
     "js.syn.wetterlage_title": {"de": "Wetterlage", "en": "Weather situation"},
+    # Karten-Legende (Redesign 07/2026: Druckband-Toenung)
+    "js.syn.legend_title": {"de": "Bodendruck (hPa)", "en": "Surface pressure (hPa)"},
+    "js.syn.legend_low": {"de": "Tief", "en": "Low"},
+    "js.syn.legend_high": {"de": "Hoch", "en": "High"},
 
     # ======================= chat.js (user-facing; Admin-Analyse/Debug bleibt DE) =======================
     "js.chat.unknown_error": {"de": "Unbekannter Fehler", "en": "Unknown error"},

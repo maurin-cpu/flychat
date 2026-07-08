@@ -4,7 +4,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
-      integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw=="
+      integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
       crossorigin="anonymous" referrerpolicy="no-referrer" />
 <link rel="stylesheet" href="{{ url_for('static', filename='css/synoptik.css') }}?v={{ static_v('css/synoptik.css') }}">
 {% endblock %}
@@ -24,36 +24,40 @@
     </div>
   </header>
 
-  <!-- Zeitsteuerung: Play/Pause + prominente Zeitanzeige + Timeline-Scrubber.
-       Inhalt der Timeline wird von synoptic-map.js aus grid.timesteps gebaut. -->
-  <div class="syn-timeline-card" id="synTimelineCard">
-    <div class="syn-controls">
-      <button type="button" class="syn-play" id="synPlayBtn" disabled>
-        <svg class="syn-play-ic syn-play-ic--play" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 5.3v13.4L18.5 12z"/></svg>
-        <svg class="syn-play-ic syn-play-ic--pause" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M7 5h3.4v14H7zM13.6 5H17v14h-3.6z"/></svg>
-      </button>
-      <div class="syn-readout" id="synReadout" aria-live="polite">
-        <span class="syn-readout-loading">{{ t('synoptik.loading') }}</span>
-      </div>
-    </div>
-    <div class="syn-timeline" id="synTimeline">
-      <div class="syn-tl-skeleton" aria-hidden="true"></div>
-    </div>
-  </div>
+  <!-- Lage-Badge + LLM-Kurzfassung — Inhalt kommt aus synoptic-map.js -->
+  <div class="syn-summary" id="synSummary" hidden></div>
 
-  <div class="syn-layout">
-    <div class="syn-map-col">
-      <div class="syn-map-card">
-        <div class="syn-map" id="synMap"></div>
-        <div class="syn-map-loading" id="synMapLoading">
-          <span class="syn-spinner" aria-hidden="true"></span>
-          <span class="syn-map-loading-text" id="synMapLoadingText">{{ t('synoptik.loading') }}</span>
+  <!-- Karten-Hero: Karte + Legende + schwebende Glas-Zeitleiste + Lade-Overlay.
+       Zeitleisten-Inhalt wird von synoptic-map.js aus grid.timesteps gebaut. -->
+  <div class="syn-map-card">
+    <div class="syn-map" id="synMap"></div>
+
+    <div class="syn-legend" id="synLegend" hidden></div>
+
+    <div class="syn-map-bar">
+      <div class="syn-controls">
+        <button type="button" class="syn-play" id="synPlayBtn" disabled>
+          <svg class="syn-play-ic syn-play-ic--play" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M8 5.3v13.4L18.5 12z"/></svg>
+          <svg class="syn-play-ic syn-play-ic--pause" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M7 5h3.4v14H7zM13.6 5H17v14h-3.6z"/></svg>
+        </button>
+        <div class="syn-readout" id="synReadout" aria-live="polite">
+          <span class="syn-readout-loading">{{ t('synoptik.loading') }}</span>
         </div>
       </div>
-      <div class="syn-map-hint" id="synMapHint"></div>
+      <div class="syn-timeline" id="synTimeline">
+        <div class="syn-tl-skeleton" aria-hidden="true"></div>
+      </div>
     </div>
-    <aside class="syn-text" id="synWetterlage" hidden></aside>
+
+    <div class="syn-map-loading" id="synMapLoading">
+      <span class="syn-spinner" aria-hidden="true"></span>
+      <span class="syn-map-loading-text" id="synMapLoadingText">{{ t('synoptik.loading') }}</span>
+    </div>
   </div>
+  <div class="syn-map-hint" id="synMapHint"></div>
+
+  <!-- Wetterlage: Tages-Karten, synchron zur Karten-Animation -->
+  <section class="syn-days" id="synWetterlage" hidden></section>
 </div>
 {% endblock %}
 

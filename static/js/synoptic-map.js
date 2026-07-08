@@ -1,11 +1,19 @@
-/* Synoptik-Karte (/synoptik): interaktive Bodendruckkarte im Met-Office-Stil.
+/* Synoptik-Karte (/synoptik): interaktive Bodendruckkarte.
  *
- * Rendert Isobaren (4-hPa-Intervall) + H/T-Druckzentren auf Leaflet aus dem
- * dichten Europa-Druckraster (/api/synoptic/grid, engine/synoptic_grid.py).
- * Konturen werden clientseitig mit d3.contours() berechnet: das 25x18-Raster
- * wird bilinear x4 hochgesampelt (glatte Linien), die Konturen entstehen im
- * Index-Raum und werden linear nach lat/lon transformiert — Leaflet macht
- * dann die Mercator-Projektion (keine Doppelprojektion).
+ * Redesign 07/2026: Das Druckfeld wird als dezente Farbband-Toenung gerendert
+ * (kuehles Blau = Tief, warmes Sand = Hoch, neutral um 1013 hPa), darueber
+ * ruhige 4-hPa-Isobaren — Hochs und Tiefs sind so auf einen Blick lesbar.
+ * Dazu H/T-Badges im App-Stil, eine Glas-Legende und die Zeitleiste als
+ * schwebende Kontrollleiste unten auf der Karte.
+ *
+ * Rendert aus dem dichten Europa-Druckraster (/api/synoptic/grid,
+ * engine/synoptic_grid.py). Konturen werden clientseitig mit d3.contours()
+ * berechnet: das 25x18-Raster wird bilinear x4 hochgesampelt (glatte Linien),
+ * die Konturen entstehen im Index-Raum und werden linear nach lat/lon
+ * transformiert — Leaflet macht dann die Mercator-Projektion (keine
+ * Doppelprojektion). Die Farbbaender entstehen aus denselben Konturen:
+ * Band k = Ringe von Kontur k + Ringe von Kontur k+1 als Loecher
+ * (fillRule evenodd) — keine Opacity-Stapelung, exakte Bandflaechen.
  *
  * Zeitsteuerung: automatische Loop-Animation ueber alle Timesteps (Timeline-
  * Scrubber statt Tabs/Chips). Die Kontur-Geometrien werden pro Timestep einmal
@@ -14,8 +22,9 @@
  * Schweizer Zeit (kein "Z"-Suffix) — Stunden werden direkt aus dem String
  * angezeigt, nie ueber Date-TZ-Konvertierung.
  *
- * Daneben der Wetterlage-Textblock (LLM short/long) aus dem Synoptik-Cache;
- * der Tagesblock des aktuellen Animations-Tags wird hervorgehoben.
+ * Daneben Wetterlage-Kurzfassung (Lage-Badge + LLM short) ueber der Karte und
+ * Tages-Karten (LLM long) darunter; die Karte des aktuellen Animations-Tags
+ * wird hervorgehoben.
  */
 (function () {
   "use strict";
@@ -27,15 +36,19 @@
   var VIEW_BOUNDS = L.latLngBounds([30, -30], [67, 35]);
 
   var UPSAMPLE = 4;          // Raster-Verfeinerung vor d3.contours
-  var ISOBAR_STEP = 2;       // hPa — Konturierungs-Schritt (inkl. Zwischenisobaren)
-  var MAIN_EVERY = 4;        // Vielfache von 4 = durchgezogene Haupt-Isobaren
-                             // (Met-Office-Standard); dazwischen (1002, 1006, ...)
-                             // gestrichelte Zwischenisobaren — fuellen flache
-                             // Druckfelder (z.B. Sahara-Hitzetief im Sommer)
-  var LABEL_EVERY = 8;       // Vielfache von 8 beschriften
+  var ISOBAR_STEP = 4;       // hPa — nur Haupt-Isobaren (Met-Office-Standard);
+                             // die frueheren 2-hPa-Zwischenisobaren sind raus:
+                             // das Druckfeld traegt jetzt die Farbtoenung
+  var LABEL_EVERY = 8;       // Vielfache von 8 beschriften + staerker zeichnen
   var LABEL_MIN_POINTS = 12; // LineStrings kuerzer als das bekommen kein Label
   var LABEL_MIN_PX = 60;     // Mindestabstand zwischen Isobaren-Labels
   var BORDER_CELLS = 1.0;    // Rand-Filter: Segmente im aeussersten Fein-Zellring
+
+  // Druckband-Toenung: diverging um den Normaldruck 1013 hPa.
+  // Lab-Interpolation (gleichmaessige Helligkeitsverlaeufe, kein Grau-Knick).
+  var FILL_DOMAIN = [980, 1000, 1013, 1026, 1044];
+  var FILL_RANGE = ["#1d4ed8", "#93c5fd", "#f4f6f8", "#fcd34d", "#d97706"];
+  var FILL_OPACITY = 0.42;
 
   // Animation-Timing: STEP_MS = Verweildauer pro Timestep, FADE_MS = Pane-
   // Crossfade (muss zur CSS-Transition von .syn-fade-pane passen).
@@ -61,6 +74,7 @@
   var map = null;
   var groups = [null, null];  // LayerGroups je Pane
   var timer = null;
+  var fillScale = null;       // lazy — d3 muss geladen sein
 
   function $(id) { return document.getElementById(id); }
 
@@ -68,6 +82,17 @@
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function fillColor(v) {
+    if (!fillScale) {
+      fillScale = d3.scaleLinear()
+        .domain(FILL_DOMAIN)
+        .range(FILL_RANGE)
+        .interpolate(d3.interpolateLab)
+        .clamp(true);
+    }
+    return fillScale(v);
   }
 
   // ===== MAP INIT ==========================================================
@@ -78,24 +103,23 @@
       maxZoom: 7,
       zoomSnap: 0.5,
       zoomControl: true,
-      maxBoundsViscosity: 1.0,  // harte Grenze — kein Ziehen ueber den Ausschnitt hinaus
+      attributionControl: false,  // Attribution steht in der Hint-Zeile unter der Karte
+      maxBoundsViscosity: 1.0,    // harte Grenze — kein Ziehen ueber den Ausschnitt hinaus
     });
     map.fitBounds(VIEW_BOUNDS);
     map.setMaxBounds(VIEW_BOUNDS.pad(0.02));
     map.setMinZoom(map.getBoundsZoom(VIEW_BOUNDS));
 
-    // Basis + Labels wie map.js — Hillshade weggelassen (auf synoptischer
-    // Skala nur Rauschen unter den Isobaren).
+    // Sehr zurueckhaltende Basemap: die Druckbaender/Isobaren sind die Figur,
+    // die Karte nur der Grund. Ortslabels stark gedimmt (nur Orientierung).
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
       subdomains: "abcd",
       maxZoom: 18,
-      opacity: 0.9,
     }).addTo(map);
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
       maxZoom: 18,
-      opacity: 0.65,
+      opacity: 0.38,
     }).addTo(map);
 
     // A/B-Panes fuer den Crossfade zwischen Timesteps
@@ -191,7 +215,8 @@
   // Gridrand entlang und wuerden dort einen falschen rechteckigen
   // Isobaren-Rahmen zeichnen. Segmente, deren BEIDE Endpunkte im
   // aeussersten Fein-Zellring liegen, werden gedroppt; der Rest wird in
-  // offene LineStrings gesplittet.
+  // offene LineStrings gesplittet. (Nur fuer die LINIEN — die Fuellflaechen
+  // brauchen die vollstaendigen Ringe bis zum Rand.)
   function ringToLineStrings(ring, W, H) {
     function onBorder(p) {
       return p[0] < BORDER_CELLS || p[0] > W - BORDER_CELLS
@@ -231,18 +256,24 @@
 
     var contours = d3.contours().size([up.W, up.H]).thresholds(thresholds)(up.values);
 
-    // Pro Threshold: alle Ringe -> LineStrings in lat/lng
+    // Pro Threshold: LineStrings (randgefiltert) fuer die Isobaren-Linien
+    // UND die vollstaendigen Ringe fuer die Band-Fuellung. WICHTIG: hier
+    // nicht filtern — die Band-Paarung braucht ALLE Thresholds (auch die
+    // unterste Kontur, deren Ring komplett am Rand laeuft und daher keine
+    // sichtbare Linie hat).
     return contours.map(function (c) {
       var lines = [];
+      var fillRings = [];
       c.coordinates.forEach(function (polygon) {
         polygon.forEach(function (ring) {
+          fillRings.push(ring.map(function (p) { return idxToLatLng(meta, p[0], p[1]); }));
           ringToLineStrings(ring, up.W, up.H).forEach(function (line) {
             lines.push(line.map(function (p) { return idxToLatLng(meta, p[0], p[1]); }));
           });
         });
       });
-      return { value: c.value, lines: lines };
-    }).filter(function (c) { return c.lines.length > 0; });
+      return { value: c.value, lines: lines, fillRings: fillRings };
+    });
   }
 
   // Geometrie-Cache: buildIsobars ist der teure Schritt — genau einmal pro
@@ -271,26 +302,47 @@
     setTimeout(step, 60);
   }
 
-  // ===== RENDER: ISOBAREN + LABELS + ZENTREN ===============================
+  // ===== RENDER: BAENDER + ISOBAREN + LABELS + ZENTREN =====================
+
+  // Druckband zwischen Threshold i und i+1: Ringe der Kontur i als Flaeche,
+  // Ringe der Kontur i+1 als Loecher — mit fillRule "evenodd" ergibt das die
+  // exakte Bandflaeche ohne Opacity-Stapelung ueberlappender Konturen.
+  function renderBands(isobars, paneName, group) {
+    for (var i = 0; i < isobars.length; i++) {
+      var rings = isobars[i].fillRings;
+      if (!rings.length) continue;
+      var next = isobars[i + 1];
+      var holes = next ? next.fillRings : [];
+      L.polygon(rings.concat(holes), {
+        pane: paneName,
+        interactive: false,
+        stroke: false,
+        fillRule: "evenodd",
+        fillColor: fillColor(isobars[i].value + ISOBAR_STEP / 2),
+        fillOpacity: FILL_OPACITY,
+        smoothFactor: 1,
+      }).addTo(group);
+    }
+  }
 
   function renderLayers(isobars, ts, paneName, group) {
+    renderBands(isobars, paneName, group);
+
     var labelPositions = [];
 
     isobars.forEach(function (c) {
-      var isMain = c.value % MAIN_EVERY === 0;
       var isMajor = c.value % LABEL_EVERY === 0;
       c.lines.forEach(function (line) {
         L.polyline(line, {
           pane: paneName,
           interactive: false,
-          color: isMain ? "#334155" : "#64748b",
-          weight: isMain ? (isMajor ? 1.8 : 1.1) : 0.8,
-          opacity: isMain ? 0.9 : 0.5,
-          dashArray: isMain ? null : "4 4",
+          color: "#475569",
+          weight: isMajor ? 1.7 : 1,
+          opacity: isMajor ? 0.85 : 0.55,
           smoothFactor: 1,
         }).addTo(group);
 
-        // Label am mittleren Vertex der laengeren Linien (nur Haupt-Isobaren)
+        // Label am mittleren Vertex der laengeren Linien (nur 8-hPa-Isobaren)
         if (isMajor && line.length >= LABEL_MIN_POINTS) {
           var mid = line[Math.floor(line.length / 2)];
           var pt = map.latLngToLayerPoint(mid);
@@ -329,11 +381,11 @@
         interactive: false,
         icon: L.divIcon({
           className: "syn-center-icon " + (isHigh ? "syn-center-icon--hoch" : "syn-center-icon--tief"),
-          html: '<span class="syn-center-letter" role="img" aria-label="' + escapeHtml(aria) + '">'
+          html: '<span class="syn-center-badge" role="img" aria-label="' + escapeHtml(aria) + '">'
               + escapeHtml(letter) + "</span>"
               + '<span class="syn-center-value">' + Math.round(c.msl_hpa) + "</span>",
-          iconSize: [44, 44],
-          iconAnchor: [22, 22],
+          iconSize: [44, 54],
+          iconAnchor: [22, 18],
         }),
       }).addTo(group);
     });
@@ -567,57 +619,101 @@
     updatePlayBtn();
   }
 
-  // ===== WETTERLAGE-TEXTPANEL ==============================================
+  // ===== LEGENDE ===========================================================
+
+  // Glas-Legende (Kartenecke): Farbskala der Druckband-Toenung.
+  function renderLegend() {
+    var el = $("synLegend");
+    if (!el) return;
+    var lo = FILL_DOMAIN[0];
+    var hi = FILL_DOMAIN[FILL_DOMAIN.length - 1];
+    var stops = [];
+    for (var v = lo; v <= hi; v += 4) {
+      stops.push(fillColor(v) + " " + (((v - lo) / (hi - lo)) * 100).toFixed(1) + "%");
+    }
+    el.innerHTML =
+      '<div class="syn-legend-title">' + escapeHtml(wcT("js.syn.legend_title")) + "</div>" +
+      '<div class="syn-legend-bar" style="background:linear-gradient(90deg,' + stops.join(",") + ')"></div>' +
+      '<div class="syn-legend-scale" aria-hidden="true">' +
+        "<span>" + escapeHtml(wcT("js.syn.legend_low")) + "</span>" +
+        "<span>1013</span>" +
+        "<span>" + escapeHtml(wcT("js.syn.legend_high")) + "</span>" +
+      "</div>";
+    el.hidden = false;
+  }
+
+  // ===== WETTERLAGE: SUMMARY + TAGES-KARTEN ================================
+
+  var HINT_ICON =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"' +
+    ' stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
+    '<path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/>' +
+    '<path d="M9.6 4.6A2 2 0 1 1 11 8H2"/>' +
+    '<path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>';
 
   function renderWetterlageText() {
-    var el = $("synWetterlage");
-    if (!el) return;
+    var daysEl = $("synWetterlage");
+    var sumEl = $("synSummary");
+    if (!daysEl) return;
     var wl = state.wetterlage;
     var overview = wl && wl.llm_overview ? wl.llm_overview : null;
     if (!overview || !overview.short) {
-      el.hidden = false;
-      el.innerHTML = '<p class="syn-text-empty">' + escapeHtml(wcT("js.syn.no_text")) + "</p>";
+      if (sumEl) sumEl.hidden = true;
+      daysEl.hidden = false;
+      daysEl.innerHTML = '<p class="syn-text-empty">' + escapeHtml(wcT("js.syn.no_text")) + "</p>";
       return;
     }
 
     var lageLabel = (wl.lage_label && wl.lage_label.value) || "";
+
+    // Kurzfassung prominent ueber der Karte: Kicker + Lage-Badge + short
+    if (sumEl) {
+      sumEl.hidden = false;
+      sumEl.innerHTML =
+        '<div class="syn-summary-head">' +
+          '<span class="syn-summary-kicker">' + escapeHtml(wcT("js.syn.wetterlage_title")) + "</span>" +
+          (lageLabel ? '<span class="syn-lage-badge">' + escapeHtml(lageLabel) + "</span>" : "") +
+        "</div>" +
+        '<p class="syn-summary-text">' + escapeHtml(overview.short) + "</p>";
+    }
+
     var longEntries = Array.isArray(overview.long_with_sources)
       ? overview.long_with_sources.filter(function (e) { return e && e.text; })
       : [];
 
-    // Wie briefing.js renderWetterlage: "Wochentag:" am Zeilenanfang fett,
-    // flight_hint kursiv darunter. Jeder Tagesblock traegt data-weekday,
-    // damit der Tag der laufenden Animation hervorgehoben werden kann.
-    var longHtml = longEntries.length
-      ? longEntries.map(function (e) {
+    // Tages-Karten: "Wochentag:" am Zeilenanfang wird zum Chip, flight_hint
+    // mit Wind-Icon darunter. Jede Karte traegt data-weekday, damit der Tag
+    // der laufenden Animation hervorgehoben werden kann. Stagger-Delay
+    // inline (CSS animiert das Einblenden).
+    var cardsHtml = longEntries.length
+      ? longEntries.map(function (e, i) {
           var txt = escapeHtml(e.text);
           var hint = e.flight_hint ? escapeHtml(e.flight_hint) : "";
           var hintHtml = hint
-            ? '<p class="syn-text-hint"><span aria-hidden="true">⏵</span> ' + hint + "</p>"
+            ? '<p class="syn-day-hint">' + HINT_ICON + "<span>" + hint + "</span></p>"
             : "";
+          var delay = ' style="animation-delay:' + (i * 70) + 'ms"';
           var m = txt.match(/^([A-Za-zÀ-ž]+):\s*/);
           if (m) {
-            return '<div class="syn-text-day-block" data-weekday="' + escapeHtml(m[1]) + '">' +
-              '<p><strong>' + m[1] + ":</strong> " + txt.slice(m[0].length) + "</p>" +
-              hintHtml + "</div>";
+            return '<article class="syn-day-card" data-weekday="' + escapeHtml(m[1]) + '"' + delay + ">" +
+              '<span class="syn-day-chip">' + m[1] + "</span>" +
+              '<p class="syn-day-text">' + txt.slice(m[0].length) + "</p>" +
+              hintHtml + "</article>";
           }
-          return '<div class="syn-text-day-block"><p>' + txt + "</p>" + hintHtml + "</div>";
+          return '<article class="syn-day-card"' + delay + '><p class="syn-day-text">' + txt + "</p>"
+            + hintHtml + "</article>";
         }).join("")
-      : (overview.long ? "<p>" + escapeHtml(overview.long) + "</p>" : "");
+      : (overview.long
+          ? '<article class="syn-day-card"><p class="syn-day-text">' + escapeHtml(overview.long) + "</p></article>"
+          : "");
 
-    el.hidden = false;
-    el.innerHTML =
-      '<div class="syn-text-head">' +
-        '<span class="syn-text-icon" aria-hidden="true">☼</span>' +
-        '<span class="syn-text-title">' + escapeHtml(wcT("js.syn.wetterlage_title")) + "</span>" +
-        (lageLabel ? '<span class="syn-text-lage">' + escapeHtml(lageLabel) + "</span>" : "") +
-      "</div>" +
-      '<div class="syn-text-summary"><p>' + escapeHtml(overview.short) + "</p></div>" +
-      '<div class="syn-text-long">' + longHtml + "</div>";
+    daysEl.hidden = !cardsHtml;
+    daysEl.innerHTML = cardsHtml;
+    daysEl.setAttribute("aria-label", wcT("js.syn.wetterlage_title"));
     highlightTextDay();
   }
 
-  // Tagesblock des aktuellen Animations-Frames hervorheben (Match ueber den
+  // Tages-Karte des aktuellen Animations-Frames hervorheben (Match ueber den
   // Wochentag, DE und EN — der LLM-Text traegt kein Datumsfeld).
   function highlightTextDay() {
     var el = $("synWetterlage");
@@ -629,9 +725,9 @@
       d.toLocaleDateString("de-CH", { weekday: "long" }),
       d.toLocaleDateString("en-GB", { weekday: "long" }),
     ];
-    el.querySelectorAll(".syn-text-day-block").forEach(function (block) {
-      var wd = block.getAttribute("data-weekday");
-      block.classList.toggle("is-active", !!wd && names.indexOf(wd) !== -1);
+    el.querySelectorAll(".syn-day-card").forEach(function (card) {
+      var wd = card.getAttribute("data-weekday");
+      card.classList.toggle("is-active", !!wd && names.indexOf(wd) !== -1);
     });
   }
 
@@ -647,9 +743,13 @@
         }),
       });
     }
+    // Hint-Zeile traegt auch die Karten-Attribution (attributionControl ist
+    // aus — die schwebende Zeitleiste laege sonst darueber).
     var hint = $("synMapHint");
     if (hint && state.grid) {
-      hint.textContent = wcT("js.syn.isobars_hint", { model: state.grid.model || "" });
+      hint.innerHTML = escapeHtml(wcT("js.syn.isobars_hint", { model: state.grid.model || "" })) +
+        ' · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">&copy; OpenStreetMap</a>' +
+        ' · <a href="https://carto.com/attributions" target="_blank" rel="noopener">&copy; CARTO</a>';
     }
   }
 
@@ -692,6 +792,7 @@
     }
 
     renderHeader();
+    renderLegend();
     buildTimeline();
     renderWetterlageText();
 
