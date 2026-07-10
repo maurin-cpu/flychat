@@ -239,22 +239,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Schwebende Zeitleiste (Glas-Bar unten auf der Karte) ───── */
+/* ── Zeitleiste (Steuerleiste unter der Karte, im Karten-Hero) ── */
 
 .syn-map-bar {
-  position: absolute;
-  left: 50%;
-  bottom: 14px;
-  transform: translateX(-50%);
-  width: min(780px, calc(100% - 24px));
-  z-index: 1050;
-  padding: 10px 16px 8px;
-  background: rgba(255, 255, 255, 0.85);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  backdrop-filter: blur(14px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 18px;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+  position: relative;         /* normaler Fluss direkt unter der Karte */
+  padding: 12px 20px 10px;
+  background: var(--color-bg-elevated);
+  border-top: 1px solid var(--color-border);
 }
 
 .syn-controls {
@@ -609,22 +600,9 @@
 
 @media (max-width: 900px) {
   .syn-map { height: 62vh; }
-  .syn-map-bar {
-    width: calc(100% - 16px);
-    bottom: 8px;
-    padding: 8px 12px 6px;
-    border-radius: 14px;
-  }
+  .syn-map-bar { padding: 10px 14px 8px; }
   .syn-readout { font-size: 0.92rem; }
   .syn-legend { top: 8px; right: 8px; width: 148px; padding: 7px 10px 6px; }
-}
-
-@media (max-width: 639px) {
-  /* Fixe App-Nav (.mobile-nav, 61px) ueberdeckt sonst den Slider der Bar,
-     wenn die Karten-Unterkante am Viewport-Boden steht. */
-  .syn-map-bar {
-    bottom: calc(69px + env(safe-area-inset-bottom, 0px));
-  }
 }
 
 @media (max-width: 560px) {

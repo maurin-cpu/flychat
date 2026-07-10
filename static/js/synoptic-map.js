@@ -29,11 +29,12 @@
 (function () {
   "use strict";
 
-  // Sichtbarer Kartenausschnitt (= maximale Zoom-out-Stufe): Europa inkl.
-  // Island, etwas Nordafrika und Atlantik — ohne Groenland. Bewusst enger
-  // als die Daten-Domain (config.SYNOPTIC_GRID_*): die Isobaren laufen so
-  // sauber ueber den Kartenrand hinaus, statt an der Domaingrenze zu enden.
-  var VIEW_BOUNDS = L.latLngBounds([30, -30], [67, 35]);
+  // Fallback-Datendomain (config.SYNOPTIC_GRID_*): die Isobaren fuellen exakt
+  // diese Laengengrad-Spanne. Nach dem Laden wird auf die echten grid.meta-
+  // Bounds praezisiert (fitWidthToData). Die Karte wird randlos auf die
+  // BREITE dieser Domain gelegt — nicht enger, nicht breiter: sonst steht
+  // leere Basemap neben den Isobaren (oder ihre Enden werden abgeschnitten).
+  var DATA_BOUNDS = L.latLngBounds([20, -65], [75, 57.5]);
 
   var UPSAMPLE = 4;          // Raster-Verfeinerung vor d3.contours
   var ISOBAR_STEP = 4;       // hPa — nur Haupt-Isobaren (Met-Office-Standard);
@@ -97,18 +98,53 @@
 
   // ===== MAP INIT ==========================================================
 
+  // Bounds der Datendomain aus grid.meta (lat0/lon0 + Schrittweiten * n-1).
+  function computeDataBounds(meta) {
+    if (!meta) return DATA_BOUNDS;
+    var latA = meta.lat0, latB = meta.lat0 + meta.dlat * (meta.ny - 1);
+    var lonA = meta.lon0, lonB = meta.lon0 + meta.dlon * (meta.nx - 1);
+    return L.latLngBounds(
+      [Math.min(latA, latB), Math.min(lonA, lonB)],
+      [Math.max(latA, latB), Math.max(lonA, lonB)]
+    );
+  }
+
+  // Karte randlos auf die Laengengrad-Spanne der Daten legen. In Web-Mercator
+  // ist px/Laengengrad konstant (256*2^z/360), der exakte Fuell-Zoom ist also
+  // direkt loesbar. Die Karte laeuft dabei oben/unten ueber die Domain hinaus
+  // (Container meist breiter als hoch) — so enden die Isobaren nie abrupt im
+  // Leeren, sondern laufen sauber ueber den oberen/unteren Rand.
+  function fitWidthToData(meta) {
+    if (!map) return;
+    var b = computeDataBounds(meta);
+    var w = map.getSize().x;
+    if (!w) return;
+    var lonSpan = b.getEast() - b.getWest();
+    var z = Math.log(w * 360 / (256 * lonSpan)) / Math.LN2;
+    map.setMinZoom(z);
+    map.setMaxBounds(b.pad(0.01));
+    map.setView(b.getCenter(), z, { animate: false });
+  }
+
   function initMap() {
     map = L.map("synMap", {
       minZoom: 2.5,
       maxZoom: 7,
-      zoomSnap: 0.5,
+      zoomSnap: 0,                // exakter Fractional-Zoom fuers randlose Breite-Fuellen
+      zoomDelta: 0.5,             // Zoom-Schritte per Steuerung/Wheel bleiben grob
       zoomControl: true,
       attributionControl: false,  // Attribution steht in der Hint-Zeile unter der Karte
       maxBoundsViscosity: 1.0,    // harte Grenze — kein Ziehen ueber den Ausschnitt hinaus
     });
-    map.fitBounds(VIEW_BOUNDS);
-    map.setMaxBounds(VIEW_BOUNDS.pad(0.02));
-    map.setMinZoom(map.getBoundsZoom(VIEW_BOUNDS));
+    fitWidthToData(null);         // Default-Domain bis die echten meta-Bounds da sind
+
+    // Bei Resize (Breakpoint-Wechsel) neu auf Breite fitten — nur wenn nicht
+    // hineingezoomt (sonst wuerde ein Resize die User-Ansicht zuruecksetzen).
+    map.on("resize", function () {
+      if (map.getZoom() <= map.getMinZoom() + 1e-6) {
+        fitWidthToData(state.grid && state.grid.meta);
+      }
+    });
 
     // Sehr zurueckhaltende Basemap: die Druckbaender/Isobaren sind die Figur,
     // die Karte nur der Grund. Ortslabels stark gedimmt (nur Orientierung).
@@ -790,6 +826,9 @@
         }
       }
     }
+
+    // Karte auf die echte Datendomain praezisieren (Fallback-Bounds ersetzen).
+    fitWidthToData(data.grid.meta);
 
     renderHeader();
     renderLegend();
