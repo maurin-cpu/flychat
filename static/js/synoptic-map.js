@@ -687,6 +687,14 @@
     '<path d="M9.6 4.6A2 2 0 1 1 11 8H2"/>' +
     '<path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>';
 
+  // Wolken-/Wetter-Icon fuer das Callout-Panel der Wetterlage-Kurzfassung.
+  var SUMMARY_ICON =
+    '<span class="syn-summary-icon" aria-hidden="true">' +
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"' +
+    ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M17.5 19a4.5 4.5 0 0 0 .3-9 6 6 0 0 0-11.5 1.5A4 4 0 0 0 6.5 19z"/>' +
+    "</svg></span>";
+
   function renderWetterlageText() {
     var daysEl = $("synWetterlage");
     var sumEl = $("synSummary");
@@ -700,17 +708,28 @@
       return;
     }
 
-    var lageLabel = (wl.lage_label && wl.lage_label.value) || "";
+    // Lage-Label: Strukturfeld liefert den kanonischen DE-Wert; Anzeige
+    // uebersetzt via i18n ("js.lage.<value>"), Fallback = DE-Wert (analog
+    // briefing.js). Ohne Uebersetzung stuende sonst z.B. "Nordfoehnlage"
+    // auf der englischen Seite.
+    var lageRaw = (wl.lage_label && wl.lage_label.value) || "";
+    var lageLabel = lageRaw
+      ? ((window.WC_I18N && window.WC_I18N["js.lage." + lageRaw]) || lageRaw)
+      : "";
 
-    // Kurzfassung prominent ueber der Karte: Kicker + Lage-Badge + short
+    // Kurzfassung als Callout-Panel ueber der Karte: Wetter-Icon links,
+    // dann Kicker + Lage als Titel, darunter die LLM-Kurzfassung.
     if (sumEl) {
       sumEl.hidden = false;
       sumEl.innerHTML =
-        '<div class="syn-summary-head">' +
-          '<span class="syn-summary-kicker">' + escapeHtml(wcT("js.syn.wetterlage_title")) + "</span>" +
-          (lageLabel ? '<span class="syn-lage-badge">' + escapeHtml(lageLabel) + "</span>" : "") +
-        "</div>" +
-        '<p class="syn-summary-text">' + escapeHtml(overview.short) + "</p>";
+        SUMMARY_ICON +
+        '<div class="syn-summary-body">' +
+          '<div class="syn-summary-head">' +
+            '<span class="syn-summary-kicker">' + escapeHtml(wcT("js.syn.wetterlage_title")) + "</span>" +
+            (lageLabel ? '<span class="syn-summary-lage">' + escapeHtml(lageLabel) + "</span>" : "") +
+          "</div>" +
+          '<p class="syn-summary-text">' + escapeHtml(overview.short) + "</p>" +
+        "</div>";
     }
 
     var longEntries = Array.isArray(overview.long_with_sources)
