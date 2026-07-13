@@ -133,7 +133,6 @@
 
 .syn-summary-text {
   margin: 0;
-  max-width: 78ch;
   font-size: var(--text-md);
   font-weight: 500;
   line-height: 1.55;
