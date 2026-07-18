@@ -2586,14 +2586,18 @@ def api_synoptic_grid():
     allowed = _allowed_date_strs(config.FORECAST_DAYS)
     gvals = grid.get("values", {})
     gcenters = grid.get("centers", {})
+    gwinds = grid.get("winds", {})
     # Nur Timesteps behalten, fuer die es auch wirklich Werte gibt -> ein
     # truncierter/legacy Cache fuehrt zu 503 statt KeyError-500.
     kept = [ts for ts in grid.get("timesteps", [])
             if ts[:10] in allowed and ts in gvals]
+    # dict(grid, ...) traegt uebrige Keys (u.a. elevations) unveraendert weiter;
+    # winds ist per-Timestep -> analog zu values/centers auf kept filtern.
     grid = dict(grid,
                 timesteps=kept,
                 values={ts: gvals[ts] for ts in kept},
-                centers={ts: gcenters.get(ts, []) for ts in kept})
+                centers={ts: gcenters.get(ts, []) for ts in kept},
+                winds={ts: gwinds[ts] for ts in kept if ts in gwinds})
 
     wetterlage = None
     sctx = load_synoptic_cache()

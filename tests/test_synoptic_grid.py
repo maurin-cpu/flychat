@@ -163,5 +163,141 @@ class TestFindGridPressureCenters(unittest.TestCase):
         self.assertEqual(len(centers), 1)
 
 
+def _circular_uv(meta, j0, i0, speed=10.0, cyclonic=True):
+    """Synthetisches u/v-Feld (m/s), das um (j0,i0) rotiert.
+
+    cyclonic=True -> zyklonal (CCW, NH-Tief); False -> antizyklonal (Hoch).
+    Tangentialkomponente auf jedem Ring = +/-speed (per Konstruktion).
+    """
+    ny, nx = meta["ny"], meta["nx"]
+    u = [None] * (ny * nx)
+    v = [None] * (ny * nx)
+    rad = math.pi / 180.0
+    lat_c = meta["lat0"] + j0 * meta["dlat"]
+    dxM = meta["dlon"] * 111320.0 * math.cos(lat_c * rad)
+    dyM = meta["dlat"] * 111320.0
+    sgn = 1.0 if cyclonic else -1.0
+    for j in range(ny):
+        for i in range(nx):
+            rx = (i - i0) * dxM
+            ry = (j - j0) * dyM
+            r = math.hypot(rx, ry)
+            if r == 0:
+                u[j * nx + i] = 0.0
+                v[j * nx + i] = 0.0
+                continue
+            # CCW-Tangential-Einheitsvektor t = (-ry, rx)/|r|
+            u[j * nx + i] = sgn * speed * (-ry / r)
+            v[j * nx + i] = sgn * speed * (rx / r)
+    return {"u": u, "v": v}
+
+
+class TestWindDirToUV(unittest.TestCase):
+    def test_west_wind(self):
+        # 270° = Westwind (weht nach Osten) -> u>0, v~0
+        u, v = sg._winddir_to_uv(36.0, 270.0)  # 36 km/h = 10 m/s
+        self.assertAlmostEqual(u, 10.0, delta=0.1)
+        self.assertAlmostEqual(v, 0.0, delta=0.1)
+
+    def test_north_wind(self):
+        # 0° = Nordwind (weht nach Sueden) -> u~0, v<0
+        u, v = sg._winddir_to_uv(36.0, 0.0)
+        self.assertAlmostEqual(u, 0.0, delta=0.1)
+        self.assertAlmostEqual(v, -10.0, delta=0.1)
+
+    def test_east_wind(self):
+        # 90° = Ostwind -> u<0
+        u, _ = sg._winddir_to_uv(36.0, 90.0)
+        self.assertLess(u, 0.0)
+
+
+class TestCenterFilters(unittest.TestCase):
+    def setUp(self):
+        self.meta = sg.build_grid_meta()
+        self.j0, self.i0 = 8, 12
+        self.vals = _add_gaussian(self.meta, _flat_field(self.meta),
+                                  self.j0, self.i0, -20.0)
+
+    def test_circulation_keeps_cyclonic_low(self):
+        winds = _circular_uv(self.meta, self.j0, self.i0, cyclonic=True)
+        centers = sg.find_grid_pressure_centers(self.meta, self.vals,
+                                                winds_ts=winds)
+        lows = [c for c in centers if c["type"] == "Tief"]
+        self.assertEqual(len(lows), 1)
+        self.assertIn("circ", lows[0]["decided_by"])
+
+    def test_circulation_rejects_low_without_rotation(self):
+        # Gleichfoermiger Westwind -> keine Zirkulation -> Tief verworfen
+        n = self.meta["ny"] * self.meta["nx"]
+        winds = {"u": [10.0] * n, "v": [0.0] * n}
+        centers = sg.find_grid_pressure_centers(self.meta, self.vals,
+                                                winds_ts=winds)
+        self.assertEqual([c for c in centers if c["type"] == "Tief"], [])
+
+    def test_no_winds_keeps_candidate(self):
+        # Fehlt der Wind (alter Cache/Tests), wird nur nach Gradient beurteilt
+        centers = sg.find_grid_pressure_centers(self.meta, self.vals,
+                                                winds_ts=None)
+        self.assertEqual(len([c for c in centers if c["type"] == "Tief"]), 1)
+
+    def test_masking_rejects_high_terrain(self):
+        n = self.meta["ny"] * self.meta["nx"]
+        elev = [400.0] * n
+        elev[self.j0 * self.meta["nx"] + self.i0] = 1500.0  # ueber MAX_ELEV_M
+        centers = sg.find_grid_pressure_centers(self.meta, self.vals,
+                                                elevations=elev)
+        self.assertEqual([c for c in centers if c["type"] == "Tief"], [])
+
+    def test_masking_keeps_low_terrain(self):
+        n = self.meta["ny"] * self.meta["nx"]
+        elev = [400.0] * n
+        centers = sg.find_grid_pressure_centers(self.meta, self.vals,
+                                                elevations=elev)
+        self.assertEqual(len([c for c in centers if c["type"] == "Tief"]), 1)
+
+
+class TestFetchWindsAndElevation(unittest.TestCase):
+    def _make_response(self, n_locations, times):
+        resp = MagicMock()
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = [
+            {
+                "elevation": 350.0,
+                "hourly": {
+                    "time": times,
+                    "pressure_msl": [1013.0] * len(times),
+                    "wind_speed_700hPa": [36.0] * len(times),   # 10 m/s
+                    "wind_direction_700hPa": [270.0] * len(times),  # West
+                },
+            }
+            for _ in range(n_locations)
+        ]
+        return resp
+
+    def test_fetch_populates_winds_and_elevations(self):
+        dates = ["2026-07-05"]
+        times = [f"2026-07-05T{h:02d}:00" for h in (0, 6, 12, 18)]
+        meta = sg.build_grid_meta()
+        n = meta["ny"] * meta["nx"]
+        chunk = config.SYNOPTIC_GRID_CHUNK_SIZE
+        n_chunks = -(-n // chunk)
+        responses = [self._make_response(min(chunk, n - k * chunk), times)
+                     for k in range(n_chunks)]
+
+        with patch("engine.synoptic_grid.requests.get", side_effect=responses):
+            result = sg.fetch_grid_pressure(dates)
+
+        self.assertIsNotNone(result)
+        self.assertIn("winds", result)
+        self.assertIn("elevations", result)
+        self.assertEqual(len(result["elevations"]), n)
+        self.assertEqual(result["elevations"][0], 350.0)
+        ts0 = result["timesteps"][0]
+        self.assertEqual(len(result["winds"][ts0]["u"]), n)
+        # Westwind 10 m/s -> u ~ +10, v ~ 0
+        self.assertAlmostEqual(result["winds"][ts0]["u"][0], 10.0, delta=0.1)
+        self.assertAlmostEqual(result["winds"][ts0]["v"][0], 0.0, delta=0.1)
+
+
 if __name__ == "__main__":
     unittest.main()

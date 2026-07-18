@@ -41,7 +41,9 @@
                              // die frueheren 2-hPa-Zwischenisobaren sind raus:
                              // das Druckfeld traegt jetzt die Farbtoenung
   var LABEL_EVERY = 8;       // Vielfache von 8 beschriften + staerker zeichnen
-  var LABEL_MIN_POINTS = 12; // LineStrings kuerzer als das bekommen kein Label
+  var LABEL_MIN_POINTS = 48; // LineStrings kuerzer als das bekommen kein Label
+                             // (nach Chaikin x2 haben Linien ~4x so viele
+                             // Punkte — entspricht den frueheren 12 rohen)
   var LABEL_MIN_PX = 60;     // Mindestabstand zwischen Isobaren-Labels
   var BORDER_CELLS = 1.0;    // Rand-Filter: Segmente im aeussersten Fein-Zellring
 
@@ -58,7 +60,10 @@
 
   // Zwei Panes fuer flackerfreien Crossfade: der naechste Timestep wird in das
   // unsichtbare Pane gerendert, dann wird per CSS-Opacity ueberblendet.
+  // Die H/T-Badges liegen in eigenen Panes UEBER dem Wind-Canvas (z 460),
+  // faden aber synchron mit ihrem Isobaren-Pane (gleicher Index).
   var PANES = ["synIsobarsA", "synIsobarsB"];
+  var CENTER_PANES = ["synCentersA", "synCentersB"];
 
   var state = {
     grid: null,
@@ -76,6 +81,8 @@
   var groups = [null, null];  // LayerGroups je Pane
   var timer = null;
   var fillScale = null;       // lazy — d3 muss geladen sein
+  var windLayer = null;       // WingcastWind-Handle (synoptic-wind.js)
+  var windAvailable = false;  // 700-hPa-Wind im Grid vorhanden? (sonst Layer aus)
 
   function $(id) { return document.getElementById(id); }
 
@@ -165,6 +172,12 @@
       pane.style.opacity = "0";
       pane.classList.add("syn-fade-pane");
       groups[i] = L.layerGroup().addTo(map);
+      // H/T-Badge-Panes ueber dem Wind-Canvas (460), fade-synchron zum
+      // jeweiligen Isobaren-Pane (showTimestep setzt beide Opacities).
+      var cPane = map.createPane(CENTER_PANES[i]);
+      cPane.style.zIndex = String(470 + i);
+      cPane.style.opacity = "0";
+      cPane.classList.add("syn-fade-pane");
     }
 
     // Nach Zoom die aktuelle Zeit neu rendern (Label-Entzerrung ist
@@ -275,6 +288,31 @@
     return lines;
   }
 
+  // Chaikin-Corner-Cutting: bilineares Upsampling liefert Konturen mit
+  // sichtbaren Knicken an den Zellgrenzen (Gradient-Spruenge). Zwei
+  // Schnitt-Iterationen runden die Ecken, ohne die Lage merklich zu
+  // veraendern (max. Abweichung ~1/4 Fein-Zelle). WICHTIG: Linien UND
+  // Band-Ringe gleich behandeln, sonst laege die Linie neben der Bandkante.
+  var SMOOTH_ITER = 2;
+
+  function chaikin(points, closed) {
+    for (var it = 0; it < SMOOTH_ITER; it++) {
+      var n = points.length;
+      if (n < 3) return points;
+      var out = [];
+      if (!closed) out.push(points[0]);
+      var last = closed ? n : n - 1;
+      for (var i = 0; i < last; i++) {
+        var p = points[i], q = points[(i + 1) % n];
+        out.push([p[0] * 0.75 + q[0] * 0.25, p[1] * 0.75 + q[1] * 0.25]);
+        out.push([p[0] * 0.25 + q[0] * 0.75, p[1] * 0.25 + q[1] * 0.75]);
+      }
+      if (!closed) out.push(points[n - 1]);
+      points = out;
+    }
+    return points;
+  }
+
   function buildIsobars(meta, rawVals) {
     var vals = fillNulls(meta, rawVals);
     var up = upsampleBilinear(meta, vals);
@@ -302,9 +340,9 @@
       var fillRings = [];
       c.coordinates.forEach(function (polygon) {
         polygon.forEach(function (ring) {
-          fillRings.push(ring.map(function (p) { return idxToLatLng(meta, p[0], p[1]); }));
+          fillRings.push(chaikin(ring, true).map(function (p) { return idxToLatLng(meta, p[0], p[1]); }));
           ringToLineStrings(ring, up.W, up.H).forEach(function (line) {
-            lines.push(line.map(function (p) { return idxToLatLng(meta, p[0], p[1]); }));
+            lines.push(chaikin(line, false).map(function (p) { return idxToLatLng(meta, p[0], p[1]); }));
           });
         });
       });
@@ -402,7 +440,8 @@
       });
     });
 
-    renderCenters(ts, paneName, group);
+    // Badges in das Center-Pane desselben Index (liegt ueber dem Wind-Canvas)
+    renderCenters(ts, CENTER_PANES[PANES.indexOf(paneName)], group);
   }
 
   function renderCenters(ts, paneName, group) {
@@ -443,33 +482,40 @@
     var nextIdx = 1 - prevIdx;
     var nextGroup = groups[nextIdx];
     var prevGroup = groups[prevIdx];
-    var nextPane = map.getPane(PANES[nextIdx]);
-    var prevPane = map.getPane(PANES[prevIdx]);
-    if (!nextGroup || !prevGroup || !nextPane || !prevPane) return;
+    // Isobaren- und Center-Pane desselben Index faden als Paar (gleiche
+    // Writes im gleichen Frame — kein visueller Versatz der H/T-Badges).
+    var nextPanes = [map.getPane(PANES[nextIdx]), map.getPane(CENTER_PANES[nextIdx])];
+    var prevPanes = [map.getPane(PANES[prevIdx]), map.getPane(CENTER_PANES[prevIdx])];
+    if (!nextGroup || !prevGroup || !nextPanes[0] || !nextPanes[1]
+        || !prevPanes[0] || !prevPanes[1]) return;
 
     nextGroup.clearLayers();
     renderLayers(iso, ts, PANES[nextIdx], nextGroup);
     state.paneIdx = nextIdx;
 
+    function eachPane(fn) {
+      for (var i = 0; i < 2; i++) { fn(nextPanes[i], "1"); fn(prevPanes[i], "0"); }
+    }
+
     if (instant || state.reducedMotion) {
-      nextPane.classList.add("syn-pane-notransition");
-      prevPane.classList.add("syn-pane-notransition");
-      nextPane.style.opacity = "1";
-      prevPane.style.opacity = "0";
+      eachPane(function (p) { p.classList.add("syn-pane-notransition"); });
+      eachPane(function (p, op) { p.style.opacity = op; });
       prevGroup.clearLayers();
       // Reflow erzwingen, dann Transition wieder aktivieren
-      void nextPane.offsetWidth;
-      nextPane.classList.remove("syn-pane-notransition");
-      prevPane.classList.remove("syn-pane-notransition");
+      void nextPanes[0].offsetWidth;
+      eachPane(function (p) { p.classList.remove("syn-pane-notransition"); });
     } else {
-      nextPane.style.opacity = "1";
-      prevPane.style.opacity = "0";
+      eachPane(function (p, op) { p.style.opacity = op; });
       setTimeout(function () {
         // Nur aufraeumen, wenn kein neuerer Frame dazwischenkam (das
         // Pane koennte sonst schon wieder frische Layer tragen).
         if (gen === state.fadeGen) prevGroup.clearLayers();
       }, FADE_MS + 80);
     }
+
+    // Wind-Partikel auf das Druckfeld dieses Timesteps umschalten (Partikel
+    // behalten ihre Position und morphen in die neue Stroemung).
+    if (windLayer) windLayer.setTimestep(ts);
   }
 
   // ===== ZEITSTEUERUNG / ANIMATION =========================================
@@ -655,6 +701,38 @@
     updatePlayBtn();
   }
 
+  // ===== WIND-LAYER (synoptic-wind.js) =====================================
+
+  // Toggle-Zustand ueberlebt Reloads; Default = an.
+  function windEnabled() {
+    try { return localStorage.getItem("wc_syn_wind") !== "0"; }
+    catch (e) { return true; }
+  }
+
+  function updateWindBtn() {
+    var btn = $("synWindBtn");
+    if (!btn) return;
+    var on = windEnabled();
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    var label = wcT(on ? "js.syn.wind_hide" : "js.syn.wind_show");
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  }
+
+  function bindWindBtn() {
+    var btn = $("synWindBtn");
+    if (!btn || !windLayer) return;
+    btn.addEventListener("click", function () {
+      var on = !windEnabled();
+      try { localStorage.setItem("wc_syn_wind", on ? "1" : "0"); } catch (e) { /* egal */ }
+      windLayer.setEnabled(on);
+      updateWindBtn();
+      renderLegend();           // Wind-Skala ein-/ausblenden
+    });
+    updateWindBtn();
+  }
+
   // ===== LEGENDE ===========================================================
 
   // Glas-Legende (Kartenecke): Farbskala der Druckband-Toenung.
@@ -674,8 +752,22 @@
         "<span>" + escapeHtml(wcT("js.syn.legend_low")) + "</span>" +
         "<span>1013</span>" +
         "<span>" + escapeHtml(wcT("js.syn.legend_high")) + "</span>" +
-      "</div>";
+      "</div>" +
+      windLegendHtml();
     el.hidden = false;
+  }
+
+  // Zweiter Legenden-Block: Speed-Skala des Wind-Partikel-Layers (nur wenn
+  // der Layer existiert und eingeschaltet ist).
+  function windLegendHtml() {
+    if (!windLayer || !windAvailable || !windEnabled() || !window.WingcastWind) return "";
+    var vmax = WingcastWind.SPEED_MAX_KMH;
+    return '<div class="syn-legend-title syn-legend-title--wind">'
+        + escapeHtml(wcT("js.syn.legend_wind")) + "</div>"
+      + '<div class="syn-legend-bar" style="background:' + WingcastWind.legendGradient() + '"></div>'
+      + '<div class="syn-legend-scale" aria-hidden="true">'
+        + "<span>0</span><span>" + Math.round(vmax / 2) + "</span><span>" + vmax + "</span>"
+      + "</div>";
   }
 
   // ===== WETTERLAGE: SUMMARY + TAGES-KARTEN ================================
@@ -802,7 +894,11 @@
     // aus — die schwebende Zeitleiste laege sonst darueber).
     var hint = $("synMapHint");
     if (hint && state.grid) {
+      // wind_hint: Ehrlichkeit fuer Piloten — der Partikel-Layer zeigt die
+      // Hoehenstroemung (700 hPa, ~3000 m), keine Bodenwind-Prognose. Nur
+      // anzeigen, wenn der Wind auch wirklich vorhanden ist.
       hint.innerHTML = escapeHtml(wcT("js.syn.isobars_hint", { model: state.grid.model || "" })) +
+        (windLayer && windAvailable ? " · " + escapeHtml(wcT("js.syn.wind_hint")) : "") +
         ' · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">&copy; OpenStreetMap</a>' +
         ' · <a href="https://carto.com/attributions" target="_blank" rel="noopener">&copy; CARTO</a>';
     }
@@ -850,7 +946,6 @@
     fitWidthToData(data.grid.meta);
 
     renderHeader();
-    renderLegend();
     buildTimeline();
     renderWetterlageText();
 
@@ -862,6 +957,28 @@
       showMapError(wcT("js.syn.no_data"));
       return;
     }
+
+    // Wind-Layer mit dem frischen Grid versorgen und Toggle scharf schalten.
+    // Fehlt der 700-hPa-Wind (alter Cache), bleibt der Layer aus und der
+    // Toggle disabled — kein Rueckfall auf (falsche) Geostrophie.
+    if (windLayer) {
+      windAvailable = windLayer.setGrid(data.grid);
+      var windBtn = $("synWindBtn");
+      if (windAvailable) {
+        windLayer.setEnabled(windEnabled());
+        if (windBtn) windBtn.disabled = false;
+      } else {
+        windLayer.setEnabled(false);
+        if (windBtn) {
+          windBtn.disabled = true;
+          windBtn.classList.remove("is-active");
+        }
+      }
+    }
+
+    // Legende erst jetzt rendern — die Wind-Skala haengt an windAvailable,
+    // das der Wind-Block oben gerade gesetzt hat.
+    renderLegend();
 
     showTimestep(true);         // Erstrender ohne Fade
     updateTimelineUI(true);
@@ -921,7 +1038,11 @@
     state.reducedMotion = !!(window.matchMedia
       && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     initMap();
+    if (window.WingcastWind) {
+      windLayer = WingcastWind.create(map, { reducedMotion: state.reducedMotion });
+    }
     bindPlayBtn();
+    bindWindBtn();
     bindRefresh();
     loadData(true);
   });

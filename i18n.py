@@ -868,6 +868,17 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.syn.legend_title": {"de": "Bodendruck (hPa)", "en": "Surface pressure (hPa)"},
     "js.syn.legend_low": {"de": "Tief", "en": "Low"},
     "js.syn.legend_high": {"de": "Hoch", "en": "High"},
+    # Wind-Partikel-Layer (07/2026): geostrophischer Wind aus dem Druckfeld
+    "js.syn.wind_show": {"de": "Windströmung einblenden", "en": "Show wind flow"},
+    "js.syn.wind_hide": {"de": "Windströmung ausblenden", "en": "Hide wind flow"},
+    "js.syn.legend_wind": {"de": "Höhenwind 700 hPa (km/h)", "en": "Wind at 700 hPa (km/h)"},
+    "js.syn.wind_hint": {"de": "Höhenströmung in ~3000 m (700 hPa) — nicht der Bodenwind",
+                         "en": "upper-level flow at ~3000 m (700 hPa) — not the surface wind"},
+    # Synoptik-Mini-Karte im Gleitcast (/briefing, synoptic-embed.js)
+    "js.syn.embed_title": {"de": "Synoptik", "en": "Synoptic map"},
+    "js.syn.embed_sub": {"de": "Bodendruck & Höhenwind", "en": "surface pressure & upper-level wind"},
+    "js.syn.embed_link": {"de": "Interaktive Karte", "en": "Interactive map"},
+    "js.syn.embed_aria": {"de": "Synoptik-Karte öffnen", "en": "Open the synoptic map"},
 
     # ======================= chat.js (user-facing; Admin-Analyse/Debug bleibt DE) =======================
     "js.chat.unknown_error": {"de": "Unbekannter Fehler", "en": "Unknown error"},

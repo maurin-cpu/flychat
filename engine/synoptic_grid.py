@@ -16,16 +16,20 @@ Halluzinations-/Konsistenz-Regeln analog synoptic_context:
     bleibt stehen (keine Teil-Grids, nichts wird erfunden).
   - Zentren unterhalb der Gradient-Schwelle werden verworfen.
 
-Cache: data/synoptic_grid.json (kompakt geschrieben, ~55 KB), Format:
-  {generated_at, model, attribution, meta, timesteps, values, centers}
+Cache: data/synoptic_grid.json (kompakt geschrieben), Format:
+  {generated_at, model, attribution, meta, timesteps, values, winds,
+   elevations, centers}
   meta   = {lat0, lon0, dlat, dlon, ny, nx}  (row-major ab NW-Ecke,
            dlat negativ -> y waechst nach Sueden, passend zu d3-contours)
-  values = {timestep: [float|None] * (ny*nx)}
+  values = {timestep: [float|None] * (ny*nx)}        (pressure_msl, hPa)
+  winds  = {timestep: {u: [float|None], v: [float|None]}}  (700 hPa, m/s)
+  elevations = [float|None] * (ny*nx)                (Gelaende, m; fuer Masking)
   centers= {timestep: [{type, lat, lon, msl_hpa, gradient_hpa, decided_by}]}
 """
 
 import json
 import logging
+import math
 import os
 import tempfile
 import threading
@@ -99,12 +103,36 @@ def _target_timesteps(forecast_dates: list[str]) -> list[str]:
     ]
 
 
+def _winddir_to_uv(speed_kmh: float, dir_deg: float) -> tuple[float, float]:
+    """Meteorologische Windrichtung (Grad, woher) + Geschwindigkeit (km/h) ->
+    u/v-Komponenten in m/s (u = ostwaerts, v = nordwaerts).
+
+    dir = 270 (Westwind, weht von West nach Ost) -> u>0, v~0.
+    dir =   0 (Nordwind, weht von Nord nach Sued) -> u~0, v<0.
+    """
+    ms = speed_kmh / 3.6
+    rad = dir_deg * math.pi / 180.0
+    u = -ms * math.sin(rad)
+    v = -ms * math.cos(rad)
+    return round(u, 1), round(v, 1)
+
+
 def fetch_grid_pressure(forecast_dates: list[str]) -> Optional[dict]:
-    """Holt pressure_msl fuer das dichte Raster via gechunkte Open-Meteo-Calls.
+    """Holt pressure_msl + 700-hPa-Wind fuer das dichte Raster via gechunkte
+    Open-Meteo-Calls; sammelt zusaetzlich die Gelaende-Elevation je Punkt.
+
+    Der 700-hPa-Wind (~3000 m) wird als u/v-Komponenten (m/s) je Timestep
+    abgelegt — u/v statt speed/dir, weil das JS bilinear interpoliert und
+    Winkel-Interpolation ueber die 360°-Naht fehleranfaellig waere. Die
+    Elevation (aus dem Open-Meteo-Payload, pro Location, nicht in `hourly`)
+    dient dem orographischen Masking der H/T-Zentren.
 
     Returns:
-        {"timesteps": [...], "values": {ts: [float|None]*450}} — oder None,
-        wenn ein Chunk auch nach Retry fehlschlaegt (kein Teil-Grid).
+        {"timesteps": [...],
+         "values": {ts: [float|None]*N},
+         "winds": {ts: {"u": [float|None]*N, "v": [float|None]*N}},
+         "elevations": [float|None]*N} — oder None, wenn ein Chunk auch nach
+        Retry fehlschlaegt (kein Teil-Grid).
     """
     if not forecast_dates:
         return None
@@ -114,6 +142,8 @@ def fetch_grid_pressure(forecast_dates: list[str]) -> Optional[dict]:
     timesteps = _target_timesteps(forecast_dates)
 
     values: dict[str, list] = {ts: [] for ts in timesteps}
+    winds: dict[str, dict] = {ts: {"u": [], "v": []} for ts in timesteps}
+    elevations: list = []
     chunk_size = config.SYNOPTIC_GRID_CHUNK_SIZE
 
     for start in range(0, len(points), chunk_size):
@@ -121,7 +151,7 @@ def fetch_grid_pressure(forecast_dates: list[str]) -> Optional[dict]:
         params = {
             "latitude": ",".join(str(lat) for lat, _ in chunk),
             "longitude": ",".join(str(lon) for _, lon in chunk),
-            "hourly": "pressure_msl",
+            "hourly": "pressure_msl,wind_speed_700hPa,wind_direction_700hPa",
             "models": "ecmwf_ifs025",  # globales Modell — deckt 65°W ab
             "start_date": forecast_dates[0],
             "end_date": forecast_dates[-1],
@@ -162,19 +192,38 @@ def fetch_grid_pressure(forecast_dates: list[str]) -> Optional[dict]:
             hourly = loc.get("hourly", {}) or {}
             times = hourly.get("time", []) or []
             msls = hourly.get("pressure_msl", []) or []
+            wspd = hourly.get("wind_speed_700hPa", []) or []
+            wdir = hourly.get("wind_direction_700hPa", []) or []
             time_index = {t: k for k, t in enumerate(times)}
+            elev = loc.get("elevation")
+            elevations.append(round(float(elev), 1) if elev is not None else None)
             for ts in timesteps:
                 idx = time_index.get(ts)
                 val = msls[idx] if idx is not None and idx < len(msls) else None
                 values[ts].append(round(float(val), 1) if val is not None else None)
 
-    # Timesteps ohne jeden Wert (z.B. Modell-Horizont ueberschritten) droppen
+                sp = wspd[idx] if idx is not None and idx < len(wspd) else None
+                di = wdir[idx] if idx is not None and idx < len(wdir) else None
+                if sp is not None and di is not None:
+                    u, v = _winddir_to_uv(float(sp), float(di))
+                else:
+                    u, v = None, None
+                winds[ts]["u"].append(u)
+                winds[ts]["v"].append(v)
+
+    # Timesteps ohne jeden MSLP-Wert (z.B. Modell-Horizont ueberschritten)
+    # droppen — winds MUSS dieselben Keys behalten (sonst KeyError downstream).
     kept = [ts for ts in timesteps
             if any(v is not None for v in values[ts])]
     if not kept:
         logger.warning("fetch_grid_pressure: kein Timestep hat gueltige Daten")
         return None
-    return {"timesteps": kept, "values": {ts: values[ts] for ts in kept}}
+    return {
+        "timesteps": kept,
+        "values": {ts: values[ts] for ts in kept},
+        "winds": {ts: winds[ts] for ts in kept},
+        "elevations": elevations,
+    }
 
 
 # ============================================================================
@@ -200,7 +249,61 @@ def _smooth_3x3(meta: dict, vals: list) -> list:
     return out
 
 
-def find_grid_pressure_centers(meta: dict, vals: list) -> list[dict]:
+def _circulation_ok(meta: dict, winds_ts: Optional[dict], j: int, i: int,
+                    radius: int, is_min: bool) -> Optional[bool]:
+    """Prueft, ob das 700-hPa-Windfeld um die Zelle (j,i) zyklonal (fuer ein
+    Tief) bzw. antizyklonal (fuer ein Hoch) zirkuliert.
+
+    Mittelt die Tangentialkomponente (CCW-positiv) des Winds auf dem
+    Fensterrand-Ring. Tief -> Mittel >= +MIN_TANGENTIAL; Hoch -> <= -MIN.
+    Returns True/False, oder None wenn der Check mangels Winddaten / zu weniger
+    gueltiger Ring-Samples nicht anwendbar ist (dann NICHT als Filter zaehlen —
+    kein Silent-Kill bei Datenluecken).
+    """
+    if not winds_ts:
+        return None
+    u_arr = winds_ts.get("u")
+    v_arr = winds_ts.get("v")
+    if not u_arr or not v_arr:
+        return None
+    ny, nx = meta["ny"], meta["nx"]
+    rad = math.pi / 180.0
+    lat_c = meta["lat0"] + j * meta["dlat"]
+    # signierte Meter-Abstaende pro Zellschritt (dlat negativ -> dj>0 = suedwaerts);
+    # dx cos(lat)-korrigiert, sonst ist die Tangentialrichtung bei hohen Breiten
+    # verzerrt (gleiches Muster wie dxM in der alten computeField).
+    dxM = meta["dlon"] * 111320.0 * math.cos(lat_c * rad)
+    dyM = meta["dlat"] * 111320.0
+    acc, n = 0.0, 0
+    for dj in range(-radius, radius + 1):
+        for di in range(-radius, radius + 1):
+            if max(abs(dj), abs(di)) != radius:  # nur Fensterrand-Ring
+                continue
+            jj, ii = j + dj, i + di
+            if not (0 <= jj < ny and 0 <= ii < nx):
+                continue
+            u = u_arr[jj * nx + ii]
+            v = v_arr[jj * nx + ii]
+            if u is None or v is None:
+                continue
+            rx = di * dxM      # ostwaerts
+            ry = dj * dyM      # nordwaerts (dyM negativ)
+            r = math.hypot(rx, ry)
+            if r == 0:
+                continue
+            # CCW-Tangential-Einheitsvektor t = (-ry, rx)/|r|; Wind = (u, v)
+            acc += (u * (-ry) + v * rx) / r
+            n += 1
+    if n < 4:
+        return None
+    mean_tang = acc / n
+    thr = config.SYNOPTIC_GRID_CENTER_MIN_TANGENTIAL_MS
+    return mean_tang >= thr if is_min else mean_tang <= -thr
+
+
+def find_grid_pressure_centers(meta: dict, vals: list,
+                               winds_ts: Optional[dict] = None,
+                               elevations: Optional[list] = None) -> list[dict]:
     """Detektiert H/T-Zentren auf dem dichten Raster.
 
     Algorithmus (Dense-Grid-Variante von find_pressure_centers):
@@ -209,9 +312,16 @@ def find_grid_pressure_centers(meta: dict, vals: list) -> list[dict]:
          R = SYNOPTIC_GRID_CENTER_WINDOW_CELLS
       3. Gradient-Check: |Mittel des Fensterrands - Zentrum| >=
          SYNOPTIC_GRID_CENTER_MIN_GRADIENT_HPA — sonst verworfen
-      4. Suppression: nach Gradient absteigend, Kandidaten naeher als
+      4. Artefakt-Doppelfilter (nur wenn Daten vorhanden):
+         (a) orographisches Masking (elevations > MAX_ELEV_M -> verworfen)
+         (b) Zirkulations-Check gegen das 700-hPa-Feld (winds_ts) — flache
+             Hitzetief-Artefakte ohne Hoehen-Zirkulation fallen weg
+      5. Suppression: nach Gradient absteigend, Kandidaten naeher als
          SYNOPTIC_GRID_CENTER_MIN_DIST_KM an einem staerkeren Zentrum fallen weg
-      5. aeusserster Zellring ausgeschlossen (Randextrema = Domaingrenze)
+      6. aeusserster Zellring ausgeschlossen (Randextrema = Domaingrenze)
+
+    winds_ts/elevations sind optional — fehlen sie (alter Cache, Tests), wird
+    nur nach Gradient beurteilt (rueckwaertskompatibel).
 
     msl_hpa im Ergebnis ist der UNGEGLAETTETE Originalwert der Zelle
     (Kerndruck soll dem Modellwert entsprechen, nicht dem Glaettungsartefakt).
@@ -220,6 +330,7 @@ def find_grid_pressure_centers(meta: dict, vals: list) -> list[dict]:
     radius = config.SYNOPTIC_GRID_CENTER_WINDOW_CELLS
     min_gradient = config.SYNOPTIC_GRID_CENTER_MIN_GRADIENT_HPA
     min_dist_km = config.SYNOPTIC_GRID_CENTER_MIN_DIST_KM
+    max_elev = config.SYNOPTIC_GRID_CENTER_MAX_ELEV_M
 
     smooth = _smooth_3x3(meta, vals)
     candidates = []
@@ -254,6 +365,17 @@ def find_grid_pressure_centers(meta: dict, vals: list) -> list[dict]:
             gradient = (ring_mean - center) if is_min else (center - ring_mean)
             if gradient < min_gradient:
                 continue
+
+            # (a) orographisches Masking gegen Hoehen-Artefakte
+            if elevations is not None:
+                ev = elevations[j * nx + i]
+                if ev is not None and ev > max_elev:
+                    continue
+            # (b) Zirkulations-Check gegen das 700-hPa-Feld
+            circ = _circulation_ok(meta, winds_ts, j, i, radius, is_min)
+            if circ is False:
+                continue
+
             lat, lon = _cell_latlon(meta, j, i)
             raw = vals[j * nx + i]
             candidates.append({
@@ -262,7 +384,8 @@ def find_grid_pressure_centers(meta: dict, vals: list) -> list[dict]:
                 "lon": round(lon, 2),
                 "msl_hpa": round(raw if raw is not None else center, 1),
                 "gradient_hpa": round(gradient, 1),
-                "decided_by": "find_grid_pressure_centers",
+                "decided_by": ("find_grid_pressure_centers+circ"
+                               if circ is True else "find_grid_pressure_centers"),
             })
 
     # Suppression: staerkste Zentren zuerst, schwaechere Nachbarn verwerfen
@@ -329,7 +452,11 @@ def refresh_synoptic_grid() -> Optional[dict]:
             return None
 
         centers = {
-            ts: find_grid_pressure_centers(meta, fetched["values"][ts])
+            ts: find_grid_pressure_centers(
+                meta, fetched["values"][ts],
+                winds_ts=fetched["winds"].get(ts),
+                elevations=fetched["elevations"],
+            )
             for ts in fetched["timesteps"]
         }
 
@@ -341,6 +468,8 @@ def refresh_synoptic_grid() -> Optional[dict]:
             "meta": meta,
             "timesteps": fetched["timesteps"],
             "values": fetched["values"],
+            "winds": fetched["winds"],
+            "elevations": fetched["elevations"],
             "centers": centers,
         }
         _atomic_write_json_compact(config.SYNOPTIC_GRID_CACHE_PATH, result)

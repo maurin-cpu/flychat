@@ -501,6 +501,13 @@ SYNOPTIC_GRID_CHUNK_SIZE = 90   # Punkte pro Open-Meteo Multi-Location-Call (URL
 SYNOPTIC_GRID_CENTER_MIN_GRADIENT_HPA = 2.0
 SYNOPTIC_GRID_CENTER_WINDOW_CELLS = 3        # Extrema-Fenster-Radius (~600 km)
 SYNOPTIC_GRID_CENTER_MIN_DIST_KM = 500.0     # Mindestabstand zwischen Zentren
+# Doppelfilter gegen flache Hitzetief-/MSLP-Reduktions-Artefakte (Sommer/Gebirge):
+# (a) orographisches Masking — Kandidat verworfen, wenn Zellen-Elevation groesser
+#     ist (IMILAST-Bandbreite 1000–1500 m; konservativ 1000, da Grid grob).
+# (b) Zirkulations-Check gegen das 700-hPa-Windfeld — Tief braucht zyklonale,
+#     Hoch antizyklonale mittlere Tangentialkomponente >= dieser Schwelle.
+SYNOPTIC_GRID_CENTER_MAX_ELEV_M = 1000.0
+SYNOPTIC_GRID_CENTER_MIN_TANGENTIAL_MS = 2.0
 SYNOPTIC_GRID_CACHE_PATH = DATA_DIR / "synoptic_grid.json"
 
 # --- Audit & Cache -------------------------------------------------------

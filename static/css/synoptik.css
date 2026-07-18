@@ -307,6 +307,53 @@
 .syn-play.is-playing .syn-play-ic--play { display: none; }
 .syn-play.is-playing .syn-play-ic--pause { display: block; }
 
+/* Wind-Partikel-Toggle: ruhige Glas-Variante neben dem Play-Button;
+   aktiv = gefuellt Primary (deutlicher Pressed-State zusaetzlich zu
+   aria-pressed) */
+.syn-wind-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg-elevated);
+  color: var(--color-primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast),
+              background var(--transition-fast), color var(--transition-fast),
+              opacity var(--transition-fast);
+}
+
+.syn-wind-toggle:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: var(--shadow-md);
+}
+
+.syn-wind-toggle:active:not(:disabled) { transform: scale(0.97); }
+.syn-wind-toggle:disabled { opacity: 0.45; cursor: default; }
+.syn-wind-toggle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+.syn-wind-toggle.is-active {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-vivid) 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px var(--color-primary-glow), var(--shadow-sm);
+}
+
+/* Partikel-Canvas: rein dekorativ, darf keine Karten-Drags schlucken */
+.syn-wind-canvas { pointer-events: none; }
+
+/* Wind-Block in der Legende leicht vom Druck-Block absetzen */
+.syn-legend-title--wind {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
 /* Prominentes Readout des aktuellen Zeitpunkts ("Mo., 6. Juli · 12:00") */
 .syn-readout {
   font-size: 1.02rem;
@@ -629,6 +676,9 @@
 @media (max-width: 560px) {
   .syn-heading { font-size: 1.3rem; }
   .syn-play { width: 40px; height: 40px; }
+  .syn-wind-toggle { width: 40px; height: 40px; }
+  /* Readout darf den Wind-Toggle nie aus der Zeile druecken */
+  .syn-readout { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .syn-summary-text { font-size: var(--text-md); }
   /* Zwischenzeiten (06/18) nur am aktiven Tick beschriften — Layouthoehe
      bleibt erhalten (visibility statt display) */
@@ -647,6 +697,7 @@
   .syn-tl-fill,
   .syn-tl-dot::after,
   .syn-play,
+  .syn-wind-toggle,
   .syn-day-card,
   .syn-day-chip { transition: none !important; }
   .syn-tl-skeleton { animation: none; }
