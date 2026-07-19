@@ -32,14 +32,16 @@
                                   // echte 700-hPa-Wind wird nur bei Fehlwerten
                                   // gekappt, nicht kuenstlich gedaempft
 
-  // Partikel / Look
-  var DENSITY_PX2 = 550;          // 1 Partikel je ~550 px2 Kartenflaeche
-  var COUNT_MIN = 400;
-  var COUNT_MAX = 2500;
-  var TTL_MIN = 40, TTL_MAX = 120;  // Frames bis Respawn
-  var FADE_ALPHA = 0.92;          // destination-in Trail-Fade pro Frame
-  var LINE_WIDTH = 1.2;
-  var LINE_ALPHA = 0.75;
+  // Partikel / Look — bewusst ruhig gehalten: weniger, aber laengere Bahnen
+  // lesen sich als fliessende Stroemung statt als dichtes Gewusel.
+  var DENSITY_PX2 = 900;          // 1 Partikel je ~900 px2 (frueher 550 = dichter)
+  var COUNT_MIN = 280;
+  var COUNT_MAX = 1500;
+  var TTL_MIN = 50, TTL_MAX = 150;  // Frames bis Respawn (laengere Bahnen)
+  var FADE_ALPHA = 0.94;          // destination-in Trail-Fade pro Frame — hoeher
+                                  // = laengere, ruhigere Streifen (weniger Flimmern)
+  var LINE_WIDTH = 1.1;
+  var LINE_ALPHA = 0.6;           // weicher (frueher 0.75) — dezenter ueber der Karte
   var SPEED_FACTOR = 55000;       // visuelle Uebertreibung: ~60 km/h => ~100 px/s
                                   // bei minZoom (skaliert mit Zoom via pxPerMeter)
   // Geschwindigkeits-KONTRAST: der Partikel-Schritt waechst super-linear mit
@@ -266,8 +268,14 @@
     // ---- Partikel ----
 
     function targetCount() {
-      var n = Math.round(st.view.w * st.view.h / DENSITY_PX2);
-      n = Math.max(COUNT_MIN, Math.min(COUNT_MAX, n));
+      var n = st.view.w * st.view.h / DENSITY_PX2;
+      // Beim Reinzoomen ausduennen: die Partikel-Schrittweite waechst mit dem
+      // Zoom (px/m), die Bahnen werden laenger und schneller -> das Bild wuerde
+      // sonst deutlich dichter wirken. Pro Zoomstufe ueber minZoom die Dichte
+      // reduzieren haelt es ruhig.
+      var over = Math.max(0, map.getZoom() - map.getMinZoom());
+      if (over > 0) n = n / (1 + over * 0.6);
+      n = Math.max(COUNT_MIN, Math.min(COUNT_MAX, Math.round(n)));
       var coarse = window.matchMedia
         && (window.matchMedia("(max-width: 560px)").matches
             || window.matchMedia("(pointer: coarse)").matches);
@@ -439,9 +447,10 @@
 
     function onZoomEnd() {
       refreshView();
-      // Alte Trails sind im neuen Massstab falsch — nur Bild leeren,
-      // Partikel-Positionen (Screen-Space) bleiben gueltig.
-      ctx.clearRect(0, 0, st.view.w, st.view.h);
+      // Alte Trails sind im neuen Massstab falsch. Partikel neu aufsetzen, damit
+      // die zoomabhaengige Dichte (targetCount) im neuen Massstab greift —
+      // spawnAll leert dabei auch das Canvas.
+      spawnAll();
       repaint();
     }
 

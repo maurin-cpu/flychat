@@ -253,6 +253,41 @@
     return { W: W, H: H, values: out };
   }
 
+  // Leichte Feld-Glaettung (3x3-Binomial 1-2-1, Rand geclampt) auf dem
+  // hochgesampelten Grid VOR d3.contours: bilineares Upsampling laesst an den
+  // Fein-Zellgrenzen Knicke stehen (C0-Uebergaenge, sichtbar als "eckige"
+  // Isobaren trotz Chaikin). Ein, zwei Glaettungspaesse entfernen diese an der
+  // Quelle -> fliessende Konturen, OHNE die Punktzahl der Linien aufzublaehen
+  // (anders als zusaetzliche Chaikin-Iterationen, die LABEL_MIN_POINTS
+  // verschieben wuerden). Meteorologischer Standard: glattes Feld -> glatte
+  // Isolinien.
+  var FIELD_SMOOTH_PASSES = 2;
+
+  function smoothField(W, H, values, passes) {
+    var src = values;
+    for (var p = 0; p < passes; p++) {
+      var out = new Float64Array(W * H);
+      for (var y = 0; y < H; y++) {
+        for (var x = 0; x < W; x++) {
+          var acc = 0, wsum = 0;
+          for (var dy = -1; dy <= 1; dy++) {
+            var yy = Math.min(H - 1, Math.max(0, y + dy));
+            var wy = dy === 0 ? 2 : 1;
+            for (var dx = -1; dx <= 1; dx++) {
+              var xx = Math.min(W - 1, Math.max(0, x + dx));
+              var w = wy * (dx === 0 ? 2 : 1);
+              acc += src[yy * W + xx] * w;
+              wsum += w;
+            }
+          }
+          out[y * W + x] = acc / wsum;
+        }
+      }
+      src = out;
+    }
+    return src;
+  }
+
   function idxToLatLng(meta, x, y) {
     return [
       meta.lat0 + y * (meta.dlat / UPSAMPLE),
@@ -316,6 +351,7 @@
   function buildIsobars(meta, rawVals) {
     var vals = fillNulls(meta, rawVals);
     var up = upsampleBilinear(meta, vals);
+    up.values = smoothField(up.W, up.H, up.values, FIELD_SMOOTH_PASSES);
 
     var min = Infinity, max = -Infinity;
     for (var k = 0; k < up.values.length; k++) {
@@ -404,15 +440,22 @@
 
     var labelPositions = [];
 
+    // Isobaren bewusst als LEICHTE graue Fuehrungslinien — kein harter Kontrast,
+    // kein weisser Halo (beides wirkte zu praesent ueber der Druckband-Toenung).
+    // Die Farbtoenung + H/T-Badges + Labels tragen die Lesbarkeit; die Linien
+    // geben nur die Form. Haupt-/Nebenisobaren nur minimal abgestuft, damit
+    // keine Linie "hart" heraussticht.
     isobars.forEach(function (c) {
       var isMajor = c.value % LABEL_EVERY === 0;
       c.lines.forEach(function (line) {
         L.polyline(line, {
           pane: paneName,
           interactive: false,
-          color: "#475569",
-          weight: isMajor ? 1.7 : 1,
-          opacity: isMajor ? 0.85 : 0.55,
+          color: "#94a3b8",              // Slate-400: leichtes Grau
+          weight: isMajor ? 1.1 : 0.8,
+          opacity: isMajor ? 0.48 : 0.3,
+          lineJoin: "round",
+          lineCap: "round",
           smoothFactor: 1,
         }).addTo(group);
 
