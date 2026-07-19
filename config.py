@@ -1006,6 +1006,13 @@ MARKETING_URL   = os.environ.get("WINGCAST_MARKETING_URL", "https://wingcast.ch"
 # (Kosten/Missbrauch bei oeffentlichem Link). Nach dem Test wieder auf "0".
 PUBLIC_DEMO_MODE = os.environ.get("PUBLIC_DEMO_MODE", "0") == "1"
 
+# SHOW_SYNOPTIK: blendet das Synoptik-Feature in der Oberflaeche ein/aus
+# (Menue-Link + Synoptik-Mini-Karte auf der Briefing-Seite). Default an;
+# fuer Tests, in denen das Feature nicht gezeigt werden soll, auf "0" setzen.
+# Die /synoptik-Route selbst bleibt erreichbar — es geht nur um die Sichtbarkeit
+# in Navigation/Briefing (kein toter Link mehr).
+SHOW_SYNOPTIK = os.environ.get("SHOW_SYNOPTIK", "1") == "1"
+
 # PostHog Product-Analytics (nur nach Opt-in-Consent im Browser geladen).
 # Leerer KEY => Analytics komplett deaktiviert (Banner erscheint dann nicht).
 POSTHOG_KEY     = os.environ.get("POSTHOG_KEY", "").strip()

@@ -20,8 +20,10 @@
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
 <link rel="stylesheet" href="{{ url_for('static', filename='css/briefing.css') }}?v={{ static_v('css/briefing.css') }}">
+{% if show_synoptik %}
 {# synoptik.css: H/T-Badge- und Wind-Canvas-Styles fuer die Synoptik-Mini-Karte #}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/synoptik.css') }}?v={{ static_v('css/synoptik.css') }}">
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -39,6 +41,7 @@
 
   <section class="bf-wetterlage" id="bfWetterlage" hidden></section>
 
+  {% if show_synoptik %}
   <!-- Synoptik-Mini-Karte (Live, nicht interaktiv, klickbar -> /synoptik).
        Wird von synoptic-embed.js befuellt und sichtbar geschaltet. -->
   <section class="bf-synoptic" id="bfSynoptic" hidden>
@@ -53,6 +56,7 @@
       <a class="bf-synoptic-overlay" href="/synoptik" aria-label="{{ t('js.syn.embed_aria') }}"></a>
     </div>
   </section>
+  {% endif %}
 
   <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="{{ t('briefing.day_tabs_aria') }}"></nav>
 
@@ -101,8 +105,10 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="{{ url_for('static', filename='js/shared-glyph.js') }}?v={{ static_v('js/shared-glyph.js') }}"></script>
+{% if show_synoptik %}
 <script src="{{ url_for('static', filename='js/synoptic-wind.js') }}?v={{ static_v('js/synoptic-wind.js') }}"></script>
 <script src="{{ url_for('static', filename='js/synoptic-embed.js') }}?v={{ static_v('js/synoptic-embed.js') }}"></script>
+{% endif %}
 <script src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
 <script src="{{ url_for('static', filename='js/briefing.js') }}?v={{ static_v('js/briefing.js') }}"></script>
 {% endblock %}
