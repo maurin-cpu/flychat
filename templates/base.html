@@ -68,7 +68,8 @@
         <div class="navbar-links">
             <a href="/chat" class="{% if request.path == '/' or request.path == '/chat' %}active{% endif %}">{{ t('nav.spots') }}</a>
             <a href="/regionen" class="{% if request.path == '/regionen' %}active{% endif %}">{{ t('nav.regions') }}</a>
-            {% if show_synoptik %}<a href="/synoptik" class="{% if request.path == '/synoptik' %}active{% endif %}">{{ t('nav.synoptic') }}</a>{% endif %}
+            {# Synoptik-Feature vor Launch ausgeblendet — zum Livegehen wieder aktivieren:
+               <a href="/synoptik" class="{% if request.path == '/synoptik' %}active{% endif %}">{{ t('nav.synoptic') }}</a> #}
             <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Wingcast</a>
             {% if is_admin %}
             <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="{{ t('nav.foehn_open') }}" aria-label="{{ t('nav.foehn_open') }}">{{ t('nav.foehn') }}</button>

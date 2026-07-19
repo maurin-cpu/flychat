@@ -133,7 +133,6 @@ def _inject_session_flags():
         # der Demo-Schalter keine Account-Features fuer Anonyme vortaeuscht.
         "chat_open": logged_in or config.PUBLIC_DEMO_MODE,
         "public_demo": config.PUBLIC_DEMO_MODE,
-        "show_synoptik": config.SHOW_SYNOPTIK,
         "is_admin": _is_admin(),
         "session_email": session.get("email", ""),
         "marketing_url": marketing,
