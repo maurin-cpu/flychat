@@ -23,6 +23,10 @@ node_modules/
 
 # Runtime data (generated, server-local)
 data/wetterdaten.json
+data/synoptic_grid.json
+
+# Remotion-Video Export (generierte Tages-Vorhersage, kein Quellcode)
+forecast_*_remotion.json
 data/spot_analyses.json
 data/region_analyses.json
 data/weekly_briefing.json
