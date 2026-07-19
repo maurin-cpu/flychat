@@ -67,8 +67,11 @@ app.json.ensure_ascii = False
 ANON_FORECAST_DAYS = 1
 
 def current_max_days() -> int:
-    """Maximale sichtbare Vorhersage-Tage fuer aktuellen Request."""
-    if session.get("sub_id"):
+    """Maximale sichtbare Vorhersage-Tage fuer aktuellen Request.
+
+    PUBLIC_DEMO_MODE schaltet die volle Tageszahl auch fuer anonyme Besucher
+    frei (Test-Modus = alle Features wie eingeloggt)."""
+    if session.get("sub_id") or config.PUBLIC_DEMO_MODE:
         return config.FORECAST_DAYS
     return min(ANON_FORECAST_DAYS, config.FORECAST_DAYS)
 
