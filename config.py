@@ -998,6 +998,14 @@ DAILY_RUN_MINUTE   = 0
 BASE_URL        = os.environ.get("WINGCAST_BASE_URL",      "https://app.wingcast.ch")
 MARKETING_URL   = os.environ.get("WINGCAST_MARKETING_URL", "https://wingcast.ch")
 
+# PUBLIC_DEMO_MODE: oeffnet den Chat-Berater OHNE Login (fuer oeffentliche
+# Tests, z.B. Reddit). Normalbetrieb: der Chat verlangt Login (Registrierung).
+# Ist der Schalter an, faellt die Login-Pflicht am /api/chat weg und die Chat-UI
+# wird auch anonymen Besuchern gezeigt; jeder Browser bekommt einen eigenen
+# anonymen Verlauf. ACHTUNG: kein Rate-Limit — jede Nachricht ruft das LLM auf
+# (Kosten/Missbrauch bei oeffentlichem Link). Nach dem Test wieder auf "0".
+PUBLIC_DEMO_MODE = os.environ.get("PUBLIC_DEMO_MODE", "0") == "1"
+
 # PostHog Product-Analytics (nur nach Opt-in-Consent im Browser geladen).
 # Leerer KEY => Analytics komplett deaktiviert (Banner erscheint dann nicht).
 POSTHOG_KEY     = os.environ.get("POSTHOG_KEY", "").strip()

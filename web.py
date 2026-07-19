@@ -11,6 +11,7 @@ import logging
 import math
 import sys
 import threading
+import uuid
 from functools import wraps
 from typing import Optional
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, \
@@ -121,8 +122,14 @@ def _inject_session_flags():
     """Templates koennen via {% if is_logged_in %} pruefen.
     Plus: marketing_url + legal_urls fuer Footer-Links."""
     marketing = config.MARKETING_URL.rstrip("/")
+    logged_in = bool(session.get("sub_id"))
     return {
-        "is_logged_in": bool(session.get("sub_id")),
+        "is_logged_in": logged_in,
+        # chat_open steuert NUR die Chat-UI: eingeloggt ODER PUBLIC_DEMO_MODE.
+        # is_logged_in bleibt fuer Navbar/Account/Login-Modal massgeblich, damit
+        # der Demo-Schalter keine Account-Features fuer Anonyme vortaeuscht.
+        "chat_open": logged_in or config.PUBLIC_DEMO_MODE,
+        "public_demo": config.PUBLIC_DEMO_MODE,
         "is_admin": _is_admin(),
         "session_email": session.get("email", ""),
         "marketing_url": marketing,
@@ -2646,7 +2653,8 @@ def _require_login_json(view_func):
     {error: ..., login_required: true} — Frontend kann das auswerten."""
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        if not session.get("sub_id"):
+        # PUBLIC_DEMO_MODE: Login-Pflicht faellt weg (oeffentlicher Test).
+        if not session.get("sub_id") and not config.PUBLIC_DEMO_MODE:
             return jsonify({
                 "error": "Login erforderlich",
                 "login_required": True,
@@ -2659,8 +2667,19 @@ def _require_login_json(view_func):
 def _chat_session_id():
     """Chat-History ist an den eingeloggten User gebunden — nicht an eine
     Client-/localStorage-ID. Dadurch ist der Verlauf geräteübergreifend,
-    isoliert pro User und nur für den jeweiligen User sichtbar."""
-    return f"user_{session['sub_id']}"
+    isoliert pro User und nur für den jeweiligen User sichtbar.
+
+    PUBLIC_DEMO_MODE (anonym): kein sub_id vorhanden — jeder Browser bekommt
+    eine eigene, in der Flask-Session gehaltene anonyme ID, damit die Tester
+    jeweils ihren eigenen isolierten Verlauf haben (kein geteilter Demo-Chat)."""
+    if session.get("sub_id"):
+        return f"user_{session['sub_id']}"
+    anon = session.get("anon_id")
+    if not anon:
+        anon = uuid.uuid4().hex
+        session["anon_id"] = anon
+        session.permanent = True
+    return f"anon_{anon}"
 
 
 @app.route("/api/chat", methods=["POST"])
