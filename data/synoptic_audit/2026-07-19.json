@@ -823,31 +823,5 @@
     "decide_precip_pattern_nord_sued",
     "decide_wind_pattern_nord_sued",
     "decide_lage_label"
-  ],
-  "llm_overview": {
-    "short": "An unstable transition gives way to building high pressure, but a moderate north foehn dominates the window. A strong westerly upper flow persists, gradually easing from Monday. The Alpine north side sees scattered showers on Sunday, then turns dry and sunny. The Alpine south side stays mostly dry until Tuesday, when locally heavy showers and an isolated thunderstorm develop. However, the wind is the overriding factor: both sides are blown out across all days, with flight-band winds above 30 km/h in most places. Flying is severely restricted throughout – Sunday is the worst, while Monday and Tuesday remain windy and only rarely flyable in sheltered spots. Ticino and the southern valleys are especially gusty due to the north foehn.",
-    "long": "Sunday: Transitional pressure with north foehn active. Westerly flow strong, flight-band wind >30 km/h in over 80% of spots on both sides. Alpine north: scattered showers, locally heavy. Alpine south: sunny but gusty in foehn valleys. Not a flying day. Monday: High pressure building, north foehn continues. Westerly flow moderate but still critical: >70% of north and south spots have flight-band wind above 30 km/h. Alpine north dry and sunny, south dry with high CAPE – watch for afternoon convection. Foehn gusts in Ticino persist. Tuesday: High pressure holds, north foehn ongoing. Westerly flow moderate, but wind remains critical: 75% of north and 84% of south spots wind-critical. Alpine north mostly dry, south increasingly unstable with local heavy showers and a possible thunderstorm. Foehn still gusty in the south.",
-    "short_with_sources": [
-      {
-        "text": "An unstable transition gives way to building high pressure, but a moderate north foehn dominates the window. A strong westerly upper flow persists, gradually easing from Monday. The Alpine north side sees scattered showers on Sunday, then turns dry and sunny. The Alpine south side stays mostly dry until Tuesday, when locally heavy showers and an isolated thunderstorm develop. However, the wind is the overriding factor: both sides are blown out across all days, with flight-band winds above 30 km/h in most places. Flying is severely restricted throughout – Sunday is the worst, while Monday and Tuesday remain windy and only rarely flyable in sheltered spots. Ticino and the southern valleys are especially gusty due to the north foehn."
-      }
-    ],
-    "long_with_sources": [
-      {
-        "text": "Sunday: Transitional pressure with north foehn active. Westerly flow strong, flight-band wind >30 km/h in over 80% of spots on both sides. Alpine north: scattered showers, locally heavy. Alpine south: sunny but gusty in foehn valleys. Not a flying day.",
-        "flight_hint": "Too windy for most pilots; ground day."
-      },
-      {
-        "text": "Monday: High pressure building, north foehn continues. Westerly flow moderate but still critical: >70% of north and south spots have flight-band wind above 30 km/h. Alpine north dry and sunny, south dry with high CAPE – watch for afternoon convection. Foehn gusts in Ticino persist.",
-        "flight_hint": "Windy everywhere; only the most sheltered spots might be flyable."
-      },
-      {
-        "text": "Tuesday: High pressure holds, north foehn ongoing. Westerly flow moderate, but wind remains critical: 75% of north and 84% of south spots wind-critical. Alpine north mostly dry, south increasingly unstable with local heavy showers and a possible thunderstorm. Foehn still gusty in the south.",
-        "flight_hint": "Still too windy; thunderstorm adds risk."
-      }
-    ],
-    "attempts": 1,
-    "unresolved": [],
-    "generated_at": "2026-07-19T06:18:28"
-  }
+  ]
 }
