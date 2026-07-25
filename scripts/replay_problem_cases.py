@@ -27,7 +27,7 @@ from openai import OpenAI
 DATA = Path(__file__).resolve().parent.parent / "data" / "labeled_examples.jsonl"
 API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 BASE_URL = "https://api.deepseek.com/v1"
-MODEL = "deepseek-chat"  # equivalent to deepseek-v4-flash in their public API
+MODEL = os.environ.get("REPLAY_MODEL", "deepseek-v4-flash")  # deepseek-chat wurde 25.07.2026 API-seitig abgeschaltet
 
 
 def effective_rating(entry):
@@ -119,7 +119,7 @@ def call_llm(client, system_prompt, user_msg):
             {"role": "user", "content": user_msg},
         ],
         temperature=0.2,
-        max_tokens=1500,
+        max_tokens=7500,  # v4-flash ist Reasoning-Modell: +6000 Headroom wie engine._common._resolve_max_tokens
         response_format={"type": "json_object"},
     )
     raw = resp.choices[0].message.content or "{}"
