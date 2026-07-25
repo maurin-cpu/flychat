@@ -896,31 +896,5 @@
     "decide_precip_pattern_nord_sued",
     "decide_wind_pattern_nord_sued",
     "decide_lage_label"
-  ],
-  "llm_overview": {
-    "short": "A Vb low brings unsettled weather at first, then pressure builds with a shift to a north foehn situation. Saturday is dominated by a Vb low over the western Mediterranean, steering widespread rain and unstable air aloft. Winds start from the southwest, then turn northwesterly by Sunday. On Monday, high pressure takes over, but a moderate north foehn develops on the Alpine south side. Saturday and Sunday are largely ground days due to heavy rain and strong wind across both sides of the Alps. Monday offers a window on the Alpine north side in sheltered spots, but the south side faces gusty foehn conditions.",
-    "long": "Saturday: Vb low influence with widespread rain on both sides of the Alps. Upper flow moderate southwesterly, but wind aloft exceeds 30 km/h in most places, making it wind-critical across the north and heavily restricted on the south. Heavy precipitation likely, especially on the Alpine north side with peak intensities up to 35 mm/h. Isolated thunderstorms possible on the south side. Sunday: Still under Vb low influence, but now with northwesterly upper flow. Widespread rain continues on the Alpine north side, coverage high. South side also wet with heavy showers. Wind remains critical: over 60% of spots on both sides have flight-band wind above 30 km/h, driven mainly by upper wind. No thunderstorms expected. Monday: High pressure builds, bringing dry conditions. A moderate north foehn activates the Alpine south side for about 4 hours, with gusty winds in the lee valleys. Alpine north side partly cloudy with isolated light showers, but wind stays elevated (over half the spots above 30 km/h aloft). The south side is heavily restricted; watch for turbulence in the foehn zones.",
-    "short_with_sources": [
-      {
-        "text": "A Vb low brings unsettled weather at first, then pressure builds with a shift to a north foehn situation. Saturday is dominated by a Vb low over the western Mediterranean, steering widespread rain and unstable air aloft. Winds start from the southwest, then turn northwesterly by Sunday. On Monday, high pressure takes over, but a moderate north foehn develops on the Alpine south side. Saturday and Sunday are largely ground days due to heavy rain and strong wind across both sides of the Alps. Monday offers a window on the Alpine north side in sheltered spots, but the south side faces gusty foehn conditions."
-      }
-    ],
-    "long_with_sources": [
-      {
-        "text": "Saturday: Vb low influence with widespread rain on both sides of the Alps. Upper flow moderate southwesterly, but wind aloft exceeds 30 km/h in most places, making it wind-critical across the north and heavily restricted on the south. Heavy precipitation likely, especially on the Alpine north side with peak intensities up to 35 mm/h. Isolated thunderstorms possible on the south side.",
-        "flight_hint": "Rain and strong wind make flying unsafe; plan a rest day."
-      },
-      {
-        "text": "Sunday: Still under Vb low influence, but now with northwesterly upper flow. Widespread rain continues on the Alpine north side, coverage high. South side also wet with heavy showers. Wind remains critical: over 60% of spots on both sides have flight-band wind above 30 km/h, driven mainly by upper wind. No thunderstorms expected.",
-        "flight_hint": "Persistent rain and strong wind; no flying day."
-      },
-      {
-        "text": "Monday: High pressure builds, bringing dry conditions. A moderate north foehn activates the Alpine south side for about 4 hours, with gusty winds in the lee valleys. Alpine north side partly cloudy with isolated light showers, but wind stays elevated (over half the spots above 30 km/h aloft). The south side is heavily restricted; watch for turbulence in the foehn zones.",
-        "flight_hint": "Foehn on the south side, gusty and dangerous; north side usable only in sheltered areas."
-      }
-    ],
-    "attempts": 1,
-    "unresolved": [],
-    "generated_at": "2026-07-25T06:26:55"
-  }
+  ]
 }
