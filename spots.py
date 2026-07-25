@@ -2,8 +2,10 @@
 Spot-Verwaltung für Wingcast.
 
 Lädt Fluggebiete aus CSV (PGE-Schema, Mai 2026) und stellt Such-/Filterfunktionen
-bereit. CSV-Spalten: wind_N..wind_NW (binaer 0/1), bemerkungen_flug,
-bemerkungen_sicherheit, plus Geometrie/Terrain-Metadaten. `windrichtung` wird
+bereit. CSV-Spalten: wind_N..wind_NW (binaer 0/1), bemerkungen_flug (nur
+rating-relevant), bemerkungen_sicherheit (nur safety-relevant),
+bemerkungen_sonstiges (Logistik/Beschreibung, nicht analyse-relevant),
+plus Geometrie/Terrain-Metadaten. `windrichtung` wird
 aus den Sektor-Spalten in legacy-kompatiblem German-Hyphen-Format synthetisiert
 (z.B. `O-SO-S-SW-W` fuer contiguous, `S/N` fuer disjoint).
 """
@@ -112,6 +114,13 @@ def load_spots(csv_path=None):
             "windrichtung": windrichtung,
             "bemerkungen_flug": row.get("bemerkungen_flug", "").strip(),
             "bemerkungen_sicherheit": row.get("bemerkungen_sicherheit", "").strip(),
+            # Operationalisierte Regeln (Bedingung -> Rating-/Safety-Wirkung),
+            # werden im Analyse-Kontext direkt unter der Bemerkung injiziert.
+            "bemerkung_flug_effekt": row.get("bemerkung_flug_effekt", "").strip(),
+            "bemerkung_sicherheit_effekt": row.get("bemerkung_sicherheit_effekt", "").strip(),
+            # Logistik/Beschreibung (Gondel, Fussweg, Parken) — bewusst NICHT in
+            # den Analyse-Kontext injiziert, nur fuer Chat/Anzeige.
+            "bemerkungen_sonstiges": row.get("bemerkungen_sonstiges", "").strip(),
             "ideal_wind_max": default_ideal_wind_max,
             "slope_azimuth": int(row["slope_azimuth"]) if row.get("slope_azimuth") else None,
             "slope_angle": int(row["slope_angle"]) if row.get("slope_angle") else 25,
@@ -210,7 +219,8 @@ def update_spot_coords(spot_id: str, new_lat: float, new_lon: float,
         dir=str(path.parent),
     )
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+        # utf-8-sig: BOM erhalten, damit Excel die Umlaute korrekt anzeigt.
+        with os.fdopen(fd, "w", encoding="utf-8-sig", newline="") as f:
             writer = csv.DictWriter(
                 f, fieldnames=fieldnames,
                 quoting=csv.QUOTE_MINIMAL,

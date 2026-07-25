@@ -32,7 +32,8 @@ SELF-CHECK (MANDATORY)
 
 1. **Text-rating consistency**: "weak"/"barely any thermals"/"not realistic" → rating ≤ 2. Rating ≥ 4 + negative text = ERROR.
 2. **Thermal reality**: No usable thermals → `experience_rating = 1`.
-3. **Check RATING-INPUTS**: `prod_h_strict < 2` → max **2**. `prod_h_strict ≥ 4` AND `sustained_peak ≥ 2.0` → min **4**.
+3. **Check RATING-INPUTS**: `prod_h_strict < 2` → max **2**. `prod_h_strict ≥ 4` AND `sustained_peak ≥ 2.0` → min **4** — UNLESS a `Rating-Regel Flug` in the data block caps lower (its gate beats this minimum, see HARD LIMITS rule 3).
+3a. **`Rating-Regel Flug` applied?** If the data block has one: condition checked hour by hour against the values, cap/gate/window effect applied, result documented in `bemerkung_check`. Rating rule present + empty `bemerkung_check` = ERROR.
 4. **Region cap (see `_flight_subratings_spot.md`)**: Rating 5 only if Region-XC high/Region=5 AND `working_height_agl >= 2000m`. Rating 4 only if Region>=4 AND `working_height_agl >= 1500m`. Otherwise cap.
 5. **Climb-above-launch finding MANDATORY**: `xc_details` sentence 1 AND `flyability_notes.altitude` contain the yes/no statement "can you climb above the launch" — source ONLY `working_height_agl` (>= ~400m = yes + number; < ~400m = no), NEVER from Region-XC. Missing = ERROR.
 5a. **How-far comes from the region**: The km statement in `xc_details` relies on `Region-XC` (not self-invented), tied to the climb-above-launch finding with "because"/"which is why".
@@ -59,7 +60,7 @@ JSON ONLY, no tags, no square brackets.
   "xc_potential": "high|moderate|low",
   "xc_details": "MANDATORY — 2-3 sentences. **Sentence 1 is ALWAYS the climb-above-launch finding:** can you climb above the launch (yes/no) and by how much — source is ONLY `working_height_agl` (climb height above launch), take the number VERBATIM from RATING-INPUTS (NEVER round/lower it): >= ~400m = YES, 'up to +XXXXm above launch' (EVEN with a weak region — 'ceiling just above launch' is then FORBIDDEN); < ~400m = NO/barely, 'ceiling just above launch — only local flight/soaring'. The climb-above-launch finding NEVER comes from Region-XC; a weak region only makes the DISTANCE short. **Then the how-far statement from `Region-XC`** (km class) — that comes from the region, not from you; tie it with 'because'/'which is why' to the climb-above-launch finding. Example: 'Can climb to +2000m above launch, climbs out well — and because the region delivers an XC day (Region-XC: high), cross-country >100km is on.' If `Region-XC` is missing: only the climb-above-launch finding + 'Without region context no distance statement — pure spot assessment.'",
   "soaring_options": "Ridge soaring, wind on the slope — natural language.",
-  "bemerkung_check": "Remarks met? What exactly?",
+  "bemerkung_check": "MANDATORY if a site note / Rating-Regel Flug is present: which condition was checked against which hourly values, which effect was applied (e.g. 'Bise 8-11 km/h < 15 -> cap 2, no soaring'). No site note present -> empty.",
   "best_window": "Best time window within safe_window.",
   "flyability_notes": {
     "thermal":  "ONE sentence of justification with data-block numbers. Example: 'Peak 2.1 m/s × 5h, BLH 3300m, cloud-free — strong day, local-XC on.'",

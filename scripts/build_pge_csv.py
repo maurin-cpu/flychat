@@ -39,7 +39,9 @@ OUTPUT_COLUMNS = [
     "region", "fluggebiet", "site_name", "latitude", "longitude", "elevation_m",
     "wind_N", "wind_NE", "wind_E", "wind_SE", "wind_S", "wind_SW", "wind_W", "wind_NW",
     "slope_azimuth", "slope_angle", "kritischer_foehn", "terrain_type", "analyse_region",
-    "bemerkungen_flug", "bemerkungen_sicherheit",
+    "bemerkungen_flug", "bemerkung_flug_effekt",
+    "bemerkungen_sicherheit", "bemerkung_sicherheit_effekt",
+    "bemerkungen_sonstiges",
 ]
 
 
@@ -233,7 +235,10 @@ def main():
             "terrain_type": terrain_type,
             "analyse_region": analyse_region,
             "bemerkungen_flug": "",
+            "bemerkung_flug_effekt": "",
             "bemerkungen_sicherheit": "",
+            "bemerkung_sicherheit_effekt": "",
+            "bemerkungen_sonstiges": "",
         }
         for k in SECTOR_KEYS:
             row[f"wind_{k}"] = str(p["sectors"][k])

@@ -26,9 +26,9 @@ THE 8 SUB-RATINGS
 **IMPORTANT**: Do NOT rate the wind direction — direction is launchability (daily window), not safety. Wrong sector / wind shift is NOT a safety issue.
 **FORBIDDEN**: rating ≤5 because of `[WIND-WRONG]`/wind shift — if the wind speed itself is green, minimum **7**.
 
-Read the site note: default-ideal {{cfg.WIND_IDEAL_MIN_KMH}}-{{cfg.WIND_IDEAL_MAX_KMH}} km/h. Soaring spots (e.g. Balderen) need a minimum wind (often 15+) — mind the site note.
+Default-ideal {{cfg.WIND_IDEAL_MIN_KMH}}-{{cfg.WIND_IDEAL_MAX_KMH}} km/h. Too WEAK a wind is NOT a safety issue (the soaring minimum wind belongs to the flyability phase via `Rating-Regel Flug`) — here only too-strong/gusty wind counts. Apply the `Rating-Regel Sicherheit` from the data block (e.g. rotor in specific wind situations).
 - 1: Stormy ({{cfg.WIND_DANGER_KMH}}+ km/h), building trend
-- 5: Borderline (>{{cfg.WIND_WARN_KMH}} km/h OR below site minimum OR building)
+- 5: Borderline (>{{cfg.WIND_WARN_KMH}} km/h OR building OR a weather trigger from `Rating-Regel Sicherheit` active)
 - 10: In the ideal range, steady all day
 
 **gust_safety_rating** — gust factor + gust peaks during productive hours including trend.

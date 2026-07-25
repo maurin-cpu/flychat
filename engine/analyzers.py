@@ -718,6 +718,11 @@ class AnalyzersMixin:
             "_rating_inputs",
             # Tag-System v4 (siehe docs/TAGS.md)
             "tags", "start_window",
+            # Bemerkungs-Kontrolle: welche Spot-Bemerkung griff (Flyability-LLM).
+            # Ohne diese Kopie fehlt das Feld im persistierten Cache (der
+            # flyability-Subdict wird nur bei gesetztem tier geschrieben) —
+            # dann ist nicht pruefbar, ob Bemerkungen angewendet wurden.
+            "bemerkung_check",
         )
         for k in new_fields:
             v = result.get(k)

@@ -531,13 +531,20 @@ class WeatherContextMixin:
                 f"Max. Wind: {spot['ideal_wind_max']} km/h | "
                 f"Kritischer Föhn: {spot['kritischer_foehn']}"
             )
-            # Vor-klassifizierte Bemerkungen (flug/sicherheit getrennt).
+            # Vor-klassifizierte Bemerkungen (flug/sicherheit getrennt) +
+            # operationalisierte Rating-Regel direkt darunter (Bedingung -> Wirkung).
             bem_flug = (spot.get("bemerkungen_flug") or "").strip()
             bem_sich = (spot.get("bemerkungen_sicherheit") or "").strip()
+            eff_flug = (spot.get("bemerkung_flug_effekt") or "").strip()
+            eff_sich = (spot.get("bemerkung_sicherheit_effekt") or "").strip()
             if bem_flug:
                 lines.append(f"Bemerkung Flug: {bem_flug}")
+                if eff_flug:
+                    lines.append(f"Rating-Regel Flug: {eff_flug}")
             if bem_sich:
                 lines.append(f"Bemerkung Sicherheit: {bem_sich}")
+                if eff_sich:
+                    lines.append(f"Rating-Regel Sicherheit: {eff_sich}")
 
             hourly_data = spot_data.get("hourly_data", {})
             pressure_level_data = spot_data.get("pressure_level_data", {})
@@ -1543,13 +1550,20 @@ class WeatherContextMixin:
             f"Max. Wind: {spot['ideal_wind_max']} km/h | "
             f"Kritischer Föhn: {spot['kritischer_foehn']}",
         ]
-        # Vor-klassifizierte Bemerkungen (flug/sicherheit getrennt).
+        # Vor-klassifizierte Bemerkungen (flug/sicherheit getrennt) +
+        # operationalisierte Rating-Regel direkt darunter (Bedingung -> Wirkung).
         bem_flug_single = (spot.get("bemerkungen_flug") or "").strip()
         bem_sich_single = (spot.get("bemerkungen_sicherheit") or "").strip()
+        eff_flug_single = (spot.get("bemerkung_flug_effekt") or "").strip()
+        eff_sich_single = (spot.get("bemerkung_sicherheit_effekt") or "").strip()
         if bem_flug_single:
             lines.append(f"Bemerkung Flug: {bem_flug_single}")
+            if eff_flug_single:
+                lines.append(f"Rating-Regel Flug: {eff_flug_single}")
         if bem_sich_single:
             lines.append(f"Bemerkung Sicherheit: {bem_sich_single}")
+            if eff_sich_single:
+                lines.append(f"Rating-Regel Sicherheit: {eff_sich_single}")
 
         hourly_data = spot_data.get("hourly_data", {})
         pressure_level_data = spot_data.get("pressure_level_data", {})

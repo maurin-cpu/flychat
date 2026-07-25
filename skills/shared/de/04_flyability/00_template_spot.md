@@ -32,7 +32,8 @@ SELBST-CHECK (PFLICHT)
 
 1. **Text-Rating-Konsistenz**: "schwach"/"kaum Thermik"/"nicht realistisch" → Rating ≤ 2. Rating ≥ 4 + negativer Text = FEHLER.
 2. **Thermik-Realitaet**: Keine nutzbare Thermik → `experience_rating = 1`.
-3. **RATING-INPUTS pruefen**: `prod_h_strict < 2` → max **2**. `prod_h_strict ≥ 4` UND `sustained_peak ≥ 2.0` → min **4**.
+3. **RATING-INPUTS pruefen**: `prod_h_strict < 2` → max **2**. `prod_h_strict ≥ 4` UND `sustained_peak ≥ 2.0` → min **4** — AUSSER eine `Rating-Regel Flug` im Datenblock kappt tiefer (deren Gate schlaegt dieses Minimum, siehe HARTE SCHRANKEN Regel 3).
+3a. **`Rating-Regel Flug` angewendet?** Wenn der Datenblock eine hat: Bedingung stundenweise gegen die Werte geprueft, Cap/Gate/Fenster-Wirkung umgesetzt, Ergebnis in `bemerkung_check` dokumentiert. Rating-Regel vorhanden + `bemerkung_check` leer = FEHLER.
 4. **Region-Cap (siehe `_flight_subratings_spot.md`)**: Rating 5 nur wenn Region-XC high/Region=5 UND `working_height_agl >= 2000m`. Rating 4 nur wenn Region>=4 UND `working_height_agl >= 1500m`. Sonst kappen.
 5. **Ueberhoehen-Befund PFLICHT**: `xc_details` Satz 1 UND `flyability_notes.altitude` enthalten die Ja/Nein-Aussage „kann man den Startplatz ueberhoehen" — Quelle NUR `working_height_agl` (>= ~400m = ja + Zahl; < ~400m = nein), NIE aus Region-XC. Fehlt = FEHLER.
 5a. **Wie-weit kommt aus der Region**: Die km-Aussage im `xc_details` stuetzt sich auf `Region-XC` (nicht selbst erfunden), mit `weil`/`weshalb` an den Ueberhoehen-Befund geknuepft.
@@ -59,7 +60,7 @@ AUSSCHLIESSLICH JSON, keine Tags, keine eckigen Klammern.
   "xc_potential": "high|moderate|low",
   "xc_details": "PFLICHT — 2-3 Saetze. **Satz 1 IMMER der Ueberhoehen-Befund:** kann man den Startplatz ueberhoehen (ja/nein) und um wieviel — Quelle ist NUR `working_height_agl` (Steighoehe ueber Start), Zahl WORTWOERTLICH aus RATING-INPUTS uebernehmen (NIE runden/senken): >= ~400m = JA, 'bis +XXXXm ueber Start' (AUCH bei schwacher Region — 'Deckel knapp ueber Platz' dann VERBOTEN); < ~400m = NEIN/kaum, 'Deckel knapp ueber Platz — nur Hausrunde/Soaring'. Der Ueberhoehen-Befund kommt NIE aus Region-XC; eine schwache Region macht nur die STRECKE kurz. **Danach die Wie-weit-Aussage aus `Region-XC`** (km-Klasse) — die kommt aus der Region, nicht von dir; verknuepfe sie mit 'weil'/'weshalb' an den Ueberhoehen-Befund. Beispiel: 'Ueber Start bis +2000m steigbar, gut ueberhoehbar — und weil die Region einen XC-Tag liefert (Region-XC: high), ist Streckenflug >100km drin.' Wenn `Region-XC` fehlt: nur der Ueberhoehen-Befund + 'Ohne Region-Kontext keine Strecken-Aussage — reine Spot-Einschaetzung.'",
   "soaring_options": "Hangsoaring, Wind am Hang — natuerliche Sprache.",
-  "bemerkung_check": "Bemerkungen erfuellt? Was genau?",
+  "bemerkung_check": "PFLICHT wenn Bemerkung/Rating-Regel Flug vorhanden: welche Bedingung wurde gegen welche Stunden-Werte geprueft, welche Wirkung angewendet (z.B. 'Bise 8-11 km/h < 15 -> Cap 2, kein Soaring'). Keine Bemerkung vorhanden -> leer.",
   "best_window": "Bestes Zeitfenster innerhalb safe_window.",
   "flyability_notes": {
     "thermal":  "EIN Satz Begruendung mit Datenblock-Zahlen. Beispiel: 'Peak 2.1 m/s × 5h, BLH 3300m, wolkenfrei — starker Tag, lokal-XC drin.'",

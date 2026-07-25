@@ -597,6 +597,7 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
                     "windrichtung": spot["windrichtung"],
                     "bemerkungen_flug": spot.get("bemerkungen_flug", ""),
                     "bemerkungen_sicherheit": spot.get("bemerkungen_sicherheit", ""),
+                    "bemerkungen_sonstiges": spot.get("bemerkungen_sonstiges", ""),
                     "reference_points": ref_points,
                     "has_weather": spot_name in self.weather_data,
                     "data_sources": data_sources,

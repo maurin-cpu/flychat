@@ -26,9 +26,9 @@ DIE 8 SUB-RATINGS
 **WICHTIG**: Anstroemrichtung NICHT bewerten — Richtung ist Startbarkeit (Tagesfenster), nicht Safety. Falscher Sektor / Winddreher ist KEIN Sicherheitsthema.
 **VERBOTEN**: rating ≤5 wegen `[WIND-WRONG]`/Winddrehung — wenn Windstaerke selbst gruen, Minimum **7**.
 
-Spot-Bemerkung lesen: Default-Ideal {{cfg.WIND_IDEAL_MIN_KMH}}-{{cfg.WIND_IDEAL_MAX_KMH}} km/h. Soaring-Spots (z.B. Balderen) brauchen Mindestwind (oft 15+) — Spot-Bemerkung beachten.
+Default-Ideal {{cfg.WIND_IDEAL_MIN_KMH}}-{{cfg.WIND_IDEAL_MAX_KMH}} km/h. Zu SCHWACHER Wind ist KEIN Sicherheitsthema (Soaring-Mindestwind gehoert der Flyability-Phase via `Rating-Regel Flug`) — hier zaehlt nur zu starker/boeiger Wind. `Rating-Regel Sicherheit` im Datenblock (z.B. Rotor bei bestimmter Windlage) anwenden.
 - 1: Stuermisch ({{cfg.WIND_DANGER_KMH}}+ km/h), Aufbau-Trend
-- 5: Grenzwertig (>{{cfg.WIND_WARN_KMH}} km/h ODER unter Spot-Mindest ODER Aufbau)
+- 5: Grenzwertig (>{{cfg.WIND_WARN_KMH}} km/h ODER Aufbau ODER Wetter-Trigger aus `Rating-Regel Sicherheit` aktiv)
 - 10: Im Ideal, stabil ganztags
 
 **gust_safety_rating** — Boenfaktor + Boen-Spitzen waehrend produktiver Stunden inkl. Trend.

@@ -10,11 +10,18 @@ RATING IS FLIGHT QUALITY, NOT SAFETY
 ─────────────────────────────────
 
 The rating depends EXCLUSIVELY on: `sustained_peak`, `prod_h_strict`,
-`working_height_agl`, `cloud_structure`.
+`working_height_agl`, `cloud_structure` — **plus, if present, the
+`Rating-Regel Flug` from the data block** (site note, operationalized).
+Its gates/caps are part of the rating basis, not a safety topic.
 
 For the rating you **ignore**: `safety_status`, `no_go_reasons`,
 `caution_notes`, [SHEAR-*]/[THERMAL-ROUGH-*]/[THERMAL-WIND-*], upper-wind markers
 ("!", "sporty"), foehn, rain, thunderstorms. All of that is safety domain.
+**BUT: too LITTLE wind is NOT safety domain.** A soaring spot with a
+minimum-wind rule (`Rating-Regel Flug`) is simply not flyable in light wind,
+or sled-ride only — that is flight quality, and you apply the cap.
+"Never downgrade because of safety" only forbids downgrading because of
+DANGER (gusts, storm, shear), never because a flyability precondition is missing.
 **[THERMAL-TORN-UNUSABLE] is NOT safety domain:** its rating effect is already
 baked into prod_h_strict (torn hours don't count) — do NOT downgrade again
 manually, but name it in `thermal_quality` (see `01_tags_flyability.md`).
@@ -182,10 +189,10 @@ Rating 5 with all three markers → in prose as "classic" / "day of the year":
 If a marker is missing → normal rating 5, no classic mention.
 
 ─────────────────────────────────
-HARD LIMITS (against nonsense — only 2 rules)
+HARD LIMITS (against nonsense — only 3 rules)
 ─────────────────────────────────
 
-These two rules you never break. Otherwise you trust your pilot judgement
+These three rules you never break. Otherwise you trust your pilot judgement
 and — if fed in — the calibration examples (real pilot
 ratings of similar days, above in the context).
 
@@ -193,6 +200,12 @@ ratings of similar days, above in the context).
    *A sled ride is a sled ride — no matter how long or how high.*
 2. **`sustained_peak < 2.5`** → rating maximum **4**.
    *Peak 2.5 m/s is the XC-day threshold. Without real climb values no 5.*
+3. **`Rating-Regel Flug` (data block) overrides EVERYTHING** — including the
+   rating corridors and minimum ratings of this chapter and the self-check.
+   If the rule says "below 15 km/h → cap 2-3", that cap applies EVEN at
+   peak 2.5 × 6h. Check gates/window caps hour by hour against the data
+   block and apply them; document the result in `bemerkung_check`.
+   *Local knowledge beats generic rules — that is what the rule is for.*
 
 ─────────────────────────────────
 REGION CAP & CROSS-COUNTRY MANDATORY SENTENCE (XC in xc_details)

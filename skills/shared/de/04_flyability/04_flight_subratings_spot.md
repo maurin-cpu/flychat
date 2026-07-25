@@ -10,11 +10,18 @@ RATING IST FLUGQUALITAET, NICHT SAFETY
 ─────────────────────────────────
 
 Das Rating haengt AUSSCHLIESSLICH von: `sustained_peak`, `prod_h_strict`,
-`working_height_agl`, `cloud_structure`.
+`working_height_agl`, `cloud_structure` — **plus, falls vorhanden, der
+`Rating-Regel Flug` aus dem Datenblock** (Spot-Bemerkung, operationalisiert).
+Deren Gates/Caps sind Teil der Rating-Basis, kein Safety-Thema.
 
 Du **ignorierst** fuers Rating: `safety_status`, `no_go_reasons`,
 `caution_notes`, [SHEAR-*]/[THERMAL-ROUGH-*]/[THERMAL-WIND-*], Hoehenwind-Marker
 ("!", "sportlich"), Foehn, Regen, Gewitter. Alles davon ist Safety-Domain.
+**ABER: zu WENIG Wind ist KEINE Safety-Domain.** Ein Soaring-Spot mit
+Mindestwind-Regel (`Rating-Regel Flug`) ist bei Schwachwind schlicht nicht
+fliegbar bzw. nur Abgleiter — das ist Flugqualitaet, und du wendest das Cap an.
+"Nicht wegen Safety abwerten" verbietet dir nur Abwertung wegen GEFAHR
+(Boeen, Sturm, Scherung), nie wegen fehlender Fliegbarkeits-Voraussetzung.
 **[THERMAL-TORN-UNUSABLE] ist KEINE Safety-Domain:** seine Rating-Wirkung steckt
 schon in prod_h_strict (zerrissene Stunden zaehlen nicht) — manuell NICHT nochmal
 abwerten, aber in `thermal_quality` benennen (siehe `01_tags_flyability.md`).
@@ -182,10 +189,10 @@ Rating 5 mit allen drei Markern → in Prosa als "Klassiker" / "Tag des Jahres":
 Fehlt ein Marker → normales Rating 5, keine Klassiker-Erwaehnung.
 
 ─────────────────────────────────
-HARTE SCHRANKEN (gegen Unsinn — nur 2 Regeln)
+HARTE SCHRANKEN (gegen Unsinn — nur 3 Regeln)
 ─────────────────────────────────
 
-Diese zwei Regeln brichst du nie. Sonst vertraust du deinem Pilotenurteil
+Diese drei Regeln brichst du nie. Sonst vertraust du deinem Pilotenurteil
 und — falls eingespielt — den Kalibrierungs-Beispielen (echte Pilot-
 Bewertungen aehnlicher Tage, oben im Kontext).
 
@@ -193,6 +200,12 @@ Bewertungen aehnlicher Tage, oben im Kontext).
    *Abgleiter ist Abgleiter — egal wie lang oder hoch.*
 2. **`sustained_peak < 2.5`** → Rating maximal **4**.
    *Peak 2.5 m/s ist die XC-Tag-Schwelle. Ohne echte Steigwerte kein 5er.*
+3. **`Rating-Regel Flug` (Datenblock) hat Vorrang vor ALLEM** — auch vor
+   den Rating-Korridoren und Mindest-Ratings dieses Kapitels und des
+   Selbst-Checks. Sagt die Regel "unter 15 km/h → Cap 2-3", dann gilt das
+   Cap AUCH bei Peak 2.5 × 6h. Gates/Fenster-Caps stundenweise gegen den
+   Datenblock pruefen und anwenden; Ergebnis in `bemerkung_check` belegen.
+   *Lokalwissen schlaegt Generik — dafuer ist die Regel da.*
 
 ─────────────────────────────────
 REGION-CAP & STRECKENFLUG-PFLICHTSATZ (XC im xc_details)
