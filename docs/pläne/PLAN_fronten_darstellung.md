@@ -1,7 +1,15 @@
 # PLAN — Fronten auf der Synoptik-Karte
 
-**Stand:** 2026-07-26
-**Status:** Machbarkeit geprüft — **Entscheidung offen** (Variante A/B/C unten)
+**Stand:** 2026-07-26 (Machbarkeit), **revidiert am 2026-07-26 nach der Recherche**
+**Status:** Richtung entschieden — **eigene Berechnung**, validiert gegen den
+DWD-Text. Umsetzungsteil noch zu schreiben.
+
+> **Revision:** Der Machbarkeitstest in §1 hat eine **falsch parametrierte**
+> Implementierung widerlegt, nicht das Verfahren. Die Recherche
+> (`meteo_research/fronten_detektion_research.md`) zeigt fünf Abweichungen vom
+> Literatur-Standard — vor allem eine um Grössenordnungen zu schwache Glättung
+> und einen fehlenden Mindestlängen-Filter. Variante A ist damit wieder offen
+> und gewählt. §1 bleibt als Messprotokoll stehen, §3 ist überholt.
 **Betrifft:** `engine/synoptic_grid.py` · `static/js/synoptic-map.js` ·
 `static/js/synoptic-embed.js` · `skills/synoptic_overview.md` (Verbotsliste)
 
@@ -67,17 +75,19 @@ Referenz: DWD Open Data, `ana_bwkman` (Berliner Wetterkarte), 25.07.2026 12 UTC.
   DWD-Analyse nichts hat. Also **Falschmeldungen genau über dem Alpenraum**,
   dem Gebiet unserer Nutzer.
 
-### Bewertung
+### Bewertung (revidiert)
 
-Das naive TFP-Verfahren ist **nicht produktreif**. Es findet Gradientenachsen,
-aber unterscheidet nicht zwischen einer Front und einem harmlosen
-Temperaturgefälle. Ein Frontsymbol ist eine starke Aussage — ein falsches über
-den Alpen ist schlimmer als gar keines.
+Ursprüngliches Urteil: „nicht produktreif". **Das war ein Urteil über diese
+Implementierung, nicht über das Verfahren.** Die Recherche danach ergab fünf
+Abweichungen vom Standard — Θe statt Θw, eine um Grössenordnungen zu schwache
+Glättung (1 Gauss statt 8 Durchgängen), geratene statt klimatologischer
+Schwellen, mask-then-join statt contour-then-mask (versagt bei ≤ 0.75°
+nachweislich) und kein 250-km-Längenfilter. Die beobachteten Kurzfragmente
+sind genau das erwartete Bild dieser Fehler.
 
-Belastbar wäre erst die vollständige operationelle Kette (Linien-Ausdünnung,
-Kohärenz- und Längenfilter, Maskierung über die Verlagerungsgeschwindigkeit,
-mehrere Niveaus, native Modellauflösung). Das ist ein Forschungsprojekt mit
-offenem Ausgang, kein Feature.
+Was bleibt: Ein Frontsymbol ist eine starke Aussage, ein falsches über den
+Alpen schlimmer als keines. Deshalb ist die Trennung lokaler von synoptischen
+Fronten (Jenkner et al. 2010) Pflichtbestandteil, kein Extra.
 
 ---
 
@@ -100,7 +110,26 @@ nur als Ganzes oder als Ausschnitt.
 
 ---
 
-## 3. Varianten zur Entscheidung
+## 2b. Entschieden: eigene Berechnung, DWD-Text als Gegenprobe
+
+Der DWD-Text (`SXDL31` Kurzfrist, `SXDL33` Mittelfrist) benennt Fronten,
+Trogachsen und Grosswetterlage im Klartext und ist frei unter GeoNutzV. Er
+wird **nicht** als Quelle in den Wetterlage-Block gemischt — das würde das
+Grundprinzip brechen, dass der Textgenerator nur sagen darf, was unser
+Strukturfeld belegt. Er dient als **unabhängige Gegenprobe** unserer eigenen
+Berechnung.
+
+**Massstab der Gegenprobe:** Vorhandensein, Typ und Zugrichtung — nicht die
+exakte Position. Zwei unabhängige *menschliche* Analysen stimmen bei der
+genauen Frontlage nur zu 23–30 % überein (bei „Front ja/nein" in grober Zelle
+zu 84.8 %). Eine Positionsgleichheit mit der DWD-Karte anzustreben wäre ein
+Ziel, das Profis untereinander verfehlen.
+
+Der Umsetzungsteil (Fetch, Klimatologie für die Perzentil-Schwellen,
+Alpen-Trennung lokal/synoptisch, Darstellung, Validierungslauf) ist noch zu
+schreiben. Grundlage: `meteo_research/fronten_detektion_research.md` §3–§5.
+
+## 3. Varianten zur Entscheidung (überholt — Variante A ist gewählt)
 
 | | Variante | Aufwand | Was der Nutzer sieht |
 |---|---|---|---|
