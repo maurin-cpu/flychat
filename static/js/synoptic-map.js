@@ -448,20 +448,22 @@
 
     var labelPositions = [];
 
-    // Die Isobaren tragen die Karte, nicht die Flaechentoenung — umgekehrt zur
-    // ersten Fassung, in der sie bewusst blasse Fuehrungslinien waren. Grund:
-    // ueber der Toenung war die Form der Druckgebilde kaum noch zu lesen.
-    // Weiterhin kein weisser Halo und nur eine leichte Abstufung Haupt-/
-    // Nebenisobare, damit die Karte ruhig bleibt.
+    // Isobaren bewusst als LEICHTE graue Fuehrungslinien — kein harter Kontrast,
+    // kein weisser Halo (beides wirkte zu praesent ueber der Druckband-Toenung).
+    // Die Farbtoenung + H/T-Badges + Labels tragen die Lesbarkeit; die Linien
+    // geben nur die Form. Haupt-/Nebenisobaren nur minimal abgestuft, damit
+    // keine Linie "hart" heraussticht.
+    // (Ein Versuch mit dunkleren Linien war ein Rueckschritt — die Karte wurde
+    // unruhig. Die gesenkte FILL_OPACITY allein reicht fuer die Lesbarkeit.)
     isobars.forEach(function (c) {
       var isMajor = c.value % LABEL_EVERY === 0;
       c.lines.forEach(function (line) {
         L.polyline(line, {
           pane: paneName,
           interactive: false,
-          color: "#475569",              // Slate-600: klar lesbares Grau
-          weight: isMajor ? 1.2 : 0.85,
-          opacity: isMajor ? 0.78 : 0.5,
+          color: "#94a3b8",              // Slate-400: leichtes Grau
+          weight: isMajor ? 1.1 : 0.8,
+          opacity: isMajor ? 0.48 : 0.3,
           lineJoin: "round",
           lineCap: "round",
           smoothFactor: 1,

@@ -235,8 +235,15 @@
       keyboard: false,
       zoomSnap: 0,
     });
+    // Basemap wie auf /synoptik: Karte ohne Labels als Grund, darueber die
+    // Ortslabels stark gedimmt. Der Embed hatte die Label-Ebene nicht und
+    // wirkte dadurch leer — die Darstellung soll in beiden Ansichten
+    // dieselbe sein.
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd", maxZoom: 18,
+    }).addTo(map);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png", {
+      subdomains: "abcd", maxZoom: 18, opacity: 0.38,
     }).addTo(map);
 
     fitWidth(map, grid.meta);
@@ -255,14 +262,19 @@
       }).addTo(map);
     }
 
-    // Isobaren-Linien (ohne Labels — die Karte ist klein)
+    // Isobaren-Linien: exakt die Werte von /synoptik (synoptic-map.js) —
+    // leichte graue Fuehrungslinien. Der Embed hatte sie dunkler und dicker,
+    // dieselbe Lage sah damit in beiden Ansichten verschieden aus. Ohne
+    // hPa-Labels, dafuer ist die Karte hier zu klein.
     iso.forEach(function (c) {
       var isMajor = c.value % 8 === 0;
       c.lines.forEach(function (line) {
         L.polyline(line, {
-          interactive: false, color: "#475569",
-          weight: isMajor ? 1.4 : 0.8,
-          opacity: isMajor ? 0.8 : 0.5,
+          interactive: false, color: "#94a3b8",
+          weight: isMajor ? 1.1 : 0.8,
+          opacity: isMajor ? 0.48 : 0.3,
+          lineJoin: "round",
+          lineCap: "round",
           smoothFactor: 1,
         }).addTo(map);
       });
