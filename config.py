@@ -456,6 +456,42 @@ SYNOPTIC_WIND_DIST_BANDS_KMH = (10, 20, 30, 40, 50, 60)
 SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # DEPRECATED — ungenutzt (CAPE ≠ Gewitter)
 SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE = 0.10  # min. Anteil nasser Spots fuer seitenweite "Schauer"/"Regen"-Aussage; sonst trocken — verhindert dass 1-3% lokale Zellen die ganze Alpenseite als nass labeln
 
+# --- Flugwetter-Zonen (Synoptik 2.0) ------------------------------------
+# 4 Zonen als Erzaehl- und Aggregations-Einheit des Wetterlage-Blocks.
+# Zuordnung Region -> Zone steht als `zone`-Spalte in data/regionen.csv
+# (Region ist atomar — keine Region wird auf mehrere Zonen aufgeteilt).
+# Spots erben die Zone ueber ihr `analyse_region`-Feld (fluggebiete_dhv.csv).
+SYNOPTIC_ZONES = ("alpennordhang", "wallis", "tessin", "graubuenden_engadin")
+SYNOPTIC_ZONE_LABELS = {
+    "alpennordhang":       {"de": "Alpennordhang", "en": "Northern Alps"},
+    "wallis":              {"de": "Wallis", "en": "Valais"},
+    "tessin":              {"de": "Tessin", "en": "Ticino"},
+    "graubuenden_engadin": {"de": "Graubuenden & Engadin",
+                            "en": "Grisons & Engadine"},
+}
+# Tagesfenster (lokale Stunden, [start, end)) — Niederschlag/Wind werden pro
+# Fenster aggregiert, damit der Block Tagesverlauf statt Tagespauschale kann
+# ("Vormittag trocken, ab dem Nachmittag Zellen"). Vorfall 25.07.2026:
+# Tagessummen machten aus einem fliegbaren Vormittag einen "Ruhetag".
+SYNOPTIC_DAY_WINDOWS = (
+    ("morning", 6, 10),
+    ("midday", 10, 14),
+    ("afternoon", 14, 18),
+    ("evening", 18, 21),
+)
+# Stunden-Schwelle fuer "nass" innerhalb eines Fensters (mm/h) — ein Spot
+# zaehlt im Fenster als nass, wenn eine Stunde >= dieser Wert liegt.
+SYNOPTIC_PRECIP_WINDOW_WET_MM = 0.2
+# Zugbahn-Detektor: Einsetz-Zeit pro Zonen-Gruppe = erste Stunde, in der
+# der Anteil nasser Spots die ONSET_SHARE erreicht. Richtungs-Aussage erst
+# ab MIN_DIFF_H Stunden Versatz zwischen den Gruppen (sonst "gleichzeitig").
+SYNOPTIC_ZUGBAHN_ONSET_SHARE = 0.10
+SYNOPTIC_ZUGBAHN_MIN_DIFF_H = 2
+SYNOPTIC_ZUGBAHN_MIN_SPOTS = 5
+# West/Ost-Split INNERHALB des Alpennordhangs (nur fuer die Zugbahn-Messung,
+# keine Erzaehl-Einheit): westlich/oestlich dieser Laenge.
+SYNOPTIC_ZUGBAHN_WEST_OST_SPLIT_LON = 8.0
+
 # --- Schneefallgrenze (saisonal) ----------------------------------------
 # Nur Maerz-Mai und Oktober-November ausweisen (im Sommer irrelevant,
 # im Hochwinter erwartbar).

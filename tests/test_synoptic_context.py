@@ -721,5 +721,192 @@ class TestAggregateWindSide(unittest.TestCase):
         self.assertIsNone(out["wind_class"])
 
 
+# ============================================================================
+# SYNOPTIK 2.0 — FLUGWETTER-ZONEN, TAGESFENSTER, ZUGBAHN
+# ============================================================================
+
+def _spot_hours(date: str, precip_by_hour: dict, wc_by_hour: dict = None,
+                lat: float = 46.8, lon: float = 8.0, elev: int = 1500) -> dict:
+    """Baut einen weather_cache-Spot mit stuendlichem Niederschlag."""
+    wc_by_hour = wc_by_hour or {}
+    return {
+        "latitude": lat, "longitude": lon, "elevation_m": elev,
+        "hourly_data": {
+            f"{date}T{h:02d}:00": {
+                "precipitation": precip_by_hour.get(h, 0.0),
+                "weather_code": wc_by_hour.get(h, 3),
+                "cape": 500,
+                "precipitation_coverage": 0.5,
+                "wind_gusts_10m": 10.0,
+            } for h in range(6, 21)
+        },
+        "pressure_level_data": {},
+    }
+
+
+class TestZoneMapping(unittest.TestCase):
+    def test_maps_all_spots_to_valid_zones(self):
+        """Kette Spot -> analyse_region -> regionen.csv[zone] muss fuer alle
+        Spots aufgehen; ohne das kippen ganze Zonen-Aggregate stillschweigend
+        auf 0 Spots."""
+        zm = sc.build_spot_zone_map()
+        self.assertGreater(len(zm), 100)
+        self.assertTrue(set(zm.values()) <= set(config.SYNOPTIC_ZONES))
+        # jede Zone muss echte Spots haben
+        for zone in config.SYNOPTIC_ZONES:
+            self.assertGreater(sum(1 for v in zm.values() if v == zone), 0,
+                               f"Zone {zone} hat keine Spots")
+
+    def test_fallback_for_unmapped_spot(self):
+        self.assertEqual(sc._classify_zone_fallback(46.2, 8.8), "tessin")
+        self.assertEqual(sc._classify_zone_fallback(46.2, 7.4), "wallis")
+        self.assertEqual(sc._classify_zone_fallback(46.8, 9.8),
+                         "graubuenden_engadin")
+        self.assertEqual(sc._classify_zone_fallback(47.0, 7.5), "alpennordhang")
+        self.assertIsNone(sc._classify_zone_fallback(None, None))
+
+
+class TestP90(unittest.TestCase):
+    """P90 statt Maximum — ein Einzelspot-Extrem (Gletscher-Spot mit
+    35 mm/h) darf nicht das Bild fuer eine ganze Zone praegen."""
+
+    def test_ignores_single_outlier(self):
+        values = [0.0] * 19 + [35.6]
+        self.assertLess(sc._p90(values), 1.0)
+
+    def test_carries_broad_signal(self):
+        values = [5.0] * 20
+        self.assertEqual(sc._p90(values), 5.0)
+
+    def test_empty(self):
+        self.assertEqual(sc._p90([]), 0.0)
+
+
+class TestPrecipZones(unittest.TestCase):
+    DATE = "2026-07-25"
+
+    def _cache(self):
+        # Nordhang: trocken bis 14 Uhr, dann nass (der 25.07.-Fall)
+        nord = {h: (0.0 if h < 14 else 3.0) for h in range(6, 21)}
+        # Tessin: ganztags trocken
+        dry = {h: 0.0 for h in range(6, 21)}
+        return {
+            "NordA": _spot_hours(self.DATE, nord),
+            "NordB": _spot_hours(self.DATE, nord),
+            "TessinA": _spot_hours(self.DATE, dry),
+        }
+
+    def _zone_map(self):
+        return {"NordA": "alpennordhang", "NordB": "alpennordhang",
+                "TessinA": "tessin"}
+
+    def test_windows_preserve_time_axis(self):
+        out = sc.decide_precip_pattern_zones(self._cache(), [self.DATE],
+                                             self._zone_map())
+        wins = out["per_day"][0]["zones"]["alpennordhang"]["windows"]
+        self.assertEqual(wins["morning"]["wet_share"], 0.0)
+        self.assertEqual(wins["midday"]["wet_share"], 0.0)
+        self.assertEqual(wins["afternoon"]["wet_share"], 1.0)
+        self.assertEqual(wins["evening"]["wet_share"], 1.0)
+        # Tagespauschale wuerde denselben Tag als durchgehend nass zeigen
+        self.assertEqual(
+            out["per_day"][0]["zones"]["alpennordhang"]["day"]["wet_share"], 1.0)
+
+    def test_zones_are_separated(self):
+        out = sc.decide_precip_pattern_zones(self._cache(), [self.DATE],
+                                             self._zone_map())
+        zones = out["per_day"][0]["zones"]
+        self.assertEqual(zones["tessin"]["day"]["wet_share"], 0.0)
+        self.assertEqual(zones["tessin"]["windows"]["evening"]["wet_share"], 0.0)
+        # Zonen ohne Spots liefern n_spots=0 statt zu fehlen
+        self.assertEqual(zones["wallis"]["day"]["n_spots"], 0)
+
+    def test_gewitter_share_not_rounded_away(self):
+        """1 Gewitterzelle unter vielen Spots darf nicht auf 0.0 runden —
+        die Skill-Regel 'Gewitter nur bei gewitter_share > 0' haengt daran."""
+        cache = {f"S{i}": _spot_hours(self.DATE, {h: 0.0 for h in range(6, 21)})
+                 for i in range(200)}
+        cache["S0"] = _spot_hours(self.DATE, {17: 5.0}, wc_by_hour={17: 95})
+        zm = {k: "alpennordhang" for k in cache}
+        out = sc.decide_precip_pattern_zones(cache, [self.DATE], zm)
+        day = out["per_day"][0]["zones"]["alpennordhang"]["day"]
+        self.assertGreater(day["gewitter_share"], 0.0)
+        self.assertEqual(day["max_wc"], 95)
+
+
+class TestZugbahn(unittest.TestCase):
+    DATE = "2026-07-25"
+
+    def _cache(self, west_onset: int, ost_onset: int):
+        cache = {}
+        for i in range(6):
+            cache[f"W{i}"] = _spot_hours(
+                self.DATE, {h: (3.0 if h >= west_onset else 0.0)
+                            for h in range(6, 21)}, lon=7.0)
+            cache[f"O{i}"] = _spot_hours(
+                self.DATE, {h: (3.0 if h >= ost_onset else 0.0)
+                            for h in range(6, 21)}, lon=9.0)
+        return cache
+
+    def _zm(self, cache):
+        return {k: "alpennordhang" for k in cache}
+
+    def test_detects_west_to_east(self):
+        cache = self._cache(west_onset=13, ost_onset=18)
+        out = sc.decide_zugbahn(cache, [self.DATE], self._zm(cache))
+        day = out["per_day"][0]
+        self.assertEqual(day["onset_hour_by_group"]["alpennordhang_west"], 13)
+        self.assertEqual(day["onset_hour_by_group"]["alpennordhang_ost"], 18)
+        self.assertEqual(day["movement"]["west_ost"], "west_nach_ost")
+
+    def test_simultaneous_when_diff_below_threshold(self):
+        cache = self._cache(west_onset=14, ost_onset=15)
+        out = sc.decide_zugbahn(cache, [self.DATE], self._zm(cache))
+        self.assertEqual(out["per_day"][0]["movement"]["west_ost"],
+                         "gleichzeitig")
+
+    def test_no_movement_on_dry_day(self):
+        cache = {f"W{i}": _spot_hours(self.DATE, {}, lon=7.0) for i in range(6)}
+        out = sc.decide_zugbahn(cache, [self.DATE], self._zm(cache))
+        day = out["per_day"][0]
+        self.assertIsNone(day["onset_hour_by_group"]["alpennordhang_west"])
+        self.assertIsNone(day["movement"]["west_ost"])
+
+    def test_ignores_groups_below_min_spots(self):
+        """Eine Gruppe mit zu wenigen Spots darf keine Richtungsaussage
+        tragen (sonst entscheidet ein Einzelspot die Zugbahn)."""
+        cache = {"W0": _spot_hours(self.DATE, {h: 3.0 for h in range(6, 21)},
+                                   lon=7.0)}
+        out = sc.decide_zugbahn(cache, [self.DATE], self._zm(cache))
+        self.assertIsNone(
+            out["per_day"][0]["onset_hour_by_group"]["alpennordhang_west"])
+
+
+class TestWindZones(unittest.TestCase):
+    DATE = "2026-07-25"
+
+    def test_window_shares_and_day_class(self):
+        # Boeen ueber Gefahrenschwelle nur am Nachmittag
+        spot = _spot_hours(self.DATE, {})
+        for h in range(6, 21):
+            spot["hourly_data"][f"{self.DATE}T{h:02d}:00"]["wind_gusts_10m"] = (
+                60.0 if h >= 14 else 5.0)
+        cache = {"A": spot}
+        out = sc.decide_wind_pattern_zones(cache, [self.DATE],
+                                           {"A": "alpennordhang"})
+        z = out["per_day"][0]["zones"]["alpennordhang"]
+        self.assertEqual(z["windows"]["morning"]["share_wind_crit"], 0.0)
+        self.assertEqual(z["windows"]["afternoon"]["share_wind_crit"], 1.0)
+        self.assertEqual(z["wind_class"], "verblasen")
+
+    def test_zone_without_spots_is_empty_not_missing(self):
+        out = sc.decide_wind_pattern_zones({"A": _spot_hours(self.DATE, {})},
+                                           [self.DATE], {"A": "tessin"})
+        zones = out["per_day"][0]["zones"]
+        for zone in config.SYNOPTIC_ZONES:
+            self.assertIn(zone, zones)
+        self.assertEqual(zones["wallis"]["n_spots"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2141,35 +2141,48 @@
       : "";
     const shortText = overview.short || "";
     const longText = overview.long || "";
+
+    // Ein Tages-Eintrag: "Wochentag:" am Zeilenanfang wird als <strong>
+    // hervorgehoben, flight_hint (optional) darunter als Pilotensicht-Zeile —
+    // visuell deutlich von der Wetterbeschreibung getrennt.
+    const dayBlockHtml = (e) => {
+      const txt = escapeHtml(e.text);
+      const hint = e.flight_hint ? escapeHtml(e.flight_hint) : "";
+      const hintHtml = hint
+        ? `<p class="bf-wetterlage-hint"><span class="bf-wetterlage-hint-icon" aria-hidden="true">⏵</span> ${hint}</p>`
+        : "";
+      const m = txt.match(/^(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*/);
+      const body = m
+        ? `<p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>`
+        : `<p class="bf-wetterlage-lead">${txt}</p>`;
+      return `<div class="bf-wetterlage-day-block">${body}${hintHtml}</div>`;
+    };
+
+    // Synoptik 2.0: `zones` = 4 Flugwetter-Zonen mit je einem Eintrag pro Tag.
+    // Legacy-Fallback (`long_with_sources`) bleibt fuer alte Caches bestehen,
+    // damit ein noch nicht refreshter Cache den Block nicht leert.
+    const zones = Array.isArray(overview.zones)
+      ? overview.zones.filter(z => z && Array.isArray(z.days) && z.days.length)
+      : [];
     const longEntries = Array.isArray(overview.long_with_sources)
       ? overview.long_with_sources.filter(e => e && e.text)
       : [];
 
-    // Pro Eintrag (Einleitung + per-Tag-Block) ein eigener Paragraph,
-    // damit die MeteoSchweiz-aehnliche Tagesstruktur lesbar wird.
-    // "Wochentag:" am Zeilenanfang wird als <strong> hervorgehoben.
-    // flight_hint (optional) wird darunter als kursive Pilotensicht-Zeile
-    // angefuegt — visuell deutlich von der Wetterbeschreibung getrennt.
-    const longHtml = longEntries.length
-      ? longEntries.map(e => {
-          const txt = escapeHtml(e.text);
-          const hint = e.flight_hint ? escapeHtml(e.flight_hint) : "";
-          const hintHtml = hint
-            ? `<p class="bf-wetterlage-hint"><span class="bf-wetterlage-hint-icon" aria-hidden="true">⏵</span> ${hint}</p>`
-            : "";
-          const m = txt.match(/^(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*/);
-          if (m) {
-            return `<div class="bf-wetterlage-day-block">
-              <p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>
-              ${hintHtml}
-            </div>`;
-          }
-          return `<div class="bf-wetterlage-day-block">
-            <p class="bf-wetterlage-lead">${txt}</p>
-            ${hintHtml}
-          </div>`;
-        }).join("")
-      : `<p>${escapeHtml(longText)}</p>`;
+    let longHtml;
+    if (zones.length) {
+      longHtml = zones.map(z => `
+        <section class="bf-wetterlage-zone">
+          <h4 class="bf-wetterlage-zone-title">${escapeHtml(z.label || z.zone || "")}</h4>
+          ${z.days.filter(d => d && d.text).map(dayBlockHtml).join("")}
+        </section>
+      `).join("");
+    } else if (longEntries.length) {
+      longHtml = longEntries.map(dayBlockHtml).join("");
+    } else {
+      longHtml = `<p>${escapeHtml(longText)}</p>`;
+    }
+    const hasLong = zones.length > 0 || longEntries.length > 0
+      || (longText && longText !== shortText);
 
     // `short` enthaelt jetzt Synoptik + Flug-Bilanz als EINEN Fliesstext
     // (siehe synoptic_overview.md Skill). Wird als ein Absatz gerendert.
@@ -2190,7 +2203,7 @@
         <a class="bf-wetterlage-maplink" href="/synoptik">${escapeHtml(wcT("js.wetterlage.to_map"))} →</a>
       </div>
       <div class="bf-wetterlage-summary">${summaryParas}</div>
-      ${longText && longText !== shortText ? `
+      ${hasLong ? `
         <button type="button" class="bf-wetterlage-toggle" aria-expanded="${state.wetterlageOpen ? "true" : "false"}">
           ${state.wetterlageOpen ? wcT("js.wetterlage.less") : wcT("js.wetterlage.detail")} <span class="bf-wetterlage-chevron" aria-hidden="true">▾</span>
         </button>

@@ -5,11 +5,14 @@ und laesst den LLM daraus eine Prosa-Version generieren (lead + days).
 
 Architektur (ersetzt den alten Loesch-Post-Filter):
   1. LLM bekommt nur das fertige Strukturfeld, keine Rohzahlen.
-  2. Output-Format ist flach: {"lead": str, "days": [{text, flight_hint}]}
-     — Zuordnung days[i] <-> forecast_dates[i] per POSITION. Die alte
-     Source-Tag-Pflicht ist abgeschafft: sie hat nur Formfehler produziert
-     (invalid_source loeschte am 05.07.2026 den halben Ueberblick) und
-     keine echte Halluzinations-Sicherheit gebracht.
+  2. Output-Format (Synoptik 2.0, Zonen):
+     {"lead": str,
+      "zones": [{"zone": <id>, "days": [{text, flight_hint}]}, ...]}
+     — Zuordnung days[i] <-> forecast_dates[i] per POSITION, Zonen ueber
+     die zone-ID (nicht ueber die Reihenfolge). Die alte Source-Tag-Pflicht
+     ist abgeschafft: sie hat nur Formfehler produziert (invalid_source
+     loeschte am 05.07.2026 den halben Ueberblick) und keine echte
+     Halluzinations-Sicherheit gebracht.
   3. _validate() prueft INHALTLICH (Verbotsbegriffe, erfundene Regionen,
      Foehn-Lee-Inversion, Schema/Vollstaendigkeit) — und loescht NICHTS.
   4. Bei Fehlern bekommt der LLM eine Korrektur-Nachricht mit der konkreten
@@ -32,8 +35,11 @@ from engine._common import _weekday_de, _WOCHENTAGE
 
 logger = logging.getLogger(__name__)
 
-# Max. LLM-Versuche pro Overview (1 Erstversuch + 2 Korrektur-Runden).
-_MAX_ATTEMPTS = 3
+# Max. LLM-Versuche pro Overview (1 Erstversuch + 3 Korrektur-Runden).
+# 3 war zu knapp: Der Zonen-Block hat mehr Pruefflaechen als v1.0 (4 Zonen ×
+# Tage statt einer flachen Liste), und am 25.07.2026 brauchte ein Lauf genau
+# 3/3 — ohne Reserve. Die 4. Runde kostet nur im Fehlerfall einen Call.
+_MAX_ATTEMPTS = 4
 
 _WEEKDAYS_EN = ("Monday", "Tuesday", "Wednesday", "Thursday",
                 "Friday", "Saturday", "Sunday")
@@ -75,7 +81,16 @@ _FORBIDDEN_PATTERNS = [
     # "Trog" / "Ruecken" als synoptische Etiketten — auf wortgrenze isolieren
     re.compile(r"\btrog\b", re.IGNORECASE),
     re.compile(r"\bruecken\b", re.IGNORECASE),
+    # "CAPE" ist Modell-Jargon. Der Skill verlangt die Uebersetzung in
+    # Pilotensprache ("labile Luft", "Ueberentwicklungs-Potenzial") —
+    # der DE-Lauf 26.07.2026 schrieb trotzdem "labile Luft und hoher CAPE".
+    re.compile(r"\bcape\b", re.IGNORECASE),
 ]
+
+# Foehn-Erwaehnung in beliebiger Schreibweise (Nordfoehn, Foehnschneise,
+# "foehn corridor"). Zulaessig nur an Tagen, an denen das Strukturfeld
+# Foehn wirklich meldet — sonst ist es eine erfundene Gefahrenlage.
+_FOEHN_MENTION_RE = re.compile(r"f(?:oe|ö|o)hn", re.IGNORECASE)
 
 
 # ============================================================================
@@ -126,10 +141,12 @@ def generate_synoptic_overview(synoptic_context: dict, analysis_client,
     Admin per Mail alarmiert.
 
     Returns:
-        {"short": str, "long": str, "long_with_sources": [{text, flight_hint}],
+        {"short": str,                      # lead (Mail + UI-Kurzfassung)
+         "zones": [{"zone", "label", "days": [{text, flight_hint}]}],
+         "long": str, "long_with_sources": [...],   # Legacy-Kompatibilitaet
          "attempts": int, "unresolved": [str], "generated_at": str}
-        — Feldnamen short/long/long_with_sources bleiben aus Kompatibilitaet
-        zu briefing.js / email_service erhalten (lead -> short, days -> long).
+        — short/long/long_with_sources bleiben fuer Konsumenten ohne
+        Zonen-Support erhalten (long_with_sources = groesste Zone).
         None nur bei API-Totalausfall oder wenn gar nichts Valides uebrig ist.
     """
     if not synoptic_context:
@@ -253,7 +270,8 @@ def _build_correction_message(errors: list) -> str:
         "Deine letzte Antwort hatte folgende Fehler:\n"
         f"{lines}\n\n"
         "Erzeuge das KOMPLETTE JSON neu (gleiches Format: "
-        '{"lead": "...", "days": [{"text": "...", "flight_hint": "..."}]}) '
+        '{"lead": "...", "zones": [{"zone": "<zone_id>", '
+        '"days": [{"text": "...", "flight_hint": "..."}]}]}) '
         "und behebe ALLE genannten Punkte. Alle uebrigen Regeln aus dem "
         "System-Prompt gelten unveraendert. Nur das JSON, kein Kommentar."
     )
@@ -292,19 +310,52 @@ _PRAISE_RE = re.compile(
 _WINDY_CLASSES = {"verblasen", "stark_eingeschraenkt"}
 
 
-def _day_wind_classes(ctx: dict, i: int) -> tuple:
-    """(nord_class, sued_class) fuer Forecast-Tag i, oder (None, None)."""
-    wp = ctx.get("wind_pattern") or {}
-    per_day = wp.get("per_day") or []
+def _zone_wind_class(ctx: dict, zone: str, i: int) -> Optional[str]:
+    """wind_class einer Zone am Forecast-Tag i (aus wind_zones), oder None."""
+    wz = ctx.get("wind_zones") or {}
+    per_day = wz.get("per_day") or []
     if i >= len(per_day):
-        return None, None
-    d = per_day[i]
-    return ((d.get("alpennord") or {}).get("wind_class"),
-            (d.get("alpensued") or {}).get("wind_class"))
+        return None
+    return (((per_day[i].get("zones") or {}).get(zone) or {})
+            .get("wind_class"))
+
+
+def _zone_gewitter_share(ctx: dict, zone: str, i: int) -> Optional[float]:
+    """gewitter_share (Tages-Aggregat) einer Zone am Tag i, oder None."""
+    pz = ctx.get("precip_zones") or {}
+    per_day = pz.get("per_day") or []
+    if i >= len(per_day):
+        return None
+    day = (((per_day[i].get("zones") or {}).get(zone) or {}).get("day") or {})
+    share = day.get("gewitter_share")
+    return share if isinstance(share, (int, float)) else None
+
+
+# Gewitter-Wortfeld. gewitter_share (weather_code 95/96/99) ist laut Skill
+# das EINZIGE Gewitter-Signal — hohe CAPE allein heisst "labile Luft".
+_GEWITTER_RE = re.compile(r"(gewitter|thunderstorm|thunder\b)", re.IGNORECASE)
+
+
+# Zone(n), die bei aktivem Foehn die boeige LEE-Seite sind — dort sind
+# Ruhe-/Schutz-Behauptungen im Zonentext auch OHNE Regionen-Token falsch.
+_FOEHN_LEE_ZONES = {
+    "nord": ("tessin",),                      # Nordfoehn -> Tessin ist Lee
+    "sued": ("alpennordhang", "wallis"),      # Suedfoehn -> Nordseite/Foehntaeler
+}
+
+_CALM_CLAIM_RE = re.compile(
+    r"(windgeschuetzt|windgeschützt|geschuetzt|geschützt|"
+    r"sheltered|protected|windstill|windless|ruhig|windarm|windschwach|calm)",
+    re.IGNORECASE,
+)
 
 
 def _validate(parsed: dict, ctx: dict) -> list:
-    """Prueft den LLM-Output inhaltlich und strukturell.
+    """Prueft den LLM-Output (Zonen-Format) inhaltlich und strukturell.
+
+    Erwartetes Format:
+      {"lead": str,
+       "zones": [{"zone": <zone_id>, "days": [{text, flight_hint}, ...]}, ...]}
 
     Liefert eine Fehlerliste [{scope, kind, message}] — leere Liste = OK.
     Loescht bewusst NICHTS: die Reaktion (Korrektur-Runde / chirurgisches
@@ -320,7 +371,7 @@ def _validate(parsed: dict, ctx: dict) -> list:
     if not isinstance(lead, str) or not lead.strip():
         errors.append(_verr("lead", "schema",
                             "`lead` fehlt oder ist leer — Pflichtfeld "
-                            "(Fliesstext-String, 5-7 Saetze, max 150 Woerter)."))
+                            "(Fliesstext-String, 4-6 Saetze, max 130 Woerter)."))
     else:
         bad = _find_forbidden_term(lead)
         if bad:
@@ -333,37 +384,85 @@ def _validate(parsed: dict, ctx: dict) -> list:
             errors.append(_verr("lead", "invalid_region",
                                 f"`lead` nennt Druckzentren-Regionen, die im "
                                 f"Strukturfeld NICHT detektiert sind: "
-                                f"{invalid_regions}. Nur die gelieferten "
-                                f"region_label verwenden."))
+                                f"{invalid_regions}. Erlaubt sind ausschliesslich "
+                                f"diese region_label: {_allowed_centers(valid_centers)}. "
+                                f"Streiche die erfundene Region ersatzlos oder "
+                                f"ersetze sie durch ein erlaubtes Label."))
         n_words = len(lead.split())
-        if n_words > 170:
+        if n_words > 150:
             errors.append(_verr("lead", "too_long",
                                 f"`lead` hat {n_words} Woerter — erlaubt sind "
-                                f"max 150. Kuerzen."))
+                                f"max 130. Kuerzen."))
 
-    # --- days: Schema + Vollstaendigkeit ---------------------------------
-    days = parsed.get("days")
+    # --- zones: Schema + Vollstaendigkeit --------------------------------
+    zones = parsed.get("zones")
+    if not isinstance(zones, list):
+        errors.append(_verr("zones", "schema",
+                            "`zones` fehlt oder ist keine Liste — Pflichtfeld "
+                            "(ein Eintrag pro Zone: "
+                            f"{list(config.SYNOPTIC_ZONES)})."))
+        return errors
+
+    seen_zones = []
+    for j, z in enumerate(zones):
+        if not isinstance(z, dict):
+            errors.append(_verr(f"zones[{j}]", "schema",
+                                "Zonen-Eintrag muss ein Objekt sein "
+                                '({"zone": "...", "days": [...]}).'))
+            continue
+        zone_id = z.get("zone")
+        if zone_id not in config.SYNOPTIC_ZONES:
+            errors.append(_verr(f"zones[{j}]", "unknown_zone",
+                                f"`zone`={zone_id!r} ist keine gueltige Zone. "
+                                f"Erlaubt sind exakt diese IDs: "
+                                f"{list(config.SYNOPTIC_ZONES)}."))
+            continue
+        seen_zones.append(zone_id)
+        errors.extend(_validate_zone(z, zone_id, ctx, fc_dates,
+                                     valid_centers, foehn))
+
+    missing = [z for z in config.SYNOPTIC_ZONES if z not in seen_zones]
+    if missing:
+        errors.append(_verr("zones", "incomplete",
+                            f"Es fehlen Zonen: {missing}. Jede der "
+                            f"{len(config.SYNOPTIC_ZONES)} Zonen braucht genau "
+                            f"einen Eintrag — auch wenn dort wenig passiert."))
+    dupes = [z for z in set(seen_zones) if seen_zones.count(z) > 1]
+    if dupes:
+        errors.append(_verr("zones", "duplicate",
+                            f"Zonen doppelt vorhanden: {dupes}. Genau ein "
+                            f"Eintrag pro Zone."))
+
+    return errors
+
+
+def _validate_zone(z: dict, zone_id: str, ctx: dict, fc_dates: list,
+                   valid_centers: set, foehn: dict) -> list:
+    """Prueft einen Zonen-Eintrag (days-Vollstaendigkeit + Inhalt pro Tag)."""
+    errors = []
+    days = z.get("days")
     if not isinstance(days, list):
-        errors.append(_verr("days", "schema",
-                            "`days` fehlt oder ist keine Liste — Pflichtfeld "
-                            "(ein Eintrag pro forecast_date, gleiche Reihenfolge)."))
+        errors.append(_verr(f"zones[{zone_id}]", "schema",
+                            "`days` fehlt oder ist keine Liste — ein Eintrag "
+                            "pro forecast_date, gleiche Reihenfolge."))
         return errors
     if fc_dates and len(days) != len(fc_dates):
-        errors.append(_verr("days", "schema",
+        errors.append(_verr(f"zones[{zone_id}]", "schema",
                             f"`days` hat {len(days)} Eintraege, erwartet "
                             f"{len(fc_dates)} — exakt einer pro Tag in "
                             f"forecast_dates-Reihenfolge, keiner fehlt, "
                             f"keiner doppelt."))
 
-    # --- days: Inhalt pro Eintrag ----------------------------------------
     for i, d in enumerate(days):
-        scope = f"days[{i}]"
+        scope = f"zones[{zone_id}].days[{i}]"
         if not isinstance(d, dict) or not isinstance(d.get("text"), str) \
                 or not d["text"].strip():
             errors.append(_verr(scope, "schema",
                                 "Eintrag braucht ein nicht-leeres `text`-Feld."))
             continue
         text = d["text"]
+        hint = d.get("flight_hint")
+        hint_str = hint if isinstance(hint, str) else ""
 
         bad = _find_forbidden_term(text)
         if bad:
@@ -375,34 +474,83 @@ def _validate(parsed: dict, ctx: dict) -> list:
         if invalid_regions:
             errors.append(_verr(scope, "invalid_region",
                                 f"`text` nennt nicht detektierte Regionen: "
-                                f"{invalid_regions}."))
+                                f"{invalid_regions}. Erlaubt sind ausschliesslich "
+                                f"diese region_label: "
+                                f"{_allowed_centers(valid_centers)}."))
 
+        # --- Foehn-Lee: zonen-basiert (der Zonentext nennt die Region oft
+        # gar nicht mehr — die Zone IST die Ortsangabe) + Text-Heuristik.
         active_side = _foehn_active_side(foehn, fc_dates, i)
-        if active_side and _text_inverts_foehn_lee(text, active_side):
-            lee = "Alpensuedseite" if active_side == "nord" else "Alpennordseite"
-            errors.append(_verr(scope, "foehn_lee_inversion",
-                                f"An diesem Tag ist {active_side.capitalize()}foehn "
-                                f"aktiv — die {lee} ist die boeige LEE-Seite und "
-                                f"darf NICHT als geschuetzt/ruhig beschrieben "
-                                f"werden."))
+        if active_side:
+            lee_zones = _FOEHN_LEE_ZONES.get(active_side, ())
+            calm_hit = (_CALM_CLAIM_RE.search(text)
+                        or _CALM_CLAIM_RE.search(hint_str))
+            if zone_id in lee_zones and calm_hit:
+                errors.append(_verr(scope, "foehn_lee_inversion",
+                                    f"An diesem Tag ist "
+                                    f"{active_side.capitalize()}foehn aktiv — "
+                                    f"diese Zone ist die boeige LEE-Seite. Das "
+                                    f"Wort {calm_hit.group(0)!r} ist hier "
+                                    f"verboten, in `text` UND in `flight_hint`. "
+                                    f"Trocken/sonnig darfst du schreiben — der "
+                                    f"Wind-Teil MUSS aber die Boeigkeit nennen. "
+                                    f"Baumuster: '<trocken/sonnig>, aber "
+                                    f"boeiger {active_side.capitalize()}foehn "
+                                    f"in den Lee-Taelern'. Ersetze das Wort, "
+                                    f"streiche es nicht bloss."))
+            elif _text_inverts_foehn_lee(text, active_side) or \
+                    _text_inverts_foehn_lee(hint_str, active_side):
+                lee = "Alpensuedseite" if active_side == "nord" else "Alpennordseite"
+                errors.append(_verr(scope, "foehn_lee_inversion",
+                                    f"{active_side.capitalize()}foehn aktiv — die "
+                                    f"{lee} ist die boeige LEE-Seite und darf "
+                                    f"nicht als geschuetzt/ruhig gelten."))
+        else:
+            # Kein Foehn an DIESEM Tag: `foehn.active` gilt fuer den ganzen
+            # Zeitraum, die Gefahr aber nur an `days_affected`. Ohne diese
+            # Pruefung wandert die Foehn-Warnung auf ruhige Tage (DE-Lauf
+            # 26.07.2026: "Foehnschneisen kritisch" an einem foehnfreien Tag).
+            foehn_hit = (_FOEHN_MENTION_RE.search(text)
+                         or _FOEHN_MENTION_RE.search(hint_str))
+            if foehn_hit:
+                errors.append(_verr(scope, "foehn_not_active",
+                                    f"An diesem Tag meldet das Strukturfeld "
+                                    f"KEINEN Foehn — {foehn_hit.group(0)!r} darf "
+                                    f"hier nicht vorkommen, weder in `text` noch "
+                                    f"in `flight_hint`. Boeigkeit ohne Foehn "
+                                    f"benennen (z.B. 'boeiger Talwind', "
+                                    f"'starker Hoehenwind') oder weglassen."))
 
-        # Wind-Konsistenz: an Tagen, die auf BEIDEN Seiten windkritisch
-        # klassifiziert sind, darf der Tag nicht pauschal gelobt werden.
-        nord_cls, sued_cls = _day_wind_classes(ctx, i)
-        both_windy = (nord_cls in _WINDY_CLASSES and sued_cls in _WINDY_CLASSES)
-        if both_windy:
-            hint_str = d.get("flight_hint") if isinstance(d.get("flight_hint"), str) else ""
+        # --- Gewitter nur mit Modell-Gewitter im Ruecken. Die Skill-Regel
+        # ("nur bei gewitter_share > 0") war bisher nirgends verankert —
+        # hohe CAPE verleitet den LLM zur Gewitter-Prosa (DE-Lauf
+        # 26.07.2026: "Schauer und Gewitter" bei CAPE 1360, share 0).
+        gew_share = _zone_gewitter_share(ctx, zone_id, i)
+        if gew_share == 0:
+            gew_hit = (_GEWITTER_RE.search(text)
+                       or _GEWITTER_RE.search(hint_str))
+            if gew_hit:
+                errors.append(_verr(scope, "gewitter_without_signal",
+                                    f"`gewitter_share` ist an dem Tag in dieser "
+                                    f"Zone 0 — {gew_hit.group(0)!r} ist damit "
+                                    f"nicht gedeckt. Hohe CAPE allein heisst "
+                                    f"'labile Luft' / 'Ueberentwicklung "
+                                    f"moeglich', NICHT Gewitter."))
+
+        # --- Wind-Konsistenz: jetzt PRO ZONE (frueher nur wenn BEIDE
+        # Alpenseiten windkritisch waren — eine verblasene Zone neben einer
+        # ruhigen rutschte damit durch).
+        wind_class = _zone_wind_class(ctx, zone_id, i)
+        if wind_class in _WINDY_CLASSES:
             praise = _PRAISE_RE.search(text) or _PRAISE_RE.search(hint_str)
             if praise:
                 errors.append(_verr(scope, "wind_contradiction",
-                                    f"Der Tag ist laut `wind_pattern` auf beiden "
-                                    f"Alpenseiten windkritisch (Nord: {nord_cls}, "
-                                    f"Sued: {sued_cls}), wird aber gelobt "
-                                    f"('{praise.group(0)}'). Wortwahl muss die "
-                                    f"Windlage widerspiegeln: 'vielerorts zu "
-                                    f"windig' / 'nur windgeschuetzte Lagen'."))
+                                    f"Diese Zone ist an dem Tag laut "
+                                    f"`wind_day.wind_class` '{wind_class}', wird "
+                                    f"aber gelobt ('{praise.group(0)}'). Wortwahl "
+                                    f"muss die Windlage widerspiegeln: 'vielerorts "
+                                    f"zu windig' / 'nur windgeschuetzte Lagen'."))
 
-        hint = d.get("flight_hint")
         if not isinstance(hint, str) or len(hint.strip()) < 3:
             errors.append(_verr(scope, "schema",
                                 "`flight_hint` fehlt — Pflichtfeld (EIN kurzer "
@@ -413,11 +561,6 @@ def _validate(parsed: dict, ctx: dict) -> list:
                 errors.append(_verr(scope, "forbidden_term",
                                     f"`flight_hint` enthaelt einen verbotenen "
                                     f"Begriff (Muster: {bad})."))
-            if active_side and _text_inverts_foehn_lee(hint, active_side):
-                errors.append(_verr(scope, "foehn_lee_inversion",
-                                    f"`flight_hint` beschreibt die Foehn-Lee-"
-                                    f"Seite als geschuetzt/ruhig, obwohl "
-                                    f"{active_side.capitalize()}foehn aktiv ist."))
 
     return errors
 
@@ -439,13 +582,16 @@ def _finalize(parsed: dict, ctx: dict, attempts: int,
     Feldnamen im Rueckgabewert bleiben aus Kompatibilitaet zum Frontend
     (briefing.js) und zur Mail (email_service) short/long/long_with_sources.
     """
+    import i18n
+    lang = "en" if i18n.get_current_lang() == "en" else "de"
+
     fc_dates = ctx.get("forecast_dates") or []
     valid_centers = _collect_valid_center_labels(ctx)
     foehn = ctx.get("foehn") or {}
 
     lead = parsed.get("lead") if isinstance(parsed.get("lead"), str) else ""
     lead = lead.strip()
-    days_raw = parsed.get("days") if isinstance(parsed.get("days"), list) else []
+    zones_raw = parsed.get("zones") if isinstance(parsed.get("zones"), list) else []
 
     if prune and lead:
         if _find_forbidden_term(lead) or \
@@ -453,59 +599,91 @@ def _finalize(parsed: dict, ctx: dict, attempts: int,
             logger.warning("Nicht behebbarer lead entfernt: '%s'", lead)
             lead = ""
 
-    entries = []
-    for i, d in enumerate(days_raw):
-        if not isinstance(d, dict):
+    by_zone = {}
+    for z in zones_raw:
+        if not isinstance(z, dict):
             continue
-        text = d.get("text")
-        if not isinstance(text, str) or not text.strip():
+        zone_id = z.get("zone")
+        if zone_id not in config.SYNOPTIC_ZONES or zone_id in by_zone:
             continue
-        text = text.strip()
-
-        # Wochentag-Praefix VOR dem Prune autoritativ setzen — Position i
-        # gilt fuer forecast_dates[i], unabhaengig davon was spaeter faellt.
-        text = _apply_weekday_prefix(text, fc_dates, i)
-
-        active_side = _foehn_active_side(foehn, fc_dates, i)
-        if prune:
-            if _find_forbidden_term(text) or \
-                    _check_pressure_region_mentions(text, valid_centers) or \
-                    (active_side and _text_inverts_foehn_lee(text, active_side)):
-                logger.warning("Nicht behebbarer days-Eintrag entfernt "
-                               "(day %d): '%s'", i + 1, text)
+        days_raw = z.get("days") if isinstance(z.get("days"), list) else []
+        entries = []
+        for i, d in enumerate(days_raw):
+            if not isinstance(d, dict):
                 continue
+            text = d.get("text")
+            if not isinstance(text, str) or not text.strip():
+                continue
+            text = text.strip()
 
-        entry = {"text": text}
-        hint = d.get("flight_hint")
-        if isinstance(hint, str) and len(hint.strip()) >= 3:
-            hint = hint.strip()
-            if prune and (_find_forbidden_term(hint) or
-                          (active_side and
-                           _text_inverts_foehn_lee(hint, active_side))):
-                logger.warning("Nicht behebbarer flight_hint entfernt "
-                               "(day %d): '%s'", i + 1, hint)
-            else:
-                entry["flight_hint"] = hint
-        entries.append(entry)
+            # Wochentag-Praefix VOR dem Prune autoritativ setzen — Position i
+            # gilt fuer forecast_dates[i], unabhaengig davon was spaeter faellt.
+            text = _apply_weekday_prefix(text, fc_dates, i)
+
+            active_side = _foehn_active_side(foehn, fc_dates, i)
+            lee_zone = (active_side
+                        and zone_id in _FOEHN_LEE_ZONES.get(active_side, ()))
+            if prune:
+                if _find_forbidden_term(text) or \
+                        _check_pressure_region_mentions(text, valid_centers) or \
+                        (lee_zone and _CALM_CLAIM_RE.search(text)) or \
+                        (active_side and _text_inverts_foehn_lee(text, active_side)) or \
+                        (not active_side and _FOEHN_MENTION_RE.search(text)):
+                    logger.warning("Nicht behebbarer days-Eintrag entfernt "
+                                   "(%s day %d): '%s'", zone_id, i + 1, text)
+                    continue
+
+            entry = {"text": _neutralize_calendar_week_text(text)}
+            hint = d.get("flight_hint")
+            if isinstance(hint, str) and len(hint.strip()) >= 3:
+                hint = hint.strip()
+                if prune and (_find_forbidden_term(hint)
+                              or (lee_zone and _CALM_CLAIM_RE.search(hint))
+                              or (active_side
+                                  and _text_inverts_foehn_lee(hint, active_side))
+                              or (not active_side
+                                  and _FOEHN_MENTION_RE.search(hint))):
+                    logger.warning("Nicht behebbarer flight_hint entfernt "
+                                   "(%s day %d): '%s'", zone_id, i + 1, hint)
+                else:
+                    entry["flight_hint"] = _neutralize_calendar_week_text(hint)
+            entries.append(entry)
+        if entries:
+            by_zone[zone_id] = entries
 
     # Kalenderwochen-Begriffe → zeitraum-neutral. Sicherheitsnetz zum
     # Skill-Verbot; der Cast ist ein rollierender Block ab heute.
     lead = _neutralize_calendar_week_text(lead)
-    for e in entries:
-        e["text"] = _neutralize_calendar_week_text(e["text"])
-        if "flight_hint" in e:
-            e["flight_hint"] = _neutralize_calendar_week_text(e["flight_hint"])
 
-    if not lead and not entries:
+    if not lead and not by_zone:
         logger.warning("generate_synoptic_overview: nach Bereinigung nichts "
                        "Valides uebrig — Block wird ausgelassen")
         return None
 
+    # Ausgabe-Reihenfolge = config.SYNOPTIC_ZONES (nicht LLM-Reihenfolge)
+    zones_out = [
+        {"zone": z,
+         "label": config.SYNOPTIC_ZONE_LABELS[z][lang],
+         "days": by_zone[z]}
+        for z in config.SYNOPTIC_ZONES if z in by_zone
+    ]
+
+    # Legacy-Felder: `short` (Mail-Lead) unveraendert; `long_with_sources`
+    # bleibt fuer Konsumenten ohne Zonen-Support befuellt — mit der groessten
+    # Zone (Alpennordhang, ~2/3 aller Spots) statt einer Flach-Verkettung
+    # aller vier Zonen, die mit 4x denselben Wochentagen unlesbar waere.
+    legacy_zone = next((z for z in config.SYNOPTIC_ZONES if z in by_zone), None)
+    legacy_entries = by_zone.get(legacy_zone, []) if legacy_zone else []
+
     return {
         "short": lead,
-        "long": " ".join(e["text"] for e in entries),
+        "long": " ".join(
+            f"{zo['label']} — " + " ".join(e["text"] for e in zo["days"])
+            for zo in zones_out
+        ),
         "short_with_sources": [{"text": lead}] if lead else [],
-        "long_with_sources": entries,
+        "long_with_sources": legacy_entries,
+        "zones": zones_out,
         "attempts": attempts,
         "unresolved": [f"[{e['scope']}] {e['message']}" for e in unresolved],
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -633,31 +811,8 @@ def _build_llm_payload(ctx: dict) -> str:
         "bise": _strip_provenance(ctx.get("bise")),
         "vb_lage": _strip_provenance(ctx.get("vb_lage")),
         "foehn": _strip_provenance(ctx.get("foehn")),
-        "precip_pattern": {
-            "per_day": [
-                {"date": d["date"],
-                 "alpennord": {
-                     "peak_mm": d["alpennord"].get("peak_mm"),
-                     "wet_share": d["alpennord"].get("wet_share"),
-                     "gewitter_share": d["alpennord"].get("gewitter_share"),
-                     "max_wc": d["alpennord"].get("max_wc"),
-                     "max_cape": d["alpennord"].get("max_cape"),
-                     "max_coverage": d["alpennord"].get("max_coverage"),
-                     "n_spots": d["alpennord"].get("n_spots"),
-                 },
-                 "alpensued": {
-                     "peak_mm": d["alpensued"].get("peak_mm"),
-                     "wet_share": d["alpensued"].get("wet_share"),
-                     "gewitter_share": d["alpensued"].get("gewitter_share"),
-                     "max_wc": d["alpensued"].get("max_wc"),
-                     "max_cape": d["alpensued"].get("max_cape"),
-                     "max_coverage": d["alpensued"].get("max_coverage"),
-                     "n_spots": d["alpensued"].get("n_spots"),
-                 }}
-                for d in (ctx.get("precip_pattern") or {}).get("per_day", [])
-            ],
-        },
-        "wind_pattern": _wind_pattern_for_llm(ctx.get("wind_pattern")),
+        "zones": _zones_for_llm(ctx),
+        "zugbahn": _zugbahn_for_llm(ctx.get("zugbahn")),
         "schneefallgrenze": (
             None if ctx.get("schneefallgrenze") is None
             else {
@@ -684,17 +839,82 @@ def _strip_provenance(field: Optional[dict]) -> Optional[dict]:
             if k not in ("decided_by", "inputs", "thresholds", "source")}
 
 
-def _wind_pattern_for_llm(wp: Optional[dict]) -> Optional[dict]:
-    """Wind-Fliegbarkeits-Aggregat fuer den LLM-Input: per_day + Schwellen,
-    ohne decided_by. Das ist die autoritative Basis der Flug-Bilanz —
-    ohne diese Daten hat der LLM Tage als "excellent" verkauft, an denen
-    die Mehrheit der Spots am Hoehenwind scheiterte (05.07.2026)."""
-    if wp is None:
+def _zones_for_llm(ctx: dict) -> Optional[dict]:
+    """Zonen-Payload: pro Zone die per-Tag-Reihe aus Niederschlag (Tag +
+    Tagesfenster) und Wind (Klasse + Anteile + Fenster-Verlauf).
+
+    Kompakt gehalten: pro Fenster nur wet_share/p90_mm/gewitter_share/
+    max_cape (Regen) bzw. share_wind_crit (Wind) — das reicht dem LLM
+    fuer Tagesverlaufs-Sprache, ohne den Prompt aufzublaehen.
+    """
+    pz = ctx.get("precip_zones")
+    wz = ctx.get("wind_zones")
+    if not pz or not wz:
         return None
+
+    import i18n
+    lang = "en" if i18n.get_current_lang() == "en" else "de"
+
+    wind_by_date = {d["date"]: d.get("zones") or {} for d in wz.get("per_day") or []}
+
+    zones_out = {}
+    for zone in config.SYNOPTIC_ZONES:
+        per_day = []
+        for d in pz.get("per_day") or []:
+            zp = (d.get("zones") or {}).get(zone) or {}
+            day = zp.get("day") or {}
+            wins = zp.get("windows") or {}
+            zw = (wind_by_date.get(d.get("date")) or {}).get(zone) or {}
+            per_day.append({
+                "date": d.get("date"),
+                "precip_day": {k: day.get(k) for k in (
+                    "wet_share", "p90_mm", "max_mm", "gewitter_share",
+                    "max_wc", "max_cape", "max_coverage")},
+                "precip_windows": {
+                    wname: {k: w.get(k) for k in
+                            ("wet_share", "p90_mm", "gewitter_share", "max_cape")}
+                    for wname, w in wins.items()
+                },
+                "wind_day": {k: zw.get(k) for k in (
+                    "wind_class", "share_wind_crit", "share_wind_warn",
+                    "wind_driver", "median_aloft_kmh", "max_aloft_kmh",
+                    "aloft_over_kmh")},
+                "wind_windows": {
+                    wname: w for wname, w in (zw.get("windows") or {}).items()
+                },
+            })
+        zones_out[zone] = {
+            "label": config.SYNOPTIC_ZONE_LABELS[zone][lang],
+            "n_spots": (pz.get("n_spots_by_zone") or {}).get(zone),
+            "per_day": per_day,
+        }
+
     return {
-        "per_day": wp.get("per_day") or [],
-        "thresholds": wp.get("thresholds") or {},
+        "windows_hours": {w["key"]: w["hours"] for w in pz.get("windows") or []},
+        "by_zone": zones_out,
+        "thresholds": {**(pz.get("thresholds") or {}),
+                       **(wz.get("thresholds") or {})},
     }
+
+
+def _zugbahn_for_llm(zb: Optional[dict]) -> Optional[dict]:
+    """Zugbahn-Payload: Einsetz-Zeiten + Richtungs-Label pro Tag, ohne
+    Provenance. Nur Tage mit mindestens einem Onset werden mitgegeben."""
+    if not zb:
+        return None
+    per_day = []
+    for d in zb.get("per_day") or []:
+        onsets = d.get("onset_hour_by_group") or {}
+        if not any(v is not None for v in onsets.values()):
+            continue
+        per_day.append({
+            "date": d.get("date"),
+            "onset_hour_by_group": onsets,
+            "movement": d.get("movement"),
+        })
+    if not per_day:
+        return None
+    return {"per_day": per_day}
 
 
 def _flow_overhead_for_llm(fo: Optional[dict]) -> Optional[dict]:
@@ -728,6 +948,17 @@ def _collect_valid_center_labels(ctx: dict) -> set:
         for c in d.get("centers") or []:
             labels.add(c.get("region_label"))
     return labels
+
+
+def _allowed_centers(valid_centers: set) -> str:
+    """Erlaubte Druckzentren-Labels als Liste fuer die Korrektur-Nachricht.
+
+    Blosses Verbieten reicht dem LLM nicht — es erfindet sonst in der
+    Korrektur-Runde die naechste Region (25.07.2026: "Adria"). Mit der
+    Positivliste hat es eine Alternative zur Hand.
+    """
+    labels = sorted(str(c) for c in valid_centers if c)
+    return str(labels) if labels else "(keine — dann gar keine Region nennen)"
 
 
 # Praefix-Regex: "Heute:", "Morgen:", "Uebermorgen:", "Tag 1:" oder Wochentag

@@ -53,3 +53,6 @@ data/foehn_cache_*.json
 
 # Lokale Dev-Server-Adresse fuer scripts/sync_from_server.sh
 .dev_server
+
+# Vorher/Nachher-Preview der Synoptik-Zonen (scripts/preview_synoptik_zonen.py)
+data/_preview_synoptik_zonen.json

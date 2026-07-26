@@ -152,6 +152,26 @@ def build_synoptic_context(weather_cache: dict,
     wind_pattern = decide_wind_pattern_nord_sued(weather_cache, forecast_dates)
     decisions_applied.append("decide_wind_pattern_nord_sued")
 
+    # 8c. Flugwetter-Zonen (Synoptik 2.0): 4 Zonen mit Tagesfenstern +
+    # Zugbahn-Detektor. Die Nord/Sued-Aggregate (8/8b) bleiben parallel
+    # bestehen (Audit-Vergleichbarkeit); der LLM-Pfad nutzt die Zonen.
+    try:
+        zone_map = build_spot_zone_map()
+        precip_zones = decide_precip_pattern_zones(weather_cache, forecast_dates,
+                                                   zone_map)
+        decisions_applied.append("decide_precip_pattern_zones")
+        wind_zones = decide_wind_pattern_zones(weather_cache, forecast_dates,
+                                               zone_map)
+        decisions_applied.append("decide_wind_pattern_zones")
+        zugbahn = decide_zugbahn(weather_cache, forecast_dates, zone_map)
+        decisions_applied.append("decide_zugbahn")
+    except Exception:
+        logger.exception("Zonen-Aggregation fehlgeschlagen — "
+                         "Block laeuft ohne Zonen-Felder weiter")
+        precip_zones = None
+        wind_zones = None
+        zugbahn = None
+
     current_month = datetime.now().month
     ssg = decide_schneefallgrenze(snapshots, current_month)
     if ssg:
@@ -178,6 +198,9 @@ def build_synoptic_context(weather_cache: dict,
         "foehn": foehn,
         "precip_pattern": precip,
         "wind_pattern": wind_pattern,
+        "precip_zones": precip_zones,
+        "wind_zones": wind_zones,
+        "zugbahn": zugbahn,
         "schneefallgrenze": ssg,
         "confidence_per_day": [
             {"date": forecast_dates[i], "level": confidence[i]}
@@ -1548,6 +1571,423 @@ def decide_wind_pattern_nord_sued(weather_cache: dict,
                                   config.SYNOPTIC_WIND_BAND_UPPER_M],
             "hours": list(config.SYNOPTIC_WIND_HOURS),
         },
+    }
+
+
+# ============================================================================
+# FLUGWETTER-ZONEN (Synoptik 2.0) — 4 Zonen + Tagesfenster + Zugbahn
+# ============================================================================
+# Zone = Summe ihrer Analyse-Regionen (zone-Spalte in data/regionen.csv);
+# Spots erben die Zone ueber ihr analyse_region-Feld. Regionen werden NIE
+# aufgeteilt — damit laesst sich die Synoptik spaeter sauber auf
+# Regionen-Analysen herunterbrechen (Hierarchie Spot -> Region -> Zone -> CH).
+
+
+def build_spot_zone_map() -> dict[str, str]:
+    """{sanitisierter Spot-Name: zone_id} — Kette Spot -> analyse_region ->
+    regionen.csv[zone].
+
+    Spot-Namen sind bereits sanitisiert (spots.load_spots nutzt
+    sanitize_spot_name) und matchen damit die weather_cache-Keys.
+    Spots ohne aufloesbare analyse_region fallen auf eine grobe
+    Lat/Lon-Heuristik zurueck (defensiv — aktuell 0 Faelle).
+    """
+    import csv as _csv
+    import spots as spots_mod
+
+    zone_by_region: dict[str, str] = {}
+    try:
+        with open(config.REGIONEN_CSV_PATH, encoding="utf-8-sig", newline="") as f:
+            for row in _csv.DictReader(f):
+                z = (row.get("zone") or "").strip()
+                if z:
+                    zone_by_region[(row.get("region_name") or "").strip()] = z
+    except OSError as e:
+        logger.error("build_spot_zone_map: regionen.csv nicht lesbar: %s", e)
+
+    out: dict[str, str] = {}
+    for s in spots_mod.load_spots():
+        ar = (s.get("analyse_region") or "").strip()
+        zone = zone_by_region.get(ar)
+        if zone is None:
+            zone = _classify_zone_fallback(s.get("latitude"), s.get("longitude"))
+        if zone in config.SYNOPTIC_ZONES:
+            out[s["name"]] = zone
+    return out
+
+
+def _classify_zone_fallback(lat, lon) -> Optional[str]:
+    """Grobe Lat/Lon-Zuordnung fuer Spots ohne analyse_region-Match."""
+    if lat is None or lon is None:
+        return None
+    if lat < 46.45 and lon > 8.5:
+        return "tessin"
+    if lat < 46.45 and 6.5 < lon <= 8.5:
+        return "wallis"
+    if lon > 9.0:
+        return "graubuenden_engadin"
+    return "alpennordhang"
+
+
+def _p90(values: list[float]) -> float:
+    """P90 einer Werteliste (robust gegen Einzelspot-Ausreisser).
+
+    Hintergrund: das Tages-Maximum ueber ~330 Spots ist regelmaessig ein
+    Einzelspot-Artefakt (35 mm/h an einem Gletscher-Spot praegte am
+    25.07.2026 die Aussage fuer die halbe Schweiz). P90 traegt das Bild,
+    das Maximum wird separat mitgefuehrt.
+    """
+    if not values:
+        return 0.0
+    vals = sorted(values)
+    idx = max(0, math.ceil(0.9 * len(vals)) - 1)
+    return vals[idx]
+
+
+def _aggregate_precip_bucket(entries: list[dict]) -> dict:
+    """Aggregiert Spot-Niederschlagswerte eines Fensters/Tages einer Zone.
+
+    entries: [{peak_mm, wet, has_ts, max_cape}] pro Spot.
+    """
+    n = len(entries)
+    if n == 0:
+        return {"n_spots": 0, "wet_share": None, "p90_mm": None,
+                "max_mm": None, "gewitter_share": None, "max_wc": None,
+                "max_cape": None}
+    peaks = [e["peak_mm"] for e in entries]
+    return {
+        "n_spots": n,
+        "wet_share": round(sum(1 for e in entries if e["wet"]) / n, 2),
+        "p90_mm": round(_p90(peaks), 1),
+        "max_mm": round(max(peaks), 1),
+        # 3 Nachkommastellen: 1 echte Gewitterzelle unter 327 Nordhang-Spots
+        # (1/327 = 0.003) darf nicht auf 0.0 wegrunden — die Skill-Regel
+        # "Gewitter nur bei gewitter_share > 0" haengt daran.
+        "gewitter_share": round(sum(1 for e in entries if e["has_ts"]) / n, 3),
+        "max_wc": max(e["max_wc"] for e in entries),
+        "max_cape": round(max(e["max_cape"] for e in entries), 0),
+    }
+
+
+def decide_precip_pattern_zones(weather_cache: dict, forecast_dates: list[str],
+                                zone_map: dict[str, str]) -> dict:
+    """Niederschlag pro Tag, Zone und Tagesfenster (Morgen/Mittag/
+    Nachmittag/Abend) — die Zeitachsen-erhaltende Nachfolge von
+    decide_precip_pattern_nord_sued.
+
+    Pro Fenster und Zone: wet_share (Anteil Spots mit >= WINDOW_WET_MM in
+    einer Fensterstunde), p90_mm/max_mm (robuster Peak + Extrem),
+    gewitter_share (weather_code 95/96/99 im Fenster), max_cape.
+    Zusaetzlich ein Tages-Aggregat pro Zone (kompatible Kennzahlen inkl.
+    max_coverage fuer stratiform-vs-konvektiv).
+    """
+    windows = config.SYNOPTIC_DAY_WINDOWS
+    wet_mm = config.SYNOPTIC_PRECIP_WINDOW_WET_MM
+    per_day = []
+
+    for date in forecast_dates:
+        zones_out: dict[str, dict] = {}
+        # Sammel-Struktur: zone -> window_key -> [spot-entries]
+        win_buckets = {z: {w[0]: [] for w in windows} for z in config.SYNOPTIC_ZONES}
+        day_buckets = {z: [] for z in config.SYNOPTIC_ZONES}
+        cov_by_zone = {z: [] for z in config.SYNOPTIC_ZONES}
+
+        for spot_name, zone in zone_map.items():
+            spot = weather_cache.get(spot_name)
+            if not spot:
+                continue
+            hd = spot.get("hourly_data") or {}
+            recs = []
+            for t, rec in hd.items():
+                if not t.startswith(date):
+                    continue
+                try:
+                    hour = int(t[11:13])
+                except (ValueError, IndexError):
+                    continue
+                if 6 <= hour <= 20:
+                    recs.append((hour, rec))
+            if not recs:
+                continue
+
+            # Tages-Aggregat (Semantik wie bisher: wet = total >= DRY_MM)
+            precs = [(h, r.get("precipitation") or 0) for h, r in recs]
+            total = sum(p for _, p in precs)
+            day_buckets[zone].append({
+                "peak_mm": max(p for _, p in precs),
+                "wet": total >= config.SYNOPTIC_PRECIP_DRY_MM,
+                "has_ts": any(int(r.get("weather_code") or 0) in (95, 96, 99)
+                              for _, r in recs),
+                "max_wc": max((int(r.get("weather_code") or 0)) for _, r in recs),
+                "max_cape": max((r.get("cape") or 0) for _, r in recs),
+            })
+            covs = [r.get("precipitation_coverage") for _, r in recs
+                    if r.get("precipitation_coverage") is not None]
+            if covs:
+                cov_by_zone[zone].append(max(covs))
+
+            # Fenster-Aggregate
+            for wname, h_lo, h_hi in windows:
+                wrecs = [(h, r) for h, r in recs if h_lo <= h < h_hi]
+                if not wrecs:
+                    continue
+                wprecs = [(r.get("precipitation") or 0) for _, r in wrecs]
+                win_buckets[zone][wname].append({
+                    "peak_mm": max(wprecs),
+                    "wet": max(wprecs) >= wet_mm,
+                    "has_ts": any(int(r.get("weather_code") or 0) in (95, 96, 99)
+                                  for _, r in wrecs),
+                    "max_wc": max((int(r.get("weather_code") or 0)) for _, r in wrecs),
+                    "max_cape": max((r.get("cape") or 0) for _, r in wrecs),
+                })
+
+        for zone in config.SYNOPTIC_ZONES:
+            day_agg = _aggregate_precip_bucket(day_buckets[zone])
+            day_agg["max_coverage"] = (round(max(cov_by_zone[zone]), 2)
+                                       if cov_by_zone[zone] else None)
+            zones_out[zone] = {
+                "day": day_agg,
+                "windows": {w[0]: _aggregate_precip_bucket(win_buckets[zone][w[0]])
+                            for w in windows},
+            }
+
+        per_day.append({"date": date, "zones": zones_out})
+
+    return {
+        "per_day": per_day,
+        "windows": [{"key": w[0], "hours": [w[1], w[2]]} for w in windows],
+        "n_spots_by_zone": {z: sum(1 for v in zone_map.values() if v == z)
+                            for z in config.SYNOPTIC_ZONES},
+        "decided_by": "decide_precip_pattern_zones",
+        "thresholds": {"dry_mm": config.SYNOPTIC_PRECIP_DRY_MM,
+                       "window_wet_mm": wet_mm},
+    }
+
+
+def _spot_day_wind_hours(spot: dict, date: str) -> dict[int, dict]:
+    """Stuendliche Flugband-/Boeen-Werte eines Spots am Tag (6-20 lokal).
+
+    Returns {hour: {"aloft": kmh|None, "gust": kmh|None}} — Basis fuer
+    Fenster-Aggregate; die Tages-Klassifikation (wind_class) nutzt weiterhin
+    _spot_day_wind (Kernstunden), damit die Semantik zu den Nord/Sued-
+    Aggregaten identisch bleibt.
+    """
+    elev = spot.get("elevation_m")
+    out: dict[int, dict] = {}
+    if elev is None:
+        return out
+    band_lo = elev + config.SYNOPTIC_WIND_BAND_LOWER_M
+    band_hi = elev + config.SYNOPTIC_WIND_BAND_UPPER_M
+
+    for t, rec in (spot.get("pressure_level_data") or {}).items():
+        if not t.startswith(date):
+            continue
+        try:
+            hour = int(t[11:13])
+        except (ValueError, IndexError):
+            continue
+        if not (6 <= hour <= 20):
+            continue
+        aloft = None
+        for lvl in _WIND_PL_LEVELS:
+            gh = rec.get(f"geopotential_height_{lvl}hPa")
+            ws = rec.get(f"wind_speed_{lvl}hPa")
+            if gh is None or ws is None:
+                continue
+            if band_lo <= gh <= band_hi and (aloft is None or ws > aloft):
+                aloft = ws
+        if aloft is not None:
+            out.setdefault(hour, {})["aloft"] = aloft
+
+    for t, rec in (spot.get("hourly_data") or {}).items():
+        if not t.startswith(date):
+            continue
+        try:
+            hour = int(t[11:13])
+        except (ValueError, IndexError):
+            continue
+        if not (6 <= hour <= 20):
+            continue
+        g = rec.get("wind_gusts_10m")
+        if g is not None:
+            out.setdefault(hour, {})["gust"] = g
+    return out
+
+
+def decide_wind_pattern_zones(weather_cache: dict, forecast_dates: list[str],
+                              zone_map: dict[str, str]) -> dict:
+    """Wind-Fliegbarkeit pro Tag und Zone + share_wind_crit pro Tagesfenster.
+
+    Tages-Kennzahlen (wind_class, shares, Verteilungen) identisch zur
+    Nord/Sued-Aggregation (_aggregate_wind_side, Kernstunden 10-17) —
+    nur der Raumschnitt aendert sich auf die 4 Zonen. Zusaetzlich pro
+    Tagesfenster der Anteil windkritischer Spots, damit der Text
+    Wind-Zeitfenster benennen kann ("am Nachmittag frischt es auf").
+    """
+    windows = config.SYNOPTIC_DAY_WINDOWS
+    per_day = []
+
+    for date in forecast_dates:
+        day_entries = {z: [] for z in config.SYNOPTIC_ZONES}
+        win_entries = {z: {w[0]: [] for w in windows} for z in config.SYNOPTIC_ZONES}
+
+        for spot_name, zone in zone_map.items():
+            spot = weather_cache.get(spot_name)
+            if not spot:
+                continue
+            w = _spot_day_wind(spot, date)
+            if w is not None:
+                day_entries[zone].append(w)
+            hours = _spot_day_wind_hours(spot, date)
+            if not hours:
+                continue
+            for wname, h_lo, h_hi in windows:
+                vals = [v for h, v in hours.items() if h_lo <= h < h_hi]
+                if not vals:
+                    continue
+                alofts = [v["aloft"] for v in vals if v.get("aloft") is not None]
+                gusts = [v["gust"] for v in vals if v.get("gust") is not None]
+                if not alofts and not gusts:
+                    continue
+                win_entries[zone][wname].append({
+                    "aloft_max": max(alofts) if alofts else None,
+                    "gust_max": max(gusts) if gusts else None,
+                })
+
+        zones_out = {}
+        for zone in config.SYNOPTIC_ZONES:
+            agg = _aggregate_wind_side(day_entries[zone])
+            win_out = {}
+            for wname, _, _ in windows:
+                entries = win_entries[zone][wname]
+                if not entries:
+                    win_out[wname] = {"share_wind_crit": None}
+                    continue
+                crit = sum(
+                    1 for e in entries
+                    if (e["aloft_max"] is not None
+                        and e["aloft_max"] > config.WIND_DANGER_KMH)
+                    or (e["gust_max"] is not None
+                        and e["gust_max"] > config.GUST_DANGER_KMH))
+                win_out[wname] = {"share_wind_crit": round(crit / len(entries), 2)}
+            agg["windows"] = win_out
+            zones_out[zone] = agg
+
+        per_day.append({"date": date, "zones": zones_out})
+
+    return {
+        "per_day": per_day,
+        "decided_by": "decide_wind_pattern_zones",
+        "thresholds": {
+            "wind_warn_kmh": config.WIND_WARN_KMH,
+            "wind_danger_kmh": config.WIND_DANGER_KMH,
+            "gust_warn_kmh": config.GUST_WARN_KMH,
+            "gust_danger_kmh": config.GUST_DANGER_KMH,
+            "band_above_spot_m": [config.SYNOPTIC_WIND_BAND_LOWER_M,
+                                  config.SYNOPTIC_WIND_BAND_UPPER_M],
+            "hours": list(config.SYNOPTIC_WIND_HOURS),
+        },
+    }
+
+
+def decide_zugbahn(weather_cache: dict, forecast_dates: list[str],
+                   zone_map: dict[str, str]) -> dict:
+    """Zugbahn-Detektor: misst pro Tag die Niederschlags-Einsetz-Zeit pro
+    Zonen-Gruppe und leitet daraus die Verlagerungsrichtung ab.
+
+    Gruppen: die 4 Zonen, wobei der Alpennordhang fuer die Messung intern
+    in West/Ost geteilt wird (Split-Laenge SYNOPTIC_ZUGBAHN_WEST_OST_SPLIT_LON)
+    — NUR Diagnose, keine Erzaehl-Einheit.
+
+    onset = erste Stunde (6-20 lokal), in der der Anteil Spots mit
+    >= WINDOW_WET_MM Niederschlag die ONSET_SHARE erreicht. Richtung nur
+    bei >= MIN_DIFF_H Stunden Versatz ("west_nach_ost" etc.), sonst
+    "gleichzeitig"; null wenn hoechstens eine Gruppe anspringt.
+    """
+    split_lon = config.SYNOPTIC_ZUGBAHN_WEST_OST_SPLIT_LON
+    wet_mm = config.SYNOPTIC_PRECIP_WINDOW_WET_MM
+    onset_share = config.SYNOPTIC_ZUGBAHN_ONSET_SHARE
+    min_spots = config.SYNOPTIC_ZUGBAHN_MIN_SPOTS
+    min_diff = config.SYNOPTIC_ZUGBAHN_MIN_DIFF_H
+
+    # Gruppen-Zuordnung einmalig
+    group_of: dict[str, str] = {}
+    for spot_name, zone in zone_map.items():
+        if zone == "alpennordhang":
+            spot = weather_cache.get(spot_name) or {}
+            lon = spot.get("longitude")
+            if lon is None:
+                continue
+            group_of[spot_name] = ("alpennordhang_west" if lon < split_lon
+                                   else "alpennordhang_ost")
+        else:
+            group_of[spot_name] = zone
+    groups = sorted({g for g in group_of.values()})
+
+    per_day = []
+    for date in forecast_dates:
+        # pro Gruppe: {hour: [n_wet, n_total]}
+        counts: dict[str, dict[int, list[int]]] = {g: {} for g in groups}
+        for spot_name, group in group_of.items():
+            hd = (weather_cache.get(spot_name) or {}).get("hourly_data") or {}
+            for t, rec in hd.items():
+                if not t.startswith(date):
+                    continue
+                try:
+                    hour = int(t[11:13])
+                except (ValueError, IndexError):
+                    continue
+                if not (6 <= hour <= 20):
+                    continue
+                c = counts[group].setdefault(hour, [0, 0])
+                c[1] += 1
+                if (rec.get("precipitation") or 0) >= wet_mm:
+                    c[0] += 1
+
+        onset_by_group: dict[str, Optional[int]] = {}
+        for g in groups:
+            onset = None
+            for hour in sorted(counts[g]):
+                n_wet, n_tot = counts[g][hour]
+                if n_tot >= min_spots and n_wet / n_tot >= onset_share:
+                    onset = hour
+                    break
+            onset_by_group[g] = onset
+
+        # Richtungs-Ableitung West<->Ost (Nordhang) und Sued<->Nord
+        def _dir(a: Optional[int], b: Optional[int],
+                 label_ab: str, label_ba: str) -> Optional[str]:
+            if a is None or b is None:
+                return None
+            if b - a >= min_diff:
+                return label_ab
+            if a - b >= min_diff:
+                return label_ba
+            return "gleichzeitig"
+
+        west = onset_by_group.get("alpennordhang_west")
+        ost = onset_by_group.get("alpennordhang_ost")
+        nord_onsets = [o for o in (west, ost) if o is not None]
+        nord = min(nord_onsets) if nord_onsets else None
+        sued_onsets = [onset_by_group.get("tessin"), onset_by_group.get("wallis")]
+        sued_onsets = [o for o in sued_onsets if o is not None]
+        sued = min(sued_onsets) if sued_onsets else None
+
+        per_day.append({
+            "date": date,
+            "onset_hour_by_group": onset_by_group,
+            "movement": {
+                "west_ost": _dir(west, ost, "west_nach_ost", "ost_nach_west"),
+                "sued_nord": _dir(sued, nord, "sued_nach_nord", "nord_nach_sued"),
+            },
+        })
+
+    return {
+        "per_day": per_day,
+        "decided_by": "decide_zugbahn",
+        "thresholds": {"onset_share": onset_share, "wet_mm": wet_mm,
+                       "min_spots": min_spots, "min_diff_h": min_diff,
+                       "west_ost_split_lon": split_lon},
     }
 
 

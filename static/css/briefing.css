@@ -261,6 +261,23 @@
   margin: 0;
 }
 
+/* Flugwetter-Zone (Synoptik 2.0): Ueberschrift + ihre Tages-Bloecke */
+.bf-wetterlage-zone {
+  margin: 0 0 var(--space-4);
+}
+.bf-wetterlage-zone:last-child {
+  margin-bottom: 0;
+}
+.bf-wetterlage-zone-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
 .bf-wetterlage-hint {
   margin: 4px 0 0 !important;
   padding: 4px 10px;
