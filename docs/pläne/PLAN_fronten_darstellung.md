@@ -110,6 +110,38 @@ nur als Ganzes oder als Ausschnitt.
 
 ---
 
+## 1b. Zweiter Testlauf — Literatur-Verfahren (26.07.2026)
+
+Dasselbe Skript, `--method hewson`: Θw statt Θe, 8 Glättungsdurchgänge,
+Perzentil-Schwellen, Linie auf dem TFP-Maximum am warmen Rand statt auf der
+Gradientenachse, versetzte Gradientenprüfung (ABZ), 250-km-Längenfilter,
+Klassifikation über die Frontgeschwindigkeit (±1.5 m/s, mit quasistationärer
+Klasse). Raster 0.75° — die publizierte ERA-Interim-Konfiguration, 34 Abrufe.
+
+| Termin | naiv | **Hewson** |
+|---|---|---|
+| 24.07. | 0.97 | **1.21** |
+| 25.07. | 0.87 | **1.30** |
+| 26.07. | 1.11 | **1.63** |
+| 01.05. | 1.14 | **1.69** |
+| 02.05. | 1.63 | **1.19** |
+| 03.05. | 0.74 | **1.13** |
+| 04.05. | 1.05 | **1.34** |
+| 05.05. | 0.71 | **1.41** |
+| **Mittel** | **0.95** | **1.36** |
+
+**Alle acht Termine liegen über 1** (naiv: 6 von 10 darunter). Die Linien
+tragen jetzt Information.
+
+**Sichtvergleich 25.07. 12 UTC gegen die DWD-Handanalyse:** eine durchgehende
+Kaltfront vom Nordmeer über die Nordsee und Frankreich zur Biskaya, davor eine
+Warmfront westlich Irlands — strukturell dieselbe Lage, die der DWD zeichnet.
+Statt der Fragmente der ersten Fassung.
+
+**Was noch fehlt:** Über Italien, Balkan und Türkei stehen weiterhin Linien,
+wo die DWD-Analyse nichts hat. Das ist genau die Trennung *lokal* gegen
+*synoptisch* aus Jenkner et al. (2010), die noch nicht implementiert ist.
+
 ## 2b. Entschieden: eigene Berechnung, DWD-Text als Gegenprobe
 
 Der DWD-Text (`SXDL31` Kurzfrist, `SXDL33` Mittelfrist) benennt Fronten,

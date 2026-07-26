@@ -153,13 +153,52 @@ def theta_e(t_c: np.ndarray, rh: np.ndarray, p_hpa: float = P_LEVEL) -> np.ndarr
     return theta * np.exp((3.376 / t_lcl - 0.00254) * r * 1000.0 * (1.0 + 0.81 * r))
 
 
+def theta_w(te: np.ndarray) -> np.ndarray:
+    """Feuchttemperatur-Potential Theta-w aus Theta-e (Davies-Jones 2008, 3.8).
+
+    Die Literatur rechnet Frontendetektion auf Theta-w, nicht Theta-e. Beide
+    sind monoton verknuepft, aber die Umrechnung ist nichtlinear: sie staucht
+    das warme Ende und veraendert damit die Gradientenbetraege — und die
+    entscheiden ueber die Schwellen.
+    """
+    a = (7.101574, -20.68208, 16.11182, 2.574631, -5.205688)
+    b = (-3.552497, 3.781782, -0.6899655, -0.5929340)
+    x = te / 273.15
+    num = a[0] + a[1]*x + a[2]*x**2 + a[3]*x**3 + a[4]*x**4
+    den = 1.0 + b[0]*x + b[1]*x**2 + b[2]*x**3 + b[3]*x**4
+    out = te - np.exp(np.clip(num / den, -50, 50))
+    return np.where(te > 173.15, out, te)
+
+
+def smooth_5point(field: np.ndarray, passes: int) -> np.ndarray:
+    """n Durchgaenge eines 5-Punkt-Mittels (Zentrum + 4 Nachbarn).
+
+    Das ist die Glaettung des Literatur-Verfahrens — acht Durchgaenge bei
+    0.75 Grad. Ohne sie erzeugt jedes Rauschen im Temperaturfeld eigene
+    Nulldurchgaenge, und die Linien zerfallen in Fragmente.
+    """
+    f = np.array(field, dtype=float)
+    for _ in range(passes):
+        p = np.pad(f, 1, mode="edge")
+        f = (p[1:-1, 1:-1] + p[:-2, 1:-1] + p[2:, 1:-1]
+             + p[1:-1, :-2] + p[1:-1, 2:]) / 5.0
+    return f
+
+
+def gradients_si(field: np.ndarray, lats: np.ndarray, lons: np.ndarray):
+    """d/dx, d/dy in Einheit pro METER (fuer den Vergleich mit den
+    publizierten Schwellen, die in K/m bzw. K/m^2 angegeben sind)."""
+    dlat_m = 111200.0 * (lats[1] - lats[0])
+    coslat = np.cos(np.radians(lats))[:, None]
+    dlon_m = 111200.0 * (lons[1] - lons[0]) * coslat
+    dfdy, dfdx = np.gradient(field)
+    return dfdx / dlon_m, dfdy / dlat_m
+
+
 def gradients(field: np.ndarray, lats: np.ndarray, lons: np.ndarray):
     """d/dx, d/dy in Einheit pro 100 km (Kugel, lokal kartesisch)."""
-    dlat_km = 111.2 * (lats[1] - lats[0])
-    coslat = np.cos(np.radians(lats))[:, None]
-    dlon_km = 111.2 * (lons[1] - lons[0]) * coslat
-    dfdy, dfdx = np.gradient(field)
-    return dfdx / dlon_km * 100.0, dfdy / dlat_km * 100.0
+    gx, gy = gradients_si(field, lats, lons)
+    return gx * 1e5, gy * 1e5
 
 
 def smooth(field: np.ndarray, sigma: float) -> np.ndarray:
@@ -189,6 +228,91 @@ def front_diagnostics(te: np.ndarray, u: np.ndarray, v: np.ndarray,
 # Plot
 # ============================================================================
 
+def hewson_fronts(t_c, rh, u, v, lats, lons, passes=8,
+                  tfp_pct=75.0, grad_pct=50.0, min_len_km=250.0):
+    """Frontendetektion nach Literatur-Standard (Hewson 1998 / Sansom & Catto 2024).
+
+    Unterschiede zur ersten Fassung (`front_diagnostics` + `front_mask`), die
+    alle fuenf aus der Recherche stammen:
+
+    1. Theta-w statt Theta-e
+    2. 8 Durchgaenge 5-Punkt-Mittel statt einem Gauss
+    3. Die Linie liegt auf dem TFP-MAXIMUM am warmen Rand der Frontalzone,
+       nicht auf der Gradientenachse. Das entspricht der Handanalyse: der
+       Meteorologe zeichnet die Front an die warme Kante, nicht in die Mitte.
+       Ortsbestimmung = Nulldurchgang des Lokators L = grad(TFP) . n.
+    4. Schwellen als Perzentile statt geraten; die Gradientenbedingung wird
+       eine halbe Gitterweite Richtung Kaltluft geprueft ("adjacent
+       baroclinic zone") — die Front braucht die kraeftige Zone NEBEN sich.
+    5. Linien unter `min_len_km` werden verworfen.
+
+    Returns (tw_smooth, g_si, tfp, mask, speed) — Betraege in SI (K/m, K/m^2).
+    """
+    from scipy.ndimage import label
+
+    tw = smooth_5point(theta_w(theta_e(t_c, rh)), passes)
+    gx, gy = gradients_si(tw, lats, lons)
+    g = np.hypot(gx, gy)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        nx_, ny_ = gx / g, gy / g          # Einheitsvektor Richtung Warmluft
+
+    ggx, ggy = gradients_si(g, lats, lons)
+    tfp = -(ggx * nx_ + ggy * ny_)         # > 0 auf der warmen Flanke
+
+    lx, ly = gradients_si(tfp, lats, lons)
+    loc = lx * nx_ + ly * ny_              # Lokator: 0 im TFP-Maximum
+
+    # Adjacent Baroclinic Zone: Gradient eine halbe Zelle Richtung Kaltluft
+    g_abz = _shift_along(g, -nx_, -ny_)
+
+    tfp_min = np.nanpercentile(tfp, tfp_pct)
+    g_min = np.nanpercentile(g_abz, grad_pct)
+
+    s = np.sign(np.nan_to_num(loc))
+    z = np.zeros(loc.shape, dtype=bool)
+    z[:, :-1] |= (s[:, :-1] * s[:, 1:] < 0)
+    z[:-1, :] |= (s[:-1, :] * s[1:, :] < 0)
+    mask = z & (tfp >= tfp_min) & (g_abz >= g_min)
+
+    # Kurze Bruchstuecke verwerfen — der Standard zieht bei 250 km die Grenze
+    lab, n = label(mask, structure=np.ones((3, 3)))
+    for k in range(1, n + 1):
+        idx = np.argwhere(lab == k)
+        if _extent_km(idx, lats, lons) < min_len_km:
+            mask[lab == k] = False
+
+    # Frontgeschwindigkeit (Hewson Gl. 13): Windkomponente entlang grad(|grad|)
+    gg = np.hypot(ggx, ggy)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        speed = (u * ggx + v * ggy) / gg
+    return tw, g, tfp, mask, speed
+
+
+def _shift_along(field, dx, dy):
+    """Feld eine halbe Zelle in Richtung (dx, dy) abgetastet (bilinear)."""
+    ny, nx = field.shape
+    jj, ii = np.mgrid[0:ny, 0:nx]
+    sj = np.clip(jj + 0.5 * np.nan_to_num(dy), 0, ny - 1)
+    si = np.clip(ii + 0.5 * np.nan_to_num(dx), 0, nx - 1)
+    j0, i0 = np.floor(sj).astype(int), np.floor(si).astype(int)
+    j1, i1 = np.minimum(j0 + 1, ny - 1), np.minimum(i0 + 1, nx - 1)
+    fj, fi = sj - j0, si - i0
+    return ((field[j0, i0] * (1 - fi) + field[j0, i1] * fi) * (1 - fj)
+            + (field[j1, i0] * (1 - fi) + field[j1, i1] * fi) * fj)
+
+
+def _extent_km(idx, lats, lons) -> float:
+    """Groesste Punkt-zu-Punkt-Distanz einer Linie (Naeherung ihrer Laenge)."""
+    if len(idx) < 2:
+        return 0.0
+    la = np.radians(lats[idx[:, 0]])
+    lo = np.radians(lons[idx[:, 1]])
+    x, y, z = np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo), np.sin(la)
+    p = np.stack([x, y, z], axis=1)
+    d = p @ p.T
+    return float(6371.0 * np.arccos(np.clip(d.min(), -1, 1)))
+
+
 def front_mask(tfp: np.ndarray, g: np.ndarray, g_min: float) -> np.ndarray:
     """Zellen auf der Frontlinie: Nulldurchgang des TFP, wo der Gradient
     stark genug ist. Das ist die Achse des staerksten Theta-e-Gefaelles."""
@@ -215,7 +339,8 @@ def precip_check(mask: np.ndarray, pr: np.ndarray, thr: float = 0.1) -> dict:
             "lift": (hit / base if base > 0 else None)}
 
 
-def plot_step(ts, tes, g, tfp, adv, lats, lons, g_min, out_path, pr=None):
+def plot_step(ts, tes, g, tfp, adv, lats, lons, g_min, out_path, pr=None,
+              front_cells=None, var_label="Theta-e 850 hPa [K]"):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -224,16 +349,28 @@ def plot_step(ts, tes, g, tfp, adv, lats, lons, g_min, out_path, pr=None):
     lon2, lat2 = np.meshgrid(lons, lats)
 
     cf = ax.contourf(lon2, lat2, tes, levels=18, cmap="RdYlBu_r", alpha=0.75)
-    plt.colorbar(cf, ax=ax, label="Theta-e 850 hPa [K]", shrink=0.85)
+    plt.colorbar(cf, ax=ax, label=var_label, shrink=0.85)
     ax.contour(lon2, lat2, tes, levels=18, colors="#555", linewidths=0.4, alpha=0.5)
 
-    # Frontkandidaten: TFP-Nulldurchgang, nur wo der Gradient stark genug ist
-    mask = g >= g_min
-    tfp_m = np.where(mask, tfp, np.nan)
-    warm = np.where(mask & (adv > 0), tfp, np.nan)
-    cold = np.where(mask & (adv <= 0), tfp, np.nan)
-    ax.contour(lon2, lat2, cold, levels=[0.0], colors="#0033cc", linewidths=2.4)
-    ax.contour(lon2, lat2, warm, levels=[0.0], colors="#cc0000", linewidths=2.4)
+    if front_cells is not None:
+        # Hewson: fertige Frontpunkte, klassifiziert ueber die Frontgeschwindigkeit
+        # (+/-1.5 m/s -> Warm / Kalt / quasistationaer)
+        for sel, col, lbl in ((front_cells & (adv > 1.5), "#cc0000", "Warmfront"),
+                              (front_cells & (adv < -1.5), "#0033cc", "Kaltfront"),
+                              (front_cells & (np.abs(adv) <= 1.5), "#555555",
+                               "quasistationaer")):
+            if np.any(sel):
+                ax.scatter(lon2[sel], lat2[sel], s=26, c=col, marker="s",
+                           edgecolors="none", label=lbl)
+        if np.any(front_cells):
+            ax.legend(loc="lower left", fontsize=8, framealpha=0.9)
+    else:
+        # erste Fassung: TFP-Nulldurchgang, maskiert ueber den Gradienten
+        mask = g >= g_min
+        warm = np.where(mask & (adv > 0), tfp, np.nan)
+        cold = np.where(mask & (adv <= 0), tfp, np.nan)
+        ax.contour(lon2, lat2, cold, levels=[0.0], colors="#0033cc", linewidths=2.4)
+        ax.contour(lon2, lat2, warm, levels=[0.0], colors="#cc0000", linewidths=2.4)
 
     # Niederschlag als Gegenprobe: die Frontlinie sollte im Regenband liegen
     if pr is not None:
@@ -263,6 +400,10 @@ def main() -> int:
                     help="Mindest-Gradient in K/100km fuer eine Frontlinie")
     ap.add_argument("--cache", action="store_true",
                     help="Rohdaten aus data/_experiment_fronten/raw.npz nutzen")
+    ap.add_argument("--method", choices=("naiv", "hewson"), default="naiv",
+                    help="naiv = erste Fassung; hewson = Literatur-Standard")
+    ap.add_argument("--passes", type=int, default=8,
+                    help="Glaettungsdurchgaenge (hewson): 8 bei 0.75 Grad")
     args = ap.parse_args()
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -288,10 +429,15 @@ def main() -> int:
         f = fields[ts]
         if np.all(np.isnan(f["t"])):
             continue
-        te = theta_e(f["t"], f["rh"])
-        tes, g, tfp, adv = front_diagnostics(te, f["u"], f["v"], lats, lons,
-                                             args.sigma)
-        mask = front_mask(tfp, g, args.gmin)
+        if args.method == "hewson":
+            tes, g_si, tfp, mask, adv = hewson_fronts(
+                f["t"], f["rh"], f["u"], f["v"], lats, lons, passes=args.passes)
+            g = g_si * 1e5          # K/m -> K/100km, nur fuer die Anzeige
+        else:
+            te = theta_e(f["t"], f["rh"])
+            tes, g, tfp, adv = front_diagnostics(te, f["u"], f["v"], lats,
+                                                 lons, args.sigma)
+            mask = front_mask(tfp, g, args.gmin)
         chk = precip_check(mask, f.get("pr"))
         hit = f"{chk['hit']*100:6.1f} %" if chk["hit"] is not None else "     —"
         base = f"{chk['base']*100:5.1f} %" if chk["base"] is not None else "    —"
@@ -301,9 +447,13 @@ def main() -> int:
         summary.append({"ts": ts, "max_grad": float(np.nanmax(g)),
                         "p95_grad": float(np.nanpercentile(g, 95)),
                         **chk})
-        out = OUT_DIR / f"front_{ts.replace(':', '')}_res{args.res}.png"
+        out = (OUT_DIR /
+               f"front_{ts.replace(':', '')}_res{args.res}_{args.method}.png")
         plot_step(ts, tes, g, tfp, adv, lats, lons, args.gmin, out,
-                  pr=f.get("pr"))
+                  pr=f.get("pr"),
+                  front_cells=mask if args.method == "hewson" else None,
+                  var_label=("Theta-w 850 hPa [K]" if args.method == "hewson"
+                             else "Theta-e 850 hPa [K]"))
 
     (OUT_DIR / "summary.json").write_text(
         json.dumps({"res_deg": args.res, "sigma": args.sigma,
