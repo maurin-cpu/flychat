@@ -23,8 +23,12 @@
   var SMOOTH_ITER = 2;
   var BORDER_CELLS = 1.0;
   var FILL_DOMAIN = [980, 1000, 1013, 1026, 1044];
+  // Identisch zur grossen Karte (synoptic-map.js) — beide Ansichten muessen
+  // dieselbe Lage gleich einfaerben.
   var FILL_RANGE = ["#1d4ed8", "#93c5fd", "#f4f6f8", "#fcd34d", "#d97706"];
-  var FILL_OPACITY = 0.42;
+  // Gleiche Zurueckhaltung wie auf der grossen Karte: Toenung als Hintergrund,
+  // Isobaren und Landkarte bleiben lesbar (vorher 0.42).
+  var FILL_OPACITY = 0.22;
 
   var fillScale = null;
 

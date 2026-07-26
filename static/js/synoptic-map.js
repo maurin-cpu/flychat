@@ -50,8 +50,16 @@
   // Druckband-Toenung: diverging um den Normaldruck 1013 hPa.
   // Lab-Interpolation (gleichmaessige Helligkeitsverlaeufe, kein Grau-Knick).
   var FILL_DOMAIN = [980, 1000, 1013, 1026, 1044];
+  // Palette bewusst unveraendert: ein Versuch mit orangem statt gelbem
+  // Warm-Ende wirkte auf dem beigen Landhintergrund braun-schmutzig. Was
+  // gestoert hat, war die Deckkraft (FILL_OPACITY), nicht der Farbton.
   var FILL_RANGE = ["#1d4ed8", "#93c5fd", "#f4f6f8", "#fcd34d", "#d97706"];
-  var FILL_OPACITY = 0.42;
+  // Flaechen bewusst zurueckhaltend: sie sollen die Druckverteilung andeuten,
+  // nicht die Karte einfaerben. Vorbild sind klassische Bodendruckkarten
+  // (MeteoSchweiz), auf denen Isobaren und Landkarte lesbar bleiben und die
+  // Toenung nur Hintergrund ist. Vorher 0.42 — da verschwanden Grenzen,
+  // Kuestenlinien und Isobaren unter dem Farbschleier.
+  var FILL_OPACITY = 0.22;
 
   // Animation-Timing: STEP_MS = Verweildauer pro Timestep, FADE_MS = Pane-
   // Crossfade (muss zur CSS-Transition von .syn-fade-pane passen).
@@ -440,20 +448,20 @@
 
     var labelPositions = [];
 
-    // Isobaren bewusst als LEICHTE graue Fuehrungslinien — kein harter Kontrast,
-    // kein weisser Halo (beides wirkte zu praesent ueber der Druckband-Toenung).
-    // Die Farbtoenung + H/T-Badges + Labels tragen die Lesbarkeit; die Linien
-    // geben nur die Form. Haupt-/Nebenisobaren nur minimal abgestuft, damit
-    // keine Linie "hart" heraussticht.
+    // Die Isobaren tragen die Karte, nicht die Flaechentoenung — umgekehrt zur
+    // ersten Fassung, in der sie bewusst blasse Fuehrungslinien waren. Grund:
+    // ueber der Toenung war die Form der Druckgebilde kaum noch zu lesen.
+    // Weiterhin kein weisser Halo und nur eine leichte Abstufung Haupt-/
+    // Nebenisobare, damit die Karte ruhig bleibt.
     isobars.forEach(function (c) {
       var isMajor = c.value % LABEL_EVERY === 0;
       c.lines.forEach(function (line) {
         L.polyline(line, {
           pane: paneName,
           interactive: false,
-          color: "#94a3b8",              // Slate-400: leichtes Grau
-          weight: isMajor ? 1.1 : 0.8,
-          opacity: isMajor ? 0.48 : 0.3,
+          color: "#475569",              // Slate-600: klar lesbares Grau
+          weight: isMajor ? 1.2 : 0.85,
+          opacity: isMajor ? 0.78 : 0.5,
           lineJoin: "round",
           lineCap: "round",
           smoothFactor: 1,
