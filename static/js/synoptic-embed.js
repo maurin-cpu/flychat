@@ -1,6 +1,7 @@
 /* Synoptik-Embed fuer den Gleitcast (/briefing): kleine, NICHT-interaktive
- * Karte unter der Wetterlage-Gesamteinschaetzung — Druckbaender, Isobaren,
- * H/T-Badges und Wind-Partikel (via WingcastWind) fuer den Timestep, der dem
+ * Karte unter der Wetterlage-Gesamteinschaetzung — Druckbaender, Isobaren und
+ * H/T-Badges ueber Europa (KEIN Wind, den gibt es nur auf der interaktiven
+ * Karte /synoptik) fuer den Timestep, der dem
  * ANALYSEZEITPUNKT am naechsten liegt (`wetterlage.generated_at`), NICHT der
  * Uhrzeit des Betrachters. Die Karte belegt den Textblock darueber; ein
  * spaeterer Zeitschritt wuerde eine Lage zeigen, die der Text nie
@@ -212,15 +213,18 @@
 
   // ===== Karte =============================================================
 
-  function fitWidth(map, meta) {
-    var latA = meta.lat0, latB = meta.lat0 + meta.dlat * (meta.ny - 1);
-    var lonA = meta.lon0, lonB = meta.lon0 + meta.dlon * (meta.nx - 1);
-    var b = L.latLngBounds([Math.min(latA, latB), Math.min(lonA, lonB)],
-                           [Math.max(latA, latB), Math.max(lonA, lonB)]);
-    var w = map.getSize().x;
-    if (!w) return;
-    var z = Math.log(w * 360 / (256 * (b.getEast() - b.getWest()))) / Math.LN2;
-    map.setView(b.getCenter(), z, { animate: false });
+  // Ausschnitt: Europa, nicht das ganze Datenraster. Das Raster reicht von
+  // Groenland bis in den Nahen Osten — auf der Mini-Karte wurde Europa damit
+  // zur Briefmarke am Rand. Gezeigt wird der Bereich, in dem die Lage fuer
+  // Schweizer Piloten entsteht: Atlantik/Iberien bis Schwarzes Meer,
+  // Mittelmeer bis Skandinavien. Isobaren und Flaechen werden weiterhin ueber
+  // das volle Raster gerechnet, es wird nur enger geschaut.
+  var EUROPE_BOUNDS = L.latLngBounds([36.0, -10.0], [58.0, 26.0]);
+
+  function fitEurope(map) {
+    // Padding, damit H/T-Badges am Rand nicht angeschnitten werden — sie
+    // ragen ueber ihren Ankerpunkt hinaus (44x54 px Icon).
+    map.fitBounds(EUROPE_BOUNDS, { animate: false, padding: [26, 22] });
   }
 
   function render(mapEl, grid, ts) {
@@ -246,7 +250,7 @@
       subdomains: "abcd", maxZoom: 18, opacity: 0.38,
     }).addTo(map);
 
-    fitWidth(map, grid.meta);
+    fitEurope(map);
 
     var iso = buildIsobars(grid.meta, grid.values[ts]);
 
@@ -280,8 +284,15 @@
       });
     });
 
-    // H/T-Badges (gleiche Markup/Klassen wie /synoptik -> synoptik.css)
-    var centers = (grid.centers && grid.centers[ts]) || [];
+    // H/T-Badges (gleiche Markup/Klassen wie /synoptik -> synoptik.css).
+    // Nur Zentren, die ganz im Bild liegen: der Europa-Ausschnitt schneidet
+    // Zentren am Rand sonst zur Haelfte ab, was wie ein Darstellungsfehler
+    // aussieht. Das Badge ragt ueber seinen Ankerpunkt hinaus, darum ein
+    // Sicherheitsabstand statt der nackten Kartengrenze.
+    var visible = map.getBounds().pad(-0.07);
+    var centers = ((grid.centers && grid.centers[ts]) || []).filter(function (c) {
+      return visible.contains(L.latLng(c.lat, c.lon));
+    });
     centers.forEach(function (c) {
       var isHigh = c.type === "Hoch";
       var letter = wcT(isHigh ? "js.syn.high_letter" : "js.syn.low_letter");
@@ -300,23 +311,14 @@
       }).addTo(map);
     });
 
-    // Wind-Partikel (synoptic-wind.js) — immer an, reduced-motion beachtet
-    if (window.WingcastWind) {
-      var reduced = !!(window.matchMedia
-        && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-      var wind = WingcastWind.create(map, { reducedMotion: reduced });
-      // setGrid meldet, ob 700-hPa-Wind vorhanden ist; fehlt er (alter Cache),
-      // bleibt der Layer aus und nur Isobaren/Badges werden gezeigt.
-      if (wind.setGrid(grid)) {
-        wind.setEnabled(true);
-        wind.setTimestep(ts);
-      }
-    }
+    // KEINE Wind-Partikel: die gehoeren auf die interaktive Karte (/synoptik).
+    // Hier traegt der Ausschnitt Druckverteilung und Zentren — bewegte Pfeile
+    // waeren auf dem kleinen, statischen Bild nur Unruhe.
 
     // Bei Layout-Wechseln (Breakpoint) Karte neu einpassen
     window.addEventListener("resize", function () {
       map.invalidateSize();
-      fitWidth(map, grid.meta);
+      fitEurope(map);
     });
 
     return map;

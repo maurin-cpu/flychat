@@ -876,7 +876,8 @@ STRINGS: dict[str, dict[str, str]] = {
                          "en": "upper-level flow at ~3000 m (700 hPa) — not the surface wind"},
     # Synoptik-Mini-Karte im Gleitcast (/briefing, synoptic-embed.js)
     "js.syn.embed_title": {"de": "Synoptik", "en": "Synoptic map"},
-    "js.syn.embed_sub": {"de": "Bodendruck & Höhenwind", "en": "surface pressure & upper-level wind"},
+    # Der Embed zeigt bewusst KEINEN Wind (nur die interaktive Karte tut das)
+    "js.syn.embed_sub": {"de": "Bodendruck & Isobaren", "en": "surface pressure & isobars"},
     "js.syn.embed_asof": {"de": "Stand", "en": "as of"},
     "js.syn.embed_link": {"de": "Interaktive Karte", "en": "Interactive map"},
     "js.syn.embed_aria": {"de": "Synoptik-Karte öffnen", "en": "Open the synoptic map"},
