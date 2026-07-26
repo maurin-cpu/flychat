@@ -56,3 +56,6 @@ data/foehn_cache_*.json
 
 # Vorher/Nachher-Preview der Synoptik-Zonen (scripts/preview_synoptik_zonen.py)
 data/_preview_synoptik_zonen.json
+
+# Rohdaten + Plots des Fronten-Machbarkeitstests (scripts/experiment_fronten_tfp.py)
+data/_experiment_fronten/
