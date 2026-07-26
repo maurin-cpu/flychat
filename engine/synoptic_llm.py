@@ -85,6 +85,12 @@ _FORBIDDEN_PATTERNS = [
     # Pilotensprache ("labile Luft", "Ueberentwicklungs-Potenzial") —
     # der DE-Lauf 26.07.2026 schrieb trotzdem "labile Luft und hoher CAPE".
     re.compile(r"\bcape\b", re.IGNORECASE),
+    # "Vb" ist die Zugbahn-Nummer nach van Bebber (Bahn V, Variante b).
+    # Im Cast stand "a Vb low brings unsettled weather" — fuer Piloten
+    # nichtssagend. Der gemeinte Sachverhalt heisst "Genua-Tief".
+    # Bewusst case-sensitiv, damit die Schreibweise "Vb" gemeint ist und
+    # nicht irgendein Kleinbuchstaben-Zufall.
+    re.compile(r"\bVb\b"),
 ]
 
 # Foehn-Erwaehnung in beliebiger Schreibweise (Nordfoehn, Foehnschneise,

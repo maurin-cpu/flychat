@@ -765,7 +765,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.lage.Suedfoehnlage": {"de": "Suedfoehnlage", "en": "South foehn"},
     "js.lage.Nordfoehnlage": {"de": "Nordfoehnlage", "en": "North foehn"},
     "js.lage.Foehnlage (wechselnd)": {"de": "Foehnlage (wechselnd)", "en": "Foehn (variable)"},
-    "js.lage.Vb-/Genua-Tief": {"de": "Vb-/Genua-Tief", "en": "Vb / Genoa low"},
+    "js.lage.Genua-Tief": {"de": "Genua-Tief", "en": "Genoa low"},
     "js.lage.Bisenlage": {"de": "Bisenlage", "en": "Bise"},
     "js.lage.Westlage": {"de": "Westlage", "en": "Westerly flow"},
     "js.lage.Suedwestlage": {"de": "Suedwestlage", "en": "Southwesterly flow"},

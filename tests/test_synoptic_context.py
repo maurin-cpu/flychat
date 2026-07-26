@@ -427,7 +427,9 @@ class TestDecideLageLabel(unittest.TestCase):
             foehn={"active": False, "side": None},
             vb_lage={"active_any_day": True},
         )
-        self.assertEqual(label["value"], "Vb-/Genua-Tief")
+        # Label ohne das Kuerzel "Vb" — van-Bebber-Zugbahnnummer, im Cast
+        # unverstaendlich (der i18n-Key haengt am Wert: js.lage.<value>)
+        self.assertEqual(label["value"], "Genua-Tief")
 
     def test_bise_priority(self):
         label = sc.decide_lage_label(

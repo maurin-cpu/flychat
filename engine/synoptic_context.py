@@ -1135,10 +1135,13 @@ def decide_lage_label(pressure_influence: dict, flow_overhead: dict,
                 "trigger": "foehn.side=wechselnd",
             }
 
-    # 2. Vb-Lage
+    # 2. Vb-Lage. Im Label steht bewusst NUR "Genua-Tief": "Vb" ist die
+    # Zugbahn-Nummer nach van Bebber (Bahn V, Variante b) und als Kuerzel
+    # in der Ueberschrift des Casts unverstaendlich. Der Feldname bleibt
+    # vb_lage — intern ist das der etablierte Begriff.
     if vb_lage and vb_lage.get("active_any_day"):
         return {
-            "value": "Vb-/Genua-Tief",
+            "value": "Genua-Tief",
             "decided_by": "decide_lage_label",
             "trigger": "vb_lage.active",
         }

@@ -274,6 +274,20 @@ class TestValidate(unittest.TestCase):
         self.assertFalse(any(e["kind"] == "gewitter_without_signal"
                              for e in errors))
 
+    def test_reject_vb_abbreviation(self):
+        """"Vb" ist die van-Bebber-Zugbahnnummer — im Cast unverstaendlich.
+        Der Sachverhalt heisst "Genua-Tief"."""
+        errors = sl._validate(
+            _parsed(lead="Ein Vb-Tief bringt wechselhaftes Wetter."), _ctx())
+        self.assertTrue(any(e["kind"] == "forbidden_term"
+                            and e["scope"] == "lead" for e in errors))
+
+    def test_accept_genua_tief(self):
+        errors = sl._validate(
+            _parsed(lead="Ein Genua-Tief bringt wechselhaftes Wetter."),
+            _ctx())
+        self.assertEqual(errors, [])
+
     def test_reject_cape_jargon(self):
         """CAPE ist Modell-Jargon — der Skill verlangt 'labile Luft'."""
         days = [{"text": "Labile Luft und hoher CAPE am Nachmittag.",

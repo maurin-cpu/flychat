@@ -90,7 +90,9 @@ ALLOWED (from the structured field):
   (including "foehn corridor") is forbidden; describe gustiness there via
   valley wind / upper wind. Only if `bise.active_any_day=true` may you use
   "Bise" or "Bise situation". Only if `vb_lage.active_any_day=true` may
-  you use "Vb low" or "Genoa low".
+  you use "Genoa low" — **never "Vb low" or "Vb situation"**: "Vb" is a
+  cyclone-track number (van Bebber) and an abbreviation nobody reads.
+  Same for any other abbreviation: spell it out or leave it out.
 - precipitation: only what appears in
   `zones.by_zone.<zone>.per_day[i].precip_day` and `.precip_windows`.
 - wind flyability: only what appears in `.wind_day` / `.wind_windows`.
@@ -149,7 +151,7 @@ When does it break down today, and which way does it travel? Basis:
 How does the situation develop over the remaining days? One sentence with
 concrete weekdays ("from Monday it dries out under building high pressure").
 
-**5. Active phenomena** (foehn/Bise/Vb) with a pilot consequence, tied to
+**5. Active phenomena** (foehn/Bise/Genoa low) with a pilot consequence, tied to
 the concrete weekday from `foehn.days_affected` / `bise.days_active` —
 NEVER blanket "the whole window" when only individual days are affected.
 

@@ -89,7 +89,10 @@ ERLAUBT (aus Strukturfeld):
   (auch "Foehnschneise") verboten; Boeigkeit dort ueber Talwind/Hoehenwind
   benennen. Nur wenn `bise.active_any_day=true` darfst du
   "Bise" oder "Bisenlage" verwenden. Nur wenn `vb_lage.active_any_day=true`
-  darfst du "Vb-Tief" oder "Genua-Tief" verwenden.
+  darfst du "Genua-Tief" verwenden — **nie "Vb-Tief" oder "Vb-Lage"**: "Vb"
+  ist eine Zugbahn-Nummer (van Bebber) und im Fliesstext ein Kuerzel, das
+  niemand versteht. Gleiches gilt fuer jedes andere Kuerzel: ausschreiben
+  oder weglassen.
 - Niederschlag: nur was in `zones.by_zone.<zone>.per_day[i].precip_day` und
   `.precip_windows` steht.
 - Wind-Fliegbarkeit: nur was in `.wind_day` / `.wind_windows` steht.
@@ -151,7 +154,7 @@ Wie entwickelt sich die Lage ueber die restlichen Tage? Ein Satz mit
 konkreten Wochentagen ("ab Montag trocknet es mit aufbauendem Hochdruck
 ab").
 
-**5. Aktive Phaenomene** (Foehn/Bise/Vb) mit Pilot-Konsequenz, gebunden
+**5. Aktive Phaenomene** (Foehn/Bise/Genua-Tief) mit Pilot-Konsequenz, gebunden
 an den konkreten Wochentag aus `foehn.days_affected` / `bise.days_active`
 — NIE pauschal "die ganzen Tage", wenn nur einzelne betroffen sind.
 

@@ -214,7 +214,9 @@ Zusaetzlich `windows[*].share_wind_crit` fuer den Tagesverlauf des Windes.
 
 ### `decide_lage_label` (Hierarchie)
 1. Föhn aktiv → Südfoehnlage / Nordfoehnlage / Foehnlage (wechselnd)
-2. Vb aktiv → Vb-/Genua-Tief
+2. Vb aktiv → Genua-Tief (Label **ohne** das Kürzel „Vb" — van-Bebber-
+   Zugbahnnummer, im Cast unverständlich; der i18n-Key hängt am Wert:
+   `js.lage.<value>`, beim Ändern beide Seiten nachziehen)
 3. Bise aktiv → Bisenlage
 4. Strömung ≠ schwach → Westlage / Nordwestlage / Suedwestlage / ...
 5. Hochdruck dominant → Hochdrucklage
@@ -254,7 +256,10 @@ Zuordnung `days[i] ↔ forecast_dates[i]` per Position, Zonen über die
 `config.SYNOPTIC_ZONES`, nicht nach LLM-Reihenfolge.
 
 ### Validierung (`engine/synoptic_llm.py:_validate`)
-1. **Regex-Verbotsfilter**: `\bkaltfront\b`, `\btrog\b`, `\d{3,4}\s?hPa`, ...
+1. **Regex-Verbotsfilter**: `\bkaltfront\b`, `\btrog\b`, `\d{3,4}\s?hPa`,
+   dazu die Kürzel `\bcape\b` und `\bVb\b` — Kürzel gehören nicht in den
+   Fliesstext („Vb" = van-Bebber-Zugbahn, gemeint ist das Genua-Tief;
+   hohe CAPE heisst „labile Luft")
 2. **Zonen-Vollständigkeit**: alle 4 Zonen, keine doppelt, keine unbekannte
    ID; pro Zone `len(days) == len(forecast_dates)`
 3. **Region-Validierung**: erwähnte Region-Labels müssen für **diesen** Cast
