@@ -1,8 +1,11 @@
 /* Synoptik-Embed fuer den Gleitcast (/briefing): kleine, NICHT-interaktive
- * Live-Karte unter der Wetterlage-Gesamteinschaetzung — Druckbaender,
- * Isobaren, H/T-Badges und Wind-Partikel (via WingcastWind) fuer den
- * Timestep, der der aktuellen Zeit am naechsten liegt. Klick auf die Karte
- * fuehrt zur grossen interaktiven Karte (/synoptik).
+ * Karte unter der Wetterlage-Gesamteinschaetzung — Druckbaender, Isobaren,
+ * H/T-Badges und Wind-Partikel (via WingcastWind) fuer den Timestep, der dem
+ * ANALYSEZEITPUNKT am naechsten liegt (`wetterlage.generated_at`), NICHT der
+ * Uhrzeit des Betrachters. Die Karte belegt den Textblock darueber; ein
+ * spaeterer Zeitschritt wuerde eine Lage zeigen, die der Text nie
+ * beschrieben hat. Der Stand steht sichtbar in der Kopfzeile.
+ * Klick auf die Karte fuehrt zur grossen interaktiven Karte (/synoptik).
  *
  * Bewusst ein eigenstaendiges, schlankes Modul statt einer Wiederverwendung
  * von synoptic-map.js: das Seitenmodul ist eine geschlossene IIFE mit
@@ -175,14 +178,22 @@
 
   // ===== Timestep-Wahl / Formatierung ======================================
 
-  // Timestep-Keys sind lokale CH-Zeit ("2026-07-13T18:00"). Naechster zum
-  // Jetzt-Zeitpunkt — Vergleich ueber Date ohne TZ-Suffix (Browser-lokal,
-  // fuer die Zielgruppe = CH ausreichend genau).
-  function nearestTimestep(timesteps) {
-    var now = Date.now();
+  // Timestep-Keys sind lokale CH-Zeit ("2026-07-13T18:00"). Gesucht ist der
+  // Schritt, der dem ANALYSEZEITPUNKT am naechsten liegt — nicht der Uhrzeit
+  // des Betrachters: Die Karte soll den Stand zeigen, auf dem der
+  // Wetterlage-Text beruht. Wer den Cast um 19:00 liest, sieht sonst eine
+  // Lage, die der Text nie beschrieben hat.
+  //
+  // `generated_at` kommt aus dem Synoptik-Cache (ISO ohne TZ-Suffix, lokale
+  // CH-Zeit — gleiche Basis wie die Timestep-Keys). Fehlt es (alter Cache),
+  // faellt die Wahl auf den ersten Timestep statt auf "jetzt": lieber der
+  // Anfang des Prognosezeitraums als ein Zeitpunkt ohne Bezug zum Text.
+  function analysisTimestep(timesteps, generatedAt) {
+    var ref = generatedAt ? new Date(generatedAt).getTime() : NaN;
+    if (isNaN(ref)) return timesteps[0];
     var best = timesteps[0], bestD = Infinity;
     timesteps.forEach(function (ts) {
-      var d = Math.abs(new Date(ts) - now);
+      var d = Math.abs(new Date(ts) - ref);
       if (d < bestD) { bestD = d; best = ts; }
     });
     return best;
@@ -310,11 +321,14 @@
       .then(function (data) {
         var grid = data && data.grid;
         if (!data.success || !grid || !grid.timesteps || !grid.timesteps.length) return;
-        var ts = nearestTimestep(grid.timesteps);
+        var generatedAt = data.wetterlage && data.wetterlage.generated_at;
+        var ts = analysisTimestep(grid.timesteps, generatedAt);
         // Karte erst sichtbar machen (Leaflet braucht reale Groesse), dann rendern
         card.hidden = false;
+        var desc = document.getElementById("bfSynopticSub");
+        if (desc) desc.textContent = "· " + wcT("js.syn.embed_sub");
         var sub = document.getElementById("bfSynopticTs");
-        if (sub) sub.textContent = "· " + wcT("js.syn.embed_sub") + " · " + fmtTs(ts);
+        if (sub) sub.textContent = "· " + wcT("js.syn.embed_asof") + " " + fmtTs(ts);
         render(mapEl, grid, ts);
       })
       .catch(function (e) {

@@ -2765,5 +2765,7 @@ body:not(.bf-hint-seen) .bf-region:not(.is-collapsed) .bf-region-chevron {
 
 @media (max-width: 560px) {
   .bf-synoptic-map { aspect-ratio: 1.7 / 1; }
-  .bf-synoptic-sub { display: none; }
+  /* Nur die Beschreibung ("Bodendruck & Hoehenwind") weicht — der Stand
+     bleibt sichtbar, sonst wirkt die Karte aktueller als sie ist. */
+  .bf-synoptic-sub--desc { display: none; }
 }
