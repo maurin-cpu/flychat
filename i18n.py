@@ -851,6 +851,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.syn.high_letter": {"de": "H", "en": "H"},
     "js.syn.low_letter": {"de": "T", "en": "L"},
     "js.syn.high_aria": {"de": "Hochdruckzentrum {p} hPa", "en": "High pressure centre {p} hPa"},
+    # Zentrum liegt ausserhalb des Briefing-Ausschnitts und ist an den Rand geheftet
+    "js.syn.center_offmap": {"de": "ausserhalb des Kartenausschnitts",
+                             "en": "outside the map view"},
     "js.syn.low_aria": {"de": "Tiefdruckzentrum {p} hPa", "en": "Low pressure centre {p} hPa"},
     "js.syn.updated": {"de": "Stand: {ts}", "en": "Updated: {ts}"},
     "js.syn.no_data": {"de": "Keine Druckdaten verfuegbar.", "en": "No pressure data available."},

@@ -586,6 +586,22 @@
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2), 0 0 0 4px rgba(220, 38, 38, 0.16);
 }
 
+/* Zentrum ausserhalb des Kartenausschnitts (nur Briefing-Embed): an den Rand
+   geheftet, damit es nicht verlorengeht. Der gestrichelte Ring sagt "die
+   Position stimmt hier nicht, das Gebilde liegt weiter draussen" — ohne ihn
+   waere das Badge eine falsche Ortsangabe. */
+.syn-center-icon--offmap { opacity: 0.82; }
+
+.syn-center-icon--offmap .syn-center-badge {
+  border: 1.5px dashed currentColor;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.syn-center-icon--offmap.syn-center-icon--hoch .syn-center-badge,
+.syn-center-icon--offmap.syn-center-icon--tief .syn-center-badge {
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.16);
+}
+
 /* ── Wetterlage: Tages-Karten (synchron zur Animation) ──────── */
 
 .syn-days {

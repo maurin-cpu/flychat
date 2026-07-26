@@ -30,6 +30,14 @@
   // Gleiche Zurueckhaltung wie auf der grossen Karte: Toenung als Hintergrund,
   // Isobaren und Landkarte bleiben lesbar (vorher 0.42).
   var FILL_OPACITY = 0.22;
+  // hPa-Beschriftung der Isobaren. Anders als auf /synoptik wird JEDE Isobare
+  // beschriftet (dort nur die 8er-Vielfachen): im Europa-Ausschnitt liegen oft
+  // nur zwei, drei Linien im Bild — bei 8er-Schritten bliebe die Karte ohne
+  // eine einzige Druckangabe. Die Entzerrung ueber LABEL_MIN_PX verhindert
+  // trotzdem Etiketten-Haufen.
+  var LABEL_EVERY = 4;
+  var LABEL_MIN_POINTS_IN_VIEW = 24;  // kuerzere Linienstuecke bleiben ohne
+  var LABEL_MIN_PX = 70;              // Mindestabstand zweier Labels
 
   var fillScale = null;
 
@@ -219,12 +227,40 @@
   // Schweizer Piloten entsteht: Atlantik/Iberien bis Schwarzes Meer,
   // Mittelmeer bis Skandinavien. Isobaren und Flaechen werden weiterhin ueber
   // das volle Raster gerechnet, es wird nur enger geschaut.
-  var EUROPE_BOUNDS = L.latLngBounds([36.0, -10.0], [58.0, 26.0]);
+  // Fester Europa-Ausschnitt im Zuschnitt klassischer Bodendruckkarten:
+  // Nordatlantik bis Schwarzes Meer, Mittelmeer bis Nordskandinavien. Bewusst
+  // FEST und nicht datenabhaengig — ein wanderndes Zentrum wuerde den
+  // Bildausschnitt sonst taeglich veraendern, und ein Zentrum ueber dem
+  // Kaspischen Meer (kommt vor) macht Europa wieder zur Briefmarke.
+  // Breitenbereich bewusst knapp: das Kartenfeld ist sehr breit (2.35:1), ein
+  // grosser Breitenbereich zieht deshalb automatisch halb Asien mit ins Bild.
+  var EUROPE_BOUNDS = L.latLngBounds([35.5, -11.0], [59.0, 27.0]);
 
   function fitEurope(map) {
     // Padding, damit H/T-Badges am Rand nicht angeschnitten werden — sie
     // ragen ueber ihren Ankerpunkt hinaus (44x54 px Icon).
-    map.fitBounds(EUROPE_BOUNDS, { animate: false, padding: [26, 22] });
+    map.fitBounds(EUROPE_BOUNDS, { animate: false, padding: [30, 26] });
+  }
+
+  // Druckzentren liegen ihrer Natur nach oft ausserhalb eines Europa-Rahmens
+  // (am 26.07.2026 lagen ALLE drei knapp draussen: Nordmeer, Ionisches Meer,
+  // Kaspisches Meer). Weglassen waere Informationsverlust — der Textblock
+  // darueber spricht von genau diesen Gebilden. Solche Zentren werden darum
+  // an den Bildrand geheftet und dort als "ausserhalb" gekennzeichnet, statt
+  // zu verschwinden oder angeschnitten zu werden.
+  // Geklemmt wird in PIXELN, nicht in Grad: das Badge ist 44x54 px gross und
+  // haengt an einem Anker 18 px unter seiner Oberkante — ein prozentualer
+  // Abstand zur Kartengrenze trifft diese Geometrie nicht und schneidet mal
+  // den Buchstaben, mal die hPa-Zahl ab.
+  var BADGE_MARGIN = { top: 22, bottom: 40, side: 26 };
+
+  function clampToView(map, c) {
+    var size = map.getSize();
+    var pt = map.latLngToContainerPoint(L.latLng(c.lat, c.lon));
+    var x = Math.min(Math.max(pt.x, BADGE_MARGIN.side), size.x - BADGE_MARGIN.side);
+    var y = Math.min(Math.max(pt.y, BADGE_MARGIN.top), size.y - BADGE_MARGIN.bottom);
+    return { latlng: map.containerPointToLatLng(L.point(x, y)),
+             offmap: (x !== pt.x || y !== pt.y) };
   }
 
   function render(mapEl, grid, ts) {
@@ -250,7 +286,8 @@
       subdomains: "abcd", maxZoom: 18, opacity: 0.38,
     }).addTo(map);
 
-    fitEurope(map);
+    var allCenters = (grid.centers && grid.centers[ts]) || [];
+    fitEurope(map, allCenters);
 
     var iso = buildIsobars(grid.meta, grid.values[ts]);
 
@@ -266,10 +303,24 @@
       }).addTo(map);
     }
 
+    // Sichtbarer Bereich mit Sicherheitsabstand — Etiketten und Badges ragen
+    // ueber ihren Ankerpunkt hinaus und wuerden an der Kante angeschnitten.
+    var visible = map.getBounds().pad(-0.07);
+
+    // Positionen der H/T-Badges vorab bestimmen (inkl. Rand-Klemmung) und als
+    // besetzt markieren: sonst legt eine Isobaren-Beschriftung sich ueber ein
+    // Zentrum — Leaflet stapelt Marker nach Breitengrad, die suedlichere
+    // Beschriftung landet dann VOR dem Badge.
+    var centerPos = allCenters.map(function (c) {
+      return { c: c, pos: clampToView(map, c) };
+    });
+
     // Isobaren-Linien: exakt die Werte von /synoptik (synoptic-map.js) —
-    // leichte graue Fuehrungslinien. Der Embed hatte sie dunkler und dicker,
-    // dieselbe Lage sah damit in beiden Ansichten verschieden aus. Ohne
-    // hPa-Labels, dafuer ist die Karte hier zu klein.
+    // leichte graue Fuehrungslinien. Dazu die hPa-Beschriftung, gleiche
+    // Markup-Klasse wie dort (.syn-isobar-label aus synoptik.css).
+    var labelPositions = centerPos.map(function (e) {
+      return map.latLngToLayerPoint(e.pos.latlng);
+    });
     iso.forEach(function (c) {
       var isMajor = c.value % 8 === 0;
       c.lines.forEach(function (line) {
@@ -281,27 +332,56 @@
           lineCap: "round",
           smoothFactor: 1,
         }).addTo(map);
+
+        if (c.value % LABEL_EVERY !== 0) return;
+        // Ankerpunkt aus den Stuetzpunkten IM BILD waehlen, nicht aus der
+        // ganzen Linie: die Isobaren laufen weit ueber den Europa-Ausschnitt
+        // hinaus, ihre Mitte liegt meist ueber dem Atlantik — das Label waere
+        // dann nie zu sehen.
+        var inView = line.filter(function (p) {
+          return visible.contains(L.latLng(p));
+        });
+        if (inView.length < LABEL_MIN_POINTS_IN_VIEW) return;
+        var mid = inView[Math.floor(inView.length / 2)];
+        var pt = map.latLngToLayerPoint(mid);
+        var tooClose = labelPositions.some(function (o) {
+          return Math.abs(o.x - pt.x) < LABEL_MIN_PX
+              && Math.abs(o.y - pt.y) < LABEL_MIN_PX;
+        });
+        if (tooClose) return;
+        labelPositions.push(pt);
+        L.marker(mid, {
+          interactive: false,
+          icon: L.divIcon({
+            className: "syn-isobar-label",
+            html: String(c.value),
+            iconSize: [40, 17],
+            iconAnchor: [20, 9],
+          }),
+        }).addTo(map);
       });
     });
 
     // H/T-Badges (gleiche Markup/Klassen wie /synoptik -> synoptik.css).
-    // Nur Zentren, die ganz im Bild liegen: der Europa-Ausschnitt schneidet
-    // Zentren am Rand sonst zur Haelfte ab, was wie ein Darstellungsfehler
-    // aussieht. Das Badge ragt ueber seinen Ankerpunkt hinaus, darum ein
-    // Sicherheitsabstand statt der nackten Kartengrenze.
-    var visible = map.getBounds().pad(-0.07);
-    var centers = ((grid.centers && grid.centers[ts]) || []).filter(function (c) {
-      return visible.contains(L.latLng(c.lat, c.lon));
-    });
-    centers.forEach(function (c) {
+    // Zentren ausserhalb des Ausschnitts werden an den Rand geheftet und mit
+    // --offmap gekennzeichnet: sie bleiben sichtbar, ohne angeschnitten zu
+    // werden, und geben die Richtung an, in der das Gebilde liegt.
+    centerPos.forEach(function (entry) {
+      var c = entry.c, pos = entry.pos;
       var isHigh = c.type === "Hoch";
       var letter = wcT(isHigh ? "js.syn.high_letter" : "js.syn.low_letter");
       var aria = wcT(isHigh ? "js.syn.high_aria" : "js.syn.low_aria",
                      { p: Math.round(c.msl_hpa) });
-      L.marker([c.lat, c.lon], {
+      if (pos.offmap) aria += " — " + wcT("js.syn.center_offmap");
+      L.marker(pos.latlng, {
         interactive: false,
+        // Badges immer ueber den Isobaren-Etiketten (Leaflets Default sortiert
+        // Marker nach Breitengrad, das reicht hier nicht).
+        zIndexOffset: 1000,
         icon: L.divIcon({
-          className: "syn-center-icon " + (isHigh ? "syn-center-icon--hoch" : "syn-center-icon--tief"),
+          className: "syn-center-icon "
+            + (isHigh ? "syn-center-icon--hoch" : "syn-center-icon--tief")
+            + (pos.offmap ? " syn-center-icon--offmap" : ""),
           html: '<span class="syn-center-badge" role="img" aria-label="' + escapeHtml(aria) + '">'
               + escapeHtml(letter) + "</span>"
               + '<span class="syn-center-value">' + Math.round(c.msl_hpa) + "</span>",
@@ -318,7 +398,7 @@
     // Bei Layout-Wechseln (Breakpoint) Karte neu einpassen
     window.addEventListener("resize", function () {
       map.invalidateSize();
-      fitEurope(map);
+      fitEurope(map, allCenters);
     });
 
     return map;
