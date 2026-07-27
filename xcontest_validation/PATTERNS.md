@@ -920,3 +920,67 @@ fuer den Tag fertig berechnet waren (LLM-Pass laeuft asynchron nach dem Wetter-R
 - Bei ≥3 Tagen für einen Issue: Cause-Hypothese im Code prüfen
 - Bei ≥5 Tagen: Fix planen
 - Issues, die nur 1× auftraten, nach 30 Tagen ggf. archivieren
+
+---
+
+## I-016 — Thermische Felder trennen räumlich nicht (Rangfolge der Regionen)
+
+**Erstmals**: 2026-07-26 (Sammel-Analyse über 49 Tage)
+**Tage beobachtet**: 49 (18.05.–25.07., alle Tage mit Archiv-Snapshot)
+**Status**: `offen`
+
+Einseitiger Test (`scripts/validate_climb_onesided.py`): bewiesen gute Regionen
+(Flüge ≥60 km) landen in unserer Steigraten-Rangliste im Median auf Perzentil
+**52 %** — also Zufall. Thermikhöhe 57 % (schlechter als Zufall), produktive
+Stunden 48 %. Der Kontroll-Test zeigt, dass die Metrik funktioniert: wenig Böen
+39 %, wenig Regen 39 %.
+
+Pro Region ist die Abweichung **konstant, nicht zufällig**: Jura Zentral 100 %
+(n=21, Tagesbeste bis 303 km, praktisch immer letzter Rang), Alpstein/Ostschweiz
+87 % (n=16), Genferseeregion 78 %, Schwarzsee/Gantrisch 70 %, Mittelland Zentral
+67 % — gegenüber Prättigau-Davos 17 %, Unterwallis 26 %, Berner Voralpen 30 %.
+
+Tagesqualität national funktioniert dagegen: Spearman(produktive Stunden,
+Tages-Best-km) +0.42, Steigen +0.24 (n=49).
+
+**Nicht** durch Skalierung behebbar — ein globaler Faktor ändert die Rangfolge
+nicht. Details, Zahlen und Grenzen: `2026-07-26_ANALYSE_49_TAGE.md`.
+
+---
+
+## I-017 — Regions-Zuordnung in fluggebiete_pge.csv (WIDERLEGT)
+
+**Erstmals**: 2026-07-26 · **Geprüft und geschlossen**: 2026-07-26
+**Status**: `nicht-reproduzierbar`
+
+**Ursprüngliche Behauptung** (falsch): 64 von 494 Spots seien der falschen
+`analyse_region` zugeordnet, u. a. Niesen unter „Freiburger Voralpen".
+
+**Prüfung**: Punkt-in-Polygon aller 494 Spots gegen
+`data/regionen_polygone_mapped.geojson` (29 Polygone, tragen den Regionsnamen
+in `properties.region`):
+
+| | Spots |
+|---|---|
+| in genau einem Polygon, Zuordnung stimmt | **476** |
+| in keinem Polygon, aber nächstgelegene Region = CSV-Wert | 17 |
+| echter Widerspruch | **0** |
+
+- **Niesen liegt im Polygon „Freiburger Voralpen"** — die Region ist so
+  definiert, dass sie bis ins Simmental reicht. Kein Fehler.
+- Die einzige Roh-Abweichung (`Steiglihorn-1950 SO` → Zentralschweizer Voralpen)
+  ist ein Polygon-Randfall: der Zwilling `Steiglihorn-1950 SW` steht 20 m
+  daneben und liegt innerhalb von „Mittelland Zentral".
+- `Ob Lucken` (47.763/8.556, Schaffhausen) unter „Bodenseeraum" ist vertretbar.
+- 26 der ursprünglich 27 gemeldeten Abweichungen waren reine Schreibweise
+  (`Waadtländer Alpen` vs. `Waadtlaender Alpen`).
+
+**Fehlerursache der Falschmeldung**: Distanz zum Median-Zentrum der Region als
+Kriterium. Bei grossflächigen Regionen liegt ein Teil der Spots zwangsläufig weit
+vom Zentrum — das Kriterium erzeugt systematisch Falschtreffer. Für solche Prüfungen
+**nur** Punkt-in-Polygon gegen `regionen_polygone_mapped.geojson` verwenden.
+
+**Was bleibt** (keine Datenfrage, sondern Zuschnitt/Benennung): die Regionsnamen
+sind teils irreführend breit — „Freiburger Voralpen" umfasst 70 Spots bis zum
+Niesen, „Berner Oberland" nur 4 Spots im Entlebuch. Das ist bei der Interpretation
+regionaler Auswertungen zu beachten (siehe I-016), ist aber so gewollt.

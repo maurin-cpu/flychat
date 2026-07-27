@@ -48,6 +48,31 @@ entstehen ~20-50 Zeilen. Über Zeit wird das die Basis für:
 - ML-Postprocessing-Training (XGBoost auf Forecast→Realität-Residuen)
 - Saisonale Muster (Frühling overforecast, Föhn unterforecast?)
 
+### 4. Sammel-Analysen und aggregierte Rohdaten (ab 2026-07-26)
+
+Wenn ein Befund **tagesübergreifend** ist, entsteht statt vieler dünner Tages-`.md`
+eine Sammel-Analyse: `YYYY-MM-DD_ANALYSE_<thema>.md` (erste: `2026-07-26_ANALYSE_49_TAGE.md`).
+
+Zugehörige Rohdaten-Ablage: `_raw/strong_flights_<von>_<bis>.tsv` mit
+`date, launch, km, airtime` — pro Tag und Startplatz **nur der beste
+Gleitschirmflug ab 60 km**, HG/RW/Starrflügler bereits ausgefiltert.
+
+> ⚠ Bewusste Verkürzung: Flüge **unter 60 km** und die **Flugzahl pro Startplatz**
+> sind für die so erfassten Tage nicht abgelegt. Für Tage im Format des
+> Paste-Parsers (`_raw/YYYY-MM-DD.tsv`, alle Flüge) gilt das nicht. Wer die
+> Niveau-Prüfung mit einer tieferen Schwelle als 60 km wiederholen will, braucht
+> zuerst die vollständigen Tages-TSVs.
+
+Auswertungs-Skripte:
+- `scripts/validate_climb_onesided.py` — der **gültige** einseitige Test
+  (Perzentil-Rang bewiesen guter Regionen) plus Kontroll-Test mit Wind/Regen.
+- `scripts/validate_climb_vs_xcontest.py` — Rang-Korrelation und Niveau-Prüfung
+  via Kurbel-Gleit-Inversion. **Achtung**: dessen rohe Rang-Korrelation verletzt
+  die 0-Launches-Regel und darf nicht als Befund zitiert werden.
+- `scripts/build_observations_from_strong.py` — erzeugt `observations.csv`-Zeilen
+  aus der Starkflug-Tabelle + Archiv (`notes` trägt `auto_from_strong_flights`;
+  `launches` und `top_start_time` bleiben dort leer).
+
 ### 3. `sector_audit.csv` — Abgeleitetes Arbeitsblatt für Sektor-Diskussion
 
 Filtert alle False-Positives aus `observations.csv` und reichert sie mit dem

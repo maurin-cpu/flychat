@@ -1,0 +1,400 @@
+25.07.26 12:26=UTC+02:00
+CHFlorian Brändli
+CHMonte Tamaro
+102.17 km    102.17 p.    4 : 33 h
+25.07.26 11:00=UTC+02:00
+CHMarco Boscacci
+CHMonte Tamaro
+57.33 km    57.33 p.    2 : 43 h
+25.07.26 12:20=UTC+02:00
+CHChristian Erne
+CHMonte Tamaro
+54.76 km    76.66 p.    3 : 54 h
+25.07.26 10:55=UTC+02:00
+CHLuigi Tornusciolo
+CHMonte Tamaro
+54.31 km    76.04 p.    2 : 30 h
+25.07.26 10:12=UTC+02:00
+CHLaurent Borella
+CHCret du Midi
+45.59 km    72.95 p.    3 : 39 h
+25.07.26 11:24=UTC+02:00
+CHGiusep Gliott
+CHCrap Sogn...
+45.48 km    72.77 p.    2 : 59 h
+25.07.26 12:51=UTC+02:00
+CHPhilipp Rothenbühler
+CHCari (Car...
+44.15 km    44.15 p.    2 : 04 h
+25.07.26 12:18=UTC+02:00
+CHFrancesco Bonavia
+CHFanas
+42.59 km    59.63 p.    3 : 58 h
+25.07.26 12:03=UTC+02:00
+CHChristian Schutter
+CHMonte Lema
+41.70 km    58.38 p.    3 : 46 h
+25.07.26 15:21=UTC+02:00
+CHElia Sartoris
+CHMonte Tamaro
+39.55 km    39.55 p.    1 : 25 h
+25.07.26 12:07=UTC+02:00
+CHRoman Allenbach
+CHFanas
+32.87 km    46.02 p.    1 : 40 h
+25.07.26 10:44=UTC+02:00
+CHMatteo Daverio
+CHMonte Tamaro
+30.66 km    30.67 p.    1 : 20 h
+25.07.26 09:27=UTC+02:00
+CHElia Sartoris
+CHMonte Tamaro
+26.67 km    32.01 p.    2 : 54 h
+25.07.26 13:16=UTC+02:00
+CHAndreas Graber
+CHGrindelwald
+19.88 km    19.88 p.    0 : 39 h
+25.07.26 10:16=UTC+02:00
+CHBenjamin Theytaz
+CHCret du Midi
+19.29 km    23.15 p.    1 : 03 h
+25.07.26 14:55=UTC+02:00
+CHFabrizio Ronchetti
+CHMonte Gen...
+18.04 km    25.25 p.    0 : 57 h
+25.07.26 12:58=UTC+02:00
+CHDaniel Gutekunst
+CHPlanplatten
+16.50 km    16.50 p.    0 : 42 h
+25.07.26 11:34=UTC+02:00
+CHKevin Fiori
+CHMonte Tamaro
+16.18 km    16.18 p.    0 : 33 h
+25.07.26 10:31=UTC+02:00
+CHMichel Hallenbarter
+CHCret du Midi
+16.12 km    16.12 p.    0 : 40 h
+25.07.26 13:40=UTC+02:00
+CHDaniele Tessaro
+CHMonte Gen...
+15.53 km    21.74 p.    1 : 39 h
+25.07.26 14:53=UTC+02:00
+CHRémy Delaloye
+CHAnzère
+14.77 km    14.76 p.    0 : 27 h
+25.07.26 14:10=UTC+02:00
+CHBenjamin Sommer
+CHMarbachegg
+14.54 km    14.54 p.    0 : 45 h
+25.07.26 10:01=UTC+02:00
+CHchristian mariotti
+CHMonte Tamaro
+13.52 km    18.93 p.    0 : 59 h
+25.07.26 09:53=UTC+02:00
+CHSepp Bucher
+CHFiesch
+13.45 km    13.45 p.    0 : 55 h
+25.07.26 11:10=UTC+02:00
+CHPatrick Plüss
+CHWildstrubel
+12.90 km    12.90 p.    0 : 27 h
+25.07.26 13:08=UTC+02:00
+CHKarin Rüttimann
+CHPilatus Kulm
+12.39 km    12.39 p.    1 : 04 h
+25.07.26 09:46=UTC+02:00
+CHHans Tanner
+CHBrunni
+11.79 km    11.79 p.    0 : 22 h
+25.07.26 13:31=UTC+02:00
+CHNoel Roje
+CHPilatus Kulm
+11.55 km    11.55 p.    0 : 26 h
+25.07.26 11:12=UTC+02:00
+CHNoel Roje
+CHPilatus Kulm
+11.35 km    11.35 p.    0 : 29 h
+25.07.26 12:27=UTC+02:00
+CHMichael Maldini
+CHPilatus Kulm
+11.22 km    11.22 p.    0 : 29 h
+25.07.26 11:05=UTC+02:00
+CHPatrick Burkhalter
+CHMotta Naluns
+11.15 km    15.61 p.    0 : 34 h
+25.07.26 10:52=UTC+02:00
+CHSusann Küpfer
+CHAlp Nagens
+11.03 km    11.03 p.    0 : 27 h
+25.07.26 11:37=UTC+02:00
+CHRomaine Leiggener
+CHCret du Midi
+10.82 km    10.82 p.    0 : 25 h
+25.07.26 12:38=UTC+02:00
+ITSedano Allegro
+CHCimetta
+10.68 km    10.68 p.    0 : 52 h
+25.07.26 11:35=UTC+02:00
+CHMartin von Arx
+CHSulegg-2320
+10.67 km    10.67 p.    0 : 22 h
+25.07.26 10:23=UTC+02:00
+CHJonas Marolf
+CHPilatus Kulm
+10.29 km    10.29 p.    0 : 28 h
+25.07.26 08:36=UTC+02:00
+ZAPierre Carter
+CHÄrmigchnubel
+9.88 km    9.88 p.    0 : 32 h
+25.07.26 14:12=UTC+02:00
+CHMichael Maldini
+CHPilatus Kulm
+9.69 km    9.69 p.    0 : 26 h
+25.07.26 09:43=UTC+02:00
+CHLauréline Humair
+CHCret du Midi
+9.61 km    9.61 p.    0 : 25 h
+25.07.26 10:36=UTC+02:00
+ZAdavid hotz
+CH?
+9.61 km    9.61 p.    0 : 31 h
+25.07.26 12:38=UTC+02:00
+ILLibi Mori
+CHCimetta
+9.59 km    9.58 p.    0 : 50 h
+25.07.26 09:29=UTC+02:00
+CHMarcello Ancarola
+CHAlpe di Prou
+9.38 km    9.38 p.    0 : 21 h
+25.07.26 16:25=UTC+02:00
+ITMarcello Rigamonti
+CHTombal
+9.31 km    11.17 p.    0 : 46 h
+25.07.26 16:18=UTC+02:00
+PGWerner Juergens
+CHPilatus K...
+8.85 km    8.85 p.    0 : 23 h
+25.07.26 09:36=UTC+02:00
+CHNoel Roje
+CHPilatus Kulm
+8.70 km    8.70 p.    0 : 22 h
+25.07.26 10:31=UTC+02:00
+CHDaniel Gutekunst
+CHPlanplatten
+8.69 km    8.69 p.    0 : 29 h
+25.07.26 11:01=UTC+02:00
+CHAndré Hemmi
+CHScheidegg
+8.65 km    12.11 p.    0 : 47 h
+25.07.26 16:21=UTC+02:00
+CHMichael Maldini
+CHPilatus K...
+8.44 km    8.44 p.    0 : 26 h
+25.07.26 11:57=UTC+02:00
+CHAndrea Ryffel
+CHBuochserhorn
+7.87 km    7.87 p.    0 : 18 h
+25.07.26 11:05=UTC+02:00
+CHDaniel Gerber
+CHMonte Lema
+7.81 km    7.81 p.    0 : 59 h
+25.07.26 12:13=UTC+02:00
+CHSimon Bärtschi
+CHBrunni
+7.71 km    7.71 p.    0 : 28 h
+25.07.26 14:47=UTC+02:00
+CHFrederik Traber
+CHScheidegg
+7.63 km    7.63 p.    0 : 26 h
+25.07.26 10:16=UTC+02:00
+CHJoachim Pellissier
+CHVerbier
+7.58 km    7.58 p.    0 : 24 h
+25.07.26 09:08=UTC+02:00
+CHPatrick Kronig
+CHRothorn
+7.54 km    7.54 p.    0 : 18 h
+25.07.26 10:57=UTC+02:00
+CHFrank Sauter
+CHNiederhorn
+7.48 km    7.48 p.    0 : 30 h
+25.07.26 11:13=UTC+02:00
+CHHans Peter Buetikofer
+CHMentschelen
+7.37 km    7.37 p.    0 : 16 h
+25.07.26 10:13=UTC+02:00
+CHMartin Stählin
+CHCret du Midi
+7.37 km    7.37 p.    0 : 27 h
+25.07.26 11:45=UTC+02:00
+CHDamien Carrara
+CHCimetta
+7.23 km    7.23 p.    0 : 22 h
+25.07.26 08:53=UTC+02:00
+DKPaw Moller
+CHRothorn
+7.15 km    7.15 p.    0 : 31 h
+25.07.26 11:27=UTC+02:00
+CHPeter Altherr
+CHScheidegg
+6.85 km    6.85 p.    0 : 55 h
+25.07.26 11:19=UTC+02:00
+CHAndi Wyder
+CHBrunni
+6.76 km    6.76 p.    1 : 23 h
+25.07.26 11:03=UTC+02:00
+CHChristoph Knüsel
+CHMentschelen
+6.74 km    6.74 p.    0 : 13 h
+25.07.26 09:41=UTC+02:00
+CHRiccardo Ricci
+CHBällenhöchst
+6.69 km    6.69 p.    0 : 20 h
+25.07.26 11:59=UTC+02:00
+CHThomas A.
+CHLaubbärgli
+6.49 km    6.49 p.    0 : 16 h
+25.07.26 13:35=UTC+02:00
+CHSteve Hiestand
+CHDreibünde...
+6.31 km    6.31 p.    0 : 17 h
+25.07.26 10:18=UTC+02:00
+CHThomas Huggler
+CHSchynige ...
+6.09 km    6.09 p.    0 : 14 h
+25.07.26 11:18=UTC+02:00
+CHThomas Bösch
+CHMentschelen
+6.06 km    6.06 p.    0 : 12 h
+25.07.26 15:15=UTC+02:00
+ITMarco Malcangi
+CHKlewenalp
+6.06 km    6.06 p.    0 : 19 h
+25.07.26 12:27=UTC+02:00
+CHJanina Radny
+CHMonte Lema
+6.03 km    9.65 p.    1 : 30 h
+25.07.26 12:02=UTC+02:00
+CHReto Mühlethaler
+CHRigi Staffel
+5.89 km    5.89 p.    0 : 20 h
+25.07.26 13:34=UTC+02:00
+CHRobert Bastian
+CHBrunni
+5.89 km    5.89 p.    0 : 27 h
+25.07.26 11:59=UTC+02:00
+CHRobert Bastian
+CHBrunni
+5.66 km    5.66 p.    0 : 38 h
+25.07.26 13:13=UTC+02:00
+CHNiklaus Bähler
+CHStockhorn
+5.63 km    5.63 p.    0 : 19 h
+25.07.26 11:40=UTC+02:00
+CHCurdin Kindschi
+CHMotta Naluns
+5.54 km    8.86 p.    0 : 41 h
+25.07.26 13:08=UTC+02:00
+ATThomas Schleiss
+CHSchönhalde
+5.38 km    5.38 p.    0 : 16 h
+25.07.26 17:56=UTC+02:00
+ITMarco Malcangi
+CHKlewenalp
+5.35 km    5.35 p.    0 : 13 h
+25.07.26 10:36=UTC+02:00
+CHJürg Flütsch
+CHBärgli-Ch...
+5.13 km    5.12 p.    0 : 40 h
+25.07.26 14:05=UTC+02:00
+CHPedro Schläppi
+CHKlewenalp
+5.12 km    5.12 p.    0 : 15 h
+25.07.26 18:51=UTC+02:00
+ITMarco Malcangi
+CHKlewenalp
+4.92 km    4.92 p.    0 : 12 h
+25.07.26 12:13=UTC+02:00
+CHAndreas Badertscher
+CHSchynige ...
+4.91 km    4.91 p.    0 : 11 h
+25.07.26 12:09=UTC+02:00
+CHMathys Bruno
+CHTschenten
+4.89 km    4.89 p.    0 : 24 h
+25.07.26 13:11=UTC+02:00
+DEYannick Schleiss
+CHSchönhalde
+4.83 km    4.84 p.    0 : 14 h
+25.07.26 11:09=UTC+02:00
+CHAndy Nussbaumer
+CHChaiserstuel
+4.77 km    4.77 p.    0 : 18 h
+25.07.26 11:31=UTC+02:00
+CHIrene Lang
+CHScheidegg
+4.75 km    4.75 p.    0 : 36 h
+25.07.26 12:29=UTC+02:00
+ITMarco Malcangi
+CHKlewenalp
+4.68 km    4.68 p.    0 : 12 h
+25.07.26 21:02=UTC+02:00
+CHJan-Leo Kaak
+CHGurnigel
+4.61 km    4.61 p.    0 : 11 h
+25.07.26 11:59=UTC+02:00
+CHUlf Cahn von Seelen
+CHRotenflue
+4.38 km    4.38 p.    0 : 13 h
+25.07.26 10:51=UTC+02:00
+BEFlorian Greco
+CHOllon
+4.28 km    4.28 p.    0 : 10 h
+25.07.26 12:03=UTC+02:00
+CHMichael Maldini
+CHPilatus Kulm
+4.24 km    4.24 p.    0 : 22 h
+25.07.26 12:08=UTC+02:00
+CHChristian Sommer
+CHTschenten
+4.19 km    4.19 p.    0 : 12 h
+25.07.26 13:18=UTC+02:00
+ITMarco Malcangi
+CHKlewenalp
+4.16 km    4.16 p.    0 : 13 h
+25.07.26 13:24=UTC+02:00
+CHYann Gosteli
+CHRuedlen
+4.11 km    4.11 p.    0 : 09 h
+25.07.26 12:59=UTC+02:00
+CHLoranne Berger
+CHMarbachegg
+4.10 km    4.10 p.    0 : 14 h
+25.07.26 11:52=UTC+02:00
+CHLoranne Berger
+CHMarbachegg
+4.09 km    4.09 p.    0 : 17 h
+25.07.26 10:28=UTC+02:00
+CHChristophe Pache
+CHTorgon
+4.08 km    4.08 p.    0 : 13 h
+25.07.26 08:23=UTC+02:00
+CHMichael Maldini
+CHNiederbauen
+4.07 km    4.07 p.    0 : 08 h
+25.07.26 12:35=UTC+02:00
+CHPedro Schläppi
+CHKlewenalp
+3.98 km    3.98 p.    0 : 15 h
+25.07.26 13:38=UTC+02:00
+FRThibaut Coutelou
+CHBrunni
+3.94 km    3.94 p.    0 : 11 h
+25.07.26 16:49=UTC+02:00
+ITMarco Malcangi
+CHKlewenalp
+3.81 km    3.82 p.    0 : 13 h
+25.07.26 14:31=UTC+02:00
+FRThibaut Coutelou
+CHBrunni
+3.78 km    3.78 p.    0 : 21 h
