@@ -50,6 +50,16 @@ LON_MIN, LON_MAX = -20.0, 32.0
 CHUNK = 90          # Punkte pro Open-Meteo-Call (wie synoptic_grid)
 P_LEVEL = 850.0     # hPa
 
+# Teilfenster fuer die Gegenprobe. Ein Mittelwert ueber ganz Europa beantwortet
+# nicht die Frage, die uns interessiert: taugt die Linie DORT, wo geflogen wird?
+# "Suedost" ist das Gebiet, in dem der Sichtvergleich Linien ohne Entsprechung
+# in der DWD-Analyse zeigte, "Atlantik" das, wo sie sauber aussahen.
+REGIONS = {
+    "Alpenraum":  (44.0, 48.5,   5.0, 17.0),
+    "Suedost":    (34.0, 44.0,  12.0, 32.0),
+    "Atlantik":   (45.0, 66.0, -20.0,  5.0),
+}
+
 
 # ============================================================================
 # Fetch
@@ -61,18 +71,20 @@ def build_grid(res: float):
     return lats, lons
 
 
-def fetch_fields(lats, lons, start: str, end: str, hours: list) -> dict:
-    """Holt T850/RH850/Wind850 fuer alle Rasterpunkte.
+def fetch_fields(lats, lons, start: str, end: str, hours: list,
+                 level: float = P_LEVEL) -> dict:
+    """Holt T/RH/Wind auf `level` hPa fuer alle Rasterpunkte.
 
     Returns {timestep: {"t": 2D, "rh": 2D, "u": 2D, "v": 2D}} in Grad C / % / m/s.
     """
+    lv = int(level)
     points = [(float(la), float(lo)) for la in lats for lo in lons]
     ny, nx = len(lats), len(lons)
     print(f"Raster {ny} x {nx} = {len(points)} Punkte, "
           f"{math.ceil(len(points)/CHUNK)} Calls")
 
     wanted = [f"{d}T{h:02d}:00" for d in _daterange(start, end) for h in hours]
-    out = {ts: {k: np.full((ny, nx), np.nan) for k in ("t", "rh", "u", "v", "pr")}
+    out = {ts: {k: np.full((ny, nx), np.nan) for k in ("t", "rh", "u", "v", "pr", "p")}
            for ts in wanted}
 
     for c0 in range(0, len(points), CHUNK):
@@ -80,8 +92,11 @@ def fetch_fields(lats, lons, start: str, end: str, hours: list) -> dict:
         params = {
             "latitude": ",".join(str(la) for la, _ in chunk),
             "longitude": ",".join(str(lo) for _, lo in chunk),
-            "hourly": ("temperature_850hPa,relative_humidity_850hPa,"
-                       "wind_speed_850hPa,wind_direction_850hPa,precipitation"),
+            "hourly": ("temperature_2m,relative_humidity_2m,surface_pressure,"
+                       "wind_speed_10m,wind_direction_10m,precipitation"
+                       if lv == 0 else
+                       f"temperature_{lv}hPa,relative_humidity_{lv}hPa,"
+                       f"wind_speed_{lv}hPa,wind_direction_{lv}hPa,precipitation"),
             "models": "ecmwf_ifs025",
             "start_date": start,
             "end_date": end,
@@ -105,10 +120,16 @@ def fetch_fields(lats, lons, start: str, end: str, hours: list) -> dict:
                 n = tindex.get(ts)
                 if n is None:
                     continue
-                t = _get(h, "temperature_850hPa", n)
-                rh = _get(h, "relative_humidity_850hPa", n)
-                sp = _get(h, "wind_speed_850hPa", n)
-                dr = _get(h, "wind_direction_850hPa", n)
+                sfc = (lv == 0)
+                t = _get(h, "temperature_2m" if sfc else f"temperature_{lv}hPa", n)
+                rh = _get(h, "relative_humidity_2m" if sfc
+                          else f"relative_humidity_{lv}hPa", n)
+                sp = _get(h, "wind_speed_10m" if sfc else f"wind_speed_{lv}hPa", n)
+                dr = _get(h, "wind_direction_10m" if sfc
+                          else f"wind_direction_{lv}hPa", n)
+                if sfc:
+                    ps = _get(h, "surface_pressure", n)
+                    out[ts]["p"][j, i] = ps if ps is not None else np.nan
                 pr = _get(h, "precipitation", n)
                 out[ts]["t"][j, i] = t if t is not None else np.nan
                 out[ts]["rh"][j, i] = rh if rh is not None else np.nan
@@ -120,6 +141,29 @@ def fetch_fields(lats, lons, start: str, end: str, hours: list) -> dict:
                     out[ts]["v"][j, i] = -ms * math.cos(rad)
         print(f"  Chunk {c0//CHUNK + 1} ok")
     return out
+
+
+def fetch_elevation(lats, lons) -> np.ndarray:
+    """Gelaendehoehe je Rasterpunkt (gecacht). Gebraucht fuer die Trennung
+    lokaler von synoptischen Fronten: wo der Boden nahe an 850 hPa (~1457 m
+    Standardatmosphaere) heranreicht, ist das Feld dort nicht gemessen, sondern
+    unter den Boden extrapoliert — Gradienten daraus sind Rechenartefakte."""
+    ny, nx = len(lats), len(lons)
+    url = config.API_URL.replace("/v1/forecast", "/v1/elevation")
+    flat = np.full(ny * nx, np.nan)
+    points = [(float(la), float(lo)) for la in lats for lo in lons]
+    step = 100
+    for c0 in range(0, len(points), step):
+        chunk = points[c0:c0 + step]
+        params = config.with_api_key({
+            "latitude": ",".join(str(la) for la, _ in chunk),
+            "longitude": ",".join(str(lo) for _, lo in chunk),
+        })
+        r = requests.get(url, params=params, timeout=config.API_TIMEOUT)
+        r.raise_for_status()
+        elev = r.json().get("elevation") or []
+        flat[c0:c0 + len(elev)] = elev
+    return flat.reshape(ny, nx)
 
 
 def _get(hourly, key, n):
@@ -229,7 +273,8 @@ def front_diagnostics(te: np.ndarray, u: np.ndarray, v: np.ndarray,
 # ============================================================================
 
 def hewson_fronts(t_c, rh, u, v, lats, lons, passes=8,
-                  tfp_pct=75.0, grad_pct=50.0, min_len_km=250.0):
+                  tfp_pct=75.0, grad_pct=50.0, min_len_km=250.0,
+                  level: float = P_LEVEL):
     """Frontendetektion nach Literatur-Standard (Hewson 1998 / Sansom & Catto 2024).
 
     Unterschiede zur ersten Fassung (`front_diagnostics` + `front_mask`), die
@@ -250,7 +295,7 @@ def hewson_fronts(t_c, rh, u, v, lats, lons, passes=8,
     """
     from scipy.ndimage import label
 
-    tw = smooth_5point(theta_w(theta_e(t_c, rh)), passes)
+    tw = smooth_5point(theta_w(theta_e(t_c, rh, level)), passes)
     gx, gy = gradients_si(tw, lats, lons)
     g = np.hypot(gx, gy)
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -288,6 +333,203 @@ def hewson_fronts(t_c, rh, u, v, lats, lons, passes=8,
     return tw, g, tfp, mask, speed
 
 
+def _bridge_over_terrain(ok, bad, la, lo, xi, yj, max_bridge_km: float):
+    """Ueberbrueckt Luecken, die nur ueber unzuverlaessigem Gelaende liegen.
+
+    Der Kern der Alpen-Loesung. Messung (§1c/§1d): die Frontpunkte ueber den
+    Alpen gehoeren zu LANGEN Linien, nicht zu kleinen lokalen Ringen — es ist
+    also eine echte Front da, nur sitzt sie an der falschen Stelle, weil das
+    Modellfeld dort unter den Boden extrapoliert ist und der Topographie folgt.
+
+    Konsequenz: die Punkte nicht verwerfen (das gaebe eine Luecke im
+    Hauptkamm), sondern ihre POSITION verwerfen und zwischen den beiden
+    verlaesslichen Enden gerade durchziehen. Genau das tut die Handanalyse,
+    und laut Recherche §3.7 stimmen zwei Meteorologen bei der exakten Lage
+    ohnehin nur zu 23-30 % ueberein — die Lage ueber dem Kamm ist auch von
+    Hand eine Fortsetzung, keine Messung.
+
+    Ueberbrueckt wird nur, wenn die Luecke (a) beidseits von gueltiger Front
+    begrenzt ist, (b) ausschliesslich ueber schlechtem Gelaende liegt und
+    (c) nicht laenger als `max_bridge_km` ist. Sonst bliebe sie offen.
+    """
+    ok = ok.copy()
+
+    # 1. Luecken schliessen, die nur am Gelaende lagen
+    for a, b in _runs(~ok):
+        if a == 0 or b == len(ok):
+            continue                       # Rand: kein zweites Ende zum Halten
+        if not bad[a:b].all():
+            continue                       # nicht das Gelaende war die Ursache
+        if _polyline_km(la[a - 1:b + 1], lo[a - 1:b + 1]) > max_bridge_km:
+            continue                       # zu weit, um es zu behaupten
+        ok[a:b] = True
+
+    # 2. Der eigentliche Punkt: JEDE Frontposition ueber schlechtem Gelaende
+    #    neu setzen. Ueber den Alpen fehlen die Punkte naemlich nicht — sie
+    #    sind da und stehen falsch, weil das Feld dort der Topographie folgt.
+    #    Also Existenz behalten, Position von den Flanken her durchziehen.
+    bridged = np.zeros(len(ok), dtype=bool)
+    for a, b in _runs(ok & bad):
+        if a == 0 or b == len(ok):
+            ok[a:b] = False                # kein zweiter Anker -> nichts behaupten
+            continue
+        if _polyline_km(la[a - 1:b + 1], lo[a - 1:b + 1]) > max_bridge_km:
+            ok[a:b] = False
+            continue
+        n = b - a + 1
+        for arr in (xi, yj):
+            arr[a:b] = np.interp(np.arange(1, n), [0, n], [arr[a - 1], arr[b]])
+        bridged[a:b] = True
+    return ok, bridged
+
+
+def hewson_fronts_contour(t_c, rh, u, v, lats, lons, passes=8,
+                          tfp_pct=75.0, grad_pct=50.0, min_len_km=250.0,
+                          min_area_km2=0.0, level: float = P_LEVEL,
+                          elev=None, max_elev_m: float = 0.0,
+                          bridge_km: float = 0.0):
+    """Wie `hewson_fronts`, aber mit den zwei Bausteinen, die bisher fehlten.
+
+    1. CONTOUR-THEN-MASK (Recherche §3.4). Bisher suchten wir Vorzeichenwechsel
+       im Raster und verknuepften die Zellen — mask-then-join, das laut
+       Literatur bei <= 0.75 Grad nachweislich zerfaellt, weil das TFP-Kriterium
+       oft nur eine Zelle breit erfuellt ist. Jetzt umgekehrt: erst die
+       Nulllinie des Lokators als echte Kontur ziehen, dann die Kriterien auf
+       die Konturpunkte interpolieren.
+
+    2. LOKAL/SYNOPTISCH nach Jenkner et al. (2010). Deren Trennung ist keine
+       Gelaendemaske, sondern ein Formkriterium: GESCHLOSSENE Konturen, die
+       eine Flaeche kleiner als eine Schwelle umschliessen, gelten als lokal
+       (thermisch/orographisch erzeugt) und fallen heraus. Eine synoptische
+       Front ist eine offene, lange Linie — kein Ring um einen Berg.
+
+    Zusaetzlich wird die Laenge jetzt als Summe der Segmente entlang der Linie
+    gerechnet, nicht als Abstand der Endpunkte (Sansom & Catto 2024 haben genau
+    das korrigiert; ein gekruemmter Bogen war vorher zu kurz gemessen).
+
+    Returns (tw, g, tfp, mask, speed) — mask ist die auf das Raster
+    zurueckgelegte Linie, damit alle Kennzahlen vergleichbar bleiben.
+    """
+    from contourpy import contour_generator
+    from scipy.ndimage import map_coordinates
+
+    tw = smooth_5point(theta_w(theta_e(t_c, rh, level)), passes)
+    gx, gy = gradients_si(tw, lats, lons)
+    g = np.hypot(gx, gy)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        nx_, ny_ = gx / g, gy / g
+
+    ggx, ggy = gradients_si(g, lats, lons)
+    tfp = -(ggx * nx_ + ggy * ny_)
+    lx, ly = gradients_si(tfp, lats, lons)
+    loc = lx * nx_ + ly * ny_
+    g_abz = _shift_along(g, -nx_, -ny_)
+
+    tfp_min = np.nanpercentile(tfp, tfp_pct)
+    g_min = np.nanpercentile(g_abz, grad_pct)
+
+    mask = np.zeros(loc.shape, dtype=bool)
+    ny, nx = loc.shape
+    for line in contour_generator(z=np.nan_to_num(loc)).lines(0.0):
+        if len(line) < 2:
+            continue
+        xi, yj = line[:, 0], line[:, 1]
+        la = lats[0] + yj * (lats[1] - lats[0])
+        lo = lons[0] + xi * (lons[1] - lons[0])
+
+        closed = (abs(xi[0] - xi[-1]) < 1e-6 and abs(yj[0] - yj[-1]) < 1e-6)
+        if closed and min_area_km2 > 0 and _ring_area_km2(la, lo) < min_area_km2:
+            continue                      # Jenkner: kleiner Ring = lokale Front
+
+        ok = ((map_coordinates(np.nan_to_num(tfp), [yj, xi], order=1) >= tfp_min)
+              & (map_coordinates(np.nan_to_num(g_abz), [yj, xi], order=1) >= g_min))
+
+        if elev is not None and max_elev_m > 0:
+            e_on = map_coordinates(np.nan_to_num(elev), [yj, xi], order=1)
+            bad = e_on >= max_elev_m
+            if bridge_km > 0:
+                xi, yj = xi.copy(), yj.copy()
+                ok, _ = _bridge_over_terrain(ok, bad, la, lo, xi, yj, bridge_km)
+                la = lats[0] + yj * (lats[1] - lats[0])
+                lo = lons[0] + xi * (lons[1] - lons[0])
+            else:
+                ok = ok & ~bad
+
+        for a, b in _runs(ok):
+            if _polyline_km(la[a:b], lo[a:b]) < min_len_km:
+                continue
+            jj = np.clip(np.rint(yj[a:b]).astype(int), 0, ny - 1)
+            ii = np.clip(np.rint(xi[a:b]).astype(int), 0, nx - 1)
+            mask[jj, ii] = True
+
+    gg = np.hypot(ggx, ggy)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        speed = (u * ggx + v * ggy) / gg
+    return tw, g, tfp, mask, speed
+
+
+def _runs(flags: np.ndarray):
+    """Zusammenhaengende True-Abschnitte als (start, stop)-Paare."""
+    out, start = [], None
+    for k, f in enumerate(flags):
+        if f and start is None:
+            start = k
+        elif not f and start is not None:
+            out.append((start, k))
+            start = None
+    if start is not None:
+        out.append((start, len(flags)))
+    return out
+
+
+def _polyline_km(la: np.ndarray, lo: np.ndarray) -> float:
+    """Laenge entlang der Linie (Summe der Segmente), nicht Endpunkt-Abstand."""
+    if len(la) < 2:
+        return 0.0
+    p1, p2 = np.radians(la[:-1]), np.radians(la[1:])
+    dl = np.radians(lo[1:] - lo[:-1])
+    d = np.sin(p1) * np.sin(p2) + np.cos(p1) * np.cos(p2) * np.cos(dl)
+    return float(6371.0 * np.arccos(np.clip(d, -1, 1)).sum())
+
+
+def _ring_area_km2(la: np.ndarray, lo: np.ndarray) -> float:
+    """Umschlossene Flaeche einer geschlossenen Kontur (Gausssche Trapezformel,
+    Laengengrade mit cos(lat) gestaucht)."""
+    k = 111.32
+    x = lo * k * np.cos(np.radians(np.mean(la)))
+    y = la * k
+    return float(abs(np.dot(x[:-1], y[1:]) - np.dot(x[1:], y[:-1])) / 2.0)
+
+
+def terrain_filter(mask, elev, lats, lons, max_elev_m: float,
+                   min_len_km: float = 250.0) -> np.ndarray:
+    """Trennung lokal / synoptisch (Jenkner et al. 2010), Kern-Baustein.
+
+    Wo das Gelaende nahe an das 850-hPa-Niveau heranreicht, liefert das Modell
+    dort keine gemessene Luftmasse, sondern eine Extrapolation unter den Boden.
+    Deren Gradienten folgen der Topographie, nicht der Wetterlage — das ist die
+    dokumentierte Quelle der Fehl-Fronten entlang von Gebirgszuegen.
+
+    Zwei Schritte, und der zweite ist der eigentliche Punkt:
+      1. Frontzellen ueber solchem Gelaende verwerfen (eine Zelle Puffer, weil
+         der Gradienten-Stencil die Nachbarn mitliest).
+      2. Den Laengenfilter DANACH erneut anwenden. Eine synoptische Front zieht
+         ueber das Gebirge hinweg und bleibt beidseits lang genug; eine lokale
+         zerfaellt in Stummel und faellt heraus.
+    """
+    from scipy.ndimage import binary_dilation, label
+
+    blocked = binary_dilation(np.nan_to_num(elev, nan=0.0) >= max_elev_m,
+                              structure=np.ones((3, 3), dtype=bool))
+    out = mask & ~blocked
+    lab, n = label(out, structure=np.ones((3, 3)))
+    for k in range(1, n + 1):
+        idx = np.argwhere(lab == k)
+        if _extent_km(idx, lats, lons) < min_len_km:
+            out[lab == k] = False
+    return out
+
+
 def _shift_along(field, dx, dy):
     """Feld eine halbe Zelle in Richtung (dx, dy) abgetastet (bilinear)."""
     ny, nx = field.shape
@@ -323,19 +565,47 @@ def front_mask(tfp: np.ndarray, g: np.ndarray, g_min: float) -> np.ndarray:
     return z & (g >= g_min)
 
 
-def precip_check(mask: np.ndarray, pr: np.ndarray, thr: float = 0.1) -> dict:
+def region_masks(lats: np.ndarray, lons: np.ndarray) -> dict:
+    """Boolesche Fenstermasken in Rasterform, plus "Gesamt" als Vollmaske."""
+    la = np.repeat(lats[:, None], len(lons), axis=1)
+    lo = np.repeat(lons[None, :], len(lats), axis=0)
+    out = {"Gesamt": np.ones((len(lats), len(lons)), dtype=bool)}
+    for name, (y0, y1, x0, x1) in REGIONS.items():
+        out[name] = (la >= y0) & (la <= y1) & (lo >= x0) & (lo <= x1)
+    return out
+
+
+def precip_check(mask: np.ndarray, pr: np.ndarray, thr: float = 0.1,
+                 area: np.ndarray = None) -> dict:
     """Gegenprobe ohne Fremdkarte: eine echte Front fuehrt ein Niederschlags-
     band mit sich. Trifft die Linie oefter Niederschlag als der Durchschnitt,
     markiert sie etwas Reales — sonst ist sie Rauschen im Temperaturfeld.
-    Verglichen wird gegen die Grundrate desselben Feldes (Basisrate)."""
+    Verglichen wird gegen die Grundrate desselben Feldes (Basisrate).
+
+    `area` schraenkt beides auf ein Teilfenster ein — Treffer UND Basisrate,
+    sonst waere der Faktor gegen eine fremde Grundgesamtheit gerechnet.
+
+    Die Rohzaehlungen kommen mit zurueck: pro Tag und Teilfenster sind es zu
+    wenige Zellen fuer einen belastbaren Faktor, erst die Summe ueber alle
+    Termine traegt (gepoolt, nicht als Mittel der Tagesfaktoren)."""
     wet = np.nan_to_num(pr) >= thr
     valid = ~np.isnan(pr)
-    n_front = int(np.sum(mask & valid))
-    if not n_front:
-        return {"n_front": 0, "hit": None, "base": None, "lift": None}
-    hit = float(np.sum(mask & wet) / n_front)
-    base = float(np.sum(wet & valid) / max(int(np.sum(valid)), 1))
-    return {"n_front": n_front, "hit": hit, "base": base,
+    if area is not None:
+        valid = valid & area
+    on_line = mask & valid
+    n_front = int(np.sum(on_line))
+    n_front_wet = int(np.sum(on_line & wet))
+    n_valid = int(np.sum(valid))
+    n_wet = int(np.sum(wet & valid))
+    if not n_front or not n_valid:
+        return {"n_front": n_front, "n_front_wet": n_front_wet,
+                "n_valid": n_valid, "n_wet": n_wet,
+                "hit": None, "base": None, "lift": None}
+    hit = n_front_wet / n_front
+    base = n_wet / n_valid
+    return {"n_front": n_front, "n_front_wet": n_front_wet,
+            "n_valid": n_valid, "n_wet": n_wet,
+            "hit": hit, "base": base,
             "lift": (hit / base if base > 0 else None)}
 
 
@@ -400,23 +670,38 @@ def main() -> int:
                     help="Mindest-Gradient in K/100km fuer eine Frontlinie")
     ap.add_argument("--cache", action="store_true",
                     help="Rohdaten aus data/_experiment_fronten/raw.npz nutzen")
-    ap.add_argument("--method", choices=("naiv", "hewson"), default="naiv",
-                    help="naiv = erste Fassung; hewson = Literatur-Standard")
+    ap.add_argument("--method", choices=("naiv", "hewson", "hewson2"),
+                    default="naiv",
+                    help="naiv = erste Fassung; hewson = Literatur-Standard "
+                         "(mask-then-join); hewson2 = contour-then-mask plus "
+                         "Jenkner-Trennung lokal/synoptisch")
+    ap.add_argument("--minarea", type=float, default=0.0,
+                    help="Jenkner (hewson2): geschlossene Konturen unter dieser "
+                         "Flaeche in km2 gelten als lokale Front. 0 = aus")
     ap.add_argument("--passes", type=int, default=8,
                     help="Glaettungsdurchgaenge (hewson): 8 bei 0.75 Grad")
+    ap.add_argument("--level", type=float, default=P_LEVEL,
+                    help="Druckniveau in hPa (850 = Standard, 700 = ueber "
+                         "dem Alpengelaende)")
+    ap.add_argument("--maxelev", type=float, default=0.0,
+                    help="Trennung lokal/synoptisch: Frontzellen ueber Gelaende "
+                         "hoeher als dieser Wert (m) verwerfen, dann erneut "
+                         "laengenfiltern. 0 = aus (Stand vor dem Filter)")
     args = ap.parse_args()
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     lats, lons = build_grid(args.res)
     hours = [int(h) for h in args.hours.split(",")]
-    raw_path = OUT_DIR / f"raw_{args.start}_{args.end}_{args.res}.npz"
+    lvl_tag = "" if args.level == P_LEVEL else f"_{int(args.level)}"
+    raw_path = OUT_DIR / f"raw_{args.start}_{args.end}_{args.res}{lvl_tag}.npz"
 
     if args.cache and raw_path.exists():
         z = np.load(raw_path, allow_pickle=True)
         fields = z["fields"].item()
         print(f"Rohdaten aus Cache: {raw_path.name}")
     else:
-        fields = fetch_fields(lats, lons, args.start, args.end, hours)
+        fields = fetch_fields(lats, lons, args.start, args.end, hours,
+                              level=args.level)
         np.savez_compressed(raw_path, fields=fields)
         print(f"Rohdaten gespeichert: {raw_path.name}")
 
@@ -424,40 +709,91 @@ def main() -> int:
           f"{'Front-Zellen':>13} {'Regen auf Linie':>16} {'Basisrate':>10} "
           f"{'Faktor':>7}")
     print("-" * 92)
+    elev = None
+    if args.maxelev > 0:
+        elev_path = OUT_DIR / f"elev_{args.res}.npy"
+        if elev_path.exists():
+            elev = np.load(elev_path)
+        else:
+            elev = fetch_elevation(lats, lons)
+            np.save(elev_path, elev)
+        print(f"Gelaende: {elev_path.name}, Filter ab {args.maxelev:.0f} m")
+
     summary = []
+    areas = region_masks(lats, lons)
+    pooled = {}
     for ts in sorted(fields):
         f = fields[ts]
         if np.all(np.isnan(f["t"])):
             continue
-        if args.method == "hewson":
+        if args.method == "hewson2":
+            tes, g_si, tfp, mask, adv = hewson_fronts_contour(
+                f["t"], f["rh"], f["u"], f["v"], lats, lons,
+                passes=args.passes, min_area_km2=args.minarea,
+                level=args.level)
+            g = g_si * 1e5
+        elif args.method == "hewson":
             tes, g_si, tfp, mask, adv = hewson_fronts(
-                f["t"], f["rh"], f["u"], f["v"], lats, lons, passes=args.passes)
+                f["t"], f["rh"], f["u"], f["v"], lats, lons,
+                passes=args.passes, level=args.level)
             g = g_si * 1e5          # K/m -> K/100km, nur fuer die Anzeige
         else:
             te = theta_e(f["t"], f["rh"])
             tes, g, tfp, adv = front_diagnostics(te, f["u"], f["v"], lats,
                                                  lons, args.sigma)
             mask = front_mask(tfp, g, args.gmin)
+        if elev is not None:
+            mask = terrain_filter(mask, elev, lats, lons, args.maxelev)
         chk = precip_check(mask, f.get("pr"))
         hit = f"{chk['hit']*100:6.1f} %" if chk["hit"] is not None else "     —"
         base = f"{chk['base']*100:5.1f} %" if chk["base"] is not None else "    —"
         lift = f"{chk['lift']:5.2f}x" if chk["lift"] else "    —"
         print(f"{ts:<20} {np.nanmax(g):10.2f} {np.nanpercentile(g, 95):10.2f} "
               f"{chk['n_front']:13d} {hit:>16} {base:>10} {lift:>7}")
+        per_region = {name: precip_check(mask, f.get("pr"), area=area)
+                      for name, area in areas.items()}
+        for name, r in per_region.items():
+            acc = pooled.setdefault(name, {"n_front": 0, "n_front_wet": 0,
+                                           "n_valid": 0, "n_wet": 0})
+            for k in acc:
+                acc[k] += r[k]
         summary.append({"ts": ts, "max_grad": float(np.nanmax(g)),
                         "p95_grad": float(np.nanpercentile(g, 95)),
-                        **chk})
+                        **chk, "regions": per_region})
         out = (OUT_DIR /
-               f"front_{ts.replace(':', '')}_res{args.res}_{args.method}.png")
+               f"front_{ts.replace(':', '')}_res{args.res}"
+               f"{lvl_tag}_{args.method}.png")
         plot_step(ts, tes, g, tfp, adv, lats, lons, args.gmin, out,
                   pr=f.get("pr"),
-                  front_cells=mask if args.method == "hewson" else None,
-                  var_label=("Theta-w 850 hPa [K]" if args.method == "hewson"
-                             else "Theta-e 850 hPa [K]"))
+                  front_cells=mask if args.method != "naiv" else None,
+                  var_label=(f"Theta-w {int(args.level)} hPa [K]"
+                             if args.method != "naiv"
+                             else f"Theta-e {int(args.level)} hPa [K]"))
+
+    # Gepoolt ueber alle Termine: Tagesfaktoren einzeln sind in den kleinen
+    # Teilfenstern zu duenn besetzt, um sie zu mitteln.
+    print(f"\n{'Teilfenster':<14} {'Zellen':>8} {'Front-Z.':>9} "
+          f"{'Regen auf Linie':>16} {'Basisrate':>10} {'Faktor':>7}")
+    print("-" * 68)
+    pooled_out = {}
+    for name in ["Gesamt"] + list(REGIONS):
+        a = pooled.get(name)
+        if not a:
+            continue
+        hit = a["n_front_wet"] / a["n_front"] if a["n_front"] else None
+        base = a["n_wet"] / a["n_valid"] if a["n_valid"] else None
+        lift = (hit / base) if (hit is not None and base) else None
+        pooled_out[name] = {**a, "hit": hit, "base": base, "lift": lift}
+        print(f"{name:<14} {a['n_valid']:8d} {a['n_front']:9d} "
+              f"{(f'{hit*100:6.1f} %' if hit is not None else '     —'):>16} "
+              f"{(f'{base*100:5.1f} %' if base is not None else '    —'):>10} "
+              f"{(f'{lift:5.2f}x' if lift else '    —'):>7}")
 
     (OUT_DIR / "summary.json").write_text(
         json.dumps({"res_deg": args.res, "sigma": args.sigma,
-                    "gmin_k_per_100km": args.gmin, "steps": summary},
+                    "gmin_k_per_100km": args.gmin, "method": args.method,
+                    "regions": REGIONS, "pooled": pooled_out,
+                    "steps": summary},
                    indent=2), encoding="utf-8")
     print(f"\nPNGs + summary.json in {OUT_DIR}")
     return 0

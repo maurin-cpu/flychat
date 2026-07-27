@@ -1,0 +1,1127 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -27.4871,
+      57.0441
+     ],
+     [
+      -27.2527,
+      57.4163
+     ],
+     [
+      -26.3957,
+      57.8979
+     ],
+     [
+      -26.323,
+      58.6762
+     ],
+     [
+      -24.701,
+      59.2084
+     ],
+     [
+      -24.056,
+      59.9016
+     ],
+     [
+      -18.4155,
+      61.3294
+     ],
+     [
+      -16.2411,
+      60.8733
+     ],
+     [
+      -14.6479,
+      61.0586
+     ],
+     [
+      -13.2722,
+      60.5078
+     ],
+     [
+      -8.6986,
+      59.6681
+     ],
+     [
+      -7.9834,
+      58.7452
+     ],
+     [
+      -6.7636,
+      58.3701
+     ],
+     [
+      -6.5149,
+      57.5523
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "okklusion",
+    "laenge_km": 1692.7,
+    "punkte": 14,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -6.4858,
+      57.5
+     ],
+     [
+      -6.5259,
+      56.8107
+     ],
+     [
+      -6.799,
+      56.368
+     ],
+     [
+      -8.6555,
+      56.0354
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 263.2,
+    "punkte": 4,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -8.7473,
+      56.018
+     ],
+     [
+      -10.7018,
+      56.3172
+     ],
+     [
+      -12.0613,
+      56.019
+     ],
+     [
+      -13.182,
+      56.1094
+     ],
+     [
+      -15.4287,
+      56.6176
+     ],
+     [
+      -17.5297,
+      56.0342
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 609.8,
+    "punkte": 6,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -17.6155,
+      56.0091
+     ],
+     [
+      -18.5892,
+      55.6541
+     ],
+     [
+      -19.0524,
+      55.0149
+     ],
+     [
+      -20.3817,
+      54.5129
+     ],
+     [
+      -22.4561,
+      52.4383
+     ],
+     [
+      -22.8085,
+      51.7949
+     ],
+     [
+      -27.3396,
+      50.4328
+     ],
+     [
+      -28.3075,
+      49.9497
+     ],
+     [
+      -29.5667,
+      50.0339
+     ],
+     [
+      -31.7303,
+      49.7293
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 1345.2,
+    "punkte": 10,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -31.8444,
+      49.7333
+     ],
+     [
+      -35.6698,
+      49.5233
+     ],
+     [
+      -37.0681,
+      48.1769
+     ],
+     [
+      -37.9536,
+      46.9103
+     ],
+     [
+      -38.6108,
+      46.5571
+     ],
+     [
+      -38.5174,
+      45.5504
+     ],
+     [
+      -38.7824,
+      45.107
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 896.4,
+    "punkte": 7,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -38.8295,
+      45.0689
+     ],
+     [
+      -37.1927,
+      43.9549
+     ],
+     [
+      -37.3477,
+      42.4316
+     ],
+     [
+      -37.834,
+      41.2258
+     ],
+     [
+      -39.2801,
+      40.4264
+     ],
+     [
+      -41.0152,
+      40.1312
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 848.1,
+    "punkte": 6,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -41.1048,
+      40.1238
+     ],
+     [
+      -43.0947,
+      41.0478
+     ],
+     [
+      -43.6514,
+      41.7243
+     ],
+     [
+      -48.3975,
+      42.7106
+     ],
+     [
+      -49.3783,
+      43.2579
+     ],
+     [
+      -50.5249,
+      43.1058
+     ],
+     [
+      -52.9363,
+      43.4225
+     ],
+     [
+      -53.9282,
+      43.8914
+     ],
+     [
+      -55.0419,
+      43.718
+     ],
+     [
+      -57.0193,
+      43.9647
+     ],
+     [
+      -58.029,
+      44.317
+     ],
+     [
+      -58.8872,
+      44.1262
+     ],
+     [
+      -60.547,
+      43.1801
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 1872.4,
+    "punkte": 13,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      11.0941,
+      73.0462
+     ],
+     [
+      11.084,
+      72.8723
+     ],
+     [
+      10.2935,
+      72.5272
+     ],
+     [
+      9.9175,
+      71.7177
+     ],
+     [
+      8.487,
+      71.2486
+     ],
+     [
+      6.7063,
+      71.1655
+     ],
+     [
+      5.3281,
+      70.2668
+     ],
+     [
+      3.5252,
+      70.0324
+     ],
+     [
+      1.1533,
+      69.2823
+     ],
+     [
+      0.8853,
+      69.1509
+     ],
+     [
+      0.9276,
+      68.3416
+     ],
+     [
+      -0.1807,
+      68.039
+     ],
+     [
+      -1.1112,
+      67.4494
+     ],
+     [
+      -0.4997,
+      66.5105
+     ],
+     [
+      -0.6465,
+      66.2106
+     ],
+     [
+      -0.4657,
+      65.8206
+     ],
+     [
+      0.6267,
+      65.2111
+     ],
+     [
+      0.4322,
+      64.6818
+     ],
+     [
+      0.7344,
+      64.2465
+     ],
+     [
+      2.3054,
+      63.8384
+     ],
+     [
+      2.8934,
+      63.1369
+     ],
+     [
+      6.1103,
+      62.4937
+     ],
+     [
+      7.4118,
+      62.809
+     ],
+     [
+      9.4946,
+      62.8367
+     ],
+     [
+      10.2316,
+      63.1183
+     ],
+     [
+      10.4818,
+      63.2861
+     ],
+     [
+      10.6208,
+      64.0159
+     ],
+     [
+      11.7119,
+      65.0221
+     ],
+     [
+      12.7076,
+      65.5728
+     ],
+     [
+      12.2364,
+      66.4317
+     ],
+     [
+      12.4534,
+      67.1681
+     ],
+     [
+      12.3181,
+      67.2841
+     ],
+     [
+      11.3072,
+      67.6947
+     ],
+     [
+      9.0473,
+      67.8097
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "okklusion",
+    "laenge_km": 2584.6,
+    "punkte": 34,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      12.9701,
+      73.5505
+     ],
+     [
+      16.9707,
+      74.7419
+     ],
+     [
+      18.2534,
+      75.4624
+     ],
+     [
+      20.1376,
+      75.8012
+     ],
+     [
+      23.0274,
+      75.7764
+     ],
+     [
+      25.9257,
+      76.3816
+     ],
+     [
+      29.3706,
+      76.2466
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "okklusion",
+    "laenge_km": 635.0,
+    "punkte": 7,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      29.6022,
+      76.2272
+     ],
+     [
+      31.3806,
+      76.1944
+     ],
+     [
+      32.718,
+      75.7493
+     ],
+     [
+      33.5794,
+      75.214
+     ],
+     [
+      31.965,
+      74.1934
+     ],
+     [
+      32.0831,
+      74.1178
+     ],
+     [
+      31.733,
+      73.7186
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 360.4,
+    "punkte": 7,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      31.6569,
+      73.6646
+     ],
+     [
+      30.8531,
+      73.0694
+     ],
+     [
+      29.9536,
+      72.8579
+     ],
+     [
+      29.0657,
+      72.2764
+     ],
+     [
+      29.1704,
+      71.8373
+     ],
+     [
+      29.6217,
+      71.543
+     ],
+     [
+      29.432,
+      71.1973
+     ],
+     [
+      29.3753,
+      69.9233
+     ],
+     [
+      28.5801,
+      68.9276
+     ],
+     [
+      27.5429,
+      68.5081
+     ],
+     [
+      27.2216,
+      68.126
+     ],
+     [
+      27.3878,
+      67.7483
+     ],
+     [
+      27.2546,
+      67.5848
+     ],
+     [
+      23.2701,
+      65.657
+     ],
+     [
+      20.9049,
+      64.1955
+     ],
+     [
+      20.816,
+      63.6877
+     ],
+     [
+      21.6077,
+      63.1608
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 1409.0,
+    "punkte": 17,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      22.2816,
+      62.1814
+     ],
+     [
+      23.4246,
+      61.7742
+     ],
+     [
+      25.4704,
+      61.526
+     ],
+     [
+      30.3792,
+      58.1785
+     ],
+     [
+      30.1127,
+      57.4732
+     ],
+     [
+      30.4305,
+      56.3655
+     ],
+     [
+      30.3203,
+      54.9472
+     ],
+     [
+      30.6288,
+      54.1927
+     ],
+     [
+      30.0267,
+      53.6952
+     ],
+     [
+      29.0565,
+      51.8706
+     ],
+     [
+      28.3038,
+      50.9703
+     ],
+     [
+      28.1016,
+      50.2387
+     ],
+     [
+      26.9613,
+      49.6466
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 1769.4,
+    "punkte": 13,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      42.3478,
+      64.2334
+     ],
+     [
+      42.7983,
+      64.6441
+     ],
+     [
+      42.7496,
+      64.9255
+     ],
+     [
+      43.0663,
+      65.4449
+     ],
+     [
+      45.176,
+      66.0215
+     ],
+     [
+      47.3395,
+      67.0096
+     ],
+     [
+      49.6438,
+      67.7617
+     ],
+     [
+      50.7905,
+      68.4469
+     ],
+     [
+      51.4354,
+      68.5446
+     ],
+     [
+      61.1636,
+      68.1053
+     ],
+     [
+      62.6544,
+      67.3881
+     ],
+     [
+      64.4994,
+      66.9968
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 1315.3,
+    "punkte": 12,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      32.5202,
+      55.2086
+     ],
+     [
+      32.4899,
+      53.4737
+     ],
+     [
+      31.8289,
+      51.3456
+     ],
+     [
+      31.5065,
+      49.397
+     ],
+     [
+      30.5474,
+      47.5877
+     ],
+     [
+      30.2558,
+      46.458
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "trog",
+    "laenge_km": 1053.8,
+    "punkte": 6,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      42.4938,
+      57.4931
+     ],
+     [
+      43.2665,
+      56.8345
+     ],
+     [
+      44.4982,
+      56.3814
+     ],
+     [
+      44.9052,
+      55.5663
+     ],
+     [
+      46.6223,
+      54.2618
+     ],
+     [
+      47.731,
+      53.7024
+     ],
+     [
+      47.7997,
+      52.7946
+     ],
+     [
+      48.1673,
+      52.2168
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 753.6,
+    "punkte": 8,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      0.6666,
+      53.7102
+     ],
+     [
+      -0.0916,
+      54.3947
+     ],
+     [
+      -0.1233,
+      55.1024
+     ],
+     [
+      -0.3773,
+      55.2952
+     ],
+     [
+      -2.5821,
+      55.9785
+     ],
+     [
+      -3.5354,
+      56.803
+     ],
+     [
+      -4.2611,
+      57.0408
+     ],
+     [
+      -6.4774,
+      57.1028
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 695.0,
+    "punkte": 8,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      41.1873,
+      62.9681
+     ],
+     [
+      41.0397,
+      62.7473
+     ],
+     [
+      41.4483,
+      61.9802
+     ],
+     [
+      40.8417,
+      61.5027
+     ],
+     [
+      40.651,
+      60.9111
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 249.4,
+    "punkte": 5,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      40.6912,
+      60.8351
+     ],
+     [
+      40.6782,
+      60.3882
+     ],
+     [
+      40.2132,
+      59.8827
+     ],
+     [
+      40.4498,
+      59.4299
+     ],
+     [
+      41.3928,
+      58.9496
+     ],
+     [
+      41.9398,
+      58.2592
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 338.0,
+    "punkte": 6,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -38.9235,
+      44.9925
+     ],
+     [
+      -40.3912,
+      45.3372
+     ],
+     [
+      -41.2135,
+      44.7015
+     ],
+     [
+      -42.438,
+      44.4876
+     ],
+     [
+      -42.723,
+      44.1368
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "okklusion",
+    "laenge_km": 388.3,
+    "punkte": 5,
+    "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+    "lauf": "202607260000",
+    "vorlauf_h": 48,
+    "gueltig": "2026-07-28T00:00:00+00:00"
+   }
+  }
+ ],
+ "properties": {
+  "lizenz": "GeoNutzV",
+  "profil": "vorhersage",
+  "quelle_url": "https://opendata.dwd.de/weather/charts/forecasts/icon/global/na/Z__C_EDZW_20260726052243_nwv01%2Cico_tkb_na_N_000048_000000_202607260000_WV12.png",
+  "lauf": "202607260000",
+  "vorlauf_h": 48,
+  "gueltig": "2026-07-28T00:00:00+00:00",
+  "copyright": "\u00a9 Deutscher Wetterdienst, vektorisiert und damit veraendert"
+ }
+}

@@ -1,0 +1,1386 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      20.6584,
+      58.6304
+     ],
+     [
+      20.5322,
+      59.1572
+     ],
+     [
+      20.7282,
+      59.9366
+     ],
+     [
+      20.5069,
+      60.7345
+     ],
+     [
+      21.8877,
+      61.3599
+     ],
+     [
+      23.0087,
+      62.5572
+     ],
+     [
+      24.2456,
+      64.9149
+     ],
+     [
+      23.7496,
+      65.7464
+     ],
+     [
+      24.9152,
+      66.63
+     ],
+     [
+      25.0968,
+      67.7203
+     ],
+     [
+      24.9847,
+      68.3001
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 1204.3,
+    "punkte": 11,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      25.0014,
+      68.3232
+     ],
+     [
+      24.3574,
+      69.3246
+     ],
+     [
+      22.2276,
+      70.8546
+     ],
+     [
+      19.5834,
+      71.0943
+     ],
+     [
+      13.3345,
+      72.1692
+     ],
+     [
+      7.4389,
+      71.9636
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 904.4,
+    "punkte": 6,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      7.3573,
+      71.9867
+     ],
+     [
+      7.9429,
+      72.3329
+     ],
+     [
+      12.3412,
+      73.615
+     ],
+     [
+      12.9682,
+      74.2149
+     ],
+     [
+      14.0304,
+      74.5141
+     ],
+     [
+      17.4143,
+      74.6932
+     ],
+     [
+      29.4041,
+      76.0342
+     ],
+     [
+      30.8722,
+      76.5571
+     ],
+     [
+      32.981,
+      76.783
+     ],
+     [
+      36.3802,
+      76.6664
+     ],
+     [
+      50.9488,
+      77.3792
+     ],
+     [
+      54.7446,
+      77.8606
+     ],
+     [
+      59.486,
+      77.5284
+     ],
+     [
+      74.178,
+      77.5747
+     ],
+     [
+      81.8664,
+      77.6846
+     ],
+     [
+      85.1318,
+      78.0414
+     ],
+     [
+      89.686,
+      77.5531
+     ],
+     [
+      94.8962,
+      77.4339
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 2637.5,
+    "punkte": 18,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      95.0181,
+      77.4117
+     ],
+     [
+      100.7408,
+      77.2131
+     ],
+     [
+      103.7165,
+      76.7952
+     ],
+     [
+      106.6626,
+      76.8817
+     ],
+     [
+      117.25,
+      76.387
+     ],
+     [
+      126.8047,
+      76.2916
+     ],
+     [
+      130.3071,
+      75.9454
+     ],
+     [
+      133.3963,
+      76.2606
+     ],
+     [
+      137.5566,
+      76.3384
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 1194.6,
+    "punkte": 9,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -4.1501,
+      49.7067
+     ],
+     [
+      -4.8903,
+      53.0747
+     ],
+     [
+      -6.173,
+      53.5801
+     ],
+     [
+      -8.6364,
+      55.2259
+     ],
+     [
+      -9.3991,
+      56.0584
+     ],
+     [
+      -11.0607,
+      56.2733
+     ],
+     [
+      -13.5159,
+      57.0474
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 1179.8,
+    "punkte": 7,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -13.5376,
+      57.0174
+     ],
+     [
+      -14.1751,
+      55.7938
+     ],
+     [
+      -14.9593,
+      55.243
+     ],
+     [
+      -15.4597,
+      54.5847
+     ],
+     [
+      -19.225,
+      53.4914
+     ],
+     [
+      -20.1005,
+      53.0134
+     ],
+     [
+      -21.2245,
+      52.9749
+     ],
+     [
+      -23.5871,
+      52.4083
+     ],
+     [
+      -24.6627,
+      51.8806
+     ],
+     [
+      -25.7674,
+      51.8871
+     ],
+     [
+      -27.6515,
+      51.457
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 1271.6,
+    "punkte": 11,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -27.6796,
+      51.4435
+     ],
+     [
+      -29.3982,
+      51.0944
+     ],
+     [
+      -30.8029,
+      51.2169
+     ],
+     [
+      -31.8462,
+      50.6976
+     ],
+     [
+      -33.2773,
+      50.5497
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 447.0,
+    "punkte": 5,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -33.3025,
+      50.5347
+     ],
+     [
+      -34.9147,
+      50.4575
+     ],
+     [
+      -35.9777,
+      50.1112
+     ],
+     [
+      -37.1088,
+      50.4639
+     ],
+     [
+      -38.8405,
+      50.2201
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 438.8,
+    "punkte": 5,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -38.8888,
+      50.218
+     ],
+     [
+      -41.1412,
+      49.1601
+     ],
+     [
+      -41.2577,
+      48.1644
+     ],
+     [
+      -42.525,
+      46.7581
+     ],
+     [
+      -43.3541,
+      46.358
+     ],
+     [
+      -43.4954,
+      45.5824
+     ],
+     [
+      -45.06,
+      44.2957
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 897.9,
+    "punkte": 7,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.5456,
+      58.6273
+     ],
+     [
+      -81.1275,
+      58.4617
+     ],
+     [
+      -82.4003,
+      57.9137
+     ],
+     [
+      -85.9402,
+      58.1215
+     ],
+     [
+      -87.5731,
+      59.7589
+     ],
+     [
+      -88.8263,
+      60.3697
+     ],
+     [
+      -88.6013,
+      61.1845
+     ],
+     [
+      -89.4902,
+      62.0606
+     ],
+     [
+      -89.1374,
+      62.7978
+     ],
+     [
+      -89.3361,
+      63.4957
+     ],
+     [
+      -89.2857,
+      64.5243
+     ],
+     [
+      -89.8921,
+      65.1989
+     ],
+     [
+      -89.8314,
+      65.4673
+     ],
+     [
+      -89.304,
+      65.8881
+     ],
+     [
+      -88.5122,
+      66.1305
+     ],
+     [
+      -88.5024,
+      67.068
+     ],
+     [
+      -84.4353,
+      68.5637
+     ],
+     [
+      -78.6003,
+      69.6269
+     ],
+     [
+      -76.4491,
+      69.3061
+     ],
+     [
+      -73.5028,
+      69.3591
+     ],
+     [
+      -69.3748,
+      68.1894
+     ],
+     [
+      -67.2724,
+      67.0011
+     ],
+     [
+      -66.9943,
+      66.4153
+     ],
+     [
+      -67.3395,
+      65.6934
+     ],
+     [
+      -66.6352,
+      64.9701
+     ],
+     [
+      -67.5408,
+      64.1161
+     ],
+     [
+      -66.8045,
+      63.2226
+     ],
+     [
+      -66.7823,
+      61.7316
+     ],
+     [
+      -66.4829,
+      60.4317
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "okklusion",
+    "laenge_km": 3533.7,
+    "punkte": 29,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -63.137,
+      40.5144
+     ],
+     [
+      -63.7855,
+      39.5576
+     ],
+     [
+      -63.9533,
+      38.8166
+     ],
+     [
+      -64.5495,
+      38.4253
+     ],
+     [
+      -65.1749,
+      37.5221
+     ],
+     [
+      -65.5939,
+      36.237
+     ],
+     [
+      -66.8866,
+      35.0809
+     ],
+     [
+      -69.7866,
+      33.5376
+     ],
+     [
+      -72.0527,
+      33.8195
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 1297.6,
+    "punkte": 9,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -72.0757,
+      33.8222
+     ],
+     [
+      -74.3845,
+      34.2634
+     ],
+     [
+      -75.044,
+      33.8094
+     ],
+     [
+      -76.0238,
+      33.5062
+     ],
+     [
+      -77.1822,
+      33.448
+     ],
+     [
+      -77.7843,
+      32.8946
+     ],
+     [
+      -79.0237,
+      32.4275
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 762.4,
+    "punkte": 7,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      73.487,
+      70.6868
+     ],
+     [
+      73.2066,
+      69.6437
+     ],
+     [
+      73.7198,
+      68.8503
+     ],
+     [
+      72.3293,
+      68.2155
+     ],
+     [
+      70.7622,
+      66.4794
+     ],
+     [
+      70.324,
+      65.5892
+     ],
+     [
+      66.9799,
+      64.8458
+     ],
+     [
+      64.2641,
+      64.5374
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 955.6,
+    "punkte": 8,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      64.2196,
+      64.5236
+     ],
+     [
+      60.871,
+      64.5797
+     ],
+     [
+      58.2859,
+      65.3542
+     ],
+     [
+      56.2331,
+      65.2375
+     ],
+     [
+      50.938,
+      65.8536
+     ],
+     [
+      49.4944,
+      66.2251
+     ],
+     [
+      48.3734,
+      66.1939
+     ],
+     [
+      43.3338,
+      63.9381
+     ],
+     [
+      41.8605,
+      63.5736
+     ],
+     [
+      41.5164,
+      63.145
+     ],
+     [
+      41.498,
+      62.6832
+     ],
+     [
+      40.8623,
+      62.0152
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 1484.4,
+    "punkte": 12,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      21.383,
+      57.7155
+     ],
+     [
+      21.4735,
+      57.3795
+     ],
+     [
+      22.5119,
+      56.3281
+     ],
+     [
+      23.6308,
+      55.8107
+     ],
+     [
+      23.5648,
+      54.9833
+     ],
+     [
+      23.9121,
+      53.824
+     ],
+     [
+      23.3603,
+      51.9799
+     ],
+     [
+      23.4165,
+      51.2673
+     ],
+     [
+      21.1033,
+      48.4152
+     ],
+     [
+      20.0164,
+      48.1977
+     ],
+     [
+      16.3897,
+      46.3372
+     ],
+     [
+      15.1774,
+      46.3361
+     ],
+     [
+      13.4923,
+      45.8689
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 1890.3,
+    "punkte": 13,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -62.0617,
+      41.6589
+     ],
+     [
+      -60.8631,
+      42.3636
+     ],
+     [
+      -58.2896,
+      43.2595
+     ],
+     [
+      -57.0346,
+      43.0185
+     ],
+     [
+      -55.1988,
+      43.0627
+     ],
+     [
+      -54.0684,
+      43.4347
+     ],
+     [
+      -52.9516,
+      43.1463
+     ],
+     [
+      -51.2078,
+      43.2282
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 1013.2,
+    "punkte": 8,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -51.1689,
+      43.2365
+     ],
+     [
+      -49.1688,
+      43.3405
+     ],
+     [
+      -48.1782,
+      43.1211
+     ],
+     [
+      -47.3966,
+      43.5531
+     ],
+     [
+      -45.5622,
+      44.0338
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 512.4,
+    "punkte": 5,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -66.4868,
+      60.0275
+     ],
+     [
+      -66.4526,
+      58.0353
+     ],
+     [
+      -67.3355,
+      55.7633
+     ],
+     [
+      -67.235,
+      55.1946
+     ],
+     [
+      -67.949,
+      54.4781
+     ],
+     [
+      -69.4301,
+      51.858
+     ],
+     [
+      -69.5518,
+      51.086
+     ],
+     [
+      -70.3839,
+      50.6428
+     ],
+     [
+      -71.4016,
+      49.6164
+     ],
+     [
+      -73.4027,
+      48.1265
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 1535.4,
+    "punkte": 10,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      6.2957,
+      71.8232
+     ],
+     [
+      5.33,
+      71.6557
+     ],
+     [
+      4.0931,
+      70.9649
+     ],
+     [
+      1.7847,
+      70.628
+     ],
+     [
+      1.7373,
+      70.0667
+     ],
+     [
+      1.4242,
+      69.8079
+     ],
+     [
+      -1.032,
+      68.9037
+     ],
+     [
+      -1.6945,
+      68.0499
+     ],
+     [
+      -1.9109,
+      67.2775
+     ],
+     [
+      -2.675,
+      66.5306
+     ],
+     [
+      -1.6706,
+      65.8899
+     ],
+     [
+      -1.5471,
+      64.9346
+     ],
+     [
+      -0.3303,
+      64.4824
+     ],
+     [
+      1.5722,
+      64.5936
+     ],
+     [
+      4.5216,
+      65.2695
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "okklusion",
+    "laenge_km": 1329.6,
+    "punkte": 15,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      40.7174,
+      61.0808
+     ],
+     [
+      40.8109,
+      60.5676
+     ],
+     [
+      41.9175,
+      60.0436
+     ],
+     [
+      42.0059,
+      59.1998
+     ],
+     [
+      43.319,
+      57.97
+     ],
+     [
+      44.539,
+      57.5043
+     ],
+     [
+      44.8183,
+      56.7619
+     ],
+     [
+      45.6362,
+      56.0253
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 698.5,
+    "punkte": 8,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      45.6455,
+      55.9937
+     ],
+     [
+      46.2724,
+      55.402
+     ],
+     [
+      46.1941,
+      54.9593
+     ],
+     [
+      46.4132,
+      54.4476
+     ],
+     [
+      47.6047,
+      53.8089
+     ],
+     [
+      47.9262,
+      53.1802
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 388.1,
+    "punkte": 6,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -13.4942,
+      57.0774
+     ],
+     [
+      -13.9807,
+      59.1414
+     ],
+     [
+      -15.0801,
+      59.6461
+     ],
+     [
+      -15.8377,
+      60.3876
+     ],
+     [
+      -17.1198,
+      60.5647
+     ],
+     [
+      -18.3681,
+      60.293
+     ],
+     [
+      -21.8422,
+      60.1759
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "okklusion",
+    "laenge_km": 795.8,
+    "punkte": 7,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      89.2977,
+      75.1017
+     ],
+     [
+      83.7064,
+      75.1329
+     ],
+     [
+      81.5447,
+      74.6504
+     ],
+     [
+      74.1508,
+      73.6159
+     ],
+     [
+      73.2721,
+      72.9771
+     ],
+     [
+      73.9193,
+      72.316
+     ],
+     [
+      73.589,
+      71.2148
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "warm",
+    "laenge_km": 818.7,
+    "punkte": 7,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      48.4189,
+      52.5498
+     ],
+     [
+      48.6919,
+      51.4811
+     ],
+     [
+      49.2294,
+      50.8117
+     ],
+     [
+      48.6374,
+      50.1008
+     ],
+     [
+      48.0641,
+      48.6456
+     ],
+     [
+      48.0947,
+      47.9699
+     ],
+     [
+      47.3586,
+      47.3997
+     ],
+     [
+      46.9066,
+      46.5305
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "kalt",
+    "laenge_km": 767.2,
+    "punkte": 8,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -31.0479,
+      59.1222
+     ],
+     [
+      -28.7349,
+      58.9178
+     ],
+     [
+      -27.2612,
+      59.3333
+     ],
+     [
+      -25.4442,
+      59.1591
+     ],
+     [
+      -24.1077,
+      59.7989
+     ],
+     [
+      -22.7756,
+      60.0459
+     ]
+    ]
+   },
+   "properties": {
+    "typ": "okklusion",
+    "laenge_km": 556.6,
+    "punkte": 6,
+    "quelle": "Deutscher Wetterdienst, Bodenanalyse (bwkman)",
+    "hinweis": "aus der DWD-Karte vektorisiert (veraendert)",
+    "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+    "gueltig": "2026-07-27T12:00:00+00:00"
+   }
+  }
+ ],
+ "properties": {
+  "lizenz": "GeoNutzV",
+  "profil": "analyse",
+  "quelle_url": "C:\\Users\\user\\Projekte\\flychat\\data\\dwd_fronten_archiv\\analyse\\dwdc_202607271200.png",
+  "copyright": "\u00a9 Deutscher Wetterdienst, vektorisiert und damit veraendert",
+  "gueltig": "2026-07-27T12:00:00+00:00",
+  "vorlauf_h": 0
+ }
+}
