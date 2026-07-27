@@ -1,20 +1,26 @@
 """A/B-Vergleich zweier Analyse-Modelle auf den Test-Spots.
 
-Fragestellung: Wenn wir ANALYSIS_MODEL von deepseek-chat auf das ~56% guenstigere
-deepseek-v4-flash umstellen — bleibt die SICHERHEITS-Bewertung gleich?
+Fragestellung: Bleibt die SICHERHEITS-Bewertung gleich, wenn ANALYSIS_MODEL
+gewechselt wird?
 
 Methode (sauber kontrolliert):
 - Wetter wird EINMAL geholt → beide Modelle sehen exakt dieselbe Datenbasis.
-- Dann je Modell die volle LLM-Analyse, Output pro Modell weggesichert.
-- Diff NUR auf safety_status (reproduziert laut README zu 100% bei temp=0.2,
-  also ist jede Modell-Abweichung echtes Signal, kein Jitter).
+- Dann je Modell die volle LLM-Analyse, Output pro LAUF weggesichert.
+- Diff NUR auf safety_status.
 - Gefaehrliche Richtung wird separat gezaehlt: Referenz=not_safe, Kandidat=safe
   → das Modell wuerde einen unsicheren Tag freigeben. Das ist das K.O.-Kriterium.
+
+WICHTIG: temp=0.2 ist NICHT deterministisch. Ein Teil der Flips ist Jitter, kein
+Modell-Signal. Darum vorher/nachher eine Baseline mit ZWEIMAL demselben Modell
+fahren und die Flip-Zahl des A/B daran messen (A/B 27.07: 91.4% vs 95.1% Baseline
+→ Differenz nicht vom Rauschen unterscheidbar).
 
 Aufruf (28 Spots, ~$1 gesamt):
     WINGCAST_SPOT_CSV=test python cost_testing/ab_model_compare.py
     # optional eigene Modelle:
-    WINGCAST_SPOT_CSV=test python cost_testing/ab_model_compare.py deepseek-chat deepseek-v4-flash
+    WINGCAST_SPOT_CSV=test python cost_testing/ab_model_compare.py deepseek-v4-flash deepseek-v4-pro
+    # Jitter-Baseline (zweimal dasselbe Modell):
+    WINGCAST_SPOT_CSV=test python cost_testing/ab_model_compare.py deepseek-v4-flash deepseek-v4-flash
 
 Aendert NICHTS dauerhaft: die Modell-Umstellung passiert nur im Speicher
 (apply_overrides), data/config_overrides.json bleibt unberuehrt.
@@ -42,8 +48,9 @@ try:
 except ImportError:
     pass
 
-# Referenz-Modell zuerst, Kandidat zweitens.
-DEFAULT_MODELS = ["deepseek-chat", "deepseek-v4-flash"]
+# Referenz-Modell zuerst, Kandidat zweitens. Default = Jitter-Baseline
+# (deepseek-chat ist seit 24.07.2026 abgeschaltet und taugt nicht mehr als Referenz).
+DEFAULT_MODELS = ["deepseek-v4-flash", "deepseek-v4-flash"]
 OUT_DIR = _REPO / "cost_testing"
 
 
@@ -65,13 +72,18 @@ def _flatten(analyses: dict) -> dict[str, str]:
     return out
 
 
-def _run_one(eng, model: str) -> dict:
-    """Setzt Modell, faehrt die Analyse, sichert Output, liefert Metriken."""
+def _run_one(eng, model: str, run_idx: int) -> dict:
+    """Setzt Modell, faehrt die Analyse, sichert Output, liefert Metriken.
+
+    run_idx (1=Referenz, 2=Kandidat) landet im Dateinamen: bei identischen
+    Modellnamen (Jitter-Messung) wuerden Ref und Kandidat sonst in dieselbe
+    Datei schreiben und der Diff verglich die zweite Datei mit sich selbst.
+    """
     import config_overrides
     changed = config_overrides.apply_overrides({"ANALYSIS_MODEL": model})
     eng.reload_llm_clients()
-    logger.info(">>> Lauf mit ANALYSIS_MODEL=%s (provider=%s, effektiv=%s) changed=%s",
-                model, eng.analysis_provider, eng.analysis_model, changed)
+    logger.info(">>> Lauf %d mit ANALYSIS_MODEL=%s (provider=%s, effektiv=%s) changed=%s",
+                run_idx, model, eng.analysis_provider, eng.analysis_model, changed)
 
     done = {}
     last_error = None
@@ -88,13 +100,17 @@ def _run_one(eng, model: str) -> dict:
     if not done:
         raise RuntimeError(f"Lauf ({model}) ohne 'done' (last_error={last_error})")
 
-    import config
-    src = Path(config.DATA_DIR) / "spot_analyses.json"
+    # NICHT hart auf spot_analyses.json: die Engine schreibt sprachabhaengig
+    # (EN -> spot_analyses_en.json). Frueher wurde deshalb der eingefrorene
+    # DE-Altbestand mit sich selbst verglichen -> falsche 100% PASS.
+    src = Path(eng.analyses_file)
+    if not src.exists():
+        raise RuntimeError(f"Analyse-Output nicht gefunden: {src}")
     tag = model.replace("/", "_")
-    dst = OUT_DIR / f"ab_{tag}.json"
+    dst = OUT_DIR / f"ab_{run_idx}_{tag}.json"
     shutil.copy(src, dst)
-    logger.info("  gesichert -> %s  (calls=%s, est_usd=%s)",
-                dst.name, done.get("total_calls"), done.get("est_usd"))
+    logger.info("  gesichert -> %s  (Quelle %s, calls=%s, est_usd=%s)",
+                dst.name, src.name, done.get("total_calls"), done.get("est_usd"))
     return {"model": model, "file": dst, "done": done}
 
 
@@ -178,9 +194,9 @@ def main() -> int:
 
     try:
         logger.info("=== Schritt 2: Referenz-Lauf (%s) ===", models[0])
-        ref = _run_one(eng, models[0])
+        ref = _run_one(eng, models[0], 1)
         logger.info("=== Schritt 3: Kandidat-Lauf (%s) ===", models[1])
-        cand = _run_one(eng, models[1])
+        cand = _run_one(eng, models[1], 2)
     finally:
         config_overrides.apply_overrides({"ANALYSIS_MODEL": original})
         eng.reload_llm_clients()

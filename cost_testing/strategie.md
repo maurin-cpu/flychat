@@ -265,7 +265,7 @@ git show 396052e:chat_engine.py | sed -n '4250,4480p'
 
 ### Offen — kritisch vor dem nächsten Optimierungsschritt
 - ✅ **Per-Lauf Kosten-Telemetrie** umgesetzt: `BatchCostTracker` (`engine/_common.py`) loggt nach `data/cost_telemetry.jsonl`, eine Zeile pro `run_all_analyses_stream`-Lauf, mit Tokens/Phase + USD-Schätzung + Pre-Filter-Skip-Count. Funktioniert für Batch- UND Parallel-Modus.
-- ✅ **Cost-Cap als Notbremse**: ENV `LLM_COST_CAP_USD` (default 5.00) bricht Batch sauber ab.
+- ~~**Cost-Cap als Notbremse**~~: am 27.07.2026 **entfernt**. Er wurde nur im Batch-Pfad geprüft, der Daily-Run läuft parallel → hat nie gegriffen.
 - ✅ **Goldstandard-Tooling**: `cost_testing/freeze_golden.py` (Cases einfrieren) + `cost_testing/score_regression.py` (Field-Level-Score + Acceptance-Gate). Auf dem Server auszuführen, wo `data/spot_analyses.json` + Wetter-Cache vorliegen.
 - ⚠ **Klarstellung Modus-Schalter:** `OPENAI_ANALYSIS_MODE` wird **nicht via `.env`** gesteuert, sondern via UI-Overlay (`config_overrides.py` + `data/config_overrides.json`, geschrieben durch den Admin-UI-Schalter "LLM-Analyse: parallel | batch"). `config.py:718` ist nur der Code-Default (`"parallel"`), den `config_overrides.init()` beim App-Start überschreibt. Aktuellen Wert prüfen: Admin-UI öffnen ODER `cat data/config_overrides.json` auf dem Server. Falls dort `"parallel"` steht → in der UI auf `"batch"` wechseln (erwartete Sofort-Ersparnis ~50%, Hebel 1 ist im Code bereits umgesetzt, läuft aber nur im batch-Pfad).
 - [ ] **Qualitäts-Baseline einfrieren**: `python cost_testing/freeze_golden.py --limit 40` auf dem Server fahren, *bevor* der ENV-Schalter umgelegt wird. So hast du die Pre-Switch-Outputs als Vergleichsbasis.
@@ -391,9 +391,11 @@ CLI-Lauf vor jedem Hebel-PR: `python cost_testing/score_regression.py && python 
 - Neuer Helper `engine/_common.py::log_batch_cost(record: dict)` schreibt JSONL und loggt eine Summary-Zeile (`logger.info("[COST] Batch=$0.74 tokens=1.98M skip=21/161")`).
 - Preise pro Modell zentral in `config.py::MODEL_PRICES` (USD pro 1M tok, in/out/cached).
 
-### 7.3 Circuit Breaker — *„Halt on Anomaly" (Mandat)*
-- ENV `LLM_COST_CAP_USD` (default 3.00). Während des Batches: nach jeder Phase Summe prüfen.
-- Bei Überschreitung → Batch sauber abbrechen, `logger.error("[COST-BREAKER] cap=$X überschritten, Batch gestoppt")`, partielle Results bleiben gespeichert. Verhindert „runaway"-Szenarios (z.B. wenn jemand `LLM_MAX_WORKERS` zu hoch zieht oder ein Prompt versehentlich auf 50K Tokens wächst).
+### 7.3 Circuit Breaker — *verworfen (27.07.2026)*
+War als `LLM_COST_CAP_USD` umgesetzt, aber nur im Batch-Pfad geprüft — der
+Daily-Run nutzt den Parallel-Pfad, dort hat der Cap nie ausgelöst (27.07: est
+$5.75 > Cap $5.00, Lauf ging durch). Ersatzlos entfernt statt scheinbar geschützt:
+Runaway-Erkennung läuft über die Telemetrie-Trendzeile (`out/call`, `est_usd`).
 
 ### 7.4 Trend-Validierung
 Nach jedem grünen Optimierungs-PR:

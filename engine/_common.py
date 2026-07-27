@@ -103,7 +103,6 @@ class BatchCostTracker:
         self.phases: dict = {}
         self.prefilter_skipped = 0
         self.errors = 0
-        self._cost_cap_tripped = False
 
     def record(self, phase: str, in_tok: int = 0, out_tok: int = 0,
                cached_tok: int = 0, calls: int = 1):
@@ -133,20 +132,6 @@ class BatchCostTracker:
             total += p["out_tok"] * prices.get(out_key, 0.0) / 1_000_000
         return round(total, 4)
 
-    def check_cap(self, cap_usd: float) -> bool:
-        """Returns True wenn Cap ueberschritten. Setzt _cost_cap_tripped flag."""
-        if cap_usd <= 0:
-            return False
-        current = self.estimate_usd()
-        if current > cap_usd:
-            self._cost_cap_tripped = True
-            logger.error(
-                "[COST-BREAKER] Schwelle %s USD ueberschritten (aktuell %.2f USD). "
-                "Lauf wird abgebrochen.", cap_usd, current,
-            )
-            return True
-        return False
-
     def to_record(self) -> dict:
         total_in = sum(p["in_tok"] for p in self.phases.values())
         total_out = sum(p["out_tok"] for p in self.phases.values())
@@ -167,7 +152,6 @@ class BatchCostTracker:
             "est_usd": self.estimate_usd(),
             "duration_s": round(time.time() - self.started, 1),
             "errors": self.errors,
-            "cost_cap_tripped": self._cost_cap_tripped,
         }
 
     def write(self, path: Path) -> dict:
@@ -401,10 +385,42 @@ def _is_reasoning_model(model: str) -> bool:
 
 def _resolve_max_tokens(model: str, base: int) -> int:
     """Bumpt max_tokens fuer Reasoning-Modelle damit der JSON-Output nicht
-    durch den internen Reasoning-Verbrauch abgeschnitten wird."""
+    durch den internen Reasoning-Verbrauch abgeschnitten wird.
+
+    Bleibt auch bei abgeschaltetem Thinking (DEEPSEEK_DISABLE_THINKING) bestehen:
+    ungenutztes max_tokens-Budget kostet nichts, schuetzt aber sofort wieder,
+    falls Thinking testweise reaktiviert wird.
+    """
     if _is_reasoning_model(model):
         return base + _REASONING_TOKEN_HEADROOM
     return base
+
+
+# DeepSeek-V4-Modelle haben Thinking per Default AN. Fuer die Massen-Analyse
+# schalten wir es ab (Begruendung + A/B-Zahlen: config.DEEPSEEK_DISABLE_THINKING).
+_THINKING_DEFAULT_ON_PATTERNS = ("v4-flash", "v4-pro")
+
+
+def deepseek_thinking_kwargs(provider: str, model: str) -> dict:
+    """Extra-kwargs fuer chat.completions.create(), die DeepSeeks Thinking-Modus
+    abschalten. Leeres Dict, wenn nicht anwendbar (anderer Provider/Modell) oder
+    per Config wieder eingeschaltet.
+
+    Bewusst NICHT global im llm_client, sondern per Call-Site: der Synoptik-Call
+    (1x/Tag) soll sein Reasoning behalten.
+    """
+    if (provider or "").lower() != "deepseek":
+        return {}
+    m = str(model or "").lower()
+    if not any(p in m for p in _THINKING_DEFAULT_ON_PATTERNS):
+        return {}
+    try:
+        import config  # late import to avoid circular
+        if not getattr(config, "DEEPSEEK_DISABLE_THINKING", True):
+            return {}
+    except Exception:
+        return {}
+    return {"extra_body": {"thinking": {"type": "disabled"}}}
 
 
 # ============================================================================

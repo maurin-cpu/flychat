@@ -63,7 +63,7 @@ from engine._common import (
     _log_prompt_cache_usage, _weekday_de,
     BatchCostTracker, extract_usage_from_response,
     _is_permanent_api_error, _user_friendly_api_error,
-    _resolve_max_tokens, compute_retry_sleep,
+    _resolve_max_tokens, compute_retry_sleep, deepseek_thinking_kwargs,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _compute_safety_rating, _compute_safety_score, derive_status_from_subs,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
@@ -340,6 +340,7 @@ class AnalyzersMixin:
                         temperature=0.2,
                         max_tokens=_resolve_max_tokens(self.analysis_model, 2000),
                         response_format={"type": "json_object"},
+                        **self._analysis_call_kwargs(),
                     )
                     self._record_call_usage(response, "spot_safety")
                     raw = response.choices[0].message.content
@@ -422,6 +423,7 @@ class AnalyzersMixin:
                         temperature=0.2,
                         max_tokens=_resolve_max_tokens(self.analysis_model, 2500),
                         response_format={"type": "json_object"},
+                        **self._analysis_call_kwargs(),
                     )
                     self._record_call_usage(response, "spot_fly")
                     raw = response.choices[0].message.content
@@ -508,6 +510,7 @@ class AnalyzersMixin:
                         temperature=0.2,
                         max_tokens=_resolve_max_tokens(self.analysis_model, 2000),
                         response_format={"type": "json_object"},
+                        **self._analysis_call_kwargs(),
                     )
                     self._record_call_usage(response, "region_safety")
                     raw = response.choices[0].message.content
@@ -588,6 +591,7 @@ class AnalyzersMixin:
                         temperature=0.2,
                         max_tokens=_resolve_max_tokens(self.analysis_model, 2500),
                         response_format={"type": "json_object"},
+                        **self._analysis_call_kwargs(),
                     )
                     self._record_call_usage(response, "region_fly")
                     raw = response.choices[0].message.content
@@ -1895,6 +1899,12 @@ class AnalyzersMixin:
         u = extract_usage_from_response(response)
         tracker.record(phase_label, u["in_tok"], u["out_tok"], u["cached_tok"], calls=1)
 
+    def _analysis_call_kwargs(self) -> dict:
+        """Provider-spezifische Zusatz-Parameter fuer die Massen-Analyse-Calls.
+        Aktuell: DeepSeek-Thinking abschalten (s. config.DEEPSEEK_DISABLE_THINKING).
+        """
+        return deepseek_thinking_kwargs(self.analysis_provider, self.analysis_model)
+
     def _apply_foehn_decision(self, result: dict, cache_key: str, label: str) -> None:
         """Wendet die deterministische Foehn-Decision (Stage-Inversion) auf das LLM-Result.
 
@@ -2381,10 +2391,6 @@ class AnalyzersMixin:
                     in_tok=usage["in_tok"], out_tok=usage["out_tok"],
                     cached_tok=usage["cached_tok"], calls=usage["calls"],
                 )
-                if cost_tracker.check_cap(config.LLM_COST_CAP_USD):
-                    cost_tracker.write(config.COST_TELEMETRY_PATH)
-                    yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
-                    return
             except BatchStalledError:
                 # An run_all_analyses_stream durchreichen → Parallel-Fallback
                 cost_tracker.errors += 1
@@ -2493,10 +2499,6 @@ class AnalyzersMixin:
                     in_tok=usage["in_tok"], out_tok=usage["out_tok"],
                     cached_tok=usage["cached_tok"], calls=usage["calls"],
                 )
-                if cost_tracker.check_cap(config.LLM_COST_CAP_USD):
-                    cost_tracker.write(config.COST_TELEMETRY_PATH)
-                    yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
-                    return
             except BatchStalledError:
                 cost_tracker.errors += 1
                 cost_tracker.write(config.COST_TELEMETRY_PATH)
@@ -2649,10 +2651,6 @@ class AnalyzersMixin:
                     in_tok=usage["in_tok"], out_tok=usage["out_tok"],
                     cached_tok=usage["cached_tok"], calls=usage["calls"],
                 )
-                if cost_tracker.check_cap(config.LLM_COST_CAP_USD):
-                    cost_tracker.write(config.COST_TELEMETRY_PATH)
-                    yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
-                    return
             except BatchStalledError:
                 cost_tracker.errors += 1
                 cost_tracker.write(config.COST_TELEMETRY_PATH)
@@ -2759,10 +2757,6 @@ class AnalyzersMixin:
                     in_tok=usage["in_tok"], out_tok=usage["out_tok"],
                     cached_tok=usage["cached_tok"], calls=usage["calls"],
                 )
-                if cost_tracker.check_cap(config.LLM_COST_CAP_USD):
-                    cost_tracker.write(config.COST_TELEMETRY_PATH)
-                    yield {"event": "error", "data": {"message": "Kosten-Cap erreicht — Batch gestoppt"}}
-                    return
             except BatchStalledError:
                 cost_tracker.errors += 1
                 cost_tracker.write(config.COST_TELEMETRY_PATH)

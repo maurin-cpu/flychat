@@ -26,8 +26,8 @@ python -c "import config; from spots import load_spots; print(config.CSV_PATH.na
 | | Datei |
 |---|---|
 | Cost-Telemetrie pro Lauf | `engine/_common.py::BatchCostTracker`, `engine/analyzers.py` |
-| Cost-Cap Notbremse | `config.LLM_COST_CAP_USD` (default 5.00) |
-| Modell-Preise | `config.MODEL_PRICES` (7 Modelle) |
+| Modell-Preise | `config.MODEL_PRICES` (verifiziert 27.07.2026) |
+| Thinking-Schalter (DeepSeek) | `config.DEEPSEEK_DISABLE_THINKING` (default an) |
 | Smoke-Lauf | `cost_testing/analyze_once.py` |
 | Goldstandard einfrieren | `cost_testing/freeze_golden.py` |
 | Regression-Score (kalibriert) | `cost_testing/score_regression.py` |

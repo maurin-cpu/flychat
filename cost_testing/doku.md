@@ -48,9 +48,35 @@ Pro Analyse-Lauf wird **eine JSONL-Zeile** in `data/cost_telemetry.jsonl` angeh�
 - `engine/analyzers.py::run_all_analyses_stream` (parallel) + `run_all_analyses_batch_stream` (batch) — Tracker pro Lauf
 - `engine/analyzers.py::_record_call_usage` — sammelt Tokens pro Call
 
-### Notbremse (Cost-Cap)
-- ENV `LLM_COST_CAP_USD` (default `5.00`)
-- Beim Batch-Pfad: nach jeder Phase wird Summe geprüft, bei Überschreitung sauberer Abbruch.
+### Thinking-Modus DeepSeek (Befund 27.07.2026)
+`deepseek-chat` war seit ~24.04.2026 nur ein **Alias auf v4-flash non-thinking**.
+Die Alias-Abschaltung am 24.07. hat deshalb kein Modell gewechselt, sondern nur
+**Thinking eingeschaltet**: Output/Call 880 → 3500 Tok (75 % davon Thinking),
+Tageskosten ~$2 → $4.48, Phase 2 des Daily-Runs 15–18 → 63–77 min, dazu
+abgeschnittene JSONs (`finish_reason=length`) → teure Voll-Retries.
+
+A/B-Test auf 27 Test-Spots × 3 Tage = 81 Spot-Tage, gemeinsamer Wetter-Fetch:
+
+| Vergleich | identisch | Flips | gefährlich (not_safe→fliegbar) |
+|---|---|---|---|
+| thinking vs non-thinking | 74/81 (91.4 %) | 7 | **0** |
+| non-thinking vs non-thinking (Jitter-Baseline) | 77/81 (95.1 %) | 4 | 0 |
+
+Alle Flips sind safe↔conditional-Wackler an Grenzfällen, beide Richtungen, ohne
+`no_go_reasons`. Ein Fall flippt sogar zwischen zwei identischen non-thinking-Läufen
+→ **die Mode-Differenz ist vom Jitter nicht unterscheidbar, non-thinking ist
+safety-äquivalent.** Messwerte non-thinking: 785 statt ~2750 Out-Tok/Call,
+3.9× schneller, −36 % Kosten (Prod ~$2.30–2.60 statt $4.48/Tag).
+
+Umgesetzt als `config.DEEPSEEK_DISABLE_THINKING` (default an) →
+`engine/_common.py::deepseek_thinking_kwargs` → die vier Analyse-Calls in
+`engine/analyzers.py`. Der Synoptik-Call (1×/Tag) behält bewusst sein Reasoning.
+
+### Notbremse (Cost-Cap) — ENTFERNT 27.07.2026
+`LLM_COST_CAP_USD` gibt es nicht mehr. Er wurde nur im Batch-Pfad geprüft, der
+Daily-Run läuft aber über `run_all_analyses_stream` (parallel) — dort hat er nie
+gegriffen (27.07: est $5.75 bei Cap $5.00, nichts ausgelöst). Kostenkontrolle
+läuft über die Telemetrie (`data/cost_telemetry.jsonl`), nicht über einen Abbruch.
 
 ### Auswerten
 Trend ansehen:
@@ -255,7 +281,9 @@ Zusatzlich rief das Skript `eng._combined_analysis_single_spot_day(...)` auf —
 - `safety_status` / `flyability_tier` gewandert? → echter Quality-Loss, Änderung zurückrollen oder nachjustieren
 
 ### Lauf wird zu teuer
-→ ENV `LLM_COST_CAP_USD=2.0` setzen, Batch bricht bei Überschreitung sauber ab.
+→ Kein automatischer Abbruch mehr (Cap entfernt). `data/cost_telemetry.jsonl`
+prüfen: `out/call` deutlich über ~800 heisst meist, dass Thinking wieder aktiv ist
+(→ `DEEPSEEK_DISABLE_THINKING=1`), sonst Spot-Zahl/Tage über `WINGCAST_SPOT_CSV=test` begrenzen.
 
 ### Lauf hängt im Schritt 1 (Wetterdaten)
 → Open-Meteo / MeteoSwiss-API langsam. Cache existiert? `ls -la data/wetterdaten.json`. Bei kaltem Cache kann Schritt 1 lokal eine Stunde dauern (ca. 28 Spots × ~10 Forecast-Endpoints). Erst-Lauf einmal abwarten, dann ist der Cache warm.
@@ -273,7 +301,7 @@ Zusatzlich rief das Skript `eng._combined_analysis_single_spot_day(...)` auf —
 | `engine/_common.py::extract_usage_from_response` | Liest Tokens aus OpenAI/Anthropic-Response |
 | `engine/analyzers.py::_record_call_usage` | Hook in jedem per-Call zum Tracker reporten |
 | `config.py::MODEL_PRICES` | USD/1M-Tokens, zentral pflegen |
-| `config.py::LLM_COST_CAP_USD` | Notbremse |
+| `config.py::DEEPSEEK_DISABLE_THINKING` | Thinking-Modus für die Massen-Analyse aus (default an) |
 | `config.py::COST_TELEMETRY_PATH` | Output-Pfad JSONL |
 | `cost_testing/golden/*.json` | Eingefrorene Cases (gitignored — pro Branch/Server eigenes Set) |
 | `data/cost_telemetry.jsonl` | Telemetrie-Trend (gitignored, append-only) |

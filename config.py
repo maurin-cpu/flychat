@@ -1107,10 +1107,10 @@ LLM_MODELS = {
     },
     "deepseek": {
         # Verfuegbare Modelle:
-        #   deepseek-chat       = V3 (general, billigste Option)
-        #   deepseek-reasoner   = R1 (Reasoning)
         #   deepseek-v4-flash   = V4 Flash (284B MoE, $0.14/$0.28 per Mtok, 1M context)
-        #   deepseek-v4-pro     = V4 Pro   (1.6T MoE, $1.74/$3.48 per Mtok, 1M context)
+        #   deepseek-v4-pro     = V4 Pro   (1.6T MoE, $0.435/$0.87 per Mtok, 1M context)
+        # Abgeschaltet 24.07.2026: deepseek-chat / deepseek-reasoner. deepseek-chat
+        # war seit ~24.04.2026 ohnehin nur ein Alias auf v4-flash (non-thinking).
         "chat":     os.environ.get("DEEPSEEK_CHAT_MODEL", "deepseek-v4-flash"),
         "analysis": os.environ.get("DEEPSEEK_ANALYSIS_MODEL", "deepseek-v4-flash"),
     },
@@ -1181,6 +1181,8 @@ globals()[f"{ANALYSIS_PROVIDER.upper()}_ANALYSIS_MODEL"] = ANALYSIS_MODEL
 # Default = ANALYSIS_MODEL (Rueckwaerts-kompatibel). Ueber ENV `SYNOPTIC_MODEL`
 # oder Admin-UI separat ueberschreibbar (z.B. deepseek-v4-flash mit Reasoning,
 # waehrend ANALYSIS_MODEL fuer die Massen-Spot-Analyse auf deepseek-chat bleibt).
+# Hinweis: DEEPSEEK_DISABLE_THINKING (unten) gilt bewusst NICHT fuer diesen Call —
+# 1 Call/Tag, Kosten irrelevant, Reasoning hier erwuenscht.
 _synoptic_override = os.environ.get("SYNOPTIC_MODEL", "").strip()
 if _synoptic_override and _synoptic_override in MODEL_PROVIDER_MAP:
     SYNOPTIC_MODEL    = _synoptic_override
@@ -1251,6 +1253,18 @@ if OPENAI_ANALYSIS_MODE == "batch" and ANALYSIS_PROVIDER != "openai":
     )
     OPENAI_ANALYSIS_MODE = "parallel"
 
+# DEEPSEEK_DISABLE_THINKING — schaltet den Thinking-Modus fuer die Massen-Analyse
+# (Spot-/Region-Calls in engine/analyzers.py) ab. Gilt nur fuer DeepSeek-V4-Modelle,
+# die Thinking per Default an haben.
+#
+# Begruendung (A/B-Test 27.07.2026, 81 Spot-Tage, Details in cost_testing/doku.md):
+# thinking vs non-thinking = 91.4% identische safety_status, 0 gefaehrliche Flips
+# (not_safe -> fliegbar). Die Jitter-Baseline (2x non-thinking) liegt bei 95.1% —
+# die Mode-Differenz ist also vom normalen Sampling-Rauschen nicht unterscheidbar.
+# Dafuer: ~785 statt ~2750 Output-Tokens/Call, 3.9x schneller, ~36% guenstiger.
+# Auf "0" setzen, um Thinking wieder einzuschalten (z.B. fuer Vergleichslaeufe).
+DEEPSEEK_DISABLE_THINKING = os.environ.get("DEEPSEEK_DISABLE_THINKING", "1") == "1"
+
 # Anzahl paralleler LLM-Calls im "parallel"-Modus.
 # OpenAI gpt-4o-mini erlaubt bis 500 RPM (Tier 1). Default 10 ist konservativ.
 # Hoeher = schneller, aber mehr Quota-Verbrauch pro Sekunde.
@@ -1282,18 +1296,18 @@ MODEL_PRICES = {
     "gemini-2.5-flash": {"in": 0.300, "out": 2.500, "cached_in": 0.075, "in_batch": 0.150, "out_batch": 1.250},
     "gemini-2.5-flash-lite": {"in": 0.100, "out": 0.400, "cached_in": 0.025, "in_batch": 0.050, "out_batch": 0.200},
     # DeepSeek: keine Batch-API (in_batch/out_batch == in/out). Cache-Hit-Rabatt automatisch (kein Opt-in).
-    # Preise prueffen unter https://api-docs.deepseek.com/quick_start/pricing — Stand 2026-04.
+    # DeepSeek V4 (Apr 2026): 1M-Kontext, MoE, optional Thinking-Mode.
+    # Gegen https://api-docs.deepseek.com/quick_start/pricing verifiziert 2026-07-27.
+    "deepseek-v4-flash": {"in": 0.140, "out": 0.280, "cached_in": 0.0028, "in_batch": 0.140, "out_batch": 0.280},
+    "deepseek-v4-pro":   {"in": 0.435, "out": 0.870, "cached_in": 0.003625, "in_batch": 0.435, "out_batch": 0.870},
+    # HISTORISCH — deepseek-chat/-reasoner waren ab ~24.04.2026 nur Aliase auf
+    # v4-flash und wurden am 24.07.2026 abgeschaltet. Zeilen bleiben nur stehen,
+    # damit alte cost_telemetry-Eintraege noch ein Preisschema finden. Nicht mehr
+    # als aktive Modelle waehlbar. Achtung: est_usd-Werte vor 25.07.2026 sind mit
+    # diesen (veralteten) Preisen gerechnet und fuer Aera-Vergleiche unbrauchbar.
     "deepseek-chat":     {"in": 0.270, "out": 1.100, "cached_in": 0.070, "in_batch": 0.270, "out_batch": 1.100},
     "deepseek-reasoner": {"in": 0.550, "out": 2.190, "cached_in": 0.140, "in_batch": 0.550, "out_batch": 2.190},
-    # DeepSeek V4 (Apr 2026): 1M-Kontext, MoE, optional Thinking-Mode.
-    # Cache-Hit-Rabatt ~50% (Schaetzung, exakter Wert in DS-Docs pruefen).
-    "deepseek-v4-flash": {"in": 0.140, "out": 0.280, "cached_in": 0.035, "in_batch": 0.140, "out_batch": 0.280},
-    "deepseek-v4-pro":   {"in": 1.740, "out": 3.480, "cached_in": 0.435, "in_batch": 1.740, "out_batch": 3.480},
 }
-
-# Notbremse: Wenn ein Analyse-Lauf diese Schwelle ueberschreitet, sauber abbrechen.
-# Schuetzt vor Runaway-Szenarien (Bug, versehentlich falscher Worker-Count, etc.).
-LLM_COST_CAP_USD = float(os.environ.get("LLM_COST_CAP_USD", "5.00"))
 
 # Pfad fuer JSONL-Telemetrie (eine Zeile pro Analyse-Lauf).
 import pathlib as _pathlib
