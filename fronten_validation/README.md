@@ -26,6 +26,7 @@ Vorhersage.
 | Datei | Inhalt |
 |---|---|
 | `observations.csv` | eine Zeile pro vorhergesagtem Frontdurchgang + was eingetreten ist. Schema in `SCHEMA.md` |
+| `AUTO_REPORT.md` | **erzeugt, nicht von Hand pflegen** — Urteilsbilanz, Systematik von `delta_h`, Lauf-Jitter, verpasste Fronten. Wird bei jedem Lauf neu geschrieben |
 | `PATTERNS.md` | numerierte Befunde `F-001`, `F-002` … eigener Namensraum, damit keine Verwechslung mit den XContest-`I-0xx` entsteht |
 | `SCHEMA.md` | Spaltendefinition von `observations.csv` |
 | `aussagen/` | unsere Aussage-Schnappschüsse je Lauf und Kalendertag, unverändert. Der Beweis, **was wir wann gesagt haben** |
@@ -50,7 +51,27 @@ Extraktion nötig und bleiben deshalb auf der lokalen Platte.
 ## Betrieb
 
 ```bash
-python scripts/archive_dwd_fronten.py        # holt Karten, Bulletins, Aussagen
+python scripts/archive_dwd_fronten.py        # holt Karten, Bulletins, Aussagen —
+                                             # traegt ein UND beurteilt gleich mit
+```
+
+Der Volllauf haengt drei Schritte hintereinander: einsammeln
+(`archive_dwd_fronten.py`), eintragen (`build_fronten_observations.py`),
+beurteilen (`validate_fronten.py`). So wird jede Front von selbst zum Testfall,
+ohne dass jemand daran denken muss.
+
+**Ausfall-Alarm.** Am Ende jedes ableitenden Laufs entscheidet
+`scripts/fronten_alarm.py`, ob eine Warnmail an `config.OPS_ALERT_EMAIL`
+(`info@wingcast.ch`) noetig ist — Quelle weg, Layout geaendert oder null
+Abschnitte auf der ganzen Karte. Hoechstens eine Mail pro Lauf, keine
+Wiederholung vor 7 Tagen, Entwarnung wenn es wieder laeuft. Der Zustand liegt
+versioniert in `data/dwd_fronten_archiv/alarm_zustand.json`, weil die
+Cloud-Routine keinen bleibenden Datentraeger hat.
+
+```bash
+python scripts/fronten_alarm.py --zustand    # laeuft gerade ein Alarm?
+python scripts/fronten_alarm.py --selftest   # Zustandsmaschine pruefen
+python scripts/fronten_alarm.py --testmail   # Versandweg pruefen
 ```
 
 Läuft **4× täglich** (04, 08, 14, 20 Uhr lokal) an zwei Orten, mit **getrennten
@@ -84,6 +105,8 @@ python scripts/experiment_dwd_fronten_extraktion.py --profil vorhersage \
        --lauf 2026072600 --alle-steps --overlay      # Linien + Kontrollbild
 python scripts/experiment_fronten_zeitachse.py --lauf 2026072600   # Aussagen
 python scripts/experiment_fronten_zeitachse.py --selftest          # Zeitrechnung
+python scripts/validate_fronten.py --probelauf                     # Urteile, ohne zu schreiben
+python scripts/validate_fronten.py --selftest                      # Urteilslogik
 ```
 
 ## Die zwei Regeln, die hier gelten

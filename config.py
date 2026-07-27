@@ -1061,6 +1061,13 @@ SENDER_NAME     = os.environ.get("SENDER_NAME", "Wingcast")
 # (Magic-Link-Session). Kein Passwort mehr.
 ADMIN_EMAIL     = os.environ.get("ADMIN_EMAIL", "mutschgito@hotmail.com")
 
+# Betriebsalarm fuer Datenketten, die an fremden Quellen haengen (zurzeit das
+# DWD-Frontenarchiv, scripts/fronten_alarm.py). BEWUSST NICHT ADMIN_EMAIL:
+# das ist die Magic-Link-Identitaet des Admins, und der Wetterlage-Alarm haengt
+# daran — wer den Betriebsempfaenger aendert, wuerde die sonst ungefragt
+# mitverschieben.
+OPS_ALERT_EMAIL = os.environ.get("OPS_ALERT_EMAIL", "info@wingcast.ch")
+
 # Salt fuer die IP-Anonymisierung im Feedback (SHA-256). Reiner Hash-Salt,
 # keine Auth-Funktion.
 FEEDBACK_SALT   = os.environ.get("FEEDBACK_SALT", "wingcast-feedback")

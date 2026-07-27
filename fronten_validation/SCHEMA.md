@@ -27,9 +27,13 @@ Auswertung: nur Zeilen mit gefülltem `verdict` zählen.
 
 ## Verifikations-Seite (aus der späteren Ist-Lage)
 
+Gefüllt von `scripts/validate_fronten.py` (Plan §6 Schritt 5). Alles, was der
+Automat schreibt, trägt in `notes` das Präfix **`auto:`** — Zeilen ohne dieses
+Präfix sind Handurteile und werden **nie** überschrieben.
+
 | Spalte | Bedeutung |
 |---|---|
-| `ana_gueltig_utc` | Handanalyse, gegen die verglichen wurde |
+| `ana_gueltig_utc` | Handanalyse(n), gegen die verglichen wurde — als Paar `von/bis` der beiden Stützpunkte, zwischen denen der Ist-Durchgang liegt |
 | `ana_front_da` | `1` = zur erwarteten Zeit lag eine Front des Typs in/an der Zone, `0` = keine |
 | `ana_median_utc` | aus den Analysen abgeleiteter tatsächlicher Durchgang, falls bestimmbar |
 | `delta_h` | `ana_median_utc − median_utc` in Stunden. **Negativ = wir waren zu spät, positiv = zu früh.** Das Vorzeichen ist die Kernzahl: eine systematische Schieflage zeigt sich hier |
@@ -40,16 +44,31 @@ Auswertung: nur Zeilen mit gefülltem `verdict` zählen.
 
 ## Urteils-Konventionen
 
-- `getroffen`: Front war da, `|delta_h|` ≤ halbe Stützweite. Innerhalb der
+- `getroffen`: Front war da, `|delta_h|` ≤ **Toleranz**. Innerhalb der
   ausgewiesenen Unschärfe zu liegen ist der Anspruch — nicht die Punktlandung.
-- `zu_frueh` / `zu_spaet`: Front war da, aber ausserhalb der Unschärfe.
+- `zu_frueh` / `zu_spaet`: Front war da, aber ausserhalb der Toleranz.
 - `keine_front`: wir sagten einen Durchgang an, die Ist-Lage zeigt keinen.
-  Der teuerste Fehler — er erzeugt eine Warnung ohne Anlass.
+  Der teuerste Fehler — er erzeugt eine Warnung ohne Anlass. Wird **nur**
+  vergeben, wenn die Analysen den ganzen Suchraum (±24 h) abdecken; sonst
+  bleibt die Zeile leer, weil ein Nicht-Fund ohne Abdeckung keine Information
+  ist, sondern eine Lücke.
 - `verpasst`: **nicht** aus unseren Zeilen erzeugbar, weil hier nur
   Vorhersagen stehen. Solche Fälle kommen aus dem Gegenlauf über die Analysen
-  und werden mit leerer Vorhersage-Seite eingetragen.
-- `unklar`: Stützpunkte reichen nicht (`randwert = 1`, Front am Kartenrand,
-  Typwechsel entlang der Linie).
+  und werden mit leerer Vorhersage-Seite eingetragen — aber nur für Zeitpunkte,
+  die ein Aussage-Schnappschuss überhaupt abgedeckt hat. Was vor dem
+  Archivbeginn lag, ist keine verpasste Front, sondern eine Zeit ohne Betrieb.
+- `unklar`: Stützpunkte reichen nicht (`randwert = 1` **und** kein Ist-Durchgang
+  gefunden, Front am Kartenrand, Typwechsel entlang der Linie).
+
+**Die Toleranz** ist die halbe Stützweite der Vorhersage **plus** die halbe der
+Analyse-Kette — in der Regel 6 h + 6 h = 12 h. Der Zusatz ist keine Grosszügigkeit
+gegen uns selbst: der Schiedsrichter erscheint nur alle 12 h und ist damit selbst
+unscharf. Eine engere Toleranz würde eine Genauigkeit behaupten, die die
+Ist-Seite nicht hat. Wer strenger urteilen will, überschreibt `verdict` von Hand
+— das gilt dann als Handurteil und bleibt stehen.
+
+Der Suchradius um eine Ansage beträgt **±24 h**: darüber hinaus ist es nicht
+mehr dasselbe Ereignis, sondern die nächste Front.
 
 ## Die 0-Front-Regel
 

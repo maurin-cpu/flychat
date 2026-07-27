@@ -100,3 +100,40 @@ echten Durchgängen messbar. Kernzahl dafür ist `delta_h` in `observations.csv`
 
 Solange die Systematik unbekannt ist, gilt für die Ausgabe: nie eine Uhrzeit,
 immer ein Tagesfenster (Plan §6, Regel 1 und 2).
+
+**Erste Messung (27.07., n = 1):** `delta_h` = **+2.7 h** aus der Auto-Validierung
+(Ist-Durchgang 03:39 UTC gegen Ansage 00:58 UTC) — von Hand aus Abstand und
+Tempo gerechnet waren es +2.9 h. Zwei Wege, dasselbe Vorzeichen: **zu früh
+angesagt**, wie vermutet. Ein Fall belegt nichts, aber die Richtung stimmt mit
+der Bremshypothese überein.
+
+---
+
+## F-006 — Ausdehnung unterschätzt: Streifschuss angesagt, Zonendurchgang eingetreten
+
+**Status:** `offen` · **Beobachtet:** 1 Fall (27.07.2026), erster Fund des
+Gegenlaufs
+
+Für die Nacht auf den 27.07. sagten wir am Alpennordhang einen **Streifschuss**
+an: 1 von 327 Spots, also ausdrücklich keine Zonenaussage (F-002). Die Kette der
+Handanalysen (00 → 12 UTC) zeigt für dieselbe Kaltfront:
+
+| | Ansage | Ist-Lage |
+|---|---|---|
+| Alpennordhang | `streift`, 1/327 Spots, 00:58 UTC | `quert`, **92/327** Spots, 03:39 UTC |
+| Graubünden/Engadin | *keine Aussage* | `quert`, **72/76** Spots, 05:17 UTC |
+
+Der Zeitfehler ist mit +2.7 h klein (F-005). Der **Ausdehnungsfehler** ist es
+nicht: aus einem Randkontakt wurde ein Durchgang durch zwei Zonen. Genau diese
+Fehlerart würde der Vorhersage-Seite allein nie auffallen — sie ist der Grund
+für den Gegenlauf über die Analysen (`verdict = verpasst`).
+
+**Was das noch nicht ist.** Ein Beleg: n = 1. Die Ist-Kette besteht aus **einer
+einzigen** Kartenpaarung (00/12 UTC), die Front-Identität dazwischen ist
+ungeprüft (F-004), und die Ist-Seite benutzt dasselbe geometrische Verfahren wie
+die Vorhersage — ein Methodenfehler beträfe beide Seiten, nur die Eingangsdaten
+sind unabhängig. Der Verdacht ist trotzdem konkret genug, um ihn zu benennen:
+**die Vorhersagekarten haben 12 h Stützweite, und eine Front, die zwischen zwei
+Terminen durchzieht, hinterlässt auf ihnen nur einen Randkontakt.** Wäre das die
+Ursache, wären Streifschüsse systematisch untertrieben — prüfbar an den nächsten
+Fällen, sobald das Archiv sie liefert.

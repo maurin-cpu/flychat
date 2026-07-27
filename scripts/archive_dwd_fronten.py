@@ -42,6 +42,9 @@ from pathlib import Path
 
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fronten_alarm import Alarm                                    # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 ARCHIV = ROOT / "data" / "dwd_fronten_archiv"
 OUT_DIR = ROOT / "data" / "_experiment_fronten"
@@ -53,6 +56,28 @@ TEXT_URL = "https://opendata.dwd.de/weather/text_forecasts/txt/"
 
 LATEST_DWDC = (ANALYSIS_URL + "Z__C_EDZW_LATEST_tka01%2Cana_bwkman_dwdc_O_"
                "000000_000000_LATEST_WV12.png")
+
+# Ausfall-Alarm des Laufs. In main() gesetzt; ausserhalb eines Laufs (Import,
+# --nur rohkarten) bleibt er None und alle Meldungen laufen ins Leere.
+_alarm: Alarm | None = None
+
+
+def _melde(fall: str, was: str, url: str = "") -> None:
+    if _alarm is not None:
+        _alarm.stoerung(fall, was, url)
+
+
+def _pruefe_zeichnung(features: list, was: str, url: str = "") -> None:
+    """Null Abschnitte auf der GESAMTEN Karte = Zeichenweise geaendert.
+
+    Ganzkartig, nicht auf unser Gebiet bezogen: "keine Front ueber den Alpen"
+    ist bei Hochdruck der Normalfall und darf nie alarmieren. Der Ausschnitt
+    reicht von Groenland bis Nordafrika — dort war ueber elf Karten (27.07.)
+    nie null, sondern 13 bis 19 Abschnitte.
+    """
+    if not features:
+        _melde("zeichnung_weg", f"{was}: 0 Abschnitte auf der gesamten Karte",
+               url)
 
 
 def _listing(url: str) -> list[str]:
@@ -112,8 +137,13 @@ def _extract(args: list[str]) -> bool:
     p = subprocess.run([sys.executable, str(EXTRAKT)] + args,
                        capture_output=True, text=True, timeout=600)
     if p.returncode != 0:
-        print(f"    EXTRAKTION FEHLGESCHLAGEN ({' '.join(args)}):\n"
-              f"    {(p.stdout + p.stderr).strip().splitlines()[-1]}")
+        letzte = (p.stdout + p.stderr).strip().splitlines()[-1]
+        print(f"    EXTRAKTION FEHLGESCHLAGEN ({' '.join(args)}):\n    {letzte}")
+        # Der Abbruchgrund steht nur im Text des Subprozesses — Waechter- und
+        # Legendenabbruch sind Layoutfaelle, alles andere zaehlt als Ausfall.
+        if _alarm is not None:
+            _alarm.aus_meldung(p.stdout + p.stderr,
+                               f"Extraktion {' '.join(args)}")
     return p.returncode == 0
 
 
@@ -126,6 +156,8 @@ def archive_analyse() -> list[str]:
     if not stamps:
         print("  ANALYSE: keine datierten dwdc-Namen im Listing — "
               "Gueltigkeit nicht bestimmbar, Karte wird NICHT abgelegt.")
+        _melde("quelle_weg", "Analyse-Listing ohne datierte dwdc-Namen — "
+                             "Pfad oder Namensschema geaendert", ANALYSIS_URL)
         return []
     stamp = max(stamps)
     png, gj = d / f"dwdc_{stamp}.png", d / f"dwdc_{stamp}.geojson"
@@ -138,6 +170,7 @@ def archive_analyse() -> list[str]:
         return []
     # Gueltigkeit nachtragen — die Zeitachse braucht sie als Stuetzpunkt.
     data = json.loads(gj.read_text(encoding="utf-8"))
+    _pruefe_zeichnung(data["features"], f"Analyse {stamp}", LATEST_DWDC)
     gueltig = datetime.strptime(stamp, "%Y%m%d%H%M").replace(
         tzinfo=timezone.utc).isoformat()
     data["properties"]["gueltig"] = gueltig
@@ -166,6 +199,9 @@ def archive_vorhersage() -> list[str]:
             continue
         for src in OUT_DIR.glob(f"dwd_fronten_{run}_*.geojson"):
             (d / src.name).write_bytes(src.read_bytes())
+            _pruefe_zeichnung(
+                json.loads(src.read_text(encoding="utf-8"))["features"],
+                f"Vorhersage {src.stem}", FORECAST_URL)
         for src in OUT_DIR.glob(f"tkb_{run}_*.png"):
             (d / src.name).write_bytes(src.read_bytes())
         got.append(f"vorhersage Lauf {run}")
@@ -227,7 +263,15 @@ def main() -> int:
                     help="nur einen Teil einsammeln. 'rohkarten' = nur die "
                          "PNGs, nichts Abgeleitetes (lokaler Lauf, siehe "
                          "archive_rohkarten)")
+    ap.add_argument("--ohne-alarm", action="store_true",
+                    help="Ausfall-Alarm nicht versenden (nur anzeigen)")
     args = ap.parse_args()
+
+    # Der Alarm haengt am ableitenden Lauf, nicht am reinen Rohkarten-Lauf:
+    # sonst melden Cloud und lokaler Rechner denselben Ausfall zweimal.
+    global _alarm
+    if args.nur != "rohkarten":
+        _alarm = Alarm(versand=not args.ohne_alarm)
 
     # Reihenfolge zaehlt: die Aussagen brauchen Analyse UND Vorhersagekarten.
     steps = {"analyse": archive_analyse, "vorhersage": archive_vorhersage,
@@ -244,6 +288,9 @@ def main() -> int:
             new.extend(fn())
         except Exception as e:
             print(f"  {name}: FEHLER {e}")
+            # Netzfehler, HTTP-Fehler, unlesbares PNG — alles derselbe Fall:
+            # die Quelle liefert nicht mehr wie erwartet.
+            _melde("quelle_weg", f"Schritt '{name}': {type(e).__name__} {e}")
     if new:
         print(f"{len(new)} neu archiviert:")
         for n in new:
@@ -253,10 +300,12 @@ def main() -> int:
     if args.nur == "rohkarten":
         print("(nur Rohkarten — nichts abgeleitet, nichts versioniert)")
     elif not args.nur or args.nur == "aussagen":
-        p = subprocess.run(
-            [sys.executable, str(ROOT / "scripts" / "build_fronten_observations.py")],
-            capture_output=True, text=True, timeout=300)
-        print((p.stdout or p.stderr).strip())
+        # Eintragen und beurteilen haengen am selben Lauf: so wird jede Front
+        # von selbst zum Testfall, ohne dass jemand daran denken muss.
+        for skript in ("build_fronten_observations.py", "validate_fronten.py"):
+            p = subprocess.run([sys.executable, str(ROOT / "scripts" / skript)],
+                               capture_output=True, text=True, timeout=900)
+            print((p.stdout or p.stderr).strip())
 
     def _n(sub, pat="*"):
         return len(list((ARCHIV / sub).glob(pat))) if (ARCHIV / sub).exists() else 0
@@ -264,6 +313,9 @@ def main() -> int:
           f"{len(list(ARCHIV.rglob('*.png')))} PNG, {_n('text')} Bulletins, "
           f"{_n('aussagen', '*.json')} Aussage-Schnappschuesse "
           f"in {ARCHIV.relative_to(ROOT)}")
+
+    if _alarm is not None:
+        print(f"Ausfall-Alarm: {_alarm.abschluss()}")
     return 0
 
 

@@ -137,6 +137,11 @@ PROFILES = {
         # Legendenkasten, senkrechter Beschriftungsstreifen, DWD-Logo. Der
         # Legendentext ist orange — ohne diese Sperre waere er eine Trogachse.
         "ignore": [(810, 910, 0, 270), (520, 790, 0, 40), (790, 910, 1150, 1280)],
+        # Invariante zur Sperrzone (§1h Befund 5): die orange Legendenfarbe muss
+        # INNERHALB der Sperrzone liegen. Schwellen = halbe gemessene Untergrenze
+        # ueber zehn Karten vom 26./27.07. (Kasten 619-651 Px, Streifen 65-71 Px).
+        "groesse": (910, 1280),
+        "legende": [((810, 910, 0, 270), 300), ((520, 790, 0, 40), 30)],
         "quelle": "Deutscher Wetterdienst, ICON-Vorhersagekarte (tkb)",
     },
 }
@@ -223,6 +228,44 @@ def check_projection(rgb) -> float:
     cls = np.where(keep[yi[ok], xi[ok]], cls, -1)
     v = cls >= 0
     return float((cls[v] == land_ref[ok][v]).mean()) if v.sum() else float("nan")
+
+
+def check_sperrzone(rgb) -> list[str]:
+    """Blindstelle des Projektions-Waechters schliessen (§1h Befund 5).
+
+    Der Legendentext der Vorhersagekarte ist orange — dieselbe Farbe wie die
+    Trogachse. Er liegt in der Sperrzone und wird deshalb nicht ausgewertet.
+    Verschiebt der DWD den Legendenkasten, bleibt die Land-See-Maske perfekt,
+    der Projektions-Waechter merkt also NICHTS — aber der orange Text steht
+    ploetzlich auf der Kartenflaeche und wird als Trogachse extrahiert.
+
+    Die Invariante dreht die Pruefung um: nicht "ist die Karte richtig", sondern
+    "liegt die erwartete Legendenfarbe noch dort, wo wir sie wegblenden". Ist
+    der Kasten leer, ist die Legende woanders — und damit im Auswertebereich.
+
+    Rueckgabe: Liste der Verstoesse, leer = in Ordnung.
+    """
+    p = PROFILES[_ACTIVE]
+    erwartet = p.get("legende") or []
+    if not erwartet:
+        return []
+    fehler = []
+    soll = p.get("groesse")
+    if soll and rgb.shape[:2] != tuple(soll):
+        # Die Sperrzonen sind Pixelkoordinaten; bei anderer Bildgroesse zeigen
+        # sie ins Leere und jede weitere Zaehlung waere sinnlos.
+        return [f"LEGENDE: Kartengroesse {rgb.shape[1]}x{rgb.shape[0]} statt "
+                f"{soll[1]}x{soll[0]} — Sperrzonen passen nicht mehr"]
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    orange = TROG_COLOR["trog"](r, g, b)
+    for (y0, y1, x0, x1), minimum in erwartet:
+        n = int(orange[y0:y1, x0:x1].sum())
+        if n < minimum:
+            fehler.append(f"LEGENDE: nur {n} orange Pixel in der Sperrzone "
+                          f"({y0}:{y1},{x0}:{x1}), erwartet >= {minimum} — "
+                          f"Legende verschoben, der Text landet sonst als "
+                          f"Trogachse in der Auswertung")
+    return fehler
 
 
 # ============================================================================
@@ -548,6 +591,13 @@ def extract(img, meta: dict, simplify_km: float, verbose: bool = True) -> list:
     if agree == agree and agree < guard:
         raise SystemExit(f"  ABBRUCH: Layout passt nicht mehr zur Kalibrierung "
                          f"({agree*100:.1f} % < {guard*100:.0f} %).")
+    verstoesse = check_sperrzone(rgb)
+    if verstoesse:
+        # Abbruch statt Weitermachen: der Fehler erzeugt keine fehlende, sondern
+        # eine ERFUNDENE Front — teurer als eine leere Ebene.
+        raise SystemExit("  ABBRUCH: " + " | ".join(verstoesse))
+    if verbose and PROFILES[_ACTIVE].get("legende"):
+        print("Legenden-Invariante: Sperrzone traegt die Legendenfarbe")
 
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     keep = _ignore_mask(rgb.shape)

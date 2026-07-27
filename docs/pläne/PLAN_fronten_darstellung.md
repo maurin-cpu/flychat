@@ -778,10 +778,94 @@ Analog zur 0-Launch-Regel gilt eine **0-Front-Regel**: frontfreie Tage
 erzeugen keine Zeile, die Tabelle sagt daher nichts darüber, wie oft wir eine
 Front *übersehen* — das braucht den Gegenlauf über die Analysen.
 
-Fünf Befunde sind bereits eingetragen: `F-001` Phantom-Durchgänge (gefixt),
+Sechs Befunde sind eingetragen: `F-001` Phantom-Durchgänge (gefixt),
 `F-002` Streifschuss als Zonenaussage (gefixt), `F-003` Randwerte (gefixt),
 `F-004` Front-Identität zwischen zwei Karten (**offen**), `F-005` zeitliche
-Systematik unbekannt (**offen, braucht Fälle**).
+Systematik (**offen**, erste Messung +2.7 h zu früh, siehe §1j), `F-006`
+Ausdehnung unterschätzt (**offen**, erster Fund des Gegenlaufs, §1j).
+
+## 1j. Schritt 5 umgesetzt — die Kette prüft sich selbst (27.07.2026, abends)
+
+Zwei Dinge, die zusammengehören: die Selbstkontrolle (§6 Schritt 5) und der
+Alarm, der meldet, wenn die Quelle unter uns wegbricht (§6 Schritt 3, Vorgabe
+vom Vormittag). Beides läuft ab jetzt am Ende jedes ableitenden Laufs mit.
+
+### Auto-Validierung: `scripts/validate_fronten.py`
+
+Der Schiedsrichter ist die Handanalyse — dieselbe Quelle, aber die Ist-Lage
+statt der Vorhersage. Aus der Kette der Analysen wird mit **demselben**
+geometrischen Verfahren wie bei der Vorhersage der tatsächliche Durchgang je
+Zone bestimmt und gegen die Ansage gehalten. Dass die Methode dieselbe ist, ist
+Absicht: ein Schiedsrichter mit eigener Methodik würde Methoden- und Datenfehler
+vermischen; so bleibt genau ein Unterschied übrig, nämlich Vorhersage gegen Ist.
+
+Drei Prüfungen in einem Lauf:
+
+| | prüft | braucht |
+|---|---|---|
+| **Vorhersage gegen Handanalyse** | war die Front da, und wann? `delta_h` samt Vorzeichen | Analysen, die den Zeitpunkt umschliessen |
+| **Gegenlauf** | Zonenereignisse der Ist-Lage **ohne** zugehörige Ansage (`verpasst`) | dasselbe + einen Schnappschuss, der den Zeitpunkt abgedeckt hat |
+| **Lauf-Jitter** | springt dieselbe Aussage zwischen den Läufen? | nichts — liefert sofort |
+
+**Die Toleranz für `getroffen`** ist die halbe Stützweite der Vorhersage *plus*
+die halbe der Analyse-Kette (6 h + 6 h). Kein Entgegenkommen gegen uns selbst:
+der Schiedsrichter erscheint nur alle 12 h und ist damit selbst unscharf; eine
+engere Toleranz würde eine Genauigkeit behaupten, die die Ist-Seite nicht hat.
+
+**Was der Automat nicht darf.** Handurteile werden nie überschrieben (erkannt am
+fehlenden `auto:`-Präfix in `notes`). Und ohne vollständige Analyse-Abdeckung
+des Suchraums bleibt die Zeile **leer** statt „keine Front" — ein Nicht-Fund
+ohne Abdeckung ist keine Information, sondern eine Lücke. Der Selbsttest nagelt
+genau das als Fall 7 fest.
+
+### Erste Ergebnisse — und der erste Fund des Gegenlaufs
+
+Zwei Handanalysen (27.07. 00 und 12 UTC) reichen für eine Kette. Ergebnis:
+
+- **Zeit:** Ist-Durchgang am Alpennordhang 03:39 UTC gegen Ansage 00:58 UTC,
+  also `delta_h` = **+2.7 h**, zu früh angesagt. Die Handrechnung vom Vormittag
+  (aus Abstand und realem Tempo) kam auf +2.9 h — zwei Wege, dasselbe
+  Vorzeichen. Richtungshinweis für `F-005`, kein Beleg (n = 1).
+- **Ausdehnung:** Wir sagten einen **Streifschuss** an (1/327 Spots). Die
+  Ist-Lage zeigt `quert` mit **92/327** am Alpennordhang und **72/76** in
+  Graubünden/Engadin — eine Zone, zu der wir gar nichts gesagt hatten. Als
+  `F-006` eingetragen, mit allen Vorbehalten: eine einzige Kartenpaarung,
+  Front-Identität ungeprüft (`F-004`).
+
+Der Zeitfehler ist klein, der Ausdehnungsfehler nicht — und **genau diese
+Fehlerart hätte die Vorhersage-Seite allein nie gezeigt.** Der Gegenlauf hat
+seinen Zweck im ersten Anlauf erfüllt.
+
+### Ausfall-Alarm: `scripts/fronten_alarm.py`
+
+Drei Fälle, wie im Auftrag festgelegt: `quelle_weg`, `layout`, `zeichnung_weg`.
+Empfänger ist die **neue** Konstante `config.OPS_ALERT_EMAIL`
+(`info@wingcast.ch`, per Env überschreibbar) — `ADMIN_EMAIL` bleibt unberührt,
+sonst wäre der Wetterlage-Alarm ungefragt mitumgezogen. Höchstens eine Mail pro
+Lauf, keine Wiederholung vor 7 Tagen, Entwarnung wenn es wieder läuft; der
+Zustand liegt **versioniert** in `data/dwd_fronten_archiv/alarm_zustand.json`,
+weil die Cloud-Routine keinen bleibenden Datenträger hat. Die Zustandsmaschine
+hat einen eigenen Selbsttest (`--selftest`, 6 Fälle) — ein Alarmsystem stirbt an
+genau diesen Regeln: zu viel gemeldet und es wird ignoriert, zu wenig und der
+Ausfall bleibt unbemerkt.
+
+### Legenden-Invariante (§1h Befund 5) — geschlossen
+
+Der Legendentext der Vorhersagekarte ist orange, dieselbe Farbe wie die
+Trogachse. Er liegt in der Sperrzone. Verschiebt der DWD den Kasten, bleibt die
+Land-See-Maske perfekt — **der Projektions-Wächter merkt nichts** — und der Text
+wird als Trogachse extrahiert.
+
+Die Invariante dreht die Prüfung um: nicht „ist die Karte richtig", sondern
+„liegt die erwartete Legendenfarbe noch dort, wo wir sie wegblenden". Gemessen
+über zehn Karten (26./27.07.): **619–651** orange Pixel im Legendenkasten,
+65–71 im senkrechten Beschriftungsstreifen — sehr stabil, Schwelle auf die halbe
+Untergrenze gesetzt. Gegenprobe mit geleertem Kasten: Wächter meldet weiterhin
+98.2 % (also nichts), die Invariante bricht ab. Dazu die Kartengrösse als
+Vorprüfung, weil die Sperrzonen Pixelkoordinaten sind.
+
+Abbruch statt Weiterrechnen ist hier richtig: der Fehler erzeugt keine fehlende,
+sondern eine **erfundene** Front — teurer als eine leere Ebene.
 
 ## 2b. Entschieden: eigene Berechnung, DWD-Text als Gegenprobe
 
@@ -832,10 +916,17 @@ Verhalten ändert):
 4. ~~**Morgen-Lücke schliessen**~~ **erledigt 27.07., §1i** — Handanalysen der
    letzten 24 h als Stützpunkte in `load_run()`; Gegenbeweis mit
    `--ohne-analyse` erbracht.
-5. **Auto-Validierung**: Vorhersage gegen spätere Handanalyse + Lauf-Jitter
-   (Konzept §1h). Erster Anwendungsfall: die nachgeholte Schritt-0-Messung.
-6. **Härtung**: Selbsttest um adversariale Fälle erweitern, Legenden-Invariante
-   in den Wächter (§1h Befunde 2 und 5).
+5. ~~**Auto-Validierung**: Vorhersage gegen spätere Handanalyse +
+   Lauf-Jitter~~ **erledigt 27.07., §1j** — `scripts/validate_fronten.py`,
+   dazu der Gegenlauf für verpasste Fronten. Läuft am Ende jedes Volllaufs mit.
+   Erster Fund: `F-006` (Ausdehnung unterschätzt). Die nachgeholte
+   Schritt-0-Messung (tkb +36 gegen die Handanalyse derselben Gültigkeitszeit)
+   läuft ab jetzt von selbst auf, sobald genug Analysen im Archiv liegen.
+6. **Härtung**: Legenden-Invariante **erledigt 27.07., §1j**; ebenso je ein
+   Selbsttest für Alarm-Zustandsmaschine und Urteilslogik. **Offen bleibt §1h
+   Befund 2**: die drei adversarialen Fälle der Front-Identität (`F-004`) im
+   `--selftest` der Zeitachse — zwei Fronten gleichen Typs, Typwechsel entlang
+   der Linie, Endpunkt-Effekte.
 7. Cache + Scheduler: neben `refresh_synoptic_grid()`, ein Lauf um 06:00.
    Für heute die +036 des gestrigen 00-UTC-Laufs, für morgen die von heute.
    Ausfall-Alarm wie unten.
@@ -845,6 +936,8 @@ Verhalten ändert):
 10. Verbotsliste lockern, mit Belegpflicht und Tests.
 
 **Ausfall-Alarm per Mail — Vorgabe vom 27.07.2026, gehört zu Schritt 3**
+(**umgesetzt am selben Abend, `scripts/fronten_alarm.py`, siehe §1j** — die
+folgende Spezifikation ist unverändert die Vorgabe, nach der gebaut wurde)
 
 Wir hängen an einer fremden Quelle. Bricht sie weg, darf das nicht still
 passieren: **Warnmail an `info@wingcast.ch`**, sobald die Kette nicht mehr
