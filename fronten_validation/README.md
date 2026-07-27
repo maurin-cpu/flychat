@@ -53,12 +53,24 @@ Extraktion nötig und bleiben deshalb auf der lokalen Platte.
 python scripts/archive_dwd_fronten.py        # holt Karten, Bulletins, Aussagen
 ```
 
-Läuft **4× täglich** (04, 08, 14, 20 Uhr lokal) an zwei Orten:
+Läuft **4× täglich** (04, 08, 14, 20 Uhr lokal) an zwei Orten, mit **getrennten
+Zuständigkeiten** — sonst erzeugen beide dieselben versionierten Dateien und
+jeder `git pull` kollidiert mit den lokalen Doppeln:
 
-- **Cloud-Routine** — sichert Linien, Bulletins, Aussagen und Tabelle per
-  Commit. Unabhängig davon, ob ein Rechner läuft.
-- **Lokal** — zusätzlich, fängt die PNG-Rohkarten ein, solange der Rechner an
-  ist. Best effort.
+| | holt | committet |
+|---|---|---|
+| **Cloud-Routine** (`trig_019kkXYvCvVromo9XhXEGmYy`, cron `0 2,6,12,18 * * *` UTC) | alles **ausser** den PNGs | ja, direkt auf `main` |
+| **Lokal** (Aufgabe `Flychat-DWD-Frontenarchiv`, `--nur rohkarten`) | **nur** die PNG-Rohkarten | nein, die sind gitignored |
+
+Die Cloud läuft zuverlässig, hat aber keinen bleibenden Datenträger. Der lokale
+Lauf hat einen, läuft aber nur bei eingeschaltetem Rechner — deshalb bekommt er
+genau das, was verzichtbar ist: die Rohkarten für eine spätere, verbesserte
+Bilderkennung.
+
+```bash
+python scripts/archive_dwd_fronten.py                  # Volllauf (wie Cloud)
+python scripts/archive_dwd_fronten.py --nur rohkarten  # nur PNGs (wie lokal)
+```
 
 Zwei Eigenheiten der Quelle, die das Abholintervall bestimmen: die *datierten*
 Analysekarten sind schwarz-weiss und damit nutzlos — farbig ist nur die jeweils

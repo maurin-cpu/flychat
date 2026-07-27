@@ -61,6 +61,52 @@ def _listing(url: str) -> list[str]:
     return re.findall(r'href="([^"]+)"', r.text)
 
 
+def archive_rohkarten() -> list[str]:
+    """NUR die PNG-Rohkarten holen, nichts ableiten, nichts versionieren.
+
+    Arbeitsteilung zwischen den beiden geplanten Laeufen:
+
+      Cloud-Routine  holt alles ausser den PNGs und committet es. Sie hat
+                     keinen bleibenden Datentraeger, dafuer laeuft sie
+                     zuverlaessig.
+      Lokal          holt NUR die PNGs. Die sind zu gross fuer Git und werden
+                     nur gebraucht, falls die Bilderkennung spaeter verbessert
+                     wird und alte Karten neu ausgewertet werden sollen.
+
+    Ohne diese Trennung erzeugen beide Laeufe dieselben versionierten Dateien,
+    und jeder git pull kollidiert mit den lokalen Doppeln.
+    """
+    got = []
+    d = ARCHIV / "analyse"
+    d.mkdir(parents=True, exist_ok=True)
+    stamps = re.findall(r"ana_bwkman_dwdc_O_000000_000000_(\d{12})_",
+                        "\n".join(_listing(ANALYSIS_URL)))
+    if stamps:
+        png = d / f"dwdc_{max(stamps)}.png"
+        if not png.exists():
+            r = requests.get(LATEST_DWDC, timeout=120)
+            r.raise_for_status()
+            png.write_bytes(r.content)
+            got.append(f"rohkarte analyse {max(stamps)}")
+
+    d = ARCHIV / "vorhersage"
+    d.mkdir(parents=True, exist_ok=True)
+    for n in _listing(FORECAST_URL):
+        if "ico_tkb_na" not in n or "LATEST_WV12" in n:
+            continue
+        m = re.search(r"_N_(\d{6})_\d{6}_(\d{12})_", n)
+        if not m:
+            continue
+        png = d / f"tkb_{m.group(2)}_{int(m.group(1))}.png"
+        if png.exists():
+            continue
+        r = requests.get(FORECAST_URL + n, timeout=120)
+        if r.ok:
+            png.write_bytes(r.content)
+            got.append(f"rohkarte tkb {m.group(2)} +{int(m.group(1)):03d}")
+    return got
+
+
 def _extract(args: list[str]) -> bool:
     """Bestehende Extraktion als Subprozess — eine Kette, kein Code-Doppel."""
     p = subprocess.run([sys.executable, str(EXTRAKT)] + args,
@@ -176,15 +222,21 @@ def archive_aussagen() -> list[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--nur", choices=("analyse", "vorhersage", "text", "aussagen"),
-                    help="nur einen Teil einsammeln")
+    ap.add_argument("--nur", choices=("analyse", "vorhersage", "text",
+                                      "aussagen", "rohkarten"),
+                    help="nur einen Teil einsammeln. 'rohkarten' = nur die "
+                         "PNGs, nichts Abgeleitetes (lokaler Lauf, siehe "
+                         "archive_rohkarten)")
     args = ap.parse_args()
 
     # Reihenfolge zaehlt: die Aussagen brauchen Analyse UND Vorhersagekarten.
     steps = {"analyse": archive_analyse, "vorhersage": archive_vorhersage,
-             "text": archive_text, "aussagen": archive_aussagen}
+             "text": archive_text, "aussagen": archive_aussagen,
+             "rohkarten": archive_rohkarten}
     if args.nur:
         steps = {args.nur: steps[args.nur]}
+    else:
+        steps.pop("rohkarten")            # im Vollauf durch die Extraktion abgedeckt
 
     new = []
     for name, fn in steps.items():
@@ -198,7 +250,9 @@ def main() -> int:
             print(f"  + {n}")
     else:
         print("Nichts Neues — Archiv ist aktuell.")
-    if not args.nur or args.nur == "aussagen":
+    if args.nur == "rohkarten":
+        print("(nur Rohkarten — nichts abgeleitet, nichts versioniert)")
+    elif not args.nur or args.nur == "aussagen":
         p = subprocess.run(
             [sys.executable, str(ROOT / "scripts" / "build_fronten_observations.py")],
             capture_output=True, text=True, timeout=300)
