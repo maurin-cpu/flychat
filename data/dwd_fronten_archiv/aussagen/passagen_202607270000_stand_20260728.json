@@ -1,0 +1,87 @@
+{
+ "lauf": "2026072700",
+ "erstellt_utc": "2026-07-28T02:04:33+00:00",
+ "mit_analyse": true,
+ "max_seitlich_km": 100.0,
+ "stuetzpunkte": [
+  {
+   "quelle": "ANA",
+   "vorlauf_h": 0,
+   "gueltig_utc": "2026-07-27T12:00:00+00:00",
+   "abschnitte": 25,
+   "datei": "dwdc_202607271200.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 36,
+   "gueltig_utc": "2026-07-28T12:00:00+00:00",
+   "abschnitte": 18,
+   "datei": "dwd_fronten_202607270000_036.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 48,
+   "gueltig_utc": "2026-07-29T00:00:00+00:00",
+   "abschnitte": 17,
+   "datei": "dwd_fronten_202607270000_048.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 60,
+   "gueltig_utc": "2026-07-29T12:00:00+00:00",
+   "abschnitte": 17,
+   "datei": "dwd_fronten_202607270000_060.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 84,
+   "gueltig_utc": "2026-07-30T12:00:00+00:00",
+   "abschnitte": 17,
+   "datei": "dwd_fronten_202607270000_084.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 108,
+   "gueltig_utc": "2026-07-31T12:00:00+00:00",
+   "abschnitte": 14,
+   "datei": "dwd_fronten_202607270000_108.geojson"
+  }
+ ],
+ "stuetzweiten_h": [
+  24.0,
+  12.0,
+  12.0,
+  24.0,
+  24.0
+ ],
+ "aussagen": [
+  {
+   "zone": "alpennordhang",
+   "typ": "kalt",
+   "art": "quert",
+   "durchgang_median_utc": "2026-07-27T16:03:57.317432+00:00",
+   "fenster_von_utc": "2026-07-27T15:49:43.845096+00:00",
+   "fenster_bis_utc": "2026-07-27T16:23:18.225312+00:00",
+   "spots_betroffen": 34,
+   "spots_zone": 327,
+   "anteil": 0.104,
+   "seitlich_km": 76.9,
+   "stuetzweite_h": 24.0,
+   "randwert": false
+  },
+  {
+   "zone": "graubuenden_engadin",
+   "typ": "kalt",
+   "art": "streift",
+   "durchgang_median_utc": "2026-07-27T15:50:18.617841+00:00",
+   "fenster_von_utc": "2026-07-27T15:49:53.833737+00:00",
+   "fenster_bis_utc": "2026-07-27T15:50:43.401944+00:00",
+   "spots_betroffen": 2,
+   "spots_zone": 76,
+   "anteil": 0.026,
+   "seitlich_km": 95.3,
+   "stuetzweite_h": 24.0,
+   "randwert": false
+  }
+ ]
+}

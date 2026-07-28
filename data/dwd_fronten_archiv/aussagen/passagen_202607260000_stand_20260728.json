@@ -1,0 +1,73 @@
+{
+ "lauf": "2026072600",
+ "erstellt_utc": "2026-07-28T02:04:32+00:00",
+ "mit_analyse": true,
+ "max_seitlich_km": 100.0,
+ "stuetzpunkte": [
+  {
+   "quelle": "ANA",
+   "vorlauf_h": 0,
+   "gueltig_utc": "2026-07-27T00:00:00+00:00",
+   "abschnitte": 28,
+   "datei": "dwdc_202607270000.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 36,
+   "gueltig_utc": "2026-07-27T12:00:00+00:00",
+   "abschnitte": 15,
+   "datei": "dwd_fronten_202607260000_036.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 48,
+   "gueltig_utc": "2026-07-28T00:00:00+00:00",
+   "abschnitte": 19,
+   "datei": "dwd_fronten_202607260000_048.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 60,
+   "gueltig_utc": "2026-07-28T12:00:00+00:00",
+   "abschnitte": 15,
+   "datei": "dwd_fronten_202607260000_060.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 84,
+   "gueltig_utc": "2026-07-29T12:00:00+00:00",
+   "abschnitte": 19,
+   "datei": "dwd_fronten_202607260000_084.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 108,
+   "gueltig_utc": "2026-07-30T12:00:00+00:00",
+   "abschnitte": 13,
+   "datei": "dwd_fronten_202607260000_108.geojson"
+  }
+ ],
+ "stuetzweiten_h": [
+  12.0,
+  12.0,
+  12.0,
+  24.0,
+  24.0
+ ],
+ "aussagen": [
+  {
+   "zone": "alpennordhang",
+   "typ": "kalt",
+   "art": "streift",
+   "durchgang_median_utc": "2026-07-27T00:58:14.844139+00:00",
+   "fenster_von_utc": "2026-07-27T00:58:14.844139+00:00",
+   "fenster_bis_utc": "2026-07-27T00:58:14.844139+00:00",
+   "spots_betroffen": 1,
+   "spots_zone": 327,
+   "anteil": 0.003,
+   "seitlich_km": 79.6,
+   "stuetzweite_h": 12.0,
+   "randwert": true
+  }
+ ]
+}
