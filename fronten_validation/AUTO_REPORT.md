@@ -1,26 +1,26 @@
 # Auto-Validierung — erzeugt, nicht von Hand gepflegt
 
-Stand 2026-07-28 18:04 UTC, erzeugt von `scripts/validate_fronten.py`. Befunde gehoeren nach `PATTERNS.md`, Urteile duerfen in `observations.csv` von Hand ueberschrieben werden — dieser Bericht wird bei jedem Lauf neu geschrieben.
+Stand 2026-07-29 02:03 UTC, erzeugt von `scripts/validate_fronten.py`. Befunde gehoeren nach `PATTERNS.md`, Urteile duerfen in `observations.csv` von Hand ueberschrieben werden — dieser Bericht wird bei jedem Lauf neu geschrieben.
 
 ## Bestand
 
-- 5 Zeile(n) in `observations.csv`, davon 4 automatisch beurteilt
+- 8 Zeile(n) in `observations.csv`, davon 7 automatisch beurteilt
 - Analyse-Abdeckung: 27.07 00:00 – 27.07 12:00 UTC
 - Ist-Ereignisse in der Analyse-Kette: 2
-- neu beurteilt in diesem Lauf: 0, neue verpasste Fronten: 0
+- neu beurteilt in diesem Lauf: 3, neue verpasste Fronten: 0
 - **0 Zeile(n) warten auf Analysen** — leer heisst NICHT GEPRUEFT, nicht "kein Befund"
 
 ## Urteile
 
 | Urteil | Zeilen |
 |---|---|
-| `getroffen` | 3 |
+| `getroffen` | 6 |
 | `verpasst` | 1 |
 | `zu_frueh` | 1 |
 
 ## Systematik (Vorzeichen von `delta_h`)
 
-- n = 4, Median -3.9 h, Spanne -12.4 … +2.9 h
+- n = 7, Median -10.5 h, Spanne -12.4 … +2.9 h
 - Lesart: wir sagen zu SPAET an (positiv = die Front kam spaeter als angesagt)
 
 Eine systematische Schieflage waere korrigierbar, Rauschen nicht. Ab n < 10 ist beides nicht unterscheidbar — die Zahl steht hier als Richtungshinweis, nicht als Beleg.
@@ -29,9 +29,9 @@ Eine systematische Schieflage waere korrigierbar, Rauschen nicht. Ab n < 10 ist 
 
 | Zone | Typ | angesagt fuer | Spanne | Laeufe | fehlt in |
 |---|---|---|---|---|---|
-| alpennordhang | kalt | 27.07 00:58 UTC | 0.0 h | 2 | — |
-| alpennordhang | kalt | 27.07 16:03 UTC | 0.0 h | 1 | Stand 20260727, Stand 20260728 |
-| graubuenden_engadin | kalt | 27.07 15:50 UTC | 0.0 h | 1 | Stand 20260727, Stand 20260728 |
+| alpennordhang | kalt | 27.07 00:58 UTC | 0.0 h | 3 | — |
+| alpennordhang | kalt | 27.07 16:03 UTC | 0.0 h | 2 | Stand 20260727, Stand 20260728, Stand 20260729 |
+| graubuenden_engadin | kalt | 27.07 15:50 UTC | 0.0 h | 2 | Stand 20260727, Stand 20260728, Stand 20260729 |
 
 `fehlt in` = Laeufe, die den Zeitpunkt abgedeckt haben, aber keine Aussage dazu machten. Das ist der haertere Jitter: nicht eine verschobene Zeit, sondern eine verschwundene Front.
 
