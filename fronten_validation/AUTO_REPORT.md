@@ -1,13 +1,13 @@
 # Auto-Validierung — erzeugt, nicht von Hand gepflegt
 
-Stand 2026-07-29 02:03 UTC, erzeugt von `scripts/validate_fronten.py`. Befunde gehoeren nach `PATTERNS.md`, Urteile duerfen in `observations.csv` von Hand ueberschrieben werden — dieser Bericht wird bei jedem Lauf neu geschrieben.
+Stand 2026-07-29 06:04 UTC, erzeugt von `scripts/validate_fronten.py`. Befunde gehoeren nach `PATTERNS.md`, Urteile duerfen in `observations.csv` von Hand ueberschrieben werden — dieser Bericht wird bei jedem Lauf neu geschrieben.
 
 ## Bestand
 
 - 8 Zeile(n) in `observations.csv`, davon 7 automatisch beurteilt
 - Analyse-Abdeckung: 27.07 00:00 – 27.07 12:00 UTC
 - Ist-Ereignisse in der Analyse-Kette: 2
-- neu beurteilt in diesem Lauf: 3, neue verpasste Fronten: 0
+- neu beurteilt in diesem Lauf: 0, neue verpasste Fronten: 0
 - **0 Zeile(n) warten auf Analysen** — leer heisst NICHT GEPRUEFT, nicht "kein Befund"
 
 ## Urteile
