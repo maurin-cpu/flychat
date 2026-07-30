@@ -1,6 +1,6 @@
 # Auto-Validierung — erzeugt, nicht von Hand gepflegt
 
-Stand 2026-07-30 06:04 UTC, erzeugt von `scripts/validate_fronten.py`. Befunde gehoeren nach `PATTERNS.md`, Urteile duerfen in `observations.csv` von Hand ueberschrieben werden — dieser Bericht wird bei jedem Lauf neu geschrieben.
+Stand 2026-07-30 18:04 UTC, erzeugt von `scripts/validate_fronten.py`. Befunde gehoeren nach `PATTERNS.md`, Urteile duerfen in `observations.csv` von Hand ueberschrieben werden — dieser Bericht wird bei jedem Lauf neu geschrieben.
 
 ## Bestand
 
