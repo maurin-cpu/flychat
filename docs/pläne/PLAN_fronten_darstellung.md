@@ -867,6 +867,98 @@ Vorprüfung, weil die Sperrzonen Pixelkoordinaten sind.
 Abbruch statt Weiterrechnen ist hier richtig: der Fehler erzeugt keine fehlende,
 sondern eine **erfundene** Front — teurer als eine leere Ebene.
 
+## 1k. Schritt 7 umgesetzt — der Server sammelt selbst (30.07.2026)
+
+Drei Tage unbeaufsichtigter Betrieb haben zwei Dinge gezeigt, die den
+Betriebsweg entschieden haben.
+
+### Die Cloud kommt nicht mehr an die Quelle
+
+Seit **28.07. 02:04 UTC** meldet die Cloud-Routine für alle drei Schritte
+denselben Fehler:
+
+```
+ProxyError: Tunnel connection failed: 403 Forbidden   (opendata.dwd.de)
+```
+
+Der Ausfall-Alarm aus §1j hat korrekt angeschlagen und den Zustand auf
+`quelle_weg` gesetzt — der erste Beleg, dass die Kette ihren eigenen Ausfall
+bemerkt. Von einem gewöhnlichen Rechner ist derselbe Pfad erreichbar (HTTP
+200), der Block liegt also in der Cloud-Umgebung und ist von uns nicht zu
+beheben. Fünf von neun Läufen kamen ohne Daten zurück; gerettet hat den
+Zeitraum allein die Windows-Aufgabe, die weiterhin PNGs holte.
+
+**Entscheid:** Beide Altsysteme fallen weg. Das Einsammeln übernimmt der
+**Hetzner-Server**, im schon laufenden Scheduler-Thread des `wingcast`-Dienstes
+(`scheduler.py`, `FRONTEN_STUNDEN` = 02/08/14/20 Uhr) als dritter Event-Typ
+neben `briefing` und `accuracy`. Kein cron, kein zweiter Prozess, kein
+Datenträger-Problem. Reissleine ohne Deploy: `WINGCAST_FRONTEN=0`.
+
+Damit fällt auch der Grund weg, die Linien zu versionieren (§1i): Der Server
+hat einen bleibenden Datenträger. Das Archiv wird behandelt wie
+`data/wetterdaten.json` — **gitignored, nie gepusht, per
+`scripts/sync_from_server.ps1` geholt**. Wichtig dabei: `deploy.sh` stasht mit
+`--include-untracked`, was ignorierte Dateien in Ruhe lässt (nur `--all` würde
+sie mitnehmen) — das Archiv überlebt also jeden Deploy.
+
+Versioniert bleibt, was ein Mensch schreibt: `PATTERNS.md`, `SCHEMA.md`,
+`README.md`, die Fallstudien — und neu **`handurteile.csv`**. Bisher stand ein
+Handurteil in `observations.csv`, und genau die wird jetzt server-seitig
+überschrieben. Der Validator legt die Handurteile bei jedem Lauf über die
+Maschinenzeilen; die alte Invariante („Handurteile werden nie überschrieben")
+bleibt, wird aber deploybar.
+
+### Der Duplikat-Defekt: 3 Messungen wurden zu 10 Zeilen
+
+Der zweite Befund wiegt schwerer, weil er still war. Ohne neue Karten leitete
+jeder Lauf trotzdem einen neuen Schnappschuss
+`passagen_<lauf>_stand_<heute>.json` aus **denselben** Vorhersagekarten vom
+26./27. ab. Jede Wiederholung wurde eine eigene Beobachtungszeile:
+
+| | 27.07. abends | 30.07. vor dem Fix |
+|---|---|---|
+| Zeilen | 2 | 11 |
+| n für die Systematik | 1 | 10 |
+| Median `delta_h` | +2.9 h | −10.5 h |
+
+Zwei getrennte Fehler stecken darin, beide behoben:
+
+1. **Der Archivlauf** schreibt einen Schnappschuss jetzt nur noch, wenn sich
+   die Eingangskarten geändert haben — `quelle_fingerprint` (SHA-256 über die
+   GeoJSON des Laufs) steht im Schnappschuss und wird vorher verglichen. Die
+   Sperre greift **vor** dem teuren Zeitachsen-Subprozess.
+2. **Die Auswertung** bildete Quoten und Median über *Zeilen*. Sie zählt jetzt
+   *unabhängige Beobachtungen* — je (Lauf, Zone, Typ, Ansagezeit) eine,
+   vertreten durch das Handurteil, sonst den jüngsten `stand`.
+
+**Korrektur zur ersten Lesart:** Die Wiederholung allein hat das Vorzeichen
+nicht gedreht. Entdoppelt bleiben n = 3 Beobachtungen aus **2 Durchgängen** mit
+Median −10.5 h — die beiden negativen Werte stammen aus dem echten Lauf vom
+27.07. und sind keine Artefakte. Die Wiederholung hat n von 3 auf 10 aufgebläht
+und damit eine Belastbarkeit vorgetäuscht, die nicht da war. `F-005` steht
+damit weiterhin offen, jetzt mit ehrlicherer Zahl.
+
+Der Bericht weist deshalb ab sofort **Beobachtungen und Frontdurchgänge
+getrennt** aus: mehrere Läufe zur selben Passage erhöhen n, aber nicht die Zahl
+der Wetterlagen — und nur die trägt eine Aussage über Systematik. Vier neue
+Selbsttestfälle (9–12) halten das fest.
+
+### Selbstheilung: `--nur nachziehen`
+
+Der Ausfall hat einen Reparaturweg erzwungen, der ohnehin fehlte. Sind die
+Rohkarten da, die Ableitung aber ausgefallen, hilft das DWD-Listing nicht mehr
+— nach rund zwei Tagen ist der Lauf dort weg. Die Karte liegt aber auf der
+Platte. `archive_nachziehen()` extrahiert die fehlenden GeoJSON aus den
+archivierten PNGs und stempelt Lauf, Vorlaufzeit und Gültigkeit aus dem
+Dateinamen nach (der `--png`-Pfad der Extraktion liefert sie als `None`).
+Läuft im Volllauf automatisch mit, vor den Aussagen.
+
+**Damit gerettet:** der komplette tkb-Lauf vom 28.07. (5 Vorlaufzeiten) und die
+Handanalyse vom 29.07. 12:00 — beide aus dem DWD-Listing bereits verschwunden.
+Die Analyse-Abdeckung hat dadurch eine zweite Kette bekommen (29.07 12:00 –
+30.07 12:00). Endgültig verloren ist nur der 28.07. auf der Analyseseite, weil
+dort keine Rohkarte eingesammelt wurde.
+
 ## 2b. Entschieden: eigene Berechnung, DWD-Text als Gegenprobe
 
 Der DWD-Text (`SXDL31` Kurzfrist, `SXDL33` Mittelfrist) benennt Fronten,
@@ -927,9 +1019,12 @@ Verhalten ändert):
    Befund 2**: die drei adversarialen Fälle der Front-Identität (`F-004`) im
    `--selftest` der Zeitachse — zwei Fronten gleichen Typs, Typwechsel entlang
    der Linie, Endpunkt-Effekte.
-7. Cache + Scheduler: neben `refresh_synoptic_grid()`, ein Lauf um 06:00.
-   Für heute die +036 des gestrigen 00-UTC-Laufs, für morgen die von heute.
-   Ausfall-Alarm wie unten.
+7. ~~Cache + Scheduler~~ **erledigt 30.07., §1k** — vier Läufe täglich im
+   Scheduler-Thread des `wingcast`-Dienstes (`FRONTEN_STUNDEN`), Archiv
+   server-lokal wie `wetterdaten.json`. Cloud-Routine und Windows-Aufgabe
+   abgelöst, nachdem die Cloud ab 28.07. am Proxy hängenblieb. Offen bleibt
+   hier nur der **Cache fürs Frontend** — der gehört zu Schritt 8/9, wenn die
+   Ebene und das Strukturfeld dazukommen.
 8. Karte: zusätzliche Ebene in `synoptic-map.js` und `synoptic-embed.js`,
    Quellenangabe „© Deutscher Wetterdienst" plus Änderungshinweis sichtbar.
 9. Strukturfeld: `decide_front_passage()` in `synoptic_context.py`.

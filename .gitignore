@@ -63,9 +63,19 @@ data/_experiment_fronten/
 # Auto-Sicherung vor dem Anhaengen (scripts/build_observations_from_strong.py)
 xcontest_validation/*.bak_before_auto
 
-# Frontenkarten-Archiv (scripts/archive_dwd_fronten.py): NUR die Rohkarten
-# bleiben draussen (~5 MB je Analysekarte). Die ausgelesenen Linien, Bulletins
-# und Aussagen werden versioniert — sie sind unwiederbringlich, sobald der DWD
-# die Karte nach ~2 Tagen loescht, und der Cloud-Lauf hat ueberhaupt keinen
-# bleibenden Datentraeger.
-data/dwd_fronten_archiv/**/*.png
+# Frontenkarten-Archiv (scripts/archive_dwd_fronten.py): Laufzeitdaten des
+# Servers, behandelt wie data/wetterdaten.json — der Hetzner-Server sammelt
+# 4x taeglich, nichts davon wird gepusht, geholt wird per
+# scripts/sync_from_server.ps1. Vorher lag das im Git, weil der Cloud-Lauf
+# keinen bleibenden Datentraeger hatte; der Server hat einen.
+# ACHTUNG: deploy.sh stasht mit --include-untracked, das laesst ignorierte
+# Dateien in Ruhe (nur --all wuerde sie mitnehmen). Genau deshalb ueberlebt
+# das Archiv hier jeden Deploy.
+data/dwd_fronten_archiv/
+
+# Maschinenausgabe der Fronten-Validierung. Von Hand gepflegt und damit
+# versioniert bleiben nur README/SCHEMA/PATTERNS, die Fallstudien — und
+# handurteile.csv, das der Validator ueber die Maschinenzeilen legt.
+fronten_validation/observations.csv
+fronten_validation/AUTO_REPORT.md
+fronten_validation/aussagen/

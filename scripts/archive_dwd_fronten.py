@@ -33,11 +33,12 @@ Run:  python scripts/archive_dwd_fronten.py
       python scripts/archive_dwd_fronten.py --nur analyse
 """
 import argparse
+import hashlib
 import json
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -226,10 +227,107 @@ def archive_text() -> list[str]:
     return got
 
 
+def _stempeln(gj: Path, lauf: str | None, vorlauf_h: int, gueltig: str) -> None:
+    """Traegt Lauf, Vorlaufzeit und Gueltigkeit in ein GeoJSON nach.
+
+    Beim Weg ueber `--png` kennt die Extraktion diese Angaben nicht
+    (`fetch_chart` liefert dort lauf/vorlauf_h/gueltig als None) — die
+    Zeitachse braucht die Gueltigkeit aber als Stuetzpunkt. Im Dateinamen
+    steht sie, also wird sie hier nachgetragen.
+    """
+    data = json.loads(gj.read_text(encoding="utf-8"))
+    data["properties"]["lauf"] = lauf
+    data["properties"]["vorlauf_h"] = vorlauf_h
+    data["properties"]["gueltig"] = gueltig
+    for f in data["features"]:
+        f["properties"]["gueltig"] = gueltig
+    gj.write_text(json.dumps(data, indent=1), encoding="utf-8")
+
+
+def archive_nachziehen() -> list[str]:
+    """Fehlende GeoJSON aus schon archivierten Rohkarten nachziehen.
+
+    Der Fall, fuer den es das gibt, ist am 28.-30.07.2026 eingetreten: die
+    Rohkarten wurden eingesammelt, die Ableitung fiel aus (der Cloud-Lauf kam
+    durch einen Proxy nicht mehr an den DWD, die lokale Aufgabe holte
+    weiterhin PNGs). Ueber das DWD-Listing ist da nichts mehr zu retten — die
+    Laeufe sind dort nach rund zwei Tagen weg —, die Karte liegt aber auf der
+    Platte.
+
+    Laeuft im Volllauf mit: fehlt nichts, kostet es zwei Verzeichnisvergleiche.
+    """
+    got = []
+    for png in sorted((ARCHIV / "vorhersage").glob("tkb_*.png")):
+        m = re.match(r"tkb_(\d{12})_(\d+)\.png$", png.name)
+        if not m:
+            continue
+        run, step = m.group(1), int(m.group(2))
+        gj = ARCHIV / "vorhersage" / f"dwd_fronten_{run}_{step:03d}.geojson"
+        if gj.exists():
+            continue
+        if not _extract(["--profil", "vorhersage", "--png", str(png),
+                         "--out", str(gj)]):
+            continue
+        t0 = datetime.strptime(run, "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+        _stempeln(gj, run, step, (t0 + timedelta(hours=step)).isoformat())
+        _pruefe_zeichnung(json.loads(gj.read_text(encoding="utf-8"))["features"],
+                          f"Nachzug Vorhersage {run}+{step}")
+        got.append(f"nachgezogen vorhersage {run}+{step:03d}")
+
+    for png in sorted((ARCHIV / "analyse").glob("dwdc_*.png")):
+        m = re.match(r"dwdc_(\d{12})\.png$", png.name)
+        if not m:
+            continue
+        gj = ARCHIV / "analyse" / f"dwdc_{m.group(1)}.geojson"
+        if gj.exists():
+            continue
+        if not _extract(["--profil", "analyse", "--png", str(png),
+                         "--out", str(gj)]):
+            continue
+        gueltig = datetime.strptime(m.group(1), "%Y%m%d%H%M").replace(
+            tzinfo=timezone.utc).isoformat()
+        _stempeln(gj, None, 0, gueltig)
+        _pruefe_zeichnung(json.loads(gj.read_text(encoding="utf-8"))["features"],
+                          f"Nachzug Analyse {m.group(1)}")
+        got.append(f"nachgezogen analyse {m.group(1)}")
+    return got
+
+
+def lauf_fingerprint(run: str) -> str:
+    """Inhalts-Fingerabdruck der Vorhersagekarten eines Laufs.
+
+    Nicht ueber Dateinamen oder Zeitstempel — nur der Inhalt entscheidet, ob
+    eine neue Aussage ueberhaupt anders ausfallen kann.
+    """
+    h = hashlib.sha256()
+    karten = sorted((ARCHIV / "vorhersage").glob(f"dwd_fronten_{run}_*.geojson"))
+    for p in karten:
+        h.update(p.name.encode("utf-8"))
+        h.update(p.read_bytes())
+    # Ohne Karten kein Fingerabdruck — leer heisst "unbekannt" und blockiert
+    # den Schnappschuss nie.
+    return h.hexdigest()[:16] if karten else ""
+
+
+def letzter_fingerprint(run: str) -> str:
+    """Fingerabdruck des juengsten Schnappschusses dieses Laufs, falls er
+    einen traegt. Aeltere Schnappschuesse ohne Feld gelten als unbekannt."""
+    schnapp = sorted((ARCHIV / "aussagen").glob(f"passagen_{run}_stand_*.json"))
+    for p in reversed(schnapp):
+        try:
+            fp = json.loads(p.read_text(encoding="utf-8")).get("quelle_fingerprint")
+        except (OSError, ValueError):
+            continue
+        if fp:
+            return fp
+    return ""
+
+
 def archive_aussagen() -> list[str]:
     """Unsere abgeleiteten Aussagen je Lauf festhalten.
 
-    Eine Momentaufnahme pro Lauf und Kalendertag. Bestehende werden NICHT
+    Eine Momentaufnahme pro Lauf und Kalendertag, aber nur wenn sich die
+    Eingangskarten seit der letzten geaendert haben. Bestehende werden NICHT
     ueberschrieben — sonst ginge verloren, was wir gestern gesagt haben, und
     genau das ist der Vergleichsgegenstand.
     """
@@ -243,13 +341,24 @@ def archive_aussagen() -> list[str]:
         tgt = d / f"passagen_{run}_stand_{heute}.json"
         if tgt.exists():
             continue
+        fp = lauf_fingerprint(run)
+        if fp and fp == letzter_fingerprint(run):
+            # Gleiche Eingangskarten wie beim letzten Schnappschuss dieses
+            # Laufs -> es gaebe Zeichen fuer Zeichen dasselbe Ergebnis. Ein
+            # neuer Schnappschuss waere kein Lauf-Jitter, sondern eine
+            # Wiederholung derselben Messung, und die Validierung fuehrt jede
+            # Wiederholung als eigene Beobachtung.
+            continue
         p = subprocess.run(
             [sys.executable, str(ROOT / "scripts" / "experiment_fronten_zeitachse.py"),
              "--lauf", run[:10], "--json", str(tgt)],
             capture_output=True, text=True, timeout=900)
         if p.returncode == 0 and tgt.exists():
-            n = len(json.loads(tgt.read_text(encoding="utf-8"))["aussagen"])
-            got.append(f"aussagen Lauf {run} ({n} Aussagen)")
+            snap = json.loads(tgt.read_text(encoding="utf-8"))
+            snap["quelle_fingerprint"] = fp
+            tgt.write_text(json.dumps(snap, ensure_ascii=False, indent=1),
+                           encoding="utf-8")
+            got.append(f"aussagen Lauf {run} ({len(snap['aussagen'])} Aussagen)")
         else:
             print(f"    AUSSAGEN FEHLGESCHLAGEN (Lauf {run}): "
                   f"{(p.stdout + p.stderr).strip().splitlines()[-1:]}")
@@ -259,7 +368,7 @@ def archive_aussagen() -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--nur", choices=("analyse", "vorhersage", "text",
-                                      "aussagen", "rohkarten"),
+                                      "aussagen", "rohkarten", "nachziehen"),
                     help="nur einen Teil einsammeln. 'rohkarten' = nur die "
                          "PNGs, nichts Abgeleitetes (lokaler Lauf, siehe "
                          "archive_rohkarten)")
@@ -273,8 +382,11 @@ def main() -> int:
     if args.nur != "rohkarten":
         _alarm = Alarm(versand=not args.ohne_alarm)
 
-    # Reihenfolge zaehlt: die Aussagen brauchen Analyse UND Vorhersagekarten.
+    # Reihenfolge zaehlt: die Aussagen brauchen Analyse UND Vorhersagekarten,
+    # und der Nachzug muss vor ihnen laufen, damit eine gerettete Karte noch
+    # in die Aussagen desselben Laufs eingeht.
     steps = {"analyse": archive_analyse, "vorhersage": archive_vorhersage,
+             "nachziehen": archive_nachziehen,
              "text": archive_text, "aussagen": archive_aussagen,
              "rohkarten": archive_rohkarten}
     if args.nur:

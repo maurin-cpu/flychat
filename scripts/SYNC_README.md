@@ -17,12 +17,35 @@ Das Skript macht in einem Rutsch:
 4. `scp` → die 4 View-Dateien **frisch vom Server-Datenträger**:
    `config_overrides.json`, `spot_analyses_en.json`, `region_analyses_en.json`,
    `wetterdaten.json` (~200 MB)
+5. `scp` → **DWD-Frontenarchiv + Validierung** (siehe unten)
 
 Warum scp und nicht nur git? `wetterdaten.json` ist gitignored und die Analysen
 liegen auf dem Server-Datenträger **neuer** als der letzte Commit. `git pull`
 allein bringt also keinen aktuellen Wetter-/Fliegbarkeits-Stand.
 
 Danach: **App neu starten** → Ansicht stimmt.
+
+## DWD-Frontenarchiv
+
+Der Server sammelt die DWD-Frontenkarten **4× täglich** selbst
+(`scheduler.py`, `FRONTEN_STUNDEN` = 02/08/14/20 Uhr) und wertet sie aus. Diese
+Daten liegen **server-lokal und gitignored**, exakt wie `wetterdaten.json` —
+es gibt keinen Weg über Git, weder hin noch zurück.
+
+Geholt werden `data/dwd_fronten_archiv/` und aus `fronten_validation/` die
+Maschinendateien (`observations.csv`, `AUTO_REPORT.md`, `aussagen/`).
+
+Die **Roh-PNGs bleiben per Default draussen** — rund 45 MB pro Tag, lokal nur
+zum Nach-Extrahieren nötig:
+
+```powershell
+.\scripts\sync_from_server.ps1 -MitKarten     # dann kommen sie mit
+```
+
+Von Hand gepflegt und deshalb **im Git**, nicht im Sync: `README.md`,
+`SCHEMA.md`, `PATTERNS.md`, die Fallstudien und `handurteile.csv`. Letztere
+legt der Validator bei jedem Lauf über die Maschinenzeilen — ein Urteil gehört
+also dorthin und nie in `observations.csv`, die wird überschrieben.
 
 ## Wenn der Sync abbricht: Merge-Konflikt im `git pull`
 

@@ -65,6 +65,7 @@ from experiment_fronten_zeitachse import (          # noqa: E402
 ARCHIV = ROOT / "data" / "dwd_fronten_archiv"
 VALID = ROOT / "fronten_validation"
 OBS = VALID / "observations.csv"
+HAND = VALID / "handurteile.csv"
 BERICHT = VALID / "AUTO_REPORT.md"
 
 # Zeitlicher Suchradius um eine Ansage. Jenseits davon ist es nicht mehr
@@ -389,6 +390,58 @@ def lies_csv() -> tuple[list[dict], list[str]]:
         return list(r), list(r.fieldnames or [])
 
 
+def _schluessel(r: dict) -> tuple:
+    """Identitaet einer Beobachtungszeile.
+
+    (lauf, stand) benennt den Aussage-Schnappschuss, (zone, typ) die Zeile
+    darin. Gegenlauf-Zeilen haben keinen Lauf — sie haengen allein am
+    Ist-Zeitpunkt, auf die Minute gerundet, damit ein neu gerechneter
+    Sekundenwert den Schluessel nicht zerreisst.
+    """
+    zeit = (r.get("median_utc") or r.get("ana_median_utc") or "")[:16]
+    return (r.get("lauf") or "", r.get("stand") or "",
+            r.get("zone") or "", r.get("typ") or "", zeit)
+
+
+def lade_handurteile() -> dict[tuple, dict]:
+    """Von Hand gefaellte Urteile — versioniert, getrennt von der Maschine.
+
+    `observations.csv` gehoert der Maschine und liegt server-lokal (gitignored,
+    wie `data/wetterdaten.json`). Ein Handurteil darin wuerde beim naechsten
+    Sync vom Server ueberschrieben. Deshalb steht es in dieser eigenen Datei,
+    kommt per Deploy auf den Server und wird bei jedem Lauf darueber gelegt.
+
+    Uebernommen wird jedes NICHT LEERE Feld; leer gelassene Spalten bleiben
+    maschinell. So kann eine Handzeile auch nur das Urteil korrigieren und die
+    gerechneten Werte stehen lassen.
+    """
+    if not HAND.exists():
+        return {}
+    with open(HAND, encoding="utf-8-sig", newline="") as f:
+        out = {}
+        for r in csv.DictReader(f):
+            werte = {k: v for k, v in r.items()
+                     if k and v is not None and str(v).strip()}
+            if werte:
+                out[_schluessel(r)] = werte
+    return out
+
+
+def lege_handurteile_auf(rows: list[dict], hand: dict[tuple, dict]) -> set:
+    """Legt die Handurteile ueber die Maschinenzeilen.
+
+    Rueckgabe: die Schluessel, die damit belegt sind — diese Zeilen werden nie
+    neu beurteilt, auch nicht mit `--neu-beurteilen`.
+    """
+    belegt = set()
+    for r in rows:
+        k = _schluessel(r)
+        if k in hand:
+            r.update(hand[k])
+            belegt.add(k)
+    return belegt
+
+
 def schreibe_csv(rows: list[dict], cols: list[str]) -> None:
     rows.sort(key=lambda r: (r.get("median_utc") or r.get("ana_median_utc") or "",
                              r.get("zone", ""), r.get("typ", "")))
@@ -398,10 +451,73 @@ def schreibe_csv(rows: list[dict], cols: list[str]) -> None:
         w.writerows(rows)
 
 
+def _ist_handurteil(r: dict) -> bool:
+    return bool((r.get("verdict") or "").strip()) and not (
+        r.get("notes") or "").startswith("auto:")
+
+
+def unabhaengige(rows: list[dict]) -> list[dict]:
+    """Eine Zeile je unabhaengiger Beobachtung.
+
+    Derselbe Lauf, dieselbe Zone, dasselbe Ist-Ereignis an mehreren Tagen neu
+    beurteilt ist EINE Messung, nicht mehrere — die Wiederholung steckt in
+    `stand` und ist als Lauf-Jitter schon eigens ausgewiesen. Wer sie in die
+    Quoten mitzaehlt, gewichtet lang stehende Faelle hoch: gemessen am
+    30.07.2026 kippte der Median dadurch von +2.9 h auf -10.5 h, also das
+    Vorzeichen der Kernaussage von F-005.
+
+    Vertreter der Gruppe: das Handurteil, sonst der juengste `stand`.
+    """
+    gruppen: dict[tuple, dict] = {}
+    for r in rows:
+        # Identisch ist eine Beobachtung ueber die ANSAGE, nicht ueber die
+        # Ist-Zeit: Hand- und Auto-Urteil derselben Ansage leiten die Ist-Zeit
+        # verschieden her (gemessen 03:50 gegen 03:39) und fielen sonst
+        # auseinander. Gegenlauf-Zeilen haben keine Ansage — dort die Ist-Zeit.
+        k = (r.get("lauf") or "", r.get("zone") or "", r.get("typ") or "",
+             (r.get("median_utc") or r.get("ana_median_utc") or "")[:16])
+        alt = gruppen.get(k)
+        if alt is None:
+            gruppen[k] = r
+            continue
+        if _ist_handurteil(r) != _ist_handurteil(alt):
+            if _ist_handurteil(r):
+                gruppen[k] = r
+        elif (r.get("stand") or "") > (alt.get("stand") or ""):
+            gruppen[k] = r
+    return list(gruppen.values())
+
+
+def zaehle_ereignisse(marken: set) -> int:
+    """Wie viele echte Frontdurchgaenge stecken hinter den Beobachtungen?
+
+    Zwei Urteile zur selben Passage nennen leicht verschiedene Ist-Zeiten —
+    das Handurteil rechnete 03:50, die Automatik 03:39. Minutengenaue
+    Gleichheit wuerde daraus zwei Durchgaenge machen. Zusammengefasst wird
+    deshalb mit derselben Grenze, die auch die Zeitachse zwischen zwei
+    Ereignissen zieht (`EVENT_GAP_H`).
+    """
+    nach_zone: dict[tuple, list[datetime]] = {}
+    for zone, typ, t in marken:
+        nach_zone.setdefault((zone, typ), []).append(t)
+    n = 0
+    for zeiten in nach_zone.values():
+        zeiten.sort()
+        n += 1
+        for a, b in zip(zeiten, zeiten[1:]):
+            if (b - a).total_seconds() / 3600.0 > EVENT_GAP_H:
+                n += 1
+    return n
+
+
 def bericht(rows, ist, spanne, jit, offen, neu_beurteilt, neu_verpasst) -> str:
+    # Quoten und Median IMMER ueber die unabhaengigen Beobachtungen, nie ueber
+    # die Zeilen — sonst zaehlt jede Wiederholung als eigene Messung.
+    unab = unabhaengige(rows)
+
     def zaehle(feld):
         d: dict[str, int] = {}
-        for r in rows:
+        for r in unab:
             v = (r.get(feld) or "").strip()
             if v:
                 d[v] = d.get(v, 0) + 1
@@ -410,25 +526,37 @@ def bericht(rows, ist, spanne, jit, offen, neu_beurteilt, neu_verpasst) -> str:
     urteile = zaehle("verdict")
     auto = [r for r in rows if (r.get("notes") or "").startswith("auto:")]
     deltas = []
-    for r in rows:
+    ereignisse = set()
+    for r in unab:
         if r.get("verdict") not in ("getroffen", "zu_frueh", "zu_spaet"):
             continue
         try:
             deltas.append(float(r["delta_h"]))
         except (TypeError, ValueError):
+            continue
+        # Zwei Laeufe koennen denselben Frontdurchgang beurteilen. Als
+        # Vorhersagen sind das zwei Beobachtungen, als Wetterlage ist es EIN
+        # Ereignis — und nur Ereignisse tragen eine Aussage ueber Systematik.
+        try:
+            ereignisse.add((r.get("zone") or "", r.get("typ") or "",
+                            datetime.fromisoformat(r["ana_median_utc"])))
+        except (KeyError, TypeError, ValueError):
             pass
 
     L = ["# Auto-Validierung — erzeugt, nicht von Hand gepflegt",
          "",
          f"Stand {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC, erzeugt von "
          f"`scripts/validate_fronten.py`. Befunde gehoeren nach `PATTERNS.md`, "
-         f"Urteile duerfen in `observations.csv` von Hand ueberschrieben werden "
-         f"— dieser Bericht wird bei jedem Lauf neu geschrieben.",
+         f"Handurteile nach `handurteile.csv` — die werden bei jedem Lauf "
+         f"ueber die Maschinenzeilen gelegt. `observations.csv` und dieser "
+         f"Bericht gehoeren der Maschine und werden neu geschrieben.",
          "",
          "## Bestand",
          "",
-         f"- {len(rows)} Zeile(n) in `observations.csv`, davon {len(auto)} "
-         f"automatisch beurteilt",
+         f"- **{len(unab)} unabhaengige Beobachtung(en)** aus {len(rows)} "
+         f"Zeile(n) in `observations.csv` ({len(auto)} automatisch beurteilt). "
+         f"Mehrere Zeilen zum selben Lauf und Ereignis sind Wiederholungen "
+         f"derselben Messung; Quoten und Median unten zaehlen sie einmal.",
          f"- Analyse-Abdeckung: " + (", ".join(
              f"{a:%d.%m %H:%M} – {b:%d.%m %H:%M} UTC" for a, b in spanne)
              or "keine zusammenhaengende Kette (mindestens zwei Analysen noetig)"),
@@ -442,7 +570,7 @@ def bericht(rows, ist, spanne, jit, offen, neu_beurteilt, neu_verpasst) -> str:
          "## Urteile",
          ""]
     if urteile:
-        L += ["| Urteil | Zeilen |", "|---|---|"]
+        L += ["| Urteil | Beobachtungen |", "|---|---|"]
         L += [f"| `{k}` | {v} |" for k, v in sorted(urteile.items())]
     else:
         L.append("Noch kein Urteil moeglich.")
@@ -451,23 +579,31 @@ def bericht(rows, ist, spanne, jit, offen, neu_beurteilt, neu_verpasst) -> str:
         med = float(np.median(deltas))
         richtung = ("wir sagen zu FRUEH an" if med > 0 else
                     "wir sagen zu SPAET an" if med < 0 else "kein Versatz")
-        L += [f"- n = {len(deltas)}, Median {med:+.1f} h, "
+        L += [f"- n = {len(deltas)} Beobachtung(en) aus "
+              f"{zaehle_ereignisse(ereignisse)} Frontdurchgang/-gaengen, "
+              f"Median {med:+.1f} h, "
               f"Spanne {min(deltas):+.1f} … {max(deltas):+.1f} h",
               f"- Lesart: {richtung} (positiv = die Front kam spaeter als "
               f"angesagt)",
               "",
               "Eine systematische Schieflage waere korrigierbar, Rauschen "
-              "nicht. Ab n < 10 ist beides nicht unterscheidbar — die Zahl "
+              "nicht. Unterscheidbar wird beides erst ab rund 10 "
+              "FRONTDURCHGAENGEN — mehrere Laeufe zum selben Durchgang "
+              "erhoehen n, aber nicht die Zahl der Wetterlagen. Die Zahl "
               "steht hier als Richtungshinweis, nicht als Beleg."]
     else:
         L.append("Noch keine verwertbaren Differenzen.")
 
     L += ["", "## Lauf-Jitter (braucht keine Ist-Lage)", ""]
     if jit:
-        L += ["| Zone | Typ | angesagt fuer | Spanne | Laeufe | fehlt in |",
+        L += ["| Zone | Typ | angesagt fuer | Spanne | Schnappschuesse | "
+              "fehlt in (Lauf/Stand) |",
               "|---|---|---|---|---|---|"]
         for j in jit:
-            fehlt = (", ".join(f"Stand {stand}" for _, stand in j["fehlend"])
+            # Lauf UND Stand nennen: derselbe Stand kommt fuer mehrere Laeufe
+            # vor, und "Stand X, Stand X, Stand X" ist keine Auskunft.
+            fehlt = (", ".join(f"{lauf[:8]}/{stand}"
+                               for lauf, stand in j["fehlend"])
                      if j["fehlend"] else "—")
             zeit = f"{j['median_von']:%d.%m %H:%M}"
             if j["spanne_h"]:
@@ -558,6 +694,52 @@ def selftest() -> int:
     else:
         print("  ok 8  Toleranz = halbe Vorhersage- + halbe Analyse-Stuetzweite")
 
+    # --- Entdopplung: der Fall, der am 30.07.2026 die Statistik verdorben hat
+    def obs(stand, delta, notes="auto: x", lauf="202607260000",
+            median=None, ana="2026-07-27T03:39+00:00"):
+        return {"lauf": lauf, "stand": stand, "zone": "alpennordhang",
+                "typ": "kalt", "median_utc": median or t.isoformat(),
+                "ana_median_utc": ana, "delta_h": delta,
+                "verdict": "getroffen", "notes": notes}
+
+    wiederholt = [obs("20260728", "-12.4"), obs("20260729", "-12.4"),
+                  obs("20260730", "-12.4")]
+    if len(unabhaengige(wiederholt)) != 1:
+        print(f"  FEHLER 9: {len(unabhaengige(wiederholt))} statt 1 Beobachtung "
+              f"— derselbe Lauf an drei Tagen ist EINE Messung")
+        ok = False
+    else:
+        print("  ok 9  dieselbe Ansage an mehreren Tagen zaehlt einmal")
+
+    # Das Handurteil muss die Gruppe vertreten, nicht der juengste Automat.
+    gemischt = [obs("20260727", "+2.9", notes="Handrechnung",
+                    ana="2026-07-27T03:50:00+00:00")] + wiederholt
+    vertreter = unabhaengige(gemischt)
+    if len(vertreter) != 1 or vertreter[0]["delta_h"] != "+2.9":
+        print(f"  FEHLER 10: Handurteil verliert gegen die Automatik "
+              f"({[v['delta_h'] for v in vertreter]})")
+        ok = False
+    else:
+        print("  ok 10 Handurteil vertritt seine Gruppe, trotz aelterem Stand")
+
+    # Zwei Laeufe zur selben Passage: zwei Beobachtungen, ein Ereignis.
+    zwei = [("alpennordhang", "kalt", datetime.fromisoformat("2026-07-27T03:39+00:00")),
+            ("alpennordhang", "kalt", datetime.fromisoformat("2026-07-27T03:50+00:00"))]
+    if zaehle_ereignisse(set(zwei)) != 1:
+        print(f"  FEHLER 11: {zaehle_ereignisse(set(zwei))} statt 1 Durchgang "
+              f"— 11 Minuten Abstand ist dieselbe Front")
+        ok = False
+    else:
+        print("  ok 11 leicht verschiedene Ist-Zeiten sind ein Durchgang")
+
+    fern = [("alpennordhang", "kalt", t), ("alpennordhang", "kalt",
+                                           t + timedelta(hours=EVENT_GAP_H + 1))]
+    if zaehle_ereignisse(set(fern)) != 2:
+        print("  FEHLER 12: zwei getrennte Fronten wurden zusammengezogen")
+        ok = False
+    else:
+        print("  ok 12 jenseits der Ereignisgrenze sind es zwei Durchgaenge")
+
     print("Selbsttest bestanden" if ok else "SELBSTTEST FEHLGESCHLAGEN")
     return 0 if ok else 1
 
@@ -584,6 +766,14 @@ def main() -> int:
               f"scripts/build_fronten_observations.py laufen lassen.")
         return 2
 
+    handurteile = lade_handurteile()
+    belegt = lege_handurteile_auf(rows, handurteile)
+    if handurteile:
+        print(f"{len(handurteile)} Handurteil(e) aus "
+              f"{HAND.relative_to(ROOT)}, {len(belegt)} davon zugeordnet")
+        for k in sorted(set(handurteile) - belegt):
+            print(f"  ohne Maschinenzeile: {k[2]}/{k[3]} {k[0]}/{k[1]} {k[4]}")
+
     analysen = lade_analysen()
     spanne = abdeckung(analysen)
     print(f"{len(analysen)} Handanalyse(n), {len(ketten(analysen))} "
@@ -601,10 +791,13 @@ def main() -> int:
 
     neu = 0
     for r in rows:
-        hand = (r.get("verdict") or "").strip() and not (
-            r.get("notes") or "").startswith("auto:")
+        # Handurteil hat Vorrang, immer — entweder aus handurteile.csv
+        # aufgelegt, oder als Altbestand direkt in der Zeile (kein `auto:`).
+        hand = _schluessel(r) in belegt or (
+            (r.get("verdict") or "").strip()
+            and not (r.get("notes") or "").startswith("auto:"))
         if hand:
-            continue                     # Handurteil hat Vorrang, immer
+            continue
         if (r.get("verdict") or "").strip() and not args.neu_beurteilen:
             continue
         if not r.get("median_utc"):
@@ -629,6 +822,10 @@ def main() -> int:
         rows.append({**{c: "" for c in cols}, **v})
     if fehlend:
         print(f"  Gegenlauf: {len(fehlend)} verpasste Front(en)")
+
+    # Auch die frisch angehaengten Gegenlauf-Zeilen duerfen von Hand
+    # korrigiert sein — sonst kaeme ein Handurteil erst beim naechsten Lauf an.
+    belegt |= lege_handurteile_auf(rows, handurteile)
 
     jit = jitter(rows, fenster)
     offen = sum(1 for r in rows if not (r.get("verdict") or "").strip())

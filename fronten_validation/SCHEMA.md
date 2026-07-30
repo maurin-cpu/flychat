@@ -13,7 +13,7 @@ Auswertung: nur Zeilen mit gefülltem `verdict` zählen.
 | Spalte | Bedeutung |
 |---|---|
 | `lauf` | Modelllauf, `YYYYMMDDHHMM` (bisher immer 00 UTC) |
-| `stand` | Kalendertag, an dem wir die Aussage getroffen haben (`YYYYMMDD`). Zusammen mit `lauf` eindeutig — dieselbe Zielzeit wird an mehreren Tagen neu beurteilt, das ist der **Lauf-Jitter** |
+| `stand` | Kalendertag, an dem wir die Aussage getroffen haben (`YYYYMMDD`). Zusammen mit `lauf` eindeutig — dieselbe Zielzeit wird an mehreren Tagen neu beurteilt, das ist der **Lauf-Jitter**. Ein neuer `stand` entsteht nur, wenn sich die Eingangskarten geändert haben; sonst wäre es keine neue Beurteilung, sondern dieselbe noch einmal |
 | `zone` | `alpennordhang`, `wallis`, `tessin`, `graubuenden_engadin` |
 | `typ` | `kalt`, `warm`, `okklusion`, `trog` |
 | `art` | `quert` (≥ 10 % der Zonen-Spots betroffen) oder `streift` (darunter) |
@@ -64,8 +64,22 @@ Präfix sind Handurteile und werden **nie** überschrieben.
 Analyse-Kette — in der Regel 6 h + 6 h = 12 h. Der Zusatz ist keine Grosszügigkeit
 gegen uns selbst: der Schiedsrichter erscheint nur alle 12 h und ist damit selbst
 unscharf. Eine engere Toleranz würde eine Genauigkeit behaupten, die die
-Ist-Seite nicht hat. Wer strenger urteilen will, überschreibt `verdict` von Hand
-— das gilt dann als Handurteil und bleibt stehen.
+Ist-Seite nicht hat. Wer strenger urteilen will, trägt eine Zeile in
+`handurteile.csv` ein — sie wird bei jedem Lauf über die Maschinenzeile gelegt
+und nie überschrieben. **Nicht** direkt in `observations.csv` ändern: die Datei
+gehört der Maschine und wird beim nächsten Lauf neu geschrieben.
+
+Der Schlüssel ist `lauf` + `stand` + `zone` + `typ` + `median_utc`; jedes nicht
+leere Feld gewinnt, leer gelassene Spalten bleiben maschinell. So kann eine
+Handzeile auch nur das Urteil korrigieren und die gerechneten Werte stehen
+lassen.
+
+**Quoten zählen Beobachtungen, nicht Zeilen.** Mehrere `stand`-Zeilen zum
+selben Lauf und Ereignis sind Wiederholungen derselben Messung; für Median und
+Trefferquote zählen sie einmal, vertreten durch das Handurteil, sonst den
+jüngsten `stand`. Und mehrere Läufe zum selben Frontdurchgang bleiben **ein**
+Ereignis — der Bericht weist beide Zahlen getrennt aus, weil erst die Zahl der
+Durchgänge etwas über Systematik sagt.
 
 Der Suchradius um eine Ansage beträgt **±24 h**: darüber hinaus ist es nicht
 mehr dasselbe Ereignis, sondern die nächste Front.

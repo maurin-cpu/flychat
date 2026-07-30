@@ -21,16 +21,24 @@ Geprüft wird nicht Linie gegen Linie, sondern **was wir gesagt haben** gegen
 derselben Gültigkeitszeit — dieselbe Quelle, aber die Ist-Lage statt der
 Vorhersage.
 
-## Was hier liegt (versioniert)
+## Was hier liegt
 
-| Datei | Inhalt |
-|---|---|
-| `observations.csv` | eine Zeile pro vorhergesagtem Frontdurchgang + was eingetreten ist. Schema in `SCHEMA.md` |
-| `AUTO_REPORT.md` | **erzeugt, nicht von Hand pflegen** — Urteilsbilanz, Systematik von `delta_h`, Lauf-Jitter, verpasste Fronten. Wird bei jedem Lauf neu geschrieben |
-| `PATTERNS.md` | numerierte Befunde `F-001`, `F-002` … eigener Namensraum, damit keine Verwechslung mit den XContest-`I-0xx` entsteht |
-| `SCHEMA.md` | Spaltendefinition von `observations.csv` |
-| `aussagen/` | unsere Aussage-Schnappschüsse je Lauf und Kalendertag, unverändert. Der Beweis, **was wir wann gesagt haben** |
-| `<datum>_*.md` | Notizen **ereignisbezogen**, nicht täglich — es gibt frontfreie Wochen |
+Die Trennlinie läuft zwischen **Hand** und **Maschine**, nicht zwischen wichtig
+und unwichtig. Was ein Mensch geschrieben hat, liegt im Git. Was ein Lauf
+erzeugt, gehört dem Server und wird geholt, nie gepusht.
+
+| Datei | Inhalt | in Git? |
+|---|---|---|
+| `PATTERNS.md` | numerierte Befunde `F-001`, `F-002` … eigener Namensraum, damit keine Verwechslung mit den XContest-`I-0xx` entsteht | **ja** |
+| `SCHEMA.md` | Spaltendefinition von `observations.csv` | **ja** |
+| `handurteile.csv` | **von Hand gefällte Urteile.** Der Validator legt sie bei jedem Lauf über die Maschinenzeilen; jedes nicht leere Feld gewinnt, leere bleiben maschinell | **ja** |
+| `<datum>_*.md` | Notizen **ereignisbezogen**, nicht täglich — es gibt frontfreie Wochen | **ja** |
+| `observations.csv` | eine Zeile pro vorhergesagtem Frontdurchgang + was eingetreten ist. Schema in `SCHEMA.md` | nein |
+| `AUTO_REPORT.md` | **erzeugt, nicht von Hand pflegen** — Urteilsbilanz, Systematik von `delta_h`, Lauf-Jitter, verpasste Fronten. Wird bei jedem Lauf neu geschrieben | nein |
+| `aussagen/` | unsere Aussage-Schnappschüsse je Lauf und Kalendertag, unverändert. Der Beweis, **was wir wann gesagt haben** | nein |
+
+Ein Urteil gehört deshalb **immer** nach `handurteile.csv` und nie direkt in
+`observations.csv` — die wird beim nächsten Lauf überschrieben.
 
 ## Was in `data/dwd_fronten_archiv/` liegt
 
@@ -38,15 +46,15 @@ Vorhersage.
 |---|---|---|
 | Analysekarte PNG | ~5 MB je Termin | **nein** — 150–300 MB/Monat |
 | Vorhersagekarten PNG | 5 × ~214 KB | **nein** |
-| Ausgelesene Linien (GeoJSON) | ~131 KB | **ja**, ~50 MB/Jahr |
-| DWD-Bulletins, Aussage-Schnappschüsse | ~10 KB | **ja** |
+| Ausgelesene Linien (GeoJSON) | ~131 KB | **nein** |
+| DWD-Bulletins, Aussage-Schnappschüsse | ~10 KB | **nein** |
 
-**Warum die Linien doch versioniert sind** (ursprünglich anders geplant): Der
-Abholvorgang läuft auch als Cloud-Routine, und die hat keinen bleibenden
-Datenträger — was sie nicht committet, ist nach dem Lauf weg. Da der DWD die
-Karten nach ~2 Tagen löscht, wären die Linien damit unwiederbringlich verloren.
-Sie sind der eigentliche Extrakt; die Rohkarten sind nur für eine *verbesserte*
-Extraktion nötig und bleiben deshalb auf der lokalen Platte.
+**Nichts davon liegt im Git** — behandelt wie `data/wetterdaten.json`. Bis zum
+29.07.2026 waren die Linien versioniert, weil der Abholvorgang als
+Cloud-Routine ohne bleibenden Datenträger lief. Seit der Hetzner-Server sammelt
+(siehe *Betrieb*), gibt es einen Datenträger, und der Umweg über Git entfällt.
+Geholt wird mit `scripts/sync_from_server.ps1` (Roh-PNGs nur mit
+`-MitKarten`), Einzelheiten in `scripts/SYNC_README.md`.
 
 ## Betrieb
 
@@ -65,8 +73,11 @@ ohne dass jemand daran denken muss.
 (`info@wingcast.ch`) noetig ist — Quelle weg, Layout geaendert oder null
 Abschnitte auf der ganzen Karte. Hoechstens eine Mail pro Lauf, keine
 Wiederholung vor 7 Tagen, Entwarnung wenn es wieder laeuft. Der Zustand liegt
-versioniert in `data/dwd_fronten_archiv/alarm_zustand.json`, weil die
-Cloud-Routine keinen bleibenden Datentraeger hat.
+in `data/dwd_fronten_archiv/alarm_zustand.json` auf dem Server.
+
+Dass der Alarm trägt, ist belegt: am 28.07.2026 um 02:04 UTC blockierte ein
+Proxy den Cloud-Lauf (`Tunnel connection failed: 403`), der Zustand sprang
+korrekt auf `quelle_weg` und blieb dort, bis die Kette wieder lief.
 
 ```bash
 python scripts/fronten_alarm.py --zustand    # laeuft gerade ein Alarm?
@@ -74,29 +85,46 @@ python scripts/fronten_alarm.py --selftest   # Zustandsmaschine pruefen
 python scripts/fronten_alarm.py --testmail   # Versandweg pruefen
 ```
 
-Läuft **4× täglich** (04, 08, 14, 20 Uhr lokal) an zwei Orten, mit **getrennten
-Zuständigkeiten** — sonst erzeugen beide dieselben versionierten Dateien und
-jeder `git pull` kollidiert mit den lokalen Doppeln:
+Läuft **4× täglich auf dem Hetzner-Server**, im Scheduler-Thread des
+`wingcast`-Dienstes (`scheduler.py`, `FRONTEN_STUNDEN` = 02/08/14/20 Uhr). Kein
+cron, kein zweiter Prozess: der Thread läuft ohnehin schon für Briefings und
+Monats-Accuracy, der Fronten-Slot ist dort ein dritter Event-Typ. Reissleine
+ohne Deploy: `WINGCAST_FRONTEN=0`.
 
-| | holt | committet |
-|---|---|---|
-| **Cloud-Routine** (`trig_019kkXYvCvVromo9XhXEGmYy`, cron `0 2,6,12,18 * * *` UTC) | alles **ausser** den PNGs | ja, direkt auf `main` |
-| **Lokal** (Aufgabe `Flychat-DWD-Frontenarchiv`, `--nur rohkarten`) | **nur** die PNG-Rohkarten | nein, die sind gitignored |
+Warum 6 h Abstand: Der DWD hält Open Data nur rund **zwei Tage** vor, und die
+farbige Handanalyse gibt es **nur als `LATEST`** — alle 12 h überschrieben, die
+datierten Zwillinge sind schwarz-weiss und unbrauchbar. Ein verpasster Termin
+ist endgültig weg. Bei 6 h Abstand fällt kein 12-h-Termin durch, auch wenn ein
+Lauf scheitert.
 
-Die Cloud läuft zuverlässig, hat aber keinen bleibenden Datenträger. Der lokale
-Lauf hat einen, läuft aber nur bei eingeschaltetem Rechner — deshalb bekommt er
-genau das, was verzichtbar ist: die Rohkarten für eine spätere, verbesserte
-Bilderkennung.
+**Vorher, bis 30.07.2026:** eine Cloud-Routine (alles ausser PNGs, committete
+auf `main`) plus eine Windows-Aufgabe (`--nur rohkarten`). Aufgegeben, weil die
+Cloud ab dem 28.07. durch einen Proxy nicht mehr an den DWD kam und die
+Windows-Aufgabe nur bei eingeschaltetem Rechner läuft. Der Server hat beide
+Nachteile nicht.
+
+**Selbstheilung.** Sind die Rohkarten da, die Ableitung aber ausgefallen, holt
+`--nur nachziehen` die fehlenden GeoJSON aus den archivierten PNGs — auch wenn
+der Lauf im DWD-Listing längst weg ist. Läuft im Volllauf automatisch mit. Der
+Fall ist real: der 28.07.2026 wurde genau so gerettet.
 
 ```bash
-python scripts/archive_dwd_fronten.py                  # Volllauf (wie Cloud)
-python scripts/archive_dwd_fronten.py --nur rohkarten  # nur PNGs (wie lokal)
+python scripts/archive_dwd_fronten.py                   # Volllauf (wie der Server)
+python scripts/archive_dwd_fronten.py --nur nachziehen  # nur fehlende GeoJSON retten
+python scripts/archive_dwd_fronten.py --nur rohkarten   # nur PNGs, nichts abgeleitet
 ```
 
 Zwei Eigenheiten der Quelle, die das Abholintervall bestimmen: die *datierten*
 Analysekarten sind schwarz-weiss und damit nutzlos — farbig ist nur die jeweils
 aktuelle. Und `dwdc` erscheint alle 12 h (00/12 UTC), `dwdna` alle 6 h. Wer
 einen Termin verpasst, bekommt ihn nicht zurück.
+
+**Kein Schnappschuss ohne neue Karten.** Ein Lauf schreibt eine Aussage nur,
+wenn sich die Eingangskarten seit der letzten geändert haben
+(`quelle_fingerprint` im Schnappschuss). Ohne diese Sperre erzeugt jeder
+Leerlauf eine weitere Kopie derselben Messung — und die Validierung führte
+jede Kopie als eigene Beobachtung. Gemessen am 30.07.2026: aus 3 Messungen
+wurden 10 Zeilen.
 
 ## Reproduzieren
 

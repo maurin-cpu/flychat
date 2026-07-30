@@ -19,7 +19,8 @@
 # Server-Adresse: Argument > .dev_server-Datei > Default unten.
 #
 param(
-  [string]$Server = ""
+  [string]$Server = "",
+  [switch]$MitKarten          # auch die Roh-PNGs des Frontenarchivs holen
 )
 $ErrorActionPreference = "Continue"
 
@@ -72,6 +73,34 @@ Write-Host "== 3) aktuelle view-Daten vom Server-Datentraeger holen ($Server) ==
 foreach ($f in $FROM_DISK) {
   Write-Host "   scp $f ..."
   scp "${Server}:$REMOTE_DIR/$f" $f
+}
+
+Write-Host "== 4) DWD-Frontenarchiv + Validierung (server-lokal, gitignored) =="
+# Der Server sammelt 4x taeglich (scheduler.py, FRONTEN_STUNDEN). Nichts davon
+# liegt im Git - genau wie wetterdaten.json. Die Roh-PNGs bleiben per Default
+# draussen: ~5 MB je Karte, rund 45 MB pro Tag, und lokal braucht man sie nur
+# zum Nach-Extrahieren. Mit -MitKarten kommen sie mit.
+$FRONTEN = @(
+  "data/dwd_fronten_archiv/analyse/*.geojson",
+  "data/dwd_fronten_archiv/vorhersage/*.geojson",
+  "data/dwd_fronten_archiv/text/*",
+  "data/dwd_fronten_archiv/aussagen/*.json",
+  "data/dwd_fronten_archiv/alarm_zustand.json",
+  "fronten_validation/observations.csv",
+  "fronten_validation/AUTO_REPORT.md",
+  "fronten_validation/aussagen/*.json"
+)
+if ($MitKarten) {
+  $FRONTEN += "data/dwd_fronten_archiv/analyse/*.png"
+  $FRONTEN += "data/dwd_fronten_archiv/vorhersage/*.png"
+} else {
+  Write-Host "   (ohne Roh-PNGs - fuer die: -MitKarten)"
+}
+foreach ($muster in $FRONTEN) {
+  $ziel = Split-Path $muster -Parent
+  if (-not (Test-Path $ziel)) { New-Item -ItemType Directory -Force $ziel | Out-Null }
+  Write-Host "   scp $muster ..."
+  scp "${Server}:$REMOTE_DIR/$muster" "$ziel/"
 }
 
 Write-Host ""

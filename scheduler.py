@@ -6,7 +6,13 @@ Taeglicher Ablauf an konfigurierten Wochentagen (siehe config.DAILY_RUN_*):
   2. engine.build_briefing_data()   — LLM-Analyse (innerhalb _send_briefings_once)
   3. Mails an aktive Subscriber versenden
 
-Zusaetzlich: Monats-Accuracy-Mail am 1. des Monats um 07:00.
+Zusaetzlich:
+  - Monats-Accuracy-Mail am 1. des Monats um 07:00
+  - DWD-Frontenarchiv 4x taeglich (FRONTEN_STUNDEN, Plan §6 Schritt 7):
+    Karten holen, Linien extrahieren, Aussagen ableiten, Validierung.
+    Laeuft auf dem Hetzner-Server; die Daten bleiben server-lokal
+    (gitignored wie wetterdaten.json) und werden per
+    scripts/sync_from_server.ps1 geholt.
 
 Laufzeit-Modi:
   - als Daemon-Thread (aus main.py aufgerufen): schlaeft bis zum naechsten
@@ -15,6 +21,8 @@ Laufzeit-Modi:
 
 Umgebungsvariablen:
   WINGCAST_BRIEFINGS=0          -> Scheduler-Thread startet nicht
+  WINGCAST_FRONTEN=0            -> Fronten-Slots werden nicht eingeplant
+                                   (Reissleine ohne Deploy)
   SCHEDULER_TEST_MODE=1          -> Thread wartet nur 30s bis zum ersten Lauf
                                     (fuer Integrations-Tests)
   WINGCAST_SMTP_DRY_RUN=1       -> Mails werden als HTML in tempdir geschrieben
@@ -48,6 +56,29 @@ def notify_config_changed() -> None:
 ACCURACY_HOUR = 7
 ACCURACY_MINUTE = 0
 
+# DWD-Frontenarchiv (Plan §6 Schritt 7). Vier Laeufe taeglich.
+#
+# Warum viermal und nicht einmal: Der DWD haelt Open Data nur rund zwei Tage
+# vor, und die farbige Handanalyse gibt es NUR als "LATEST" — sie wird alle
+# 12 h ueberschrieben, die datierten Zwillinge sind schwarz-weiss und damit
+# unbrauchbar. Ein verpasster Termin ist endgueltig weg. Bei hoechstens 6 h
+# Abstand faellt kein 12-h-Termin durch, auch wenn ein Lauf scheitert.
+#
+# Die Stunden sind Ortszeit und muessen es nicht auf die Minute sein — der
+# Abstand zaehlt, nicht die Lage. Das Skript ist idempotent, ein Lauf ohne
+# neue Karten kostet einen Verzeichnisabruf.
+#
+# Bewusst NICHT auf 06:00 gelegt: dort laeuft der Daily-Run im selben Thread
+# und haelt ihn waehrend der LLM-Analyse lange fest. Faellt ein Slot doch mal
+# aus, weil ein Job ueberzieht, kostet das einen von vier — der naechste holt
+# es nach, denn der DWD haelt rund zwei Tage vor.
+FRONTEN_STUNDEN = (2, 8, 14, 20)
+FRONTEN_MINUTE = 10
+
+# Reissleine ohne Deploy: WINGCAST_FRONTEN=0 haelt die Kette an.
+def _fronten_aktiv() -> bool:
+    return os.environ.get("WINGCAST_FRONTEN", "1").strip() not in ("0", "false", "no")
+
 
 def _next_send_time(now: datetime) -> datetime:
     """Naechster konfigurierter Wochentag zur konfigurierten Uhrzeit, strikt NACH `now`."""
@@ -76,13 +107,25 @@ def _next_accuracy_time(now: datetime) -> datetime:
     return datetime(year, month, 1, ACCURACY_HOUR, ACCURACY_MINUTE, 0)
 
 
+def _next_fronten_time(now: datetime) -> datetime:
+    """Naechster Fronten-Slot strikt NACH `now`."""
+    for stunde in FRONTEN_STUNDEN:
+        candidate = now.replace(hour=stunde, minute=FRONTEN_MINUTE,
+                                second=0, microsecond=0)
+        if candidate > now:
+            return candidate
+    return (now + timedelta(days=1)).replace(
+        hour=FRONTEN_STUNDEN[0], minute=FRONTEN_MINUTE,
+        second=0, microsecond=0)
+
+
 def _next_event(now: datetime) -> Tuple[datetime, str]:
-    """Gibt (Zeitpunkt, 'briefing'|'accuracy') fuer das naechste Event zurueck."""
-    b = _next_send_time(now)
-    a = _next_accuracy_time(now)
-    if a < b:
-        return a, "accuracy"
-    return b, "briefing"
+    """Gibt (Zeitpunkt, 'briefing'|'accuracy'|'fronten') fuers naechste Event."""
+    kandidaten = [(_next_send_time(now), "briefing"),
+                  (_next_accuracy_time(now), "accuracy")]
+    if _fronten_aktiv():
+        kandidaten.append((_next_fronten_time(now), "fronten"))
+    return min(kandidaten, key=lambda k: k[0])
 
 
 def _send_briefings_once(engine) -> dict:
@@ -283,6 +326,42 @@ def _run_snapshot() -> bool:
         return False
 
 
+def _run_fronten() -> bool:
+    """Holt die DWD-Frontenkarten und laesst die Validierung darueber laufen.
+
+    Als Subprozess und nicht per Import: das Archivskript startet selbst
+    Unterprozesse fuer Extraktion und Zeitachse und laeuft im Extremfall
+    Minuten. Ein eigener Prozess kann hart abgebrochen werden, ohne den
+    Scheduler-Thread des laufenden Webdienstes mitzunehmen.
+
+    Failure-tolerant wie der Grid-Refresh: ein Fehler hier darf den
+    Briefing-Versand nie blockieren. Ausfaelle meldet das Skript selbst per
+    Mail an config.OPS_ALERT_EMAIL (scripts/fronten_alarm.py).
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    skript = Path(__file__).resolve().parent / "scripts" / "archive_dwd_fronten.py"
+    try:
+        p = subprocess.run([sys.executable, str(skript)],
+                           capture_output=True, text=True, timeout=3600)
+    except subprocess.TimeoutExpired:
+        logger.error("Fronten: Archivlauf nach 60 min abgebrochen")
+        return False
+    except Exception as e:
+        logger.exception("Fronten: Archivlauf nicht startbar: %s", e)
+        return False
+
+    letzte = (p.stdout or "").strip().splitlines()[-3:]
+    if p.returncode == 0:
+        logger.info("Fronten: Archivlauf ok — %s", " | ".join(letzte))
+        return True
+    logger.error("Fronten: Archivlauf rc=%s — %s | %s", p.returncode,
+                 " | ".join(letzte), (p.stderr or "").strip()[-300:])
+    return False
+
+
 def _daily_run(engine) -> dict:
     """Sequenzieller Daily-Job: refresh_weather -> LLM-Analyse -> Briefings -> Snapshot.
 
@@ -352,6 +431,8 @@ def briefing_scheduler(engine) -> None:
             with flask_app.app_context(), flask_app.test_request_context():
                 if next_event_type == "accuracy":
                     _send_accuracy_once()
+                elif next_event_type == "fronten":
+                    _run_fronten()
                 else:
                     _daily_run(engine)
         except Exception as e:

@@ -70,5 +70,32 @@ for f in "${FROM_DISK[@]}"; do
   rsync -az --info=progress2 "$SERVER:$REMOTE_DIR/$f" "$f"
 done
 
+echo "== 4) DWD-Frontenarchiv + Validierung (server-lokal, gitignored) =="
+# Der Server sammelt 4x taeglich (scheduler.py, FRONTEN_STUNDEN). Nichts davon
+# liegt im Git - genau wie wetterdaten.json. Die Roh-PNGs bleiben per Default
+# draussen: ~5 MB je Karte, rund 45 MB pro Tag, und lokal braucht man sie nur
+# zum Nach-Extrahieren. Mit --mit-karten kommen sie mit.
+FRONTEN_EXCLUDE=(--exclude '*.png')
+if [ "${MIT_KARTEN:-0}" = "1" ] || [ "${2:-}" = "--mit-karten" ]; then
+  FRONTEN_EXCLUDE=()
+else
+  echo "   (ohne Roh-PNGs - fuer die: --mit-karten)"
+fi
+mkdir -p data/dwd_fronten_archiv fronten_validation/aussagen
+rsync -az --info=progress2 "${FRONTEN_EXCLUDE[@]}" \
+  "$SERVER:$REMOTE_DIR/data/dwd_fronten_archiv/" data/dwd_fronten_archiv/
+
+# In fronten_validation/ NUR die Maschinendateien holen. README, SCHEMA,
+# PATTERNS und handurteile.csv sind von Hand gepflegt und liegen im Git — ein
+# rsync des ganzen Ordners wuerde lokale, noch nicht gepushte Aenderungen
+# daran mit der Serverkopie ueberschreiben.
+rsync -az --info=progress2 \
+  "$SERVER:$REMOTE_DIR/fronten_validation/observations.csv" \
+  "$SERVER:$REMOTE_DIR/fronten_validation/AUTO_REPORT.md" \
+  fronten_validation/
+rsync -az --info=progress2 \
+  "$SERVER:$REMOTE_DIR/fronten_validation/aussagen/" \
+  fronten_validation/aussagen/
+
 echo ""
 echo "FERTIG. Lokal = aktueller Server-Stand (Analysen inkl. Tag 3 + Wetterdaten). App neu starten."
