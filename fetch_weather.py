@@ -33,6 +33,7 @@ API_CHUNK_SIZE = 80            # Max Locations pro API-Call (URL-Länge + Timeou
 
 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint, compute_daily_thermals
 from source_area import get_reference_points, get_all_regions, get_precip_reference_points
+import ensemble_thunder
 import statistics
 
 # Schwelle: ab welcher Spot-Anzahl je Region wird der Spot-Median Thermik-Override
@@ -62,6 +63,48 @@ def _spot_p75(vals):
 # --- Aggregation Constants (Modul-Level) ---
 CLOUD_PARAMS = {"cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"}
 PRECIP_USE_MIN = {"precipitation", "rain", "precipitation_probability"}
+
+# WMO weather_code 95/96/99 = Gewitter. Identisch zur Auswertung in
+# engine/weather_context.py und engine/synoptic_context.py.
+THUNDER_CODES = (95, 96, 99)
+
+# WMO-Codes nach FLUG-GEFAEHRDUNG geordnet — NICHT numerisch. Die WMO-Skala
+# ist nicht monoton nach Gefahr sortiert: 75 (starker Schneefall) > 65 (starker
+# Regen), 45 (Nebel) > 3 (bedeckt), 77 (Schneegriesel) > 65. Ein max() ueber
+# die Codes waehlt daher regelmaessig den falschen Punkt aus. Deshalb entscheidet
+# der Rang, nicht der Code.
+_WMO_SEVERITY_TIERS = [
+    (0, (0,)),                          # klar
+    (1, (1, 2, 3)),                     # heiter bis bedeckt
+    (2, (45, 48)),                      # Nebel / Reifnebel
+    (3, (51, 53, 55, 61, 71, 77, 80)),  # leichter Niederschlag
+    (4, (63, 73, 81, 85)),              # maessiger Niederschlag
+    (5, (65, 75, 82, 86)),              # starker Niederschlag
+    (6, (56, 57, 66, 67)),              # gefrierender Niederschlag (Vereisung)
+    (7, (95,)),                         # Gewitter
+    (8, (96, 99)),                      # Gewitter mit Hagel
+]
+_WMO_SEVERITY = {c: rank for rank, codes in _WMO_SEVERITY_TIERS for c in codes}
+
+
+def _severest_weather_code(values):
+    """Schwerwiegendster WMO-Code aus mehreren Referenzpunkten (None wenn leer).
+
+    Unbekannte Codes bekommen Rang 0 (wie "klar") und koennen ein echtes
+    Wettersignal damit nicht verdraengen; bei Ranggleichheit gewinnt der
+    hoehere Code als stabiler Tiebreaker.
+    """
+    valid = []
+    for v in values:
+        if v is None:
+            continue
+        try:
+            valid.append(int(v))
+        except (TypeError, ValueError):
+            continue
+    if not valid:
+        return None
+    return max(valid, key=lambda c: (_WMO_SEVERITY.get(c, 0), c))
 
 
 class DailyLimitExceeded(Exception):
@@ -390,7 +433,7 @@ def _override_precip_with_dense_rps(target: dict, dense_data_list: list) -> dict
     return target
 
 
-def _aggregate_regional_data(data_list):
+def _aggregate_regional_data(data_list, aggregate_weather_code=False):
     """
     Generalisierte Source-Area Aggregation:
     - Wolken: 30%-Perzentil -> findet regionale Sonnenfenster (Blue Holes)
@@ -407,6 +450,17 @@ def _aggregate_regional_data(data_list):
       Thermik haengt von den Bedingungen AM Startplatz ab, nicht vom Regionalmittel.
     - Wind: hier NICHT aggregiert. Fuer Regionen separat via
       _aggregate_wind_across_points() aufrufen.
+    - weather_code: nur bei aggregate_weather_code=True (Regionen), dann der
+      schwerwiegendste Code ueber alle Referenzpunkte.
+
+    aggregate_weather_code: NUR fuer Regionen setzen.
+      Bis Juli 2026 blieb weather_code immer auf data_list[0] stehen — bei
+      Regionen also auf EINEM von 7-16 Referenzpunkten in einem bis zu 40 km
+      breiten Polygon. Messung am Archiv: an 290 Region-Tagen mit Gewitter-Code
+      an mindestens einem Punkt erreichte nur die Haelfte die Anzeige.
+      Fuer SPOTS bleibt der Default False: dort ist data_list[0] der Startplatz
+      selbst, und genau der soll das Wetter am Startplatz beschreiben (der
+      Spot-Pfad ist mit 92.6 % gesund und darf nicht angefasst werden).
     """
     if not data_list or not isinstance(data_list, list):
         return data_list
@@ -458,6 +512,18 @@ def _aggregate_regional_data(data_list):
             primary["hourly"]["cloud_cover_mid"][i] = int(rep["mid"])
             primary["hourly"]["cloud_cover_high"][i] = int(rep["high"])
             primary["hourly"]["cloud_cover"][i] = int(rep["total"])
+
+        # weather_code: schwerwiegendster Code ueber alle Referenzpunkte
+        # (Rang, nicht numerisches max — siehe _severest_weather_code).
+        if aggregate_weather_code and "weather_code" in primary["hourly"]:
+            wc_vals = [
+                d["hourly"]["weather_code"][i]
+                for d in data_list
+                if i < len(d.get("hourly", {}).get("weather_code", []))
+            ]
+            severest = _severest_weather_code(wc_vals)
+            if severest is not None:
+                primary["hourly"]["weather_code"][i] = severest
 
         # Nur Wolken + Niederschlag aggregieren; Rest = Spot-Punkt (primary bleibt)
         for k in all_params:
@@ -1317,6 +1383,27 @@ def fetch_all_spots(spots, save_to_file=True):
             return batch_region[ridx]
         return None
 
+    # Ensemble-Gewitterwahrscheinlichkeit (ICON-CH2-EPS, 21 Member).
+    # EIN gebuendelter Abruf fuer alle Regionen, vor der Schleife. Ergaenzt den
+    # deterministischen weather_code um eine weiche Warnstufe — ersetzt ihn nicht.
+    # Faellt der Abruf aus (freier Endpunkt, eigene Rate-Limits), laeuft der
+    # Wetterlauf ohne Ensemble weiter; die Regionen bekommen dann kein Feld.
+    region_thunder = {}
+    try:
+        region_thunder = ensemble_thunder.compute_region_thunder(
+            {r["id"]: region_refs.get(r["id"], []) for r in all_regions
+             if region_refs.get(r["id"])}
+        )
+        n_warn = sum(
+            1 for per in region_thunder.values()
+            for d, v in per.items()
+            if d != "_meta" and v.get("level")
+        )
+        print(f"  [OK] Ensemble-Gewitter: {len(region_thunder)} Regionen, "
+              f"{n_warn} Region-Tage ueber Erwaehnungsschwelle")
+    except Exception as e:  # noqa: BLE001 — Ensemble darf den Lauf nie kippen
+        print(f"  [WARN] Ensemble-Gewitter uebersprungen: {e}")
+
     region_data = {}
     for region in all_regions:
         rid = region["id"]
@@ -1345,7 +1432,8 @@ def fetch_all_spots(spots, save_to_file=True):
                 thermal_data_list[0], thermal_data_list[best_idx] = (
                     thermal_data_list[best_idx], thermal_data_list[0]
                 )
-            data_thermal_r = _aggregate_regional_data(thermal_data_list)
+            data_thermal_r = _aggregate_regional_data(
+                thermal_data_list, aggregate_weather_code=True)
             # NEU: Wind/Gust/Richtung ueber ALLE RPs aggregieren (Median),
             # sodass kein einzelner alpiner RP die ganze Region dominiert.
             data_thermal_r = _aggregate_wind_across_points(thermal_data_list)
@@ -1363,7 +1451,8 @@ def fetch_all_spots(spots, save_to_file=True):
                 fallback_data_list[0], fallback_data_list[best_idx_fb] = (
                     fallback_data_list[best_idx_fb], fallback_data_list[0]
                 )
-            data_fallback_r = _aggregate_regional_data(fallback_data_list)
+            data_fallback_r = _aggregate_regional_data(
+                fallback_data_list, aggregate_weather_code=True)
             data_fallback_r = _aggregate_wind_across_points(fallback_data_list)
 
         # Niederschlag mit dichten 16 RPs ueberschreiben (falls verfuegbar).
@@ -1394,7 +1483,8 @@ def fetch_all_spots(spots, save_to_file=True):
                 if idx is not None and idx < len(batch_region_ch1):
                     ch1_data_list.append(copy.deepcopy(batch_region_ch1[idx]))
             if ch1_data_list:
-                data_ch1_r = _aggregate_regional_data(ch1_data_list)
+                data_ch1_r = _aggregate_regional_data(
+                    ch1_data_list, aggregate_weather_code=True)
                 data_ch1_r = _aggregate_wind_across_points(ch1_data_list)
 
         data_ch2_r = None
@@ -1406,7 +1496,8 @@ def fetch_all_spots(spots, save_to_file=True):
                 if idx is not None and idx < len(batch_region_ch2):
                     ch2_data_list.append(copy.deepcopy(batch_region_ch2[idx]))
             if ch2_data_list:
-                data_ch2_r = _aggregate_regional_data(ch2_data_list)
+                data_ch2_r = _aggregate_regional_data(
+                    ch2_data_list, aggregate_weather_code=True)
                 data_ch2_r = _aggregate_wind_across_points(ch2_data_list)
 
         # Tier-1-Wind-Quelle (= 'data_wind' fuer _process_spot_weather):
@@ -1439,6 +1530,9 @@ def fetch_all_spots(spots, save_to_file=True):
             "pressure_level_data": pressure_level_data,
             "reference_points": refs,
             "data_sources": data_sources,
+            # Weiche Gewitter-Warnstufe je Tag (Anteil der EPS-Member).
+            # Kein Fliegbarkeits-Gate — siehe ensemble_thunder.py.
+            "thunder_ensemble": region_thunder.get(rid),
         }
 
     print(f"[INFO] {len(region_data)} Regionen verarbeitet")

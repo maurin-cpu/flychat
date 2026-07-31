@@ -12,7 +12,123 @@ Validierung der fertigen Blitz-Prognose (LPI).
 > abgerufenen Wetterparametern (`config.py`: `CH_SURFACE_PARAMS`,
 > `GFS_SUPPLEMENTARY_PARAMS`): diese Doku nachziehen und Changelog ergänzen.
 
-Letzte Aktualisierung: 2026-06-28 (Verify + Regression-Bewertung, §0a)
+Letzte Aktualisierung: 2026-07-31 (Regions-Aggregation repariert + Ensemble, §0b)
+
+---
+
+## 0b. Regions-Aggregation repariert + Ensemble ergänzt (2026-07-31)
+
+Die Entscheidung von §0 („Gewitter = `weather_code`") war richtig, aber auf
+Regionsebene kam sie nie an. Zwei Defekte, beide belegt:
+
+### Defekt 1 — Regionsaggregation verlor den `weather_code` (behoben)
+
+`_aggregate_regional_data()` aggregierte nur `CLOUD_PARAMS` und
+`PRECIP_USE_MIN`. Alles andere — auch `weather_code` — blieb auf
+`data_list[0]`, also **einem** von 7–16 Referenzpunkten in einem bis zu 40 km
+breiten Polygon. Zündete die Zelle an einem anderen Punkt, existierte sie für
+die Region nicht. Verschärfend: `weather_code` steht in
+`config.CH_SURFACE_PARAMS`, der Surface-Override in `_process_spot_weather()`
+holte den Wert also erneut aus einer RP0-Quelle.
+
+**Fix:** neuer Parameter `aggregate_weather_code` (Default `False`). Gesetzt
+wird er an den vier Region-Aufrufen (thermal, fallback, ch1, ch2) — damit
+greift er auch im Surface-Override. Der Spot-Pfad bleibt unangetastet: dort
+*ist* `data_list[0]` der Startplatz, und der Spot-Pfad war mit 92.6 % gesund.
+
+Aggregiert wird nach **Schweregrad, nicht numerisch** — die WMO-Skala ist nicht
+monoton nach Gefahr sortiert (75 starker Schneefall > 65 starker Regen,
+45 Nebel > 3 bedeckt). Rangfolge: `_WMO_SEVERITY_TIERS` in `fetch_weather.py`.
+
+**Messung** (`scripts/measure_region_weather_code.py`, ICON-CH2, 60 Tage,
+29 Regionen, 203 Referenzpunkte): von 90 Gewitterstunden erreichten bisher
+**15 die Anzeige — 16.7 %**. Mit dem Fix: 100 %.
+
+### Defekt 2 — nur ein deterministischer Lauf (ergänzt, nicht ersetzt)
+
+Für Konvektion ist ein Einzellauf die unzuverlässigste verfügbare Information.
+Belegfall Engelberg (46.82/8.40), 02.08.2026, Fenster 11–20 h, gemessen am
+31.07.2026:
+
+| Quelle | Gewitter | CAPE max | Regen |
+|---|---|---|---|
+| ICON-CH2 deterministisch | keins (Code 0) | 430 | 0.0 mm |
+| ICON-CH2-EPS (21 Member) | 3 Member Code 95 | median 720 / max 1570 | 4 Member ≥ 1 mm/h |
+
+Auch ICON-D2, ICON-EU, ECMWF und GFS zünden deterministisch keine Zelle.
+
+**Ergänzung:** `ensemble_thunder.py` berechnet je Region und Tag den Anteil der
+Member mit Code 95/96/99 im Flugfenster und liefert Schwerpunkt-Fenster dazu.
+Das Ergebnis steht in `_regions[rid]["thunder_ensemble"]` und erscheint im
+Regions-Kontext als Zeile `GEWITTER-ENSEMBLE`.
+
+> **Ausdrücklich eine weiche Warnstufe.** Kein Fliegbarkeits-Gate, kein No-Go,
+> kein `not_safe` allein daraus. Das harte Gate bleibt der deterministische
+> `weather_code`.
+
+Die Schwellen (`config.ENSEMBLE_THUNDER_MENTION_PCT` = 20 / `_ELEVATED_` = 40 /
+`_HIGH_` = 60) sind **nicht kalibriert** — Startpunkt, kein Messergebnis. Vor
+einem Livegang gegen Stationsmessungen prüfen.
+
+API-Eigenheit: Der Ensemble-Endpunkt läuft **nur ohne** unseren Kunden-Key
+(mit Key: HTTP 403, „requires API Professional or Enterprise plan"). Es gelten
+also freie Rate-Limits — daher kleine Chunks, nur `weather_code` als
+Standardvariable, Backoff bei 429. Fällt der Abruf aus, läuft der Wetterlauf
+ohne Ensemble weiter.
+
+### Validierung — gegen Messungen, nie gegen Modelle
+
+`scripts/validate_thunder_vs_stations.py` vergleicht beide Varianten desselben
+Codepfads gegen MeteoSchweiz-Stundenmessungen (OGD-SMN, frei).
+
+Vorgeschaltet ist ein **Zeitachsen-Beweis**: `reference_timestamp` ist UTC und
+bezeichnet die Stunde *davor*. Das Skript verschiebt die Messreihe um −3…+3 h
+gegen die Modelltemperatur; liegt das Minimum nicht bei 0 h, bricht es ab.
+Gemessen: Minimum bei 0 h, Restabweichung 1.85 K (der konstante Höhenversatz
+Station↔Referenzpunkt wird vorher herausgerechnet — geprüft wird der Tagesgang,
+nicht die absolute Temperatur).
+
+Ergebnis über 5300 Regions-Tage (123 Stationen, 26 Regionen, 60 Tage):
+
+| | Treffer | Verpasst | Fehlalarm | Quote |
+|---|---|---|---|---|
+| Regen ALT | 504 | 1374 | 184 | 26.8 % |
+| Regen NEU | 504 | 1374 | 184 | 26.8 % |
+| Gewitter ALT | 7 | 391 | 8 | 1.8 % |
+| Gewitter NEU | 42 | 356 | 23 | 10.6 % |
+
+Regen ist **identisch** — die Änderung fasst Niederschlag nicht an (zusätzlich
+durch `tests/test_weather_code_aggregation.py` abgesichert). Gewitter-Treffer
+versechsfachen sich; markierte Regions-Tage steigen von 15 auf 65 von 5300.
+
+Zwei Einschränkungen, die beim Lesen mitgehören:
+1. Der Gewitter-Indikator („Station meldet ≥ 5 mm in einer Stunde") ist
+   **schwach** — offene Blitzdaten gibt es nicht, Starkregen entsteht auch ohne
+   Gewitter. Ein Teil der „Fehlalarme" dürften echte Gewitter sein, die an
+   keiner Station 5 mm abgeladen haben.
+2. Die absoluten Regen-Quoten sind **nicht** mit den 86 %/91 % aus der
+   Analysesession vom 30.07. vergleichbar: dort wurde Station gegen Station
+   gepaart, hier Regions-Tag gegen „irgendeine Station der Region", und ohne
+   die 16-Punkte-Niederschlagsüberschreibung der Produktion. Aussagekräftig ist
+   hier allein der Vergleich ALT↔NEU.
+
+### Defekt 3 — Modell verpasst Gewitter auch echt (offen)
+
+An einzelnen Tagen liefert das Modell null Gewitterstunden, obwohl Stationen
+16–44 mm in einer Stunde massen. Das ist keine Pipeline-, sondern eine
+Modellschwäche. Nur relevant, falls das Ensemble nicht ausreicht — vor einer
+weiteren Massnahme erst das Ensemble kalibrieren.
+
+### Nebenbefund: Archiv seit 01.07. ohne Bewertungen
+
+Beim Aufsetzen der Validierung fiel auf, dass das Archiv seit dem 01.07. für
+**Spots und Regionen** null Bewertungen enthielt (24 Tage). Ursache: der
+Englisch-Flip schrieb die Analysen in `*_en.json`, das Snapshot-Skript las den
+fest verdrahteten deutschen Pfad. Behoben in `scripts/snapshot_weather.py`
+(sprach-unabhängige Quellenwahl + Alarm bei 0 Bewertungen, jetzt auch für
+Regionen). Zusätzlich archiviert der Snapshot jetzt die Regions-**Wetterwerte**
+(inkl. `weather_code`, Gewitterstunden, Ensemble) — vorher standen dort nur die
+LLM-Bewertungen, womit sich Regions-Änderungen gar nicht überprüfen liessen.
 
 ---
 

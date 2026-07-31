@@ -79,3 +79,6 @@ data/dwd_fronten_archiv/
 fronten_validation/observations.csv
 fronten_validation/AUTO_REPORT.md
 fronten_validation/aussagen/
+
+# MeteoSchweiz-Stationsmessungen (Validierungs-Cache, server-lokal)
+data/_meteoschweiz_cache/

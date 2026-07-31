@@ -3898,6 +3898,30 @@ class WeatherContextMixin:
                 f"In hazard_notes['thunderstorm'] und caution_notes erwaehnen."
             )
 
+        # Gewitter-Ensemble (ICON-CH2-EPS) — WEICHE Warnstufe, KEIN Gate.
+        # Der Block darueber ist ein einzelner deterministischer Lauf: die Zelle
+        # muss zufaellig auf einem Referenzpunkt zuenden. Das Ensemble sagt
+        # stattdessen, wie viele von 21 Laeufen ueberhaupt eine zuenden — bei
+        # Konvektion die belastbarere Information. Bewusst NICHT als No-Go
+        # formuliert: die Schwellen sind noch nicht kalibriert.
+        ens_all = region_data.get("thunder_ensemble") or {}
+        ens = ens_all.get(date_str) or {}
+        if ens.get("level") and ens.get("probability_pct") is not None:
+            peak = ""
+            if ens.get("peak_start") and ens.get("peak_end"):
+                peak = f", Schwerpunkt {ens['peak_start']}-{ens['peak_end']}"
+            lines.append(
+                f"GEWITTER-ENSEMBLE: {ens['probability_pct']}% der Modelllaeufe "
+                f"({ens.get('n_members', 0)} Member ICON-CH2-EPS) zeigen ein Gewitter "
+                f"im Flugfenster{peak}. Einstufung: {ens['level']}. "
+                f"WEICHE Angabe — allein KEIN No-Go und KEIN Grund fuer not_safe. "
+                f"Als Wahrscheinlichkeit formulieren "
+                f"(z.B. \"Gewitterwahrscheinlichkeit {ens['probability_pct']}%{peak}\"), "
+                f"nicht als Tatsache. "
+                f"Bei fehlendem Modell-Gewitter oben trotzdem erwaehnen — genau "
+                f"dafuer ist das Ensemble da."
+            )
+
         # Hoehenwind-Trend (analog Boeen-Trend in Spots)
         if aloft_pattern_region:
             aloft_trend_text = _format_aloft_trend_text(

@@ -112,6 +112,24 @@ FORECAST_DAYS_D2  = 2   # D2 hat 48h
 FORECAST_DAYS_EU  = 5
 FORECAST_DAYS_GFS = 5
 
+# --- ENSEMBLE-GEWITTER (ICON-CH2-EPS, Kontrolllauf + 20 Member) ---
+# Gewitter kamen bisher nur aus EINEM deterministischen Lauf. Fuer Konvektion
+# ist das die unzuverlaessigste verfuegbare Information: die Zelle muss zufaellig
+# genau auf einem Referenzpunkt zuenden. Das Ensemble ersetzt das nicht, es
+# ergaenzt es um eine Wahrscheinlichkeit. Siehe ensemble_thunder.py.
+#
+# ACHTUNG: Der Ensemble-Endpunkt laeuft nur OHNE unseren Kunden-API-Key
+# (mit Key: HTTP 403 "requires API Professional or Enterprise plan").
+ENSEMBLE_MODEL = "meteoswiss_icon_ch2"
+
+# Weiche Warnstufen als Anteil der Member mit Gewitter-Code im Flugfenster.
+# NICHT KALIBRIERT — Startpunkt laut Auftrag (20-30 %). Vor einem Livegang
+# gegen MeteoSchweiz-Stationsmessungen pruefen, nicht gegen Modelldaten.
+# Diese Schwellen setzen NIE ein No-Go, sie steuern nur die Erwaehnung.
+ENSEMBLE_THUNDER_MENTION_PCT  = 20   # ab hier ueberhaupt erwaehnen ("moeglich")
+ENSEMBLE_THUNDER_ELEVATED_PCT = 40   # "erhoeht"
+ENSEMBLE_THUNDER_HIGH_PCT     = 60   # "hoch"
+
 # --- SURFACE-PARAMS die CH1/CH2 ueber Open-Meteo liefern ---
 # Mai 2026 verifiziert. Diese Liste wird im Wind/CH1/CH2-Batch verwendet.
 # Im Tag-Voting (CH1->CH2->EU) gelten diese Variablen als "CH-eligible".
@@ -448,6 +466,21 @@ SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE = 0.10  # DEPRECATED — ungenutzt
 SYNOPTIC_WIND_BAND_LOWER_M = 200     # Band-Unterkante: Spot-Hoehe + 200 m
 SYNOPTIC_WIND_BAND_UPPER_M = 2000    # Band-Oberkante: Spot-Hoehe + 2000 m
 SYNOPTIC_WIND_HOURS = (10, 17)       # Kern-Flugfenster (lokale Stunden)
+# Abendfenster — SEPARAT, nicht als Erweiterung von SYNOPTIC_WIND_HOURS.
+# Anlass: Boeenfront 30.07.2026 abends (~72 km/h ostwaerts, Boeen bis 100 km/h)
+# blieb unsichtbar, weil nur 10-17 Uhr ausgewertet wurde — Graubuenden galt als
+# "unauffaellig" bei 67 km/h um 19 Uhr.
+#
+# WARUM NICHT EINFACH DAS FENSTER AUFZIEHEN: dann haette ein 19-Uhr-Ereignis
+# die ganze Zone auf `verblasen` gehoben, waehrend die Spot-Analysen den
+# Nachmittag korrekt als fliegbar zeigen — Widerspruch im selben Briefing.
+# `wind_class` bleibt deshalb am Kernfenster verankert; der Abend ist eine
+# eigene, zeitlich benannte Groesse ("abends Boeen", nicht "windiger Tag").
+#
+# Kostet nichts: die Stunden liegen in hourly_data bereits vor und wurden nur
+# beim Auswerten verworfen. Gilt ausschliesslich fuer den Wetterlage-Block
+# (1x/Tag); Spot- und Regionsanalysen bleiben unberuehrt.
+SYNOPTIC_WIND_EVENING_HOURS = (18, 22)
 # Kumulative Verteilungs-Baender: Anteil Spots ueber X km/h (Flugband/Boeen).
 # Gibt dem Synoptik-LLM das volle Windbild statt eines Schwellen-Flags.
 SYNOPTIC_WIND_DIST_BANDS_KMH = (10, 20, 30, 40, 50, 60)
