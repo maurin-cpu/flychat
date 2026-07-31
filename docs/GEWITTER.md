@@ -112,6 +112,56 @@ Zwei Einschränkungen, die beim Lesen mitgehören:
    die 16-Punkte-Niederschlagsüberschreibung der Produktion. Aussagekräftig ist
    hier allein der Vergleich ALT↔NEU.
 
+### Kein Quorum — anders als beim Regen, und zwar bewusst
+
+Naheliegende Frage: soll das Gewitter dieselbe Quorums-Logik bekommen wie der
+Niederschlag? Antwort aus den Daten: **den beschreibenden Teil ja, den
+unterdrückenden nein.**
+
+Der Regen-Filter hat zwei Teile, und nur einer davon filtert:
+1. Ein **Quorum** — aber nur im Rauschband 0.05–0.2 mm/h. Ab
+   `PRECIP_SIGNIFICANT_MM` („echte Zelle") lässt der Filter auch **einen
+   einzelnen** Referenzpunkt durch. Ein Gewitter ist per Definition eine echte
+   Zelle, fällt also nie ins Rauschband. Unter der Logik des Regens gilt für
+   Gewitter also gar kein Quorum.
+2. Eine **Flächen-Beschreibung** (`precipitation_class`) — die unterdrückt
+   nichts, sie beschreibt.
+
+Gemessen (60 Tage, ICON-CH2, 29 Regionen à 7 Referenzpunkte):
+
+| gleichzeitig zündende RPs | Stunden | Anteil |
+|---|---|---|
+| 1 von 7 | 76 | 84.4 % |
+| 2 von 7 | 10 | 11.1 % |
+| 3 von 7 | 3 | 3.3 % |
+| 4 von 7 | 1 | 1.1 % |
+
+Konvektion ist punktförmig — das ist Physik, kein Artefakt. Ein Quorum würde
+fast alles löschen:
+
+| Variante | Treffer | Fehlalarm | Quote | Präzision |
+|---|---|---|---|---|
+| irgendein RP (gewählt) | 42 | 23 | 10.6 % | 64.6 % |
+| ≥ 2 RPs | 10 | 3 | 2.5 % | 76.9 % |
+| Quorum 30 % | 2 | 2 | 0.5 % | 50.0 % |
+| Quorum 40 % | 2 | 2 | 0.5 % | 50.0 % |
+
+Ein 30-%-Quorum liesse von 42 Treffern **2** übrig — schlechter als der alte,
+kaputte Zustand (7). Für rund 12 Punkte Präzision würden wir 85 % des Signals
+wegwerfen. Bei einer Sicherheitswarnung ist das der falsche Tausch.
+
+**Übernommen wurde daher die Beschreibung:** `thunder_coverage` +
+`thunder_class` (`classify_thunder_pattern`), mit denselben Schwellen wie beim
+Niederschlag — `widespread` ≥ 70 %, `scattered` ≥ 40 %, sonst `isolated`.
+Das Flächenbild erscheint im `GEWITTER-TREND` und wandert mit dem
+`weather_code` durch das Tier-Voting (es steht daher in der
+Surface-Override-Liste, nicht bei den Thermal-Ableitungen — sonst beschriebe
+es einen anderen Modelllauf als den angezeigten Code).
+
+`isolated` heisst **nicht harmlos**: die Zelle ist real und zieht. Es heisst,
+dass die räumliche Unsicherheit innerhalb der Region gross ist — und genau das
+soll der Text sagen dürfen.
+
 ### Defekt 3 — Modell verpasst Gewitter auch echt (offen)
 
 An einzelnen Tagen liefert das Modell null Gewitterstunden, obwohl Stationen

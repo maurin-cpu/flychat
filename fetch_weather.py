@@ -87,6 +87,27 @@ _WMO_SEVERITY_TIERS = [
 _WMO_SEVERITY = {c: rank for rank, codes in _WMO_SEVERITY_TIERS for c in codes}
 
 
+def classify_thunder_pattern(coverage):
+    """Flaechenbild der Gewitterzellen einer Region-Stunde.
+
+    Gleiche Schwellen wie classify_precip_pattern, damit Regen und Gewitter
+    dieselbe Sprache sprechen:
+        "widespread" — >= 70 % der Referenzpunkte
+        "scattered"  — >= 40 %
+        "isolated"   — mindestens einer, aber darunter
+        "none"       — keiner
+
+    Beschreibend, NICHT filternd: "isolated" bleibt ein Gewitter.
+    """
+    if not coverage:
+        return "none"
+    if coverage >= config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG:
+        return "widespread"
+    if coverage >= config.SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV:
+        return "scattered"
+    return "isolated"
+
+
 def _severest_weather_code(values):
     """Schwerwiegendster WMO-Code aus mehreren Referenzpunkten (None wenn leer).
 
@@ -481,6 +502,11 @@ def _aggregate_regional_data(data_list, aggregate_weather_code=False):
     primary["hourly"].setdefault("precipitation_class", ["dry"] * num_hours)
     # Anzahl Referenzpunkte (fuer Transparenz im LLM-Datenblock).
     primary["hourly"].setdefault("precipitation_n_rps", [0] * num_hours)
+    # Flaechenbild der Gewitterzellen (nur Regionen — Spots haben nur einen
+    # Punkt und damit kein Flaechenbild).
+    if aggregate_weather_code:
+        primary["hourly"].setdefault("thunder_coverage", [0.0] * num_hours)
+        primary["hourly"].setdefault("thunder_class", ["none"] * num_hours)
 
     for i in range(num_hours):
         # Wolken: 30%-Perzentil (NWP ueberschaetzt Wolken in Bergen systematisch)
@@ -515,6 +541,18 @@ def _aggregate_regional_data(data_list, aggregate_weather_code=False):
 
         # weather_code: schwerwiegendster Code ueber alle Referenzpunkte
         # (Rang, nicht numerisches max — siehe _severest_weather_code).
+        #
+        # KEIN Quorum — bewusst, und konsistent zum Niederschlag: dessen Quorum
+        # greift nur im Rauschband (0.05-0.2 mm/h); ab PRECIP_SIGNIFICANT_MM
+        # ("echte Zelle") laesst der Filter auch EINEN einzelnen RP durch. Ein
+        # Gewitter ist per Definition eine echte Zelle. Gemessen (60 Tage,
+        # ICON-CH2): 84 % aller Gewitterstunden haben genau 1 von 7 RPs —
+        # Konvektion ist punktfoermig. Ein 30 %-Quorum haette von 42 Treffern
+        # nur 2 uebrig gelassen.
+        #
+        # Was wir vom Niederschlag UEBERNEHMEN, ist die Flaechen-Beschreibung:
+        # thunder_coverage/-class unterdruecken nichts, sie sagen, ob die Zelle
+        # vereinzelt oder flaechig ist (gleiche Schwellen wie precipitation_class).
         if aggregate_weather_code and "weather_code" in primary["hourly"]:
             wc_vals = [
                 d["hourly"]["weather_code"][i]
@@ -524,6 +562,12 @@ def _aggregate_regional_data(data_list, aggregate_weather_code=False):
             severest = _severest_weather_code(wc_vals)
             if severest is not None:
                 primary["hourly"]["weather_code"][i] = severest
+            valid_wc = [v for v in wc_vals if v is not None]
+            if valid_wc:
+                n_thunder = sum(1 for v in valid_wc if int(v) in THUNDER_CODES)
+                cov = n_thunder / len(valid_wc)
+                primary["hourly"]["thunder_coverage"][i] = round(cov, 2)
+                primary["hourly"]["thunder_class"][i] = classify_thunder_pattern(cov)
 
         # Nur Wolken + Niederschlag aggregieren; Rest = Spot-Punkt (primary bleibt)
         for k in all_params:
@@ -665,7 +709,13 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
     # Mai 2026 erweitert von 3 Wind-Vars auf alle CH-faehigen Surface-Variablen
     # (siehe config.CH_SURFACE_PARAMS). Andere Surface-Vars (soil, updraft)
     # kommen weiterhin aus thermal_model_by_day (D2 -> EU).
-    surface_ch_override_params = list(config.CH_SURFACE_PARAMS)
+    # thunder_coverage/-class gehoeren zu weather_code und muessen aus DERSELBEN
+    # Tier-Quelle stammen. weather_code steht in CH_SURFACE_PARAMS, wird also
+    # vom Tag-Voting ueberschrieben — das Flaechenbild muss mitwandern, sonst
+    # beschreibt es einen anderen Modelllauf als den angezeigten Code.
+    surface_ch_override_params = list(config.CH_SURFACE_PARAMS) + [
+        "thunder_coverage", "thunder_class",
+    ]
     wind_pl_params = [
         p for p in config.PRESSURE_LEVEL_PARAMS
         if p.startswith("wind_speed_") or p.startswith("wind_direction_") or p.startswith("geopotential_height_")
@@ -713,6 +763,15 @@ def _process_spot_weather(location_name, data_wind, data_thermal, data_fallback,
             for derived_key in ("precipitation_coverage",
                                 "precipitation_class",
                                 "precipitation_n_rps"):
+                arr = t_src.get(derived_key, [])
+                if i_therm < len(arr) and arr[i_therm] is not None:
+                    entry[derived_key] = arr[i_therm]
+            # Nur die Luecke fuellen: hat der Surface-Override oben schon ein
+            # Flaechenbild gesetzt, gehoert es zum dort gewaehlten weather_code
+            # und darf nicht durch die Thermal-Quelle ersetzt werden.
+            for derived_key in ("thunder_coverage", "thunder_class"):
+                if entry.get(derived_key) is not None:
+                    continue
                 arr = t_src.get(derived_key, [])
                 if i_therm < len(arr) and arr[i_therm] is not None:
                     entry[derived_key] = arr[i_therm]

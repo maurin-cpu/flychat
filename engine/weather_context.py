@@ -2899,6 +2899,7 @@ class WeatherContextMixin:
         rain_scattered_h = 0
         rain_isolated_h = 0
         thunderstorm_in_window_h = 0  # Gewitter-Stunden strikt INNERHALB des Flugfensters
+        thunder_class_counts = {}     # isolated/scattered/widespread → Stunden
         aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND, Region)
         aloft_danger_hours_list = []  # Nur [ALOFT-WIND-DANGER] (> WIND_DANGER_KMH)
         tag_counts = {}        # tag_name → count (für Tagesprofil-Histogramm)
@@ -3357,6 +3358,12 @@ class WeatherContextMixin:
                 tag_counts[w] = tag_counts.get(w, 0) + 1
             if "[THUNDERSTORM]" in warnings:
                 thunderstorm_in_window_h += 1
+                # Flaechenbild mitzaehlen: eine Einzelzelle irgendwo in der
+                # Region ist etwas anderes als flaechige Gewitter, auch wenn
+                # beide denselben weather_code tragen.
+                tcls = data.get("thunder_class")
+                if tcls:
+                    thunder_class_counts[tcls] = thunder_class_counts.get(tcls, 0) + 1
             if wind_status == "[WIND-DANGER]":
                 tag_counts["[WIND-DANGER]"] = tag_counts.get("[WIND-DANGER]", 0) + 1
             elif wind_status == "[WIND-WARN]":
@@ -3891,11 +3898,23 @@ class WeatherContextMixin:
 
         # Gewitter-Trend (Region)
         if thunderstorm_in_window_h > 0:
+            # Flaechenbild anhaengen (gleiche Sprache wie beim Niederschlag).
+            # "isolated" heisst NICHT harmlos — die Zelle ist real, nur nicht
+            # flaechendeckend. Wichtig fuers Formulieren, nicht fuers Gate.
+            spread = ""
+            if thunder_class_counts:
+                dom = max(thunder_class_counts, key=thunder_class_counts.get)
+                label = {"isolated": "EINZELZELLEN (wenige Referenzpunkte)",
+                         "scattered": "VERSTREUTE Zellen",
+                         "widespread": "FLAECHIG"}.get(dom, dom)
+                spread = (f" Flaechenbild: {label}. Einzelzellen sind real und "
+                          f"ziehen — nicht als harmlos darstellen, aber die "
+                          f"raeumliche Unsicherheit benennen.")
             lines.append(
                 f"GEWITTER-TREND: IM FLUGFENSTER — Modell-Gewitter in {thunderstorm_in_window_h}h "
                 f"im Flugfenster ({config.FLIGHT_HOURS_START:02d}–{config.FLIGHT_HOURS_END:02d}h). "
                 f"DANGER-Niveau. → safety_status mindestens conditional, meist not_safe. "
-                f"In hazard_notes['thunderstorm'] und caution_notes erwaehnen."
+                f"In hazard_notes['thunderstorm'] und caution_notes erwaehnen.{spread}"
             )
 
         # Gewitter-Ensemble (ICON-CH2-EPS) — WEICHE Warnstufe, KEIN Gate.

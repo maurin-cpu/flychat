@@ -18,6 +18,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import config
 import fetch_weather as fw
 
 
@@ -171,3 +172,51 @@ def test_jeder_gewittercode_setzt_sich_durch(code):
     out = fw._aggregate_regional_data(data_list, aggregate_weather_code=True)
     assert out["hourly"]["weather_code"][0] == code
     assert int(out["hourly"]["weather_code"][0]) in fw.THUNDER_CODES
+
+
+# --- Flaechenbild (thunder_class): beschreibend, nicht filternd -----------
+
+def test_einzelzelle_bleibt_gewitter():
+    """Kernentscheid: KEIN Quorum. 1 von 7 RPs ist ein Gewitter — gemessen
+    haben 84 % aller Gewitterstunden genau einen Punkt. Ein Quorum haette
+    das Signal geloescht."""
+    data_list = [_mk([95])] + [_mk([0]) for _ in range(6)]
+    out = fw._aggregate_regional_data(data_list, aggregate_weather_code=True)
+    assert out["hourly"]["weather_code"][0] == 95
+    assert out["hourly"]["thunder_class"][0] == "isolated"
+    assert out["hourly"]["thunder_coverage"][0] == 0.14
+
+
+def test_flaechiges_gewitter_wird_als_solches_erkannt():
+    data_list = [_mk([95]) for _ in range(8)] + [_mk([0]) for _ in range(2)]
+    out = fw._aggregate_regional_data(data_list, aggregate_weather_code=True)
+    assert out["hourly"]["thunder_class"][0] == "widespread"
+
+
+def test_verstreute_zellen():
+    data_list = [_mk([95]) for _ in range(5)] + [_mk([0]) for _ in range(5)]
+    out = fw._aggregate_regional_data(data_list, aggregate_weather_code=True)
+    assert out["hourly"]["thunder_class"][0] == "scattered"
+
+
+def test_kein_gewitter_kein_flaechenbild():
+    data_list = [_mk([61]), _mk([3])]
+    out = fw._aggregate_regional_data(data_list, aggregate_weather_code=True)
+    assert out["hourly"]["thunder_class"][0] == "none"
+    assert out["hourly"]["thunder_coverage"][0] == 0.0
+
+
+def test_flaechenbild_nutzt_dieselben_schwellen_wie_regen():
+    """Regen und Gewitter muessen dieselbe Sprache sprechen."""
+    assert fw.classify_thunder_pattern(config.SYNOPTIC_PRECIP_COVERAGE_FLAECHIG) == "widespread"
+    assert fw.classify_thunder_pattern(config.SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV) == "scattered"
+    assert fw.classify_thunder_pattern(0.01) == "isolated"
+    assert fw.classify_thunder_pattern(0.0) == "none"
+    assert fw.classify_thunder_pattern(None) == "none"
+
+
+def test_spot_pfad_bekommt_kein_flaechenbild():
+    """Ein Spot ist ein Punkt — ein Flaechenbild waere dort eine Erfindung."""
+    out = fw._aggregate_regional_data([_mk([95]), _mk([0])])
+    assert "thunder_class" not in out["hourly"]
+    assert "thunder_coverage" not in out["hourly"]

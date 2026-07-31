@@ -93,6 +93,8 @@ HOURLY_KEEP_FIELDS = [
     "vapour_pressure_deficit",
     "snow_depth",
     "weather_code",
+    "thunder_coverage",
+    "thunder_class",
 ]
 
 THERMAL_KEEP_FIELDS = [
