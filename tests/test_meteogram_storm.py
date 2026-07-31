@@ -79,18 +79,30 @@ def test_deterministisches_gewitter_ueberlebt_schwaches_ensemble():
     assert len(_storm_hours(c)) == 12
 
 
-def test_unter_der_erwaehnungsschwelle_kein_blitz():
+def test_unter_der_anzeige_schwelle_kein_blitz():
     c = format_data_for_charts(
-        _hourly(), thunder_ensemble=_ens(pct=config.ENSEMBLE_THUNDER_MENTION_PCT - 1))
+        _hourly(),
+        thunder_ensemble=_ens(pct=config.ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT - 1))
     assert _storm_hours(c) == []
 
 
-def test_knapp_ueber_der_schwelle_gibt_blitz():
-    """Fall Sa 01.08.: 19 % der Member — bei der alten Schwelle 20 fiel der
-    Tag komplett durch."""
+def test_ab_der_anzeige_schwelle_gibt_blitz():
+    c = format_data_for_charts(
+        _hourly(),
+        thunder_ensemble=_ens(pct=config.ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT,
+                              peak=("15:00", "16:00")))
+    assert _storm_hours(c) == ["15:00", "16:00"]
+
+
+def test_anzeige_ist_zurueckhaltender_als_der_text():
+    """Zwei getrennte Schwellen mit Absicht: ein Satz im Analysetext ist billig,
+    ein Blitz im Meteogramm ist laut. Fall 01.08. (19 %) — Text erwaehnt,
+    Meteogramm schweigt."""
+    assert (config.ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT
+            > config.ENSEMBLE_THUNDER_MENTION_PCT)
     c = format_data_for_charts(
         _hourly(), thunder_ensemble=_ens(pct=19, peak=("15:00", "16:00")))
-    assert _storm_hours(c) == ["15:00", "16:00"]
+    assert _storm_hours(c) == []
 
 
 def test_einzelstunde_mit_hohem_anteil_zaehlt_auch_ausserhalb():

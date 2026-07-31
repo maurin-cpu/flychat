@@ -4079,8 +4079,6 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
     Spots haben kein Ensemble (494 Punkte x 21 Member sind am freien Endpunkt
     nicht zu holen) — dort bleibt es beim weather_code.
     """
-    from ensemble_thunder import probability_level as _ens_level
-
     # Blitz-Stunden aus dem Ensemble ableiten.
     #
     # Massgeblich ist das SCHWERPUNKT-FENSTER des Tages — also exakt die Aussage,
@@ -4101,9 +4099,13 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
             ens_by_hour[f"{_day}T{_hhmm}"] = _share
             if _share is not None and _share >= config.ENSEMBLE_THUNDER_METEOGRAM_PCT:
                 ens_storm_hours.add(f"{_day}T{_hhmm}")
-        # Stufe hier neu berechnen, nicht das gespeicherte `level` nehmen —
-        # sonst wirkt eine Schwellen-Aenderung erst nach dem naechsten Wetterlauf.
-        if not _ens_level(_v.get("probability_pct")):
+        # Eigene, hoehere Schwelle fuer die ANZEIGE: der Text darf ab 15 %
+        # erwaehnen, der Blitz erst ab ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT.
+        # Direkt aus probability_pct gerechnet und nicht aus dem gespeicherten
+        # `level`, damit eine Schwellen-Aenderung sofort wirkt und nicht erst
+        # nach dem naechsten Wetterlauf.
+        _p = _v.get("probability_pct")
+        if _p is None or _p < config.ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT:
             continue
         _ps, _pe = _v.get("peak_start"), _v.get("peak_end")
         if not _ps or not _pe:

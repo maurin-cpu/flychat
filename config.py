@@ -138,9 +138,22 @@ ENSEMBLE_MODEL = "meteoswiss_icon_ch2"
 #
 # Diese Schwellen setzen NIE ein No-Go, sie steuern nur die Erwaehnung.
 ENSEMBLE_THUNDER_MENTION_PCT  = 15   # ab hier ueberhaupt erwaehnen ("moeglich")
-# Schwelle fuer das BLITZ-SYMBOL im Meteogramm, angewendet auf den
-# STUENDLICHEN Member-Anteil (nicht auf den Tageswert). Bewusst eine eigene
-# Zahl: die Anzeige darf nachgezogen werden, ohne die Text-Stufen zu bewegen.
+# --- Schwellen fuer das BLITZ-SYMBOL im Meteogramm ---
+# Bewusst eigene Zahlen: die Anzeige darf nachgezogen werden, ohne die
+# Text-Stufen (MENTION/ELEVATED/HIGH) zu bewegen. Ein Satz im Analysetext ist
+# billig, ein Blitz im Meteogramm ist laut.
+#
+# TAGES-Schwelle: ab wieviel Prozent der Member ueberhaupt Blitze fuer diesen
+# Tag gezeigt werden. Gilt fuer das Schwerpunkt-Fenster.
+# 31.07.2026 von 15 auf 50 gesetzt — bei 15 leuchteten 88 von 145 Region-Tagen
+# und rund jede fuenfte Flugstunde; im Betrieb als zu empfindlich bewertet.
+# Kosten: Tage mit schwachem Signal fallen ganz raus (Zentralschweizer
+# Voralpen 01.08. mit 19 % zeigt keinen Blitz mehr — im TEXT bleibt der Hinweis
+# erhalten, weil ENSEMBLE_THUNDER_MENTION_PCT weiter bei 15 steht).
+ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT = 50
+
+# STUNDEN-Schwelle: eine Einzelstunde mit sehr hoher Zustimmung zeigt einen
+# Blitz auch dann, wenn der Tag unter der Tages-Schwelle liegt.
 #
 # Warum ueberhaupt: das Meteogramm zeigte Gewitter nur aus dem
 # deterministischen weather_code — genau der Quelle, die Konvektion

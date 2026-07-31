@@ -220,11 +220,29 @@ Mengengerüst im 5-Tage-Fenster vom 31.07. (1740 Region-Flugstunden):
 | vorher (nur `weather_code`) | 4 (0.2 %) |
 | jetzt (Schwerpunkt-Fenster) | 370 (21.3 %) |
 
-Das ist ein Faktor 90 — bewusst in Kauf genommen, weil die Anzeige sonst eine
-Minderheitsmeinung als Tatsache zeigt. Zentralschweizer Voralpen hatte an fünf
-Tagen in Folge 19–100 % Member-Zustimmung und **null** Gewitterstunden im
-`weather_code`. Nachregelbar über `ENSEMBLE_THUNDER_MENTION_PCT` (Fenster) und
-`ENSEMBLE_THUNDER_METEOGRAM_PCT` (Einzelstunde).
+Zentralschweizer Voralpen hatte an fünf Tagen in Folge 19–100 %
+Member-Zustimmung und **null** Gewitterstunden im `weather_code`.
+
+**Nachjustiert am selben Tag:** 21 % aller Flugstunden wurden im Betrieb als zu
+empfindlich bewertet. Die Anzeige hat deshalb eine **eigene Tages-Schwelle**
+bekommen (`ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT = 50`), getrennt von der
+Text-Schwelle (`ENSEMBLE_THUNDER_MENTION_PCT = 15`). Begründung: ein Satz im
+Analysetext ist billig, ein Blitz im Meteogramm ist laut.
+
+| Anzeige-Schwelle | Blitzstunden | Region-Tage mit Blitz |
+|---|---|---|
+| 15 % | 370 (21.3 %) | 88 von 145 |
+| **50 %** | **260 (14.9 %)** | **57 von 145** |
+
+Gemessener Nebenbefund: die Tages-Schwelle ist nicht der stärkste Hebel — von
+15 auf 50 fallen nur 6 Prozentpunkte weg. Der eigentliche Treiber ist die
+**Breite** des Schwerpunkt-Fensters (Stunden ab der halben Spitzen-Zustimmung).
+Wer weiter reduzieren will, sollte dort ansetzen, nicht an der Schwelle.
+
+Preis der Änderung: Tage mit schwachem Signal verschwinden aus dem Meteogramm —
+Zentralschweizer Voralpen 01.08. (19 %) zeigt keinen Blitz mehr. Im **Text**
+bleibt der Hinweis erhalten, weil die Erwähnungsschwelle bei 15 steht. Das ist
+der bewusste Kompromiss zwischen „nichts übersehen" und „nicht dauerblitzen".
 
 **Nur Regionen.** Spots haben kein Ensemble — 494 Punkte × 21 Member sind am
 freien Endpunkt nicht zu holen. Dort bleibt es beim `weather_code`; durch Test
