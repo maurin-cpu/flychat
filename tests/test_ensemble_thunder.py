@@ -161,3 +161,66 @@ def test_zusammenfassung_nutzt_schwere_nicht_zahl():
 
 def test_leere_punktliste():
     assert et.merge_points_per_member([], "weather_code") == []
+
+
+# --- Warn-Kachel: sichtbar, aber niemals ein No-Go ------------------------
+
+from engine.decision_engine import build_region_topic_tags  # noqa: E402
+
+
+def _thunder_tag(gi):
+    tags = [t for t in build_region_topic_tags({}, gi) if t["topic"] == "THUNDERSTORM"]
+    return tags[0] if tags else None
+
+
+def test_ensemble_erzeugt_sichtbare_kachel():
+    """Der gemeldete Fall: Zentralschweizer Voralpen 02.08. — 71 % der Member,
+    deterministisch nichts. Vorher blieb der Tag in der Anzeige komplett leer."""
+    t = _thunder_tag({
+        "thunderstorm_hours": 0, "thunder_ens_pct": 71,
+        "thunder_ens_level": "hoch",
+        "thunder_ens_peak_start": "13:00", "thunder_ens_peak_end": "17:00",
+    })
+    assert t is not None
+    assert t["severity"] == "warn"
+    assert "71%" in t["value"]
+    assert t["time"] == "13:00-17:00"
+
+
+def test_ensemble_kachel_ist_nie_ein_no_go():
+    """Auch bei 100 % bleibt es eine Warnung — die Schwellen sind ungemessen."""
+    t = _thunder_tag({"thunderstorm_hours": 0, "thunder_ens_pct": 100,
+                      "thunder_ens_level": "hoch"})
+    assert t["severity"] == "warn"
+
+
+def test_unter_der_schwelle_keine_kachel():
+    assert _thunder_tag({"thunderstorm_hours": 0, "thunder_ens_pct": 8,
+                         "thunder_ens_level": None}) is None
+
+
+def test_deterministisches_gewitter_bleibt_stop():
+    """Das harte Gate darf vom Ensemble nicht verdraengt oder verdoppelt werden."""
+    t = _thunder_tag({
+        "thunderstorm_hours": 3, "thunderstorm_in_window_h": 3,
+        "thunder_ens_pct": 71, "thunder_ens_level": "hoch",
+    })
+    assert t["severity"] == "stop"
+    assert "71%" not in t["value"]
+
+
+def test_nur_eine_gewitter_kachel():
+    """Kein Doppel-Eintrag, wenn beide Quellen etwas sagen."""
+    tags = [t for t in build_region_topic_tags({}, {
+        "thunderstorm_hours": 2, "thunderstorm_in_window_h": 2,
+        "thunder_ens_pct": 60, "thunder_ens_level": "hoch",
+    }) if t["topic"] == "THUNDERSTORM"]
+    assert len(tags) == 1
+
+
+def test_stufe_folgt_der_konfiguration_nicht_dem_cache():
+    """Die Schwelle ist Anzeige-Politik: eine Aenderung muss sofort wirken,
+    nicht erst nach dem naechsten Wetterlauf. Darum wird die Stufe aus
+    probability_pct neu berechnet und das gespeicherte `level` ignoriert."""
+    assert et.probability_level(19) == "moeglich"   # bei MENTION=15
+    assert et.probability_level(14) is None

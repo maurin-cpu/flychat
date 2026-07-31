@@ -162,6 +162,57 @@ es einen anderen Modelllauf als den angezeigten Code).
 dass die räumliche Unsicherheit innerhalb der Region gross ist — und genau das
 soll der Text sagen dürfen.
 
+### Ensemble sichtbar gemacht + Schwelle 20 → 15 (2026-07-31, Rückmeldung)
+
+Praxis-Rückmeldung: Zentralschweizer Voralpen müsste am Sa 01.08. und So 02.08.
+Gewitter zeigen — tat es nicht. Zwei verschiedene Ursachen:
+
+| | Deterministisch | Ensemble | Ergebnis |
+|---|---|---|---|
+| **Sa 01.08** | 17.1 mm/h um 15 h, CAPE 380, Code 65 (kein Gewitter) | 19 % | Nichts — ein Punkt unter der Schwelle |
+| **So 02.08** | Code 0–3, 0.0 mm | 71 %, „hoch", 13–17 h | Erkannt, aber **unsichtbar** |
+
+**Sonntag war das grössere Problem:** Das Ensemble hatte recht, der Wert ging
+aber nur in den LLM-Text. Es gab keine Kachel, kein Symbol, nichts in der
+Anzeige. Behoben über das **bestehende** `THUNDERSTORM`-Topic mit Severity
+`warn` — kein neues Topic, keine Frontend-Änderung. Feuert nur, wenn
+deterministisch **nichts** anliegt; das harte `stop` wird nie verdrängt oder
+verdoppelt (durch Tests abgesichert).
+
+**Samstag:** `ENSEMBLE_THUNDER_MENTION_PCT` von 20 auf 15. Kosten im damaligen
+5-Tage-Fenster: 88 statt 82 von 145 Region-Tagen (+6). 15 ist **ebenso
+ungemessen** wie 20 — nur an einem echten Fall ausgerichtet statt frei gewählt.
+
+Die Stufe wird jetzt **beim Lesen** aus `probability_pct` berechnet statt aus
+dem im Cache gespeicherten `level`. Eine Schwellen-Änderung wirkt damit sofort
+und nicht erst nach dem nächsten Wetterlauf.
+
+### Warum die Schwelle rückwirkend NICHT kalibrierbar ist
+
+Der erste Kalibrierungsversuch war **wertlos und sah trotzdem sauber aus**:
+alle Schwellen von 5 % bis 75 % lieferten exakt 0 Treffer, während der
+deterministische Vergleichsmassstab 12 hatte.
+
+Ursache: `past_days` füllt beim Ensemble-Endpunkt die Vergangenheit mit **einer
+einzigen Reihe**. Älter als rund drei Tage sind alle 21 Member identisch — es
+gibt dort kein Ensemble, dessen Streuung man auswerten könnte:
+
+| Tag | Stunden mit Member-Streuung |
+|---|---|
+| 05.07. / 15.07. / 19.07. / 25.07. / 27.07. | 0 von 24 |
+| 28.07. | 10 von 24 |
+| 29.07. / 31.07. | 23 von 24 |
+
+`scripts/calibrate_ensemble_threshold.py` prüft die Streuung deshalb selbst,
+verwirft Tage ohne Member und **bricht ab**, statt eine Tabelle voller Nullen
+auszugeben. Genau dieselbe Fehlerklasse wie der ECMWF-Scheinbefund: eine
+Auswertung, die plausibel aussieht und nichts gemessen hat.
+
+Der belastbare Weg ist **vorwärts sammeln** — `snapshot_weather.py` archiviert
+`thunder_ensemble` täglich (der Scheduler ruft es am Ende jedes Laufs).
+Sobald genug Tage mit echten Membern beisammen sind, lässt sich gegen die
+Stationsmessungen kalibrieren. Bis dahin bleiben 15/40/60 provisorisch.
+
 ### Defekt 3 — Modell verpasst Gewitter auch echt (offen)
 
 An einzelnen Tagen liefert das Modell null Gewitterstunden, obwohl Stationen

@@ -1069,6 +1069,23 @@ def build_region_topic_tags(result: dict, gust_info: dict) -> list:
             "THUNDERSTORM", thunder_sev, i18n.t("tag.label.thunderstorm"),
             i18n.t("tag.val.model_storm"), f"{thunder_h}h"
         ))
+    else:
+        # Ensemble-Gewitter (nur Region): Der deterministische Lauf sieht nichts,
+        # aber ein relevanter Teil der 21 EPS-Member zuendet. Immer "warn", nie
+        # "stop" — die Schwellen sind nicht kalibriert, und rueckwirkend LAESST
+        # sich das auch nicht nachholen (Open-Meteo liefert im Ensemble-Archiv
+        # keine echten Member; siehe scripts/calibrate_ensemble_threshold.py).
+        # Nur wenn oben KEINE deterministische Kachel steht: sonst wuerde die
+        # weiche Aussage die harte verdraengen oder doppeln.
+        ens_pct = gi.get("thunder_ens_pct")
+        if gi.get("thunder_ens_level") and ens_pct is not None:
+            peak = ""
+            if gi.get("thunder_ens_peak_start") and gi.get("thunder_ens_peak_end"):
+                peak = f"{gi['thunder_ens_peak_start']}-{gi['thunder_ens_peak_end']}"
+            tags.append(_make_tag(
+                "THUNDERSTORM", "warn", i18n.t("tag.label.thunderstorm"),
+                f"{i18n.t('tag.val.ensemble_storm')} {ens_pct}%", peak
+            ))
 
     # ── CLOUDS — STOP (Safety) + REDUCER (Basis nahe Ref), Region-Pfad ─
     # Region nutzt elev_ref als Referenz fuer "Startplatz" — gleiche Logik

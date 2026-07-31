@@ -2900,6 +2900,16 @@ class WeatherContextMixin:
         rain_isolated_h = 0
         thunderstorm_in_window_h = 0  # Gewitter-Stunden strikt INNERHALB des Flugfensters
         thunder_class_counts = {}     # isolated/scattered/widespread → Stunden
+        # Ensemble-Gewitter fuer diesen Tag (kann fehlen: aelterer Cache, oder
+        # der Ensemble-Abruf ist ausgefallen). Frueh geholt, weil sowohl der
+        # Datenblock (general_info) als auch der Trend-Text ihn brauchen.
+        ens = (region_data.get("thunder_ensemble") or {}).get(date_str) or {}
+        # Warnstufe hier NEU berechnen statt das im Cache gespeicherte `level`
+        # zu nehmen: die Schwelle ist Anzeige-Politik, keine Messgroesse. Sonst
+        # wirkt eine Schwellen-Aenderung erst nach dem naechsten Wetterlauf —
+        # und bis dahin zeigt die App eine Einstufung, die nicht mehr gilt.
+        from ensemble_thunder import probability_level as _ens_level
+        ens_level = _ens_level(ens.get("probability_pct"))
         aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND, Region)
         aloft_danger_hours_list = []  # Nur [ALOFT-WIND-DANGER] (> WIND_DANGER_KMH)
         tag_counts = {}        # tag_name → count (für Tagesprofil-Histogramm)
@@ -3589,6 +3599,17 @@ class WeatherContextMixin:
             "rain_isolated_h": rain_isolated_h,
             "thunderstorm_hours": tag_counts.get("[THUNDERSTORM]", 0),
             "thunderstorm_in_window_h": thunderstorm_in_window_h,
+            "thunder_class_counts": dict(thunder_class_counts),
+            # Ensemble-Gewitter (ICON-CH2-EPS). Bewusst getrennt von den
+            # deterministischen Stunden: erzeugt nur eine WARN-Kachel, nie STOP.
+            # Ohne diese Felder blieb die Ensemble-Aussage unsichtbar — sie ging
+            # nur in den LLM-Text, nicht in die Anzeige (gemeldet 31.07. am
+            # Beispiel Zentralschweizer Voralpen 02.08.: 71 % der Member,
+            # deterministisch 0.0 mm und Code 0-3, in der App also blank).
+            "thunder_ens_pct": (ens or {}).get("probability_pct"),
+            "thunder_ens_level": ens_level,
+            "thunder_ens_peak_start": (ens or {}).get("peak_start"),
+            "thunder_ens_peak_end": (ens or {}).get("peak_end"),
             # CLOUDS-Sicht (siehe docs/TAGS.md), Region nutzt elev_ref:
             "elevation_m": elev_ref,
             "cloud_at_or_below_takeoff_h": cloud_at_or_below_takeoff_h,
@@ -3923,16 +3944,14 @@ class WeatherContextMixin:
         # stattdessen, wie viele von 21 Laeufen ueberhaupt eine zuenden — bei
         # Konvektion die belastbarere Information. Bewusst NICHT als No-Go
         # formuliert: die Schwellen sind noch nicht kalibriert.
-        ens_all = region_data.get("thunder_ensemble") or {}
-        ens = ens_all.get(date_str) or {}
-        if ens.get("level") and ens.get("probability_pct") is not None:
+        if ens_level and ens.get("probability_pct") is not None:
             peak = ""
             if ens.get("peak_start") and ens.get("peak_end"):
                 peak = f", Schwerpunkt {ens['peak_start']}-{ens['peak_end']}"
             lines.append(
                 f"GEWITTER-ENSEMBLE: {ens['probability_pct']}% der Modelllaeufe "
                 f"({ens.get('n_members', 0)} Member ICON-CH2-EPS) zeigen ein Gewitter "
-                f"im Flugfenster{peak}. Einstufung: {ens['level']}. "
+                f"im Flugfenster{peak}. Einstufung: {ens_level}. "
                 f"WEICHE Angabe — allein KEIN No-Go und KEIN Grund fuer not_safe. "
                 f"Als Wahrscheinlichkeit formulieren "
                 f"(z.B. \"Gewitterwahrscheinlichkeit {ens['probability_pct']}%{peak}\"), "

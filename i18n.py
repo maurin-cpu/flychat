@@ -720,6 +720,9 @@ STRINGS: dict[str, dict[str, str]] = {
     "tag.val.foehn_moderate": {"de": "moderat", "en": "moderate"},
     "tag.val.precip": {"de": "Niederschlag", "en": "Precipitation"},
     "tag.val.model_storm": {"de": "Modell-Gewitter", "en": "Model storm"},
+    # Ensemble-Gewitter: bewusst als Wahrscheinlichkeit beschriftet, damit
+    # der Unterschied zum deterministischen "Modell-Gewitter" sichtbar bleibt.
+    "tag.val.ensemble_storm": {"de": "Gewitterrisiko", "en": "Storm risk"},
     "tag.val.mech_rough": {"de": "mech. ruppig", "en": "mech. rough"},
     "tag.val.rain_widespread": {"de": "flaechig", "en": "widespread"},
     "tag.val.rain_scattered": {"de": "verstreut", "en": "scattered"},
