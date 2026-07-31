@@ -187,6 +187,53 @@ Die Stufe wird jetzt **beim Lesen** aus `probability_pct` berechnet statt aus
 dem im Cache gespeicherten `level`. Eine Schwellen-Änderung wirkt damit sofort
 und nicht erst nach dem nächsten Wetterlauf.
 
+### Blitz im Meteogramm kommt jetzt aus dem Ensemble (2026-07-31)
+
+Vorgabe aus der Praxis: *„was wir der KI zur Analyse geben, muss auch im
+Meteogramm stehen — dann nehmen wir nicht mehr den Wettercode, sondern das
+Ensemble."*
+
+Der Blitz hing bis dahin allein am deterministischen `weather_code`, also an
+genau der Quelle, die Konvektion regelmässig verpasst. Die KI bekam die
+Ensemble-Aussage längst, die Anzeige nicht.
+
+**Massgeblich ist das Schwerpunkt-Fenster des Tages** — dieselbe Aussage, die
+im LLM-Kontext steht („Gewitterwahrscheinlichkeit 71 %, Schwerpunkt
+13:00–17:00"). Ein rein stündlicher Anteil wäre nicht deckungsgleich: der
+Tageswert (irgendein Member, irgendwann) liegt systematisch höher als jede
+Einzelstunde — am 02.08. lag der Tag bei 71 %, die beste Stunde bei 43 %.
+
+Regel: Blitz, wenn `weather_code` in 95/96/99 **ODER** die Stunde im
+Schwerpunkt-Fenster eines Tages über der Erwähnungsschwelle liegt **ODER** der
+Stundenanteil `ENSEMBLE_THUNDER_METEOGRAM_PCT` (40 %) erreicht. Das ODER ist
+Absicht — ein hartes Modell-Gewitter darf nie verschwinden.
+
+Der Wahrheitswert wird **server-seitig** berechnet (`storm` im Chart-Payload),
+damit die Schwelle nur an einer Stelle steht und nicht zusätzlich im
+JavaScript. Fehlt das Feld (Spots, älterer Cache), fällt `stormAt()` auf den
+reinen `weather_code` zurück.
+
+Mengengerüst im 5-Tage-Fenster vom 31.07. (1740 Region-Flugstunden):
+
+| | Blitzstunden |
+|---|---|
+| vorher (nur `weather_code`) | 4 (0.2 %) |
+| jetzt (Schwerpunkt-Fenster) | 370 (21.3 %) |
+
+Das ist ein Faktor 90 — bewusst in Kauf genommen, weil die Anzeige sonst eine
+Minderheitsmeinung als Tatsache zeigt. Zentralschweizer Voralpen hatte an fünf
+Tagen in Folge 19–100 % Member-Zustimmung und **null** Gewitterstunden im
+`weather_code`. Nachregelbar über `ENSEMBLE_THUNDER_MENTION_PCT` (Fenster) und
+`ENSEMBLE_THUNDER_METEOGRAM_PCT` (Einzelstunde).
+
+**Nur Regionen.** Spots haben kein Ensemble — 494 Punkte × 21 Member sind am
+freien Endpunkt nicht zu holen. Dort bleibt es beim `weather_code`; durch Test
+abgesichert, dass sich der Spot-Pfad nicht bewegt.
+
+Der Tooltip benennt die Herkunft: „⚡ Modell-Gewitter" gegenüber „⚡ 71 %".
+Es bleibt **ein** Blitz-Symbol — die Entscheidung von §0 („zwei Blitze → einer")
+wird nicht rückgängig gemacht.
+
 ### Warum die Schwelle rückwirkend NICHT kalibrierbar ist
 
 Der erste Kalibrierungsversuch war **wertlos und sah trotzdem sauber aus**:

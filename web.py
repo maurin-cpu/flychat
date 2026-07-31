@@ -2040,6 +2040,7 @@ def api_labeled_examples_meteogram(analysis_id):
         slope_angle=slope_an,
         region_id=region_id,
         spotmedian_override=spotmedian_override,
+        thunder_ensemble=wi.get("thunder_ensemble") if is_region else None,
     )
     if is_region:
         for w in chart_data.get("wind", []):
@@ -3698,7 +3699,8 @@ def api_region_weather(region_id):
     spotmedian_override = region_data.get("thermals_spotmedian")
 
     chart_data = format_data_for_charts(hourly_data, pressure_level_data, elevation_ref=elevation_ref,
-                                        region_id=region_id, spotmedian_override=spotmedian_override)
+                                        region_id=region_id, spotmedian_override=spotmedian_override,
+                                        thunder_ensemble=region_data.get("thunder_ensemble"))
 
     # Regionen haben keine Böen (Apr 2026): gusts = null.
     # Frontend (meteogram.js) interpretiert null korrekt: hasRealGust=false →
@@ -4060,13 +4062,57 @@ def _safe_get(arr, i):
 
 def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=None,
                            slope_azimuth=None, slope_angle=None, region_id=None,
-                           spotmedian_override=None):
+                           spotmedian_override=None, thunder_ensemble=None):
     """Formatiert Daten für D3.js Charts inkl. Thermik-Physik.
 
     spotmedian_override (Mai 2026): nur fuer Regionen. Ueberschreibt max_height /
     climb_rate / lcl pro Stunde mit Spot-Median. Siehe fetch_weather.py
     _compute_region_spotmedian_thermals fuer Motivation.
+
+    thunder_ensemble (Juli 2026): nur fuer Regionen — {"YYYY-MM-DD": {...}} aus
+    _regions[rid]["thunder_ensemble"]. Steuert das Blitz-Symbol. Vorher kam der
+    Blitz allein aus dem deterministischen weather_code, also aus der Quelle,
+    die Konvektion regelmaessig verpasst: die KI bekam die Ensemble-Aussage,
+    die Anzeige nicht. Der fertige Wahrheitswert wird hier server-seitig
+    berechnet ("storm"), damit die Schwelle nur an EINER Stelle steht
+    (config.ENSEMBLE_THUNDER_METEOGRAM_PCT) und nicht zusaetzlich im JavaScript.
+    Spots haben kein Ensemble (494 Punkte x 21 Member sind am freien Endpunkt
+    nicht zu holen) — dort bleibt es beim weather_code.
     """
+    from ensemble_thunder import probability_level as _ens_level
+
+    # Blitz-Stunden aus dem Ensemble ableiten.
+    #
+    # Massgeblich ist das SCHWERPUNKT-FENSTER des Tages — also exakt die Aussage,
+    # die auch im LLM-Kontext steht ("Gewitterwahrscheinlichkeit 71 %,
+    # Schwerpunkt 13:00-17:00"). Anzeige und KI-Eingabe muessen dieselbe Geschichte
+    # erzaehlen; ein stuendlicher Anteil allein tut das nicht, weil der Tageswert
+    # (irgendein Member, irgendwann) systematisch hoeher liegt als jede
+    # Einzelstunde: 02.08. lag der Tag bei 71 %, die beste Stunde bei 43 %.
+    #
+    # Zusaetzlich zaehlt eine Einzelstunde mit sehr hohem Anteil, auch ausserhalb
+    # des Schwerpunkts (ENSEMBLE_THUNDER_METEOGRAM_PCT).
+    ens_by_hour = {}
+    ens_storm_hours = set()
+    for _day, _v in (thunder_ensemble or {}).items():
+        if _day == "_meta" or not isinstance(_v, dict):
+            continue
+        for _hhmm, _share in (_v.get("hourly_share_pct") or {}).items():
+            ens_by_hour[f"{_day}T{_hhmm}"] = _share
+            if _share is not None and _share >= config.ENSEMBLE_THUNDER_METEOGRAM_PCT:
+                ens_storm_hours.add(f"{_day}T{_hhmm}")
+        # Stufe hier neu berechnen, nicht das gespeicherte `level` nehmen —
+        # sonst wirkt eine Schwellen-Aenderung erst nach dem naechsten Wetterlauf.
+        if not _ens_level(_v.get("probability_pct")):
+            continue
+        _ps, _pe = _v.get("peak_start"), _v.get("peak_end")
+        if not _ps or not _pe:
+            continue
+        try:
+            for _h in range(int(_ps[:2]), int(_pe[:2]) + 1):
+                ens_storm_hours.add(f"{_day}T{_h:02d}:00")
+        except (TypeError, ValueError):
+            continue
     chart_data = {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}
     sorted_times = sorted(hourly_data.keys())
 
@@ -4111,11 +4157,28 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
             precipitation = data.get("precipitation", 0)
             precip_prob = data.get("precipitation_probability", 0)
             if precipitation is not None:
+                _wc = data.get("weather_code")
+                _ens = ens_by_hour.get(time_str[:16])
+                # Blitz = Ensemble ODER deterministischer Code. Das ODER ist
+                # Absicht: das Ensemble ist die fuehrende Quelle, aber ein
+                # hartes Modell-Gewitter darf nie verschwinden, nur weil die
+                # Member-Zahl knapp unter der Schwelle liegt.
+                # ODER ist Absicht: das Ensemble fuehrt, aber ein hartes
+                # Modell-Gewitter darf nie verschwinden, nur weil die
+                # Member-Zahl knapp unter der Schwelle liegt.
+                _storm = bool(
+                    (_wc is not None and int(_wc) in (95, 96, 99))
+                    or (time_str[:16] in ens_storm_hours)
+                )
                 chart_data["precipitation"].append({
                     "time": time_str,
                     "amount": precipitation,
                     "probability": precip_prob if precip_prob is not None else 0,
-                    "weather_code": data.get("weather_code"),
+                    "weather_code": _wc,
+                    # Fertiger Wahrheitswert fuers Frontend (Schwelle bleibt in
+                    # config.py). Aelterer Cache ohne Ensemble -> nur weather_code.
+                    "storm": _storm,
+                    "thunder_ens_pct": _ens,
                     # 16-RP Coverage-Klasse (widespread/scattered/isolated/dry)
                     # damit das Meteogramm pro Stunde die Tropfen-Anzahl variieren kann.
                     "klass": data.get("precipitation_class"),

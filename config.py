@@ -138,6 +138,23 @@ ENSEMBLE_MODEL = "meteoswiss_icon_ch2"
 #
 # Diese Schwellen setzen NIE ein No-Go, sie steuern nur die Erwaehnung.
 ENSEMBLE_THUNDER_MENTION_PCT  = 15   # ab hier ueberhaupt erwaehnen ("moeglich")
+# Schwelle fuer das BLITZ-SYMBOL im Meteogramm, angewendet auf den
+# STUENDLICHEN Member-Anteil (nicht auf den Tageswert). Bewusst eine eigene
+# Zahl: die Anzeige darf nachgezogen werden, ohne die Text-Stufen zu bewegen.
+#
+# Warum ueberhaupt: das Meteogramm zeigte Gewitter nur aus dem
+# deterministischen weather_code — genau der Quelle, die Konvektion
+# regelmaessig verpasst. Die KI bekam die Ensemble-Aussage, die Anzeige nicht.
+# Ab jetzt speist dieselbe Quelle beides.
+#
+# Mengengeruest im 5-Tage-Fenster vom 31.07.2026 (1740 Region-Flugstunden):
+#   weather_code allein   4 Stunden (0.2 %)
+#   Ensemble >= 30 %    216 Stunden (12.4 %)
+#   Ensemble >= 40 %    174 Stunden (10.0 %)
+#   Ensemble >= 50 %    141 Stunden ( 8.1 %)
+# 40 gewaehlt: deutlich mehr als heute, aber keine Dauerbeblitzung. UNGEMESSEN
+# wie alle Ensemble-Schwellen — mit den vorwaerts gesammelten Daten ersetzen.
+ENSEMBLE_THUNDER_METEOGRAM_PCT = 40
 ENSEMBLE_THUNDER_ELEVATED_PCT = 40   # "erhoeht"
 ENSEMBLE_THUNDER_HIGH_PCT     = 60   # "hoch"
 

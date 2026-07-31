@@ -212,6 +212,21 @@ window.Meteogram = (function () {
         return code === 95 || code === 96 || code === 99;
     }
 
+    // Gewitter-Entscheid fuer eine Stunde.
+    //
+    // Fuehrende Quelle ist das Ensemble (ICON-CH2-EPS): der deterministische
+    // weather_code verpasst Konvektion regelmaessig — die KI bekam die
+    // Ensemble-Aussage laengst, das Meteogramm nicht. Das Backend liefert den
+    // fertigen Wahrheitswert als `storm`, damit die Schwelle nur an einer
+    // Stelle steht (config.ENSEMBLE_THUNDER_METEOGRAM_PCT).
+    //
+    // Fallback auf den reinen Code, wenn `storm` fehlt: Spots haben kein
+    // Ensemble, und aelterer Cache kennt das Feld nicht.
+    function stormAt(rec, code) {
+        if (rec && rec.storm != null) return !!rec.storm;
+        return isThunderstorm(code);
+    }
+
     // ===== DIRECTION PARSER (compatible with map.js) =====
     // Returns an array of [startDeg, endDeg] sectors (0-360+ possibly), or null.
     // Accepts "SW", "SW-W", "N-NO-O", "W/NW", etc.
@@ -579,7 +594,7 @@ window.Meteogram = (function () {
             if (precip.amount != null && precip.amount > 0.05) f.rain = true;
             var wcAll = (precip.weather_code != null) ? precip.weather_code
                       : ((wx.cloudbase && wx.cloudbase.weather_code != null) ? wx.cloudbase.weather_code : null);
-            if (isThunderstorm(wcAll)) f.storm = true;
+            if (stormAt(precip, wcAll)) f.storm = true;
             // CAPE-Überentwicklung ist KEIN Gewitter und KEIN Blitz mehr —
             // bleibt ein Safety-Aspekt in der Analyse, nicht im Wetter-Strip.
 
@@ -1023,7 +1038,7 @@ window.Meteogram = (function () {
             var wc = precip.weather_code != null ? precip.weather_code : (wx.cloudbase && wx.cloudbase.weather_code);
             var cx = ci * CELL_W + CELL_W / 2;
             var hasPrecip = precipAmt > 0;
-            var hasStorm = isThunderstorm(wc);
+            var hasStorm = stormAt(precip, wc);
             // Gewitter = ausschliesslich weather_code 95/96/99 (ICON-CH). Die
             // CAPE-Ueberentwicklung wird hier NICHT mehr als (hohler) Blitz
             // gezeigt — sie bleibt ein Safety-Aspekt in der Analyse, ist aber
@@ -1968,8 +1983,15 @@ window.Meteogram = (function () {
                 html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.warn_rain') + '</span><span class="tooltip-value">' + wx.precipitation.amount.toFixed(1) + ' mm</span></div>';
             }
             var wc = (wx.precipitation && wx.precipitation.weather_code != null) ? wx.precipitation.weather_code : (wx.cloudbase && wx.cloudbase.weather_code);
-            if (isThunderstorm(wc)) {
-                html += '<div class="tooltip-row"><span class="tooltip-label">Gewitter</span><span class="tooltip-value">\u26A1 vorhergesagt</span></div>';
+            if (stormAt(wx.precipitation, wc)) {
+                // Herkunft benennen: ein Modell-Gewitter ist eine andere Aussage
+                // als "so viele Prozent der Laeufe". Wer den Blitz sieht, soll
+                // wissen, worauf er beruht.
+                var ensPct = wx.precipitation ? wx.precipitation.thunder_ens_pct : null;
+                var stormTxt = isThunderstorm(wc)
+                    ? '\u26A1 ' + wcT('js.mg.warn_storm')
+                    : '\u26A1 ' + (ensPct != null ? ensPct + '%' : '');
+                html += '<div class="tooltip-row"><span class="tooltip-label">Gewitter</span><span class="tooltip-value">' + stormTxt + '</span></div>';
             }
 
             tooltipEl.innerHTML = html;
