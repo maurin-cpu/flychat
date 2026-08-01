@@ -203,40 +203,59 @@ def lines_by_type(features, typ, lat0) -> list:
 # ============================================================================
 
 def passages_for_point(lat, lon, karten, typ, lat0, max_lateral=MAX_LATERAL_KM):
-    """Durchgaenge an einem Punkt: [(zeit, stuetzweite_h, seitlicher_abstand)]."""
+    """Durchgaenge an einem Punkt: [(zeit, stuetzweite_h, seitlicher_abstand)].
+
+    Je Linie verfolgt, nicht ueber alle Linien gemeinsam (F-004). Der frueher
+    verfolgte GLOBAL naechste Punkt wechselt die Front, sobald eine naehere
+    verschwindet — das Verfahren las den Wechsel als Verlagerung und meldete
+    Durchgaenge, die es nie gab (Selbsttest 5 und 6).
+    """
     px, py = _to_km(lat, lon, lat0)
     px, py = float(px), float(py)
 
     track = []
     for k in karten:
-        d, qx, qy = nearest_on_lines(px, py, lines_by_type(k["features"], typ, lat0))
-        track.append((k["gueltig"], d, qx, qy))
+        per_line = []
+        for ln in lines_by_type(k["features"], typ, lat0):
+            d, qx, qy = nearest_on_lines(px, py, [ln])
+            if np.isfinite(d):
+                per_line.append((d, qx, qy))
+        track.append((k["gueltig"], per_line))
 
     found = []
-    for (t1, d1, q1x, q1y), (t2, d2, q2x, q2y) in zip(track, track[1:]):
-        if not np.isfinite(d1) or not np.isfinite(d2):
+    for (t1, prev), (t2, cur) in zip(track, track[1:]):
+        if not prev or not cur:
             continue
         dt_h = (t2 - t1).total_seconds() / 3600.0
-        mx, my = q2x - q1x, q2y - q1y
-        shift = float(np.hypot(mx, my))
-        speed = shift / dt_h if dt_h else 0.0
-        if not (MIN_SHIFT_KMH <= speed <= MAX_SHIFT_KMH):
-            continue                      # Richtung unbestimmbar oder andere Front
-        mxn, myn = mx / shift, my / shift
-        # Zerlegung in laengs (s) und quer (c) zur Zugrichtung.
-        # positiv = Front steht noch bevor, negativ = durch
-        s1 = (px - q1x) * mxn + (py - q1y) * myn
-        s2 = (px - q2x) * mxn + (py - q2y) * myn
-        c1 = abs((px - q1x) * myn - (py - q1y) * mxn)
-        c2 = abs((px - q2x) * myn - (py - q2y) * mxn)
-        if not (s1 > 0 >= s2):
-            continue
-        frac = s1 / (s1 - s2) if (s1 - s2) else 0.5
-        c = c1 + (c2 - c1) * frac         # seitlicher Abstand im Moment des Durchgangs
-        if c > max_lateral:
-            continue                      # Front zieht vorbei, nicht darueber
-        rand = frac < EDGE_FRAC or frac > (1.0 - EDGE_FRAC)
-        found.append((t1 + timedelta(hours=frac * dt_h), dt_h, float(c), rand))
+        for d2, q2x, q2y in cur:
+            # Zuordnung ueber die Vorkarte: Fortsetzung dieser Linie ist die,
+            # deren Aufpunkt am naechsten liegt. Steht auf der Vorkarte bereits
+            # eine Linie dort, wo diese steht, ist SIE die Fortsetzung — nicht
+            # eine weit entfernte, die sich womoeglich aufgeloest hat. Genau
+            # diese Verwechslung ist F-004.
+            d1, q1x, q1y = min(prev, key=lambda a: float(np.hypot(a[1] - q2x,
+                                                                 a[2] - q2y)))
+            mx, my = q2x - q1x, q2y - q1y
+            shift = float(np.hypot(mx, my))
+            speed = shift / dt_h if dt_h else 0.0
+            if not (MIN_SHIFT_KMH <= speed <= MAX_SHIFT_KMH):
+                continue                  # steht still, oder nicht dieselbe Front
+            mxn, myn = mx / shift, my / shift
+            # Zerlegung in laengs (s) und quer (c) zur Zugrichtung.
+            # positiv = Front steht noch bevor, negativ = durch
+            s1 = (px - q1x) * mxn + (py - q1y) * myn
+            s2 = (px - q2x) * mxn + (py - q2y) * myn
+            c1 = abs((px - q1x) * myn - (py - q1y) * mxn)
+            c2 = abs((px - q2x) * myn - (py - q2y) * mxn)
+            if not (s1 > 0 >= s2):
+                continue
+            frac = s1 / (s1 - s2) if (s1 - s2) else 0.5
+            c = c1 + (c2 - c1) * frac     # seitlicher Abstand beim Durchgang
+            if c > max_lateral:
+                continue                  # Front zieht vorbei, nicht darueber
+            rand = frac < EDGE_FRAC or frac > (1.0 - EDGE_FRAC)
+            found.append((t1 + timedelta(hours=frac * dt_h), dt_h, float(c),
+                          rand))
     return found
 
 
@@ -322,6 +341,93 @@ def selftest() -> int:
         ok = False
     else:
         print("  ok 4  zwei Fronten bleiben zwei Ereignisse")
+
+    # ------------------------------------------------------------------
+    # F-004: Front-Identitaet zwischen zwei Karten.
+    #
+    # Faelle 1-4 pruefen die Zeitrechnung bei EINER Front. Auf einer echten
+    # Karte liegen 13-19 Abschnitte gleichzeitig, und keiner traegt ein
+    # Namensschild. Das Verfahren verfolgt den naechstgelegenen Punkt ueber
+    # alle Linien eines Typs — wechselt der von einer Front zur anderen, liest
+    # es das als Verlagerung. Die Tempo-Schranke faengt das nicht: bei 12 h
+    # Stuetzweite erlaubt MAX_SHIFT_KMH einen Sprung von 1080 km, und darin
+    # liegt halb Europa.
+    #
+    # Die drei Faelle bauen genau diese Falle, jeweils INNERHALB des erlaubten
+    # Tempobands — ein absurder Sprung wuerde nur bestaetigen, was Fall 3
+    # bereits zeigt.
+    # ------------------------------------------------------------------
+
+    def karte(t, *features, vorlauf=36):
+        return {"gueltig": t, "features": list(features), "vorlauf_h": vorlauf}
+
+    NS = ([40.0, 55.0])          # Nord-Sued-Linie, deckt die Punktbreite ab
+
+    # 5. Zwei Fronten gleichen Typs, die naehere loest sich auf.
+    #    Karte 1: Kaltfront bei 5 Ost (westlich des Punktes) und eine zweite
+    #    bei 11 Ost (oestlich). Karte 2: die westliche ist verschwunden, die
+    #    oestliche steht unveraendert.
+    #    Keine der beiden ueberquert den Punkt. Richtige Antwort: kein
+    #    Durchgang. Das Verfahren sieht jedoch, wie der naechste Punkt von
+    #    5 Ost nach 11 Ost wandert — 464 km in 12 h, also 39 km/h und damit
+    #    mitten im erlaubten Band — und meldet eine Ueberquerung, die es nie
+    #    gab.
+    k = [karte(t0, _synth([5.0, 5.0], NS), _synth([11.0, 11.0], NS)),
+         karte(t0 + timedelta(hours=12), _synth([11.0, 11.0], NS), vorlauf=48)]
+    got = passages_for_point(*ZH, k, "kalt", lat0)
+    if got:
+        print(f"  FEHLER 5: aufgeloeste Front als Durchgang gemeldet "
+              f"({got[0][0]:%H:%M} UTC, quer {got[0][2]:.0f} km) — die nahe "
+              f"Front loeste sich auf, gemeldet wurde der Sprung zur fernen")
+        ok = False
+    else:
+        print("  ok 5  aufgeloeste Front erzeugt keinen Durchgang")
+
+    # 6. Typwechsel entlang der Linie. Eine Front ist selten durchgehend
+    #    kalt — noerdlich des Okklusionspunktes kalt, suedlich warm, und der
+    #    Punkt wandert. Fuer eine typ-getrennte Abfrage verschwindet die Front
+    #    dadurch aus ihrer Menge, obwohl sie physikalisch weiterzieht.
+    #    Karte 1: Kaltfront bei 5 Ost, zweite Kaltfront bei 11 Ost.
+    #    Karte 2: die erste ist auf 8.5 Ost weitergezogen und jetzt als
+    #    Warmfront gezeichnet; die oestliche Kaltfront steht noch.
+    #    Die Abfrage "kalt" darf daraus keinen Durchgang bauen — die einzige
+    #    Kaltfront, die sie auf Karte 2 sieht, lag immer schon oestlich.
+    k = [karte(t0, _synth([5.0, 5.0], NS), _synth([11.0, 11.0], NS)),
+         karte(t0 + timedelta(hours=12), _synth([8.5, 8.5], NS, typ="warm"),
+               _synth([11.0, 11.0], NS), vorlauf=48)]
+    got = passages_for_point(*ZH, k, "kalt", lat0)
+    if got:
+        print(f"  FEHLER 6: Typwechsel als Kaltfront-Durchgang gemeldet "
+              f"({got[0][0]:%H:%M} UTC) — die nahe Front wurde zur Warmfront, "
+              f"eingesprungen ist die ferne Kaltfront")
+        ok = False
+    else:
+        print("  ok 6  Typwechsel erzeugt keinen Kaltfront-Durchgang")
+
+    # 7. Endpunkt-Effekt. Die Front zieht ostwaerts ueber den Punkt, ihr
+    #    Suedende zieht sich zwischen den Karten aber nach Norden zurueck
+    #    (44 -> 48 Nord). Der naechste Punkt sitzt auf Karte 2 nicht mehr auf
+    #    der Linie, sondern auf deren Ende — die abgeleitete Zugrichtung kippt
+    #    dadurch nach Nordost, und mit ihr die Durchgangszeit.
+    #    Hier IST ein Durchgang plausibel; geprueft wird, dass die verkippte
+    #    Geometrie ihn nicht mit einem seitlichen Scheinabstand versieht, der
+    #    unter der Schwelle durchrutscht, oder die Zeit grob verschiebt.
+    k = [karte(t0, _synth([5.0, 5.0], [44.0, 55.0])),
+         karte(t0 + timedelta(hours=12), _synth([11.0, 11.0], [48.0, 55.0]),
+               vorlauf=48)]
+    got = passages_for_point(*ZH, k, "kalt", lat0)
+    soll = t0 + timedelta(hours=12 * (7.95 - 5.0) / (11.0 - 5.0))
+    if not got:
+        print("  ok 7  Endpunkt-Rueckzug: kein Durchgang gemeldet "
+              "(vorsichtige Antwort)")
+    elif abs((got[0][0] - soll).total_seconds()) > 3600:
+        print(f"  FEHLER 7: Endpunkt-Rueckzug verschiebt die Zeit auf "
+              f"{got[0][0]:%H:%M} UTC (Geometrie erwartet {soll:%H:%M}), "
+              f"quer {got[0][2]:.0f} km")
+        ok = False
+    else:
+        print(f"  ok 7  Endpunkt-Rueckzug: Zeit {got[0][0]:%H:%M} UTC bleibt "
+              f"bei der Geometrie ({soll:%H:%M})")
 
     print("Selbsttest bestanden" if ok else "SELBSTTEST FEHLGESCHLAGEN")
     return 0 if ok else 1

@@ -68,24 +68,63 @@ nur: „ungefähr zu Beginn des Fensters oder früher".
 
 ## F-004 — Front-Identität zwischen zwei Karten ist nicht sichergestellt
 
-**Status:** `offen` · **Beobachtet:** noch kein Schadensfall
+**Status:** `gefixt 31.07.` · **Beobachtet:** Schadensfall im Lauf 2026072700
 
-Das Verfahren verfolgt den „nächsten Punkt einer Frontlinie gleichen Typs"
-zwischen zwei Terminen. Auf den Karten liegen aber **13–19 Abschnitte
-gleichzeitig**. Nichts stellt sicher, dass es dieselbe Front ist. Bekannte
-ungeprüfte Fälle:
+Das Verfahren verfolgte den „nächsten Punkt einer Frontlinie gleichen Typs"
+**über alle Linien gemeinsam**. Auf den Karten liegen aber 13–19 Abschnitte
+gleichzeitig, und nichts stellte sicher, dass es dieselbe Front ist. Löst sich
+die nähere auf, rückt die nächste nach — und der Sprung wird als Verlagerung
+gelesen.
 
-- Front A löst sich auf, Front B nähert sich von anderer Seite → scheinbare
-  Bewegung, die den Punkt überstreicht. Das Geschwindigkeitsgate (3–90 km/h)
-  hilft nur zufällig: 600 km in 12 h = 50 km/h und passiert es.
-- Stationärfronten wechseln den Typ **entlang** der Linie (rot/blau
-  alternierend). Dieselbe Front kann an unserer Länge auf Karte 1 `kalt`, auf
-  Karte 2 `warm` heissen → Durchgang wird für beide Typen verpasst.
-- Linien-Endpunkte: die Projektion klemmt auf das Segmentende, die Zerlegung
-  längs/quer wird dort systematisch schief.
+**Der Schadensfall.** Lauf 27.07. 00 UTC, Punkt Alpennordhang. Die
+Handanalyse 12 UTC zeigt die nächste Kaltfront **440 km südöstlich**
+(13.5 O / 45.9 N) — der Durchgang am Morgen war vorbei, die Front zog ab. Auf
+der Folgekarte (+36 h) ist die nächste Kaltfront eine **völlig andere**, 1652 km
+**nordwestlich** über dem Atlantik (−8.4 O / 56.5 N). Das Verfahren verband
+beide zu einer Bewegung: 2048 km in 24 h = **85 km/h**, knapp unter der
+90-km/h-Schranke, und meldete `Kaltfront quert alpennordhang 27.07 16:03 UTC,
+34/327 Spots` plus `graubuenden_engadin streift, 2/76`. Beide Fronten haben die
+Schweiz in diesem Fenster nie berührt.
 
-Nächster Schritt: `--selftest` um diese drei Fälle erweitern, danach entscheiden,
-ob eine echte Frontverfolgung (Zuordnung über Länge, Form und Lage) nötig ist.
+Das Geschwindigkeitsgate half nicht und konnte nicht helfen: bei 12 h Stützweite
+erlaubt es einen Sprung von **1080 km** — darin liegt halb Europa. Es siebt das
+Absurde, nicht das Falsche.
+
+**Der Fix.** `passages_for_point()` verfolgt jetzt **je Linie** statt global.
+Zu jeder Linie der Folgekarte wird die Vorgängerlinie mit dem nächstgelegenen
+Aufpunkt gesucht: steht dort bereits eine Linie, wo diese steht, ist **sie** die
+Fortsetzung — nicht eine weit entfernte, die sich womöglich aufgelöst hat. Eine
+aufgelöste Front hat damit keinen Nachfolger und erzeugt nichts mehr. Nebenbei
+wird jede Linie einzeln bewertet statt nur die global nächste; ein echter
+Durchgang kann so nicht mehr von einer näheren, aber unbeteiligten Linie
+verdeckt werden.
+
+**Selbsttest** (`--selftest`, Fälle 5–7, gebaut innerhalb des erlaubten
+Tempobands — ein absurder Sprung würde nur bestätigen, was Fall 3 zeigt):
+
+- **5** Zwei Fronten gleichen Typs, die nähere löst sich auf → kein Durchgang.
+  Vor dem Fix gemeldet, **ununterscheidbar** von Fall 1: gleiche Zeit
+  (17:54 UTC), gleicher Querabstand (0 km). Nichts in der Ausgabe hätte den
+  Unterschied verraten.
+- **6** Front wechselt den Typ entlang der Linie, eine fernere gleichen Typs
+  bleibt stehen → kein Phantom-Durchgang. Vor dem Fix gemeldet.
+- **7** Endpunkt-Rückzug zwischen zwei Karten (Südende 44 → 48 N) verkippt die
+  Zugrichtung → Zeit muss bei der Geometrie bleiben. War **schon vorher in
+  Ordnung** (Abweichung 29 min); die Endpunkt-Sorge aus §1h Befund 2 hat sich
+  nicht bestätigt.
+
+**Was offen bleibt.** Die Zuordnung geht über die Lage des Aufpunkts, nicht über
+Länge und Form der Linie. Zwei Fronten, die sich *tatsächlich* nahekommen,
+können weiterhin verwechselt werden — das braucht echte Frontverfolgung und ist
+erst nötig, wenn ein Fall es zeigt. Ebenso ungeprüft bleibt die Gegenrichtung:
+wie oft der strengere Zuordnungstest jetzt eine **echte** Front verwirft.
+
+**Altlast in den Daten.** `observations.csv` enthält die vor dem Fix erzeugten
+Phantom-Zeilen (27.07 16:03 UTC alpennordhang, 15:50 UTC graubuenden_engadin).
+Sie werden nicht automatisch überschrieben, weil die Uhrzeit Teil des Schlüssels
+ist. Im `AUTO_REPORT` standen sie bereits als härtester Jitter markiert —
+„nicht eine verschobene Zeit, sondern eine verschwundene Front", in 4 von 7
+Läufen gar nicht vorhanden. Rückblickend war das der Vorbote dieses Befunds.
 
 ---
 

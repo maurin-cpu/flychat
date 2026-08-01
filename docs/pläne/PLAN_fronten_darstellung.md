@@ -780,9 +780,11 @@ Front *übersehen* — das braucht den Gegenlauf über die Analysen.
 
 Sechs Befunde sind eingetragen: `F-001` Phantom-Durchgänge (gefixt),
 `F-002` Streifschuss als Zonenaussage (gefixt), `F-003` Randwerte (gefixt),
-`F-004` Front-Identität zwischen zwei Karten (**offen**), `F-005` zeitliche
-Systematik (**offen**, erste Messung +2.7 h zu früh, siehe §1j), `F-006`
-Ausdehnung unterschätzt (**offen**, erster Fund des Gegenlaufs, §1j).
+`F-004` Front-Identität zwischen zwei Karten (**gefixt 31.07.**, mit
+Schadensfall im Lauf 27.07.), `F-005` zeitliche Systematik (**offen**, erste
+Messung +2.7 h zu früh, siehe §1j), `F-006` Ausdehnung unterschätzt
+(**offen**, erster Fund des Gegenlaufs, §1j — der Vorbehalt „Front-Identität
+ungeprüft" ist damit erledigt, der Befund selbst bleibt bei n = 1).
 
 ## 1j. Schritt 5 umgesetzt — die Kette prüft sich selbst (27.07.2026, abends)
 
@@ -1014,11 +1016,16 @@ Verhalten ändert):
    Erster Fund: `F-006` (Ausdehnung unterschätzt). Die nachgeholte
    Schritt-0-Messung (tkb +36 gegen die Handanalyse derselben Gültigkeitszeit)
    läuft ab jetzt von selbst auf, sobald genug Analysen im Archiv liegen.
-6. **Härtung**: Legenden-Invariante **erledigt 27.07., §1j**; ebenso je ein
-   Selbsttest für Alarm-Zustandsmaschine und Urteilslogik. **Offen bleibt §1h
-   Befund 2**: die drei adversarialen Fälle der Front-Identität (`F-004`) im
-   `--selftest` der Zeitachse — zwei Fronten gleichen Typs, Typwechsel entlang
-   der Linie, Endpunkt-Effekte.
+6. ~~**Härtung**~~ **erledigt 31.07.** — Legenden-Invariante und die
+   Selbsttests für Alarm-Zustandsmaschine und Urteilslogik am 27.07. (§1j);
+   die drei adversarialen Fälle der Front-Identität (`F-004`) am 31.07. als
+   Selbsttest 5–7 der Zeitachse. **Zwei der drei fielen durch**, und der
+   Fehler steckte nicht nur im Labor: im Lauf 27.07. verband das Verfahren
+   eine nach Südosten abziehende Kaltfront (440 km) mit einer völlig anderen
+   über dem Atlantik (1652 km nordwestlich) zu einer Bewegung von 85 km/h und
+   meldete daraus einen Durchgang durch zwei Zonen, den es nie gab.
+   `passages_for_point()` verfolgt jetzt je Linie statt global; Details und
+   Restrisiko in `fronten_validation/PATTERNS.md` unter `F-004`.
 7. ~~Cache + Scheduler~~ **erledigt 30.07., §1k** — vier Läufe täglich im
    Scheduler-Thread des `wingcast`-Dienstes (`FRONTEN_STUNDEN`), Archiv
    server-lokal wie `wetterdaten.json`. Cloud-Routine und Windows-Aufgabe
