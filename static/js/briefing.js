@@ -749,7 +749,24 @@
     // in anderen Tagen leeren State weil der Spot nur an einem Tag ist.
     state.focusSpot = null;
     renderDayTabs(state.data);
+    // Wetterlage + Synoptik-Karte folgen dem gewaehlten Tag
+    renderWetterlage(state.data);
+    syncSynopticDate();
     renderDayContent();
+  }
+
+  // Datum des aktuell gewaehlten Tages ("YYYY-MM-DD") oder null.
+  function selectedDate() {
+    const days = (state.data && state.data.days) || [];
+    const d = days[state.selectedDayIdx];
+    return d && d.date ? d.date : null;
+  }
+
+  // Synoptik-Mini-Karte auf den gewaehlten Tag stellen (12:00-Timestep).
+  // synoptic-embed.js laedt das Grid asynchron und merkt sich das Datum,
+  // falls es noch nicht bereit ist — die Reihenfolge ist damit egal.
+  function syncSynopticDate() {
+    if (window.WCSynopticEmbed) window.WCSynopticEmbed.setDate(selectedDate());
   }
 
   // ── Render: Filters ─────────────────────────────────────────
@@ -2106,8 +2123,11 @@
   function render(data) {
     state.data = data;
     renderHeader(data);
-    renderWetterlage(data);
+    // Tabs VOR der Wetterlage: renderDayTabs clampt selectedDayIdx,
+    // und renderWetterlage haengt am gewaehlten Tag.
     renderDayTabs(data);
+    renderWetterlage(data);
+    syncSynopticDate();
     renderFilters(data);
     renderTierFilter();
     renderDayContent();
@@ -2159,8 +2179,11 @@
     };
 
     // Synoptik 2.0: `zones` = 4 Flugwetter-Zonen mit je einem Eintrag pro Tag.
-    // Legacy-Fallback (`long_with_sources`) bleibt fuer alte Caches bestehen,
-    // damit ein noch nicht refreshter Cache den Block nicht leert.
+    // Angezeigt wird NUR der gewaehlte Tag (Day-Tabs zuoberst steuern die
+    // ganze Seite) — der Tages-Eintrag jeder Zone, immer sichtbar, ohne
+    // Toggle. Legacy-Fallback (`long_with_sources`) bleibt fuer alte Caches
+    // beim alten Toggle-Verhalten, damit ein noch nicht refreshter Cache den
+    // Block nicht leert.
     const zones = Array.isArray(overview.zones)
       ? overview.zones.filter(z => z && Array.isArray(z.days) && z.days.length)
       : [];
@@ -2168,21 +2191,12 @@
       ? overview.long_with_sources.filter(e => e && e.text)
       : [];
 
-    let longHtml;
-    if (zones.length) {
-      longHtml = zones.map(z => `
-        <section class="bf-wetterlage-zone">
-          <h4 class="bf-wetterlage-zone-title">${escapeHtml(z.label || z.zone || "")}</h4>
-          ${z.days.filter(d => d && d.text).map(dayBlockHtml).join("")}
-        </section>
-      `).join("");
-    } else if (longEntries.length) {
-      longHtml = longEntries.map(dayBlockHtml).join("");
-    } else {
-      longHtml = `<p>${escapeHtml(longText)}</p>`;
-    }
-    const hasLong = zones.length > 0 || longEntries.length > 0
-      || (longText && longText !== shortText);
+    // Gewaehlten Briefing-Tag auf den Wetterlage-Index abbilden. Die
+    // forecast_dates der Wetterlage koennen vom Briefing abweichen (aelterer
+    // Cache) — dann gibt es fuer den Tag schlicht keinen Zonen-Text.
+    const selDate = selectedDate();
+    const wlDates = Array.isArray(wl.forecast_dates) ? wl.forecast_dates : [];
+    const wlIdx = selDate ? wlDates.indexOf(selDate) : -1;
 
     // `short` enthaelt jetzt Synoptik + Flug-Bilanz als EINEN Fliesstext
     // (siehe synoptic_overview.md Skill). Wird als ein Absatz gerendert.
@@ -2195,6 +2209,30 @@
       outlookLegacyText ? `<p>${escapeHtml(outlookLegacyText)}</p>` : "",
     ].filter(Boolean).join("");
 
+    let dayHtml = "";
+    let legacyHtml = "";
+    if (zones.length) {
+      if (wlIdx >= 0) {
+        dayHtml = zones.map(z => {
+          const d = z.days[wlIdx];
+          if (!d || !d.text) return "";
+          return `
+            <section class="bf-wetterlage-zone">
+              <h4 class="bf-wetterlage-zone-title">${escapeHtml(z.label || z.zone || "")}</h4>
+              ${dayBlockHtml(d)}
+            </section>
+          `;
+        }).join("");
+      }
+      if (!dayHtml) {
+        dayHtml = `<p class="bf-wetterlage-noday">${escapeHtml(wcT("js.wetterlage.no_day"))}</p>`;
+      }
+    } else if (longEntries.length) {
+      legacyHtml = longEntries.map(dayBlockHtml).join("");
+    } else if (longText && longText !== shortText) {
+      legacyHtml = `<p>${escapeHtml(longText)}</p>`;
+    }
+
     el.hidden = false;
     el.innerHTML = `
       <div class="bf-wetterlage-head">
@@ -2203,11 +2241,12 @@
         <a class="bf-wetterlage-maplink" href="/synoptik">${escapeHtml(wcT("js.wetterlage.to_map"))} →</a>
       </div>
       <div class="bf-wetterlage-summary">${summaryParas}</div>
-      ${hasLong ? `
+      ${dayHtml ? `<div class="bf-wetterlage-long">${dayHtml}</div>` : ""}
+      ${legacyHtml ? `
         <button type="button" class="bf-wetterlage-toggle" aria-expanded="${state.wetterlageOpen ? "true" : "false"}">
           ${state.wetterlageOpen ? wcT("js.wetterlage.less") : wcT("js.wetterlage.detail")} <span class="bf-wetterlage-chevron" aria-hidden="true">▾</span>
         </button>
-        <div class="bf-wetterlage-long"${state.wetterlageOpen ? "" : " hidden"}>${longHtml}</div>
+        <div class="bf-wetterlage-long"${state.wetterlageOpen ? "" : " hidden"}>${legacyHtml}</div>
       ` : ""}
     `;
     el.classList.toggle("is-open", !!state.wetterlageOpen);

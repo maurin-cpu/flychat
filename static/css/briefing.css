@@ -294,6 +294,13 @@
   margin-right: 4px;
 }
 
+/* Gewaehlter Tag liegt ausserhalb des Wetterlage-Casts (alter Cache) */
+.bf-wetterlage-noday {
+  margin: 0;
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
 /* ── Day Tabs ────────────────────────────────────────────── */
 
 .bf-day-tabs {

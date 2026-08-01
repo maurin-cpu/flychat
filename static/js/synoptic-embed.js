@@ -1,11 +1,14 @@
 /* Synoptik-Embed fuer den Gleitcast (/briefing): kleine, NICHT-interaktive
  * Karte unter der Wetterlage-Gesamteinschaetzung — Druckbaender, Isobaren und
  * H/T-Badges ueber Europa (KEIN Wind, den gibt es nur auf der interaktiven
- * Karte /synoptik) fuer den Timestep, der dem
- * ANALYSEZEITPUNKT am naechsten liegt (`wetterlage.generated_at`), NICHT der
- * Uhrzeit des Betrachters. Die Karte belegt den Textblock darueber; ein
- * spaeterer Zeitschritt wuerde eine Lage zeigen, die der Text nie
- * beschrieben hat. Der Stand steht sichtbar in der Kopfzeile.
+ * Karte /synoptik).
+ *
+ * Gezeigter Timestep: 12:00 des im Briefing GEWAEHLTEN Tages — briefing.js
+ * meldet den Tag ueber window.WCSynopticEmbed.setDate(date). Karte und
+ * Wetterlage-Text darueber beschreiben damit denselben Tag. Solange kein
+ * Tag gemeldet wurde (oder ohne Day-Tabs), faellt die Wahl auf den Timestep
+ * am ANALYSEZEITPUNKT (`wetterlage.generated_at`) — den Stand, auf dem der
+ * Text beruht. Der gezeigte Stand steht sichtbar in der Kopfzeile.
  * Klick auf die Karte fuehrt zur grossen interaktiven Karte (/synoptik).
  *
  * Bewusst ein eigenstaendiges, schlankes Modul statt einer Wiederverwendung
@@ -212,6 +215,28 @@
     return best;
   }
 
+  // Timestep fuer den im Briefing gewaehlten Tag: 12:00 lokale Zeit — die
+  // klassische Mittagskarte. Exakter Treffer bevorzugt; fehlt er, der dem
+  // Mittag naechste Schritt DESSELBEN Tages; liegt der Tag ganz ausserhalb
+  // des Grids (Cache aelter als das Briefing), der insgesamt naechste
+  // Schritt zum gewuenschten Mittag. Ohne Datum: Analysezeitpunkt.
+  function timestepForDate(timesteps, dateStr, generatedAt) {
+    if (!dateStr) return analysisTimestep(timesteps, generatedAt);
+    var exact = dateStr + "T12:00";
+    if (timesteps.indexOf(exact) !== -1) return exact;
+    var ref = new Date(dateStr + "T12:00:00").getTime();
+    var sameDay = timesteps.filter(function (ts) {
+      return ts.slice(0, 10) === dateStr;
+    });
+    var pool = sameDay.length ? sameDay : timesteps;
+    var best = pool[0], bestD = Infinity;
+    pool.forEach(function (ts) {
+      var d = Math.abs(new Date(ts) - ref);
+      if (d < bestD) { bestD = d; best = ts; }
+    });
+    return best;
+  }
+
   function fmtTs(ts) {
     var loc = window.WC_LANG === "en" ? "en-GB" : "de-CH";
     var d = new Date(ts.slice(0, 10) + "T12:00:00");
@@ -395,21 +420,58 @@
     // Hier traegt der Ausschnitt Druckverteilung und Zentren — bewegte Pfeile
     // waeren auf dem kleinen, statischen Bild nur Unruhe.
 
-    // Bei Layout-Wechseln (Breakpoint) Karte neu einpassen
-    window.addEventListener("resize", function () {
-      map.invalidateSize();
-      fitEurope(map, allCenters);
-    });
-
     return map;
   }
 
-  // ===== Boot ==============================================================
+  // ===== Boot / Tages-Steuerung ============================================
+  // briefing.js meldet den gewaehlten Tag ueber WCSynopticEmbed.setDate().
+  // Grid-Fetch und Briefing-Fetch laufen parallel — wer zuerst fertig ist,
+  // spielt keine Rolle: setDate merkt sich das Datum, show() rendert erst,
+  // wenn das Grid da ist.
+
+  var _card = null, _mapEl = null;
+  var _grid = null, _generatedAt = null;
+  var _map = null;
+  var _date = null;      // gewuenschter Briefing-Tag ("YYYY-MM-DD") oder null
+  var _shownTs = null;   // aktuell gerenderter Timestep (Re-Render vermeiden)
+
+  function show() {
+    if (!_grid || !_card || !_mapEl) return;
+    var ts = timestepForDate(_grid.timesteps, _date, _generatedAt);
+    if (ts === _shownTs) return;
+    // Leaflet-Karte vollstaendig ersetzen: die Kontur-Pipeline haengt am
+    // Timestep, ein Layer-Austausch spart nichts Spuerbares bei 1x/Tag-Daten.
+    if (_map) { _map.remove(); _map = null; }
+    _mapEl.innerHTML = "";
+    // Karte erst sichtbar machen (Leaflet braucht reale Groesse), dann rendern
+    _card.hidden = false;
+    var desc = document.getElementById("bfSynopticSub");
+    if (desc) desc.textContent = "· " + wcT("js.syn.embed_sub");
+    var sub = document.getElementById("bfSynopticTs");
+    if (sub) sub.textContent = "· " + wcT("js.syn.embed_asof") + " " + fmtTs(ts);
+    _map = render(_mapEl, _grid, ts);
+    _shownTs = ts;
+  }
+
+  window.WCSynopticEmbed = {
+    setDate: function (dateStr) {
+      _date = dateStr || null;
+      show();
+    },
+  };
 
   document.addEventListener("DOMContentLoaded", function () {
-    var card = document.getElementById("bfSynoptic");
-    var mapEl = document.getElementById("bfSynopticMap");
-    if (!card || !mapEl || typeof L === "undefined" || typeof d3 === "undefined") return;
+    _card = document.getElementById("bfSynoptic");
+    _mapEl = document.getElementById("bfSynopticMap");
+    if (!_card || !_mapEl || typeof L === "undefined" || typeof d3 === "undefined") return;
+
+    // Bei Layout-Wechseln (Breakpoint) Karte neu einpassen — EIN Listener,
+    // wirkt immer auf die aktuell gerenderte Karte.
+    window.addEventListener("resize", function () {
+      if (!_map) return;
+      _map.invalidateSize();
+      fitEurope(_map);
+    });
 
     fetch("/api/synoptic/grid")
       .then(function (r) {
@@ -419,15 +481,9 @@
       .then(function (data) {
         var grid = data && data.grid;
         if (!data.success || !grid || !grid.timesteps || !grid.timesteps.length) return;
-        var generatedAt = data.wetterlage && data.wetterlage.generated_at;
-        var ts = analysisTimestep(grid.timesteps, generatedAt);
-        // Karte erst sichtbar machen (Leaflet braucht reale Groesse), dann rendern
-        card.hidden = false;
-        var desc = document.getElementById("bfSynopticSub");
-        if (desc) desc.textContent = "· " + wcT("js.syn.embed_sub");
-        var sub = document.getElementById("bfSynopticTs");
-        if (sub) sub.textContent = "· " + wcT("js.syn.embed_asof") + " " + fmtTs(ts);
-        render(mapEl, grid, ts);
+        _grid = grid;
+        _generatedAt = data.wetterlage && data.wetterlage.generated_at;
+        show();
       })
       .catch(function (e) {
         // Kein User-facing Error: die Karte ist ein Zusatz, das Briefing

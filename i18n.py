@@ -765,6 +765,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.wetterlage.heading": {"de": "Wetterlage", "en": "Weather situation"},
     "js.wetterlage.less": {"de": "Weniger", "en": "Less"},
     "js.wetterlage.detail": {"de": "Detail", "en": "Detail"},
+    # Day-Tabs steuern die Wetterlage: alter Cache kann den gewaehlten Tag
+    # noch nicht abdecken -> ehrliche Leer-Zeile statt Text eines anderen Tags.
+    "js.wetterlage.no_day": {
+        "de": "Für diesen Tag liegt noch keine Wetterlage-Analyse vor.",
+        "en": "No weather-situation analysis available for this day yet.",
+    },
     "js.lage.Suedfoehnlage": {"de": "Suedfoehnlage", "en": "South foehn"},
     "js.lage.Nordfoehnlage": {"de": "Nordfoehnlage", "en": "North foehn"},
     "js.lage.Foehnlage (wechselnd)": {"de": "Foehnlage (wechselnd)", "en": "Foehn (variable)"},

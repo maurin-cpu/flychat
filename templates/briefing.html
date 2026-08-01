@@ -37,11 +37,16 @@
     </div>
   </header>
 
+  {# Tagesauswahl zuoberst: Wetterlage-Text und Synoptik-Karte darunter
+     zeigen den GEWAEHLTEN Tag — die Tabs steuern also die ganze Seite,
+     nicht nur die Spot-Listen. #}
+  <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="{{ t('briefing.day_tabs_aria') }}"></nav>
+
   <section class="bf-wetterlage" id="bfWetterlage" hidden></section>
 
-  <!-- Synoptik-Mini-Karte: nicht interaktiv, zeigt den Stand zum
-       Analysezeitpunkt (nicht "jetzt"). Klick fuehrt zur grossen Karte.
-       Wird von synoptic-embed.js befuellt und sichtbar geschaltet. -->
+  <!-- Synoptik-Mini-Karte: nicht interaktiv, zeigt den Timestep 12:00 des
+       gewaehlten Tages (briefing.js meldet den Tag an synoptic-embed.js).
+       Klick fuehrt zur grossen Karte. -->
   <section class="bf-synoptic" id="bfSynoptic" hidden>
     <div class="bf-synoptic-head">
       <svg class="bf-synoptic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18M3.6 9h16.8M3.6 15h16.8"/></svg>
@@ -57,8 +62,6 @@
       <a class="bf-synoptic-overlay" href="/synoptik" aria-label="{{ t('js.syn.embed_aria') }}"></a>
     </div>
   </section>
-
-  <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="{{ t('briefing.day_tabs_aria') }}"></nav>
 
   <section class="bf-filters" id="bfFilters">
     <div class="bf-filter-group bf-filter-group--region">
