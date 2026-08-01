@@ -1824,8 +1824,15 @@ def decide_wind_pattern_zones(weather_cache: dict, forecast_dates: list[str],
     Tages-Kennzahlen (wind_class, shares, Verteilungen) identisch zur
     Nord/Sued-Aggregation (_aggregate_wind_side, Kernstunden 10-17) —
     nur der Raumschnitt aendert sich auf die 4 Zonen. Zusaetzlich pro
-    Tagesfenster der Anteil windkritischer Spots, damit der Text
-    Wind-Zeitfenster benennen kann ("am Nachmittag frischt es auf").
+    Tagesfenster der Anteil windkritischer Spots UND die Boeenwerte (P90 +
+    Maximum), damit der Text Wind-Zeitfenster nicht nur benennen, sondern
+    beziffern kann ("am Nachmittag frischt es auf" vs. "abends Boeen um
+    90 km/h").
+
+    Zum Abendfenster: es faellt bewusst ausserhalb SYNOPTIC_WIND_HOURS und
+    damit ausserhalb von `wind_class`. Das ist kein Fehler — die Tagesklasse
+    bewertet den Flugtag, und der endet um 17 Uhr. Ein Abendereignis darf ihn
+    nicht umetikettieren; es ist eine eigene, zeitlich benannte Aussage.
     """
     windows = config.SYNOPTIC_DAY_WINDOWS
     per_day = []
@@ -1864,7 +1871,8 @@ def decide_wind_pattern_zones(weather_cache: dict, forecast_dates: list[str],
             for wname, _, _ in windows:
                 entries = win_entries[zone][wname]
                 if not entries:
-                    win_out[wname] = {"share_wind_crit": None}
+                    win_out[wname] = {"share_wind_crit": None,
+                                      "p90_gust_kmh": None, "max_gust_kmh": None}
                     continue
                 crit = sum(
                     1 for e in entries
@@ -1872,7 +1880,39 @@ def decide_wind_pattern_zones(weather_cache: dict, forecast_dates: list[str],
                         and e["aloft_max"] > config.WIND_DANGER_KMH)
                     or (e["gust_max"] is not None
                         and e["gust_max"] > config.GUST_DANGER_KMH))
-                win_out[wname] = {"share_wind_crit": round(crit / len(entries), 2)}
+                # Boeen- UND Flugbandwerte je Fenster. Der Anteil allein sagt,
+                # WIE VIELE Gebiete betroffen sind, nicht WIE STARK — bei der
+                # Boeenfront vom 30.07.2026 war genau die Zahl das Alarmierende
+                # (bis 100 km/h), und sie stand nirgends. P90 wie beim
+                # Niederschlag: das Maximum ueber viele Spots ist regelmaessig
+                # ein Einzelspot-Artefakt, P90 traegt das Bild.
+                gusts = [e["gust_max"] for e in entries
+                         if e["gust_max"] is not None]
+                alofts = [e["aloft_max"] for e in entries
+                          if e["aloft_max"] is not None]
+                p90_gust = round(_p90(gusts), 1) if gusts else None
+                p90_aloft = round(_p90(alofts), 1) if alofts else None
+                win_out[wname] = {
+                    "share_wind_crit": round(crit / len(entries), 2),
+                    "p90_gust_kmh": p90_gust,
+                    "max_gust_kmh": round(max(gusts), 1) if gusts else None,
+                    "p90_aloft_kmh": p90_aloft,
+                    "max_aloft_kmh": round(max(alofts), 1) if alofts else None,
+                    # Verhaeltnis Boden zu Hoehe — die Frage "rauscht der Wind
+                    # oben durch, oder kommt er unten an?". Fuer Piloten der
+                    # Unterschied zwischen fliegbar und nicht: 45 km/h im
+                    # Flugband bei ruhigem Boden ist ein anderer Tag als
+                    # dieselben 45 km/h, die bis zum Boden durchgreifen.
+                    #
+                    # BEWUSST NUR DIE ZAHL, KEIN LABEL: ein hoher Wert kann
+                    # auch aus lokaler Konvektion kommen (Boe ohne
+                    # Impulstransport von oben). Die Deutung gehoert in den
+                    # Text, nicht in eine Schwelle, die wir nie gemessen haben.
+                    # Boeen sind Spitzen, Flugbandwind ist ein Mittel — Werte
+                    # ueber 1.0 sind daher moeglich und kein Fehler.
+                    "bodenkopplung": (round(p90_gust / p90_aloft, 2)
+                                      if p90_gust and p90_aloft else None),
+                }
             agg["windows"] = win_out
             zones_out[zone] = agg
 

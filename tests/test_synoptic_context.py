@@ -723,6 +723,120 @@ class TestAggregateWindSide(unittest.TestCase):
         self.assertIsNone(out["wind_class"])
 
 
+class TestWindFensterBoeenwerte(unittest.TestCase):
+    """Boeenwerte je Tagesfenster (Boeenfront 30.07.2026).
+
+    Der Anteil allein sagt, WIE VIELE Gebiete betroffen sind, nicht WIE STARK.
+    Genau die Zahl war das Alarmierende und stand nirgends.
+    """
+
+    def _cache(self, date, gusts_by_hour, n_spots=3, aloft_by_hour=None):
+        """n Spots mit identischem Tagesgang. aloft_by_hour optional.
+
+        Flugband = Spot-Hoehe +200..+2000 m, hier 1700-3500 m; das
+        Geopotenzial im Testdatensatz liegt bewusst mittendrin.
+        """
+        def _pld(h, v):
+            return {"geopotential_height_700hPa": 3000.0,
+                    "wind_speed_700hPa": v}
+
+        return {f"spot_{i}": {
+            "elevation_m": 1500,
+            "pressure_level_data": (
+                {f"{date}T{h:02d}:00": _pld(h, v)
+                 for h, v in (aloft_by_hour or {}).items()}),
+            "hourly_data": {f"{date}T{h:02d}:00": {"wind_gusts_10m": g}
+                            for h, g in gusts_by_hour.items()},
+        } for i in range(n_spots)}
+
+    def _zone_map(self, n_spots=3):
+        return {f"spot_{i}": "alpennordhang" for i in range(n_spots)}
+
+    def test_abendboeen_sind_beziffert(self):
+        date = "2026-07-30"
+        # Nachmittag ruhig, Abend heftig — die Boeenfront-Signatur.
+        cache = self._cache(date, {10: 12, 13: 15, 16: 14, 19: 88, 20: 75})
+        out = sc.decide_wind_pattern_zones(cache, [date], self._zone_map())
+        zone = out["per_day"][0]["zones"]["alpennordhang"]
+        abend = zone["windows"]["evening"]
+        self.assertEqual(abend["max_gust_kmh"], 88)
+        self.assertEqual(abend["p90_gust_kmh"], 88)
+        self.assertEqual(abend["share_wind_crit"], 1.0)
+        # Der Flugtag bleibt unbewertet vom Abend — wind_class kennt nur 10-17.
+        self.assertEqual(zone["wind_class"], "unauffaellig")
+        self.assertLessEqual(zone["windows"]["afternoon"]["max_gust_kmh"], 20)
+
+    def test_ruhiger_abend_bleibt_klein(self):
+        date = "2026-07-31"
+        cache = self._cache(date, {10: 10, 13: 14, 16: 12, 19: 9, 20: 6})
+        out = sc.decide_wind_pattern_zones(cache, [date], self._zone_map())
+        abend = out["per_day"][0]["zones"]["alpennordhang"]["windows"]["evening"]
+        self.assertEqual(abend["share_wind_crit"], 0.0)
+        self.assertEqual(abend["max_gust_kmh"], 9)
+
+    def test_fenster_ohne_daten_liefert_none_statt_zu_fehlen(self):
+        """Archivtage enden teils vor 18 Uhr — Schluessel muessen trotzdem da
+        sein, sonst bricht die Payload-Weitergabe je nach Tag weg."""
+        date = "2026-07-30"
+        cache = self._cache(date, {10: 30, 13: 35, 16: 33})
+        out = sc.decide_wind_pattern_zones(cache, [date], self._zone_map())
+        abend = out["per_day"][0]["zones"]["alpennordhang"]["windows"]["evening"]
+        self.assertIn("max_gust_kmh", abend)
+        self.assertIsNone(abend["max_gust_kmh"])
+        self.assertIsNone(abend["share_wind_crit"])
+
+    def test_p90_daempft_einzelspot_ausreisser(self):
+        """Ein einzelner Extremspot darf das Bild nicht tragen — dieselbe
+        Lehre wie beim Niederschlag (25.07.2026, Gletscher-Spot)."""
+        date = "2026-07-30"
+        cache = self._cache(date, {19: 20}, n_spots=10)
+        cache["spot_0"]["hourly_data"][f"{date}T19:00"] = {"wind_gusts_10m": 150}
+        out = sc.decide_wind_pattern_zones(cache, [date], self._zone_map(10))
+        abend = out["per_day"][0]["zones"]["alpennordhang"]["windows"]["evening"]
+        self.assertEqual(abend["max_gust_kmh"], 150)
+        self.assertEqual(abend["p90_gust_kmh"], 20,
+                         "P90 darf dem Einzelausreisser nicht folgen")
+
+
+class TestBodenkopplung(unittest.TestCase):
+    """"Rauscht der Wind oben durch, oder kommt er unten an?"
+
+    Beide Zahlen rechnen wir laengst, sie standen nur nie nebeneinander. Fuer
+    Piloten ist das der Unterschied zwischen fliegbar und nicht: 45 km/h im
+    Flugband bei ruhigem Boden ist ein anderer Tag als dieselben 45 km/h, die
+    bis zum Boden durchgreifen.
+    """
+
+    def _run(self, gusts, alofts, date="2026-07-30"):
+        cache = TestWindFensterBoeenwerte._cache(
+            self, date, gusts, aloft_by_hour=alofts)
+        zmap = TestWindFensterBoeenwerte._zone_map(self)
+        out = sc.decide_wind_pattern_zones(cache, [date], zmap)
+        return out["per_day"][0]["zones"]["alpennordhang"]["windows"]
+
+    def test_hoehenwind_bleibt_oben(self):
+        # Kraeftig im Flugband, am Boden ruhig — klassische Entkopplung.
+        w = self._run({14: 12, 16: 10}, {14: 60, 16: 58})["afternoon"]
+        self.assertEqual(w["p90_aloft_kmh"], 60)
+        self.assertEqual(w["p90_gust_kmh"], 12)
+        self.assertEqual(w["bodenkopplung"], 0.2)
+
+    def test_hoehenwind_greift_durch(self):
+        # Derselbe Hoehenwind, aber er kommt unten an.
+        w = self._run({14: 55, 16: 52}, {14: 60, 16: 58})["afternoon"]
+        self.assertEqual(w["p90_aloft_kmh"], 60)
+        self.assertEqual(w["p90_gust_kmh"], 55)
+        self.assertGreater(w["bodenkopplung"], 0.8)
+
+    def test_ohne_hoehenwind_keine_kopplungszahl(self):
+        """Ohne Flugbandwert waere das Verhaeltnis eine Division durch nichts —
+        dann lieber gar keine Zahl als eine erfundene."""
+        w = self._run({14: 40, 16: 38}, {})["afternoon"]
+        self.assertIsNone(w["p90_aloft_kmh"])
+        self.assertIsNone(w["bodenkopplung"])
+        self.assertEqual(w["p90_gust_kmh"], 40)
+
+
 # ============================================================================
 # SYNOPTIK 2.0 — FLUGWETTER-ZONEN, TAGESFENSTER, ZUGBAHN
 # ============================================================================
