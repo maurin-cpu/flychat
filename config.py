@@ -1245,10 +1245,10 @@ globals()[f"{ANALYSIS_PROVIDER.upper()}_ANALYSIS_MODEL"] = ANALYSIS_MODEL
 
 # SYNOPTIC_MODEL — separates Modell fuer den Wetterlage-Block (1x/Tag Call).
 # Default = ANALYSIS_MODEL (Rueckwaerts-kompatibel). Ueber ENV `SYNOPTIC_MODEL`
-# oder Admin-UI separat ueberschreibbar (z.B. deepseek-v4-flash mit Reasoning,
+# oder Admin-UI separat ueberschreibbar (z.B. deepseek-v4-flash,
 # waehrend ANALYSIS_MODEL fuer die Massen-Spot-Analyse auf deepseek-chat bleibt).
-# Hinweis: DEEPSEEK_DISABLE_THINKING (unten) gilt bewusst NICHT fuer diesen Call —
-# 1 Call/Tag, Kosten irrelevant, Reasoning hier erwuenscht.
+# Hinweis: der Thinking-Modus fuer diesen Call haengt an SYNOPTIC_THINKING
+# (unten), NICHT an DEEPSEEK_DISABLE_THINKING.
 _synoptic_override = os.environ.get("SYNOPTIC_MODEL", "").strip()
 if _synoptic_override and _synoptic_override in MODEL_PROVIDER_MAP:
     SYNOPTIC_MODEL    = _synoptic_override
@@ -1330,6 +1330,26 @@ if OPENAI_ANALYSIS_MODE == "batch" and ANALYSIS_PROVIDER != "openai":
 # Dafuer: ~785 statt ~2750 Output-Tokens/Call, 3.9x schneller, ~36% guenstiger.
 # Auf "0" setzen, um Thinking wieder einzuschalten (z.B. fuer Vergleichslaeufe).
 DEEPSEEK_DISABLE_THINKING = os.environ.get("DEEPSEEK_DISABLE_THINKING", "1") == "1"
+
+# SYNOPTIC_THINKING — Thinking-Modus fuer den Wetterlage-Call (1x/Tag,
+# engine/synoptic_llm.py). Eigener Schalter, weil der Call NICHT an
+# DEEPSEEK_DISABLE_THINKING haengt (das gilt nur fuer die Massen-Analyse).
+#
+# Default AUS (Messung 01.08.2026, echter Prod-Call gegen synoptic_context):
+#   - thinking AN:  message.content in 8/8 Laeufen LEER (Antwort landet in
+#     message.reasoning_content, finish_reason=stop) -> Scheduler-Ausfall
+#     06:22 am 01.08.; 1/8 Laeufe lief ins Endlos-Reasoning (12k Tokens,
+#     gar keine Antwort). Treiber ist die Ausgabemenge (4 Zonen x 3 Tage),
+#     nicht die Prompt-Groesse: reduziert auf 1 Zone/1 Tag fuellt content.
+#   - thinking AUS: content gefuellt 3/3, valides JSON, ~810-910 out_tok.
+#   - Qualitaets-A/B (3 Laeufe je Modus, _validate()-Treffer): AN = 6/1/0,
+#     AUS = 1/0/1 — kein Qualitaetsvorteil durch Reasoning; plausibel, weil
+#     der Payload nur fertig klassifizierte Felder enthaelt, keine Rohzahlen.
+# Auf "1" setzen, um Thinking wieder zu aktivieren (erst sinnvoll, wenn der
+# Payload Rohdaten/Zeitachse enthaelt — siehe docs/pläne). Der
+# reasoning_content-Fallback in synoptic_llm._call_llm() faengt den
+# Leer-content-Fall dann ab.
+SYNOPTIC_THINKING = os.environ.get("SYNOPTIC_THINKING", "0") == "1"
 
 # Anzahl paralleler LLM-Calls im "parallel"-Modus.
 # OpenAI gpt-4o-mini erlaubt bis 500 RPM (Tier 1). Default 10 ist konservativ.

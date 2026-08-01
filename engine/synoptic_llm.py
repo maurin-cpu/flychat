@@ -31,7 +31,7 @@ from typing import Optional
 
 import config
 import prompts
-from engine._common import _weekday_de, _WOCHENTAGE
+from engine._common import _weekday_de, _WOCHENTAGE, deepseek_thinking_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +234,30 @@ def generate_synoptic_overview(synoptic_context: dict, analysis_client,
 # INTERNAL: LLM-Call + Korrektur-Nachricht
 # ============================================================================
 
+def _extract_json_object(text: str) -> Optional[str]:
+    """Findet das LETZTE vollstaendige JSON-Objekt in einem Freitext.
+
+    Fuer den reasoning_content-Fallback: der Reasoning-Kanal kann mehrere
+    Entwuerfe enthalten — der letzte ist die finale Antwort.
+    """
+    if not isinstance(text, str):
+        return None
+    decoder = json.JSONDecoder()
+    found = None
+    i = text.find("{")
+    while i != -1:
+        try:
+            obj, end = decoder.raw_decode(text, i)
+            if isinstance(obj, dict):
+                found = text[i:end]
+                i = text.find("{", end)
+                continue
+        except ValueError:
+            pass
+        i = text.find("{", i + 1)
+    return found
+
+
 def _call_llm(analysis_client, analysis_model: str,
               messages: list) -> Optional[str]:
     """Ein LLM-Versuch. Liefert den rohen Antwort-String oder None."""
@@ -242,16 +266,36 @@ def _call_llm(analysis_client, analysis_model: str,
             model=analysis_model,
             messages=messages,
             temperature=0.4,
-            # v4-flash laeuft im Thinking-Mode — Reasoning-Tokens VOR der
-            # Antwort. Plus 5-Tage-Output (lead + days mit flight_hint)
-            # sprengt 4000. Bei Truncation kommt finish_reason=length
-            # und das JSON ist mittendrin abgeschnitten.
+            # 12000 statt 4000: Headroom fuer den Fall, dass Thinking
+            # (SYNOPTIC_THINKING) reaktiviert wird — Reasoning-Tokens kommen
+            # VOR der Antwort. Ungenutztes Budget kostet nichts. Bei
+            # Truncation kommt finish_reason=length und das JSON ist
+            # mittendrin abgeschnitten.
             max_tokens=12000,
             response_format={"type": "json_object"},
+            # Thinking-Modus haengt am eigenen Schalter SYNOPTIC_THINKING
+            # (Default aus — Ausfall 01.08.2026: v4-flash schreibt bei dieser
+            # Output-Menge die Antwort in reasoning_content und laesst
+            # content leer; Messzahlen in config.py bei SYNOPTIC_THINKING).
+            **deepseek_thinking_kwargs(
+                getattr(config, "SYNOPTIC_PROVIDER", ""), analysis_model,
+                thinking_enabled=getattr(config, "SYNOPTIC_THINKING", False)),
         )
         finish = getattr(response.choices[0], "finish_reason", None)
-        raw = response.choices[0].message.content
+        message = response.choices[0].message
+        raw = message.content
         if not raw:
+            # Thinking-Modus-Falle: v4-flash liefert die komplette Antwort
+            # in reasoning_content und laesst content leer (finish=stop).
+            # Ohne diesen Fallback scheitert der Thinking-Modus STILL.
+            reasoning = getattr(message, "reasoning_content", None)
+            salvaged = _extract_json_object(reasoning) if reasoning else None
+            if salvaged:
+                logger.warning(
+                    "_call_llm: content leer (finish_reason=%s) — JSON aus "
+                    "reasoning_content uebernommen (%d Zeichen Reasoning)",
+                    finish, len(reasoning))
+                return salvaged
             logger.warning("_call_llm: leerer LLM-Output (finish_reason=%s)", finish)
             return None
         if finish == "length":

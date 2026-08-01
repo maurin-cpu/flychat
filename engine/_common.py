@@ -401,24 +401,31 @@ def _resolve_max_tokens(model: str, base: int) -> int:
 _THINKING_DEFAULT_ON_PATTERNS = ("v4-flash", "v4-pro")
 
 
-def deepseek_thinking_kwargs(provider: str, model: str) -> dict:
+def deepseek_thinking_kwargs(provider: str, model: str,
+                             thinking_enabled: bool | None = None) -> dict:
     """Extra-kwargs fuer chat.completions.create(), die DeepSeeks Thinking-Modus
     abschalten. Leeres Dict, wenn nicht anwendbar (anderer Provider/Modell) oder
     per Config wieder eingeschaltet.
 
-    Bewusst NICHT global im llm_client, sondern per Call-Site: der Synoptik-Call
-    (1x/Tag) soll sein Reasoning behalten.
+    thinking_enabled — explizite Vorgabe der Call-Site (z.B.
+    config.SYNOPTIC_THINKING fuer den Wetterlage-Call). None = Default der
+    Massen-Analyse (config.DEEPSEEK_DISABLE_THINKING).
+
+    Bewusst NICHT global im llm_client, sondern per Call-Site: jeder Call
+    entscheidet ueber seinen eigenen Config-Schalter.
     """
     if (provider or "").lower() != "deepseek":
         return {}
     m = str(model or "").lower()
     if not any(p in m for p in _THINKING_DEFAULT_ON_PATTERNS):
         return {}
-    try:
-        import config  # late import to avoid circular
-        if not getattr(config, "DEEPSEEK_DISABLE_THINKING", True):
-            return {}
-    except Exception:
+    if thinking_enabled is None:
+        try:
+            import config  # late import to avoid circular
+            thinking_enabled = not getattr(config, "DEEPSEEK_DISABLE_THINKING", True)
+        except Exception:
+            thinking_enabled = True
+    if thinking_enabled:
         return {}
     return {"extra_body": {"thinking": {"type": "disabled"}}}
 

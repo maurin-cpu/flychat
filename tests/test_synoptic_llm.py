@@ -513,6 +513,118 @@ class TestBuildLlmPayload(unittest.TestCase):
         self.assertIn("Hochdruck", payload)
 
 
+class _FakeMessage:
+    def __init__(self, content, reasoning_content=None):
+        self.content = content
+        if reasoning_content is not None:
+            self.reasoning_content = reasoning_content
+
+
+class _FakeChoice:
+    def __init__(self, message, finish_reason="stop"):
+        self.message = message
+        self.finish_reason = finish_reason
+
+
+class _FakeResponse:
+    def __init__(self, content, reasoning_content=None, finish_reason="stop"):
+        self.choices = [_FakeChoice(_FakeMessage(content, reasoning_content),
+                                    finish_reason)]
+
+
+class _FakeClient:
+    """Faengt die create()-kwargs ab und liefert eine vorgegebene Response."""
+    def __init__(self, response):
+        self.captured_kwargs = None
+        outer = self
+
+        class _Completions:
+            def create(self, **kwargs):
+                outer.captured_kwargs = kwargs
+                return response
+
+        class _Chat:
+            completions = _Completions()
+
+        self.chat = _Chat()
+
+
+class TestCallLlm(unittest.TestCase):
+    """Thinking-Schalter + reasoning_content-Fallback (Ausfall 01.08.2026:
+    v4-flash schrieb die Antwort in reasoning_content, content blieb leer)."""
+
+    def _with_synoptic_config(self, provider, thinking):
+        self._old = (getattr(config, "SYNOPTIC_PROVIDER", None),
+                     getattr(config, "SYNOPTIC_THINKING", None))
+        config.SYNOPTIC_PROVIDER = provider
+        config.SYNOPTIC_THINKING = thinking
+
+    def _restore(self):
+        config.SYNOPTIC_PROVIDER, config.SYNOPTIC_THINKING = self._old
+
+    def test_empty_content_uses_json_from_reasoning(self):
+        answer = '{"lead": "Stabil.", "zones": []}'
+        reasoning = ("Ich pruefe die Zonen... Entwurf: {\"lead\": \"alt\"} "
+                     "verworfen. Finale Antwort:\n" + answer)
+        client = _FakeClient(_FakeResponse(content="",
+                                           reasoning_content=reasoning))
+        self._with_synoptic_config("deepseek", True)
+        try:
+            raw = sl._call_llm(client, "deepseek-v4-flash", [])
+        finally:
+            self._restore()
+        self.assertEqual(raw, answer)  # das LETZTE Objekt, nicht der Entwurf
+
+    def test_empty_content_without_reasoning_returns_none(self):
+        client = _FakeClient(_FakeResponse(content=""))
+        self._with_synoptic_config("deepseek", True)
+        try:
+            raw = sl._call_llm(client, "deepseek-v4-flash", [])
+        finally:
+            self._restore()
+        self.assertIsNone(raw)
+
+    def test_thinking_off_sends_disable_kwargs(self):
+        client = _FakeClient(_FakeResponse(content='{"lead": "x"}'))
+        self._with_synoptic_config("deepseek", False)
+        try:
+            sl._call_llm(client, "deepseek-v4-flash", [])
+        finally:
+            self._restore()
+        self.assertEqual(
+            client.captured_kwargs.get("extra_body"),
+            {"thinking": {"type": "disabled"}})
+
+    def test_thinking_on_sends_no_disable_kwargs(self):
+        client = _FakeClient(_FakeResponse(content='{"lead": "x"}'))
+        self._with_synoptic_config("deepseek", True)
+        try:
+            sl._call_llm(client, "deepseek-v4-flash", [])
+        finally:
+            self._restore()
+        self.assertNotIn("extra_body", client.captured_kwargs)
+
+    def test_non_deepseek_provider_untouched(self):
+        client = _FakeClient(_FakeResponse(content='{"lead": "x"}'))
+        self._with_synoptic_config("openai", False)
+        try:
+            sl._call_llm(client, "gpt-4o-mini", [])
+        finally:
+            self._restore()
+        self.assertNotIn("extra_body", client.captured_kwargs)
+
+
+class TestExtractJsonObject(unittest.TestCase):
+    def test_last_complete_object_wins(self):
+        text = 'Draft {"a": 1} then prose... final {"b": {"c": 2}} done.'
+        self.assertEqual(sl._extract_json_object(text), '{"b": {"c": 2}}')
+
+    def test_no_object_returns_none(self):
+        self.assertIsNone(sl._extract_json_object("nur Prosa, kein JSON"))
+        self.assertIsNone(sl._extract_json_object("kaputt {\"a\": "))
+        self.assertIsNone(sl._extract_json_object(None))
+
+
 class TestLabelVariants(unittest.TestCase):
     def test_simple_label(self):
         v = sl._label_variants("Schottland")
@@ -558,7 +670,13 @@ def _zone_ctx(date="2026-05-17"):
                     "share_wind_warn": 0.9, "wind_driver": "beide",
                     "median_aloft_kmh": 36.1, "max_aloft_kmh": 60.0,
                     "aloft_over_kmh": {"30": 0.6},
-                    "windows": {"morning": {"share_wind_crit": 0.91}}}
+                    "windows": {
+                        "morning": {"share_wind_crit": 0.91,
+                                    "p90_gust_kmh": 41.0,
+                                    "max_gust_kmh": 48.2},
+                        "evening": {"share_wind_crit": 0.95,
+                                    "p90_gust_kmh": 88.6,
+                                    "max_gust_kmh": 97.4}}}
                 for z in config.SYNOPTIC_ZONES}}],
             "thresholds": {"wind_danger_kmh": 30},
         },
@@ -590,6 +708,11 @@ class TestPayloadZones(unittest.TestCase):
         # Wind pro Zone inkl. autoritativem Label
         self.assertIn("wind_class", payload)
         self.assertIn("verblasen", payload)
+        # Boeenwerte je Fenster muessen beziffert durchkommen — der blosse
+        # Anteil sagt nicht, WIE STARK es blaest (Boeenfront 30.07.2026).
+        self.assertIn("evening", payload)
+        self.assertIn("97.4", payload)
+        self.assertIn("88.6", payload)
         # Zugbahn
         self.assertIn("west_nach_ost", payload)
         # Konkrete Werte kommen durch
