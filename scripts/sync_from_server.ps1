@@ -40,6 +40,13 @@ $FROM_DISK = @(
   "data/config_overrides.json",
   "data/spot_analyses_en.json",
   "data/region_analyses_en.json",
+  # Wetterlage-Block und /synoptik-Druckkarte. Beide schreibt der Server
+  # taeglich neu; synoptic_grid.json ist gitignored und kam frueher gar nicht
+  # mit, synoptic_context.json nur ueber git und damit verspaetet. Fehlen sie
+  # oder sind sie aelter als das Vorhersagefenster, verschwindet der ganze
+  # Synoptik-Teil lokal wortlos.
+  "data/synoptic_context.json",
+  "data/synoptic_grid.json",
   "data/wetterdaten.json"          # gross (~200 MB) -> zuletzt
 )
 # getrackte Analyse-Dateien: vor git pull lokale Aenderungen verwerfen, damit
