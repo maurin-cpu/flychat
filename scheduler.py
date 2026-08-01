@@ -308,8 +308,9 @@ def _run_snapshot() -> bool:
     """Friert den heutigen Forecast in data/weather_archive/YYYY-MM-DD.json ein.
 
     Failure-tolerant: Exception wird geloggt, nicht propagiert. Snapshot ist
-    read-only auf wetterdaten.json + spot_analyses.json + region_analyses.json,
-    laeuft am Ende des Daily-Runs und beeinflusst Briefings nicht.
+    read-only auf wetterdaten.json + die aktuelle Analyse-Datei (deutsch oder
+    englisch, siehe snapshot_weather), laeuft am Ende des Daily-Runs und
+    beeinflusst Briefings nicht.
     """
     try:
         from scripts.snapshot_weather import build_snapshots, write_snapshots
@@ -319,6 +320,17 @@ def _run_snapshot() -> bool:
                            "(heute nicht im Forecast-Fenster?)")
             return False
         written = write_snapshots(snapshots)
+        # Ein Snapshot ohne Bewertungen ist der teure Fall: er sieht aus wie ein
+        # normaler Archivtag, ist aber nie validierbar (Juli 2026: ein Monat
+        # Historie still verloren). Darum als ERROR, nicht als Debug-Zeile.
+        for day, snap in snapshots.items():
+            m = snap.get("_meta", {})
+            if not m.get("spots_with_analysis"):
+                logger.error("Daily run: Snapshot %s enthaelt 0 Bewertungen "
+                             "(Quelle=%s) — Tag ist nicht validierbar. Laeuft "
+                             "die LLM-Analyse, und schreibt sie in die Datei, "
+                             "die der Snapshot liest?",
+                             day, m.get("spot_analysis_source") or "keine")
         logger.info("Daily run: Snapshot OK (%d Datei(en) geschrieben)", written)
         return True
     except Exception as e:

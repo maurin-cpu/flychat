@@ -92,6 +92,49 @@ python scripts/generate_sector_audit.py
 
 → nach jedem `observations.csv`-Append neu erzeugen. Schema siehe `SCHEMA.md`.
 
+### 5. `spot_aliases.csv` — Namens-Auflösung und Region-Ebene (ab 2026-07-30)
+
+XContest benennt Startplätze anders als unsere DB, schneidet lange Namen ab
+(`Luegibrue...`) und kennt Plätze, die wir gar nicht führen. Bis dahin landete
+das alles undifferenziert als `coverage_gap` — **40 % aller observations-Zeilen**.
+
+`scripts/build_spot_aliases.py` trennt die Ursachen und erzeugt die persistente
+Alias-Tabelle (ersetzt das gewachsene `MAPPING`-Dict in `xc_aggregate.py` nicht,
+sondern ergänzt es — das kuratierte Dict hat Vorrang):
+
+```bash
+PYTHONUTF8=1 python scripts/build_spot_aliases.py
+```
+
+Auflösungs-Kaskade pro Name — exakt, dann Prefix (für abgeschnittene Namen),
+dann Teilstring, jeweils gegen:
+
+1. `data/fluggebiete_pge.csv` (494) → `status=resolved_spot`, **spot-validierbar**
+2. `data/fluggebiete_dhv.backup_pre_pge.csv` (487, Alt-DB mit Koordinaten)
+3. `data/osm_peaks_{major,minor}.geojson` (20 412 benannte Gipfel)
+
+Quelle 2 und 3 liefern keinen DB-Spot, aber eine **Koordinate** — und daraus per
+Punkt-in-Polygon gegen `data/regionen_polygone_mapped.geojson` die Analyse-Region
+(`status=region_only`). Solche Flüge sind auf Region-Ebene validierbar, auch wenn
+der Spot fehlt.
+
+`confidence`: `high` = exakter Treffer in einer Startplatz-DB, `medium` =
+über Prefix/Teilstring erschlossen, `low` = nur über OSM-Gipfelnamen, mehrdeutig,
+oder >15 km vom nächsten bekannten Startplatz (`status=suspect_match`).
+**`low` ist eine Review-Queue, kein Ergebnis** — gleichnamige Gipfel gibt es in
+der Schweiz mehrfach (z. B. `Walalp` → Walalpgrat FR statt Stoos).
+
+> Für Region-Aussagen ist `analyse_region` aus `weather_archive` massgeblich,
+> **nicht** die `region`-Spalte der PGE-CSV — die trägt die DHV-Gebietsbezeichnung
+> ("Schwyz", "Berneroberland") und ist eine andere Taxonomie. Die Polygone decken
+> sich mit `analyse_region`; irreführend sind nur die Regions*namen*
+> (vgl. `docs/pläne/PLAN_regionen_umbenennung.md`).
+
+`xc_aggregate.py` liest die Tabelle automatisch (`load_aliases()`): aufgelöste
+Spots werden gejoint (`how=alias`), Region-only-Namen bekommen die `region`-Spalte
+gefüllt und behalten `finding_type=coverage_gap` mit Hinweis in `notes`.
+Digest zeigt `alias=` und `gap=… (davon region_only=…)`.
+
 ## Was wir in `PATTERNS.md` akkumulieren
 
 Wiederkehrende Issues über mehrere Tage — pro Issue:
@@ -191,6 +234,7 @@ TSV als Provenance erhalten. Lehre: `snapshot_weather.py` täglich sicherstellen
 - `YYYY-MM-DD.md` — eine Datei pro analysiertem XContest-Tag (manuell/kuratiert)
 - `observations.csv` — strukturierte Daten, append-only
 - `sector_audit.csv` — abgeleitet, überschrieben (`scripts/generate_sector_audit.py`)
+- `spot_aliases.csv` — abgeleitet, überschrieben (`scripts/build_spot_aliases.py`)
 - `PATTERNS.md` — akkumulierter Issue-Tracker (manuell)
 - `_raw/YYYY-MM-DD.tsv` — kompakte Rohdaten pro Tag (`launch⇥km⇥start⇥airtime⇥pilot`), Provenance
 - `_raw/_obs_YYYY-MM-DD.csv` — vom Aggregator erzeugte Kandidaten-Zeilen (vor Append in observations.csv)

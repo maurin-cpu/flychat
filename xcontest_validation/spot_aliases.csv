@@ -1,0 +1,374 @@
+xc_name,obs_rows,obs_launches,obs_best_km,truncated,status,confidence,match_source,match_how,n_candidates,db_name,all_candidates,lat,lon,nearest_site,nearest_site_km,nearest_site_region,region_pip,region_recorded,region_verdict
+Gornergrat,20,33,129.81,no,region_only,medium,osm_peak,exact,1,Gornergrat,Gornergrat,45.98360,7.78434,Riffelberg-2700,1.9,Mattertal / Saastal,Mattertal / Saastal,,new
+Winteregg,13,17,127.33,no,region_only,medium,osm_peak,exact,1,Winteregg,Winteregg,46.76571,7.67887,Falkenflue,7.2,,Berner Oberland,,new
+Pizol,10,0,231.23,no,resolved_spot,medium,pge,contains,1,Wangs -Pizolbahn Endstation,Wangs -Pizolbahn Endstation,46.98210,9.41763,Wangs -Pizolbahn Endstation,0.0,Ostschweiz,Ostschweiz,,new
+Brunni,9,0,154.66,no,resolved_spot,medium,pge,contains,1,Engelberg - Brunni - Schonegg,Engelberg - Brunni - Schonegg,46.83820,8.41241,Engelberg - Brunni - Schonegg,0.0,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Caquerelle,9,24,107.85,no,unresolved,,,,0,,,,,,,,,,no_coords
+Gnipen,9,14,82.92,no,region_only,medium,osm_peak,exact,1,Gnipen,Gnipen,47.08167,8.56322,Wildspitz,1.1,Mittelland Zentral,Mittelland Zentral,,new
+Moléson,9,18,146.18,no,ambiguous_variant,low,pge,contains,2,Le Moléson-2000 NW,Le Moléson-2000 NW | Le Moléson-2000 SW,46.54870,7.01684,Le Moléson-2000 NW,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Schildgrat,9,9,85.87,no,unresolved,,,,0,,,,,,,,,,no_coords
+Luegibrue...,8,19,14.16,yes,region_only,medium,dhv_alt,prefix,1,Luegibrüggli,Luegibrüggli,46.69100,7.81040,Luegibrüggli,0.0,,Berner Voralpen,,new
+Niederwil,8,3,190.37,no,unresolved,,,,0,,,,,,,,,,no_coords
+Planachaux,8,16,230.79,no,ambiguous,low,dhv_alt,prefix,4,Planachaux 1,Planachaux 1 | Planachaux 2 | Planachaux 3 | Planachaux 4,46.17673,6.84031,Planachaux 1,0.0,,Waadtlaender Alpen,Champéry,CONFLICT
+Torgon,8,12,136.63,no,unresolved,,,,0,,,,,,,,,,no_coords
+Tritt,8,8,94.82,no,region_only,high,dhv_alt,exact,1,Tritt,Tritt,47.00280,8.79690,Tritt,0.0,,Zentralschweizer Voralpen,,new
+Verbier,8,0,160.09,no,ambiguous,low,pge,prefix,2,Verbier - Ruinettes _ Fontanets_Attelas,Verbier - Ruinettes _ Fontanets_Attelas | Verbier - Croix de Coeur_Savolyeres,46.09040,7.25185,Verbier - Ruinettes _ Fontanets_Attelas,0.0,Unterwallis,Unterwallis,,new
+Le Cernil,7,32,71.92,no,unresolved,,,,0,,,,,,,,,,no_coords
+Raimeux,7,10,165.21,no,resolved_spot,medium,pge,contains,1,Mont Raimeux,Mont Raimeux,47.29960,7.42674,Mont Raimeux,0.0,Jura Zentral,Jura Zentral,,new
+Ruogig,7,9,186.82,no,region_only,high,dhv_alt,exact,1,Ruogig,Ruogig,46.90604,8.69051,Ruogig,0.0,,Zentralschweizer Voralpen,,new
+Walalp,7,22,88.79,no,region_only,low,osm_peak,prefix,1,Walalpgrat,Walalpgrat,46.70163,7.52619,Stockhorn 2,1.3,,Freiburger Voralpen,ZS Voralpen Stoos?,CONFLICT
+Alp Nagens,6,6,137.82,no,unresolved,,,,0,,,,,,,,,,no_coords
+Grandvillard,6,15,102.55,no,unresolved,,,,0,,,,,,,,,,no_coords
+Leysin,6,1,135.19,no,ambiguous,low,osm_peak,contains,2,Chateleysine Est,Chateleysine Est | Chateleysine Ovest,45.80139,7.39945,Petit Combin,22.7,Mattertal / Saastal,,,ambiguous_region
+Pilatus Kulm,6,4,228.46,no,region_only,high,dhv_alt,exact,1,Pilatus Kulm,Pilatus Kulm,46.97930,8.25520,Pilatus Kulm,0.0,,Mittelland Zentral,,new
+Wispile,6,0,126.28,no,ambiguous_variant,low,pge,prefix,2,Wispile-1900 (Saanen- Gstaad),Wispile-1900 (Saanen- Gstaad) | Wispile Mitte,46.43640,7.29486,Wispile-1900 (Saanen- Gstaad),0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Balderen,5,0,117.58,no,region_only,high,dhv_alt,exact,1,Balderen,Balderen,47.32260,8.50080,Balderen,0.0,,Mittelland Ost,,new
+Calmut,5,7,177.84,no,region_only,medium,osm_peak,exact,1,Calmut,Calmut,46.65910,8.68429,Gütsch,5.8,,Surselva,,new
+Gunggalp,5,2,115.83,no,unresolved,,,,0,,,,,,,,,,no_coords
+Jeizinen,5,5,6.45,no,region_only,high,dhv_alt,exact,1,Jeizinen,Jeizinen,46.33071,7.72986,Jeizinen,0.0,,Unterwallis,,new
+Altwis,4,14,36.29,no,region_only,medium,dhv_alt,prefix,1,Altwisstock,Altwisstock,47.21076,9.06835,Altwisstock,0.0,,Alpstein / Ostschweiz,,new
+Amisbühl,4,0,93.19,no,resolved_spot,high,pge,exact,1,Amisbuehl,Amisbuehl,46.70220,7.82306,Amisbuehl,0.0,Berner Voralpen,Berner Voralpen,,new
+Béplan,4,5,14.53,no,unresolved,,,,0,,,,,,,,,,no_coords
+Chrienseregg,4,5,21.50,no,unresolved,,,,0,,,,,,,,,,no_coords
+Chrüz,4,2,265.86,no,region_only,medium,osm_peak,exact,1,Chrüz,Chrüz,46.95493,9.77487,Stelserberg,3.9,,Prättigau - Davos,,new
+Grand Cha,4,0,93.70,no,ambiguous,low,osm_peak,prefix,2,Grand Chavalard,Grand Chavalard | Grand Château,46.17869,7.11312,Dent de Fully,0.5,Unterwallis,Unterwallis,,new
+Hoch Ybrig,4,0,154.39,no,resolved_spot,high,pge,exact,1,Hoch-Ybrig,Hoch-Ybrig,46.99950,8.80180,Hoch-Ybrig,0.0,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Jaman,4,0,141.06,no,resolved_spot,medium,pge,contains,1,Dent de Jaman (Rochers de Naye),Dent de Jaman (Rochers de Naye),46.44170,6.97593,Dent de Jaman (Rochers de Naye),0.0,Waadtländer Alpen,Waadtländer Alpen,,new
+Laubbärgli,4,4,65.15,no,unresolved,,,,0,,,,,,,,,BO Wengen,no_coords
+Mervelier,4,9,35.28,no,unresolved,,,,0,,,,,,,,,,no_coords
+Montoz,4,0,116.16,no,ambiguous,low,pge,contains,2,Werdtberg-1270 (Montoz sud),Werdtberg-1270 (Montoz sud) | Werdtberg-1240 (Montoz nord),47.20660,7.21530,Werdtberg-1270 (Montoz sud),0.0,Jura Zentral,Jura Zentral,,new
+National,4,4,21.82,no,unresolved,,,,0,,,,,,,,,,no_coords
+Niederwil...,4,20,84.83,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Pany,4,2,200.32,no,unresolved,,,,0,,,,,,,,,,no_coords
+Pilatus K...,4,5,25.68,yes,region_only,medium,dhv_alt,prefix,1,Pilatus Kulm,Pilatus Kulm,46.97930,8.25520,Pilatus Kulm,0.0,,Mittelland Zentral,,new
+Schwyberg,4,1,111.84,no,ambiguous_variant,low,pge,prefix,2,Schwyberg-1600 NO,Schwyberg-1600 NO | Schwyberg-1600 SW,46.67750,7.26220,Schwyberg-1600 NO,0.0,Schwarzsee / Gantrisch,Schwarzsee / Gantrisch,,new
+Schynige ...,4,19,35.26,yes,resolved_spot,medium,pge,prefix,1,Schynige Platte -Kamel_Chrüterwand (Interlaken),Schynige Platte -Kamel_Chrüterwand (Interlaken),46.66230,7.90117,Schynige Platte -Kamel_Chrüterwand (Interlaken),0.0,Berner Voralpen,Berner Voralpen,,new
+Tussweid,4,4,57.65,no,unresolved,,,,0,,,,,,,,,,no_coords
+Tête-de-Ran,4,8,51.04,no,resolved_spot,high,pge,exact,1,Tete de Ran,Tete de Ran,47.05410,6.85310,Tete de Ran,0.0,Jura West,Jura West,,new
+Bullet,3,2,73.21,no,unresolved,,,,0,,,,,,,,,,no_coords
+Bärgli-Ch...,3,5,36.02,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Bözingenberg,3,7,49.47,no,resolved_spot,medium,pge,prefix,1,Boezingenberg-940 (Biel- Bienne),Boezingenberg-940 (Biel- Bienne),47.17450,7.29420,Boezingenberg-940 (Biel- Bienne),0.0,Jura Zentral,Jura Zentral,,new
+Caviano,3,4,16.91,no,resolved_spot,medium,pge,contains,1,Alpe del Caviano,Alpe del Caviano,45.87800,9.00856,Alpe del Caviano,0.0,Tessin Zentral,Tessin Zentral,,new
+Diegisbalm,3,4,4.41,no,unresolved,,,,0,,,,,,,,,,no_coords
+Eggbergen,3,4,77.97,no,ambiguous,low,dhv_alt,prefix,2,Eggbergen 1,Eggbergen 1 | Eggbergen 2,46.90367,8.65175,Eggbergen 1,0.0,,Zentralschweizer Voralpen,,new
+Falkenflue,3,4,6.14,no,region_only,high,dhv_alt,exact,1,Falkenflue,Falkenflue,46.82406,7.63674,Falkenflue,0.0,,Berner Oberland,,new
+Gariva,3,8,75.76,no,unresolved,,,,0,,,,,,,,,,no_coords
+Gotthard,3,9,206.67,no,unresolved,,,,0,,,,,,,,,,no_coords
+Grimer,3,5,22.66,no,region_only,high,dhv_alt,exact,1,Grimer,Grimer,46.55367,7.68239,Grimer,0.0,,Freiburger Voralpen,,new
+L'étoile,3,3,18.45,no,region_only,low,osm_peak,contains,1,Mont de l'Étoile,Mont de l'Étoile,46.07393,7.45017,Evolene,7.4,,Mattertal / Saastal,,new
+La Roche-...,3,14,68.78,yes,resolved_spot,medium,pge,prefix,1,La Roche-Devant,La Roche-Devant,46.92870,6.74834,La Roche-Devant,0.0,Jura West,Jura West,,new
+Langenthal,3,3,315.83,no,unresolved,,,,0,,,,,,,,,,no_coords
+Marnex,3,2,99.91,no,region_only,high,dhv_alt,exact,1,Marnex,Marnex,46.36787,7.15435,Marnex,0.0,,Waadtlaender Alpen,,new
+Moosfluh,3,3,253.35,no,unresolved,,,,0,,,,,,,,,Oberwallis Goms,no_coords
+Mornera,3,11,53.02,no,resolved_spot,medium,pge,prefix,1,Mornera (Bellinzona),Mornera (Bellinzona),46.20580,8.98590,Mornera (Bellinzona),0.0,Tessin Zentral,Tessin Zentral,,new
+Mäggisseren,3,0,97.26,no,region_only,high,dhv_alt,exact,1,Mäggisseren,Mäggisseren,46.58807,7.60929,Mäggisseren,0.0,,Freiburger Voralpen,,new
+Rochers d...,3,5,67.18,yes,resolved_spot,medium,pge,prefix,1,Rochers de Naye Antenne,Rochers de Naye Antenne,46.43220,6.97698,Rochers de Naye Antenne,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Rütiberg,3,7,86.14,no,region_only,medium,osm_peak,exact,1,Rütiberg,Rütiberg,47.41790,7.38799,Mont Raimeux Nord,12.5,,Jura Ost,,new
+Scheidegg,3,0,131.81,no,ambiguous,low,pge,contains,2,Rigi-Scheidegg,Rigi-Scheidegg | Alp Scheidegg (Wald),47.02790,8.51983,Rigi-Scheidegg,0.0,Mittelland Zentral,,,ambiguous_region
+Schwalmis,3,3,35.50,no,region_only,medium,osm_peak,exact,1,Schwalmis,Schwalmis,46.91855,8.49356,Ober Egg,1.9,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Schwängimatt,3,0,92.20,no,resolved_spot,high,pge,exact,1,Schwaengimatt,Schwaengimatt,47.28910,7.67262,Schwaengimatt,0.0,Jura Zentral,Jura Zentral,,new
+Schönboden,3,3,10.53,no,unresolved,,,,0,,,,,,,,,Toggenburg?,no_coords
+Seebodenalp,3,4,18.15,no,region_only,high,dhv_alt,exact,1,Seebodenalp,Seebodenalp,47.06220,8.45750,Seebodenalp,0.0,,Mittelland Zentral,,new
+Sompréi,3,2,76.72,no,unresolved,,,,0,,,,,,,,,,no_coords
+Spitz,3,2,105.34,no,ambiguous,low,pge,contains,3,Rotenfluespitz-1520,Rotenfluespitz-1520 | Schwandfeldspitz-2020 | Wildspitz,46.87760,7.94238,Rotenfluespitz-1520,0.0,Mittelland Zentral,,,ambiguous_region
+St. Anton,3,3,8.39,no,region_only,high,dhv_alt,exact,1,St. Anton,St. Anton,47.41106,9.54252,St. Anton,0.0,,Ostschweiz,,new
+Sta.Maria...,3,4,5.78,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Vercorin ...,3,6,35.47,yes,resolved_spot,high,pge,exact,1,Vercorin,Vercorin,46.25940,7.52902,Vercorin,0.0,Unterwallis,Unterwallis,,new
+.,2,2,20.95,no,unresolved,,,,0,,,,,,,,,,no_coords
+Aiguilles...,2,4,32.66,yes,ambiguous,low,osm_peak,prefix,15,Aiguille Sans Nom,Aiguille Sans Nom | Aiguilles Rouges du Dolent - Pointe Kurz | Aiguilles Rouges d'Arolla | Aiguilles du Meitin | Aiguille Savoie | Aiguilles Marbrées Nord,45.93336,6.96422,La Breya,14.3,,,,ambiguous_region
+Bella Lui,2,4,114.53,no,resolved_spot,medium,pge,contains,1,Montana - Bella Lui,Montana - Bella Lui,46.34440,7.48611,Montana - Bella Lui,0.0,Unterwallis,Unterwallis,,new
+Bellwald,2,2,3.22,no,ambiguous,low,pge,prefix,2,Bellwald - Ried,Bellwald - Ried | Bellwald - Steibenkreuz,46.43520,8.15426,Bellwald - Ried,0.0,Oberwallis / Goms,Oberwallis / Goms,,new
+Blüemlisa...,2,3,46.09,yes,region_only,medium,dhv_alt,prefix,1,Blümlisalp,Blümlisalp,46.47014,7.68932,Blümlisalp,0.0,,Freiburger Voralpen,,new
+Bockmattli,2,3,21.05,no,ambiguous,low,osm_peak,prefix,2,Bockmattlipass,Bockmattlipass | Bockmattlistock,47.09717,8.95700,Bärensolspitz,3.0,,Glarnerland / Walensee,,new
+Bärgli-Ch,2,2,87.99,no,unresolved,,,,0,,,,,,,,,,no_coords
+Calandahütte,2,2,12.37,no,unresolved,,,,0,,,,,,,,,,no_coords
+Crete des...,2,2,64.23,yes,resolved_spot,medium,pge,prefix,1,Crete des Champeys,Crete des Champeys,46.20380,6.84719,Crete des Champeys,0.0,Waadtländer Alpen,Waadtländer Alpen,,new
+Davos,2,0,120.23,no,ambiguous,low,pge,prefix,7,Davos - Jakobshorn -2560,Davos - Jakobshorn -2560 | Davos - Parsenn- Hoehenweg  -2200 | Davos - Schiahorn -2700 | Davos - Strela -2440 | Davos - Weissfluhjoch -2650 | Davos - Weissfluhgipfel -2820,46.77280,9.84544,Davos - Jakobshorn -2560,0.0,Prättigau - Davos,Prättigau - Davos,,new
+Doldenhor...,2,3,14.52,yes,region_only,low,osm_peak,prefix,1,Doldenhorn,Doldenhorn,46.46856,7.73496,Blümlisalp,3.5,,Freiburger Voralpen,,new
+Dämpfelsmatt,2,1,110.56,no,resolved_spot,medium,pge,contains,1,Melchsee-Frutt Daempfelsmatt,Melchsee-Frutt Daempfelsmatt,46.77900,8.26777,Melchsee-Frutt Daempfelsmatt,0.0,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Eigerglet...,2,3,57.42,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Flumserberg,2,3,22.46,no,resolved_spot,medium,pge,prefix,1,Flumserberge -Maschgenkamm,Flumserberge -Maschgenkamm,47.06950,9.25177,Flumserberge -Maschgenkamm,0.0,Glarnerland / Walensee,Glarnerland / Walensee,,new
+Gurnigel,2,0,91.31,no,region_only,low,osm_peak,prefix,1,Gurnigelpass,Gurnigelpass,46.73204,7.44788,Wasserscheide,1.1,Freiburger Voralpen,Berner Oberland,,new
+Hammenberg,2,2,11.38,no,unresolved,,,,0,,,,,,,,,,no_coords
+Helgisberg,2,2,100.33,no,unresolved,,,,0,,,,,,,,,,no_coords
+Hüenerchopf,2,0,101.91,no,region_only,medium,osm_peak,exact,1,Hüenerchopf,Hüenerchopf,47.02424,9.32760,Schönhalden,4.0,,Glarnerland / Walensee,,new
+Kistleralp,2,3,5.75,no,region_only,high,dhv_alt,exact,1,Kistleralp,Kistleralp,47.15543,8.95891,Kistleralp,0.0,,Mittelland Zentral,,new
+Lai Alv,2,0,193.25,no,resolved_spot,medium,pge,contains,1,Disentis: Caischavedra - Lai Alv - Plaun Tir,Disentis: Caischavedra - Lai Alv - Plaun Tir,46.70620,8.79983,Disentis: Caischavedra - Lai Alv - Plaun Tir,0.0,Surselva,Surselva,,new
+Laubberg,2,5,3.67,no,ambiguous,low,osm_peak,exact,2,Laubberg,Laubberg | Läubberg,47.33277,8.99822,Alp Scheidegg,5.1,,,,ambiguous_region
+Laupersdö...,2,3,71.61,yes,resolved_spot,medium,pge,prefix,1,Laupersdoerfer Stierenberg,Laupersdoerfer Stierenberg,47.33230,7.64502,Laupersdoerfer Stierenberg,0.0,Jura Zentral,Jura Zentral,,new
+Le Champr...,2,2,63.37,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Le Rosy d...,2,2,25.41,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Leissigbä...,2,4,3.40,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Lobhornhütte,2,1,123.21,no,unresolved,,,,0,,,,,,,,,,no_coords
+Mentschelen,2,0,184.83,no,region_only,medium,dhv_alt,prefix,1,Mentschelenalp,Mentschelenalp,46.71550,7.50996,Mentschelenalp,0.0,,Freiburger Voralpen,,new
+Metschstand,2,3,53.70,no,ambiguous_variant,low,pge,prefix,2,Metschstand-2060,Metschstand-2060 | Metschstand-2090,46.44370,7.49199,Metschstand-2060,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Moron,2,5,236.21,no,region_only,medium,osm_peak,exact,1,Moron,Moron,47.26241,7.26343,Montagne de Sorvillier,5.8,,Jura Zentral,,new
+Noirmont,2,2,22.94,no,ambiguous,low,osm_peak,contains,2,Le Noirmont,Le Noirmont | Le Noirmont-des-Français,46.48421,6.11574,La Barilette,6.2,,,,ambiguous_region
+Ollon,2,6,4.79,no,ambiguous,low,osm_peak,contains,4,Mont Collon,Mont Collon | Petit Mont Collon | Col du Petit Mont Collon | Col Collon,45.97728,7.50772,Schwarzsee,15.7,,Mattertal / Saastal,,new
+Opfi Stich,2,2,27.54,no,unresolved,,,,0,,,,,,,,,,no_coords
+Planplatten,2,0,75.91,no,resolved_spot,medium,pge,contains,1,Meiringen - Planplatten-2240,Meiringen - Planplatten-2240,46.73650,8.25473,Meiringen - Planplatten-2240,0.0,Berner Voralpen,Berner Voralpen,,new
+Pointe de...,2,3,30.65,yes,region_only,medium,dhv_alt,prefix,1,Pointe de Bellevue,Pointe de Bellevue,46.24908,6.90473,Pointe de Bellevue,0.0,,Waadtlaender Alpen,,new
+Riederalp,2,5,109.50,no,resolved_spot,medium,pge,prefix,1,Riederalp- Greicheralp,Riederalp- Greicheralp,46.37700,8.03090,Riederalp- Greicheralp,0.0,Oberwallis / Goms,Oberwallis / Goms,,new
+Rinderberg,2,2,15.24,no,ambiguous_variant,low,pge,prefix,2,Rinderberg-2000 NO,Rinderberg-2000 NO | Rinderberg-2000 O,46.50850,7.35851,Rinderberg-2000 NO,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Rothorn,2,2,91.72,no,ambiguous,low,pge,contains,5,Brienzer Rothorn,Brienzer Rothorn | Brienzer Rothorn-2260 | Zermatt -Oberrothorn | Parpaner Rothorn -2800 | Zermatt -Rothorn- Blauherd- Sunegga,46.78710,8.04630,Brienzer Rothorn,0.0,Berner Voralpen,,,ambiguous_region
+Rotmoos,2,5,12.12,no,region_only,high,dhv_alt,exact,1,Rotmoos,Rotmoos,47.10318,8.77430,Rotmoos,0.0,,Mittelland Zentral,BO Brünig/Hasli,CONFLICT
+SP (SE) P...,2,2,18.83,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Saas-Fee,2,2,141.84,no,resolved_spot,medium,pge,prefix,1,Saas Fee -Plattjen,Saas Fee -Plattjen,46.09000,7.94093,Saas Fee -Plattjen,0.0,Mattertal / Saastal,Mattertal / Saastal,,new
+Sarn Alp,2,2,18.53,no,unresolved,,,,0,,,,,,,,,Heinzenberg,no_coords
+Schollberg,2,3,21.31,no,region_only,medium,osm_peak,exact,1,Schollberg,Schollberg,46.97481,9.86486,Bärgli,3.7,,Prättigau - Davos,,new
+Schrot,2,2,3.08,no,region_only,medium,dhv_alt,contains,1,Ober Schrot,Ober Schrot,47.05976,8.84093,Ober Schrot,0.0,,Mittelland Zentral,,new
+Skilift H...,2,3,12.48,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Stiereber...,2,2,13.27,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Tierberg,2,3,17.20,no,region_only,medium,osm_peak,exact,1,Tierberg,Tierberg,46.77027,8.44665,Engelberg -Titlis,0.9,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Tombal,2,2,19.30,no,unresolved,,,,0,,,,,,,,,,no_coords
+Torrentalp,2,2,69.39,no,unresolved,,,,0,,,,,,,,,Wallis Leukerbad,no_coords
+Tätsch,2,1,93.98,no,region_only,high,dhv_alt,exact,1,Tätsch,Tätsch,46.59922,8.48027,Tätsch,0.0,,Oberwallis / Goms,,new
+UNKNOWN,2,3,24.05,no,unresolved,,,,0,,,,,,,,,,no_coords
+Waldrand,2,2,11.93,no,region_only,medium,dhv_alt,prefix,1,"Waldrand, oberhalb Kreuz","Waldrand, oberhalb Kreuz",47.09360,8.82310,"Waldrand, oberhalb Kreuz",0.0,,Mittelland Zentral,,new
+Walenstad...,2,2,15.00,yes,unresolved,,,,0,,,,,,,,,,no_coords
+ruinettes,2,2,22.87,no,resolved_spot,medium,pge,contains,1,Verbier - Ruinettes _ Fontanets_Attelas,Verbier - Ruinettes _ Fontanets_Attelas,46.09040,7.25185,Verbier - Ruinettes _ Fontanets_Attelas,0.0,Unterwallis,Unterwallis,,new
+?,1,13,212.42,no,unresolved,,,,0,,,,,,,,,,no_coords
+Aarau-7.4km,1,1,3.70,no,unresolved,,,,0,,,,,,,,,,no_coords
+Abondance,1,1,21.44,no,unresolved,,,,0,,,,,,,,,,no_coords
+Aemmerten...,1,1,14.78,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Aemsigen,1,1,64.07,no,unresolved,,,,0,,,,,,,,,,no_coords
+Aiguille ...,1,1,28.36,yes,region_only,medium,dhv_alt,prefix,1,Aiguille de Champeys,Aiguille de Champeys,46.20412,6.84736,Aiguille de Champeys,0.0,,Waadtlaender Alpen,,new
+Alp Clünas,1,0,225.76,no,unresolved,,,,0,,,,,,,,,,no_coords
+Alp Sot,1,1,2.84,no,unresolved,,,,0,,,,,,,,,,no_coords
+Alpogler,1,1,12.90,no,resolved_spot,medium,pge,prefix,1,Alpoglerberg-1840,Alpoglerberg-1840,46.81790,8.09710,Alpoglerberg-1840,0.0,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Alpoglerberg,1,1,22.36,no,resolved_spot,medium,pge,prefix,1,Alpoglerberg-1840,Alpoglerberg-1840,46.81790,8.09710,Alpoglerberg-1840,0.0,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Altenoren,1,1,14.15,no,region_only,low,osm_peak,prefix,1,Altenorenstock,Altenorenstock,46.86037,8.94353,Fisetengrat,2.8,Glarnerland / Walensee,Glarnerland / Walensee,,new
+Ammertenhore,1,1,19.70,no,unresolved,,,,0,,,,,,,,,,no_coords
+Anzère,1,1,83.03,no,resolved_spot,medium,pge,prefix,1,Anzere - Pas de Maimbra -2350,Anzere - Pas de Maimbra -2350,46.31240,7.38541,Anzere - Pas de Maimbra -2350,0.0,Unterwallis,Unterwallis,,new
+Artelengrat,1,1,40.90,no,ambiguous_variant,low,pge,prefix,2,Artelengrat-2180,Artelengrat-2180 | Artelengrat-2100,46.44770,7.57529,Artelengrat-2180,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Ausserberg,1,1,5.66,no,suspect_match,low,osm_peak,exact,1,Außerberg,Außerberg,47.18108,9.79092,Triesen,18.9,,,,ambiguous_region
+Bachtel,1,1,12.79,no,region_only,medium,osm_peak,exact,1,Bachtel,Bachtel,47.29488,8.88636,Alp Scheidegg (Wald),4.4,Alpstein / Ostschweiz,Alpstein / Ostschweiz,,new
+Balmeregg,1,0,109.99,no,region_only,low,osm_peak,prefix,1,Balmeregghorn,Balmeregghorn,46.75319,8.28347,Bonistock,2.8,Zentralschweizer Voralpen,Berner Voralpen,,new
+Beichle,1,2,12.41,no,ambiguous_variant,low,pge,prefix,2,Beichlen-1750,Beichlen-1750 | Beichlen-1730,46.89720,7.97209,Beichlen-1750,0.0,Mittelland Zentral,Mittelland Zentral,,new
+Belalp,1,1,102.24,no,unresolved,,,,0,,,,,,,,,,no_coords
+Bella Tola,1,1,11.16,no,region_only,medium,osm_peak,exact,1,Bella Tola,Bella Tola,46.23906,7.65361,Tignousa,3.5,Unterwallis,Unterwallis,,new
+Bergrüti,1,1,3.46,no,unresolved,,,,0,,,,,,,,,,no_coords
+Bergseehü...,1,1,6.50,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Bettlachberg,1,1,84.56,no,unresolved,,,,0,,,,,,,,,,no_coords
+Bishorn,1,1,9.10,no,region_only,medium,osm_peak,exact,1,Bishorn,Bishorn,46.11792,7.71496,Sorebois (Zinal),9.1,Mattertal / Saastal,Mattertal / Saastal,,new
+Blapbach,1,1,3.71,no,unresolved,,,,0,,,,,,,,,,no_coords
+Blüemlisa,1,1,15.98,no,region_only,medium,dhv_alt,prefix,1,Blümlisalp,Blümlisalp,46.47014,7.68932,Blümlisalp,0.0,,Freiburger Voralpen,,new
+Boettstein,1,1,45.21,no,unresolved,,,,0,,,,,,,,,,no_coords
+Boglia,1,1,22.39,no,region_only,low,osm_peak,contains,1,Monte Boglia,Monte Boglia,46.02978,9.00756,Moschera,7.5,Tessin Zentral,,,ambiguous_region
+Bolberg,1,1,4.96,no,region_only,medium,osm_peak,exact,1,Bolberg,Bolberg,46.75307,7.88357,Hohwald,6.3,Berner Voralpen,Berner Voralpen,,new
+Bovonne,1,1,87.81,no,unresolved,,,,0,,,,,,,,,,no_coords
+Brambrüesch,1,1,4.55,no,unresolved,,,,0,,,,,,,,,,no_coords
+Breithorn,1,0,76.31,no,region_only,medium,osm_peak,exact,1,Breithorn,Breithorn,46.41898,7.89374,Winter,5.8,,Zentralwallis,,new
+Brogoldone,1,1,21.98,no,unresolved,,,,0,,,,,,,,,,no_coords
+Bunderspitz,1,1,6.38,no,region_only,medium,osm_peak,exact,1,Bunderspitz,Bunderspitz,46.49249,7.62038,Steintal,1.9,Freiburger Voralpen,Freiburger Voralpen,,new
+Burgfelds,1,1,16.54,no,resolved_spot,medium,pge,prefix,1,Burgfeldstand,Burgfeldstand,46.72110,7.79507,Burgfeldstand,0.0,Berner Voralpen,Berner Voralpen,,new
+Burgfeldstand,1,1,14.04,no,resolved_spot,high,pge,exact,1,Burgfeldstand,Burgfeldstand,46.72110,7.79507,Burgfeldstand,0.0,Berner Voralpen,Berner Voralpen,,new
+Bälmeten,1,1,26.89,no,region_only,medium,osm_peak,exact,1,Bälmeten,Bälmeten,46.83117,8.68052,Haldi,3.4,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Bäregg,1,1,4.72,no,region_only,medium,osm_peak,exact,1,Bäregg,Bäregg,46.54974,8.28278,Ulrichergale-2100,3.5,Oberwallis / Goms,Berner Voralpen,,new
+Bäregghütte,1,1,4.77,no,unresolved,,,,0,,,,,,,,,,no_coords
+Bölchen,1,0,98.28,no,region_only,high,dhv_alt,exact,1,Bölchen,Bölchen,47.36576,7.80229,Bölchen,0.0,,Jura Ost,,new
+Bühlberg,1,1,45.68,no,region_only,low,osm_peak,contains,1,Spitzebüehlberg,Spitzebüehlberg,47.38595,7.43908,Mont Raimeux Nord,8.7,,Jura Ost,,new
+Cabane des Audannes,1,1,28.01,no,unresolved,,,,0,,,,,,,,,Wallis Conthey,no_coords
+Chaiserstuel,1,1,16.43,no,region_only,medium,osm_peak,exact,1,Chaiserstuel,Chaiserstuel,46.87718,8.46790,Lauwistock,3.0,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Chamerstock,1,1,4.83,no,region_only,medium,osm_peak,exact,1,Chamerstock,Chamerstock,46.89380,8.96500,Fisetenpass,2.5,,Glarnerland / Walensee,,new
+Chaudzerya,1,1,3.16,no,unresolved,,,,0,,,,,,,,,,no_coords
+Chaumont ...,1,1,22.31,yes,resolved_spot,high,pge,exact,1,Chaumont,Chaumont,47.05330,6.97805,Chaumont,0.0,Jura West,Jura West,,new
+Chnübeli,1,0,96.17,no,region_only,medium,osm_peak,exact,1,Chnubeli,Chnubeli,46.80086,7.77682,Schallenberg,3.1,Berner Oberland,Berner Oberland,,new
+Chuenisbä,1,0,92.01,no,unresolved,,,,0,,,,,,,,,,no_coords
+Chulm,1,1,8.05,no,region_only,high,dhv_alt,exact,1,Chulm,Chulm,46.94566,8.55086,Chulm,0.0,,Zentralschweizer Voralpen,,new
+Chörnlisegg,1,2,16.04,no,unresolved,,,,0,,,,,,,,,,no_coords
+Cima di M...,1,1,3.69,yes,resolved_spot,medium,pge,prefix,1,Cima di Medeglia,Cima di Medeglia,46.12990,8.94648,Cima di Medeglia,0.0,Tessin Zentral,Tessin Zentral,,new
+Col du Rawyl,1,1,108.37,no,region_only,medium,osm_peak,exact,1,Col du Rawyl,Col du Rawyl,46.38333,7.44232,Plaine Morte,3.7,,Freiburger Voralpen,,new
+Courfaivre,1,1,14.97,no,unresolved,,,,0,,,,,,,,,,no_coords
+Crans-Montana,1,1,9.60,no,region_only,low,osm_peak,contains,1,Col de Crans Montana,Col de Crans Montana,46.33924,7.52313,Petit Mont Bonvin 2,0.9,,Unterwallis,,new
+Crap Sogn...,1,1,122.42,yes,ambiguous,low,dhv_alt,prefix,2,Crap Sogn Gion,Crap Sogn Gion | Crap Sogn Gion 2,46.83473,9.21702,Crap Sogn Gion,0.0,,Surselva,,new
+Cret du Midi,1,1,9.44,no,resolved_spot,high,pge,exact,1,Crêt-du-Midi,Crêt-du-Midi,46.22940,7.52861,Crêt-du-Midi,0.0,Unterwallis,Unterwallis,,new
+Cuolm Val,1,0,86.46,no,unresolved,,,,0,,,,,,,,,,no_coords
+Dent de N...,1,1,153.12,yes,resolved_spot,medium,pge,prefix,1,Dent de Nendaz-2430,Dent de Nendaz-2430,46.15490,7.29172,Dent de Nendaz-2430,0.0,Unterwallis,Unterwallis,,new
+Dent de V...,1,1,4.76,yes,resolved_spot,medium,pge,prefix,1,Dent de Vaulion,Dent de Vaulion,46.68400,6.35050,Dent de Vaulion,0.0,Genferseeregion,Genferseeregion,,new
+Diavolezza,1,1,194.06,no,resolved_spot,medium,pge,contains,1,Munt Pers (Diavolezza- Pontresina),Munt Pers (Diavolezza- Pontresina),46.41900,9.95466,Munt Pers (Diavolezza- Pontresina),0.0,Engadin Ober,Engadin Ober,,new
+Doldendor...,1,1,3.36,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Doldenhor,1,1,22.40,no,region_only,low,osm_peak,prefix,1,Doldenhorn,Doldenhorn,46.46856,7.73496,Blümlisalp,3.5,,Freiburger Voralpen,,new
+Doldenhorn,1,1,7.18,no,region_only,medium,osm_peak,exact,1,Doldenhorn,Doldenhorn,46.46856,7.73496,Blümlisalp,3.5,,Freiburger Voralpen,,new
+Dolderhor...,1,1,3.93,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Dreibünde...,1,1,7.70,yes,resolved_spot,medium,pge,prefix,1,Dreibuendenstein-2120,Dreibuendenstein-2120,46.80430,9.49890,Dreibuendenstein-2120,0.0,Ostschweiz,Ostschweiz,,new
+Druesberg,1,1,7.83,no,region_only,medium,osm_peak,exact,1,Druesberg,Druesberg,47.00427,8.83371,Forstberg,0.8,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Ebenalp (Appenzell- Wasserauen),1,0,149.97,no,resolved_spot,high,pge,exact,1,Ebenalp (Appenzell- Wasserauen),Ebenalp (Appenzell- Wasserauen),47.28420,9.41057,Ebenalp (Appenzell- Wasserauen),0.0,Alpstein / Ostschweiz,Alpstein / Ostschweiz,,new
+Estavannens,1,1,21.20,no,unresolved,,,,0,,,,,,,,,,no_coords
+Euthal,1,1,37.70,no,resolved_spot,high,pge,exact,1,Euthal,Euthal,47.09360,8.82327,Euthal,0.0,Mittelland Zentral,Mittelland Zentral,,new
+Faido,1,1,152.36,no,unresolved,,,,0,,,,,,,,,,no_coords
+Farneren,1,1,16.61,no,ambiguous,low,dhv_alt,prefix,2,Farneren 1,Farneren 1 | Farneren 2,46.93502,8.04344,Farneren 1,0.0,,Mittelland Zentral,,new
+Fiesch -Kuehboden (Heimat- Galfera),1,0,129.00,no,resolved_spot,high,pge,exact,1,Fiesch -Kuehboden (Heimat- Galfera),Fiesch -Kuehboden (Heimat- Galfera),46.40480,8.09598,Fiesch -Kuehboden (Heimat- Galfera),0.0,Oberwallis / Goms,Oberwallis / Goms,,new
+"First, He...",1,1,9.81,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Firstboden,1,1,6.74,no,unresolved,,,,0,,,,,,,,,,no_coords
+Fluebrig-...,1,1,8.97,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Flueseeli,1,1,14.12,no,unresolved,,,,0,,,,,,,,,,no_coords
+Foggenhorn,1,0,72.50,no,region_only,medium,osm_peak,exact,1,Foggenhorn,Foggenhorn,46.35290,7.94944,Sommer,2.9,,Oberwallis / Goms,,new
+Fêta d'août,1,1,51.73,no,unresolved,,,,0,,,,,,,,,,no_coords
+Gagn da Piöv,1,1,103.93,no,unresolved,,,,0,,,,,,,,,,no_coords
+Galgenen,1,8,34.69,no,resolved_spot,medium,pge,contains,1,Gschwänd - Galgenen,Gschwänd - Galgenen,47.15610,8.87190,Gschwänd - Galgenen,0.0,Mittelland Zentral,Mittelland Zentral,,new
+Galm_Chiley,1,1,2.10,no,unresolved,,,,0,,,,,,,,,,no_coords
+Gantrisch,1,1,12.47,no,region_only,medium,osm_peak,exact,1,Gantrisch,Gantrisch,46.70469,7.45076,Wasserscheide,1.6,Freiburger Voralpen,Freiburger Voralpen,Schwarzsee/Gurnigel,CONFLICT
+Gazzirola,1,1,7.59,no,region_only,low,osm_peak,contains,1,Monte Gazzirola,Monte Gazzirola,46.11798,9.07238,Monte Bar,5.0,Tessin Zentral,,,ambiguous_region
+Gemsfaire,1,0,60.01,no,unresolved,,,,0,,,,,,,,,,no_coords
+Giferspitz,1,1,56.72,no,region_only,medium,osm_peak,exact,1,Giferspitz,Giferspitz,46.45116,7.35321,Bräschegrat,1.8,Freiburger Voralpen,Freiburger Voralpen,,new
+Glacier 3000,1,2,136.84,no,unresolved,,,,0,,,,,,,,,,no_coords
+Gotschna,1,1,5.09,no,resolved_spot,medium,pge,contains,1,Klosters - Gotschnagrat,Klosters - Gotschnagrat,46.85530,9.85057,Klosters - Gotschnagrat,0.0,Prättigau - Davos,Prättigau - Davos,,new
+Graitery,1,0,143.48,no,resolved_spot,high,pge,exact,1,Graitery,Graitery,47.25640,7.37522,Graitery,0.0,Jura Zentral,Jura Zentral,,new
+Grande Ch...,1,1,74.37,yes,ambiguous,low,osm_peak,prefix,2,Grande Chenalette,Grande Chenalette | Grande Chaux de Naye,45.87553,7.16454,Petit Combin,14.3,Mattertal / Saastal,,,ambiguous_region
+Gratflue,1,0,85.45,no,region_only,medium,osm_peak,exact,1,Gratflue,Gratflue,46.58863,7.28479,Gastlosen,0.7,Freiburger Voralpen,Freiburger Voralpen,,new
+Grenchenberg,1,1,32.45,no,resolved_spot,medium,pge,prefix,1,Grenchenberg Nord,Grenchenberg Nord,47.22950,7.37988,Grenchenberg Nord,0.0,Jura Zentral,Jura Zentral,,new
+Grimmialp,1,3,23.57,no,unresolved,,,,0,,,,,,,,,,no_coords
+Grindelwald,1,9,58.94,no,resolved_spot,medium,pge,prefix,1,Grindelwald - First,Grindelwald - First,46.65710,8.05527,Grindelwald - First,0.0,Berner Voralpen,Berner Voralpen,,new
+Gross Chärpf,1,1,6.86,no,unresolved,,,,0,,,,,,,,,,no_coords
+Grosse Sc...,1,1,8.09,yes,ambiguous,low,osm_peak,prefix,3,Große Schneeglocke - Cima Campana Grande,Große Schneeglocke - Cima Campana Grande | Große Schafkarspitze | Grosse Scheidegg,46.49659,10.50904,Terza 1,15.1,,Berner Voralpen,,new
+Grächen,1,0,304.99,no,resolved_spot,medium,pge,prefix,1,Graechen -Seetalhorn,Graechen -Seetalhorn,46.17530,7.85819,Graechen -Seetalhorn,0.0,Mattertal / Saastal,Mattertal / Saastal,,new
+Gschwend ...,1,1,4.24,yes,ambiguous,low,osm_peak,prefix,2,Gschwendtsattel,Gschwendtsattel | Gschwender Horn,47.39315,9.81509,Hüsli Berneck,17.0,,,,ambiguous_region
+Gulmen,1,3,19.12,no,region_only,medium,osm_peak,exact,1,Gulmen,Gulmen,47.08309,9.18928,Ziger,4.9,Glarnerland / Walensee,Glarnerland / Walensee,,new
+Guscha,1,1,23.34,no,region_only,medium,osm_peak,exact,1,Guscha,Guscha,47.05025,9.31504,Schönhalden,1.9,,Glarnerland / Walensee,,new
+Günzenen,1,1,8.50,no,unresolved,,,,0,,,,,,,,,,no_coords
+HF Faesil,1,1,7.33,no,unresolved,,,,0,,,,,,,,,,no_coords
+Hanegg,1,1,146.71,no,unresolved,,,,0,,,,,,,,,,no_coords
+Heruhubil,1,1,10.89,no,unresolved,,,,0,,,,,,,,,Engelberg,no_coords
+Hirzli,1,1,101.88,no,region_only,high,dhv_alt,exact,1,Hirzli,Hirzli,47.13416,9.00756,Hirzli,0.0,,Mittelland Ost,,new
+Hochhamm,1,1,1.88,no,region_only,high,dhv_alt,exact,1,Hochhamm,Hochhamm,47.31710,9.24509,Hochhamm,0.0,,Alpstein / Ostschweiz,,new
+Homad,1,2,32.04,no,region_only,medium,osm_peak,exact,1,Homad,Homad,46.70523,7.49436,Möntschelealp,1.6,Freiburger Voralpen,Freiburger Voralpen,,new
+Honegg,1,2,49.65,no,ambiguous,low,pge,contains,2,Engelberg - Brunni - Schonegg,Engelberg - Brunni - Schonegg | Schonegg-2190,46.83820,8.41241,Engelberg - Brunni - Schonegg,0.0,Zentralschweizer Voralpen,,,ambiguous_region
+Höri,1,1,3.93,no,region_only,medium,osm_peak,exact,1,Höri,Höri,46.58291,7.69099,Ramslauen,1.2,,Freiburger Voralpen,,new
+Hüsliberg,1,0,88.47,no,resolved_spot,medium,pge,contains,1,Schänis - Hüsliberg,Schänis - Hüsliberg,47.18970,9.07480,Schänis - Hüsliberg,0.0,Alpstein / Ostschweiz,Alpstein / Ostschweiz,,new
+Jungfrau,1,1,13.05,no,resolved_spot,medium,pge,prefix,1,Jungfraujoch,Jungfraujoch,46.54770,7.97582,Jungfraujoch,0.0,Berner Voralpen,Berner Voralpen,,new
+Klein Mat...,1,1,141.79,yes,region_only,low,osm_peak,prefix,1,Klein Matterhorn,Klein Matterhorn,45.93836,7.72989,Kleines Matterhorn,0.2,,,,ambiguous_region
+L'etoile,1,1,18.33,no,region_only,low,osm_peak,contains,1,Mont de l'Étoile,Mont de l'Étoile,46.07393,7.45017,Evolene,7.4,,Mattertal / Saastal,,new
+L'Étoile,1,1,58.93,no,region_only,low,osm_peak,contains,1,Mont de l'Étoile,Mont de l'Étoile,46.07393,7.45017,Evolene,7.4,,Mattertal / Saastal,,new
+LSPL,1,1,359.43,no,unresolved,,,,0,,,,,,,,,,no_coords
+La Barill...,1,1,8.36,yes,resolved_spot,medium,pge,prefix,1,La Barillette (or:Les Burnes Gelées),La Barillette (or:Les Burnes Gelées),46.42940,6.13222,La Barillette (or:Les Burnes Gelées),0.0,Genferseeregion,Genferseeregion,,new
+La Chia,1,2,4.73,no,unresolved,,,,0,,,,,,,,,,no_coords
+La Suzette,1,1,38.55,no,unresolved,,,,0,,,,,,,,,,no_coords
+Laucherna...,1,1,3.24,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Lauihöchi,1,1,38.07,no,region_only,medium,osm_peak,exact,1,Lauihöchi,Lauihöchi,47.14131,8.95576,Kistleralp,1.6,,Mittelland Zentral,ZS Voralpen?,CONFLICT
+Le pont,1,1,3.76,no,resolved_spot,medium,pge,prefix,1,Le Pont-Vallée de Joux,Le Pont-Vallée de Joux,46.66100,6.33530,Le Pont-Vallée de Joux,0.0,Genferseeregion,Genferseeregion,,new
+Leiggern,1,1,13.23,no,region_only,high,dhv_alt,exact,1,Leiggern,Leiggern,46.32694,7.83772,Leiggern,0.0,,Oberwallis / Goms,Wallis Ausserberg,CONFLICT
+Leissigbächli,1,1,17.26,no,unresolved,,,,0,,,,,,,,,BO Aeschiried?,no_coords
+Leistchamm,1,1,21.43,no,region_only,medium,osm_peak,exact,1,Leistchamm,Leistchamm,47.14605,9.21341,Hinterrugg,6.9,Glarnerland / Walensee,Glarnerland / Walensee,,new
+Leistkamm,1,0,62.87,no,unresolved,,,,0,,,,,,,,,,no_coords
+Les Esserts,1,1,49.80,no,resolved_spot,medium,pge,contains,1,L'Orient - Les Esserts,L'Orient - Les Esserts,46.59270,6.24413,L'Orient - Les Esserts,0.0,Genferseeregion,Genferseeregion,,new
+Les prelayes,1,1,14.53,no,unresolved,,,,0,,,,,,,,,,no_coords
+Loeita,1,1,73.12,no,region_only,low,osm_peak,contains,1,Poncione di Löita del Pizzo,Poncione di Löita del Pizzo,46.54923,8.61086,Gemsstock,6.1,Zentralschweizer Voralpen,Tessin Nord,,new
+Luegibrue,1,0,64.78,no,region_only,medium,dhv_alt,prefix,1,Luegibrüggli,Luegibrüggli,46.69100,7.81040,Luegibrüggli,0.0,,Berner Voralpen,,new
+Luesis,1,1,15.95,no,unresolved,,,,0,,,,,,,,,,no_coords
+Lutersee,1,1,112.97,no,region_only,high,dhv_alt,exact,1,Lutersee,Lutersee,46.85598,8.34407,Lutersee,0.0,,Zentralschweizer Voralpen,,new
+Löita,1,1,39.88,no,region_only,low,osm_peak,contains,1,Poncione di Löita del Pizzo,Poncione di Löita del Pizzo,46.54923,8.61086,Gemsstock,6.1,Zentralschweizer Voralpen,Tessin Nord,,new
+Madone,1,1,110.08,no,suspect_match,low,osm_peak,exact,1,Madone,Madone,46.34042,8.53287,Cimetta,25.0,,Tessin Nord,,new
+Madrisa,1,2,216.24,no,resolved_spot,medium,pge,prefix,1,Madrisa nord-ost,Madrisa nord-ost,46.90450,9.87797,Madrisa nord-ost,0.0,Prättigau - Davos,Prättigau - Davos,,new
+Mederbode,1,1,62.23,no,unresolved,,,,0,,,,,,,,,,no_coords
+Metsch_Me,1,0,65.24,no,unresolved,,,,0,,,,,,,,,,no_coords
+Monte Boglia,1,1,5.66,no,region_only,medium,osm_peak,exact,1,Monte Boglia,Monte Boglia,46.02978,9.00756,Moschera,7.5,Tessin Zentral,,,ambiguous_region
+Motta Nal...,1,1,91.69,yes,resolved_spot,medium,pge,prefix,1,Motta Naluns (Schuls- Scuol),Motta Naluns (Schuls- Scuol),46.81250,10.27330,Motta Naluns (Schuls- Scuol),0.0,Engadin Ober,Engadin Ober,,new
+Motto del...,1,1,25.50,yes,ambiguous,low,osm_peak,prefix,17,Motto Del Belvedere,Motto Del Belvedere | Motto dell` Asino | Motto della Scala | Motto del Piano | Motto del Toro | Motto della Fame,46.49345,9.30411,"Bocchetta de Curciusa, San Bernardino",7.4,Tessin Zentral,,,ambiguous_region
+Muerren,1,1,31.55,no,resolved_spot,medium,pge,prefix,1,Mürren-1680,Mürren-1680,46.56030,7.89006,Mürren-1680,0.0,Berner Voralpen,Berner Voralpen,,new
+Mutthornh...,1,1,29.60,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Mägisalp,1,2,56.09,no,unresolved,,,,0,,,,,,,,,,no_coords
+Mönch,1,2,27.40,no,ambiguous,low,osm_peak,exact,2,Mönch,Mönch | Monch,46.55850,7.99727,Jungfraujoch,1.9,Berner Voralpen,Zentralwallis,,new
+Münster,1,1,4.40,no,region_only,low,osm_peak,prefix,1,Münsterjoch,Münsterjoch,46.52364,8.19789,Baechigalen,4.5,Oberwallis / Goms,Zentralwallis,,new
+NATIONAL,1,1,21.70,no,unresolved,,,,0,,,,,,,,,,no_coords
+National Park,1,1,30.14,no,unresolved,,,,0,,,,,,,,,Engadin S-charl,no_coords
+Niederhorn,1,0,136.63,no,resolved_spot,medium,pge,prefix,1,Niederhorn-1920,Niederhorn-1920,46.71000,7.77342,Niederhorn-1920,0.0,Berner Voralpen,Berner Voralpen,,new
+Niesen-2280,1,0,74.81,no,resolved_spot,high,pge,exact,1,Niesen-2280,Niesen-2280,46.64410,7.64566,Niesen-2280,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Nüenchamm,1,1,56.61,no,region_only,medium,osm_peak,exact,1,Nüenchamm,Nüenchamm,47.09145,9.12063,Fronalp,2.9,Glarnerland / Walensee,Glarnerland / Walensee,,new
+ORIEN,1,1,2.52,no,ambiguous,low,pge,contains,2,Saleve - La Table d'Orientation,Saleve - La Table d'Orientation | L'Orient - Les Esserts,46.14870,6.18910,Saleve - La Table d'Orientation,0.0,Genferseeregion,,,ambiguous_region
+Oberchäse...,1,1,4.05,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Orenberg,1,1,6.07,no,suspect_match,low,osm_peak,contains,1,Hörenberg,Hörenberg,47.70587,9.12320,Hamenberg - Rudolfingen,34.6,,Bodenseeraum,,new
+P Bergbah...,1,2,5.66,yes,unresolved,,,,0,,,,,,,,,,no_coords
+P Talstat...,1,1,28.69,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Parc des ...,1,1,94.37,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Pente du ...,1,1,12.50,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Pfunds,1,1,58.37,no,unresolved,,,,0,,,,,,,,,,no_coords
+Pierre à ...,1,1,8.85,yes,ambiguous,low,osm_peak,prefix,2,Pierre Avoi,Pierre Avoi | Pierre à Midi,46.11815,7.20000,La Tournelle 2,0.8,,,,ambiguous_region
+Pierreberg,1,1,56.90,no,unresolved,,,,0,,,,,,,,,,no_coords
+Pino,1,1,115.80,no,unresolved,,,,0,,,,,,,,,,no_coords
+Piz Belvair,1,0,66.52,no,region_only,medium,osm_peak,exact,1,Piz Belvair,Piz Belvair,46.61208,9.91945,la Punt - Muntische,2.4,Engadin Ober,Engadin Ober,,new
+Piz Cluen,1,0,114.95,no,region_only,low,osm_peak,prefix,1,Piz Clünas,Piz Clünas,46.82037,10.24475,Motta Naluns 2,2.3,,,,ambiguous_region
+Piz Corva,1,0,116.54,no,region_only,low,osm_peak,prefix,1,Piz Corvatsch,Piz Corvatsch,46.40849,9.81614,Corvatsch (Silvaplana- St.Moritz),0.9,Engadin Ober,Engadin Ober,,new
+Piz Mezdi,1,1,6.86,no,region_only,medium,osm_peak,exact,1,Piz Mezdi,Piz Mezdi,46.47012,9.86329,Alp Languard 1,4.9,,Engadin Ober,,new
+Piz Mudin,1,1,40.79,no,unresolved,,,,0,,,,,,,,,,no_coords
+Pizzo del...,1,1,31.84,yes,ambiguous,low,osm_peak,prefix,108,Pizzo delle Tre Mogge,Pizzo delle Tre Mogge | Pizzo della Forcola Alta | Pizzo del Ferro Orientale | Pizzo della Palù | Pizzo del Muretto | Pizzo del Leverone,46.35186,9.82191,Corvatsch (Silvaplana- St.Moritz),7.1,Engadin Ober,,,ambiguous_region
+Pointe de,1,0,95.56,no,region_only,medium,dhv_alt,prefix,1,Pointe de Bellevue,Pointe de Bellevue,46.24908,6.90473,Pointe de Bellevue,0.0,,Waadtlaender Alpen,,new
+Pradoir,1,1,6.59,no,unresolved,,,,0,,,,,,,,,,no_coords
+Pradóir,1,1,15.56,no,unresolved,,,,0,,,,,,,,,,no_coords
+Prodchamm,1,0,74.83,no,unresolved,,,,0,,,,,,,,,,no_coords
+Prés d'Or...,1,1,17.90,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Pépinet,1,1,14.34,no,unresolved,,,,0,,,,,,,,,,no_coords
+Ragenau,1,1,9.77,no,unresolved,,,,0,,,,,,,,,,no_coords
+Ratoser Stei,1,2,17.00,no,region_only,medium,osm_peak,exact,1,Ratoser Stei,Ratoser Stei,46.86539,9.63890,Chur - Montalin -2260,3.7,Ostschweiz,Prättigau - Davos,,new
+Rheinwald...,1,1,15.88,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Riederalp- Greicheralp,1,0,86.60,no,resolved_spot,high,pge,exact,1,Riederalp- Greicheralp,Riederalp- Greicheralp,46.37700,8.03090,Riederalp- Greicheralp,0.0,Oberwallis / Goms,Oberwallis / Goms,,new
+Roc d'Orz...,1,1,18.06,yes,resolved_spot,medium,pge,prefix,1,Roc d-'Orzival,Roc d-'Orzival,46.19450,7.53385,Roc d-'Orzival,0.0,Unterwallis,Unterwallis,,new
+Rodomont,1,0,92.88,no,ambiguous_variant,low,pge,contains,2,Les Rodomonts-1800,Les Rodomonts-1800 | Les Rodomonts-1860,46.50560,7.22172,Les Rodomonts-1800,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Rorschach,1,0,78.03,no,region_only,medium,dhv_alt,prefix,1,Rorschacherberg,Rorschacherberg,47.45355,9.50066,Rorschacherberg,0.0,,Ostschweiz,,new
+Rorschach...,1,1,3.76,yes,region_only,medium,dhv_alt,prefix,1,Rorschacherberg,Rorschacherberg,47.45355,9.50066,Rorschacherberg,0.0,,Ostschweiz,,new
+Roteflues...,1,1,12.14,yes,region_only,low,osm_peak,prefix,1,Rotefluespitz,Rotefluespitz,46.87782,7.94266,Rotenfluespitz,0.0,,Mittelland Zentral,,new
+Rotenflue...,1,1,4.22,yes,resolved_spot,high,pge,exact,1,Rotenflue,Rotenflue,47.01860,8.70177,Rotenflue,0.0,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Rothornhütte,1,1,10.39,no,unresolved,,,,0,,,,,,,,,,no_coords
+Rotse,1,1,58.33,no,ambiguous,low,osm_peak,contains,2,Le Rotsé,Le Rotsé | Col des Brotsets,46.24041,7.61938,Tignousa,1.4,Unterwallis,Unterwallis,,new
+Ruetiberg,1,1,2.65,no,region_only,medium,osm_peak,exact,1,Rütiberg,Rütiberg,47.41790,7.38799,Mont Raimeux Nord,12.5,,Jura Ost,,new
+Rueun,1,2,68.59,no,unresolved,,,,0,,,,,,,,,,no_coords
+SP (S) Al...,1,1,33.63,yes,unresolved,,,,0,,,,,,,,,,no_coords
+SP (SW) B...,1,1,12.44,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Salzmatt,1,1,86.63,no,unresolved,,,,0,,,,,,,,,,no_coords
+Sarn / Alp,1,0,81.55,no,unresolved,,,,0,,,,,,,,,,no_coords
+Sarn /Alp,1,1,10.19,no,unresolved,,,,0,,,,,,,,,,no_coords
+Sarner Alp,1,1,20.28,no,unresolved,,,,0,,,,,,,,,,no_coords
+Schafberg,1,1,5.11,no,resolved_spot,high,pge,exact,1,Schafberg,Schafberg,46.36840,7.66670,Schafberg,0.0,Unterwallis,Unterwallis,,new
+Schiesshorn,1,1,4.43,no,ambiguous,low,osm_peak,exact,2,Schiesshorn,Schiesshorn | Schießhorn,46.76637,9.70313,Arosa -Brueggerhorn,5.0,Prättigau - Davos,Prättigau - Davos,,new
+Schilthorn -Mürren - Muerren,1,0,73.28,no,resolved_spot,high,pge,exact,1,Schilthorn -Mürren - Muerren,Schilthorn -Mürren - Muerren,46.55850,7.83000,Schilthorn -Mürren - Muerren,0.0,Berner Voralpen,Berner Voralpen,,new
+Schlivera,1,0,104.96,no,unresolved,,,,0,,,,,,,,,,no_coords
+Schmadrih...,1,1,4.94,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Schoenboden,1,1,16.57,no,unresolved,,,,0,,,,,,,,,,no_coords
+Schofwies,1,1,4.39,no,unresolved,,,,0,,,,,,,,,,no_coords
+Schonegg,1,1,30.49,no,resolved_spot,medium,pge,prefix,1,Schonegg-2190,Schonegg-2190,46.69160,7.98574,Schonegg-2190,0.0,Berner Voralpen,Berner Voralpen,,new
+Schänis,1,1,202.23,no,resolved_spot,medium,pge,prefix,1,Schänis - Hüsliberg,Schänis - Hüsliberg,47.18970,9.07480,Schänis - Hüsliberg,0.0,Alpstein / Ostschweiz,Alpstein / Ostschweiz,,new
+Sconosciuto,1,1,17.60,no,unresolved,,,,0,,,,,,,,,,no_coords
+Sembrancher,1,1,40.70,no,unresolved,,,,0,,,,,,,,,Unterwallis,no_coords
+Senin,1,1,20.91,no,unresolved,,,,0,,,,,,,,,,no_coords
+Sorvilier,1,1,51.55,no,resolved_spot,medium,pge,contains,1,Montagne de Sorvilier,Montagne de Sorvilier,47.22360,7.31453,Montagne de Sorvilier,0.0,Jura Zentral,Jura Zentral,,new
+TO (E) Ev...,1,1,17.19,yes,unresolved,,,,0,,,,,,,,,,no_coords
+TO (NE) C...,1,1,73.54,yes,unresolved,,,,0,,,,,,,,,,no_coords
+TO (S-SE),1,1,95.27,no,region_only,medium,osm_peak,exact,1,Tosse,Tosse,46.66767,7.39443,Widdersgrind-2020,1.3,Freiburger Voralpen,Freiburger Voralpen,,new
+TO (SW-NW...,1,1,51.85,yes,unresolved,,,,0,,,,,,,,,,no_coords
+TO (W-NW),1,1,137.62,no,unresolved,,,,0,,,,,,,,,,no_coords
+Teysachaux,1,1,31.29,no,region_only,medium,osm_peak,exact,1,Teysachaux,Teysachaux,46.53404,6.99629,Le Moléson-2000 SW,2.1,Freiburger Voralpen,Freiburger Voralpen,,new
+Thyon,1,1,34.59,no,ambiguous_variant,low,pge,contains,2,Crete de Thyon-2060 (Veysonnaz),Crete de Thyon-2060 (Veysonnaz) | Crete de Thyon-2380,46.17970,7.36417,Crete de Thyon-2060 (Veysonnaz),0.0,Unterwallis,Unterwallis,,new
+Titlis,1,0,118.45,no,resolved_spot,medium,pge,contains,1,Engelberg -Titlis,Engelberg -Titlis,46.77310,8.43502,Engelberg -Titlis,0.0,Zentralschweizer Voralpen,Zentralschweizer Voralpen,,new
+Tracouet,1,0,141.91,no,resolved_spot,medium,pge,contains,1,Haute-Nendaz - Tracouet,Haute-Nendaz - Tracouet,46.16120,7.28329,Haute-Nendaz - Tracouet,0.0,Unterwallis,Unterwallis,,new
+Trutä,1,1,11.51,no,unresolved,,,,0,,,,,,,,,,no_coords
+Tschenten,1,1,16.98,no,resolved_spot,medium,pge,prefix,1,Tschentenegg,Tschentenegg,46.49950,7.54806,Tschentenegg,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Tschingla,1,2,29.57,no,region_only,medium,osm_peak,exact,1,Tschingla,Tschingla,46.78704,9.59962,Gürgaletsch,1.6,,Prättigau - Davos,,new
+Tschäpper...,1,1,1.86,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Tussweid ...,1,1,1.50,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Unter Margli,1,2,17.58,no,unresolved,,,,0,,,,,,,,,,no_coords
+Unterbüelen,1,1,7.78,no,unresolved,,,,0,,,,,,,,,,no_coords
+Vacheresse,1,1,5.51,no,resolved_spot,high,pge,exact,1,Vacheresse,Vacheresse,46.56340,7.13173,Vacheresse,0.0,Freiburger Voralpen,Freiburger Voralpen,,new
+Visperter...,1,1,4.60,yes,unresolved,,,,0,,,,,,,,,,no_coords
+Visperterminen,1,1,44.65,no,unresolved,,,,0,,,,,,,,,Wallis Visp,no_coords
+Vogelberg,1,1,5.04,no,region_only,medium,osm_peak,exact,1,Vogelberg,Vogelberg,47.36836,7.68251,Hohwacht,1.1,Jura Ost,Jura Zentral,,new
+Wasserfallen,1,1,28.98,no,region_only,high,dhv_alt,exact,1,Wasserfallen,Wasserfallen,47.37427,7.70469,Wasserfallen,0.0,,Jura Ost,,new
+Widderfel,1,0,78.64,no,ambiguous,low,osm_peak,prefix,2,Widderfeldstock,Widderfeldstock | Widderfeld,46.83369,8.33256,Lutersee,2.6,,Zentralschweizer Voralpen,,new
+Wpt001,1,1,19.99,no,unresolved,,,,0,,,,,,,,,,no_coords
+Zahlershorn,1,1,12.84,no,region_only,medium,osm_peak,exact,1,Zahlershorn,Zahlershorn,46.51582,7.70964,Bire-2360,1.0,Freiburger Voralpen,Freiburger Voralpen,,new
+alpage d...,1,1,70.54,yes,unresolved,,,,0,,,,,,,,,,no_coords
+blas,1,1,20.75,no,unresolved,,,,0,,,,,,,,,,no_coords
+craistas,1,1,4.85,no,ambiguous,low,osm_peak,prefix,2,Craista Sura,Craista Sura | Craista Sot,46.93570,10.46561,Motta Naluns 2,20.0,,,,ambiguous_region
+croix de ...,1,1,92.85,yes,ambiguous,low,pge,prefix,2,Croix de Culet,Croix de Culet | Croix de l Aiguille,46.17630,6.84037,Croix de Culet,0.0,Waadtländer Alpen,Waadtlaender Alpen,,new
+dixence,1,1,47.52,no,unresolved,,,,0,,,,,,,,,,no_coords
+fontanet,1,1,6.82,no,resolved_spot,medium,pge,contains,1,Verbier - Ruinettes _ Fontanets_Attelas,Verbier - Ruinettes _ Fontanets_Attelas,46.09040,7.25185,Verbier - Ruinettes _ Fontanets_Attelas,0.0,Unterwallis,Unterwallis,,new
+gazzi,1,1,6.28,no,region_only,low,osm_peak,contains,1,Monte Gazzirola,Monte Gazzirola,46.11798,9.07238,Monte Bar,5.0,Tessin Zentral,,,ambiguous_region
+il jalet,1,1,5.76,no,region_only,medium,osm_peak,exact,1,Il Jalet,Il Jalet,46.63582,10.28571,Terza 2,10.0,,Engadin Ober,,new
+kmvertifly,1,1,4.56,no,unresolved,,,,0,,,,,,,,,,no_coords
+la Payanne,1,0,110.51,no,region_only,low,osm_peak,contains,1,Tête de la Payanne,Tête de la Payanne,46.03621,7.19583,Orsieres,6.1,,Unterwallis,,new
+le Chiesso,1,1,24.90,no,unresolved,,,,0,,,,,,,,,,no_coords
+les chailles,1,1,38.35,no,unresolved,,,,0,,,,,,,,,,no_coords
+marbachegg,1,1,4.90,no,resolved_spot,medium,pge,prefix,1,Marbachegg-1480,Marbachegg-1480,46.83500,7.90427,Marbachegg-1480,0.0,Berner Oberland,Berner Oberland,,new
+schwefelberg,1,1,19.63,no,unresolved,,,,0,,,,,,,,,,no_coords
+serdun,1,1,0.76,no,unresolved,,,,0,,,,,,,,,,no_coords
+tuffarolas,1,1,26.55,no,unresolved,,,,0,,,,,,,,,,no_coords
+zugerber,1,1,18.26,no,resolved_spot,medium,pge,prefix,1,Zugerberg,Zugerberg,47.14780,8.53573,Zugerberg,0.0,Mittelland Zentral,Mittelland Zentral,,new

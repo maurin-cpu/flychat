@@ -140,6 +140,35 @@ MAPPING = {
 # Namen, die keine echten Spots sind -> ignorieren (kein observation-Row)
 SKIP = {"?", "Inconnu", "unknown", "TO (N-NW)...", "TO (WNW)...", "Talstatio...", "TO"}
 
+# --- Persistente Alias-Tabelle (erzeugt von scripts/build_spot_aliases.py) ---
+# Ergaenzt MAPPING um die maschinell aufgeloesten Namen. Das kuratierte MAPPING
+# oben hat Vorrang; aus der Tabelle werden nur eindeutige Spot-Treffer
+# uebernommen (status=resolved_spot, confidence in high/medium).
+ALIASES = ROOT / "xcontest_validation" / "spot_aliases.csv"
+
+
+def load_aliases():
+    """-> (name->pge_key, name->(region, confidence))
+
+    Zweiter Rueckgabewert traegt die Region-Ebene: Namen, die keinen DB-Spot
+    haben, deren Koordinate aber in einem Regions-Polygon liegt. Damit bleibt
+    ein Flug fuer die Region-Validierung nutzbar, auch wenn der Spot fehlt.
+    """
+    spot_map, region_map = {}, {}
+    if not ALIASES.exists():
+        return spot_map, region_map
+    with ALIASES.open(encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            name = row["xc_name"]
+            if row["status"] == "resolved_spot" and row["confidence"] in ("high", "medium"):
+                spot_map[name] = row["db_name"]
+            if row["region_pip"]:
+                region_map[name] = (row["region_pip"], row["confidence"])
+    return spot_map, region_map
+
+
+ALIAS_MAP, ALIAS_REGION = load_aliases()
+
 # Snapshot-Vollstaendigkeit pro Tag (siehe Investigation):
 #   xc_ok   = streckenflug_rating ist valide (LLM-XC-Pass gelaufen)
 #   exp_ok  = experience_rating ist valide
@@ -232,6 +261,11 @@ def map_to_pge(name, arch_spots):
         return None, "mapped_missing:" + key
     if name in arch_spots:
         return name, "exact"
+    if name in ALIAS_MAP:
+        key = ALIAS_MAP[name]
+        if key in arch_spots:
+            return key, "alias"
+        return None, "alias_missing:" + key
     return None, "gap"
 
 
@@ -262,15 +296,20 @@ def build_rows(date, agg, arch):
     flags = DATE_FLAGS.get(date, {"xc_ok": True, "exp_ok": True})
     xc_ok, exp_ok = flags["xc_ok"], flags["exp_ok"]
     rows = []
-    diag = {"mapped": 0, "exact": 0, "gap": 0, "skip": 0, "mapped_missing": 0}
+    diag = {"mapped": 0, "exact": 0, "alias": 0, "gap": 0, "skip": 0,
+            "mapped_missing": 0, "alias_missing": 0, "region_only": 0}
     for name, a in sorted(agg.items(), key=lambda kv: -kv[1]["best_km"]):
         pge, how = map_to_pge(name, arch_spots)
-        if how.startswith("mapped_missing"):
-            diag["mapped_missing"] += 1
+        if how.startswith("mapped_missing") or how.startswith("alias_missing"):
+            diag["mapped_missing" if how.startswith("mapped") else "alias_missing"] += 1
+            if name in ALIAS_REGION:
+                diag["region_only"] += 1
             how_short = "gap"
         else:
             how_short = how
             diag[how] = diag.get(how, 0) + 1
+            if how == "gap" and name in ALIAS_REGION:
+                diag["region_only"] += 1
         pilot, start, airtime = a["top"] or ("", "", "")
         row = {c: "" for c in COLS}
         row.update({
@@ -282,9 +321,20 @@ def build_rows(date, agg, arch):
             continue
         if pge is None:
             row["finding_type"] = "coverage_gap"
-            row["notes"] = f"Nicht in PGE-DB (XContest: {name})."
-            row["region"] = ""
             row["spot"] = name
+            # Spot fehlt, Region kann trotzdem feststehen: Alias-Tabelle liefert
+            # die Koordinate (Alt-DB/OSM) und daraus per Punkt-in-Polygon die
+            # Analyse-Region. Solche Zeilen sind region-, nicht spot-validierbar.
+            alias_reg = ALIAS_REGION.get(name)
+            if alias_reg:
+                region, conf = alias_reg
+                row["region"] = region
+                row["notes"] = (f"Nicht in PGE-DB (XContest: {name}); "
+                                f"Region via Alias-Tabelle ({conf} confidence) "
+                                f"-> nur Region-Ebene validierbar.")
+            else:
+                row["region"] = ""
+                row["notes"] = f"Nicht in PGE-DB (XContest: {name})."
             rows.append(row)
             continue
         s = arch_spots[pge]
@@ -295,6 +345,7 @@ def build_rows(date, agg, arch):
         exp_val = ana.get("experience_rating")
         xc_legacy = ana.get("streckenflug_rating")
         row["our_safety_rating"] = ana.get("rating", "")
+        row["our_status"] = status
         row["our_experience_rating"] = (exp_val if (exp_val is not None and exp_ok) else "")
         # Ab 2026-05-30: streckenflug abgekuendigt -> XC-Signal = experience_rating
         # (in die Flugeinschaetzung integriert). Davor: eigenes streckenflug-Feld.
@@ -360,8 +411,11 @@ def main(argv):
         print(f"\n===== {date} =====")
         print(f"Fluege: {len(flights)}  Spots: {len(agg)}  "
               f"mapped={diag.get('mapped',0)} exact={diag.get('exact',0)} "
-              f"gap={diag.get('gap',0)} skip={diag.get('skip',0)} "
-              f"mapped_missing={diag.get('mapped_missing',0)}")
+              f"alias={diag.get('alias',0)} "
+              f"gap={diag.get('gap',0)} (davon region_only={diag.get('region_only',0)}) "
+              f"skip={diag.get('skip',0)} "
+              f"mapped_missing={diag.get('mapped_missing',0)} "
+              f"alias_missing={diag.get('alias_missing',0)}")
         from collections import Counter
         ft = Counter(r["finding_type"] for r in rows)
         print("finding_type:", dict(ft))

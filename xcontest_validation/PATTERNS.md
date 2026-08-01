@@ -646,9 +646,39 @@ Mapping falsch ist, wird der Vergleich falsch.
   laden zum Identifizieren.
 
 **Nächste Schritte**:
-- Bei zukünftigen XContest-Auszügen Alias-Tabelle führen
+- ~~Bei zukünftigen XContest-Auszügen Alias-Tabelle führen~~ → umgesetzt 30.07., s. u.
 - Klären: ist "Obere Wengi" tatsächlich Niederhorn oder eigener Spot?
   → Spot in DB ergänzen falls Lücke
+
+### Alias-Tabelle umgesetzt (2026-07-30)
+
+`scripts/build_spot_aliases.py` → `spot_aliases.csv` (373 unmatched Namen aus
+728 `coverage_gap`-Zeilen). Damit ist I-009 **quantifiziert und in drei
+Ursachen getrennt** — vorher war alles ununterscheidbar `coverage_gap`:
+
+| Ursache | Zeilen | Folge |
+|---|---|---|
+| Name wich ab, Spot war am Tag im Snapshot | **105** | war **unnötig** verloren → jetzt spot-validierbar |
+| Alias sauber, Spot an dem Tag nicht im Snapshot | 27 | Region-Ebene |
+| Nur Koordinate auflösbar (Alt-DB/OSM), Spot nicht in DB | 310 | Region-Ebene |
+| Kein Snapshot an dem Tag (11.06 etc.) | 37 | Datenlücke, unabhängig von I-009 |
+| Unauflösbar (keine Koordinate, oft Truncate) | 249 | offen |
+
+→ **105 Zeilen spot-validierbar, 337 region-validierbar**, 286 bleiben offen.
+Damit lässt sich Spot-Genauigkeit und Region-Genauigkeit erstmals getrennt
+ausweisen (Region-Stichprobe ist deutlich grösser als die Spot-Stichprobe).
+
+**Wichtig für die Interpretation älterer Befunde**: der Ausfall war nicht
+zufällig verteilt. Im Jura fehlten mit Caquerelle, Le Cernil, Montoz, Raimeux
+gleich mehrere Startplätze — also genau in der Region, die in
+`2026-07-26_ANALYSE_49_TAGE.md` als systematisch überbewertet auffällt. Der
+Perzentil-Befund selbst hängt nicht am Mapping, die Stichprobendichte pro
+Region aber schon.
+
+**Offen**: die 66 `low`-confidence-Namen sind eine Review-Queue, kein Ergebnis
+(gleichnamige Gipfel: `Walalp` → Walalpgrat FR statt Stoos). `observations.csv`
+ist noch **nicht** neu aufgebaut — die 105 gewinnbaren Zeilen stecken bis dahin
+weiter als `coverage_gap` in der Historie.
 
 ---
 
@@ -945,6 +975,23 @@ Tages-Best-km) +0.42, Steigen +0.24 (n=49).
 
 **Nicht** durch Skalierung behebbar — ein globaler Faktor ändert die Rangfolge
 nicht. Details, Zahlen und Grenzen: `2026-07-26_ANALYSE_49_TAGE.md`.
+
+---
+
+## I-018 — `our_status` wurde vom Aggregator nie geschrieben (GEFIXT 30.07.)
+
+**Erstmals bemerkt**: 2026-07-30 (beim Bau von `scripts/xc_accuracy.py`)
+**Status**: Code gefixt, Historie noch nicht neu aufgebaut
+
+`build_rows()` in `xc_aggregate.py` las `status = ana.get("status")`, nutzte ihn
+für `classify()` — schrieb ihn aber nie in `row["our_status"]`. Alle maschinell
+erzeugten Zeilen seit 27.05. haben die Spalte leer. Gefüllt sind nur die 327
+Zeilen der 14 handkuratierten Tage (von 1822).
+
+**Folge**: jede Auswertung, die auf `observations.csv.our_status` filterte, lief
+auf 18 % der Daten, ohne Fehler zu werfen. Fix: `row["our_status"] = status`.
+
+**Offen**: `observations.csv` neu aufbauen — die Historie trägt die Lücke weiter.
 
 ---
 
