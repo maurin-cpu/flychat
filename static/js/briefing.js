@@ -2163,27 +2163,35 @@
     const longText = overview.long || "";
 
     // Ein Tages-Eintrag: "Wochentag:" am Zeilenanfang wird als <strong>
-    // hervorgehoben, flight_hint (optional) darunter als Pilotensicht-Zeile —
-    // visuell deutlich von der Wetterbeschreibung getrennt.
-    const dayBlockHtml = (e) => {
+    // hervorgehoben (Legacy-Ansicht) ODER ganz entfernt (stripPrefix: die
+    // Tagesansicht zeigt ohnehin nur den gewaehlten Tag — der Wochentag
+    // steht schon im aktiven Tab). flight_hint (optional) darunter als
+    // Pilotensicht-Zeile — visuell deutlich von der Wetterbeschreibung
+    // getrennt.
+    const dayBlockHtml = (e, stripPrefix) => {
       const txt = escapeHtml(e.text);
       const hint = e.flight_hint ? escapeHtml(e.flight_hint) : "";
       const hintHtml = hint
         ? `<p class="bf-wetterlage-hint"><span class="bf-wetterlage-hint-icon" aria-hidden="true">⏵</span> ${hint}</p>`
         : "";
       const m = txt.match(/^(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*/);
-      const body = m
-        ? `<p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>`
-        : `<p class="bf-wetterlage-lead">${txt}</p>`;
+      let body;
+      if (m && stripPrefix) {
+        body = `<p class="bf-wetterlage-day">${txt.slice(m[0].length)}</p>`;
+      } else if (m) {
+        body = `<p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>`;
+      } else {
+        body = `<p class="bf-wetterlage-lead">${txt}</p>`;
+      }
       return `<div class="bf-wetterlage-day-block">${body}${hintHtml}</div>`;
     };
 
     // Synoptik 2.0: `zones` = 4 Flugwetter-Zonen mit je einem Eintrag pro Tag.
     // Angezeigt wird NUR der gewaehlte Tag (Day-Tabs zuoberst steuern die
-    // ganze Seite) — der Tages-Eintrag jeder Zone, immer sichtbar, ohne
-    // Toggle. Legacy-Fallback (`long_with_sources`) bleibt fuer alte Caches
-    // beim alten Toggle-Verhalten, damit ein noch nicht refreshter Cache den
-    // Block nicht leert.
+    // ganze Seite): Summary zuerst, die Zonen-Texte des Tages hinter dem
+    // Detail-Toggle, Wochentag-Praefix gestrippt (steht schon im Tab).
+    // Legacy-Fallback (`long_with_sources`) bleibt fuer alte Caches
+    // erhalten, damit ein noch nicht refreshter Cache den Block nicht leert.
     const zones = Array.isArray(overview.zones)
       ? overview.zones.filter(z => z && Array.isArray(z.days) && z.days.length)
       : [];
@@ -2209,28 +2217,31 @@
       outlookLegacyText ? `<p>${escapeHtml(outlookLegacyText)}</p>` : "",
     ].filter(Boolean).join("");
 
-    let dayHtml = "";
-    let legacyHtml = "";
+    // detailHtml = aufklappbarer Teil hinter dem Detail-Toggle (Summary
+    // zuerst, Gebiete auf Klick). nodayHtml = ehrliche Leer-Zeile, direkt
+    // sichtbar OHNE Toggle — hinter einem Klapper waere sie eine Falle.
+    let detailHtml = "";
+    let nodayHtml = "";
     if (zones.length) {
       if (wlIdx >= 0) {
-        dayHtml = zones.map(z => {
+        detailHtml = zones.map(z => {
           const d = z.days[wlIdx];
           if (!d || !d.text) return "";
           return `
             <section class="bf-wetterlage-zone">
               <h4 class="bf-wetterlage-zone-title">${escapeHtml(z.label || z.zone || "")}</h4>
-              ${dayBlockHtml(d)}
+              ${dayBlockHtml(d, true)}
             </section>
           `;
         }).join("");
       }
-      if (!dayHtml) {
-        dayHtml = `<p class="bf-wetterlage-noday">${escapeHtml(wcT("js.wetterlage.no_day"))}</p>`;
+      if (!detailHtml) {
+        nodayHtml = `<p class="bf-wetterlage-noday">${escapeHtml(wcT("js.wetterlage.no_day"))}</p>`;
       }
     } else if (longEntries.length) {
-      legacyHtml = longEntries.map(dayBlockHtml).join("");
+      detailHtml = longEntries.map(e => dayBlockHtml(e, false)).join("");
     } else if (longText && longText !== shortText) {
-      legacyHtml = `<p>${escapeHtml(longText)}</p>`;
+      detailHtml = `<p>${escapeHtml(longText)}</p>`;
     }
 
     el.hidden = false;
@@ -2241,12 +2252,12 @@
         <a class="bf-wetterlage-maplink" href="/synoptik">${escapeHtml(wcT("js.wetterlage.to_map"))} →</a>
       </div>
       <div class="bf-wetterlage-summary">${summaryParas}</div>
-      ${dayHtml ? `<div class="bf-wetterlage-long">${dayHtml}</div>` : ""}
-      ${legacyHtml ? `
+      ${nodayHtml}
+      ${detailHtml ? `
         <button type="button" class="bf-wetterlage-toggle" aria-expanded="${state.wetterlageOpen ? "true" : "false"}">
           ${state.wetterlageOpen ? wcT("js.wetterlage.less") : wcT("js.wetterlage.detail")} <span class="bf-wetterlage-chevron" aria-hidden="true">▾</span>
         </button>
-        <div class="bf-wetterlage-long"${state.wetterlageOpen ? "" : " hidden"}>${legacyHtml}</div>
+        <div class="bf-wetterlage-long"${state.wetterlageOpen ? "" : " hidden"}>${detailHtml}</div>
       ` : ""}
     `;
     el.classList.toggle("is-open", !!state.wetterlageOpen);
