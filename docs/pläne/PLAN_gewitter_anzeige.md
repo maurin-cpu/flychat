@@ -395,8 +395,7 @@ den gefährlichsten Tagen unterdrücken.
 
 ## 12b. Erster Modellvergleich — XC Therm gegen uns
 
-Vollständige Daten: `data/modellvergleich/2026-08-02.json`,
-Regionszuordnung: `data/modellvergleich/regionen_mapping_xctherm.json`.
+Vollständige Daten und Regionszuordnung: Kapitel 12b-1 weiter unten.
 **Ohne diese Zuordnung vergleicht man Namen statt Gebiete** — am 02.08. führte
 das zu zwei Fehlschlüssen (Zentralschweizer Voralpen ist *nicht* Urner Alpen;
 Tessin Zentral ist Alpi Ticinesi, nicht Sopra Ceneri).
@@ -416,9 +415,8 @@ beiden Seiten.
 
 ## 12b-1. Die Vergleichsdaten vom 02.08. — vollständig
 
-Auch als Datei: `data/modellvergleich/2026-08-02.json` und
-`data/modellvergleich/regionen_mapping_xctherm.json`. Hier im Klartext, damit
-der Vergleich ohne Werkzeug nachvollziehbar bleibt.
+Alles steht hier im Klartext. **Bewusst keine separaten Datendateien** — jeder
+weitere Vergleichstag kommt als eigener Abschnitt in dieses Dokument.
 
 ### Regionszuordnung — zuerst lesen
 
@@ -596,9 +594,9 @@ gemeint ist. Die aus unserer Sicht schwächsten Glieder der Kette:
 ## 12c. Offen — hier geht es am 03.08. weiter
 
 1. **Vergleich für Montag ziehen.** XC Therm für 03.08. abgreifen (kommt vom
-   User, wir kommen an die Seite nicht ran), unsere Werte danebenstellen, in
-   `data/modellvergleich/2026-08-03.json` ablegen. Erst mit zwei Tagen lässt
-   sich sagen, ob die Verbesserung echt ist oder Tagesrauschen.
+   User, wir kommen an die Seite nicht ran), unsere Werte danebenstellen und
+   als neues Kapitel 12b-1b hier eintragen — Aufbau wie 12b-1. Erst mit zwei
+   Tagen lässt sich sagen, ob die Verbesserung echt ist oder Tagesrauschen.
 2. **Blinder Fleck Hochalpen.** Oberengadin meldet im Ensemble **0 %**, während
    XC Therm dort 2,5 h Gewitter zeigt. Der Lifted Index hat das nicht behoben —
    das Problem sitzt im Modellsignal, nicht im Filter. Nächster Schritt:
