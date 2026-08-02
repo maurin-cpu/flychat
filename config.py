@@ -143,17 +143,17 @@ ENSEMBLE_THUNDER_MENTION_PCT  = 15   # ab hier ueberhaupt erwaehnen ("moeglich")
 # Text-Stufen (MENTION/ELEVATED/HIGH) zu bewegen. Ein Satz im Analysetext ist
 # billig, ein Blitz im Meteogramm ist laut.
 #
-# TAGES-Schwelle: ab wieviel Prozent der Member ueberhaupt Blitze fuer diesen
-# Tag gezeigt werden. Gilt fuer das Schwerpunkt-Fenster.
-# 31.07.2026 von 15 auf 50 gesetzt — bei 15 leuchteten 88 von 145 Region-Tagen
-# und rund jede fuenfte Flugstunde; im Betrieb als zu empfindlich bewertet.
-# Kosten: Tage mit schwachem Signal fallen ganz raus (Zentralschweizer
-# Voralpen 01.08. mit 19 % zeigt keinen Blitz mehr — im TEXT bleibt der Hinweis
-# erhalten, weil ENSEMBLE_THUNDER_MENTION_PCT weiter bei 15 steht).
-ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT = 50
+# TAGES-Schwelle ABGESCHAFFT am 02.08.2026 (Schritt 1, PLAN_gewitter_anzeige
+# Teil B). Sie fuellte das ganze Schwerpunkt-Fenster mit Blitzen, sobald der
+# TAGESWERT ueber der Schwelle lag. Dieser Tageswert ist aber der Anteil der
+# Member, die IRGENDWANN im Flugfenster an IRGENDEINEM der 16 Referenzpunkte
+# zuenden — im Sommer nahezu gesaettigt (Median 95 % ueber alle Blitzstunden
+# vom 02.08.). Eine Tagesaussage auf Stunden zu malen erzeugte 53 der damals
+# 217 Blitzstunden, viele davon bei blankem Himmel. Der Tageswert bleibt fuer
+# den TEXT zustaendig (ENSEMBLE_THUNDER_MENTION_PCT), nicht fuer das Symbol.
 
-# STUNDEN-Schwelle: eine Einzelstunde mit sehr hoher Zustimmung zeigt einen
-# Blitz auch dann, wenn der Tag unter der Tages-Schwelle liegt.
+# STUNDEN-Schwelle: der Blitz kommt jetzt AUSSCHLIESSLICH aus dem stuendlichen
+# Member-Anteil — die einzige Groesse im Ensemble, die wirklich stuendlich ist.
 #
 # Warum ueberhaupt: das Meteogramm zeigte Gewitter nur aus dem
 # deterministischen weather_code — genau der Quelle, die Konvektion
@@ -170,6 +170,71 @@ ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT = 50
 ENSEMBLE_THUNDER_METEOGRAM_PCT = 40
 ENSEMBLE_THUNDER_ELEVATED_PCT = 40   # "erhoeht"
 ENSEMBLE_THUNDER_HIGH_PCT     = 60   # "hoch"
+
+# --- MINDESTANTEIL DER REFERENZPUNKTE (02.08.2026) ---
+# Bis hierher galt: zuendet EIN einziger der 7 Referenzpunkte in einem Member,
+# zaehlt dieser Member fuer die GANZE Region als Gewitter
+# (merge_points_per_member -> _severest, also ein ODER ueber die Flaeche).
+#
+# Messbefund vom 02.08. gegen XC Therm (25 zuordenbare Regionen): 5 Regionen,
+# in denen nur wir Gewitter zeigten, alle im Voralpenguertel 1400-1860 m —
+# genau dort spannen die 7 Punkte vom Talboden bis zum Grat und sind damit am
+# unterschiedlichsten, das ODER schlaegt also am staerksten durch. Dasselbe
+# ODER erzeugt die zu breiten Zeitfenster: ueber einen Nachmittag zuendet
+# fast immer irgendein Punkt, es entsteht ein Plateau statt einer Spitze
+# (unsere Fenster 3-6 h gegen 0.5-1.5 h bei XC Therm).
+#
+# 2 von 7: ein einzelner Punkt gilt als vereinzelt und traegt die Region
+# nicht mehr allein. UNGEMESSEN — rueckwirkend nicht pruefbar, weil wir nur
+# das fertige Ergebnis speichern und nicht die einzelnen Punkte. Wirkt erst
+# ab dem naechsten Wetterlauf; danach erneut gegen XC Therm vergleichen.
+ENSEMBLE_THUNDER_POINT_QUORUM = 2
+
+# --- PLAUSIBILITAETS-ANKER fuer das Blitz-Symbol (02.08.2026, Schritt 2) ---
+# Das Ensemble kennt nur Wettercodes. Bewoelkung, Niederschlag und CAPE
+# derselben Stunde stammen aus dem deterministischen Lauf und wurden nie
+# gegengelesen — die beiden mussten sich nie einig sein und waren es meist
+# nicht: von 217 Blitzstunden am 02.08. hatten 85 % keinen Niederschlag,
+# 53 % unter 50 % Bewoelkung, 50 % beides zugleich (Tessin Zentral 04.08.
+# 14:00 zeigte einen Blitz bei 2 % Bewoelkung).
+#
+# Ein Ensemble-Blitz erscheint nur noch, wenn der deterministische Lauf in
+# DERSELBEN Stunde ueberhaupt etwas zeigt:
+#     (Niederschlag ODER Bewoelkung) UND CAPE
+#
+# Wirkung gemessen (137 Regionstage): 36 % -> 19 % der Regionstage mit Blitz.
+#
+# Gilt NUR fuer den Ensemble-Weg. Ein deterministischer Gewittercode 95/96/99
+# bleibt ungefiltert — er stammt aus demselben Lauf wie Wolken und Regen und
+# ist damit per Konstruktion in sich stimmig; ihn zu unterdruecken hiesse, ein
+# hartes Modellsignal wegzurechnen.
+#
+# CIN ist BEWUSST NICHT Teil des Ankers: In den Alpen druecken
+# Talwind-Konvergenzen die Luft mechanisch durch den Deckel, und ein mittlerer
+# Deckel macht das Nachmittagsgewitter heftiger statt harmloser. Ein
+# CIN-Filter wuerde Blitze ausgerechnet an den gefaehrlichsten Tagen
+# unterdruecken.
+#
+# Der Lifted Index waere der trennschaerfste Wert (Median -2,1 in
+# Blitzstunden gegen -0,9 sonst, gemessen 01.08.), fehlt Regionen aber im
+# Abruf — kommt mit Schritt 3 zusammen mit dem DWD-Blitzpotenzial.
+#
+# UNGEMESSEN gesetzt, gegen das Archiv nachzuziehen.
+THUNDER_ANCHOR_PRECIP_MM  = 0.1   # mm/h in dieser Stunde
+THUNDER_ANCHOR_CLOUD_PCT  = 50    # % Gesamtbewoelkung in dieser Stunde
+THUNDER_ANCHOR_CAPE_JKG   = 300   # J/kg in dieser Stunde
+# Instabilitaet gilt als gegeben bei CAPE ODER Lifted Index. Das ODER ist der
+# Kern der Hoehenkorrektur (02.08.2026): CAPE wird vom Boden aufwaerts
+# gerechnet und ist zwischen Regionen unterschiedlicher Hoehe nicht
+# vergleichbar — auf 2450 m beginnt die Saeule oberhalb der feuchten
+# Grenzschicht. Gemessen: CAPE-Median 860 in den Voralpen, 295 im Hochgebirge,
+# und Oberwallis erreichte den ganzen 02.08. hoechstens 290, waehrend XC Therm
+# dort 1,5 h Gewitter zeigte. Mit CAPE allein waere die Schwelle dort eine
+# zweite Sperre gewesen.
+# -1.0 ist bewusst schwach angesetzt (Literatur: < -2 Gewitter moeglich,
+# < -4 kraeftig) — der Anker soll nur Unmoegliches ausschliessen, nicht
+# vorsortieren. UNGEMESSEN.
+THUNDER_ANCHOR_LI         = -1.0  # Lifted Index in dieser Stunde (kleiner = instabiler)
 
 # --- SURFACE-PARAMS die CH1/CH2 ueber Open-Meteo liefern ---
 # Mai 2026 verifiziert. Diese Liste wird im Wind/CH1/CH2-Batch verwendet.

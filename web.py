@@ -4056,6 +4056,12 @@ def _safe_get(arr, i):
     return arr[i]
 
 
+# Plausibilitaetsanker fuer den Ensemble-Blitz. Liegt in ensemble_thunder,
+# damit Meteogramm-Symbol, Gewitter-Kachel und LLM-Kontext garantiert dieselbe
+# Regel benutzen (vorher hatte jede Schicht ihre eigene Rechnung).
+from ensemble_thunder import thunder_anchor_ok as _thunder_anchor_ok  # noqa: E402
+
+
 # ============================================================================
 # DATA FORMATTING (adaptiert von uetliberg_ticker/web.py)
 # ============================================================================
@@ -4081,15 +4087,13 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
     """
     # Blitz-Stunden aus dem Ensemble ableiten.
     #
-    # Massgeblich ist das SCHWERPUNKT-FENSTER des Tages — also exakt die Aussage,
-    # die auch im LLM-Kontext steht ("Gewitterwahrscheinlichkeit 71 %,
-    # Schwerpunkt 13:00-17:00"). Anzeige und KI-Eingabe muessen dieselbe Geschichte
-    # erzaehlen; ein stuendlicher Anteil allein tut das nicht, weil der Tageswert
-    # (irgendein Member, irgendwann) systematisch hoeher liegt als jede
-    # Einzelstunde: 02.08. lag der Tag bei 71 %, die beste Stunde bei 43 %.
-    #
-    # Zusaetzlich zaehlt eine Einzelstunde mit sehr hohem Anteil, auch ausserhalb
-    # des Schwerpunkts (ENSEMBLE_THUNDER_METEOGRAM_PCT).
+    # NUR der stuendliche Member-Anteil (ENSEMBLE_THUNDER_METEOGRAM_PCT). Bis
+    # 02.08.2026 fuellte zusaetzlich der TAGESWERT das ganze Schwerpunkt-Fenster.
+    # Das war falsch: der Tageswert ist der Anteil der Member, die irgendwann im
+    # Flugfenster an irgendeinem der 16 Referenzpunkte zuenden — im Sommer
+    # nahezu gesaettigt (Median 95 %). Auf Stunden gemalt erzeugte er 53 von 217
+    # Blitzstunden, viele bei blankem Himmel. Fuer den TEXT bleibt der Tageswert
+    # zustaendig, fuers Stundensymbol ist er die falsche Groesse.
     ens_by_hour = {}
     ens_storm_hours = set()
     for _day, _v in (thunder_ensemble or {}).items():
@@ -4099,22 +4103,6 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
             ens_by_hour[f"{_day}T{_hhmm}"] = _share
             if _share is not None and _share >= config.ENSEMBLE_THUNDER_METEOGRAM_PCT:
                 ens_storm_hours.add(f"{_day}T{_hhmm}")
-        # Eigene, hoehere Schwelle fuer die ANZEIGE: der Text darf ab 15 %
-        # erwaehnen, der Blitz erst ab ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT.
-        # Direkt aus probability_pct gerechnet und nicht aus dem gespeicherten
-        # `level`, damit eine Schwellen-Aenderung sofort wirkt und nicht erst
-        # nach dem naechsten Wetterlauf.
-        _p = _v.get("probability_pct")
-        if _p is None or _p < config.ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT:
-            continue
-        _ps, _pe = _v.get("peak_start"), _v.get("peak_end")
-        if not _ps or not _pe:
-            continue
-        try:
-            for _h in range(int(_ps[:2]), int(_pe[:2]) + 1):
-                ens_storm_hours.add(f"{_day}T{_h:02d}:00")
-        except (TypeError, ValueError):
-            continue
     chart_data = {"wind": [], "precipitation": [], "thermik": [], "cloudbase": []}
     sorted_times = sorted(hourly_data.keys())
 
@@ -4161,16 +4149,15 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
             if precipitation is not None:
                 _wc = data.get("weather_code")
                 _ens = ens_by_hour.get(time_str[:16])
-                # Blitz = Ensemble ODER deterministischer Code. Das ODER ist
-                # Absicht: das Ensemble ist die fuehrende Quelle, aber ein
-                # hartes Modell-Gewitter darf nie verschwinden, nur weil die
-                # Member-Zahl knapp unter der Schwelle liegt.
-                # ODER ist Absicht: das Ensemble fuehrt, aber ein hartes
-                # Modell-Gewitter darf nie verschwinden, nur weil die
-                # Member-Zahl knapp unter der Schwelle liegt.
+                # Blitz = deterministischer Code ODER Ensemble-Stunde MIT
+                # Plausibilitaetsanker. Das ODER ist Absicht: das Ensemble ist
+                # die fuehrende Quelle, aber ein hartes Modell-Gewitter darf nie
+                # verschwinden, nur weil die Member-Zahl knapp unter der
+                # Schwelle liegt.
                 _storm = bool(
                     (_wc is not None and int(_wc) in (95, 96, 99))
-                    or (time_str[:16] in ens_storm_hours)
+                    or (time_str[:16] in ens_storm_hours
+                        and _thunder_anchor_ok(data))
                 )
                 chart_data["precipitation"].append({
                     "time": time_str,

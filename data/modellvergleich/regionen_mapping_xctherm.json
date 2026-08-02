@@ -1,0 +1,45 @@
+{
+  "_zweck": "Zuordnung unserer 29 Regionen zu den Regionen von XC Therm. Grundlage fuer jeden weiteren Modellvergleich — ohne diese Tabelle vergleicht man Namen statt Gebiete und zieht falsche Schluesse (am 02.08.2026 zwei Fehlzuordnungen: Zentralschweizer Voralpen ist NICHT Urner Alpen, und Tessin Zentral ist Alpi Ticinesi, nicht Sopra Ceneri).",
+  "_quelle": "Vom User am 02.08.2026 anhand der XC-Therm-Karte erstellt.",
+  "_warnung": "XC Therm ist KEINE Wahrheit — ein einzelner deterministischer Lauf gegen unsere 21 Ensemble-Member. Abweichung heisst Uneinigkeit, nicht Fehler.",
+
+  "sicher": {
+    "bodenseeraum": "Bodenseeraum",
+    "zentrales_mittelland": "Zentrales Mittelland",
+    "mittelland_ost": "Oestliches Mittelland",
+    "seeland_emmental": "Emmental",
+    "glarnerland_walensee": "Glarner Alpen",
+    "berner_oberland": "Berner Oberland",
+    "zentralschweizer_voralpen": "Zentrale Voralpen",
+    "freiburger_voralpen": "Freiburger Voralpen",
+    "praettigau_davos": "Praettigau-Davos",
+    "surselva": "Surselva",
+    "engadin_ober": "Oberengadin",
+    "genferseeregion": "Lac Leman",
+    "zentralwallis": "Valais Central",
+    "oberwallis_goms": "Oberwallis",
+    "unterwallis": "Bas-Valais",
+    "jura_west": "Neuenburger Jura"
+  },
+
+  "wahrscheinlich": {
+    "jura_zentral": "Berner Jura",
+    "jura_ost": "Tafeljura",
+    "mittelland_zentral": "Ober Aargau",
+    "mittelland_west": "Plateau",
+    "ostschweiz": "Rheintal",
+    "alpstein_ostschweiz": "Oestliche Voralpen",
+    "mattertal_saastal": "Walliser Hochalpen",
+    "tessin_nord": "Sopra Ceneri",
+    "tessin_zentral": "Alpi Ticinesi"
+  },
+
+  "ohne_entsprechung": {
+    "unsere_ohne_xctherm": ["berner_voralpen", "schwarzsee_gantrisch",
+                            "waadtlaender_alpen", "engadin_unter"],
+    "xctherm_ohne_unsere": ["Urner Alpen", "Berner Alpen", "Hinterrhein",
+                            "Bassa Valtellina", "Valsesia / Val d'Ossola"]
+  },
+
+  "_hinweis_namensfalle": "Unser 'Mittelland Zentral' liegt NICHT im Mittelland — die Referenzpunkte liegen im Entlebuch/Pilatus-Gebiet auf 1400 m Referenzhoehe. Gleichzeitig existiert eine eigene Region 'Zentrales Mittelland'. Beim Vergleich mit fremden Karten immer ueber die Koordinaten gehen, nie ueber den Namen. Siehe auch docs/plaene/PLAN_regionen_umbenennung.md."
+}

@@ -2908,8 +2908,32 @@ class WeatherContextMixin:
         # zu nehmen: die Schwelle ist Anzeige-Politik, keine Messgroesse. Sonst
         # wirkt eine Schwellen-Aenderung erst nach dem naechsten Wetterlauf —
         # und bis dahin zeigt die App eine Einstufung, die nicht mehr gilt.
+        # Ensemble-Gewitterstunden — DIESELBE Regel wie das Blitz-Symbol im
+        # Meteogramm (ensemble_thunder.is_ensemble_storm_hour): stuendlicher
+        # Member-Anteil plus Plausibilitaetsanker.
+        #
+        # Bis 02.08.2026 lief die Kachel auf dem TAGESWERT mit Schwerpunkt-
+        # fenster, das Symbol seit demselben Tag auf Stundenwerten. Ergebnis
+        # waren zwei widersprechende Aussagen nebeneinander: 20 von 29 Regionen
+        # mit geschriebener Gewitterwarnung, 9 mit Blitz im Meteogramm —
+        # Seeland/Emmental warnte bei 24 % ohne einen einzigen Blitz. Der
+        # Tageswert ist dafuer die falsche Groesse: er sagt nur, dass
+        # IRGENDWANN im Flugfenster an IRGENDEINEM der 16 Referenzpunkte ein
+        # Member zuendet, und ist im Sommer nahezu gesaettigt.
         from ensemble_thunder import probability_level as _ens_level
-        ens_level = _ens_level(ens.get("probability_pct"))
+        from ensemble_thunder import is_ensemble_storm_hour as _ens_storm_hour
+        ens_share = ens.get("hourly_share_pct") or {}
+        ens_storm_hours = []      # ["13:00", ...] — Stunden mit Blitz-Symbol
+        ens_storm_peak_pct = None  # hoechster Stundenanteil unter diesen Stunden
+        # Instabilitaet fuer die Analyse: BEIDE Werte, nicht nur CAPE.
+        # CAPE wird vom Boden aufwaerts gerechnet und ist zwischen Regionen
+        # unterschiedlicher Hoehe nicht vergleichbar (Voralpen-Median 860
+        # gegen 295 im Hochgebirge, gemessen 02.08.). Der Lifted Index ist
+        # weitgehend hoehenunabhaengig. Arbeitsteilung: LI sagt OB es
+        # ueberentwickelt, CAPE WIE HEFTIG es dann wird.
+        li_min = None             # negativster (= instabilster) Wert des Tages
+        li_min_hour = None
+        cape_max = None
         aloft_hours = []       # Stunden mit ALOFT-WARN/DANGER (fuer HOEHENWIND-TREND, Region)
         aloft_danger_hours_list = []  # Nur [ALOFT-WIND-DANGER] (> WIND_DANGER_KMH)
         tag_counts = {}        # tag_name → count (für Tagesprofil-Histogramm)
@@ -2960,6 +2984,21 @@ class WeatherContextMixin:
             has_data = True
             data = hourly_data[timestamp]
             time_str = timestamp.replace("T", " ")[:16]
+
+            # Ensemble-Gewitterstunde? Gleiche Regel wie das Blitz-Symbol.
+            _hhmm = dt.strftime("%H:%M")
+            _share = ens_share.get(_hhmm)
+            if _ens_storm_hour(_share, data):
+                ens_storm_hours.append(_hhmm)
+                if ens_storm_peak_pct is None or _share > ens_storm_peak_pct:
+                    ens_storm_peak_pct = _share
+
+            _li = data.get("lifted_index")
+            if isinstance(_li, (int, float)) and (li_min is None or _li < li_min):
+                li_min, li_min_hour = _li, _hhmm
+            _cape = data.get("cape")
+            if isinstance(_cape, (int, float)) and (cape_max is None or _cape > cape_max):
+                cape_max = _cape
 
             # Thermik berechnen
             thermal_info = ""
@@ -3582,6 +3621,11 @@ class WeatherContextMixin:
         active_window_start_region = _determine_active_window_start(
             clean_hours, config.CLEAN_WINDOW_MIN_HOURS
         )
+        # Einstufung aus dem STAERKSTEN Gewitterstunden-Anteil, nicht mehr aus
+        # dem Tageswert (siehe Kommentar oben bei ens_storm_hours). Ohne
+        # Gewitterstunde bleibt sie None — dann gibt es weder Kachel noch
+        # LLM-Zeile, genau wie es dann auch keinen Blitz im Meteogramm gibt.
+        ens_level = _ens_level(ens_storm_peak_pct)
         self._ctx_cache_put(self._ctx_gust_cache, f"{rname}|{date_str}", {
             "aloft_warn_hours": tag_counts.get("[ALOFT-WIND-WARN]", 0),
             "aloft_danger_hours": tag_counts.get("[ALOFT-WIND-DANGER]", 0),
@@ -3606,10 +3650,18 @@ class WeatherContextMixin:
             # nur in den LLM-Text, nicht in die Anzeige (gemeldet 31.07. am
             # Beispiel Zentralschweizer Voralpen 02.08.: 71 % der Member,
             # deterministisch 0.0 mm und Code 0-3, in der App also blank).
-            "thunder_ens_pct": (ens or {}).get("probability_pct"),
+            #
+            # Seit 02.08.2026 aus den STUNDEN, nicht mehr aus dem Tageswert —
+            # identisch zum Blitz-Symbol. `_pct` ist damit der hoechste
+            # Stundenanteil unter den Gewitterstunden, `_peak_start/_end` deren
+            # erste und letzte Stunde. Keine Gewitterstunde -> keine Kachel.
+            "thunder_ens_pct": ens_storm_peak_pct,
             "thunder_ens_level": ens_level,
-            "thunder_ens_peak_start": (ens or {}).get("peak_start"),
-            "thunder_ens_peak_end": (ens or {}).get("peak_end"),
+            "thunder_ens_peak_start": ens_storm_hours[0] if ens_storm_hours else None,
+            "thunder_ens_peak_end": ens_storm_hours[-1] if ens_storm_hours else None,
+            "thunder_ens_hours": len(ens_storm_hours),
+            # Tageswert nur noch als Kontext fuer die KI, nicht fuer die Anzeige.
+            "thunder_ens_day_pct": (ens or {}).get("probability_pct"),
             # CLOUDS-Sicht (siehe docs/TAGS.md), Region nutzt elev_ref:
             "elevation_m": elev_ref,
             "cloud_at_or_below_takeoff_h": cloud_at_or_below_takeoff_h,
@@ -3938,24 +3990,48 @@ class WeatherContextMixin:
                 f"In hazard_notes['thunderstorm'] und caution_notes erwaehnen.{spread}"
             )
 
+        # Instabilitaet fuer die Analyse — IMMER beide Werte nennen.
+        # Der Lifted Index ist hoehenunabhaengig und beantwortet die Frage, OB
+        # es ueberentwickelt; CAPE beantwortet, WIE HEFTIG. CAPE allein ist
+        # zwischen Regionen unterschiedlicher Hoehe nicht vergleichbar: 300 auf
+        # 2450 m bedeutet etwas anderes als 300 auf 700 m. Deshalb hat unsere
+        # Anzeige im Hochgebirge Gewitter uebersehen, die andere Anbieter
+        # zeigten (Oberengadin, Oberwallis, 02.08.).
+        if li_min is not None or cape_max is not None:
+            _li_txt = (f"Lifted Index min {li_min:+.1f} ({li_min_hour})"
+                       if li_min is not None else "Lifted Index nicht verfuegbar")
+            _cape_txt = (f"CAPE max {cape_max:.0f} J/kg"
+                         if cape_max is not None else "CAPE nicht verfuegbar")
+            lines.append(
+                f"INSTABILITAET: {_li_txt}, {_cape_txt}. "
+                f"Lifted Index = OB ueberentwickelt (unter -2 Gewitter moeglich, "
+                f"unter -4 kraeftig), CAPE = WIE HEFTIG. "
+                f"CAPE ist hoehenabhaengig und zwischen Regionen NICHT "
+                f"vergleichbar — bei hoch gelegenen Regionen dem Lifted Index "
+                f"folgen, nicht dem niedrigen CAPE-Wert."
+            )
+
         # Gewitter-Ensemble (ICON-CH2-EPS) — WEICHE Warnstufe, KEIN Gate.
         # Der Block darueber ist ein einzelner deterministischer Lauf: die Zelle
         # muss zufaellig auf einem Referenzpunkt zuenden. Das Ensemble sagt
         # stattdessen, wie viele von 21 Laeufen ueberhaupt eine zuenden — bei
         # Konvektion die belastbarere Information. Bewusst NICHT als No-Go
         # formuliert: die Schwellen sind noch nicht kalibriert.
-        if ens_level and ens.get("probability_pct") is not None:
-            peak = ""
-            if ens.get("peak_start") and ens.get("peak_end"):
-                peak = f", Schwerpunkt {ens['peak_start']}-{ens['peak_end']}"
+        if ens_level and ens_storm_hours:
+            peak = (f", betroffen {ens_storm_hours[0]}-{ens_storm_hours[-1]} "
+                    f"({len(ens_storm_hours)}h)")
             lines.append(
-                f"GEWITTER-ENSEMBLE: {ens['probability_pct']}% der Modelllaeufe "
+                f"GEWITTER-ENSEMBLE: bis zu {ens_storm_peak_pct}% der Modelllaeufe "
                 f"({ens.get('n_members', 0)} Member ICON-CH2-EPS) zeigen ein Gewitter "
-                f"im Flugfenster{peak}. Einstufung: {ens_level}. "
+                f"in einer einzelnen Stunde{peak}. Einstufung: {ens_level}. "
                 f"WEICHE Angabe — allein KEIN No-Go und KEIN Grund fuer not_safe. "
                 f"Als Wahrscheinlichkeit formulieren "
-                f"(z.B. \"Gewitterwahrscheinlichkeit {ens['probability_pct']}%{peak}\"), "
+                f"(z.B. \"Gewitterwahrscheinlichkeit {ens_storm_peak_pct}%{peak}\"), "
                 f"nicht als Tatsache. "
+                f"NUR diese Stunden nennen — sie sind identisch mit den "
+                f"Blitzen im Meteogramm. Der Tageswert "
+                f"({(ens or {}).get('probability_pct')}% irgendwann/irgendwo) "
+                f"ist absichtlich NICHT die Aussage und gehoert nicht in den Text. "
                 f"Bei fehlendem Modell-Gewitter oben trotzdem erwaehnen — genau "
                 f"dafuer ist das Ensemble da."
             )

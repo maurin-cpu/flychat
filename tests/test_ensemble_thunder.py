@@ -163,6 +163,45 @@ def test_leere_punktliste():
     assert et.merge_points_per_member([], "weather_code") == []
 
 
+# --- Mindestanteil der Referenzpunkte (02.08.2026) ------------------------
+# Vorher genuegte ein einziger von 7 Punkten, damit ein Member fuer die ganze
+# Region als Gewitter zaehlte. Im Vergleich gegen XC Therm lagen alle 5
+# Faelle, in denen nur wir Gewitter zeigten, im Voralpenguertel — dort spannen
+# die Punkte vom Talboden bis zum Grat und sind am unterschiedlichsten.
+
+def test_punktzaehler_zaehlt_treffer_statt_schwerstem_code():
+    rp_a = {"weather_code": [95, 0]}
+    rp_b = {"weather_code": [95, 65]}
+    rp_c = {"weather_code": [0, 0]}
+    assert et.merge_points_thunder_count([rp_a, rp_b, rp_c]) == [[2, 0]]
+
+
+def test_ein_einzelner_punkt_traegt_die_region_nicht_mehr():
+    """Der Kern der Aenderung: 1 von 3 Punkten reicht nicht mehr."""
+    mem = [[1] * len(TIMES)]           # jede Stunde genau EIN Punkt mit Gewitter
+    r = et.thunder_probability(mem, TIMES, "2026-08-02", 11, 20, quorum=2)
+    assert r["probability_pct"] == 0
+
+
+def test_zwei_punkte_genuegen():
+    mem = [[0] * len(TIMES)]
+    mem[0][12] = 2
+    r = et.thunder_probability(mem, TIMES, "2026-08-02", 11, 20, quorum=2)
+    assert r["probability_pct"] == 100
+    assert r["hourly_share_pct"]["12:00"] == 100
+    assert r["hourly_share_pct"]["13:00"] == 0
+
+
+def test_ohne_quorum_bleibt_das_alte_verhalten():
+    """Bestandsschutz: ohne quorum sind die Werte weiter Wettercodes."""
+    mem = _members({0: {12: 95}})
+    assert et.thunder_probability(mem, TIMES, "2026-08-02", 11, 20)["n_hit"] == 1
+
+
+def test_quorum_ist_konfiguriert_und_plausibel():
+    assert 1 <= config.ENSEMBLE_THUNDER_POINT_QUORUM <= 4
+
+
 # --- Warn-Kachel: sichtbar, aber niemals ein No-Go ------------------------
 
 from engine.decision_engine import build_region_topic_tags  # noqa: E402

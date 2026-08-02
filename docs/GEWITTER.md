@@ -203,7 +203,8 @@ im LLM-Kontext steht („Gewitterwahrscheinlichkeit 71 %, Schwerpunkt
 Tageswert (irgendein Member, irgendwann) liegt systematisch höher als jede
 Einzelstunde — am 02.08. lag der Tag bei 71 %, die beste Stunde bei 43 %.
 
-Regel: Blitz, wenn `weather_code` in 95/96/99 **ODER** die Stunde im
+Regel (Stand 31.07., **am 02.08. ersetzt** — siehe „Umgebaut am 02.08.2026"
+weiter unten): Blitz, wenn `weather_code` in 95/96/99 **ODER** die Stunde im
 Schwerpunkt-Fenster eines Tages über der Erwähnungsschwelle liegt **ODER** der
 Stundenanteil `ENSEMBLE_THUNDER_METEOGRAM_PCT` (40 %) erreicht. Das ODER ist
 Absicht — ein hartes Modell-Gewitter darf nie verschwinden.
@@ -243,6 +244,50 @@ Preis der Änderung: Tage mit schwachem Signal verschwinden aus dem Meteogramm �
 Zentralschweizer Voralpen 01.08. (19 %) zeigt keinen Blitz mehr. Im **Text**
 bleibt der Hinweis erhalten, weil die Erwähnungsschwelle bei 15 steht. Das ist
 der bewusste Kompromiss zwischen „nichts übersehen" und „nicht dauerblitzen".
+
+### Umgebaut am 02.08.2026 — Tageswert raus, Plausibilitätsanker rein
+
+Der Nebenbefund oben („der eigentliche Treiber ist die Breite des
+Schwerpunkt-Fensters") hat sich bestätigt und wurde zur Konsequenz geführt.
+Gemessen am Bestand vom 02.08. (29 Regionen, 137 Regionstage, 1507
+Flugstunden): **217 Blitzstunden auf 36 % aller Regionstage**, davon 215 aus
+dem Ensemble und nur 2 aus dem `weather_code`. Die Hälfte dieser Blitze stand
+bei **unter 50 % Bewölkung und ohne Niederschlag** — Tessin Zentral 04.08.
+14:00 bei 2 % Bewölkung, Rheintal 04.08. 11:00 bei 0 %.
+
+**Zwei Ursachen, zwei Änderungen:**
+
+**1. Der Tageswert malt keine Stunden mehr.** `probability_pct` ist der Anteil
+der Member, die *irgendwann* im Flugfenster an *irgendeinem* der 16
+Referenzpunkte zünden — im Sommer nahezu gesättigt (Median 95 % über alle
+Blitzstunden). Über das Schwerpunkt-Fenster verteilt erzeugte er 53 der 217
+Blitzstunden. `ENSEMBLE_THUNDER_METEOGRAM_DAY_PCT` ist damit **abgeschafft**;
+der Blitz kommt ausschliesslich aus dem stündlichen Member-Anteil. Für den
+**Text** bleibt der Tageswert zuständig (`ENSEMBLE_THUNDER_MENTION_PCT`).
+
+**2. Plausibilitätsanker.** Das Ensemble kennt nur Wettercodes; Bewölkung,
+Regen und CAPE derselben Stunde stammen aus dem deterministischen Lauf und
+wurden nie gegengelesen. Ein Ensemble-Blitz erscheint nur noch, wenn gilt:
+**(Niederschlag ≥ 0,1 mm ODER Bewölkung ≥ 50 %) UND CAPE ≥ 300 J/kg**
+(`config.THUNDER_ANCHOR_*`, `web._thunder_anchor_ok`).
+
+| Variante | Blitzstunden | Regionstage mit Blitz |
+|---|---|---|
+| vorher | 217 | 50 von 137 (36 %) |
+| ohne Tagesfenster-Füllung | 164 | 43 von 137 (31 %) |
+| **beides zusammen** | **62** | **26 von 137 (19 %)** |
+
+**Der Anker gilt nur für den Ensemble-Weg.** Ein deterministischer Code
+95/96/99 bleibt ungefiltert — er stammt aus demselben Lauf wie Wolken und
+Regen und ist per Konstruktion in sich stimmig.
+
+**CIN ist bewusst nicht Teil des Ankers.** In den Alpen drücken
+Talwind-Konvergenzen die Luft mechanisch durch den Deckel, und ein mittlerer
+Deckel macht das Nachmittagsgewitter heftiger statt harmloser — ein CIN-Filter
+würde Blitze ausgerechnet an den gefährlichsten Tagen unterdrücken. Der
+**Lifted Index** wäre der trennschärfste Wert (Median −2,1 in Blitzstunden
+gegen −0,9 sonst), fehlt Regionen aber im Abruf; er kommt zusammen mit dem
+DWD-Blitzpotenzial (`docs/pläne/PLAN_gewitter_anzeige.md`, Teil B, Schritt 3).
 
 **Nur Regionen.** Spots haben kein Ensemble — 494 Punkte × 21 Member sind am
 freien Endpunkt nicht zu holen. Dort bleibt es beim `weather_code`; durch Test

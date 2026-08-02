@@ -108,6 +108,33 @@ def classify_thunder_pattern(coverage):
     return "isolated"
 
 
+def _median_hourly_across_points(point_hourlies, params):
+    """Median je Stunde ueber mehrere Referenzpunkte, im Open-Meteo-Format.
+
+    Rueckgabe: {"time": [...], param: [...]} — genau die Struktur, die
+    _process_spot_weather als hourly_gfs erwartet. None, wenn nichts da ist.
+
+    Median statt Minimum: Beim Lifted Index waere das Minimum der instabilste
+    Punkt der Region, und der wuerde jede Region mit einem einzigen Grat
+    dauerhaft alarmieren — dieselbe Ein-Punkt-Falle, gegen die im Ensemble der
+    Mindestanteil eingefuehrt wurde.
+    """
+    usable = [h for h in point_hourlies if h and h.get("time")]
+    if not usable:
+        return None
+    times = usable[0]["time"]
+    out = {"time": times}
+    for p in params:
+        col = []
+        for i in range(len(times)):
+            vals = [h[p][i] for h in usable
+                    if isinstance(h.get(p), list) and i < len(h[p])
+                    and isinstance(h[p][i], (int, float))]
+            col.append(statistics.median(vals) if vals else None)
+        out[p] = col
+    return out
+
+
 def _severest_weather_code(values):
     """Schwerwiegendster WMO-Code aus mehreren Referenzpunkten (None wenn leer).
 
@@ -1362,6 +1389,7 @@ def fetch_all_spots(spots, save_to_file=True):
     # nur EU (13 km).
     batch_region_ch1 = None
     batch_region_ch2 = None
+    batch_region_gfs = None
 
     if region_only_points:
         region_lats = [str(p[0]) for p in region_only_points]
@@ -1428,6 +1456,36 @@ def fetch_all_spots(spots, save_to_file=True):
         except Exception as e:
             print(f"  [WARN] Region-CH2-Batch fehlgeschlagen (Fallback auf D2/EU): {e}")
             batch_region_ch2 = None
+
+        # GFS-Supplement fuer Regionen (02.08.2026) — bringt den LIFTED INDEX.
+        # Regionen hatten ihn bisher gar nicht: der GFS-Call lief nur fuer
+        # Spots, Regionen bekamen hourly_gfs=None. Damit blieb CAPE ihr
+        # einziges Instabilitaetsmass — und CAPE wird vom Boden aufwaerts
+        # gerechnet, ist also zwischen Regionen unterschiedlicher Hoehe NICHT
+        # vergleichbar. Gemessen am 02.08.: CAPE-Median 860 in den Voralpen
+        # (1000-1900 m) gegen 295 im Hochgebirge (>1900 m), bei durchgehend
+        # 100 % Bewoelkung dort. Genau dort haben wir Gewitter uebersehen, die
+        # XC Therm zeigte (Oberengadin, Oberwallis).
+        #
+        # Der Lifted Index vergleicht ein gehobenes Luftpaket mit der
+        # Atmosphaere darueber statt mit dem Boden und ist deshalb weitgehend
+        # hoehenunabhaengig — und er war in der Messung vom 01.08. der
+        # trennschaerfste Wert (Median -2,1 in Blitzstunden gegen -0,9 sonst).
+        try:
+            time.sleep(API_DELAY_BETWEEN_CALLS)
+            print(f"[API] Batch Region-GFS (Lifted Index): "
+                  f"{len(region_all_ref_points)} Punkte, Modell {config.BLH_MODEL}")
+            batch_region_gfs = _chunked_api_get(ref_lats, ref_lons, {
+                "models": config.BLH_MODEL,
+                "hourly": ",".join(config.GFS_SUPPLEMENTARY_PARAMS),
+                "forecast_days": config.FORECAST_DAYS_GFS,
+                "timezone": config.TIMEZONE,
+            }, API_BATCH_TIMEOUT, label="Batch-Region-GFS")
+            print(f"  [OK] {len(batch_region_gfs)} Region-GFS-Antworten")
+        except Exception as e:
+            print(f"  [WARN] Region-GFS-Batch fehlgeschlagen "
+                  f"(Regionen ohne Lifted Index): {e}")
+            batch_region_gfs = None
 
     def _get_batch_entry_for_point(pt, batch_spot, batch_region):
         """Holt Batch-Eintrag: zuerst Spot-Batch, dann Region-Batch."""
@@ -1567,10 +1625,28 @@ def fetch_all_spots(spots, save_to_file=True):
         # (Bug vor Mai 2026: Region-data_sources zeigte "ch1" obwohl D2 lief).
         data_wind_r = data_ch1_r
 
+        # GFS-Supplement der Region: Median ueber die Referenzpunkte.
+        # Median und nicht Minimum aus demselben Grund, aus dem das Ensemble
+        # jetzt einen Mindestanteil verlangt — ein einzelner Punkt soll die
+        # ganze Region nicht tragen. Beim Lifted Index waere das Minimum der
+        # instabilste Punkt und wuerde jede Region dauerhaft alarmieren.
+        hourly_gfs_r = None
+        if batch_region_gfs:
+            gfs_list = []
+            for pt in refs:
+                key = (round(pt[0], 4), round(pt[1], 4))
+                idx = region_all_ref_index.get(key)
+                if idx is not None and idx < len(batch_region_gfs):
+                    h = batch_region_gfs[idx].get("hourly")
+                    if h:
+                        gfs_list.append(h)
+            hourly_gfs_r = _median_hourly_across_points(
+                gfs_list, config.GFS_SUPPLEMENTARY_PARAMS)
+
         try:
             result = _process_spot_weather(
                 f"Region:{rname}", data_wind_r, data_thermal_r, data_fallback_r,
-                None, elev_ref,
+                hourly_gfs_r, elev_ref,
                 data_ch1=data_ch1_r, data_ch2=data_ch2_r,
             )
         except Exception as e:

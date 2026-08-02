@@ -123,12 +123,45 @@ def _is_thunder(v) -> bool:
         return False
 
 
+def merge_points_thunder_count(point_hourlies: list) -> list:
+    """Wie merge_points_per_member, liefert aber die ANZAHL der Referenzpunkte
+    mit Gewitter-Code statt des schwersten Codes.
+
+    Grundlage fuer den Mindestanteil (config.ENSEMBLE_THUNDER_POINT_QUORUM).
+    Vorher genuegte ein einziger von 7 Punkten, damit ein Member fuer die ganze
+    Region als Gewitter zaehlte — ein ODER ueber die Flaeche. In Voralpen-
+    regionen, deren Punkte vom Talboden bis zum Grat reichen, schlaegt das am
+    staerksten durch; dort lagen am 02.08. alle 5 Faelle, in denen nur wir
+    Gewitter zeigten und XC Therm nicht.
+    """
+    if not point_hourlies:
+        return []
+    keys = member_keys(point_hourlies[0], "weather_code")
+    if not keys:
+        return []
+    n_hours = min(len(h.get(k, [])) for h in point_hourlies for k in keys)
+
+    merged = []
+    for k in keys:
+        row = []
+        for i in range(n_hours):
+            vals = [h[k][i] for h in point_hourlies if k in h and i < len(h[k])]
+            row.append(sum(1 for v in vals if _is_thunder(v)))
+        merged.append(row)
+    return merged
+
+
 def thunder_probability(member_codes: list, times: list, date: str,
-                        hour_start: int = None, hour_end: int = None) -> dict:
+                        hour_start: int = None, hour_end: int = None,
+                        quorum: int = None) -> dict:
     """Anteil der Member mit Gewitter-Code im Flugfenster eines Tages.
 
     member_codes: eine Werteliste je Member (aus merge_points_per_member).
     times:        Zeitachse (Open-Meteo "time"), gleiche Laenge.
+    quorum:       Ist er gesetzt, sind die Werte PUNKTZAEHLER aus
+                  merge_points_thunder_count und ein Member zaehlt erst ab
+                  dieser Anzahl Referenzpunkte als Gewitter. Ohne quorum
+                  bleibt es beim alten Verhalten (Werte sind Wettercodes).
 
     Rueckgabe (probability_pct = Anteil der Member, die IRGENDWANN im Fenster
     zuenden; peak_* = zeitlicher Schwerpunkt):
@@ -147,13 +180,20 @@ def thunder_probability(member_codes: list, times: list, date: str,
                 "hourly_share_pct": {}, "peak_start": None, "peak_end": None,
                 "peak_share_pct": None, "level": None}
 
+    if quorum is None:
+        def _hit(v):
+            return _is_thunder(v)
+    else:
+        def _hit(v):
+            return isinstance(v, int) and v >= quorum
+
     n_hit = sum(1 for m in member_codes
-                if any(i < len(m) and _is_thunder(m[i]) for i in idx))
+                if any(i < len(m) and _hit(m[i]) for i in idx))
     prob = round(100.0 * n_hit / n_members)
 
     hourly_share = {}
     for i in idx:
-        hits = sum(1 for m in member_codes if i < len(m) and _is_thunder(m[i]))
+        hits = sum(1 for m in member_codes if i < len(m) and _hit(m[i]))
         hourly_share[times[i][11:16]] = round(100.0 * hits / n_members)
 
     peak_start = peak_end = peak_share = None
@@ -192,6 +232,61 @@ def probability_level(prob):
     if prob >= config.ENSEMBLE_THUNDER_MENTION_PCT:
         return "moeglich"
     return None
+
+
+def thunder_anchor_ok(data):
+    """Plausibilitaetsanker: gibt die Stunde ein Gewitter ueberhaupt her?
+
+    Das Ensemble kennt nur Wettercodes und wurde bis 02.08.2026 nie gegen die
+    Stunde gegengelesen, in der es angezeigt wird — die Haelfte aller Blitze
+    stand bei unter 50 % Bewoelkung und ohne einen Tropfen Regen (Tessin
+    Zentral 04.08. 14:00 bei 2 % Bewoelkung).
+
+    Bedingung: Instabilitaet UND (Niederschlag ODER Bewoelkung), alles in
+    DERSELBEN Stunde aus dem deterministischen Lauf. Instabilitaet heisst
+    CAPE ODER Lifted Index — CAPE allein waere hoehenabhaengig und wuerde
+    Hochalpenregionen dauerhaft stummschalten. Schwellen und Begruendung —
+    auch warum CIN bewusst fehlt — in config.THUNDER_ANCHOR_*.
+
+    Gilt nur fuer den Ensemble-Weg, nie fuer den deterministischen
+    Gewittercode 95/96/99: der stammt aus demselben Lauf wie Wolken und Regen
+    und ist per Konstruktion in sich stimmig.
+    """
+    if not isinstance(data, dict):
+        return False
+
+    def _num(key):
+        v = data.get(key)
+        return v if isinstance(v, (int, float)) else None
+
+    cape = _num("cape")
+    li = _num("lifted_index")
+    unstable = ((cape is not None and cape >= config.THUNDER_ANCHOR_CAPE_JKG)
+                or (li is not None and li <= config.THUNDER_ANCHOR_LI))
+    if not unstable:
+        return False
+    precip = _num("precipitation")
+    if precip is not None and precip >= config.THUNDER_ANCHOR_PRECIP_MM:
+        return True
+    cloud = _num("cloud_cover")
+    return cloud is not None and cloud >= config.THUNDER_ANCHOR_CLOUD_PCT
+
+
+def is_ensemble_storm_hour(share_pct, data):
+    """Zeigt diese Stunde ein Ensemble-Gewitter? Die EINE gemeinsame Regel.
+
+    Wird sowohl vom Blitz-Symbol im Meteogramm (web.format_data_for_charts)
+    als auch von der Gewitter-Kachel und dem LLM-Kontext
+    (engine/weather_context.py) benutzt. Vorher hatte jede Schicht ihre eigene
+    Rechnung: das Symbol lief ab 02.08. auf Stundenwerten, die Kachel weiter
+    auf dem Tageswert — dieselbe Region zeigte im Meteogramm keinen Blitz und
+    im Text daneben eine Gewitterwarnung.
+
+    share_pct: Anteil der Member mit Gewitter in DIESER Stunde.
+    """
+    if share_pct is None or share_pct < config.ENSEMBLE_THUNDER_METEOGRAM_PCT:
+        return False
+    return thunder_anchor_ok(data)
 
 
 def _get_with_retry(params, label=""):
@@ -287,15 +382,23 @@ def compute_region_thunder(region_points: dict, days: int = None,
         if not hourlies:
             continue
         times = hourlies[0].get("time", [])
-        merged = merge_points_per_member(hourlies, "weather_code")
+        # Punktzaehler statt schwerstem Code: ein einzelner Referenzpunkt soll
+        # die ganze Region nicht mehr allein tragen (siehe
+        # config.ENSEMBLE_THUNDER_POINT_QUORUM). Bei Regionen mit weniger
+        # Punkten als der Mindestanteil verlangt faellt er auf 1 zurueck —
+        # sonst waere die Region stumm.
+        merged = merge_points_thunder_count(hourlies)
         if not merged:
             continue
+        quorum = max(1, min(config.ENSEMBLE_THUNDER_POINT_QUORUM, len(hourlies)))
         days_seen = sorted({t[:10] for t in times})
-        per_day = {d: thunder_probability(merged, times, d) for d in days_seen}
+        per_day = {d: thunder_probability(merged, times, d, quorum=quorum)
+                   for d in days_seen}
         per_day["_meta"] = {
             "model": model or config.ENSEMBLE_MODEL,
             "n_members": len(merged),
             "n_points": len(hourlies),
+            "point_quorum": quorum,
         }
         out[rid] = per_day
     return out
