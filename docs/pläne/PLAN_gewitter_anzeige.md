@@ -414,6 +414,75 @@ der Mindestanteil schneidet nicht nur Fehlalarme weg.
 stecken zusammen in den Zahlen. Eine saubere Messung braucht denselben Tag auf
 beiden Seiten.
 
+## 12b-2. Wie ein Blitz heute entsteht — die vollständige Kette
+
+Dieses Kapitel ist bewusst redundant: **Es soll ohne jedes Vorwissen und ohne
+Gedächtnis aus einer früheren Sitzung lesbar sein.**
+
+**Quellen (Stand 02.08.):**
+
+| Quelle | Anbieter | Wofür |
+|---|---|---|
+| `weather_code` 95/96/99 | MeteoSchweiz ICON-CH1/CH2 | harter Gewittercode, ein Lauf |
+| Ensemble ICON-CH2-EPS, 21 Member | MeteoSchweiz | Anteil der Läufe mit Gewitter, **nur Regionen** |
+| CAPE, CIN, Bewölkung, Regen | MeteoSchweiz | Plausibilitätsprüfung |
+| Lifted Index | GFS | höhenunabhängige Instabilität, **seit 02.08. auch für Regionen** |
+| Blitzpotenzial | DWD ICON-D2 | **noch nicht im Tageslauf**, nur im Archiv |
+
+**Der Entscheidungsweg pro Stunde und Region:**
+
+1. Sagt der deterministische Code 95/96/99? → **Blitz, ungeprüft.** Begründung:
+   Wolken, Regen und dieser Code stammen aus derselben Rechnung, können sich
+   also nicht widersprechen. (Betraf am 02.08. genau 2 von 1507 Stunden — für
+   Regionen ist dieser Weg praktisch stumm.)
+2. Sonst: Wie viele der 21 Ensemble-Läufe zeigen **in dieser Stunde** Gewitter?
+   Ein Lauf zählt erst, wenn **mindestens 2 der 7 Referenzpunkte** zünden
+   (`ENSEMBLE_THUNDER_POINT_QUORUM`). Unter 40 % der Läufe → kein Blitz.
+3. Plausibilitätsanker: **Instabilität** (CAPE ≥ 300 **oder** Lifted Index
+   ≤ −1) **und** (Regen ≥ 0,1 mm **oder** Bewölkung ≥ 50 %), alles aus
+   derselben Stunde. Nicht erfüllt → kein Blitz.
+4. Erfüllt → Blitz im Meteogramm, Kachel im Analyse-Panel, Erwähnung im
+   KI-Text. **Alle drei über dieselbe Funktion**
+   (`ensemble_thunder.is_ensemble_storm_hour`).
+
+**Was der Blitz NICHT tut:** Er sperrt die Fliegbarkeit nicht. Gesperrt wird
+weiter nur über den deterministischen Code. Symbol und Bewertung erzählen
+damit weiterhin nicht ganz dieselbe Geschichte — offener Punkt.
+
+**Bewusst nicht verwendet:** CIN (Talwind-Konvergenzen drücken die Luft
+mechanisch durch den Deckel; ein mittlerer Deckel macht das Nachmittagsgewitter
+heftiger statt harmloser). CAPE als alleiniges Instabilitätsmass (höhenabhängig,
+zwischen Regionen nicht vergleichbar).
+
+**Wo die Zahlen herkommen — und wo nicht:** Keine einzige Schwelle ist gegen
+gemessene Blitze kalibriert. Es gibt **keine freie Gewitterwahrheit** (§3,
+nicht erneut anrennen). Alle Schwellen sind plausibel gesetzt und gegen die
+Häufigkeitsverteilung geprüft, mehr nicht. Das ist die Schwachstelle des ganzen
+Bauwerks.
+
+## 12b-3. Offene Unzufriedenheit mit der Herleitung (User, 02.08.)
+
+Der User ist mit der Gewitteranalyse **nicht zufrieden — ausdrücklich mit der
+Herleitung, nicht mit der Darstellung.** Am 03.08. zuerst klären, was genau
+gemeint ist. Die aus unserer Sicht schwächsten Glieder der Kette:
+
+1. **Keine Wahrheit, nirgends.** Wir vergleichen Modelle mit Modellen. XC Therm
+   ist ein einzelner Lauf, unser Ensemble sind 21 — Uneinigkeit sagt nicht, wer
+   recht hat. Ohne Blitzmessung bleibt jede Schwelle Setzung.
+2. **Die 40-%-Schwelle ist frei gewählt.** Sie entscheidet über jeden Blitz und
+   ist an nichts geeicht.
+3. **Der Mindestanteil von 2 ist ebenso gesetzt.** Er hat am 02.08. zwei
+   Fehlalarme beseitigt und einen Treffer gekostet (Tessin) — n = 1 Tag.
+4. **Der Anker ist ein Notbehelf.** Er prüft nur, ob eine Stunde ein Gewitter
+   überhaupt hergibt. Er sagt nichts darüber, ob eines kommt.
+5. **Der blinde Fleck im Hochgebirge ist unerklärt.** Oberengadin: 0 % im
+   Ensemble, während XC Therm 2,5 h Gewitter zeigt. Solange wir nicht wissen,
+   warum, ist die ganze Kette dort wertlos.
+6. **Wir leiten aus Wettercodes ab, nicht aus Physik.** Die Szene entscheidet
+   an der Überentwicklung (Lifted Index), nicht am Blitz — §5 „Später". Wir
+   haben den Lifted Index jetzt, benutzen ihn aber nur als Türsteher, nicht als
+   Primärindikator.
+
 ## 12c. Offen — hier geht es am 03.08. weiter
 
 1. **Vergleich für Montag ziehen.** XC Therm für 03.08. abgreifen (kommt vom
