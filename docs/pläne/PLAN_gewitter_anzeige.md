@@ -414,6 +414,116 @@ der Mindestanteil schneidet nicht nur Fehlalarme weg.
 stecken zusammen in den Zahlen. Eine saubere Messung braucht denselben Tag auf
 beiden Seiten.
 
+## 12b-1. Die Vergleichsdaten vom 02.08. — vollständig
+
+Auch als Datei: `data/modellvergleich/2026-08-02.json` und
+`data/modellvergleich/regionen_mapping_xctherm.json`. Hier im Klartext, damit
+der Vergleich ohne Werkzeug nachvollziehbar bleibt.
+
+### Regionszuordnung — zuerst lesen
+
+**Ohne diese Tabelle vergleicht man Namen statt Gebiete.** Am 02.08. führte das
+zu zwei Fehlschlüssen: Zentralschweizer Voralpen ist *nicht* Urner Alpen
+(sondern Zentrale Voralpen), und Tessin Zentral ist Alpi Ticinesi, *nicht*
+Sopra Ceneri. Beide Male drehte sich das Urteil um.
+
+| Wingcast | XC Therm | Sicherheit |
+|---|---|---|
+| Bodenseeraum | Bodenseeraum | sicher |
+| Zentrales Mittelland | Zentrales Mittelland | sicher |
+| Mittelland Ost | Östliches Mittelland | sicher |
+| Seeland / Emmental | Emmental | sicher |
+| Glarnerland / Walensee | Glarner Alpen | sicher |
+| Berner Oberland | Berner Oberland | sicher |
+| Zentralschweizer Voralpen | **Zentrale Voralpen** | sicher |
+| Freiburger Voralpen | Freiburger Voralpen | sicher |
+| Prättigau - Davos | Prättigau-Davos | sicher |
+| Surselva | Surselva | sicher |
+| Engadin Ober | Oberengadin | sicher |
+| Genferseeregion | Lac Léman | sicher |
+| Zentralwallis | Valais Central | sicher |
+| Oberwallis / Goms | Oberwallis | sicher |
+| Unterwallis | Bas-Valais | sicher |
+| Jura West | Neuenburger Jura | sicher |
+| Jura Zentral | Berner Jura | geschätzt |
+| Jura Ost | Tafeljura | geschätzt |
+| Mittelland Zentral | Ober Aargau | geschätzt |
+| Mittelland West | Plateau | geschätzt |
+| Ostschweiz | Rheintal | geschätzt |
+| Alpstein / Ostschweiz | Östliche Voralpen | geschätzt |
+| Mattertal / Saastal | Walliser Hochalpen | geschätzt |
+| Tessin Nord | Sopra Ceneri | geschätzt |
+| Tessin Zentral | **Alpi Ticinesi** | geschätzt |
+
+Ohne Entsprechung bei XC Therm: Berner Voralpen, Schwarzsee/Gantrisch,
+Waadtländer Alpen, Engadin Unter. Ohne Entsprechung bei uns: Urner Alpen,
+Berner Alpen, Hinterrhein, Bassa Valtellina, Valsesia/Val d'Ossola.
+
+**Namensfalle:** Unser „Mittelland Zentral" liegt nicht im Mittelland — seine
+Referenzpunkte liegen im Entlebuch/Pilatus-Gebiet auf 1400 m. Daneben gibt es
+eine eigene Region „Zentrales Mittelland". Immer über Koordinaten zuordnen.
+
+### XC Therm am 02.08. — mit Gewitter
+
+Glarner Alpen 16:00–18:30 · Oberengadin 13:00–15:30 · Oberwallis 14:00–15:30 ·
+Alpi Ticinesi 13:00–14:30 · Bassa Valtellina 12:00–13:30 · Urner Alpen
+17:00–17:30 · Berner Alpen 19:00–19:30 · Valsesia/Val d'Ossola 16:00–16:30
+
+**Ohne Gewitter:** Bodenseeraum, Zentrales Mittelland, Tafeljura, Berner Jura,
+Ober Aargau, Neuenburger Jura, Plateau, Freiburger Voralpen, Berner Oberland,
+Emmental, Surselva, Hinterrhein, Prättigau-Davos, Östliche Voralpen, Östliches
+Mittelland, Zentrale Voralpen, Walliser Hochalpen, Bas-Valais, Valais Central,
+Sopra Ceneri, Lac Léman. **Nicht erfasst:** Rheintal.
+
+### Wingcast am 02.08. — drei Stände desselben Tages
+
+**(a) Live vor dem Umbau**, Analyse-Panel, 20 von 29 Regionen — Tageswert mit
+Schwerpunktfenster, Erwähnung ab 15 %:
+Alpstein 11–17 (100 %) · Ostschweiz 12–17 (100 %) · Glarnerland 12–17 (100 %) ·
+Mittelland Zentral 12–17 (100 %) · Zentralschweizer Voralpen 13–17 (100 %) ·
+Tessin Zentral 12–17 (100 %) · Mittelland Ost 13–17 (100 %) · Berner Oberland
+12–17 (76 %) · Berner Voralpen 14–17 (76 %) · Freiburger Voralpen 14–17 (76 %) ·
+Prättigau-Davos 13–17 (76 %) · Schwarzsee/Gantrisch 13–16 (81 %) · Surselva
+12:00 (81 %) · Zentrales Mittelland 15–17 (67 %) · Tessin Nord 16–17 (48 %) ·
+Jura Ost 14–17 (38 %) · Engadin Unter 13:00 (38 %) · Genferseeregion 12–14
+(33 %) · Oberwallis/Goms 16:00 (29 %) · Seeland/Emmental 15–17 (24 %)
+
+**(b) Nach Stundenlogik und Anker**, 9 Regionen, 27 Stunden:
+Tessin Zentral 12–18 · Ostschweiz 12–18 · Alpstein 12–16 · Berner Voralpen
+15–18 · Glarnerland 16–18 · Zentralschweizer Voralpen 13–14 und 17–18 ·
+Mittelland Zentral 14–16 · Freiburger Voralpen 16–17 · Berner Oberland 17–18
+
+**(c) Nach Mindestanteil und Lifted Index**, neuer Lauf 20:35, 6 Regionen,
+20 Stunden:
+Ostschweiz 13–18 · Alpstein 12–16 und 17–18 · Glarnerland 14–18 ·
+Zentralschweizer Voralpen 15–18 · Berner Voralpen 16–18 · Mittelland Zentral
+13–14
+
+### Auswertung
+
+| | Stand (b) | Stand (c) |
+|---|---|---|
+| Übereinstimmung | 17 von 24 | 18 von 24 |
+| nur wir | 5 | 3 |
+| nur XC Therm | 2 | 3 |
+
+Aufgelöst durch den Mindestanteil: Berner Oberland, Freiburger Voralpen.
+Verloren: Tessin Zentral — XC Therm hatte dort Gewitter.
+
+### Höhenbefund — die Erklärung für die Schieflage
+
+Gemessen am Bestand vom 02.08., 11–19 Uhr:
+
+| Höhenlage | CAPE-Median | bestes Ensemble-Stundenmittel |
+|---|---|---|
+| unter 1000 m | 640 | 24 % |
+| 1000–1900 m | 860 | 69 % |
+| über 1900 m | 295 | 12 % |
+
+CAPE wird vom Boden aufwärts gerechnet und ist zwischen Regionen
+unterschiedlicher Höhe nicht vergleichbar. Alle acht Hochalpenregionen hatten
+100 % Bewölkung — die Wolken sind da, der Energiewert sieht sie nicht.
+
 ## 12b-2. Wie ein Blitz heute entsteht — die vollständige Kette
 
 Dieses Kapitel ist bewusst redundant: **Es soll ohne jedes Vorwissen und ohne
