@@ -1,14 +1,20 @@
-# Backup der Server-Daten — Hetzner Storage Box
+# Backup der Server-Daten
 
 **Entscheid 03.08.2026:** Die server-lokalen Daten (Snapshots, Validierung,
-DWD-Archiv, Live-Wetterstand) werden täglich auf eine Hetzner Storage Box
-gesichert — **nicht** nach Git. Begründung: ~11 MB/Tag wachsen in Git
-unbegrenzt und sind nie wieder löschbar; und zwei Vorfälle in einer Woche
-(rollendes Prognosefenster 31.07., Deploy-Stash frass 8 Snapshot-Tage,
-23.07. endgültig verloren) haben gezeigt, dass eine einzige Server-Kopie
-nicht reicht.
+DWD-Archiv, Live-Wetterstand) werden täglich gesichert — **nicht** nach Git.
+Begründung: ~11 MB/Tag wachsen in Git unbegrenzt und sind nie wieder
+löschbar; und zwei Vorfälle in einer Woche (rollendes Prognosefenster
+31.07., Deploy-Stash frass 8 Snapshot-Tage, 23.07. endgültig verloren)
+haben gezeigt, dass eine einzige Server-Kopie nicht reicht.
 
-## Struktur auf der Box
+**Aktuelle Stufe (Übergangslösung, Entscheid 03.08.):** lokaler Ordner
+`/home/deploy/flychat-backup/` neben dem Projektordner. Schützt vor
+Deploy-/Skript-Unfällen (die bisherige reale Verlustursache), **nicht** vor
+einem Plattenausfall. **Zielstufe:** Hetzner Storage Box — der Wechsel ist
+später nur `echo 'u…@u….your-storagebox.de' > ~/.storagebox`, das Skript
+schaltet dann selbst um.
+
+## Struktur im Backup
 
 ```
 flychat-backup/
@@ -18,26 +24,27 @@ flychat-backup/
 └─ wetterdaten/           letzter Live-Stand (wetterdaten.json + Analysen)
 ```
 
-Das Backup ist **additiv** — `scripts/backup_to_storagebox.sh` löscht nie
-etwas auf der Box. Ein lokaler Datenverlust pflanzt sich damit nicht ins
-Backup fort.
+Das Backup ist **additiv** — `scripts/backup_daily.sh` löscht nie etwas im
+Backup. Ein lokaler Datenverlust pflanzt sich damit nicht fort.
 
-## Einmalige Einrichtung
+## Betrieb
+
+Cron auf dem Server (täglich 07:30, nach dem Morgen-Lauf):
+
+```
+30 7 * * * /home/deploy/flychat/scripts/backup_daily.sh >> /home/deploy/backup.log 2>&1
+```
+
+## Später: Umstieg auf die Storage Box
 
 1. **Storage Box bestellen** (Hetzner Console → Storage Boxes → kleinste
    Stufe reicht auf Jahre). Bei den Box-Einstellungen **SSH-Support
    aktivieren**. Ergebnis: Adresse `u######@u######.your-storagebox.de`.
-2. **Server-Schlüssel hinterlegen:** öffentlichen Schlüssel des Servers
-   (`~/.ssh/id_ed25519.pub` — falls keiner existiert: `ssh-keygen -t
-   ed25519 -N ""`) im Hetzner-Panel der Box als SSH-Key eintragen.
-3. **Adresse auf dem Server ablegen:**
-   `echo 'u######@u######.your-storagebox.de' > ~/.storagebox`
-4. **Testlauf:** `~/flychat/scripts/backup_to_storagebox.sh`
-5. **Cron einrichten** (täglich 07:30, nach dem Morgen-Lauf):
-   ```
-   crontab -e
-   30 7 * * * /home/deploy/flychat/scripts/backup_to_storagebox.sh >> /home/deploy/backup.log 2>&1
-   ```
+2. **Server-Schlüssel hinterlegen:** `~/.ssh/id_ed25519.pub` des Servers
+   (existiert seit 03.08.) im Hetzner-Panel der Box als SSH-Key eintragen.
+3. **Umschalten:** `echo 'u######@u######.your-storagebox.de' > ~/.storagebox`
+4. **Testlauf:** `~/flychat/scripts/backup_daily.sh` — danach den lokalen
+   `~/flychat-backup/` einmalig auf die Box nachschieben und löschen.
 
 ## Wiederherstellung
 
