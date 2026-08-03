@@ -185,9 +185,21 @@ def build_synoptic_context(weather_cache: dict,
                                    bise, foehn, vb_lage)
     decisions_applied.append("decide_lage_label")
 
+    # Weiche Konvektions-Signale (Ensemble + Wolkentop) je Tag/Zone — die
+    # Wetterlage soll Gewitter ERKENNEN koennen, nicht nur den 13-%-Code sehen.
+    konvektion = None
+    try:
+        konvektion = summarize_convection(
+            weather_cache.get("_regions") or {}, forecast_dates)
+        if konvektion:
+            decisions_applied.append("summarize_convection")
+    except Exception:
+        logger.exception("build_synoptic_context: summarize_convection fehlgeschlagen")
+
     result = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "forecast_dates": forecast_dates,
+        "konvektion": konvektion,
         "lage_label": lage_label,
         "pressure_influence": pressure_influence,
         "flow_overhead": flow_overhead,
@@ -1617,6 +1629,69 @@ def build_spot_zone_map() -> dict[str, str]:
         if zone in config.SYNOPTIC_ZONES:
             out[s["name"]] = zone
     return out
+
+
+def summarize_convection(region_weather_data: dict,
+                          forecast_dates: list[str]) -> Optional[dict]:
+    """Weiche Konvektions-Signale je Tag und Zone — fuer die Wetterlage.
+
+    Ergaenzt gewitter_share (deterministischer Code, erkennt nur ~13 % der
+    Gewittertage, Saison-Backtest docs/GEWITTER.md par.0c) um die Signale,
+    die Spots/Regionen seit 03.08. laengst haben: Ensemble-Gewitterstunden
+    und Ueberentwicklung (convection.py — DIESELBEN Regeln wie Meteogramm
+    und Regions-KI, die Wetterlage kann der Regions-Analyse nie widersprechen).
+
+    Zonen-Zuordnung: Mittel der Referenzpunkte -> _classify_zone_fallback.
+    Rueckgabe {"per_day": [{"date", "zones": {zone: {"gewitter": [[Region,
+    "HH-HH"], ...], "ueberentwicklung": [...]}}}]} oder None ohne Daten.
+    """
+    import convection
+    if not region_weather_data:
+        return None
+    out = []
+    for d in forecast_dates:
+        zones = {z: {"gewitter": [], "ueberentwicklung": []}
+                 for z in config.SYNOPTIC_ZONES}
+        for rid, rdata in region_weather_data.items():
+            if not isinstance(rdata, dict):
+                continue
+            refs = rdata.get("reference_points") or []
+            lats = [r[0] for r in refs if isinstance(r, (list, tuple)) and len(r) >= 2]
+            lons = [r[1] for r in refs if isinstance(r, (list, tuple)) and len(r) >= 2]
+            if not lats:
+                continue
+            zone = _classify_zone_fallback(sum(lats) / len(lats),
+                                           sum(lons) / len(lons))
+            if zone not in zones:
+                continue
+            ens = (rdata.get("thunder_ensemble") or {}).get(d) or {}
+            shares = ens.get("hourly_share_pct") or {}
+            hourly = rdata.get("hourly_data") or {}
+            therms = rdata.get("thermals_spotmedian") or {}
+            cloud_top = rdata.get("cloud_top") or {}
+            storm_hours, od_hours = [], []
+            for ts in sorted(hourly):
+                if not ts.startswith(d):
+                    continue
+                data = hourly.get(ts) or {}
+                _wc = data.get("weather_code")
+                storm = (convection.is_ensemble_storm_hour(
+                             shares.get(ts[11:16]), data)
+                         or (_wc is not None and int(_wc) in (95, 96, 99)))
+                if storm:
+                    storm_hours.append(ts[11:16])
+                elif convection.is_overdev_hour(cloud_top.get(ts), data,
+                                                therm=therms.get(ts)):
+                    od_hours.append(ts[11:16])
+            rname = rdata.get("region_name") or rid
+            if storm_hours:
+                zones[zone]["gewitter"].append(
+                    [rname, f"{storm_hours[0]}-{storm_hours[-1]}"])
+            if od_hours:
+                zones[zone]["ueberentwicklung"].append(
+                    [rname, f"{od_hours[0]}-{od_hours[-1]}"])
+        out.append({"date": d, "zones": zones})
+    return {"per_day": out}
 
 
 def _classify_zone_fallback(lat, lon) -> Optional[str]:

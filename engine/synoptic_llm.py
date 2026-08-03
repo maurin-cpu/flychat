@@ -381,8 +381,21 @@ def _zone_gewitter_share(ctx: dict, zone: str, i: int) -> Optional[float]:
     return share if isinstance(share, (int, float)) else None
 
 
-# Gewitter-Wortfeld. gewitter_share (weather_code 95/96/99) ist laut Skill
-# das EINZIGE Gewitter-Signal — hohe CAPE allein heisst "labile Luft".
+def _zone_konvektion(ctx: dict, zone: str, i: int, key: str) -> list:
+    """Weiche Konvektions-Signale (Ensemble/Wolkentop) einer Zone am Tag i.
+
+    key: "gewitter" oder "ueberentwicklung". Leere Liste, wenn nichts da —
+    aeltere Caches haben das Feld nicht.
+    """
+    per_day = (ctx.get("konvektion") or {}).get("per_day") or []
+    if i >= len(per_day):
+        return []
+    return (((per_day[i].get("zones") or {}).get(zone) or {}).get(key)) or []
+
+
+# Gewitter-Wortfeld. Gewitter-Signale sind gewitter_share (weather_code
+# 95/96/99) ODER konvektion.gewitter (Ensemble + Anker, seit 03.08.2026) —
+# hohe CAPE allein heisst weiterhin nur "labile Luft".
 _GEWITTER_RE = re.compile(r"(gewitter|thunderstorm|thunder\b)", re.IGNORECASE)
 
 
@@ -576,14 +589,17 @@ def _validate_zone(z: dict, zone_id: str, ctx: dict, fc_dates: list,
         # hohe CAPE verleitet den LLM zur Gewitter-Prosa (DE-Lauf
         # 26.07.2026: "Schauer und Gewitter" bei CAPE 1360, share 0).
         gew_share = _zone_gewitter_share(ctx, zone_id, i)
-        if gew_share == 0:
+        ens_gewitter = _zone_konvektion(ctx, zone_id, i, "gewitter")
+        if gew_share == 0 and not ens_gewitter:
             gew_hit = (_GEWITTER_RE.search(text)
                        or _GEWITTER_RE.search(hint_str))
             if gew_hit:
                 errors.append(_verr(scope, "gewitter_without_signal",
-                                    f"`gewitter_share` ist an dem Tag in dieser "
-                                    f"Zone 0 — {gew_hit.group(0)!r} ist damit "
-                                    f"nicht gedeckt. Hohe CAPE allein heisst "
+                                    f"Weder `gewitter_share` noch "
+                                    f"`konvektion.gewitter` zeigen an dem Tag "
+                                    f"in dieser Zone ein Signal — "
+                                    f"{gew_hit.group(0)!r} ist damit nicht "
+                                    f"gedeckt. Hohe CAPE allein heisst "
                                     f"'labile Luft' / 'Ueberentwicklung "
                                     f"moeglich', NICHT Gewitter."))
 
@@ -858,6 +874,7 @@ def _build_llm_payload(ctx: dict) -> str:
                          for c in d.get("centers", [])]}
             for d in (ctx.get("pressure_centers_per_day") or [])
         ],
+        "konvektion": ctx.get("konvektion"),
         "bise": _strip_provenance(ctx.get("bise")),
         "vb_lage": _strip_provenance(ctx.get("vb_lage")),
         "foehn": _strip_provenance(ctx.get("foehn")),
