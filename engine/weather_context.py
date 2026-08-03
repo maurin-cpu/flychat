@@ -13,6 +13,8 @@ import os
 import re
 import statistics
 import threading
+
+import overdev as _overdev_mod
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from datetime import datetime, timedelta
@@ -1574,6 +1576,14 @@ class WeatherContextMixin:
         spot_region_id = spot_region["id"] if spot_region else None
         spot_terrain_zone = get_terrain_zone(elevation_m, spot_region_id)
 
+        # Regions-Konvektion in die SPOT-Analyse spiegeln (User-Vorgabe
+        # 03.08.2026): Gewitter-Ensemble + Ueberentwicklung gibt es nur auf
+        # Regionsebene — der Spot-Kontext bekam bisher keins von beidem.
+        if spot_region_id:
+            _conv_hint = self._region_convective_hint(spot_region_id, date_str)
+            if _conv_hint:
+                lines.append(_conv_hint)
+
         # Stateful Thermik-Berechnung über alle Stunden (Single Source of Truth:
         # gleiche climb_rate / max_height wie im Meteogramm). Thermal Inertia,
         # Encroachment-Cap und H-skalierte Verfallsrate wirken nur mit State-
@@ -2832,6 +2842,55 @@ class WeatherContextMixin:
                 result.append(spot)
         return result
 
+    def _region_convective_hint(self, region_id, date_str):
+        """Eine Zeile Region-Konvektion (Gewitter-Ensemble + Ueberentwicklung)
+        fuers SPOT-Kontextfenster.
+
+        Spots haben kein Ensemble (21 Member x 494 Punkte nicht abrufbar) und
+        keine Wolkentops — die Regions-Signale muessen trotzdem in die
+        Spot-Analyse (User-Vorgabe 03.08.2026: Gewitter UND Ueberentwicklung
+        pro Spot UND Region). Leerstring, wenn nichts anliegt.
+        """
+        rdata = (getattr(self, "region_weather_data", None) or {}).get(region_id) or {}
+        if not rdata:
+            return ""
+        from ensemble_thunder import is_ensemble_storm_hour, probability_level
+        parts = []
+        ens = (rdata.get("thunder_ensemble") or {}).get(date_str) or {}
+        lvl = probability_level(ens.get("probability_pct"))
+        if lvl:
+            peak = ""
+            if ens.get("peak_start"):
+                peak = f" (Schwerpunkt {ens.get('peak_start')}-{ens.get('peak_end')})"
+            parts.append(
+                f"Gewitterwahrscheinlichkeit {ens.get('probability_pct')}% "
+                f"[{lvl}]{peak}")
+        shares = ens.get("hourly_share_pct") or {}
+        hourly = rdata.get("hourly_data") or {}
+        therms = rdata.get("thermals_spotmedian") or {}
+        od_hours = []
+        for ts, entry in sorted((rdata.get("cloud_top") or {}).items()):
+            if not ts.startswith(date_str):
+                continue
+            data = hourly.get(ts) or {}
+            _wc = data.get("weather_code")
+            storm = (is_ensemble_storm_hour(shares.get(ts[11:16]), data)
+                     or (_wc is not None and int(_wc) in (95, 96, 99)))
+            if _overdev_mod.is_overdev_hour(entry, data,
+                                            therm=therms.get(ts), storm=storm):
+                od_hours.append(ts[11:16])
+        if od_hours:
+            parts.append(f"Ueberentwicklung moeglich ab ~{od_hours[0]} "
+                         f"({od_hours[0]}-{od_hours[-1]}, Quellwolken koennen "
+                         f"hochschiessen)")
+        if not parts:
+            return ""
+        return (f"REGION-KONVEKTION ({rdata.get('region_name') or region_id}): "
+                + " · ".join(parts)
+                + ". WEICHE Regions-Signale, kein Spot-Messwert — allein KEIN "
+                  "No-Go, aber im Text erwaehnen und das Zeitfenster nennen "
+                  "(Landung vor der Entwicklung planen).")
+
     def _build_single_region_context(self, region, date_str: str) -> str:
         """
         Baut Wetterkontext fuer EINE Region an EINEM Tag.
@@ -2925,6 +2984,11 @@ class WeatherContextMixin:
         ens_share = ens.get("hourly_share_pct") or {}
         ens_storm_hours = []      # ["13:00", ...] — Stunden mit Blitz-Symbol
         ens_storm_peak_pct = None  # hoechster Stundenanteil unter diesen Stunden
+        # Ueberentwicklungs-Stufe (overdev.py) — DIESELBE Regel wie der hohle
+        # Blitz im Meteogramm; harte Blitz-Stunden gewinnen.
+        region_cloud_top = region_data.get("cloud_top") or {}
+        overdev_hours = []         # ["14:00", ...] — Stunden mit hohlem Blitz
+        overdev_top_min = None     # kaeltester Wolkentop dieser Stunden
         # Instabilitaet fuer die Analyse: BEIDE Werte, nicht nur CAPE.
         # CAPE wird vom Boden aufwaerts gerechnet und ist zwischen Regionen
         # unterschiedlicher Hoehe nicht vergleichbar (Voralpen-Median 860
@@ -2988,10 +3052,24 @@ class WeatherContextMixin:
             # Ensemble-Gewitterstunde? Gleiche Regel wie das Blitz-Symbol.
             _hhmm = dt.strftime("%H:%M")
             _share = ens_share.get(_hhmm)
-            if _ens_storm_hour(_share, data):
+            _storm_h = _ens_storm_hour(_share, data)
+            if _storm_h:
                 ens_storm_hours.append(_hhmm)
                 if ens_storm_peak_pct is None or _share > ens_storm_peak_pct:
                     ens_storm_peak_pct = _share
+            # Ueberentwicklung: kalter Wolkentop + angezeigte Wolken +
+            # Instabilitaet + kein Blauthermik-Veto (overdev.py).
+            _wc_h = data.get("weather_code")
+            _det_storm = _wc_h is not None and int(_wc_h) in (95, 96, 99)
+            if _overdev_mod.is_overdev_hour(
+                    region_cloud_top.get(timestamp[:16]), data,
+                    therm=daily_thermals.get(timestamp),
+                    storm=_storm_h or _det_storm):
+                overdev_hours.append(_hhmm)
+                _top_c = (region_cloud_top.get(timestamp[:16]) or {}).get("top_min_c")
+                if isinstance(_top_c, (int, float)) and (
+                        overdev_top_min is None or _top_c < overdev_top_min):
+                    overdev_top_min = _top_c
 
             _li = data.get("lifted_index")
             if isinstance(_li, (int, float)) and (li_min is None or _li < li_min):
@@ -4034,6 +4112,23 @@ class WeatherContextMixin:
                 f"ist absichtlich NICHT die Aussage und gehoert nicht in den Text. "
                 f"Bei fehlendem Modell-Gewitter oben trotzdem erwaehnen — genau "
                 f"dafuer ist das Ensemble da."
+            )
+
+        if overdev_hours:
+            _top_txt = (f", Wolkentop bis {overdev_top_min:.0f} Grad C"
+                        if overdev_top_min is not None else "")
+            lines.append(
+                f"UEBERENTWICKLUNG: Quellwolken koennen hochschiessen — "
+                f"betroffen {overdev_hours[0]}-{overdev_hours[-1]} "
+                f"({len(overdev_hours)}h{_top_txt}, ICON-EU an >=75% der "
+                f"Referenzpunkte). WEICHE Vorwarnstufe UNTERHALB des Gewitters "
+                f"— allein KEIN No-Go, KEIN Gewitter-Level und nicht als "
+                f"Gewitter formulieren. Als Entwicklungs-Hinweis schreiben "
+                f"(z.B. \"Quellwolken koennen ab ~{overdev_hours[0]} "
+                f"hochschiessen — Entwicklung beobachten, Landung "
+                f"entsprechend planen\"). Die Stunden sind identisch mit den "
+                f"HOHLEN Blitzen im Meteogramm — nur diese nennen. Stunden, "
+                f"die oben schon als Gewitter stehen, NICHT doppelt nennen."
             )
 
         # Hoehenwind-Trend (analog Boeen-Trend in Spots)

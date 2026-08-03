@@ -508,6 +508,10 @@ def build_snapshots(target_date: Optional[str] = None, all_days: bool = False) -
                 # sonst laesst sich die Schwelle (aktuell UNKALIBRIERT) spaeter
                 # nicht gegen Stationsmessungen kalibrieren.
                 "thunder_ensemble": (rdata.get("thunder_ensemble") or {}).get(day),
+                # Wolkentops (Ueberentwicklungs-Stufe) — gleiche Pflicht:
+                # ohne Freeze ist die Stufe nie validierbar (Lehre 31.07.).
+                "cloud_top": {t: v for t, v in (rdata.get("cloud_top") or {}).items()
+                              if t.startswith(day)},
                 "analysis": extract_region_analysis(r_ana) if r_ana else None,
             }
             out["regions"][region_id] = entry

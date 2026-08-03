@@ -1039,16 +1039,21 @@ window.Meteogram = (function () {
             var cx = ci * CELL_W + CELL_W / 2;
             var hasPrecip = precipAmt > 0;
             var hasStorm = stormAt(precip, wc);
-            // Gewitter = ausschliesslich weather_code 95/96/99 (ICON-CH). Die
-            // CAPE-Ueberentwicklung wird hier NICHT mehr als (hohler) Blitz
-            // gezeigt — sie bleibt ein Safety-Aspekt in der Analyse, ist aber
-            // kein Blitz-Symbol mehr (ein Blitz statt zwei).
-            if (!hasPrecip && !hasStorm) return;
+            // Weiche Ueberentwicklungs-Stufe (August 2026): hohler Blitz.
+            // Server-seitig entschieden (overdev.py — Wolkentop ICON-EU +
+            // Konsistenz mit der angezeigten Bewoelkung + Instabilitaet +
+            // Blauthermik-Gate). Der harte Blitz gewinnt immer. Der ALTE
+            // hohle CAPE-Blitz (bis 06/2026) warnte auf nacktem CAPE und
+            // flog deshalb raus — dieser hier ist physikalisch hergeleitet.
+            var hasOverdev = !hasStorm && !!(precip && precip.overdev);
+            if (!hasPrecip && !hasStorm && !hasOverdev) return;
 
             // Gefuellter Hintergrund – sofort sichtbar
             var fillColor = hasStorm ? 'rgba(245, 158, 11, 0.5)'
+                          : hasOverdev ? 'rgba(245, 158, 11, 0.22)'
                           : (precipColor(precipAmt) + '99');
             var titleTxt = hasStorm ? (hasPrecip ? wcT('js.mg.precip_storm', { mm: precipAmt.toFixed(1) }) : wcT('js.mg.warn_storm'))
+                         : hasOverdev ? wcT('js.mg.overdev_possible')
                          : precipAmt.toFixed(1) + ' mm';
             chartG.append('rect')
                 .attr('x', ci * CELL_W + 1)
@@ -1075,14 +1080,14 @@ window.Meteogram = (function () {
                 var iconSize = Math.min(14, PRECIP_ROW_H - 4);
                 var iconY = precipRowY + (PRECIP_ROW_H - iconSize) / 2;
                 var iconScale = iconSize / 24;
-                if (hasStorm) {
+                if (hasStorm || hasOverdev) {
                     var boltX = cx - iconSize * 0.32;
                     chartG.append('path')
                         .attr('d', 'M13 2 L4 14 L11 14 L9 22 L20 10 L13 10 Z')
                         .attr('transform', 'translate(' + boltX + ',' + iconY + ') scale(' + iconScale + ')')
-                        .attr('fill', '#92400E')
-                        .attr('stroke', '#FBBF24')
-                        .attr('stroke-width', 0.8 / iconScale)
+                        .attr('fill', hasStorm ? '#92400E' : 'none')
+                        .attr('stroke', hasStorm ? '#FBBF24' : '#B45309')
+                        .attr('stroke-width', (hasStorm ? 0.8 : 1.6) / iconScale)
                         .attr('stroke-linejoin', 'round');
                 } else if (hasPrecip) {
                     // Tropfen-Cluster mit ueberlappenden Drops + y-Jitter.
@@ -1115,23 +1120,23 @@ window.Meteogram = (function () {
                 var dText = hasPrecip ? precipAmt.toFixed(1) + ' mm' : '';
                 var dGap = dText ? 3 : 0;
                 // Cluster: kleinere Tropfen bei >1, OHNE Gap (ueberlappend statt nebeneinander).
-                var dPerDropSize = (!hasStorm && dropCount > 1) ? 7 : dIconSize;
+                var dPerDropSize = (!hasStorm && !hasOverdev && dropCount > 1) ? 7 : dIconSize;
                 var dPerDropScale = dPerDropSize / 24;
                 var dDropStep = dropCount > 1 ? Math.round(dPerDropSize * 0.55) : 0;  // <Drop-Breite = ueberlappend
-                var dClusterW = hasStorm ? dIconSize : (dPerDropSize + (dropCount - 1) * dDropStep);
+                var dClusterW = (hasStorm || hasOverdev) ? dIconSize : (dPerDropSize + (dropCount - 1) * dDropStep);
                 var dTextW = dText.length * 6.2;
                 var dTotalW = dClusterW + dGap + dTextW;
                 var dStartX = cx - dTotalW / 2;
                 var dIconX = dStartX;
                 var dTextX = dStartX + dClusterW + dGap;
 
-                if (hasStorm) {
+                if (hasStorm || hasOverdev) {
                     chartG.append('path')
                         .attr('d', 'M13 2 L4 14 L11 14 L9 22 L20 10 L13 10 Z')
                         .attr('transform', 'translate(' + dIconX + ',' + dIconY + ') scale(' + dIconScale + ')')
-                        .attr('fill', '#92400E')
-                        .attr('stroke', '#FBBF24')
-                        .attr('stroke-width', 0.8 / dIconScale)
+                        .attr('fill', hasStorm ? '#92400E' : 'none')
+                        .attr('stroke', hasStorm ? '#FBBF24' : '#B45309')
+                        .attr('stroke-width', (hasStorm ? 0.8 : 1.6) / dIconScale)
                         .attr('stroke-linejoin', 'round');
                 } else {
                     var dDropColor = precipAmt >= 3 ? '#1D4ED8' : precipAmt >= 1 ? '#2563EB' : '#3B82F6';
@@ -1992,6 +1997,12 @@ window.Meteogram = (function () {
                     ? '\u26A1 ' + wcT('js.mg.warn_storm')
                     : '\u26A1 ' + (ensPct != null ? ensPct + '%' : '');
                 html += '<div class="tooltip-row"><span class="tooltip-label">Gewitter</span><span class="tooltip-value">' + stormTxt + '</span></div>';
+            }
+            if (!stormAt(wx.precipitation, wc) && wx.precipitation && wx.precipitation.overdev) {
+                var odTop = wx.precipitation.overdev_top_c;
+                var odTxt = '⛅⚡ ' + wcT('js.mg.overdev_possible')
+                    + (odTop != null ? ' (' + wcT('js.mg.overdev_top', { c: Math.round(odTop) }) + ')' : '');
+                html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.overdev_label') + '</span><span class="tooltip-value">' + odTxt + '</span></div>';
             }
 
             tooltipEl.innerHTML = html;

@@ -1521,6 +1521,22 @@ def fetch_all_spots(spots, save_to_file=True):
     except Exception as e:  # noqa: BLE001 — Ensemble darf den Lauf nie kippen
         print(f"  [WARN] Ensemble-Gewitter uebersprungen: {e}")
 
+    # Wolkentops fuer die Ueberentwicklungs-Stufe (ICON-EU, cloud_top.py).
+    # Gleiche Konstruktion wie das Ensemble: EIN gebuendelter Abruf, faellt er
+    # aus, laeuft der Lauf ohne die Stufe weiter — reine Zusatzinfo.
+    region_cloud_tops = {}
+    try:
+        import cloud_top as _cloud_top
+        region_cloud_tops = _cloud_top.compute_region_cloud_tops(
+            {r["id"]: region_refs.get(r["id"], []) for r in all_regions
+             if region_refs.get(r["id"])}
+        )
+        n_hours = sum(len(v) for v in region_cloud_tops.values())
+        print(f"  [OK] Wolkentops: {len(region_cloud_tops)} Regionen mit "
+              f"kalten Tops, {n_hours} Stunden")
+    except Exception as e:  # noqa: BLE001
+        print(f"  [WARN] Wolkentops uebersprungen: {e}")
+
     region_data = {}
     for region in all_regions:
         rid = region["id"]
@@ -1668,6 +1684,9 @@ def fetch_all_spots(spots, save_to_file=True):
             # Weiche Gewitter-Warnstufe je Tag (Anteil der EPS-Member).
             # Kein Fliegbarkeits-Gate — siehe ensemble_thunder.py.
             "thunder_ensemble": region_thunder.get(rid),
+            # Wolkentops je Stunde fuer die Ueberentwicklungs-Stufe
+            # (ICON-EU). Kein Gate — siehe overdev.py.
+            "cloud_top": region_cloud_tops.get(rid),
         }
 
     print(f"[INFO] {len(region_data)} Regionen verarbeitet")

@@ -994,6 +994,11 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.mg.more_warnings_many": {"de": "{n} weitere Warnungen:", "en": "{n} more warnings:"},
     # Niederschlag/Überentwicklung-Titel
     "js.mg.precip_storm": {"de": "{mm} mm + Gewitter", "en": "{mm} mm + thunderstorm"},
+    # Ueberentwicklungs-Stufe (hohler Blitz, August 2026)
+    "js.mg.overdev_possible": {"de": "Überentwicklung möglich — Quellwolken können hochschiessen",
+                               "en": "Overdevelopment possible — cumulus may grow tall"},
+    "js.mg.overdev_label": {"de": "Überentwicklung", "en": "Overdevelopment"},
+    "js.mg.overdev_top": {"de": "Wolkentop bis {c} °C", "en": "cloud top down to {c} °C"},
     "js.mg.overdev": {"de": "Überentwicklungsgefahr", "en": "Overdevelopment risk"},
     "js.mg.overdev_high": {"de": " (hoch)", "en": " (high)"},
     "js.mg.overdev_possible": {"de": " (möglich)", "en": " (possible)"},

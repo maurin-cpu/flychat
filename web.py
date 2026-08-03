@@ -3700,7 +3700,8 @@ def api_region_weather(region_id):
 
     chart_data = format_data_for_charts(hourly_data, pressure_level_data, elevation_ref=elevation_ref,
                                         region_id=region_id, spotmedian_override=spotmedian_override,
-                                        thunder_ensemble=region_data.get("thunder_ensemble"))
+                                        thunder_ensemble=region_data.get("thunder_ensemble"),
+                                        cloud_top=region_data.get("cloud_top"))
 
     # Regionen haben keine Böen (Apr 2026): gusts = null.
     # Frontend (meteogram.js) interpretiert null korrekt: hasRealGust=false →
@@ -4060,6 +4061,7 @@ def _safe_get(arr, i):
 # damit Meteogramm-Symbol, Gewitter-Kachel und LLM-Kontext garantiert dieselbe
 # Regel benutzen (vorher hatte jede Schicht ihre eigene Rechnung).
 from ensemble_thunder import thunder_anchor_ok as _thunder_anchor_ok  # noqa: E402
+import overdev as _overdev  # noqa: E402
 
 
 # ============================================================================
@@ -4068,7 +4070,8 @@ from ensemble_thunder import thunder_anchor_ok as _thunder_anchor_ok  # noqa: E4
 
 def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=None,
                            slope_azimuth=None, slope_angle=None, region_id=None,
-                           spotmedian_override=None, thunder_ensemble=None):
+                           spotmedian_override=None, thunder_ensemble=None,
+                           cloud_top=None):
     """Formatiert Daten für D3.js Charts inkl. Thermik-Physik.
 
     spotmedian_override (Mai 2026): nur fuer Regionen. Ueberschreibt max_height /
@@ -4084,6 +4087,11 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
     (config.ENSEMBLE_THUNDER_METEOGRAM_PCT) und nicht zusaetzlich im JavaScript.
     Spots haben kein Ensemble (494 Punkte x 21 Member sind am freien Endpunkt
     nicht zu holen) — dort bleibt es beim weather_code.
+
+    cloud_top (August 2026): nur fuer Regionen — Wolkentops je Stunde aus
+    _regions[rid]["cloud_top"] (ICON-EU). Steuert die weiche
+    Ueberentwicklungs-Stufe ("overdev", hohler Blitz). Die Regel liegt in
+    overdev.is_overdev_hour — dieselbe Funktion wie KI-Text und Validierung.
     """
     # Blitz-Stunden aus dem Ensemble ableiten.
     #
@@ -4159,6 +4167,12 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     or (time_str[:16] in ens_storm_hours
                         and _thunder_anchor_ok(data))
                 )
+                # Weiche Ueberentwicklungs-Stufe (hohler Blitz). Regel in
+                # overdev.py — der harte Blitz gewinnt immer (storm=...).
+                _ct = (cloud_top or {}).get(time_str[:16])
+                _overdev_flag = _overdev.is_overdev_hour(
+                    _ct, data, therm=daily_thermals.get(timestamp),
+                    storm=_storm)
                 chart_data["precipitation"].append({
                     "time": time_str,
                     "amount": precipitation,
@@ -4167,6 +4181,8 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     # Fertiger Wahrheitswert fuers Frontend (Schwelle bleibt in
                     # config.py). Aelterer Cache ohne Ensemble -> nur weather_code.
                     "storm": _storm,
+                    "overdev": _overdev_flag,
+                    "overdev_top_c": (_ct or {}).get("top_min_c") if _overdev_flag else None,
                     "thunder_ens_pct": _ens,
                     # 16-RP Coverage-Klasse (widespread/scattered/isolated/dry)
                     # damit das Meteogramm pro Stunde die Tropfen-Anzahl variieren kann.

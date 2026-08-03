@@ -254,6 +254,31 @@ THUNDER_ANCHOR_CAPE_JKG   = 300   # J/kg in dieser Stunde
 # vorsortieren. UNGEMESSEN.
 THUNDER_ANCHOR_LI         = -1.0  # Lifted Index in dieser Stunde (kleiner = instabiler)
 
+# --- UEBERENTWICKLUNG (weiche Vorwarn-Stufe, 03.08.2026) ---
+# "Quellwolken koennen hochschiessen" — die Stufe VOR dem Gewitter. Sperrt
+# nie, hohler Blitz + Satz in der KI-Analyse. Vier Bedingungen, alle in
+# derselben Stunde (Herleitung + Saison-Backtest: docs/GEWITTER.md par.0c —
+# Top<=-20 @>=75% Punkte + Anker erkannte 2 von 3 Konvektionstagen,
+# ~3-4 h Vorlauf):
+#   1. Wolkentop-Temperatur <= OVERDEV_TOP_TEMP_C an >= OVERDEV_TOP_SHARE_PCT
+#      der Referenzpunkte (ICON-EU convective_cloud_top — einziges Modell,
+#      das das Feld fuellt; CH1/CH2 liefern es nicht, D2 praktisch leer)
+#   2. KONSISTENZ-REGEL (User 03.08.): Bewoelkung im ANGEZEIGTEN Lauf
+#      >= OVERDEV_CLOUD_MIN_PCT — das Meteogramm darf nie wolkenlos zeigen
+#      und daneben Ueberentwicklung behaupten (dieselbe Lehre wie der
+#      Blitz bei 2 % Bewoelkung)
+#   3. Instabilitaet: CAPE ODER Lifted Index (THUNDER_ANCHOR_*-Schwellen)
+#   4. Blauthermik-Gate: erreicht die Thermik die Wolkenbasis nicht
+#      (max_height deutlich unter LCL), waechst keine Quellwolke -> keine
+#      Warnung. Nutzt das eigene Thermikmodell (Spot-Median je Region).
+# Harte Blitz-Stunde gewinnt immer: dort KEIN Zusatzsymbol.
+# UNGEMESSEN im Detail — Schwellen laufen im Validierungs-Scoreboard
+# parallel mit und werden nach ~4 Wochen geeicht.
+OVERDEV_TOP_TEMP_C     = -20.0  # Wolkentop kaelter als das -> gewittertaugliche Tiefe
+OVERDEV_TOP_SHARE_PCT  = 75     # Anteil der Referenzpunkte mit kaltem Top
+OVERDEV_CLOUD_MIN_PCT  = 30     # Konsistenz: angezeigte Bewoelkung in DIESER Stunde
+OVERDEV_THERMIK_MARGIN_M = 200  # Blauthermik-Gate: max_height + Marge < LCL -> aus
+
 # --- SURFACE-PARAMS die CH1/CH2 ueber Open-Meteo liefern ---
 # Mai 2026 verifiziert. Diese Liste wird im Wind/CH1/CH2-Batch verwendet.
 # Im Tag-Voting (CH1->CH2->EU) gelten diese Variablen als "CH-eligible".

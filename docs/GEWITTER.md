@@ -12,7 +12,55 @@ Validierung der fertigen Blitz-Prognose (LPI).
 > abgerufenen Wetterparametern (`config.py`: `CH_SURFACE_PARAMS`,
 > `GFS_SUPPLEMENTARY_PARAMS`): diese Doku nachziehen und Changelog ergänzen.
 
-Letzte Aktualisierung: 2026-08-03 (Anker verschaerft: Regen-Pflicht, §0c — erster Saison-Backtest gegen SwissMetNet)
+Letzte Aktualisierung: 2026-08-03 (Ueberentwicklungs-Stufe gebaut, §0d — damit ist PLAN_gewitter_anzeige.md abgeschlossen und geloescht)
+
+---
+
+## 0d. Überentwicklungs-Stufe (2026-08-03) — die weiche Vorwarnung vor dem Gewitter
+
+**Was:** „Quellwolken können hochschiessen" — die Stufe VOR dem Gewitter, für
+die Pilotengefahr *wachsende Wolke* (Einsaugen, Schauer, Abwinde). **Sperrt
+nie**, setzt kein No-Go. Anzeige: **hohler Blitz** im Meteogramm (Wiedergänger
+des 06/2026 entfernten CAPE-Blitzes — aber physikalisch hergeleitet statt aus
+nacktem CAPE) + Zeile `UEBERENTWICKLUNG` in der Regions-KI-Analyse + Zeile
+`REGION-KONVEKTION` in der **Spot**-KI-Analyse (Spots erben die
+Regions-Signale — auch das Gewitter-Ensemble, das den Spots bisher fehlte).
+
+**Die EINE Regel** (`overdev.is_overdev_hour` — Meteogramm, KI-Text und
+Validierung nutzen dieselbe Funktion), vier Bedingungen je Stunde
+(Schwellen: `config.OVERDEV_*`):
+
+1. **Wolkentop ≤ −20 °C an ≥ 75 % der Referenzpunkte** — ICON-EU
+   `convective_cloud_top` (einziges Modell, das das Feld füllt), Abruf
+   `cloud_top.py`, im Tageslauf gebündelt wie das Ensemble, im Snapshot
+   eingefroren. Backtest §0c: erkennt 2 von 3 Konvektionstagen, ~3–4 h Vorlauf.
+2. **Konsistenz-Regel (User 03.08.):** angezeigte Bewölkung derselben Stunde
+   ≥ 30 % — das Meteogramm darf nie wolkenlos zeigen und daneben
+   Überentwicklung behaupten.
+3. **Instabilität:** CAPE ≥ 300 ODER LI ≤ −1 (wie Blitz-Anker).
+4. **Blauthermik-Veto:** *aktive* Thermik (climb > 0), die die Basis klar
+   verfehlt (max_height + 200 m < LCL) → keine Quellwolke → keine Warnung.
+   Bewusst nur bei aktiver Thermik — Stunden ohne Thermik (Abend!) können
+   Front-/Abendkonvektion tragen, der blinde Fleck des Testtags 02.08.
+
+Harte Blitz-Stunde gewinnt immer: ein Symbol, eine Botschaft.
+
+**Modell-Mix, bewusst (Entscheid 03.08.):** Indizien-Voting, keine
+Physik-Kette — Begründung in `cloud_top.py`. Cross-Modell-Bedingungen nie
+stundenscharf ver-UND-et; die Messvalidierung entscheidet empirisch.
+
+**Offen (übernommen aus dem gelöschten PLAN_gewitter_anzeige.md):**
+- Validierungs-Scoreboard um Überentwicklung erweitern (Wahrheit läuft schon:
+  Schauer/Sonne/Ausfluss in `validation/gewitter/`) — dann Schwellen-Wahl
+  Top −15/−20/−25 × Quorum 50/75 % nach ~4 Wochen
+- **Challenger:** Wolkentiefe selbst aus dem CH1/CH2-Höhenprofil rechnen
+  (eine Atmosphäre, kein Mix) — im Scoreboard gegen den Mix antreten lassen
+- Ensemble-Schwelle (40 %) vorwärts eichen (läuft, `validation/gewitter/`)
+- CAPE-Kachel Prozent → ordinale Stufen (branchenüblich, niemand nennt
+  Gewitter-Prozente) · Meteomatics-Blitzdaten anfragen oder dauerhaft ohne
+  Wahrheit arbeiten (unverändert offen)
+
+Tests: `tests/test_overdev.py` (Regel + Chart-Payload, 15 Fälle).
 
 ---
 
