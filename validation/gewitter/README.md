@@ -19,9 +19,15 @@ Regen ≥ 4 mm/h   UND   (Böensprung ≥ 15 km/h ODER Temperatursturz ≥ 2 K
                         gegenüber der Vorstunde)
 ```
 
-Daneben: **Schauer** = Regen ≥ 2 mm/h (Beleg für hochgewachsene Wolken =
-Überentwicklung) und **Sonnenanteil 12–18 Uhr** (widerlegt Bewölkungs-
-Warnungen). Schwellen: `scripts/validation_common.py`.
+Daneben: **Schauer** = Regenguss ohne Sturm-Zeichen (Beleg für hochgewachsene
+Wolken = Überentwicklung), **Sonnenanteil 12–18 Uhr** (widerlegt Bewölkungs-
+Warnungen) und **Ausfluss** = Böensprung + Temperatursturz + Druckanstieg
+*ohne* Regen — konvektive Kaltluft, deren Regenkern die Station verfehlt hat
+*oder* eine trockene Front (30.07.!). Ausfluss ist darum bewusst **kein
+Gewitter-Beweis**: er wird nur gespeichert (nie angezeigt, ändert kein
+Urteil) und beziffert über die Zeit den blinden Fleck der Gewitter-Signatur —
+z. B. wie viele „Fehlalarme" eine Ausfluss-Signatur daneben hatten.
+Schwellen: `scripts/validation_common.py`.
 
 ## Grenzen des Richters — beim Lesen immer mitdenken
 

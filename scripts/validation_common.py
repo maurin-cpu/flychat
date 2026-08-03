@@ -43,6 +43,18 @@ STORM_GUST_JUMP_KMH = 15.0   # Böensprung gegen 30 min davor
 STORM_TEMP_DROP_K = -2.0     # Temperatursturz gegen 30 min davor
 SHOWER_RAIN_MM30 = 1.5
 
+# AUSFLUSS-Signatur (03.08.2026): konvektive Kaltluft OHNE Regen an der
+# Station — Böensprung + Temperatursturz + Druckanstieg. Markiert den blinden
+# Fleck der Gewitter-Signatur (Regenkern verfehlt die Station, Böenfront
+# kommt trotzdem an) — bewusst KEIN Gewitter-Beweis: exakt dieses Muster
+# erzeugte die trockene Böenfront vom 30.07. an 45 Stationen ohne ein
+# einziges Gewitter. Wird nur GESPEICHERT (messwerte/urteile), nie angezeigt
+# und aendert kein Urteil. Schwellen = die an 139 Stationen validierte
+# Dichtestroemungs-Signatur der Böenfront-Analyse vom 30.07.
+OUTFLOW_GUST_JUMP_KMH = 15.0
+OUTFLOW_TEMP_DROP_K = -1.0
+OUTFLOW_PRES_RISE_HPA = 0.2
+
 VERDICTS = ("treffer", "verpasst", "fehlalarm", "still")
 
 
@@ -145,7 +157,8 @@ def smn_station_day(abbr: str, day: datetime.date) -> dict[str, list] | None:
             _num(r.get("rre150z0")),
             gust * 3.6 if gust is not None else None,
             _num(r.get("tre200s0")),
-            _num(r.get("sre000z0"))]
+            _num(r.get("sre000z0")),
+            _num(r.get("prestas0"))]
     return out or None
 
 
@@ -163,15 +176,17 @@ def region_events(werte_by_station: dict[str, dict], stations_meta: dict[str, di
         if not meta:
             continue
         reg = regionen.setdefault(meta["region"], {
-            "gewitter": [], "schauer": [], "_sonne": []})
+            "gewitter": [], "schauer": [], "ausfluss": [], "_sonne": []})
         times = sorted(werte)
-        best_storm = best_shower = None
+        best_storm = best_shower = best_outflow = None
         for i in range(3, len(times)):
             win = [werte[t] for t in times[i - 2:i + 1]]
             rain30 = sum(v[0] for v in win if v[0] is not None)
             a, b = werte[times[i - 3]], werte[times[i]]
             jump = (b[1] - a[1]) if None not in (a[1], b[1]) else None
             dtemp = (b[2] - a[2]) if None not in (a[2], b[2]) else None
+            dpres = ((b[4] - a[4]) if len(a) > 4 and len(b) > 4
+                     and None not in (a[4], b[4]) else None)
             if rain30 >= STORM_RAIN_MM30 and (
                     (jump is not None and jump >= STORM_GUST_JUMP_KMH)
                     or (dtemp is not None and dtemp <= STORM_TEMP_DROP_K)):
@@ -184,10 +199,19 @@ def region_events(werte_by_station: dict[str, dict], stations_meta: dict[str, di
                 cand = [times[i], abbr, round(rain30, 1)]
                 if best_shower is None or cand[2] > best_shower[2]:
                     best_shower = cand
+            elif (jump is not None and jump >= OUTFLOW_GUST_JUMP_KMH
+                    and dtemp is not None and dtemp <= OUTFLOW_TEMP_DROP_K
+                    and dpres is not None and dpres >= OUTFLOW_PRES_RISE_HPA):
+                cand = [times[i], abbr, round(jump),
+                        round(dtemp, 1), round(dpres, 1)]
+                if best_outflow is None or cand[2] > best_outflow[2]:
+                    best_outflow = cand
         if best_storm:
             reg["gewitter"].append(best_storm)
         elif best_shower:
             reg["schauer"].append(best_shower)
+        elif best_outflow:
+            reg["ausfluss"].append(best_outflow)
         sonne = [v[3] for t, v in werte.items()
                  if "12:00" <= t < "18:00" and v[3] is not None]
         if sonne:

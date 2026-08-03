@@ -76,7 +76,10 @@ def build_messwerte(day: datetime.date, stations: list[dict]) -> dict | None:
                   "signatur": f"gewitter: regen>={vc.STORM_RAIN_MM30}mm/30min & "
                               f"(boee>={vc.STORM_GUST_JUMP_KMH}km/h | "
                               f"dT<={vc.STORM_TEMP_DROP_K}K je 30min); "
-                              f"schauer: regen>={vc.SHOWER_RAIN_MM30}mm/30min"},
+                              f"schauer: regen>={vc.SHOWER_RAIN_MM30}mm/30min; "
+                              f"ausfluss (ohne Regen): boee>={vc.OUTFLOW_GUST_JUMP_KMH}"
+                              f"km/h & dT<={vc.OUTFLOW_TEMP_DROP_K}K & "
+                              f"dP>=+{vc.OUTFLOW_PRES_RISE_HPA}hPa"},
         "stationen": {a: {**meta_by_abbr[a],
                           "stunden": {str(h): v for h, v in st.items()}}
                       for a, st in stunden_by_station.items()},
@@ -123,6 +126,11 @@ def validate_day(day: datetime.date, stations: list[dict]) -> dict | None:
                        "gemessen": sorted(gemessen),
                        "schauer": sorted(e[0] for e in ereignisse.get("schauer", [])
                                          if h0 <= int(str(e[0])[:2]) < h1),
+                       # Nur gespeichert, nie angezeigt, aendert kein Urteil:
+                       # Kaltluft-Ausfluss ohne Regen = moeglicher blinder
+                       # Fleck der Gewitter-Signatur (validation_common).
+                       "ausfluss": sorted(e[0] for e in ereignisse.get("ausfluss", [])
+                                          if h0 <= int(str(e[0])[:2]) < h1),
                        "sonne_1218_pct": ereignisse.get("sonne_1218_pct")}
             for s in SCHWELLEN:
                 w = [hh for hh in warn[s] if h0 <= int(hh[:2]) < h1]

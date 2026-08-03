@@ -15,15 +15,22 @@ fielen auf Stundenbasis unter die Schwellen.
   "stationen": {
     "alt": {                       // Stations-Kürzel (klein)
       "name": "Altdorf", "elev": 438, "region": "Zentralschweizer Voralpen",
-      "stunden": { "21:50": [rain_mm, gust_kmh, temp_c, sonne_min], ... }
+      "stunden": { "21:50": [rain_mm, gust_kmh, temp_c, sonne_min, druck_hpa], ... }
     }
   },
   "regionen": {
     "Zentralschweizer Voralpen": {
       // Signatur auf gleitenden 30-min-Fenstern; Zeit = Fensterende.
-      // Ein Eintrag je Station (der stärkste Treffer des Tages).
+      // Ein Eintrag je Station (der stärkste Treffer des Tages),
+      // Rangfolge gewitter > schauer > ausfluss.
       "gewitter":  [["21:50", "alt", regen_mm_30min, boeensprung_kmh, temp_delta_k], ...],
       "schauer":   [["15:10", "elm", regen_mm_30min], ...],
+      // ausfluss = konvektive Kaltluft OHNE Regen (Böensprung + Temperatur-
+      // sturz + Druckanstieg, Schwellen der Böenfront-Analyse 30.07.).
+      // KEIN Gewitter-Beweis (dieselbe Signatur erzeugte die trockene Front
+      // vom 30.07.) — markiert den blinden Fleck der Gewitter-Signatur,
+      // wird nur gespeichert, nie angezeigt, ändert kein Urteil.
+      "ausfluss":  [["17:40", "pil", boeensprung_kmh, temp_delta_k, druck_delta_hpa], ...],
       "sonne_1218_pct": 60        // Median über die Stationen, null = keine Daten
     }
   }
