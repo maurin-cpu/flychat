@@ -63,7 +63,7 @@ from experiment_fronten_zeitachse import (          # noqa: E402
 )
 
 ARCHIV = ROOT / "data" / "dwd_fronten_archiv"
-VALID = ROOT / "fronten_validation"
+VALID = ROOT / "validation/fronten"
 OBS = VALID / "observations.csv"
 HAND = VALID / "handurteile.csv"
 BERICHT = VALID / "AUTO_REPORT.md"

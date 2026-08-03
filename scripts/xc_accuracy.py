@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Genauigkeits-Auswertung Forecast vs. XContest — getrennt nach Spot und Region.
 
-Liest die Tages-TSVs aus xcontest_validation/_raw/, joint den eingefrorenen
+Liest die Tages-TSVs aus validation/xcontest/_raw/, joint den eingefrorenen
 Forecast aus data/weather_archive/ und misst, was wir an bewiesen geflogenen
 Tagen vorhergesagt hatten. Schreibt nichts — reine Auswertung.
 

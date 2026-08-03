@@ -101,20 +101,20 @@ Eigenstaendige Modell-Beobachtungen brauchen einen eigenen Kanal:
 
 ## 4. Verifikation der Beobachtungen
 
-Die Maschinerie existiert (`fronten_validation/` mit Auto-Report,
-`xcontest_validation/`, `observations.csv`-Muster) — sie braucht nur
+Die Maschinerie existiert (`validation/fronten/` mit Auto-Report,
+`validation/xcontest/`, `observations.csv`-Muster) — sie braucht nur
 maschinenpruefbare Beobachtungen:
 
 - `observations` bekommen deshalb neben dem Freitext ein strukturiertes
   `claim`-Feld: `{feld: "msl_hpa"|"regen"|"wind", zone/scope, richtung:
   "steigt"|"faellt"|"tritt_ein", zeitraum: [date, date]}`. Ohne pruefbaren
   Claim keine Observation (Skill-Regel + Validator-Check auf Schema).
-- Taeglicher Auto-Check (Scheduler, analog `fronten_validation`): Claim gegen
+- Taeglicher Auto-Check (Scheduler, analog `validation/fronten`): Claim gegen
   eingetroffene Daten pruefen — Druck/Temperatur gegen die naechsten
   `ch_snapshots`, Regen/Wind gegen MeteoSchweiz-Stationen
   (`scripts/meteoschweiz_stations.py`), NICHT gegen Modell-Ist.
 - Ergebnis in `synoptic_validation/observations.csv`
-  (Spalten analog `fronten_validation/observations.csv`) + Auto-Report.
+  (Spalten analog `validation/fronten/observations.csv`) + Auto-Report.
   Metrik: Trefferquote je Claim-Typ. Erst ab belegter Quote (Vorschlag:
   ≥70 % ueber ≥20 Claims) wird §3 im Cast sichtbar geschaltet.
 

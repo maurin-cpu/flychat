@@ -6,7 +6,7 @@
 
 **Wiederaufnahme (HIER starten):**
 1. Diese Datei lesen. Der **Abschnitt „Abgrenzung" ist die wichtigste Vorgabe** und darf
-   NICHT aufgeweicht werden: OGN_validation ist NICHT xcontest_validation und wird nicht
+   NICHT aufgeweicht werden: OGN_validation ist NICHT validation/xcontest und wird nicht
    damit verglichen/vermischt.
 2. Es ist noch **kein Code geschrieben**. Es existiert weder `ogn_collector.py` noch
    `data/ogn_tracks.db` noch ein Ordner `ogn_validation/`.
@@ -18,14 +18,14 @@
 
 ---
 
-## Abgrenzung — warum OGN_validation ≠ xcontest_validation
+## Abgrenzung — warum OGN_validation ≠ validation/xcontest
 
 Das sind **zwei verschiedene Beweisarten**. Sie speisen dasselbe Ziel (Kalibrierung der
 Region-/Spot-Ratings), aber als **eigenständige, nicht vergleichbare Evidenz**. Sie dürfen
 nicht in dasselbe Schema, dieselbe Tabelle oder dasselbe „confirm/false-positive"-Urteil
 gemischt werden.
 
-| | **xcontest_validation** | **OGN_validation** |
+| | **validation/xcontest** | **OGN_validation** |
 |---|---|---|
 | Beobachtungseinheit | *Deklarierte Rekord-Leistung* (Flug ≥ ~40 km, hochgeladen) | *Roh-Telemetrie* eines Tracker-Geräts (jeder Flug, der gesendet wird) |
 | Was es misst | „An diesem Spot wurde eine große XC-Strecke geflogen" | „Ein Gerät war hier in der Luft — wie lange, wie hoch, welche Steigwerte" |
@@ -36,7 +36,7 @@ gemischt werden.
 
 **Konsequenz für die Architektur:**
 - Eigener Ordner `flychat/ogn_validation/` (parallel zu, aber getrennt von
-  `xcontest_validation/`).
+  `validation/xcontest/`).
 - Eigenes DB-Schema, eigene CSV-Spaltenlogik.
 - Eine Querverbindung der beiden ist NUR auf der **Analyse-/Lese-Ebene** erlaubt
   („XContest sagt 0, OGN sagt 5 Gleitschirm-Sessions à 2 h → erzählt eine andere
@@ -93,7 +93,7 @@ aprs.glidernet.org  ──APRS-TCP (24/7)──►  ogn-collector.service   (NEU
                                           ogn_validation.py
                                           - pro Tag: flights × Region/Spot-Rating
                                           - Präsenz-Signal, EIGENES Schema
-                                          - getrennt von xcontest_validation/
+                                          - getrennt von validation/xcontest/
 ```
 
 ### Bausteine
@@ -120,7 +120,7 @@ aprs.glidernet.org  ──APRS-TCP (24/7)──►  ogn-collector.service   (NEU
 - Höhe-AGL braucht Terrain-Lookup (Quelle offen — evtl. vorhandenes Spot-Terrain, sonst SRTM).
 
 **4. `ogn_validation/` + `ogn_validation.py` — der eigentliche Zweck**
-- Eigener Ordner, eigenes Schema (NICHT das von xcontest_validation).
+- Eigener Ordner, eigenes Schema (NICHT das von validation/xcontest).
 - Pro Tag: `flights` × Region/Spot-Rating → Präsenz-Signal
   („Spot X: 6 Gleitschirm-Starts, Σ 9 h Airtime, max +800 m überhöht" gegen Rating).
 - Trifft direkt die False-Positive-Jagd (`not_safe`, aber es wurde nachweislich geflogen).
@@ -140,7 +140,7 @@ aprs.glidernet.org  ──APRS-TCP (24/7)──►  ogn-collector.service   (NEU
 
 ### Phase 2 — Validation-Layer
 - `ogn_validation/`-Ordner + `ogn_validation.py`, eigenes Korpus.
-- Optional: Lese-seitiger Quervergleich zu xcontest_validation (NIE Schema-Merge).
+- Optional: Lese-seitiger Quervergleich zu validation/xcontest (NIE Schema-Merge).
 
 ---
 
@@ -162,5 +162,5 @@ aprs.glidernet.org  ──APRS-TCP (24/7)──►  ogn-collector.service   (NEU
 - `data/ogn_tracks.db` — SQLite (Klassen-Wrapper im Stil `station_observations.py`)
 - `ogn_sessions.py` — Roll-up, Hook in `scheduler.py`
 - `ogn_validation/` — eigener Ordner (README + SCHEMA + tägliche Outputs), getrennt von
-  `xcontest_validation/`
+  `validation/xcontest/`
 - `requirements.txt` — `ogn-client` ergänzen

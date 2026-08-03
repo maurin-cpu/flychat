@@ -32,7 +32,7 @@ Der Server sammelt die DWD-Frontenkarten **4× täglich** selbst
 Daten liegen **server-lokal und gitignored**, exakt wie `wetterdaten.json` —
 es gibt keinen Weg über Git, weder hin noch zurück.
 
-Geholt werden `data/dwd_fronten_archiv/` und aus `fronten_validation/` die
+Geholt werden `data/dwd_fronten_archiv/` und aus `validation/fronten/` die
 Maschinendateien (`observations.csv`, `AUTO_REPORT.md`, `aussagen/`).
 
 Die **Roh-PNGs bleiben per Default draussen** — rund 45 MB pro Tag, lokal nur

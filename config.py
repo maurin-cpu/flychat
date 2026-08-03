@@ -1103,7 +1103,7 @@ CLEAN_WINDOW_GREEN_HOURS = 2     # h — ab hier: safe/green moeglich
 # Drehen, kein Gradient) — unter dieser Schwelle kann man aus jeder Richtung
 # starten, die Sektor-Pruefung wird uebersprungen (immer WIND-OK). Deckt sich mit
 # der Nullwind-Grenze (Abhebe-Airspeed ~30 km/h; <5 km/h aendert das Laufen kaum)
-# und WIND_IDEAL_MIN_KMH. Siehe xcontest_validation/I013_DIAGNOSE.md (Hebel A).
+# und WIND_IDEAL_MIN_KMH. Siehe validation/xcontest/I013_DIAGNOSE.md (Hebel A).
 WIND_DIRECTION_IRRELEVANT_BELOW_KMH = 5   # km/h — darunter: Richtung egal, immer WIND-OK
 
 # Richtungsdreher-Anmerkung (nur caution_notes, KEIN Status-Downgrade):

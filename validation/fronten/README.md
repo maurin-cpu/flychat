@@ -1,7 +1,7 @@
 # Fronten-Validierung
 
 Erkenntnisspeicher für die Frontenvorhersage aus den DWD-Karten. Aufgebaut wie
-`xcontest_validation/`, mit einem bewussten Unterschied: **hier füllt sich die
+`validation/xcontest/`, mit einem bewussten Unterschied: **hier füllt sich die
 Datenbasis automatisch.** Bei XContest trägt ein Mensch Flüge ein, dort liegt
 der Wert in der Kuratierung. Hier sammeln Skripte, der Mensch schreibt nur die
 Befunde in `PATTERNS.md`.

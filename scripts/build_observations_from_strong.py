@@ -1,6 +1,6 @@
 """Erzeugt observations.csv-Zeilen aus der Starkflug-Tabelle + weather_archive.
 
-Konvention siehe xcontest_validation/README.md + SCHEMA.md: eine Zeile pro
+Konvention siehe validation/xcontest/README.md + SCHEMA.md: eine Zeile pro
 Spot+Tag, XContest-Seite aus dem Paste, `our_*` aus
 weather_archive[day].spots[spot].analysis, `wx_*` aus daily_aggregates.
 
@@ -37,7 +37,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = ROOT / "data" / "weather_archive"
-VAL = ROOT / "xcontest_validation"
+VAL = ROOT / "validation/xcontest"
 OBS = VAL / "observations.csv"
 
 _spec = importlib.util.spec_from_file_location("v", ROOT / "scripts" / "validate_climb_onesided.py")

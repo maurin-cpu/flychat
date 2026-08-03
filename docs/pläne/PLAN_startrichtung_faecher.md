@@ -143,7 +143,7 @@ python scripts/build_pge_csv.py
 - `weather_context.py`: `_parse_wind_range(spot["windrichtung"])` ggf. auf
   `windrichtung_optimal` umstellen (Zeilen 429, 581, 1395, 1591).
 - Re-Analyse aller Spots, Golden-Tests neu freezen, Validierung gegen
-  `xcontest_validation/` prüfen.
+  `validation/xcontest/` prüfen.
 - **Bei Variante "nur Karte": Schritt 6 entfällt komplett.**
 
 ---

@@ -4,7 +4,7 @@ Frage: Unterschaetzt der produktive P50 (Spot-Median) die real erreichte
 Hoehe? Trifft P75 die Pilot-Realitaet besser?
 
 Daten:
-  - Topouts: xcontest_validation/_raw/topout_altitudes_2026-05-28_30.tsv (User-abgelesen)
+  - Topouts: validation/xcontest/_raw/topout_altitudes_2026-05-28_30.tsv (User-abgelesen)
   - Vorhersage: data/weather_archive/<date>.json, Spot.hourly_flight (max_height/lcl)
     -> Region-Tages-Peak (max ueber 10-17 Uhr) je Aggregator, wie ab_region_percentile.py.
 
@@ -25,7 +25,7 @@ from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARCHIVE = os.path.join(ROOT, "data", "weather_archive")
-TOPOUT_TSV = os.path.join(ROOT, "xcontest_validation", "_raw",
+TOPOUT_TSV = os.path.join(ROOT, "validation/xcontest", "_raw",
                           "topout_altitudes_2026-05-28_30.tsv")
 FLIGHT_HOURS = [f"{h:02d}:00" for h in range(10, 18)]
 MIN_SPOTS = 3

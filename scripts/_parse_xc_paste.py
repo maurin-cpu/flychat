@@ -1,6 +1,6 @@
 """Einmal-Parser: XContest-Tageswertung (Copy-Paste) -> _raw/YYYY-MM-DD.tsv.
 
-Liest alle xcontest_validation/_raw/_paste_*.txt, ankert auf die Zeit-Zeile
+Liest alle validation/xcontest/_raw/_paste_*.txt, ankert auf die Zeit-Zeile
 'DD.MM.YY HH:MM=UTC+02:00' und nimmt die folgenden 3 nicht-leeren Zeilen als
 Pilot / Launch / Stats. Ländercode (2 Großbuchstaben) wird von Pilot+Launch
 entfernt. Schreibt pro Tag eine TSV im Format launch\tkm\tstart\tairtime\tpilot.
@@ -11,7 +11,7 @@ from pathlib import Path
 from collections import defaultdict
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW = ROOT / "xcontest_validation" / "_raw"
+RAW = ROOT / "validation/xcontest" / "_raw"
 
 TIME_RE = re.compile(r"^\s*(\d{2})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})=UTC")
 STATS_RE = re.compile(r"([\d]+\.[\d]+)\s*km.*?(\d+)\s*:\s*(\d+)\s*h")

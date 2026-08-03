@@ -1,0 +1,51 @@
+{
+ "lauf": "2026072800",
+ "erstellt_utc": "2026-07-30T19:00:34+00:00",
+ "mit_analyse": true,
+ "max_seitlich_km": 100.0,
+ "stuetzpunkte": [
+  {
+   "quelle": "FC",
+   "vorlauf_h": 36,
+   "gueltig_utc": "2026-07-29T12:00:00+00:00",
+   "abschnitte": 18,
+   "datei": "dwd_fronten_202607280000_036.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 48,
+   "gueltig_utc": "2026-07-30T00:00:00+00:00",
+   "abschnitte": 17,
+   "datei": "dwd_fronten_202607280000_048.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 60,
+   "gueltig_utc": "2026-07-30T12:00:00+00:00",
+   "abschnitte": 18,
+   "datei": "dwd_fronten_202607280000_060.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 84,
+   "gueltig_utc": "2026-07-31T12:00:00+00:00",
+   "abschnitte": 18,
+   "datei": "dwd_fronten_202607280000_084.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 108,
+   "gueltig_utc": "2026-08-01T12:00:00+00:00",
+   "abschnitte": 18,
+   "datei": "dwd_fronten_202607280000_108.geojson"
+  }
+ ],
+ "stuetzweiten_h": [
+  12.0,
+  12.0,
+  24.0,
+  24.0
+ ],
+ "aussagen": [],
+ "quelle_fingerprint": "2cdb21b1ba2d4407"
+}

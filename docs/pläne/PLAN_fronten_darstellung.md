@@ -753,12 +753,12 @@ in `observations.csv` deshalb `unklar`, nicht `getroffen`. **Betriebsfolge: zu
 beiden Analyseterminen abholen (00 und 12 UTC)** — sonst fehlt jedem Fall die
 unabhängige Gegenprobe.
 
-### Erkenntnisspeicher `fronten_validation/` (nach Vorbild `xcontest_validation/`)
+### Erkenntnisspeicher `validation/fronten/` (nach Vorbild `validation/xcontest/`)
 
 Aufgesetzt 27.07. Trennlinie nach gemessener Grösse: **Git hält die Erkenntnis,
 die Platte den Rohstoff.**
 
-| versioniert in `fronten_validation/` | ausserhalb (`data/dwd_fronten_archiv/`) |
+| versioniert in `validation/fronten/` | ausserhalb (`data/dwd_fronten_archiv/`) |
 |---|---|
 | `observations.csv` — eine Zeile je vorhergesagtem Durchgang + Verifikation | Analysekarte PNG (~5 MB je Termin → 150–300 MB/Monat) |
 | `PATTERNS.md` — Befunde `F-001`…`F-005`, eigener Namensraum gegen die XContest-`I-0xx` | Vorhersagekarten PNG (~1 MB/Tag) |
@@ -1025,7 +1025,7 @@ Verhalten ändert):
    über dem Atlantik (1652 km nordwestlich) zu einer Bewegung von 85 km/h und
    meldete daraus einen Durchgang durch zwei Zonen, den es nie gab.
    `passages_for_point()` verfolgt jetzt je Linie statt global; Details und
-   Restrisiko in `fronten_validation/PATTERNS.md` unter `F-004`.
+   Restrisiko in `validation/fronten/PATTERNS.md` unter `F-004`.
 7. ~~Cache + Scheduler~~ **erledigt 30.07., §1k** — vier Läufe täglich im
    Scheduler-Thread des `wingcast`-Dienstes (`FRONTEN_STUNDEN`), Archiv
    server-lokal wie `wetterdaten.json`. Cloud-Routine und Windows-Aufgabe

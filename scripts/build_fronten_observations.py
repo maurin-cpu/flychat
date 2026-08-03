@@ -1,4 +1,4 @@
-"""Traegt die Aussage-Schnappschuesse in fronten_validation/observations.csv ein.
+"""Traegt die Aussage-Schnappschuesse in validation/fronten/observations.csv ein.
 
 Die Vorhersage-Seite der Tabelle entsteht damit automatisch. Die
 Verifikations-Seite (was eingetreten ist) bleibt leer, bis der Abgleich gegen
@@ -9,7 +9,7 @@ Idempotent ueber den Schluessel (lauf, stand, zone, typ, median_utc): ein
 erneuter Lauf ergaenzt nur, was fehlt, und ueberschreibt keine von Hand
 gefuellte Verifikations-Spalte.
 
-Kopiert zugleich die Schnappschuesse nach fronten_validation/aussagen/, damit
+Kopiert zugleich die Schnappschuesse nach validation/fronten/aussagen/, damit
 der Beleg versioniert ist — die Rohkarten bleiben ausserhalb von Git.
 
 Run:  python scripts/build_fronten_observations.py
@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ARCHIV = ROOT / "data" / "dwd_fronten_archiv" / "aussagen"
-VALID = ROOT / "fronten_validation"
+VALID = ROOT / "validation/fronten"
 OBS = VALID / "observations.csv"
 
 COLS = [

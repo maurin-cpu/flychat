@@ -1,7 +1,7 @@
 # I-013 Root-Cause-Diagnose — Pre-Filter-Instabilität (not_safe ⇄ conditional)
 
 **Status: reine Diagnose, kein Code-Eingriff.** Erstellt aus den Snapshots 27.–30.05.2026
-(Replay der Stundenwerte gegen den realen Code). Grundlage: `xcontest_validation/2026-05-27..30.md`.
+(Replay der Stundenwerte gegen den realen Code). Grundlage: `validation/xcontest/2026-05-27..30.md`.
 
 ## Frage
 

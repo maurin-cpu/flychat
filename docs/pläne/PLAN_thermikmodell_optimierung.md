@@ -4,7 +4,7 @@
 
 **Wiederaufnahme (HIER starten):**
 1. Diese Datei lesen — die Befunde sind verifiziert (Code-Zeilen am 2026-07-03 gegengeprüft), Prioritäten sind entschieden.
-2. Eiserne Regel für ALLE Parameter-Änderungen: **immer gegen `xcontest_validation/` kalibrieren** (Topout-P75-Methode wie in `xcontest_validation/TOPOUT_STICHPROBE.md` + `debug_scripts/topout_vs_percentile.py`). Nie einen Parameter isoliert drehen — sonst Whack-a-Mole.
+2. Eiserne Regel für ALLE Parameter-Änderungen: **immer gegen `validation/xcontest/` kalibrieren** (Topout-P75-Methode wie in `validation/xcontest/TOPOUT_STICHPROBE.md` + `debug_scripts/topout_vs_percentile.py`). Nie einen Parameter isoliert drehen — sonst Whack-a-Mole.
 3. Empfohlene Reihenfolge: erst P2 (schnelle, risikofreie Aufräumer), dann P1 (größter Hebel, braucht Kalibrier-Session), dann P3 (nur gemeinsam kalibrierbar), P4 nach Bedarf.
 4. Nach jedem Engine-Fix: `sudo systemctl restart wingcast` — die Analyse-Pipeline läuft in-process, Fixes werden sonst nicht wirksam (Lehre aus dem not_safe-Fix 02b7646).
 

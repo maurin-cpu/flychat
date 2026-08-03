@@ -11,7 +11,7 @@ Zwei nicht-zirkulaere Pruefungen:
   TEIL A  Magnitude vs Tier-Erwartung (cloudbase_terrain_tiers.md):
           Landet die Tages-Peak-Basis im realistischen Band des Terrains?
           Median-Verdacht: zu tief (unter "Standard"). P75 besser? Beste-30% zu hoch?
-  TEIL B  XC-Diskriminierung gegen echte best_km (xcontest_validation/observations.csv):
+  TEIL B  XC-Diskriminierung gegen echte best_km (validation/xcontest/observations.csv):
           Korreliert der Region-Wert an WIRKLICH geflogenen Top-Tagen besser?
 
 Aggregatoren je Region/Stunde, dann Tages-Peak ueber Flugstunden.
@@ -27,7 +27,7 @@ from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARCHIVE = os.path.join(ROOT, "data", "weather_archive")
-XC_CSV = os.path.join(ROOT, "xcontest_validation", "observations.csv")
+XC_CSV = os.path.join(ROOT, "validation/xcontest", "observations.csv")
 FLIGHT_HOURS = [f"{h:02d}:00" for h in range(10, 18)]
 MIN_SPOTS = 3  # = SPOT_MEDIAN_MIN_SPOTS (Produktiv-Schwelle)
 

@@ -602,13 +602,24 @@ Fehlalarm-Potenzial (61 % → 24 % Durchlass an stillen Tagen); am Lauf vom
 Wolkentop als künftige weiche Stufe; Abend > Flugfenster).
 
 Damit erledigt aus diesem Plan: §11 Schritt 1–4 (02.08.) + Anker-Härtung.
-**User-Entscheid 03.08.:** (1) täglicher **Mess-Abgleich** gegen SwissMetNet
-bauen (Struktur vor Bau vorlegen), (2) danach **weiche Überentwicklungs-
-Stufe** (Wolkentop ICON-EU, Top ≤ −20 °C @ ≥ 75 % Punkte + weicher Anker,
-hohler Blitz). §12c.4 (DWD-Blitzpotenzial/LPI) ist damit **gestrichen** —
-LPI erkannte im Backtest 0 von 4 Gewittern des Testtags.
-**Dieser Plan wird gelöscht**, sobald Abgleich + Überentwicklungs-Stufe
-umgesetzt und in `docs/` dokumentiert sind (Doku ersetzt Plan).
+§12c.4 (DWD-Blitzpotenzial/LPI) ist **gestrichen** — LPI erkannte im
+Backtest 0 von 4 Gewittern des Testtags; `data/lpi_archive/` gelöscht.
+
+**Ebenfalls umgesetzt 03.08.: der tägliche Mess-Abgleich.** Neue Struktur
+`validation/` (Umzug von `fronten_validation/` + `xcontest_validation/`,
+Konvention in `validation/README.md`), Domäne `validation/gewitter/`
+(Grenzen im dortigen README), gemeinsame Lib `scripts/validation_common.py`,
+Tages-Skript `scripts/validate_gewitter_daily.py` (Scheduler: morgens für
+den Vortag; Scoreboard eicht die Schwellen 40/50/60 % parallel). Erster
+validierter Tag: 02.08. — beide Abend-Gewitter korrekt als „verpasst",
+die 5 Flugzeit-Fehlalarme korrekt erkannt. Messbasis Zehnminutenwerte
+(Stundenwerte verwässern die Signatur — beide reale Gewitter fielen auf
+Stundenbasis unter die Schwellen).
+
+**Einziger offener Punkt: die weiche Überentwicklungs-Stufe** (Wolkentop
+ICON-EU, Top ≤ −20 °C @ ≥ 75 % Punkte + weicher Anker, hohler Blitz,
+sperrt nie — Kennzahlen in `docs/GEWITTER.md` §0c). **Dieser Plan wird
+gelöscht**, sobald sie umgesetzt und in `docs/` dokumentiert ist.
 
 ## 12c. Offen — hier geht es am 03.08. weiter
 

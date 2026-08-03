@@ -50,7 +50,7 @@ def _spot_p75(vals):
     Beleg: 16 echte XContest-Topouts (28.-30.05.2026) gegen Region-Vorhersage —
     P50 unterschaetzte die erreichte Decke median 371m (13/16 Fluege ueber Vorhersage,
     7/16 mit Basis UNTER erflogener Hoehe = physikalisch unmoeglich). P75 nahezu
-    bias-frei (median +96m), kleinster |Bias| (321m). Siehe xcontest_validation/
+    bias-frei (median +96m), kleinster |Bias| (321m). Siehe validation/xcontest/
     SYSTEM_CHANGES.md (2026-06-07) und debug_scripts/topout_vs_percentile.py.
     Gilt nur fuer max_height/lcl (Hoehen-Groessen, durch Topout validiert);
     climb_rate bleibt Median (Steig-Groesse, nicht gegen Topout pruefbar).

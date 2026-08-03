@@ -1,12 +1,12 @@
 """XContest-Validierung Aggregator.
 
-Liest kompakte Tagesdaten aus xcontest_validation/_raw/YYYY-MM-DD.tsv
+Liest kompakte Tagesdaten aus validation/xcontest/_raw/YYYY-MM-DD.tsv
 (Format: launch\tkm\tstart\tairtime\tpilot), aggregiert pro Spot, mappt
 XContest-Namen auf PGE-DB-Keys, joint our_*/wx_* aus weather_archive und
 klassifiziert finding_type.
 
 Output:
-  - xcontest_validation/_raw/_obs_YYYY-MM-DD.csv  (Kandidaten-observations-Zeilen)
+  - validation/xcontest/_raw/_obs_YYYY-MM-DD.csv  (Kandidaten-observations-Zeilen)
   - Konsole: Digest pro Tag (Spot-Tabelle sortiert nach best_km + Stats)
 
 Usage: PYTHONUTF8=1 python scripts/xc_aggregate.py 2026-05-27 2026-05-28 ...
@@ -17,7 +17,7 @@ from pathlib import Path
 from collections import defaultdict
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW = ROOT / "xcontest_validation" / "_raw"
+RAW = ROOT / "validation/xcontest" / "_raw"
 ARCHIVE = ROOT / "data" / "weather_archive"
 
 # --- XContest-Name -> PGE-DB-Key Mapping (kuratiert) ---
@@ -144,7 +144,7 @@ SKIP = {"?", "Inconnu", "unknown", "TO (N-NW)...", "TO (WNW)...", "Talstatio..."
 # Ergaenzt MAPPING um die maschinell aufgeloesten Namen. Das kuratierte MAPPING
 # oben hat Vorrang; aus der Tabelle werden nur eindeutige Spot-Treffer
 # uebernommen (status=resolved_spot, confidence in high/medium).
-ALIASES = ROOT / "xcontest_validation" / "spot_aliases.csv"
+ALIASES = ROOT / "validation/xcontest" / "spot_aliases.csv"
 
 
 def load_aliases():

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Baut die persistente Alias-Tabelle XContest-Startplatzname -> unsere Spot-/Region-Ebene.
 
-Hintergrund: 40% der Zeilen in xcontest_validation/observations.csv sind
+Hintergrund: 40% der Zeilen in validation/xcontest/observations.csv sind
 `coverage_gap` — der XContest-Name liess sich nicht auf einen DB-Spot mappen.
 Das hat drei verschiedene Ursachen (I-009), die dieses Skript trennt:
 
@@ -14,7 +14,7 @@ Fuer 2. und 3. ist Spot-Validierung unmoeglich, **Region-Validierung aber schon*
 sobald wir irgendeine Koordinate zum Namen finden (Alt-DB DHV oder OSM-Gipfel),
 liefert Punkt-in-Polygon gegen data/regionen_polygone_mapped.geojson die Region.
 
-Output: xcontest_validation/spot_aliases.csv (ueberschrieben, deterministisch)
+Output: validation/xcontest/spot_aliases.csv (ueberschrieben, deterministisch)
 """
 from __future__ import annotations
 
@@ -32,8 +32,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from spots import sanitize_spot_name  # noqa: E402  (Schluessel-Konvention der Archive)
 
-OBS = os.path.join(ROOT, "xcontest_validation", "observations.csv")
-OUT = os.path.join(ROOT, "xcontest_validation", "spot_aliases.csv")
+OBS = os.path.join(ROOT, "validation/xcontest", "observations.csv")
+OUT = os.path.join(ROOT, "validation/xcontest", "spot_aliases.csv")
 PGE = os.path.join(ROOT, "data", "fluggebiete_pge.csv")
 DHV = os.path.join(ROOT, "data", "fluggebiete_dhv.backup_pre_pge.csv")
 POLY = os.path.join(ROOT, "data", "regionen_polygone_mapped.geojson")

@@ -110,8 +110,8 @@ den kleinsten absoluten Fehler; best30 ueberschiesst. Bestaetigt den A/B-Test vo
 - Override-Durchreichung unveraendert (`thermals_spotmedian`-Key).
 
 **Validierungs-Artefakte:**
-- `xcontest_validation/_raw/topout_altitudes_2026-05-28_30.tsv` (16 Roh-Topouts)
-- `xcontest_validation/TOPOUT_STICHPROBE.md` (Auswertung)
+- `validation/xcontest/_raw/topout_altitudes_2026-05-28_30.tsv` (16 Roh-Topouts)
+- `validation/xcontest/TOPOUT_STICHPROBE.md` (Auswertung)
 - `debug_scripts/topout_vs_percentile.py` (Analyse-Skript)
 
 **Memory-Referenzen:**

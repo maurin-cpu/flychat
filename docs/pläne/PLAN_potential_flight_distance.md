@@ -1,10 +1,10 @@
 # Plan: Potential Flight Distance (PFD) — XC-Potenzial in km
 
-**Stand:** 2026-07-04 · **Status:** Recherche abgeschlossen (Web + Code), **Umsetzung nicht gestartet** · **Neuer Code:** `scripts/potential_flight_distance.py` (Phase 1), später `engine/pfd.py` · **Ground Truth:** `xcontest_validation/observations.csv` (Spalte `best_km`, ~1460 Zeilen)
+**Stand:** 2026-07-04 · **Status:** Recherche abgeschlossen (Web + Code), **Umsetzung nicht gestartet** · **Neuer Code:** `scripts/potential_flight_distance.py` (Phase 1), später `engine/pfd.py` · **Ground Truth:** `validation/xcontest/observations.csv` (Spalte `best_km`, ~1460 Zeilen)
 
 **Wiederaufnahme (HIER starten):**
 1. Diese Datei lesen — Formeln und Parameter sind aus der Web-Recherche 2026-07-04 belegt (Quellen am Ende), die Code-Anknüpfpunkte wurden am selben Tag verifiziert.
-2. Eiserne Regel (wie im Thermikmodell-Plan): **jede Parameterwahl gegen `xcontest_validation/observations.csv` kalibrieren**, nie Konstanten isoliert drehen.
+2. Eiserne Regel (wie im Thermikmodell-Plan): **jede Parameterwahl gegen `validation/xcontest/observations.csv` kalibrieren**, nie Konstanten isoliert drehen.
 3. Reihenfolge: Phase 1 (Standalone-Skript) → Phase 2 (Kalibrierung) → Phase 3 (Integration). Phase 1+2 sind unabhängig von der Analyse-Pipeline und risikofrei.
 4. Abhängigkeit beachten: Die Steigraten-Kette wird lt. `PLAN_thermikmodell_optimierung.md` (P1) evtl. auf subtraktiv umgestellt — die PFD nutzt `climb_rate` als Input. Nach P1-Umsetzung **Rekalibrierung der PFD nötig** (nur `c_region`/`pilot_factor` neu fitten, Formeln bleiben).
 
@@ -22,7 +22,7 @@ Alle Bausteine existieren bereits:
 | Arbeitshöhe über Start (`working_height_agl_m`), produktive Stunden (`productive_thermal_h`), `sustained_peak_mps` | `engine/weather_context.py:1508 ff.`, persistiert als `_rating_inputs` (`engine/analyzers.py:2117`) |
 | Höhenwind / BL-Wind, B/S-Ratio | `engine/weather_context.py`: `_calculate_bl_mean_wind` (Z.1017), `_calculate_bs_ratio` (Z.1002) |
 | Spot-Geometrie (lat/lon, elevation, Startrichtung) | `data/fluggebiete_dhv.csv` via `spots.py` |
-| **Echte geflogene km (Ground Truth)** | `xcontest_validation/observations.csv`: `best_km` + alle `wx_*`-Features + `our_*`-Ratings |
+| **Echte geflogene km (Ground Truth)** | `validation/xcontest/observations.csv`: `best_km` + alle `wx_*`-Features + `our_*`-Ratings |
 
 ---
 

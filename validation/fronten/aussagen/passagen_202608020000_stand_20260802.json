@@ -1,0 +1,80 @@
+{
+ "lauf": "2026080200",
+ "erstellt_utc": "2026-08-02T12:10:05+00:00",
+ "mit_analyse": true,
+ "max_seitlich_km": 100.0,
+ "stuetzpunkte": [
+  {
+   "quelle": "FC",
+   "vorlauf_h": 36,
+   "gueltig_utc": "2026-08-03T12:00:00+00:00",
+   "abschnitte": 12,
+   "datei": "dwd_fronten_202608020000_036.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 48,
+   "gueltig_utc": "2026-08-04T00:00:00+00:00",
+   "abschnitte": 21,
+   "datei": "dwd_fronten_202608020000_048.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 60,
+   "gueltig_utc": "2026-08-04T12:00:00+00:00",
+   "abschnitte": 19,
+   "datei": "dwd_fronten_202608020000_060.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 84,
+   "gueltig_utc": "2026-08-05T12:00:00+00:00",
+   "abschnitte": 17,
+   "datei": "dwd_fronten_202608020000_084.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 108,
+   "gueltig_utc": "2026-08-06T12:00:00+00:00",
+   "abschnitte": 20,
+   "datei": "dwd_fronten_202608020000_108.geojson"
+  }
+ ],
+ "stuetzweiten_h": [
+  12.0,
+  12.0,
+  24.0,
+  24.0
+ ],
+ "aussagen": [
+  {
+   "zone": "alpennordhang",
+   "typ": "kalt",
+   "art": "streift",
+   "durchgang_median_utc": "2026-08-06T10:48:56.551654+00:00",
+   "fenster_von_utc": "2026-08-06T09:34:31.416542+00:00",
+   "fenster_bis_utc": "2026-08-06T11:27:22.325343+00:00",
+   "spots_betroffen": 4,
+   "spots_zone": 327,
+   "anteil": 0.012,
+   "seitlich_km": 78.1,
+   "stuetzweite_h": 24.0,
+   "randwert": false
+  },
+  {
+   "zone": "alpennordhang",
+   "typ": "warm",
+   "art": "streift",
+   "durchgang_median_utc": "2026-08-06T11:37:46.888935+00:00",
+   "fenster_von_utc": "2026-08-06T11:27:49.785865+00:00",
+   "fenster_bis_utc": "2026-08-06T11:44:49.888990+00:00",
+   "spots_betroffen": 4,
+   "spots_zone": 327,
+   "anteil": 0.012,
+   "seitlich_km": 56.8,
+   "stuetzweite_h": 24.0,
+   "randwert": true
+  }
+ ],
+ "quelle_fingerprint": "13ce5f057b441f3a"
+}

@@ -208,4 +208,4 @@ Kurzreferenzen zu den Fundstellen — Details stehen in der Analyse vom 2026-06-
 - `except Exception: pass` (~50×, u. a. `weather_context.py:748/756/1299/1707`) → mindestens `logger.debug(..., exc_info=True)`
 - gunicorn (`--workers 1 --threads 16 --worker-class gthread`; 1 Worker wegen In-Process-State/Scheduler); `FLASK_DEBUG`-Default in `main.py` auf false
 - `_build_single_spot_context` (870 Zeilen, `weather_context.py:1447`) in Sektions-Builder splitten
-- Archiv: `debug_scripts/`, `debug_weissenstein_wind.py`, `xcontest_validation/`, `marktresearch/`, `meteo_research/`, `import_dhv/` → `archive/`; **`cost_testing/` ist live** (web.py:1502), nicht verschieben
+- Archiv: `debug_scripts/`, `debug_weissenstein_wind.py`, `validation/xcontest/`, `marktresearch/`, `meteo_research/`, `import_dhv/` → `archive/`; **`cost_testing/` ist live** (web.py:1502), nicht verschieben

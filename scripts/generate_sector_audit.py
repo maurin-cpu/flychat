@@ -96,7 +96,7 @@ for arch in Path('data/weather_archive').glob('2026-*.json'):
 
 
 # Load observations
-rows = list(csv.DictReader(open('xcontest_validation/observations.csv', encoding='utf-8')))
+rows = list(csv.DictReader(open('validation/xcontest/observations.csv', encoding='utf-8')))
 
 # Filter to false-positives only
 fps = [r for r in rows if r['finding_type'] in ('false_positive_notsafe', 'false_positive_caution')]
@@ -167,7 +167,7 @@ COLS = ['date', 'spot', 'region', 'elevation_m', 'terrain_type',
         'no_go_reason', 'launches', 'best_km', 'top_pilot', 'top_start_time',
         'finding_type', 'verdict', 'notes']
 
-out_path = 'xcontest_validation/sector_audit.csv'
+out_path = 'validation/xcontest/sector_audit.csv'
 with open(out_path, 'w', encoding='utf-8', newline='') as f:
     w = csv.DictWriter(f, fieldnames=COLS, quoting=csv.QUOTE_MINIMAL)
     w.writeheader()

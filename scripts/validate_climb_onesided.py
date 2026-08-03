@@ -1,15 +1,15 @@
 """Einseitiger Validierungstest: Erkennt der Forecast, WO gute Thermik war?
 
-Methodisch zwingend einseitig — der README von xcontest_validation/ haelt fest:
+Methodisch zwingend einseitig — der README von validation/xcontest/ haelt fest:
 "Wenige oder keine Fluege ab Spot X != Spot war schlecht" (Pilotendichte,
 Topografie, Wochentag). Zulaessig ist nur der umgekehrte Schluss: viele/weite
 Fluege ab X => X war an dem Tag gut. Gemessen wird daher der Perzentil-Rang der
 BEWIESEN guten Regionen in unserer Tages-Rangliste. 50 % = Zufall, kleiner = besser.
 
 Zwei Datenquellen:
-  1. xcontest_validation/_raw/strong_flights_*.tsv — pro Tag+Startplatz der beste
+  1. validation/xcontest/_raw/strong_flights_*.tsv — pro Tag+Startplatz der beste
      Gleitschirmflug ab 60 km (HG/RW-Klassen bereits ausgefiltert).
-  2. xcontest_validation/observations.csv — die gepflegte Spot->Region-Zuordnung
+  2. validation/xcontest/observations.csv — die gepflegte Spot->Region-Zuordnung
      der Mai/Juni-Tage.
 
 Kontroll-Test: dieselbe Metrik mit Groessen, die trennen MUESSEN (wenig Regen,
@@ -30,7 +30,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = ROOT / "data" / "weather_archive"
-VAL = ROOT / "xcontest_validation"
+VAL = ROOT / "validation/xcontest"
 
 THRESHOLDS = (60.0, 100.0)
 MIN_SPOTS_PER_REGION = 3

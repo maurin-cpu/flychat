@@ -1,0 +1,108 @@
+{
+ "lauf": "2026073100",
+ "erstellt_utc": "2026-07-31T06:10:12+00:00",
+ "mit_analyse": true,
+ "max_seitlich_km": 100.0,
+ "stuetzpunkte": [
+  {
+   "quelle": "FC",
+   "vorlauf_h": 36,
+   "gueltig_utc": "2026-08-01T12:00:00+00:00",
+   "abschnitte": 21,
+   "datei": "dwd_fronten_202607310000_036.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 48,
+   "gueltig_utc": "2026-08-02T00:00:00+00:00",
+   "abschnitte": 16,
+   "datei": "dwd_fronten_202607310000_048.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 60,
+   "gueltig_utc": "2026-08-02T12:00:00+00:00",
+   "abschnitte": 13,
+   "datei": "dwd_fronten_202607310000_060.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 84,
+   "gueltig_utc": "2026-08-03T12:00:00+00:00",
+   "abschnitte": 8,
+   "datei": "dwd_fronten_202607310000_084.geojson"
+  },
+  {
+   "quelle": "FC",
+   "vorlauf_h": 108,
+   "gueltig_utc": "2026-08-04T12:00:00+00:00",
+   "abschnitte": 8,
+   "datei": "dwd_fronten_202607310000_108.geojson"
+  }
+ ],
+ "stuetzweiten_h": [
+  12.0,
+  12.0,
+  24.0,
+  24.0
+ ],
+ "aussagen": [
+  {
+   "zone": "alpennordhang",
+   "typ": "warm",
+   "art": "quert",
+   "durchgang_median_utc": "2026-08-02T07:03:27.028010+00:00",
+   "fenster_von_utc": "2026-08-02T02:05:18.610118+00:00",
+   "fenster_bis_utc": "2026-08-02T09:20:27.021465+00:00",
+   "spots_betroffen": 245,
+   "spots_zone": 327,
+   "anteil": 0.749,
+   "seitlich_km": 34.0,
+   "stuetzweite_h": 12.0,
+   "randwert": false
+  },
+  {
+   "zone": "graubuenden_engadin",
+   "typ": "warm",
+   "art": "quert",
+   "durchgang_median_utc": "2026-08-02T11:02:13.586007+00:00",
+   "fenster_von_utc": "2026-08-02T10:29:31.961538+00:00",
+   "fenster_bis_utc": "2026-08-02T11:51:10.921627+00:00",
+   "spots_betroffen": 16,
+   "spots_zone": 76,
+   "anteil": 0.211,
+   "seitlich_km": 6.6,
+   "stuetzweite_h": 12.0,
+   "randwert": false
+  },
+  {
+   "zone": "tessin",
+   "typ": "warm",
+   "art": "streift",
+   "durchgang_median_utc": "2026-08-02T11:34:41.942955+00:00",
+   "fenster_von_utc": "2026-08-02T11:32:40.816480+00:00",
+   "fenster_bis_utc": "2026-08-02T11:38:16.025429+00:00",
+   "spots_betroffen": 3,
+   "spots_zone": 34,
+   "anteil": 0.088,
+   "seitlich_km": 38.3,
+   "stuetzweite_h": 12.0,
+   "randwert": true
+  },
+  {
+   "zone": "wallis",
+   "typ": "warm",
+   "art": "quert",
+   "durchgang_median_utc": "2026-08-02T09:01:07.550730+00:00",
+   "fenster_von_utc": "2026-08-02T07:38:30.084232+00:00",
+   "fenster_bis_utc": "2026-08-02T09:11:26.282928+00:00",
+   "spots_betroffen": 10,
+   "spots_zone": 57,
+   "anteil": 0.175,
+   "seitlich_km": 88.0,
+   "stuetzweite_h": 12.0,
+   "randwert": false
+  }
+ ],
+ "quelle_fingerprint": "943a269dd368c61d"
+}

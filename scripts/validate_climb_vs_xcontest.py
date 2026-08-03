@@ -13,7 +13,7 @@ Zwei getrennte Fragen — die Reihenfolge ist wichtig:
    dominiert (>= MIN_KM, >= MIN_H) — kurze schnelle Abgleiter verfälschen sonst.
 
 Datenquellen: data/weather_archive/YYYY-MM-DD.json (unser Forecast, Snapshot vom
-Morgen) und xcontest_validation/_raw/YYYY-MM-DD.tsv (aus Paste via
+Morgen) und validation/xcontest/_raw/YYYY-MM-DD.tsv (aus Paste via
 scripts/_parse_xc_paste.py). Ausgewertet werden nur Tage, an denen beides vorliegt.
 
 Nur-Lese-Skript: schreibt nichts in Prod-Caches.
@@ -33,7 +33,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = ROOT / "data" / "weather_archive"
-RAW = ROOT / "xcontest_validation" / "_raw"
+RAW = ROOT / "validation/xcontest" / "_raw"
 
 # --- Inversion XC-Speed -> erreichtes Steigen ---------------------------------
 # Gleitschirm-Polare (EN-B/C Mittelklasse): Reisegeschwindigkeit und zugehöriges

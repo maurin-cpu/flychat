@@ -6,7 +6,7 @@
 > Spot-Elevation. Was wirklich zu tief war: die Region-Aggregation, weil sie nur 1
 > Refpoint (mit max Strahlung) für das Temperatur-Profil nutzte, während Wolken/Wind
 > über alle 7 RPs aggregiert wurden. Fix Mai 2026: Region-Thermik via Spot-Median.
-> Siehe `memory/region_thermik_spotmedian.md`, `xcontest_validation/SYSTEM_CHANGES.md`,
+> Siehe `memory/region_thermik_spotmedian.md`, `validation/xcontest/SYSTEM_CHANGES.md`,
 > `fetch_weather.py:_compute_region_spotmedian_thermals`.
 >
 > Das untenstehende Material bleibt erhalten als historische Doku — die genannten

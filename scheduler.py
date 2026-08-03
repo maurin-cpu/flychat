@@ -338,6 +338,33 @@ def _run_snapshot() -> bool:
         return False
 
 
+def _run_gewitter_validation() -> bool:
+    """Gewitter-Abgleich fuer den VORTAG: Warnung (Freeze) gegen SMN-Messung.
+
+    Schreibt validation/gewitter/{messwerte,urteile}/ + Scoreboard +
+    AUTO_REPORT (Konvention: validation/README.md). Failure-tolerant wie der
+    Snapshot — eine ausgefallene Validierung stoppt nie den Wetterlauf.
+    Idempotent: existierende Messwerte werden wiederverwendet.
+    """
+    try:
+        import datetime as _dt
+        from scripts.validate_gewitter_daily import (
+            rebuild_scoreboard, validate_day, write_report)
+        from scripts import validation_common as vc
+        day = _dt.date.today() - _dt.timedelta(days=1)
+        stations = vc.smn_stations_by_region()
+        if not validate_day(day, stations):
+            logger.warning("Daily run: Gewitter-Validierung %s ohne Ergebnis "
+                           "(kein Freeze oder keine SMN-Daten)", day)
+            return False
+        write_report(rebuild_scoreboard())
+        logger.info("Daily run: Gewitter-Validierung %s OK", day)
+        return True
+    except Exception as e:
+        logger.exception("Daily run: Gewitter-Validierung fehlgeschlagen: %s", e)
+        return False
+
+
 def _run_fronten() -> bool:
     """Holt die DWD-Frontenkarten und laesst die Validierung darueber laufen.
 
@@ -398,6 +425,9 @@ def _daily_run(engine) -> dict:
 
     logger.info("Daily run: starte Snapshot (Forecast einfrieren)...")
     _run_snapshot()
+
+    logger.info("Daily run: starte Gewitter-Validierung (Vortag)...")
+    _run_gewitter_validation()
 
     return stats
 
