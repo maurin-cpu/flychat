@@ -61,7 +61,7 @@ data/_preview_synoptik_zonen.json
 data/_experiment_fronten/
 
 # Auto-Sicherung vor dem Anhaengen (scripts/build_observations_from_strong.py)
-xcontest_validation/*.bak_before_auto
+validation/xcontest/*.bak_before_auto
 
 # Frontenkarten-Archiv (scripts/archive_dwd_fronten.py): Laufzeitdaten des
 # Servers, behandelt wie data/wetterdaten.json — der Hetzner-Server sammelt
@@ -76,9 +76,19 @@ data/dwd_fronten_archiv/
 # Maschinenausgabe der Fronten-Validierung. Von Hand gepflegt und damit
 # versioniert bleiben nur README/SCHEMA/PATTERNS, die Fallstudien — und
 # handurteile.csv, das der Validator ueber die Maschinenzeilen legt.
-fronten_validation/observations.csv
-fronten_validation/AUTO_REPORT.md
-fronten_validation/aussagen/
+validation/fronten/observations.csv
+validation/fronten/AUTO_REPORT.md
+validation/fronten/aussagen/
+
+# Maschinenausgabe der Gewitter-Validierung: schreibt der Server taeglich
+# (scheduler -> scripts/validate_gewitter_daily.py). Gleiche Politik wie bei
+# den Fronten — versioniert bleiben README/SCHEMA/PATTERNS, geholt wird per
+# scripts/sync_from_server.ps1. Rekonstruierbar aus data/weather_archive/
+# (Freeze, getrackt) + MeteoSchweiz-OGD-Archiv (amtlich, dauerhaft).
+validation/gewitter/messwerte/
+validation/gewitter/urteile/
+validation/gewitter/scoreboard.json
+validation/gewitter/AUTO_REPORT.md
 
 # MeteoSchweiz-Stationsmessungen (Validierungs-Cache, server-lokal)
 data/_meteoschweiz_cache/

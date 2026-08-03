@@ -88,21 +88,31 @@ if [ "${MIT_KARTEN:-0}" = "1" ] || [ "${2:-}" = "--mit-karten" ]; then
 else
   echo "   (ohne Roh-PNGs - fuer die: --mit-karten)"
 fi
-mkdir -p data/dwd_fronten_archiv fronten_validation/aussagen
+mkdir -p data/dwd_fronten_archiv validation/fronten/aussagen validation/gewitter/messwerte validation/gewitter/urteile
 rsync -az --info=progress2 "${FRONTEN_EXCLUDE[@]}" \
   "$SERVER:$REMOTE_DIR/data/dwd_fronten_archiv/" data/dwd_fronten_archiv/
 
-# In fronten_validation/ NUR die Maschinendateien holen. README, SCHEMA,
+# In validation/fronten/ NUR die Maschinendateien holen. README, SCHEMA,
 # PATTERNS und handurteile.csv sind von Hand gepflegt und liegen im Git — ein
 # rsync des ganzen Ordners wuerde lokale, noch nicht gepushte Aenderungen
 # daran mit der Serverkopie ueberschreiben.
 rsync -az --info=progress2 \
-  "$SERVER:$REMOTE_DIR/fronten_validation/observations.csv" \
-  "$SERVER:$REMOTE_DIR/fronten_validation/AUTO_REPORT.md" \
-  fronten_validation/
+  "$SERVER:$REMOTE_DIR/validation/fronten/observations.csv" \
+  "$SERVER:$REMOTE_DIR/validation/fronten/AUTO_REPORT.md" \
+  validation/fronten/
 rsync -az --info=progress2 \
-  "$SERVER:$REMOTE_DIR/fronten_validation/aussagen/" \
-  fronten_validation/aussagen/
+  "$SERVER:$REMOTE_DIR/validation/fronten/aussagen/" \
+  validation/fronten/aussagen/
+rsync -az --info=progress2 \
+  "$SERVER:$REMOTE_DIR/validation/gewitter/messwerte/" \
+  validation/gewitter/messwerte/
+rsync -az --info=progress2 \
+  "$SERVER:$REMOTE_DIR/validation/gewitter/urteile/" \
+  validation/gewitter/urteile/
+rsync -az --info=progress2 \
+  "$SERVER:$REMOTE_DIR/validation/gewitter/scoreboard.json" \
+  "$SERVER:$REMOTE_DIR/validation/gewitter/AUTO_REPORT.md" \
+  validation/gewitter/
 
 echo ""
 echo "FERTIG. Lokal = aktueller Server-Stand (Analysen inkl. Tag 3 + Wetterdaten). App neu starten."

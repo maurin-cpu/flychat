@@ -93,9 +93,13 @@ $FRONTEN = @(
   "data/dwd_fronten_archiv/text/*",
   "data/dwd_fronten_archiv/aussagen/*.json",
   "data/dwd_fronten_archiv/alarm_zustand.json",
-  "fronten_validation/observations.csv",
-  "fronten_validation/AUTO_REPORT.md",
-  "fronten_validation/aussagen/*.json"
+  "validation/fronten/observations.csv",
+  "validation/fronten/AUTO_REPORT.md",
+  "validation/fronten/aussagen/*.json",
+  "validation/gewitter/messwerte/*.json",
+  "validation/gewitter/urteile/*.json",
+  "validation/gewitter/scoreboard.json",
+  "validation/gewitter/AUTO_REPORT.md"
 )
 if ($MitKarten) {
   $FRONTEN += "data/dwd_fronten_archiv/analyse/*.png"
