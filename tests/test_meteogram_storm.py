@@ -9,9 +9,13 @@ Stand 02.08.2026 (PLAN_gewitter_anzeige Teil B, Schritte 1 + 2). Zwei Regeln:
    Stunden gemalt erzeugte er 53 von 217 Blitzstunden.
 
 2. Ein Ensemble-Blitz braucht einen PLAUSIBILITAETSANKER in derselben Stunde:
-   (Niederschlag ODER Bewoelkung) UND CAPE. Vorher stand die Haelfte aller
-   Blitze bei unter 50 % Bewoelkung und ohne Regen — Tessin Zentral 04.08.
-   14:00 zeigte einen Blitz bei 2 % Bewoelkung.
+   NIEDERSCHLAG UND Instabilitaet (CAPE oder Lifted Index). Vorher stand die
+   Haelfte aller Blitze bei unter 50 % Bewoelkung und ohne Regen — Tessin
+   Zentral 04.08. 14:00 zeigte einen Blitz bei 2 % Bewoelkung.
+
+   Seit 03.08.2026 ist der Regen PFLICHT (vorher: Regen ODER Bewoelkung).
+   Saison-Backtest: die Wolken-Alternative liess 61 % der gewitterfreien
+   Tage durch und rettete genau einen Gewittertag von 113.
 
 Der deterministische Gewittercode 95/96/99 bleibt ungefiltert.
 """
@@ -24,8 +28,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from web import format_data_for_charts
 
-# Anker-erfuellende Stunde: bewoelkt genug und instabil genug.
-_ANCHOR_OK = {"cloud_cover": config.THUNDER_ANCHOR_CLOUD_PCT + 10,
+# Anker-erfuellende Stunde: Modell-Regen und instabil genug.
+_ANCHOR_OK = {"precipitation": config.THUNDER_ANCHOR_PRECIP_MM,
               "cape": config.THUNDER_ANCHOR_CAPE_JKG + 100}
 
 
@@ -113,14 +117,26 @@ def test_kein_blitz_ohne_wolken_und_ohne_regen():
 
 
 def test_kein_blitz_ohne_cape():
-    """Bewoelkung allein ist keine Konvektion."""
+    """Regen allein ist keine Konvektion."""
     c = format_data_for_charts(
-        _hourly(cloud_cover=90, cape=50.0),
+        _hourly(precipitation=1.0, cape=50.0),
         thunder_ensemble=_ens(hourly_share=_share("14:00")))
     assert _storm_hours(c) == []
 
 
-def test_regen_ersetzt_die_bewoelkung_im_anker():
+def test_wolken_ohne_regen_genuegen_nicht_mehr():
+    """Kern der Verschaerfung vom 03.08.: bewoelkt + instabil, aber der
+    det. Lauf hat keinen Regen -> kein Blitz. Vorher passierte diese Stunde
+    den Anker — im Saison-Backtest der Grund fuer 61 % Durchlass an
+    gewitterfreien Tagen."""
+    c = format_data_for_charts(
+        _hourly(cloud_cover=95, precipitation=0.0,
+                cape=config.THUNDER_ANCHOR_CAPE_JKG + 500),
+        thunder_ensemble=_ens(hourly_share=_share("14:00")))
+    assert _storm_hours(c) == []
+
+
+def test_regen_und_instabilitaet_erzeugen_blitz():
     c = format_data_for_charts(
         _hourly(cloud_cover=10, precipitation=config.THUNDER_ANCHOR_PRECIP_MM,
                 cape=config.THUNDER_ANCHOR_CAPE_JKG),
@@ -130,7 +146,7 @@ def test_regen_ersetzt_die_bewoelkung_im_anker():
 
 def test_fehlendes_cape_zaehlt_nicht_als_erfuellt():
     """Aeltere Caches ohne CAPE duerfen den Anker nicht stillschweigend passieren."""
-    h = _hourly(cloud_cover=90)
+    h = _hourly(precipitation=1.0)
     for rec in h.values():
         rec.pop("cape")
     c = format_data_for_charts(h, thunder_ensemble=_ens(hourly_share=_share("14:00")))
@@ -141,7 +157,7 @@ def test_lifted_index_ersetzt_fehlendes_cape():
     """Hoehenkorrektur: Oberwallis kam am 02.08. nie ueber CAPE 290, XC Therm
     zeigte dort 1,5 h Gewitter. Der Lifted Index rettet solche Stunden."""
     c = format_data_for_charts(
-        _hourly(cloud_cover=90, cape=100.0,
+        _hourly(precipitation=1.0, cape=100.0,
                 lifted_index=config.THUNDER_ANCHOR_LI - 1),
         thunder_ensemble=_ens(hourly_share=_share("14:00")))
     assert _storm_hours(c) == ["14:00"]
@@ -149,7 +165,7 @@ def test_lifted_index_ersetzt_fehlendes_cape():
 
 def test_stabiler_lifted_index_rettet_nicht():
     c = format_data_for_charts(
-        _hourly(cloud_cover=90, cape=100.0, lifted_index=+5.0),
+        _hourly(precipitation=1.0, cape=100.0, lifted_index=+5.0),
         thunder_ensemble=_ens(hourly_share=_share("14:00")))
     assert _storm_hours(c) == []
 

@@ -242,11 +242,19 @@ def thunder_anchor_ok(data):
     stand bei unter 50 % Bewoelkung und ohne einen Tropfen Regen (Tessin
     Zentral 04.08. 14:00 bei 2 % Bewoelkung).
 
-    Bedingung: Instabilitaet UND (Niederschlag ODER Bewoelkung), alles in
-    DERSELBEN Stunde aus dem deterministischen Lauf. Instabilitaet heisst
-    CAPE ODER Lifted Index — CAPE allein waere hoehenabhaengig und wuerde
-    Hochalpenregionen dauerhaft stummschalten. Schwellen und Begruendung —
-    auch warum CIN bewusst fehlt — in config.THUNDER_ANCHOR_*.
+    Bedingung: Instabilitaet UND Niederschlag, beides in DERSELBEN Stunde aus
+    dem deterministischen Lauf. Instabilitaet heisst CAPE ODER Lifted Index —
+    CAPE allein waere hoehenabhaengig und wuerde Hochalpenregionen dauerhaft
+    stummschalten. Schwellen und Begruendung — auch warum CIN bewusst fehlt —
+    in config.THUNDER_ANCHOR_*.
+
+    Bewoelkung als Regen-Alternative wurde am 03.08.2026 ENTFERNT: im
+    Saison-Backtest (15.05.-02.08., 2320 Regionstage gegen SwissMetNet-
+    Signaturen) liess der Wolken-Zweig 61 % aller gewitterfreien Tage durch
+    — im Sommer hat fast jede Region irgendwo 50 % Bewoelkung. Die
+    Regen-Pflicht senkt das auf 24 % und kostet genau einen Gewittertag von
+    113 (Tessin Nord 16.07., det. Lauf voellig trocken). Zahlen:
+    docs/GEWITTER.md, Abschnitt "Anker verschaerft".
 
     Gilt nur fuer den Ensemble-Weg, nie fuer den deterministischen
     Gewittercode 95/96/99: der stammt aus demselben Lauf wie Wolken und Regen
@@ -266,10 +274,7 @@ def thunder_anchor_ok(data):
     if not unstable:
         return False
     precip = _num("precipitation")
-    if precip is not None and precip >= config.THUNDER_ANCHOR_PRECIP_MM:
-        return True
-    cloud = _num("cloud_cover")
-    return cloud is not None and cloud >= config.THUNDER_ANCHOR_CLOUD_PCT
+    return precip is not None and precip >= config.THUNDER_ANCHOR_PRECIP_MM
 
 
 def is_ensemble_storm_hour(share_pct, data):

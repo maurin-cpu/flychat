@@ -12,7 +12,54 @@ Validierung der fertigen Blitz-Prognose (LPI).
 > abgerufenen Wetterparametern (`config.py`: `CH_SURFACE_PARAMS`,
 > `GFS_SUPPLEMENTARY_PARAMS`): diese Doku nachziehen und Changelog ergänzen.
 
-Letzte Aktualisierung: 2026-07-31 (Regions-Aggregation repariert + Ensemble, §0b)
+Letzte Aktualisierung: 2026-08-03 (Anker verschaerft: Regen-Pflicht, §0c — erster Saison-Backtest gegen SwissMetNet)
+
+---
+
+## 0c. Anker verschärft: Regen-Pflicht (2026-08-03) — erster Saison-Backtest
+
+**Änderung:** Im Plausibilitätsanker (`ensemble_thunder.thunder_anchor_ok`) ist
+Niederschlag jetzt **Pflicht**. Vorher genügte „Regen ODER Bewölkung ≥ 50 %";
+die Bewölkungs-Alternative ist entfernt (`THUNDER_ANCHOR_CLOUD_PCT` gestrichen).
+Regel neu: **Regen ≥ 0,1 mm/h UND (CAPE ≥ 300 ODER LI ≤ −1), dieselbe Stunde,
+det. Lauf.** Der deterministische Gewittercode 95/96/99 bleibt ungefiltert.
+
+**Grundlage — erster Saison-Backtest des Projekts** (15.05.–02.08.2026,
+**2'320 Regionstage**; Wahrheit = SwissMetNet-Stundenwerte, 144 Stationen den
+29 Regionen zugeordnet; Gewitter-Signatur = Regen ≥ 4 mm/h **und**
+Böensprung ≥ 15 km/h oder Temperatursturz ≥ 2 K; Basisrate: Gewitter an 5,3 %
+der Regionstage im Flugfenster 10–18 Uhr):
+
+| Anker-Variante | lässt Gewittertage durch | lässt stille Tage durch |
+|---|---|---|
+| (Wolke 50 \| Regen) & (CAPE \| LI) — alt | 113/124 = 91,1 % | 1331/2196 = **60,6 %** |
+| **nur Regen & (CAPE \| LI) — neu** | 112/124 = 90,3 % | 528/2196 = **24,0 %** |
+| stärkere Labilität (CAPE 600 \| LI −2) | 83,9 % | 48,6 % |
+
+Die Wolken-Alternative filterte praktisch nichts — im Sommer hat fast jede
+Region irgendwo ≥ 50 % Bewölkung (Maximum über 7 Referenzpunkte). Preis der
+Verschärfung über die ganze Saison: **ein einziger Gewittertag** (Tessin Nord
+16.07., det. Lauf völlig trocken, Gewitter erst ab 17 Uhr). Wirkung am Lauf vom
+02.08.: **33 → 15 Blitzstunden** (17 → 10 Regionstage); unter den entfernten
+sind die am Testtag **gemessen widerlegten** Fehlalarme (Alpstein 99 % Sonne,
+Mittelland Zentral 94 %).
+
+**Weitere Backtest-Befunde** (Details/Skripte: Session-Scratchpad 03.08.,
+Übernahme nach `scripts/` mit dem Mess-Abgleich):
+- Deterministischer Wettercode erkennt nur **13 %** der Gewittertage (16/124)
+  — als hartes Gate wertlos, bestätigt die Ensemble-Entscheidung.
+- Wolkentop-Ansatz (ICON-EU `convective_cloud_top`): erkennt 96 % der
+  Gewittertage, aber FAR ~90 % — als harter Alarm unbrauchbar, als **weiche
+  Überentwicklungs-Vorwarnung** geeignet (beste Variante: Top ≤ −20 °C an
+  ≥ 75 % der Punkte + Anker → 2 von 3 Konvektionstagen erkannt, ~3–4 h
+  Vorlauf). Geplant als eigene Stufe, sperrt nie.
+- Gewitter treten **abends häufiger auf als im Flugfenster** (7,1 % vs.
+  5,3 % der Regionstage) — Auswertungen immer nach Fenster trennen.
+- Das Ensemble selbst ist rückwirkend **nicht** testbar (identische Member
+  älter ~3 Tage, s. u.) — Eichung nur vorwärts über den täglichen Mitschnitt.
+
+Tests: `tests/test_meteogram_storm.py` (Regen-Pflicht-Fall
+`test_wolken_ohne_regen_genuegen_nicht_mehr`).
 
 ---
 

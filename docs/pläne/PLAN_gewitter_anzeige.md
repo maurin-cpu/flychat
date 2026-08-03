@@ -591,6 +591,25 @@ gemeint ist. Die aus unserer Sicht schwächsten Glieder der Kette:
    haben den Lifted Index jetzt, benutzen ihn aber nur als Türsteher, nicht als
    Primärindikator.
 
+## 12d. UMGESETZT am 03.08.2026 — Anker verschärft (Regen-Pflicht)
+
+Erster **Saison-Backtest** (15.05.–02.08., 2'320 Regionstage gegen
+SwissMetNet-Signaturen) → Anker-Nässe-Bedingung von „Regen ODER Wolke 50 %"
+auf **Regen-Pflicht** verschärft. Kostet 1 Gewittertag von 113, drittelt das
+Fehlalarm-Potenzial (61 % → 24 % Durchlass an stillen Tagen); am Lauf vom
+02.08.: 33 → 15 Blitzstunden. **Alle Zahlen und Befunde: `docs/GEWITTER.md`
+§0c** (dort auch: det. Code erkennt nur 13 % → Ensemble-Entscheid bestätigt;
+Wolkentop als künftige weiche Stufe; Abend > Flugfenster).
+
+Damit erledigt aus diesem Plan: §11 Schritt 1–4 (02.08.) + Anker-Härtung.
+**User-Entscheid 03.08.:** (1) täglicher **Mess-Abgleich** gegen SwissMetNet
+bauen (Struktur vor Bau vorlegen), (2) danach **weiche Überentwicklungs-
+Stufe** (Wolkentop ICON-EU, Top ≤ −20 °C @ ≥ 75 % Punkte + weicher Anker,
+hohler Blitz). §12c.4 (DWD-Blitzpotenzial/LPI) ist damit **gestrichen** —
+LPI erkannte im Backtest 0 von 4 Gewittern des Testtags.
+**Dieser Plan wird gelöscht**, sobald Abgleich + Überentwicklungs-Stufe
+umgesetzt und in `docs/` dokumentiert sind (Doku ersetzt Plan).
+
 ## 12c. Offen — hier geht es am 03.08. weiter
 
 1. **Vergleich für Montag ziehen.** XC Therm für 03.08. abgreifen (kommt vom

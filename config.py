@@ -200,9 +200,29 @@ ENSEMBLE_THUNDER_POINT_QUORUM = 2
 #
 # Ein Ensemble-Blitz erscheint nur noch, wenn der deterministische Lauf in
 # DERSELBEN Stunde ueberhaupt etwas zeigt:
-#     (Niederschlag ODER Bewoelkung) UND CAPE
+#     NIEDERSCHLAG und (CAPE oder Lifted Index)
 #
-# Wirkung gemessen (137 Regionstage): 36 % -> 19 % der Regionstage mit Blitz.
+# Wirkung gemessen (137 Regionstage, 02.08.): 36 % -> 19 % der Regionstage.
+#
+# --- VERSCHAERFT am 03.08.2026: Regen-PFLICHT statt Wolken-Alternative ---
+# Erster Saison-Backtest (15.05.-02.08., 2320 Regionstage, Wahrheit =
+# SwissMetNet-Gewittersignatur: Regen >= 4 mm/h + Boeensprung >= 15 km/h
+# oder Temperatursturz >= 2 K):
+#
+#   Anker-Variante                Gewittertage durch   stille Tage durch
+#   (Wolke50|Regen)&(CAPE|LI)        113/124 = 91 %      1331/2196 = 61 %
+#   nur Regen      &(CAPE|LI)        112/124 = 90 %       528/2196 = 24 %
+#
+# Die Wolken-Alternative filterte praktisch nichts — im Sommer hat fast jede
+# Region irgendwo >= 50 % Bewoelkung (Maximum ueber 7 Referenzpunkte). Die
+# Regen-Pflicht kostet ueber die ganze Saison genau EINEN Gewittertag
+# (Tessin Nord 16.07., det. Lauf voellig trocken, Gewitter erst 17 Uhr) und
+# drittelt das Fehlalarm-Potenzial. Am Lauf vom 02.08.: 33 -> 15 Blitz-
+# stunden, darunter fallen genau die am Testtag GEMESSEN widerlegten
+# Fehlalarme (Alpstein 99 % Sonne, Mittelland Zentral 94 %).
+# Der Fall "Modelle sehen Gewitter, aber kein Regen" bleibt im TEXT
+# erwaehnt (MENTION-Schwelle) und wandert spaeter in die weiche
+# Ueberentwicklungs-Stufe. THUNDER_ANCHOR_CLOUD_PCT damit entfernt.
 #
 # Gilt NUR fuer den Ensemble-Weg. Ein deterministischer Gewittercode 95/96/99
 # bleibt ungefiltert — er stammt aus demselben Lauf wie Wolken und Regen und
@@ -219,9 +239,7 @@ ENSEMBLE_THUNDER_POINT_QUORUM = 2
 # Blitzstunden gegen -0,9 sonst, gemessen 01.08.), fehlt Regionen aber im
 # Abruf — kommt mit Schritt 3 zusammen mit dem DWD-Blitzpotenzial.
 #
-# UNGEMESSEN gesetzt, gegen das Archiv nachzuziehen.
-THUNDER_ANCHOR_PRECIP_MM  = 0.1   # mm/h in dieser Stunde
-THUNDER_ANCHOR_CLOUD_PCT  = 50    # % Gesamtbewoelkung in dieser Stunde
+THUNDER_ANCHOR_PRECIP_MM  = 0.1   # mm/h in dieser Stunde (PFLICHT seit 03.08.)
 THUNDER_ANCHOR_CAPE_JKG   = 300   # J/kg in dieser Stunde
 # Instabilitaet gilt als gegeben bei CAPE ODER Lifted Index. Das ODER ist der
 # Kern der Hoehenkorrektur (02.08.2026): CAPE wird vom Boden aufwaerts
