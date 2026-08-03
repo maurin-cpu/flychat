@@ -68,9 +68,11 @@ validation/xcontest/*.bak_before_auto
 # 4x taeglich, nichts davon wird gepusht, geholt wird per
 # scripts/sync_from_server.ps1. Vorher lag das im Git, weil der Cloud-Lauf
 # keinen bleibenden Datentraeger hatte; der Server hat einen.
-# ACHTUNG: deploy.sh stasht mit --include-untracked, das laesst ignorierte
-# Dateien in Ruhe (nur --all wuerde sie mitnehmen). Genau deshalb ueberlebt
-# das Archiv hier jeden Deploy.
+# deploy.sh stasht seit 03.08.2026 NUR getrackte Aenderungen — ignorierte
+# UND untrackte Daten bleiben liegen. (Vorher stashte er mit
+# --include-untracked: ignorierte Dateien wie dieses Archiv ueberlebten,
+# aber untrackte Snapshots in data/weather_archive/ verschwanden in nie
+# gepoppte Stashes.)
 data/dwd_fronten_archiv/
 
 # Maschinenausgabe der Fronten-Validierung. Von Hand gepflegt und damit
