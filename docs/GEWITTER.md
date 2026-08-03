@@ -26,13 +26,13 @@ nacktem CAPE) + Zeile `UEBERENTWICKLUNG` in der Regions-KI-Analyse + Zeile
 `REGION-KONVEKTION` in der **Spot**-KI-Analyse (Spots erben die
 Regions-Signale — auch das Gewitter-Ensemble, das den Spots bisher fehlte).
 
-**Die EINE Regel** (`convection_rules.is_overdev_hour` — Meteogramm, KI-Text und
+**Die EINE Regel** (`convection.is_overdev_hour` — Meteogramm, KI-Text und
 Validierung nutzen dieselbe Funktion), vier Bedingungen je Stunde
 (Schwellen: `config.OVERDEV_*`):
 
 1. **Wolkentop ≤ −20 °C an ≥ 75 % der Referenzpunkte** — ICON-EU
    `convective_cloud_top` (einziges Modell, das das Feld füllt), Abruf
-   `convection_cloud_top.py`, im Tageslauf gebündelt wie das Ensemble, im Snapshot
+   `convection.py`, im Tageslauf gebündelt wie das Ensemble, im Snapshot
    eingefroren. Backtest §0c: erkennt 2 von 3 Konvektionstagen, ~3–4 h Vorlauf.
 2. **Konsistenz-Regel (User 03.08.):** angezeigte Bewölkung derselben Stunde
    ≥ 30 % — das Meteogramm darf nie wolkenlos zeigen und daneben
@@ -46,7 +46,7 @@ Validierung nutzen dieselbe Funktion), vier Bedingungen je Stunde
 Harte Blitz-Stunde gewinnt immer: ein Symbol, eine Botschaft.
 
 **Modell-Mix, bewusst (Entscheid 03.08.):** Indizien-Voting, keine
-Physik-Kette — Begründung in `convection_cloud_top.py`. Cross-Modell-Bedingungen nie
+Physik-Kette — Begründung in `convection.py`. Cross-Modell-Bedingungen nie
 stundenscharf ver-UND-et; die Messvalidierung entscheidet empirisch.
 
 **Offen (übernommen aus dem gelöschten PLAN_gewitter_anzeige.md):**
@@ -60,13 +60,13 @@ stundenscharf ver-UND-et; die Messvalidierung entscheidet empirisch.
   Gewitter-Prozente) · Meteomatics-Blitzdaten anfragen oder dauerhaft ohne
   Wahrheit arbeiten (unverändert offen)
 
-Tests: `tests/test_convection_rules.py` (Regel + Chart-Payload, 15 Fälle).
+Tests: `tests/test_convection.py` (Regel + Chart-Payload, 15 Fälle).
 
 ---
 
 ## 0c. Anker verschärft: Regen-Pflicht (2026-08-03) — erster Saison-Backtest
 
-**Änderung:** Im Plausibilitätsanker (`convection_rules.thunder_anchor_ok`) ist
+**Änderung:** Im Plausibilitätsanker (`convection.thunder_anchor_ok`) ist
 Niederschlag jetzt **Pflicht**. Vorher genügte „Regen ODER Bewölkung ≥ 50 %";
 die Bewölkungs-Alternative ist entfernt (`THUNDER_ANCHOR_CLOUD_PCT` gestrichen).
 Regel neu: **Regen ≥ 0,1 mm/h UND (CAPE ≥ 300 ODER LI ≤ −1), dieselbe Stunde,
@@ -152,7 +152,7 @@ Belegfall Engelberg (46.82/8.40), 02.08.2026, Fenster 11–20 h, gemessen am
 
 Auch ICON-D2, ICON-EU, ECMWF und GFS zünden deterministisch keine Zelle.
 
-**Ergänzung:** `convection_ensemble.py` berechnet je Region und Tag den Anteil der
+**Ergänzung:** `convection.py` berechnet je Region und Tag den Anteil der
 Member mit Code 95/96/99 im Flugfenster und liefert Schwerpunkt-Fenster dazu.
 Das Ergebnis steht in `_regions[rid]["thunder_ensemble"]` und erscheint im
 Regions-Kontext als Zeile `GEWITTER-ENSEMBLE`.

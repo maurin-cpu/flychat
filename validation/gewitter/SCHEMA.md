@@ -61,7 +61,7 @@ Ein Eintrag je Region × Fenster (`flug` = 10–18 Uhr, `abend` = 18–24 Uhr):
 
 `angezeigt` wird aus dem eingefrorenen Snapshot mit der **aktuellen**
 Anzeige-Regel nachgerechnet (dieselbe Funktion wie die App:
-`convection_rules.thunder_anchor_ok` — eine Quelle der Wahrheit). Das
+`convection.thunder_anchor_ok` — eine Quelle der Wahrheit). Das
 Scoreboard eicht also die heutige Regel; welche das war, steht in
 `_meta.regel`. Ändert sich die Regel, wird das Scoreboard aus den
 Urteils-Rohdaten neu gerechnet (`rebuild_scoreboard` ist idempotent).

@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-import convection_ensemble as et
+import convection as et
 
 TIMES = [f"2026-08-02T{h:02d}:00" for h in range(24)]
 

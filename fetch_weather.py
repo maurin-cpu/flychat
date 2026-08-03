@@ -33,7 +33,7 @@ API_CHUNK_SIZE = 80            # Max Locations pro API-Call (URL-Länge + Timeou
 
 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint, compute_daily_thermals
 from source_area import get_reference_points, get_all_regions, get_precip_reference_points
-import convection_ensemble
+import convection
 import statistics
 
 # Schwelle: ab welcher Spot-Anzahl je Region wird der Spot-Median Thermik-Override
@@ -1507,7 +1507,7 @@ def fetch_all_spots(spots, save_to_file=True):
     # Wetterlauf ohne Ensemble weiter; die Regionen bekommen dann kein Feld.
     region_thunder = {}
     try:
-        region_thunder = convection_ensemble.compute_region_thunder(
+        region_thunder = convection.compute_region_thunder(
             {r["id"]: region_refs.get(r["id"], []) for r in all_regions
              if region_refs.get(r["id"])}
         )
@@ -1521,12 +1521,12 @@ def fetch_all_spots(spots, save_to_file=True):
     except Exception as e:  # noqa: BLE001 — Ensemble darf den Lauf nie kippen
         print(f"  [WARN] Ensemble-Gewitter uebersprungen: {e}")
 
-    # Wolkentops fuer die Ueberentwicklungs-Stufe (ICON-EU, convection_cloud_top.py).
+    # Wolkentops fuer die Ueberentwicklungs-Stufe (ICON-EU, convection.py).
     # Gleiche Konstruktion wie das Ensemble: EIN gebuendelter Abruf, faellt er
     # aus, laeuft der Lauf ohne die Stufe weiter — reine Zusatzinfo.
     region_cloud_tops = {}
     try:
-        import convection_cloud_top as _cloud_top
+        import convection as _cloud_top
         region_cloud_tops = _cloud_top.compute_region_cloud_tops(
             {r["id"]: region_refs.get(r["id"], []) for r in all_regions
              if region_refs.get(r["id"])}
@@ -1682,10 +1682,10 @@ def fetch_all_spots(spots, save_to_file=True):
             "reference_points": refs,
             "data_sources": data_sources,
             # Weiche Gewitter-Warnstufe je Tag (Anteil der EPS-Member).
-            # Kein Fliegbarkeits-Gate — siehe convection_ensemble.py.
+            # Kein Fliegbarkeits-Gate — siehe convection.py.
             "thunder_ensemble": region_thunder.get(rid),
             # Wolkentops je Stunde fuer die Ueberentwicklungs-Stufe
-            # (ICON-EU). Kein Gate — siehe convection_rules.py.
+            # (ICON-EU). Kein Gate — siehe convection.py.
             "cloud_top": region_cloud_tops.get(rid),
         }
 
