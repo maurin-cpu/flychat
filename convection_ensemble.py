@@ -1,4 +1,7 @@
-"""Ensemble-basierte Gewitterwahrscheinlichkeit (ICON-CH2-EPS, 21 Member).
+"""Ensemble-basierte Gewitterwahrscheinlichkeit (ICON-CH2-EPS, 21 Member) — DATEN-SEITE.
+
+Die ENTSCHEIDUNGS-Regeln (harter Blitz, Anker, Ueberentwicklung) liegen seit
+03.08.2026 gebuendelt in convection_rules.py.
 
 WARUM
 -----
@@ -44,6 +47,7 @@ import time
 import requests
 
 import config
+from convection_rules import probability_level  # noqa: F401 — Re-Export, thunder_probability nutzt es
 
 ENSEMBLE_URL = "https://ensemble-api.open-meteo.com/v1/ensemble"
 ENSEMBLE_TIMEOUT = 90
@@ -216,82 +220,6 @@ def thunder_probability(member_codes: list, times: list, date: str,
         "peak_share_pct": peak_share,
         "level": probability_level(prob),
     }
-
-
-def probability_level(prob):
-    """Weiche Warnstufe. None = unterhalb der Erwaehnungsschwelle.
-
-    UNKALIBRIERT — Startpunkt laut Auftrag (20-30 % der Member).
-    """
-    if prob is None:
-        return None
-    if prob >= config.ENSEMBLE_THUNDER_HIGH_PCT:
-        return "hoch"
-    if prob >= config.ENSEMBLE_THUNDER_ELEVATED_PCT:
-        return "erhoeht"
-    if prob >= config.ENSEMBLE_THUNDER_MENTION_PCT:
-        return "moeglich"
-    return None
-
-
-def thunder_anchor_ok(data):
-    """Plausibilitaetsanker: gibt die Stunde ein Gewitter ueberhaupt her?
-
-    Das Ensemble kennt nur Wettercodes und wurde bis 02.08.2026 nie gegen die
-    Stunde gegengelesen, in der es angezeigt wird — die Haelfte aller Blitze
-    stand bei unter 50 % Bewoelkung und ohne einen Tropfen Regen (Tessin
-    Zentral 04.08. 14:00 bei 2 % Bewoelkung).
-
-    Bedingung: Instabilitaet UND Niederschlag, beides in DERSELBEN Stunde aus
-    dem deterministischen Lauf. Instabilitaet heisst CAPE ODER Lifted Index —
-    CAPE allein waere hoehenabhaengig und wuerde Hochalpenregionen dauerhaft
-    stummschalten. Schwellen und Begruendung — auch warum CIN bewusst fehlt —
-    in config.THUNDER_ANCHOR_*.
-
-    Bewoelkung als Regen-Alternative wurde am 03.08.2026 ENTFERNT: im
-    Saison-Backtest (15.05.-02.08., 2320 Regionstage gegen SwissMetNet-
-    Signaturen) liess der Wolken-Zweig 61 % aller gewitterfreien Tage durch
-    — im Sommer hat fast jede Region irgendwo 50 % Bewoelkung. Die
-    Regen-Pflicht senkt das auf 24 % und kostet genau einen Gewittertag von
-    113 (Tessin Nord 16.07., det. Lauf voellig trocken). Zahlen:
-    docs/GEWITTER.md, Abschnitt "Anker verschaerft".
-
-    Gilt nur fuer den Ensemble-Weg, nie fuer den deterministischen
-    Gewittercode 95/96/99: der stammt aus demselben Lauf wie Wolken und Regen
-    und ist per Konstruktion in sich stimmig.
-    """
-    if not isinstance(data, dict):
-        return False
-
-    def _num(key):
-        v = data.get(key)
-        return v if isinstance(v, (int, float)) else None
-
-    cape = _num("cape")
-    li = _num("lifted_index")
-    unstable = ((cape is not None and cape >= config.THUNDER_ANCHOR_CAPE_JKG)
-                or (li is not None and li <= config.THUNDER_ANCHOR_LI))
-    if not unstable:
-        return False
-    precip = _num("precipitation")
-    return precip is not None and precip >= config.THUNDER_ANCHOR_PRECIP_MM
-
-
-def is_ensemble_storm_hour(share_pct, data):
-    """Zeigt diese Stunde ein Ensemble-Gewitter? Die EINE gemeinsame Regel.
-
-    Wird sowohl vom Blitz-Symbol im Meteogramm (web.format_data_for_charts)
-    als auch von der Gewitter-Kachel und dem LLM-Kontext
-    (engine/weather_context.py) benutzt. Vorher hatte jede Schicht ihre eigene
-    Rechnung: das Symbol lief ab 02.08. auf Stundenwerten, die Kachel weiter
-    auf dem Tageswert — dieselbe Region zeigte im Meteogramm keinen Blitz und
-    im Text daneben eine Gewitterwarnung.
-
-    share_pct: Anteil der Member mit Gewitter in DIESER Stunde.
-    """
-    if share_pct is None or share_pct < config.ENSEMBLE_THUNDER_METEOGRAM_PCT:
-        return False
-    return thunder_anchor_ok(data)
 
 
 def _get_with_retry(params, label=""):

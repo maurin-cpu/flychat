@@ -14,7 +14,7 @@ import re
 import statistics
 import threading
 
-import overdev as _overdev_mod
+import convection_rules as _conv_rules
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from datetime import datetime, timedelta
@@ -2854,7 +2854,7 @@ class WeatherContextMixin:
         rdata = (getattr(self, "region_weather_data", None) or {}).get(region_id) or {}
         if not rdata:
             return ""
-        from ensemble_thunder import is_ensemble_storm_hour, probability_level
+        from convection_rules import is_ensemble_storm_hour, probability_level
         parts = []
         ens = (rdata.get("thunder_ensemble") or {}).get(date_str) or {}
         lvl = probability_level(ens.get("probability_pct"))
@@ -2876,7 +2876,7 @@ class WeatherContextMixin:
             _wc = data.get("weather_code")
             storm = (is_ensemble_storm_hour(shares.get(ts[11:16]), data)
                      or (_wc is not None and int(_wc) in (95, 96, 99)))
-            if _overdev_mod.is_overdev_hour(entry, data,
+            if _conv_rules.is_overdev_hour(entry, data,
                                             therm=therms.get(ts), storm=storm):
                 od_hours.append(ts[11:16])
         if od_hours:
@@ -2968,7 +2968,7 @@ class WeatherContextMixin:
         # wirkt eine Schwellen-Aenderung erst nach dem naechsten Wetterlauf —
         # und bis dahin zeigt die App eine Einstufung, die nicht mehr gilt.
         # Ensemble-Gewitterstunden — DIESELBE Regel wie das Blitz-Symbol im
-        # Meteogramm (ensemble_thunder.is_ensemble_storm_hour): stuendlicher
+        # Meteogramm (convection_rules.is_ensemble_storm_hour): stuendlicher
         # Member-Anteil plus Plausibilitaetsanker.
         #
         # Bis 02.08.2026 lief die Kachel auf dem TAGESWERT mit Schwerpunkt-
@@ -2979,12 +2979,12 @@ class WeatherContextMixin:
         # Tageswert ist dafuer die falsche Groesse: er sagt nur, dass
         # IRGENDWANN im Flugfenster an IRGENDEINEM der 16 Referenzpunkte ein
         # Member zuendet, und ist im Sommer nahezu gesaettigt.
-        from ensemble_thunder import probability_level as _ens_level
-        from ensemble_thunder import is_ensemble_storm_hour as _ens_storm_hour
+        from convection_rules import probability_level as _ens_level
+        from convection_rules import is_ensemble_storm_hour as _ens_storm_hour
         ens_share = ens.get("hourly_share_pct") or {}
         ens_storm_hours = []      # ["13:00", ...] — Stunden mit Blitz-Symbol
         ens_storm_peak_pct = None  # hoechster Stundenanteil unter diesen Stunden
-        # Ueberentwicklungs-Stufe (overdev.py) — DIESELBE Regel wie der hohle
+        # Ueberentwicklungs-Stufe (convection_rules.py) — DIESELBE Regel wie der hohle
         # Blitz im Meteogramm; harte Blitz-Stunden gewinnen.
         region_cloud_top = region_data.get("cloud_top") or {}
         overdev_hours = []         # ["14:00", ...] — Stunden mit hohlem Blitz
@@ -3058,10 +3058,10 @@ class WeatherContextMixin:
                 if ens_storm_peak_pct is None or _share > ens_storm_peak_pct:
                     ens_storm_peak_pct = _share
             # Ueberentwicklung: kalter Wolkentop + angezeigte Wolken +
-            # Instabilitaet + kein Blauthermik-Veto (overdev.py).
+            # Instabilitaet + kein Blauthermik-Veto (convection_rules.py).
             _wc_h = data.get("weather_code")
             _det_storm = _wc_h is not None and int(_wc_h) in (95, 96, 99)
-            if _overdev_mod.is_overdev_hour(
+            if _conv_rules.is_overdev_hour(
                     region_cloud_top.get(timestamp[:16]), data,
                     therm=daily_thermals.get(timestamp),
                     storm=_storm_h or _det_storm):

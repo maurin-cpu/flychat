@@ -1040,7 +1040,7 @@ window.Meteogram = (function () {
             var hasPrecip = precipAmt > 0;
             var hasStorm = stormAt(precip, wc);
             // Weiche Ueberentwicklungs-Stufe (August 2026): hohler Blitz.
-            // Server-seitig entschieden (overdev.py — Wolkentop ICON-EU +
+            // Server-seitig entschieden (convection_rules.py — Wolkentop ICON-EU +
             // Konsistenz mit der angezeigten Bewoelkung + Instabilitaet +
             // Blauthermik-Gate). Der harte Blitz gewinnt immer. Der ALTE
             // hohle CAPE-Blitz (bis 06/2026) warnte auf nacktem CAPE und

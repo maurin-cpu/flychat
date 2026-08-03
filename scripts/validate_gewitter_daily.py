@@ -18,7 +18,7 @@ Prognose-Quelle ist der zentrale Freeze `data/weather_archive/YYYY-MM-DD.json`
 Warnung übersprungen — es gibt nichts Ehrliches nachzurechnen.
 
 Die Warnstunden werden mit der AKTUELLEN Anzeige-Regel nachgerechnet
-(`ensemble_thunder.is_ensemble_storm_hour` — dieselbe Funktion wie die App,
+(`convection_rules.is_ensemble_storm_hour` — dieselbe Funktion wie die App,
 eine Quelle der Wahrheit). Das Scoreboard eicht also die heutige Regel;
 welche Regel galt, steht je Urteil im `_meta.regel`.
 """
@@ -33,7 +33,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import config                                        # noqa: E402
-from ensemble_thunder import thunder_anchor_ok        # noqa: E402
+from convection_rules import thunder_anchor_ok        # noqa: E402
 from scripts import validation_common as vc           # noqa: E402
 
 DOM = vc.ROOT / "validation" / "gewitter"

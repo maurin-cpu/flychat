@@ -4057,11 +4057,11 @@ def _safe_get(arr, i):
     return arr[i]
 
 
-# Plausibilitaetsanker fuer den Ensemble-Blitz. Liegt in ensemble_thunder,
+# Plausibilitaetsanker fuer den Ensemble-Blitz. Liegt in convection_rules,
 # damit Meteogramm-Symbol, Gewitter-Kachel und LLM-Kontext garantiert dieselbe
 # Regel benutzen (vorher hatte jede Schicht ihre eigene Rechnung).
-from ensemble_thunder import thunder_anchor_ok as _thunder_anchor_ok  # noqa: E402
-import overdev as _overdev  # noqa: E402
+from convection_rules import thunder_anchor_ok as _thunder_anchor_ok  # noqa: E402
+import convection_rules as _conv_rules  # noqa: E402
 
 
 # ============================================================================
@@ -4091,7 +4091,7 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
     cloud_top (August 2026): nur fuer Regionen — Wolkentops je Stunde aus
     _regions[rid]["cloud_top"] (ICON-EU). Steuert die weiche
     Ueberentwicklungs-Stufe ("overdev", hohler Blitz). Die Regel liegt in
-    overdev.is_overdev_hour — dieselbe Funktion wie KI-Text und Validierung.
+    convection_rules.is_overdev_hour — dieselbe Funktion wie KI-Text und Validierung.
     """
     # Blitz-Stunden aus dem Ensemble ableiten.
     #
@@ -4168,9 +4168,9 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                         and _thunder_anchor_ok(data))
                 )
                 # Weiche Ueberentwicklungs-Stufe (hohler Blitz). Regel in
-                # overdev.py — der harte Blitz gewinnt immer (storm=...).
+                # convection_rules.py — der harte Blitz gewinnt immer (storm=...).
                 _ct = (cloud_top or {}).get(time_str[:16])
-                _overdev_flag = _overdev.is_overdev_hour(
+                _overdev_flag = _conv_rules.is_overdev_hour(
                     _ct, data, therm=daily_thermals.get(timestamp),
                     storm=_storm)
                 chart_data["precipitation"].append({

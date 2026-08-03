@@ -16,7 +16,7 @@ Das ist eine Zutat aus einem ANDEREN Modell als dem angezeigten CH1/CH2 —
 ein Indizien-Voting, keine Physik-Kette (Entscheid 03.08.). Darum wird der
 Top nie stundenscharf mit CH1-Feldern ver-UND-et, sondern nur als
 Flaechen-Anteil je Stunde gefuehrt; die Konsistenz mit der Anzeige stellt
-overdev.is_overdev_hour ueber die ANGEZEIGTE Bewoelkung her. Der Abgleich
+convection_rules.is_overdev_hour ueber die ANGEZEIGTE Bewoelkung her. Der Abgleich
 gegen die Messung (validation/gewitter/) entscheidet empirisch, ob der Mix
 traegt — die Ein-Modell-Alternative (Wolkentiefe selbst aus dem
 CH1/CH2-Profil) bleibt als Challenger im Plan.

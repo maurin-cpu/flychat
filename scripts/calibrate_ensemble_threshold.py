@@ -57,7 +57,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config
-import ensemble_thunder as et
+import convection_ensemble as et
 from fetch_weather import THUNDER_CODES, _api_get_with_retry
 from source_area import get_all_regions
 from spots import load_spots
