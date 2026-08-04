@@ -116,7 +116,7 @@ FORECAST_DAYS_GFS = 5
 # Gewitter kamen bisher nur aus EINEM deterministischen Lauf. Fuer Konvektion
 # ist das die unzuverlaessigste verfuegbare Information: die Zelle muss zufaellig
 # genau auf einem Referenzpunkt zuenden. Das Ensemble ersetzt das nicht, es
-# ergaenzt es um eine Wahrscheinlichkeit. Siehe convection_ensemble.py.
+# ergaenzt es um eine Wahrscheinlichkeit. Siehe convection.py.
 #
 # ACHTUNG: Der Ensemble-Endpunkt laeuft nur OHNE unseren Kunden-API-Key
 # (mit Key: HTTP 403 "requires API Professional or Enterprise plan").
