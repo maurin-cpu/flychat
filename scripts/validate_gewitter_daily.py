@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Täglicher Gewitter-Abgleich: Warnung (eingefrorener Lauf) gegen Messung (SMN).
 
-Läuft morgens für den VORTAG (Scheduler) oder per Hand:
-    python scripts/validate_gewitter_daily.py                  # gestern
+Läuft morgens (Scheduler) oder per Hand:
+    python scripts/validate_gewitter_daily.py                  # letzter komplett
+                                                               # publizierter Tag
     python scripts/validate_gewitter_daily.py --date 2026-08-02
     python scripts/validate_gewitter_daily.py --backfill 2026-07-31 2026-08-02
 
@@ -43,6 +44,22 @@ REGEL = "ensemble>=SCHWELLE% je Stunde + Anker Regen-Pflicht (03.08.2026)"
 SCHWELLEN = (40, 50, 60)          # 40 = Live-Schwelle, Rest fuer die Eichung
 FENSTER = {"flug": (10, 18), "abend": (18, 24)}
 
+# Ab wann gilt ein Messtag als vollstaendig (spaeteste Zehnminutenzeit im
+# Median ueber die Stationen). 23:00 statt 23:50: einzelne Stationen liefern
+# den letzten Block verzoegert, das darf keinen ganzen Tag blockieren.
+MIN_LETZTE_ZEIT = "23:00"
+
+
+def letzter_vollstaendiger_tag(now: datetime.datetime) -> datetime.date:
+    """Juengster Kalendertag, der bei MeteoSchweiz komplett publiziert ist.
+
+    Die t_recent-Dateien werden am Folgetag gegen 11:00 UTC (~13:00 lokal)
+    nachgefuehrt. Vorher ist der Vortag nur bis 01:50 Uhr da — wer ihn dann
+    holt, validiert gegen eine Luecke. Eine Stunde Sicherheitsabstand.
+    """
+    return (now.date() - datetime.timedelta(days=1) if now.hour >= 14
+            else now.date() - datetime.timedelta(days=2))
+
 
 def _load_json(p: Path):
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
@@ -53,12 +70,41 @@ def _dump_json(p: Path, obj) -> None:
     p.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
 
 
+def tag_vollstaendig(stunden_by_station: dict) -> bool:
+    """Deckt die Messung den ganzen Tag ab — oder haben wir zu frueh geholt?
+
+    Die OGD-Dateien werden erst am Folgetag gegen 11:00 UTC nachgefuehrt
+    (validation_common.OGD_PUBLISH_HOUR_UTC). Wer morgens den Vortag holt,
+    bekommt dessen erste zwei Lokalstunden und sonst nichts — und genau das
+    sah im Urteil aus wie ein stiller Tag: keine Messung, also kein Ereignis,
+    also Fehlalarm oder "still". Am 03.08.2026 ist der ganze Tag so ins
+    Scoreboard gelaufen (12 statt 144 Werte je Station, gefunden 04.08.).
+
+    Massstab ist der MEDIAN ueber die Stationen — einzelne Ausfaelle sind
+    normal, ein zu frueher Abruf trifft alle gleichzeitig.
+    """
+    letzte = sorted(max(st) for st in stunden_by_station.values() if st)
+    if not letzte:
+        return False
+    return letzte[len(letzte) // 2] >= MIN_LETZTE_ZEIT
+
+
 def build_messwerte(day: datetime.date, stations: list[dict]) -> dict | None:
-    """SMN-Stundenwerte + Regions-Ereignisse fuer einen Tag holen/ableiten."""
+    """SMN-Stundenwerte + Regions-Ereignisse fuer einen Tag holen/ableiten.
+
+    Unvollstaendige Tage werden NICHT gespeichert (und ein bereits
+    gespeicherter unvollstaendiger Tag wird neu geholt): der Cache soll den
+    Fehler eines zu fruehen Laufs nicht fuer immer festschreiben.
+    """
     out_path = DOM / "messwerte" / f"{day.isoformat()}.json"
     cached = _load_json(out_path)
     if cached:
-        return cached
+        stunden = {a: s.get("stunden") or {}
+                   for a, s in (cached.get("stationen") or {}).items()}
+        if tag_vollstaendig(stunden):
+            return cached
+        print(f"  ! gespeicherte Messwerte {day} sind unvollstaendig "
+              f"(zu frueh geholt) — werden neu geholt")
     stunden_by_station, meta_by_abbr = {}, {}
     for i, s in enumerate(stations, 1):
         stunden = vc.smn_station_day(s["abbr"], day)
@@ -68,6 +114,13 @@ def build_messwerte(day: datetime.date, stations: list[dict]) -> dict | None:
         if i % 40 == 0:
             print(f"  SMN {i}/{len(stations)} ...", flush=True)
     if not stunden_by_station:
+        return None
+    if not tag_vollstaendig(stunden_by_station):
+        letzte = sorted(max(st) for st in stunden_by_station.values() if st)
+        print(f"  !! {day}: Messung endet im Median um "
+              f"{letzte[len(letzte) // 2]} — der Tag ist bei MeteoSchweiz noch "
+              f"nicht vollstaendig publiziert (~{vc.OGD_PUBLISH_HOUR_UTC}:00 UTC "
+              f"am Folgetag). NICHTS gespeichert, Tag spaeter nachholen.")
         return None
     regionen = vc.region_events(stunden_by_station, meta_by_abbr)
     doc = {
@@ -114,10 +167,16 @@ def validate_day(day: datetime.date, stations: list[dict]) -> dict | None:
         print(f"  !! keine SMN-Daten fuer {day} — Tag uebersprungen")
         return None
 
+    # Join ueber den normalisierten Namen: die Prognose schreibt "Waadtländer
+    # Alpen", die Polygon-Datei "Waadtlaender Alpen" — ueber den rohen Namen
+    # fand diese Region ihre eigene Messung nie und zaehlte still als
+    # ereignislos (gefunden 04.08.2026).
+    mess_idx = {vc.norm_region(k): v for k, v in mess["regionen"].items()}
+
     urteile = []
     for rid, rsnap in snap["regions"].items():
         rname = rsnap.get("region_name") or rid
-        ereignisse = mess["regionen"].get(rname) or {}
+        ereignisse = mess_idx.get(vc.norm_region(rname)) or {}
         warn = {s: warn_hours_from_snapshot(rsnap, s) for s in SCHWELLEN}
         for fname, (h0, h1) in FENSTER.items():
             gemessen = [e[0] for e in ereignisse.get("gewitter", [])
@@ -212,7 +271,7 @@ def main() -> int:
         days = [d0 + datetime.timedelta(days=i) for i in range((d1 - d0).days + 1)]
     else:
         days = [datetime.date.fromisoformat(args.date) if args.date
-                else datetime.date.today() - datetime.timedelta(days=1)]
+                else letzter_vollstaendiger_tag(datetime.datetime.now())]
 
     print(f"Gewitter-Validierung: {len(days)} Tag(e)")
     stations = vc.smn_stations_by_region()

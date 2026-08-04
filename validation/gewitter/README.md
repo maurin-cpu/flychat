@@ -2,8 +2,9 @@
 
 Prüft täglich, ob unsere Gewitteranzeige (Blitz-Symbol aus Ensemble + Anker,
 `docs/GEWITTER.md`) stimmt. Richter sind **echte Stationsmessungen** —
-SwissMetNet-Stundenwerte (MeteoSchweiz OGD), ~144 Stationen den 29 Regionen
-zugeordnet.
+SwissMetNet-**Zehnminutenwerte** (MeteoSchweiz OGD), ~144 Stationen den 29
+Regionen zugeordnet. Stundenwerte verwässern die Signatur (beide realen
+Gewitter vom 02.08. fielen auf Stundenbasis unter die Schwellen).
 
 Entstanden am 03.08.2026 aus dem ersten Saison-Backtest (15.05.–02.08.,
 2'320 Regionstage — Befunde in `docs/GEWITTER.md` §0c). Zweck des laufenden
@@ -12,11 +13,11 @@ sind (Member-Archiv existiert nur vorwärts, seit 31.07.).
 
 ## Was als „Gewitter" zählt (Mess-Signatur)
 
-An mindestens einer Station der Region, in derselben Stunde:
+An mindestens einer Station der Region, im selben gleitenden 30-Minuten-Fenster:
 
 ```
-Regen ≥ 4 mm/h   UND   (Böensprung ≥ 15 km/h ODER Temperatursturz ≥ 2 K
-                        gegenüber der Vorstunde)
+Regen ≥ 3 mm/30min   UND   (Böensprung ≥ 15 km/h ODER Temperatursturz ≥ 2 K
+                            gegenüber 30 min davor)
 ```
 
 Daneben: **Schauer** = Regenguss ohne Sturm-Zeichen (Beleg für hochgewachsene
@@ -28,6 +29,29 @@ Gewitter-Beweis**: er wird nur gespeichert (nie angezeigt, ändert kein
 Urteil) und beziffert über die Zeit den blinden Fleck der Gewitter-Signatur —
 z. B. wie viele „Fehlalarme" eine Ausfluss-Signatur daneben hatten.
 Schwellen: `scripts/validation_common.py`.
+
+## Die Messung kommt mit einem Tag Verzögerung (04.08.2026)
+
+MeteoSchweiz führt die Zehnminuten-Dateien (`t_recent`) **einmal täglich gegen
+11:00 UTC** nach; danach stehen alle Werte bis zur letzten UTC-Mitternacht
+drin. Ein Lauf am frühen Morgen sieht vom Vortag darum nur **00:00–01:50**
+Lokalzeit — und das sah im Urteil aus wie ein *stiller Tag*, nicht wie
+fehlende Daten. Genau so ist der 03.08. ins Scoreboard gelaufen (12 statt 144
+Werte je Station, gefunden am 04.08.).
+
+Drei Konsequenzen, alle im Code verankert:
+
+1. Validiert wird der **jüngste vollständig publizierte Tag**
+   (`letzter_vollstaendiger_tag`) — im 06:00-Lauf also **D-2**, nicht der
+   Vortag. Nach 14 Uhr lokal reicht D-1.
+2. Ein unvollständiger Tag wird **nicht gespeichert** (`tag_vollstaendig`:
+   Median-Ende der Stationen ≥ 23:00). Ein bereits gespeicherter
+   unvollständiger Tag wird beim nächsten Lauf neu geholt — der Cache darf
+   den Fehler eines zu frühen Laufs nicht festschreiben.
+3. Der Join Prognose ↔ Messung läuft über den **normalisierten** Regionsnamen
+   (`validation_common.norm_region`). „Waadtländer Alpen" (Prognose) und
+   „Waadtlaender Alpen" (Polygon-Datei) sind dieselbe Region; über den rohen
+   Namen fand sie ihre eigene Messung nie und zählte still als ereignislos.
 
 ## Grenzen des Richters — beim Lesen immer mitdenken
 
@@ -56,5 +80,6 @@ Schwellen: `scripts/validation_common.py`.
 | `PATTERNS.md` | kuratierte Befunde (von Hand) |
 
 Tages-Skript: `scripts/validate_gewitter_daily.py` (Scheduler, morgens für den
-Vortag; `--backfill` holt Lücken ab 31.07. nach — älter geht nicht, das
-Ensemble-Archiv beginnt dort).
+letzten vollständig publizierten Tag — siehe Verzögerung oben; `--backfill`
+holt Lücken ab 31.07. nach — älter geht nicht, das Ensemble-Archiv beginnt
+dort).

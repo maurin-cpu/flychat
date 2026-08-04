@@ -57,6 +57,31 @@ OUTFLOW_PRES_RISE_HPA = 0.2
 
 VERDICTS = ("treffer", "verpasst", "fehlalarm", "still")
 
+# --- Publikations-Verzoegerung der OGD-Dateien ----------------------------
+# Gemessen am 04.08.2026 an 6 Stationen: die t_recent-Dateien werden taeglich
+# gegen 11:00 UTC aktualisiert und enthalten dann alles bis zur letzten
+# UTC-Mitternacht. Ein Lauf am fruehen Morgen sieht vom Vortag darum nur die
+# ersten zwei Lokalstunden (00:00-01:50) — und das sah lange aus wie ein
+# stiller Tag statt wie fehlende Daten (validation/gewitter/README.md).
+# Wer einen Kalendertag vollstaendig braucht, wartet bis zum UEBERNAECHSTEN
+# Morgen oder bis nach ~13:00 Lokalzeit des Folgetages.
+OGD_PUBLISH_HOUR_UTC = 11
+
+
+def norm_region(name: str) -> str:
+    """Regionsname auf eine vergleichbare Form bringen.
+
+    Prognose und Polygon-Datei schreiben denselben Namen nicht immer gleich
+    ("Waadtlaender Alpen" vs. "Waadtländer Alpen", 04.08.2026 gefunden). Ein
+    Join ueber den rohen Namen verliert die Region dann still — sie zaehlt
+    ewig als ereignislos. Umlaute werden gefaltet, Gross-/Kleinschreibung und
+    Randleerzeichen ignoriert.
+    """
+    s = (name or "").strip().lower()
+    for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
+        s = s.replace(a, b)
+    return " ".join(s.split())
+
 
 def _fetch(url: str, headers: dict | None = None) -> bytes:
     req = urllib.request.Request(url, headers={**_UA, **(headers or {})})

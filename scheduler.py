@@ -339,7 +339,13 @@ def _run_snapshot() -> bool:
 
 
 def _run_gewitter_validation() -> bool:
-    """Gewitter-Abgleich fuer den VORTAG: Warnung (Freeze) gegen SMN-Messung.
+    """Gewitter-Abgleich: Warnung (Freeze) gegen SMN-Messung.
+
+    NICHT der Vortag: MeteoSchweiz fuehrt die Zehnminuten-Dateien erst am
+    Folgetag gegen 11:00 UTC nach. Der 06:00-Lauf sah vom Vortag nur
+    00:00-01:50 und schrieb den Rest als ereignislos ins Scoreboard (am
+    03.08.2026 real passiert, gefunden 04.08.). Darum den juengsten
+    vollstaendig publizierten Tag validieren — im Morgenlauf ist das D-2.
 
     Schreibt validation/gewitter/{messwerte,urteile}/ + Scoreboard +
     AUTO_REPORT (Konvention: validation/README.md). Failure-tolerant wie der
@@ -349,9 +355,10 @@ def _run_gewitter_validation() -> bool:
     try:
         import datetime as _dt
         from scripts.validate_gewitter_daily import (
-            rebuild_scoreboard, validate_day, write_report)
+            letzter_vollstaendiger_tag, rebuild_scoreboard, validate_day,
+            write_report)
         from scripts import validation_common as vc
-        day = _dt.date.today() - _dt.timedelta(days=1)
+        day = letzter_vollstaendiger_tag(_dt.datetime.now())
         stations = vc.smn_stations_by_region()
         if not validate_day(day, stations):
             logger.warning("Daily run: Gewitter-Validierung %s ohne Ergebnis "
@@ -426,7 +433,8 @@ def _daily_run(engine) -> dict:
     logger.info("Daily run: starte Snapshot (Forecast einfrieren)...")
     _run_snapshot()
 
-    logger.info("Daily run: starte Gewitter-Validierung (Vortag)...")
+    logger.info("Daily run: starte Gewitter-Validierung (letzter komplett "
+                "publizierter Tag)...")
     _run_gewitter_validation()
 
     return stats
