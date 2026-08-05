@@ -241,7 +241,7 @@ Das Regionsprofil existiert in **zwei gleichwertigen Varianten**, die denselben 
 2. `apply_oi_gust_correction()` auf denselben Pressure-Levels (kein Grid)
 3. Running Maximum bottom-to-top
 
-Beide Pfade liefern praktisch dieselben Werte (Mittel-Diff ≈ 0.25 km/h, siehe `debug_scripts/find_chart_chat_diff.py`). Die kleine Rest-Diff stammt nur daher, dass das Chart auf einem feineren 250m-Grid smoothed wird, während der Klassifizierer genau auf den ~13 Pressure-Level-Höhen rechnet. Das ist **gewollt** — so sieht der LLM dieselben Böenwerte wie der Benutzer im Chart.
+Beide Pfade liefern praktisch dieselben Werte (Mittel-Diff ≈ 0.25 km/h, siehe `archive/debug_scripts/find_chart_chat_diff.py`). Die kleine Rest-Diff stammt nur daher, dass das Chart auf einem feineren 250m-Grid smoothed wird, während der Klassifizierer genau auf den ~13 Pressure-Level-Höhen rechnet. Das ist **gewollt** — so sieht der LLM dieselben Böenwerte wie der Benutzer im Chart.
 
 Der OI-Ansatz fusioniert Modell-Background (Drucklevel) mit Beobachtungen (Anker) — ein Standardverfahren in der Meteorologie (Gandin 1963).
 

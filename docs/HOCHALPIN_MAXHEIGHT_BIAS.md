@@ -128,5 +128,5 @@ REGTHERM (Liechti 2001, von xc-therm lizenziert) modelliert zwei Mechanismen exp
 - `meteo_research/inter_regional_coupling.md` — peer-reviewed Lit zu Alpine Pumping / Mountain Venting / TEAMx-PC22
 - `meteo_research/thermal_model_calibration.md` — offene Fragen Section
 - `meteo_research/cloudbase_terrain_tiers.md` — Hochalpin Hammer-Klassifikation 4000–5000 m+
-- xc-therm Screenshots: `data/screenshots/Screenshot 2026-05-24 *.png` (9 Stück, Walliser Hochalpen / Oberwallis / Valais Central / Hinterrhein / Alpi Ticinesi, 24.–28.05.2026)
+- xc-therm Screenshots: `data/screenshots/Screenshot 2026-05-24 *.png` (9 Stück, Walliser Hochalpen / Oberwallis / Valais Central / Hinterrhein / Alpi Ticinesi, 24.–28.05.2026) — am 05.08.2026 gelöscht, bei Bedarf aus der Git-Historie vor a252d2f wiederherstellbar
 - `thermik_calculator.py:670` — Parcel-Start-Code-Stelle

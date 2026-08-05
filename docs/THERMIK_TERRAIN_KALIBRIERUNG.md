@@ -333,7 +333,7 @@ Diese Kalibrierung berührt **nicht**:
 implementiert waren, zeigte Zentralwallis (hochalpin, elev_ref 2100 m) am
 7. April 2026 durchgehend `climb_rate=0` — während LLM-Analyse und Referenz-
 Piloten von ~2 m/s und 4-5 h Thermikflug sprachen. Debugging (siehe
-`debug_scripts/debug_zentralwallis_profile.py`) ergab:
+`archive/debug_scripts/debug_zentralwallis_profile.py`) ergab:
 
 - Schneedecke 2.1 m drückt T2m auf 4.6 °C
 - Pressure-Level-Environment bei 2100 m: **7.6 °C** (Warmluftadvektion)
@@ -471,7 +471,7 @@ Warnmeldung erklärt welches Gate gesperrt hat:
 
 ### Validierung April-Cache (alle 29 Regionen)
 
-Run von `debug_scripts/debug_all_alpine.py` gegen `data/wetterdaten.json`
+Run von `archive/debug_scripts/debug_all_alpine.py` gegen `data/wetterdaten.json`
 (2026-04-07) nach Implementierung der Gates:
 
 ```

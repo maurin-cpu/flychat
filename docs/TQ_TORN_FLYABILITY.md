@@ -100,7 +100,7 @@ Konsequenz für die Thermik.
 
 ## Warum das tiefe TORN vertrauenswürdig ist
 
-Untersuchung 2026-06-04 (`debug_scripts/test_torn_shear_vs_climb.py`, 83 Fälle):
+Untersuchung 2026-06-04 (`archive/debug_scripts/test_torn_shear_vs_climb.py`, 83 Fälle):
 - **100 % shear-getrieben, 0 % Climb-Artefakt.** 86 % SHEAR-ECHT (`du_dz` ≥ danger, Median
   4.37 vs. Schwelle 3.0), 14 % SHEAR-WARN.
 - Der `CLIMB_FLOOR` (0.3 m/s) wird **nie** ausgelöst — bei rel 0.15 ist die parabolische
@@ -130,10 +130,10 @@ Referenzpunkte, sonst spot-roh.
 
 | Skript | Befund |
 |---|---|
-| `debug_scripts/verify_anchor_fix.py` | 0 Anker-Segmente; TORN 2686 → 83 Std |
-| `debug_scripts/verify_torn_gate.py` | 73 Std / 35 Spots aus Produktivität gegated |
-| `debug_scripts/test_torn_shear_vs_climb.py` | 100 % shear-getrieben, 90 % zerreißen Peak-Kern |
-| `debug_scripts/test_torn_spot_impact.py` | 1,3 % der Thermikstunden, 8 % Spots, kein Ganztag |
+| `archive/debug_scripts/verify_anchor_fix.py` | 0 Anker-Segmente; TORN 2686 → 83 Std |
+| `archive/debug_scripts/verify_torn_gate.py` | 73 Std / 35 Spots aus Produktivität gegated |
+| `archive/debug_scripts/test_torn_shear_vs_climb.py` | 100 % shear-getrieben, 90 % zerreißen Peak-Kern |
+| `archive/debug_scripts/test_torn_spot_impact.py` | 1,3 % der Thermikstunden, 8 % Spots, kein Ganztag |
 | `tests/test_decision_engine.py` u.a. | grün (2 vorbestehende, unabhängige Failures) |
 
 End-to-end (Hasenmatt 2026-06-06): `THERMIK-QUALITÄT … TORN-UNUSABLE 2h`, Hinweis-Zeile
