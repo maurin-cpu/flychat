@@ -1,3 +1,0 @@
-{
-  "buildCommand": "python -c \"import shutil; from pathlib import Path; Path('public').mkdir(exist_ok=True); shutil.copytree('static', 'public/static', dirs_exist_ok=True)\""
-}

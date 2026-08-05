@@ -1,5 +1,9 @@
 # CLAUDE.md — flychat
 
+**`archive/` NIE lesen oder durchsuchen** (kein Grep/Glob/Read hinein) —
+dort liegt nur Abgeschlossenes. Einzige Ausnahme: der User fragt
+ausdrücklich nach einer Datei daraus.
+
 ## Daten-Wegweiser: wo hole ich was für Vergleiche/Validierungen?
 
 **Grundregel:** Die Maschinendaten entstehen auf dem **Server** — der lokale
