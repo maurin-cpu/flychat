@@ -1,0 +1,6 @@
+Regionen-Umbenennung 2026-08-10 auf den versionierten Bestand angewendet.
+Zuordnung: data/region_renames_2026-08.csv
+Doku:      docs/REGIONEN_UMBENENNUNG_2026-08.md
+
+Dieser Marker sperrt einen zweiten unbegrenzten --apply-Lauf von
+scripts/migrate_region_names.py. Nicht loeschen.

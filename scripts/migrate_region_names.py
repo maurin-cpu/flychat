@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regionen-Umbenennung 2026-08 — Migration und Verifikation.
 
-Plan: docs/pläne/PLAN_regionen_umbenennung.md
+Doku: docs/REGIONEN_UMBENENNUNG_2026-08.md
 Mapping: data/region_renames_2026-08.csv  (einzige Quelle, hier nichts hartkodiert)
 
 Default ist Dry-Run. Geschrieben wird nur mit --apply, und dann mit Backup
@@ -13,7 +13,17 @@ je Datei.
     python scripts/migrate_region_names.py --verify           # Restsuche nach Altnamen
     python scripts/migrate_region_names.py --show-ambiguous   # die Ostschweiz-Fundstellen
 
-Die drei Fallen (Plan §1.6) und wie sie hier behandelt werden:
+    # Server: nur die gitignorierten Daten, die nicht über git kommen
+    python scripts/migrate_region_names.py --paths validation/gewitter \
+        --paths validation/fronten --paths data/labeled_examples.jsonl --apply
+
+EINMALIG. Der versionierte Bestand ist am 10.08.2026 migriert; der Marker
+data/.region_rename_2026-08.done sperrt einen zweiten unbegrenzten --apply-Lauf.
+Zusätzlich überspringt jede Datei sich selbst, sobald ihre .pre_rename-Sicherung
+existiert. Grund: "Freiburger Voralpen" und "Berner Oberland" sind zugleich Alt-
+und Neuname — ein zweiter Lauf schöbe die Kette eine Stufe weiter.
+
+Die drei Fallen und wie sie hier behandelt werden:
 
   1. Ketten (Schwarzsee -> Freiburger Voralpen -> Berner Oberland -> Emmental):
      Zwei-Pass über Platzhalter. Erst jeder Altname -> \\x00<n>\\x00, dann
@@ -45,6 +55,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MAPPING = ROOT / "data" / "region_renames_2026-08.csv"
 
+# Marker, dass der versionierte Bestand migriert ist. Liegt IM Repo (anders als
+# die .pre_rename-Sicherungen, die gitignored sind und auf einem frischen Klon
+# oder dem Server gar nicht existieren). Solange er da ist, verweigert das
+# Skript einen unbegrenzten --apply-Lauf: die Migration ist nicht wiederholbar,
+# weil "Freiburger Voralpen" und "Berner Oberland" zugleich Alt- und Neuname
+# sind. Fuer die gitignorierten Server-Daten gibt es --paths.
+DONE_MARKER = ROOT / "data" / ".region_rename_2026-08.done"
+
 # Namen, die alleinstehend mehrdeutig sind: nur in strukturierten Feldern
 # ersetzen (CSV-Spalte, GeoJSON-Property, JSON-Feld), nie in Fliesstext.
 STRUCTURED_ONLY = {"Ostschweiz"}
@@ -70,9 +88,14 @@ EXCLUDE_DIRS = {
     "import_dhv",          # mappt Kantone auf die grobe DHV-Herkunft (Plan §3.2)
 }
 
+# Dateien, die die Zuordnung alt->neu SELBST enthalten. Sie müssen die alten
+# Namen behalten — ein Lauf darüber würde die Übersetzungstabelle übersetzen
+# und damit unbrauchbar machen.
 EXCLUDE_PATHS = {
-    "docs/pläne/PLAN_regionen_umbenennung.md",   # enthält die Zuordnung alt->neu
-    "data/region_renames_2026-08.csv",           # das Mapping selbst
+    "data/region_renames_2026-08.csv",           # das Mapping
+    "docs/REGIONEN_UMBENENNUNG_2026-08.md",      # die Dokumentation dazu
+    "subscriber.py",                             # _REGION_ID_RENAMES_2026_08
+    "tests/test_subscriber_region_rename.py",    # prüft ebendiese Tabelle
     "scripts/migrate_region_names.py",           # dieses Skript
     "data/wetterdaten.json",                     # rollend, wird neu erzeugt
 }
@@ -417,7 +440,7 @@ def is_excluded(rel: str) -> bool:
     return False
 
 
-def candidate_files(rules) -> list[tuple[str, Path]]:
+def candidate_files(rules, only_paths=None) -> list[tuple[str, Path]]:
     alts = [r.alt for r in rules]
     needles = [a.encode("utf-8") for a in alts]
     found = []
@@ -426,6 +449,8 @@ def candidate_files(rules) -> list[tuple[str, Path]]:
             continue
         rel = path.relative_to(ROOT).as_posix()
         if is_excluded(rel):
+            continue
+        if only_paths and not rel.startswith(tuple(only_paths)):
             continue
         try:
             raw = path.read_bytes()
@@ -471,9 +496,9 @@ def show_ambiguous(rules):
 # Hauptlauf
 # ---------------------------------------------------------------------------
 
-def run(stages, apply_changes, quiet=False):
+def run(stages, apply_changes, quiet=False, only_paths=None):
     rules = load_rules()
-    files = candidate_files(rules)
+    files = candidate_files(rules, only_paths)
     per_stage: dict[str, list] = {"A": [], "B": [], "C": []}
     for rel, path in files:
         per_stage[stage_of(rel)].append((rel, path))
@@ -587,6 +612,12 @@ def main():
     ap.add_argument("--apply", action="store_true", help="wirklich schreiben")
     ap.add_argument("--verify", action="store_true", help="nur Restsuche")
     ap.add_argument("--show-ambiguous", action="store_true")
+    ap.add_argument("--paths", action="append", metavar="PREFIX",
+                    help="nur Pfade unter diesem Prefix (z.B. validation/gewitter). "
+                         "Noetig fuer einen zweiten --apply-Lauf, etwa auf dem "
+                         "Server fuer die gitignorierten Daten")
+    ap.add_argument("--force", action="store_true",
+                    help="Sperre des Marker-Files uebergehen (fast nie richtig)")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
@@ -606,7 +637,24 @@ def main():
         verify(rules)
         return
 
-    run(set(args.stage or ["A", "B", "C"]), args.apply, args.quiet)
+    if args.apply and DONE_MARKER.exists() and not args.paths and not args.force:
+        marker = DONE_MARKER.relative_to(ROOT)
+        sys.exit("\n".join([
+            "",
+            f"ABGEBROCHEN: {marker} existiert - der versionierte Bestand ist",
+            "bereits migriert.",
+            "",
+            "Die Migration ist NICHT wiederholbar: 'Freiburger Voralpen' und",
+            "'Berner Oberland' sind zugleich Alt- und Neuname. Ein zweiter Lauf",
+            "schoebe sie eine Stufe weiter und liesse Regionen verschmelzen.",
+            "",
+            "Fuer die gitignorierten Server-Daten den Umfang eingrenzen:",
+            "  --paths validation/gewitter --paths validation/fronten \\",
+            "  --paths data/labeled_examples.jsonl --apply",
+            "",
+        ]))
+
+    run(set(args.stage or ["A", "B", "C"]), args.apply, args.quiet, args.paths)
 
 
 if __name__ == "__main__":
