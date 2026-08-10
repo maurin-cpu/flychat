@@ -151,6 +151,39 @@ Drei Fallen, die das Skript abfängt:
 | C | Prompts, Doku, cost_testing-Goldens, Code-Kommentare | 97 | 590 |
 | D | Abo-Datenbank (`subscriber.py`) | – | element-weise über das JSON-Array |
 
+## Ausrollen — was git nicht mitbringt
+
+Ausgerollt am 10.08.2026. **`git push` allein bewirkt auf dem Server nichts**,
+und selbst ein erfolgreicher `pull` migriert nur die Hälfte. Für die nächste
+Datenmigration ist das hier die Checkliste:
+
+1. **Der Server nimmt den Pull nicht an, solange sein Arbeitsverzeichnis
+   schmutzig ist.** Er schreibt selbst in getrackte Dateien
+   (`labeled_examples.jsonl`, `region_analyses_en.json`,
+   `spot_analyses_en.json`, `synoptic_context.json`) und hatte **kein
+   `skip-worktree` gesetzt**. Diese Stände sind neuer als die in git → vor dem
+   Pull sichern, danach zurückspielen, dann migrieren. `skip-worktree` ist
+   inzwischen gesetzt.
+2. **Archivtage, die nur auf dem Server liegen**, sind noch nicht committet und
+   tragen alte Namen. Die, die der Pull selbst mitbringt, vorher aus dem Weg
+   räumen — sonst bricht er ab.
+3. **Die Abo-Datenbank erreicht kein `git revert`.** Vorher kopieren.
+4. **Die Abo-Migration läuft NICHT beim Dienststart.** `SubscriberManager` wird
+   in `web.py` pro Request erzeugt (`get_manager_from_env`) — `_init_db` zündet
+   also irgendwann unbeaufsichtigt. Bewusst auslösen und prüfen, bevor Betrieb
+   darauf läuft.
+5. **`data/wetterdaten.json` muss mit.** Sie ist zwar rollend, hält aber unter
+   `_regions` die Regions-Wetterdaten auf der Regions-ID. Ohne sie liefen 15 von
+   29 Regionen in „Keine Wetterdaten". Der Fehler war live sichtbar.
+6. **Nur auf dem Server vorhanden und deshalb leicht zu übersehen:**
+   `validation/gewitter/**`, `validation/fronten/**`, die deutschen
+   `*_analyses.json`, `data/synoptic_audit/**`, `data/test_runs/**`,
+   `data/mocks/**`, `data/foehn_cache_*.json`.
+   → **Immer `--verify` auf dem Server laufen lassen**, nicht nur lokal.
+7. Der Marker `data/.region_rename_2026-08.done` kommt über git mit und sperrt
+   dort einen unbegrenzten `--apply`-Lauf. Für die server-eigenen Daten
+   `--paths` benutzen.
+
 **Neu gegenüber dem ursprünglichen Plan:** `validation/gewitter/**` gehört dazu.
 Der Gewitter-Richter zieht seine Regionsnamen über
 `scripts/validation_common.py:30` direkt aus

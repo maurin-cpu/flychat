@@ -97,8 +97,15 @@ EXCLUDE_PATHS = {
     "subscriber.py",                             # _REGION_ID_RENAMES_2026_08
     "tests/test_subscriber_region_rename.py",    # prüft ebendiese Tabelle
     "scripts/migrate_region_names.py",           # dieses Skript
-    "data/wetterdaten.json",                     # rollend, wird neu erzeugt
 }
+
+# data/wetterdaten.json stand hier einmal drin ("rollend, wird um 06:00 neu
+# erzeugt"). Das stimmt — und war trotzdem falsch: die Datei hält unter dem
+# Schlüssel `_regions` die Regions-Wetterdaten, geschlüsselt auf die Regions-ID
+# (chat_engine.py: `cached.pop("_regions")`). Ohne Migration liefen nach dem
+# Deploy 15 von 29 Regionen in "Keine Wetterdaten" — bis zum nächsten
+# Pipeline-Lauf. Die Datei ist ~200 MB; ein Lauf darüber dauert entsprechend,
+# ist aber notwendig. (Real passiert am 10.08.2026.)
 
 EXCLUDE_GLOBS = [
     "validation/xcontest/*.md",   # datierte Analysen = Protokoll eines Stands
