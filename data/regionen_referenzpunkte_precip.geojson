@@ -581,7 +581,7 @@
       },
       "properties": {
         "id": "waadtlaender_alpen",
-        "region": "Waadtlaender Alpen",
+        "region": "Waadtländer Alpen",
         "name": "Col du Pillon / Leysin",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -3846,7 +3846,7 @@
       "properties": {
         "id": "emmental",
         "region": "Emmental",
-        "name": "Interlaken / Niederhorn",
+        "name": "Marbachegg / Schallenberg",
         "purpose": "precipitation_only",
         "n_points": 16,
         "reference_points": [

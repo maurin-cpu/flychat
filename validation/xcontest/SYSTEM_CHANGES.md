@@ -161,5 +161,12 @@ Analysen in diesem Ordner tragen dazu oben einen Hinweis.
 - Zuschnitte: "Zentralschweizer Alpen" bleibt ein Topf mit 87 Spots,
   `unterwallis` bleibt zu gross geschnitten.
 - Polygon-Fehlzuordnungen (Scuol liegt im Polygon `oberengadin`).
-- Terrain-Zonen: `zentrale_voralpen` traegt weiter `terrain_type=mittelland`.
-  Das ist ein Physik-Eingriff auf `climb_factor_terrain`, kein Rename.
+- Terrain-Zonen und Referenzhoehen. Nachgemessen 10.08.2026: 12 von 27
+  Regionen mit Spots tragen eine `terrain_type`, die nicht zu ihrer
+  Median-Spothoehe passt, 5 davon um zwei Stufen. Am deutlichsten "Emmental"
+  (4 Spots, Median 1327 m, gesetzt `hochalpin`, elevation_ref 1800) und
+  "Berner Oberland" (70 Spots, Median 1983 m, gesetzt `voralpen`,
+  elevation_ref 1500) — also derselbe Befund wie beim Namen, eine Ebene
+  tiefer: auch diese Attribute wurden zum alten NAMEN gepflegt, nicht zum
+  Inhalt. Das ist ein Physik-Eingriff auf `climb_factor_terrain` und den
+  Refpoint-Pfad, kein Rename. Eigener Plan.

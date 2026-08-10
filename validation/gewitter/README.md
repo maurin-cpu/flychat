@@ -50,8 +50,10 @@ Drei Konsequenzen, alle im Code verankert:
    den Fehler eines zu frühen Laufs nicht festschreiben.
 3. Der Join Prognose ↔ Messung läuft über den **normalisierten** Regionsnamen
    (`validation_common.norm_region`). „Waadtländer Alpen" (Prognose) und
-   „Waadtlaender Alpen" (Polygon-Datei) sind dieselbe Region; über den rohen
+   „Waadtlaender Alpen" (Polygon-Datei) waren dieselbe Region; über den rohen
    Namen fand sie ihre eigene Messung nie und zählte still als ereignislos.
+   Die Polygon-Datei trägt seit 10.08.2026 ebenfalls den Umlaut — der
+   normalisierte Join bleibt für die bereits gespeicherten Messwerte nötig.
 
 ## Grenzen des Richters — beim Lesen immer mitdenken
 

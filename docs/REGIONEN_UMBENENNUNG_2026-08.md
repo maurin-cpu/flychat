@@ -110,10 +110,29 @@ Drei Fallen, die das Skript abfängt:
   `oberengadin`. Falkenflue liegt im Polygon `zentrale_voralpen`, obwohl der
   Spot der Region `emmental` zugeordnet ist. Der Name ist jetzt ehrlich, die
   Geometrie unverändert.
-- **Terrain-Zonen.** `zentrale_voralpen` trägt weiter `terrain_type=mittelland`
-  — für Pilatus und Rigi ohnehin falsch. Das ist ein Physik-Eingriff
-  (`climb_factor_terrain`), kein Kosmetik-Schritt, und gehört in einen eigenen
-  Plan.
+- **Terrain-Zonen und Referenzhöhen.** Nachgemessen am 10.08.2026 gegen die
+  Median-Höhe der Spots je Region: **12 von 27 Regionen mit Spots tragen eine
+  `terrain_type`, die nicht zu ihrem Inhalt passt, 5 davon um zwei Stufen.**
+  Die zwei krassesten sind genau das Paar, um das es beim Rename ging:
+
+  | Region | Spots | Median-Höhe | gesetzt | passend | `elevation_ref` |
+  |---|---|---|---|---|---|
+  | Emmental *(4 Entlebuch-Spots)* | 4 | 1327 m | `hochalpin` | `voralpen` | 1800 |
+  | Berner Oberland *(70 Spots)* | 70 | 1983 m | `voralpen` | `hochalpin` | 1500 |
+
+  Das ist derselbe Befund wie beim Namen, eine Ebene tiefer: **auch
+  `terrain_type` und `elevation_ref` wurden zum alten Namen gepflegt, nicht
+  zum tatsächlichen Inhalt.** Wirkung: `terrain_type` geht über
+  `climb_factor_terrain` (0.95–1.15) und die Mindest-Thermikhöhe direkt in die
+  Steigwert-Prognose ein; `elevation_ref` in den Refpoint-Pfad. Für die grösste
+  Region des Systems bedeutet die falsche Stufe rund 9 % zu tiefe Steigwerte.
+
+  Bewusst **nicht** in dieser Migration geändert: das ist ein Physik-Eingriff
+  und gehört in einen eigenen Plan mit eigener Validierung.
+
+  *Korrektur zum ursprünglichen Plan:* dieser behauptete, `zentrale_voralpen`
+  trage `terrain_type=mittelland`. Das stimmt nicht — dort steht `voralpen`,
+  was zur Median-Höhe von 1220 m passt. Der Befund liegt woanders, siehe oben.
 - **Die Landmarken-Spalte `name` in den GeoJSONs.** Sie ist teils
   offensichtlich verrutscht (`rheintal` → „Santa Maria in Calanca",
   `bodenseeraum` → „Eggberge Altdorf", `zentrales_mittelland` → „Hasliberg

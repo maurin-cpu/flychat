@@ -71,11 +71,15 @@ OGD_PUBLISH_HOUR_UTC = 11
 def norm_region(name: str) -> str:
     """Regionsname auf eine vergleichbare Form bringen.
 
-    Prognose und Polygon-Datei schreiben denselben Namen nicht immer gleich
+    Prognose und Polygon-Datei schrieben denselben Namen nicht immer gleich
     ("Waadtlaender Alpen" vs. "Waadtländer Alpen", 04.08.2026 gefunden). Ein
     Join ueber den rohen Namen verliert die Region dann still — sie zaehlt
     ewig als ereignislos. Umlaute werden gefaltet, Gross-/Kleinschreibung und
     Randleerzeichen ignoriert.
+
+    Die Quelle ist seit 10.08.2026 vereinheitlicht (Polygon-Datei traegt jetzt
+    den Umlaut). Diese Normalisierung bleibt trotzdem noetig: Archivtage und
+    bereits gespeicherte Messwerte tragen die ASCII-Form weiter.
     """
     s = (name or "").strip().lower()
     for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
