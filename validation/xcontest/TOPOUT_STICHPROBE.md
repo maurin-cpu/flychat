@@ -1,5 +1,11 @@
 # Topout-Stichprobe — Region-Thermik P50 vs P75 vs best30%
 
+> **Hinweis (10.08.2026):** Dieses Protokoll nennt die Regionsnamen im Stand
+> **vor** der Umbenennung. Zuordnung alt→neu:
+> `data/region_renames_2026-08.csv` · `docs/REGIONEN_UMBENENNUNG_2026-08.md`.
+> Der Text bleibt bewusst unverändert — Befunde rückwirkend umzuschreiben
+> würde sie fälschen.
+
 ## ERGEBNIS (2026-06-07) — P75 umgesetzt
 
 **16 echte XContest-Topouts** (Max-Hoehe MSL, vom User abgelesen 2026-06-07) vom

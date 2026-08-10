@@ -1,5 +1,11 @@
 # System-Aenderungen waehrend XContest-Validierungs-Periode
 
+> **Hinweis (10.08.2026):** Dieses Protokoll nennt die Regionsnamen im Stand
+> **vor** der Umbenennung. Zuordnung alt→neu:
+> `data/region_renames_2026-08.csv` · `docs/REGIONEN_UMBENENNUNG_2026-08.md`.
+> Der Text bleibt bewusst unverändert — Befunde rückwirkend umzuschreiben
+> würde sie fälschen.
+
 Diese Datei dokumentiert grundsaetzliche Aenderungen am Wingcast-Vorhersage-System,
 die waehrend des laufenden XContest-Validierungs-Workflows passiert sind. Wichtig
 fuer die Interpretation von Validierungs-Ergebnissen ueber die Zeit: ein Drift
@@ -116,3 +122,44 @@ den kleinsten absoluten Fehler; best30 ueberschiesst. Bestaetigt den A/B-Test vo
 
 **Memory-Referenzen:**
 - `region-thermik-perzentil.md` (P50->P75 Empfehlung, jetzt Meter-validiert + umgesetzt)
+
+---
+
+## 2026-08-10 — 19 von 29 Regionen umbenannt (Namen und ids)
+
+**Was sich geaendert hat:**
+Die Regionsnamen beschrieben ihren Inhalt nicht. Umbenannt wurden 19 Regionen,
+Namen *und* technische ids, ueber den gesamten Bestand hinweg: Stammdaten,
+71 Archivtage, der XContest-Korpus (`observations.csv`, `_raw/`,
+`sector_audit.csv`, `spot_aliases.csv`), die Gewitter-Validierung, Prompts,
+Doku und die Abo-Datenbank.
+
+Zuordnung alt->neu: `data/region_renames_2026-08.csv`
+Hintergrund: `docs/REGIONEN_UMBENENNUNG_2026-08.md`
+
+**Was sich NICHT geaendert hat:**
+- Kein einziger Zuschnitt. Keine Spot->Region-Zuordnung, keine Polygongrenze.
+- Keine Zahl. Nachgerechnet: 494 Spots bleiben 494, jede Region behaelt exakt
+  ihre Spots, 29 Regionen bleiben 29.
+- Die Spalte `region` in den Spot-CSVs (grobe DHV-Herkunft) - dort bedeutet
+  "Ostschweiz" etwas anderes und bleibt stehen.
+
+**Warum das fuer die Validierung wichtig ist:**
+Die Namen waren bisher ein **Benennungs-Effekt** in den Auswertungen. Das Paar
+*Berner Oberland 87 % / Freiburger Voralpen 26 %* aus der 49-Tage-Analyse
+verglich nicht die Gebiete, die die Namen suggerierten: "Freiburger Voralpen"
+hielt 70 Spots bis zum Niesen (Adelboden, Kandersteg, Gstaad), "Berner
+Oberland" nur 4 Spots im Entlebuch. Ab jetzt heissen sie, was sie sind.
+
+**Fuer die Zeitreihe heisst das:**
+Kein Sprung in der Treffer-Quote - die Daten sind identisch, nur anders
+beschriftet. Aber jede Auswertung, die Zahlen aus einem Protokoll VOR diesem
+Datum mit Zahlen danach vergleicht, muss die Namen uebersetzen. Die datierten
+Analysen in diesem Ordner tragen dazu oben einen Hinweis.
+
+**Nicht erledigt (bewusst):**
+- Zuschnitte: "Zentralschweizer Alpen" bleibt ein Topf mit 87 Spots,
+  `unterwallis` bleibt zu gross geschnitten.
+- Polygon-Fehlzuordnungen (Scuol liegt im Polygon `oberengadin`).
+- Terrain-Zonen: `zentrale_voralpen` traegt weiter `terrain_type=mittelland`.
+  Das ist ein Physik-Eingriff auf `climb_factor_terrain`, kein Rename.

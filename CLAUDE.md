@@ -4,6 +4,22 @@
 dort liegt nur Abgeschlossenes. Einzige Ausnahme: der User fragt
 ausdrücklich nach einer Datei daraus.
 
+## Regionen wurden am 10.08.2026 umbenannt (19 von 29)
+
+Namen **und** technische ids. Zuordnung alt→neu:
+**`data/region_renames_2026-08.csv`** · Hintergrund:
+`docs/REGIONEN_UMBENENNUNG_2026-08.md`.
+
+Alte Namen stehen bewusst noch in **Chatverläufen** (`data/history/`),
+**Backups** (`*.bak*`, `*.pre_rename`), den **datierten Protokollen**
+(`validation/xcontest/*.md`, `meteo_research/`) — und in der Spalte
+**`region`** der Spot-CSVs, wo „Ostschweiz" die grobe DHV-Herkunft meint,
+nicht unsere Region (die steht in `analyse_region`). Wer dort alte Namen
+findet, hat keinen Migrationsrest gefunden.
+
+Zwei Namen sind zugleich alt und neu — `Freiburger Voralpen` und
+`Berner Oberland`. Die Migration darf deshalb **nie ein zweites Mal** laufen.
+
 ## Daten-Wegweiser: wo hole ich was für Vergleiche/Validierungen?
 
 **Grundregel:** Die Maschinendaten entstehen auf dem **Server** — der lokale
