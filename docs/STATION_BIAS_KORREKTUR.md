@@ -130,7 +130,7 @@ Hang/Tal. Beispiel Uetliberg (1016m) → Balderen (730m):
 | First | +13.2 | Männlichen | +221m |
 
 **Betroffene Regionen** (über Spot-Anker im Altitude-Grid):
-- Mittelland Ost, Jura Zentral, Berner Voralpen, Mittelland Zentral, Zentralschweizer Voralpen
+- Mittelland Ost, Jura Zentral, Berner Alpen, Zentrale Voralpen, Zentralschweizer Alpen
 
 ### Die Lösung (ab April 2026)
 
@@ -206,7 +206,7 @@ Spots haben einen direkten Bias aus eigenen `forecast_pairs`. Regionen haben kei
 7. Auf alle stündlichen `wind_gusts_10m` der Region angewandt; Originalwert bleibt als `wind_gusts_10m_raw`.
 
 **Warum der Höhenfilter ±600 m?**
-Bias-Werte sind ortsspezifisch. Ein Pilatus-Bias auf 2059 m beschreibt die Modellabweichung an einem exponierten Bergspitzen-Pixel und sagt nichts darüber aus, wie ICON-D2 sich auf 1400 m im selben Polygon verhält. Ohne Filter würde z.B. die Region "Mittelland Zentral" (`elev_ref` 1400 m, voralpenähnliche Klassifizierung) durch positive Berggipfel-Biases nach oben verzerrt — genau das Gegenteil dessen, was wir wollen. Mit dem ±600 m Filter bleiben nur Spots, deren Modell­auflösungs­situation der Region ähnelt.
+Bias-Werte sind ortsspezifisch. Ein Pilatus-Bias auf 2059 m beschreibt die Modellabweichung an einem exponierten Bergspitzen-Pixel und sagt nichts darüber aus, wie ICON-D2 sich auf 1400 m im selben Polygon verhält. Ohne Filter würde z.B. die Region "Zentrale Voralpen" (`elev_ref` 1400 m, voralpenähnliche Klassifizierung) durch positive Berggipfel-Biases nach oben verzerrt — genau das Gegenteil dessen, was wir wollen. Mit dem ±600 m Filter bleiben nur Spots, deren Modell­auflösungs­situation der Region ähnelt.
 
 **Aufruf-Reihenfolge** in `chat_engine.refresh_weather()`:
 

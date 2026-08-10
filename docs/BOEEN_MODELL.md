@@ -59,10 +59,10 @@ Die OI korrigiert die Modell-Böen anhand von Beobachtungen (Anker).
 
 #### a) Anker vorbereiten
 
-Ein **Anker** ist ein Punkt, an dem Open-Meteo eine Boden-Böe liefert. Typisch: der Regions-Referenzpunkt (z.B. 1300m MSL für Glarnerland/Walensee).
+Ein **Anker** ist ein Punkt, an dem Open-Meteo eine Boden-Böe liefert. Typisch: der Regions-Referenzpunkt (z.B. 1300m MSL für Glarner Alpen).
 
 **Wichtig — Regions-Boden­wind aus mehreren Referenzpunkten:**
-Eine Region hat 4 Referenzpunkte (RPs) im GeoJSON. Früher wurde der Anker aus dem **ersten** RP genommen, was bei heterogenen Regionen wie "Mittelland Zentral" zu Verzerrungen führte: lag RP 1 zufällig in einem alpinen Modellpixel (z.B. Eriz auf 1662m), bestimmte dieser eine Punkt den gesamten Regions-Anker, obwohl die anderen 3 RPs im flachen Mittelland (~500m) lagen.
+Eine Region hat 4 Referenzpunkte (RPs) im GeoJSON. Früher wurde der Anker aus dem **ersten** RP genommen, was bei heterogenen Regionen wie "Zentrale Voralpen" zu Verzerrungen führte: lag RP 1 zufällig in einem alpinen Modellpixel (z.B. Eriz auf 1662m), bestimmte dieser eine Punkt den gesamten Regions-Anker, obwohl die anderen 3 RPs im flachen Mittelland (~500m) lagen.
 
 Heute wird `wind_speed_10m` als **Median über alle 4 RPs** gebildet und `wind_direction_10m` vektoriell gemittelt (zirkulär korrekt). `wind_gusts_10m` wird auf Region-Ebene **NICHT** aggregiert (Apr 2026) — Böen sind lokale Spitzenwerte und gehören auf Spot-Ebene. Implementiert in `_aggregate_wind_across_points()` in `fetch_weather.py`. Der Median ist robust gegen einen einzelnen Ausreisser-RP. Erst danach läuft die OI/Gauss-Kernel-Pipeline. Für Spots gilt das nicht — Spots nutzen ihren eigenen Punkt direkt.
 
@@ -172,7 +172,7 @@ T(z) folgt jetzt reiner Gauss-Decay aus dem Anker. Oberhalb PBL → T(z) → W(z
 
 ---
 
-## Beispiel: Glarnerland/Walensee, 10:00
+## Beispiel: Glarner Alpen, 10:00
 
 Anker: 1300m MSL, Böe 36.7 km/h, freier Wind 10.4 km/h → Exzess 26.3 km/h
 

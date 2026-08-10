@@ -129,7 +129,7 @@ ENSEMBLE_MODEL = "meteoswiss_icon_ch2"
 # scripts/calibrate_ensemble_threshold.py). Der Weg ist vorwaerts sammeln:
 # snapshot_weather.py archiviert thunder_ensemble taeglich.
 #
-# MENTION 20 -> 15 am 31.07.2026: Fallbeispiel Zentralschweizer Voralpen,
+# MENTION 20 -> 15 am 31.07.2026: Fallbeispiel Zentralschweizer Alpen,
 # Sa 01.08. — 19 % der Member, deterministisch 17.1 mm/h bei CAPE 380 ohne
 # Gewitter-Code. Bei 20 % fiel der Tag komplett durch. Kosten der Senkung im
 # damaligen 5-Tage-Fenster: 88 statt 82 von 145 Region-Tagen (+6). 15 ist
@@ -195,7 +195,7 @@ ENSEMBLE_THUNDER_POINT_QUORUM = 2
 # derselben Stunde stammen aus dem deterministischen Lauf und wurden nie
 # gegengelesen — die beiden mussten sich nie einig sein und waren es meist
 # nicht: von 217 Blitzstunden am 02.08. hatten 85 % keinen Niederschlag,
-# 53 % unter 50 % Bewoelkung, 50 % beides zugleich (Tessin Zentral 04.08.
+# 53 % unter 50 % Bewoelkung, 50 % beides zugleich (Locarnese / Bellinzonese 04.08.
 # 14:00 zeigte einen Blitz bei 2 % Bewoelkung).
 #
 # Ein Ensemble-Blitz erscheint nur noch, wenn der deterministische Lauf in
@@ -216,10 +216,10 @@ ENSEMBLE_THUNDER_POINT_QUORUM = 2
 # Die Wolken-Alternative filterte praktisch nichts — im Sommer hat fast jede
 # Region irgendwo >= 50 % Bewoelkung (Maximum ueber 7 Referenzpunkte). Die
 # Regen-Pflicht kostet ueber die ganze Saison genau EINEN Gewittertag
-# (Tessin Nord 16.07., det. Lauf voellig trocken, Gewitter erst 17 Uhr) und
+# (Leventina / Blenio 16.07., det. Lauf voellig trocken, Gewitter erst 17 Uhr) und
 # drittelt das Fehlalarm-Potenzial. Am Lauf vom 02.08.: 33 -> 15 Blitz-
 # stunden, darunter fallen genau die am Testtag GEMESSEN widerlegten
-# Fehlalarme (Alpstein 99 % Sonne, Mittelland Zentral 94 %).
+# Fehlalarme (Alpstein 99 % Sonne, Zentrale Voralpen 94 %).
 # Der Fall "Modelle sehen Gewitter, aber kein Regen" bleibt im TEXT
 # erwaehnt (MENTION-Schwelle) und wandert spaeter in die weiche
 # Ueberentwicklungs-Stufe. THUNDER_ANCHOR_CLOUD_PCT damit entfernt.
@@ -941,12 +941,12 @@ THERMAL_PARAMS = {
         "hochalpin": 150,
     },
 
-    # --- Rock-Face Bonus bei Schneedecke (Zentralwallis-Fix) ---
+    # --- Rock-Face Bonus bei Schneedecke (Lötschental-Fix) ---
     # Im (hoch-)alpinen Gelaende sind suedexponierte Felswaende im Fruehling
     # trotz Schneedecke schneefrei und erreichen Oberflaechentemperaturen von
     # 20-30 Grad C, waehrend T2m durch den Schnee auf ~0 Grad C gepinnt wird.
     # Dies erzeugt eine starke bodennahe Inversion, die den regionalen
-    # Paketaufstieg sabotiert (Zentralwallis-Problem: max_h bleibt an elev_ref
+    # Paketaufstieg sabotiert (Lötschental-Problem: max_h bleibt an elev_ref
     # kleben, obwohl 800 W/m^2 Einstrahlung vorhanden sind).
     #
     # Die beiden Parameter erlauben die solare Ueberhitzung auch unter Schnee,

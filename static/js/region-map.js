@@ -496,7 +496,7 @@
                 var zoom = map.getZoom();
                 if (zoom >= 7) {
                     // Polygon-Centroid statt bbox-Center: bei irregulaeren Shapes
-                    // (Surselva, Mittelland Zentral) liegt der bbox-Center oft am
+                    // (Surselva, Zentrale Voralpen) liegt der bbox-Center oft am
                     // Rand oder ausserhalb des Polygons.
                     var ndCenter;
                     try { ndCenter = layer.getCenter(); }
@@ -586,7 +586,7 @@
 
             // Center-Label — Pille mit Rating-Zahl 1-10 (RATING_CONCEPT v1.4 §4.3).
             // Polygon-Centroid (layer.getCenter) statt bbox-Center: bei irregulaeren
-            // Shapes (Surselva, Mittelland Zentral) faellt der bbox-Mittelpunkt
+            // Shapes (Surselva, Zentrale Voralpen) faellt der bbox-Mittelpunkt
             // sonst an den Rand oder ausserhalb des Polygons.
             var center;
             try { center = layer.getCenter(); }

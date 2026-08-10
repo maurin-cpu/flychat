@@ -2,7 +2,7 @@
 
 > ⚠️ **Koordinaten sind ein Snapshot und teilweise veraltet.** Die **Source of Truth** ist
 > `data/regionen_referenzpunkte.geojson` (`properties.reference_points` je Region). Die unten
-> gelisteten Koordinaten weichen davon ab — Stichprobe `seeland_emmental`: 5 von 7 Punkten
+> gelisteten Koordinaten weichen davon ab — Stichprobe `seeland`: 5 von 7 Punkten
 > verschoben (Punkt 2 um ~7 km). Das frühere Generator-Skript `scripts/_write_refpoint_liste.py`
 > **existiert nicht mehr**, daher wird diese Liste derzeit nicht automatisch nachgezogen. Für
 > exakte Werte die GeoJSON lesen; die Tabellen unten dienen nur der groben Orientierung.
@@ -39,35 +39,35 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 
 | # | Region | Terrain | Föhn | S-Anker |
 |---|---|---|---|---|
-| 1 | [seeland_emmental](#1-seeland_emmental) | mittelland | Süd | ✓ |
-| 2 | [mittelland_west](#2-mittelland_west) | mittelland | Süd | auto |
+| 1 | [seeland](#1-seeland) | mittelland | Süd | ✓ |
+| 2 | [plateau](#2-plateau) | mittelland | Süd | auto |
 | 3 | [mittelland_ost](#3-mittelland_ost) | mittelland | Süd | auto |
 | 4 | [genferseeregion](#4-genferseeregion) | mittelland | Süd | ✓ |
-| 5 | [jura_ost](#5-jura_ost) | jura | Süd | auto |
-| 6 | [jura_west](#6-jura_west) | jura | Süd | ✓ |
+| 5 | [tafeljura](#5-tafeljura) | jura | Süd | auto |
+| 6 | [neuenburger_jura](#6-neuenburger_jura) | jura | Süd | ✓ |
 | 7 | [jura_zentral](#7-jura_zentral) | jura | Süd | ✓ |
-| 8 | [mittelland_zentral](#8-mittelland_zentral) | voralpen | Süd | ✓ |
-| 9 | [glarnerland_walensee](#9-glarnerland_walensee) | alpen | Süd | ✓ |
-| 10 | [schwarzsee_gantrisch](#10-schwarzsee_gantrisch) | voralpen | Süd | ✓ |
+| 8 | [zentrale_voralpen](#8-zentrale_voralpen) | voralpen | Süd | ✓ |
+| 9 | [glarner_alpen](#9-glarner_alpen) | alpen | Süd | ✓ |
+| 10 | [freiburger_voralpen](#10-freiburger_voralpen) | voralpen | Süd | ✓ |
 | 11 | [rheintal](#11-rheintal) | voralpen | Süd | auto |
 | 12 | [bodenseeraum](#12-bodenseeraum) | mittelland | Süd | ✓ |
 | 13 | [waadtlaender_alpen](#13-waadtlaender_alpen) | alpen | Süd | ✓ |
 | 14 | [alpstein](#14-alpstein) | alpen | Süd | ✓ |
-| 15 | [tessin_zentral](#15-tessin_zentral) | alpen | Nord | ✓ |
+| 15 | [locarnese_bellinzonese](#15-locarnese_bellinzonese) | alpen | Nord | ✓ |
 | 16 | [praettigau_davos](#16-praettigau_davos) | alpen | Beide | ✓ |
-| 17 | [berner_oberland](#17-berner_oberland) | hochalpin | Süd | auto |
-| 18 | [zentralschweizer_voralpen](#18-zentralschweizer_voralpen) | alpen | Süd | ✓ |
-| 19 | [berner_voralpen](#19-berner_voralpen) | alpen | Beide | ✓ |
-| 20 | [freiburger_voralpen](#20-freiburger_voralpen) | voralpen | Süd | ✓ |
-| 21 | [mattertal_saastal](#21-mattertal_saastal) | hochalpin | Beide | ✓ |
-| 22 | [tessin_nord](#22-tessin_nord) | hochalpin | Nord | ✓ |
-| 23 | [zentralwallis](#23-zentralwallis) | hochalpin | Beide | ✓ |
-| 24 | [engadin_unter](#24-engadin_unter) | hochalpin | Beide | ✓ |
+| 17 | [emmental](#17-emmental) | hochalpin | Süd | auto |
+| 18 | [zentralschweizer_alpen](#18-zentralschweizer_alpen) | alpen | Süd | ✓ |
+| 19 | [berner_alpen](#19-berner_alpen) | alpen | Beide | ✓ |
+| 20 | [berner_oberland](#20-berner_oberland) | voralpen | Süd | ✓ |
+| 21 | [walliser_hochalpen](#21-walliser_hochalpen) | hochalpin | Beide | ✓ |
+| 22 | [leventina_blenio](#22-leventina_blenio) | hochalpin | Nord | ✓ |
+| 23 | [loetschental](#23-loetschental) | hochalpin | Beide | ✓ |
+| 24 | [mittelbuenden](#24-mittelbuenden) | hochalpin | Beide | ✓ |
 | 25 | [unterwallis](#25-unterwallis) | hochalpin | Beide | ✓ |
 | 26 | [oberwallis_goms](#26-oberwallis_goms) | hochalpin | Beide | ✓ |
 | 27 | [surselva](#27-surselva) | hochalpin | Beide | ✓ |
 | 28 | [zentrales_mittelland](#28-zentrales_mittelland) | mittelland | Süd | auto |
-| 29 | [engadin_ober](#29-engadin_ober) | hochalpin | Beide | ✓ |
+| 29 | [oberengadin](#29-oberengadin) | hochalpin | Beide | ✓ |
 
 > `S-Anker ✓` = validierter Pflicht-S-Anker eingesetzt (liegt innerhalb Polygon).
 > `S-Anker auto` = validierter S-Anker liegt AUSSERHALB Polygon, südlichster auto-gen
@@ -75,8 +75,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 
 ---
 
-## 1. seeland_emmental
-**Region**: Seeland / Emmental · **Terrain**: mittelland · **Ref-Höhe**: 600 m · **Föhn**: Süd
+## 1. seeland
+**Region**: Seeland · **Terrain**: mittelland · **Ref-Höhe**: 600 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -88,8 +88,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Innen-Sample | 47.0698, 7.4138 | Polygon-Innern, kein Spot < 8 km (nächster: Décollage Ost, 15 km SO) |
 | 7 | Edge-W | 47.1400, 7.5651 | westliche Polygon-Kante, kein Spot < 8 km (nächster: Weissenstein, 13 km SSO) |
 
-## 2. mittelland_west
-**Region**: Mittelland West · **Terrain**: mittelland · **Ref-Höhe**: 700 m · **Föhn**: Süd
+## 2. plateau
+**Region**: Plateau · **Terrain**: mittelland · **Ref-Höhe**: 700 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -127,8 +127,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Edge-W | 46.2553, 6.1458 | westliche Polygon-Kante, kein Spot < 8 km (nächster: La Barilette, 19 km S) |
 | 7 | Edge-W | 46.3775, 6.3291 | westliche Polygon-Kante, kein Spot < 8 km (nächster: St. Cergue, 14 km OSO) |
 
-## 5. jura_ost
-**Region**: Jura Ost · **Terrain**: jura · **Ref-Höhe**: 900 m · **Föhn**: Süd
+## 5. tafeljura
+**Region**: Tafeljura · **Terrain**: jura · **Ref-Höhe**: 900 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -140,8 +140,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Edge-W | 47.4137, 7.1224 | westliche Polygon-Kante, kein Spot < 8 km (nächster: Boecourt, 8 km NW) |
 | 7 | Edge-O | 47.4126, 7.4939 | östliche Polygon-Kante, kein Spot < 8 km (nächster: Hohwacht, 14 km WNW) |
 
-## 6. jura_west
-**Region**: Jura West · **Terrain**: jura · **Ref-Höhe**: 1200 m · **Föhn**: Süd
+## 6. neuenburger_jura
+**Region**: Neuenburger Jura · **Terrain**: jura · **Ref-Höhe**: 1200 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -166,8 +166,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Innen-Sample | 47.2548, 7.2714 | 4.7 km NW von Montagne de Sorvillier (Montagne de Sorvillier) |
 | 7 | Edge-O | 47.2906, 7.4228 | nahe **Mont Raimeux Süd** (Mont Raimeux Süd, 1232 m, 1.0 km S) |
 
-## 8. mittelland_zentral
-**Region**: Mittelland Zentral · **Terrain**: voralpen · **Ref-Höhe**: 1400 m · **Föhn**: Süd
+## 8. zentrale_voralpen
+**Region**: Zentrale Voralpen · **Terrain**: voralpen · **Ref-Höhe**: 1400 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -179,8 +179,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Edge-W | 46.9787, 8.0242 | 5.1 km NNW von Farneren 1 (Farneren) |
 | 7 | Edge-O | 47.0831, 8.5370 | 3.1 km W von Wildspitz (Wildspitz) |
 
-## 9. glarnerland_walensee
-**Region**: Glarnerland / Walensee · **Terrain**: alpen · **Ref-Höhe**: 1300 m · **Föhn**: Süd
+## 9. glarner_alpen
+**Region**: Glarner Alpen · **Terrain**: alpen · **Ref-Höhe**: 1300 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -192,8 +192,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Innen-Sample | 46.9734, 9.0225 | nahe **Bodenberg** (Bodenberg, 1226 m, 0.1 km W) |
 | 7 | Innen-Sample | 47.0193, 9.1440 | 6.2 km NNW von Wissenberg (Wissenberg) |
 
-## 10. schwarzsee_gantrisch
-**Region**: Schwarzsee / Gantrisch · **Terrain**: voralpen · **Ref-Höhe**: 1500 m · **Föhn**: Süd
+## 10. freiburger_voralpen
+**Region**: Freiburger Voralpen · **Terrain**: voralpen · **Ref-Höhe**: 1500 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -206,7 +206,7 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 7 | Innen-Sample | 46.7523, 7.3034 | 3.1 km NW von Phyffe (Phyffe) |
 
 ## 11. rheintal
-**Region**: Ostschweiz · **Terrain**: voralpen · **Ref-Höhe**: 1500 m · **Föhn**: Süd
+**Region**: Rheintal · **Terrain**: voralpen · **Ref-Höhe**: 1500 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -245,7 +245,7 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 7 | Innen-Sample | 46.2714, 7.0358 | 2.8 km NNW von Les Vernays (Les Verneys) |
 
 ## 14. alpstein
-**Region**: Alpstein / Ostschweiz · **Terrain**: alpen · **Ref-Höhe**: 1640 m · **Föhn**: Süd
+**Region**: Alpstein / Toggenburg · **Terrain**: alpen · **Ref-Höhe**: 1640 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -257,8 +257,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Edge-W | 47.3566, 8.9854 | 6.6 km NNO von Alp Scheidegg (Alp Scheidegg) |
 | 7 | Innen-Sample | 47.2791, 9.1616 | 7.6 km SW von Hochhamm (Hochhamm) |
 
-## 15. tessin_zentral
-**Region**: Tessin Zentral · **Terrain**: alpen · **Ref-Höhe**: 1650 m · **Föhn**: Nord
+## 15. locarnese_bellinzonese
+**Region**: Locarnese / Bellinzonese · **Terrain**: alpen · **Ref-Höhe**: 1650 m · **Föhn**: Nord
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -283,8 +283,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Innen-Sample | 46.9369, 9.7371 | 3.0 km SSO von Stelserberg (Stelserberg) |
 | 7 | Innen-Sample | 46.8501, 9.7405 | 4.3 km WNW von Parsenn 2 (Parsenn) |
 
-## 17. berner_oberland
-**Region**: Berner Oberland · **Terrain**: hochalpin · **Ref-Höhe**: 1800 m · **Föhn**: Süd
+## 17. emmental
+**Region**: Emmental · **Terrain**: hochalpin · **Ref-Höhe**: 1800 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -296,8 +296,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Innen-Sample | 46.8664, 7.5923 | 5.8 km NW von Falkenflue (Falkenflue) |
 | 7 | Innen-Sample | 46.9512, 7.7630 | Polygon-Innern, kein Spot < 8 km (nächster: Marbachegg 1, 17 km NW) |
 
-## 18. zentralschweizer_voralpen
-**Region**: Zentralschweizer Voralpen · **Terrain**: alpen · **Ref-Höhe**: 1860 m · **Föhn**: Süd
+## 18. zentralschweizer_alpen
+**Region**: Zentralschweizer Alpen · **Terrain**: alpen · **Ref-Höhe**: 1860 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -309,8 +309,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Edge-W | 46.8774, 8.2900 | nahe **Linderenalp** (Linderenalp, 1541 m, 0.9 km NW) |
 | 7 | Innen-Sample | 46.8870, 8.7004 | 2.2 km W von Ratzi (Ratzi) |
 
-## 19. berner_voralpen
-**Region**: Berner Voralpen · **Terrain**: alpen · **Ref-Höhe**: 1800 m · **Föhn**: Beide
+## 19. berner_alpen
+**Region**: Berner Alpen · **Terrain**: alpen · **Ref-Höhe**: 1800 m · **Föhn**: Beide
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -322,8 +322,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Innen-Sample | 46.6612, 7.9127 | nahe **Schynige Platte 1** (Schynige Platte, 1750 m, 0.8 km ONO) |
 | 7 | Innen-Sample | 46.6561, 8.2494 | Polygon-Innern, kein Spot < 8 km (nächster: Planplatten 1, 9 km S) |
 
-## 20. freiburger_voralpen
-**Region**: Freiburger Voralpen · **Terrain**: voralpen · **Ref-Höhe**: 1500 m · **Föhn**: Süd
+## 20. berner_oberland
+**Region**: Berner Oberland · **Terrain**: voralpen · **Ref-Höhe**: 1500 m · **Föhn**: Süd
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -335,8 +335,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Edge-W | 46.4793, 7.2293 | 2.8 km NO von La Videmanette 1 (Videmanette) |
 | 7 | Innen-Sample | 46.5469, 7.4214 | 2.0 km SO von Danielsweid (Danielsweid) |
 
-## 21. mattertal_saastal
-**Region**: Mattertal / Saastal · **Terrain**: hochalpin · **Ref-Höhe**: 2000 m · **Föhn**: Beide
+## 21. walliser_hochalpen
+**Region**: Walliser Hochalpen · **Terrain**: hochalpin · **Ref-Höhe**: 2000 m · **Föhn**: Beide
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -348,8 +348,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Edge-W | 46.0191, 7.4178 | westliche Polygon-Kante, kein Spot < 8 km (nächster: Evolene, 14 km SSW) |
 | 7 | Innen-Sample | 46.0705, 7.6750 | Polygon-Innern, kein Spot < 8 km (nächster: Schwarzsee, 9 km NNW) |
 
-## 22. tessin_nord
-**Region**: Tessin Nord · **Terrain**: hochalpin · **Ref-Höhe**: 2000 m · **Föhn**: Nord
+## 22. leventina_blenio
+**Region**: Leventina / Blenio · **Terrain**: hochalpin · **Ref-Höhe**: 2000 m · **Föhn**: Nord
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -361,8 +361,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Innen-Sample | 46.4249, 8.5907 | Polygon-Innern, kein Spot < 8 km (nächster: Cari 1, 19 km WSW) |
 | 7 | Edge-N (Schatten) | 46.4792, 8.7577 | 5.3 km WSW von Cari 1 (Cari) |
 
-## 23. zentralwallis
-**Region**: Zentralwallis · **Terrain**: hochalpin · **Ref-Höhe**: 2100 m · **Föhn**: Beide
+## 23. loetschental
+**Region**: Lötschental · **Terrain**: hochalpin · **Ref-Höhe**: 2100 m · **Föhn**: Beide
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -374,8 +374,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Edge-W | 46.4291, 7.8314 | 5.1 km ONO von Laucheralp (Laucheralp) |
 | 7 | Edge-O | 46.4610, 7.9627 | östliche Polygon-Kante, kein Spot < 8 km (nächster: Laucheralp, 16 km ONO) |
 
-## 24. engadin_unter
-**Region**: Engadin Unter · **Terrain**: hochalpin · **Ref-Höhe**: 2100 m · **Föhn**: Beide
+## 24. mittelbuenden
+**Region**: Mittelbünden · **Terrain**: hochalpin · **Ref-Höhe**: 2100 m · **Föhn**: Beide
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -439,8 +439,8 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 | 6 | Innen-Sample | 47.3340, 8.2849 | Polygon-Innern, kein Spot < 8 km (nächster: Herlisberg, 16 km NNO) |
 | 7 | Innen-Sample | 47.4973, 8.2764 | Polygon-Innern, kein Spot < 8 km (nächster: Herlisberg, 33 km N) |
 
-## 29. engadin_ober
-**Region**: Engadin Ober · **Terrain**: hochalpin · **Ref-Höhe**: 2450 m · **Föhn**: Beide
+## 29. oberengadin
+**Region**: Oberengadin · **Terrain**: hochalpin · **Ref-Höhe**: 2450 m · **Föhn**: Beide
 
 | # | Funktion | Lat, Lon | Begründung |
 |---|---|---|---|
@@ -462,11 +462,11 @@ den S-Anker ersetzt, sofern dieser innerhalb des Polygons liegt.
 - **S-Anker-Status**: 23 von 29 Regionen haben den validierten S-Anker einsetzbar
   (liegt im Polygon). 6 Regionen haben den S-Anker ausserhalb — dort wird als
   Fallback der südlichste auto-gen Punkt als Flughöhe-S markiert. Das sind:
-  - `mittelland_west` — Empfehlung 'Belpberg-S' liegt 7.5 km ausserhalb
+  - `plateau` — Empfehlung 'Belpberg-S' liegt 7.5 km ausserhalb
   - `mittelland_ost` — Empfehlung 'Albishorn-S' liegt 1.6 km ausserhalb
-  - `jura_ost` — Empfehlung 'Wasserflue-S' liegt 4.4 km ausserhalb
+  - `tafeljura` — Empfehlung 'Wasserflue-S' liegt 4.4 km ausserhalb
   - `rheintal` — Empfehlung 'Säntis SW-Flanke' liegt 3.1 km ausserhalb
-  - `berner_oberland` — Empfehlung 'Männlichen-S-Flanke' liegt 15.7 km ausserhalb
+  - `emmental` — Empfehlung 'Männlichen-S-Flanke' liegt 15.7 km ausserhalb
   - `zentrales_mittelland` — Empfehlung 'Bantiger-S' liegt 52.5 km ausserhalb
 
   Für diese Regionen müsste entweder das Polygon erweitert oder ein neuer S-Anker
@@ -486,7 +486,7 @@ letzter Generierung:
 | Mindestens 1 Flughöhe-S-Punkt im Set | **29/29 ✓** (6 davon auto-Fallback, siehe oben) |
 | Föhn-Lee-Anker für Regionen mit `kritischer_foehn` ≠ leer | **29/29 ✓** |
 | Keine Duplikat-Positionen | **29/29 ✓** |
-| Mindestens 1 Spot < 5 km von irgendeinem Punkt (Flugschul-Anker) | **28/29** — `mittelland_west` hat keinen Spot < 9.4 km (Region ohne Startplätze in `fluggebiete_complete.csv`) |
+| Mindestens 1 Spot < 5 km von irgendeinem Punkt (Flugschul-Anker) | **28/29** — `plateau` hat keinen Spot < 9.4 km (Region ohne Startplätze in `fluggebiete_complete.csv`) |
 
 **Nicht prüfbar ohne DEM/Aspekt-Daten** (4 weitere Kriterien aus dem KONZEPT):
 
@@ -514,7 +514,7 @@ bzw. eine Reverse-Geocoding-API prüfbar. Aktuell nicht implementiert.
 Pro Region 7 Zeilen `lat, lon` — direkt in Admin-UI `/admin/reference-points`
 Bulk-Paste-Textarea einfügbar.
 
-### seeland_emmental
+### seeland
 ```
 47.3556, 7.9168
 46.9700, 7.4900
@@ -525,7 +525,7 @@ Bulk-Paste-Textarea einfügbar.
 47.1400, 7.5651
 ```
 
-### mittelland_west
+### plateau
 ```
 46.9008, 7.3792
 46.6785, 6.5352
@@ -558,7 +558,7 @@ Bulk-Paste-Textarea einfügbar.
 46.3775, 6.3291
 ```
 
-### jura_ost
+### tafeljura
 ```
 47.4661, 7.9678
 47.3066, 6.9828
@@ -569,7 +569,7 @@ Bulk-Paste-Textarea einfügbar.
 47.4126, 7.4939
 ```
 
-### jura_west
+### neuenburger_jura
 ```
 47.1112, 7.0433
 46.8960, 6.2186
@@ -591,7 +591,7 @@ Bulk-Paste-Textarea einfügbar.
 47.2906, 7.4228
 ```
 
-### mittelland_zentral
+### zentrale_voralpen
 ```
 47.0480, 8.4600
 47.1582, 8.8999
@@ -602,7 +602,7 @@ Bulk-Paste-Textarea einfügbar.
 47.0831, 8.5370
 ```
 
-### glarnerland_walensee
+### glarner_alpen
 ```
 47.1000, 9.3000
 47.0939, 9.3912
@@ -613,7 +613,7 @@ Bulk-Paste-Textarea einfügbar.
 47.0193, 9.1440
 ```
 
-### schwarzsee_gantrisch
+### freiburger_voralpen
 ```
 46.8730, 7.4068
 46.6770, 7.2610
@@ -668,7 +668,7 @@ Bulk-Paste-Textarea einfügbar.
 47.2791, 9.1616
 ```
 
-### tessin_zentral
+### locarnese_bellinzonese
 ```
 46.1683, 8.4782
 46.4633, 9.2423
@@ -690,7 +690,7 @@ Bulk-Paste-Textarea einfügbar.
 46.8501, 9.7405
 ```
 
-### berner_oberland
+### emmental
 ```
 47.0777, 7.9379
 46.7734, 7.4727
@@ -701,7 +701,7 @@ Bulk-Paste-Textarea einfügbar.
 46.9512, 7.7630
 ```
 
-### zentralschweizer_voralpen
+### zentralschweizer_alpen
 ```
 46.8299, 7.9749
 47.0290, 8.8844
@@ -712,7 +712,7 @@ Bulk-Paste-Textarea einfügbar.
 46.8870, 8.7004
 ```
 
-### berner_voralpen
+### berner_alpen
 ```
 46.7602, 8.4048
 46.6302, 7.7952
@@ -723,7 +723,7 @@ Bulk-Paste-Textarea einfügbar.
 46.6561, 8.2494
 ```
 
-### freiburger_voralpen
+### berner_oberland
 ```
 46.4157, 7.0307
 46.6045, 7.7930
@@ -734,7 +734,7 @@ Bulk-Paste-Textarea einfügbar.
 46.5469, 7.4214
 ```
 
-### mattertal_saastal
+### walliser_hochalpen
 ```
 46.1510, 7.5860
 46.1745, 7.9890
@@ -745,7 +745,7 @@ Bulk-Paste-Textarea einfügbar.
 46.0705, 7.6750
 ```
 
-### tessin_nord
+### leventina_blenio
 ```
 46.5090, 8.8180
 46.4444, 9.1221
@@ -756,7 +756,7 @@ Bulk-Paste-Textarea einfügbar.
 46.4792, 8.7577
 ```
 
-### zentralwallis
+### loetschental
 ```
 46.4110, 7.7710
 46.5269, 8.1762
@@ -767,7 +767,7 @@ Bulk-Paste-Textarea einfügbar.
 46.4610, 7.9627
 ```
 
-### engadin_unter
+### mittelbuenden
 ```
 46.4977, 9.0761
 46.6642, 9.8250
@@ -822,7 +822,7 @@ Bulk-Paste-Textarea einfügbar.
 47.4973, 8.2764
 ```
 
-### engadin_ober
+### oberengadin
 ```
 46.5011, 9.7124
 46.6308, 10.2544
@@ -839,7 +839,7 @@ Bulk-Paste-Textarea einfügbar.
 
 ```python
 MANUAL_REFERENCE_POINTS = {
-    "seeland_emmental": [
+    "seeland": [
         [47.3556, 7.9168],   # Edge-O
         [46.9700, 7.4900],   # Flughöhe-S
         [47.2340, 7.5910],   # Edge-N (Schatten)
@@ -848,7 +848,7 @@ MANUAL_REFERENCE_POINTS = {
         [47.0698, 7.4138],   # Innen-Sample
         [47.1400, 7.5651],   # Edge-W
     ],
-    "mittelland_west": [
+    "plateau": [
         [46.9008, 7.3792],   # Edge-O
         [46.6785, 6.5352],   # Edge-W
         [46.9749, 6.8969],   # Edge-N (Schatten)
@@ -875,7 +875,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.2553, 6.1458],   # Edge-W
         [46.3775, 6.3291],   # Edge-W
     ],
-    "jura_ost": [
+    "tafeljura": [
         [47.4661, 7.9678],   # Edge-O
         [47.3066, 6.9828],   # Flughöhe-S (auto)
         [47.4661, 7.4049],   # Edge-W
@@ -884,7 +884,7 @@ MANUAL_REFERENCE_POINTS = {
         [47.4137, 7.1224],   # Edge-W
         [47.4126, 7.4939],   # Edge-O
     ],
-    "jura_west": [
+    "neuenburger_jura": [
         [47.1112, 7.0433],   # Edge-O
         [46.8960, 6.2186],   # Edge-W
         [47.1112, 6.5720],   # Edge-N (Schatten)
@@ -902,7 +902,7 @@ MANUAL_REFERENCE_POINTS = {
         [47.2548, 7.2714],   # Innen-Sample
         [47.2906, 7.4228],   # Edge-O
     ],
-    "mittelland_zentral": [
+    "zentrale_voralpen": [
         [47.0480, 8.4600],   # Flughöhe-S
         [47.1582, 8.8999],   # Edge-O
         [47.0694, 8.3694],   # Edge-W
@@ -911,7 +911,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.9787, 8.0242],   # Edge-W
         [47.0831, 8.5370],   # Edge-O
     ],
-    "glarnerland_walensee": [
+    "glarner_alpen": [
         [47.1000, 9.3000],   # Flughöhe-S
         [47.0939, 9.3912],   # Edge-O
         [47.0939, 9.0361],   # Edge-W
@@ -920,7 +920,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.9734, 9.0225],   # Innen-Sample
         [47.0193, 9.1440],   # Innen-Sample
     ],
-    "schwarzsee_gantrisch": [
+    "freiburger_voralpen": [
         [46.8730, 7.4068],   # Edge-O
         [46.6770, 7.2610],   # Flughöhe-S
         [46.6067, 7.1825],   # Edge-S
@@ -965,7 +965,7 @@ MANUAL_REFERENCE_POINTS = {
         [47.3566, 8.9854],   # Edge-W
         [47.2791, 9.1616],   # Innen-Sample
     ],
-    "tessin_zentral": [
+    "locarnese_bellinzonese": [
         [46.1683, 8.4782],   # Edge-W
         [46.4633, 9.2423],   # Edge-O
         [46.2000, 8.7880],   # Flughöhe-S
@@ -983,7 +983,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.9369, 9.7371],   # Innen-Sample
         [46.8501, 9.7405],   # Innen-Sample
     ],
-    "berner_oberland": [
+    "emmental": [
         [47.0777, 7.9379],   # Edge-O
         [46.7734, 7.4727],   # Flughöhe-S (auto)
         [46.7734, 7.8050],   # Edge-S
@@ -992,7 +992,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.8664, 7.5923],   # Innen-Sample
         [46.9512, 7.7630],   # Innen-Sample
     ],
-    "zentralschweizer_voralpen": [
+    "zentralschweizer_alpen": [
         [46.8299, 7.9749],   # Edge-W
         [47.0290, 8.8844],   # Edge-O
         [46.9650, 8.6400],   # Flughöhe-S
@@ -1001,7 +1001,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.8774, 8.2900],   # Edge-W
         [46.8870, 8.7004],   # Innen-Sample
     ],
-    "berner_voralpen": [
+    "berner_alpen": [
         [46.7602, 8.4048],   # Edge-O
         [46.6302, 7.7952],   # Edge-W
         [46.7110, 7.7780],   # Flughöhe-S
@@ -1010,7 +1010,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.6612, 7.9127],   # Innen-Sample
         [46.6561, 8.2494],   # Innen-Sample
     ],
-    "freiburger_voralpen": [
+    "berner_oberland": [
         [46.4157, 7.0307],   # Edge-W
         [46.6045, 7.7930],   # Edge-O
         [46.6517, 7.3574],   # Edge-N (Schatten)
@@ -1019,7 +1019,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.4793, 7.2293],   # Edge-W
         [46.5469, 7.4214],   # Innen-Sample
     ],
-    "mattertal_saastal": [
+    "walliser_hochalpen": [
         [46.1510, 7.5860],   # Flughöhe-S
         [46.1745, 7.9890],   # Edge-O
         [45.9606, 7.6806],   # Edge-S
@@ -1028,7 +1028,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.0191, 7.4178],   # Edge-W
         [46.0705, 7.6750],   # Innen-Sample
     ],
-    "tessin_nord": [
+    "leventina_blenio": [
         [46.5090, 8.8180],   # Flughöhe-S
         [46.4444, 9.1221],   # Edge-O
         [46.5333, 8.7283],   # Edge-N (Schatten)
@@ -1037,7 +1037,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.4249, 8.5907],   # Innen-Sample
         [46.4792, 8.7577],   # Edge-N (Schatten)
     ],
-    "zentralwallis": [
+    "loetschental": [
         [46.4110, 7.7710],   # Flughöhe-S
         [46.5269, 8.1762],   # Edge-O
         [46.4106, 7.9793],   # Edge-S
@@ -1046,7 +1046,7 @@ MANUAL_REFERENCE_POINTS = {
         [46.4291, 7.8314],   # Edge-W
         [46.4610, 7.9627],   # Edge-O
     ],
-    "engadin_unter": [
+    "mittelbuenden": [
         [46.4977, 9.0761],   # Edge-W
         [46.6642, 9.8250],   # Edge-O
         [46.6240, 9.7800],   # Flughöhe-S
@@ -1091,7 +1091,7 @@ MANUAL_REFERENCE_POINTS = {
         [47.3340, 8.2849],   # Innen-Sample
         [47.4973, 8.2764],   # Innen-Sample
     ],
-    "engadin_ober": [
+    "oberengadin": [
         [46.5011, 9.7124],   # Edge-W
         [46.6308, 10.2544],   # Edge-O
         [46.7605, 9.9834],   # Edge-N (Schatten)

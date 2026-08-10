@@ -38,7 +38,7 @@ import statistics
 
 # Schwelle: ab welcher Spot-Anzahl je Region wird der Spot-Median Thermik-Override
 # aktiv? Darunter bleibt der Refpoint-Pfad. Mai 2026: 3 ist Mindest-Median-Robustheit,
-# 7 Regionen heute haben n<3 (Mittelland West/Ost, Bodenseeraum, Jura Ost, Seeland,
+# 7 Regionen heute haben n<3 (Plateau/Ost, Bodenseeraum, Tafeljura, Seeland,
 # Zentrales Mittelland, Waadtländer Alpen).
 SPOT_MEDIAN_MIN_SPOTS = 3
 
@@ -312,7 +312,7 @@ def _aggregate_wind_across_points(data_list):
     Für Regionen gibt es keinen dedizierten Spot-Punkt — der Regionalwind soll
     repräsentativ für das gesamte Polygon sein, nicht nur für refs[0]. Ein
     einzelner alpiner Referenzpunkt würde sonst die gesamte Region dominieren
-    (z.B. "Mittelland Zentral" mit einem 1662m-Punkt).
+    (z.B. "Zentrale Voralpen" mit einem 1662m-Punkt).
 
     Verfahren:
     - wind_speed_10m: Median über alle RPs (robust gegen Ausreißer)

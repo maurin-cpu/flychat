@@ -209,7 +209,7 @@ Zuerst **ohne** echten SMTP testen — HTML-Preview in Tempdir.
 
 #### B5.1 URL-Parameter wirken
 
-- [ ] `http://localhost:5000/briefing?regions=alpstein,zentralwallis&day=2` oeffnen
+- [ ] `http://localhost:5000/briefing?regions=alpstein,loetschental&day=2` oeffnen
 - [ ] Nur die 2 Regionen sichtbar
 - [ ] Tag-Index 2 vorausgewaehlt
 - [ ] Nach Laden: URL steht auf `/briefing` (Params wurden entfernt)

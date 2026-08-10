@@ -239,10 +239,10 @@ Nur relevant wenn `kritischer_foehn` in `regionen.csv` gesetzt ist.
 | Region | Kritischer Föhn | Empfohlene Anker-Position |
 |---|---|---|
 | Mittelland Ost | S-Föhn | Alpennord-Fuss (Linth-Gebiet, Glarner Tor) |
-| Mittelland West | S-Föhn | Saanen, Diemtigtal-Ausgang |
-| Berner Oberland | S-Föhn | Brienzersee-Nord, Thunersee-Nord |
+| Plateau | S-Föhn | Saanen, Diemtigtal-Ausgang |
+| Emmental | S-Föhn | Brienzersee-Nord, Thunersee-Nord |
 | Innerschweiz | S-Föhn | Vierwaldstättersee-Nordufer |
-| Zentralwallis | N-Föhn | Brig/Visp am Talausgang |
+| Lötschental | N-Föhn | Brig/Visp am Talausgang |
 | Tessin | N-Föhn | Magadinoebene |
 | Engadin | N-Föhn | Maloja-Pass / St. Moritz-Ebene |
 
@@ -264,7 +264,7 @@ Nur relevant wenn `kritischer_foehn` in `regionen.csv` gesetzt ist.
 | Region-Typ | Tal | Flughöhe | Kamm |
 |---|---|---|---|
 | Hochalpin (Wallis-Süd, Bernina) | 1× | 3× | 3× |
-| Alpin (Berner Oberland) | 2× | 3× | 2× |
+| Alpin (Emmental) | 2× | 3× | 2× |
 | Voralpen (Innerschweiz, Säntis) | 2× | 3× | 2× |
 | Jura | 2× | 3× | 2× |
 | Mittelland (flach) | — | Aspekt-Variation 7× | — |
@@ -294,7 +294,7 @@ nähere Punkte liefern denselben Grid-Wert, redundant).
 - 1 Punkt auf Hauptkamm
 - 1 Föhn-Strom-Anker am kritischen Talausgang
 
-### Voralpen-Massiv (Berner Oberland, Säntis, Pilatus-Gebiet)
+### Voralpen-Massiv (Emmental, Säntis, Pilatus-Gebiet)
 **Priorität**: S-Flanken-Hotspots + N-Schattenkontrast + Kamm
 - 3 Punkte auf S-exponierten Hauptflanken (in unterschiedlicher Höhe)
 - 1-2 Punkte auf N-exponierten Hängen

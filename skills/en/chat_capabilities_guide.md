@@ -37,7 +37,7 @@ You have access to **extensive weather data** for all of Switzerland. When a pil
 | Region | Spots |
 |--------|-------|
 | Zuerich | Balderen (Uetliberg) |
-| Berner Oberland | First (Grindelwald) |
+| Berner Alpen | First (Grindelwald) |
 | Zentralschweiz | Taempfeli, Brunnihuette, Fuerenalp (Engelberg), Pilatus Kulm, Zugerberg |
 | Solothurn | Weissenstein, Roeti |
 | Schwyz | Grosser Sternen, Tritt, Tisch, Forstberg, Steinhüttli (Hoch-Ybrig), Waldrand/Chli Aubrig (Euthal), Rotmoos/Hummel, Fronalpstock (4 Starts), Rigi (4 Starts), Rotenflue (2 Starts) |
@@ -47,11 +47,11 @@ Every spot has: elevation, allowed wind direction, ideal maximum wind, slope asp
 ### 1.2 Regions
 <!-- Quelle: data/regionen.csv -->
 29 regions across 5 terrain zones with aggregated weather data:
-- **Mittelland** (4): Seeland/Emmental, Mittelland West/Ost, Genfersee
-- **Jura** (3): Jura Ost/West/Zentral
-- **Voralpen** (3): Mittelland Zentral, Glarnerland/Walensee, Schwarzsee/Gantrisch
-- **Alpen** (8): Suedbuerden, Urner Alpen, Waadtlaender Alpen, Alpstein, Tessin Zentral, Chur/Mittelbuenden, Berner Oberland, Zentralschweizer Voralpen
-- **Hochalpin** (11): Berner/Freiburger Voralpen, Mattertal, Tessin Nord, Zentralwallis, Engadin Unter/Ober, Unterwallis, Oberwallis/Goms, Surselva, Haslital/Grimsel
+- **Mittelland** (4): Seeland, Plateau/Ost, Genfersee
+- **Jura** (3): Tafeljura/West/Zentral
+- **Voralpen** (3): Zentrale Voralpen, Glarner Alpen, Freiburger Voralpen
+- **Alpen** (8): Suedbuerden, Urner Alpen, Waadtlaender Alpen, Alpstein, Locarnese / Bellinzonese, Chur/Mittelbuenden, Emmental, Zentralschweizer Alpen
+- **Hochalpin** (11): Berner/Berner Oberland, Mattertal, Leventina / Blenio, Lötschental, Mittelbünden/Ober, Unterwallis, Oberwallis/Goms, Surselva, Haslital/Grimsel
 
 ### 1.3 Weather parameters per spot/hour (06:00–18:00, 5 days)
 
@@ -251,7 +251,7 @@ You embed these tags in your text reply. The frontend automatically renders them
 ```
 [METEOGRAM:region=RegionID|date=YYYY-MM-DD]
 ```
-- `region` (required): exact region ID (e.g. `berner_oberland`, `zentralwallis`, `jura_zentral`)
+- `region` (required): exact region ID (e.g. `emmental`, `loetschental`, `jura_zentral`)
 - `date` (optional): default = today
 - Loads: `/api/region-weather/{region}` + `/api/region-altitude-wind/{region}`
 

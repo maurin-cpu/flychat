@@ -131,7 +131,7 @@ def thunder_anchor_ok(data):
     Signaturen) liess der Wolken-Zweig 61 % aller gewitterfreien Tage durch
     — im Sommer hat fast jede Region irgendwo 50 % Bewoelkung. Die
     Regen-Pflicht senkt das auf 24 % und kostet genau einen Gewittertag von
-    113 (Tessin Nord 16.07., det. Lauf voellig trocken). Zahlen:
+    113 (Leventina / Blenio 16.07., det. Lauf voellig trocken). Zahlen:
     docs/GEWITTER.md, Abschnitt "Anker verschaerft".
 
     Gilt nur fuer den Ensemble-Weg, nie fuer den deterministischen

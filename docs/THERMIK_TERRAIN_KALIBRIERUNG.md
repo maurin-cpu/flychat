@@ -42,11 +42,11 @@ Kalibrierung bringt den Thermik-Calculator auf den gleichen Standard.
 
 | Zone | Höhenbereich | Beispielregionen | Charakteristik |
 |---|---|---|---|
-| **mittelland** | 600–800 m | Seeland, Mittelland West, Mittelland Ost, Genfersee | Flach, hohe Bodenfeuchte, Mischwald, viel mittelhoher Bewuchs, dominiert von synoptischen Winden |
-| **jura** | 900–1280 m | Jura Ost, Jura West, Jura Zentral | Mittelgebirgs-Faltenketten, Kalk, oft karge Höhen, gute Hangthermik |
-| **voralpen** | 1300–1500 m | Mittelland Zentral (Napf), Glarnerland, Schwarzsee/Gantrisch | Voralpine Ketten, organisierte Hangthermik, beginnende Tal-Berg-Wind-Systeme |
-| **alpen** | 1500–1860 m | Berner Oberland, Alpstein, Tessin Zentral, Chur, Zentralschweizer Voralpen | Alpenhauptkamm-nahe, ausgeprägte Talwindsysteme, gemischte Schnee/Fels-Oberflächen |
-| **hochalpin** | 1950–2450 m | Berner Voralpen (Niederhorn), Mattertal, Tessin Nord, Zentralwallis, Engadin, Surselva, Goms | Trockene Luft, hohe direkte Strahlung, Felswand-Heizung, teilweise Gletscher-Einfluss |
+| **mittelland** | 600–800 m | Seeland, Plateau, Mittelland Ost, Genfersee | Flach, hohe Bodenfeuchte, Mischwald, viel mittelhoher Bewuchs, dominiert von synoptischen Winden |
+| **jura** | 900–1280 m | Tafeljura, Neuenburger Jura, Jura Zentral | Mittelgebirgs-Faltenketten, Kalk, oft karge Höhen, gute Hangthermik |
+| **voralpen** | 1300–1500 m | Zentrale Voralpen (Napf), Glarnerland, Freiburger Voralpen | Voralpine Ketten, organisierte Hangthermik, beginnende Tal-Berg-Wind-Systeme |
+| **alpen** | 1500–1860 m | Emmental, Alpstein, Locarnese / Bellinzonese, Chur, Zentralschweizer Alpen | Alpenhauptkamm-nahe, ausgeprägte Talwindsysteme, gemischte Schnee/Fels-Oberflächen |
+| **hochalpin** | 1950–2450 m | Berner Alpen (Niederhorn), Mattertal, Leventina / Blenio, Lötschental, Engadin, Surselva, Goms | Trockene Luft, hohe direkte Strahlung, Felswand-Heizung, teilweise Gletscher-Einfluss |
 
 `elevation_ref` aus `regionen.csv` ist die typische Flughöhen-Referenz, nicht
 der höchste Gipfel der Region.
@@ -72,7 +72,7 @@ konvektive Schicht mindestens X m über Grund reicht."
 | alpen | 200 | Sehr starke Hangwärme, Thermik löst flach aus |
 | hochalpin | 150 | Extrem starke direkte Strahlung, dünne Luft, flache Auslösung |
 
-**Effekt:** Tessin Nord und Zentralwallis werden nicht mehr durch das
+**Effekt:** Leventina / Blenio und Lötschental werden nicht mehr durch das
 Hardcode-150-m-Killswitch unterdrückt, wenn die berechnete Thermikhöhe nur
 knapp über der Referenzhöhe liegt.
 
@@ -273,15 +273,15 @@ Validiert anhand der DI 07.04.2026 Vergleichsdaten:
 
 | Region | Heute (FC) | Nach Kalibrierung (Erwartung) | XCT (Referenz) |
 |---|---|---|---|
-| Tessin Nord | 0.0 m/s | ~2.0–2.3 m/s | 2.2 m/s |
-| Zentralwallis | 1.4 m/s | ~2.2–2.4 m/s | 2.4 m/s |
-| Engadin Unter | 1.6 m/s | ~2.0–2.3 m/s | 2.2 m/s |
-| Mittelland Zentral | 1.4 m/s | ~1.6–1.8 m/s (kleine Korrektur, climb_factor) | 2.5 m/s* |
+| Leventina / Blenio | 0.0 m/s | ~2.0–2.3 m/s | 2.2 m/s |
+| Lötschental | 1.4 m/s | ~2.2–2.4 m/s | 2.4 m/s |
+| Mittelbünden | 1.6 m/s | ~2.0–2.3 m/s | 2.2 m/s |
+| Zentrale Voralpen | 1.4 m/s | ~1.6–1.8 m/s (kleine Korrektur, climb_factor) | 2.5 m/s* |
 | Schwarzsee | 2.0 m/s | ~2.0–2.2 m/s (fast unverändert) | 1.9 m/s |
-| Berner Oberland | 1.9 m/s | ~2.0 m/s (fast unverändert) | 2.0 m/s |
-| Jura West | 1.8 m/s | unverändert | 1.8 m/s |
+| Emmental | 1.9 m/s | ~2.0 m/s (fast unverändert) | 2.0 m/s |
+| Neuenburger Jura | 1.8 m/s | unverändert | 1.8 m/s |
 
-\* Mittelland Zentral bei XCT bleibt eine offene Diskrepanz — XCT könnte hier
+\* Zentrale Voralpen bei XCT bleibt eine offene Diskrepanz — XCT könnte hier
 ein Gain haben, der mit dem Volumeneffekt zusammenhängt, den Wingcast nicht
 modelliert (siehe Recherche-Dokument, Abschnitt „Limitierungen").
 
@@ -289,9 +289,9 @@ modelliert (siehe Recherche-Dokument, Abschnitt „Limitierungen").
 
 | Region | Heute (FC) | Nach Kalibrierung | XCT |
 |---|---|---|---|
-| Tessin Nord | – | ~3700 m | 3700 m |
-| Zentralwallis | 3274 m | ~4300 m | 4400 m |
-| Engadin Unter | 3274 m | ~4100 m | 4400 m |
+| Leventina / Blenio | – | ~3700 m | 3700 m |
+| Lötschental | 3274 m | ~4300 m | 4400 m |
+| Mittelbünden | 3274 m | ~4100 m | 4400 m |
 
 ---
 
@@ -327,10 +327,10 @@ Diese Kalibrierung berührt **nicht**:
 
 ---
 
-## Schritt 7 — Rock-Face Rescue (Zentralwallis-Fix)
+## Schritt 7 — Rock-Face Rescue (Lötschental-Fix)
 
 **Motivation (April 2026 Produktionsbefund):** Obwohl die Schritte 1–6 alle
-implementiert waren, zeigte Zentralwallis (hochalpin, elev_ref 2100 m) am
+implementiert waren, zeigte Lötschental (hochalpin, elev_ref 2100 m) am
 7. April 2026 durchgehend `climb_rate=0` — während LLM-Analyse und Referenz-
 Piloten von ~2 m/s und 4-5 h Thermikflug sprachen. Debugging (siehe
 `archive/debug_scripts/debug_zentralwallis_profile.py`) ergab:
@@ -372,7 +372,7 @@ Neue Config-Parameter in `THERMAL_PARAMS`:
 Mittelland und Jura bleiben bei vollständiger Blockade — dort gibt es keine
 relevanten Felswände, homogene Wiesen-/Wald-Schneedecke.
 
-**Resultat Zentralwallis 7. April 2026:** rating 7, peak 2.5 m/s bei 14:00,
+**Resultat Lötschental 7. April 2026:** rating 7, peak 2.5 m/s bei 14:00,
 `max_h` 3253 m (1153 m AGL). Deckt sich mit Pilotenerfahrung und LLM-Analyse.
 
 ---
@@ -464,10 +464,10 @@ Warnmeldung erklärt welches Gate gesperrt hat:
 
 | Fall | Bedingungen | Resultat | Erwartet |
 |---|---|---|---|
-| **A — Zentralwallis 7. April 14 h** | T2m=4.6 °C, SW=850, dir_rad≈700, H≈60 | **Branch aktiv** → rating 7, climb 2.5 m/s | ✓ Frühlings-Fall erhalten |
-| **B — Zentralwallis 7. Januar 14 h** (hypothetisch) | T2m=-8 °C, SW≈450, dir_rad≈280, H≈10 | Branch blockiert (dir_rad<400, H<25) → 0 | ✓ Tiefwinter korrekt |
-| **C — Zentralwallis Mitte März klar** | T2m≈0 °C, SW≈700, dir_rad≈540, H≈30 | Branch aktiv → rating 3-4, schwach | ✓ Saisonanfang plausibel |
-| **D — Zentralwallis Mitte Februar** | T2m≈-3 °C, SW≈550, dir_rad≈400 (Grenze), H≈15 | Branch blockiert (H<25) → 0 | ✓ noch zu früh |
+| **A — Lötschental 7. April 14 h** | T2m=4.6 °C, SW=850, dir_rad≈700, H≈60 | **Branch aktiv** → rating 7, climb 2.5 m/s | ✓ Frühlings-Fall erhalten |
+| **B — Lötschental 7. Januar 14 h** (hypothetisch) | T2m=-8 °C, SW≈450, dir_rad≈280, H≈10 | Branch blockiert (dir_rad<400, H<25) → 0 | ✓ Tiefwinter korrekt |
+| **C — Lötschental Mitte März klar** | T2m≈0 °C, SW≈700, dir_rad≈540, H≈30 | Branch aktiv → rating 3-4, schwach | ✓ Saisonanfang plausibel |
+| **D — Lötschental Mitte Februar** | T2m≈-3 °C, SW≈550, dir_rad≈400 (Grenze), H≈15 | Branch blockiert (H<25) → 0 | ✓ noch zu früh |
 
 ### Validierung April-Cache (alle 29 Regionen)
 
@@ -483,7 +483,7 @@ Zone summary:
   hochalpin  : 11 regions, 10 schneebedeckt, 10 mit Rock-Face Branch aktiv
 ```
 
-**15 von 15 Frühlings-Treffern unverändert** aktiv. Zentralwallis weiterhin
+**15 von 15 Frühlings-Treffern unverändert** aktiv. Lötschental weiterhin
 rating 7, peak 2.5 m/s bei 14:00, `max_h` 3253 m (1153 m AGL). Die Gates
 lassen den kalibrierten Frühlingsfall vollständig durch.
 

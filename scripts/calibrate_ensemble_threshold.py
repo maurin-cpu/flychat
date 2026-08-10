@@ -11,7 +11,7 @@ alle Schwellen von 5 % bis 75 % lieferten exakt 0 Treffer.
 Ursache: `past_days` fuellt beim Ensemble-Endpunkt die Vergangenheit mit EINER
 einzigen Reihe. Aelter als rund drei Tage sind alle 21 Member identisch — es
 gibt dort kein Ensemble, dessen Streuung man auswerten koennte. Gemessen an
-einem Punkt der Zentralschweizer Voralpen:
+einem Punkt der Zentralschweizer Alpen:
 
     05.07. / 15.07. / 19.07. / 25.07. / 27.07.  ->  24 von 24 Stunden identisch
     28.07.                                      ->  10 von 24 Stunden mit Streuung

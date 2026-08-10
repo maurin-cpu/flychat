@@ -108,7 +108,7 @@ def test_blitz_auch_ausserhalb_des_schwerpunkts():
 # --- Schritt 2: Plausibilitaetsanker --------------------------------------
 
 def test_kein_blitz_ohne_wolken_und_ohne_regen():
-    """Der gemeldete Fall Tessin Zentral: Ensemble feuert, aber 2 % Bewoelkung,
+    """Der gemeldete Fall Locarnese / Bellinzonese: Ensemble feuert, aber 2 % Bewoelkung,
     kein Regen. CAPE allein genuegt nicht."""
     c = format_data_for_charts(
         _hourly(cloud_cover=2, cape=750.0),

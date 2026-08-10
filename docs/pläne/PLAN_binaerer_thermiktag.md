@@ -5,7 +5,7 @@
 **Wiederaufnahme (HIER starten):**
 1. Diese Datei lesen, dann `validation/xcontest/2026-07-26_ANALYSE_49_TAGE.md` und `PATTERNS.md` I-016.
 2. **Eiserne Regel** wie in den anderen Plänen: keine Schwelle von Hand setzen — jede Schwelle gegen `validation/xcontest/` kalibrieren. Unsere Steigskala liegt faktisch zwischen 1.5 und 3.1 m/s; jede intuitiv gesetzte Schwelle über 3.0 schaltet ein Feature faktisch ab.
-3. **Gotcha, der schon zweimal zugeschlagen hat:** Der `regions`-Block im Archiv nutzt sanitisierte Keys (`berner_oberland`, `alpstein`), die Flugdaten die rohe `analyse_region` (`Berner Oberland`, `Alpstein / Ostschweiz`). Direkter Vergleich liefert stille Nulltreffer. Immer über ein Loose-Mapping (Unterstrich→Leerzeichen, `ae/oe/ue`→`a/o/u`, Präfixabgleich) gehen. Vgl. Spot-Namen-Sanitize-Gotcha.
+3. **Gotcha, der schon zweimal zugeschlagen hat:** Der `regions`-Block im Archiv nutzt sanitisierte Keys (`emmental`, `alpstein`), die Flugdaten die rohe `analyse_region` (`Emmental`, `Alpstein / Toggenburg`). Direkter Vergleich liefert stille Nulltreffer. Immer über ein Loose-Mapping (Unterstrich→Leerzeichen, `ae/oe/ue`→`a/o/u`, Präfixabgleich) gehen. Vgl. Spot-Namen-Sanitize-Gotcha.
 4. Reihenfolge: **PA zuerst** — ohne die Code-Analyse ist der Umfang von P1 nicht bestimmbar. Danach P1 (Produktaussage ehrlich machen). **P0 ist Voraussetzung für die Nachjustierung**, nicht für P1.
 
 ---

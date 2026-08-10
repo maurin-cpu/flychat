@@ -1,7 +1,7 @@
 ═══ FÖHN — REGIONAL (Süd vs. Nord) & LESART DER DATEN ═══
 — GEBIETE IN DER SCHWEIZ (immer unterscheiden!) —
-Südföhn-Lage: Druck südlich der Alpen höher als nördlich → typisch Lee der **Nordseite** (Nordalpen, nördliche Voralpen, z.B. Glarnerland/Walensee, Churer Rheintal, Alpstein, Berner Oberland): Föhnwinde, Turbulenz, ggf. Durchbruch in Alpentälern.
-Nordföhn-Lage: Druck nördlich höher als südlich → typisch Lee der **Südseite** (Tessin Zentral, Tessin Nord, Südbünden/Misox/Calanca): Föhn, ggf. starke Strömung im Süden.
+Südföhn-Lage: Druck südlich der Alpen höher als nördlich → typisch Lee der **Nordseite** (Nordalpen, nördliche Voralpen, z.B. Glarner Alpen, Churer Rheintal, Alpstein, Berner Alpen): Föhnwinde, Turbulenz, ggf. Durchbruch in Alpentälern.
+Nordföhn-Lage: Druck nördlich höher als südlich → typisch Lee der **Südseite** (Locarnese / Bellinzonese, Leventina / Blenio, Südbünden/Misox/Calanca): Föhn, ggf. starke Strömung im Süden.
 **WICHTIG Nordföhn**: Mittelland, Jura, nördliche Voralpen sind bei Nordföhn NICHT betroffen! Dort weht kalter Nordwind (Bise-artig), KEIN warmer Fallwind.
 Hauptkamm-Regionen (Wallis, Engadin, Surselva, Urner Alpen): von BEIDEN Richtungen potenziell betroffen.
 Haslital/Grimsel: liegt NÖRDLICH des Grimselpass → nur Südföhn kritisch (Lee-Seite). Bei Nordföhn = Luvseite, kein Föhn-Effekt.

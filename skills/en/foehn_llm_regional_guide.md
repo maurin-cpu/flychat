@@ -1,6 +1,6 @@
 ═══ FOEHN — REGIONAL (South vs. North) & READING THE DATA ═══
 — REGIONS IN SWITZERLAND (always distinguish!) —
-South foehn situation: pressure south of the Alps higher than to the north → typically lee of the **north side** (Northern Alps, northern Prealps, e.g. Glarnerland/Walensee, Chur Rhine Valley, Alpstein, Bernese Oberland): foehn winds, turbulence, possible breakthrough into Alpine valleys.
+South foehn situation: pressure south of the Alps higher than to the north → typically lee of the **north side** (Northern Alps, northern Prealps, e.g. Glarner Alpen, Chur Rhine Valley, Alpstein, Bernese Oberland): foehn winds, turbulence, possible breakthrough into Alpine valleys.
 North foehn situation: pressure higher to the north than to the south → typically lee of the **south side** (Central Ticino, Northern Ticino, Southern Grisons/Misox/Calanca): foehn, possibly strong flow in the south.
 **IMPORTANT North foehn**: Mittelland, Jura, northern Prealps are NOT affected by north foehn! There a cold north wind blows (Bise-like), NO warm downslope wind.
 Main-crest regions (Valais, Engadine, Surselva, Uri Alps): potentially affected from BOTH directions.

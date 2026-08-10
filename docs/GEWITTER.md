@@ -86,11 +86,11 @@ der Regionstage im Flugfenster 10–18 Uhr):
 
 Die Wolken-Alternative filterte praktisch nichts — im Sommer hat fast jede
 Region irgendwo ≥ 50 % Bewölkung (Maximum über 7 Referenzpunkte). Preis der
-Verschärfung über die ganze Saison: **ein einziger Gewittertag** (Tessin Nord
+Verschärfung über die ganze Saison: **ein einziger Gewittertag** (Leventina / Blenio
 16.07., det. Lauf völlig trocken, Gewitter erst ab 17 Uhr). Wirkung am Lauf vom
 02.08.: **33 → 15 Blitzstunden** (17 → 10 Regionstage); unter den entfernten
 sind die am Testtag **gemessen widerlegten** Fehlalarme (Alpstein 99 % Sonne,
-Mittelland Zentral 94 %).
+Zentrale Voralpen 94 %).
 
 **Weitere Backtest-Befunde** (Details/Skripte: Session-Scratchpad 03.08.,
 Übernahme nach `scripts/` mit dem Mess-Abgleich):
@@ -259,7 +259,7 @@ soll der Text sagen dürfen.
 
 ### Ensemble sichtbar gemacht + Schwelle 20 → 15 (2026-07-31, Rückmeldung)
 
-Praxis-Rückmeldung: Zentralschweizer Voralpen müsste am Sa 01.08. und So 02.08.
+Praxis-Rückmeldung: Zentralschweizer Alpen müsste am Sa 01.08. und So 02.08.
 Gewitter zeigen — tat es nicht. Zwei verschiedene Ursachen:
 
 | | Deterministisch | Ensemble | Ergebnis |
@@ -316,7 +316,7 @@ Mengengerüst im 5-Tage-Fenster vom 31.07. (1740 Region-Flugstunden):
 | vorher (nur `weather_code`) | 4 (0.2 %) |
 | jetzt (Schwerpunkt-Fenster) | 370 (21.3 %) |
 
-Zentralschweizer Voralpen hatte an fünf Tagen in Folge 19–100 %
+Zentralschweizer Alpen hatte an fünf Tagen in Folge 19–100 %
 Member-Zustimmung und **null** Gewitterstunden im `weather_code`.
 
 **Nachjustiert am selben Tag:** 21 % aller Flugstunden wurden im Betrieb als zu
@@ -336,7 +336,7 @@ Gemessener Nebenbefund: die Tages-Schwelle ist nicht der stärkste Hebel — von
 Wer weiter reduzieren will, sollte dort ansetzen, nicht an der Schwelle.
 
 Preis der Änderung: Tage mit schwachem Signal verschwinden aus dem Meteogramm —
-Zentralschweizer Voralpen 01.08. (19 %) zeigt keinen Blitz mehr. Im **Text**
+Zentralschweizer Alpen 01.08. (19 %) zeigt keinen Blitz mehr. Im **Text**
 bleibt der Hinweis erhalten, weil die Erwähnungsschwelle bei 15 steht. Das ist
 der bewusste Kompromiss zwischen „nichts übersehen" und „nicht dauerblitzen".
 
@@ -347,7 +347,7 @@ Schwerpunkt-Fensters") hat sich bestätigt und wurde zur Konsequenz geführt.
 Gemessen am Bestand vom 02.08. (29 Regionen, 137 Regionstage, 1507
 Flugstunden): **217 Blitzstunden auf 36 % aller Regionstage**, davon 215 aus
 dem Ensemble und nur 2 aus dem `weather_code`. Die Hälfte dieser Blitze stand
-bei **unter 50 % Bewölkung und ohne Niederschlag** — Tessin Zentral 04.08.
+bei **unter 50 % Bewölkung und ohne Niederschlag** — Locarnese / Bellinzonese 04.08.
 14:00 bei 2 % Bewölkung, Rheintal 04.08. 11:00 bei 0 %.
 
 **Zwei Ursachen, zwei Änderungen:**

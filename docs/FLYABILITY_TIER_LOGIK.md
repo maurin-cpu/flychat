@@ -54,7 +54,7 @@ Eine Stunde zählt als **produktive Thermik-Stunde**, wenn alle drei Bedingungen
 
 Die `climb_rate` wird in `thermik_calculator.py` (Funktion `_calculate_climb_rate_for_hour`) bereits aus `direct_radiation` + `diffuse_radiation` über den sensiblen Wärmefluss H abgeleitet. Wolken-Dämpfung steckt also **physikalisch in climb_rate drin** (siehe Code-Kommentar `thermik_calculator.py:1367-1369`: "W*-Deardorff beinhaltet die Bewölkungsdämpfung bereits ... wir dürfen hier nicht nochmals künstlich mit einem sun_factor multiplizieren").
 
-Eine zusätzliche Cloud-Cover-Schwelle wäre Doppelbestrafung — und ICON-D2 `cloud_cover_mid` ist flächige Bedeckung, **nicht** optische Dicke. Bei dünnem Altostratus zeigt mid=100% trotzdem swr=800 W/m² (Beobachtung aus Cache 16.05.2026 für Wallis/Goms, Berner Oberland u.a.). Die Strahlung ist der verlässlichere Proxy und ist in climb bereits eingepreist.
+Eine zusätzliche Cloud-Cover-Schwelle wäre Doppelbestrafung — und ICON-D2 `cloud_cover_mid` ist flächige Bedeckung, **nicht** optische Dicke. Bei dünnem Altostratus zeigt mid=100% trotzdem swr=800 W/m² (Beobachtung aus Cache 16.05.2026 für Wallis/Goms, Emmental u.a.). Die Strahlung ist der verlässlichere Proxy und ist in climb bereits eingepreist.
 
 **Wolken-% bleiben weiterhin relevant für:**
 - LLM-Labels (`VIEL_BEWOELKUNG` / `GUTE_EINSTRAHLUNG`) als Sky-Beschreibung
