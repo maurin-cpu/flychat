@@ -87,8 +87,8 @@
         ]
       },
       "properties": {
-        "id": "zentralwallis",
-        "region": "Zentralwallis",
+        "id": "loetschental",
+        "region": "Lötschental",
         "name": "Leukerbad / Loetschental",
         "elevation_ref": 2100,
         "reference_points": [
@@ -201,8 +201,8 @@
         ]
       },
       "properties": {
-        "id": "mattertal_saastal",
-        "region": "Mattertal / Saastal",
+        "id": "walliser_hochalpen",
+        "region": "Walliser Hochalpen",
         "name": "Graehen",
         "elevation_ref": 2000,
         "reference_points": [
@@ -769,8 +769,8 @@
         ]
       },
       "properties": {
-        "id": "tessin_nord",
-        "region": "Tessin Nord",
+        "id": "leventina_blenio",
+        "region": "Leventina / Blenio",
         "name": "Carì",
         "elevation_ref": 2000,
         "reference_points": [
@@ -943,8 +943,8 @@
         ]
       },
       "properties": {
-        "id": "tessin_zentral",
-        "region": "Tessin Zentral",
+        "id": "locarnese_bellinzonese",
+        "region": "Locarnese / Bellinzonese",
         "name": "Locarno Cimetta",
         "elevation_ref": 1650,
         "reference_points": [
@@ -1113,8 +1113,8 @@
         ]
       },
       "properties": {
-        "id": "engadin_unter",
-        "region": "Engadin Unter",
+        "id": "mittelbuenden",
+        "region": "Mittelbünden",
         "name": "Scuol Motta Naluns",
         "elevation_ref": 2100,
         "reference_points": [
@@ -1227,8 +1227,8 @@
         ]
       },
       "properties": {
-        "id": "engadin_ober",
-        "region": "Engadin Ober",
+        "id": "oberengadin",
+        "region": "Oberengadin",
         "name": "Muottas Muragl",
         "elevation_ref": 2450,
         "reference_points": [
@@ -1460,7 +1460,7 @@
       },
       "properties": {
         "id": "rheintal",
-        "region": "Ostschweiz",
+        "region": "Rheintal",
         "name": "Santa Maria in Calanca",
         "elevation_ref": 1500,
         "reference_points": [
@@ -1562,7 +1562,7 @@
       },
       "properties": {
         "id": "alpstein",
-        "region": "Alpstein / Ostschweiz",
+        "region": "Alpstein / Toggenburg",
         "name": "Ebenalp",
         "elevation_ref": 1640,
         "reference_points": [
@@ -1691,8 +1691,8 @@
         ]
       },
       "properties": {
-        "id": "zentralschweizer_voralpen",
-        "region": "Zentralschweizer Voralpen",
+        "id": "zentralschweizer_alpen",
+        "region": "Zentralschweizer Alpen",
         "name": "Engelberg Brunni",
         "elevation_ref": 1860,
         "reference_points": [
@@ -1955,8 +1955,8 @@
         ]
       },
       "properties": {
-        "id": "glarnerland_walensee",
-        "region": "Glarnerland / Walensee",
+        "id": "glarner_alpen",
+        "region": "Glarner Alpen",
         "name": "Schrina",
         "elevation_ref": 1300,
         "reference_points": [
@@ -2105,8 +2105,8 @@
         ]
       },
       "properties": {
-        "id": "berner_voralpen",
-        "region": "Berner Voralpen",
+        "id": "berner_alpen",
+        "region": "Berner Alpen",
         "name": "Niederhorn",
         "elevation_ref": 1950,
         "reference_points": [
@@ -2251,8 +2251,8 @@
         ]
       },
       "properties": {
-        "id": "freiburger_voralpen",
-        "region": "Freiburger Voralpen",
+        "id": "berner_oberland",
+        "region": "Berner Oberland",
         "name": "Moléson",
         "elevation_ref": 1950,
         "reference_points": [
@@ -2455,8 +2455,8 @@
         ]
       },
       "properties": {
-        "id": "mittelland_west",
-        "region": "Mittelland West",
+        "id": "plateau",
+        "region": "Plateau",
         "name": "Moudon",
         "elevation_ref": 700,
         "reference_points": [
@@ -2549,8 +2549,8 @@
         ]
       },
       "properties": {
-        "id": "jura_west",
-        "region": "Jura West",
+        "id": "neuenburger_jura",
+        "region": "Neuenburger Jura",
         "name": "Mauborget / Suchet",
         "elevation_ref": 1200,
         "reference_points": [
@@ -2781,8 +2781,8 @@
         ]
       },
       "properties": {
-        "id": "jura_ost",
-        "region": "Jura Ost",
+        "id": "tafeljura",
+        "region": "Tafeljura",
         "name": "Wasserflue / Geissflue",
         "elevation_ref": 900,
         "reference_points": [
@@ -2891,8 +2891,8 @@
         ]
       },
       "properties": {
-        "id": "schwarzsee_gantrisch",
-        "region": "Schwarzsee / Gantrisch",
+        "id": "freiburger_voralpen",
+        "region": "Freiburger Voralpen",
         "name": "Gantrisch / Schwarzsee",
         "elevation_ref": 1500,
         "reference_points": [
@@ -2993,8 +2993,8 @@
         ]
       },
       "properties": {
-        "id": "berner_oberland",
-        "region": "Berner Oberland",
+        "id": "emmental",
+        "region": "Emmental",
         "name": "Interlaken / Niederhorn",
         "elevation_ref": 1800,
         "reference_points": [
@@ -3087,8 +3087,8 @@
         ]
       },
       "properties": {
-        "id": "seeland_emmental",
-        "region": "Seeland / Emmental",
+        "id": "seeland",
+        "region": "Seeland",
         "name": "Belp / Bantiger",
         "elevation_ref": 600,
         "reference_points": [
@@ -3205,8 +3205,8 @@
         ]
       },
       "properties": {
-        "id": "mittelland_zentral",
-        "region": "Mittelland Zentral",
+        "id": "zentrale_voralpen",
+        "region": "Zentrale Voralpen",
         "name": "Napf",
         "elevation_ref": 1400,
         "reference_points": [
