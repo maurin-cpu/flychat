@@ -636,7 +636,7 @@
       "latitude": 46.6571,
       "longitude": 8.05527,
       "elevation_m": 2111,
-      "analyse_region": "Berner Voralpen",
+      "analyse_region": "Berner Alpen",
       "terrain_type": "alpen",
       "windrichtung": "O/SW-W-NW-N",
       "slope_azimuth": null,
@@ -1276,7 +1276,7 @@
       "latitude": 46.8382,
       "longitude": 8.41241,
       "elevation_m": 1797,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "SO-S-SW-W",
       "slope_azimuth": null,
@@ -1900,7 +1900,7 @@
       "latitude": 46.8052,
       "longitude": 8.46575,
       "elevation_m": 1901,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "SW",
       "slope_azimuth": null,
@@ -3034,7 +3034,7 @@
       "latitude": 47.1478,
       "longitude": 8.53573,
       "elevation_m": 938,
-      "analyse_region": "Mittelland Zentral",
+      "analyse_region": "Zentrale Voralpen",
       "terrain_type": "voralpen",
       "windrichtung": "SW-W-NW",
       "slope_azimuth": null,
@@ -4895,7 +4895,7 @@
       "latitude": 46.9995,
       "longitude": 8.8018,
       "elevation_m": 1813,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "NW-N-NO",
       "slope_azimuth": null,
@@ -5530,7 +5530,7 @@
       "latitude": 47.0007,
       "longitude": 8.82388,
       "elevation_m": 2200,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "W",
       "slope_azimuth": null,
@@ -6166,7 +6166,7 @@
       "latitude": 47.0936,
       "longitude": 8.82327,
       "elevation_m": 988,
-      "analyse_region": "Mittelland Zentral",
+      "analyse_region": "Zentrale Voralpen",
       "terrain_type": "voralpen",
       "windrichtung": "NW-N",
       "slope_azimuth": null,
@@ -6799,7 +6799,7 @@
       "latitude": 47.1069,
       "longitude": 8.86022,
       "elevation_m": 1580,
-      "analyse_region": "Mittelland Zentral",
+      "analyse_region": "Zentrale Voralpen",
       "terrain_type": "voralpen",
       "windrichtung": "SW-W",
       "slope_azimuth": null,
@@ -7424,7 +7424,7 @@
       "latitude": 47.0985,
       "longitude": 8.77173,
       "elevation_m": 1330,
-      "analyse_region": "Mittelland Zentral",
+      "analyse_region": "Zentrale Voralpen",
       "terrain_type": "voralpen",
       "windrichtung": "N-NO",
       "slope_azimuth": null,
@@ -8064,7 +8064,7 @@
       "latitude": 46.965,
       "longitude": 8.63898,
       "elevation_m": 1883,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "W",
       "slope_azimuth": null,
@@ -8687,7 +8687,7 @@
       "latitude": 46.9735,
       "longitude": 8.64377,
       "elevation_m": 1780,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "NO",
       "slope_azimuth": null,
@@ -9320,7 +9320,7 @@
       "latitude": 47.0549,
       "longitude": 8.4862,
       "elevation_m": 1748,
-      "analyse_region": "Mittelland Zentral",
+      "analyse_region": "Zentrale Voralpen",
       "terrain_type": "voralpen",
       "windrichtung": "NO-O-SO-S-SW-W",
       "slope_azimuth": null,
@@ -9931,7 +9931,7 @@
       "latitude": 47.0476,
       "longitude": 8.46056,
       "elevation_m": 1555,
-      "analyse_region": "Mittelland Zentral",
+      "analyse_region": "Zentrale Voralpen",
       "terrain_type": "voralpen",
       "windrichtung": "NW",
       "slope_azimuth": null,
@@ -10560,7 +10560,7 @@
       "latitude": 47.0279,
       "longitude": 8.51983,
       "elevation_m": 1649,
-      "analyse_region": "Mittelland Zentral",
+      "analyse_region": "Zentrale Voralpen",
       "terrain_type": "voralpen",
       "windrichtung": "NO/SO",
       "slope_azimuth": null,
@@ -11191,7 +11191,7 @@
       "latitude": 47.0186,
       "longitude": 8.70177,
       "elevation_m": 1554,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "O-SO-S-SW-W",
       "slope_azimuth": null,
@@ -12460,7 +12460,7 @@
       "latitude": 46.9526,
       "longitude": 8.74906,
       "elevation_m": 1620,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "N",
       "slope_azimuth": null,
@@ -13082,7 +13082,7 @@
       "latitude": 45.878,
       "longitude": 9.00856,
       "elevation_m": 1012,
-      "analyse_region": "Tessin Zentral",
+      "analyse_region": "Locarnese / Bellinzonese",
       "terrain_type": "alpen",
       "windrichtung": "SW",
       "slope_azimuth": null,
@@ -13712,7 +13712,7 @@
       "latitude": 46.8901,
       "longitude": 8.78297,
       "elevation_m": 2340,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "SO",
       "slope_azimuth": null,
@@ -14307,7 +14307,7 @@
       "latitude": 46.8179,
       "longitude": 8.0971,
       "elevation_m": 1840,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "NO/SW",
       "slope_azimuth": null,
@@ -14934,7 +14934,7 @@
       "latitude": 46.7022,
       "longitude": 7.82306,
       "elevation_m": 1310,
-      "analyse_region": "Berner Voralpen",
+      "analyse_region": "Berner Alpen",
       "terrain_type": "alpen",
       "windrichtung": "SO",
       "slope_azimuth": null,
@@ -15575,7 +15575,7 @@
       "latitude": 46.9037,
       "longitude": 8.65139,
       "elevation_m": 1580,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "NW",
       "slope_azimuth": null,
@@ -16208,7 +16208,7 @@
       "latitude": 46.7849,
       "longitude": 8.65461,
       "elevation_m": 1290,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "NO",
       "slope_azimuth": null,
@@ -16840,7 +16840,7 @@
       "latitude": 46.8905,
       "longitude": 8.32972,
       "elevation_m": 1800,
-      "analyse_region": "Zentralschweizer Voralpen",
+      "analyse_region": "Zentralschweizer Alpen",
       "terrain_type": "alpen",
       "windrichtung": "NW",
       "slope_azimuth": null,
@@ -17468,7 +17468,7 @@
     }
   },
   "regions": {
-    "engadin_unter": {
+    "mittelbuenden": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -17514,7 +17514,7 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Engadin Unter/2026-06-23)",
+        "IsConditional(Mittelbünden/2026-06-23)",
         "FewShot:hochalpin,3 examples"
       ]
     },
@@ -17569,7 +17569,7 @@
         "FewShot:hochalpin,3 examples"
       ]
     },
-    "tessin_zentral": {
+    "locarnese_bellinzonese": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -17629,11 +17629,11 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Tessin Zentral/2026-06-23)",
+        "IsConditional(Locarnese / Bellinzonese/2026-06-23)",
         "FewShot:alpen,3 examples"
       ]
     },
-    "mattertal_saastal": {
+    "walliser_hochalpen": {
       "safety_status": "safe",
       "rating": 0.0,
       "status": "safe",
@@ -17681,7 +17681,7 @@
         "FewShot:hochalpin,3 examples"
       ]
     },
-    "zentralwallis": {
+    "loetschental": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -17742,7 +17742,7 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Zentralwallis/2026-06-23)",
+        "IsConditional(Lötschental/2026-06-23)",
         "FewShot:hochalpin,3 examples"
       ]
     },
@@ -17805,7 +17805,7 @@
         "FewShot:hochalpin,3 examples"
       ]
     },
-    "tessin_nord": {
+    "leventina_blenio": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -17866,7 +17866,7 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Tessin Nord/2026-06-23)",
+        "IsConditional(Leventina / Blenio/2026-06-23)",
         "FewShot:hochalpin,3 examples"
       ]
     },
@@ -17928,7 +17928,7 @@
         "FewShot:alpen,3 examples"
       ]
     },
-    "engadin_ober": {
+    "oberengadin": {
       "safety_status": "safe",
       "rating": 0.0,
       "status": "safe",
@@ -18138,7 +18138,7 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Alpstein / Ostschweiz/2026-06-23)",
+        "IsConditional(Alpstein / Toggenburg/2026-06-23)",
         "FewShot:alpen,3 examples"
       ]
     },
@@ -18208,7 +18208,7 @@
         "FewShot:hochalpin,3 examples"
       ]
     },
-    "glarnerland_walensee": {
+    "glarner_alpen": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -18261,11 +18261,11 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Glarnerland / Walensee/2026-06-23)",
+        "IsConditional(Glarner Alpen/2026-06-23)",
         "FewShot:voralpen,3 examples"
       ]
     },
-    "freiburger_voralpen": {
+    "berner_oberland": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -18318,7 +18318,7 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Freiburger Voralpen/2026-06-23)",
+        "IsConditional(Berner Oberland/2026-06-23)",
         "FewShot:voralpen,3 examples"
       ]
     },
@@ -18377,7 +18377,7 @@
         "FewShot:mittelland,3 examples"
       ]
     },
-    "zentralschweizer_voralpen": {
+    "zentralschweizer_alpen": {
       "safety_status": "safe",
       "rating": 0.0,
       "status": "safe",
@@ -18423,7 +18423,7 @@
         "FewShot:alpen,3 examples"
       ]
     },
-    "mittelland_west": {
+    "plateau": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -18476,11 +18476,11 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Mittelland West/2026-06-23)",
+        "IsConditional(Plateau/2026-06-23)",
         "FewShot:mittelland,3 examples"
       ]
     },
-    "jura_west": {
+    "neuenburger_jura": {
       "safety_status": "safe",
       "rating": 0.0,
       "status": "safe",
@@ -18526,7 +18526,7 @@
         "FewShot:jura,3 examples"
       ]
     },
-    "berner_voralpen": {
+    "berner_alpen": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -18572,11 +18572,11 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Berner Voralpen/2026-06-23)",
+        "IsConditional(Berner Alpen/2026-06-23)",
         "FewShot:alpen,3 examples"
       ]
     },
-    "jura_ost": {
+    "tafeljura": {
       "safety_status": "safe",
       "rating": 0.0,
       "status": "safe",
@@ -18622,7 +18622,7 @@
         "FewShot:jura,3 examples"
       ]
     },
-    "schwarzsee_gantrisch": {
+    "freiburger_voralpen": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -18675,11 +18675,11 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Schwarzsee / Gantrisch/2026-06-23)",
+        "IsConditional(Freiburger Voralpen/2026-06-23)",
         "FewShot:voralpen,3 examples"
       ]
     },
-    "berner_oberland": {
+    "emmental": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -18734,11 +18734,11 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Berner Oberland/2026-06-23)",
+        "IsConditional(Emmental/2026-06-23)",
         "FewShot:hochalpin,3 examples"
       ]
     },
-    "seeland_emmental": {
+    "seeland": {
       "safety_status": "conditional",
       "rating": 0.0,
       "status": "conditional",
@@ -18792,7 +18792,7 @@
         }
       ],
       "decisions_applied": [
-        "IsConditional(Seeland / Emmental/2026-06-23)",
+        "IsConditional(Seeland/2026-06-23)",
         "FewShot:mittelland,3 examples"
       ]
     },
@@ -18945,7 +18945,7 @@
         "FewShot:mittelland,3 examples"
       ]
     },
-    "mittelland_zentral": {
+    "zentrale_voralpen": {
       "safety_status": "safe",
       "rating": 0.0,
       "status": "safe",

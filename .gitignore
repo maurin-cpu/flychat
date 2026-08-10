@@ -94,3 +94,6 @@ validation/gewitter/AUTO_REPORT.md
 
 # MeteoSchweiz-Stationsmessungen (Validierungs-Cache, server-lokal)
 data/_meteoschweiz_cache/
+
+# Sicherungen der Regionen-Umbenennung 2026-08 (scripts/migrate_region_names.py)
+*.pre_rename

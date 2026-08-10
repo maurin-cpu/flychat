@@ -1,5 +1,11 @@
 # Sammel-Analyse 49 Tage — Trennschärfe der Thermik-Prognose
 
+> **Hinweis (10.08.2026):** Dieses Protokoll nennt die Regionsnamen im Stand
+> **vor** der Umbenennung. Zuordnung alt→neu:
+> `data/region_renames_2026-08.csv` · `docs/REGIONEN_UMBENENNUNG_2026-08.md`.
+> Der Text bleibt bewusst unverändert — Befunde rückwirkend umzuschreiben
+> würde sie fälschen.
+
 **Datum**: 2026-07-26 · **Zeitraum der Flugdaten**: 18.05.–25.07.2026 ·
 **Auslöser**: Vergleich unserer Steigwerte mit XC Therm (25.07.) — der Verdacht
 „unsere Skala ist zu heiss" hat sich als der falsche Ansatz erwiesen.

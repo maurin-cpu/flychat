@@ -97,6 +97,81 @@ class SubscriberManager:
         ("suedbuenden",        "rheintal"),
     )
 
+    # Regionen-Umbenennung 2026-08 (Plan: docs/pläne/PLAN_regionen_umbenennung.md,
+    # Zuordnung: data/region_renames_2026-08.csv). 17 der 29 ids aendern sich.
+    #
+    # Diese Liste enthaelt eine KETTE:
+    #   schwarzsee_gantrisch -> freiburger_voralpen -> berner_oberland -> emmental
+    # Das Verfahren oben (sequenzielles REPLACE je Paar) wuerde daraus drei
+    # Regionen in einer machen. Deshalb laeuft dieser Block nicht ueber String-
+    # Ersetzung, sondern element-weise ueber das geparste JSON-Array: jede id
+    # wird genau einmal aus ihrem Ausgangswert abgebildet, Ketten und selbst
+    # Ringtausche sind damit strukturell ausgeschlossen.
+    _REGION_ID_RENAMES_2026_08 = (
+        ("schwarzsee_gantrisch",      "freiburger_voralpen"),
+        ("freiburger_voralpen",       "berner_oberland"),
+        ("berner_oberland",           "emmental"),
+        ("seeland_emmental",          "seeland"),
+        ("berner_voralpen",           "berner_alpen"),
+        ("mittelland_west",           "plateau"),
+        ("mattertal_saastal",         "walliser_hochalpen"),
+        ("zentralschweizer_voralpen", "zentralschweizer_alpen"),
+        ("mittelland_zentral",        "zentrale_voralpen"),
+        ("zentralwallis",             "loetschental"),
+        ("engadin_unter",             "mittelbuenden"),
+        ("engadin_ober",              "oberengadin"),
+        ("glarnerland_walensee",      "glarner_alpen"),
+        ("jura_ost",                  "tafeljura"),
+        ("jura_west",                 "neuenburger_jura"),
+        ("tessin_nord",               "leventina_blenio"),
+        ("tessin_zentral",            "locarnese_bellinzonese"),
+    )
+    _MIGRATION_KEY_2026_08 = "region_ids_2026_08"
+
+    @classmethod
+    def _migrate_rename_region_ids_2026_08(cls, conn):
+        """Einmalig, per Marker abgesichert.
+
+        Anders als die Migration von 2026-04 darf dieser Block NICHT bei jedem
+        Start erneut laufen: "berner_oberland" ist zugleich Alt- und Neuwert.
+        Ein zweiter Durchlauf wuerde die Abos, die gerade erst nach
+        berner_oberland gewandert sind, weiter nach emmental schieben. Der
+        Marker in schema_migrations verhindert genau das.
+        """
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                name        TEXT PRIMARY KEY,
+                applied_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        done = conn.execute(
+            "SELECT 1 FROM schema_migrations WHERE name = ?",
+            (cls._MIGRATION_KEY_2026_08,),
+        ).fetchone()
+        if done:
+            return
+
+        mapping = dict(cls._REGION_ID_RENAMES_2026_08)
+        changed_rows = 0
+        for sub_id, raw in conn.execute(
+                "SELECT id, regions FROM subscribers").fetchall():
+            regions = cls._regions_from_db(raw)
+            migrated = [mapping.get(r, r) for r in regions]
+            if migrated != regions:
+                conn.execute(
+                    "UPDATE subscribers SET regions = ? WHERE id = ?",
+                    (cls._regions_to_db(migrated), sub_id),
+                )
+                changed_rows += 1
+        conn.execute(
+            "INSERT INTO schema_migrations (name) VALUES (?)",
+            (cls._MIGRATION_KEY_2026_08,),
+        )
+        logger.info(
+            "Region-ID-Migration 2026-08: %d subscriber-Zeile(n) umgestellt",
+            changed_rows,
+        )
+
     @classmethod
     def _migrate_rename_region_ids(cls, conn):
         for old, new in cls._REGION_ID_RENAMES:
@@ -204,6 +279,7 @@ class SubscriberManager:
                 END;
             """)
             self._migrate_rename_region_ids(conn)
+            self._migrate_rename_region_ids_2026_08(conn)
             conn.commit()
         finally:
             conn.close()

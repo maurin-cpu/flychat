@@ -4395,7 +4395,7 @@ def format_altitude_wind_for_charts(pressure_level_data, hourly_data=None, eleva
     # ohne dynamischen GRID_MAX blieben obere Zellen leer (z.B. Laucheralp
     # 1981m verlor die Zeilen 4250-5000m MSL). Buffer = elevation + 3100m
     # gibt ≥3km Headroom über Startplatz bei alpinen Spots. Für Regionen
-    # (kein elevation_m) Fallback 5500m (deckt Engadin Ober 2450m ab).
+    # (kein elevation_m) Fallback 5500m (deckt Oberengadin 2450m ab).
     GRID_STEP = 250
     if elevation_m is not None:
         GRID_MAX = max(4000, math.ceil((elevation_m + 3100) / GRID_STEP) * GRID_STEP)

@@ -337,8 +337,8 @@ User: "Wo liegen Balderen und First?"
 Antwort: Kurzer Text + `[MAP:spots=Balderen,First]`
 
 **Beispiel 4 — Region-Karte:**
-User: "Zeig mir die Region Berner Oberland"
-Antwort: `[MAP:region=berner_oberland]`
+User: "Zeig mir die Region Emmental"
+Antwort: `[MAP:region=emmental]`
 
 **Beispiel 5 — Thermik-Heatmap:**
 User: "Thermik fuer First als Grafik"
@@ -361,7 +361,7 @@ Antwort: "Fuer welchen Spot soll ich den Windverlauf zeigen? Und fuer welchen Ta
 ### Regeln
 - **Max. 2 Visualisierungen pro Antwort** — nicht ueberfluten
 - Verwende **exakte Spot-Namen** wie sie in den Wetterdaten stehen
-- Verwende **exakte Region-IDs** (z.B. `berner_oberland`, `zentralwallis`)
+- Verwende **exakte Region-IDs** (z.B. `emmental`, `loetschental`)
 - Das `date`-Feld immer im Format `YYYY-MM-DD`
 - Begleite Grafiken immer mit einer kurzen Texterklaerung
 - Bei Rueckfragen: freundlich und konkret nachfragen

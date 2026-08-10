@@ -66,8 +66,8 @@ def test_umlaut_und_ae_treffen_sich():
 
 
 def test_normalisierung_ignoriert_schreibweise_und_leerzeichen():
-    assert vc.norm_region("  JURA  Ost ") == vc.norm_region("Jura Ost")
+    assert vc.norm_region("  NEUENBURGER  Jura ") == vc.norm_region("Neuenburger Jura")
 
 
 def test_verschiedene_regionen_bleiben_verschieden():
-    assert vc.norm_region("Jura Ost") != vc.norm_region("Jura West")
+    assert vc.norm_region("Tafeljura") != vc.norm_region("Neuenburger Jura")

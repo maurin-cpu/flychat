@@ -167,10 +167,11 @@ def validate_day(day: datetime.date, stations: list[dict]) -> dict | None:
         print(f"  !! keine SMN-Daten fuer {day} — Tag uebersprungen")
         return None
 
-    # Join ueber den normalisierten Namen: die Prognose schreibt "Waadtländer
-    # Alpen", die Polygon-Datei "Waadtlaender Alpen" — ueber den rohen Namen
-    # fand diese Region ihre eigene Messung nie und zaehlte still als
-    # ereignislos (gefunden 04.08.2026).
+    # Join ueber den normalisierten Namen: die Polygon-Datei schrieb
+    # "Waadtlaender Alpen", die Prognose "Waadtländer Alpen" — ueber den rohen
+    # Namen fand diese Region ihre eigene Messung nie und zaehlte still als
+    # ereignislos (gefunden 04.08.2026, Quelle vereinheitlicht 10.08.2026).
+    # Noetig bleibt es fuer die Altdaten, die die ASCII-Form weiter tragen.
     mess_idx = {vc.norm_region(k): v for k, v in mess["regionen"].items()}
 
     urteile = []

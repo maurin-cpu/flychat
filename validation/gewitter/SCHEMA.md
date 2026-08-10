@@ -14,12 +14,12 @@ fielen auf Stundenbasis unter die Schwellen.
              "quelle": "MeteoSchweiz OGD SMN, Zehnminutenwerte", "signatur": "..." },
   "stationen": {
     "alt": {                       // Stations-Kürzel (klein)
-      "name": "Altdorf", "elev": 438, "region": "Zentralschweizer Voralpen",
+      "name": "Altdorf", "elev": 438, "region": "Zentralschweizer Alpen",
       "stunden": { "21:50": [rain_mm, gust_kmh, temp_c, sonne_min, druck_hpa], ... }
     }
   },
   "regionen": {
-    "Zentralschweizer Voralpen": {
+    "Zentralschweizer Alpen": {
       // Signatur auf gleitenden 30-min-Fenstern; Zeit = Fensterende.
       // Ein Eintrag je Station (der stärkste Treffer des Tages),
       // Rangfolge gewitter > schauer > ausfluss.
@@ -46,7 +46,7 @@ Ein Eintrag je Region × Fenster (`flug` = 10–18 Uhr, `abend` = 18–24 Uhr):
   "_meta": { "tag": "2026-08-02", "prognose_quelle": "data/weather_archive/2026-08-02.json" },
   "urteile": [
     {
-      "region": "Zentralschweizer Voralpen",
+      "region": "Zentralschweizer Alpen",
       "fenster": "flug",
       "gemessen":  ["21:50"],                     // leere Liste = nichts gemessen
       "schauer":   [],

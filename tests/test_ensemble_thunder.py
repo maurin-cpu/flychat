@@ -213,7 +213,7 @@ def _thunder_tag(gi):
 
 
 def test_ensemble_erzeugt_sichtbare_kachel():
-    """Der gemeldete Fall: Zentralschweizer Voralpen 02.08. — 71 % der Member,
+    """Der gemeldete Fall: Zentralschweizer Alpen 02.08. — 71 % der Member,
     deterministisch nichts. Vorher blieb der Tag in der Anzeige komplett leer."""
     t = _thunder_tag({
         "thunderstorm_hours": 0, "thunder_ens_pct": 71,

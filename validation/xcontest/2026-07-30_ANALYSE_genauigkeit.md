@@ -1,5 +1,11 @@
 # Genauigkeit Forecast vs. XContest — Spot- und Region-Ebene getrennt
 
+> **Hinweis (10.08.2026):** Dieses Protokoll nennt die Regionsnamen im Stand
+> **vor** der Umbenennung. Zuordnung alt→neu:
+> `data/region_renames_2026-08.csv` · `docs/REGIONEN_UMBENENNUNG_2026-08.md`.
+> Der Text bleibt bewusst unverändert — Befunde rückwirkend umzuschreiben
+> würde sie fälschen.
+
 **Stand**: 2026-07-30
 **Werkzeug**: `scripts/xc_accuracy.py` (schreibt nichts, deterministisch wiederholbar)
 **Basis**: 18 auswertbare Tage (27.05.–20.06.), 676 Spot-Tage, 256 Region-Tage

@@ -2975,7 +2975,7 @@ class WeatherContextMixin:
         # fenster, das Symbol seit demselben Tag auf Stundenwerten. Ergebnis
         # waren zwei widersprechende Aussagen nebeneinander: 20 von 29 Regionen
         # mit geschriebener Gewitterwarnung, 9 mit Blitz im Meteogramm —
-        # Seeland/Emmental warnte bei 24 % ohne einen einzigen Blitz. Der
+        # Seeland warnte bei 24 % ohne einen einzigen Blitz. Der
         # Tageswert ist dafuer die falsche Groesse: er sagt nur, dass
         # IRGENDWANN im Flugfenster an IRGENDEINEM der 16 Referenzpunkte ein
         # Member zuendet, und ist im Sommer nahezu gesaettigt.
@@ -3726,7 +3726,7 @@ class WeatherContextMixin:
             # deterministischen Stunden: erzeugt nur eine WARN-Kachel, nie STOP.
             # Ohne diese Felder blieb die Ensemble-Aussage unsichtbar — sie ging
             # nur in den LLM-Text, nicht in die Anzeige (gemeldet 31.07. am
-            # Beispiel Zentralschweizer Voralpen 02.08.: 71 % der Member,
+            # Beispiel Zentralschweizer Alpen 02.08.: 71 % der Member,
             # deterministisch 0.0 mm und Code 0-3, in der App also blank).
             #
             # Seit 02.08.2026 aus den STUNDEN, nicht mehr aus dem Tageswert —

@@ -181,7 +181,7 @@ und Regionen haben **keinen echten Startplatz** (`elev_ref` ist eine Referenz). 
 | tief >1800 m | (im Cache 0 Fälle — Föhn-Lücke) |
 
 Der Nutzen **steigt klar mit der Säulen-Tiefe** (= Föhn-Geometrie). **Reale Wirkung auf dem
-aktuellen (windigen Flachland-)Cache:** Region **1** gerettete Std (Jura West, Riss@1512m,
+aktuellen (windigen Flachland-)Cache:** Region **1** gerettete Std (Neuenburger Jura, Riss@1512m,
 312 m fliegbar, roh-Top 2010 m), Spot **0** (wie erwartet, Riss am Startplatz). Die Logik
 liegt bereit; der wahre Wert zeigt sich erst bei tiefen Säulen.
 
@@ -208,7 +208,7 @@ auf `productive_thermal_h`/`working_height`.
 ### Föhn-Test: ERLEDIGT (2026-06-07, Server-Session) — Band-Cap auf echtem Föhn validiert ✅
 
 **Ergebnis:** Der Band-Cap rettet auf einem echten Föhntag (2026-06-04, 29 Regionen) **6 von 37**
-TORN-gegateten Produktiv-Region-Stunden (Prättigau-Davos ×5, Berner Oberland ×1; z.B. Riss@1965m,
+TORN-gegateten Produktiv-Region-Stunden (Prättigau-Davos ×5, Emmental ×1; z.B. Riss@1965m,
 265 m fliegbar darunter, Roh-Top 2324 m, climb 1.8). 19 % (11/59) der gerissenen Stunden haben ein
 fliegbares Band darunter (am windstillen Kontrolltag: 0 %), Riss sitzt höher (median rel 0.23, teils
 0.5–0.58) — genau die Föhn-Geometrie, die der Band-Cap adressiert. TORN-Echtheit auf der 2. (Föhn-)

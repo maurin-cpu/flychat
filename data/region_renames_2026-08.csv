@@ -1,0 +1,42 @@
+alt;neu;typ;kommentar
+Schwarzsee / Gantrisch;Freiburger Voralpen;name;7 Spots Kanton FR (Gurli, Schwyberg, Vounetse)
+Freiburger Voralpen;Berner Oberland;name;70 Spots (Adelboden, Kandersteg, Lenk, Gstaad, Interlaken)
+Berner Oberland;Emmental;name;nur 4 Spots (Falkenflue, Marbachegg) = Entlebuch
+Seeland / Emmental;Seeland;name;0 Spots - macht den Namen Emmental frei
+Berner Voralpen;Berner Alpen;name;33 Spots (First, Niederhorn, Brienzer Rothorn)
+Mittelland West;Plateau;name;0 Spots - Vorgabe "Plateu" als Tippfehler gelesen
+Mattertal / Saastal;Walliser Hochalpen;name;13 Spots, enthaelt Evolene + Sorebois
+Zentralschweizer Voralpen;Zentralschweizer Alpen;name;87 Spots Hochgebirge (Engelberg, Melchsee-Frutt, Stoos)
+Mittelland Zentral;Zentrale Voralpen;name;22 Spots (Pilatus, Rigi, Zugerberg)
+Zentralwallis;Lötschental;name;4 Spots (Lauchernalp, Hockenhorngrat)
+Engadin Unter;Mittelbünden;name;28 Spots (Lenzerheide, Savognin, Parpaner Rothorn)
+Engadin Ober;Oberengadin;name;12 Spots (Corvatsch, Diavolezza)
+Ostschweiz;Rheintal;name;RISKANT - auch grobe DHV-Herkunft und Prosa-Begriff, siehe Guard im Skript
+Alpstein / Ostschweiz;Alpstein / Toggenburg;name;6 Spots (Ebenalp, Kronberg, Chaeserugg)
+Glarnerland / Walensee;Glarner Alpen;name;17 Spots (Braunwald, Elm, Fronalp)
+Jura Ost;Tafeljura;name;1 Spot (Belchen, Wasserfallen, Hohwacht)
+Jura West;Neuenburger Jura;name;9 Spots (Chasseral, Chaumont, Tete de Ran)
+Tessin Nord;Leventina / Blenio;name;4 Spots (Bassa di Nara, Cari, Malvaglia)
+Tessin Zentral;Locarnese / Bellinzonese;name;30 Spots (Cimetta, Monte Tamaro, Mornera)
+Schwarzsee/Gantrisch;Freiburger Voralpen;variante;Schreibweise ohne Leerzeichen um den Schraegstrich
+Mattertal/Saastal;Walliser Hochalpen;variante;Schreibweise ohne Leerzeichen um den Schraegstrich
+Seeland/Emmental;Seeland;variante;Schreibweise ohne Leerzeichen um den Schraegstrich
+Alpstein/Ostschweiz;Alpstein / Toggenburg;variante;Schreibweise ohne Leerzeichen um den Schraegstrich
+Glarnerland/Walensee;Glarner Alpen;variante;Schreibweise ohne Leerzeichen um den Schraegstrich
+schwarzsee_gantrisch;freiburger_voralpen;id;Kette Stufe 1
+freiburger_voralpen;berner_oberland;id;Kette Stufe 2
+berner_oberland;emmental;id;Kette Stufe 3
+seeland_emmental;seeland;id;Kette Stufe 4
+berner_voralpen;berner_alpen;id;
+mittelland_west;plateau;id;
+mattertal_saastal;walliser_hochalpen;id;
+zentralschweizer_voralpen;zentralschweizer_alpen;id;NICHT urner_alpen - die id war 2026-04 schon einmal vergeben
+mittelland_zentral;zentrale_voralpen;id;
+zentralwallis;loetschental;id;
+engadin_unter;mittelbuenden;id;
+engadin_ober;oberengadin;id;
+glarnerland_walensee;glarner_alpen;id;
+jura_ost;tafeljura;id;
+jura_west;neuenburger_jura;id;
+tessin_nord;leventina_blenio;id;
+tessin_zentral;locarnese_bellinzonese;id;

@@ -87,8 +87,8 @@
         ]
       },
       "properties": {
-        "id": "zentralwallis",
-        "region": "Zentralwallis",
+        "id": "loetschental",
+        "region": "Lötschental",
         "name": "Leukerbad / Loetschental",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -238,8 +238,8 @@
         ]
       },
       "properties": {
-        "id": "mattertal_saastal",
-        "region": "Mattertal / Saastal",
+        "id": "walliser_hochalpen",
+        "region": "Walliser Hochalpen",
         "name": "Graehen",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -581,7 +581,7 @@
       },
       "properties": {
         "id": "waadtlaender_alpen",
-        "region": "Waadtlaender Alpen",
+        "region": "Waadtländer Alpen",
         "name": "Col du Pillon / Leysin",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -954,8 +954,8 @@
         ]
       },
       "properties": {
-        "id": "tessin_nord",
-        "region": "Tessin Nord",
+        "id": "leventina_blenio",
+        "region": "Leventina / Blenio",
         "name": "Carì",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -1165,8 +1165,8 @@
         ]
       },
       "properties": {
-        "id": "tessin_zentral",
-        "region": "Tessin Zentral",
+        "id": "locarnese_bellinzonese",
+        "region": "Locarnese / Bellinzonese",
         "name": "Locarno Cimetta",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -1372,8 +1372,8 @@
         ]
       },
       "properties": {
-        "id": "engadin_unter",
-        "region": "Engadin Unter",
+        "id": "mittelbuenden",
+        "region": "Mittelbünden",
         "name": "Scuol Motta Naluns",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -1523,8 +1523,8 @@
         ]
       },
       "properties": {
-        "id": "engadin_ober",
-        "region": "Engadin Ober",
+        "id": "oberengadin",
+        "region": "Oberengadin",
         "name": "Muottas Muragl",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -1830,7 +1830,7 @@
       },
       "properties": {
         "id": "rheintal",
-        "region": "Ostschweiz",
+        "region": "Rheintal",
         "name": "Santa Maria in Calanca",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -1969,7 +1969,7 @@
       },
       "properties": {
         "id": "alpstein",
-        "region": "Alpstein / Ostschweiz",
+        "region": "Alpstein / Toggenburg",
         "name": "Ebenalp",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -2135,8 +2135,8 @@
         ]
       },
       "properties": {
-        "id": "zentralschweizer_voralpen",
-        "region": "Zentralschweizer Voralpen",
+        "id": "zentralschweizer_alpen",
+        "region": "Zentralschweizer Alpen",
         "name": "Engelberg Brunni",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -2473,8 +2473,8 @@
         ]
       },
       "properties": {
-        "id": "glarnerland_walensee",
-        "region": "Glarnerland / Walensee",
+        "id": "glarner_alpen",
+        "region": "Glarner Alpen",
         "name": "Schrina",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -2660,8 +2660,8 @@
         ]
       },
       "properties": {
-        "id": "berner_voralpen",
-        "region": "Berner Voralpen",
+        "id": "berner_alpen",
+        "region": "Berner Alpen",
         "name": "Niederhorn",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -2843,8 +2843,8 @@
         ]
       },
       "properties": {
-        "id": "freiburger_voralpen",
-        "region": "Freiburger Voralpen",
+        "id": "berner_oberland",
+        "region": "Berner Oberland",
         "name": "Moléson",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -3121,8 +3121,8 @@
         ]
       },
       "properties": {
-        "id": "mittelland_west",
-        "region": "Mittelland West",
+        "id": "plateau",
+        "region": "Plateau",
         "name": "Moudon",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -3252,8 +3252,8 @@
         ]
       },
       "properties": {
-        "id": "jura_west",
-        "region": "Jura West",
+        "id": "neuenburger_jura",
+        "region": "Neuenburger Jura",
         "name": "Mauborget / Suchet",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -3558,8 +3558,8 @@
         ]
       },
       "properties": {
-        "id": "jura_ost",
-        "region": "Jura Ost",
+        "id": "tafeljura",
+        "region": "Tafeljura",
         "name": "Wasserflue / Geissflue",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -3705,8 +3705,8 @@
         ]
       },
       "properties": {
-        "id": "schwarzsee_gantrisch",
-        "region": "Schwarzsee / Gantrisch",
+        "id": "freiburger_voralpen",
+        "region": "Freiburger Voralpen",
         "name": "Gantrisch / Schwarzsee",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -3844,9 +3844,9 @@
         ]
       },
       "properties": {
-        "id": "berner_oberland",
-        "region": "Berner Oberland",
-        "name": "Interlaken / Niederhorn",
+        "id": "emmental",
+        "region": "Emmental",
+        "name": "Marbachegg / Schallenberg",
         "purpose": "precipitation_only",
         "n_points": 16,
         "reference_points": [
@@ -3975,8 +3975,8 @@
         ]
       },
       "properties": {
-        "id": "seeland_emmental",
-        "region": "Seeland / Emmental",
+        "id": "seeland",
+        "region": "Seeland",
         "name": "Belp / Bantiger",
         "purpose": "precipitation_only",
         "n_points": 16,
@@ -4130,8 +4130,8 @@
         ]
       },
       "properties": {
-        "id": "mittelland_zentral",
-        "region": "Mittelland Zentral",
+        "id": "zentrale_voralpen",
+        "region": "Zentrale Voralpen",
         "name": "Napf",
         "purpose": "precipitation_only",
         "n_points": 16,

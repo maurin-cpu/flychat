@@ -21,13 +21,13 @@ Nutze das **immer zusammen** mit dem Spot/Region-Feld **"Kritischer Foehn"** und
 **Suedoehn**
 Druck suedlich hoeher als noerdlich → **ΔP = Lugano − Zuerich > 0**.
 Typisch: **Lee Nordalpen / noerdliche Voralpen**, viel los in der Hoehe (**S/SW** am Kamm, 700 hPa).
-**Betroffene Regionen**: Glarnerland/Walensee, Chur/Mittelbuenden, Alpstein, Berner Oberland, Zentralschweizer Voralpen, Berner/Freiburger Voralpen. Bei starkem Suedoehn (≥5 hPa) bis ins Mittelland.
+**Betroffene Regionen**: Glarner Alpen, Chur/Mittelbuenden, Alpstein, Berner Alpen, Zentralschweizer Alpen, Berner Oberland. Bei starkem Suedoehn (≥5 hPa) bis ins Mittelland.
 
 **Nordoehn**
 **ΔP = Zuerich − Lugano > 0**.
 Typisch: **Lee suedlich des Kamms**, in der Hoehe oft **N/NE** (315°–45°).
-**Betroffene Regionen**: Tessin Zentral, Tessin Nord, Suedbuenden (Misox/Calanca).
-**NICHT betroffen bei Nordoehn**: Mittelland, Jura, noerdliche Voralpen, Schwarzsee/Gantrisch, Alpstein — diese Regionen bekommen **kalte Nordstroemung** (Bise-artig), **keinen warmen Fallwind**.
+**Betroffene Regionen**: Locarnese / Bellinzonese, Leventina / Blenio, Suedbuenden (Misox/Calanca).
+**NICHT betroffen bei Nordoehn**: Mittelland, Jura, noerdliche Voralpen, Freiburger Voralpen, Alpstein — diese Regionen bekommen **kalte Nordstroemung** (Bise-artig), **keinen warmen Fallwind**.
 
 **Nordoehn-Besonderheit:** Physikalisch oft eine "maskierte Bora" — kalte, schwere Luft stuerzt ueber den Kamm. Hoehere Dichte → enorme kinetische Energie → Windspitzen am Boden ueber 80 km/h moeglich. Schon ab **~2 hPa** konservativ warnen.
 
@@ -46,7 +46,7 @@ Typisch: **Lee suedlich des Kamms**, in der Hoehe oft **N/NE** (315°–45°).
 | Region | Besonderheit |
 |--------|-------------|
 | **Wallis** (Visp/Sion) | Durchbruch schon ab ~2 hPa moeglich, besonders im Fruehjahy (Thermik destabilisiert Inversion) |
-| **Berner Oberland** (Haslital) | Grimselpass-Einfluss, Rotoren im Lee, 3–4 hPa |
+| **Berner Alpen** (Haslital) | Grimselpass-Einfluss, Rotoren im Lee, 3–4 hPa |
 | **Glarnerland** | Guggifoehn-Effekte, 4–5 hPa |
 | **Rheintal** (Chur/Vaduz) | Komplexe Verzweigungen, Windshear in Bodennaehe, ~4 hPa |
 

@@ -205,22 +205,22 @@ Pilotenbauchgefuehl — auch wenn die Engine-Zahlen aehnlich aussehen.
   *Pilot sah Abgleiter trotz nominell verfuegbarer Thermik.*
 
 **Rating 2 — kurzer Thermikflug** *(aus Labels — bestaetigt)*
-- Seeland/Emmental (mittelland), Peak 1.9 m/s × 7h, AGL 981m, mixed → **2**.
+- Seeland (mittelland), Peak 1.9 m/s × 7h, AGL 981m, mixed → **2**.
 
 **Rating 3 — solider Thermikflug** *(aus Labels — Korrektur 5→3)*
-- Engadin Unter (hochalpin), Peak 2.4 m/s × 8h, AGL 660m, cu_clean_top → **3**.
+- Mittelbünden (hochalpin), Peak 2.4 m/s × 8h, AGL 660m, cu_clean_top → **3**.
   *Trotz Cu sauber und langer Dauer: lokal-Tag, nicht XC.*
 
 **Rating 4 — starker Thermikflug** *(aus Labels — Problemzone gegen 5)*
-- Freiburger Voralpen (voralpen), Peak 2.8 m/s × 10h, AGL 742m, blue → **4**.
+- Berner Oberland (voralpen), Peak 2.8 m/s × 10h, AGL 742m, blue → **4**.
   *Engine-Zahlen sehen nach XC-Substanz aus, Pilot sieht lokal-XC.*
-- Jura West (jura), Peak 2.3 m/s × 9h, AGL 938m, cu_clean_top → **4**.
+- Neuenburger Jura (jura), Peak 2.3 m/s × 9h, AGL 938m, cu_clean_top → **4**.
   *Auch im Jura: Cu sauber alleine reicht nicht fuer 5.*
 
 **Rating 5 — XC-Tag-Kandidat** *(aus Labels — bestaetigt durch Piloten)*
-- Engadin Ober (hochalpin), Peak 2.6 m/s × 10h, AGL 1294m, blue → **5**.
+- Oberengadin (hochalpin), Peak 2.6 m/s × 10h, AGL 1294m, blue → **5**.
 - Waadtlaender Alpen (alpen), Peak 2.9 m/s × 10h, AGL 1160m, mixed → **5**.
-- Mittelland Zentral (voralpen), Peak 2.6 m/s × 8h, AGL 1172m, blue → **5**.
+- Zentrale Voralpen (voralpen), Peak 2.6 m/s × 8h, AGL 1172m, blue → **5**.
 
 Sonst gilt: dein Pilotenurteil zaehlt, nicht eine Checkliste.
 

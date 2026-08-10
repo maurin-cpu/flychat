@@ -1,5 +1,12 @@
 # XContest-Validierung — Wiederkehrende Muster
 
+> **Hinweis (10.08.2026):** Einträge **bis** zu diesem Datum nennen die
+> Regionsnamen im Stand vor der Umbenennung — insbesondere die Befund-2-Tabelle
+> der 49-Tage-Analyse ist ohne Übersetzung nicht mehr lesbar. Zuordnung alt→neu:
+> `data/region_renames_2026-08.csv` · `docs/REGIONEN_UMBENENNUNG_2026-08.md`.
+> Alte Einträge bleiben unverändert — Befunde rückwirkend umzuschreiben würde
+> sie fälschen. Neue Einträge nutzen die neuen Namen.
+
 Akkumulierter Issue-Tracker über alle analysierten XContest-Tage.
 Jeder Issue zählt Tage, an denen er beobachtet wurde — sobald Muster
 konsistent auftauchen, lohnt sich ein Kalibrierungs-Eingriff.

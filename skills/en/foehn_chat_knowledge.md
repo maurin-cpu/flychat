@@ -21,13 +21,13 @@ Always use this **together** with the spot/region field **"Critical Foehn"** and
 **South foehn**
 Pressure higher in the south than in the north → **ΔP = Lugano − Zurich > 0**.
 Typical: **lee of the northern Alps / northern foothills**, lots going on aloft (**S/SW** at the ridge, 700 hPa).
-**Affected regions**: Glarnerland/Walensee, Chur/central Graubünden, Alpstein, Berner Oberland, central Swiss foothills, Bernese/Fribourg foothills. With strong south foehn (≥5 hPa) reaching into the Mittelland.
+**Affected regions**: Glarner Alpen, Chur/central Graubünden, Alpstein, Berner Alpen, central Swiss foothills, Berner Oberland. With strong south foehn (≥5 hPa) reaching into the Mittelland.
 
 **North foehn**
 **ΔP = Zurich − Lugano > 0**.
 Typical: **lee south of the ridge**, aloft often **N/NE** (315°–45°).
 **Affected regions**: central Ticino, northern Ticino, southern Graubünden (Misox/Calanca).
-**NOT affected by north foehn**: Mittelland, Jura, northern foothills, Schwarzsee/Gantrisch, Alpstein — these regions get a **cold northerly flow** (Bise-like), **not** a warm downslope wind.
+**NOT affected by north foehn**: Mittelland, Jura, northern foothills, Freiburger Voralpen, Alpstein — these regions get a **cold northerly flow** (Bise-like), **not** a warm downslope wind.
 
 **North foehn specialty:** Physically often a "masked bora" — cold, heavy air plunges over the ridge. Higher density → enormous kinetic energy → surface gusts over 80 km/h possible. Warn conservatively from as little as **~2 hPa**.
 
@@ -46,7 +46,7 @@ Typical: **lee south of the ridge**, aloft often **N/NE** (315°–45°).
 | Region | Specialty |
 |--------|-------------|
 | **Valais** (Visp/Sion) | Breakthrough possible from ~2 hPa, especially in spring (thermals destabilize the inversion) |
-| **Berner Oberland** (Haslital) | Grimsel Pass influence, rotors in the lee, 3–4 hPa |
+| **Berner Alpen** (Haslital) | Grimsel Pass influence, rotors in the lee, 3–4 hPa |
 | **Glarnerland** | Guggifoehn effects, 4–5 hPa |
 | **Rhine valley** (Chur/Vaduz) | Complex branching, wind shear near the surface, ~4 hPa |
 

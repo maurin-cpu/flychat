@@ -7,7 +7,7 @@ Nutzung:
     python scripts/preview_briefing_email.py
 
 Optional mit anderer Region-Auswahl:
-    python scripts/preview_briefing_email.py --regions jura_ost,mittelland_ost
+    python scripts/preview_briefing_email.py --regions tafeljura,mittelland_ost
 
 Tipp: Der Pfad am Ende kann direkt im Browser geoeffnet werden.
 """
@@ -26,15 +26,15 @@ if str(ROOT) not in sys.path:
 
 # Default-Mock-Subscriber: 10 Regionen quer durch CH
 DEFAULT_REGIONS = [
-    "jura_ost",
+    "tafeljura",
     "jura_zentral",
     "mittelland_ost",
     "zentrales_mittelland",
-    "berner_voralpen",
-    "schwarzsee_gantrisch",
+    "berner_alpen",
+    "freiburger_voralpen",
     "waadtlaender_alpen",
     "bodenseeraum",
-    "glarnerland_walensee",
+    "glarner_alpen",
     "oberwallis_goms",
 ]
 

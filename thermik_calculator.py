@@ -119,15 +119,15 @@ def get_terrain_zone(elevation_m: float, region_id: str = None) -> str:
 
     Die Schwellen des Fallbacks orientieren sich an den typischen Referenz-
     elevationen der regionen.csv-Eintraege:
-      mittelland:  < 850 m   (Seeland, Mittelland, Genfersee)
-      jura:        850–1300  (Jura Ost/West/Zentral)
-      voralpen:    1300–1550 (Napf, Schwarzsee, Glarnerland)
-      alpen:       1550–1900 (Berner Oberland, Alpstein, Tessin Zentral)
-      hochalpin:   ≥ 1900 m  (Wallis, Engadin, Tessin Nord, Goms, Surselva)
+      mittelland:  < 850 m   (Seeland, Plateau, Mittelland Ost, Genferseeregion)
+      jura:        850–1300  (Tafeljura, Neuenburger Jura, Jura Zentral)
+      voralpen:    1300–1550 (Zentrale Voralpen, Freiburger Voralpen, Glarner Alpen)
+      alpen:       1550–1900 (Berner Alpen, Alpstein / Toggenburg, Locarnese / Bellinzonese)
+      hochalpin:   ≥ 1900 m  (Walliser Hochalpen, Oberengadin, Leventina / Blenio, Goms, Surselva)
 
     Args:
         elevation_m: Referenzhoehe des Spots/der Region (m MSL)
-        region_id: optionale Regions-ID (z.B. "tessin_nord", "zentralwallis")
+        region_id: optionale Regions-ID (z.B. "leventina_blenio", "loetschental")
 
     Returns:
         Eine der Strings aus _VALID_TERRAIN_ZONES.

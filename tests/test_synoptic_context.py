@@ -305,7 +305,7 @@ class TestClassifyNordSued(unittest.TestCase):
         self.assertEqual(sc._classify_nord_sued(47.37, 8.55), "alpennord")
 
     def test_voralpen_nord(self):
-        # Berner Oberland (~46.6, 7.9) → alpennord (lat >= 46.45)
+        # Emmental (~46.6, 7.9) → alpennord (lat >= 46.45)
         self.assertEqual(sc._classify_nord_sued(46.6, 7.9), "alpennord")
 
     def test_tessin_sued(self):
