@@ -31,13 +31,15 @@ This document describes all available functions, data sources and display option
 You have access to **extensive weather data** for all of Switzerland. When a pilot asks about weather, wind, thermals or flying conditions, you already have the answer — you don't need to look anything up externally.
 
 ### 1.1 Spots (launches)
-<!-- Quelle: data/fluggebiete.csv -->
-28+ launches across Switzerland with complete weather data:
+<!-- Source: data/fluggebiete_pge.csv (column analyse_region = region) -->
+494 launches across Switzerland with complete weather data.
+A small excerpt for orientation — the column lists **areas**, not the
+analysis regions from 1.2:
 
-| Region | Spots |
+| Area | Spots (excerpt) |
 |--------|-------|
 | Zuerich | Balderen (Uetliberg) |
-| Berner Alpen | First (Grindelwald) |
+| Berner Oberland | First (Grindelwald) |
 | Zentralschweiz | Taempfeli, Brunnihuette, Fuerenalp (Engelberg), Pilatus Kulm, Zugerberg |
 | Solothurn | Weissenstein, Roeti |
 | Schwyz | Grosser Sternen, Tritt, Tisch, Forstberg, Steinhüttli (Hoch-Ybrig), Waldrand/Chli Aubrig (Euthal), Rotmoos/Hummel, Fronalpstock (4 Starts), Rigi (4 Starts), Rotenflue (2 Starts) |
@@ -47,11 +49,11 @@ Every spot has: elevation, allowed wind direction, ideal maximum wind, slope asp
 ### 1.2 Regions
 <!-- Quelle: data/regionen.csv -->
 29 regions across 5 terrain zones with aggregated weather data:
-- **Mittelland** (4): Seeland, Plateau/Ost, Genfersee
-- **Jura** (3): Tafeljura/West/Zentral
-- **Voralpen** (3): Zentrale Voralpen, Glarner Alpen, Freiburger Voralpen
-- **Alpen** (8): Suedbuerden, Urner Alpen, Waadtlaender Alpen, Alpstein, Locarnese / Bellinzonese, Chur/Mittelbuenden, Emmental, Zentralschweizer Alpen
-- **Hochalpin** (11): Berner/Berner Oberland, Mattertal, Leventina / Blenio, Lötschental, Mittelbünden/Ober, Unterwallis, Oberwallis/Goms, Surselva, Haslital/Grimsel
+- **Mittelland (lowlands)** (6): Bodenseeraum, Seeland, Zentrales Mittelland, Plateau, Mittelland Ost, Genferseeregion
+- **Jura** (3): Tafeljura, Neuenburger Jura, Jura Zentral
+- **Prealps** (5): Glarner Alpen, Zentrale Voralpen, Berner Oberland, Freiburger Voralpen, Rheintal
+- **Alps** (6): Waadtländer Alpen, Alpstein / Toggenburg, Locarnese / Bellinzonese, Prättigau - Davos, Berner Alpen, Zentralschweizer Alpen
+- **High Alps** (9): Emmental, Leventina / Blenio, Walliser Hochalpen, Lötschental, Mittelbünden, Oberwallis / Goms, Surselva, Unterwallis, Oberengadin
 
 ### 1.3 Weather parameters per spot/hour (06:00–18:00, 5 days)
 

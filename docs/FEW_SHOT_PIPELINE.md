@@ -360,7 +360,7 @@ Eine Zeile pro Eintrag, JSON-Objekt. **Pflichtfelder fett.**
 | **`schema_version`** | string | ja | aktuelle Rating-Schema-Version, z.B. `"v1.6"` (aus RATING_CONCEPT.md) |
 | **`model_id`** | string | ja | LLM-Modell, das die Original-Analyse erzeugt hat (`claude-sonnet-4-6` etc.) |
 | **`prompt_hash`** | string | ja | Hash des verwendeten Skill-Templates + Capabilities-Guide |
-| **`spot_or_region_id`** | string | ja | z.B. `"niederrickenbach"` oder `"voralpen_zentral"` |
+| **`spot_or_region_id`** | string | ja | z.B. `"niederrickenbach"` oder `"zentrale_voralpen"` |
 | **`entity_type`** | enum | ja | `spot` oder `region` |
 | **`terrain_tier`** | enum | ja | `mittelland`, `jura`, `voralpen`, `alpen`, `hochalpin` (aus `data/regionen.csv`) |
 | **`target_date`** | ISO-date | ja | Datum, für das die Analyse galt |

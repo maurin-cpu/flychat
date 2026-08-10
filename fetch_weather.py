@@ -38,7 +38,7 @@ import statistics
 
 # Schwelle: ab welcher Spot-Anzahl je Region wird der Spot-Median Thermik-Override
 # aktiv? Darunter bleibt der Refpoint-Pfad. Mai 2026: 3 ist Mindest-Median-Robustheit,
-# 7 Regionen heute haben n<3 (Plateau/Ost, Bodenseeraum, Tafeljura, Seeland,
+# 7 Regionen heute haben n<3 (Plateau, Mittelland Ost, Bodenseeraum, Tafeljura, Seeland,
 # Zentrales Mittelland, Waadtländer Alpen).
 SPOT_MEDIAN_MIN_SPOTS = 3
 
