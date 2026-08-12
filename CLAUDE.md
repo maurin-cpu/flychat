@@ -29,7 +29,7 @@ Projekt `/home/deploy/flychat`, App läuft als `wingcast.service`.
 
 | Ich brauche … | Ort | Achtung |
 |---|---|---|
-| **Eingefrorene Tagesprognose** (Basis jeder Validierung) | `data/weather_archive/YYYY-MM-DD.json` — Server vollständig, seit 31.07. inkl. `thunder_ensemble` je Region | 23.07.2026 existiert nicht (Deploy-Stash-Verlust). Nie die Live-Datei als Beleg nehmen |
+| **Eingefrorene Tagesprognose** (Basis jeder Validierung) | `data/weather_archive/YYYY-MM-DD.json` — Server führend, seit 31.07. inkl. `thunder_ensemble` je Region | **Nicht lückenlos** (nachgezählt 12.08.): 9 Tage fehlen, 31 sind unvollständig — 01.07.–01.08. tragen **gar keine Bewertungen**, weder Spot noch Region. Vor jeder Auswertung `python scripts/snapshot_wache.py --luecken`, nie eine Tagesliste ungeprüft annehmen. Seit 02.08. lückenlos, seit 12.08. bewacht. Nie die Live-Datei als Beleg nehmen |
 | **Live-Lauf** (aktuelles 5-Tage-Fenster) | `data/wetterdaten.json` — nur Server aktuell, gitignored | **Rollendes Fenster** — Vergangenheit fällt täglich raus. Für Belege sofort archivieren |
 | **Gewitter-Validierung** (Warnung vs. SMN-Messung, täglich) | `validation/gewitter/` — `messwerte/`, `urteile/`, `scoreboard.json`, `AUTO_REPORT.md` | Maschinendaten sind server-lokal (gitignored) → per Sync holen. Grenzen des Richters: dortiges README |
 | **Fronten-/XContest-Validierung** | `validation/fronten/`, `validation/xcontest/` | gleiche Bauart, Konvention in `validation/README.md` |
