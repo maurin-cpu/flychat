@@ -382,9 +382,18 @@ def main(argv=None) -> int:
                  "spots_bewertet": 0, "regionen_bewertet": 0, "referenz_spots": 494,
                  "maengel": ["abgeschnitten", "keine_regionen", "keine_spot_bewertung"]}
         betreff, text = _text(probe, nachgeholt=True)
+        # Der Hinweis MUSS in den Text, nicht nur in den Betreff: Mail-Clients
+        # und Weiterleitungen zeigen oft nur den Rumpf, und wer eine
+        # Alarmmeldung liest, liest die Zahlen — nicht die Betreffzeile.
+        # Am 12.08.2026 hat genau das einen Fehlalarm ausgeloest.
+        text = (f"*** PROBEMELDUNG — KEIN ECHTER BEFUND ***\n"
+                f"Test des Versandwegs (scripts/snapshot_wache.py --testmail).\n"
+                f"Die Zahlen unten sind erfunden. Der echte Stand steht in\n"
+                f"    python scripts/snapshot_wache.py\n"
+                f"{'=' * 62}\n\n") + text
         print(f"Empfaenger: {config.OPS_ALERT_EMAIL}\n")
         print(text)
-        _sende(betreff + " (PROBE)", text)
+        _sende("[PROBE] " + betreff, text)
         return 0
 
     if args.luecken:
