@@ -56,6 +56,11 @@ def notify_config_changed() -> None:
 ACCURACY_HOUR = 7
 ACCURACY_MINUTE = 0
 
+# Bis zu dieser Stunde wird ein ausgefallener Morgenlauf nachgeholt
+# (_nachholen_falls_noetig). Spaeter friert ein Snapshot nicht mehr die
+# Tagesprognose ein, sondern einen Nowcast auf einen fast abgelaufenen Tag.
+NACHHOL_GRENZE_STUNDE = 12
+
 # DWD-Frontenarchiv (Plan §6 Schritt 7). Vier Laeufe taeglich.
 #
 # Warum viermal und nicht einmal: Der DWD haelt Open Data nur rund zwei Tage
@@ -338,6 +343,121 @@ def _run_snapshot() -> bool:
         return False
 
 
+def _snapshot_pruefen(nachgeholt: Optional[bool] = None) -> dict:
+    """Waechter nach jedem Lauf: liegt HEUTE brauchbar im Archiv?
+
+    Der Snapshot-Code meldet Ausfaelle bisher nur als Logzeile — gesehen hat
+    sie niemand (Juli 2026: 29 Tage ohne Regionsebene, gefunden erst Wochen
+    spaeter). Hier geht daraus eine Mail an config.OPS_ALERT_EMAIL raus,
+    derselbe Weg wie beim Frontenalarm.
+    """
+    try:
+        from scripts.snapshot_wache import pruefe_und_melde
+        b = pruefe_und_melde(nachgeholt=nachgeholt)
+        if b.get("maengel"):
+            logger.error("Snapshot-Wache: %s hat Maengel: %s — %s", b["tag"],
+                         ", ".join(b["maengel"]), b.get("meldung", "keine Meldung"))
+        else:
+            logger.info("Snapshot-Wache: %s in Ordnung (%d Startplaetze, "
+                        "%d bewertet, %d Regionen)", b["tag"], b["spots"],
+                        b["spots_bewertet"], b["regionen"])
+        return b
+    except Exception as e:
+        logger.exception("Snapshot-Wache fehlgeschlagen: %s", e)
+        return {}
+
+
+def _briefings_heute() -> Optional[int]:
+    """Wie viele Briefing-Mails sind heute schon raus? None = nicht feststellbar.
+
+    Trennt die beiden Ausfallbilder, die man sonst verwechselt: faellt nur der
+    Snapshot-Schritt aus, hat der Kunde seine Mail laengst; faellt der ganze
+    Morgenlauf aus, fehlt beides. Die Meldung soll das sagen, nicht raten.
+    """
+    try:
+        from subscriber import get_manager_from_env
+        mgr = get_manager_from_env()
+        if mgr is None:
+            return None
+        n = mgr.count_sent_today()
+        return None if n < 0 else n
+    except Exception as e:
+        logger.warning("Snapshot-Nachlauf: Briefing-Stand nicht feststellbar: %s", e)
+        return None
+
+
+def _nachholen_falls_noetig(engine) -> None:
+    """Beim Start pruefen, ob der heutige Daily-Run ausgefallen ist — und ihn
+    fuer die Datenkette nachholen.
+
+    Warum das noetig ist: `_next_send_time` liefert immer den naechsten Termin
+    STRIKT NACH jetzt. Startet der Dienst um 06:03 neu — der Normalfall bei
+    einem Deploy am Morgen —, faellt der 06:00-Lauf ersatzlos aus, und der
+    Archivtag ist endgueltig weg (die Prognose von heute Morgen existiert
+    nirgends sonst). Genau so sind zwischen Mai und Juli 2026 neun Tage
+    verschwunden, zusaetzlich zum abgeschnittenen 23.06.
+
+    Nachgeholt wird NUR die Datenkette (Wetter -> LLM-Analyse -> Snapshot),
+    NICHT der Briefing-Versand. Eine Morgenmail um 11:00 ist schlechter als
+    keine, und ohne verlaesslichen Nachweis, ob der Versand schon lief, waere
+    ein Doppelversand die wahrscheinlichere Folge. Die Mail des Waechters sagt
+    ausdruecklich, dass die Briefings dieses Morgens fehlen.
+    """
+    from scripts import snapshot_wache
+
+    now = datetime.now()
+    heute = now.date().isoformat()
+
+    if now.weekday() not in config.DAILY_RUN_WEEKDAYS:
+        return
+    slot = now.replace(hour=config.DAILY_RUN_HOUR, minute=config.DAILY_RUN_MINUTE,
+                       second=0, microsecond=0)
+    if now <= slot:
+        return                      # der heutige Lauf steht noch bevor
+
+    vorher = snapshot_wache.befund(heute)
+    if not vorher["maengel"]:
+        return                      # Lauf ist gelaufen, alles da
+
+    if not snapshot_wache.nachhol_versuch_offen(heute):
+        logger.warning("Snapshot-Nachlauf: fuer %s bereits versucht — kein "
+                       "zweiter Anlauf (Schutz gegen Neustart-Schleife)", heute)
+        return
+    # Vermerk VOR dem Lauf: startet der Dienst wiederholt neu, weil etwas
+    # anderes kaputt ist, darf das nicht jedes Mal eine volle LLM-Analyse kosten.
+    snapshot_wache.vermerke_nachhol_versuch(heute)
+
+    if now.hour >= NACHHOL_GRENZE_STUNDE:
+        # Nach der Mittagsgrenze friert ein Snapshot nicht mehr die
+        # Tagesprognose ein, sondern einen Nowcast auf einen fast abgelaufenen
+        # Tag. Als Beleg ist das wertlos — dann lieber ehrlich melden.
+        logger.error("Snapshot-Nachlauf: %s fehlt (%s), aber es ist %02d:%02d — "
+                     "nach %02d:00 ist der Tag als Prognose-Beleg nicht mehr "
+                     "zu retten. Kein Nachlauf.", heute, ", ".join(vorher["maengel"]),
+                     now.hour, now.minute, NACHHOL_GRENZE_STUNDE)
+        _snapshot_pruefen(nachgeholt=False)
+        return
+
+    logger.warning("Snapshot-Nachlauf: %s fehlt (%s) — hole Wetter, Analyse und "
+                   "Snapshot nach (ohne Briefing-Versand)",
+                   heute, ", ".join(vorher["maengel"]))
+    try:
+        engine.refresh_weather()
+        logger.info("Snapshot-Nachlauf: Wetter-Refresh OK")
+    except Exception as e:
+        logger.exception("Snapshot-Nachlauf: Wetter-Refresh fehlgeschlagen — "
+                         "weiter mit Cache-Daten: %s", e)
+    _run_llm_analysis(engine)
+    _run_snapshot()
+
+    nachher = snapshot_wache.befund(heute)
+    logger.info("Snapshot-Nachlauf: %s",
+                snapshot_wache.melde_nachlauf(vorher, nachher, _briefings_heute()))
+    if nachher["maengel"]:
+        logger.error("Snapshot-Nachlauf: %s bleibt unvollstaendig (%s)",
+                     heute, ", ".join(nachher["maengel"]))
+
+
 def _run_gewitter_validation() -> bool:
     """Gewitter-Abgleich: Warnung (Freeze) gegen SMN-Messung.
 
@@ -432,6 +552,7 @@ def _daily_run(engine) -> dict:
 
     logger.info("Daily run: starte Snapshot (Forecast einfrieren)...")
     _run_snapshot()
+    _snapshot_pruefen()
 
     logger.info("Daily run: starte Gewitter-Validierung (letzter komplett "
                 "publizierter Tag)...")
@@ -454,6 +575,16 @@ def briefing_scheduler(engine) -> None:
 
     # Flask-App einmalig laden — wird pro Job-Aufruf mit app_context() gewrapped.
     from web import app as flask_app
+
+    # Erst nachholen, dann in den Schlaf: ein Neustart nach 06:00 hat sonst
+    # gerade den Archivtag gekostet. Failure-tolerant wie jeder Job hier — ein
+    # Fehler beim Nachholen darf den Scheduler nicht am Starten hindern.
+    if not test_mode:
+        try:
+            with flask_app.app_context(), flask_app.test_request_context():
+                _nachholen_falls_noetig(engine)
+        except Exception as e:
+            logger.exception("Scheduler: Nachhol-Pruefung fehlgeschlagen: %s", e)
 
     first_iter = True
     while True:

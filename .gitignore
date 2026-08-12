@@ -24,6 +24,12 @@ node_modules/
 # Runtime data (generated, server-local)
 data/wetterdaten.json
 data/synoptic_grid.json
+# Zustand des Archiv-Waechters (Wiederholungssperre + Nachhol-Vermerk).
+# Bewusst NICHT versioniert, anders als beim Frontenalarm: der bleibt in git,
+# weil die Cloud-Routine keinen bleibenden Datentraeger hat. Der Waechter
+# laeuft nur auf dem Server, dort ueberlebt die Datei den Neustart — im Repo
+# wuerde sie zwischen Server und Arbeitsplatz hin und her springen.
+data/.snapshot_wache.json
 
 # Remotion-Video Export (generierte Tages-Vorhersage, kein Quellcode)
 forecast_*_remotion.json

@@ -1199,6 +1199,30 @@ class SubscriberManager:
             logger.error("mark_sent failed: %s", e)
             return False
 
+    def count_sent_today(self) -> int:
+        """Wie viele Abos haben heute schon eine Briefing-Mail bekommen?
+
+        Fuer den Archiv-Waechter (scripts/snapshot_wache.py): ein fehlender
+        Snapshot heisst NICHT automatisch, dass der Versand ausgefallen ist —
+        beides sind getrennte Schritte im Daily-Run. Statt das zu unterstellen,
+        wird hier nachgesehen.
+
+        Zeitbezug: last_sent_at wird mit datetime('now') geschrieben, also UTC,
+        und hier gegen date('now') in UTC verglichen — dieselbe Skala.
+        """
+        try:
+            with self._cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM subscribers "
+                    "WHERE last_sent_at IS NOT NULL "
+                    "  AND date(last_sent_at) = date('now')"
+                )
+                row = cur.fetchone()
+                return int(row[0]) if row else 0
+        except Exception as e:
+            logger.error("count_sent_today failed: %s", e)
+            return -1          # -1 = nicht feststellbar, 0 = sicher keine
+
     def close(self):
         """Kompatibilitaet — SQLite-Verbindungen werden pro Operation geoeffnet/geschlossen."""
         return
