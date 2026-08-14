@@ -103,3 +103,8 @@ data/_meteoschweiz_cache/
 
 # Sicherungen der Regionen-Umbenennung 2026-08 (scripts/migrate_region_names.py)
 *.pre_rename
+
+# OGN-Collector: Salt fuer die Geraete-Hashes. Bleibt server-lokal und darf NIE
+# wechseln — ein neuer Salt macht dasselbe Geraet zu zwei Geraeten und
+# entwertet jede Geraete-Zaehlung rueckwirkend (ogn_collector.py).
+data/ogn_salt.txt

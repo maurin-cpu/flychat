@@ -1,0 +1,19 @@
+[Unit]
+Description=Wingcast OGN Collector (Gleitschirm-Telemetrie mitschneiden)
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/home/deploy/flychat
+ExecStart=/home/deploy/flychat/.venv/bin/python ogn_collector.py
+# Bewusst entkoppelt vom Webdienst: faellt der Collector aus, laeuft die App
+# weiter — und umgekehrt. Restart=always statt on-failure, weil ein Stream-Ende
+# kein Fehler ist, aber jede Minute Ausfall unwiederbringlich Daten kostet.
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
