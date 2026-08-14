@@ -1,7 +1,8 @@
 # Plan: OGN-Validierung — Real-Flug-Belege über OpenGliderNetwork
 
-**Status:** Mitschnitt gebaut und lokal am Livestrom verifiziert, **noch nicht
-auf dem Server in Betrieb**. Auswertung (Phase 2/3) nicht begonnen.
+**Status:** Mitschnitt **seit 14.08.2026, 11:13 auf dem Server in Betrieb**
+(`ogn-collector.service`, läuft entkoppelt vom Webdienst). Verdichtung zu
+Flügen (Phase 2) und Auswertung (Phase 3) noch nicht gebaut.
 **Erstellt:** 2026-06-14 · **Überarbeitet:** 2026-08-14 (Methodik + Hausordnung)
 **Branch:** `main` (Single-Branch-Workflow)
 
@@ -16,8 +17,29 @@ in der Messung bestätigt).
 Geräte-Kennung nur als Hash (Salt in `data/ogn_salt.txt`, gitignored, darf nie
 wechseln), Stealth-/No-Track-Geräte werden beim Eintreffen verworfen.
 
-**Offen:** Inbetriebnahme auf dem Server, danach Phase 2 (Flüge bilden) und
-Phase 3 (Auswertung).
+**Offen:** Phase 2 (Flüge bilden) und Phase 3 (Auswertung).
+
+**Erste Zahlen vom laufenden Dienst** (14.08., 11:13–11:16, Mittagsbetrieb):
+2482 Punkte, **126 verschiedene Geräte**, 98 % Gleitschirm, Höhen 694–3890 m,
+maximales Steigen **6.84 m/s**. Morgens um 09:21 waren es 14 Geräte — der
+Tagesgang ist also gross, und die Verbreitungsfrage ist praktisch beantwortet
+(das Gate verlangte rund 40 Geräte).
+
+**Speicherbedarf, korrigiert:** hochgerechnet aus dem Mittagswert rund
+**75 MB pro Tag** an einem starken Sommertag → 30 Tage ≈ 2.3 GB, 5 GB ≈ 65 Tage.
+Frühere Schätzungen (60 MB/Tag, dann 400 MB–1 GB je 30 Tage) lagen zu tief, weil
+sie auf der Morgenmessung beruhten. Server hat 22 GB frei. **Nach dem ersten
+vollen Sammeltag durch die echte Zahl ersetzen.**
+
+### Nächster Schritt (Phase 2, geplant für den 15.08.)
+Bewusst nicht am 14.08. gebaut: Die zwei Schwellenwerte des Verdichters — ab
+welcher Sendepause ein Flug endet, und wie Boden von Luft getrennt wird — lassen
+sich nur an **abgeschlossenen** Flügen ablesen. Ablauf:
+1. Aus dem vollen Tag die tatsächlichen Pausen- und Startmuster ablesen.
+2. `ogn_sessions.py` bauen, rückwirkend über den 14.08. laufen lassen.
+3. Ergebnis gegen die Wirklichkeit prüfen (plausible Dauern/Höhen, keine
+   erfundenen Flüge).
+4. Klären, ob vorhandene Geländedaten für die Höhe über Grund reichen.
 
 ### Was die ersten echten Daten gezeigt haben
 - **Ein eingeschaltetes Gerät heisst nicht „fliegt".** Am Morgen stehen viele
