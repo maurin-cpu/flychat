@@ -66,12 +66,51 @@ Messung sagt ~$8.70. Das Profil trägt.
 | `gpt-5.6-luna` parallel | 7.76 | 233 |
 | `deepseek-v4-flash` neu, peak | 13.73 | 412 |
 
-## 4. Qualität — „gleiche Power" ist zu bescheiden
+## 4. Qualität — für UNSERE Aufgabe ist der Benchmark-Vorsprung kein Argument
 
-Luna ist auf den öffentlichen Benchmarks **besser**, nicht gleich: DeepSWE pass@1
-67.2 % vs. 53.3 % für V4 Flash. In einem SaaS-Tool-Use-Test 5/12 vs. 4/12 Tasks.
-Für unsere Aufgabe (strukturiertes JSON aus einem grossen Wetterkontext) sagt das
-wenig — die Entscheidung fällt am `score_regression.py`-Gate, nicht am Benchmark.
+Auf den öffentlichen Benchmarks ist Luna klar vorn: DeepSWE pass@1 67.2 % vs.
+53.3 %, SaaS-Tool-Use 5/12 vs. 4/12. Nur misst beides etwas anderes als das, was
+wir tun — agentisches Coding und Tool-Calling gegen „strukturiertes Urteil aus
+einem bereits vorverdauten Wetterkontext, auf Deutsch". Eine Korrelation zwischen
+DeepSWE und der Treffsicherheit von `safety_status` ist nicht belegt.
+
+Zwei Gründe, warum der Vorsprung bei uns eher **nicht** ankommt:
+
+1. **Unsere Prompts sind kein Reasoning-Problem.** Die Physik ist vorher gerechnet
+   (Decision-Engine, Thermikmodell, Böen-Merge) — das LLM stuft ein und formuliert.
+   Genau das hat der Synoptik-A/B vom 01.08. schon gezeigt: Thinking AN brachte
+   *keinen* Qualitätsvorteil, „plausibel, weil der Payload nur fertig
+   klassifizierte Felder enthält, keine Rohzahlen" (`config.py`, SYNOPTIC_THINKING).
+2. **Wir würden das Benchmark-Luna gar nicht kaufen.** Die $3.88 gelten nur mit
+   `reasoning.effort=none`. Der Vorsprung, auf den man sich beruft, ist genau das,
+   was wir wegkonfigurieren müssen, damit die Rechnung aufgeht.
+
+### Wie die Frage beantwortet wird: messen, nicht schätzen
+
+`cost_testing/ab_model_compare.py` stellt exakt diese Frage — Diff nur auf
+`safety_status`, gefährliche Flips (`not_safe` → fliegbar) separat gezählt als
+K.O.-Kriterium. Gate: **≥ 98 % identisch UND 0 gefährliche Flips.** Luna ist seit
+dem Eintrag in `MODEL_PROVIDER_MAP` als Kandidat wählbar.
+
+```bash
+export WINGCAST_SPOT_CSV=test                                    # 28 Spots, ~$1
+python cost_testing/ab_model_compare.py deepseek-v4-flash deepseek-v4-flash  # Jitter-Baseline
+python cost_testing/ab_model_compare.py deepseek-v4-flash gpt-5.6-luna       # A/B
+python cost_testing/score_regression.py --report cost_testing/reports/reg_luna.md
+```
+
+Die Baseline ist nicht optional: `temperature=0.2` ist nicht deterministisch, ein
+Teil jeder Abweichung ist Rauschen. Präzedenz ist der Thinking-A/B vom 27.07.
+(81 Spot-Tage): 91.4 % identisch gegen 95.1 % Jitter-Baseline — Differenz nicht
+vom Rauschen unterscheidbar, 0 gefährliche Flips → angenommen.
+
+`score_regression.py` läuft ergänzend, weil `safety_status` allein nicht alles
+abdeckt: `rating`, `flyability_tier`, `streckenflug_tier` und `caution_notes`
+hängen dort mit kalibrierten Schwellen drin.
+
+**Reihenfolge:** Der A/B wäre heute unfair — ohne Reasoning-Schalter liefe Luna
+mit `effort=medium`, also in einer Konfiguration, die wir nie deployen würden.
+Erst der Schalter, dann der A/B mit `effort=none`, dann die Entscheidung.
 
 ## 5. Drei Vorbehalte, die die Rechnung kippen können
 
