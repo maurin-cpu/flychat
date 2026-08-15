@@ -14,9 +14,16 @@ Besser als die Hochrechnung: echte Zahlen aus data/cost_telemetry.jsonl:
 
     python cost_testing/compare_models.py --from-telemetry
 
+Ab 16.08.2026 haengt der DeepSeek-Preis an der Uhrzeit (Peak 01-04 + 06-10 UTC,
+doppelter Tarif). Entscheidend ist nicht, wann der Daily-Job startet, sondern wann
+die LLM-Phase laeuft — dazwischen liegt der Wetter-Refresh. Das zeigt:
+
+    python cost_testing/compare_models.py --fenster
+
 Hintergrund + Quellenlage der Preise: docs/LLM_KOSTEN_VERGLEICH_2026-08.md
 """
 import argparse
+import datetime as dt
 import json
 import pathlib
 import sys
@@ -56,12 +63,53 @@ def profil_aus_telemetrie(pfad):
     return in_tok, out_tok, (r["total_cached_tok"] / in_tok if in_tok else 0.0)
 
 
+# DeepSeek Peak-Fenster in UTC (ab 16.08.2026 16:00 UTC). Off-peak = halber Preis,
+# liegt aber trotzdem ueber dem alten Flat-Tarif.
+PEAK_FENSTER_UTC = ((1, 4), (6, 10))
+
+
+def _tarif(stunde_utc):
+    return "PEAK" if any(a <= stunde_utc < b for a, b in PEAK_FENSTER_UTC) else "off-peak"
+
+
+def zeige_fenster(pfad, letzte=7):
+    """Wann lief die LLM-Phase wirklich — und in welchem DeepSeek-Tarif?
+
+    `ts` wird am ENDE der Analyse geschrieben, `duration_s` ist deren Dauer.
+    Start = ts - duration_s. Der Daily-Job startet frueher: dazwischen liegt
+    refresh_weather() (scheduler.py::_daily_run).
+    """
+    zeilen = [json.loads(z) for z in pathlib.Path(pfad).read_text().splitlines() if z.strip()]
+    if not zeilen:
+        raise SystemExit(f"{pfad} ist leer — erst einen Lauf machen.")
+    print(f"LLM-Phase der letzten {min(letzte, len(zeilen))} Laeufe (UTC):\n")
+    grenzfaelle = 0
+    for r in zeilen[-letzte:]:
+        ende = dt.datetime.fromisoformat(r["ts"])
+        start = ende - dt.timedelta(seconds=r.get("duration_s") or 0)
+        t_start, t_ende = _tarif(start.hour), _tarif(ende.hour)
+        marke = "" if t_start == t_ende == "off-peak" else "   <-- teurer Tarif beruehrt"
+        if marke:
+            grenzfaelle += 1
+        print(f"  {start:%Y-%m-%d}  {start:%H:%M}-{ende:%H:%M} UTC  "
+              f"({(r.get('duration_s') or 0)/60:5.1f} min)  "
+              f"{t_start} -> {t_ende}  ${r.get('est_usd', 0):.2f}{marke}")
+    print(f"\nPeak-Fenster: {', '.join(f'{a:02d}-{b:02d}' for a, b in PEAK_FENSTER_UTC)} UTC. "
+          f"{grenzfaelle} von {min(letzte, len(zeilen))} Laeufen betroffen.")
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--fenster", nargs="?", const=str(config.COST_TELEMETRY_PATH),
+                    metavar="JSONL", help="wann lief die LLM-Phase, und in welchem Tarif?")
     ap.add_argument("--from-telemetry", nargs="?", const=str(config.COST_TELEMETRY_PATH),
                     metavar="JSONL", help="letzte Zeile aus cost_telemetry.jsonl statt Hochrechnung")
     ap.add_argument("--laeufe-pro-monat", type=int, default=30)
     args = ap.parse_args()
+
+    if args.fenster:
+        zeige_fenster(args.fenster)
+        return 0
 
     if args.from_telemetry:
         in_tok, out_tok, hit = profil_aus_telemetrie(args.from_telemetry)

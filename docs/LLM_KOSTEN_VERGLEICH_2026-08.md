@@ -90,16 +90,48 @@ wenig — die Entscheidung fällt am `score_regression.py`-Gate, nicht am Benchm
    Auto-Cache und OpenAIs Prefix-Cache greifen unterschiedlich; bei niedrigerer
    Hit-Rate steigen beide Seiten, aber Luna stärker (Input 0.20 vs. 0.14).
 
+## 5b. Wann ist off-peak? — und was das für den Tageslauf heisst
+
+Peak ist 01–04 und 06–10 UTC. In Schweizer Lokalzeit bleibt morgens **ein
+Zwei-Stunden-Fenster**:
+
+| | Peak (doppelt) | brauchbares Off-Peak-Fenster morgens |
+|---|---|---|
+| Sommer (CEST) | 03–06 und 08–12 lokal | **06:00–08:00 lokal** |
+| Winter (CET) | 02–05 und 07–11 lokal | **05:00–07:00 lokal** |
+
+Der Tageslauf startet 06:00 lokal (`config.DAILY_RUN_HOUR`) — im Sommer exakt auf
+der Fensterkante, im Winter mit nur einer Stunde Luft bis zum Peak.
+
+**Der Haken:** `_daily_run()` ist sequenziell — `refresh_weather()` läuft **vor**
+der LLM-Analyse (`scheduler.py:530`). Die Calls starten also nicht um 06:00,
+sondern um 06:00 + Refresh-Dauer. Ob wir das Fenster überhaupt treffen, weiss
+niemand ohne Messung; `ts` (Ende der LLM-Phase) minus `duration_s` in
+`data/cost_telemetry.jsonl` gibt es exakt her:
+
+```bash
+python cost_testing/compare_models.py --fenster
+```
+
+Kippt die LLM-Phase über 06:00 UTC, zahlt der überhängende Teil den doppelten
+Tarif. Zwei Auswege, falls das Fenster nicht reicht:
+
+- **Lauf an UTC hängen statt an Lokalzeit** — fix 04:00–04:15 UTC ganzjährig
+  (= 06:00 lokal im Sommer, 05:00 im Winter). Kostet im Winter eine Stunde
+  frühere Briefings, gibt dafür ganzjährig die vollen zwei Stunden.
+- **Wetter-Refresh vorziehen**, damit die LLM-Phase am Fensteranfang steht statt
+  am Ende.
+
+Beides ist Schadensbegrenzung, keine Ersparnis (siehe unten).
+
 ## 6. Empfehlung
 
 **Jetzt nichts umschalten.** Die Erhöhung ist morgen 16:00 UTC — bis dahin ist
 DeepSeek konkurrenzlos. Danach in dieser Reihenfolge:
 
-1. **Tageslauf nicht verschieben.** 06:00 Europe/Zurich = 04:00 UTC (Sommer) bzw.
-   05:00 UTC (Winter) — beides **off-peak** (Peak: 01–04 und 06–10 UTC). Im Sommer
-   liegt der Start allerdings direkt auf der Fenstergrenze, und ein Lauf, der über
-   06:00 UTC hinausläuft, kippt in den doppelten Tarif. Gratis-Ersparnis: nur
-   nichts kaputtmachen.
+1. **Zuerst messen, wann die LLM-Phase wirklich läuft** (`--fenster`, §5b). Der
+   Startzeitpunkt des Jobs sagt es nicht — der Wetter-Refresh liegt dazwischen.
+   Erst danach entscheiden, ob der Lauf verschoben werden muss.
 2. **Zwei Läufe nach dem 16.08. messen**, `data/cost_telemetry.jsonl` auswerten,
    echte DeepSeek-Preise in `config.MODEL_PRICES` nachtragen, dann
    `python cost_testing/compare_models.py --from-telemetry`. Erst hier steht die
