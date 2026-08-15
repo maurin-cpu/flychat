@@ -38,6 +38,7 @@ _MODEL_TOKEN_LIMITS = {
     "gpt-4.1":        128_000,
     "gpt-4.1-mini":   128_000,
     "gpt-4.1-nano":   128_000,
+    "gpt-5.6-luna": 1_050_000,
     # Anthropic (Claude) — alle aktuellen Modelle haben 200k Context
     "claude-haiku-4-5":   200_000,
     "claude-sonnet-4-6":  200_000,

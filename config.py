@@ -1308,6 +1308,7 @@ DEEPSEEK_ANALYSIS_MODEL  = LLM_MODELS["deepseek"]["analysis"]
 # Bei neuen Modellen hier eintragen — sonst greift der Auto-Provider nicht.
 MODEL_PROVIDER_MAP: dict[str, str] = {
     # OpenAI
+    "gpt-5.6-luna": "openai",
     "gpt-5.5": "openai", "gpt-5.4": "openai", "gpt-5.4-mini": "openai",
     "gpt-5.4-nano": "openai", "gpt-5.3-codex": "openai",
     "gpt-4o": "openai", "gpt-4o-mini": "openai",
@@ -1485,6 +1486,16 @@ MODEL_PRICES = {
     "gpt-4o-mini":      {"in": 0.150, "out": 0.600, "cached_in": 0.075, "in_batch": 0.075, "out_batch": 0.300},
     "gpt-4o":           {"in": 2.500, "out": 10.000, "cached_in": 1.250, "in_batch": 1.250, "out_batch": 5.000},
     "gpt-4.1-mini":     {"in": 0.400, "out": 1.600, "cached_in": 0.100, "in_batch": 0.200, "out_batch": 0.800},
+    # GPT-5.6 Luna (guenstigste 5.6-Stufe, 1.05M Kontext). Preise seit der
+    # 80%-Senkung vom 30.07.2026. Cache-Hit = 10% des Input-Preises, Batch = -50%,
+    # und beide Rabatte stapeln (cached_in im Batch waere real 0.010 — der
+    # BatchCostTracker rechnet cached_tok immer mit `cached_in`, die Schaetzung
+    # liegt im Batch-Modus also leicht zu hoch).
+    # ACHTUNG vor dem Umschalten: reasoning.effort ist per Default "medium" und
+    # Reasoning-Tokens werden als OUTPUT abgerechnet. Ohne einen Schalter analog
+    # zu DEEPSEEK_DISABLE_THINKING sind die Out-Kosten ein Vielfaches der Tabelle.
+    # Details + Rechnung: docs/LLM_KOSTEN_VERGLEICH_2026-08.md
+    "gpt-5.6-luna":     {"in": 0.200, "out": 1.200, "cached_in": 0.020, "in_batch": 0.100, "out_batch": 0.600},
     "claude-haiku-4-5": {"in": 1.000, "out": 5.000, "cached_in": 0.100, "in_batch": 0.500, "out_batch": 2.500},
     "claude-sonnet-4-6":{"in": 3.000, "out": 15.000, "cached_in": 0.300, "in_batch": 1.500, "out_batch": 7.500},
     "gemini-2.5-flash": {"in": 0.300, "out": 2.500, "cached_in": 0.075, "in_batch": 0.150, "out_batch": 1.250},
@@ -1492,6 +1503,16 @@ MODEL_PRICES = {
     # DeepSeek: keine Batch-API (in_batch/out_batch == in/out). Cache-Hit-Rabatt automatisch (kein Opt-in).
     # DeepSeek V4 (Apr 2026): 1M-Kontext, MoE, optional Thinking-Mode.
     # Gegen https://api-docs.deepseek.com/quick_start/pricing verifiziert 2026-07-27.
+    #
+    # PREISERHOEHUNG ANGEKUENDIGT — ab 16.08.2026 16:00 UTC stellt DeepSeek auf
+    # Peak/Off-Peak um (Peak 01:00-04:00 + 06:00-10:00 UTC, Off-Peak = halber
+    # Peak-Preis, aber trotzdem ueber dem heutigen Flat-Preis). Bestaetigt ist
+    # bisher nur der Output-Peak (~$1.32/Mtok, Fortune 13.08.); Input- und
+    # Cache-Hit-Saetze sind offiziell noch nicht publiziert. Die Werte unten
+    # bleiben deshalb absichtlich unveraendert stehen — sie sind belegt, die
+    # neuen waeren geraten. Nach dem 16.08. gegen die offizielle Preisseite UND
+    # gegen `data/cost_telemetry.jsonl` nachziehen, dann hier eintragen.
+    # Erwartungskorridor + Alternativenrechnung: docs/LLM_KOSTEN_VERGLEICH_2026-08.md
     "deepseek-v4-flash": {"in": 0.140, "out": 0.280, "cached_in": 0.0028, "in_batch": 0.140, "out_batch": 0.280},
     "deepseek-v4-pro":   {"in": 0.435, "out": 0.870, "cached_in": 0.003625, "in_batch": 0.435, "out_batch": 0.870},
     # HISTORISCH — deepseek-chat/-reasoner waren ab ~24.04.2026 nur Aliase auf
