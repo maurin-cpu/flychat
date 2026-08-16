@@ -447,6 +447,10 @@ def deepseek_thinking_kwargs(provider: str, model: str,
     Bewusst NICHT global im llm_client, sondern per Call-Site: jeder Call
     entscheidet ueber seinen eigenen Config-Schalter.
     """
+    # Nur DeepSeek: bei DeepInfra am 16.08.2026 gemessen, dass derselbe
+    # extra_body-Schalter zwar angenommen, aber wirkungslos ist (936 vs 943
+    # Output-Tokens/Call). Dort also nicht setzen — sonst suggeriert der Code
+    # eine Steuerung, die es nicht gibt.
     if (provider or "").lower() != "deepseek":
         return {}
     m = str(model or "").lower()
