@@ -108,3 +108,6 @@ data/_meteoschweiz_cache/
 # wechseln — ein neuer Salt macht dasselbe Geraet zu zwei Geraeten und
 # entwertet jede Geraete-Zaehlung rueckwirkend (ogn_collector.py).
 data/ogn_salt.txt
+
+# Anbietervergleich 08/2026: gesicherter Referenzlauf, lokal (wie data/test_runs)
+reference_deepseek/
