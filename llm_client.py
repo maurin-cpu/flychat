@@ -447,7 +447,7 @@ class LLMClient:
         text = response.choices[0].message.content
     """
 
-    SUPPORTED_PROVIDERS = ("openai", "anthropic", "gemini", "deepseek")
+    SUPPORTED_PROVIDERS = ("openai", "anthropic", "gemini", "deepseek", "deepinfra")
 
     def __init__(self, provider: str, api_key: str, timeout: float = 120.0):
         provider = (provider or "").lower().strip()
@@ -475,6 +475,18 @@ class LLMClient:
             return OpenAI(
                 api_key=self.api_key,
                 base_url="https://api.deepseek.com",
+                timeout=self.timeout,
+            )
+        if self.provider == "deepinfra":
+            # DeepInfra hostet dasselbe DeepSeek-Modell (FP8) hinter einem
+            # OpenAI-kompatiblen Endpunkt — kein eigener Adapter noetig.
+            # Cache-Hits meldet DeepInfra im OpenAI-Feld
+            # usage.prompt_tokens_details.cached_tokens, die Telemetrie
+            # greift also unveraendert.
+            from openai import OpenAI
+            return OpenAI(
+                api_key=self.api_key,
+                base_url="https://api.deepinfra.com/v1/openai",
                 timeout=self.timeout,
             )
         if self.provider == "anthropic":
@@ -537,9 +549,10 @@ class _CompletionsAPI:
         **extra,
     ):
         p = self._parent.provider
-        if p in ("openai", "deepseek"):
-            # OpenAI- und DeepSeek-API sind schemakompatibel (DeepSeek dispatcht
-            # ueber den OpenAI-SDK mit base_url-Override). Parameter 1:1, None-Werte weglassen.
+        if p in ("openai", "deepseek", "deepinfra"):
+            # OpenAI-, DeepSeek- und DeepInfra-API sind schemakompatibel (beide
+            # dispatchen ueber den OpenAI-SDK mit base_url-Override).
+            # Parameter 1:1, None-Werte weglassen.
             kwargs: dict[str, Any] = {
                 "model": model,
                 "messages": messages,

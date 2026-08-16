@@ -1288,6 +1288,13 @@ LLM_MODELS = {
         "chat":     os.environ.get("DEEPSEEK_CHAT_MODEL", "deepseek-v4-flash"),
         "analysis": os.environ.get("DEEPSEEK_ANALYSIS_MODEL", "deepseek-v4-flash"),
     },
+    "deepinfra": {
+        # Dasselbe Modell wie oben, nur bei einem anderen Hoster (FP8, wie bei
+        # DeepSeek selbst). Zweck: Preisvergleich seit der DeepSeek-Erhoehung
+        # vom 16.08.2026. Modellnamen sind die DeepInfra-Kennungen.
+        "chat":     os.environ.get("DEEPINFRA_CHAT_MODEL", "deepseek-ai/DeepSeek-V4-Flash"),
+        "analysis": os.environ.get("DEEPINFRA_ANALYSIS_MODEL", "deepseek-ai/DeepSeek-V4-Flash"),
+    },
 }
 
 # Top-Level-Attribute fuer Admin-UI-Override (config_overrides.setattr greift hier).
@@ -1302,6 +1309,8 @@ GEMINI_CHAT_MODEL        = LLM_MODELS["gemini"]["chat"]
 GEMINI_ANALYSIS_MODEL    = LLM_MODELS["gemini"]["analysis"]
 DEEPSEEK_CHAT_MODEL      = LLM_MODELS["deepseek"]["chat"]
 DEEPSEEK_ANALYSIS_MODEL  = LLM_MODELS["deepseek"]["analysis"]
+DEEPINFRA_CHAT_MODEL     = LLM_MODELS["deepinfra"]["chat"]
+DEEPINFRA_ANALYSIS_MODEL = LLM_MODELS["deepinfra"]["analysis"]
 
 # Mapping Modellname -> Provider. Wird vom Admin-UI verwendet, um aus einem
 # einzelnen CHAT_MODEL/ANALYSIS_MODEL-Dropdown den Provider abzuleiten.
@@ -1321,6 +1330,8 @@ MODEL_PROVIDER_MAP: dict[str, str] = {
     # DeepSeek
     "deepseek-v4-pro": "deepseek", "deepseek-v4-flash": "deepseek",
     "deepseek-chat": "deepseek", "deepseek-reasoner": "deepseek",
+    # DeepInfra (gleiches Modell, anderer Hoster — Praefix unterscheidet sie)
+    "deepseek-ai/DeepSeek-V4-Flash": "deepinfra",
 }
 
 # Single Source of Truth fuer Admin-UI: ein Modellname pro Anwendung.
@@ -1370,6 +1381,7 @@ OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY    = os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GOOGLE_API_KEY", "")
 DEEPSEEK_API_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPINFRA_API_KEY = os.environ.get("DEEPINFRA_API_KEY", "")
 
 # Rueckwaertskompatibilitaet: OPENAI_MODEL (alter ENV-Name) ueberschreibt beide Defaults
 _legacy_model = os.environ.get("OPENAI_MODEL", "").strip()
@@ -1385,6 +1397,7 @@ def get_api_key(provider: str) -> str:
         "anthropic": ANTHROPIC_API_KEY,
         "gemini":    GEMINI_API_KEY,
         "deepseek":  DEEPSEEK_API_KEY,
+        "deepinfra": DEEPINFRA_API_KEY,
     }.get(provider, "")
 
 
@@ -1499,6 +1512,14 @@ MODEL_PRICES = {
     # Gegen https://api-docs.deepseek.com/quick_start/pricing verifiziert 2026-07-27.
     "deepseek-v4-flash": {"in": 0.140, "out": 0.280, "cached_in": 0.0028, "in_batch": 0.140, "out_batch": 0.280},
     "deepseek-v4-pro":   {"in": 0.435, "out": 0.870, "cached_in": 0.003625, "in_batch": 0.435, "out_batch": 0.870},
+    # DeepInfra (Standard-Tier): derselbe Modellstand, anderer Hoster, FP8 wie
+    # bei DeepSeek selbst. Keine Batch-API, keine Peak-Zeiten.
+    # Gegen https://deepinfra.com/deepseek-ai/DeepSeek-V4-Flash geprueft 16.08.2026.
+    # Achtung beim Vergleich: der Cache-Rabatt ist hier nur Faktor 5 (DeepSeek:
+    # Faktor 31) — dafuer sind Grundpreis und Output deutlich guenstiger. Bei
+    # unserem Lastprofil (74 % Cache, aber nur 6 % der Kosten) gewinnt DeepInfra.
+    "deepseek-ai/DeepSeek-V4-Flash": {"in": 0.090, "out": 0.180, "cached_in": 0.018,
+                                      "in_batch": 0.090, "out_batch": 0.180},
     # HISTORISCH — deepseek-chat/-reasoner waren ab ~24.04.2026 nur Aliase auf
     # v4-flash und wurden am 24.07.2026 abgeschaltet. Zeilen bleiben nur stehen,
     # damit alte cost_telemetry-Eintraege noch ein Preisschema finden. Nicht mehr

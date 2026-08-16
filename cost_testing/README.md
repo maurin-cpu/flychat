@@ -6,6 +6,13 @@
 
 ---
 
+> ⚠ **Die 55 Goldfälle hängen an der alten Spot-Liste** (`fluggebiete_dhv.csv`,
+> 487 Spots). Produktion läuft inzwischen auf `fluggebiete_pge.csv` (494 Spots),
+> dort lösen nur noch **7 von 55** Fällen auf — der Rest fällt still mit
+> „Spot nicht in CSV" raus. Wer den Goldstandard nutzt, muss
+> `WINGCAST_SPOT_CSV=dhv` setzen, sonst misst er ungewollt an 7 Fällen.
+> Gemessen 16.08.2026. Ein Neu-Einfrieren gegen `pge` steht aus.
+
 ## Sofort-Setup (jede neue Shell)
 
 ```bash
