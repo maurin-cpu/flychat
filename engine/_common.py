@@ -10,6 +10,7 @@ Extrahiert aus chat_engine.py (Phase 2 des Monolith-Splits).
 import json
 import logging
 import re
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -102,7 +103,17 @@ class BatchCostTracker:
         self.started = time.time()
         self.phases: dict = {}
         self.prefilter_skipped = 0
+        self._prefilter_lock = threading.Lock()
         self.errors = 0
+
+    def note_prefilter_skip(self, n: int = 1) -> None:
+        """Zaehlt einen Pre-Filter-Treffer (Spot/Tag ohne LLM-Call entschieden).
+
+        Der Parallel-Pfad ruft das aus Worker-Threads → Lock. Der Batch-Pfad zaehlt
+        sequenziell in einer eigenen Schleife und setzt `prefilter_skipped` direkt.
+        """
+        with self._prefilter_lock:
+            self.prefilter_skipped += n
 
     def record(self, phase: str, in_tok: int = 0, out_tok: int = 0,
                cached_tok: int = 0, calls: int = 1):
@@ -117,7 +128,11 @@ class BatchCostTracker:
     def estimate_usd(self) -> float:
         try:
             import config  # late import to avoid circular
-            prices = config.MODEL_PRICES.get(self.model)
+            # Zeitabhaengig: DeepSeek rechnet ab 16.08.2026 nach Peak/Off-Peak.
+            # Bewertet wird der Startzeitpunkt dieses Laufs, nicht "jetzt" —
+            # sonst wuerde ein Lauf ueber die Fenstergrenze falsch abgerechnet.
+            start_utc = datetime.fromtimestamp(self.started, tz=timezone.utc)
+            prices = config.prices_for(self.model, start_utc)
         except Exception:
             prices = None
         if not prices:
@@ -175,6 +190,24 @@ class BatchCostTracker:
             record["total_cached_tok"], cache_pct,
             self.prefilter_skipped, record["est_usd"], record["duration_s"],
         )
+        # Peak-Warnung: seit 16.08.2026 kostet DeepSeek im Peakfenster das Doppelte.
+        # Der Daily-Run liegt normalerweise off-peak — schlaegt das hier an, war es
+        # ein Sonderlauf (Snapshot-Nachlauf, manueller Start) oder die Startzeit ist
+        # nach einer Zeitumstellung verrutscht. Beides will man sofort sehen.
+        try:
+            import config
+            start_utc = datetime.fromtimestamp(self.started, tz=timezone.utc)
+            if config.prices_for(self.model, start_utc) and \
+                    self.model in config.DEEPSEEK_PRICES_FROM_2026_08_16 and \
+                    config.deepseek_peak_factor(start_utc) > 1.0:
+                logger.warning(
+                    "[COST] Lauf startete %s UTC - im DeepSeek-PEAKFENSTER "
+                    "(01-04 und 06-10 UTC). Doppelter Tarif, est=$%.2f statt ~$%.2f. "
+                    "Pruefen: Startzeit des Daily-Runs (Zeitumstellung?) oder Nachlauf.",
+                    start_utc.strftime("%H:%M"), record["est_usd"], record["est_usd"] / 2,
+                )
+        except Exception:
+            pass
         return record
 
 

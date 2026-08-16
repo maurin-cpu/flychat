@@ -107,6 +107,12 @@ class AnalyzersMixin:
         # ── Deterministischer Pre-Filter: offensichtliche not_safe ohne LLM ──
         prefilter = self._prefilter_not_safe(spot, date_str)
         if prefilter is not None:
+            # Telemetrie: bis 08/2026 zaehlte NUR der Batch-Pfad die Treffer, der
+            # Daily-Run laeuft aber parallel → in der Telemetrie stand immer "0",
+            # obwohl der Filter greift. Ohne diese Zahl ist der Hebel nicht bewertbar.
+            tracker = getattr(self, "_cost_tracker", None)
+            if tracker is not None:
+                tracker.note_prefilter_skip()
             self._finalize_tags(prefilter, f"{name}|{date_str}", is_region=False)
             return prefilter
 

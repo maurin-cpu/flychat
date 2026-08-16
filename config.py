@@ -1480,6 +1480,11 @@ LLM_BATCH_STALL_TIMEOUT_S = int(os.environ.get("LLM_BATCH_STALL_TIMEOUT_S", "360
 # - in_batch / out_batch : OpenAI Batch-API (50% Rabatt)
 # - cached_in         : Anthropic Prompt-Cache-Hit (10%) bzw. OpenAI auto-cache (50%)
 # Stand: 2026-04. Bei Preisaenderung hier zentral pflegen.
+#
+# ACHTUNG DeepSeek: die Eintraege unten sind die Tarife BIS 16.08.2026 16:00 UTC.
+# Ab dann gelten Peak/Off-Peak-Preise — siehe DEEPSEEK_PRICES_FROM_2026_08_16 und
+# prices_for(). Nicht die Werte hier ueberschreiben, sonst rechnen alte
+# Telemetrie-Zeilen falsch.
 # ============================================================================
 MODEL_PRICES = {
     "gpt-4o-mini":      {"in": 0.150, "out": 0.600, "cached_in": 0.075, "in_batch": 0.075, "out_batch": 0.300},
@@ -1502,6 +1507,71 @@ MODEL_PRICES = {
     "deepseek-chat":     {"in": 0.270, "out": 1.100, "cached_in": 0.070, "in_batch": 0.270, "out_batch": 1.100},
     "deepseek-reasoner": {"in": 0.550, "out": 2.190, "cached_in": 0.140, "in_batch": 0.550, "out_batch": 2.190},
 }
+
+# ----------------------------------------------------------------------------
+# DeepSeek-Preiserhoehung ab 16.08.2026 16:00 UTC
+# ----------------------------------------------------------------------------
+# DeepSeek fuehrt Peak/Off-Peak ein. Off-Peak-Tarife stehen unten; im Peak-Fenster
+# gilt exakt das Doppelte (Angabe DeepSeek: "off-peak rates at half the peak rates").
+#
+# Peak (UTC):     01:00-04:00 und 06:00-10:00
+# Off-Peak (UTC): alle uebrigen Stunden
+#
+# Wo das den Daily-Run trifft: der Lauf startet 06:00 Serverzeit; die LLM-Phase
+# beginnt nach dem Wetter-Refresh gegen 04:18 UTC (Sommerzeit) und ist ~04:36 UTC
+# durch — also Off-Peak. ACHTUNG bei der Zeitumstellung (CET = UTC+1): dann liegt
+# die LLM-Phase bei ~05:18-05:35 UTC, nur noch ~25 min vor dem 06:00-Peak.
+# Zweiter Fall: der Snapshot-Nachlauf (scheduler.py, bis 12:00 lokal) startet einen
+# vollen Lauf und faellt damit mitten ins 06:00-10:00-Peakfenster → doppelter Preis.
+# Quelle: https://api-docs.deepseek.com/quick_start/pricing (geprueft 15.08.2026)
+DEEPSEEK_PRICE_CHANGE_UTC = "2026-08-16T16:00:00+00:00"
+DEEPSEEK_PEAK_WINDOWS_UTC = ((1, 4), (6, 10))   # [start, ende) in UTC-Stunden
+
+# Off-Peak-Tarife ab dem Stichtag. Peak = 2x diese Werte (peak_factor()).
+DEEPSEEK_PRICES_FROM_2026_08_16 = {
+    "deepseek-v4-flash": {"in": 0.220, "out": 0.660, "cached_in": 0.007,
+                          "in_batch": 0.220, "out_batch": 0.660},
+    "deepseek-v4-pro":   {"in": 0.660, "out": 1.980, "cached_in": 0.022,
+                          "in_batch": 0.660, "out_batch": 1.980},
+}
+
+
+def deepseek_peak_factor(when=None) -> float:
+    """2.0 wenn `when` (UTC-datetime) im DeepSeek-Peakfenster liegt, sonst 1.0.
+
+    Bewertet wird der START eines Laufs. Ein Lauf, der die Fenstergrenze
+    ueberschreitet, wird dadurch leicht ungenau abgerechnet — bei ~16 min
+    Laufzeit ist das die pragmatischere Loesung als eine Abrechnung pro Call.
+    """
+    from datetime import datetime, timezone
+    dt = when or datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    h = dt.astimezone(timezone.utc).hour
+    for start, ende in DEEPSEEK_PEAK_WINDOWS_UTC:
+        if start <= h < ende:
+            return 2.0
+    return 1.0
+
+
+def prices_for(model: str, when=None) -> dict:
+    """Preisschema fuer `model` zum Zeitpunkt `when` (UTC-datetime, default jetzt).
+
+    Fuer DeepSeek wird ab dem Stichtag auf die Peak/Off-Peak-Tarife umgestellt.
+    Alle anderen Provider liefern unveraendert ihren MODEL_PRICES-Eintrag, damit
+    historische Telemetrie-Zeilen weiterhin korrekt nachgerechnet werden koennen.
+    """
+    from datetime import datetime, timezone
+    base = MODEL_PRICES.get(model)
+    if model not in DEEPSEEK_PRICES_FROM_2026_08_16:
+        return base or {}
+    dt = when or datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if dt < datetime.fromisoformat(DEEPSEEK_PRICE_CHANGE_UTC):
+        return base or {}
+    faktor = deepseek_peak_factor(dt)
+    return {k: v * faktor for k, v in DEEPSEEK_PRICES_FROM_2026_08_16[model].items()}
 
 # Pfad fuer JSONL-Telemetrie (eine Zeile pro Analyse-Lauf).
 import pathlib as _pathlib
