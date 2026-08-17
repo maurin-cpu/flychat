@@ -1,15 +1,200 @@
 # Plan: OGN-Validierung — Real-Flug-Belege über OpenGliderNetwork
 
-**Status:** Mitschnitt **seit 14.08.2026, 11:13 auf dem Server in Betrieb**
-(`ogn-collector.service`, läuft entkoppelt vom Webdienst). Verdichtung zu
-Flügen (Phase 2) und Auswertung (Phase 3) noch nicht gebaut.
-**Erstellt:** 2026-06-14 · **Überarbeitet:** 2026-08-14 (Methodik + Hausordnung)
+**Status:** Mitschnitt seit 14.08.2026 in Betrieb, **Phase 2 (Verdichtung)
+seit 17.08.2026 fertig und im Scheduler**. Offen ist Phase 3 (Auswertung in
+`validation/ogn/`).
+**Erstellt:** 2026-06-14 · **Überarbeitet:** 2026-08-17 (Phase 2 umgesetzt)
 **Branch:** `main` (Single-Branch-Workflow)
 
-## Umsetzungsstand (14.08.2026)
+## Umsetzungsstand Phase 2 (17.08.2026)
+
+**Gebaut:** `ogn_sessions.py` (+ Hook in `scheduler.py._daily_run`, Tests in
+`tests/test_ogn_sessions.py`). Aus Rohpunkten entstehen Flüge mit Steig- und
+Höhenwerten, dazu die Empfangslage je Region. Idempotent und
+`--backfill`-fähig; das Pruning der Rohpunkte läuft bewusst **nur hier** —
+erst verdichten, dann wegwerfen.
+
+**Ertrag an den ersten vier Tagen** — und er folgt dem Wetter fast eins zu eins:
+
+| Tag | Flüge | Geräte | Regionen | Dauer P50 | Steigen P75 (Median) | Regen (Ø Region) |
+|---|---:|---:|---:|---:|---:|---:|
+| 14.08. | 1682 | 970 | 26 | 33 min | 2.01 m/s | 9.3 mm |
+| 15.08. | 1299 | 936 | 26 | 30 min | 1.81 m/s | 8.4 mm |
+| 16.08. | 352 | 276 | 23 | 28 min | 1.71 m/s | 14.9 mm |
+| 17.08. | 2 | 2 | 1 | 11 min | 1.31 m/s | 32.0 mm |
+
+Zum Vergleich: die P50→P75-Umstellung der Basishöhe hängt bis heute an
+**16** XContest-Topouts. Ein einziger starker Tag liefert hier über 1000 Flüge.
+
+### Was ein Flugdatensatz enthält — und was davon trägt
+
+Nicht jedes Feld ist gleich belastbar. Der Unterschied entsteht durch die
+Empfangslücken (gemessen am 14./15.08., 2981 Flüge):
+
+| Feld | belastbar? |
+|---|---|
+| **Steigen P75** (`climb_p75`) | **ja** — lückenrobust, siehe unten |
+| **erreichte Höhe** (`max_alt_m`, `max_height_agl_m`) | **ja** |
+| Startpunkt (`launch_lat/lon`, `launch_spot`, `region`) | nur bei bodennahem Start — **33 %** |
+| Landepunkt (`landing_lat/lon`, `landing_region`) | nur bei bodennaher Landung — **23 %** |
+| Dauer, Streckenlänge | **nein** — systematisch zu kurz |
+| `climb_max` | fragil, hängt an einem Einzelwert |
+
+**Start UND Landung zusammen haben nur 13 %** der Flüge; **57 % sind reine
+Bruchstücke** (weder Start noch Landung empfangen). Genau deshalb stehen
+`takeoff_agl_m` und `landing_agl_m` in der Tabelle: Ohne sie ist nicht
+entscheidbar, ob eine Koordinate ein echter Start-/Landeplatz ist oder bloss
+die Stelle, an der der Empfang ein- bzw. aussetzte. **335 Flüge landen am
+Boden, starten aber in der Luft** — die sähen ohne diese Felder wie
+einwandfreie Startpunkte aus.
+
+Die Landekoordinate fehlte zunächst ganz (nachgetragen 17.08.): gespeichert
+war nur die Höhe über Grund bei der Landung, nicht der Ort. Sie ist eigenes
+Neuland — **54 von 64 Landeplätzen mit ≥ 3 Landungen liegen mehr als 1 km von
+jedem Startplatz entfernt**, sind also eigenständige Landewiesen, die in einer
+Startplatz-Liste gar nicht vorkommen können. 22 % der vollständigen Flüge
+landen in einer anderen Region, als sie gestartet sind; 11 % sind
+Toplandungen (< 300 m vom Start).
+
+### Die zwei Schwellenwerte — abgelesen, nicht geraten
+
+Beide wurden an 1414 Geräten / 1.12 Mio. Punkten des 15.08. gemessen
+(Sonden als Wegwerf-Code, bewusst nicht im Repo):
+
+- **Sendepause = Flugende: 300 s.** 99.85 % aller Punktabstände desselben
+  Geräts liegen darunter. Mit 60 s zerfällt ein Flug an jeder Empfangslücke
+  (9.4 Sessions je Gerät, Dauer-Median 9 min); ab 600 s werden echte
+  Zweitflüge zusammengeklebt.
+- **Boden vs. Luft: Bewegungsfenster ±60 s.** Ein eingeschaltetes Gerät heisst
+  nicht „fliegt" — am Startplatz stehen Instrumente im P90 noch 10 Minuten
+  herum, im P99 fast 50. Geprüft wird Strecke **oder** Höhenänderung: Soaring
+  am Hang bewegt sich kaum horizontal, ein Transport im Auto kaum vertikal.
+
+### Drei Defekte, die der erste Lauf über echte Daten zeigte
+
+Alle drei hätten stille Falschzahlen erzeugt und wären beim Draufschauen nicht
+aufgefallen. Jeder ist im Code behoben **und** in `tests/test_ogn_sessions.py`
+festgenagelt:
+
+1. **Positionssprünge** — ein „Flug" ergab 911 km in 56 min (~975 km/h).
+   Einzelne Beacons sitzen weit neben der Bahn. Jetzt Geschwindigkeitsfilter
+   mit Neu-Verankerung, damit ein falscher Ankerpunkt nicht den Rest kappt.
+2. **Geräte am Boden** — 364 min „Flug" mit 3.8 km und 1 m über Grund. Das
+   Höhen-Rauschen allein riss die Spannen-Schwelle. Zwei unabhängige Merkmale
+   entlarven es: Höhe über Grund und **zurückgelegte Bahn** (ein Schirm fliegt
+   ~30 km/h durch die Luft, auch beim Soaring; das Instrument kam auf
+   0.6 km/h). Der Bahn-Filter kostet real nur 3 von 1302 Flügen — er trifft
+   genau die Liegengebliebenen.
+3. **Höhe über Grund bis −1214 m** — und genau die speiste die
+   Empfangs-Kennzahl. Unplausible Werte werden jetzt als *unbekannt* geführt
+   statt als Zahl: lieber eine fehlende Messung als eine erfundene. Sonst
+   „bestätigt" eine geschönte Empfangslage exakt den Defekt, den wir suchen.
+
+### Erledigte Vorab-Entscheidungen
+
+- **#4 Gap-Schwelle:** 300 s (Begründung oben).
+- **#5 Terrain/AGL:** Open-Meteo-Elevation, auf ~100 m gerastert in der Tabelle
+  `terrain` gecacht. Kein SRTM-Download, keine neue Abhängigkeit. Ein starker
+  Tag braucht rund 3000 neue Rasterzellen ≈ 30 API-Aufrufe; danach greift der
+  Cache. **Achtung:** ohne den Key aus `.env` läuft es in den freien Endpunkt
+  und dort ins Rate-Limit (429) — also mit `./.venv/bin/python` starten.
+
+### Korrigierte Zahlen
+
+- **Speicherbedarf: rund 222 MB pro starkem Sommertag** (gemessen: 454 MB für
+  2.66 Mio. Punkte = 171 Byte/Punkt). Die Schätzung von 75 MB im Abschnitt
+  unten war **dreimal zu tief**.
+
+### Aufbewahrung: 7 Tage statt 30 (Entscheid 17.08.2026)
+
+30 Tage hätten an einer Schönwetterserie bis **6.7 GB** bedeutet — ein Drittel
+des freien Plattenplatzes für Rohmaterial, das nach der Verdichtung niemand
+mehr braucht. Jetzt: **7 Tage, gut 1.5 GB im schlimmsten Fall.**
+
+Die Verkürzung legte ein Risiko frei, das bei 30 Tagen nur theoretisch war:
+**der Collector räumte eigenständig auf**, ohne zu wissen, ob die Verdichtung
+gelaufen ist. Bei einer Woche Frist hätte ein stiller Ausfall die Rohdaten
+gelöscht, bevor er auffällt. Die Zuständigkeit ist deshalb neu geteilt:
+
+| | wer | wann | was |
+|---|---|---|---|
+| **Regelbetrieb** | `ogn_sessions.prune_beacons` | täglich nach dem Roll-up | nur Tage, die im **`rollup_log`** stehen — also nachweislich verdichtet sind |
+| **Notbremse** | `ogn_collector._prune` | täglich | alles älter als `HARD_LIMIT_DAYS` = 30, **mit Fehlermeldung im Log** |
+
+Fällt die Verdichtung aus, wachsen die Rohpunkte also absichtlich weiter,
+statt still zu verschwinden — man kann den Ausfall nachholen
+(`ogn_sessions.py --backfill`). Erst nach Wochen greift die Notbremse gegen
+eine volllaufende Platte, und sie meldet sich dabei. `--report` und der
+Scheduler nennen unverdichtete Tage beim Namen; das ist bei kurzer Frist die
+Zahl, auf die man schaut.
+
+Am Trockenlauf gegen die echte Datenbank belegt: hätte die Verdichtung den
+15.08. verpasst, blieben dessen **1 123 655 Rohpunkte** geschützt stehen statt
+gelöscht zu werden.
+
+**Was man wissen muss:** SQLite gibt gelöschten Platz nicht ans Dateisystem
+zurück. Die Datei bleibt auf ihrem Höchststand (rund 1.7 GB bei 7 vollen
+Tagen) und füllt ihn danach wieder auf — das ist die Obergrenze, nicht der
+laufende Verbrauch.
+
+- **17 % der Flüge starten ausserhalb unserer Regionspolygone.** Unsere
+  29 Regionen kacheln die Schweiz nicht lückenlos, und der 150-km-Filter reicht
+  ins Ausland. Diese Flüge sind für den Regionsvergleich schlicht nicht
+  verwendbar — kein Fehler, aber eine Grenze, die in Phase 3 sichtbar bleiben
+  muss.
+
+### Sind die Flüge trotz Empfangslücken brauchbar? (geprüft 17.08.)
+
+Ja — für das, wozu wir sie brauchen. Die Lücken sind erheblich (53 % der Flüge
+sind über 10 % ihrer Dauer blind, 14 % über die Hälfte), aber sie treffen die
+Felder ungleich:
+
+- **Das Steigen bleibt stabil.** Der saubere Test läuft *innerhalb* einer
+  Region, wo die echten Bedingungen gleich sind: dort ist der Unterschied
+  zwischen gut und schlecht empfangenen Flügen **±0.00 m/s im Median**, und
+  6 von 14 Regionen zeigen ihn in die eine, 8 in die andere Richtung. Auch der
+  Gesamtwert bewegt sich kaum (1.91 m/s ungefiltert, 1.81 unter dem
+  strengsten Filter). Grund: Das Steigen misst das Instrument des Piloten
+  selbst und meldet es je Punkt — fehlende Punkte **verdünnen** die Stichprobe,
+  sie **verschieben** sie nicht. Dauer und Strecke sind dagegen aufsummiert,
+  da fehlt jede Lücke direkt.
+- **Zwischen Regionen** korreliert schlechter Empfang mit höherem Steigen
+  (Rangkorrelation +0.57). Das ist keine Verzerrung, sondern Überlagerung:
+  Wo der Empfang am schlechtesten ist (Wallis, Berner Alpen), sind die
+  Thermiken tatsächlich am stärksten. Der Innerhalb-Test oben schliesst die
+  Messfehler-Erklärung aus.
+- **Die Regionszuordnung** stimmt in 88 % (Start- vs. Hochpunkt-Region);
+  65 % der Flüge bleiben ganz in einer Region.
+
+**Bleibt als Grenze:** Flüge, die wir *gar nie* hören, kann keine Auswertung
+von innen sichtbar machen. Die Grundregel gilt weiter — Anwesenheit ist ein
+Beleg, Abwesenheit sagt nichts.
+
+### Nächster Schritt: Phase 3
+`validation/ogn/` nach Hausordnung anlegen und gegen den Prognose-Freeze
+rechnen. Die Empfangslage (`coverage`) liegt dafür bereits vor: am 15.08.
+hörten **25 von 26** Regionen Flüge unter 300 m über Grund.
+
+Drei Vorgaben aus der Lückenmessung:
+1. **Qualitätstor** setzen (Vorschlag: Blindzeit ≤ 25 % und tiefster Punkt
+   ≤ 200 m über Grund) — das lässt 41 % der Flüge übrig, 12 Regionen mit je
+   ≥ 20 vollständigen Flügen in nur zwei Tagen.
+2. Das Steigen der Region des **Hochpunkts** gutschreiben, nicht der des
+   Starts. Das behebt die 12 % Fehlzuordnung.
+3. **Dauer und Strecke gar nicht erst** als Prüfgrössen verwenden.
+
+### Beobachtung am Rande, die noch keiner Erklärung hat
+Unter den zehn längsten Flügen des 15.08. stammen **sieben vom Weissenstein
+(Jura Zentral)**, mit Dauern bis 5.9 h. Das ist genau die Region, die in der
+XContest-Auswertung mit Perzentil 100 % auffällt. Ob das echte
+Jura-Soaring-Bedingungen sind oder ein Artefakt (SafeSky-Handys, Segelflug
+unter Gleitschirm-Kennung), ist **offen** und vor jeder Kalibrierung zu klären.
+
+## Umsetzungsstand Phase 1 (14.08.2026)
 
 **Entschieden:** nur Gleitschirm (Typ 7) und Delta (Typ 6) mitschreiben ·
-Rohpunkte **30 Tage** halten · Umkreis **150 km um 46.8/8.2** (deckt die CH ab,
+Rohpunkte ~~30 Tage~~ **7 Tage** halten (revidiert 17.08., siehe oben) ·
+Umkreis **150 km um 46.8/8.2** (deckt die CH ab,
 in der Messung bestätigt).
 
 **Gebaut:** `ogn_collector.py` + `ogn-collector.service`. Ohne neue Abhängigkeit
@@ -17,7 +202,8 @@ in der Messung bestätigt).
 Geräte-Kennung nur als Hash (Salt in `data/ogn_salt.txt`, gitignored, darf nie
 wechseln), Stealth-/No-Track-Geräte werden beim Eintreffen verworfen.
 
-**Offen:** Phase 2 (Flüge bilden) und Phase 3 (Auswertung).
+**Offen:** ~~Phase 2 (Flüge bilden)~~ — erledigt 17.08., siehe oben. Phase 3
+(Auswertung) steht noch aus.
 
 **Erste Zahlen vom laufenden Dienst** (14.08., 11:13–11:16, Mittagsbetrieb):
 2482 Punkte, **126 verschiedene Geräte**, 98 % Gleitschirm, Höhen 694–3890 m,
@@ -25,21 +211,23 @@ maximales Steigen **6.84 m/s**. Morgens um 09:21 waren es 14 Geräte — der
 Tagesgang ist also gross, und die Verbreitungsfrage ist praktisch beantwortet
 (das Gate verlangte rund 40 Geräte).
 
-**Speicherbedarf, korrigiert:** hochgerechnet aus dem Mittagswert rund
-**75 MB pro Tag** an einem starken Sommertag → 30 Tage ≈ 2.3 GB, 5 GB ≈ 65 Tage.
-Frühere Schätzungen (60 MB/Tag, dann 400 MB–1 GB je 30 Tage) lagen zu tief, weil
-sie auf der Morgenmessung beruhten. Server hat 22 GB frei. **Nach dem ersten
-vollen Sammeltag durch die echte Zahl ersetzen.**
+**Speicherbedarf:** ~~hochgerechnet rund 75 MB pro Tag~~ — **überholt.** Die
+echte Messung nach vier Sammeltagen ergab **222 MB pro starkem Tag** (siehe
+„Korrigierte Zahlen" oben). Auch diese Schätzung war noch dreimal zu tief; alle
+früheren Zahlen in diesem Abschnitt sind es erst recht.
 
-### Nächster Schritt (Phase 2, geplant für den 15.08.)
+### Nächster Schritt (Phase 2) — am 17.08. so abgearbeitet
 Bewusst nicht am 14.08. gebaut: Die zwei Schwellenwerte des Verdichters — ab
 welcher Sendepause ein Flug endet, und wie Boden von Luft getrennt wird — lassen
-sich nur an **abgeschlossenen** Flügen ablesen. Ablauf:
-1. Aus dem vollen Tag die tatsächlichen Pausen- und Startmuster ablesen.
-2. `ogn_sessions.py` bauen, rückwirkend über den 14.08. laufen lassen.
-3. Ergebnis gegen die Wirklichkeit prüfen (plausible Dauern/Höhen, keine
-   erfundenen Flüge).
-4. Klären, ob vorhandene Geländedaten für die Höhe über Grund reichen.
+sich nur an **abgeschlossenen** Flügen ablesen. Der Ablauf hat sich bewährt,
+besonders Schritt 3: er hat alle drei Defekte gefunden.
+1. ✅ Aus dem vollen Tag die tatsächlichen Pausen- und Startmuster abgelesen.
+2. ✅ `ogn_sessions.py` gebaut, rückwirkend über alle Tage laufen lassen.
+3. ✅ Ergebnis gegen die Wirklichkeit geprüft — drei Defekte gefunden und
+   behoben (siehe oben). **Ohne diesen Schritt wären 911-km-Flüge und
+   Geräte am Boden als Belege in die Kalibrierung gegangen.**
+4. ✅ Geländefrage geklärt: kein DEM im Repo, daher Open-Meteo-Elevation mit
+   eigenem Raster-Cache.
 
 ### Was die ersten echten Daten gezeigt haben
 - **Ein eingeschaltetes Gerät heisst nicht „fliegt".** Am Morgen stehen viele
@@ -58,12 +246,13 @@ sich nur an **abgeschlossenen** Flügen ablesen. Ablauf:
 1. Diese Datei lesen. Die beiden wichtigsten Abschnitte sind
    **„Was OGN sagen kann — und was nicht"** und **„Die zwei Verzerrungen"**.
    Beide dürfen nicht aufgeweicht werden.
-2. Es ist noch **kein Code geschrieben**: weder `ogn_collector.py`, noch
-   `data/ogn_tracks.db`, noch `validation/ogn/`.
-3. Einstieg ist **Phase 0 (Archiv-Check)** — eine halbe Stunde Recherche, die
-   den ganzen Zeitplan umwerfen kann.
-4. Vor Phase 1 müssen die **Vorab-Entscheidungen** getroffen sein (Scope,
-   Retention, Gate-Zahlen). Nicht raten, nicht überspringen.
+2. Der Einstieg ist **Phase 3**. Phase 0–2 sind erledigt; es laufen
+   `ogn_collector.py` (Daemon) und `ogn_sessions.py` (täglich im Scheduler),
+   die Tabellen `beacons`, `flights`, `coverage`, `terrain` sind gefüllt.
+   Was noch fehlt, ist ausschliesslich `validation/ogn/`.
+3. Vor der ersten Kalibrierung die **Weissenstein-Auffälligkeit** klären
+   (Abschnitt „Beobachtung am Rande"). Sie sitzt genau auf dem Defekt, den wir
+   messen wollen — sie zuerst zu glauben wäre die bequemste Art, sich zu irren.
 
 ---
 
@@ -411,26 +600,29 @@ Messskript: Wegwerf-Code im Scratchpad, bewusst nicht im Repo.
 Die ersten drei betreffen das, was der Collector schreibt — sie können nicht
 warten, denn Phase 1 schreibt bereits Rohdaten.
 
-1. **Geografischer Scope:** ganze CH oder nur unsere Spot-Regionen?
-2. **Retention Rohpunkte:** 7 / 14 / 30 Tage? (Der Host hat knappen RAM, 2 GB
-   Swap nachgerüstet; Beacon-Volumen wächst schnell.)
-3. **Gate-Zahlen:** Vorschlag oben bestätigen oder ersetzen.
-4. **Gap-Schwelle Sessionizing:** ab welcher Beacon-Lücke gilt ein Flug als
-   beendet? (vor Phase 2)
-5. **Terrain-/AGL-Quelle:** vorhandenes Spot-Terrain wiederverwendbar oder SRTM
-   nachrüsten? (vor Phase 2)
-6. **No-Track-Policy:** intern reicht das Respektieren des Flags plus Hashing;
+1. ✅ **Geografischer Scope:** 150 km um 46.8/8.2, serverseitig gefiltert.
+2. ✅ **Retention Rohpunkte: 7 Tage** (17.08.). Die Volumenschätzung, auf der
+   die ursprüngliche 30-Tage-Wahl beruhte, war dreimal zu tief — und
+   weggeworfen wird nur, was verdichtet ist. Siehe „Aufbewahrung" oben.
+3. ⬜ **Gate-Zahlen:** Vorschlag oben bestätigen oder ersetzen.
+4. ✅ **Gap-Schwelle Sessionizing: 300 s**, an echten Daten abgelesen.
+5. ✅ **Terrain-/AGL-Quelle:** Open-Meteo-Elevation mit eigenem Raster-Cache
+   (kein SRTM-Download, keine neue Abhängigkeit).
+6. ⬜ **No-Track-Policy:** intern reicht das Respektieren des Flags plus Hashing;
    bei späterer öffentlicher Nutzung rechtliche Lage prüfen.
 
 ---
 
-## Touch-Points (neu anzulegen, noch nichts davon existiert)
-- `ogn_collector.py` — Daemon
-- `ogn-collector.service` — systemd-Unit (entkoppelt von `wingcast.service`)
-- `data/ogn_tracks.db` — SQLite (Wrapper im Stil `station_observations.py`)
-- `ogn_sessions.py` — Roll-up, Hook in `scheduler.py`
-- `validation/ogn/` — README + SCHEMA + PATTERNS + AUTO_REPORT nach Hausordnung
-- `requirements.txt` — `ogn-client` ergänzen
+## Touch-Points
+- ✅ `ogn_collector.py` — Daemon
+- ✅ `ogn-collector.service` — systemd-Unit (entkoppelt von `wingcast.service`)
+- ✅ `data/ogn_tracks.db` — SQLite, Tabellen `beacons`, `flights`, `coverage`,
+  `terrain` (server-lokal, gitignored)
+- ✅ `ogn_sessions.py` — Roll-up, Hook in `scheduler.py._daily_run`
+- ✅ `tests/test_ogn_sessions.py` — hält die drei gefundenen Defekte fest
+- ⬜ `validation/ogn/` — README + SCHEMA + PATTERNS + AUTO_REPORT nach Hausordnung
+- ~~`requirements.txt` — `ogn-client` ergänzen~~ — **entfällt**: das APRS-Format
+  wird direkt gelesen, keine neue Abhängigkeit.
 
 ## Änderungen gegenüber der Fassung vom 14.06.2026
 - Empfangs-Abdeckung als zweite, regional strukturierte Verzerrung aufgenommen;

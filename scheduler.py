@@ -528,6 +528,50 @@ def _run_fronten() -> bool:
     return False
 
 
+def _run_ogn_sessions() -> bool:
+    """OGN-Rohpunkte des Vortags zu Fluegen verdichten (Phase 2).
+
+    Der Collector laeuft als eigener Daemon (ogn-collector.service) und schreibt
+    nur Rohpunkte; hier entstehen daraus Fluege mit Steig- und Hoehenwerten.
+    Der Vortag ist sicher abgeschlossen — der laufende Tag waere es nicht.
+
+    Failure-tolerant wie Snapshot und Gewitter: eine ausgefallene Verdichtung
+    darf den Wetterlauf nie stoppen. Idempotent — der Tag wird vor dem Schreiben
+    geleert, ein zweiter Lauf ist harmlos.
+
+    Das Pruning der Rohpunkte laeuft bewusst NUR hier und nicht im Collector-
+    Takt: erst verdichten, dann wegwerfen.
+    """
+    try:
+        import datetime as _dt
+        import ogn_sessions
+        if not ogn_sessions.DB_PATH.exists():
+            logger.info("Daily run: keine OGN-Datenbank — uebersprungen")
+            return False
+        gestern = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+        conn = ogn_sessions._connect()
+        try:
+            ogn_sessions.init_db(conn)
+            res = ogn_sessions.run_day(conn, gestern)
+            weg = ogn_sessions.prune_beacons(conn)
+            offen = ogn_sessions.unverdichtete_tage(conn)
+        finally:
+            conn.close()
+        logger.info("Daily run: OGN %s — %d Fluege, %d Regionen, "
+                    "%d Rohpunkte geloescht",
+                    gestern, res["fluege"], res["regionen"], weg)
+        # Bei 7 Tagen Aufbewahrung ist ein Rueckstand die Zahl, die zaehlt:
+        # was hier auflaeuft, ist noch da — aber nicht mehr lange.
+        if offen:
+            logger.warning("Daily run: OGN — %d Tage unverdichtet (%s). "
+                           "Nachholen mit: ogn_sessions.py --backfill",
+                           len(offen), ", ".join(offen[:5]))
+        return True
+    except Exception as e:
+        logger.exception("Daily run: OGN-Verdichtung fehlgeschlagen: %s", e)
+        return False
+
+
 def _daily_run(engine) -> dict:
     """Sequenzieller Daily-Job: refresh_weather -> LLM-Analyse -> Briefings -> Snapshot.
 
@@ -557,6 +601,9 @@ def _daily_run(engine) -> dict:
     logger.info("Daily run: starte Gewitter-Validierung (letzter komplett "
                 "publizierter Tag)...")
     _run_gewitter_validation()
+
+    logger.info("Daily run: starte OGN-Verdichtung (Vortag)...")
+    _run_ogn_sessions()
 
     return stats
 

@@ -53,7 +53,18 @@ TYPE_PARAGLIDER = 7
 TYPE_HANGGLIDER = 6
 KEEP_TYPES = {TYPE_PARAGLIDER, TYPE_HANGGLIDER}
 
-RETENTION_DAYS = 30
+# NOTBREMSE, nicht die normale Aufbewahrung.
+#
+# Im Normalbetrieb raeumt ogn_sessions.py auf: nach 7 Tagen, und nur bei Tagen,
+# die nachweislich zu Fluegen verdichtet sind. Faellt die Verdichtung aus,
+# wachsen die Rohpunkte absichtlich weiter — 222 MB je starkem Tag —, damit
+# nichts unbemerkt verschwindet und man den Ausfall nachholen kann.
+#
+# Dieser Wert ist nur die Obergrenze, ab der Weiterlaufen teurer waere als der
+# Verlust: der Collector darf niemals die Platte fuellen und damit den
+# Webdienst mitreissen. Er muss deutlich ueber der normalen Frist liegen,
+# sonst nimmt er der Verdichtung die Arbeitsgrundlage weg.
+HARD_LIMIT_DAYS = 30
 SILENCE_TIMEOUT = 120   # ohne Daten -> Verbindung gilt als tot
 RECONNECT_WAIT = 10
 
@@ -186,10 +197,22 @@ def _store(conn: sqlite3.Connection, batch: list[dict]) -> None:
 
 
 def _prune(conn: sqlite3.Connection) -> int:
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
+    """Notbremse gegen eine volllaufende Platte — siehe HARD_LIMIT_DAYS.
+
+    Das regulaere Aufraeumen macht ogn_sessions.py und nur fuer verdichtete
+    Tage. Was hier faellt, ist Rohmaterial, das nie verarbeitet wurde: immer ein
+    Zeichen, dass die Verdichtung seit Wochen ausgefallen ist.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=HARD_LIMIT_DAYS)
               ).strftime("%Y-%m-%dT%H:%M:%SZ")
     cur = conn.execute("DELETE FROM beacons WHERE ts < ?", (cutoff,))
     conn.commit()
+    if cur.rowcount:
+        logger.error(
+            "NOTBREMSE: %d Rohpunkte aelter als %d Tage geloescht. Das passiert "
+            "nur, wenn ogn_sessions.py sie nie verdichtet hat — Verdichtung "
+            "pruefen (Scheduler-Hook _run_ogn_sessions).",
+            cur.rowcount, HARD_LIMIT_DAYS)
     return cur.rowcount
 
 
@@ -208,12 +231,12 @@ def run() -> None:
 
 
 def _maybe_prune(conn: sqlite3.Connection) -> None:
+    """Einmal taeglich die Notbremse pruefen. Im Normalbetrieb faellt nichts an —
+    dann hat ogn_sessions.py laengst nach 7 Tagen aufgeraeumt."""
     global _NEXT_PRUNE
     if time.time() > _NEXT_PRUNE:
-        removed = _prune(conn)
+        _prune(conn)                    # meldet selbst, wenn wirklich etwas faellt
         _NEXT_PRUNE = time.time() + 86400
-        logger.info("Aufräumen: %d Rohpunkte älter als %d Tage gelöscht",
-                    removed, RETENTION_DAYS)
 
 
 def _stream_once(conn: sqlite3.Connection, housekeeping) -> None:
