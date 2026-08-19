@@ -98,13 +98,21 @@ class Alarm:
                                 "wert": wert, "schwelle": schwelle})
 
     def aus_meldung(self, text: str, was: str, url: str = "") -> None:
-        """Ordnet die Ausgabe der Extraktion einem Fall zu.
+        """Ordnet die ABBRUCHZEILE der Extraktion einem Fall zu.
 
         Die Extraktion laeuft als Subprozess; ihr Abbruchgrund steht nur im
-        Text. Die beiden Marker sind dort bewusst stabil gehalten.
+        Text. Erwartet wird die letzte Ausgabezeile, NICHT das ganze
+        Protokoll: bei --alle-steps drucken gelungene Steps die Erfolgszeile
+        "Legenden-Invariante: ..." — im Gesamtprotokoll machte deren Wort
+        LEGENDE aus jedem spaeteren Fehler faelschlich einen Layoutfall
+        (Fehlalarm-Serie im August 2026).
         """
         t = (text or "").upper()
-        if "LAYOUT PASST NICHT MEHR" in t or "LEGENDE" in t:
+        layout = ("LAYOUT PASST NICHT MEHR" in t
+                  or ("ABBRUCH" in t and ("LEGENDE" in t
+                                          or "KARTENGROESSE" in t
+                                          or "SPERRZONE" in t)))
+        if layout:
             self.stoerung("layout", was, url)
         else:
             self.stoerung("quelle_weg", f"{was}: {(text or '').strip()[:300]}", url)
@@ -297,6 +305,38 @@ def selftest() -> int:
             ok = False
         else:
             print("  ok 6  Entwarnung genau einmal, danach Ruhe")
+
+        # 7. Fall-Zuordnung aus der Abbruchzeile (Fehlalarm-Serie 08/2026):
+        #    "Karte noch nicht da" ist KEIN Layoutfall, die echten
+        #    Layout-Abbrueche und die Legenden-Invariante schon.
+        zuordnung = [
+            ("Keine tkb-Karte fuer Lauf 202608190000 +084 h. "
+             "Der DWD haelt nur rund zwei Tage vor.", "quelle_weg"),
+            ("Legenden-Invariante: Sperrzone traegt die Legendenfarbe",
+             "quelle_weg"),  # Erfolgszeile gelungener Steps
+            ("  ABBRUCH: Layout passt nicht mehr zur Kalibrierung "
+             "(91.2 % < 93 %).", "layout"),
+            ("  ABBRUCH: LEGENDE: Kartengroesse 1200x900 statt 1280x910 — "
+             "Sperrzonen passen nicht mehr", "layout"),
+            ("  ABBRUCH: LEGENDE: nur 12 orange Pixel in der Sperrzone "
+             "(810:910,0:270), erwartet >= 300 — Legende verschoben, der "
+             "Text landet sonst als Trogachse in der Auswertung", "layout"),
+        ]
+        fehler7 = []
+        for zeile, erwartet in zuordnung:
+            a = _Probe()
+            a.aus_meldung(zeile, "Extraktion Test")
+            ist = a.stoerungen[0]["fall"]
+            if ist != erwartet:
+                fehler7.append(f"'{zeile.strip()[:60]}' als {ist} "
+                               f"statt {erwartet}")
+        if fehler7:
+            ok = False
+            for f in fehler7:
+                print(f"  FEHLER 7: {f}")
+        else:
+            print("  ok 7  Abbruchzeilen richtig zugeordnet "
+                  f"({len(zuordnung)} Faelle)")
 
     print("Selbsttest bestanden" if ok else "SELBSTTEST FEHLGESCHLAGEN")
     return 0 if ok else 1

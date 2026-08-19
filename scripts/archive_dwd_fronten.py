@@ -138,13 +138,15 @@ def _extract(args: list[str]) -> bool:
     p = subprocess.run([sys.executable, str(EXTRAKT)] + args,
                        capture_output=True, text=True, timeout=600)
     if p.returncode != 0:
-        letzte = (p.stdout + p.stderr).strip().splitlines()[-1]
+        zeilen = (p.stdout + p.stderr).strip().splitlines()
+        letzte = zeilen[-1] if zeilen else f"rc={p.returncode} ohne Ausgabe"
         print(f"    EXTRAKTION FEHLGESCHLAGEN ({' '.join(args)}):\n    {letzte}")
-        # Der Abbruchgrund steht nur im Text des Subprozesses — Waechter- und
-        # Legendenabbruch sind Layoutfaelle, alles andere zaehlt als Ausfall.
+        # Der Abbruchgrund steht nur im Text des Subprozesses. Nur die letzte
+        # Zeile weitergeben: im Gesamtprotokoll steht bei --alle-steps die
+        # Erfolgszeile "Legenden-Invariante: ..." gelungener Steps, deren Wort
+        # LEGENDE jeden anderen Fehler als Layoutfall etikettieren wuerde.
         if _alarm is not None:
-            _alarm.aus_meldung(p.stdout + p.stderr,
-                               f"Extraktion {' '.join(args)}")
+            _alarm.aus_meldung(letzte, f"Extraktion {' '.join(args)}")
     return p.returncode == 0
 
 

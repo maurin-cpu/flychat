@@ -688,7 +688,17 @@ def main() -> int:
     rc, summary = 0, []
 
     for step in steps:
-        img, meta = fetch_chart(args.profil, step, args.lauf, args.png)
+        try:
+            img, meta = fetch_chart(args.profil, step, args.lauf, args.png)
+        except SystemExit as e:
+            if len(steps) == 1:
+                raise
+            # Der DWD publiziert die spaeten Steps (+084/+108) einige Minuten
+            # nach den fruehen. Ein fehlender Step ist darum kein Ketten-
+            # ausfall: ueberspringen, der naechste Archivlauf zieht ihn nach.
+            print(f"\n=== {args.profil} {args.lauf} +{step:03d} h ===")
+            print(f"  uebersprungen: {e}")
+            continue
         tag = (f"{args.profil} {meta.get('lauf')} +{step:03d} h"
                if args.profil == "vorhersage" else f"{args.profil} LATEST")
         print(f"\n=== {tag} ===")
@@ -724,6 +734,10 @@ def main() -> int:
         print("\nUebersicht:")
         for tag, n, km in summary:
             print(f"  {tag:<32} {n:>3} Abschnitte  {km:>7.0f} km")
+    if not summary:
+        # Erst wenn KEIN Step eine Karte hatte, ist die Quelle wirklich weg.
+        print(f"Keine einzige tkb-Karte fuer Lauf {args.lauf} gefunden.")
+        return 1
     return rc
 
 
