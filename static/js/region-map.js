@@ -234,27 +234,31 @@
         // Topo-Stack identisch zur Spot-Karte: Carto Light + Esri-Hillshade + Labels.
         // Drei Layer in dieser Reihenfolge ergeben eine topografische Optik
         // (Huegel/Berge sichtbar) ohne dass Beschriftungen ueberlagert werden.
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+        // Tile-Optionen gegen graue Kacheln (gleiche Begruendung wie map.js):
+        // waehrend des Pannens laden, mehr Puffer, eine H2-Verbindung statt 4.
+        var tileOpts = { updateWhenIdle: false, keepBuffer: 4 };
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', Object.assign({
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-            subdomains: 'abcd',
+            subdomains: 'a',
             maxZoom: 18,
-        }).addTo(map);
+        }, tileOpts)).addTo(map);
 
         // Hillshade NICHT auf kleinen Screens: dritter (halbtransparenter) Layer
         // verdreifacht die Compositing-Arbeit — auf Handys Hauptursache fuer
         // Stocken beim Zoomen/Ziehen (gleiche Regel wie Spot-Karte, map.js).
         if (window.innerWidth > 900) {
-            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
+            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', Object.assign({
                 attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
                 opacity: 0.45,
                 maxZoom: 16,
-            }).addTo(map);
+            }, tileOpts)).addTo(map);
         }
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
+            subdomains: 'a',
             maxZoom: 18,
-        }).addTo(map);
+        }, tileOpts)).addTo(map);
 
         labelMarkersGroup = L.layerGroup().addTo(map);
 

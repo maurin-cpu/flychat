@@ -2,6 +2,9 @@
 {% block title %}Wingcast - Regionen{% endblock %}
 
 {% block head %}
+{# Tile-Server-Verbindungen vorwaermen: spart DNS+TLS bevor die ersten Kacheln angefragt werden #}
+<link rel="preconnect" href="https://a.basemaps.cartocdn.com">
+<link rel="preconnect" href="https://services.arcgisonline.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
     /* ── Leaflet Tooltip (Light) ──────────────────────────── */

@@ -100,12 +100,20 @@
             wheelPxPerZoomLevel: 120,
         });
 
+        // Gemeinsame Tile-Optionen gegen graue Kacheln:
+        // - updateWhenIdle:false — Kacheln schon WAEHREND des Pannens laden
+        //   (Leaflet-Default auf Mobile: erst nach Gesten-Ende → grau beim Ziehen)
+        // - keepBuffer:4 — mehr Nachbar-Kacheln behalten (Default 2), Zurueck-Pannen ohne Grau
+        // - subdomains:'a' — EINE HTTP/2-Verbindung statt 4 TLS-Handshakes zu a-d
+        //   (Sharding stammt aus HTTP/1.1-Zeiten und ist heute kontraproduktiv)
+        var tileOpts = { updateWhenIdle: false, keepBuffer: 4 };
+
         // Basis ohne Labels
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', Object.assign({
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-            subdomains: 'abcd',
+            subdomains: 'a',
             maxZoom: 18,
-        }).addTo(map);
+        }, tileOpts)).addTo(map);
 
         // Topografie (Schummerung) — zeigt Hügel/Berge ohne das Design zu überladen.
         // NICHT auf kleinen Screens: der halbtransparente Zusatz-Layer verdreifacht
@@ -113,18 +121,18 @@
         // "Bild stockt kurz" beim Zoomen/Ziehen. Auf dem kleinen Display ist die
         // Schummerung ohnehin kaum sichtbar.
         if (window.innerWidth > 900) {
-            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
+            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', Object.assign({
                 attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
                 opacity: 0.45,
                 maxZoom: 16,
-            }).addTo(map);
+            }, tileOpts)).addTo(map);
         }
 
         // Labels über der Schummerung
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
+            subdomains: 'a',
             maxZoom: 18,
-        }).addTo(map);
+        }, tileOpts)).addTo(map);
 
         // Expose the Leaflet map instance under a non-colliding name.
         // `window.map` is unusable because `<div id="map">` auto-creates an
@@ -550,6 +558,41 @@
                 } catch (e) {
                     console.warn('fitBounds fehlgeschlagen:', e);
                 }
+
+                // ===== VIEWPORT-CULLING (Pan-Fluessigkeit, v.a. mobil) =====
+                // Reingezoomt sind meist <10% der 494 Marker sichtbar — der Rest
+                // blaeht nur die Marker-Pane auf, die der Browser bei jedem Pan
+                // rastern muss. Marker ausserhalb des gepufferten Viewports werden
+                // aus der Gruppe genommen und beim Reinpannen wieder eingesetzt.
+                // Unter Zoom 8.5 (Uebersicht: fast alles sichtbar) bleibt alles drin.
+                var cullPending = false;
+                function cullSpots() {
+                    var z = map.getZoom();
+                    var names = Object.keys(markersByName);
+                    var i, m;
+                    if (z < 8.5) {
+                        for (i = 0; i < names.length; i++) {
+                            m = markersByName[names[i]];
+                            if (!geoJsonLayer.hasLayer(m)) geoJsonLayer.addLayer(m);
+                        }
+                        return;
+                    }
+                    var b = map.getBounds().pad(0.3);
+                    for (i = 0; i < names.length; i++) {
+                        m = markersByName[names[i]];
+                        var inside = b.contains(m.getLatLng());
+                        if (inside && !geoJsonLayer.hasLayer(m)) geoJsonLayer.addLayer(m);
+                        else if (!inside && geoJsonLayer.hasLayer(m)) geoJsonLayer.removeLayer(m);
+                    }
+                }
+                function scheduleCull() {
+                    if (cullPending) return;
+                    cullPending = true;
+                    requestAnimationFrame(function () { cullPending = false; cullSpots(); });
+                }
+                map.on('moveend', scheduleCull);
+                map.on('zoomend', scheduleCull);
+                scheduleCull();
             })
             .then(function () {
                 // Race-Fix: falls /api/analyses VOR /api/spots zurueckkam,
