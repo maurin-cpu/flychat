@@ -108,8 +108,14 @@
         //   (Sharding stammt aus HTTP/1.1-Zeiten und ist heute kontraproduktiv)
         var tileOpts = { updateWhenIdle: false, keepBuffer: 4 };
 
-        // Basis ohne Labels
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', Object.assign({
+        // Basis ohne Labels. Mobil in Normalaufloesung ({r} weglassen): Retina-
+        // Kacheln (@2x) vervierfachen die Pixel-Dekodier-/Rasterlast — bei der
+        // flachen Farbflaechen-Grundkarte auf kleinem Display nicht sichtbar,
+        // beim Pannen aber deutlich spuerbar. Labels-Layer bleibt @2x (Textschaerfe).
+        var baseTileUrl = (window.innerWidth <= 900)
+            ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'
+            : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
+        L.tileLayer(baseTileUrl, Object.assign({
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
             subdomains: 'a',
             maxZoom: 18,

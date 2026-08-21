@@ -238,7 +238,11 @@
         // waehrend des Pannens laden, mehr Puffer, eine H2-Verbindung statt 4.
         var tileOpts = { updateWhenIdle: false, keepBuffer: 4 };
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', Object.assign({
+        // Grundkarte mobil in Normalaufloesung — Begruendung siehe map.js
+        var baseTileUrl = (window.innerWidth <= 900)
+            ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'
+            : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
+        L.tileLayer(baseTileUrl, Object.assign({
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
             subdomains: 'a',
             maxZoom: 18,
