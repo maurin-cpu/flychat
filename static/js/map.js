@@ -351,17 +351,20 @@
     // Redraw-Region pro Marker (deckt Maximalgroesse inkl. Windsektor ab).
     // Hit-Test ist separat (SpotMarker._containsPoint), sonst waere das Tap-Ziel
     // absurd gross.
-    var SPOT_DRAW_BOUNDS = 36;
+    var SPOT_DRAW_BOUNDS = 56;
 
     // Zoomabhaengige Spotgroesse: waehrend der Zoom-Geste skaliert der Browser
     // den Canvas mit der Karte (GPU, butterweich). Damit am Gesten-Ende KEIN
     // Groessensprung entsteht, folgt die gezeichnete Groesse derselben Kurve
     // (2^Δzoom) — nur nach oben/unten geklemmt. Rest-Differenz beim Klemmen
     // wird per kurzem Settle-Tween (~160ms) weich ausgeglichen, nie als Sprung.
-    var SPOT_R_Z0 = 7.5, SPOT_R_MIN = 5, SPOT_R_MAX = 15;
+    // K = Kopplungsstaerke an den Zoom (1.0 = exakt wie die Karte). 0.65 haelt
+    // die Spanne ueber den real genutzten Bereich z7..z11 nutzbar: Uebersicht
+    // kleine Punkte, reingezoomt grosse. Die Klemmen greifen erst ausserhalb.
+    var SPOT_R_Z0 = 8.5, SPOT_R_K = 0.65, SPOT_R_MIN = 3.5, SPOT_R_MAX = 22;
     function spotRadiusForZoom(z) {
-        var base = (window.innerWidth <= 600) ? 8 : 7;
-        var r = base * Math.pow(2, z - SPOT_R_Z0);
+        var base = (window.innerWidth <= 600) ? 8 : 7.5;
+        var r = base * Math.pow(2, (z - SPOT_R_Z0) * SPOT_R_K);
         return Math.max(SPOT_R_MIN, Math.min(SPOT_R_MAX, r));
     }
     var _zoomSettle = { factor: 1, raf: 0, zStart: null };
@@ -461,7 +464,8 @@
             ctx.moveTo(x + arm, y - arm); ctx.lineTo(x - arm, y + arm);
             ctx.stroke();
             ctx.lineCap = 'butt';
-        } else if (rating >= 1 && (band === 'green' || band === 'amber' || band === 'violet')) {
+        } else if (rating >= 1 && radius >= 6
+                   && (band === 'green' || band === 'amber' || band === 'violet')) {
             // Ziffer 1-5 — dunkler Text auf hellen Fills, weiss auf saturierten
             var fontSize = Math.round(radius * 1.5);
             var darkBgHere = (band === 'violet')
@@ -473,7 +477,8 @@
             ctx.textBaseline = 'middle';
             ctx.fillText(String(rating), x, y + 0.5);
         } else if (band === 'green' || band === 'amber' || band === 'violet') {
-            // 0 rating: kleiner weisser Punkt (sicher aber Abgleiter)
+            // rating 0 ODER zu klein fuer eine lesbare Ziffer (Uebersicht-Zoom):
+            // kleiner weisser Punkt. Die Ziffer erscheint beim Reinzoomen ab r>=6.
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
             ctx.arc(x, y, radius * 0.26, 0, Math.PI * 2);
@@ -493,8 +498,9 @@
         },
         _containsPoint: function (p) {
             var z = this._map ? this._map.getZoom() : SPOT_R_Z0;
-            // Kreis + Sektor-Ring, mindestens 14px (Touch-Ziel)
-            var hitR = Math.max(14, spotRadiusForZoom(z) * 2.0);
+            // Kreis + etwas Rand, mindestens 12px (Touch-Ziel). Nicht zu gross,
+            // sonst ueberlappen sich die Trefferflaechen dicht stehender Spots.
+            var hitR = Math.max(12, spotRadiusForZoom(z) * 1.4);
             return p.distanceTo(this._point) <= hitR + this._clickTolerance();
         }
     });
