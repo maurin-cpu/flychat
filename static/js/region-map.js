@@ -216,6 +216,11 @@
             center: [46.8, 8.3],
             zoom: 7,
             zoomControl: true,
+            // Feine Zoom-Raststufen (wie Spot-Karte): verhindert den sichtbaren
+            // Einrast-Sprung am Ende einer Pinch-Geste auf Mobile.
+            zoomSnap: 0.25,
+            zoomDelta: 0.5,
+            wheelPxPerZoomLevel: 120,
         });
 
         // Expose the Leaflet map instance under a non-colliding name.
@@ -235,11 +240,16 @@
             maxZoom: 18,
         }).addTo(map);
 
-        L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
-            opacity: 0.45,
-            maxZoom: 16,
-        }).addTo(map);
+        // Hillshade NICHT auf kleinen Screens: dritter (halbtransparenter) Layer
+        // verdreifacht die Compositing-Arbeit — auf Handys Hauptursache fuer
+        // Stocken beim Zoomen/Ziehen (gleiche Regel wie Spot-Karte, map.js).
+        if (window.innerWidth > 900) {
+            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
+                opacity: 0.45,
+                maxZoom: 16,
+            }).addTo(map);
+        }
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',

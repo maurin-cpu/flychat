@@ -93,6 +93,11 @@
             center: [46.8, 8.3],
             zoom: 7,
             zoomControl: true,
+            // Feine Zoom-Raststufen: ohne das rastet der Pinch-Zoom am Gesten-Ende
+            // auf GANZE Stufen ein (sichtbarer Sprung beim Loslassen, "springt grob").
+            zoomSnap: 0.25,
+            zoomDelta: 0.5,
+            wheelPxPerZoomLevel: 120,
         });
 
         // Basis ohne Labels
@@ -102,12 +107,18 @@
             maxZoom: 18,
         }).addTo(map);
 
-        // Topografie (Schummerung) — zeigt Hügel/Berge ohne das Design zu überladen
-        L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
-            opacity: 0.45,
-            maxZoom: 16,
-        }).addTo(map);
+        // Topografie (Schummerung) — zeigt Hügel/Berge ohne das Design zu überladen.
+        // NICHT auf kleinen Screens: der halbtransparente Zusatz-Layer verdreifacht
+        // die Compositing-Arbeit pro Frame — auf Handys die Hauptursache fuer
+        // "Bild stockt kurz" beim Zoomen/Ziehen. Auf dem kleinen Display ist die
+        // Schummerung ohnehin kaum sichtbar.
+        if (window.innerWidth > 900) {
+            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
+                opacity: 0.45,
+                maxZoom: 16,
+            }).addTo(map);
+        }
 
         // Labels über der Schummerung
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
