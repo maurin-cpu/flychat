@@ -59,6 +59,11 @@ app.permanent_session_lifetime = timedelta(days=365)
 app.config['JSON_AS_ASCII'] = False
 app.json.ensure_ascii = False
 
+# Statische Files duerfen 1 Jahr im Browser-Cache bleiben: jede Referenz traegt
+# ?v=<mtime> (static_v), bei Aenderung entsteht also automatisch eine neue URL.
+# Ohne dieses Setting macht der Browser pro Asset einen 304-Roundtrip je Seitenaufruf.
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
+
 
 # ---------------------------------------------------------------------------
 # Day-Gating: anonyme Web-Besucher sehen 2 Tage, eingeloggte Subscriber 5 Tage.
@@ -204,15 +209,45 @@ def _inject_static_v():
 
 # Weather-API responses ändern sich nur beim Refresh (~1x/Tag).
 # 60s Browser-Cache = sofortige Overlays beim Tab-Wechsel, ohne stale-Risiko.
+# WICHTIG: private + Vary: Cookie, weil die Antworten session-abhaengig sind
+# (_gate_forecast: anonym 1 Tag vs. eingeloggt alle Tage) — "public" koennte in
+# einem Shared Cache die volle Tageszahl an Anonyme ausliefern.
 _CACHEABLE_PREFIXES = ("/api/weather/", "/api/altitude-wind/",
                        "/api/region-weather/", "/api/region-altitude-wind/",
                        "/api/foehn", "/api/regionen-polygone")
 
 @app.after_request
 def _add_cache_headers(response):
-    if request.path.startswith(_CACHEABLE_PREFIXES) and response.status_code == 200:
-        response.headers["Cache-Control"] = "public, max-age=60"
+    if request.path.startswith("/static/") and response.status_code in (200, 304):
+        # Cache-Busting via ?v=<mtime> existiert fuer alle Referenzen → immutable ok.
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif request.path.startswith(_CACHEABLE_PREFIXES) and response.status_code == 200:
+        response.headers["Cache-Control"] = "private, max-age=60"
+        response.headers["Vary"] = "Cookie"
     return response
+
+
+def _mtime_or_0(path) -> int:
+    try:
+        return int(os.path.getmtime(path))
+    except OSError:
+        return 0
+
+
+def _cached_json(payload: dict, *etag_parts):
+    """JSON-Response mit ETag + Conditional Request (If-None-Match → 304).
+
+    etag_parts MUESSEN alles enthalten, was die Payload beeinflusst — insbesondere
+    die Sichtbarkeitsstufe (current_max_days, session-abhaengig!) und das heutige
+    Datum (rollendes Datumsfenster). Die grossen Analyse-Payloads (bis mehrere MB)
+    werden vom Frontend bei jedem Tab-Fokus refetcht; mit ETag wird daraus ein
+    304 ohne Body."""
+    resp = jsonify(payload)
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    resp.headers["Vary"] = "Cookie"
+    raw = "|".join(str(p) for p in etag_parts)
+    resp.set_etag(hashlib.md5(raw.encode("utf-8")).hexdigest())
+    return resp.make_conditional(request)
 
 
 # ---------------------------------------------------------------------------
@@ -2507,14 +2542,28 @@ def api_briefing_get():
         aggregated["_test_view"] = True
     else:
         aggregated = engine.build_briefing_data()
-    return jsonify({
+    payload = {
         "success": True,
         "days": aggregated.get("days", []),
         "forecast_dates": aggregated.get("forecast_dates", []),
         "generated_at": aggregated.get("generated_at", ""),
         "wetterlage": aggregated.get("wetterlage"),
         "test_view": aggregated.get("_test_view", False),
-    })
+    }
+    if payload["test_view"]:
+        # Test-Ansicht: Daten kommen aus data/test_runs/, deren Aenderungen der
+        # ETag nicht sieht → gar nicht cachen.
+        resp = jsonify(payload)
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+    return _cached_json(
+        payload,
+        "briefing",
+        engine.analyses_loaded_at,
+        engine.region_analyses_loaded_at,
+        _mtime_or_0(config.SYNOPTIC_CACHE_PATH),
+        datetime.now().date(),
+    )
 
 
 @app.route("/api/briefing/generate", methods=["POST"])
@@ -2851,7 +2900,10 @@ def api_analyses():
 
     loaded_at = engine.analyses_loaded_at.isoformat() if engine.analyses_loaded_at else None
     flat = _format_spot_analyses_flat(engine.spot_analyses, loaded_at, allowed_dates)
-    return jsonify({"spot_analyses": flat, "analyses_count": len(flat)})
+    return _cached_json(
+        {"spot_analyses": flat, "analyses_count": len(flat)},
+        "analyses", loaded_at, current_max_days(), datetime.now().date(),
+    )
 
 
 @app.route("/api/spot-debug/<spot_name>/<date_str>")
@@ -3104,7 +3156,10 @@ def api_region_analyses():
 
     loaded_at = engine.region_analyses_loaded_at.isoformat() if engine.region_analyses_loaded_at else None
     flat = _format_region_analyses_flat(engine.region_analyses, loaded_at, allowed_dates)
-    return jsonify({"region_analyses": flat, "analyses_count": len(flat)})
+    return _cached_json(
+        {"region_analyses": flat, "analyses_count": len(flat)},
+        "region-analyses", loaded_at, current_max_days(), datetime.now().date(),
+    )
 
 
 import queue as _queue_mod
@@ -3563,7 +3618,8 @@ def api_stations_collect():
 
 @app.route("/api/spots")
 def api_spots():
-    return jsonify(engine.get_spots_geojson())
+    # ETag = mtime der Spot-CSV: aendert sich nur bei Spot-Reload (Admin) oder Deploy.
+    return _cached_json(engine.get_spots_geojson(), "spots", _mtime_or_0(config.CSV_PATH))
 
 
 @app.route("/api/regionen")

@@ -772,6 +772,8 @@
 {% endblock %}
 
 {% block scripts %}
+{# data-store.js OHNE defer: muss vor den Inline-Skripten und region-map.js verfuegbar sein #}
+<script src="{{ url_for('static', filename='js/data-store.js') }}?v={{ static_v('js/data-store.js') }}"></script>
 <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -827,6 +829,17 @@ document.addEventListener('DOMContentLoaded', function () {
     applyInitialSidebarWidth();
 
     if (resizer && sidebar) {
+        // invalidateSize ist teuer (forced layout + Leaflet-Resize). mousemove
+        // feuert beim Drag bis zu 120x/s → auf 1x pro Frame drosseln.
+        var invalidatePending = false;
+        function scheduleMapInvalidate() {
+            if (invalidatePending) return;
+            invalidatePending = true;
+            requestAnimationFrame(function () {
+                invalidatePending = false;
+                if (window.regionMap && window.regionMap.invalidateSize) window.regionMap.invalidateSize();
+            });
+        }
         resizer.addEventListener('mousedown', function () {
             isDragging = true;
             document.body.style.cursor = 'col-resize';
@@ -837,7 +850,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!isDragging) return;
             var newW = Math.max(MIN_SIDEBAR_W, Math.min(window.innerWidth * 0.92, e.clientX));
             sidebar.style.width = newW + 'px';
-            if (window.regionMap && window.regionMap.invalidateSize) window.regionMap.invalidateSize();
+            scheduleMapInvalidate();
         });
         document.addEventListener('mouseup', function () {
             if (!isDragging) return;
@@ -951,8 +964,8 @@ function _applyApiPayload(regionAnalyses) {
     if (window.setRegionDate) window.setRegionDate(currentDate);
 }
 
-// 1) Initial-Load via API
-fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+// 1) Initial-Load via API (data-store: dedupliziert parallele Aufrufer)
+window.wingcastData.getRegionAnalyses().then(function(data) {
     var regionAnalyses = data.region_analyses || {};
     if (Object.keys(regionAnalyses).length === 0) {
         statusBar.textContent = {{ t('region.no_analyses')|tojson }};
@@ -966,7 +979,8 @@ fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(functi
 // 2) Refresh on tab focus: holt neue Region-Analysen wenn der User zum Tab zurueckkommt.
 //    Eine Analyse laeuft 1x/Tag — Polling reicht voellig, kein Realtime noetig.
 function _refetchRegionAnalyses() {
-    fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+    // force=true: neues Promise; dank ETag antwortet der Server meist mit 304
+    window.wingcastData.getRegionAnalyses(true).then(function(data) {
         var regionAnalyses = data.region_analyses || {};
         if (Object.keys(regionAnalyses).length > 0) {
             _applyApiPayload(regionAnalyses);

@@ -2541,7 +2541,11 @@ body.page-fixed-nav {
 
 .custom-spot-marker svg {
     transition: transform var(--transition-base), filter var(--transition-base);
-    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.15));
+    /* KEIN filter im Grundzustand: drop-shadow zwang den Browser, jeden der
+       494 Marker in einen eigenen Raster-Layer zu legen — Hauptursache des
+       Zoom-Ruckelns. Der Schatten wird stattdessen als SVG-Ellipse im Icon
+       selbst gezeichnet (createSpotIcon in map.js). Hover unten bleibt:
+       betrifft nur 1 Marker. */
 }
 
 .custom-spot-marker:hover svg {

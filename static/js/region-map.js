@@ -619,9 +619,10 @@
         if (spotAnalyses && spotRegionMap) return Promise.resolve(spotAnalyses);
         if (spotAnalysesPromise) return spotAnalysesPromise;
         // Parallel: Analysen + Spot-Properties (fuer name→region_id-Mapping).
+        // via data-store: dedupliziert mit index-Inline/map.js (ein Download)
         spotAnalysesPromise = Promise.all([
-            fetch('/api/analyses').then(function (r) { return r.json(); }),
-            fetch('/api/spots').then(function (r) { return r.json(); })
+            window.wingcastData.getAnalyses(),
+            window.wingcastData.getSpots()
         ]).then(function (results) {
             spotAnalyses = results[0].spot_analyses || results[0] || {};
             var geo = results[1] || {};

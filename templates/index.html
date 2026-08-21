@@ -617,6 +617,8 @@
 {% endblock %}
 
 {% block scripts %}
+{# data-store.js OHNE defer: muss vor den Inline-Skripten und map.js verfuegbar sein #}
+<script src="{{ url_for('static', filename='js/data-store.js') }}?v={{ static_v('js/data-store.js') }}"></script>
 <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script defer src="https://d3js.org/d3.v7.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -677,6 +679,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         applyInitialSidebarWidth();
 
+        // invalidateSize ist teuer (forced layout + Leaflet-Resize). Beim Drag
+        // feuern mousemove/touchmove bis zu 120x/s → auf 1x pro Frame drosseln.
+        var _invalidatePending = false;
+        function scheduleMapInvalidate() {
+            if (_invalidatePending || !window.wingcastMap) return;
+            _invalidatePending = true;
+            requestAnimationFrame(function () {
+                _invalidatePending = false;
+                if (window.wingcastMap) window.wingcastMap.invalidateSize();
+            });
+        }
+
         window.addEventListener('resize', function () {
             if (!sidebar || window.innerWidth < 1024) return;
             var w = sidebar.offsetWidth;
@@ -707,7 +721,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 sidebar.style.height = newWidth + 'px';
             }
 
-            if (window.wingcastMap) window.wingcastMap.invalidateSize();
+            scheduleMapInvalidate();
         });
 
         document.addEventListener('mouseup', function () {
@@ -745,7 +759,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 newWidth = touch.clientY - 60;
                 sidebar.style.height = newWidth + 'px';
             }
-            if (window.wingcastMap) window.wingcastMap.invalidateSize();
+            scheduleMapInvalidate();
         }, { passive: true });
 
         document.addEventListener('touchend', function () {
@@ -895,7 +909,8 @@ function _updateStatusBarFromSpotAnalyses(spotAnalyses) {
 }
 
 // ── Primary: Load analyses from API (JSON/Postgres via Python backend) ──
-fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
+// via data-store: dedupliziert mit map.js/region-map.js (ein Download statt 2-3)
+window.wingcastData.getAnalyses().then(function(data) {
     if (data.spot_analyses && Object.keys(data.spot_analyses).length > 0) {
         window.analysisData = _normalizeFlyStatusInNested(data.spot_analyses);
         _updateStatusBarFromSpotAnalyses(window.analysisData);
@@ -907,7 +922,7 @@ fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data
     }
 }).catch(function(e) { console.warn('API spot analyses fetch failed:', e); });
 
-fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+window.wingcastData.getRegionAnalyses().then(function(data) {
     if (data.region_analyses && Object.keys(data.region_analyses).length > 0) {
         window.regionAnalysisData = _normalizeFlyStatusInNested(data.region_analyses);
         console.log('[INIT] Region-Analysen via API geladen:', Object.keys(data.region_analyses).length);
@@ -917,7 +932,8 @@ fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(functi
 // ── Refresh on tab focus: holt neue Analysen wenn der User zum Tab zurueckkommt ──
 // Eine Analyse laeuft 1x/Tag — Polling reicht voellig, kein Realtime noetig.
 function _refetchSpots() {
-    fetch('/api/analyses').then(function(r) { return r.json(); }).then(function(data) {
+    // force=true: neues Promise; dank ETag antwortet der Server meist mit 304 (0 Bytes)
+    window.wingcastData.getAnalyses(true).then(function(data) {
         if (data.spot_analyses && Object.keys(data.spot_analyses).length > 0) {
             window.analysisData = _normalizeFlyStatusInNested(data.spot_analyses);
             _updateStatusBarFromSpotAnalyses(window.analysisData);
@@ -929,7 +945,7 @@ function _refetchSpots() {
     }).catch(function(e) { console.warn('Refetch /api/analyses failed:', e); });
 }
 function _refetchRegions() {
-    fetch('/api/region-analyses').then(function(r) { return r.json(); }).then(function(data) {
+    window.wingcastData.getRegionAnalyses(true).then(function(data) {
         if (data.region_analyses && Object.keys(data.region_analyses).length > 0) {
             window.regionAnalysisData = _normalizeFlyStatusInNested(data.region_analyses);
         }

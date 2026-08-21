@@ -137,7 +137,7 @@
       }).addTo(mapObj);
       mapState.map = mapObj;
 
-      fetch("/api/regionen-polygone", { cache: "no-store" })
+      fetch("/api/regionen-polygone", { cache: "no-cache" })
         .then((r) => r.json())
         .then((geojson) => {
           if (!geojson || !Array.isArray(geojson.features) || !geojson.features.length) return;

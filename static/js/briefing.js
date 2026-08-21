@@ -972,7 +972,7 @@
       _filterMap.map = mapObj;
       mapObj.fitBounds([[45.8, 5.9], [47.9, 10.6]], { padding: [20, 20], maxZoom: 7 });
 
-      fetch("/api/regionen-polygone", { cache: "no-store" })
+      fetch("/api/regionen-polygone", { cache: "no-cache" })
         .then((r) => r.json())
         .then((geojson) => {
           if (!geojson || !Array.isArray(geojson.features) || !geojson.features.length) return;
@@ -2081,7 +2081,9 @@
 
   async function loadBriefing() {
     try {
-      const res = await fetch("/api/briefing", { cache: "no-store" });
+      // "no-cache" statt "no-store": der Browser darf die Antwort behalten und
+      // per ETag revalidieren (304 ohne Body) — "no-store" verbietet das komplett.
+      const res = await fetch("/api/briefing", { cache: "no-cache" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       render(data);

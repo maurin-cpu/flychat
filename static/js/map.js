@@ -321,6 +321,11 @@
             html += '<circle cx="' + center + '" cy="' + center + '" r="' + (radius + 4) + '" fill="' + style.fill + '" opacity="0.25" />';
         }
 
+        // Schatten direkt im SVG statt CSS drop-shadow-Filter: der Filter legte
+        // jeden Marker in einen eigenen Raster-Layer (Zoom-Ruckeln bei 494 Stueck).
+        // Nachbildung von drop-shadow(0 1px 3px rgba(0,0,0,0.15)) ohne Blur.
+        html += '<circle cx="' + center + '" cy="' + (center + 1.2) + '" r="' + (radius + 1) + '" fill="rgba(0,0,0,0.13)" />';
+
         // Weisser Hintergrund-Kreis, damit die Karte bei transparentem Fill nicht durchscheint
         html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="#ffffff" />';
 
@@ -405,8 +410,8 @@
 
     // ===== LOAD SPOTS =====
     function loadSpots() {
-        fetch('/api/spots')
-            .then(function (resp) { return resp.json(); })
+        // via data-store: dedupliziert mit region-map.js (ein Download)
+        window.wingcastData.getSpots()
             .then(function (geojson) {
                 var geoJsonLayer = L.geoJSON(geojson, {
                     pointToLayer: function (feature, latlng) {
@@ -1088,8 +1093,8 @@
 
     // ===== REFRESH SPOT MARKERS =====
     window.refreshSpotMarkers = function () {
-        fetch('/api/spots')
-            .then(function (resp) { return resp.json(); })
+        // force=true: expliziter Refresh soll wirklich neu laden (ETag macht es billig)
+        window.wingcastData.getSpots(true)
             .then(function (geojson) {
                 geojson.features.forEach(function (feature) {
                     var p = feature.properties;

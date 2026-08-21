@@ -12,6 +12,14 @@ git stash 2>/dev/null || true
 git pull
 source .venv/bin/activate
 pip install -q -r requirements.txt
+# Caddy-Konfig synchron halten: Repo-caddyfile ist die Quelle, /etc/caddy/Caddyfile
+# die live gelesene Kopie. Erst validieren, dann kopieren, dann reload (kein Downtime).
+if ! sudo cmp -s caddyfile /etc/caddy/Caddyfile; then
+    sudo caddy validate --config caddyfile --adapter caddyfile \
+        && sudo cp caddyfile /etc/caddy/Caddyfile \
+        && sudo systemctl reload caddy \
+        && echo "=== Caddy-Konfig aktualisiert ==="
+fi
 sudo systemctl restart wingcast
 echo "=== Deploy fertig ==="
 sudo systemctl status wingcast --no-pager | head -5
