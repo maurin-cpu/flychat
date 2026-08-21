@@ -147,58 +147,49 @@
         map.createPane('spotPane').style.zIndex = '600';
         spotRenderer = L.canvas({ pane: 'spotPane', padding: 0.5, tolerance: 6 });
 
-        // Settle-Tween gegen Groessensprung am Zoom-Ende: waehrend der Geste
-        // skaliert der Browser den Canvas mit (Spots wachsen/schrumpfen nahtlos
-        // mit der Karte). Am Ende zeichnet der Renderer mit spotRadiusForZoom neu.
-        // Solange die Groessenkurve ungeklemmt ist, sind beide identisch (kein
-        // Sprung); greift die Klemmung (sehr weit rein-/rausgezoomt), wird die
-        // Rest-Differenz hier in ~160ms weich ausgeglichen.
-        // WICHTIG: Diese Handler sind VOR dem Renderer registriert (der haengt
-        // sich erst beim ersten Marker-Add an) → Faktor steht, bevor er zeichnet.
-        map.on('zoomstart', function () {
-            _zoomSettle.zStart = map.getZoom();
-            _zoomSettle.animated = false;
-            if (_zoomSettle.raf) {
-                cancelAnimationFrame(_zoomSettle.raf);
-                _zoomSettle.raf = 0;
+        // ===== ZOOM-KOMPENSATION (konstante Spot-Groesse, live) =====
+        // Leaflet skaliert den Spot-Canvas waehrend jeder Zoom-Geste per CSS
+        // mit der Karte mit. Damit die Spots dabei NICHT mitwachsen, wird der
+        // gezeichnete Radius laufend um 1/scale gegenskaliert — die Groesse
+        // passt sich also WAEHREND des Zoomens an, nicht danach. Kein Sprung,
+        // kein Nachkorrigieren, kein Flackern.
+        // Diese Handler sind vor dem Renderer registriert (der haengt sich erst
+        // beim ersten Marker-Add an) → der Faktor steht, bevor er zeichnet.
+        function compRedraw() {
+            if (spotRenderer && spotRenderer._redraw) spotRenderer._redraw();
+        }
+        function compCancel() {
+            if (_zoomComp.raf) { cancelAnimationFrame(_zoomComp.raf); _zoomComp.raf = 0; }
+        }
+        map.on('zoomanim', function (e) {
+            var scale = map.getZoomScale(e.zoom, map.getZoom());
+            if (!isFinite(scale) || scale <= 0) return;
+            compCancel();
+            if (e.noUpdate) {
+                // Pinch: feuert pro Frame mit dem aktuell interpolierten Zoom →
+                // Faktor direkt setzen, die Geste selbst ist die Animation.
+                _zoomComp.factor = 1 / scale;
+                compRedraw();
+                return;
             }
-            _zoomSettle.factor = 1;
+            // Wheel/Buttons: Leaflet animiert den Transform per CSS-Transition
+            // (~250ms). Faktor synchron mitziehen, sonst poppt es am Anfang.
+            var from = _zoomComp.factor, to = 1 / scale;
+            var t0 = performance.now(), DUR = 250;
+            (function step(t) {
+                var p = Math.min(1, (t - t0) / DUR);
+                var eased = 1 - Math.pow(1 - p, 4); // ~cubic-bezier(0,0,.25,1)
+                _zoomComp.factor = from + (to - from) * eased;
+                compRedraw();
+                _zoomComp.raf = (p < 1) ? requestAnimationFrame(step) : 0;
+            })(performance.now());
         });
-        // Nur echte Zoom-ANIMATIONEN hinterlassen einen skalierten Canvas —
-        // bei animate:false zeichnet der Renderer direkt in Zielgroesse und
-        // ein Ausgleichsfaktor waere falsch (Bug: Riesen-Marker).
-        map.on('zoomanim', function () { _zoomSettle.animated = true; });
         map.on('zoomend', function () {
-            var z0 = _zoomSettle.zStart, z1 = map.getZoom();
-            var wasAnimated = _zoomSettle.animated;
-            _zoomSettle.zStart = null;
-            _zoomSettle.animated = false;
-            // Sicherheitsnetz: egal was passiert (verstecktes Tab friert rAF ein,
-            // unterbrochene Animation, …) — nach 300ms ist der Faktor wieder 1.
-            setTimeout(function () {
-                if (_zoomSettle.factor !== 1) {
-                    if (_zoomSettle.raf) { cancelAnimationFrame(_zoomSettle.raf); _zoomSettle.raf = 0; }
-                    _zoomSettle.factor = 1;
-                    if (spotRenderer && spotRenderer._redraw) spotRenderer._redraw();
-                }
-            }, 300);
-            if (!wasAnimated || z0 == null || z0 === z1) { _zoomSettle.factor = 1; return; }
-            // Groesse, die der skalierte Canvas gerade anzeigt vs. Zielgroesse
-            var displayed = spotRadiusForZoom(z0) * Math.pow(2, z1 - z0);
-            var target = spotRadiusForZoom(z1);
-            var f = displayed / target;
-            if (!isFinite(f) || Math.abs(f - 1) < 0.04) { _zoomSettle.factor = 1; return; }
-            _zoomSettle.factor = f;
-            var tStart = performance.now(), DUR = 160;
-            function settleStep(t) {
-                var p = Math.min(1, (t - tStart) / DUR);
-                var e = 1 - Math.pow(1 - p, 2); // ease-out
-                _zoomSettle.factor = f + (1 - f) * e;
-                if (p >= 1) { _zoomSettle.factor = 1; _zoomSettle.raf = 0; }
-                else { _zoomSettle.raf = requestAnimationFrame(settleStep); }
-                if (spotRenderer && spotRenderer._redraw) spotRenderer._redraw();
-            }
-            _zoomSettle.raf = requestAnimationFrame(settleStep);
+            // Transform ist zurueckgesetzt, der Renderer zeichnet gleich in der
+            // neuen Projektion → Kompensation aus.
+            compCancel();
+            _zoomComp.factor = 1;
+            compRedraw();
         });
 
         // Expose the Leaflet map instance under a non-colliding name.
@@ -353,21 +344,17 @@
     // absurd gross.
     var SPOT_DRAW_BOUNDS = 56;
 
-    // Zoomabhaengige Spotgroesse: waehrend der Zoom-Geste skaliert der Browser
-    // den Canvas mit der Karte (GPU, butterweich). Damit am Gesten-Ende KEIN
-    // Groessensprung entsteht, folgt die gezeichnete Groesse derselben Kurve
-    // (2^Δzoom) — nur nach oben/unten geklemmt. Rest-Differenz beim Klemmen
-    // wird per kurzem Settle-Tween (~160ms) weich ausgeglichen, nie als Sprung.
-    // K = Kopplungsstaerke an den Zoom (1.0 = exakt wie die Karte). 0.65 haelt
-    // die Spanne ueber den real genutzten Bereich z7..z11 nutzbar: Uebersicht
-    // kleine Punkte, reingezoomt grosse. Die Klemmen greifen erst ausserhalb.
-    var SPOT_R_Z0 = 8.5, SPOT_R_K = 0.65, SPOT_R_MIN = 3.5, SPOT_R_MAX = 22;
-    function spotRadiusForZoom(z) {
-        var base = (window.innerWidth <= 600) ? 8 : 7.5;
-        var r = base * Math.pow(2, (z - SPOT_R_Z0) * SPOT_R_K);
-        return Math.max(SPOT_R_MIN, Math.min(SPOT_R_MAX, r));
+    // Spots haben auf JEDER Zoomstufe dieselbe Bildschirmgroesse. Konstant zu
+    // bleiben ist aber nicht gratis: Leaflet skaliert den Canvas waehrend der
+    // Zoom-Geste mit der Karte mit. Deshalb wird der gezeichnete Radius live um
+    // genau denselben Faktor GEGENskaliert (_zoomComp) — die Groesse passt sich
+    // also waehrend des Zoomens laufend an, statt hinterher zu springen.
+    // Originalgroessen (unveraendert seit jeher): Handy groesser als Desktop.
+    function spotRadius(highlighted) {
+        var isMobile = window.innerWidth <= 600;
+        return highlighted ? (isMobile ? 9 : 8) : (isMobile ? 8 : 7);
     }
-    var _zoomSettle = { factor: 1, raf: 0, zStart: null };
+    var _zoomComp = { factor: 1, raf: 0 };
 
     // Zeichnet einen Spot — Optik identisch zum frueheren SVG-DivIcon:
     // Windsektor(en), Highlight-Glow, Schatten, weisser Grund, Band-Kreis, Glyphe.
@@ -379,10 +366,16 @@
         var highlighted = !!layer._wcHighlight;
         var props = layer.featureProperties || {};
         var style = mapSafetyBandToStyle(band);
-        var zoomNow = layer._map ? layer._map.getZoom() : SPOT_R_Z0;
-        var radius = spotRadiusForZoom(zoomNow) * _zoomSettle.factor;
-        if (highlighted) radius *= 1.15;
-        if (layer._wcHover) radius *= 1.12; // Hover-Feedback (ersetzt CSS :hover scale)
+        var radius = spotRadius(highlighted);
+        if (layer._wcHover) radius += 1; // Hover-Feedback (ersetzt CSS :hover scale)
+
+        // Alles ab hier wird um den Ursprung gezeichnet und als Ganzes um
+        // _zoomComp.factor skaliert. So bleiben die Original-Proportionen
+        // (Sektor r+1/r+9, Schatten 1.2px versetzt, Strichbreiten) exakt
+        // erhalten — auch waehrend der Zoom-Kompensation.
+        ctx.save();
+        ctx.translate(x, y);
+        if (_zoomComp.factor !== 1) ctx.scale(_zoomComp.factor, _zoomComp.factor);
 
         // Display-Band Premium-Override: safe + rating=5 (xc_tag/Klassiker) →
         // Violet-400 (Palette v3.2 Royal Premium).
@@ -395,16 +388,15 @@
         if (props.windrichtung) {
             var arcs = getDirAngles(props.windrichtung);
             if (arcs && arcs.length) {
-                // proportional zur Groesse (frueher r+1 / r+9 bei r=7-8)
-                var ri = radius * 1.15, ro = radius * 2.3;
+                var ri = radius + 1, ro = radius + 9;
                 ctx.globalAlpha = 0.5;
                 ctx.fillStyle = style.stroke;
                 for (var ai = 0; ai < arcs.length; ai++) {
                     var a0 = (arcs[ai][0] - 90) * Math.PI / 180;
                     var a1 = (arcs[ai][1] - 90) * Math.PI / 180;
                     ctx.beginPath();
-                    ctx.arc(x, y, ro, a0, a1, false);
-                    ctx.arc(x, y, ri, a1, a0, true);
+                    ctx.arc(0, 0, ro, a0, a1, false);
+                    ctx.arc(0, 0, ri, a1, a0, true);
                     ctx.closePath();
                     ctx.fill();
                 }
@@ -417,7 +409,7 @@
             ctx.globalAlpha = 0.25;
             ctx.fillStyle = style.fill;
             ctx.beginPath();
-            ctx.arc(x, y, radius * 1.5, 0, Math.PI * 2);
+            ctx.arc(0, 0, radius + 4, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1;
         }
@@ -425,13 +417,13 @@
         // Schatten (Nachbildung von drop-shadow(0 1px 3px …) ohne Blur)
         ctx.fillStyle = 'rgba(0,0,0,0.13)';
         ctx.beginPath();
-        ctx.arc(x, y + radius * 0.17, radius * 1.14, 0, Math.PI * 2);
+        ctx.arc(0, 1.2, radius + 1, 0, Math.PI * 2);
         ctx.fill();
 
         // Weisser Hintergrund-Kreis, damit die Karte bei hellem Fill nicht durchscheint
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
         ctx.fill();
 
         // Rating-Tint: Hue-Shift quer durch verwandte Farbtoene
@@ -445,10 +437,10 @@
 
         // Main circle (safety band color)
         ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
         ctx.fillStyle = markerFill;
         ctx.fill();
-        ctx.lineWidth = Math.max(1, radius * (highlighted ? 0.25 : 0.21));
+        ctx.lineWidth = highlighted ? 2 : 1.5;
         ctx.strokeStyle = markerStroke;
         ctx.stroke();
 
@@ -457,15 +449,14 @@
             // White X cross — Sperr-Glyphe
             var arm = radius * 0.55;
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = Math.max(1.5, radius * 0.22);
+            ctx.lineWidth = Math.max(2, radius * 0.22);
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(x - arm, y - arm); ctx.lineTo(x + arm, y + arm);
-            ctx.moveTo(x + arm, y - arm); ctx.lineTo(x - arm, y + arm);
+            ctx.moveTo(-arm, -arm); ctx.lineTo(arm, arm);
+            ctx.moveTo(arm, -arm); ctx.lineTo(-arm, arm);
             ctx.stroke();
             ctx.lineCap = 'butt';
-        } else if (rating >= 1 && radius >= 6
-                   && (band === 'green' || band === 'amber' || band === 'violet')) {
+        } else if (rating >= 1 && (band === 'green' || band === 'amber' || band === 'violet')) {
             // Ziffer 1-5 — dunkler Text auf hellen Fills, weiss auf saturierten
             var fontSize = Math.round(radius * 1.5);
             var darkBgHere = (band === 'violet')
@@ -475,15 +466,15 @@
             ctx.font = '800 ' + fontSize + 'px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(String(rating), x, y + 0.5);
+            ctx.fillText(String(rating), 0, 0.5);
         } else if (band === 'green' || band === 'amber' || band === 'violet') {
-            // rating 0 ODER zu klein fuer eine lesbare Ziffer (Uebersicht-Zoom):
-            // kleiner weisser Punkt. Die Ziffer erscheint beim Reinzoomen ab r>=6.
+            // 0 rating: kleiner weisser Punkt (sicher aber Abgleiter)
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(x, y, radius * 0.26, 0, Math.PI * 2);
+            ctx.arc(0, 0, 1.8, 0, Math.PI * 2);
             ctx.fill();
         }
+        ctx.restore();
     }
 
     // CircleMarker-Subklasse: Leaflet liefert Events/Tooltip/Popup,
@@ -497,10 +488,11 @@
             }
         },
         _containsPoint: function (p) {
-            var z = this._map ? this._map.getZoom() : SPOT_R_Z0;
-            // Kreis + etwas Rand, mindestens 12px (Touch-Ziel). Nicht zu gross,
-            // sonst ueberlappen sich die Trefferflaechen dicht stehender Spots.
-            var hitR = Math.max(12, spotRadiusForZoom(z) * 1.4);
+            // Grosszuegiges Tap-Ziel auf Touch (WCAG ~44px Durchmesser), enger
+            // mit der Maus. Nicht groesser, sonst ueberlappen sich die
+            // Trefferflaechen dicht stehender Spots.
+            var isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            var hitR = isTouch ? 22 : Math.max(10, spotRadius(false) * 1.4);
             return p.distanceTo(this._point) <= hitR + this._clickTolerance();
         }
     });
