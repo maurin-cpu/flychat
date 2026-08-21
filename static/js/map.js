@@ -79,8 +79,8 @@
     var currentSpotExperienceStars = null;
     var currentSpotExperienceRating = null;
     var markersByName = {}; // Store marker references
+    var spotRenderer = null; // gemeinsamer Canvas-Renderer fuer alle Spot-Marker
     var currentRefLayer = null; // Store reference points overlay
-    var _iconUid = 0; // Unique ID counter for SVG defs
     var hideNotSafe = true; // Default: dim not_safe spots
 
     // Phase 1 (Tool-Use): Layers für Isochrone + User-Standort
@@ -139,6 +139,13 @@
             subdomains: 'a',
             maxZoom: 18,
         }, tileOpts)).addTo(map);
+
+        // Canvas-Pane fuer Spot-Marker: ueber OSM-Peaks (450), Position des
+        // frueheren markerPane-Stacks. padding 0.5 = Canvas deckt 2x Viewport,
+        // Pan innerhalb des Puffers braucht kein Neuzeichnen. tolerance 6 =
+        // zusaetzlicher Hit-Spielraum fuer Touch.
+        map.createPane('spotPane').style.zIndex = '600';
+        spotRenderer = L.canvas({ pane: 'spotPane', padding: 0.5, tolerance: 6 });
 
         // Expose the Leaflet map instance under a non-colliding name.
         // `window.map` is unusable because `<div id="map">` auto-creates an
@@ -279,158 +286,149 @@
         return 'default';
     }
 
-    // ===== CUSTOM MARKER GENERATOR (RATING_ARCHITECTURE v2.0) =====
-    // Inner circle = safety band color
-    // Inner glyph:
-    //   - red                 → white X cross (Sperr-Glyphe)
-    //   - rating >= 1         → white digit 1-6 (experience_rating)
-    //   - rating == 0         → small white dot (sicher aber Abgleiter)
-    //   - no_data / default   → small white dot (faded)
-    function createSpotIcon(props, safetyBand, experienceRating, isHighlighted) {
-        var uid = ++_iconUid;
-        var style = mapSafetyBandToStyle(safetyBand);
+    // ===== CANVAS-MARKER (RATING_ARCHITECTURE v2.0) =====
+    // Alle 494 Spots werden auf EINE Canvas-Flaeche gezeichnet statt als 494
+    // DOM-Elemente (~4000 SVG-Knoten). Grund: bei vielen sichtbaren Spots war
+    // Pannen/Zoomen spuerbar zaeher als bei wenigen — der Browser musste die
+    // aufgeblaehte Marker-Pane rastern. Canvas = ein Element, egal wie viele.
+    // Klick/Tooltip/Popup/Suche laufen unveraendert ueber Leaflet: SpotMarker
+    // ist eine L.CircleMarker-Subklasse (Hit-Test = Kreis mit SPOT_HIT_RADIUS),
+    // nur das Zeichnen ist durch drawSpot ersetzt.
+    var SPOT_HIT_RADIUS = 20; // Hit-/Redraw-Radius; grosszuegiges Tap-Ziel (WCAG)
+
+    // Zeichnet einen Spot — Optik identisch zum frueheren SVG-DivIcon:
+    // Windsektor(en), Highlight-Glow, Schatten, weisser Grund, Band-Kreis, Glyphe.
+    function drawSpot(ctx, x, y, layer) {
+        var band = layer.currentSafetyBand || 'default';
+        var rating = (typeof layer.currentRating === 'number') ? Math.floor(layer.currentRating) : 0;
+        if (rating === 6) rating = 5; // Migration-Tolerance: alter Cache-Wert 6 → 5
+        rating = Math.max(0, Math.min(5, rating));
+        var highlighted = !!layer._wcHighlight;
+        var props = layer.featureProperties || {};
+        var style = mapSafetyBandToStyle(band);
         var isMobile = window.innerWidth <= 600;
-        var svgSize = 44;
-        var center = svgSize / 2;
-        var radius = isHighlighted ? (isMobile ? 9 : 8) : (isMobile ? 8 : 7);
-        var rating = (typeof experienceRating === 'number' && experienceRating >= 0 && experienceRating <= 6)
-            ? Math.floor(experienceRating) : 0;
-        // Migration-Tolerance: alter Cache-Wert 6 → 5 mappen
-        if (rating === 6) rating = 5;
+        var radius = highlighted ? (isMobile ? 9 : 8) : (isMobile ? 8 : 7);
+        if (layer._wcHover) radius += 1; // Hover-Feedback (ersetzt CSS :hover scale)
 
         // Display-Band Premium-Override: safe + rating=5 (xc_tag/Klassiker) →
         // Violet-400 (Palette v3.2 Royal Premium).
-        if (safetyBand === 'green' && rating >= 5) {
-            safetyBand = 'violet';
+        if (band === 'green' && rating >= 5) {
+            band = 'violet';
             style = { fill: '#a78bfa', stroke: '#6d28d9' };
         }
 
-        var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">';
-        // Invisible hit-area — extends tap target to full 44x44 (WCAG).
-        // An Touch-Faehigkeit gekoppelt, nicht an Bildschirmbreite: Tablets und
-        // grosse Handys (>600px) hatten sonst nur die winzige sichtbare Flaeche
-        // als Tap-Ziel ("man muss ordentlich druecken").
-        var isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        if (isTouch || isMobile) {
-            html += '<circle cx="' + center + '" cy="' + center + '" r="' + (svgSize / 2) + '" fill="rgba(0,0,0,0)" pointer-events="all" />';
-        }
-
         // Wind direction sector (PGE: kann mehrere disjunkte Arcs liefern)
-        if (props && props.windrichtung) {
+        if (props.windrichtung) {
             var arcs = getDirAngles(props.windrichtung);
             if (arcs && arcs.length) {
-                var sectorInner = radius + 1;
-                var sectorOuter = radius + 9;
+                var ri = radius + 1, ro = radius + 9;
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = style.stroke;
                 for (var ai = 0; ai < arcs.length; ai++) {
-                    var angles = arcs[ai];
-                    var startRad = (angles[0] - 90) * Math.PI / 180;
-                    var endRad = (angles[1] - 90) * Math.PI / 180;
-                    var ix1 = center + sectorInner * Math.cos(startRad);
-                    var iy1 = center + sectorInner * Math.sin(startRad);
-                    var ix2 = center + sectorInner * Math.cos(endRad);
-                    var iy2 = center + sectorInner * Math.sin(endRad);
-                    var ox1 = center + sectorOuter * Math.cos(startRad);
-                    var oy1 = center + sectorOuter * Math.sin(startRad);
-                    var ox2 = center + sectorOuter * Math.cos(endRad);
-                    var oy2 = center + sectorOuter * Math.sin(endRad);
-                    var largeArc = (angles[1] - angles[0]) > 180 ? 1 : 0;
-
-                    var d = 'M ' + ox1 + ' ' + oy1 +
-                        ' A ' + sectorOuter + ' ' + sectorOuter + ' 0 ' + largeArc + ' 1 ' + ox2 + ' ' + oy2 +
-                        ' L ' + ix2 + ' ' + iy2 +
-                        ' A ' + sectorInner + ' ' + sectorInner + ' 0 ' + largeArc + ' 0 ' + ix1 + ' ' + iy1 + ' Z';
-
-                    html += '<path d="' + d + '" fill="' + style.stroke + '" opacity="0.5" />';
+                    var a0 = (arcs[ai][0] - 90) * Math.PI / 180;
+                    var a1 = (arcs[ai][1] - 90) * Math.PI / 180;
+                    ctx.beginPath();
+                    ctx.arc(x, y, ro, a0, a1, false);
+                    ctx.arc(x, y, ri, a1, a0, true);
+                    ctx.closePath();
+                    ctx.fill();
                 }
+                ctx.globalAlpha = 1;
             }
         }
 
         // Highlight glow (selected spot)
-        if (isHighlighted) {
-            html += '<circle cx="' + center + '" cy="' + center + '" r="' + (radius + 4) + '" fill="' + style.fill + '" opacity="0.25" />';
+        if (highlighted) {
+            ctx.globalAlpha = 0.25;
+            ctx.fillStyle = style.fill;
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
         }
 
-        // Schatten direkt im SVG statt CSS drop-shadow-Filter: der Filter legte
-        // jeden Marker in einen eigenen Raster-Layer (Zoom-Ruckeln bei 494 Stueck).
-        // Nachbildung von drop-shadow(0 1px 3px rgba(0,0,0,0.15)) ohne Blur.
-        html += '<circle cx="' + center + '" cy="' + (center + 1.2) + '" r="' + (radius + 1) + '" fill="rgba(0,0,0,0.13)" />';
+        // Schatten (Nachbildung von drop-shadow(0 1px 3px …) ohne Blur)
+        ctx.fillStyle = 'rgba(0,0,0,0.13)';
+        ctx.beginPath();
+        ctx.arc(x, y + 1.2, radius + 1, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Weisser Hintergrund-Kreis, damit die Karte bei transparentem Fill nicht durchscheint
-        html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="#ffffff" />';
+        // Weisser Hintergrund-Kreis, damit die Karte bei hellem Fill nicht durchscheint
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Rating-Tint: Hue-Shift quer durch verwandte Farbtoene (Lime→Forest fuer green,
-        // Yellow→Burnt fuer amber). Fill-Opazitaet fix bei 1.0 — Differenzierung traegt
-        // jetzt der Farbton, nicht mehr die Transparenz.
+        // Rating-Tint: Hue-Shift quer durch verwandte Farbtoene
+        // (Source of Truth: docs/RATING_FARBKONZEPT.md)
         var markerFill = style.fill;
         var markerStroke = style.stroke;
-        if (rating > 0 && (safetyBand === 'green' || safetyBand === 'amber')) {
-            var tint = getRatingTint(safetyBand, rating);
+        if (rating > 0 && (band === 'green' || band === 'amber')) {
+            var tint = getRatingTint(band, rating);
             if (tint) { markerFill = tint.fill; markerStroke = tint.stroke; }
         }
 
         // Main circle (safety band color)
-        html += '<circle cx="' + center + '" cy="' + center + '" r="' + radius + '" fill="' + markerFill
-                + '" stroke="' + markerStroke + '" stroke-width="' + (isHighlighted ? '2' : '1.5') + '" />';
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = markerFill;
+        ctx.fill();
+        ctx.lineWidth = highlighted ? 2 : 1.5;
+        ctx.strokeStyle = markerStroke;
+        ctx.stroke();
 
         // Inner glyph
-        if (safetyBand === 'red') {
-            // White X cross — Sperr-Glyphe, proportional zur Marker-Groesse
+        if (band === 'red') {
+            // White X cross — Sperr-Glyphe
             var arm = radius * 0.55;
-            var crossWidth = Math.max(2, radius * 0.22);
-            html += '<line x1="' + (center - arm) + '" y1="' + (center - arm)
-                  + '" x2="' + (center + arm) + '" y2="' + (center + arm)
-                  + '" stroke="#ffffff" stroke-width="' + crossWidth + '" stroke-linecap="round" />';
-            html += '<line x1="' + (center + arm) + '" y1="' + (center - arm)
-                  + '" x2="' + (center - arm) + '" y2="' + (center + arm)
-                  + '" stroke="#ffffff" stroke-width="' + crossWidth + '" stroke-linecap="round" />';
-        } else if (rating >= 1 && (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet')) {
-            // Ziffer 1-5 — experience_rating, prominent zum sofortigen Erkennen.
-            // Palette v3 Royal Premium:
-            // - green Rating 1-4 hat helle Fills (Sky/Mint-Green/Cyan) → dunkler Text
-            // - green Rating 5 wird via Premium-Override zu violet-band geswitcht (weisser Text)
-            // - amber Rating 1+2 hellgelb → dunkler Text, ab Rating 3 saturiert → weisser Text
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = Math.max(2, radius * 0.22);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x - arm, y - arm); ctx.lineTo(x + arm, y + arm);
+            ctx.moveTo(x + arm, y - arm); ctx.lineTo(x - arm, y + arm);
+            ctx.stroke();
+            ctx.lineCap = 'butt';
+        } else if (rating >= 1 && (band === 'green' || band === 'amber' || band === 'violet')) {
+            // Ziffer 1-5 — dunkler Text auf hellen Fills, weiss auf saturierten
             var fontSize = Math.round(radius * 1.5);
-            // v3.2: Rating 4 (green-band Green-500) bekommt auch weissen Text.
-            var darkBgHere = (safetyBand === 'violet')
-                || (safetyBand === 'amber' && rating >= 3)
-                || (safetyBand === 'green' && rating >= 4);
-            var textFill = darkBgHere ? '#ffffff' : markerStroke;
-            html += '<text x="' + center + '" y="' + (center + fontSize * 0.35)
-                  + '" text-anchor="middle" fill="' + textFill + '" font-family="Inter, sans-serif"'
-                  + ' font-size="' + fontSize + '" font-weight="800">' + rating + '</text>';
-        } else if (safetyBand === 'green' || safetyBand === 'amber' || safetyBand === 'violet') {
+            var darkBgHere = (band === 'violet')
+                || (band === 'amber' && rating >= 3)
+                || (band === 'green' && rating >= 4);
+            ctx.fillStyle = darkBgHere ? '#ffffff' : markerStroke;
+            ctx.font = '800 ' + fontSize + 'px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(rating), x, y + 0.5);
+        } else if (band === 'green' || band === 'amber' || band === 'violet') {
             // 0 rating: kleiner weisser Punkt (sicher aber Abgleiter)
-            html += '<circle cx="' + center + '" cy="' + center + '" r="1.8" fill="#ffffff" />';
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+            ctx.fill();
         }
-
-        html += '</svg>';
-
-        return L.divIcon({
-            html: html,
-            className: 'custom-spot-marker',
-            iconSize: [svgSize, svgSize],
-            iconAnchor: [center, center],
-            tooltipAnchor: [0, -radius - 6]
-        });
     }
 
-    // Visuellen Zustand eines Markers setzen — OHNE das DOM-Element zu zerstoeren.
-    // setIcon() reisst das Element ab und baut es neu: bei 494 Markern sichtbares
-    // Flackern, und ein Tap, der gerade auf dem alten Element liegt, geht verloren
-    // (Touch landet auf totem Knoten). Stattdessen: Signatur-Guard (unveraendert →
-    // gar nichts tun) und sonst nur das SVG im bestehenden Element austauschen.
+    // CircleMarker-Subklasse: Leaflet liefert Events/Tooltip/Popup/Hit-Test,
+    // gezeichnet wird via drawSpot auf dem gemeinsamen Canvas.
+    var SpotMarker = L.CircleMarker.extend({
+        _updatePath: function () {
+            if (this._renderer && this._renderer._ctx) {
+                drawSpot(this._renderer._ctx, this._point.x, this._point.y, this);
+            }
+        }
+    });
+
+    // Visuellen Zustand eines Markers setzen. Signatur-Guard: unveraendert →
+    // gar nichts tun (haeufigster Fall beim Tab-Fokus-Refetch). Sonst genuegt
+    // redraw() — der Canvas-Renderer sammelt alle Aenderungen in EINEM
+    // Frame-Repaint statt 494 einzelner DOM-Operationen.
     function applySpotVisual(marker, band, rating, highlighted) {
         var sig = band + '|' + rating + '|' + (highlighted ? 1 : 0);
         if (marker._wcSig === sig) return false;
         marker._wcSig = sig;
-        var icon = createSpotIcon(marker.featureProperties, band, rating, highlighted);
-        var el = marker.getElement();
-        if (el) {
-            el.innerHTML = icon.options.html;
-            marker.options.icon = icon; // konsistent, falls Leaflet das Element neu anlegt
-        } else {
-            marker.setIcon(icon);
-        }
+        marker._wcHighlight = !!highlighted;
+        if (marker._map) marker.redraw();
         return true;
     }
 
@@ -464,9 +462,15 @@
             .then(function (geojson) {
                 var geoJsonLayer = L.geoJSON(geojson, {
                     pointToLayer: function (feature, latlng) {
-                        var initBand = feature.properties.has_weather ? 'default' : 'no_data';
-                        return L.marker(latlng, {
-                            icon: createSpotIcon(feature.properties, initBand, 0, false)
+                        // Canvas-Marker: Optik kommt komplett aus drawSpot,
+                        // radius dient nur Hit-Test + Redraw-Region.
+                        return new SpotMarker(latlng, {
+                            renderer: spotRenderer,
+                            pane: 'spotPane',
+                            radius: SPOT_HIT_RADIUS,
+                            stroke: false,
+                            fill: false,
+                            bubblingMouseEvents: false,
                         });
                     },
                     onEachFeature: function (feature, layer) {
@@ -504,6 +508,9 @@
                         
                         // Hover Effect for Reference Points
                         layer.on('mouseover', function () {
+                            // Hover-Grow (ersetzt frueheres CSS :hover scale auf dem SVG)
+                            layer._wcHover = true;
+                            layer.redraw();
                             if (SHOW_REFERENCE_POINTS && p.reference_points && p.reference_points.length > 1) {
                                 var refGroup = L.layerGroup();
                                 var spotPt = p.reference_points[0]; // Point 0 is the spot itself
@@ -546,6 +553,8 @@
                         });
                         
                         layer.on('mouseout', function () {
+                            layer._wcHover = false;
+                            layer.redraw();
                             if (currentRefLayer) {
                                 map.removeLayer(currentRefLayer);
                                 currentRefLayer = null;
@@ -565,40 +574,9 @@
                     console.warn('fitBounds fehlgeschlagen:', e);
                 }
 
-                // ===== VIEWPORT-CULLING (Pan-Fluessigkeit, v.a. mobil) =====
-                // Reingezoomt sind meist <10% der 494 Marker sichtbar — der Rest
-                // blaeht nur die Marker-Pane auf, die der Browser bei jedem Pan
-                // rastern muss. Marker ausserhalb des gepufferten Viewports werden
-                // aus der Gruppe genommen und beim Reinpannen wieder eingesetzt.
-                // Unter Zoom 8.5 (Uebersicht: fast alles sichtbar) bleibt alles drin.
-                var cullPending = false;
-                function cullSpots() {
-                    var z = map.getZoom();
-                    var names = Object.keys(markersByName);
-                    var i, m;
-                    if (z < 8.5) {
-                        for (i = 0; i < names.length; i++) {
-                            m = markersByName[names[i]];
-                            if (!geoJsonLayer.hasLayer(m)) geoJsonLayer.addLayer(m);
-                        }
-                        return;
-                    }
-                    var b = map.getBounds().pad(0.3);
-                    for (i = 0; i < names.length; i++) {
-                        m = markersByName[names[i]];
-                        var inside = b.contains(m.getLatLng());
-                        if (inside && !geoJsonLayer.hasLayer(m)) geoJsonLayer.addLayer(m);
-                        else if (!inside && geoJsonLayer.hasLayer(m)) geoJsonLayer.removeLayer(m);
-                    }
-                }
-                function scheduleCull() {
-                    if (cullPending) return;
-                    cullPending = true;
-                    requestAnimationFrame(function () { cullPending = false; cullSpots(); });
-                }
-                map.on('moveend', scheduleCull);
-                map.on('zoomend', scheduleCull);
-                scheduleCull();
+                // (Frueheres Viewport-Culling entfernt: der Canvas-Renderer
+                // zeichnet von sich aus nur Marker im Sichtbereich, und fuer den
+                // Hit-Test muessen alle Marker angehaengt bleiben.)
             })
             .then(function () {
                 // Race-Fix: falls /api/analyses VOR /api/spots zurueckkam,
@@ -1128,7 +1106,8 @@
             var rating = (typeof marker.currentRating === 'number') ? marker.currentRating : 0;
             var hl = !!wanted[name];
             var changed = applySpotVisual(marker, band, rating, hl);
-            if (changed && marker.getElement()) marker.getElement().style.zIndex = hl ? 1000 : '';
+            // Hervorgehobene zuletzt zeichnen (Canvas-Aequivalent von zIndex)
+            if (changed && hl && marker._map) marker.bringToFront();
         });
     };
 
