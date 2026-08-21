@@ -292,8 +292,12 @@
         }
 
         var html = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 ' + svgSize + ' ' + svgSize + '">';
-        // Invisible hit-area — extends tap target to full 44x44 (mobile only, WCAG)
-        if (isMobile) {
+        // Invisible hit-area — extends tap target to full 44x44 (WCAG).
+        // An Touch-Faehigkeit gekoppelt, nicht an Bildschirmbreite: Tablets und
+        // grosse Handys (>600px) hatten sonst nur die winzige sichtbare Flaeche
+        // als Tap-Ziel ("man muss ordentlich druecken").
+        var isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        if (isTouch || isMobile) {
             html += '<circle cx="' + center + '" cy="' + center + '" r="' + (svgSize / 2) + '" fill="rgba(0,0,0,0)" pointer-events="all" />';
         }
 
@@ -396,6 +400,26 @@
         });
     }
 
+    // Visuellen Zustand eines Markers setzen — OHNE das DOM-Element zu zerstoeren.
+    // setIcon() reisst das Element ab und baut es neu: bei 494 Markern sichtbares
+    // Flackern, und ein Tap, der gerade auf dem alten Element liegt, geht verloren
+    // (Touch landet auf totem Knoten). Stattdessen: Signatur-Guard (unveraendert →
+    // gar nichts tun) und sonst nur das SVG im bestehenden Element austauschen.
+    function applySpotVisual(marker, band, rating, highlighted) {
+        var sig = band + '|' + rating + '|' + (highlighted ? 1 : 0);
+        if (marker._wcSig === sig) return false;
+        marker._wcSig = sig;
+        var icon = createSpotIcon(marker.featureProperties, band, rating, highlighted);
+        var el = marker.getElement();
+        if (el) {
+            el.innerHTML = icon.options.html;
+            marker.options.icon = icon; // konsistent, falls Leaflet das Element neu anlegt
+        } else {
+            marker.setIcon(icon);
+        }
+        return true;
+    }
+
     // ===== TOOLTIP BUILDER (RATING_CONCEPT v1.4 §8.2) =====
     // Signature: buildTooltipHtml(p, _legacyStyle, safetyBand, experienceRating, dayData)
     // experienceRating ist 0-10 (0 = kein Flug). _legacyStyle bleibt fuer alte
@@ -437,6 +461,8 @@
                         layer.currentSafetyBand = p.has_weather ? 'default' : 'no_data';
                         layer.currentRating = 0;
                         layer.currentStars = 0;
+                        // Signatur des initial gesetzten Icons (siehe applySpotVisual)
+                        layer._wcSig = layer.currentSafetyBand + '|0|0';
                         // Legacy compat-Felder (fuer Highlight/Tooltip-Pfade die noch davon lesen)
                         layer.currentSafety = p.has_weather ? 'default' : 'no_data';
                         layer.currentQuality = 'green';
@@ -1039,26 +1065,21 @@
 
     // ===== HIGHLIGHTING =====
     window.highlightSpots = function (items) {
-        // Reset all markers to their current analysis state
-        Object.values(markersByName).forEach(function (marker) {
+        // Ein Durchlauf statt Reset-aller + Neu-Setzen: nur Marker, deren
+        // Highlight-Zustand sich tatsaechlich aendert, werden angefasst.
+        var wanted = {};
+        if (items && Array.isArray(items)) {
+            items.forEach(function (item) {
+                wanted[typeof item === 'string' ? item : item.name] = true;
+            });
+        }
+        Object.keys(markersByName).forEach(function (name) {
+            var marker = markersByName[name];
             var band = marker.currentSafetyBand || 'default';
             var rating = (typeof marker.currentRating === 'number') ? marker.currentRating : 0;
-            marker.setIcon(createSpotIcon(marker.featureProperties, band, rating, false));
-            if (marker.getElement()) marker.getElement().style.zIndex = '';
-        });
-
-        if (!items || !Array.isArray(items)) return;
-
-        // Highlight selected
-        items.forEach(function (item) {
-            var name = typeof item === 'string' ? item : item.name;
-            var marker = markersByName[name];
-            if (marker) {
-                var band = marker.currentSafetyBand || 'default';
-                var rating = (typeof marker.currentRating === 'number') ? marker.currentRating : 0;
-                marker.setIcon(createSpotIcon(marker.featureProperties, band, rating, true));
-                if (marker.getElement()) marker.getElement().style.zIndex = 1000;
-            }
+            var hl = !!wanted[name];
+            var changed = applySpotVisual(marker, band, rating, hl);
+            if (changed && marker.getElement()) marker.getElement().style.zIndex = hl ? 1000 : '';
         });
     };
 
@@ -1080,7 +1101,7 @@
                 marker.currentStars = 0;
                 marker.currentSafety = 'no_data';
                 marker.currentQuality = 'green';
-                marker.setIcon(createSpotIcon(marker.featureProperties, 'no_data', 0, false));
+                applySpotVisual(marker, 'no_data', 0, false);
                 marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, null, 'no_data', 0, dayData));
                 return;
             }
@@ -1097,7 +1118,7 @@
             marker.currentRating = rating;
             marker.currentSafety = dayData.safety_status || 'safe';
 
-            marker.setIcon(createSpotIcon(marker.featureProperties, band, rating, false));
+            applySpotVisual(marker, band, rating, false);
             marker.setTooltipContent(buildTooltipHtml(marker.featureProperties, null, band, rating, dayData));
         });
     };
@@ -1123,7 +1144,7 @@
                             marker.currentStars = 0;
                             marker.currentSafety = band;
                             marker.currentQuality = 'green';
-                            marker.setIcon(createSpotIcon(p, band, 0, false));
+                            applySpotVisual(marker, band, 0, false);
                         }
                         var ratingTip = (typeof marker.currentRating === 'number') ? marker.currentRating : 0;
                         marker.setTooltipContent(buildTooltipHtml(

@@ -258,8 +258,15 @@
 
         labelMarkersGroup = L.layerGroup().addTo(map);
 
-        // Re-render Labels bei Zoom-Wechsel (Labels werden je nach Zoom als Pill, Dot oder gar nicht gezeichnet)
+        // Re-render Labels bei Zoom-Wechsel (Labels werden je nach Zoom als Pill, Dot oder gar nicht gezeichnet).
+        // Guard: colorRegions baut alle 29 Labels neu — nur noetig, wenn sich die
+        // Groessenstufe (zoom <7 / <9 / sonst, siehe Pill-Size) wirklich aendert.
+        var _lastLabelStage = null;
+        function _labelStage(z) { return z < 7 ? 0 : z < 9 ? 1 : 2; }
         map.on('zoomend', function () {
+            var stage = _labelStage(map.getZoom());
+            if (stage === _lastLabelStage) return;
+            _lastLabelStage = stage;
             if (currentDate && regionAnalyses) colorRegions(currentDate);
         });
 
@@ -363,9 +370,9 @@
             + 'display:flex;'
             + 'align-items:center;'
             + 'justify-content:center;'
-            + 'background:rgba(255,255,255,0.9);'
-            + '-webkit-backdrop-filter:blur(6px);'
-            + 'backdrop-filter:blur(6px);'
+            // Kein backdrop-filter: 29 Blur-Layer ueber der Kachelkarte sind pro
+            // Repaint teuer (mobil spuerbar); opakes Weiss sieht praktisch gleich aus.
+            + 'background:rgba(255,255,255,0.94);'
             + 'border:1.5px solid ' + p.ring + ';'
             + 'border-radius:50%;'
             + 'box-shadow:0 1px 3px rgba(0,0,0,0.12), 0 0 0 4px rgba(255,255,255,0.35);'

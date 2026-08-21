@@ -164,6 +164,13 @@
         // State pro Tier — vermeidet unnoetige Re-Renders wenn weder Bbox
         // noch Label-Modus sich geaendert haben.
         var lastRender = { major: null, minor: null };
+        // Inkrementell statt clearLayers+Neuaufbau: lebende Marker je Feature-Index.
+        // Beim Pan aendert sich nur der Rand des Viewports — vorher wurden trotzdem
+        // ALLE sichtbaren Marker abgerissen und neu gebaut (spuerbarer Ruck am Ende
+        // jeder Bewegung, v.a. mobil). Jetzt: nur neu Sichtbare anlegen, nur aus dem
+        // Viewport Gefallene entfernen.
+        var live = { major: {}, minor: {} };
+        var liveLabel = { major: null, minor: null };
 
         function renderTier(tier, fc) {
             var z = map.getZoom();
@@ -181,15 +188,23 @@
             if (lastRender[tier] === sig) return;
             lastRender[tier] = sig;
 
-            layers[tier].clearLayers();
+            var relabel = (liveLabel[tier] !== showLabel);
+            liveLabel[tier] = showLabel;
+            var cur = live[tier];
+            var keep = {};
             var feats = fc.features || [];
-            var added = 0;
             for (var i = 0; i < feats.length; i++) {
                 var f = feats[i];
                 var c = f.geometry && f.geometry.coordinates;
                 if (!c || c.length < 2) continue;
                 var lon = c[0], lat = c[1];
                 if (lat < minLat || lat > maxLat || lon < minLon || lon > maxLon) continue;
+                keep[i] = true;
+                if (cur[i]) {
+                    if (!relabel) continue;              // lebt schon, Label unveraendert
+                    layers[tier].removeLayer(cur[i]);    // Label-Modus wechselt → neu bauen
+                    delete cur[i];
+                }
                 var p = f.properties || {};
                 var m = L.marker([lat, lon], {
                     icon: makeIcon(p.kind || 'peak', showLabel, p.name || '', p.ele),
@@ -203,9 +218,16 @@
                 else if (p.kind === 'saddle') tip = 'Sattel · ' + tip;
                 m.bindTooltip(tip, { direction: 'top', offset: [0, -6], opacity: 0.95 });
                 layers[tier].addLayer(m);
-                added++;
+                cur[i] = m;
             }
-            // Debug-Hook (optional): window._osmPeaksLastCount = added;
+            // Aus dem Viewport gefallene Marker entfernen
+            var keys = Object.keys(cur);
+            for (var k = 0; k < keys.length; k++) {
+                if (!keep[keys[k]]) {
+                    layers[tier].removeLayer(cur[keys[k]]);
+                    delete cur[keys[k]];
+                }
+            }
         }
 
         function ensureTier(tier) {
