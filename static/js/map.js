@@ -147,6 +147,60 @@
         map.createPane('spotPane').style.zIndex = '600';
         spotRenderer = L.canvas({ pane: 'spotPane', padding: 0.5, tolerance: 6 });
 
+        // Settle-Tween gegen Groessensprung am Zoom-Ende: waehrend der Geste
+        // skaliert der Browser den Canvas mit (Spots wachsen/schrumpfen nahtlos
+        // mit der Karte). Am Ende zeichnet der Renderer mit spotRadiusForZoom neu.
+        // Solange die Groessenkurve ungeklemmt ist, sind beide identisch (kein
+        // Sprung); greift die Klemmung (sehr weit rein-/rausgezoomt), wird die
+        // Rest-Differenz hier in ~160ms weich ausgeglichen.
+        // WICHTIG: Diese Handler sind VOR dem Renderer registriert (der haengt
+        // sich erst beim ersten Marker-Add an) → Faktor steht, bevor er zeichnet.
+        map.on('zoomstart', function () {
+            _zoomSettle.zStart = map.getZoom();
+            _zoomSettle.animated = false;
+            if (_zoomSettle.raf) {
+                cancelAnimationFrame(_zoomSettle.raf);
+                _zoomSettle.raf = 0;
+            }
+            _zoomSettle.factor = 1;
+        });
+        // Nur echte Zoom-ANIMATIONEN hinterlassen einen skalierten Canvas —
+        // bei animate:false zeichnet der Renderer direkt in Zielgroesse und
+        // ein Ausgleichsfaktor waere falsch (Bug: Riesen-Marker).
+        map.on('zoomanim', function () { _zoomSettle.animated = true; });
+        map.on('zoomend', function () {
+            var z0 = _zoomSettle.zStart, z1 = map.getZoom();
+            var wasAnimated = _zoomSettle.animated;
+            _zoomSettle.zStart = null;
+            _zoomSettle.animated = false;
+            // Sicherheitsnetz: egal was passiert (verstecktes Tab friert rAF ein,
+            // unterbrochene Animation, …) — nach 300ms ist der Faktor wieder 1.
+            setTimeout(function () {
+                if (_zoomSettle.factor !== 1) {
+                    if (_zoomSettle.raf) { cancelAnimationFrame(_zoomSettle.raf); _zoomSettle.raf = 0; }
+                    _zoomSettle.factor = 1;
+                    if (spotRenderer && spotRenderer._redraw) spotRenderer._redraw();
+                }
+            }, 300);
+            if (!wasAnimated || z0 == null || z0 === z1) { _zoomSettle.factor = 1; return; }
+            // Groesse, die der skalierte Canvas gerade anzeigt vs. Zielgroesse
+            var displayed = spotRadiusForZoom(z0) * Math.pow(2, z1 - z0);
+            var target = spotRadiusForZoom(z1);
+            var f = displayed / target;
+            if (!isFinite(f) || Math.abs(f - 1) < 0.04) { _zoomSettle.factor = 1; return; }
+            _zoomSettle.factor = f;
+            var tStart = performance.now(), DUR = 160;
+            function settleStep(t) {
+                var p = Math.min(1, (t - tStart) / DUR);
+                var e = 1 - Math.pow(1 - p, 2); // ease-out
+                _zoomSettle.factor = f + (1 - f) * e;
+                if (p >= 1) { _zoomSettle.factor = 1; _zoomSettle.raf = 0; }
+                else { _zoomSettle.raf = requestAnimationFrame(settleStep); }
+                if (spotRenderer && spotRenderer._redraw) spotRenderer._redraw();
+            }
+            _zoomSettle.raf = requestAnimationFrame(settleStep);
+        });
+
         // Expose the Leaflet map instance under a non-colliding name.
         // `window.map` is unusable because `<div id="map">` auto-creates an
         // HTML implicit global pointing to the DIV element, which has no
@@ -294,7 +348,23 @@
     // Klick/Tooltip/Popup/Suche laufen unveraendert ueber Leaflet: SpotMarker
     // ist eine L.CircleMarker-Subklasse (Hit-Test = Kreis mit SPOT_HIT_RADIUS),
     // nur das Zeichnen ist durch drawSpot ersetzt.
-    var SPOT_HIT_RADIUS = 20; // Hit-/Redraw-Radius; grosszuegiges Tap-Ziel (WCAG)
+    // Redraw-Region pro Marker (deckt Maximalgroesse inkl. Windsektor ab).
+    // Hit-Test ist separat (SpotMarker._containsPoint), sonst waere das Tap-Ziel
+    // absurd gross.
+    var SPOT_DRAW_BOUNDS = 36;
+
+    // Zoomabhaengige Spotgroesse: waehrend der Zoom-Geste skaliert der Browser
+    // den Canvas mit der Karte (GPU, butterweich). Damit am Gesten-Ende KEIN
+    // Groessensprung entsteht, folgt die gezeichnete Groesse derselben Kurve
+    // (2^Δzoom) — nur nach oben/unten geklemmt. Rest-Differenz beim Klemmen
+    // wird per kurzem Settle-Tween (~160ms) weich ausgeglichen, nie als Sprung.
+    var SPOT_R_Z0 = 7.5, SPOT_R_MIN = 5, SPOT_R_MAX = 15;
+    function spotRadiusForZoom(z) {
+        var base = (window.innerWidth <= 600) ? 8 : 7;
+        var r = base * Math.pow(2, z - SPOT_R_Z0);
+        return Math.max(SPOT_R_MIN, Math.min(SPOT_R_MAX, r));
+    }
+    var _zoomSettle = { factor: 1, raf: 0, zStart: null };
 
     // Zeichnet einen Spot — Optik identisch zum frueheren SVG-DivIcon:
     // Windsektor(en), Highlight-Glow, Schatten, weisser Grund, Band-Kreis, Glyphe.
@@ -306,9 +376,10 @@
         var highlighted = !!layer._wcHighlight;
         var props = layer.featureProperties || {};
         var style = mapSafetyBandToStyle(band);
-        var isMobile = window.innerWidth <= 600;
-        var radius = highlighted ? (isMobile ? 9 : 8) : (isMobile ? 8 : 7);
-        if (layer._wcHover) radius += 1; // Hover-Feedback (ersetzt CSS :hover scale)
+        var zoomNow = layer._map ? layer._map.getZoom() : SPOT_R_Z0;
+        var radius = spotRadiusForZoom(zoomNow) * _zoomSettle.factor;
+        if (highlighted) radius *= 1.15;
+        if (layer._wcHover) radius *= 1.12; // Hover-Feedback (ersetzt CSS :hover scale)
 
         // Display-Band Premium-Override: safe + rating=5 (xc_tag/Klassiker) →
         // Violet-400 (Palette v3.2 Royal Premium).
@@ -321,7 +392,8 @@
         if (props.windrichtung) {
             var arcs = getDirAngles(props.windrichtung);
             if (arcs && arcs.length) {
-                var ri = radius + 1, ro = radius + 9;
+                // proportional zur Groesse (frueher r+1 / r+9 bei r=7-8)
+                var ri = radius * 1.15, ro = radius * 2.3;
                 ctx.globalAlpha = 0.5;
                 ctx.fillStyle = style.stroke;
                 for (var ai = 0; ai < arcs.length; ai++) {
@@ -342,7 +414,7 @@
             ctx.globalAlpha = 0.25;
             ctx.fillStyle = style.fill;
             ctx.beginPath();
-            ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+            ctx.arc(x, y, radius * 1.5, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1;
         }
@@ -350,7 +422,7 @@
         // Schatten (Nachbildung von drop-shadow(0 1px 3px …) ohne Blur)
         ctx.fillStyle = 'rgba(0,0,0,0.13)';
         ctx.beginPath();
-        ctx.arc(x, y + 1.2, radius + 1, 0, Math.PI * 2);
+        ctx.arc(x, y + radius * 0.17, radius * 1.14, 0, Math.PI * 2);
         ctx.fill();
 
         // Weisser Hintergrund-Kreis, damit die Karte bei hellem Fill nicht durchscheint
@@ -373,7 +445,7 @@
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         ctx.fillStyle = markerFill;
         ctx.fill();
-        ctx.lineWidth = highlighted ? 2 : 1.5;
+        ctx.lineWidth = Math.max(1, radius * (highlighted ? 0.25 : 0.21));
         ctx.strokeStyle = markerStroke;
         ctx.stroke();
 
@@ -382,7 +454,7 @@
             // White X cross — Sperr-Glyphe
             var arm = radius * 0.55;
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = Math.max(2, radius * 0.22);
+            ctx.lineWidth = Math.max(1.5, radius * 0.22);
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(x - arm, y - arm); ctx.lineTo(x + arm, y + arm);
@@ -404,18 +476,26 @@
             // 0 rating: kleiner weisser Punkt (sicher aber Abgleiter)
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+            ctx.arc(x, y, radius * 0.26, 0, Math.PI * 2);
             ctx.fill();
         }
     }
 
-    // CircleMarker-Subklasse: Leaflet liefert Events/Tooltip/Popup/Hit-Test,
+    // CircleMarker-Subklasse: Leaflet liefert Events/Tooltip/Popup,
     // gezeichnet wird via drawSpot auf dem gemeinsamen Canvas.
+    // options.radius (= SPOT_DRAW_BOUNDS) bestimmt nur die Redraw-Region;
+    // der Hit-Test ist zoomabhaengig und deutlich enger.
     var SpotMarker = L.CircleMarker.extend({
         _updatePath: function () {
             if (this._renderer && this._renderer._ctx) {
                 drawSpot(this._renderer._ctx, this._point.x, this._point.y, this);
             }
+        },
+        _containsPoint: function (p) {
+            var z = this._map ? this._map.getZoom() : SPOT_R_Z0;
+            // Kreis + Sektor-Ring, mindestens 14px (Touch-Ziel)
+            var hitR = Math.max(14, spotRadiusForZoom(z) * 2.0);
+            return p.distanceTo(this._point) <= hitR + this._clickTolerance();
         }
     });
 
@@ -467,7 +547,7 @@
                         return new SpotMarker(latlng, {
                             renderer: spotRenderer,
                             pane: 'spotPane',
-                            radius: SPOT_HIT_RADIUS,
+                            radius: SPOT_DRAW_BOUNDS,
                             stroke: false,
                             fill: false,
                             bubblingMouseEvents: false,
