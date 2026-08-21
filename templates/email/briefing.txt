@@ -17,22 +17,30 @@ WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr
 {{ week_lead }}
 
 {% endif -%}
+{% if gap_notice -%}
+? {{ gap_notice }}
+
+{% endif -%}
+{% if stale_notice -%}
+! {{ stale_notice }}
+
+{% endif -%}
 {% if region_matrix -%}
 {{ t('email.briefing.txt_regions_header') }}
             {% for d in day_short_labels %}{{ '%-6s'|format(d) }}{% endfor %} {{ t('email.briefing.best_col') }}
 {% for r in region_matrix -%}
-{{ '%-12.12s'|format(r.region_name) }}{% for cell in r.days %}{% if cell.tier == "none" %} ----  {% elif cell.tier == "not_safe" %} x {{ cell.rating_display or ' --  ' }}{% elif cell.tier == "conditional" %} ! {{ cell.rating_display or ' --  ' }}{% else %}   {{ cell.rating_display or ' --  ' }}{% endif %} {% endfor %} {{ r.best_rating_int or '–' }}
+{{ '%-12.12s'|format(r.region_name) }}{% for cell in r.days %}{% if cell.tier == "unknown" %}   ?{% elif cell.tier == "none" %} ----  {% elif cell.tier == "not_safe" %} x {{ cell.rating_display or ' --  ' }}{% elif cell.tier == "conditional" %} ! {{ cell.rating_display or ' --  ' }}{% else %}   {{ cell.rating_display or ' --  ' }}{% endif %} {% endfor %} {{ r.best_rating_int or '–' }}
 {% endfor %}
 {{ t('email.briefing.txt_legend') }}
 
 {% endif -%}
 {{ t('email.briefing.txt_week_glance') }}
 {% for d in days -%}
-{{ d.label.weekday }} {% if d.tier == 'conditional' %}{{ t('email.briefing.txt_caution') }}{% elif d.tier == 'none' %}{{ t('email.briefing.txt_not_flyable') }}{% else %}{{ t('email.briefing.txt_ok') }}{% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
+{{ d.label.weekday }} {% if d.tier == 'unknown' %}{{ t('email.briefing.txt_no_rating') }}{% elif d.tier == 'conditional' %}{{ t('email.briefing.txt_caution') }}{% elif d.tier == 'none' %}{{ t('email.briefing.txt_not_flyable') }}{% else %}{{ t('email.briefing.txt_ok') }}{% endif %}{% if d.day_rating_display %} · {{ d.day_rating_display }}{% endif %}
 {% endfor %}
 {{ t('email.briefing.txt_per_day') }}
 {% for d in days %}
-{{ d.label.long }} — {% if d.tier == 'conditional' %}{{ t('email.briefing.txt_caution') }}{% elif d.tier == 'none' %}{{ t('email.briefing.txt_not_flyable') }}{% else %}{{ t('email.briefing.txt_ok') }}{% endif %}{% if d.day_rating_display %} · Rating {{ d.day_rating_display }}{% endif %}
+{{ d.label.long }} — {% if d.tier == 'unknown' %}{{ t('email.briefing.txt_no_rating') }}{% elif d.tier == 'conditional' %}{{ t('email.briefing.txt_caution') }}{% elif d.tier == 'none' %}{{ t('email.briefing.txt_not_flyable') }}{% else %}{{ t('email.briefing.txt_ok') }}{% endif %}{% if d.day_rating_display %} · Rating {{ d.day_rating_display }}{% endif %}
 {% if d.compact_top_region -%}
 {% for grp in d.region_groups[:3] %}  {{ grp.region_name }} · {% for s in grp.spots[:3] %}{{ s.spot }} {{ s.rating_display }}{% if not loop.last %} · {% endif %}{% endfor %}
 {% endfor %}{% if d.notable_good %}  + {{ d.notable_good }}

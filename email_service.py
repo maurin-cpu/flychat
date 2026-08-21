@@ -67,9 +67,23 @@ _TIER_META = {
         "bg":    "#f1f5f9",
         "icon":  "o",
     },
+    # 'unknown' ist KEINE Flugaussage, sondern das Eingestaendnis einer Luecke.
+    # Es muss sich sichtbar von 'none' (= gemessen, nicht fliegbar) unterscheiden,
+    # sonst verkauft die Mail ein Datenloch als Urteil.
+    "unknown": {
+        "label": "Keine Bewertung",
+        "color": "#94a3b8",
+        "bg":    "#f8fafc",
+        "icon":  "?",
+    },
 }
 
-_TIER_RANK = {"violet": 3, "green": 2, "conditional": 1, "gray": 0, "none": -1}
+_TIER_RANK = {"violet": 3, "green": 2, "conditional": 1, "gray": 0,
+              "none": -1, "unknown": -2}
+
+# Tiers, die eine echte Flugaussage tragen (Verdict/Bestwert duerfen nur diese
+# nutzen — 'unknown' ist eine Luecke, 'none' ein Urteil).
+_TIER_FLYABLE = ("violet", "green", "conditional", "gray")
 
 
 def _stars_for_spot(spot: dict) -> int:
@@ -105,6 +119,91 @@ def _safety_band_for_spot(spot: dict) -> str:
     return "no_data"
 
 
+def _entry_band(entry: dict) -> str:
+    """safety_band eines Spot- oder Region-Eintrags aus briefing_data.
+
+    Bevorzugt das Top-Level-Feld (RATING_CONCEPT v1.3), faellt sonst auf die
+    Ableitung aus safety_status zurueck (aelterer Cache).
+    """
+    b = entry.get("safety_band")
+    if b in ("green", "amber", "red", "no_data"):
+        return b
+    return _safety_band_for_spot(entry)
+
+
+def _entry_has_rating(entry: dict) -> bool:
+    """Traegt dieser Eintrag eine verwertbare Bewertung?
+
+    'no_data' ist eine Luecke, keine Aussage: ein solcher Eintrag darf weder
+    als Spot in der Mail stehen noch als Abdeckung zaehlen. Sonst gilt eine
+    leere Huelle formal als "bewertet" und das Gate greift nie.
+    """
+    return _entry_band(entry) != "no_data"
+
+
+def briefing_coverage(subscriber: dict, briefing_data: dict) -> dict:
+    """Misst, wie viel Bewertung fuer diesen Abonnenten tatsaechlich vorliegt.
+
+    Ursachenblind: warum etwas fehlt (ausgefallener Lauf, abgebrochene Analyse,
+    Provider-Stoerung, Zeitueberschreitung) spielt hier keine Rolle — gezaehlt
+    wird nur, was da ist. Eine ursachenbasierte Regel deckt immer nur die
+    Ausfaelle ab, die schon einmal passiert sind.
+
+    Raster: Abo-Region x Tag. Eine Zelle zaehlt als bewertet, wenn das
+    Regions-Verdikt ODER mindestens ein Spot dieser Region eine Bewertung
+    traegt.
+
+    Returns:
+      {"state": "voll"|"teilweise"|"leer", "cells", "cells_rated",
+       "regions", "regions_rated", "missing_regions": [region_id],
+       "days", "days_rated", "rated_by_day": {date: set(region_id)}}
+    """
+    regions = set(subscriber.get("regions") or [])
+    days = briefing_data.get("days") or []
+
+    rated_by_day: dict[str, set] = {}
+    rated_regions: set = set()
+    cells_rated = 0
+    days_rated = 0
+
+    for day in days:
+        date_str = day.get("date", "")
+        rated_here: set = set()
+        for r in (day.get("top_regions") or []):
+            rid = r.get("region_id")
+            if rid in regions and _entry_has_rating(r):
+                rated_here.add(rid)
+        for s in (day.get("top_spots") or []):
+            rid = s.get("region_id")
+            if rid in regions and _entry_has_rating(s):
+                rated_here.add(rid)
+        rated_by_day[date_str] = rated_here
+        cells_rated += len(rated_here)
+        rated_regions |= rated_here
+        if rated_here:
+            days_rated += 1
+
+    cells = len(days) * len(regions)
+    if cells_rated == 0:
+        state = "leer"
+    elif cells and cells_rated >= cells:
+        state = "voll"
+    else:
+        state = "teilweise"
+
+    return {
+        "state": state,
+        "cells": cells,
+        "cells_rated": cells_rated,
+        "regions": len(regions),
+        "regions_rated": len(rated_regions),
+        "missing_regions": sorted(regions - rated_regions),
+        "days": len(days),
+        "days_rated": days_rated,
+        "rated_by_day": rated_by_day,
+    }
+
+
 def _stars_glyph_text(n: int) -> str:
     """5-Char Stern-Glyphe fuer Plain-Text-Mail (★★★ ··)."""
     n = max(0, min(5, int(n or 0)))
@@ -126,7 +225,8 @@ def _weekday_long_list() -> list[str]:
     return _WEEKDAY_EN_LONG if i18n.get_current_lang() == "en" else _WEEKDAY_DE_LONG
 
 
-_TIER_LABEL_KEYS = {"violet", "green", "conditional", "gray", "none", "not_safe"}
+_TIER_LABEL_KEYS = {"violet", "green", "conditional", "gray", "none",
+                    "not_safe", "unknown"}
 
 
 def _tier_label(tier: str) -> str:
@@ -660,9 +760,13 @@ def _matrix_tier_for_band(band: str, rating_int: int) -> str:
     """Mappt das Region-safety_band auf das Heatmap-Tier-Vokabular.
 
     green → violet (rating>=5) / green, amber → conditional, red → not_safe,
-    sonst none. 'not_safe' ist ein Matrix-eigenes Tier (rot), das es im
+    sonst unknown. 'not_safe' ist ein Matrix-eigenes Tier (rot), das es im
     Spot-Tier-System nicht gibt — die Region kann no-go sein (kein XC), waehrend
     einzelne Spots lokal conditional fliegbar bleiben.
+
+    'no_data' wird zu 'unknown', NICHT zu 'none': frueher landete jede Luecke
+    auf derselben grauen Zelle wie ein gemessenes "nicht fliegbar" — das
+    Datenloch las sich als Urteil.
     """
     if band == "green":
         return "violet" if rating_int >= 5 else "green"
@@ -670,7 +774,7 @@ def _matrix_tier_for_band(band: str, rating_int: int) -> str:
         return "conditional"
     if band == "red":
         return "not_safe"
-    return "none"
+    return "unknown"
 
 
 def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[dict]:
@@ -682,6 +786,11 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
     (kein XC, kein Hochsteigen), waehrend einzelne Spots darunter ('Pro Tag ·
     Top-Spots') lokal conditional fliegbar bleiben.
 
+    Jede abonnierte Region bekommt eine Zeile — auch die ohne jede Bewertung.
+    Frueher entstand eine Zeile nur aus einem vorhandenen Eintrag, eine Region
+    ohne Analyse fiel damit komplett aus der Uebersicht: der Kunde sah seine
+    Abo-Region gar nicht und schloss daraus, dort sei nichts los.
+
     Args:
       days_out: Day-Dicts mit `_top_regions_by_id` (Region-Verdikt pro Region)
       subscriber_regions: Menge der abonnierten region_ids
@@ -689,6 +798,17 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
     # region_id -> {name, days: [{tier, rating, band} per day], best_rating}
     matrix = {}
     n_days = len(days_out)
+
+    def _leere_zeile(rid: str, rname: str) -> dict:
+        return {
+            "region_id": rid,
+            "region_name": rname,
+            "days": [{"tier": "unknown", "rating": 0.0, "stars": 0,
+                      "spot_count": 0, "rating_int": 0, "band": "no_data"}
+                     for _ in range(n_days)],
+            "best_rating": 0.0,
+            "best_rating_int": 0,
+        }
 
     for day_idx, day in enumerate(days_out):
         for rid, rentry in (day.get("_top_regions_by_id") or {}).items():
@@ -710,15 +830,9 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
             except (TypeError, ValueError):
                 stars = 0
 
-            entry = matrix.setdefault(rid, {
-                "region_id": rid,
-                "region_name": rname,
-                "days": [{"tier": "none", "rating": 0.0, "stars": 0,
-                          "spot_count": 0, "rating_int": 0, "band": "no_data"}
-                         for _ in range(n_days)],
-                "best_rating": 0.0,
-                "best_rating_int": 0,
-            })
+            entry = matrix.setdefault(rid, _leere_zeile(rid, rname))
+            if entry["region_name"] == rid and rname != rid:
+                entry["region_name"] = rname   # Name kam erst mit diesem Tag
             cell = entry["days"][day_idx]
             cell["band"] = band
             cell["tier"] = _matrix_tier_for_band(band, rating_int)
@@ -730,6 +844,20 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
             # rote/no_data Tage liefern keinen "besten" Wert.
             if band in ("green", "amber"):
                 entry["best_rating_int"] = max(entry["best_rating_int"], rating_int)
+
+    # Abo-Regionen ohne jede Bewertung nachtragen — sie sollen als Zeile mit
+    # "keine Bewertung" dastehen statt lautlos zu fehlen.
+    fehlend = [rid for rid in subscriber_regions if rid and rid not in matrix]
+    if fehlend:
+        namen = {}
+        try:
+            from source_area import get_all_regions
+            namen = {r["id"]: r.get("region", r["id"]) for r in get_all_regions()}
+        except Exception as e:
+            logger.warning("Region-Matrix: Regionsnamen nicht ladbar (%s) — "
+                           "fehlende Zeilen laufen unter ihrer id.", e)
+        for rid in fehlend:
+            matrix[rid] = _leere_zeile(rid, namen.get(rid, rid))
 
     def _mix_hex_with_white(hex_str: str, alpha: float) -> str:
         hex_str = hex_str.lstrip('#')
@@ -753,13 +881,14 @@ def _build_region_matrix(days_out: list[dict], subscriber_regions: set) -> list[
             cell["rating_display"] = str(rating_int) if rating_int > 0 else ""
             cell["stars_glyph"] = _stars_glyph_text(cell.get("stars", 0))
 
-            if tier == "none":
-                # no_data: Template rendert ohnehin die graue '–'-Zelle.
-                meta = _TIER_META["none"]
+            if tier in ("none", "unknown"):
+                # unknown = Luecke ('?'), none = gemessenes "nicht fliegbar".
+                # Beide bleiben unbunt, muessen sich aber im Label unterscheiden.
+                meta = _TIER_META[tier]
                 cell["tier_color"] = meta["color"]
                 cell["tier_text_color"] = "#ffffff"
                 cell["tier_bg"] = meta["bg"]
-                cell["tier_label"] = _tier_label("none")
+                cell["tier_label"] = _tier_label(tier)
                 continue
 
             if band == "red":
@@ -947,13 +1076,23 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
                 return False
         return True
 
+    # Datenlage zuerst messen — sie entscheidet, ob ein leerer Tag "nicht
+    # fliegbar" (Urteil) oder "keine Bewertung" (Luecke) heisst.
+    coverage = briefing_coverage(subscriber, briefing_data)
+    rated_by_day = coverage["rated_by_day"]
+
     days_out = []
     days_with_all_my_spots = []  # fuer Safety-Header Scan (ALLE Spots, nicht nur Top-9)
     for day in briefing_data.get("days", []):
         date_str = day.get("date", "")
         all_spots = day.get("top_spots", []) or []
-        my_spots_unfiltered = [s for s in all_spots if s.get("region_id") in subscriber_regions]
+        # no_data-Spots fliegen hier raus: sie kamen bisher als graue Spots mit
+        # Rating 0 durch und hoben den ganzen Tag auf "bedingt fliegbar".
+        my_spots_unfiltered = [s for s in all_spots
+                               if s.get("region_id") in subscriber_regions
+                               and _entry_has_rating(s)]
         my_spots = [s for s in my_spots_unfiltered if _passes_filter(s)]
+        day_has_data = bool(rated_by_day.get(date_str))
         day_label_dict = _date_label(date_str)
         # Safety-Scan auf UNFILTERED (Warnungen sind unabhaengig von Tier/Rating wichtig)
         days_with_all_my_spots.append((day_label_dict, my_spots_unfiltered))
@@ -981,7 +1120,9 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
                 "rating_display": _rating_display(s),
             })
 
-        day_tier = _derive_day_tier(my_spots)
+        # Ohne jede Bewertung fuer diesen Tag gibt es keine Flugaussage —
+        # weder "nicht fliegbar" noch "bedingt". Nur: wir wissen es nicht.
+        day_tier = _derive_day_tier(my_spots) if day_has_data else "unknown"
         meta = _TIER_META[day_tier]
 
         # Region-Rating-Lookup aus briefing_data.top_regions, Fallback Max-Spot-Rating
@@ -1022,6 +1163,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             "date": date_str,
             "label": day_label_dict,
             "tier": day_tier,
+            "has_data": day_has_data,
             "tier_label": _tier_label(day_tier),
             "tier_color": meta["color"],
             "tier_bg":    meta["bg"],
@@ -1054,7 +1196,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # Verdict = bester Tag (Tier-Rank, dann Rating des Top-Spots)
     def _day_score(d):
         top_rating = d["shown_spots"][0]["rating"] if d["shown_spots"] else 0.0
-        return (_TIER_RANK.get(d["tier"], -1), float(top_rating or 0))
+        return (_TIER_RANK.get(d["tier"], -2), float(top_rating or 0))
 
     best_day = max(days_out, key=_day_score, default=None)
     best_day_idx = days_out.index(best_day) if best_day else 0
@@ -1064,7 +1206,7 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # - headline_short: kompakt für E-Mail-Hero (Eyebrow zeigt schon Wochentag,
     #   Tier-Pill zeigt schon Status — Headline fokussiert auf WAS/WO)
     verdict = None
-    if best_day and best_day["tier"] != "none":
+    if best_day and best_day["tier"] in _TIER_FLYABLE:
         top_spot = best_day["shown_spots"][0] if best_day["shown_spots"] else None
         verdict = {
             "day": best_day,
@@ -1113,7 +1255,11 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     for day in days_out:
         wd_short = day["label"].get("short", "")
         warn_labels = warnings_per_day_short.get(wd_short, [])
-        if warn_labels:
+        if day["tier"] == "unknown":
+            # Vor den Warnungen: ohne Bewertung gibt es auch keine Warnung,
+            # die diesen Tag beschreiben koennte.
+            day["reason_short"] = i18n.t("email.briefing.no_rating")
+        elif warn_labels:
             day["reason_short"] = " · ".join(warn_labels[:2])
         elif day["tier"] == "none":
             day["reason_short"] = "Nichts fliegbar"
@@ -1214,10 +1360,47 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         "mailto":       f"mailto:?subject={quote('Wingcast KW' + str(today.isocalendar().week))}&body={quote(share_payload, safe='')}",
     }
 
+    # Luecken-Hinweis: nur wenn wirklich etwas fehlt. Er nennt Zahlen statt
+    # Ursachen — der Kunde soll wissen, WORUEBER wir nichts sagen koennen.
+    # Datenstand: stammen die Bewertungen ueberhaupt von heute? Bisher gingen
+    # Analysen von gestern kommentarlos als aktuell raus — eine Luecke, die die
+    # Abdeckungsmessung nicht sieht, weil formal alles bewertet ist.
+    stale_notice = ""
+    analyses_at = briefing_data.get("analyses_at")
+    if analyses_at:
+        try:
+            stand = datetime.fromisoformat(analyses_at)
+            if stand.date() < datetime.now().date():
+                stale_notice = i18n.t("email.briefing.stale_notice",
+                                      stand=stand.strftime("%d.%m. %H:%M"))
+        except (TypeError, ValueError):
+            pass
+
+    gap_notice = ""
+    if coverage["state"] == "teilweise":
+        fehlende_regionen = coverage["regions"] - coverage["regions_rated"]
+        fehlende_tage = coverage["days"] - coverage["days_rated"]
+        if fehlende_regionen > 0:
+            gap_notice = i18n.t("email.briefing.gap_regions",
+                                missing=fehlende_regionen,
+                                total=coverage["regions"])
+        elif fehlende_tage > 0:
+            gap_notice = i18n.t("email.briefing.gap_days",
+                                missing=fehlende_tage, total=coverage["days"])
+        else:
+            # Jede Region und jeder Tag hat irgendwo etwas — die Luecken liegen
+            # verstreut in einzelnen Zellen.
+            gap_notice = i18n.t("email.briefing.gap_cells",
+                                missing=coverage["cells"] - coverage["cells_rated"])
+
     return {
         "subscriber_email": subscriber.get("email", ""),
         "days": days_out,
         "verdict": verdict,
+        "coverage": coverage,
+        "gap_notice": gap_notice,
+        "stale_notice": stale_notice,
+        "analyses_at": analyses_at,
         "best_day_idx": best_day_idx,
         "urls": urls,
         "share": share,
@@ -1279,8 +1462,23 @@ def _verdict_headline_short(day: dict, spot: Optional[dict]) -> str:
 
 def send_briefing_email(subscriber: dict, briefing_data: dict,
                         *, async_send: bool = True) -> bool:
-    """Rendert und versendet das Haupt-Briefing fuer einen Subscriber."""
+    """Rendert und versendet das Haupt-Briefing fuer einen Subscriber.
+
+    Ohne jede Bewertung wird NICHT versendet (Rueckgabe False). Eine Mail ohne
+    Datengrundlage liest sich zwangslaeufig wie ein Wetterurteil ("nichts
+    fliegbar") — der Ausfall waere fuer den Kunden nicht erkennbar. Der
+    Zeitplaner prueft das vorher selbst; diese Sperre faengt alle anderen
+    Aufrufer ab (Admin-Testversand, Skripte).
+    """
     ctx = build_briefing_context(subscriber, briefing_data)
+    coverage = ctx.get("coverage") or {}
+    if coverage.get("state") == "leer":
+        logger.error("send_briefing_email: kein Versand an %s — keine einzige "
+                     "Bewertung fuer die abonnierten Regionen (%d Tage, %d Regionen)",
+                     subscriber.get("email"), coverage.get("days", 0),
+                     coverage.get("regions", 0))
+        return False
+
     html = render_template("email/briefing.html", **ctx)
     text = render_template("email/briefing.txt", **ctx)
 
@@ -1295,6 +1493,10 @@ def send_briefing_email(subscriber: dict, briefing_data: dict,
         subject = f"{kw_pfx}{verdict['headline']}"
     elif verdict:
         subject = f"{kw_pfx}{i18n.t('email.briefing.subject_conditional')}"
+    elif coverage.get("state") == "teilweise":
+        # Kein fliegbarer Tag UND Luecken: "nichts fliegbar" waere zu viel
+        # behauptet — wir kennen ja nicht die ganze Woche.
+        subject = f"{kw_pfx}{i18n.t('email.briefing.subject_nothing_partial')}"
     else:
         subject = f"{kw_pfx}{i18n.t('email.briefing.subject_nothing')}"
 

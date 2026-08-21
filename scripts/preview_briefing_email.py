@@ -88,11 +88,24 @@ def main() -> int:
     txt_path.write_text(text, encoding="utf-8")
 
     # Stats
-    flyable_days = [d for d in ctx['days'] if d['tier'] != 'none' and d['region_groups']]
+    flyable_days = [d for d in ctx['days']
+                    if d['tier'] not in ('none', 'unknown') and d['region_groups']]
+    cov = ctx.get('coverage') or {}
+    unbewertet = [d['label']['short'] for d in ctx['days'] if d['tier'] == 'unknown']
     print("[OK] briefing_context gebaut:")
     print(f"     - Tage:            {len(ctx['days'])} ({len(flyable_days)} fliegbar)")
     print(f"     - Region-Matrix:   {len(ctx['region_matrix'])} Regionen")
     print(f"     - Verdict:         {ctx['verdict']['headline'] if ctx['verdict'] else '(keiner)'}")
+    print(f"     - Datenlage:       {cov.get('state', '?')} "
+          f"({cov.get('cells_rated', 0)}/{cov.get('cells', 0)} Zellen bewertet)")
+    if unbewertet:
+        print(f"     - ohne Bewertung:  {', '.join(unbewertet)}")
+    if cov.get('missing_regions'):
+        print(f"     - Regionen ohne Bewertung: {', '.join(cov['missing_regions'])}")
+    if cov.get('state') == 'leer':
+        print("     ! Diese Mail wuerde NICHT versendet — keine einzige Bewertung.")
+    if ctx.get('stale_notice'):
+        print(f"     ! {ctx['stale_notice']}")
     print()
     print(f"[OK] HTML:  {html_path}")
     print(f"[OK] TEXT:  {txt_path}")

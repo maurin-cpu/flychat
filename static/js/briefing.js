@@ -1092,6 +1092,12 @@
       let emptyMsg;
       if (state.focusSpot) {
         emptyMsg = wcT('js.empty.spot_not_found', { spot: escapeHtml(state.focusSpot) });
+      } else if (!allSpotsRegionFiltered.length
+                 || allSpotsRegionFiltered.every((s) => spotSafetyBand(s) === "no_data")) {
+        // Nichts ausgeblendet, sondern nichts bewertet. Das muss anders klingen
+        // als "passt nicht zu deinen Filtern" — sonst liest der Pilot eine
+        // Luecke als Aussage. Gleiche Sprachregelung wie in der Briefing-Mail.
+        emptyMsg = `<div class="bf-empty-msg">${wcT('js.empty.no_rating')}</div>`;
       } else {
         const filterActive = (state.safetyFilters.size < SAFETY_DEFS.length) || state.minRating > 0 || state.filterRegions.size > 0;
         const filterHint = filterActive

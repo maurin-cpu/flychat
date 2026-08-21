@@ -320,3 +320,47 @@ Wenn alle 12 Punkte gruen: MVP ist launch-fertig.
 python email_service.py --preview <email>     # Dry-Run (default)
 python email_service.py --preview <email> --send   # echt verschicken
 ```
+
+## Datenlage-Regel: keine / teilweise / alle Daten
+
+Seit 21.08.2026. Anlass: Kunden erhielten leere Briefings. Die Mail las sich
+dann wie ein Wetterurteil („Diese Woche nichts in deinen Regionen") — ein
+Ausfall war fuer den Kunden nicht von einer echten Schlechtwetter-Woche zu
+unterscheiden.
+
+Entschieden wird **ausschliesslich an der Datenlage**, nie an der Ursache
+(abgebrochener Lauf, Provider-Stoerung, leeres Guthaben, Zeitueberschreitung).
+Eine ursachenbasierte Regel deckt immer nur die Ausfaelle ab, die schon einmal
+passiert sind.
+
+**Die Messung** — `email_service.briefing_coverage(subscriber, briefing_data)`.
+Raster: Abo-Region × Tag des Prognosefensters. Eine Zelle zaehlt als bewertet,
+wenn das Regions-Verdikt ODER mindestens ein Spot der Region eine Bewertung
+traegt. Ein `no_data`-Eintrag ist eine **Luecke, keine Bewertung** — sonst gilt
+eine leere Huelle formal als abgedeckt und das Gate greift nie.
+
+| Fall | Definition | Verhalten |
+|---|---|---|
+| `voll` | Abdeckung vollstaendig | Mail wie bisher |
+| `teilweise` | Abdeckung > 0, unvollstaendig | Mail geht raus, Luecken benannt, Meldung an `OPS_ALERT_EMAIL` |
+| `leer` | Abdeckung = 0 | **Kein Versand**, nur Meldung an den Betrieb |
+
+Da das Raster Region × Tag ist, heisst `teilweise` immer: mindestens eine
+Region blieb einen ganzen Tag ohne Bewertung. Streuende Einzelspot-Ausfaelle
+bewegen die Abdeckung nicht.
+
+**Luecken werden nie umgedeutet.** Tages-Tier `unknown` (nicht `none`),
+Heatmap-Zelle `?` (nicht die graue „nicht fliegbar"-Zelle), Abo-Regionen ohne
+Bewertung bleiben als Zeile stehen statt lautlos zu fehlen. Dazu eine
+Hinweiszeile mit Zahlen im Kopf der Mail.
+
+**Datenstand.** `briefing_data["analyses_at"]` = mtime des Analyse-Caches.
+Stammt er nicht von heute, weist die Mail das aus — vorher gingen Bewertungen
+von gestern kommentarlos als aktuell raus.
+
+**Pruefen:**
+
+```bash
+python scripts/preview_briefing_email.py --no-open   # nennt Datenlage + Luecken
+python -m pytest tests/test_briefing_datenlage.py    # die drei Faelle
+```

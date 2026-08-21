@@ -455,6 +455,18 @@ STRINGS: dict[str, dict[str, str]] = {
     "email.briefing.per_day": {"de": "Pro Tag", "en": "Per day"},
     "email.briefing.per_day_sub": {"de": "Beste Region + Top-Spots", "en": "Best region + top spots"},
     "email.briefing.nothing_flyable": {"de": "Nichts fliegbar in deinen Regionen.", "en": "Nothing flyable in your regions."},
+    # Luecken-Sprache: "keine Bewertung" ist ein Eingestaendnis, kein Urteil.
+    # Es muss sich von "nicht fliegbar" klar unterscheiden, sonst verkauft die
+    # Mail ein Datenloch als Aussage.
+    "email.briefing.no_rating": {"de": "Keine Bewertung", "en": "No assessment"},
+    "email.briefing.gap_regions": {"de": "Für {missing} von {total} deiner Regionen liegt diese Woche keine Bewertung vor.",
+                                   "en": "No assessment available this week for {missing} of your {total} regions."},
+    "email.briefing.gap_days": {"de": "Für {missing} von {total} Tagen liegt keine Bewertung vor.",
+                                "en": "No assessment available for {missing} of {total} days."},
+    "email.briefing.gap_cells": {"de": "Einzelne Regionen konnten an {missing} Tagen nicht bewertet werden.",
+                                 "en": "Some regions could not be assessed on {missing} days."},
+    "email.briefing.stale_notice": {"de": "Stand der Bewertungen: {stand} — heute konnte nicht neu bewertet werden.",
+                                    "en": "Assessments as of {stand} — no new assessment could be made today."},
     "email.briefing.feedback_q": {"de": "War diese Vorhersage richtig?", "en": "Was this forecast right?"},
     "email.briefing.feedback_yes": {"de": "Ja, passte", "en": "Yes, it fit"},
     "email.briefing.feedback_no": {"de": "Nein, lag daneben", "en": "No, it was off"},
@@ -467,12 +479,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "email.briefing.txt_in_dashboard": {"de": "Im Dashboard:", "en": "On the dashboard:"},
     "email.briefing.txt_share_whatsapp": {"de": "Per WhatsApp teilen:", "en": "Share via WhatsApp:"},
     "email.briefing.txt_regions_header": {"de": "DEINE REGIONEN · DIESE WOCHE", "en": "YOUR REGIONS · THIS WEEK"},
-    "email.briefing.txt_legend": {"de": 'Legende: Zahl = Regions-Rating · "!" = Vorsicht · "x" = nicht sicher · "----" = keine Daten',
-                                  "en": 'Legend: number = region rating · "!" = caution · "x" = not safe · "----" = no data'},
+    "email.briefing.txt_legend": {"de": 'Legende: Zahl = Regions-Rating · "!" = Vorsicht · "x" = nicht sicher · "?" = keine Bewertung',
+                                  "en": 'Legend: number = region rating · "!" = caution · "x" = not safe · "?" = no assessment'},
     "email.briefing.txt_week_glance": {"de": "DIESE WOCHE AUF EINEN BLICK", "en": "THIS WEEK AT A GLANCE"},
     "email.briefing.txt_caution": {"de": "VORSICHT", "en": "CAUTION"},
     "email.briefing.txt_not_flyable": {"de": "NICHT FLIEGBAR", "en": "NOT FLYABLE"},
     "email.briefing.txt_ok": {"de": "OK", "en": "OK"},
+    "email.briefing.txt_no_rating": {"de": "KEINE BEWERTUNG", "en": "NO ASSESSMENT"},
     "email.briefing.txt_per_day": {"de": "PRO TAG", "en": "PER DAY"},
     "email.briefing.txt_yes": {"de": "Ja:", "en": "Yes:"},
     "email.briefing.txt_no": {"de": "Nein:", "en": "No:"},
@@ -488,6 +501,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "email.briefing.subject_conditional": {"de": "Bedingte Woche", "en": "Conditional week"},
     "email.briefing.subject_nothing": {"de": "Diese Woche nichts in deinen Regionen",
                                         "en": "Nothing in your regions this week"},
+    # Kein fliegbarer Tag, aber Luecken in den Daten: "nichts" waere zu viel
+    # behauptet — wir kennen die Woche nur teilweise.
+    "email.briefing.subject_nothing_partial": {"de": "Nichts fliegbar, teils ohne Bewertung",
+                                               "en": "Nothing flyable, partly unassessed"},
     "email.accuracy.subject": {"de": "Wingcast {month}: Deine Vorhersage zu {pct}% korrekt",
                                "en": "Wingcast {month}: your forecast was {pct}% correct"},
 
@@ -499,6 +516,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "tier.gray": {"de": "Abgleiter", "en": "Sled run"},
     "tier.none": {"de": "Nicht fliegbar", "en": "Not flyable"},
     "tier.not_safe": {"de": "Nicht sicher", "en": "Not safe"},
+    # 'unknown' ist bewusst KEIN Flug-Tier, sondern die fehlende Bewertung.
+    "tier.unknown": {"de": "Keine Bewertung", "en": "No assessment"},
 
     # ======================= Monatsnamen (serverseitig, accuracy-Mail) =======================
     "month.1": {"de": "Januar", "en": "January"},
@@ -802,6 +821,11 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.empty.no_forecast": {"de": "Noch keine Prognosedaten vorhanden.", "en": "No forecast data yet."},
     "js.empty.spot_not_found": {"de": "Spot \"{spot}\" nicht in diesem Tag gefunden.",
                                 "en": "Spot \"{spot}\" not found on this day."},
+    # Luecke, nicht Filter: fuer diesen Tag/diese Region liegt keine Bewertung
+    # vor. Muss anders klingen als "passt nicht zum Filter" — gleiche
+    # Sprachregelung wie in der Briefing-Mail (email.briefing.no_rating).
+    "js.empty.no_rating": {"de": "Für diesen Tag liegt keine Bewertung vor.",
+                           "en": "No assessment available for this day."},
     "js.empty.no_match_pre": {"de": "Keine Spots", "en": "No spots"},
     "js.empty.in_filtered_regions": {"de": " in den gefilterten Regionen", "en": " in the filtered regions"},
     "js.empty.no_match_post": {"de": " entsprechen dem aktuellen Filter.", "en": " match the current filter."},

@@ -1308,8 +1308,21 @@ class AnalyzersMixin:
             logger.warning("build_briefing_data: synoptic_cache laden fehlgeschlagen: %s", e)
             wetterlage = None
 
+        # Datenstand der Bewertungen = mtime des Analyse-Caches. 'generated_at'
+        # sagt nur, wann dieses Dict gebaut wurde — es ist immer frisch, auch
+        # wenn die Bewertungen darin von gestern stammen. Genau diese stille
+        # Alterung soll die Mail ausweisen koennen.
+        analyses_at = None
+        try:
+            p = self.analyses_file
+            if p.exists():
+                analyses_at = datetime.fromtimestamp(p.stat().st_mtime).isoformat()
+        except Exception as e:
+            logger.warning("build_briefing_data: Datenstand nicht ermittelbar: %s", e)
+
         return {
             "generated_at": datetime.now().isoformat(),
+            "analyses_at": analyses_at,
             "forecast_dates": forecast_dates,
             "days": days_data,
             "wetterlage": wetterlage,

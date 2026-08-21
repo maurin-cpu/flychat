@@ -133,12 +133,72 @@ def _next_event(now: datetime) -> Tuple[datetime, str]:
     return min(kandidaten, key=lambda k: k[0])
 
 
+def _abbruch_hinweis(engine) -> Optional[str]:
+    """Bekannter Abbruchgrund der letzten Analyse — nur als Zusatzinfo.
+
+    Er steht in der Betriebsmeldung, damit man nicht im Log suchen muss. In die
+    Versand-Entscheidung darf er NICHT einfliessen: die faellt allein an der
+    Datenlage, sonst deckt sie nur die Ausfaelle ab, die wir schon kennen.
+    """
+    try:
+        ereignis = getattr(engine, "_api_abort", None)
+        if ereignis is not None and ereignis.is_set():
+            return getattr(engine, "_api_abort_reason", None)
+    except Exception:
+        pass
+    return None
+
+
+def _melde_datenluecke(ohne_daten: list, luecken: list, days_count: int,
+                       abbruchgrund: Optional[str] = None) -> None:
+    """Meldet dem Betrieb, dass Briefings wegen fehlender Bewertungen ausfielen.
+
+    Der Kunde bekommt in dem Fall nichts — also muss es wenigstens hier
+    auffallen. Die Meldung nennt zuerst Zahlen; ein bekannter Abbruchgrund
+    kommt als Zusatz dazu, nicht als Begruendung der Entscheidung.
+    """
+    if not ohne_daten and not luecken:
+        return
+    try:
+        import email_service
+        zeilen = [
+            f"Prognosefenster: {days_count} Tage",
+            f"Ohne Versand (keine einzige Bewertung): {len(ohne_daten)}",
+            f"Versendet mit Luecken: {len(luecken)}",
+            "",
+        ]
+        for email, cov in ohne_daten:
+            zeilen.append(f"  KEIN VERSAND  {email} — 0 von {cov['cells']} "
+                          f"Zellen bewertet ({cov['regions']} Regionen)")
+        for email, cov in luecken:
+            zeilen.append(f"  LUECKEN       {email} — {cov['cells_rated']} von "
+                          f"{cov['cells']} Zellen, {cov['regions_rated']} von "
+                          f"{cov['regions']} Regionen bewertet")
+        zeilen += ["", "Gemessen wird die Datenlage, nicht die Ursache."]
+        if abbruchgrund:
+            zeilen.append(f"Bekannter Abbruchgrund der Analyse: {abbruchgrund}")
+        else:
+            zeilen.append("Kein Abbruchgrund gemeldet — Log des Morgenlaufs "
+                          "pruefen (LLM-Analyse).")
+        zeilen.append(f"Geprueft: {datetime.now().isoformat(timespec='seconds')}")
+        text = "\n".join(zeilen)
+        betreff = (f"[Wingcast] Briefing-Versand: {len(ohne_daten)} ohne Daten, "
+                   f"{len(luecken)} mit Luecken")
+        html = "<pre>" + text.replace("<", "&lt;").replace(">", "&gt;") + "</pre>"
+        email_service.send_email(config.OPS_ALERT_EMAIL, betreff, html, text)
+        logger.info("Scheduler: Datenluecken-Meldung an %s raus", config.OPS_ALERT_EMAIL)
+    except Exception as e:
+        # Wie beim Snapshot-Waechter: eine gescheiterte Meldung darf den Lauf
+        # nie mitnehmen.
+        logger.exception("Scheduler: Datenluecken-Meldung fehlgeschlagen: %s", e)
+
+
 def _send_briefings_once(engine) -> dict:
     """Baut briefing_data einmal, loopt ueber aktive Subscriber.
     Returns: {'total': N, 'sent': n_sent, 'skipped': n_skipped, 'failed': n_failed}
     """
     from subscriber import get_manager_from_env
-    from email_service import send_briefing_email
+    from email_service import send_briefing_email, briefing_coverage
 
     mgr = get_manager_from_env()
     if mgr is None:
@@ -204,6 +264,8 @@ def _send_briefings_once(engine) -> dict:
     sent = 0
     skipped = 0
     failed = 0
+    ohne_daten: list = []   # (email, coverage) — kein Versand
+    mit_luecken: list = []  # (email, coverage) — versendet, aber unvollstaendig
     for sub in subscribers:
         email = sub.get("email")
 
@@ -227,6 +289,25 @@ def _send_briefings_once(engine) -> dict:
                         email, sub["id"], today_weekday, weekdays)
             continue
 
+        # Datenlage-Gate: ohne jede Bewertung geht nichts raus. Eine Mail ohne
+        # Datengrundlage liest sich zwangslaeufig wie "diese Woche nichts
+        # fliegbar" — der Kunde koennte den Ausfall nicht erkennen. Gemessen
+        # wird die Abdeckung, nicht die Ursache des Ausfalls.
+        cov = briefing_coverage(sub, briefing_data)
+        if cov["state"] == "leer":
+            skipped += 1
+            ohne_daten.append((email, cov))
+            logger.error("[BRIEF] -> %s (#%s) KEIN VERSAND (keine Bewertung: "
+                         "0 von %d Zellen, %d Regionen x %d Tage)",
+                         email, sub["id"], cov["cells"], cov["regions"], cov["days"])
+            continue
+        if cov["state"] == "teilweise":
+            mit_luecken.append((email, cov))
+            logger.warning("[BRIEF] -> %s (#%s) LUECKEN (%d von %d Zellen "
+                           "bewertet, fehlende Regionen: %s)",
+                           email, sub["id"], cov["cells_rated"], cov["cells"],
+                           ", ".join(cov["missing_regions"]) or "keine")
+
         try:
             ok = send_briefing_email(sub, briefing_data, async_send=False)
             if ok:
@@ -241,9 +322,13 @@ def _send_briefings_once(engine) -> dict:
             failed += 1
             logger.exception("[BRIEF] -> %s (#%s) EXCEPTION: %s", email, sub["id"], e)
 
-    logger.info("Scheduler: fertig. sent=%d skipped=%d failed=%d / %d",
-                sent, skipped, failed, total)
-    return {"total": total, "sent": sent, "skipped": skipped, "failed": failed}
+    logger.info("Scheduler: fertig. sent=%d skipped=%d failed=%d / %d "
+                "(ohne Daten: %d, mit Luecken: %d)",
+                sent, skipped, failed, total, len(ohne_daten), len(mit_luecken))
+    _melde_datenluecke(ohne_daten, mit_luecken, days_count,
+                       _abbruch_hinweis(engine))
+    return {"total": total, "sent": sent, "skipped": skipped, "failed": failed,
+            "ohne_daten": len(ohne_daten), "mit_luecken": len(mit_luecken)}
 
 
 def _send_accuracy_once() -> dict:

@@ -73,6 +73,23 @@
   </td></tr>
   {% endif %}
 
+  {# === Luecken-Hinweis: nur wenn Bewertungen fehlen. Steht bewusst vor der
+       Heatmap, damit die '?'-Zellen darunter erklaert sind. === #}
+  {% if gap_notice or stale_notice %}
+  <tr><td style="padding:10px 18px;border-top:1px solid #e2e8f0;background-color:#f8fafc;">
+    {% if gap_notice %}
+    <div style="font-size:12px;color:#475569;line-height:1.45;">
+      <span style="font-weight:700;color:#64748b;">?</span>&nbsp; {{ gap_notice }}
+    </div>
+    {% endif %}
+    {% if stale_notice %}
+    <div style="font-size:12px;color:#475569;line-height:1.45;{% if gap_notice %}margin-top:4px;{% endif %}">
+      <span style="font-weight:700;color:#64748b;">!</span>&nbsp; {{ stale_notice }}
+    </div>
+    {% endif %}
+  </td></tr>
+  {% endif %}
+
   {# === SECTION: Region-Heatmap === #}
   <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;">
     <div class="ds-muted" style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#64748b;margin-bottom:12px;">
@@ -100,7 +117,14 @@
           <a href="{{ r.url }}" class="ds-text" style="color:#0f172a;text-decoration:none;">{{ r.region_name }}</a>
         </td>
         {% for cell in r.days %}
-        {% if cell.tier == "none" %}
+        {# 'unknown' = wir haben keine Bewertung. Muss sich vom gemessenen
+           'none' (nicht fliegbar) unterscheiden, sonst liest sich die Luecke
+           als Urteil. #}
+        {% if cell.tier == "unknown" %}
+        <td align="center" title="{{ cell.tier_label }}" style="padding:0;border:2px dashed #e2e8f0;background-color:#f8fafc;color:#94a3b8;font-size:10px;border-radius:4px;">
+          <div style="padding:6px 2px;">?</div>
+        </td>
+        {% elif cell.tier == "none" %}
         <td align="center" style="padding:0;border:2px solid #ffffff;background-color:#f1f5f9;color:#cbd5e1;font-size:10px;border-radius:4px;">
           <div style="padding:6px 2px;">&ndash;</div>
         </td>
