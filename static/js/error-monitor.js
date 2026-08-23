@@ -152,6 +152,10 @@
         try {
             // Ignore ResizeObserver loop benign warnings
             if (ev.message && /ResizeObserver loop/.test(ev.message)) return;
+            // Fehler aus der MapLibre-Bibliothek behandelt vector-basemap.js
+            // selbst (GL-Ebene wird abgeraeumt, Raster-Karte bleibt) — dem
+            // Nutzer einen Banner zu zeigen waere doppelt und irrefuehrend.
+            if (ev.filename && ev.filename.indexOf('maplibre') !== -1) return;
             showError(formatErrorEvent(ev));
             // also forward to console for the developer
             if (window.console && console.error && ev.error) console.error(ev.error);

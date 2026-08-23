@@ -135,32 +135,28 @@
         // zeigte statt aller 494 Spots nur noch 346.
         var tileOpts = { updateWhenIdle: false, updateWhenZooming: !sparsam, keepBuffer: 4, minZoom: 0 };
 
-        // Grundkarte: bevorzugt als VEKTOR (MapLibre GL, vector-basemap.js) —
-        // gezeichnet auf der GPU statt als Bilder nachgeladen. Damit gibt es
-        // beim Ziehen keine grauen Felder mehr (gemessen 0.7% statt 60-87% auf
-        // langsamem Netz) und Labels sind auf jeder Zoomstufe scharf. Der Stil
-        // enthaelt die Labels bereits; sie liegen damit UNTER der Schummerung —
-        // die ist halbtransparent (0.45) und in Tallagen fast weiss, im
-        // Prototyp nicht stoerend. Attribution steht am Raster-Fallback und
-        // gilt fuer beide Zweige (gleiche Datenbasis OSM/CARTO).
-        var vektorKarte = (typeof window.wingcastVectorBasemap === 'function')
-            && window.wingcastVectorBasemap(map);
+        // Grundkarte in zwei Phasen (Begruendung: vector-basemap.js, Kopf):
+        // SOFORT der bewaehrte Raster-Stack — Karte augenblicklich sichtbar
+        // und bedienbar. Im Leerlauf laedt die VEKTOR-Karte (MapLibre GL,
+        // GPU-gezeichnet: 0.1-1% grau beim Ziehen statt 60-87%, Zwischenzoom
+        // scharf, gleiche Optik) dazu und loest die Carto-Rasterebenen ab,
+        // sobald sie ihr 'load' meldet. Schlaegt irgendetwas fehl, bleibt
+        // einfach der Raster-Stack — selbstheilend, kein Fehler beim Nutzer.
+        var cartoRasterEbenen = [];
 
-        if (!vektorKarte) {
-        // ===== RASTER-FALLBACK (alte Geraete ohne WebGL / MapLibre-CDN weg) =====
         // Vorschau-Unterlage: dieselbe Karte, aber grob (nie feiner als Stufe 9)
         // und weit gepuffert. Sie liegt unter allem und ist praktisch immer
         // geladen — dadurch erscheint dort, wo die scharfen Kacheln noch fehlen,
         // ein unscharfes Kartenbild statt der grauen Flaeche. Die paar groben
         // Kacheln kosten fast nichts, weil sie ueber viele Zoomstufen halten.
-        L.tileLayer('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+        cartoRasterEbenen.push(L.tileLayer('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
             // minZoom 9 = die Unterlage wird erst eingeblendet, wenn man
             // ueberhaupt hineinzoomt. In der Uebersicht (Zoom 7-8) deckt die
             // Grundkarte alles ab — dort waeren es nur unnoetige Downloads.
             minZoom: 9, maxNativeZoom: 9, maxZoom: 18, keepBuffer: 8,
             updateWhenIdle: false, updateWhenZooming: false,
             className: 'wc-tiles-preview',
-        }).addTo(map);
+        }).addTo(map));
 
         // Basis ohne Labels. Mobil in Normalaufloesung ({r} weglassen): Retina-
         // Kacheln (@2x) vervierfachen die Pixel-Dekodier-/Rasterlast — bei der
@@ -169,12 +165,11 @@
         var baseTileUrl = (window.innerWidth <= 900)
             ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'
             : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
-        L.tileLayer(baseTileUrl, Object.assign({
+        cartoRasterEbenen.push(L.tileLayer(baseTileUrl, Object.assign({
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
             subdomains: 'a',
             maxZoom: 18,
-        }, tileOpts)).addTo(map);
-        }
+        }, tileOpts)).addTo(map));
 
         // Topografie (Schummerung) — zeigt Hügel/Berge ohne das Design zu überladen.
         // NICHT auf kleinen Screens: der halbtransparente Zusatz-Layer verdreifacht
@@ -189,13 +184,23 @@
             }, tileOpts)).addTo(map);
         }
 
-        // Labels über der Schummerung — nur im Raster-Zweig noetig, der
-        // Vektor-Stil bringt seine Labels selbst mit.
-        if (!vektorKarte) {
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
-                subdomains: 'a',
-                maxZoom: 18,
-            }, tileOpts)).addTo(map);
+        // Labels über der Schummerung (der Vektor-Stil bringt eigene mit,
+        // deshalb gehoert auch diese Ebene zu den abloesbaren Raster-Ebenen)
+        cartoRasterEbenen.push(L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
+            subdomains: 'a',
+            maxZoom: 18,
+        }, tileOpts)).addTo(map));
+
+        // Vektor-Karte im Leerlauf dazuladen; uebernimmt erst wenn fertig.
+        if (typeof window.wingcastVectorBasemap === 'function') {
+            window.wingcastVectorBasemap(map, {
+                onReady: function () {
+                    cartoRasterEbenen.forEach(function (l) {
+                        try { map.removeLayer(l); } catch (e) { /* egal */ }
+                    });
+                    cartoRasterEbenen = [];
+                },
+            });
         }
 
         // Canvas-Pane fuer Spot-Marker: ueber OSM-Peaks (450), Position des

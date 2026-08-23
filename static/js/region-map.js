@@ -247,21 +247,19 @@
                       /(^|-)(2g|3g)$/.test(conn.effectiveType || '');
         var tileOpts = { updateWhenIdle: false, updateWhenZooming: !sparsam, keepBuffer: 4 };
 
-        // Grundkarte bevorzugt als Vektor (Begruendung und Messwerte: map.js).
-        var vektorKarte = (typeof window.wingcastVectorBasemap === 'function')
-            && window.wingcastVectorBasemap(map);
+        // Grundkarte in zwei Phasen — Raster sofort, Vektor uebernimmt wenn
+        // fertig (Begruendung und Messwerte: map.js / vector-basemap.js).
+        var cartoRasterEbenen = [];
 
         // Grundkarte mobil in Normalaufloesung — Begruendung siehe map.js
-        if (!vektorKarte) {
         var baseTileUrl = (window.innerWidth <= 900)
             ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'
             : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
-        L.tileLayer(baseTileUrl, Object.assign({
+        cartoRasterEbenen.push(L.tileLayer(baseTileUrl, Object.assign({
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
             subdomains: 'a',
             maxZoom: 18,
-        }, tileOpts)).addTo(map);
-        }
+        }, tileOpts)).addTo(map));
 
         // Hillshade NICHT auf kleinen Screens: dritter (halbtransparenter) Layer
         // verdreifacht die Compositing-Arbeit — auf Handys Hauptursache fuer
@@ -274,11 +272,20 @@
             }, tileOpts)).addTo(map);
         }
 
-        if (!vektorKarte) {
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
-                subdomains: 'a',
-                maxZoom: 18,
-            }, tileOpts)).addTo(map);
+        cartoRasterEbenen.push(L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
+            subdomains: 'a',
+            maxZoom: 18,
+        }, tileOpts)).addTo(map));
+
+        if (typeof window.wingcastVectorBasemap === 'function') {
+            window.wingcastVectorBasemap(map, {
+                onReady: function () {
+                    cartoRasterEbenen.forEach(function (l) {
+                        try { map.removeLayer(l); } catch (e) { /* egal */ }
+                    });
+                    cartoRasterEbenen = [];
+                },
+            });
         }
 
         labelMarkersGroup = L.layerGroup().addTo(map);

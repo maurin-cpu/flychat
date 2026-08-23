@@ -779,8 +779,11 @@
 {# data-store.js OHNE defer: muss vor den Inline-Skripten und region-map.js verfuegbar sein #}
 <script src="{{ url_for('static', filename='js/data-store.js') }}?v={{ static_v('js/data-store.js') }}"></script>
 <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script defer src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
+{# async statt defer: die ~800KB MapLibre duerfen NICHT den ersten
+   Fingerkontakt blockieren. Die Leaflet-Bruecke laedt vector-basemap.js
+   selbst nach, sobald MapLibre UND Leaflet da sind (Reihenfolge bei async
+   nicht garantiert). #}
+<script async src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script defer src="{{ url_for('static', filename='js/vector-basemap.js') }}?v={{ static_v('js/vector-basemap.js') }}"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
