@@ -279,7 +279,13 @@ class _Engine:
 @pytest.fixture
 def nachlauf(monkeypatch, archiv):
     """Scheduler mit abgeklemmter LLM-Analyse und Snapshot."""
+    import config
     import scheduler
+    # Der Nachlauf laeuft nur in Produktion (config.ops_produktion(), seit
+    # 23.08.2026). Auf einem Entwicklungsrechner zeigt BASE_URL auf localhost,
+    # sonst wuerden diese Tests je nach .env des Rechners gar nichts pruefen.
+    monkeypatch.setattr(config, "BASE_URL", "https://app.wingcast.ch")
+    monkeypatch.setattr(config, "OPS_PRODUKTION_HOST", "app.wingcast.ch")
     protokoll = []
     monkeypatch.setattr(scheduler, "_run_llm_analysis",
                         lambda engine: protokoll.append("analyse") or True)

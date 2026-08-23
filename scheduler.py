@@ -160,6 +160,11 @@ def _melde_datenluecke(ohne_daten: list, luecken: list, days_count: int,
     if not ohne_daten and not luecken:
         return
     try:
+        # Nur der Server alarmiert — siehe config.ops_produktion().
+        erlaubt, grund = config.ops_produktion()
+        if not erlaubt:
+            logger.info("Scheduler: Datenluecken-Meldung unterdrueckt — %s", grund)
+            return
         import email_service
         zeilen = [
             f"Prognosefenster: {days_count} Tage",
@@ -492,6 +497,15 @@ def _nachholen_falls_noetig(engine) -> None:
 
     now = datetime.now()
     heute = now.date().isoformat()
+
+    # Nur auf dem Server. Ein Entwicklungsrechner hat kein aktuelles Archiv,
+    # findet den Tag also immer "fehlend" — und wuerde vormittags eine volle
+    # LLM-Analyse nachziehen (rund 1500 Aufrufe, echte Kosten) fuer ein
+    # Archiv, das dort niemanden interessiert.
+    erlaubt, grund = config.ops_produktion()
+    if not erlaubt:
+        logger.info("Snapshot-Nachlauf uebersprungen — %s", grund)
+        return
 
     if now.weekday() not in config.DAILY_RUN_WEEKDAYS:
         return

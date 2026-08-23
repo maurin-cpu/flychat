@@ -1235,6 +1235,72 @@ ADMIN_EMAIL     = os.environ.get("ADMIN_EMAIL", "mutschgito@hotmail.com")
 # mitverschieben.
 OPS_ALERT_EMAIL = os.environ.get("OPS_ALERT_EMAIL", "info@wingcast.ch")
 
+# --- Produktion oder Entwicklungsrechner? -----------------------------------
+# Betriebsalarme und der Snapshot-Nachlauf duerfen NUR auf dem Server laufen.
+# Auf einem Entwicklungsrechner fehlen Archiv und Abo-Datenbank, also meldet
+# der Waechter dort zwangslaeufig "Tag verloren" und will nachholen — am
+# 21. und 23.08.2026 je einmal real passiert, beide Male Fehlalarm, und der
+# Nachlauf haette vormittags eine volle LLM-Analyse gekostet.
+#
+# Erkannt wird POSITIV am Hostnamen der App-Adresse: nur OPS_PRODUKTION_HOST
+# gilt als Produktion. Eine Ausschlussliste ("alles ausser localhost") waere
+# falsch herum — Testlaeufe unter 127.0.0.1, einer LAN-IP oder einem anderen
+# Port erraet man nie vollstaendig. Der Port bleibt bewusst unbeachtet.
+#
+# Zieht die App je auf eine andere Domain um, muss diese Variable mit —
+# sonst haelt sich der Server fuer eine Testumgebung und schweigt. Dagegen
+# schreibt der Scheduler den erkannten Zustand beim Start ins Protokoll.
+OPS_PRODUKTION_HOST = os.environ.get(
+    "OPS_PRODUKTION_HOST", "app.wingcast.ch").strip().lower()
+
+# Notausgang: Alarmweg vom Entwicklungsrechner aus testen (--testmail).
+OPS_ALERT_FORCE = os.environ.get("OPS_ALERT_FORCE", "0") == "1"
+
+
+def _url_host(url: str) -> str:
+    """Hostname aus einer Adresse — ohne Port, ohne Schema, klein geschrieben."""
+    from urllib.parse import urlsplit
+    roh = (url or "").strip()
+    if "://" not in roh:
+        roh = "//" + roh          # "localhost:5000" ist sonst ein Pfad
+    try:
+        return (urlsplit(roh).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def ops_produktion() -> tuple:
+    """(darf Alarme senden?, Klartext-Begruendung fuers Protokoll).
+
+    Wird als Funktion gehalten, nicht als Konstante: BASE_URL kann zur
+    Laufzeit ueberschrieben werden, und Tests sollen den Fall umschalten
+    koennen, ohne das Modul neu zu laden.
+    """
+    host = _url_host(BASE_URL)
+    if OPS_ALERT_FORCE:
+        return True, f"erzwungen (OPS_ALERT_FORCE=1, Adresse: {host or 'unbekannt'})"
+    if host and host == OPS_PRODUKTION_HOST:
+        return True, f"Produktion erkannt (Adresse: {host})"
+    return False, (f"Entwicklungsumgebung erkannt (Adresse: {host or 'unbekannt'}, "
+                   f"Produktion waere {OPS_PRODUKTION_HOST})")
+
+
+def ops_betreff(betreff: str) -> str:
+    """Kennzeichnet Alarme, die NICHT von der Produktion kommen.
+
+    Nur der erzwungene Fall (OPS_ALERT_FORCE) wird markiert — dort ist die
+    Herkunft die entscheidende Information. In der Produktion bliebe der
+    Rechnername ohne Aussage und wuerde nur jede Betreffzeile verlaengern.
+    """
+    if _url_host(BASE_URL) == OPS_PRODUKTION_HOST:
+        return betreff
+    import socket
+    try:
+        rechner = socket.gethostname()
+    except Exception:
+        rechner = "unbekannt"
+    return f"[NICHT PRODUKTION: {rechner}] {betreff}"
+
 # Salt fuer die IP-Anonymisierung im Feedback (SHA-256). Reiner Hash-Salt,
 # keine Auth-Funktion.
 FEEDBACK_SALT   = os.environ.get("FEEDBACK_SALT", "wingcast-feedback")

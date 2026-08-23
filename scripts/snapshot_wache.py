@@ -258,7 +258,16 @@ def _sende(betreff: str, text: str, versand: bool = True) -> None:
         return
     try:
         import config
+        # Auf einem Entwicklungsrechner fehlen Archiv und Abo-Datenbank; der
+        # Befund waere dort immer "Tag verloren". Ein Alarm, der oft grundlos
+        # kommt, wird ignoriert — und dann sieht man den echten Ausfall auch
+        # nicht mehr. Zum Testen des Versandwegs: OPS_ALERT_FORCE=1.
+        erlaubt, grund = config.ops_produktion()
+        if not erlaubt:
+            print(f"  (kein Versand — {grund}; OPS_ALERT_FORCE=1 erzwingt ihn)")
+            return
         import email_service
+        betreff = config.ops_betreff(betreff)
         html = "<pre>" + text.replace("<", "&lt;").replace(">", "&gt;") + "</pre>"
         ok = email_service.send_email(config.OPS_ALERT_EMAIL, betreff, html, text)
         print(f"  -> {config.OPS_ALERT_EMAIL}: "

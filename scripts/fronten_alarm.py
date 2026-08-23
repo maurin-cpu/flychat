@@ -213,7 +213,13 @@ class Alarm:
             return
         try:
             import config
+            # Nur der Server alarmiert — siehe config.ops_produktion().
+            erlaubt, grund = config.ops_produktion()
+            if not erlaubt:
+                print(f"  (kein Versand — {grund}; OPS_ALERT_FORCE=1 erzwingt ihn)")
+                return
             import email_service
+            betreff = config.ops_betreff(betreff)
             html = "<pre>" + text.replace("<", "&lt;").replace(">", "&gt;") + "</pre>"
             ok = email_service.send_email(config.OPS_ALERT_EMAIL, betreff, html, text)
             print(f"  -> {config.OPS_ALERT_EMAIL}: "

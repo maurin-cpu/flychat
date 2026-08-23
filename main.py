@@ -66,6 +66,12 @@ def main():
             sorted(config.DAILY_RUN_WEEKDAYS),
             config.DAILY_RUN_HOUR, config.DAILY_RUN_MINUTE,
         )
+        # Sichtbar machen, ob diese Instanz alarmieren darf. Ein Server, der
+        # sich nach einem Domainwechsel fuer eine Testumgebung haelt, wuerde
+        # sonst still schweigen — der schlimmste Ausfall ist der unbemerkte.
+        _ops_erlaubt, _ops_grund = config.ops_produktion()
+        logger.info("Betriebsalarme: %s — %s",
+                    "AKTIV" if _ops_erlaubt else "ausgeschaltet", _ops_grund)
     else:
         logger.info("Daily-Scheduler deaktiviert (WINGCAST_BRIEFINGS=0)")
 
