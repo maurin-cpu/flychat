@@ -6,6 +6,7 @@
 <link rel="preconnect" href="https://a.basemaps.cartocdn.com">
 <link rel="preconnect" href="https://services.arcgisonline.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" crossorigin="anonymous" />
 <style>
     .navbar {
         position: fixed;
@@ -623,6 +624,9 @@
 {# data-store.js OHNE defer: muss vor den Inline-Skripten und map.js verfuegbar sein #}
 <script src="{{ url_for('static', filename='js/data-store.js') }}?v={{ static_v('js/data-store.js') }}"></script>
 <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script defer src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
+<script defer src="{{ url_for('static', filename='js/vector-basemap.js') }}?v={{ static_v('js/vector-basemap.js') }}"></script>
 <script defer src="https://d3js.org/d3.v7.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="{{ url_for('static', filename='js/analysis-view.js') }}?v={{ static_v('js/analysis-view.js') }}"></script>

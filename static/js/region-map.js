@@ -247,7 +247,12 @@
                       /(^|-)(2g|3g)$/.test(conn.effectiveType || '');
         var tileOpts = { updateWhenIdle: false, updateWhenZooming: !sparsam, keepBuffer: 4 };
 
+        // Grundkarte bevorzugt als Vektor (Begruendung und Messwerte: map.js).
+        var vektorKarte = (typeof window.wingcastVectorBasemap === 'function')
+            && window.wingcastVectorBasemap(map);
+
         // Grundkarte mobil in Normalaufloesung — Begruendung siehe map.js
+        if (!vektorKarte) {
         var baseTileUrl = (window.innerWidth <= 900)
             ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'
             : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
@@ -256,6 +261,7 @@
             subdomains: 'a',
             maxZoom: 18,
         }, tileOpts)).addTo(map);
+        }
 
         // Hillshade NICHT auf kleinen Screens: dritter (halbtransparenter) Layer
         // verdreifacht die Compositing-Arbeit — auf Handys Hauptursache fuer
@@ -268,10 +274,12 @@
             }, tileOpts)).addTo(map);
         }
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
-            subdomains: 'a',
-            maxZoom: 18,
-        }, tileOpts)).addTo(map);
+        if (!vektorKarte) {
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
+                subdomains: 'a',
+                maxZoom: 18,
+            }, tileOpts)).addTo(map);
+        }
 
         labelMarkersGroup = L.layerGroup().addTo(map);
 

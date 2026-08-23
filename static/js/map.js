@@ -135,6 +135,19 @@
         // zeigte statt aller 494 Spots nur noch 346.
         var tileOpts = { updateWhenIdle: false, updateWhenZooming: !sparsam, keepBuffer: 4, minZoom: 0 };
 
+        // Grundkarte: bevorzugt als VEKTOR (MapLibre GL, vector-basemap.js) —
+        // gezeichnet auf der GPU statt als Bilder nachgeladen. Damit gibt es
+        // beim Ziehen keine grauen Felder mehr (gemessen 0.7% statt 60-87% auf
+        // langsamem Netz) und Labels sind auf jeder Zoomstufe scharf. Der Stil
+        // enthaelt die Labels bereits; sie liegen damit UNTER der Schummerung —
+        // die ist halbtransparent (0.45) und in Tallagen fast weiss, im
+        // Prototyp nicht stoerend. Attribution steht am Raster-Fallback und
+        // gilt fuer beide Zweige (gleiche Datenbasis OSM/CARTO).
+        var vektorKarte = (typeof window.wingcastVectorBasemap === 'function')
+            && window.wingcastVectorBasemap(map);
+
+        if (!vektorKarte) {
+        // ===== RASTER-FALLBACK (alte Geraete ohne WebGL / MapLibre-CDN weg) =====
         // Vorschau-Unterlage: dieselbe Karte, aber grob (nie feiner als Stufe 9)
         // und weit gepuffert. Sie liegt unter allem und ist praktisch immer
         // geladen — dadurch erscheint dort, wo die scharfen Kacheln noch fehlen,
@@ -161,6 +174,7 @@
             subdomains: 'a',
             maxZoom: 18,
         }, tileOpts)).addTo(map);
+        }
 
         // Topografie (Schummerung) — zeigt Hügel/Berge ohne das Design zu überladen.
         // NICHT auf kleinen Screens: der halbtransparente Zusatz-Layer verdreifacht
@@ -175,11 +189,14 @@
             }, tileOpts)).addTo(map);
         }
 
-        // Labels über der Schummerung
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
-            subdomains: 'a',
-            maxZoom: 18,
-        }, tileOpts)).addTo(map);
+        // Labels über der Schummerung — nur im Raster-Zweig noetig, der
+        // Vektor-Stil bringt seine Labels selbst mit.
+        if (!vektorKarte) {
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
+                subdomains: 'a',
+                maxZoom: 18,
+            }, tileOpts)).addTo(map);
+        }
 
         // Canvas-Pane fuer Spot-Marker: ueber OSM-Peaks (450), Position des
         // frueheren markerPane-Stacks. padding 0.5 = Canvas deckt 2x Viewport,
