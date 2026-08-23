@@ -119,11 +119,15 @@
             // sonst bleibt ein Rest wie 11.0019 stehen und die Kacheln werden
             // trotz Auslauf auf die ganze Stufe minimal gedehnt.
             st.current = clamp(st.target);
-            var z = map._limitZoom ? map._limitZoom(st.current) : st.current;
-            // Uebernahme wie am Ende einer Pinch-Geste: laedt die Kacheln der
-            // neuen Stufe nach und feuert zoomend (daran haengt z.B. die
-            // Spot-Groessen-Kompensation in map.js).
-            map._animateZoom(centerFor(z), z, true, map.options.zoomSnap);
+            var z = st.current;
+            // Uebernahme SOFORT statt ueber Leaflets 250ms-Zoomanimation: der
+            // Zoom steht hier schon (Restdistanz < 0.002), die Animation waere
+            // unsichtbar — aber waehrend ihr rechnet die Treffer-Erkennung mit
+            // den alten Ebenen-Positionen, und ein Klick in dem Fenster geht
+            // daneben ("erster Klick ignoriert"). setView ohne Animation
+            // feuert zoomend/moveend, laedt Kacheln nach und schliesst die
+            // Geste im selben Frame ab.
+            map.setView(centerFor(z), z, { animate: false });
         }
 
         // --- Pinch (Leaflets eigener TouchZoom) ---
@@ -212,14 +216,18 @@
                 if (!pz.aktiv || (e.touches && e.touches.length >= 2)) return;
                 pz.aktiv = false;
                 if (pz.raf) { cancelAnimationFrame(pz.raf); pz.raf = 0; }
-                // Uebergabe an die Rad-Logik: von hier laeuft finish() —
-                // richtungstreu gerundete ganze Stufe, ein weicher Auslauf.
+                // Uebergabe an die Rad-Logik (finish-Auslauf). ANDERS als am
+                // Rad wird zur NAECHSTGELEGENEN Stufe gerundet: das leichte
+                // Ueberziehen der Finger ist beim Pinch Absicht, kein Nachlauf-
+                // Rauschen. Die richtungstreue Regel schob hier ein Loslassen
+                // bei 11.19 auf 12 weiter — alles wanderte nach der Geste
+                // (gemessen 51px) und der erste Tipp ging daneben.
                 st.anchor = pz.mitte;
                 st.current = pz.zoom;
                 st.raw = pz.zoom;
                 st.dir = (pz.zoom >= pz.startZoom) ? 1 : -1;
                 if (Math.abs(pz.zoom - pz.startZoom) < 1e-6) st.dir = 0;
-                st.target = st.dir ? clamp(rasterZiel(pz.zoom, st.dir)) : clamp(Math.round(pz.zoom));
+                st.target = clamp(Math.round(pz.zoom));
                 st.active = true;
                 if (!st.raf) st.raf = requestAnimationFrame(step);
             };
