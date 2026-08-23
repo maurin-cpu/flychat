@@ -14,9 +14,10 @@
  * langen Einzelbilder beim Reinzoomen. Uebernommen (und nachgeladen) wird
  * erst, wenn die Bewegung steht.
  *
- * Voraussetzung dafuer: die Karte muss mit `zoomSnap: 0` laufen (sonst rastet
- * das Ergebnis am Ende wieder auf eine Stufe ein) und ihre Kachel-Layer mit
- * `updateWhenZooming: false`.
+ * Der Ruhepunkt ist immer eine GANZE Zoomstufe (`zoomSnap: 1` auf der Karte),
+ * weil Rasterkacheln nur dort 1:1 scharf sind. Gerundet wird aber schon bei der
+ * Eingabe, nicht nach der Bewegung — sonst zieht die Karte am Ende sichtbar
+ * zurueck.
  *
  * Gemessene JS-Arbeit pro Gleit-Bild: ~1.6ms (Spitze 3ms) bei 4x gedrosselter
  * CPU und 494 Spots — der Rest des Bildbudgets bleibt dem Browser.
@@ -30,7 +31,6 @@
 
     var ZOOM_PER_NOTCH = 1.0;   // eine Mausrad-Raste = eine Zoomstufe (wie Google)
     var ZOOM_EASE = 0.22;       // Anteil der Reststrecke pro Bild (~250ms Auslauf)
-    var SETTLE_MS = 140;        // Ruhe am Rad, ab der auf eine ganze Stufe gezielt wird
 
     window.wingcastSmoothWheelZoom = function (map) {
         if (!map || !map.scrollWheelZoom || typeof map._move !== 'function' ||
@@ -38,22 +38,22 @@
             return false;
         }
         map.scrollWheelZoom.disable();
-        var st = { active: false, target: 0, current: 0, anchor: null, raf: 0, settle: 0 };
+        // roh = die Summe aller Rad-Eingaben, ziel = die daraus gerundete
+        // ganze Zoomstufe. Getrennt, damit kleine Trackpad-Deltas sich
+        // aufsummieren koennen, ohne einzeln verschluckt zu werden.
+        var st = { active: false, raw: 0, target: 0, current: 0, anchor: null, raf: 0 };
 
         // Kacheln sind Rasterbilder: nur auf einer GANZEN Zoomstufe werden sie
         // 1:1 gezeichnet. Auf einem Zwischenwert wird gedehnt — gemessen bis zu
         // 26% weniger Kantenschaerfe (Zoom 9.0: 9.0, Zoom 9.25: 6.6). Hoeher
         // aufgeloeste Kacheln helfen kaum (7.0) und kosten das 2.7-fache an
-        // Daten. Deshalb: sobald am Rad Ruhe ist, wird das ZIEL auf die naechste
-        // ganze Stufe gerundet — die laufende Bewegung traegt einfach dorthin
-        // aus. Kein zweiter Ruck nach der Geste, aber im Ruhezustand scharf.
-        function armSettle() {
-            clearTimeout(st.settle);
-            st.settle = setTimeout(function () {
-                if (!st.active) return;
-                st.target = clamp(Math.round(st.target));
-            }, SETTLE_MS);
-        }
+        // Daten. Deshalb ist der Ruhepunkt immer eine ganze Stufe.
+        //
+        // WICHTIG ist der Zeitpunkt des Rundens: es passiert SOFORT bei der
+        // Eingabe, nicht nach der Bewegung. Wurde erst hinterher gerundet, lief
+        // die Karte auf z.B. 11.4 zu und zog danach auf 11 zurueck — sichtbar
+        // als "zoomt am Schluss wieder ein Stueck raus". Jetzt steht das Ziel
+        // von der ersten Bewegung an fest, die Karte laeuft nur noch hin.
 
         // Rasten aus dem Rad-Ereignis. deltaMode: 0=Pixel, 1=Zeilen, 2=Seiten.
         // Trackpads liefern viele kleine Deltas — die summieren sich von selbst.
@@ -89,7 +89,6 @@
 
         function finish() {
             st.active = false;
-            clearTimeout(st.settle);
             // Exakt auf dem Ziel landen (nicht auf dem letzten Tween-Wert):
             // sonst bleibt ein Rest wie 11.0019 stehen und die Kacheln werden
             // trotz Auslauf auf die ganze Stufe minimal gedehnt.
@@ -114,12 +113,13 @@
                 }
                 map._stop();
                 st.current = map.getZoom();
+                st.raw = st.current;
                 st.target = st.current;
                 st.active = true;
                 map._moveStart(true, false);   // feuert zoomstart
             }
-            st.target = clamp(st.target + n * ZOOM_PER_NOTCH);
-            armSettle();
+            st.raw = clamp(st.raw + n * ZOOM_PER_NOTCH);
+            st.target = clamp(Math.round(st.raw));
             if (!st.raf) st.raf = requestAnimationFrame(step);
         }, { passive: false });
 
