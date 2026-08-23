@@ -216,12 +216,14 @@
             center: [46.8, 8.3],
             zoom: 7,
             zoomControl: true,
-            // Feine Zoom-Raststufen (wie Spot-Karte): verhindert den sichtbaren
-            // Einrast-Sprung am Ende einer Pinch-Geste auf Mobile.
-            zoomSnap: 0.25,
-            zoomDelta: 0.5,
-            wheelPxPerZoomLevel: 120,
+            // Wie Spot-Karte (Begruendung dort): waehrend der Geste
+            // stufenlos, Ruhepunkt auf einer ganzen Stufe — nur dort sind
+            // Rasterkacheln scharf. Das Rad uebernimmt smooth-zoom.js.
+            zoomSnap: 1,
+            zoomDelta: 0.5,             // nur fuer +/- Buttons und Tastatur
         });
+
+        if (typeof window.wingcastSmoothWheelZoom === 'function') window.wingcastSmoothWheelZoom(map);
 
         // Expose the Leaflet map instance under a non-colliding name.
         // `window.regionMap` is otherwise the implicit-global DIV element
@@ -236,7 +238,14 @@
         // (Huegel/Berge sichtbar) ohne dass Beschriftungen ueberlagert werden.
         // Tile-Optionen gegen graue Kacheln (gleiche Begruendung wie map.js):
         // waehrend des Pannens laden, mehr Puffer, eine H2-Verbindung statt 4.
-        var tileOpts = { updateWhenIdle: false, keepBuffer: 4 };
+        // updateWhenZooming — Kachelstufen waehrend der Zoom-Geste nachladen
+        // (Begruendung und Messwerte in map.js): an, wo Bandbreite und
+        // Rechenleistung da sind, sonst schnappt die Karte am Gesten-Ende
+        // sichtbar scharf. Aus auf kleinen Screens / im Sparmodus.
+        var conn = navigator.connection || {};
+        var sparsam = window.innerWidth <= 900 || conn.saveData === true ||
+                      /(^|-)(2g|3g)$/.test(conn.effectiveType || '');
+        var tileOpts = { updateWhenIdle: false, updateWhenZooming: !sparsam, keepBuffer: 4 };
 
         // Grundkarte mobil in Normalaufloesung — Begruendung siehe map.js
         var baseTileUrl = (window.innerWidth <= 900)

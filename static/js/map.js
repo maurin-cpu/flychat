@@ -93,11 +93,18 @@
             center: [46.8, 8.3],
             zoom: 7,
             zoomControl: true,
-            // Feine Zoom-Raststufen: ohne das rastet der Pinch-Zoom am Gesten-Ende
-            // auf GANZE Stufen ein (sichtbarer Sprung beim Loslassen, "springt grob").
-            zoomSnap: 0.25,
-            zoomDelta: 0.5,
-            wheelPxPerZoomLevel: 120,
+            // Zoom-Raster fuer das ENDE einer Geste. Waehrend der Bewegung
+            // ist der Zoom stufenlos (Pinch von Leaflet, Mausrad ueber
+            // smooth-zoom.js) — nur der Ruhepunkt wird auf eine ganze Stufe
+            // gelegt. Grund: Rasterkacheln sind ausschliesslich auf einer
+            // ganzen Stufe 1:1 scharf; auf einem Zwischenwert misst sich bis
+            // zu 26% weniger Kantenschaerfe. Der Weg dorthin wird animiert,
+            // ist also ein Auslaufen und kein Sprung.
+            zoomSnap: 1,
+            zoomDelta: 0.5,             // nur fuer +/- Buttons und Tastatur
+            // Das Mausrad uebernimmt smooth-zoom.js — Leaflets eigener
+            // Rad-Zoom wird dort abgeschaltet, seine wheel*-Optionen sind
+            // deshalb wirkungslos.
         });
 
         // Gemeinsame Tile-Optionen gegen graue Kacheln:
@@ -106,7 +113,41 @@
         // - keepBuffer:4 — mehr Nachbar-Kacheln behalten (Default 2), Zurueck-Pannen ohne Grau
         // - subdomains:'a' — EINE HTTP/2-Verbindung statt 4 TLS-Handshakes zu a-d
         //   (Sharding stammt aus HTTP/1.1-Zeiten und ist heute kontraproduktiv)
-        var tileOpts = { updateWhenIdle: false, keepBuffer: 4 };
+        // - updateWhenZooming — Kachelstufen schon WAEHREND der Zoom-Geste
+        //   nachladen? Gemessen im echten Fenster (identische Bildrate, 8.3ms
+        //   Median in beiden Faellen):
+        //     aus: Bildschaerfe waehrend des Zooms 1.86, am Ende 2.08 — die
+        //          Karte bleibt unscharf und schnappt am Gesten-Ende scharf.
+        //          Dieses Nachschaerfen liest sich als Ruckler, obwohl kein
+        //          einziges Bild ausfaellt.
+        //     an:  2.06 durchgehend, kein Sprung — kostet aber gut das
+        //          Dreifache an Kachel-Downloads (264 statt 80 pro Zoomfahrt).
+        //   Deshalb: an, wo Bandbreite und Rechenleistung da sind; aus auf
+        //   kleinen Screens, im Sparmodus und bei langsamer Verbindung.
+        var conn = navigator.connection || {};
+        var sparsam = window.innerWidth <= 900 || conn.saveData === true ||
+                      /(^|-)(2g|3g)$/.test(conn.effectiveType || '');
+        // minZoom:0 ist PFLICHT, sobald irgendein Layer ein eigenes minZoom
+        // setzt (hier die Vorschau-Unterlage mit 9): Leaflet bildet die
+        // Mindest-Zoomstufe der KARTE aus den Layern, und zwar nur aus denen,
+        // die eines deklarieren. Ohne diese Zeile wurde map.getMinZoom() zu 9 —
+        // die Startansicht konnte nicht mehr auf Stufe 8 herauszoomen und
+        // zeigte statt aller 494 Spots nur noch 346.
+        var tileOpts = { updateWhenIdle: false, updateWhenZooming: !sparsam, keepBuffer: 4, minZoom: 0 };
+
+        // Vorschau-Unterlage: dieselbe Karte, aber grob (nie feiner als Stufe 9)
+        // und weit gepuffert. Sie liegt unter allem und ist praktisch immer
+        // geladen — dadurch erscheint dort, wo die scharfen Kacheln noch fehlen,
+        // ein unscharfes Kartenbild statt der grauen Flaeche. Die paar groben
+        // Kacheln kosten fast nichts, weil sie ueber viele Zoomstufen halten.
+        L.tileLayer('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+            // minZoom 9 = die Unterlage wird erst eingeblendet, wenn man
+            // ueberhaupt hineinzoomt. In der Uebersicht (Zoom 7-8) deckt die
+            // Grundkarte alles ab — dort waeren es nur unnoetige Downloads.
+            minZoom: 9, maxNativeZoom: 9, maxZoom: 18, keepBuffer: 8,
+            updateWhenIdle: false, updateWhenZooming: false,
+            className: 'wc-tiles-preview',
+        }).addTo(map);
 
         // Basis ohne Labels. Mobil in Normalaufloesung ({r} weglassen): Retina-
         // Kacheln (@2x) vervierfachen die Pixel-Dekodier-/Rasterlast — bei der
@@ -145,52 +186,108 @@
         // Pan innerhalb des Puffers braucht kein Neuzeichnen. tolerance 6 =
         // zusaetzlicher Hit-Spielraum fuer Touch.
         map.createPane('spotPane').style.zIndex = '600';
-        spotRenderer = L.canvas({ pane: 'spotPane', padding: 0.5, tolerance: 6 });
+
+        // Leaflets Canvas-Renderer skaliert seine Zeichenflaeche waehrend einer
+        // Zoombewegung per CSS mit. Fuer die Spots ist das doppelt schaedlich:
+        // damit sie gleich gross BLEIBEN, muessten sie um 1/Faktor kleiner
+        // gezeichnet werden — und werden anschliessend wieder aufgeblasen. Bei
+        // Faktor 2 sieht man sie also in halber Aufloesung: unscharf, genau
+        // waehrend man hinschaut.
+        // Deshalb hier: bei jeder Zoomaenderung NEU PROJIZIEREN statt skalieren
+        // (_reset = Flaeche auf die aktuelle Ansicht setzen, alle Marker neu
+        // verorten, neu zeichnen). Die Spots sind damit in jeder Phase 1:1
+        // gezeichnet — immer scharf, unabhaengig vom Zoomfaktor.
+        // 'zoom' feuert bei jedem map._move, also pro Bild waehrend Pinch und
+        // Mausrad-Gleiten. Die kurzen CSS-Animationen (Zoom-Buttons, Auslauf
+        // am Gesten-Ende) laufen weiter ueber zoomanim + Groessen-Kompensation.
+        var SpotCanvas = L.Canvas.extend({
+            _onZoom: function () { this._reset(); }
+        });
+        spotRenderer = new SpotCanvas({ pane: 'spotPane', padding: 0.5, tolerance: 6 });
 
         // ===== ZOOM-KOMPENSATION (konstante Spot-Groesse, live) =====
         // Leaflet skaliert den Spot-Canvas waehrend jeder Zoom-Geste per CSS
         // mit der Karte mit. Damit die Spots dabei NICHT mitwachsen, wird der
         // gezeichnete Radius laufend um 1/scale gegenskaliert — die Groesse
-        // passt sich also WAEHREND des Zoomens an, nicht danach. Kein Sprung,
-        // kein Nachkorrigieren, kein Flackern.
-        // Diese Handler sind vor dem Renderer registriert (der haengt sich erst
-        // beim ersten Marker-Add an) → der Faktor steht, bevor er zeichnet.
+        // passt sich WAEHREND des Zoomens an, nicht danach.
+        //
+        // Der Faktor wird GEMESSEN, nicht aus Leaflet-Events geschaetzt. Die
+        // frueheren Schaetzungen stimmten waehrend der Geste, aber nicht an
+        // deren Ende — zwei Bruchstellen, beide als Groessen-Pop sichtbar:
+        //   1. zoomend schaltete die Kompensation sofort ab, obwohl Leaflet den
+        //      Canvas danach noch ~250ms weiter animiert.
+        //   2. Der Release-Frame des Pinch landete im Pinch-Zweig, weil Leaflet
+        //      ihn mit noUpdate = options.zoomSnap (0.25 → truthy) feuert.
+        // Gemessen wird direkt im Zeichenpfad (compFactor/currentSpotScale, oben)
+        // — Zeichnung und Kartenzustand koennen so gar nicht auseinanderlaufen.
+        // Diese Schleife sorgt nur dafuer, dass waehrend der Geste ueberhaupt
+        // neu gezeichnet wird.
         function compRedraw() {
             if (spotRenderer && spotRenderer._redraw) spotRenderer._redraw();
         }
         function compCancel() {
             if (_zoomComp.raf) { cancelAnimationFrame(_zoomComp.raf); _zoomComp.raf = 0; }
+            _zoomComp.running = false;
         }
-        map.on('zoomanim', function (e) {
-            var scale = map.getZoomScale(e.zoom, map.getZoom());
-            if (!isFinite(scale) || scale <= 0) return;
-            compCancel();
-            if (e.noUpdate) {
-                // Pinch: feuert pro Frame mit dem aktuell interpolierten Zoom →
-                // Faktor direkt setzen, die Geste selbst ist die Animation.
-                _zoomComp.factor = 1 / scale;
+        // EINE rAF-Schleife fuer die ganze Zoomphase inkl. Auslauf: hoechstens
+        // ein Redraw pro Frame, und nur wenn sich sichtbar etwas aendert.
+        function compStep() {
+            _zoomComp.raf = 0;
+            _zoomComp.stamp = 0;            // frische Messung erzwingen
+            var f = compFactor();
+            // Nur zeichnen, wenn es sichtbar etwas aendert (0.5% ≈ 1/25 Pixel).
+            if (Math.abs(f - _zoomComp.drawn) > _zoomComp.drawn * 0.005) {
+                _zoomComp.drawn = f;
                 compRedraw();
-                return;
             }
-            // Wheel/Buttons: Leaflet animiert den Transform per CSS-Transition
-            // (~250ms). Faktor synchron mitziehen, sonst poppt es am Anfang.
-            var from = _zoomComp.factor, to = 1 / scale;
-            var t0 = performance.now(), DUR = 250;
-            (function step(t) {
-                var p = Math.min(1, (t - t0) / DUR);
-                var eased = 1 - Math.pow(1 - p, 4); // ~cubic-bezier(0,0,.25,1)
-                _zoomComp.factor = from + (to - from) * eased;
-                compRedraw();
-                _zoomComp.raf = (p < 1) ? requestAnimationFrame(step) : 0;
-            })(performance.now());
+            if (_zoomComp.ended) {
+                var settled = Math.abs(f - 1) < 0.002;
+                // Notbremse NUR nach dem Gesten-Ende: die Geste selbst darf
+                // beliebig lange dauern (langsamer Pinch). Ein Deckel, der
+                // waehrend der Geste greift, stellt die Kompensation mitten im
+                // Zoomen ab — dann stehen alle Spots schlagartig in voller
+                // Gestenvergroesserung da. Und selbst die Notbremse setzt den
+                // Faktor NICHT auf 1: compFactor misst danach weiter je
+                // Zeichnung, das laeuft ohne Sprung aus.
+                var overdue = _zoomComp.t0 && (performance.now() - _zoomComp.t0) > 1500;
+                if (settled || overdue) {
+                    _zoomComp.running = false;
+                    if (settled) {
+                        _zoomComp.factor = 1;
+                        if (_zoomComp.drawn !== 1) { _zoomComp.drawn = 1; compRedraw(); }
+                    }
+                    return;
+                }
+            }
+            _zoomComp.raf = requestAnimationFrame(compStep);
+        }
+        function compStart() {
+            if (_zoomComp.running) return;
+            _zoomComp.running = true;
+            _zoomComp.raf = requestAnimationFrame(compStep);
+        }
+        // Stufenloser Mausrad-Zoom (smooth-zoom.js, geteilt mit der
+        // Regionen-Karte). Ohne das Modul bleibt Leaflets Standard aktiv.
+        if (typeof window.wingcastSmoothWheelZoom === 'function') window.wingcastSmoothWheelZoom(map);
+
+        // Jede Transform-Aenderung macht die Messung ungueltig — Leaflet setzt
+        // sie in seinen eigenen Handlern fuer dieselben Events. 'zoom' deckt
+        // zusaetzlich das Gleiten des Mausrad-Zooms ab (map._move mit pinch).
+        map.on('zoom zoomanim zoomend viewreset', compInvalidate);
+        spotRenderer.on('update', compInvalidate);
+        map.on('zoomstart', function () {
+            _zoomComp.ended = false;
+            _zoomComp.t0 = 0;          // waehrend der Geste keine Frist
+            compStart();
         });
         map.on('zoomend', function () {
-            // Transform ist zurueckgesetzt, der Renderer zeichnet gleich in der
-            // neuen Projektion → Kompensation aus.
-            compCancel();
-            _zoomComp.factor = 1;
-            compRedraw();
+            // NICHT sofort abschalten: Leaflet animiert den Transform u.U. noch
+            // weiter. Die Schleife laeuft aus, sobald gemessen 1.0 anliegt.
+            _zoomComp.ended = true;
+            _zoomComp.t0 = performance.now();
+            compStart();
         });
+        map.on('unload', compCancel);
 
         // Expose the Leaflet map instance under a non-colliding name.
         // `window.map` is unusable because `<div id="map">` auto-creates an
@@ -354,10 +451,128 @@
         var isMobile = window.innerWidth <= 600;
         return highlighted ? (isMobile ? 9 : 8) : (isMobile ? 8 : 7);
     }
-    var _zoomComp = { factor: 1, raf: 0 };
+    var _zoomComp = { factor: 1, drawn: 1, stamp: 0, raf: 0, running: false, ended: true, t0: 0 };
 
-    // Zeichnet einen Spot — Optik identisch zum frueheren SVG-DivIcon:
-    // Windsektor(en), Highlight-Glow, Schatten, weisser Grund, Band-Kreis, Glyphe.
+    // Tatsaechlich anliegende CSS-Skalierung des Spot-Canvas. getComputedStyle
+    // liefert waehrend einer Transition den INTERPOLIERTEN Wert — deckt Pinch
+    // (Inline-Transform pro Frame) und Wheel/Buttons (Transition) gleich ab.
+    function currentSpotScale() {
+        var el = spotRenderer && spotRenderer._container;
+        if (!el || typeof DOMMatrixReadOnly === 'undefined') return 1;
+        var t = getComputedStyle(el).transform;
+        if (!t || t === 'none') return 1;
+        try {
+            var a = new DOMMatrixReadOnly(t).a;
+            return (isFinite(a) && a > 0) ? a : 1;
+        } catch (err) { return 1; }
+    }
+
+    // Der Kompensationsfaktor wird beim ZEICHNEN gemessen (hoechstens alle 4ms
+    // neu), nicht vorab gesetzt. Damit kann kein Zeichenpfad mit einem
+    // veralteten Wert malen — auch nicht Leaflets eigene Redraws am Gesten-Ende,
+    // die frueher einen Frame lang die volle Gestenvergroesserung zeigten.
+    // Im Ruhezustand kostet das nichts: Faktor 1, keine Messung.
+    function compFactor() {
+        if (_zoomComp.factor === 1 && !_zoomComp.running && !(map && map._animatingZoom)) return 1;
+        var now = performance.now();
+        if (now - _zoomComp.stamp >= 4) {
+            _zoomComp.stamp = now;
+            _zoomComp.factor = 1 / currentSpotScale();
+        }
+        return _zoomComp.factor;
+    }
+
+    // Messung verwerfen: die naechste Zeichnung misst frisch. Noetig bei JEDER
+    // Transform-Aenderung, sonst zeichnet ein Durchgang, der innerhalb des
+    // 4ms-Fensters startet, mit dem alten Wert — genau das liess am Gesten-Ende
+    // einen Frame lang alle Spots in voller Gestenvergroesserung stehen.
+    // Innerhalb EINES Durchgangs bleibt der Wert dagegen stabil (alle Marker
+    // gleich gross), weil die erste Messung den Zeitstempel neu setzt.
+    function compInvalidate() { _zoomComp.stamp = 0; }
+
+    // ===== SPRITE-CACHE =====
+    // Ein Spot besteht aus bis zu 8 Pfaden plus einer Ziffer (Text ist der mit
+    // Abstand teuerste Canvas-Aufruf). Waehrend der Zoom-Geste muessten die 494
+    // Marker das pro Frame neu aufbauen — gemessen ~4ms/Frame auf dem Desktop,
+    // ein Vielfaches auf dem Handy: das war die Ruckel-Ursache.
+    // Stattdessen wird jedes Erscheinungsbild EINMAL in ein kleines Offscreen-
+    // Canvas gezeichnet und danach nur noch gestempelt (drawImage = GPU-Blit).
+    // Der Cache ist geteilt: gleich aussehende Spots benutzen dasselbe Sprite.
+    var SPRITE_SS = 2;            // Sprite-Aufloesung (wie Leaflets Retina-Canvas)
+    var SPRITE_CACHE_MAX = 600;   // Deckel gegen unbegrenztes Wachstum
+    var spotSprites = new Map();
+
+    function spriteKey(layer) {
+        var props = layer.featureProperties || {};
+        return (layer.currentSafetyBand || 'default')
+            + '|' + (typeof layer.currentRating === 'number' ? Math.floor(layer.currentRating) : 0)
+            + '|' + (layer._wcHighlight ? 1 : 0)
+            + '|' + (layer._wcHover ? 1 : 0)
+            + '|' + (props.windrichtung || '')
+            + '|' + (window.innerWidth <= 600 ? 'm' : 'd');
+    }
+
+    // Verwirft alle Sprites (Font nachgeladen, Breakpoint gewechselt) und
+    // zeichnet neu — sonst blieben alte Glyphen/Groessen eingebrannt.
+    function invalidateSpotSprites() {
+        spotSprites.clear();
+        if (spotRenderer && spotRenderer._redraw && spotRenderer._map) spotRenderer._redraw();
+    }
+
+    function spriteFor(layer) {
+        var key = spriteKey(layer);
+        var sprite = spotSprites.get(key);
+        if (sprite) return sprite;
+        var highlighted = !!layer._wcHighlight;
+        var radius = spotRadius(highlighted) + (layer._wcHover ? 1 : 0);
+        // Aussenradius: Windsektor (r+9) + Schattenversatz/Strich → 11 Reserve.
+        var pad = radius + 11;
+        var cv = document.createElement('canvas');
+        cv.width = cv.height = Math.ceil(pad * 2 * SPRITE_SS);
+        var sctx = cv.getContext('2d');
+        sctx.scale(SPRITE_SS, SPRITE_SS);
+        sctx.translate(pad, pad);
+        drawSpot(sctx, 0, 0, layer);
+        sprite = { canvas: cv, pad: pad };
+        if (spotSprites.size >= SPRITE_CACHE_MAX) spotSprites.clear();
+        spotSprites.set(key, sprite);
+        return sprite;
+    }
+
+    // Sprites verwerfen, sobald die Web-Font wirklich geladen ist (sonst waere
+    // die Fallback-Schrift in die Ziffern eingebrannt) und wenn der Handy/
+    // Desktop-Breakpoint wechselt (andere Spot-Groesse).
+    if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+        document.fonts.ready.then(invalidateSpotSprites).catch(function () {});
+    }
+    var _spotBreakpointMobile = window.innerWidth <= 600;
+    window.addEventListener('resize', function () {
+        var m = window.innerWidth <= 600;
+        if (m !== _spotBreakpointMobile) { _spotBreakpointMobile = m; invalidateSpotSprites(); }
+    });
+
+    // Zeichnen auf dem Karten-Canvas: ein einziger Blit, live gegenskaliert.
+    function stampSpot(ctx, x, y, layer) {
+        var sprite = spriteFor(layer);
+        var comp = compFactor();
+        var half = sprite.pad * comp;
+        if (comp === 1) {
+            // Auf GANZE Pixel legen. Waehrend einer Bewegung liegen die Marker
+            // sonst auf krummen Koordinaten, und drawImage interpoliert — der
+            // Marker wird weich, obwohl er in voller Aufloesung vorliegt
+            // (gemessen: staerkste Kante 108 statt 169). Die Verschiebung
+            // betraegt hoechstens einen halben Pixel und ist nicht sichtbar.
+            var d = Math.round(half * 2);
+            ctx.drawImage(sprite.canvas, Math.round(x - half), Math.round(y - half), d, d);
+            return;
+        }
+        // Waehrend einer CSS-Zoomanimation ist die Zielgroesse zwangslaeufig
+        // krumm — hier wuerde Runden als Groessen-Zappeln auffallen.
+        ctx.drawImage(sprite.canvas, x - half, y - half, half * 2, half * 2);
+    }
+
+    // Zeichnet einen Spot ins Sprite — Optik identisch zum frueheren SVG-DivIcon:
+    // Windsektor(e), Highlight-Glow, Schatten, weisser Grund, Band-Kreis, Glyphe.
     function drawSpot(ctx, x, y, layer) {
         var band = layer.currentSafetyBand || 'default';
         var rating = (typeof layer.currentRating === 'number') ? Math.floor(layer.currentRating) : 0;
@@ -369,13 +584,12 @@
         var radius = spotRadius(highlighted);
         if (layer._wcHover) radius += 1; // Hover-Feedback (ersetzt CSS :hover scale)
 
-        // Alles ab hier wird um den Ursprung gezeichnet und als Ganzes um
-        // _zoomComp.factor skaliert. So bleiben die Original-Proportionen
-        // (Sektor r+1/r+9, Schatten 1.2px versetzt, Strichbreiten) exakt
-        // erhalten — auch waehrend der Zoom-Kompensation.
+        // Alles ab hier wird um den Ursprung gezeichnet, in Originalgroesse.
+        // Die Zoom-Gegenskalierung passiert erst beim Stempeln (stampSpot) —
+        // so bleiben die Original-Proportionen (Sektor r+1/r+9, Schatten 1.2px
+        // versetzt, Strichbreiten) in jeder Zoomphase exakt erhalten.
         ctx.save();
         ctx.translate(x, y);
-        if (_zoomComp.factor !== 1) ctx.scale(_zoomComp.factor, _zoomComp.factor);
 
         // Display-Band Premium-Override: safe + rating=5 (xc_tag/Klassiker) →
         // Violet-400 (Palette v3.2 Royal Premium).
@@ -483,9 +697,17 @@
     // der Hit-Test ist zoomabhaengig und deutlich enger.
     var SpotMarker = L.CircleMarker.extend({
         _updatePath: function () {
-            if (this._renderer && this._renderer._ctx) {
-                drawSpot(this._renderer._ctx, this._point.x, this._point.y, this);
-            }
+            var r = this._renderer;
+            if (!r || !r._ctx || !this._point) return;
+            // Viewport-Culling: Leaflets Canvas._draw() prueft bei einem
+            // VOLL-Redraw nicht gegen den sichtbaren Bereich und zeichnet auch
+            // alle Spots ausserhalb. Waehrend der Zoom-Geste laeuft das pro
+            // Frame ueber alle 494 Marker → das ist die teuerste Stelle.
+            // _bounds und _point liegen beide in Layer-Koordinaten.
+            var b = r._bounds, p = this._point;
+            if (b && (p.x < b.min.x - SPOT_DRAW_BOUNDS || p.x > b.max.x + SPOT_DRAW_BOUNDS ||
+                      p.y < b.min.y - SPOT_DRAW_BOUNDS || p.y > b.max.y + SPOT_DRAW_BOUNDS)) return;
+            stampSpot(r._ctx, p.x, p.y, this);
         },
         _containsPoint: function (p) {
             // Grosszuegiges Tap-Ziel auf Touch (WCAG ~44px Durchmesser), enger
@@ -647,6 +869,27 @@
                     if (bounds && bounds.isValid()) {
                         window.wingcastSpotsBounds = bounds;
                         map.fitBounds(bounds, { padding: [20, 20] });
+                        // Dieser erste Fit rechnet oft noch mit der falschen
+                        // Containergroesse (Sidebar klappt auf, Schriften laden).
+                        // Frueher fiel das nicht auf, weil der Zoom auf feine
+                        // Zwischenstufen rasten durfte; seit der Ruhepunkt eine
+                        // GANZE Stufe ist, wird daraus schnell eine Stufe zu nah
+                        // — gemessen fehlten dann 148 der 494 Spots im Bild.
+                        // Deshalb einmal nachfitten, sobald das Layout steht —
+                        // aber nur, solange der Nutzer die Karte nicht selbst
+                        // angefasst hat.
+                        var userTouched = false;
+                        ['wheel', 'mousedown', 'touchstart', 'keydown'].forEach(function (ev) {
+                            map.getContainer().addEventListener(ev, function () { userTouched = true; },
+                                { once: true, passive: true });
+                        });
+                        var refit = function () {
+                            if (userTouched || !window.wingcastSpotsBounds) return;
+                            map.invalidateSize({ animate: false });
+                            map.fitBounds(window.wingcastSpotsBounds, { padding: [20, 20], animate: false });
+                        };
+                        requestAnimationFrame(refit);
+                        setTimeout(refit, 400);
                     }
                 } catch (e) {
                     console.warn('fitBounds fehlgeschlagen:', e);
