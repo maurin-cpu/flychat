@@ -251,6 +251,14 @@
         // fertig (Begruendung und Messwerte: map.js / vector-basemap.js).
         var cartoRasterEbenen = [];
 
+        // Grobe Vorschau-Unterlage fuer die Raster-Phase (Begruendung map.js):
+        // deckt jede Zoomrichtung, bis die Vektor-Karte uebernimmt.
+        cartoRasterEbenen.push(L.tileLayer('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+            maxNativeZoom: 6, maxZoom: 18, minZoom: 0, keepBuffer: 16,
+            updateWhenIdle: false, updateWhenZooming: false,
+            className: 'wc-tiles-preview',
+        }).addTo(map));
+
         // Grundkarte mobil in Normalaufloesung — Begruendung siehe map.js
         var baseTileUrl = (window.innerWidth <= 900)
             ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'

@@ -151,6 +151,82 @@
             return origLimitZoom.call(this, z);
         };
 
+        // --- Eigener Pinch-Pfad (ersetzt Leaflets TouchZoom) ---
+        // Leaflets Pinch skaliert die Ebenen per CSS mit der Geste. Beim
+        // RAUSzoomen schrumpft dabei die ganze Kartenflaeche und rundherum
+        // wird der Container-Untergrund sichtbar (gemessen: grauer Rand mitten
+        // in der Geste). Der Rad-Pfad hat das nicht, weil er pro Bild echt
+        // neu zeichnet (map._move mit pinch:true — die Vektor-Grundkarte
+        // rendert dann jeden Zwischenzustand). Deshalb laeuft der Pinch jetzt
+        // ueber denselben Weg: Zoom aus dem Fingerabstand, Anker unter den
+        // Fingern, ein _move pro Frame. Am Ende dieselbe Uebernahme wie beim
+        // Rad (finish-Logik: richtungstreu auf eine ganze Stufe).
+        if (map.touchZoom) {
+            map.touchZoom.disable();
+            var pz = { aktiv: false, startZoom: 0, startLatLng: null, startDist: 1, mitte: null, raf: 0 };
+
+            function containerPoint(t) {
+                var r = map.getContainer().getBoundingClientRect();
+                return L.point(t.clientX - r.left, t.clientY - r.top);
+            }
+
+            function pinchFrame() {
+                pz.raf = 0;
+                if (!pz.aktiv) return;
+                // Center so, dass der Start-Weltpunkt unter der aktuellen
+                // Fingermitte liegt (Mathe wie Leaflets TouchZoom).
+                var z = pz.zoom;
+                var centerPt = map.project(pz.startLatLng, z)
+                    .subtract(pz.mitte)
+                    .add(map.getSize().divideBy(2));
+                map._move(map.unproject(centerPt, z), z, { pinch: true, round: false });
+            }
+
+            map.getContainer().addEventListener('touchstart', function (e) {
+                if (e.touches.length !== 2 || pz.aktiv) return;
+                if (map._animatingZoom && typeof map._onZoomTransitionEnd === 'function') {
+                    map._onZoomTransitionEnd();
+                }
+                map._stop();
+                var p1 = containerPoint(e.touches[0]), p2 = containerPoint(e.touches[1]);
+                var mitte = p1.add(p2).divideBy(2);
+                pz.aktiv = true;
+                pz.startZoom = map.getZoom();
+                pz.zoom = pz.startZoom;
+                pz.startDist = Math.max(1, p1.distanceTo(p2));
+                pz.startLatLng = map.containerPointToLatLng(mitte);
+                pz.mitte = mitte;
+                map._moveStart(true, false);   // feuert zoomstart
+            }, { passive: true });
+
+            map.getContainer().addEventListener('touchmove', function (e) {
+                if (!pz.aktiv || e.touches.length !== 2) return;
+                e.preventDefault();            // kein Browser-Pinch auf der Seite
+                var p1 = containerPoint(e.touches[0]), p2 = containerPoint(e.touches[1]);
+                pz.mitte = p1.add(p2).divideBy(2);
+                pz.zoom = clamp(pz.startZoom + Math.log(p1.distanceTo(p2) / pz.startDist) / Math.LN2);
+                if (!pz.raf) pz.raf = requestAnimationFrame(pinchFrame);
+            }, { passive: false });
+
+            var pinchEnde = function (e) {
+                if (!pz.aktiv || (e.touches && e.touches.length >= 2)) return;
+                pz.aktiv = false;
+                if (pz.raf) { cancelAnimationFrame(pz.raf); pz.raf = 0; }
+                // Uebergabe an die Rad-Logik: von hier laeuft finish() —
+                // richtungstreu gerundete ganze Stufe, ein weicher Auslauf.
+                st.anchor = pz.mitte;
+                st.current = pz.zoom;
+                st.raw = pz.zoom;
+                st.dir = (pz.zoom >= pz.startZoom) ? 1 : -1;
+                if (Math.abs(pz.zoom - pz.startZoom) < 1e-6) st.dir = 0;
+                st.target = st.dir ? clamp(rasterZiel(pz.zoom, st.dir)) : clamp(Math.round(pz.zoom));
+                st.active = true;
+                if (!st.raf) st.raf = requestAnimationFrame(step);
+            };
+            map.getContainer().addEventListener('touchend', pinchEnde, { passive: true });
+            map.getContainer().addEventListener('touchcancel', pinchEnde, { passive: true });
+        }
+
         map.getContainer().addEventListener('wheel', function (e) {
             var n = notchesOf(e);
             if (!n) return;

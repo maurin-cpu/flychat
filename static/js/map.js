@@ -149,11 +149,14 @@
         // geladen — dadurch erscheint dort, wo die scharfen Kacheln noch fehlen,
         // ein unscharfes Kartenbild statt der grauen Flaeche. Die paar groben
         // Kacheln kosten fast nichts, weil sie ueber viele Zoomstufen halten.
+        // maxNativeZoom 6: die ganze Schweiz sind auf Stufe 6 nur ein paar
+        // Kacheln — die sind nach dem ersten Laden praktisch immer im Cache
+        // und decken JEDE Zoomrichtung ab. Mit der frueheren Stufe-9-Unterlage
+        // (minZoom 9) blieb das RAUSzoomen unter Stufe 9 ungedeckt: genau da
+        // sah man wieder graue Kacheln, solange die Vektor-Karte noch nicht
+        // uebernommen hat.
         cartoRasterEbenen.push(L.tileLayer('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
-            // minZoom 9 = die Unterlage wird erst eingeblendet, wenn man
-            // ueberhaupt hineinzoomt. In der Uebersicht (Zoom 7-8) deckt die
-            // Grundkarte alles ab — dort waeren es nur unnoetige Downloads.
-            minZoom: 9, maxNativeZoom: 9, maxZoom: 18, keepBuffer: 8,
+            maxNativeZoom: 6, maxZoom: 18, minZoom: 0, keepBuffer: 16,
             updateWhenIdle: false, updateWhenZooming: false,
             className: 'wc-tiles-preview',
         }).addTo(map));
