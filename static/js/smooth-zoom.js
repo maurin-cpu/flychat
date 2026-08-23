@@ -41,7 +41,31 @@
         // roh = die Summe aller Rad-Eingaben, ziel = die daraus gerundete
         // ganze Zoomstufe. Getrennt, damit kleine Trackpad-Deltas sich
         // aufsummieren koennen, ohne einzeln verschluckt zu werden.
-        var st = { active: false, raw: 0, target: 0, current: 0, anchor: null, raf: 0 };
+        var st = { active: false, raw: 0, target: 0, current: 0, anchor: null, raf: 0,
+                   dir: 0, letzteRichtung: 0, endeZeit: 0 };
+
+        // Nachlauf-Schutz. Praezisions-Raeder und Trackpads schicken nach dem
+        // Wisch noch kleine Impulse, teils in die Gegenrichtung. Trifft so
+        // einer NACH dem Gesten-Ende ein, startete er bisher eine neue Geste —
+        // und wurde durch das richtungstreue Runden auf eine ganze Stufe
+        // rueckwaerts verstaerkt. Das war das sichtbare "zoomt am Schluss
+        // wieder raus". Deshalb: kurz nach einer Geste zaehlen kleine
+        // Gegenimpulse nicht.
+        var NACHLAUF_MS = 350;
+        var NACHLAUF_MIN = 0.5;   // Rasten, ab denen es eine echte neue Geste ist
+
+        // Rueckwaerts-Korrekturen sind das, was der Nutzer als "zoomt am Ende
+        // wieder ein Stueck raus" sieht. Erlaubt ist deshalb nur eine winzige
+        // Korrektur (RUECK_TOLERANZ, ~5% Massstab — unsichtbar); alles darueber
+        // wird nach VORN gerundet, also in die Richtung, in die man gerade
+        // gezoomt hat. So bewegt sich die Karte nie gegen die eigene Geste.
+        var RUECK_TOLERANZ = 0.08;
+        function rasterZiel(z, richtung) {
+            var nah = Math.round(z);
+            if (richtung > 0 && nah < z - RUECK_TOLERANZ) return Math.ceil(z - 1e-6);
+            if (richtung < 0 && nah > z + RUECK_TOLERANZ) return Math.floor(z + 1e-6);
+            return nah;
+        }
 
         // Kacheln sind Rasterbilder: nur auf einer GANZEN Zoomstufe werden sie
         // 1:1 gezeichnet. Auf einem Zwischenwert wird gedehnt — gemessen bis zu
@@ -89,6 +113,8 @@
 
         function finish() {
             st.active = false;
+            st.letzteRichtung = st.dir;
+            st.endeZeit = performance.now();
             // Exakt auf dem Ziel landen (nicht auf dem letzten Tween-Wert):
             // sonst bleibt ein Rest wie 11.0019 stehen und die Kacheln werden
             // trotz Auslauf auf die ganze Stufe minimal gedehnt.
@@ -100,10 +126,41 @@
             map._animateZoom(centerFor(z), z, true, map.options.zoomSnap);
         }
 
+        // --- Pinch (Leaflets eigener TouchZoom) ---
+        // Am Gesten-Ende rundet Leaflet ueber map._limitZoom auf die naechste
+        // ganze Stufe — also potenziell bis zu einer halben Stufe ZURUECK.
+        // Dieselbe Regel wie oben anwenden: nur winzige Korrekturen rueckwaerts,
+        // sonst nach vorn. Greift nur waehrend einer laufenden Geste, damit
+        // setView/fitBounds unveraendert bleiben.
+        var geste = { aktiv: false, von: 0 };
+        map.on('zoomstart', function () {
+            if (geste.aktiv) return;
+            geste.aktiv = true;
+            geste.von = map.getZoom();
+        });
+        map.on('zoomend', function () { geste.aktiv = false; });
+        var origLimitZoom = map._limitZoom;
+        map._limitZoom = function (z) {
+            if (geste.aktiv && this.options.zoomSnap) {
+                var d = z - geste.von;
+                if (Math.abs(d) > 1e-6) {
+                    return Math.max(this.getMinZoom(),
+                           Math.min(this.getMaxZoom(), rasterZiel(z, d > 0 ? 1 : -1)));
+                }
+            }
+            return origLimitZoom.call(this, z);
+        };
+
         map.getContainer().addEventListener('wheel', function (e) {
             var n = notchesOf(e);
             if (!n) return;
             e.preventDefault();          // kein Seiten-Scroll, kein Browser-Zoom
+            var richtung = (n > 0 ? 1 : -1);
+            if (!st.active && st.letzteRichtung && richtung !== st.letzteRichtung &&
+                Math.abs(n) < NACHLAUF_MIN &&
+                (performance.now() - st.endeZeit) < NACHLAUF_MS) {
+                return;   // Nachlauf der eben beendeten Geste, keine neue
+            }
             st.anchor = map.mouseEventToContainerPoint(e);
             if (!st.active) {
                 // Eine noch laufende Uebernahme-Animation sauber abschliessen,
@@ -115,11 +172,19 @@
                 st.current = map.getZoom();
                 st.raw = st.current;
                 st.target = st.current;
+                st.dir = 0;
                 st.active = true;
                 map._moveStart(true, false);   // feuert zoomstart
             }
+            if (!st.dir) st.dir = richtung;
+            // Praezisions-Raeder und Trackpads schicken am Ende eines Wischs
+            // kleine Impulse in die GEGENRICHTUNG (Nachlauf). Zaehlte man die
+            // mit, rutschte das Ziel eine Stufe zurueck — sichtbar als
+            // Rauszoomen am Schluss. Innerhalb einer Geste zaehlt deshalb nur,
+            // was in die urspruengliche Richtung geht.
+            if (richtung !== st.dir) return;
             st.raw = clamp(st.raw + n * ZOOM_PER_NOTCH);
-            st.target = clamp(Math.round(st.raw));
+            st.target = clamp(rasterZiel(st.raw, st.dir));
             if (!st.raf) st.raf = requestAnimationFrame(step);
         }, { passive: false });
 
