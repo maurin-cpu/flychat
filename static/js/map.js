@@ -576,24 +576,37 @@
         if (m !== _spotBreakpointMobile) { _spotBreakpointMobile = m; invalidateSpotSprites(); }
     });
 
+    // Laeuft gerade eine Zoombewegung? Nicht am Kompensationsfaktor ablesbar:
+    // seit SpotCanvas pro Bild neu projiziert (statt den Canvas zu skalieren)
+    // steht die CSS-Skalierung waehrend der ganzen Geste auf 1, der Faktor also
+    // ebenfalls. Deshalb die Gesten-Flags direkt fragen.
+    function zoomBewegtSich() {
+        return _zoomComp.running || !_zoomComp.ended || !!(map && map._animatingZoom);
+    }
+
     // Zeichnen auf dem Karten-Canvas: ein einziger Blit, live gegenskaliert.
     function stampSpot(ctx, x, y, layer) {
         var sprite = spriteFor(layer);
         var comp = compFactor();
         var half = sprite.pad * comp;
-        if (comp === 1) {
-            // Auf GANZE Pixel legen. Waehrend einer Bewegung liegen die Marker
-            // sonst auf krummen Koordinaten, und drawImage interpoliert — der
-            // Marker wird weich, obwohl er in voller Aufloesung vorliegt
-            // (gemessen: staerkste Kante 108 statt 169). Die Verschiebung
-            // betraegt hoechstens einen halben Pixel und ist nicht sichtbar.
-            var d = Math.round(half * 2);
-            ctx.drawImage(sprite.canvas, Math.round(x - half), Math.round(y - half), d, d);
+        var d = half * 2;
+        if (!zoomBewegtSich()) {
+            // In RUHE auf ganze Pixel legen: sonst liegt der Marker auf krummen
+            // Koordinaten, drawImage interpoliert und er wird weich, obwohl er
+            // in voller Aufloesung vorliegt (gemessen: staerkste Kante 108
+            // statt 169).
+            var dr = Math.round(d);
+            ctx.drawImage(sprite.canvas, Math.round(x - half), Math.round(y - half), dr, dr);
             return;
         }
-        // Waehrend einer CSS-Zoomanimation ist die Zielgroesse zwangslaeufig
-        // krumm — hier wuerde Runden als Groessen-Zappeln auffallen.
-        ctx.drawImage(sprite.canvas, x - half, y - half, half * 2, half * 2);
+        // Waehrend der BEWEGUNG darf nicht gerundet werden. Die Grundkarte
+        // gleitet stufenlos, gerundete Marker springen dagegen in Ganzpixel-
+        // Stufen: gemessen ein Versatz zwischen Spot und Karte von bis zu
+        // 0.89px, der pro Bild umschlaegt — sichtbar als Zappeln der Spots,
+        // am deutlichsten kurz vor dem Einrasten, wo der Zoom nur noch
+        // kriecht und mehrere Bilder auf demselben ganzen Pixel liegen.
+        // Die Unschaerfe im Bruchteil eines Pixels faellt in Bewegung nicht auf.
+        ctx.drawImage(sprite.canvas, x - half, y - half, d, d);
     }
 
     // Zeichnet einen Spot ins Sprite — Optik identisch zum frueheren SVG-DivIcon:
@@ -721,6 +734,29 @@
     // options.radius (= SPOT_DRAW_BOUNDS) bestimmt nur die Redraw-Region;
     // der Hit-Test ist zoomabhaengig und deutlich enger.
     var SpotMarker = L.CircleMarker.extend({
+        // Position OHNE Leaflets Rundungen. Leaflets latLngToLayerPoint rundet
+        // die Projektion auf ganze Pixel, und der Pixelursprung (_move →
+        // _getNewPixelOrigin) wird ebenfalls gerundet. Bei stufenlosem Zoom
+        // gleitet die Grundkarte deshalb weich, waehrend die Spots in
+        // Ganzpixel-Stufen nachspringen — gemessen ein Versatz zur idealen
+        // Position von +-0.84px, der zwischen zwei Bildern um bis zu 1.38px
+        // umschlaegt (11 von 50 Bildern ueber 0.5px). Genau das sieht der
+        // Nutzer als Zappeln, am staerksten kurz vor dem Einrasten, wo der
+        // Zoom nur noch kriecht.
+        // Der eigene Ursprung ist derselbe Ausdruck wie Leaflets, nur ohne das
+        // abschliessende _round(). Die Abweichung zu Leaflets Layer-Koordinaten
+        // bleibt damit unter einem Pixel — unkritisch fuer das Culling
+        // (SPOT_DRAW_BOUNDS = 56 Reserve) und fuer den Hit-Test (Radius 10-22px).
+        _project: function () {
+            var m = this._map;
+            if (!m) return;
+            var z = m.getZoom();
+            var ursprungExakt = m.project(m.getCenter(), z)
+                .subtract(m.getSize().divideBy(2))
+                .add(m._getMapPanePos());
+            this._point = m.project(this._latlng, z).subtract(ursprungExakt);
+            this._updateBounds();
+        },
         _updatePath: function () {
             var r = this._renderer;
             if (!r || !r._ctx || !this._point) return;

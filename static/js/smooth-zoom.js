@@ -22,7 +22,7 @@
  * Gemessene JS-Arbeit pro Gleit-Bild: ~1.6ms (Spitze 3ms) bei 4x gedrosselter
  * CPU und 494 Spots — der Rest des Bildbudgets bleibt dem Browser.
  *
- * Benutzt Leaflet-Interna (_move/_moveStart/_animateZoom, wie Leaflets eigener
+ * Benutzt Leaflet-Interna (_move/_moveStart/_moveEnd, wie Leaflets eigener
  * TouchZoom-Handler). Fehlen sie, passiert nichts und Leaflets Standard-Zoom
  * bleibt aktiv — die Karte funktioniert dann wie vorher.
  */
@@ -34,7 +34,7 @@
 
     window.wingcastSmoothWheelZoom = function (map) {
         if (!map || !map.scrollWheelZoom || typeof map._move !== 'function' ||
-            typeof map._moveStart !== 'function' || typeof map._animateZoom !== 'function') {
+            typeof map._moveStart !== 'function' || typeof map._moveEnd !== 'function') {
             return false;
         }
         map.scrollWheelZoom.disable();
@@ -124,10 +124,25 @@
             // Zoom steht hier schon (Restdistanz < 0.002), die Animation waere
             // unsichtbar — aber waehrend ihr rechnet die Treffer-Erkennung mit
             // den alten Ebenen-Positionen, und ein Klick in dem Fenster geht
-            // daneben ("erster Klick ignoriert"). setView ohne Animation
-            // feuert zoomend/moveend, laedt Kacheln nach und schliesst die
-            // Geste im selben Frame ab.
-            map.setView(centerFor(z), z, { animate: false });
+            // daneben ("erster Klick ignoriert").
+            //
+            // Genau diese zwei Aufrufe benutzt Leaflet selbst am Ende seiner
+            // Zoomanimation (Map._onZoomTransitionEnd): _move feuert zoom/move
+            // (die Kacheln der neuen Stufe werden nachgeladen, die alte Stufe
+            // bleibt bis zum Prune stehen), _moveEnd feuert zoomend/moveend —
+            // alles synchron im selben Frame, damit trifft der erste Klick.
+            //
+            // NICHT setView({animate:false}): das laeuft ueber Map._resetView
+            // und feuert viewprereset — also GridLayer._invalidateAll, das
+            // JEDER noch vorhandenen Rasterebene die Kacheln aus dem DOM
+            // reisst und sie danach neu einblendet. Gemessen: waehrend
+            // viewprereset 0 von 35 Kacheln im DOM. Auf dem Desktop haengt da
+            // die Schummerung (map.js/region-map.js, nur >900px, nicht Teil
+            // der abloesbaren cartoRasterEbenen) — faellt ihre 45%-Deckung
+            // fuer ein paar Bilder weg, blitzt die ganze Karte hell auf. In
+            // der Raster-Phase traf es den kompletten Kartenstapel.
+            map._move(centerFor(z), z);
+            map._moveEnd(true);
         }
 
         // --- Pinch (Leaflets eigener TouchZoom) ---
