@@ -31,7 +31,8 @@ from typing import Optional
 
 import config
 import prompts
-from engine._common import _weekday_de, _WOCHENTAGE, deepseek_thinking_kwargs
+from engine._common import (_weekday_de, _WOCHENTAGE, deepseek_thinking_kwargs,
+                            parse_llm_json)
 
 logger = logging.getLogger(__name__)
 
@@ -180,8 +181,8 @@ def generate_synoptic_overview(synoptic_context: dict, analysis_client,
             continue
 
         try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError as e:
+            parsed = parse_llm_json(raw)
+        except ValueError as e:
             logger.warning("generate_synoptic_overview: JSON parse failed "
                            "(Versuch %d): %s — raw[:300]=%r", attempt, e, raw[:300])
             parsed = None

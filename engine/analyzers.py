@@ -64,6 +64,7 @@ from engine._common import (
     BatchCostTracker, extract_usage_from_response,
     _is_permanent_api_error, _user_friendly_api_error,
     _resolve_max_tokens, compute_retry_sleep, deepseek_thinking_kwargs,
+    parse_llm_json,
     _FLYABILITY_TIERS, _normalize_flyability_tier,
     _compute_safety_rating, _compute_safety_score, derive_status_from_subs,
     _TAG_NATURAL, _TAG_NATURAL_MAP, _TAG_SANITIZE_RE,
@@ -356,7 +357,7 @@ class AnalyzersMixin:
                             f"LLM lieferte leeren Content (finish_reason={finish}) — "
                             f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
                         )
-                    result = json.loads(raw)
+                    result = parse_llm_json(raw, "safety_status")
                     last_err = None
                     break
                 except Exception as api_err:
@@ -439,7 +440,7 @@ class AnalyzersMixin:
                             f"LLM lieferte leeren Content (finish_reason={finish}) — "
                             f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
                         )
-                    result = json.loads(raw)
+                    result = parse_llm_json(raw, "experience_rating")
                     last_err = None
                     break
                 except Exception as api_err:
@@ -526,7 +527,7 @@ class AnalyzersMixin:
                             f"LLM lieferte leeren Content (finish_reason={finish}) — "
                             f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
                         )
-                    result = json.loads(raw)
+                    result = parse_llm_json(raw, "safety_status")
                     last_err = None
                     break
                 except Exception as api_err:
@@ -607,7 +608,7 @@ class AnalyzersMixin:
                             f"LLM lieferte leeren Content (finish_reason={finish}) — "
                             f"vermutlich max_tokens zu klein fuer Reasoning-Modell {self.analysis_model}"
                         )
-                    result = json.loads(raw)
+                    result = parse_llm_json(raw, "experience_rating")
                     last_err = None
                     break
                 except Exception as api_err:

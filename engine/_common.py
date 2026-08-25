@@ -298,6 +298,66 @@ _PERMANENT_ERROR_KEYWORDS = (
 )
 
 
+_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
+
+
+def parse_llm_json(raw: str, required_key: str | None = None) -> dict:
+    """Parst eine LLM-JSON-Antwort und faengt Fence-Artefakte ab.
+
+    Hintergrund (gemessen 25.08.2026 auf DeepInfra/DeepSeek-V4-Flash, 6 von 50
+    Antworten): im json_object-Modus rutscht die Markdown-Fence gelegentlich in
+    die Antwort. Das eigentliche Objekt landet dann als *String* unter einem
+    Schluessel `` `json` `` — oder der ganze Rumpf wird selbst zum Schluessel.
+    Beides ist syntaktisch gueltiges JSON: `json.loads` wirft nicht, das
+    Ergebnis ist aber leer, und der Datensatz landet still als "error" in der
+    Produktion. Deshalb hier entpacken statt draussen raten.
+
+    required_key: fehlt der Schluessel im Ergebnis, wird geworfen. Alle
+    Aufrufer stecken in einem Retry-Loop, der die Antwort dann neu holt —
+    ein verstuemmeltes Ergebnis darf nicht stillschweigend durchgehen.
+    """
+    data = json.loads(_FENCE_RE.sub("", raw or ""))
+    if not isinstance(data, dict):
+        raise ValueError(f"LLM lieferte {type(data).__name__} statt JSON-Objekt")
+
+    if required_key is None or required_key in data:
+        if required_key is None and len(data) == 1:
+            entpackt = _unwrap_fence_artifact(data, None)
+            if entpackt is not None:
+                return entpackt
+        return data
+
+    entpackt = _unwrap_fence_artifact(data, required_key)
+    if entpackt is not None:
+        logger.warning("LLM-Antwort war in ein Fence-Artefakt verpackt — entpackt.")
+        return entpackt
+
+    raise ValueError(
+        f"LLM-Antwort ohne Pflichtfeld '{required_key}' "
+        f"(Schluessel: {sorted(data)[:8]})"
+    )
+
+
+def _unwrap_fence_artifact(data: dict, required_key: str | None) -> dict | None:
+    """Holt das echte Objekt aus einem Ein-Schluessel-Wrapper. None = kein Treffer."""
+    if len(data) != 1:
+        return None
+    key, value = next(iter(data.items()))
+    kandidaten = []
+    if isinstance(value, str):
+        kandidaten.append(value)          # {"`json`": "{...}"}
+    if isinstance(key, str) and ":" in key:
+        kandidaten.append("{" + key + "}")  # Rumpf als Schluessel verunglueckt
+    for text in kandidaten:
+        try:
+            inner = json.loads(text)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(inner, dict) and (required_key is None or required_key in inner):
+            return inner
+    return None
+
+
 def _is_permanent_api_error(err: Exception) -> bool:
     """Prueft ob ein LLM-Fehler permanent ist (kein Retry sinnvoll).
     insufficient_quota, authentication_error, invalid_api_key → sofort abbrechen.
