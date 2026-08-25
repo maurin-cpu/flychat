@@ -1400,6 +1400,22 @@ MODEL_PROVIDER_MAP: dict[str, str] = {
     "deepseek-ai/DeepSeek-V4-Flash": "deepinfra",
 }
 
+# Anzeigenamen der Provider fuers Admin-UI. Wichtig seit dem Wechsel auf
+# DeepInfra (25.08.2026): dort laeuft dasselbe DeepSeek-Modell bei einem
+# anderen Hoster — am Modellnamen allein ist der Unterschied kaum zu sehen.
+PROVIDER_DISPLAY_NAMES: dict[str, str] = {
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "gemini": "Google Gemini",
+    "deepseek": "DeepSeek (direkt)",
+    "deepinfra": "DeepInfra (Hoster)",
+}
+
+
+def provider_display_name(provider: str) -> str:
+    """Anzeigename eines Providers; unbekannte werden durchgereicht."""
+    return PROVIDER_DISPLAY_NAMES.get(provider, provider)
+
 # Single Source of Truth fuer Admin-UI: ein Modellname pro Anwendung.
 # Provider wird beim Override automatisch via MODEL_PROVIDER_MAP abgeleitet
 # und CHAT_PROVIDER/ANALYSIS_PROVIDER + per-provider-Modell-Attr nachgezogen.

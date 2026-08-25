@@ -36,6 +36,36 @@ OVERRIDE_PATH: Path = config.DATA_DIR / "config_overrides.json"
 # help:    kurze Erklaerung (Tooltip + Muted-Subline)
 # ---------------------------------------------------------------------------
 
+def _model_choice_groups() -> list[dict]:
+    """Modell-Auswahl nach Provider gruppiert, fuer <optgroup> im Admin-UI.
+
+    Ohne die Gruppierung ist `deepseek-v4-flash` (DeepSeek direkt) von
+    `deepseek-ai/DeepSeek-V4-Flash` (dasselbe Modell bei DeepInfra) im
+    Dropdown kaum zu unterscheiden.
+    """
+    gruppen: dict[str, list[str]] = {}
+    for modell, provider in config.MODEL_PROVIDER_MAP.items():
+        gruppen.setdefault(provider, []).append(modell)
+    return [{"label": config.provider_display_name(p), "models": m}
+            for p, m in gruppen.items()]
+
+
+def _model_choice_labels() -> dict[str, str]:
+    """Beschriftung je Modell inkl. Provider.
+
+    Die <optgroup>-Ueberschrift ist im zugeklappten Select nicht sichtbar —
+    deshalb steht der Provider zusaetzlich in der Option selbst. Nur so sieht
+    man auf einen Blick, ob gerade DeepSeek oder DeepInfra aktiv ist.
+    """
+    return {modell: f"{modell} · {config.provider_display_name(provider)}"
+            for modell, provider in config.MODEL_PROVIDER_MAP.items()}
+
+
+_MODEL_CHOICES = list(config.MODEL_PROVIDER_MAP.keys())
+_MODEL_GROUPS = _model_choice_groups()
+_MODEL_LABELS = _model_choice_labels()
+
+
 SCHEMA: dict[str, dict[str, list[dict]]] = {
     "meteo": {
         "Wind-Schwellen (Boden + Hoehe einheitlich)": [
@@ -168,13 +198,16 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
         ],
         "LLM-Modelle (Chat + Analyse)": [
             {"key": "CHAT_MODEL", "type": "choice",
-             "choices": list(config.MODEL_PROVIDER_MAP.keys()),
-             "help": "Modell fuer den Chat-Berater. Provider wird automatisch erkannt (OpenAI / Anthropic / Gemini / DeepSeek). Der passende API-Key (z.B. OPENAI_API_KEY) muss als ENV-Variable gesetzt sein."},
+             "choices": _MODEL_CHOICES, "choice_groups": _MODEL_GROUPS,
+             "choice_labels": _MODEL_LABELS,
+             "help": "Modell fuer den Chat-Berater. Provider wird automatisch erkannt (OpenAI / Anthropic / Gemini / DeepSeek / DeepInfra) und steht als Gruppe ueber dem Modell. Der passende API-Key (z.B. OPENAI_API_KEY) muss als ENV-Variable gesetzt sein."},
             {"key": "ANALYSIS_MODEL", "type": "choice",
-             "choices": list(config.MODEL_PROVIDER_MAP.keys()),
-             "help": "Modell fuer Spot/Region-Analysen. Provider wird automatisch erkannt. Bei OpenAI ist zusaetzlich der Batch-Modus moeglich (siehe OPENAI_ANALYSIS_MODE). Hybrid-Setup moeglich (z.B. Chat=claude-haiku-4-5, Analyse=gpt-5.4-mini)."},
+             "choices": _MODEL_CHOICES, "choice_groups": _MODEL_GROUPS,
+             "choice_labels": _MODEL_LABELS,
+             "help": "Modell fuer Spot/Region-Analysen. Provider wird automatisch erkannt und steht als Gruppe ueber dem Modell. Bei OpenAI ist zusaetzlich der Batch-Modus moeglich (siehe OPENAI_ANALYSIS_MODE). Hybrid-Setup moeglich (z.B. Chat=claude-haiku-4-5, Analyse=gpt-5.4-mini)."},
             {"key": "SYNOPTIC_MODEL", "type": "choice",
-             "choices": list(config.MODEL_PROVIDER_MAP.keys()),
+             "choices": _MODEL_CHOICES, "choice_groups": _MODEL_GROUPS,
+             "choice_labels": _MODEL_LABELS,
              "help": "Modell fuer den Wetterlage-Block (Synoptik, 1 Call/Tag). Provider wird automatisch erkannt. Default = ANALYSIS_MODEL. Hier z.B. deepseek-v4-flash setzen, falls Reasoning fuer die taegliche Synoptik gewuenscht ist, waehrend ANALYSIS_MODEL fuer die Massen-Spot-Analyse auf einem schnelleren Modell bleibt."},
         ],
         "LLM-Analyse (technisch)": [

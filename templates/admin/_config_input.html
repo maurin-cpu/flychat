@@ -10,9 +10,21 @@
 
 {%- elif f.type == "choice" -%}
   <select class="cfg-input" name="{{ f.key }}" title="{{ f.help }}">
-    {% for choice in f.choices %}
-      <option value="{{ choice }}" {% if val == choice %}selected{% endif %}>{{ choice }}</option>
-    {% endfor %}
+    {% if f.choice_groups %}
+      {# Nach Provider gruppiert — sonst sind gleichnamige Modelle bei
+         verschiedenen Hostern (DeepSeek vs. DeepInfra) nicht unterscheidbar. #}
+      {% for grp in f.choice_groups %}
+        <optgroup label="{{ grp.label }}">
+          {% for choice in grp.models %}
+            <option value="{{ choice }}" {% if val == choice %}selected{% endif %}>{{ f.choice_labels.get(choice, choice) if f.choice_labels else choice }}</option>
+          {% endfor %}
+        </optgroup>
+      {% endfor %}
+    {% else %}
+      {% for choice in f.choices %}
+        <option value="{{ choice }}" {% if val == choice %}selected{% endif %}>{{ f.choice_labels.get(choice, choice) if f.choice_labels else choice }}</option>
+      {% endfor %}
+    {% endif %}
   </select>
 
 {%- elif f.type == "time" -%}
