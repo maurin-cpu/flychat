@@ -182,6 +182,21 @@
         // Rad (finish-Logik: richtungstreu auf eine ganze Stufe).
         if (map.touchZoom) {
             map.touchZoom.disable();
+            // disable() nimmt die Klasse 'leaflet-touch-zoom' vom Container.
+            // Uebrig bleibt Leaflets Regel fuer 'leaflet-touch-drag' allein:
+            // touch-action: pinch-zoom — der BROWSER macht den Pinch dann
+            // selbst (Seiten-Zoom). Auf dem Handy skalierte dabei die ganze
+            // Karte als Bitmap mit, Spots eingeschlossen: sie wuchsen
+            // waehrend der Geste mit und sprangen erst beim Loslassen auf
+            // ihre feste Groesse zurueck. Die touchmove-Ereignisse einer
+            // browserseitigen Geste sind nicht cancelable — das
+            // preventDefault unten war wirkungslos, der eigene Pinch-Pfad
+            // lief nur nebenher. (Synthetische Touch-Events im Test loesen
+            // keine Browser-Geste aus, deshalb fiel es headless nie auf.)
+            // touch-action: none stellt her, was die entfernte Klasse per
+            // CSS gesetzt hatte — jede Zwei-Finger-Geste landet damit
+            // garantiert im Pfad hier drunter.
+            map.getContainer().style.touchAction = 'none';
             var pz = { aktiv: false, startZoom: 0, startLatLng: null, startDist: 1, mitte: null, raf: 0 };
 
             function containerPoint(t) {
