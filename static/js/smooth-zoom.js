@@ -145,6 +145,75 @@
             map._moveEnd(true);
         }
 
+        // --- Zoom-Buttons, Tastatur, Doppeltipp: derselbe Gleit-Pfad ---
+        // Diese Wege liefen bisher ueber Leaflets `_animateZoom`, das die Ebenen
+        // 250ms lang per CSS dehnt. Fuer die Spots ist das sichtbar: sie muessen
+        // waehrenddessen um 1/Faktor KLEINER gezeichnet werden (sonst wuerden sie
+        // mitwachsen) und der Compositor blaest sie wieder auf. Gemessen bei
+        // Faktor 2: 33% weniger bedeckte Flaeche und 37% weniger volldeckende
+        // Pixel als danach — der Nutzer sieht die Punkte waehrend der Bewegung
+        // blasser werden und am Ende zurueckspringen.
+        // Deshalb laufen sie jetzt durch denselben Tween wie Rad und Pinch: pro
+        // Bild ein echtes `_move`, die Spots werden in jedem Zwischenzustand in
+        // voller Aufloesung neu gezeichnet. Die CSS-Skalierung bleibt bei 1.
+        function gleiteZu(zielZoom, anker) {
+            var ziel = clamp(zielZoom);
+            var basis = st.active ? st.target : map.getZoom();
+            if (Math.abs(ziel - basis) < 1e-6) return;
+            st.anchor = anker || map.getSize().divideBy(2);
+            if (!st.active) {
+                if (map._animatingZoom && typeof map._onZoomTransitionEnd === 'function') {
+                    map._onZoomTransitionEnd();
+                }
+                map._stop();
+                st.current = map.getZoom();
+                st.raw = st.current;
+                st.active = true;
+                map._moveStart(true, false);   // feuert zoomstart
+            }
+            st.dir = (ziel > st.current) ? 1 : -1;
+            st.raw = ziel;
+            st.target = ziel;
+            if (!st.raf) st.raf = requestAnimationFrame(step);
+        }
+
+        // Ganze Zoomstufe als Ziel — `zoomDelta` ist auf beiden Karten 0.5, und
+        // Leaflet rundete das bisher selbst ueber `_limitZoom` (zoomSnap 1) auf.
+        function stufenZiel(delta) {
+            var basis = st.active ? st.target : map.getZoom();
+            return rasterZiel(basis + delta, delta > 0 ? 1 : -1);
+        }
+        function ankerAus(punktOderLatLng) {
+            if (!punktOderLatLng) return null;
+            if (typeof punktOderLatLng.lat === 'number') {
+                return map.latLngToContainerPoint(punktOderLatLng);
+            }
+            return L.point(punktOderLatLng);
+        }
+
+        var origZoomIn = map.zoomIn, origZoomOut = map.zoomOut,
+            origSetZoomAround = map.setZoomAround;
+        // Kein Gleiten, solange die Karte noch keinen View hat (fitBounds beim
+        // Start) — dann bleibt Leaflets Originalweg zustaendig.
+        map.zoomIn = function (delta, options) {
+            if (!map._loaded) return origZoomIn.call(this, delta, options);
+            gleiteZu(stufenZiel(delta || this.options.zoomDelta), null);
+            return this;
+        };
+        map.zoomOut = function (delta, options) {
+            if (!map._loaded) return origZoomOut.call(this, delta, options);
+            gleiteZu(stufenZiel(-(delta || this.options.zoomDelta)), null);
+            return this;
+        };
+        // Deckt den Doppelklick/Doppeltipp ab: Leaflets DoubleClickZoom ruft
+        // setZoomAround mit dem Container-Punkt unter dem Finger.
+        map.setZoomAround = function (latlngOderPunkt, zoom, options) {
+            if (!map._loaded) return origSetZoomAround.call(this, latlngOderPunkt, zoom, options);
+            var richtung = (zoom > this.getZoom()) ? 1 : -1;
+            gleiteZu(rasterZiel(zoom, richtung), ankerAus(latlngOderPunkt));
+            return this;
+        };
+
         // --- Pinch (Leaflets eigener TouchZoom) ---
         // Am Gesten-Ende rundet Leaflet ueber map._limitZoom auf die naechste
         // ganze Stufe — also potenziell bis zu einer halben Stufe ZURUECK.
