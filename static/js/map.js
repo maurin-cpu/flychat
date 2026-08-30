@@ -179,12 +179,60 @@
         // die Compositing-Arbeit pro Frame — auf Handys die Hauptursache fuer
         // "Bild stockt kurz" beim Zoomen/Ziehen. Auf dem kleinen Display ist die
         // Schummerung ohnehin kaum sichtbar.
+        // Beim Zoomen sah man rechteckige helle Bloecke ("weisse Kacheln"):
+        // Die Schummerung ist die EINZIGE Rasterebene, die nach der
+        // Vektor-Uebernahme bestehen bleibt (sie steht nicht in
+        // cartoRasterEbenen), und sie deckt 45%. Wo ihre Kacheln beim Zoomen
+        // noch fehlen, ist die Karte schlagartig heller — und weil Kacheln
+        // rechteckig sind, sieht man genau das Muster.
+        // Zwei Massnahmen, beide ohne zweite Ebene (die wuerde sich mit ihrer
+        // eigenen Halbtransparenz aufaddieren und die Karte verdunkeln):
+        //   updateWhenZooming: false → waehrend der Geste werden die
+        //     vorhandenen Kacheln gedehnt statt neue angefordert; nachgeladen
+        //     wird erst, wenn die Bewegung steht. Bei einem weichen Relief mit
+        //     45% Deckung faellt die Dehnung nicht auf — anders als bei der
+        //     Grundkarte mit Beschriftung (Schaerfe-Entscheid 23.08.).
+        //   keepBuffer 8 → mehr Kacheln bleiben ausserhalb des Bildes stehen,
+        //     das deckt kleine Zoom- und Pan-Spruenge ohne Nachladen ab.
+        // Zwei Varianten wurden gemessen und VERWORFEN, beide machten es
+        // schlechter: eine feinere Reserve (maxNativeZoom 9) ist beim
+        // Rauszoomen selbst noch nicht geladen (Ueberhelligkeit 9.44 statt
+        // 2.49), und eine schwaecher deckende Reserve (62%) fuellt die Luecke
+        // nur halb (5.83). Sie muss grob UND voll deckend sein.
+        //
+        // Dazu eine grobe Reserve-Schummerung darunter, nach demselben Muster
+        // wie die Vorschau-Unterlage der Grundkarte: Stufe 7 sind fuer die
+        // Schweiz eine Handvoll Kacheln, die nach dem ersten Laden immer da
+        // sind und JEDE Zoomstufe abdecken. Damit bleibt beim Zoomen nie eine
+        // Flaeche ohne Relief.
+        //
+        // Der Kniff gegen das Aufaddieren: beide Ebenen zeichnen mit voller
+        // Deckung in ein EIGENES Pane, und erst das Pane ist zu 45%
+        // durchsichtig. Die Hillshade-Kacheln sind undurchsichtige Graubilder,
+        // die scharfe Ebene ueberdeckt die grobe also vollstaendig. Lege man
+        // stattdessen zwei je 45%-Ebenen uebereinander, ergaebe das dort, wo
+        // beide liegen, 70% — die Karte wuerde fleckig dunkler.
         if (window.innerWidth > 900) {
-            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', Object.assign({
+            var schummerPane = map.createPane('schummerPane');
+            schummerPane.style.zIndex = '350';      // ueber der Grundkarte, unter Labels (400)
+            schummerPane.style.opacity = '0.45';
+            schummerPane.style.pointerEvents = 'none';
+            var schummerUrl = 'https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}';
+            L.tileLayer(schummerUrl, {
+                pane: 'schummerPane', maxNativeZoom: 7, maxZoom: 18, minZoom: 0,
+                keepBuffer: 16, updateWhenIdle: false, updateWhenZooming: false,
+            }).addTo(map);
+            // Die scharfe Ebene laedt WAEHREND des Zoomens nach (kein
+            // updateWhenZooming:false mehr): die Reserve darunter deckt jede
+            // Luecke ab, also gibt es keinen Grund mehr zu warten. Mit dem
+            // Warten blieb das grobe Relief unnoetig lange stehen — sichtbar
+            // als „beim Rauszoomen ist ein Teil noch unscharf".
+            L.tileLayer(schummerUrl, Object.assign({}, tileOpts, {
+                pane: 'schummerPane',
                 attribution: 'Hillshade &copy; <a href="https://www.esri.com/">Esri</a>',
-                opacity: 0.45,
                 maxZoom: 16,
-            }, tileOpts)).addTo(map);
+                keepBuffer: 8,
+            })).addTo(map);
         }
 
         // Labels über der Schummerung (der Vektor-Stil bringt eigene mit,
