@@ -61,6 +61,15 @@ ACCURACY_MINUTE = 0
 # Tagesprognose ein, sondern einen Nowcast auf einen fast abgelaufenen Tag.
 NACHHOL_GRENZE_STUNDE = 12
 
+# Bis zu dieser Stunde geht nach einem nachgeholten Lauf auch die Briefing-Mail
+# noch raus. Die Grenze ist enger als NACHHOL_GRENZE_STUNDE, weil Archiv und
+# Kunde verschiedene Massstaebe haben: fuers Archiv zaehlt, dass die Prognose
+# eingefroren ist, fuer den Kunden, dass er den Tag noch planen kann. Ein
+# Neustart-Ausfall ist typischerweise in einer knappen Stunde repariert
+# (29.08.2026: Lauf abgeschnitten 06:03, Daten fertig 06:47) — das ist eine
+# verspaetete Morgenmail, keine Mittagsmail.
+NACHSENDE_GRENZE_STUNDE = 9
+
 # DWD-Frontenarchiv (Plan §6 Schritt 7). Vier Laeufe taeglich.
 #
 # Warum viermal und nicht einmal: Der DWD haelt Open Data nur rund zwei Tage
@@ -198,9 +207,14 @@ def _melde_datenluecke(ohne_daten: list, luecken: list, days_count: int,
         logger.exception("Scheduler: Datenluecken-Meldung fehlgeschlagen: %s", e)
 
 
-def _send_briefings_once(engine) -> dict:
+def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
     """Baut briefing_data einmal, loopt ueber aktive Subscriber.
     Returns: {'total': N, 'sent': n_sent, 'skipped': n_skipped, 'failed': n_failed}
+
+    nur_ohne_mail_heute=True fuer den Nachversand nach einem ausgefallenen
+    Morgenlauf: dann gehen Mails ausschliesslich an Abos, die heute noch keine
+    bekommen haben. Ist der Stand nicht feststellbar, wird nichts versendet —
+    eine fehlende Mail ist aergerlich, eine doppelte beschaedigt das Vertrauen.
     """
     from subscriber import get_manager_from_env
     from email_service import send_briefing_email, briefing_coverage
@@ -211,6 +225,19 @@ def _send_briefings_once(engine) -> dict:
         return {"total": 0, "sent": 0, "skipped": 0, "failed": 0}
 
     subscribers = mgr.list_active()
+    if nur_ohne_mail_heute:
+        schon_versendet = mgr.ids_sent_today()
+        if schon_versendet is None:
+            logger.error("Scheduler: Nachversand abgebrochen — nicht feststellbar, "
+                         "welche Abos heute schon eine Mail haben")
+            return {"total": len(subscribers), "sent": 0,
+                    "skipped": len(subscribers), "failed": 0,
+                    "grund": "Versandstand nicht feststellbar"}
+        vorher_n = len(subscribers)
+        subscribers = [s for s in subscribers if s["id"] not in schon_versendet]
+        logger.info("Scheduler: Nachversand — %d von %d Abos haben heute noch "
+                    "keine Mail", len(subscribers), vorher_n)
+
     total = len(subscribers)
     if total == 0:
         logger.info("Scheduler: keine aktiven Subscriber")
@@ -476,6 +503,46 @@ def _briefings_heute() -> Optional[int]:
         return None
 
 
+def _nachversand_falls_rechtzeitig(engine, nachher: dict) -> dict:
+    """Nach einem nachgeholten Lauf die ausgefallenen Briefing-Mails senden.
+
+    Drei Bedingungen, alle am messbaren Ergebnis festgemacht, nicht an der
+    vermuteten Ausfallursache:
+      1. Die Datenkette steht (keine Maengel im Snapshot-Befund). Auf einer
+         halben Datenlage waere die Mail schlechter als keine.
+      2. Es ist noch vor NACHSENDE_GRENZE_STUNDE.
+      3. Der Versandstand je Abo ist feststellbar (prueft _send_briefings_once).
+
+    Returns ein dict fuer die Waechter-Meldung: {'sent': n} oder {'grund': ...}.
+    """
+    if nachher.get("maengel"):
+        grund = ("Datenkette blieb unvollstaendig (%s)"
+                 % ", ".join(nachher["maengel"]))
+        logger.warning("Nachversand: kein Versand — %s", grund)
+        return {"sent": 0, "grund": grund}
+
+    jetzt = datetime.now()
+    if jetzt.hour >= NACHSENDE_GRENZE_STUNDE:
+        grund = (f"Daten erst um {jetzt.strftime('%H:%M')} fertig, Grenze fuer "
+                 f"eine Morgenmail ist {NACHSENDE_GRENZE_STUNDE:02d}:00")
+        logger.warning("Nachversand: kein Versand — %s", grund)
+        return {"sent": 0, "grund": grund}
+
+    logger.warning("Nachversand: sende Briefings nach (%s) — nur an Abos ohne "
+                   "heutige Mail", jetzt.strftime("%H:%M"))
+    try:
+        stats = _send_briefings_once(engine, nur_ohne_mail_heute=True)
+    except Exception as e:
+        logger.exception("Nachversand: fehlgeschlagen: %s", e)
+        return {"sent": 0, "grund": f"Nachversand-Exception: {e}"}
+
+    stats["zeit"] = jetzt.strftime("%H:%M")
+    logger.info("Nachversand: fertig. sent=%d skipped=%d failed=%d",
+                stats.get("sent", 0), stats.get("skipped", 0),
+                stats.get("failed", 0))
+    return stats
+
+
 def _nachholen_falls_noetig(engine) -> None:
     """Beim Start pruefen, ob der heutige Daily-Run ausgefallen ist — und ihn
     fuer die Datenkette nachholen.
@@ -487,11 +554,15 @@ def _nachholen_falls_noetig(engine) -> None:
     nirgends sonst). Genau so sind zwischen Mai und Juli 2026 neun Tage
     verschwunden, zusaetzlich zum abgeschnittenen 23.06.
 
-    Nachgeholt wird NUR die Datenkette (Wetter -> LLM-Analyse -> Snapshot),
-    NICHT der Briefing-Versand. Eine Morgenmail um 11:00 ist schlechter als
-    keine, und ohne verlaesslichen Nachweis, ob der Versand schon lief, waere
-    ein Doppelversand die wahrscheinlichere Folge. Die Mail des Waechters sagt
-    ausdruecklich, dass die Briefings dieses Morgens fehlen.
+    Nachgeholt wird die Datenkette (Wetter -> LLM-Analyse -> Snapshot) und —
+    wenn die Daten stehen und es noch vor NACHSENDE_GRENZE_STUNDE ist — auch
+    der Briefing-Versand, ausschliesslich an Abos ohne heutige Mail. Frueher
+    unterblieb der Versand ganz, mit zwei Begruendungen, die beide nicht
+    tragen: ein Doppelversand ist ausschliessbar (last_sent_at je Abo, siehe
+    subscriber.ids_sent_today), und "Morgenmail um 11:00" war die falsche
+    Vorstellung von der Verspaetung — der Nachlauf startet, sobald der Dienst
+    wieder laeuft. Was bleibt, ist die Zeitgrenze; nach ihr meldet der
+    Waechter den ausgefallenen Versand, statt ihn nachzuholen.
     """
     from scripts import snapshot_wache
 
@@ -550,8 +621,14 @@ def _nachholen_falls_noetig(engine) -> None:
     _run_snapshot()
 
     nachher = snapshot_wache.befund(heute)
+    # Versandstand VOR dem Nachversand festhalten: danach steht der Zaehler auf
+    # den gerade verschickten Mails und die Meldung wuerde "Versand in Ordnung"
+    # sagen — genau die Verwechslung, die _briefing_lage aufloesen soll.
+    briefings_vorher = _briefings_heute()
+    nachversand = _nachversand_falls_rechtzeitig(engine, nachher)
     logger.info("Snapshot-Nachlauf: %s",
-                snapshot_wache.melde_nachlauf(vorher, nachher, _briefings_heute()))
+                snapshot_wache.melde_nachlauf(vorher, nachher, briefings_vorher,
+                                              nachversand=nachversand))
     if nachher["maengel"]:
         logger.error("Snapshot-Nachlauf: %s bleibt unvollstaendig (%s)",
                      heute, ", ".join(nachher["maengel"]))

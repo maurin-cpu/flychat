@@ -1223,6 +1223,32 @@ class SubscriberManager:
             logger.error("count_sent_today failed: %s", e)
             return -1          # -1 = nicht feststellbar, 0 = sicher keine
 
+    def ids_sent_today(self):
+        """IDs der Abos, die heute schon eine Briefing-Mail bekommen haben.
+
+        Fuer den Nachversand nach einem ausgefallenen Morgenlauf
+        (scheduler._nachholen_falls_noetig): count_sent_today sagt nur, DASS
+        schon versendet wurde, nicht an wen. Faellt der Lauf mittendrin aus,
+        haben die ersten Abos ihre Mail und der Rest nicht — nur mit den IDs
+        laesst sich der Rest bedienen, ohne den ersten eine zweite zu schicken.
+
+        Rueckgabe None = nicht feststellbar. Dann darf kein Nachversand laufen:
+        lieber keine Mail als eine doppelte.
+
+        Zeitbezug wie count_sent_today: last_sent_at und date('now') beide UTC.
+        """
+        try:
+            with self._cursor() as cur:
+                cur.execute(
+                    "SELECT id FROM subscribers "
+                    "WHERE last_sent_at IS NOT NULL "
+                    "  AND date(last_sent_at) = date('now')"
+                )
+                return {int(r[0]) for r in cur.fetchall()}
+        except Exception as e:
+            logger.error("ids_sent_today failed: %s", e)
+            return None
+
     def close(self):
         """Kompatibilitaet — SQLite-Verbindungen werden pro Operation geoeffnet/geschlossen."""
         return

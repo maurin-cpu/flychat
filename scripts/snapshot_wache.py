@@ -298,7 +298,8 @@ def melde(b: dict, nachgeholt: Optional[bool] = None, versand: bool = True) -> s
     return f"gemeldet ({', '.join(b['maengel'])})"
 
 
-def _briefing_lage(briefings_heute: Optional[int]) -> str:
+def _briefing_lage(briefings_heute: Optional[int],
+                   nachversand: Optional[dict] = None) -> str:
     """Formuliert, was mit dem Briefing-Versand ist — gemessen, nicht geraten.
 
     Ein fehlender Snapshot heisst NICHT automatisch, dass der Versand
@@ -306,23 +307,48 @@ def _briefing_lage(briefings_heute: Optional[int]) -> str:
     Faellt nur der Snapshot-Schritt aus, sind die Mails laengst beim Kunden.
     Faellt der ganze Lauf aus (Neustart nach 06:00), fehlt beides. Welcher
     Fall vorliegt, verraet die Abo-Datenbank (subscriber.count_sent_today).
+
+    `briefings_heute` ist der Stand VOR dem Nachversand, `nachversand` das
+    Ergebnis von scheduler._nachversand_falls_rechtzeitig ({'sent': n} oder
+    {'grund': ...}) — sonst laese sich nicht mehr unterscheiden, ob die Mails
+    aus dem Morgenlauf kamen oder aus der Reparatur.
     """
     if briefings_heute is None or briefings_heute < 0:
         return ("Briefing-Versand:  nicht feststellbar (Abo-Datenbank nicht "
                 "erreichbar).\n")
     if briefings_heute == 0:
-        return ("Briefing-Versand:  KEINE Mail heute — es ist also nicht nur\n"
-                "                   der Snapshot ausgefallen, sondern der ganze\n"
-                "                   Morgenlauf. Nachgesendet wird bewusst nicht:\n"
-                "                   eine Morgenmail am Mittag ist schlechter als\n"
-                "                   keine, ein Doppelversand schlimmer als beides.\n")
+        kopf = ("Briefing-Versand:  KEINE Mail aus dem Morgenlauf — es ist also\n"
+                "                   nicht nur der Snapshot ausgefallen, sondern\n"
+                "                   der ganze Lauf.\n")
+        return kopf + _nachversand_lage(nachversand)
     return (f"Briefing-Versand:  in Ordnung, {briefings_heute} Abo(s) haben heute\n"
             f"                   ihre Mail bekommen. Betroffen ist NUR das Archiv,\n"
             f"                   der Kunde hat nichts gemerkt.\n")
 
 
+def _nachversand_lage(nachversand: Optional[dict]) -> str:
+    """Zeile(n) zum Nachversand — sagt, was passiert ist, nicht was Politik ist."""
+    if nachversand is None:
+        return ("Nachversand:       nicht versucht.\n")
+    sent = nachversand.get("sent", 0)
+    if sent:
+        zeit = nachversand.get("zeit")
+        wann = f" um {zeit}" if zeit else ""
+        zusatz = ""
+        if nachversand.get("failed"):
+            zusatz = (f"\n                   {nachversand['failed']} Mail(s) "
+                      f"scheiterten trotzdem — Log pruefen.")
+        return (f"Nachversand:       {sent} Abo(s){wann} nachversendet (nur solche\n"
+                f"                   ohne heutige Mail, Doppelversand ausgeschlossen)."
+                f"{zusatz}\n")
+    grund = nachversand.get("grund")
+    if grund:
+        return f"Nachversand:       unterblieben — {grund}.\n"
+    return ("Nachversand:       kein Abo offen — es war nichts nachzusenden.\n")
+
+
 def melde_nachlauf(vorher: dict, nachher: dict, briefings_heute: Optional[int] = None,
-                   versand: bool = True) -> str:
+                   versand: bool = True, nachversand: Optional[dict] = None) -> str:
     """Meldet, dass ein ausgefallener Morgenlauf nachgeholt wurde (einmal je Tag).
 
     Diese Meldung kommt AUCH, wenn das Nachholen geklappt hat — absichtlich:
@@ -348,10 +374,14 @@ def melde_nachlauf(vorher: dict, nachher: dict, briefings_heute: Optional[int] =
            f"({nachher.get('regionen_bewertet', 0)} bewertet)\n"
            if erfolg else
            f"weiterhin {', '.join(nachher.get('maengel', ['unbekannt']))}\n")
-        + _briefing_lage(briefings_heute) +
+        + _briefing_lage(briefings_heute, nachversand) +
         f"\nUrsache pruefen: gab es am {datetime.now().strftime('%d.%m.')} kurz nach\n"
         f"06:00 einen Deploy oder Neustart? Der Zeitplaner sucht beim Start nur\n"
         f"den naechsten Termin nach jetzt, ein vergangener Slot faellt aus.\n"
+        f"Auch ohne Zutun moeglich: das automatische Ubuntu-Update laeuft\n"
+        f"taeglich zwischen 06:00 und 07:00 und startet bei manchen Paketen\n"
+        f"(z.B. libpam) alle Dienste neu — so geschehen am 29.08.2026 um 06:03.\n"
+        f"Pruefen mit: grep \"^{vorher['tag']} 06:\" /var/log/dpkg.log\n"
     )
     _sende(betreff, text, versand)
     z["nachlauf_gemeldet_tag"] = tag

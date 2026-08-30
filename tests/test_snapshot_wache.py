@@ -229,12 +229,41 @@ def test_meldung_unterscheidet_snapshot_von_briefing_ausfall(archiv, monkeypatch
     # Fall B: gar keine Mail raus -> der ganze Morgenlauf ist ausgefallen
     monkeypatch.setattr(wache, "_lade_zustand", lambda: {})   # Sperre loesen
     wache.melde_nachlauf(vorher, nachher, briefings_heute=0)
-    assert "KEINE Mail heute" in briefe[1]
+    assert "KEINE Mail aus dem Morgenlauf" in briefe[1]
     assert "ganze" in briefe[1]
 
     # Fall C: Datenbank nicht erreichbar -> nichts behaupten
     wache.melde_nachlauf(vorher, nachher, briefings_heute=None)
     assert "nicht feststellbar" in briefe[2]
+
+
+def test_meldung_sagt_ob_nachversendet_wurde(archiv, monkeypatch):
+    """Ohne Mail aus dem Morgenlauf sind drei Ausgaenge moeglich, und die
+    Meldung muss sie unterscheiden: nachversendet, bewusst unterlassen
+    (Zeitgrenze), oder gar nicht erst versucht. Frueher stand hier pauschal
+    'nachgesendet wird bewusst nicht' — das war ab dem Nachversand falsch."""
+    briefe = []
+    monkeypatch.setattr(wache, "_sende",
+                        lambda betreff, text, versand=True: briefe.append(text))
+    monkeypatch.setattr(wache, "_lade_zustand", lambda: {})   # Sperre je Fall loesen
+    vorher = {"tag": "2026-08-12", "maengel": ["keine_spot_bewertung"]}
+    nachher = {"tag": "2026-08-12", "maengel": [], "spots": 494,
+               "spots_bewertet": 494, "regionen": 29, "regionen_bewertet": 29}
+
+    # Nachversendet
+    wache.melde_nachlauf(vorher, nachher, briefings_heute=0,
+                         nachversand={"sent": 12, "zeit": "06:47", "failed": 0})
+    assert "12 Abo(s) um 06:47 nachversendet" in briefe[0]
+    assert "Doppelversand ausgeschlossen" in briefe[0]
+
+    # Unterlassen — die Zeitgrenze gehoert benannt, nicht verschwiegen
+    wache.melde_nachlauf(vorher, nachher, briefings_heute=0,
+                         nachversand={"sent": 0, "grund": "Grenze ist 09:00"})
+    assert "unterblieben — Grenze ist 09:00" in briefe[1]
+
+    # Nicht versucht
+    wache.melde_nachlauf(vorher, nachher, briefings_heute=0)
+    assert "nicht versucht" in briefe[2]
 
 
 def test_nachhol_versuch_wird_vermerkt(archiv):
