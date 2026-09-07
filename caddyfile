@@ -1,4 +1,11 @@
 app.wingcast.ch {
     encode zstd gzip
+    # Die App gehoert nicht in den Suchindex: die Inhalte sind tagesaktuelle
+    # Prognosen und morgen veraltet. Google hatte hunderte /map?spot=...&date=...
+    # Seiten gecrawlt. noindex nimmt sie schrittweise wieder raus.
+    # Bewusst KEIN robots.txt-Disallow: gesperrte Seiten liest Google nicht mehr
+    # und sieht das noindex nie — sie blieben ewig im Index. Disallow erst,
+    # wenn der Index leer ist.
+    header X-Robots-Tag "noindex"
     reverse_proxy localhost:5000
 }
