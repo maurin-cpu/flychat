@@ -593,12 +593,26 @@
     </script>
 
     {% if posthog_enabled and not is_admin %}
-    {# PostHog Product-Analytics — COOKIELOS (persistence: 'memory'). Setzt keine
-       Cookies und keinen Geraetespeicher => kein Consent-Banner noetig (CH revDSG
-       transparenzbasiert, EU ePrivacy greift ohne Geraetespeicher nicht). Laedt
-       direkt bei jedem Seitenaufruf. Session-Recording ist aus (waere einwilligungs-
-       pflichtig). Datenschutzerklaerung sollte die anonyme Nutzungsstatistik nennen.
-       Admin (config.ADMIN_EMAIL, eingeloggt) wird NICHT getrackt => is_admin-Guard. #}
+    {# PostHog Product-Analytics — cookiefrei, Speicher nur fuer die Dauer des
+       Besuchs (persistence: 'sessionStorage'). Kein Cookie, kein localStorage,
+       keine Wiedererkennung ueber Besuche hinweg: der Schluessel verfaellt, sobald
+       der Tab geschlossen wird. Session-Recording ist aus (waere einwilligungs-
+       pflichtig). Admin (config.ADMIN_EMAIL, eingeloggt) wird NICHT getrackt
+       => is_admin-Guard.
+
+       Warum nicht mehr 'memory': dort lag die Kennung nur im Arbeitsspeicher der
+       einzelnen Seite. Jeder Seitenaufruf erzeugte eine neue device_id, eine neue
+       session_id und damit eine neue "Person". Nachgemessen am 13.09.2026:
+       246 Seitenaufrufe = 246 Sessions = 246 device_ids, kein einziger Besuch mit
+       zwei Seiten. Wer Startseite -> Regionen -> Chat klickte, zaehlte als drei
+       Besucher. Die Besucherzahlen waren dadurch rund doppelt so hoch wie die
+       Realitaet und die Trichter-Quoten entsprechend zu schlecht.
+
+       Rechtlich: sessionStorage IST Geraetespeicher — die frueher hier notierte
+       Begruendung "ePrivacy greift ohne Geraetespeicher nicht" trifft so nicht mehr
+       zu. Es bleibt eine reine First-Party-Reichweitenmessung ohne besuchsueber-
+       greifende Verfolgung. In der Datenschutzerklaerung nennen; rund ein Viertel
+       der Besucher kommt aus der EU (v.a. FR), dort einen strengen Massstab pruefen. #}
     <script>
     (function () {
         var PH_KEY = {{ posthog_key|tojson }};
@@ -609,7 +623,7 @@
         posthog.init(PH_KEY, {
             api_host: PH_HOST,
             ui_host: PH_UI_HOST,
-            persistence: 'memory',           // keine Cookies / kein localStorage
+            persistence: 'sessionStorage',   // nur dieser Tab, kein Cookie
             disable_session_recording: true, // Session-Replay aus (Consent-pflichtig)
             capture_pageview: true,
             autocapture: true,
