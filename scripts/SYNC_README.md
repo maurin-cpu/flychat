@@ -50,15 +50,20 @@ also dorthin und nie in `observations.csv`, die wird überschrieben.
 ## Wenn der Sync abbricht: Merge-Konflikt im `git pull`
 
 Symptom: `You have unmerged paths` / `both modified`. Fast immer betroffen:
-`data/synoptic_context.json`, `data/synoptic_audit/<datum>.json`,
-`static/js/briefing.js`.
+`data/synoptic_context.json`, `static/js/briefing.js`.
+
+> **`data/synoptic_audit/` steht seit dem 13.09.2026 nicht mehr im Git** (siehe
+> `.gitignore`). Die Protokolle sind server-lokal und werden nach 30 Tagen
+> rotiert — versioniert ergaben sie zusammen mit der Rotation eine
+> Endlosschleife. Sie tauchen deshalb in keinem Sync- und Konflikt-Schritt
+> mehr auf.
 
 Auflösen:
 
 ```powershell
 # Laufzeit-Daten -> immer Server-Version (theirs)
-git checkout --theirs data/synoptic_context.json data/synoptic_audit/*.json
-git add data/synoptic_context.json data/synoptic_audit/*.json
+git checkout --theirs data/synoptic_context.json
+git add data/synoptic_context.json
 
 # CODE (z.B. briefing.js) -> NICHT blind theirs! Von Hand mergen,
 # damit lokale Features (z.B. Maplink /synoptik) nicht verloren gehen.
@@ -80,7 +85,7 @@ git update-index --skip-worktree `
   data/spot_analyses_en.json data/region_analyses_en.json `
   data/spot_analyses.json data/region_analyses.json `
   data/synoptic_context.json data/labeled_examples.jsonl
-git update-index --skip-worktree (git ls-files data/synoptic_audit data/weather_archive)
+git update-index --skip-worktree (git ls-files data/weather_archive)
 ```
 
 Prüfen (S = geschützt): `git ls-files -v | Select-String '^S'`

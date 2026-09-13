@@ -63,7 +63,7 @@ $NO_PUSH = @(
   "data/spot_analyses.json","data/region_analyses.json",
   "data/synoptic_context.json","data/labeled_examples.jsonl"
 )
-$extra = (git ls-files data/synoptic_audit data/weather_archive) 2>$null
+$extra = (git ls-files data/weather_archive) 2>$null
 if ($extra) { $NO_PUSH += ($extra -split "`n" | Where-Object { $_ }) }
 
 Write-Host "== 0) getrackte Analysen fuer sauberen git pull freigeben =="

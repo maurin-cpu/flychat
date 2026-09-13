@@ -58,7 +58,7 @@ NO_PUSH=(
   data/spot_analyses.json data/region_analyses.json
   data/synoptic_context.json data/labeled_examples.jsonl
 )
-extra="$(git ls-files data/synoptic_audit data/weather_archive)"
+extra="$(git ls-files data/weather_archive)"
 [ -n "$extra" ] && while IFS= read -r line; do NO_PUSH+=("$line"); done <<< "$extra"
 
 echo "== 0) getrackte Analysen fuer sauberen git pull freigeben =="

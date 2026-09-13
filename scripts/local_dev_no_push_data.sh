@@ -35,7 +35,6 @@ FILES=(
 
 # Ganze Ordner mit taeglich neuen Dateien (Server committet dort neu):
 DIRS=(
-  data/synoptic_audit
   data/weather_archive
 )
 
@@ -64,7 +63,7 @@ done
 echo "== 3) git-Alias 'sync' anlegen =="
 git config alias.sync '!f() { \
   root=$(git rev-parse --show-toplevel); cd "$root"; \
-  files=$(git ls-files data/region_analyses_en.json data/spot_analyses_en.json data/synoptic_context.json data/labeled_examples.jsonl data/synoptic_audit data/weather_archive); \
+  files=$(git ls-files data/region_analyses_en.json data/spot_analyses_en.json data/synoptic_context.json data/labeled_examples.jsonl data/weather_archive); \
   [ -n "$files" ] && echo "$files" | xargs git update-index --no-skip-worktree; \
   [ -n "$files" ] && echo "$files" | xargs git checkout --; \
   git pull --no-rebase; \

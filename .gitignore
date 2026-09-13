@@ -24,6 +24,21 @@ node_modules/
 # Runtime data (generated, server-local)
 data/wetterdaten.json
 data/synoptic_grid.json
+# Audit-Protokolle der Wetterlage, ein JSON je Tag (~80 KB). Server-lokal und
+# bewusst vergaenglich: _rotate_audit_logs() in engine/synoptic_context.py
+# loescht sie nach SYNOPTIC_AUDIT_KEEP_DAYS = 30 Tagen.
+#
+# Bis 13.09.2026 waren sie versehentlich versioniert — mit der Rotation zusammen
+# ergab das eine Endlosschleife: die Rotation loeschte, der naechste Deploy
+# stashte die Loeschung weg und holte die Dateien damit zurueck, die Rotation
+# loeschte erneut. Zehn Stashes auf dem Server waren die Folge, dazu 29 Dateien
+# aus Juni/Juli, die immer wieder auferstanden. Kein Datenverlust, aber sinnlos:
+# entweder sind die Protokolle 30 Tage wert oder fuer immer, nicht beides.
+#
+# Gelesen werden sie ausschliesslich von /admin/wetterlage_audit fuer die letzten
+# 30 Tage. Der einst geplante build_synoptic_history() wurde nie gebaut, und die
+# Flugdaten-Auswertung speist sich aus data/weather_archive, nicht von hier.
+data/synoptic_audit/
 # Zustand des Archiv-Waechters (Wiederholungssperre + Nachhol-Vermerk).
 # Bewusst NICHT versioniert, anders als beim Frontenalarm: der bleibt in git,
 # weil die Cloud-Routine keinen bleibenden Datentraeger hat. Der Waechter
