@@ -115,5 +115,29 @@ foreach ($muster in $FRONTEN) {
 }
 
 Write-Host ""
+Write-Host "== 4) OGN-Flugdaten (verdichtet) nach data/ogn_local/ =="
+# Der Server haelt data/ogn_tracks.db - 686 MB Rohpunkte plus WAL, dazu ein
+# offener Schreiber (ogn-collector.service). Die Datei als Ganzes zu kopieren
+# waere gross UND unzuverlaessig: ohne Checkpoint fehlt der WAL-Inhalt.
+# Deshalb nur die verdichteten Tabellen als CSV, lesend ueber stdout gestreamt
+# (mode=ro + query_only, der Collector wird nicht gestoert). Zusammen ~3 MB.
+# data/ogn_local/ ist gitignored - erzeugte Daten, jederzeit neu holbar.
+$OGN_TABELLEN = @("flights", "coverage", "rollup_log")
+if (-not (Test-Path "data/ogn_local")) {
+  New-Item -ItemType Directory -Force "data/ogn_local" | Out-Null
+}
+foreach ($tab in $OGN_TABELLEN) {
+  $py = "import sqlite3,csv,sys;" +
+        "con=sqlite3.connect('file:data/ogn_tracks.db?mode=ro',uri=True,timeout=20);" +
+        "con.execute('PRAGMA query_only=1');" +
+        "cur=con.execute('SELECT * FROM $tab');" +
+        "w=csv.writer(sys.stdout,lineterminator=chr(10));" +
+        "w.writerow([d[0] for d in cur.description]);w.writerows(cur)"
+  Write-Host "   $tab.csv ..."
+  ssh $Server "cd $REMOTE_DIR && python3 -c `"$py`"" |
+    Out-File -Encoding utf8 "data/ogn_local/$tab.csv"
+}
+
+Write-Host ""
 Write-Host "FERTIG. Lokal = aktueller Server-Stand (Analysen inkl. Tag 3 + Wetterdaten)."
 Write-Host "App neu starten, dann stimmt die Ansicht."

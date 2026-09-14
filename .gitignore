@@ -39,6 +39,12 @@ data/synoptic_grid.json
 # 30 Tage. Der einst geplante build_synoptic_history() wurde nie gebaut, und die
 # Flugdaten-Auswertung speist sich aus data/weather_archive, nicht von hier.
 data/synoptic_audit/
+# Lokale Abbildung der OGN-Flugdaten vom Server (scripts/sync_from_server.ps1).
+# Der Server haelt die Wahrheit in data/ogn_tracks.db (686 MB Rohpunkte + WAL);
+# hier liegen nur die verdichteten Tabellen als CSV (~3 MB), damit man lokal
+# sieht, was da ist. Bewusst NICHT versioniert: erzeugte Daten, jederzeit neu
+# holbar, und sie wuerden dasselbe Problem schaffen wie data/weather_archive.
+data/ogn_local/
 # Zustand des Archiv-Waechters (Wiederholungssperre + Nachhol-Vermerk).
 # Bewusst NICHT versioniert, anders als beim Frontenalarm: der bleibt in git,
 # weil die Cloud-Routine keinen bleibenden Datentraeger hat. Der Waechter
