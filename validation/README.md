@@ -33,6 +33,8 @@ validation/<domäne>/
    `scripts/snapshot_weather.py`). Eine Domäne liest den Freeze, sie
    dupliziert ihn nie. Was dort fehlt, kann rückwirkend nicht validiert
    werden — fehlende Felder darum dort ergänzen, nicht lokal sammeln.
+   Der Freeze ist **Klasse A** im Datenkonzept: unersetzlich, nie in Git,
+   Kopie ausser Haus über das Server-Backup (`docs/DATENKONZEPT.md`).
 2. **Urteile haben ein gemeinsames Schema** (`scripts/validation_common.py`):
    `Datum · Objekt (Region/Spot/Zone) · vorhergesagt · eingetreten · Urteil
    (treffer | verpasst | fehlalarm | still) · Zeitfenster`. Damit sind

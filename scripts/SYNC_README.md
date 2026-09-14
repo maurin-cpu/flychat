@@ -11,17 +11,20 @@ laufen zu lassen. Lokale Daten werden **nie** auf den Server gepusht.
 (Linux/macOS: `./scripts/sync_from_server.sh`)
 
 Das Skript macht in einem Rutsch:
-1. lokale Daten-Änderungen freigeben (für sauberen `git pull`)
-2. `git pull` → holt den **Code**
-3. `skip-worktree` setzen → Server-Daten werden nie gepusht
-4. `scp` → die 4 View-Dateien **frisch vom Server-Datenträger**:
+1. `git pull` → holt den **Code** (Daten sind seit 14.09.2026 nicht mehr in
+   Git — `docs/DATENKONZEPT.md`)
+2. `scp` → die View-Dateien **frisch vom Server-Datenträger**:
    `config_overrides.json`, `spot_analyses_en.json`, `region_analyses_en.json`,
+   `synoptic_context.json`, `synoptic_grid.json`, `labeled_examples.jsonl`,
    `wetterdaten.json` (~200 MB)
-5. `scp` → **DWD-Frontenarchiv + Validierung** (siehe unten)
+3. `scp` → **DWD-Frontenarchiv + Validierung** (siehe unten)
+4. OGN-Flugdaten verdichtet nach `data/ogn_local/`
+5. Wetter-Archiv **additiv** nach `data/weather_archive/` — nur fehlende Tage,
+   nie überschreiben (zweite Kopie der Belege, freiwillig)
 
-Warum scp und nicht nur git? `wetterdaten.json` ist gitignored und die Analysen
-liegen auf dem Server-Datenträger **neuer** als der letzte Commit. `git pull`
-allein bringt also keinen aktuellen Wetter-/Fliegbarkeits-Stand.
+Warum scp und nicht git? Weil nichts davon in Git liegt: Der Server erzeugt
+diese Dateien, Git ist für Code (`docs/DATENKONZEPT.md`). `git pull` allein
+bringt keinen Wetter-/Fliegbarkeits-Stand.
 
 Danach: **App neu starten** → Ansicht stimmt.
 
@@ -50,20 +53,20 @@ also dorthin und nie in `observations.csv`, die wird überschrieben.
 ## Wenn der Sync abbricht: Merge-Konflikt im `git pull`
 
 Symptom: `You have unmerged paths` / `both modified`. Fast immer betroffen:
-`data/synoptic_context.json`, `static/js/briefing.js`.
+`static/js/briefing.js`, seltener `data/labeled_examples.jsonl`.
 
-> **`data/synoptic_audit/` steht seit dem 13.09.2026 nicht mehr im Git** (siehe
-> `.gitignore`). Die Protokolle sind server-lokal und werden nach 30 Tagen
-> rotiert — versioniert ergaben sie zusammen mit der Rotation eine
-> Endlosschleife. Sie tauchen deshalb in keinem Sync- und Konflikt-Schritt
-> mehr auf.
+> **Seit dem 14.09.2026 liegt nichts mehr in Git, was der Server erzeugt**
+> (`docs/DATENKONZEPT.md`): `data/synoptic_audit/` (13.09.),
+> `data/weather_archive/`, `data/spot_analyses_en.json`,
+> `data/region_analyses_en.json`, `data/synoptic_context.json` (14.09.). Sie
+> tauchen in keinem Sync- und Konflikt-Schritt mehr auf.
 
 Auflösen:
 
 ```powershell
-# Laufzeit-Daten -> immer Server-Version (theirs)
-git checkout --theirs data/synoptic_context.json
-git add data/synoptic_context.json
+# Server-beschriftete Daten -> immer Server-Version (theirs)
+git checkout --theirs data/labeled_examples.jsonl
+git add data/labeled_examples.jsonl
 
 # CODE (z.B. briefing.js) -> NICHT blind theirs! Von Hand mergen,
 # damit lokale Features (z.B. Maplink /synoptik) nicht verloren gehen.
@@ -78,14 +81,10 @@ Konfliktmarker finden: `git diff --check`
 
 ## „git status zeigt Server-Daten als modified"
 
-Dann ist `skip-worktree` nicht (mehr) gesetzt. Neu setzen:
+Seit dem 14.09.2026 sollte das nur noch `data/labeled_examples.jsonl` treffen —
+die einzige Datei, die der Server beschriftet und die trotzdem getrackt ist.
+Das ist gewollt: neue Labels werden vom Entwicklungsrechner aus committet.
 
-```powershell
-git update-index --skip-worktree `
-  data/spot_analyses_en.json data/region_analyses_en.json `
-  data/spot_analyses.json data/region_analyses.json `
-  data/synoptic_context.json data/labeled_examples.jsonl
-git update-index --skip-worktree (git ls-files data/weather_archive)
-```
-
-Prüfen (S = geschützt): `git ls-files -v | Select-String '^S'`
+Zeigt `git status` eine **andere** vom Server erzeugte Datei, fehlt sie in
+`.gitignore` — Zeile ergänzen, nicht `skip-worktree` setzen. Der Behelf ist
+abgeschafft (`docs/DATENKONZEPT.md`).

@@ -29,14 +29,14 @@ Projekt `/home/deploy/flychat`, App läuft als `wingcast.service`.
 
 | Ich brauche … | Ort | Achtung |
 |---|---|---|
-| **Eingefrorene Tagesprognose** (Basis jeder Validierung) | `data/weather_archive/YYYY-MM-DD.json` — Server führend, seit 31.07. inkl. `thunder_ensemble` je Region | **Nicht lückenlos** (nachgezählt 12.08.): 9 Tage fehlen, 31 sind unvollständig — 01.07.–01.08. tragen **gar keine Bewertungen**, weder Spot noch Region. Vor jeder Auswertung `python scripts/snapshot_wache.py --luecken`, nie eine Tagesliste ungeprüft annehmen. Seit 02.08. lückenlos, seit 12.08. bewacht. Nie die Live-Datei als Beleg nehmen |
+| **Eingefrorene Tagesprognose** (Basis jeder Validierung) | `data/weather_archive/YYYY-MM-DD.json` — Server führend, seit 31.07. inkl. `thunder_ensemble` je Region | **Nicht lückenlos** (nachgezählt 12.08.): 9 Tage fehlen, 31 sind unvollständig — 01.07.–01.08. tragen **gar keine Bewertungen**, weder Spot noch Region. Vor jeder Auswertung `python scripts/snapshot_wache.py --luecken`, nie eine Tagesliste ungeprüft annehmen. Seit 02.08. lückenlos, seit 12.08. bewacht. Nie die Live-Datei als Beleg nehmen. **Klasse A, nie in Git** — `docs/DATENKONZEPT.md` |
 | **Live-Lauf** (aktuelles 5-Tage-Fenster) | `data/wetterdaten.json` — nur Server aktuell, gitignored | **Rollendes Fenster** — Vergangenheit fällt täglich raus. Für Belege sofort archivieren |
 | **Gewitter-Validierung** (Warnung vs. SMN-Messung, täglich) | `validation/gewitter/` — `messwerte/`, `urteile/`, `scoreboard.json`, `AUTO_REPORT.md` | Maschinendaten sind server-lokal (gitignored) → per Sync holen. Grenzen des Richters: dortiges README |
 | **Fronten-/XContest-Validierung** | `validation/fronten/`, `validation/xcontest/` | gleiche Bauart, Konvention in `validation/README.md` |
 | **Echte Messwerte** (Wahrheit) | MeteoSchweiz OGD SwissMetNet — Zugriff fertig gebaut in `scripts/validation_common.py` (Zehnminutenwerte, Station→Region-Mapping, Gewitter-Signatur) | Prognose ≠ Messung. Stundenwerte verwässern Gewitter-Signaturen — Zehnminutenwerte nehmen |
 | **Regionen/Referenzpunkte** | `data/regionen_referenzpunkte.geojson`, `data/regionen_polygone_mapped.geojson` | Regionsnamen ≠ Fremdanbieter-Namen — immer über Koordinaten zuordnen |
 | **Modell-Rückblick** (beliebige Vergangenheit) | Open-Meteo `historical-forecast-api` (icon_ch1/ch2, icon_d2, icon_eu, gfs) | **Ensemble ist rückwirkend NICHT rekonstruierbar** (Member identisch nach ~3 Tagen) — nur vorwärts über die Snapshots |
-| **Backup** (falls etwas fehlt) | Server `~/flychat-backup/` — additiv, täglich 07:30 Cron | Übergangslösung lokale Platte; Storage Box später (`docs/BACKUP.md`) |
+| **Backup** (falls etwas fehlt) | Server `~/flychat-backup/` — additiv, täglich 07:30 Cron | lokale Platte **plus Hetzner Server-Backup** (Abbild, rollend 7 Tage, seit 14.09.) — `docs/BACKUP.md`; welche Daten warum: `docs/DATENKONZEPT.md` |
 
 ## Harte Lehren (alle 2026 real passiert)
 
@@ -52,5 +52,6 @@ Projekt `/home/deploy/flychat`, App läuft als `wingcast.service`.
 
 - Gewitter/Blitz-Logik + Backtest-Befunde: `docs/GEWITTER.md` (§0c)
 - Validierungs-Konvention: `validation/README.md`
+- Datenklassen — was wohin gehört, was nie in Git: `docs/DATENKONZEPT.md`
 - Offene Pläne: `docs/pläne/` (Plan wird gelöscht, sobald umgesetzt und
   in `docs/` dokumentiert)

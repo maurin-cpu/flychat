@@ -1,4 +1,5 @@
 .env
+.env.bak*
 __pycache__/
 *.pyc
 .venv/
@@ -45,6 +46,15 @@ data/synoptic_audit/
 # sieht, was da ist. Bewusst NICHT versioniert: erzeugte Daten, jederzeit neu
 # holbar, und sie wuerden dasselbe Problem schaffen wie data/weather_archive.
 data/ogn_local/
+# Klasse A und C nach docs/DATENKONZEPT.md (Entscheid 14.09.2026): Belege liegen
+# auf dem Server, die Kopie ausser Haus ist das Hetzner Server-Backup — nie in
+# Git. Laufzeit-Ausgaben erzeugt die App taeglich neu und holt der Sync per scp.
+# Bis 14.09. lagen 71 Archivtage (691 MB, nur bis 05.08.) und die drei
+# Analyse-Dateien mit skip-worktree-Behelf im Git; der Behelf ist abgeschafft.
+data/weather_archive/
+data/spot_analyses_en.json
+data/region_analyses_en.json
+data/synoptic_context.json
 # Zustand des Archiv-Waechters (Wiederholungssperre + Nachhol-Vermerk).
 # Bewusst NICHT versioniert, anders als beim Frontenalarm: der bleibt in git,
 # weil die Cloud-Routine keinen bleibenden Datentraeger hat. Der Waechter
@@ -113,7 +123,7 @@ validation/fronten/aussagen/
 # (scheduler -> scripts/validate_gewitter_daily.py). Gleiche Politik wie bei
 # den Fronten — versioniert bleiben README/SCHEMA/PATTERNS, geholt wird per
 # scripts/sync_from_server.ps1. Rekonstruierbar aus data/weather_archive/
-# (Freeze, getrackt) + MeteoSchweiz-OGD-Archiv (amtlich, dauerhaft).
+# (Freeze, Klasse A nach docs/DATENKONZEPT.md) + MeteoSchweiz-OGD-Archiv (amtlich, dauerhaft).
 validation/gewitter/messwerte/
 validation/gewitter/urteile/
 validation/gewitter/scoreboard.json

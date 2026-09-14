@@ -14,6 +14,13 @@ einem Plattenausfall. **Zielstufe:** Hetzner Storage Box — der Wechsel ist
 später nur `echo 'u…@u….your-storagebox.de' > ~/.storagebox`, das Skript
 schaltet dann selbst um.
 
+**Nachtrag 14.09.2026:** Die Zielstufe ist anders gelöst — nicht Storage Box,
+sondern das **Hetzner Server-Backup** (ganze Platte als Abbild, täglich,
+rollend sieben Tage, im Cloud-Konto aktiviert; auf dem Server nichts
+einzurichten). Der Ordner `~/flychat-backup/` liegt mit im Abbild. Das
+übergreifende Datenkonzept — welche Daten warum gesichert werden und was nie
+in Git gehört — steht in `docs/DATENKONZEPT.md`.
+
 ## Struktur im Backup
 
 ```

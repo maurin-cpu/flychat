@@ -13,7 +13,7 @@
 #   - config_overrides.json  (LANG=en etc. -> sonst laueft lokal Default-Deutsch)
 #   - spot_analyses_en.json / region_analyses_en.json  (aktuelle Fliegbarkeit)
 #   - wetterdaten.json  (~200 MB, Rohwetter fuer Meteogramme)
-# git pull liefert nur den Code (+ die evtl. hinterherhinkenden getrackten Daten).
+# git pull liefert nur den Code - seit 14.09.2026 keine Daten mehr (docs/DATENKONZEPT.md).
 #
 # Voraussetzung: Windows-OpenSSH (ssh/scp). Test:  ssh deploy@178.105.39.152 "echo ok"
 # Server-Adresse: Argument > .dev_server-Datei > Default unten.
@@ -47,34 +47,16 @@ $FROM_DISK = @(
   # Synoptik-Teil lokal wortlos.
   "data/synoptic_context.json",
   "data/synoptic_grid.json",
+  "data/labeled_examples.jsonl",   # auf dem Server beschriftet (Admin-UI), getrackt
   "data/wetterdaten.json"          # gross (~200 MB) -> zuletzt
 )
-# getrackte Analyse-Dateien: vor git pull lokale Aenderungen verwerfen, damit
-# pull nicht mit "clean your working tree" abbricht (auch DE, falls frueher mal
-# per scp ueberschrieben). Werden danach ggf. per scp neu geholt.
-$TRACKED_DISK = @(
-  "data/spot_analyses_en.json","data/region_analyses_en.json",
-  "data/spot_analyses.json","data/region_analyses.json"
-)
+# Seit 14.09.2026 (docs/DATENKONZEPT.md) ist nichts mehr getrackt, was der
+# Server erzeugt - kein skip-worktree, kein Freigeben vor dem Pull. Einzige
+# Ausnahme bleibt data/labeled_examples.jsonl: auf dem Server beschriftet,
+# per scp geholt, vom Entwicklungsrechner aus committet.
 
-# getrackte Server-Daten, die lokal NIE gepusht werden duerfen (skip-worktree):
-$NO_PUSH = @(
-  "data/spot_analyses_en.json","data/region_analyses_en.json",
-  "data/spot_analyses.json","data/region_analyses.json",
-  "data/synoptic_context.json","data/labeled_examples.jsonl"
-)
-$extra = (git ls-files data/weather_archive) 2>$null
-if ($extra) { $NO_PUSH += ($extra -split "`n" | Where-Object { $_ }) }
-
-Write-Host "== 0) getrackte Analysen fuer sauberen git pull freigeben =="
-git update-index --no-skip-worktree $TRACKED_DISK 2>$null
-git checkout -- $TRACKED_DISK 2>$null
-
-Write-Host "== 1) git pull (nur Code relevant; Daten kommen unten frisch per scp) =="
+Write-Host "== 1) git pull (nur Code; Daten kommen unten frisch per scp) =="
 git pull --no-rebase
-
-Write-Host "== 2) skip-worktree setzen -> lokale Daten werden nie gepusht =="
-git update-index --skip-worktree $NO_PUSH 2>$null
 
 Write-Host "== 3) aktuelle view-Daten vom Server-Datentraeger holen ($Server) =="
 foreach ($f in $FROM_DISK) {
@@ -136,6 +118,27 @@ foreach ($tab in $OGN_TABELLEN) {
   Write-Host "   $tab.csv ..."
   ssh $Server "cd $REMOTE_DIR && python3 -c `"$py`"" |
     Out-File -Encoding utf8 "data/ogn_local/$tab.csv"
+}
+
+Write-Host ""
+Write-Host "== 5) Wetter-Archiv additiv nach data/weather_archive/ (nur fehlende Tage) =="
+# Klasse A (docs/DATENKONZEPT.md): Belege liegen auf dem Server, die Kopie
+# ausser Haus ist das Hetzner Server-Backup. Diese zweite Kopie hier ist
+# freiwillig und additiv - es wird nur geholt, was lokal fehlt, nie
+# ueberschrieben, nie geloescht. ~10 MB je Tag.
+if (-not (Test-Path "data/weather_archive")) {
+  New-Item -ItemType Directory -Force "data/weather_archive" | Out-Null
+}
+$remote = ssh $Server "ls $REMOTE_DIR/data/weather_archive/" 2>$null |
+  Where-Object { $_ -match '^\d{4}-\d{2}-\d{2}\.json$' }
+$fehlend = @($remote | Where-Object { -not (Test-Path "data/weather_archive/$_") })
+if ($fehlend.Count -gt 0) {
+  Write-Host "   $($fehlend.Count) fehlende Tage ..."
+  foreach ($tag in $fehlend) {
+    scp "${Server}:$REMOTE_DIR/data/weather_archive/$tag" "data/weather_archive/$tag"
+  }
+} else {
+  Write-Host "   nichts fehlt"
 }
 
 Write-Host ""

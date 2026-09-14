@@ -4,8 +4,9 @@
 # -------------------------
 # NUR auf dem LOKALEN DEV-PC ausfuehren (NICHT auf dem Server).
 #
-# Idee: Der Server macht die (teuren) Analysen + haelt die Wetterdaten und
-# committet/pusht sie. Der lokale PC soll diese Staende nur ZIEHEN, damit man
+# Idee: Der Server macht die (teuren) Analysen + haelt die Wetterdaten. Seit
+# 14.09.2026 committet er davon nichts mehr (docs/DATENKONZEPT.md); getrackt
+# ist nur noch data/labeled_examples.jsonl. Der lokale PC soll ZIEHEN, damit man
 # lokal mit echten Daten am Code arbeiten kann - ohne die Pipeline lokal laufen
 # zu lassen. Lokale Aenderungen an diesen Daten sollen NIE zurueckgepusht werden.
 #
@@ -27,16 +28,12 @@ cd "$(git rev-parse --show-toplevel)"
 
 # Einzelne, namentlich bekannte Server-Daten-Dateien:
 FILES=(
-  data/region_analyses_en.json
-  data/spot_analyses_en.json
-  data/synoptic_context.json
-  data/labeled_examples.jsonl
+  data/labeled_examples.jsonl   # einzige getrackte Server-Datei (docs/DATENKONZEPT.md)
 )
 
-# Ganze Ordner mit taeglich neuen Dateien (Server committet dort neu):
-DIRS=(
-  data/weather_archive
-)
+# Ganze Ordner mit taeglich neuen Dateien: seit 14.09.2026 keine mehr -
+# data/weather_archive/ und data/synoptic_audit/ stehen in .gitignore.
+DIRS=()
 
 echo "== 1) skip-worktree fuer getrackte Server-Daten setzen =="
 # Nur wirklich getrackte Pfade an update-index geben:
@@ -63,7 +60,7 @@ done
 echo "== 3) git-Alias 'sync' anlegen =="
 git config alias.sync '!f() { \
   root=$(git rev-parse --show-toplevel); cd "$root"; \
-  files=$(git ls-files data/region_analyses_en.json data/spot_analyses_en.json data/synoptic_context.json data/labeled_examples.jsonl data/weather_archive); \
+  files=$(git ls-files data/labeled_examples.jsonl); \
   [ -n "$files" ] && echo "$files" | xargs git update-index --no-skip-worktree; \
   [ -n "$files" ] && echo "$files" | xargs git checkout --; \
   git pull --no-rebase; \

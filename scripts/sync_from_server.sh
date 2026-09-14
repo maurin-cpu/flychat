@@ -8,8 +8,8 @@
 # gleiche Ansicht hat wie der Server - OHNE lokal die Pipeline laufen zu lassen.
 #
 # WICHTIG: Die App liest zur Laufzeit Dateien, die auf dem Server-DATENTRAEGER
-# oft NEUER sind als der letzte git-Commit (Analyse-Job schreibt taeglich,
-# committet aber nur ~1x/Tag mit Versatz). Deshalb holen wir die view-relevanten
+# nicht in git liegen (Analyse-Job schreibt taeglich; seit 14.09.2026 wird
+# davon nichts mehr committet - docs/DATENKONZEPT.md). Deshalb holen wir die view-relevanten
 # Dateien direkt per rsync vom Datentraeger - NICHT ueber git:
 #   - config_overrides.json  (LANG=en etc.)
 #   - spot_analyses_en.json / region_analyses_en.json  (aktuelle Fliegbarkeit)
@@ -42,34 +42,16 @@ FROM_DISK=(
   # Synoptik-Teil lokal wortlos.
   data/synoptic_context.json
   data/synoptic_grid.json
+  data/labeled_examples.jsonl    # auf dem Server beschriftet (Admin-UI), getrackt
   data/wetterdaten.json          # gross (~200 MB) -> zuletzt
 )
-# getrackte Analyse-Dateien: vor git pull lokale Aenderungen verwerfen, damit
-# pull nicht mit "clean your working tree" abbricht (auch DE, falls frueher mal
-# per scp ueberschrieben):
-TRACKED_DISK=(
-  data/spot_analyses_en.json data/region_analyses_en.json
-  data/spot_analyses.json data/region_analyses.json
-)
+# Seit 14.09.2026 (docs/DATENKONZEPT.md) ist nichts mehr getrackt, was der
+# Server erzeugt - kein skip-worktree, kein Freigeben vor dem Pull. Einzige
+# Ausnahme bleibt data/labeled_examples.jsonl: auf dem Server beschriftet,
+# per rsync geholt, vom Entwicklungsrechner aus committet.
 
-# getrackte Server-Daten, die lokal NIE gepusht werden duerfen:
-NO_PUSH=(
-  data/spot_analyses_en.json data/region_analyses_en.json
-  data/spot_analyses.json data/region_analyses.json
-  data/synoptic_context.json data/labeled_examples.jsonl
-)
-extra="$(git ls-files data/weather_archive)"
-[ -n "$extra" ] && while IFS= read -r line; do NO_PUSH+=("$line"); done <<< "$extra"
-
-echo "== 0) getrackte Analysen fuer sauberen git pull freigeben =="
-git update-index --no-skip-worktree "${TRACKED_DISK[@]}" 2>/dev/null || true
-git checkout -- "${TRACKED_DISK[@]}" 2>/dev/null || true
-
-echo "== 1) git pull (nur Code relevant; Daten kommen unten frisch per rsync) =="
+echo "== 1) git pull (nur Code; Daten kommen unten frisch per rsync) =="
 git pull --no-rebase || echo "   git pull-Hinweis beachten."
-
-echo "== 2) skip-worktree setzen -> lokale Daten werden nie gepusht =="
-printf '%s\n' "${NO_PUSH[@]}" | xargs git update-index --skip-worktree 2>/dev/null || true
 
 echo "== 3) aktuelle view-Daten vom Server-Datentraeger holen ($SERVER) =="
 for f in "${FROM_DISK[@]}"; do
@@ -113,6 +95,14 @@ rsync -az --info=progress2 \
   "$SERVER:$REMOTE_DIR/validation/gewitter/scoreboard.json" \
   "$SERVER:$REMOTE_DIR/validation/gewitter/AUTO_REPORT.md" \
   validation/gewitter/
+
+echo "== 5) Wetter-Archiv additiv nach data/weather_archive/ (nur fehlende Tage) =="
+# Klasse A (docs/DATENKONZEPT.md): Belege liegen auf dem Server, die Kopie
+# ausser Haus ist das Hetzner Server-Backup. Diese zweite Kopie hier ist
+# freiwillig und additiv - nur holen, was fehlt, nie ueberschreiben, nie
+# loeschen (kein --delete). ~10 MB je Tag.
+mkdir -p data/weather_archive
+rsync -az --info=progress2 --ignore-existing   "$SERVER:$REMOTE_DIR/data/weather_archive/" data/weather_archive/
 
 echo ""
 echo "FERTIG. Lokal = aktueller Server-Stand (Analysen inkl. Tag 3 + Wetterdaten). App neu starten."
