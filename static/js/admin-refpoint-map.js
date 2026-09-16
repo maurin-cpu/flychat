@@ -36,7 +36,7 @@
             attributionControl: true,
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+        L.tileLayer(wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png'), {
             attribution: '© OpenStreetMap, © CARTO',
             subdomains: 'abcd', maxZoom: 19,
         }).addTo(map);
@@ -45,7 +45,7 @@
             attribution: 'Hillshade: Esri', opacity: 0.35, maxZoom: 19,
         }).addTo(map);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+        L.tileLayer(wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'), {
             attribution: '', subdomains: 'abcd', maxZoom: 19, pane: 'shadowPane',
         }).addTo(map);
 

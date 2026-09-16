@@ -163,11 +163,11 @@
 
     // Sehr zurueckhaltende Basemap: die Druckbaender/Isobaren sind die Figur,
     // die Karte nur der Grund. Ortslabels stark gedimmt (nur Orientierung).
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+    L.tileLayer(wcCartoUrl("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"), {
       subdomains: "abcd",
       maxZoom: 18,
     }).addTo(map);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png", {
+    L.tileLayer(wcCartoUrl("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"), {
       subdomains: "abcd",
       maxZoom: 18,
       opacity: 0.38,

@@ -1215,6 +1215,12 @@ POSTHOG_KEY     = os.environ.get("POSTHOG_KEY", "").strip()
 POSTHOG_HOST    = os.environ.get("POSTHOG_HOST", "https://eu.i.posthog.com").strip()
 POSTHOG_UI_HOST = os.environ.get("POSTHOG_UI_HOST", "https://eu.posthog.com").strip()
 
+# Carto-Basiskarten: seit 28.08.2026 verlangt Carto einen Key, sonst liegt
+# "API KEY REQUIRED" als Wasserzeichen ueber jeder Kachel (Gratis-Key mit
+# 5 Mio. Kacheln/Monat: https://carto.com/basemaps/apikey/). Leerer Key =>
+# Kacheln werden wie bisher ohne Key geladen, also mit Wasserzeichen.
+CARTO_API_KEY   = os.environ.get("CARTO_API_KEY", "").strip()
+
 # Infomaniak SMTP (Standardwerte aus ihrer Doku; Port 465 SSL oder 587 STARTTLS)
 SMTP_HOST       = os.environ.get("SMTP_HOST", "mail.infomaniak.com")
 SMTP_PORT       = int(os.environ.get("SMTP_PORT", "465"))

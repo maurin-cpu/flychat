@@ -304,10 +304,10 @@
     // Ortslabels stark gedimmt. Der Embed hatte die Label-Ebene nicht und
     // wirkte dadurch leer — die Darstellung soll in beiden Ansichten
     // dieselbe sein.
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+    L.tileLayer(wcCartoUrl("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"), {
       subdomains: "abcd", maxZoom: 18,
     }).addTo(map);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png", {
+    L.tileLayer(wcCartoUrl("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"), {
       subdomains: "abcd", maxZoom: 18, opacity: 0.38,
     }).addTo(map);
 

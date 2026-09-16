@@ -155,7 +155,7 @@
         // (minZoom 9) blieb das RAUSzoomen unter Stufe 9 ungedeckt: genau da
         // sah man wieder graue Kacheln, solange die Vektor-Karte noch nicht
         // uebernommen hat.
-        cartoRasterEbenen.push(L.tileLayer('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+        cartoRasterEbenen.push(L.tileLayer(wcCartoUrl('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'), {
             maxNativeZoom: 6, maxZoom: 18, minZoom: 0, keepBuffer: 16,
             updateWhenIdle: false, updateWhenZooming: false,
             className: 'wc-tiles-preview',
@@ -166,8 +166,8 @@
         // flachen Farbflaechen-Grundkarte auf kleinem Display nicht sichtbar,
         // beim Pannen aber deutlich spuerbar. Labels-Layer bleibt @2x (Textschaerfe).
         var baseTileUrl = (window.innerWidth <= 900)
-            ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'
-            : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
+            ? wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png')
+            : wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png');
         cartoRasterEbenen.push(L.tileLayer(baseTileUrl, Object.assign({
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
             subdomains: 'a',
@@ -237,7 +237,7 @@
 
         // Labels über der Schummerung (der Vektor-Stil bringt eigene mit,
         // deshalb gehoert auch diese Ebene zu den abloesbaren Raster-Ebenen)
-        cartoRasterEbenen.push(L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
+        cartoRasterEbenen.push(L.tileLayer(wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'), Object.assign({
             subdomains: 'a',
             maxZoom: 18,
         }, tileOpts)).addTo(map));

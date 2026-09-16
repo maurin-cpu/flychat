@@ -132,7 +132,7 @@
         zoomControl: true, attributionControl: false,
         scrollWheelZoom: false, dragging: true, touchZoom: true, doubleClickZoom: false,
       });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      L.tileLayer(wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'), {
         subdomains: 'abcd', maxZoom: 14,
       }).addTo(mapObj);
       mapState.map = mapObj;

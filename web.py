@@ -174,6 +174,13 @@ def _inject_analytics():
 
 
 @app.context_processor
+def _inject_map_config():
+    """Carto-Key fuer base.html. Client-seitiger Basemap-Key, gehoert also
+    ins Frontend — im Carto-Konto auf die Domain beschraenken."""
+    return {"carto_api_key": config.CARTO_API_KEY}
+
+
+@app.context_processor
 def _inject_test_mode_flag():
     """Globales Flag fuer den persistenten Test-Mode-Banner in base.html.
 

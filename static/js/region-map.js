@@ -253,7 +253,7 @@
 
         // Grobe Vorschau-Unterlage fuer die Raster-Phase (Begruendung map.js):
         // deckt jede Zoomrichtung, bis die Vektor-Karte uebernimmt.
-        cartoRasterEbenen.push(L.tileLayer('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+        cartoRasterEbenen.push(L.tileLayer(wcCartoUrl('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'), {
             maxNativeZoom: 6, maxZoom: 18, minZoom: 0, keepBuffer: 16,
             updateWhenIdle: false, updateWhenZooming: false,
             className: 'wc-tiles-preview',
@@ -261,8 +261,8 @@
 
         // Grundkarte mobil in Normalaufloesung — Begruendung siehe map.js
         var baseTileUrl = (window.innerWidth <= 900)
-            ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png'
-            : 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
+            ? wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png')
+            : wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png');
         cartoRasterEbenen.push(L.tileLayer(baseTileUrl, Object.assign({
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
             subdomains: 'a',
@@ -280,7 +280,7 @@
             }, tileOpts)).addTo(map);
         }
 
-        cartoRasterEbenen.push(L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', Object.assign({
+        cartoRasterEbenen.push(L.tileLayer(wcCartoUrl('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'), Object.assign({
             subdomains: 'a',
             maxZoom: 18,
         }, tileOpts)).addTo(map));

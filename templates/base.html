@@ -25,6 +25,15 @@
     <!-- i18n fürs Frontend-JS: aktive Sprache + kuratiertes String-Subset (i18n.js_i18n()).
          Muss VOR allen Page-Scripts laden. wcT(key, vars) = JS-Pendant zu Python t(). -->
     <script>
+        // Carto-Basiskarten brauchen seit 28.08.2026 einen Key, sonst liegt
+        // "API KEY REQUIRED" ueber jeder Kachel. wcCartoUrl() haengt ihn an;
+        // ohne Key bleibt die URL unveraendert (Wasserzeichen, aber Karte laedt).
+        window.WC_CARTO_KEY = {{ carto_api_key|default('', true)|tojson }};
+        window.wcCartoUrl = function (url) {
+            if (!window.WC_CARTO_KEY) return url;
+            return url + (url.indexOf("?") === -1 ? "?" : "&") +
+                   "key=" + encodeURIComponent(window.WC_CARTO_KEY);
+        };
         window.WC_LANG = {{ lang|tojson }};
         window.WC_I18N = {{ js_i18n|tojson }};
         window.wcT = function (key, vars) {

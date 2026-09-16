@@ -28,7 +28,7 @@
 (function () {
     'use strict';
 
-    var STYLE_URL = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+    var STYLE_URL = wcCartoUrl('https://basemaps.cartocdn.com/gl/positron-gl-style/style.json');
     var WARTE_INTERVALL_MS = 400;   // Poll: Bibliothek geladen? Container sichtbar?
     var WARTE_MAX_MS = 30000;       // danach endgueltig beim Raster bleiben
 
