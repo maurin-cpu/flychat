@@ -21,5 +21,14 @@ if ! sudo cmp -s caddyfile /etc/caddy/Caddyfile; then
         && echo "=== Caddy-Konfig aktualisiert ==="
 fi
 sudo systemctl restart wingcast
+# MCP-Server (docs/MCP_SERVER.md): Unit-Datei aus dem Repo installieren, wenn neu/geaendert.
+if ! sudo cmp -s wingcast-mcp.service /etc/systemd/system/wingcast-mcp.service; then
+    sudo cp wingcast-mcp.service /etc/systemd/system/wingcast-mcp.service \
+        && sudo systemctl daemon-reload \
+        && sudo systemctl enable wingcast-mcp \
+        && echo "=== wingcast-mcp.service installiert ==="
+fi
+sudo systemctl restart wingcast-mcp
 echo "=== Deploy fertig ==="
 sudo systemctl status wingcast --no-pager | head -5
+sudo systemctl status wingcast-mcp --no-pager | head -5

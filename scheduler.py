@@ -748,6 +748,24 @@ def _run_ogn_sessions() -> bool:
         return False
 
 
+def _run_mcp_export(engine) -> bool:
+    """Schreibt den Export fuer den MCP-Server (data/mcp_export/, docs/MCP_SERVER.md).
+
+    Direkt nach dem Wetter-Refresh, vor der LLM-Analyse: der Export ist rein
+    deterministisch (Rohdaten + Engine-Caches) und braucht keine Analysen.
+    Failure-tolerant wie _run_snapshot — ein Fehler hier darf den Daily-Run
+    nicht stoppen; der MCP-Server meldet dann selbst, dass sein Stand alt ist.
+    """
+    try:
+        from mcp_server.export import build_export
+        build_dir = build_export(engine)
+        logger.info("Daily run: MCP-Export OK (%s)", build_dir)
+        return True
+    except Exception as e:
+        logger.exception("Daily run: MCP-Export fehlgeschlagen: %s", e)
+        return False
+
+
 def _daily_run(engine) -> dict:
     """Sequenzieller Daily-Job: refresh_weather -> LLM-Analyse -> Briefings -> Snapshot.
 
@@ -763,6 +781,9 @@ def _daily_run(engine) -> dict:
     except Exception as e:
         logger.exception("Daily run: Wetter-Refresh fehlgeschlagen — Briefings "
                          "laufen mit Cache-Daten weiter: %s", e)
+
+    logger.info("Daily run: starte MCP-Export...")
+    _run_mcp_export(engine)
 
     logger.info("Daily run: starte LLM-Analyse...")
     _run_llm_analysis(engine)

@@ -2482,6 +2482,9 @@ class WeatherContextMixin:
             "wind_ok_count": len(wind_ok_hours),
             "wind_wrong_count": len(wind_wrong_hours),
             "clean_hours_count": len(clean_hours),
+            # Stundenliste der sauberen Stunden ("HH:00"), damit der MCP-Export
+            # (mcp_server/export.py) die Fenster nicht aus dem Text zurueckparsen muss.
+            "clean_hour_list": list(clean_hours),
             "longest_clean_run_hours": longest_clean_run,
             "active_window_start": active_window_start,
             "max_wind_swing_deg": round(max_swing_deg, 1),

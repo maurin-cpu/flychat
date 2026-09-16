@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "wingcast": {
+      "command": "python",
+      "args": ["-m", "mcp_server", "--transport", "stdio"],
+      "env": {
+        "WINGCAST_MCP_EXPORT_DIR": "data/mcp_export",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}

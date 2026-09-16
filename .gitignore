@@ -142,3 +142,6 @@ data/ogn_salt.txt
 
 # Anbietervergleich 08/2026: gesicherter Referenzlauf, lokal (wie data/test_runs)
 reference_deepseek/
+
+# MCP-Export (Klasse C, wird aus wetterdaten.json neu gebaut — mcp_server/export.py)
+data/mcp_export/

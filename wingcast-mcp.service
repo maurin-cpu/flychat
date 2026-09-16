@@ -1,0 +1,21 @@
+[Unit]
+Description=Wingcast MCP-Server (Forecast-Daten fuer externes Claude)
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/home/deploy/flychat
+EnvironmentFile=/home/deploy/flychat/.env
+Environment="WINGCAST_MCP_EXPORT_DIR=/home/deploy/flychat/data/mcp_export"
+Environment="WINGCAST_MCP_HOSTS=app.wingcast.ch,localhost:5100,127.0.0.1:5100"
+Environment="WINGCAST_MCP_RATE_PER_MIN=60"
+Environment="PYTHONIOENCODING=utf-8"
+ExecStart=/home/deploy/flychat/.venv/bin/python -m mcp_server --transport streamable-http --host 127.0.0.1 --port 5100
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
