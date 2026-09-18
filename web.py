@@ -2624,6 +2624,48 @@ def synoptik_page():
     return render_template("synoptik.html", forecast_days=current_max_days())
 
 
+@app.route("/api/synoptic/fronts", methods=["GET"])
+def api_synoptic_fronts():
+    """DWD-Fronten zum Karten-Timestep: ?ts=YYYY-MM-DDTHH:MM (lokale CH-Zeit,
+    wie /api/synoptic/grid die Timesteps liefert).
+
+    Heute die Bodenanalyse, an Folgetagen die Vorhersagekarte des juengsten
+    Laufs — jeweils die mit der Gueltigkeit am naechsten (engine/fronten.py).
+    Keine passende Karte: fronts = null, die Karte zeigt dann keine Fronten.
+    Ausgeliefert wird nur, was die Karte braucht: Linie + Typ je Front und die
+    Namensnennung (GeoNutzV) — keine Archivpfade des Servers.
+    """
+    from engine.fronten import select_for_timestep
+
+    sel = select_for_timestep(request.args.get("ts", ""))
+    if not sel:
+        return jsonify({"success": True, "fronts": None})
+    feats = []
+    for f in (sel["geojson"].get("features") or []):
+        typ = (f.get("properties") or {}).get("typ")
+        geom = f.get("geometry") or {}
+        if typ in ("kalt", "warm", "okklusion") and geom.get("type") == "LineString":
+            feats.append({"type": "Feature", "properties": {"typ": typ}, "geometry": geom})
+    return jsonify({
+        "success": True,
+        "fronts": {"type": "FeatureCollection", "features": feats},
+        "kind": sel["kind"],
+        "valid": sel["valid"],
+        "lead_h": sel["lead_h"],
+        "copyright": (sel["geojson"].get("properties") or {}).get(
+            "copyright", "\u00a9 Deutscher Wetterdienst, vektorisiert und damit veraendert"),
+    })
+
+
+@app.route("/api/synoptic/fronts/times", methods=["GET"])
+def api_synoptic_fronts_times():
+    """Zeitpunkte, zu denen es eine Frontkarte gibt (lokale Timestep-Strings).
+    Die Synoptik-Seite zeigt nur Timesteps innerhalb `tolerance_h` davon."""
+    from engine.fronten import available_valid_times_local
+    return jsonify({"success": True, "valid": available_valid_times_local(),
+                    "tolerance_h": config.SYNOPTIC_FRONTS_TIMELINE_TOLERANCE_H})
+
+
 @app.route("/api/synoptic/grid", methods=["GET"])
 def api_synoptic_grid():
     """Liefert das dichte Druckraster + Zentren fuer die Synoptik-Karte.

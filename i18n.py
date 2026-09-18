@@ -915,6 +915,10 @@ STRINGS: dict[str, dict[str, str]] = {
     # Der Embed zeigt bewusst KEINEN Wind (nur die interaktive Karte tut das)
     "js.syn.embed_sub": {"de": "Bodendruck & Isobaren", "en": "surface pressure & isobars"},
     "js.syn.embed_asof": {"de": "Stand", "en": "as of"},
+    "js.syn.front_cold": {"de": "Kaltfront", "en": "Cold front"},
+    "js.syn.front_warm": {"de": "Warmfront", "en": "Warm front"},
+    "js.syn.front_occl": {"de": "Okklusion", "en": "Occlusion"},
+    "js.syn.fronts_src": {"de": "Fronten: DWD", "en": "Fronts: DWD"},
     "js.syn.embed_link": {"de": "Interaktive Karte", "en": "Interactive map"},
     "js.syn.embed_aria": {"de": "Synoptik-Karte öffnen", "en": "Open the synoptic map"},
 

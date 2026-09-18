@@ -636,6 +636,10 @@ SYNOPTIC_ZONE_LABELS = {
     "graubuenden_engadin": {"de": "Graubuenden & Engadin",
                             "en": "Grisons & Engadine"},
 }
+# Synoptik-Seite: nur Zeitpunkte zeigen, die hoechstens so viele Stunden von
+# einer DWD-Frontkarte entfernt liegen (Analyse 00/12 UTC, Vorhersage +36/48/
+# 60/84/108 h -> lokal 02:00/14:00; die 6-h-Timesteps 00:00/12:00 passen).
+SYNOPTIC_FRONTS_TIMELINE_TOLERANCE_H = 3
 # Tagesfenster (lokale Stunden, [start, end)) — Niederschlag/Wind werden pro
 # Fenster aggregiert, damit der Block Tagesverlauf statt Tagespauschale kann
 # ("Vormittag trocken, ab dem Nachmittag Zellen"). Vorfall 25.07.2026:

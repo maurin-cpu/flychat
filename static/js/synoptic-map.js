@@ -90,6 +90,7 @@
   var timer = null;
   var fillScale = null;       // lazy — d3 muss geladen sein
   var windLayer = null;       // WingcastWind-Handle (synoptic-wind.js)
+  var frontsLayer = null;     // WCSynopticFronts-Handle (synoptic-fronts.js)
   var windAvailable = false;  // 700-hPa-Wind im Grid vorhanden? (sonst Layer aus)
 
   function $(id) { return document.getElementById(id); }
@@ -569,6 +570,13 @@
     // Wind-Partikel auf das Druckfeld dieses Timesteps umschalten (Partikel
     // behalten ihre Position und morphen in die neue Stroemung).
     if (windLayer) windLayer.setTimestep(ts);
+
+    // DWD-Fronten zum selben Zeitpunkt (heute Analyse, danach Vorhersage)
+    if (!frontsLayer && window.WCSynopticFronts) {
+      // groessere Karte, groessere Symbole; Legende als Card unter Druck/Wind
+      frontsLayer = window.WCSynopticFronts.create(map, { legend: "card", scale: 1.25 });
+    }
+    if (frontsLayer) frontsLayer.update(state.grid, ts);
   }
 
   // ===== ZEITSTEUERUNG / ANIMATION =========================================
@@ -976,10 +984,25 @@
     if (txt) txt.textContent = msg;
   }
 
-  function applyData(data) {
+  // Nur Zeitpunkte mit Frontkarte zeigen (User 17.09.2026): Timesteps, die
+  // weiter als tolerance_h von jeder DWD-Gueltigkeit entfernt liegen, fallen
+  // aus der Zeitleiste. Bleibt nichts uebrig (kein Archiv, alter Server),
+  // bleibt die Leiste wie sie war — lieber Karte ohne Fronten als keine Karte.
+  function timestepsWithFronts(timesteps, fronts) {
+    if (!fronts || !fronts.valid || !fronts.valid.length) return timesteps;
+    var tol = (fronts.tolerance_h || 3) * 3600 * 1000;
+    var valid = fronts.valid.map(function (v) { return new Date(v).getTime(); });
+    var kept = timesteps.filter(function (ts) {
+      var t = new Date(ts).getTime();
+      return valid.some(function (v) { return Math.abs(v - t) <= tol; });
+    });
+    return kept.length ? kept : timesteps;
+  }
+
+  function applyData(data, fronts) {
     state.grid = data.grid;
     state.wetterlage = data.wetterlage || null;
-    state.timesteps = (data.grid.timesteps || []).slice();
+    state.timesteps = timestepsWithFronts((data.grid.timesteps || []).slice(), fronts);
     state.cache = {};
 
     // Startframe: 12:00 des ersten Tages wenn vorhanden, sonst erster Timestep
@@ -1040,6 +1063,10 @@
   }
 
   function loadData(autoplay) {
+    // Frontzeiten parallel — fehlen sie, laeuft die Karte ohne Filter weiter
+    var frontsP = fetch("/api/synoptic/fronts/times")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
     return fetch("/api/synoptic/grid")
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -1047,7 +1074,9 @@
       })
       .then(function (data) {
         if (!data.success || !data.grid) throw new Error(data.error || "no grid");
-        applyData(data);
+        return frontsP.then(function (fronts) { return applyData(data, fronts); });
+      })
+      .then(function () {
         // Autoplay-Loop — bei prefers-reduced-motion pausiert starten
         if (autoplay && !state.reducedMotion && state.timesteps.length > 1) play();
       })

@@ -432,6 +432,7 @@
   var _card = null, _mapEl = null;
   var _grid = null, _generatedAt = null;
   var _map = null;
+  var _fronts = null;    // Fronten-Layer (synoptic-fronts.js)
   var _date = null;      // gewuenschter Briefing-Tag ("YYYY-MM-DD") oder null
   var _shownTs = null;   // aktuell gerenderter Timestep (Re-Render vermeiden)
 
@@ -441,6 +442,7 @@
     if (ts === _shownTs) return;
     // Leaflet-Karte vollstaendig ersetzen: die Kontur-Pipeline haengt am
     // Timestep, ein Layer-Austausch spart nichts Spuerbares bei 1x/Tag-Daten.
+    if (_fronts) { _fronts.destroy(); _fronts = null; }
     if (_map) { _map.remove(); _map = null; }
     _mapEl.innerHTML = "";
     // Karte erst sichtbar machen (Leaflet braucht reale Groesse), dann rendern
@@ -451,6 +453,14 @@
     if (sub) sub.textContent = "· " + wcT("js.syn.embed_asof") + " " + fmtTs(ts);
     _map = render(_mapEl, _grid, ts);
     _shownTs = ts;
+    // Fronten zum selben Timestep. data-fronts-ready sagt dem Karten-Screenshot
+    // fuers Morgenbriefing (scripts/synoptik_snapshot.js), dass sie gezeichnet sind.
+    _mapEl.removeAttribute("data-fronts-ready");
+    if (window.WCSynopticFronts) {
+      _fronts = window.WCSynopticFronts.create(_map, { legend: true });
+      var el = _mapEl;
+      _fronts.update(_grid, ts).then(function () { el.setAttribute("data-fronts-ready", "1"); });
+    }
   }
 
   window.WCSynopticEmbed = {
