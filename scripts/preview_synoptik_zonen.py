@@ -38,6 +38,8 @@ def build_ctx(weather_cache: dict, old_ctx: dict) -> dict:
     ctx["wind_zones"] = sc.decide_wind_pattern_zones(weather_cache, dates,
                                                      zone_map)
     ctx["zugbahn"] = sc.decide_zugbahn(weather_cache, dates, zone_map)
+    ctx["aloft_regional"] = sc.decide_aloft_regional(weather_cache, dates,
+                                                     sc.build_spot_region_map())
     return ctx
 
 
@@ -85,6 +87,13 @@ def print_overview(title: str, ov: dict) -> None:
             print(f"\n  {e['text']}")
             if e.get("flight_hint"):
                 print(f"     -> {e['flight_hint']}")
+    if ov.get("hazards"):
+        print("\n--- Gefahren schweizweit ---")
+        for h in ov["hazards"]:
+            active = [t for t, c in h["checks"].items() if c["active"]]
+            print(f"  {h['date']}  aktiv: {', '.join(active) or '-'}")
+            for item in h["items"]:
+                print(f"     {item['topic']}: {item['text']}")
     print(f"\n[attempts={ov.get('attempts')} unresolved={ov.get('unresolved')}]")
 
 
@@ -132,6 +141,7 @@ def main() -> int:
          "precip_zones": ctx["precip_zones"],
          "wind_zones": ctx["wind_zones"],
          "zugbahn": ctx["zugbahn"],
+         "aloft_regional": ctx["aloft_regional"],
          "llm_overview_neu": new_ov,
          "llm_overview_alt": old_ctx.get("llm_overview")},
         ensure_ascii=False, indent=2), encoding="utf-8")

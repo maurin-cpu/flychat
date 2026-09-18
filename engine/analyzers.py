@@ -1238,6 +1238,10 @@ class AnalyzersMixin:
                     "comfort_index": entry.get("comfort_index"),
                     # LLM-Einschaetzungssatz fuer Wingcast-Region-Header
                     "recommendation": entry.get("recommendation", "") or "",
+                    # Liegen im Cache, wurden bisher nicht durchgereicht — die
+                    # Briefing-Mail baut ihren Regionen-Block daraus.
+                    "best_window": entry.get("best_window", "") or "",
+                    "tags": entry.get("tags") or [],
                 })
             region_entries.sort(key=lambda e: (
                 _BAND_RANK.get(e.get("safety_band", "no_data"), 4),

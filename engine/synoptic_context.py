@@ -172,6 +172,15 @@ def build_synoptic_context(weather_cache: dict,
         wind_zones = None
         zugbahn = None
 
+    # 8d. Hoehenwind-Spitze je Region (neben dem Schweizer Mittel)
+    try:
+        aloft_regional = decide_aloft_regional(weather_cache, forecast_dates,
+                                               build_spot_region_map())
+        decisions_applied.append("decide_aloft_regional")
+    except Exception:
+        logger.exception("Hoehenwind regional fehlgeschlagen — Feld fehlt")
+        aloft_regional = None
+
     current_month = datetime.now().month
     ssg = decide_schneefallgrenze(snapshots, current_month)
     if ssg:
@@ -212,6 +221,7 @@ def build_synoptic_context(weather_cache: dict,
         "wind_pattern": wind_pattern,
         "precip_zones": precip_zones,
         "wind_zones": wind_zones,
+        "aloft_regional": aloft_regional,
         "zugbahn": zugbahn,
         "schneefallgrenze": ssg,
         "confidence_per_day": [
@@ -994,8 +1004,14 @@ def decide_vb_lage(grid: list[dict], forecast_dates: list[str]) -> dict:
 def decide_foehn_summary(forecast_dates: list[str]) -> dict:
     """Aggregiert Foehn-Status pro Tag via foehn_indicators.fetch_foehn_data.
 
-    Pro Tag: Stunden 10-16 lokal pruefen, aktiv wenn mind. 2h caution+ in
-    Sued- oder Nord-Richtung.
+    Pro Tag: Stunden im Flugfenster (FLIGHT_HOURS_START..END) pruefen, aktiv
+    ab SYNOPTIC_FOEHN_ACTIVE_MIN_HOURS Stunden caution+ in Sued- oder
+    Nord-Richtung. Gleiche Regel wie die Regions-Analyse
+    (weather_context._format_foehn_info) — damit gilt: hat eine Region Foehn,
+    zeigt ihn auch die Synoptik. evaluate_foehn("Beide") ist je Stunde das
+    Maximum aus "Sued" und "Nord", jede Region-Richtung ist also abgedeckt.
+    Frueher 10-16 Uhr und >= 2 h (Vorfall 16.09.2026: 1 h Nordfoehn,
+    Oberwallis "Foehn maessig", Synoptik "kein Foehn").
 
     Bei API-Fehler: liefert active=False mit source="fetch_failed", damit
     der Synoptik-Block nicht komplett ausfaellt.
@@ -1004,6 +1020,9 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
         fetch_foehn_data, evaluate_foehn,
         THRESHOLD_DELTA_P_CAUTION, THRESHOLD_DELTA_P_DANGER,
     )
+
+    min_hours = config.SYNOPTIC_FOEHN_ACTIVE_MIN_HOURS
+    h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
 
     days_n = max(len(forecast_dates), 2)
     data = fetch_foehn_data(forecast_days=days_n)
@@ -1020,7 +1039,7 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
             "thresholds": {
                 "delta_p_caution_hpa": THRESHOLD_DELTA_P_CAUTION,
                 "delta_p_danger_hpa": THRESHOLD_DELTA_P_DANGER,
-                "active_min_hours": 2,
+                "active_min_hours": min_hours,
             },
         }
 
@@ -1042,13 +1061,29 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
     for date in forecast_dates:
         day_indices = [
             i for i, t in enumerate(times)
-            if t.startswith(date) and 10 <= int(t[11:13]) <= 16
+            if t.startswith(date) and h_start <= int(t[11:13]) < h_end
         ]
         sued_hours = 0
         nord_hours = 0
         peak_sued = "none"
         peak_nord = "none"
+        # Tagesverlauf je Seite: Stunden und Spitze pro Tagesfenster. Ohne das
+        # steht in der Warnung nur "6 h Foehn" — der Pilot will aber wissen, ob
+        # er morgens noch fliegt und der Foehn erst nachmittags durchgreift.
+        win_sued = {w[0]: {"hours": 0, "peak": "none"}
+                    for w in config.SYNOPTIC_DAY_WINDOWS}
+        win_nord = {w[0]: {"hours": 0, "peak": "none"}
+                    for w in config.SYNOPTIC_DAY_WINDOWS}
+
+        def _bucket(hour: int):
+            for wname, h_lo, h_hi in config.SYNOPTIC_DAY_WINDOWS:
+                if h_lo <= hour < h_hi:
+                    return wname
+            return None
+
         for i in day_indices:
+            hour = int(times[i][11:13])
+            wname = _bucket(hour)
             ev_sued = evaluate_foehn(data["nord"], data["sued"], i,
                                      kritischer_foehn="Süd")
             ev_nord = evaluate_foehn(data["nord"], data["sued"], i,
@@ -1056,11 +1091,19 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
             if ev_sued.get("level", "none") != "none":
                 sued_hours += 1
                 peak_sued = _peak(peak_sued, ev_sued["level"])
+                if wname:
+                    win_sued[wname]["hours"] += 1
+                    win_sued[wname]["peak"] = _peak(win_sued[wname]["peak"],
+                                                    ev_sued["level"])
             if ev_nord.get("level", "none") != "none":
                 nord_hours += 1
                 peak_nord = _peak(peak_nord, ev_nord["level"])
-        sued_active = sued_hours >= 2
-        nord_active = nord_hours >= 2
+                if wname:
+                    win_nord[wname]["hours"] += 1
+                    win_nord[wname]["peak"] = _peak(win_nord[wname]["peak"],
+                                                    ev_nord["level"])
+        sued_active = sued_hours >= min_hours
+        nord_active = nord_hours >= min_hours
         per_day.append({
             "date": date,
             "sued_active": sued_active,
@@ -1069,6 +1112,8 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
             "peak_nord": peak_nord,
             "sued_hours": sued_hours,
             "nord_hours": nord_hours,
+            "sued_windows": win_sued,
+            "nord_windows": win_nord,
         })
 
     any_sued = any(d["sued_active"] for d in per_day)
@@ -1106,10 +1151,62 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
         "thresholds": {
             "delta_p_caution_hpa": THRESHOLD_DELTA_P_CAUTION,
             "delta_p_danger_hpa": THRESHOLD_DELTA_P_DANGER,
-            "active_min_hours": 2,
-            "day_hours_checked": [10, 16],
+            "active_min_hours": min_hours,
+            "day_hours_checked": [h_start, h_end - 1],
         },
     }
+
+
+# Stroemungs-Sektor -> Lage-Begriff in Pilotensprache
+_SECTOR_TO_LAGE = {
+    "West": "Westlage",
+    "Suedwest": "Suedwestlage",
+    "Nordwest": "Nordwestlage",
+    "Nord": "Nordlage",
+    "Nordost": "Nordostlage",
+    "Ost": "Ostlage",
+    "Suedost": "Suedostlage",
+    "Sued": "Suedlage",
+}
+
+
+def decide_lage_label_for_day(ctx: dict, date: str) -> dict:
+    """Lage-Label fuer EINEN Tag — gleiche Hierarchie wie decide_lage_label,
+    aber aus den per_day-Feldern.
+
+    decide_lage_label beschreibt das ganze Prognosefenster: am 16.09.2026 stand
+    "Nordfoehnlage" (Foehn erst am Donnerstag) ueber einem Tag mit "Kein Foehn".
+    In der Tages-Sektion des Briefings gilt nur dieser Tag.
+    """
+    def day(key):
+        for d in (ctx.get(key) or {}).get("per_day") or []:
+            if isinstance(d, dict) and d.get("date") == date:
+                return d
+        return {}
+
+    fo = day("foehn")
+    nord, sued = bool(fo.get("nord_active")), bool(fo.get("sued_active"))
+    if nord and sued:
+        return {"value": "Foehnlage (wechselnd)", "trigger": "foehn.both"}
+    if sued:
+        return {"value": "Suedfoehnlage", "trigger": "foehn.sued_active"}
+    if nord:
+        return {"value": "Nordfoehnlage", "trigger": "foehn.nord_active"}
+    if day("vb_lage").get("active"):
+        return {"value": "Genua-Tief", "trigger": "vb_lage.active"}
+    if day("bise").get("active"):
+        return {"value": "Bisenlage", "trigger": "bise.active"}
+    flow = day("flow_overhead")
+    sector, strength = flow.get("sector"), flow.get("strength")
+    if sector and sector != "unbekannt" and strength and strength != "schwach":
+        return {"value": _SECTOR_TO_LAGE.get(sector, f"{sector}lage"),
+                "trigger": f"flow.sector={sector},strength={strength}"}
+    regime = day("pressure_influence").get("regime")
+    if regime == "Hochdruck":
+        return {"value": "Hochdrucklage", "trigger": "regime=Hochdruck"}
+    if regime in ("Tiefdruck", "starker Tiefdruck"):
+        return {"value": "Tiefdrucklage", "trigger": f"regime={regime}"}
+    return {"value": "unbestimmt", "trigger": "no_trigger_fired"}
 
 
 def decide_lage_label(pressure_influence: dict, flow_overhead: dict,
@@ -1170,18 +1267,7 @@ def decide_lage_label(pressure_influence: dict, flow_overhead: dict,
     flow_sector = flow_overhead.get("value") if flow_overhead else None
     flow_strength = flow_overhead.get("strength") if flow_overhead else None
     if flow_sector and flow_sector != "unbekannt" and flow_strength != "schwach":
-        # Mapping Sektor -> Lage-Begriff in Pilotensprache
-        sector_to_lage = {
-            "West": "Westlage",
-            "Suedwest": "Suedwestlage",
-            "Nordwest": "Nordwestlage",
-            "Nord": "Nordlage",
-            "Nordost": "Nordostlage",
-            "Ost": "Ostlage",
-            "Suedost": "Suedostlage",
-            "Sued": "Suedlage",
-        }
-        lage = sector_to_lage.get(flow_sector, f"{flow_sector}lage")
+        lage = _SECTOR_TO_LAGE.get(flow_sector, f"{flow_sector}lage")
         return {
             "value": lage,
             "decided_by": "decide_lage_label",
@@ -1596,6 +1682,81 @@ def decide_wind_pattern_nord_sued(weather_cache: dict,
 # Spots erben die Zone ueber ihr analyse_region-Feld. Regionen werden NIE
 # aufgeteilt — damit laesst sich die Synoptik spaeter sauber auf
 # Regionen-Analysen herunterbrechen (Hierarchie Spot -> Region -> Zone -> CH).
+
+
+def build_spot_region_map() -> dict[str, str]:
+    """{sanitisierter Spot-Name: analyse_region} — der Regionsname, wie ihn
+    App und Briefing anzeigen. Spots ohne analyse_region fehlen."""
+    import spots as spots_mod
+    return {s["name"]: (s.get("analyse_region") or "").strip()
+            for s in spots_mod.load_spots()
+            if (s.get("analyse_region") or "").strip()}
+
+
+def decide_aloft_regional(weather_cache: dict, forecast_dates: list[str],
+                          region_map: dict[str, str]) -> dict:
+    """Staerkster Hoehenwind (700 hPa) je Tag auf Regionsebene.
+
+    Das Schweizer Mittel in flow_overhead ist ein Vektor-Mittel: gegenlaeufige
+    Winde heben sich auf, und 18 km/h im Mittel standen am 16.09.2026 neben
+    Regionen, die verblasen waren. Deshalb zusaetzlich die Spitze — ohne
+    Ausreisser:
+      1. je Region und Stunde der MEDIAN ueber ihre Spots (ein einzelner Spot
+         kann den Wert nicht treiben; Regionen unter
+         SYNOPTIC_ALOFT_REGION_MIN_SPOTS zaehlen nicht mit)
+      2. je Region die Spitze dieser Stundenwerte im Flugfenster
+         FLIGHT_HOURS_START..END
+      3. die staerkste Region — eine genuegt fuer "regional bis xx km/h"
+
+    Returns: {"per_day": [{"date", "max_kmh", "region", "hour", "top",
+              "n_regions"}], "decided_by", "thresholds"}
+      top — die drei staerksten Regionen [{"region", "kmh"}]
+    """
+    min_spots = config.SYNOPTIC_ALOFT_REGION_MIN_SPOTS
+    h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
+    spots_by_region: dict[str, list[str]] = {}
+    for spot, region in region_map.items():
+        if spot in weather_cache:
+            spots_by_region.setdefault(region, []).append(spot)
+
+    per_day = []
+    for date in forecast_dates:
+        peaks = []   # (kmh, region, hour)
+        for region, spot_names in spots_by_region.items():
+            best = None
+            for hour in range(h_start, h_end):
+                key = f"{date}T{hour:02d}:00"
+                vals = []
+                for name in spot_names:
+                    rec = ((weather_cache[name].get("pressure_level_data") or {})
+                           .get(key) or {})
+                    v = rec.get("wind_speed_700hPa")
+                    if isinstance(v, (int, float)):
+                        vals.append(v)
+                if len(vals) < min_spots:
+                    continue
+                med = statistics.median(vals)
+                if best is None or med > best[0]:
+                    best = (med, hour)
+            if best is not None:
+                peaks.append((best[0], region, best[1]))
+        peaks.sort(key=lambda p: -p[0])
+        if not peaks:
+            per_day.append({"date": date, "max_kmh": None, "region": None,
+                            "hour": None, "top": [], "n_regions": 0})
+            continue
+        kmh, region, hour = peaks[0]
+        per_day.append({
+            "date": date, "max_kmh": round(kmh), "region": region, "hour": hour,
+            "top": [{"region": r, "kmh": round(k)} for k, r, _ in peaks[:3]],
+            "n_regions": len(peaks),
+        })
+    return {
+        "per_day": per_day,
+        "decided_by": "decide_aloft_regional",
+        "thresholds": {"region_min_spots": min_spots,
+                       "hours": [h_start, h_end], "level_hpa": 700},
+    }
 
 
 def build_spot_zone_map() -> dict[str, str]:

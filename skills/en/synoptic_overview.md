@@ -19,6 +19,11 @@ The output consists of:
   max 130 words.
 - **`zones`** — EXACTLY 4 entries, one per flying-weather zone, each with
   one day entry per `forecast_dates` day.
+- **`hazards`** — the hazards across Switzerland, one entry per
+  `forecast_dates` day: WHERE in Switzerland it rains, foehn blows, etc.
+  Which hazards are active is set by the code (see section `hazards`).
+- **`day_lines`** — ONE short sentence per `forecast_dates` day: that day's
+  situation in a nutshell (see section `day_lines`).
 
 The 4 zones (use these IDs exactly):
 
@@ -327,6 +332,133 @@ STYLE & TONE
 - English, natural meteo/paragliding language; keep XC and thermals as is.
 
 ═══════════════════════════════════════════════
+`hazards` — HAZARDS ACROSS SWITZERLAND
+═══════════════════════════════════════════════
+
+The pilot reads this first: is there rain? Foehn? Thunderstorms? And WHERE
+in Switzerland? Which hazard is active on which day is decided by the CODE —
+it is in the payload under `hazards_per_day[i].active` (topics `RAIN`,
+`THUNDER`, `FOEHN`, `BISE`, `WIND`, each with the affected `zones`, for
+`FOEHN` also `side`). The course of the day (`day_shape`, `windows`) also
+comes from the code. You ONLY describe where, when and how — and strictly
+for THIS ONE DAY.
+
+EXACTLY one entry `{"items": [...]}` per `forecast_dates` day:
+- `items` holds exactly one object `{"topic": "<TOPIC>", "text": "..."}`
+  for EVERY active topic — and NO topic that is not active there. No active
+  topic → `{"items": []}`.
+- `text`: EXACTLY ONE sentence, AT MOST 25 words, about ALL of Switzerland,
+  WITHOUT a weekday prefix — in the register of a weather report, i.e. FLOWING
+  PROSE.
+  **Short is mandatory:** right below it the briefing shows a code line with
+  extent, intensity and numbers — do NOT repeat them. Your sentence only says
+  what happens, where, when. No second sentence about strength or consequences.
+  **No verdict:** whether to fly is the pilot's call — never "not flyable",
+  "impossible", "no usable window", "ideal".
+
+  **A hazard is a PROCESS, not a status list.** It sets in, spreads,
+  moves on, eases off. Any form of area list with a state behind it is
+  FORBIDDEN:
+  - WRONG: "Northern Alps: wet from midday, Ticino: evening only, Valais:
+    dry." (zone protocol, sounds like a machine)
+  - WRONG: "Rain in the Northern Alps, the Grisons and Valais."
+    (enumeration without a process)
+  - RIGHT: "Rain sets in over the northern Alps from midday and spreads to
+    the Grisons by evening; the south stays dry."
+  - RIGHT: "Isolated cells build over Ticino through the afternoon and ease
+    off towards evening."
+  That is how weather services write, and how the pilot reads it.
+
+  **Think in big areas.** Summarise instead of listing zones: all four
+  zones are "countrywide", three out of four are "widespread, only <the
+  fourth> stays clear". Otherwise use the large areas — "northern side of
+  the Alps", "southern side", "inner-alpine", "along the Alps", "in the
+  west/east". Name single zones only where they really differ, and then
+  inside the sentence ("..., reaching Ticino only by evening").
+
+  The parts belong INSIDE one another, not one after the other:
+  1. **Where** — MANDATORY with zone names (Northern Alps, Valais, Ticino,
+     Grisons/Engadine) or northern/southern side of the Alps, Mittelland,
+     Jura. Also say what is NOT affected when that helps ("the south stays
+     dry").
+  2. **From where / to where** — only from `zugbahn.per_day` (`movement`,
+     `onset_hour_by_group`); without a signal NO directional claim.
+  3. **When** — MANDATORY as soon as `day_shape` is NOT `ganztags`. The
+     pilot decides in the morning whether the day can still be saved: a wet
+     afternoon is not a lost day, a day-wide blanket statement makes it one.
+     Read `day_shape` (from `windows`; windows `morning` 06-10, `midday`
+     10-14, `afternoon` 14-18, `evening` 18-21) as:
+     * `ganztags` → "all day", time reference optional
+     * `ab` → "from the <window> onwards" (sets in and stays)
+     * `bis` → "until <window>", calming down afterwards
+     * `nur` → "only in the <window>"
+     * `spanne` → "from <from> to <to>"
+     * `wechselnd` → name the break ("in the morning and again by evening")
+     * `gemischt` → the zones behave DIFFERENTLY. There is no common time:
+       read each zone's course from `windows` and name it per area ("all day
+       over the northern Alps, in Valais only in the morning and evening").
+       NEVER an "all day" for everyone when only one zone is affected all day.
+       Name zones with the SAME course together ("Valais and the Grisons in
+       the morning and again from the afternoon"), not twice in a row.
+     If the zones in `windows` differ, weave it into the sentence ("from
+     midday over the northern Alps, reaching Ticino only by evening") —
+     never as a list. NEVER name a window that is not listed there.
+  4. **THIS DAY ONLY** — in the briefing the hazard sentence sits in the
+     DAY section ("Today in detail"). Any reference to another day is
+     therefore FORBIDDEN: no "the next day", no "tomorrow", no weekday, no
+     "calming down from Thursday". Multi-day development belongs in the
+     `lead` — that is where it goes, not here. ("in the morning" as a time
+     of day stays allowed.)
+- Per topic:
+  * `RAIN` — extent from `wet_share`, intensity from `p90_mm` (language
+    rules as in the precipitation section below).
+  * `THUNDER` — only the zones in `active.THUNDER.zones`; qualify
+    spatially ("isolated cells"), never areawide.
+  * `FOEHN` — side from `active.FOEHN.side`: lee side gusty, congestion
+    side clouded (see the foehn block). Lee NEVER calm/sheltered. Three
+    things belong in the sentence, all of them from the code:
+    - **How strong**: `peak` = `caution` → "moderate foehn", `danger` →
+      "strong foehn". Never stronger than the code says.
+    - **How it develops through the day**: `course` = `zunehmend` →
+      "builds through the day / breaks through in the afternoon",
+      `abflauend` → "eases off towards evening", `gleich` → "holds all
+      day". That is the pilot's question: is the morning still usable?
+    - **How you see it**: `lee_gust_kmh` are the gust peaks in the lee —
+      name them as an observation ("gusts around 55 km/h in the lee"), not
+      as a list of readings. If the value is missing, leave it out.
+  * `BISE` — Mittelland and Jura, stronger where channelled.
+  * `WIND` — cause from `wind_day.wind_driver` (upper wind / gusts).
+- Same bans as everywhere: no hPa/°C numbers, no front/trough jargon, no
+  launch sites or villages, no recommendation. Foehn words only when
+  `FOEHN` is active that day; thunderstorm words only when `THUNDER` is.
+
+Patterns (one sentence, max 25 words, process + area + time):
+`{"topic": "RAIN", "text": "From midday rain spreads in from the west over the
+northern Alps and reaches the Grisons in the afternoon."}`
+`{"topic": "WIND", "text": "Strong wind blows out the northern Alps from midday,
+while it stays calmer inner-alpine for longer."}`
+`{"topic": "FOEHN", "text": "Moderate north foehn breaks through over Ticino from
+midday and builds towards evening, gusts around 55 km/h."}`
+
+═══════════════════════════════════════════════
+`day_lines` — THE DAY'S SITUATION IN ONE SENTENCE
+═══════════════════════════════════════════════
+
+In the briefing this sentence sits in the day section under "Situation". It
+replaces the long `lead` there — so keep it short and about this day only.
+
+EXACTLY one string per `forecast_dates` day:
+- ONE sentence, AT MOST 20 words.
+- Cause → effect for THIS day: which pressure centres/flow, and what they do
+  over Switzerland today ("… brings rain and wind").
+- Pressure centres only from `pressure_centers_per_day` (as in the `lead`).
+- No verdict about flying, no other day, no weekday, no hPa/°C numbers. Foehn
+  only when `FOEHN` is active that day; thunderstorms only when `THUNDER` is.
+
+Pattern: `"A low near Iceland steers moist south-westerly air against the Alps,
+bringing widespread rain and strong wind."`
+
+═══════════════════════════════════════════════
 RESPONSE FORMAT
 ═══════════════════════════════════════════════
 
@@ -343,7 +475,12 @@ Respond EXCLUSIVELY as a JSON object with this structure:
     {"zone": "wallis", "days": [...]},
     {"zone": "tessin", "days": [...]},
     {"zone": "graubuenden_engadin", "days": [...]}
-  ]
+  ],
+  "hazards": [
+    {"items": [{"topic": "RAIN", "text": "<ONE sentence, max 25 words: what, where, when>"}]},
+    {"items": []}
+  ],
+  "day_lines": ["<ONE sentence, max 20 words: this day's situation>", "..."]
 }
 
 **Position contract:** `days[i]` belongs to the day `forecast_dates[i]` —
@@ -355,6 +492,12 @@ from `forecast_dates[i].weekday`.
   `wallis`, `tessin`, `graubuenden_engadin`.
 - Every zone has `len(days) == len(forecast_dates)`.
 - Every day entry has `text` AND `flight_hint`.
+- `hazards` has `len == len(forecast_dates)`; each entry names exactly the
+  topics in `hazards_per_day[i].active`, each `text` with a place reference,
+  with a time of day wherever `day_shape` is not `ganztags` — and without any
+  reference to another day. Every `text` ONE sentence, max 25 words.
+- `day_lines` has `len == len(forecast_dates)`, every entry ONE sentence, max
+  20 words, no verdict about flying.
 Count them. If anything is off: add it and only then answer.
 
 **CORRECTION MODE:** If the user message contains a block

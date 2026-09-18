@@ -7,7 +7,8 @@ Architektur (ersetzt den alten Loesch-Post-Filter):
   1. LLM bekommt nur das fertige Strukturfeld, keine Rohzahlen.
   2. Output-Format (Synoptik 2.0, Zonen):
      {"lead": str,
-      "zones": [{"zone": <id>, "days": [{text, flight_hint}]}, ...]}
+      "zones": [{"zone": <id>, "days": [{text, flight_hint}]}, ...],
+      "hazards": [{"items": [{topic, text}]}, ...]}   # je Tag, Themen vom Code
      — Zuordnung days[i] <-> forecast_dates[i] per POSITION, Zonen ueber
      die zone-ID (nicht ueber die Reihenfolge). Die alte Source-Tag-Pflicht
      ist abgeschafft: sie hat nur Formfehler produziert (invalid_source
@@ -316,13 +317,24 @@ def _build_correction_message(errors: list) -> str:
     beiden Sprachmodi ohne i18n-Weiche.
     """
     lines = "\n".join(f"- [{e['scope']}] {e['message']}" for e in errors)
+    # Die Fehlertexte sind deutsch — ohne ausdrueckliche Vorgabe antwortet der
+    # LLM im EN-Modus nach ein, zwei Runden deutsch (Vorfall 16.09.2026).
+    import i18n
+    language = ("OUTPUT LANGUAGE: ENGLISH. The error notes below are in German, "
+                "but write EVERY text field (lead, zones, hazards, day_lines) in "
+                "English, exactly as the system prompt requires.\n\n"
+                if i18n.get_current_lang() == "en" else
+                "AUSGABESPRACHE: DEUTSCH. Schreibe alle Textfelder auf Deutsch.\n\n")
     return (
         "KORREKTUR NOETIG / CORRECTION REQUIRED\n\n"
+        f"{language}"
         "Deine letzte Antwort hatte folgende Fehler:\n"
         f"{lines}\n\n"
         "Erzeuge das KOMPLETTE JSON neu (gleiches Format: "
         '{"lead": "...", "zones": [{"zone": "<zone_id>", '
-        '"days": [{"text": "...", "flight_hint": "..."}]}]}) '
+        '"days": [{"text": "...", "flight_hint": "..."}]}], '
+        '"hazards": [{"items": [{"topic": "<THEMA>", "text": "..."}]}], '
+        '"day_lines": ["...", "..."]}) '
         "und behebe ALLE genannten Punkte. Alle uebrigen Regeln aus dem "
         "System-Prompt gelten unveraendert. Nur das JSON, kein Kommentar."
     )
@@ -457,6 +469,11 @@ def _validate(parsed: dict, ctx: dict) -> list:
             errors.append(_verr("lead", "too_long",
                                 f"`lead` hat {n_words} Woerter — erlaubt sind "
                                 f"max 130. Kuerzen."))
+
+    # --- hazards + day_lines (vor zones — dort early return) ------------
+    errors.extend(_validate_hazards(parsed, ctx))
+    errors.extend(_validate_day_lines(parsed, ctx))
+    errors.extend(_language_errors(parsed))
 
     # --- zones: Schema + Vollstaendigkeit --------------------------------
     zones = parsed.get("zones")
@@ -751,6 +768,10 @@ def _finalize(parsed: dict, ctx: dict, attempts: int,
         "short_with_sources": [{"text": lead}] if lead else [],
         "long_with_sources": legacy_entries,
         "zones": zones_out,
+        # Gefahren schweizweit (Briefing-Warnungen) — additiv, App ignoriert es
+        "hazards": _finalize_hazards(parsed, ctx, prune),
+        # ein kurzer Satz je Tag fuer die Tages-Sektion des Briefings
+        "day_lines": _finalize_day_lines(parsed, ctx, prune),
         "attempts": attempts,
         "unresolved": [f"[{e['scope']}] {e['message']}" for e in unresolved],
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -880,6 +901,8 @@ def _build_llm_payload(ctx: dict) -> str:
         "vb_lage": _strip_provenance(ctx.get("vb_lage")),
         "foehn": _strip_provenance(ctx.get("foehn")),
         "zones": _zones_for_llm(ctx),
+        # vom Code geschaltete Gefahren je Tag — nur diese darf `hazards` nennen
+        "hazards_per_day": _hazards_for_llm(hazard_checks(ctx)),
         "zugbahn": _zugbahn_for_llm(ctx.get("zugbahn")),
         "schneefallgrenze": (
             None if ctx.get("schneefallgrenze") is None
@@ -1222,4 +1245,803 @@ def _label_variants(label: str) -> list[str]:
     # Klammern raus
     if "(" in label:
         out.append(re.sub(r"\s*\([^)]*\)", "", label).strip().lower())
+    return out
+
+
+# ============================================================================
+# GEFAHREN SCHWEIZWEIT (hazards) — Code schaltet, LLM beschreibt den Ort
+# ============================================================================
+# Die Briefing-Warnungen beginnen mit einer Gesamteinschaetzung fuer die
+# Schweiz (Regen? Foehn? ...). OB eine Gefahr an einem Tag aktiv ist,
+# entscheidet allein hazard_checks() aus dem Strukturfeld; der LLM liefert je
+# aktivem Thema 1-2 Saetze, WO in der Schweiz und woher/wohin. Ein Thema, das
+# der Code nicht schaltet, ist eine erfundene Gefahr und wird abgelehnt.
+
+HAZARD_TOPICS = ("RAIN", "THUNDER", "FOEHN", "BISE", "WIND")
+
+# Laengen der Briefing-Saetze (Wunsch User 16.09.2026: "kurz, auf den Punkt").
+# Harte Grenzen im Validator — "halte dich kurz" allein befolgt der LLM nicht.
+HAZARD_MAX_WORDS = 25
+DAY_LINE_MAX_WORDS = 20
+
+# Urteil ueber das Fliegen — gehoert dem Piloten, nie dem Satz
+# (User 16.09.2026: "er soll nie sagen kein nutzbares Fenster").
+_VERDICT_RE = re.compile(
+    rf"(\b(?:nicht\s+|un)?fliegbar\w*|\b(?:un)?flyable\b|nutzbare?[sn]?\s+(?:flug)?fenster|"
+    rf"usable\s+window|\btop-?tag\b|\btop\s+day\b|\bperfekt\w*|\bperfect\b|\bideal\w*|"
+    rf"unm(?:oe|{_O_UMLAUT})glich|\bimpossible\b|empfehl\w*|\brecommend\w*|"
+    rf"\bnicht\s+fliegen\b|\bdon'?t\s+fly\b|\bno\s+flying\b|\bflying\s+is\s+off\b)",
+    re.IGNORECASE)
+# Satzende = Punkt/Ausrufe-/Fragezeichen, dann Leerzeichen und Grossbuchstabe
+_SENTENCE_BREAK_RE = re.compile(r"[.!?](?=\s+[A-Z\u00c4\u00d6\u00dc])")
+
+
+# Deutscher Text im EN-Modus. Umlaute sind ein sicheres Zeichen (die englischen
+# Zonennamen haben keine); dazu Funktionswoerter, die im Englischen nicht
+# vorkommen — erst ab zwei verschiedenen, damit ein einzelnes "die" nicht zaehlt.
+_DE_CHARS_RE = re.compile("[\u00e4\u00f6\u00fc\u00df\u00c4\u00d6\u00dc]")
+_DE_WORDS_RE = re.compile(r"\b(und|der|die|das|ein|eine|einer|einem|einen|mit|im|ab|bei|wird|nicht|sich|auf|ueber|zum|zur|vom|am|es)\b",
+                          re.IGNORECASE)
+
+
+def _looks_german(text: str) -> bool:
+    if not isinstance(text, str) or not text.strip():
+        return False
+    if _DE_CHARS_RE.search(text):
+        return True
+    return len({m.group(1).lower() for m in _DE_WORDS_RE.finditer(text)}) >= 2
+
+
+def _language_errors(parsed: dict) -> list:
+    """Im EN-Modus: jedes Textfeld, das deutsch aussieht, als `wrong_language`."""
+    import i18n
+    if i18n.get_current_lang() != "en":
+        return []
+    found = []
+    if _looks_german(parsed.get("lead")):
+        found.append("lead")
+    for z in parsed.get("zones") or []:
+        if not isinstance(z, dict):
+            continue
+        for i, day in enumerate(z.get("days") or []):
+            if isinstance(day, dict) and (_looks_german(day.get("text"))
+                                          or _looks_german(day.get("flight_hint"))):
+                found.append(f"zones[{z.get('zone')}].days[{i}]")
+    for i, h in enumerate(parsed.get("hazards") or []):
+        for item in (h.get("items") or []) if isinstance(h, dict) else []:
+            if isinstance(item, dict) and _looks_german(item.get("text")):
+                found.append(f"hazards[{i}].{item.get('topic')}")
+    for i, line in enumerate(parsed.get("day_lines") or []):
+        if _looks_german(line):
+            found.append(f"day_lines[{i}]")
+    if not found:
+        return []
+    return [_verr("language", "wrong_language",
+                  f"Diese Felder sind DEUTSCH, die Ausgabesprache ist ENGLISCH: "
+                  f"{found[:8]}{' …' if len(found) > 8 else ''}. Schreibe ALLE "
+                  f"Textfelder auf Englisch (Zonen: Northern Alps, Valais, Ticino, "
+                  f"Grisons).")]
+
+
+def _word_count(text: str) -> int:
+    return len((text or "").split())
+
+
+def _length_problems(text: str, max_words: int, field: str) -> list:
+    """Ein Satz, hoechstens max_words Woerter."""
+    problems = []
+    n = _word_count(text)
+    if n > max_words:
+        problems.append(("too_long",
+                         f"{field}: {n} Woerter — erlaubt sind hoechstens {max_words}. "
+                         f"Auf den Punkt bringen: Details und Zahlen stehen im "
+                         f"Briefing ohnehin daneben."))
+    if _SENTENCE_BREAK_RE.search(text or ""):
+        problems.append(("more_than_one_sentence",
+                         f"{field}: GENAU EIN Satz — mehrere Saetze zusammenziehen "
+                         f"oder den weniger wichtigen streichen."))
+    return problems
+
+
+def _verdict_problem(text: str, field: str) -> list:
+    hit = _VERDICT_RE.search(text or "")
+    if not hit:
+        return []
+    return [("verdict",
+             f"{field}: {hit.group(0)!r} ist ein Urteil ueber das Fliegen. Ob "
+             f"geflogen wird, entscheidet der Pilot — beschreibe nur, was das "
+             f"Wetter tut und wo.")]
+
+# Ortsbezug im Gefahren-Satz: Zonen-Namen, Alpenseiten, Grosslandschaften.
+_PLACE_RE = re.compile(
+    rf"(alpennord|alpens(?:ue|{_U_UMLAUT})d|nordalpen|s(?:ue|{_U_UMLAUT})dalpen|"
+    rf"northern\s+alps|southern\s+alps|(?:north|south)(?:ern)?\s+(?:side|slope)|"
+    rf"nordseite|s(?:ue|{_U_UMLAUT})dseite|nordhang|s(?:ue|{_U_UMLAUT})dhang|"
+    rf"wallis|valais|tessin|ticino|graub(?:ue|{_U_UMLAUT})nden|grisons|engadin|"
+    rf"mittelland|jura|voralpen|pre-?alps|inneralpin|inner-?alpine)",
+    re.IGNORECASE,
+)
+
+
+# Tageszeit-Bezug im Gefahren-Satz (de + en). "mittag" deckt auch
+# Vormittag/Nachmittag ab, "morgens" nicht mit "morgen" (Folgetag) verwechseln.
+_TIME_RE = re.compile(
+    rf"(vormittag|mittag|nachmittag|abend|morgens|am morgen|fr(?:ue|{_U_UMLAUT})h|"
+    rf"tagesverlauf|ganztags|ganzen tag|sp(?:ae|{_A_UMLAUT})ter|"
+    rf"\d{{1,2}}\s*uhr|ab \d{{1,2}}|bis \d{{1,2}}|"
+    rf"morning|midday|noon|afternoon|evening|all day|through the day|"
+    rf"\d{{1,2}}(?::\d{{2}})?\s*(?:am|pm))",
+    re.IGNORECASE,
+)
+
+
+# Zonen-Protokoll statt Wetterbericht: "Alpennordhang: nass, Tessin: trocken".
+# Ein Prognosetext kommt ohne Doppelpunkt und ohne Aufzaehlungszeichen aus —
+# beides ist hier deshalb ein sicheres Zeichen fuer eine Liste.
+_ENUM_RE = re.compile(r"(:|\s\u00b7\s|\s\|\s|\s\u2013\s\w+\s\u2013\s)")
+
+
+# Verweis auf einen ANDEREN Tag. Die Gefahren-Saetze stehen in der Tages-
+# Sektion des Briefings ("Heute im Detail") — dort gilt ausschliesslich der
+# eine Tag. Mehrtages-Entwicklung gehoert in den `lead` (3-Tage-Sektion),
+# genauso wie _situation_sentences() im Briefing Saetze mit fremdem Wochentag
+# aussortiert. "morgens"/"am Morgen" ist eine Tageszeit und bleibt erlaubt.
+_CROSS_DAY_RE = re.compile(
+    r"(\bFolgetag|\bfolgetags|\b(?:ue|\u00fc)bermorgen\b|(?<![A-Za-z\u00c4\u00d6\u00dc])morgen\b(?!s)|"
+    r"\bVortag|\bnext day\b|\btomorrow\b|\byesterday\b|\bthe day after\b|"
+    # Satzanfang "Morgen ..." meint den Folgetag; die Tageszeit hiesse
+    # "Am Morgen" und bleibt damit erlaubt.
+    r"(?:^|[.!?]\s+)Morgen\b(?!s)|"
+    r"\b(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)\b|"
+    r"\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b)")
+
+
+# --- Beginn je Zone gegen die Fensterdaten ----------------------------------
+# Zonen-Erwaehnungen im Fliesstext (de + en). Nur fuer die Onset-Pruefung —
+# der Ortsbezug an sich laeuft ueber _PLACE_RE.
+_ZONE_ALIASES = {
+    "alpennordhang": (r"alpennord\w*", r"nordalpen", r"northern\s+alps",
+                      r"north(?:ern)?\s+side\s+of\s+the\s+alps"),
+    "wallis": (r"wallis", r"valais"),
+    "tessin": (r"tessin", r"ticino"),
+    "graubuenden_engadin": (rf"graub(?:ue|{_U_UMLAUT})nden", r"grisons",
+                            r"engadin\w*"),
+}
+# Zeitwort -> Fenster, in dem der genannte Verlauf BEGINNT
+_ONSET_WORDS = (
+    # \b ueberall: "mittag" steckt sonst in "Nachmittag" und "Vormittag"
+    (r"\b(?:ganzen\s+tag|ganzt(?:ae|\u00e4)g\w*|all\s+day|throughout\s+the\s+day)", "morning"),
+    (r"\b(?:vormittag\w*|morgens|am\s+morgen|fr(?:ue|\u00fc)h\w*|morning|early)", "morning"),
+    (r"\b(?:nachmittag\w*|afternoon)", "afternoon"),
+    (r"\b(?:mittag\w*|midday|noon)", "midday"),
+    (r"\b(?:abend\w*|evening)", "evening"),
+)
+# "bis Mittag" / "until the evening" nennt ein ENDE, keinen Beginn
+_UNTIL_RE = re.compile(r"(?:bis(?:\s+(?:zum|zur|in\s+den))?|until|till)\s+(?:the\s+|am\s+|dem\s+|den\s+)?$",
+                       re.IGNORECASE)
+_CLAUSE_SPLIT_RE = re.compile(r"[;,.]|\bwhile\b|\bw(?:ae|\u00e4)hrend\b|\bwhereas\b",
+                              re.IGNORECASE)
+
+
+def _stated_onset(clause: str) -> Optional[str]:
+    """Fruehestes Zeitfenster, das der Teilsatz als BEGINN nennt (oder None)."""
+    order = [w[0] for w in config.SYNOPTIC_DAY_WINDOWS]
+    found = []
+    for pattern, window in _ONSET_WORDS:
+        for m in re.finditer(pattern, clause, re.IGNORECASE):
+            if _UNTIL_RE.search(clause[:m.start()]):
+                continue
+            found.append(window)
+    return min(found, key=order.index) if found else None
+
+
+def _onset_too_late(text: str, windows_by_zone: dict) -> list:
+    """Zonen, fuer die der Satz einen SPAETEREN Beginn nennt als die Daten.
+
+    Returns: [(zone, genannt, laut_daten)]. Geprueft werden nur Zonen, die in
+    `windows_by_zone` stehen — was nicht betroffen ist, darf frei beschrieben
+    werden ("im Wallis bleibt es trocken").
+    """
+    order = [w[0] for w in config.SYNOPTIC_DAY_WINDOWS]
+    out = []
+    for clause in _CLAUSE_SPLIT_RE.split(text or ""):
+        onset = _stated_onset(clause)
+        if onset is None:
+            continue
+        for zone, aliases in _ZONE_ALIASES.items():
+            wins = windows_by_zone.get(zone)
+            if not wins:
+                continue
+            if not any(re.search(a, clause, re.IGNORECASE) for a in aliases):
+                continue
+            first = min(wins, key=order.index)
+            if order.index(onset) > order.index(first):
+                out.append((zone, onset, first))
+    return out
+
+
+def _num(v) -> float:
+    return float(v) if isinstance(v, (int, float)) else 0.0
+
+
+def _zone_entry(ctx: dict, key: str, i: int, zone: str) -> dict:
+    """Zonen-Eintrag aus precip_zones/wind_zones am Forecast-Tag i."""
+    per_day = (ctx.get(key) or {}).get("per_day") or []
+    if i >= len(per_day):
+        return {}
+    return ((per_day[i].get("zones") or {}).get(zone)) or {}
+
+
+# --- Tagesverlauf ----------------------------------------------------------
+# Die Tagespauschale ist fuer den Piloten die falsche Aufloesung: "Regen am
+# Alpennordhang" kann ein verlorener Tag sein oder ein fliegbarer Vormittag
+# mit Abbruch um 13 Uhr. Beides steht in den Fenster-Aggregaten
+# (precip_zones/wind_zones -> windows), wir heben es nur in die Gefahr hoch.
+
+_WINDOW_KEYS = tuple(w[0] for w in config.SYNOPTIC_DAY_WINDOWS)
+
+
+def _zone_windows(ctx: dict, key: str, i: int, zone: str) -> dict:
+    """Tagesfenster-Aggregate einer Zone am Tag i ({} bei aelteren Caches)."""
+    return _zone_entry(ctx, key, i, zone).get("windows") or {}
+
+
+def _hit_windows(windows: dict, field: str, threshold: float,
+                 strict: bool = False) -> list:
+    """Fenster-Keys (in Tagesreihenfolge), in denen `field` die Schwelle reisst."""
+    out = []
+    for w in _WINDOW_KEYS:
+        v = (windows.get(w) or {}).get(field)
+        if v is None:
+            continue
+        v = _num(v)
+        if v > threshold if strict else v >= threshold:
+            out.append(w)
+    return out
+
+
+_KONV_SPAN_RE = re.compile(r"(\d{1,2}):\d{2}\s*[-–]\s*(\d{1,2}):\d{2}")
+
+
+def _konvektion_windows(entries: list) -> list:
+    """Fenster-Keys aus den Konvektions-Zeitspannen ("14:00-16:00").
+
+    Fallback, wenn der Modell-Niederschlag kein Gewitter-Fenster zeigt, das
+    Ensemble/Wolkentop-Signal aber eine Zeitspanne nennt.
+    """
+    hours = set()
+    for e in entries or []:
+        for part in (e if isinstance(e, (list, tuple)) else [e]):
+            m = _KONV_SPAN_RE.search(str(part))
+            if m:
+                lo, hi = int(m.group(1)), int(m.group(2))
+                hours.update(range(lo, max(hi, lo + 1)))
+    if not hours:
+        return []
+    return [w for w, h_lo, h_hi in config.SYNOPTIC_DAY_WINDOWS
+            if any(h_lo <= h < h_hi for h in hours)]
+
+
+def _day_shape(windows_by_zone: dict) -> Optional[dict]:
+    """Tagesverlauf der Gefahr ueber alle betroffenen Zonen zusammengefasst.
+
+    Returns: {"shape", "from", "to", "hit"} oder None, wenn keine
+      Fensterdaten vorliegen (aeltere Caches, Foehn/Bise: nur Tageswerte).
+      shape — "ganztags" | "ab" | "bis" | "nur" | "spanne" | "wechselnd"
+              | "gemischt" (die Zonen verlaufen unterschiedlich)
+
+    Verlaufen die Zonen unterschiedlich, ist die Vereinigung ihrer Fenster
+    KEINE Aussage: eine ganztags nasse Zone machte sonst den ganzen Tag zu
+    "ganztags", auch wo es erst am Nachmittag einsetzt (Vorfall 16.09.2026).
+    """
+    hit = [w for w in _WINDOW_KEYS
+           if any(w in wins for wins in windows_by_zone.values())]
+    if not hit:
+        return None
+    per_zone = {tuple(_shape_of(wins)[k] for k in ("shape", "from", "to"))
+                for wins in windows_by_zone.values() if wins}
+    if len(per_zone) > 1:
+        return {"shape": "gemischt", "from": hit[0], "to": hit[-1], "hit": hit}
+    return {**_shape_of(hit), "hit": hit}
+
+
+def _shape_of(hit: list) -> dict:
+    """Form EINER Fensterliste: {"shape", "from", "to"}."""
+    hit = [w for w in _WINDOW_KEYS if w in hit]
+    idx = [_WINDOW_KEYS.index(w) for w in hit]
+    if len(hit) == len(_WINDOW_KEYS):
+        shape = "ganztags"
+    elif idx != list(range(idx[0], idx[-1] + 1)):
+        shape = "wechselnd"          # Luecke drin: Vormittag und Abend, Mittag frei
+    elif len(hit) == 1:
+        shape = "nur"
+    elif idx[-1] == len(_WINDOW_KEYS) - 1:
+        shape = "ab"                 # setzt ein und bleibt bis Tagesende
+    elif idx[0] == 0:
+        shape = "bis"                # von Tagesbeginn an, klingt dann ab
+    else:
+        shape = "spanne"
+    return {"shape": shape, "from": hit[0], "to": hit[-1]}
+
+
+_LEVEL_RANK = {"none": 0, "caution": 1, "danger": 2}
+
+
+def _foehn_course(windows: dict) -> Optional[str]:
+    """Verlauf des Foehns INNERHALB des Tages: "zunehmend" | "abflauend" |
+    "gleich" (None ohne Fensterdaten).
+
+    Der Pilot fragt nicht "wie viele Stunden", sondern "greift er durch,
+    solange ich in der Luft bin?". Gewichtet wird die Spitze je Fenster
+    (caution/danger), die Stundenzahl entscheidet nur bei Gleichstand.
+    """
+    if not windows:
+        return None
+    score = {}
+    for w in _WINDOW_KEYS:
+        v = windows.get(w) or {}
+        score[w] = _LEVEL_RANK.get(v.get("peak", "none"), 0) * 10 + _num(v.get("hours"))
+    early = max(score.get("morning", 0), score.get("midday", 0))
+    late = max(score.get("afternoon", 0), score.get("evening", 0))
+    if not early and not late:
+        return None
+    if late > early:
+        return "zunehmend"
+    if early > late:
+        return "abflauend"
+    return "gleich"
+
+
+def _lee_gust_kmh(ctx: dict, i: int, lee_zones) -> Optional[int]:
+    """Staerkste Boeen-Spitze (P90) im Lee — die Spur des Foehns in den
+    Winddaten. Ohne Fensterdaten None."""
+    gusts = []
+    for z in lee_zones:
+        for w in (_zone_entry(ctx, "wind_zones", i, z).get("windows") or {}).values():
+            g = (w or {}).get("p90_gust_kmh")
+            if g:
+                gusts.append(_num(g))
+    return round(max(gusts)) if gusts else None
+
+
+def _hazard_strength(topic: str, check: dict) -> float:
+    """Vergleichsmass einer Gefahr fuer den Folgetag-Trend — je Thema die
+    Groesse, die der Pilot als 'mehr' empfindet."""
+    f = check.get("facts") or {}
+    if topic == "RAIN":
+        return _num(f.get("wet_share"))
+    if topic == "FOEHN":
+        return _num(f.get("hours"))
+    if topic == "BISE":
+        return abs(_num(f.get("delta_p_hpa")))
+    return float(len(check.get("zones") or []))   # THUNDER/WIND: Flaeche
+
+
+def _attach_outlook(days: list) -> None:
+    """Setzt facts["tomorrow"] je aktiver Gefahr — in-place.
+
+    Nur fuer Auswertungen ueber das ganze Prognosefenster (3-Tage-Sektion);
+    der tagesreine Gefahren-Satz und die Tages-Warnbox nutzen es NICHT.
+
+    {"active": bool, "trend": "vorbei"|"zunehmend"|"abklingend"|"gleich"};
+    None am letzten Tag des Prognosefensters (kein Folgetag bekannt).
+    """
+    ratio = getattr(config, "SYNOPTIC_HAZARD_TREND_RATIO", 1.25)
+    for i, c in enumerate(days):
+        nxt = days[i + 1] if i + 1 < len(days) else None
+        for topic in HAZARD_TOPICS:
+            cur = c["checks"][topic]
+            if not cur["active"]:
+                continue
+            if nxt is None:
+                cur["facts"]["tomorrow"] = None
+                continue
+            n = nxt["checks"][topic]
+            if not n["active"]:
+                cur["facts"]["tomorrow"] = {"active": False, "trend": "vorbei"}
+                continue
+            a = _hazard_strength(topic, cur)
+            b = _hazard_strength(topic, n)
+            trend = ("zunehmend" if b >= a * ratio
+                     else "abklingend" if a >= b * ratio else "gleich")
+            cur["facts"]["tomorrow"] = {"active": True, "trend": trend}
+
+
+def hazard_checks(ctx: dict) -> list:
+    """Deterministische Gefahren-Schalter je forecast_dates-Tag.
+
+    Returns: [{"date", "checks": {TOPIC: {"active", "level", "zones", "facts"}}}]
+      level  — "stop" | "warn" (Stufe fuer die Anzeige)
+      zones  — betroffene Zonen-IDs (bei FOEHN die Lee-Zonen)
+      facts  — Kennzahlen fuer den Code-Satz der Anzeige, nicht fuer den LLM
+    Fehlende Felder (aeltere Caches) schalten das Thema einfach nicht.
+    """
+    fc_dates = ctx.get("forecast_dates") or []
+    foehn = ctx.get("foehn") or {}
+    foehn_by_date = {d.get("date"): d for d in foehn.get("per_day") or []
+                     if isinstance(d, dict)}
+    bise_by_date = {d.get("date"): d for d in (ctx.get("bise") or {}).get("per_day") or []
+                    if isinstance(d, dict)}
+    foehn_thr = foehn.get("thresholds") or {}
+    rain_thr = getattr(config, "SYNOPTIC_HAZARD_RAIN_WET_SHARE", 0.2)
+
+    win_rain = getattr(config, "SYNOPTIC_HAZARD_WINDOW_WET_SHARE", 0.2)
+    win_gew = getattr(config, "SYNOPTIC_HAZARD_WINDOW_GEWITTER_SHARE", 0.0)
+    win_wind = getattr(config, "SYNOPTIC_HAZARD_WINDOW_WIND_SHARE", 0.3)
+
+    out = []
+    for i, date in enumerate(fc_dates):
+        rain_z, thunder_z, wind_z = [], [], []
+        rain_share = rain_mm = thunder_share = aloft = 0.0
+        wind_classes = {}
+        # {zone: [fenster]} — nur fuer betroffene Zonen, leer bei alten Caches
+        rain_wins, thunder_wins, wind_wins = {}, {}, {}
+        for z in config.SYNOPTIC_ZONES:
+            day = _zone_entry(ctx, "precip_zones", i, z).get("day") or {}
+            pw = _zone_windows(ctx, "precip_zones", i, z)
+            share = _num(day.get("wet_share"))
+            if share >= rain_thr:
+                rain_z.append(z)
+                rain_share = max(rain_share, share)
+                rain_mm = max(rain_mm, _num(day.get("p90_mm")))
+                hit = _hit_windows(pw, "wet_share", win_rain)
+                if hit:
+                    rain_wins[z] = hit
+            g = _num(day.get("gewitter_share"))
+            konv = _zone_konvektion(ctx, z, i, "gewitter")
+            if g > 0 or konv:
+                thunder_z.append(z)
+                thunder_share = max(thunder_share, g)
+                # Fenster aus dem Modell-Anteil, sonst aus den Konvektions-
+                # Zeitspannen ("Sopraceneri", "14:00-16:00")
+                hit = (_hit_windows(pw, "gewitter_share", win_gew, strict=True)
+                       or _konvektion_windows(konv))
+                if hit:
+                    thunder_wins[z] = hit
+            w = _zone_entry(ctx, "wind_zones", i, z)
+            if w.get("wind_class") in _WINDY_CLASSES:
+                wind_z.append(z)
+                wind_classes[z] = w["wind_class"]
+                aloft = max(aloft, _num(w.get("median_aloft_kmh")))
+                hit = _hit_windows(w.get("windows") or {},
+                                   "share_wind_crit", win_wind)
+                if hit:
+                    wind_wins[z] = hit
+
+        side = _foehn_active_side(foehn, fc_dates, i)
+        fo = foehn_by_date.get(date) or {}
+        peak = fo.get(f"peak_{side}") if side else None
+        bi = bise_by_date.get(date) or {}
+
+        lee_zones = list(_FOEHN_LEE_ZONES.get(side, ())) if side else []
+        foehn_wins_raw = (fo.get(f"{side}_windows") or {}) if side else {}
+        foehn_hit = [w for w in _WINDOW_KEYS
+                     if (foehn_wins_raw.get(w) or {}).get("hours")]
+        foehn_wins = {z: foehn_hit for z in lee_zones} if foehn_hit else {}
+
+        out.append({"date": date, "checks": {
+            "RAIN": {"active": bool(rain_z), "level": "warn", "zones": rain_z,
+                     "facts": {"wet_share": round(rain_share, 2),
+                               "p90_mm": round(rain_mm, 1),
+                               "windows": rain_wins,
+                               "day_shape": _day_shape(rain_wins)}},
+            "THUNDER": {"active": bool(thunder_z), "level": "stop", "zones": thunder_z,
+                        "facts": {"gewitter_share": round(thunder_share, 2),
+                                  "windows": thunder_wins,
+                                  "day_shape": _day_shape(thunder_wins)}},
+            "FOEHN": {"active": bool(side),
+                      "level": "stop" if peak == "danger" else "warn",
+                      "zones": lee_zones,
+                      "facts": {"side": side, "peak": peak,
+                                "hours": fo.get(f"{side}_hours", 0) if side else 0,
+                                "windows": foehn_wins,
+                                "day_shape": _day_shape(foehn_wins),
+                                "course": _foehn_course(foehn_wins_raw),
+                                "lee_gust_kmh": _lee_gust_kmh(ctx, i, lee_zones),
+                                "delta_p_min_hpa": (foehn_thr.get("delta_p_danger_hpa", 8)
+                                                    if peak == "danger"
+                                                    else foehn_thr.get("delta_p_caution_hpa", 4))}},
+            "BISE": {"active": bool(bi.get("active")), "level": "warn", "zones": [],
+                     "facts": {"strength": bi.get("strength"),
+                               "delta_p_hpa": bi.get("delta_p_hpa")}},
+            "WIND": {"active": bool(wind_z),
+                     "level": "stop" if "verblasen" in wind_classes.values() else "warn",
+                     "zones": wind_z,
+                     "facts": {"classes": wind_classes,
+                               "median_aloft_kmh": round(aloft),
+                               "windows": wind_wins,
+                               "day_shape": _day_shape(wind_wins)}},
+        }})
+    _attach_outlook(out)
+    return out
+
+
+def _hazards_for_llm(checks: list) -> list:
+    """Nur die aktiven Themen je Tag, mit Zonen und Tagesverlauf.
+
+    `day_shape`/`windows` sind der Tagesverlauf innerhalb DIESES Tages —
+    vom Code entschieden, der LLM formuliert sie nur aus. Der Folgetag-Trend
+    (`facts["tomorrow"]`) geht bewusst NICHT an den LLM: der Gefahren-Satz
+    steht in der Tages-Sektion und darf keinen anderen Tag nennen.
+    """
+    out = []
+    for c in checks:
+        active = {}
+        for topic in HAZARD_TOPICS:
+            v = c["checks"][topic]
+            if not v["active"]:
+                continue
+            f = v.get("facts") or {}
+            entry = {"zones": v["zones"]}
+            if topic == "FOEHN":
+                entry["side"] = f.get("side")
+                entry["peak"] = f.get("peak")          # caution | danger
+                if f.get("course"):
+                    entry["course"] = f["course"]      # innerhalb DIESES Tages
+                if f.get("lee_gust_kmh"):
+                    entry["lee_gust_kmh"] = f["lee_gust_kmh"]
+            if f.get("day_shape"):
+                entry["day_shape"] = f["day_shape"]["shape"]
+                entry["windows"] = f.get("windows") or {}
+            active[topic] = entry
+        out.append({"date": c["date"], "active": active})
+    return out
+
+
+def _hazard_text_problems(text, topic: str, ctx: dict, i: int, day_checks: dict,
+                          valid_centers: set) -> list:
+    """Inhaltliche Fehler eines Gefahren-Satzes als [(kind, message)]."""
+    if not isinstance(text, str) or not text.strip():
+        return [("schema", "Eintrag braucht ein nicht-leeres `text`-Feld.")]
+    problems = []
+    # Tagesverlauf: wenn der Code sagt, dass die Gefahr NICHT ganztags gilt,
+    # muss der Satz die Zeit nennen — sonst wird aus einem fliegbaren
+    # Vormittag ein verlorener Tag (Vorfall 25.07.2026, Tagespauschale).
+    shape = ((day_checks.get(topic) or {}).get("facts") or {}).get("day_shape")
+    if (shape and shape["shape"] == "gemischt"
+            and len({m.group(0).lower() for m in _TIME_RE.finditer(text)}) < 2):
+        problems.append(("time_not_differentiated",
+                         f"Die Zonen verlaufen an diesem Tag UNTERSCHIEDLICH "
+                         f"(`windows` je Zone: "
+                         f"{((day_checks.get(topic) or {}).get('facts') or {}).get('windows')}). "
+                         f"Eine einzige Zeitangabe fuer alle ist falsch — nenne "
+                         f"den Verlauf je Raum, z.B. 'den ganzen Tag an der "
+                         f"Alpennordseite, im Wallis nur morgens und abends'."))
+    elif shape and shape["shape"] != "ganztags" and not _TIME_RE.search(text):
+        problems.append(("no_time",
+                         f"Die Gefahr gilt nicht den ganzen Tag "
+                         f"(`day_shape` = {shape['shape']}, Fenster "
+                         f"{shape['hit']}) — der Satz MUSS die Tageszeit "
+                         f"nennen (z.B. 'ab dem Nachmittag', 'nur am "
+                         f"Vormittag')."))
+    bad = _find_forbidden_term(text)
+    if bad:
+        problems.append(("forbidden_term",
+                         f"`text` enthaelt einen verbotenen Begriff (Muster: {bad})."))
+    invalid = _check_pressure_region_mentions(text, valid_centers)
+    if invalid:
+        problems.append(("invalid_region",
+                         f"`text` nennt nicht detektierte Regionen: {invalid}. "
+                         f"Erlaubt: {_allowed_centers(valid_centers)}."))
+    if not day_checks["FOEHN"]["active"]:
+        hit = _FOEHN_MENTION_RE.search(text)
+        if hit:
+            problems.append(("foehn_not_active",
+                             f"An diesem Tag ist FOEHN nicht aktiv — {hit.group(0)!r} "
+                             f"darf im Gefahren-Satz nicht vorkommen."))
+    elif _text_inverts_foehn_lee(text, day_checks["FOEHN"]["facts"]["side"]):
+        problems.append(("foehn_lee_inversion",
+                         "Foehn aktiv — die Lee-Seite darf nicht als "
+                         "geschuetzt/ruhig beschrieben werden."))
+    if not day_checks["THUNDER"]["active"]:
+        hit = _GEWITTER_RE.search(text)
+        if hit:
+            problems.append(("gewitter_without_signal",
+                             f"An diesem Tag ist THUNDER nicht aktiv — "
+                             f"{hit.group(0)!r} ist nicht gedeckt."))
+    facts = (day_checks.get(topic) or {}).get("facts") or {}
+    for zone, stated, first in _onset_too_late(text, facts.get("windows") or {}):
+        problems.append(("onset_too_late",
+                         f"Der Satz nennt fuer {zone} einen Beginn ab {stated!r}, "
+                         f"laut `windows` ist die Zone aber schon ab {first!r} "
+                         f"betroffen ({facts['windows'][zone]}). Einen spaeteren "
+                         f"Beginn zu nennen als die Daten ist gefaehrlich — der "
+                         f"Pilot haelt die Stunden davor fuer fliegbar. Nenne "
+                         f"den Verlauf dieser Zone so, wie er in `windows` steht."))
+    cross_hit = _CROSS_DAY_RE.search(text)
+    if cross_hit:
+        problems.append(("cross_day",
+                         f"{cross_hit.group(0)!r} verweist auf einen anderen "
+                         f"Tag. Der Gefahren-Satz steht in der TAGES-Sektion "
+                         f"des Briefings und gilt ausschliesslich fuer diesen "
+                         f"einen Tag — kein Folgetag, kein Vortag, kein "
+                         f"Wochentag. Mehrtages-Entwicklung gehoert in `lead`."))
+    problems.extend(_length_problems(text, HAZARD_MAX_WORDS, "Gefahren-Satz"))
+    problems.extend(_verdict_problem(text, "Gefahren-Satz"))
+    enum_hit = _ENUM_RE.search(text)
+    if enum_hit:
+        problems.append(("enumeration",
+                         f"{enum_hit.group(0)!r} macht aus dem Satz eine "
+                         f"Gebiets-Liste. Der Gefahren-Satz ist ein "
+                         f"Wetterbericht-Satz: die Gefahr SETZT EIN, GREIFT "
+                         f"UEBER, KLINGT AB — Ort und Zeit gehoeren in den "
+                         f"Satzfluss ('Ab Mittag greift von Westen her Regen "
+                         f"auf die Alpennordseite ueber'), nicht als "
+                         f"'<Gebiet>: <Zustand>' hintereinander."))
+    if not _PLACE_RE.search(text):
+        problems.append(("no_place",
+                         "Der Gefahren-Satz nennt keinen Ort. Pflicht: Zonen-Name "
+                         "(Alpennordhang, Wallis, Tessin, Graubuenden/Engadin) oder "
+                         "Alpennord-/Alpensuedseite, Mittelland, Jura."))
+    return problems
+
+
+def _validate_hazards(parsed: dict, ctx: dict) -> list:
+    """Prueft `hazards`: ein Eintrag pro Tag, genau die vom Code geschalteten
+    Themen, jeder Satz mit Ortsbezug und ohne erfundene Gefahr."""
+    errors = []
+    fc_dates = ctx.get("forecast_dates") or []
+    checks = hazard_checks(ctx)
+    valid_centers = _collect_valid_center_labels(ctx)
+    any_active = any(v["active"] for c in checks for v in c["checks"].values())
+
+    hz = parsed.get("hazards")
+    if hz is None and not any_active:
+        return errors
+    if not isinstance(hz, list):
+        errors.append(_verr("hazards", "schema",
+                            "`hazards` fehlt oder ist keine Liste — Pflichtfeld: "
+                            'ein Eintrag {"items": [...]} pro forecast_date, '
+                            "gleiche Reihenfolge."))
+        return errors
+    if fc_dates and len(hz) != len(fc_dates):
+        errors.append(_verr("hazards", "schema",
+                            f"`hazards` hat {len(hz)} Eintraege, erwartet "
+                            f"{len(fc_dates)} — genau einer pro Tag."))
+
+    for i, c in enumerate(checks):
+        scope = f"hazards[{i}]"
+        active = [t for t in HAZARD_TOPICS if c["checks"][t]["active"]]
+        entry = hz[i] if i < len(hz) else None
+        items = entry.get("items") if isinstance(entry, dict) else None
+        if not isinstance(items, list):
+            if active:
+                errors.append(_verr(scope, "schema",
+                                    f'Eintrag braucht {{"items": [...]}} mit den '
+                                    f"aktiven Themen {active}."))
+            continue
+        written = []
+        for item in items:
+            topic = item.get("topic") if isinstance(item, dict) else None
+            if topic not in HAZARD_TOPICS:
+                errors.append(_verr(scope, "unknown_topic",
+                                    f"Unbekanntes Thema {topic!r} — erlaubt: "
+                                    f"{list(HAZARD_TOPICS)}."))
+                continue
+            if topic not in active:
+                errors.append(_verr(f"{scope}.{topic}", "hazard_not_active",
+                                    f"{topic} ist an diesem Tag laut "
+                                    f"`hazards_per_day` NICHT aktiv — Eintrag "
+                                    f"streichen. Aktiv sind nur: {active or 'keine'}."))
+                continue
+            if topic in written:
+                errors.append(_verr(f"{scope}.{topic}", "duplicate",
+                                    f"{topic} doppelt — genau ein Eintrag je Thema."))
+                continue
+            written.append(topic)
+            for kind, msg in _hazard_text_problems(item.get("text"), topic, ctx,
+                                                   i, c["checks"], valid_centers):
+                errors.append(_verr(f"{scope}.{topic}", kind, msg))
+        missing = [t for t in active if t not in written]
+        if missing:
+            errors.append(_verr(scope, "hazard_missing",
+                                f"Aktive Gefahren ohne Satz: {missing}. Fuer jedes "
+                                f"aktive Thema genau ein Eintrag."))
+    return errors
+
+
+def _day_line_problems(text, ctx: dict, i: int, day_checks: dict,
+                       valid_centers: set) -> list:
+    """Inhaltliche Fehler eines Tagessatzes als [(kind, message)]."""
+    if not isinstance(text, str) or not text.strip():
+        return [("schema", "Tagessatz muss ein nicht-leerer String sein.")]
+    problems = []
+    problems.extend(_length_problems(text, DAY_LINE_MAX_WORDS, "Tagessatz"))
+    problems.extend(_verdict_problem(text, "Tagessatz"))
+    bad = _find_forbidden_term(text)
+    if bad:
+        problems.append(("forbidden_term",
+                         f"Tagessatz enthaelt einen verbotenen Begriff (Muster: {bad})."))
+    invalid = _check_pressure_region_mentions(text, valid_centers)
+    if invalid:
+        problems.append(("invalid_region",
+                         f"Tagessatz nennt nicht detektierte Regionen: {invalid}. "
+                         f"Erlaubt: {_allowed_centers(valid_centers)}."))
+    hit = _CROSS_DAY_RE.search(text)
+    if hit:
+        problems.append(("cross_day",
+                         f"{hit.group(0)!r} verweist auf einen anderen Tag — der "
+                         f"Tagessatz gilt nur fuer diesen einen Tag."))
+    if not day_checks["FOEHN"]["active"] and _FOEHN_MENTION_RE.search(text):
+        problems.append(("foehn_not_active",
+                         "An diesem Tag ist FOEHN nicht aktiv — kein Foehn im Tagessatz."))
+    if not day_checks["THUNDER"]["active"] and _GEWITTER_RE.search(text):
+        problems.append(("gewitter_without_signal",
+                         "An diesem Tag ist THUNDER nicht aktiv — keine Gewitter im Tagessatz."))
+    return problems
+
+
+def _validate_day_lines(parsed: dict, ctx: dict) -> list:
+    """`day_lines`: je forecast_date genau ein kurzer Satz, tagesrein, ohne Urteil."""
+    errors = []
+    fc_dates = ctx.get("forecast_dates") or []
+    lines = parsed.get("day_lines")
+    if not isinstance(lines, list):
+        return [_verr("day_lines", "schema",
+                      "`day_lines` fehlt oder ist keine Liste — Pflichtfeld: je "
+                      "forecast_date EIN Satz (max "
+                      f"{DAY_LINE_MAX_WORDS} Woerter), gleiche Reihenfolge.")]
+    if fc_dates and len(lines) != len(fc_dates):
+        errors.append(_verr("day_lines", "schema",
+                            f"`day_lines` hat {len(lines)} Eintraege, erwartet "
+                            f"{len(fc_dates)} — genau einer pro Tag."))
+    checks = hazard_checks(ctx)
+    valid_centers = _collect_valid_center_labels(ctx)
+    for i, c in enumerate(checks):
+        if i >= len(lines):
+            break
+        for kind, msg in _day_line_problems(lines[i], ctx, i, c["checks"], valid_centers):
+            errors.append(_verr(f"day_lines[{i}]", kind, msg))
+    return errors
+
+
+def _finalize_day_lines(parsed: dict, ctx: dict, prune: bool) -> list:
+    """Cache-Format: [{date, text}] je forecast_date; fehlerhafte Saetze nur beim
+    Prune leer (das Briefing faellt dann auf den ersten Lead-Satz zurueck)."""
+    lines = parsed.get("day_lines") if isinstance(parsed.get("day_lines"), list) else []
+    valid_centers = _collect_valid_center_labels(ctx)
+    out = []
+    for i, c in enumerate(hazard_checks(ctx)):
+        text = lines[i] if i < len(lines) else ""
+        text = text.strip() if isinstance(text, str) else ""
+        if text and prune and _day_line_problems(text, ctx, i, c["checks"], valid_centers):
+            logger.warning("Nicht behebbarer Tagessatz entfernt (day %d): '%s'", i + 1, text)
+            text = ""
+        out.append({"date": c["date"],
+                    "text": _neutralize_calendar_week_text(text) if text else ""})
+    return out
+
+
+def _finalize_hazards(parsed: dict, ctx: dict, prune: bool) -> list:
+    """Cache-Format: [{date, checks, items: [{topic, text}]}] je forecast_date.
+    checks kommen vom Code und stehen auch ohne LLM-Satz da. Nicht geschaltete
+    Themen fallen immer weg, fehlerhafte Saetze nur beim Prune."""
+    raw = parsed.get("hazards") if isinstance(parsed.get("hazards"), list) else []
+    valid_centers = _collect_valid_center_labels(ctx)
+    out = []
+    for i, c in enumerate(hazard_checks(ctx)):
+        entry = raw[i] if i < len(raw) else None
+        items_raw = entry.get("items") if isinstance(entry, dict) else None
+        by_topic = {}
+        for item in items_raw if isinstance(items_raw, list) else []:
+            if not isinstance(item, dict):
+                continue
+            topic = item.get("topic")
+            text = item.get("text")
+            if (topic not in HAZARD_TOPICS or not c["checks"][topic]["active"]
+                    or topic in by_topic or not isinstance(text, str) or not text.strip()):
+                continue
+            text = text.strip()
+            if prune and _hazard_text_problems(text, topic, ctx, i,
+                                               c["checks"], valid_centers):
+                logger.warning("Nicht behebbarer Gefahren-Satz entfernt "
+                               "(%s day %d): '%s'", topic, i + 1, text)
+                continue
+            by_topic[topic] = _neutralize_calendar_week_text(text)
+        out.append({
+            "date": c["date"],
+            "checks": c["checks"],
+            "items": [{"topic": t, "text": by_topic[t]}
+                      for t in HAZARD_TOPICS if t in by_topic],
+        })
     return out

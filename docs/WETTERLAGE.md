@@ -92,7 +92,7 @@ fetch_europe_pressure_grid()            ← Mini-API-Call ECMWF-IFS, 15 Europa-P
 
 fetch_foehn_data() (foehn_indicators.py)
     ↓
-decide_foehn_summary()                  ← Pro Tag: ≥2h caution+ → aktiv
+decide_foehn_summary()                  ← Pro Tag: ≥1h caution+ im Flugfenster → aktiv (wie Regionen)
 
 weather_cache (alle Spots)
     ↓ Lat/Lon-Klassifikation
@@ -159,7 +159,15 @@ Alle Schwellen in `config.py` unter `SYNOPTIC_*`.
 
 ### `decide_foehn_summary`
 - Quelle: `foehn_indicators.fetch_foehn_data` (eigener API-Call, 2 Punkte)
-- Pro Tag: Stunden 10-16 lokal prüfen, ≥2h caution+ → aktiv
+- Pro Tag: Stunden im Flugfenster `FLIGHT_HOURS_START..END` (06–18) prüfen,
+  aktiv ab `SYNOPTIC_FOEHN_ACTIVE_MIN_HOURS` (1) Stunde caution+ — dieselbe
+  Regel wie die Regions-Analyse (`_format_foehn_info`: schlimmste Stunde im
+  Flugfenster). Damit gilt: **hat eine Region Föhn, zeigt ihn auch die
+  Synoptik.** Früher 10–16 Uhr und ≥2 h — am 16.09.2026 zeigte Oberwallis
+  „Föhn mässig“ (1 h Nordföhn), die Synoptik keinen Föhn.
+- Umgekehrt darf die Synoptik Föhn zeigen, den eine Region wegen ihrer
+  `kritischer_foehn`-Richtung ausblendet — der Föhn ist real, nur dort
+  unkritisch.
 - Richtungen: Süd / Nord / wechselnd
 - Bei API-Fehler: `source="fetch_failed"`, Block läuft trotzdem weiter
 
@@ -249,11 +257,24 @@ Damit ist jede Aussage rückwärts auflösbar bis zur Rohzahl. Audit-Logs unter
 ```json
 {"lead": "...",
  "zones": [{"zone": "alpennordhang",
-            "days": [{"text": "...", "flight_hint": "..."}]}]}
+            "days": [{"text": "...", "flight_hint": "..."}]}],
+ "hazards": [{"items": [{"topic": "RAIN", "text": "..."}]}]}
 ```
 Zuordnung `days[i] ↔ forecast_dates[i]` per Position, Zonen über die
 `zone`-ID (nicht über die Reihenfolge). `_finalize` sortiert nach
 `config.SYNOPTIC_ZONES`, nicht nach LLM-Reihenfolge.
+
+**`hazards` (seit 15.09.2026) — Gefahren schweizweit** für die
+Briefing-Warnungen: ein Eintrag je `forecast_dates`-Tag. **Der Code schaltet**,
+`hazard_checks()` entscheidet je Tag über `RAIN` (Nässe ≥
+`SYNOPTIC_HAZARD_RAIN_WET_SHARE` in einer Zone), `THUNDER` (`gewitter_share`
+> 0 oder `konvektion.gewitter`), `FOEHN` (`foehn.per_day`), `BISE`,
+`WIND` (`wind_class` verblasen/stark eingeschränkt). Das Payload bekommt
+davon nur die aktiven Themen als `hazards_per_day`; der LLM schreibt je
+aktivem Thema 1–2 Sätze: wo in der Schweiz, woher/wohin, wann. Im Cache steht
+`llm_overview.hazards = [{date, checks, items: [{topic, text}]}]` — `checks`
+kommen immer vom Code, auch wenn ein Satz fehlt. Die App liest das Feld nicht;
+Konsument ist die Briefing-Vorschau (`scripts/briefing_v3_context.py`).
 
 ### Validierung (`engine/synoptic_llm.py:_validate`)
 1. **Regex-Verbotsfilter**: `\bkaltfront\b`, `\btrog\b`, `\d{3,4}\s?hPa`,
@@ -279,6 +300,11 @@ Zuordnung `days[i] ↔ forecast_dates[i]` per Position, Zonen über die
 7. **Gewitter nur mit Signal**: `gewitter_share == 0` in der Zone → das
    Wort „Gewitter"/„thunderstorm" ist unzulässig. Hohe CAPE allein heisst
    „labile Luft". Die Regel stand im Skill, war aber nirgends verankert.
+8. **Gefahren nur, wenn der Code sie schaltet** (`_validate_hazards`): je
+   Tag genau die aktiven Themen (`hazard_missing` / `hazard_not_active`),
+   jeder Satz mit Ortsbezug (`no_place`: Zone, Alpennord/-süd, Mittelland,
+   Jura), dazu Verbotsbegriffe, Föhn- und Gewitter-Wörter wie oben. Beim
+   Bereinigen fällt nur der fehlerhafte Satz weg, der Schalter bleibt.
 
 Fehler → Korrekturrunde (max 4 Versuche) → chirurgisches Bereinigen der
 besten Version + Admin-Mail. Kein stilles Löschen.

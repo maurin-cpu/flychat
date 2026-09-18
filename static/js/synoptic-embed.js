@@ -18,6 +18,11 @@
  * Timesteps). Die Wind-Partikel kommen aus synoptic-wind.js (echtes Modul).
  * CSS: nutzt die .syn-center-*-Badge-Styles aus synoptik.css (im Briefing-
  * Template mitgeladen) + .bf-synoptic-Styles aus briefing.css.
+ *
+ * Zweiter Einsatz: /synoptik/karte (Kartenbild fuers Morgenbriefing). Dort
+ * traegt #bfSynoptic data-ausschnitt="festland" (engerer Ausschnitt) und
+ * data-wind="pfeile" (statische Hoehenwind-Pfeile aus synoptic-wind.js). Ohne
+ * die Attribute — also im Gleitcast — bleibt alles wie beschrieben.
  */
 (function () {
   "use strict";
@@ -261,10 +266,18 @@
   // grosser Breitenbereich zieht deshalb automatisch halb Asien mit ins Bild.
   var EUROPE_BOUNDS = L.latLngBounds([35.5, -11.0], [59.0, 27.0]);
 
+  // Kartenbild fuers Morgenbriefing (data-ausschnitt="festland"): enger auf das
+  // europaeische Festland — Iberien bis zum Schwarzen Meer, Mittelmeer bis Nord-
+  // und Ostsee. Die Mail zeigt die Karte klein; im Europa-Rahmen waere die
+  // Schweiz dort kaum zu finden.
+  var FESTLAND_BOUNDS = L.latLngBounds([37.0, -9.5], [55.5, 28.5]);
+
   function fitEurope(map) {
+    var bounds = (_card && _card.dataset.ausschnitt === "festland")
+      ? FESTLAND_BOUNDS : EUROPE_BOUNDS;
     // Padding, damit H/T-Badges am Rand nicht angeschnitten werden — sie
     // ragen ueber ihren Ankerpunkt hinaus (44x54 px Icon).
-    map.fitBounds(EUROPE_BOUNDS, { animate: false, padding: [30, 26] });
+    map.fitBounds(bounds, { animate: false, padding: [30, 26] });
   }
 
   // Druckzentren liegen ihrer Natur nach oft ausserhalb eines Europa-Rahmens
@@ -416,9 +429,18 @@
       }).addTo(map);
     });
 
-    // KEINE Wind-Partikel: die gehoeren auf die interaktive Karte (/synoptik).
-    // Hier traegt der Ausschnitt Druckverteilung und Zentren — bewegte Pfeile
-    // waeren auf dem kleinen, statischen Bild nur Unruhe.
+    // Gleitcast: KEINE Wind-Partikel — die gehoeren auf die interaktive Karte
+    // (/synoptik). Hier traegt der Ausschnitt Druckverteilung und Zentren —
+    // bewegte Pfeile waeren auf dem kleinen Bild nur Unruhe.
+    // Kartenbild fuers Morgenbriefing (data-wind="pfeile"): der statische
+    // Pfeil-Snapshot von synoptic-wind.js (Laenge + Farbe = Staerke).
+    if (_card && _card.dataset.wind === "pfeile" && window.WingcastWind
+        && grid.winds && grid.winds[ts]) {
+      _wind = WingcastWind.create(map, { reducedMotion: true });
+      _wind.setGrid(grid);
+      _wind.setTimestep(ts);
+      _wind.setEnabled(true);
+    }
 
     return map;
   }
@@ -432,8 +454,9 @@
   var _card = null, _mapEl = null;
   var _grid = null, _generatedAt = null;
   var _map = null;
+  var _wind = null;      // Pfeil-Layer (nur mit data-wind="pfeile")
   var _fronts = null;    // Fronten-Layer (synoptic-fronts.js)
-  var _date = null;      // gewuenschter Briefing-Tag ("YYYY-MM-DD") oder null
+  var _date = null;     // gewuenschter Briefing-Tag ("YYYY-MM-DD") oder null
   var _shownTs = null;   // aktuell gerenderter Timestep (Re-Render vermeiden)
 
   function show() {
@@ -442,13 +465,16 @@
     if (ts === _shownTs) return;
     // Leaflet-Karte vollstaendig ersetzen: die Kontur-Pipeline haengt am
     // Timestep, ein Layer-Austausch spart nichts Spuerbares bei 1x/Tag-Daten.
+    if (_wind) { _wind.destroy(); _wind = null; }
     if (_fronts) { _fronts.destroy(); _fronts = null; }
     if (_map) { _map.remove(); _map = null; }
     _mapEl.innerHTML = "";
     // Karte erst sichtbar machen (Leaflet braucht reale Groesse), dann rendern
     _card.hidden = false;
     var desc = document.getElementById("bfSynopticSub");
-    if (desc) desc.textContent = "· " + wcT("js.syn.embed_sub");
+    var withWind = _card.dataset.wind === "pfeile" && _grid.winds && _grid.winds[ts];
+    if (desc) desc.textContent = "· " + wcT("js.syn.embed_sub")
+      + (withWind ? " · " + wcT("js.syn.legend_wind") : "");
     var sub = document.getElementById("bfSynopticTs");
     if (sub) sub.textContent = "· " + wcT("js.syn.embed_asof") + " " + fmtTs(ts);
     _map = render(_mapEl, _grid, ts);
@@ -457,7 +483,7 @@
     // fuers Morgenbriefing (scripts/synoptik_snapshot.js), dass sie gezeichnet sind.
     _mapEl.removeAttribute("data-fronts-ready");
     if (window.WCSynopticFronts) {
-      _fronts = window.WCSynopticFronts.create(_map, { legend: true });
+      _fronts = window.WCSynopticFronts.create(_map, { legend: "compact" });
       var el = _mapEl;
       _fronts.update(_grid, ts).then(function () { el.setAttribute("data-fronts-ready", "1"); });
     }

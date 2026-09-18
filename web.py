@@ -2624,6 +2624,23 @@ def synoptik_page():
     return render_template("synoptik.html", forecast_days=current_max_days())
 
 
+@app.route("/synoptik/karte")
+def synoptik_karte_page():
+    """Nur die Synoptik-Kartenkarte (Festland-Ausschnitt + Hoehenwind-Pfeile) —
+    Vorlage fuer das Kartenbild im Morgenbriefing (scripts/synoptik_snapshot.js).
+
+    ?day=N waehlt den Tag ab heute wie auf /briefing; ausserhalb des Fensters
+    wird auf den ersten bzw. letzten Tag begrenzt.
+    """
+    days = sorted(_allowed_date_strs(config.FORECAST_DAYS))
+    try:
+        idx = int(request.args.get("day", 0))
+    except ValueError:
+        idx = 0
+    idx = max(0, min(idx, len(days) - 1))
+    return render_template("synoptik_karte.html", date=days[idx])
+
+
 @app.route("/api/synoptic/fronts", methods=["GET"])
 def api_synoptic_fronts():
     """DWD-Fronten zum Karten-Timestep: ?ts=YYYY-MM-DDTHH:MM (lokale CH-Zeit,

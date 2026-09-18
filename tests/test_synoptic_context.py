@@ -1024,5 +1024,177 @@ class TestWindZones(unittest.TestCase):
         self.assertEqual(zones["wallis"]["n_spots"], 0)
 
 
+# ============================================================================
+# decide_foehn_summary — gleiche Regel wie die Regions-Analyse
+# ============================================================================
+
+from unittest import mock  # noqa: E402
+
+from foehn_indicators import evaluate_foehn  # noqa: E402
+
+FOEHN_DATE = "2026-09-16"
+
+
+def _foehn_series(dp_by_hour: dict) -> dict:
+    """Zeitreihe Zuerich/Lugano: dp_by_hour {Stunde: ΔP}, positiv = Suedfoehn
+    (Lugano hoeher), negativ = Nordfoehn. Uebrige Stunden ohne Gradient."""
+    times = [f"{FOEHN_DATE}T{h:02d}:00" for h in range(24)]
+    nord = [1015.0] * 24
+    sued = [1015.0 + dp_by_hour.get(h, 0.0) for h in range(24)]
+    return {"nord": {"hourly": {"time": times, "pressure_msl": nord}},
+            "sued": {"hourly": {"time": times, "pressure_msl": sued}}}
+
+
+def _region_has_foehn(data: dict, kritisch: str) -> bool:
+    """Nachbau von weather_context._format_foehn_info: schlimmste Stunde (max ΔP)
+    im Flugfenster, deren Level; irrelevante Richtung zaehlt als kein Foehn."""
+    times = data["nord"]["hourly"]["time"]
+    idx = [i for i, t in enumerate(times) if t.startswith(FOEHN_DATE)
+           and config.FLIGHT_HOURS_START <= int(t[11:13]) < config.FLIGHT_HOURS_END]
+    worst, max_dp = idx[0], -999
+    for i in idx:
+        dp = evaluate_foehn(data["nord"], data["sued"], i, kritischer_foehn=kritisch).get("delta_p_hpa") or 0
+        if dp > max_dp:
+            worst, max_dp = i, dp
+    ev = evaluate_foehn(data["nord"], data["sued"], worst, kritischer_foehn=kritisch)
+    d = ev.get("foehn_direction", "none")
+    irrelevant = d != "none" and ((kritisch == "Süd" and d == "Nord")
+                                  or (kritisch == "Nord" and d == "Süd"))
+    return not irrelevant and ev.get("level", "none") != "none"
+
+
+class TestDecideFoehnSummary(unittest.TestCase):
+    def _run(self, dp_by_hour):
+        data = _foehn_series(dp_by_hour)
+        with mock.patch("foehn_indicators.fetch_foehn_data", return_value=data):
+            return data, sc.decide_foehn_summary([FOEHN_DATE])
+
+    def test_single_morning_hour_is_active(self):
+        # 16.09.2026: 1 h Nordfoehn ausserhalb 10-16 — frueher still
+        _, out = self._run({7: -5.0})
+        day = out["per_day"][0]
+        self.assertTrue(day["nord_active"])
+        self.assertEqual(day["nord_hours"], 1)
+        self.assertEqual(out["days_affected"], [FOEHN_DATE])
+
+    def test_no_gradient_is_inactive(self):
+        _, out = self._run({})
+        self.assertFalse(out["active"])
+
+    def test_hour_outside_flight_window_is_inactive(self):
+        _, out = self._run({config.FLIGHT_HOURS_END + 1: 6.0})
+        self.assertFalse(out["per_day"][0]["sued_active"])
+
+    def test_thresholds_reflect_config(self):
+        _, out = self._run({})
+        self.assertEqual(out["thresholds"]["active_min_hours"],
+                         config.SYNOPTIC_FOEHN_ACTIVE_MIN_HOURS)
+
+    def test_region_foehn_implies_synoptic_foehn(self):
+        """Zusage: zeigt irgendeine Region Foehn, zeigt ihn auch die Synoptik."""
+        scenarios = [
+            {7: -5.0}, {17: 4.5}, {12: 5.0, 13: 6.0, 14: 9.0},
+            {8: 5.0, 15: -6.0}, {6: -8.5}, {11: 3.9}, {},
+        ]
+        for dp in scenarios:
+            data, out = self._run(dp)
+            day = out["per_day"][0]
+            synoptic = day["sued_active"] or day["nord_active"]
+            for kritisch in ("Süd", "Nord", "Beide"):
+                if _region_has_foehn(data, kritisch):
+                    self.assertTrue(synoptic, f"Region {kritisch} Foehn bei {dp}, Synoptik still")
+
+
+
+# ============================================================================
+# Hoehenwind regional (decide_aloft_regional)
+# ============================================================================
+
+def _aloft_cache(values_by_spot, date="2026-09-16", hour=12):
+    """{spot: kmh} -> Wetter-Cache mit einem 700-hPa-Wert je Spot."""
+    return {name: {"pressure_level_data": {
+        f"{date}T{hour:02d}:00": {"wind_speed_700hPa": kmh}}}
+        for name, kmh in values_by_spot.items()}
+
+
+class TestAloftRegional(unittest.TestCase):
+    def test_single_spot_outlier_does_not_drive_the_region(self):
+        """Ein Spot mit 90 km/h in einer Region mit 20er-Spots: der Median
+        bleibt bei 20 — das ist der Ausreisser-Schutz."""
+        cache = _aloft_cache({"a1": 20, "a2": 21, "a3": 90})
+        out = sc.decide_aloft_regional(cache, ["2026-09-16"],
+                                       {"a1": "Alpen", "a2": "Alpen", "a3": "Alpen"})
+        self.assertEqual(out["per_day"][0]["max_kmh"], 21)
+
+    def test_strongest_region_wins(self):
+        cache = _aloft_cache({"a1": 20, "a2": 22, "a3": 21,
+                              "b1": 44, "b2": 46, "b3": 45})
+        rmap = {"a1": "Jura", "a2": "Jura", "a3": "Jura",
+                "b1": "Berner Alpen", "b2": "Berner Alpen", "b3": "Berner Alpen"}
+        day = sc.decide_aloft_regional(cache, ["2026-09-16"], rmap)["per_day"][0]
+        self.assertEqual((day["max_kmh"], day["region"], day["hour"]),
+                         (45, "Berner Alpen", 12))
+        self.assertEqual([t["region"] for t in day["top"]], ["Berner Alpen", "Jura"])
+
+    def test_region_with_too_few_spots_is_skipped(self):
+        cache = _aloft_cache({"a1": 20, "a2": 21, "a3": 22, "b1": 80, "b2": 80})
+        rmap = {"a1": "Jura", "a2": "Jura", "a3": "Jura",
+                "b1": "Klein", "b2": "Klein"}
+        day = sc.decide_aloft_regional(cache, ["2026-09-16"], rmap)["per_day"][0]
+        self.assertEqual((day["region"], day["n_regions"]), ("Jura", 1))
+
+    def test_hours_outside_the_flight_window_are_ignored(self):
+        cache = _aloft_cache({"a1": 90, "a2": 90, "a3": 90}, hour=22)
+        day = sc.decide_aloft_regional(cache, ["2026-09-16"],
+                                       {"a1": "Jura", "a2": "Jura", "a3": "Jura"})["per_day"][0]
+        self.assertIsNone(day["max_kmh"])
+
+
+# ============================================================================
+# Lage-Label je Tag (decide_lage_label_for_day)
+# ============================================================================
+
+def _lage_ctx(**day):
+    """Kontext mit genau einem Tag 2026-09-16; day: foehn/bise/vb/flow/regime."""
+    d = "2026-09-16"
+    return {
+        "foehn": {"per_day": [{"date": d, **day.get("foehn", {})}]},
+        "bise": {"per_day": [{"date": d, "active": day.get("bise", False)}]},
+        "vb_lage": {"per_day": [{"date": d, "active": day.get("vb", False)}]},
+        "flow_overhead": {"per_day": [{"date": d, **day.get("flow", {})}]},
+        "pressure_influence": {"per_day": [{"date": d, "regime": day.get("regime", "neutral")}]},
+    }
+
+
+class TestLageLabelForDay(unittest.TestCase):
+    def test_foehn_only_on_its_own_day(self):
+        """Vorfall 16.09.2026: 'Nordfoehnlage' (Foehn erst Do) ueber 'Kein Foehn'."""
+        ctx = _lage_ctx(flow={"sector": "Suedwest", "strength": "maessig"})
+        self.assertEqual(sc.decide_lage_label_for_day(ctx, "2026-09-16")["value"],
+                         "Suedwestlage")
+
+    def test_foehn_day(self):
+        ctx = _lage_ctx(foehn={"nord_active": True})
+        self.assertEqual(sc.decide_lage_label_for_day(ctx, "2026-09-16")["value"],
+                         "Nordfoehnlage")
+
+    def test_hierarchy_bise_before_flow(self):
+        ctx = _lage_ctx(bise=True, flow={"sector": "Nordost", "strength": "maessig"})
+        self.assertEqual(sc.decide_lage_label_for_day(ctx, "2026-09-16")["value"],
+                         "Bisenlage")
+
+    def test_weak_flow_falls_back_to_pressure(self):
+        ctx = _lage_ctx(flow={"sector": "West", "strength": "schwach"}, regime="Hochdruck")
+        self.assertEqual(sc.decide_lage_label_for_day(ctx, "2026-09-16")["value"],
+                         "Hochdrucklage")
+
+    def test_neutral_is_undetermined(self):
+        self.assertEqual(sc.decide_lage_label_for_day(_lage_ctx(), "2026-09-16")["value"],
+                         "unbestimmt")
+
+    def test_unknown_date(self):
+        self.assertEqual(sc.decide_lage_label_for_day(_lage_ctx(), "2030-01-01")["value"],
+                         "unbestimmt")
+
 if __name__ == "__main__":
     unittest.main()

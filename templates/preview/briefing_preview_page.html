@@ -1,0 +1,444 @@
+{# =====================================================================
+   Briefing-Vorschau v3 — Design-Seite. PREVIEW-ONLY, kein Mail-Template.
+
+   Konzept: docs/pläne/PLAN_briefing_mail_v3.md. Die Seite folgt der
+   Analyse-Kette des Piloten, zaehlt Spots je Region statt sie zu kueren,
+   und zeigt zu jeder Zahl einen Satz. Woche ohne Fliesstext, Tag im
+   Briefing-Stil, Synoptik-Karte immer.
+
+   Synoptik-Karte: Screenshot der App-Karte (#bfSynoptic auf /briefing, via
+   scripts/synoptik_snapshot.js) — 1:1 wie in der App, kein Nachbau.
+   Rating-Farben: RATING_FARBKONZEPT v3.2.
+   ===================================================================== #}
+<!DOCTYPE html>
+<html lang="{{ v3_lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wingcast Briefing — Vorschau v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<style>
+  /* =====================================================================
+     Design-System (ui-ux-pro-max, 09.09.): Muster "Real-Time / Operations",
+     Stil "Executive Dashboard" mit Flat-Disziplin. Tokens = Aviation Blue der
+     App (static/css/style.css), Typo Lexend (Lesbarkeit) + Fira Code (Zahlen),
+     Skala 12/14/16/18/24/32, Abstaende 4/8/12/16/24/32, Radius 8/12/16,
+     Tippziele >= 44 px, Kontrast >= 4.5:1, keine Einstiegsanimation (Export).
+     Rating-Farben bleiben die Palette v3.2 (docs/RATING_FARBKONZEPT.md).
+     ===================================================================== */
+  :root{
+    --primary:#0369a1; --primary-vivid:#075985; --primary-light:#e0f2fe; --on-primary:#ffffff;
+    --accent:#d97706; --accent-soft:#fef3c7; --danger:#b91c1c; --danger-soft:#fee2e2;
+    --bg:#f7f8fc; --surface:#ffffff; --surface-2:#f8fafc;
+    --text:#1e293b; --text-2:#475569; --muted:#64748b; --border:#e5e7eb; --border-strong:#cbd5e1;
+    --shadow-sm:0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md:0 4px 12px rgba(0,0,0,.06), 0 2px 4px rgba(0,0,0,.04);
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px;
+    --sans:"Lexend", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono:"Fira Code", ui-monospace, "Cascadia Code", Consolas, monospace;
+    --t:150ms ease-out;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --primary:#38bdf8; --primary-vivid:#0c4a6e; --primary-light:#0c2a3d; --on-primary:#ffffff;
+      --accent:#fbbf24; --accent-soft:#3a2a08; --danger:#f87171; --danger-soft:#3b1212;
+      --bg:#0b1219; --surface:#121b25; --surface-2:#182432;
+      --text:#e6edf3; --text-2:#b6c2cf; --muted:#8fa1b3; --border:#243342; --border-strong:#34475a;
+      --shadow-sm:0 1px 3px rgba(0,0,0,.4); --shadow-md:0 4px 12px rgba(0,0,0,.45);
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0; background:var(--bg); color:var(--text); font:16px/1.55 var(--sans); -webkit-font-smoothing:antialiased}
+  a{color:var(--primary)} a:focus-visible,button:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+  .wrap{max-width:720px; margin:0 auto; padding:var(--s6) var(--s4) var(--s8)}
+  .ico{width:1em; height:1em; vertical-align:-.15em; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none}
+  /* Keine Einstiegsanimation mehr: ein PNG-/PDF-Export ohne Wartezeit
+     fing die Seite halb eingeblendet (blass) ein. .rise bleibt als Klasse. */
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+
+  /* ---------- Seitenkopf (nur Vorschau-Meta) ---------- */
+  .pagehead{margin:0 0 var(--s4)}
+  .pagehead .eyebrow{display:inline-block; font:600 12px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--primary); background:var(--primary-light); padding:6px 10px; border-radius:999px; margin:0 0 var(--s3)}
+  .pagehead h1{font-size:24px; line-height:1.25; margin:0 0 var(--s2); font-weight:700; letter-spacing:-.01em}
+  .pagehead p{margin:0; color:var(--text-2); font-size:16px; max-width:62ch}
+  .pagehead .stand{font:12px/1.6 var(--mono); color:var(--muted); margin-top:var(--s2)}
+  .srclegend{display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center; margin:0 0 var(--s5); font-size:14px; color:var(--muted)}
+  .src{display:inline-flex; font:600 11px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; padding:4px 7px; border-radius:6px}
+  .src.code{color:var(--primary); background:var(--primary-light)} .src.ki{color:#6d28d9; background:#ede9fe}
+  @media (prefers-color-scheme: dark){ .src.ki{color:#c4b5fd; background:#2a2140} }
+
+  /* ---------- Inbox ---------- */
+  .push{display:flex; gap:var(--s3); align-items:flex-start; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:var(--s3) var(--s4); margin-bottom:var(--s5); box-shadow:var(--shadow-sm)}
+  .push .appicon{width:44px; height:44px; border-radius:10px; flex:none; background:var(--primary); display:grid; place-items:center; color:#fff; font-weight:700; font-size:20px}
+  .push .body{flex:1; min-width:0}
+  .push .meta{display:flex; justify-content:space-between; gap:var(--s2); font-size:14px; color:var(--muted)}
+  .push .meta b{color:var(--text); font-weight:600}
+  .push .subject{font-weight:600; font-size:16px; margin-top:2px; line-height:1.35}
+  .push .pre{font-size:14px; color:var(--muted); margin-top:2px}
+
+  /* ---------- Mail ---------- */
+  .mail{background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-md)}
+  .sky{padding:var(--s6) var(--s6) var(--s5); color:var(--on-primary); background:var(--primary-vivid)}
+  .sky .row{display:flex; justify-content:space-between; align-items:baseline; gap:var(--s3); flex-wrap:wrap}
+  .brand{font-weight:700; font-size:18px} .brand em{font-style:normal; opacity:.85; font-weight:400}
+  .sky .date{font-size:14px; opacity:.9}
+  .verdict-pill{display:inline-flex; align-items:center; gap:var(--s2); margin:var(--s4) 0 var(--s2); background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.3); border-radius:999px; padding:6px 14px; font-weight:600; font-size:14px; letter-spacing:.04em; text-transform:uppercase}
+  .verdict-pill i{width:10px; height:10px; border-radius:50%; background:#86efac}
+  .sky h2{margin:0; font-size:24px; line-height:1.3; font-weight:700; letter-spacing:-.01em; max-width:30ch}
+  .kpi{margin-top:var(--s4); display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; background:rgba(255,255,255,.1); border-radius:var(--r-md); padding:var(--s3) var(--s4)}
+  .kpi .n{font:600 32px/1 var(--mono); padding:6px 12px; border-radius:var(--r-sm)}
+  .kpi .l{display:flex; flex-direction:column; gap:2px} .kpi .l b{font-size:16px; font-weight:600} .kpi .l span{font-size:14px; opacity:.9; font-family:var(--mono)}
+
+  .chapter{padding:var(--s3) var(--s6); display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; background:var(--surface-2); border-top:1px solid var(--border); border-bottom:1px solid var(--border)}
+  .chapter .q{font:600 12px/1 var(--mono); color:var(--primary); background:var(--primary-light); border-radius:6px; padding:5px 8px; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap}
+  .chapter .t{font-size:16px; font-weight:600}
+  .block{padding:var(--s5) var(--s6)} .block + .block{border-top:1px solid var(--border)}
+  .label{display:flex; align-items:center; gap:var(--s2); margin:0 0 var(--s3); font:600 12px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  .label::after{content:""; flex:1; height:1px; background:var(--border)}
+  .empty{font-size:15px; color:var(--muted); font-style:italic; margin:0}
+  .notice{margin-bottom:var(--s2); padding:var(--s3) var(--s4); border-radius:var(--r-sm); background:var(--accent-soft); border-left:4px solid var(--accent); font-size:15px; line-height:1.5}
+
+  /* ---------- Woche: KPI-Karten ---------- */
+  .week{display:grid; gap:var(--s3)}
+  .day{border:1px solid var(--border); border-radius:var(--r-md); padding:var(--s3); background:var(--surface)}
+  .day.focus{border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-light)}
+  .day .top{display:flex; align-items:flex-start; gap:var(--s2)}
+  .day .nm{font-size:18px; font-weight:700; line-height:1.2}
+  .day .st{display:inline-flex; align-items:center; gap:5px; font-size:14px; font-weight:500; margin-top:2px}
+  .day .st .ico{width:16px; height:16px}
+  .day .rt{margin-left:auto; font:600 24px/1 var(--mono)}
+  .rl{list-style:none; margin:6px 0 0; padding:0; display:flex; flex-direction:column; gap:3px}
+  .rl li{display:flex; align-items:center; gap:var(--s2); font-size:14px; line-height:1.3; min-height:22px}
+  .rc{flex:none; display:inline-grid; place-items:center; min-width:24px; height:22px; padding:0 5px; border-radius:5px; border:1px solid; font:600 12px/1 var(--mono)}
+  .rc .ico{width:13px; height:13px}
+  .rn{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .rg{display:flex; align-items:flex-start; gap:var(--s2); margin-top:4px; font-size:13px; line-height:1.4; color:var(--text-2)}
+  .segh{margin-top:var(--s3); font:600 11px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  .seg{display:flex; flex-wrap:wrap; gap:var(--s1); margin-top:6px}
+  .seg span{flex:0 0 auto; min-width:34px; height:24px; padding:0 6px; display:grid; place-items:center; border-radius:6px; border:1px solid; font:600 11px/1 var(--mono); letter-spacing:.02em}
+  .grp{margin-top:var(--s2)}
+  .gh{display:flex; align-items:baseline; gap:6px; font:600 12px/1.2 var(--mono); padding-bottom:3px; border-bottom:1px solid var(--border)}
+  .gh .gr{color:var(--text)} .gh .gn{margin-left:auto; color:var(--muted); font-weight:500}
+  .day .syn .nw{color:var(--muted); font-weight:400}
+  .cnt{margin-top:var(--s2); font-size:14px; line-height:1.5; color:var(--text)}
+  .cnt b{font-family:var(--mono); font-weight:600}
+  .cnt .ch{color:var(--muted); display:block}
+  .cnt .tn{display:block} .cnt .tn b{font-family:var(--sans); font-weight:600}
+  .cnt .tn-safe b{color:#15803d} .cnt .tn-cond b{color:var(--accent)}
+  .day .syn{border-top:0; padding-top:0; margin-top:var(--s2)}
+  .day .syn{margin-top:var(--s2); padding-top:var(--s2); border-top:1px solid var(--border); font:14px/1.6 var(--mono); color:var(--text-2)}
+  .day .syn .w{color:var(--text); font-weight:500} .day .syn .w.hot{color:var(--danger)} .day .syn .arr{color:var(--primary)} .day .syn .w.hot .arr{color:var(--danger)}
+  .day .syn b{color:var(--accent); font-weight:600}
+  .day .hint{margin-top:var(--s2); font-size:15px; line-height:1.45; color:var(--text)}
+  .matrix{width:100%; border-collapse:separate; border-spacing:0; font-size:15px}
+  .matrix th,.matrix td{padding:6px var(--s2); text-align:left; vertical-align:middle}
+  .matrix thead th{font:600 12px/1.2 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:center; padding-bottom:var(--s2)}
+  .matrix thead th.focus{color:var(--primary)}
+  .matrix tbody th{font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0; width:99%}
+  .matrix tbody tr{border-top:1px solid var(--border)}
+  .matrix tbody td{text-align:center; width:56px}
+  .matrix tbody tr:nth-child(even) th,.matrix tbody tr:nth-child(even) td{background:var(--surface-2)}
+  .matrix .cell{display:inline-grid; place-items:center; min-width:40px; height:30px; padding:0 8px; border-radius:6px; border:1px solid; font:600 14px/1 var(--mono)}
+  .matrix .cell .ico{width:16px; height:16px}
+  .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+  .weekhint{margin-top:var(--s3); font-size:14px; color:var(--muted); line-height:1.5}
+
+  /* ---------- Karte ---------- */
+  .mapshot{display:block; width:100%; height:auto}
+  .leg{display:flex; gap:var(--s3); flex-wrap:wrap}
+  .leg i{display:inline-block; width:18px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px}
+  .syn-center-icon{display:flex; flex-direction:column; align-items:center; gap:2px; line-height:1; pointer-events:none}
+  .syn-center-badge{display:flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,.92); font:800 17px/1 var(--sans); box-shadow:0 2px 8px rgba(15,23,42,.22)}
+  .syn-center-value{padding:1px 7px; font:700 10px/1.4 var(--mono); color:#334155; background:rgba(255,255,255,.9); border-radius:100px; box-shadow:0 1px 2px rgba(0,0,0,.1)}
+  .syn-center-icon--hoch .syn-center-badge{color:#1d4ed8; box-shadow:0 2px 8px rgba(15,23,42,.2), 0 0 0 4px rgba(29,78,216,.16)}
+  .syn-center-icon--tief .syn-center-badge{color:#dc2626; box-shadow:0 2px 8px rgba(15,23,42,.2), 0 0 0 4px rgba(220,38,38,.16)}
+  .syn-center-icon--offmap{opacity:.82} .syn-center-icon--offmap .syn-center-badge{border:1.5px dashed currentColor; background:rgba(255,255,255,.82)}
+  .osm-muted{filter:grayscale(.85) contrast(.9) brightness(1.06)}
+  .syn-iso-label{font:600 10px var(--mono); color:#475569; background:rgba(255,255,255,.75); padding:1px 3px; border-radius:3px; white-space:nowrap}
+
+  /* ---------- Kette ---------- */
+  .chain{margin-top:var(--s4)}
+  .step{display:grid; grid-template-columns:36px 1fr; gap:var(--s3); padding:var(--s3) 0; border-top:1px solid var(--border)}
+  .step:first-child{border-top:0; padding-top:0}
+  .step .no{width:28px; height:28px; border-radius:var(--r-sm); display:grid; place-items:center; font:600 13px/1 var(--mono); color:var(--primary); background:var(--primary-light)}
+  .step .h{font-size:16px; font-weight:600; margin:2px 0 var(--s1); display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap}
+  .step .h small{font-weight:400; color:var(--muted); font-size:14px}
+  .step .num{font:15px/1.6 var(--mono); color:var(--text)}
+  .step .num .hot{color:var(--danger); font-weight:600} .step .num .warn{color:var(--accent); font-weight:600} .step .num .k{color:var(--muted)}
+  .step p{margin:var(--s1) 0 0; font-size:16px; line-height:1.55; color:var(--text-2); max-width:62ch}
+  .step p em{font-style:normal; color:var(--text); font-weight:600}
+  .centers{display:flex; gap:var(--s2); flex-wrap:wrap; margin-top:var(--s2)}
+  .centers span{display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-sm); padding:5px 10px 5px 6px; font:500 14px/1 var(--mono)}
+  .centers i{width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font:700 11px/1 var(--sans); font-style:normal; color:#fff}
+  .centers i.h{background:#1d4ed8} .centers i.t{background:#dc2626}
+  .centers small{color:var(--muted); font-weight:400}
+  .conf{display:inline-block; padding:3px 8px; border-radius:100px; font:500 12px/1.2 var(--mono); background:var(--surface-2); border:1px solid var(--border); color:var(--muted)}
+
+  /* ---------- Warnungen ---------- */
+  .warnbox{background:var(--accent-soft); border-left:4px solid var(--accent); border-radius:var(--r-sm); padding:var(--s3) var(--s4)}
+  .warnbox + .warnbox{margin-top:var(--s2)}
+  .warnbox .wt{display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:16px; font-weight:600; color:var(--text)}
+  .warnbox .wt .ico{color:var(--accent); width:18px; height:18px}
+  .warnbox .days{margin-left:auto; font:600 12px/1 var(--mono); color:var(--text-2); background:var(--surface); border-radius:6px; padding:5px 8px; letter-spacing:.04em}
+  .warnbox p{margin:var(--s1) 0 0; font-size:15px; line-height:1.5; color:var(--text-2); max-width:62ch}
+  .warnbox .wr{color:var(--text)} .warnbox .wr b{font-weight:600}
+  .warnbox.stop{background:rgba(220,38,38,.07); border-left-color:var(--danger)} .warnbox.stop .wt .ico{color:var(--danger)}
+  .warnbox .wc{font:14px/1.5 var(--mono); color:var(--muted)}
+  .hzrow{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:var(--s3)}
+  .hz{font:600 13px/1 var(--mono); border-radius:6px; padding:7px 10px; border:1px solid var(--border); color:var(--muted); background:var(--surface-2)}
+  .hz.on.warn{color:#92400e; background:var(--accent-soft); border-color:var(--accent)}
+  .hz.on.stop{color:#991b1b; background:rgba(220,38,38,.08); border-color:var(--danger)}
+
+  /* ---------- Regionen: kompakte Zeilen, jede Region einzeln (Notiz 13.09.) ---------- */
+  .rrow{border:1px solid var(--border); border-left-width:4px; border-radius:var(--r-sm); padding:var(--s2) var(--s3); display:flex; flex-direction:column; gap:4px; background:var(--surface); transition:background var(--t), border-color var(--t)}
+  .rrow:hover{background:var(--surface-2)}
+  .rrow + .rrow{margin-top:6px}
+  .rrow .head{display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap}
+  .rrow .name{font-weight:600; font-size:15px}
+  .rrow .win{font:500 12px/1 var(--mono); color:var(--primary); background:var(--primary-light); border-radius:5px; padding:4px 6px}
+  .rrow .rate{margin-left:auto; display:inline-flex; align-items:baseline; gap:2px; font:600 13px/1 var(--mono); border-radius:5px; padding:4px 8px; border:1px solid}
+  .rrow .rate small{font-weight:400; opacity:.8; font-size:11px}
+  .chips{display:flex; flex-wrap:wrap; gap:4px}
+  .chip{font:600 12px/1 var(--mono); border-radius:5px; padding:4px 7px; border:1px solid}
+  .chip.warn{color:#92400e; background:var(--accent-soft); border-color:var(--accent)}
+  .chip.stop{color:#991b1b; background:rgba(220,38,38,.08); border-color:var(--danger)}
+  .rrow .line{display:flex; gap:var(--s3); align-items:baseline; justify-content:space-between}
+  .rrow .short{font-size:14px; line-height:1.45; color:var(--text-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .rrow .line a{display:inline-flex; align-items:center; gap:2px; flex:none; font-size:13px; font-weight:600; color:var(--primary); text-decoration:none; white-space:nowrap; cursor:pointer}
+  .rrow .line a:hover{background:#bae6fd} @media (prefers-color-scheme: dark){ .rrow .line a:hover{background:#0e3a52} }
+  .rrow .empty{font-size:14px}
+
+  .cta{display:flex; align-items:center; justify-content:center; gap:var(--s2); min-height:48px; text-decoration:none; background:var(--primary); color:#fff; font-weight:600; font-size:16px; padding:0 var(--s5); border-radius:var(--r-md); cursor:pointer; transition:background var(--t)}
+  .cta:hover{background:var(--primary-vivid)}
+  .disclaimer{font-size:14px; color:var(--muted); text-align:center; margin:var(--s3) 0 0; line-height:1.5}
+
+  @media (max-width:560px){
+    .wrap{padding:var(--s4) var(--s3) var(--s6)} .sky,.chapter,.block{padding-left:var(--s4); padding-right:var(--s4)}
+    .week{grid-template-columns:1fr !important}
+    .rrow .cntrow{grid-template-columns:1fr}
+    .rrow .line{flex-direction:column; align-items:stretch} .rrow .line a{justify-content:center}
+    .sky h2{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+</svg>
+<div class="wrap">
+
+  <div class="pagehead">
+    <p class="eyebrow">Wingcast · Briefing-Vorschau v3 · echte Cache-Daten</p>
+    <h1>Das Morgenbriefing, wie ein Pilot denkt</h1>
+    <p>Zuerst die Woche als Bild, dann der Tag entlang der Analyse-Kette:
+       Lage → Fronten → Föhn/Bise → Höhenwind → Labilität → deine Regionen.
+       Keine Spot-Empfehlung — gezählt wird, wie viele Spots je Region tragen.</p>
+    <div class="stand">
+      Datenstand {{ analyses_at[:16]|replace('T', ' ') if analyses_at else '—' }}
+      &nbsp;·&nbsp; {{ v3_strip|length }} Tage &nbsp;·&nbsp; {{ v3_abo_count }} Abo-Regionen von {{ v3_ch_count }}
+      &nbsp;·&nbsp; Fokus {{ v3_focus_date }}{% if not v3_focus_is_today %} (nicht heute){% endif %}
+    </div>
+  </div>
+  <div class="srclegend">
+    <span class="src code">Code</span> {{ v3_labels.legend_code }}
+    <span class="src ki">KI</span> {{ v3_labels.legend_ki }}
+  </div>
+
+  <div class="push">
+    <div class="appicon">w</div>
+    <div class="body">
+      <div class="meta"><b>{{ v3_labels.inbox_sender }}</b><span>{{ briefing_date }} · 06:30</span></div>
+      <div class="subject">Wingcast {{ t('email.briefing.week_abbr') }}{{ kw }}: {{ v3_subject }}</div>
+      <div class="pre">{{ v3_subject }} — {{ briefing_weekday }}, {{ briefing_date }}</div>
+    </div>
+  </div>
+
+  <div class="mail rise">
+
+    {# ---------- Sky-Kopf: Region statt Spot ---------- #}
+    <div class="sky">
+      <div class="row">
+        <div class="brand">wingcast <em>briefing</em></div>
+        <div class="date">{{ briefing_weekday }}, {{ briefing_date }}</div>
+      </div>
+      <div class="verdict-pill"><i></i>{{ v3_subject }}</div>
+      <h2>{{ v3_week_line or v3_headline }}</h2>
+      {% if v3_hero %}
+      {# Beste Abo-Region: Rating 1-5 + Status der App + Fenster — keine Spot-Zaehlung #}
+      <div class="kpi">
+        {% if v3_hero.rating %}<span class="n" style="background:{{ v3_hero.fill }};color:{{ v3_hero.text }};">{{ v3_hero.rating }}/5</span>{% endif %}
+        <span class="l"><b>{{ v3_hero.region_name }}</b><span>{{ v3_hero.status }}{% if v3_hero.has_window and v3_hero.cls != 'not_safe' %} · {{ v3_hero.window }}{% endif %}</span></span>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if gap_notice or stale_notice %}
+    <div class="block">
+      {% if gap_notice %}<div class="notice">{{ gap_notice }}</div>{% endif %}
+      {% if stale_notice %}<div class="notice">{{ stale_notice }}</div>{% endif %}
+    </div>
+    {% endif %}
+
+    {# ═══════════ SEKTION 1 — Woche als Bild ═══════════ #}
+    <div class="chapter"><span class="q">{{ v3_labels.question }} 1</span><span class="t">{{ v3_labels.q1_long }}</span></div>
+    <div class="block">
+      <p class="label">{{ v3_labels.days_ahead }} <span class="src code">Code</span></p>
+      <div class="week" style="grid-template-columns:repeat({{ v3_strip|length }},1fr);">
+        {% for d in v3_strip %}
+        <div class="day{% if d.is_focus %} focus{% endif %}">
+          {% set icon = {'violet':'i-sun','green':'i-sun','conditional':'i-warn','gray':'i-warn','none':'i-x','not_safe':'i-x','unknown':'i-help'}.get(d.tier, 'i-help') %}
+          <div class="top">
+            <div><div class="nm">{{ d.name }}</div>
+              <div class="st" style="color:{{ d.border }};"><svg class="ico" aria-hidden="true"><use href="#{{ icon }}"/></svg>{{ d.status }}</div></div>
+            <div class="rt" style="color:{{ d.border }};">{% if d.rating_display %}{{ d.rating_display }}<span style="font-size:14px;font-weight:400;color:var(--muted)">/5</span>{% else %}—{% endif %}</div>
+          </div>
+          {# Druck/Wind zuerst (Notiz 13.09.), dann die Regionen #}
+          <div class="syn">
+            {{ d.pressure }}<br>
+            {% if d.wind_sector %}<span class="w{% if d.wind_hot %} hot{% endif %}"><span class="arr">{{ d.wind_arrow }}</span> {{ d.wind_sector }} {{ d.wind_strength }}</span>{% endif %}
+            <br>{% if d.notable %}<b>{{ d.notable }}</b>{% else %}<span class="nw">{{ v3_labels.no_warning }}</span>{% endif %}
+          </div>
+          {# Regionen gruppiert: Rating 4-5 / 1-3 je Sicher oder Vorsicht, Nicht sicher
+             separat — Status-Woerter der App. Ab 12 Regionen: 1-3 und darunter als Namenszeile. #}
+          <div class="segh">{{ v3_labels.regions_word }}</div>
+          {% set many = d.segments|length > 12 %}
+          {% for g in d.groups %}
+          <div class="grp">
+            <div class="gh">{% if g.range %}<span class="gr">{{ g.range }}</span>{% endif %}<span style="color:{{ g.color }};">{{ g.status }}</span><span class="gn">{{ g.n }}</span></div>
+            {% if many and g.cls not in ('hi_safe','hi_cond') %}
+            <div class="rg">{{ g['items']|map(attribute='name')|join(', ') }}</div>
+            {% else %}
+            <ul class="rl">
+              {% for s in g['items'] %}
+              <li><span class="rc" style="background:{{ s.fill }};border-color:{{ s.border }};color:{{ s.text }};" title="{{ s.label }}">{% if s.rating_display %}{{ s.rating_display }}{% elif s.cls == 'not_safe' %}<svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>{% else %}·{% endif %}</span><span class="rn">{{ s.name }}</span></li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </div>
+          {% endfor %}
+          <div class="cnt">
+            <span class="ch">{{ v3_labels.ch_context }} {{ d.ch.hi_safe }}/{{ d.ch.total }} · 4–5 {{ t('tier.green') }}</span>
+          </div>
+          {% if d.hint %}<div class="hint">{{ d.hint }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="weekhint">{{ v3_labels.week_hint }}</div>
+    </div>
+
+    {# ═══════════ SEKTION 2 — Tag entlang der Kette ═══════════ #}
+    <div class="chapter"><span class="q">{{ v3_labels.question }} 2</span><span class="t">{{ v3_labels.q2_long }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}</span></div>
+
+    <div class="block">
+      <p class="label">{{ v3_labels.map_title }} <span class="src code">Code</span></p>
+      {# Die Karte der App als Bild (Kopfzeile, Druckbaender, Isobaren, H/T,
+         Stand) — sie steht ohne JavaScript da, wie spaeter in der Mail. #}
+      {% if v3_map_img %}
+      <img class="mapshot" src="{{ v3_map_img }}" alt="{{ v3_labels.map_title }}">
+      {% else %}
+      <p class="empty">Keine Synoptik-Karte — Screenshot aus der App fehlgeschlagen (Hinweis in der Konsole).</p>
+      {% endif %}
+
+      <div class="chain">
+        {# 1 Lage — ein Satz fuer die ganze Schweiz, keine Zonen #}
+        <div class="step"><div class="no">1</div><div>
+          <div class="h">{{ v3_labels.step_lage }} <small>· {{ v3_chain.lage.label }}</small>
+            {% if v3_chain.stability.confidence %}<span class="conf">{{ v3_labels.confidence }} {{ v3_chain.stability.confidence }}</span>{% endif %}</div>
+          <div class="num">{{ v3_chain.lage.pressure or '—' }} <span class="k">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}</span></div>
+          {% if v3_chain.lage.centers %}<div class="centers">{% for c in v3_chain.lage.centers %}<span><i class="{% if c.is_high %}h{% else %}t{% endif %}">{{ c.type[0] }}</i>{{ c.region }} <small>{{ c.msl }} hPa</small></span>{% endfor %}</div>{% endif %}
+          {% if v3_chain.situation %}<p>{{ v3_chain.situation }}{% if v3_chain.day_hint %} <em style="color:var(--ink);font-style:normal;font-weight:600">{{ v3_chain.day_hint }}</em>{% endif %}</p>{% endif %}
+        </div></div>
+
+        {# 2 Fronten #}
+        <div class="step"><div class="no">2</div><div>
+          <div class="h">{{ v3_labels.step_front }} <small>· DWD</small></div>
+          {% for l in v3_chain.fronts.lines %}<p style="margin-top:2px">{{ l }}</p>{% endfor %}
+          {% if v3_chain.fronts.zugbahn %}<div class="num" style="margin-top:5px">{{ v3_chain.fronts.zugbahn }}</div>{% endif %}
+        </div></div>
+
+        {# 3 Foehn / Bise #}
+        <div class="step"><div class="no">3</div><div>
+          <div class="h">{{ v3_labels.step_foehn }}{% if v3_chain.foehn.flags %} <small>· <span style="color:var(--warn)">{{ v3_chain.foehn.flags|join(' · ') }}</span></small>{% endif %}</div>
+          <p style="margin-top:2px">{{ v3_chain.foehn.foehn }} {{ v3_chain.foehn.bise }}</p>
+        </div></div>
+
+        {# 4 Hoehenwind #}
+        <div class="step"><div class="no">4</div><div>
+          <div class="h">{{ v3_labels.step_wind }} <small>· 700 hPa</small></div>
+          <div class="num"><span class="{% if v3_chain.wind.hot %}hot{% endif %}">{{ v3_chain.wind.arrow }} {{ v3_chain.wind.sector }} {{ v3_chain.wind.speed or '—' }}</span>
+            <span class="k">· {{ v3_chain.wind.strength }}{% if v3_chain.wind.deg %} · {{ v3_chain.wind.deg }}{% endif %}</span>
+            {% if v3_chain.wind.meaning %}<br><span class="k">{{ v3_chain.wind.meaning }}</span>{% endif %}
+            {% if v3_chain.wind.regional %}<br><span class="hot">{{ v3_chain.wind.regional }}</span>{% endif %}
+            {% if v3_chain.wind.ground %}<br>≈ {{ v3_chain.wind.ground }} <span class="k">{{ v3_labels.ground_est }} ({{ v3_labels.rule_23 }})</span>{% endif %}</div>
+        </div></div>
+
+        {# 5 Labilitaet #}
+        <div class="step"><div class="no">5</div><div>
+          <div class="h">{{ v3_labels.step_stab }} <small>· T850 {{ v3_chain.stability.t850 or '—' }}{% if v3_chain.stability.t850_note %} · {{ v3_chain.stability.t850_note }}{% endif %}</small></div>
+          <div class="num">
+            {% if v3_chain.stability.thunder %}<span class="hot">{{ v3_labels.thunder }}</span> {{ v3_chain.stability.thunder|join(', ') }} <span class="k">· {{ v3_labels.thunder_window }}</span><br>{% endif %}
+            {% if v3_chain.stability.overdev %}<span class="warn">{{ v3_labels.overdev }}</span> {{ v3_chain.stability.overdev|join(', ') }}<br>{% endif %}
+            {% if not v3_chain.stability.thunder and not v3_chain.stability.overdev %}<span class="k">{{ v3_labels.no_convection }}</span>{% endif %}
+          </div>
+          {% if v3_chain.stability.thunder %}<p>{{ v3_labels.thunder_caveat }}</p>{% endif %}
+        </div></div>
+      </div>
+    </div>
+
+    {# ---------- Warnungen: Gesamtlage Schweiz — Regionen erst danach ---------- #}
+    {% if v3_warnings.checks %}
+    <div class="block">
+      <p class="label">{{ v3_labels.warnings_ch }} <span class="src code">Code</span>{% if v3_warnings.has_ki %}<span class="src ki">KI</span>{% endif %}</p>
+      {# Schalter vom Code: welche Gefahr hat es heute ueberhaupt #}
+      <div class="hzrow">{% for c in v3_warnings.checks %}<span class="hz{% if c.active %} on {{ c.level }}{% endif %}">{% if c.active %}✓{% else %}–{% endif %} {{ c.label }}</span>{% endfor %}</div>
+      {% for w in v3_warnings.entries %}
+      <div class="warnbox {{ w.severity }}">
+        <div class="wt"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg>{{ w.label }}<span class="days">{{ w.sev_label }}</span></div>
+        {% if w.ki_text %}<p class="wr">{{ w.ki_text }}</p>{% endif %}
+        <p class="wc">{{ w.code_text }}</p>
+      </div>
+      {% else %}
+      <p class="empty">{{ v3_labels.hz_none }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ---------- Deine Regionen ---------- #}
+    <div class="block">
+      <p class="label">{{ v3_labels.regions }} <span class="src code">Code</span><span class="src ki">KI</span></p>
+      {% for r in v3_regions %}
+      <div class="rrow" style="border-left:4px solid {{ r.border }};">
+        <div class="head">
+          <span class="name">{{ r.region_name }}</span>
+          {% if r.has_window and r.cls != 'not_safe' %}<span class="win">{{ r.window }}</span>{% endif %}
+          <span class="rate" style="background:{{ r.fill }};color:{{ r.text }};border-color:{{ r.border }};">{% if r.rating_display %}{{ r.rating_display }}<small>/5</small>{% else %}—{% endif %}</span>
+        </div>
+        {% if r.tags %}<div class="chips">{% for t in r.tags %}<span class="chip {{ t.severity }}">{{ t.text or (t.label ~ ' ' ~ t.value) }}</span>{% endfor %}</div>{% endif %}
+        <div class="line">
+          {% if r.short %}<span class="short">{{ r.short }}</span>{% endif %}
+          <a href="{{ r.url }}">{{ v3_labels.spots_link }}<svg class="ico" aria-hidden="true"><use href="#i-chev"/></svg></a>
+        </div>
+      </div>
+      {% else %}
+      <p class="empty">{{ v3_labels.no_regions }}</p>
+      {% endfor %}
+    </div>
+
+    <div class="block">
+      <a class="cta" href="{{ urls.dashboard }}">{{ v3_labels.cta }}<svg class="ico" aria-hidden="true"><use href="#i-chev"/></svg></a>
+      <p class="disclaimer">{{ v3_labels.disclaimer }}<br>{{ v3_labels.airspace_note }}</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

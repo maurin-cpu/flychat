@@ -50,6 +50,7 @@ def _parsed(lead="Ruhige Hochdrucklage praegt die Tage.", days=None, n_days=2,
     return {
         "lead": lead,
         "zones": [{"zone": z, "days": overrides.get(z, base)} for z in ZONES],
+        "day_lines": ["Ruhige Hochdrucklage mit trockener Luft." for _ in base],
     }
 
 
@@ -740,6 +741,724 @@ class TestPayloadZones(unittest.TestCase):
         # KEIN char-Feld mehr
         self.assertNotIn('"char"', payload)
         self.assertNotIn('"value"', payload.split("precip_pattern")[1] if "precip_pattern" in payload else "")
+
+
+# ============================================================================
+# Gefahren schweizweit (hazards)
+# ============================================================================
+
+def _hz_ctx(dates=("2026-07-05", "2026-07-06")):
+    """Ruhiges Strukturfeld: keine Gefahr aktiv, alle Felder vorhanden."""
+    ctx = _ctx(dates=dates)
+    ctx["precip_zones"] = {"per_day": [
+        {"date": d, "zones": {z: {"day": {"wet_share": 0.0, "p90_mm": 0.0,
+                                          "gewitter_share": 0.0}} for z in ZONES}}
+        for d in dates]}
+    ctx["wind_zones"] = _wind_zones(dates, [{z: "unauffaellig" for z in ZONES}
+                                            for _ in dates])
+    return ctx
+
+
+def _set_rain(ctx, i, zone, share, p90=1.5, windows=None):
+    """windows: {fenster: wet_share} — ohne das bleibt der Tag pauschal."""
+    ctx["precip_zones"]["per_day"][i]["zones"][zone]["day"].update(
+        {"wet_share": share, "p90_mm": p90})
+    if windows:
+        ctx["precip_zones"]["per_day"][i]["zones"][zone]["windows"] = {
+            w: {"wet_share": v} for w, v in windows.items()}
+
+
+def _set_wind(ctx, i, zone, cls="verblasen", windows=None):
+    """windows: {fenster: share_wind_crit}."""
+    z = ctx["wind_zones"]["per_day"][i]["zones"][zone]
+    z["wind_class"] = cls
+    if windows:
+        z["windows"] = {w: {"share_wind_crit": v} for w, v in windows.items()}
+
+
+RAIN_TEXT = "Regen erfasst ab Mittag den Alpennordhang von Westen her."
+
+
+class TestHazardChecks(unittest.TestCase):
+    def test_all_inactive_on_calm_day(self):
+        checks = sl.hazard_checks(_hz_ctx())
+        self.assertEqual(len(checks), 2)
+        for c in checks:
+            self.assertFalse(any(v["active"] for v in c["checks"].values()))
+
+    def test_rain_above_threshold_lists_zones(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "alpennordhang", 0.5)
+        checks = sl.hazard_checks(ctx)
+        self.assertTrue(checks[0]["checks"]["RAIN"]["active"])
+        self.assertEqual(checks[0]["checks"]["RAIN"]["zones"], ["alpennordhang"])
+        self.assertEqual(checks[0]["checks"]["RAIN"]["facts"]["wet_share"], 0.5)
+        self.assertFalse(checks[1]["checks"]["RAIN"]["active"])
+
+    def test_rain_below_threshold_inactive(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "tessin", 0.1)
+        self.assertFalse(sl.hazard_checks(ctx)[0]["checks"]["RAIN"]["active"])
+
+    def test_thunder_from_gewitter_share_or_konvektion(self):
+        ctx = _hz_ctx()
+        ctx["precip_zones"]["per_day"][0]["zones"]["wallis"]["day"]["gewitter_share"] = 0.1
+        ctx["konvektion"] = {"per_day": [
+            {}, {"zones": {"tessin": {"gewitter": [["Sopraceneri", "14:00-16:00"]]}}}]}
+        checks = sl.hazard_checks(ctx)
+        self.assertEqual(checks[0]["checks"]["THUNDER"]["zones"], ["wallis"])
+        self.assertEqual(checks[1]["checks"]["THUNDER"]["zones"], ["tessin"])
+        self.assertEqual(checks[0]["checks"]["THUNDER"]["level"], "stop")
+
+    def test_foehn_side_level_and_lee_zones(self):
+        ctx = _hz_ctx()
+        ctx["foehn"] = {"per_day": [{"date": "2026-07-05", "nord_active": True,
+                                     "peak_nord": "danger", "nord_hours": 6}]}
+        f = sl.hazard_checks(ctx)[0]["checks"]["FOEHN"]
+        self.assertTrue(f["active"])
+        self.assertEqual(f["level"], "stop")
+        self.assertEqual(f["zones"], ["tessin"])
+        self.assertEqual(f["facts"]["side"], "nord")
+        self.assertEqual(f["facts"]["hours"], 6)
+
+    def test_bise_active(self):
+        ctx = _hz_ctx()
+        ctx["bise"] = {"per_day": [{"date": "2026-07-06", "active": True,
+                                    "strength": "maessig", "delta_p_hpa": 3.1}]}
+        checks = sl.hazard_checks(ctx)
+        self.assertFalse(checks[0]["checks"]["BISE"]["active"])
+        self.assertTrue(checks[1]["checks"]["BISE"]["active"])
+
+    def test_wind_verblasen_is_stop(self):
+        ctx = _hz_ctx()
+        ctx["wind_zones"]["per_day"][0]["zones"]["alpennordhang"]["wind_class"] = "verblasen"
+        ctx["wind_zones"]["per_day"][1]["zones"]["wallis"]["wind_class"] = "stark_eingeschraenkt"
+        checks = sl.hazard_checks(ctx)
+        self.assertEqual(checks[0]["checks"]["WIND"]["level"], "stop")
+        self.assertEqual(checks[1]["checks"]["WIND"]["level"], "warn")
+        self.assertEqual(checks[1]["checks"]["WIND"]["zones"], ["wallis"])
+
+    def test_old_cache_without_fields(self):
+        checks = sl.hazard_checks(_ctx())
+        self.assertFalse(any(v["active"] for c in checks for v in c["checks"].values()))
+
+
+class TestValidateHazards(unittest.TestCase):
+    def setUp(self):
+        self.ctx = _hz_ctx()
+        _set_rain(self.ctx, 0, "alpennordhang", 0.5)
+
+    def _parsed(self, day0_items, day1_items=None):
+        p = _parsed()
+        p["hazards"] = [{"items": day0_items}, {"items": day1_items or []}]
+        return p
+
+    def test_accept_matching_items(self):
+        errors = sl._validate(self._parsed([{"topic": "RAIN", "text": RAIN_TEXT}]), self.ctx)
+        self.assertEqual(errors, [])
+
+    def test_missing_field_when_hazard_active(self):
+        errors = sl._validate(_parsed(), self.ctx)
+        self.assertTrue(any(e["scope"] == "hazards" and e["kind"] == "schema"
+                            for e in errors))
+
+    def test_missing_field_ok_when_nothing_active(self):
+        self.assertEqual(sl._validate(_parsed(), _hz_ctx()), [])
+
+    def test_active_topic_without_sentence(self):
+        errors = sl._validate(self._parsed([]), self.ctx)
+        self.assertTrue(any(e["kind"] == "hazard_missing" for e in errors))
+
+    def test_topic_not_active(self):
+        errors = sl._validate(self._parsed(
+            [{"topic": "RAIN", "text": RAIN_TEXT},
+             {"topic": "FOEHN", "text": "Nordfoehn im Tessin."}]), self.ctx)
+        self.assertTrue(any(e["kind"] == "hazard_not_active"
+                            and e["scope"] == "hazards[0].FOEHN" for e in errors))
+
+    def test_text_without_place(self):
+        errors = sl._validate(self._parsed(
+            [{"topic": "RAIN", "text": "Ab Mittag verbreitet Regen."}]), self.ctx)
+        self.assertTrue(any(e["kind"] == "no_place" for e in errors))
+
+    def test_foehn_word_without_foehn(self):
+        errors = sl._validate(self._parsed(
+            [{"topic": "RAIN", "text": RAIN_TEXT + " Im Tessin foehnig."}]), self.ctx)
+        self.assertTrue(any(e["kind"] == "foehn_not_active" for e in errors))
+
+    def test_thunder_word_without_signal(self):
+        errors = sl._validate(self._parsed(
+            [{"topic": "RAIN", "text": "Schauer und Gewitter am Alpennordhang."}]), self.ctx)
+        self.assertTrue(any(e["kind"] == "gewitter_without_signal" for e in errors))
+
+
+class TestFinalizeHazards(unittest.TestCase):
+    def setUp(self):
+        self.ctx = _hz_ctx()
+        _set_rain(self.ctx, 0, "alpennordhang", 0.5)
+        self.ctx["bise"] = {"per_day": [{"date": "2026-07-05", "active": True,
+                                         "strength": "maessig", "delta_p_hpa": 3.0}]}
+
+    def test_checks_and_items_per_day(self):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "BISE", "text": "Bise im Mittelland."},
+                                   {"topic": "RAIN", "text": RAIN_TEXT}]},
+                        {"items": []}]
+        hz = sl._finalize(p, self.ctx, attempts=1, unresolved=[])["hazards"]
+        self.assertEqual([h["date"] for h in hz], ["2026-07-05", "2026-07-06"])
+        # Reihenfolge = HAZARD_TOPICS, nicht LLM-Reihenfolge
+        self.assertEqual([i["topic"] for i in hz[0]["items"]], ["RAIN", "BISE"])
+        self.assertTrue(hz[0]["checks"]["RAIN"]["active"])
+        self.assertEqual(hz[1]["items"], [])
+
+    def test_inactive_topic_dropped_even_without_prune(self):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "FOEHN", "text": "Foehn im Tessin."}]},
+                        {"items": [{"topic": "RAIN", "text": RAIN_TEXT}]}]
+        hz = sl._finalize(p, self.ctx, attempts=1, unresolved=[])["hazards"]
+        self.assertEqual(hz[0]["items"], [])
+        self.assertEqual(hz[1]["items"], [])
+
+    def test_prune_drops_only_bad_item(self):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "RAIN", "text": "Verbreitet Regen."},
+                                   {"topic": "BISE", "text": "Bise im Mittelland."}]},
+                        {"items": []}]
+        hz = sl._finalize(p, self.ctx, attempts=4, unresolved=[], prune=True)["hazards"]
+        self.assertEqual([i["topic"] for i in hz[0]["items"]], ["BISE"])
+
+    def test_checks_present_without_llm_hazards(self):
+        hz = sl._finalize(_parsed(), self.ctx, attempts=1, unresolved=[])["hazards"]
+        self.assertTrue(hz[0]["checks"]["BISE"]["active"])
+        self.assertEqual(hz[0]["items"], [])
+
+    def test_payload_carries_active_hazards(self):
+        payload = sl._build_llm_payload(self.ctx)
+        self.assertIn('"hazards_per_day"', payload)
+        self.assertIn('"RAIN"', payload)
+
+
+# ============================================================================
+# Tagesverlauf und Folgetag — die Warnung darf keine Tagespauschale sein
+# ============================================================================
+
+class TestDayShape(unittest.TestCase):
+    def test_none_without_window_data(self):
+        self.assertIsNone(sl._day_shape({}))
+
+    def test_ganztags(self):
+        sh = sl._day_shape({"tessin": ["morning", "midday", "afternoon", "evening"]})
+        self.assertEqual(sh["shape"], "ganztags")
+
+    def test_ab_nachmittag(self):
+        sh = sl._day_shape({"alpennordhang": ["afternoon", "evening"]})
+        self.assertEqual((sh["shape"], sh["from"]), ("ab", "afternoon"))
+
+    def test_bis_mittag(self):
+        sh = sl._day_shape({"alpennordhang": ["morning", "midday"]})
+        self.assertEqual((sh["shape"], sh["to"]), ("bis", "midday"))
+
+    def test_nur_ein_fenster(self):
+        self.assertEqual(sl._day_shape({"wallis": ["midday"]})["shape"], "nur")
+
+    def test_spanne_in_der_tagesmitte(self):
+        sh = sl._day_shape({"wallis": ["midday", "afternoon"]})
+        self.assertEqual((sh["shape"], sh["from"], sh["to"]),
+                         ("spanne", "midday", "afternoon"))
+
+    def test_luecke_ist_wechselnd(self):
+        sh = sl._day_shape({"wallis": ["morning", "evening"]})
+        self.assertEqual(sh["shape"], "wechselnd")
+
+    def test_zonen_werden_vereinigt(self):
+        sh = sl._day_shape({"alpennordhang": ["midday"],
+                            "tessin": ["afternoon", "evening"]})
+        self.assertEqual(sh["hit"], ["midday", "afternoon", "evening"])
+
+    def test_unterschiedliche_zonen_sind_gemischt_nicht_ganztags(self):
+        """Vorfall 16.09.2026: Alpennordhang ganztags, Wallis nur morgens und
+        abends — die Vereinigung hiess 'ganztags', die KI schrieb 'all day'."""
+        full = ["morning", "midday", "afternoon", "evening"]
+        sh = sl._day_shape({"alpennordhang": full,
+                            "wallis": ["morning", "evening"]})
+        self.assertEqual(sh["shape"], "gemischt")
+
+    def test_gleicher_verlauf_bleibt_eine_form(self):
+        sh = sl._day_shape({"alpennordhang": ["afternoon", "evening"],
+                            "tessin": ["afternoon", "evening"]})
+        self.assertEqual((sh["shape"], sh["from"]), ("ab", "afternoon"))
+
+
+class TestHazardWindows(unittest.TestCase):
+    def test_rain_windows_per_zone(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "alpennordhang", 0.6,
+                  windows={"morning": 0.0, "midday": 0.3, "afternoon": 0.7,
+                           "evening": 0.5})
+        f = sl.hazard_checks(ctx)[0]["checks"]["RAIN"]["facts"]
+        self.assertEqual(f["windows"],
+                         {"alpennordhang": ["midday", "afternoon", "evening"]})
+        self.assertEqual(f["day_shape"]["shape"], "ab")
+        self.assertEqual(f["day_shape"]["from"], "midday")
+
+    def test_dry_morning_is_not_in_the_window_list(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "wallis", 0.5,
+                  windows={"morning": 0.05, "midday": 0.6, "afternoon": 0.6,
+                           "evening": 0.6})
+        f = sl.hazard_checks(ctx)[0]["checks"]["RAIN"]["facts"]
+        self.assertNotIn("morning", f["windows"]["wallis"])
+
+    def test_wind_windows_use_share_wind_crit(self):
+        ctx = _hz_ctx()
+        _set_wind(ctx, 0, "alpennordhang", "verblasen",
+                  windows={"morning": 0.1, "midday": 0.4, "afternoon": 0.8,
+                           "evening": 0.9})
+        f = sl.hazard_checks(ctx)[0]["checks"]["WIND"]["facts"]
+        self.assertEqual(f["windows"],
+                         {"alpennordhang": ["midday", "afternoon", "evening"]})
+        self.assertEqual(f["day_shape"]["shape"], "ab")
+
+    def test_thunder_windows_from_konvektion_time_span(self):
+        ctx = _hz_ctx()
+        ctx["konvektion"] = {"per_day": [
+            {"zones": {"tessin": {"gewitter": [["Sopraceneri", "14:00-16:00"]]}}},
+            {}]}
+        f = sl.hazard_checks(ctx)[0]["checks"]["THUNDER"]["facts"]
+        self.assertEqual(f["windows"], {"tessin": ["afternoon"]})
+        self.assertEqual(f["day_shape"]["shape"], "nur")
+
+    def test_no_windows_in_old_cache(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "tessin", 0.4)
+        f = sl.hazard_checks(ctx)[0]["checks"]["RAIN"]["facts"]
+        self.assertEqual(f["windows"], {})
+        self.assertIsNone(f["day_shape"])
+
+
+class TestFoehnCourse(unittest.TestCase):
+    """Foehn: Tagesverlauf, Staerke und die Spur in den Winddaten."""
+
+    def _ctx(self, win_hours, peak="caution"):
+        """win_hours: {fenster: stunden} fuer Nordfoehn an Tag 0."""
+        ctx = _hz_ctx()
+        ctx["foehn"] = {"per_day": [{
+            "date": "2026-07-05", "nord_active": True, "peak_nord": peak,
+            "nord_hours": sum(win_hours.values()),
+            "nord_windows": {w: {"hours": h, "peak": peak if h else "none"}
+                             for w, h in win_hours.items()},
+        }]}
+        return ctx
+
+    def test_windows_map_to_the_lee_zone(self):
+        f = sl.hazard_checks(self._ctx({"morning": 0, "midday": 2,
+                                        "afternoon": 4, "evening": 3})
+                             )[0]["checks"]["FOEHN"]["facts"]
+        self.assertEqual(f["windows"], {"tessin": ["midday", "afternoon", "evening"]})
+        self.assertEqual(f["day_shape"]["shape"], "ab")
+
+    def test_course_increases_towards_evening(self):
+        f = sl.hazard_checks(self._ctx({"morning": 1, "midday": 1,
+                                        "afternoon": 4, "evening": 4})
+                             )[0]["checks"]["FOEHN"]["facts"]
+        self.assertEqual(f["course"], "zunehmend")
+
+    def test_course_eases_off(self):
+        f = sl.hazard_checks(self._ctx({"morning": 4, "midday": 4,
+                                        "afternoon": 1, "evening": 0})
+                             )[0]["checks"]["FOEHN"]["facts"]
+        self.assertEqual(f["course"], "abflauend")
+
+    def test_course_steady(self):
+        f = sl.hazard_checks(self._ctx({"morning": 3, "midday": 3,
+                                        "afternoon": 3, "evening": 3})
+                             )[0]["checks"]["FOEHN"]["facts"]
+        self.assertEqual(f["course"], "gleich")
+
+    def test_danger_peak_beats_hours(self):
+        """Eine Stunde 'danger' am Nachmittag wiegt schwerer als vier
+        Stunden 'caution' am Morgen — sonst heisst ein Tag, der erst
+        gefaehrlich wird, 'abflauend'."""
+        ctx = self._ctx({"morning": 4, "midday": 0, "afternoon": 1, "evening": 0})
+        wins = ctx["foehn"]["per_day"][0]["nord_windows"]
+        wins["morning"]["peak"] = "caution"
+        wins["afternoon"]["peak"] = "danger"
+        f = sl.hazard_checks(ctx)[0]["checks"]["FOEHN"]["facts"]
+        self.assertEqual(f["course"], "zunehmend")
+
+    def test_lee_gusts_come_from_the_wind_windows(self):
+        ctx = self._ctx({"morning": 0, "midday": 2, "afternoon": 4, "evening": 2})
+        ctx["wind_zones"]["per_day"][0]["zones"]["tessin"]["windows"] = {
+            "midday": {"p90_gust_kmh": 38.0}, "afternoon": {"p90_gust_kmh": 55.4}}
+        f = sl.hazard_checks(ctx)[0]["checks"]["FOEHN"]["facts"]
+        self.assertEqual(f["lee_gust_kmh"], 55)
+
+    def test_old_cache_without_foehn_windows(self):
+        ctx = _hz_ctx()
+        ctx["foehn"] = {"per_day": [{"date": "2026-07-05", "nord_active": True,
+                                     "peak_nord": "caution", "nord_hours": 3}]}
+        f = sl.hazard_checks(ctx)[0]["checks"]["FOEHN"]["facts"]
+        self.assertEqual(f["windows"], {})
+        self.assertIsNone(f["day_shape"])
+        self.assertIsNone(f["course"])
+
+    def test_payload_carries_course_and_gusts(self):
+        ctx = self._ctx({"morning": 0, "midday": 2, "afternoon": 4, "evening": 2})
+        ctx["wind_zones"]["per_day"][0]["zones"]["tessin"]["windows"] = {
+            "afternoon": {"p90_gust_kmh": 55.4}}
+        payload = sl._build_llm_payload(ctx)
+        hz = payload.split('"hazards_per_day"')[1]
+        self.assertIn('"course": "zunehmend"', hz)
+        self.assertIn('"lee_gust_kmh": 55', hz)
+        self.assertIn('"peak": "caution"', hz)
+
+
+class TestHazardOutlook(unittest.TestCase):
+    def test_hazard_over_tomorrow(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "alpennordhang", 0.6)
+        tm = sl.hazard_checks(ctx)[0]["checks"]["RAIN"]["facts"]["tomorrow"]
+        self.assertEqual(tm, {"active": False, "trend": "vorbei"})
+
+    def test_increasing_and_easing(self):
+        ctx = _hz_ctx(dates=("2026-07-05", "2026-07-06", "2026-07-07"))
+        _set_rain(ctx, 0, "alpennordhang", 0.3)
+        _set_rain(ctx, 1, "alpennordhang", 0.9)
+        _set_rain(ctx, 2, "alpennordhang", 0.3)
+        checks = sl.hazard_checks(ctx)
+        self.assertEqual(
+            checks[0]["checks"]["RAIN"]["facts"]["tomorrow"]["trend"], "zunehmend")
+        self.assertEqual(
+            checks[1]["checks"]["RAIN"]["facts"]["tomorrow"]["trend"], "abklingend")
+
+    def test_same_strength_is_gleich(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "alpennordhang", 0.5)
+        _set_rain(ctx, 1, "alpennordhang", 0.5)
+        self.assertEqual(
+            sl.hazard_checks(ctx)[0]["checks"]["RAIN"]["facts"]["tomorrow"]["trend"],
+            "gleich")
+
+    def test_last_day_has_no_outlook(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 1, "alpennordhang", 0.5)
+        self.assertIsNone(
+            sl.hazard_checks(ctx)[1]["checks"]["RAIN"]["facts"]["tomorrow"])
+
+    def test_wind_trend_counts_zones(self):
+        ctx = _hz_ctx()
+        _set_wind(ctx, 0, "alpennordhang")
+        _set_wind(ctx, 1, "alpennordhang")
+        _set_wind(ctx, 1, "wallis")
+        self.assertEqual(
+            sl.hazard_checks(ctx)[0]["checks"]["WIND"]["facts"]["tomorrow"]["trend"],
+            "zunehmend")
+
+
+class TestHazardProse(unittest.TestCase):
+    """Der Gefahren-Satz ist ein Wetterbericht, kein Zonen-Protokoll."""
+
+    def setUp(self):
+        self.ctx = _hz_ctx()
+        _set_rain(self.ctx, 0, "alpennordhang", 0.6)
+
+    def _errors(self, text):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "RAIN", "text": text}]}, {"items": []}]
+        return sl._validate(p, self.ctx)
+
+    def test_zone_protocol_rejected(self):
+        errors = self._errors("Alpennordhang: nass, Tessin: trocken.")
+        self.assertTrue(any(e["kind"] == "enumeration" for e in errors))
+
+    def test_bullet_list_rejected(self):
+        errors = self._errors("Regen am Alpennordhang \u00b7 Tessin trocken.")
+        self.assertTrue(any(e["kind"] == "enumeration" for e in errors))
+
+    def test_flowing_sentence_accepted(self):
+        errors = self._errors("Ab Mittag greift von Westen her Regen auf die "
+                              "Alpennordseite ueber, im Tessin bleibt es trocken.")
+        self.assertEqual(errors, [])
+
+
+class TestHazardTimeRequired(unittest.TestCase):
+    """Sagt der Code 'nicht ganztags', MUSS der Satz die Tageszeit nennen."""
+
+    def _ctx_ab_mittag(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "alpennordhang", 0.6,
+                  windows={"morning": 0.0, "midday": 0.5, "afternoon": 0.7,
+                           "evening": 0.6})
+        return ctx
+
+    def _parsed_rain(self, text):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "RAIN", "text": text}]}, {"items": []}]
+        return p
+
+    def test_missing_time_is_an_error(self):
+        errors = sl._validate(
+            self._parsed_rain("Regen erfasst den Alpennordhang von Westen her."),
+            self._ctx_ab_mittag())
+        self.assertTrue(any(e["kind"] == "no_time"
+                            and e["scope"] == "hazards[0].RAIN" for e in errors))
+
+    def test_time_reference_accepted(self):
+        errors = sl._validate(
+            self._parsed_rain("Ab Mittag Regen am Alpennordhang, Tessin bleibt trocken."),
+            self._ctx_ab_mittag())
+        self.assertEqual(errors, [])
+
+    def test_no_time_required_when_all_day(self):
+        ctx = _hz_ctx()
+        _set_rain(ctx, 0, "alpennordhang", 0.8,
+                  windows={"morning": 0.7, "midday": 0.8, "afternoon": 0.8,
+                           "evening": 0.7})
+        errors = sl._validate(
+            self._parsed_rain("Regen am Alpennordhang, Tessin bleibt trocken."), ctx)
+        self.assertEqual(errors, [])
+
+    def test_prune_drops_sentence_without_time(self):
+        hz = sl._finalize(self._parsed_rain("Regen am Alpennordhang."),
+                          self._ctx_ab_mittag(), attempts=4, unresolved=[],
+                          prune=True)["hazards"]
+        self.assertEqual(hz[0]["items"], [])
+
+    def test_payload_carries_day_shape(self):
+        payload = sl._build_llm_payload(self._ctx_ab_mittag())
+        self.assertIn('"day_shape": "ab"', payload)
+
+    def test_payload_hides_the_next_day_trend(self):
+        """Der Folgetag-Trend darf den LLM nicht erreichen — der Satz steht
+        in der Tages-Sektion und muss tagesrein bleiben."""
+        payload = sl._build_llm_payload(self._ctx_ab_mittag())
+        self.assertNotIn('"tomorrow"', payload.split('"hazards_per_day"')[1])
+
+
+class TestHazardMixedTiming(unittest.TestCase):
+    """day_shape 'gemischt': der Satz muss die Zonen zeitlich unterscheiden."""
+
+    def setUp(self):
+        full = {"morning": 0.6, "midday": 0.6, "afternoon": 0.6, "evening": 0.6}
+        self.ctx = _hz_ctx()
+        _set_wind(self.ctx, 0, "alpennordhang", windows={k: 0.8 for k in full})
+        _set_wind(self.ctx, 0, "wallis", windows={"morning": 0.5, "midday": 0.0,
+                                                  "afternoon": 0.0, "evening": 0.5})
+
+    def _errors(self, text):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "WIND", "text": text}]}, {"items": []}]
+        return sl._validate(p, self.ctx)
+
+    def test_one_time_for_all_rejected(self):
+        errors = self._errors("Strong wind blows across the northern Alps and "
+                              "Valais all day.")
+        self.assertTrue(any(e["kind"] == "time_not_differentiated" for e in errors))
+
+    def test_differentiated_sentence_accepted(self):
+        errors = self._errors("Strong wind blows over the northern Alps all day, "
+                              "in Valais only in the morning and again in the evening.")
+        self.assertEqual(errors, [])
+
+
+class TestHazardOnset(unittest.TestCase):
+    """Genannter Beginn je Zone darf nicht spaeter liegen als die Daten."""
+
+    WINDOWS = {"alpennordhang": ["morning", "midday", "afternoon", "evening"],
+               "wallis": ["morning", "afternoon", "evening"],
+               "graubuenden_engadin": ["morning", "afternoon", "evening"]}
+
+    def test_incident_wind_sentence_is_caught(self):
+        """Der Satz aus der Vorschau vom 16.09.2026."""
+        text = ("Strong upper wind and gusts blow out the northern Alps all day, "
+                "while Valais and the Grisons turn critical from the afternoon "
+                "onwards; Ticino stays calmer until the evening.")
+        late = {z for z, _, _ in sl._onset_too_late(text, self.WINDOWS)}
+        self.assertEqual(late, {"wallis", "graubuenden_engadin"})
+
+    def test_correct_rain_sentence_passes(self):
+        windows = {"alpennordhang": ["morning", "midday", "afternoon", "evening"],
+                   "wallis": ["morning", "afternoon", "evening"],
+                   "tessin": ["afternoon", "evening"],
+                   "graubuenden_engadin": ["midday", "afternoon", "evening"]}
+        text = ("Widespread rain sets in over the northern Alps from the morning and "
+                "spreads eastwards, reaching the Grisons by midday and Ticino by the "
+                "afternoon; Valais sees rain in the morning and again from the "
+                "afternoon, with a drier midday gap.")
+        self.assertEqual(sl._onset_too_late(text, windows), [])
+
+    def test_earlier_than_data_is_allowed(self):
+        """Zu frueh gewarnt ist nicht gefaehrlich — kein Fehler."""
+        self.assertEqual(sl._onset_too_late(
+            "Ab dem Morgen Regen im Tessin.", {"tessin": ["afternoon", "evening"]}), [])
+
+    def test_until_is_not_an_onset(self):
+        self.assertEqual(sl._onset_too_late(
+            "Regen im Wallis bis Mittag.", {"wallis": ["morning", "midday"]}), [])
+
+    def test_unaffected_zone_is_not_checked(self):
+        self.assertEqual(sl._onset_too_late(
+            "Im Tessin bleibt es bis zum Abend trocken.",
+            {"alpennordhang": ["morning"]}), [])
+
+    def test_german_sentence(self):
+        late = sl._onset_too_late(
+            "Ab Nachmittag greift Regen auf die Alpennordseite ueber.",
+            {"alpennordhang": ["midday", "afternoon", "evening"]})
+        self.assertEqual(late, [("alpennordhang", "afternoon", "midday")])
+
+    def test_validator_reports_onset_too_late(self):
+        ctx = _hz_ctx()
+        _set_wind(ctx, 0, "wallis", windows={"morning": 0.5, "midday": 0.0,
+                                             "afternoon": 0.5, "evening": 0.5})
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "WIND", "text":
+                         "Im Wallis wird der Wind ab Nachmittag kritisch."}]},
+                        {"items": []}]
+        errors = sl._validate(p, ctx)
+        self.assertTrue(any(e["kind"] == "onset_too_late" for e in errors))
+
+
+class TestShortSentences(unittest.TestCase):
+    """Wunsch User 16.09.2026: KI-Saetze kurz und ohne Urteil."""
+
+    def setUp(self):
+        self.ctx = _hz_ctx()
+        _set_rain(self.ctx, 0, "alpennordhang", 0.6)
+
+    def _hazard_errors(self, text):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "RAIN", "text": text}]}, {"items": []}]
+        return sl._validate(p, self.ctx)
+
+    def test_long_hazard_sentence_rejected(self):
+        """Der Regen-Satz aus der Vorschau vom 16.09.2026 (58 Woerter, 2 Saetze)."""
+        text = ("Rain spreads in from the west over the northern Alps from the morning "
+                "and reaches the Grisons by midday and Ticino by the afternoon; Valais "
+                "sees rain in the morning and again in the afternoon. The rain is "
+                "widespread and solid, with heavy peaks in Ticino from the afternoon "
+                "and in the Grisons from midday.")
+        kinds = {e["kind"] for e in self._hazard_errors(text)}
+        self.assertIn("too_long", kinds)
+        self.assertIn("more_than_one_sentence", kinds)
+
+    def test_short_hazard_sentence_accepted(self):
+        self.assertEqual(self._hazard_errors(
+            "Ab Mittag greift Regen von Westen auf die Alpennordseite ueber."), [])
+
+    def test_verdict_in_hazard_rejected(self):
+        errors = self._hazard_errors(
+            "Regen an der Alpennordseite macht das Fliegen unmoeglich.")
+        self.assertTrue(any(e["kind"] == "verdict" for e in errors))
+
+    def test_day_lines_required(self):
+        p = _parsed()
+        del p["day_lines"]
+        errors = sl._validate(p, _hz_ctx())
+        self.assertTrue(any(e["scope"] == "day_lines" and e["kind"] == "schema"
+                            for e in errors))
+
+    def test_day_line_too_long_and_verdict(self):
+        p = _parsed()
+        p["day_lines"][0] = ("Ein Tief bei Island lenkt feuchte Luft an die Alpen, es regnet "
+                             "verbreitet und der Wind ist so stark, dass kein nutzbares "
+                             "Fenster bleibt.")
+        kinds = {e["kind"] for e in sl._validate(p, _hz_ctx())
+                 if e["scope"] == "day_lines[0]"}
+        self.assertIn("too_long", kinds)
+        self.assertIn("verdict", kinds)
+
+    def test_day_line_other_day_rejected(self):
+        p = _parsed()
+        p["day_lines"][0] = "Regen heute, ab Donnerstag trocken."
+        self.assertTrue(any(e["kind"] == "cross_day" for e in sl._validate(p, _hz_ctx())))
+
+    def test_day_lines_in_finalize(self):
+        p = _parsed()
+        p["day_lines"] = ["Ein Tief bringt Regen an die Alpen.", ""]
+        out = sl._finalize(p, _hz_ctx(), attempts=1, unresolved=[])["day_lines"]
+        self.assertEqual(out[0], {"date": "2026-07-05",
+                                  "text": "Ein Tief bringt Regen an die Alpen."})
+        self.assertEqual(out[1]["text"], "")
+
+    def test_prune_empties_bad_day_line(self):
+        p = _parsed()
+        p["day_lines"][0] = "Ideale Bedingungen fuer lange Fluege."
+        out = sl._finalize(p, _hz_ctx(), attempts=4, unresolved=[], prune=True)["day_lines"]
+        self.assertEqual(out[0]["text"], "")
+
+
+class TestLanguageDrift(unittest.TestCase):
+    """Vorfall 16.09.2026: im EN-Modus kam nach Korrekturrunden alles deutsch."""
+
+    def setUp(self):
+        self._lang = config.LANG
+        config.LANG = "en"
+
+    def tearDown(self):
+        config.LANG = self._lang
+
+    def test_correction_message_names_the_language(self):
+        msg = sl._build_correction_message([{"scope": "lead", "message": "zu lang"}])
+        self.assertIn("OUTPUT LANGUAGE: ENGLISH", msg)
+
+    def test_german_text_is_flagged_in_english_mode(self):
+        p = _parsed(lead="A low near Iceland steers moist air against the Alps.")
+        p["day_lines"] = ["Ein Tief bei Island lenkt feuchte Luft an die Alpen.",
+                          "Dry and calm air over the Alps."]
+        errors = [e for e in sl._validate(p, _ctx()) if e["kind"] == "wrong_language"]
+        self.assertEqual(len(errors), 1)
+        self.assertIn("day_lines[0]", errors[0]["message"])
+        self.assertNotIn("day_lines[1]", errors[0]["message"])
+
+    def test_umlaut_is_enough(self):
+        self.assertTrue(sl._looks_german("Rain over Graub\u00fcnden from midday."))
+
+    def test_english_sentences_pass(self):
+        for text in ("Rain spreads in from the west over the northern Alps from midday.",
+                     "Strong wind blows out the northern Alps all day, while Ticino stays calmer.",
+                     "Moderate north foehn breaks through over Ticino, gusts around 35 km/h."):
+            self.assertFalse(sl._looks_german(text), text)
+
+    def test_german_mode_is_not_checked(self):
+        config.LANG = "de"
+        p = _parsed()
+        self.assertEqual([e for e in sl._validate(p, _ctx())
+                          if e["kind"] == "wrong_language"], [])
+
+
+class TestHazardDayScope(unittest.TestCase):
+    """Warnungen stehen in der Tages-Sektion: kein anderer Tag im Satz."""
+
+    def setUp(self):
+        self.ctx = _hz_ctx()
+        _set_rain(self.ctx, 0, "alpennordhang", 0.6)
+
+    def _errors(self, text):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "RAIN", "text": text}]}, {"items": []}]
+        return sl._validate(p, self.ctx)
+
+    def test_folgetag_rejected(self):
+        errors = self._errors("Regen an der Alpennordseite. Am Folgetag klingt er ab.")
+        self.assertTrue(any(e["kind"] == "cross_day" for e in errors))
+
+    def test_weekday_rejected(self):
+        errors = self._errors("Am Donnerstag greift Regen auf die Alpennordseite ueber.")
+        self.assertTrue(any(e["kind"] == "cross_day" for e in errors))
+
+    def test_time_of_day_still_allowed(self):
+        errors = self._errors("Am Morgen greift Regen auf die Alpennordseite ueber, "
+                              "morgens bleibt das Tessin trocken.")
+        self.assertEqual(errors, [])
+
+    def test_prune_drops_cross_day_sentence(self):
+        p = _parsed()
+        p["hazards"] = [{"items": [{"topic": "RAIN",
+                                    "text": "Regen an der Alpennordseite, morgen vorbei."}]},
+                        {"items": []}]
+        hz = sl._finalize(p, self.ctx, attempts=4, unresolved=[], prune=True)["hazards"]
+        self.assertEqual(hz[0]["items"], [])
 
 
 if __name__ == "__main__":

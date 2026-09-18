@@ -636,10 +636,49 @@ SYNOPTIC_ZONE_LABELS = {
     "graubuenden_engadin": {"de": "Graubuenden & Engadin",
                             "en": "Grisons & Engadine"},
 }
+# Gefahren-Schalter schweizweit (llm_overview.hazards): "Regen" gilt als
+# aktiv, sobald in mindestens einer Zone dieser Anteil der Spots am Tag nass
+# ist. Bewusst hoeher als SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE — die Warnung
+# soll verbreiteten Regen melden, nicht einzelne Schauer.
+SYNOPTIC_HAZARD_RAIN_WET_SHARE = 0.2
+# Foehn-Tag in der Synoptik: aktiv ab so vielen Stunden caution+ im
+# Flugfenster FLIGHT_HOURS_START..END. MUSS der Regel der Regions-Analyse
+# entsprechen (weather_context._format_foehn_info: schlimmste Stunde im
+# Flugfenster, also 1 h) — sonst zeigt eine Region Foehn, die Synoptik nicht
+# (Vorfall 16.09.2026: 1 h Nordfoehn, Oberwallis "moderate", Synoptik still).
+SYNOPTIC_FOEHN_ACTIVE_MIN_HOURS = 1
+# Tagesverlauf der Gefahren: ab wann gilt ein einzelnes Tagesfenster
+# (SYNOPTIC_DAY_WINDOWS) als betroffen? Ohne das steht in der Warnung eine
+# Tagespauschale ("Regen am Alpennordhang"), und der Pilot verliert genau die
+# Information, nach der er morgens sucht: Vormittag fliegbar, ab Mittag zu.
+SYNOPTIC_HAZARD_WINDOW_WET_SHARE = 0.2    # Regen: nasser Spot-Anteil im Fenster
+SYNOPTIC_HAZARD_WINDOW_GEWITTER_SHARE = 0.0   # Gewitter: > 0 genuegt
+SYNOPTIC_HAZARD_WINDOW_WIND_SHARE = 0.3   # Wind: share_wind_crit im Fenster
+# (0.3 = dieselbe Schwelle, ab der ein Tag "stark_eingeschraenkt" heisst)
+# Folgetag-Trend: ab welchem Verhaeltnis heisst es zunehmend/abklingend statt
+# gleich. 1.25 = ein Viertel mehr/weniger, darunter ist es Rauschen.
+SYNOPTIC_HAZARD_TREND_RATIO = 1.25
+# Aus Rohwerten werden Worte: "93 % der Spots nass" sagt einem Piloten nichts,
+# "verbreitet" schon. Ausdehnung aus wet_share, Intensitaet aus p90_mm/h —
+# Schwellen an der Sprache der Wetterdienste orientiert.
+# Tages-Einstufung im Briefing v3 (Entscheid 16.09.2026): der Tag wird aus den
+# Abo-Regionen bewertet, nicht aus dem besten Startplatz. Anteile beziehen sich
+# auf die Regionen MIT Bewertung.
+# Hoehenwind regional (decide_aloft_regional): Median je Region schuetzt vor
+# Einzelspot-Ausreissern — Regionen mit weniger Spots zaehlen nicht mit, weil
+# dort ein einzelner Spot den Median bestimmt.
+SYNOPTIC_ALOFT_REGION_MIN_SPOTS = 3
 # Synoptik-Seite: nur Zeitpunkte zeigen, die hoechstens so viele Stunden von
 # einer DWD-Frontkarte entfernt liegen (Analyse 00/12 UTC, Vorhersage +36/48/
 # 60/84/108 h -> lokal 02:00/14:00; die 6-h-Timesteps 00:00/12:00 passen).
 SYNOPTIC_FRONTS_TIMELINE_TOLERANCE_H = 3
+BRIEFING_DAY_NOT_SAFE_SHARE = 0.5   # MEHR als dieser Anteil Not safe -> Tag Not safe
+BRIEFING_DAY_SAFE_SHARE = 0.5       # MINDESTENS dieser Anteil Safe  -> Tag Safe
+SYNOPTIC_HAZARD_EXTENT_WIDESPREAD = 0.7    # ab hier "verbreitet"
+SYNOPTIC_HAZARD_EXTENT_SCATTERED = 0.35    # ab hier "gebietsweise", darunter "vereinzelt"
+SYNOPTIC_HAZARD_RAIN_MM_MODERATE = 1.0     # ab hier "maessig"
+SYNOPTIC_HAZARD_RAIN_MM_HEAVY = 4.0        # ab hier "kraeftig"
+SYNOPTIC_HAZARD_RAIN_MM_SEVERE = 10.0      # ab hier "Starkregen"
 # Tagesfenster (lokale Stunden, [start, end)) — Niederschlag/Wind werden pro
 # Fenster aggregiert, damit der Block Tagesverlauf statt Tagespauschale kann
 # ("Vormittag trocken, ab dem Nachmittag Zellen"). Vorfall 25.07.2026:
