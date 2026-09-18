@@ -391,14 +391,17 @@
 
     // ---- Statischer Pfeil-Snapshot (prefers-reduced-motion) ----
 
+    // Statisches Bild (Morgenbriefing): Pfeilraster, bewusst dezent — duenne
+    // Linie, kleine Spitze, gedaempfte Deckkraft. Laenge + Farbe = Staerke.
     function drawArrows() {
       ctx.clearRect(0, 0, st.view.w, st.view.h);
       if (!st.field || !st.grid) return;
       var meta = st.grid.meta;
       var GRID = 48;                       // Screen-Raster in px
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.1;
       ctx.lineCap = "round";
-      ctx.globalAlpha = 0.8;
+      ctx.lineJoin = "round";
+      ctx.globalAlpha = 0.58;
       for (var y = GRID / 2; y < st.view.h; y += GRID) {
         var lat = pxToLat(y);
         for (var x = GRID / 2; x < st.view.w; x += GRID) {
@@ -410,7 +413,7 @@
           if (kmh < 2) continue;
           // Screen-Richtung: x = Ost, y = Sued (v>0 zeigt nach oben)
           var ang = Math.atan2(-_uv.v, _uv.u);
-          var len = 10 + Math.min(1, kmh / SPEED_MAX_KMH) * 12;
+          var len = 8 + Math.min(1, kmh / SPEED_MAX_KMH) * 9;
           var cos = Math.cos(ang), sin = Math.sin(ang);
           var x1 = x + cos * len / 2, y1 = y + sin * len / 2;
           var x0 = x - cos * len / 2, y0 = y - sin * len / 2;
@@ -419,11 +422,11 @@
           ctx.beginPath();
           ctx.moveTo(x0, y0);
           ctx.lineTo(x1, y1);
-          // Pfeilspitze
-          var hw = 3.2;
-          ctx.moveTo(x1 - cos * hw * 1.8 - sin * hw, y1 - sin * hw * 1.8 + cos * hw);
+          // kleine offene Pfeilspitze
+          var hw = 2.3;
+          ctx.moveTo(x1 - cos * hw * 1.7 - sin * hw, y1 - sin * hw * 1.7 + cos * hw);
           ctx.lineTo(x1, y1);
-          ctx.lineTo(x1 - cos * hw * 1.8 + sin * hw, y1 - sin * hw * 1.8 - cos * hw);
+          ctx.lineTo(x1 - cos * hw * 1.7 + sin * hw, y1 - sin * hw * 1.7 - cos * hw);
           ctx.stroke();
         }
       }

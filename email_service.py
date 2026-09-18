@@ -258,7 +258,10 @@ def _phenomenon_label(category: str, fallback: str = "") -> str:
 # Low-level: SMTP-Versand
 # ----------------------------------------------------------------------
 
-def _build_message(to: str, subject: str, html: str, text: str) -> EmailMessage:
+def _build_message(to: str, subject: str, html: str, text: str,
+                   images: Optional[dict] = None) -> EmailMessage:
+    """images: {cid: png_bytes} — als inline-Anhang (multipart/related) unter
+    dem HTML-Teil, referenziert per <img src="cid:...">."""
     msg = EmailMessage()
     msg["From"] = formataddr((config.SENDER_NAME, config.SENDER_EMAIL))
     msg["To"] = to
@@ -266,6 +269,11 @@ def _build_message(to: str, subject: str, html: str, text: str) -> EmailMessage:
     msg["Message-ID"] = make_msgid(domain=_sender_domain())
     msg.set_content(text or "")              # text/plain part
     msg.add_alternative(html, subtype="html")  # text/html part
+    if images:
+        html_part = msg.get_payload()[-1]
+        for cid, data in images.items():
+            html_part.add_related(data, maintype="image", subtype="png",
+                                  cid=f"<{cid}>", filename=f"{cid}.png")
     return msg
 
 
@@ -313,7 +321,8 @@ def _dry_run_write(to: str, subject: str, html: str) -> Path:
     return path
 
 
-def send_email(to: str, subject: str, html: str, text: str = "") -> bool:
+def send_email(to: str, subject: str, html: str, text: str = "",
+               images: Optional[dict] = None) -> bool:
     """Synchron. Gibt True bei Erfolg, False bei Fehler zurueck.
 
     Dry-Run-Modus: Schreibt HTML-Preview in tempdir und logged Pfad.
@@ -358,7 +367,7 @@ def send_email(to: str, subject: str, html: str, text: str = "") -> bool:
         logger.error("send_email: SMTP_PASSWORD nicht gesetzt — Mail an %s nicht gesendet", to)
         return False
 
-    msg = _build_message(to, subject, html, text)
+    msg = _build_message(to, subject, html, text, images)
 
     try:
         if use_ssl:
@@ -383,14 +392,15 @@ def send_email(to: str, subject: str, html: str, text: str = "") -> bool:
         return False
 
 
-def send_email_async(to: str, subject: str, html: str, text: str = "") -> None:
+def send_email_async(to: str, subject: str, html: str, text: str = "",
+                     images: Optional[dict] = None) -> None:
     """Fire-and-forget: startet einen Daemon-Thread fuer den SMTP-Call,
     damit Flask-Request-Handler nicht 1-5s blockieren.
     Bei Fehler wird nur geloggt (kein Retry). Fuer MVP OK.
     """
     t = threading.Thread(
         target=send_email,
-        args=(to, subject, html, text),
+        args=(to, subject, html, text, images),
         name=f"smtp-{to}",
         daemon=True,
     )
@@ -1479,15 +1489,29 @@ def send_briefing_email(subscriber: dict, briefing_data: dict,
                      coverage.get("regions", 0))
         return False
 
-    html = render_template("email/briefing.html", **ctx)
-    text = render_template("email/briefing.txt", **ctx)
+    images, subject_v3 = None, ""
+    use_v3 = config.BRIEFING_VERSION == "v3"
+    if use_v3:
+        try:
+            html, text, subject_v3, images = _render_briefing_v3(ctx, briefing_data, subscriber)
+        except Exception:
+            # v3 braucht das Wetterlage-Strukturfeld; fehlt es oder bricht der
+            # Aufbau, geht das alte Layout raus — nie gar kein Briefing.
+            logger.exception("send_briefing_email: v3 fehlgeschlagen, Rueckfall auf v2 (%s)",
+                             subscriber.get("email"))
+            use_v3 = False
+    if not use_v3:
+        html = render_template("email/briefing.html", **ctx)
+        text = render_template("email/briefing.txt", **ctx)
 
     # Betreff dynamisch: wenn bester Tag legendaer -> markant, sonst sachlich
     verdict = ctx.get("verdict")
     today = datetime.now()
     kw = today.isocalendar().week
     kw_pfx = f"Wingcast {i18n.t('email.briefing.week_abbr')}{kw}: "
-    if verdict and verdict["day"]["tier"] == "violet":
+    if use_v3 and subject_v3:
+        subject = f"{kw_pfx}{subject_v3}"
+    elif verdict and verdict["day"]["tier"] == "violet":
         subject = f"{kw_pfx}{verdict['headline']}"
     elif verdict and verdict["day"]["tier"] == "green":
         subject = f"{kw_pfx}{verdict['headline']}"
@@ -1506,9 +1530,70 @@ def send_briefing_email(subscriber: dict, briefing_data: dict,
         return False
 
     if async_send:
-        send_email_async(to, subject, html, text)
+        send_email_async(to, subject, html, text, images)
         return True
-    return send_email(to, subject, html, text)
+    return send_email(to, subject, html, text, images)
+
+
+# ----------------------------------------------------------------------
+# Briefing v3: Analyse-Kette (docs/BRIEFING.md)
+# ----------------------------------------------------------------------
+
+_MAP_CACHE: dict = {}   # (date, day_idx) -> png bytes | None — ein Screenshot je Lauf
+
+
+def briefing_map_png(day_idx: int, iso_date: str) -> Optional[bytes]:
+    """Synoptik-Karte der App als PNG — Screenshot per Playwright
+    (scripts/synoptik_snapshot.js) von BRIEFING_MAP_URL/synoptik/karte.
+    Einmal je Tag und Tagesindex gecacht: alle Subscriber bekommen dieselbe
+    Karte. None, wenn node/Playwright fehlen oder die App nicht antwortet —
+    das Mail geht dann ohne Bild raus, nie gar nicht."""
+    import subprocess
+    import tempfile
+    key = (iso_date, day_idx)
+    if key in _MAP_CACHE:
+        return _MAP_CACHE[key]
+    png: Optional[bytes] = None
+    base = (config.BRIEFING_MAP_URL or "").rstrip("/")
+    script = Path(config.PROJECT_ROOT) / "scripts" / "synoptik_snapshot.js"
+    if base and script.exists():
+        url = f"{base}/synoptik/karte?day={day_idx}"
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "synoptik.png"
+            try:
+                r = subprocess.run(["node", str(script), url, str(out), "960", iso_date],
+                                   cwd=str(config.PROJECT_ROOT), capture_output=True, timeout=180)
+                if r.returncode == 0 and out.exists() and out.stat().st_size > 0:
+                    png = out.read_bytes()
+                else:
+                    logger.warning("briefing_map_png: Screenshot fehlgeschlagen (%s): %s",
+                                   url, r.stderr.decode(errors="replace")[-300:])
+            except (OSError, subprocess.TimeoutExpired) as e:
+                logger.warning("briefing_map_png: %s", e)
+    _MAP_CACHE[key] = png
+    return png
+
+
+def _render_briefing_v3(ctx: dict, briefing_data: dict, subscriber: dict):
+    """HTML, Text, Betreff-Kern und Inline-Bilder fuer das v3-Briefing."""
+    from scripts.briefing_v3_context import build_v3_context
+    from datetime import date as _date
+    ctx = build_v3_context(ctx, briefing_data, subscriber,
+                           top_n_regions_per_day=max(3, len(subscriber.get("regions") or [])))
+    images = {}
+    try:
+        focus = ctx.get("v3_focus_date") or ""
+        day_idx = (_date.fromisoformat(focus) - _date.today()).days if focus else -1
+        if 0 <= day_idx < int(config.FORECAST_DAYS):
+            png = briefing_map_png(day_idx, focus)
+            if png:
+                images["synoptik"] = png
+                ctx["v3_map_cid"] = "synoptik"
+    except Exception:
+        logger.exception("_render_briefing_v3: Kartenbild uebersprungen")
+    html = render_template("email/briefing_v3.html", **ctx)
+    text = render_template("email/briefing_v3.txt", **ctx)
+    return html, text, ctx.get("v3_subject") or "", (images or None)
 
 
 # ======================================================================

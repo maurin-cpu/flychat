@@ -20,7 +20,7 @@ import math
 import os
 import re
 import statistics
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -351,6 +351,48 @@ def _day_line(wetterlage: dict, date: str) -> str:
     return ""
 
 
+def _wind_class(kmh: float) -> str:
+    """Staerkeklasse wie decide_flow_overhead (schwach <15, maessig <30,
+    kraeftig <50, sonst stuermisch)."""
+    return ("schwach" if kmh < 15 else "maessig" if kmh < 30
+            else "kraeftig" if kmh < 50 else "stuermisch")
+
+
+def _wind_range_block(wetterlage: dict, date: str, strip: dict) -> dict:
+    """Spanne der Regionsspitzen (700 hPa) und ein Fazit: deckt sich der Wind
+    in den Prognosedaten mit der Stroemungsstaerke der Synoptik? Leer, wenn
+    der Kontext keine Regionsspitzen traegt (aeltere Caches)."""
+    day = _per_day_index((wetterlage or {}).get("aloft_regional"), [date]).get(date) or {}
+    hi, lo = day.get("max_kmh"), day.get("min_kmh")
+    if not hi or not day.get("region"):
+        return {}
+    lo = lo if isinstance(lo, (int, float)) else hi
+    hour = int(day.get("hour") or 12)
+    when = _lbl("hour_morning" if hour < 10 else "hour_midday" if hour < 14
+                else "hour_afternoon" if hour < 18 else "hour_evening")
+    flow = _per_day_index((wetterlage or {}).get("flow_overhead"), [date]).get(date) or {}
+    syn_cls = flow.get("strength") or _wind_class(float(flow.get("speed_kmh") or 0))
+    data_cls = _wind_class(float(hi))
+    order = ["schwach", "maessig", "kraeftig", "stuermisch"]
+    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
+    sector = _lbl("lg_sector_" + abbr) if abbr else ""
+    args = dict(strength=_lbl("wstr_" + syn_cls), sector=sector, lo=int(lo), hi=int(hi),
+                region=day["region"], when=when, cls=_lbl("wcls_" + data_cls))
+    if order.index(data_cls) > order.index(syn_cls):
+        fazit, verdict = _lbl("wind_fazit_stronger").format(**args), "stronger"
+    elif order.index(data_cls) < order.index(syn_cls):
+        fazit, verdict = _lbl("wind_fazit_weaker").format(**args), "weaker"
+    else:
+        fazit, verdict = _lbl("wind_fazit_match").format(**args), "match"
+    return {
+        "verdict": verdict, "peak_region": day["region"], "peak_hour": f"{hour:02d}",
+        "range": _lbl("wind_range").format(lo=int(lo), hi=int(hi)),
+        "range_note": _lbl("wind_range_note").format(region=day["region"], hour=f"{hour:02d}"),
+        "ground_range": _lbl("wind_ground_range").format(lo=int(round(lo * 2 / 3)), hi=int(round(hi * 2 / 3))),
+        "fazit": fazit,
+    }
+
+
 def _aloft_regional_text(wetterlage: dict, date: str) -> str:
     """"Regional bis 45 km/h (Berner Alpen), staerkste Stunde 14 Uhr" — nur,
     wenn der Kontext das Feld hat (aeltere Caches: leer)."""
@@ -542,9 +584,206 @@ _L3 = {
         "step_foehn":   "Föhn / Bise",
         "step_wind":    "Höhenwind",
         "step_stab":    "Labilität",
+        "step_thermik": "Thermik / Basis",
+        "step_sonne":   "Sonne / Bewölkung",
+        "step_modelle": "Modelle",
+        # Status-Pille je Kettenglied (kurz, max 3 Woerter)
+        "st_front_passes": "Front zieht durch", "st_front_weak": "Front schwächt ab", "st_front_none": "keine Front", "st_front_rear": "Rückseite",
+        "st_foehn_on": "Föhn aktiv", "st_foehn_gusty": "einzelne Böen", "st_foehn_off": "kein Föhn", "st_bise_on": "Bise",
+        "st_wind_stronger": "regional stärker", "st_wind_match": "regional wie im Mittel", "st_wind_weaker": "regional schwächer",
+        "st_stab_thunder": "Gewitter", "st_stab_labile": "teils labil", "st_stab_stable": "stabil",
+        "st_th_good": "gutes Steigen", "st_th_mod": "mässiges Steigen", "st_th_weak": "schwaches Steigen",
+        "st_sun_match": "wie erwartet", "st_sun_partial": "teils anders", "st_sun_contra": "anders als erwartet",
+        "st_md_agree": "Modelle einig", "st_md_partial": "ein offener Punkt", "st_md_uncertain": "Modelle uneinig",
+        "fx_dwd": "DWD", "fx_signature": "Signatur", "fx_sig_yes": "ja", "fx_sig_no": "keine",
+        "fx_dp": "ΔP Alpen", "fx_gust": "Böe", "fx_t850": "T850", "fx_thunder_none": "keine Gewitter",
+        "fx_ground": "am Boden ≈", "fx_peak": "Spitze",
+        "md_agree":      "Fazit: Die Modelle sind sich bei Wind, Niederschlag und Bewölkung einig.",
+        "md_partial":    "Fazit: Bei {agree} sind sich die Modelle einig, bei {q}",
+        "md_uncertain":  "Fazit: Die Modelle widersprechen sich — bei {q}",
+        "md_q":          "{what} {zone} nicht (Vergleichspunkt {place}): {groups}.",
+        "md_grp":        "{models} {verb} {label}",
+        "md_lab_wind_mid": "fliegbaren Wind", "md_lab_cloud_mid": "halb bedeckt",
+        "md_what_wind":  "dem Wind", "md_what_rain": "dem Niederschlag", "md_what_cloud": "der Bewölkung",
+        "md_lab_wind_hi": "windig bis verblasen", "md_lab_wind_lo": "ruhigen Wind",
+        "md_lab_rain_hi": "Niederschlag", "md_lab_rain_lo": "trocken",
+        "md_lab_cloud_hi": "bedeckt", "md_lab_cloud_lo": "wenig Wolken",
+        "md_verb_one":   "sieht", "md_verb_many": "sehen",
+        "md_var_wind":   "Wind", "md_var_rain": "Niederschlag", "md_var_cloud": "Bewölkung",
+        "md_place_alpennordhang": "Interlaken", "md_place_wallis": "Sion", "md_place_tessin": "Locarno", "md_place_graubuenden_engadin": "Chur",
+        "su_exp_high":  "{Press} lässt viel Sonne erwarten",
+        "su_exp_low":   "{Press} lässt viel Bewölkung erwarten",
+        "su_exp_flat":  "Die Übergangslage lässt wechselnde Bewölkung erwarten",
+        "su_air_south": ", die feuchte {sector}luft aber Wolken im Süden",
+        "su_air_north": ", die {sector}luft aber Wolken am Alpennordhang",
+        "su_data":      " — die Prognosedaten zeigen {zones}{best}.",
+        "su_match":     ". Die Prognosedaten bestätigen die Zweiteilung: {zones}{best}.",
+        "su_match_all": ". Die Prognosedaten bestätigen das landesweit: {zones}{best}.",
+        "su_partial":   ". Die Prognosedaten zeigen das nur teilweise: {zones}{best} — {miss}.",
+        "su_contra":    ". Die Prognosedaten widersprechen: {zones}{best} — {miss}.",
+        "su_miss_north_cloudy": "mehr Wolken im Norden, als die Lage erwarten lässt",
+        "su_miss_north_sunny":  "die Wolken am Alpennordhang bleiben aus",
+        "su_miss_south_cloudy": "mehr Wolken im Süden, als die Lage erwarten lässt",
+        "su_miss_south_sunny":  "die feuchte Luft zeigt sich im Süden nicht",
+        "su_zone":      "{where} {word}{cloud}",
+        "su_group":     "{zones} {word}{cloud}",
+        "su_word_sunny": "meist sonnig", "su_word_mixed": "teils sonnig", "su_word_overcast": "meist bedeckt",
+        "su_low":       " mit tiefen Wolken (unter 2 km)",
+        "su_high":      " unter mittelhohen und hohen Wolken (über 2 km)",
+        "su_best":      "; am sonnigsten {zone}",
+        "su_both":      "im ganzen Land {word}",
+        "su_north":     "im Norden", "su_south": "im Süden",
+        "su_lbl_sun":   "Sonne 10–16 Uhr", "su_lbl_low": "Wolken unter 2 km", "su_lbl_high": "Wolken über 2 km",
+        "th_exp_high":  "{Press} lässt Absinken und eine gedeckelte Basis erwarten",
+        "th_exp_low":   "{Press} lässt eine hohe Basis, aber Überentwicklung erwarten",
+        "th_exp_flat":  "Die Übergangslage lässt keine klare Schichtung erwarten",
+        "th_press_hoch": "Der Hochdruck", "th_press_up": "Der steigende Druck",
+        "th_press_tief": "Der Tiefdruck", "th_press_down": "Der fallende Druck",
+        "th_t850_warm": ", die warme Höhenluft bremst das Steigen",
+        "th_t850_cold": ", die kalte Höhenluft fördert kräftiges Steigen",
+        "th_data":      " — die Prognosedaten zeigen {base}, {climb}{start}{sun}.",
+        "th_match":     ". Die Prognosedaten bestätigen die gedeckelte Basis: {base}, {climb}{start}{sun}.",
+        "th_match_high": ". Die Prognosedaten bestätigen die hohe Basis: {base}, {climb}{start}{sun}.",
+        "th_contra_higher": ". Die Prognosedaten zeigen das nicht: {base}, {climb}{start}{sun} — die Basis liegt höher, als die Lage erwarten lässt.",
+        "th_contra_lower":  ". Die Prognosedaten zeigen das nicht: {base}, {climb}{start}{sun} — die Basis bleibt tiefer, als die Lage erwarten lässt.",
+        "th_base_range": "Basis {lo_zone} am tiefsten, {hi_zone} am höchsten",
+        "th_base_one":  "Basis überall ähnlich",
+        "th_lbl_base":  "Basis", "th_lbl_climb": "Steigen", "th_lbl_from": "ab", "th_unit_h": " Uhr",
+        "th_base_none": "keine Basisangabe",
+        "th_climb":     "Steigen {grade}",
+        "th_grade_weak": "schwach", "th_grade_mod": "mässig", "th_grade_good": "gut", "th_grade_strong": "kräftig",
+        "th_start":     ", Thermik ab {h} Uhr",
+        "th_sun_split": "; {sunny} sonnig, {cloudy} bedeckt",
+        "th_sun_all":   "; verbreitet sonnig",
+        "th_cloud_all": "; verbreitet tiefe Bewölkung",
+        "th_north":     "Norden", "th_south": "Süden",
         "ground_est":   "am Boden zu erwarten",
         "rule_23":      "⅔-Regel",
         "front_none":   "Keine Front im Vorhersagefenster (DWD).",
+        # Fazit — Prognosedaten, nie eine finale Aussage
+        # Lage in drei kurzen Saetzen: Einfluss -> Druck -> Prognosedaten
+        "lg_between":      "Zwischen {a} und {b}: {strength} {sector}strömung mit {air}.",
+        "lg_single":       "{a}: {strength} {sector}strömung mit {air}.",
+        "lg_nocenter":     "{strength} {sector}strömung mit {air}.",
+        "lg_center":       "{ctype} {name}",
+        "lg_air_SW":       "feuchter Mittelmeerluft", "lg_air_S": "Südströmung, Föhnrisiko im Norden",
+        "lg_air_SE":       "Südströmung, Föhnrisiko im Norden", "lg_air_W": "milder Atlantikluft",
+        "lg_air_NW":       "kühler Nordwestluft", "lg_air_N": "kühler Nordluft",
+        "lg_air_NE":       "trockener Kontinentalluft, Bise möglich", "lg_air_E": "trockener Kontinentalluft, Bise möglich",
+        "lg_sector_N":     "Nord", "lg_sector_NE": "Nordost", "lg_sector_E": "Ost", "lg_sector_SE": "Südost",
+        "lg_sector_S":     "Süd", "lg_sector_SW": "Südwest", "lg_sector_W": "West", "lg_sector_NW": "Nordwest",
+        "lg_strength_schwach": "schwache", "lg_strength_maessig": "mässige",
+        "lg_strength_kraeftig": "kräftige", "lg_strength_stuermisch": "stürmische",
+        "lg_pressure":     "{regime} {trend} — {meaning}.",
+        "lg_regime_hoch":  "Hochdruck", "lg_regime_tief": "Tiefdruck", "lg_regime_neutral": "Der Druck",
+        "lg_trend_up":     "steigt", "lg_trend_down": "fällt", "lg_trend_flat": "bleibt",
+        # was das fuer das Wetter heisst — Hoch: stabil und trocken, Tief: unbestaendig
+        "lg_mean_hoch_up": "Hochdruckeinfluss festigt sich, stabiles und meist trockenes Wetter",
+        "lg_mean_hoch_flat": "stabiles, meist trockenes Wetter",
+        "lg_mean_hoch_down": "das Hoch gibt nach, das Wetter wird anfälliger",
+        "lg_mean_tief_up": "das Tief zieht ab, das Wetter beruhigt sich langsam",
+        "lg_mean_tief_flat": "unbeständig, Wolken und Regen",
+        "lg_mean_tief_down": "Tiefdruckeinfluss verstärkt sich, unbeständig mit Regen",
+        "lg_mean_neutral_up": "Hochdruckeinfluss nimmt zu, das Wetter beruhigt sich",
+        "lg_mean_neutral_flat": "Übergangslage, wechselhaft",
+        "lg_mean_neutral_down": "Tiefdruckeinfluss nimmt zu, das Wetter wird unbeständiger",
+        "lg_data":         ": {rain}{rain_trend}, {wind}.",
+        "lg_rain_fading":  " und im Tagesverlauf abklingend",
+        "lg_mean_calm_north": "Hochdruckeinfluss nimmt zu, das Wetter beruhigt sich auf der Alpennordseite",
+        "lg_rain_south_growing": "meist trocken, auf der Alpensüdseite Schauer und am Nachmittag zunehmend",
+        "lg_mean_calm_not_yet": "Hochdruckeinfluss nimmt zu, kommt aber noch nicht an",
+        "lg_rain_for_now": "vorerst ",
+        "lg_rain_growing": " und am Nachmittag zunehmend",
+        "lg_rain_dry":     "trocken",
+        "lg_rain_mostly_dry": "meist trocken",
+        "lg_rain_south_only": "meist trocken, Schauer nur auf der Alpensüdseite",
+        "lg_rain_north_only": "meist trocken, Regen nur auf der Alpennordseite",
+        "lg_rain_partly":  "teils Regen",
+        "lg_rain_wide":    "verbreitet Regen",
+        "lg_wind_calm":    "Wind ruhig",
+        "lg_wind_partly":  "teils windig",
+        "lg_wind_wide":    "verbreitet windig",
+        "lg_wind_strong":  "verbreitet stark windig",
+        "lg_wind_aloft":   " vom Höhenwind",
+        "lg_wind_less_south": ", auf der Alpensüdseite weniger",
+        "lg_wind_less_north": ", auf der Alpennordseite weniger",
+        "from_morning":    "ab dem Morgen", "from_midday": "ab Mittag",
+        "from_afternoon":  "ab dem Nachmittag", "from_evening": "ab dem Abend",
+        "wc_windig":       "windig", "wc_verblasen": "verblasen", "wc_ruhig": "ruhig",
+        "wc_stark_eingeschraenkt": "stark eingeschränkt",
+        # Foehn/Bise: Anspruch der Synoptik gegen die Prognosedaten
+        "fb_foehn_yes":     "{Side}föhnlage: Druckgefälle {dp} hPa über die Alpen. Die Prognosedaten bestätigen ihn — am Lee-Prognosepunkt {station} Böen bis {gust} km/h{windows}.",
+        "fb_foehn_aloft":   "{Side}föhnlage: Druckgefälle {dp} hPa über die Alpen, doch am Lee-Prognosepunkt {station} zeigen die Prognosedaten kaum Böen (bis {gust} km/h) — der Föhn bleibt in der Höhe.",
+        "fb_foehn_no":      "Kein Föhn: das Druckgefälle über die Alpen bleibt mit {dp} hPa unter der Schwelle von 4 hPa.{strong}",
+        "fb_foehn_no_nodp": "Kein Föhn: kein nennenswertes Druckgefälle über die Alpen.{strong}",
+        "fb_strong_none":   " Keine starken Winde an den Startplätzen.",
+        "fb_strong_some":   " Starke Winde trotzdem an einzelnen Startplätzen: Böen bis {gust} km/h aus {dir} ({spot}, {alt} m, {when}){models} — Höhenwind, kein Föhn.",
+        "fb_models":        "; die Modelle sind uneinig, CH2 sieht nur {ch2} km/h",
+        "fb_station_nord":  "Zürich", "fb_station_sued": "Lugano",
+        "fb_bise_yes":      "Bise: Druckgefälle Nordost–Süd {dp} hPa und Höhenwind aus Nordost — im Mittelland zeigen die Prognosedaten Nordostwind bis {kmh} km/h an {share} % der Startplätze.",
+        "fb_bise_yes_noground": "Bise laut Synoptik (Druckgefälle {dp} hPa, Höhenwind Nordost), doch im Mittelland zeigen die Prognosedaten kaum Nordostwind — schwach oder erst später.",
+        "fb_bise_no":       "Keine Bise: {reason} — im Mittelland kein Nordostwind.",
+        "fb_bise_no_ground": "Keine Bise laut Synoptik ({reason}), im Mittelland aber lokal Nordostwind bis {kmh} km/h.",
+        "fb_reason_dp":     "das Druckgefälle Nordost–Süd ist zu schwach ({dp} hPa)",
+        "fb_reason_dir":    "der Höhenwind kommt aus {sector} statt Nordost",
+        "fb_reason_both":   "Druckgefälle und Höhenwind passen nicht ({dp} hPa, {sector})",
+        "fb_side_nord":     "Nord", "fb_side_sued": "Süd",
+        "fb_win_from":      ", ab {when}",
+        # Labilitaet: Erwartung aus der Synoptik gegen CAPE / Gewitter / Ueberentwicklung
+        "lb_expect":        "{air}{press}",
+        "lb_air_humid":     "Die feuchte {sector}luft lässt Labilität erwarten",
+        "lb_air_cool":      "Die kühle {sector}luft lässt Schauer und Labilität am Nordhang erwarten",
+        "lb_air_neutral":   "Die {sector}strömung bringt keine ausgeprägt labile Luft",
+        "lb_press_cap":     ", der {regime} deckelt sie aber",
+        "lb_press_up":      ", der steigende Druck deckelt sie aber zunehmend",
+        "lb_press_low":     ", der Tiefdruck begünstigt sie",
+        "lb_press_none":    "",
+        "lb_regime_hoch":   "Hochdruck",
+        "lb_data":          " — die Prognosedaten zeigen {what}.",
+        "lb_match":         ". Die Prognosedaten bestätigen die Labilität: {what}.",
+        "lb_match_stable":  ". Die Prognosedaten bestätigen die stabile Schichtung: {what}.",
+        "lb_partial":       ". Die Prognosedaten zeigen das nur teilweise: {what} — der Deckel hält am Alpennordhang nicht.",
+        "lb_contra_stable": ". Die Prognosedaten zeigen das nicht: {what} — die Luft ist stabiler, als die Lage vermuten lässt.",
+        "lb_contra_labile": ". Die Prognosedaten widersprechen: {what} — labiler, als die Lage vermuten lässt.",
+        "lb_stable":        "überall stabile Luft, keine Gewitter",
+        "lb_labile_only":   "nur {zones}, ohne Gewitter{overdev}{north}",
+        "lb_labile_wide":   "{zones}, ohne Gewitter{overdev}",
+        "lb_thunder":       "Gewitter {zones}{overdev}{north}",
+        "lb_thunder_at":    "{zone} ab {hour} Uhr",
+        "lb_overdev":       ", Überentwicklung {zones}",
+        "lb_od_in":         ", Überentwicklung ab {hour} Uhr",
+        "lb_zone_grade":    "{zone} ({grade}{od})",
+        "lb_od_zone":       "Überentwicklung {zone} ab {hour} Uhr",
+        "lb_north_capped":  "; am Alpennordhang bleibt die Luft gedeckelt",
+        "lb_grade_light":   "leicht labil", "lb_grade_mod": "labil", "lb_grade_strong": "stark labil",
+        "lb_in":            "im ", "lb_in_plural": "in ",
+        "front_today_in":     "{Day} dürfte die {typ} {zone} {when} {art}{unsicher}{prov}.",
+        "front_sig_yes":      "In der DWD-Prognose wird eine {typ} über {zone_dat} angegeben. {Day} zieht sie gegen {hour} Uhr durch — unsere Prognosedaten zeigen {belege}.",
+        "front_fazit_none_more": "Danach ist im 3-Tage-Fenster keine weitere Front in Sicht.",
+        "front_sig_dwd_only": "In der DWD-Prognose wird {day} {when} eine {typ} über {zone_dat} angegeben. Unsere Prognosedaten zeigen keine Signatur dazu ({gegen}) — die Front dürfte sich abschwächen oder auflösen.",
+        "front_sig_none":     "In der DWD-Prognose ist keine Front über der Schweiz angegeben. {Day} zieht keine durch — unsere Prognosedaten zeigen {gegen}.",
+        "ev_druck":           "Druckanstieg",
+        "ev_drehung":         "Winddrehung auf {sector}",
+        "ev_kalt":            "Abkühlung in der Höhe",
+        "ev_warm":            "Erwärmung in der Höhe",
+        "ev_regen":           "Regen",
+        "gv_druck_steigt":    "steigenden Druck",
+        "gv_druck_faellt":    "fallenden Druck ohne Sprung",
+        "gv_druck_flach":     "keinen Drucksprung",
+        "gv_drehung":         "keine Winddrehung",
+        "gv_regen":           "keinen Regen",
+        "front_generic":      "Front",
+        "sectors":            "Nord,Nordost,Ost,Südost,Süd,Südwest,West,Nordwest",
+        "front_prev_run":     " (Lauf von gestern; heute früh {dist} km {dir})",
+        "front_fazit_in_more": "Gemäss Prognosedaten dürfte eine weitere {typ} {zone} {day} {when} {art}{unsicher}.",
+        "front_today_none":   "{Day} wird keine Front erwartet.",
+        "front_passed":       "{When} ist die {typ} über {zone} gezogen (DWD-Analyse) — {day} auf der Rückseite.",
+        "yesterday":          "gestern",
+        "front_fazit_in":     "Gemäss Prognosedaten dürfte die {typ} {zone} {day} {when} {art}{unsicher}.",
+        "front_fazit_later":  "Gemäss Prognosedaten erreicht die {typ} die Schweiz frühestens {day} — nach dem 3-Tage-Fenster.",
+        "front_fazit_stays":  "Gemäss Prognosedaten bleibt die {typ} ({dist} km {dir}) im 3-Tage-Fenster fern der Schweiz.",
+        "front_fazit_none":   "Gemäss Prognosedaten erreicht im 3-Tage-Fenster keine Front die Schweiz.",
+        "front_unsicher":     " — unsicher, nur ein Randkontakt",
         "front_far":    "{typ} {dist} km {dir} — ausserhalb der Reichweite heute.",
         "front_near":   "{typ} {dist} km {dir}.",
         "front_pass":   "{typ} {art} {zone} {when}.",
@@ -602,6 +841,17 @@ _L3 = {
         "hz_RAIN": "Regen", "hz_THUNDER": "Gewitter", "hz_FOEHN": "Föhn", "hz_BISE": "Bise",
         "hz_WIND": "Starker Wind",
         "hz_none":      "Keine Gefahr schweizweit.",
+        # Ursache je Warnung aus der Synoptik — Warnung = Daten, Ursache = Lage
+        "hz_cause_rain_south": "— die feuchte {sector}luft staut sich im Süden.",
+        "hz_cause_rain_north": "— die {sector}luft staut sich am Alpennordhang.",
+        "hz_cause_rain_front": "— Frontdurchgang.",
+        "hz_cause_rain_flow":  "— {sector}strömung.",
+        "hz_cause_wind_aloft": "— der {sector}-Höhenwind schlägt bis in die Täler durch.",
+        "hz_cause_wind_gusts": "— böiger Wind.",
+        "hz_cause_foehn":      "— Druckgefälle {dp} hPa über die Alpen.",
+        "hz_cause_thunder":    "— feuchte, labile Luft{cap}.",
+        "hz_cause_thunder_cap": ", im Norden gedeckelt",
+        "hz_cause_bise":       "— Druckgefälle Nordost–Süd {dp} hPa.",
         "hz_code_rain": "Regen {zones}, {extent} und {intensity}.",
         "hz_extent_widespread": "verbreitet",
         "hz_extent_scattered": "gebietsweise",
@@ -648,6 +898,15 @@ _L3 = {
         "sum_RAIN": "Regen", "sum_THUNDER": "Gewitter", "sum_FOEHN": "Föhn",
         "sum_BISE": "Bise", "sum_WIND": "starker Wind",
         "wind_meaning": "Mittelwert über alle Schweizer Spots, 12 Uhr",
+        "wind_range":   "{lo}–{hi} km/h je Region",
+        "wind_range_note": "Spanne der Regionsspitzen auf 700 hPa, am stärksten {region} {hour} Uhr",
+        "wind_ground_range": "≈ {lo}–{hi} km/h am Boden zu erwarten (⅔-Regel)",
+        "wind_fazit_match": "Das Schweizer Mittel sagt {strength} {sector}strömung, und die Regionen bleiben in dieser Klasse: {lo} bis {hi} km/h, am stärksten {region} am {when}.",
+        "wind_fazit_stronger": "Das Schweizer Mittel sagt {strength} {sector}strömung — regional ist es eine Klasse stärker: bis {hi} km/h {region} am {when}, also {cls}. Das Mittel verharmlost.",
+        "wind_fazit_weaker": "Das Schweizer Mittel sagt {strength} {sector}strömung — selbst die stärkste Region bleibt darunter: höchstens {hi} km/h ({region}).",
+        "wcls_schwach": "schwach", "wcls_maessig": "mässig", "wcls_kraeftig": "kräftig", "wcls_stuermisch": "stürmisch",
+        "wstr_schwach": "schwache", "wstr_maessig": "mässige", "wstr_kraeftig": "kräftige", "wstr_stuermisch": "stürmische",
+        "hour_morning": "Morgen", "hour_midday": "Mittag", "hour_afternoon": "Nachmittag", "hour_evening": "Abend",
         "chip_rain_widespread": "Flächiger Regen",
         "chip_rain_scattered":  "Regen in Teilen der Region",
         "chip_rain_isolated":   "Einzelne Schauer",
@@ -708,9 +967,207 @@ _L3 = {
         "step_foehn":   "Foehn / Bise",
         "step_wind":    "Upper wind",
         "step_stab":    "Stability",
+        "step_thermik": "Thermals / cloud base",
+        "step_sonne":   "Sun / cloud",
+        "step_modelle": "Models",
+        # status pill per chain step (short, max 3 words)
+        "st_front_passes": "front passes", "st_front_weak": "front weakening", "st_front_none": "no front", "st_front_rear": "rear side",
+        "st_foehn_on": "foehn active", "st_foehn_gusty": "isolated gusts", "st_foehn_off": "no foehn", "st_bise_on": "Bise",
+        "st_wind_stronger": "regionally stronger", "st_wind_match": "regionally as average", "st_wind_weaker": "regionally weaker",
+        "st_stab_thunder": "thunderstorms", "st_stab_labile": "partly unstable", "st_stab_stable": "stable",
+        "st_th_good": "good climbs", "st_th_mod": "moderate climbs", "st_th_weak": "weak climbs",
+        "st_sun_match": "as expected", "st_sun_partial": "partly different", "st_sun_contra": "different than expected",
+        "st_md_agree": "models agree", "st_md_partial": "one open point", "st_md_uncertain": "models disagree",
+        "fx_dwd": "DWD", "fx_signature": "signature", "fx_sig_yes": "yes", "fx_sig_no": "none",
+        "fx_dp": "ΔP Alps", "fx_gust": "gust", "fx_t850": "T850", "fx_thunder_none": "no thunderstorms",
+        "fx_ground": "ground ≈", "fx_peak": "peak",
+        "md_agree":      "Verdict: The models agree on wind, precipitation and cloud.",
+        "md_partial":    "Verdict: The models agree on {agree}, but not on {q}",
+        "md_uncertain":  "Verdict: The models contradict each other — on {q}",
+        "md_q":          "{what} {zone} (comparison point {place}): {groups}.",
+        "md_grp":        "{models} {verb} {label}",
+        "md_lab_wind_mid": "flyable wind", "md_lab_cloud_mid": "half overcast",
+        "md_what_wind":  "wind", "md_what_rain": "precipitation", "md_what_cloud": "cloud",
+        "md_lab_wind_hi": "windy to blown out", "md_lab_wind_lo": "calm wind",
+        "md_lab_rain_hi": "precipitation", "md_lab_rain_lo": "dry",
+        "md_lab_cloud_hi": "overcast", "md_lab_cloud_lo": "little cloud",
+        "md_verb_one":   "sees", "md_verb_many": "see",
+        "md_var_wind":   "wind", "md_var_rain": "precipitation", "md_var_cloud": "cloud",
+        "md_place_alpennordhang": "Interlaken", "md_place_wallis": "Sion", "md_place_tessin": "Locarno", "md_place_graubuenden_engadin": "Chur",
+        "su_exp_high":  "{Press} suggests plenty of sunshine",
+        "su_exp_low":   "{Press} suggests a lot of cloud",
+        "su_exp_flat":  "The transitional situation suggests changeable cloud",
+        "su_air_south": ", but the humid {sector} air brings cloud to the south",
+        "su_air_north": ", but the {sector} air brings cloud to the Northern Alps",
+        "su_data":      " — the forecast data show {zones}{best}.",
+        "su_match":     ". The forecast data confirm the split: {zones}{best}.",
+        "su_match_all": ". The forecast data confirm it nationwide: {zones}{best}.",
+        "su_partial":   ". The forecast data only partly show this: {zones}{best} — {miss}.",
+        "su_contra":    ". The forecast data contradict it: {zones}{best} — {miss}.",
+        "su_miss_north_cloudy": "more cloud in the north than the situation suggests",
+        "su_miss_north_sunny":  "the cloud on the Northern Alps fails to appear",
+        "su_miss_south_cloudy": "more cloud in the south than the situation suggests",
+        "su_miss_south_sunny":  "the humid air does not show in the south",
+        "su_zone":      "{where} {word}{cloud}",
+        "su_word_sunny": "mostly sunny", "su_word_mixed": "partly sunny", "su_word_overcast": "mostly overcast",
+        "su_group":     "{zones} {word}{cloud}",
+        "su_low":       " with low-level cloud (below 2 km)",
+        "su_high":      " under mid- and high-level cloud (above 2 km)",
+        "su_best":      "; sunniest in {zone}",
+        "su_both":      "{word} nationwide",
+        "su_north":     "in the north", "su_south": "in the south",
+        "su_lbl_sun":   "Sun 10–16h", "su_lbl_low": "cloud below 2 km", "su_lbl_high": "cloud above 2 km",
+        "th_exp_high":  "{Press} suggests subsidence and a capped cloud base",
+        "th_exp_low":   "{Press} suggests a high base but overdevelopment",
+        "th_exp_flat":  "The transitional situation suggests no clear stratification",
+        "th_press_hoch": "High pressure", "th_press_up": "Rising pressure",
+        "th_press_tief": "Low pressure", "th_press_down": "Falling pressure",
+        "th_t850_warm": ", the warm air aloft brakes the climb",
+        "th_t850_cold": ", the cold air aloft favours strong climbs",
+        "th_data":      " — the forecast data show {base}, {climb}{start}{sun}.",
+        "th_match":     ". The forecast data confirm the capped base: {base}, {climb}{start}{sun}.",
+        "th_match_high": ". The forecast data confirm the high base: {base}, {climb}{start}{sun}.",
+        "th_contra_higher": ". The forecast data do not show this: {base}, {climb}{start}{sun} — the cloud base is higher than the situation suggests.",
+        "th_contra_lower":  ". The forecast data do not show this: {base}, {climb}{start}{sun} — the cloud base stays lower than the situation suggests.",
+        "th_base_range": "cloud base lowest {lo_zone}, highest {hi_zone}",
+        "th_base_one":  "cloud base similar everywhere",
+        "th_lbl_base":  "Base", "th_lbl_climb": "Climb", "th_lbl_from": "from", "th_unit_h": "h",
+        "th_base_none": "no base available",
+        "th_climb":     "climbs {grade}",
+        "th_grade_weak": "weak", "th_grade_mod": "moderate", "th_grade_good": "good", "th_grade_strong": "strong",
+        "th_start":     ", thermals from {h}h",
+        "th_sun_split": "; {sunny} sunny, {cloudy} overcast",
+        "th_sun_all":   "; widely sunny",
+        "th_cloud_all": "; widespread low cloud",
+        "th_north":     "north", "th_south": "south",
         "ground_est":   "expected at ground level",
         "rule_23":      "⅔ rule",
         "front_none":   "No front within the forecast window (DWD).",
+        # verdict — forecast data, never a final statement
+        # situation in three short sentences: influence -> pressure -> forecast data
+        "lg_between":      "Between {a} and {b}: {strength} {sector} flow with {air}.",
+        "lg_single":       "{a}: {strength} {sector} flow with {air}.",
+        "lg_nocenter":     "{strength} {sector} flow with {air}.",
+        "lg_center":       "{ctype} {name}",
+        "lg_air_SW":       "humid Mediterranean air", "lg_air_S": "a southerly flow, foehn risk in the north",
+        "lg_air_SE":       "a southerly flow, foehn risk in the north", "lg_air_W": "mild Atlantic air",
+        "lg_air_NW":       "cool north-westerly air", "lg_air_N": "cool northerly air",
+        "lg_air_NE":       "dry continental air, Bise possible", "lg_air_E": "dry continental air, Bise possible",
+        "lg_sector_N":     "northerly", "lg_sector_NE": "north-easterly", "lg_sector_E": "easterly",
+        "lg_sector_SE":    "south-easterly", "lg_sector_S": "southerly", "lg_sector_SW": "south-westerly",
+        "lg_sector_W":     "westerly", "lg_sector_NW": "north-westerly",
+        "lg_strength_schwach": "light", "lg_strength_maessig": "moderate",
+        "lg_strength_kraeftig": "strong", "lg_strength_stuermisch": "stormy",
+        "lg_pressure":     "{regime} {trend} — {meaning}.",
+        "lg_regime_hoch":  "High pressure", "lg_regime_tief": "Low pressure", "lg_regime_neutral": "Pressure",
+        "lg_trend_up":     "rising", "lg_trend_down": "falling", "lg_trend_flat": "steady",
+        # what it means for the weather — high: stable and dry, low: unsettled
+        "lg_mean_hoch_up": "high-pressure influence consolidating, stable and mostly dry weather",
+        "lg_mean_hoch_flat": "stable, mostly dry weather",
+        "lg_mean_hoch_down": "the high is giving way, weather turning more fragile",
+        "lg_mean_tief_up": "the low is moving off, weather slowly calming down",
+        "lg_mean_tief_flat": "unsettled, cloud and rain",
+        "lg_mean_tief_down": "low-pressure influence strengthening, unsettled with rain",
+        "lg_mean_neutral_up": "high-pressure influence growing, weather calming down",
+        "lg_mean_neutral_flat": "transitional, changeable",
+        "lg_mean_neutral_down": "low-pressure influence growing, weather turning more unsettled",
+        "lg_data":         ": {rain}{rain_trend}, {wind}.",
+        "lg_rain_fading":  " and fading during the day",
+        "lg_mean_calm_north": "high-pressure influence growing, weather calming down on the north side of the Alps",
+        "lg_rain_south_growing": "mostly dry, showers on the south side of the Alps increasing in the afternoon",
+        "lg_mean_calm_not_yet": "high-pressure influence growing but not arriving yet",
+        "lg_rain_for_now": "for now ",
+        "lg_rain_growing": " and increasing in the afternoon",
+        "lg_rain_dry":     "dry",
+        "lg_rain_mostly_dry": "mostly dry",
+        "lg_rain_south_only": "mostly dry, showers only on the south side of the Alps",
+        "lg_rain_north_only": "mostly dry, rain only on the north side of the Alps",
+        "lg_rain_partly":  "some rain",
+        "lg_rain_wide":    "widespread rain",
+        "lg_wind_calm":    "wind calm",
+        "lg_wind_partly":  "partly windy",
+        "lg_wind_wide":    "widely windy",
+        "lg_wind_strong":  "widely strong wind",
+        "lg_wind_aloft":   " from the upper wind",
+        "lg_wind_less_south": ", less on the south side of the Alps",
+        "lg_wind_less_north": ", less on the north side of the Alps",
+        "from_morning":    "from the morning", "from_midday": "from midday",
+        "from_afternoon":  "from the afternoon", "from_evening": "from the evening",
+        "wc_windig":       "windy", "wc_verblasen": "blown out", "wc_ruhig": "calm",
+        "wc_stark_eingeschraenkt": "severely restricted",
+        # foehn/bise: synoptic claim against the forecast data
+        "fb_foehn_yes":     "{Side} foehn situation: pressure difference of {dp} hPa across the Alps. The forecast data confirm it — gusts up to {gust} km/h at the lee forecast point {station}{windows}.",
+        "fb_foehn_aloft":   "{Side} foehn situation: pressure difference of {dp} hPa across the Alps, but at the lee forecast point {station} the forecast data show hardly any gusts (up to {gust} km/h) — the foehn stays aloft.",
+        "fb_foehn_no":      "No foehn: the pressure difference across the Alps stays below the 4 hPa threshold at {dp} hPa.{strong}",
+        "fb_foehn_no_nodp": "No foehn: no notable pressure difference across the Alps.{strong}",
+        "fb_strong_none":   " No strong winds at the launch sites.",
+        "fb_strong_some":   " Strong winds nevertheless at individual launch sites: gusts up to {gust} km/h from the {dir} ({spot}, {alt} m, {when}){models} — upper wind, not foehn.",
+        "fb_models":        "; the models disagree, CH2 sees only {ch2} km/h",
+        "fb_station_nord":  "Zurich", "fb_station_sued": "Lugano",
+        "fb_bise_yes":      "Bise: pressure difference north-east–south of {dp} hPa and upper wind from the north-east — on the Plateau the forecast data show north-easterly wind up to {kmh} km/h at {share} % of launch sites.",
+        "fb_bise_yes_noground": "Bise according to the synoptic picture (pressure difference {dp} hPa, upper wind north-east), but the forecast data show hardly any north-easterly wind on the Plateau — weak or later.",
+        "fb_bise_no":       "No Bise: {reason} — no north-easterly wind on the Plateau.",
+        "fb_bise_no_ground": "No Bise in the synoptic picture ({reason}), but locally north-easterly wind up to {kmh} km/h on the Plateau.",
+        "fb_reason_dp":     "the north-east–south pressure difference is too weak ({dp} hPa)",
+        "fb_reason_dir":    "the upper wind comes from the {sector} instead of the north-east",
+        "fb_reason_both":   "pressure difference and upper wind do not fit ({dp} hPa, {sector})",
+        "fb_side_nord":     "North", "fb_side_sued": "South",
+        "fb_win_from":      ", from the {when}",
+        # stability: expectation from the synoptic picture against CAPE / thunderstorms / overdevelopment
+        "lb_expect":        "{air}{press}",
+        "lb_air_humid":     "The humid {sector} air suggests instability",
+        "lb_air_cool":      "The cool {sector} air suggests showers and instability on the north side",
+        "lb_air_neutral":   "The {sector} flow brings no distinctly unstable air",
+        "lb_press_cap":     ", but the {regime} caps it",
+        "lb_press_up":      ", but rising pressure increasingly caps it",
+        "lb_press_low":     ", and low pressure favours it",
+        "lb_press_none":    "",
+        "lb_regime_hoch":   "high pressure",
+        "lb_data":          " — the forecast data show {what}.",
+        "lb_match":         ". The forecast data confirm instability: {what}.",
+        "lb_match_stable":  ". The forecast data confirm the stable stratification: {what}.",
+        "lb_partial":       ". The forecast data only partly show this: {what} — the cap does not hold on the Northern Alps.",
+        "lb_contra_stable": ". The forecast data do not show this: {what} — the air is more stable than the situation suggests.",
+        "lb_contra_labile": ". The forecast data contradict it: {what} — more unstable than the situation suggests.",
+        "lb_stable":        "stable air everywhere, no thunderstorms",
+        "lb_labile_only":   "only {zones}, no thunderstorms{overdev}{north}",
+        "lb_labile_wide":   "{zones}, no thunderstorms{overdev}",
+        "lb_thunder":       "thunderstorms {zones}{overdev}{north}",
+        "lb_thunder_at":    "{zone} from {hour}h",
+        "lb_overdev":       ", overdevelopment {zones}",
+        "lb_od_in":         ", overdevelopment from {hour}h",
+        "lb_zone_grade":    "{zone} ({grade}{od})",
+        "lb_od_zone":       "overdevelopment {zone} from {hour}h",
+        "lb_north_capped":  "; on the Northern Alps the air stays capped",
+        "lb_grade_light":   "slightly unstable", "lb_grade_mod": "unstable", "lb_grade_strong": "strongly unstable",
+        "lb_in":            "in ", "lb_in_plural": "in ",
+        "front_today_in":     "{Day} the {typ} is expected to {art_inf} {zone} {when}{unsicher}{prov}.",
+        "front_sig_yes":      "The DWD forecast indicates a {typ} over {zone}. {Day} it passes around {hour_full} — our forecast data show {belege}.",
+        "front_fazit_none_more": "No further front is in sight within the 3-day window.",
+        "front_sig_dwd_only": "The DWD forecast indicates a {typ} over {zone} {day} {when}. Our forecast data show no signature for it ({gegen}) — the front is likely weakening or dissolving.",
+        "front_sig_none":     "The DWD forecast indicates no front over Switzerland. {Day} none passes — our forecast data show {gegen}.",
+        "ev_druck":           "a pressure rise",
+        "ev_drehung":         "wind veering to the {sector}",
+        "ev_kalt":            "cooling aloft",
+        "ev_warm":            "warming aloft",
+        "ev_regen":           "rain",
+        "gv_druck_steigt":    "rising pressure",
+        "gv_druck_faellt":    "falling pressure without a jump",
+        "gv_druck_flach":     "no pressure jump",
+        "gv_drehung":         "no wind shift",
+        "gv_regen":           "no rain",
+        "front_generic":      "front",
+        "sectors":            "north,north-east,east,south-east,south,south-west,west,north-west",
+        "front_prev_run":     " (yesterday's run; this morning {dist} km to the {dir})",
+        "front_fazit_in_more": "Forecast data suggest a further {typ} {art} {zone} {day} {when}{unsicher}.",
+        "front_today_none":   "{Day} no front is expected.",
+        "front_passed":       "{When} the {typ} passed over {zone} (DWD analysis) — {day} on its rear side.",
+        "yesterday":          "yesterday",
+        "front_fazit_in":     "Forecast data suggest the {typ} {art} {zone} {day} {when}{unsicher}.",
+        "front_fazit_later":  "Forecast data suggest the {typ} reaches Switzerland {day} at the earliest — beyond the 3-day window.",
+        "front_fazit_stays":  "Forecast data suggest the {typ} ({dist} km to the {dir}) stays clear of Switzerland within the 3-day window.",
+        "front_fazit_none":   "Forecast data suggest no front reaches Switzerland within the 3-day window.",
+        "front_unsicher":     " — uncertain, edge contact only",
         "front_far":    "{typ} {dist} km to the {dir} — out of reach today.",
         "front_near":   "{typ} {dist} km to the {dir}.",
         "front_pass":   "{typ} {art} {zone} {when}.",
@@ -768,6 +1225,17 @@ _L3 = {
         "hz_RAIN": "Rain", "hz_THUNDER": "Thunderstorms", "hz_FOEHN": "Foehn", "hz_BISE": "Bise",
         "hz_WIND": "Strong wind",
         "hz_none":      "No hazard across Switzerland.",
+        # cause per warning from the synoptic picture — warning = data, cause = situation
+        "hz_cause_rain_south": "— the humid {sector} air piles up in the south.",
+        "hz_cause_rain_north": "— the {sector} air piles up on the Northern Alps.",
+        "hz_cause_rain_front": "— frontal passage.",
+        "hz_cause_rain_flow":  "— {sector} flow.",
+        "hz_cause_wind_aloft": "— the {sector} upper wind reaches down into the valleys.",
+        "hz_cause_wind_gusts": "— gusty wind.",
+        "hz_cause_foehn":      "— pressure difference of {dp} hPa across the Alps.",
+        "hz_cause_thunder":    "— humid, unstable air{cap}.",
+        "hz_cause_thunder_cap": ", capped in the north",
+        "hz_cause_bise":       "— north-east–south pressure difference of {dp} hPa.",
         "hz_code_rain": "Rain {zones}, {extent} and {intensity}.",
         "hz_extent_widespread": "widespread",
         "hz_extent_scattered": "in places",
@@ -814,6 +1282,15 @@ _L3 = {
         "sum_RAIN": "rain", "sum_THUNDER": "thunderstorms", "sum_FOEHN": "foehn",
         "sum_BISE": "bise", "sum_WIND": "strong wind",
         "wind_meaning": "Average across all Swiss spots, 12:00",
+        "wind_range":   "{lo}–{hi} km/h across regions",
+        "wind_range_note": "range of regional peaks at 700 hPa, strongest {region} {hour}h",
+        "wind_ground_range": "≈ {lo}–{hi} km/h expected at ground level (⅔ rule)",
+        "wind_fazit_match": "The Swiss average says {strength} {sector} flow, and the regions stay in that class: {lo} to {hi} km/h, strongest {region} in the {when}.",
+        "wind_fazit_stronger": "The Swiss average says {strength} {sector} flow — regionally it is one class stronger: up to {hi} km/h {region} in the {when}, i.e. {cls}. The average understates it.",
+        "wind_fazit_weaker": "The Swiss average says {strength} {sector} flow — even the strongest region stays below that: at most {hi} km/h ({region}).",
+        "wcls_schwach": "light", "wcls_maessig": "moderate", "wcls_kraeftig": "strong", "wcls_stuermisch": "stormy",
+        "wstr_schwach": "light", "wstr_maessig": "moderate", "wstr_kraeftig": "strong", "wstr_stuermisch": "stormy",
+        "hour_morning": "morning", "hour_midday": "midday", "hour_afternoon": "afternoon", "hour_evening": "evening",
         "chip_rain_widespread": "Widespread rain",
         "chip_rain_scattered":  "Rain in parts of the region",
         "chip_rain_isolated":   "Isolated showers",
@@ -1150,6 +1627,14 @@ def _day_summaries(wetterlage: dict, dates: list) -> dict:
         day = _hazard_day(wetterlage, date) if wetterlage else None
         if not day:
             continue
+        # Dieselben Datenworte wie Block 1 (Lage): "Meist trocken, Schauer nur im
+        # Sueden, verbreitet windig …" — national und ohne Urteil. Das fruehere
+        # "Regen und starker Wind erschweren das Fliegen" stand unter Regionen,
+        # fuer die es nicht galt (Freitag 18.09.2026: Nordseite trocken).
+        words = _lage_data_words(wetterlage, date)
+        if words:
+            out[date] = words
+            continue
         active = [t for t in HAZARD_TOPICS if (day["checks"].get(t) or {}).get("active")]
         if not active:
             out[date] = _lbl("sum_none")
@@ -1260,25 +1745,383 @@ def _front_lines(fronts: dict | None, passagen: dict | None, date: str) -> list:
             zone=_zone_name(a.get("zone", "")),
             when=_when(a.get("fenster_von_utc") or med),
         ))
-    # 2) Naechste Front auf der Karte — Distanz zur Schweiz (Faktum, keine Prognose)
-    nearest = []
-    for f in (fronts or {}).get("features") or []:
-        coords = (f.get("geometry") or {}).get("coordinates") or []
-        if not coords:
-            continue
-        best = min(coords, key=lambda c: _haversine_km(46.8, 8.2, c[1], c[0]))
-        d = _haversine_km(46.8, 8.2, best[1], best[0])
-        nearest.append((d, f.get("properties", {}).get("typ", ""), best))
-    nearest.sort(key=lambda x: x[0])
-    for d, typ, pt in nearest[:2]:
-        if d > 1200:
-            continue
-        key = "front_near" if d <= 400 else "front_far"
-        lines.append(_lbl(key).format(typ=_front_type(typ), dist=int(round(d / 10) * 10),
-                                      dir=_bearing_word(pt[1], pt[0])))
-    if not lines:
-        lines.append(_lbl("front_none"))
+    # Keine Distanz-Zeilen ("Warmfront 230 km suedoestlich") mehr: der Pilot
+    # sieht die Fronten auf der Karte, und ob eine kommt, sagt das Fazit
+    # (_front_fazit). Ohne Durchgang am Fokus-Tag bleibt die Liste leer.
     return lines
+
+
+def _lage_regime(wl: dict, date: str) -> tuple[str, str]:
+    """(regime hoch|tief|neutral, Tendenz up|down|flat) fuer den Tag."""
+    press = _per_day_index(wl.get("pressure_influence"), [date]).get(date) or {}
+    regime = (press.get("regime") or "neutral").replace("druck", "")
+    regime = regime if regime in ("hoch", "tief") else "neutral"
+    slope = (wl.get("pressure_influence") or {}).get("slope_hpa_per_day")
+    tkey = ("up" if isinstance(slope, (int, float)) and slope >= 2
+            else "down" if isinstance(slope, (int, float)) and slope <= -2 else "flat")
+    return regime, tkey
+
+
+def _lage_effects(wl: dict, date: str, regime: str, tkey: str) -> dict:
+    """Wetterfolge fuer die ganze Schweiz aus den Nord/Sued-Aggregaten, in
+    Worten: {rain, rain_trend, wind, meaning} — inkl. Logik-Abgleich mit der
+    Druck-Tendenz. Von Block 1 (Lage) und den Wochenkacheln genutzt."""
+    pp = _per_day_index(wl.get("precip_pattern"), [date]).get(date) or {}
+    wp = _per_day_index(wl.get("wind_pattern"), [date]).get(date) or {}
+
+    def _wavg(field, key):
+        tot, acc = 0, 0.0
+        for side in ("alpennord", "alpensued"):
+            v = field.get(side) or {}
+            n = v.get("n_spots") or 0
+            if n and isinstance(v.get(key), (int, float)):
+                tot += n
+                acc += n * v[key]
+        return (acc / tot) if tot else None
+
+    wet = _wavg(pp, "wet_share")
+    wet_n = ((pp.get("alpennord") or {}).get("wet_share"))
+    wet_s = ((pp.get("alpensued") or {}).get("wet_share"))
+    if wet is None:
+        rain = _lbl("lg_rain_mostly_dry")
+    elif wet < 0.05:
+        rain = _lbl("lg_rain_dry")
+    elif wet < 0.15 and wet_s is not None and wet_s >= 0.2 and (wet_n or 0) < 0.1:
+        rain = _lbl("lg_rain_south_only")
+    elif wet < 0.15 and wet_n is not None and wet_n >= 0.2 and (wet_s or 0) < 0.1:
+        rain = _lbl("lg_rain_north_only")
+    elif wet < 0.15:
+        rain = _lbl("lg_rain_mostly_dry")
+    elif wet < 0.4:
+        rain = _lbl("lg_rain_partly")
+    else:
+        rain = _lbl("lg_rain_wide")
+
+    pz = ((_per_day_index(wl.get("precip_zones"), [date]).get(date) or {}).get("zones") or {})
+
+    def _win(name):
+        tot, acc = 0, 0.0
+        for z in pz.values():
+            w = ((z or {}).get("windows") or {}).get(name) or {}
+            n = w.get("n_spots") or 0
+            if n and isinstance(w.get("wet_share"), (int, float)):
+                tot += n
+                acc += n * w["wet_share"]
+        return (acc / tot) if tot else None
+
+    early, late = _win("morning"), _win("afternoon")
+    rain_trend = ""
+    if early is not None and late is not None and wet is not None and wet >= 0.05:
+        if early >= 0.1 and late <= early * 0.5:
+            rain_trend = _lbl("lg_rain_fading")
+        elif late >= 0.1 and late >= early * 2:
+            rain_trend = _lbl("lg_rain_growing")
+
+    warn = _wavg(wp, "share_wind_warn")
+    crit = _wavg(wp, "share_wind_crit")
+    warn_n = ((wp.get("alpennord") or {}).get("share_wind_warn"))
+    warn_s = ((wp.get("alpensued") or {}).get("share_wind_warn"))
+    if warn is None or warn < 0.3:
+        wind = _lbl("lg_wind_calm")
+    elif (crit or 0) >= 0.3:
+        wind = _lbl("lg_wind_strong")
+    elif warn < 0.6:
+        wind = _lbl("lg_wind_partly")
+    else:
+        wind = _lbl("lg_wind_wide")
+    if warn is not None and warn >= 0.3:
+        drivers = {(wp.get(side) or {}).get("wind_driver") for side in ("alpennord", "alpensued")}
+        if drivers == {"hoehenwind"}:
+            wind += _lbl("lg_wind_aloft")
+        if warn_n is not None and warn_s is not None:
+            if warn_n - warn_s >= 0.25:
+                wind += _lbl("lg_wind_less_south")
+            elif warn_s - warn_n >= 0.25:
+                wind += _lbl("lg_wind_less_north")
+    # Logik-Abgleich: "beruhigt sich" darf nicht neben "Schauer nehmen zu" stehen.
+    # Steigt der Druck, aber der Regen nimmt zu, wird die Beruhigung eingegrenzt
+    # (nur Norden) oder vertagt; ist es unbestaendig, aber trocken, gilt "vorerst".
+    meaning = _lbl(f"lg_mean_{regime}_{tkey}")
+    calming = tkey == "up" or (regime == "hoch" and tkey == "flat")
+    if calming and rain_trend == _lbl("lg_rain_growing"):
+        if rain == _lbl("lg_rain_south_only"):
+            meaning, rain, rain_trend = _lbl("lg_mean_calm_north"), _lbl("lg_rain_south_growing"), ""
+        else:
+            meaning = _lbl("lg_mean_calm_not_yet")
+    unsettled = tkey == "down" or (regime == "tief" and tkey == "flat")
+    if unsettled and rain in (_lbl("lg_rain_dry"), _lbl("lg_rain_mostly_dry"))             and rain_trend != _lbl("lg_rain_growing"):
+        rain = _lbl("lg_rain_for_now") + rain
+    return {"rain": rain, "rain_trend": rain_trend, "wind": wind, "meaning": meaning}
+
+
+def _lage_data_words(wl: dict | None, date: str) -> str:
+    """Nur die Wetterfolge als Satz — der Tages-Hinweis der Wochenkacheln.
+    Leer, wenn der Kontext keine Aggregate traegt."""
+    wl = wl or {}
+    if not (_per_day_index(wl.get("precip_pattern"), [date]).get(date)
+            or _per_day_index(wl.get("wind_pattern"), [date]).get(date)):
+        return ""
+    regime, tkey = _lage_regime(wl, date)
+    e = _lage_effects(wl, date, regime, tkey)
+    return _capitalize(f"{e['rain']}{e['rain_trend']}, {e['wind']}.")
+
+
+def _lage_fazit(wetterlage: dict | None, date: str) -> str:
+    """Die Lage fuer die ganze Schweiz in drei kurzen Saetzen, ohne Zahlen:
+    Einfluss (Druckzentren -> Stroemung -> Luftmasse), Druck mit Tendenz und
+    Bedeutung, und was die Prognosedaten daraus machen (Wind je Zone, Regen
+    mit Seite und Beginn). Deterministisch — die Form, die der Skill auch von
+    der KI verlangt."""
+    wl = wetterlage or {}
+    if not wl:
+        return ""
+    lang = _lang()
+    centers = []
+    for d in wl.get("pressure_centers_per_day") or []:
+        if d.get("date") == date:
+            for c in d.get("centers") or []:
+                ctype = _CENTER_TYPE[lang].get(c.get("type"), c.get("type", ""))
+                centers.append(_lbl("lg_center").format(
+                    ctype=ctype, name=_center_name(c.get("region_label", ""))))
+            break
+    flow = _per_day_index(wl.get("flow_overhead"), [date]).get(date) or {}
+    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
+    sector = _lbl("lg_sector_" + abbr) if abbr else ""
+    air = _lbl("lg_air_" + abbr) if abbr else ""
+    strength = _lbl("lg_strength_" + (flow.get("strength") or "maessig"))
+    if len(centers) >= 2:
+        s1 = _lbl("lg_between").format(a=centers[0], b=centers[1], strength=strength, sector=sector, air=air)
+    elif centers:
+        s1 = _lbl("lg_single").format(a=centers[0], strength=strength, sector=sector, air=air)
+    else:
+        s1 = _lbl("lg_nocenter").format(strength=strength, sector=sector, air=air)
+    s1 = s1[0].upper() + s1[1:]
+
+    regime, tkey = _lage_regime(wl, date)
+    s2 = _lbl("lg_pressure").format(regime=_lbl("lg_regime_" + regime), trend=_lbl("lg_trend_" + tkey),
+                                    meaning=_lbl(f"lg_mean_{regime}_{tkey}"))
+
+    e = _lage_effects(wl, date, regime, tkey)
+    rain, rain_trend, wind, meaning = e["rain"], e["rain_trend"], e["wind"], e["meaning"]
+    s2 = _lbl("lg_pressure").format(regime=_lbl("lg_regime_" + regime), trend=_lbl("lg_trend_" + tkey),
+                                    meaning=meaning)
+    # Datenfolge haengt am Druck-Satz: "… das Wetter beruhigt sich: meist trocken, …"
+    s2 = s2.rstrip(".") + _lbl("lg_data").format(rain=rain, rain_trend=rain_trend, wind=wind)
+    return " ".join((s1, s2))
+
+
+def _sector_word(deg) -> str:
+    names = _lbl("sectors").split(",")
+    return names[int(((float(deg) + 22.5) // 45) % 8)]
+
+
+def _front_signature(wetterlage: dict | None, date: str) -> tuple[dict | None, dict]:
+    """(beste Signatur des Tages mit 'zone', Tagesverlauf je Zone) aus
+    wetterlage['frontsignatur'] — leer, wenn der Kontext das Feld nicht hat."""
+    fs = (wetterlage or {}).get("frontsignatur") or {}
+    day = next((d for d in fs.get("per_day") or [] if d.get("date") == date), None)
+    if not day:
+        return None, {}
+    best = None
+    for z, sig in (day.get("zones") or {}).items():
+        if not sig:
+            continue
+        score = (sig.get("druck_hpa") or 0) + abs(sig.get("t850_k") or 0) + min(sig.get("regen_mm") or 0, 5) / 2
+        if best is None or score > best[0]:
+            best = (score, dict(sig, zone=z))
+    return (best[1] if best else None), (day.get("verlauf") or {})
+
+
+def _evidence_words(sig: dict) -> str:
+    parts = [_lbl("ev_druck"), _lbl("ev_drehung").format(sector=_sector_word(sig["drehung"][1]))]
+    t = sig.get("t850_k")
+    if t is not None and t <= -2.0:
+        parts.append(_lbl("ev_kalt"))
+    elif t is not None and t >= 2.0:
+        parts.append(_lbl("ev_warm"))
+    if (sig.get("regen_mm") or 0) >= 1.0:
+        parts.append(_lbl("ev_regen"))
+    return ", ".join(parts)
+
+
+def _counter_words(verlauf: dict, zone: str = "") -> str:
+    v = verlauf.get(zone) or (next(iter(verlauf.values()), {}) if verlauf else {})
+    if not v:
+        return _lbl("gv_druck_flach") + ", " + _lbl("gv_drehung")
+    tr = v.get("druck_trend_hpa")
+    druck = (_lbl("gv_druck_steigt") if tr is not None and tr >= 1.0
+             else _lbl("gv_druck_faellt") if tr is not None and tr <= -1.0
+             else _lbl("gv_druck_flach"))
+    parts = [druck]
+    if (v.get("max_drehung_deg") or 0) < 40:
+        parts.append(_lbl("gv_drehung"))
+    if (v.get("regen_mm") or 0) < 1.0:
+        parts.append(_lbl("gv_regen"))
+    return ", ".join(parts)
+
+
+def _nearest_front(fronts: dict | None, typ: str):
+    """(Distanz km, Punkt [lon, lat]) der naechsten Front dieses Typs auf der
+    Karte, oder None."""
+    best = None
+    for f in (fronts or {}).get("features") or []:
+        if (f.get("properties") or {}).get("typ") != typ:
+            continue
+        for c in (f.get("geometry") or {}).get("coordinates") or []:
+            d = _haversine_km(46.8, 8.2, c[1], c[0])
+            if best is None or d < best[0]:
+                best = (d, c)
+    return best
+
+
+def _front_day_word(iso_day: str, dates: list) -> str:
+    """'heute' / 'morgen' / 'am So' relativ zum ersten Tag des Fensters."""
+    lang = _lang()
+    try:
+        d = date.fromisoformat(iso_day)
+    except ValueError:
+        return iso_day
+    today = date.fromisoformat(dates[0]) if dates else datetime.now().date()
+    off = (d - today).days
+    if off == 0:
+        return "heute" if lang == "de" else "today"
+    if off == 1:
+        return "morgen" if lang == "de" else "tomorrow"
+    short = {"de": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
+             "en": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}[lang][d.weekday()]
+    return ("am " if lang == "de" else "on ") + short
+
+
+# Zone mit Artikel im Akkusativ (DE) bzw. Artikel wo ueblich (EN) — fuer
+# "streift den Alpennordhang" / "brushes the Northern Alps"
+_ZONE_ARTICLE = {"de": {"alpennordhang": "den ", "wallis": "das ", "tessin": "das "},
+                 "en": {"alpennordhang": "the "}}
+_ZONE_ARTICLE_DAT = {"de": {"alpennordhang": "dem ", "wallis": "dem ", "tessin": "dem "},
+                     "en": {"alpennordhang": "the "}}
+
+
+def _zone_dat(zone_id: str) -> str:
+    return _ZONE_ARTICLE_DAT[_lang()].get(zone_id, "") + _zone_name(zone_id)
+
+
+def _zone_object(zone_id: str) -> str:
+    return _ZONE_ARTICLE[_lang()].get(zone_id, "") + _zone_name(zone_id)
+
+
+def _front_fazit(fronts: dict | None, passagen: dict | None, dates: list,
+                 focus: str = "", wetterlage: dict | None = None) -> str:
+    """Kurzes Fazit: kommt eine Front — laut DWD-Frontenprognose (passagen_*.json,
+    Durchgang je Zone aus den +36…+108-h-Karten). Immer als Prognose formuliert.
+
+    Satz 1 gilt IMMER dem Fokus-Tag ("Heute wird keine Front erwartet." oder
+    "Heute duerfte die Kaltfront …"). Satz 2 ist der Ausblick: fruehester
+    Durchgang im 3-Tage-Fenster > Durchgang danach > naechste Front auf der
+    Analysekarte bleibt fern > gar keine Front."""
+    if not dates:
+        return ""
+    focus = focus if focus in dates else dates[0]
+    window_end = date.fromisoformat(dates[-1])
+    hits = []
+    for a in (passagen or {}).get("aussagen") or []:
+        med = a.get("durchgang_median_utc") or ""
+        try:
+            local = datetime.fromisoformat(med.replace("Z", "+00:00")).astimezone(_TZ)
+        except (TypeError, ValueError):
+            continue
+        hits.append((local, a))
+    hits.sort(key=lambda h: h[0])
+
+    def _typ(a):
+        t = _front_type(a.get("typ", ""))
+        return t.lower() if _lang() == "en" else t
+
+    def _art(a, infinitive=False):
+        art = a.get("art") if a.get("art") in ("quert", "streift") else "quert"
+        if _lang() == "en" and infinitive:
+            return {"quert": "cross", "streift": "brush"}[art]
+        return _lbl(art)
+
+    day_word = _front_day_word(focus, dates)
+    day_cap = day_word[0].upper() + day_word[1:]
+
+    # 0) durchgezogene Front (DWD-Analyse, letzte 36 h vor dem Fokus-Tag)
+    passed = ""
+    focus_start = datetime.fromisoformat(focus).replace(tzinfo=_TZ)
+    for e in (passagen or {}).get("vergangen") or []:
+        try:
+            med = datetime.fromisoformat(e["median_utc"]).astimezone(_TZ)
+        except (KeyError, ValueError):
+            continue
+        if med >= focus_start or (focus_start - med).total_seconds() > 36 * 3600:
+            continue
+        when_day = (_lbl("yesterday") if (focus_start.date() - med.date()).days == 1
+                    else _front_day_word(med.date().isoformat(), dates))
+        when = when_day[0].upper() + when_day[1:] + " " + _when(e["median_utc"])
+        passed = _lbl("front_passed").format(
+            When=when, typ=_typ(e), zone=_zone_object(e.get("zone", "")), day=day_word)
+        break
+
+    # Der neueste Lauf sieht die naechsten 36 h nicht (Vorhersagekarten ab
+    # +36 h). Eine Aussage fuer den Fokus-Tag stammt deshalb oft aus dem
+    # Vortageslauf — die gilt nur, wenn die Karte des Tages die Front noch
+    # zeigt (gleicher Typ, hoechstens 600 km entfernt). Sonst ist sie
+    # aufgeloest oder schon durch, und der Satz waere erfunden.
+    latest_run = max((a.get("lauf") or "" for _, a in hits), default="")
+    today_hits = []
+    for l, a in hits:
+        if l.date().isoformat() != focus:
+            continue
+        prov = ""
+        if (a.get("lauf") or "") != latest_run:
+            near = _nearest_front(fronts, a.get("typ", ""))
+            if not near or near[0] > 600:
+                continue                      # Karte kennt die Front nicht mehr
+            prov = _lbl("front_prev_run").format(dist=int(round(near[0] / 10) * 10),
+                                                 dir=_bearing_word(near[1][1], near[1][0]))
+        today_hits.append((l, a, prov))
+    today_typ = ""
+    # Entscheidend ist, was die EIGENEN Prognosedaten fuer den Tag zeigen
+    # (Druck, Winddrehung, T850, Regen) — die DWD-Prognose gibt den Namen, die
+    # eigene Prognose gibt das Urteil. Ohne Signatur zieht keine Front durch, auch
+    # wenn die Karte eine zeichnet: dann schwaecht sie sich ab.
+    sig, verlauf = _front_signature(wetterlage, focus)
+    if sig:
+        if today_hits:
+            _, a, _ = today_hits[0]
+            today_typ = a.get("typ", "")
+            typ_txt = _typ(a)
+        else:
+            today_typ = sig.get("typ_hinweis") or ""
+            typ_txt = (_typ({"typ": today_typ}) if today_typ else _lbl("front_generic"))
+        first = _lbl("front_sig_yes").format(
+            Day=day_cap, typ=typ_txt, zone=_zone_object(sig["zone"]), zone_dat=_zone_dat(sig["zone"]),
+            hour=sig["hour"][:2], hour_full=sig["hour"], belege=_evidence_words(sig))
+    elif today_hits:
+        local, a, prov = today_hits[0]
+        today_typ = a.get("typ", "")
+        if verlauf:
+            first = _lbl("front_sig_dwd_only").format(
+                typ=_typ(a), day=day_word, zone=_zone_object(a.get("zone", "")),
+                zone_dat=_zone_dat(a.get("zone", "")),
+                when=_when(a.get("fenster_von_utc") or a.get("durchgang_median_utc") or ""),
+                gegen=_counter_words(verlauf, a.get("zone", "")))
+            first = first[0].upper() + first[1:]
+        else:
+            unsicher = bool(a.get("randwert")) or (a.get("anteil") or 0) < 0.1
+            first = _lbl("front_today_in").format(
+                Day=day_cap, typ=_typ(a), zone=_zone_object(a.get("zone", "")),
+                when=_when(a.get("fenster_von_utc") or a.get("durchgang_median_utc") or ""),
+                art=_art(a), art_inf=_art(a, infinitive=True),
+                unsicher=_lbl("front_unsicher") if unsicher else "", prov=prov)
+    elif verlauf:
+        first = _lbl("front_sig_none").format(Day=day_cap, gegen=_counter_words(verlauf))
+    else:
+        first = _lbl("front_today_none").format(Day=day_cap)
+    if passed:
+        first = passed + " " + first
+    # Nur der Tag zaehlt. Ob am Sonntag eine Front kommt, steht im Briefing
+    # des Sonntags — kein Ausblick, keine "weitere Front".
+    return first
 
 
 def _zugbahn_text(wetterlage: dict, date: str) -> str:
@@ -1297,6 +2140,471 @@ def _zugbahn_text(wetterlage: dict, date: str) -> str:
         return own if own != "zb_" + group else _zone_name(group)
     parts = [f"{name(k)} {int(v):02d}h" for k, v in sorted(onset.items(), key=lambda kv: kv[1])]
     return _lbl("showers_onset") + ": " + " → ".join(parts)
+
+
+def _thermik_fazit(wetterlage: dict, date: str) -> str:
+    """Block 6: was die Synoptik fuer Thermik und Basis erwarten laesst (Druck,
+    T850) und was die Prognosedaten je Zone zeigen (Basis, Steigen, Beginn,
+    Sonne/tiefe Wolken). Leer ohne thermik_zonen."""
+    wl = wetterlage or {}
+    tz = ((_per_day_index(wl.get("thermik_zonen"), [date]).get(date) or {}).get("zones") or {})
+    zones = {z: v for z, v in tz.items() if v}
+    if not zones:
+        return ""
+    lang = _lang()
+    regime, tkey = _lage_regime(wl, date)
+    if regime == "hoch" or tkey == "up":
+        press = _lbl("th_press_hoch" if regime == "hoch" else "th_press_up")
+        expect = _lbl("th_exp_high").format(Press=press)
+    elif regime == "tief" or tkey == "down":
+        press = _lbl("th_press_tief" if regime == "tief" else "th_press_down")
+        expect = _lbl("th_exp_low").format(Press=press)
+    else:
+        expect = _lbl("th_exp_flat")
+    t850 = _per_day_index(wl.get("t850_trend"), [date]).get(date)
+    if isinstance(t850, (int, float)):
+        if t850 >= 14:
+            expect += _lbl("th_t850_warm")
+        elif t850 <= 4:
+            expect += _lbl("th_t850_cold")
+    # Basis: Spanne ueber die Zonen
+    bases = {z: v["base_m"] for z, v in zones.items() if isinstance(v.get("base_m"), (int, float))}
+    if len(bases) >= 2 and max(bases.values()) - min(bases.values()) >= 300:
+        lo_z = min(bases, key=bases.get)
+        hi_z = max(bases, key=bases.get)
+        def _zin(z):
+            if lang != "de":
+                return "in " + _ZONE_ARTICLE_DAT["en"].get(z, "") + _zone_name(z)
+            return ("am " if z == "alpennordhang" else ("im " if _ZONE_ARTICLE_DAT["de"].get(z) else "in ")) + _zone_name(z)
+        base = _lbl("th_base_range").format(lo_zone=_zin(lo_z), hi_zone=_zin(hi_z))
+    elif bases:
+        base = _lbl("th_base_one")
+    else:
+        base = _lbl("th_base_none")
+    # Steigen: Median der Zonen-Spitzen
+    climbs = [v["climb_ms"] for v in zones.values() if isinstance(v.get("climb_ms"), (int, float))]
+    c = statistics.median(climbs) if climbs else 0
+    grade = ("strong" if c >= 3 else "good" if c >= 2 else "mod" if c >= 1 else "weak")
+    climb = _lbl("th_climb").format(grade=_lbl("th_grade_" + grade))
+    start = ""   # Thermikbeginn bewusst weggelassen (User 18.09.2026: brauchen wir nicht)
+    # Sonne / tiefe Wolken: Norden (Alpennordhang) gegen Sueden (Tessin)
+    def cloudy(z):
+        v = zones.get(z) or {}
+        lc = v.get("low_cloud_pct")
+        return None if lc is None else lc >= 60
+    joiner = " und " if lang == "de" else " and "
+    sunny = [_zone_name(z) for z in config.SYNOPTIC_ZONES if cloudy(z) is False]
+    cloud = [_zone_name(z) for z in config.SYNOPTIC_ZONES if cloudy(z) is True]
+
+    def _names(ns):
+        return (", ".join(ns[:-1]) + joiner + ns[-1]) if len(ns) > 1 else "".join(ns)
+
+    if sunny and cloud:
+        sun = _lbl("th_sun_split").format(sunny=_names(sunny), cloudy=_names(cloud))
+    elif cloud:
+        sun = _lbl("th_cloud_all")
+    elif sunny:
+        sun = _lbl("th_sun_all")
+    else:
+        sun = ""
+    # Urteil: Hoch/steigend erwartet gedeckelte Basis, Tief/fallend eine hohe —
+    # gemessen am Median der Zonen-Basen (Schwelle 2800 m)
+    med_base = statistics.median(bases.values()) if bases else None
+    if med_base is None or not (regime in ("hoch", "tief") or tkey in ("up", "down")):
+        key = "th_data"
+    elif regime == "hoch" or tkey == "up":
+        key = "th_match" if med_base < 2800 else "th_contra_higher"
+    else:
+        key = "th_match_high" if med_base >= 2800 else "th_contra_lower"
+    return expect + _lbl(key).format(base=base, climb=climb, start=start, sun=sun)
+
+
+def _modelle_block(wetterlage: dict, date: str) -> dict:
+    """Block 8: sind sich die Modelle einig? Fazit zuerst; bei Uneinigkeit
+    ALLE Modelle mit Wert, dazu Mehrheit und Ausreisser, dann die offene
+    Pilotenfrage. Der Vergleichspunkt (Interlaken, Sion, Locarno, Chur) steht
+    im Satz. Keine separate Zahlenzeile — die Werte sind im Text."""
+    wl = wetterlage or {}
+    mv = wl.get("modell_vergleich") or {}
+    day = _per_day_index(mv, [date]).get(date) or {}
+    zones = {z: v for z, v in (day.get("zones") or {}).items() if v}
+    if not zones:
+        return {}
+    names = mv.get("models") or {}
+    thr = mv.get("thresholds") or {}
+    excl = set(thr.get("spread_excludes") or [])
+    lang = _lang()
+    joiner = " und " if lang == "de" else " and "
+
+    def zone_in(z):
+        if lang == "de":
+            prep = "am " if z == "alpennordhang" else ("im " if _ZONE_ARTICLE_DAT["de"].get(z) else "in ")
+            return prep + _zone_name(z)
+        return "in " + _ZONE_ARTICLE_DAT["en"].get(z, "") + _zone_name(z)
+
+    def _list(models):
+        """'A, B und C' statt 'A und B und C'."""
+        if len(models) <= 1:
+            return "".join(models)
+        return ", ".join(models[:-1]) + joiner + models[-1]
+
+    def question(kind, z, field, unit, classify):
+        """Satz fuer eine Groesse: welche Modelle sehen was — Klassen statt Zahlen."""
+        vals = {names.get(k, k): v[field] for k, v in zones[z]["models"].items() if v.get(field) is not None}
+        groups: dict[str, list[str]] = {}
+        for m, v in vals.items():
+            groups.setdefault(classify(v), []).append(m)
+        order = ["hi", "mid", "lo"]
+        parts = []
+        for cls in sorted(groups, key=lambda c: (-len(groups[c]), order.index(c))):
+            ms = groups[cls]
+            parts.append(_lbl("md_grp").format(models=_list(ms),
+                                               verb=_lbl("md_verb_many" if len(ms) > 1 else "md_verb_one"),
+                                               label=_lbl(f"md_lab_{kind}_{cls}")))
+        return _lbl("md_q").format(what=_lbl("md_what_" + kind), zone=zone_in(z),
+                                   place=_lbl("md_place_" + z), groups=", ".join(parts))
+
+    questions = []
+    wz = max(zones, key=lambda z: zones[z].get("gust_spread_kmh") or 0)
+    if (zones[wz].get("gust_spread_kmh") or 0) >= thr.get("gust_disagree_kmh", 20):
+        questions.append(("wind", question("wind", wz, "gust_kmh", " km/h",
+                                           lambda v: "hi" if v >= 25 else "mid" if v >= 15 else "lo")))
+    for z, v in zones.items():
+        n, wet = v.get("rain_n") or 0, v.get("rain_wet_models") or 0
+        if n >= 2 and 0 < wet < n:
+            questions.append(("rain", question("rain", z, "rain_mm", " mm",
+                                               lambda v: "hi" if v >= thr.get("wet_mm", 1.0) else "lo")))
+            break
+    cz = max(zones, key=lambda z: zones[z].get("cloud_spread_pct") or 0)
+    if (zones[cz].get("cloud_spread_pct") or 0) >= thr.get("cloud_agree_pct", 30):
+        questions.append(("cloud", question("cloud", cz, "cloud_pct", " %",
+                                            lambda v: "hi" if v >= 60 else "mid" if v >= 30 else "lo")))
+
+    open_kinds = {k for k, _ in questions}
+    agree = [_lbl("md_var_" + k) for k in ("wind", "rain", "cloud") if k not in open_kinds]
+    if not questions:
+        text, verdict = _lbl("md_agree"), "agree"
+    elif len(questions) == 1:
+        text, verdict = _lbl("md_partial").format(agree=_list(agree), q=questions[0][1]), "partial"
+    else:
+        text, verdict = _lbl("md_uncertain").format(q=" ".join(qq[1] for qq in questions)), "uncertain"
+    return {"fazit": text, "num": {}, "verdict": verdict,
+            "agree": [k for k in ("wind", "rain", "cloud") if k not in open_kinds],
+            "open": [k for k, _ in questions]}
+
+
+def _sonne_fazit(wetterlage: dict, date: str) -> str:
+    """Block 7: was die Synoptik an Sonne/Bewoelkung erwarten laesst (Druck,
+    Luftmasse) und was die Prognosedaten je Landesteil zeigen (Sonnenanteil,
+    tiefe vs. hohe Wolken). Leer ohne thermik_zonen."""
+    wl = wetterlage or {}
+    tz = ((_per_day_index(wl.get("thermik_zonen"), [date]).get(date) or {}).get("zones") or {})
+    zones = {z: v for z, v in tz.items() if v and v.get("sun_share") is not None}
+    if not zones:
+        return ""
+    regime, tkey = _lage_regime(wl, date)
+    if regime == "hoch" or tkey == "up":
+        expect = _lbl("su_exp_high").format(Press=_lbl("th_press_hoch" if regime == "hoch" else "th_press_up"))
+    elif regime == "tief" or tkey == "down":
+        expect = _lbl("su_exp_low").format(Press=_lbl("th_press_tief" if regime == "tief" else "th_press_down"))
+    else:
+        expect = _lbl("su_exp_flat")
+    flow = _per_day_index(wl.get("flow_overhead"), [date]).get(date) or {}
+    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
+    sector = _lbl("lg_sector_" + abbr) if abbr else ""
+    if abbr in ("S", "SW", "SE"):
+        expect += _lbl("su_air_south").format(sector=sector)
+    elif abbr in ("N", "NW"):
+        expect += _lbl("su_air_north").format(sector=sector)
+
+    def word(v):
+        s = v.get("sun_share") or 0
+        w = _lbl("su_word_sunny" if s >= 0.6 else "su_word_mixed" if s >= 0.3 else "su_word_overcast")
+        if s < 0.6:
+            if (v.get("low_cloud_pct") or 0) >= 60:
+                w += _lbl("su_low")
+            elif (v.get("mid_high_pct") or 0) >= 60:
+                w += _lbl("su_high")
+        return w
+
+    # Norden = Alpennordhang, Sueden = Tessin; die anderen Zonen ueber "am sonnigsten"
+    # Zonen nach Sonnenklasse gruppieren und beim Namen nennen — "Norden/Sueden"
+    # waere unpraezise (gemeint waeren nur Alpennordhang und Tessin)
+    joiner = " und " if _lang() == "de" else " and "
+    groups: dict[str, list[str]] = {}
+    for z in config.SYNOPTIC_ZONES:
+        if z in zones:
+            groups.setdefault(word(zones[z]), []).append(_zone_name(z))
+    parts = []
+    for w_, names in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        names_txt = (", ".join(names[:-1]) + joiner + names[-1]) if len(names) > 1 else names[0]
+        if len(names) == len(zones):
+            parts.append(_lbl("su_both").format(word=w_))
+        else:
+            parts.append(_lbl("su_group").format(zones=names_txt, word=w_, cloud=""))
+    wn = word(zones["alpennordhang"]) if "alpennordhang" in zones else None
+    ws = word(zones["tessin"]) if "tessin" in zones else None
+    best = ""
+
+    # Abgleich: was die Lage je Landesteil erwarten laesst gegen die Daten.
+    # Erwartung: Hoch/steigend -> Sonne, Tief/fallend -> Wolken; die Luftmasse
+    # legt Wolken auf eine Seite (Suedwest -> Sueden, Nordwest -> Nordhang).
+    high = regime == "hoch" or tkey == "up"
+    low = regime == "tief" or tkey == "down"
+    exp_n = "cloudy" if abbr in ("N", "NW") or low else ("sunny" if high else None)
+    exp_s = "cloudy" if abbr in ("S", "SW", "SE") or low else ("sunny" if high else None)
+
+    def obs(z):
+        v = zones.get(z)
+        if not v:
+            return None
+        sh = v.get("sun_share") or 0
+        return "sunny" if sh >= 0.6 else "mixed" if sh >= 0.3 else "overcast"
+
+    def fits(exp, ob):
+        if exp is None or ob is None:
+            return None
+        return ob != "overcast" if exp == "sunny" else ob != "sunny"
+
+    o_n, o_s = obs("alpennordhang"), obs("tessin")
+    checks = [(fits(exp_n, o_n), "north", exp_n, o_n), (fits(exp_s, o_s), "south", exp_s, o_s)]
+    misses = [(side, o) for ok, side, e, o in checks if ok is False]
+    judged = [ok for ok, *_ in checks if ok is not None]
+    zones_txt = ", ".join(parts)
+    if not judged:
+        _SUN_VERDICT[date] = "match"
+        return expect + _lbl("su_data").format(zones=zones_txt, best=best)
+    if not misses:
+        _SUN_VERDICT[date] = "match"
+        key = "su_match_all" if (wn and ws and wn == ws) else "su_match"
+        return expect + _lbl(key).format(zones=zones_txt, best=best)
+    miss_txt = (", " if _lang() == "de" else ", ").join(_lbl(f"su_miss_{side}_{'cloudy' if o == 'overcast' else 'sunny'}") for side, o in misses)
+    key = "su_contra" if len(misses) == len(judged) else "su_partial"
+    _SUN_VERDICT[date] = "contra" if key == "su_contra" else "partial"
+    return expect + _lbl(key).format(zones=zones_txt, best=best, miss=miss_txt)
+
+
+_SUN_VERDICT: dict = {}
+
+
+def _sonne_numbers(wetterlage: dict, date: str) -> dict:
+    wl = wetterlage or {}
+    tz = ((_per_day_index(wl.get("thermik_zonen"), [date]).get(date) or {}).get("zones") or {})
+    zones = {z: v for z, v in tz.items() if v and v.get("sun_share") is not None}
+    if not zones:
+        return {}
+    return {
+        "lbl_sun": _lbl("su_lbl_sun"), "lbl_low": _lbl("su_lbl_low"), "lbl_high": _lbl("su_lbl_high"),
+        "zones": [{"name": _zone_name(z),
+                   "sun": f"{int(round(100 * (v.get('sun_share') or 0)))} %",
+                   "low": (f"{int(v['low_cloud_pct'])} %" if isinstance(v.get("low_cloud_pct"), (int, float)) else "—"),
+                   "high": (f"{int(v['mid_high_pct'])} %" if isinstance(v.get("mid_high_pct"), (int, float)) else "—")}
+                  for z, v in zones.items()],
+    }
+
+
+def _thermik_numbers(wetterlage: dict, date: str) -> dict:
+    """Die Zahlen zum Thermik-Block, sauber formatiert und getrennt vom
+    Fliesstext: Basis-Spanne, Steig-Spanne, Beginn, dazu je Zone ein Chip."""
+    wl = wetterlage or {}
+    tz = ((_per_day_index(wl.get("thermik_zonen"), [date]).get(date) or {}).get("zones") or {})
+    zones = {z: v for z, v in tz.items() if v}
+    if not zones:
+        return {}
+    bases = [v["base_m"] for v in zones.values() if isinstance(v.get("base_m"), (int, float))]
+    climbs = [v["climb_ms"] for v in zones.values() if isinstance(v.get("climb_ms"), (int, float))]
+    starts = [v["start_hour"] for v in zones.values() if isinstance(v.get("start_hour"), int)]
+    def rng(vals, fmt):
+        if not vals:
+            return "—"
+        lo, hi = min(vals), max(vals)
+        return fmt(lo) if lo == hi else f"{fmt(lo)}–{fmt(hi)}"
+    return {
+        "base": rng(bases, lambda v: f"{int(v)}") + " m",
+        "climb": rng(climbs, lambda v: f"{v:.1f}") + " m/s",
+        "start": (f"{min(starts):02d}" + _lbl("th_unit_h")) if starts else "",
+        "zones": [{"name": _zone_name(z),
+                   "base": (f"{int(v['base_m'])} m" if isinstance(v.get("base_m"), (int, float)) else "—"),
+                   "climb": (f"{v['climb_ms']:.1f} m/s" if isinstance(v.get("climb_ms"), (int, float)) else "—")}
+                  for z, v in zones.items()],
+        "lbl_base": _lbl("th_lbl_base"), "lbl_climb": _lbl("th_lbl_climb"), "lbl_from": _lbl("th_lbl_from"),
+    }
+
+
+def _konv_by_zone(wetterlage: dict, date: str) -> dict:
+    """Gewitter/Ueberentwicklung je ZONE (nicht je Region): erste Stunde.
+    'Locarnese / Bellinzonese' neben 'Tessin' zu nennen, ist doppelt."""
+    kv = ((_per_day_index((wetterlage or {}).get("konvektion"), [date]).get(date) or {}).get("zones") or {})
+    out = {}
+    for z, v in kv.items():
+        th = [str(h)[:2] for _n, h in (v or {}).get("gewitter") or []]
+        od = [str(h)[:2] for _n, h in (v or {}).get("ueberentwicklung") or []]
+        out[z] = {"thunder_hour": min(th) if th else None, "overdev_hour": min(od) if od else None}
+    return out
+
+
+def _labilitaet_fazit(wetterlage: dict, date: str) -> str:
+    """Block 5: was die Synoptik an Labilitaet erwarten laesst (Luftmasse,
+    Druck) und was die Prognosedaten zeigen (CAPE je Zone in Worten, Gewitter
+    mit Beginn, Ueberentwicklung). Leer ohne Zonen-Felder."""
+    wl = wetterlage or {}
+    pz = ((_per_day_index(wl.get("precip_zones"), [date]).get(date) or {}).get("zones") or {})
+    kv = ((_per_day_index(wl.get("konvektion"), [date]).get(date) or {}).get("zones") or {})
+    if not pz and not kv:
+        return ""
+    lang = _lang()
+    joiner = " und " if lang == "de" else " and "
+    # --- Erwartung ---
+    flow = _per_day_index(wl.get("flow_overhead"), [date]).get(date) or {}
+    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
+    sector = _lbl("lg_sector_" + abbr) if abbr else ""
+    if abbr in ("S", "SW", "SE"):
+        air = _lbl("lb_air_humid").format(sector=sector)
+    elif abbr in ("N", "NW"):
+        air = _lbl("lb_air_cool").format(sector=sector)
+    else:
+        air = _lbl("lb_air_neutral").format(sector=sector)
+    regime, tkey = _lage_regime(wl, date)
+    if regime == "hoch":
+        press = _lbl("lb_press_cap").format(regime=_lbl("lb_regime_hoch"))
+    elif tkey == "up":
+        press = _lbl("lb_press_up")
+    elif regime == "tief" or tkey == "down":
+        press = _lbl("lb_press_low")
+    else:
+        press = _lbl("lb_press_none")
+    expect = _lbl("lb_expect").format(air=air, press=press)
+    # --- Daten ---
+    def grade(cape):
+        return ("strong" if cape >= 1000 else "mod" if cape >= 400 else "light" if cape >= 150 else None)
+    labile = {z: grade(((pz.get(z) or {}).get("day") or {}).get("max_cape") or 0) for z in config.SYNOPTIC_ZONES}
+    labile = {z: g for z, g in labile.items() if g}
+    konv = _konv_by_zone(wl, date)
+    zone_prep = (lambda z: (("am " if z == "alpennordhang" else ("im " if _ZONE_ARTICLE_DAT["de"].get(z) else "in ")) + _zone_name(z))
+                 if lang == "de" else ("in " + _ZONE_ARTICLE_DAT["en"].get(z, "") + _zone_name(z)))
+    thunder = [_lbl("lb_thunder_at").format(zone=zone_prep(z), hour=konv[z]["thunder_hour"])
+               for z in config.SYNOPTIC_ZONES if konv.get(z, {}).get("thunder_hour")]
+    # Ueberentwicklung: bei labilen Zonen in die Klammer, sonst als eigener Zusatz
+    od_extra = [_lbl("lb_od_zone").format(zone=zone_prep(z), hour=konv[z]["overdev_hour"])
+                for z in config.SYNOPTIC_ZONES
+                if konv.get(z, {}).get("overdev_hour") and z not in labile and not konv[z].get("thunder_hour")]
+    ov = (", " + ", ".join(od_extra)) if od_extra else ""
+    north_capped = ("alpennordhang" not in labile and (regime == "hoch" or tkey == "up")
+                    and (labile or thunder))
+    north = _lbl("lb_north_capped") if north_capped else ""
+    # Urteil: Erwartung (labil? gedeckelt?) gegen Daten (labil irgendwo? Norden?)
+    # feuchte Suedluft UND kuehle Nord(west)luft lassen Labilitaet erwarten (Sueden bzw. Nordhang)
+    expect_labile = abbr in ("S", "SW", "SE", "N", "NW") or regime == "tief" or tkey == "down"
+    expect_cap = regime == "hoch" or tkey == "up"
+    obs_labile = bool(thunder or labile)
+    obs_north = "alpennordhang" in labile or any("Alpennordhang" in t for t in thunder)
+    if expect_labile != obs_labile:
+        verdict = "contra_labile" if obs_labile else "contra_stable"
+    elif expect_cap and obs_north:
+        verdict = "partial"
+    else:
+        verdict = "match" if obs_labile else "match_stable"
+    if thunder:
+        what = _lbl("lb_thunder").format(zones=joiner.join(thunder[:3]), overdev=ov, north=north)
+    elif labile:
+        top = max(labile.values(), key=lambda g: ["light", "mod", "strong"].index(g))
+        def _zl(z):
+            od = konv.get(z, {}).get("overdev_hour")
+            return _lbl("lb_zone_grade").format(zone=zone_prep(z), grade=_lbl("lb_grade_" + labile[z]),
+                                                od=_lbl("lb_od_in").format(hour=od) if od else "")
+        zones = joiner.join(_zl(z) for z in labile)
+        key = "lb_labile_only" if len(labile) < len(config.SYNOPTIC_ZONES) else "lb_labile_wide"
+        what = _lbl(key).format(zones=zones, grade=_lbl("lb_grade_" + top), overdev=ov, north=north)
+    else:
+        what = _lbl("lb_stable") + (ov if ov else "")
+    return expect + _lbl("lb_" + verdict).format(what=what)
+
+
+def _foehn_bise_fazit(wetterlage: dict, date: str) -> str:
+    """Block 3: was die Synoptik zu Foehn und Bise sagt (Druckgefaelle,
+    Hoehenwind) und ob die Prognosedaten es zeigen (Lee-Boeen, Nordostwind
+    im Mittelland). Leer, wenn der Kontext die Abgleich-Felder nicht hat."""
+    fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
+    claim, lee = fo.get("claim") or {}, fo.get("lee") or {}
+    sw = _per_day_index(wetterlage.get("starkwind_punkte"), [date]).get(date) or {}
+    bi = _per_day_index(wetterlage.get("bise"), [date]).get(date) or {}
+    bb = _per_day_index(wetterlage.get("bise_boden"), [date]).get(date) or {}
+    if not claim and not bb and not sw:
+        return ""
+    parts = []
+
+    # --- Foehn: Anspruch (Druckgefaelle) gegen die Lee-Station — ein Punkt, von
+    # dem wir wissen, dass er unten liegt (Zuerich fuer Suedfoehn, Lugano fuer
+    # Nordfoehn). Startplaetze taugen dafuer nicht: welcher im Tal liegt, wissen
+    # wir nicht.
+    side = "sued" if fo.get("sued_active") else "nord" if fo.get("nord_active") else None
+    if side:
+        dp = claim.get(f"delta_p_{side}_max_hpa")
+        gust = lee.get("gust_nord_max_kmh" if side == "sued" else "gust_sued_max_kmh") or 0
+        station = _lbl("fb_station_nord" if side == "sued" else "fb_station_sued")
+        wins = fo.get(f"{side}_windows") or {}
+        first = next((w for w in ("morning", "midday", "afternoon", "evening")
+                      if (wins.get(w) or {}).get("hours")), None)
+        windows = _lbl("fb_win_from").format(when=_lbl("hour_" + first)) if first else ""
+        key = "fb_foehn_yes" if gust >= 30 else "fb_foehn_aloft"
+        parts.append(_lbl(key).format(Side=_lbl("fb_side_" + side), station=station,
+                                      dp=(f"{dp:.0f}" if isinstance(dp, (int, float)) else "–"),
+                                      gust=int(gust), windows=windows))
+    else:
+        dps = [v for v in (claim.get("delta_p_sued_max_hpa"), claim.get("delta_p_nord_max_hpa"))
+               if isinstance(v, (int, float))]
+        # Starke Winde absolut, an einzelnen Prognosepunkten — mit Richtung,
+        # Hoehe, Stunde und Modell-Uneinigkeit; bewusst ohne "Foehntal"
+        strong = ""
+        g = sw.get("max_gust_kmh") or 0
+        if sw and g >= 40:
+            hour = int(sw.get("hour") or 12)
+            when = _lbl("hour_morning" if hour < 10 else "hour_midday" if hour < 14
+                        else "hour_afternoon" if hour < 18 else "hour_evening")
+            # Kein Modellvergleich in diesem Block (CH1/CH2-Differenz bleibt im
+            # Feld, wird hier aber nicht genannt)
+            models = ""
+            alt = sw.get("elevation_m")
+            strong = _lbl("fb_strong_some").format(
+                gust=int(g), dir=(_sector_word(sw["dir_deg"]) if sw.get("dir_deg") is not None else "–"),
+                spot=sw.get("spot", ""), alt=(int(alt) if isinstance(alt, (int, float)) else "–"),
+                when=when, models=models)
+        elif sw:
+            strong = _lbl("fb_strong_none")
+        if dps:
+            parts.append(_lbl("fb_foehn_no").format(dp=f"{max(dps):.0f}", strong=strong))
+        else:
+            parts.append(_lbl("fb_foehn_no_nodp").format(strong=strong))
+    # --- Bise ---
+    dp = bi.get("delta_p_hpa")
+    ddeg = bi.get("wind_700_dir_deg")
+    ne = isinstance(ddeg, (int, float)) and 30 <= ddeg <= 90
+    dp_ok = isinstance(dp, (int, float)) and dp >= 4
+    share, kmh = bb.get("share_ne"), bb.get("max_kmh") or 0
+    ground = isinstance(share, (int, float)) and share >= 0.2
+    sector = _lbl("lg_sector_" + _SECTOR_ABBR.get(bi.get("sector", ""), "")) if bi.get("sector") else (
+        _sector_word(ddeg) if isinstance(ddeg, (int, float)) else "")
+    dp_txt = f"{dp:+.0f}" if isinstance(dp, (int, float)) else "–"
+    # Bise nur erwaehnen, wenn sie ein Thema ist: aktiv, Nordostwind am Boden,
+    # oder der Hoehenwind hat eine Nord-/Ostkomponente. Bei Suedwest weiss
+    # jeder Pilot, dass keine Bise kommt.
+    ne_component = isinstance(ddeg, (int, float)) and (ddeg >= 330 or ddeg <= 120)
+    if not (bi.get("active") or ground or ne_component):
+        return " ".join(parts)
+    if bi.get("active"):
+        key = "fb_bise_yes" if ground else "fb_bise_yes_noground"
+        parts.append(_lbl(key).format(dp=dp_txt, kmh=int(kmh),
+                                      share=int(round(100 * (share or 0)))))
+    else:
+        if not dp_ok and not ne:
+            reason = _lbl("fb_reason_both").format(dp=dp_txt, sector=sector)
+        elif not dp_ok:
+            reason = _lbl("fb_reason_dp").format(dp=dp_txt)
+        else:
+            reason = _lbl("fb_reason_dir").format(sector=sector)
+        key = "fb_bise_no_ground" if ground else "fb_bise_no"
+        parts.append(_lbl(key).format(reason=reason, kmh=int(kmh)))
+    return " ".join(parts)
 
 
 def _foehn_text(wetterlage: dict, date: str) -> str:
@@ -1368,6 +2676,102 @@ def _week_line(wetterlage: dict, days: list) -> str:
 
 
 def _chain(wetterlage: dict, dates: list, date: str, fronts, passagen) -> dict:
+    chain = _chain_raw(wetterlage, dates, date, fronts, passagen)
+    _decorate_chain(chain, wetterlage, date)
+    return chain
+
+
+def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
+    """Status-Pille (ok / info / warn + Kurzlabel) und Fakten-Chips je Block —
+    die visuelle Schicht ueber den Saetzen. Alles aus Feldern, die die Bloecke
+    schon tragen; kein neuer Datenzugriff."""
+    wl = wetterlage or {}
+
+    def st(block, kind, label_key):
+        chain[block]["status"] = kind
+        chain[block]["status_label"] = _lbl(label_key)
+
+    # Fronten
+    sig, _ = _front_signature(wl, date)
+    passed = " " in (chain["fronts"].get("fazit") or "") and (
+        (chain["fronts"].get("fazit") or "").startswith(("Yesterday", "Gestern")))
+    hits = [a for a in ((wl.get("fronten") or {}).get("durchgaenge") or []) if a.get("tag") == date]
+    if sig:
+        st("fronts", "warn", "st_front_passes")
+    elif hits:
+        st("fronts", "info", "st_front_weak")
+    elif passed:
+        st("fronts", "info", "st_front_rear")
+    else:
+        st("fronts", "ok", "st_front_none")
+    fo = _per_day_index(wl.get("foehn"), [date]).get(date) or {}
+    sw = _per_day_index(wl.get("starkwind_punkte"), [date]).get(date) or {}
+    chain["fronts"]["facts"] = [
+        {"k": _lbl("fx_dwd"), "v": (_front_type(hits[0]["typ"]) if hits else "—")},
+        {"k": _lbl("fx_signature"), "v": (_lbl("fx_sig_yes") + " " + sig["hour"][:2] + "h") if sig else _lbl("fx_sig_no")},
+    ]
+    # Foehn / Bise
+    bi = _per_day_index(wl.get("bise"), [date]).get(date) or {}
+    if fo.get("sued_active") or fo.get("nord_active"):
+        st("foehn", "warn", "st_foehn_on")
+    elif bi.get("active"):
+        st("foehn", "warn", "st_bise_on")
+    elif (sw.get("max_gust_kmh") or 0) >= 40:
+        st("foehn", "info", "st_foehn_gusty")
+    else:
+        st("foehn", "ok", "st_foehn_off")
+    claim = fo.get("claim") or {}
+    dps = [v for v in (claim.get("delta_p_sued_max_hpa"), claim.get("delta_p_nord_max_hpa")) if isinstance(v, (int, float))]
+    chain["foehn"]["facts"] = [
+        {"k": _lbl("fx_dp"), "v": (f"{max(dps):.0f} hPa" if dps else "—")},
+        {"k": _lbl("fx_gust"), "v": (f"{int(sw['max_gust_kmh'])} km/h" if sw.get("max_gust_kmh") else "—")},
+    ]
+    # Hoehenwind
+    w = chain["wind"]
+    st("wind", {"stronger": "warn", "weaker": "info"}.get(w.get("verdict"), "ok"), "st_wind_" + (w.get("verdict") or "match"))
+    w["facts"] = [f for f in [
+        {"k": "700 hPa", "v": f"{w.get('arrow', '')} {w.get('sector', '')} {w.get('range') or w.get('speed') or ''}".strip()},
+        {"k": _lbl("fx_ground"), "v": (lambda m: m.group(0) if m else "")(
+            re.search(r"\d+(?:–\d+)? km/h", w.get("ground_range", "")))},
+        {"k": _lbl("fx_peak"), "v": f"{w.get('peak_region', '')} {w.get('peak_hour', '')}h".strip()} if w.get("peak_region") else None,
+    ] if f and f["v"]]
+    # Labilitaet
+    s_ = chain["stability"]
+    if s_.get("thunder"):
+        st("stability", "warn", "st_stab_thunder")
+    elif "(" in (s_.get("fazit") or "") and ("labil" in s_["fazit"] or "unstable" in s_["fazit"]):
+        st("stability", "info", "st_stab_labile")
+    else:
+        st("stability", "ok", "st_stab_stable")
+    s_["facts"] = [f for f in [
+        {"k": _lbl("fx_t850"), "v": s_.get("t850", "")} if s_.get("t850") else None,
+        {"k": _lbl("thunder"), "v": ", ".join(f"{_zone_name(z)} {v['thunder_hour']}h" for z, v in _konv_by_zone(wl, date).items() if v.get("thunder_hour"))}
+        if any(v.get("thunder_hour") for v in _konv_by_zone(wl, date).values()) else {"k": "", "v": _lbl("fx_thunder_none")},
+        {"k": _lbl("overdev"), "v": ", ".join(f"{_zone_name(z)} {v['overdev_hour']}h" for z, v in _konv_by_zone(wl, date).items() if v.get("overdev_hour"))}
+        if any(v.get("overdev_hour") for v in _konv_by_zone(wl, date).values()) else None,
+    ] if f]
+    # Thermik
+    th = chain.get("thermik") or {}
+    if th.get("num"):
+        climbs = [float(z["climb"].split()[0]) for z in th["num"].get("zones", []) if z.get("climb", "—") != "—"]
+        c = statistics.median(climbs) if climbs else 0
+        st("thermik", "ok" if c >= 2 else "info" if c >= 1 else "warn", "st_th_good" if c >= 2 else "st_th_mod" if c >= 1 else "st_th_weak")
+    # Sonne
+    so = chain.get("sonne") or {}
+    if so.get("fazit"):
+        v = _SUN_VERDICT.get(date, "match")
+        st("sonne", {"match": "ok", "partial": "info"}.get(v, "warn"), "st_sun_" + v)
+    # Modelle
+    md = chain.get("modelle") or {}
+    if md.get("fazit"):
+        v = md.get("verdict", "agree")
+        st("modelle", {"agree": "ok", "partial": "info"}.get(v, "warn"), "st_md_" + v)
+        md["facts"] = [{"k": _lbl("md_var_" + k), "v": ("✓" if k in md.get("agree", []) else "✗")}
+                       for k in ("wind", "rain", "cloud")]
+    return None
+
+
+def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> dict:
     syn = _synoptik_today(wetterlage, dates, date) or {}
     strip = _strip_synoptik(wetterlage, dates).get(date, {})
     note = syn.get("pressure_note", "")
@@ -1375,6 +2779,7 @@ def _chain(wetterlage: dict, dates: list, date: str, fronts, passagen) -> dict:
         note = note.replace(de, _lbl(f"trend_{de}"))
     return {
         "lage": {
+            "fazit": _lage_fazit(wetterlage, date),
             "label": syn.get("lage", ""),
             "centers": syn.get("centers", []),
             "pressure": syn.get("pressure_msl", ""),
@@ -1389,9 +2794,11 @@ def _chain(wetterlage: dict, dates: list, date: str, fronts, passagen) -> dict:
                       or _situation_sentences(((wetterlage.get("llm_overview") or {})
                                                .get("short") or "").strip(), date, 1)),
         "day_hint": _day_summaries(wetterlage, dates).get(date, ""),
-        "fronts": {"lines": _front_lines(fronts, passagen, date),
+        "fronts": {"fazit": _front_fazit(fronts, passagen, dates, date, wetterlage),
+                   "lines": _front_lines(fronts, passagen, date),
                    "zugbahn": _zugbahn_text(wetterlage, date)},
         "foehn": {"foehn": _foehn_text(wetterlage, date), "bise": _bise_text(wetterlage, date),
+                  "fazit": _foehn_bise_fazit(wetterlage, date),
                   "flags": strip.get("flags", [])},
         "wind": {
             "arrow": strip.get("wind_arrow", ""), "speed": strip.get("wind_speed", ""),
@@ -1403,8 +2810,14 @@ def _chain(wetterlage: dict, dates: list, date: str, fronts, passagen) -> dict:
             "meaning": _lbl("wind_meaning"),
             # Spitze auf Regionsebene — ohne sie wirkt das Mittel harmlos
             "regional": _aloft_regional_text(wetterlage, date),
+            # Spanne der Regionsspitzen + Fazit gegen die Synoptik (ersetzt das Mittel)
+            **_wind_range_block(wetterlage, date, strip),
         },
+        "thermik": {"fazit": _thermik_fazit(wetterlage, date), "num": _thermik_numbers(wetterlage, date)},
+        "sonne": {"fazit": _sonne_fazit(wetterlage, date), "num": _sonne_numbers(wetterlage, date)},
+        "modelle": _modelle_block(wetterlage, date),
         "stability": {
+            "fazit": _labilitaet_fazit(wetterlage, date),
             "t850": syn.get("t850", ""), "t850_note": syn.get("t850_note", ""),
             "thunder": syn.get("thunder", []), "overdev": syn.get("overdev", []),
             "confidence": syn.get("confidence", ""),
@@ -1567,14 +2980,57 @@ def _hazard_tomorrow_text(check: dict) -> str:
     return _lbl("hz_tm_" + tm["trend"])
 
 
-def _hazard_code_text(topic: str, check: dict, timing: bool = True) -> str:
+def _hazard_cause(topic: str, check: dict, wetterlage: dict, date: str) -> str:
+    """Die synoptische Ursache der Warnung als Halbsatz — dasselbe Prinzip wie
+    in der Kette: die Warnung kommt aus den Daten, die Ursache aus der Lage."""
+    wl = wetterlage or {}
+    flow = _per_day_index(wl.get("flow_overhead"), [date]).get(date) or {}
+    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
+    sector = _lbl("lg_sector_" + abbr) if abbr else ""
+    if topic == "RAIN":
+        sig, _ = _front_signature(wl, date)
+        if sig:
+            return _lbl("hz_cause_rain_front")
+        zones = set(check.get("zones") or [])
+        if abbr in ("S", "SW", "SE") and "alpennordhang" not in zones:
+            return _lbl("hz_cause_rain_south").format(sector=sector)
+        if abbr in ("N", "NW", "W") and "alpennordhang" in zones:
+            return _lbl("hz_cause_rain_north").format(sector=sector)
+        return _lbl("hz_cause_rain_flow").format(sector=sector) if sector else ""
+    if topic == "WIND":
+        wp = _per_day_index(wl.get("wind_pattern"), [date]).get(date) or {}
+        drivers = {(wp.get(side) or {}).get("wind_driver") for side in ("alpennord", "alpensued")}
+        if "hoehenwind" in drivers and sector:
+            return _lbl("hz_cause_wind_aloft").format(sector=sector)
+        return _lbl("hz_cause_wind_gusts")
+    if topic == "FOEHN":
+        fo = _per_day_index(wl.get("foehn"), [date]).get(date) or {}
+        side = "sued" if fo.get("sued_active") else "nord"
+        dp = (fo.get("claim") or {}).get(f"delta_p_{side}_max_hpa")
+        return _lbl("hz_cause_foehn").format(dp=f"{dp:.0f}") if isinstance(dp, (int, float)) else ""
+    if topic == "THUNDER":
+        regime, tkey = _lage_regime(wl, date)
+        zones = set(check.get("zones") or [])
+        cap = _lbl("hz_cause_thunder_cap") if (regime == "hoch" or tkey == "up") and "alpennordhang" not in zones else ""
+        return _lbl("hz_cause_thunder").format(cap=cap)
+    if topic == "BISE":
+        bi = _per_day_index(wl.get("bise"), [date]).get(date) or {}
+        dp = bi.get("delta_p_hpa")
+        return _lbl("hz_cause_bise").format(dp=f"{dp:+.0f}") if isinstance(dp, (int, float)) else ""
+    return ""
+
+
+def _hazard_code_text(topic: str, check: dict, timing: bool = True, cause: str = "") -> str:
     """Der Code-Satz mit Zahl je Gefahr — steht immer, auch ohne KI-Satz.
     Reihenfolge: Ausmass/Zahl, Tagesverlauf, Boeen. NUR dieser Tag.
 
     timing=False: Zeitfenster und Verlauf weglassen — dann nennt sie der
     KI-Satz direkt darueber schon (geprueft auf zu spaeten Beginn), und die
     Zeile wiederholte sie nur (User 16.09.2026: zu viel Text)."""
-    parts = [_hazard_base_text(topic, check)]
+    base = _hazard_base_text(topic, check)
+    if cause:
+        base = base.rstrip(".") + " " + cause
+    parts = [base]
     if timing:
         parts += [_hazard_windows_text(check), _hazard_course_text(check)]
     parts.append(_hazard_gust_text(check))
@@ -1647,7 +3103,8 @@ def _ch_warnings(wetterlage: dict, date: str) -> dict:
         items.append({"topic": topic, "label": label, "severity": c.get("level", "warn"),
                       "sev_label": _lbl("sev_" + c.get("level", "warn")),
                       "ki_text": ki.get(topic, ""),
-                      "code_text": _hazard_code_text(topic, c, timing=not ki.get(topic))})
+                      "code_text": _hazard_code_text(topic, c, timing=not ki.get(topic),
+                                                     cause=_hazard_cause(topic, c, wetterlage, date))})
     items.sort(key=lambda e: e["severity"] != "stop")
     # "entries", nicht "items": Jinja loest w.items auf die dict-Methode auf
     return {"checks": checks, "entries": items, "any": bool(items),
@@ -1712,8 +3169,14 @@ def _map_payload(focus_date: str, dates: list) -> dict | None:
 
 
 def _load_passagen() -> dict | None:
-    cands = sorted(glob.glob(str(ROOT / "validation" / "fronten" / "aussagen" / "passagen_*.json")))
-    return _load_json(Path(cands[-1])) if cands else None
+    """Prognose-Durchgaenge (letzte Laeufe uebereinandergelegt, siehe
+    engine.synoptic_context.merge_passagen_runs) plus die tatsaechlichen
+    Durchgaenge der letzten 36 h aus der DWD-Analyse."""
+    from engine.synoptic_context import merge_passagen_runs, load_ist_durchgaenge
+    aussagen, datei = merge_passagen_runs()
+    if datei is None:
+        return None
+    return {"aussagen": aussagen, "vergangen": load_ist_durchgaenge(), "datei": datei}
 
 
 # ----------------------------------------------------------------------
@@ -1721,7 +3184,7 @@ def _load_passagen() -> dict | None:
 # ----------------------------------------------------------------------
 
 def build_v3_context(ctx: dict, briefing_data: dict, subscriber: dict,
-                     focus_date: str = "") -> dict:
+                     focus_date: str = "", top_n_regions_per_day: int = 0) -> dict:
     days = ctx.get("days") or []
     dates = [d.get("date", "") for d in days]
     raw_days = {d.get("date", ""): d for d in briefing_data.get("days", []) or []}

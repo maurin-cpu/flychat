@@ -26,6 +26,9 @@
   /* Hoeher als die Minikarte (2.35:1): im Mail-Bild soll das Festland von
      Iberien bis zur Ostsee Platz haben, nicht nur ein flacher Streifen. */
   .bf-synoptic-map { aspect-ratio: 1.6 / 1; }
+  /* Grundkarte als leise Buehne: Laender- und Staedtenamen duerfen nicht im
+     selben Kontrast stehen wie Isobaren, Wind und Fronten. */
+  .bf-synoptic-map .leaflet-tile-pane { opacity: 0.55; filter: grayscale(0.35); }
 </style>
 <script>
   // Diese Seite laeuft ohne base.html — der Carto-Helfer muss also hier stehen.

@@ -104,6 +104,33 @@ def _snapshot_app_map(base_url: str, day_idx: int, png_path: Path,
     return (png_path if ok else None), stand
 
 
+def _snapshot_local_map(base_url: str, day_idx: int, png_path: Path,
+                        iso_date: str = "") -> tuple[Path | None, str]:
+    """Dieselbe Karte, aber aus einer LOKAL laufenden App fotografiert — node
+    mit playwright-core gegen das installierte Chrome. Damit braucht die
+    Vorschau keinen Deploy, um die aktuelle Karte zu zeigen."""
+    url = f"{base_url.rstrip('/')}/synoptik/karte?day={day_idx}"
+    png_path.unlink(missing_ok=True)
+    try:
+        r = subprocess.run(
+            ["node", str(_SNAPSHOT_JS), url, str(png_path), "960", iso_date],
+            cwd=str(ROOT), capture_output=True, timeout=180, check=False)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"WARN: lokaler Karten-Screenshot fehlgeschlagen: {e}", file=sys.stderr)
+        return None, ""
+    if r.returncode != 0:
+        print("WARN: lokaler Karten-Screenshot fehlgeschlagen:" + chr(10) + "  "
+              + r.stderr.decode(errors="replace").strip()[-400:], file=sys.stderr)
+        return None, ""
+    stand = ""
+    try:
+        stand = json.loads(r.stdout.decode().strip().splitlines()[-1]).get("stand", "")
+    except (IndexError, ValueError):
+        pass
+    ok = png_path.exists() and png_path.stat().st_size > 0
+    return (png_path if ok else None), stand
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--regions", default=",".join(DEFAULT_REGIONS),
@@ -120,6 +147,11 @@ def main() -> int:
                          "YYYY-MM-DD oder Index 0..n. Default: heute. Nuetzlich, "
                          "weil ein Tag ohne Einschaetzungssaetze im Cache nichts "
                          "ueber das Layout aussagt.")
+    ap.add_argument("--lokal-karte", default="",
+                    help="Karten-Screenshot LOKAL statt auf dem Server: Basis-URL "
+                         "einer laufenden lokalen App, z.B. http://localhost:5001 . "
+                         "Braucht node + playwright-core (Chrome-Kanal). Noetig, "
+                         "solange /synoptik/karte nicht deployt ist.")
     ap.add_argument("--synoptik", default="",
                     help="JSON aus scripts/preview_synoptik_zonen.py: dessen "
                          "llm_overview_neu ersetzt den Wetterlage-Text aus dem "
@@ -204,9 +236,14 @@ def main() -> int:
         map_png, map_stand = None, ""
         day_idx = (date.fromisoformat(ctx["v3_focus_date"]) - date.today()).days
         if 0 <= day_idx < int(config.FORECAST_DAYS):
-            map_png, map_stand = _snapshot_app_map(config.BASE_URL, day_idx,
-                                                   out_dir / "synoptik_karte.png",
-                                                   ctx["v3_focus_date"])
+            if args.lokal_karte:
+                map_png, map_stand = _snapshot_local_map(
+                    args.lokal_karte, day_idx, out_dir / "synoptik_karte.png",
+                    ctx["v3_focus_date"])
+            else:
+                map_png, map_stand = _snapshot_app_map(
+                    config.BASE_URL, day_idx, out_dir / "synoptik_karte.png",
+                    ctx["v3_focus_date"])
         else:
             print(f"WARN: Fokus-Tag {ctx['v3_focus_date']} liegt nicht im App-Fenster "
                   f"(heute + {config.FORECAST_DAYS} Tage) - keine Karte", file=sys.stderr)

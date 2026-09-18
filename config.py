@@ -1264,6 +1264,15 @@ POSTHOG_UI_HOST = os.environ.get("POSTHOG_UI_HOST", "https://eu.posthog.com").st
 # Kacheln werden wie bisher ohne Key geladen, also mit Wasserzeichen.
 CARTO_API_KEY   = os.environ.get("CARTO_API_KEY", "").strip()
 
+# Morgenbriefing-Mail: "v3" = Analyse-Kette (docs/BRIEFING.md, seit 19.09.2026),
+# "v2" = altes Layout (templates/email/briefing.html). Umschaltbar ohne Deploy
+# ueber WINGCAST_BRIEFING_VERSION, falls v3 im Postfach Probleme macht.
+BRIEFING_VERSION = os.environ.get("WINGCAST_BRIEFING_VERSION", "v3").strip().lower()
+# Wo die laufende App fuer den Karten-Screenshot erreichbar ist (Playwright
+# auf dem Server; scripts/synoptik_snapshot.js). Leer = kein Kartenbild.
+BRIEFING_MAP_URL = os.environ.get("WINGCAST_BRIEFING_MAP_URL",
+                                  f"http://127.0.0.1:{os.environ.get('PORT', '5000')}").strip()
+
 # Infomaniak SMTP (Standardwerte aus ihrer Doku; Port 465 SSL oder 587 STARTTLS)
 SMTP_HOST       = os.environ.get("SMTP_HOST", "mail.infomaniak.com")
 SMTP_PORT       = int(os.environ.get("SMTP_PORT", "465"))

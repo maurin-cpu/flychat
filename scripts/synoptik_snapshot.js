@@ -10,7 +10,15 @@
 //   node scripts/synoptik_snapshot.js <url> <png> [breite] [datum]
 //   ssh ... "cd /home/deploy/flychat && node - <url> <png>" < synoptik_snapshot.js
 // Ausgabe: eine JSON-Zeile {"ok": true, "stand": "<Stand-Text der Karte>"}.
-const { chromium } = require("playwright");
+// Server: playwright mit eigenem Chromium. Lokaler Dev-PC: playwright-core
+// gegen das installierte Chrome (channel), damit kein 150-MB-Browser noetig ist.
+let chromium, launchOpts = {};
+try {
+  chromium = require("playwright").chromium;
+} catch (e) {
+  chromium = require("playwright-core").chromium;
+  launchOpts = { channel: "chrome" };
+}
 
 const [url, out, width = "960", date = ""] = process.argv.slice(2);
 if (!url || !out) {
@@ -19,7 +27,7 @@ if (!url || !out) {
 }
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(launchOpts);
   try {
     const page = await browser.newPage({
       viewport: { width: parseInt(width, 10), height: 900 },

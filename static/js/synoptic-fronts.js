@@ -33,8 +33,8 @@
 
   // exakt die Badge-Farben (.syn-center-icon--hoch / --tief) + Violet-600
   var COLORS = { kalt: "#1d4ed8", warm: "#dc2626", okklusion: "#7c3aed" };
-  var LINE_OPACITY = 0.82;
-  var HALO = "rgba(255, 255, 255, 0.5)";
+  var LINE_OPACITY = 0.74;
+  var HALO = "rgba(255, 255, 255, 0.34)";
   var LABEL_KEYS = {
     kalt: ["js.syn.front_cold", "Cold front"],
     warm: ["js.syn.front_warm", "Warm front"],
@@ -42,7 +42,7 @@
   };
   // Masse bei scale 1 (Briefing-Karte); die grosse Synoptik-Karte skaliert hoch.
   // Linie knapp ueber den Haupt-Isobaren (1.1 px), Symbole klein und luftig.
-  var BASE = { line: 1.7, halo: 4.5, size: 4.5, spacing: 36 };
+  var BASE = { line: 1.45, halo: 3.4, size: 3.8, spacing: 46 };
   var PANE = "wcFronts";
 
   var _cache = {};       // ts -> Promise(Antwort oder null)
@@ -135,8 +135,17 @@
     }
     return out;
   }
+  // Kraeftig glaetten: dreimal entzittern, viermal Eckenschnitt (naehert sich
+  // einer B-Spline — die Kurve laeuft NICHT mehr durch jeden Stuetzpunkt,
+  // sondern schwingt wie eine Isobare), dann Spline fuer die Rundung. Die
+  // Front weicht dabei an scharfen Knicken bis ~15 px vom Polygonzug ab —
+  // unter der Unschaerfe der DWD-Vektorisierung.
   function smooth(pts) {
-    return spline(chaikin(chaikin(denoise(pts))));
+    // Kein Spline mehr obendrauf: nach vier Eckenschnitten liegen die Punkte
+    // ~5 px auseinander, und Leaflet rundet jeden auf ganze Pixel — ein
+    // dichter Spline wird dadurch zum Mikro-Zickzack (perlige Linie).
+    var p = denoise(denoise(denoise(pts)));
+    return chaikin(chaikin(chaikin(chaikin(p))));
   }
 
   function triangle(cx, cy, ex, ey, mx, my, s) {
@@ -268,13 +277,13 @@
       // Farbe — so ueberdeckt kein Saum eine benachbarte Front.
       drawn.forEach(function (d) {
         L.polyline(d.lls, { pane: PANE, color: HALO, weight: dims.halo, opacity: 1,
-                            lineCap: "round", lineJoin: "round", smoothFactor: 1,
+                            lineCap: "round", lineJoin: "round", smoothFactor: 0.7,
                             interactive: false }).addTo(group);
       });
       drawn.forEach(function (d) {
         L.polyline(d.lls, { pane: PANE, color: d.color, weight: dims.line,
                             opacity: LINE_OPACITY, lineCap: "round", lineJoin: "round",
-                            smoothFactor: 1, interactive: false }).addTo(group);
+                            smoothFactor: 0.7, interactive: false }).addTo(group);
         d.polys.forEach(function (poly) {
           addPoly(poly, { stroke: false, fillColor: d.color, fillOpacity: LINE_OPACITY });
         });

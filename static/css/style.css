@@ -4738,7 +4738,16 @@ body.overlay-open {
 }
 .wc-fronts-legend[hidden] { display: none; }
 .wc-fronts-legend--card { top: 12px; right: 12px; width: 172px; }
-.wc-fronts-legend--compact { left: 12px; bottom: 12px; }
+.wc-fronts-legend--compact {
+  right: 10px;
+  bottom: 10px;
+  padding: 5px 9px 4px;
+  background: rgba(255, 255, 255, 0.58);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: none;
+  font-weight: 500;
+}
+.wc-fronts-legend--compact .wc-fronts-legend-title { margin-bottom: 2px; }
 /* auf /synoptik unter die Druck-/Wind-Legende (172 px breit, ~135 px hoch) */
 .syn-map-wrap .wc-fronts-legend--card,
 #synMap .wc-fronts-legend--card { top: 152px; }

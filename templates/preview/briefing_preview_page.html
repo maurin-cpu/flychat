@@ -172,6 +172,21 @@
   .step .num .hot{color:var(--danger); font-weight:600} .step .num .warn{color:var(--accent); font-weight:600} .step .num .k{color:var(--muted)}
   .step p{margin:var(--s1) 0 0; font-size:16px; line-height:1.55; color:var(--text-2); max-width:62ch}
   .step p em{font-style:normal; color:var(--text); font-weight:600}
+  /* ---- Ketten-Feinschliff: Status-Pille, Icon, Fakten-Chips ---- */
+  .step .h .ico{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; color:var(--primary); flex:none}
+  .step .tag{margin-left:auto; display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:100px; font:600 11px/1.2 var(--mono); letter-spacing:.04em; text-transform:uppercase; white-space:nowrap}
+  .step .tag::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor}
+  .step .tag.ok{color:#166534; background:#dcfce7} .step .tag.info{color:var(--primary); background:var(--primary-light)} .step .tag.warn{color:#9a3412; background:#ffedd5}
+  @media (prefers-color-scheme: dark){ .step .tag.ok{color:#86efac; background:#0f2a1a} .step .tag.warn{color:#fdba74; background:#3a1f0b} }
+  .step .facts{display:flex; flex-wrap:wrap; gap:6px 8px; margin:2px 0 var(--s2)}
+  .step .fact{display:inline-flex; align-items:baseline; gap:6px; padding:4px 10px; border-radius:8px; background:var(--surface-2); border:1px solid var(--border); font:500 13px/1.3 var(--mono); color:var(--text)}
+  .step .fact .k{color:var(--muted); font-size:11px; letter-spacing:.04em; text-transform:uppercase}
+  .step .fact.hot{border-color:var(--danger); color:var(--danger)}
+  .step .zones{display:flex; flex-wrap:wrap; gap:6px 10px; margin:0 0 var(--s2); font:13px/1.4 var(--mono); color:var(--muted)}
+  .step .zones span b{color:var(--text); font-weight:500}
+  .step .bar{position:relative; display:inline-block; width:64px; height:6px; border-radius:3px; background:var(--border); vertical-align:middle; margin-left:6px; overflow:hidden}
+  .step .bar i{position:absolute; inset:0 auto 0 0; background:var(--accent); border-radius:3px}
+  .step p.v{color:var(--text-2)} .step p.v em{color:var(--text)}
   .centers{display:flex; gap:var(--s2); flex-wrap:wrap; margin-top:var(--s2)}
   .centers span{display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-sm); padding:5px 10px 5px 6px; font:500 14px/1 var(--mono)}
   .centers i{width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font:700 11px/1 var(--sans); font-style:normal; color:#fff}
@@ -233,26 +248,17 @@
   <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></symbol>
   <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-front" viewBox="0 0 24 24"><path d="M3 17c3-6 6-6 9-6s6 0 9-6"/><path d="M8 11l-1-3M13 11l1-3M18 6l1-3"/></symbol>
+  <symbol id="i-foehn" viewBox="0 0 24 24"><path d="M3 20 9 8l3 6 3-9 6 15Z"/><path d="M14 4h7M15 8h5"/></symbol>
+  <symbol id="i-wind" viewBox="0 0 24 24"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h9a2 2 0 1 1-2 2"/></symbol>
+  <symbol id="i-stab" viewBox="0 0 24 24"><path d="M7 17a5 5 0 0 1 0-10 6 6 0 0 1 11.5 2A4 4 0 0 1 18 17H7Z"/><path d="m12 17-2 5M15 17l-1 3"/></symbol>
+  <symbol id="i-therm" viewBox="0 0 24 24"><path d="M12 22c-4-4-4-8 0-12 4 4 4 8 0 12Z"/><path d="M12 10V2M8 6l4-4 4 4"/></symbol>
+  <symbol id="i-models" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16M15 4v16"/></symbol>
 </svg>
 <div class="wrap">
 
-  <div class="pagehead">
-    <p class="eyebrow">Wingcast · Briefing-Vorschau v3 · echte Cache-Daten</p>
-    <h1>Das Morgenbriefing, wie ein Pilot denkt</h1>
-    <p>Zuerst die Woche als Bild, dann der Tag entlang der Analyse-Kette:
-       Lage → Fronten → Föhn/Bise → Höhenwind → Labilität → deine Regionen.
-       Keine Spot-Empfehlung — gezählt wird, wie viele Spots je Region tragen.</p>
-    <div class="stand">
-      Datenstand {{ analyses_at[:16]|replace('T', ' ') if analyses_at else '—' }}
-      &nbsp;·&nbsp; {{ v3_strip|length }} Tage &nbsp;·&nbsp; {{ v3_abo_count }} Abo-Regionen von {{ v3_ch_count }}
-      &nbsp;·&nbsp; Fokus {{ v3_focus_date }}{% if not v3_focus_is_today %} (nicht heute){% endif %}
-    </div>
-  </div>
-  <div class="srclegend">
-    <span class="src code">Code</span> {{ v3_labels.legend_code }}
-    <span class="src ki">KI</span> {{ v3_labels.legend_ki }}
-  </div>
-
+  {# Kein Seitenkopf, keine Code/KI-Legende: die Vorschau zeigt nur, was
+     das Mail am Ende zeigt. Datenstand und Fokus stehen in der Konsole. #}
   <div class="push">
     <div class="appicon">w</div>
     <div class="body">
@@ -291,7 +297,7 @@
     {# ═══════════ SEKTION 1 — Woche als Bild ═══════════ #}
     <div class="chapter"><span class="q">{{ v3_labels.question }} 1</span><span class="t">{{ v3_labels.q1_long }}</span></div>
     <div class="block">
-      <p class="label">{{ v3_labels.days_ahead }} <span class="src code">Code</span></p>
+      <p class="label">{{ v3_labels.days_ahead }}</p>
       <div class="week" style="grid-template-columns:repeat({{ v3_strip|length }},1fr);">
         {% for d in v3_strip %}
         <div class="day{% if d.is_focus %} focus{% endif %}">
@@ -305,7 +311,7 @@
           <div class="syn">
             {{ d.pressure }}<br>
             {% if d.wind_sector %}<span class="w{% if d.wind_hot %} hot{% endif %}"><span class="arr">{{ d.wind_arrow }}</span> {{ d.wind_sector }} {{ d.wind_strength }}</span>{% endif %}
-            <br>{% if d.notable %}<b>{{ d.notable }}</b>{% else %}<span class="nw">{{ v3_labels.no_warning }}</span>{% endif %}
+            {# keine Auffaelligkeits-Zeile ("Schauer ab 07h" / "keine Warnung") auf der Kachel #}
           </div>
           {# Regionen gruppiert: Rating 4-5 / 1-3 je Sicher oder Vorsicht, Nicht sicher
              separat — Status-Woerter der App. Ab 12 Regionen: 1-3 und darunter als Namenszeile. #}
@@ -328,7 +334,7 @@
           <div class="cnt">
             <span class="ch">{{ v3_labels.ch_context }} {{ d.ch.hi_safe }}/{{ d.ch.total }} · 4–5 {{ t('tier.green') }}</span>
           </div>
-          {% if d.hint %}<div class="hint">{{ d.hint }}</div>{% endif %}
+          {# kein Tages-Hinweis auf der Kachel: national gilt nicht fuer die Regionen darunter #}
         </div>
         {% endfor %}
       </div>
@@ -339,7 +345,7 @@
     <div class="chapter"><span class="q">{{ v3_labels.question }} 2</span><span class="t">{{ v3_labels.q2_long }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}</span></div>
 
     <div class="block">
-      <p class="label">{{ v3_labels.map_title }} <span class="src code">Code</span></p>
+      <p class="label">{{ v3_labels.map_title }}</p>
       {# Die Karte der App als Bild (Kopfzeile, Druckbaender, Isobaren, H/T,
          Stand) — sie steht ohne JavaScript da, wie spaeter in der Mail. #}
       {% if v3_map_img %}
@@ -355,49 +361,96 @@
             {% if v3_chain.stability.confidence %}<span class="conf">{{ v3_labels.confidence }} {{ v3_chain.stability.confidence }}</span>{% endif %}</div>
           <div class="num">{{ v3_chain.lage.pressure or '—' }} <span class="k">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}</span></div>
           {% if v3_chain.lage.centers %}<div class="centers">{% for c in v3_chain.lage.centers %}<span><i class="{% if c.is_high %}h{% else %}t{% endif %}">{{ c.type[0] }}</i>{{ c.region }} <small>{{ c.msl }} hPa</small></span>{% endfor %}</div>{% endif %}
-          {% if v3_chain.situation %}<p>{{ v3_chain.situation }}{% if v3_chain.day_hint %} <em style="color:var(--ink);font-style:normal;font-weight:600">{{ v3_chain.day_hint }}</em>{% endif %}</p>{% endif %}
+          {# Ein Text zur Lage: die Code-Fassung. Der KI-Tagessatz nimmt dieselbe
+             Form an (Skill day_lines) und ersetzt sie, sobald er sie hat. #}
+          {% if v3_chain.lage.fazit %}<p>{{ v3_chain.lage.fazit }}</p>{% elif v3_chain.situation %}<p>{{ v3_chain.situation }}</p>{% endif %}
         </div></div>
 
         {# 2 Fronten #}
         <div class="step"><div class="no">2</div><div>
-          <div class="h">{{ v3_labels.step_front }} <small>· DWD</small></div>
-          {% for l in v3_chain.fronts.lines %}<p style="margin-top:2px">{{ l }}</p>{% endfor %}
-          {% if v3_chain.fronts.zugbahn %}<div class="num" style="margin-top:5px">{{ v3_chain.fronts.zugbahn }}</div>{% endif %}
+          <div class="h"><svg class="ico" aria-hidden="true"><use href="#i-front"/></svg>{{ v3_labels.step_front }}{% if v3_chain.fronts.status %}<span class="tag {{ v3_chain.fronts.status }}">{{ v3_chain.fronts.status_label }}</span>{% endif %}</div>
+          {% if v3_chain.fronts.facts %}<div class="facts">{% for f in v3_chain.fronts.facts %}<span class="fact"><span class="k">{{ f.k }}</span>{{ f.v }}</span>{% endfor %}</div>{% endif %}
+          {% if v3_chain.fronts.fazit %}{% set t = v3_chain.fronts.fazit.split('. ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}.{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>{% endif %}
         </div></div>
 
         {# 3 Foehn / Bise #}
         <div class="step"><div class="no">3</div><div>
-          <div class="h">{{ v3_labels.step_foehn }}{% if v3_chain.foehn.flags %} <small>· <span style="color:var(--warn)">{{ v3_chain.foehn.flags|join(' · ') }}</span></small>{% endif %}</div>
-          <p style="margin-top:2px">{{ v3_chain.foehn.foehn }} {{ v3_chain.foehn.bise }}</p>
+          <div class="h"><svg class="ico" aria-hidden="true"><use href="#i-foehn"/></svg>{{ v3_labels.step_foehn }}{% if v3_chain.foehn.status %}<span class="tag {{ v3_chain.foehn.status }}">{{ v3_chain.foehn.status_label }}</span>{% endif %}</div>
+          {% if v3_chain.foehn.facts %}<div class="facts">{% for f in v3_chain.foehn.facts %}<span class="fact"><span class="k">{{ f.k }}</span>{{ f.v }}</span>{% endfor %}</div>{% endif %}
+          {% set txt = v3_chain.foehn.fazit if v3_chain.foehn.fazit else (v3_chain.foehn.foehn ~ ' ' ~ v3_chain.foehn.bise) %}
+          {% set t = txt.split('. ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}.{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
         </div></div>
 
         {# 4 Hoehenwind #}
         <div class="step"><div class="no">4</div><div>
-          <div class="h">{{ v3_labels.step_wind }} <small>· 700 hPa</small></div>
+          <div class="h"><svg class="ico" aria-hidden="true"><use href="#i-wind"/></svg>{{ v3_labels.step_wind }}{% if v3_chain.wind.status %}<span class="tag {{ v3_chain.wind.status }}">{{ v3_chain.wind.status_label }}</span>{% endif %}</div>
+          {% if v3_chain.wind.range %}
+          <div class="facts">{% for f in v3_chain.wind.facts %}<span class="fact{% if loop.first and v3_chain.wind.hot %} hot{% endif %}"><span class="k">{{ f.k }}</span>{{ f.v }}</span>{% endfor %}</div>
+          {% set t = v3_chain.wind.fazit.split(': ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}:{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
+          {% else %}
           <div class="num"><span class="{% if v3_chain.wind.hot %}hot{% endif %}">{{ v3_chain.wind.arrow }} {{ v3_chain.wind.sector }} {{ v3_chain.wind.speed or '—' }}</span>
             <span class="k">· {{ v3_chain.wind.strength }}{% if v3_chain.wind.deg %} · {{ v3_chain.wind.deg }}{% endif %}</span>
-            {% if v3_chain.wind.meaning %}<br><span class="k">{{ v3_chain.wind.meaning }}</span>{% endif %}
             {% if v3_chain.wind.regional %}<br><span class="hot">{{ v3_chain.wind.regional }}</span>{% endif %}
             {% if v3_chain.wind.ground %}<br>≈ {{ v3_chain.wind.ground }} <span class="k">{{ v3_labels.ground_est }} ({{ v3_labels.rule_23 }})</span>{% endif %}</div>
+          {% endif %}
         </div></div>
 
         {# 5 Labilitaet #}
         <div class="step"><div class="no">5</div><div>
-          <div class="h">{{ v3_labels.step_stab }} <small>· T850 {{ v3_chain.stability.t850 or '—' }}{% if v3_chain.stability.t850_note %} · {{ v3_chain.stability.t850_note }}{% endif %}</small></div>
+          <div class="h"><svg class="ico" aria-hidden="true"><use href="#i-stab"/></svg>{{ v3_labels.step_stab }}{% if v3_chain.stability.status %}<span class="tag {{ v3_chain.stability.status }}">{{ v3_chain.stability.status_label }}</span>{% endif %}</div>
+          {% if v3_chain.stability.fazit %}
+          {% if v3_chain.stability.facts %}<div class="facts">{% for f in v3_chain.stability.facts %}<span class="fact">{% if f.k %}<span class="k">{{ f.k }}</span>{% endif %}{{ f.v }}</span>{% endfor %}</div>{% endif %}
+          {% set t = v3_chain.stability.fazit.split('. ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}.{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
+          {% else %}
           <div class="num">
             {% if v3_chain.stability.thunder %}<span class="hot">{{ v3_labels.thunder }}</span> {{ v3_chain.stability.thunder|join(', ') }} <span class="k">· {{ v3_labels.thunder_window }}</span><br>{% endif %}
             {% if v3_chain.stability.overdev %}<span class="warn">{{ v3_labels.overdev }}</span> {{ v3_chain.stability.overdev|join(', ') }}<br>{% endif %}
             {% if not v3_chain.stability.thunder and not v3_chain.stability.overdev %}<span class="k">{{ v3_labels.no_convection }}</span>{% endif %}
           </div>
+          {% endif %}
           {% if v3_chain.stability.thunder %}<p>{{ v3_labels.thunder_caveat }}</p>{% endif %}
         </div></div>
+
+        {# 6 Thermik / Basis #}
+        {% if v3_chain.thermik and v3_chain.thermik.fazit %}
+        <div class="step"><div class="no">6</div><div>
+          <div class="h"><svg class="ico" aria-hidden="true"><use href="#i-therm"/></svg>{{ v3_labels.step_thermik }}{% if v3_chain.thermik.status %}<span class="tag {{ v3_chain.thermik.status }}">{{ v3_chain.thermik.status_label }}</span>{% endif %}</div>
+          {% set n = v3_chain.thermik.num %}
+          {% if n %}
+          <div class="facts"><span class="fact"><span class="k">{{ n.lbl_base }}</span>{{ n.base }}</span><span class="fact"><span class="k">{{ n.lbl_climb }}</span>{{ n.climb }}</span></div>
+          <div class="zones">{% for z in n.zones %}<span>{{ z.name }} <b>{{ z.base }}</b> / <b>{{ z.climb }}</b></span>{% endfor %}</div>
+          {% endif %}
+          {% set t = v3_chain.thermik.fazit.split('. ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}.{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
+        </div></div>
+        {% endif %}
+
+        {# 7 Sonne / Bewoelkung #}
+        {% if v3_chain.sonne and v3_chain.sonne.fazit %}
+        <div class="step"><div class="no">7</div><div>
+          <div class="h"><svg class="ico" aria-hidden="true"><use href="#i-sun"/></svg>{{ v3_labels.step_sonne }}{% if v3_chain.sonne.status %}<span class="tag {{ v3_chain.sonne.status }}">{{ v3_chain.sonne.status_label }}</span>{% endif %}</div>
+          {% set n = v3_chain.sonne.num %}
+          {% if n %}
+          <div class="zones"><span class="k" style="text-transform:uppercase;letter-spacing:.04em;font-size:11px">{{ n.lbl_sun }}</span>{% for z in n.zones %}<span>{{ z.name }} <b>{{ z.sun }}</b><span class="bar"><i style="width:{{ z.sun|replace(' %','') }}%"></i></span></span>{% endfor %}</div>
+          {% endif %}
+          {% set t = v3_chain.sonne.fazit.split('. ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}.{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
+        </div></div>
+        {% endif %}
+
+        {# 8 Modelle #}
+        {% if v3_chain.modelle and v3_chain.modelle.fazit %}
+        <div class="step"><div class="no">8</div><div>
+          <div class="h"><svg class="ico" aria-hidden="true"><use href="#i-models"/></svg>{{ v3_labels.step_modelle }}{% if v3_chain.modelle.status %}<span class="tag {{ v3_chain.modelle.status }}">{{ v3_chain.modelle.status_label }}</span>{% endif %}</div>
+          {% if v3_chain.modelle.facts %}<div class="facts">{% for f in v3_chain.modelle.facts %}<span class="fact{% if f.v == '✗' %} hot{% endif %}"><span class="k">{{ f.k }}</span>{{ f.v }}</span>{% endfor %}</div>{% endif %}
+          {% set t = v3_chain.modelle.fazit.split(', ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %},{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
+        </div></div>
+        {% endif %}
       </div>
     </div>
 
     {# ---------- Warnungen: Gesamtlage Schweiz — Regionen erst danach ---------- #}
     {% if v3_warnings.checks %}
     <div class="block">
-      <p class="label">{{ v3_labels.warnings_ch }} <span class="src code">Code</span>{% if v3_warnings.has_ki %}<span class="src ki">KI</span>{% endif %}</p>
+      <p class="label">{{ v3_labels.warnings_ch }}</p>
       {# Schalter vom Code: welche Gefahr hat es heute ueberhaupt #}
       <div class="hzrow">{% for c in v3_warnings.checks %}<span class="hz{% if c.active %} on {{ c.level }}{% endif %}">{% if c.active %}✓{% else %}–{% endif %} {{ c.label }}</span>{% endfor %}</div>
       {% for w in v3_warnings.entries %}
@@ -414,7 +467,7 @@
 
     {# ---------- Deine Regionen ---------- #}
     <div class="block">
-      <p class="label">{{ v3_labels.regions }} <span class="src code">Code</span><span class="src ki">KI</span></p>
+      <p class="label">{{ v3_labels.regions }}</p>
       {% for r in v3_regions %}
       <div class="rrow" style="border-left:4px solid {{ r.border }};">
         <div class="head">

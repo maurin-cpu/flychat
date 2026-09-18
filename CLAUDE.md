@@ -50,6 +50,7 @@ Projekt `/home/deploy/flychat`, App läuft als `wingcast.service`.
 
 ## Fachliche Einstiegspunkte
 
+- Morgenbriefing — Aufbau, Prinzip Synoptik↔Prognose, Status-Pillen: `docs/BRIEFING.md`
 - Gewitter/Blitz-Logik + Backtest-Befunde: `docs/GEWITTER.md` (§0c)
 - Validierungs-Konvention: `validation/README.md`
 - Datenklassen — was wohin gehört, was nie in Git: `docs/DATENKONZEPT.md`

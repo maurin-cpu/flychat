@@ -1,0 +1,273 @@
+{# =====================================================================
+   Morgenbriefing v3 — versendetes Mail. Mail-sicher: Tabellen, Inline-CSS,
+   keine SVG-Sprites, keine Grid/Flex-Abhaengigkeit. Inhalt und Texte kommen
+   1:1 aus dem Kontext der Vorschau (scripts/briefing_v3_context.py);
+   die Vorschau-Seite templates/preview/briefing_preview_page.html ist die
+   Design-Referenz. Aufbau: docs/BRIEFING.md.
+   ===================================================================== #}
+{%- set C = {
+  'ink':'#1e293b','text2':'#475569','muted':'#64748b','border':'#e5e7eb','surface2':'#f8fafc',
+  'primary':'#0369a1','primary_light':'#e0f2fe','primary_vivid':'#075985',
+  'ok_fg':'#166534','ok_bg':'#dcfce7','info_fg':'#0369a1','info_bg':'#e0f2fe','warn_fg':'#9a3412','warn_bg':'#ffedd5',
+  'danger':'#b91c1c','accent':'#d97706'
+} -%}
+{%- set MONO = "'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" -%}
+{%- set SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" -%}
+{%- macro pill(status, label) -%}
+  {%- if status -%}
+  <span style="display:inline-block;padding:3px 9px;border-radius:100px;font:600 11px/1.2 {{ MONO }};letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;color:{{ C[status ~ '_fg'] }};background-color:{{ C[status ~ '_bg'] }};">&#9679;&nbsp;{{ label }}</span>
+  {%- endif -%}
+{%- endmacro -%}
+{%- macro fact(k, v, hot=False) -%}
+  <span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;border-radius:8px;background-color:{{ C.surface2 }};border:1px solid {{ '#fca5a5' if hot else C.border }};font:500 13px/1.3 {{ MONO }};color:{{ C.danger if hot else C.ink }};">{% if k %}<span style="color:{{ C.muted }};font-size:11px;letter-spacing:.04em;text-transform:uppercase;">{{ k }}</span>&nbsp;{% endif %}{{ v }}</span>
+{%- endmacro -%}
+{%- macro verdict(text, sep='. ') -%}
+  {%- set t = text.split(sep, 1) -%}
+  <p style="margin:6px 0 0;font:16px/1.55 {{ SANS }};color:{{ C.text2 }};"><b style="color:{{ C.ink }};font-weight:600;">{{ t[0] }}{% if t|length > 1 %}{{ sep.rstrip() }}{% endif %}</b>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
+{%- endmacro -%}
+{%- macro step(no, title, status, status_label) -%}
+  <tr><td style="padding:14px 18px 4px;border-top:1px solid {{ C.border }};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td width="30" valign="top" style="padding-right:8px;"><span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:6px;font:600 13px/28px {{ MONO }};color:{{ C.primary }};background-color:{{ C.primary_light }};">{{ no }}</span></td>
+      <td valign="top" style="font:600 16px/28px {{ SANS }};color:{{ C.ink }};">{{ title }}</td>
+      <td valign="top" align="right" style="padding-top:4px;">{{ pill(status, status_label) }}</td>
+    </tr></table>
+  </td></tr>
+{%- endmacro -%}
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wingcast {{ t('email.briefing.week_abbr') }}{{ kw }}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;color:{{ C.ink }};font-family:{{ SANS }};">
+
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">{{ v3_subject }} &mdash; {{ briefing_weekday }}, {{ briefing_date }}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1f5f9" style="background-color:#f1f5f9;">
+<tr><td align="center" style="padding:18px 10px 30px;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:10px;">
+
+  {# ---------- Kopf ---------- #}
+  <tr><td bgcolor="{{ C.primary_vivid }}" style="background-color:{{ C.primary_vivid }};padding:20px 18px 18px;border-radius:10px 10px 0 0;color:#ffffff;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="font:700 13px/1.2 {{ SANS }};letter-spacing:.06em;text-transform:uppercase;color:#ffffff;">wingcast <span style="font-weight:400;opacity:.85;">briefing</span></td>
+      <td align="right" style="font:13px/1.2 {{ SANS }};color:#e0f2fe;">{{ briefing_weekday }}, {{ briefing_date }}</td>
+    </tr></table>
+    <div style="margin:14px 0 8px;"><span style="display:inline-block;padding:5px 11px;border-radius:100px;background-color:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);font:600 12px/1.3 {{ MONO }};color:#ffffff;">{{ v3_subject }}</span></div>
+    <div style="font:600 22px/1.3 {{ SANS }};color:#ffffff;">{{ v3_week_line or v3_headline }}</div>
+    {% if v3_hero %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;"><tr>
+      {% if v3_hero.rating %}<td style="padding-right:10px;"><span style="display:inline-block;padding:6px 10px;border-radius:8px;font:700 18px/1 {{ MONO }};background-color:{{ v3_hero.fill }};color:{{ v3_hero.text }};">{{ v3_hero.rating }}/5</span></td>{% endif %}
+      <td style="font:14px/1.4 {{ SANS }};color:#ffffff;"><b>{{ v3_hero.region_name }}</b><br><span style="color:#e0f2fe;">{{ v3_hero.status }}{% if v3_hero.has_window and v3_hero.cls != 'not_safe' %} · {{ v3_hero.window }}{% endif %}</span></td>
+    </tr></table>
+    {% endif %}
+  </td></tr>
+
+  {% if gap_notice or stale_notice %}
+  <tr><td style="padding:12px 18px 0;">
+    {% if gap_notice %}<div style="padding:10px 12px;border-radius:8px;background-color:#fef3c7;border:1px solid #fcd34d;font:14px/1.5 {{ SANS }};color:#78350f;">{{ gap_notice }}</div>{% endif %}
+    {% if stale_notice %}<div style="margin-top:8px;padding:10px 12px;border-radius:8px;background-color:#fef3c7;border:1px solid #fcd34d;font:14px/1.5 {{ SANS }};color:#78350f;">{{ stale_notice }}</div>{% endif %}
+  </td></tr>
+  {% endif %}
+
+  {# ---------- Sektion 1: Woche ---------- #}
+  <tr><td style="padding:18px 18px 6px;">
+    <span style="display:inline-block;padding:5px 8px;border-radius:6px;font:600 12px/1 {{ MONO }};letter-spacing:.06em;text-transform:uppercase;color:{{ C.primary }};background-color:{{ C.primary_light }};">{{ v3_labels.question }} 1</span>
+    <span style="font:600 16px/1.4 {{ SANS }};color:{{ C.ink }};margin-left:8px;">{{ v3_labels.q1_long }}</span>
+  </td></tr>
+  <tr><td style="padding:6px 18px 12px;">
+    <div style="font:600 12px/1 {{ MONO }};letter-spacing:.08em;text-transform:uppercase;color:{{ C.muted }};margin:0 0 10px;">{{ v3_labels.days_ahead }}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      {% for d in v3_strip %}
+      <td width="{{ (100 / v3_strip|length)|int }}%" valign="top" style="padding:0 {{ '6px' if not loop.last else '0' }} 0 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:{{ '2px solid ' ~ C.primary if d.is_focus else '1px solid ' ~ C.border }};border-radius:10px;background-color:#ffffff;">
+          <tr><td style="padding:10px 10px 6px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td style="font:700 15px/1.2 {{ SANS }};color:{{ C.ink }};">{{ d.name }}<br><span style="font:600 12px/1.6 {{ SANS }};color:{{ d.border }};">{{ d.status }}</span></td>
+              <td align="right" valign="top" style="font:700 22px/1 {{ MONO }};color:{{ d.border }};">{% if d.rating_display %}{{ d.rating_display }}<span style="font-size:12px;font-weight:400;color:{{ C.muted }};">/5</span>{% else %}&mdash;{% endif %}</td>
+            </tr></table>
+            <div style="margin-top:6px;font:12px/1.5 {{ MONO }};color:{{ C.muted }};">{{ d.pressure }}{% if d.wind_sector %}<br><span style="color:{{ C.danger if d.wind_hot else C.ink }};"><span style="color:{{ C.danger if d.wind_hot else C.primary }};">{{ d.wind_arrow }}</span> {{ d.wind_sector }} {{ d.wind_strength }}</span>{% endif %}</div>
+            <div style="margin-top:8px;font:600 10px/1 {{ MONO }};letter-spacing:.08em;text-transform:uppercase;color:{{ C.muted }};">{{ v3_labels.regions_word }}</div>
+            {% set many = d.segments|length > 12 %}
+            {% for g in d.groups %}
+            <div style="margin-top:6px;font:12px/1.5 {{ SANS }};color:{{ C.ink }};"><b>{% if g.range %}{{ g.range }} {% endif %}<span style="color:{{ g.color }};">{{ g.status }}</span></b> <span style="color:{{ C.muted }};">{{ g.n }}</span></div>
+            {% if many and g.cls not in ('hi_safe','hi_cond') %}
+            <div style="font:12px/1.5 {{ SANS }};color:{{ C.text2 }};">{{ g['items']|map(attribute='name')|join(', ') }}</div>
+            {% else %}
+            {% for s in g['items'] %}
+            <div style="font:12px/1.6 {{ SANS }};color:{{ C.text2 }};"><span style="display:inline-block;min-width:16px;padding:0 4px;border-radius:5px;text-align:center;font:700 11px/16px {{ MONO }};background-color:{{ s.fill }};border:1px solid {{ s.border }};color:{{ s.text }};">{% if s.rating_display %}{{ s.rating_display }}{% elif s.cls == 'not_safe' %}&times;{% else %}&middot;{% endif %}</span> {{ s.name }}</div>
+            {% endfor %}
+            {% endif %}
+            {% endfor %}
+            <div style="margin-top:8px;font:11px/1.5 {{ MONO }};color:{{ C.muted }};">{{ v3_labels.ch_context }} {{ d.ch.hi_safe }}/{{ d.ch.total }} · 4–5 {{ t('tier.green') }}</div>
+          </td></tr>
+        </table>
+      </td>
+      {% endfor %}
+    </tr></table>
+    <div style="margin-top:10px;font:13px/1.5 {{ SANS }};color:{{ C.muted }};">{{ v3_labels.week_hint }}</div>
+  </td></tr>
+
+  {# ---------- Sektion 2: Tag entlang der Kette ---------- #}
+  <tr><td style="padding:14px 18px 6px;border-top:1px solid {{ C.border }};">
+    <span style="display:inline-block;padding:5px 8px;border-radius:6px;font:600 12px/1 {{ MONO }};letter-spacing:.06em;text-transform:uppercase;color:{{ C.primary }};background-color:{{ C.primary_light }};">{{ v3_labels.question }} 2</span>
+    <span style="font:600 16px/1.4 {{ SANS }};color:{{ C.ink }};margin-left:8px;">{{ v3_labels.q2_long }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}</span>
+  </td></tr>
+
+  {% if v3_map_cid %}
+  <tr><td style="padding:6px 18px 8px;">
+    <div style="font:600 12px/1 {{ MONO }};letter-spacing:.08em;text-transform:uppercase;color:{{ C.muted }};margin:0 0 8px;">{{ v3_labels.map_title }}</div>
+    <img src="cid:{{ v3_map_cid }}" width="602" alt="{{ v3_labels.map_title }}" style="display:block;width:100%;max-width:602px;height:auto;border:1px solid {{ C.border }};border-radius:10px;">
+  </td></tr>
+  {% endif %}
+
+  {# 1 Lage #}
+  {{ step(1, v3_labels.step_lage, '', '') }}
+  <tr><td style="padding:0 18px 12px 56px;">
+    <div style="font:15px/1.6 {{ MONO }};color:{{ C.ink }};">{{ v3_chain.lage.pressure or '—' }} <span style="color:{{ C.muted }};">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}</span></div>
+    {% if v3_chain.lage.centers %}<div style="margin-top:6px;">{% for c in v3_chain.lage.centers %}{{ fact((c.type[0]), c.region ~ ' ' ~ c.msl ~ ' hPa') }}{% endfor %}</div>{% endif %}
+    {% if v3_chain.lage.fazit %}{{ verdict(v3_chain.lage.fazit) }}{% elif v3_chain.situation %}<p style="margin:6px 0 0;font:16px/1.55 {{ SANS }};color:{{ C.text2 }};">{{ v3_chain.situation }}</p>{% endif %}
+  </td></tr>
+
+  {# 2 Fronten #}
+  {{ step(2, v3_labels.step_front, v3_chain.fronts.status, v3_chain.fronts.status_label) }}
+  <tr><td style="padding:0 18px 12px 56px;">
+    {% if v3_chain.fronts.facts %}<div>{% for f in v3_chain.fronts.facts %}{{ fact(f.k, f.v) }}{% endfor %}</div>{% endif %}
+    {% if v3_chain.fronts.fazit %}{{ verdict(v3_chain.fronts.fazit) }}{% endif %}
+  </td></tr>
+
+  {# 3 Foehn / Bise #}
+  {{ step(3, v3_labels.step_foehn, v3_chain.foehn.status, v3_chain.foehn.status_label) }}
+  <tr><td style="padding:0 18px 12px 56px;">
+    {% if v3_chain.foehn.facts %}<div>{% for f in v3_chain.foehn.facts %}{{ fact(f.k, f.v) }}{% endfor %}</div>{% endif %}
+    {{ verdict(v3_chain.foehn.fazit if v3_chain.foehn.fazit else (v3_chain.foehn.foehn ~ ' ' ~ v3_chain.foehn.bise)) }}
+  </td></tr>
+
+  {# 4 Hoehenwind #}
+  {{ step(4, v3_labels.step_wind, v3_chain.wind.status, v3_chain.wind.status_label) }}
+  <tr><td style="padding:0 18px 12px 56px;">
+    {% if v3_chain.wind.facts %}<div>{% for f in v3_chain.wind.facts %}{{ fact(f.k, f.v, hot=(loop.first and v3_chain.wind.hot)) }}{% endfor %}</div>{% endif %}
+    {% if v3_chain.wind.fazit %}{{ verdict(v3_chain.wind.fazit, ': ') }}{% endif %}
+  </td></tr>
+
+  {# 5 Labilitaet #}
+  {{ step(5, v3_labels.step_stab, v3_chain.stability.status, v3_chain.stability.status_label) }}
+  <tr><td style="padding:0 18px 12px 56px;">
+    {% if v3_chain.stability.facts %}<div>{% for f in v3_chain.stability.facts %}{{ fact(f.k, f.v) }}{% endfor %}</div>{% endif %}
+    {% if v3_chain.stability.fazit %}{{ verdict(v3_chain.stability.fazit) }}{% endif %}
+    {% if v3_chain.stability.thunder %}<p style="margin:6px 0 0;font:14px/1.5 {{ SANS }};color:{{ C.muted }};">{{ v3_labels.thunder_caveat }}</p>{% endif %}
+  </td></tr>
+
+  {# 6 Thermik / Basis #}
+  {% if v3_chain.thermik and v3_chain.thermik.fazit %}
+  {{ step(6, v3_labels.step_thermik, v3_chain.thermik.status, v3_chain.thermik.status_label) }}
+  <tr><td style="padding:0 18px 12px 56px;">
+    {% set n = v3_chain.thermik.num %}
+    {% if n %}
+    <div>{{ fact(n.lbl_base, n.base) }}{{ fact(n.lbl_climb, n.climb) }}</div>
+    <div style="font:13px/1.6 {{ MONO }};color:{{ C.muted }};">{% for z in n.zones %}{{ z.name }} <span style="color:{{ C.ink }};">{{ z.base }}</span> / <span style="color:{{ C.ink }};">{{ z.climb }}</span>{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}</div>
+    {% endif %}
+    {{ verdict(v3_chain.thermik.fazit) }}
+  </td></tr>
+  {% endif %}
+
+  {# 7 Sonne / Bewoelkung #}
+  {% if v3_chain.sonne and v3_chain.sonne.fazit %}
+  {{ step(7, v3_labels.step_sonne, v3_chain.sonne.status, v3_chain.sonne.status_label) }}
+  <tr><td style="padding:0 18px 12px 56px;">
+    {% set n = v3_chain.sonne.num %}
+    {% if n %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="font:13px/1.6 {{ MONO }};color:{{ C.muted }};">
+      <tr><td colspan="3" style="font:600 11px/1.6 {{ MONO }};letter-spacing:.04em;text-transform:uppercase;color:{{ C.muted }};">{{ n.lbl_sun }}</td></tr>
+      {% for z in n.zones %}
+      {% set pct = z.sun|replace(' %','')|int %}
+      <tr>
+        <td style="padding:1px 10px 1px 0;color:{{ C.muted }};">{{ z.name }}</td>
+        <td style="padding:1px 10px 1px 0;color:{{ C.ink }};">{{ z.sun }}</td>
+        <td style="padding:1px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="80"><tr><td width="{{ pct }}%" bgcolor="{{ C.accent }}" style="background-color:{{ C.accent }};height:6px;font-size:0;line-height:0;">&nbsp;</td><td width="{{ 100 - pct }}%" bgcolor="{{ C.border }}" style="background-color:{{ C.border }};height:6px;font-size:0;line-height:0;">&nbsp;</td></tr></table></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    {{ verdict(v3_chain.sonne.fazit) }}
+  </td></tr>
+  {% endif %}
+
+  {# 8 Modelle #}
+  {% if v3_chain.modelle and v3_chain.modelle.fazit %}
+  {{ step(8, v3_labels.step_modelle, v3_chain.modelle.status, v3_chain.modelle.status_label) }}
+  <tr><td style="padding:0 18px 14px 56px;">
+    {% if v3_chain.modelle.facts %}<div>{% for f in v3_chain.modelle.facts %}{{ fact(f.k, f.v, hot=(f.v == '✗')) }}{% endfor %}</div>{% endif %}
+    {{ verdict(v3_chain.modelle.fazit, ', ') }}
+  </td></tr>
+  {% endif %}
+
+  {# ---------- Warnungen ---------- #}
+  {% if v3_warnings.checks %}
+  <tr><td style="padding:14px 18px 6px;border-top:1px solid {{ C.border }};">
+    <div style="font:600 12px/1 {{ MONO }};letter-spacing:.08em;text-transform:uppercase;color:{{ C.muted }};margin:0 0 8px;">{{ v3_labels.warnings_ch }}</div>
+    <div>{% for c in v3_warnings.checks %}<span style="display:inline-block;margin:0 6px 6px 0;padding:3px 8px;border-radius:100px;font:500 12px/1.3 {{ MONO }};{% if c.active %}color:{{ C.danger if c.level == 'stop' else C.warn_fg }};background-color:{{ '#fee2e2' if c.level == 'stop' else C.warn_bg }};{% else %}color:{{ C.muted }};background-color:{{ C.surface2 }};border:1px solid {{ C.border }};{% endif %}">{% if c.active %}&#10003;{% else %}&ndash;{% endif %} {{ c.label }}</span>{% endfor %}</div>
+    {% for w in v3_warnings.entries %}
+    <div style="margin:8px 0 0;padding:10px 12px;border-left:4px solid {{ C.danger if w.severity == 'stop' else C.accent }};border-radius:6px;background-color:{{ '#fef2f2' if w.severity == 'stop' else '#fffbeb' }};">
+      <div style="font:600 14px/1.4 {{ SANS }};color:{{ C.ink }};">{{ w.label }} <span style="font:500 11px/1.2 {{ MONO }};color:{{ C.muted }};text-transform:uppercase;letter-spacing:.04em;">· {{ w.sev_label }}</span></div>
+      {% if w.ki_text %}<p style="margin:4px 0 0;font:15px/1.5 {{ SANS }};color:{{ C.ink }};">{{ w.ki_text }}</p>{% endif %}
+      <p style="margin:4px 0 0;font:14px/1.5 {{ SANS }};color:{{ C.text2 }};">{{ w.code_text }}</p>
+    </div>
+    {% else %}
+    <p style="margin:4px 0 0;font:15px/1.5 {{ SANS }};color:{{ C.muted }};font-style:italic;">{{ v3_labels.hz_none }}</p>
+    {% endfor %}
+  </td></tr>
+  {% endif %}
+
+  {# ---------- Deine Regionen ---------- #}
+  <tr><td style="padding:14px 18px 6px;border-top:1px solid {{ C.border }};">
+    <div style="font:600 12px/1 {{ MONO }};letter-spacing:.08em;text-transform:uppercase;color:{{ C.muted }};margin:0 0 8px;">{{ v3_labels.regions }}</div>
+    {% for r in v3_regions %}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;border-left:4px solid {{ r.border }};background-color:{{ C.surface2 }};border-radius:6px;">
+      <tr><td style="padding:10px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td style="font:700 15px/1.3 {{ SANS }};color:{{ C.ink }};">{{ r.region_name }}{% if r.has_window and r.cls != 'not_safe' %} <span style="font:500 12px/1.3 {{ MONO }};color:{{ C.muted }};">{{ r.window }}</span>{% endif %}</td>
+          <td align="right"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font:700 15px/1 {{ MONO }};background-color:{{ r.fill }};color:{{ r.text }};border:1px solid {{ r.border }};">{% if r.rating_display %}{{ r.rating_display }}<span style="font-size:10px;font-weight:400;">/5</span>{% else %}&mdash;{% endif %}</span></td>
+        </tr></table>
+        {% if r.tags %}<div style="margin-top:6px;">{% for tg in r.tags %}<span style="display:inline-block;margin:0 4px 4px 0;padding:2px 8px;border-radius:100px;font:500 11px/1.4 {{ MONO }};color:{{ C.danger if tg.severity == 'stop' else (C.warn_fg if tg.severity == 'warn' else C.text2) }};background-color:{{ '#fee2e2' if tg.severity == 'stop' else (C.warn_bg if tg.severity == 'warn' else '#ffffff') }};border:1px solid {{ C.border }};">{{ tg.text or (tg.label ~ ' ' ~ tg.value) }}</span>{% endfor %}</div>{% endif %}
+        {% if r.short %}<div style="margin-top:6px;font:14px/1.5 {{ SANS }};color:{{ C.text2 }};">{{ r.short }}</div>{% endif %}
+        <div style="margin-top:6px;"><a href="{{ r.url }}" style="font:600 13px/1.4 {{ SANS }};color:{{ C.primary }};text-decoration:none;">{{ v3_labels.spots_link }} &rsaquo;</a></div>
+      </td></tr>
+    </table>
+    {% else %}
+    <p style="margin:4px 0 0;font:15px/1.5 {{ SANS }};color:{{ C.muted }};font-style:italic;">{{ v3_labels.no_regions }}</p>
+    {% endfor %}
+  </td></tr>
+
+  {# ---------- CTA + Disclaimer ---------- #}
+  <tr><td style="padding:10px 18px 16px;">
+    <a href="{{ urls.dashboard }}" style="display:block;padding:12px 16px;border-radius:8px;background-color:{{ C.primary }};color:#ffffff;text-align:center;font:600 15px/1.3 {{ SANS }};text-decoration:none;">{{ v3_labels.cta }} &rsaquo;</a>
+    <p style="margin:12px 0 0;font:12px/1.6 {{ SANS }};color:{{ C.muted }};">{{ v3_labels.disclaimer }}<br>{{ v3_labels.airspace_note }}</p>
+  </td></tr>
+
+  {# ---------- Footer ---------- #}
+  <tr><td style="padding:14px 18px;border-top:1px solid #e2e8f0;background-color:#f8fafc;border-radius:0 0 10px 10px;">
+    <div style="font-size:10px;color:#64748b;line-height:1.7;">
+      {{ t('email.briefing.sources_label') }} ICON-CH1/CH2 (MeteoSwiss), ICON-D2/EU (DWD), GFS (NOAA), Open-Meteo, DWD-Frontenprognose.<br>
+      {{ t('email.briefing.disclaimer_short_html')|safe }}
+    </div>
+    <div style="font-size:10px;color:#64748b;line-height:1.6;margin-top:8px;">
+      <a href="{{ urls.account }}" style="color:#0f172a;text-decoration:underline;font-weight:600;">{{ t('nav.settings') }}</a>
+      &nbsp; &middot; &nbsp;
+      <a href="{{ urls.dashboard }}" style="color:#64748b;text-decoration:underline;">Dashboard</a>
+      &nbsp; &middot; &nbsp;
+      <a href="{{ urls.unsubscribe }}" style="color:#64748b;text-decoration:underline;">{{ t('email.unsubscribe_link') }}</a>
+      &nbsp; &middot; &nbsp;
+      <a href="{{ urls.datenschutz }}" style="color:#64748b;text-decoration:underline;">{{ t('footer.privacy') }}</a>
+      &nbsp; &middot; &nbsp;
+      <a href="{{ urls.impressum }}" style="color:#64748b;text-decoration:underline;">{{ t('footer.imprint') }}</a>
+    </div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

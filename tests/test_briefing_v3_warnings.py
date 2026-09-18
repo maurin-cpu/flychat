@@ -280,3 +280,183 @@ class TestLageLabel(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFrontFazit(unittest.TestCase):
+    """Das Fronten-Fazit bezieht sich IMMER auf den Fokus-Tag, nennt eine
+    durchgezogene Front als Rueckseite und den naechsten Durchgang als
+    Ausblick — alles als Prognose formuliert."""
+    DATES = ["2026-09-18", "2026-09-19", "2026-09-20"]
+    SUN = {"zone": "alpennordhang", "typ": "kalt", "art": "streift",
+           "durchgang_median_utc": "2026-09-20T14:17:00+00:00",
+           "fenster_von_utc": "2026-09-20T14:17:00+00:00",
+           "randwert": True, "anteil": 0.003}
+
+    def test_today_without_passage_says_so_and_no_outlook(self):
+        txt = bc._front_fazit(None, {"aussagen": [self.SUN]}, self.DATES, "2026-09-18")
+        self.assertTrue(txt.startswith("Today no front is expected.") or
+                        txt.startswith("Heute wird keine Front erwartet."), txt)
+        self.assertNotIn("Sun", txt)          # Sonntag interessiert heute nicht
+        self.assertNotIn("further", txt)
+
+    def test_today_with_passage_names_it_first(self):
+        today = dict(self.SUN, durchgang_median_utc="2026-09-18T14:37:00+00:00",
+                     fenster_von_utc="2026-09-18T13:55:00+00:00", art="quert",
+                     randwert=False, anteil=0.6)
+        txt = bc._front_fazit(None, {"aussagen": [today, self.SUN]}, self.DATES, "2026-09-18")
+        self.assertTrue(txt.startswith("Today the cold front") or
+                        txt.startswith("Heute dürfte die Kaltfront"), txt)
+        self.assertNotIn("no front is expected", txt)
+
+    def test_passed_front_is_named_as_rear_side(self):
+        pas = {"aussagen": [],
+               "vergangen": [{"zone": "alpennordhang", "typ": "kalt", "art": "quert",
+                              "median_utc": "2026-09-17T10:40+00:00"}]}
+        txt = bc._front_fazit({"features": []}, pas, self.DATES, "2026-09-18")
+        self.assertTrue(txt.startswith("Yesterday") or txt.startswith("Gestern"), txt)
+        self.assertTrue("rear side" in txt or "Rückseite" in txt, txt)
+        self.assertNotIn("3-day window", txt)
+
+    def test_old_passage_is_not_mentioned(self):
+        pas = {"aussagen": [],
+               "vergangen": [{"zone": "alpennordhang", "typ": "kalt", "art": "quert",
+                              "median_utc": "2026-09-15T10:40+00:00"}]}
+        txt = bc._front_fazit({"features": []}, pas, self.DATES, "2026-09-18")
+        self.assertFalse(txt.startswith("Yesterday") or txt.startswith("Gestern"), txt)
+        self.assertTrue("no front" in txt or "keine Front" in txt, txt)
+
+
+class TestFrontSignatur(unittest.TestCase):
+    """Das Urteil fuer den Tag kommt aus den eigenen Prognosedaten: mit
+    Signatur zieht die Front durch (Belege in Worten), ohne Signatur
+    schwaecht sie sich ab — auch wenn die DWD-Karte sie zeichnet."""
+    DATES = ["2026-09-18", "2026-09-19", "2026-09-20"]
+    DWD = {"zone": "alpennordhang", "typ": "kalt", "art": "quert",
+           "durchgang_median_utc": "2026-09-18T14:37:00+00:00",
+           "fenster_von_utc": "2026-09-18T13:55:00+00:00",
+           "randwert": False, "anteil": 0.6, "lauf": "2026091800"}
+    SIG = {"hour": "16:00", "druck_hpa": 1.8, "drehung": [225, 300],
+           "t850_k": -2.6, "regen_mm": 3.1, "typ_hinweis": "kalt"}
+
+    def _wl(self, sig, verlauf=None):
+        return {"frontsignatur": {"per_day": [{
+            "date": "2026-09-18",
+            "zones": {"alpennordhang": sig, "wallis": None, "tessin": None,
+                      "graubuenden_engadin": None},
+            "verlauf": verlauf or {"alpennordhang": {"druck_trend_hpa": 3.7,
+                                                     "max_drehung_deg": 20, "regen_mm": 0.0}}}]}}
+
+    def test_signature_means_passage_with_evidence(self):
+        txt = bc._front_fazit({"features": []}, {"aussagen": [self.DWD]}, self.DATES,
+                              "2026-09-18", self._wl(self.SIG))
+        self.assertTrue("passes" in txt or "zieht" in txt, txt)
+        self.assertTrue("north-west" in txt or "Nordwest" in txt, txt)
+        self.assertTrue("rain" in txt or "Regen" in txt, txt)
+        self.assertNotIn("stays clear", txt)
+
+    def test_dwd_without_signature_means_weakening(self):
+        txt = bc._front_fazit({"features": []}, {"aussagen": [self.DWD]}, self.DATES,
+                              "2026-09-18", self._wl(None))
+        self.assertTrue("weakening" in txt or "abschwächen" in txt, txt)
+        self.assertTrue("rising pressure" in txt or "steigenden Druck" in txt, txt)
+
+    def test_no_dwd_no_signature(self):
+        txt = bc._front_fazit({"features": []}, {"aussagen": []}, self.DATES,
+                              "2026-09-18", self._wl(None))
+        self.assertTrue("Today none passes" in txt or "Heute zieht keine durch" in txt, txt)
+        self.assertTrue(txt.startswith("The DWD forecast indicates no front") or
+                        txt.startswith("In der DWD-Prognose ist keine Front"), txt)
+
+
+class TestDetectFrontsignatur(unittest.TestCase):
+    """Synthetische Zone: Druckminimum 14 h mit Anstieg, Winddrehung SW->NW,
+    T850-Sturz und Regen -> Signatur; glatter Tag -> keine."""
+
+    def _region(self, front: bool):
+        hd, pl = {}, {}
+        for h in range(24):
+            k = f"2026-09-18T{h:02d}:00"
+            if front:
+                msl = 1012 - 0.4 * h if h <= 14 else 1006.4 + 0.8 * (h - 14)
+                wd = 225 if h < 14 else 300
+                t = 10.0 if h < 14 else 6.0
+                rain = 1.0 if 13 <= h <= 17 else 0.0
+            else:
+                msl, wd, t, rain = 1015 + 0.1 * h, 240, 9.0, 0.0
+            hd[k] = {"pressure_msl": msl, "precipitation": rain}
+            pl[k] = {"wind_direction_700hPa": wd, "temperature_850hPa": t}
+        return {"reference_points": [[46.9, 7.5]], "hourly_data": hd, "pressure_level_data": pl}
+
+    def test_front_day_detected(self):
+        from engine.synoptic_context import detect_frontsignatur
+        res = detect_frontsignatur({"r1": self._region(True)}, ["2026-09-18"])
+        sig = res["per_day"][0]["zones"]["alpennordhang"]
+        self.assertIsNotNone(sig)
+        self.assertEqual(sig["typ_hinweis"], "kalt")
+        self.assertIn(sig["hour"], ("13:00", "14:00", "15:00"))
+
+    def test_quiet_day_not_detected(self):
+        from engine.synoptic_context import detect_frontsignatur
+        res = detect_frontsignatur({"r1": self._region(False)}, ["2026-09-18"])
+        self.assertIsNone(res["per_day"][0]["zones"]["alpennordhang"])
+        self.assertGreaterEqual(res["per_day"][0]["verlauf"]["alpennordhang"]["druck_trend_hpa"], 1.0)
+
+
+class TestLageFazit(unittest.TestCase):
+    """Die Code-Zeile zur Lage: Ursache -> Stroemung, dann je Zone Wind und
+    Regen in Worten, keine hPa-/km/h-Zahlen."""
+
+    def test_plain_words_no_numbers(self):
+        wl = {
+            "pressure_centers_per_day": [{"date": "2026-09-18", "centers": [
+                {"type": "Tief", "region_label": "Island", "msl_hpa": 983},
+                {"type": "Hoch", "region_label": "Azoren", "msl_hpa": 1026}]}],
+            "flow_overhead": {"per_day": [{"date": "2026-09-18", "dir_deg": 244, "speed_kmh": 16.8,
+                                           "sector": "Suedwest", "strength": "maessig"}]},
+            "pressure_influence": {"slope_hpa_per_day": 5.1, "per_day": [{"date": "2026-09-18"}]},
+            "precip_pattern": {"per_day": [{"date": "2026-09-18",
+                "alpennord": {"n_spots": 397, "wet_share": 0.06},
+                "alpensued": {"n_spots": 97, "wet_share": 0.28}}]},
+            "wind_pattern": {"per_day": [{"date": "2026-09-18",
+                "alpennord": {"n_spots": 397, "share_wind_warn": 0.76, "share_wind_crit": 0.26, "wind_driver": "hoehenwind"},
+                "alpensued": {"n_spots": 97, "share_wind_warn": 0.51, "share_wind_crit": 0.18, "wind_driver": "hoehenwind"}}]},
+        }
+        txt = bc._lage_fazit(wl, "2026-09-18")
+        import re
+        self.assertFalse(re.search(r"\d", txt), txt)          # keine Zahlen
+        self.assertTrue("showers only on the south side" in txt or "Schauer nur auf der Alpensüdseite" in txt, txt)
+        self.assertTrue("widely windy" in txt or "verbreitet windig" in txt, txt)
+        self.assertTrue("less on the south side" in txt or "auf der Alpensüdseite weniger" in txt, txt)
+        self.assertTrue("Mediterranean" in txt or "Mittelmeer" in txt, txt)   # Luftmasse der SW-Lage
+        self.assertTrue("calming down" in txt or "beruhigt sich" in txt, txt)  # Druck steigt
+        self.assertEqual(txt.count("."), 2, txt)                             # zwei Saetze, Daten haengen am Druck
+        self.assertNotIn("Forecast data", txt)
+        self.assertLess(len(txt.split()), 40, txt)
+
+
+class TestLageLogik(unittest.TestCase):
+    """'beruhigt sich' und 'Schauer nehmen zu' duerfen nicht im selben Satz stehen."""
+
+    def _wl(self, morning, afternoon):
+        return {
+            "pressure_centers_per_day": [{"date": "2026-09-18", "centers": []}],
+            "flow_overhead": {"per_day": [{"date": "2026-09-18", "dir_deg": 244, "sector": "Suedwest", "strength": "maessig"}]},
+            "pressure_influence": {"slope_hpa_per_day": 5.1, "per_day": [{"date": "2026-09-18"}]},
+            "precip_pattern": {"per_day": [{"date": "2026-09-18",
+                "alpennord": {"n_spots": 397, "wet_share": 0.06}, "alpensued": {"n_spots": 97, "wet_share": 0.28}}]},
+            "precip_zones": {"per_day": [{"date": "2026-09-18", "zones": {"tessin": {"windows": {
+                "morning": {"n_spots": 97, "wet_share": morning}, "afternoon": {"n_spots": 97, "wet_share": afternoon}}}}}]},
+            "wind_pattern": {"per_day": [{"date": "2026-09-18",
+                "alpennord": {"n_spots": 397, "share_wind_warn": 0.2, "share_wind_crit": 0.05},
+                "alpensued": {"n_spots": 97, "share_wind_warn": 0.2, "share_wind_crit": 0.05}}]},
+        }
+
+    def test_growing_showers_limit_the_calming(self):
+        txt = bc._lage_fazit(self._wl(0.05, 0.6), "2026-09-18")
+        self.assertTrue("calming down on the north side" in txt or "beruhigt sich auf der Alpennordseite" in txt, txt)
+        self.assertNotIn("calming down:", txt)
+
+    def test_fading_showers_keep_the_calming(self):
+        txt = bc._lage_fazit(self._wl(0.6, 0.05), "2026-09-18")
+        self.assertTrue("calming down:" in txt or "beruhigt sich:" in txt, txt)
+        self.assertTrue("fading" in txt or "abklingend" in txt, txt)

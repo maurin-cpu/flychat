@@ -1,0 +1,74 @@
+WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr') }}{{ kw }}
+{{ briefing_weekday }}, {{ briefing_date }}
+
+============================================================
+{{ v3_subject }}
+{{ v3_week_line or v3_headline }}
+{%- if v3_hero %}
+{{ v3_hero.region_name }}{% if v3_hero.rating %} · {{ v3_hero.rating }}/5{% endif %} · {{ v3_hero.status }}{% if v3_hero.has_window and v3_hero.cls != 'not_safe' %} · {{ v3_hero.window }}{% endif %}
+{%- endif %}
+============================================================
+{% if gap_notice %}
+? {{ gap_notice }}
+{% endif %}{% if stale_notice %}
+! {{ stale_notice }}
+{% endif %}
+{{ v3_labels.question }} 1 — {{ v3_labels.q1_long }}
+{% for d in v3_strip -%}
+{{ d.name }}: {{ d.status }}{% if d.rating_display %} {{ d.rating_display }}/5{% endif %} · {{ d.pressure }}{% if d.wind_sector %} · {{ d.wind_sector }} {{ d.wind_strength }}{% endif %}
+{%- for g in d.groups %}
+  {% if g.range %}{{ g.range }} {% endif %}{{ g.status }} ({{ g.n }}): {{ g['items']|map(attribute='name')|join(', ') }}
+{%- endfor %}
+  {{ v3_labels.ch_context }} {{ d.ch.hi_safe }}/{{ d.ch.total }}
+{% endfor %}
+{{ v3_labels.question }} 2 — {{ v3_labels.q2_long }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}
+
+1 {{ v3_labels.step_lage }}
+{{ v3_chain.lage.pressure }} {{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}
+{{ v3_chain.lage.fazit or v3_chain.situation }}
+
+2 {{ v3_labels.step_front }}{% if v3_chain.fronts.status_label %} [{{ v3_chain.fronts.status_label }}]{% endif %}
+{{ v3_chain.fronts.fazit }}
+
+3 {{ v3_labels.step_foehn }}{% if v3_chain.foehn.status_label %} [{{ v3_chain.foehn.status_label }}]{% endif %}
+{{ v3_chain.foehn.fazit or (v3_chain.foehn.foehn ~ ' ' ~ v3_chain.foehn.bise) }}
+
+4 {{ v3_labels.step_wind }}{% if v3_chain.wind.status_label %} [{{ v3_chain.wind.status_label }}]{% endif %}
+{% for f in v3_chain.wind.facts or [] %}{{ f.k }} {{ f.v }}{% if not loop.last %} · {% endif %}{% endfor %}
+{{ v3_chain.wind.fazit }}
+
+5 {{ v3_labels.step_stab }}{% if v3_chain.stability.status_label %} [{{ v3_chain.stability.status_label }}]{% endif %}
+{{ v3_chain.stability.fazit }}
+{% if v3_chain.thermik and v3_chain.thermik.fazit %}
+6 {{ v3_labels.step_thermik }}{% if v3_chain.thermik.status_label %} [{{ v3_chain.thermik.status_label }}]{% endif %}
+{% if v3_chain.thermik.num %}{{ v3_chain.thermik.num.lbl_base }} {{ v3_chain.thermik.num.base }} · {{ v3_chain.thermik.num.lbl_climb }} {{ v3_chain.thermik.num.climb }}
+{% for z in v3_chain.thermik.num.zones %}{{ z.name }} {{ z.base }} / {{ z.climb }}{% if not loop.last %} · {% endif %}{% endfor %}
+{% endif %}{{ v3_chain.thermik.fazit }}
+{% endif %}{% if v3_chain.sonne and v3_chain.sonne.fazit %}
+7 {{ v3_labels.step_sonne }}{% if v3_chain.sonne.status_label %} [{{ v3_chain.sonne.status_label }}]{% endif %}
+{% if v3_chain.sonne.num %}{{ v3_chain.sonne.num.lbl_sun }}: {% for z in v3_chain.sonne.num.zones %}{{ z.name }} {{ z.sun }}{% if not loop.last %} · {% endif %}{% endfor %}
+{% endif %}{{ v3_chain.sonne.fazit }}
+{% endif %}{% if v3_chain.modelle and v3_chain.modelle.fazit %}
+8 {{ v3_labels.step_modelle }}{% if v3_chain.modelle.status_label %} [{{ v3_chain.modelle.status_label }}]{% endif %}
+{{ v3_chain.modelle.fazit }}
+{% endif %}
+{{ v3_labels.warnings_ch }}
+{% for w in v3_warnings.entries -%}
+! {{ w.label }} ({{ w.sev_label }}): {% if w.ki_text %}{{ w.ki_text }} {% endif %}{{ w.code_text }}
+{% else -%}
+{{ v3_labels.hz_none }}
+{% endfor %}
+{{ v3_labels.regions }}
+{% for r in v3_regions -%}
+- {{ r.region_name }}{% if r.rating_display %} {{ r.rating_display }}/5{% endif %}{% if r.has_window and r.cls != 'not_safe' %} · {{ r.window }}{% endif %}{% if r.short %}: {{ r.short }}{% endif %}
+  {{ r.url }}
+{% else -%}
+{{ v3_labels.no_regions }}
+{% endfor %}
+{{ v3_labels.cta }}: {{ urls.dashboard }}
+
+{{ v3_labels.disclaimer }}
+{{ v3_labels.airspace_note }}
+
+{{ t('nav.settings') }}: {{ urls.account }}
+{{ t('email.unsubscribe_link') }}: {{ urls.unsubscribe }}

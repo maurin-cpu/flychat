@@ -270,7 +270,7 @@
   // europaeische Festland — Iberien bis zum Schwarzen Meer, Mittelmeer bis Nord-
   // und Ostsee. Die Mail zeigt die Karte klein; im Europa-Rahmen waere die
   // Schweiz dort kaum zu finden.
-  var FESTLAND_BOUNDS = L.latLngBounds([37.0, -9.5], [55.5, 28.5]);
+  var FESTLAND_BOUNDS = L.latLngBounds([37.0, -9.5], [54.5, 22.5]);
 
   function fitEurope(map) {
     var bounds = (_card && _card.dataset.ausschnitt === "festland")
