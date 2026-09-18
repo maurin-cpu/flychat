@@ -1,22 +1,22 @@
 {
   "_doc": "Pro EN-Uebersetzung der SHA256-Hash der DE-Quelle beim letzten Sync. Pruefen: python scripts/check_i18n_sync.py ; Stempeln nach Nachziehen: --update. Schluessel = EN-Pfad (repo-relativ).",
   "pairs": {
-    "skills/en/chat_capabilities_guide.md": "4a458c36f4dddd6b2d4197406c9b836121b44b72ddd4ea1c268032a676eb501e",
+    "skills/en/chat_capabilities_guide.md": "134bbe1f213afff43cee36cbc10c4b8099db4919157c8b19cfb625dfd76f67ac",
     "skills/en/email_week_lead.md": "c16e4d8671d3341d15f502bfd7d6c75b514c1cbf82a913165ffc39b2976e7ee3",
-    "skills/en/foehn_chat_knowledge.md": "c75246f258d5457d63ddf5e0cb4490a3df7cd2333bf106eb31ec6c763c903458",
-    "skills/en/foehn_llm_regional_guide.md": "143370d53fd180d0cfc4c9c6a9b3f087df5e876c2c214e7f35e5fcfe4cdf4ab0",
-    "skills/en/synoptic_overview.md": "8629c33c9d2c458eaa5547ad218f3c1731652c3de06323c7495ffaeff2d1b6a1",
-    "skills/en/system_chat.md": "1eabcc24b9e2d0623c52caabd02134db74ed125d4c9c741eb1a4ba21401ccb24",
+    "skills/en/foehn_chat_knowledge.md": "7d8e070887d4d8e8f567e15649acebd32a03cc261512214f702a1213ecfcde04",
+    "skills/en/foehn_llm_regional_guide.md": "aea9dc6e5c0c2fc8df17ffa0ac1308417c1ffc9ae5784f18614c5d700388e362",
+    "skills/en/synoptic_overview.md": "4b27ebef2ff45e2f3d03e029b1c1eddd84715dca5c5c3557211abbcc973a47e9",
+    "skills/en/system_chat.md": "05324807653cff72844267847f6a9d2b23c85efcbaeaa0aede3ccea916261df3",
     "skills/shared/en/01_global/01_core_principles.md": "4591f276188030b81cd69040480e31bd8b3b57c0889aac0b83404c548977d8ff",
     "skills/shared/en/03_safety/00_template_region.md": "f5a619df2e301a26acf9b7f2a633f9b4c6c99384f769ed258b557bd2b114433d",
     "skills/shared/en/03_safety/00_template_spot.md": "996154b60a81786f5bcbb1f862804fa5e405f01419863fc5c620478fc0385e7c",
     "skills/shared/en/03_safety/03_status_derivation.md": "08dd4f46aff9fe97234fca845b8523d2fb0e676aa4994843d41a3c115c7ad7cc",
-    "skills/shared/en/03_safety/04_safety_subratings.md": "81e4b87c4ca1c9c0ff3f6a4f3d695dc03d25693fc39487cbd5ef05b01a338f7b",
+    "skills/shared/en/03_safety/04_safety_subratings.md": "aa91cecc2709d9db47c269abde0aa594504b1a95eb9ca23e00bdeb9c012ca690",
     "skills/shared/en/04_flyability/00_template_region.md": "495ad34f4082920eccc2bb105ee0a50d1c7889836e5927c95609a329b2d886e9",
-    "skills/shared/en/04_flyability/00_template_spot.md": "566761273a869220760dc8b1911023dbdeb92c8e31a1536949e4b4eee805a1bc",
+    "skills/shared/en/04_flyability/00_template_spot.md": "71a3b5486273547c777d6c61a438c92458d7a45c4b504aeee31c1b5587301637",
     "skills/shared/en/04_flyability/03_prose_style.md": "9f76ba64eca53f06c4afbd51a1175e638bcc245b9bbda58aef881fc34aa1b654",
-    "skills/shared/en/04_flyability/04_flight_subratings_region.md": "a3aa6c8ce78228a5786eaebbd78793c5d5ff877f4976311a6e70f09da6ef1040",
-    "skills/shared/en/04_flyability/04_flight_subratings_spot.md": "6b6d50124a027e94d87152d763fa178c93705648f2228d673eb6e99b5ffc9cbf",
-    "skills/shared/en/05_context/_spot_context.md": "2415aa9b34d876d2d81e24cc36ac7a38fe334b10f25222cfbaa229e58dd4df15"
+    "skills/shared/en/04_flyability/04_flight_subratings_region.md": "3f6fad3efa6c633b8f3d08c00ae7ca9161a6a3669d7d61a1df618b89be8fc5e4",
+    "skills/shared/en/04_flyability/04_flight_subratings_spot.md": "7e2f9ffb045767ecab01341ea2c39a9af5a64126d4130dd52baae0b15f2a43cf",
+    "skills/shared/en/05_context/_spot_context.md": "1338ae5330463f555e4f26c43d69e4df6827f47d42e2a0ae9e03068ca6a191f6"
   }
 }
