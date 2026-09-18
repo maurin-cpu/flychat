@@ -77,6 +77,33 @@ class TestValidate(unittest.TestCase):
         errors = sl._validate(_parsed(), _ctx())
         self.assertEqual(errors, [])
 
+    def test_kaltfront_allowed_when_fronts_in_ctx(self):
+        """Mit DWD-Durchgaengen im Strukturfeld ist Fronten-Vokabular erlaubt."""
+        ctx = _ctx()
+        ctx["fronten"] = {"durchgaenge": [{"zone": "alpennordhang", "typ": "kalt",
+                                           "art": "streift", "tag": "2026-07-06",
+                                           "fenster_lokal": ["14:00", "16:00"],
+                                           "randkontakt": False, "im_fenster": True}]}
+        errors = sl._validate(_parsed(lead="Die Kaltfront streift den Alpennordhang."), ctx)
+        self.assertFalse(any(e["kind"] == "forbidden_term" for e in errors))
+
+    def test_kaltfront_rejected_when_fronts_empty(self):
+        """Leere Durchgangsliste = weiter verboten (kein Datenrueckhalt)."""
+        ctx = _ctx()
+        ctx["fronten"] = {"durchgaenge": []}
+        errors = sl._validate(_parsed(lead="Eine Kaltfront zieht durch."), ctx)
+        self.assertTrue(any(e["kind"] == "forbidden_term" and e["scope"] == "lead"
+                            for e in errors))
+
+    def test_trog_still_forbidden_with_fronts(self):
+        """Die Freigabe gilt nur fuer Fronten, nicht fuer Trog/hPa."""
+        ctx = _ctx()
+        ctx["fronten"] = {"durchgaenge": [{"zone": "wallis", "typ": "warm", "art": "quert",
+                                           "tag": "2026-07-05", "fenster_lokal": ["09:00", "11:00"],
+                                           "randkontakt": True, "im_fenster": True}]}
+        errors = sl._validate(_parsed(lead="Die Trogachse liegt ueber den Alpen."), ctx)
+        self.assertTrue(any(e["kind"] == "forbidden_term" for e in errors))
+
     def test_reject_kaltfront_in_lead(self):
         errors = sl._validate(_parsed(lead="Eine Kaltfront zieht durch."), _ctx())
         self.assertTrue(any(e["kind"] == "forbidden_term" and e["scope"] == "lead"
@@ -1360,9 +1387,13 @@ class TestShortSentences(unittest.TestCase):
 
     def test_day_line_too_long_and_verdict(self):
         p = _parsed()
+        # Limit ist seit 09/2026 45 Woerter (Einfluss -> Druck -> Daten) — der
+        # Satz hier muss klar drueber liegen
         p["day_lines"][0] = ("Ein Tief bei Island lenkt feuchte Luft an die Alpen, es regnet "
                              "verbreitet und der Wind ist so stark, dass kein nutzbares "
-                             "Fenster bleibt.")
+                             "Fenster bleibt, weder am Morgen noch am Mittag noch am "
+                             "Nachmittag, und auch am Abend bleibt es an allen Haengen der "
+                             "Alpennordseite windig, nass, kalt und unfliegbar bis in die Nacht.")
         kinds = {e["kind"] for e in sl._validate(p, _hz_ctx())
                  if e["scope"] == "day_lines[0]"}
         self.assertIn("too_long", kinds)

@@ -78,7 +78,8 @@ mislead pilots.
 
 FORBIDDEN TERMS:
 - "cold front", "warm front", "occlusion", "frontal passage", "pre-frontal",
-  "post-frontal"
+  "post-frontal" — **unless** `fronten.durchgaenge` is non-empty (see the
+  FRONTS section). With no entries there: not a single front word.
 - "trough", "ridge", "geopotential", "vorticity", "trough axis"
 - concrete hPa values (e.g. "1015 hPa"), concrete temperature values in °C
   ("4°C at 850 hPa") — the pilot wants character, not numbers
@@ -109,6 +110,59 @@ NAME UNCERTAINTY HONESTLY:
   "likely to", "points towards" instead of definitive statements
 - `level=medium` → "probably"
 - `level=high` → clear statements allowed
+
+═══════════════════════════════════════════════
+FRONTS — ONLY FROM `fronten.durchgaenge`, ALWAYS AS A FORECAST
+═══════════════════════════════════════════════
+
+Since 2026-09 the DWD front forecast is part of the structured field:
+`fronten` carries `durchgaenge`, each with `zone`, `typ` (kalt/warm/okklusion
+= cold/warm/occlusion), `art` (quert = crosses / streift = brushes), `tag`
+(date), `fenster_lokal` [from, to], `randkontakt` (edge contact), `im_fenster`
+(inside the forecast window). This is the ONLY source for front sentences.
+
+- `durchgaenge` empty or `fronten` null → **no front word**, anywhere. Not
+  even "no front in sight" — what is not in the field does not exist.
+- `durchgaenge` non-empty → in the `lead` exactly ONE sentence per front is
+  MANDATORY, always as a forecast, never as certainty: "Forecast data suggest
+  the cold front brushes the Northern Alps on Sunday afternoon."
+  * weekday from `forecast_dates[*].weekday` for `tag`; time of day from
+    `fenster_lokal` (morning / midday / afternoon / evening / night), no
+    clock times.
+  * `art=streift` → "brushes", `art=quert` → "crosses". Do not escalate.
+  * `randkontakt=true` → add the uncertainty: "— uncertain, edge contact only".
+  * `im_fenster=false` → do not mention it at all: only the day itself counts.
+  * `aus_vortageslauf=true` → the entry comes from yesterday's run (the
+    latest run cannot see the next 36 h): soften ("is expected to",
+    "according to yesterday's run"), never "will".
+  * Two entries of the same type on different days are TWO fronts ("a
+    further cold front on Sunday") — not the same one twice.
+- In `zones[].days[i].text` and `day_lines[i]` the front may appear ONLY on
+  day `tag` and ONLY in zone `zone` (front type + brushes/crosses + time of
+  day). A day BEFORE the earliest `tag` may say so ("still ahead of the cold
+  front", "the front only arrives on Sunday") — that is the link to the
+  current day a pilot needs. Days AFTER a passage: no front word, unless a
+  further entry names one.
+- Never invent what the field does not say: no rain amounts, no wind figure
+  "because of the front", no "pre-frontal/post-frontal".
+- `flight_hint`: state the consequence when `im_fenster=true` and not
+  `randkontakt` ("fly before the passage, gusts afterwards") — otherwise
+  nothing.
+- `frontsignatur.per_day[i].zones.<zone>` is the passage in OUR forecast
+  data (pressure rise, 700 hPa wind shift, T850 jump, rain around `hour`).
+  That is the verdict; the DWD forecast (`fronten`) only supplies the name:
+  * signature present → "the cold front passes in the afternoon — pressure
+    rise, wind veering north-west, rain" (evidence in words, no numbers).
+  * `fronten` names a passage, signature null → "the front weakens over
+    Switzerland", never "passes".
+  * signature present, `fronten` empty → "front-like passage" without a
+    type, unless `typ_hinweis` is set.
+- `fronten.vergangen` (passages of the last 36 h from the DWD ANALYSIS, i.e.
+  observed, not forecast): may be named on the following day as the rear
+  side — "after yesterday's cold front the Northern Alps sit on its rear
+  side: cooler, north-westerly". Only with zone and day from the entry; what
+  the rear side brings comes from the other fields (wind, T850,
+  precipitation), not from the textbook.
 
 ═══════════════════════════════════════════════
 `lead` — THE GENERAL SITUATION (4-6 sentences, max 130 words)
@@ -428,7 +482,8 @@ EXACTLY one entry `{"items": [...]}` per `forecast_dates` day:
       as a list of readings. If the value is missing, leave it out.
   * `BISE` — Mittelland and Jura, stronger where channelled.
   * `WIND` — cause from `wind_day.wind_driver` (upper wind / gusts).
-- Same bans as everywhere: no hPa/°C numbers, no front/trough jargon, no
+- Same bans as everywhere: no hPa/°C numbers, no trough jargon, fronts only
+  from `fronten.durchgaenge` (FRONTS section), no
   launch sites or villages, no recommendation. Foehn words only when
   `FOEHN` is active that day; thunderstorm words only when `THUNDER` is.
 
@@ -448,15 +503,50 @@ In the briefing this sentence sits in the day section under "Situation". It
 replaces the long `lead` there — so keep it short and about this day only.
 
 EXACTLY one string per `forecast_dates` day:
-- ONE sentence, AT MOST 20 words.
+- ONE to THREE sentences, AT MOST 35 words.
 - Cause → effect for THIS day: which pressure centres/flow, and what they do
   over Switzerland today ("… brings rain and wind").
 - Pressure centres only from `pressure_centers_per_day` (as in the `lead`).
 - No verdict about flying, no other day, no weekday, no hPa/°C numbers. Foehn
-  only when `FOEHN` is active that day; thunderstorms only when `THUNDER` is.
+  only when `FOEHN` is active that day; thunderstorms only when `THUNDER` is;
+  a front only when `fronten.durchgaenge` has an entry with this `tag` — then
+  as a forecast ("is expected to brush …").
 
-Pattern: `"A low near Iceland steers moist south-westerly air against the Alps,
-bringing widespread rain and strong wind."`
+- Structured the way a pilot reads the situation, in this order —
+  condensed, no list, no numbers:
+  1. INFLUENCE: which pressure centres (`pressure_centers_per_day`) bring
+     which flow (`flow_overhead.per_day[i]`) and what air that is
+     (south-west = mild, humid Mediterranean air piling up in the south;
+     north-west = cool air piling up on the Northern Alps; north-east = dry
+     continental air).
+  2. PRESSURE OVER SWITZERLAND: `pressure_influence.per_day[i].regime` and
+     the tendency (`slope_hpa_per_day`) — and what it means ("high-pressure
+     influence growing, the situation calms down" / "low-pressure influence,
+     unsettled").
+  2b. What the pressure MEANS for the weather, in plain words: high
+     pressure = stable, mostly dry; low pressure = unsettled, cloud and rain;
+     rising pressure = calming down; falling = turning more unsettled.
+  3. WHAT THE FORECAST DATA MAKE OF IT — for the WHOLE of Switzerland, like a
+     weather report (MeteoSwiss, DWD aviation bulletin): precipitation (dry /
+     mostly dry, showers only in the south / some rain / widespread rain)
+     from `precip_pattern.per_day[i]`, wind (calm / partly windy / widely
+     windy, cause `wind_driver`) from `wind_pattern.per_day[i]`, the
+     north–south difference only as an addition ("less in the south"). NO
+     zones, no regions — those belong in the zone texts. The code writes the
+     same form as a line below; both must agree.
+
+The weather consequence hangs on the pressure sentence as ONE flow (colon),
+no "Forecast data:" label, no third list.
+THE LOGIC MUST HOLD: "calming down" must not sit next to "showers increasing".
+If pressure rises but rain increases in one part of the country, narrow it
+("calming down in the north, showers in the south increasing in the
+afternoon") or defer it ("high-pressure influence growing but not arriving
+yet"). If pressure falls but it is dry: "for now mostly dry".
+
+Pattern: `"Between the Iceland low and the Azores high: moderate south-westerly
+flow with humid Mediterranean air. Pressure rising — high-pressure influence
+growing, weather calming down: mostly dry, showers only in the south and fading
+during the day, widely windy from the upper wind, less in the south."`
 
 ═══════════════════════════════════════════════
 RESPONSE FORMAT

@@ -20,6 +20,11 @@ ist nicht statisch — pro Tag wird das beste verfügbare Modell gewählt
 | **ICON-EU**  | DWD | 13 km | 5 d | parametrisiert | Pan-Europa | ✓ | ✓ | — |
 | **GFS**      | NOAA | ~25 km | 5 d | parametrisiert | global | (✓) | ✓ | ✓ |
 
+> **Bezugsweg:** Diese Doku beschreibt, *welches Modell* welche Grösse
+> liefert. Über *welchen Weg* die Daten kommen — Tarif, Verbrauch,
+> Gratis-Zugang und der Direktbezug bei DWD/MeteoSchweiz als Alternative —
+> steht in **[`DATENBEZUG.md`](DATENBEZUG.md)**.
+
 > **Open-Meteo-Limit (Mai 2026 verifiziert):**
 > - **CH1/CH2** liefern **nur Surface-Variablen** (kein PL, kein BLH).
 > - **D2-Surface** wird nur noch für die Variablen genutzt, die CH-Modelle

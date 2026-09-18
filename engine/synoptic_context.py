@@ -181,6 +181,53 @@ def build_synoptic_context(weather_cache: dict,
         logger.exception("Hoehenwind regional fehlgeschlagen — Feld fehlt")
         aloft_regional = None
 
+    # 8j. Modellvergleich (MeteoSchweiz, DWD, NOAA) an vier Referenzpunkten
+    try:
+        modelle = modell_vergleich(forecast_dates)
+    except Exception:
+        logger.exception("Modellvergleich fehlgeschlagen — Feld fehlt")
+        modelle = None
+
+    # 8i. Thermik und Basis je Zone
+    try:
+        thermik = thermik_zonen(weather_cache.get("_regions") or {}, forecast_dates)
+    except Exception:
+        logger.exception("Thermik-Zonen fehlgeschlagen — Feld fehlt")
+        thermik = None
+
+    # 8h. Starke Winde an einzelnen Startplaetzen (Prognosepunkte)
+    try:
+        starkwind = starkwind_punkte(weather_cache, forecast_dates, build_spot_region_map())
+    except Exception:
+        logger.exception("Starkwind-Check fehlgeschlagen — Feld fehlt")
+        starkwind = None
+
+    # 8g. Bise am Boden (Nordostwind im Mittelland) — Abgleich zur Synoptik
+    try:
+        bise_bod = bise_boden(weather_cache, forecast_dates, build_spot_region_map())
+    except Exception:
+        logger.exception("Bise-Bodencheck fehlgeschlagen — Feld fehlt")
+        bise_bod = None
+
+    # 8f. Frontsignatur in den eigenen Prognosedaten (Druck/Wind/T850/Regen)
+    try:
+        frontsignatur = detect_frontsignatur(weather_cache.get("_regions") or {},
+                                             forecast_dates)
+        if frontsignatur:
+            decisions_applied.append("detect_frontsignatur")
+    except Exception:
+        logger.exception("Frontsignatur fehlgeschlagen — Feld fehlt")
+        frontsignatur = None
+
+    # 8e. DWD-Frontdurchgaenge (Zone, Typ, Zeitfenster) — fuer KI und Briefing
+    try:
+        fronten = load_dwd_frontdurchgaenge(forecast_dates)
+        if fronten:
+            decisions_applied.append("load_dwd_frontdurchgaenge")
+    except Exception:
+        logger.exception("Frontdurchgaenge fehlgeschlagen — Feld fehlt")
+        fronten = None
+
     current_month = datetime.now().month
     ssg = decide_schneefallgrenze(snapshots, current_month)
     if ssg:
@@ -222,6 +269,12 @@ def build_synoptic_context(weather_cache: dict,
         "precip_zones": precip_zones,
         "wind_zones": wind_zones,
         "aloft_regional": aloft_regional,
+        "fronten": fronten,
+        "frontsignatur": frontsignatur,
+        "bise_boden": bise_bod,
+        "starkwind_punkte": starkwind,
+        "thermik_zonen": thermik,
+        "modell_vergleich": modelle,
         "zugbahn": zugbahn,
         "schneefallgrenze": ssg,
         "confidence_per_day": [
@@ -1081,6 +1134,10 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
                     return wname
             return None
 
+        dp_sued_max = dp_nord_max = crest_max = None
+        gust_nord_max = gust_sued_max = None      # Lee-Boeen: Nordseite (Suedfoehn), Suedseite (Nordfoehn)
+        g_nord = (data["nord"].get("hourly") or {}).get("wind_gusts_10m") or []
+        g_sued = (data["sued"].get("hourly") or {}).get("wind_gusts_10m") or []
         for i in day_indices:
             hour = int(times[i][11:13])
             wname = _bucket(hour)
@@ -1088,6 +1145,21 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
                                      kritischer_foehn="Süd")
             ev_nord = evaluate_foehn(data["nord"], data["sued"], i,
                                      kritischer_foehn="Nord")
+            # Anspruch der Synoptik und Antwort der Daten fuer den Abgleich im Briefing
+            for val, cur, name in ((ev_sued.get("delta_p_hpa"), dp_sued_max, "s"),
+                                   (ev_nord.get("delta_p_hpa"), dp_nord_max, "n")):
+                if isinstance(val, (int, float)) and (cur is None or val > cur):
+                    if name == "s":
+                        dp_sued_max = float(val)
+                    else:
+                        dp_nord_max = float(val)
+            cw = ev_sued.get("crest_wind_kmh") or ev_nord.get("crest_wind_kmh")
+            if isinstance(cw, (int, float)) and (crest_max is None or cw > crest_max):
+                crest_max = float(cw)
+            if i < len(g_nord) and isinstance(g_nord[i], (int, float)):
+                gust_nord_max = max(gust_nord_max or 0.0, float(g_nord[i]))
+            if i < len(g_sued) and isinstance(g_sued[i], (int, float)):
+                gust_sued_max = max(gust_sued_max or 0.0, float(g_sued[i]))
             if ev_sued.get("level", "none") != "none":
                 sued_hours += 1
                 peak_sued = _peak(peak_sued, ev_sued["level"])
@@ -1114,6 +1186,11 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
             "nord_hours": nord_hours,
             "sued_windows": win_sued,
             "nord_windows": win_nord,
+            "claim": {"delta_p_sued_max_hpa": (round(dp_sued_max, 1) if dp_sued_max is not None else None),
+                      "delta_p_nord_max_hpa": (round(dp_nord_max, 1) if dp_nord_max is not None else None),
+                      "crest_wind_max_kmh": (round(crest_max) if crest_max is not None else None)},
+            "lee": {"gust_nord_max_kmh": (round(gust_nord_max) if gust_nord_max is not None else None),
+                    "gust_sued_max_kmh": (round(gust_sued_max) if gust_sued_max is not None else None)},
         })
 
     any_sued = any(d["sued_active"] for d in per_day)
@@ -1693,6 +1770,411 @@ def build_spot_region_map() -> dict[str, str]:
             if (s.get("analyse_region") or "").strip()}
 
 
+def merge_passagen_runs(max_runs: int = 3) -> tuple[list[dict], Optional[str]]:
+    """Durchgangs-Aussagen der letzten Laeufe zusammenfuehren.
+
+    Ein Lauf rechnet nur mit den DWD-Vorhersagekarten ab +36 h — die naechsten
+    36 Stunden sieht der neueste Lauf NICHT (am 18.09.2026 fehlte so die
+    Kaltfront, die der Vortageslauf fuer denselben Nachmittag angesetzt hatte).
+    Deshalb: die letzten Laeufe uebereinanderlegen, je (Zone, Typ, Tag) gilt
+    der neueste. Returns (aussagen, name der neuesten Datei)."""
+    import glob
+    import json
+    from zoneinfo import ZoneInfo
+    cands = sorted(glob.glob(str(config.PROJECT_ROOT / "validation" / "fronten"
+                                 / "aussagen" / "passagen_*.json")))[-max_runs:]
+    if not cands:
+        return [], None
+    tz = ZoneInfo("Europe/Zurich")
+    by_key: dict = {}
+    for f in cands:                       # alt -> neu: der neuere ueberschreibt
+        try:
+            with open(f, encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except (OSError, ValueError):
+            logger.warning("merge_passagen_runs: %s nicht lesbar", f)
+            continue
+        for a in raw.get("aussagen") or []:
+            try:
+                local = datetime.fromisoformat(
+                    (a.get("durchgang_median_utc") or "").replace("Z", "+00:00")).astimezone(tz)
+            except (TypeError, ValueError):
+                continue
+            a = dict(a)
+            a["lauf"] = raw.get("lauf")
+            by_key[(a.get("zone"), a.get("typ"), local.date().isoformat())] = a
+    latest = max((a.get("lauf") or "" for a in by_key.values()), default="")
+    for a in by_key.values():
+        a["aus_vortageslauf"] = (a.get("lauf") or "") != latest
+    return list(by_key.values()), Path(cands[-1]).name
+
+
+def load_ist_durchgaenge(max_age_h: int = 36) -> list[dict]:
+    """Tatsaechliche Durchgaenge aus der DWD-Analysekette
+    (validation/fronten/observations.csv, Spalten ana_*), nicht aelter als
+    max_age_h — fuer den Satz "gestern ist die Kaltfront durchgezogen, heute
+    Rueckseite". Dedupliziert je (Zone, Typ, Stunde)."""
+    import csv
+    from datetime import timezone
+    path = config.PROJECT_ROOT / "validation" / "fronten" / "observations.csv"
+    if not path.exists():
+        return []
+    now = datetime.now(timezone.utc)
+    out, seen = [], set()
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            for r in csv.DictReader(fh):
+                am = (r.get("ana_median_utc") or "").strip()
+                if not am or (r.get("ana_front_da") or "").strip() != "1":
+                    continue
+                try:
+                    med = datetime.fromisoformat(am.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if med.tzinfo is None:
+                    med = med.replace(tzinfo=timezone.utc)
+                if med > now or (now - med).total_seconds() > max_age_h * 3600:
+                    continue
+                key = (r.get("zone"), r.get("typ"), am[:13])
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append({"zone": r.get("zone"), "typ": r.get("typ"),
+                            "art": r.get("art") or "quert",
+                            "median_utc": med.isoformat(timespec="minutes")})
+    except OSError:
+        return []
+    out.sort(key=lambda d: d["median_utc"])
+    return out
+
+
+# build_spot_region_map liefert Regions-NAMEN (analyse_region), deshalb beide Formen
+BISE_PLATEAU_REGIONS = ("mittelland_ost", "zentrales_mittelland", "genferseeregion",
+                        "bodenseeraum", "tafeljura", "neuenburger_jura", "jura_zentral",
+                        'Mittelland Ost', 'Genferseeregion', 'Tafeljura', 'Neuenburger Jura', 'Jura Zentral', 'Bodenseeraum', 'Zentrales Mittelland')
+
+
+def bise_boden(weather_cache: dict, forecast_dates: list[str],
+               region_map: dict[str, str]) -> Optional[dict]:
+    """Zeigt sich die Bise der Synoptik am Boden? Je Tag der Anteil der
+    Mittelland-/Jura-Startplaetze, an denen der 10-m-Wind im Flugfenster aus
+    Nordost (30-90 Grad) mit >= 15 km/h weht, plus die staerkste Stunde."""
+    h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
+    spots = [s for s, r in region_map.items() if r in BISE_PLATEAU_REGIONS and s in weather_cache]
+    if not spots:
+        return None
+    per_day = []
+    for date in forecast_dates:
+        n_ne, n_all, max_kmh = 0, 0, 0.0
+        for name in spots:
+            hd = weather_cache[name].get("hourly_data") or {}
+            best, seen = 0.0, False
+            for hour in range(h_start, h_end):
+                rec = hd.get(f"{date}T{hour:02d}:00") or {}
+                d, v = rec.get("wind_direction_10m"), rec.get("wind_speed_10m")
+                if not isinstance(d, (int, float)) or not isinstance(v, (int, float)):
+                    continue
+                seen = True
+                if 30 <= d <= 90 and v >= 15:
+                    best = max(best, float(v))
+            if seen:
+                n_all += 1
+                if best > 0:
+                    n_ne += 1
+                    max_kmh = max(max_kmh, best)
+        per_day.append({"date": date, "share_ne": (round(n_ne / n_all, 2) if n_all else None),
+                        "max_kmh": round(max_kmh), "n_spots": n_all})
+    return {"per_day": per_day, "decided_by": "bise_boden",
+            "thresholds": {"dir_sector": [30, 90], "min_kmh": 15, "regions": list(BISE_PLATEAU_REGIONS)}}
+
+
+def thermik_zonen(region_weather_data: dict, forecast_dates: list[str]) -> Optional[dict]:
+    """Thermik und Basis je Zone und Tag aus den Regions-Prognosen
+    (thermals_spotmedian: climb_rate m/s, max_height m, lcl m je Stunde;
+    hourly_data: cloud_cover_low, sunshine_duration). Je Zone der Median ueber
+    ihre Regionen: Tagesspitze des Steigens, Basis (lcl) um 13 Uhr, nutzbare
+    Hoehe, Thermikbeginn (erste Stunde >= 0.5 m/s), tiefe Bewoelkung und
+    Sonnenanteil im Mittagsfenster. Nur Prognosedaten."""
+    if not region_weather_data or not forecast_dates:
+        return None
+    by_zone: dict[str, list[dict]] = {}
+    for rdata in region_weather_data.values():
+        if isinstance(rdata, dict):
+            z = _zone_of_region(rdata)
+            if z in config.SYNOPTIC_ZONES:
+                by_zone.setdefault(z, []).append(rdata)
+    h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
+    per_day = []
+    for date in forecast_dates:
+        zones = {}
+        for z in config.SYNOPTIC_ZONES:
+            climbs, bases, heights, starts, lows, suns = [], [], [], [], [], []
+            totals, midhigh = [], []
+            for r in by_zone.get(z) or []:
+                th = r.get("thermals_spotmedian") or {}
+                hd = r.get("hourly_data") or {}
+                peak, start = 0.0, None
+                for hour in range(h_start, h_end):
+                    key = f"{date}T{hour:02d}:00"
+                    t = th.get(key) or {}
+                    c = t.get("climb_rate")
+                    if isinstance(c, (int, float)):
+                        peak = max(peak, float(c))
+                        if start is None and c >= 0.5:
+                            start = hour
+                climbs.append(peak)
+                if start is not None:
+                    starts.append(start)
+                t13 = th.get(f"{date}T13:00") or {}
+                if isinstance(t13.get("lcl"), (int, float)):
+                    bases.append(float(t13["lcl"]))
+                if isinstance(t13.get("max_height"), (int, float)):
+                    heights.append(float(t13["max_height"]))
+                lo, su, tot, mh = [], [], [], []
+                for hour in range(10, 16):
+                    rec = hd.get(f"{date}T{hour:02d}:00") or {}
+                    if isinstance(rec.get("cloud_cover_low"), (int, float)):
+                        lo.append(float(rec["cloud_cover_low"]))
+                    if isinstance(rec.get("cloud_cover"), (int, float)):
+                        tot.append(float(rec["cloud_cover"]))
+                    m = rec.get("cloud_cover_mid")
+                    h = rec.get("cloud_cover_high")
+                    if isinstance(m, (int, float)) or isinstance(h, (int, float)):
+                        mh.append(max(float(m or 0), float(h or 0)))
+                    if isinstance(rec.get("sunshine_duration"), (int, float)):
+                        su.append(float(rec["sunshine_duration"]) / 3600.0)
+                if lo:
+                    lows.append(statistics.mean(lo))
+                if su:
+                    suns.append(statistics.mean(su))
+                if tot:
+                    totals.append(statistics.mean(tot))
+                if mh:
+                    midhigh.append(statistics.mean(mh))
+            if not climbs:
+                zones[z] = None
+                continue
+            zones[z] = {
+                "climb_ms": round(statistics.median(climbs), 1),
+                "base_m": (round(statistics.median(bases) / 100) * 100 if bases else None),
+                "top_m": (round(statistics.median(heights) / 100) * 100 if heights else None),
+                "start_hour": (int(statistics.median(starts)) if starts else None),
+                "low_cloud_pct": (round(statistics.median(lows)) if lows else None),
+                "cloud_pct": (round(statistics.median(totals)) if totals else None),
+                "mid_high_pct": (round(statistics.median(midhigh)) if midhigh else None),
+                "sun_share": (round(statistics.median(suns), 2) if suns else None),
+                "n_regions": len(climbs),
+            }
+        per_day.append({"date": date, "zones": zones})
+    return {"per_day": per_day, "decided_by": "thermik_zonen",
+            "thresholds": {"start_climb_ms": 0.5, "base_hour": 13, "sun_hours": [10, 16]}}
+
+
+# Modellvergleich: ein Punkt je Zone, fuenf Modelle (MeteoSchweiz, DWD, NOAA)
+MODEL_COMPARE_POINTS = {
+    "alpennordhang": (46.69, 7.86),        # Interlaken
+    "wallis": (46.23, 7.36),               # Sion
+    "tessin": (46.17, 8.80),               # Locarno
+    "graubuenden_engadin": (46.85, 9.53),  # Chur
+}
+MODEL_COMPARE_MODELS = {
+    "meteoswiss_icon_ch1": "ICON-CH1", "meteoswiss_icon_ch2": "ICON-CH2",
+    "icon_d2": "ICON-D2", "icon_eu": "ICON-EU", "gfs_seamless": "GFS",
+}
+
+
+def modell_vergleich(forecast_dates: list[str]) -> Optional[dict]:
+    """Sind sich die Modelle einig? Je Zone ein Referenzpunkt, je Modell die
+    Boeenspitze im Flugfenster, die Regensumme und die Bewoelkung 10-16 Uhr
+    fuer jeden Tag. Spread = groesster minus kleinster Modellwert. MeteoSchweiz
+    (ICON-CH1/CH2), DWD (ICON-D2/EU) und NOAA (GFS) — ein Modell, das den Tag
+    nicht abdeckt (ICON-D2 nach 48 h), fehlt einfach."""
+    if not forecast_dates:
+        return None
+    h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
+    models = list(MODEL_COMPARE_MODELS)
+    per_zone = {}
+    for zone, (lat, lon) in MODEL_COMPARE_POINTS.items():
+        params = {
+            "latitude": lat, "longitude": lon, "timezone": "Europe/Zurich",
+            "hourly": "wind_gusts_10m,precipitation,cloud_cover",
+            "models": ",".join(models), "forecast_days": max(len(forecast_dates), 3),
+        }
+        config.with_api_key(params)
+        try:
+            resp = requests.get(config.API_URL, params=params, timeout=30)
+            resp.raise_for_status()
+            hourly = resp.json().get("hourly") or {}
+        except Exception as e:
+            logger.warning("modell_vergleich: %s fehlgeschlagen: %s", zone, e)
+            continue
+        times = hourly.get("time") or []
+        idx = {t: i for i, t in enumerate(times)}
+        days = {}
+        for date in forecast_dates:
+            row = {}
+            for m in models:
+                g = hourly.get(f"wind_gusts_10m_{m}") or []
+                p = hourly.get(f"precipitation_{m}") or []
+                c = hourly.get(f"cloud_cover_{m}") or []
+                gusts, rain, cloud = [], [], []
+                for h in range(24):
+                    i = idx.get(f"{date}T{h:02d}:00")
+                    if i is None:
+                        continue
+                    if h_start <= h < h_end and i < len(g) and isinstance(g[i], (int, float)):
+                        gusts.append(float(g[i]))
+                    if i < len(p) and isinstance(p[i], (int, float)):
+                        rain.append(float(p[i]))
+                    if 10 <= h < 16 and i < len(c) and isinstance(c[i], (int, float)):
+                        cloud.append(float(c[i]))
+                if not gusts and not rain:
+                    continue                      # Modell deckt den Tag nicht ab
+                row[m] = {"gust_kmh": (round(max(gusts)) if gusts else None),
+                          "rain_mm": (round(sum(rain), 1) if rain else None),
+                          "cloud_pct": (round(statistics.mean(cloud)) if cloud else None)}
+            days[date] = row
+        per_zone[zone] = days
+    if not per_zone:
+        return None
+    per_day = []
+    for date in forecast_dates:
+        zones = {}
+        for zone, days in per_zone.items():
+            row = days.get(date) or {}
+            if len(row) < 2:
+                zones[zone] = None
+                continue
+            # GFS (25 km) liegt bei Boeen und Bewoelkung im Alpenraum systematisch
+            # daneben (18.09.2026: 6 km/h neben 26-35 der ICON-Modelle) und wuerde
+            # jeden Tag zum "uneinig" machen — fuer Wind/Wolken nur die ICON-
+            # Modelle vergleichen, GFS bleibt in der Zahlenzeile sichtbar.
+            fine = {k: v for k, v in row.items() if k != "gfs_seamless"} or row
+            gv = [v["gust_kmh"] for v in fine.values() if v.get("gust_kmh") is not None]
+            rv = [v["rain_mm"] for v in row.values() if v.get("rain_mm") is not None]
+            cv = [v["cloud_pct"] for v in fine.values() if v.get("cloud_pct") is not None]
+            zones[zone] = {
+                "models": row,
+                "gust_spread_kmh": (max(gv) - min(gv)) if gv else None,
+                "rain_wet_models": sum(1 for r in rv if r >= 1.0), "rain_n": len(rv),
+                "cloud_spread_pct": (max(cv) - min(cv)) if cv else None,
+            }
+        per_day.append({"date": date, "zones": zones})
+    return {"per_day": per_day, "decided_by": "modell_vergleich",
+            "models": MODEL_COMPARE_MODELS, "points": MODEL_COMPARE_POINTS,
+            "thresholds": {"gust_agree_kmh": 10, "gust_disagree_kmh": 20, "wet_mm": 1.0,
+                           "cloud_agree_pct": 30, "spread_excludes": ["gfs_seamless"]}}
+
+
+def starkwind_punkte(weather_cache: dict, forecast_dates: list[str],
+                     region_map: dict[str, str]) -> Optional[dict]:
+    """Starke Winde an einzelnen Startplaetzen — Prognosepunkte, keine
+    Messungen, und ohne Tal-Zuordnung (welcher Punkt im Tal liegt, wissen wir
+    nicht). Je Tag: die staerkste 10-m-Boe im Flugfenster mit Spot, Region,
+    Hoehe, Richtung und dem CH2-Wert derselben Stunde (Modell-Uneinigkeit),
+    plus Anteil der Spots mit Boeen >= 40 km/h."""
+    h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
+    per_day = []
+    for date in forecast_dates:
+        best, n_strong, n_all = None, 0, 0
+        for spot, region in region_map.items():
+            sd = weather_cache.get(spot) or {}
+            hd = sd.get("hourly_data") or {}
+            mx, seen = None, False
+            for hour in range(h_start, h_end):
+                rec = hd.get(f"{date}T{hour:02d}:00") or {}
+                g = rec.get("wind_gusts_10m")
+                if not isinstance(g, (int, float)):
+                    continue
+                seen = True
+                if mx is None or g > mx[0]:
+                    mx = (float(g), hour, rec.get("wind_direction_10m"), rec.get("wind_gusts_10m_ch2"))
+            if not seen:
+                continue
+            n_all += 1
+            if mx[0] >= 40:
+                n_strong += 1
+            if best is None or mx[0] > best[0]:
+                best = (mx[0], spot, region, sd.get("elevation_m"), mx[1], mx[2], mx[3])
+        if best is None:
+            per_day.append({"date": date, "max_gust_kmh": None})
+            continue
+        per_day.append({
+            "date": date, "max_gust_kmh": round(best[0]), "spot": best[1], "region": best[2],
+            "elevation_m": best[3], "hour": best[4],
+            "dir_deg": (round(best[5]) if isinstance(best[5], (int, float)) else None),
+            "gust_ch2_kmh": (round(best[6]) if isinstance(best[6], (int, float)) else None),
+            "n_spots": n_all, "share_strong": (round(n_strong / n_all, 2) if n_all else None),
+        })
+    return {"per_day": per_day, "decided_by": "starkwind_punkte",
+            "thresholds": {"strong_gust_kmh": 40, "hours": [h_start, h_end]}}
+
+
+def load_dwd_frontdurchgaenge(forecast_dates: list[str]) -> Optional[dict]:
+    """DWD-Frontenprognose als Strukturfeld-Block fuer die KI.
+
+    Quelle: validation/fronten/aussagen/passagen_*.json — der Server rechnet
+    aus den DWD-Vorhersagekarten (+36…+108 h) je Zone, ob und wann eine Front
+    die Zone quert oder streift. Bis 2026-09 bekam die KI keine Frontendaten
+    und durfte deshalb keine Fronten nennen (Halluzinationsschutz). Jetzt
+    liegen die Durchgaenge vor; die KI darf sie nennen — und nur sie.
+
+    Returns None, wenn keine Datei da ist (dann bleibt das Frontverbot).
+    """
+    from zoneinfo import ZoneInfo
+    aussagen, datei = merge_passagen_runs()
+    if datei is None:
+        return None
+    tz = ZoneInfo("Europe/Zurich")
+    window_end = forecast_dates[-1] if forecast_dates else ""
+
+    def _local(iso):
+        try:
+            return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(tz)
+        except (TypeError, ValueError, AttributeError):
+            return None
+
+    out = []
+    for a in aussagen:
+        local = _local(a.get("durchgang_median_utc") or "")
+        if local is None:
+            continue
+        tag = local.date().isoformat()
+        von = _local(a.get("fenster_von_utc") or "") or local
+        bis = _local(a.get("fenster_bis_utc") or "") or local
+        out.append({
+            "zone": a.get("zone"),
+            "typ": a.get("typ"),                       # kalt | warm | okklusion
+            "art": a.get("art"),                       # quert | streift
+            "tag": tag,
+            "fenster_lokal": [von.strftime("%H:%M"), bis.strftime("%H:%M")],
+            # Randkontakt: DWD-Linie trifft nur den Zonenrand oder kaum Spots —
+            # die KI muss das als unsicher formulieren
+            "randkontakt": bool(a.get("randwert")) or (a.get("anteil") or 0) < 0.1,
+            "im_fenster": bool(window_end) and tag <= window_end,
+            # aus dem Vortageslauf uebernommen (der neueste sieht <36 h nicht)
+            "aus_vortageslauf": bool(a.get("aus_vortageslauf")),
+        })
+    out.sort(key=lambda d: (d["tag"], d["fenster_lokal"][0]))
+    # durchgezogene Fronten der letzten 36 h (DWD-Analyse) — Rueckseite
+    vergangen = []
+    for e in load_ist_durchgaenge():
+        local = _local(e["median_utc"])
+        if local is None:
+            continue
+        vergangen.append({"zone": e["zone"], "typ": e["typ"], "art": e["art"],
+                          "tag": local.date().isoformat(),
+                          "zeit_lokal": local.strftime("%H:%M")})
+    return {
+        "quelle": "DWD-Frontenprognose",
+        "lauf": datei,
+        "durchgaenge": out,
+        "vergangen": vergangen,
+        "decided_by": "load_dwd_frontdurchgaenge",
+        "inputs": {"datei": datei},
+    }
+
+
 def decide_aloft_regional(weather_cache: dict, forecast_dates: list[str],
                           region_map: dict[str, str]) -> dict:
     """Staerkster Hoehenwind (700 hPa) je Tag auf Regionsebene.
@@ -1746,8 +2228,12 @@ def decide_aloft_regional(weather_cache: dict, forecast_dates: list[str],
                             "hour": None, "top": [], "n_regions": 0})
             continue
         kmh, region, hour = peaks[0]
+        lo_kmh, lo_region, _ = peaks[-1]
         per_day.append({
             "date": date, "max_kmh": round(kmh), "region": region, "hour": hour,
+            # Spanne ueber die Regionen: die schwaechste Regionsspitze — der
+            # Pilot will den Bereich, nicht das Schweizer Mittel
+            "min_kmh": round(lo_kmh), "min_region": lo_region,
             "top": [{"region": r, "kmh": round(k)} for k, r, _ in peaks[:3]],
             "n_regions": len(peaks),
         })
@@ -1853,6 +2339,136 @@ def summarize_convection(region_weather_data: dict,
                     [rname, f"{od_hours[0]}-{od_hours[-1]}"])
         out.append({"date": d, "zones": zones})
     return {"per_day": out}
+
+
+def _zone_of_region(rdata: dict) -> Optional[str]:
+    refs = rdata.get("reference_points") or []
+    lats = [r[0] for r in refs if isinstance(r, (list, tuple)) and len(r) >= 2]
+    lons = [r[1] for r in refs if isinstance(r, (list, tuple)) and len(r) >= 2]
+    if not lats:
+        return None
+    return _classify_zone_fallback(sum(lats) / len(lats), sum(lons) / len(lons))
+
+
+def _circ_mean_deg(degs: list[float]) -> Optional[float]:
+    if not degs:
+        return None
+    sx = sum(math.cos(math.radians(d)) for d in degs)
+    sy = sum(math.sin(math.radians(d)) for d in degs)
+    if abs(sx) < 1e-9 and abs(sy) < 1e-9:
+        return None
+    return (math.degrees(math.atan2(sy, sx)) + 360) % 360
+
+
+def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str]) -> Optional[dict]:
+    """Frontdurchgang in den EIGENEN Prognosedaten je Zone und Tag.
+
+    Die DWD-Karte sagt, wo eine Front gezeichnet ist; ob sie an einem Tag
+    ueber eine Zone zieht, muss die Prognose zeigen. Signatur eines
+    Durchgangs (Stundenmediane ueber die Regionen der Zone):
+      - Druck: Minimum, davor fallend, danach in 3 h >= +1.2 hPa (Pflicht)
+      - Wind 700 hPa: Drehung >= 40 Grad zwischen h-3 und h+3 (Pflicht)
+      - dazu mindestens eines: T850 in 6 h um >= 2 K gefallen (Kaltfront)
+        oder gestiegen (Warmfront), oder >= 1 mm Regen um den Zeitpunkt
+    Stundenschluessel sind Lokalzeit (wie ueberall im Cache).
+
+    Returns {"per_day": [{"date", "zones": {zone: sig | None}}]}; sig =
+    {"hour": "16:00", "druck_hpa": +1.8, "drehung": [225, 300],
+     "t850_k": -2.5 | None, "regen_mm": 3.1, "typ_hinweis": "kalt"|"warm"|None}
+    """
+    if not region_weather_data or not forecast_dates:
+        return None
+    by_zone: dict[str, list[dict]] = {}
+    for rdata in region_weather_data.values():
+        if not isinstance(rdata, dict):
+            continue
+        z = _zone_of_region(rdata)
+        if z in config.SYNOPTIC_ZONES:
+            by_zone.setdefault(z, []).append(rdata)
+
+    def series(regions, date, hkey, pkey, field):
+        out = {}
+        for h in range(24):
+            key = f"{date}T{h:02d}:00"
+            vals = []
+            for r in regions:
+                rec = ((r.get(pkey) or {}).get(key) or {})
+                v = rec.get(field)
+                if isinstance(v, (int, float)):
+                    vals.append(float(v))
+            if vals:
+                out[h] = vals
+        return out
+
+    per_day = []
+    for date in forecast_dates:
+        zones: dict = {}
+        verlauf: dict = {}
+        for z in config.SYNOPTIC_ZONES:
+            regions = by_zone.get(z) or []
+            sig = None
+            if regions:
+                msl = {h: statistics.median(v) for h, v in
+                       series(regions, date, "hourly_data", "hourly_data", "pressure_msl").items()}
+                wd = {h: _circ_mean_deg(v) for h, v in
+                      series(regions, date, "pressure_level_data", "pressure_level_data",
+                             "wind_direction_700hPa").items()}
+                t850 = {h: statistics.median(v) for h, v in
+                        series(regions, date, "pressure_level_data", "pressure_level_data",
+                               "temperature_850hPa").items()}
+                rain = {h: statistics.median(v) for h, v in
+                        series(regions, date, "hourly_data", "hourly_data", "precipitation").items()}
+                best = None
+                for h in range(3, 21):
+                    if not all(k in msl for k in (h - 3, h, h + 3)):
+                        continue
+                    rise = msl[h + 3] - msl[h]
+                    fall = msl[h] - msl[h - 3]
+                    if rise < 1.2 or fall > -0.3:
+                        continue
+                    if msl[h] > min(msl.get(k, 9e9) for k in range(h - 3, h + 4)):
+                        continue                              # kein lokales Minimum
+                    a, b = wd.get(h - 3), wd.get(h + 3)
+                    if a is None or b is None:
+                        continue
+                    turn = abs((b - a + 180) % 360 - 180)
+                    if turn < 40:
+                        continue
+                    dt = (t850.get(h + 3) - t850.get(h - 3)
+                          if h + 3 in t850 and h - 3 in t850 else None)
+                    mm = sum(rain.get(k, 0.0) for k in range(h - 2, h + 4))
+                    if not ((dt is not None and abs(dt) >= 2.0) or mm >= 1.0):
+                        continue
+                    score = rise + turn / 40 + (abs(dt) if dt else 0) + min(mm, 5) / 2
+                    if best is None or score > best[0]:
+                        best = (score, {
+                            "hour": f"{h:02d}:00",
+                            "druck_hpa": round(rise, 1),
+                            "drehung": [round(a), round(b)],
+                            "t850_k": round(dt, 1) if dt is not None else None,
+                            "regen_mm": round(mm, 1),
+                            "typ_hinweis": ("kalt" if dt is not None and dt <= -2.0
+                                            else "warm" if dt is not None and dt >= 2.0
+                                            else None),
+                        })
+                sig = best[1] if best else None
+                # Tagesverlauf 06-22 h als Gegenbeleg, wenn keine Signatur da ist
+                hs = [h for h in range(6, 23) if h in msl]
+                wds = [wd[h] for h in range(6, 23) if wd.get(h) is not None]
+                max_turn = 0
+                for i in range(len(wds)):
+                    for j in range(i + 1, len(wds)):
+                        max_turn = max(max_turn, abs((wds[j] - wds[i] + 180) % 360 - 180))
+                verlauf[z] = {
+                    "druck_trend_hpa": round(msl[hs[-1]] - msl[hs[0]], 1) if len(hs) >= 2 else None,
+                    "max_drehung_deg": round(max_turn),
+                    "regen_mm": round(sum(rain.get(h, 0.0) for h in range(6, 23)), 1),
+                }
+            zones[z] = sig
+        per_day.append({"date": date, "zones": zones, "verlauf": verlauf})
+    return {"per_day": per_day, "decided_by": "detect_frontsignatur",
+            "thresholds": {"druck_hpa_3h": 1.2, "drehung_deg": 40, "t850_k_6h": 2.0,
+                           "regen_mm": 1.0, "level_hpa": 700}}
 
 
 def _classify_zone_fallback(lat, lon) -> Optional[str]:

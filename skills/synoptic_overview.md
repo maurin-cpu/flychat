@@ -77,7 +77,8 @@ stehen.** Erfindungen sind streng verboten — sie wuerden Piloten irrefuehren.
 
 VERBOTENE BEGRIFFE:
 - "Kaltfront", "Warmfront", "Okklusion", "Frontdurchgang", "praefrontal",
-  "postfrontal"
+  "postfrontal" — **ausser** `fronten.durchgaenge` ist nicht leer (siehe
+  Abschnitt FRONTEN). Ohne Eintraege dort: kein einziges Frontenwort.
 - "Trog", "Ruecken", "Geopotential", "Vorticity", "Trogachse"
 - Konkrete hPa-Werte (z.B. "1015 hPa"), konkrete Temperatur-Werte in °C
   ("4°C auf 850 hPa") — der Pilot will Charakter, nicht Zahlen
@@ -109,6 +110,57 @@ UNSICHERHEIT EHRLICH BENENNEN:
   "duerfte", "deutet auf" statt definitiver Aussagen
 - `level=medium` → "wahrscheinlich"
 - `level=high` → klare Aussagen erlaubt
+
+═══════════════════════════════════════════════
+FRONTEN — NUR AUS `fronten.durchgaenge`, IMMER ALS PROGNOSE
+═══════════════════════════════════════════════
+
+Seit 2026-09 liegt die DWD-Frontenprognose im Strukturfeld: `fronten` traegt
+`durchgaenge`, je Eintrag `zone`, `typ` (kalt/warm/okklusion), `art`
+(quert/streift), `tag`, `fenster_lokal` [von, bis], `randkontakt`,
+`im_fenster`. Das ist die EINZIGE Quelle fuer Fronten-Saetze.
+
+- `durchgaenge` leer oder `fronten` null → **kein Frontenwort**, nirgends.
+  Auch nicht "keine Front in Sicht" — was nicht im Feld steht, gibt es nicht.
+- `durchgaenge` nicht leer → im `lead` PFLICHT genau EIN Satz je Front, immer
+  als Prognose und nie als Gewissheit: "Gemaess Prognosedaten duerfte die
+  Kaltfront am Sonntagnachmittag den Alpennordhang streifen."
+  * Wochentag aus `forecast_dates[*].weekday` fuer `tag`; Tageszeit aus
+    `fenster_lokal` (Vormittag / Mittag / Nachmittag / Abend / Nacht), keine
+    Uhrzeiten.
+  * `art=streift` → "streift", `art=quert` → "ueberquert". Nicht steigern.
+  * `randkontakt=true` → Unsicherheit dazu: "— unsicher, nur ein Randkontakt".
+  * `im_fenster=false` → gar nicht erwaehnen: es zaehlt nur der jeweilige Tag.
+  * `aus_vortageslauf=true` → der Eintrag stammt aus dem Lauf von gestern
+    (der neueste sieht die naechsten 36 h nicht): weicher formulieren
+    ("duerfte", "nach dem gestrigen Lauf"), nie "wird".
+  * Zwei Eintraege gleichen Typs an verschiedenen Tagen sind ZWEI Fronten
+    ("eine weitere Kaltfront am Sonntag") — nicht dieselbe zweimal.
+- In `zones[].days[i].text` und `day_lines[i]` darf die Front NUR am Tag
+  `tag` und NUR in der Zone `zone` stehen (Fronttyp + streift/quert +
+  Tageszeit). Liegt ein Tag VOR dem fruehesten `tag`, darf der Tagessatz das
+  sagen ("noch vor der Kaltfront", "die Front kommt erst am Sonntag") —
+  das ist der Bezug zum aktuellen Tag, den der Pilot braucht. Tage NACH einem
+  Durchgang: kein Frontenwort mehr, ausser ein weiterer Eintrag nennt sie.
+- Nie erfinden, was das Feld nicht sagt: keine Niederschlagsmenge, keine
+  Windzahl "wegen der Front", kein "praefrontal/postfrontal".
+- `flight_hint`: Konsequenz nennen, wenn `im_fenster=true` und nicht
+  `randkontakt` ("vor dem Durchgang fliegen, danach Boeen") — sonst nichts.
+- `frontsignatur.per_day[i].zones.<zone>` ist der Durchgang in UNSEREN
+  Prognosedaten (Druckanstieg, Winddrehung auf 700 hPa, T850-Sprung, Regen um
+  `hour`). Das ist das Urteil, die DWD-Prognose (`fronten`) nur der Name:
+  * Signatur da → "die Kaltfront zieht am Nachmittag durch — Druckanstieg,
+    Winddrehung auf Nordwest, Regen" (Belege in Worten, keine Zahlen).
+  * `fronten` nennt einen Durchgang, Signatur null → "die Front schwaecht
+    sich ueber der Schweiz ab", nie "zieht durch".
+  * Signatur da, `fronten` leer → "frontaehnlicher Durchgang" ohne Typ,
+    ausser `typ_hinweis` ist gesetzt.
+- `fronten.vergangen` (Durchgaenge der letzten 36 h aus der DWD-ANALYSE, also
+  beobachtet, nicht prognostiziert): darf am Folgetag als Rueckseite genannt
+  werden — "nach der Kaltfront von gestern liegt der Alpennordhang auf der
+  Rueckseite: kuehler, Nordwest". Nur mit Zone und Tag aus dem Eintrag; was
+  die Rueckseite bringt, kommt aus den anderen Feldern (Wind, T850,
+  Niederschlag), nicht aus dem Lehrbuch.
 
 ═══════════════════════════════════════════════
 `lead` — DIE ALLGEMEINE LAGE (4-6 Saetze, max 130 Woerter)
@@ -443,7 +495,8 @@ Pro `forecast_dates`-Tag GENAU ein Eintrag `{"items": [...]}`:
       Messwert-Liste. Fehlt der Wert, lass ihn weg.
   * `BISE` — Mittelland und Jura, kanalisiert verstaerkt.
   * `WIND` — Ursache aus `wind_day.wind_driver` (Hoehenwind / Boeen).
-- Verbote wie ueberall: keine hPa-/°C-Zahlen, kein Front-/Trog-Jargon,
+- Verbote wie ueberall: keine hPa-/°C-Zahlen, kein Trog-Jargon, Fronten
+  nur aus `fronten.durchgaenge` (Abschnitt FRONTEN),
   keine Startplaetze oder Ortschaften, keine Empfehlung. Foehn-Woerter nur,
   wenn `FOEHN` an dem Tag aktiv ist; Gewitter-Woerter nur, wenn `THUNDER`
   aktiv ist.
@@ -464,16 +517,49 @@ Im Briefing steht dieser Satz in der Tages-Sektion unter "Lage". Er ersetzt
 dort den langen `lead` — also kurz und nur fuer diesen Tag.
 
 Pro `forecast_dates`-Tag GENAU ein String:
-- EIN Satz, HOECHSTENS 20 Woerter.
+- EIN bis DREI Saetze, HOECHSTENS 35 Woerter.
 - Ursache → Wirkung fuer DIESEN Tag: welche Druckzentren/Stroemung, und was
   sie heute ueber der Schweiz bewirken ("… bringt Regen und Wind").
 - Druckzentren nur aus `pressure_centers_per_day` (wie im `lead`).
 - Kein Urteil ueber das Fliegen, kein anderer Tag, kein Wochentag, keine
   hPa-/°C-Zahlen. Foehn nur, wenn an dem Tag `FOEHN` aktiv ist; Gewitter nur,
-  wenn `THUNDER` aktiv ist.
+  wenn `THUNDER` aktiv ist; eine Front nur, wenn `fronten.durchgaenge` einen
+  Eintrag mit diesem `tag` hat — dann als Prognose ("duerfte … streifen").
 
-Muster: `"Ein Tief bei Island lenkt feuchte Suedwestluft an die Alpen und
-bringt verbreitet Regen und kraeftigen Wind."`
+- Aufbau wie ein Pilot die Lage liest, in dieser Reihenfolge — verdichtet,
+  keine Aufzaehlung, keine Zahlen:
+  1. EINFLUSS: welche Druckzentren (`pressure_centers_per_day`) welche
+     Stroemung bringen (`flow_overhead.per_day[i]`) und was fuer Luft das
+     ist (Suedwest = milde, feuchte Mittelmeerluft, Stau im Sueden; Nordwest
+     = kuehle Luft, Stau am Nordhang; Nordost = trockene Kontinentalluft).
+  2. DRUCK UEBER DER SCHWEIZ: `pressure_influence.per_day[i].regime` und die
+     Tendenz (`slope_hpa_per_day`) — und was das heisst ("Hochdruckeinfluss
+     nimmt zu, die Lage beruhigt sich" / "Tiefdruckeinfluss, unbestaendig").
+  2b. Was der Druck fuers Wetter HEISST, in Laienworten: Hochdruck = stabil,
+     meist trocken; Tiefdruck = unbestaendig, Wolken und Regen; steigender
+     Druck = beruhigt sich; fallender = wird unbestaendiger.
+  3. WAS DIE PROGNOSEDATEN DARAUS MACHEN — fuer die GANZE Schweiz, wie ein
+     Wetterbericht (MeteoSchweiz, DWD-Luftsportbericht): Niederschlag
+     (trocken / meist trocken, Schauer nur im Sueden / teils Regen /
+     verbreitet Regen) aus `precip_pattern.per_day[i]`, Wind (ruhig / teils
+     windig / verbreitet windig, Ursache `wind_driver`) aus
+     `wind_pattern.per_day[i]`, Nord-Sued-Unterschied nur als Zusatz ("im
+     Sueden weniger"). KEINE Zonen, keine Regionen — die kommen in den
+     Zonentexten. Der Code schreibt dieselbe Form als Zeile darunter; beide
+     muessen sich decken.
+
+Die Wetterfolge haengt als EIN Guss am Druck-Satz (Doppelpunkt), kein
+"Prognosedaten:"-Etikett, keine dritte Aufzaehlung.
+LOGIK MUSS STIMMEN: "beruhigt sich" darf nicht neben "Schauer nehmen zu"
+stehen. Steigt der Druck, aber der Regen nimmt in einem Landesteil zu, dann
+eingrenzen ("beruhigt sich im Norden, im Sueden Schauer am Nachmittag
+zunehmend") oder vertagen ("Hochdruckeinfluss nimmt zu, kommt aber noch nicht
+an"). Faellt der Druck, ist es aber trocken: "vorerst meist trocken".
+
+Muster: `"Zwischen Tief Island und Hoch Azoren: maessige Suedwestlage mit
+feuchter Mittelmeerluft. Der Druck steigt — Hochdruckeinfluss nimmt zu, das
+Wetter beruhigt sich: meist trocken, Schauer nur im Sueden und im Tagesverlauf
+abklingend, verbreitet windig vom Hoehenwind, im Sueden weniger."`
 
 ═══════════════════════════════════════════════
 ANTWORTFORMAT

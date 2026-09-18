@@ -66,13 +66,18 @@ def _weekday_label(date_str: str) -> str:
 # VERBOTENE BEGRIFFE — synoptische Etiketten ohne Daten-Backing
 # ============================================================================
 
-_FORBIDDEN_PATTERNS = [
+# Fronten-Vokabular: verboten, solange das Strukturfeld keine DWD-Durchgaenge
+# liefert (`fronten.durchgaenge` leer/fehlend). Mit Durchgaengen ist es
+# erlaubt — die KI hat dann Daten, keine Vermutung.
+_FRONT_PATTERNS = [
     re.compile(r"\bkaltfront\b", re.IGNORECASE),
     re.compile(r"\bwarmfront\b", re.IGNORECASE),
     re.compile(r"\bokklusion\b", re.IGNORECASE),
     re.compile(r"\bfrontdurchgang\b", re.IGNORECASE),
     re.compile(r"\bpraefrontal\b", re.IGNORECASE),
     re.compile(r"\bpostfrontal\b", re.IGNORECASE),
+]
+_FORBIDDEN_PATTERNS = _FRONT_PATTERNS + [
     re.compile(r"\btrogachse\b", re.IGNORECASE),
     re.compile(r"\bvorticity\b", re.IGNORECASE),
     re.compile(r"\bgeopotential\b", re.IGNORECASE),
@@ -348,12 +353,21 @@ def _verr(scope: str, kind: str, message: str) -> dict:
     return {"scope": scope, "kind": kind, "message": message}
 
 
-def _find_forbidden_term(text: str) -> Optional[str]:
+def _fronts_ok(ctx: dict) -> bool:
+    """True, wenn das Strukturfeld DWD-Frontdurchgaenge traegt — dann darf
+    die KI Fronten nennen."""
+    return bool(((ctx or {}).get("fronten") or {}).get("durchgaenge"))
+
+
+def _find_forbidden_term(text: str, fronts_ok: bool = False) -> Optional[str]:
     """Findet das erste Verbots-Pattern in einem Text. Liefert das
-    Pattern als Debug-String oder None."""
+    Pattern als Debug-String oder None. fronts_ok=True laesst das
+    Fronten-Vokabular durch (Strukturfeld hat DWD-Durchgaenge)."""
     if not isinstance(text, str):
         return "non_string"
     for pattern in _FORBIDDEN_PATTERNS:
+        if fronts_ok and pattern in _FRONT_PATTERNS:
+            continue
         if pattern.search(text):
             return pattern.pattern
     return None
@@ -449,7 +463,7 @@ def _validate(parsed: dict, ctx: dict) -> list:
                             "`lead` fehlt oder ist leer — Pflichtfeld "
                             "(Fliesstext-String, 4-6 Saetze, max 130 Woerter)."))
     else:
-        bad = _find_forbidden_term(lead)
+        bad = _find_forbidden_term(lead, _fronts_ok(ctx))
         if bad:
             errors.append(_verr("lead", "forbidden_term",
                                 f"`lead` enthaelt einen verbotenen Begriff "
@@ -545,7 +559,7 @@ def _validate_zone(z: dict, zone_id: str, ctx: dict, fc_dates: list,
         hint = d.get("flight_hint")
         hint_str = hint if isinstance(hint, str) else ""
 
-        bad = _find_forbidden_term(text)
+        bad = _find_forbidden_term(text, _fronts_ok(ctx))
         if bad:
             errors.append(_verr(scope, "forbidden_term",
                                 f"`text` enthaelt einen verbotenen Begriff "
@@ -640,7 +654,7 @@ def _validate_zone(z: dict, zone_id: str, ctx: dict, fc_dates: list,
                                 "`flight_hint` fehlt — Pflichtfeld (EIN kurzer "
                                 "Satz Pilotensicht, max ~15 Woerter)."))
         else:
-            bad = _find_forbidden_term(hint)
+            bad = _find_forbidden_term(hint, _fronts_ok(ctx))
             if bad:
                 errors.append(_verr(scope, "forbidden_term",
                                     f"`flight_hint` enthaelt einen verbotenen "
@@ -678,7 +692,7 @@ def _finalize(parsed: dict, ctx: dict, attempts: int,
     zones_raw = parsed.get("zones") if isinstance(parsed.get("zones"), list) else []
 
     if prune and lead:
-        if _find_forbidden_term(lead) or \
+        if _find_forbidden_term(lead, _fronts_ok(ctx)) or \
                 _check_pressure_region_mentions(lead, valid_centers):
             logger.warning("Nicht behebbarer lead entfernt: '%s'", lead)
             lead = ""
@@ -708,7 +722,7 @@ def _finalize(parsed: dict, ctx: dict, attempts: int,
             lee_zone = (active_side
                         and zone_id in _FOEHN_LEE_ZONES.get(active_side, ()))
             if prune:
-                if _find_forbidden_term(text) or \
+                if _find_forbidden_term(text, _fronts_ok(ctx)) or \
                         _check_pressure_region_mentions(text, valid_centers) or \
                         (lee_zone and _CALM_CLAIM_RE.search(text)) or \
                         (active_side and _text_inverts_foehn_lee(text, active_side)) or \
@@ -721,7 +735,7 @@ def _finalize(parsed: dict, ctx: dict, attempts: int,
             hint = d.get("flight_hint")
             if isinstance(hint, str) and len(hint.strip()) >= 3:
                 hint = hint.strip()
-                if prune and (_find_forbidden_term(hint)
+                if prune and (_find_forbidden_term(hint, _fronts_ok(ctx))
                               or (lee_zone and _CALM_CLAIM_RE.search(hint))
                               or (active_side
                                   and _text_inverts_foehn_lee(hint, active_side))
@@ -852,8 +866,9 @@ def _compose_system_prompt() -> str:
         + "    beschreibt.\n"
         + "  - Die Strukturfeld-Daten sind die einzige autoritative Quelle\n"
         + "    fuer WAS gerade passiert. Die Wissensbasis sagt WAS DAS HEISST.\n"
-        + "  - Verbote aus dem Skill (Kaltfront/Trog/hPa-Werte) gelten\n"
-        + "    weiterhin — auch wenn die Wissensbasis diese Begriffe erklaert.\n\n"
+        + "  - Verbote aus dem Skill (Trog/hPa-Werte) gelten weiterhin — auch\n"
+        + "    wenn die Wissensbasis diese Begriffe erklaert. Fronten nur aus\n"
+        + "    `fronten.durchgaenge`, nie aus der Wissensbasis.\n\n"
         + knowledge
     )
 
@@ -904,6 +919,10 @@ def _build_llm_payload(ctx: dict) -> str:
         # vom Code geschaltete Gefahren je Tag — nur diese darf `hazards` nennen
         "hazards_per_day": _hazards_for_llm(hazard_checks(ctx)),
         "zugbahn": _zugbahn_for_llm(ctx.get("zugbahn")),
+        # DWD-Frontdurchgaenge je Zone — die einzige Quelle fuer Fronten-Saetze
+        "fronten": _strip_provenance(ctx.get("fronten")),
+        # Frontdurchgang in den eigenen Prognosedaten je Zone/Tag (Belege)
+        "frontsignatur": _strip_provenance(ctx.get("frontsignatur")),
         "schneefallgrenze": (
             None if ctx.get("schneefallgrenze") is None
             else {
@@ -1262,7 +1281,7 @@ HAZARD_TOPICS = ("RAIN", "THUNDER", "FOEHN", "BISE", "WIND")
 # Laengen der Briefing-Saetze (Wunsch User 16.09.2026: "kurz, auf den Punkt").
 # Harte Grenzen im Validator — "halte dich kurz" allein befolgt der LLM nicht.
 HAZARD_MAX_WORDS = 25
-DAY_LINE_MAX_WORDS = 20
+DAY_LINE_MAX_WORDS = 35
 
 # Urteil ueber das Fliegen — gehoert dem Piloten, nie dem Satz
 # (User 16.09.2026: "er soll nie sagen kein nutzbares Fenster").
@@ -1814,7 +1833,7 @@ def _hazard_text_problems(text, topic: str, ctx: dict, i: int, day_checks: dict,
                          f"{shape['hit']}) — der Satz MUSS die Tageszeit "
                          f"nennen (z.B. 'ab dem Nachmittag', 'nur am "
                          f"Vormittag')."))
-    bad = _find_forbidden_term(text)
+    bad = _find_forbidden_term(text, _fronts_ok(ctx))
     if bad:
         problems.append(("forbidden_term",
                          f"`text` enthaelt einen verbotenen Begriff (Muster: {bad})."))
@@ -1948,7 +1967,7 @@ def _day_line_problems(text, ctx: dict, i: int, day_checks: dict,
     problems = []
     problems.extend(_length_problems(text, DAY_LINE_MAX_WORDS, "Tagessatz"))
     problems.extend(_verdict_problem(text, "Tagessatz"))
-    bad = _find_forbidden_term(text)
+    bad = _find_forbidden_term(text, _fronts_ok(ctx))
     if bad:
         problems.append(("forbidden_term",
                          f"Tagessatz enthaelt einen verbotenen Begriff (Muster: {bad})."))
