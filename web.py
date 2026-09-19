@@ -161,6 +161,34 @@ def _is_admin_session() -> bool:
 
 
 @app.context_processor
+def _inject_meta_pixel():
+    """Meta Pixel fuer base.html — Conversion-Messung der Ads.
+
+    Laedt nur, wenn (a) META_PIXEL_ID gesetzt ist und (b) der Besucher auf
+    wingcast.ch der Kategorie "Marketing" zugestimmt hat. Diese Zustimmung
+    kommt als Cookie wc_consent_marketing=1 auf .wingcast.ch mit; die App
+    selbst fragt nicht. Admin wird wie bei PostHog nicht getrackt.
+
+    meta_track_registration: einmaliges Flag aus login_consume() — wird hier
+    beim ersten gerenderten Request nach dem Login konsumiert (pop), damit
+    "CompleteRegistration" genau einmal pro neuem Konto feuert."""
+    pixel_id = config.META_PIXEL_ID
+    allowed = bool(pixel_id) \
+        and request.cookies.get("wc_consent_marketing") == "1" \
+        and not _is_admin()
+    track_reg = False
+    if session.get("meta_registration"):
+        # Flag immer verbrauchen — auch ohne Consent, sonst bliebe es haengen
+        # und wuerde bei spaeterer Zustimmung nachtraeglich feuern.
+        session.pop("meta_registration", None)
+        track_reg = allowed
+    return {
+        "meta_pixel_id": pixel_id if allowed else "",
+        "meta_track_registration": track_reg,
+    }
+
+
+@app.context_processor
 def _inject_analytics():
     """PostHog-Config fuer base.html. posthog_enabled steuert, ob Banner +
     Loader ueberhaupt gerendert werden (nur wenn ein Key konfiguriert ist).
@@ -241,6 +269,9 @@ def _mtime_or_0(path) -> int:
         return 0
 
 
+_PROCESS_STARTED = int(datetime.now().timestamp())
+
+
 def _cached_json(payload: dict, *etag_parts):
     """JSON-Response mit ETag + Conditional Request (If-None-Match → 304).
 
@@ -252,7 +283,10 @@ def _cached_json(payload: dict, *etag_parts):
     resp = jsonify(payload)
     resp.headers["Cache-Control"] = "private, max-age=300"
     resp.headers["Vary"] = "Cookie"
-    raw = "|".join(str(p) for p in etag_parts)
+    # Prozessstart gehoert in den ETag: nach einem Deploy aendert sich die
+    # Payload-Form, die Daten-Zeitstempel aber nicht — sonst bekaeme der
+    # Browser per 304 bis zum naechsten Datenlauf die alte Antwort.
+    raw = "|".join(str(p) for p in (*etag_parts, _PROCESS_STARTED))
     resp.set_etag(hashlib.md5(raw.encode("utf-8")).hexdigest())
     return resp.make_conditional(request)
 
@@ -857,8 +891,14 @@ def login_consume(token):
     session.permanent = True
     session["sub_id"] = res["id"]
     session["email"] = res["email"]
-    logger.info("login_consume: OK sub_id=%s email=%s host=%s",
-                res["id"], res["email"], request.host)
+    # Erster Login eines neuen Kontos = Registrierung abgeschlossen. Flag wird
+    # beim naechsten gerenderten Seitenaufruf (nach dem Redirect) einmalig vom
+    # Meta Pixel als "CompleteRegistration" abgeholt (siehe _inject_meta_pixel).
+    if res.get("is_first_login"):
+        session["meta_registration"] = True
+    logger.info("login_consume: OK sub_id=%s email=%s first=%s host=%s",
+                res["id"], res["email"], bool(res.get("is_first_login")),
+                request.host)
     # Nach erfolgreichem Magic-Link-Login direkt auf die Konto-Seite leiten
     return redirect("/account")
 
@@ -2555,6 +2595,10 @@ def api_briefing_get():
         "forecast_dates": aggregated.get("forecast_dates", []),
         "generated_at": aggregated.get("generated_at", ""),
         "wetterlage": aggregated.get("wetterlage"),
+        # Analyse-Kette + Warnungen Schweiz je Tag (dieselben Bloecke wie das
+        # Mail-Briefing, docs/BRIEFING.md) — die Tages-Tabs schalten um. Darf
+        # die Seite nie reissen: bei Fehler None, die Spots kommen trotzdem.
+        "analyse": _briefing_analyse(aggregated),
         "test_view": aggregated.get("_test_view", False),
     }
     if payload["test_view"]:
@@ -2569,8 +2613,30 @@ def api_briefing_get():
         engine.analyses_loaded_at,
         engine.region_analyses_loaded_at,
         _mtime_or_0(config.SYNOPTIC_CACHE_PATH),
+        # Fronten-Pillen haengen am DWD-Archiv (4x taeglich) und an den
+        # Prognose-Durchgaengen — sonst zeigt die App bis zum naechsten
+        # Synoptik-Lauf alte Fronten.
+        _dir_mtime(config.DATA_DIR / "dwd_fronten_archiv" / "analyse"),
+        _dir_mtime(config.DATA_DIR / "dwd_fronten_archiv" / "vorhersage"),
+        _dir_mtime(config.PROJECT_ROOT / "validation" / "fronten" / "aussagen"),
         datetime.now().date(),
     )
+
+
+def _dir_mtime(path) -> int:
+    """mtime eines Ordners: aendert sich, sobald eine Datei dazukommt."""
+    return _mtime_or_0(path)
+
+
+def _briefing_analyse(aggregated: dict):
+    try:
+        from scripts.briefing_v3_context import build_chain_all_days
+        return build_chain_all_days(aggregated.get("wetterlage"),
+                                    aggregated.get("forecast_dates") or [],
+                                    days=aggregated.get("days") or [])
+    except Exception:
+        logger.exception("api_briefing: Analyse-Kette uebersprungen")
+        return None
 
 
 @app.route("/api/briefing/generate", methods=["POST"])

@@ -234,6 +234,11 @@ class SubscriberManager:
             self._migrate_add_column(conn, "subscribers", "min_rating",
                                      "REAL NOT NULL DEFAULT 0.0")
             self._migrate_add_column(conn, "subscribers", "login_token", "TEXT")
+            # Erster erfolgreicher Magic-Link-Login. NULL = noch nie eingeloggt.
+            # Dient der Conversion-Messung (Meta "CompleteRegistration" genau
+            # einmal pro Konto); Bestandskonten ohne Wert zaehlen beim naechsten
+            # Login NICHT als neu (siehe consume_login_token).
+            self._migrate_add_column(conn, "subscribers", "first_login_at", "TEXT")
             self._migrate_add_column(conn, "subscribers", "login_token_expires_at", "TEXT")
             conn.executescript("""
 
@@ -1084,8 +1089,14 @@ class SubscriberManager:
             return False
 
     def consume_login_token(self, token: str) -> Optional[dict]:
-        """Verifiziert + verbraucht Token (One-Time). Liefert {id, email} oder None.
+        """Verifiziert + verbraucht Token (One-Time). Liefert
+        {id, email, is_first_login} oder None.
         Auch Unsubscribed-User koennen sich einloggen (zur Reaktivierung).
+
+        is_first_login = True genau beim ersten Login eines NEUEN Kontos
+        (first_login_at war NULL und das Konto ist juenger als 2 Tage —
+        Bestandskonten von vor der Spalte first_login_at zaehlen so nicht
+        nachtraeglich als Neuregistrierung). Setzt first_login_at.
 
         WICHTIG: Wird NUR aus POST aufgerufen — GET ist read-only via
         peek_login_token(), sonst killen Mail-Prefetcher den Token vor dem
@@ -1102,14 +1113,25 @@ class SubscriberManager:
                        AND login_token_expires_at IS NOT NULL
                        AND login_token_expires_at > datetime('now')
                        AND status IN ('active', 'paused', 'unsubscribed')
-                 RETURNING id, email
+                 RETURNING id, email,
+                           (first_login_at IS NULL
+                            AND created_at >= datetime('now', '-2 days'))
                     """,
                     (token,),
                 )
                 row = cur.fetchone()
                 if row is None:
                     return None
-                return {"id": row[0], "email": row[1]}
+                is_first = bool(row[2])
+                cur.execute(
+                    """
+                    UPDATE subscribers
+                       SET first_login_at = COALESCE(first_login_at, datetime('now'))
+                     WHERE id = ?
+                    """,
+                    (row[0],),
+                )
+                return {"id": row[0], "email": row[1], "is_first_login": is_first}
         except Exception as e:
             logger.error("consume_login_token failed: %s", e)
             return None

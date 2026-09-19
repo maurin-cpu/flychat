@@ -649,6 +649,32 @@
     </script>
     {% endif %}
 
+    {% if meta_pixel_id %}
+    {# Meta Pixel (Facebook/Instagram Ads) — nur wenn der Besucher auf wingcast.ch
+       "Marketing" zugestimmt hat (Cookie wc_consent_marketing=1, geprueft in
+       web.py _inject_meta_pixel; ohne Zustimmung ist meta_pixel_id leer und
+       dieser Block wird nicht gerendert). Sendet PageView und — genau einmal
+       beim ersten Login eines neuen Kontos — "CompleteRegistration". Keine
+       E-Mail, keine Kontodaten an Meta; Attribution zur Anzeige laeuft ueber
+       die Meta-Cookies _fbp/_fbc auf .wingcast.ch. Loader = offizieller
+       Snippet aus dem Events Manager. #}
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', {{ meta_pixel_id|tojson }});
+    fbq('track', 'PageView');
+    {% if meta_track_registration %}
+    fbq('track', 'CompleteRegistration', { content_name: 'magic_link_login' });
+    {% endif %}
+    </script>
+    {% endif %}
+
     {# Globaler dezenter Footer mit Rechtliches-Links — auf jeder Seite sichtbar #}
     <footer class="app-footer" role="contentinfo">
         <a href="{{ datenschutz_url }}" rel="noopener">{{ t('footer.privacy') }}</a>

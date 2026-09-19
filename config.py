@@ -1258,6 +1258,13 @@ POSTHOG_KEY     = os.environ.get("POSTHOG_KEY", "").strip()
 POSTHOG_HOST    = os.environ.get("POSTHOG_HOST", "https://eu.i.posthog.com").strip()
 POSTHOG_UI_HOST = os.environ.get("POSTHOG_UI_HOST", "https://eu.posthog.com").strip()
 
+# Meta Pixel (Facebook/Instagram Ads) — Conversion "CompleteRegistration" beim
+# ersten Login eines neuen Kontos. Laedt NUR, wenn der Besucher auf wingcast.ch
+# der Kategorie "Marketing" zugestimmt hat (Cookie wc_consent_marketing=1 auf
+# .wingcast.ch, gesetzt vom Consent-Banner der Marketing-Seite). Die App hat
+# keinen eigenen Banner. Leer => Pixel komplett aus.
+META_PIXEL_ID   = os.environ.get("META_PIXEL_ID", "").strip()
+
 # Carto-Basiskarten: seit 28.08.2026 verlangt Carto einen Key, sonst liegt
 # "API KEY REQUIRED" als Wasserzeichen ueber jeder Kachel (Gratis-Key mit
 # 5 Mio. Kacheln/Monat: https://carto.com/basemaps/apikey/). Leerer Key =>
