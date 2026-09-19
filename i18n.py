@@ -879,6 +879,28 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.failed": {"de": "Fehlgeschlagen", "en": "Failed"},
     # Link Wetterlage-Block -> Synoptik-Karte
     "js.wetterlage.to_map": {"de": "Zur Druckkarte", "en": "Open pressure chart"},
+    # Analyse-Kette (briefing.js renderChain): nur das UI-Gerüst — Blocktitel,
+    # Pillen-Woerter und Saetze kommen fertig vom Server (briefing_v3_context).
+    "js.chain.heading": {"de": "Analyse des Tages", "en": "Analysis of the day"},
+    "js.chain.warn_none": {"de": "keine", "en": "none"},
+    # Kopfzeile: Zeitpunkt des Morgenlaufs (Analyse + Datenabzug), nicht der Abruf
+    "js.header.asof": {"de": "Stand {when}", "en": "As of {when}"},
+    # Tag ohne Bewertung (Lücke im Cache): Kachel behält ihre Form
+    "js.tab.no_rating": {"de": "keine Bewertung", "en": "no rating"},
+    "js.header.asof_title": {
+        "de": "Zeitpunkt des Morgenlaufs: Daten gezogen und Analyse gerechnet",
+        "en": "Time of the morning run: data fetched and analysis computed",
+    },
+    # Tages-Tab: was die Zahl bedeutet (Startplaetze mit Sicher oder Vorsicht)
+    "js.tab.count": {"de": "{n} Startplätze sicher/Vorsicht", "en": "{n} sites safe/caution"},
+    "js.tab.count_title": {"de": "Startplätze mit Einstufung Sicher oder Vorsicht an diesem Tag",
+                           "en": "Launch sites rated Safe or Caution on this day"},
+    "js.chain.expand": {"de": "Aufklappen", "en": "Expand"},
+    "js.chain.collapse": {"de": "Zuklappen", "en": "Collapse"},
+    "js.chain.no_day": {
+        "de": "Für diesen Tag liegt noch keine Analyse vor.",
+        "en": "No analysis available for this day yet.",
+    },
 
     # ======================= synoptic-map.js (Synoptik-Karte, user-facing) =======================
     "js.syn.high_letter": {"de": "H", "en": "H"},

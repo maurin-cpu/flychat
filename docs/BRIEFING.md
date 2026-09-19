@@ -1,6 +1,6 @@
 # Morgenbriefing — Aufbau, Prinzip, Labels
 
-**Stand:** 2026-09-18 · Gilt für das **versendete Mail** ab 19.09.2026
+**Stand:** 2026-09-19 · Gilt für das **versendete Mail** ab 19.09.2026 und (§8) die App-Seite `/briefing`
 (`email_service.send_briefing_email` → `templates/email/briefing_v3.html`/`.txt`)
 und die Vorschau-Seite (`scripts/preview_briefing_email.py` →
 `data/preview/briefing_preview.html`). Beide bauen denselben Kontext
@@ -56,7 +56,7 @@ Status-Pille, Fakten-Chips, ein Satz (erster Teil fett = Aussage).
 
 | # | Block | Erwartung (Synoptik) | Daten (Prognose) | Urteil / Satz |
 |---|---|---|---|---|
-| 1 | Lage | Druckzentren → Strömung → Luftmasse; Druck und Tendenz | Regen und Wind für die ganze Schweiz (Nord/Süd-Aggregate), Regen-Trend im Tagesverlauf | zwei Sätze, Wetterfolge hängt per Doppelpunkt am Druck-Satz |
+| 1 | Lage | Druckzentren → Strömung → Luftmasse; Druck und Tendenz | Regen und Wind für die ganze Schweiz (Nord/Süd-Aggregate), Regen-Trend im Tagesverlauf | drei Sätze: Einfluss, Druck mit Bedeutung, „ICON-CH1/ICON-D2 bestätigt das / passt nur teilweise dazu / widerspricht: …“. Urteil: Erwartung (beruhigend / unbeständig / Übergang) gegen Stufe der Daten (0 trocken & ruhig, 1 teils/einseitig, 2 verbreitet/kräftig) |
 | 2 | Fronten | DWD-Frontenprognose (`fronten.durchgaenge`), letzte drei Läufe zusammengeführt, ältere Aussagen gegen die Karte des Tages geprüft | **Frontsignatur** je Zone: Druckminimum + Anstieg ≥ 1.2 hPa/3 h, Winddrehung ≥ 40° auf 700 hPa, dazu T850-Sprung ≥ 2 K oder ≥ 1 mm Regen | „zieht durch" nur mit Signatur; DWD ohne Signatur → „schwächt sich ab"; gestern durchgezogen → „Rückseite" |
 | 3 | Föhn / Bise | Druckgefälle über die Alpen (Schwelle 4 hPa), Druckgefälle NE–S und 700-hPa-Richtung für Bise | Böen am Lee-**Prognosepunkt** (Zürich / Lugano); starke Winde an einzelnen Startplätzen (≥ 40 km/h, mit Richtung, Höhe, Stunde); Nordostwind im Mittelland | Bise nur erwähnt, wenn Nord-/Ostkomponente, aktiv oder am Boden sichtbar. Kein „Föhntal": wir wissen nicht, welcher Punkt im Tal liegt |
 | 4 | Höhenwind | Schweizer Mittel 700 hPa (Vektormittel 12 Uhr) mit Stärkeklasse | Spanne der Regionsspitzen (schwächste bis stärkste Region, Stunde); ⅔-Regel für den Boden | Klasse der Spitze gegen Klasse des Mittels: „regional stärker / wie im Mittel / schwächer". Das ist ein Auflösungs-, kein Quellen-Vergleich |
@@ -75,6 +75,7 @@ ausführlich.
 
 | Block | grün | blau | orange |
 |---|---|---|---|
+| Lage | Daten passen zur Lage | Daten passen teilweise | Daten widersprechen der Lage |
 | Fronten | keine Front | Front schwächt ab · Rückseite | Front zieht durch |
 | Föhn / Bise | kein Föhn | einzelne Böen | Föhn aktiv · Bise |
 | Höhenwind | regional wie im Mittel | regional schwächer | regional stärker |
@@ -84,8 +85,15 @@ ausführlich.
 | Modelle | Modelle einig | ein offener Punkt | Modelle uneinig |
 
 Regeln:
+- **Lage**: beruhigend (Druck steigt, oder Hoch) erwartet trocken & ruhig,
+  unbeständig (fällt, oder Tief) erwartet Regen/Wind; Stufe 1 → teilweise,
+  Gegenteil → widersprechen; Übergangslage: nur Stufe 2 → teilweise.
 - **Fronten**: Signatur → zieht durch; DWD nennt Front, keine Signatur →
   schwächt ab; Ist-Durchgang der letzten 36 h (DWD-Analyse) → Rückseite.
+  Ob die DWD-Prognose für den Tag eine Front nennt, kommt aus **derselben**
+  Quelle wie der Satz (`passagen_*.json` über `_front_block`, Feld `dwd`) —
+  nicht aus `wetterlage.fronten.durchgaenge`: deren Tageszuordnung wich ab
+  und stellte „keine Front“ neben einen Satz mit Front (19.09.2026).
 - **Föhn/Bise**: aktiv → orange; sonst Böe ≥ 40 km/h an einem Startplatz →
   einzelne Böen.
 - **Höhenwind**: Stärkeklasse der Regionsspitze gegen Klasse des Mittels
@@ -97,8 +105,8 @@ Regeln:
 - **Modelle**: 0 / 1 / ≥ 2 Parameter uneinig (Böen-Spanne ≥ 20 km/h,
   Bewölkung ≥ 30 %, Regen geteilt).
 
-Keine Pille: Block 1 (Lead, kein Urteil) und die Warnungen (eigene Schwere
-Vorsicht / Stopp).
+Keine Pille: die Warnungen (eigene Schwere Vorsicht / Stopp). Block 1 trägt
+seit 19.09.2026 eine Pille (Daten gegen Erwartung aus dem Druck).
 
 ## 5. Wer schreibt was
 
@@ -114,6 +122,15 @@ Einträge hat; Validator lässt sie dann durch (`_FRONT_PATTERNS`). Ohne
 Daten kein Frontenwort — auch nicht „keine Front in Sicht".
 
 ## 6. Logik-Regeln (Code und Skill identisch)
+
+- **Nie „unsere Prognose", nie anonyme „Prognosedaten".** Die Daten sind nicht
+  von Wingcast: **jeder** Abgleich-Satz der Blöcke 1–7 nennt das Modell und
+  spricht das Urteil aus („ICON-CH1/ICON-D2 bestätigt das / zeigt das nur
+  teilweise / widerspricht: …"; Namen
+  aus `config.SURFACE_PRIMARY_MODEL` / `PRESSURE_LEVEL_PRIMARY_MODEL` über
+  `_model_words()`), die DWD-Frontenprognose heisst DWD. Die App zeigt unter
+  der Kette eine Quellenzeile (`analyse.source`), das Mail nennt die Quellen
+  im Footer.
 
 - „beruhigt sich" (Druck steigt) + Schauer nehmen zu, nur im Süden →
   „beruhigt sich im Norden, im Süden Schauer am Nachmittag zunehmend";
@@ -132,7 +149,33 @@ Neu seit 09/2026, alle aus `engine/synoptic_context.py`: `fronten`
 `modell_vergleich`; Föhn-Block trägt `claim` (ΔP, Kammwind) und `lee`.
 Server rechnet sie im Morgenlauf; lokal per Preview-Skript nachrechenbar.
 
-## 8. Vorschau bauen, Grenzen, offene Schritte
+## 8. Dieselbe Kette in der App (`/briefing`)
+
+**Seit 19.09.2026.** Die App zeigt unter der Synoptik-Mini-Karte die Analyse-Kette
+und die Warnungen Schweiz — **für jeden Prognosetag**, die Tages-Tabs
+schalten um (das Mail bleibt ein Heute-Briefing). Gleiche Quelle, gleiches
+Ergebnis: `scripts/briefing_v3_context.build_chain_all_days(wetterlage, dates)`
+ruft je Tag dieselben Funktionen wie `build_v3_context` (`_chain`,
+`_ch_warnings`); Fronten je Tag aus dem DWD-Archiv wie die Karte
+(`engine.fronten.select_for_timestep`, 12:00). Für „heute" sind Pillen und
+Sätze in Mail und App 1:1 identisch.
+
+| Ebene | Ort |
+|---|---|
+| Payload | `/api/briefing` → `analyse.by_date[YYYY-MM-DD].{chain, warnings, fronts_kind}` + `analyse.labels` (`web.py _briefing_analyse`, bei Fehler `null`, die Spots kommen trotzdem) |
+| Cache | ETag zusätzlich über die Ordner-mtimes des DWD-Fronten-Archivs und der Prognose-Durchgänge sowie den Prozessstart (sonst liefert der Browser nach einem Deploy per 304 die alte Payload-Form bis zum nächsten Datenlauf) |
+| Darstellung | `static/js/briefing.js renderChain`: Akkordeon-Liste, eine Zeile je Block 1–8 plus Warnungen — Nummer, Titel, Status-Pille rechts, Chevron; Inhalt klappt unter der Zeile auf (ARIA-Disclosure, Tastatur-Fokus bleibt auf der Zeile). Lage trägt statt Pille Druck · Regime · Tendenz. Offene Blöcke bleiben über den Tageswechsel (`localStorage wingcast.briefing.chainOpen2`, Erstbesuch: **alle** offen) |
+| Kopfzeile | „Stand" = Zeitpunkt des Morgenlaufs (`wetterlage.generated_at`, sonst mtime des Analyse-Caches) — **nie** die Abrufzeit |
+| Tages-Tabs | tragen die Kachel des Wochenstreifens (`tile`: Einstufung Safe/Caution/Not safe über **alle** bewerteten Regionen per `_day_verdict` — ohne die Note, die ist ohne Regionsliste daneben nicht einzuordnen —, Bodendruck, Höhenwind-Pfeil · Sektor · Stärke) plus die Zahl fliegbarer Spots |
+| Nicht übernommen | Kartenbild, „Deine Regionen", Betreff, Hero — die App hat Mini-Karte und Regionsfilter; sie kennt keine Abo-Regionen |
+| Entfallen | der ganze frühere Wetterlage-Block (KI-Kurztext der Woche + KI-Zonentexte hinter „Detail"): zwei Aussagen zum selben Tag konnten sich widersprechen, und die Lage des Tages steht als Block 1 in der Kette |
+
+Tag ohne Synoptik-Daten (älterer Cache) → ehrliche Leerzeile, kein geratener
+Block. Folgetage sind beim Fronten-Block unschärfer als heute: „Rückseite"
+(Ist-Durchgang der letzten 36 h) gibt es nur für heute; für Tag +1/+2 greift
+die Regel nicht, das Ergebnis ist korrekt, aber nicht gleich belastbar.
+
+## 9. Vorschau bauen, Grenzen, offene Schritte
 
 ```
 PORT=5001 python main.py

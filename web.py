@@ -2594,6 +2594,9 @@ def api_briefing_get():
         "days": aggregated.get("days", []),
         "forecast_dates": aggregated.get("forecast_dates", []),
         "generated_at": aggregated.get("generated_at", ""),
+        # Datenstand der Bewertungen (mtime des Analyse-Caches = Morgenlauf).
+        # "generated_at" ist nur der Zeitpunkt dieses Requests.
+        "analyses_at": aggregated.get("analyses_at"),
         "wetterlage": aggregated.get("wetterlage"),
         # Analyse-Kette + Warnungen Schweiz je Tag (dieselben Bloecke wie das
         # Mail-Briefing, docs/BRIEFING.md) — die Tages-Tabs schalten um. Darf

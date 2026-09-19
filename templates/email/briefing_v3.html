@@ -124,7 +124,7 @@
   {% endif %}
 
   {# 1 Lage #}
-  {{ step(1, v3_labels.step_lage, '', '') }}
+  {{ step(1, v3_labels.step_lage, v3_chain.lage.status, v3_chain.lage.status_label) }}
   <tr><td style="padding:0 18px 12px 56px;">
     <div style="font:15px/1.6 {{ MONO }};color:{{ C.ink }};">{{ v3_chain.lage.pressure or '—' }} <span style="color:{{ C.muted }};">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}</span></div>
     {% if v3_chain.lage.centers %}<div style="margin-top:6px;">{% for c in v3_chain.lage.centers %}{{ fact((c.type[0]), c.region ~ ' ' ~ c.msl ~ ' hPa') }}{% endfor %}</div>{% endif %}

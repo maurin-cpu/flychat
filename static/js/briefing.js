@@ -41,6 +41,16 @@
     return n.toFixed(1);
   }
 
+  // "Stand" = wann der Morgenlauf die Analyse gerechnet und die Daten gezogen
+  // hat — NIE die Abrufzeit (data.generated_at ist nur der Zeitpunkt des
+  // Requests und waere jede Minute neu). Quelle in dieser Reihenfolge:
+  // Synoptik-Lauf (Zeitstempel IN der Datei, ueberlebt Kopien), sonst mtime
+  // des Analyse-Caches, sonst nichts. Nie neuer erscheinen als die Daten sind.
+  function standOf(data) {
+    const wl = data && data.wetterlage;
+    return (wl && wl.generated_at) || (data && data.analyses_at) || "";
+  }
+
   function formatGeneratedAt(ts) {
     if (!ts) return "";
     try {
@@ -49,7 +59,7 @@
       const mm = String(d.getMonth() + 1).padStart(2, "0");
       const hh = String(d.getHours()).padStart(2, "0");
       const mi = String(d.getMinutes()).padStart(2, "0");
-      return `Stand ${dd}.${mm}. ${hh}:${mi}`;
+      return wcT("js.header.asof", { when: `${dd}.${mm}. ${hh}:${mi}` });
     } catch (e) { return ""; }
   }
 
@@ -57,6 +67,13 @@
 
   const LS_REGION_FILTER_KEY = "wingcast.briefing.regionFilter";
   const LS_DAY_IDX_KEY = "wingcast.briefing.dayIdx";
+  // "2": neuer Default (alle Bloecke offen, 19.09.2026) — der alte Schluessel
+  // haette bei Testern den damaligen Stand "nur Lage offen" konserviert.
+  const LS_CHAIN_OPEN_KEY = "wingcast.briefing.chainOpen2";
+  // Reihenfolge wie CHAIN_BLOCKS unten plus die Warnungen. Bewusst als
+  // Literal: der State wird beim Laden gebaut, CHAIN_BLOCKS steht spaeter.
+  const CHAIN_OPEN_DEFAULT = ["lage", "fronts", "foehn", "wind", "stability",
+                              "thermik", "sonne", "modelle", "warnings"];
   const LS_TIER_FILTER_KEY = "wingcast.briefing.tierFilter";       // legacy key (read-only fallback)
   const LS_SAFETY_FILTER_KEY = "wingcast.briefing.safetyFilter";   // v1.3
   const LS_MIN_STARS_KEY = "wingcast.briefing.minStars";           // legacy key (read-only fallback, v1.3 stars)
@@ -83,7 +100,9 @@
     selectedDayIdx: loadDayIdx(),
     safetyFilters: loadSafetyFilter(),
     minRating: loadMinRating(),
-    wetterlageOpen: false,
+    // Analyse-Kette: welche Bloecke aufgeklappt sind (bleibt ueber den
+    // Tageswechsel — wer Fronten offen hat, will sie am Folgetag auch sehen)
+    chainOpen: loadChainOpen(),
     mapVisible: false,
     collapsedRegions: loadCollapsedRegions(),
     expandHintSeen: loadExpandHintSeen(),
@@ -104,6 +123,22 @@
 
   function saveRegionFilter(set) {
     try { localStorage.setItem(LS_REGION_FILTER_KEY, JSON.stringify(Array.from(set))); } catch (e) {}
+  }
+
+  function loadChainOpen() {
+    // Erstbesuch: alle Bloecke offen — die Analyse ist der Inhalt der Seite,
+    // nicht eine Liste zum Aufklappen. Danach zaehlt, was der User zuletzt
+    // offen hatte (leere Liste = alles zu, bleibt so).
+    try {
+      const raw = localStorage.getItem(LS_CHAIN_OPEN_KEY);
+      if (raw === null) return new Set(CHAIN_OPEN_DEFAULT);
+      const arr = JSON.parse(raw);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch (e) { return new Set(CHAIN_OPEN_DEFAULT); }
+  }
+
+  function saveChainOpen(set) {
+    try { localStorage.setItem(LS_CHAIN_OPEN_KEY, JSON.stringify([...set])); } catch (e) { /* noop */ }
   }
 
   function loadDayIdx() {
@@ -675,7 +710,10 @@
       rangeEl.textContent = first && last ? `${formatDateShort(first)} – ${formatDateShort(last)}` : "";
     }
     const tsEl = $("bfGeneratedAt");
-    if (tsEl) tsEl.textContent = formatGeneratedAt(data.generated_at);
+    if (tsEl) {
+      tsEl.textContent = formatGeneratedAt(standOf(data));
+      tsEl.title = wcT("js.header.asof_title");
+    }
   }
 
   // ── Render: Day Tabs ────────────────────────────────────────
@@ -704,7 +742,9 @@
       }
       const flyable = topCount + greenCount + amberCount;
 
-      // Build dots (max 4 visuell): Top zuerst, dann green, dann amber
+      // Build dots (max 4 visuell): Top zuerst, dann green, dann amber.
+      // Nur noch ohne Kachel-Daten (aelterer Server): die Kachel traegt die
+      // Einstufung des Tages als Wort.
       const dots = [];
       for (let j = 0; j < Math.min(topCount, 2); j++) dots.push('<span class="bf-tab-dot top"></span>');
       for (let j = 0; j < Math.min(greenCount, 2); j++) dots.push('<span class="bf-tab-dot green"></span>');
@@ -716,16 +756,45 @@
       const dayNum = dateObj.getDate();
       const wdShort = (d.weekday || "").substring(0, 2);
 
+      // Kachel wie im Mail-Wochenstreifen: Einstufung des Tages ueber alle
+      // Regionen, Bodendruck, Hoehenwind (analyse.by_date[date].tile). Die
+      // Note ("3/5") bewusst NICHT: ohne Regionsliste daneben ist die Zahl
+      // hier nicht einzuordnen (User 19.09.2026).
+      const tile = (data.analyse && data.analyse.by_date && data.analyse.by_date[d.date] || {}).tile || null;
+      let tileHtml = "";
+      if (tile) {
+        // Tag ohne bewertete Region: Pille bleibt, sagt aber "keine Bewertung" —
+        // eine Kachel ohne Pille sah neben den anderen wie ein Fehler aus.
+        const status = tile.status
+          ? `<span class="bf-tab-status bf-tab-status--${escapeHtml(tile.band || "no_data")}">${escapeHtml(tile.status)}</span>`
+          : `<span class="bf-tab-status bf-tab-status--no_data">${escapeHtml(wcT("js.tab.no_rating"))}</span>`;
+        // Hoehenwind zuerst und gross: Pfeil zeigt, wohin die Luft laeuft
+        // (dir_deg ist "woher", daher +180), Sektor fett. Keine Staerke: nur die
+        // Richtung (User 19.09.2026); die Staerke steht im Hoehenwind-Block.
+        let wind = "";
+        if (tile.wind_sector) {
+          const deg = Number.isFinite(tile.wind_dir_deg) ? (tile.wind_dir_deg + 180) % 360 : null;
+          const arrow = deg === null
+            ? `<span class="bf-tab-wind-arrow bf-tab-wind-arrow--txt" aria-hidden="true">${escapeHtml(tile.wind_arrow || "")}</span>`
+            : `<svg class="bf-tab-wind-arrow" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" style="transform:rotate(${deg}deg)"><path d="M10 2.5v15M4.5 8l5.5-5.5L15.5 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+          wind = `<span class="bf-tab-wind${tile.wind_hot ? " bf-tab-wind--hot" : ""}" title="700 hPa">${arrow}<span class="bf-tab-wind-txt"><b>${escapeHtml(tile.wind_sector)}</b></span></span>`;
+        }
+        const press = tile.pressure_hpa ? `<span class="bf-tab-press">${escapeHtml(tile.pressure_hpa)}</span>` : "";
+        tileHtml = status + wind + press;
+      }
+
       const cls = ["bf-day-tab"];
       if (isActive) cls.push("is-active");
+      if (tile) cls.push("has-tile");
 
       return `
         <button type="button" class="${cls.join(" ")}" role="tab"
                 aria-selected="${isActive}" data-day-idx="${i}">
           <span class="bf-tab-weekday">${escapeHtml(wdShort)}</span>
           <span class="bf-tab-date">${dayNum}</span>
-          ${dots.length ? `<span class="bf-tab-dots">${dots.join("")}</span>` : ""}
-          ${flyable > 0 ? `<span class="bf-tab-count">${flyable}</span>` : ""}
+          ${tileHtml}
+          ${!tile && dots.length ? `<span class="bf-tab-dots">${dots.join("")}</span>` : ""}
+          ${flyable > 0 ? `<span class="bf-tab-count" title="${escapeHtml(wcT("js.tab.count_title"))}">${escapeHtml(wcT("js.tab.count", { n: flyable }))}</span>` : ""}
         </button>
       `;
     }).join("");
@@ -749,8 +818,8 @@
     // in anderen Tagen leeren State weil der Spot nur an einem Tag ist.
     state.focusSpot = null;
     renderDayTabs(state.data);
-    // Wetterlage + Synoptik-Karte folgen dem gewaehlten Tag
-    renderWetterlage(state.data);
+    // Analyse-Kette + Synoptik-Karte folgen dem gewaehlten Tag
+    renderChain(state.data);
     syncSynopticDate();
     renderDayContent();
   }
@@ -2131,155 +2200,218 @@
   function render(data) {
     state.data = data;
     renderHeader(data);
-    // Tabs VOR der Wetterlage: renderDayTabs clampt selectedDayIdx,
-    // und renderWetterlage haengt am gewaehlten Tag.
+    // Tabs VOR der Kette: renderDayTabs clampt selectedDayIdx,
+    // und renderChain haengt am gewaehlten Tag.
     renderDayTabs(data);
-    renderWetterlage(data);
+    renderChain(data);
     syncSynopticDate();
     renderFilters(data);
     renderTierFilter();
     renderDayContent();
   }
 
-  // ── Render: Wetterlage ──────────────────────────────────────
-  // Block fuer die grossraeumige Synoptik (1x/Tag vom Scheduler generiert,
-  // deterministisch + LLM-Prosa). Zeigt die Kurzfassung initial sichtbar;
-  // bei Klick auf Toggle wird die Langfassung eingeblendet.
+  // ── Render: Analyse-Kette ───────────────────────────────────
+  // Dieselben acht Bloecke wie das Mail-Briefing (docs/BRIEFING.md), vom
+  // Server je Tag gerechnet (/api/briefing -> analyse.by_date[date]). Die
+  // Tages-Tabs schalten um. Der fruehere Wetterlage-Block (KI-Kurztext der
+  // Woche + Zonentexte) ist entfallen (19.09.2026): die Lage des Tages
+  // steht als Block 1 hier, die Woche in den Tabs.
+  //
+  // Bauform: eine Akkordeon-Liste (Disclosure-Pattern). Jede Zeile =
+  // Nummer, Titel, Status-Pille, Chevron; der Inhalt klappt direkt unter
+  // seiner Zeile auf. Offene Bloecke bleiben ueber den Tageswechsel.
+  // Saetze und Labels kommen fertig in config.LANG vom Server.
 
-  function renderWetterlage(data) {
-    const el = $("bfWetterlage");
+  // Reihenfolge wie ein Pilot die Lage liest. `sep` = Trenner, bis zu dem
+  // der Fazit-Satz fett gesetzt wird (gleiche Regel wie das Mail-Makro).
+  const CHAIN_BLOCKS = [
+    { key: "lage",      label: "step_lage",    sep: ". " },
+    { key: "fronts",    label: "step_front",   sep: ". " },
+    { key: "foehn",     label: "step_foehn",   sep: ". " },
+    { key: "wind",      label: "step_wind",    sep: ": " },
+    { key: "stability", label: "step_stab",    sep: ". " },
+    { key: "thermik",   label: "step_thermik", sep: ". " },
+    { key: "sonne",     label: "step_sonne",   sep: ". " },
+    { key: "modelle",   label: "step_modelle", sep: ", " },
+  ];
+
+  function chainVerdictHtml(text, sep) {
+    if (!text) return "";
+    const i = text.indexOf(sep);
+    if (i < 0) return `<p class="bf-chain-verdict"><b>${escapeHtml(text)}</b></p>`;
+    const head = text.slice(0, i) + sep.trim();
+    const rest = text.slice(i + sep.length);
+    return `<p class="bf-chain-verdict"><b>${escapeHtml(head)}</b> ${escapeHtml(rest)}</p>`;
+  }
+
+  function chainFactsHtml(facts, hotFn) {
+    if (!Array.isArray(facts) || !facts.length) return "";
+    const chips = facts.map((f, i) => {
+      if (!f || !f.v) return "";
+      const hot = hotFn ? hotFn(f, i) : false;
+      return `<span class="bf-chain-fact${hot ? " bf-chain-fact--hot" : ""}">${f.k ? `<span class="bf-chain-fact-k">${escapeHtml(f.k)}</span> ` : ""}${escapeHtml(f.v)}</span>`;
+    }).join("");
+    return chips ? `<div class="bf-chain-facts">${chips}</div>` : "";
+  }
+
+  // Inhalt eines Blocks: Chips, Zahlen je Zone, Fazit-Satz, Hinweise.
+  function chainBodyHtml(def, chain, labels, entry) {
+    const blk = chain[def.key] || {};
+    const parts = [];
+    if (def.key === "lage") {
+      const centers = Array.isArray(blk.centers) ? blk.centers : [];
+      parts.push(chainFactsHtml(centers.map(c => ({ k: String(c.type || "").slice(0, 1), v: `${c.region || ""} ${c.msl || ""} hPa`.trim() }))));
+      parts.push(chainVerdictHtml(blk.fazit || chain.situation || "", def.sep));
+      return parts.filter(Boolean).join("");
+    }
+    if (def.key === "wind") {
+      parts.push(chainFactsHtml(blk.facts, (f, i) => i === 0 && !!blk.hot));
+    } else if (def.key === "modelle") {
+      parts.push(chainFactsHtml(blk.facts, (f) => f.v === "✗"));
+    } else {
+      parts.push(chainFactsHtml(blk.facts));
+    }
+    const n = blk.num;
+    if (def.key === "thermik" && n) {
+      parts.push(chainFactsHtml([{ k: n.lbl_base, v: n.base }, { k: n.lbl_climb, v: n.climb }]));
+      if (Array.isArray(n.zones) && n.zones.length) {
+        parts.push(`<dl class="bf-chain-zones">${n.zones.map(z =>
+          `<div class="bf-chain-zone"><dt>${escapeHtml(z.name)}</dt><dd>${escapeHtml(z.base)} / ${escapeHtml(z.climb)}</dd></div>`
+        ).join("")}</dl>`);
+      }
+    }
+    if (def.key === "sonne" && n && Array.isArray(n.zones) && n.zones.length) {
+      parts.push(`<div class="bf-chain-sun">
+        <div class="bf-chain-zones-title">${escapeHtml(n.lbl_sun || "")}</div>
+        ${n.zones.map(z => {
+          const pct = Math.max(0, Math.min(100, parseInt(String(z.sun).replace(/[^0-9]/g, ""), 10) || 0));
+          return `<div class="bf-chain-sunrow"><span class="bf-chain-sunname">${escapeHtml(z.name)}</span><span class="bf-chain-sunbar" role="img" aria-label="${escapeHtml(z.sun)}"><span style="width:${pct}%"></span></span><b>${escapeHtml(z.sun)}</b></div>`;
+        }).join("")}
+      </div>`);
+    }
+    let fazit = blk.fazit || "";
+    if (def.key === "foehn" && !fazit) fazit = [blk.foehn, blk.bise].filter(Boolean).join(" ");
+    parts.push(chainVerdictHtml(fazit, def.sep));
+    if (def.key === "stability" && Array.isArray(blk.thunder) && blk.thunder.length && labels.thunder_caveat) {
+      parts.push(`<p class="bf-chain-caveat">${escapeHtml(labels.thunder_caveat)}</p>`);
+    }
+    if (def.key === "fronts" && entry.fronts_kind) {
+      parts.push(`<p class="bf-chain-caveat">DWD · ${escapeHtml(entry.fronts_kind)}</p>`);
+    }
+    return parts.filter(Boolean).join("");
+  }
+
+  function chainWarningsBodyHtml(w, labels) {
+    const checks = (w.checks || []).map(c =>
+      `<span class="bf-chain-check${c.active ? (c.level === "stop" ? " bf-chain-check--stop" : " bf-chain-check--on") : ""}">${c.active ? "✓" : "–"} ${escapeHtml(c.label)}</span>`
+    ).join("");
+    const entries = Array.isArray(w.entries) ? w.entries : [];
+    const body = entries.length
+      ? entries.map(e => `
+          <div class="bf-chain-entry${e.severity === "stop" ? " bf-chain-entry--stop" : ""}">
+            <div class="bf-chain-entry-title">${escapeHtml(e.label)} <span class="bf-chain-entry-sev">· ${escapeHtml(e.sev_label || "")}</span></div>
+            ${e.ki_text ? `<p class="bf-chain-entry-ki">${escapeHtml(e.ki_text)}</p>` : ""}
+            ${e.code_text ? `<p class="bf-chain-entry-code">${escapeHtml(e.code_text)}</p>` : ""}
+          </div>`).join("")
+      : `<p class="bf-chain-none">${escapeHtml(labels.hz_none || "")}</p>`;
+    return `<div class="bf-chain-checks">${checks}</div>${body}`;
+  }
+
+  // Eine Akkordeon-Zeile. status: ok|info|warn|"" (Lage/ohne Urteil).
+  function chainRowHtml({ key, no, title, status, statusLabel, meta, open, body }) {
+    const id = `bfChainBody-${key}`;
+    return `
+      <div class="bf-chain-row${status ? ` bf-chain-row--${escapeHtml(status)}` : ""}${open ? " is-open" : ""}">
+        <button type="button" class="bf-chain-row-btn" data-chain-block="${key}" aria-expanded="${open ? "true" : "false"}" aria-controls="${id}">
+          <span class="bf-chain-no" aria-hidden="true">${no}</span>
+          <span class="bf-chain-title">${escapeHtml(title)}</span>
+          ${meta ? `<span class="bf-chain-meta">${escapeHtml(meta)}</span>` : ""}
+          ${statusLabel ? `<span class="bf-chain-status${status ? ` bf-chain-status--${escapeHtml(status)}` : ""}">${escapeHtml(statusLabel)}</span>` : ""}
+          <svg class="bf-chain-chev" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="sr-only">${escapeHtml(wcT(open ? "js.chain.collapse" : "js.chain.expand"))}</span>
+        </button>
+        <div class="bf-chain-body" id="${id}"${open ? "" : " hidden"}>${open ? body : ""}</div>
+      </div>`;
+  }
+
+  function renderChain(data) {
+    const el = $("bfChain");
     if (!el) return;
-    const wl = data.wetterlage;
-    const overview = wl && wl.llm_overview ? wl.llm_overview : null;
-
-    // Wenn kein LLM-Overview vorhanden (Refresh fehlgeschlagen,
-    // Strukturfeld unvollstaendig, alle Saetze vom Post-Filter verworfen):
-    // Block ausblenden — keine Halluzination, kein Fallback-Text.
-    if (!overview || !overview.short) {
+    const analyse = data && data.analyse;
+    if (!analyse || !analyse.by_date) {
       el.hidden = true;
       el.innerHTML = "";
       return;
     }
+    const labels = analyse.labels || {};
+    const date = selectedDate();
+    const entry = (date && analyse.by_date[date]) || null;
+    const chain = entry && entry.chain;
 
-    // Lage-Label: Strukturfeld liefert den kanonischen DE-Wert; Anzeige
-    // uebersetzt via i18n ("js.lage.<value>"), Fallback = DE-Wert.
-    const lageRaw = (wl.lage_label && wl.lage_label.value) || "";
-    const lageLabel = lageRaw
-      ? ((window.WC_I18N && window.WC_I18N["js.lage." + lageRaw]) || lageRaw)
-      : "";
-    const shortText = overview.short || "";
-    const longText = overview.long || "";
+    const head = `
+      <div class="bf-chain-head">
+        <span class="bf-chain-icon" aria-hidden="true">≡</span>
+        <h2 class="bf-chain-label">${escapeHtml(wcT("js.chain.heading"))}</h2>
+      </div>`;
 
-    // Ein Tages-Eintrag: "Wochentag:" am Zeilenanfang wird als <strong>
-    // hervorgehoben (Legacy-Ansicht) ODER ganz entfernt (stripPrefix: die
-    // Tagesansicht zeigt ohnehin nur den gewaehlten Tag — der Wochentag
-    // steht schon im aktiven Tab). flight_hint (optional) darunter als
-    // Pilotensicht-Zeile — visuell deutlich von der Wetterbeschreibung
-    // getrennt.
-    const dayBlockHtml = (e, stripPrefix) => {
-      const txt = escapeHtml(e.text);
-      const hint = e.flight_hint ? escapeHtml(e.flight_hint) : "";
-      const hintHtml = hint
-        ? `<p class="bf-wetterlage-hint"><span class="bf-wetterlage-hint-icon" aria-hidden="true">⏵</span> ${hint}</p>`
-        : "";
-      const m = txt.match(/^(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*/);
-      let body;
-      if (m && stripPrefix) {
-        body = `<p class="bf-wetterlage-day">${txt.slice(m[0].length)}</p>`;
-      } else if (m) {
-        body = `<p class="bf-wetterlage-day"><strong>${m[1]}:</strong> ${txt.slice(m[0].length)}</p>`;
-      } else {
-        body = `<p class="bf-wetterlage-lead">${txt}</p>`;
-      }
-      return `<div class="bf-wetterlage-day-block">${body}${hintHtml}</div>`;
-    };
+    if (!chain) {
+      el.hidden = false;
+      el.innerHTML = head + `<p class="bf-chain-noday">${escapeHtml(wcT("js.chain.no_day"))}</p>`;
+      return;
+    }
 
-    // Synoptik 2.0: `zones` = 4 Flugwetter-Zonen mit je einem Eintrag pro Tag.
-    // Angezeigt wird NUR der gewaehlte Tag (Day-Tabs zuoberst steuern die
-    // ganze Seite): Summary zuerst, die Zonen-Texte des Tages hinter dem
-    // Detail-Toggle, Wochentag-Praefix gestrippt (steht schon im Tab).
-    // Legacy-Fallback (`long_with_sources`) bleibt fuer alte Caches
-    // erhalten, damit ein noch nicht refreshter Cache den Block nicht leert.
-    const zones = Array.isArray(overview.zones)
-      ? overview.zones.filter(z => z && Array.isArray(z.days) && z.days.length)
-      : [];
-    const longEntries = Array.isArray(overview.long_with_sources)
-      ? overview.long_with_sources.filter(e => e && e.text)
-      : [];
+    const rows = [];
+    let no = 0;
+    CHAIN_BLOCKS.forEach(d => {
+      const blk = chain[d.key];
+      if (!blk) return;
+      if (!blk.status && !(d.key === "lage" && (blk.fazit || chain.situation))) return;   // Block ohne Daten
+      no += 1;
+      const open = state.chainOpen.has(d.key);
+      const lage = d.key === "lage";
+      rows.push(chainRowHtml({
+        key: d.key, no,
+        title: labels[d.label] || d.key,
+        status: blk.status || "",
+        statusLabel: blk.status_label || "",
+        // Lage traegt kein Urteil: Druck + Regime + Tendenz stehen als Meta
+        meta: lage ? [blk.pressure, blk.regime, blk.pressure_note].filter(Boolean).join(" · ") : "",
+        open,
+        body: open ? chainBodyHtml(d, chain, labels, entry) : "",
+      }));
+    });
 
-    // Gewaehlten Briefing-Tag auf den Wetterlage-Index abbilden. Die
-    // forecast_dates der Wetterlage koennen vom Briefing abweichen (aelterer
-    // Cache) — dann gibt es fuer den Tag schlicht keinen Zonen-Text.
-    const selDate = selectedDate();
-    const wlDates = Array.isArray(wl.forecast_dates) ? wl.forecast_dates : [];
-    const wlIdx = selDate ? wlDates.indexOf(selDate) : -1;
-
-    // `short` enthaelt jetzt Synoptik + Flug-Bilanz als EINEN Fliesstext
-    // (siehe synoptic_overview.md Skill). Wird als ein Absatz gerendert.
-    // Backward-compat: falls ein alter Cache noch flight_outlook hat,
-    // haengen wir den Text dran — neue Caches haben das Feld nicht.
-    const outlookLegacy = wl.llm_overview && wl.llm_overview.flight_outlook;
-    const outlookLegacyText = outlookLegacy && outlookLegacy.text ? outlookLegacy.text : "";
-    const summaryParas = [
-      shortText ? `<p>${escapeHtml(shortText)}</p>` : "",
-      outlookLegacyText ? `<p>${escapeHtml(outlookLegacyText)}</p>` : "",
-    ].filter(Boolean).join("");
-
-    // detailHtml = aufklappbarer Teil hinter dem Detail-Toggle (Summary
-    // zuerst, Gebiete auf Klick). nodayHtml = ehrliche Leer-Zeile, direkt
-    // sichtbar OHNE Toggle — hinter einem Klapper waere sie eine Falle.
-    let detailHtml = "";
-    let nodayHtml = "";
-    if (zones.length) {
-      if (wlIdx >= 0) {
-        detailHtml = zones.map(z => {
-          const d = z.days[wlIdx];
-          if (!d || !d.text) return "";
-          return `
-            <section class="bf-wetterlage-zone">
-              <h4 class="bf-wetterlage-zone-title">${escapeHtml(z.label || z.zone || "")}</h4>
-              ${dayBlockHtml(d, true)}
-            </section>
-          `;
-        }).join("");
-      }
-      if (!detailHtml) {
-        nodayHtml = `<p class="bf-wetterlage-noday">${escapeHtml(wcT("js.wetterlage.no_day"))}</p>`;
-      }
-    } else if (longEntries.length) {
-      detailHtml = longEntries.map(e => dayBlockHtml(e, false)).join("");
-    } else if (longText && longText !== shortText) {
-      detailHtml = `<p>${escapeHtml(longText)}</p>`;
+    const w = entry.warnings;
+    if (w && Array.isArray(w.checks) && w.checks.length) {
+      const active = w.checks.filter(c => c.active);
+      const stop = active.some(c => c.level === "stop");
+      const open = state.chainOpen.has("warnings");
+      rows.push(chainRowHtml({
+        key: "warnings", no: "!",
+        title: labels.warnings_ch || "",
+        status: active.length ? (stop ? "stop" : "warn") : "ok",
+        statusLabel: active.length ? active.map(c => c.label).join(" · ") : wcT("js.chain.warn_none"),
+        meta: "", open,
+        body: open ? chainWarningsBodyHtml(w, labels) : "",
+      }));
     }
 
     el.hidden = false;
-    el.innerHTML = `
-      <div class="bf-wetterlage-head">
-        <span class="bf-wetterlage-icon" aria-hidden="true">☼</span>
-        <span class="bf-wetterlage-label">${escapeHtml(wcT("js.wetterlage.heading"))}${lageLabel ? ` — ${escapeHtml(lageLabel)}` : ""}</span>
-        <a class="bf-wetterlage-maplink" href="/synoptik">${escapeHtml(wcT("js.wetterlage.to_map"))} →</a>
-      </div>
-      <div class="bf-wetterlage-summary">${summaryParas}</div>
-      ${nodayHtml}
-      ${detailHtml ? `
-        <button type="button" class="bf-wetterlage-toggle" aria-expanded="${state.wetterlageOpen ? "true" : "false"}">
-          ${state.wetterlageOpen ? wcT("js.wetterlage.less") : wcT("js.wetterlage.detail")} <span class="bf-wetterlage-chevron" aria-hidden="true">▾</span>
-        </button>
-        <div class="bf-wetterlage-long"${state.wetterlageOpen ? "" : " hidden"}>${detailHtml}</div>
-      ` : ""}
-    `;
-    el.classList.toggle("is-open", !!state.wetterlageOpen);
+    el.innerHTML = head + `<div class="bf-chain-list">${rows.join("")}</div>`
+      + (analyse.source ? `<p class="bf-chain-source">${escapeHtml(analyse.source)}</p>` : "");
 
-    const toggle = el.querySelector(".bf-wetterlage-toggle");
-    if (toggle && !toggle._wlBound) {
-      toggle._wlBound = true;
-      toggle.addEventListener("click", () => {
-        state.wetterlageOpen = !state.wetterlageOpen;
-        const longEl = el.querySelector(".bf-wetterlage-long");
-        if (longEl) longEl.hidden = !state.wetterlageOpen;
-        toggle.setAttribute("aria-expanded", state.wetterlageOpen ? "true" : "false");
-        toggle.firstChild.textContent = (state.wetterlageOpen ? wcT("js.wetterlage.less") : wcT("js.wetterlage.detail")) + " ";
-        el.classList.toggle("is-open", state.wetterlageOpen);
+    if (!el._chainBound) {
+      el._chainBound = true;
+      el.addEventListener("click", (ev) => {
+        const btn = ev.target.closest("[data-chain-block]");
+        if (!btn || !el.contains(btn)) return;
+        const key = btn.getAttribute("data-chain-block");
+        if (state.chainOpen.has(key)) state.chainOpen.delete(key); else state.chainOpen.add(key);
+        saveChainOpen(state.chainOpen);
+        renderChain(state.data);
+        // Fokus bleibt auf der Zeile, die der User bedient hat (Tastatur)
+        const again = el.querySelector(`[data-chain-block="${key}"]`);
+        if (again) again.focus({ preventScroll: true });
       });
     }
   }

@@ -423,13 +423,15 @@ class TestLageFazit(unittest.TestCase):
         }
         txt = bc._lage_fazit(wl, "2026-09-18")
         import re
-        self.assertFalse(re.search(r"\d", txt), txt)          # keine Zahlen
+        # keine Zahlen — ausser im Modellnamen (ICON-CH1/ICON-D2), der den
+        # Datensatz benennt (19.09.2026: nie "unsere Prognose")
+        self.assertFalse(re.search(r"\d", re.sub(r"ICON-\w+", "", txt)), txt)
         self.assertTrue("showers only on the south side" in txt or "Schauer nur auf der Alpensüdseite" in txt, txt)
         self.assertTrue("widely windy" in txt or "verbreitet windig" in txt, txt)
         self.assertTrue("less on the south side" in txt or "auf der Alpensüdseite weniger" in txt, txt)
         self.assertTrue("Mediterranean" in txt or "Mittelmeer" in txt, txt)   # Luftmasse der SW-Lage
         self.assertTrue("calming down" in txt or "beruhigt sich" in txt, txt)  # Druck steigt
-        self.assertEqual(txt.count("."), 2, txt)                             # zwei Saetze, Daten haengen am Druck
+        self.assertEqual(txt.count("."), 3, txt)                             # drei Saetze: Einfluss, Druck, Datensatz (Modellname)
         self.assertNotIn("Forecast data", txt)
         self.assertLess(len(txt.split()), 40, txt)
 
@@ -458,5 +460,5 @@ class TestLageLogik(unittest.TestCase):
 
     def test_fading_showers_keep_the_calming(self):
         txt = bc._lage_fazit(self._wl(0.6, 0.05), "2026-09-18")
-        self.assertTrue("calming down:" in txt or "beruhigt sich:" in txt, txt)
+        self.assertTrue("calming down." in txt or "beruhigt sich." in txt, txt)
         self.assertTrue("fading" in txt or "abklingend" in txt, txt)

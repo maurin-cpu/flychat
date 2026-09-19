@@ -37,17 +37,15 @@
     </div>
   </header>
 
-  {# Tagesauswahl zuoberst: Wetterlage-Text und Synoptik-Karte darunter
+  {# Tagesauswahl zuoberst: Synoptik-Karte und Analyse-Kette darunter
      zeigen den GEWAEHLTEN Tag — die Tabs steuern also die ganze Seite,
      nicht nur die Spot-Listen. #}
   <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="{{ t('briefing.day_tabs_aria') }}"></nav>
 
-  <section class="bf-wetterlage" id="bfWetterlage" hidden></section>
-
   <!-- Synoptik-Mini-Karte: nicht interaktiv, zeigt den Timestep 12:00 des
        gewaehlten Tages (briefing.js meldet den Tag an synoptic-embed.js).
        Klick fuehrt zur grossen Karte. -->
-  <section class="bf-synoptic" id="bfSynoptic" hidden>
+  <section class="bf-synoptic" id="bfSynoptic" data-wind="pfeile" hidden>
     <div class="bf-synoptic-head">
       <svg class="bf-synoptic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18M3.6 9h16.8M3.6 15h16.8"/></svg>
       <span class="bf-synoptic-title">{{ t('js.syn.embed_title') }}</span>
@@ -62,6 +60,11 @@
       <a class="bf-synoptic-overlay" href="/synoptik" aria-label="{{ t('js.syn.embed_aria') }}"></a>
     </div>
   </section>
+
+  {# Analyse-Kette + Warnungen Schweiz des GEWAEHLTEN Tages, unter der Karte (dieselben
+     Bloecke wie das Mail-Briefing, docs/BRIEFING.md; vom Server je Tag
+     gerechnet, briefing.js renderChain). #}
+  <section class="bf-chain" id="bfChain" hidden></section>
 
   <section class="bf-filters" id="bfFilters">
     <div class="bf-filter-group bf-filter-group--region">
@@ -108,8 +111,11 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="{{ url_for('static', filename='js/shared-glyph.js') }}?v={{ static_v('js/shared-glyph.js') }}"></script>
-{# synoptic-wind.js wird hier NICHT geladen: der Embed zeigt bewusst keine
-   Wind-Partikel, die gibt es nur auf der interaktiven Karte (/synoptik). #}
+{# synoptic-wind.js: statische Hoehenwind-Pfeile (700 hPa) wie auf der
+   Kartenbild-Seite /synoptik/karte, die ins Mail-Briefing geht — data-wind=
+   "pfeile" am Container schaltet sie ein. Bewegte Partikel bleiben der
+   interaktiven Karte (/synoptik) vorbehalten. #}
+<script src="{{ url_for('static', filename='js/synoptic-wind.js') }}?v={{ static_v('js/synoptic-wind.js') }}"></script>
 <script src="{{ url_for('static', filename='js/synoptic-fronts.js') }}?v={{ static_v('js/synoptic-fronts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/synoptic-embed.js') }}?v={{ static_v('js/synoptic-embed.js') }}"></script>
 <script src="{{ url_for('static', filename='js/meteogram.js') }}?v={{ static_v('js/meteogram.js') }}"></script>
