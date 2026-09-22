@@ -233,7 +233,7 @@
         </tr></table>
         {% if r.tags %}<div style="margin-top:6px;">{% for tg in r.tags %}<span style="display:inline-block;margin:0 4px 4px 0;padding:2px 8px;border-radius:100px;font:500 11px/1.4 {{ MONO }};color:{{ C.danger if tg.severity == 'stop' else (C.warn_fg if tg.severity == 'warn' else C.text2) }};background-color:{{ '#fee2e2' if tg.severity == 'stop' else (C.warn_bg if tg.severity == 'warn' else '#ffffff') }};border:1px solid {{ C.border }};">{{ tg.text or (tg.label ~ ' ' ~ tg.value) }}</span>{% endfor %}</div>{% endif %}
         {% if r.short %}<div style="margin-top:6px;font:14px/1.5 {{ SANS }};color:{{ C.text2 }};">{{ r.short }}</div>{% endif %}
-        <div style="margin-top:6px;"><a href="{{ r.url }}" style="font:600 13px/1.4 {{ SANS }};color:{{ C.primary }};text-decoration:none;">{{ v3_labels.spots_link }} &rsaquo;</a></div>
+        <div style="margin-top:6px;"><a href="{{ track(r.url) }}" style="font:600 13px/1.4 {{ SANS }};color:{{ C.primary }};text-decoration:none;">{{ v3_labels.spots_link }} &rsaquo;</a></div>
       </td></tr>
     </table>
     {% else %}
@@ -243,7 +243,7 @@
 
   {# ---------- CTA + Disclaimer ---------- #}
   <tr><td style="padding:10px 18px 16px;">
-    <a href="{{ urls.dashboard }}" style="display:block;padding:12px 16px;border-radius:8px;background-color:{{ C.primary }};color:#ffffff;text-align:center;font:600 15px/1.3 {{ SANS }};text-decoration:none;">{{ v3_labels.cta }} &rsaquo;</a>
+    <a href="{{ track(urls.dashboard) }}" style="display:block;padding:12px 16px;border-radius:8px;background-color:{{ C.primary }};color:#ffffff;text-align:center;font:600 15px/1.3 {{ SANS }};text-decoration:none;">{{ v3_labels.cta }} &rsaquo;</a>
     <p style="margin:12px 0 0;font:12px/1.6 {{ SANS }};color:{{ C.muted }};">{{ v3_labels.disclaimer }}<br>{{ v3_labels.airspace_note }}</p>
   </td></tr>
 
@@ -254,9 +254,9 @@
       {{ t('email.briefing.disclaimer_short_html')|safe }}
     </div>
     <div style="font-size:10px;color:#64748b;line-height:1.6;margin-top:8px;">
-      <a href="{{ urls.account }}" style="color:#0f172a;text-decoration:underline;font-weight:600;">{{ t('nav.settings') }}</a>
+      <a href="{{ track(urls.account) }}" style="color:#0f172a;text-decoration:underline;font-weight:600;">{{ t('nav.settings') }}</a>
       &nbsp; &middot; &nbsp;
-      <a href="{{ urls.dashboard }}" style="color:#64748b;text-decoration:underline;">Dashboard</a>
+      <a href="{{ track(urls.dashboard) }}" style="color:#64748b;text-decoration:underline;">Dashboard</a>
       &nbsp; &middot; &nbsp;
       <a href="{{ urls.unsubscribe }}" style="color:#64748b;text-decoration:underline;">{{ t('email.unsubscribe_link') }}</a>
       &nbsp; &middot; &nbsp;
@@ -269,5 +269,6 @@
 </table>
 </td></tr>
 </table>
+{% if pixel_url %}<img src="{{ pixel_url }}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;" />{% endif %}
 </body>
 </html>

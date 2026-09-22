@@ -161,6 +161,43 @@ def _is_admin_session() -> bool:
     return bool(session.get("admin_debug"))
 
 
+@app.route("/t/o/<int:sid>/<sig>.gif")
+def mail_track_open(sid: int, sig: str):
+    """Oeffnungs-Pixel des Briefing-Mails (siehe mail_tracking.py)."""
+    import mail_tracking
+    if mail_tracking.verify(sid, sig):
+        mgr = _get_subscriber_manager()
+        if mgr is not None:
+            try:
+                mail_tracking.record_open(
+                    mgr, sid, (request.args.get("d") or "")[:10],
+                    request.headers.get("User-Agent", ""), _client_ip())
+            except Exception:
+                logger.exception("mail_track_open failed")
+    resp = Response(mail_tracking.PIXEL_GIF, mimetype="image/gif")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
+@app.route("/t/c/<int:sid>/<sig>")
+def mail_track_click(sid: int, sig: str):
+    """Klick-Weiterleitung aus dem Briefing-Mail. Ziel nur auf eigenen Domains."""
+    import mail_tracking
+    target = request.args.get("u") or ""
+    if not mail_tracking.is_allowed_target(target):
+        target = "/"
+    if mail_tracking.verify(sid, sig):
+        mgr = _get_subscriber_manager()
+        if mgr is not None:
+            try:
+                mail_tracking.record_click(mgr, sid, (request.args.get("d") or "")[:10], target)
+            except Exception:
+                logger.exception("mail_track_click failed")
+    return redirect(target, code=302)
+
+
 @app.before_request
 def _touch_last_seen():
     """Haelt subscribers.last_seen_at aktuell: bei jedem eingeloggten Seitenaufruf,
@@ -170,7 +207,7 @@ def _touch_last_seen():
     if not sub_id:
         return
     path = request.path or ""
-    if path.startswith("/static") or path.startswith("/admin"):
+    if path.startswith("/static") or path.startswith("/admin") or path.startswith("/t/"):
         return
     now = int(time.time())
     if now - int(session.get("seen_ts") or 0) < 600:

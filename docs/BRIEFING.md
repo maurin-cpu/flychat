@@ -200,3 +200,22 @@ DWD-Lauf 00 UTC).
 
 Verwandt: `docs/WETTERLAGE.md`, `docs/GEWITTER.md`, `docs/RATING_FARBKONZEPT.md`,
 `docs/pläne/PLAN_briefing_mail_v3.md`.
+
+## Oeffnungs- und Klick-Messung (seit 22.09.2026)
+
+`mail_tracking.py`. Jedes Briefing-Mail traegt ein 1x1-Pixel (`/t/o/<id>/<sig>.gif`)
+und leitet die Links Konto/Dashboard/Spots ueber `/t/c/<id>/<sig>?u=…` (nur eigene
+Domains als Ziel). Signatur = HMAC ueber die Subscriber-ID, kein DB-Token.
+
+Gespeichert wird je Abonnent `last_open_at`, `last_open_client`, `last_open_valid`,
+`last_valid_open_at`, `last_click_at` plus jedes Ereignis in `email_events`.
+**`last_open_valid=0` = Apple Mail** (laedt Bilder ueber den Privacy-Proxy vor dem
+Lesen, belegt keine Oeffnung). Outlook blockiert Bilder standardmaessig — kommt kein
+Aufruf, fehlt der Wert schlicht. Ein Klick belegt die Oeffnung immer.
+
+PostHog bekommt server-seitig (ohne Browser-Consent, kein Browser-Tracking) die
+Events `briefing_sent`, `briefing_opened`, `briefing_clicked` und je Person die
+Eigenschaften `briefing_last_opened_at`, `briefing_last_open_valid`,
+`briefing_last_open_client`, `briefing_last_valid_open_at`, `briefing_last_clicked_at`,
+`subscriber_status`, `regions_count`, … Einmal-Abgleich aller Konten:
+`python scripts/posthog_sync_subscribers.py`. Keine IPs, keine User-Agents gespeichert.

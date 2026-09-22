@@ -244,6 +244,27 @@ class SubscriberManager:
             # bestehender Session). Beantwortet "kommt der User wieder?" —
             # first_login_at allein kann das nicht, weil die Session 31 Tage haelt.
             self._migrate_add_column(conn, "subscribers", "last_seen_at", "TEXT")
+            # Briefing-Mail: Oeffnung (Pixel) und Klick (Weiterleitung), siehe
+            # mail_tracking.py. last_open_valid=0 heisst: Aufruf kam von Apple
+            # Mail / Proxy-Vorabruf und belegt keine echte Oeffnung.
+            self._migrate_add_column(conn, "subscribers", "last_open_at", "TEXT")
+            self._migrate_add_column(conn, "subscribers", "last_open_client", "TEXT")
+            self._migrate_add_column(conn, "subscribers", "last_open_valid", "INTEGER")
+            self._migrate_add_column(conn, "subscribers", "last_valid_open_at", "TEXT")
+            self._migrate_add_column(conn, "subscribers", "last_click_at", "TEXT")
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS email_events (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    subscriber_id INTEGER NOT NULL,
+                    kind          TEXT NOT NULL,      -- 'open' | 'click'
+                    briefing_date TEXT,               -- 'YYYY-MM-DD'
+                    client        TEXT,               -- gmail | apple_mail | outlook | browser | ...
+                    valid         INTEGER NOT NULL DEFAULT 1,
+                    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_email_events_sub
+                    ON email_events (subscriber_id, created_at);
+            """)
             conn.executescript("""
 
                 CREATE INDEX IF NOT EXISTS idx_subscribers_status_active
@@ -740,7 +761,9 @@ class SubscriberManager:
                     """
                     SELECT id, email, regions, skill_level, status,
                            paused_until, created_at, confirmed_at, last_sent_at,
-                           first_login_at, last_seen_at
+                           first_login_at, last_seen_at,
+                           last_open_at, last_open_client, last_open_valid,
+                           last_valid_open_at, last_click_at
                       FROM subscribers
                      ORDER BY created_at DESC
                      LIMIT ?
@@ -750,10 +773,73 @@ class SubscriberManager:
                 rows = cur.fetchall()
                 keys = ("id", "email", "regions", "skill_level", "status",
                         "paused_until", "created_at", "confirmed_at", "last_sent_at",
-                        "first_login_at", "last_seen_at")
+                        "first_login_at", "last_seen_at",
+                        "last_open_at", "last_open_client", "last_open_valid",
+                        "last_valid_open_at", "last_click_at")
                 return [self._row_to_subscriber(r, keys) for r in rows]
         except Exception as e:
             logger.error("list_recent failed: %s", e)
+            return []
+
+    def record_email_event(self, subscriber_id: int, kind: str, briefing_date: str,
+                           client: str, valid: bool) -> Optional[dict]:
+        """Verbucht Oeffnung/Klick in email_events und auf dem Subscriber.
+        Liefert {id, email} oder None (unbekannter Subscriber)."""
+        try:
+            with self._cursor(write=True) as cur:
+                cur.execute("SELECT id, email FROM subscribers WHERE id = ?",
+                            (int(subscriber_id),))
+                row = cur.fetchone()
+                if row is None:
+                    return None
+                cur.execute(
+                    """INSERT INTO email_events (subscriber_id, kind, briefing_date, client, valid)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (row[0], kind, briefing_date or None, client, 1 if valid else 0),
+                )
+                if kind == "open":
+                    cur.execute(
+                        """UPDATE subscribers
+                              SET last_open_at = datetime('now'),
+                                  last_open_client = ?,
+                                  last_open_valid = ?,
+                                  last_valid_open_at = CASE WHEN ? THEN datetime('now')
+                                                            ELSE last_valid_open_at END
+                            WHERE id = ?""",
+                        (client, 1 if valid else 0, 1 if valid else 0, row[0]),
+                    )
+                elif kind == "click":
+                    # Ein Klick belegt die Oeffnung sicher.
+                    cur.execute(
+                        """UPDATE subscribers
+                              SET last_click_at = datetime('now'),
+                                  last_valid_open_at = datetime('now'),
+                                  last_open_valid = 1
+                            WHERE id = ?""",
+                        (row[0],),
+                    )
+                return {"id": row[0], "email": row[1]}
+        except Exception as e:
+            logger.error("record_email_event failed: %s", e)
+            return None
+
+    def list_for_tracking_sync(self) -> list:
+        """Alle Konten mit den Feldern, die als PostHog-Personen-Eigenschaften
+        gespiegelt werden (scripts/posthog_sync_subscribers.py)."""
+        try:
+            with self._cursor() as cur:
+                cur.execute(
+                    """SELECT id, email, regions, skill_level, status, created_at,
+                              last_sent_at, last_seen_at, last_open_at, last_open_client,
+                              last_open_valid, last_valid_open_at, last_click_at
+                         FROM subscribers ORDER BY id"""
+                )
+                keys = ("id", "email", "regions", "skill_level", "status", "created_at",
+                        "last_sent_at", "last_seen_at", "last_open_at", "last_open_client",
+                        "last_open_valid", "last_valid_open_at", "last_click_at")
+                return [self._row_to_subscriber(r, keys) for r in cur.fetchall()]
+        except Exception as e:
+            logger.error("list_for_tracking_sync failed: %s", e)
             return []
 
     def touch_last_seen(self, subscriber_id: int) -> None:

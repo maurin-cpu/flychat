@@ -346,6 +346,11 @@ def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
                 mgr.mark_sent(sub["id"])
                 sent += 1
                 logger.info("[BRIEF] -> %s (#%s) OK", email, sub["id"])
+                try:
+                    import mail_tracking
+                    mail_tracking.record_sent(sub, datetime.now().date().isoformat())
+                except Exception:
+                    logger.exception("[BRIEF] PostHog briefing_sent uebersprungen")
             else:
                 failed += 1
                 logger.error("[BRIEF] -> %s (#%s) FAIL (send_email returned False)",

@@ -1591,6 +1591,20 @@ def _render_briefing_v3(ctx: dict, briefing_data: dict, subscriber: dict):
                 ctx["v3_map_cid"] = "synoptik"
     except Exception:
         logger.exception("_render_briefing_v3: Kartenbild uebersprungen")
+    # Oeffnungs-Pixel + Klick-Weiterleitung (mail_tracking.py). Nur im HTML;
+    # der Text-Teil bleibt unveraendert.
+    try:
+        import mail_tracking
+        sid = int(subscriber.get("id") or 0)
+        if sid > 0:
+            base = _resolve_base_url()
+            bdate = _date.today().isoformat()
+            ctx["track"] = lambda u: mail_tracking.click_url(base, sid, bdate, u)
+            ctx["pixel_url"] = mail_tracking.pixel_url(base, sid, bdate)
+    except Exception:
+        logger.exception("_render_briefing_v3: Tracking-URLs uebersprungen")
+    ctx.setdefault("track", lambda u: u)
+    ctx.setdefault("pixel_url", "")
     html = render_template("email/briefing_v3.html", **ctx)
     text = render_template("email/briefing_v3.txt", **ctx)
     return html, text, ctx.get("v3_subject") or "", (images or None)
