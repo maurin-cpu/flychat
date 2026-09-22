@@ -162,6 +162,7 @@ def subscriber_person_props(sub: dict) -> dict:
     """Personen-Eigenschaften eines Abonnenten fuer PostHog."""
     regions = sub.get("regions") or []
     return {
+        "email": sub.get("email"),
         "subscriber_id": sub.get("id"),
         "subscriber_status": sub.get("status"),
         "subscriber_since": sub.get("created_at"),
