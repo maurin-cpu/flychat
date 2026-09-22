@@ -116,6 +116,7 @@
             <th>Regionen</th>
             <th>Registriert</th>
             <th>Letzter Versand</th>
+            <th title="Letzter eingeloggter Seitenaufruf (Login oder Besuch mit bestehender Session)">Zuletzt aktiv</th>
             <th></th>
           </tr>
         </thead>
@@ -137,6 +138,7 @@
             </td>
             <td class="sp-tbl__dt">{{ (s.created_at|string)[:16] if s.created_at else '' }}</td>
             <td class="sp-tbl__dt">{{ (s.last_sent_at|string)[:16] if s.last_sent_at else '—' }}</td>
+            <td class="sp-tbl__dt" title="Erster Login: {{ (s.first_login_at|string)[:16] if s.first_login_at else 'nie' }}">{{ (s.last_seen_at|string)[:16] if s.last_seen_at else '—' }}</td>
             <td style="white-space:nowrap;">
               {% if s.status != 'unsubscribed' %}
               <form method="post" action="/admin/subscribers/{{ s.id }}/block"

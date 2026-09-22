@@ -240,6 +240,10 @@ class SubscriberManager:
             # Login NICHT als neu (siehe consume_login_token).
             self._migrate_add_column(conn, "subscribers", "first_login_at", "TEXT")
             self._migrate_add_column(conn, "subscribers", "login_token_expires_at", "TEXT")
+            # Letzter eingeloggter Seitenaufruf (Login ODER spaeterer Besuch mit
+            # bestehender Session). Beantwortet "kommt der User wieder?" —
+            # first_login_at allein kann das nicht, weil die Session 31 Tage haelt.
+            self._migrate_add_column(conn, "subscribers", "last_seen_at", "TEXT")
             conn.executescript("""
 
                 CREATE INDEX IF NOT EXISTS idx_subscribers_status_active
@@ -735,7 +739,8 @@ class SubscriberManager:
                 cur.execute(
                     """
                     SELECT id, email, regions, skill_level, status,
-                           paused_until, created_at, confirmed_at, last_sent_at
+                           paused_until, created_at, confirmed_at, last_sent_at,
+                           first_login_at, last_seen_at
                       FROM subscribers
                      ORDER BY created_at DESC
                      LIMIT ?
@@ -744,11 +749,24 @@ class SubscriberManager:
                 )
                 rows = cur.fetchall()
                 keys = ("id", "email", "regions", "skill_level", "status",
-                        "paused_until", "created_at", "confirmed_at", "last_sent_at")
+                        "paused_until", "created_at", "confirmed_at", "last_sent_at",
+                        "first_login_at", "last_seen_at")
                 return [self._row_to_subscriber(r, keys) for r in rows]
         except Exception as e:
             logger.error("list_recent failed: %s", e)
             return []
+
+    def touch_last_seen(self, subscriber_id: int) -> None:
+        """Setzt last_seen_at = jetzt. Aufrufer drosselt (web.py: max. alle
+        10 Minuten pro Session), damit nicht jeder Request schreibt."""
+        try:
+            with self._cursor(write=True) as cur:
+                cur.execute(
+                    "UPDATE subscribers SET last_seen_at = datetime('now') WHERE id = ?",
+                    (int(subscriber_id),),
+                )
+        except Exception as e:
+            logger.error("touch_last_seen failed: %s", e)
 
     def count_feedback_overall(self, days: int = 30) -> dict:
         try:
@@ -1126,7 +1144,8 @@ class SubscriberManager:
                 cur.execute(
                     """
                     UPDATE subscribers
-                       SET first_login_at = COALESCE(first_login_at, datetime('now'))
+                       SET first_login_at = COALESCE(first_login_at, datetime('now')),
+                           last_seen_at   = datetime('now')
                      WHERE id = ?
                     """,
                     (row[0],),

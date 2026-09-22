@@ -16,6 +16,7 @@ from functools import wraps
 from typing import Optional
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, \
     stream_with_context, session, send_from_directory
+import time
 from datetime import datetime, timedelta
 
 import config
@@ -158,6 +159,26 @@ def _is_admin() -> bool:
 def _is_admin_session() -> bool:
     """True wenn die aktuelle Session via Admin-Login verifiziert wurde."""
     return bool(session.get("admin_debug"))
+
+
+@app.before_request
+def _touch_last_seen():
+    """Haelt subscribers.last_seen_at aktuell: bei jedem eingeloggten Seitenaufruf,
+    gedrosselt auf einmal pro 10 Minuten je Session. Statische Dateien und
+    Admin-Routen zaehlen nicht."""
+    sub_id = session.get("sub_id")
+    if not sub_id:
+        return
+    path = request.path or ""
+    if path.startswith("/static") or path.startswith("/admin"):
+        return
+    now = int(time.time())
+    if now - int(session.get("seen_ts") or 0) < 600:
+        return
+    session["seen_ts"] = now
+    mgr = _get_subscriber_manager()
+    if mgr is not None:
+        mgr.touch_last_seen(sub_id)
 
 
 @app.context_processor
