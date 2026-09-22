@@ -198,15 +198,6 @@ window.Meteogram = (function () {
     const PRECIP_ROW_H = 20;
     const CLOUD_STRIP_H = 3 * CLOUD_ROW_H + PRECIP_ROW_H; // CH, CM, CL + Niederschlag/Gewitter
     const CLOUD_GAP = 6;
-    // Warnings strip: small pills under the ground section summarising hour-ranges
-    // Warn-Pills sollen schmal bleiben — bei vielen Warnungen kann der Strip
-    // sonst >80px hoch werden und das Meteogramm wegdrücken.
-    // Cap bei MAX_WARN_ROWS Reihen; alle weiteren Warnungen werden in der
-    // letzten Reihe als "+N weitere" Indikator am rechten Rand zusammengefasst.
-    const WARN_ROW_H = 13;
-    const WARN_ROW_GAP = 1;
-    const MAX_WARN_ROWS = 4;
-
     // WMO weather_code: 95/96/99 = Gewitter
     function isThunderstorm(code) {
         return code === 95 || code === 96 || code === 99;
@@ -553,127 +544,13 @@ window.Meteogram = (function () {
         var CELL_W = (chartW - MARGIN.left - MARGIN.right) / nCols;
         var isNarrow = CELL_W < 36;
 
-        // ===== COMPUTE PLAIN-LANGUAGE WARNING BANDS =====
-        // These are grouped hour-ranges (ci..ci) used later to draw pills
-        // BELOW the ground strip in plain German.
-        // elevation already extracted above for altitude grid filtering
+        // Warnstreifen unter dem Meteogramm entfernt (22.09.2026, User-Entscheid:
+        // bei vielen Warnungen ueberladen). Die Zellfarben (ruhig/sportlich/
+        // unfliegbar) und der Richtungsrahmen tragen die Information weiter.
         var windSectors = parseWindDirection(options.windrichtung || '');
         var idealWindMax = options.idealWindMax || 30;
         var thresholds = options.thresholds || DEFAULT_THRESHOLDS;
-
-        // Per-column boolean flags
-        var flagBuf = [];
-        for (var wci = 0; wci < nCols; wci++) flagBuf.push({});
-
-        times.forEach(function (t, ci) {
-            var wx = wxByTime[t] || {};
-            var wind = wx.wind || {};
-            var precip = wx.precipitation || {};
-            var thermik = wx.thermik || {};
-            var profile = profiles[ci];
-            var f = flagBuf[ci];
-
-            // Ground wind direction wrong
-            if (windSectors && wind.direction != null
-                && wind.speed != null && wind.speed >= 3) {
-                if (!isDirInSectors(wind.direction, windSectors, 10)) {
-                    f.wrong = true;
-                }
-            }
-            // Strong ground wind
-            if (wind.speed != null && wind.speed > idealWindMax) {
-                f.strong = true;
-            }
-            // Gusts
-            if (wind.gusts != null && wind.speed != null) {
-                if (wind.gusts > 40) f.gustDanger = true;
-                else if (wind.gusts > 30 && (wind.gusts - wind.speed) > 15) f.gustWarn = true;
-                else if (wind.gusts > 30) f.gustWarn = true;
-            }
-            // Rain
-            if (precip.amount != null && precip.amount > 0.05) f.rain = true;
-            var wcAll = (precip.weather_code != null) ? precip.weather_code
-                      : ((wx.cloudbase && wx.cloudbase.weather_code != null) ? wx.cloudbase.weather_code : null);
-            if (stormAt(precip, wcAll)) f.storm = true;
-            // CAPE-Überentwicklung ist KEIN Gewitter und KEIN Blitz mehr —
-            // bleibt ein Safety-Aspekt in der Analyse, nicht im Wetter-Strip.
-
-            // Aloft danger (within flight layer: elevation .. thermal_max + 1000m)
-            // Schwellen aus thresholds-API (config.WIND_*_KMH / GUST_*_KMH).
-            if (profile && profile.levels && elevation > 0) {
-                var topLimit = (thermik.max_height || (elevation + 2000)) + 1000;
-                var aloftWindTh = _th(thresholds, 'aloft_wind');
-                var aloftGustTh = _th(thresholds, 'aloft_gust');
-                for (var li = 0; li < profile.levels.length; li++) {
-                    var lv = profile.levels[li];
-                    if (lv == null || lv.altitude == null) continue;
-                    if (lv.altitude < elevation || lv.altitude > topLimit) continue;
-                    var wsA = lv.wind_speed;
-                    var wgA = lv.wind_gusts != null ? lv.wind_gusts : wsA;
-                    if (wsA != null) {
-                        if (wsA > aloftWindTh.danger) f.aloftDanger = true;
-                        else if (wsA > aloftWindTh.warn) f.aloftWarn = true;
-                    }
-                    if (wgA != null) {
-                        if (wgA > aloftGustTh.danger) f.aloftGustDanger = true;
-                        else if (wgA > aloftGustTh.warn) f.aloftGustWarn = true;
-                    }
-                }
-            }
-        });
-
-        // Warning type configuration, in priority order
-        var WARN_TYPES = [
-            { key: 'storm',            label: wcT('js.mg.warn_storm'),               color: '#92400E', bg: '#FEF3C7' },
-            { key: 'rain',             label: wcT('js.mg.warn_rain'),                  color: '#1E3A8A', bg: '#DBEAFE' },
-            { key: 'gustDanger',       label: wcT('js.mg.warn_gust_danger'),        color: '#991B1B', bg: '#FEE2E2' },
-            { key: 'aloftDanger',      label: wcT('js.mg.warn_aloft_danger'),   color: '#991B1B', bg: '#FEE2E2' },
-            { key: 'aloftGustDanger',  label: wcT('js.mg.warn_aloftgust_danger'),   color: '#991B1B', bg: '#FEE2E2' },
-            { key: 'strong',           label: wcT('js.mg.warn_strong'),     color: '#991B1B', bg: '#FEE2E2' },
-            { key: 'wrong',            label: wcT('js.mg.warn_wrong'),  color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'gustWarn',         label: wcT('js.mg.warn_gust_warn'),             color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'aloftWarn',        label: wcT('js.mg.warn_aloft_warn'),      color: '#9A3412', bg: '#FFEDD5' },
-            { key: 'aloftGustWarn',    label: wcT('js.mg.warn_aloftgust_warn'),      color: '#9A3412', bg: '#FFEDD5' }
-        ];
-
-        // Build groups per warning type
-        var warnBands = [];
-        WARN_TYPES.forEach(function (wt) {
-            var groups = groupConsecutive(nCols, function (ci) { return !!flagBuf[ci][wt.key]; });
-            groups.forEach(function (g) {
-                warnBands.push({
-                    key: wt.key,
-                    label: wt.label,
-                    color: wt.color,
-                    bg: wt.bg,
-                    start: g[0],
-                    end: g[1],
-                });
-            });
-        });
-
-        // Row-pack (greedy) so non-overlapping bands share a row.
-        // Cap bei MAX_WARN_ROWS Reihen — alle weiteren Warnungen werden NICHT
-        // gerendert, sondern als "+N weitere" Overflow-Pill in der letzten
-        // Reihe rechts ausserhalb der Daten zusammengefasst (Tooltip listet
-        // alle gedroppten Warnings auf).
-        warnBands.forEach(function (b) { b.row = -1; });
-        var rowLastEnd = []; // rowLastEnd[row] = last end col used
-        var droppedWarns = []; // bands die nicht in MAX_WARN_ROWS passen
-        warnBands.forEach(function (b) {
-            var r = 0;
-            while (rowLastEnd[r] != null && rowLastEnd[r] >= b.start) {
-                r++;
-            }
-            if (r >= MAX_WARN_ROWS) {
-                droppedWarns.push(b);
-                return; // b.row bleibt -1 → wird beim Render uebersprungen
-            }
-            b.row = r;
-            rowLastEnd[r] = b.end;
-        });
-        var usedRows = rowLastEnd.length;
-        var WARN_STRIP_H = usedRows > 0 ? (usedRows * (WARN_ROW_H + WARN_ROW_GAP) + 4) : 0;
+        var WARN_STRIP_H = 0;
 
         var chartH = MARGIN.top + CLOUD_STRIP_H + CLOUD_GAP + nRows * cellH + TIME_LABEL_H + GROUND_H + WARN_STRIP_H + 8;
 
@@ -874,20 +751,6 @@ window.Meteogram = (function () {
         // Wind/Böen/Thermik nutzen Mini-Text-Labels statt Icons — Glyphs für
         // diese Konzepte waren nicht eindeutig genug (Pfeil-mit-Welle = Therm
         // oder Wind? Spike = Böe oder Stromschlag?). Text ist klarer.
-        function drawWarnIcon(g) {
-            // Klassisches Warndreieck mit Ausrufezeichen.
-            g.append('path')
-                .attr('d', 'M12 3 L 22 21 L 2 21 Z')
-                .attr('fill', '#FEF3C7').attr('stroke', '#92400E')
-                .attr('stroke-width', 1.8).attr('stroke-linejoin', 'round');
-            g.append('path')
-                .attr('d', 'M12 10 V 16')
-                .attr('stroke', '#92400E').attr('stroke-width', 2)
-                .attr('stroke-linecap', 'round');
-            g.append('circle')
-                .attr('cx', 12).attr('cy', 19).attr('r', 1)
-                .attr('fill', '#92400E');
-        }
 
         var GRID_TOP = CLOUD_STRIP_H + CLOUD_GAP;
         // Alle Rows gleich hoch — Bodenwind ist physikalisch punktuell,
@@ -1717,102 +1580,6 @@ window.Meteogram = (function () {
             }
 
         });
-
-        // ===== WARNINGS STRIP =====
-        // Plain-German hour-range pills below the ground strip.
-        if (warnBands.length > 0 && WARN_STRIP_H > 0) {
-            var warnTop = groundY + GROUND_H + 4;
-            // Row label on the left — Icon auf Mobile, Text auf Desktop.
-            if (isMobileViewport) {
-                appendLeftIcon(warnTop + WARN_ROW_H / 2, drawWarnIcon);
-            } else {
-                chartG.append('text').attr('class', 'ground-label')
-                    .attr('x', -8).attr('y', warnTop + WARN_ROW_H / 2 + 3)
-                    .attr('text-anchor', 'end')
-                    .attr('fill', '#92400E')
-                    .text(wcT('js.mg.warnings'));
-            }
-
-            warnBands.forEach(function (band) {
-                if (band.row < 0) return; // dropped due to row overflow
-                var bx = band.start * CELL_W + 1;
-                var bw = (band.end - band.start + 1) * CELL_W - 2;
-                var by = warnTop + band.row * (WARN_ROW_H + WARN_ROW_GAP);
-                var bcx = bx + bw / 2;
-
-                // Pill background
-                chartG.append('rect')
-                    .attr('x', bx).attr('y', by)
-                    .attr('width', bw).attr('height', WARN_ROW_H)
-                    .attr('rx', 4)
-                    .attr('fill', band.bg)
-                    .attr('stroke', band.color)
-                    .attr('stroke-width', 0.75)
-                    .attr('opacity', 0.95);
-
-                // Label text — auto-shorten if pill too narrow
-                var rangeStr = formatHourRange(times, band.start, band.end);
-                var fullLabel = band.label + ' ' + rangeStr;
-                // Rough fit: ~5px per char at 9px font
-                var maxChars = Math.floor((bw - 6) / 5);
-                var displayLabel;
-                if (fullLabel.length <= maxChars) {
-                    displayLabel = fullLabel;
-                } else if (band.label.length + 1 + rangeStr.length <= maxChars) {
-                    displayLabel = band.label + ' ' + rangeStr;
-                } else if (rangeStr.length + 1 <= maxChars) {
-                    // Drop label, keep range visible
-                    displayLabel = rangeStr;
-                } else {
-                    displayLabel = '';
-                }
-
-                if (displayLabel) {
-                    chartG.append('text')
-                        .attr('x', bcx).attr('y', by + WARN_ROW_H / 2 + 3)
-                        .attr('text-anchor', 'middle')
-                        .attr('font-size', '9px')
-                        .attr('font-weight', '600')
-                        .attr('fill', band.color)
-                        .text(displayLabel);
-                }
-
-                // Tooltip on hover (native title, simple + reliable)
-                chartG.append('title').text(fullLabel);
-            });
-
-            // Overflow-Indikator: wenn Warnings wegen MAX_WARN_ROWS gedroppt
-            // wurden, in der letzten Reihe rechts eine "+N" Pill mit Tooltip
-            // (komplette Liste der gedroppten Warnings) zeigen.
-            if (droppedWarns.length > 0) {
-                var lastRow = MAX_WARN_ROWS - 1;
-                var oy = warnTop + lastRow * (WARN_ROW_H + WARN_ROW_GAP);
-                var oLabel = '+' + droppedWarns.length;
-                var oW = Math.max(28, oLabel.length * 7 + 8);
-                var oX = nCols * CELL_W - oW - 1;
-                var oG = chartG.append('g');
-                oG.append('rect')
-                    .attr('x', oX).attr('y', oy)
-                    .attr('width', oW).attr('height', WARN_ROW_H)
-                    .attr('rx', 4)
-                    .attr('fill', '#FEE2E2')
-                    .attr('stroke', '#B91C1C')
-                    .attr('stroke-width', 0.75)
-                    .attr('opacity', 0.95);
-                oG.append('text')
-                    .attr('x', oX + oW / 2).attr('y', oy + WARN_ROW_H / 2 + 3)
-                    .attr('text-anchor', 'middle')
-                    .attr('font-size', '9px')
-                    .attr('font-weight', '700')
-                    .attr('fill', '#991B1B')
-                    .text(oLabel);
-                var oTooltip = droppedWarns.map(function (b) {
-                    return b.label + ' ' + formatHourRange(times, b.start, b.end);
-                }).join('\n');
-                oG.append('title').text(wcT(droppedWarns.length === 1 ? 'js.mg.more_warnings_one' : 'js.mg.more_warnings_many', { n: droppedWarns.length })
-                    + '\n' + oTooltip);
-            }
-        }
 
         // ===== CROSSHAIR + TOOLTIP =====
         var crossV = chartG.append('line').attr('class', 'crosshair-v')
