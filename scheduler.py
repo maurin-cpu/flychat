@@ -824,13 +824,14 @@ def briefing_scheduler(engine) -> None:
 
     # Flask-App einmalig laden — wird pro Job-Aufruf mit app_context() gewrapped.
     from web import app as flask_app
+    from email_service import mail_context
 
     # Erst nachholen, dann in den Schlaf: ein Neustart nach 06:00 hat sonst
     # gerade den Archivtag gekostet. Failure-tolerant wie jeder Job hier — ein
     # Fehler beim Nachholen darf den Scheduler nicht am Starten hindern.
     if not test_mode:
         try:
-            with flask_app.app_context(), flask_app.test_request_context():
+            with mail_context(flask_app):
                 _nachholen_falls_noetig(engine)
         except Exception as e:
             logger.exception("Scheduler: Nachhol-Pruefung fehlgeschlagen: %s", e)
@@ -858,7 +859,7 @@ def briefing_scheduler(engine) -> None:
             continue  # kein Job ausfuehren, zurueck zum Anfang und Slot neu berechnen
 
         try:
-            with flask_app.app_context(), flask_app.test_request_context():
+            with mail_context(flask_app):
                 if next_event_type == "accuracy":
                     _send_accuracy_once()
                 elif next_event_type == "fronten":
@@ -896,7 +897,8 @@ def _cli_now() -> int:
 
     # Flask-App-Context ist noetig fuer render_template
     from web import app as flask_app
-    with flask_app.app_context(), flask_app.test_request_context():
+    from email_service import mail_context
+    with mail_context(flask_app):
         stats = _daily_run(eng)
 
     print(f"[DONE] total={stats['total']} sent={stats['sent']} "
@@ -932,7 +934,8 @@ if __name__ == "__main__":
         except ImportError:
             pass
         from web import app as flask_app
-        with flask_app.app_context(), flask_app.test_request_context():
+        from email_service import mail_context
+        with mail_context(flask_app):
             stats = _send_accuracy_once()
         print(f"[DONE] accuracy: total={stats['total']} sent={stats['sent']} "
               f"skipped={stats['skipped']} failed={stats['failed']}")

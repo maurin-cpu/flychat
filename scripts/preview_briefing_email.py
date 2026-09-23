@@ -197,6 +197,7 @@ def main() -> int:
 
     # Flask-App fuer render_template
     from web import app as flask_app
+    from email_service import mail_context
     from email_service import build_briefing_context
     from flask import render_template
 
@@ -219,7 +220,7 @@ def main() -> int:
     # Genau eine Fassung: die Vorschau-Seite.
     from scripts.briefing_v3_context import build_v3_context
 
-    with flask_app.app_context(), flask_app.test_request_context():
+    with mail_context(flask_app):
         # Spot-Gruppen fuer JEDE Abo-Region, nicht nur die besten drei: der
         # v2-Regionenblock listet alle Regionen, und Cards ohne Spot-Chips
         # sehen aus wie ein Fehler, obwohl es nur die Kappung von

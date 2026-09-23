@@ -433,6 +433,18 @@ def _resolve_base_url() -> str:
     return config.BASE_URL.rstrip("/")
 
 
+def mail_context(flask_app):
+    """App- + Request-Kontext fuer Mails ausserhalb eines echten Requests
+    (Scheduler, CLI). Ohne base_url waere request.host_url "http://localhost/"
+    und alle Links ueber _resolve_base_url zeigten auf localhost (23.09.2026:
+    Oeffnungs-Pixel kam nie an)."""
+    from contextlib import ExitStack
+    stack = ExitStack()
+    stack.enter_context(flask_app.app_context())
+    stack.enter_context(flask_app.test_request_context(base_url=config.BASE_URL))
+    return stack
+
+
 def _build_urls(*, confirm_token: Optional[str] = None,
                 action_token: Optional[str] = None,
                 login_token: Optional[str] = None) -> dict[str, str]:
@@ -1700,7 +1712,7 @@ def _cli_preview(email: str, wet_run: bool = False) -> int:
 
     # Flask app_context fuer render_template
     from web import app as flask_app
-    with flask_app.app_context(), flask_app.test_request_context():
+    with mail_context(flask_app):
         ok = send_briefing_email(subscriber, briefing_data, async_send=False)
     print(f"[{'OK' if ok else 'FEHLER'}] send_briefing_email -> {subscriber['email']}")
     if not wet_run:
