@@ -126,7 +126,7 @@
   {# 1 Lage #}
   {{ step(1, v3_labels.step_lage, v3_chain.lage.status, v3_chain.lage.status_label) }}
   <tr><td style="padding:0 18px 12px 56px;">
-    <div style="font:15px/1.6 {{ MONO }};color:{{ C.ink }};">{{ v3_chain.lage.pressure or '—' }} <span style="color:{{ C.muted }};">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}</span></div>
+    <div style="font:15px/1.6 {{ MONO }};color:{{ C.ink }};">{{ v3_chain.lage.pressure or '—' }} <span style="color:{{ C.muted }};">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}{% if v3_chain.lage.pressure_jump %} · <span style="{% if v3_chain.lage.pressure_jump_hot %}font-weight:700;color:{{ C.ink }};{% endif %}">{{ v3_chain.lage.pressure_jump }}</span>{% endif %}</span></div>
     {% if v3_chain.lage.centers %}<div style="margin-top:6px;">{% for c in v3_chain.lage.centers %}{{ fact((c.type[0]), c.region ~ ' ' ~ c.msl ~ ' hPa') }}{% endfor %}</div>{% endif %}
     {% if v3_chain.lage.fazit %}{{ verdict(v3_chain.lage.fazit) }}{% elif v3_chain.situation %}<p style="margin:6px 0 0;font:16px/1.55 {{ SANS }};color:{{ C.text2 }};">{{ v3_chain.situation }}</p>{% endif %}
   </td></tr>

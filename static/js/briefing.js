@@ -2375,7 +2375,7 @@
         status: blk.status || "",
         statusLabel: blk.status_label || "",
         // Lage traegt kein Urteil: Druck + Regime + Tendenz stehen als Meta
-        meta: lage ? [blk.pressure, blk.regime, blk.pressure_note].filter(Boolean).join(" · ") : "",
+        meta: lage ? [blk.pressure, blk.regime, blk.pressure_note, blk.pressure_jump].filter(Boolean).join(" · ") : "",
         open,
         body: open ? chainBodyHtml(d, chain, labels, entry) : "",
       }));

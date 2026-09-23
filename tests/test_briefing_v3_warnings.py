@@ -358,7 +358,9 @@ class TestFrontSignatur(unittest.TestCase):
         txt = bc._front_fazit({"features": []}, {"aussagen": [self.DWD]}, self.DATES,
                               "2026-09-18", self._wl(None))
         self.assertTrue("weakening" in txt or "abschwächen" in txt, txt)
-        self.assertTrue("rising pressure" in txt or "steigenden Druck" in txt, txt)
+        # 23.09.2026: Gegenbeleg ist der fehlende Sprung, nie die Tagesbilanz
+        self.assertTrue("no pressure jump" in txt or "keinen Drucksprung" in txt, txt)
+        self.assertNotIn("rising pressure", txt)
 
     def test_no_dwd_no_signature(self):
         txt = bc._front_fazit({"features": []}, {"aussagen": []}, self.DATES,
@@ -389,7 +391,7 @@ class TestDetectFrontsignatur(unittest.TestCase):
 
     def test_front_day_detected(self):
         from engine.synoptic_context import detect_frontsignatur
-        res = detect_frontsignatur({"r1": self._region(True)}, ["2026-09-18"])
+        res = detect_frontsignatur({"r1": self._region(True)}, ["2026-09-18"], tagesgang={})
         sig = res["per_day"][0]["zones"]["alpennordhang"]
         self.assertIsNotNone(sig)
         self.assertEqual(sig["typ_hinweis"], "kalt")
@@ -397,9 +399,105 @@ class TestDetectFrontsignatur(unittest.TestCase):
 
     def test_quiet_day_not_detected(self):
         from engine.synoptic_context import detect_frontsignatur
-        res = detect_frontsignatur({"r1": self._region(False)}, ["2026-09-18"])
+        res = detect_frontsignatur({"r1": self._region(False)}, ["2026-09-18"], tagesgang={})
         self.assertIsNone(res["per_day"][0]["zones"]["alpennordhang"])
-        self.assertGreaterEqual(res["per_day"][0]["verlauf"]["alpennordhang"]["druck_trend_hpa"], 1.0)
+        v = res["per_day"][0]["verlauf"]["alpennordhang"]
+        self.assertAlmostEqual(v["druck_trend_hpa"], 1.6, places=1)   # +0.1/h ueber 16 h
+        self.assertAlmostEqual(v["sprung_max_hpa"], 0.3, places=1)
+        self.assertFalse(v["tagesgang_korrigiert"])
+        tag = res["per_day"][0]["druck_tag"]
+        self.assertTrue(tag["einig"])
+        self.assertFalse(tag["sprung_hot"])
+
+    def test_tagesgang_wird_abgezogen(self):
+        """Flacher Rohdruck, Tagesgang-Tabelle mit Stufe +1 hPa ab 12 h: die
+        bereinigte Reihe faellt um 1 hPa — Tendenz negativ, Sprung -1.0."""
+        from engine.synoptic_context import detect_frontsignatur
+        hd, pl = {}, {}
+        for h in range(24):
+            k = f"2026-09-18T{h:02d}:00"
+            hd[k] = {"pressure_msl": 1015.0, "precipitation": 0.0}
+            pl[k] = {"wind_direction_700hPa": 240, "temperature_850hPa": 9.0}
+        reg = {"reference_points": [[46.9, 7.5]], "hourly_data": hd, "pressure_level_data": pl}
+        cyc = [-0.5] * 12 + [0.5] * 12
+        res = detect_frontsignatur({"r1": reg}, ["2026-09-18"],
+                                   tagesgang={"alpennordhang": {"09": cyc}})
+        v = res["per_day"][0]["verlauf"]["alpennordhang"]
+        self.assertTrue(v["tagesgang_korrigiert"])
+        self.assertLess(v["druck_trend_hpa"], -0.5)
+        self.assertAlmostEqual(v["sprung_max_hpa"], -1.0, places=1)
+        self.assertAlmostEqual(v["druck_trend_roh_hpa"], 0.0, places=1)
+
+
+class TestDruckTag(unittest.TestCase):
+    """Tendenz = Mittel nur bei einigen Zonen, sonst Muster; Sprung = Maximum
+    mit Zone (23.09.2026: Tessin -2.3 gegen Graubuenden +2.7 wurde vorher
+    zur 'steigenden' Erstzone im Dict)."""
+
+    def _v(self, **tr):
+        return {z: {"druck_trend_hpa": t, "sprung_max_hpa": 0.4, "sprung_max_hour": "11:00",
+                    "max_drehung_deg": 20, "regen_mm": 0.0} for z, t in tr.items()}
+
+    def test_einig_mittel(self):
+        from engine.synoptic_context import druck_tag_aus_verlauf
+        tag = druck_tag_aus_verlauf(self._v(alpennordhang=1.5, wallis=1.2, tessin=0.4,
+                                            graubuenden_engadin=2.0))
+        self.assertTrue(tag["einig"])
+        self.assertAlmostEqual(tag["tendenz_hpa"], 1.3, places=1)
+        self.assertIsNone(tag["muster"])
+
+    def test_nord_sued(self):
+        from engine.synoptic_context import druck_tag_aus_verlauf
+        tag = druck_tag_aus_verlauf(self._v(alpennordhang=1.5, wallis=1.2, tessin=-1.6,
+                                            graubuenden_engadin=2.0))
+        self.assertFalse(tag["einig"])
+        self.assertIsNone(tag["tendenz_hpa"])
+        self.assertEqual(tag["muster"], {"art": "nord_sued", "nord": "up", "sued": "down"})
+
+    def test_einzelzone(self):
+        from engine.synoptic_context import druck_tag_aus_verlauf
+        tag = druck_tag_aus_verlauf(self._v(alpennordhang=-1.5, wallis=-1.2, tessin=-1.6,
+                                            graubuenden_engadin=2.0))
+        self.assertEqual(tag["muster"], {"art": "einzel", "zone": "graubuenden_engadin",
+                                         "richtung": "up"})
+
+    def test_sprung_maximum_mit_zone(self):
+        from engine.synoptic_context import druck_tag_aus_verlauf
+        v = self._v(alpennordhang=0.2, wallis=0.1, tessin=0.0, graubuenden_engadin=0.3)
+        v["tessin"].update({"sprung_max_hpa": -2.4, "sprung_max_hour": "14:00"})
+        tag = druck_tag_aus_verlauf(v)
+        self.assertEqual(tag["sprung"], {"hpa": -2.4, "hour": "14:00", "zone": "tessin"})
+        self.assertTrue(tag["sprung_hot"])
+
+    def test_counter_words_alle_zonen(self):
+        v = self._v(alpennordhang=1.0, wallis=1.2, tessin=-2.3, graubuenden_engadin=2.7)
+        txt = bc._counter_words(v)
+        self.assertTrue(txt.startswith("no pressure jump") or txt.startswith("keinen Drucksprung"), txt)
+        self.assertNotIn("rising", txt)
+        v["tessin"].update({"sprung_max_hpa": -2.4})
+        v["alpennordhang"]["max_drehung_deg"] = 62
+        txt = bc._counter_words(v)
+        self.assertTrue("Ticino" in txt or "Tessin" in txt, txt)
+        self.assertIn("-2.4", txt)
+        self.assertNotIn("wind shift", txt)
+        self.assertNotIn("Winddrehung", txt)
+
+    def test_druckzeile_worte(self):
+        wl = {"frontsignatur": {"per_day": [{"date": "2026-09-23", "druck_tag": {
+            "einig": False, "tendenz_hpa": None, "steigend": ["alpennordhang", "wallis"],
+            "fallend": ["tessin"], "muster": {"art": "nord_sued", "nord": "up", "sued": "down"},
+            "sprung": {"hpa": 1.4, "hour": "17:00", "zone": "alpennordhang"}, "sprung_hot": False}}]}}
+        day, jump, hot = bc._druck_tag_words(wl, "2026-09-23")
+        self.assertTrue("mixed" in day or "uneinheitlich" in day, day)
+        self.assertTrue("north rising" in day or "Norden steigend" in day, day)
+        self.assertIn("+1.4", jump)
+        self.assertIn("17", jump)
+        self.assertFalse(hot)
+        day, jump, hot = bc._druck_tag_words({"frontsignatur": {"per_day": [{"date": "2026-09-23",
+            "druck_tag": {"einig": True, "tendenz_hpa": 1.2, "sprung": None, "sprung_hot": False}}]}},
+            "2026-09-23")
+        self.assertIn("+1.2", day)
+        self.assertEqual(jump, "")
 
 
 class TestLageFazit(unittest.TestCase):

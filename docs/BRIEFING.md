@@ -137,6 +137,23 @@ Daten kein Frontenwort — auch nicht „keine Front in Sicht".
   verbreitet → „Hochdruckeinfluss nimmt zu, kommt aber noch nicht an".
 - „unbeständig" (Druck fällt) + trocken → „vorerst meist trocken".
 - Front: kein „zieht durch" ohne Signatur in den eigenen Daten.
+- **Druckzeile** (seit 23.09.2026): „3 Tage: stabil −1,2 hPa/d · tagsüber
+  +0,4 hPa · Sprung +1,4 hPa in 3 h, 17–20 Uhr (Alpennordhang)". Drei Zahlen,
+  drei Jobs: 3-Tage-Steigung des CH-Mittels; Tagestendenz 06–22 h als Mittel
+  über die Zonen, nur wenn sie einig sind — sonst „uneinheitlich" plus das
+  Muster in ein paar Wörtern („Norden steigend, Süden fallend" / „nur Tessin
+  fallend"); der betragsgrösste 3-h-Sprung als Maximum über die Zonen mit
+  Zonenname, hervorgehoben ab `SYNOPTIC_DRUCK_SPRUNG_HPA` (2 hPa). Alles auf
+  der um den **mittleren Tagesgang** bereinigten Druckreihe
+  (`data/druck_tagesgang.json`, je Zone und Monat, aus einem Jahr ICON-CH1 via
+  `python scripts/druck_tagesgang.py`; einmal je Quartal nachziehen). Ohne
+  Abzug misst die Tendenz die Tageszeit: über den Alpen schwankt der MSL-Druck
+  täglich um 1–2 hPa, die 06→22-h-Differenz war im September um +0,7…+1,0 hPa
+  verzerrt — genau die alte Schwelle, daher stand fast täglich „steigender
+  Druck" neben einer fallenden 3-Tage-Zahl. Der Frontsatz nennt als Gegenbeleg
+  den fehlenden **Sprung** über alle Zonen, nie die Tagesbilanz (eine Front ist
+  ein Knick, keine Steigung). Die KI bekommt dasselbe `druck_tag` und darf bei
+  uneinigen Zonen das Muster als Halbsatz aufgreifen, keine Zahl.
 - Zwei Fronten gleichen Typs an verschiedenen Tagen sind zwei Fronten.
 - Aussagen aus dem Vortageslauf gelten nur, wenn die Karte des Tages die
   Front noch innerhalb 600 km zeigt (der neueste DWD-Lauf sieht < 36 h nicht).

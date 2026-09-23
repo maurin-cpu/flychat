@@ -24,7 +24,7 @@ WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr
 {{ v3_labels.question }} 2 — {{ v3_labels.q2_long }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}
 
 1 {{ v3_labels.step_lage }}{% if v3_chain.lage.status_label %} [{{ v3_chain.lage.status_label }}]{% endif %}
-{{ v3_chain.lage.pressure }} {{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}
+{{ v3_chain.lage.pressure }} {{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}{% if v3_chain.lage.pressure_jump %} · {{ v3_chain.lage.pressure_jump }}{% endif %}
 {{ v3_chain.lage.fazit or v3_chain.situation }}
 
 2 {{ v3_labels.step_front }}{% if v3_chain.fronts.status_label %} [{{ v3_chain.fronts.status_label }}]{% endif %}

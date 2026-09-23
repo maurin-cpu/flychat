@@ -359,7 +359,7 @@
         <div class="step"><div class="no">1</div><div>
           <div class="h">{{ v3_labels.step_lage }} <small>· {{ v3_chain.lage.label }}</small>
             {% if v3_chain.stability.confidence %}<span class="conf">{{ v3_labels.confidence }} {{ v3_chain.stability.confidence }}</span>{% endif %}</div>
-          <div class="num">{{ v3_chain.lage.pressure or '—' }} <span class="k">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}</span></div>
+          <div class="num">{{ v3_chain.lage.pressure or '—' }} <span class="k">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}{% if v3_chain.lage.pressure_jump %} · <span{% if v3_chain.lage.pressure_jump_hot %} style="font-weight:700"{% endif %}>{{ v3_chain.lage.pressure_jump }}</span>{% endif %}</span></div>
           {% if v3_chain.lage.centers %}<div class="centers">{% for c in v3_chain.lage.centers %}<span><i class="{% if c.is_high %}h{% else %}t{% endif %}">{{ c.type[0] }}</i>{{ c.region }} <small>{{ c.msl }} hPa</small></span>{% endfor %}</div>{% endif %}
           {# Ein Text zur Lage: die Code-Fassung. Der KI-Tagessatz nimmt dieselbe
              Form an (Skill day_lines) und ersetzt sie, sobald er sie hat. #}

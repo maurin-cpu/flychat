@@ -552,6 +552,14 @@ SYNOPTIC_TIEF_HPA = 1010.0      # <= 1010 hPa → Tiefdruckeinfluss
 SYNOPTIC_STRONG_TIEF_HPA = 1000.0  # <= 1000 → starker Tiefdruckeinfluss
 # Trend-Schwelle: |ΔP/Tag| ueber dieser Schwelle = signifikante Tendenz
 SYNOPTIC_PRESSURE_TREND_THRESHOLD_HPA = 2.0
+# Druck innerhalb des Tages (detect_frontsignatur, nach Abzug des mittleren
+# Tagesgangs aus data/druck_tagesgang.json): ab dieser Tendenz 06-22 h zaehlt
+# eine Zone als "steigend"/"fallend"; ab diesem 3-Stunden-Sprung gilt er als
+# Befund (Briefing hebt ihn hervor). Befund 23.09.2026: der bereinigte
+# |d3h| liegt an 10 % aller Sommerstunden ueber 1,0-1,35 hPa — 1,2 wie in der
+# Frontsuche reicht nur im Verbund mit Drehung/T850/Regen, allein nicht.
+SYNOPTIC_DRUCK_TENDENZ_HPA = 1.0
+SYNOPTIC_DRUCK_SPRUNG_HPA = 2.0
 
 # --- Uebergeordnete Stroemung (700 hPa) ---------------------------------
 # Stuerkeklassen fuer 700-hPa-Wind (CH-Mittel)

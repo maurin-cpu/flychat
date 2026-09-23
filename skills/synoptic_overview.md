@@ -155,6 +155,13 @@ Seit 2026-09 liegt die DWD-Frontenprognose im Strukturfeld: `fronten` traegt
     sich ueber der Schweiz ab", nie "zieht durch".
   * Signatur da, `fronten` leer → "frontaehnlicher Durchgang" ohne Typ,
     ausser `typ_hinweis` ist gesetzt.
+- `frontsignatur.per_day[i].druck_tag` ist die Drucktendenz des Tages ueber
+  die Zonen (tagesgang-bereinigt, vom Code). Nur wenn `einig=false` UND
+  `muster` gesetzt ist, darf `day_lines[i]` das Muster in HOECHSTENS einem
+  Halbsatz nennen ("Druck im Norden steigend, im Tessin fallend") — keine
+  Zahl, kein eigener Satz, kein Wort mehr als noetig. Eine Foehn-Deutung
+  dazu nur, wenn `FOEHN` an dem Tag aktiv ist. `einig=true` → nicht
+  erwaehnen; die Zahl steht in der Kopfzeile.
 - `fronten.vergangen` (Durchgaenge der letzten 36 h aus der DWD-ANALYSE, also
   beobachtet, nicht prognostiziert): darf am Folgetag als Rueckseite genannt
   werden — "nach der Kaltfront von gestern liegt der Alpennordhang auf der

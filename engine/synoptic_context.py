@@ -2341,6 +2341,99 @@ def summarize_convection(region_weather_data: dict,
     return {"per_day": out}
 
 
+_DRUCK_TAGESGANG_PATH = config.DATA_DIR / "druck_tagesgang.json"
+_druck_tagesgang_cache: Optional[dict] = None
+
+
+def load_druck_tagesgang(path=None) -> dict:
+    """Mittlerer Tagesgang pressure_msl je Zone und Monat: {zone: {"MM": [24
+    Anomalien zum Tagesmittel, hPa]}} aus data/druck_tagesgang.json
+    (scripts/druck_tagesgang.py). Ueber den Alpen sind das 1-2 hPa am Tag —
+    ohne Abzug misst jede Intraday-Tendenz die Tageszeit (23.09.2026).
+    Fehlt die Datei: {} und eine Warnung, die Rechnung laeuft unkorrigiert."""
+    global _druck_tagesgang_cache
+    if path is None and _druck_tagesgang_cache is not None:
+        return _druck_tagesgang_cache
+    p = Path(path) if path else _DRUCK_TAGESGANG_PATH
+    try:
+        with open(p, encoding="utf-8") as f:
+            zones = (json.load(f) or {}).get("zones") or {}
+    except FileNotFoundError:
+        logger.warning("druck_tagesgang.json fehlt (%s) — Drucktendenz ohne "
+                       "Tagesgang-Korrektur", p)
+        zones = {}
+    except (OSError, ValueError) as e:
+        logger.warning("druck_tagesgang.json unlesbar: %s", e)
+        zones = {}
+    if path is None:
+        _druck_tagesgang_cache = zones
+    return zones
+
+
+def _trend_hpa(msl: dict, hs: list) -> Optional[float]:
+    """Lineare Tendenz 06-22 h als Gesamtaenderung ueber das Fenster (hPa).
+    Regression statt Endpunkt-Differenz: zwei Einzelstunden tragen den Rest
+    des Tagesgangs und jede Modell-Zacke voll, die Gerade nicht."""
+    if len(hs) < 4:
+        return None
+    ys = [msl[h] for h in hs]
+    xm = sum(hs) / len(hs)
+    ym = sum(ys) / len(ys)
+    den = sum((h - xm) ** 2 for h in hs) or 1.0
+    slope = sum((h - xm) * (y - ym) for h, y in zip(hs, ys)) / den
+    return round(slope * (hs[-1] - hs[0]), 1)
+
+
+_ZONEN_NORD = ("alpennordhang", "wallis", "graubuenden_engadin")
+_ZONEN_SUED = ("tessin",)
+
+
+def druck_tag_aus_verlauf(verlauf: dict) -> Optional[dict]:
+    """Der Drucktag ueber alle Zonen — zwei Kennzahlen mit zwei Jobs.
+
+    Tendenz (Zustand -> Mittel): Mittel der bereinigten 06-22-h-Tendenzen,
+    aber nur wenn die Zonen einig sind (keine Zone >= +Schwelle bei einer
+    anderen <= -Schwelle). Sonst `einig=false` und, wenn erkennbar, das
+    Muster: Nord-Sued (Alpennordhang/Wallis/Graubuenden gegen Tessin) oder
+    eine Einzelzone gegen den Rest. Ohne Muster bleibt es "uneinheitlich".
+    Sprung (Ereignis -> Maximum): der betragsgroesste 3-h-Sprung ueber alle
+    Zonen mit Stunde und Zone; `sprung_hot` ab SYNOPTIC_DRUCK_SPRUNG_HPA.
+    Ein Mittel wuerde eine Front, die nur eine Zone trifft, wegmitteln."""
+    tr = {z: v["druck_trend_hpa"] for z, v in (verlauf or {}).items()
+          if isinstance(v, dict) and v.get("druck_trend_hpa") is not None}
+    if not tr:
+        return None
+    thr = config.SYNOPTIC_DRUCK_TENDENZ_HPA
+    up = sorted(z for z, t in tr.items() if t >= thr)
+    down = sorted(z for z, t in tr.items() if t <= -thr)
+    einig = not (up and down)
+    muster = None
+    if not einig:
+        nord = [z for z in _ZONEN_NORD if z in up or z in down]
+        sued = [z for z in _ZONEN_SUED if z in up or z in down]
+        nord_einig = len({z in up for z in nord}) == 1
+        sued_einig = len({z in up for z in sued}) == 1
+        if nord and sued and nord_einig and sued_einig and (nord[0] in up) != (sued[0] in up):
+            muster = {"art": "nord_sued", "nord": "up" if nord[0] in up else "down",
+                      "sued": "up" if sued[0] in up else "down"}
+        elif len(up) == 1 and len(down) >= 2:
+            muster = {"art": "einzel", "zone": up[0], "richtung": "up"}
+        elif len(down) == 1 and len(up) >= 2:
+            muster = {"art": "einzel", "zone": down[0], "richtung": "down"}
+    sprung = None
+    for z, v in (verlauf or {}).items():
+        if not isinstance(v, dict) or v.get("sprung_max_hpa") is None:
+            continue
+        if sprung is None or abs(v["sprung_max_hpa"]) > abs(sprung["hpa"]):
+            sprung = {"hpa": v["sprung_max_hpa"], "hour": v.get("sprung_max_hour"), "zone": z}
+    return {
+        "tendenz_hpa": round(statistics.mean(tr.values()), 1) if einig else None,
+        "einig": einig, "steigend": up, "fallend": down, "muster": muster,
+        "sprung": sprung,
+        "sprung_hot": bool(sprung and abs(sprung["hpa"]) >= config.SYNOPTIC_DRUCK_SPRUNG_HPA),
+    }
+
+
 def _zone_of_region(rdata: dict) -> Optional[str]:
     refs = rdata.get("reference_points") or []
     lats = [r[0] for r in refs if isinstance(r, (list, tuple)) and len(r) >= 2]
@@ -2360,7 +2453,8 @@ def _circ_mean_deg(degs: list[float]) -> Optional[float]:
     return (math.degrees(math.atan2(sy, sx)) + 360) % 360
 
 
-def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str]) -> Optional[dict]:
+def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str],
+                         tagesgang: Optional[dict] = None) -> Optional[dict]:
     """Frontdurchgang in den EIGENEN Prognosedaten je Zone und Tag.
 
     Die DWD-Karte sagt, wo eine Front gezeichnet ist; ob sie an einem Tag
@@ -2372,12 +2466,22 @@ def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str]) -
         oder gestiegen (Warmfront), oder >= 1 mm Regen um den Zeitpunkt
     Stundenschluessel sind Lokalzeit (wie ueberall im Cache).
 
-    Returns {"per_day": [{"date", "zones": {zone: sig | None}}]}; sig =
+    Der Druck wird vorher um den mittleren Tagesgang der Zone bereinigt
+    (`tagesgang`, Default data/druck_tagesgang.json; {} = keine Korrektur).
+
+    Returns {"per_day": [{"date", "zones": {zone: sig | None}, "verlauf":
+    {zone: {...}}, "druck_tag": {...}}]}; sig =
     {"hour": "16:00", "druck_hpa": +1.8, "drehung": [225, 300],
-     "t850_k": -2.5 | None, "regen_mm": 3.1, "typ_hinweis": "kalt"|"warm"|None}
+     "t850_k": -2.5 | None, "regen_mm": 3.1, "typ_hinweis": "kalt"|"warm"|None};
+    verlauf je Zone: druck_trend_hpa (bereinigt, 06-22 h), druck_trend_roh_hpa,
+    sprung_max_hpa/-hour (betragsgroesster 3-h-Sprung), anstieg_max_hpa,
+    fall_max_hpa, tagesgang_korrigiert, max_drehung_deg, regen_mm;
+    druck_tag: siehe druck_tag_aus_verlauf.
     """
     if not region_weather_data or not forecast_dates:
         return None
+    if tagesgang is None:
+        tagesgang = load_druck_tagesgang()
     by_zone: dict[str, list[dict]] = {}
     for rdata in region_weather_data.values():
         if not isinstance(rdata, dict):
@@ -2408,8 +2512,13 @@ def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str]) -
             regions = by_zone.get(z) or []
             sig = None
             if regions:
-                msl = {h: statistics.median(v) for h, v in
-                       series(regions, date, "hourly_data", "hourly_data", "pressure_msl").items()}
+                msl_raw = {h: statistics.median(v) for h, v in
+                           series(regions, date, "hourly_data", "hourly_data", "pressure_msl").items()}
+                # Tagesgang abziehen — sonst misst jede Tendenz die Tageszeit
+                # statt das Wetter (06->22 h im Sept. um +0,7..+1,0 hPa verzerrt)
+                cyc = (tagesgang.get(z) or {}).get(date[5:7]) or []
+                korr = len(cyc) == 24
+                msl = {h: v - cyc[h] for h, v in msl_raw.items()} if korr else dict(msl_raw)
                 wd = {h: _circ_mean_deg(v) for h, v in
                       series(regions, date, "pressure_level_data", "pressure_level_data",
                              "wind_direction_700hPa").items()}
@@ -2452,23 +2561,37 @@ def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str]) -
                                             else None),
                         })
                 sig = best[1] if best else None
-                # Tagesverlauf 06-22 h als Gegenbeleg, wenn keine Signatur da ist
+                # Tagesverlauf als Gegenbeleg und fuer die Druckzeile: Tendenz
+                # 06-22 h auf der bereinigten Reihe und der groesste 3-h-Sprung
+                # des ganzen Tages (eine Front um 03 h zaehlt fuer den Tag)
                 hs = [h for h in range(6, 23) if h in msl]
                 wds = [wd[h] for h in range(6, 23) if wd.get(h) is not None]
                 max_turn = 0
                 for i in range(len(wds)):
                     for j in range(i + 1, len(wds)):
                         max_turn = max(max_turn, abs((wds[j] - wds[i] + 180) % 360 - 180))
+                d3 = [(msl[h + 3] - msl[h], h) for h in range(0, 21) if h in msl and h + 3 in msl]
+                sprung = max(d3, key=lambda t: abs(t[0])) if d3 else None
                 verlauf[z] = {
-                    "druck_trend_hpa": round(msl[hs[-1]] - msl[hs[0]], 1) if len(hs) >= 2 else None,
+                    "druck_trend_hpa": _trend_hpa(msl, hs),
+                    "druck_trend_roh_hpa": (round(msl_raw[hs[-1]] - msl_raw[hs[0]], 1)
+                                            if len(hs) >= 2 else None),
+                    "sprung_max_hpa": round(sprung[0], 1) if sprung else None,
+                    "sprung_max_hour": f"{sprung[1]:02d}:00" if sprung else None,
+                    "anstieg_max_hpa": round(max(v for v, _ in d3), 1) if d3 else None,
+                    "fall_max_hpa": round(min(v for v, _ in d3), 1) if d3 else None,
+                    "tagesgang_korrigiert": korr,
                     "max_drehung_deg": round(max_turn),
                     "regen_mm": round(sum(rain.get(h, 0.0) for h in range(6, 23)), 1),
                 }
             zones[z] = sig
-        per_day.append({"date": date, "zones": zones, "verlauf": verlauf})
+        per_day.append({"date": date, "zones": zones, "verlauf": verlauf,
+                        "druck_tag": druck_tag_aus_verlauf(verlauf)})
     return {"per_day": per_day, "decided_by": "detect_frontsignatur",
             "thresholds": {"druck_hpa_3h": 1.2, "drehung_deg": 40, "t850_k_6h": 2.0,
-                           "regen_mm": 1.0, "level_hpa": 700}}
+                           "regen_mm": 1.0, "level_hpa": 700,
+                           "tendenz_hpa": config.SYNOPTIC_DRUCK_TENDENZ_HPA,
+                           "sprung_hpa_3h": config.SYNOPTIC_DRUCK_SPRUNG_HPA}}
 
 
 def _classify_zone_fallback(lat, lon) -> Optional[str]:

@@ -776,8 +776,7 @@ _L3 = {
         "ev_kalt":            "Abkühlung in der Höhe",
         "ev_warm":            "Erwärmung in der Höhe",
         "ev_regen":           "Regen",
-        "gv_druck_steigt":    "steigenden Druck",
-        "gv_druck_faellt":    "fallenden Druck ohne Sprung",
+        "gv_sprung":          "Drucksprung {val} hPa in 3 h ({zone})",
         "gv_druck_flach":     "keinen Drucksprung",
         "gv_drehung":         "keine Winddrehung",
         "gv_regen":           "keinen Regen",
@@ -841,6 +840,12 @@ _L3 = {
         "w_thunder_spots": "Gewitter-Hinweise in den Spot-Analysen an {days} — die Synoptik zeigt an diesen Tagen keine Zellen im Flugfenster. Vor Ort prüfen.",
         "w_overdev_spots": "Überentwicklung in den Spot-Analysen an {days} erwähnt — die Synoptik zeigt keine Zonen. Weiche Vorwarnung.",
         "trend_aufbauend": "aufbauend", "trend_fallend": "fallend", "trend_stabil": "stabil",
+        "trend_abschwaechend": "abschwächend",
+        # Druckzeile: 3-Tage-Steigung, Tagestendenz (bereinigt), 3-h-Sprung
+        "pt_3d": "3 Tage:", "pt_day": "tagsüber {val} hPa", "pt_mixed": "tagsüber uneinheitlich",
+        "pt_ns": " — Norden {a}, Süden {b}", "pt_one": " — nur {zone} {dir}",
+        "pt_up": "steigend", "pt_down": "fallend",
+        "pt_jump": "Sprung {val} hPa in 3 h, {von}–{bis} Uhr ({zone})",
         "w_generic":    "{label} an {days}.",
         "sev_stop":     "Stopp",
         "sev_warn":     "Warnung",
@@ -1164,8 +1169,7 @@ _L3 = {
         "ev_kalt":            "cooling aloft",
         "ev_warm":            "warming aloft",
         "ev_regen":           "rain",
-        "gv_druck_steigt":    "rising pressure",
-        "gv_druck_faellt":    "falling pressure without a jump",
+        "gv_sprung":          "pressure jump of {val} hPa in 3 h ({zone})",
         "gv_druck_flach":     "no pressure jump",
         "gv_drehung":         "no wind shift",
         "gv_regen":           "no rain",
@@ -1229,6 +1233,11 @@ _L3 = {
         "w_thunder_spots": "Thunderstorm hints in the spot analyses on {days} — the synoptics show no cells in the flying window on those days. Verify on site.",
         "w_overdev_spots": "Overdevelopment mentioned in the spot analyses on {days} — the synoptics show no zones. Soft early warning.",
         "trend_aufbauend": "building", "trend_fallend": "falling", "trend_stabil": "steady",
+        "trend_abschwaechend": "weakening",
+        "pt_3d": "3 days:", "pt_day": "daytime {val} hPa", "pt_mixed": "daytime mixed",
+        "pt_ns": " — north {a}, south {b}", "pt_one": " — only {zone} {dir}",
+        "pt_up": "rising", "pt_down": "falling",
+        "pt_jump": "jump of {val} hPa in 3 h, {von}–{bis} h ({zone})",
         "w_generic":    "{label} on {days}.",
         "sev_stop":     "stop",
         "sev_warn":     "warning",
@@ -1979,19 +1988,58 @@ def _evidence_words(sig: dict) -> str:
 
 
 def _counter_words(verlauf: dict, zone: str = "") -> str:
-    v = verlauf.get(zone) or (next(iter(verlauf.values()), {}) if verlauf else {})
-    if not v:
+    """Gegenbeleg 'keine Front': was in ALLEN Zonen fehlt (oder in der
+    genannten Zone, wenn die DWD-Karte dort eine Front zeichnet). Der Druck
+    zaehlt als Sprung, nicht als Tagesbilanz — eine Front ist ein Knick,
+    keine Steigung; und das Maximum ueber die Zonen mit Namen, weil ein
+    Mittel eine Front ueber nur einer Zone wegrechnet. Bis 23.09.2026 stand
+    hier die 06->22-h-Bilanz der ersten Zone im Dict — die war im September
+    durch den Tagesgang fast immer "steigend" und widersprach der Kopfzeile."""
+    items = ([(zone, verlauf[zone])] if zone and verlauf.get(zone)
+             else [(z, v) for z, v in (verlauf or {}).items() if v])
+    if not items:
         return _lbl("gv_druck_flach") + ", " + _lbl("gv_drehung")
-    tr = v.get("druck_trend_hpa")
-    druck = (_lbl("gv_druck_steigt") if tr is not None and tr >= 1.0
-             else _lbl("gv_druck_faellt") if tr is not None and tr <= -1.0
-             else _lbl("gv_druck_flach"))
-    parts = [druck]
-    if (v.get("max_drehung_deg") or 0) < 40:
+    z_max, sprung = max(((z, v.get("sprung_max_hpa") or 0.0) for z, v in items),
+                        key=lambda t: abs(t[1]))
+    if abs(sprung) >= config.SYNOPTIC_DRUCK_SPRUNG_HPA:
+        parts = [_lbl("gv_sprung").format(val=f"{sprung:+.1f}", zone=_zone_name(z_max))]
+    else:
+        parts = [_lbl("gv_druck_flach")]
+    if max((v.get("max_drehung_deg") or 0) for _, v in items) < 40:
         parts.append(_lbl("gv_drehung"))
-    if (v.get("regen_mm") or 0) < 1.0:
+    if max((v.get("regen_mm") or 0) for _, v in items) < 1.0:
         parts.append(_lbl("gv_regen"))
     return ", ".join(parts)
+
+
+def _druck_tag_words(wetterlage: dict | None, date: str) -> tuple[str, str, bool]:
+    """(Tagestendenz-Text, Sprung-Text, Sprung hervorheben) fuer die Druckzeile
+    aus frontsignatur.per_day[date].druck_tag — Worte vom Code, nicht von der
+    KI. Einig: eine Zahl. Uneinig: 'uneinheitlich' plus das Muster in ein
+    paar Woertern, wenn es eines gibt."""
+    fs = (wetterlage or {}).get("frontsignatur") or {}
+    day = next((d for d in fs.get("per_day") or [] if d.get("date") == date), None)
+    tag = (day or {}).get("druck_tag") or {}
+    if not tag:
+        return "", "", False
+    if tag.get("einig"):
+        t = tag.get("tendenz_hpa")
+        day_txt = _lbl("pt_day").format(val=f"{t:+.1f}") if t is not None else ""
+    else:
+        day_txt = _lbl("pt_mixed")
+        m = tag.get("muster") or {}
+        if m.get("art") == "nord_sued":
+            day_txt += _lbl("pt_ns").format(a=_lbl("pt_" + m["nord"]), b=_lbl("pt_" + m["sued"]))
+        elif m.get("art") == "einzel":
+            day_txt += _lbl("pt_one").format(zone=_zone_name(m["zone"]),
+                                             dir=_lbl("pt_" + m["richtung"]))
+    sp = tag.get("sprung") or {}
+    jump_txt = ""
+    if sp.get("hpa") is not None:
+        h = int((sp.get("hour") or "00:00")[:2])
+        jump_txt = _lbl("pt_jump").format(val=f"{sp['hpa']:+.1f}", von=f"{h:02d}",
+                                          bis=f"{h + 3:02d}", zone=_zone_name(sp.get("zone", "")))
+    return day_txt, jump_txt, bool(tag.get("sprung_hot"))
 
 
 def _nearest_front(fronts: dict | None, typ: str):
@@ -2831,8 +2879,13 @@ def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> di
     syn = _synoptik_today(wetterlage, dates, date) or {}
     strip = _strip_synoptik(wetterlage, dates).get(date, {})
     note = syn.get("pressure_note", "")
-    for de in ("aufbauend", "fallend", "stabil"):
+    for de in ("abschwaechend", "aufbauend", "fallend", "stabil"):
         note = note.replace(de, _lbl(f"trend_{de}"))
+    if note:
+        note = f"{_lbl('pt_3d')} {note}"          # die Steigung gilt fuer 3 Tage, nicht fuer heute
+    day_txt, jump_txt, jump_hot = _druck_tag_words(wetterlage, date)
+    if day_txt:
+        note = f"{note} · {day_txt}" if note else day_txt
     return {
         "lage": {
             **_lage_block(wetterlage, date),
@@ -2840,6 +2893,8 @@ def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> di
             "centers": syn.get("centers", []),
             "pressure": syn.get("pressure_msl", ""),
             "pressure_note": note,
+            "pressure_jump": jump_txt,
+            "pressure_jump_hot": jump_hot,
             "regime": syn.get("pressure_regime", ""),
         },
         # Gesamtlage Schweiz in einem Satz: erster Satz des Wochen-Leads (der

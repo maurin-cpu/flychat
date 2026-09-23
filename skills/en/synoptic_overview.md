@@ -157,6 +157,13 @@ Since 2026-09 the DWD front forecast is part of the structured field:
     Switzerland", never "passes".
   * signature present, `fronten` empty → "front-like passage" without a
     type, unless `typ_hinweis` is set.
+- `frontsignatur.per_day[i].druck_tag` is the day's pressure tendency across
+  the zones (diurnal cycle removed, computed by code). Only when `einig=false`
+  AND `muster` is set may `day_lines[i]` name the pattern in AT MOST half a
+  sentence ("pressure rising in the north, falling over Ticino") — no number,
+  no sentence of its own, not a word more than needed. A foehn interpretation
+  only if `FOEHN` is active that day. `einig=true` → do not mention it; the
+  figure sits in the header line.
 - `fronten.vergangen` (passages of the last 36 h from the DWD ANALYSIS, i.e.
   observed, not forecast): may be named on the following day as the rear
   side — "after yesterday's cold front the Northern Alps sit on its rear
