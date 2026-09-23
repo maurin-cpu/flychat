@@ -116,8 +116,14 @@ foreach ($tab in $OGN_TABELLEN) {
         "w=csv.writer(sys.stdout,lineterminator=chr(10));" +
         "w.writerow([d[0] for d in cur.description]);w.writerows(cur)"
   Write-Host "   $tab.csv ..."
-  ssh $Server "cd $REMOTE_DIR && python3 -c `"$py`"" |
-    Out-File -Encoding utf8 "data/ogn_local/$tab.csv"
+  # Programm per stdin (python3 -), nicht als -c-Argument: PowerShell reicht
+  # die inneren Anfuehrungszeichen nicht an die Remote-Shell durch, bash sah
+  # "python3 -c import sqlite3,..." und brach mit Syntaxfehler ab (23.09.2026).
+  # Ohne BOM schreiben - Out-File -Encoding utf8 setzt in PS 5.1 eines, und
+  # das haengt am ersten Spaltennamen.
+  $csv = $py | ssh $Server "cd $REMOTE_DIR && python3 -"
+  [IO.File]::WriteAllText((Join-Path $root "data/ogn_local/$tab.csv"),
+    (($csv -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding $false))
 }
 
 Write-Host ""
