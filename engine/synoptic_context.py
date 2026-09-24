@@ -181,9 +181,9 @@ def build_synoptic_context(weather_cache: dict,
         logger.exception("Hoehenwind regional fehlgeschlagen — Feld fehlt")
         aloft_regional = None
 
-    # 8j. Modellvergleich (MeteoSchweiz, DWD, NOAA) an vier Referenzpunkten
+    # 8j. Modellvergleich (MeteoSchweiz, DWD, NOAA) auf allen Referenzpunkten
     try:
-        modelle = modell_vergleich(forecast_dates)
+        modelle = modell_vergleich(forecast_dates, weather_cache.get("_regions") or {})
     except Exception:
         logger.exception("Modellvergleich fehlgeschlagen — Feld fehlt")
         modelle = None
@@ -1983,87 +1983,268 @@ MODEL_COMPARE_MODELS = {
 }
 
 
-def modell_vergleich(forecast_dates: list[str]) -> Optional[dict]:
-    """Sind sich die Modelle einig? Je Zone ein Referenzpunkt, je Modell die
-    Boeenspitze im Flugfenster, die Regensumme und die Bewoelkung 10-16 Uhr
-    fuer jeden Tag. Spread = groesster minus kleinster Modellwert. MeteoSchweiz
-    (ICON-CH1/CH2), DWD (ICON-D2/EU) und NOAA (GFS) — ein Modell, das den Tag
-    nicht abdeckt (ICON-D2 nach 48 h), fehlt einfach."""
-    if not forecast_dates:
-        return None
+# Modellvergleich v2 (24.09.2026): Klassenraster je Groesse, Urteil je Region
+# (Median ihrer Referenzpunkte je Modell), Zone uneinig ab einem Drittel
+# uneiniger Regionen. "Uneinig" heisst zwei Klassen Abstand — Nachbarklassen (24 vs. 26 km/h) sind Grenzrauschen,
+# kein Streit. Obere Klassen bis 80 km/h, damit 30 und 80 km/h nicht dasselbe
+# Urteil bekommen. Gemessen wird je Tagesfenster (SYNOPTIC_DAY_WINDOWS im
+# Flugtag), denn "Sturm am Vormittag" vs. "Sturm ab Mittag" ist fuer den
+# Piloten der groesstmoegliche Streit — eine Tageszahl saehe ihn nicht.
+MODEL_COMPARE_CLASSES = {
+    "gust":      (15, 25, 40, 60, 80),          # km/h, Spitze im Fenster
+    "speed":     (10, 20, 30, 45, 60, 80),      # km/h, Mittel im Fenster
+    "cloud":     (20, 40, 60, 80),              # %, Mittel im Fenster
+    "cloud_low": (20, 40, 60, 80),
+}
+MODEL_COMPARE_PARAMS = ("rain", "dir", "speed", "gust", "cloud", "cloud_low")
+MODEL_COMPARE_THRESHOLDS = {
+    "class_gap": 2,          # Klassen Abstand, ab dem ein Punkt "uneinig" ist
+    "sector_gap": 2,         # Sektoren (45 Grad) Abstand fuer die Windrichtung
+    "dir_min_speed_kmh": 8,  # Richtung nur bewertet, wenn ueberhaupt Wind weht
+    "wet_mm": 1.0,           # nass im Fenster
+    "region_share": 1 / 3,   # Anteil uneiniger Regionen, ab dem die Zone uneinig ist
+    "spread_excludes": ["gfs_seamless"],   # bei Wind/Wolken nicht in der Wertung
+}
+MODEL_COMPARE_HOURLY = ("wind_speed_10m", "wind_direction_10m", "wind_gusts_10m",
+                        "precipitation", "cloud_cover", "cloud_cover_low")
+
+
+def _mc_class(param: str, val: float) -> int:
+    return sum(1 for b in MODEL_COMPARE_CLASSES[param] if val >= b)
+
+
+def _mc_sector(deg: float) -> int:
+    return int(((deg + 22.5) % 360) // 45)
+
+
+def _mc_sector_gap(a: int, b: int) -> int:
+    d = abs(a - b) % 8
+    return min(d, 8 - d)
+
+
+def _mc_windows() -> list[tuple[str, int, int]]:
+    """Tagesfenster im Flugtag (der Abend faellt raus)."""
     h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
-    models = list(MODEL_COMPARE_MODELS)
-    per_zone = {}
-    for zone, (lat, lon) in MODEL_COMPARE_POINTS.items():
-        params = {
-            "latitude": lat, "longitude": lon, "timezone": "Europe/Zurich",
-            "hourly": "wind_gusts_10m,precipitation,cloud_cover",
-            "models": ",".join(models), "forecast_days": max(len(forecast_dates), 3),
-        }
-        config.with_api_key(params)
-        try:
-            resp = requests.get(config.API_URL, params=params, timeout=30)
-            resp.raise_for_status()
-            hourly = resp.json().get("hourly") or {}
-        except Exception as e:
-            logger.warning("modell_vergleich: %s fehlgeschlagen: %s", zone, e)
-            continue
-        times = hourly.get("time") or []
-        idx = {t: i for i, t in enumerate(times)}
-        days = {}
-        for date in forecast_dates:
-            row = {}
-            for m in models:
-                g = hourly.get(f"wind_gusts_10m_{m}") or []
-                p = hourly.get(f"precipitation_{m}") or []
-                c = hourly.get(f"cloud_cover_{m}") or []
-                gusts, rain, cloud = [], [], []
-                for h in range(24):
+    return [(w, max(a, h_start), min(b, h_end)) for w, a, b in config.SYNOPTIC_DAY_WINDOWS
+            if max(a, h_start) < min(b, h_end)]
+
+
+def _mc_point_values(hourly: dict, models: list[str], date: str) -> dict:
+    """Je Modell und Fenster die Kennzahlen eines Punkts. Ein Modell ohne
+    Daten im Fenster (ICON-D2 nach 48 h) fehlt dort einfach."""
+    times = hourly.get("time") or []
+    idx = {t: i for i, t in enumerate(times)}
+    out = {}
+    for w, a, b in _mc_windows():
+        row = {}
+        for m in models:
+            def col(name):
+                arr = hourly.get(f"{name}_{m}") or []
+                vals = []
+                for h in range(a, b):
                     i = idx.get(f"{date}T{h:02d}:00")
-                    if i is None:
-                        continue
-                    if h_start <= h < h_end and i < len(g) and isinstance(g[i], (int, float)):
-                        gusts.append(float(g[i]))
-                    if i < len(p) and isinstance(p[i], (int, float)):
-                        rain.append(float(p[i]))
-                    if 10 <= h < 16 and i < len(c) and isinstance(c[i], (int, float)):
-                        cloud.append(float(c[i]))
-                if not gusts and not rain:
-                    continue                      # Modell deckt den Tag nicht ab
-                row[m] = {"gust_kmh": (round(max(gusts)) if gusts else None),
-                          "rain_mm": (round(sum(rain), 1) if rain else None),
-                          "cloud_pct": (round(statistics.mean(cloud)) if cloud else None)}
-            days[date] = row
-        per_zone[zone] = days
-    if not per_zone:
+                    if i is not None and i < len(arr) and isinstance(arr[i], (int, float)):
+                        vals.append(float(arr[i]))
+                return vals
+            sp, dr, gu = col("wind_speed_10m"), col("wind_direction_10m"), col("wind_gusts_10m")
+            ra, cl, lo = col("precipitation"), col("cloud_cover"), col("cloud_cover_low")
+            if not sp and not gu and not ra:
+                continue
+            v = {}
+            if gu:
+                v["gust"] = max(gu)
+            if sp:
+                v["speed"] = statistics.mean(sp)
+            if sp and dr and len(sp) == len(dr):
+                sx = sum(s_ * math.cos(math.radians(d)) for s_, d in zip(sp, dr))
+                sy = sum(s_ * math.sin(math.radians(d)) for s_, d in zip(sp, dr))
+                if abs(sx) > 1e-9 or abs(sy) > 1e-9:
+                    v["dir"] = (math.degrees(math.atan2(sy, sx)) + 360) % 360
+            if ra:
+                v["rain"] = sum(ra)
+            if cl:
+                v["cloud"] = statistics.mean(cl)
+            if lo:
+                v["cloud_low"] = statistics.mean(lo)
+            row[m] = v
+        out[w] = row
+    return out
+
+
+def _mc_verdict(summary: dict, param: str, thr: dict) -> Optional[bool]:
+    """Streiten die Modelle ueber die Groesse? summary = je Modell {"cls",
+    "val", "speed"} (aus _mc_model_summary). None = nicht bewertbar (nur ein
+    Modell; Flaute bei der Richtung)."""
+    excl = set(thr.get("spread_excludes") or []) if param != "rain" else set()
+    rows = {m: v for m, v in summary.items() if m not in excl}
+    if len(rows) < 2:
         return None
+    cls = [int(v["cls"]) for v in rows.values()]
+    if param == "rain":
+        return 0 < sum(cls) < len(cls)
+    if param == "dir":
+        speeds = [v["speed"] for v in rows.values() if v.get("speed") is not None]
+        if not speeds or statistics.mean(speeds) < thr["dir_min_speed_kmh"]:
+            return None
+        return max(_mc_sector_gap(a, b) for a in cls for b in cls) >= thr["sector_gap"]
+    return max(cls) - min(cls) >= thr["class_gap"]
+
+
+def _mc_gap(summary: dict, param: str, thr: dict) -> int:
+    excl = set(thr.get("spread_excludes") or []) if param != "rain" else set()
+    cls = [int(v["cls"]) for m, v in summary.items() if m not in excl]
+    if len(cls) < 2:
+        return 0
+    if param == "dir":
+        return max(_mc_sector_gap(a, b) for a in cls for b in cls)
+    return max(cls) - min(cls)
+
+
+def _mc_model_summary(rows: list[dict], param: str, thr: dict) -> dict:
+    """Je Modell die typische Klasse ueber mehrere Punkte (Median) — damit
+    vergleichen wir Modell gegen Modell, nicht Punkt-Rauschen gegen
+    Punkt-Rauschen. rain: Anteil nasser Punkte (Klasse 1 ab der Haelfte),
+    dir: Sektor des Vektor-Mittels, dazu der mittlere Grundwind."""
+    per_model: dict[str, list] = {}
+    speeds: dict[str, list] = {}
+    for row in rows:
+        for m, v in row.items():
+            if v.get(param) is not None:
+                per_model.setdefault(m, []).append(v[param])
+                if v.get("speed") is not None:
+                    speeds.setdefault(m, []).append(v["speed"])
+    out = {}
+    for m, vals in per_model.items():
+        if param == "rain":
+            share = sum(1 for x in vals if x >= thr["wet_mm"]) / len(vals)
+            rec = {"cls": int(share >= 0.5), "val": round(share, 2)}
+        elif param == "dir":
+            sx = sum(math.cos(math.radians(d)) for d in vals)
+            sy = sum(math.sin(math.radians(d)) for d in vals)
+            deg = (math.degrees(math.atan2(sy, sx)) + 360) % 360
+            rec = {"cls": _mc_sector(deg), "val": round(deg)}
+        else:
+            med = statistics.median(vals)
+            rec = {"cls": _mc_class(param, med), "val": round(med)}
+        if speeds.get(m):
+            rec["speed"] = round(statistics.mean(speeds[m]), 1)
+        out[m] = rec
+    return out
+
+
+def modell_vergleich_aus_punkten(points: list[dict], forecast_dates: list[str]) -> Optional[dict]:
+    """Der Vergleich selbst, ohne API: points = [{"zone", "region", "hourly"}]
+    mit Open-Meteo-hourly je Modell (Suffix _<modell>).
+
+    Ebenen: Punkt -> Region (Median je Modell ueber ihre Punkte, dort das
+    Urteil einig/uneinig) -> Zone (Anteil uneiniger Regionen). Das Urteil
+    faellt auf Regionsebene, weil Punkt gegen Punkt nur Rauschen misst
+    (Live-Probe 24.09.: 37 % der Punkte "uneinig", alle Modell-Mediane in
+    derselben Klasse). Die Modell-Gruppen fuer den Satz kommen aus den
+    uneinigen Regionen — und wenn deren Mediane den Streit verwischen, aus
+    der Region mit dem groessten Abstand: der Satz zeigt immer zwei Gruppen."""
+    thr = MODEL_COMPARE_THRESHOLDS
+    models = list(MODEL_COMPARE_MODELS)
+    windows = [w for w, _, _ in _mc_windows()]
     per_day = []
     for date in forecast_dates:
-        zones = {}
-        for zone, days in per_zone.items():
-            row = days.get(date) or {}
-            if len(row) < 2:
+        zones: dict[str, Optional[dict]] = {}
+        for zone in config.SYNOPTIC_ZONES:
+            pts = [p for p in points if p.get("zone") == zone]
+            if not pts:
                 zones[zone] = None
                 continue
-            # GFS (25 km) liegt bei Boeen und Bewoelkung im Alpenraum systematisch
-            # daneben (18.09.2026: 6 km/h neben 26-35 der ICON-Modelle) und wuerde
-            # jeden Tag zum "uneinig" machen — fuer Wind/Wolken nur die ICON-
-            # Modelle vergleichen, GFS bleibt in der Zahlenzeile sichtbar.
-            fine = {k: v for k, v in row.items() if k != "gfs_seamless"} or row
-            gv = [v["gust_kmh"] for v in fine.values() if v.get("gust_kmh") is not None]
-            rv = [v["rain_mm"] for v in row.values() if v.get("rain_mm") is not None]
-            cv = [v["cloud_pct"] for v in fine.values() if v.get("cloud_pct") is not None]
-            zones[zone] = {
-                "models": row,
-                "gust_spread_kmh": (max(gv) - min(gv)) if gv else None,
-                "rain_wet_models": sum(1 for r in rv if r >= 1.0), "rain_n": len(rv),
-                "cloud_spread_pct": (max(cv) - min(cv)) if cv else None,
-            }
+            by_reg: dict[str, list[dict]] = {}
+            for p in pts:
+                by_reg.setdefault(p.get("region") or "", []).append(
+                    _mc_point_values(p.get("hourly") or {}, models, date))
+            params = {}
+            for param in MODEL_COMPARE_PARAMS:
+                wins = {}
+                for w in windows:
+                    reg_sum = {reg: _mc_model_summary([pv.get(w) or {} for pv in pvs], param, thr)
+                               for reg, pvs in by_reg.items()}
+                    verdicts = {reg: _mc_verdict(sm, param, thr) for reg, sm in reg_sum.items()}
+                    judged = {reg: v for reg, v in verdicts.items() if v is not None}
+                    if not judged:
+                        continue
+                    dis = sorted(reg for reg, v in judged.items() if v)
+                    share = len(dis) / len(judged)
+                    src = dis or list(judged)
+                    summary = _mc_model_summary([pv.get(w) or {} for reg in src for pv in by_reg[reg]], param, thr)
+                    if dis and not _mc_verdict(summary, param, thr):
+                        worst = max(dis, key=lambda r: _mc_gap(reg_sum[r], param, thr))
+                        summary = reg_sum[worst]
+                    wins[w] = {"share": round(share, 2), "n_regions": len(judged),
+                               "disagree": share >= thr["region_share"],
+                               "regions": dis, "models": summary}
+                if not wins:
+                    continue
+                worst_w = max(wins, key=lambda w: wins[w]["share"])
+                params[param] = {"windows": wins, "disagree": any(v["disagree"] for v in wins.values()),
+                                 "worst_window": worst_w, "share": wins[worst_w]["share"]}
+            zones[zone] = {"n_points": len(pts), "n_regions": len(by_reg), "params": params} if params else None
         per_day.append({"date": date, "zones": zones})
-    return {"per_day": per_day, "decided_by": "modell_vergleich",
-            "models": MODEL_COMPARE_MODELS, "points": MODEL_COMPARE_POINTS,
-            "thresholds": {"gust_agree_kmh": 10, "gust_disagree_kmh": 20, "wet_mm": 1.0,
-                           "cloud_agree_pct": 30, "spread_excludes": ["gfs_seamless"]}}
+    return {"per_day": per_day, "decided_by": "modell_vergleich", "version": 2,
+            "models": MODEL_COMPARE_MODELS, "windows": windows,
+            "classes": {k: list(v) for k, v in MODEL_COMPARE_CLASSES.items()},
+            "thresholds": {k: (v if not isinstance(v, float) else round(v, 3)) for k, v in thr.items()}}
+
+
+def _mc_points_from_regions(region_weather_data: Optional[dict]) -> list[dict]:
+    pts = []
+    for name, rdata in (region_weather_data or {}).items():
+        if not isinstance(rdata, dict):
+            continue
+        zone = _zone_of_region(rdata)
+        if zone not in config.SYNOPTIC_ZONES:
+            continue
+        for rp in rdata.get("reference_points") or []:
+            if isinstance(rp, (list, tuple)) and len(rp) >= 2:
+                pts.append({"zone": zone, "region": rdata.get("region_name") or name,
+                            "lat": float(rp[0]), "lon": float(rp[1])})
+    return pts
+
+
+def modell_vergleich(forecast_dates: list[str],
+                     region_weather_data: Optional[dict] = None) -> Optional[dict]:
+    """Sind sich die Modelle einig? Auf ALLEN Referenzpunkten der Regionen
+    (Alpennordhang 112, Graubuenden 49, Wallis 28, Tessin 14; ohne Regionsdaten
+    die vier Punkte MODEL_COMPARE_POINTS), fuer ICON-CH1/CH2 (MeteoSchweiz),
+    ICON-D2/EU (DWD) und GFS (NOAA), je Tagesfenster: Regen, Windrichtung,
+    Grundwind, Boeen, Bewoelkung, tiefe Bewoelkung. Regeln: MODEL_COMPARE_*
+    oben, Rechnung in modell_vergleich_aus_punkten. Doku docs/BRIEFING.md.
+    Kosten: 203 Punkte x 5 Modelle in 5 Calls, ~2 s (Probe 24.09.2026)."""
+    if not forecast_dates:
+        return None
+    pts = _mc_points_from_regions(region_weather_data)
+    if not pts:
+        pts = [{"zone": z, "region": z, "lat": lat, "lon": lon}
+               for z, (lat, lon) in MODEL_COMPARE_POINTS.items()]
+    models = list(MODEL_COMPARE_MODELS)
+    base = {"timezone": "Europe/Zurich", "hourly": ",".join(MODEL_COMPARE_HOURLY),
+            "models": ",".join(models), "forecast_days": max(len(forecast_dates), 3)}
+    config.with_api_key(base)
+    chunk = 50
+    got = []
+    for i in range(0, len(pts), chunk):
+        part = pts[i:i + chunk]
+        params = {**base, "latitude": ",".join(f"{p['lat']:.4f}" for p in part),
+                  "longitude": ",".join(f"{p['lon']:.4f}" for p in part)}
+        try:
+            resp = requests.get(config.API_URL, params=params, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            logger.warning("modell_vergleich: Punkte %d-%d fehlgeschlagen: %s", i, i + len(part), e)
+            continue
+        if not isinstance(data, list):
+            data = [data]
+        for p, d in zip(part, data):
+            got.append({**p, "hourly": (d or {}).get("hourly") or {}})
+    if not got:
+        return None
+    return modell_vergleich_aus_punkten(got, forecast_dates)
 
 
 def starkwind_punkte(weather_cache: dict, forecast_dates: list[str],

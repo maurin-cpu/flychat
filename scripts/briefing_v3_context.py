@@ -612,19 +612,32 @@ _L3 = {
         "fx_dwd": "DWD", "fx_signature": "Signatur", "fx_sig_yes": "ja", "fx_sig_no": "keine",
         "fx_dp": "ΔP Alpen", "fx_gust": "Böe", "fx_t850": "T850", "fx_thunder_none": "keine Gewitter",
         "fx_ground": "am Boden ≈", "fx_peak": "Spitze",
-        "md_agree":      "Fazit: Die Modelle sind sich bei Wind, Niederschlag und Bewölkung einig.",
-        "md_partial":    "Fazit: Bei {agree} sind sich die Modelle einig, bei {q}",
-        "md_uncertain":  "Fazit: Die Modelle widersprechen sich — bei {q}",
-        "md_q":          "{what} {zone} nicht (Vergleichspunkt {place}): {groups}.",
+        "md_agree":      "Fazit: Die Modelle sind sich bei Niederschlag, Wind, Windrichtung und Bewölkung einig — in allen Tagesfenstern.",
+        "md_partial":    "Fazit: Bei {agree} sind sich die Modelle einig, {q}",
+        "md_uncertain":  "Fazit: Die Modelle widersprechen sich — {q}",
+        "md_q":          "{what} {zone} {window} nicht ({regs}): {groups}.",
+        "md_q_join":     " ",
+        "md_regs":       "{k} von {n} Regionen",
         "md_grp":        "{models} {verb} {label}",
-        "md_lab_wind_mid": "fliegbaren Wind", "md_lab_cloud_mid": "halb bedeckt",
-        "md_what_wind":  "dem Wind", "md_what_rain": "dem Niederschlag", "md_what_cloud": "der Bewölkung",
-        "md_lab_wind_hi": "windig bis verblasen", "md_lab_wind_lo": "ruhigen Wind",
-        "md_lab_rain_hi": "Niederschlag", "md_lab_rain_lo": "trocken",
-        "md_lab_cloud_hi": "bedeckt", "md_lab_cloud_lo": "wenig Wolken",
         "md_verb_one":   "sieht", "md_verb_many": "sehen",
-        "md_var_wind":   "Wind", "md_var_rain": "Niederschlag", "md_var_cloud": "Bewölkung",
-        "md_place_alpennordhang": "Interlaken", "md_place_wallis": "Sion", "md_place_tessin": "Locarno", "md_place_graubuenden_engadin": "Chur",
+        "md_win_morning": "am Vormittag", "md_win_midday": "über Mittag", "md_win_afternoon": "am Nachmittag",
+        "md_var_rain": "Niederschlag", "md_var_dir": "Windrichtung", "md_var_speed": "Wind",
+        "md_var_gust": "Böen", "md_var_cloud": "Bewölkung", "md_var_cloud_low": "tiefe Wolken",
+        "md_what_rain": "beim Niederschlag", "md_what_dir": "bei der Windrichtung", "md_what_speed": "beim Wind",
+        "md_what_gust": "bei den Böen", "md_what_cloud": "bei der Bewölkung", "md_what_cloud_low": "bei den tiefen Wolken",
+        "md_lab_rain_0": "trocken", "md_lab_rain_1": "Niederschlag",
+        "md_lab_gust_0": "ruhig (unter 15 km/h)", "md_lab_gust_1": "fliegbar (15–25 km/h)",
+        "md_lab_gust_2": "stark (25–40 km/h)", "md_lab_gust_3": "verblasen (40–60 km/h)",
+        "md_lab_gust_4": "Sturm (60–80 km/h)", "md_lab_gust_5": "schweren Sturm (über 80 km/h)",
+        "md_lab_speed_0": "Flaute (unter 10 km/h)", "md_lab_speed_1": "schwachen Wind (10–20 km/h)",
+        "md_lab_speed_2": "mässigen Wind (20–30 km/h)", "md_lab_speed_3": "frischen Wind (30–45 km/h)",
+        "md_lab_speed_4": "starken Wind (45–60 km/h)", "md_lab_speed_5": "Sturm (60–80 km/h)",
+        "md_lab_speed_6": "Orkan (über 80 km/h)",
+        "md_lab_cloud_0": "wenig Wolken (0–20 %)", "md_lab_cloud_1": "aufgelockert (20–40 %)",
+        "md_lab_cloud_2": "halb bedeckt (40–60 %)", "md_lab_cloud_3": "stark bewölkt (60–80 %)",
+        "md_lab_cloud_4": "bedeckt (80–100 %)",
+        "md_lab_dir_0": "Nord", "md_lab_dir_1": "Nordost", "md_lab_dir_2": "Ost", "md_lab_dir_3": "Südost",
+        "md_lab_dir_4": "Süd", "md_lab_dir_5": "Südwest", "md_lab_dir_6": "West", "md_lab_dir_7": "Nordwest",
         "su_exp_high":  "{Press} lässt viel Sonne erwarten",
         "su_exp_low":   "{Press} lässt viel Bewölkung erwarten",
         "su_exp_flat":  "Die Übergangslage lässt wechselnde Bewölkung erwarten",
@@ -1005,19 +1018,32 @@ _L3 = {
         "fx_dwd": "DWD", "fx_signature": "signature", "fx_sig_yes": "yes", "fx_sig_no": "none",
         "fx_dp": "ΔP Alps", "fx_gust": "gust", "fx_t850": "T850", "fx_thunder_none": "no thunderstorms",
         "fx_ground": "ground ≈", "fx_peak": "peak",
-        "md_agree":      "Verdict: The models agree on wind, precipitation and cloud.",
+        "md_agree":      "Verdict: The models agree on precipitation, wind, wind direction and cloud — in every part of the day.",
         "md_partial":    "Verdict: The models agree on {agree}, but not on {q}",
         "md_uncertain":  "Verdict: The models contradict each other — on {q}",
-        "md_q":          "{what} {zone} (comparison point {place}): {groups}.",
+        "md_q":          "{what} {zone} {window} ({regs}): {groups}.",
+        "md_q_join":     " Also on ",
+        "md_regs":       "{k} of {n} regions",
         "md_grp":        "{models} {verb} {label}",
-        "md_lab_wind_mid": "flyable wind", "md_lab_cloud_mid": "half overcast",
-        "md_what_wind":  "wind", "md_what_rain": "precipitation", "md_what_cloud": "cloud",
-        "md_lab_wind_hi": "windy to blown out", "md_lab_wind_lo": "calm wind",
-        "md_lab_rain_hi": "precipitation", "md_lab_rain_lo": "dry",
-        "md_lab_cloud_hi": "overcast", "md_lab_cloud_lo": "little cloud",
         "md_verb_one":   "sees", "md_verb_many": "see",
-        "md_var_wind":   "wind", "md_var_rain": "precipitation", "md_var_cloud": "cloud",
-        "md_place_alpennordhang": "Interlaken", "md_place_wallis": "Sion", "md_place_tessin": "Locarno", "md_place_graubuenden_engadin": "Chur",
+        "md_win_morning": "in the morning", "md_win_midday": "around midday", "md_win_afternoon": "in the afternoon",
+        "md_var_rain": "precipitation", "md_var_dir": "wind direction", "md_var_speed": "wind",
+        "md_var_gust": "gusts", "md_var_cloud": "cloud", "md_var_cloud_low": "low cloud",
+        "md_what_rain": "precipitation", "md_what_dir": "wind direction", "md_what_speed": "wind",
+        "md_what_gust": "gusts", "md_what_cloud": "cloud", "md_what_cloud_low": "low cloud",
+        "md_lab_rain_0": "dry", "md_lab_rain_1": "precipitation",
+        "md_lab_gust_0": "calm (under 15 km/h)", "md_lab_gust_1": "flyable (15–25 km/h)",
+        "md_lab_gust_2": "strong (25–40 km/h)", "md_lab_gust_3": "blown out (40–60 km/h)",
+        "md_lab_gust_4": "storm (60–80 km/h)", "md_lab_gust_5": "severe storm (over 80 km/h)",
+        "md_lab_speed_0": "calm (under 10 km/h)", "md_lab_speed_1": "light wind (10–20 km/h)",
+        "md_lab_speed_2": "moderate wind (20–30 km/h)", "md_lab_speed_3": "fresh wind (30–45 km/h)",
+        "md_lab_speed_4": "strong wind (45–60 km/h)", "md_lab_speed_5": "storm (60–80 km/h)",
+        "md_lab_speed_6": "hurricane force (over 80 km/h)",
+        "md_lab_cloud_0": "little cloud (0–20 %)", "md_lab_cloud_1": "broken cloud (20–40 %)",
+        "md_lab_cloud_2": "half overcast (40–60 %)", "md_lab_cloud_3": "mostly cloudy (60–80 %)",
+        "md_lab_cloud_4": "overcast (80–100 %)",
+        "md_lab_dir_0": "north", "md_lab_dir_1": "north-east", "md_lab_dir_2": "east", "md_lab_dir_3": "south-east",
+        "md_lab_dir_4": "south", "md_lab_dir_5": "south-west", "md_lab_dir_6": "west", "md_lab_dir_7": "north-west",
         "su_exp_high":  "{Press} suggests plenty of sunshine",
         "su_exp_low":   "{Press} suggests a lot of cloud",
         "su_exp_flat":  "The transitional situation suggests changeable cloud",
@@ -2326,20 +2352,26 @@ def _thermik_fazit(wetterlage: dict, date: str) -> str:
     return expect + _lbl(key).format(models=_model_words(), base=base, climb=climb, start=start, sun=sun)
 
 
+MD_PARAMS = ("rain", "dir", "speed", "gust", "cloud", "cloud_low")   # Reihenfolge = Piloten-Relevanz
+
+
 def _modelle_block(wetterlage: dict, date: str) -> dict:
-    """Block 8: sind sich die Modelle einig? Fazit zuerst; bei Uneinigkeit
-    ALLE Modelle mit Wert, dazu Mehrheit und Ausreisser, dann die offene
-    Pilotenfrage. Der Vergleichspunkt (Interlaken, Sion, Locarno, Chur) steht
-    im Satz. Keine separate Zahlenzeile — die Werte sind im Text."""
+    """Block 8: sind sich die Modelle einig? Datenformat v2
+    (engine.synoptic_context.modell_vergleich_aus_punkten): je Zone, Groesse
+    und Tagesfenster der Anteil uneiniger Referenzpunkte. Fazit zuerst; je
+    uneiniger Groesse EIN Satz fuer die Zone und das Fenster mit dem
+    hoechsten Anteil — wie viele Regionen betroffen sind, und welche Modelle
+    welche Klasse sehen (dieselben Klassen, in denen gemessen wird: ein
+    Streit ist damit immer als zwei Gruppen erzaehlbar)."""
     wl = wetterlage or {}
     mv = wl.get("modell_vergleich") or {}
+    if mv.get("version") != 2:
+        return {}
     day = _per_day_index(mv, [date]).get(date) or {}
-    zones = {z: v for z, v in (day.get("zones") or {}).items() if v}
+    zones = {z: v for z, v in (day.get("zones") or {}).items() if v and v.get("params")}
     if not zones:
         return {}
     names = mv.get("models") or {}
-    thr = mv.get("thresholds") or {}
-    excl = set(thr.get("spread_excludes") or [])
     lang = _lang()
     joiner = " und " if lang == "de" else " and "
 
@@ -2349,54 +2381,48 @@ def _modelle_block(wetterlage: dict, date: str) -> dict:
             return prep + _zone_name(z)
         return "in " + _ZONE_ARTICLE_DAT["en"].get(z, "") + _zone_name(z)
 
-    def _list(models):
+    def _list(items):
         """'A, B und C' statt 'A und B und C'."""
-        if len(models) <= 1:
-            return "".join(models)
-        return ", ".join(models[:-1]) + joiner + models[-1]
+        if len(items) <= 1:
+            return "".join(items)
+        return ", ".join(items[:-1]) + joiner + items[-1]
 
-    def question(kind, z, field, unit, classify):
-        """Satz fuer eine Groesse: welche Modelle sehen was — Klassen statt Zahlen."""
-        vals = {names.get(k, k): v[field] for k, v in zones[z]["models"].items() if v.get(field) is not None}
-        groups: dict[str, list[str]] = {}
-        for m, v in vals.items():
-            groups.setdefault(classify(v), []).append(m)
-        order = ["hi", "mid", "lo"]
+    def question(param, z, win):
+        info = zones[z]["params"][param]["windows"][win]
+        kind = "cloud" if param == "cloud_low" else param
+        groups: dict[int, list[str]] = {}
+        for m, mv_ in (info.get("models") or {}).items():
+            groups.setdefault(int(mv_["cls"]), []).append(names.get(m, m))
         parts = []
-        for cls in sorted(groups, key=lambda c: (-len(groups[c]), order.index(c))):
+        for cls in sorted(groups, key=lambda c: (-len(groups[c]), c)):
             ms = groups[cls]
             parts.append(_lbl("md_grp").format(models=_list(ms),
                                                verb=_lbl("md_verb_many" if len(ms) > 1 else "md_verb_one"),
                                                label=_lbl(f"md_lab_{kind}_{cls}")))
-        return _lbl("md_q").format(what=_lbl("md_what_" + kind), zone=zone_in(z),
-                                   place=_lbl("md_place_" + z), groups=", ".join(parts))
+        regs = _lbl("md_regs").format(k=len(info.get("regions") or []), n=info.get("n_regions") or 0)
+        return _lbl("md_q").format(what=_lbl("md_what_" + param), zone=zone_in(z),
+                                   window=_lbl("md_win_" + win), regs=regs, groups=", ".join(parts))
 
     questions = []
-    wz = max(zones, key=lambda z: zones[z].get("gust_spread_kmh") or 0)
-    if (zones[wz].get("gust_spread_kmh") or 0) >= thr.get("gust_disagree_kmh", 20):
-        questions.append(("wind", question("wind", wz, "gust_kmh", " km/h",
-                                           lambda v: "hi" if v >= 25 else "mid" if v >= 15 else "lo")))
-    for z, v in zones.items():
-        n, wet = v.get("rain_n") or 0, v.get("rain_wet_models") or 0
-        if n >= 2 and 0 < wet < n:
-            questions.append(("rain", question("rain", z, "rain_mm", " mm",
-                                               lambda v: "hi" if v >= thr.get("wet_mm", 1.0) else "lo")))
-            break
-    cz = max(zones, key=lambda z: zones[z].get("cloud_spread_pct") or 0)
-    if (zones[cz].get("cloud_spread_pct") or 0) >= thr.get("cloud_agree_pct", 30):
-        questions.append(("cloud", question("cloud", cz, "cloud_pct", " %",
-                                            lambda v: "hi" if v >= 60 else "mid" if v >= 30 else "lo")))
+    for param in MD_PARAMS:
+        cands = [(v["params"][param]["share"], z) for z, v in zones.items()
+                 if v["params"].get(param, {}).get("disagree")]
+        if not cands:
+            continue
+        share, z = max(cands)
+        questions.append((param, question(param, z, zones[z]["params"][param]["worst_window"])))
 
     open_kinds = {k for k, _ in questions}
-    agree = [_lbl("md_var_" + k) for k in ("wind", "rain", "cloud") if k not in open_kinds]
+    agree = [_lbl("md_var_" + k) for k in MD_PARAMS if k not in open_kinds]
     if not questions:
         text, verdict = _lbl("md_agree"), "agree"
     elif len(questions) == 1:
         text, verdict = _lbl("md_partial").format(agree=_list(agree), q=questions[0][1]), "partial"
     else:
-        text, verdict = _lbl("md_uncertain").format(q=" ".join(qq[1] for qq in questions)), "uncertain"
+        text = _lbl("md_uncertain").format(q=_lbl("md_q_join").join(qq[1] for qq in questions))
+        verdict = "uncertain"
     return {"fazit": text, "num": {}, "verdict": verdict,
-            "agree": [k for k in ("wind", "rain", "cloud") if k not in open_kinds],
+            "agree": [k for k in MD_PARAMS if k not in open_kinds],
             "open": [k for k, _ in questions]}
 
 
@@ -2884,7 +2910,7 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         v = md.get("verdict", "agree")
         st("modelle", {"agree": "ok", "partial": "info"}.get(v, "warn"), "st_md_" + v)
         md["facts"] = [{"k": _lbl("md_var_" + k), "v": ("✓" if k in md.get("agree", []) else "✗")}
-                       for k in ("wind", "rain", "cloud")]
+                       for k in MD_PARAMS]
     return None
 
 

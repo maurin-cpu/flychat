@@ -63,7 +63,44 @@ Status-Pille, Fakten-Chips, ein Satz (erster Teil fett = Aussage).
 | 5 | Labilität | Luftmasse (SW feucht → labil im Süden; N/NW kühl → Schauer am Nordhang), Druck deckelt oder begünstigt | CAPE je Zone in Klassen (150/400/1000), Modell-Gewitter mit Beginn, Überentwicklung | Urteil: „Die Prognosedaten bestätigen …" (blockspezifisch: die Labilität dort, wo die Lage sie erwarten lässt / die stabile Schichtung / die gedeckelte bzw. hohe Basis / die Zweiteilung bzw. landesweit) / „nur teilweise — der Deckel hält im Norden nicht" / „zeigen das nicht — stabiler als …" / „widersprechen — labiler als …" |
 | 6 | Thermik / Basis | Hoch → Absinken, gedeckelte Basis; Tief → hohe Basis, Überentwicklung; T850 ≥ 14 °C bremst, ≤ 4 °C fördert | je Zone: Basis (LCL 13 Uhr, Median der Regionen), Steigen (Tagesspitze, Median), Sonne/tiefe Wolken 10–16 Uhr — kein Thermikbeginn (bewusst weggelassen) | Urteil am Median der Zonen-Basen (Schwelle 2800 m): „Genau das …" / „zeigen das nicht — Basis höher/tiefer als die Lage erwarten lässt". Zahlen in Chips, Text ohne Meter |
 | 7 | Sonne / Bewölkung | Hoch → Sonne, Tief → Wolken; Luftmasse legt Wolken auf eine Seite | Sonnenanteil je Zone (Balken), Wolkenart unter/über 2 km | Nord und Süd gegen Erwartung: passt / teilweise / nicht |
-| 8 | Modelle | Verlässlichkeit der Lage | fünf Modelle an vier Punkten (Interlaken, Sion, Locarno, Chur): ICON-CH1/CH2 (MeteoSchweiz), ICON-D2/EU (DWD), GFS (NOAA) — Böen, Niederschlag, Bewölkung | welche Parameter einig, welche nicht, welche Modelle zusammenstehen. GFS zählt bei Wind/Wolken nicht in die Spanne (25 km, systematisch tief) |
+| 8 | Modelle | Verlässlichkeit der Lage | fünf Modelle auf **allen Referenzpunkten** der Regionen (Alpennordhang 112, Graubünden 49, Wallis 28, Tessin 14): ICON-CH1/CH2 (MeteoSchweiz), ICON-D2/EU (DWD), GFS (NOAA) — Niederschlag, Windrichtung, Grundwind, Böen, Bewölkung, tiefe Bewölkung, je **Tagesfenster** (Vormittag / Mittag / Nachmittag). Regeln: §3a | welche Parameter einig, welche nicht — je offenem Parameter ein Satz: Zone und Fenster mit dem grössten Anteil uneiniger Regionen („4 von 7 Regionen"), welche Modelle welche Klasse sehen. GFS zählt bei Wind/Wolken nicht ins Urteil (25 km, systematisch tief), steht aber in der Aufzählung |
+
+### 3a. Modellvergleich — die Regeln (seit 24.09.2026, v2)
+
+Gemessen wird in Klassen, erzählt wird in denselben Klassen — damit kann
+ein „uneinig" nie mit nur einer Modell-Gruppe enden (Vorfall 24.09.:
+„uneinig bei der Bewölkung … alle sehen bedeckt"). **Uneinig heisst zwei
+Klassen Abstand**; Nachbarklassen (24 vs. 26 km/h) sind Grenzrauschen.
+Die oberen Klassen reichen bis 80 km/h, damit 30 und 80 km/h nicht dasselbe
+Urteil bekommen.
+
+| Parameter | Wert je Modell | Klassen | Uneinig wenn |
+|---|---|---|---|
+| Niederschlag | Summe im Fenster | trocken < 1 mm / nass ≥ 1 mm | manche Modelle nass, andere trocken (GFS zählt mit) |
+| Windrichtung | Vektor-Mittel 10 m, gewichtet mit der Geschwindigkeit | 8 Sektoren à 45° (N, NE, …) | ≥ 2 Sektoren Abstand (≥ 90°); nur bewertet, wenn der mittlere Grundwind ≥ 8 km/h |
+| Grundwind | Mittel 10 m im Fenster | < 10 / 10–20 / 20–30 / 30–45 / 45–60 / 60–80 / ≥ 80 km/h | ≥ 2 Klassen Abstand |
+| Böen | Spitze im Fenster | < 15 / 15–25 / 25–40 / 40–60 / 60–80 / ≥ 80 km/h | ≥ 2 Klassen Abstand |
+| Bewölkung gesamt | Mittel im Fenster | 0–20 / 20–40 / 40–60 / 60–80 / 80–100 % | ≥ 2 Klassen Abstand |
+| Tiefe Bewölkung | Mittel `cloud_cover_low` | wie gesamt | wie gesamt |
+
+**Ebenen:** Punkt → Region (je Modell der Median über ihre Referenzpunkte,
+dort fällt das Urteil) → Zone (uneinig ab **einem Drittel** uneiniger
+Regionen). Das Urteil fällt bewusst auf Regionsebene: Punkt gegen Punkt
+misst nur Rauschen (Probe 24.09.: 37 % der Punkte „uneinig", alle
+Modell-Mediane in derselben Klasse). **Tagesfenster** statt Tageswert,
+weil „Sturm am Vormittag" gegen „Sturm ab Mittag" dieselbe Tagesspitze
+hat und für den Piloten der grösste Streit ist; der Abend zählt nicht.
+Ein Modell ohne Daten (ICON-D2 nach 48 h) fehlt still. Eine nicht
+bewertbare Grösse (Richtung bei Flaute) gilt als einig.
+
+Code: `engine/synoptic_context.py` (`MODEL_COMPARE_*`,
+`modell_vergleich_aus_punkten`), Satz in `scripts/briefing_v3_context.py`
+(`_modelle_block`), Tests `tests/test_modell_vergleich.py`. Kosten: 203
+Punkte × 5 Modelle in 5 Open-Meteo-Calls, ~2 s. Vorgängerformat (vier
+Einzelpunkte, Spanne max−min) wird vom Briefing ignoriert — Snapshots vor
+dem 25.09.2026 zeigen den Block nicht. Offen: Eichung der Drittel-Schwelle
+und der Bewölkungsklassen im Backtest gegen SwissMetNet — die Bewölkung war
+in der ersten Probe an jedem Tag in jeder Zone uneinig.
 
 ## 4. Status-Pillen
 
@@ -102,8 +139,8 @@ Regeln:
   teils labil.
 - **Sonne**: Nord (Alpennordhang) und Süd (Tessin) je gegen Erwartung; eine
   passt nicht → teils; keine → anders.
-- **Modelle**: 0 / 1 / ≥ 2 Parameter uneinig (Böen-Spanne ≥ 20 km/h,
-  Bewölkung ≥ 30 %, Regen geteilt).
+- **Modelle**: 0 / 1 / ≥ 2 Parameter uneinig (sechs Parameter, Regeln
+  in §3a).
 
 Keine Pille: die Warnungen (eigene Schwere Vorsicht / Stopp). Block 1 trägt
 seit 19.09.2026 eine Pille (Daten gegen Erwartung aus dem Druck).
