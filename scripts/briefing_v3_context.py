@@ -1368,7 +1368,12 @@ _L3 = {
 
 def _lbl(key: str) -> str:
     lang = _lang()
-    return _L3[lang].get(key) or _L2[lang].get(key) or key
+    # .get() statt "or": ein absichtlich leeres Label (z.B. lb_press_none)
+    # ist falsy und wuerde sonst als Schluessel im Text landen.
+    val = _L3[lang].get(key)
+    if val is None:
+        val = _L2[lang].get(key)
+    return key if val is None else val
 
 
 def _labels() -> dict:
