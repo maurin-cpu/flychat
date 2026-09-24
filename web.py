@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 
 import config
 import i18n
+from engine._common import normalize_window
 
 logger = logging.getLogger(__name__)
 
@@ -2545,8 +2546,10 @@ def _build_briefing_og(regions_csv: str, day_str: str | None, spot_name: str = "
     - Mit Filter: peekt briefing_data und baut Title aus bestem Spot / Tag-Tier.
     """
     base_url = request.url_root.rstrip("/")
-    title = "Wingcast – Flugwetter für Gleitschirmpiloten"
-    desc  = "Präzise Thermik- und Wind-Prognose für die Schweizer Berge."
+    # Sprachbewusst: die Keys existieren seit dem i18n-Umbau (i18n.py "meta.og_*").
+    # Hart verdrahtet waren sie ein Rest — der Titel ist auch die Link-Vorschau.
+    title = i18n.t("meta.og_title")
+    desc  = i18n.t("meta.og_description")
     img   = f"{base_url}/og-image/briefing.png"
 
     region_ids = [r.strip() for r in regions_csv.split(",") if r.strip()] if regions_csv else []
@@ -3015,7 +3018,7 @@ def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], al
                 "date": date_str,
                 "status": entry.get("status", "error"),
                 "safety_status": safety.get("safety_status", "error"),
-                "safe_window": safety.get("safe_window", "keins"),
+                "safe_window": normalize_window(safety.get("safe_window")),
                 "best_window": entry.get("best_window", "?"),
                 "safety_feedback": safety.get("summary", ""),
                 "error": safety.get("error", ""),
@@ -3284,7 +3287,7 @@ def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str]
                 "date": date_str,
                 "status": entry.get("status", "error"),
                 "safety_status": ss,
-                "safe_window": safety.get("safe_window", entry.get("safe_window", "keins")),
+                "safe_window": normalize_window(safety.get("safe_window") or entry.get("safe_window")),
                 "best_window": entry.get("best_window", "?"),
                 "safety_feedback": safety.get("summary", entry.get("summary", "")),
                 "foehn_risk": safety.get("foehn_risk", entry.get("foehn_risk", "none")),

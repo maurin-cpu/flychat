@@ -704,7 +704,8 @@
     function shortenWindow(s) {
         if (!s) return '';
         var str = String(s).trim();
-        if (!str || str.toLowerCase() === 'keins') return '';
+        var low = str.toLowerCase();
+        if (!str || low === 'keins' || low === 'none') return '';
         // Bereits kompakt? (z.B. "10-13", "10–13")
         var m = str.match(/^(\d{1,2})\s*[-–]\s*(\d{1,2})/);
         if (m) return m[1] + '–' + m[2];

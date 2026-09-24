@@ -848,7 +848,7 @@
     function buildTooltipHtml(p, _legacyStyle, safetyBand, experienceRating, dayData) {
         var html = '<b>' + p.name + '</b><br>' +
             p.fluggebiet + ' (' + p.region + ')<br>' +
-            p.elevation_m + 'm MSL | Wind: ' + p.windrichtung;
+            p.elevation_m + 'm MSL | Wind: ' + wcWindDir(p.windrichtung);
         if (!p.has_weather) {
             html += '<br><span style="color:#F59E0B;">' + wcT('js.map.no_weather_loaded') + '</span>';
         }
@@ -1232,7 +1232,7 @@
         currentSpotExperienceRating = null;
         titleEl.textContent = spotName;
         infoEl.textContent = props
-            ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + props.windrichtung
+            ? props.fluggebiet + ' | ' + props.elevation_m + 'm MSL | ' + wcWindDir(props.windrichtung)
             : '';
 
         // Modell-Badge neben spot-info — wird in renderCurrentDay pro Tag

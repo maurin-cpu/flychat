@@ -48,6 +48,22 @@
             }
             return s;
         };
+        /* Himmelsrichtungen NUR fuer die Anzeige uebersetzen (NO->NE, O->E, SO->SE).
+           Der Rohwert (spots.py:_PGE_TO_DE) bleibt ueberall deutsch: er speist
+           fuenf Parser (map.js/briefing.js/meteogram.js getDirAngles,
+           engine/_common.py COMPASS_POINTS, engine._is_wind_in_range), steckt in
+           Snapshots/MCP-Export und in tests/test_spots_data.py. Nur Sektor-Tokens
+           werden ersetzt, Trenner ('-' contiguous, '/' disjunkt) bleiben erhalten,
+           Unbekanntes wird unveraendert durchgereicht. */
+        var WC_DIR_EN = { NO: 'NE', O: 'E', SO: 'SE', NNO: 'NNE', ONO: 'ENE',
+                          OSO: 'ESE', SSO: 'SSE' };
+        window.wcWindDir = function (raw) {
+            if (raw == null || window.WC_LANG !== 'en') return raw;
+            return String(raw).replace(/[A-Za-z]+/g, function (tok) {
+                return Object.prototype.hasOwnProperty.call(WC_DIR_EN, tok)
+                    ? WC_DIR_EN[tok] : tok;
+            });
+        };
         /* Sicherer Analytics-Helfer: sendet ein PostHog-Custom-Event, wenn PostHog
            geladen ist — sonst No-op (z.B. Admin, oder Analytics deaktiviert). */
         window.wcTrack = function (event, props) {

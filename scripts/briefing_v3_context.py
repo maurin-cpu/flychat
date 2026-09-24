@@ -146,9 +146,17 @@ _STRENGTH = {
     "en": {"schwach": "light", "maessig": "moderate", "kraeftig": "strong",
            "stuermisch": "stormy"},
 }
+# Muss ALLE Werte kennen, die engine/synoptic_context.py:decide_pressure_influence()
+# erzeugen kann (Z. 695-735): Hochdruck, starker Tiefdruck, Tiefdruck, neutral,
+# unbekannt, Uebergangslage. Fehlt einer, reicht der Fallback unten den deutschen
+# Rohwert still ins EN-UI durch.
 _REGIME = {
-    "de": {"hoch": "Hoch", "hochdruck": "Hochdruck", "tief": "Tief", "tiefdruck": "Tiefdruck", "neutral": "Neutral"},
-    "en": {"hoch": "High", "hochdruck": "High pressure", "tief": "Low", "tiefdruck": "Low pressure", "neutral": "Neutral"},
+    "de": {"hoch": "Hoch", "hochdruck": "Hochdruck", "tief": "Tief", "tiefdruck": "Tiefdruck",
+           "starker tiefdruck": "Starker Tiefdruck", "neutral": "Neutral",
+           "uebergangslage": "Uebergangslage", "unbekannt": "Unbekannt"},
+    "en": {"hoch": "High", "hochdruck": "High pressure", "tief": "Low", "tiefdruck": "Low pressure",
+           "starker tiefdruck": "Strong low pressure", "neutral": "Neutral",
+           "uebergangslage": "Transitional", "unbekannt": "Unknown"},
 }
 _CONFIDENCE = {
     "de": {"high": "hoch", "medium": "mittel", "low": "gering"},

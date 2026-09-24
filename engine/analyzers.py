@@ -75,6 +75,7 @@ from engine._common import (
     _KEYWORD_TO_KEY_NO_GO, _KEYWORD_TO_KEY_CAUTION,
     _pick_key_from_list, _validate_key, _derive_primary_labels,
     COMPASS_POINTS, _compute_wind_trend, _detect_rain_sandwich,
+    normalize_window,
     _interpolate_wind_at_altitude,
 )
 
@@ -463,7 +464,7 @@ class AnalyzersMixin:
             # Post-Process die korrekten Werte sehen (Bug: ohne Transfer fallen
             # Subs auf Default 5 zurueck, MIN ergibt 5 statt 9).
             result["safety_status"] = safety_result.get("safety_status", "")
-            result["safe_window"] = safety_result.get("safe_window", "")
+            result["safe_window"] = normalize_window(safety_result.get("safe_window"))
             for f in ("wind_safety_rating", "gust_safety_rating",
                       "aloft_safety_rating", "foehn_safety_rating",
                       "rain_safety_rating", "thunderstorm_safety_rating",
@@ -629,7 +630,7 @@ class AnalyzersMixin:
             # damit _compute_safety_rating und compute_safety_band im Flyability-
             # Post-Process die korrekten Werte sehen (Vorab-Fix #4 Bug-Fix).
             result["safety_status"] = safety_result.get("safety_status", "")
-            result["safe_window"] = safety_result.get("safe_window", "")
+            result["safe_window"] = normalize_window(safety_result.get("safe_window"))
             result["wind_calm_count"] = safety_result.get("wind_calm_count", 0)
             result["wind_moderate_count"] = safety_result.get("wind_moderate_count", 0)
             result["wind_strong_count"] = safety_result.get("wind_strong_count", 0)
@@ -835,7 +836,7 @@ class AnalyzersMixin:
                     safety = entry.get("safety", {})
                     doc_data["safety_status"] = safety.get("safety_status", "error")
                     doc_data["error"] = safety.get("error", "")
-                    doc_data["safe_window"] = safety.get("safe_window", "keins")
+                    doc_data["safe_window"] = normalize_window(safety.get("safe_window"))
                     doc_data["safety_feedback"] = safety.get("summary", "")
                     for key in ["no_go_reasons", "caution_notes"]:
                         val = safety.get(key, [])
@@ -935,7 +936,7 @@ class AnalyzersMixin:
                         "updated_at": self.region_analyses_loaded_at.isoformat(),
                         "safety_status": ss,
                         "error": safety.get("error", entry.get("error", "")),
-                        "safe_window": safety.get("safe_window", entry.get("safe_window", "keins")),
+                        "safe_window": normalize_window(safety.get("safe_window") or entry.get("safe_window")),
                         "safety_feedback": safety.get("summary", entry.get("summary", "")),
                         "foehn_risk": safety.get("foehn_risk", entry.get("foehn_risk", "none")),
                         "wind_summary": safety.get("wind_summary", entry.get("wind_summary", "")),
@@ -1410,7 +1411,7 @@ class AnalyzersMixin:
                 # Safety-Felder extrahieren
                 safety = {
                     "safety_status": safety_status,
-                    "safe_window": result.get("safe_window", "keins"),
+                    "safe_window": normalize_window(result.get("safe_window")),
                     "no_go_reasons": result.get("no_go_reasons", []),
                     "caution_notes": result.get("caution_notes", []),
                     "primary_no_go": result.get("primary_no_go"),
@@ -1483,7 +1484,7 @@ class AnalyzersMixin:
                     entry["fly_status"] = ""
                     entry["status"] = safety_status
 
-                entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
+                entry["best_window"] = normalize_window(result.get("best_window") or safety.get("safe_window"))
                 entry["recommendation"] = result.get("recommendation", "")
                 entry["region_name"] = result.get("region", regions_by_id.get(rid, {}).get("region", rid))
                 merged[rid][date_str] = entry
@@ -1663,7 +1664,7 @@ class AnalyzersMixin:
                 # Safety-Felder extrahieren
                 safety = {
                     "safety_status": safety_status,
-                    "safe_window": result.get("safe_window", "keins"),
+                    "safe_window": normalize_window(result.get("safe_window")),
                     "no_go_reasons": result.get("no_go_reasons", []),
                     "caution_notes": result.get("caution_notes", []),
                     "primary_no_go": result.get("primary_no_go"),
@@ -1740,7 +1741,7 @@ class AnalyzersMixin:
                     "summary": "", "limiting_factor": "spot_not_flyable" if safety_status == "not_safe" else "none",
                     "region_context_available": False,
                 }
-                entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
+                entry["best_window"] = normalize_window(result.get("best_window") or safety.get("safe_window"))
                 entry["recommendation"] = result.get("recommendation", "")
                 merged.setdefault(spot_name, {})[date_str] = entry
 
@@ -2546,7 +2547,7 @@ class AnalyzersMixin:
                 try:
                     # Safety-Felder ins Ergebnis uebernehmen
                     raw_result["safety_status"] = safety_res.get("safety_status", "")
-                    raw_result["safe_window"] = safety_res.get("safe_window", "")
+                    raw_result["safe_window"] = normalize_window(safety_res.get("safe_window"))
                     raw_result["wind_calm_count"] = safety_res.get("wind_calm_count", 0)
                     raw_result["wind_moderate_count"] = safety_res.get("wind_moderate_count", 0)
                     raw_result["wind_strong_count"] = safety_res.get("wind_strong_count", 0)
@@ -2805,7 +2806,7 @@ class AnalyzersMixin:
                 try:
                     # Safety-Felder ins Ergebnis uebernehmen
                     raw_result["safety_status"] = safety_res.get("safety_status", "")
-                    raw_result["safe_window"] = safety_res.get("safe_window", "")
+                    raw_result["safe_window"] = normalize_window(safety_res.get("safe_window"))
                     raw_result["spot"] = name
                     raw_result["date"] = date_str
 
@@ -2855,7 +2856,7 @@ class AnalyzersMixin:
                 safety_status = result.get("safety_status", "error")
                 safety = {
                     "safety_status": safety_status,
-                    "safe_window": result.get("safe_window", "keins"),
+                    "safe_window": normalize_window(result.get("safe_window")),
                     "no_go_reasons": result.get("no_go_reasons", []),
                     "caution_notes": result.get("caution_notes", []),
                     "primary_no_go": result.get("primary_no_go"),
@@ -2920,7 +2921,7 @@ class AnalyzersMixin:
                     "summary": "", "limiting_factor": "spot_not_flyable" if safety_status == "not_safe" else "none",
                     "region_context_available": False,
                 }
-                entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
+                entry["best_window"] = normalize_window(result.get("best_window") or safety.get("safe_window"))
                 entry["recommendation"] = result.get("recommendation", "")
                 spot_merged[spot_name][date_str] = entry
 
@@ -2940,7 +2941,7 @@ class AnalyzersMixin:
                 safety_status = result.get("safety_status", "error")
                 safety = {
                     "safety_status": safety_status,
-                    "safe_window": result.get("safe_window", "keins"),
+                    "safe_window": normalize_window(result.get("safe_window")),
                     "no_go_reasons": result.get("no_go_reasons", []),
                     "caution_notes": result.get("caution_notes", []),
                     "primary_no_go": result.get("primary_no_go"),
@@ -2998,7 +2999,7 @@ class AnalyzersMixin:
                 else:
                     entry["fly_status"] = ""
                     entry["status"] = safety_status
-                entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
+                entry["best_window"] = normalize_window(result.get("best_window") or safety.get("safe_window"))
                 entry["recommendation"] = result.get("recommendation", "")
                 entry["region_name"] = result.get("region", regions_by_id.get(rid, {}).get("region", rid))
                 region_merged[rid][date_str] = entry
@@ -3255,7 +3256,7 @@ class AnalyzersMixin:
                         safety_status = result.get("safety_status", "error")
                         safety = {
                             "safety_status": safety_status,
-                            "safe_window": result.get("safe_window", "keins"),
+                            "safe_window": normalize_window(result.get("safe_window")),
                             "no_go_reasons": result.get("no_go_reasons", []),
                             "caution_notes": result.get("caution_notes", []),
                             "primary_no_go": result.get("primary_no_go"),
@@ -3313,7 +3314,7 @@ class AnalyzersMixin:
                         else:
                             entry["fly_status"] = ""
                             entry["status"] = safety_status
-                        entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
+                        entry["best_window"] = normalize_window(result.get("best_window") or safety.get("safe_window"))
                         entry["recommendation"] = result.get("recommendation", "")
                         entry["region_name"] = result.get("region", regions_by_id.get(rid, {}).get("region", rid))
                         region_merged[rid][date_str] = entry
@@ -3339,7 +3340,7 @@ class AnalyzersMixin:
                         safety_status = result.get("safety_status", "error")
                         safety = {
                             "safety_status": safety_status,
-                            "safe_window": result.get("safe_window", "keins"),
+                            "safe_window": normalize_window(result.get("safe_window")),
                             "no_go_reasons": result.get("no_go_reasons", []),
                             "caution_notes": result.get("caution_notes", []),
                             "primary_no_go": result.get("primary_no_go"),
@@ -3404,7 +3405,7 @@ class AnalyzersMixin:
                             "summary": "", "limiting_factor": "spot_not_flyable" if safety_status == "not_safe" else "none",
                             "region_context_available": False,
                         }
-                        entry["best_window"] = result.get("best_window") or safety.get("safe_window", "keins")
+                        entry["best_window"] = normalize_window(result.get("best_window") or safety.get("safe_window"))
                         entry["recommendation"] = result.get("recommendation", "")
                         spot_merged[spot_name][date_str] = entry
                     except Exception as e:
@@ -3865,7 +3866,7 @@ class AnalyzersMixin:
                     # Rekonstruiere die zweiphasige Struktur aus dem flachen InstantDB-Format
                     safety = {
                         "safety_status": entry.get("safety_status", "error"),
-                        "safe_window": entry.get("safe_window", "keins"),
+                        "safe_window": normalize_window(entry.get("safe_window")),
                         "no_go_reasons": entry.get("no_go_reasons", []),
                         "caution_notes": entry.get("caution_notes", []),
                         "primary_no_go": entry.get("primary_no_go"),

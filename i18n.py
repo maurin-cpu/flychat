@@ -157,6 +157,7 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # ======================= regionen.html =======================
     # (Chat-Sidebar + Locked-Karte teilen sich die Keys mit index.html)
+    "regionen.title": {"de": "Wingcast - Regionen", "en": "Wingcast - Regions"},
     "region.overlay_aria": {"de": "Region-Analyse", "en": "Region analysis"},
     "region.share_aria": {"de": "Region teilen", "en": "Share region"},
     "region.no_analyses": {"de": "Keine Region-Analysen vorhanden", "en": "No region analyses available"},

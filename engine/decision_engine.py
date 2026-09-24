@@ -128,7 +128,7 @@ def apply_foehn_decision(result: dict, decision: FoehnDecision) -> Optional[str]
     if decision.forces_status == "not_safe":
         if result.get("safety_status") != "not_safe":
             result["safety_status"] = "not_safe"
-            result["safe_window"] = "keins"
+            result["safe_window"] = i18n.t("analysis.window_none")
         if not result.get("primary_no_go"):
             result["primary_no_go"] = decision.primary_no_go
         if decision.no_go_reason:
@@ -162,7 +162,7 @@ def decide_wind_ok_zero(result: dict, gust_info: dict, label: str) -> Optional[s
 
     logger.info(f"Decision WindOk0 fuer {label}: 0 WIND-OK Stunden → not_safe")
     result["safety_status"] = "not_safe"
-    result["safe_window"] = "keins"
+    result["safe_window"] = i18n.t("analysis.window_none")
     nogo = result.get("no_go_reasons", []) or []
     if not any("Windrichtung" in (r or "") for r in nogo):
         nogo.append("Keine Stunde mit korrekter Windrichtung")
@@ -204,7 +204,7 @@ def decide_aloft_not_safe(result: dict, gust_info: dict, label: str) -> Optional
         f"(Schwelle {nogo_thresh}h, Trend={pattern_str}) → not_safe"
     )
     result["safety_status"] = "not_safe"
-    result["safe_window"] = "keins"
+    result["safe_window"] = i18n.t("analysis.window_none")
     if not result.get("primary_no_go"):
         result["primary_no_go"] = "ALOFT_DANGER"
     nogo = result.get("no_go_reasons", []) or []
@@ -494,7 +494,7 @@ def decide_wind_strong_majority(result: dict, label: str) -> Optional[str]:
         f"0 WIND-CALM, {moderate} WIND-MODERATE → not_safe"
     )
     result["safety_status"] = "not_safe"
-    result["safe_window"] = "keins"
+    result["safe_window"] = i18n.t("analysis.window_none")
     nogo = result.get("no_go_reasons", []) or []
     if not any(any(kw in (r or "").lower() for kw in ["starker wind", "wind-strong", "zu stark"]) for r in nogo):
         nogo.append(

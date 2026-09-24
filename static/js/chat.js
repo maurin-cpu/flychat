@@ -672,7 +672,10 @@
                     : (d.safety_status === 'not_safe' ? '\u2014 (keine Fliegbarkeit)' : '?');
                 var safeLabel = safetyLabels[d.safety_status] || d.safety_status || 'unbekannt';
                 var line = '- **' + name + '**: Sicherheit **' + safeLabel + '**, Fliegbarkeit **' + flyLabel + '**';
-                if (d.best_window && d.best_window !== 'keins') {
+                // "kein Fenster" kommt sprachabhaengig ('keins' DE / 'none' EN,
+                // engine/_common.py normalize_window) — beide unterdruecken.
+                var bw = (d.best_window || '').trim().toLowerCase();
+                if (d.best_window && bw !== 'keins' && bw !== 'none') {
                     line += ' (' + d.best_window + ')';
                 }
                 if (d.recommendation) {

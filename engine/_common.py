@@ -942,6 +942,32 @@ def _derive_primary_labels(result: dict) -> None:
 
 
 # ============================================================================
+# FLUGFENSTER
+# ============================================================================
+# "kein Fenster" kam bisher in vier Schreibweisen vor: "keins" (DE-Prompt +
+# hartcodierte Defaults), "none" (EN-Prompt), "" und "-". Im EN-Modus stand
+# dadurch das deutsche "keins" als Chip in der UI (briefing.js:1356).
+# Der i18n-Key existiert seit dem i18n-Umbau; analyzers.py:255 nutzte ihn schon.
+# Ausgeblendet wird NICHT: "kein Fenster" ist eine Aussage und muss sichtbar
+# bleiben, sonst liest sich die Karte wie fehlende Daten.
+_WINDOW_NONE_RAW = ("keins", "kein", "none", "-", "?", "n/a", "")
+
+
+def normalize_window(raw) -> str:
+    """Vereinheitlicht ein Flugfenster auf den uebersetzten "kein Fenster"-Text.
+
+    Ein echtes Fenster ("10:00-13:00") wird nur getrimmt durchgereicht.
+    """
+    import i18n
+    if raw is None:
+        return i18n.t("analysis.window_none")
+    text = str(raw).strip()
+    if text.lower() in _WINDOW_NONE_RAW:
+        return i18n.t("analysis.window_none")
+    return text
+
+
+# ============================================================================
 # COMPASS + WIND
 # ============================================================================
 COMPASS_POINTS = {
