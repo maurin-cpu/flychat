@@ -216,7 +216,11 @@ def record_click(mgr, subscriber_id: int, briefing_date: str, target: str) -> No
 
 
 def record_sent(sub: dict, briefing_date: str) -> None:
+    # Der Versand kennt nur die Versand-Spalten (list_active), nicht
+    # last_open_at & Co. Ein $set mit None wuerde in PostHog die letzte
+    # Oeffnung jeden Morgen auf null zuruecksetzen (so geschehen 23./24.09.)
+    # — deshalb nur Werte setzen, die wirklich vorliegen.
+    props = {k: v for k, v in subscriber_person_props(sub).items() if v is not None}
     posthog_capture(sub.get("email", ""), "briefing_sent",
                     {"briefing_date": briefing_date},
-                    {**subscriber_person_props(sub),
-                     "briefing_last_sent_at": _now_iso()})
+                    {**props, "briefing_last_sent_at": _now_iso()})
