@@ -827,7 +827,7 @@ class AnalyzersMixin:
                         "spot": spot_name,
                         "date": date_str,
                         "status": entry.get("status", "error"),
-                        "best_window": entry.get("best_window", "?"),
+                        "best_window": normalize_window(entry.get("best_window")),
                         "updated_at": self.analyses_loaded_at.isoformat(),
                         "rating": float(entry.get("rating", 0.0) or 0.0),
                         "is_conditional": bool(entry.get("is_conditional", False)),
@@ -932,7 +932,7 @@ class AnalyzersMixin:
                         "region_name": entry.get("region_name", rid),
                         "date": date_str,
                         "status": entry.get("status", "error"),
-                        "best_window": entry.get("best_window", "?"),
+                        "best_window": normalize_window(entry.get("best_window")),
                         "updated_at": self.region_analyses_loaded_at.isoformat(),
                         "safety_status": ss,
                         "error": safety.get("error", entry.get("error", "")),
@@ -1179,7 +1179,7 @@ class AnalyzersMixin:
                     "flight_type": fly.get("flight_type", ""),
                     "flight_duration": fly.get("flight_duration_estimate", ""),
                     "xc_potential": fly.get("xc_potential", ""),
-                    "best_window": fly.get("best_window", "") or entry.get("best_window", ""),
+                    "best_window": normalize_window(fly.get("best_window") or entry.get("best_window")),
                     "recommendation": fly.get("recommendation", ""),
                     "safety_feedback": safety.get("summary", ""),
                     # RATING_CONCEPT v1.3/v1.4 — 2-Achsen Top-Level-Felder.
@@ -1241,7 +1241,7 @@ class AnalyzersMixin:
                     "recommendation": entry.get("recommendation", "") or "",
                     # Liegen im Cache, wurden bisher nicht durchgereicht — die
                     # Briefing-Mail baut ihren Regionen-Block daraus.
-                    "best_window": entry.get("best_window", "") or "",
+                    "best_window": normalize_window(entry.get("best_window")),
                     "tags": entry.get("tags") or [],
                 })
             region_entries.sort(key=lambda e: (
@@ -3528,7 +3528,7 @@ class AnalyzersMixin:
                     "no_data": "KEINE DATEN (unvollständig)",
                 }.get(safety_status, safety_status)
 
-                safe_window = safety.get("safe_window", entry.get("best_window", "?"))
+                safe_window = normalize_window(safety.get("safe_window") or entry.get("best_window"))
                 lines.append(f"  {name}: {status_label} (Fenster: {safe_window})")
 
                 no_go = safety.get("no_go_reasons", [])
@@ -3712,7 +3712,7 @@ class AnalyzersMixin:
                     continue
                 safety = entry.get("safety", {})
                 ss = safety.get("safety_status", "error")
-                bw = entry.get("best_window", "?")
+                bw = normalize_window(entry.get("best_window"))
                 if ss == "no_data":
                     no_data.append(name)
                     continue
@@ -3748,7 +3748,7 @@ class AnalyzersMixin:
                 rname = rentry.get("region_name") or region_name_by_id.get(rid, rid)
                 rrating = rentry.get("experience_rating")
                 rss = rsafety.get("safety_status") or "error"
-                rbw = rentry.get("best_window") or rfly.get("best_window") or "?"
+                rbw = normalize_window(rentry.get("best_window") or rfly.get("best_window"))
                 rpcr = rfly.get("peak_climb_rate") or rentry.get("peak_climb_rate")
                 rrec = (rentry.get("recommendation") or rfly.get("recommendation") or "").strip()
                 region_rows.append((rrating if isinstance(rrating, int) else 0,
@@ -3899,7 +3899,7 @@ class AnalyzersMixin:
                         "safety": safety,
                         "status": st,
                         "fly_status": fs,
-                        "best_window": entry.get("best_window", "?"),
+                        "best_window": normalize_window(entry.get("best_window")),
                         "recommendation": entry.get("recommendation", ""),
                     }
                     if fs:
