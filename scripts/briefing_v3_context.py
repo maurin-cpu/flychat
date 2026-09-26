@@ -621,7 +621,7 @@ _L3 = {
         "md_nomaj":      ", keine Mehrheit",
         "md_info":       "{what} {window} ist weitgehend einig, nur {models} sieht {more}.",
         "md_info_plain": "{what} {window} ist nur knapp einig.",
-        "md_least":      "{what} ist am wenigsten sicher, aber innerhalb einer Klasse.",
+        "md_least":      "{what} ist am wenigsten sicher ({pct} %), die Abweichungen bleiben aber lokal.",
         "md_more":       "mehr", "md_less": "weniger",
         "md_aw_morning":   "am Vormittag sind sie einig",
         "md_aw_midday":    "über Mittag sind sie einig",
@@ -1044,7 +1044,7 @@ _L3 = {
         "md_nomaj":      ", no majority",
         "md_info":       "{what} {window} is largely agreed, only {models} sees {more}.",
         "md_info_plain": "{what} {window} is only just agreed.",
-        "md_least":      "{what} is the least certain, but within one class.",
+        "md_least":      "{what} is the least certain ({pct} %), but the deviations stay local.",
         "md_more":       "more", "md_less": "less",
         "md_aw_morning":   "in the morning they agree",
         "md_aw_midday":    "around midday they agree",
@@ -2529,7 +2529,8 @@ def _modelle_block(wetterlage: dict, date: str) -> dict:
             sentences.append(_lbl("md_info_plain").format(
                 what=big(_lbl("md_var_" + weakest)), window=_lbl("md_win_" + c["window"])))
     elif weakest:
-        sentences.append(_lbl("md_least").format(what=big(_lbl("md_var_" + weakest))))
+        sentences.append(_lbl("md_least").format(what=big(_lbl("md_var_" + weakest)),
+                                                 pct=cons[weakest]["pct"]))
     head = _lbl("md_head_0") if not warn else (
         _lbl("md_head_1") if len(warn) == 1 else _lbl("md_head_n").format(n=len(warn)))
     verdict = "uncertain" if warn else ("partial" if info_ else "agree")

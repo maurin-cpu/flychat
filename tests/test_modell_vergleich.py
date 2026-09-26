@@ -188,6 +188,17 @@ class TestSatz(unittest.TestCase):
         b = self._block([{"zone": "wallis", "region": "a", "hourly": h}])
         self.assertIn("am Nachmittag sind sie einig", b["fazit"])
 
+    def test_blauer_satz_nennt_den_gemessenen_wert(self):
+        """Ohne oranges Thema steht der Prozentwert im Satz — "innerhalb einer
+        Klasse" waere eine Behauptung, die die Messung nicht deckt (info heisst
+        nur: die Minderheit der Regionen weicht ab, dort aber um >=2 Klassen)."""
+        h = _hourly(_icon(gust=20))
+        h["wind_gusts_10m_meteoswiss_icon_ch1"] = [70 if hh < 10 else 20 for hh in range(24)]
+        b = self._block([{"zone": "wallis", "region": "a", "hourly": h}])
+        self.assertIn("Böen ist am wenigsten sicher (67 %)", b["fazit"])
+        self.assertIn("bleiben aber lokal", b["fazit"])
+        self.assertNotIn("innerhalb einer Klasse", b["fazit"])
+
     def test_ein_fenster_von_drei_bleibt_blau(self):
         """Nur das Vormittagsfenster uneinig: 67 % Konsens -> Halbsatz, keine
         Modell-Zeile (ein Fenster von drei ist kein offener Punkt)."""
