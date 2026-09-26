@@ -50,8 +50,10 @@ WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr
 {% endif %}{{ v3_chain.sonne.fazit }}
 {% endif %}{% if v3_chain.modelle and v3_chain.modelle.fazit %}
 8 {{ v3_labels.step_modelle }}{% if v3_chain.modelle.status_label %} [{{ v3_chain.modelle.status_label }}]{% endif %}
-{{ v3_chain.modelle.fazit }}
-{% endif %}
+{% if v3_chain.modelle.facts %}{% for f in v3_chain.modelle.facts %}{{ f.k }} {{ f.v }}{% if not loop.last %} · {% endif %}{% endfor %}
+{% endif %}{{ v3_chain.modelle.fazit }}
+{% for l in v3_chain.modelle.lines %}- {{ l.text }}
+{% endfor %}{% endif %}
 {{ v3_labels.warnings_ch }}
 {% for w in v3_warnings.entries -%}
 ! {{ w.label }} ({{ w.sev_label }}): {% if w.ki_text %}{{ w.ki_text }} {% endif %}{{ w.code_text }}

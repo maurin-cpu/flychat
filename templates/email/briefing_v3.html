@@ -18,8 +18,11 @@
   <span style="display:inline-block;padding:3px 9px;border-radius:100px;font:600 11px/1.2 {{ MONO }};letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;color:{{ C[status ~ '_fg'] }};background-color:{{ C[status ~ '_bg'] }};">&#9679;&nbsp;{{ label }}</span>
   {%- endif -%}
 {%- endmacro -%}
-{%- macro fact(k, v, hot=False) -%}
-  <span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;border-radius:8px;background-color:{{ C.surface2 }};border:1px solid {{ '#fca5a5' if hot else C.border }};font:500 13px/1.3 {{ MONO }};color:{{ C.danger if hot else C.ink }};">{% if k %}<span style="color:{{ C.muted }};font-size:11px;letter-spacing:.04em;text-transform:uppercase;">{{ k }}</span>&nbsp;{% endif %}{{ v }}</span>
+{%- macro fact(k, v, hot=False, level='') -%}
+  {%- set bg = {'ok': C.ok_bg, 'info': C.info_bg, 'warn': C.warn_bg}.get(level, C.surface2) -%}
+  {%- set fg = {'ok': C.ok_fg, 'info': C.info_fg, 'warn': C.warn_fg}.get(level, C.danger if hot else C.ink) -%}
+  {%- set bd = {'ok': '#86efac', 'info': '#7dd3fc', 'warn': '#fdba74'}.get(level, '#fca5a5' if hot else C.border) -%}
+  <span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;border-radius:8px;background-color:{{ bg }};border:1px solid {{ bd }};font:500 13px/1.3 {{ MONO }};color:{{ fg }};">{% if k %}<span style="{% if level %}color:{{ fg }};opacity:.75;{% else %}color:{{ C.muted }};{% endif %}font-size:11px;letter-spacing:.04em;text-transform:uppercase;">{{ k }}</span>&nbsp;{% endif %}{{ v }}</span>
 {%- endmacro -%}
 {%- macro verdict(text, sep='. ') -%}
   {%- set t = text.split(sep, 1) -%}
@@ -199,8 +202,9 @@
   {% if v3_chain.modelle and v3_chain.modelle.fazit %}
   {{ step(8, v3_labels.step_modelle, v3_chain.modelle.status, v3_chain.modelle.status_label) }}
   <tr><td style="padding:0 18px 14px 56px;">
-    {% if v3_chain.modelle.facts %}<div>{% for f in v3_chain.modelle.facts %}{{ fact(f.k, f.v, hot=(f.v == '✗')) }}{% endfor %}</div>{% endif %}
-    {{ verdict(v3_chain.modelle.fazit, ', ') }}
+    {% if v3_chain.modelle.facts %}<div>{% for f in v3_chain.modelle.facts %}{{ fact(f.k, f.v, level=f.level) }}{% endfor %}</div>{% endif %}
+    {{ verdict(v3_chain.modelle.fazit) }}
+    {% for l in v3_chain.modelle.lines %}<p style="margin:6px 0 0;font:14px/1.5 {{ SANS }};color:{{ C.text2 }};"><b style="color:{{ C.ink }};font-weight:600;">{{ l.what }}</b> &middot; {{ l.groups }}</p>{% endfor %}
   </td></tr>
   {% endif %}
 

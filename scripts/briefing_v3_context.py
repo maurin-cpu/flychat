@@ -608,36 +608,53 @@ _L3 = {
         "st_stab_thunder": "Gewitter", "st_stab_labile": "teils labil", "st_stab_stable": "stabil",
         "st_th_good": "gutes Steigen", "st_th_mod": "mässiges Steigen", "st_th_weak": "schwaches Steigen",
         "st_sun_match": "wie erwartet", "st_sun_partial": "teils anders", "st_sun_contra": "anders als erwartet",
-        "st_md_agree": "Modelle einig", "st_md_partial": "ein offener Punkt", "st_md_uncertain": "Modelle uneinig",
+        "st_md_agree": "Modelle einig", "st_md_partial": "meist einig", "st_md_uncertain": "Modelle uneinig",
         "fx_dwd": "DWD", "fx_signature": "Signatur", "fx_sig_yes": "ja", "fx_sig_no": "keine",
         "fx_dp": "ΔP Alpen", "fx_gust": "Böe", "fx_t850": "T850", "fx_thunder_none": "keine Gewitter",
         "fx_ground": "am Boden ≈", "fx_peak": "Spitze",
-        "md_agree":      "Fazit: Die Modelle sind sich bei Niederschlag, Wind, Windrichtung und Bewölkung einig — in allen Tagesfenstern.",
-        "md_partial":    "Fazit: Bei {agree} sind sich die Modelle einig, {q}",
-        "md_uncertain":  "Fazit: Die Modelle widersprechen sich — {q}",
-        "md_q":          "{what} {zone} {window} nicht ({regs}): {groups}.",
-        "md_q_join":     " ",
-        "md_regs":       "{k} von {n} Regionen",
-        "md_grp":        "{models} {verb} {label}",
-        "md_verb_one":   "sieht", "md_verb_many": "sehen",
+        "md_head_0":     "Fazit: Gute Übereinstimmung der Modelle.",
+        "md_head_1":     "Fazit: Ein offener Punkt.",
+        "md_head_n":     "Fazit: {n} offene Punkte.",
+        "md_warn":       "{what}: {zones} {window} sehen die Modelle {spread}{nomaj}; {agreewin}.",
+        "md_warn_allday": "{what}: {zones} sehen die Modelle den ganzen Tag {spread}{nomaj}.",
+        "md_spread":     "alles von {lo} bis {hi}",
+        "md_nomaj":      ", keine Mehrheit",
+        "md_info":       "{what} {window} ist weitgehend einig, nur {models} sieht {more}.",
+        "md_info_plain": "{what} {window} ist nur knapp einig.",
+        "md_least":      "{what} ist am wenigsten sicher, aber innerhalb einer Klasse.",
+        "md_more":       "mehr", "md_less": "weniger",
+        "md_aw_morning":   "am Vormittag sind sie einig",
+        "md_aw_midday":    "über Mittag sind sie einig",
+        "md_aw_afternoon": "am Nachmittag sind sie einig",
+        "md_aw_from_midday":  "ab Mittag sind sie einig",
+        "md_aw_until_midday": "bis Mittag sind sie einig",
+        "md_aw_split":     "am Vormittag und am Nachmittag sind sie einig",
+        "md_aw_none":      "uneinig über den ganzen Tag",
+        "md_grp":        "{label}: {models}",
+        "md_line":       "{what} · {groups}",
         "md_win_morning": "am Vormittag", "md_win_midday": "über Mittag", "md_win_afternoon": "am Nachmittag",
         "md_var_rain": "Niederschlag", "md_var_dir": "Windrichtung", "md_var_speed": "Wind",
         "md_var_gust": "Böen", "md_var_cloud": "Bewölkung", "md_var_cloud_low": "tiefe Wolken",
-        "md_what_rain": "beim Niederschlag", "md_what_dir": "bei der Windrichtung", "md_what_speed": "beim Wind",
-        "md_what_gust": "bei den Böen", "md_what_cloud": "bei der Bewölkung", "md_what_cloud_low": "bei den tiefen Wolken",
         "md_lab_rain_0": "trocken", "md_lab_rain_1": "Niederschlag",
-        "md_lab_gust_0": "ruhig (unter 15 km/h)", "md_lab_gust_1": "fliegbar (15–25 km/h)",
-        "md_lab_gust_2": "stark (25–40 km/h)", "md_lab_gust_3": "verblasen (40–60 km/h)",
-        "md_lab_gust_4": "Sturm (60–80 km/h)", "md_lab_gust_5": "schweren Sturm (über 80 km/h)",
-        "md_lab_speed_0": "Flaute (unter 10 km/h)", "md_lab_speed_1": "schwachen Wind (10–20 km/h)",
-        "md_lab_speed_2": "mässigen Wind (20–30 km/h)", "md_lab_speed_3": "frischen Wind (30–45 km/h)",
-        "md_lab_speed_4": "starken Wind (45–60 km/h)", "md_lab_speed_5": "Sturm (60–80 km/h)",
-        "md_lab_speed_6": "Orkan (über 80 km/h)",
-        "md_lab_cloud_0": "wenig Wolken (0–20 %)", "md_lab_cloud_1": "aufgelockert (20–40 %)",
-        "md_lab_cloud_2": "halb bedeckt (40–60 %)", "md_lab_cloud_3": "stark bewölkt (60–80 %)",
-        "md_lab_cloud_4": "bedeckt (80–100 %)",
-        "md_lab_dir_0": "Nord", "md_lab_dir_1": "Nordost", "md_lab_dir_2": "Ost", "md_lab_dir_3": "Südost",
-        "md_lab_dir_4": "Süd", "md_lab_dir_5": "Südwest", "md_lab_dir_6": "West", "md_lab_dir_7": "Nordwest",
+        "md_lab_gust_0": "unter 15 km/h", "md_lab_gust_1": "15–25 km/h", "md_lab_gust_2": "25–40 km/h",
+        "md_lab_gust_3": "40–60 km/h", "md_lab_gust_4": "60–80 km/h", "md_lab_gust_5": "über 80 km/h",
+        "md_lab_speed_0": "unter 10 km/h", "md_lab_speed_1": "10–20 km/h", "md_lab_speed_2": "20–30 km/h",
+        "md_lab_speed_3": "30–45 km/h", "md_lab_speed_4": "45–60 km/h", "md_lab_speed_5": "60–80 km/h",
+        "md_lab_speed_6": "über 80 km/h",
+        "md_lab_cloud_0": "0–20 %", "md_lab_cloud_1": "20–40 %", "md_lab_cloud_2": "40–60 %",
+        "md_lab_cloud_3": "60–80 %", "md_lab_cloud_4": "80–100 %",
+        "md_lab_dir_0": "N", "md_lab_dir_1": "NO", "md_lab_dir_2": "O", "md_lab_dir_3": "SO",
+        "md_lab_dir_4": "S", "md_lab_dir_5": "SW", "md_lab_dir_6": "W", "md_lab_dir_7": "NW",
+        "md_word_rain_0": "trocken", "md_word_rain_1": "Niederschlag",
+        "md_word_gust_0": "ruhig", "md_word_gust_1": "fliegbar", "md_word_gust_2": "stark",
+        "md_word_gust_3": "verblasen", "md_word_gust_4": "Sturm", "md_word_gust_5": "schwerer Sturm",
+        "md_word_speed_0": "Flaute", "md_word_speed_1": "schwachem Wind", "md_word_speed_2": "mässigem Wind",
+        "md_word_speed_3": "frischem Wind", "md_word_speed_4": "starkem Wind", "md_word_speed_5": "Sturm",
+        "md_word_speed_6": "Orkan",
+        "md_word_cloud_0": "wolkenlos", "md_word_cloud_1": "aufgelockert", "md_word_cloud_2": "halb bedeckt",
+        "md_word_cloud_3": "stark bewölkt", "md_word_cloud_4": "bedeckt",
+        "md_word_dir_0": "Nord", "md_word_dir_1": "Nordost", "md_word_dir_2": "Ost", "md_word_dir_3": "Südost",
+        "md_word_dir_4": "Süd", "md_word_dir_5": "Südwest", "md_word_dir_6": "West", "md_word_dir_7": "Nordwest",
         "su_exp_high":  "{Press} lässt viel Sonne erwarten",
         "su_exp_low":   "{Press} lässt viel Bewölkung erwarten",
         "su_exp_flat":  "Die Übergangslage lässt wechselnde Bewölkung erwarten",
@@ -1014,36 +1031,53 @@ _L3 = {
         "st_stab_thunder": "thunderstorms", "st_stab_labile": "partly unstable", "st_stab_stable": "stable",
         "st_th_good": "good climbs", "st_th_mod": "moderate climbs", "st_th_weak": "weak climbs",
         "st_sun_match": "as expected", "st_sun_partial": "partly different", "st_sun_contra": "different than expected",
-        "st_md_agree": "models agree", "st_md_partial": "one open point", "st_md_uncertain": "models disagree",
+        "st_md_agree": "models agree", "st_md_partial": "mostly agree", "st_md_uncertain": "models disagree",
         "fx_dwd": "DWD", "fx_signature": "signature", "fx_sig_yes": "yes", "fx_sig_no": "none",
         "fx_dp": "ΔP Alps", "fx_gust": "gust", "fx_t850": "T850", "fx_thunder_none": "no thunderstorms",
         "fx_ground": "ground ≈", "fx_peak": "peak",
-        "md_agree":      "Verdict: The models agree on precipitation, wind, wind direction and cloud — in every part of the day.",
-        "md_partial":    "Verdict: The models agree on {agree}, but not on {q}",
-        "md_uncertain":  "Verdict: The models contradict each other — on {q}",
-        "md_q":          "{what} {zone} {window} ({regs}): {groups}.",
-        "md_q_join":     " Also on ",
-        "md_regs":       "{k} of {n} regions",
-        "md_grp":        "{models} {verb} {label}",
-        "md_verb_one":   "sees", "md_verb_many": "see",
+        "md_head_0":     "Verdict: Good agreement between the models.",
+        "md_head_1":     "Verdict: One open point.",
+        "md_head_n":     "Verdict: {n} open points.",
+        "md_warn":       "{what}: {zones} {window} the models see {spread}{nomaj}; {agreewin}.",
+        "md_warn_allday": "{what}: {zones} the models see {spread} all day{nomaj}.",
+        "md_spread":     "anything from {lo} to {hi}",
+        "md_nomaj":      ", no majority",
+        "md_info":       "{what} {window} is largely agreed, only {models} sees {more}.",
+        "md_info_plain": "{what} {window} is only just agreed.",
+        "md_least":      "{what} is the least certain, but within one class.",
+        "md_more":       "more", "md_less": "less",
+        "md_aw_morning":   "in the morning they agree",
+        "md_aw_midday":    "around midday they agree",
+        "md_aw_afternoon": "in the afternoon they agree",
+        "md_aw_from_midday":  "from midday on they agree",
+        "md_aw_until_midday": "until midday they agree",
+        "md_aw_split":     "in the morning and in the afternoon they agree",
+        "md_aw_none":      "they disagree all day",
+        "md_grp":        "{label}: {models}",
+        "md_line":       "{what} · {groups}",
         "md_win_morning": "in the morning", "md_win_midday": "around midday", "md_win_afternoon": "in the afternoon",
         "md_var_rain": "precipitation", "md_var_dir": "wind direction", "md_var_speed": "wind",
         "md_var_gust": "gusts", "md_var_cloud": "cloud", "md_var_cloud_low": "low cloud",
-        "md_what_rain": "precipitation", "md_what_dir": "wind direction", "md_what_speed": "wind",
-        "md_what_gust": "gusts", "md_what_cloud": "cloud", "md_what_cloud_low": "low cloud",
         "md_lab_rain_0": "dry", "md_lab_rain_1": "precipitation",
-        "md_lab_gust_0": "calm (under 15 km/h)", "md_lab_gust_1": "flyable (15–25 km/h)",
-        "md_lab_gust_2": "strong (25–40 km/h)", "md_lab_gust_3": "blown out (40–60 km/h)",
-        "md_lab_gust_4": "storm (60–80 km/h)", "md_lab_gust_5": "severe storm (over 80 km/h)",
-        "md_lab_speed_0": "calm (under 10 km/h)", "md_lab_speed_1": "light wind (10–20 km/h)",
-        "md_lab_speed_2": "moderate wind (20–30 km/h)", "md_lab_speed_3": "fresh wind (30–45 km/h)",
-        "md_lab_speed_4": "strong wind (45–60 km/h)", "md_lab_speed_5": "storm (60–80 km/h)",
-        "md_lab_speed_6": "hurricane force (over 80 km/h)",
-        "md_lab_cloud_0": "little cloud (0–20 %)", "md_lab_cloud_1": "broken cloud (20–40 %)",
-        "md_lab_cloud_2": "half overcast (40–60 %)", "md_lab_cloud_3": "mostly cloudy (60–80 %)",
-        "md_lab_cloud_4": "overcast (80–100 %)",
-        "md_lab_dir_0": "north", "md_lab_dir_1": "north-east", "md_lab_dir_2": "east", "md_lab_dir_3": "south-east",
-        "md_lab_dir_4": "south", "md_lab_dir_5": "south-west", "md_lab_dir_6": "west", "md_lab_dir_7": "north-west",
+        "md_lab_gust_0": "under 15 km/h", "md_lab_gust_1": "15–25 km/h", "md_lab_gust_2": "25–40 km/h",
+        "md_lab_gust_3": "40–60 km/h", "md_lab_gust_4": "60–80 km/h", "md_lab_gust_5": "over 80 km/h",
+        "md_lab_speed_0": "under 10 km/h", "md_lab_speed_1": "10–20 km/h", "md_lab_speed_2": "20–30 km/h",
+        "md_lab_speed_3": "30–45 km/h", "md_lab_speed_4": "45–60 km/h", "md_lab_speed_5": "60–80 km/h",
+        "md_lab_speed_6": "over 80 km/h",
+        "md_lab_cloud_0": "0–20 %", "md_lab_cloud_1": "20–40 %", "md_lab_cloud_2": "40–60 %",
+        "md_lab_cloud_3": "60–80 %", "md_lab_cloud_4": "80–100 %",
+        "md_lab_dir_0": "N", "md_lab_dir_1": "NE", "md_lab_dir_2": "E", "md_lab_dir_3": "SE",
+        "md_lab_dir_4": "S", "md_lab_dir_5": "SW", "md_lab_dir_6": "W", "md_lab_dir_7": "NW",
+        "md_word_rain_0": "dry", "md_word_rain_1": "precipitation",
+        "md_word_gust_0": "calm", "md_word_gust_1": "flyable", "md_word_gust_2": "strong",
+        "md_word_gust_3": "blown out", "md_word_gust_4": "storm", "md_word_gust_5": "severe storm",
+        "md_word_speed_0": "calm", "md_word_speed_1": "light wind", "md_word_speed_2": "moderate wind",
+        "md_word_speed_3": "fresh wind", "md_word_speed_4": "strong wind", "md_word_speed_5": "storm",
+        "md_word_speed_6": "hurricane force",
+        "md_word_cloud_0": "clear", "md_word_cloud_1": "broken cloud", "md_word_cloud_2": "half overcast",
+        "md_word_cloud_3": "mostly cloudy", "md_word_cloud_4": "overcast",
+        "md_word_dir_0": "north", "md_word_dir_1": "north-east", "md_word_dir_2": "east", "md_word_dir_3": "south-east",
+        "md_word_dir_4": "south", "md_word_dir_5": "south-west", "md_word_dir_6": "west", "md_word_dir_7": "north-west",
         "su_exp_high":  "{Press} suggests plenty of sunshine",
         "su_exp_low":   "{Press} suggests a lot of cloud",
         "su_exp_flat":  "The transitional situation suggests changeable cloud",
@@ -2355,14 +2389,72 @@ def _thermik_fazit(wetterlage: dict, date: str) -> str:
 MD_PARAMS = ("rain", "dir", "speed", "gust", "cloud", "cloud_low")   # Reihenfolge = Piloten-Relevanz
 
 
+def _mc_consensus(zones: dict, param: str) -> dict | None:
+    """Konsens einer Groesse als Prozent: Anteil der beurteilten
+    (Region, Tagesfenster)-Paare ueber alle Zonen, in denen die Region einig
+    ist. Die Bewertung selbst faellt im Engine (Region = Median ihrer
+    Referenzpunkte je Modell); hier wird nur gezaehlt. Dazu die Stelle mit dem
+    groessten Streit (Zone + Fenster), die Zonen ueber der Schwelle und die
+    Fenster, in denen keine betroffene Zone uneinig ist."""
+    total = agree = 0
+    worst = None            # (share, zone, window)
+    dis_zones, dis_wins = [], set()
+    for z, zv in zones.items():
+        pv = (zv.get("params") or {}).get(param)
+        if not pv:
+            continue
+        if pv.get("disagree"):
+            dis_zones.append(z)
+        for w, info in (pv.get("windows") or {}).items():
+            n = int(info.get("n_regions") or 0)
+            if not n:
+                continue
+            total += n
+            agree += n - len(info.get("regions") or [])
+            if info.get("disagree"):
+                dis_wins.add(w)
+            share = float(info.get("share") or 0.0)
+            if worst is None or share > worst[0]:
+                worst = (share, z, w)
+    if not total or worst is None:
+        return None
+    pct = round(100 * agree / total)
+    level = "ok" if pct >= 90 else ("info" if pct >= 67 else "warn")
+    return {"pct": pct, "level": level, "zone": worst[1], "window": worst[2],
+            "zones": dis_zones, "agree_windows": [w for w in _MD_WINDOWS if w not in dis_wins]}
+
+
+_MD_WINDOWS = ("morning", "midday", "afternoon")   # Reihenfolge des Tages
+
+
+def _md_agree_window_key(agree_wins: list) -> str:
+    """Welche Tagesfenster sind einig? Als Satzteil, nicht als Liste."""
+    got = [w for w in _MD_WINDOWS if w in set(agree_wins)]
+    if not got:
+        return "none"
+    if got == ["midday", "afternoon"]:
+        return "from_midday"
+    if got == ["morning", "midday"]:
+        return "until_midday"
+    if got == ["morning", "afternoon"]:
+        return "split"
+    if len(got) == 1:
+        return got[0]
+    return "none"
+
+
 def _modelle_block(wetterlage: dict, date: str) -> dict:
     """Block 8: sind sich die Modelle einig? Datenformat v2
-    (engine.synoptic_context.modell_vergleich_aus_punkten): je Zone, Groesse
-    und Tagesfenster der Anteil uneiniger Referenzpunkte. Fazit zuerst; je
-    uneiniger Groesse EIN Satz fuer die Zone und das Fenster mit dem
-    hoechsten Anteil — wie viele Regionen betroffen sind, und welche Modelle
-    welche Klasse sehen (dieselben Klassen, in denen gemessen wird: ein
-    Streit ist damit immer als zwei Gruppen erzaehlbar)."""
+    (engine.synoptic_context.modell_vergleich_aus_punkten).
+
+    Drei Ebenen, alle kurz (26.09.2026 umgebaut; der Fliesstext mit drei
+    Saetzen zu je fuenf Modellgruppen war unlesbar, und ✓/✗ war zu binaer):
+    **Konsens in Prozent** je Groesse fuer die Pillen, **Fazit** nur ueber die
+    nicht-gruenen Groessen (orange: ganzer Satz mit Zonen, Tagesfenster,
+    Spanne und der Angabe, wann die Modelle wieder einig sind; blau: ein
+    Halbsatz; gruen: nichts), und **eine Modell-Zeile je oranger Groesse**.
+    Ort sind immer die Zonen, nie einzelne Regionen — die Regionsebene ist
+    die Messebene, nicht die Erzaehlebene."""
     wl = wetterlage or {}
     mv = wl.get("modell_vergleich") or {}
     if mv.get("version") != 2:
@@ -2372,58 +2464,81 @@ def _modelle_block(wetterlage: dict, date: str) -> dict:
     if not zones:
         return {}
     names = mv.get("models") or {}
-    lang = _lang()
-    joiner = " und " if lang == "de" else " and "
+    joiner = " und " if _lang() == "de" else " and "
 
-    def zone_in(z):
-        if lang == "de":
-            prep = "am " if z == "alpennordhang" else ("im " if _ZONE_ARTICLE_DAT["de"].get(z) else "in ")
-            return prep + _zone_name(z)
-        return "in " + _ZONE_ARTICLE_DAT["en"].get(z, "") + _zone_name(z)
+    def big(t):
+        return t[:1].upper() + t[1:] if t else t
 
-    def _list(items):
-        """'A, B und C' statt 'A und B und C'."""
-        if len(items) <= 1:
-            return "".join(items)
-        return ", ".join(items[:-1]) + joiner + items[-1]
+    def short(m):
+        return names.get(m, m).replace("ICON-", "")
 
-    def question(param, z, win):
+    def groups_of(param, z, win):
         info = zones[z]["params"][param]["windows"][win]
-        kind = "cloud" if param == "cloud_low" else param
-        groups: dict[int, list[str]] = {}
+        out: dict[int, list[str]] = {}
         for m, mv_ in (info.get("models") or {}).items():
-            groups.setdefault(int(mv_["cls"]), []).append(names.get(m, m))
-        parts = []
-        for cls in sorted(groups, key=lambda c: (-len(groups[c]), c)):
-            ms = groups[cls]
-            parts.append(_lbl("md_grp").format(models=_list(ms),
-                                               verb=_lbl("md_verb_many" if len(ms) > 1 else "md_verb_one"),
-                                               label=_lbl(f"md_lab_{kind}_{cls}")))
-        regs = _lbl("md_regs").format(k=len(info.get("regions") or []), n=info.get("n_regions") or 0)
-        return _lbl("md_q").format(what=_lbl("md_what_" + param), zone=zone_in(z),
-                                   window=_lbl("md_win_" + win), regs=regs, groups=", ".join(parts))
+            out.setdefault(int(mv_["cls"]), []).append(short(m))
+        return out
 
-    questions = []
-    for param in MD_PARAMS:
-        cands = [(v["params"][param]["share"], z) for z, v in zones.items()
-                 if v["params"].get(param, {}).get("disagree")]
-        if not cands:
-            continue
-        share, z = max(cands)
-        questions.append((param, question(param, z, zones[z]["params"][param]["worst_window"])))
+    def models_line(param, groups):
+        kind = "cloud" if param == "cloud_low" else param
+        return " · ".join(_lbl("md_grp").format(label=_lbl(f"md_lab_{kind}_{c}"),
+                                               models=", ".join(groups[c]))
+                          for c in sorted(groups))
 
-    open_kinds = {k for k, _ in questions}
-    agree = [_lbl("md_var_" + k) for k in MD_PARAMS if k not in open_kinds]
-    if not questions:
-        text, verdict = _lbl("md_agree"), "agree"
-    elif len(questions) == 1:
-        text, verdict = _lbl("md_partial").format(agree=_list(agree), q=questions[0][1]), "partial"
-    else:
-        text = _lbl("md_uncertain").format(q=_lbl("md_q_join").join(qq[1] for qq in questions))
-        verdict = "uncertain"
-    return {"fazit": text, "num": {}, "verdict": verdict,
-            "agree": [k for k in MD_PARAMS if k not in open_kinds],
-            "open": [k for k, _ in questions]}
+    cons = {p: _mc_consensus(zones, p) for p in MD_PARAMS}
+    cons = {p: c for p, c in cons.items() if c}
+    if not cons:
+        return {}
+    warn = [p for p in MD_PARAMS if cons.get(p, {}).get("level") == "warn"]
+    info_ = [p for p in MD_PARAMS if cons.get(p, {}).get("level") == "info"]
+
+    sentences, lines = [], []
+    for param in warn:
+        c = cons[param]
+        kind = "cloud" if param == "cloud_low" else param
+        groups = groups_of(param, c["zone"], c["window"])
+        lo, hi = min(groups), max(groups)
+        spread = _lbl("md_spread").format(lo=_lbl(f"md_word_{kind}_{lo}"),
+                                          hi=_lbl(f"md_word_{kind}_{hi}"))
+        nomaj = "" if any(len(v) >= 3 for v in groups.values()) else _lbl("md_nomaj")
+        # Kein einiges Fenster: dann kein Fenster nennen — "am Vormittag" und
+        # "den ganzen Tag uneinig" im selben Satz widersprechen sich.
+        awin = _md_agree_window_key(c["agree_windows"])
+        sentences.append(_lbl("md_warn_allday" if awin == "none" else "md_warn").format(
+            what=big(_lbl("md_var_" + param)),
+            zones=_zones_text(c["zones"] or [c["zone"]], where=True),
+            window=_lbl("md_win_" + c["window"]), spread=spread, nomaj=nomaj,
+            agreewin=_lbl("md_aw_" + awin)))
+        what, grp = big(_lbl("md_var_" + param)), models_line(param, groups)
+        lines.append({"what": what, "groups": grp,
+                      "text": _lbl("md_line").format(what=what, groups=grp)})
+    # Blau: ein Halbsatz, und nur fuer die unsicherste — sonst waechst das
+    # Fazit wieder zu, wogegen der Umbau gemacht wurde.
+    weakest = min(info_, key=lambda p: cons[p]["pct"]) if info_ else None
+    if weakest and warn:
+        c = cons[weakest]
+        groups = groups_of(weakest, c["zone"], c["window"])
+        odd = [cl for cl, ms in groups.items() if len(ms) == 1]
+        rest = [cl for cl, ms in groups.items() if len(ms) > 1]
+        if len(odd) == 1 and rest and weakest != "dir":
+            sentences.append(_lbl("md_info").format(
+                what=big(_lbl("md_var_" + weakest)), window=_lbl("md_win_" + c["window"]),
+                models=", ".join(groups[odd[0]]),
+                more=_lbl("md_more" if odd[0] > max(rest) else "md_less")))
+        else:
+            sentences.append(_lbl("md_info_plain").format(
+                what=big(_lbl("md_var_" + weakest)), window=_lbl("md_win_" + c["window"])))
+    elif weakest:
+        sentences.append(_lbl("md_least").format(what=big(_lbl("md_var_" + weakest))))
+    head = _lbl("md_head_0") if not warn else (
+        _lbl("md_head_1") if len(warn) == 1 else _lbl("md_head_n").format(n=len(warn)))
+    verdict = "uncertain" if warn else ("partial" if info_ else "agree")
+    return {"fazit": " ".join([head] + sentences), "lines": lines, "num": {},
+            "verdict": verdict,
+            "consensus": [{"k": _lbl("md_var_" + p), "v": f"{cons[p]['pct']} %",
+                           "level": cons[p]["level"]} for p in MD_PARAMS if p in cons],
+            "agree": [p for p in MD_PARAMS if p in cons and cons[p]["level"] == "ok"],
+            "open": warn}
 
 
 def _sonne_fazit(wetterlage: dict, date: str) -> str:
@@ -2909,8 +3024,7 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
     if md.get("fazit"):
         v = md.get("verdict", "agree")
         st("modelle", {"agree": "ok", "partial": "info"}.get(v, "warn"), "st_md_" + v)
-        md["facts"] = [{"k": _lbl("md_var_" + k), "v": ("✓" if k in md.get("agree", []) else "✗")}
-                       for k in MD_PARAMS]
+        md["facts"] = md.get("consensus") or []
     return None
 
 

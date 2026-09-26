@@ -93,6 +93,28 @@ hat und für den Piloten der grösste Streit ist; der Abend zählt nicht.
 Ein Modell ohne Daten (ICON-D2 nach 48 h) fehlt still. Eine nicht
 bewertbare Grösse (Richtung bei Flaute) gilt als einig.
 
+**Darstellung** (umgebaut 26.09.2026 — der Fliesstext mit einem Satz je
+uneiniger Grösse und allen fünf Modellnamen war unlesbar, und ✓/✗ je Grösse
+war zu binär, weil die Drittel-Schwelle die Bewölkung fast täglich auf ✗
+setzte): drei Ebenen.
+
+1. **Konsens in Prozent** je Grösse als Pille — Anteil der beurteilten
+   (Region, Tagesfenster)-Paare über alle Zonen, in denen die Region einig
+   ist. Stufen: grün ab 90 %, blau 67–90 %, orange darunter.
+2. **Fazit**: Kopf mit der Anzahl offener (oranger) Punkte, dann **je oranger
+   Grösse ein Satz** — Zonen (nie einzelne Regionen), Tagesfenster, die
+   Spanne der Modellklassen in Worten, und wann die Modelle wieder einig
+   sind. Ist kein Fenster einig, entfällt das Fenster und der Satz sagt „den
+   ganzen Tag". **Blau** liefert einen Halbsatz, und nur für die unsicherste
+   Grösse. **Grün wird nie erklärt.**
+3. **Eine Modell-Zeile je oranger Grösse**: welche Modelle welche Klasse
+   sehen, Klassen als Zahl (20–40 %, 25–40 km/h) bzw. Kürzel (SW), Modelle
+   kurz (CH1, CH2, D2, EU, GFS).
+
+Das „weshalb" einer Abweichung steht bewusst nicht hier — das kann nur der
+KI-Wetterlagetext liefern, und der bekommt den Modellvergleich noch nicht
+als Eingabe.
+
 Code: `engine/synoptic_context.py` (`MODEL_COMPARE_*`,
 `modell_vergleich_aus_punkten`), Satz in `scripts/briefing_v3_context.py`
 (`_modelle_block`), Tests `tests/test_modell_vergleich.py`. Kosten: 203

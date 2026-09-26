@@ -3,9 +3,12 @@ Briefing-Satz (scripts.briefing_v3_context._modelle_block).
 
 Regeln (docs/BRIEFING.md, Block 8): Klassenraster je Groesse, uneinig ab
 zwei Klassen Abstand, Urteil je Region und Tagesfenster, Zone uneinig ab
-einem Drittel uneiniger Regionen. Der Satz erzaehlt in denselben Klassen,
-in denen gemessen wird — ein "uneinig" mit nur einer Modell-Gruppe (Vorfall
-24.09.2026: "uneinig, aber alle sehen bedeckt") darf nicht mehr vorkommen.
+einem Drittel uneiniger Regionen. Die Darstellung (26.09.2026): Konsens in
+Prozent je Groesse, Fazit nur ueber die nicht-gruenen Groessen (orange mit
+Zonen, Fenster, Spanne und "wann wieder einig"; blau als Halbsatz), eine
+Modell-Zeile je oranger Groesse. Der Satz erzaehlt in denselben Klassen, in
+denen gemessen wird — ein "uneinig" mit nur einer Modell-Gruppe (Vorfall
+24.09.2026: "uneinig, aber alle sehen bedeckt") darf nicht vorkommen.
 """
 import unittest
 
@@ -139,37 +142,97 @@ class TestSatz(unittest.TestCase):
         mv = sc.modell_vergleich_aus_punkten(points, [DATE])
         return bc._modelle_block({"modell_vergleich": mv}, DATE)
 
-    def test_einig(self):
+    def test_einig_erklaert_nichts(self):
         b = self._block(_points("wallis", {"a": _icon()}))
         self.assertEqual(b["verdict"], "agree")
         self.assertEqual(len(b["agree"]), 6)
+        self.assertEqual(b["fazit"], "Fazit: Gute Übereinstimmung der Modelle.")
+        self.assertEqual(b["lines"], [])
+        self.assertTrue(all(f["v"] == "100 %" and f["level"] == "ok" for f in b["consensus"]))
 
-    def test_uneinig_hat_immer_zwei_gruppen_und_keine_schluessel(self):
+    def test_uneinig_nennt_zone_fenster_spanne_und_wann_einig(self):
         pm = _icon(gust=30)
         pm["icon_eu"]["gust"] = 80
         b = self._block(_points("wallis", {"a": pm}))
-        self.assertEqual(b["verdict"], "partial")
-        self.assertIn("ICON-CH1, ICON-CH2, ICON-D2 und GFS sehen stark (25–40 km/h)", b["fazit"])
-        self.assertIn("ICON-EU sieht schweren Sturm (über 80 km/h)", b["fazit"])
-        self.assertIn("1 von 1 Regionen", b["fazit"])
+        self.assertEqual(b["verdict"], "uncertain")
+        self.assertEqual(b["open"], ["gust"])
+        self.assertIn("Fazit: Ein offener Punkt.", b["fazit"])
+        self.assertIn("Böen: im Wallis", b["fazit"])
+        self.assertIn("den ganzen Tag alles von stark bis schwerer Sturm", b["fazit"])
+        self.assertNotIn("am Vormittag", b["fazit"])   # kein einiges Fenster -> kein Fenster nennen
         self.assertNotIn("md_", b["fazit"])
+        self.assertEqual(len(b["lines"]), 1)
+        self.assertEqual(b["lines"][0]["text"], "Böen · 25–40 km/h: CH1, CH2, D2, GFS · über 80 km/h: EU")
+        self.assertEqual(dict((f["k"], f["level"]) for f in b["consensus"])["Böen"], "warn")
+
+    def test_keine_mehrheit_wird_gesagt(self):
+        """Fuenf Modelle in drei Klassen, keine mit drei Stimmen."""
+        pm = _icon(gust=20)
+        pm["meteoswiss_icon_ch2"]["gust"] = 20
+        pm["icon_d2"]["gust"] = 50
+        pm["icon_eu"]["gust"] = 50
+        pm["gfs_seamless"]["gust"] = 90
+        b = self._block(_points("wallis", {"a": pm}))
+        self.assertIn("keine Mehrheit", b["fazit"])
+
+    def test_mehrheit_sagt_keine_mehrheit_nicht(self):
+        pm = _icon(gust=30)
+        pm["icon_eu"]["gust"] = 80
+        b = self._block(_points("wallis", {"a": pm}))
+        self.assertNotIn("keine Mehrheit", b["fazit"])
+
+    def test_nennt_die_einigen_fenster(self):
+        """Uneinig am Vormittag und ueber Mittag, einig am Nachmittag."""
+        h = _hourly(_icon(gust=20))
+        h["wind_gusts_10m_meteoswiss_icon_ch1"] = [70 if hh < 14 else 20 for hh in range(24)]
+        b = self._block([{"zone": "wallis", "region": "a", "hourly": h}])
+        self.assertIn("am Nachmittag sind sie einig", b["fazit"])
+
+    def test_ein_fenster_von_drei_bleibt_blau(self):
+        """Nur das Vormittagsfenster uneinig: 67 % Konsens -> Halbsatz, keine
+        Modell-Zeile (ein Fenster von drei ist kein offener Punkt)."""
+        h = _hourly(_icon(gust=20))
+        h["wind_gusts_10m_meteoswiss_icon_ch1"] = [70 if hh < 10 else 20 for hh in range(24)]
+        b = self._block([{"zone": "wallis", "region": "a", "hourly": h}])
+        self.assertEqual(b["verdict"], "partial")
+        self.assertEqual(b["lines"], [])
+        self.assertEqual(dict((f["k"], f["level"]) for f in b["consensus"])["Böen"], "info")
+
+    def test_zonen_statt_regionen(self):
+        """Ort im Satz sind die Zonen; einzelne Regionen kommen nicht vor."""
+        pm = _icon(cloud=10)
+        pm["icon_eu"]["cloud"] = 90
+        pts = _points("tessin", {"reg_a": pm, "reg_b": pm}) + _points("wallis", {"reg_c": pm})
+        b = self._block(pts)
+        self.assertIn("im Wallis und im Tessin", b["fazit"])
+        self.assertNotIn("reg_", b["fazit"])
 
     def test_englisch(self):
         pm = _icon(gust=30)
         pm["icon_eu"]["gust"] = 80
         b = self._block(_points("wallis", {"a": pm}), lang="en")
-        self.assertIn("gusts in Valais", b["fazit"])
-        self.assertIn("ICON-EU sees severe storm (over 80 km/h)", b["fazit"])
+        self.assertIn("Verdict: One open point.", b["fazit"])
+        self.assertIn("Gusts: in Valais", b["fazit"])
+        self.assertIn("anything from strong to severe storm all day", b["fazit"])
+        self.assertEqual(b["lines"][0]["text"], "Gusts · 25–40 km/h: CH1, CH2, D2, GFS · over 80 km/h: EU")
 
     def test_gruppen_aus_der_streitenden_region(self):
         """Mediane ueber einige Regionen wuerden den Streit verwischen —
-        der Satz muss trotzdem zwei Gruppen zeigen."""
+        die Modell-Zeile muss trotzdem zwei Gruppen zeigen."""
         a = _icon(cloud=10); a["icon_eu"]["cloud"] = 90
         b_ = _icon(cloud=90); b_["icon_eu"]["cloud"] = 10
         b = self._block(_points("tessin", {"a": a, "b": b_}))
-        self.assertEqual(b["verdict"], "partial")
-        self.assertIn("wenig Wolken (0–20 %)", b["fazit"])
-        self.assertIn("bedeckt (80–100 %)", b["fazit"])
+        self.assertIn("0–20 %:", b["lines"][0]["groups"])
+        self.assertIn("80–100 %:", b["lines"][0]["groups"])
+
+    def test_konsens_prozent_zaehlt_regionen_und_fenster(self):
+        """Eine von vier Regionen uneinig in allen drei Fenstern -> 75 %."""
+        streit = _icon(cloud=10); streit["icon_eu"]["cloud"] = 90
+        einig = _icon(cloud=50)
+        b = self._block(_points("alpennordhang",
+                                {"a": streit, "b": einig, "c": einig, "d": einig}))
+        pct = dict((f["k"], f["v"]) for f in b["consensus"])["Bewölkung"]
+        self.assertEqual(pct, "75 %")
 
     def test_altes_format_wird_ignoriert(self):
         self.assertEqual(bc._modelle_block({"modell_vergleich": {"per_day": []}}, DATE), {})
