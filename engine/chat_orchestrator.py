@@ -109,10 +109,14 @@ TOOLS: list = [
             "name": "find_spots_within_travel_time",
             "description": (
                 "Findet alle Fluggebiete, die der Pilot von einem Startpunkt aus innerhalb "
-                "einer maximalen Reisezeit erreichen kann. Berechnet eine Isochrone (erreichbare "
-                "Zone) per Valhalla, zeichnet sie automatisch auf der Karte ein und filtert die "
-                "Spots, die darin liegen. Liefert die Liste der erreichbaren Spots zurück, "
-                "inklusive Voranalyse-Daten (Sicherheit, Fliegbarkeit) für deine Empfehlung."
+                "einer maximalen Fahrzeit erreichen kann. Berechnet die ECHTE Fahrzeit zu "
+                "jedem Gebiet und liefert sie als `travel_minutes` mit, nach Fahrzeit "
+                "sortiert, inklusive Voranalyse-Daten (Sicherheit, Fliegbarkeit) für deine "
+                "Empfehlung. Nenne die Fahrzeit beim Spot ('Weissenstein, 28 Min.') — sie "
+                "ist die Zahl, die den Piloten interessiert. Schätze niemals selbst eine "
+                "Fahrzeit und rechne nie Luftlinien in Fahrzeiten um. Beachte ein `notes`-"
+                "Feld in der Antwort: Dort stehen Gebiete, die NICHT berechnet werden "
+                "konnten, mit dem Grund."
             ),
             "parameters": {
                 "type": "object",
@@ -631,64 +635,156 @@ class ChatOrchestratorMixin:
             mode = (args.get("mode") or "auto").lower()
             label = (args.get("label") or "").strip()
 
-            try:
-                iso = routing.isochrone(lat, lon, minutes, mode)
-            except (routing.RoutingError, ValueError) as e:
+            # ----------------------------------------------------------------
+            # Nur Fahrzeiten, keine Flaeche mehr. Warum (alles am 27.09.2026
+            # gemessen, Befund in validation/chat/BEFUNDE.md §7):
+            #
+            #   Die Flaeche (Isochrone) deckelt bei 60 Minuten — feste Hausregel
+            #   des Gratis-Dienstes. Genau daran scheiterte am 25.09. die Frage
+            #   "1h30 ab Grenchen", und die App gab die Grenze als Ausfall aus.
+            #
+            #   Die Fahrzeit kennt diese Grenze nicht (gemessen bis 241 Minuten)
+            #   und liefert dem Piloten ausserdem die Zahl, die ihn interessiert
+            #   ("Weissenstein, 30 Min.") statt eines Vielecks auf der Karte.
+            #
+            # Zeitbudget, weil das Nachfuellen einzelner Wege 0.77 s je Ziel
+            # kostet und der Dienst parallele Anfragen sperrt. Was das Budget
+            # nicht mehr schafft, wird benannt und liegt beim naechsten Mal im
+            # Speicher — vorgewaermt per scripts/prewarm_travel_times.py.
+            # ----------------------------------------------------------------
+
+            # 1 · Vorfilter per Luftlinie: Die Fahrstrecke ist immer laenger als
+            #     die Luftlinie, also kann hier kein echter Treffer verloren gehen.
+            max_km = routing.max_straight_line_km(minutes)
+            kandidaten = [
+                s for s in self.spots
+                if s.get("latitude") is not None and s.get("longitude") is not None
+                and routing.haversine_km(lat, lon, s["latitude"], s["longitude"]) <= max_km
+            ]
+            if not kandidaten:
                 return {
                     "content": {
-                        "error": (
-                            f"Routing-Service ist aktuell nicht erreichbar ({e}). "
-                            "Bitte in ein paar Minuten erneut versuchen."
-                        )
+                        "origin": {"lat": lat, "lon": lon, "label": label},
+                        "minutes": minutes, "mode": mode, "count": 0, "spots": [],
+                        "note": (
+                            f"Kein Fluggebiet liegt innerhalb von {minutes} Minuten — "
+                            f"das naechste ist weiter als {max_km:.0f} km Luftlinie weg."
+                        ),
                     },
                     "map_actions": [],
                 }
 
+            # 2 · Fahrzeiten holen (Sammelabfrage + Einzelwege im Budget).
             try:
-                matched = routing.spots_in_polygon(iso, self.spots)
-            except routing.RoutingError as e:
+                zeiten = routing.travel_times(
+                    lat, lon,
+                    [(s["latitude"], s["longitude"]) for s in kandidaten],
+                    mode,
+                    budget_seconds=config.TRAVEL_TIME_CHAT_BUDGET_S,
+                )
+            except (routing.RoutingError, ValueError) as e:
+                # Der Hinweis geht als eigenes Ereignis an den Chat, nicht nur als
+                # Anweisung an das LLM: Eine Prompt-Regel wird verletzt, sobald sie
+                # unbequem ist, und dann steht der Pilot wieder vor einer Antwort,
+                # die die Luecke verschweigt (25.09.2026, BEFUNDE.md §7).
+                logger.warning("Reichweiten-Suche ohne Ergebnis: %s", e)
                 return {
-                    "content": {"error": f"Spot-Filter fehlgeschlagen: {e}"},
-                    "map_actions": [],
+                    "content": {
+                        "error": (
+                            f"Fahrzeiten sind gerade nicht berechenbar ({e}). Sage das "
+                            "offen und nenne die Gebiete in seiner Naehe ohne Fahrzeit — "
+                            "schaetze keine und rechne keine Luftlinie um."
+                        )
+                    },
+                    "map_actions": [{
+                        "type": "map_action", "action": "showNotice",
+                        "payload": {"text": i18n.t("chat.reach.none")},
+                    }],
                 }
 
-            spot_entries = [self._build_spot_context_for_tool(s) for s in matched]
-            spot_names = [s["name"] for s in matched if s.get("name")]
+            # 3 · Treffer nach Fahrzeit; was keine Zahl hat, wird benannt.
+            map_actions_notice: list = []
+            treffer, offen_gruende = [], {"budget": [], "limit": [], "no_route": []}
+            for spot, z in zip(kandidaten, zeiten):
+                m = z.get("minutes")
+                if m is None:
+                    offen_gruende.setdefault(z.get("reason") or "no_route", []).append(
+                        spot.get("name", "")
+                    )
+                    continue
+                if m <= minutes:
+                    treffer.append((int(round(m)), spot))
+            treffer.sort(key=lambda p: p[0])
 
-            mode_label = {
-                "auto": "Auto",
-                "bicycle": "Velo",
-                "pedestrian": "zu Fuss",
-            }.get(mode, mode)
-            iso_label = f"{minutes} min {mode_label}"
+            eintraege = []
+            for m, spot in treffer:
+                entry = self._build_spot_context_for_tool(spot)
+                entry["travel_minutes"] = m
+                eintraege.append(entry)
 
-            map_actions = [
-                {
-                    "type": "map_action",
-                    "action": "drawIsochrone",
-                    "payload": {"geojson": iso, "label": iso_label},
-                },
-                {
-                    "type": "map_action",
-                    "action": "setUserLocation",
-                    "payload": {"lat": lat, "lon": lon, "label": label or "Standort"},
-                },
-                {
-                    "type": "map_action",
-                    "action": "highlightSpots",
-                    "payload": {"spots": spot_names},
-                },
-            ]
+            notes = []
+            if offen_gruende["budget"]:
+                notes.append(
+                    f"Fuer {len(offen_gruende['budget'])} weitere Gebiete war die Fahrzeit "
+                    f"in der Antwortzeit nicht mehr zu berechnen. Sage dem Piloten in einem "
+                    f"Satz, dass die Liste noch nicht vollstaendig ist und eine erneute "
+                    f"Frage mehr Gebiete bringt — hier hilft ein zweiter Versuch wirklich."
+                )
+            if offen_gruende["limit"]:
+                notes.append(
+                    f"{len(offen_gruende['limit'])} Gebiete liegen weiter als die "
+                    f"{config.VALHALLA_MAX_MATRIX_KM:.0f} km, die der Kartendienst je Route "
+                    f"rechnet. Feste Grenze, kein Ausfall — biete dort keinen erneuten "
+                    f"Versuch an."
+                )
+            if offen_gruende["no_route"]:
+                notes.append(
+                    f"{len(offen_gruende['no_route'])} Gebiete ohne Strassenverbindung im "
+                    f"Modus '{mode}': " + ", ".join(offen_gruende["no_route"][:5])
+                )
+
+            # Sichtbare Rueckmeldung, unabhaengig vom Antworttext des Modells.
+            # "budget" ist der Fall, in dem ein zweiter Versuch wirklich hilft —
+            # "limit" der, in dem er nie hilft. Die zwei duerfen nie verwechselt
+            # werden, das war der ganze Fehler vom 25.09.2026.
+            hinweise = []
+            if offen_gruende["budget"]:
+                hinweise.append(i18n.t(
+                    "chat.reach.partial",
+                    fehlend=len(offen_gruende["budget"]),
+                    gesamt=len(eintraege) + len(offen_gruende["budget"]),
+                ))
+            if offen_gruende["limit"]:
+                hinweise.append(i18n.t(
+                    "chat.reach.limit", anzahl=len(offen_gruende["limit"]),
+                ))
+            for text in hinweise:
+                map_actions_notice.append({
+                    "type": "map_action", "action": "showNotice",
+                    "payload": {"text": text},
+                })
 
             return {
                 "content": {
                     "origin": {"lat": lat, "lon": lon, "label": label},
                     "minutes": minutes,
                     "mode": mode,
-                    "count": len(spot_entries),
-                    "spots": spot_entries,
+                    "count": len(eintraege),
+                    "spots": eintraege,
+                    "hinweis_fahrzeit": (
+                        "travel_minutes ist die echte Fahrzeit in Minuten. Nenne sie beim "
+                        "Spot ('Weissenstein, 30 Min.'); die Liste ist danach sortiert. "
+                        "Schaetze niemals selbst eine Fahrzeit und rechne keine Luftlinie "
+                        "in eine Fahrzeit um."
+                    ),
+                    **({"notes": notes} if notes else {}),
                 },
-                "map_actions": map_actions,
+                "map_actions": [
+                    {"type": "map_action", "action": "setUserLocation",
+                     "payload": {"lat": lat, "lon": lon, "label": label or "Standort"}},
+                    {"type": "map_action", "action": "highlightSpots",
+                     "payload": {"spots": [e["name"] for e in eintraege if e.get("name")]}},
+                ] + map_actions_notice,
             }
 
         if name == "clear_map_overlays":

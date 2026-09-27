@@ -196,9 +196,21 @@
     // Phase 1: Map-Action Dispatcher — empfängt Tool-Use Events vom Backend
     // und ruft die window.flymap API auf.
     function handleMapAction(event) {
-        if (!event || !window.flymap) return;
+        if (!event) return;
         var action = event.action;
         var payload = event.payload || {};
+        // showNotice ist KEINE Karten-Aktion und darf nicht an window.flymap
+        // haengen: Es ist die Rueckmeldung an den Piloten, wenn die
+        // Reichweiten-Suche nicht oder nur teilweise liefert. Sie kommt
+        // absichtlich aus dem Backend und nicht aus dem Antworttext des
+        // Sprachmodells — eine Prompt-Regel wird verletzt, sobald sie
+        // unbequem ist, und dann steht der Pilot wieder vor einem
+        // "versuch's nochmal", das nie klappt (25.09.2026).
+        if (action === 'showNotice') {
+            if (payload.text) appendMessage('bot', payload.text);
+            return;
+        }
+        if (!window.flymap) return;
         try {
             switch (action) {
                 case 'drawIsochrone':
@@ -1064,11 +1076,17 @@
         var candidates = [];
 
         // === Immer aktiv — USP-Anker ===
-        candidates.push({
-            label: wcT('chat.quick_map_label'),
-            msg: wcT('chat.quick_map_msg'),
-            score: 10
-        });
+        // "Karte: 1h ab Zürich" ist am 27.09.2026 bewusst deaktiviert.
+        // Grund: Der Vorschlag führte in eine Sackgasse — der Gratis-Kartendienst
+        // deckelt die erreichbare Zone bei 60 Minuten und liefert zu ~60 % der
+        // Startplätze keine Fahrzeit; ein Pilot hat am 25.09. dreimal vergeblich
+        // "try again" gedrückt und ist nicht wiedergekommen
+        // (validation/chat/BEFUNDE.md §7). Einen Chip anzubieten heisst, die
+        // Funktion zu bewerben — das machen wir erst wieder, wenn sie sauber
+        // läuft. Wiedereinschalten: diesen Block plus die Buttons in
+        // templates/index.html und templates/regionen.html. Voraussetzung:
+        // docs/pläne/PLAN_routing_eigene_instanz.md, Schritt 2.
+        // Die i18n-Schlüssel chat.quick_map_* bleiben absichtlich stehen.
 
         candidates.push({
             label: wcT('chat.quick_top3_label'),

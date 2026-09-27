@@ -509,7 +509,13 @@
             </div>
 
             <div class="quick-actions" id="quickActions">
-                <button class="quick-btn" data-msg="{{ t('chat.quick_map_msg') }}">{{ t('chat.quick_map_label') }}</button>
+                {# "Karte: 1h ab Zürich" ist am 27.09.2026 deaktiviert: Der Kartendienst
+                   deckelt die erreichbare Zone bei 60 Min. und liefert zu ~60 % der
+                   Startplätze keine Fahrzeit — ein Pilot lief am 25.09. dreimal ins
+                   Leere (validation/chat/BEFUNDE.md §7). Einen Chip anzubieten heisst
+                   werben; das machen wir erst wieder, wenn es sauber läuft.
+                   Wieder einschalten: hier, in templates/regionen.html und in
+                   static/js/chat.js. Voraussetzung: docs/pläne/PLAN_routing_eigene_instanz.md #}
                 <button class="quick-btn" data-msg="{{ t('chat.quick_top3_msg') }}">{{ t('chat.quick_top3_label') }}</button>
                 <button class="quick-btn" data-msg="{{ t('chat.quick_wind_msg') }}">{{ t('chat.quick_wind_label') }}</button>
             </div>

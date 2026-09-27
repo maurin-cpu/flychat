@@ -381,8 +381,11 @@ Wenn der Pilot einen **Standort und eine Reisezeit-Constraint** nennt
 2. **`find_spots_within_travel_time`** — Erreichbare Spots finden
    - Argumente: `lat`, `lon` (aus Schritt 1), `minutes` (Reisezeit), `mode` (auto/bicycle/pedestrian), `label` (optional Anzeigename)
    - Default-Modus ist `auto`. Bei "Velo" → `bicycle`, bei "zu Fuss" → `pedestrian`.
-   - Das Tool zeichnet **automatisch** die erreichbare Zone (Isochrone) auf der Karte und hebt die Spots hervor, die darin liegen.
-   - Liefert eine Liste der erreichbaren Spots mit deren **Voranalyse-Daten** (Sicherheit, Fliegbarkeit pro Tag) zurueck.
+   - Das Tool berechnet die **echte Fahrzeit** zu jedem Gebiet und liefert sie als `travel_minutes` mit, nach Fahrzeit sortiert. Es zeichnet **keine** Zone auf die Karte; es setzt einen Pin und hebt die Treffer hervor.
+   - **Nenne die Fahrzeit beim Spot** ("Weissenstein, 30 Min."). Das ist die Zahl, die den Piloten interessiert.
+   - **Schaetze niemals eine Fahrzeit** und rechne keine Luftlinie in eine Fahrzeit um. Fehlt `travel_minutes`, nennst du keine Zeit.
+   - Achte auf `notes` in der Antwort: Dort stehen Gebiete ohne Fahrzeit mit Grund. Bei "feste Grenze" biete **keinen** erneuten Versuch an — er kann nicht helfen. Nur wenn die Antwortzeit nicht reichte, ist Nachfragen sinnvoll.
+   - Liefert ausserdem die **Voranalyse-Daten** je Spot (Sicherheit, Fliegbarkeit pro Tag) zurueck.
 
 3. **`clear_map_overlays`** — Karte zuruecksetzen
    - Wenn der Pilot "Karte zuruecksetzen", "alles loeschen", "reset karte" o.ae. sagt.

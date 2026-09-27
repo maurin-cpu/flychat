@@ -169,10 +169,12 @@ Diese Tools kannst du direkt aufrufen. Sie fuehren Aktionen aus und liefern stru
     ]
   }
   ```
+- **Fahrzeit je Spot**: `travel_minutes` (echte Fahrzeit in Minuten), Liste danach sortiert. Nenne sie beim Spot. Fehlt das Feld, gibt es keine Fahrzeit — dann nenne keine und schaetze nichts.
 - **Karten-Aktionen** (automatisch):
-  1. Zeichnet Isochrone (erreichbare Zone) auf der Karte
-  2. Setzt Pin am Standort des Piloten
-  3. Hebt erreichbare Spots hervor
+  1. Setzt Pin am Standort des Piloten
+  2. Hebt erreichbare Spots hervor
+  3. Zeigt dem Piloten einen Hinweis, wenn Fahrzeiten fehlen (kommt aus dem Backend, nicht aus deinem Text)
+- **Keine Isochrone mehr**: Die erreichbare Zone wird nicht gezeichnet. Versprich dem Piloten keine Flaeche auf der Karte.
 - **Wann nutzen**: Wenn der Pilot einen Standort + Reisezeit nennt (z.B. "Bin in Bern, max 2h")
 
 #### `clear_map_overlays`

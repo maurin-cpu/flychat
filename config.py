@@ -389,12 +389,14 @@ if os.environ.get("VERCEL"):
     STATION_DB_PATH = _WRITABLE_DIR / "station_observations.db"
     SUBSCRIBERS_DB_PATH = _WRITABLE_DIR / "subscribers.db"
     FEEDBACK_DB_PATH = _WRITABLE_DIR / "feedback.db"
+    TRAVEL_TIME_CACHE_PATH = _WRITABLE_DIR / "travel_times_cache.json"
 else:
     WEATHER_JSON_PATH = DATA_DIR / "wetterdaten.json"
     HISTORY_DIR = DATA_DIR / "history"
     STATION_DB_PATH = DATA_DIR / "station_observations.db"
     SUBSCRIBERS_DB_PATH = DATA_DIR / "subscribers.db"
     FEEDBACK_DB_PATH = DATA_DIR / "feedback.db"
+    TRAVEL_TIME_CACHE_PATH = DATA_DIR / "travel_times_cache.json"
 
 # ============================================================================
 # SPOT SOURCE AREAS (manuelle Overrides fuer Referenzpunkte)
@@ -1387,7 +1389,39 @@ VALHALLA_URL = os.environ.get("VALHALLA_URL", "https://valhalla1.openstreetmap.d
 NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
 ROUTING_TIMEOUT = 15  # seconds (Valhalla + Nominatim HTTP)
 ROUTING_USER_AGENT = "Wingcast/1.0 (paragliding weather app)"
+# Der FOSSGIS-Betreiber bittet Anwendungen mit echten Nutzern ausdruecklich um
+# einen X-Client-Id-Kopf, damit er den Verursacher von Last erkennen kann
+# (valhalla.openstreetmap.de, "Usage"). Ohne ihn sind wir anonyme Last — genau
+# was eine Fair-Use-Sperre treffen soll. Am 27.09.2026 hat der Dienst den
+# Entwicklungsrechner ausgesperrt; seither wird der Kopf mitgeschickt.
+ROUTING_CLIENT_ID = os.environ.get("ROUTING_CLIENT_ID", "wingcast.ch")
 GEOCODE_CACHE_TTL = 24 * 3600  # 24h in-memory cache für Nominatim
+
+# Grenzen des oeffentlichen Valhalla (FOSSGIS) — am 27.09.2026 nachgemessen.
+# Es sind Hausregeln des Gratis-Dienstes, keine technischen Grenzen: eine eigene
+# Instanz setzt sie selbst. Darum konfigurierbar statt hartcodiert.
+#   Isochrone: >60 min  -> HTTP 400 "Exceeded max time: 60"        (error_code 151)
+#              >100 km  -> HTTP 400 "Exceeded max distance: 100"   (error_code 166)
+#   Matrix:    Route >150 km -> HTTP 400 "Path distance exceeds
+#              the max distance limit: 150000 meters"              (error_code 154)
+# Warum das wichtig ist: Ueberschreitungen sind DAUERHAFT, kein Ausfall. Eine
+# Fehlermeldung "bitte spaeter erneut versuchen" ist dort eine Luege —
+# validation/chat/BEFUNDE.md §7 (Nutzer hat dreimal vergeblich retried).
+VALHALLA_MAX_ISOCHRONE_MINUTES = int(os.environ.get("VALHALLA_MAX_ISOCHRONE_MINUTES", "60"))
+VALHALLA_MAX_MATRIX_KM = float(os.environ.get("VALHALLA_MAX_MATRIX_KM", "150"))
+VALHALLA_MATRIX_CHUNK = int(os.environ.get("VALHALLA_MATRIX_CHUNK", "50"))
+# Fahrzeiten aendern sich praktisch nicht -> lange Haltbarkeit, Piloten fragen
+# immer wieder vom selben Ort aus (Wohnort, Bahnhof).
+TRAVEL_TIME_CACHE_TTL = 30 * 24 * 3600
+# Obergrenze fuer den Luftlinien-Vorfilter: schneller ist auf Schweizer Strassen
+# nicht zu fahren, also kann der Filter keinen echten Treffer verlieren.
+TRAVEL_TIME_MAX_KMH = 120.0
+# Antwortzeit-Budget im Chat fuer das Nachfuellen einzelner Wege. Eine Einzel-
+# abfrage kostet ~0.77 s und der Gratis-Dienst sperrt parallele Anfragen, also
+# ist das die Stelle, an der Vollstaendigkeit gegen Wartezeit steht. Was nicht
+# mehr reinpasst, wird in der Antwort benannt und beim naechsten Mal aus dem
+# Speicher geliefert — vorwaermen mit scripts/prewarm_travel_times.py.
+TRAVEL_TIME_CHAT_BUDGET_S = float(os.environ.get("TRAVEL_TIME_CHAT_BUDGET_S", "20"))
 
 # ============================================================================
 # LLM-PROVIDER + MODELL (Chat + Analyse getrennt konfigurierbar)

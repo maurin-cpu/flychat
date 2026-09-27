@@ -582,6 +582,21 @@ STRINGS: dict[str, dict[str, str]] = {
                              "en": "Searching for reachable spots within {mins} min…"},
     "chat.tool.find_spots_noarg": {"de": "Ich suche erreichbare Spots…", "en": "Searching for reachable spots…"},
     "chat.tool.clear_map": {"de": "Ich räume die Karte auf…", "en": "Clearing the map…"},
+
+    # --- Reichweiten-Suche: Rueckmeldung, wenn sie NICHT liefert ---------------
+    # Bewusst nicht dem LLM ueberlassen: Eine Regel im Prompt wird verletzt,
+    # sobald sie unbequem ist (Lehre aus dem Wetterlage-Block). Diese Saetze
+    # gehen als eigenes Ereignis an den Chat, damit der Pilot die Grenze sicher
+    # erfaehrt — der Fall vom 25.09.2026, validation/chat/BEFUNDE.md §7.
+    "chat.reach.none": {
+        "de": "Ich konnte für diese Anfrage keine einzige Fahrzeit berechnen — der Kartendienst antwortet gerade nicht. Such dir dein Gebiet bitte von Hand aus; geschätzte Fahrzeiten gebe ich dir bewusst nicht.",
+        "en": "I could not compute a single drive time for this request — the routing service is not responding. Please pick your area by hand; I will not give you estimated drive times."},
+    "chat.reach.partial": {
+        "de": "Achtung: Diese Liste ist unvollständig. Für {fehlend} von {gesamt} Gebieten habe ich noch keine Fahrzeit. Frag gleich nochmal — dann sind mehr dabei.",
+        "en": "Heads-up: this list is incomplete. I don't have a drive time yet for {fehlend} of {gesamt} areas. Ask again in a moment — more will be included."},
+    "chat.reach.limit": {
+        "de": "Für {anzahl} weitere Gebiete ist die Strecke länger, als der Kartendienst berechnet. Das ist eine feste Grenze — erneutes Fragen ändert daran nichts.",
+        "en": "For {anzahl} further areas the route is longer than the routing service will compute. That is a hard limit — asking again will not change it."},
     "chat.tool.spot_analysis": {"de": "Ich schaue mir die Einschätzung für {spot} genauer an…",
                                 "en": "Taking a closer look at the assessment for {spot}…"},
     "chat.tool.spot_analysis_noarg": {"de": "Ich schaue mir die Detail-Einschätzung an…",
@@ -1255,6 +1270,7 @@ def llm_lang_instruction() -> str:
 _JS_EXTRA_KEYS = (
     "chat.welcome",
     "chat.quick_map_label", "chat.quick_map_msg",
+    "chat.reach.none", "chat.reach.partial", "chat.reach.limit",
     "chat.quick_top3_label", "chat.quick_top3_msg",
     "chat.quick_wind_label", "chat.quick_wind_msg",
     "foehn.no_data",

@@ -381,8 +381,11 @@ When the pilot names a **location and a travel-time constraint**
 2. **`find_spots_within_travel_time`** — find reachable spots
    - Arguments: `lat`, `lon` (from step 1), `minutes` (travel time), `mode` (auto/bicycle/pedestrian), `label` (optional display name)
    - Default mode is `auto`. For "bike" → `bicycle`, for "on foot" → `pedestrian`.
-   - The tool **automatically** draws the reachable zone (isochrone) on the map and highlights the spots that lie within it.
-   - Returns a list of the reachable spots with their **pre-analysis data** (safety, flyability per day).
+   - The tool computes the **real drive time** to every area and returns it as `travel_minutes`, sorted by drive time. It does **not** draw a zone on the map; it drops a pin and highlights the matches.
+   - **State the drive time with the spot** ("Weissenstein, 30 min"). That is the number the pilot cares about.
+   - **Never estimate a drive time** and never convert a straight-line distance into one. If `travel_minutes` is missing, give no time at all.
+   - Watch for `notes` in the response: it lists areas without a drive time and why. Where it says the limit is fixed, do **not** offer to try again — it cannot help. Only when the answer ran out of time is asking again worthwhile.
+   - Also returns the **pre-analysis data** per spot (safety, flyability per day).
 
 3. **`clear_map_overlays`** — reset the map
    - When the pilot says "reset map", "clear everything", "reset karte", or similar.
