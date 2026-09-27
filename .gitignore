@@ -145,3 +145,12 @@ reference_deepseek/
 
 # MCP-Export (Klasse C, wird aus wetterdaten.json neu gebaut — mcp_server/export.py)
 data/mcp_export/
+
+# Föhn-Validierung: Maschinendaten (Wahrheit + Modellreihen sind nachladbar)
+validation/foehn/messwerte/
+validation/foehn/modell/
+validation/foehn/scoreboard.json
+validation/foehn/AUTO_REPORT.md
+
+# Fahrzeit-Speicher (Klasse C, jederzeit neu berechenbar — prewarm_travel_times.py)
+data/travel_times_cache.json

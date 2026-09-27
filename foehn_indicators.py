@@ -38,9 +38,12 @@ FOEHN_STATIONS = {
     },
 }
 
-# Südföhn: Wind am Kamm aus S/SW (135°–225°)
+# Südföhn: Wind am Kamm aus S/SW (135°–225°) — Kern-Sektor für den Kammwind-Trigger
 SUEDFOEHN_DIR_START = 135
 SUEDFOEHN_DIR_END = 225
+# Südhalbkreis (Ost über Süd nach West) — Pflichtbedingung für den Δp-Trigger
+SUEDFOEHN_HALFCIRCLE_START = 90
+SUEDFOEHN_HALFCIRCLE_END = 270
 
 # Schwellenwerte (Gemini-Empfehlung)
 THRESHOLD_DELTA_P_CAUTION = 4   # hPa – Vorsicht
@@ -157,10 +160,22 @@ def evaluate_foehn(
     is_suedfoehn_active = delta_p_sued is not None and delta_p_sued > 0
     is_nordfoehn_active = delta_p_nord is not None and delta_p_nord > 0
     
+    # Südföhn braucht eine Strömung, die die Alpen von Süden her überquert:
+    # 700-hPa-Wind im Südhalbkreis (Ost über Süd nach West, 90–270°; Jansing
+    # et al. 2022). Backtest 2024–26 gegen den MeteoSchweiz-Föhnindex
+    # (validation/foehn/PATTERNS.md, P-2): 62 % der Fehlalarme in Altdorf
+    # hatten Δp ≥ 4 bei Höhenwind AUSSERHALB dieses Halbkreises — Westlagen mit
+    # Druckgefälle, kein Föhn. Fehlt die Richtung, bleibt die alte Regel.
+    crest_south_half = dir_700 is None or (SUEDFOEHN_HALFCIRCLE_START <= dir_700 <= SUEDFOEHN_HALFCIRCLE_END)
+
     # 1. Druckgradient
     if is_suedfoehn_active:
         indicators.append(f"Delta-P (Südföhn): {delta_p_sued} hPa")
-        if delta_p_sued >= THRESHOLD_DELTA_P_CAUTION:
+        if delta_p_sued >= THRESHOLD_DELTA_P_CAUTION and not crest_south_half:
+            indicators.append(
+                f"Südföhn Delta-P >= {THRESHOLD_DELTA_P_CAUTION} hPa, aber Höhenwind aus "
+                f"{round(dir_700)}° ohne Südkomponente -> keine Föhnlage")
+        elif delta_p_sued >= THRESHOLD_DELTA_P_CAUTION:
             msg = f"Südföhn Delta-P >= {THRESHOLD_DELTA_P_CAUTION} hPa"
             if krit_foehn in ['Süd', 'Beide']:
                 if delta_p_sued >= THRESHOLD_DELTA_P_DANGER:

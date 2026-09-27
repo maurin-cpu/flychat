@@ -1296,6 +1296,31 @@ def fetch_all_spots(spots, save_to_file=True):
         }
     }
 
+    # Föhn-Grundlagen (Zürich/Lugano stündlich) mit ablegen, damit der
+    # Tages-Snapshot sie einfrieren kann. Bis 09/2026 lebten sie nur im
+    # Speicher — vom Föhn blieb im Archiv allein `foehn_risk`, das Warum
+    # (Δp, Höhenwind, Richtung) war nachträglich nicht mehr rekonstruierbar
+    # (validation/foehn/README.md). Unter _meta, nicht als Top-Level-Key:
+    # mehrere Stellen behandeln jeden Nicht-`_meta`-Key als Spot.
+    try:
+        from foehn_indicators import fetch_foehn_data
+        _foehn_raw = fetch_foehn_data(forecast_days=config.FORECAST_DAYS)
+        if _foehn_raw:
+            _hn = _foehn_raw["nord"].get("hourly", {})
+            _hs = _foehn_raw["sued"].get("hourly", {})
+            all_data["_meta"]["foehn_series"] = {
+                "time": _hn.get("time", []),
+                "pressure_msl_nord": _hn.get("pressure_msl", []),
+                "pressure_msl_sued": _hs.get("pressure_msl", []),
+                "wind_speed_700hPa_nord": _hn.get("wind_speed_700hPa", []),
+                "wind_direction_700hPa_nord": _hn.get("wind_direction_700hPa", []),
+                "relative_humidity_2m_nord": _hn.get("relative_humidity_2m", []),
+                "wind_speed_10m_nord": _hn.get("wind_speed_10m", []),
+                "wind_gusts_10m_nord": _hn.get("wind_gusts_10m", []),
+            }
+    except Exception as e:  # nie den Wetterlauf daran scheitern lassen
+        print(f"  [WARN] Föhn-Reihe nicht abgelegt (nicht kritisch): {e}")
+
     for i, spot in enumerate(spots):
         name = spot["name"]
         refs = spot_refs[name]

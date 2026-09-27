@@ -1,0 +1,1418 @@
+{
+ "period_utc": [
+  "2024-01-01T00",
+  "2026-09-26T23"
+ ],
+ "stations": [
+  {
+   "station": "ALT",
+   "name": "Altdorf",
+   "region": "Zentralschweizer Alpen",
+   "side": "Süd",
+   "hours_evaluated": 11994,
+   "foehn_hours": 537,
+   "misch_hours": 18,
+   "pod_pct": 94.4,
+   "miss_hours": 30,
+   "false_alarm_hours": 760,
+   "far_pct": 60.0,
+   "misch_warned_pct": 44.4,
+   "foehn_days": 87,
+   "warn_days": 189,
+   "day_pod_pct": 89.7,
+   "day_far_pct": 58.7,
+   "dp_foehn_p10": 4.4,
+   "dp_foehn_p50": 7.4,
+   "dp_foehn_p90": 11.7,
+   "dp_none_p50": -1.4,
+   "dp_none_p90": 3.1,
+   "dp_none_p99": 7.0,
+   "foehn_hours_dp_below_4_pct": 5.6,
+   "foehn_hours_dp_below_2_pct": 0.7
+  },
+  {
+   "station": "ENG",
+   "name": "Engelberg",
+   "region": "Zentralschweizer Alpen",
+   "side": "Süd",
+   "hours_evaluated": 11994,
+   "foehn_hours": 287,
+   "misch_hours": 18,
+   "pod_pct": 94.8,
+   "miss_hours": 15,
+   "false_alarm_hours": 991,
+   "far_pct": 78.5,
+   "misch_warned_pct": 66.7,
+   "foehn_days": 54,
+   "warn_days": 189,
+   "day_pod_pct": 94.4,
+   "day_far_pct": 73.0,
+   "dp_foehn_p10": 4.6,
+   "dp_foehn_p50": 7.8,
+   "dp_foehn_p90": 12.2,
+   "dp_none_p50": -1.3,
+   "dp_none_p90": 3.5,
+   "dp_none_p99": 8.6,
+   "foehn_hours_dp_below_4_pct": 5.2,
+   "foehn_hours_dp_below_2_pct": 0.3
+  },
+  {
+   "station": "CHU",
+   "name": "Chur",
+   "region": "Rheintal",
+   "side": "Süd",
+   "hours_evaluated": 11994,
+   "foehn_hours": 839,
+   "misch_hours": 513,
+   "pod_pct": 72.2,
+   "miss_hours": 233,
+   "false_alarm_hours": 439,
+   "far_pct": 42.0,
+   "misch_warned_pct": 44.8,
+   "foehn_days": 149,
+   "warn_days": 189,
+   "day_pod_pct": 78.5,
+   "day_far_pct": 38.1,
+   "dp_foehn_p10": 2.2,
+   "dp_foehn_p50": 5.2,
+   "dp_foehn_p90": 10.3,
+   "dp_none_p50": -1.8,
+   "dp_none_p90": 2.3,
+   "dp_none_p99": 6.8,
+   "foehn_hours_dp_below_4_pct": 29.4,
+   "foehn_hours_dp_below_2_pct": 7.2
+  },
+  {
+   "station": "RAG",
+   "name": "Bad Ragaz",
+   "region": "Rheintal",
+   "side": "Süd",
+   "hours_evaluated": 11986,
+   "foehn_hours": 881,
+   "misch_hours": 241,
+   "pod_pct": 80.1,
+   "miss_hours": 175,
+   "false_alarm_hours": 489,
+   "far_pct": 40.9,
+   "misch_warned_pct": 33.2,
+   "foehn_days": 129,
+   "warn_days": 189,
+   "day_pod_pct": 86.0,
+   "day_far_pct": 41.3,
+   "dp_foehn_p10": 3.0,
+   "dp_foehn_p50": 6.0,
+   "dp_foehn_p90": 10.7,
+   "dp_none_p50": -1.6,
+   "dp_none_p90": 2.4,
+   "dp_none_p99": 6.3,
+   "foehn_hours_dp_below_4_pct": 20.4,
+   "foehn_hours_dp_below_2_pct": 3.5
+  },
+  {
+   "station": "VAD",
+   "name": "Vaduz",
+   "region": "Rheintal",
+   "side": "Süd",
+   "hours_evaluated": 11994,
+   "foehn_hours": 498,
+   "misch_hours": 121,
+   "pod_pct": 93.0,
+   "miss_hours": 35,
+   "false_alarm_hours": 736,
+   "far_pct": 61.4,
+   "misch_warned_pct": 62.8,
+   "foehn_days": 79,
+   "warn_days": 189,
+   "day_pod_pct": 97.5,
+   "day_far_pct": 59.3,
+   "dp_foehn_p10": 4.0,
+   "dp_foehn_p50": 7.3,
+   "dp_foehn_p90": 11.8,
+   "dp_none_p50": -1.4,
+   "dp_none_p90": 3.0,
+   "dp_none_p99": 6.9,
+   "foehn_hours_dp_below_4_pct": 9.0,
+   "foehn_hours_dp_below_2_pct": 1.0
+  },
+  {
+   "station": "GLA",
+   "name": "Glarus",
+   "region": "Glarner Alpen",
+   "side": "Süd",
+   "hours_evaluated": 11970,
+   "foehn_hours": 211,
+   "misch_hours": 4,
+   "pod_pct": 99.5,
+   "miss_hours": 1,
+   "false_alarm_hours": 1062,
+   "far_pct": 83.5,
+   "misch_warned_pct": 75.0,
+   "foehn_days": 44,
+   "warn_days": 189,
+   "day_pod_pct": 97.7,
+   "day_far_pct": 77.2,
+   "dp_foehn_p10": 5.3,
+   "dp_foehn_p50": 9.1,
+   "dp_foehn_p90": 12.6,
+   "dp_none_p50": -1.3,
+   "dp_none_p90": 3.6,
+   "dp_none_p99": 8.7,
+   "foehn_hours_dp_below_4_pct": 0.5,
+   "foehn_hours_dp_below_2_pct": 0.0
+  },
+  {
+   "station": "ELM",
+   "name": "Elm",
+   "region": "Glarner Alpen",
+   "side": "Süd",
+   "hours_evaluated": 11953,
+   "foehn_hours": 765,
+   "misch_hours": 213,
+   "pod_pct": 76.6,
+   "miss_hours": 179,
+   "false_alarm_hours": 561,
+   "far_pct": 48.9,
+   "misch_warned_pct": 52.1,
+   "foehn_days": 130,
+   "warn_days": 188,
+   "day_pod_pct": 85.4,
+   "day_far_pct": 41.0,
+   "dp_foehn_p10": 2.9,
+   "dp_foehn_p50": 5.7,
+   "dp_foehn_p90": 10.6,
+   "dp_none_p50": -1.6,
+   "dp_none_p90": 2.5,
+   "dp_none_p99": 7.0,
+   "foehn_hours_dp_below_4_pct": 24.2,
+   "foehn_hours_dp_below_2_pct": 2.6
+  },
+  {
+   "station": "MER",
+   "name": "Meiringen",
+   "region": "Berner Alpen",
+   "side": "Süd",
+   "hours_evaluated": 11777,
+   "foehn_hours": 320,
+   "misch_hours": 4,
+   "pod_pct": 93.1,
+   "miss_hours": 22,
+   "false_alarm_hours": 932,
+   "far_pct": 75.8,
+   "misch_warned_pct": 100.0,
+   "foehn_days": 56,
+   "warn_days": 184,
+   "day_pod_pct": 91.1,
+   "day_far_pct": 72.3,
+   "dp_foehn_p10": 4.2,
+   "dp_foehn_p50": 7.9,
+   "dp_foehn_p90": 11.8,
+   "dp_none_p50": -1.3,
+   "dp_none_p90": 3.4,
+   "dp_none_p99": 8.0,
+   "foehn_hours_dp_below_4_pct": 6.9,
+   "foehn_hours_dp_below_2_pct": 1.2
+  },
+  {
+   "station": "AND",
+   "name": "Andeer",
+   "region": "Mittelbünden",
+   "side": "Süd",
+   "hours_evaluated": 11985,
+   "foehn_hours": 1202,
+   "misch_hours": 229,
+   "pod_pct": 50.0,
+   "miss_hours": 601,
+   "false_alarm_hours": 592,
+   "far_pct": 49.6,
+   "misch_warned_pct": 35.8,
+   "foehn_days": 260,
+   "warn_days": 189,
+   "day_pod_pct": 53.5,
+   "day_far_pct": 26.5,
+   "dp_foehn_p10": 0.4,
+   "dp_foehn_p50": 3.8,
+   "dp_foehn_p90": 9.3,
+   "dp_none_p50": -1.8,
+   "dp_none_p90": 2.5,
+   "dp_none_p99": 7.9,
+   "foehn_hours_dp_below_4_pct": 51.7,
+   "foehn_hours_dp_below_2_pct": 24.4
+  },
+  {
+   "station": "DAV",
+   "name": "Davos",
+   "region": "Prättigau - Davos",
+   "side": "Süd",
+   "hours_evaluated": 11994,
+   "foehn_hours": 905,
+   "misch_hours": 107,
+   "pod_pct": 61.2,
+   "miss_hours": 351,
+   "false_alarm_hours": 687,
+   "far_pct": 55.4,
+   "misch_warned_pct": 31.8,
+   "foehn_days": 188,
+   "warn_days": 189,
+   "day_pod_pct": 67.0,
+   "day_far_pct": 33.3,
+   "dp_foehn_p10": 1.3,
+   "dp_foehn_p50": 4.5,
+   "dp_foehn_p90": 9.7,
+   "dp_none_p50": -1.6,
+   "dp_none_p90": 2.9,
+   "dp_none_p99": 8.3,
+   "foehn_hours_dp_below_4_pct": 41.7,
+   "foehn_hours_dp_below_2_pct": 16.4
+  },
+  {
+   "station": "VIS",
+   "name": "Visp",
+   "region": "Oberwallis / Goms",
+   "side": "Süd",
+   "hours_evaluated": 11905,
+   "foehn_hours": 994,
+   "misch_hours": 48,
+   "pod_pct": 55.9,
+   "miss_hours": 438,
+   "false_alarm_hours": 714,
+   "far_pct": 56.2,
+   "misch_warned_pct": 10.4,
+   "foehn_days": 183,
+   "warn_days": 189,
+   "day_pod_pct": 57.9,
+   "day_far_pct": 43.9,
+   "dp_foehn_p10": 1.1,
+   "dp_foehn_p50": 4.3,
+   "dp_foehn_p90": 9.1,
+   "dp_none_p50": -1.6,
+   "dp_none_p90": 2.9,
+   "dp_none_p99": 9.0,
+   "foehn_hours_dp_below_4_pct": 44.5,
+   "foehn_hours_dp_below_2_pct": 18.5
+  },
+  {
+   "station": "SIO",
+   "name": "Sion",
+   "region": "Unterwallis",
+   "side": "Süd",
+   "hours_evaluated": 11994,
+   "foehn_hours": 165,
+   "misch_hours": 97,
+   "pod_pct": 81.8,
+   "miss_hours": 30,
+   "false_alarm_hours": 1084,
+   "far_pct": 88.9,
+   "misch_warned_pct": 57.7,
+   "foehn_days": 51,
+   "warn_days": 189,
+   "day_pod_pct": 78.4,
+   "day_far_pct": 78.8,
+   "dp_foehn_p10": 2.5,
+   "dp_foehn_p50": 7.9,
+   "dp_foehn_p90": 12.0,
+   "dp_none_p50": -1.3,
+   "dp_none_p90": 3.6,
+   "dp_none_p99": 9.4,
+   "foehn_hours_dp_below_4_pct": 18.2,
+   "foehn_hours_dp_below_2_pct": 6.7
+  },
+  {
+   "station": "EVI",
+   "name": "Evionnaz",
+   "region": "Waadtländer Alpen",
+   "side": "Süd",
+   "hours_evaluated": 11982,
+   "foehn_hours": 439,
+   "misch_hours": 53,
+   "pod_pct": 78.8,
+   "miss_hours": 93,
+   "false_alarm_hours": 904,
+   "far_pct": 72.3,
+   "misch_warned_pct": 39.6,
+   "foehn_days": 85,
+   "warn_days": 189,
+   "day_pod_pct": 82.4,
+   "day_far_pct": 63.0,
+   "dp_foehn_p10": 2.5,
+   "dp_foehn_p50": 6.7,
+   "dp_foehn_p90": 11.9,
+   "dp_none_p50": -1.4,
+   "dp_none_p90": 3.3,
+   "dp_none_p99": 8.2,
+   "foehn_hours_dp_below_4_pct": 21.6,
+   "foehn_hours_dp_below_2_pct": 7.3
+  },
+  {
+   "station": "PIO",
+   "name": "Piotta",
+   "region": "Leventina / Blenio",
+   "side": "Nord",
+   "hours_evaluated": 11994,
+   "foehn_hours": 1756,
+   "misch_hours": 94,
+   "pod_pct": 78.4,
+   "miss_hours": 379,
+   "false_alarm_hours": 1522,
+   "far_pct": 52.5,
+   "misch_warned_pct": 75.5,
+   "foehn_days": 303,
+   "warn_days": 357,
+   "day_pod_pct": 82.5,
+   "day_far_pct": 30.0,
+   "dp_foehn_p10": 2.9,
+   "dp_foehn_p50": 6.3,
+   "dp_foehn_p90": 10.7,
+   "dp_none_p50": 0.5,
+   "dp_none_p90": 4.9,
+   "dp_none_p99": 9.5,
+   "foehn_hours_dp_below_4_pct": 21.6,
+   "foehn_hours_dp_below_2_pct": 3.8
+  },
+  {
+   "station": "COM",
+   "name": "Acquarossa",
+   "region": "Leventina / Blenio",
+   "side": "Nord",
+   "hours_evaluated": 11841,
+   "foehn_hours": 1016,
+   "misch_hours": 295,
+   "pod_pct": 94.9,
+   "miss_hours": 52,
+   "false_alarm_hours": 1671,
+   "far_pct": 63.4,
+   "misch_warned_pct": 88.8,
+   "foehn_days": 182,
+   "warn_days": 351,
+   "day_pod_pct": 95.1,
+   "day_far_pct": 50.7,
+   "dp_foehn_p10": 4.5,
+   "dp_foehn_p50": 7.9,
+   "dp_foehn_p90": 12.1,
+   "dp_none_p50": 0.7,
+   "dp_none_p90": 4.9,
+   "dp_none_p99": 8.2,
+   "foehn_hours_dp_below_4_pct": 5.1,
+   "foehn_hours_dp_below_2_pct": 0.3
+  },
+  {
+   "station": "MAG",
+   "name": "Magadino",
+   "region": "Locarnese / Bellinzonese",
+   "side": "Nord",
+   "hours_evaluated": 11958,
+   "foehn_hours": 536,
+   "misch_hours": 181,
+   "pod_pct": 98.5,
+   "miss_hours": 8,
+   "false_alarm_hours": 2299,
+   "far_pct": 81.3,
+   "misch_warned_pct": 79.0,
+   "foehn_days": 96,
+   "warn_days": 357,
+   "day_pod_pct": 99.0,
+   "day_far_pct": 73.4,
+   "dp_foehn_p10": 6.5,
+   "dp_foehn_p50": 9.2,
+   "dp_foehn_p90": 12.8,
+   "dp_none_p50": 0.9,
+   "dp_none_p90": 5.7,
+   "dp_none_p99": 9.8,
+   "foehn_hours_dp_below_4_pct": 1.5,
+   "foehn_hours_dp_below_2_pct": 0.0
+  }
+ ],
+ "dp_sweep": {
+  "ALT": [
+   {
+    "thr": 1,
+    "pod_pct": 99.8,
+    "far_pct": 84.2,
+    "fa_hours": 2851
+   },
+   {
+    "thr": 2,
+    "pod_pct": 99.3,
+    "far_pct": 78.1,
+    "fa_hours": 1904
+   },
+   {
+    "thr": 3,
+    "pod_pct": 98.1,
+    "far_pct": 69.8,
+    "fa_hours": 1217
+   },
+   {
+    "thr": 4,
+    "pod_pct": 94.4,
+    "far_pct": 57.4,
+    "fa_hours": 683
+   },
+   {
+    "thr": 5,
+    "pod_pct": 83.6,
+    "far_pct": 45.8,
+    "fa_hours": 380
+   },
+   {
+    "thr": 6,
+    "pod_pct": 69.5,
+    "far_pct": 38.8,
+    "fa_hours": 236
+   },
+   {
+    "thr": 7,
+    "pod_pct": 54.2,
+    "far_pct": 28.3,
+    "fa_hours": 115
+   },
+   {
+    "thr": 8,
+    "pod_pct": 43.9,
+    "far_pct": 20.0,
+    "fa_hours": 59
+   },
+   {
+    "thr": 9,
+    "pod_pct": 33.7,
+    "far_pct": 16.6,
+    "fa_hours": 36
+   },
+   {
+    "thr": 10,
+    "pod_pct": 22.5,
+    "far_pct": 17.7,
+    "fa_hours": 26
+   }
+  ],
+  "ENG": [
+   {
+    "thr": 1,
+    "pod_pct": 100.0,
+    "far_pct": 91.5,
+    "fa_hours": 3101
+   },
+   {
+    "thr": 2,
+    "pod_pct": 99.7,
+    "far_pct": 88.3,
+    "fa_hours": 2153
+   },
+   {
+    "thr": 3,
+    "pod_pct": 98.6,
+    "far_pct": 83.8,
+    "fa_hours": 1459
+   },
+   {
+    "thr": 4,
+    "pod_pct": 94.8,
+    "far_pct": 77.1,
+    "fa_hours": 914
+   },
+   {
+    "thr": 5,
+    "pod_pct": 86.8,
+    "far_pct": 69.8,
+    "fa_hours": 575
+   },
+   {
+    "thr": 6,
+    "pod_pct": 71.1,
+    "far_pct": 66.4,
+    "fa_hours": 403
+   },
+   {
+    "thr": 7,
+    "pod_pct": 59.6,
+    "far_pct": 57.6,
+    "fa_hours": 232
+   },
+   {
+    "thr": 8,
+    "pod_pct": 48.4,
+    "far_pct": 52.6,
+    "fa_hours": 154
+   },
+   {
+    "thr": 9,
+    "pod_pct": 39.0,
+    "far_pct": 48.1,
+    "fa_hours": 104
+   },
+   {
+    "thr": 10,
+    "pod_pct": 27.2,
+    "far_pct": 46.9,
+    "fa_hours": 69
+   }
+  ],
+  "CHU": [
+   {
+    "thr": 1,
+    "pod_pct": 97.5,
+    "far_pct": 72.2,
+    "fa_hours": 2123
+   },
+   {
+    "thr": 2,
+    "pod_pct": 92.8,
+    "far_pct": 61.9,
+    "fa_hours": 1264
+   },
+   {
+    "thr": 3,
+    "pod_pct": 84.1,
+    "far_pct": 50.5,
+    "fa_hours": 721
+   },
+   {
+    "thr": 4,
+    "pod_pct": 70.6,
+    "far_pct": 39.0,
+    "fa_hours": 378
+   },
+   {
+    "thr": 5,
+    "pod_pct": 53.8,
+    "far_pct": 34.4,
+    "fa_hours": 236
+   },
+   {
+    "thr": 6,
+    "pod_pct": 40.8,
+    "far_pct": 31.9,
+    "fa_hours": 160
+   },
+   {
+    "thr": 7,
+    "pod_pct": 29.3,
+    "far_pct": 26.6,
+    "fa_hours": 89
+   },
+   {
+    "thr": 8,
+    "pod_pct": 22.8,
+    "far_pct": 22.7,
+    "fa_hours": 56
+   },
+   {
+    "thr": 9,
+    "pod_pct": 17.5,
+    "far_pct": 21.0,
+    "fa_hours": 39
+   },
+   {
+    "thr": 10,
+    "pod_pct": 11.2,
+    "far_pct": 26.0,
+    "fa_hours": 33
+   }
+  ],
+  "RAG": [
+   {
+    "thr": 1,
+    "pod_pct": 98.6,
+    "far_pct": 72.7,
+    "fa_hours": 2317
+   },
+   {
+    "thr": 2,
+    "pod_pct": 96.5,
+    "far_pct": 62.5,
+    "fa_hours": 1414
+   },
+   {
+    "thr": 3,
+    "pod_pct": 90.5,
+    "far_pct": 50.9,
+    "fa_hours": 825
+   },
+   {
+    "thr": 4,
+    "pod_pct": 79.6,
+    "far_pct": 37.4,
+    "fa_hours": 418
+   },
+   {
+    "thr": 5,
+    "pod_pct": 63.5,
+    "far_pct": 29.2,
+    "fa_hours": 231
+   },
+   {
+    "thr": 6,
+    "pod_pct": 50.9,
+    "far_pct": 23.2,
+    "fa_hours": 135
+   },
+   {
+    "thr": 7,
+    "pod_pct": 37.2,
+    "far_pct": 17.2,
+    "fa_hours": 68
+   },
+   {
+    "thr": 8,
+    "pod_pct": 28.7,
+    "far_pct": 12.8,
+    "fa_hours": 37
+   },
+   {
+    "thr": 9,
+    "pod_pct": 22.0,
+    "far_pct": 10.6,
+    "fa_hours": 23
+   },
+   {
+    "thr": 10,
+    "pod_pct": 14.3,
+    "far_pct": 14.3,
+    "fa_hours": 21
+   }
+  ],
+  "VAD": [
+   {
+    "thr": 1,
+    "pod_pct": 99.6,
+    "far_pct": 84.9,
+    "fa_hours": 2792
+   },
+   {
+    "thr": 2,
+    "pod_pct": 99.0,
+    "far_pct": 78.9,
+    "fa_hours": 1846
+   },
+   {
+    "thr": 3,
+    "pod_pct": 95.8,
+    "far_pct": 71.2,
+    "fa_hours": 1178
+   },
+   {
+    "thr": 4,
+    "pod_pct": 91.0,
+    "far_pct": 59.6,
+    "fa_hours": 669
+   },
+   {
+    "thr": 5,
+    "pod_pct": 80.5,
+    "far_pct": 48.5,
+    "fa_hours": 378
+   },
+   {
+    "thr": 6,
+    "pod_pct": 67.7,
+    "far_pct": 40.8,
+    "fa_hours": 232
+   },
+   {
+    "thr": 7,
+    "pod_pct": 53.8,
+    "far_pct": 29.7,
+    "fa_hours": 113
+   },
+   {
+    "thr": 8,
+    "pod_pct": 44.0,
+    "far_pct": 20.4,
+    "fa_hours": 56
+   },
+   {
+    "thr": 9,
+    "pod_pct": 35.1,
+    "far_pct": 15.5,
+    "fa_hours": 32
+   },
+   {
+    "thr": 10,
+    "pod_pct": 23.3,
+    "far_pct": 18.3,
+    "fa_hours": 26
+   }
+  ],
+  "GLA": [
+   {
+    "thr": 1,
+    "pod_pct": 100.0,
+    "far_pct": 93.8,
+    "fa_hours": 3190
+   },
+   {
+    "thr": 2,
+    "pod_pct": 100.0,
+    "far_pct": 91.4,
+    "fa_hours": 2238
+   },
+   {
+    "thr": 3,
+    "pod_pct": 99.5,
+    "far_pct": 88.0,
+    "fa_hours": 1542
+   },
+   {
+    "thr": 4,
+    "pod_pct": 99.5,
+    "far_pct": 82.4,
+    "fa_hours": 985
+   },
+   {
+    "thr": 5,
+    "pod_pct": 94.8,
+    "far_pct": 75.9,
+    "fa_hours": 631
+   },
+   {
+    "thr": 6,
+    "pod_pct": 82.0,
+    "far_pct": 71.7,
+    "fa_hours": 438
+   },
+   {
+    "thr": 7,
+    "pod_pct": 71.1,
+    "far_pct": 63.1,
+    "fa_hours": 257
+   },
+   {
+    "thr": 8,
+    "pod_pct": 59.2,
+    "far_pct": 57.6,
+    "fa_hours": 170
+   },
+   {
+    "thr": 9,
+    "pod_pct": 52.1,
+    "far_pct": 49.5,
+    "fa_hours": 108
+   },
+   {
+    "thr": 10,
+    "pod_pct": 36.5,
+    "far_pct": 48.0,
+    "fa_hours": 71
+   }
+  ],
+  "ELM": [
+   {
+    "thr": 1,
+    "pod_pct": 99.2,
+    "far_pct": 76.0,
+    "fa_hours": 2403
+   },
+   {
+    "thr": 2,
+    "pod_pct": 97.4,
+    "far_pct": 66.7,
+    "fa_hours": 1489
+   },
+   {
+    "thr": 3,
+    "pod_pct": 89.5,
+    "far_pct": 56.8,
+    "fa_hours": 899
+   },
+   {
+    "thr": 4,
+    "pod_pct": 75.8,
+    "far_pct": 45.8,
+    "fa_hours": 491
+   },
+   {
+    "thr": 5,
+    "pod_pct": 59.1,
+    "far_pct": 39.3,
+    "fa_hours": 293
+   },
+   {
+    "thr": 6,
+    "pod_pct": 46.3,
+    "far_pct": 34.9,
+    "fa_hours": 190
+   },
+   {
+    "thr": 7,
+    "pod_pct": 34.6,
+    "far_pct": 29.7,
+    "fa_hours": 112
+   },
+   {
+    "thr": 8,
+    "pod_pct": 27.3,
+    "far_pct": 24.8,
+    "fa_hours": 69
+   },
+   {
+    "thr": 9,
+    "pod_pct": 20.5,
+    "far_pct": 23.8,
+    "fa_hours": 49
+   },
+   {
+    "thr": 10,
+    "pod_pct": 13.3,
+    "far_pct": 27.7,
+    "fa_hours": 39
+   }
+  ],
+  "MER": [
+   {
+    "thr": 1,
+    "pod_pct": 99.7,
+    "far_pct": 90.4,
+    "fa_hours": 3016
+   },
+   {
+    "thr": 2,
+    "pod_pct": 98.8,
+    "far_pct": 86.8,
+    "fa_hours": 2075
+   },
+   {
+    "thr": 3,
+    "pod_pct": 97.2,
+    "far_pct": 81.7,
+    "fa_hours": 1387
+   },
+   {
+    "thr": 4,
+    "pod_pct": 93.1,
+    "far_pct": 74.2,
+    "fa_hours": 855
+   },
+   {
+    "thr": 5,
+    "pod_pct": 82.5,
+    "far_pct": 66.9,
+    "fa_hours": 533
+   },
+   {
+    "thr": 6,
+    "pod_pct": 68.1,
+    "far_pct": 62.3,
+    "fa_hours": 360
+   },
+   {
+    "thr": 7,
+    "pod_pct": 58.1,
+    "far_pct": 51.2,
+    "fa_hours": 195
+   },
+   {
+    "thr": 8,
+    "pod_pct": 48.8,
+    "far_pct": 43.1,
+    "fa_hours": 118
+   },
+   {
+    "thr": 9,
+    "pod_pct": 38.4,
+    "far_pct": 37.9,
+    "fa_hours": 75
+   },
+   {
+    "thr": 10,
+    "pod_pct": 25.0,
+    "far_pct": 37.5,
+    "fa_hours": 48
+   }
+  ],
+  "AND": [
+   {
+    "thr": 1,
+    "pod_pct": 87.2,
+    "far_pct": 67.4,
+    "fa_hours": 2167
+   },
+   {
+    "thr": 2,
+    "pod_pct": 75.6,
+    "far_pct": 60.5,
+    "fa_hours": 1393
+   },
+   {
+    "thr": 3,
+    "pod_pct": 63.6,
+    "far_pct": 53.3,
+    "fa_hours": 871
+   },
+   {
+    "thr": 4,
+    "pod_pct": 48.3,
+    "far_pct": 48.0,
+    "fa_hours": 536
+   },
+   {
+    "thr": 5,
+    "pod_pct": 34.7,
+    "far_pct": 46.3,
+    "fa_hours": 360
+   },
+   {
+    "thr": 6,
+    "pod_pct": 26.1,
+    "far_pct": 45.0,
+    "fa_hours": 257
+   },
+   {
+    "thr": 7,
+    "pod_pct": 18.3,
+    "far_pct": 42.4,
+    "fa_hours": 162
+   },
+   {
+    "thr": 8,
+    "pod_pct": 14.4,
+    "far_pct": 37.3,
+    "fa_hours": 103
+   },
+   {
+    "thr": 9,
+    "pod_pct": 11.6,
+    "far_pct": 32.4,
+    "fa_hours": 67
+   },
+   {
+    "thr": 10,
+    "pod_pct": 7.6,
+    "far_pct": 35.9,
+    "fa_hours": 51
+   }
+  ],
+  "DAV": [
+   {
+    "thr": 1,
+    "pod_pct": 92.6,
+    "far_pct": 74.7,
+    "fa_hours": 2477
+   },
+   {
+    "thr": 2,
+    "pod_pct": 83.6,
+    "far_pct": 68.2,
+    "fa_hours": 1625
+   },
+   {
+    "thr": 3,
+    "pod_pct": 72.2,
+    "far_pct": 61.7,
+    "fa_hours": 1054
+   },
+   {
+    "thr": 4,
+    "pod_pct": 58.3,
+    "far_pct": 54.6,
+    "fa_hours": 636
+   },
+   {
+    "thr": 5,
+    "pod_pct": 43.0,
+    "far_pct": 52.1,
+    "fa_hours": 423
+   },
+   {
+    "thr": 6,
+    "pod_pct": 30.9,
+    "far_pct": 52.9,
+    "fa_hours": 315
+   },
+   {
+    "thr": 7,
+    "pod_pct": 22.0,
+    "far_pct": 49.5,
+    "fa_hours": 195
+   },
+   {
+    "thr": 8,
+    "pod_pct": 17.6,
+    "far_pct": 44.6,
+    "fa_hours": 128
+   },
+   {
+    "thr": 9,
+    "pod_pct": 13.8,
+    "far_pct": 40.8,
+    "fa_hours": 86
+   },
+   {
+    "thr": 10,
+    "pod_pct": 9.3,
+    "far_pct": 41.3,
+    "fa_hours": 59
+   }
+  ],
+  "VIS": [
+   {
+    "thr": 1,
+    "pod_pct": 91.3,
+    "far_pct": 73.1,
+    "fa_hours": 2469
+   },
+   {
+    "thr": 2,
+    "pod_pct": 81.5,
+    "far_pct": 66.8,
+    "fa_hours": 1627
+   },
+   {
+    "thr": 3,
+    "pod_pct": 69.3,
+    "far_pct": 60.5,
+    "fa_hours": 1057
+   },
+   {
+    "thr": 4,
+    "pod_pct": 55.5,
+    "far_pct": 53.7,
+    "fa_hours": 641
+   },
+   {
+    "thr": 5,
+    "pod_pct": 40.3,
+    "far_pct": 51.8,
+    "fa_hours": 431
+   },
+   {
+    "thr": 6,
+    "pod_pct": 28.5,
+    "far_pct": 53.8,
+    "fa_hours": 330
+   },
+   {
+    "thr": 7,
+    "pod_pct": 19.7,
+    "far_pct": 52.1,
+    "fa_hours": 213
+   },
+   {
+    "thr": 8,
+    "pod_pct": 14.6,
+    "far_pct": 51.2,
+    "fa_hours": 152
+   },
+   {
+    "thr": 9,
+    "pod_pct": 10.4,
+    "far_pct": 53.0,
+    "fa_hours": 116
+   },
+   {
+    "thr": 10,
+    "pod_pct": 6.5,
+    "far_pct": 56.1,
+    "fa_hours": 83
+   }
+  ],
+  "SIO": [
+   {
+    "thr": 1,
+    "pod_pct": 95.8,
+    "far_pct": 95.2,
+    "fa_hours": 3163
+   },
+   {
+    "thr": 2,
+    "pod_pct": 93.3,
+    "far_pct": 93.5,
+    "fa_hours": 2219
+   },
+   {
+    "thr": 3,
+    "pod_pct": 88.5,
+    "far_pct": 91.3,
+    "fa_hours": 1539
+   },
+   {
+    "thr": 4,
+    "pod_pct": 81.8,
+    "far_pct": 88.2,
+    "fa_hours": 1008
+   },
+   {
+    "thr": 5,
+    "pod_pct": 71.5,
+    "far_pct": 85.1,
+    "fa_hours": 672
+   },
+   {
+    "thr": 6,
+    "pod_pct": 61.2,
+    "far_pct": 82.7,
+    "fa_hours": 484
+   },
+   {
+    "thr": 7,
+    "pod_pct": 54.5,
+    "far_pct": 76.6,
+    "fa_hours": 295
+   },
+   {
+    "thr": 8,
+    "pod_pct": 47.9,
+    "far_pct": 71.7,
+    "fa_hours": 200
+   },
+   {
+    "thr": 9,
+    "pod_pct": 37.6,
+    "far_pct": 69.8,
+    "fa_hours": 143
+   },
+   {
+    "thr": 10,
+    "pod_pct": 28.5,
+    "far_pct": 66.9,
+    "fa_hours": 95
+   }
+  ],
+  "EVI": [
+   {
+    "thr": 1,
+    "pod_pct": 96.8,
+    "far_pct": 87.3,
+    "fa_hours": 2926
+   },
+   {
+    "thr": 2,
+    "pod_pct": 92.7,
+    "far_pct": 83.1,
+    "fa_hours": 1999
+   },
+   {
+    "thr": 3,
+    "pod_pct": 87.0,
+    "far_pct": 77.8,
+    "fa_hours": 1336
+   },
+   {
+    "thr": 4,
+    "pod_pct": 78.4,
+    "far_pct": 70.7,
+    "fa_hours": 829
+   },
+   {
+    "thr": 5,
+    "pod_pct": 66.3,
+    "far_pct": 64.6,
+    "fa_hours": 531
+   },
+   {
+    "thr": 6,
+    "pod_pct": 56.7,
+    "far_pct": 59.0,
+    "fa_hours": 358
+   },
+   {
+    "thr": 7,
+    "pod_pct": 46.9,
+    "far_pct": 49.4,
+    "fa_hours": 201
+   },
+   {
+    "thr": 8,
+    "pod_pct": 38.0,
+    "far_pct": 43.6,
+    "fa_hours": 129
+   },
+   {
+    "thr": 9,
+    "pod_pct": 29.4,
+    "far_pct": 40.8,
+    "fa_hours": 89
+   },
+   {
+    "thr": 10,
+    "pod_pct": 21.4,
+    "far_pct": 36.5,
+    "fa_hours": 54
+   }
+  ],
+  "PIO": [
+   {
+    "thr": 1,
+    "pod_pct": 99.3,
+    "far_pct": 71.9,
+    "fa_hours": 4470
+   },
+   {
+    "thr": 2,
+    "pod_pct": 96.2,
+    "far_pct": 66.4,
+    "fa_hours": 3335
+   },
+   {
+    "thr": 3,
+    "pod_pct": 89.3,
+    "far_pct": 59.3,
+    "fa_hours": 2288
+   },
+   {
+    "thr": 4,
+    "pod_pct": 78.4,
+    "far_pct": 52.5,
+    "fa_hours": 1519
+   },
+   {
+    "thr": 5,
+    "pod_pct": 66.1,
+    "far_pct": 46.0,
+    "fa_hours": 987
+   },
+   {
+    "thr": 6,
+    "pod_pct": 53.6,
+    "far_pct": 38.8,
+    "fa_hours": 596
+   },
+   {
+    "thr": 7,
+    "pod_pct": 39.9,
+    "far_pct": 36.0,
+    "fa_hours": 393
+   },
+   {
+    "thr": 8,
+    "pod_pct": 26.6,
+    "far_pct": 33.9,
+    "fa_hours": 239
+   },
+   {
+    "thr": 9,
+    "pod_pct": 18.2,
+    "far_pct": 30.9,
+    "fa_hours": 143
+   },
+   {
+    "thr": 10,
+    "pod_pct": 13.4,
+    "far_pct": 25.1,
+    "fa_hours": 79
+   }
+  ],
+  "COM": [
+   {
+    "thr": 1,
+    "pod_pct": 99.9,
+    "far_pct": 82.7,
+    "fa_hours": 4867
+   },
+   {
+    "thr": 2,
+    "pod_pct": 99.7,
+    "far_pct": 78.4,
+    "fa_hours": 3683
+   },
+   {
+    "thr": 3,
+    "pod_pct": 98.4,
+    "far_pct": 71.9,
+    "fa_hours": 2553
+   },
+   {
+    "thr": 4,
+    "pod_pct": 94.9,
+    "far_pct": 63.4,
+    "fa_hours": 1668
+   },
+   {
+    "thr": 5,
+    "pod_pct": 87.6,
+    "far_pct": 53.3,
+    "fa_hours": 1016
+   },
+   {
+    "thr": 6,
+    "pod_pct": 78.1,
+    "far_pct": 41.3,
+    "fa_hours": 559
+   },
+   {
+    "thr": 7,
+    "pod_pct": 63.9,
+    "far_pct": 33.0,
+    "fa_hours": 320
+   },
+   {
+    "thr": 8,
+    "pod_pct": 49.9,
+    "far_pct": 21.9,
+    "fa_hours": 142
+   },
+   {
+    "thr": 9,
+    "pod_pct": 36.3,
+    "far_pct": 13.0,
+    "fa_hours": 55
+   },
+   {
+    "thr": 10,
+    "pod_pct": 26.4,
+    "far_pct": 6.9,
+    "fa_hours": 20
+   }
+  ],
+  "MAG": [
+   {
+    "thr": 1,
+    "pod_pct": 100.0,
+    "far_pct": 91.2,
+    "fa_hours": 5574
+   },
+   {
+    "thr": 2,
+    "pod_pct": 100.0,
+    "far_pct": 89.1,
+    "fa_hours": 4392
+   },
+   {
+    "thr": 3,
+    "pod_pct": 98.9,
+    "far_pct": 85.9,
+    "fa_hours": 3240
+   },
+   {
+    "thr": 4,
+    "pod_pct": 98.5,
+    "far_pct": 81.3,
+    "fa_hours": 2296
+   },
+   {
+    "thr": 5,
+    "pod_pct": 97.6,
+    "far_pct": 75.0,
+    "fa_hours": 1566
+   },
+   {
+    "thr": 6,
+    "pod_pct": 93.8,
+    "far_pct": 66.3,
+    "fa_hours": 991
+   },
+   {
+    "thr": 7,
+    "pod_pct": 80.6,
+    "far_pct": 59.4,
+    "fa_hours": 631
+   },
+   {
+    "thr": 8,
+    "pod_pct": 65.3,
+    "far_pct": 49.7,
+    "fa_hours": 346
+   },
+   {
+    "thr": 9,
+    "pod_pct": 53.0,
+    "far_pct": 38.7,
+    "fa_hours": 179
+   },
+   {
+    "thr": 10,
+    "pod_pct": 39.9,
+    "far_pct": 32.5,
+    "fa_hours": 103
+   }
+  ]
+ }
+}

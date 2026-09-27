@@ -365,6 +365,64 @@ def pick_source_for_day(sources: list, day: str):
     return best[3], best[2], best[0]
 
 
+def build_foehn_block(series: Optional[Dict], day: str) -> Optional[Dict]:
+    """Föhn-Grundlagen eines Tages aus wetterdaten._meta.foehn_series.
+
+    Liefert pro Flugstunde (lokal) Δp = Lugano − Zürich (positiv = Südföhn),
+    700-hPa-Wind/-Richtung über Zürich und die Warnstufe für Süd- und
+    Nord-kritische Regionen — gerechnet mit `evaluate_foehn`, also exakt so wie
+    die Analysen des Tages sie gesehen haben. None, wenn die Reihe fehlt
+    (Wetterlauf vor 09/2026 oder Föhn-Abruf ausgefallen).
+    """
+    if not series or not series.get("time"):
+        return None
+    from foehn_indicators import evaluate_foehn
+
+    times = series["time"]
+    nord = {"hourly": {
+        "time": times,
+        "pressure_msl": series.get("pressure_msl_nord", []),
+        "wind_speed_700hPa": series.get("wind_speed_700hPa_nord", []),
+        "wind_direction_700hPa": series.get("wind_direction_700hPa_nord", []),
+        "relative_humidity_2m": series.get("relative_humidity_2m_nord", []),
+        "wind_speed_10m": series.get("wind_speed_10m_nord", []),
+        "wind_gusts_10m": series.get("wind_gusts_10m_nord", []),
+    }}
+    sued = {"hourly": {"time": times, "pressure_msl": series.get("pressure_msl_sued", [])}}
+
+    hours: Dict[str, Dict] = {}
+    worst = {"Süd": "none", "Nord": "none"}
+    rank = {"none": 0, "caution": 1, "danger": 2}
+    for i, t in enumerate(times):
+        if t[:10] != day:
+            continue
+        h = int(t[11:13])
+        if not (config.FLIGHT_HOURS_START <= h < config.FLIGHT_HOURS_END):
+            continue
+        ev_s = evaluate_foehn(nord, sued, time_index=i, kritischer_foehn="Süd")
+        ev_n = evaluate_foehn(nord, sued, time_index=i, kritischer_foehn="Nord")
+        p_n = nord["hourly"]["pressure_msl"][i] if i < len(nord["hourly"]["pressure_msl"]) else None
+        p_s = sued["hourly"]["pressure_msl"][i] if i < len(sued["hourly"]["pressure_msl"]) else None
+        hours[t[11:16]] = {
+            "dp_hpa": None if (p_n is None or p_s is None) else round(p_s - p_n, 1),
+            "wind_700_kmh": ev_s.get("crest_wind_kmh"),
+            "dir_700_deg": ev_s.get("crest_dir_deg"),
+            "level_sued": ev_s["level"],
+            "level_nord": ev_n["level"],
+        }
+        for side, ev in (("Süd", ev_s), ("Nord", ev_n)):
+            if rank[ev["level"]] > rank[worst[side]]:
+                worst[side] = ev["level"]
+    if not hours:
+        return None
+    return {
+        "stations": {"nord": "Zürich 47.37/8.55", "sued": "Lugano 46.00/8.96"},
+        "worst_level_sued": worst["Süd"],
+        "worst_level_nord": worst["Nord"],
+        "hours": hours,
+    }
+
+
 def build_snapshots(target_date: Optional[str] = None, all_days: bool = False) -> Dict[str, Dict]:
     """Baut Snapshots.
 
@@ -457,6 +515,11 @@ def build_snapshots(target_date: Optional[str] = None, all_days: bool = False) -
             },
             "spots": {},
             "regions": {},
+            # Föhn-Grundlagen des Tages (Flugfenster): Δp Lugano−Zürich,
+            # 700-hPa-Wind über Zürich, Warnstufe Süd/Nord nach der
+            # Produktivlogik. Ohne diesen Block ist eine Föhnwarnung im Archiv
+            # nicht mehr begründbar oder prüfbar (validation/foehn/).
+            "foehn": build_foehn_block(meta.get("foehn_series"), day),
         }
 
         for spot in spots:
