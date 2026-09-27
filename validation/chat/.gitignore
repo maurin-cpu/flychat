@@ -1,0 +1,8 @@
+# Echte Nutzergespräche — bleiben lokal, nie in Git.
+# Begründung siehe README.md. Nur Code, README, .gitignore und BEFUNDE.md sind versioniert.
+konversationen/
+user_*.md
+anon_*.md
+00-INDEX.md
+00-FEHLSCHLAEGE.md
+*.json
