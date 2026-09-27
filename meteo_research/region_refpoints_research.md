@@ -147,6 +147,22 @@ Die theoretisch saubere Lösung für einen Gleitschirm-Forecaster wäre:
 
 **Erwarteter Impact:** Föhn-Detection-Quality steigt deutlich (vermutlich 30–50 % weniger False-Negatives für Föhntage), weil der Strömungs-Anstellwinkel jetzt *dort* gemessen wird, wo das Phänomen real durchbricht. Höchster Aufwand (manuelle Pflege ~29 Regionen), aber einmalig.
 
+> **Korrektur 27.09.2026** (Backtest gegen den MeteoSchweiz-Föhnindex,
+> `validation/foehn/PATTERNS.md`, Recherche `foehn_valley_forecasting.md`):
+> 1. Föhn-Anker gehören **nicht** in die 7 Regions-Referenzpunkte. Wind wird
+>    dort als Median aggregiert und die Thermik vom strahlungsstärksten Punkt
+>    genommen — ein Talboden-Föhnpunkt verzerrt beides. Richtig ist eine
+>    **eigene Punkt-Ebene** (wie die Niederschlags-Referenzpunkte), pro Tal
+>    ein Talpunkt auf der Föhnstation plus ein Kammpunkt, ausgewertet nach
+>    dem Verfahren von Dürr (2008).
+> 2. Die False-Negatives liegen gemessen **nicht** in den grossen Nordföhn-
+>    tälern (Altdorf/Vaduz/Glarus: 93–99 % der Föhnstunden erkannt), sondern
+>    **inneralpin** (Visp, Andeer, Davos: jede zweite Föhnstunde verpasst,
+>    weil Föhn dort bei Δp < 4 hPa entsteht). Dort — und beim
+>    Fehlalarm-Problem „Föhn oben, unten Kaltluftsee" — liegt der Nutzen.
+> 3. Die Zahl „30–50 %" war eine Vermutung; die belastbare Zahl liefert erst
+>    der Talpunkt-Backtest gegen dieselben Stationen.
+
 ### Priorität 3 (Medium Impact, Low Effort): Adaptive N je Polygonfläche
 
 **Problem:** N=7 fix bedeutet, dass "Berner Oberland" (gross, heterogen) gleich viele Punkte hat wie eine kleine Region. API-Quota wird ineffizient ausgegeben.

@@ -77,14 +77,47 @@ in hochaufgelösten Modelldaten (ICON-D2). Am besten sichtbar auf Windy.com bei 
 
 ### Was bereits implementiert ist (`foehn_indicators.py`)
 - Druckgradient (Lugano/Zürich)
-- Kammwind (700hPa Geschwindigkeit + Richtung)
+- Kammwind (700hPa Geschwindigkeit + Richtung) — **Achtung: über Zürich, nicht am Kamm**
 - Luftfeuchtigkeit als Bestätigungsindikator
+- seit 27.09.2026: Südföhn-Δp-Trigger nur bei 700-hPa-Wind im Südhalbkreis 90–270°
 
 ### Was fehlt / ergänzt werden sollte
 - **Verhältnis Bodenwind zu Höhenwind pro Spot** (versteckter Föhn)
 - Pro Spot die Höhenwinde bei 850/800hPa mit dem Bodenwind vergleichen
 - Im LLM-Kontext die relevanten Höhenwinde mitliefern
 - Prompt-Hinweis: grosses Verhältnis + südliche Strömung in Höhe = Föhn-Warnung
+
+### Nachtrag 27.09.2026 — was der Backtest zu diesem Dokument sagt
+
+Quelle: `validation/foehn/PATTERNS.md` (1000 Tage gegen den MeteoSchweiz-
+Föhnindex), Recherche `foehn_valley_forecasting.md`.
+
+- **Schwellentabelle bestätigt, für die grossen Täler.** Δp während Föhn
+  in Altdorf: P10 4.4, Median 7.4 hPa; bei ≥ 4 hPa werden 94 % der
+  Föhnstunden erkannt. Die Faustregel „4 hPa = Durchbruch in die Alpentäler"
+  hält.
+- **„Föhn schon ab 2 hPa" bestätigt — aber nur inneralpin.** Visp, Andeer,
+  Davos haben 42–52 % ihrer Föhnstunden bei Δp < 4, Andeer 24 % bei < 2.
+  In Altdorf/Glarus sind es < 6 % bzw. 0.5 %. Der Satz „Druckgradient
+  allein reicht nicht" gilt also ortsabhängig: inneralpin ja, in den
+  kanalisierten Nordföhntälern nein.
+- **Der „Kammwind" dieses Dokuments ist keiner.** `foehn_indicators` liest
+  700 hPa **über Zürich**. Als Pflichtbedingung (≥ 30 km/h) halbiert er die
+  Trefferquote in Altdorf (93 → 53 %) — d. h. bei der Hälfte aller echten
+  Föhnstunden weht über Zürich auf 700 hPa fast nichts. Die Höhenwind-
+  Kriterien der Tabelle oben (850 hPa > 30 km/h aus Süd usw.) sind darum
+  nur sinnvoll, wenn sie **am Spot oder am Kamm** (Gütsch-Äquivalent)
+  abgefragt werden — genau das, was der Abschnitt „Was fehlt" verlangt und
+  was weiterhin nicht gebaut ist.
+- **Versteckter Föhn ist die Hauptquelle der Fehlalarme.** 60–85 % der
+  Warnstunden haben keinen Föhn am Talboden; ein Teil davon ist Föhn über
+  dem Kaltluftsee. Die Talstation kann das nicht trennen — der hier
+  vorgeschlagene Höhen/Boden-Vergleich pro Spot ist der Weg, es zu
+  unterscheiden. Bleibt offen.
+- **Föhntypen (Jansing 2022) quantifiziert:** Der bestehende enge Sektor
+  135–225° verpasst SW-Föhn (225–270°) und Gegenstromföhn; der Halbkreis
+  90–270° ist seit 27.09. die Bedingung für den Δp-Trigger, der
+  Kammwind-Trigger nutzt weiterhin 135–225°.
 
 ## Quellen
 

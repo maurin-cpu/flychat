@@ -249,6 +249,11 @@ oder mehr** kann er das Vorland erreichen (Erfahrungswerte aus
 [Rheintalmeteo](https://www.rheintalmeteo.ch/prognosen/foehnprognose),
 [MeteoSchweiz — starker Foehn](https://www.meteoschweiz.admin.ch/ueber-uns/meteoschweiz-blog/de/2023/10/starker-foehn-in-den-alpentaelern.html)).
 Diese Werte sind nicht hart, sondern lagen­spezifisch.
+*Gemessen 27.09.2026* (`validation/foehn/PATTERNS.md`): Die +4 hPa halten für
+Reuss- und Rheintal (94 % der Föhnstunden in Altdorf erkannt, Median-Δp bei
+Föhn 7.4 hPa). Inneralpin (Visp, Andeer, Davos) entsteht Föhn dagegen in
+42–52 % der Stunden **unter** 4 hPa — dort ist die Faustregel blind. Für
+Nordföhn ist der gespiegelte Wert nirgends belegt; er warnt an 36 % aller Tage.
 
 ### Vorfoehn vs. echter Foehn
 - **Vorfoehn**: Suedwind setzt in der Hoehe ein, der eigentliche Lee-Effekt
