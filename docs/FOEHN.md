@@ -61,8 +61,32 @@ des Richters (Talboden ≠ Startplatz!) in `validation/foehn/README.md`.
 2. **Nordföhn-Warnung an 36 % aller Tage**, in Magadino 81 % der Warnstunden
    ohne Föhn am Boden (P-5). Bewusst belassen.
 3. **Kammwind ist keiner**: 700 hPa über Zürich ≠ Alpenkamm (P-6).
-4. Nächster Schritt (offen, nicht freigegeben): Modell-Föhnindex pro Tal nach
+4. Nächster Schritt: Modell-Föhnindex pro Tal nach
    Dürr (2008) — Talpunkt + Kammpunkt, Δθ, Sektor, Feuchte — als eigene
    Punkt-Ebene, am Modell kalibriert (ICON-Kaltbias −1.5 K), gegen dieselben
    Stationen gemessen. Zuerst Reuss/Rheintal (Fehlalarme), dann Wallis/Bünden
-   (verpasste Stunden), dann Tessin.
+   (verpasste Stunden), dann Tessin. Die Punkt-Ebene steht (siehe unten),
+   der Index noch nicht.
+
+## Föhn-Talpunkte (seit 03.10.2026)
+
+Eigene Punkt-Ebene `data/foehn_talpunkte.geojson` (Lader `foehn_talpunkte.py`),
+bearbeitbar unter `/admin/reference-points` → „Föhn-Täler". **Bewusst nicht**
+Teil der 7 Regions-Referenzpunkte — Föhnanker würden Wind-Median und
+Thermik-Anker der Region verzerren. Die Punkte fliessen noch in keine
+Bewertung ein.
+
+- **20 Punkte auf Stationen mit amtlichem Föhnindex**, Startlage = Station
+  (Modellwert und Messung am selben Ort). Gruppen: A Nordseite/Südföhn
+  (Altdorf, Chur, Bad Ragaz, Vaduz, Altenrhein, Elm, Glarus, Meiringen,
+  Andeer, Davos), B Wallis (Visp, Sion, Evionnaz, Aigle), C Südseite/Nordföhn
+  (Piotta, Acquarossa, Cevio, Magadino, Grono, San Bernardino).
+- **3 Punkte ohne amtlichen Föhnindex** (`ohne_foehnindex`), aufgenommen weil
+  beflogen (OGN 13.08.–02.10.: 74–134 Flüge je Tal): Riviera auf Station
+  Biasca, Oberengadin auf Station Samedan — beide prüfbar über eine eigene
+  Signatur aus Wind/Temperatur/Feuchte (Engadin: Malojawind ausschliessen);
+  Verzascatal auf dem Talboden bei Brione, ohne Station, nicht prüfbar.
+- **Weggelassen:** Montana (Hangstation 485 m über dem Rhonetal).
+- Geprüft 03.10.: alle Punkte 0–9 m an der Stationshöhe (Open-Meteo-DEM),
+  alle im Polygon ihrer `region_id`. Ob der 1-km-Modellpunkt in engen Tälern
+  den Talboden trifft, ist offen.

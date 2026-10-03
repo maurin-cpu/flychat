@@ -375,6 +375,10 @@ REGIONEN_GEOJSON_LEGACY_PATH = DATA_DIR / "regionen_referenzpunkte_legacy4.geojs
 # 16 dichte CVT-Punkte pro Region — NUR fuer Niederschlag (Coverage-Statistik).
 # Generiert via scripts/create_precip_refpoints.py.
 REGIONEN_GEOJSON_PRECIP_PATH = DATA_DIR / "regionen_referenzpunkte_precip.geojson"
+# Föhn-Talpunkte — eigene Punkt-Ebene, bewusst NICHT in den 7 Regions-RPs
+# (Wind-Median/Thermik-Anker würden verzerrt). Startlage = Föhnindex-Station.
+# Editierbar unter /admin/reference-points. Herleitung: docs/FOEHN.md.
+FOEHN_TALPUNKTE_PATH = DATA_DIR / "foehn_talpunkte.geojson"
 # Master-File fuer Region-Properties (Name, terrain_type, elevation_ref,
 # kritischer_foehn, description). Geometrie + reference_points kommen aus
 # der GeoJSON, alle textuellen Felder aus dieser CSV.

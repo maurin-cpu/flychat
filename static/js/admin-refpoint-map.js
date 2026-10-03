@@ -3,6 +3,8 @@
  * Modes:
  *   - 'regions': edit 7 reference_points per region (saved to GeoJSON)
  *   - 'spots':   edit lat/lon per spot (saved to CSV)
+ *   - 'foehn':   edit lat/lon per Föhn-Talpunkt (saved to foehn_talpunkte.geojson);
+ *                reuses the spot-mode marker/input machinery
  */
 (function () {
     'use strict';
@@ -11,8 +13,10 @@
         mode: 'regions',
         regions: [],          // loaded from /api/admin/refpoints/regions
         spots: [],            // loaded from /api/admin/refpoints/spots
+        foehn: [],            // loaded from /api/admin/refpoints/foehn
         currentRegion: null,  // selected region object
         currentSpot: null,    // selected spot object
+        currentFoehn: null,   // selected Föhn-Talpunkt (coords in spotCoords)
         points: [],           // working copy of region refpoints [[lat,lon],...] (length 7)
         baseline: [],         // last-saved snapshot for reset
         spotCoords: null,     // {lat, lon} working copy for selected spot
@@ -78,14 +82,17 @@
         Promise.all([
             fetchJSON('/api/admin/refpoints/regions'),
             fetchJSON('/api/admin/refpoints/spots'),
+            fetchJSON('/api/admin/refpoints/foehn'),
         ]).then(function (results) {
             state.regions = results[0].regions || [];
             state.spots = results[1].spots || [];
+            state.foehn = results[2].punkte || [];
             populateRegionFilter();
             renderSelector();
             renderPanel();
             updateButtons();
-            setHint(state.regions.length + ' Regionen · ' + state.spots.length + ' Spots');
+            setHint(state.regions.length + ' Regionen · ' + state.spots.length + ' Spots · '
+                    + state.foehn.length + ' Föhn-Talpunkte');
         }).catch(function (e) {
             flashError('Laden fehlgeschlagen: ' + e.message);
         });
@@ -108,10 +115,18 @@
         sel.innerHTML = '';
         var placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = state.mode === 'regions' ? '— Region wählen —' : '— Spot wählen —';
+        placeholder.textContent = state.mode === 'regions' ? '— Region wählen —'
+            : state.mode === 'foehn' ? '— Föhntal wählen —' : '— Spot wählen —';
         sel.appendChild(placeholder);
 
-        if (state.mode === 'regions') {
+        if (state.mode === 'foehn') {
+            state.foehn.forEach(function (p) {
+                var o = document.createElement('option');
+                o.value = p.id;
+                o.textContent = p.gruppe + ' · ' + p.tal + ' (' + p.station + ')';
+                sel.appendChild(o);
+            });
+        } else if (state.mode === 'regions') {
             state.regions.forEach(function (r) {
                 var o = document.createElement('option');
                 o.value = r.id; o.textContent = r.name;
@@ -136,20 +151,23 @@
         state.mode = mode;
         state.currentRegion = null;
         state.currentSpot = null;
+        state.currentFoehn = null;
         state.points = [];
         state.baseline = [];
         state.spotCoords = null;
         state.spotBaseline = null;
         state.dirty = false;
 
-        document.getElementById('rp-mode-regions').classList.toggle('is-active', mode === 'regions');
-        document.getElementById('rp-mode-spots').classList.toggle('is-active', mode === 'spots');
-        document.getElementById('rp-mode-regions').setAttribute('aria-selected', mode === 'regions');
-        document.getElementById('rp-mode-spots').setAttribute('aria-selected', mode === 'spots');
+        ['regions', 'spots', 'foehn'].forEach(function (m) {
+            var btn = document.getElementById('rp-mode-' + m);
+            btn.classList.toggle('is-active', mode === m);
+            btn.setAttribute('aria-selected', mode === m);
+        });
         document.getElementById('rp-region-filter').style.display = mode === 'spots' ? '' : 'none';
 
         clearMapLayers();
         if (mode === 'spots') renderAllSpotMarkers();
+        if (mode === 'foehn') renderAllFoehnMarkers();
         renderSelector();
         renderPanel();
         updateButtons();
@@ -285,11 +303,104 @@
         updateButtons();
     }
 
+    // ---------------- Föhn mode ----------------
+    var FOEHN_COLORS = { A: '#dc2626', B: '#ea580c', C: '#7c3aed' };
+
+    function renderAllFoehnMarkers() {
+        spotMarkers.forEach(function (m) { map.removeLayer(m); }); spotMarkers = [];
+        state.foehn.forEach(function (p) {
+            var color = FOEHN_COLORS[p.gruppe] || '#475569';
+            var m = L.circleMarker([p.lat, p.lon], {
+                radius: 7, color: '#fff', weight: 2,
+                fillColor: color, fillOpacity: 0.9,
+            });
+            m.bindTooltip(p.gruppe + ' · ' + p.tal + ' (' + p.station + ')', { direction: 'top' });
+            m.on('click', function () { selectFoehn(p.id); });
+            m.addTo(map);
+            spotMarkers.push(m);
+        });
+        if (state.foehn.length > 0) {
+            try {
+                var bounds = L.latLngBounds(state.foehn.map(function (p) { return [p.lat, p.lon]; }));
+                map.fitBounds(bounds, { padding: [40, 40] });
+            } catch (e) { /* ignore */ }
+        }
+    }
+
+    function selectFoehn(punktId) {
+        var p = state.foehn.find(function (x) { return x.id === punktId; });
+        if (!p) return;
+        state.currentFoehn = p;
+        state.spotCoords = { lat: Number(p.lat), lon: Number(p.lon) };
+        state.spotBaseline = { lat: Number(p.lat), lon: Number(p.lon) };
+        state.dirty = false;
+
+        if (selectedSpotMarker) { map.removeLayer(selectedSpotMarker); selectedSpotMarker = null; }
+        var color = FOEHN_COLORS[p.gruppe] || '#475569';
+        var icon = L.divIcon({
+            className: '',
+            html: '<div style="width:20px;height:20px;border-radius:50%;background:' + color + ';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>',
+            iconSize: [20, 20], iconAnchor: [10, 10],
+        });
+        selectedSpotMarker = L.marker([p.lat, p.lon], { draggable: true, icon: icon, zIndexOffset: 1000 });
+        selectedSpotMarker.on('drag dragend', function (ev) {
+            var ll = ev.target.getLatLng();
+            state.spotCoords = { lat: Number(ll.lat.toFixed(5)), lon: Number(ll.lng.toFixed(5)) };
+            state.dirty = true;
+            syncInputsFromState();
+            updateButtons();
+        });
+        selectedSpotMarker.addTo(map);
+        map.setView([p.lat, p.lon], 12);
+
+        var sel = document.getElementById('rp-selector');
+        if (sel.value !== p.id) sel.value = p.id;
+
+        renderPanel();
+        updateButtons();
+    }
+
+    function foehnPanelHtml(p) {
+        var html = '<h3>' + escapeHtml(p.tal) + '</h3>';
+        html += '<div class="rp-spot-info">';
+        html += '<strong>Gruppe ' + escapeHtml(p.gruppe) + ' · ' + escapeHtml(p.foehn_typ) + 'föhn</strong>';
+        if (p.station_abbr) {
+            html += 'Messstation: ' + escapeHtml(p.station) + ' (' + escapeHtml(p.station_abbr.toUpperCase())
+                  + ', ' + (p.station_elev || '?') + ' m)';
+        } else {
+            html += 'Keine Messstation — Talboden ' + (p.station_elev || '?') + ' m';
+        }
+        if (p.ohne_foehnindex) html += '<br><span style="color:#b45309;">Kein amtlicher Föhnindex</span>';
+        html += '<br>Region: ' + escapeHtml(p.region_id || '–');
+        html += '<br>Kammstation: ' + escapeHtml((p.kamm_station || '').toUpperCase());
+        if (p.hinweis) html += '<br><em>' + escapeHtml(p.hinweis) + '</em>';
+        html += '</div>';
+        html += '<div class="rp-hint">Startlage = Messstation. Punkt ziehen, wenn das Modell den Talboden an anderer Stelle besser trifft. Fliesst noch in keine Bewertung ein.</div>';
+        html += '<div class="rp-point-row">';
+        html += '<div class="rp-idx">🌬</div>';
+        html += '<input type="number" step="0.0001" id="rp-spot-lat" value="' + state.spotCoords.lat.toFixed(4) + '" aria-label="Latitude">';
+        html += '<input type="number" step="0.0001" id="rp-spot-lon" value="' + state.spotCoords.lon.toFixed(4) + '" aria-label="Longitude">';
+        html += '</div>';
+        return html;
+    }
+
     // ---------------- Panel rendering ----------------
     function renderPanel() {
         var panel = document.getElementById('rp-panel-content');
         var actions = document.getElementById('rp-actions');
-        if (state.mode === 'regions') {
+        if (state.mode === 'foehn') {
+            if (!state.currentFoehn) {
+                panel.className = 'rp-empty';
+                panel.textContent = 'Föhntal auf der Karte anklicken oder oben auswählen. '
+                    + 'Rot = Gruppe A (Nordseite, Südföhn), Orange = B (Wallis), Violett = C (Südseite, Nordföhn).';
+                actions.style.display = 'none';
+                return;
+            }
+            panel.className = '';
+            panel.innerHTML = foehnPanelHtml(state.currentFoehn);
+            attachSpotInputListeners();
+            actions.style.display = 'flex';
+        } else if (state.mode === 'regions') {
             if (!state.currentRegion) {
                 panel.className = 'rp-empty';
                 panel.textContent = 'Region oben auswählen, um die 7 Reference-Points zu editieren.';
@@ -459,7 +570,8 @@
         var resetBtn = document.getElementById('rp-reset');
         var dirty = document.getElementById('rp-dirty');
         var canEdit = (state.mode === 'regions' && state.currentRegion)
-                   || (state.mode === 'spots' && state.currentSpot);
+                   || (state.mode === 'spots' && state.currentSpot)
+                   || (state.mode === 'foehn' && state.currentFoehn);
         saveBtn.disabled = !(canEdit && state.dirty);
         resetBtn.disabled = !(canEdit && state.dirty);
         dirty.style.display = state.dirty ? 'block' : 'none';
@@ -467,7 +579,26 @@
 
     function doSave() {
         clearFlash();
-        if (state.mode === 'regions') {
+        if (state.mode === 'foehn') {
+            if (!state.currentFoehn || !state.spotCoords) return;
+            fetchJSON('/api/admin/refpoints/foehn/' + encodeURIComponent(state.currentFoehn.id), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat: state.spotCoords.lat, lon: state.spotCoords.lon }),
+            }).then(function (resp) {
+                var p = resp.punkt;
+                state.spotCoords = { lat: p.lat, lon: p.lon };
+                state.spotBaseline = { lat: p.lat, lon: p.lon };
+                state.currentFoehn.lat = p.lat;
+                state.currentFoehn.lon = p.lon;
+                state.dirty = false;
+                syncInputsFromState();
+                renderAllFoehnMarkers();
+                map.setView([p.lat, p.lon], map.getZoom());
+                updateButtons();
+                flashOk('Gespeichert: ' + state.currentFoehn.tal + ' → ' + p.lat + ', ' + p.lon);
+            }).catch(function (e) { flashError('Speichern fehlgeschlagen: ' + e.message); });
+        } else if (state.mode === 'regions') {
             if (!state.currentRegion) return;
             var url = '/api/admin/refpoints/region/' + encodeURIComponent(state.currentRegion.id);
             fetchJSON(url, {
@@ -547,10 +678,12 @@
         initMap();
         document.getElementById('rp-mode-regions').addEventListener('click', function () { setMode('regions'); });
         document.getElementById('rp-mode-spots').addEventListener('click', function () { setMode('spots'); });
+        document.getElementById('rp-mode-foehn').addEventListener('click', function () { setMode('foehn'); });
         document.getElementById('rp-selector').addEventListener('change', function (ev) {
             var v = ev.target.value;
             if (!v) return;
             if (state.mode === 'regions') selectRegion(v);
+            else if (state.mode === 'foehn') selectFoehn(v);
             else selectSpot(v);
         });
         document.getElementById('rp-region-filter').addEventListener('change', function () {

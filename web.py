@@ -1421,6 +1421,31 @@ def admin_api_refpoints_save_region(region_id: str):
     return jsonify({"ok": True, "region_id": region_id, "points": validated})
 
 
+@app.route("/api/admin/refpoints/foehn", methods=["GET"])
+@_require_admin
+def admin_api_refpoints_foehn():
+    """JSON: alle Föhn-Talpunkte (eigene Ebene, nicht Teil der Regions-RPs)."""
+    from foehn_talpunkte import load_talpunkte
+    return jsonify({"punkte": load_talpunkte()})
+
+
+@app.route("/api/admin/refpoints/foehn/<punkt_id>", methods=["POST"])
+@_require_admin
+def admin_api_refpoints_save_foehn(punkt_id: str):
+    """Body: {lat, lon}. Verschiebt einen Föhn-Talpunkt."""
+    from foehn_talpunkte import update_talpunkt
+    data = request.get_json(silent=True) or {}
+    try:
+        lat, lon = _validate_latlon(data.get("lat"), data.get("lon"))
+        punkt = update_talpunkt(punkt_id, lat, lon)
+    except (ValueError, FileNotFoundError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.exception("admin refpoints foehn save: %s", e)
+        return jsonify({"ok": False, "error": f"Server-Fehler: {e}"}), 500
+    return jsonify({"ok": True, "punkt": punkt})
+
+
 @app.route("/api/admin/refpoints/spot", methods=["POST"])
 @_require_admin
 def admin_api_refpoints_save_spot():

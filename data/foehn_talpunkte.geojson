@@ -1,0 +1,515 @@
+{
+  "type": "FeatureCollection",
+  "_doc": "Föhn-Talpunkte: eigene Punkt-Ebene, NICHT Teil der 7 Regions-Referenzpunkte. Startlage = SwissMetNet-Station mit Föhnindex (Wahrheit). Montana (Hangstation) bewusst weggelassen. Punkte mit ohne_foehnindex=true: Tal wird beflogen (OGN), aber keine Station mit amtlichem Föhnindex — Riviera/Oberengadin auf Station Biasca/Samedan (eigene Signatur prüfbar), Verzasca ohne Station. Herleitung: meteo_research/foehn_valley_forecasting.md §3.2. Bearbeitbar unter /admin/reference-points (Modus Föhn-Täler).",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.6219,
+          46.8871
+        ]
+      },
+      "properties": {
+        "id": "alt",
+        "tal": "Reusstal / Urnerland",
+        "station": "Altdorf",
+        "station_abbr": "alt",
+        "station_elev": 438,
+        "region_id": "zentralschweizer_alpen",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "Referenzstation der Schweiz, klarste Föhn-Signatur"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.5308,
+          46.8706
+        ]
+      },
+      "properties": {
+        "id": "chu",
+        "tal": "Churer Rheintal",
+        "station": "Chur",
+        "station_abbr": "chu",
+        "station_elev": 556,
+        "region_id": "rheintal",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "viel Mischluft (Index 1) — mitführen"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.5026,
+          47.0166
+        ]
+      },
+      "properties": {
+        "id": "rag",
+        "tal": "Sarganserland",
+        "station": "Bad Ragaz",
+        "station_abbr": "rag",
+        "station_elev": 497,
+        "region_id": "rheintal",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "Talverzweigung Seeztal/Rheintal, häufiger Föhn als Chur"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.5176,
+          47.1275
+        ]
+      },
+      "properties": {
+        "id": "vad",
+        "tal": "St. Galler Rheintal oben",
+        "station": "Vaduz",
+        "station_abbr": "vad",
+        "station_elev": 457,
+        "region_id": "rheintal",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "klares Föhnsignal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.5669,
+          47.4836
+        ]
+      },
+      "properties": {
+        "id": "arh",
+        "tal": "St. Galler Rheintal unten",
+        "station": "Altenrhein",
+        "station_abbr": "arh",
+        "station_elev": 398,
+        "region_id": "rheintal",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "Föhn nimmt talabwärts stark ab — Gegenpunkt zu Vaduz"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1753,
+          46.9237
+        ]
+      },
+      "properties": {
+        "id": "elm",
+        "tal": "Glarnerland (Sernftal, oben)",
+        "station": "Elm",
+        "station_abbr": "elm",
+        "station_elev": 958,
+        "region_id": "glarner_alpen",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "oben häufig Föhn"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.067,
+          47.0346
+        ]
+      },
+      "properties": {
+        "id": "gla",
+        "tal": "Glarnerland (Linthtal, unten)",
+        "station": "Glarus",
+        "station_abbr": "gla",
+        "station_elev": 517,
+        "region_id": "glarner_alpen",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "unten selten — Höhenabhängigkeit zu Elm"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.1692,
+          46.7322
+        ]
+      },
+      "properties": {
+        "id": "mer",
+        "tal": "Haslital",
+        "station": "Meiringen",
+        "station_abbr": "mer",
+        "station_elev": 589,
+        "region_id": "berner_alpen",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "Guttannen wäre besser, hat aber keinen Föhnindex"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.432,
+          46.6101
+        ]
+      },
+      "properties": {
+        "id": "and",
+        "tal": "Domleschg / Schams",
+        "station": "Andeer",
+        "station_abbr": "and",
+        "station_elev": 987,
+        "region_id": "mittelbuenden",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "inneralpin, Föhn schon bei kleinem Druckunterschied"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.8436,
+          46.813
+        ]
+      },
+      "properties": {
+        "id": "dav",
+        "tal": "Davos / Prättigau",
+        "station": "Davos",
+        "station_abbr": "dav",
+        "station_elev": 1594,
+        "region_id": "praettigau_davos",
+        "foehn_typ": "Süd",
+        "gruppe": "A",
+        "kamm_station": "gue",
+        "hinweis": "häufigste inneralpine Föhnstation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.843,
+          46.3029
+        ]
+      },
+      "properties": {
+        "id": "vis",
+        "tal": "Oberwallis Visp–Brig",
+        "station": "Visp",
+        "station_abbr": "vis",
+        "station_elev": 639,
+        "region_id": "oberwallis_goms",
+        "foehn_typ": "Süd(-ost)",
+        "gruppe": "B",
+        "kamm_station": "gsb",
+        "hinweis": "Föhn aus E/SE"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.3302,
+          46.2187
+        ]
+      },
+      "properties": {
+        "id": "sio",
+        "tal": "Mittelwallis",
+        "station": "Sion",
+        "station_abbr": "sio",
+        "station_elev": 482,
+        "region_id": "unterwallis",
+        "foehn_typ": "Süd(-ost)",
+        "gruppe": "B",
+        "kamm_station": "gsb",
+        "hinweis": "fast die Hälfte Mischluft — schwieriger Fall"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.0267,
+          46.183
+        ]
+      },
+      "properties": {
+        "id": "evi",
+        "tal": "Unterwallis Martigny",
+        "station": "Evionnaz",
+        "station_abbr": "evi",
+        "station_elev": 482,
+        "region_id": "waadtlaender_alpen",
+        "foehn_typ": "Süd",
+        "gruppe": "B",
+        "kamm_station": "gsb",
+        "hinweis": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6.9245,
+          46.3266
+        ]
+      },
+      "properties": {
+        "id": "aig",
+        "tal": "Chablais",
+        "station": "Aigle",
+        "station_abbr": "aig",
+        "station_elev": 381,
+        "region_id": "waadtlaender_alpen",
+        "foehn_typ": "Süd",
+        "gruppe": "B",
+        "kamm_station": "gsb",
+        "hinweis": "selten Föhn"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.688,
+          46.5148
+        ]
+      },
+      "properties": {
+        "id": "pio",
+        "tal": "Leventina",
+        "station": "Piotta",
+        "station_abbr": "pio",
+        "station_elev": 990,
+        "region_id": "leventina_blenio",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "gue",
+        "hinweis": "stärkstes Föhnsignal 2026"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.9355,
+          46.4595
+        ]
+      },
+      "properties": {
+        "id": "com",
+        "tal": "Blenio",
+        "station": "Acquarossa/Comprovasco",
+        "station_abbr": "com",
+        "station_elev": 575,
+        "region_id": "leventina_blenio",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "gue",
+        "hinweis": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.6032,
+          46.3205
+        ]
+      },
+      "properties": {
+        "id": "cev",
+        "tal": "Maggiatal",
+        "station": "Cevio",
+        "station_abbr": "cev",
+        "station_elev": 417,
+        "region_id": "leventina_blenio",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "gue",
+        "hinweis": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.9337,
+          46.16
+        ]
+      },
+      "properties": {
+        "id": "mag",
+        "tal": "Magadinoebene",
+        "station": "Magadino/Cadenazzo",
+        "station_abbr": "mag",
+        "station_elev": 203,
+        "region_id": "locarnese_bellinzonese",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "gue",
+        "hinweis": "viel Mischluft"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1638,
+          46.2551
+        ]
+      },
+      "properties": {
+        "id": "gro",
+        "tal": "Misox (unten)",
+        "station": "Grono",
+        "station_abbr": "gro",
+        "station_elev": 324,
+        "region_id": "locarnese_bellinzonese",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "gue",
+        "hinweis": ""
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.1847,
+          46.4635
+        ]
+      },
+      "properties": {
+        "id": "sbe",
+        "tal": "Misox (San Bernardino)",
+        "station": "S. Bernardino",
+        "station_abbr": "sbe",
+        "station_elev": 1639,
+        "region_id": "locarnese_bellinzonese",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "gue",
+        "hinweis": "Passstation 1639 m, nicht Talboden"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.799,
+          46.287
+        ]
+      },
+      "properties": {
+        "id": "verzasca",
+        "tal": "Verzascatal",
+        "station": "ohne Messung",
+        "station_abbr": "",
+        "station_elev": 689,
+        "region_id": "locarnese_bellinzonese",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "gue",
+        "ohne_foehnindex": true,
+        "hinweis": "Keine Station im Tal — Talboden bei Brione, nicht gegen Messung prüfbar"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.9782,
+          46.3361
+        ]
+      },
+      "properties": {
+        "id": "riviera",
+        "tal": "Riviera",
+        "station": "Biasca",
+        "station_abbr": "bia",
+        "station_elev": 278,
+        "region_id": "locarnese_bellinzonese",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "gue",
+        "ohne_foehnindex": true,
+        "hinweis": "Station Biasca misst Wind/Temperatur/Feuchte, führt aber keinen amtlichen Föhnindex — Prüfung über eigene Föhn-Signatur"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.8795,
+          46.5262
+        ]
+      },
+      "properties": {
+        "id": "oberengadin",
+        "tal": "Oberengadin",
+        "station": "Samedan",
+        "station_abbr": "sam",
+        "station_elev": 1709,
+        "region_id": "oberengadin",
+        "foehn_typ": "Nord",
+        "gruppe": "C",
+        "kamm_station": "",
+        "ohne_foehnindex": true,
+        "hinweis": "Station Samedan misst Wind/Temperatur/Feuchte, führt aber keinen amtlichen Föhnindex — Prüfung über eigene Föhn-Signatur; Malojawind ausschliessen"
+      }
+    }
+  ]
+}
