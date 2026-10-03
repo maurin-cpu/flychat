@@ -15,6 +15,7 @@ from .geo import geocode, spots_within
 from .resolve import candidates_text, resolve_region, resolve_spot
 from .screening import (EXCLUSION_REASONS, apply_filters, default_filters, overview_counts, rank)
 from .store import ExportMissing, ExportStore
+from .telemetry import TelemetryMiddleware
 
 MAX_TOP_N = 100
 
@@ -37,11 +38,15 @@ Regeln:
 """
 
 
-def build_server(export_dir: str | None = None) -> MCPServer:
+def build_server(export_dir: str | None = None, telemetry_sink=None) -> MCPServer:
+    """telemetry_sink: (distinct_id, event, props) -> None; Standard PostHog
+    (mcp_server/telemetry.py), False schaltet die Nutzungs-Telemetrie ab."""
     root = export_dir or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "mcp_export")
     store = ExportStore(root)
     server = MCPServer(name="wingcast", instructions=INSTRUCTIONS, version="0.1.0")
     register(server, store)
+    if telemetry_sink is not False:
+        server.middleware.append(TelemetryMiddleware(sink=telemetry_sink))
     return server
 
 

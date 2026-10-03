@@ -29,7 +29,11 @@ def main() -> None:
     if args.transport == "stdio":
         server.run(transport="stdio")
     else:
+        import logging
         import uvicorn
+        # Modul-Logger (Telemetrie je Tool-Aufruf, Export-Stand) ins journal; uvicorn
+        # konfiguriert sonst nur seine eigenen Logger.
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
         hosts = [h.strip() for h in args.allowed_hosts.split(",") if h.strip()]
         app = build_http_app(server, allowed_hosts=hosts, rate_per_min=args.rate_per_min, host=args.host)
         uvicorn.run(app, host=args.host, port=args.port, log_level="info", proxy_headers=True, forwarded_allow_ips="127.0.0.1")

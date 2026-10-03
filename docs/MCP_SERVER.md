@@ -58,13 +58,46 @@ python scripts/build_mcp_export.py      # ~100 s, schreibt data/mcp_export/
 `.mcp.json` im Projektroot registriert den Server für Claude Code (stdio). Danach in
 Claude Code z. B.: „Wo kann ich am Donnerstag fliegen, max 1 h von Luzern?“
 
-Tests: `python -m pytest tests/test_mcp_*.py` (35 Tests, offline).
+Tests: `python -m pytest tests/test_mcp_*.py` (offline).
+
+## Betrieb (seit 09/2026)
+
+- `wingcast-mcp.service` (streamable-http, 127.0.0.1:5100), Caddy leitet
+  `https://app.wingcast.ch/mcp` dorthin, `/healthz` fürs Monitoring. Offen, Rate-Limit
+  pro IP (60/min), kein Login.
+- Export läuft im Scheduler nach dem Wetter-Refresh (`scheduler._run_mcp_export`).
+- `deploy.sh` installiert die Unit und startet den Dienst neu.
+
+## Nutzungs-Telemetrie (seit 03.10.2026)
+
+`mcp_server/telemetry.py` hängt als Middleware des MCP-SDK vor jedem Aufruf und
+meldet an PostHog (gleicher Projekt-Key wie App und Briefing, `app = "mcp"`):
+
+| Event | wann | Eigenschaften |
+|---|---|---|
+| `mcp_tool_called` | jeder `tools/call` | `tool`, `ok`, `duration_ms`, `client_kind`, `user_agent` (gekürzt), `client_name/version` (falls der Client sich nennt) |
+| `mcp_initialize` | Start einer Client-Verbindung | `client_kind`, `client_name/version` |
+
+**Wer zählt als Nutzer?** Der Server kennt keine Konten. `distinct_id` ist ein
+gesalzener Hash aus Client-IP + User-Agent (`MCP_CLIENT_SALT`, Standard
+`wingcast-mcp`) — pseudonym, keine IP verlässt den Server. Grenze: über den
+claude.ai-Connector kommen alle Nutzer von Anthropic-Servern und fallen auf wenige
+Kennungen zusammen → „Clients" ist eine **Untergrenze**, kein Nutzerzähler. Echte
+Zahlen gäbe es erst mit einem Token pro Nutzer (nicht gebaut).
+
+Events sind personenlos (`$process_person_profile = false`, keine Personen-Profile).
+Ohne `POSTHOG_KEY` passiert nichts; zusätzlich steht jeder Aufruf als Zeile im
+journal (`mcp tools/call tool=… client=… mcp:<hash> …ms`). Ein Fehler der
+Telemetrie erreicht das Tool nie (Tests: `tests/test_mcp_telemetry.py`).
+
+**Dashboard** „MCP-Server Nutzung" in PostHog (EU): legt
+`python scripts/posthog_mcp_dashboard.py` an — braucht einen *persönlichen*
+API-Key (`POSTHOG_PERSONAL_API_KEY`, Scopes dashboard:write + insight:write) und
+`POSTHOG_PROJECT_ID`; `--dry-run` druckt nur die Definition. Inhalt: Aufrufe/Tag,
+Clients/Tag und /Woche, Aufrufe je Tool, Clients nach Art, Verbindungsstarts,
+Fehlerquote, p95-Antwortzeit. Abschalten für Tests: `build_server(telemetry_sink=False)`.
 
 ## Bewusst noch nicht gebaut
 
-- **Kein Scheduler-Hook** — Export von Hand, solange es ein Experiment ist. Später:
-  `_run_mcp_export(engine)` in `scheduler._daily_run` nach dem Wetter-Refresh.
-- **Kein Deploy** — Phase 2 wäre `wingcast-mcp.service` (streamable-http, Port 5100),
-  Caddy `mcp.wingcast.ch`, offen mit Rate-Limit pro IP (Entscheid 16.09.).
 - **Open-Meteo-Lizenz** (CC BY, freie API nicht kommerziell) vor einer Veröffentlichung klären.
 - Sprache: Blöcke und Tags sind deutsch; keine Übersetzung in v1.
