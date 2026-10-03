@@ -151,6 +151,8 @@ validation/foehn/messwerte/
 validation/foehn/modell/
 validation/foehn/scoreboard.json
 validation/foehn/AUTO_REPORT.md
+validation/foehn/scoreboard_tal.json
+validation/foehn/AUTO_REPORT_TAL.md
 
 # Fahrzeit-Speicher (Klasse C, jederzeit neu berechenbar — prewarm_travel_times.py)
 data/travel_times_cache.json

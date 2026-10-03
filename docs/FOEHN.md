@@ -90,3 +90,7 @@ Bewertung ein.
 - Geprüft 03.10.: alle Punkte 0–9 m an der Stationshöhe (Open-Meteo-DEM),
   alle im Polygon ihrer `region_id`. Ob der 1-km-Modellpunkt in engen Tälern
   den Talboden trifft, ist offen.
+- **Erster Test 03.10. (Altdorf, Vaduz; `validation/foehn/PATTERNS.md` P-9):**
+  Ein Föhnindex am Talpunkt senkt die Fehlalarm-Stunden auf ein Drittel bis
+  ein Achtzehntel, verpasst aber rund 26 % der Föhnstunden (national 6 %).
+  Vorschlag: als Abstufung zur nationalen Warnung, nicht als Ersatz.

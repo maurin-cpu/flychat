@@ -91,6 +91,42 @@ Fehlalarm-Problem ist strukturell (Föhn oben vs. am Boden) und nur lokal lösba
 Entscheid User 27.09.: Nordföhn-Schwelle bleibt bei 4 hPa (konservativ);
 die 36 % Warntage werden in Kauf genommen.
 
+## P-9 · 03.10.2026: Föhnindex am Talpunkt drittelt die Fehlalarme — kostet aber ein Viertel der Föhnstunden
+
+`scripts/backtest_foehn_tal.py` → `AUTO_REPORT_TAL.md`. Modell-Index am
+Talpunkt (= Station, `data/foehn_talpunkte.geojson`): Δθ Tal−Gütsch,
+Windsektor, Böe, Feuchte; Schwellen per Gittersuche auf einem Zeitraum
+eingestellt, auf einem **anderen** gemessen. ICON-D2 (2 km), Flugfenster.
+
+| Test | Station | national Treffer / FAR / Fehlalarm-h | tal Treffer / FAR / Fehlalarm-h | national∧tal Treffer / FAR |
+|---|---|---|---|---|
+| 2026 (Train 2024–25) | Altdorf, 78 Föhn-h | 86 % / 65 % / 126 | 74 % / 43 % / 44 | 63 % / 16 % |
+| 2026 (Train 2024–25) | Vaduz, 60 Föhn-h | 87 % / 72 % / 133 | 88 % / 37 % / 31 | 77 % / 13 % |
+| 2024 (Train 2025–26) | Altdorf, 285 Föhn-h | 94 % / 50 % / 266 | 74 % / 14 % / 33 | 71 % / 11 % |
+| 2024 (Train 2025–26) | Vaduz, 278 Föhn-h | 94 % / 49 % / 254 | 73 % / 6 % / 14 | 71 % / 3 % |
+
+- **Fehlalarme fallen auf ein Drittel bis ein Achtzehntel** — in beiden
+  Richtungen der Prüfung, also kein Zufall eines Zeitraums. Das bestätigt
+  P-2: Die Fehlalarme der nationalen Warnung sind Föhn oben, der den
+  Talboden nicht erreicht; das sieht nur ein Punkt im Tal.
+- **Preis: rund 26 % der Föhnstunden verpasst** (national 6 %). Für eine
+  Sicherheitswarnung ist das der gefährlichere Fehler.
+- Die eingestellten Schwellen sind über beide Prüfrichtungen ähnlich
+  (Altdorf Δθ ≥ −5…−7 K, Sektor ~140° ± 30–45°, Feuchte ≤ 60 %; Vaduz
+  Δθ ≥ −2…−2.5 K, Sektor ~175° ± 90°) — der Index ist stabil, nicht
+  überangepasst. Die Feuchte-Bedingung (≤ 50–60 %) ist überall dabei.
+- **ICON-CH1 (1 km) noch nicht beurteilbar:** erst ab 08/2025 im Archiv,
+  Training 8 Monate Herbst/Winter, Test Sommer — Vaduz kippt (FAR 71 %),
+  national∧tal bleibt gut (Treffer 90 %, FAR 16 %). Neu rechnen, sobald ein
+  ganzes Jahr vorliegt.
+- Talboden ≠ Startplatz (README, Grenze 1): Ein „verpasster" Föhn ist am
+  Talboden gemessen; ein Fehlalarm kann auf Starthöhe trotzdem Föhn sein.
+
+Folgerung (Vorschlag, nicht umgesetzt): Den Talindex **nicht** als Ersatz
+der nationalen Warnung, sondern als **Abstufung** nutzen — national =
+„Föhnlage", national∧tal = „Föhn im Tal am Boden". Vor jedem Einbau auf
+die übrigen Talpunkte ausdehnen.
+
 ## Was daraus folgt (Vorschlag, nicht umgesetzt)
 
 1. Sofort und billig: Kammwind-Sektor 90–270° als UND-Bedingung zum Δp

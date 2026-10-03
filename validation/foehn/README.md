@@ -15,6 +15,7 @@ Zürich) — gerechnet auf Open-Meteo `historical-forecast-api` mit
 Stündlich UTC, 2024-01-01 bis 2026-09-26 (1000 Tage).
 
 **Skript:** `scripts/backtest_foehn.py` → `AUTO_REPORT.md`, `scoreboard.json`.
+Föhnindex pro Tal: `scripts/backtest_foehn_tal.py` → `AUTO_REPORT_TAL.md`, `scoreboard_tal.json` (P-9).
 
 ## Grenzen des Richters — was die Wahrheit NICHT sagen kann
 
