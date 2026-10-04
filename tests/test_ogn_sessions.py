@@ -422,3 +422,27 @@ def test_empfangslage_wird_je_region_geschrieben(tmp_path, monkeypatch):
         assert r[1] == 1 and r[2] == 1 and r[3] == 1 and r[4] == 60
     finally:
         conn.close()
+
+
+def test_spot_liste_ist_die_der_app():
+    """OGN ordnet mit derselben Startplatzliste zu wie die App (bis 04.10.2026
+    stand hier die alte DHV-Liste)."""
+    import config
+    assert og.SPOT_CSV == config.CSV_PATH
+
+
+def test_respot_ordnet_gespeicherte_fluege_neu_zu(tmp_path, monkeypatch):
+    beacons = [_row("dev1", T0, 10 * i, 46.5 + 0.001 * i, 8.0, 1600 + 20 * i)
+               for i in range(60)]
+    conn = _db(tmp_path, monkeypatch, beacons)
+    try:
+        og.run_day(conn, T0.date().isoformat())
+        assert conn.execute("SELECT launch_spot FROM flights").fetchone()[0] == "Testberg"
+        # neue Liste: anderer Name am selben Ort
+        monkeypatch.setattr(og, "_load_spots", lambda: [("Neuer Startplatz", "Testregion",
+                                                         46.5, 8.0)])
+        assert og.reassign_launch_spots(conn) == 1
+        assert conn.execute("SELECT launch_spot FROM flights").fetchone()[0] == "Neuer Startplatz"
+        assert og.reassign_launch_spots(conn) == 0          # zweiter Lauf: nichts mehr
+    finally:
+        conn.close()

@@ -38,11 +38,16 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import config
+
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "data" / "ogn_tracks.db"
-SPOT_CSV = ROOT / "data" / "fluggebiete_dhv.csv"
+# Dieselbe Startplatzliste wie die App (config.CSV_PATH, aktiv: PGE). Bis
+# 04.10.2026 stand hier die alte DHV-Liste — neue Startplaetze (z.B. Waadtlaender
+# Jura) wurden dadurch nie erkannt.
+SPOT_CSV = config.CSV_PATH
 
 # --- abgelesene Schwellenwerte (Begruendung im Modul-Docstring) -------------
 SESSION_GAP_S = 300        # Sendepause, ab der ein Flug als beendet gilt
@@ -270,6 +275,24 @@ class RegionLookup:
                 break
         self._memo[key] = found
         return found
+
+
+def reassign_launch_spots(conn: sqlite3.Connection) -> int:
+    """Startplatz aller gespeicherten Fluege neu zuordnen (aus launch_lat/lon,
+    aktuelle Liste). Noetig nach einem Wechsel der Spot-Liste: die Rohpunkte
+    alter Tage sind nach RETENTION_DAYS geloescht, ein Neuverdichten geht nicht.
+    Liefert die Zahl geaenderter Fluege."""
+    spots = _load_spots()
+    changed = 0
+    rows = conn.execute("SELECT rowid, launch_lat, launch_lon, launch_spot FROM flights "
+                        "WHERE launch_lat IS NOT NULL AND launch_lon IS NOT NULL").fetchall()
+    for rowid, lat, lon, old in rows:
+        new, _d = _nearest_spot(lat, lon, spots)
+        if new != old:
+            conn.execute("UPDATE flights SET launch_spot=? WHERE rowid=?", (new, rowid))
+            changed += 1
+    conn.commit()
+    return changed
 
 
 def _nearest_spot(lat, lon, spots):
@@ -681,6 +704,9 @@ def main(argv=None) -> int:
     ap.add_argument("--report", action="store_true", help="Stand zeigen")
     ap.add_argument("--prune", action="store_true",
                     help="Rohpunkte aelter als die Aufbewahrung loeschen")
+    ap.add_argument("--respot", action="store_true",
+                    help="Startplatz aller gespeicherten Fluege neu zuordnen "
+                         "(nach einem Wechsel der Spot-Liste)")
     args = ap.parse_args(argv)
 
     if not DB_PATH.exists():
@@ -691,6 +717,10 @@ def main(argv=None) -> int:
         init_db(conn)
         if args.report:
             report(conn)
+            return 0
+        if args.respot:
+            print(f"{reassign_launch_spots(conn)} Fluege neu zugeordnet "
+                  f"(Liste: {SPOT_CSV.name})")
             return 0
         if args.backfill:
             tage = days_with_beacons(conn)
