@@ -143,6 +143,34 @@ def refresh_synoptic_overview(weather_cache: dict, analysis_client,
     return sctx
 
 
+def refresh_synoptic_overview_lang(sctx: dict, analysis_client,
+                                   analysis_model: str, lang: str) -> Optional[dict]:
+    """Zweite Sprachfassung des Wetterlage-Blocks fuer das oeffentliche Briefing.
+
+    Nimmt das fertige Strukturfeld des Hauptlaufs (deterministisch und
+    sprachneutral), erzeugt nur den LLM-Teil neu in `lang` — mit demselben
+    Validator und Korrektur-Loop — und schreibt synoptic_context.<lang>.json.
+    Thread-lokal (i18n.lang_override): Web-Requests und Mails bleiben in LANG.
+    Fuer die Server-Sprache gibt es nichts zu tun, dann kommt sctx zurueck.
+    """
+    import copy
+    import i18n
+    from engine import synoptic_context as sc
+
+    if lang == i18n.get_server_lang():
+        return sctx
+    out = copy.deepcopy(sctx)
+    with i18n.lang_override(lang):
+        overview = generate_synoptic_overview(out, analysis_client, analysis_model)
+    out["llm_overview"] = overview   # None, wenn der Validator nichts durchliess
+    out["lang"] = lang
+    try:
+        sc._write_synoptic_cache(out, lang=lang)
+    except Exception as e:
+        logger.warning("synoptic cache (%s) schreiben fehlgeschlagen: %s", lang, e)
+    return out
+
+
 def generate_synoptic_overview(synoptic_context: dict, analysis_client,
                                analysis_model: str) -> Optional[dict]:
     """Generiert den Wetterlage-Block mit Validierungs-/Korrektur-Loop.

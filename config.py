@@ -775,11 +775,25 @@ SYNOPTIC_CACHE_PATH = DATA_DIR / "synoptic_context.json"
 SYNOPTIC_AUDIT_DIR = DATA_DIR / "synoptic_audit"
 SYNOPTIC_AUDIT_KEEP_DAYS = 30   # ältere Audit-Files werden rotiert geloescht
 
+# --- Oeffentliches Briefing (wingcast.ch/flugwetter-schweiz) ----------------
+# Sprachen, fuer die der Scheduler das Briefing taeglich als schlanke JSON
+# ablegt (engine/public_briefing.py). Die Server-Sprache (LANG) ist gratis,
+# jede weitere kostet einen zusaetzlichen LLM-Call fuer den Wetterlage-Block.
+PUBLIC_BRIEFING_LANGS = tuple(
+    s.strip().lower()
+    for s in os.environ.get("WINGCAST_PUBLIC_BRIEFING_LANGS", "de,en").split(",")
+    if s.strip()
+)
+PUBLIC_BRIEFING_DAYS = int(os.environ.get("WINGCAST_PUBLIC_BRIEFING_DAYS", "3"))
+PUBLIC_BRIEFING_MAX_AGE_H = 18   # aelter -> Endpunkt antwortet 503, Webseite zeigt Fallback
+PUBLIC_BRIEFING_DIR = DATA_DIR / "public_briefing"
+
 # Vercel-Override (writable nur in /tmp)
 if os.environ.get("VERCEL"):
     SYNOPTIC_CACHE_PATH = _WRITABLE_DIR / "synoptic_context.json"
     SYNOPTIC_AUDIT_DIR = _WRITABLE_DIR / "synoptic_audit"
     SYNOPTIC_GRID_CACHE_PATH = _WRITABLE_DIR / "synoptic_grid.json"
+    PUBLIC_BRIEFING_DIR = _WRITABLE_DIR / "public_briefing"
 
 # ============================================================================
 # THERMIK-BERECHNUNGS-PARAMETER

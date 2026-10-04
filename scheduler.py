@@ -250,6 +250,7 @@ def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
 
     # Wetterlage-Block (Synoptik) 1x/Tag refreshen, bevor build_briefing_data laeuft.
     # Schlaegt der Refresh fehl, faellt der Block aus dem Cast — kein Fallback-Text.
+    sctx_main = None
     try:
         from engine.synoptic_llm import refresh_synoptic_overview
         from fetch_weather import load_cached_weather
@@ -259,6 +260,7 @@ def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
                 wcache, engine.synoptic_client, engine.synoptic_model,
             )
             if sctx:
+                sctx_main = sctx
                 logger.info("Scheduler: Wetterlage refreshed (lage=%s, llm_overview=%s)",
                             sctx.get("lage_label", {}).get("value"),
                             "ok" if sctx.get("llm_overview") else "fehlt")
@@ -267,6 +269,25 @@ def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
     except Exception as e:
         logger.exception("Scheduler: Wetterlage-Refresh Exception: %s", e)
         # weiter mit Briefing, ohne Wetterlage-Block
+
+    # Oeffentliches Briefing (wingcast.ch): weitere Sprachfassungen des
+    # Wetterlage-Blocks, je ein LLM-Call. Thread-lokal, eigenes try/except je
+    # Sprache — ein Fehler hier darf den Mailversand nie blockieren.
+    import i18n
+    wetterlage_by_lang: dict = {i18n.get_server_lang(): sctx_main}
+    for lang in config.PUBLIC_BRIEFING_LANGS:
+        if lang not in i18n.SUPPORTED or lang == i18n.get_server_lang():
+            continue
+        try:
+            if sctx_main and engine.synoptic_client:
+                from engine.synoptic_llm import refresh_synoptic_overview_lang
+                wetterlage_by_lang[lang] = refresh_synoptic_overview_lang(
+                    sctx_main, engine.synoptic_client, engine.synoptic_model, lang,
+                )
+                logger.info("Scheduler: Wetterlage %s (llm_overview=%s)", lang,
+                            "ok" if (wetterlage_by_lang[lang] or {}).get("llm_overview") else "fehlt")
+        except Exception as e:
+            logger.exception("Scheduler: Wetterlage %s Exception: %s", lang, e)
 
     # Synoptik-Grid (/synoptik-Druckkarte) 1x/Tag refreshen — eigenes
     # try/except: ein Grid-Fehler darf Briefing-Mails nie blockieren.
@@ -289,6 +310,14 @@ def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
 
     days_count = len(briefing_data.get("days", []))
     logger.info("Scheduler: briefing_data = %d Tage", days_count)
+
+    # Oeffentliches Briefing je Sprache als schlanke JSON ablegen
+    # (data/public_briefing/, Endpunkt /api/public/briefing). Nie blockierend.
+    try:
+        from engine.public_briefing import write_all
+        write_all(wetterlage_by_lang, briefing_data)
+    except Exception as e:
+        logger.exception("Scheduler: oeffentliches Briefing: %s", e)
 
     from datetime import datetime as _dt
     today_weekday = _dt.now().weekday()  # 0=Mo, 6=So

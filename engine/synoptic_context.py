@@ -341,9 +341,22 @@ def _atomic_write_json(path: Path, data: dict) -> None:
         raise
 
 
-def _write_synoptic_cache(result: dict) -> None:
-    """Schreibt das Wetterlage-Strukturfeld nach data/synoptic_context.json."""
-    _atomic_write_json(config.SYNOPTIC_CACHE_PATH, result)
+def synoptic_cache_path(lang: Optional[str] = None) -> Path:
+    """Cache-Datei je Sprache. Ohne `lang` oder fuer die Server-Sprache die
+    bisherige synoptic_context.json; fuer eine weitere Sprache (oeffentliches
+    Briefing) synoptic_context.<lang>.json daneben. Bewusst gegen die
+    Server-Sprache verglichen, nicht gegen get_current_lang(): innerhalb
+    einer lang_override() darf der Hauptcache nicht ueberschrieben werden."""
+    import i18n
+    base = Path(config.SYNOPTIC_CACHE_PATH)
+    if not lang or lang == i18n.get_server_lang():
+        return base
+    return base.with_name(f"{base.stem}.{lang}{base.suffix}")
+
+
+def _write_synoptic_cache(result: dict, lang: Optional[str] = None) -> None:
+    """Schreibt das Wetterlage-Strukturfeld nach data/synoptic_context[.<lang>].json."""
+    _atomic_write_json(synoptic_cache_path(lang), result)
 
 
 def _write_audit_log(result: dict) -> None:
@@ -374,13 +387,14 @@ def _rotate_audit_logs() -> None:
             continue
 
 
-def load_synoptic_cache() -> Optional[dict]:
+def load_synoptic_cache(lang: Optional[str] = None) -> Optional[dict]:
     """Laedt das letzte Wetterlage-Strukturfeld aus dem Cache.
 
     Wird von Web-Layer (Wingcast/Email) verwendet, um den fertig
     generierten Block anzuzeigen. Kein neuer LLM-Call hier.
+    `lang` nur fuer das oeffentliche Briefing in einer weiteren Sprache.
     """
-    path = Path(config.SYNOPTIC_CACHE_PATH)
+    path = synoptic_cache_path(lang)
     if not path.exists():
         return None
     try:

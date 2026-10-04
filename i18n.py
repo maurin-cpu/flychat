@@ -13,9 +13,35 @@ Grundsaetze:
 
 from __future__ import annotations
 
+import threading
+from contextlib import contextmanager
+
 import config
 
 SUPPORTED = ("de", "en")
+
+# Thread-lokale Uebersteuerung der Sprache. Gebraucht vom Scheduler, der im
+# selben Prozess wie der Webserver laeuft: der zweite Wetterlage-Lauf (DE fuer
+# das oeffentliche Briefing) darf Web-Requests und Mails nicht umschalten.
+_override = threading.local()
+
+
+def get_server_lang() -> str:
+    """Sprache des Servers (config.LANG), ohne thread-lokale Uebersteuerung."""
+    lang = (getattr(config, "LANG", "de") or "de").strip().lower()
+    return lang if lang in SUPPORTED else "de"
+
+
+@contextmanager
+def lang_override(lang: str):
+    """Sprache nur fuer diesen Thread und nur innerhalb des Blocks setzen.
+    Unbekannte Sprachen werden ignoriert (bleibt bei der Server-Sprache)."""
+    prev = getattr(_override, "lang", None)
+    _override.lang = lang if lang in SUPPORTED else None
+    try:
+        yield
+    finally:
+        _override.lang = prev
 
 # ---------------------------------------------------------------------------
 # Sprach-Tabelle:  key -> {"de": ..., "en": ...}
@@ -1225,9 +1251,12 @@ STRINGS: dict[str, dict[str, str]] = {
 
 
 def get_current_lang() -> str:
-    """Aktive Sprache (global). Faellt bei ungueltigem Wert auf 'de' zurueck."""
-    lang = (getattr(config, "LANG", "de") or "de").strip().lower()
-    return lang if lang in SUPPORTED else "de"
+    """Aktive Sprache: thread-lokale Uebersteuerung vor config.LANG.
+    Faellt bei ungueltigem Wert auf 'de' zurueck."""
+    forced = getattr(_override, "lang", None)
+    if forced in SUPPORTED:
+        return forced
+    return get_server_lang()
 
 
 def t(key: str, **kwargs) -> str:

@@ -2728,7 +2728,36 @@ def _briefing_analyse(aggregated: dict):
         return None
 
 
+@app.route("/api/public/briefing", methods=["GET"])
+def api_public_briefing():
+    """Oeffentliches Schweiz-Briefing fuer wingcast.ch/flugwetter-schweiz.
+
+    Liefert die vom Scheduler abgelegte JSON (engine/public_briefing.py)
+    unveraendert: kein Rechnen pro Request, keine Sprachumschaltung im
+    Web-Thread, nur die Whitelist-Felder. Kein Login, kein Tages-Gating —
+    die Kette steht in der App ohnehin fuer alle offen, hier mit
+    PUBLIC_BRIEFING_DAYS Tagen. 503, wenn die Datei fehlt oder der
+    Wetterlage-Block aelter als PUBLIC_BRIEFING_MAX_AGE_H ist.
+    """
+    from engine import public_briefing as pb
+    lang = (request.args.get("lang") or "de").strip().lower()
+    if lang not in config.PUBLIC_BRIEFING_LANGS:
+        return jsonify({"available": False, "reason": "unknown_lang"}), 404
+    payload = pb.load_public_briefing(lang)
+    age = pb.age_hours(payload)
+    if payload is None or age is None or age > config.PUBLIC_BRIEFING_MAX_AGE_H:
+        resp = jsonify({"available": False,
+                        "reason": "missing" if payload is None else "stale"})
+        resp.status_code = 503
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+    resp = jsonify({**payload, "available": True, "age_hours": round(age, 1)})
+    resp.headers["Cache-Control"] = "public, max-age=300, s-maxage=300"
+    return resp
+
+
 @app.route("/api/briefing/generate", methods=["POST"])
+@_require_admin
 def api_briefing_generate():
     """Triggert manuell den Wetterlage-Block (Synoptik) refresh
     (1× extra API-Call ECMWF + optional 1× Foehn-API + 1× LLM-Call).
