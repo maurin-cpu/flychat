@@ -58,7 +58,15 @@ PAIR_ROOTS = [
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Hash des INHALTS, nicht der Bytes: Zeilenenden (CRLF auf Windows, LF auf
+    dem Server) und ein UTF-8-BOM zaehlen nicht. Frueher wurden die rohen Bytes
+    gehasht — ein Stempel von Windows meldete auf dem Server dann 13 Dateien als
+    Drift, obwohl nichts geaendert war (04.10.2026)."""
+    data = path.read_bytes()
+    if data.startswith(b"\xef\xbb\xbf"):
+        data = data[3:]
+    data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def _rel(path: Path) -> str:
