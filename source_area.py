@@ -85,14 +85,7 @@ def update_reference_points(region_id: str, new_points: list) -> None:
 
 
 def _current_geojson_path():
-    """Gibt den aktiven Pfad zurueck (CVT-7 oder Legacy-4 je nach Config).
-    Wird dynamisch ausgewertet, damit ein Toggle ohne Restart greift —
-    der Cache wird in _load_regions() automatisch invalidiert."""
-    if getattr(config, "USE_LEGACY_REGION_REFPOINTS", False):
-        legacy = getattr(config, "REGIONEN_GEOJSON_LEGACY_PATH", None)
-        if legacy and legacy.exists():
-            return legacy
-        print("[WARN] USE_LEGACY_REGION_REFPOINTS=True aber Legacy-File fehlt — Fallback auf Default")
+    """Pfad der Region-GeoJSON (Geometrie + 7 Referenzpunkte je Region)."""
     return config.REGIONEN_GEOJSON_PATH
 
 
@@ -251,10 +244,6 @@ def get_reference_points(spot_name, lat, lon, quiet=False):
     ]
 
 
-def get_region_name_for_spot(spot_name, lat, lon):
-    """Gibt den Region-Namen fuer einen Spot zurueck (fuer Anzeige)."""
-    region = find_region_for_point(lat, lon)
-    return region["region"] if region else None
 
 
 def get_all_regions():

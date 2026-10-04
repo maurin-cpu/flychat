@@ -83,8 +83,6 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
         "Start-Fenster (Windrichtung + Gefahrenfreiheit)": [
             {"key": "CLEAN_WINDOW_MIN_HOURS", "type": "int", "min": 1, "max": 8, "unit": "h",
              "help": "Mindest-Laenge des zusammenhaengenden sauberen Fensters (WIND-OK + keine DANGER-Tags), damit der Tag ueberhaupt conditional sein darf. Darunter: not_safe."},
-            {"key": "CLEAN_WINDOW_GREEN_HOURS", "type": "int", "min": 2, "max": 12, "unit": "h",
-             "help": "Ab dieser Laenge des sauberen Fensters kann der Tag safe/green sein. Zwischen MIN und GREEN: conditional."},
             {"key": "WIND_DIRECTION_SWING_NOTE_DEG", "type": "int", "min": 10, "max": 180, "unit": "°",
              "help": "Winkel-Schwelle fuer Richtungsdreher-Anmerkung in caution_notes. Ab diesem Dreher innerhalb des Swing-Fensters wird erwaehnt, dass der Wind unbestaendig ist. KEIN Status-Downgrade."},
             {"key": "WIND_DIRECTION_SWING_WINDOW_H", "type": "int", "min": 1, "max": 6, "unit": "h",
@@ -95,8 +93,6 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
              "help": "Boeen ab dem [GUST-WARN] (Boden) bzw. [ALOFT-GUST-WARN] (Hoehe) vergeben wird."},
             {"key": "GUST_DANGER_KMH", "type": "int", "min": 0, "max": 100, "unit": "km/h",
              "help": "Boeen ab dem [GUST-DANGER] / [ALOFT-GUST-DANGER] vergeben wird. LLM bevorzugt NoGo bei DURCHGEHEND_DANGER-Trend."},
-            {"key": "GUST_TREND_FLOOR_HOURS", "type": "int", "min": 0, "max": 12, "unit": "h",
-             "help": "Mindeststunden Boeen (WARN oder DANGER, Boden + Hoehe summiert) fuer Boeen-Floor → safe→conditional."},
         ],
         "CAPE-Schwellen (Konvektion)": [
             {"key": "CAPE_WARN_JKG", "type": "int", "min": 0, "max": 5000, "unit": "J/kg",
@@ -113,8 +109,6 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
              "help": "Max. mittlere Wolken (3000-6000m) fuer produktive Stunde. Altostratus ab ~90% = praktisch tot."},
             {"key": "PRODUCTIVE_HOURS_FOR_GREEN", "type": "int", "min": 1, "max": 12, "unit": "h",
              "help": "Mindest-Anzahl produktive Stunden fuer gray->green Upgrade (Flyability-Tier)."},
-            {"key": "PRODUCTIVE_HOURS_DOWNGRADE", "type": "int", "min": 0, "max": 12, "unit": "h",
-             "help": "Unter dieser Anzahl produktiver Stunden wird green/violet -> gray herabgestuft."},
         ],
         "Violett-Kriterien (XC-Tag)": [
             {"key": "VIOLET_PEAK_MIN", "type": "float", "min": 0.0, "max": 5.0, "step": 0.1, "unit": "m/s",
@@ -178,8 +172,6 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
         "Darstellung": [
             {"key": "SHOW_REFERENCE_POINTS", "type": "bool",
              "help": "Zeigt Linien vom Startplatz zu den regionalen Thermik-Referenzpunkten beim Hover auf der Karte."},
-            {"key": "USE_LEGACY_REGION_REFPOINTS", "type": "bool",
-             "help": "Fallback auf die alten 4 Referenzpunkte pro Region (am Rand). Standard: CVT-7 (7 Punkte im Innern). Wechsel greift beim naechsten Wetter-Refresh."},
             {"key": "SHOW_OSM_PEAKS", "type": "bool",
              "help": "OSM-Berge/Paesse/Saettel auf allen Karten anzeigen (osm.org-Stil). Daten aus Overpass-API, Refresh via scripts/fetch_osm_peaks.py."},
         ],
@@ -204,19 +196,15 @@ SCHEMA: dict[str, dict[str, list[dict]]] = {
             {"key": "ANALYSIS_MODEL", "type": "choice",
              "choices": _MODEL_CHOICES, "choice_groups": _MODEL_GROUPS,
              "choice_labels": _MODEL_LABELS,
-             "help": "Modell fuer Spot/Region-Analysen. Provider wird automatisch erkannt und steht als Gruppe ueber dem Modell. Bei OpenAI ist zusaetzlich der Batch-Modus moeglich (siehe OPENAI_ANALYSIS_MODE). Hybrid-Setup moeglich (z.B. Chat=claude-haiku-4-5, Analyse=gpt-5.4-mini)."},
+             "help": "Modell fuer Spot/Region-Analysen. Provider wird automatisch erkannt und steht als Gruppe ueber dem Modell. Hybrid-Setup moeglich (z.B. Chat=claude-haiku-4-5, Analyse=gpt-5.4-mini)."},
             {"key": "SYNOPTIC_MODEL", "type": "choice",
              "choices": _MODEL_CHOICES, "choice_groups": _MODEL_GROUPS,
              "choice_labels": _MODEL_LABELS,
              "help": "Modell fuer den Wetterlage-Block (Synoptik, 1 Call/Tag). Provider wird automatisch erkannt. Default = ANALYSIS_MODEL. Hier z.B. deepseek-v4-flash setzen, falls Reasoning fuer die taegliche Synoptik gewuenscht ist, waehrend ANALYSIS_MODEL fuer die Massen-Spot-Analyse auf einem schnelleren Modell bleibt."},
         ],
         "LLM-Analyse (technisch)": [
-            {"key": "OPENAI_ANALYSIS_MODE", "type": "choice", "choices": ["parallel", "batch"],
-             "help": "Gilt NUR wenn ANALYSIS_PROVIDER=openai. parallel = schnell (viele gleichzeitige Calls). batch = guenstig (OpenAI Batch API, 50% billiger, 5-30 Min). Bei Anthropic/Gemini/DeepSeek wird der Wert ignoriert (immer parallel)."},
             {"key": "LLM_MAX_WORKERS", "type": "int", "min": 1, "max": 100,
-             "help": "Anzahl paralleler LLM-Calls im parallel-Modus. Hoeher = schneller, aber mehr Quota-Verbrauch."},
-            {"key": "LLM_BATCH_POLL_INTERVAL", "type": "int", "min": 5, "max": 300, "unit": "s",
-             "help": "Poll-Intervall fuer Batch-Status im OpenAI-batch-Modus."},
+             "help": "Anzahl paralleler LLM-Calls. Hoeher = schneller, aber mehr Quota-Verbrauch."},
         ],
     },
 }
@@ -240,7 +228,6 @@ def _flat_keys() -> dict[str, dict]:
 # Beim Lesen wird der alte Key transparent in den neuen umbenannt; existierende
 # data/config_overrides.json muss nicht von Hand migriert werden.
 _RENAMED_KEYS: dict[str, str] = {
-    "LLM_ANALYSIS_MODE": "OPENAI_ANALYSIS_MODE",  # Apr 2026: Klarstellung dass nur OpenAI betroffen
 }
 
 

@@ -893,48 +893,6 @@ class WeatherContextMixin:
             return guide + "\n\n" + head + "\n\n" + series
         return guide + "\n\n" + head
 
-    def _calculate_wind_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m):
-        """
-        Berechnet die vertikale Windscherung dU/dz durch die Thermikschicht.
-
-        Returns: (dU_dz_kmh_per_100m, u_top_kmh, u_sfc_kmh) oder (None, None, None)
-        falls keine pressure levels verfuegbar.
-
-        Basis: meteo_research/wind_shear_thermal_quality.md Abschnitt 3.2/3.3.
-        """
-        if not isinstance(wind_speed_10m, (int, float)):
-            return (None, None, None)
-        if not pl_data or not isinstance(thermal_top_m, (int, float)):
-            return (None, None, None)
-        if thermal_top_m <= elevation_m:
-            return (None, None, None)
-
-        # Sammle alle pressure-level Winde zwischen elevation und thermal_top
-        winds_in_layer = []
-        for level in config.PRESSURE_LEVELS:
-            h_val = pl_data.get(f"geopotential_height_{level}hPa")
-            ws_val = pl_data.get(f"wind_speed_{level}hPa")
-            if h_val is None or ws_val is None:
-                continue
-            if elevation_m <= h_val <= thermal_top_m:
-                winds_in_layer.append((h_val, ws_val))
-
-        if len(winds_in_layer) < 1:
-            return (None, None, None)
-
-        # Waehle den hoechsten Punkt in der Schicht als U_top
-        winds_in_layer.sort(key=lambda x: x[0])
-        h_top, u_top = winds_in_layer[-1]
-
-        # Distanz vom 10 m ueber Grund (~ wind_speed_10m Referenz) bis h_top
-        dz_m = h_top - elevation_m
-        if dz_m < 200:
-            # Zu duenne Schicht fuer belastbare Scherungs-Schaetzung
-            return (None, None, None)
-
-        du_kmh = abs(u_top - wind_speed_10m)
-        du_dz_kmh_per_100m = (du_kmh / dz_m) * 100.0
-        return (du_dz_kmh_per_100m, u_top, wind_speed_10m)
 
     def _calculate_segment_shear(self, wind_speed_10m, pl_data, elevation_m, thermal_top_m,
                                  include_surface_anchor=True):
@@ -2832,18 +2790,6 @@ class WeatherContextMixin:
 
         return "\n".join(lines)
 
-    def _get_spots_in_region(self, region):
-        """Findet Spots innerhalb des Region-Polygons via Point-in-Polygon."""
-        from shapely.geometry import Point
-        polygon = region.get("polygon")
-        if polygon is None:
-            return []
-        result = []
-        for spot in self.spots:
-            pt = Point(spot["longitude"], spot["latitude"])
-            if polygon.contains(pt):
-                result.append(spot)
-        return result
 
     def _region_convective_hint(self, region_id, date_str):
         """Eine Zeile Region-Konvektion (Gewitter-Ensemble + Ueberentwicklung)

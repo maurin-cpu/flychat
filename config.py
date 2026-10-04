@@ -78,7 +78,6 @@ def with_api_key(params):
 #   4. EU  (13 km, 5d)    — Notfall, nur Tag 3-5 ausserhalb der CH-Coverage.
 SURFACE_PRIMARY_MODEL   = "meteoswiss_icon_ch1"   # Tier 1: Tag 1 (33h), 1.1 km
 SURFACE_SECONDARY_MODEL = "meteoswiss_icon_ch2"   # Tier 2: Tag 2-5 (120h), 2.1 km
-SURFACE_TERTIARY_MODEL  = "icon_d2"               # Tier 3: CH-rand, Tag 1-2 (48h), 2.2 km
 SURFACE_FALLBACK_MODEL  = "icon_eu"               # Tier 4: Notfall, 13 km
 
 # --- D2-SPEZIFISCHE Surface-Variablen + PRESSURE-LEVEL ---
@@ -100,10 +99,6 @@ BLH_MODEL = "gfs_seamless"                          # 5 d, 25 km
 # meteo_research/precipitation_aggregation.md funktioniert nur auf
 # konvektionsaufloesenden Modellen (CH1/CH2/D2), nicht auf EU.
 PRECIP_DENSE_MODEL = "meteoswiss_icon_ch2"          # 5 d, 2.1 km
-
-# --- BOEEN-MULTI-MAX-MERGE (Sicherheits-Layer) ---
-# Konservatives max(D2, CH1, CH2) auf wind_gusts_10m (siehe BOEEN_MODELL.md).
-GUST_MERGE_MODELS = ["icon_d2", "meteoswiss_icon_ch1", "meteoswiss_icon_ch2"]
 
 # --- HORIZONTE pro Modell (forecast_days fuer Batch-Calls) ---
 FORECAST_DAYS_CH1 = 2   # real ~33h, 2d genuegt
@@ -303,11 +298,6 @@ WIND_MODEL    = SURFACE_PRIMARY_MODEL
 THERMAL_MODEL = PRESSURE_LEVEL_PRIMARY_MODEL
 FALLBACK_MODEL = PRESSURE_LEVEL_FALLBACK_MODEL
 PRECIP_MODEL  = PRECIP_DENSE_MODEL
-CH1_MODEL = SURFACE_PRIMARY_MODEL
-CH2_MODEL = SURFACE_SECONDARY_MODEL
-CH1_FORECAST_DAYS = FORECAST_DAYS_CH1
-CH2_FORECAST_DAYS = FORECAST_DAYS_CH2
-API_MODEL = SURFACE_PRIMARY_MODEL
 
 API_TIMEOUT = 30
 FORECAST_DAYS = 5
@@ -365,13 +355,10 @@ DATA_DIR = PROJECT_ROOT / "data"
 # bemerkungen_flug, bemerkungen_sicherheit).
 USE_SPOT_CSV = os.environ.get("WINGCAST_SPOT_CSV", "pge")
 CSV_PATH = DATA_DIR / f"fluggebiete_{USE_SPOT_CSV}.csv"
-# Region-Referenzpunkte: Default ist CVT-7 (Apr 2026, 7 Punkte im
-# Polygon-Innern via Lloyd-CVT). Legacy-Modus nutzt die alten 4 Punkte
-# am Polygon-Rand (Greedy Max-Min-Distance). Fallback-Option bei Problemen
-# mit der neuen Aggregation. Beide Files muessen in data/ vorliegen.
-USE_LEGACY_REGION_REFPOINTS = False
+# Region-Referenzpunkte: CVT-7 (Apr 2026, 7 Punkte im Polygon-Innern via
+# Lloyd-CVT). Der fruehere Legacy-Schalter auf die alten 4 Randpunkte ist
+# seit 04.10.2026 entfernt — die Legacy-Datei existierte nicht mehr.
 REGIONEN_GEOJSON_PATH = DATA_DIR / "regionen_referenzpunkte.geojson"
-REGIONEN_GEOJSON_LEGACY_PATH = DATA_DIR / "regionen_referenzpunkte_legacy4.geojson"
 # 16 dichte CVT-Punkte pro Region — NUR fuer Niederschlag (Coverage-Statistik).
 # Generiert via scripts/create_precip_refpoints.py.
 REGIONEN_GEOJSON_PRECIP_PATH = DATA_DIR / "regionen_referenzpunkte_precip.geojson"
@@ -384,23 +371,13 @@ FOEHN_TALPUNKTE_PATH = DATA_DIR / "foehn_talpunkte.geojson"
 # der GeoJSON, alle textuellen Felder aus dieser CSV.
 REGIONEN_CSV_PATH = DATA_DIR / "regionen.csv"
 
-# Vercel: Nur /tmp ist schreibbar. Readonly-Daten (CSV, GeoJSON) bleiben in data/
-if os.environ.get("VERCEL"):
-    _WRITABLE_DIR = Path("/tmp/wingcast")
-    _WRITABLE_DIR.mkdir(parents=True, exist_ok=True)
-    WEATHER_JSON_PATH = _WRITABLE_DIR / "wetterdaten.json"
-    HISTORY_DIR = _WRITABLE_DIR / "history"
-    STATION_DB_PATH = _WRITABLE_DIR / "station_observations.db"
-    SUBSCRIBERS_DB_PATH = _WRITABLE_DIR / "subscribers.db"
-    FEEDBACK_DB_PATH = _WRITABLE_DIR / "feedback.db"
-    TRAVEL_TIME_CACHE_PATH = _WRITABLE_DIR / "travel_times_cache.json"
-else:
-    WEATHER_JSON_PATH = DATA_DIR / "wetterdaten.json"
-    HISTORY_DIR = DATA_DIR / "history"
-    STATION_DB_PATH = DATA_DIR / "station_observations.db"
-    SUBSCRIBERS_DB_PATH = DATA_DIR / "subscribers.db"
-    FEEDBACK_DB_PATH = DATA_DIR / "feedback.db"
-    TRAVEL_TIME_CACHE_PATH = DATA_DIR / "travel_times_cache.json"
+# Schreibbare Laufzeit-Dateien (Server: alles unter data/)
+WEATHER_JSON_PATH = DATA_DIR / "wetterdaten.json"
+HISTORY_DIR = DATA_DIR / "history"
+STATION_DB_PATH = DATA_DIR / "station_observations.db"
+SUBSCRIBERS_DB_PATH = DATA_DIR / "subscribers.db"
+FEEDBACK_DB_PATH = DATA_DIR / "feedback.db"
+TRAVEL_TIME_CACHE_PATH = DATA_DIR / "travel_times_cache.json"
 
 # ============================================================================
 # SPOT SOURCE AREAS (manuelle Overrides fuer Referenzpunkte)
@@ -608,16 +585,8 @@ SYNOPTIC_VB_MAX_MSL_HPA = 1010.0   # Druck im Zentrum muss unter dieser Schwelle
 # Alpenhauptkette. Wird aus regionen.csv abgeleitet (s. synoptic_context.py).
 # Schwellen fuer Niederschlagscharakter pro Tag:
 SYNOPTIC_PRECIP_DRY_MM = 0.5         # Tages-Peak unter dieser Schwelle = trocken
-SYNOPTIC_PRECIP_LIGHT_MM = 2.0       # 0.5-2 mm = leicht
-SYNOPTIC_PRECIP_MODERATE_MM = 8.0    # 2-8 mm = maessig, > 8 = stark
 SYNOPTIC_PRECIP_COVERAGE_FLAECHIG = 0.7   # Coverage >= 70% = flaechig (stratiform)
 SYNOPTIC_PRECIP_COVERAGE_KONVEKTIV = 0.4  # Coverage < 40% + CAPE = konvektiv/Schauer
-# DEPRECATED (ungenutzt seit Pure-LLM-Synoptik, Mai 2026): CAPE ist KEIN
-# Gewitter-Signal mehr. Gewitter = weather_code 95/96/99 (gewitter_share,
-# s. synoptic_context.py / skills/synoptic_overview.md). CAPE = nur noch
-# Ueberentwicklungs-Indikator. Siehe docs/GEWITTER.md.
-SYNOPTIC_PRECIP_CAPE_KONVEKTIV = 300      # DEPRECATED — ungenutzt
-SYNOPTIC_PRECIP_GEWITTER_MIN_WETSHARE = 0.10  # DEPRECATED — ungenutzt
 
 # --- Wind-Fliegbarkeit Nord/Sued der Alpen (wind_pattern) -----------------
 # Deterministisches Wind-Aggregat pro Tag/Seite fuer den Synoptik-Block —
@@ -634,7 +603,6 @@ SYNOPTIC_WIND_HOURS = (10, 17)       # Kern-Flugfenster (lokale Stunden)
 SYNOPTIC_WIND_DIST_BANDS_KMH = (10, 20, 30, 40, 50, 60)
 # Kritisch-Schwellen: bewusst identisch zu WIND_WARN_KMH/WIND_DANGER_KMH
 # bzw. GUST_WARN_KMH/GUST_DANGER_KMH (dort definiert) — kein zweites Regime.
-SYNOPTIC_PRECIP_CAPE_GEWITTER = 800       # DEPRECATED — ungenutzt (CAPE ≠ Gewitter)
 SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE = 0.10  # min. Anteil nasser Spots fuer seitenweite "Schauer"/"Regen"-Aussage; sonst trocken — verhindert dass 1-3% lokale Zellen die ganze Alpenseite als nass labeln
 
 # --- Flugwetter-Zonen (Synoptik 2.0) ------------------------------------
@@ -787,13 +755,6 @@ PUBLIC_BRIEFING_LANGS = tuple(
 PUBLIC_BRIEFING_DAYS = int(os.environ.get("WINGCAST_PUBLIC_BRIEFING_DAYS", "3"))
 PUBLIC_BRIEFING_MAX_AGE_H = 18   # aelter -> Endpunkt antwortet 503, Webseite zeigt Fallback
 PUBLIC_BRIEFING_DIR = DATA_DIR / "public_briefing"
-
-# Vercel-Override (writable nur in /tmp)
-if os.environ.get("VERCEL"):
-    SYNOPTIC_CACHE_PATH = _WRITABLE_DIR / "synoptic_context.json"
-    SYNOPTIC_AUDIT_DIR = _WRITABLE_DIR / "synoptic_audit"
-    SYNOPTIC_GRID_CACHE_PATH = _WRITABLE_DIR / "synoptic_grid.json"
-    PUBLIC_BRIEFING_DIR = _WRITABLE_DIR / "public_briefing"
 
 # ============================================================================
 # THERMIK-BERECHNUNGS-PARAMETER
@@ -1121,9 +1082,7 @@ PRODUCTIVE_CLIMB_MIN = 0.7      # m/s — Mindest-Climb fuer "produktive" Stunde
 # Thermik-Arbeitshoehe → "praktisch tot" laut FAA erst >87%, daher lockerer bei 90%.
 PRODUCTIVE_LOW_CLOUD_MAX = 80   # % — Max cloud_cover_low fuer "produktive" Stunde
 PRODUCTIVE_MID_CLOUD_MAX = 90   # % — Max cloud_cover_mid fuer "produktive" Stunde
-PRODUCTIVE_CLOUD_MAX = 80       # % — DEPRECATED, behalten fuer Abwaertskompatibilitaet. Nutze LOW/MID getrennt.
 PRODUCTIVE_HOURS_FOR_GREEN = 4  # Mindest-Stunden fuer gray->green Upgrade
-PRODUCTIVE_HOURS_DOWNGRADE = 2  # Untere Schwelle: green/violet -> gray
 
 # ─── OVERCAST-DANGER (Sicherheits-Gate, killt clean_hours → not_safe) ───
 # Gefahr = dichte, geschlossene Wolkendecke AUF oder UNTER Startplatzhoehe:
@@ -1186,14 +1145,13 @@ WIND_IDEAL_MAX_KMH = 20         # km/h — ab diesem: ueber Komfortzone (= WIND_
 # Eine "saubere Stunde" = WIND-OK (Spot-Sektor) UND keine DANGER-Tags.
 # Tag-Status haengt am laengsten zusammenhaengenden Block sauberer Stunden:
 #   < CLEAN_WINDOW_MIN_HOURS   → not_safe (kein ausreichendes Start-Fenster)
-#   >= CLEAN_WINDOW_GREEN_HOURS → safe/green moeglich (LLM entscheidet conditional vs safe)
-# Schwellen sind absichtlich identisch: keine Zwischenzone "max conditional" mehr —
+#   >= CLEAN_WINDOW_MIN_HOURS  → safe/green moeglich (LLM entscheidet conditional vs safe)
+# Eine einzige Schwelle: keine Zwischenzone "max conditional" mehr —
 # entweder reicht das Fenster (>=3h) oder nicht (<3h). Pre-Filter wendet dieselbe
 # Schwelle deterministisch auf wind_ok_count an (siehe analyzers._prefilter_not_safe).
 # WIND-WRONG Stunden NACH dem Start-Fenster sind kein Grund fuer UNFLIEGBAR —
 # der Pilot ist bereits in der Luft, Landung i.d.R. auf separatem Landeplatz.
 CLEAN_WINDOW_MIN_HOURS = 2       # h — unterhalb: not_safe
-CLEAN_WINDOW_GREEN_HOURS = 2     # h — ab hier: safe/green moeglich
 
 # Bei Flaute ist die Windrichtung bedeutungsloses Rauschen (Thermik-/Talwind-
 # Drehen, kein Gradient) — unter dieser Schwelle kann man aus jeder Richtung
@@ -1233,11 +1191,6 @@ CAPE_LID_CIN_JKG = 150          # CIN > 150 J/kg (positiv!) = geschlossener Deck
 #                     → harter NO-GO. Boeen-Trend → LLM-Empfehlung "bevorzugt NoGo".
 WIND_TREND_CONDITIONAL_HOURS = 3
 WIND_TREND_NOTSAFE_HOURS = 3
-GUST_TREND_FLOOR_HOURS = 3       # Min. Stunden fuer Boeen-Floor (Boden+Hoehe summiert)
-
-# ============================================================================
-# INSTANTDB-KONFIGURATION
-# ============================================================================
 
 # ============================================================================
 # STATIONSDATEN + BIAS-KORREKTUR
@@ -1625,28 +1578,6 @@ def get_model(provider: str, purpose: str) -> str:
 # LLM-ANALYSE-KONFIGURATION
 # ============================================================================
 
-# OPENAI_ANALYSIS_MODE — gilt AUSSCHLIESSLICH wenn ANALYSIS_PROVIDER=openai.
-# "parallel" = schnell (viele gleichzeitige Calls), "batch" = guenstig
-# (OpenAI Batch API, 50% billiger, dauert 5-30 Min).
-#
-# Anthropic, Gemini und DeepSeek haben KEINE Batch-API → bei diesen Providern
-# wird der Wert zur Laufzeit ignoriert und immer parallel ausgefuehrt
-# (Auto-Fallback unten + Dispatcher in engine/analyzers.py).
-#
-# Wird ueblicherweise via Admin-UI gesetzt (data/config_overrides.json), nicht ENV.
-OPENAI_ANALYSIS_MODE = os.environ.get(
-    "OPENAI_ANALYSIS_MODE",
-    # Backwards-Compat: alter ENV-Name LLM_ANALYSIS_MODE als Fallback
-    os.environ.get("LLM_ANALYSIS_MODE", "parallel"),
-)
-if OPENAI_ANALYSIS_MODE == "batch" and ANALYSIS_PROVIDER != "openai":
-    logging.getLogger(__name__).warning(
-        "OPENAI_ANALYSIS_MODE=batch greift nur mit ANALYSIS_PROVIDER=openai "
-        "(aktuell: '%s'). Wird zur Laufzeit ignoriert → parallel.",
-        ANALYSIS_PROVIDER,
-    )
-    OPENAI_ANALYSIS_MODE = "parallel"
-
 # DEEPSEEK_DISABLE_THINKING — schaltet den Thinking-Modus fuer die Massen-Analyse
 # (Spot-/Region-Calls in engine/analyzers.py) ab. Gilt nur fuer DeepSeek-V4-Modelle,
 # die Thinking per Default an haben.
@@ -1684,13 +1615,8 @@ SYNOPTIC_THINKING = os.environ.get("SYNOPTIC_THINKING", "0") == "1"
 # Hoeher = schneller, aber mehr Quota-Verbrauch pro Sekunde.
 LLM_MAX_WORKERS = int(os.environ.get("LLM_MAX_WORKERS", "20"))
 
-# Poll-Intervall (Sekunden) im "batch"-Modus, wie oft der Batch-Status geprüft wird.
-LLM_BATCH_POLL_INTERVAL = int(os.environ.get("LLM_BATCH_POLL_INTERVAL", "30"))
 
-# Stall-Timeout (Sekunden): Wenn ein OpenAI-Batch so lange ohne Progress
-# (completed-Counter unverändert) bleibt, wird er gecancelt und der Daily-Run
-# fällt einmalig auf Parallel-Modus zurück. Default 60 min.
-LLM_BATCH_STALL_TIMEOUT_S = int(os.environ.get("LLM_BATCH_STALL_TIMEOUT_S", "3600"))
+
 
 
 # ============================================================================

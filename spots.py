@@ -145,15 +145,8 @@ def get_spot_by_name(spots, name):
     return None
 
 
-def get_all_spot_names(spots):
-    """Gibt alle Spot-Namen zurück."""
-    return [s["name"] for s in spots]
 
 
-def find_spots_by_region(spots, region):
-    """Filtert Spots nach Region (case-insensitive, Teilmatch)."""
-    region_lower = region.lower()
-    return [s for s in spots if region_lower in s["region"].lower()]
 
 
 def make_spot_id(region: str, fluggebiet: str, site_name: str) -> str:

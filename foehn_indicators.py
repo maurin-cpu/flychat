@@ -70,11 +70,6 @@ TAL_SEKTOR = {
 }
 
 
-def _potential_temperature(temp_kelvin: float, pressure_hpa: float, p0: float = 1000.0) -> float:
-    """Potenzielle Temperatur θ = T * (P0/P)^0.2854"""
-    if pressure_hpa <= 0:
-        return 0.0
-    return temp_kelvin * (p0 / pressure_hpa) ** 0.2854
 
 
 def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:

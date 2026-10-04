@@ -1048,6 +1048,7 @@ def admin_wetterlage_audit(date: str = None):
     LLM-Prompt-Input, LLM-Output, Post-Filter-Log.
     """
     import os, json as _json
+    from pathlib import Path
     audit_dir = Path(config.SYNOPTIC_AUDIT_DIR)
     if not audit_dir.exists():
         return jsonify({"error": "No audit dir", "path": str(audit_dir)}), 404
@@ -3044,17 +3045,6 @@ def api_chat_history():
 
 
 
-@app.route("/api/run-analyses", methods=["POST"])
-@_require_admin
-def api_run_analyses():
-    """Startet die LLM Spot-Analyse für alle Spots."""
-    try:
-        result = engine.run_spot_analyses()
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
 def _format_spot_analyses_flat(spot_analyses: dict, loaded_at: Optional[str], allowed_dates: set) -> dict:
     """Baut die flache Spot-Analysen-Repraesentation fuer /api/analyses.
 
@@ -3315,17 +3305,6 @@ def api_region_context(region_id: str, date_str: str):
     return jsonify({"region_id": region_id, "date": date_str, "text": text})
 
 
-@app.route("/api/run-region-analyses", methods=["POST"])
-@_require_admin
-def api_run_region_analyses():
-    """Startet die LLM Region-Analyse fuer alle Regionen."""
-    try:
-        result = engine.run_region_analyses()
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
 def _format_region_analyses_flat(region_analyses: dict, loaded_at: Optional[str], allowed_dates: set) -> dict:
     """Baut die flache Region-Analysen-Repraesentation fuer /api/region-analyses."""
     flat: dict = {}
@@ -3427,115 +3406,6 @@ _analysis_completed = False
 _analysis_error = None
 _analysis_result = None
 _analysis_queue = None  # queue.Queue — wird bei Start erstellt
-
-
-def _run_analysis_in_background(eng, q):
-    """Laeuft in eigenem Thread, pusht Events in die Queue."""
-    global _analysis_running, _analysis_completed, _analysis_error, _analysis_result
-    try:
-        for evt in eng.run_all_analyses_stream():
-            q.put(evt)
-            # Bei done-Event: Ergebnis cachen
-            if evt.get("event") == "done":
-                data = evt.get("data", {})
-                rs = data.get("region_stats") or {}
-                ss = data.get("spot_stats") or {}
-                _analysis_result = {
-                    "regions_count": rs.get("regions_count", 0),
-                    "spots_count": ss.get("spots_count", 0),
-                    "total_calls": data.get("total_calls", 0),
-                }
-                _analysis_completed = True
-    except Exception as e:
-        logger.exception("[ANALYSIS-BG] Fehler im Analyse-Thread")
-        q.put({"event": "error", "data": {"message": str(e)}})
-        _analysis_error = str(e)
-    finally:
-        q.put(None)  # Sentinel: "fertig"
-        _analysis_running = False
-        logger.info("[ANALYSIS-BG] Analyse-Thread beendet (completed=%s)", _analysis_completed)
-
-
-@app.route("/api/analyses-status")
-def api_analyses_status():
-    """Polling-Endpoint: Status der laufenden/letzten Analyse."""
-    if _analysis_running:
-        return jsonify({"running": True, "completed": False})
-    if _analysis_completed and _analysis_result:
-        return jsonify({
-            "running": False, "completed": True,
-            "regions_count": _analysis_result.get("regions_count", 0),
-            "spots_count": _analysis_result.get("spots_count", 0),
-            "total_calls": _analysis_result.get("total_calls", 0),
-        })
-    return jsonify({"running": False, "completed": False,
-                     "error": _analysis_error})
-
-
-@app.route("/api/run-all-analyses-stream")
-@_require_admin
-def api_run_all_analyses_stream():
-    """SSE-Endpoint: Startet Analyse im Background-Thread, streamt Events aus Queue."""
-    global _analysis_running, _analysis_completed, _analysis_error, _analysis_result, _analysis_queue
-
-    with _analysis_lock:
-        if _analysis_running:
-            logger.warning("[SSE] Analyse laeuft bereits, lehne zweiten Request ab")
-            return Response(
-                "event: error\ndata: {\"message\": \"Analyse läuft bereits\"}\n\n",
-                mimetype="text/event-stream",
-                headers={"Cache-Control": "no-cache"},
-            )
-
-        _analysis_running = True
-        _analysis_completed = False
-        _analysis_error = None
-        _analysis_result = None
-        _analysis_queue = _queue_mod.Queue()
-
-    # Analyse in Background-Thread starten
-    t = threading.Thread(
-        target=_run_analysis_in_background,
-        args=(engine, _analysis_queue),
-        daemon=True,
-    )
-    t.start()
-
-    def generate():
-        yield "retry: 300000\n\n"
-        try:
-            while True:
-                try:
-                    evt = _analysis_queue.get(timeout=15)
-                except _queue_mod.Empty:
-                    # Heartbeat wenn Queue leer (Thread arbeitet noch)
-                    if not _analysis_running:
-                        break
-                    yield "event: heartbeat\ndata: {}\n\n"
-                    continue
-                if evt is None:
-                    break  # Sentinel: Thread ist fertig
-                event_type = evt.get("event", "message")
-                if event_type == "heartbeat":
-                    yield "event: heartbeat\ndata: {}\n\n"
-                    continue
-                data = evt.get("data", {})
-                yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-        except GeneratorExit:
-            logger.warning("[SSE] Client disconnected — Analyse laeuft im Background weiter")
-        except Exception as e:
-            logger.exception("[SSE] analyses stream Fehler")
-            yield f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
 
 
 def _run_single_stream_in_background(eng, q, stream_attr, done_event):
@@ -3666,17 +3536,6 @@ def api_regionen_precip_refpoints():
         return jsonify({"type": "FeatureCollection", "features": []})
     with open(path, "r", encoding="utf-8") as f:
         return jsonify(json.load(f))
-
-
-@app.route("/api/refresh-spots", methods=["POST"])
-@_require_admin
-def api_refresh_spots():
-    """Laedt Spots neu aus CSV."""
-    try:
-        count = engine.reload_spots()
-        return jsonify({"success": True, "spots_count": count})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/refresh-weather", methods=["POST"])
@@ -3823,11 +3682,6 @@ def _tier_thresholds():
         "aloft_wind": {"warn": config.WIND_WARN_KMH, "danger": config.WIND_DANGER_KMH},
         "aloft_gust": {"warn": config.GUST_WARN_KMH, "danger": config.GUST_DANGER_KMH},
     }
-
-
-@app.route("/api/thresholds")
-def api_thresholds():
-    return jsonify({"tiers": _tier_thresholds()})
 
 
 # ============================================================================

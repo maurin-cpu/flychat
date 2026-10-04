@@ -35,8 +35,6 @@ def main():
     logger.info("Aktive LLM-Modelle:")
     logger.info("  Chat:     %s  (provider=%s)", engine.chat_model, engine.chat_provider)
     logger.info("  Analyse:  %s  (provider=%s)", engine.analysis_model, engine.analysis_provider)
-    if engine.analysis_provider == "openai":
-        logger.info("  OpenAI Analysis-Mode: %s", config.OPENAI_ANALYSIS_MODE)
     logger.info("=" * 60)
 
     # Wetterdaten aus lokalem Cache laden (kein API-Call, nur JSON lesen)

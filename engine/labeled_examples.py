@@ -29,7 +29,6 @@ REGIONEN_CSV = config.DATA_DIR / "regionen.csv"
 
 VALID_LABELS = ("richtig", "zu_optimistisch", "zu_pessimistisch")
 VALID_SAFETY_STATUS = ("safe", "conditional", "not_safe")
-VALID_ENTITY_TYPES = ("region", "spot")
 
 # analysis_id = <kind>_<slug>_<YYYY-MM-DD>. Slug ist lowercase a-z0-9_.
 # Kind unterscheidet region vs. spot — beide nutzen denselben Speicher,

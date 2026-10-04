@@ -85,10 +85,6 @@ def is_overdev_hour(cloud_top_entry, data, therm=None, storm=False):
     return True
 
 
-def onset_hour(hours):
-    """Erste Ueberentwicklungs-Stunde ("HH:MM"-Liste) — fuer das Wording
-    "Quellwolken koennen ab ~14 Uhr hochschiessen"."""
-    return min(hours) if hours else None
 
 
 # --------------------------------------------------------------------------

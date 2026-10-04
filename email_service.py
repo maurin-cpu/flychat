@@ -1626,8 +1626,6 @@ def _render_briefing_v3(ctx: dict, briefing_data: dict, subscriber: dict):
 # ACCURACY-MAIL (Stufe 6): Monatsrueckblick mit Vorhersage-Genauigkeit
 # ======================================================================
 
-_MONTH_DE = ["", "Januar", "Februar", "Maerz", "April", "Mai", "Juni",
-             "Juli", "August", "September", "Oktober", "November", "Dezember"]
 
 
 def _accuracy_framing(pct: int) -> tuple[str, str]:

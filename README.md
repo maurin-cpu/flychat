@@ -36,7 +36,7 @@ Frontend für die Web-Oberfläche.
 ---
 
 ## Richtlinien für neue Dateien
-1. **Keine** neuen Skripte oder Dumps im **Hauptordner** — außer zentrale Einstiegspunkte (`main.py`, `app.py`, `web.py`, `config.py`, …).
+1. **Keine** neuen Skripte oder Dumps im **Hauptordner** — außer zentrale Einstiegspunkte (`main.py`, `web.py`, `config.py`, …).
 2. **Debug / manuelle Tests** → `debug_scripts/`.
 3. **Pytest / Regression** → `tests/`.
 4. **Längere Doku** → `docs/` oder `meteo_research/`, je nach Thema.

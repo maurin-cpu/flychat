@@ -110,10 +110,6 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
         self.weather_loaded_at = None
         self.foehn_data = None
         self.conversations = {}
-        # InstantDB ist deaktiviert — Stub fuer Backwards-Kompat in engine/analyzers.py
-        # und engine/chat_orchestrator.py, die noch `if self.instantdb:` Branches haben.
-        # Diese werden so zu No-Ops, ohne dass die Module umgebaut werden muessen.
-        self.instantdb = None
         self.spot_analyses = {}
         self.analyses_loaded_at = None
         self._analyses_stale = False  # True nach Wetter-Refresh, bis neue Analysen da sind
@@ -410,7 +406,7 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
         # (~500k Zeichen bei 487 Spots) an das LLM geschickt → 147k Tokens → Error 400.
         # Die alten Analysen sind zwar nicht mehr 100% aktuell, aber immer noch besser
         # als der Fallback auf Rohdaten, der das Token-Limit sprengt.
-        # Cleanup passiert erst in run_spot_analyses() / run_combined_analyses() wenn
+        # Cleanup passiert erst in den Analyse-Laeufen (run_all_analyses_stream), wenn
         # neue Ergebnisse vorliegen.
         if self.spot_analyses:
             print(f"[ENGINE] Behalte {len(self.spot_analyses)} alte Spot-Analysen bis neue generiert werden")
@@ -454,9 +450,6 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
 
         print(f"[ENGINE] Wetterdaten geladen ({len(self.weather_data) - 1} Spots)")
 
-    def analyze_weather(self) -> str:
-        """Manuelle Analyse wurde deaktiviert."""
-        return "Die Vor-Zusammenfassung wurde deaktiviert. Nutze bitte den Chat für eine direkte Analyse der Daten."
 
     def reload_spots(self):
         """Laedt Spots neu aus CSV."""
@@ -541,22 +534,6 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
         if path.exists():
             path.unlink()
 
-    def cleanup_old_conversations(self, max_age_hours=24):
-        """Entfernt inaktive Conversations."""
-        now = datetime.now()
-        to_remove = []
-        for sid, conv in self.conversations.items():
-            try:
-                last = datetime.fromisoformat(conv["last_activity"])
-                age = (now - last).total_seconds() / 3600
-                if age > max_age_hours:
-                    to_remove.append(sid)
-            except Exception:
-                to_remove.append(sid)
-        for sid in to_remove:
-            del self.conversations[sid]
-        if to_remove:
-            print(f"[ENGINE] {len(to_remove)} alte Conversations bereinigt")
 
     def get_spots_geojson(self):
         """Gibt alle Spots als GeoJSON FeatureCollection zurück."""

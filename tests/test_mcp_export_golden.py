@@ -59,7 +59,6 @@ def _engine(date_str: str, windy_from: int | None = None):
     e.spot_analyses = {}
     e.region_analyses = {}
     e.station_manager = None
-    e.instantdb = None
     e._ctx_gust_cache, e._ctx_tq_cache, e._ctx_foehn_cache, e._ctx_fewshot_cache = {}, {}, {}, {}
     return e
 

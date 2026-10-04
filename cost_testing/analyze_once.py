@@ -46,10 +46,10 @@ except ImportError:
 def main() -> int:
     import config
     import config_overrides
-    config_overrides.init()  # UI-Overlay anwenden (OPENAI_ANALYSIS_MODE etc.)
+    config_overrides.init()  # UI-Overlay anwenden (Modelle, Sprache etc.)
 
-    logger.info("OPENAI_ANALYSIS_MODE=%s, ANALYSIS_PROVIDER=%s, MODEL=%s",
-                config.OPENAI_ANALYSIS_MODE, config.ANALYSIS_PROVIDER,
+    logger.info("ANALYSIS_PROVIDER=%s, MODEL=%s",
+                config.ANALYSIS_PROVIDER,
                 config.LLM_MODELS.get(config.ANALYSIS_PROVIDER, {}).get("analysis"))
     logger.info("Spot-CSV: %s", config.CSV_PATH)
     logger.info("Cost-Telemetry-Datei: %s", config.COST_TELEMETRY_PATH)

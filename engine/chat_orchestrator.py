@@ -338,25 +338,6 @@ class ChatOrchestratorMixin:
         }
         return messages
 
-    def _ensure_weather_context(self):
-        """Stellt sicher dass weather_context_str vorhanden ist. Fallback: InstantDB."""
-        if self.weather_context_str:
-            return
-        if not self.instantdb:
-            return
-        try:
-            global_id = self.instantdb.make_id("weather_state.global")
-            result = self.instantdb.query("weather_state")
-            if result and "weather_state" in result:
-                for entry in result["weather_state"]:
-                    matrix = entry.get("matrix_text")
-                    if matrix:
-                        self.weather_context_str = matrix
-                        logger.info("Wetterdaten aus InstantDB weather_state geladen")
-                        return
-        except Exception as e:
-            logger.error(f"InstantDB weather_state Fallback fehlgeschlagen: {e}")
-
     def answer(self, session_id: str, question: str) -> str:
         """Beantwortet eine Pilotenfrage. Wetterdaten sind im Kontext."""
         if not self.chat_client:
@@ -372,14 +353,8 @@ class ChatOrchestratorMixin:
         else:
             question_clean = question
 
-        # Sicherstellen dass Wetterdaten verfügbar sind (Fallback: InstantDB)
-        self._ensure_weather_context()
-
         if not self.weather_context_str:
             return i18n.t("chat.loading_weather")
-
-        # Spot-Analysen aus InstantDB laden falls lokal nicht vorhanden
-        self._ensure_spot_analyses()
 
         # Kompakte Voranalysen-Uebersicht (alle Spots, vollstaendig aber kurz) ist der
         # Chat-Kontext. Fehlt sie, ehrlich "wird geladen" antworten — nicht die Roh-
@@ -928,7 +903,6 @@ class ChatOrchestratorMixin:
         else:
             question_clean = question
 
-        self._ensure_weather_context()
         if not self.weather_context_str:
             yield {
                 "type": "text",
@@ -936,8 +910,6 @@ class ChatOrchestratorMixin:
             }
             yield {"type": "done"}
             return
-
-        self._ensure_spot_analyses()
 
         # Der Chat braucht die kompakte Voranalysen-Uebersicht (alle Spots, vollstaendig
         # aber kurz) als Kontext. Fehlt sie (Cache noch nicht geladen), antworten wir
