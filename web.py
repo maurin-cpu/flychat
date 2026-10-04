@@ -3044,6 +3044,7 @@ def api_chat_history():
 
 
 @app.route("/api/run-analyses", methods=["POST"])
+@_require_admin
 def api_run_analyses():
     """Startet die LLM Spot-Analyse für alle Spots."""
     try:
@@ -3314,6 +3315,7 @@ def api_region_context(region_id: str, date_str: str):
 
 
 @app.route("/api/run-region-analyses", methods=["POST"])
+@_require_admin
 def api_run_region_analyses():
     """Startet die LLM Region-Analyse fuer alle Regionen."""
     try:
@@ -3470,6 +3472,7 @@ def api_analyses_status():
 
 
 @app.route("/api/run-all-analyses-stream")
+@_require_admin
 def api_run_all_analyses_stream():
     """SSE-Endpoint: Startet Analyse im Background-Thread, streamt Events aus Queue."""
     global _analysis_running, _analysis_completed, _analysis_error, _analysis_result, _analysis_queue
@@ -3624,12 +3627,14 @@ def _start_single_analysis_stream(stream_attr, done_event):
 
 
 @app.route("/api/run-analyses-stream")
+@_require_admin
 def api_run_analyses_stream():
     """SSE-Endpoint: startet Spot-Analyse im Background-Thread, streamt Progress."""
     return _start_single_analysis_stream("run_spot_analyses_stream", "spot_done")
 
 
 @app.route("/api/run-region-analyses-stream")
+@_require_admin
 def api_run_region_analyses_stream():
     """SSE-Endpoint: startet Region-Analyse im Background-Thread, streamt Progress."""
     return _start_single_analysis_stream("run_region_analyses_stream", "region_done")
@@ -3663,6 +3668,7 @@ def api_regionen_precip_refpoints():
 
 
 @app.route("/api/refresh-spots", methods=["POST"])
+@_require_admin
 def api_refresh_spots():
     """Laedt Spots neu aus CSV."""
     try:
@@ -3673,6 +3679,7 @@ def api_refresh_spots():
 
 
 @app.route("/api/refresh-weather", methods=["POST"])
+@_require_admin
 def api_refresh_weather():
     """Erzwingt einen Neustart des Wetter-Downloads und baut den Kontext neu.
 
@@ -3839,6 +3846,7 @@ def api_stations_status():
 
 
 @app.route("/api/stations/discover", methods=["POST"])
+@_require_admin
 def api_stations_discover():
     """Stationen neu suchen (manuell)."""
     if not engine.station_manager:
@@ -3851,6 +3859,7 @@ def api_stations_discover():
 
 
 @app.route("/api/stations/collect", methods=["POST"])
+@_require_admin
 def api_stations_collect():
     """Beobachtungen holen (manuell)."""
     if not engine.station_manager:
