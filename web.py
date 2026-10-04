@@ -2909,12 +2909,13 @@ def api_synoptic_grid():
                 centers={ts: gcenters.get(ts, []) for ts in kept},
                 winds={ts: gwinds[ts] for ts in kept if ts in gwinds})
 
+    # Nur noch Zeitstempel/Tage: die Briefing-Karte (synoptic-embed.js) waehlt
+    # damit den Timestep. Die Wetterlage-Texte zeigt die Synoptik-Seite nicht
+    # mehr (seit 10/2026 nur Karte).
     wetterlage = None
     sctx = load_synoptic_cache()
     if sctx:
         wetterlage = {
-            "lage_label": sctx.get("lage_label"),
-            "llm_overview": sctx.get("llm_overview"),
             "forecast_dates": sctx.get("forecast_dates"),
             "generated_at": sctx.get("generated_at"),
         }

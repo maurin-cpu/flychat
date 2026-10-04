@@ -53,6 +53,22 @@ THRESHOLD_CREST_WIND_DANGER = 180   # km/h (50 m/s) – Flugverbot
 THRESHOLD_HUMIDITY_LOW = 40     # % – Föhn „durchgebrochen“
 THRESHOLD_GUST_RATIO = 1.5      # Böen/Wind > 1.5 = böig/turbulent
 
+# Bestätigung der Föhnlage durch Wind an den Föhn-Talpunkten
+# (data/foehn_talpunkte.geojson). Ergänzung, kein Ersatz für Δp/Kammwind —
+# nur das Briefing nutzt sie (docs/FOEHN.md). Eine Flugstunde ist Föhnstunde,
+# wenn der Wind aus dem Föhnsektor des Tals kommt, stark genug ist (Mittelwind
+# ODER Böe) und die Luft trocken ist. Ein Tal gilt ab TAL_MIN_HOURS als bestätigt.
+TAL_WIND_MIN_KMH = 20
+TAL_GUST_MIN_KMH = 30
+TAL_RH_MAX = 60
+TAL_MIN_HOURS = 2
+# Föhnsektor je foehn_typ (Grad, im Uhrzeigersinn von lo nach hi; Nord über 0°)
+TAL_SEKTOR = {
+    "Süd": (SUEDFOEHN_HALFCIRCLE_START, SUEDFOEHN_HALFCIRCLE_END),   # 90–270
+    "Süd(-ost)": (45, 225),     # Wallis: Föhn aus E/SE (Visp, Sion)
+    "Nord": (270, 90),
+}
+
 
 def _potential_temperature(temp_kelvin: float, pressure_hpa: float, p0: float = 1000.0) -> float:
     """Potenzielle Temperatur θ = T * (P0/P)^0.2854"""
@@ -456,3 +472,72 @@ if __name__ == "__main__":
             print(f"  - {ind}")
     else:
         print("Fehler:", r.get("error"))
+
+
+# ============================================================================
+# FÖHN-TALPUNKTE: Bestätigung der Föhnlage durch Wind am Talboden
+# ============================================================================
+
+def dir_in_sector(deg: float, lo: float, hi: float) -> bool:
+    """True, wenn `deg` im Sektor lo→hi (im Uhrzeigersinn) liegt; lo > hi = über 0°."""
+    deg = deg % 360
+    return lo <= deg <= hi if lo <= hi else (deg >= lo or deg <= hi)
+
+
+def tal_side(foehn_typ: str) -> str:
+    """'nord' für Nordföhn-Täler (Tessin), sonst 'sued'."""
+    return "nord" if (foehn_typ or "").startswith("Nord") else "sued"
+
+
+def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str) -> dict:
+    """Föhnstunden eines Talpunkts in den Stunden `indices` (Flugfenster eines Tages).
+
+    hourly: Listen `wind_speed_10m`, `wind_gusts_10m`, `wind_direction_10m`,
+    `relative_humidity_2m` (km/h, Grad, %). Föhnstunde = Richtung im Sektor des
+    Tals ∧ (Mittelwind ≥ TAL_WIND_MIN_KMH ∨ Böe ≥ TAL_GUST_MIN_KMH) ∧ Feuchte ≤
+    TAL_RH_MAX. Die Werte (Spanne Mittelwind, Böenspitze) stammen nur aus den
+    Föhnstunden. has_data=False, wenn keine Stunde vollständige Werte hat —
+    dann zählt der Punkt nicht mit (nie als "kein Föhn" werten).
+    """
+    lo, hi = TAL_SEKTOR.get(foehn_typ, TAL_SEKTOR["Süd"])
+
+    def _at(key, i):
+        arr = hourly.get(key) or []
+        v = arr[i] if i < len(arr) else None
+        return float(v) if isinstance(v, (int, float)) else None
+
+    winds, gusts, hours = [], [], []
+    has_data = False
+    for i in indices:
+        w, g = _at("wind_speed_10m", i), _at("wind_gusts_10m", i)
+        d, rh = _at("wind_direction_10m", i), _at("relative_humidity_2m", i)
+        if w is None or g is None or d is None or rh is None:
+            continue
+        has_data = True
+        if dir_in_sector(d, lo, hi) and (w >= TAL_WIND_MIN_KMH or g >= TAL_GUST_MIN_KMH) \
+                and rh <= TAL_RH_MAX:
+            winds.append(w)
+            gusts.append(g)
+            hours.append(i)
+    out = {"has_data": has_data, "hours": len(hours),
+           "bestaetigt": has_data and len(hours) >= TAL_MIN_HOURS}
+    if out["bestaetigt"]:
+        out.update(wind_min_kmh=round(min(winds)), wind_max_kmh=round(max(winds)),
+                   gust_max_kmh=round(max(gusts)), first_index=min(hours))
+    return out
+
+
+def summarize_taeler(results: list) -> dict:
+    """Landesweite Zusammenfassung aus evaluate_talpunkt-Ergebnissen (je Eintrag
+    zusätzlich `id`, `tal`, `wind_min/max`, …). Spanne/Spitze über ALLE
+    bestätigten Täler — so liegt jede Talzeile innerhalb der Landeswerte."""
+    checked = [r for r in results if r.get("has_data")]
+    best = [r for r in checked if r.get("bestaetigt")]
+    out = {"n_total": len(checked), "n_bestaetigt": len(best)}
+    if best:
+        top = max(best, key=lambda r: r["gust_max_kmh"])
+        out.update(wind_min_kmh=min(r["wind_min_kmh"] for r in best),
+                   wind_max_kmh=max(r["wind_max_kmh"] for r in best),
+                   gust_max_kmh=top["gust_max_kmh"], gust_tal=top["tal"],
+                   first_hour=min(r["first_hour"] for r in best))
+    return out

@@ -1,4 +1,4 @@
-"""Erzeugt den Zonen-Wetterlage-Block aus dem AKTUELLEN Wettercache und
+"""Erzeugt den Wetterlage-Text (lead, Tagessaetze, Gefahren) aus dem AKTUELLEN Wettercache und
 legt ihn neben den bestehenden (alten) Block — ohne Prod-Caches zu
 ueberschreiben.
 
@@ -74,19 +74,8 @@ def print_overview(title: str, ov: dict) -> None:
         print("(kein Output)")
         return
     print("\nLEAD:\n" + (ov.get("short") or "(leer)"))
-    zones = ov.get("zones")
-    if zones:
-        for z in zones:
-            print(f"\n--- {z['label']} ---")
-            for d in z["days"]:
-                print(f"  {d['text']}")
-                if d.get("flight_hint"):
-                    print(f"     -> {d['flight_hint']}")
-    else:
-        for e in ov.get("long_with_sources") or []:
-            print(f"\n  {e['text']}")
-            if e.get("flight_hint"):
-                print(f"     -> {e['flight_hint']}")
+    for d in ov.get("day_lines") or []:
+        print(f"  {d.get('date')}: {d.get('text')}")
     if ov.get("hazards"):
         print("\n--- Gefahren schweizweit ---")
         for h in ov["hazards"]:
@@ -133,7 +122,7 @@ def main() -> int:
 
     print(f"\n... LLM-Call ({config.SYNOPTIC_MODEL}, lang={config.LANG}) ...")
     new_ov = sl.generate_synoptic_overview(ctx, client, config.SYNOPTIC_MODEL)
-    print_overview("NEU — Zonen-Block (Synoptik 2.0)", new_ov)
+    print_overview("NEU — Wetterlage-Text (lead, Tagessaetze, Gefahren)", new_ov)
 
     out = ROOT / "data" / "_preview_synoptik_zonen.json"
     out.write_text(json.dumps(

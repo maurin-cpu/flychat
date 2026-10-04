@@ -1321,6 +1321,18 @@ def fetch_all_spots(spots, save_to_file=True):
     except Exception as e:  # nie den Wetterlauf daran scheitern lassen
         print(f"  [WARN] Föhn-Reihe nicht abgelegt (nicht kritisch): {e}")
 
+    # Wind an den Föhn-Talpunkten — bestätigt im Briefing die Föhnlage am
+    # Talboden (docs/FOEHN.md). Gleiche Ablage-Regel wie foehn_series.
+    try:
+        from foehn_talpunkte import fetch_talpunkt_wind
+        _tal = fetch_talpunkt_wind(forecast_days=config.FORECAST_DAYS)
+        if _tal:
+            all_data["_meta"]["foehn_tal_series"] = _tal
+        else:
+            print("  [WARN] Föhn-Talpunkte: kein Abruf — Briefing meldet 'nicht prüfbar'")
+    except Exception as e:  # nie den Wetterlauf daran scheitern lassen
+        print(f"  [WARN] Föhn-Talpunkte nicht abgelegt (nicht kritisch): {e}")
+
     for i, spot in enumerate(spots):
         name = spot["name"]
         refs = spot_refs[name]

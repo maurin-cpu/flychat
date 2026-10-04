@@ -818,11 +818,7 @@ STRINGS: dict[str, dict[str, str]] = {
     # Region-Auswahl-Button (Toggle)
     "js.regions.none": {"de": "Keine", "en": "None"},
     "js.regions.all": {"de": "Alle", "en": "All"},
-    # Wetterlage-Block (Heading, Toggle, Lage-Labels).
-    # Die Lage-Label-Keys tragen den kanonischen DE-Wert aus
-    # decide_lage_label() im Key ("js.lage.<value>") — das Strukturfeld
-    # bleibt deutsch (deterministisch, Audit), uebersetzt wird nur die
-    # Anzeige. Fehlt ein Key, zeigt briefing.js den DE-Wert als Fallback.
+    # Wetterlage-Block (Heading, Toggle).
     "js.wetterlage.heading": {"de": "Wetterlage", "en": "Weather situation"},
     "js.wetterlage.less": {"de": "Weniger", "en": "Less"},
     "js.wetterlage.detail": {"de": "Detail", "en": "Detail"},
@@ -832,23 +828,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "de": "Für diesen Tag liegt noch keine Wetterlage-Analyse vor.",
         "en": "No weather-situation analysis available for this day yet.",
     },
-    "js.lage.Suedfoehnlage": {"de": "Suedfoehnlage", "en": "South foehn"},
-    "js.lage.Nordfoehnlage": {"de": "Nordfoehnlage", "en": "North foehn"},
-    "js.lage.Foehnlage (wechselnd)": {"de": "Foehnlage (wechselnd)", "en": "Foehn (variable)"},
-    "js.lage.Genua-Tief": {"de": "Genua-Tief", "en": "Genoa low"},
-    "js.lage.Bisenlage": {"de": "Bisenlage", "en": "Bise"},
-    "js.lage.Westlage": {"de": "Westlage", "en": "Westerly flow"},
-    "js.lage.Suedwestlage": {"de": "Suedwestlage", "en": "Southwesterly flow"},
-    "js.lage.Nordwestlage": {"de": "Nordwestlage", "en": "Northwesterly flow"},
-    "js.lage.Nordlage": {"de": "Nordlage", "en": "Northerly flow"},
-    "js.lage.Nordostlage": {"de": "Nordostlage", "en": "Northeasterly flow"},
-    "js.lage.Ostlage": {"de": "Ostlage", "en": "Easterly flow"},
-    "js.lage.Suedostlage": {"de": "Suedostlage", "en": "Southeasterly flow"},
-    "js.lage.Suedlage": {"de": "Suedlage", "en": "Southerly flow"},
-    "js.lage.Hochdrucklage": {"de": "Hochdrucklage", "en": "High pressure"},
-    "js.lage.Tiefdrucklage": {"de": "Tiefdrucklage", "en": "Low pressure"},
-    "js.lage.Uebergangslage": {"de": "Uebergangslage", "en": "Transitional"},
-    "js.lage.unbestimmt": {"de": "unbestimmt", "en": "undetermined"},
     "js.regions.deselect_all": {"de": "Alle Regionen abwählen", "en": "Deselect all regions"},
     "js.regions.select_all": {"de": "Alle Regionen auswählen", "en": "Select all regions"},
     # Tages-Statistik (Band-Counts)
@@ -954,7 +933,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.syn.low_aria": {"de": "Tiefdruckzentrum {p} hPa", "en": "Low pressure centre {p} hPa"},
     "js.syn.updated": {"de": "Stand: {ts}", "en": "Updated: {ts}"},
     "js.syn.no_data": {"de": "Keine Druckdaten verfuegbar.", "en": "No pressure data available."},
-    "js.syn.no_text": {"de": "Kein Wetterlage-Text verfuegbar.", "en": "No weather situation text available."},
     "js.syn.load_failed": {"de": "Laden fehlgeschlagen", "en": "Loading failed"},
     "js.syn.isobars_hint": {"de": "Isobaren alle 4 hPa · Fläche = Bodendruck · {model}",
                             "en": "Isobars every 4 hPa · shading = surface pressure · {model}"},
@@ -963,7 +941,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.syn.pause": {"de": "Animation anhalten", "en": "Pause animation"},
     "js.syn.timeline_aria": {"de": "Zeitleiste: Zeitpunkt waehlen", "en": "Timeline: choose a time"},
     "js.syn.tick_aria": {"de": "{d}, {t} Uhr", "en": "{d}, {t}"},
-    "js.syn.wetterlage_title": {"de": "Wetterlage", "en": "Weather situation"},
     # Karten-Legende (Redesign 07/2026: Druckband-Toenung)
     "js.syn.legend_title": {"de": "Bodendruck (hPa)", "en": "Surface pressure (hPa)"},
     "js.syn.legend_low": {"de": "Tief", "en": "Low"},

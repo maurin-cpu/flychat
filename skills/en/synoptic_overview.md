@@ -10,22 +10,21 @@ The block has EXACTLY TWO jobs:
 Anything that answers neither question does NOT belong in it.
 
 ═══════════════════════════════════════════════
-STRUCTURE — GENERAL SITUATION + 4 FLYING-WEATHER ZONES
+STRUCTURE — GENERAL SITUATION, HAZARDS, DAY LINES
 ═══════════════════════════════════════════════
 
 The output consists of:
 
 - **`lead`** — the general situation (synoptics, both axes), 4-6 sentences,
   max 130 words.
-- **`zones`** — EXACTLY 4 entries, one per flying-weather zone, each with
-  one day entry per `forecast_dates` day.
 - **`hazards`** — the hazards across Switzerland, one entry per
   `forecast_dates` day: WHERE in Switzerland it rains, foehn blows, etc.
   Which hazards are active is set by the code (see section `hazards`).
 - **`day_lines`** — ONE short sentence per `forecast_dates` day: that day's
   situation in a nutshell (see section `day_lines`).
 
-The 4 zones (use these IDs exactly):
+The data comes per flying-weather zone — four zones; use these names to
+place things in `hazards` and `lead`:
 
 | `zone` | stands for |
 |---|---|
@@ -91,7 +90,7 @@ ALLOWED (from the structured field):
   Scandinavia", "low off Scotland"). Do NOT invent other regions.
 - flow direction from `flow_overhead.value` and `.per_day[i].sector`
 - phenomena: only if `foehn.active=true` may you mention foehn (with the
-  side from `foehn.side`) — and inside `days` entries ONLY on the days
+  side from `foehn.side`) — and in `hazards`/`day_lines` ONLY on the days
   listed in `foehn.days_affected`. On every other day any foehn wording
   (including "foehn corridor") is forbidden; describe gustiness there via
   valley wind / upper wind. Only if `bise.active_any_day=true` may you use
@@ -137,7 +136,7 @@ Since 2026-09 the DWD front forecast is part of the structured field:
     "according to yesterday's run"), never "will".
   * Two entries of the same type on different days are TWO fronts ("a
     further cold front on Sunday") — not the same one twice.
-- In `zones[].days[i].text` and `day_lines[i]` the front may appear ONLY on
+- In `day_lines[i]` the front may appear ONLY on
   day `tag` and ONLY in zone `zone` (front type + brushes/crosses + time of
   day). A day BEFORE the earliest `tag` may say so ("still ahead of the cold
   front", "the front only arrives on Sunday") — that is the link to the
@@ -145,9 +144,6 @@ Since 2026-09 the DWD front forecast is part of the structured field:
   further entry names one.
 - Never invent what the field does not say: no rain amounts, no wind figure
   "because of the front", no "pre-frontal/post-frontal".
-- `flight_hint`: state the consequence when `im_fenster=true` and not
-  `randkontakt` ("fly before the passage, gusts afterwards") — otherwise
-  nothing.
 - `frontsignatur.per_day[i].zones.<zone>` is the passage in OUR forecast
   data (pressure rise, 700 hPa wind shift, T850 jump, rain around `hour`).
   That is the verdict; the DWD forecast (`fronten`) only supplies the name:
@@ -221,49 +217,8 @@ concrete weekdays ("from Monday it dries out under building high pressure").
 the concrete weekday from `foehn.days_affected` / `bise.days_active` —
 NEVER blanket "the whole window" when only individual days are affected.
 
-**FORBIDDEN in the lead:** listing the four zones (that is what the zone
-texts do), repeating the same statement in two sentences.
-
-═══════════════════════════════════════════════
-`zones` — THE FOUR ZONE TEXTS
-═══════════════════════════════════════════════
-
-One entry for EACH of the 4 zones, one `days` entry for EACH
-`forecast_dates` day. **No zone may be missing, no day may be missing** —
-not even when little happens there ("Ticino: dry and sunny throughout,
-wind a non-issue." is enough for a day entry).
-
-**`text` per day** (2-3 sentences, weekday prefix + colon):
-
-1. **Prefix**: weekday name from `forecast_dates[i].weekday` + ":".
-   FORBIDDEN: "Today:", "Tomorrow:", "Day 1:".
-2. **MANDATORY — day progression instead of a daily blanket.** Use
-   `precip_windows` (morning 6-10, midday 10-14, afternoon 14-18,
-   evening 18-21) and name WHEN things change:
-   - "dry until the early afternoon, cells building after that"
-   - "wet in the morning, drying out through the day"
-   A day whose windows all look alike needs no timing — then do not
-   invent one.
-3. **MANDATORY — wind with a time reference.** `wind_day.wind_class` is
-   the authoritative label (see below), `wind_windows[*].share_wind_crit`
-   shows whether wind builds or eases through the day ("calm in the
-   morning, picking up noticeably in the afternoon"). With critical wind,
-   name the cause from `wind_day.wind_driver`.
-4. **Situation character of the zone that day** — what does the
-   large-scale situation do here concretely (congestion, lee, shielding,
-   subsidence)? Use the knowledge base at the end of this prompt to
-   interpret.
-5. With foehn: zone `tessin` is the LEE side when `foehn.side="Nord"`,
-   zones `alpennordhang`/`wallis` when `"Sued"` — see the foehn block below.
-
-**`flight_hint` per day** — ONE short sentence (max ~15 words), purely
-the pilot's view: what does this day mean for flying in this zone?
-- **Assessment, NOT a recommendation.** FORBIDDEN: "plan a flight",
-  "take the day off", "plan a rest day", "better stay home".
-  ALLOWED: "morning window holds, too unstable after that",
-  "too windy in most places", "no usable window".
-- If a time window holds, SAY SO — the single most important sentence for
-  the pilot is whether and when the day has a window.
+**FORBIDDEN in the lead:** listing the four zones, repeating the same
+statement in two sentences.
 
 ═══════════════════════════════════════════════
 PRECIPITATION DATA — YOUR ASSESSMENT
@@ -321,8 +276,7 @@ Per zone and day in `wind_day`:
   * `"windig"` (windy) → "flyable, but noticeable wind".
   * `"unauffaellig"` (unremarkable) → wind is a non-issue.
   Praise vocabulary ("ideal", "excellent", "highlight", "good conditions")
-  in a zone with `verblasen`/`stark_eingeschraenkt` is rejected by the
-  validator and triggers a correction round.
+  for a zone with `verblasen`/`stark_eingeschraenkt` is wrong.
 - `share_wind_crit` — share of spots above the danger threshold.
 - `wind_driver` — the cause, MANDATORY to name when critical:
   * `"hoehenwind"` → "too strong aloft, often calm below — no usable
@@ -346,28 +300,24 @@ FOEHN: LEE vs. CONGESTION SIDE — DO NOT CONFUSE!
 If `foehn.active=true`, the side assignment applies STRICTLY:
 
 - **`foehn.side="Sued"` (south foehn)** → zones `alpennordhang` and
-  `wallis` are LEE with descending, warm, GUSTY air (dangerous in the
-  foehn valleys). Zone `tessin` = congestion, often clouded/damp.
+  `wallis` are LEE with descending, warm, GUSTY air. Zone `tessin` =
+  congestion, often clouded/damp.
 - **`foehn.side="Nord"` (north foehn)** → zone `tessin` is LEE with gusty
   air (not rarely storm gusts). Zone `alpennordhang` = congestion, often
   residual cloud.
 
-**STRICTLY FORBIDDEN with active foehn:** describing the lee zone as
-"sheltered", "calm", "protected", "windless" — not in the `flight_hint`
-either. The validator checks this per zone.
-
-**Correct phrasings:**
-- north foehn, zone tessin: "sunny, but gusty in the foehn corridors."
-- south foehn, zone alpennordhang: "warm and dry, but gusty in the foehn
-  valleys."
-- "Sheltered"/"calm" applies only when foehn is INACTIVE.
+**STRICTLY FORBIDDEN with active foehn:** describing the lee side as
+"sheltered", "calm", "protected", "windless". Whether the foehn reaches the
+ground in the foehn valleys is told only by the valley values in the hazard
+entry (`tal_confirmed`, see `hazards`) — never a blanket "gusty in the foehn
+valleys".
 
 ═══════════════════════════════════════════════
 MANDATORY: PILOT IMPLICATION OF THE SITUATION
 ═══════════════════════════════════════════════
 
 When you name a situation / a pressure influence / a flow, at least ONE
-sentence in the `lead` AND at least ONE sentence per zone must explain
+sentence in the `lead` must explain
 what that concretely means for Swiss pilots — supported by the KNOWLEDGE
 BASE at the end of this system prompt.
 
@@ -487,6 +437,18 @@ EXACTLY one entry `{"items": [...]}` per `forecast_dates` day:
     - **How you see it**: `lee_gust_kmh` are the gust peaks in the lee —
       name them as an observation ("gusts around 55 km/h in the lee"), not
       as a list of readings. If the value is missing, leave it out.
+    - **Does it reach the ground** (`tal_checked` = true, instead of
+      `lee_gust_kmh`): the foehn valley points show whether the foehn blows
+      on the valley floor of the foehn valleys. `tal_confirmed` not empty →
+      name at least one of these valleys (name as given, in addition to the
+      zone); numbers ONLY `tal_wind_kmh` (mean-wind range) and
+      `tal_gust_max_kmh` (gust peak, in valley `tal_gust_valley`), exactly
+      as given. `tal_confirmed` empty → say that according to the model the
+      foehn stays aloft and does not reach the valleys (launch sites at
+      height are still affected) — then NO km/h number and never "gusty in
+      the valleys". Foehn valleys are only the names given, never launch
+      sites. Also applies to `lead` and `day_lines`. The validator checks
+      names, numbers and "aloft".
   * `BISE` — Mittelland and Jura, stronger where channelled.
   * `WIND` — cause from `wind_day.wind_driver` (upper wind / gusts).
 - Same bans as everywhere: no hPa/°C numbers, no trough jargon, fronts only
@@ -539,7 +501,7 @@ EXACTLY one string per `forecast_dates` day:
      from `precip_pattern.per_day[i]`, wind (calm / partly windy / widely
      windy, cause `wind_driver`) from `wind_pattern.per_day[i]`, the
      north–south difference only as an addition ("less in the south"). NO
-     zones, no regions — those belong in the zone texts. The code writes the
+     zones, no regions. The code writes the
      same form as a line below; both must agree.
 
 The weather consequence hangs on the pressure sentence as ONE flow (colon),
@@ -563,16 +525,6 @@ Respond EXCLUSIVELY as a JSON object with this structure:
 
 {
   "lead": "General situation as flowing text (4-6 sentences, max 130 words).",
-  "zones": [
-    {"zone": "alpennordhang",
-     "days": [
-       {"text": "<weekday>: <day progression + wind + situation character>",
-        "flight_hint": "<pilot consequence, max ~15 words>"}
-     ]},
-    {"zone": "wallis", "days": [...]},
-    {"zone": "tessin", "days": [...]},
-    {"zone": "graubuenden_engadin", "days": [...]}
-  ],
   "hazards": [
     {"items": [{"topic": "RAIN", "text": "<ONE sentence, max 25 words: what, where, when>"}]},
     {"items": []}
@@ -580,15 +532,10 @@ Respond EXCLUSIVELY as a JSON object with this structure:
   "day_lines": ["<ONE sentence, max 20 words: this day's situation>", "..."]
 }
 
-**Position contract:** `days[i]` belongs to the day `forecast_dates[i]` —
-same order, no gaps, no duplicates. The weekday prefix in `text` comes
-from `forecast_dates[i].weekday`.
+**Position contract:** `hazards[i]` and `day_lines[i]` belong to the day
+`forecast_dates[i]` — same order, no gaps, no duplicates.
 
 **ABSOLUTE OBLIGATION before submitting:**
-- `zones` contains EXACTLY 4 entries with the IDs `alpennordhang`,
-  `wallis`, `tessin`, `graubuenden_engadin`.
-- Every zone has `len(days) == len(forecast_dates)`.
-- Every day entry has `text` AND `flight_hint`.
 - `hazards` has `len == len(forecast_dates)`; each entry names exactly the
   topics in `hazards_per_day[i].active`, each `text` with a place reference,
   with a time of day wherever `day_shape` is not `ganztags` — and without any

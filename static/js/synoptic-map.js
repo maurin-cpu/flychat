@@ -75,7 +75,6 @@
 
   var state = {
     grid: null,
-    wetterlage: null,
     timesteps: [],    // ["2026-07-05T00:00", ...] — lokale CH-Zeit, sortiert wie geliefert
     tsIdx: 0,         // Index in timesteps = aktueller Frame
     playing: false,
@@ -708,7 +707,6 @@
       var ts = currentTs();
       ro.textContent = ts ? fmtReadout(ts) : "";
     }
-    highlightTextDay();
   }
 
   function advance() {
@@ -831,114 +829,6 @@
       + "</div>";
   }
 
-  // ===== WETTERLAGE: SUMMARY + TAGES-KARTEN ================================
-
-  var HINT_ICON =
-    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"' +
-    ' stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
-    '<path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/>' +
-    '<path d="M9.6 4.6A2 2 0 1 1 11 8H2"/>' +
-    '<path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>';
-
-  // Wolken-/Wetter-Icon fuer das Callout-Panel der Wetterlage-Kurzfassung.
-  var SUMMARY_ICON =
-    '<span class="syn-summary-icon" aria-hidden="true">' +
-    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"' +
-    ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M17.5 19a4.5 4.5 0 0 0 .3-9 6 6 0 0 0-11.5 1.5A4 4 0 0 0 6.5 19z"/>' +
-    "</svg></span>";
-
-  function renderWetterlageText() {
-    var daysEl = $("synWetterlage");
-    var sumEl = $("synSummary");
-    if (!daysEl) return;
-    var wl = state.wetterlage;
-    var overview = wl && wl.llm_overview ? wl.llm_overview : null;
-    if (!overview || !overview.short) {
-      if (sumEl) sumEl.hidden = true;
-      daysEl.hidden = false;
-      daysEl.innerHTML = '<p class="syn-text-empty">' + escapeHtml(wcT("js.syn.no_text")) + "</p>";
-      return;
-    }
-
-    // Lage-Label: Strukturfeld liefert den kanonischen DE-Wert; Anzeige
-    // uebersetzt via i18n ("js.lage.<value>"), Fallback = DE-Wert (analog
-    // briefing.js). Ohne Uebersetzung stuende sonst z.B. "Nordfoehnlage"
-    // auf der englischen Seite.
-    var lageRaw = (wl.lage_label && wl.lage_label.value) || "";
-    var lageLabel = lageRaw
-      ? ((window.WC_I18N && window.WC_I18N["js.lage." + lageRaw]) || lageRaw)
-      : "";
-
-    // Kurzfassung als Callout-Panel ueber der Karte: Wetter-Icon links,
-    // dann Kicker + Lage als Titel, darunter die LLM-Kurzfassung.
-    if (sumEl) {
-      sumEl.hidden = false;
-      sumEl.innerHTML =
-        SUMMARY_ICON +
-        '<div class="syn-summary-body">' +
-          '<div class="syn-summary-head">' +
-            '<span class="syn-summary-kicker">' + escapeHtml(wcT("js.syn.wetterlage_title")) + "</span>" +
-            (lageLabel ? '<span class="syn-summary-lage">' + escapeHtml(lageLabel) + "</span>" : "") +
-          "</div>" +
-          '<p class="syn-summary-text">' + escapeHtml(overview.short) + "</p>" +
-        "</div>";
-    }
-
-    var longEntries = Array.isArray(overview.long_with_sources)
-      ? overview.long_with_sources.filter(function (e) { return e && e.text; })
-      : [];
-
-    // Tages-Karten: "Wochentag:" am Zeilenanfang wird zum Chip, flight_hint
-    // mit Wind-Icon darunter. Jede Karte traegt data-weekday, damit der Tag
-    // der laufenden Animation hervorgehoben werden kann. Stagger-Delay
-    // inline (CSS animiert das Einblenden).
-    var cardsHtml = longEntries.length
-      ? longEntries.map(function (e, i) {
-          var txt = escapeHtml(e.text);
-          var hint = e.flight_hint ? escapeHtml(e.flight_hint) : "";
-          var hintHtml = hint
-            ? '<p class="syn-day-hint">' + HINT_ICON + "<span>" + hint + "</span></p>"
-            : "";
-          var delay = ' style="animation-delay:' + (i * 70) + 'ms"';
-          var m = txt.match(/^([A-Za-zÀ-ž]+):\s*/);
-          if (m) {
-            return '<article class="syn-day-card" data-weekday="' + escapeHtml(m[1]) + '"' + delay + ">" +
-              '<span class="syn-day-chip">' + m[1] + "</span>" +
-              '<p class="syn-day-text">' + txt.slice(m[0].length) + "</p>" +
-              hintHtml + "</article>";
-          }
-          return '<article class="syn-day-card"' + delay + '><p class="syn-day-text">' + txt + "</p>"
-            + hintHtml + "</article>";
-        }).join("")
-      : (overview.long
-          ? '<article class="syn-day-card"><p class="syn-day-text">' + escapeHtml(overview.long) + "</p></article>"
-          : "");
-
-    daysEl.hidden = !cardsHtml;
-    daysEl.innerHTML = cardsHtml;
-    daysEl.setAttribute("aria-label", wcT("js.syn.wetterlage_title"));
-    highlightTextDay();
-  }
-
-  // Tages-Karte des aktuellen Animations-Frames hervorheben (Match ueber den
-  // Wochentag, DE und EN — der LLM-Text traegt kein Datumsfeld).
-  function highlightTextDay() {
-    var el = $("synWetterlage");
-    if (!el) return;
-    var ts = currentTs();
-    if (!ts) return;
-    var d = dateObj(ts.slice(0, 10));
-    var names = [
-      d.toLocaleDateString("de-CH", { weekday: "long" }),
-      d.toLocaleDateString("en-GB", { weekday: "long" }),
-    ];
-    el.querySelectorAll(".syn-day-card").forEach(function (card) {
-      var wd = card.getAttribute("data-weekday");
-      card.classList.toggle("is-active", !!wd && names.indexOf(wd) !== -1);
-    });
-  }
-
   // ===== HEADER / LADEN ====================================================
 
   function renderHeader() {
@@ -1001,7 +891,6 @@
 
   function applyData(data, fronts) {
     state.grid = data.grid;
-    state.wetterlage = data.wetterlage || null;
     state.timesteps = timestepsWithFronts((data.grid.timesteps || []).slice(), fronts);
     state.cache = {};
 
@@ -1023,7 +912,6 @@
 
     renderHeader();
     buildTimeline();
-    renderWetterlageText();
 
     var playBtn = $("synPlayBtn");
     if (playBtn) playBtn.disabled = state.timesteps.length < 2;

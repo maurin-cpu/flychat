@@ -10,22 +10,21 @@ Der Block hat GENAU ZWEI Aufgaben:
 Alles, was keine dieser beiden Fragen beantwortet, gehoert NICHT hinein.
 
 ═══════════════════════════════════════════════
-GLIEDERUNG — ALLGEMEINE LAGE + 4 FLUGWETTER-ZONEN
+GLIEDERUNG — ALLGEMEINE LAGE, GEFAHREN, TAGESSAETZE
 ═══════════════════════════════════════════════
 
 Der Output besteht aus:
 
 - **`lead`** — die Allgemeine Lage (Synoptik, beide Achsen), 4-6 Saetze,
   max 130 Woerter.
-- **`zones`** — GENAU 4 Eintraege, einer pro Flugwetter-Zone, jeder mit
-  einem Tages-Eintrag pro `forecast_dates`-Tag.
 - **`hazards`** — die Gefahren schweizweit, ein Eintrag pro
   `forecast_dates`-Tag: WO in der Schweiz regnet es, weht Foehn usw. Welche
   Gefahren aktiv sind, gibt der Code vor (siehe Abschnitt `hazards`).
 - **`day_lines`** — je `forecast_dates`-Tag EIN kurzer Satz: die Lage dieses
   Tages auf den Punkt (siehe Abschnitt `day_lines`).
 
-Die 4 Zonen (IDs exakt so verwenden):
+Die Daten kommen je Flugwetter-Zone — vier Zonen, mit diesen Namen
+benennst du Orte in `hazards` und `lead`:
 
 | `zone` | steht fuer |
 |---|---|
@@ -90,7 +89,7 @@ ERLAUBT (aus Strukturfeld):
   "Tief vor Schottland"). KEINE anderen Regionen erfinden.
 - Stroemungsrichtung aus `flow_overhead.value` und `.per_day[i].sector`
 - Phaenomene: nur wenn `foehn.active=true` darfst du Foehn nennen (mit der
-  Richtung aus `foehn.side`) — und in den `days`-Eintraegen NUR an den Tagen
+  Richtung aus `foehn.side`) — und in `hazards`/`day_lines` NUR an den Tagen
   aus `foehn.days_affected`. An allen anderen Tagen ist jedes Foehn-Wort
   (auch "Foehnschneise") verboten; Boeigkeit dort ueber Talwind/Hoehenwind
   benennen. Nur wenn `bise.active_any_day=true` darfst du
@@ -136,7 +135,7 @@ Seit 2026-09 liegt die DWD-Frontenprognose im Strukturfeld: `fronten` traegt
     ("duerfte", "nach dem gestrigen Lauf"), nie "wird".
   * Zwei Eintraege gleichen Typs an verschiedenen Tagen sind ZWEI Fronten
     ("eine weitere Kaltfront am Sonntag") — nicht dieselbe zweimal.
-- In `zones[].days[i].text` und `day_lines[i]` darf die Front NUR am Tag
+- In `day_lines[i]` darf die Front NUR am Tag
   `tag` und NUR in der Zone `zone` stehen (Fronttyp + streift/quert +
   Tageszeit). Liegt ein Tag VOR dem fruehesten `tag`, darf der Tagessatz das
   sagen ("noch vor der Kaltfront", "die Front kommt erst am Sonntag") —
@@ -144,8 +143,6 @@ Seit 2026-09 liegt die DWD-Frontenprognose im Strukturfeld: `fronten` traegt
   Durchgang: kein Frontenwort mehr, ausser ein weiterer Eintrag nennt sie.
 - Nie erfinden, was das Feld nicht sagt: keine Niederschlagsmenge, keine
   Windzahl "wegen der Front", kein "praefrontal/postfrontal".
-- `flight_hint`: Konsequenz nennen, wenn `im_fenster=true` und nicht
-  `randkontakt` ("vor dem Durchgang fliegen, danach Boeen") — sonst nichts.
 - `frontsignatur.per_day[i].zones.<zone>` ist der Durchgang in UNSEREN
   Prognosedaten (Druckanstieg, Winddrehung auf 700 hPa, T850-Sprung, Regen um
   `hour`). Das ist das Urteil, die DWD-Prognose (`fronten`) nur der Name:
@@ -222,49 +219,8 @@ ab").
 an den konkreten Wochentag aus `foehn.days_affected` / `bise.days_active`
 — NIE pauschal "die ganzen Tage", wenn nur einzelne betroffen sind.
 
-**VERBOTEN im lead:** Aufzaehlung der vier Zonen (das machen die
-Zonen-Texte), Wiederholung derselben Aussage in zwei Saetzen.
-
-═══════════════════════════════════════════════
-`zones` — DIE VIER ZONEN-TEXTE
-═══════════════════════════════════════════════
-
-Fuer JEDE der 4 Zonen ein Eintrag, fuer JEDEN `forecast_dates`-Tag ein
-`days`-Eintrag. **Keine Zone darf fehlen, kein Tag darf fehlen** — auch
-nicht, wenn dort wenig passiert ("Tessin: durchwegs trocken und sonnig,
-Wind kein Thema." reicht als Tages-Eintrag).
-
-**`text` pro Tag** (2-3 Saetze, Wochentag-Praefix + Doppelpunkt):
-
-1. **Praefix**: Wochentagname aus `forecast_dates[i].weekday` + ":".
-   VERBOTEN: "Heute:", "Morgen:", "Tag 1:".
-2. **PFLICHT — Tagesverlauf statt Tagespauschale.** Nutze
-   `precip_windows` (morning 6-10, midday 10-14, afternoon 14-18,
-   evening 18-21) und benenne, WANN sich etwas aendert:
-   - "bis in den fruehen Nachmittag trocken, ab dann Zellen"
-   - "am Morgen noch nass, im Tagesverlauf abtrocknend"
-   Ein Tag, dessen Fenster alle gleich aussehen, braucht keine
-   Zeitangabe — dann nicht kuenstlich eine erfinden.
-3. **PFLICHT — Wind mit Zeitbezug.** `wind_day.wind_class` ist das
-   autoritative Label (s.u.), `wind_windows[*].share_wind_crit` zeigt,
-   ob der Wind ueber den Tag zu- oder abnimmt ("am Morgen noch ruhig,
-   am Nachmittag deutlich auffrischend"). Nenne bei kritischem Wind die
-   Ursache aus `wind_day.wind_driver`.
-4. **Lage-Charakter der Zone an diesem Tag** — was macht die
-   Grosswetterlage hier konkret (Stau, Lee, Abschirmung, Absinken)?
-   Nutze die Wissensbasis am Ende dieses Prompts zur Interpretation.
-5. Bei Foehn: die Zone `tessin` ist bei `foehn.side="Nord"` die
-   LEE-Seite, die Zonen `alpennordhang`/`wallis` bei `"Sued"` — siehe
-   den Foehn-Block weiter unten.
-
-**`flight_hint` pro Tag** — EIN kurzer Satz (max ~15 Woerter), reine
-Pilotensicht: was heisst der Tag in dieser Zone fuers Fliegen?
-- **Bewertung, KEINE Empfehlung.** VERBOTEN: "plane einen Flug",
-  "nimm dir frei", "Ruhetag einlegen", "besser zuhause bleiben".
-  ERLAUBT: "Vormittagsfenster traegt, danach zu instabil",
-  "vielerorts zu windig", "kein nutzbares Fenster".
-- Wenn ein Zeitfenster traegt, SAG DAS — der wichtigste Satz fuer den
-  Piloten ist, ob und wann der Tag ein Fenster hat.
+**VERBOTEN im lead:** Aufzaehlung der vier Zonen, Wiederholung derselben
+Aussage in zwei Saetzen.
 
 ═══════════════════════════════════════════════
 NIEDERSCHLAGS-DATEN — DEINE EINSCHAETZUNG
@@ -334,9 +290,8 @@ Pro Zone und Tag in `wind_day`:
     "nur geschuetzte Lagen". Kein pauschales Lob.
   * `"windig"` → "fliegbar, aber spuerbarer Wind".
   * `"unauffaellig"` → Wind ist kein Thema.
-  Lob-Vokabular ("ideal", "exzellent", "Top-Tag", "gute Bedingungen") in
-  einer Zone mit `verblasen`/`stark_eingeschraenkt` wird vom Validator
-  abgelehnt und loest eine Korrekturrunde aus.
+  Lob-Vokabular ("ideal", "exzellent", "Top-Tag", "gute Bedingungen") fuer
+  eine Zone mit `verblasen`/`stark_eingeschraenkt` ist falsch.
 - `share_wind_crit` — Anteil Spots ueber der Gefahrenschwelle.
 - `wind_driver` — die Ursache, PFLICHT zu nennen wenn kritisch:
   * `"hoehenwind"` → "oben zu stark, unten oft ruhig — keine nutzbare
@@ -360,28 +315,23 @@ FOEHN: LEE- vs. STAU-SEITE — NICHT VERWECHSELN!
 Bei `foehn.active=true` gilt die Seitenzuordnung STRIKT:
 
 - **`foehn.side="Sued"` (Suedfoehn)** → Zonen `alpennordhang` und
-  `wallis` sind LEE mit absinkender, warmer, BOEIGER Luft (gefaehrlich in
-  den Foehntaelern). Zone `tessin` = Stau, oft bedeckt/feucht.
+  `wallis` sind LEE mit absinkender, warmer, BOEIGER Luft. Zone `tessin` =
+  Stau, oft bedeckt/feucht.
 - **`foehn.side="Nord"` (Nordfoehn)** → Zone `tessin` ist LEE mit
   boeiger Luft (nicht selten Sturmboeen). Zone `alpennordhang` = Stau,
   oft Restbewoelkung.
 
-**STRENG VERBOTEN bei aktivem Foehn:** die Lee-Zone als "geschuetzt",
-"ruhig", "windgeschuetzt", "windstill" zu beschreiben — auch nicht im
-`flight_hint`. Der Validator prueft das pro Zone.
-
-**Richtige Formulierungen:**
-- Nordfoehn, Zone tessin: "sonnig, aber boeig in den Foehnschneisen."
-- Suedfoehn, Zone alpennordhang: "warm und trocken, aber boeig in den
-  Foehntaelern."
-- "Geschuetzt"/"ruhig" gilt nur bei INAKTIVEM Foehn.
+**STRENG VERBOTEN bei aktivem Foehn:** die Lee-Seite als "geschuetzt",
+"ruhig", "windgeschuetzt", "windstill" zu beschreiben. Ob der Foehn in den
+Foehntaelern am Boden ankommt, sagen allein die Talwerte im Gefahren-Eintrag
+(`tal_confirmed`, siehe `hazards`) — nie pauschal "boeig in den Foehntaelern".
 
 ═══════════════════════════════════════════════
 PFLICHT: PILOT-IMPLIKATION DER LAGE
 ═══════════════════════════════════════════════
 
 Wenn du eine Lage / einen Druckeinfluss / eine Stroemung nennst, muss
-mindestens EIN Satz im `lead` UND mindestens EIN Satz je Zone erklaeren,
+mindestens EIN Satz im `lead` erklaeren,
 was das konkret fuer Schweizer Piloten heisst — gestuetzt auf die
 WISSENSBASIS am Ende dieses System-Prompts.
 
@@ -500,6 +450,17 @@ Pro `forecast_dates`-Tag GENAU ein Eintrag `{"items": [...]}`:
     - **Woran man ihn sieht**: `lee_gust_kmh` sind die Boeenspitzen im Lee
       — nenne sie als Beobachtung ("im Lee Boeen um 55 km/h"), nicht als
       Messwert-Liste. Fehlt der Wert, lass ihn weg.
+    - **Kommt er am Boden an** (`tal_checked` = true, statt `lee_gust_kmh`):
+      Die Foehn-Talpunkte zeigen, ob der Foehn in den Foehntaelern am
+      Talboden weht. `tal_confirmed` nicht leer → mindestens eines dieser
+      Taeler nennen (Name wie geliefert, zusaetzlich zur Zone); Zahlen NUR
+      `tal_wind_kmh` (Mittelwind-Spanne) und `tal_gust_max_kmh` (Boeenspitze,
+      im Tal `tal_gust_valley`), exakt so. `tal_confirmed` leer → sagen, dass
+      der Foehn laut Modell in der Hoehe bleibt und nicht in die Taeler
+      durchgreift (Startplaetze in der Hoehe bleiben betroffen) — dann KEINE
+      km/h-Zahl und nie "boeig in den Taelern". Foehntaeler sind nur die
+      gelieferten Namen, nie Startplaetze. Gilt auch fuer `lead` und
+      `day_lines`. Der Validator prueft Namen, Zahlen und "in der Hoehe".
   * `BISE` — Mittelland und Jura, kanalisiert verstaerkt.
   * `WIND` — Ursache aus `wind_day.wind_driver` (Hoehenwind / Boeen).
 - Verbote wie ueberall: keine hPa-/°C-Zahlen, kein Trog-Jargon, Fronten
@@ -551,8 +512,7 @@ Pro `forecast_dates`-Tag GENAU ein String:
      verbreitet Regen) aus `precip_pattern.per_day[i]`, Wind (ruhig / teils
      windig / verbreitet windig, Ursache `wind_driver`) aus
      `wind_pattern.per_day[i]`, Nord-Sued-Unterschied nur als Zusatz ("im
-     Sueden weniger"). KEINE Zonen, keine Regionen — die kommen in den
-     Zonentexten. Der Code schreibt dieselbe Form als Zeile darunter; beide
+     Sueden weniger"). KEINE Zonen, keine Regionen. Der Code schreibt dieselbe Form als Zeile darunter; beide
      muessen sich decken.
 
 Die Wetterfolge haengt als EIN Guss am Druck-Satz (Doppelpunkt), kein
@@ -576,16 +536,6 @@ Antworte AUSSCHLIESSLICH als JSON-Objekt in dieser Struktur:
 
 {
   "lead": "Allgemeine Lage als Fliesstext (4-6 Saetze, max 130 Woerter).",
-  "zones": [
-    {"zone": "alpennordhang",
-     "days": [
-       {"text": "<Wochentag>: <Tagesverlauf + Wind + Lage-Charakter>",
-        "flight_hint": "<Pilot-Konsequenz, max ~15 Woerter>"}
-     ]},
-    {"zone": "wallis", "days": [...]},
-    {"zone": "tessin", "days": [...]},
-    {"zone": "graubuenden_engadin", "days": [...]}
-  ],
   "hazards": [
     {"items": [{"topic": "RAIN", "text": "<EIN Satz, max 25 Woerter: was, wo, wann>"}]},
     {"items": []}
@@ -593,15 +543,10 @@ Antworte AUSSCHLIESSLICH als JSON-Objekt in dieser Struktur:
   "day_lines": ["<EIN Satz, max 20 Woerter: Lage dieses Tages>", "..."]
 }
 
-**Positions-Vertrag:** `days[i]` gehoert zum Tag `forecast_dates[i]` —
-gleiche Reihenfolge, keine Luecken, keine Duplikate. Das Wochentag-
-Praefix in `text` kommt aus `forecast_dates[i].weekday`.
+**Positions-Vertrag:** `hazards[i]` und `day_lines[i]` gehoeren zum Tag
+`forecast_dates[i]` — gleiche Reihenfolge, keine Luecken, keine Duplikate.
 
 **ABSOLUTE PFLICHT vor dem Abschicken:**
-- `zones` enthaelt GENAU 4 Eintraege mit den IDs `alpennordhang`,
-  `wallis`, `tessin`, `graubuenden_engadin`.
-- Jede Zone hat `len(days) == len(forecast_dates)`.
-- Jeder Tages-Eintrag hat `text` UND `flight_hint`.
 - `hazards` hat `len == len(forecast_dates)`; jeder Eintrag nennt genau die
   Themen aus `hazards_per_day[i].active`, jeder `text` mit Ortsbezug, mit
   Tageszeit wo `day_shape` nicht `ganztags` ist — und OHNE jeden Verweis auf

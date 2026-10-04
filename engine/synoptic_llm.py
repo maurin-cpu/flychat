@@ -1,21 +1,19 @@
 """LLM-Caller + Validierungs-/Korrektur-Loop fuer den Wetterlage-Block.
 
 Nimmt das deterministisch erzeugte Strukturfeld aus synoptic_context.build_*
-und laesst den LLM daraus eine Prosa-Version generieren (lead + days).
+und laesst den LLM daraus die Texte fuers Briefing generieren (lead,
+hazards, day_lines). Die frueheren Zonen-Texte sind seit 04.10.2026 weg —
+sie erschienen nur auf der Synoptik-Seite, die jetzt nur noch die Karte zeigt.
 
 Architektur (ersetzt den alten Loesch-Post-Filter):
   1. LLM bekommt nur das fertige Strukturfeld, keine Rohzahlen.
-  2. Output-Format (Synoptik 2.0, Zonen):
+  2. Output-Format:
      {"lead": str,
-      "zones": [{"zone": <id>, "days": [{text, flight_hint}]}, ...],
-      "hazards": [{"items": [{topic, text}]}, ...]}   # je Tag, Themen vom Code
-     — Zuordnung days[i] <-> forecast_dates[i] per POSITION, Zonen ueber
-     die zone-ID (nicht ueber die Reihenfolge). Die alte Source-Tag-Pflicht
-     ist abgeschafft: sie hat nur Formfehler produziert (invalid_source
-     loeschte am 05.07.2026 den halben Ueberblick) und keine echte
-     Halluzinations-Sicherheit gebracht.
+      "hazards": [{"items": [{topic, text}]}, ...],   # je Tag, Themen vom Code
+      "day_lines": [str, ...]}                        # je Tag ein Satz
+     — Zuordnung hazards[i]/day_lines[i] <-> forecast_dates[i] per POSITION.
   3. _validate() prueft INHALTLICH (Verbotsbegriffe, erfundene Regionen,
-     Foehn-Lee-Inversion, Schema/Vollstaendigkeit) — und loescht NICHTS.
+     Foehn-Lee-Inversion, Foehn-Talwerte, Schema) — und loescht NICHTS.
   4. Bei Fehlern bekommt der LLM eine Korrektur-Nachricht mit der konkreten
      Fehlerliste und erzeugt neu — max. _MAX_ATTEMPTS Versuche.
   5. Nach erschoepften Versuchen: beste Version chirurgisch bereinigen
@@ -32,7 +30,7 @@ from typing import Optional
 
 import config
 import prompts
-from engine._common import (_weekday_de, _WOCHENTAGE, deepseek_thinking_kwargs,
+from engine._common import (_weekday_de, deepseek_thinking_kwargs,
                             parse_llm_json)
 
 logger = logging.getLogger(__name__)
@@ -104,6 +102,95 @@ _FORBIDDEN_PATTERNS = _FRONT_PATTERNS + [
 # "foehn corridor"). Zulaessig nur an Tagen, an denen das Strukturfeld
 # Foehn wirklich meldet — sonst ist es eine erfundene Gefahrenlage.
 _FOEHN_MENTION_RE = re.compile(r"f(?:oe|ö|o)hn", re.IGNORECASE)
+
+# Foehn am Talboden (Briefing, docs/FOEHN.md): Die Foehn-Talpunkte bestaetigen
+# die Foehnlage oder nicht (foehn.per_day[].tal). Unbestaetigt muss der Text
+# sagen, dass der Foehn in der Hoehe bleibt — und darf ihn nicht in die Taeler
+# legen. km/h-Zahlen zum Foehn nur aus den Talwerten (eine Zahl, eine Quelle).
+_FOEHN_ALOFT_RE = re.compile(
+    r"(in der h(?:oe|ö)he|bleibt oben|greift nicht (?:bis )?(?:in die t|durch)|"
+    r"nicht bis (?:in die t|zum boden|auf den talboden)|aloft|"
+    r"stays? (?:up )?(?:high|above)|above the valleys|without reaching|"
+    r"(?:does|do) not reach (?:the |down to the )?(?:valley|ground)|"
+    r"not reach(?:ing)? (?:the |down to the )?(?:valley|ground))", re.IGNORECASE)
+_FOEHN_VALLEY_CLAIM_RE = re.compile(
+    r"(gusty in the (?:foehn |lee )?valleys|in the (?:foehn |lee )?valleys|"
+    r"(?:reaches|reaching|breaks? through to) the (?:valley|ground)|valley floors?|"
+    r"in den (?:f(?:oe|ö)hn|lee)?-?t(?:ae|ä)lern|bis in die t(?:ae|ä)ler|"
+    r"am (?:tal)?boden)", re.IGNORECASE)
+_KMH_RE = re.compile(r"(\d+)\s*(?:[–-]\s*(\d+)\s*)?km/h", re.IGNORECASE)
+
+
+def _kmh_numbers(text: str) -> list:
+    out = []
+    for m in _KMH_RE.finditer(text or ""):
+        out.append(int(m.group(1)))
+        if m.group(2):
+            out.append(int(m.group(2)))
+    return out
+
+
+def _fold(text: str) -> str:
+    return (text or "").lower().replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
+
+
+def _tal_stem(name: str) -> str:
+    """Erkennungsmerkmal eines Talnamens: die ersten 5 Buchstaben des laengsten
+    Worts ('St. Galler Rheintal' -> 'rhein', 'Reusstal' -> 'reuss')."""
+    words = [w for w in re.split(r"[\s/–-]+", _fold(name)) if w]
+    return max(words, key=len)[:5] if words else ""
+
+
+def _tal_allowed_kmh(tal: dict) -> set:
+    if not tal or not tal.get("n_bestaetigt"):
+        return set()
+    out = {tal.get("wind_min_kmh"), tal.get("wind_max_kmh"), tal.get("gust_max_kmh")}
+    for t in tal.get("taeler") or []:
+        if t.get("bestaetigt"):
+            out |= {t.get("wind_min_kmh"), t.get("wind_max_kmh"), t.get("gust_max_kmh")}
+    return {x for x in out if isinstance(x, int)}
+
+
+def _foehn_tal_problems(text: str, tal: dict, *, require_name: bool,
+                        require_aloft: bool, only_foehn_sentences: bool) -> list:
+    """[(kind, message)] — Talbezug eines Foehn-Texts gegen foehn.per_day[].tal."""
+    from foehn_talpunkte import tal_namen
+    if not isinstance(text, str) or not tal:
+        return []
+    probs = []
+    scope = text
+    if only_foehn_sentences:
+        scope = " ".join(x for x in re.split(r"(?<=[.!?;])\s+", text)
+                         if _FOEHN_MENTION_RE.search(x))
+    allowed = _tal_allowed_kmh(tal)
+    bad = sorted({n for n in _kmh_numbers(scope) if n not in allowed})
+    if bad:
+        probs.append(("foehn_number_mismatch",
+                      f"km/h-Zahl(en) {bad} zum Foehn stimmen nicht mit den Talwerten "
+                      f"ueberein. Erlaubt: "
+                      f"{sorted(allowed) if allowed else 'KEINE Zahl (Foehn am Talboden nicht bestaetigt)'} "
+                      f"— genau diese Werte aus `tal_wind_kmh`/`tal_gust_max_kmh`, sonst keine."))
+    names = tal_namen(tal)
+    folded = _fold(scope)
+    if names:
+        if require_name and not any(_tal_stem(n) and _tal_stem(n) in folded for n in names):
+            probs.append(("foehn_tal_missing",
+                          f"Der Foehn ist am Talboden bestaetigt in {names}. Der Satz MUSS "
+                          f"mindestens eines dieser Taeler nennen (Name wie geliefert)."))
+    else:
+        claim = _FOEHN_VALLEY_CLAIM_RE.search(scope)
+        if claim and not _FOEHN_ALOFT_RE.search(scope):
+            probs.append(("foehn_tal_overclaim",
+                          f"{claim.group(0)!r} legt den Foehn in die Taeler — an keinem der "
+                          f"{tal.get('n_total', 0)} Foehn-Talpunkte zeigt das Modell Foehnwind. "
+                          f"Das ist falsch."))
+        if require_aloft and not _FOEHN_ALOFT_RE.search(scope):
+            probs.append(("foehn_tal_unconfirmed",
+                          "Kein Foehn-Talpunkt zeigt Foehnwind — der Satz MUSS sagen, dass der "
+                          "Foehn laut Modell in der Hoehe bleibt und nicht in die Taeler "
+                          "durchgreift (z.B. 'stays aloft and does not reach the valleys'); "
+                          "nie 'ruhig/geschuetzt'."))
+    return probs
 
 
 # ============================================================================
@@ -182,12 +269,9 @@ def generate_synoptic_overview(synoptic_context: dict, analysis_client,
     Admin per Mail alarmiert.
 
     Returns:
-        {"short": str,                      # lead (Mail + UI-Kurzfassung)
-         "zones": [{"zone", "label", "days": [{text, flight_hint}]}],
-         "long": str, "long_with_sources": [...],   # Legacy-Kompatibilitaet
+        {"short": str,                      # lead (Mail + Briefing)
+         "hazards": [...], "day_lines": [...],
          "attempts": int, "unresolved": [str], "generated_at": str}
-        — short/long/long_with_sources bleiben fuer Konsumenten ohne
-        Zonen-Support erhalten (long_with_sources = groesste Zone).
         None nur bei API-Totalausfall oder wenn gar nichts Valides uebrig ist.
     """
     if not synoptic_context:
@@ -354,7 +438,7 @@ def _build_correction_message(errors: list) -> str:
     # LLM im EN-Modus nach ein, zwei Runden deutsch (Vorfall 16.09.2026).
     import i18n
     language = ("OUTPUT LANGUAGE: ENGLISH. The error notes below are in German, "
-                "but write EVERY text field (lead, zones, hazards, day_lines) in "
+                "but write EVERY text field (lead, hazards, day_lines) in "
                 "English, exactly as the system prompt requires.\n\n"
                 if i18n.get_current_lang() == "en" else
                 "AUSGABESPRACHE: DEUTSCH. Schreibe alle Textfelder auf Deutsch.\n\n")
@@ -364,8 +448,7 @@ def _build_correction_message(errors: list) -> str:
         "Deine letzte Antwort hatte folgende Fehler:\n"
         f"{lines}\n\n"
         "Erzeuge das KOMPLETTE JSON neu (gleiches Format: "
-        '{"lead": "...", "zones": [{"zone": "<zone_id>", '
-        '"days": [{"text": "...", "flight_hint": "..."}]}], '
+        '{"lead": "...", '
         '"hazards": [{"items": [{"topic": "<THEMA>", "text": "..."}]}], '
         '"day_lines": ["...", "..."]}) '
         "und behebe ALLE genannten Punkte. Alle uebrigen Regeln aus dem "
@@ -401,39 +484,7 @@ def _find_forbidden_term(text: str, fronts_ok: bool = False) -> Optional[str]:
     return None
 
 
-# Lob-Vokabular, das an beidseitig windkritischen Tagen (wind_class
-# verblasen/stark_eingeschraenkt auf BEIDEN Seiten) verboten ist —
-# DE + EN, bewusst kurze Liste mit eindeutigen Gesamturteils-Phrasen.
-_PRAISE_RE = re.compile(
-    r"(ideal|excellent|exzellent|hervorragend|perfekt|perfect|highlight|"
-    r"top-?tag|beste[rn]?\s+(flug)?tag|best\s+day|"
-    r"gute[rn]?\s+flug(tag|bedingungen)|good\s+(flying\s+day|conditions)|"
-    r"great\s+(day|conditions))",
-    re.IGNORECASE,
-)
-
 _WINDY_CLASSES = {"verblasen", "stark_eingeschraenkt"}
-
-
-def _zone_wind_class(ctx: dict, zone: str, i: int) -> Optional[str]:
-    """wind_class einer Zone am Forecast-Tag i (aus wind_zones), oder None."""
-    wz = ctx.get("wind_zones") or {}
-    per_day = wz.get("per_day") or []
-    if i >= len(per_day):
-        return None
-    return (((per_day[i].get("zones") or {}).get(zone) or {})
-            .get("wind_class"))
-
-
-def _zone_gewitter_share(ctx: dict, zone: str, i: int) -> Optional[float]:
-    """gewitter_share (Tages-Aggregat) einer Zone am Tag i, oder None."""
-    pz = ctx.get("precip_zones") or {}
-    per_day = pz.get("per_day") or []
-    if i >= len(per_day):
-        return None
-    day = (((per_day[i].get("zones") or {}).get(zone) or {}).get("day") or {})
-    share = day.get("gewitter_share")
-    return share if isinstance(share, (int, float)) else None
 
 
 def _zone_konvektion(ctx: dict, zone: str, i: int, key: str) -> list:
@@ -454,35 +505,24 @@ def _zone_konvektion(ctx: dict, zone: str, i: int, key: str) -> list:
 _GEWITTER_RE = re.compile(r"(gewitter|thunderstorm|thunder\b)", re.IGNORECASE)
 
 
-# Zone(n), die bei aktivem Foehn die boeige LEE-Seite sind — dort sind
-# Ruhe-/Schutz-Behauptungen im Zonentext auch OHNE Regionen-Token falsch.
+# Zone(n), die bei aktivem Foehn die boeige LEE-Seite sind (Gefahren-Schalter
+# FOEHN: betroffene Zonen).
 _FOEHN_LEE_ZONES = {
     "nord": ("tessin",),                      # Nordfoehn -> Tessin ist Lee
     "sued": ("alpennordhang", "wallis"),      # Suedfoehn -> Nordseite/Foehntaeler
 }
 
-_CALM_CLAIM_RE = re.compile(
-    r"(windgeschuetzt|windgeschützt|geschuetzt|geschützt|"
-    r"sheltered|protected|windstill|windless|ruhig|windarm|windschwach|calm)",
-    re.IGNORECASE,
-)
-
-
 def _validate(parsed: dict, ctx: dict) -> list:
-    """Prueft den LLM-Output (Zonen-Format) inhaltlich und strukturell.
+    """Prueft den LLM-Output inhaltlich und strukturell.
 
-    Erwartetes Format:
-      {"lead": str,
-       "zones": [{"zone": <zone_id>, "days": [{text, flight_hint}, ...]}, ...]}
+    Erwartetes Format: {"lead": str, "hazards": [...], "day_lines": [...]}
 
     Liefert eine Fehlerliste [{scope, kind, message}] — leere Liste = OK.
     Loescht bewusst NICHTS: die Reaktion (Korrektur-Runde / chirurgisches
     Bereinigen / Alarm) entscheidet der Aufrufer.
     """
     errors = []
-    fc_dates = ctx.get("forecast_dates") or []
     valid_centers = _collect_valid_center_labels(ctx)
-    foehn = ctx.get("foehn") or {}
 
     # --- lead -----------------------------------------------------------
     lead = parsed.get("lead")
@@ -506,188 +546,31 @@ def _validate(parsed: dict, ctx: dict) -> list:
                                 f"diese region_label: {_allowed_centers(valid_centers)}. "
                                 f"Streiche die erfundene Region ersatzlos oder "
                                 f"ersetze sie durch ein erlaubtes Label."))
+        # Foehn-Talwerte: Zahlen nur aus den Talpunkten; ohne bestaetigtes Tal
+        # keinen Foehn "in den Taelern" (lead gilt fuer alle Tage zusammen)
+        tals = [c["checks"]["FOEHN"]["facts"].get("tal") for c in hazard_checks(ctx)
+                if c["checks"]["FOEHN"]["active"]]
+        tals = [t for t in tals if t]
+        if tals:
+            merged = {"n_total": max(t.get("n_total", 0) for t in tals),
+                      "n_bestaetigt": sum(t.get("n_bestaetigt", 0) for t in tals),
+                      "taeler": [x for t in tals for x in (t.get("taeler") or [])]}
+            for t in tals:
+                if t.get("n_bestaetigt"):
+                    merged.update({k: t[k] for k in ("wind_min_kmh", "wind_max_kmh", "gust_max_kmh")})
+            for kind, msg in _foehn_tal_problems(lead, merged, require_name=False,
+                                                 require_aloft=False, only_foehn_sentences=True):
+                errors.append(_verr("lead", kind, msg))
         n_words = len(lead.split())
         if n_words > 150:
             errors.append(_verr("lead", "too_long",
                                 f"`lead` hat {n_words} Woerter — erlaubt sind "
                                 f"max 130. Kuerzen."))
 
-    # --- hazards + day_lines (vor zones — dort early return) ------------
+    # --- hazards + day_lines --------------------------------------------
     errors.extend(_validate_hazards(parsed, ctx))
     errors.extend(_validate_day_lines(parsed, ctx))
     errors.extend(_language_errors(parsed))
-
-    # --- zones: Schema + Vollstaendigkeit --------------------------------
-    zones = parsed.get("zones")
-    if not isinstance(zones, list):
-        errors.append(_verr("zones", "schema",
-                            "`zones` fehlt oder ist keine Liste — Pflichtfeld "
-                            "(ein Eintrag pro Zone: "
-                            f"{list(config.SYNOPTIC_ZONES)})."))
-        return errors
-
-    seen_zones = []
-    for j, z in enumerate(zones):
-        if not isinstance(z, dict):
-            errors.append(_verr(f"zones[{j}]", "schema",
-                                "Zonen-Eintrag muss ein Objekt sein "
-                                '({"zone": "...", "days": [...]}).'))
-            continue
-        zone_id = z.get("zone")
-        if zone_id not in config.SYNOPTIC_ZONES:
-            errors.append(_verr(f"zones[{j}]", "unknown_zone",
-                                f"`zone`={zone_id!r} ist keine gueltige Zone. "
-                                f"Erlaubt sind exakt diese IDs: "
-                                f"{list(config.SYNOPTIC_ZONES)}."))
-            continue
-        seen_zones.append(zone_id)
-        errors.extend(_validate_zone(z, zone_id, ctx, fc_dates,
-                                     valid_centers, foehn))
-
-    missing = [z for z in config.SYNOPTIC_ZONES if z not in seen_zones]
-    if missing:
-        errors.append(_verr("zones", "incomplete",
-                            f"Es fehlen Zonen: {missing}. Jede der "
-                            f"{len(config.SYNOPTIC_ZONES)} Zonen braucht genau "
-                            f"einen Eintrag — auch wenn dort wenig passiert."))
-    dupes = [z for z in set(seen_zones) if seen_zones.count(z) > 1]
-    if dupes:
-        errors.append(_verr("zones", "duplicate",
-                            f"Zonen doppelt vorhanden: {dupes}. Genau ein "
-                            f"Eintrag pro Zone."))
-
-    return errors
-
-
-def _validate_zone(z: dict, zone_id: str, ctx: dict, fc_dates: list,
-                   valid_centers: set, foehn: dict) -> list:
-    """Prueft einen Zonen-Eintrag (days-Vollstaendigkeit + Inhalt pro Tag)."""
-    errors = []
-    days = z.get("days")
-    if not isinstance(days, list):
-        errors.append(_verr(f"zones[{zone_id}]", "schema",
-                            "`days` fehlt oder ist keine Liste — ein Eintrag "
-                            "pro forecast_date, gleiche Reihenfolge."))
-        return errors
-    if fc_dates and len(days) != len(fc_dates):
-        errors.append(_verr(f"zones[{zone_id}]", "schema",
-                            f"`days` hat {len(days)} Eintraege, erwartet "
-                            f"{len(fc_dates)} — exakt einer pro Tag in "
-                            f"forecast_dates-Reihenfolge, keiner fehlt, "
-                            f"keiner doppelt."))
-
-    for i, d in enumerate(days):
-        scope = f"zones[{zone_id}].days[{i}]"
-        if not isinstance(d, dict) or not isinstance(d.get("text"), str) \
-                or not d["text"].strip():
-            errors.append(_verr(scope, "schema",
-                                "Eintrag braucht ein nicht-leeres `text`-Feld."))
-            continue
-        text = d["text"]
-        hint = d.get("flight_hint")
-        hint_str = hint if isinstance(hint, str) else ""
-
-        bad = _find_forbidden_term(text, _fronts_ok(ctx))
-        if bad:
-            errors.append(_verr(scope, "forbidden_term",
-                                f"`text` enthaelt einen verbotenen Begriff "
-                                f"(Muster: {bad})."))
-
-        invalid_regions = _check_pressure_region_mentions(text, valid_centers)
-        if invalid_regions:
-            errors.append(_verr(scope, "invalid_region",
-                                f"`text` nennt nicht detektierte Regionen: "
-                                f"{invalid_regions}. Erlaubt sind ausschliesslich "
-                                f"diese region_label: "
-                                f"{_allowed_centers(valid_centers)}."))
-
-        # --- Foehn-Lee: zonen-basiert (der Zonentext nennt die Region oft
-        # gar nicht mehr — die Zone IST die Ortsangabe) + Text-Heuristik.
-        active_side = _foehn_active_side(foehn, fc_dates, i)
-        if active_side:
-            lee_zones = _FOEHN_LEE_ZONES.get(active_side, ())
-            calm_hit = (_CALM_CLAIM_RE.search(text)
-                        or _CALM_CLAIM_RE.search(hint_str))
-            if zone_id in lee_zones and calm_hit:
-                errors.append(_verr(scope, "foehn_lee_inversion",
-                                    f"An diesem Tag ist "
-                                    f"{active_side.capitalize()}foehn aktiv — "
-                                    f"diese Zone ist die boeige LEE-Seite. Das "
-                                    f"Wort {calm_hit.group(0)!r} ist hier "
-                                    f"verboten, in `text` UND in `flight_hint`. "
-                                    f"Trocken/sonnig darfst du schreiben — der "
-                                    f"Wind-Teil MUSS aber die Boeigkeit nennen. "
-                                    f"Baumuster: '<trocken/sonnig>, aber "
-                                    f"boeiger {active_side.capitalize()}foehn "
-                                    f"in den Lee-Taelern'. Ersetze das Wort, "
-                                    f"streiche es nicht bloss."))
-            elif _text_inverts_foehn_lee(text, active_side) or \
-                    _text_inverts_foehn_lee(hint_str, active_side):
-                lee = "Alpensuedseite" if active_side == "nord" else "Alpennordseite"
-                errors.append(_verr(scope, "foehn_lee_inversion",
-                                    f"{active_side.capitalize()}foehn aktiv — die "
-                                    f"{lee} ist die boeige LEE-Seite und darf "
-                                    f"nicht als geschuetzt/ruhig gelten."))
-        else:
-            # Kein Foehn an DIESEM Tag: `foehn.active` gilt fuer den ganzen
-            # Zeitraum, die Gefahr aber nur an `days_affected`. Ohne diese
-            # Pruefung wandert die Foehn-Warnung auf ruhige Tage (DE-Lauf
-            # 26.07.2026: "Foehnschneisen kritisch" an einem foehnfreien Tag).
-            foehn_hit = (_FOEHN_MENTION_RE.search(text)
-                         or _FOEHN_MENTION_RE.search(hint_str))
-            if foehn_hit:
-                errors.append(_verr(scope, "foehn_not_active",
-                                    f"An diesem Tag meldet das Strukturfeld "
-                                    f"KEINEN Foehn — {foehn_hit.group(0)!r} darf "
-                                    f"hier nicht vorkommen, weder in `text` noch "
-                                    f"in `flight_hint`. Boeigkeit ohne Foehn "
-                                    f"benennen (z.B. 'boeiger Talwind', "
-                                    f"'starker Hoehenwind') oder weglassen."))
-
-        # --- Gewitter nur mit Modell-Gewitter im Ruecken. Die Skill-Regel
-        # ("nur bei gewitter_share > 0") war bisher nirgends verankert —
-        # hohe CAPE verleitet den LLM zur Gewitter-Prosa (DE-Lauf
-        # 26.07.2026: "Schauer und Gewitter" bei CAPE 1360, share 0).
-        gew_share = _zone_gewitter_share(ctx, zone_id, i)
-        ens_gewitter = _zone_konvektion(ctx, zone_id, i, "gewitter")
-        if gew_share == 0 and not ens_gewitter:
-            gew_hit = (_GEWITTER_RE.search(text)
-                       or _GEWITTER_RE.search(hint_str))
-            if gew_hit:
-                errors.append(_verr(scope, "gewitter_without_signal",
-                                    f"Weder `gewitter_share` noch "
-                                    f"`konvektion.gewitter` zeigen an dem Tag "
-                                    f"in dieser Zone ein Signal — "
-                                    f"{gew_hit.group(0)!r} ist damit nicht "
-                                    f"gedeckt. Hohe CAPE allein heisst "
-                                    f"'labile Luft' / 'Ueberentwicklung "
-                                    f"moeglich', NICHT Gewitter."))
-
-        # --- Wind-Konsistenz: jetzt PRO ZONE (frueher nur wenn BEIDE
-        # Alpenseiten windkritisch waren — eine verblasene Zone neben einer
-        # ruhigen rutschte damit durch).
-        wind_class = _zone_wind_class(ctx, zone_id, i)
-        if wind_class in _WINDY_CLASSES:
-            praise = _PRAISE_RE.search(text) or _PRAISE_RE.search(hint_str)
-            if praise:
-                errors.append(_verr(scope, "wind_contradiction",
-                                    f"Diese Zone ist an dem Tag laut "
-                                    f"`wind_day.wind_class` '{wind_class}', wird "
-                                    f"aber gelobt ('{praise.group(0)}'). Wortwahl "
-                                    f"muss die Windlage widerspiegeln: 'vielerorts "
-                                    f"zu windig' / 'nur windgeschuetzte Lagen'."))
-
-        if not isinstance(hint, str) or len(hint.strip()) < 3:
-            errors.append(_verr(scope, "schema",
-                                "`flight_hint` fehlt — Pflichtfeld (EIN kurzer "
-                                "Satz Pilotensicht, max ~15 Woerter)."))
-        else:
-            bad = _find_forbidden_term(hint, _fronts_ok(ctx))
-            if bad:
-                errors.append(_verr(scope, "forbidden_term",
-                                    f"`flight_hint` enthaelt einen verbotenen "
-                                    f"Begriff (Muster: {bad})."))
-
     return errors
 
 
@@ -700,120 +583,37 @@ def _finalize(parsed: dict, ctx: dict, attempts: int,
     """Baut aus dem (validierten oder besten) LLM-Output das Cache-Format.
 
     prune=True (nur nach erschoepften Versuchen): verletzende Teile werden
-    chirurgisch entfernt — verletzender lead faellt weg, verletzende
-    days-Eintraege fallen einzeln weg, verletzende flight_hints werden
-    gestrippt. Alles andere bleibt erhalten (Nie-leer-Garantie, soweit
-    irgendetwas Valides existiert).
-
-    Feldnamen im Rueckgabewert bleiben aus Kompatibilitaet zum Frontend
-    (briefing.js) und zur Mail (email_service) short/long/long_with_sources.
+    chirurgisch entfernt — ein verletzender lead faellt weg, verletzende
+    Gefahren-Saetze/Tagessaetze einzeln. Alles andere bleibt erhalten.
+    `short` heisst aus Kompatibilitaet so (Mail, Briefing).
     """
-    import i18n
-    lang = "en" if i18n.get_current_lang() == "en" else "de"
-
-    fc_dates = ctx.get("forecast_dates") or []
     valid_centers = _collect_valid_center_labels(ctx)
-    foehn = ctx.get("foehn") or {}
-
     lead = parsed.get("lead") if isinstance(parsed.get("lead"), str) else ""
     lead = lead.strip()
-    zones_raw = parsed.get("zones") if isinstance(parsed.get("zones"), list) else []
-
     if prune and lead:
         if _find_forbidden_term(lead, _fronts_ok(ctx)) or \
                 _check_pressure_region_mentions(lead, valid_centers):
             logger.warning("Nicht behebbarer lead entfernt: '%s'", lead)
             lead = ""
 
-    by_zone = {}
-    for z in zones_raw:
-        if not isinstance(z, dict):
-            continue
-        zone_id = z.get("zone")
-        if zone_id not in config.SYNOPTIC_ZONES or zone_id in by_zone:
-            continue
-        days_raw = z.get("days") if isinstance(z.get("days"), list) else []
-        entries = []
-        for i, d in enumerate(days_raw):
-            if not isinstance(d, dict):
-                continue
-            text = d.get("text")
-            if not isinstance(text, str) or not text.strip():
-                continue
-            text = text.strip()
-
-            # Wochentag-Praefix VOR dem Prune autoritativ setzen — Position i
-            # gilt fuer forecast_dates[i], unabhaengig davon was spaeter faellt.
-            text = _apply_weekday_prefix(text, fc_dates, i)
-
-            active_side = _foehn_active_side(foehn, fc_dates, i)
-            lee_zone = (active_side
-                        and zone_id in _FOEHN_LEE_ZONES.get(active_side, ()))
-            if prune:
-                if _find_forbidden_term(text, _fronts_ok(ctx)) or \
-                        _check_pressure_region_mentions(text, valid_centers) or \
-                        (lee_zone and _CALM_CLAIM_RE.search(text)) or \
-                        (active_side and _text_inverts_foehn_lee(text, active_side)) or \
-                        (not active_side and _FOEHN_MENTION_RE.search(text)):
-                    logger.warning("Nicht behebbarer days-Eintrag entfernt "
-                                   "(%s day %d): '%s'", zone_id, i + 1, text)
-                    continue
-
-            entry = {"text": _neutralize_calendar_week_text(text)}
-            hint = d.get("flight_hint")
-            if isinstance(hint, str) and len(hint.strip()) >= 3:
-                hint = hint.strip()
-                if prune and (_find_forbidden_term(hint, _fronts_ok(ctx))
-                              or (lee_zone and _CALM_CLAIM_RE.search(hint))
-                              or (active_side
-                                  and _text_inverts_foehn_lee(hint, active_side))
-                              or (not active_side
-                                  and _FOEHN_MENTION_RE.search(hint))):
-                    logger.warning("Nicht behebbarer flight_hint entfernt "
-                                   "(%s day %d): '%s'", zone_id, i + 1, hint)
-                else:
-                    entry["flight_hint"] = _neutralize_calendar_week_text(hint)
-            entries.append(entry)
-        if entries:
-            by_zone[zone_id] = entries
-
     # Kalenderwochen-Begriffe → zeitraum-neutral. Sicherheitsnetz zum
     # Skill-Verbot; der Cast ist ein rollierender Block ab heute.
     lead = _neutralize_calendar_week_text(lead)
+    hazards = _finalize_hazards(parsed, ctx, prune)
+    day_lines = _finalize_day_lines(parsed, ctx, prune)
 
-    if not lead and not by_zone:
+    if not lead and not any(h.get("items") for h in hazards) \
+            and not any(d.get("text") for d in day_lines):
         logger.warning("generate_synoptic_overview: nach Bereinigung nichts "
                        "Valides uebrig — Block wird ausgelassen")
         return None
 
-    # Ausgabe-Reihenfolge = config.SYNOPTIC_ZONES (nicht LLM-Reihenfolge)
-    zones_out = [
-        {"zone": z,
-         "label": config.SYNOPTIC_ZONE_LABELS[z][lang],
-         "days": by_zone[z]}
-        for z in config.SYNOPTIC_ZONES if z in by_zone
-    ]
-
-    # Legacy-Felder: `short` (Mail-Lead) unveraendert; `long_with_sources`
-    # bleibt fuer Konsumenten ohne Zonen-Support befuellt — mit der groessten
-    # Zone (Alpennordhang, ~2/3 aller Spots) statt einer Flach-Verkettung
-    # aller vier Zonen, die mit 4x denselben Wochentagen unlesbar waere.
-    legacy_zone = next((z for z in config.SYNOPTIC_ZONES if z in by_zone), None)
-    legacy_entries = by_zone.get(legacy_zone, []) if legacy_zone else []
-
     return {
         "short": lead,
-        "long": " ".join(
-            f"{zo['label']} — " + " ".join(e["text"] for e in zo["days"])
-            for zo in zones_out
-        ),
-        "short_with_sources": [{"text": lead}] if lead else [],
-        "long_with_sources": legacy_entries,
-        "zones": zones_out,
-        # Gefahren schweizweit (Briefing-Warnungen) — additiv, App ignoriert es
-        "hazards": _finalize_hazards(parsed, ctx, prune),
+        # Gefahren schweizweit (Briefing-Warnungen)
+        "hazards": hazards,
         # ein kurzer Satz je Tag fuer die Tages-Sektion des Briefings
-        "day_lines": _finalize_day_lines(parsed, ctx, prune),
+        "day_lines": day_lines,
         "attempts": attempts,
         "unresolved": [f"[{e['scope']}] {e['message']}" for e in unresolved],
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -942,7 +742,7 @@ def _build_llm_payload(ctx: dict) -> str:
         "konvektion": ctx.get("konvektion"),
         "bise": _strip_provenance(ctx.get("bise")),
         "vb_lage": _strip_provenance(ctx.get("vb_lage")),
-        "foehn": _strip_provenance(ctx.get("foehn")),
+        "foehn": _foehn_for_llm(ctx.get("foehn")),
         "zones": _zones_for_llm(ctx),
         # vom Code geschaltete Gefahren je Tag — nur diese darf `hazards` nennen
         "hazards_per_day": _hazards_for_llm(hazard_checks(ctx)),
@@ -964,6 +764,16 @@ def _build_llm_payload(ctx: dict) -> str:
         f"AKTUELLE LOKALZEIT: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         f"WETTERLAGE-STRUKTURFELD:\n{json.dumps(out, ensure_ascii=False, indent=2)}\n"
     )
+
+
+def _foehn_for_llm(field: Optional[dict]) -> Optional[dict]:
+    """Foehn-Block ohne die Talpunkt-Details: die Talwerte bekommt der LLM einmal,
+    kompakt in `hazards_per_day` (eine Zahl, eine Quelle)."""
+    out = _strip_provenance(field)
+    if out and isinstance(out.get("per_day"), list):
+        out["per_day"] = [{k: v for k, v in d.items() if k != "tal"}
+                          if isinstance(d, dict) else d for d in out["per_day"]]
+    return out
 
 
 def _strip_provenance(field: Optional[dict]) -> Optional[dict]:
@@ -1097,52 +907,6 @@ def _allowed_centers(valid_centers: set) -> str:
     """
     labels = sorted(str(c) for c in valid_centers if c)
     return str(labels) if labels else "(keine — dann gar keine Region nennen)"
-
-
-# Praefix-Regex: "Heute:", "Morgen:", "Uebermorgen:", "Tag 1:" oder Wochentag
-# (DE + EN, optional mit Klammer-Zusatz wie "Sonntag (Sunday):" — der LLM
-# haengt im EN-Modus gerne die Uebersetzung an; ohne Klammer-Support wurde
-# daraus "Sonntag: Sonntag (Sunday): ..." mit Doppel-Praefix, 05.07.2026).
-_WEEKDAY_SET = {w.lower() for w in _WOCHENTAGE}
-_PREFIX_RE = re.compile(
-    r"^(Heute|Morgen|Uebermorgen|Übermorgen|Tag\s*\d+|Today|Tomorrow|Day\s*\d+|"
-    r"Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|"
-    r"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
-    r"\s*(?:\([^)]{0,30}\))?\s*:\s*",
-    re.IGNORECASE,
-)
-
-
-def _apply_weekday_prefix(text: str, forecast_dates: list, i: int) -> str:
-    """Setzt das Wochentag-Praefix eines days-Eintrags autoritativ auf den
-    korrekten Wochentag aus `forecast_dates[i]`. Der briefing.js-Renderer
-    matcht nur `^(Montag|...|Sonntag):` — Eintraege mit "Heute:"/"Morgen:"
-    oder verschobenen Wochentagen wuerden sonst als unbeschriftete
-    Lead-Absaetze gerendert.
-
-    Positions-Vertrag: days[i] gehoert zu forecast_dates[i] (Skill).
-    Wir setzen das Praefix anhand der Position, unabhaengig davon, was
-    der LLM gewaehlt hat.
-    """
-    if i >= len(forecast_dates):
-        return text
-    try:
-        correct_wd = _weekday_label(forecast_dates[i])
-    except Exception:
-        return text
-    # ALLE fuehrenden Praefix-Varianten abraeumen (auch gestapelte wie
-    # "Sonntag: Sonntag (Sunday):"), dann kanonisch neu setzen.
-    stripped = text
-    for _ in range(3):
-        m = _PREFIX_RE.match(stripped)
-        if not m:
-            break
-        stripped = stripped[m.end():].lstrip()
-    new_text = f"{correct_wd}: {stripped}"
-    if new_text != text:
-        logger.info("Wetterlage-Praefix normalisiert (day %d) -> '%s'",
-                    i + 1, correct_wd)
-    return new_text
 
 
 # Kalenderwochen-Begriffe → zeitraum-neutral. Der Cast ist ein rollierender
@@ -1347,13 +1111,6 @@ def _language_errors(parsed: dict) -> list:
     found = []
     if _looks_german(parsed.get("lead")):
         found.append("lead")
-    for z in parsed.get("zones") or []:
-        if not isinstance(z, dict):
-            continue
-        for i, day in enumerate(z.get("days") or []):
-            if isinstance(day, dict) and (_looks_german(day.get("text"))
-                                          or _looks_german(day.get("flight_hint"))):
-                found.append(f"zones[{z.get('zone')}].days[{i}]")
     for i, h in enumerate(parsed.get("hazards") or []):
         for item in (h.get("items") or []) if isinstance(h, dict) else []:
             if isinstance(item, dict) and _looks_german(item.get("text")):
@@ -1785,6 +1542,8 @@ def hazard_checks(ctx: dict) -> list:
                                 "day_shape": _day_shape(foehn_wins),
                                 "course": _foehn_course(foehn_wins_raw),
                                 "lee_gust_kmh": _lee_gust_kmh(ctx, i, lee_zones),
+                                # Foehn am Talboden (foehn_tal_for_day) — None ohne Talreihe
+                                "tal": fo.get("tal") if side else None,
                                 "delta_p_min_hpa": (foehn_thr.get("delta_p_danger_hpa", 8)
                                                     if peak == "danger"
                                                     else foehn_thr.get("delta_p_caution_hpa", 4))}},
@@ -1825,7 +1584,17 @@ def _hazards_for_llm(checks: list) -> list:
                 entry["peak"] = f.get("peak")          # caution | danger
                 if f.get("course"):
                     entry["course"] = f["course"]      # innerhalb DIESES Tages
-                if f.get("lee_gust_kmh"):
+                tal = f.get("tal")
+                if tal:
+                    from foehn_talpunkte import tal_kurzname, tal_namen
+                    entry["tal_checked"] = True
+                    entry["tal_confirmed"] = tal_namen(tal)
+                    entry["tal_unconfirmed_n"] = tal.get("n_total", 0) - tal.get("n_bestaetigt", 0)
+                    if tal.get("n_bestaetigt"):
+                        entry["tal_wind_kmh"] = f"{tal['wind_min_kmh']}-{tal['wind_max_kmh']}"
+                        entry["tal_gust_max_kmh"] = tal["gust_max_kmh"]
+                        entry["tal_gust_valley"] = tal_kurzname(tal.get("gust_tal", ""))
+                elif f.get("lee_gust_kmh"):
                     entry["lee_gust_kmh"] = f["lee_gust_kmh"]
             if f.get("day_shape"):
                 entry["day_shape"] = f["day_shape"]["shape"]
@@ -1880,6 +1649,10 @@ def _hazard_text_problems(text, topic: str, ctx: dict, i: int, day_checks: dict,
         problems.append(("foehn_lee_inversion",
                          "Foehn aktiv — die Lee-Seite darf nicht als "
                          "geschuetzt/ruhig beschrieben werden."))
+    if topic == "FOEHN" and day_checks["FOEHN"]["active"]:
+        problems.extend(_foehn_tal_problems(
+            text, day_checks["FOEHN"]["facts"].get("tal"),
+            require_name=True, require_aloft=True, only_foehn_sentences=False))
     if not day_checks["THUNDER"]["active"]:
         hit = _GEWITTER_RE.search(text)
         if hit:
@@ -2039,6 +1812,12 @@ def _validate_day_lines(parsed: dict, ctx: dict) -> list:
             break
         for kind, msg in _day_line_problems(lines[i], ctx, i, c["checks"], valid_centers):
             errors.append(_verr(f"day_lines[{i}]", kind, msg))
+        fo = c["checks"]["FOEHN"]
+        if fo["active"] and isinstance(lines[i], str):
+            for kind, msg in _foehn_tal_problems(lines[i], fo["facts"].get("tal"),
+                                                 require_name=False, require_aloft=False,
+                                                 only_foehn_sentences=True):
+                errors.append(_verr(f"day_lines[{i}]", kind, msg))
     return errors
 
 

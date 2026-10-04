@@ -253,16 +253,19 @@ Damit ist jede Aussage rückwärts auflösbar bis zur Rohzahl. Audit-Logs unter
   die Zentren-Lage nicht zu `flow_overhead.sector`, wird die Herleitung
   weggelassen statt erfunden
 
-### Ausgabe-Format (v2.0)
+### Ausgabe-Format (seit 04.10.2026 ohne Zonen-Texte)
 ```json
 {"lead": "...",
- "zones": [{"zone": "alpennordhang",
-            "days": [{"text": "...", "flight_hint": "..."}]}],
- "hazards": [{"items": [{"topic": "RAIN", "text": "..."}]}]}
+ "hazards": [{"items": [{"topic": "RAIN", "text": "..."}]}],
+ "day_lines": ["...", "..."]}
 ```
-Zuordnung `days[i] ↔ forecast_dates[i]` per Position, Zonen über die
-`zone`-ID (nicht über die Reihenfolge). `_finalize` sortiert nach
-`config.SYNOPTIC_ZONES`, nicht nach LLM-Reihenfolge.
+Zuordnung `hazards[i]`/`day_lines[i] ↔ forecast_dates[i]` per Position.
+Cache: `llm_overview = {short, hazards, day_lines, attempts, unresolved,
+generated_at}`. Die vier Zonen-**Texte** (`zones`, `long`,
+`long_with_sources`) sind entfallen: sie erschienen nur auf der
+Synoptik-Seite, die seit 04.10.2026 nur noch die Karte zeigt. Die
+Zonen-**Daten** (`precip_zones`, `wind_zones`, …) bleiben — Briefing und
+Gefahren bauen darauf.
 
 **`hazards` (seit 15.09.2026) — Gefahren schweizweit** für die
 Briefing-Warnungen: ein Eintrag je `forecast_dates`-Tag. **Der Code schaltet**,
@@ -281,26 +284,18 @@ Konsument ist die Briefing-Vorschau (`scripts/briefing_v3_context.py`).
    dazu die Kürzel `\bcape\b` und `\bVb\b` — Kürzel gehören nicht in den
    Fliesstext („Vb" = van-Bebber-Zugbahn, gemeint ist das Genua-Tief;
    hohe CAPE heisst „labile Luft")
-2. **Zonen-Vollständigkeit**: alle 4 Zonen, keine doppelt, keine unbekannte
-   ID; pro Zone `len(days) == len(forecast_dates)`
-3. **Region-Validierung**: erwähnte Region-Labels müssen für **diesen** Cast
+2. **Region-Validierung**: erwähnte Region-Labels müssen für **diesen** Cast
    detektiert worden sein (sonst Erfindung)
-4. **Föhn-Lee pro Zone**: bei `foehn.side="Nord"` darf `tessin`, bei
-   `"Sued"` dürfen `alpennordhang`/`wallis` nicht als ruhig/geschützt
-   gelten — greift auch ohne Regionen-Token im Satz (die Zone *ist* die
-   Ortsangabe)
-5. **Lob-Gate pro Zone**: Lob-Vokabular in einer Zone mit
-   `wind_class ∈ {verblasen, stark_eingeschraenkt}` → Korrekturrunde
-   (v1.0 prüfte nur, ob BEIDE Alpenseiten windkritisch waren — eine
-   verblasene Zone neben einer ruhigen rutschte durch)
-6. **Föhn nur an Föhntagen**: `foehn.active` gilt für den ganzen Zeitraum,
-   die Gefahr aber nur an `days_affected`. Jedes Föhn-Wort an einem Tag
-   ohne aktiven Föhn ist ein Fehler (DE-Lauf 26.07.: „Föhnschneisen
-   kritisch" an einem föhnfreien Samstag)
-7. **Gewitter nur mit Signal**: `gewitter_share == 0` in der Zone → das
-   Wort „Gewitter"/„thunderstorm" ist unzulässig. Hohe CAPE allein heisst
-   „labile Luft". Die Regel stand im Skill, war aber nirgends verankert.
-8. **Gefahren nur, wenn der Code sie schaltet** (`_validate_hazards`): je
+3. **Föhn-Lee**: die Lee-Seite darf im Gefahrensatz nicht als ruhig/geschützt
+   gelten (`foehn_lee_inversion`)
+4. **Föhn nur an Föhntagen**: Jedes Föhn-Wort in Gefahrensatz oder
+   Tagessatz an einem Tag ohne aktiven Föhn ist ein Fehler (DE-Lauf 26.07.:
+   „Föhnschneisen kritisch" an einem föhnfreien Samstag)
+5. **Gewitter nur mit Signal**: ohne `THUNDER` kein „Gewitter"/„thunderstorm".
+6. **Föhn-Talwerte** (seit 04.10.2026, `docs/FOEHN.md`): Talname bei
+   bestätigtem Föhn, „bleibt in der Höhe" bei unbestätigtem, km/h nur aus den
+   Talwerten — in Gefahrensatz, `lead` und Tagessatz.
+7. **Gefahren nur, wenn der Code sie schaltet** (`_validate_hazards`): je
    Tag genau die aktiven Themen (`hazard_missing` / `hazard_not_active`),
    jeder Satz mit Ortsbezug (`no_place`: Zone, Alpennord/-süd, Mittelland,
    Jura), dazu Verbotsbegriffe, Föhn- und Gewitter-Wörter wie oben. Beim
@@ -310,17 +305,15 @@ Fehler → Korrekturrunde (max 4 Versuche) → chirurgisches Bereinigen der
 besten Version + Admin-Mail. Kein stilles Löschen.
 
 Die Fehlermeldung an den LLM ist **prescriptiv, nicht nur verbietend**:
-bei Föhn-Lee steht das gefundene Wort und ein Ersatz-Baumuster darin, bei
-erfundenen Druckzentren die Positivliste der erlaubten `region_label`.
+bei erfundenen Druckzentren steht die Positivliste der erlaubten
+`region_label` darin, bei Föhn-Talwerten die erlaubten Zahlen und Täler.
 Grund: Am 25.07.2026 fiel das Modell auf das blosse Verbot hin zweimal in
 dieselbe Formulierung zurück (3/3 Versuche verbraucht, keine Reserve) und
 ersetzte eine erfundene Region durch die nächste erfundene.
 
-### Legacy-Kompatibilität
-`short` (Mail-Lead) unverändert. `long_with_sources` wird weiterhin
-befüllt — mit der **grössten Zone** (Alpennordhang), nicht mit einer
-Flach-Verkettung aller vier (die hätte 4× dieselben Wochentage).
-`briefing.js` bevorzugt `zones` und fällt darauf zurück.
+### Kompatibilität
+`short` (Mail-Lead) heisst weiterhin so. Ältere Caches können noch `zones`,
+`long`, `long_with_sources` tragen — kein Konsument liest sie mehr.
 
 ## Integration
 
@@ -332,21 +325,23 @@ Flach-Verkettung aller vier (die hätte 4× dieselben Wochentage).
 - **Email** (`email_service.py`): wenn `wetterlage.llm_overview.short`
   existiert → ersetzt `week_lead`. Sonst Fallback auf
   `_week_summary_llm` (alter 1-2-Satz-Lead).
-- **UI** (`static/js/briefing.js:renderWetterlage`): Block oben vor Fazit
-  und Tag-Tabs. Kurzfassung (`short`) sichtbar, "Detail"-Toggle zeigt die
-  4 Zonen-Abschnitte (`.bf-wetterlage-zone` mit Überschrift + Tages-Blöcken).
+- **App-Briefing** (`/briefing`, `scripts/briefing_v3_context.py`): dieselben
+  Bausteine wie die Mail (Kurzfassung, Tagessatz, Gefahren).
+- **Synoptik-Seite** (`/synoptik`): seit 04.10.2026 nur die interaktive
+  Druckkarte, keine Wetterlage-Texte mehr.
 - **Admin** (`/admin/wetterlage_audit/<date>`): zeigt Audit-JSON für
   Nachvollziehbarkeit (welcher Klassifikator hat was entschieden mit welchen
   Inputs).
 
 ## Vorher/Nachher prüfen
 
-`python scripts/preview_synoptik_zonen.py` erzeugt den Zonen-Block aus dem
-aktuellen Wettercache, ohne Prod-Caches zu überschreiben, und zeigt:
+`python scripts/preview_synoptik_zonen.py` erzeugt den Wetterlage-Text
+(lead, Tagessätze, Gefahren) aus dem aktuellen Wettercache, ohne Prod-Caches
+zu überschreiben, und zeigt:
 1. **Rohdaten-Faktencheck** — `wet_share`/`p90_mm` je Zone/Tag/Fenster,
    `wind_class`, Zugbahn-Einsetzzeiten
 2. den **alten** Block aus `synoptic_context.json`
-3. den **neuen** Zonen-Block (LLM-Call)
+3. den **neuen** Text (LLM-Call)
 
 `--no-llm` überspringt den LLM-Call (nur Strukturfeld + Faktencheck).
 Ergebnis landet in `data/_preview_synoptik_zonen.json` (gitignored).
@@ -361,18 +356,13 @@ Ergebnis landet in `data/_preview_synoptik_zonen.json` (gitignored).
     P90-Ausreisser-Resistenz, Tagesfenster erhalten die Zeitachse,
     `gewitter_share` rundet 1/200 nicht weg, Zugbahn (Richtung /
     "gleichzeitig" / trockener Tag / Mindest-Spotzahl)
-- `tests/test_synoptic_llm.py` — 42 Tests:
-  - Validierung (Verbotsbegriffe inkl. CAPE-Jargon, Region-Mention-Check,
-    Zonen-Vollständigkeit/Duplikate/unbekannte IDs)
-  - Föhn-Lee **pro Zone** (Lee verboten, Stau-Zone erlaubt)
-  - Föhn-Erwähnung nur an `days_affected`; Gewitter nur bei
-    `gewitter_share > 0` (und kein Fehlalarm ohne `precip_zones`)
-  - Korrektur-Nachrichten sind prescriptiv (nennen Wort + Ersatzmuster
-    bzw. die erlaubten `region_label`)
-  - Lob-Gate **pro Zone** (verblasene Zone ≠ ruhige Nachbarzone)
-  - `_finalize`: Zonen-Reihenfolge aus Config, Wochentag-Präfixe,
-    EN-Modus (Wochentage + Zonen-Labels), Prune, Legacy-Felder
-  - Payload-Builder (Zonen + Fenster + Zugbahn drin, altes Nord/Süd raus)
+- `tests/test_synoptic_llm.py`:
+  - Validierung (Verbotsbegriffe inkl. CAPE-Jargon, Region-Mention-Check)
+  - Gefahren: Schalter, Tagesverlauf, Ortsbezug, Föhn/Gewitter nur mit Signal
+  - Korrektur-Nachrichten nennen die erlaubten `region_label`
+  - `_finalize`: Cache-Format ohne Zonen-Texte, Prune, EN-Wochentage
+  - Payload-Builder (Zonen-Daten + Fenster + Zugbahn drin, altes Nord/Süd raus)
+- `tests/test_foehn_tal_briefing.py` — Föhn-Talwerte im Briefing + Validator
 
 LLM-Calls selbst werden **nicht** getestet (Integration, kein Unit-Test).
 

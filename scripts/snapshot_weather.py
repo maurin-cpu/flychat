@@ -423,6 +423,53 @@ def build_foehn_block(series: Optional[Dict], day: str) -> Optional[Dict]:
     }
 
 
+def build_foehn_tal_block(series: Optional[Dict], day: str) -> Optional[Dict]:
+    """Wind an den Föhn-Talpunkten eines Tages aus wetterdaten._meta.foehn_tal_series.
+
+    Je Punkt: Stammdaten (wie am Tag gespeichert), Urteil Föhnstunden/bestätigt
+    (foehn_indicators.evaluate_talpunkt — exakt wie das Briefing) und die
+    Rohstunden im Flugfenster. Material für die spätere Prüfung gegen den
+    MeteoSchweiz-Föhnindex (validation/foehn). None ohne Reihe.
+    """
+    if not series or not series.get("punkte"):
+        return None
+    from foehn_indicators import (evaluate_talpunkt, TAL_WIND_MIN_KMH, TAL_GUST_MIN_KMH,
+                                  TAL_RH_MAX, TAL_MIN_HOURS, TAL_SEKTOR)
+
+    times = series.get("time") or []
+    idx = [i for i, t in enumerate(times) if t[:10] == day
+           and config.FLIGHT_HOURS_START <= int(t[11:13]) < config.FLIGHT_HOURS_END]
+    if not idx:
+        return None
+    punkte: Dict[str, Dict] = {}
+    for pid, p in series["punkte"].items():
+        meta, h = p.get("meta") or {}, p.get("hourly") or {}
+
+        def _v(key, i):
+            arr = h.get(key) or []
+            return arr[i] if i < len(arr) else None
+
+        verdict = evaluate_talpunkt(h, idx, meta.get("foehn_typ", ""))
+        if "first_index" in verdict:
+            verdict["first_hour"] = int(times[verdict.pop("first_index")][11:13])
+        punkte[pid] = {
+            "meta": meta,
+            "verdict": verdict,
+            "hours": {times[i][11:16]: {"wind_kmh": _v("wind_speed_10m", i),
+                                        "gust_kmh": _v("wind_gusts_10m", i),
+                                        "dir_deg": _v("wind_direction_10m", i),
+                                        "rh": _v("relative_humidity_2m", i),
+                                        "t2m": _v("temperature_2m", i)} for i in idx},
+        }
+    return {
+        "model": series.get("model"),
+        "thresholds": {"wind_min_kmh": TAL_WIND_MIN_KMH, "gust_min_kmh": TAL_GUST_MIN_KMH,
+                       "rh_max": TAL_RH_MAX, "min_hours": TAL_MIN_HOURS,
+                       "sektor": {k: list(v) for k, v in TAL_SEKTOR.items()}},
+        "punkte": punkte,
+    }
+
+
 def build_snapshots(target_date: Optional[str] = None, all_days: bool = False) -> Dict[str, Dict]:
     """Baut Snapshots.
 
@@ -520,6 +567,7 @@ def build_snapshots(target_date: Optional[str] = None, all_days: bool = False) -
             # Produktivlogik. Ohne diesen Block ist eine Föhnwarnung im Archiv
             # nicht mehr begründbar oder prüfbar (validation/foehn/).
             "foehn": build_foehn_block(meta.get("foehn_series"), day),
+            "foehn_tal": build_foehn_tal_block(meta.get("foehn_tal_series"), day),
         }
 
         for spot in spots:

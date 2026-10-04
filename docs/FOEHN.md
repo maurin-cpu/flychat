@@ -73,8 +73,9 @@ des Richters (Talboden ≠ Startplatz!) in `validation/foehn/README.md`.
 Eigene Punkt-Ebene `data/foehn_talpunkte.geojson` (Lader `foehn_talpunkte.py`),
 bearbeitbar unter `/admin/reference-points` → „Föhn-Täler". **Bewusst nicht**
 Teil der 7 Regions-Referenzpunkte — Föhnanker würden Wind-Median und
-Thermik-Anker der Region verzerren. Die Punkte fliessen noch in keine
-Bewertung ein.
+Thermik-Anker der Region verzerren. **Seit 04.10.2026 nutzt sie das Briefing**
+(nur das Briefing — Spot-/Regionsanalyse und Synoptik-Seite nicht), siehe
+„Bestätigung im Briefing" unten.
 
 - **20 Punkte auf Stationen mit amtlichem Föhnindex**, Startlage = Station
   (Modellwert und Messung am selben Ort). Gruppen: A Nordseite/Südföhn
@@ -94,3 +95,27 @@ Bewertung ein.
   Ein Föhnindex am Talpunkt senkt die Fehlalarm-Stunden auf ein Drittel bis
   ein Achtzehntel, verpasst aber rund 26 % der Föhnstunden (national 6 %).
   Vorschlag: als Abstufung zur nationalen Warnung, nicht als Ersatz.
+
+## Bestätigung im Briefing (seit 04.10.2026)
+
+Ergänzung, kein Ersatz: Warnstufe, `foehn_risk`, Safety-Status und die orange
+Pille kommen weiterhin allein aus Δp/Kammwind. Neu sagt das Briefing, ob der
+Föhn am Talboden ankommt.
+
+- **Daten:** `foehn_talpunkte.fetch_talpunkt_wind` (ICON-CH2, ein Call) im
+  Wetterlauf → `wetterdaten._meta.foehn_tal_series`; eingefroren als Snapshot-Block
+  `foehn_tal` (Urteil + Rohstunden).
+- **Regel** (`foehn_indicators.evaluate_talpunkt`, Konstanten `TAL_*`):
+  Föhnstunde = Wind aus dem Föhnsektor des Tals (Süd 90–270°, Süd(-ost) 45–225°,
+  Nord 270–90°) ∧ (Mittelwind ≥ 20 ∨ Böe ≥ 30 km/h) ∧ Feuchte ≤ 60 %, im
+  Flugfenster; Tal bestätigt ab 2 Föhnstunden. Nur Talpunkte der aktiven Seite.
+  Die Sektoren sind eine Hypothese — gegen den Föhnindex zu prüfen (Snapshot).
+- **Eine Quelle:** `synoptic_context.foehn_tal_for_day` → `foehn.per_day[].tal`.
+  Block 3, Chips, Warnbox-Zusatz und KI-Payload lesen nur diese Werte.
+  Mittelwind als Spanne über alle Föhnstunden aller bestätigten Täler, Böe als
+  Spitze mit Talname, Tageszeit aus der ersten Föhnstunde. Unbestätigt: keine Zahl.
+- **KI-Text** (Kurzfassung, Tagessatz, Gefahrensatz): Validator
+  `synoptic_llm._foehn_tal_problems` — bestätigt → Talname Pflicht
+  (Gefahrensatz); unbestätigt → „bleibt in der Höhe" Pflicht, „in den Tälern"
+  verboten; km/h-Zahlen nur aus den Talwerten.
+- **Drei Zustände:** bestätigt / bleibt in der Höhe / nicht prüfbar (keine Reihe).

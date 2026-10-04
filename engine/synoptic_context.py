@@ -137,7 +137,7 @@ def build_synoptic_context(weather_cache: dict,
                    "source": "grid_unavailable"}
 
     # 7. Foehn
-    foehn = decide_foehn_summary(forecast_dates)
+    foehn = decide_foehn_summary(forecast_dates, weather_cache=weather_cache)
     if foehn.get("source") != "fetch_failed":
         decisions_applied.append("decide_foehn_summary")
     else:
@@ -1068,7 +1068,45 @@ def decide_vb_lage(grid: list[dict], forecast_dates: list[str]) -> dict:
     }
 
 
-def decide_foehn_summary(forecast_dates: list[str]) -> dict:
+def foehn_tal_for_day(series: Optional[dict], date: str, side: str) -> Optional[dict]:
+    """Bestätigung der Föhnlage an den Föhn-Talpunkten für einen Tag.
+
+    series: wetterdaten._meta.foehn_tal_series (foehn_talpunkte.fetch_talpunkt_wind).
+    side: "sued"|"nord" — nur Talpunkte dieser Föhnseite zählen.
+    Rückgabe: Landeswerte (foehn_indicators.summarize_taeler) + `taeler` (je Punkt)
+    + `model`; None ohne Reihe oder ohne Talpunkt dieser Seite. EINZIGE Quelle für
+    Föhn-Talwerte im Briefing (Block 3, Chips, Warnbox, KI-Payload).
+    """
+    if not series or not series.get("punkte") or side not in ("sued", "nord"):
+        return None
+    from foehn_indicators import evaluate_talpunkt, summarize_taeler, tal_side
+
+    times = series.get("time") or []
+    h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
+    idx = [i for i, t in enumerate(times)
+           if t.startswith(date) and h_start <= int(t[11:13]) < h_end]
+    if not idx:
+        return None
+    taeler = []
+    for pid, p in series["punkte"].items():
+        meta = p.get("meta") or {}
+        if tal_side(meta.get("foehn_typ", "")) != side:
+            continue
+        r = evaluate_talpunkt(p.get("hourly") or {}, idx, meta.get("foehn_typ", ""))
+        e = {"id": pid, "tal": meta.get("tal", pid), "station": meta.get("station", ""),
+             "region_id": meta.get("region_id"), **r}
+        if r.get("bestaetigt"):
+            e["first_hour"] = int(times[e.pop("first_index")][11:13])
+        taeler.append(e)
+    if not taeler:
+        return None
+    out = summarize_taeler(taeler)
+    out.update({"side": side, "model": series.get("model"), "taeler": taeler})
+    return out
+
+
+def decide_foehn_summary(forecast_dates: list[str],
+                         weather_cache: Optional[dict] = None) -> dict:
     """Aggregiert Foehn-Status pro Tag via foehn_indicators.fetch_foehn_data.
 
     Pro Tag: Stunden im Flugfenster (FLIGHT_HOURS_START..END) pruefen, aktiv
@@ -1082,6 +1120,10 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
 
     Bei API-Fehler: liefert active=False mit source="fetch_failed", damit
     der Synoptik-Block nicht komplett ausfaellt.
+
+    weather_cache: mit `_meta.foehn_tal_series` bekommt jeder Tag mit aktiver
+    Föhnlage `tal` (Bestätigung am Talboden, foehn_tal_for_day); ohne Reihe
+    `tal=None` — das Briefing sagt dann "nicht prüfbar".
     """
     from foehn_indicators import (
         fetch_foehn_data, evaluate_foehn,
@@ -1190,6 +1232,9 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
                                                     ev_nord["level"])
         sued_active = sued_hours >= min_hours
         nord_active = nord_hours >= min_hours
+        tal_side_ = "sued" if sued_active else "nord" if nord_active else None
+        tal = (foehn_tal_for_day(((weather_cache or {}).get("_meta") or {}).get("foehn_tal_series"),
+                                 date, tal_side_) if tal_side_ else None)
         per_day.append({
             "date": date,
             "sued_active": sued_active,
@@ -1205,6 +1250,7 @@ def decide_foehn_summary(forecast_dates: list[str]) -> dict:
                       "crest_wind_max_kmh": (round(crest_max) if crest_max is not None else None)},
             "lee": {"gust_nord_max_kmh": (round(gust_nord_max) if gust_nord_max is not None else None),
                     "gust_sued_max_kmh": (round(gust_sued_max) if gust_sued_max is not None else None)},
+            "tal": tal,
         })
 
     any_sued = any(d["sued_active"] for d in per_day)
@@ -2264,8 +2310,8 @@ def modell_vergleich(forecast_dates: list[str],
 def starkwind_punkte(weather_cache: dict, forecast_dates: list[str],
                      region_map: dict[str, str]) -> Optional[dict]:
     """Starke Winde an einzelnen Startplaetzen — Prognosepunkte, keine
-    Messungen, und ohne Tal-Zuordnung (welcher Punkt im Tal liegt, wissen wir
-    nicht). Je Tag: die staerkste 10-m-Boe im Flugfenster mit Spot, Region,
+    Messungen. Startplaetze gelten NICHT als Foehntal: Foehntaeler sind nur die
+    Foehn-Talpunkte (data/foehn_talpunkte.geojson, foehn_tal_for_day). Je Tag: die staerkste 10-m-Boe im Flugfenster mit Spot, Region,
     Hoehe, Richtung und dem CH2-Wert derselben Stunde (Modell-Uneinigkeit),
     plus Anteil der Spots mit Boeen >= 40 km/h."""
     h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
