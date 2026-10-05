@@ -93,19 +93,19 @@ _RULES: tuple[tuple[re.Pattern, str], ...] = tuple(
     )
 )
 
-def soften_result(result, label: str = ""):
+def soften_result(result, label: str = "", log: bool = True):
     """Wendet den Waechter auf JEDEN Prosa-String eines Analyse-Ergebnisses an,
     beliebig tief (safety/flyability/streckenflug/hazard_notes/...). Strings ohne
     Leerzeichen (Enums wie `safe`, IDs, Daten) werden nie angefasst. Mutiert in
     place und gibt das Ergebnis zurueck."""
     if isinstance(result, dict):
         for key, val in result.items():
-            result[key] = soften_result(val, label=label)
+            result[key] = soften_result(val, label=label, log=log)
         return result
     if isinstance(result, list):
-        return [soften_result(x, label=label) for x in result]
+        return [soften_result(x, label=label, log=log) for x in result]
     if isinstance(result, str) and " " in result:
-        return soften_clearance(result, label=label)
+        return soften_clearance(result, label=label, log=log)
     return result
 
 
@@ -123,9 +123,13 @@ def soften_analysis_tree(tree: dict, kind: str = "") -> int:
             if not isinstance(res, dict):
                 continue
             before = json.dumps(res, ensure_ascii=False, sort_keys=True)
-            soften_result(res, label=f"{kind}{name}/{day}")
+            # Kein Log pro Treffer — beim Cache-Load waeren das tausend Zeilen
+            # je Neustart; der Aufrufer meldet die Summe.
+            soften_result(res, label=f"{kind}{name}/{day}", log=False)
             if json.dumps(res, ensure_ascii=False, sort_keys=True) != before:
                 changed += 1
+    if changed:
+        logger.info("%sCache: %d Analyse-Texte vom Wortlaut-Waechter nachgezogen", kind, changed)
     return changed
 
 
@@ -139,7 +143,7 @@ def _apply(pat: re.Pattern, rep: str, text: str) -> tuple[str, int]:
     return pat.subn(_sub, text)
 
 
-def soften_clearance(text: str, label: str = "") -> str:
+def soften_clearance(text: str, label: str = "", log: bool = True) -> str:
     """Ersetzt Freigabe- und Urteilsformulierungen durch beschreibende Sprache.
 
     Liefert den Text unveraendert zurueck, wenn nichts zu tun ist. Treffer
@@ -162,7 +166,7 @@ def soften_clearance(text: str, label: str = "") -> str:
             hits.append(f"{pat.pattern}×{n}")
     for i, tag in enumerate(tags):
         work = work.replace(_UI_TAG_MARK.format(i), tag)
-    if hits:
+    if hits and log:
         prefix = f"[{label}] " if label else ""
         logger.warning("%sFreigabe-/Urteilssprache ersetzt: %s", prefix, "; ".join(hits))
     return work
