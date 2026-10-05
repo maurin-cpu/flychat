@@ -599,12 +599,14 @@
     (function () {
         var KEY = 'wingcast_disclaimer_{{ disclaimer_version }}_accepted';
         var PENDING = {{ 'true' if disclaimer_pending else 'false' }};
+        var ACCEPTED = {{ 'true' if disclaimer_accepted else 'false' }};
         var modal = document.getElementById('disclaimerModal');
         if (!modal) return;
         var accept = document.getElementById('disclaimerAccept');
         var stored;
         try { stored = localStorage.getItem(KEY); } catch (e) { stored = '1'; }
-        if (stored && !PENDING) return; // schon akzeptiert — nicht erneut zeigen
+        if (ACCEPTED) return;            // am Konto quittiert — nie wieder, auch auf neuem Geraet
+        if (stored && !PENDING) return;  // anonym: im Browser schon weggeklickt
 
         function close() {
             modal.hidden = true;

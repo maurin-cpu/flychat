@@ -139,6 +139,8 @@ def _inject_session_flags():
         # Haftungshinweis noch nicht am Konto quittiert -> Modal erzwingen,
         # unabhaengig vom Browser-Flag (siehe base.html, /api/disclaimer-accept).
         "disclaimer_pending": logged_in and not _disclaimer_accepted(),
+        # Am Konto quittiert -> nie wieder zeigen, auch auf neuem Geraet.
+        "disclaimer_accepted": logged_in and _disclaimer_accepted(),
         "disclaimer_version": DISCLAIMER_VERSION,
         # chat_open steuert NUR die Chat-UI: eingeloggt ODER PUBLIC_DEMO_MODE.
         # is_logged_in bleibt fuer Navbar/Account/Login-Modal massgeblich, damit
