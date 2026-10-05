@@ -189,7 +189,12 @@ window.AnalysisView = (function () {
                  + '<div class="mga-hero-verdict ' + band + '">' + esc(verdictTxt) + '</div>';
         // Pills: Safety-Band + Rating. RATING_ARCHITECTURE v2.0 + Palette v2.
         html += '<div class="mga-hero-pills">';
-        html += '<span class="mga-hero-pill ' + band + '">Safety ' + band.toUpperCase() + '</span>';
+        // Statuswort statt Farbname: Befund der Gefahrenpruefung (No alerts / Alerts / Severe alerts).
+        var bandWord = (band === 'red') ? wcT('js.safety.not_flyable')
+                     : (band === 'amber') ? wcT('js.safety.caution')
+                     : (band === 'no_data') ? wcT('js.av.no_data')
+                     : wcT('js.safety.safe');
+        html += '<span class="mga-hero-pill ' + band + '">' + esc(bandWord) + '</span>';
         if (band !== 'red' && band !== 'no_data') {
             // Rating-Pill mit Rating-Tint-Farbe (Palette v2 Option C) — inline-style
             // damit alle 5 Stufen visuell unterscheidbar sind, nicht nur 3 Tiers.
