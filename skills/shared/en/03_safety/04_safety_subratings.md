@@ -99,4 +99,4 @@ CONSISTENCY REQUIREMENT (HARD)
 
 **Rule 2** — prose must match the status. **Sentence 1** of the reasoning follows the reasoning principle in `03_status_derivation.md`.
 
-**Consequence**: Read the sub-ratings before finalizing. If one is ≤3, correct `safety_status` AND the prose. NOT permitted: low sub-rating + `safe` status + "safe day" prose.
+**Consequence**: Read the sub-ratings before finalizing. If one is ≤3, correct `safety_status` AND the prose. NOT permitted: low sub-rating + `safe` status + "no alerts" prose.

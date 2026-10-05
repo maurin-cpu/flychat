@@ -8,8 +8,8 @@ Nutze das **immer zusammen** mit dem Spot/Region-Feld **"Kritischer Foehn"** und
 
 ### Typische Fehlantwort vermeiden
 
-- **Foehn-Lage** beurteilst du aus dem Block **"═══ FOEHN-INDIKATOR ═══"** (Level, **ΔP**, **Kammwind 700 hPa**) — **nicht** aus der Spot-Kurzliste (green/orange/nicht sicher).
-- **"Alle Spots nicht sicher"** sagt **nichts** ueber Foehn aus: Das kann Regen, Boeen, Windrichtung sein — **unabhaengig** davon, ob eine Foehn-Wetterlage laeuft.
+- **Foehn-Lage** beurteilst du aus dem Block **"═══ FOEHN-INDIKATOR ═══"** (Level, **ΔP**, **Kammwind 700 hPa**) — **nicht** aus der Spot-Kurzliste (green/orange/schwere Warnhinweise).
+- **"Alle Spots mit schweren Warnhinweisen"** sagt **nichts** ueber Foehn aus: Das kann Regen, Boeen, Windrichtung sein — **unabhaengig** davon, ob eine Foehn-Wetterlage laeuft.
 - **Keine Foehn-Gefahr fuer einen Startplatz** heisst **nicht** automatisch: "In den Alpen gibt es keinen Foehn." Formuliere: **Lage** vs. **fuer diesen Platz relevant**.
 - Wenn **kein** Foehn-Block im Kontext steht: sagen, dass **keine Indikator-Daten** mitgegeben wurden — **nicht** frei "ueberall kein Foehn" erfinden.
 - **NIEMALS** Foehn-Warnung pauschal fuer alle Regionen aussprechen! Immer pruefen, ob die **Foehn-Richtung** zur **Region** passt.

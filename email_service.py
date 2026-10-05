@@ -44,13 +44,13 @@ _TIER_META = {
         "icon":  "*",
     },
     "green": {
-        "label": "Sicher",
+        "label": "Keine Warnhinweise",
         "color": "#15803d",      # 4.7:1 auf #fff
         "bg":    "#dcfce7",
         "icon":  "+",
     },
     "conditional": {
-        "label": "Vorsicht",
+        "label": "Warnhinweise",
         "color": "#b45309",      # 4.6:1 auf #fff (amber-700)
         "bg":    "#fef3c7",
         "icon":  "!",
@@ -62,7 +62,7 @@ _TIER_META = {
         "icon":  "-",
     },
     "none": {
-        "label": "Nicht fliegbar",
+        "label": "Nichts gelistet",
         "color": "#64748b",
         "bg":    "#f1f5f9",
         "icon":  "o",
@@ -666,8 +666,8 @@ def _build_week_lead_input(days_out: list[dict]) -> str:
     lines: list[str] = []
     _tier_de = {
         "violet": "top",
-        "green": "gut",
-        "conditional": "bedingt",
+        "green": "keine warnhinweise",
+        "conditional": "mit warnhinweisen",
         "gray": "abgleiter",
         "none": "nichts",
     }
@@ -1013,7 +1013,7 @@ def _day_fly_summary(my_spots: list[dict], day_tier: str) -> str:
     label_map = {
         "violet": "Top-Bedingungen",
         "green": "Solide Thermik",
-        "conditional": "Mit Vorsicht fliegbar",
+        "conditional": "Fliegbar mit Warnhinweisen",
     }
     bits = [label_map.get(day_tier, "")]
     if peak > 0:
@@ -1043,8 +1043,8 @@ def _day_safety_summary(my_spots: list[dict]) -> str:
             if any(kw in haystack for kw in keywords) and label not in seen_labels:
                 seen_labels.append(label)
     if seen_labels:
-        return f"Vorsicht: {', '.join(seen_labels[:2])}."
-    return "Stabil, keine Warnungen."
+        return f"Warnhinweise: {', '.join(seen_labels[:2])}."
+    return "Keine Warnhinweise."
 
 
 def _date_label(date_str: str) -> dict:
@@ -1284,11 +1284,11 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         elif warn_labels:
             day["reason_short"] = " · ".join(warn_labels[:2])
         elif day["tier"] == "none":
-            day["reason_short"] = "Nichts fliegbar"
+            day["reason_short"] = "Nichts gelistet"
         elif day["tier"] == "conditional":
             fs = (day.get("fly_summary") or "").rstrip(".")
             head = fs.split(",")[0].strip() if fs else ""
-            day["reason_short"] = head or "Bedingt fliegbar"
+            day["reason_short"] = head or "Fliegbar mit Warnhinweisen"
         else:
             day["reason_short"] = ""
 
@@ -1316,9 +1316,9 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             day["notable_good"] = ""
 
         ss = day.get("safety_summary") or ""
-        # Prefix sprachabhaengig: "Vorsicht:" (DE) / "Caution:" (EN). Generisch
+        # Prefix sprachabhaengig: "Warnhinweise:" (DE) / "Alerts:" (EN). Generisch
         # bis zum ersten Doppelpunkt strippen, damit beide Sprachen greifen.
-        if ss.lower().startswith(("vorsicht", "caution")):
+        if ss.lower().startswith(("warnhinweise", "alerts")):
             day["notable_bad"] = (ss.split(":", 1)[1] if ":" in ss else ss).strip().rstrip(".")
         else:
             day["notable_bad"] = ""

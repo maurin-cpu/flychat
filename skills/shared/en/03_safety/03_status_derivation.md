@@ -9,7 +9,7 @@ OVERRIDE A — 35% RULE
 ─────────────────────────────────
 
 Read `Ratio clean/total: X/Yh = Z%` (clean = CALM + SPORTY):
-- **Z < 35**: Day predominantly dangerous. Even with a 4h window → max **conditional**, more likely **not_safe** if boxed in.
+- **Z < 35**: Day predominantly made of warning hours. Even with a 4h window → max **conditional**, more likely **not_safe** if boxed in.
 - **Z 35-60**: Mixed day. `safe` possible if the window is continuously CALM AND not boxed in.
 - **Z > 60**: Normal case.
 
@@ -38,14 +38,14 @@ The derivation says **which status**. The reasoning says **what you fill sentenc
 **Principle per status:**
 
 - **`not_safe`** → name the **dominant hazard** (matches `primary_no_go`) with value + time.
-  - *Example (do not copy):* "Not safe due to foehn breakthrough, ΔP 8.4 hPa South from 11:00 — pressure gradient clearly above the no-go threshold."
+  - *Example (do not copy):* "Severe alert: foehn breakthrough, ΔP 8.4 hPa South from 11:00 — pressure gradient clearly above the threshold."
 
 - **`conditional`** → name **the factor that pulled the day down from `safe`**. Exactly one derivation point took effect — name it with numbers.
   - **NEVER** the window, calm hours, or absent hazards as the reasoning — the window is the precondition for the day not being `not_safe` in the first place.
-  - *Example:* "Conditionally safe due to strong gusts 28-34 km/h from 13:00 — calm hours stay in the minority."
+  - *Example:* "Alert: strong gusts 28-34 km/h from 13:00 — calm hours stay in the minority."
 
-- **`safe`** → name **the setup that makes the day relaxed**. Look at the highest safety sub-ratings — that tells you what carries the day. Concrete, in pilot language.
-  - **NEVER** "the day is classified as safe" (says nothing), "because no problems" (negative), audit-speak, or mere window existence. NO thermal/cross-country content — that belongs in Flyability.
-  - *Example:* "Clean west wind 8-12 km/h all day in the right direction, altitude wind moderate around 22 km/h at 2500m — a calm setup for flying."
+- **`safe`** → name **the setup under which no hazard check triggered**. Look at the highest safety sub-ratings — that tells you what carries the day. Concrete, in pilot language.
+  - **NEVER** "the day is classified as safe" (says nothing), "safe"/"relaxed"/"ideal" as a verdict, "because no problems" (negative), audit-speak, or mere window existence. NO thermal/cross-country content — that belongs in Flyability.
+  - *Example:* "Clean west wind 8-12 km/h all day in the right direction, altitude wind moderate around 22 km/h at 2500m — no hazard check triggered."
 
 Examples are inspiration, not a mandatory schema. What matters is the **What** (limiting factor / dominant hazard / supporting setup), not the **How**.

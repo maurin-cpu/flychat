@@ -25,12 +25,18 @@
     return "gray";
   }
 
+  // Status-Woerter aus der Sprachtabelle (base.html: window.WC_I18N); Fallback EN.
+  function _t(key, fallback) {
+    var tbl = (typeof window !== "undefined" && window.WC_I18N) || {};
+    return tbl[key] || fallback;
+  }
+
   function styleFor(band) {
     // Palette v3.2 "Royal Premium": violet-Band = Violet-400 (Legendary/Top).
     if (band === "violet")  return { fill: "#a78bfa", stroke: "#6d28d9", label: "Top" };
-    if (band === "green")   return { fill: "#22c55e", stroke: "#15803d", label: "Sicher" };
-    if (band === "amber")   return { fill: "#f59e0b", stroke: "#92400e", label: "Vorsicht" };
-    if (band === "red")     return { fill: "#ef4444", stroke: "#991b1b", label: "Nicht fliegbar" };
+    if (band === "green")   return { fill: "#22c55e", stroke: "#15803d", label: _t("js.safety.safe", "No alerts") };
+    if (band === "amber")   return { fill: "#f59e0b", stroke: "#92400e", label: _t("js.safety.caution", "Alerts") };
+    if (band === "red")     return { fill: "#ef4444", stroke: "#991b1b", label: _t("js.safety.not_flyable", "Severe alerts") };
     if (band === "no_data") return { fill: "#9ca3af", stroke: "#6b7280", label: "Keine Daten" };
     return { fill: "#6b7280", stroke: "#4b5563", label: "" };
   }

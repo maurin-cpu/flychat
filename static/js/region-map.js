@@ -198,7 +198,7 @@
                 fill: '#f59e0b', fillOpacity: 0.42,
                 border: '#92400e', borderOpacity: 0.7,
                 labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
-                safetyLabel: 'Vorsicht'
+                safetyLabel: wcT('js.safety.caution')
             };
         }
         // green
@@ -206,7 +206,7 @@
             fill: '#22c55e', fillOpacity: 0.42,
             border: '#15803d', borderOpacity: 0.7,
             labelColor: '#fff', labelShadow: '-1px -1px 0 rgba(0,0,0,0.85), 1px -1px 0 rgba(0,0,0,0.85), -1px 1px 0 rgba(0,0,0,0.85), 1px 1px 0 rgba(0,0,0,0.85), 0 0 6px rgba(0,0,0,0.5)',
-            safetyLabel: 'Sicher'
+            safetyLabel: wcT('js.safety.safe')
         };
     }
 

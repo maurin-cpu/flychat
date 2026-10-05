@@ -62,11 +62,11 @@ mit Bezug zur Lage. Vier Faelle:
   erfundenen Gefahren, keine Aufforderung.
 - **Spot lokal gruen, Region conditional/not_safe** → 1 Satz Vorsicht mit konkreten
   Region-Meteodaten: "Am Startplatz selbst ruhig, aber die Region zeigt kraeftigen
-  Hoehenwind (52 km/h auf 2500m) — daher als bedingt sicher eingestuft."
+  Hoehenwind (52 km/h auf 2500m) — daher mit Warnhinweis."
 - **Spot schon conditional (lokal) + Region conditional/not_safe** → Region-Grund
-  ergaenzen: "... Zudem ist die Region selbst nur bedingt sicher (Hoehenwind 38 km/h,
-  Regen ab 16h)." / "... und die ganze Region gilt wegen Foehn (ΔP 7 hPa Sued) als
-  nicht sicher."
+  ergaenzen: "... Zudem traegt die Region selbst einen Warnhinweis (Hoehenwind 38 km/h,
+  Regen ab 16h)." / "... und die ganze Region traegt wegen Foehn (ΔP 7 hPa Sued) einen
+  schweren Warnhinweis."
 
 Der Leser muss verstehen, dass die Einstufung auch aus der **Grosswetterlage** kommt,
 nicht nur vom lokalen Startplatz. Bei conditional/not_safe-Region IMMER datenbelegt
@@ -118,6 +118,6 @@ AUSSCHLIESSLICH JSON, keine Tags, keine eckigen Klammern, keine Codes.
     "cape":         "TREND ('AUFBAUEND'/'KEIN-AUFBAU'/'AKTIV') + CAPE-Wert + Entwicklungspotenzial.",
     "visibility":   "TREND ('ABSINKEND'/'HEBEND'/'STABIL') + Wolkenbasis vs. Startplatzhoehe."
   },
-  "summary": "5-7 Saetze. Satz 1: Einstufung + Kern-Begruendung (folge 'Begruendungs-Prinzip fuer Satz 1' in `03_status_derivation.md`). Satz 2-3: Hauptgefahren MIT Ursache aus Datenblock. Satz 4: Tagesentwicklung/Trend (PFLICHT bei WIND-/GUST-TREND/Foehn-Aufbau, OHNE Code-Namen). Satz 5: sicheres Fenster konkret. Satz 6: Sicherheits-Einschaetzung — **passiv, NIE Aufforderung**. KEINE Tags wie ALOFT-WIND-WARN — schreibe 'kraeftiger Hoehenwind'.\n\n**PFLICHT-Region-Referenz (siehe Abschnitt REGION-SAFETY-CAP):** Das `summary` MUSS die Region IMMER benennen — bei sicherer Region 1 kurzer bestaetigender Halbsatz ('... auch regional ruhig, Hoehenwind unter 25 km/h, kein Foehn'), bei `conditional`/`not_safe`-Region additiv mit konkreten Region-Meteodaten (km/h, m/s, ΔP, m), auch wenn der Spot lokal gruen ist ('Am Startplatz selbst ruhig, aber die Region zeigt kraeftigen Hoehenwind 52 km/h auf 2500m — daher bedingt sicher') und auch wenn der Spot schon aus eigenen Gruenden conditional ist ('... zudem ist die ganze Region wegen Foehn ΔP 7 hPa Sued nicht sicher'). Beachte: der Region-Cap zieht NIE auf `not_safe` — ein lokal gruener Spot wird durch eine not_safe-Region hoechstens `conditional`. VERBOTEN: fehlende Region-Referenz; abstraktes 'Region-Rating X' statt Lage-Bezug.\n\nSchluss-Satz VERBOTEN: 'ideal fuer Flugtag', 'nutze das Fenster', 'plane Flug'. ERLAUBT: 'wird als sicherer Flugtag eingestuft', 'die Voranalyse stuft den Tag als sicher ein', 'Einschaetzung: stabile Bedingungen'."
+  "summary": "5-7 Saetze. Satz 1: Einstufung + Kern-Begruendung (folge 'Begruendungs-Prinzip fuer Satz 1' in `03_status_derivation.md`). Satz 2-3: Hauptgefahren MIT Ursache aus Datenblock. Satz 4: Tagesentwicklung/Trend (PFLICHT bei WIND-/GUST-TREND/Foehn-Aufbau, OHNE Code-Namen). Satz 5: Fenster ohne Warnhinweise konkret. Satz 6: Sicherheits-Einschaetzung — **passiv, NIE Aufforderung**. KEINE Tags wie ALOFT-WIND-WARN — schreibe 'kraeftiger Hoehenwind'.\n\n**PFLICHT-Region-Referenz (siehe Abschnitt REGION-SAFETY-CAP):** Das `summary` MUSS die Region IMMER benennen — bei Region ohne Warnhinweise 1 kurzer bestaetigender Halbsatz ('... auch regional ruhig, Hoehenwind unter 25 km/h, kein Foehn'), bei `conditional`/`not_safe`-Region additiv mit konkreten Region-Meteodaten (km/h, m/s, ΔP, m), auch wenn der Spot lokal gruen ist ('Am Startplatz selbst ruhig, aber die Region zeigt kraeftigen Hoehenwind 52 km/h auf 2500m — daher mit Warnhinweis') und auch wenn der Spot schon aus eigenen Gruenden conditional ist ('... zudem traegt die ganze Region wegen Foehn ΔP 7 hPa Sued einen schweren Warnhinweis'). Beachte: der Region-Cap zieht NIE auf `not_safe` — ein lokal gruener Spot wird durch eine not_safe-Region hoechstens `conditional`. VERBOTEN: fehlende Region-Referenz; abstraktes 'Region-Rating X' statt Lage-Bezug.\n\nVokabular: REIN BESCHREIBEND, kein Urteil ueber den Tag. ERLAUBT: 'keine Warnhinweise — ...', 'Warnhinweis wegen ...', 'schwerer Warnhinweis wegen ...'. VERBOTEN als Urteil: 'sicher', 'sicherer Flugtag', 'gefaehrlich', 'ideal', 'perfekt', 'entspannt', 'nicht fliegen', 'nutze das Fenster', 'plane Flug' — nenne stattdessen, welche Pruefung mit welchem Wert angeschlagen hat."
 }
 ```

@@ -252,6 +252,12 @@ class SubscriberManager:
             self._migrate_add_column(conn, "subscribers", "last_open_valid", "INTEGER")
             self._migrate_add_column(conn, "subscribers", "last_valid_open_at", "TEXT")
             self._migrate_add_column(conn, "subscribers", "last_click_at", "TEXT")
+            # Haftungshinweis am Konto quittiert (Modal "Bevor du loslegst").
+            # NULL = noch nie am eingeloggten Konto bestaetigt. Vorher lag das
+            # Flag nur im Browser (localStorage) und war im Streitfall nicht
+            # einem Nutzer zuordenbar. Version = i18n-Fassung des Textes.
+            self._migrate_add_column(conn, "subscribers", "disclaimer_accepted_at", "TEXT")
+            self._migrate_add_column(conn, "subscribers", "disclaimer_version", "TEXT")
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS email_events (
                     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -854,6 +860,26 @@ class SubscriberManager:
         except Exception as e:
             logger.error("touch_last_seen failed: %s", e)
 
+    def record_disclaimer_accept(self, subscriber_id: int, version: str) -> bool:
+        """Quittierung des Haftungshinweises am Konto festhalten (Zeitpunkt +
+        Textversion). Erste Quittierung zaehlt; ein erneutes Wegklicken
+        ueberschreibt den Erstzeitpunkt nicht, aktualisiert aber die Version."""
+        try:
+            with self._cursor(write=True) as cur:
+                cur.execute(
+                    """
+                    UPDATE subscribers
+                       SET disclaimer_accepted_at = COALESCE(disclaimer_accepted_at, datetime('now')),
+                           disclaimer_version = ?
+                     WHERE id = ?
+                    """,
+                    (str(version)[:32], int(subscriber_id)),
+                )
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.error("record_disclaimer_accept failed: %s", e)
+            return False
+
     def count_feedback_overall(self, days: int = 30) -> dict:
         try:
             with self._cursor() as cur:
@@ -1251,7 +1277,8 @@ class SubscriberManager:
                 cur.execute(
                     """
                     SELECT id, email, regions, skill_level, status, action_token,
-                           active_weekdays, min_tier_set, min_rating
+                           active_weekdays, min_tier_set, min_rating,
+                           disclaimer_accepted_at, disclaimer_version
                       FROM subscribers
                      WHERE id = ?
                        AND status IN ('active', 'paused', 'unsubscribed')
@@ -1262,7 +1289,8 @@ class SubscriberManager:
                 return self._row_to_subscriber(
                     row,
                     ("id", "email", "regions", "skill_level", "status", "action_token",
-                     "active_weekdays", "min_tier_set", "min_rating"),
+                     "active_weekdays", "min_tier_set", "min_rating",
+                     "disclaimer_accepted_at", "disclaimer_version"),
                 )
         except Exception as e:
             logger.error("get_session_user(%s) failed: %s", sub_id, e)

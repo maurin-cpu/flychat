@@ -576,7 +576,9 @@
       const safety = g.getAttribute('data-safety') || '';
       const stars = parseInt(g.getAttribute('data-stars') || '0', 10);
       const band = g.getAttribute('data-band') || '';
-      const bandLabel = band === 'green' ? 'safe' : (band === 'amber' ? 'conditional' : band);
+      const bandLabel = band === 'green' ? wcT('js.safety.safe')
+        : (band === 'amber' ? wcT('js.safety.caution')
+        : (band === 'red' ? wcT('js.safety.not_flyable') : band));
       const starGlyph = '★'.repeat(Math.max(0, Math.min(5, stars))) + '☆'.repeat(5 - Math.max(0, Math.min(5, stars)));
       tooltip.innerHTML =
         '<div class="bf-bubble-tooltip-name">' + escapeHtml(spot) + '</div>'

@@ -24,8 +24,8 @@ REGION-SPEZIFIK: FOEHN-RICHTUNGS-CHECK
 ═══════════════════════════════════════════════
 
 Jede Region hat im Header `Kritischer Foehn: Sued | Nord | Beide`:
-- **Sued** = Region noerdlich des Alpenhauptkamms → nur Suedfoehn gefaehrlich.
-- **Nord** = Region suedlich des Hauptkamms → nur Nordfoehn gefaehrlich.
+- **Sued** = Region noerdlich des Alpenhauptkamms → nur Suedfoehn loest den Warnhinweis aus.
+- **Nord** = Region suedlich des Hauptkamms → nur Nordfoehn loest den Warnhinweis aus.
 - **Beide** = Region am/nahe Hauptkamm.
 
 Nordfoehn betrifft **NICHT** Mittelland, Jura, noerdliche Voralpen — die bekommen bei Nordlage kalte Bise.

@@ -83,7 +83,7 @@ def compute_foehn_decision(foehn_eval: dict) -> FoehnDecision:
         return FoehnDecision(
             risk="high",
             caution_note=None,
-            no_go_reason=f"Foehn-Gefahr: {direction}foehn {delta_p_str} (Flugverbot-Empfehlung)",
+            no_go_reason=f"Foehn-Durchbruch: {direction}foehn {delta_p_str} (schwerer Warnhinweis)",
             primary_no_go="FOEHN",
             forces_status="not_safe",
             delta_p_hpa=delta_p,
@@ -92,7 +92,7 @@ def compute_foehn_decision(foehn_eval: dict) -> FoehnDecision:
     if level == "caution":
         return FoehnDecision(
             risk="moderate",
-            caution_note=f"Foehn-Vorsicht: {direction}foehn {delta_p_str} — an exponierten Stellen vorsichtig.",
+            caution_note=f"Foehn-Warnhinweis: {direction}foehn {delta_p_str} — Boeen an exponierten Stellen.",
             no_go_reason=None,
             primary_no_go=None,
             forces_status="conditional_min",
@@ -243,11 +243,11 @@ def decide_aloft_conditional(result: dict, gust_info: dict, label: str) -> Optio
     if aloft_gd >= cond_thresh:
         bits.append(f"Hoehenboeen >{gust_kmh_thresh} km/h im Flugbereich in {aloft_gd}h")
     if aloft_d >= cond_thresh and aloft_gd >= cond_thresh:
-        head = "Gefahr in der Hoehe (Wind und Boeen)"
+        head = "Hoehenwind und Boeen ueber Schwelle"
     elif aloft_gd >= cond_thresh:
         head = "Kraeftige Hoehenboeen"
     else:
-        head = "Gefahr in der Hoehe"
+        head = "Hoehenwind ueber Schwelle"
     cn.append(head + ": " + ", ".join(bits) + " — auch bei ruhigem Bodenwind pruefen.")
     result["caution_notes"] = cn
     return f"AloftConditional({aloft_d}h)"

@@ -9,7 +9,7 @@ OVERRIDE A — 35%-REGEL
 ─────────────────────────────────
 
 Lies `Verhaeltnis sauber/gesamt: X/Yh = Z%` (sauber = RUHIG + SPORTLICH):
-- **Z < 35**: Tag ueberwiegend gefaehrlich. Auch bei 4h-Fenster → max **conditional**, eher **not_safe** falls eingekesselt.
+- **Z < 35**: Tag ueberwiegend aus Warnstunden. Auch bei 4h-Fenster → max **conditional**, eher **not_safe** falls eingekesselt.
 - **Z 35-60**: Mischtag. `safe` moeglich wenn Fenster durchgehend RUHIG UND nicht eingekesselt.
 - **Z > 60**: Normalfall.
 
@@ -38,14 +38,14 @@ Ableitung sagt **welcher Status**. Begruendung sagt **womit du Satz 1 fuellst** 
 **Prinzip pro Status:**
 
 - **`not_safe`** → nenne die **dominierende Gefahr** (passt zu `primary_no_go`) mit Wert + Uhrzeit.
-  - *Beispiel (nicht abschreiben):* "Nicht sicher wegen Foehn-Durchbruch ΔP 8.4 hPa Sued ab 11 Uhr — Druckgradient klar ueber Verbots-Schwelle."
+  - *Beispiel (nicht abschreiben):* "Schwerer Warnhinweis: Foehn-Durchbruch ΔP 8.4 hPa Sued ab 11 Uhr — Druckgradient klar ueber der Schwelle."
 
 - **`conditional`** → nenne **den Faktor der den Tag von `safe` heruntergezogen hat**. Genau ein Ableitungs-Punkt hat gegriffen — diesen mit Zahlen nennen.
   - **NIEMALS** das Fenster, ruhige Stunden oder fehlende Gefahren als Begruendung — Fenster ist Voraussetzung dass Tag ueberhaupt nicht `not_safe` ist.
-  - *Beispiel:* "Bedingt sicher wegen kraeftiger Boeen 28-34 km/h ab 13 Uhr — ruhige Stunden bleiben in der Minderheit."
+  - *Beispiel:* "Warnhinweis: kraeftige Boeen 28-34 km/h ab 13 Uhr — ruhige Stunden bleiben in der Minderheit."
 
-- **`safe`** → nenne **die Konstellation die den Tag entspannt macht**. Schau auf hoechste Safety-Sub-Ratings — das erzaehlt was den Tag traegt. Konkret in Pilotensprache.
-  - **NIEMALS** "Tag wird als sicher eingestuft" (nichtssagend), "weil keine Probleme" (negativ), Audit-Sprache, oder blosse Fenster-Existenz. KEIN Thermik/Streckenflug-Inhalt — gehoert in Flyability.
-  - *Beispiel:* "Sauberer Westwind 8-12 km/h durchgehend in passender Richtung, Hoehenwind moderat um 22 km/h auf 2500m — fliegerisch ruhige Konstellation."
+- **`safe`** → nenne **die Konstellation, bei der keine Pruefung angeschlagen hat**. Schau auf hoechste Safety-Sub-Ratings — das erzaehlt was den Tag traegt. Konkret in Pilotensprache.
+  - **NIEMALS** "Tag wird als sicher eingestuft" (nichtssagend), "sicher"/"entspannt"/"ideal" als Urteil, "weil keine Probleme" (negativ), Audit-Sprache, oder blosse Fenster-Existenz. KEIN Thermik/Streckenflug-Inhalt — gehoert in Flyability.
+  - *Beispiel:* "Sauberer Westwind 8-12 km/h durchgehend in passender Richtung, Hoehenwind moderat um 22 km/h auf 2500m — keine Pruefung angeschlagen."
 
 Beispiele sind Inspiration, kein Pflicht-Schema. Wichtig ist das **Was** (begrenzender Faktor / dominierende Gefahr / tragende Konstellation), nicht das **Wie**.

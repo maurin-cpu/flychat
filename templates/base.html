@@ -577,8 +577,10 @@
     </script>
 
     {# Erstbesuch-Disclaimer: Haftungshinweis, einmalig vor erster Nutzung.
-       Server-gerendert (wie loginModal); JS blendet ihn nur beim ersten Besuch
-       ein (localStorage-Flag) und merkt sich das Wegklicken. #}
+       Server-gerendert (wie loginModal). Anonym: JS blendet ihn beim ersten
+       Besuch ein (localStorage-Flag). Eingeloggt: solange das Konto nicht
+       quittiert hat (disclaimer_pending), erscheint er unabhaengig vom
+       Browser-Flag; "Verstanden" wird per POST am Konto festgehalten. #}
     <div class="disclaimer-modal" id="disclaimerModal" role="dialog" aria-modal="true"
          aria-labelledby="disclaimerTitle" hidden>
         <div class="disclaimer-modal__backdrop"></div>
@@ -595,18 +597,23 @@
     </div>
     <script>
     (function () {
-        var KEY = 'wingcast_disclaimer_v1_accepted';
+        var KEY = 'wingcast_disclaimer_{{ disclaimer_version }}_accepted';
+        var PENDING = {{ 'true' if disclaimer_pending else 'false' }};
         var modal = document.getElementById('disclaimerModal');
         if (!modal) return;
         var accept = document.getElementById('disclaimerAccept');
         var stored;
         try { stored = localStorage.getItem(KEY); } catch (e) { stored = '1'; }
-        if (stored) return; // schon akzeptiert — nicht erneut zeigen
+        if (stored && !PENDING) return; // schon akzeptiert — nicht erneut zeigen
 
         function close() {
             modal.hidden = true;
             document.body.style.overflow = '';
             try { localStorage.setItem(KEY, '1'); } catch (e) {}
+            if (PENDING) {
+                fetch('/api/disclaimer-accept', { method: 'POST', credentials: 'same-origin' })
+                    .catch(function () {});
+            }
         }
         modal.hidden = false;
         document.body.style.overflow = 'hidden';

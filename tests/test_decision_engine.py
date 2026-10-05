@@ -128,7 +128,7 @@ class TestApplyFoehnDecision(unittest.TestCase):
         # bereinigt das, weil Cache "none" sagt (z.B. irrelevante Richtung).
         result = self._baseline_result()
         result["foehn_risk"] = "moderate"
-        result["caution_notes"] = ["Foehn-Vorsicht: Delta-P 4.5 hPa erkannt"]
+        result["caution_notes"] = ["Foehn-Warnhinweis: Delta-P 4.5 hPa erkannt"]
         d = compute_foehn_decision({"level": "none", "delta_p_hpa": 4.5, "direction": "Nord"})
         tag = apply_foehn_decision(result, d)
         self.assertEqual(result["foehn_risk"], "none")
@@ -150,7 +150,7 @@ class TestApplyFoehnDecision(unittest.TestCase):
         # Genau eine Foehn-Note vorhanden, kanonisches Format
         foehn_notes = [n for n in result["caution_notes"] if any(k in n.lower() for k in FOEHN_KEYWORDS)]
         self.assertEqual(len(foehn_notes), 1)
-        self.assertIn("Foehn-Vorsicht", foehn_notes[0])
+        self.assertIn("Foehn-Warnhinweis", foehn_notes[0])
 
 
 class TestWindOkZero(unittest.TestCase):
@@ -351,10 +351,10 @@ class TestIsConditional(unittest.TestCase):
 
     def test_keeps_true_when_already_true_and_conditional(self):
         # LLM hat is_conditional bereits korrekt gesetzt — Decision idempotent
-        result = self._baseline(safety_status="conditional", is_cond=True, reason="Foehn-Vorsicht")
+        result = self._baseline(safety_status="conditional", is_cond=True, reason="Foehn-Warnhinweis")
         tag = decide_is_conditional(result, "X/Y")
         self.assertTrue(result["is_conditional"])
-        self.assertEqual(result["conditional_reason"], "Foehn-Vorsicht")
+        self.assertEqual(result["conditional_reason"], "Foehn-Warnhinweis")
         self.assertIsNone(tag)  # kein Tag — Engine hat nichts geaendert
 
     def test_clamps_false_on_not_safe(self):

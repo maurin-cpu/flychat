@@ -99,4 +99,4 @@ KONSISTENZ-PFLICHT (HART)
 
 **Regel 2** — Prosa muss zum Status passen. **Satz 1** der Begruendung folgt dem Begruendungs-Prinzip in `03_status_derivation.md`.
 
-**Konsequenz**: Vor Finalisierung Sub-Ratings lesen. Falls eines ≤3, korrigiere `safety_status` UND Prosa. NICHT zulaessig: niedriges Sub-Rating + `safe`-Status + "sicherer Tag"-Prosa.
+**Konsequenz**: Vor Finalisierung Sub-Ratings lesen. Falls eines ≤3, korrigiere `safety_status` UND Prosa. NICHT zulaessig: niedriges Sub-Rating + `safe`-Status + "keine Warnhinweise"-Prosa.

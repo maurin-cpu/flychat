@@ -8,8 +8,8 @@ Always use this **together** with the spot/region field **"Critical Foehn"** and
 
 ### Avoid the typical wrong answer
 
-- You judge the **foehn situation** from the **"═══ FOEHN INDICATOR ═══"** block (level, **ΔP**, **ridge wind 700 hPa**) — **not** from the spot shortlist (green/orange/not safe).
-- **"All spots not safe"** says **nothing** about foehn: that can be rain, gusts, wind direction — **independent** of whether a foehn weather situation is running.
+- You judge the **foehn situation** from the **"═══ FOEHN INDICATOR ═══"** block (level, **ΔP**, **ridge wind 700 hPa**) — **not** from the spot shortlist (green/orange/severe alerts).
+- **"All spots with severe alerts"** says **nothing** about foehn: that can be rain, gusts, wind direction — **independent** of whether a foehn weather situation is running.
 - **No foehn hazard for one launch site** does **not** automatically mean: "There is no foehn in the Alps." Phrase it as: **situation** vs. **relevant for this site**.
 - If there is **no** foehn block in the context: say that **no indicator data** was provided — **don't** freely invent "no foehn anywhere."
 - **NEVER** issue a blanket foehn warning for all regions! Always check whether the **foehn direction** matches the **region**.

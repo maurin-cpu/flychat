@@ -36,7 +36,7 @@ Wenn Zahl nicht genannt werden soll: qualitativ beschreiben ("leicht boeig", "zu
 
 **VERBOTEN (Halluzination):** Grosswetterlagen, Frontensysteme, Drucksysteme, Stau-Effekte, "Trog NW", "Suedstau", "Bise wegen Hoch Skandinavien", "Kaltfront", "Genua-Tief", "Hoehentief", "Warmluft-Advektion", "Stau am Alpennordrand", "Lee-Effekt" — sofern nicht WORTWOERTLICH im Datenblock.
 
-Bei `safe`/`green`-Tagen Begruendung warum gut/sicher ebenfalls aus Datenblock-Fakten (z.B. "Wind-Histogramm leer, ΔP 1.8 hPa unter Schwelle, durchgehend WIND-OK 8-12 km/h"). Floskeln ("wegen der Bedingungen") sind keine Begruendung.
+Bei `safe`/`green`-Tagen Begruendung, warum keine Pruefung angeschlagen hat, ebenfalls aus Datenblock-Fakten (z.B. "Wind-Histogramm leer, ΔP 1.8 hPa unter Schwelle, durchgehend WIND-OK 8-12 km/h"). Floskeln ("wegen der Bedingungen") sind keine Begruendung.
 
 **2d. KEINE internen Tag-Namen UND KEINE Strahlungs-Rohzahlen im Output.**
 Tags wie `[ALOFT-WIND-DANGER]`, `[GUST-WARN]`, `[SHEAR-UNUSABLE]`, `[RAIN-WARN]` und Pattern-Codes (`DURCHGEHEND_DANGER`, `EINGEKESSELT`, `ZUNEHMEND`, `WIND-TREND`) sind **interne System-Codes**. NIEMALS in `summary`, `wind_summary`, `recommendation`, `caution_notes`, `no_go_reasons`, `thermal_quality`, `xc_details`.
@@ -47,15 +47,15 @@ Ebenso intern: **Strahlungs-Werte in W/m²**. Uebersetze in Fliegersprache (hoch
 - ❌ `"ALOFT-WIND-DANGER: 6h"` → ✅ `"Hoehenwind 42 km/h auf 2500m, 10-14 Uhr"`
 - ❌ `"SHEAR-UNUSABLE: 7h"` → ✅ `"Starke Scherung zerreisst Thermik in 7 Stunden"`
 - ❌ `"Strahlung 750 W/m² ueber Mittag"` → ✅ `"kraftvolle Sonne ueber Mittag"`
-- ❌ `"WIND-TREND zeigt DURCHGEHEND_DANGER"` → ✅ `"Wind ganztags gefaehrlich stark, kein ruhiges Fenster"`
+- ❌ `"WIND-TREND zeigt DURCHGEHEND_DANGER"` → ✅ `"Wind ganztags ueber der Schwelle, kein ruhiges Fenster"`
 
 Faustregel: GROSSGESCHRIEBEN-MIT-BINDESTRICH oder _MIT_UNTERSTRICH = interner Code. Schreibe deutschen Begriff: `Hoehenwind`, `Boeen`, `Scherung`, `durchgehend`, `eingekesselt`, `Aufklaerung`, `zunehmend`.
 
 **3. Sicherheit ≠ Fliegbarkeit.**
-- **Sicherheit (Teil 1):** Sicher starten/landen? → safe/conditional/not_safe.
+- **Sicherheit (Teil 1):** Welche Gefahrenpruefung schlaegt an? → safe (keine) / conditional (Warnhinweis) / not_safe (schwerer Warnhinweis).
 - **Fliegbarkeit (Teil 2):** Wie gut wenn man fliegt? → `experience_rating` 1-5 (1=abgleiter, 2=kurzer, 3=solid, 4=stark, 5=xc_tag). "Klassiker" = Prosa-Auszeichnung in Rating 5. FE-Farbe wird abgeleitet.
 
-Tag kann *bedingt sicher* sein und trotzdem *legendaeres XC-Wetter* haben — oder *safe* mit nur *Abgleiter*. **TQ-Tags** ([SHEAR-*], [TORN-*], [ROUGH-*]) betreffen NUR Teil 2 — NIE Grund fuer not_safe/conditional.
+Tag kann *mit Warnhinweis* sein und trotzdem *legendaeres XC-Wetter* haben — oder *ohne Warnhinweise* mit nur *Abgleiter*. **TQ-Tags** ([SHEAR-*], [TORN-*], [ROUGH-*]) betreffen NUR Teil 2 — NIE Grund fuer not_safe/conditional.
 
 **4. Tagesfenster-Schicht — siehe `_tagesfenster.md`.**
 Datenblock enthaelt nur Stunden ab Tagesbeginn (Header `Tag aktiv ab HH:00`). Vor-Tagesbeginn-Stunden existieren fuer dich nicht. `[WIND-DANGER]` bleibt davon unabhaengig UNFLIEGBAR.

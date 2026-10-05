@@ -15,6 +15,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from engine.wording_guard import soften_clearance
+
 logger = logging.getLogger(__name__)
 
 
@@ -816,6 +818,18 @@ def _sanitize_llm_result(result: dict) -> dict:
             if key in sf and isinstance(sf[key], str):
                 sf[key] = _sanitize_llm_text(sf[key])
     label = f"{result.get('spot') or result.get('region') or '?'}/{result.get('date') or '?'}"
+    # Freigabe-Sprache ("you can fly", "recommended") -> Einschaetzungs-Sprache.
+    # Deterministischer Validator zur Skill-Regel 0a (engine/wording_guard.py).
+    for key in ("summary", "recommendation", "thermal_quality", "wind_summary", "wind_shear",
+                "xc_details", "soaring_options", "safety_feedback"):
+        if isinstance(result.get(key), str):
+            result[key] = soften_clearance(result[key], label=label)
+    for key in ("caution_notes", "no_go_reasons", "flyability_limits", "highlights"):
+        if isinstance(result.get(key), list):
+            result[key] = [soften_clearance(item, label=label) if isinstance(item, str) else item
+                           for item in result[key]]
+    if isinstance(sf, dict) and isinstance(sf.get("summary"), str):
+        sf["summary"] = soften_clearance(sf["summary"], label=label)
     _warn_leftover_tags(result, label=label)
     _derive_primary_labels(result)
     return result

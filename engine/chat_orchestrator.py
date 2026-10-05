@@ -11,6 +11,8 @@ import logging
 import math
 import os
 import re
+
+from engine.wording_guard import soften_clearance
 import statistics
 import threading
 import time
@@ -407,7 +409,7 @@ class ChatOrchestratorMixin:
                 "kurzen Chat. Keine vollständige Tabelle aller Spots, es sei denn der Pilot verlangt "
                 "ausdrücklich eine Übersicht/Tabelle **aller** Gebiete oder einen mehrzeiligen Vergleich.\n"
                 'Bei **Föhn-Fragen**: die Föhn-Lage nur aus dem Block „FÖHN-INDIKATOR" (ΔP, Kammwind, Level) '
-                'ableiten — nicht aus „alle Spots nicht sicher" schließen, dass es „keinen Föhn" gäbe.\n\n'
+                'ableiten — nicht aus „alle Spots mit schweren Warnhinweisen" schließen, dass es „keinen Föhn" gäbe.\n\n'
                 f"Frage des Piloten: {question_clean}{format_hint}"
             )
             conv["first_question"] = False
@@ -432,7 +434,7 @@ class ChatOrchestratorMixin:
             )
             _log_prompt_cache_usage(response, label="chat_answer")
             _msg = response.choices[0].message
-            reply = _msg.content
+            reply = soften_clearance(_msg.content, label="chat")
             reply_reasoning = getattr(_msg, "reasoning_content", None)
         except Exception as e:
             logger.error(f"Chat-LLM ({self.chat_provider}) Fehler: {e}")
@@ -968,7 +970,7 @@ class ChatOrchestratorMixin:
                 "kurzen Chat. Keine vollständige Tabelle aller Spots, es sei denn der Pilot verlangt "
                 "ausdrücklich eine Übersicht/Tabelle **aller** Gebiete oder einen mehrzeiligen Vergleich.\n"
                 'Bei **Föhn-Fragen**: die Föhn-Lage nur aus dem Block „FÖHN-INDIKATOR" (ΔP, Kammwind, Level) '
-                'ableiten — nicht aus „alle Spots nicht sicher" schließen, dass es „keinen Föhn" gäbe.\n\n'
+                'ableiten — nicht aus „alle Spots mit schweren Warnhinweisen" schließen, dass es „keinen Föhn" gäbe.\n\n'
                 f"Frage des Piloten: {question_clean}{format_hint}"
             )
 
@@ -1107,7 +1109,7 @@ class ChatOrchestratorMixin:
                     continue  # nächste LLM-Iteration
 
                 # Kein Tool-Call mehr → finale Antwort
-                reply_text = msg.content or ""
+                reply_text = soften_clearance(msg.content or "", label="chat")
                 final_msg = {"role": "assistant", "content": reply_text}
                 final_reasoning = getattr(msg, "reasoning_content", None)
                 if final_reasoning:

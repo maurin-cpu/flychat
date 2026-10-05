@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import math
+import re
 import sys
 import threading
 import uuid
@@ -135,6 +136,10 @@ def _inject_session_flags():
     logged_in = bool(session.get("sub_id"))
     return {
         "is_logged_in": logged_in,
+        # Haftungshinweis noch nicht am Konto quittiert -> Modal erzwingen,
+        # unabhaengig vom Browser-Flag (siehe base.html, /api/disclaimer-accept).
+        "disclaimer_pending": logged_in and not _disclaimer_accepted(),
+        "disclaimer_version": DISCLAIMER_VERSION,
         # chat_open steuert NUR die Chat-UI: eingeloggt ODER PUBLIC_DEMO_MODE.
         # is_logged_in bleibt fuer Navbar/Account/Login-Modal massgeblich, damit
         # der Demo-Schalter keine Account-Features fuer Anonyme vortaeuscht.
@@ -146,6 +151,27 @@ def _inject_session_flags():
         "datenschutz_url": f"{marketing}/datenschutz",
         "impressum_url": f"{marketing}/impressum",
     }
+
+
+# Textfassung des Haftungshinweises (i18n 'disclaimer.*'). Bei inhaltlicher
+# Aenderung hochzaehlen: dann muessen alle Konten erneut quittieren.
+DISCLAIMER_VERSION = "v1"
+
+
+def _disclaimer_accepted() -> bool:
+    """Hat das eingeloggte Konto den Haftungshinweis quittiert? Ergebnis wird
+    in der Session gemerkt, damit nur bis zur Quittierung die DB gefragt wird."""
+    if session.get("disclaimer_ok") == DISCLAIMER_VERSION:
+        return True
+    sub_id = session.get("sub_id")
+    if not sub_id:
+        return False
+    mgr = _get_subscriber_manager()
+    sub = mgr.get_session_user(sub_id) if mgr is not None else None
+    if sub and sub.get("disclaimer_accepted_at") and sub.get("disclaimer_version") == DISCLAIMER_VERSION:
+        session["disclaimer_ok"] = DISCLAIMER_VERSION
+        return True
+    return False
 
 
 def _is_admin() -> bool:
@@ -197,6 +223,50 @@ def mail_track_click(sid: int, sig: str):
             except Exception:
                 logger.exception("mail_track_click failed")
     return redirect(target, code=302)
+
+
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
+
+
+def _is_local_dev_request() -> bool:
+    """True nur fuer direkte Aufrufe auf dem Windows-Entwicklungsrechner.
+
+    Der Server (Linux, hinter Proxy, BASE_URL=app.wingcast.ch) faellt an jeder
+    Bedingung einzeln durch: Plattform, BASE_URL, Proxy-Header, Peer-Adresse und
+    Host-Header muessen alle lokal sein. Abschaltbar mit LOCAL_AUTO_LOGIN=0."""
+    if os.environ.get("LOCAL_AUTO_LOGIN", "1") == "0" or sys.platform != "win32":
+        return False
+    if not re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?/?$", config.BASE_URL or ""):
+        return False
+    if request.headers.get("X-Forwarded-For") or request.headers.get("X-Real-IP"):
+        return False
+    if (request.remote_addr or "") not in ("127.0.0.1", "::1"):
+        return False
+    host = (request.host or "").lower()
+    host = host[:host.find("]") + 1] if host.startswith("[") else host.split(":")[0]
+    return host in _LOOPBACK_HOSTS
+
+
+@app.before_request
+def _local_auto_login():
+    """Lokal ist man immer als config.ADMIN_EMAIL eingeloggt — lokal gibt es
+    keinen Mailversand, der Magic-Link kaeme nie an."""
+    if session.get("sub_id") or (request.path or "").startswith("/static"):
+        return
+    if not _is_local_dev_request():
+        return
+    mgr = _get_subscriber_manager()
+    if mgr is None:
+        return
+    tok = mgr.create_login_token(config.ADMIN_EMAIL, ttl_minutes=1)
+    res = mgr.consume_login_token(tok["login_token"]) if tok else None
+    if not res:
+        logger.warning("local auto-login fuer %s fehlgeschlagen", config.ADMIN_EMAIL)
+        return
+    session.permanent = True
+    session["sub_id"] = res["id"]
+    session["email"] = res["email"]
+    logger.info("local auto-login: %s", res["email"])
 
 
 @app.before_request
@@ -3025,6 +3095,21 @@ def api_chat():
     # Legacy Pfad: einmalige JSON-Antwort
     reply = engine.answer(session_id, message)
     return jsonify({"reply": reply, "session_id": session_id})
+
+
+@app.route("/api/disclaimer-accept", methods=["POST"])
+def api_disclaimer_accept():
+    """Quittierung des Haftungshinweises am Konto festhalten (Modal-Button
+    "Verstanden"). Anonyme Besucher behalten nur das Browser-Flag."""
+    sub_id = session.get("sub_id")
+    if not sub_id:
+        return jsonify({"ok": False, "login_required": True}), 401
+    mgr = _get_subscriber_manager()
+    ok = bool(mgr and mgr.record_disclaimer_accept(sub_id, DISCLAIMER_VERSION))
+    if ok:
+        session["disclaimer_ok"] = DISCLAIMER_VERSION
+        logger.info("disclaimer accepted: sub_id=%s version=%s", sub_id, DISCLAIMER_VERSION)
+    return jsonify({"ok": ok, "version": DISCLAIMER_VERSION})
 
 
 @app.route("/api/reset-chat", methods=["POST"])

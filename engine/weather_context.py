@@ -298,7 +298,7 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
     parts = [
         header,
         f"Region: {region_result.get('region_name') or region_result.get('region') or region_name}",
-        f"Safety-Status: {ss} | Safe-Window: {_g('safe_window', '?')}",
+        f"Safety-Status: {ss} | Clean-Window: {_g('safe_window', '?')}",
         (
             f"Wind-Stunden (Region-weit): CALM={_g('wind_calm_count', 0)}h, "
             f"MODERATE={_g('wind_moderate_count', 0)}h, "
@@ -347,7 +347,7 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
                 f"Fenster {sw} — im Fenster lokal fliegbar, ausserhalb kein Streckenflug."
             )
         else:
-            parts.append("Region-Fliegbarkeit: nicht fliegbar (not_safe, kein sicheres Fenster).")
+            parts.append("Region-Fliegbarkeit: nicht fliegbar (not_safe, kein Fenster ohne Warnhinweise).")
     else:
         # Region safe/conditional → fliegbar. Primaerwert experience_rating (1-5).
         fly_line = "Region-Fliegbarkeit: fliegbar (Region safe/conditional)"

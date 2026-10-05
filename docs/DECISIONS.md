@@ -108,7 +108,7 @@ Reihenfolge in `_post_process_safety_spot`:
 | --------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------- |
 | `decide_wind_ok_zero`             | `wind_ok_count == 0` und Status != not_safe                                                   | `not_safe`, `safe_window=keins`, no_go_reason "Windrichtung"        | `WindOk0`                     |
 | `decide_aloft_not_safe`           | `aloft_danger_hours >= WIND_TREND_NOTSAFE_HOURS` ODER aloft-Pattern `DURCHGEHEND_DANGER` ODER `EINGEKESSELT` mit zu kleinem Calm-Gap | `not_safe`, `primary_no_go=ALOFT_DANGER`, no_go_reason | `AloftNotSafe(Nh)`           |
-| `decide_aloft_conditional`        | `aloft_danger_hours >= WIND_TREND_CONDITIONAL_HOURS` ODER `aloft_gust_danger_hours >= cond_thresh`, Status = safe | `conditional`, caution_note "Gefahr in der Hoehe …"  | `AloftConditional(Nh)`        |
+| `decide_aloft_conditional`        | `aloft_danger_hours >= WIND_TREND_CONDITIONAL_HOURS` ODER `aloft_gust_danger_hours >= cond_thresh`, Status = safe | `conditional`, caution_note "Hoehenwind ueber Schwelle …"  | `AloftConditional(Nh)`        |
 | `decide_gust_floor`               | `gust_warn_hours + aloft_gust_warn_hours >= WIND_TREND_NOTSAFE_HOURS` ODER analog DANGER, Status = safe | `conditional`, caution_note mit Boeen-Details                       | `GustFloor`                   |
 | `decide_overclaim_relax`          | Status = not_safe, `hard_warning_hours == 0`, `clean_hours_count >= 4`                       | **DEMOTIERT** zu `conditional`, no_go_reasons geleert, caution_note "Auto-Korrektur" | `OverclaimRelax(Nh)`          |
 

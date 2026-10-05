@@ -3849,6 +3849,12 @@ body.page-fixed-nav {
     align-items: flex-end;
 }
 
+/* Haftungshinweis unter dem Eingabefeld: jede Antwort ist eine Einschaetzung */
+.chat-disclaimer {
+    margin: 0 0 6px;
+    font-size: 11px; line-height: 1.4; color: #6b7280;
+}
+
 textarea.chat-input {
     flex: 1;
     padding: 10px 16px;

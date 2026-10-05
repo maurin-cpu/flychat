@@ -156,7 +156,7 @@ BLOCK 5 — FOEHN
 
 **Richtungs-Check ZUERST:**
 - Spot hat `Kritischer Foehn: Sued | Nord | Beide`.
-- Sued = noerdlich des Hauptkamms → nur Suedfoehn gefaehrlich.
+- Sued = noerdlich des Hauptkamms → nur Suedfoehn loest den Warnhinweis aus.
 - Nord = suedlich → nur Nordfoehn.
 - Nordfoehn betrifft NICHT Mittelland/Jura/noerdliche Voralpen (bekommen kalte Bise).
 - Indikator "nicht kritisch" oder "Kein Foehn" → `foehn_risk = "none"`, ignorieren.

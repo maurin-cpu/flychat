@@ -160,6 +160,12 @@
                   '<p>' + wcT('js.ri.who_fly') + '</p>' +
                 '</div>' +
 
+                '<div class="rating-info-section">' +
+                  '<h3>' + wcT('js.ri.limits_title') + '</h3>' +
+                  '<p>' + wcT('js.ri.limits_storm') + '</p>' +
+                  '<p>' + wcT('js.ri.limits_thermals') + '</p>' +
+                '</div>' +
+
               '</div>' +
             '</div>';
         document.body.appendChild(ov);
