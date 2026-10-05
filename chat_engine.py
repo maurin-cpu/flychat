@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 # Konstanten + Pure-Helpers → engine/_common.py (Phase 2 Refactor)
 # Re-Exports fuer Backwards-Compatibility (bestehender Code importiert aus chat_engine).
 # ============================================================================
+from engine.wording_guard import soften_analysis_tree
 from engine._common import (
     MAX_HISTORY_MESSAGES,
     _MODEL_TOKEN_LIMITS,
@@ -253,7 +254,11 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
                 with open(self.analyses_file, "r", encoding="utf-8") as f:
                     self.spot_analyses = json.load(f)
                     self.analyses_loaded_at = datetime.fromtimestamp(self.analyses_file.stat().st_mtime)
-                print(f"[ENGINE] {len(self.spot_analyses)} Spot-Analysen aus JSON-Cache geladen.")
+                # Alte Cache-Texte (vor dem Wortlaut-Waechter erzeugt) beim Laden
+                # nachziehen — sonst stehen bis zum naechsten Lauf noch Urteile drin.
+                n = soften_analysis_tree(self.spot_analyses, kind="Spot ")
+                print(f"[ENGINE] {len(self.spot_analyses)} Spot-Analysen aus JSON-Cache geladen"
+                      + (f" ({n} Texte vom Waechter nachgezogen)." if n else "."))
             except Exception as e:
                 logger.error(f"Fehler beim Laden des Spot-Analyse-Caches: {e}")
         if self.region_analyses_file.exists():
@@ -261,6 +266,7 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
                 with open(self.region_analyses_file, "r", encoding="utf-8") as f:
                     raw = json.load(f)
                 self.region_analyses = self._filter_stale_region_analyses(raw)
+                soften_analysis_tree(self.region_analyses, kind="Region ")
                 self.region_analyses_loaded_at = datetime.fromtimestamp(
                     self.region_analyses_file.stat().st_mtime)
                 dropped = len(raw) - len(self.region_analyses)

@@ -17,6 +17,7 @@ steuert die Hervorhebung auf der Karte und wird vom Frontend entfernt.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 
@@ -54,6 +55,15 @@ _RULES: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"\bsafe (conditions|days?|windows?|flights?|flying|options?|periods?|phases?|hours|blocks?)\b", r"\1 without alerts"),
         (r"\bno-go\b",                                "severe alert"),
         (r"\bsafe (limits?|thresholds?|range|margin)\b", r"the \1"),
+        (r"\bas safe\b",                              "as 'no alerts'"),
+        (r"\brated safe\b",                           "rated 'no alerts'"),
+        (r"\b(always|and|but|still|generally|overall) safe\b", r"\1 without alerts"),
+        (r"\bsafe (synoptic|setup|situation|pattern|picture)\b", r"unremarkable \1"),
+        # --- Englisch: Aufforderung an den Piloten -> Befund ---
+        (r"\b(pilots|you) should (avoid|steer clear of|stay away from|skip)\b", "the alert covers"),
+        (r"\b(pilots|you) should not (fly|launch)\b", r"severe alert for \2ing"),
+        (r"\bavoid (flying|launching)\b",             r"alert for \1"),
+        (r"\b(pilots|you) should (wait|hold off)\b",   "the alert applies"),
         (r"\b(perfect|ideal|excellent|risk-free|harmless) (conditions|day|window)\b", r"unremarkable \2"),
         # --- Deutsch: Freigabe ---
         (r"\bdu (kannst|darfst) (sicher |bedenkenlos )?(fliegen|starten)\b", r"\3 sieht möglich aus"),
@@ -76,8 +86,47 @@ _RULES: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"\bsicherer (Flugtag|Tag)\b",               r"\1 ohne Warnhinweise"),
         (r"\bsichere[rn]? (Bedingungen|Option|Alternative|Wahl)\b", r"\1 ohne Warnhinweise"),
         (r"\b(perfekte|ideale|risikolose|unbedenkliche|harmlose)[rn]? (Bedingungen|Tag|Fenster)\b", r"unauffällige \2"),
+        # --- Deutsch: Aufforderung -> Befund ---
+        (r"\bPiloten sollten (.{1,60}?) (meiden|vermeiden|auslassen)\b", r"der Warnhinweis gilt für \1"),
+        (r"\b(Piloten sollten|du solltest) nicht (fliegen|starten)\b", "schwerer Warnhinweis für Flüge"),
+        (r"\bsollte nicht geflogen werden\b",         "trägt einen schweren Warnhinweis"),
     )
 )
+
+def soften_result(result, label: str = ""):
+    """Wendet den Waechter auf JEDEN Prosa-String eines Analyse-Ergebnisses an,
+    beliebig tief (safety/flyability/streckenflug/hazard_notes/...). Strings ohne
+    Leerzeichen (Enums wie `safe`, IDs, Daten) werden nie angefasst. Mutiert in
+    place und gibt das Ergebnis zurueck."""
+    if isinstance(result, dict):
+        for key, val in result.items():
+            result[key] = soften_result(val, label=label)
+        return result
+    if isinstance(result, list):
+        return [soften_result(x, label=label) for x in result]
+    if isinstance(result, str) and " " in result:
+        return soften_clearance(result, label=label)
+    return result
+
+
+def soften_analysis_tree(tree: dict, kind: str = "") -> int:
+    """Waechter ueber einen ganzen Cache {name: {datum: ergebnis}} — fuer
+    Analysen, die VOR dem Waechter erzeugt wurden und noch alte Formulierungen
+    tragen. Liefert die Zahl der geaenderten Ergebnisse."""
+    changed = 0
+    if not isinstance(tree, dict):
+        return 0
+    for name, days in tree.items():
+        if not isinstance(days, dict):
+            continue
+        for day, res in days.items():
+            if not isinstance(res, dict):
+                continue
+            before = json.dumps(res, ensure_ascii=False, sort_keys=True)
+            soften_result(res, label=f"{kind}{name}/{day}")
+            if json.dumps(res, ensure_ascii=False, sort_keys=True) != before:
+                changed += 1
+    return changed
 
 
 def _apply(pat: re.Pattern, rep: str, text: str) -> tuple[str, int]:

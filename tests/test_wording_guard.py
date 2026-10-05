@@ -24,6 +24,9 @@ def test_english_verdicts_become_alert_findings():
     assert soften_clearance("Conditional rather than safe; verdict: no-go.") == \
         "Conditional rather than without alerts; verdict: severe alert."
     assert soften_clearance("Gusts stay well within safe limits.") == "Gusts stay well within the limits."
+    assert soften_clearance("The region is also rated safe; the day as safe overall.") == \
+        "The region is also rated 'no alerts'; the day as 'no alerts' overall."
+    assert soften_clearance("A 12h safe window, calm and safe.") == "A 12h window without alerts, calm and without alerts."
 
 
 def test_negations_keep_their_meaning():
@@ -46,6 +49,29 @@ def test_german_clearance_and_verdicts_are_softened():
     assert soften_clearance("Ein sicherer Flugtag.") == "Ein Flugtag ohne Warnhinweise."
     # "sicher" allein bleibt (mehrdeutig: "sicher nicht", "sicherlich")
     assert soften_clearance("Das ist sicher nicht der Fall.") == "Das ist sicher nicht der Fall."
+
+
+def test_instructions_become_findings():
+    assert soften_clearance("Pilots should avoid the 11:00 hour.") == "The alert covers the 11:00 hour."
+    assert soften_clearance("You should not fly after 13:00.") == "Severe alert for flying after 13:00."
+    assert soften_clearance("Piloten sollten den Nachmittag meiden.") == "Der Warnhinweis gilt für den Nachmittag."
+
+
+def test_cached_tree_is_softened_in_place():
+    from engine.wording_guard import soften_analysis_tree
+    tree = {"Hummel": {"2026-10-05": {
+        "safety": {"summary": "Conditionally safe — pilots should avoid 11:00.",
+                   "safety_status": "conditional", "caution_notes": ["safe window 09-11"]},
+        "recommendation": "I recommend the morning.",
+        "streckenflug": {"summary": "safe flight possible"},
+    }}, "Leer": {"2026-10-05": {"safety": {"summary": "Alerts: gusts 40 km/h."}}}}
+    assert soften_analysis_tree(tree) == 1
+    res = tree["Hummel"]["2026-10-05"]
+    assert res["safety"]["summary"] == "With alerts — the alert covers 11:00."
+    assert res["safety"]["safety_status"] == "conditional"
+    assert res["safety"]["caution_notes"] == ["window without alerts 09-11"]
+    assert res["recommendation"] == "I would favor the morning."
+    assert res["streckenflug"]["summary"] == "flight without alerts possible"
 
 
 def test_ui_tag_is_untouched():
