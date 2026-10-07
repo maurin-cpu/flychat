@@ -1911,7 +1911,9 @@ def load_ist_durchgaenge(max_age_h: int = 36) -> list[dict]:
 # build_spot_region_map liefert Regions-NAMEN (analyse_region), deshalb beide Formen
 BISE_PLATEAU_REGIONS = ("mittelland_ost", "zentrales_mittelland", "genferseeregion",
                         "bodenseeraum", "tafeljura", "neuenburger_jura", "jura_zentral",
-                        'Mittelland Ost', 'Genferseeregion', 'Tafeljura', 'Neuenburger Jura', 'Jura Zentral', 'Bodenseeraum', 'Zentrales Mittelland')
+                        "haut_jura", "jura_sud",
+                        'Mittelland Ost', 'Genferseeregion', 'Tafeljura', 'Neuenburger Jura', 'Jura Zentral', 'Bodenseeraum', 'Zentrales Mittelland',
+                        'Haut-Jura', 'Jura Sud')
 
 
 def bise_boden(weather_cache: dict, forecast_dates: list[str],

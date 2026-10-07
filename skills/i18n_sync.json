@@ -1,7 +1,7 @@
 {
   "_doc": "Pro EN-Uebersetzung der SHA256-Hash der DE-Quelle beim letzten Sync. Pruefen: python scripts/check_i18n_sync.py ; Stempeln nach Nachziehen: --update. Schluessel = EN-Pfad (repo-relativ).",
   "pairs": {
-    "skills/en/chat_capabilities_guide.md": "2332602f13c95103a294eed84130de7bd25170b272a1d2df2370497b083ac02e",
+    "skills/en/chat_capabilities_guide.md": "507d43c4752a757fdfc712919b0d9c17ea5a257a53da0591c417477006ef76d0",
     "skills/en/email_week_lead.md": "c16e4d8671d3341d15f502bfd7d6c75b514c1cbf82a913165ffc39b2976e7ee3",
     "skills/en/foehn_chat_knowledge.md": "08bb17b7dada0a3029dda248077e2d1373550d3439f1970358206faaaa32bf56",
     "skills/en/foehn_llm_regional_guide.md": "aea9dc6e5c0c2fc8df17ffa0ac1308417c1ffc9ae5784f18614c5d700388e362",

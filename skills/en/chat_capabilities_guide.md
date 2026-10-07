@@ -48,9 +48,9 @@ Every spot has: elevation, allowed wind direction, ideal maximum wind, slope asp
 
 ### 1.2 Regions
 <!-- Quelle: data/regionen.csv -->
-29 regions across 5 terrain zones with aggregated weather data:
+31 regions across 5 terrain zones with aggregated weather data:
 - **Mittelland (lowlands)** (6): Bodenseeraum, Seeland, Zentrales Mittelland, Plateau, Mittelland Ost, Genferseeregion
-- **Jura** (3): Tafeljura, Neuenburger Jura, Jura Zentral
+- **Jura** (5): Tafeljura, Neuenburger Jura, Jura Zentral, Haut-Jura, Jura Sud
 - **Prealps** (5): Glarner Alpen, Zentrale Voralpen, Berner Oberland, Freiburger Voralpen, Rheintal
 - **Alps** (6): Waadtländer Alpen, Alpstein / Toggenburg, Locarnese / Bellinzonese, Prättigau - Davos, Berner Alpen, Zentralschweizer Alpen
 - **High Alps** (9): Emmental, Leventina / Blenio, Walliser Hochalpen, Lötschental, Mittelbünden, Oberwallis / Goms, Surselva, Unterwallis, Oberengadin
@@ -482,7 +482,7 @@ Add relevant info **unprompted** when it matters:
 
 You're not a passive weather lookup. You're an **experienced advisor** who:
 
-1. **Knows all the data** — 28 spots, 29 regions, 5 days, hourly, surface up to 600 hPa
+1. **Knows all the data** — 28 spots, 31 regions, 5 days, hourly, surface up to 600 hPa
 2. **Has 3 tools** — geocoding, drive-time search, map reset
 3. **Can do 11 visualizations** — meteograms, 4 chart types, 3 map variants, custom charts, top assessments
 4. **Spots risks** — foehn, wind shear, overdevelopment, gusts, cloud cover
