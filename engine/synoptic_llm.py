@@ -601,6 +601,12 @@ def _finalize(parsed: dict, ctx: dict, attempts: int,
     lead = _neutralize_calendar_week_text(lead)
     hazards = _finalize_hazards(parsed, ctx, prune)
     day_lines = _finalize_day_lines(parsed, ctx, prune)
+    # Wortlaut-Waechter: Urteile ("No foehn", "safe") -> Datenbezug. Gleicher
+    # Waechter wie bei den Analysen (engine/wording_guard.py).
+    from engine.wording_guard import soften_clearance, soften_result
+    lead = soften_clearance(lead, label="Wetterlage")
+    hazards = soften_result(hazards, label="Wetterlage")
+    day_lines = soften_result(day_lines, label="Wetterlage")
 
     if not lead and not any(h.get("items") for h in hazards) \
             and not any(d.get("text") for d in day_lines):

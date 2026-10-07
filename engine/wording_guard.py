@@ -59,6 +59,11 @@ _RULES: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"\brated safe\b",                           "rated 'no alerts'"),
         (r"\b(always|and|but|still|generally|overall) safe\b", r"\1 without alerts"),
         (r"\bsafe (synoptic|setup|situation|pattern|picture)\b", r"unremarkable \1"),
+        # --- Englisch: Wetter als Tatsache -> Datenbezug ---
+        (r"\bno foehn\b(?! (signs|wind|indicated))",  "no signs of foehn in the data"),
+        (r"\bno bise\b(?! (signs|indicated))",        "no signs of Bise in the data"),
+        (r"\b(north|south)(ern)? foehn situation\b",  r"data indicating \1 foehn"),
+        (r"\bfoehn situation\b",                      "foehn indicated by the data"),
         # --- Englisch: Aufforderung an den Piloten -> Befund ---
         (r"\b(pilots|you) should (avoid|steer clear of|stay away from|skip)\b", "the alert covers"),
         (r"\b(pilots|you) should not (fly|launch)\b", r"severe alert for \2ing"),
@@ -86,6 +91,11 @@ _RULES: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"\bsicherer (Flugtag|Tag)\b",               r"\1 ohne Warnhinweise"),
         (r"\bsichere[rn]? (Bedingungen|Option|Alternative|Wahl)\b", r"\1 ohne Warnhinweise"),
         (r"\b(perfekte|ideale|risikolose|unbedenkliche|harmlose)[rn]? (Bedingungen|Tag|Fenster)\b", r"unauffällige \2"),
+        # --- Deutsch: Wetter als Tatsache -> Datenbezug ---
+        (r"\bkein Föhn\b",                            "keine Föhn-Anzeichen in den Daten"),
+        (r"\bkeine Bise\b(?!-)",                      "keine Bise-Anzeichen in den Daten"),
+        (r"\b(Süd|Nord)föhnlage\b",                   r"\1föhn laut Daten"),
+        (r"\bFöhnlage\b",                             "Föhn laut Daten"),
         # --- Deutsch: Aufforderung -> Befund ---
         (r"\bPiloten sollten (.{1,60}?) (meiden|vermeiden|auslassen)\b", r"der Warnhinweis gilt für \1"),
         (r"\b(Piloten sollten|du solltest) nicht (fliegen|starten)\b", "schwerer Warnhinweis für Flüge"),

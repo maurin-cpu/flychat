@@ -85,3 +85,23 @@ def test_clean_text_and_non_strings_pass_through():
     assert soften_clearance("Alerts: gusts to 35 km/h after 13:00.") == "Alerts: gusts to 35 km/h after 13:00."
     assert soften_clearance("") == ""
     assert soften_clearance(None) is None
+
+
+def test_weather_as_fact_becomes_data_attribution():
+    assert soften_clearance("No foehn today, light wind.") == "No signs of foehn in the data today, light wind."
+    assert soften_clearance("South foehn situation from noon.") == "Data indicating South foehn from noon."
+    assert soften_clearance("No Bise on the Plateau.") == "No signs of Bise in the data on the Plateau."
+    assert soften_clearance("Heute kein Föhn.") == "Heute keine Föhn-Anzeichen in den Daten."
+    assert soften_clearance("Südföhnlage ab Mittag.") == "Südföhn laut Daten ab Mittag."
+    # schon datenbezogen oder anderes Wort: unangetastet
+    assert soften_clearance("Data show no foehn wind in the valleys.") == "Data show no foehn wind in the valleys."
+    assert soften_clearance("In den Tälern kein Föhnwind.") == "In den Tälern kein Föhnwind."
+
+
+def test_briefing_labels_never_state_weather_as_fact():
+    """Kein Föhn-/Bise-/Front-Satz im Briefing beginnt mit einer Tatsache."""
+    import re
+    import scripts.briefing_v3_context as bc
+    src = open(bc.__file__, encoding="utf-8").read()
+    bad = re.findall(r'"(?:No|Kein|Keine) (?:foehn|Föhn|bise|Bise|front|Front|hazard|Gefahr)[^"]*"', src)
+    assert bad == [], bad

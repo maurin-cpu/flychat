@@ -180,7 +180,7 @@ class TestBriefing(unittest.TestCase):
         tal = sc.foehn_tal_for_day(_series(), DATE, "sued")
         day = _day(tal)
         fazit = day["chain"]["foehn"]["fazit"]
-        self.assertIn("bestätigt den Föhn am Boden in Reusstal, Haslital", fazit)
+        self.assertIn("zeigt den Föhn auch am Boden in Reusstal, Haslital", fazit)
         self.assertIn("Wind 22–34 km/h aus Süd, Böen bis 55 km/h (Reusstal), ab Mittag", fazit)
         facts = {f["k"]: f["v"] for f in day["chain"]["foehn"]["facts"]}
         self.assertEqual(facts["Föhntäler"], "2/3")
@@ -206,7 +206,7 @@ class TestBriefing(unittest.TestCase):
         facts = {f["k"]: f["v"] for f in day["chain"]["foehn"]["facts"]}
         self.assertEqual(facts["Föhntäler"], "0/3")
         self.assertNotIn("Böe", facts)
-        self.assertIn("In den Föhntälern kein Föhnwind.", _foehn_warning(day)["code_text"])
+        self.assertIn("Daten zeigen in den Föhntälern keinen Föhnwind.", _foehn_warning(day)["code_text"])
         self.assertEqual(day["chain"]["foehn"]["status"], "warn")      # Pille bleibt orange
 
     def test_without_series_says_not_verifiable(self):

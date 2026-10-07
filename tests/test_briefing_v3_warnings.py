@@ -294,8 +294,8 @@ class TestFrontFazit(unittest.TestCase):
 
     def test_today_without_passage_says_so_and_no_outlook(self):
         txt = bc._front_fazit(None, {"aussagen": [self.SUN]}, self.DATES, "2026-09-18")
-        self.assertTrue(txt.startswith("Today no front is expected.") or
-                        txt.startswith("Heute wird keine Front erwartet."), txt)
+        self.assertTrue(txt.startswith("Today: data indicate no front.") or
+                        txt.startswith("Heute: Daten zeigen keine Front."), txt)
         self.assertNotIn("Sun", txt)          # Sonntag interessiert heute nicht
         self.assertNotIn("further", txt)
 
@@ -306,7 +306,7 @@ class TestFrontFazit(unittest.TestCase):
         txt = bc._front_fazit(None, {"aussagen": [today, self.SUN]}, self.DATES, "2026-09-18")
         self.assertTrue(txt.startswith("Today the cold front") or
                         txt.startswith("Heute dürfte die Kaltfront"), txt)
-        self.assertNotIn("no front is expected", txt)
+        self.assertNotIn("indicate no front", txt)
 
     def test_passed_front_is_named_as_rear_side(self):
         pas = {"aussagen": [],
