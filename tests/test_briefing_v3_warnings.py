@@ -326,88 +326,181 @@ class TestFrontFazit(unittest.TestCase):
         self.assertTrue("no front" in txt or "keine Front" in txt, txt)
 
 
-class TestFrontSignatur(unittest.TestCase):
-    """Das Urteil fuer den Tag kommt aus den eigenen Prognosedaten: mit
-    Signatur zieht die Front durch (Belege in Worten), ohne Signatur
-    schwaecht sie sich ab — auch wenn die DWD-Karte sie zeichnet."""
+class TestFrontZeichen(unittest.TestCase):
+    """Seit 09.10.2026: die DWD-Prognose nennt die Front, die eigene Prognose
+    beschreibt ihre Zeichen — nie "schwaecht sich ab" oder "zieht durch"
+    (die Kaltfront vom 08.10. hiess vorher "loest sich auf")."""
     DATES = ["2026-09-18", "2026-09-19", "2026-09-20"]
     DWD = {"zone": "alpennordhang", "typ": "kalt", "art": "quert",
            "durchgang_median_utc": "2026-09-18T14:37:00+00:00",
            "fenster_von_utc": "2026-09-18T13:55:00+00:00",
            "randwert": False, "anteil": 0.6, "lauf": "2026091800"}
-    SIG = {"hour": "16:00", "druck_hpa": 1.8, "drehung": [225, 300],
-           "t850_k": -2.6, "regen_mm": 3.1, "typ_hinweis": "kalt"}
+    DEUTLICH = {"druck": {"hpa": 13.2, "von": "08:00", "stufe": "deutlich"},
+                "t850": {"k": -8.8, "richtung": "kalt", "stufe": "deutlich"},
+                "regen": {"mm": 14.2, "stufe": "deutlich"},
+                "drehung": {"deg": 120, "von": 225, "nach": 315, "stufe": "schwach"},
+                "stufe": "deutlich"}
+    SCHWACH = {"druck": {"hpa": 4.6, "von": "06:00", "stufe": "schwach"},
+               "t850": {"k": -1.0, "richtung": "kalt", "stufe": None},
+               "regen": {"mm": 0.0, "stufe": None}, "stufe": "schwach"}
+    KEINE = {"druck": {"hpa": 1.1, "von": "06:00", "stufe": None},
+             "t850": {"k": 0.8, "richtung": "warm", "stufe": None},
+             "regen": {"mm": 0.0, "stufe": None}, "stufe": None}
 
-    def _wl(self, sig, verlauf=None):
-        return {"frontsignatur": {"per_day": [{
-            "date": "2026-09-18",
-            "zones": {"alpennordhang": sig, "wallis": None, "tessin": None,
-                      "graubuenden_engadin": None},
-            "verlauf": verlauf or {"alpennordhang": {"druck_trend_hpa": 3.7,
-                                                     "max_drehung_deg": 20, "regen_mm": 0.0}}}]}}
+    def _wl(self, zeichen, zone="alpennordhang"):
+        zones = {"alpennordhang": self.KEINE, "wallis": self.KEINE, "tessin": self.KEINE,
+                 "graubuenden_engadin": self.KEINE}
+        zones[zone] = zeichen
+        return {"frontsignatur": {"per_day": [{"date": "2026-09-18", "zones": zones,
+                                               "verlauf": {}}]}}
 
-    def test_signature_means_passage_with_evidence(self):
-        txt = bc._front_fazit({"features": []}, {"aussagen": [self.DWD]}, self.DATES,
-                              "2026-09-18", self._wl(self.SIG))
-        self.assertTrue("passes" in txt or "zieht" in txt, txt)
-        self.assertTrue("north-west" in txt or "Nordwest" in txt, txt)
-        self.assertTrue("rain" in txt or "Regen" in txt, txt)
-        self.assertNotIn("stays clear", txt)
+    def _blk(self, zeichen, aussagen=None, zone="alpennordhang"):
+        pas = {"aussagen": [self.DWD] if aussagen is None else aussagen}
+        return bc._front_block({"features": []}, pas, self.DATES, "2026-09-18",
+                               self._wl(zeichen, zone))
 
-    def test_dwd_without_signature_means_weakening(self):
-        txt = bc._front_fazit({"features": []}, {"aussagen": [self.DWD]}, self.DATES,
-                              "2026-09-18", self._wl(None))
-        self.assertTrue("weakening" in txt or "abschwächen" in txt, txt)
-        # 23.09.2026: Gegenbeleg ist der fehlende Sprung, nie die Tagesbilanz
-        self.assertTrue("no pressure jump" in txt or "keinen Drucksprung" in txt, txt)
-        self.assertNotIn("rising pressure", txt)
+    def test_deutliche_zeichen_mit_zahlen(self):
+        blk = self._blk(self.DEUTLICH)
+        txt = blk["fazit"]
+        self.assertTrue("clear signs" in txt or "deutliche Zeichen" in txt, txt)
+        self.assertIn("+13.2 hPa", txt)
+        self.assertIn("-8.8", txt)
+        self.assertIn("14 mm", txt)
+        dreh = "north-west" if "north-west" in txt else "Nordwest"
+        self.assertIn(dreh, txt)
+        # deutliche Zeichen vor der (immer nur schwachen) Drehung
+        self.assertLess(txt.find("14 mm"), txt.find(dreh))
+        self.assertEqual(blk["zeichen"], "deutlich")
+        for w in ("passes", "zieht", "weaken", "abschw", "dissolv", "aufl"):
+            self.assertNotIn(w, txt)
 
-    def test_no_dwd_no_signature(self):
-        txt = bc._front_fazit({"features": []}, {"aussagen": []}, self.DATES,
-                              "2026-09-18", self._wl(None))
-        self.assertTrue("Today none passes" in txt or "Heute zieht keine durch" in txt, txt)
-        self.assertTrue(txt.startswith("The DWD forecast indicates no front") or
-                        txt.startswith("In der DWD-Prognose ist keine Front"), txt)
+    def test_schwache_zeichen_nur_was_sichtbar_ist(self):
+        txt = self._blk(self.SCHWACH)["fazit"]
+        self.assertTrue("only weak signs" in txt or "nur schwache Zeichen" in txt, txt)
+        self.assertIn("+4.6 hPa", txt)
+        self.assertNotIn("mm", txt)
+        self.assertNotIn("1500 m", txt)
+
+    def test_keine_zeichen(self):
+        blk = self._blk(self.KEINE)
+        self.assertTrue("shows no signs" in blk["fazit"] or "keine Zeichen" in blk["fazit"],
+                        blk["fazit"])
+        self.assertIsNone(blk["zeichen"])
+
+    WARM = {"druck": {"hpa": 0.5, "von": "06:00", "stufe": None},
+            "druck_fall": {"hpa": -5.2, "von": "03:00", "stufe": "schwach"},
+            "t850": {"k": 4.6, "richtung": "warm", "stufe": "deutlich"},
+            "regen": {"mm": 6.0, "stufe": "deutlich"}, "stufe": "schwach"}
+
+    def test_warmfront_nennt_nur_passende_zeichen(self):
+        dwd = dict(self.DWD, typ="warm")
+        blk = bc._front_block({"features": []}, {"aussagen": [dwd]}, self.DATES, "2026-09-18",
+                              self._wl(self.WARM))
+        txt = blk["fazit"]
+        self.assertEqual(blk["zeichen"], "deutlich")
+        self.assertTrue("warmer air" in txt or "wärmere Luft" in txt, txt)
+        self.assertTrue("pressure fall" in txt or "Druckfall" in txt, txt)
+        self.assertNotIn("Instead", txt)
+        self.assertNotIn("Stattdessen", txt)
+
+    def test_warmfront_mit_kaltluft_sagt_stattdessen(self):
+        dwd = dict(self.DWD, typ="warm")
+        blk = bc._front_block({"features": []}, {"aussagen": [dwd]}, self.DATES, "2026-09-18",
+                              self._wl(self.DEUTLICH))
+        txt = blk["fazit"]
+        # Druckanstieg und Kaltluft passen nicht zur Warmfront -> nur Regen
+        self.assertEqual(blk["zeichen"], "schwach")
+        self.assertNotIn("pressure rise", txt)
+        self.assertNotIn("Druckanstieg", txt)
+        self.assertTrue("Instead: markedly colder air" in txt or
+                        "Stattdessen: deutlich kältere Luft" in txt, txt)
+
+    def test_okklusion_zaehlt_beide_richtungen(self):
+        dwd = dict(self.DWD, typ="okklusion")
+        for z in (self.DEUTLICH, self.WARM):
+            blk = bc._front_block({"features": []}, {"aussagen": [dwd]}, self.DATES,
+                                  "2026-09-18", self._wl(z))
+            self.assertEqual(blk["zeichen"], "deutlich", blk["fazit"])
+            self.assertNotIn("Instead", blk["fazit"])
+
+    def test_mehrere_dwd_zonen_staerkste_zeichen(self):
+        wallis = dict(self.DWD, zone="wallis", durchgang_median_utc="2026-09-18T10:00:00+00:00",
+                      fenster_von_utc="2026-09-18T09:30:00+00:00")
+        zones = {"alpennordhang": self.DEUTLICH, "wallis": self.SCHWACH,
+                 "tessin": self.KEINE, "graubuenden_engadin": self.KEINE}
+        wl = {"frontsignatur": {"per_day": [{"date": "2026-09-18", "zones": zones, "verlauf": {}}]}}
+        blk = bc._front_block({"features": []}, {"aussagen": [wallis, self.DWD]}, self.DATES,
+                              "2026-09-18", wl)
+        self.assertEqual(blk["zeichen"], "deutlich")
+        self.assertTrue("Northern Alps" in blk["fazit"] or "Alpennordhang" in blk["fazit"], blk["fazit"])
+
+    def test_ohne_dwd_kaltluft_wird_genannt(self):
+        blk = self._blk(self.DEUTLICH, aussagen=[], zone="wallis")
+        self.assertTrue(blk["ohne_dwd"])
+        self.assertTrue("air-mass change" in blk["fazit"] or "Luftmassenwechsel" in blk["fazit"],
+                        blk["fazit"])
+        self.assertTrue("Valais" in blk["fazit"] or "Wallis" in blk["fazit"], blk["fazit"])
+
+    def test_ohne_dwd_ohne_kaltluft(self):
+        blk = self._blk(self.SCHWACH, aussagen=[])
+        self.assertFalse(blk["ohne_dwd"])
+        self.assertTrue(blk["fazit"].startswith("Today: data indicate no front.") or
+                        blk["fazit"].startswith("Heute: Daten zeigen keine Front."), blk["fazit"])
 
 
 class TestDetectFrontsignatur(unittest.TestCase):
-    """Synthetische Zone: Druckminimum 14 h mit Anstieg, Winddrehung SW->NW,
-    T850-Sturz und Regen -> Signatur; glatter Tag -> keine."""
+    """Synthetische Zone ueber drei Tage: Kaltfront am 18.09. um 08 h (Druck
+    danach +1 hPa/h, T850 -7 K, Regen, Hoehenwind SW->NW bei 40 km/h) ->
+    deutliche Zeichen; ruhiger Tag -> keine."""
 
     def _region(self, front: bool):
         hd, pl = {}, {}
-        for h in range(24):
-            k = f"2026-09-18T{h:02d}:00"
-            if front:
-                msl = 1012 - 0.4 * h if h <= 14 else 1006.4 + 0.8 * (h - 14)
-                wd = 225 if h < 14 else 300
-                t = 10.0 if h < 14 else 6.0
-                rain = 1.0 if 13 <= h <= 17 else 0.0
-            else:
-                msl, wd, t, rain = 1015 + 0.1 * h, 240, 9.0, 0.0
-            hd[k] = {"pressure_msl": msl, "precipitation": rain}
-            pl[k] = {"wind_direction_700hPa": wd, "temperature_850hPa": t}
+        for d, base in (("2026-09-17", 0), ("2026-09-18", 24), ("2026-09-19", 48)):
+            for h in range(24):
+                t = base + h                      # Stunden seit 17.09. 00 h
+                k = f"{d}T{h:02d}:00"
+                after = front and t >= 32         # Front 18.09. 08 h
+                if front:
+                    msl = 1010 - 0.05 * t if not after else 1008.4 + min(t - 32, 14) * 1.0
+                    wd = 225 if not after else 315
+                    temp = 10.0 if not after else 3.0
+                    rain = 2.0 if 32 <= t <= 38 else 0.0
+                else:
+                    msl, wd, temp, rain = 1015 + 0.01 * t, 240, 9.0, 0.0
+                hd[k] = {"pressure_msl": msl, "precipitation": rain}
+                pl[k] = {"wind_direction_700hPa": wd, "wind_speed_700hPa": 40.0,
+                         "temperature_850hPa": temp}
         return {"reference_points": [[46.9, 7.5]], "hourly_data": hd, "pressure_level_data": pl}
 
     def test_front_day_detected(self):
         from engine.synoptic_context import detect_frontsignatur
         res = detect_frontsignatur({"r1": self._region(True)}, ["2026-09-18"], tagesgang={})
-        sig = res["per_day"][0]["zones"]["alpennordhang"]
-        self.assertIsNotNone(sig)
-        self.assertEqual(sig["typ_hinweis"], "kalt")
-        self.assertIn(sig["hour"], ("13:00", "14:00", "15:00"))
+        z = res["per_day"][0]["zones"]["alpennordhang"]
+        self.assertEqual(z["stufe"], "deutlich")
+        self.assertEqual(z["druck"]["stufe"], "deutlich")
+        self.assertEqual(z["t850"]["richtung"], "kalt")
+        self.assertEqual(z["t850"]["stufe"], "deutlich")
+        self.assertEqual(z["regen"]["stufe"], "deutlich")
+        self.assertEqual(z["drehung"]["stufe"], "schwach")
 
     def test_quiet_day_not_detected(self):
         from engine.synoptic_context import detect_frontsignatur
         res = detect_frontsignatur({"r1": self._region(False)}, ["2026-09-18"], tagesgang={})
-        self.assertIsNone(res["per_day"][0]["zones"]["alpennordhang"])
+        self.assertIsNone(res["per_day"][0]["zones"]["alpennordhang"]["stufe"])
         v = res["per_day"][0]["verlauf"]["alpennordhang"]
-        self.assertAlmostEqual(v["druck_trend_hpa"], 1.6, places=1)   # +0.1/h ueber 16 h
-        self.assertAlmostEqual(v["sprung_max_hpa"], 0.3, places=1)
+        self.assertAlmostEqual(v["druck_trend_hpa"], 0.2, places=1)
         self.assertFalse(v["tagesgang_korrigiert"])
         tag = res["per_day"][0]["druck_tag"]
         self.assertTrue(tag["einig"])
         self.assertFalse(tag["sprung_hot"])
+
+    def test_schwacher_hoehenwind_dreht_nicht(self):
+        from engine.synoptic_context import detect_frontsignatur
+        reg = self._region(True)
+        for rec in reg["pressure_level_data"].values():
+            rec["wind_speed_700hPa"] = 10.0
+        res = detect_frontsignatur({"r1": reg}, ["2026-09-18"], tagesgang={})
+        self.assertNotIn("drehung", res["per_day"][0]["zones"]["alpennordhang"])
 
     def test_tagesgang_wird_abgezogen(self):
         """Flacher Rohdruck, Tagesgang-Tabelle mit Stufe +1 hPa ab 12 h: die
@@ -468,19 +561,6 @@ class TestDruckTag(unittest.TestCase):
         tag = druck_tag_aus_verlauf(v)
         self.assertEqual(tag["sprung"], {"hpa": -2.4, "hour": "14:00", "zone": "tessin"})
         self.assertTrue(tag["sprung_hot"])
-
-    def test_counter_words_alle_zonen(self):
-        v = self._v(alpennordhang=1.0, wallis=1.2, tessin=-2.3, graubuenden_engadin=2.7)
-        txt = bc._counter_words(v)
-        self.assertTrue(txt.startswith("no pressure jump") or txt.startswith("keinen Drucksprung"), txt)
-        self.assertNotIn("rising", txt)
-        v["tessin"].update({"sprung_max_hpa": -2.4})
-        v["alpennordhang"]["max_drehung_deg"] = 62
-        txt = bc._counter_words(v)
-        self.assertTrue("Ticino" in txt or "Tessin" in txt, txt)
-        self.assertIn("-2.4", txt)
-        self.assertNotIn("wind shift", txt)
-        self.assertNotIn("Winddrehung", txt)
 
     def test_druckzeile_worte(self):
         wl = {"frontsignatur": {"per_day": [{"date": "2026-09-23", "druck_tag": {

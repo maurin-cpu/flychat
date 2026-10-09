@@ -57,7 +57,7 @@ Status-Pille, Fakten-Chips, ein Satz (erster Teil fett = Aussage).
 | # | Block | Erwartung (Synoptik) | Daten (Prognose) | Urteil / Satz |
 |---|---|---|---|---|
 | 1 | Lage | Druckzentren → Strömung → Luftmasse; Druck und Tendenz | Regen und Wind für die ganze Schweiz (Nord/Süd-Aggregate), Regen-Trend im Tagesverlauf | drei Sätze: Einfluss, Druck mit Bedeutung, „ICON-CH1/ICON-D2 bestätigt das / passt nur teilweise dazu / widerspricht: …“. Urteil: Erwartung (beruhigend / unbeständig / Übergang) gegen Stufe der Daten (0 trocken & ruhig, 1 teils/einseitig, 2 verbreitet/kräftig) |
-| 2 | Fronten | DWD-Frontenprognose (`fronten.durchgaenge`), letzte drei Läufe zusammengeführt, ältere Aussagen gegen die Karte des Tages geprüft | **Frontsignatur** je Zone: Druckminimum + Anstieg ≥ 1.2 hPa/3 h, Winddrehung ≥ 40° auf 700 hPa, dazu T850-Sprung ≥ 2 K oder ≥ 1 mm Regen | „zieht durch" nur mit Signatur; DWD ohne Signatur → „schwächt sich ab"; gestern durchgezogen → „Rückseite" |
+| 2 | Fronten | DWD-Frontenprognose (`fronten.durchgaenge`), letzte drei Läufe zusammengeführt, ältere Aussagen gegen die Karte des Tages geprüft | **Frontzeichen** je Zone (seit 09.10.2026), je schwach/deutlich: Druckanstieg in 12 h (≥ 4 / ≥ 7 hPa), T850 gegen dieselbe Uhrzeit am Vortag (≥ 2.5 / ≥ 4 K), Regen (≥ 1 / ≥ 5 mm), Druckfall in 12 h (≥ 4 / ≥ 7 hPa), Höhenwind-Drehung ≥ 60° nur bei ≥ 25 km/h. Gezählt wird nur, was zum DWD-Typ passt: Kaltfront/Trog = Anstieg, kältere Luft, Regen, Drehung; Warmfront = Fall, wärmere Luft, Regen; Okklusion = beides | Kein Urteil: „DWD zeigt Front — unsere Prognose zeigt deutliche / nur schwache / keine Zeichen: …“ (Zeichen mit Zahl); zeigt die Luft deutlich das Gegenteil des Typs → „Stattdessen: …“. Ohne DWD-Front, aber deutlich kältere Luft + Druckanstieg → „Luftmassenwechsel“; gestern durchgezogen → „Rückseite“ |
 | 3 | Föhn / Bise | Druckgefälle über die Alpen (Schwelle 4 hPa), Druckgefälle NE–S und 700-hPa-Richtung für Bise | Bei Föhnlage: Wind an den **Föhn-Talpunkten** (`data/foehn_talpunkte.geojson`, ICON-CH2, `foehn.per_day[].tal`, Regel in `docs/FOEHN.md`); ohne Talreihe Böen am Lee-Prognosepunkt (Zürich / Lugano). Sonst starke Winde an einzelnen Startplätzen (≥ 40 km/h); Nordostwind im Mittelland | Föhn: „bestätigt am Boden in <Tälern> — Wind X–Y km/h, Böen bis Z (Tal)" / „bleibt laut Modell in der Höhe" / „nicht prüfbar". Föhntäler sind **nur** die Talpunkte (seit 04.10.2026), nie Startplätze. Dieselben Zahlen in Chips und Warnbox (eine Zahl, eine Quelle). Bise nur erwähnt, wenn Nord-/Ostkomponente, aktiv oder am Boden sichtbar |
 | 4 | Höhenwind | Schweizer Mittel 700 hPa (Vektormittel 12 Uhr) mit Stärkeklasse | Spanne der Regionsspitzen (schwächste bis stärkste Region, Stunde); ⅔-Regel für den Boden | Klasse der Spitze gegen Klasse des Mittels: „regional stärker / wie im Mittel / schwächer". Das ist ein Auflösungs-, kein Quellen-Vergleich |
 | 5 | Labilität | Luftmasse (SW feucht → labil im Süden; N/NW kühl → Schauer am Nordhang), Druck deckelt oder begünstigt | CAPE je Zone in Klassen (150/400/1000), Modell-Gewitter mit Beginn, Überentwicklung | Urteil: „Die Prognosedaten bestätigen …" (blockspezifisch: die Labilität dort, wo die Lage sie erwarten lässt / die stabile Schichtung / die gedeckelte bzw. hohe Basis / die Zweiteilung bzw. landesweit) / „nur teilweise — der Deckel hält im Norden nicht" / „zeigen das nicht — stabiler als …" / „widersprechen — labiler als …" |
@@ -147,8 +147,11 @@ Regeln:
 - **Lage**: beruhigend (Druck steigt, oder Hoch) erwartet trocken & ruhig,
   unbeständig (fällt, oder Tief) erwartet Regen/Wind; Stufe 1 → teilweise,
   Gegenteil → widersprechen; Übergangslage: nur Stufe 2 → teilweise.
-- **Fronten**: Signatur → zieht durch; DWD nennt Front, keine Signatur →
-  schwächt ab; Ist-Durchgang der letzten 36 h (DWD-Analyse) → Rückseite.
+- **Fronten**: DWD nennt Front → Pille nach Stärke der eigenen Zeichen
+  („Zeichen sichtbar“ / „schwache Zeichen“ / „keine Zeichen“); keine DWD-Front,
+  aber Kaltluft + Druckanstieg → „Luftmassenwechsel“; Ist-Durchgang der letzten
+  36 h (DWD-Analyse) → Rückseite. Nennt der DWD mehrere Zonen, gilt die mit
+  den stärksten Zeichen. Hintergrund: meteo_research/frontdurchgang_punktreihen.md
   Ob die DWD-Prognose für den Tag eine Front nennt, kommt aus **derselben**
   Quelle wie der Satz (`passagen_*.json` über `_front_block`, Feld `dwd`) —
   nicht aus `wetterlage.fronten.durchgaenge`: deren Tageszuordnung wich ab
@@ -195,7 +198,7 @@ Daten kein Frontenwort — auch nicht „keine Front in Sicht".
   „beruhigt sich im Norden, im Süden Schauer am Nachmittag zunehmend";
   verbreitet → „Hochdruckeinfluss nimmt zu, kommt aber noch nicht an".
 - „unbeständig" (Druck fällt) + trocken → „vorerst meist trocken".
-- Front: kein „zieht durch" ohne Signatur in den eigenen Daten.
+- Front: nie „zieht durch“ oder „löst sich auf“ — nur die Zeichen beschreiben.
 - **Druckzeile** (seit 23.09.2026): „3 Tage: stabil −1,2 hPa/d · tagsüber
   +0,4 hPa · Sprung +1,4 hPa in 3 h, 17–20 Uhr (Alpennordhang)". Drei Zahlen,
   drei Jobs: 3-Tage-Steigung des CH-Mittels; Tagestendenz 06–22 h als Mittel

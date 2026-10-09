@@ -544,6 +544,26 @@ SYNOPTIC_PRESSURE_TREND_THRESHOLD_HPA = 2.0
 SYNOPTIC_DRUCK_TENDENZ_HPA = 1.0
 SYNOPTIC_DRUCK_SPRUNG_HPA = 2.0
 
+# Frontzeichen je Zone und Tag (detect_frontsignatur -> zones.<zone>): was
+# die eigene Prognose zu einer Front zeigt, ohne Urteil. Lange Fenster, weil
+# Druck, Abkuehlung und Drehung an den Alpen Stunden versetzt kommen
+# (meteo_research/frontdurchgang_punktreihen.md). Je Zeichen (schwach,
+# deutlich). Kalibriert 09.10.2026 an 39 Tagen ICON-D2 (01.09.-09.10.):
+# - Druckanstieg in 12 h erreicht auch beim Hochaufbau +4..+5.6 hPa;
+#   Fronten +4.6..+13 -> erst ab +7 "deutlich".
+# - T850 schwankt im Tagesgang um +-3 K -> verglichen wird mit derselben
+#   Uhrzeit 24 h vorher. Ruhige Tage meist innerhalb +-2.5 K, Kaltfronten
+#   -5.4 (01.10.), -6.5 (05.09.), -8.8 (08.10.), -10 (16.09.), -15 (09.09.).
+FRONT_ZEICHEN_DRUCK_HPA = (4.0, 7.0)     # Anstieg in 12 h (tagesgang-bereinigt)
+FRONT_ZEICHEN_DRUCKFALL_HPA = (4.0, 7.0) # Fall in 12 h (Warmfront, Okklusion)
+FRONT_ZEICHEN_T850_K = (2.5, 4.0)        # |Aenderung T850| gegen 24 h vorher
+FRONT_ZEICHEN_REGEN_MM = (1.0, 5.0)      # Tagessumme (Median der Zone)
+# Drehung 700 hPa nur bei kraeftigem Hoehenwind an beiden Fensterenden —
+# bei schwachem Wind dreht er auch an ruhigen Tagen um bis zu 180 Grad, bei
+# >= 25 km/h an ruhigen Tagen noch bis ~50 Grad.
+FRONT_ZEICHEN_DREHUNG_DEG = 60
+FRONT_ZEICHEN_DREHUNG_MIN_KMH = 25
+
 # --- Uebergeordnete Stroemung (700 hPa) ---------------------------------
 # Stuerkeklassen fuer 700-hPa-Wind (CH-Mittel)
 SYNOPTIC_FLOW_SCHWACH_KMH = 15      # < 15 km/h → schwach

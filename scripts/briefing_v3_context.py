@@ -602,14 +602,14 @@ _L3 = {
         "step_modelle": "Modelle",
         # Status-Pille je Kettenglied (kurz, max 3 Woerter)
         "st_lage_match": "Daten passen zur Lage", "st_lage_partial": "Daten passen teilweise", "st_lage_contra": "Daten widersprechen der Lage",
-        "st_front_passes": "Front zieht durch", "st_front_weak": "Front schwächt ab", "st_front_none": "keine Front angezeigt", "st_front_rear": "Rückseite",
+        "st_front_signs": "Zeichen sichtbar", "st_front_weaksigns": "schwache Zeichen", "st_front_nosigns": "keine Zeichen", "st_front_airmass": "Luftmassenwechsel", "st_front_none": "keine Front angezeigt", "st_front_rear": "Rückseite",
         "st_foehn_on": "Föhn angezeigt", "st_foehn_gusty": "einzelne Böen", "st_foehn_off": "keine Föhn-Anzeichen", "st_bise_on": "Bise angezeigt",
         "st_wind_stronger": "regional stärker", "st_wind_match": "regional wie im Mittel", "st_wind_weaker": "regional schwächer",
         "st_stab_thunder": "Gewitter", "st_stab_labile": "teils labil", "st_stab_stable": "stabil",
         "st_th_good": "gutes Steigen", "st_th_mod": "mässiges Steigen", "st_th_weak": "schwaches Steigen",
         "st_sun_match": "wie erwartet", "st_sun_partial": "teils anders", "st_sun_contra": "anders als erwartet",
         "st_md_agree": "Modelle einig", "st_md_partial": "meist einig", "st_md_uncertain": "Modelle uneinig",
-        "fx_dwd": "DWD", "fx_signature": "Signatur", "fx_sig_yes": "ja", "fx_sig_no": "keine",
+        "fx_dwd": "DWD", "fx_signature": "Zeichen", "fx_sig_deutlich": "deutlich", "fx_sig_schwach": "schwach", "fx_sig_no": "keine",
         "fx_dp": "ΔP Alpen", "fx_gust": "Böe", "fx_tal": "Föhntäler", "fx_tal_na": "n. prüfbar", "fx_t850": "T850", "fx_thunder_none": "keine Gewitter",
         "fx_ground": "am Boden ≈", "fx_peak": "Spitze",
         "md_head_0":     "Fazit: Gute Übereinstimmung der Modelle.",
@@ -811,19 +811,25 @@ _L3 = {
         "lb_grade_light":   "leicht labil", "lb_grade_mod": "labil", "lb_grade_strong": "stark labil",
         "lb_in":            "im ", "lb_in_plural": "in ",
         "front_today_in":     "{Day} dürfte die {typ} {zone} {when} {art}{unsicher}{prov}.",
-        "front_sig_yes":      "In der DWD-Prognose wird eine {typ} über {zone_dat} angegeben. {Day} zieht sie gegen {hour} Uhr durch — {models} bestätigt das: {belege}.",
         "front_fazit_none_more": "Danach zeigen die Daten im 3-Tage-Fenster keine weitere Front.",
-        "front_sig_dwd_only": "In der DWD-Prognose wird {day} {when} eine {typ} über {zone_dat} angegeben. {models} bestätigt das nicht: keine Signatur ({gegen}) — die Front dürfte sich abschwächen oder auflösen.",
-        "front_sig_none":     "In der DWD-Prognose ist keine Front über der Schweiz angegeben. {Day} zieht keine durch — {models} bestätigt das: {gegen}.",
-        "ev_druck":           "Druckanstieg",
-        "ev_drehung":         "Winddrehung auf {sector}",
-        "ev_kalt":            "Abkühlung in der Höhe",
-        "ev_warm":            "Erwärmung in der Höhe",
-        "ev_regen":           "Regen",
-        "gv_sprung":          "Drucksprung {val} hPa in 3 h ({zone})",
-        "gv_druck_flach":     "keinen Drucksprung",
-        "gv_drehung":         "keine Winddrehung",
-        "gv_regen":           "keinen Regen",
+        # Frontzeichen (seit 09.10.2026): DWD nennt die Front, die eigene
+        # Prognose beschreibt ihre Zeichen — kein Urteil "zieht durch/loest sich auf"
+        "front_z_deutlich":   "In der DWD-Prognose wird {day} {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu deutliche Zeichen: {zeichen}.",
+        "front_z_schwach":    "In der DWD-Prognose wird {day} {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu nur schwache Zeichen: {zeichen}.",
+        "front_z_keine":      "In der DWD-Prognose wird {day} {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu keine Zeichen.",
+        "front_z_ohne_dwd":   "In der DWD-Prognose ist {day} keine Front über der Schweiz angegeben. {models} zeigt über {zone_dat} aber deutliche Zeichen eines Luftmassenwechsels: {zeichen}.",
+        "ez_druck_deutlich":  "kräftiger Druckanstieg ({val} hPa in 12 h)",
+        "ez_druck_schwach":   "Druckanstieg ({val} hPa in 12 h)",
+        "ez_druckfall_deutlich": "kräftiger Druckfall ({val} hPa in 12 h)",
+        "ez_druckfall_schwach": "Druckfall ({val} hPa in 12 h)",
+        "front_z_gegen":      " Stattdessen: {gegen}.",
+        "ez_kalt_deutlich":   "deutlich kältere Luft auf 1500 m ({val} °C gegenüber dem Vortag)",
+        "ez_kalt_schwach":    "etwas kältere Luft auf 1500 m ({val} °C gegenüber dem Vortag)",
+        "ez_warm_deutlich":   "deutlich wärmere Luft auf 1500 m ({val} °C gegenüber dem Vortag)",
+        "ez_warm_schwach":    "etwas wärmere Luft auf 1500 m ({val} °C gegenüber dem Vortag)",
+        "ez_regen_deutlich":  "Regen ({val} mm)",
+        "ez_regen_schwach":   "etwas Regen ({val} mm)",
+        "ez_drehung":         "Höhenwind dreht auf {sector}",
         "front_generic":      "Front",
         "sectors":            "Nord,Nordost,Ost,Südost,Süd,Südwest,West,Nordwest",
         "front_prev_run":     " (Lauf von gestern; heute früh {dist} km {dir})",
@@ -903,7 +909,7 @@ _L3 = {
         # Ursache je Warnung aus der Synoptik — Warnung = Daten, Ursache = Lage
         "hz_cause_rain_south": "— die feuchte {sector}luft staut sich im Süden.",
         "hz_cause_rain_north": "— die {sector}luft staut sich am Alpennordhang.",
-        "hz_cause_rain_front": "— Frontdurchgang.",
+        "hz_cause_rain_front": "— mit Frontzeichen in den Daten.",
         "hz_cause_rain_flow":  "— {sector}strömung.",
         "hz_cause_wind_aloft": "— der {sector}-Höhenwind schlägt bis in die Täler durch.",
         "hz_cause_wind_gusts": "— böiger Wind.",
@@ -1033,14 +1039,14 @@ _L3 = {
         "step_modelle": "Models",
         # status pill per chain step (short, max 3 words)
         "st_lage_match": "data fit the pattern", "st_lage_partial": "data partly fit", "st_lage_contra": "data contradict the pattern",
-        "st_front_passes": "front passes", "st_front_weak": "front weakening", "st_front_none": "no front indicated", "st_front_rear": "rear side",
+        "st_front_signs": "signs visible", "st_front_weaksigns": "weak signs", "st_front_nosigns": "no signs", "st_front_airmass": "air-mass change", "st_front_none": "no front indicated", "st_front_rear": "rear side",
         "st_foehn_on": "foehn indicated", "st_foehn_gusty": "isolated gusts", "st_foehn_off": "no foehn signs", "st_bise_on": "Bise indicated",
         "st_wind_stronger": "regionally stronger", "st_wind_match": "regionally as average", "st_wind_weaker": "regionally weaker",
         "st_stab_thunder": "thunderstorms", "st_stab_labile": "partly unstable", "st_stab_stable": "stable",
         "st_th_good": "good climbs", "st_th_mod": "moderate climbs", "st_th_weak": "weak climbs",
         "st_sun_match": "as expected", "st_sun_partial": "partly different", "st_sun_contra": "different than expected",
         "st_md_agree": "models agree", "st_md_partial": "mostly agree", "st_md_uncertain": "models disagree",
-        "fx_dwd": "DWD", "fx_signature": "signature", "fx_sig_yes": "yes", "fx_sig_no": "none",
+        "fx_dwd": "DWD", "fx_signature": "signs", "fx_sig_deutlich": "clear", "fx_sig_schwach": "weak", "fx_sig_no": "none",
         "fx_dp": "ΔP Alps", "fx_gust": "gust", "fx_tal": "foehn valleys", "fx_tal_na": "n/a", "fx_t850": "T850", "fx_thunder_none": "no thunderstorms",
         "fx_ground": "ground ≈", "fx_peak": "peak",
         "md_head_0":     "Verdict: Good agreement between the models.",
@@ -1241,19 +1247,23 @@ _L3 = {
         "lb_grade_light":   "slightly unstable", "lb_grade_mod": "unstable", "lb_grade_strong": "strongly unstable",
         "lb_in":            "in ", "lb_in_plural": "in ",
         "front_today_in":     "{Day} the {typ} is expected to {art_inf} {zone} {when}{unsicher}{prov}.",
-        "front_sig_yes":      "The DWD forecast indicates a {typ} over {zone}. {Day} it passes around {hour_full} — {models} confirms it: {belege}.",
         "front_fazit_none_more": "After that, data indicate no further front within the 3-day window.",
-        "front_sig_dwd_only": "The DWD forecast indicates a {typ} over {zone} {day} {when}. {models} does not confirm it: no signature ({gegen}) — the front is likely weakening or dissolving.",
-        "front_sig_none":     "The DWD forecast indicates no front over Switzerland. {Day} none passes — {models} confirms it: {gegen}.",
-        "ev_druck":           "a pressure rise",
-        "ev_drehung":         "wind veering to the {sector}",
-        "ev_kalt":            "cooling aloft",
-        "ev_warm":            "warming aloft",
-        "ev_regen":           "rain",
-        "gv_sprung":          "pressure jump of {val} hPa in 3 h ({zone})",
-        "gv_druck_flach":     "no pressure jump",
-        "gv_drehung":         "no wind shift",
-        "gv_regen":           "no rain",
+        "front_z_deutlich":   "The DWD forecast indicates a {typ} over {zone} {day} {when}. {models} shows clear signs of it: {zeichen}.",
+        "front_z_schwach":    "The DWD forecast indicates a {typ} over {zone} {day} {when}. {models} shows only weak signs of it: {zeichen}.",
+        "front_z_keine":      "The DWD forecast indicates a {typ} over {zone} {day} {when}. {models} shows no signs of it.",
+        "front_z_ohne_dwd":   "The DWD forecast indicates no front over Switzerland {day}. {models} nevertheless shows clear signs of an air-mass change over {zone}: {zeichen}.",
+        "ez_druck_deutlich":  "a strong pressure rise ({val} hPa in 12 h)",
+        "ez_druck_schwach":   "a pressure rise ({val} hPa in 12 h)",
+        "ez_druckfall_deutlich": "a strong pressure fall ({val} hPa in 12 h)",
+        "ez_druckfall_schwach": "a pressure fall ({val} hPa in 12 h)",
+        "front_z_gegen":      " Instead: {gegen}.",
+        "ez_kalt_deutlich":   "markedly colder air at 1500 m ({val} °C vs. the day before)",
+        "ez_kalt_schwach":    "slightly colder air at 1500 m ({val} °C vs. the day before)",
+        "ez_warm_deutlich":   "markedly warmer air at 1500 m ({val} °C vs. the day before)",
+        "ez_warm_schwach":    "slightly warmer air at 1500 m ({val} °C vs. the day before)",
+        "ez_regen_deutlich":  "rain ({val} mm)",
+        "ez_regen_schwach":   "some rain ({val} mm)",
+        "ez_drehung":         "upper wind veering to the {sector}",
         "front_generic":      "front",
         "sectors":            "north,north-east,east,south-east,south,south-west,west,north-west",
         "front_prev_run":     " (yesterday's run; this morning {dist} km to the {dir})",
@@ -1332,7 +1342,7 @@ _L3 = {
         # cause per warning from the synoptic picture — warning = data, cause = situation
         "hz_cause_rain_south": "— the humid {sector} air piles up in the south.",
         "hz_cause_rain_north": "— the {sector} air piles up on the Northern Alps.",
-        "hz_cause_rain_front": "— frontal passage.",
+        "hz_cause_rain_front": "— with front signs in the data.",
         "hz_cause_rain_flow":  "— {sector} flow.",
         "hz_cause_wind_aloft": "— the {sector} upper wind reaches down into the valleys.",
         "hz_cause_wind_gusts": "— gusty wind.",
@@ -2028,58 +2038,74 @@ def _sector_word(deg) -> str:
     return names[int(((float(deg) + 22.5) // 45) % 8)]
 
 
-def _front_signature(wetterlage: dict | None, date: str) -> tuple[dict | None, dict]:
-    """(beste Signatur des Tages mit 'zone', Tagesverlauf je Zone) aus
-    wetterlage['frontsignatur'] — leer, wenn der Kontext das Feld nicht hat."""
+_STUFE_RANG = {"deutlich": 2, "schwach": 1, None: 0}
+
+
+def _front_zeichen(wetterlage: dict | None, date: str, zone: str = "") -> tuple[str, dict]:
+    """(Zone, Frontzeichen) des Tages aus wetterlage['frontsignatur'] — fuer
+    die genannte Zone, sonst die Zone mit den staerksten Zeichen. ("", {}),
+    wenn der Kontext das Feld nicht hat."""
     fs = (wetterlage or {}).get("frontsignatur") or {}
     day = next((d for d in fs.get("per_day") or [] if d.get("date") == date), None)
-    if not day:
-        return None, {}
-    best = None
-    for z, sig in (day.get("zones") or {}).items():
-        if not sig:
-            continue
-        score = (sig.get("druck_hpa") or 0) + abs(sig.get("t850_k") or 0) + min(sig.get("regen_mm") or 0, 5) / 2
-        if best is None or score > best[0]:
-            best = (score, dict(sig, zone=z))
-    return (best[1] if best else None), (day.get("verlauf") or {})
+    zones = {z: v for z, v in ((day or {}).get("zones") or {}).items() if isinstance(v, dict)}
+    if zone:
+        return (zone, zones[zone]) if zone in zones else ("", {})
+    if not zones:
+        return "", {}
+    z = max(zones, key=lambda k: (_STUFE_RANG.get(zones[k].get("stufe"), 0),
+                                  abs((zones[k].get("t850") or {}).get("k") or 0),
+                                  (zones[k].get("druck") or {}).get("hpa") or 0))
+    return z, zones[z]
 
 
-def _evidence_words(sig: dict) -> str:
-    parts = [_lbl("ev_druck"), _lbl("ev_drehung").format(sector=_sector_word(sig["drehung"][1]))]
-    t = sig.get("t850_k")
-    if t is not None and t <= -2.0:
-        parts.append(_lbl("ev_kalt"))
-    elif t is not None and t >= 2.0:
-        parts.append(_lbl("ev_warm"))
-    if (sig.get("regen_mm") or 0) >= 1.0:
-        parts.append(_lbl("ev_regen"))
-    return ", ".join(parts)
+def _kaltluft_ohne_dwd(zeichen: dict) -> bool:
+    """Deutlich kaeltere Luft plus Druckanstieg: ein Luftmassenwechsel, der
+    auch ohne DWD-Front ins Briefing gehoert."""
+    t = zeichen.get("t850") or {}
+    return (t.get("richtung") == "kalt" and t.get("stufe") == "deutlich"
+            and bool((zeichen.get("druck") or {}).get("stufe")))
 
 
-def _counter_words(verlauf: dict, zone: str = "") -> str:
-    """Gegenbeleg 'keine Front': was in ALLEN Zonen fehlt (oder in der
-    genannten Zone, wenn die DWD-Karte dort eine Front zeichnet). Der Druck
-    zaehlt als Sprung, nicht als Tagesbilanz — eine Front ist ein Knick,
-    keine Steigung; und das Maximum ueber die Zonen mit Namen, weil ein
-    Mittel eine Front ueber nur einer Zone wegrechnet. Bis 23.09.2026 stand
-    hier die 06->22-h-Bilanz der ersten Zone im Dict — die war im September
-    durch den Tagesgang fast immer "steigend" und widersprach der Kopfzeile."""
-    items = ([(zone, verlauf[zone])] if zone and verlauf.get(zone)
-             else [(z, v) for z, v in (verlauf or {}).items() if v])
-    if not items:
-        return _lbl("gv_druck_flach") + ", " + _lbl("gv_drehung")
-    z_max, sprung = max(((z, v.get("sprung_max_hpa") or 0.0) for z, v in items),
-                        key=lambda t: abs(t[1]))
-    if abs(sprung) >= config.SYNOPTIC_DRUCK_SPRUNG_HPA:
-        parts = [_lbl("gv_sprung").format(val=f"{sprung:+.1f}", zone=_zone_name(z_max))]
-    else:
-        parts = [_lbl("gv_druck_flach")]
-    if max((v.get("max_drehung_deg") or 0) for _, v in items) < 40:
-        parts.append(_lbl("gv_drehung"))
-    if max((v.get("regen_mm") or 0) for _, v in items) < 1.0:
-        parts.append(_lbl("gv_regen"))
-    return ", ".join(parts)
+def _zeichen_text(zeichen: dict, key: str) -> str:
+    """Ein Zeichen in Worten mit Zahl. key: druck, druck_fall, kalt, warm,
+    regen, drehung (kalt/warm = T850 in dieser Richtung)."""
+    if key in ("kalt", "warm"):
+        z = zeichen.get("t850") or {}
+        return _lbl(f"ez_{key}_{z['stufe']}").format(val=f"{z['k']:+.1f}")
+    z = zeichen.get(key) or {}
+    if key == "druck":
+        return _lbl(f"ez_druck_{z['stufe']}").format(val=f"{z['hpa']:+.1f}")
+    if key == "druck_fall":
+        return _lbl(f"ez_druckfall_{z['stufe']}").format(val=f"{z['hpa']:+.1f}")
+    if key == "regen":
+        return _lbl(f"ez_regen_{z['stufe']}").format(val=f"{z['mm']:.0f}" if z["mm"] >= 2 else f"{z['mm']:.1f}")
+    return _lbl("ez_drehung").format(sector=_sector_word(z["nach"]))
+
+
+def _zeichen_stufe(zeichen: dict, key: str) -> str | None:
+    if key in ("kalt", "warm"):
+        t = zeichen.get("t850") or {}
+        return t.get("stufe") if t.get("richtung") == key else None
+    return (zeichen.get(key) or {}).get("stufe")
+
+
+def _zeichen_words(zeichen: dict, typ: str = "kalt") -> tuple[str | None, str, str]:
+    """(Stufe, Zeichen in Worten, Gegenzeichen) fuer einen Fronttyp — nur
+    die Zeichen, die zu diesem Typ passen (Warmfront: Druckfall, waermere
+    Luft, Regen; Kaltfront: Druckanstieg, kaeltere Luft, Regen, Drehung),
+    deutliche zuerst. Gegenzeichen: deutlich die andere Luftmasse als der Typ
+    erwarten laesst (DWD-Warmfront, aber deutlich kaeltere Luft) — die
+    gehoert in den Satz, sonst verschweigt er den eigentlichen Wechsel."""
+    from engine.synoptic_context import front_zeichen_passend
+    stufe, keys = front_zeichen_passend(zeichen, typ)
+    items = sorted(((-_STUFE_RANG[_zeichen_stufe(zeichen, k)], i, _zeichen_text(zeichen, k))
+                    for i, k in enumerate(keys)))
+    gegen = ""
+    t = zeichen.get("t850") or {}
+    erwartet = {"kalt": "kalt", "trog": "kalt", "warm": "warm"}.get(typ)
+    if erwartet and t.get("stufe") == "deutlich" and t.get("richtung") != erwartet:
+        gegen = _zeichen_text(zeichen, t["richtung"])
+    return stufe, ", ".join(x for _, _, x in items), gegen
 
 
 def _druck_tag_words(wetterlage: dict | None, date: str) -> tuple[str, str, bool]:
@@ -2175,7 +2201,8 @@ def _front_block(fronts: dict | None, passagen: dict | None, dates: list,
     Durchgang im 3-Tage-Fenster > Durchgang danach > naechste Front auf der
     Analysekarte bleibt fern > gar keine Front."""
     if not dates:
-        return {"fazit": "", "rear": False, "dwd": False, "dwd_typ": ""}
+        return {"fazit": "", "rear": False, "dwd": False, "dwd_typ": "",
+                "zeichen": None, "ohne_dwd": False}
     focus = focus if focus in dates else dates[0]
     window_end = date.fromisoformat(dates[-1])
     hits = []
@@ -2237,31 +2264,33 @@ def _front_block(fronts: dict | None, passagen: dict | None, dates: list,
                                                  dir=_bearing_word(near[1][1], near[1][0]))
         today_hits.append((l, a, prov))
     today_typ = ""
-    # Entscheidend ist, was die EIGENEN Prognosedaten fuer den Tag zeigen
-    # (Druck, Winddrehung, T850, Regen) — die DWD-Prognose gibt den Namen, die
-    # eigene Prognose gibt das Urteil. Ohne Signatur zieht keine Front durch, auch
-    # wenn die Karte eine zeichnet: dann schwaecht sie sich ab.
-    sig, verlauf = _front_signature(wetterlage, focus)
-    if sig:
-        if today_hits:
-            _, a, _ = today_hits[0]
-            today_typ = a.get("typ", "")
-            typ_txt = _typ(a)
-        else:
-            today_typ = sig.get("typ_hinweis") or ""
-            typ_txt = (_typ({"typ": today_typ}) if today_typ else _lbl("front_generic"))
-        first = _lbl("front_sig_yes").format(models=_model_words(),
-            Day=day_cap, typ=typ_txt, zone=_zone_object(sig["zone"]), zone_dat=_zone_dat(sig["zone"]),
-            hour=sig["hour"][:2], hour_full=sig["hour"], belege=_evidence_words(sig))
-    elif today_hits:
-        local, a, prov = today_hits[0]
+    # Die DWD-Prognose nennt die Front, die eigene Prognose beschreibt ihre
+    # Zeichen (Druckanstieg, kaeltere/waermere Luft auf 1500 m, Regen,
+    # Hoehenwind-Drehung) — ohne Urteil. Bis 09.10.2026 stand hier ein Ja/Nein
+    # ("zieht durch" / "duerfte sich aufloesen"), das an keinem Fronttag
+    # angeschlagen hat; die Kaltfront vom 08.10. hiess deshalb "loest sich auf".
+    stufe = None
+    ohne_dwd = False
+    if today_hits:
+        # Nennt der DWD mehrere Zonen, gilt der Satz der Zone mit den
+        # staerksten Zeichen (01.10.2026: Wallis zuerst mit schwachen
+        # Zeichen, am Alpennordhang waren sie deutlich); bei Gleichstand
+        # der frueheste Durchgang.
+        rank = [_STUFE_RANG.get(_zeichen_words(_front_zeichen(wetterlage, focus, h[1].get("zone", ""))[1],
+                                               h[1].get("typ", ""))[0], 0) for h in today_hits]
+        local, a, prov = today_hits[rank.index(max(rank))]
         today_typ = a.get("typ", "")
-        if verlauf:
-            first = _lbl("front_sig_dwd_only").format(models=_model_words(),
+        z, zeichen = _front_zeichen(wetterlage, focus, a.get("zone", ""))
+        if zeichen:
+            stufe, words, gegen = _zeichen_words(zeichen, today_typ)
+            key = {"deutlich": "front_z_deutlich", "schwach": "front_z_schwach"}.get(stufe, "front_z_keine")
+            first = _lbl(key).format(models=_model_words(),
                 typ=_typ(a), day=day_word, zone=_zone_object(a.get("zone", "")),
                 zone_dat=_zone_dat(a.get("zone", "")),
                 when=_when(a.get("fenster_von_utc") or a.get("durchgang_median_utc") or ""),
-                gegen=_counter_words(verlauf, a.get("zone", "")))
+                zeichen=words)
+            if gegen:
+                first += _lbl("front_z_gegen").format(gegen=gegen)
             first = first[0].upper() + first[1:]
         else:
             unsicher = bool(a.get("randwert")) or (a.get("anteil") or 0) < 0.1
@@ -2270,10 +2299,15 @@ def _front_block(fronts: dict | None, passagen: dict | None, dates: list,
                 when=_when(a.get("fenster_von_utc") or a.get("durchgang_median_utc") or ""),
                 art=_art(a), art_inf=_art(a, infinitive=True),
                 unsicher=_lbl("front_unsicher") if unsicher else "", prov=prov)
-    elif verlauf:
-        first = _lbl("front_sig_none").format(models=_model_words(), Day=day_cap, gegen=_counter_words(verlauf))
     else:
-        first = _lbl("front_today_none").format(Day=day_cap)
+        z, zeichen = _front_zeichen(wetterlage, focus)
+        if zeichen and _kaltluft_ohne_dwd(zeichen):
+            ohne_dwd = True
+            stufe, words, _ = _zeichen_words(zeichen, "kalt")
+            first = _lbl("front_z_ohne_dwd").format(models=_model_words(), day=day_word,
+                zone=_zone_object(z), zone_dat=_zone_dat(z), zeichen=words)
+        else:
+            first = _lbl("front_today_none").format(Day=day_cap)
     if passed:
         first = passed + " " + first
     # Nur der Tag zaehlt. Ob am Sonntag eine Front kommt, steht im Briefing
@@ -2284,8 +2318,11 @@ def _front_block(fronts: dict | None, passagen: dict | None, dates: list,
     #        Laeufe). Frueher las die Pille stattdessen wetterlage.fronten.
     #        durchgaenge — eine zweite Quelle mit eigener Tageszuordnung, die
     #        "keine Front" neben einen Satz mit Front stellen konnte (19.09.2026).
+    # zeichen  = Stufe der Frontzeichen in der eigenen Prognose (Pille)
+    # ohne_dwd = keine DWD-Front, aber deutlich kaeltere Luft + Druckanstieg
     return {"fazit": first, "rear": bool(passed),
-            "dwd": bool(today_hits), "dwd_typ": today_typ or ""}
+            "dwd": bool(today_hits), "dwd_typ": today_typ or "",
+            "zeichen": stufe, "ohne_dwd": ohne_dwd}
 
 
 def _zugbahn_text(wetterlage: dict, date: str) -> str:
@@ -2994,13 +3031,14 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
     if lv:
         st("lage", {"match": "ok", "partial": "info"}.get(lv, "warn"), "st_lage_" + lv)
     # Fronten
-    sig, _ = _front_signature(wl, date)
     passed = bool(chain["fronts"].get("rear"))
     dwd_typ = chain["fronts"].get("dwd_typ") or ""
-    if sig:
-        st("fronts", "warn", "st_front_passes")
-    elif chain["fronts"].get("dwd"):
-        st("fronts", "info", "st_front_weak")
+    zst = chain["fronts"].get("zeichen")
+    if chain["fronts"].get("dwd"):
+        st("fronts", *{"deutlich": ("warn", "st_front_signs"),
+                       "schwach": ("info", "st_front_weaksigns")}.get(zst, ("info", "st_front_nosigns")))
+    elif chain["fronts"].get("ohne_dwd"):
+        st("fronts", "warn", "st_front_airmass")
     elif passed:
         st("fronts", "info", "st_front_rear")
     else:
@@ -3009,7 +3047,7 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
     sw = _per_day_index(wl.get("starkwind_punkte"), [date]).get(date) or {}
     chain["fronts"]["facts"] = [
         {"k": _lbl("fx_dwd"), "v": (_front_type(dwd_typ) if dwd_typ else "—")},
-        {"k": _lbl("fx_signature"), "v": (_lbl("fx_sig_yes") + " " + sig["hour"][:2] + "h") if sig else _lbl("fx_sig_no")},
+        {"k": _lbl("fx_signature"), "v": _lbl("fx_sig_" + zst) if zst else _lbl("fx_sig_no")},
     ]
     # Foehn / Bise
     bi = _per_day_index(wl.get("bise"), [date]).get(date) or {}
@@ -3307,8 +3345,8 @@ def _hazard_cause(topic: str, check: dict, wetterlage: dict, date: str) -> str:
     abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
     sector = _lbl("lg_sector_" + abbr) if abbr else ""
     if topic == "RAIN":
-        sig, _ = _front_signature(wl, date)
-        if sig:
+        _, zeichen = _front_zeichen(wl, date)
+        if zeichen.get("stufe") == "deutlich" and (zeichen.get("regen") or {}).get("stufe"):
             return _lbl("hz_cause_rain_front")
         zones = set(check.get("zones") or [])
         if abbr in ("S", "SW", "SE") and "alpennordhang" not in zones:

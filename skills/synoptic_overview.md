@@ -153,15 +153,27 @@ Seit 2026-09 liegt die DWD-Frontenprognose im Strukturfeld: `fronten` traegt
   Durchgang: kein Frontenwort mehr, ausser ein weiterer Eintrag nennt sie.
 - Nie erfinden, was das Feld nicht sagt: keine Niederschlagsmenge, keine
   Windzahl "wegen der Front", kein "praefrontal/postfrontal".
-- `frontsignatur.per_day[i].zones.<zone>` ist der Durchgang in UNSEREN
-  Prognosedaten (Druckanstieg, Winddrehung auf 700 hPa, T850-Sprung, Regen um
-  `hour`). Das ist das Urteil, die DWD-Prognose (`fronten`) nur der Name:
-  * Signatur da → "die Kaltfront zieht am Nachmittag durch — Druckanstieg,
-    Winddrehung auf Nordwest, Regen" (Belege in Worten, keine Zahlen).
-  * `fronten` nennt einen Durchgang, Signatur null → "die Front schwaecht
-    sich ueber der Schweiz ab", nie "zieht durch".
-  * Signatur da, `fronten` leer → "frontaehnlicher Durchgang" ohne Typ,
-    ausser `typ_hinweis` ist gesetzt.
+- `frontsignatur.per_day[i].zones.<zone>` sind die FRONTZEICHEN in UNSEREN
+  Prognosedaten: `druck` (Anstieg in 12 h), `druck_fall` (Fall in 12 h),
+  `t850` (kaeltere/waermere Luft auf 1500 m gegen den Vortag, `richtung`),
+  `regen`, `drehung` (Hoehenwind), je mit `stufe` deutlich / schwach / null.
+  `stufe_je_typ` gibt die Gesamtstufe je Fronttyp — nimm die des DWD-Typs.
+  Passende Zeichen: Kaltfront/Trog = Druckanstieg, kaeltere Luft, Regen,
+  Drehung; Warmfront = Druckfall, waermere Luft, Regen; Okklusion = beides.
+  Nenne nur passende Zeichen; zeigt `t850` deutlich die GEGENTEILIGE
+  Richtung (Warmfront, aber kaeltere Luft), nenne das als "stattdessen".
+  Die DWD-Prognose (`fronten`) nennt die Front, unsere Daten BESCHREIBEN ihre
+  Zeichen — kein Urteil, ob sie durchzieht oder sich aufloest:
+  * `fronten` nennt einen Durchgang, Stufe deutlich → "die DWD-Prognose
+    zeigt am Vormittag eine Kaltfront, unsere Daten zeigen deutliche Zeichen:
+    kraeftiger Druckanstieg, kaeltere Luft, Regen" (nur Zeichen mit `stufe`,
+    in Worten, keine Zahlen).
+  * Stufe schwach → "... nur schwache Zeichen: ...".
+  * Stufe null → "... unsere Daten zeigen keine Zeichen dafuer".
+  * NIE "die Front schwaecht sich ab / loest sich auf / zieht durch" — das
+    weiss niemand aus den Daten.
+  * `fronten` leer, aber `t850` kalt deutlich und `druck` mit `stufe` →
+    "deutlich kaeltere Luft und Druckanstieg" ohne Frontenwort.
 - `frontsignatur.per_day[i].druck_tag` ist die Drucktendenz des Tages ueber
   die Zonen (tagesgang-bereinigt, vom Code). Nur wenn `einig=false` UND
   `muster` gesetzt ist, darf `day_lines[i]` das Muster in HOECHSTENS einem

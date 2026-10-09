@@ -154,15 +154,26 @@ Since 2026-09 the DWD front forecast is part of the structured field:
   further entry names one.
 - Never invent what the field does not say: no rain amounts, no wind figure
   "because of the front", no "pre-frontal/post-frontal".
-- `frontsignatur.per_day[i].zones.<zone>` is the passage in OUR forecast
-  data (pressure rise, 700 hPa wind shift, T850 jump, rain around `hour`).
-  That is the verdict; the DWD forecast (`fronten`) only supplies the name:
-  * signature present → "the cold front passes in the afternoon — pressure
-    rise, wind veering north-west, rain" (evidence in words, no numbers).
-  * `fronten` names a passage, signature null → "the front weakens over
-    Switzerland", never "passes".
-  * signature present, `fronten` empty → "front-like passage" without a
-    type, unless `typ_hinweis` is set.
+- `frontsignatur.per_day[i].zones.<zone>` are the FRONT SIGNS in OUR
+  forecast data: `druck` (pressure rise in 12 h), `druck_fall` (pressure
+  fall in 12 h), `t850` (colder/warmer air at 1500 m vs. the day before,
+  `richtung` kalt/warm), `regen` (rain), `drehung` (upper wind veer), each
+  with `stufe` deutlich (clear) / schwach (weak) / null. `stufe_je_typ` gives
+  the overall level per front type — use the one of the DWD type. Matching
+  signs: cold front/trough = pressure rise, colder air, rain, veer; warm
+  front = pressure fall, warmer air, rain; occlusion = both. Name only
+  matching signs; if `t850` clearly shows the OPPOSITE direction (warm front
+  but colder air), name that as "instead". The DWD forecast (`fronten`)
+  names the front; our data DESCRIBE its signs — no verdict on whether it
+  passes or dissolves:
+  * `fronten` names a passage, level deutlich → "the DWD forecast shows a
+    cold front in the morning; our data show clear signs: a strong pressure
+    rise, colder air, rain" (only signs with a `stufe`, in words, no numbers).
+  * level schwach → "... only weak signs: ...".
+  * level null → "... our data show no signs of it".
+  * NEVER "the front weakens / dissolves / passes" — the data cannot tell.
+  * `fronten` empty, but `t850` kalt deutlich and `druck` has a `stufe` →
+    "markedly colder air and a pressure rise", without any front word.
 - `frontsignatur.per_day[i].druck_tag` is the day's pressure tendency across
   the zones (diurnal cycle removed, computed by code). Only when `einig=false`
   AND `muster` is set may `day_lines[i]` name the pattern in AT MOST half a

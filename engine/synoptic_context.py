@@ -2696,26 +2696,137 @@ def _circ_mean_deg(degs: list[float]) -> Optional[float]:
     return (math.degrees(math.atan2(sy, sx)) + 360) % 360
 
 
+def _stufe(wert: Optional[float], schwellen: tuple) -> Optional[str]:
+    if wert is None:
+        return None
+    return ("deutlich" if wert >= schwellen[1]
+            else "schwach" if wert >= schwellen[0] else None)
+
+
+def _front_zeichen(msl: dict, t850: dict, wd: dict, ws: dict, rain: dict,
+                   date: str) -> dict:
+    """Was die eigene Prognose an Frontzeichen fuer einen Tag zeigt — jedes
+    Zeichen einzeln mit Stufe (deutlich / schwach / None), kein Urteil.
+    Reihen: {"YYYY-MM-DDTHH:00": wert} ueber das ganze Fenster (auch Vor- und
+    Folgetag), Druck tagesgang-bereinigt.
+
+    Fenstermitte 06-18 h des Tages: so gehoert eine Front am Vormittag des
+    Folgetags nicht schon zum Vorabend (Befund 07./08.10.2026).
+      druck   groesster Anstieg in 12 h (Start 00-12 h)
+      t850    groesste Aenderung gegen dieselbe Uhrzeit 24 h vorher (frei vom
+              Tagesgang, der in 12 h +-3 K ausmacht); Vorzeichen = kalt/warm
+      regen   Tagessumme 00-24 h
+      drehung 700-hPa-Drehung in 12 h, nur wo der Wind an beiden Enden
+              >= FRONT_ZEICHEN_DREHUNG_MIN_KMH weht; nie "deutlich"
+    stufe gesamt: deutlich, wenn Druck oder T850 deutlich; schwach, wenn
+    irgendein Zeichen; sonst None."""
+    d0 = datetime.fromisoformat(date)
+
+    def at(series, t):
+        return series.get(t.strftime("%Y-%m-%dT%H:00"))
+
+    druck = fall = None
+    for i in range(13):
+        s = d0 + timedelta(hours=i)
+        a, b = at(msl, s), at(msl, s + timedelta(hours=12))
+        if a is None or b is None:
+            continue
+        if druck is None or b - a > druck[0]:
+            druck = (b - a, s)
+        if fall is None or b - a < fall[0]:
+            fall = (b - a, s)
+    temp = None
+    for i in range(6, 19):
+        m = d0 + timedelta(hours=i)
+        a, b = at(t850, m - timedelta(hours=12)), at(t850, m + timedelta(hours=12))
+        if a is not None and b is not None and (temp is None or abs(b - a) > abs(temp[0])):
+            temp = (b - a, m)
+    dreh = None
+    for i in range(13):
+        s = d0 + timedelta(hours=i)
+        e = s + timedelta(hours=12)
+        wa, wb, sa, sb = at(wd, s), at(wd, e), at(ws, s), at(ws, e)
+        if None in (wa, wb, sa, sb) or min(sa, sb) < config.FRONT_ZEICHEN_DREHUNG_MIN_KMH:
+            continue
+        turn = abs((wb - wa + 180) % 360 - 180)
+        if dreh is None or turn > dreh[0]:
+            dreh = (turn, wa, wb)
+    regen = [v for k, v in rain.items() if k.startswith(date)]
+    regen_mm = round(sum(regen), 1) if regen else None
+
+    out: dict = {}
+    if druck:
+        out["druck"] = {"hpa": round(druck[0], 1),
+                        "von": druck[1].strftime("%H:00"),
+                        "stufe": _stufe(druck[0], config.FRONT_ZEICHEN_DRUCK_HPA)}
+    if fall:
+        out["druck_fall"] = {"hpa": round(fall[0], 1),
+                             "von": fall[1].strftime("%H:00"),
+                             "stufe": _stufe(-fall[0], config.FRONT_ZEICHEN_DRUCKFALL_HPA)}
+    if temp:
+        out["t850"] = {"k": round(temp[0], 1),
+                       "richtung": "kalt" if temp[0] < 0 else "warm",
+                       "stufe": _stufe(abs(temp[0]), config.FRONT_ZEICHEN_T850_K)}
+    if regen_mm is not None:
+        out["regen"] = {"mm": regen_mm,
+                        "stufe": _stufe(regen_mm, config.FRONT_ZEICHEN_REGEN_MM)}
+    if dreh:
+        out["drehung"] = {"deg": round(dreh[0]), "von": round(dreh[1]), "nach": round(dreh[2]),
+                          "stufe": ("schwach" if dreh[0] >= config.FRONT_ZEICHEN_DREHUNG_DEG
+                                    else None)}
+    out["stufe_je_typ"] = {t: front_zeichen_passend(out, t)[0] for t in ("kalt", "warm", "okklusion")}
+    # ohne Fronttyp (keine DWD-Front) gilt die Kaltfront-Lesart
+    out["stufe"] = out["stufe_je_typ"]["kalt"]
+    return out
+
+
+# Welche Zeichen zu welchem Fronttyp passen (meteo_research/
+# frontdurchgang_punktreihen.md): (Hauptzeichen, Nebenzeichen). "kalt"/"warm"
+# = T850 in dieser Richtung. Hauptzeichen deutlich -> gesamt deutlich;
+# Nebenzeichen allein hoechstens schwach. Troglinie liest sich wie eine
+# Kaltfront; Okklusion ist eine Mischform, beide Richtungen zaehlen.
+_FRONT_TYP_ZEICHEN = {
+    "kalt":      (("druck", "kalt"), ("regen", "drehung")),
+    "trog":      (("druck", "kalt"), ("regen", "drehung")),
+    "warm":      (("druck_fall", "warm"), ("regen",)),
+    "okklusion": (("druck", "druck_fall", "kalt", "warm"), ("regen", "drehung")),
+}
+
+
+def front_zeichen_passend(zeichen: dict, typ: str) -> tuple[Optional[str], list[str]]:
+    """(Gesamtstufe, Schluessel der sichtbaren passenden Zeichen) fuer einen
+    Fronttyp. Schluessel: druck, druck_fall, kalt, warm, regen, drehung."""
+    haupt, neben = _FRONT_TYP_ZEICHEN.get(typ, _FRONT_TYP_ZEICHEN["kalt"])
+
+    def st(key):
+        if key in ("kalt", "warm"):
+            t = zeichen.get("t850") or {}
+            return t.get("stufe") if t.get("richtung") == key else None
+        return (zeichen.get(key) or {}).get("stufe")
+
+    sichtbar = [k for k in haupt + neben if st(k)]
+    if any(st(k) == "deutlich" for k in haupt):
+        return "deutlich", sichtbar
+    return ("schwach" if sichtbar else None), sichtbar
+
+
 def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str],
                          tagesgang: Optional[dict] = None) -> Optional[dict]:
-    """Frontdurchgang in den EIGENEN Prognosedaten je Zone und Tag.
+    """Frontzeichen in den EIGENEN Prognosedaten je Zone und Tag.
 
-    Die DWD-Karte sagt, wo eine Front gezeichnet ist; ob sie an einem Tag
-    ueber eine Zone zieht, muss die Prognose zeigen. Signatur eines
-    Durchgangs (Stundenmediane ueber die Regionen der Zone):
-      - Druck: Minimum, davor fallend, danach in 3 h >= +1.2 hPa (Pflicht)
-      - Wind 700 hPa: Drehung >= 40 Grad zwischen h-3 und h+3 (Pflicht)
-      - dazu mindestens eines: T850 in 6 h um >= 2 K gefallen (Kaltfront)
-        oder gestiegen (Warmfront), oder >= 1 mm Regen um den Zeitpunkt
+    Die DWD-Karte sagt, wo eine Front gezeichnet ist; die eigene Prognose
+    sagt, welche Zeichen sie dazu zeigt — beschrieben, nicht geurteilt
+    (seit 09.10.2026; vorher ein Ja/Nein-Detektor mit +-3-h-Fenster, der an
+    keinem einzigen Fronttag angeschlagen hat, auch nicht an der per
+    SwissMetNet belegten Kaltfront vom 08.10.). Zeichen je Zone: siehe
+    _front_zeichen (Stundenmediane ueber die Regionen der Zone).
     Stundenschluessel sind Lokalzeit (wie ueberall im Cache).
 
     Der Druck wird vorher um den mittleren Tagesgang der Zone bereinigt
     (`tagesgang`, Default data/druck_tagesgang.json; {} = keine Korrektur).
 
-    Returns {"per_day": [{"date", "zones": {zone: sig | None}, "verlauf":
-    {zone: {...}}, "druck_tag": {...}}]}; sig =
-    {"hour": "16:00", "druck_hpa": +1.8, "drehung": [225, 300],
-     "t850_k": -2.5 | None, "regen_mm": 3.1, "typ_hinweis": "kalt"|"warm"|None};
+    Returns {"per_day": [{"date", "zones": {zone: zeichen | None}, "verlauf":
+    {zone: {...}}, "druck_tag": {...}}]}; zeichen siehe _front_zeichen;
     verlauf je Zone: druck_trend_hpa (bereinigt, 06-22 h), druck_trend_roh_hpa,
     sprung_max_hpa/-hour (betragsgroesster 3-h-Sprung), anstieg_max_hpa,
     fall_max_hpa, tagesgang_korrigiert, max_drehung_deg, regen_mm;
@@ -2733,80 +2844,58 @@ def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str],
         if z in config.SYNOPTIC_ZONES:
             by_zone.setdefault(z, []).append(rdata)
 
-    def series(regions, date, hkey, pkey, field):
+    def series(regions, pkey, field, agg):
+        """{"YYYY-MM-DDTHH:00": agg(werte der Regionen)} ueber alle Stunden."""
+        keys = set()
+        for r in regions:
+            keys.update((r.get(pkey) or {}).keys())
         out = {}
-        for h in range(24):
-            key = f"{date}T{h:02d}:00"
-            vals = []
-            for r in regions:
-                rec = ((r.get(pkey) or {}).get(key) or {})
-                v = rec.get(field)
-                if isinstance(v, (int, float)):
-                    vals.append(float(v))
+        for key in keys:
+            vals = [float(v) for r in regions
+                    for v in [((r.get(pkey) or {}).get(key) or {}).get(field)]
+                    if isinstance(v, (int, float))]
             if vals:
-                out[h] = vals
+                out[key] = agg(vals)
         return out
+
+    def day(full, date):
+        return {int(k[11:13]): v for k, v in full.items() if k.startswith(date)}
+
+    # Zonenreihen einmal ueber das ganze Fenster: die Zeichen eines Tages
+    # brauchen den Vor- und Folgetag (12-/24-h-Fenster)
+    zone_series: dict = {}
+    for z, regions in by_zone.items():
+        msl_raw = series(regions, "hourly_data", "pressure_msl", statistics.median)
+        # Tagesgang abziehen — sonst misst jede Tendenz die Tageszeit statt
+        # das Wetter (06->22 h im Sept. um +0,7..+1,0 hPa verzerrt)
+        msl, korr = {}, {}
+        for k, v in msl_raw.items():
+            cyc = (tagesgang.get(z) or {}).get(k[5:7]) or []
+            korr[k[:10]] = len(cyc) == 24
+            msl[k] = v - cyc[int(k[11:13])] if len(cyc) == 24 else v
+        zone_series[z] = {
+            "msl_raw": msl_raw, "msl": msl, "korr": korr,
+            "wd": series(regions, "pressure_level_data", "wind_direction_700hPa", _circ_mean_deg),
+            "ws": series(regions, "pressure_level_data", "wind_speed_700hPa", statistics.median),
+            "t850": series(regions, "pressure_level_data", "temperature_850hPa", statistics.median),
+            "rain": series(regions, "hourly_data", "precipitation", statistics.median),
+        }
 
     per_day = []
     for date in forecast_dates:
         zones: dict = {}
         verlauf: dict = {}
         for z in config.SYNOPTIC_ZONES:
-            regions = by_zone.get(z) or []
-            sig = None
-            if regions:
-                msl_raw = {h: statistics.median(v) for h, v in
-                           series(regions, date, "hourly_data", "hourly_data", "pressure_msl").items()}
-                # Tagesgang abziehen — sonst misst jede Tendenz die Tageszeit
-                # statt das Wetter (06->22 h im Sept. um +0,7..+1,0 hPa verzerrt)
-                cyc = (tagesgang.get(z) or {}).get(date[5:7]) or []
-                korr = len(cyc) == 24
-                msl = {h: v - cyc[h] for h, v in msl_raw.items()} if korr else dict(msl_raw)
-                wd = {h: _circ_mean_deg(v) for h, v in
-                      series(regions, date, "pressure_level_data", "pressure_level_data",
-                             "wind_direction_700hPa").items()}
-                t850 = {h: statistics.median(v) for h, v in
-                        series(regions, date, "pressure_level_data", "pressure_level_data",
-                               "temperature_850hPa").items()}
-                rain = {h: statistics.median(v) for h, v in
-                        series(regions, date, "hourly_data", "hourly_data", "precipitation").items()}
-                best = None
-                for h in range(3, 21):
-                    if not all(k in msl for k in (h - 3, h, h + 3)):
-                        continue
-                    rise = msl[h + 3] - msl[h]
-                    fall = msl[h] - msl[h - 3]
-                    if rise < 1.2 or fall > -0.3:
-                        continue
-                    if msl[h] > min(msl.get(k, 9e9) for k in range(h - 3, h + 4)):
-                        continue                              # kein lokales Minimum
-                    a, b = wd.get(h - 3), wd.get(h + 3)
-                    if a is None or b is None:
-                        continue
-                    turn = abs((b - a + 180) % 360 - 180)
-                    if turn < 40:
-                        continue
-                    dt = (t850.get(h + 3) - t850.get(h - 3)
-                          if h + 3 in t850 and h - 3 in t850 else None)
-                    mm = sum(rain.get(k, 0.0) for k in range(h - 2, h + 4))
-                    if not ((dt is not None and abs(dt) >= 2.0) or mm >= 1.0):
-                        continue
-                    score = rise + turn / 40 + (abs(dt) if dt else 0) + min(mm, 5) / 2
-                    if best is None or score > best[0]:
-                        best = (score, {
-                            "hour": f"{h:02d}:00",
-                            "druck_hpa": round(rise, 1),
-                            "drehung": [round(a), round(b)],
-                            "t850_k": round(dt, 1) if dt is not None else None,
-                            "regen_mm": round(mm, 1),
-                            "typ_hinweis": ("kalt" if dt is not None and dt <= -2.0
-                                            else "warm" if dt is not None and dt >= 2.0
-                                            else None),
-                        })
-                sig = best[1] if best else None
-                # Tagesverlauf als Gegenbeleg und fuer die Druckzeile: Tendenz
-                # 06-22 h auf der bereinigten Reihe und der groesste 3-h-Sprung
-                # des ganzen Tages (eine Front um 03 h zaehlt fuer den Tag)
+            zs = zone_series.get(z)
+            zeichen = None
+            if zs:
+                zeichen = _front_zeichen(zs["msl"], zs["t850"], zs["wd"], zs["ws"],
+                                         zs["rain"], date)
+                msl_raw, msl = day(zs["msl_raw"], date), day(zs["msl"], date)
+                wd, rain = day(zs["wd"], date), day(zs["rain"], date)
+                # Tagesverlauf fuer die Druckzeile: Tendenz 06-22 h auf der
+                # bereinigten Reihe und der groesste 3-h-Sprung des ganzen
+                # Tages (eine Front um 03 h zaehlt fuer den Tag)
                 hs = [h for h in range(6, 23) if h in msl]
                 wds = [wd[h] for h in range(6, 23) if wd.get(h) is not None]
                 max_turn = 0
@@ -2823,16 +2912,20 @@ def detect_frontsignatur(region_weather_data: dict, forecast_dates: list[str],
                     "sprung_max_hour": f"{sprung[1]:02d}:00" if sprung else None,
                     "anstieg_max_hpa": round(max(v for v, _ in d3), 1) if d3 else None,
                     "fall_max_hpa": round(min(v for v, _ in d3), 1) if d3 else None,
-                    "tagesgang_korrigiert": korr,
+                    "tagesgang_korrigiert": bool(zs["korr"].get(date)),
                     "max_drehung_deg": round(max_turn),
                     "regen_mm": round(sum(rain.get(h, 0.0) for h in range(6, 23)), 1),
                 }
-            zones[z] = sig
+            zones[z] = zeichen
         per_day.append({"date": date, "zones": zones, "verlauf": verlauf,
                         "druck_tag": druck_tag_aus_verlauf(verlauf)})
     return {"per_day": per_day, "decided_by": "detect_frontsignatur",
-            "thresholds": {"druck_hpa_3h": 1.2, "drehung_deg": 40, "t850_k_6h": 2.0,
-                           "regen_mm": 1.0, "level_hpa": 700,
+            "thresholds": {"druck_hpa_12h": list(config.FRONT_ZEICHEN_DRUCK_HPA),
+                           "t850_k_24h": list(config.FRONT_ZEICHEN_T850_K),
+                           "regen_mm": list(config.FRONT_ZEICHEN_REGEN_MM),
+                           "drehung_deg_12h": config.FRONT_ZEICHEN_DREHUNG_DEG,
+                           "drehung_min_kmh": config.FRONT_ZEICHEN_DREHUNG_MIN_KMH,
+                           "level_hpa": 700,
                            "tendenz_hpa": config.SYNOPTIC_DRUCK_TENDENZ_HPA,
                            "sprung_hpa_3h": config.SYNOPTIC_DRUCK_SPRUNG_HPA}}
 
