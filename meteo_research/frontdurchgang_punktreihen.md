@@ -91,3 +91,41 @@ SatManu (Kaltfront, Okklusion, Front Modification) · Steenburgh, Vorlesung
 Front-Mountain Interactions · DHV-Magazin Bodendruck/Fronten · Sansom &
 Catto 2024 (GMD 17, 6137). Nicht im Volltext gelesen: Egger & Hoinka 1992,
 Jenkner et al. 2010, Sinclair (Helsinki).
+
+## 6. Warmfront-Prüfung gegen SwissMetNet (09.10.2026)
+
+**Basis.** Alle Tage vom 28.07. bis 18.09., an denen die DWD-Prognose
+morgens eine Warmfront oder Okklusion für eine Zone nannte.
+
+**Modell.** Die Zeichen kommen aus `detect_frontsignatur` auf dem
+ICON-D2-Rückblick. Gelesen werden sie mit `front_zeichen_passend(typ="warm")`.
+
+**Messung.** Was als „Warmluft angekommen“ zählt:
+
+- Erwärmung an der Bergstation (Napf/Pilatus, Montana, Cimetta, Davos/Samedan)
+  um mindestens 3 K gegenüber derselben Stunde am Vortag,
+- **oder** Druckfall im Tal von mindestens 4 hPa in 12 h.
+
+**Ergebnis.** Ausgewertet wurden 32 Zonen-Tage mit reiner Warmfront oder
+Okklusion. Tage, an denen der DWD zugleich eine Kaltfront nannte, sind
+ausgenommen.
+
+| | Anzahl | Davon richtig |
+|---|---|---|
+| Warmluft gemessen | 16 | 12 Zeichen sichtbar (75 %) |
+| Keine Warmluft gemessen | 16 | 11 ohne Zeichen |
+
+- **„Deutliche Zeichen“:** 5 von 5 durch die Messung bestätigt.
+- **Fehlsignale:** 3 Fälle mit falscher Erwärmung (25.08. Tessin, 25.08.
+  Wallis, 29.08. Graubünden). Alle drei waren nur „schwach“. Dazu kommen
+  2 Fälle, die nur wegen Regen „schwach“ wurden; der Regen war real.
+- **Verpasst:** 4 Fälle (02.08. Wallis, 11.08. Alpennordhang, 26.08. Tessin,
+  29.08. Tessin). Am 24.08. lag die Modell-T850 im Tessin und im Wallis in
+  der falschen Richtung. Der Druckfall hat den Fall dort trotzdem getragen.
+- **DWD-Warmfronten sind oft nicht angekommen.** Bei der Hälfte der genannten
+  Warmfronten maß keine Station Erwärmung oder Druckfall. „Keine Zeichen“ ist
+  dann die richtige Aussage.
+- **Schwachstelle:** Tessin. 2 der 4 verpassten Fälle liegen dort.
+
+**Grenze der Prüfung.** Die Bergstationen sind nur ein Ersatz für 850 hPa:
+Sonne am Gipfel erwärmt mit. Die Schwellen bleiben deshalb unverändert.
