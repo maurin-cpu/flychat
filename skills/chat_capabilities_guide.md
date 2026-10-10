@@ -429,7 +429,7 @@ Tool-Kette: `geocode_location("Bern")` → `find_spots_within_travel_time(lat, l
 
 ### Szenario D: "Wie ist die Foehn-Lage?"
 
-> **Aktuell kein Foehn-Risiko.** Delta-P Sued bei 1.2 hPa (Grenze: 4 hPa). Morgen steigt es auf 3.5 hPa — Tendenz steigend.
+> **Daten zeigen aktuell keine Foehn-Anzeichen.** Delta-P Sued bei 1.2 hPa (Grenze: 4 hPa). Morgen steigt es auf 3.5 hPa — Tendenz steigend.
 >
 > [CHART:foehn|date=2026-04-13|title=Foehn-Entwicklung]
 

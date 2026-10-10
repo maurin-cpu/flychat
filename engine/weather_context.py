@@ -1367,7 +1367,7 @@ class WeatherContextMixin:
             # Föhn aktiv aber Richtung NICHT relevant für diesen Standort
             lines = [
                 "═══ FÖHN-INDIKATOR ═══",
-                f"KEIN FÖHN-RISIKO für diesen Standort.",
+                "Daten zeigen kein Föhn-Risiko für diesen Standort.",
                 f"Aktiver {foehn_dir}föhn (ΔP {ev['delta_p_hpa']} hPa) betrifft diesen Standort NICHT "
                 f"(Kritischer Föhn: {kritischer_foehn} — nur {kritischer_foehn}föhn wäre hier gefährlich).",
                 "→ foehn_risk = none. KEINE Föhn-Einträge in caution_notes oder no_go_reasons.",
@@ -1375,7 +1375,7 @@ class WeatherContextMixin:
         elif ev["level"] == "none":
             lines = [
                 "═══ FÖHN-INDIKATOR ═══",
-                "Kein Föhn aktiv. foehn_risk = none.",
+                "Daten zeigen keine Föhn-Anzeichen. foehn_risk = none.",
             ]
         else:
             # Relevanter Föhn — vollständige Info anzeigen

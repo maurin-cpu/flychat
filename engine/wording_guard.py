@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 _UI_TAG_RE = re.compile(r"\[RECOMMENDED:[^\]]*\]")
 _UI_TAG_MARK = "\x00WCTAG{}\x00"
 
+# Nomen hinter "no foehn"/"no Bise", die die KI typischerweise anhaengt
+# ("no foehn breakthrough"). Gemessen am Server-Cache 10.10.2026.
+_PHEN_NOUNS = (r"breakthrough|shear|signature|signals?|veer|risk|effect|hazard|influence|"
+               r"flow|activity|pattern|component|situation|conditions|threat|onset")
+
 # (Muster, Ersatz) — Reihenfolge zaehlt: laengere Phrasen zuerst, damit
 # "I recommend" nicht erst zu "I favor" und dann nochmals umgebaut wird.
 # Gross-/Kleinschreibung des ersten Buchstabens bleibt erhalten (siehe _apply).
@@ -60,8 +65,13 @@ _RULES: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"\b(always|and|but|still|generally|overall) safe\b", r"\1 without alerts"),
         (r"\bsafe (synoptic|setup|situation|pattern|picture)\b", r"unremarkable \1"),
         # --- Englisch: Wetter als Tatsache -> Datenbezug ---
-        (r"\bno foehn\b(?! (signs|wind|indicated))",  "no signs of foehn in the data"),
-        (r"\bno bise\b(?! (signs|indicated))",        "no signs of Bise in the data"),
+        # Reparatur: Waechter-Version bis 10.10. erzeugte "no signs of foehn in
+        # the data breakthrough" — gespeicherte Texte beim Laden geradeziehen.
+        (r"\bno signs of (foehn|Bise) in the data (" + _PHEN_NOUNS + r")\b", r"no \1 \2 indicated"),
+        # "no foehn breakthrough" -> "no foehn breakthrough indicated"
+        (r"\bno (foehn|bise) (" + _PHEN_NOUNS + r")\b(?! indicated\b)", r"no \1 \2 indicated"),
+        # "no foehn" allein -> "no foehn indicated" (nicht vor signs/wind/indicated)
+        (r"\bno (foehn|bise)\b(?! (?:signs|wind|indicated|data)\b)(?! [a-z-]+ indicated\b)", r"no \1 indicated"),
         (r"\b(north|south)(ern)? foehn situation\b",  r"data indicating \1 foehn"),
         (r"\bfoehn situation\b",                      "foehn indicated by the data"),
         # --- Englisch: Aufforderung an den Piloten -> Befund ---
@@ -92,8 +102,8 @@ _RULES: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"\bsichere[rn]? (Bedingungen|Option|Alternative|Wahl)\b", r"\1 ohne Warnhinweise"),
         (r"\b(perfekte|ideale|risikolose|unbedenkliche|harmlose)[rn]? (Bedingungen|Tag|Fenster)\b", r"unauffällige \2"),
         # --- Deutsch: Wetter als Tatsache -> Datenbezug ---
-        (r"\bkein Föhn\b",                            "keine Föhn-Anzeichen in den Daten"),
-        (r"\bkeine Bise\b(?!-)",                      "keine Bise-Anzeichen in den Daten"),
+        (r"\bkein (Föhn|Foehn)(-[A-Za-zÄÖÜäöü]+)?\b(?!-)(?! angezeigt\b)", r"kein \1\2 angezeigt"),
+        (r"\bkeine Bise\b(?!-)(?! angezeigt\b)",      "keine Bise angezeigt"),
         (r"\b(Süd|Nord)föhnlage\b",                   r"\1föhn laut Daten"),
         (r"\bFöhnlage\b",                             "Föhn laut Daten"),
         # --- Deutsch: Aufforderung -> Befund ---

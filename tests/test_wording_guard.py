@@ -88,14 +88,36 @@ def test_clean_text_and_non_strings_pass_through():
 
 
 def test_weather_as_fact_becomes_data_attribution():
-    assert soften_clearance("No foehn today, light wind.") == "No signs of foehn in the data today, light wind."
+    assert soften_clearance("No foehn today, light wind.") == "No foehn indicated today, light wind."
     assert soften_clearance("South foehn situation from noon.") == "Data indicating South foehn from noon."
-    assert soften_clearance("No Bise on the Plateau.") == "No signs of Bise in the data on the Plateau."
-    assert soften_clearance("Heute kein Föhn.") == "Heute keine Föhn-Anzeichen in den Daten."
+    assert soften_clearance("No Bise on the Plateau.") == "No Bise indicated on the Plateau."
+    assert soften_clearance("Heute kein Föhn.") == "Heute kein Föhn angezeigt."
+    assert soften_clearance("Aktuell kein Foehn-Risiko.") == "Aktuell kein Foehn-Risiko angezeigt."
+    assert soften_clearance("Keine Bise im Mittelland.") == "Keine Bise angezeigt im Mittelland."
     assert soften_clearance("Südföhnlage ab Mittag.") == "Südföhn laut Daten ab Mittag."
     # schon datenbezogen oder anderes Wort: unangetastet
     assert soften_clearance("Data show no foehn wind in the valleys.") == "Data show no foehn wind in the valleys."
     assert soften_clearance("In den Tälern kein Föhnwind.") == "In den Tälern kein Föhnwind."
+
+
+def test_foehn_followed_by_noun_stays_grammatical():
+    """Regression 10.10.: "No foehn breakthrough" wurde zu "No signs of foehn in
+    the data breakthrough"."""
+    assert soften_clearance("No foehn breakthrough at the surface.") == \
+        "No foehn breakthrough indicated at the surface."
+    assert soften_clearance("Currently no foehn risk.") == "Currently no foehn risk indicated."
+    assert soften_clearance("calm regionally (wind below 25 km/h, no foehn).") == \
+        "calm regionally (wind below 25 km/h, no foehn indicated)."
+    # Reparatur gespeicherter Texte aus der alten Waechter-Version
+    assert soften_clearance("No signs of foehn in the data breakthrough at the surface.") == \
+        "No foehn breakthrough indicated at the surface."
+    assert soften_clearance("No signs of foehn in the data shear signs: the 850 hPa wind.") == \
+        "No foehn shear indicated signs: the 850 hPa wind."
+    # schon richtig: unangetastet, auch beim zweiten Durchlauf
+    for ok in ("No foehn signs in the vertical column.", "No foehn breakthrough indicated.",
+               "No foehn indicated.", "Kein Föhn angezeigt.", "Data show no signs of foehn."):
+        assert soften_clearance(ok) == ok, ok
+        assert soften_clearance(soften_clearance(ok)) == ok, ok
 
 
 def test_briefing_labels_never_state_weather_as_fact():

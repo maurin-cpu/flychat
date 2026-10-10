@@ -429,7 +429,7 @@ Tool chain: `geocode_location("Bern")` → `find_spots_within_travel_time(lat, l
 
 ### Scenario D: "What's the foehn situation?"
 
-> **Currently no foehn risk.** Delta-P south at 1.2 hPa (threshold: 4 hPa). Tomorrow it climbs to 3.5 hPa — trend rising.
+> **Data currently show no signs of foehn.** Delta-P south at 1.2 hPa (threshold: 4 hPa). Tomorrow it climbs to 3.5 hPa — trend rising.
 >
 > [CHART:foehn|date=2026-04-13|title=Foehn-Entwicklung]
 
