@@ -156,13 +156,13 @@ class TestChipText(_De):
     def test_clouds(self):
         self.assertEqual(bc._chip_text({"topic": "CLOUDS", "severity": "stop",
                                         "value": "Base 1400m \u2264 region ref 1500m"}),
-                         "Wolken bis auf Starth\u00f6he")
+                         "Wolken bis auf Starth\u00f6he angezeigt")
 
     def test_rain_classes_in_both_cache_languages(self):
-        for value, expected in (("widespread", "Fl\u00e4chiger Regen"),
-                                ("flaechig", "Fl\u00e4chiger Regen"),
-                                ("isolated", "Einzelne Schauer"),
-                                ("Precipitation", "Regen")):
+        for value, expected in (("widespread", "Fl\u00e4chiger Regen angezeigt"),
+                                ("flaechig", "Fl\u00e4chiger Regen angezeigt"),
+                                ("isolated", "Einzelne Schauer angezeigt"),
+                                ("Precipitation", "Regen angezeigt")):
             self.assertEqual(bc._chip_text({"topic": "RAIN", "severity": "stop",
                                             "value": value}), expected)
 

@@ -122,6 +122,47 @@ def test_foehn_followed_by_noun_stays_grammatical():
         assert soften_clearance(soften_clearance(ok)) == ok, ok
 
 
+def test_every_phenomenon_gets_data_attribution():
+    """Gleiche Regel fuer Gewitter, Ueberentwicklung, Regen, ... (User 10.10.)."""
+    assert soften_clearance("No thunderstorm risk today.") == "No thunderstorm risk indicated today."
+    assert soften_clearance("no overdevelopment until 15:00") == "no overdevelopment indicated until 15:00"
+    assert soften_clearance("light wind, no rain, no thunderstorm, and no foehn.") == \
+        "light wind, no rain, no thunderstorm, and no foehn indicated."
+    assert soften_clearance("No foehn, rain, thunderstorm, or CAPE hazards are present.") == \
+        "No foehn, rain, thunderstorm, or CAPE hazards indicated."
+    assert soften_clearance("no wind, gust, upper-wind, rain, thunderstorm, or foehn hazards") == \
+        "no wind, gust, upper-wind, rain, thunderstorm, or foehn hazards indicated"
+    assert soften_clearance("no rain showers in the window") == "no rain showers indicated in the window"
+    # echte KI-Saetze aus dem Testlauf 10.10.
+    assert soften_clearance("though no rain or thunderstorms are forecast") == \
+        "though no rain or thunderstorms indicated"
+    assert soften_clearance("No strong wind or dangerous gusts are present.") == \
+        "No strong wind or dangerous gusts indicated."
+    # Reparatur gespeicherter Ausgaben der Vorversion
+    assert soften_clearance("no rain or thunderstorms indicated are forecast") == \
+        "no rain or thunderstorms indicated"
+    assert soften_clearance("No foehn indicated, rain, thunderstorm, or CAPE hazards are present.") == \
+        "No foehn, rain, thunderstorm, or CAPE hazards indicated."
+    assert soften_clearance("No strong wind indicated or dangerous gusts are present.") == \
+        "No strong wind or dangerous gusts indicated."
+    assert soften_clearance("Heute kein Gewitter und keine Überentwicklung.") == \
+        "Heute kein Gewitter angezeigt und keine Überentwicklung angezeigt."
+    # schon datenbezogen: unangetastet, auch beim zweiten Durchlauf
+    for ok in ("Data show no rain in the morning.", "The models show no thunderstorm cells.",
+               "no rain, no thunderstorm, and no foehn indicated.", "Daten zeigen kein Gewitter.",
+               "In den Tälern kein Föhnwind.", "keine Gewitterzellen"):
+        assert soften_clearance(ok) == ok, ok
+        assert soften_clearance(soften_clearance(ok)) == ok, ok
+
+
+def test_more_safe_forms():
+    assert soften_clearance("hours prevent a safe rating.") == "hours prevent a 'no alerts' rating."
+    assert soften_clearance("the spot remains locally safe.") == "the spot remains locally without alerts."
+    assert soften_clearance("keep the day from being fully safe.") == "keep the day from being fully without alerts."
+    assert soften_clearance("too short for a safe launch") == "too short for a launch without alerts"
+    assert soften_clearance("pull it from safe to conditional.") == "pull it from 'no alerts' to 'alerts'."
+
+
 def test_briefing_labels_never_state_weather_as_fact():
     """Kein Föhn-/Bise-/Front-Satz im Briefing beginnt mit einer Tatsache."""
     import re

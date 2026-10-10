@@ -2,26 +2,26 @@
 DAY OVERRIDE (after hazard blocks)
 ═══════════════════════════════════════════════
 
-**You compute NOTHING.** The system provides all numbers in the DAY PROFILE.
+**You compute NOTHING.** The system provides all numbers in the `TAGESPROFIL` (day profile).
 
 ─────────────────────────────────
 OVERRIDE A — 35% RULE
 ─────────────────────────────────
 
-Read `Ratio clean/total: X/Yh = Z%` (clean = CALM + SPORTY):
+Read `Verhaeltnis sauber/gesamt: X/Yh = Z%` (ratio clean/total; clean = CALM + SPORTY):
 - **Z < 35**: Day predominantly made of warning hours. Even with a 4h window → max **conditional**, more likely **not_safe** if boxed in.
 - **Z 35-60**: Mixed day. `safe` possible if the window is continuously CALM AND not boxed in.
 - **Z > 60**: Normal case.
 
-**Mandatory:** With `→ CAUTION Ratio < 35%` it MUST be reflected in `caution_notes` or `no_go_reasons`.
+**Mandatory:** With `→ ACHTUNG Verhaeltnis < 35%` (caution: ratio below 35%) it MUST be reflected in `caution_notes` or `no_go_reasons`.
 
-BOXED IN + wind trend in TREND VOCABULARY (`_hazards_*.md`). OVERRIDE B (WIND-DIRECTION) has been dropped — the launch-window rule in Block 2 replaces it.
+`EINGEKESSELT` (boxed in) + wind trend in TREND VOCABULARY (`_hazards_*.md`). OVERRIDE B (WIND-DIRECTION) has been dropped — the launch-window rule in Block 2 replaces it.
 
 ═══════════════════════════════════════════════
 STATUS DERIVATION (final step, part 1)
 ═══════════════════════════════════════════════
 
-1. Read `Longest window: Xh` from WINDOW INFO. Binding.
+1. Read `Laengstes Fenster: Xh` (longest window) from `FENSTER-INFO` (window info). Binding.
 2. Per hazard block: determine the trend pattern, check BOXED IN special cases.
 3. Apply OVERRIDE A (35%).
 4. Status per launch-window rule:

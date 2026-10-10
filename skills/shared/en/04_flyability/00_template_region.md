@@ -59,7 +59,7 @@ JSON ONLY, no tags, no square brackets.
     "xc":       "OPTIONAL: XC context (cloudbase, upper wind, cross-country potential)."
   },
   "llm_tags": [
-    "Schema: {topic, severity, label, value, time}. Max ~5 tags, one tag per topic.",
+    "Schema: {topic, severity, label, value, time}. Max ~5 tags, one tag per topic. Tag `label` values must be short ENGLISH words (e.g. Thermal, Clouds, Sunshine, Window, Base, Inversion, XC) — never German (not Thermik/Bewoelkung/Fenster/Sonne).",
     "Sanity: THERMAL 'good' only if peak_climb_rate >= 1.0. CLOUDS 'good' if low ≤50% AND mid ≤30% (= cu_clean_top). CLOUDS 'reducer' if low ≥80% OR mid ≥70% — describes only the sky, not the thermals. BASE 'reducer' if cloudbase <600m above region ref; 'good' if >800m above the summit.",
     "Example: [{topic:THERMAL, severity:good, label:Thermals, value:'peak 2.8 m/s', time:'12-15 h'}, {topic:CLOUDS, severity:reducer, label:Cloud cover, value:'overcast 80% midday', time:'11-14 h'}]"
   ],

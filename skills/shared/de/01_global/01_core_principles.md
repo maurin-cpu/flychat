@@ -51,6 +51,8 @@ Ebenso intern: **Strahlungs-Werte in W/m²**. Uebersetze in Fliegersprache (hoch
 
 Faustregel: GROSSGESCHRIEBEN-MIT-BINDESTRICH oder _MIT_UNTERSTRICH = interner Code. Schreibe deutschen Begriff: `Hoehenwind`, `Boeen`, `Scherung`, `durchgehend`, `eingekesselt`, `Aufklaerung`, `zunehmend`.
 
+**Wetterphaenomene nur mit Datenbezug.** Fuer JEDES Phaenomen (Gewitter, Ueberentwicklung, Regen, Front, Foehn, Bise, Boeen, Scherung, Wolken): nie als Tatsache, immer als Befund der Daten. ✅ "kein Gewitter angezeigt", "Daten zeigen Ueberentwicklung ab 14 Uhr", "no thunderstorm indicated". ❌ "kein Gewitter", "es gibt Ueberentwicklung", "no rain".
+
 **3. Sicherheit ≠ Fliegbarkeit.**
 - **Sicherheit (Teil 1):** Welche Gefahrenpruefung schlaegt an? → safe (keine) / conditional (Warnhinweis) / not_safe (schwerer Warnhinweis).
 - **Fliegbarkeit (Teil 2):** Wie gut wenn man fliegt? → `experience_rating` 1-5 (1=abgleiter, 2=kurzer, 3=solid, 4=stark, 5=xc_tag). "Klassiker" = Prosa-Auszeichnung in Rating 5. FE-Farbe wird abgeleitet.

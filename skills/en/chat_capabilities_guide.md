@@ -160,9 +160,9 @@ You can call these tools directly. They perform actions and return structured re
               "safety_rating": 8.0
             },
             "experience_rating": 5,
-            "xc_details": "Klassiker mit 2200m Arbeitshoehe ueber Startplatz, Streckenflug >100km moeglich.",
+            "xc_details": "Classic day with 2200m working height above launch, cross-country >100km possible.",
             "best_window": "11:00-16:00",
-            "recommendation": "Starker Thermiktag..."
+            "recommendation": "Strong thermal day..."
           }
         }
       }
