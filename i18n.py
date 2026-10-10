@@ -770,6 +770,38 @@ STRINGS: dict[str, dict[str, str]] = {
                                       "en": "Thunderstorms practically all day ({ts} of {total} hours). No flyable window."},
     "analysis.window_none": {"de": "keins", "en": "none"},
 
+    # ======================= Decision-Engine (engine/decision_engine.py) =======================
+    # Deterministische Warntexte, die in caution_notes / no_go_reasons landen.
+    # DE-Wortlaut = bisheriger Code-Wortlaut (byte-identisch).
+    "decision.foehn_dir_sued": {"de": "Süd", "en": "south"},
+    "decision.foehn_dir_nord": {"de": "Nord", "en": "north"},
+    "decision.foehn_dp_unknown": {"de": "ΔP unbekannt", "en": "ΔP unknown"},
+    "decision.foehn_nogo": {"de": "Foehn-Durchbruch: {dir}foehn {dp} (schwerer Warnhinweis)",
+                            "en": "Foehn breakthrough: {dir} foehn {dp} (severe alert)"},
+    "decision.foehn_caution": {"de": "Foehn-Warnhinweis: {dir}foehn {dp} — Boeen an exponierten Stellen.",
+                               "en": "Foehn alert: {dir} foehn {dp} — gusts at exposed spots."},
+    "decision.aloft_nogo": {"de": "Kraeftiger Hoehenwind im Flugbereich: >{kmh} km/h in {h}h",
+                            "en": "Strong upper wind in the flight layer: >{kmh} km/h in {h}h"},
+    "decision.aloft_wind_bit": {"de": "Hoehenwind >{kmh} km/h im Flugbereich in {h}h",
+                                "en": "upper wind >{kmh} km/h in the flight layer in {h}h"},
+    "decision.aloft_gust_bit": {"de": "Hoehenboeen >{kmh} km/h im Flugbereich in {h}h",
+                                "en": "gusts aloft >{kmh} km/h in the flight layer in {h}h"},
+    "decision.aloft_head_both": {"de": "Hoehenwind und Boeen ueber Schwelle", "en": "Upper wind and gusts above threshold"},
+    "decision.aloft_head_gust": {"de": "Kraeftige Hoehenboeen", "en": "Strong gusts aloft"},
+    "decision.aloft_head_wind": {"de": "Hoehenwind ueber Schwelle", "en": "Upper wind above threshold"},
+    "decision.aloft_tail": {"de": " — auch bei ruhigem Bodenwind pruefen.",
+                            "en": " — applies even when the ground wind is calm."},
+    "decision.gust_sfc_max": {"de": "Bodenboeen bis ~{g} km/h in {h}h", "en": "ground gusts up to ~{g} km/h in {h}h"},
+    "decision.gust_sfc_30": {"de": "Bodenboeen ueber 30 km/h in {h}h", "en": "ground gusts above 30 km/h in {h}h"},
+    "decision.gust_aloft_30": {"de": "Hoehenboeen ueber 30 km/h im Flugbereich in {h}h",
+                               "en": "gusts aloft above 30 km/h in the flight layer in {h}h"},
+    "decision.gust_sfc_40": {"de": "Bodenboeen ueber 40 km/h in {h}h", "en": "ground gusts above 40 km/h in {h}h"},
+    "decision.gust_aloft_40": {"de": "Hoehenboeen ueber 40 km/h in {h}h", "en": "gusts aloft above 40 km/h in {h}h"},
+    "decision.gust_head": {"de": "Starke Boeen erkannt: ", "en": "Strong gusts detected: "},
+    "decision.gust_tail": {"de": " — Trend und Fenster pruefen.", "en": " — see trend and window."},
+    "decision.wind_strong_majority": {"de": "Durchgehend starker Wind ({s} von {n} Stunden), keine ruhige Phase",
+                                      "en": "Strong wind throughout ({s} of {n} hours), no calm phase"},
+
     # ======================= Topic-Tags (build_topic_tags / build_region_topic_tags) =======================
     # Deterministische Backend-Tags (label/value/time) — werden zur Analyse-Bauzeit
     # in der aktiven Sprache erzeugt und in *_en.json / *.json persistiert.
@@ -1083,6 +1115,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.mg.tt_clouds": {"de": "Wolken", "en": "Clouds"},
     "js.mg.tt_cloudbase": {"de": "Wolkenbasis", "en": "Cloud base"},
     "js.mg.tt_groundwind": {"de": "Bodenwind", "en": "Ground wind"},
+    "js.mg.tt_launch": {"de": "Startplatz", "en": "Launch"},
+    "js.mg.cloud_high": {"de": "Hoch", "en": "High"},
+    "js.mg.cloud_mid": {"de": "Mittel", "en": "Mid"},
+    "js.mg.cloud_low": {"de": "Tief", "en": "Low"},
+    "js.share_spot": {"de": "Startplatz teilen", "en": "Share launch site"},
+    "js.regions.pill_aria": {"de": "{name}, Bewertung {rating} von 6", "en": "{name}, rating {rating} of 6"},
+    "js.regions.pill_aria_safety": {"de": ", Safety {score} von 100", "en": ", safety {score} of 100"},
+    "js.regions.pill_aria_window": {"de": ", Fenster {window}", "en": ", window {window}"},
     "js.mg.tt_direction": {"de": "Richtung", "en": "Direction"},
     "js.mg.tt_launchcheck": {"de": "Start-Check", "en": "Launch check"},
     "js.mg.dir_ok": {"de": "✓ OK", "en": "✓ OK"},
@@ -1283,7 +1323,11 @@ def llm_lang_instruction() -> str:
             "\n\nIMPORTANT — OUTPUT LANGUAGE: Write your entire response to the user "
             "in natural, fluent English. All field values, prose, summaries and notes "
             "must be in English. Keep the meaning, structure and verdicts identical; "
-            "only the language changes."
+            "only the language changes. The data block contains German labels — never "
+            "copy German words into your text, translate them (Gewitter = thunderstorm, "
+            "Boeen/Böen = gusts, Hoehenwind = upper wind, Wolkendecke = cloud cover, "
+            "Regen = rain, Thermik = thermals, Fenster = window, Bemerkung = site note, "
+            "Rating-Regel = rating rule). Place names stay as they are."
         )
     return ""
 

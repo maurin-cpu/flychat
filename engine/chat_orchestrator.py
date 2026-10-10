@@ -289,6 +289,55 @@ TOOLS: list = [
 ]
 
 
+
+def _chat_user_message(context_block: str, question: str, format_hint: str) -> str:
+    """User-Nachricht des Chats: Zeit, Datums-Zuordnung, Kontext, Frage.
+
+    DE-Wortlaut unveraendert (validierte Fassung). EN bekommt dieselbe Nachricht
+    auf Englisch — vorher war sie auch im EN-Modus deutsch (10.10.2026)."""
+    now = datetime.now()
+    today = now.date()
+    en = i18n.get_current_lang() == "en"
+    if en:
+        labels = ("TODAY", "TOMORROW", "DAY AFTER TOMORROW", "+3 days", "+4 days", "+5 days", "+6 days")
+        wd = lambda d: d.strftime("%A")  # noqa: E731
+    else:
+        labels = ("HEUTE", "MORGEN", "ÜBERMORGEN", "+3 Tage", "+4 Tage", "+5 Tage", "+6 Tage")
+        wd = _weekday_de
+    date_map = "\n".join(
+        f"  {lbl} = {(today + timedelta(days=i)).isoformat()} ({wd(today + timedelta(days=i))})"
+        for i, lbl in enumerate(labels)
+    )
+    sep = "==========================================================\n"
+    if en:
+        return (
+            f"CURRENT TIME: {now.strftime('%Y-%m-%d %H:%M:%S')} ({wd(now)})\n"
+            f"DATE MAPPING (binding — when the pilot says 'tomorrow', it always means the date given here):\n"
+            f"{date_map}\n"
+            "Background data for your answer (do not output verbatim as a full report):\n"
+            + sep + f"{context_block}\n" + sep +
+            "Answer the pilot's question **directly** and at an appropriate length — like in a "
+            "short chat. No full table of all spots unless the pilot explicitly asks for an "
+            "overview/table of **all** areas or a multi-line comparison.\n"
+            'For **foehn questions**: derive the foehn situation only from the block "FÖHN-INDIKATOR" '
+            '(ΔP, crest wind, level) — do not conclude from "all spots with severe alerts" that there '
+            'is "no foehn".\n\n'
+            f"Pilot's question: {question}{format_hint}"
+        )
+    return (
+        f"AKTUELZEIT: {now.strftime('%Y-%m-%d %H:%M:%S')} ({wd(now)})\n"
+        f"DATUM-MAPPING (verbindlich — wenn der Pilot 'morgen' sagt, ist immer das hier gemeinte Datum gemeint):\n"
+        f"{date_map}\n"
+        "Hintergrunddaten für deine Antwort (nicht wörtlich als Gesamtreport ausgeben):\n"
+        + sep + f"{context_block}\n" + sep +
+        "Beantworte die Frage des Piloten **direkt** und in angemessenem Umfang — wie in einem "
+        "kurzen Chat. Keine vollständige Tabelle aller Spots, es sei denn der Pilot verlangt "
+        "ausdrücklich eine Übersicht/Tabelle **aller** Gebiete oder einen mehrzeiligen Vergleich.\n"
+        'Bei **Föhn-Fragen**: die Föhn-Lage nur aus dem Block „FÖHN-INDIKATOR" (ΔP, Kammwind, Level) '
+        'ableiten — nicht aus „alle Spots mit schweren Warnhinweisen" schließen, dass es „keinen Föhn" gäbe.\n\n'
+        f"Frage des Piloten: {question}{format_hint}"
+    )
+
 def _tool_status_message(name: str, args: dict) -> str:
     """Verständliche Statusmeldung in Alltagssprache für einen Tool-Aufruf.
 
@@ -388,30 +437,7 @@ class ChatOrchestratorMixin:
                     _estimate_tokens(context_block), context_budget, self.chat_model,
                 )
 
-            _now = datetime.now()
-            _today = _now.date()
-            _date_map_lines = []
-            _labels = ("HEUTE", "MORGEN", "ÜBERMORGEN", "+3 Tage", "+4 Tage", "+5 Tage", "+6 Tage")
-            for _i, _lbl in enumerate(_labels):
-                _d = _today + timedelta(days=_i)
-                _date_map_lines.append(f"  {_lbl} = {_d.isoformat()} ({_weekday_de(_d)})")
-            _date_map = "\n".join(_date_map_lines)
-
-            user_content = (
-                f"AKTUELZEIT: {_now.strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(_now)})\n"
-                f"DATUM-MAPPING (verbindlich — wenn der Pilot 'morgen' sagt, ist immer das hier gemeinte Datum gemeint):\n"
-                f"{_date_map}\n"
-                "Hintergrunddaten für deine Antwort (nicht wörtlich als Gesamtreport ausgeben):\n"
-                "==========================================================\n"
-                f"{context_block}\n"
-                "==========================================================\n"
-                "Beantworte die Frage des Piloten **direkt** und in angemessenem Umfang — wie in einem "
-                "kurzen Chat. Keine vollständige Tabelle aller Spots, es sei denn der Pilot verlangt "
-                "ausdrücklich eine Übersicht/Tabelle **aller** Gebiete oder einen mehrzeiligen Vergleich.\n"
-                'Bei **Föhn-Fragen**: die Föhn-Lage nur aus dem Block „FÖHN-INDIKATOR" (ΔP, Kammwind, Level) '
-                'ableiten — nicht aus „alle Spots mit schweren Warnhinweisen" schließen, dass es „keinen Föhn" gäbe.\n\n'
-                f"Frage des Piloten: {question_clean}{format_hint}"
-            )
+            user_content = _chat_user_message(context_block, question_clean, format_hint)
             conv["first_question"] = False
         else:
             user_content = question_clean + format_hint
@@ -949,30 +975,7 @@ class ChatOrchestratorMixin:
                     _estimate_tokens(context_block_local), context_budget, self.chat_model,
                 )
 
-            _now = datetime.now()
-            _today = _now.date()
-            _date_map_lines = []
-            _labels = ("HEUTE", "MORGEN", "ÜBERMORGEN", "+3 Tage", "+4 Tage", "+5 Tage", "+6 Tage")
-            for _i, _lbl in enumerate(_labels):
-                _d = _today + timedelta(days=_i)
-                _date_map_lines.append(f"  {_lbl} = {_d.isoformat()} ({_weekday_de(_d)})")
-            _date_map = "\n".join(_date_map_lines)
-
-            return (
-                f"AKTUELZEIT: {_now.strftime('%Y-%m-%d %H:%M:%S')} ({_weekday_de(_now)})\n"
-                f"DATUM-MAPPING (verbindlich — wenn der Pilot 'morgen' sagt, ist immer das hier gemeinte Datum gemeint):\n"
-                f"{_date_map}\n"
-                "Hintergrunddaten für deine Antwort (nicht wörtlich als Gesamtreport ausgeben):\n"
-                "==========================================================\n"
-                f"{context_block_local}\n"
-                "==========================================================\n"
-                "Beantworte die Frage des Piloten **direkt** und in angemessenem Umfang — wie in einem "
-                "kurzen Chat. Keine vollständige Tabelle aller Spots, es sei denn der Pilot verlangt "
-                "ausdrücklich eine Übersicht/Tabelle **aller** Gebiete oder einen mehrzeiligen Vergleich.\n"
-                'Bei **Föhn-Fragen**: die Föhn-Lage nur aus dem Block „FÖHN-INDIKATOR" (ΔP, Kammwind, Level) '
-                'ableiten — nicht aus „alle Spots mit schweren Warnhinweisen" schließen, dass es „keinen Föhn" gäbe.\n\n'
-                f"Frage des Piloten: {question_clean}{format_hint}"
-            )
+            return _chat_user_message(context_block_local, question_clean, format_hint)
 
         if conv["first_question"]:
             user_content = _build_full_user_content()

@@ -94,6 +94,25 @@ def discover_pairs() -> list[dict]:
     return pairs
 
 
+def missing_en() -> list[str]:
+    """DE-Bausteine OHNE EN-Fassung (repo-relativ).
+
+    prompts._load_shared faellt im EN-Modus dann auf Deutsch zurueck — bis
+    10.10.2026 still, 8 Bausteine fehlten monatelang und die KI schrieb
+    deutsche Woerter in englische Texte. Deshalb zaehlt das als Problem.
+    Gilt fuer die Shared-Bausteine und die Top-Level-Skills (ohne Backups).
+    """
+    out: list[str] = []
+    for en_root, de_root in PAIR_ROOTS:
+        if not de_root.is_dir():
+            continue
+        files = de_root.rglob("*.md") if de_root != SKILLS else de_root.glob("*.md")
+        for de_path in sorted(files):
+            if not (en_root / de_path.relative_to(de_root)).is_file():
+                out.append(_rel(de_path))
+    return out
+
+
 def load_manifest() -> dict:
     if MANIFEST.is_file():
         return json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -158,7 +177,13 @@ def cmd_check() -> int:
         for en in stale:
             print(f"   {en}  -> mit --update bereinigt")
 
-    problems = len(drift) + len(untracked) + len(missing_de) + len(stale)
+    no_en = missing_en()
+    if no_en:
+        print(f"\n\U0001f534 EN-FASSUNG FEHLT — EN-Modus nutzt still Deutsch ({len(no_en)}):")
+        for de in no_en:
+            print(f"   {de}")
+
+    problems = len(drift) + len(untracked) + len(missing_de) + len(stale) + len(no_en)
     print("\n" + "=" * 50)
     if problems == 0:
         print("Alles synchron. ✅")

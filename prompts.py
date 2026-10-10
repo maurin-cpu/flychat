@@ -15,10 +15,13 @@ Consumer-Konvention: `import prompts` + `prompts.SYSTEM_PROMPT` statt
 `from prompts import SYSTEM_PROMPT`, damit der Lazy-Access greift.
 """
 
+import logging
 import re
 from pathlib import Path
 
 import config
+
+logger = logging.getLogger(__name__)
 
 _SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 _SHARED_DIR = _SKILLS_DIR / "shared"
@@ -114,6 +117,10 @@ def _load_shared(filename: str) -> str:
         en_path = _SHARED_DIR / "en" / filename
         if en_path.is_file():
             return _render_placeholders(en_path.read_text(encoding="utf-8"))
+        # Bis 10.10.2026 fiel das still auf Deutsch zurueck — 8 Bausteine fehlten
+        # monatelang unbemerkt und die KI schrieb deutsche Woerter ins Englische.
+        # Waechter: scripts/check_i18n_sync.py + tests/test_i18n_sync.py.
+        logger.warning("Shared-Baustein ohne EN-Fassung, nutze DE: %s", filename)
     path = _SHARED_DIR / "de" / filename
     if not path.is_file():
         raise FileNotFoundError(f"Shared-Baustein fehlt: {path}")

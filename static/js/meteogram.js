@@ -796,9 +796,9 @@ window.Meteogram = (function () {
         gradLow.append("stop").attr("offset", "100%").style("stop-color", "#020617").style("stop-opacity", 0.95);
 
         var cloudLayers = [
-            { key: 'cover_high', label: 'Hoch', baseColor: '#94A3B8' }, // Slate-400
-            { key: 'cover_mid', label: 'Mittel', baseColor: '#64748B' }, // Slate-500
-            { key: 'cover_low', label: 'Tief', baseColor: '#475569' }     // Slate-600
+            { key: 'cover_high', label: wcT('js.mg.cloud_high'), baseColor: '#94A3B8' }, // Slate-400
+            { key: 'cover_mid', label: wcT('js.mg.cloud_mid'), baseColor: '#64748B' }, // Slate-500
+            { key: 'cover_low', label: wcT('js.mg.cloud_low'), baseColor: '#475569' }     // Slate-600
         ];
 
         // Sky background (nur ueber den 3 Wolkenzeilen, nicht ueber Niederschlag-Zeile)
@@ -1691,7 +1691,7 @@ window.Meteogram = (function () {
                     (ttTag ? ' <span style="color:#94A3B8;font-weight:500;font-size:10px">[' + ttTag.name + ']</span>' : '') +
                     '</span></div>';
                 if (isGroundCell) {
-                    html += '<div class="tooltip-row"><span class="tooltip-label" style="color:#C2410C;font-weight:700">\u2605 Startplatz</span><span class="tooltip-value" style="color:#C2410C;font-weight:700">' + Math.round(elevation) + 'm</span></div>';
+                    html += '<div class="tooltip-row"><span class="tooltip-label" style="color:#C2410C;font-weight:700">\u2605 ' + wcT('js.mg.tt_launch') + '</span><span class="tooltip-value" style="color:#C2410C;font-weight:700">' + Math.round(elevation) + 'm</span></div>';
                     html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.tt_groundwind') + '</span><span class="tooltip-value" style="color:' + windColor(dd.wind_speed) + '">' + Math.round(dd.wind_speed) + ' km/h</span></div>';
                     if (dd.wind_gusts != null && Math.round(dd.wind_gusts) > Math.round(dd.wind_speed)) {
                         html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.chart.legend_gusts') + '</span><span class="tooltip-value" style="color:' + windColor(dd.wind_gusts) + '">' + Math.round(dd.wind_gusts) + ' km/h</span></div>';
@@ -1763,7 +1763,7 @@ window.Meteogram = (function () {
                 var stormTxt = isThunderstorm(wc)
                     ? '\u26A1 ' + wcT('js.mg.warn_storm')
                     : '\u26A1 ' + (ensPct != null ? ensPct + '%' : '');
-                html += '<div class="tooltip-row"><span class="tooltip-label">Gewitter</span><span class="tooltip-value">' + stormTxt + '</span></div>';
+                html += '<div class="tooltip-row"><span class="tooltip-label">' + wcT('js.mg.warn_storm') + '</span><span class="tooltip-value">' + stormTxt + '</span></div>';
             }
             if (!stormAt(wx.precipitation, wc) && wx.precipitation && wx.precipitation.overdev) {
                 var odTop = wx.precipitation.overdev_top_c;

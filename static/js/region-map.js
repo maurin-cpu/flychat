@@ -776,9 +776,9 @@
             html += '<button type="button" class="region-spot-pill ' + bandClass + '"'
                 + ' role="listitem"'
                 + ' data-spot-name="' + escHtml(e.name) + '"'
-                + ' aria-label="' + escHtml(e.name) + ', Bewertung ' + e.rating + ' von 6'
-                + (safetyStr ? ', Safety ' + e.safetyScore + ' von 100' : '')
-                + (e.window ? ', Fenster ' + escHtml(e.window) : '') + '">'
+                + ' aria-label="' + escHtml(wcT('js.regions.pill_aria', { name: e.name, rating: e.rating })
+                    + (safetyStr ? wcT('js.regions.pill_aria_safety', { score: e.safetyScore }) : '')
+                    + (e.window ? wcT('js.regions.pill_aria_window', { window: e.window }) : '')) + '">'
                 + '<span class="region-spot-pill-rating">' + e.rating + '</span>'
                 + '<span class="region-spot-pill-name">' + escHtml(e.name) + '</span>'
                 + (safetyStr ? '<span class="region-spot-pill-safety">' + safetyStr + '</span>' : '')

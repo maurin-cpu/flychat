@@ -729,6 +729,65 @@ _TAG_NATURAL = [
 
 _TAG_NATURAL_MAP = {tag.upper(): natural for tag, natural in _TAG_NATURAL}
 
+# Englische Fassung derselben Tabelle (gleiche Tags, gleiche Reihenfolge).
+# Ohne sie setzte der Sanitizer auch in englische Texte deutsche Begriffe ein
+# ("no THUNDERSTORMs" -> "no Gewitters"; gemessen 10.10.2026 am Server-Cache).
+_TAG_NATURAL_EN = {
+    "THERMAL-TORN-UNUSABLE":    "torn thermals",
+    "THERMAL-TORN-DEGRADED":    "broken thermals",
+    "THERMAL-ROUGH-FRAGMENTED": "fragmented thermals",
+    "THERMAL-ROUGH-UNUSABLE":   "extreme turbulence",
+    "THERMAL-ROUGH-DEGRADED":   "rough thermals",
+    "SHEAR-UNUSABLE":           "strong shear",
+    "SHEAR-DEGRADED":           "wind shear aloft",
+    "THERMAL-WIND-UNUSABLE":    "base wind tears thermals apart",
+    "THERMAL-WIND-DEGRADED":    "base wind disturbs thermals",
+    "TORN-UNUSABLE":            "torn thermals",
+    "TORN-DEGRADED":            "broken thermals",
+    "ROUGH-FRAG":               "fragmented thermals",
+    "ROUGH-UNUSABLE":           "extreme turbulence",
+    "ROUGH-DEGRADED":           "rough thermals",
+    "SHEAR-DEG":                "wind shear aloft",
+    "WIND-UNUSABLE":            "base wind too strong for thermals",
+    "WIND-DEGRADED":            "strong base wind disturbs thermals",
+    "ALOFT-GUST-DANGER":        "dangerous gusts aloft",
+    "ALOFT-GUST-WARN":          "strong gusts aloft",
+    "ALOFT-WIND-DANGER":        "dangerous upper wind",
+    "ALOFT-WIND-WARN":          "strong upper wind",
+    "ALOFT-GUST":               "gusts aloft",
+    "ALOFT-WIND":               "upper wind",
+    "GUST-DANGER":              "dangerous gusts",
+    "GUST-WARN":                "strong gusts",
+    "WIND-DANGER":              "strong wind",
+    "WIND-WARN":                "moderate wind",
+    "WIND-WRONG":               "unsuitable wind direction",
+    "WIND-CALM":                "wind too light – direction irrelevant, launch possible",
+    "WIND-OK":                  "suitable wind direction",
+    "RAIN-WARN":                "rain",
+    "CAPE-DANGER":              "risk of overdevelopment",
+    "CAPE-WARN":                "overdevelopment possible",
+    "OVERCAST-DANGER":          "dense cloud cover",
+    "THUNDERSTORM":             "thunderstorm",
+    "DURCHGEHEND_DANGER":       "dangerous throughout",
+    "DURCHGEHEND_WARN":         "elevated throughout",
+    "EINGEKESSELT_KNAPP":       "narrowly boxed in",
+    "EINGEKESSELT":             "boxed in",
+    "AUFKLAERUNG":              "clearing",
+    "VEREINZELT":               "isolated",
+    "ZUNEHMEND":                "increasing",
+    "ABNEHMEND":                "decreasing",
+    "STABIL":                   "stable",
+    "WIND-TREND":               "wind trend",
+    "GUST-TREND":               "gust trend",
+}
+assert set(_TAG_NATURAL_EN) == set(_TAG_NATURAL_MAP), "_TAG_NATURAL_EN muss alle Tags abdecken"
+
+
+def _tag_natural_map() -> dict:
+    """Tag -> Klartext in der aktiven Sprache (DE-Pfad unveraendert)."""
+    import i18n
+    return _TAG_NATURAL_EN if i18n.get_current_lang() == "en" else _TAG_NATURAL_MAP
+
 # Regex matcht nur Tag (mit optionalen Klammern + optionalem Doppelpunkt).
 # Trailing Stunden-Angaben wie "6h" oder "13-16h" werden BEWUSST nicht gefressen,
 # damit Zeit-/Dauer-Information erhalten bleibt: "ALOFT-WIND-DANGER: 6h"
@@ -750,14 +809,15 @@ _COMPOUND_SUFFIX_RE = re.compile(
 
 
 def _sanitize_llm_text(text: str) -> str:
-    """Ersetzt versehentlich verbliebene interne Tags durch kurze deutsche Begriffe."""
+    """Ersetzt versehentlich verbliebene interne Tags durch kurze Begriffe in der aktiven Sprache."""
     if not text or not isinstance(text, str):
         return text
+    natural = _tag_natural_map()
 
     def _replace_tag(m):
         raw = m.group(0)
         core = re.sub(r'[\[\]]', '', raw).strip()
-        return _TAG_NATURAL_MAP.get(core.upper(), '')
+        return natural.get(core.upper(), '')
 
     cleaned = _TAG_SANITIZE_RE.sub(_replace_tag, text)
     # Composita-Suffix entkleben ("Hoehenwind-Stunden" -> "Hoehenwind Stunden").
@@ -830,6 +890,9 @@ def _sanitize_llm_result(result: dict) -> dict:
                            for item in result[key]]
     if isinstance(sf, dict) and isinstance(sf.get("summary"), str):
         sf["summary"] = soften_clearance(sf["summary"], label=label)
+    # EN-Modus: deutsche Reste (Glossar, alte Code-Texte) -> Englisch (engine/lang_guard.py).
+    from engine.lang_guard import englishify_result
+    englishify_result(result)
     _warn_leftover_tags(result, label=label)
     _derive_primary_labels(result)
     return result

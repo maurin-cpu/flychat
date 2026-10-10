@@ -77,13 +77,16 @@ def compute_foehn_decision(foehn_eval: dict) -> FoehnDecision:
     level = foehn_eval.get("level", "none")
     delta_p = foehn_eval.get("delta_p_hpa")
     direction = foehn_eval.get("direction") or "Süd"
-    delta_p_str = f"ΔP {delta_p} hPa" if delta_p is not None else "ΔP unbekannt"
+    delta_p_str = f"ΔP {delta_p} hPa" if delta_p is not None else i18n.t("decision.foehn_dp_unknown")
+    # direction bleibt intern "Süd"/"Nord" (Tracking); nur der Text wird uebersetzt.
+    dir_txt = {"Süd": i18n.t("decision.foehn_dir_sued"),
+               "Nord": i18n.t("decision.foehn_dir_nord")}.get(direction, direction)
 
     if level == "danger":
         return FoehnDecision(
             risk="high",
             caution_note=None,
-            no_go_reason=f"Foehn-Durchbruch: {direction}foehn {delta_p_str} (schwerer Warnhinweis)",
+            no_go_reason=i18n.t("decision.foehn_nogo", dir=dir_txt, dp=delta_p_str),
             primary_no_go="FOEHN",
             forces_status="not_safe",
             delta_p_hpa=delta_p,
@@ -92,7 +95,7 @@ def compute_foehn_decision(foehn_eval: dict) -> FoehnDecision:
     if level == "caution":
         return FoehnDecision(
             risk="moderate",
-            caution_note=f"Foehn-Warnhinweis: {direction}foehn {delta_p_str} — Boeen an exponierten Stellen.",
+            caution_note=i18n.t("decision.foehn_caution", dir=dir_txt, dp=delta_p_str),
             no_go_reason=None,
             primary_no_go=None,
             forces_status="conditional_min",
@@ -208,7 +211,7 @@ def decide_aloft_not_safe(result: dict, gust_info: dict, label: str) -> Optional
     if not result.get("primary_no_go"):
         result["primary_no_go"] = "ALOFT_DANGER"
     nogo = result.get("no_go_reasons", []) or []
-    nogo.append(f"Kraeftiger Hoehenwind im Flugbereich: >{config.WIND_DANGER_KMH} km/h in {aloft_d}h")
+    nogo.append(i18n.t("decision.aloft_nogo", kmh=config.WIND_DANGER_KMH, h=aloft_d))
     result["no_go_reasons"] = nogo
     return f"AloftNotSafe({aloft_d}h)"
 
@@ -239,16 +242,16 @@ def decide_aloft_conditional(result: dict, gust_info: dict, label: str) -> Optio
     cn = result.get("caution_notes", []) or []
     bits = []
     if aloft_d >= cond_thresh:
-        bits.append(f"Hoehenwind >{kmh_thresh} km/h im Flugbereich in {aloft_d}h")
+        bits.append(i18n.t("decision.aloft_wind_bit", kmh=kmh_thresh, h=aloft_d))
     if aloft_gd >= cond_thresh:
-        bits.append(f"Hoehenboeen >{gust_kmh_thresh} km/h im Flugbereich in {aloft_gd}h")
+        bits.append(i18n.t("decision.aloft_gust_bit", kmh=gust_kmh_thresh, h=aloft_gd))
     if aloft_d >= cond_thresh and aloft_gd >= cond_thresh:
-        head = "Hoehenwind und Boeen ueber Schwelle"
+        head = i18n.t("decision.aloft_head_both")
     elif aloft_gd >= cond_thresh:
-        head = "Kraeftige Hoehenboeen"
+        head = i18n.t("decision.aloft_head_gust")
     else:
-        head = "Hoehenwind ueber Schwelle"
-    cn.append(head + ": " + ", ".join(bits) + " — auch bei ruhigem Bodenwind pruefen.")
+        head = i18n.t("decision.aloft_head_wind")
+    cn.append(head + ": " + ", ".join(bits) + i18n.t("decision.aloft_tail"))
     result["caution_notes"] = cn
     return f"AloftConditional({aloft_d}h)"
 
@@ -281,16 +284,16 @@ def decide_gust_floor(result: dict, gust_info: dict, label: str) -> Optional[str
         sfc_warn = gust_info.get("gust_warn_hours", 0)
         alo_warn = gust_info.get("aloft_gust_warn_hours", 0)
         if sfc_warn > 0 and max_gust > 0:
-            bits.append(f"Bodenboeen bis ~{max_gust} km/h in {sfc_warn}h")
+            bits.append(i18n.t("decision.gust_sfc_max", g=max_gust, h=sfc_warn))
         elif sfc_warn > 0:
-            bits.append(f"Bodenboeen ueber 30 km/h in {sfc_warn}h")
+            bits.append(i18n.t("decision.gust_sfc_30", h=sfc_warn))
         if alo_warn > 0:
-            bits.append(f"Hoehenboeen ueber 30 km/h im Flugbereich in {alo_warn}h")
+            bits.append(i18n.t("decision.gust_aloft_30", h=alo_warn))
         if gust_info.get("gust_danger_hours", 0) > 0:
-            bits.append(f"Bodenboeen ueber 40 km/h in {gust_info['gust_danger_hours']}h")
+            bits.append(i18n.t("decision.gust_sfc_40", h=gust_info['gust_danger_hours']))
         if gust_info.get("aloft_gust_danger_hours", 0) > 0:
-            bits.append(f"Hoehenboeen ueber 40 km/h in {gust_info['aloft_gust_danger_hours']}h")
-        cn.append("Starke Boeen erkannt: " + ", ".join(bits) + " — Trend und Fenster pruefen.")
+            bits.append(i18n.t("decision.gust_aloft_40", h=gust_info['aloft_gust_danger_hours']))
+        cn.append(i18n.t("decision.gust_head") + ", ".join(bits) + i18n.t("decision.gust_tail"))
     result["caution_notes"] = cn
     return "GustFloor"
 
@@ -496,10 +499,8 @@ def decide_wind_strong_majority(result: dict, label: str) -> Optional[str]:
     result["safety_status"] = "not_safe"
     result["safe_window"] = i18n.t("analysis.window_none")
     nogo = result.get("no_go_reasons", []) or []
-    if not any(any(kw in (r or "").lower() for kw in ["starker wind", "wind-strong", "zu stark"]) for r in nogo):
-        nogo.append(
-            f"Durchgehend starker Wind ({strong} von {strong + moderate} Stunden), keine ruhige Phase"
-        )
+    if not any(any(kw in (r or "").lower() for kw in ["starker wind", "wind-strong", "zu stark", "strong wind"]) for r in nogo):
+        nogo.append(i18n.t("decision.wind_strong_majority", s=strong, n=strong + moderate))
     result["no_go_reasons"] = nogo
     return f"WindStrongMajority({strong})"
 
@@ -697,6 +698,9 @@ def validate_llm_tags(llm_tags, result: dict, *, log_prefix: str = "") -> list:
         topic = raw.get("topic")
         severity = raw.get("severity")
         label = raw.get("label") or topic or ""
+        # EN-Modus: deutsche LLM-Labels ("Thermik", "Bewoelkung") -> Englisch.
+        from engine.lang_guard import english_label
+        label = english_label(label)
         value = raw.get("value") or ""
         time = raw.get("time") or ""
 

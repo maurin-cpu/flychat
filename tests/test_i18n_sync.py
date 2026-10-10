@@ -36,3 +36,9 @@ def test_repo_is_in_sync():
         assert stamps.get(p["en"]) == c._sha256(p["_de_abs"]), (
             f"{p['en']}: DE-Quelle geaendert — EN nachziehen, dann "
             f"`python scripts/check_i18n_sync.py --update`")
+
+
+def test_every_de_block_has_an_en_twin():
+    """Jeder deutsche Prompt-Baustein hat eine englische Fassung — sonst laeuft
+    der EN-Modus still mit deutschem Prompt (10.10.2026: 8 fehlten)."""
+    assert c.missing_en() == []

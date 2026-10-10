@@ -1399,7 +1399,7 @@
              data-share-region-name="${escapeHtml(spot.region_name || "")}"
              data-share-spot="${escapeHtml(spot.spot)}"
              data-share-rating="${shareRatingAttr}"
-             title="Startplatz teilen" aria-label="Startplatz teilen">${window.wingcastShareIconSVG || "⇪"}</button>`;
+             title="${escapeAttr(wcT("js.share_spot"))}" aria-label="${escapeAttr(wcT("js.share_spot"))}">${window.wingcastShareIconSVG || "⇪"}</button>`;
     // RATING_ARCHITECTURE v2.1 — Farbintensität skaliert linear mit experience_rating (1-5).
     // Premium-Marker: safe + rating=5 (xc_tag/Klassiker) → violett (siehe shared-glyph.displayBand).
     const fillNorm = (rating > 0 && band !== "red" && band !== "no_data") ? rating / 5 : 0;

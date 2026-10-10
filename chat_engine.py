@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 # Re-Exports fuer Backwards-Compatibility (bestehender Code importiert aus chat_engine).
 # ============================================================================
 from engine.wording_guard import soften_analysis_tree
+from engine.lang_guard import englishify_analysis_tree
 from engine._common import (
     MAX_HISTORY_MESSAGES,
     _MODEL_TOKEN_LIMITS,
@@ -257,6 +258,7 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
                 # Alte Cache-Texte (vor dem Wortlaut-Waechter erzeugt) beim Laden
                 # nachziehen — sonst stehen bis zum naechsten Lauf noch Urteile drin.
                 n = soften_analysis_tree(self.spot_analyses, kind="Spot ")
+                englishify_analysis_tree(self.spot_analyses, kind="Spot ")
                 print(f"[ENGINE] {len(self.spot_analyses)} Spot-Analysen aus JSON-Cache geladen"
                       + (f" ({n} Texte vom Waechter nachgezogen)." if n else "."))
             except Exception as e:
@@ -267,6 +269,7 @@ class WingcastEngine(ChatOrchestratorMixin, AnalyzersMixin, WeatherContextMixin)
                     raw = json.load(f)
                 self.region_analyses = self._filter_stale_region_analyses(raw)
                 soften_analysis_tree(self.region_analyses, kind="Region ")
+                englishify_analysis_tree(self.region_analyses, kind="Region ")
                 self.region_analyses_loaded_at = datetime.fromtimestamp(
                     self.region_analyses_file.stat().st_mtime)
                 dropped = len(raw) - len(self.region_analyses)
