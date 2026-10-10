@@ -112,7 +112,9 @@ def test_foehn_followed_by_noun_stays_grammatical():
     assert soften_clearance("No signs of foehn in the data breakthrough at the surface.") == \
         "No foehn breakthrough indicated at the surface."
     assert soften_clearance("No signs of foehn in the data shear signs: the 850 hPa wind.") == \
-        "No foehn shear indicated signs: the 850 hPa wind."
+        "No foehn shear signs indicated: the 850 hPa wind."
+    assert soften_clearance("no vertical veer, no foehn shear signature.") == \
+        "no vertical veer, no foehn shear signature indicated."
     # schon richtig: unangetastet, auch beim zweiten Durchlauf
     for ok in ("No foehn signs in the vertical column.", "No foehn breakthrough indicated.",
                "No foehn indicated.", "Kein Föhn angezeigt.", "Data show no signs of foehn."):

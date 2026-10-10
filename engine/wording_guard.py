@@ -67,11 +67,14 @@ _RULES: tuple[tuple[re.Pattern, str], ...] = tuple(
         # --- Englisch: Wetter als Tatsache -> Datenbezug ---
         # Reparatur: Waechter-Version bis 10.10. erzeugte "no signs of foehn in
         # the data breakthrough" — gespeicherte Texte beim Laden geradeziehen.
-        (r"\bno signs of (foehn|Bise) in the data (" + _PHEN_NOUNS + r")\b", r"no \1 \2 indicated"),
-        # "no foehn breakthrough" -> "no foehn breakthrough indicated"
-        (r"\bno (foehn|bise) (" + _PHEN_NOUNS + r")\b(?! indicated\b)", r"no \1 \2 indicated"),
+        (r"\bno signs of (foehn|Bise) in the data ((?:" + _PHEN_NOUNS + r")(?: (?:signature|signs|signals?|pattern))?)\b",
+         r"no \1 \2 indicated"),
+        # "no foehn breakthrough" / "no foehn shear signature" -> "... indicated"
+        (r"\bno (foehn|bise) ((?:" + _PHEN_NOUNS + r")(?: (?:signature|signs|signals?|pattern))?)\b"
+         r"(?! indicated\b)(?! (?:signature|signs|signals?|pattern)\b)",
+         r"no \1 \2 indicated"),
         # "no foehn" allein -> "no foehn indicated" (nicht vor signs/wind/indicated)
-        (r"\bno (foehn|bise)\b(?! (?:signs|wind|indicated|data)\b)(?! [a-z-]+ indicated\b)", r"no \1 indicated"),
+        (r"\bno (foehn|bise)\b(?! (?:signs|wind|indicated|data)\b)(?! (?:[a-z-]+ ){1,2}indicated\b)", r"no \1 indicated"),
         (r"\b(north|south)(ern)? foehn situation\b",  r"data indicating \1 foehn"),
         (r"\bfoehn situation\b",                      "foehn indicated by the data"),
         # --- Englisch: Aufforderung an den Piloten -> Befund ---
