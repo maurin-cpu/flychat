@@ -162,6 +162,7 @@
 
                 '<div class="rating-info-section">' +
                   '<h3>' + wcT('js.ri.limits_title') + '</h3>' +
+                  '<p>' + wcT('js.ri.limits_foehn') + '</p>' +
                   '<p>' + wcT('js.ri.limits_storm') + '</p>' +
                   '<p>' + wcT('js.ri.limits_thermals') + '</p>' +
                 '</div>' +

@@ -157,7 +157,7 @@ def _inject_session_flags():
 
 # Textfassung des Haftungshinweises (i18n 'disclaimer.*'). Bei inhaltlicher
 # Aenderung hochzaehlen: dann muessen alle Konten erneut quittieren.
-DISCLAIMER_VERSION = "v1"
+DISCLAIMER_VERSION = "v2"
 
 
 def _disclaimer_accepted() -> bool:

@@ -130,6 +130,11 @@ STRINGS: dict[str, dict[str, str]] = {
         "de": "Gleitschirm- und Drachenfliegen ist gefährlich und erfolgt auf eigene Gefahr.",
         "en": "Paragliding and hang gliding are dangerous and undertaken at your own risk.",
     },
+    # v2 (10.10.2026): ausdruecklicher Haftungsausschluss (OR 100) + ohne Gewaehr.
+    "disclaimer.p_liability": {
+        "de": "Wingcast ist ein kostenloses, privat betriebenes Angebot ohne Gewähr. Soweit gesetzlich zulässig, ist jede Haftung für Inhalt, Richtigkeit und Verfügbarkeit ausgeschlossen.",
+        "en": "Wingcast is a free, privately operated service provided without warranty. To the extent permitted by law, any liability for the content, accuracy or availability of the service is excluded.",
+    },
     "disclaimer.accept": {"de": "Verstanden", "en": "Got it"},
 
     # ======================= index.html (Cockpit) =======================
@@ -1216,6 +1221,8 @@ STRINGS: dict[str, dict[str, str]] = {
     # Bekannte Grenzen — offen genannt, Quellen: docs/GEWITTER.md,
     # validation/xcontest (Thermik-Schieflage). Nur belegte Befunde eintragen.
     "js.ri.limits_title": {"de": "Bekannte Grenzen", "en": "Known limits"},
+    "js.ri.limits_foehn": {"de": "<b>Föhn in inneralpinen Tälern:</b> Wallis, Rheinwald und Davos erfasst der Föhn-Index nicht zuverlässig — dort deuten die Daten Föhn oft nicht an, obwohl er weht.",
+                           "en": "<b>Foehn in inner-Alpine valleys:</b> the foehn index does not reliably capture the Valais, Rheinwald and Davos — there the data often do not indicate foehn even when it blows."},
     "js.ri.limits_storm": {"de": "<b>Gewitter am Abend:</b> Validiert ist das Flugfenster bis 17 Uhr. Abendliche Entwicklung wird nicht nachgemessen.",
                            "en": "<b>Evening thunderstorms:</b> validation covers the flying window until 17:00. Evening development is not verified."},
     "js.ri.limits_thermals": {"de": "<b>Thermikstärke:</b> Prognose, kein Messwert — regional systematisch zu hoch oder zu tief (z. B. Jura zu optimistisch, Prättigau zu pessimistisch).",
