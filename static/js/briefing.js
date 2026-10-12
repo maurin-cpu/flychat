@@ -2224,26 +2224,29 @@
   // seiner Zeile auf. Offene Bloecke bleiben ueber den Tageswechsel.
   // Saetze und Labels kommen fertig in config.LANG vom Server.
 
-  // Reihenfolge wie ein Pilot die Lage liest. `sep` = Trenner, bis zu dem
-  // der Fazit-Satz fett gesetzt wird (gleiche Regel wie das Mail-Makro).
+  // Reihenfolge wie ein Pilot die Lage liest.
   const CHAIN_BLOCKS = [
-    { key: "lage",      label: "step_lage",    sep: ". " },
-    { key: "fronts",    label: "step_front",   sep: ". " },
-    { key: "foehn",     label: "step_foehn",   sep: ". " },
-    { key: "wind",      label: "step_wind",    sep: ": " },
-    { key: "stability", label: "step_stab",    sep: ". " },
-    { key: "thermik",   label: "step_thermik", sep: ". " },
-    { key: "sonne",     label: "step_sonne",   sep: ". " },
-    { key: "modelle",   label: "step_modelle", sep: ", " },
+    { key: "lage",      label: "step_lage" },
+    { key: "fronts",    label: "step_front" },
+    { key: "foehn",     label: "step_foehn" },
+    { key: "wind",      label: "step_wind" },
+    { key: "stability", label: "step_stab" },
+    { key: "thermik",   label: "step_thermik" },
+    { key: "sonne",     label: "step_sonne" },
+    { key: "modelle",   label: "step_modelle" },
   ];
 
-  function chainVerdictHtml(text, sep) {
+  // Fett nur ein kurzer Aufhaenger mit Doppelpunkt ("Signs of north foehn:",
+  // "Verdict:", "Today:"), nie ein ganzer Satz — vorher war immer der erste
+  // Satz fett, oft der halbe oder ganze Absatz (User 12.10.2026).
+  // Gleiche Regel wie das Mail-Makro `verdict`.
+  const VERDICT_HEAD_MAX = 60;
+  function chainVerdictHtml(text) {
     if (!text) return "";
-    const i = text.indexOf(sep);
-    if (i < 0) return `<p class="bf-chain-verdict"><b>${escapeHtml(text)}</b></p>`;
-    const head = text.slice(0, i) + sep.trim();
-    const rest = text.slice(i + sep.length);
-    return `<p class="bf-chain-verdict"><b>${escapeHtml(head)}</b> ${escapeHtml(rest)}</p>`;
+    const i = text.indexOf(": ");
+    const dot = text.indexOf(". ");
+    if (i <= 0 || i + 1 > VERDICT_HEAD_MAX || (dot > 0 && dot < i)) return `<p class="bf-chain-verdict">${escapeHtml(text)}</p>`;
+    return `<p class="bf-chain-verdict"><b>${escapeHtml(text.slice(0, i + 1))}</b> ${escapeHtml(text.slice(i + 2))}</p>`;
   }
 
   function chainFactsHtml(facts, hotFn) {
@@ -2263,7 +2266,7 @@
     if (def.key === "lage") {
       const centers = Array.isArray(blk.centers) ? blk.centers : [];
       parts.push(chainFactsHtml(centers.map(c => ({ k: String(c.type || "").slice(0, 1), v: `${c.region || ""} ${c.msl || ""} hPa`.trim() }))));
-      parts.push(chainVerdictHtml(blk.fazit || chain.situation || "", def.sep));
+      parts.push(chainVerdictHtml(blk.fazit || chain.situation || ""));
       return parts.filter(Boolean).join("");
     }
     if (def.key === "wind") {
@@ -2293,7 +2296,7 @@
     }
     let fazit = blk.fazit || "";
     if (def.key === "foehn" && !fazit) fazit = blk.foehn || "";
-    parts.push(chainVerdictHtml(fazit, def.sep));
+    parts.push(chainVerdictHtml(fazit));
     if (def.key === "stability" && Array.isArray(blk.thunder) && blk.thunder.length && labels.thunder_caveat) {
       parts.push(`<p class="bf-chain-caveat">${escapeHtml(labels.thunder_caveat)}</p>`);
     }

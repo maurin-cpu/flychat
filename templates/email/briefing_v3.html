@@ -24,9 +24,15 @@
   {%- set bd = {'ok': '#86efac', 'info': '#7dd3fc', 'warn': '#fdba74'}.get(level, '#fca5a5' if hot else C.border) -%}
   <span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;border-radius:8px;background-color:{{ bg }};border:1px solid {{ bd }};font:500 13px/1.3 {{ MONO }};color:{{ fg }};">{% if k %}<span style="{% if level %}color:{{ fg }};opacity:.75;{% else %}color:{{ C.muted }};{% endif %}font-size:11px;letter-spacing:.04em;text-transform:uppercase;">{{ k }}</span>&nbsp;{% endif %}{{ v }}</span>
 {%- endmacro -%}
-{%- macro verdict(text, sep='. ') -%}
-  {%- set t = text.split(sep, 1) -%}
-  <p style="margin:6px 0 0;font:16px/1.55 {{ SANS }};color:{{ C.text2 }};"><b style="color:{{ C.ink }};font-weight:600;">{{ t[0] }}{% if t|length > 1 %}{{ sep.rstrip() }}{% endif %}</b>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
+{#- Fett nur ein kurzer Aufhaenger mit Doppelpunkt (max. 60 Zeichen, vor dem ersten
+    Satzende), nie ein ganzer Satz (User 12.10.2026). Gleiche Regel wie briefing.js. -#}
+{%- macro verdict(text) -%}
+  {%- set i = text.find(': ') -%}{%- set dot = text.find('. ') -%}
+  {%- if i > 0 and i + 1 <= 60 and (dot <= 0 or i < dot) -%}
+  <p style="margin:6px 0 0;font:16px/1.55 {{ SANS }};color:{{ C.text2 }};"><b style="color:{{ C.ink }};font-weight:600;">{{ text[:i + 1] }}</b> {{ text[i + 2:] }}</p>
+  {%- else -%}
+  <p style="margin:6px 0 0;font:16px/1.55 {{ SANS }};color:{{ C.text2 }};">{{ text }}</p>
+  {%- endif -%}
 {%- endmacro -%}
 {%- macro step(no, title, status, status_label) -%}
   <tr><td style="padding:14px 18px 4px;border-top:1px solid {{ C.border }};">
@@ -152,7 +158,7 @@
   {{ step(4, v3_labels.step_wind, v3_chain.wind.status, v3_chain.wind.status_label) }}
   <tr><td style="padding:0 18px 12px 56px;">
     {% if v3_chain.wind.facts %}<div>{% for f in v3_chain.wind.facts %}{{ fact(f.k, f.v, hot=(loop.first and v3_chain.wind.hot)) }}{% endfor %}</div>{% endif %}
-    {% if v3_chain.wind.fazit %}{{ verdict(v3_chain.wind.fazit, ': ') }}{% endif %}
+    {% if v3_chain.wind.fazit %}{{ verdict(v3_chain.wind.fazit) }}{% endif %}
   </td></tr>
 
   {# 5 Labilitaet #}
