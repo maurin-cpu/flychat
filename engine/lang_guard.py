@@ -54,6 +54,10 @@ _GLOSSARY = (
     ("Thermik", "thermals"), ("Regen", "rain"),
     ("Nordfoehn", "north foehn"), ("Nordföhn", "north foehn"),
     ("Suedfoehn", "south foehn"), ("Südfoehn", "south foehn"), ("Südföhn", "south foehn"),
+    # Klappern-Hinweis vor dem 12.10.: beim Erzeugen hatte der Waechter nur
+    # ROUGH-UNUSABLE ersetzt, gespeichert ist die Mischform
+    # "Mechanisches Klappern: extreme turbulence in 100% der Thermikstunden".
+    ("Mechanisches Klappern", "Mechanical chop"), ("der Thermikstunden", "of thermal hours"),
 )
 
 _FOEHN_DIR = {"süd": "south", "sued": "south", "nord": "north"}

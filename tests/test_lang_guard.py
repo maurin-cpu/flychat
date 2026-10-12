@@ -99,3 +99,6 @@ def test_guard_translates_old_mech_chop_note():
     with i18n.lang_override("en"):
         assert englishify_text("Mechanisches Klappern: ROUGH-UNUSABLE in 83% der Thermikstunden") \
             == "Mechanical chop: extreme turbulence in 83% of thermal hours"
+        # Mischform im Server-Cache (beim Erzeugen schon halb uebersetzt).
+        assert englishify_text("Mechanisches Klappern: extreme turbulence in 100% der Thermikstunden") \
+            == "Mechanical chop: extreme turbulence in 100% of thermal hours"
