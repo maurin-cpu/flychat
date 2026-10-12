@@ -31,7 +31,7 @@ WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr
 {{ v3_chain.fronts.fazit }}
 
 3 {{ v3_labels.step_foehn }}{% if v3_chain.foehn.status_label %} [{{ v3_chain.foehn.status_label }}]{% endif %}
-{{ v3_chain.foehn.fazit or (v3_chain.foehn.foehn ~ ' ' ~ v3_chain.foehn.bise) }}
+{{ v3_chain.foehn.fazit or v3_chain.foehn.foehn }}
 
 4 {{ v3_labels.step_wind }}{% if v3_chain.wind.status_label %} [{{ v3_chain.wind.status_label }}]{% endif %}
 {% for f in v3_chain.wind.facts or [] %}{{ f.k }} {{ f.v }}{% if not loop.last %} · {% endif %}{% endfor %}

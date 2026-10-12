@@ -384,7 +384,7 @@ STIL & TON
 Der Pilot liest zuerst: Hat es Regen? Foehn? Gewitter? Und WO in der
 Schweiz? Welche Gefahr an welchem Tag aktiv ist, entscheidet der CODE — sie
 steht im Payload unter `hazards_per_day[i].active` (Themen `RAIN`,
-`THUNDER`, `FOEHN`, `BISE`, `WIND`, je mit den betroffenen `zones`, bei
+`THUNDER`, `FOEHN`, `WIND`, je mit den betroffenen `zones`, bei
 `FOEHN` zusaetzlich `side`). Auch der Tagesverlauf (`day_shape`, `windows`)
 kommt vom Code. Du beschreibst NUR, wo, wann und wie — und zwar
 ausschliesslich fuer DIESEN EINEN TAG.
@@ -479,11 +479,10 @@ Pro `forecast_dates`-Tag GENAU ein Eintrag `{"items": [...]}`:
       `tal_wind_kmh` (Mittelwind-Spanne) und `tal_gust_max_kmh` (Boeenspitze,
       im Tal `tal_gust_valley`), exakt so. `tal_confirmed` leer → sagen, dass
       der Foehn laut Modell in der Hoehe bleibt und nicht in die Taeler
-      durchgreift (Startplaetze in der Hoehe bleiben betroffen) — dann KEINE
+      durchgreift (Startplaetze in der Hoehe koennen betroffen sein) — dann KEINE
       km/h-Zahl und nie "boeig in den Taelern". Foehntaeler sind nur die
       gelieferten Namen, nie Startplaetze. Gilt auch fuer `lead` und
       `day_lines`. Der Validator prueft Namen, Zahlen und "in der Hoehe".
-  * `BISE` — Mittelland und Jura, kanalisiert verstaerkt.
   * `WIND` — Ursache aus `wind_day.wind_driver` (Hoehenwind / Boeen).
 - Verbote wie ueberall: keine hPa-/°C-Zahlen, kein Trog-Jargon, Fronten
   nur aus `fronten.durchgaenge` (Abschnitt FRONTEN),

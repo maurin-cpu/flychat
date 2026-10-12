@@ -1074,7 +1074,8 @@ def _label_variants(label: str) -> list[str]:
 # aktivem Thema 1-2 Saetze, WO in der Schweiz und woher/wohin. Ein Thema, das
 # der Code nicht schaltet, ist eine erfundene Gefahr und wird abgelehnt.
 
-HAZARD_TOPICS = ("RAIN", "THUNDER", "FOEHN", "BISE", "WIND")
+# Ohne Bise (User 12.10.2026: "Bise ist egal, wichtig ist nur Nord-/Suedfoehn").
+HAZARD_TOPICS = ("RAIN", "THUNDER", "FOEHN", "WIND")
 
 # Laengen der Briefing-Saetze (Wunsch User 16.09.2026: "kurz, auf den Punkt").
 # Harte Grenzen im Validator — "halte dich kurz" allein befolgt der LLM nicht.
@@ -1422,8 +1423,6 @@ def _hazard_strength(topic: str, check: dict) -> float:
         return _num(f.get("wet_share"))
     if topic == "FOEHN":
         return _num(f.get("hours"))
-    if topic == "BISE":
-        return abs(_num(f.get("delta_p_hpa")))
     return float(len(check.get("zones") or []))   # THUNDER/WIND: Flaeche
 
 
@@ -1470,8 +1469,6 @@ def hazard_checks(ctx: dict) -> list:
     foehn = ctx.get("foehn") or {}
     foehn_by_date = {d.get("date"): d for d in foehn.get("per_day") or []
                      if isinstance(d, dict)}
-    bise_by_date = {d.get("date"): d for d in (ctx.get("bise") or {}).get("per_day") or []
-                    if isinstance(d, dict)}
     foehn_thr = foehn.get("thresholds") or {}
     rain_thr = getattr(config, "SYNOPTIC_HAZARD_RAIN_WET_SHARE", 0.2)
 
@@ -1521,7 +1518,6 @@ def hazard_checks(ctx: dict) -> list:
         side = _foehn_active_side(foehn, fc_dates, i)
         fo = foehn_by_date.get(date) or {}
         peak = fo.get(f"peak_{side}") if side else None
-        bi = bise_by_date.get(date) or {}
 
         lee_zones = list(_FOEHN_LEE_ZONES.get(side, ())) if side else []
         foehn_wins_raw = (fo.get(f"{side}_windows") or {}) if side else {}
@@ -1553,9 +1549,6 @@ def hazard_checks(ctx: dict) -> list:
                                 "delta_p_min_hpa": (foehn_thr.get("delta_p_danger_hpa", 8)
                                                     if peak == "danger"
                                                     else foehn_thr.get("delta_p_caution_hpa", 4))}},
-            "BISE": {"active": bool(bi.get("active")), "level": "warn", "zones": [],
-                     "facts": {"strength": bi.get("strength"),
-                               "delta_p_hpa": bi.get("delta_p_hpa")}},
             "WIND": {"active": bool(wind_z),
                      "level": "stop" if "verblasen" in wind_classes.values() else "warn",
                      "zones": wind_z,

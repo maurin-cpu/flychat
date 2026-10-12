@@ -575,13 +575,14 @@ class TestHazardChecks(unittest.TestCase):
         self.assertEqual(f["facts"]["side"], "nord")
         self.assertEqual(f["facts"]["hours"], 6)
 
-    def test_bise_active(self):
+    def test_bise_is_no_hazard(self):
+        # User 12.10.2026: Bise ist kein Briefing-Thema, auch wenn erkannt.
         ctx = _hz_ctx()
         ctx["bise"] = {"per_day": [{"date": "2026-07-06", "active": True,
                                     "strength": "maessig", "delta_p_hpa": 3.1}]}
         checks = sl.hazard_checks(ctx)
-        self.assertFalse(checks[0]["checks"]["BISE"]["active"])
-        self.assertTrue(checks[1]["checks"]["BISE"]["active"])
+        self.assertNotIn("BISE", checks[1]["checks"])
+        self.assertNotIn("BISE", sl.HAZARD_TOPICS)
 
     def test_wind_verblasen_is_stop(self):
         ctx = _hz_ctx()
@@ -646,22 +647,24 @@ class TestValidateHazards(unittest.TestCase):
         self.assertTrue(any(e["kind"] == "gewitter_without_signal" for e in errors))
 
 
+WIND_TEXT = "Am Alpennordhang verblasen durch kraeftigen Hoehenwind."
+
+
 class TestFinalizeHazards(unittest.TestCase):
     def setUp(self):
         self.ctx = _hz_ctx()
         _set_rain(self.ctx, 0, "alpennordhang", 0.5)
-        self.ctx["bise"] = {"per_day": [{"date": "2026-07-05", "active": True,
-                                         "strength": "maessig", "delta_p_hpa": 3.0}]}
+        self.ctx["wind_zones"]["per_day"][0]["zones"]["alpennordhang"]["wind_class"] = "verblasen"
 
     def test_checks_and_items_per_day(self):
         p = _parsed()
-        p["hazards"] = [{"items": [{"topic": "BISE", "text": "Bise im Mittelland."},
+        p["hazards"] = [{"items": [{"topic": "WIND", "text": WIND_TEXT},
                                    {"topic": "RAIN", "text": RAIN_TEXT}]},
                         {"items": []}]
         hz = sl._finalize(p, self.ctx, attempts=1, unresolved=[])["hazards"]
         self.assertEqual([h["date"] for h in hz], ["2026-07-05", "2026-07-06"])
         # Reihenfolge = HAZARD_TOPICS, nicht LLM-Reihenfolge
-        self.assertEqual([i["topic"] for i in hz[0]["items"]], ["RAIN", "BISE"])
+        self.assertEqual([i["topic"] for i in hz[0]["items"]], ["RAIN", "WIND"])
         self.assertTrue(hz[0]["checks"]["RAIN"]["active"])
         self.assertEqual(hz[1]["items"], [])
 
@@ -676,14 +679,14 @@ class TestFinalizeHazards(unittest.TestCase):
     def test_prune_drops_only_bad_item(self):
         p = _parsed()
         p["hazards"] = [{"items": [{"topic": "RAIN", "text": "Verbreitet Regen."},
-                                   {"topic": "BISE", "text": "Bise im Mittelland."}]},
+                                   {"topic": "WIND", "text": WIND_TEXT}]},
                         {"items": []}]
         hz = sl._finalize(p, self.ctx, attempts=4, unresolved=[], prune=True)["hazards"]
-        self.assertEqual([i["topic"] for i in hz[0]["items"]], ["BISE"])
+        self.assertEqual([i["topic"] for i in hz[0]["items"]], ["WIND"])
 
     def test_checks_present_without_llm_hazards(self):
         hz = sl._finalize(_parsed(), self.ctx, attempts=1, unresolved=[])["hazards"]
-        self.assertTrue(hz[0]["checks"]["BISE"]["active"])
+        self.assertTrue(hz[0]["checks"]["WIND"]["active"])
         self.assertEqual(hz[0]["items"], [])
 
     def test_payload_carries_active_hazards(self):

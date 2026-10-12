@@ -2,7 +2,7 @@
 Analyse-Kette des Morgenbriefings — gemeinsame Quelle fuer Mail und App.
 
 Aufbau, Prinzip und Pillen-Regeln: docs/BRIEFING.md. Kurz: das Briefing folgt
-der Analyse-Kette des Piloten (Lage -> Fronten -> Foehn/Bise -> Hoehenwind ->
+der Analyse-Kette des Piloten (Lage -> Fronten -> Foehn -> Hoehenwind ->
 Labilitaet -> Thermik -> Sonne -> Modelle), stellt je Block die Erwartung aus
 der Synoptik gegen die eigenen Prognosedaten und spricht ein Urteil (Pille +
 Satz). Jede Block-Funktion rechnet fuer EINEN Tag: Signatur `(wetterlage, date)`.
@@ -295,13 +295,12 @@ def _per_day_index(block, dates: list[str]) -> dict:
 
 
 def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
-    """Pro Datum eine Kurzzeile: Druckregime + msl, T850, Foehn/Bise."""
+    """Pro Datum eine Kurzzeile: Druckregime + msl, T850, Foehn."""
     lang = _lang()
     flow = _per_day_index(wetterlage.get("flow_overhead"), dates)
     press = _per_day_index(wetterlage.get("pressure_influence"), dates)
     t850 = _per_day_index(wetterlage.get("t850_trend"), dates)
     foehn = _per_day_index(wetterlage.get("foehn"), dates)
-    bise = _per_day_index(wetterlage.get("bise"), dates)
 
     out = {}
     for d in dates:
@@ -333,9 +332,6 @@ def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
             flags.append("Foehn N")
         if fo.get("sued_active"):
             flags.append("Foehn S")
-        bi = bise.get(d) or {}
-        if bi.get("active"):
-            flags.append("Bise")
 
         out[d] = {
             "wind": wind,
@@ -594,7 +590,7 @@ _L3 = {
         "of":           "von",
         "step_lage":    "Lage",
         "step_front":   "Fronten",
-        "step_foehn":   "Föhn / Bise",
+        "step_foehn":   "Föhn",
         "step_wind":    "Höhenwind",
         "step_stab":    "Labilität",
         "step_thermik": "Thermik / Basis",
@@ -603,7 +599,7 @@ _L3 = {
         # Status-Pille je Kettenglied (kurz, max 3 Woerter)
         "st_lage_match": "Daten passen zur Lage", "st_lage_partial": "Daten passen teilweise", "st_lage_contra": "Daten widersprechen der Lage",
         "st_front_signs": "Zeichen sichtbar", "st_front_weaksigns": "schwache Zeichen", "st_front_nosigns": "keine Zeichen", "st_front_airmass": "Luftmassenwechsel", "st_front_none": "keine Front angezeigt", "st_front_rear": "Rückseite",
-        "st_foehn_on": "Föhn angezeigt", "st_foehn_gusty": "einzelne Böen", "st_foehn_off": "keine Föhn-Anzeichen", "st_bise_on": "Bise angezeigt",
+        "st_foehn_on": "Föhn angezeigt", "st_foehn_gusty": "einzelne Böen", "st_foehn_off": "keine Föhn-Anzeichen",
         "st_wind_stronger": "regional stärker", "st_wind_match": "regional wie im Mittel", "st_wind_weaker": "regional schwächer",
         "st_stab_thunder": "Gewitter angezeigt", "st_stab_labile": "teils Labilität angezeigt", "st_stab_stable": "stabile Luft angezeigt",
         "st_th_good": "gutes Steigen", "st_th_mod": "mässiges Steigen", "st_th_weak": "schwaches Steigen",
@@ -713,7 +709,7 @@ _L3 = {
         "lg_air_SW":       "feuchter Mittelmeerluft", "lg_air_S": "Südströmung, Föhnrisiko im Norden",
         "lg_air_SE":       "Südströmung, Föhnrisiko im Norden", "lg_air_W": "milder Atlantikluft",
         "lg_air_NW":       "kühler Nordwestluft", "lg_air_N": "kühler Nordluft",
-        "lg_air_NE":       "trockener Kontinentalluft, Bise möglich", "lg_air_E": "trockener Kontinentalluft, Bise möglich",
+        "lg_air_NE":       "trockener Kontinentalluft", "lg_air_E": "trockener Kontinentalluft",
         "lg_sector_N":     "Nord", "lg_sector_NE": "Nordost", "lg_sector_E": "Ost", "lg_sector_SE": "Südost",
         "lg_sector_S":     "Süd", "lg_sector_SW": "Südwest", "lg_sector_W": "West", "lg_sector_NW": "Nordwest",
         "lg_strength_schwach": "schwache", "lg_strength_maessig": "mässige",
@@ -758,14 +754,14 @@ _L3 = {
         "from_afternoon":  "ab dem Nachmittag", "from_evening": "ab dem Abend",
         "wc_windig":       "windig", "wc_verblasen": "verblasen", "wc_ruhig": "ruhig",
         "wc_stark_eingeschraenkt": "stark eingeschränkt",
-        # Foehn/Bise: Anspruch der Synoptik gegen die Prognosedaten
+        # Foehn: Anspruch der Synoptik gegen die Prognosedaten
         "fb_foehn_yes":     "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen. {models} zeigt ihn auch — am Lee-Prognosepunkt {station} Böen bis {gust} km/h{windows}.",
         "fb_foehn_aloft":   "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen, doch am Lee-Prognosepunkt {station} zeigt {models} kaum Böen (bis {gust} km/h) — laut Daten bleibt der Föhn in der Höhe.",
         "fb_foehn_no":      "Daten zeigen keine Föhn-Anzeichen: das Druckgefälle über die Alpen bleibt mit {dp} hPa unter der Schwelle von 4 hPa.{strong}",
         "fb_foehn_no_nodp": "Daten zeigen keine Föhn-Anzeichen: kein nennenswertes Druckgefälle über die Alpen.{strong}",
         # Bestaetigung am Talboden: Foehn-Talpunkte (data/foehn_talpunkte.geojson)
         "fb_foehn_tal_yes": "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen. {model} zeigt den Föhn auch am Boden in {taeler} — Wind {w1}–{w2} km/h aus {dir}, Böen bis {g} km/h ({gtal}){when}.",
-        "fb_foehn_tal_no":  "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen, doch an den {n} Föhn-Talpunkten zeigt {model} keinen Föhnwind — der Föhn bleibt laut Modell in der Höhe, Startplätze auf 1500–2000 m sind trotzdem betroffen.",
+        "fb_foehn_tal_no":  "{Side}föhn: Druckgefälle {dp} hPa über die Alpen. {model} zeigt in den {n} Föhntälern keinen Föhnwind — der Föhn bleibt in der Höhe, Startplätze auf 1500–2000 m können trotzdem betroffen sein.",
         "fb_foehn_tal_na":  " Bestätigung durch Talwind nicht prüfbar (keine Talpunkt-Daten).",
         "fb_tal_more":      " u. a.",
         "fb_dir_sued":      "Süd", "fb_dir_nord": "Nord",
@@ -773,13 +769,6 @@ _L3 = {
         "fb_strong_some":   " {models} zeigt trotzdem starke Winde an einzelnen Startplätzen: Böen bis {gust} km/h aus {dir} ({spot}, {alt} m, {when}){cmp} — laut Daten Höhenwind, kein Föhn.",
         "fb_models":        "; die Modelle sind uneinig, CH2 sieht nur {ch2} km/h",
         "fb_station_nord":  "Zürich", "fb_station_sued": "Lugano",
-        "fb_bise_yes":      "Daten deuten auf Bise hin: Druckgefälle Nordost–Süd {dp} hPa und Höhenwind aus Nordost — im Mittelland zeigt {models} Nordostwind bis {kmh} km/h an {share} % der Startplätze.",
-        "fb_bise_yes_noground": "Daten deuten auf Bise hin (Synoptik (Druckgefälle {dp} hPa, Höhenwind Nordost), doch im Mittelland zeigt {models} kaum Nordostwind — schwach oder erst später.",
-        "fb_bise_no":       "Daten zeigen keine Bise-Anzeichen: {reason} — auch {models} zeigt im Mittelland keinen Nordostwind.",
-        "fb_bise_no_ground": "Synoptik-Daten zeigen keine Bise-Anzeichen ({reason}), {models} zeigt im Mittelland aber lokal Nordostwind bis {kmh} km/h.",
-        "fb_reason_dp":     "das Druckgefälle Nordost–Süd ist zu schwach ({dp} hPa)",
-        "fb_reason_dir":    "der Höhenwind kommt aus {sector} statt Nordost",
-        "fb_reason_both":   "Druckgefälle und Höhenwind passen nicht ({dp} hPa, {sector})",
         "fb_side_nord":     "Nord", "fb_side_sued": "Süd",
         "fb_win_from":      ", ab {when}",
         # Labilitaet: Erwartung aus der Synoptik gegen CAPE / Gewitter / Ueberentwicklung
@@ -860,8 +849,6 @@ _L3 = {
         "simultaneous": "überall gleichzeitig",
         "foehn_none":   "Daten zeigen keine Föhn-Anzeichen.",
         "foehn_line":   "Daten deuten auf {side}föhn hin ({level}), {h} h.",
-        "bise_none":    "Daten zeigen keine Bise-Anzeichen.",
-        "bise_line":    "Daten deuten auf Bise hin ({strength}), ΔP {dp} hPa.",
         "north":        "Nord",
         "south":        "Süd",
         "level_caution": "mässig",
@@ -903,7 +890,7 @@ _L3 = {
         "alps_south":   "Alpensüdseite",
         "warnings_ch":  "Warnungen · Gesamtlage Schweiz",
         "src_line":     "Prognosedaten: {surface} (Boden), {pl} (Höhe) — MeteoSchweiz/DWD via Open-Meteo · Grosswetterlage: ECMWF IFS · Fronten: DWD",
-        "hz_RAIN": "Regen", "hz_THUNDER": "Gewitter", "hz_FOEHN": "Föhn", "hz_BISE": "Bise",
+        "hz_RAIN": "Regen", "hz_THUNDER": "Gewitter", "hz_FOEHN": "Föhn",
         "hz_WIND": "Starker Wind",
         "hz_none":      "Daten zeigen schweizweit keine Gefahr.",
         # Ursache je Warnung aus der Synoptik — Warnung = Daten, Ursache = Lage
@@ -916,7 +903,6 @@ _L3 = {
         "hz_cause_foehn":      "— Druckgefälle {dp} hPa über die Alpen.",
         "hz_cause_thunder":    "— Daten zeigen feuchte, labile Luft{cap}.",
         "hz_cause_thunder_cap": ", im Norden gedeckelt",
-        "hz_cause_bise":       "— Druckgefälle Nordost–Süd {dp} hPa.",
         "hz_code_rain": "Daten zeigen Regen {zones}, {extent} und {intensity}.",
         "hz_extent_widespread": "verbreitet",
         "hz_extent_scattered": "gebietsweise",
@@ -961,7 +947,7 @@ _L3 = {
         "sum_one":      "{hz} erschwert das Fliegen.",
         "sum_many":     "{hz} erschweren das Fliegen.",
         "sum_RAIN": "Regen", "sum_THUNDER": "Gewitter", "sum_FOEHN": "Föhn",
-        "sum_BISE": "Bise", "sum_WIND": "starker Wind",
+        "sum_WIND": "starker Wind",
         "wind_meaning": "Mittelwert über alle Schweizer Spots, 12 Uhr",
         "wind_range":   "{lo}–{hi} km/h je Region",
         "wind_range_note": "Spanne der Regionsspitzen auf 700 hPa, am stärksten {region} {hour} Uhr",
@@ -1021,7 +1007,7 @@ _L3 = {
         "regions_word": "Deine Regionen",
         "situation_ch":  "Gesamtlage Schweiz",
         "wl_rain": "Regen", "wl_dry": "trocken", "wl_high": "Hochdruck", "wl_low": "Tiefdruck",
-        "wl_windy": "kräftiger Höhenwind", "wl_calm": "ruhig", "wl_foehn_n": "Nordföhn", "wl_foehn_s": "Südföhn", "wl_bise": "Bise",
+        "wl_windy": "kräftiger Höhenwind", "wl_calm": "ruhig", "wl_foehn_n": "Nordföhn", "wl_foehn_s": "Südföhn",
     },
     "en": {
         "no_warning":   "no warning",
@@ -1031,7 +1017,7 @@ _L3 = {
         "of":           "of",
         "step_lage":    "Situation",
         "step_front":   "Fronts",
-        "step_foehn":   "Foehn / Bise",
+        "step_foehn":   "Foehn",
         "step_wind":    "Upper wind",
         "step_stab":    "Stability",
         "step_thermik": "Thermals / cloud base",
@@ -1040,7 +1026,7 @@ _L3 = {
         # status pill per chain step (short, max 3 words)
         "st_lage_match": "data fit the pattern", "st_lage_partial": "data partly fit", "st_lage_contra": "data contradict the pattern",
         "st_front_signs": "signs visible", "st_front_weaksigns": "weak signs", "st_front_nosigns": "no signs", "st_front_airmass": "air-mass change", "st_front_none": "no front indicated", "st_front_rear": "rear side",
-        "st_foehn_on": "foehn indicated", "st_foehn_gusty": "isolated gusts", "st_foehn_off": "no foehn signs", "st_bise_on": "Bise indicated",
+        "st_foehn_on": "foehn indicated", "st_foehn_gusty": "isolated gusts", "st_foehn_off": "no foehn signs",
         "st_wind_stronger": "regionally stronger", "st_wind_match": "regionally as average", "st_wind_weaker": "regionally weaker",
         "st_stab_thunder": "thunderstorms indicated", "st_stab_labile": "instability indicated in parts", "st_stab_stable": "stable air indicated",
         "st_th_good": "good climbs", "st_th_mod": "moderate climbs", "st_th_weak": "weak climbs",
@@ -1150,7 +1136,7 @@ _L3 = {
         "lg_air_SW":       "humid Mediterranean air", "lg_air_S": "a southerly flow, foehn risk in the north",
         "lg_air_SE":       "a southerly flow, foehn risk in the north", "lg_air_W": "mild Atlantic air",
         "lg_air_NW":       "cool north-westerly air", "lg_air_N": "cool northerly air",
-        "lg_air_NE":       "dry continental air, Bise possible", "lg_air_E": "dry continental air, Bise possible",
+        "lg_air_NE":       "dry continental air", "lg_air_E": "dry continental air",
         "lg_sector_N":     "northerly", "lg_sector_NE": "north-easterly", "lg_sector_E": "easterly",
         "lg_sector_SE":    "south-easterly", "lg_sector_S": "southerly", "lg_sector_SW": "south-westerly",
         "lg_sector_W":     "westerly", "lg_sector_NW": "north-westerly",
@@ -1195,13 +1181,13 @@ _L3 = {
         "from_afternoon":  "from the afternoon", "from_evening": "from the evening",
         "wc_windig":       "windy", "wc_verblasen": "blown out", "wc_ruhig": "calm",
         "wc_stark_eingeschraenkt": "severely restricted",
-        # foehn/bise: synoptic claim against the forecast data
+        # foehn: synoptic claim against the forecast data
         "fb_foehn_yes":     "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps. {models} shows it too — gusts up to {gust} km/h at the lee forecast point {station}{windows}.",
         "fb_foehn_aloft":   "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps, but at the lee forecast point {station} {models} shows hardly any gusts (up to {gust} km/h) — per the data the foehn stays aloft.",
         "fb_foehn_no":      "Data show no signs of foehn: the pressure difference across the Alps stays below the 4 hPa threshold at {dp} hPa.{strong}",
         "fb_foehn_no_nodp": "Data show no signs of foehn: no notable pressure difference across the Alps.{strong}",
         "fb_foehn_tal_yes": "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps. {model} shows the foehn on the ground too in {taeler} — wind {w1}–{w2} km/h from the {dir}, gusts up to {g} km/h ({gtal}){when}.",
-        "fb_foehn_tal_no":  "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps, but at the {n} foehn valley points {model} shows no foehn wind — the foehn stays aloft according to the model; launch sites at 1500–2000 m are still affected.",
+        "fb_foehn_tal_no":  "{Side} foehn: pressure difference of {dp} hPa across the Alps. {model} shows no foehn wind in the {n} foehn valleys — the foehn stays aloft; launch sites at 1500–2000 m can still be affected.",
         "fb_foehn_tal_na":  " Confirmation by valley wind not verifiable (no valley-point data).",
         "fb_tal_more":      " and others",
         "fb_dir_sued":      "south", "fb_dir_nord": "north",
@@ -1209,13 +1195,6 @@ _L3 = {
         "fb_strong_some":   " {models} nevertheless shows strong winds at individual launch sites: gusts up to {gust} km/h from the {dir} ({spot}, {alt} m, {when}){cmp} — per the data upper wind, not foehn.",
         "fb_models":        "; the models disagree, CH2 sees only {ch2} km/h",
         "fb_station_nord":  "Zurich", "fb_station_sued": "Lugano",
-        "fb_bise_yes":      "Data indicate Bise: pressure difference north-east–south of {dp} hPa and upper wind from the north-east — on the Plateau {models} shows north-easterly wind up to {kmh} km/h at {share} % of launch sites.",
-        "fb_bise_yes_noground": "Data indicate Bise (synoptic picture (pressure difference {dp} hPa, upper wind north-east), but {models} shows hardly any north-easterly wind on the Plateau — weak or later.",
-        "fb_bise_no":       "Data show no signs of Bise: {reason} — {models} also shows no north-easterly wind on the Plateau.",
-        "fb_bise_no_ground": "Synoptic data show no signs of Bise ({reason}), but {models} shows locally north-easterly wind up to {kmh} km/h on the Plateau.",
-        "fb_reason_dp":     "the north-east–south pressure difference is too weak ({dp} hPa)",
-        "fb_reason_dir":    "the upper wind comes from the {sector} instead of the north-east",
-        "fb_reason_both":   "pressure difference and upper wind do not fit ({dp} hPa, {sector})",
         "fb_side_nord":     "North", "fb_side_sued": "South",
         "fb_win_from":      ", from the {when}",
         # stability: expectation from the synoptic picture against CAPE / thunderstorms / overdevelopment
@@ -1294,8 +1273,6 @@ _L3 = {
         "simultaneous": "everywhere at once",
         "foehn_none":   "Data show no signs of foehn.",
         "foehn_line":   "Data indicate {side} foehn ({level}), {h} h.",
-        "bise_none":    "Data show no signs of Bise.",
-        "bise_line":    "Data indicate Bise ({strength}), ΔP {dp} hPa.",
         "north":        "North",
         "south":        "South",
         "level_caution": "moderate",
@@ -1336,7 +1313,7 @@ _L3 = {
         "alps_south":   "southern Alps",
         "warnings_ch":  "Warnings · Switzerland overall",
         "src_line":     "Forecast data: {surface} (surface), {pl} (upper levels) — MeteoSwiss/DWD via Open-Meteo · Synoptic pattern: ECMWF IFS · Fronts: DWD",
-        "hz_RAIN": "Rain", "hz_THUNDER": "Thunderstorms", "hz_FOEHN": "Foehn", "hz_BISE": "Bise",
+        "hz_RAIN": "Rain", "hz_THUNDER": "Thunderstorms", "hz_FOEHN": "Foehn",
         "hz_WIND": "Strong wind",
         "hz_none":      "Data show no hazards across Switzerland.",
         # cause per warning from the synoptic picture — warning = data, cause = situation
@@ -1349,7 +1326,6 @@ _L3 = {
         "hz_cause_foehn":      "— pressure difference of {dp} hPa across the Alps.",
         "hz_cause_thunder":    "— data show humid, unstable air{cap}.",
         "hz_cause_thunder_cap": ", capped in the north",
-        "hz_cause_bise":       "— north-east–south pressure difference of {dp} hPa.",
         "hz_code_rain": "Data indicate rain {zones}, {extent} and {intensity}.",
         "hz_extent_widespread": "widespread",
         "hz_extent_scattered": "in places",
@@ -1394,7 +1370,7 @@ _L3 = {
         "sum_one":      "{hz} makes flying difficult.",
         "sum_many":     "{hz} make flying difficult.",
         "sum_RAIN": "rain", "sum_THUNDER": "thunderstorms", "sum_FOEHN": "foehn",
-        "sum_BISE": "bise", "sum_WIND": "strong wind",
+        "sum_WIND": "strong wind",
         "wind_meaning": "Average across all Swiss spots, 12:00",
         "wind_range":   "{lo}–{hi} km/h across regions",
         "wind_range_note": "range of regional peaks at 700 hPa, strongest {region} {hour}h",
@@ -1454,7 +1430,7 @@ _L3 = {
         "regions_word": "Your regions",
         "situation_ch":  "Overall situation Switzerland",
         "wl_rain": "rain", "wl_dry": "dry", "wl_high": "high pressure", "wl_low": "low pressure",
-        "wl_windy": "strong upper wind", "wl_calm": "calm", "wl_foehn_n": "north foehn", "wl_foehn_s": "south foehn", "wl_bise": "bise",
+        "wl_windy": "strong upper wind", "wl_calm": "calm", "wl_foehn_n": "north foehn", "wl_foehn_s": "south foehn",
     },
 }
 
@@ -1769,7 +1745,7 @@ def _day_summaries(wetterlage: dict, dates: list) -> dict:
 
 
 def _notable(strip_entry: dict, wetterlage: dict, date: str) -> str:
-    """Das eine Auffaellige je Tag: Foehn/Bise vor Schauerbeginn vor nichts."""
+    """Das eine Auffaellige je Tag: Foehn vor Schauerbeginn vor nichts."""
     if strip_entry.get("flags"):
         return " · ".join(strip_entry["flags"])
     zb = _per_day_index(wetterlage.get("zugbahn"), [date]).get(date) or {}
@@ -2810,16 +2786,15 @@ def _labilitaet_block(wetterlage: dict, date: str) -> dict:
             "labile": bool(labile) and not thunder}
 
 
-def _foehn_bise_fazit(wetterlage: dict, date: str) -> str:
-    """Block 3: was die Synoptik zu Foehn und Bise sagt (Druckgefaelle,
-    Hoehenwind) und ob die Prognosedaten es zeigen (Lee-Boeen, Nordostwind
-    im Mittelland). Leer, wenn der Kontext die Abgleich-Felder nicht hat."""
+def _foehn_fazit(wetterlage: dict, date: str) -> str:
+    """Block 3: was die Synoptik zum Foehn sagt (Druckgefaelle) und ob die
+    Prognosedaten es zeigen (Talpunkte bzw. Lee-Boeen). Bise bewusst nicht
+    (User 12.10.2026: "Bise ist egal, wichtig ist nur Nord-/Suedfoehn").
+    Leer, wenn der Kontext die Abgleich-Felder nicht hat."""
     fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
     claim, lee = fo.get("claim") or {}, fo.get("lee") or {}
     sw = _per_day_index(wetterlage.get("starkwind_punkte"), [date]).get(date) or {}
-    bi = _per_day_index(wetterlage.get("bise"), [date]).get(date) or {}
-    bb = _per_day_index(wetterlage.get("bise_boden"), [date]).get(date) or {}
-    if not claim and not bb and not sw:
+    if not claim and not sw:
         return ""
     parts = []
 
@@ -2869,35 +2844,6 @@ def _foehn_bise_fazit(wetterlage: dict, date: str) -> str:
             parts.append(_lbl("fb_foehn_no").format(dp=f"{max(dps):.0f}", strong=strong))
         else:
             parts.append(_lbl("fb_foehn_no_nodp").format(strong=strong))
-    # --- Bise ---
-    dp = bi.get("delta_p_hpa")
-    ddeg = bi.get("wind_700_dir_deg")
-    ne = isinstance(ddeg, (int, float)) and 30 <= ddeg <= 90
-    dp_ok = isinstance(dp, (int, float)) and dp >= 4
-    share, kmh = bb.get("share_ne"), bb.get("max_kmh") or 0
-    ground = isinstance(share, (int, float)) and share >= 0.2
-    sector = _lbl("lg_sector_" + _SECTOR_ABBR.get(bi.get("sector", ""), "")) if bi.get("sector") else (
-        _sector_word(ddeg) if isinstance(ddeg, (int, float)) else "")
-    dp_txt = f"{dp:+.0f}" if isinstance(dp, (int, float)) else "–"
-    # Bise nur erwaehnen, wenn sie ein Thema ist: aktiv, Nordostwind am Boden,
-    # oder der Hoehenwind hat eine Nord-/Ostkomponente. Bei Suedwest weiss
-    # jeder Pilot, dass keine Bise kommt.
-    ne_component = isinstance(ddeg, (int, float)) and (ddeg >= 330 or ddeg <= 120)
-    if not (bi.get("active") or ground or ne_component):
-        return " ".join(parts)
-    if bi.get("active"):
-        key = "fb_bise_yes" if ground else "fb_bise_yes_noground"
-        parts.append(_lbl(key).format(models=_model_words(), dp=dp_txt, kmh=int(kmh),
-                                      share=int(round(100 * (share or 0)))))
-    else:
-        if not dp_ok and not ne:
-            reason = _lbl("fb_reason_both").format(dp=dp_txt, sector=sector)
-        elif not dp_ok:
-            reason = _lbl("fb_reason_dp").format(dp=dp_txt)
-        else:
-            reason = _lbl("fb_reason_dir").format(sector=sector)
-        key = "fb_bise_no_ground" if ground else "fb_bise_no"
-        parts.append(_lbl(key).format(models=_model_words(), reason=reason, kmh=int(kmh)))
     return " ".join(parts)
 
 
@@ -2954,14 +2900,6 @@ def _foehn_text(wetterlage: dict, date: str) -> str:
     return " ".join(parts) if parts else _lbl("foehn_none")
 
 
-def _bise_text(wetterlage: dict, date: str) -> str:
-    bi = _per_day_index(wetterlage.get("bise"), [date]).get(date) or {}
-    if not bi.get("active"):
-        return _lbl("bise_none")
-    return _lbl("bise_line").format(strength=bi.get("strength") or "",
-                                    dp=f"{float(bi.get('delta_p_hpa') or 0):+.1f}")
-
-
 def _ground_estimate(speed_txt: str) -> str:
     m = re.match(r"(\d+)", speed_txt or "")
     if not m:
@@ -2976,7 +2914,6 @@ def _week_line(wetterlage: dict, days: list) -> str:
     press = _per_day_index(wetterlage.get("pressure_influence"), dates)
     flow = _per_day_index(wetterlage.get("flow_overhead"), dates)
     foehn = _per_day_index(wetterlage.get("foehn"), dates)
-    bise = _per_day_index(wetterlage.get("bise"), dates)
     precip = _per_day_index(wetterlage.get("precip_pattern"), dates)
     parts = []
     for d in days:
@@ -2999,8 +2936,6 @@ def _week_line(wetterlage: dict, days: list) -> str:
             words.append(_lbl("wl_foehn_n"))
         if fo.get("sued_active"):
             words.append(_lbl("wl_foehn_s"))
-        if (bise.get(date) or {}).get("active"):
-            words.append(_lbl("wl_bise"))
         strength = (flow.get(date) or {}).get("strength", "")
         if strength in ("kraeftig", "stuermisch"):
             words.append(_lbl("wl_windy"))
@@ -3049,12 +2984,9 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         {"k": _lbl("fx_dwd"), "v": (_front_type(dwd_typ) if dwd_typ else "—")},
         {"k": _lbl("fx_signature"), "v": _lbl("fx_sig_" + zst) if zst else _lbl("fx_sig_no")},
     ]
-    # Foehn / Bise
-    bi = _per_day_index(wl.get("bise"), [date]).get(date) or {}
+    # Foehn
     if fo.get("sued_active") or fo.get("nord_active"):
         st("foehn", "warn", "st_foehn_on")
-    elif bi.get("active"):
-        st("foehn", "warn", "st_bise_on")
     elif (sw.get("max_gust_kmh") or 0) >= 40:
         st("foehn", "info", "st_foehn_gusty")
     else:
@@ -3154,8 +3086,8 @@ def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> di
         "fronts": {**_front_block(fronts, passagen, dates, date, wetterlage),
                    "lines": _front_lines(fronts, passagen, date),
                    "zugbahn": _zugbahn_text(wetterlage, date)},
-        "foehn": {"foehn": _foehn_text(wetterlage, date), "bise": _bise_text(wetterlage, date),
-                  "fazit": _foehn_bise_fazit(wetterlage, date),
+        "foehn": {"foehn": _foehn_text(wetterlage, date),
+                  "fazit": _foehn_fazit(wetterlage, date),
                   "flags": strip.get("flags", [])},
         "wind": {
             "arrow": strip.get("wind_arrow", ""), "speed": strip.get("wind_speed", ""),
@@ -3370,10 +3302,6 @@ def _hazard_cause(topic: str, check: dict, wetterlage: dict, date: str) -> str:
         zones = set(check.get("zones") or [])
         cap = _lbl("hz_cause_thunder_cap") if (regime == "hoch" or tkey == "up") and "alpennordhang" not in zones else ""
         return _lbl("hz_cause_thunder").format(cap=cap)
-    if topic == "BISE":
-        bi = _per_day_index(wl.get("bise"), [date]).get(date) or {}
-        dp = bi.get("delta_p_hpa")
-        return _lbl("hz_cause_bise").format(dp=f"{dp:+.0f}") if isinstance(dp, (int, float)) else ""
     return ""
 
 
@@ -3427,9 +3355,6 @@ def _hazard_base_text(topic: str, check: dict) -> str:
         level = _lbl("level_danger" if f.get("peak") == "danger" else "level_caution")
         return _lbl("hz_code_foehn").format(side=_lbl(side), level=level,
                                             h=f.get("hours", 0), zones=zones_plain)
-    if topic == "BISE":
-        return _lbl("bise_line").format(strength=f.get("strength") or "",
-                                        dp=f"{float(f.get('delta_p_hpa') or 0):+.1f}")
     if topic == "WIND":
         # Gleiche Klasse buendeln: "verblasen am Alpennordhang und im Wallis"
         by_class = {}

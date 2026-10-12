@@ -201,7 +201,7 @@ class TestBriefing(unittest.TestCase):
         tal = sc.foehn_tal_for_day(_series(confirmed=False), DATE, "sued")
         day = _day(tal)
         fazit = day["chain"]["foehn"]["fazit"]
-        self.assertIn("bleibt laut Modell in der Höhe", fazit)
+        self.assertIn("der Föhn bleibt in der Höhe", fazit)
         self.assertNotIn("km/h", fazit.split("Startplätze")[0])
         facts = {f["k"]: f["v"] for f in day["chain"]["foehn"]["facts"]}
         self.assertEqual(facts["Föhntäler"], "0/3")

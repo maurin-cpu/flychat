@@ -370,7 +370,7 @@ STYLE & TONE
 The pilot reads this first: is there rain? Foehn? Thunderstorms? And WHERE
 in Switzerland? Which hazard is active on which day is decided by the CODE —
 it is in the payload under `hazards_per_day[i].active` (topics `RAIN`,
-`THUNDER`, `FOEHN`, `BISE`, `WIND`, each with the affected `zones`, for
+`THUNDER`, `FOEHN`, `WIND`, each with the affected `zones`, for
 `FOEHN` also `side`). The course of the day (`day_shape`, `windows`) also
 comes from the code. You ONLY describe where, when and how — and strictly
 for THIS ONE DAY.
@@ -466,11 +466,10 @@ EXACTLY one entry `{"items": [...]}` per `forecast_dates` day:
       `tal_gust_max_kmh` (gust peak, in valley `tal_gust_valley`), exactly
       as given. `tal_confirmed` empty → say that according to the model the
       foehn stays aloft and does not reach the valleys (launch sites at
-      height are still affected) — then NO km/h number and never "gusty in
+      height can still be affected) — then NO km/h number and never "gusty in
       the valleys". Foehn valleys are only the names given, never launch
       sites. Also applies to `lead` and `day_lines`. The validator checks
       names, numbers and "aloft".
-  * `BISE` — Mittelland and Jura, stronger where channelled.
   * `WIND` — cause from `wind_day.wind_driver` (upper wind / gusts).
 - Same bans as everywhere: no hPa/°C numbers, no trough jargon, fronts only
   from `fronten.durchgaenge` (FRONTS section), no

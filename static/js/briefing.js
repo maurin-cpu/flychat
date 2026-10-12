@@ -2292,7 +2292,7 @@
       </div>`);
     }
     let fazit = blk.fazit || "";
-    if (def.key === "foehn" && !fazit) fazit = [blk.foehn, blk.bise].filter(Boolean).join(" ");
+    if (def.key === "foehn" && !fazit) fazit = blk.foehn || "";
     parts.push(chainVerdictHtml(fazit, def.sep));
     if (def.key === "stability" && Array.isArray(blk.thunder) && blk.thunder.length && labels.thunder_caveat) {
       parts.push(`<p class="bf-chain-caveat">${escapeHtml(labels.thunder_caveat)}</p>`);

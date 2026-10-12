@@ -141,11 +141,11 @@
     {% if v3_chain.fronts.fazit %}{{ verdict(v3_chain.fronts.fazit) }}{% endif %}
   </td></tr>
 
-  {# 3 Foehn / Bise #}
+  {# 3 Foehn #}
   {{ step(3, v3_labels.step_foehn, v3_chain.foehn.status, v3_chain.foehn.status_label) }}
   <tr><td style="padding:0 18px 12px 56px;">
     {% if v3_chain.foehn.facts %}<div>{% for f in v3_chain.foehn.facts %}{{ fact(f.k, f.v) }}{% endfor %}</div>{% endif %}
-    {{ verdict(v3_chain.foehn.fazit if v3_chain.foehn.fazit else (v3_chain.foehn.foehn ~ ' ' ~ v3_chain.foehn.bise)) }}
+    {{ verdict(v3_chain.foehn.fazit or v3_chain.foehn.foehn) }}
   </td></tr>
 
   {# 4 Hoehenwind #}

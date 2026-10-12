@@ -373,11 +373,11 @@
           {% if v3_chain.fronts.fazit %}{% set t = v3_chain.fronts.fazit.split('. ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}.{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>{% endif %}
         </div></div>
 
-        {# 3 Foehn / Bise #}
+        {# 3 Foehn #}
         <div class="step"><div class="no">3</div><div>
           <div class="h"><svg class="ico" aria-hidden="true"><use href="#i-foehn"/></svg>{{ v3_labels.step_foehn }}{% if v3_chain.foehn.status %}<span class="tag {{ v3_chain.foehn.status }}">{{ v3_chain.foehn.status_label }}</span>{% endif %}</div>
           {% if v3_chain.foehn.facts %}<div class="facts">{% for f in v3_chain.foehn.facts %}<span class="fact"><span class="k">{{ f.k }}</span>{{ f.v }}</span>{% endfor %}</div>{% endif %}
-          {% set txt = v3_chain.foehn.fazit if v3_chain.foehn.fazit else (v3_chain.foehn.foehn ~ ' ' ~ v3_chain.foehn.bise) %}
+          {% set txt = v3_chain.foehn.fazit or v3_chain.foehn.foehn %}
           {% set t = txt.split('. ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}.{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>
         </div></div>
 
