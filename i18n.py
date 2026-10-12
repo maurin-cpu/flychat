@@ -938,6 +938,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.window.state_neutral": {"de": "Ausserhalb", "en": "Outside"},
     # Generische Fehler-/Status-Texte (briefing.js)
     "js.error.prefix": {"de": "Fehler: {msg}", "en": "Error: {msg}"},
+    "js.error.unknown": {"de": "Unbekannt", "en": "Unknown"},
+    "js.error.js_error": {"de": "JavaScript-Fehler", "en": "JavaScript error"},
     "js.generating": {"de": "Generiert…", "en": "Generating…"},
     "js.failed": {"de": "Fehlgeschlagen", "en": "Failed"},
     # Link Wetterlage-Block -> Synoptik-Karte
@@ -1047,6 +1049,7 @@ STRINGS: dict[str, dict[str, str]] = {
     # ======================= chat-charts.js (Chat-Visualisierungen, user-facing) =======================
     # Einheiten (km/h, m/s, hPa), ":00" und "Wind" bleiben (sprachneutral/identisch).
     "js.chart.loading": {"de": "Daten werden geladen…", "en": "Loading data…"},
+    "js.chart.load_error": {"de": "Fehler beim Laden", "en": "Failed to load"},
     "js.chart.loading_chart": {"de": "Chart wird geladen…", "en": "Loading chart…"},
     "js.chart.chartjs_load_failed": {"de": "Chart.js konnte nicht geladen werden",
                                      "en": "Chart.js could not be loaded"},
@@ -1118,6 +1121,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "js.mg.tt_cloudbase": {"de": "Wolkenbasis", "en": "Cloud base"},
     "js.mg.tt_groundwind": {"de": "Bodenwind", "en": "Ground wind"},
     "js.mg.tt_launch": {"de": "Startplatz", "en": "Launch"},
+    "js.briefing.launch_title": {"de": "Startplatz", "en": "Launch site"},
     "js.mg.cloud_high": {"de": "Hoch", "en": "High"},
     "js.mg.cloud_mid": {"de": "Mittel", "en": "Mid"},
     "js.mg.cloud_low": {"de": "Tief", "en": "Low"},

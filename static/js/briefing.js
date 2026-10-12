@@ -1440,7 +1440,7 @@
           ${assessmentsHtml}
           <div class="bf-detail-mapmeteo-row">
             <section class="bf-detail-mapblock">
-              <h4 class="bf-detail-title"><span class="bf-detail-icon">🗺</span>Startplatz</h4>
+              <h4 class="bf-detail-title"><span class="bf-detail-icon">🗺</span>${wcT('js.briefing.launch_title')}</h4>
               ${miniMapInner}
             </section>
             <section class="bf-detail-meteoblock">

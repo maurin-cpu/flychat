@@ -19,6 +19,12 @@
     var AUTO_HIDE_MS = 12000;
     var hideTimer = null;
 
+    // Wird vor base.html's wcT geladen — Texte erst beim Fehler aufloesen, mit DE-Rueckfall.
+    function tr(key, fallback) {
+        var s = window.wcT ? window.wcT(key) : key;
+        return s === key ? fallback : s;
+    }
+
     function ensureBanner() {
         var existing = document.getElementById(BANNER_ID);
         if (existing) return existing;
@@ -50,7 +56,7 @@
         var closeBtn = document.createElement('button');
         closeBtn.type = 'button';
         closeBtn.textContent = '\u00D7';
-        closeBtn.setAttribute('aria-label', 'Schliessen');
+        closeBtn.setAttribute('aria-label', tr('js.ri.close', 'Schliessen'));
         closeBtn.style.cssText = [
             'position:absolute',
             'top:6px',
@@ -112,8 +118,8 @@
 
     function formatErrorEvent(ev) {
         // window.error event: ev.message, ev.filename, ev.lineno, ev.colno, ev.error
-        var parts = ['\u26A0 JavaScript-Fehler'];
-        var msg = ev && (ev.message || (ev.error && ev.error.message)) || 'Unbekannter Fehler';
+        var parts = ['\u26A0 ' + tr('js.error.js_error', 'JavaScript-Fehler')];
+        var msg = ev && (ev.message || (ev.error && ev.error.message)) || tr('js.chat.unknown_error', 'Unbekannter Fehler');
         parts.push(msg);
 
         var file = ev && ev.filename;

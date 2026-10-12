@@ -26,7 +26,7 @@ window.ChatCharts = (function () {
     }
 
     function showError(el, msg) {
-        el.innerHTML = '<div class="chart-error">' + (msg || 'Fehler beim Laden') + '</div>';
+        el.innerHTML = '<div class="chart-error">' + (msg || wcT('js.chart.load_error')) + '</div>';
     }
 
     function todayStr() {

@@ -1344,7 +1344,7 @@
                 var errBox = document.createElement('div');
                 errBox.className = 'error-state';
                 errBox.appendChild(document.createTextNode(
-                    'Fehler: ' + (err && err.message ? err.message : 'Unbekannt')
+                    wcT('js.error.prefix', {msg: (err && err.message ? err.message : wcT('js.error.unknown'))})
                 ));
                 errBox.appendChild(document.createElement('br'));
                 var retryBtn = document.createElement('button');

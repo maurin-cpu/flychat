@@ -382,7 +382,7 @@
                 var contentDiv = document.createElement('div');
                 contentDiv.className = 'message-content';
                 var msgP = document.createElement('p');
-                msgP.textContent = 'Fehler: ' + (err && err.message ? err.message : 'Unbekannt');
+                msgP.textContent = wcT('js.error.prefix', {msg: (err && err.message ? err.message : wcT('js.error.unknown'))});
                 contentDiv.appendChild(msgP);
                 var dismissBtn = document.createElement('button');
                 dismissBtn.className = 'btn btn-secondary btn-sm';
@@ -473,7 +473,7 @@
                     }
                 })
                 .catch(function (err) {
-                    alert('Fehler: ' + err.message);
+                    alert(wcT('js.error.prefix', {msg: err.message}));
                 });
         });
     }
