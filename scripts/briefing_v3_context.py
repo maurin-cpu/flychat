@@ -386,6 +386,7 @@ def _wind_range_block(wetterlage: dict, date: str, strip: dict) -> dict:
     abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
     sector = _lbl("lg_sector_" + abbr) if abbr else ""
     args = dict(models=_model_words(), strength=_lbl("wstr_" + syn_cls), sector=sector, lo=int(lo), hi=int(hi),
+                Strength=_capitalize(_lbl("wstr_" + syn_cls)),
                 region=day["region"], when=when, cls=_lbl("wcls_" + data_cls))
     if order.index(data_cls) > order.index(syn_cls):
         fazit, verdict = _lbl("wind_fazit_stronger").format(**args), "stronger"
@@ -651,11 +652,11 @@ _L3 = {
         "md_word_cloud_3": "stark bewölkt", "md_word_cloud_4": "bedeckt",
         "md_word_dir_0": "Nord", "md_word_dir_1": "Nordost", "md_word_dir_2": "Ost", "md_word_dir_3": "Südost",
         "md_word_dir_4": "Süd", "md_word_dir_5": "Südwest", "md_word_dir_6": "West", "md_word_dir_7": "Nordwest",
-        "su_exp_high":  "{Press} lässt viel Sonne erwarten",
-        "su_exp_low":   "{Press} lässt viel Bewölkung erwarten",
-        "su_exp_flat":  "Die Übergangslage lässt wechselnde Bewölkung erwarten",
-        "su_air_south": ", die feuchte {sector}luft aber Wolken im Süden",
-        "su_air_north": ", die {sector}luft aber Wolken am Alpennordhang",
+        "su_exp_high":  "{Press}: viel Sonne zu erwarten",
+        "su_exp_low":   "{Press}: viel Bewölkung zu erwarten",
+        "su_exp_flat":  "Übergangslage: wechselnde Bewölkung zu erwarten",
+        "su_air_south": ", die feuchte {sector}luft bringt aber Wolken in den Süden",
+        "su_air_north": ", die {sector}luft bringt aber Wolken an den Alpennordhang",
         "su_data":      " — {models} zeigt {zones}{best}.",
         "su_match":     ". {models} bestätigt die Zweiteilung: {zones}{best}.",
         "su_match_all": ". {models} bestätigt das landesweit: {zones}{best}.",
@@ -674,11 +675,11 @@ _L3 = {
         "su_both":      "im ganzen Land {word}",
         "su_north":     "im Norden", "su_south": "im Süden",
         "su_lbl_sun":   "Sonne 10–16 Uhr", "su_lbl_low": "Wolken unter 2 km", "su_lbl_high": "Wolken über 2 km",
-        "th_exp_high":  "{Press} lässt Absinken und eine gedeckelte Basis erwarten",
-        "th_exp_low":   "{Press} lässt eine hohe Basis, aber Überentwicklung erwarten",
-        "th_exp_flat":  "Die Übergangslage lässt keine klare Schichtung erwarten",
-        "th_press_hoch": "Der Hochdruck", "th_press_up": "Der steigende Druck",
-        "th_press_tief": "Der Tiefdruck", "th_press_down": "Der fallende Druck",
+        "th_exp_high":  "{Press}: Absinken und eine gedeckelte Basis zu erwarten",
+        "th_exp_low":   "{Press}: hohe Basis, aber Überentwicklung zu erwarten",
+        "th_exp_flat":  "Übergangslage: keine klare Schichtung zu erwarten",
+        "th_press_hoch": "Hochdruck", "th_press_up": "Steigender Druck",
+        "th_press_tief": "Tiefdruck", "th_press_down": "Fallender Druck",
         "th_t850_warm": ", die warme Höhenluft bremst das Steigen",
         "th_t850_cold": ", die kalte Höhenluft fördert kräftiges Steigen",
         "th_data":      " — {models} zeigt {base}, {climb}{start}{sun}.",
@@ -704,7 +705,7 @@ _L3 = {
         # Lage in drei kurzen Saetzen: Einfluss -> Druck -> Prognosedaten
         "lg_between":      "Zwischen {a} und {b}: {strength} {sector}strömung mit {air}.",
         "lg_single":       "{a}: {strength} {sector}strömung mit {air}.",
-        "lg_nocenter":     "{strength} {sector}strömung mit {air}.",
+        "lg_nocenter":     "Kein prägendes Druckzentrum: {strength} {sector}strömung mit {air}.",
         "lg_center":       "{ctype} {name}",
         "lg_air_SW":       "feuchter Mittelmeerluft", "lg_air_S": "Südströmung, Föhnrisiko im Norden",
         "lg_air_SE":       "Südströmung, Föhnrisiko im Norden", "lg_air_W": "milder Atlantikluft",
@@ -773,9 +774,9 @@ _L3 = {
         "fb_win_from":      ", ab {when}",
         # Labilitaet: Erwartung aus der Synoptik gegen CAPE / Gewitter / Ueberentwicklung
         "lb_expect":        "{air}{press}",
-        "lb_air_humid":     "Die feuchte {sector}luft lässt Labilität erwarten",
-        "lb_air_cool":      "Die kühle {sector}luft lässt Schauer und Labilität am Nordhang erwarten",
-        "lb_air_neutral":   "Die {sector}strömung bringt keine ausgeprägt labile Luft",
+        "lb_air_humid":     "Feuchte {sector}luft: Labilität zu erwarten",
+        "lb_air_cool":      "Kühle {sector}luft: Schauer und Labilität am Nordhang zu erwarten",
+        "lb_air_neutral":   "{Sector}strömung: keine ausgeprägt labile Luft",
         "lb_press_cap":     ", der {regime} deckelt sie aber",
         "lb_press_up":      ", der steigende Druck deckelt sie aber zunehmend",
         "lb_press_low":     ", der Tiefdruck begünstigt sie",
@@ -799,14 +800,14 @@ _L3 = {
         "lb_north_capped":  "; am Alpennordhang bleibt die Luft gedeckelt",
         "lb_grade_light":   "leicht labil", "lb_grade_mod": "labil", "lb_grade_strong": "stark labil",
         "lb_in":            "im ", "lb_in_plural": "in ",
-        "front_today_in":     "{Day} dürfte die {typ} {zone} {when} {art}{unsicher}{prov}.",
+        "front_today_in":     "{Day}: Die {typ} {art} {zone} voraussichtlich {when}{unsicher}{prov}.",
         "front_fazit_none_more": "Danach zeigen die Daten im 3-Tage-Fenster keine weitere Front.",
         # Frontzeichen (seit 09.10.2026): DWD nennt die Front, die eigene
         # Prognose beschreibt ihre Zeichen — kein Urteil "zieht durch/loest sich auf"
-        "front_z_deutlich":   "In der DWD-Prognose wird {day} {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu deutliche Zeichen: {zeichen}.",
-        "front_z_schwach":    "In der DWD-Prognose wird {day} {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu nur schwache Zeichen: {zeichen}.",
-        "front_z_keine":      "In der DWD-Prognose wird {day} {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu keine Zeichen.",
-        "front_z_ohne_dwd":   "In der DWD-Prognose ist {day} keine Front über der Schweiz angegeben. {models} zeigt über {zone_dat} aber deutliche Zeichen eines Luftmassenwechsels: {zeichen}.",
+        "front_z_deutlich":   "{Day}: In der DWD-Prognose wird {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu deutliche Zeichen: {zeichen}.",
+        "front_z_schwach":    "{Day}: In der DWD-Prognose wird {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu nur schwache Zeichen: {zeichen}.",
+        "front_z_keine":      "{Day}: In der DWD-Prognose wird {when} eine {typ} über {zone_dat} angegeben. {models} zeigt dazu keine Zeichen.",
+        "front_z_ohne_dwd":   "{Day}: In der DWD-Prognose ist keine Front über der Schweiz angegeben. {models} zeigt über {zone_dat} aber deutliche Zeichen eines Luftmassenwechsels: {zeichen}.",
         "ez_druck_deutlich":  "kräftiger Druckanstieg ({val} hPa in 12 h)",
         "ez_druck_schwach":   "Druckanstieg ({val} hPa in 12 h)",
         "ez_druckfall_deutlich": "kräftiger Druckfall ({val} hPa in 12 h)",
@@ -824,7 +825,7 @@ _L3 = {
         "front_prev_run":     " (Lauf von gestern; heute früh {dist} km {dir})",
         "front_fazit_in_more": "Gemäss Prognosedaten dürfte eine weitere {typ} {zone} {day} {when} {art}{unsicher}.",
         "front_today_none":   "{Day}: Daten zeigen keine Front.",
-        "front_passed":       "{When} ist die {typ} über {zone} gezogen (DWD-Analyse) — {day} auf der Rückseite.",
+        "front_passed":       "{When}: Die {typ} ist über {zone} gezogen (DWD-Analyse) — {day} auf der Rückseite.",
         "yesterday":          "gestern",
         "front_fazit_in":     "Gemäss Prognosedaten dürfte die {typ} {zone} {day} {when} {art}{unsicher}.",
         "front_fazit_later":  "Gemäss Prognosedaten erreicht die {typ} die Schweiz frühestens {day} — nach dem 3-Tage-Fenster.",
@@ -952,9 +953,9 @@ _L3 = {
         "wind_range":   "{lo}–{hi} km/h je Region",
         "wind_range_note": "Spanne der Regionsspitzen auf 700 hPa, am stärksten {region} {hour} Uhr",
         "wind_ground_range": "≈ {lo}–{hi} km/h am Boden zu erwarten (⅔-Regel)",
-        "wind_fazit_match": "Das Schweizer Mittel ({models}) sagt {strength} {sector}strömung, und die Regionen bleiben in dieser Klasse: {lo} bis {hi} km/h, am stärksten {region} am {when}.",
-        "wind_fazit_stronger": "Das Schweizer Mittel ({models}) sagt {strength} {sector}strömung — regional ist es eine Klasse stärker: bis {hi} km/h {region} am {when}, also {cls}. Das Mittel verharmlost.",
-        "wind_fazit_weaker": "Das Schweizer Mittel ({models}) sagt {strength} {sector}strömung — selbst die stärkste Region bleibt darunter: höchstens {hi} km/h ({region}).",
+        "wind_fazit_match": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}), und die Regionen bleiben in dieser Klasse — {lo} bis {hi} km/h, am stärksten {region} am {when}.",
+        "wind_fazit_stronger": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}) — regional ist es eine Klasse stärker, bis {hi} km/h {region} am {when}, also {cls}. Das Mittel verharmlost.",
+        "wind_fazit_weaker": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}) — selbst die stärkste Region bleibt darunter, höchstens {hi} km/h ({region}).",
         "wcls_schwach": "schwach", "wcls_maessig": "mässig", "wcls_kraeftig": "kräftig", "wcls_stuermisch": "stürmisch",
         "wstr_schwach": "schwache", "wstr_maessig": "mässige", "wstr_kraeftig": "kräftige", "wstr_stuermisch": "stürmische",
         "hour_morning": "Morgen", "hour_midday": "Mittag", "hour_afternoon": "Nachmittag", "hour_evening": "Abend",
@@ -1078,9 +1079,9 @@ _L3 = {
         "md_word_cloud_3": "mostly cloudy", "md_word_cloud_4": "overcast",
         "md_word_dir_0": "north", "md_word_dir_1": "north-east", "md_word_dir_2": "east", "md_word_dir_3": "south-east",
         "md_word_dir_4": "south", "md_word_dir_5": "south-west", "md_word_dir_6": "west", "md_word_dir_7": "north-west",
-        "su_exp_high":  "{Press} suggests plenty of sunshine",
-        "su_exp_low":   "{Press} suggests a lot of cloud",
-        "su_exp_flat":  "The transitional situation suggests changeable cloud",
+        "su_exp_high":  "{Press}: plenty of sunshine expected",
+        "su_exp_low":   "{Press}: a lot of cloud expected",
+        "su_exp_flat":  "Transitional situation: changeable cloud expected",
         "su_air_south": ", but the humid {sector} air brings cloud to the south",
         "su_air_north": ", but the {sector} air brings cloud to the Northern Alps",
         "su_data":      " — {models} shows {zones}{best}.",
@@ -1101,9 +1102,9 @@ _L3 = {
         "su_both":      "{word} nationwide",
         "su_north":     "in the north", "su_south": "in the south",
         "su_lbl_sun":   "Sun 10–16h", "su_lbl_low": "cloud below 2 km", "su_lbl_high": "cloud above 2 km",
-        "th_exp_high":  "{Press} suggests subsidence and a capped cloud base",
-        "th_exp_low":   "{Press} suggests a high base but overdevelopment",
-        "th_exp_flat":  "The transitional situation suggests no clear stratification",
+        "th_exp_high":  "{Press}: subsidence and a capped cloud base expected",
+        "th_exp_low":   "{Press}: high base but overdevelopment expected",
+        "th_exp_flat":  "Transitional situation: no clear stratification expected",
         "th_press_hoch": "High pressure", "th_press_up": "Rising pressure",
         "th_press_tief": "Low pressure", "th_press_down": "Falling pressure",
         "th_t850_warm": ", the warm air aloft brakes the climb",
@@ -1131,7 +1132,7 @@ _L3 = {
         # situation in three short sentences: influence -> pressure -> forecast data
         "lg_between":      "Between {a} and {b}: {strength} {sector} flow with {air}.",
         "lg_single":       "{a}: {strength} {sector} flow with {air}.",
-        "lg_nocenter":     "{strength} {sector} flow with {air}.",
+        "lg_nocenter":     "No dominant pressure centre: {strength} {sector} flow with {air}.",
         "lg_center":       "{ctype} {name}",
         "lg_air_SW":       "humid Mediterranean air", "lg_air_S": "a southerly flow, foehn risk in the north",
         "lg_air_SE":       "a southerly flow, foehn risk in the north", "lg_air_W": "mild Atlantic air",
@@ -1199,9 +1200,9 @@ _L3 = {
         "fb_win_from":      ", from the {when}",
         # stability: expectation from the synoptic picture against CAPE / thunderstorms / overdevelopment
         "lb_expect":        "{air}{press}",
-        "lb_air_humid":     "The humid {sector} air suggests instability",
-        "lb_air_cool":      "The cool {sector} air suggests showers and instability on the north side",
-        "lb_air_neutral":   "The {sector} flow brings no distinctly unstable air",
+        "lb_air_humid":     "Humid {sector} air: instability expected",
+        "lb_air_cool":      "Cool {sector} air: showers and instability on the north side expected",
+        "lb_air_neutral":   "{Sector} flow: no distinctly unstable air",
         "lb_press_cap":     ", but the {regime} caps it",
         "lb_press_up":      ", but rising pressure increasingly caps it",
         "lb_press_low":     ", and low pressure favours it",
@@ -1225,12 +1226,12 @@ _L3 = {
         "lb_north_capped":  "; on the Northern Alps the air stays capped",
         "lb_grade_light":   "slightly unstable", "lb_grade_mod": "unstable", "lb_grade_strong": "strongly unstable",
         "lb_in":            "in ", "lb_in_plural": "in ",
-        "front_today_in":     "{Day} the {typ} is expected to {art_inf} {zone} {when}{unsicher}{prov}.",
+        "front_today_in":     "{Day}: the {typ} is expected to {art_inf} {zone} {when}{unsicher}{prov}.",
         "front_fazit_none_more": "After that, data indicate no further front within the 3-day window.",
-        "front_z_deutlich":   "The DWD forecast indicates a {typ} over {zone} {day} {when}. {models} shows clear signs of it: {zeichen}.",
-        "front_z_schwach":    "The DWD forecast indicates a {typ} over {zone} {day} {when}. {models} shows only weak signs of it: {zeichen}.",
-        "front_z_keine":      "The DWD forecast indicates a {typ} over {zone} {day} {when}. {models} shows no signs of it.",
-        "front_z_ohne_dwd":   "The DWD forecast indicates no front over Switzerland {day}. {models} nevertheless shows clear signs of an air-mass change over {zone}: {zeichen}.",
+        "front_z_deutlich":   "{Day}: the DWD forecast indicates a {typ} over {zone} {when}. {models} shows clear signs of it: {zeichen}.",
+        "front_z_schwach":    "{Day}: the DWD forecast indicates a {typ} over {zone} {when}. {models} shows only weak signs of it: {zeichen}.",
+        "front_z_keine":      "{Day}: the DWD forecast indicates a {typ} over {zone} {when}. {models} shows no signs of it.",
+        "front_z_ohne_dwd":   "{Day}: the DWD forecast indicates no front over Switzerland. {models} nevertheless shows clear signs of an air-mass change over {zone}: {zeichen}.",
         "ez_druck_deutlich":  "a strong pressure rise ({val} hPa in 12 h)",
         "ez_druck_schwach":   "a pressure rise ({val} hPa in 12 h)",
         "ez_druckfall_deutlich": "a strong pressure fall ({val} hPa in 12 h)",
@@ -1248,7 +1249,7 @@ _L3 = {
         "front_prev_run":     " (yesterday's run; this morning {dist} km to the {dir})",
         "front_fazit_in_more": "Forecast data suggest a further {typ} {art} {zone} {day} {when}{unsicher}.",
         "front_today_none":   "{Day}: data indicate no front.",
-        "front_passed":       "{When} the {typ} passed over {zone} (DWD analysis) — {day} on its rear side.",
+        "front_passed":       "{When}: the {typ} passed over {zone} (DWD analysis) — {day} on its rear side.",
         "yesterday":          "yesterday",
         "front_fazit_in":     "Forecast data suggest the {typ} {art} {zone} {day} {when}{unsicher}.",
         "front_fazit_later":  "Forecast data suggest the {typ} reaches Switzerland {day} at the earliest — beyond the 3-day window.",
@@ -1375,9 +1376,9 @@ _L3 = {
         "wind_range":   "{lo}–{hi} km/h across regions",
         "wind_range_note": "range of regional peaks at 700 hPa, strongest {region} {hour}h",
         "wind_ground_range": "≈ {lo}–{hi} km/h expected at ground level (⅔ rule)",
-        "wind_fazit_match": "The Swiss average ({models}) says {strength} {sector} flow, and the regions stay in that class: {lo} to {hi} km/h, strongest {region} in the {when}.",
-        "wind_fazit_stronger": "The Swiss average ({models}) says {strength} {sector} flow — regionally it is one class stronger: up to {hi} km/h {region} in the {when}, i.e. {cls}. The average understates it.",
-        "wind_fazit_weaker": "The Swiss average ({models}) says {strength} {sector} flow — even the strongest region stays below that: at most {hi} km/h ({region}).",
+        "wind_fazit_match": "{Strength} {sector} flow: that is the Swiss average ({models}), and the regions stay in that class — {lo} to {hi} km/h, strongest {region} in the {when}.",
+        "wind_fazit_stronger": "{Strength} {sector} flow: that is the Swiss average ({models}) — regionally it is one class stronger, up to {hi} km/h {region} in the {when}, i.e. {cls}. The average understates it.",
+        "wind_fazit_weaker": "{Strength} {sector} flow: that is the Swiss average ({models}) — even the strongest region stays below that, at most {hi} km/h ({region}).",
         "wcls_schwach": "light", "wcls_maessig": "moderate", "wcls_kraeftig": "strong", "wcls_stuermisch": "stormy",
         "wstr_schwach": "light", "wstr_maessig": "moderate", "wstr_kraeftig": "strong", "wstr_stuermisch": "stormy",
         "hour_morning": "morning", "hour_midday": "midday", "hour_afternoon": "afternoon", "hour_evening": "evening",
@@ -2261,7 +2262,7 @@ def _front_block(fronts: dict | None, passagen: dict | None, dates: list,
             stufe, words, gegen = _zeichen_words(zeichen, today_typ)
             key = {"deutlich": "front_z_deutlich", "schwach": "front_z_schwach"}.get(stufe, "front_z_keine")
             first = _lbl(key).format(models=_model_words(),
-                typ=_typ(a), day=day_word, zone=_zone_object(a.get("zone", "")),
+                typ=_typ(a), day=day_word, Day=day_cap, zone=_zone_object(a.get("zone", "")),
                 zone_dat=_zone_dat(a.get("zone", "")),
                 when=_when(a.get("fenster_von_utc") or a.get("durchgang_median_utc") or ""),
                 zeichen=words)
@@ -2280,7 +2281,7 @@ def _front_block(fronts: dict | None, passagen: dict | None, dates: list,
         if zeichen and _kaltluft_ohne_dwd(zeichen):
             ohne_dwd = True
             stufe, words, _ = _zeichen_words(zeichen, "kalt")
-            first = _lbl("front_z_ohne_dwd").format(models=_model_words(), day=day_word,
+            first = _lbl("front_z_ohne_dwd").format(models=_model_words(), day=day_word, Day=day_cap,
                 zone=_zone_object(z), zone_dat=_zone_dat(z), zeichen=words)
         else:
             first = _lbl("front_today_none").format(Day=day_cap)
@@ -2728,7 +2729,7 @@ def _labilitaet_block(wetterlage: dict, date: str) -> dict:
     elif abbr in ("N", "NW"):
         air = _lbl("lb_air_cool").format(sector=sector)
     else:
-        air = _lbl("lb_air_neutral").format(sector=sector)
+        air = _lbl("lb_air_neutral").format(sector=sector, Sector=_capitalize(sector))
     regime, tkey = _lage_regime(wl, date)
     if regime == "hoch":
         press = _lbl("lb_press_cap").format(regime=_lbl("lb_regime_hoch"))

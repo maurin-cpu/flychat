@@ -305,8 +305,9 @@ class TestFrontFazit(unittest.TestCase):
                      fenster_von_utc="2026-09-18T13:55:00+00:00", art="quert",
                      randwert=False, anteil=0.6)
         txt = bc._front_fazit(None, {"aussagen": [today, self.SUN]}, self.DATES, "2026-09-18")
-        self.assertTrue(txt.startswith("Today the cold front") or
-                        txt.startswith("Heute dürfte die Kaltfront"), txt)
+        # Kurzer fetter Aufhaenger "Heute:" wie in allen Bloecken (12.10.2026)
+        self.assertTrue(txt.startswith("Today: the cold front") or
+                        txt.startswith("Heute: Die Kaltfront quert"), txt)
         self.assertNotIn("indicate no front", txt)
 
     def test_passed_front_is_named_as_rear_side(self):
