@@ -40,7 +40,7 @@ Folgetage in den Blöcken (die haben ihr eigenes Briefing).
 | Sektion | Inhalt | Quelle |
 |---|---|---|
 | Kopf | Betreff, Vorschautext, beste Abo-Region mit Note und Fenster | Code |
-| Woche als Bild | drei Tageskacheln: Einstufung, Note, Druck, Höhenwind-Pfeil, Regionen-Gruppen, CH-Zählung. **Kein** Tages-Hinweis, keine Auffälligkeits-Zeile — beides las sich als Urteil über die gelisteten Regionen | Code |
+| Woche als Bild | drei Tageskacheln: Einstufung (`_day_verdict`, seit 12.10.2026 ohne Mehrheits-Schwelle: Severe alerts, sobald **eine** Abo-Region schwere hat; No alerts nur, wenn **keine** Region Warnhinweise hat; sonst Alerts), Note, Druck, Höhenwind-Pfeil, Regionen-Gruppen, CH-Zählung. **Kein** Tages-Hinweis, keine Auffälligkeits-Zeile — beides las sich als Urteil über die gelisteten Regionen | Code |
 | Synoptik-Karte | Screenshot der App-Karte `/synoptik/karte` (Festland Spanien–Slowakei, Isobaren, H/T, DWD-Fronten, Höhenwind-Pfeile) | App + Playwright |
 | **Analyse-Kette** | acht Blöcke, §3 | Code (Block 1 künftig KI) |
 | Warnungen Schweiz | Gefahren-Schalter je Tag mit Ausmass, Zeitfenster und **synoptischer Ursache** | Code (+ KI-Satz, wenn vorhanden) |

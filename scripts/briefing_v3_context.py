@@ -535,10 +535,12 @@ def _day_verdict(raw_day: dict, region_ids) -> dict:
 
     Frueher: bester einzelner Startplatz — ein guter Spot hob den ganzen Tag,
     und die Zahl passte nicht zur Regionsliste darunter (Do 2/5 ueber drei
-    Regionen mit 3). Jetzt zaehlt, wie der Tag in den Regionen insgesamt ist:
-      not_safe     — mehr als BRIEFING_DAY_NOT_SAFE_SHARE der Regionen Not safe
-      green (Safe) — mindestens BRIEFING_DAY_SAFE_SHARE der Regionen Safe
-      conditional  — dazwischen
+    Regionen mit 3). Jetzt zaehlt, wie der Tag in den Regionen insgesamt ist
+    (Entscheid 12.10.2026: keine Mehrheits-Schwellen mehr — eine einzige
+    Region mit Warnhinweisen darf nicht hinter "No alerts" verschwinden):
+      not_safe     — mindestens eine Region mit schweren Warnhinweisen
+      green        — alle bewerteten Regionen ohne Warnhinweise
+      conditional  — sonst
       unknown      — keine Region mit Bewertung
     rating = Mittelwert der Regions-Bewertungen, kaufmaennisch gerundet.
     """
@@ -553,11 +555,9 @@ def _day_verdict(raw_day: dict, region_ids) -> dict:
     if not rated:
         return {"tier": "unknown", "rating": 0, "n": 0}
     n = len(rated)
-    red = sum(1 for b, _ in rated if b == "red")
-    green = sum(1 for b, _ in rated if b == "green")
-    if red > n * config.BRIEFING_DAY_NOT_SAFE_SHARE:
+    if any(b == "red" for b, _ in rated):
         tier = "not_safe"
-    elif green >= n * config.BRIEFING_DAY_SAFE_SHARE:
+    elif all(b == "green" for b, _ in rated):
         tier = "green"
     else:
         tier = "conditional"
@@ -1017,7 +1017,7 @@ _L3 = {
         "hz_tm_gleich":     "Folgetag: unverändert.",
         "airspace_note": "Luftraum (DABS), Startplatz und Windsack prüft der Pilot vor Ort — das kann keine Prognose.",
         "days_ahead":   "Die Tage voraus",
-        "week_hint":    "Oben je Tag: Mittelwert deiner Regionen (1–5). Keine Warnhinweise, wenn mindestens die Hälfte der Regionen ohne Warnhinweise ist; schwere Warnhinweise, wenn mehr als die Hälfte schwere hat; sonst Warnhinweise. Darunter jede Region mit ihrer eigenen Bewertung.",
+        "week_hint":    "Oben je Tag: Mittelwert deiner Regionen (1–5). Keine Warnhinweise nur, wenn keine deiner Regionen Warnhinweise hat; schwere Warnhinweise, sobald eine Region schwere hat; sonst Warnhinweise. Darunter jede Region mit ihrer eigenen Bewertung.",
         "regions_word": "Deine Regionen",
         "situation_ch":  "Gesamtlage Schweiz",
         "wl_rain": "Regen", "wl_dry": "trocken", "wl_high": "Hochdruck", "wl_low": "Tiefdruck",
@@ -1450,7 +1450,7 @@ _L3 = {
         "hz_tm_gleich":     "Next day: unchanged.",
         "airspace_note": "Airspace (DABS), launch site and windsock are checked by the pilot on site — no forecast can do that.",
         "days_ahead":   "The days ahead",
-        "week_hint":    "Top of each day: average of your regions (1–5). No alerts when at least half of your regions have none; severe alerts when more than half have severe ones; otherwise alerts. Below, each region with its own rating.",
+        "week_hint":    "Top of each day: average of your regions (1–5). No alerts only when none of your regions has any; severe alerts as soon as one region has severe ones; otherwise alerts. Below, each region with its own rating.",
         "regions_word": "Your regions",
         "situation_ch":  "Overall situation Switzerland",
         "wl_rain": "rain", "wl_dry": "dry", "wl_high": "high pressure", "wl_low": "low pressure",

@@ -674,8 +674,6 @@ SYNOPTIC_ALOFT_REGION_MIN_SPOTS = 3
 # einer DWD-Frontkarte entfernt liegen (Analyse 00/12 UTC, Vorhersage +36/48/
 # 60/84/108 h -> lokal 02:00/14:00; die 6-h-Timesteps 00:00/12:00 passen).
 SYNOPTIC_FRONTS_TIMELINE_TOLERANCE_H = 3
-BRIEFING_DAY_NOT_SAFE_SHARE = 0.5   # MEHR als dieser Anteil Not safe -> Tag Not safe
-BRIEFING_DAY_SAFE_SHARE = 0.5       # MINDESTENS dieser Anteil Safe  -> Tag Safe
 SYNOPTIC_HAZARD_EXTENT_WIDESPREAD = 0.7    # ab hier "verbreitet"
 SYNOPTIC_HAZARD_EXTENT_SCATTERED = 0.35    # ab hier "gebietsweise", darunter "vereinzelt"
 SYNOPTIC_HAZARD_RAIN_MM_MODERATE = 1.0     # ab hier "maessig"

@@ -221,18 +221,19 @@ class TestDayVerdict(unittest.TestCase):
         v = self._verdict([("red", 1)] * 8 + [("amber", 2), ("amber", 3)])
         self.assertEqual((v["tier"], v["rating"]), ("not_safe", 1))
 
-    def test_thursday_majority_safe(self):
-        v = self._verdict([("green", 3)] * 3 + [("green", 2)] * 5 + [("amber", 2)] * 2)
+    def test_all_green_is_no_alerts(self):
+        v = self._verdict([("green", 3)] * 3 + [("green", 2)] * 5)
         self.assertEqual((v["tier"], v["rating"]), ("green", 2))
 
-    def test_exactly_half_not_safe_is_caution(self):
-        """'Mehr als die Haelfte' — genau die Haelfte ist noch nicht Not safe."""
-        v = self._verdict([("red", 1)] * 5 + [("amber", 3)] * 5)
+    def test_one_alert_region_breaks_no_alerts(self):
+        """Entscheid 12.10.2026: 'No alerts' nur, wenn KEINE Region Warnhinweise hat."""
+        v = self._verdict([("green", 3)] * 9 + [("amber", 2)])
         self.assertEqual(v["tier"], "conditional")
 
-    def test_exactly_half_safe_is_safe(self):
-        v = self._verdict([("green", 3)] * 5 + [("amber", 2)] * 5)
-        self.assertEqual(v["tier"], "green")
+    def test_one_severe_region_is_severe(self):
+        """Entscheid 12.10.2026: eine Region mit schweren Warnhinweisen reicht."""
+        v = self._verdict([("green", 3)] * 9 + [("red", 1)])
+        self.assertEqual(v["tier"], "not_safe")
 
     def test_mean_rating_rounds_half_up(self):
         v = self._verdict([("green", 2), ("green", 3)])      # 2.5
