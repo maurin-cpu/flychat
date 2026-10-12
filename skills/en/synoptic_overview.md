@@ -464,10 +464,10 @@ EXACTLY one entry `{"items": [...]}` per `forecast_dates` day:
       name at least one of these valleys (name as given, in addition to the
       zone); numbers ONLY `tal_wind_kmh` (mean-wind range) and
       `tal_gust_max_kmh` (gust peak, in valley `tal_gust_valley`), exactly
-      as given. `tal_confirmed` empty → say that the model data show
-      no foehn wind in the valleys, but aloft the data can still
-      point to foehn (launch sites at height can be affected) — describe
-      the data, never claim "no foehn" — then NO km/h number and never "gusty in
+      as given. `tal_confirmed` empty → say that the wind in the foehn
+      valleys does not point to foehn on the valley floor, but aloft the
+      data can still point to foehn (launch sites at height can be
+      affected) — describe the data, never "no foehn" or "no foehn wind" — then NO km/h number and never "gusty in
       the valleys". Foehn valleys are only the names given, never launch
       sites. Also applies to `lead` and `day_lines`. The validator checks
       names, numbers and "aloft".

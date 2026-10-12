@@ -186,10 +186,11 @@ def _foehn_tal_problems(text: str, tal: dict, *, require_name: bool,
                           f"Das ist falsch."))
         if require_aloft and not _FOEHN_ALOFT_RE.search(scope):
             probs.append(("foehn_tal_unconfirmed",
-                          "Kein Foehn-Talpunkt zeigt Foehnwind — der Satz MUSS sagen, dass die "
-                          "Daten in den Taelern keinen Foehnwind zeigen, in der Hoehe aber auf "
-                          "Foehn hindeuten koennen (z.B. 'the data show no foehn wind in the "
-                          "valleys, but aloft they can still point to foehn'); nie 'ruhig/geschuetzt'."))
+                          "Kein Foehn-Talpunkt zeigt Foehnwind — der Satz MUSS sagen, dass der "
+                          "Wind in den Foehntaelern am Talboden nicht auf Foehn hindeutet, die "
+                          "Daten in der Hoehe aber schon koennen (z.B. 'the valley wind does not "
+                          "point to foehn on the valley floor, but aloft the data can still point "
+                          "to foehn'); nie 'kein Foehn', nie 'ruhig/geschuetzt'."))
     return probs
 
 

@@ -197,17 +197,32 @@ class TestBriefing(unittest.TestCase):
         self.assertEqual(entry["tal_confirmed"], ["Reusstal", "Haslital"])
         self.assertNotIn("lee_gust_kmh", entry)
 
-    def test_unconfirmed_sentence_has_no_number(self):
+    def test_unconfirmed_names_valley_wind_never_no_foehn(self):
+        # User 12.10.2026: nie "kein Foehn(wind)" — Windstaerke im Tal nennen,
+        # bei schwachem Wind "deutet nicht auf Foehn hin".
         tal = sc.foehn_tal_for_day(_series(confirmed=False), DATE, "sued")
         day = _day(tal)
         fazit = day["chain"]["foehn"]["fazit"]
-        self.assertIn("in der Höhe können die Daten trotzdem auf Föhn hindeuten", fazit)
-        self.assertNotIn("km/h", fazit.split("Startplätze")[0])
+        tal_txt = ("In den 3 Föhntälern zeigt ICON-CH2 Wind bis 8 km/h, Böen bis 15 km/h (Reusstal)"
+                   " — die Windstärke deutet am Talboden nicht auf Föhn hin.")
+        self.assertIn(tal_txt, fazit)
+        self.assertIn("In der Höhe können die Daten trotzdem auf Föhn hindeuten", fazit)
+        self.assertNotIn("keinen Föhn", fazit)
         facts = {f["k"]: f["v"] for f in day["chain"]["foehn"]["facts"]}
         self.assertEqual(facts["Föhntäler"], "0/3")
         self.assertNotIn("Böe", facts)
-        self.assertIn("Daten zeigen in den Föhntälern keinen Föhnwind.", _foehn_warning(day)["code_text"])
+        # eine Zahl, eine Quelle: Warnbox nennt denselben Satz
+        self.assertIn(tal_txt, _foehn_warning(day)["code_text"])
         self.assertEqual(day["chain"]["foehn"]["status"], "warn")      # Pille bleibt orange
+
+    def test_unconfirmed_strong_wind_is_not_called_weak(self):
+        series = _series(confirmed=False)
+        series["punkte"]["alt"]["hourly"] = _hourly(wind=35.0, gust=60.0, direction=300.0)
+        tal = sc.foehn_tal_for_day(series, DATE, "sued")
+        fazit = _day(tal)["chain"]["foehn"]["fazit"]
+        self.assertIn("Wind bis 35 km/h, Böen bis 60 km/h (Reusstal)", fazit)
+        self.assertIn("nicht das typische Föhnmuster", fazit)
+        self.assertNotIn("Windstärke deutet", fazit)
 
     def test_without_series_says_not_verifiable(self):
         day = _day(None)

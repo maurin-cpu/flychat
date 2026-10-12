@@ -762,7 +762,10 @@ _L3 = {
         "fb_foehn_no_nodp": "Daten zeigen keine Föhn-Anzeichen: kein nennenswertes Druckgefälle über die Alpen.{strong}",
         # Bestaetigung am Talboden: Foehn-Talpunkte (data/foehn_talpunkte.geojson)
         "fb_foehn_tal_yes": "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen. {model} zeigt den Föhn auch am Boden in {taeler} — Wind {w1}–{w2} km/h aus {dir}, Böen bis {g} km/h ({gtal}){when}.",
-        "fb_foehn_tal_no":  "Anzeichen für {Side}föhn: Druckgefälle {dp} hPa über die Alpen. An den {n} Föhn-Talpunkten sehen wir in den {model}-Daten keinen Föhnwind — in der Höhe können die Daten trotzdem auf Föhn hindeuten, Startplätze auf 1500–2000 m können betroffen sein.",
+        "fb_foehn_tal_no":  "Anzeichen für {Side}föhn: Druckgefälle {dp} hPa über die Alpen. {tal_wind} In der Höhe können die Daten trotzdem auf Föhn hindeuten, Startplätze auf 1500–2000 m können betroffen sein.",
+        "fb_tal_weak": "In den {n} Föhntälern zeigt {model} Wind bis {w} km/h, Böen bis {g} km/h ({gtal}) — die Windstärke deutet am Talboden nicht auf Föhn hin.",
+        "fb_tal_strong": "In den {n} Föhntälern zeigt {model} Wind bis {w} km/h, Böen bis {g} km/h ({gtal}) — der Wind zeigt aber nicht das typische Föhnmuster (Richtung, trockene Luft).",
+        "fb_tal_nonum": "Der Wind an den {n} Föhn-Talpunkten ({model}) deutet am Talboden nicht auf Föhn hin.",
         "fb_foehn_tal_na":  " Bestätigung durch Talwind nicht prüfbar (keine Talpunkt-Daten).",
         "fb_tal_more":      " u. a.",
         "fb_dir_sued":      "Süd", "fb_dir_nord": "Nord",
@@ -997,7 +1000,7 @@ _L3 = {
         "hz_course_gleich":    "Bleibt den Tag über gleich stark.",
         "hz_foehn_gust":       "An Startplätzen im Lee Böen bis {kmh} km/h.",
         "hz_foehn_tal_yes":    "In den Föhntälern Wind {w1}–{w2} km/h, Böen bis {g} km/h ({gtal}).",
-        "hz_foehn_tal_no":     "Daten zeigen in den Föhntälern keinen Föhnwind.",
+        "hz_foehn_tal_no":     "{tal_wind}",
         "hz_tm_vorbei":     "Folgetag: vorbei.",
         "hz_tm_abklingend": "Folgetag: schwächer.",
         "hz_tm_zunehmend":  "Folgetag: stärker.",
@@ -1188,7 +1191,10 @@ _L3 = {
         "fb_foehn_no":      "Data show no signs of foehn: the pressure difference across the Alps stays below the 4 hPa threshold at {dp} hPa.{strong}",
         "fb_foehn_no_nodp": "Data show no signs of foehn: no notable pressure difference across the Alps.{strong}",
         "fb_foehn_tal_yes": "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps. {model} shows the foehn on the ground too in {taeler} — wind {w1}–{w2} km/h from the {dir}, gusts up to {g} km/h ({gtal}){when}.",
-        "fb_foehn_tal_no":  "Signs of {side} foehn: pressure difference of {dp} hPa across the Alps. At the {n} foehn valley points we see no foehn wind in the {model} data — aloft the data can still point to foehn; launch sites at 1500–2000 m can be affected.",
+        "fb_foehn_tal_no":  "Signs of {side} foehn: pressure difference of {dp} hPa across the Alps. {tal_wind} Aloft the data can still point to foehn; launch sites at 1500–2000 m can be affected.",
+        "fb_tal_weak": "In the {n} foehn valleys {model} shows wind up to {w} km/h, gusts up to {g} km/h ({gtal}) — the wind strength does not point to foehn on the valley floor.",
+        "fb_tal_strong": "In the {n} foehn valleys {model} shows wind up to {w} km/h, gusts up to {g} km/h ({gtal}) — but the wind does not show the typical foehn pattern (direction, dry air).",
+        "fb_tal_nonum": "The wind at the {n} foehn valley points ({model}) does not point to foehn on the valley floor.",
         "fb_foehn_tal_na":  " Confirmation by valley wind not verifiable (no valley-point data).",
         "fb_tal_more":      " and others",
         "fb_dir_sued":      "south", "fb_dir_nord": "north",
@@ -1420,7 +1426,7 @@ _L3 = {
         "hz_course_gleich":    "Stays at the same strength all day.",
         "hz_foehn_gust":       "Gusts up to {kmh} km/h at launch sites in the lee.",
         "hz_foehn_tal_yes":    "In the foehn valleys wind {w1}–{w2} km/h, gusts up to {g} km/h ({gtal}).",
-        "hz_foehn_tal_no":     "Data show no foehn wind in the foehn valleys.",
+        "hz_foehn_tal_no":     "{tal_wind}",
         "hz_tm_vorbei":     "Next day: over.",
         "hz_tm_abklingend": "Next day: weaker.",
         "hz_tm_zunehmend":  "Next day: stronger.",
@@ -2876,7 +2882,21 @@ def _foehn_tal_sentence(fo: dict, side: str, tal: dict) -> str:
             g=tal["gust_max_kmh"], gtal=tal_kurzname(tal.get("gust_tal", "")),
             when=_tal_when(tal.get("first_hour")))
     return _lbl("fb_foehn_tal_no").format(Side=_lbl("fb_side_" + side), side=_lbl("fb_dir_" + side), dp=dp_txt,
-                                          model=model, n=tal.get("n_total", 0))
+                                          tal_wind=_tal_wind_text(tal))
+
+
+def _tal_wind_text(tal: dict) -> str:
+    """Talwind ohne Foehnstunden: Hoechstwind/-boe in den Foehntaelern und was
+    die Windstaerke sagt — nie "kein Foehn" (User 12.10.2026). Derselbe Satz in
+    Block 3 und Warnbox (eine Zahl, eine Quelle). Aeltere Daten ohne die
+    Hoechstwerte: Satz ohne Zahl."""
+    from foehn_talpunkte import tal_kurzname
+    args = dict(n=tal.get("n_total", 0), model=_model_short(tal.get("model")))
+    if tal.get("all_gust_max_kmh") is None:
+        return _lbl("fb_tal_nonum").format(**args)
+    return _lbl("fb_tal_weak" if tal.get("all_weak") else "fb_tal_strong").format(
+        w=tal["all_wind_max_kmh"], g=tal["all_gust_max_kmh"],
+        gtal=tal_kurzname(tal.get("all_gust_tal", "")), **args)
 
 
 def _foehn_tal_gust_text(tal: dict) -> str:
@@ -2886,7 +2906,7 @@ def _foehn_tal_gust_text(tal: dict) -> str:
         return _lbl("hz_foehn_tal_yes").format(w1=tal["wind_min_kmh"], w2=tal["wind_max_kmh"],
                                                g=tal["gust_max_kmh"],
                                                gtal=tal_kurzname(tal.get("gust_tal", "")))
-    return _lbl("hz_foehn_tal_no")
+    return _lbl("hz_foehn_tal_no").format(tal_wind=_tal_wind_text(tal))
 
 
 def _foehn_text(wetterlage: dict, date: str) -> str:

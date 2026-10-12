@@ -502,6 +502,7 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str) -> dict:
         return float(v) if isinstance(v, (int, float)) else None
 
     winds, gusts, hours = [], [], []
+    all_w, all_g = [], []
     has_data = False
     for i in indices:
         w, g = _at("wind_speed_10m", i), _at("wind_gusts_10m", i)
@@ -509,6 +510,8 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str) -> dict:
         if w is None or g is None or d is None or rh is None:
             continue
         has_data = True
+        all_w.append(w)
+        all_g.append(g)
         if dir_in_sector(d, lo, hi) and (w >= TAL_WIND_MIN_KMH or g >= TAL_GUST_MIN_KMH) \
                 and rh <= TAL_RH_MAX:
             winds.append(w)
@@ -516,6 +519,10 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str) -> dict:
             hours.append(i)
     out = {"has_data": has_data, "hours": len(hours),
            "bestaetigt": has_data and len(hours) >= TAL_MIN_HOURS}
+    if has_data:
+        # Hoechstwerte ueber ALLE Flugstunden, jede Richtung — damit das Briefing
+        # auch ohne Foehnstunden die Windstaerke im Tal nennen kann (12.10.2026)
+        out.update(all_wind_max_kmh=round(max(all_w)), all_gust_max_kmh=round(max(all_g)))
     if out["bestaetigt"]:
         out.update(wind_min_kmh=round(min(winds)), wind_max_kmh=round(max(winds)),
                    gust_max_kmh=round(max(gusts)), first_index=min(hours))
@@ -529,6 +536,14 @@ def summarize_taeler(results: list) -> dict:
     checked = [r for r in results if r.get("has_data")]
     best = [r for r in checked if r.get("bestaetigt")]
     out = {"n_total": len(checked), "n_bestaetigt": len(best)}
+    # Windstaerke in allen Taelern (jede Richtung) — fuer den Satz ohne Foehnstunden
+    with_all = [r for r in checked if r.get("all_gust_max_kmh") is not None]
+    if with_all:
+        top = max(with_all, key=lambda r: r["all_gust_max_kmh"])
+        out.update(all_wind_max_kmh=max(r["all_wind_max_kmh"] for r in with_all),
+                   all_gust_max_kmh=top["all_gust_max_kmh"], all_gust_tal=top.get("tal", ""),
+                   all_weak=(max(r["all_wind_max_kmh"] for r in with_all) < TAL_WIND_MIN_KMH
+                             and top["all_gust_max_kmh"] < TAL_GUST_MIN_KMH))
     if best:
         top = max(best, key=lambda r: r["gust_max_kmh"])
         out.update(wind_min_kmh=min(r["wind_min_kmh"] for r in best),
