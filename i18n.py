@@ -801,6 +801,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "decision.gust_tail": {"de": " — Trend und Fenster pruefen.", "en": " — see trend and window."},
     "decision.wind_strong_majority": {"de": "Durchgehend starker Wind ({s} von {n} Stunden), keine ruhige Phase",
                                       "en": "Strong wind throughout ({s} of {n} hours), no calm phase"},
+    "decision.mech_chop": {"de": "Mechanisches Klappern: ROUGH-UNUSABLE in {pct}% der Thermikstunden",
+                           "en": "Mechanical chop: extreme turbulence in {pct}% of thermal hours"},
 
     # ======================= Topic-Tags (build_topic_tags / build_region_topic_tags) =======================
     # Deterministische Backend-Tags (label/value/time) — werden zur Analyse-Bauzeit

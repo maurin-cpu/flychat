@@ -77,3 +77,25 @@ def test_tree_fixes_cache_in_english_mode():
     assert res["safety"]["summary"] == "no rain, thunderstorm, or CAPE build-up"
     assert res["tags"][0]["label"] == "Thermal"
     assert res["spot"] == "Regenalp"
+
+
+def test_mech_chop_note_per_language():
+    """Nachmessung 12.10.2026: der Klappern-Hinweis war beim 10.10.-Fix vergessen
+    (~150 EN-Spot-Analysen mit "Mechanisches Klappern … der Thermikstunden")."""
+    from engine.decision_engine import decide_flyability_mech_danger
+    tq = {"thermal_hours_total": 6, "rough_danger_h": 6}
+    notes = {}
+    for lang in ("de", "en"):
+        res = {"safety_status": "safe", "caution_notes": []}
+        with i18n.lang_override(lang):
+            decide_flyability_mech_danger(res, tq, "X")
+            decide_flyability_mech_danger(res, tq, "X")  # kein Doppel
+        notes[lang] = res["caution_notes"]
+    assert notes["de"] == ["Mechanisches Klappern: ROUGH-UNUSABLE in 100% der Thermikstunden"]
+    assert notes["en"] == ["Mechanical chop: extreme turbulence in 100% of thermal hours"]
+
+
+def test_guard_translates_old_mech_chop_note():
+    with i18n.lang_override("en"):
+        assert englishify_text("Mechanisches Klappern: ROUGH-UNUSABLE in 83% der Thermikstunden") \
+            == "Mechanical chop: extreme turbulence in 83% of thermal hours"

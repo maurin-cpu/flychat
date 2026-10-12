@@ -556,8 +556,9 @@ def decide_flyability_mech_danger(result: dict, tq: dict, label: str) -> Optiona
     # Caution-Note (immer, unabhaengig von vorherigem safety_status — der Pilot
     # soll auch bei not_safe oder bei bereits conditional die Begruendung sehen)
     cn = result.get("caution_notes", []) or []
-    note = f"Mechanisches Klappern: ROUGH-UNUSABLE in {rough_pct:.0f}% der Thermikstunden"
-    if not any("Klappern" in (n or "") for n in cn):
+    note = i18n.t("decision.mech_chop", pct=f"{rough_pct:.0f}")
+    head = note.split(":")[0]
+    if not any((n or "").startswith(head) for n in cn):
         cn.append(note)
     result["caution_notes"] = cn
 
