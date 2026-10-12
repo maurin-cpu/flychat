@@ -105,7 +105,7 @@ _FOEHN_MENTION_RE = re.compile(r"f(?:oe|ö|o)hn", re.IGNORECASE)
 
 # Foehn am Talboden (Briefing, docs/FOEHN.md): Die Foehn-Talpunkte bestaetigen
 # die Foehnlage oder nicht (foehn.per_day[].tal). Unbestaetigt muss der Text
-# sagen, dass der Foehn in der Hoehe bleibt — und darf ihn nicht in die Taeler
+# sagen, dass die Daten in der Hoehe auf Foehn hindeuten — und darf ihn nicht in die Taeler
 # legen. km/h-Zahlen zum Foehn nur aus den Talwerten (eine Zahl, eine Quelle).
 _FOEHN_ALOFT_RE = re.compile(
     r"(in der h(?:oe|ö)he|bleibt oben|greift nicht (?:bis )?(?:in die t|durch)|"
@@ -186,10 +186,10 @@ def _foehn_tal_problems(text: str, tal: dict, *, require_name: bool,
                           f"Das ist falsch."))
         if require_aloft and not _FOEHN_ALOFT_RE.search(scope):
             probs.append(("foehn_tal_unconfirmed",
-                          "Kein Foehn-Talpunkt zeigt Foehnwind — der Satz MUSS sagen, dass der "
-                          "Foehn laut Modell in der Hoehe bleibt und nicht in die Taeler "
-                          "durchgreift (z.B. 'stays aloft and does not reach the valleys'); "
-                          "nie 'ruhig/geschuetzt'."))
+                          "Kein Foehn-Talpunkt zeigt Foehnwind — der Satz MUSS sagen, dass die "
+                          "Daten in den Taelern keinen Foehnwind zeigen, in der Hoehe aber auf "
+                          "Foehn hindeuten koennen (z.B. 'the data show no foehn wind in the "
+                          "valleys, but aloft they can still point to foehn'); nie 'ruhig/geschuetzt'."))
     return probs
 
 

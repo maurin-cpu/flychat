@@ -756,17 +756,17 @@ _L3 = {
         "wc_stark_eingeschraenkt": "stark eingeschränkt",
         # Foehn: Anspruch der Synoptik gegen die Prognosedaten
         "fb_foehn_yes":     "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen. {models} zeigt ihn auch — am Lee-Prognosepunkt {station} Böen bis {gust} km/h{windows}.",
-        "fb_foehn_aloft":   "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen, doch am Lee-Prognosepunkt {station} zeigt {models} kaum Böen (bis {gust} km/h) — laut Daten bleibt der Föhn in der Höhe.",
+        "fb_foehn_aloft":   "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen, doch am Lee-Prognosepunkt {station} zeigt {models} kaum Böen (bis {gust} km/h) — in der Höhe können die Daten trotzdem auf Föhn hindeuten.",
         "fb_foehn_no":      "Daten zeigen keine Föhn-Anzeichen: das Druckgefälle über die Alpen bleibt mit {dp} hPa unter der Schwelle von 4 hPa.{strong}",
         "fb_foehn_no_nodp": "Daten zeigen keine Föhn-Anzeichen: kein nennenswertes Druckgefälle über die Alpen.{strong}",
         # Bestaetigung am Talboden: Foehn-Talpunkte (data/foehn_talpunkte.geojson)
         "fb_foehn_tal_yes": "Daten deuten auf {Side}föhn hin: Druckgefälle {dp} hPa über die Alpen. {model} zeigt den Föhn auch am Boden in {taeler} — Wind {w1}–{w2} km/h aus {dir}, Böen bis {g} km/h ({gtal}){when}.",
-        "fb_foehn_tal_no":  "{Side}föhn: Druckgefälle {dp} hPa über die Alpen. {model} zeigt in den {n} Föhntälern keinen Föhnwind — der Föhn bleibt in der Höhe, Startplätze auf 1500–2000 m können trotzdem betroffen sein.",
+        "fb_foehn_tal_no":  "Anzeichen für {Side}föhn: Druckgefälle {dp} hPa über die Alpen. An den {n} Föhn-Talpunkten sehen wir in den {model}-Daten keinen Föhnwind — in der Höhe können die Daten trotzdem auf Föhn hindeuten, Startplätze auf 1500–2000 m können betroffen sein.",
         "fb_foehn_tal_na":  " Bestätigung durch Talwind nicht prüfbar (keine Talpunkt-Daten).",
         "fb_tal_more":      " u. a.",
         "fb_dir_sued":      "Süd", "fb_dir_nord": "Nord",
         "fb_strong_none":   " {models} zeigt auch keine starken Winde an den Startplätzen.",
-        "fb_strong_some":   " {models} zeigt trotzdem starke Winde an einzelnen Startplätzen: Böen bis {gust} km/h aus {dir} ({spot}, {alt} m, {when}){cmp} — laut Daten Höhenwind, kein Föhn.",
+        "fb_strong_some":   " {models} zeigt trotzdem starke Winde an einzelnen Startplätzen: Böen bis {gust} km/h aus {dir} ({spot}, {alt} m, {when}){cmp} — die Daten zeigen Höhenwind, ohne Föhn-Anzeichen.",
         "fb_models":        "; die Modelle sind uneinig, CH2 sieht nur {ch2} km/h",
         "fb_station_nord":  "Zürich", "fb_station_sued": "Lugano",
         "fb_side_nord":     "Nord", "fb_side_sued": "Süd",
@@ -1183,16 +1183,16 @@ _L3 = {
         "wc_stark_eingeschraenkt": "severely restricted",
         # foehn: synoptic claim against the forecast data
         "fb_foehn_yes":     "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps. {models} shows it too — gusts up to {gust} km/h at the lee forecast point {station}{windows}.",
-        "fb_foehn_aloft":   "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps, but at the lee forecast point {station} {models} shows hardly any gusts (up to {gust} km/h) — per the data the foehn stays aloft.",
+        "fb_foehn_aloft":   "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps, but at the lee forecast point {station} {models} shows hardly any gusts (up to {gust} km/h) — aloft the data can still point to foehn.",
         "fb_foehn_no":      "Data show no signs of foehn: the pressure difference across the Alps stays below the 4 hPa threshold at {dp} hPa.{strong}",
         "fb_foehn_no_nodp": "Data show no signs of foehn: no notable pressure difference across the Alps.{strong}",
         "fb_foehn_tal_yes": "Data indicate {Side} foehn: pressure difference of {dp} hPa across the Alps. {model} shows the foehn on the ground too in {taeler} — wind {w1}–{w2} km/h from the {dir}, gusts up to {g} km/h ({gtal}){when}.",
-        "fb_foehn_tal_no":  "{Side} foehn: pressure difference of {dp} hPa across the Alps. {model} shows no foehn wind in the {n} foehn valleys — the foehn stays aloft; launch sites at 1500–2000 m can still be affected.",
+        "fb_foehn_tal_no":  "Signs of {side} foehn: pressure difference of {dp} hPa across the Alps. At the {n} foehn valley points we see no foehn wind in the {model} data — aloft the data can still point to foehn; launch sites at 1500–2000 m can be affected.",
         "fb_foehn_tal_na":  " Confirmation by valley wind not verifiable (no valley-point data).",
         "fb_tal_more":      " and others",
         "fb_dir_sued":      "south", "fb_dir_nord": "north",
         "fb_strong_none":   " {models} also shows no strong winds at the launch sites.",
-        "fb_strong_some":   " {models} nevertheless shows strong winds at individual launch sites: gusts up to {gust} km/h from the {dir} ({spot}, {alt} m, {when}){cmp} — per the data upper wind, not foehn.",
+        "fb_strong_some":   " {models} nevertheless shows strong winds at individual launch sites: gusts up to {gust} km/h from the {dir} ({spot}, {alt} m, {when}){cmp} — the data show upper wind, without signs of foehn.",
         "fb_models":        "; the models disagree, CH2 sees only {ch2} km/h",
         "fb_station_nord":  "Zurich", "fb_station_sued": "Lugano",
         "fb_side_nord":     "North", "fb_side_sued": "South",
@@ -2874,7 +2874,7 @@ def _foehn_tal_sentence(fo: dict, side: str, tal: dict) -> str:
             w1=tal["wind_min_kmh"], w2=tal["wind_max_kmh"], dir=_lbl("fb_dir_" + side),
             g=tal["gust_max_kmh"], gtal=tal_kurzname(tal.get("gust_tal", "")),
             when=_tal_when(tal.get("first_hour")))
-    return _lbl("fb_foehn_tal_no").format(Side=_lbl("fb_side_" + side), dp=dp_txt,
+    return _lbl("fb_foehn_tal_no").format(Side=_lbl("fb_side_" + side), side=_lbl("fb_dir_" + side), dp=dp_txt,
                                           model=model, n=tal.get("n_total", 0))
 
 

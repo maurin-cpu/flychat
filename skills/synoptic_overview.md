@@ -478,8 +478,9 @@ Pro `forecast_dates`-Tag GENAU ein Eintrag `{"items": [...]}`:
       Taeler nennen (Name wie geliefert, zusaetzlich zur Zone); Zahlen NUR
       `tal_wind_kmh` (Mittelwind-Spanne) und `tal_gust_max_kmh` (Boeenspitze,
       im Tal `tal_gust_valley`), exakt so. `tal_confirmed` leer → sagen, dass
-      der Foehn laut Modell in der Hoehe bleibt und nicht in die Taeler
-      durchgreift (Startplaetze in der Hoehe koennen betroffen sein) — dann KEINE
+      die Daten in den Taelern keinen Foehnwind zeigen, in der Hoehe aber
+      trotzdem auf Foehn hindeuten koennen (Startplaetze in der Hoehe
+      koennen betroffen sein) — Daten beschreiben, nie "kein Foehn" — dann KEINE
       km/h-Zahl und nie "boeig in den Taelern". Foehntaeler sind nur die
       gelieferten Namen, nie Startplaetze. Gilt auch fuer `lead` und
       `day_lines`. Der Validator prueft Namen, Zahlen und "in der Hoehe".
