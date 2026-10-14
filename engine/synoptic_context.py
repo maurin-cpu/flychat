@@ -1080,6 +1080,7 @@ def foehn_tal_for_day(series: Optional[dict], date: str, side: str) -> Optional[
     if not series or not series.get("punkte") or side not in ("sued", "nord"):
         return None
     from foehn_indicators import evaluate_talpunkt, summarize_taeler, tal_side
+    from foehn_talpunkte import sektor_fuer
 
     times = series.get("time") or []
     h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
@@ -1092,7 +1093,8 @@ def foehn_tal_for_day(series: Optional[dict], date: str, side: str) -> Optional[
         meta = p.get("meta") or {}
         if tal_side(meta.get("foehn_typ", "")) != side:
             continue
-        r = evaluate_talpunkt(p.get("hourly") or {}, idx, meta.get("foehn_typ", ""))
+        r = evaluate_talpunkt(p.get("hourly") or {}, idx, meta.get("foehn_typ", ""),
+                              sektor=sektor_fuer(pid, meta))
         e = {"id": pid, "tal": meta.get("tal", pid), "station": meta.get("station", ""),
              "region_id": meta.get("region_id"), **r}
         if r.get("bestaetigt"):
@@ -1233,8 +1235,13 @@ def decide_foehn_summary(forecast_dates: list[str],
         sued_active = sued_hours >= min_hours
         nord_active = nord_hours >= min_hours
         tal_side_ = "sued" if sued_active else "nord" if nord_active else None
-        tal = (foehn_tal_for_day(((weather_cache or {}).get("_meta") or {}).get("foehn_tal_series"),
-                                 date, tal_side_) if tal_side_ else None)
+        tal_series = ((weather_cache or {}).get("_meta") or {}).get("foehn_tal_series")
+        # Beide Foehnseiten JEDEN Tag, unabhaengig vom Druckindex: Foehn kommt
+        # inneralpin oft unter 4 hPa (Blog wetterkunde/foehn: Andeer 39 %, Davos
+        # 33 %, Visp 30 % der Foehnstunden). Das Briefing beschreibt die Talmerkmale,
+        # nicht die Druckschwelle (User 14.10.2026).
+        taeler_beide = {s: foehn_tal_for_day(tal_series, date, s) for s in ("sued", "nord")}
+        tal = taeler_beide.get(tal_side_) if tal_side_ else None
         per_day.append({
             "date": date,
             "sued_active": sued_active,
@@ -1251,6 +1258,7 @@ def decide_foehn_summary(forecast_dates: list[str],
             "lee": {"gust_nord_max_kmh": (round(gust_nord_max) if gust_nord_max is not None else None),
                     "gust_sued_max_kmh": (round(gust_sued_max) if gust_sued_max is not None else None)},
             "tal": tal,
+            "taeler": taeler_beide,
         })
 
     any_sued = any(d["sued_active"] for d in per_day)

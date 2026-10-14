@@ -81,7 +81,10 @@ $FRONTEN = @(
   "validation/gewitter/messwerte/*.json",
   "validation/gewitter/urteile/*.json",
   "validation/gewitter/scoreboard.json",
-  "validation/gewitter/AUTO_REPORT.md"
+  "validation/gewitter/AUTO_REPORT.md",
+  "validation/foehn/urteile/*.json",
+  "validation/foehn/scoreboard_daily.json",
+  "validation/foehn/AUTO_REPORT_DAILY.md"
 )
 if ($MitKarten) {
   $FRONTEN += "data/dwd_fronten_archiv/analyse/*.png"

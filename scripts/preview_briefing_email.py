@@ -276,7 +276,7 @@ def main() -> int:
     ch = ctx['v3_chain']
     print(f"     - Lage:            {ch['lage']['label']} ({len(ch['lage']['centers'])} Zentren) — {ch['situation'][:90]}")
     print(f"     - Fronten:         {' | '.join(ch['fronts']['lines'])[:140]}")
-    print(f"     - Foehn/Bise:      {ch['foehn']['foehn']} {ch['foehn']['bise']}")
+    print(f"     - Foehn/Bise:      {ch['foehn']['foehn']} {ch['foehn'].get('bise', '')}")
     print(f"     - Hoehenwind:      {ch['wind']['arrow']} {ch['wind']['sector']} {ch['wind']['speed']} -> {ch['wind']['ground']} am Boden")
     print(f"     - Karte (App):     {map_png if map_png else '(keine - siehe WARN)'}"
           f"{'  Stand ' + map_stand if map_stand else ''}")

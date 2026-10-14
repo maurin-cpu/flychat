@@ -58,6 +58,7 @@ Grössen: Stand 14.09.2026, Server.
 | `data/station_observations.db`, `data/_meteoschweiz_cache/` | Cache | MeteoSchweiz OGD, amtlich und dauerhaft |
 | `validation/gewitter/messwerte/`, `urteile/` | Maschinenausgabe | Freeze (A) + MeteoSchweiz OGD — rekonstruierbar, siehe `.gitignore` |
 | `validation/fronten/observations.csv`, `aussagen/` | Maschinenausgabe | Frontenarchiv (A) |
+| `validation/foehn/urteile/`, `scoreboard_daily.json` | Maschinenausgabe (~7 KB/Tag, keine Rohmessungen) | Freeze `foehn_tal` (A) + MeteoSchweiz OGD Föhnindex — rekonstruierbar |
 
 ### C · Laufzeit-Ausgaben
 

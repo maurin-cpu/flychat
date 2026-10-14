@@ -435,6 +435,7 @@ def build_foehn_tal_block(series: Optional[Dict], day: str) -> Optional[Dict]:
         return None
     from foehn_indicators import (evaluate_talpunkt, TAL_WIND_MIN_KMH, TAL_GUST_MIN_KMH,
                                   TAL_RH_MAX, TAL_MIN_HOURS, TAL_SEKTOR)
+    from foehn_talpunkte import sektor_fuer
 
     times = series.get("time") or []
     idx = [i for i, t in enumerate(times) if t[:10] == day
@@ -449,7 +450,8 @@ def build_foehn_tal_block(series: Optional[Dict], day: str) -> Optional[Dict]:
             arr = h.get(key) or []
             return arr[i] if i < len(arr) else None
 
-        verdict = evaluate_talpunkt(h, idx, meta.get("foehn_typ", ""))
+        verdict = evaluate_talpunkt(h, idx, meta.get("foehn_typ", ""),
+                                    sektor=sektor_fuer(pid, meta))
         if "first_index" in verdict:
             verdict["first_hour"] = int(times[verdict.pop("first_index")][11:13])
         punkte[pid] = {

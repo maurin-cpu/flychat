@@ -702,6 +702,30 @@ def _run_gewitter_validation() -> bool:
         return False
 
 
+def _run_foehn_validation() -> bool:
+    """Föhn-Abgleich: Föhn-Block (Freeze foehn_tal) gegen den MeteoSchweiz-Föhnindex.
+
+    Gleicher Tag wie die Gewitter-Validierung (juengster komplett publizierter,
+    im Morgenlauf D-2). DATENARM: nur eine Urteilsdatei je Tag (~7 KB), keine
+    Rohmessungen. Failure-tolerant, idempotent (validation/foehn/README.md).
+    """
+    try:
+        import datetime as _dt
+        from scripts.validate_foehn_daily import (
+            letzter_vollstaendiger_tag, rebuild_scoreboard, validate_day, write_report)
+        day = letzter_vollstaendiger_tag(_dt.datetime.now())
+        if not validate_day(day):
+            logger.warning("Daily run: Föhn-Validierung %s ohne Ergebnis "
+                           "(kein foehn_tal im Freeze oder keine SMN-Daten)", day)
+            return False
+        write_report(rebuild_scoreboard())
+        logger.info("Daily run: Föhn-Validierung %s OK", day)
+        return True
+    except Exception as e:
+        logger.exception("Daily run: Föhn-Validierung fehlgeschlagen: %s", e)
+        return False
+
+
 def _run_fronten() -> bool:
     """Holt die DWD-Frontenkarten und laesst die Validierung darueber laufen.
 
@@ -832,6 +856,7 @@ def _daily_run(engine) -> dict:
     logger.info("Daily run: starte Gewitter-Validierung (letzter komplett "
                 "publizierter Tag)...")
     _run_gewitter_validation()
+    _run_foehn_validation()
 
     logger.info("Daily run: starte OGN-Verdichtung (Vortag)...")
     _run_ogn_sessions()

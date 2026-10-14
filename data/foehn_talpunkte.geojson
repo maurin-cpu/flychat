@@ -21,7 +21,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "Referenzstation der Schweiz, klarste Föhn-Signatur"
+        "hinweis": "Referenzstation der Schweiz, klarste Föhn-Signatur",
+        "sektor": [
+          95,
+          205
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -43,7 +48,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "viel Mischluft (Index 1) — mitführen"
+        "hinweis": "viel Mischluft (Index 1) — mitführen",
+        "sektor": [
+          155,
+          255
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -65,7 +75,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "Talverzweigung Seeztal/Rheintal, häufiger Föhn als Chur"
+        "hinweis": "Talverzweigung Seeztal/Rheintal, häufiger Föhn als Chur",
+        "sektor": [
+          80,
+          170
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -87,7 +102,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "klares Föhnsignal"
+        "hinweis": "klares Föhnsignal",
+        "sektor": [
+          140,
+          220
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -109,7 +129,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "Föhn nimmt talabwärts stark ab — Gegenpunkt zu Vaduz"
+        "hinweis": "Föhn nimmt talabwärts stark ab — Gegenpunkt zu Vaduz",
+        "sektor": [
+          140,
+          220
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -131,7 +156,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "oben häufig Föhn"
+        "hinweis": "oben häufig Föhn",
+        "sektor": [
+          70,
+          200
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -153,7 +183,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "unten selten — Höhenabhängigkeit zu Elm"
+        "hinweis": "unten selten — Höhenabhängigkeit zu Elm",
+        "sektor": [
+          95,
+          190
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -175,7 +210,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "Guttannen wäre besser, hat aber keinen Föhnindex"
+        "hinweis": "Guttannen wäre besser, hat aber keinen Föhnindex",
+        "sektor": [
+          65,
+          205
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -197,7 +237,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "inneralpin, Föhn schon bei kleinem Druckunterschied"
+        "hinweis": "inneralpin, Föhn schon bei kleinem Druckunterschied",
+        "sektor": [
+          50,
+          250
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -219,7 +264,12 @@
         "foehn_typ": "Süd",
         "gruppe": "A",
         "kamm_station": "gue",
-        "hinweis": "häufigste inneralpine Föhnstation"
+        "hinweis": "häufigste inneralpine Föhnstation",
+        "sektor": [
+          115,
+          255
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -241,7 +291,12 @@
         "foehn_typ": "Süd(-ost)",
         "gruppe": "B",
         "kamm_station": "gsb",
-        "hinweis": "Föhn aus E/SE"
+        "hinweis": "Föhn aus E/SE",
+        "sektor": [
+          35,
+          240
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -263,7 +318,12 @@
         "foehn_typ": "Süd(-ost)",
         "gruppe": "B",
         "kamm_station": "gsb",
-        "hinweis": "fast die Hälfte Mischluft — schwieriger Fall"
+        "hinweis": "fast die Hälfte Mischluft — schwieriger Fall",
+        "sektor": [
+          40,
+          135
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -285,7 +345,12 @@
         "foehn_typ": "Süd",
         "gruppe": "B",
         "kamm_station": "gsb",
-        "hinweis": ""
+        "hinweis": "",
+        "sektor": [
+          80,
+          210
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -307,7 +372,12 @@
         "foehn_typ": "Süd",
         "gruppe": "B",
         "kamm_station": "gsb",
-        "hinweis": "selten Föhn"
+        "hinweis": "selten Föhn",
+        "sektor": [
+          90,
+          175
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -329,7 +399,12 @@
         "foehn_typ": "Nord",
         "gruppe": "C",
         "kamm_station": "gue",
-        "hinweis": "stärkstes Föhnsignal 2026"
+        "hinweis": "stärkstes Föhnsignal 2026",
+        "sektor": [
+          225,
+          10
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -351,7 +426,12 @@
         "foehn_typ": "Nord",
         "gruppe": "C",
         "kamm_station": "gue",
-        "hinweis": ""
+        "hinweis": "",
+        "sektor": [
+          285,
+          20
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -373,7 +453,12 @@
         "foehn_typ": "Nord",
         "gruppe": "C",
         "kamm_station": "gue",
-        "hinweis": ""
+        "hinweis": "",
+        "sektor": [
+          285,
+          55
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -395,7 +480,12 @@
         "foehn_typ": "Nord",
         "gruppe": "C",
         "kamm_station": "gue",
-        "hinweis": "viel Mischluft"
+        "hinweis": "viel Mischluft",
+        "sektor": [
+          350,
+          245
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -417,7 +507,12 @@
         "foehn_typ": "Nord",
         "gruppe": "C",
         "kamm_station": "gue",
-        "hinweis": ""
+        "hinweis": "",
+        "sektor": [
+          340,
+          75
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {
@@ -439,7 +534,12 @@
         "foehn_typ": "Nord",
         "gruppe": "C",
         "kamm_station": "gue",
-        "hinweis": "Passstation 1639 m, nicht Talboden"
+        "hinweis": "Passstation 1639 m, nicht Talboden",
+        "sektor": [
+          250,
+          30
+        ],
+        "sektor_quelle": "Messung MeteoSchweiz 2026 (95 % + 20°) ∪ ICON-CH2 an Föhntagen 26.–28.08. und 26.03.–02.04.2026 (95 % + 10°), 14.10.2026"
       }
     },
     {

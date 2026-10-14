@@ -151,6 +151,10 @@ data/mcp_export/
 # Föhn-Validierung: Maschinendaten (Wahrheit + Modellreihen sind nachladbar)
 validation/foehn/messwerte/
 validation/foehn/modell/
+# Föhn täglich (scripts/validate_foehn_daily.py) — Maschinendaten, server-lokal wie gewitter/
+validation/foehn/urteile/
+validation/foehn/scoreboard_daily.json
+validation/foehn/AUTO_REPORT_DAILY.md
 validation/foehn/scoreboard.json
 validation/foehn/AUTO_REPORT.md
 validation/foehn/scoreboard_tal.json

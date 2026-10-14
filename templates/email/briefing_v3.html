@@ -8,7 +8,7 @@
 {%- set C = {
   'ink':'#1e293b','text2':'#475569','muted':'#64748b','border':'#e5e7eb','surface2':'#f8fafc',
   'primary':'#0369a1','primary_light':'#e0f2fe','primary_vivid':'#075985',
-  'ok_fg':'#166534','ok_bg':'#dcfce7','info_fg':'#0369a1','info_bg':'#e0f2fe','warn_fg':'#9a3412','warn_bg':'#ffedd5',
+  'ok_fg':'#166534','ok_bg':'#dcfce7','info_fg':'#0369a1','info_bg':'#e0f2fe','warn_fg':'#9a3412','warn_bg':'#ffedd5','neutral_fg':'#475569','neutral_bg':'#f1f5f9',
   'danger':'#b91c1c','accent':'#d97706'
 } -%}
 {%- set MONO = "'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace" -%}
@@ -152,6 +152,10 @@
   <tr><td style="padding:0 18px 12px 56px;">
     {% if v3_chain.foehn.facts %}<div>{% for f in v3_chain.foehn.facts %}{{ fact(f.k, f.v) }}{% endfor %}</div>{% endif %}
     {{ verdict(v3_chain.foehn.fazit or v3_chain.foehn.foehn) }}
+    {#- Einordnung: fester, gepruefter Satz je Datenlage (briefing_v3_context._foehn_valley_reading) -#}
+    {% if v3_chain.foehn.reading %}{{ verdict(v3_chain.foehn.reading) }}
+    {% if v3_chain.foehn.legend %}<p style="margin:8px 0 0;font:13px/1.45 {{ SANS }};color:{{ C.muted }};">{{ v3_chain.foehn.legend }}</p>{% endif %}
+    {% if v3_chain.foehn.guide and v3_chain.foehn.guide.url %}<p style="margin:6px 0 0;font:14px/1.5 {{ SANS }};"><a href="{{ track(v3_chain.foehn.guide.url) }}" style="color:{{ C.primary }};text-decoration:underline;">&rarr; {{ v3_chain.foehn.guide.label }}</a></p>{% endif %}{% endif %}
   </td></tr>
 
   {# 4 Hoehenwind #}

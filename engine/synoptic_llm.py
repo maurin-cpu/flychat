@@ -1519,6 +1519,18 @@ def hazard_checks(ctx: dict) -> list:
         side = _foehn_active_side(foehn, fc_dates, i)
         fo = foehn_by_date.get(date) or {}
         peak = fo.get(f"peak_{side}") if side else None
+        # Foehn auch ohne Druckschwelle, wenn Taeler trockenen Wind aus Foehnrichtung
+        # zeigen (User 14.10.2026; Blog wetterkunde/foehn: Andeer/Davos/Visp ein
+        # Drittel der Foehnstunden unter 4 hPa). Dann: Talbezug statt Druckstufe.
+        valley_signs = None
+        if not side:
+            cand = [(s_, t_) for s_, t_ in ((fo.get("taeler") or {}).items()) if t_ and t_.get("n_dir_dry")]
+            if cand:
+                side, tv = max(cand, key=lambda st: st[1]["n_dir_dry"])
+                valley_signs = {"n": tv["n_dir_dry"], "n_total": tv.get("n_total", 0),
+                                "taeler": [e.get("tal", "") for e in tv.get("taeler") or [] if e.get("dir_dry")],
+                                "gust_max_kmh": max((e.get("all_gust_max_kmh") or 0)
+                                                    for e in tv.get("taeler") or [] if e.get("dir_dry"))}
 
         lee_zones = list(_FOEHN_LEE_ZONES.get(side, ())) if side else []
         foehn_wins_raw = (fo.get(f"{side}_windows") or {}) if side else {}
@@ -1546,7 +1558,9 @@ def hazard_checks(ctx: dict) -> list:
                                 "course": _foehn_course(foehn_wins_raw),
                                 "lee_gust_kmh": _lee_gust_kmh(ctx, i, lee_zones),
                                 # Foehn am Talboden (foehn_tal_for_day) — None ohne Talreihe
-                                "tal": fo.get("tal") if side else None,
+                                # oder wenn nur die Talmerkmale ausloesen (eigene Fakten)
+                                "tal": fo.get("tal") if side and not valley_signs else None,
+                                "valley_signs": valley_signs,
                                 "delta_p_min_hpa": (foehn_thr.get("delta_p_danger_hpa", 8)
                                                     if peak == "danger"
                                                     else foehn_thr.get("delta_p_caution_hpa", 4))}},
@@ -1594,6 +1608,14 @@ def _hazards_for_llm(checks: list) -> list:
                         entry["tal_wind_kmh"] = f"{tal['wind_min_kmh']}-{tal['wind_max_kmh']}"
                         entry["tal_gust_max_kmh"] = tal["gust_max_kmh"]
                         entry["tal_gust_valley"] = tal_kurzname(tal.get("gust_tal", ""))
+                elif f.get("valley_signs"):
+                    from foehn_talpunkte import tal_kurzname
+                    vs = f["valley_signs"]
+                    entry["valley_dry_foehn_wind"] = {
+                        "valleys": [tal_kurzname(n) for n in vs["taeler"]][:5],
+                        "n": vs["n"], "of": vs["n_total"], "gust_max_kmh": vs["gust_max_kmh"],
+                        "note": "Pressure difference below threshold; valleys show dry wind from "
+                                "the foehn direction. Describe as data, never as fact."}
                 elif f.get("lee_gust_kmh"):
                     entry["lee_gust_kmh"] = f["lee_gust_kmh"]
             if f.get("day_shape"):

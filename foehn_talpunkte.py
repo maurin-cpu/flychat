@@ -37,6 +37,19 @@ def load_talpunkte() -> list[dict]:
     return out
 
 
+_SEKTOR_CACHE: dict = {}
+
+
+def sektor_fuer(punkt_id: str, meta: Optional[dict] = None):
+    """Gemessene Föhnrichtung eines Tals [lo, hi] — aus der AKTUELLEN Talpunkt-Datei,
+    damit auch ältere Reihen/Snapshots (Meta ohne `sektor`) mit der heutigen Regel
+    gerechnet werden; sonst aus `meta`; sonst None (Halbkreis je foehn_typ)."""
+    if not _SEKTOR_CACHE:
+        _SEKTOR_CACHE.update({p["id"]: p.get("sektor") for p in load_talpunkte() if p.get("id")})
+        _SEKTOR_CACHE.setdefault("__geladen__", True)
+    return _SEKTOR_CACHE.get(punkt_id) or (meta or {}).get("sektor")
+
+
 def update_talpunkt(punkt_id: str, lat: float, lon: float) -> dict:
     """Verschiebt EINEN Talpunkt und schreibt die Datei atomar zurück.
 

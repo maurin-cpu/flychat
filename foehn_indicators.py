@@ -11,6 +11,7 @@ Berechnet Föhn-Warnstufen basierend auf:
 Verwendet MeteoSwiss ICON für die Schweiz (hochauflösend).
 """
 
+import math
 import requests
 from datetime import datetime
 from typing import Optional
@@ -62,6 +63,17 @@ TAL_WIND_MIN_KMH = 20
 TAL_GUST_MIN_KMH = 30
 TAL_RH_MAX = 60
 TAL_MIN_HOURS = 2
+# "Richtung + trockene Luft": die Modelle zeigen Foehnwind zu schwach (Blog
+# wetterkunde/foehn, Fall 26.-28.08.2026: Mittelwind 3-4, Boeen knapp 8 km/h
+# unter der Messung). Schwelle minus dieser Fehler — ohne Mindestwind zaehlte
+# jede schwache, trockene Talbrise im 180°-Sektor (Vorschau 14.10.2026: bis
+# 16 von 23 Taelern bei 10 km/h, auf beiden Seiten zugleich).
+TAL_WIND_WEAK_KMH = TAL_WIND_MIN_KMH - 4
+TAL_GUST_WEAK_KMH = TAL_GUST_MIN_KMH - 8
+# Feuchte genauso: Modelle zeigen Foehnluft ~8 Prozentpunkte zu feucht (Blog,
+# Fall 26.-28.08.). Validierung 07.10.2026 Davos: Richtung SW + Boeen 30 km/h, Feuchte
+# 59-62 % -> mit 60 % verpasst, Foehnindex zeigte 5 Foehnstunden.
+TAL_RH_WEAK = TAL_RH_MAX + 8
 # Föhnsektor je foehn_typ (Grad, im Uhrzeigersinn von lo nach hi; Nord über 0°)
 TAL_SEKTOR = {
     "Süd": (SUEDFOEHN_HALFCIRCLE_START, SUEDFOEHN_HALFCIRCLE_END),   # 90–270
@@ -484,7 +496,7 @@ def tal_side(foehn_typ: str) -> str:
     return "nord" if (foehn_typ or "").startswith("Nord") else "sued"
 
 
-def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str) -> dict:
+def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str, sektor=None) -> dict:
     """Föhnstunden eines Talpunkts in den Stunden `indices` (Flugfenster eines Tages).
 
     hourly: Listen `wind_speed_10m`, `wind_gusts_10m`, `wind_direction_10m`,
@@ -493,8 +505,14 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str) -> dict:
     TAL_RH_MAX. Die Werte (Spanne Mittelwind, Böenspitze) stammen nur aus den
     Föhnstunden. has_data=False, wenn keine Stunde vollständige Werte hat —
     dann zählt der Punkt nicht mit (nie als "kein Föhn" werten).
+
+    sektor: gemessene Föhnrichtung DIESES Tals [lo, hi] (foehn_talpunkte.geojson,
+    14.10.2026: Station ∪ Modell an Föhntagen). Ohne: Halbkreis je foehn_typ.
     """
-    lo, hi = TAL_SEKTOR.get(foehn_typ, TAL_SEKTOR["Süd"])
+    if sektor and len(sektor) == 2:
+        lo, hi = float(sektor[0]), float(sektor[1])
+    else:
+        lo, hi = TAL_SEKTOR.get(foehn_typ, TAL_SEKTOR["Süd"])
 
     def _at(key, i):
         arr = hourly.get(key) or []
@@ -502,7 +520,9 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str) -> dict:
         return float(v) if isinstance(v, (int, float)) else None
 
     winds, gusts, hours = [], [], []
-    all_w, all_g = [], []
+    all_w, all_g, all_rh = [], [], []
+    dir_dry_hours = 0
+    foehn_dirs = []        # Richtungen der Merkmal-Stunden (fuer "Leventina aus W")
     has_data = False
     for i in indices:
         w, g = _at("wind_speed_10m", i), _at("wind_gusts_10m", i)
@@ -512,20 +532,36 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str) -> dict:
         has_data = True
         all_w.append(w)
         all_g.append(g)
-        if dir_in_sector(d, lo, hi) and (w >= TAL_WIND_MIN_KMH or g >= TAL_GUST_MIN_KMH) \
-                and rh <= TAL_RH_MAX:
+        all_rh.append(rh)
+        in_dir, dry = dir_in_sector(d, lo, hi), rh <= TAL_RH_MAX
+        dry_weak = rh <= TAL_RH_WEAK
+        # Richtung + trockene Luft, ohne Windstaerke: erkannte im Foehnfall
+        # 26.-28.08.2026 84-85 % der Foehnstunden, weil die Modelle den
+        # Foehnwind zu schwach zeigen (Blog wetterkunde/foehn, Abschnitt Prognose)
+        if in_dir and dry_weak and (w >= TAL_WIND_WEAK_KMH or g >= TAL_GUST_WEAK_KMH):
+            dir_dry_hours += 1
+            foehn_dirs.append(d)
+        if in_dir and (w >= TAL_WIND_MIN_KMH or g >= TAL_GUST_MIN_KMH) and dry:
             winds.append(w)
             gusts.append(g)
             hours.append(i)
     out = {"has_data": has_data, "hours": len(hours),
-           "bestaetigt": has_data and len(hours) >= TAL_MIN_HOURS}
+           "bestaetigt": has_data and len(hours) >= TAL_MIN_HOURS,
+           "dir_dry_hours": dir_dry_hours,
+           "dir_dry": has_data and dir_dry_hours >= TAL_MIN_HOURS}
     if has_data:
         # Hoechstwerte ueber ALLE Flugstunden, jede Richtung — damit das Briefing
         # auch ohne Foehnstunden die Windstaerke im Tal nennen kann (12.10.2026)
-        out.update(all_wind_max_kmh=round(max(all_w)), all_gust_max_kmh=round(max(all_g)))
+        out.update(all_wind_max_kmh=round(max(all_w)), all_gust_max_kmh=round(max(all_g)),
+                   rh_min_pct=round(min(all_rh)))
     if out["bestaetigt"]:
         out.update(wind_min_kmh=round(min(winds)), wind_max_kmh=round(max(winds)),
                    gust_max_kmh=round(max(gusts)), first_index=min(hours))
+    if foehn_dirs:
+        # Vektormittel der Richtung (nicht arithmetisch: 350° und 10° -> 0°)
+        sx = sum(math.sin(math.radians(x)) for x in foehn_dirs)
+        cx = sum(math.cos(math.radians(x)) for x in foehn_dirs)
+        out["foehn_dir_deg"] = round(math.degrees(math.atan2(sx, cx)) % 360)
     return out
 
 
@@ -535,7 +571,14 @@ def summarize_taeler(results: list) -> dict:
     bestätigten Täler — so liegt jede Talzeile innerhalb der Landeswerte."""
     checked = [r for r in results if r.get("has_data")]
     best = [r for r in checked if r.get("bestaetigt")]
-    out = {"n_total": len(checked), "n_bestaetigt": len(best)}
+    dir_dry = [r for r in checked if r.get("dir_dry")]
+    out = {"n_total": len(checked), "n_bestaetigt": len(best),
+           # Richtung + trockene Luft (auch ohne starken Wind), inkl. der bestaetigten
+           "n_dir_dry": len(dir_dry), "dir_dry_taeler": [r.get("tal", "") for r in dir_dry]}
+    with_rh = [r for r in checked if r.get("rh_min_pct") is not None]
+    if with_rh:
+        low = min(with_rh, key=lambda r: r["rh_min_pct"])
+        out.update(rh_min_pct=low["rh_min_pct"], rh_min_tal=low.get("tal", ""))
     # Windstaerke in allen Taelern (jede Richtung) — fuer den Satz ohne Foehnstunden
     with_all = [r for r in checked if r.get("all_gust_max_kmh") is not None]
     if with_all:

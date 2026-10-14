@@ -287,3 +287,257 @@ class TestSnapshot(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTalmerkmaleBriefing(unittest.TestCase):
+    """Föhn-Block nach Talmerkmalen (14.10.2026): beide Seiten jeden Tag,
+    Richtung + Wind + Feuchte, Druck nur als Zahl, nie ein Urteil."""
+
+    def setUp(self):
+        self._lang = config.LANG
+        config.LANG = "en"
+
+    def tearDown(self):
+        config.LANG = self._lang
+
+    def _fo(self, series, dp=2.0):
+        return {"claim": {"delta_p_sued_max_hpa": dp, "delta_p_nord_max_hpa": 1.0},
+                "taeler": {s: sc.foehn_tal_for_day(series, DATE, s) for s in ("sued", "nord")}}
+
+    def test_humidity_and_direction_dry_are_counted(self):
+        r = fi.evaluate_talpunkt(_hourly(foehn_hours=(11, 12), fw=(14, 15), fg=(23, 24)),
+                                 list(range(10, 17)), "Süd")
+        self.assertFalse(r["bestaetigt"])          # zu schwach fuer alle drei Merkmale
+        self.assertTrue(r["dir_dry"])              # aber Foehnrichtung + trocken + Wind knapp darunter
+        self.assertEqual(r["rh_min_pct"], 38)
+
+    def test_weak_dry_breeze_in_sector_is_not_counted(self):
+        # Vorschau 14.10.: trockene Talbrise um 10 km/h im 180°-Sektor = kein Merkmal
+        r = fi.evaluate_talpunkt(_hourly(foehn_hours=(11, 12, 13), fw=(9, 10, 10), fg=(15, 16, 16)),
+                                 list(range(10, 17)), "Süd")
+        self.assertFalse(r["dir_dry"])
+
+    def test_valleys_are_checked_without_pressure_index(self):
+        # Druck 2 hPa, trotzdem bestaetigte Taeler -> Block nennt sie
+        text = bc._foehn_valley_fazit(self._fo(_series(True)), {})
+        self.assertIn("dry wind from the foehn direction in 2 of 3 valleys", text)
+        self.assertNotIn("hPa", text)          # Druck nur als Kennzahl
+        self.assertNotRegex(text, r"(?i)threshold|no signs|no foehn\b")
+        kind, label, facts = bc._foehn_valley_status(self._fo(_series(True)), {})
+        self.assertEqual(kind, "warn")
+        self.assertIn("valleys", label)
+
+    def test_calm_valleys_with_strong_wind_aloft_name_the_pattern(self):
+        fo = self._fo(_series(False))
+        fo["taeler"]["nord"] = None                 # nur Nordseite mit Daten, ruhig
+        fo["taeler"]["nord"] = sc.foehn_tal_for_day(
+            {"model": "meteoswiss_icon_ch2", "time": TIMES,
+             "punkte": {"pio": {"meta": {"id": "pio", "tal": "Leventina", "station": "Piotta",
+                                         "region_id": "leventina_blenio", "foehn_typ": "Nord"},
+                                "hourly": _hourly()}}}, DATE, "nord")
+        sw = {"max_gust_kmh": 81, "dir_deg": 0, "spot": "Cari", "elevation_m": 2293, "hour": 9}
+        text = bc._foehn_valley_fazit(fo, sw)
+        self.assertIn("Valleys: no dry wind from the foehn direction", text)
+        self.assertIn("gusts up to 81 km/h from the north", text)
+        self.assertIn("over a cold-air pool", bc._foehn_valley_reading(fo, sw))
+        self.assertNotIn("cold-air pool", text)   # Deutung nur in der Einordnung
+        kind, label, _ = bc._foehn_valley_status(fo, sw)
+        self.assertEqual((kind, label), ("info", "Wind aloft 81 km/h"))
+
+    def test_quiet_day_states_numbers_not_verdict(self):
+        fo = self._fo(_series(False))
+        fo["taeler"]["nord"] = None
+        text = bc._foehn_valley_fazit(fo, {"max_gust_kmh": 20})
+        self.assertIn("no dry wind from the foehn direction in the 3 valleys", text)
+        self.assertNotRegex(text, r"(?i)no signs of foehn|without signs|threshold")
+
+    def test_old_cache_without_taeler_keeps_legacy_text(self):
+        fo = {"claim": {"delta_p_sued_max_hpa": 2.0}, "sued_active": False}
+        wl = {"foehn": {"per_day": [dict(fo, date=DATE)]}}
+        self.assertIn("pressure difference", bc._foehn_fazit(wl, DATE))
+
+
+class TestEinordnung(unittest.TestCase):
+    """Einordnung: ein fester Satz je Datenlage, immer mit Grenze, nie Urteil."""
+
+    def setUp(self):
+        self._lang = config.LANG
+        config.LANG = "en"
+
+    def tearDown(self):
+        config.LANG = self._lang
+
+    def _fo(self, confirmed, dp=2.0):
+        return {"claim": {"delta_p_sued_max_hpa": dp},
+                "taeler": {"sued": sc.foehn_tal_for_day(_series(confirmed), DATE, "sued"), "nord": None}}
+
+    def test_each_case_has_its_sentence(self):
+        self.assertIn("features MeteoSwiss uses", bc._foehn_valley_reading(self._fo(True), {}))
+        self.assertIn("indicators in the valleys show no foehn signal", bc._foehn_valley_reading(self._fo(False), {}))
+        self.assertIn("pressure difference this large", bc._foehn_valley_reading(self._fo(False, dp=9), {}))
+
+    def test_calm_day_names_the_limit_never_gives_all_clear(self):
+        text = bc._foehn_valley_reading(self._fo(False), {})
+        self.assertIn("model forecast", text)
+        self.assertIn("inner-Alpine", text)
+        self.assertNotRegex(text, r"(?i)no foehn|safe|no risk")
+
+    def test_both_languages_carry_every_sentence(self):
+        for key in ("fvr_quiet", "fvr_pool", "fvr_dirdry", "fvr_full", "fvr_dp_high", "fvr_guide"):
+            for lang in ("de", "en"):
+                config.LANG = lang
+                self.assertNotEqual(bc._lbl(key), key, (key, lang))
+
+
+class TestRuhigerTag(unittest.TestCase):
+    """Recherche 14.10.2026: kein Anbieter schreibt 'kein Foehn' in Prognosen,
+    der SHV nennt Schweigen bei seichtem Foehn als Unfallmuster -> ruhiger Tag
+    = neutrale Pille, Indikatoren + Grenze + Live-Werte, nie Entwarnung."""
+
+    def setUp(self):
+        self._lang = config.LANG
+        config.LANG = "de"
+
+    def tearDown(self):
+        config.LANG = self._lang
+
+    def test_quiet_day_is_neutral_not_green(self):
+        fo = {"claim": {"delta_p_sued_max_hpa": 2.0},
+              "taeler": {"sued": sc.foehn_tal_for_day(_series(False), DATE, "sued"), "nord": None}}
+        kind, label, _ = bc._foehn_valley_status(fo, {})
+        self.assertEqual(kind, "neutral")
+        text = bc._foehn_valley_reading(fo, {})
+        self.assertIn("Seichter Föhn wird von Modellen oft nicht erfasst", text)
+        self.assertIn("Live-Werte", text)
+        self.assertNotRegex(text, r"kein Föhn")
+
+
+class TestRichtung(unittest.TestCase):
+    """14.10.2026: Hoehe SO–SW / NW–NO = Foehnrichtung (User-Regel, Guetsch-Messung);
+    Ost/West nur als Wind. Taeler: gemessene Richtung je Tal, im Text genannt."""
+
+    def setUp(self):
+        self._lang = config.LANG
+        config.LANG = "en"
+
+    def tearDown(self):
+        config.LANG = self._lang
+
+    def _quiet(self):
+        return {"claim": {"delta_p_sued_max_hpa": 2.0},
+                "taeler": {"sued": sc.foehn_tal_for_day(_series(False), DATE, "sued"),
+                           "nord": sc.foehn_tal_for_day(_series(False), DATE, "nord")}}
+
+    def test_west_wind_aloft_is_only_wind(self):
+        fo = self._quiet()
+        fo["taeler"]["nord"]["n_dir_dry"] = 0
+        fo["taeler"]["nord"]["n_bestaetigt"] = 0
+        sw = {"max_gust_kmh": 70, "dir_deg": 270, "spot": "Piz X", "elevation_m": 2900, "hour": 9}
+        self.assertIn("from the west", bc._foehn_valley_fazit(fo, sw))
+        self.assertNotIn("cold-air pool", bc._foehn_valley_reading(fo, sw))
+        kind, label, _ = bc._foehn_valley_status(fo, sw)
+        self.assertNotIn("aloft", label)
+
+    def test_aloft_sectors_follow_user_rule(self):
+        self.assertEqual(bc._aloft_foehn_side({"dir_deg": 140}), "sued")
+        self.assertEqual(bc._aloft_foehn_side({"dir_deg": 220}), "sued")
+        self.assertEqual(bc._aloft_foehn_side({"dir_deg": 320}), "nord")
+        self.assertEqual(bc._aloft_foehn_side({"dir_deg": 40}), "nord")
+        self.assertIsNone(bc._aloft_foehn_side({"dir_deg": 270}))
+        self.assertIsNone(bc._aloft_foehn_side({"dir_deg": 90}))
+
+    def test_valley_named_with_its_direction(self):
+        fo = {"claim": {"delta_p_sued_max_hpa": 6.0},
+              "taeler": {"sued": sc.foehn_tal_for_day(_series(True), DATE, "sued"), "nord": None}}
+        text = bc._foehn_valley_fazit(fo, {})
+        self.assertRegex(text, r"Reusstal from S")
+        self.assertIn("South side valleys: no valley data — not verifiable.", text)
+
+    def test_measured_sector_overrides_half_circle(self):
+        # Leventina: Foehn aus West (Talachse) — Halbkreis 270–90 haette 255° verpasst
+        h = _hourly(foehn_hours=(11, 12, 13), fw=(25, 28, 30), fg=(45, 50, 52), fdir=255.0, frh=40.0)
+        r_alt = fi.evaluate_talpunkt(h, list(range(10, 17)), "Nord")
+        r_neu = fi.evaluate_talpunkt(h, list(range(10, 17)), "Nord", sektor=[225, 10])
+        self.assertFalse(r_alt["bestaetigt"])
+        self.assertTrue(r_neu["bestaetigt"])
+        self.assertAlmostEqual(r_neu["foehn_dir_deg"], 255, delta=1)
+
+
+class TestFoehnRichter(unittest.TestCase):
+    """scripts/validate_foehn_daily: Wahrheit je Stunde und Urteil je Tal."""
+
+    def test_wahrheit_counts_foehn_and_mixed_hours(self):
+        from scripts import validate_foehn_daily as v
+        idx = {12: ["2"] * 6, 13: ["2", "2", "2", "0", "0", "0"], 14: ["1"] * 6, 15: ["2", "2", "0", "0", "0", "0"]}
+        w = v._wahrheit(idx)
+        self.assertEqual(w["foehn_std"], [12, 13])
+        self.assertEqual(w["misch_std"], [14])
+
+    def test_urteil(self):
+        from scripts import validate_foehn_daily as v
+        f = {"foehn_std": [12, 13], "misch_std": []}
+        m = {"foehn_std": [], "misch_std": [12, 13]}
+        q = {"foehn_std": [12], "misch_std": []}
+        self.assertEqual(v._urteil(True, f), "treffer")
+        self.assertEqual(v._urteil(False, f), "verpasst")
+        self.assertEqual(v._urteil(True, m), "mischluft")
+        self.assertEqual(v._urteil(True, q), "fehlalarm")
+        self.assertEqual(v._urteil(False, q), "still")
+
+
+class TestLegende(unittest.TestCase):
+    """Legende: wann ein Tal zaehlt — Zahlen aus den Konstanten der Regel."""
+
+    def test_legend_numbers_come_from_the_rule(self):
+        config_lang = config.LANG
+        config.LANG = "en"
+        try:
+            fo = {"taeler": {"sued": sc.foehn_tal_for_day(_series(False), DATE, "sued"), "nord": None}}
+            text = bc._foehn_legend(fo)
+            self.assertIn(f"from {fi.TAL_WIND_WEAK_KMH} km/h", text)
+            self.assertIn(f"gusts from {fi.TAL_GUST_WEAK_KMH} km/h", text)
+            self.assertIn(f"at most {fi.TAL_RH_WEAK} %", text)
+            self.assertIn(f"at least {fi.TAL_MIN_HOURS} hours", text)
+            self.assertEqual(bc._foehn_legend({"taeler": {"sued": None, "nord": None}}), "")
+        finally:
+            config.LANG = config_lang
+
+
+class TestWarnungAusTaelern(unittest.TestCase):
+    """14.10.2026: Foehn-Warnung auch ohne Druckschwelle, wenn Taeler trockenen
+    Wind aus Foehnrichtung zeigen (Blog-Fall 26.08.: 3 hPa, Foehn in Andeer)."""
+
+    def setUp(self):
+        self._lang = config.LANG
+        config.LANG = "en"
+
+    def tearDown(self):
+        config.LANG = self._lang
+
+    def _wl(self):
+        wl = _wetterlage(None)
+        d = wl["foehn"]["per_day"][0]
+        d.update(sued_active=False, peak_sued="none", sued_hours=0, claim={"delta_p_sued_max_hpa": 3.0})
+        d["taeler"] = {"sued": sc.foehn_tal_for_day(_series(True), DATE, "sued"), "nord": None}
+        return wl
+
+    def test_valley_signs_activate_the_warning(self):
+        chk = sl.hazard_checks(self._wl())[0]["checks"]["FOEHN"]
+        self.assertTrue(chk["active"])
+        self.assertEqual(chk["facts"]["side"], "sued")
+        self.assertIsNone(chk["facts"]["tal"])              # KI-Validator: keine Talzahl-Pflicht
+        self.assertEqual(chk["facts"]["valley_signs"]["n"], 2)
+
+    def test_warnbox_and_ki_payload_describe_the_valleys(self):
+        day = bc.build_chain_all_days(self._wl(), [DATE])["by_date"][DATE]
+        code = _foehn_warning(day)["code_text"]
+        self.assertIn("Data show dry wind from the foehn direction in 2 of 3 valleys", code)
+        self.assertNotRegex(code, r"(?i)\bno foehn\b|south foehn \(")
+        entry = sl._hazards_for_llm(sl.hazard_checks(self._wl()))[0]["active"]["FOEHN"]
+        self.assertEqual(entry["valley_dry_foehn_wind"]["n"], 2)
+        self.assertNotIn("tal_confirmed", entry)
+
+    def test_no_valley_signs_no_warning(self):
+        wl = self._wl()
+        wl["foehn"]["per_day"][0]["taeler"] = {"sued": sc.foehn_tal_for_day(_series(False), DATE, "sued"), "nord": None}
+        self.assertFalse(sl.hazard_checks(wl)[0]["checks"]["FOEHN"]["active"])

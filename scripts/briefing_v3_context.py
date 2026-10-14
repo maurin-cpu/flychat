@@ -607,7 +607,7 @@ _L3 = {
         "st_sun_match": "wie erwartet", "st_sun_partial": "teils anders", "st_sun_contra": "anders als erwartet",
         "st_md_agree": "Modelle einig", "st_md_partial": "meist einig", "st_md_uncertain": "Modelle uneinig",
         "fx_dwd": "DWD", "fx_signature": "Zeichen", "fx_sig_deutlich": "deutlich", "fx_sig_schwach": "schwach", "fx_sig_no": "keine",
-        "fx_dp": "ΔP Alpen", "fx_gust": "Böe", "fx_tal": "Föhntäler", "fx_tal_na": "n. prüfbar", "fx_t850": "T850", "fx_thunder_none": "keine Gewitter",
+        "fx_dp": "Druckunterschied Alpen", "fx_gust": "Böe", "fx_tal": "Föhntäler", "fx_tal_na": "n. prüfbar", "fx_t850": "T850", "fx_thunder_none": "keine Gewitter",
         "fx_ground": "am Boden ≈", "fx_peak": "Spitze",
         "md_head_0":     "Fazit: Gute Übereinstimmung der Modelle.",
         "md_head_1":     "Fazit: Ein offener Punkt.",
@@ -768,6 +768,41 @@ _L3 = {
         "fb_tal_nonum": "Der Wind an den {n} Föhn-Talpunkten ({model}) deutet am Talboden nicht auf Föhn hin.",
         "fb_foehn_tal_na":  " Bestätigung durch Talwind nicht prüfbar (keine Talpunkt-Daten).",
         "fb_tal_more":      " u. a.",
+        # Foehn-Block nach Talmerkmalen (User 14.10.2026, Blog wetterkunde/foehn):
+        # beide Seiten jeden Tag, Richtung + Wind + trockene Luft, Druck nur als Zahl.
+        "fv_side_sued":     "Täler Nordseite",
+        "fv_side_nord":     "Täler Südseite",
+        "fv_full":          "{side}: trockener Wind aus Föhnrichtung in {n} von {t} Tälern — {taeler}; Böen bis {g} km/h.",
+        "fv_dirdry":        "{side}: trockener Wind aus Föhnrichtung in {n} von {t} Tälern — {taeler}; Wind noch schwach, Böen bis {g} km/h.",
+        "fv_none":          "{side}: kein trockener Wind aus Föhnrichtung in den {t} Tälern, Talwind bis {w} km/h.",
+        "fv_both_none":     "Täler: kein trockener Wind aus Föhnrichtung in den {t} Tälern, Talwind bis {w} km/h.",
+        "fv_aloft":         "In der Höhe: Böen bis {g} km/h aus {dir} ({spot}, {alt} m).",
+        "fv_none_short":    "{side}: kein trockener Wind aus Föhnrichtung in den {t} Tälern, Talwind bis {w} km/h.",
+        "fv_dp":            "Druckunterschied über die Alpen: {dp} hPa.",
+        "fv_dp_high":       "Druckunterschied über die Alpen: {dp} hPa — in dieser Grösse ist Föhn in den grossen Föhntälern häufig.",
+        "fv_na":            "Föhntäler: keine Taldaten verfügbar.",
+        "fvs_full":         "Trockener Wind aus Föhnrichtung: {n} von {t} Tälern",
+        "fvs_dirdry":       "Trockener Wind aus Föhnrichtung: {n} von {t} Tälern",
+        "fvs_aloft":        "Wind in der Höhe {g} km/h",
+        "fvs_dp":           "Druckunterschied {dp} hPa",
+        "fvs_none":         "Trockener Wind aus Föhnrichtung: 0 von {t} Tälern",
+        "fx_rh":            "Tiefste Talfeuchte",
+        "fx_gust_aloft":    "Böe in der Höhe",
+        "fv_side_na":       "{side}: keine Taldaten — nicht prüfbar.",
+        "hz_code_foehn_tal": "Daten zeigen trockenen Wind aus Föhnrichtung in {n} von {t} Tälern ({names}), Böen bis {g} km/h — Lee-Seite {zones}.",
+        "hz_cause_foehn_tal": "— Wind aus der Föhnrichtung der Täler mit trockener Luft.",
+        "fv_name_dir":      "{tal} aus {dir}",
+        "fv_dir_N": "N", "fv_dir_NE": "NO", "fv_dir_E": "O", "fv_dir_SE": "SO",
+        "fv_dir_S": "S", "fv_dir_SW": "SW", "fv_dir_W": "W", "fv_dir_NW": "NW",
+        # Einordnung: feste Saetze, was ein Datenmuster ueblicherweise bedeutet,
+        # immer mit Grenze (User 14.10.2026; Grundlage Blog wetterkunde/foehn).
+        "fvr_quiet":   "Einordnung: Die Föhn-Indikatoren in den Tälern zeigen kein Föhnsignal. Das ist eine Modellprognose: Seichter Föhn wird von Modellen oft nicht erfasst, und inneralpin (Wallis, Domleschg, Davos) setzt Föhn auch bei kleinem Druckunterschied ein. Am Flugtag die Live-Werte an Tal- und Gipfelstationen prüfen.",
+        "fvr_pool":    "Einordnung: In solchen Daten kann der Föhn über den ruhigen Tälern wehen, über einem Kaltluftsee. Auf Starthöhe kann es stark wehen, während das Tal ruhig ist, und der Föhn kann bis zum Boden durchbrechen.",
+        "fvr_dirdry":  "Einordnung: Die Luft zeigt Föhn-Eigenschaften, der Modellwind ist aber schwach. Die Modelle zeigen Föhnwind meist zu schwach — Föhn am Talboden ist deshalb nicht auszuschliessen.",
+        "fvr_full":    "Einordnung: In diesen Tälern zeigt die Prognose trockenen Wind aus der Föhnrichtung — die Merkmale, an denen MeteoSchweiz Föhn am Talboden erkennt. Die Modelle zeigen Föhnwind meist zu schwach, und Nachbartäler können um Stunden versetzt sein.",
+        "fvr_dp_high": "Einordnung: Bei so grossem Druckunterschied tritt in den grossen Föhntälern häufig Föhn auf, auch wenn die Taldaten noch ruhig sind.",
+        "fvr_guide":   "So liest du Föhn-Daten",
+        "fvr_legend":  "So wird gezählt: Ein Tal zählt, wenn die Prognose ({model}) dort mindestens {h} Stunden zwischen {h0} und {h1} Uhr Wind aus der Föhnrichtung dieses Tals zeigt, mit Wind ab {w} km/h oder Böen ab {g} km/h und höchstens {rh} % Luftfeuchte. Die Föhnrichtung je Tal stammt aus Messungen von MeteoSchweiz ({m} von {n} Tälern, die übrigen: Halbkreis).",
         "fb_dir_sued":      "Süd", "fb_dir_nord": "Nord",
         "fb_strong_none":   " {models} zeigt auch keine starken Winde an den Startplätzen.",
         "fb_strong_some":   " {models} zeigt trotzdem starke Winde an einzelnen Startplätzen: Böen bis {gust} km/h aus {dir} ({spot}, {alt} m, {when}){cmp} — die Daten zeigen Höhenwind, ohne Föhn-Anzeichen.",
@@ -1011,7 +1046,7 @@ _L3 = {
         "regions_word": "Deine Regionen",
         "situation_ch":  "Gesamtlage Schweiz",
         "wl_rain": "Regen", "wl_dry": "trocken", "wl_high": "Hochdruck", "wl_low": "Tiefdruck",
-        "wl_windy": "kräftiger Höhenwind", "wl_calm": "ruhig", "wl_foehn_n": "Nordföhn", "wl_foehn_s": "Südföhn",
+        "wl_windy": "kräftiger Höhenwind", "wl_calm": "ruhig", "wl_foehn_n": "Nordföhn angezeigt", "wl_foehn_s": "Südföhn angezeigt",
     },
     "en": {
         "no_warning":   "no warning",
@@ -1037,7 +1072,7 @@ _L3 = {
         "st_sun_match": "as expected", "st_sun_partial": "partly different", "st_sun_contra": "different than expected",
         "st_md_agree": "models agree", "st_md_partial": "mostly agree", "st_md_uncertain": "models disagree",
         "fx_dwd": "DWD", "fx_signature": "signs", "fx_sig_deutlich": "clear", "fx_sig_schwach": "weak", "fx_sig_no": "none",
-        "fx_dp": "ΔP Alps", "fx_gust": "gust", "fx_tal": "foehn valleys", "fx_tal_na": "n/a", "fx_t850": "T850", "fx_thunder_none": "no thunderstorms",
+        "fx_dp": "Pressure diff. Alps", "fx_gust": "gust", "fx_tal": "foehn valleys", "fx_tal_na": "n/a", "fx_t850": "T850", "fx_thunder_none": "no thunderstorms",
         "fx_ground": "ground ≈", "fx_peak": "peak",
         "md_head_0":     "Verdict: Good agreement between the models.",
         "md_head_1":     "Verdict: One open point.",
@@ -1197,6 +1232,37 @@ _L3 = {
         "fb_tal_nonum": "The wind at the {n} foehn valley points ({model}) does not point to foehn on the valley floor.",
         "fb_foehn_tal_na":  " Confirmation by valley wind not verifiable (no valley-point data).",
         "fb_tal_more":      " and others",
+        "fv_side_sued":     "North side valleys",
+        "fv_side_nord":     "South side valleys",
+        "fv_full":          "{side}: dry wind from the foehn direction in {n} of {t} valleys — {taeler}; gusts up to {g} km/h.",
+        "fv_dirdry":        "{side}: dry wind from the foehn direction in {n} of {t} valleys — {taeler}; wind still weak, gusts up to {g} km/h.",
+        "fv_none":          "{side}: no dry wind from the foehn direction in the {t} valleys, valley wind up to {w} km/h.",
+        "fv_both_none":     "Valleys: no dry wind from the foehn direction in the {t} valleys, valley wind up to {w} km/h.",
+        "fv_aloft":         "Aloft: gusts up to {g} km/h from the {dir} ({spot}, {alt} m).",
+        "fv_none_short":    "{side}: no dry wind from the foehn direction in the {t} valleys, valley wind up to {w} km/h.",
+        "fv_dp":            "Pressure difference across the Alps: {dp} hPa.",
+        "fv_dp_high":       "Pressure difference across the Alps: {dp} hPa — at this level foehn is frequent in the large foehn valleys.",
+        "fv_na":            "Foehn valleys: no valley data available.",
+        "fvs_full":         "Dry wind from foehn direction: {n} of {t} valleys",
+        "fvs_dirdry":       "Dry wind from foehn direction: {n} of {t} valleys",
+        "fvs_aloft":        "Wind aloft {g} km/h",
+        "fvs_dp":           "Pressure difference {dp} hPa",
+        "fvs_none":         "Dry wind from foehn direction: 0 of {t} valleys",
+        "fx_rh":            "Lowest valley humidity",
+        "fx_gust_aloft":    "Gust aloft",
+        "fv_side_na":       "{side}: no valley data — not verifiable.",
+        "hz_code_foehn_tal": "Data show dry wind from the foehn direction in {n} of {t} valleys ({names}), gusts up to {g} km/h — lee side {zones}.",
+        "hz_cause_foehn_tal": "— wind from the valleys' foehn direction with dry air.",
+        "fv_name_dir":      "{tal} from {dir}",
+        "fv_dir_N": "N", "fv_dir_NE": "NE", "fv_dir_E": "E", "fv_dir_SE": "SE",
+        "fv_dir_S": "S", "fv_dir_SW": "SW", "fv_dir_W": "W", "fv_dir_NW": "NW",
+        "fvr_quiet":   "Context: the foehn indicators in the valleys show no foehn signal. This is a model forecast: shallow foehn is often not captured by models, and in inner-Alpine valleys (Valais, Domleschg, Davos) foehn sets in even with a small pressure difference. On the day, check live readings at valley and summit stations.",
+        "fvr_pool":    "Context: in data like these, foehn can blow above the calm valleys, over a cold-air pool. At launch height it can be strong while the valley is calm, and the foehn can break through to the ground.",
+        "fvr_dirdry":  "Context: the air shows foehn characteristics, but the model wind is weak. Models usually show foehn wind too weak — foehn at the valley floor cannot be ruled out.",
+        "fvr_full":    "Context: in these valleys the forecast shows dry wind from the foehn direction — the features MeteoSwiss uses to identify foehn at the valley floor. Models usually show foehn wind too weak, and neighbouring valleys can be hours apart.",
+        "fvr_dp_high": "Context: with a pressure difference this large, foehn is frequent in the large foehn valleys, even while the valley data are still calm.",
+        "fvr_guide":   "How to read foehn data",
+        "fvr_legend":  "How valleys are counted: a valley counts when the forecast ({model}) shows wind from that valley's foehn direction for at least {h} hours between {h0}:00 and {h1}:00, with wind from {w} km/h or gusts from {g} km/h and humidity of at most {rh} %. The foehn direction of each valley comes from MeteoSwiss measurements ({m} of {n} valleys; the rest: half-circle).",
         "fb_dir_sued":      "south", "fb_dir_nord": "north",
         "fb_strong_none":   " {models} also shows no strong winds at the launch sites.",
         "fb_strong_some":   " {models} nevertheless shows strong winds at individual launch sites: gusts up to {gust} km/h from the {dir} ({spot}, {alt} m, {when}){cmp} — the data show upper wind, without signs of foehn.",
@@ -1437,7 +1503,7 @@ _L3 = {
         "regions_word": "Your regions",
         "situation_ch":  "Overall situation Switzerland",
         "wl_rain": "rain", "wl_dry": "dry", "wl_high": "high pressure", "wl_low": "low pressure",
-        "wl_windy": "strong upper wind", "wl_calm": "calm", "wl_foehn_n": "north foehn", "wl_foehn_s": "south foehn",
+        "wl_windy": "strong upper wind", "wl_calm": "calm", "wl_foehn_n": "north foehn indicated", "wl_foehn_s": "south foehn indicated",
     },
 }
 
@@ -2803,6 +2869,10 @@ def _foehn_fazit(wetterlage: dict, date: str) -> str:
     sw = _per_day_index(wetterlage.get("starkwind_punkte"), [date]).get(date) or {}
     if not claim and not sw:
         return ""
+    # Neuer Block (14.10.2026): Talmerkmale beider Seiten, Druck nur als Zahl.
+    # Aeltere Caches ohne `taeler` fallen auf den bisherigen Abgleich zurueck.
+    if isinstance(fo.get("taeler"), dict):
+        return _foehn_valley_fazit(fo, sw)
     parts = []
 
     # --- Foehn: Anspruch (Druckgefaelle) gegen den Wind an den Foehn-Talpunkten
@@ -2852,6 +2922,248 @@ def _foehn_fazit(wetterlage: dict, date: str) -> str:
         else:
             parts.append(_lbl("fb_foehn_no_nodp").format(strong=strong))
     return " ".join(parts)
+
+
+# Foehnrichtung des Hoehenwinds (User-Regel 14.10.2026): Suedfoehn SO–SW,
+# Nordfoehn NW–NO. Bestaetigt durch die Messung am Guetsch 2026 (Kamm, 2283 m):
+# Suedfoehn zu 90 % aus 130–170°, Nordfoehn aus 315–30°, Westwind 0–1 %.
+# Ost-/Westwind in der Hoehe wird nur als Wind genannt, ohne Foehn-Bezug.
+_ALOFT_FOEHN_SECTOR = {"nord": (315, 45), "sued": (135, 225)}
+
+
+def _aloft_foehn_side(sw: dict):
+    """Seite, deren Foehnrichtung der staerkste Startplatzwind hat (oder None)."""
+    from foehn_indicators import dir_in_sector
+    d = sw.get("dir_deg")
+    if not isinstance(d, (int, float)):
+        return None
+    for side, (lo, hi) in _ALOFT_FOEHN_SECTOR.items():
+        if dir_in_sector(d, lo, hi):
+            return side
+    return None
+
+
+def _dir_abbr(deg) -> str:
+    """Windrichtung als Kurzzeichen in der aktiven Sprache (N, NO/NE, O/E, ...)."""
+    if not isinstance(deg, (int, float)):
+        return ""
+    keys = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+    k = keys[int(((deg % 360) + 22.5) // 45) % 8]
+    return _lbl("fv_dir_" + k)
+
+
+def _valley_names_with_dir(tal: dict, key: str) -> str:
+    """'Reusstal aus SO, Haslital aus O u. a.' — die Richtung zeigt, dass der Wind
+    dem Tal folgt (Leventina: Foehn aus W). Nach Boeenspitze sortiert."""
+    from foehn_talpunkte import tal_kurzname
+    rows = [t for t in tal.get("taeler") or [] if t.get(key)]
+    rows.sort(key=lambda t: -(t.get("gust_max_kmh") or t.get("all_gust_max_kmh") or 0))
+    out, seen = [], set()
+    for t in rows:
+        name = tal_kurzname(t.get("tal", ""))
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        d = _dir_abbr(t.get("foehn_dir_deg"))
+        out.append(_lbl("fv_name_dir").format(tal=name, dir=d) if d else name)
+    return ", ".join(out[:3]) + (_lbl("fb_tal_more") if len(out) > 3 else "")
+
+
+def _valley_side_sentence(side: str, tal: dict) -> str:
+    """Ein Satz je Foehnseite aus den Talmerkmalen — nur Messgroessen, kein Urteil."""
+    from foehn_talpunkte import tal_kurzname
+    lbl_side = _lbl("fv_side_" + side)
+    total = tal.get("n_total", 0)
+    if tal.get("n_dir_dry"):
+        # EINE Grenze (User 14.10.2026): Foehnrichtung + Boeen ab 22/Wind ab 16 km/h
+        # + Feuchte bis 68 %, >= 2 h — im MeteoSchweiz-Bereich (Duerr 2008: Boeen
+        # 14-33 km/h je Station), Modellfehler eingerechnet; 15 km/h getestet:
+        # gleiche Treffer, doppelt so viele Fehlalarme.
+        counted = [e for e in tal.get("taeler") or [] if e.get("dir_dry")]
+        g = max((e.get("all_gust_max_kmh") or 0) for e in counted) if counted else "–"
+        return _lbl("fv_full").format(side=lbl_side, n=tal["n_dir_dry"], t=total,
+                                      taeler=_valley_names_with_dir(tal, "dir_dry"), g=g)
+    return _lbl("fv_none").format(side=lbl_side, t=total, w=tal.get("all_wind_max_kmh", "–"),
+                                  wmin=_tal_wmin(), g=tal.get("all_gust_max_kmh", "–"),
+                                  gtal=tal_kurzname(tal.get("all_gust_tal", "")),
+                                  rh=tal.get("rh_min_pct", "–"))
+
+
+def _spot_kurz(name: str) -> str:
+    """'Carì, Lago di Pro da Lèi' -> 'Carì' (Text kurz halten)."""
+    return (name or "").split(",")[0].strip()
+
+
+def _tal_wmin() -> int:
+    from foehn_indicators import TAL_WIND_WEAK_KMH
+    return TAL_WIND_WEAK_KMH
+
+
+def _valley_quiet(tal) -> bool:
+    return bool(tal) and not tal.get("n_bestaetigt") and not tal.get("n_dir_dry")
+
+
+def _foehn_valley_fazit(fo: dict, sw: dict) -> str:
+    """Block 3 (ab 14.10.2026): was die Foehntaeler beider Seiten zeigen
+    (Richtung, Wind, Feuchte), der staerkste Wind in der Hoehe und der
+    Druckunterschied als Zahl. Nie "Foehn" oder "kein Foehn" als Tatsache,
+    keine Druckschwelle als Urteil (Blog wetterkunde/foehn)."""
+    from foehn_talpunkte import tal_kurzname
+    taeler = fo.get("taeler") or {}
+    sued, nord = taeler.get("sued"), taeler.get("nord")
+    sides = [(s, t) for s, t in (("sued", sued), ("nord", nord)) if t]
+    missing = [s for s, t in (("sued", sued), ("nord", nord)) if not t]
+    parts = []
+    if not sides:
+        parts.append(_lbl("fv_na"))
+    elif all(_valley_quiet(t) for _, t in sides) and len(sides) == 2:
+        # Beide Seiten ruhig: ein Satz mit den Landeswerten
+        tot = sum(t.get("n_total", 0) for _, t in sides)
+        top = max(sides, key=lambda st: st[1].get("all_gust_max_kmh") or 0)[1]
+        rh = min((t.get("rh_min_pct") for _, t in sides if t.get("rh_min_pct") is not None), default="–")
+        parts.append(_lbl("fv_both_none").format(
+            t=tot, wmin=_tal_wmin(), w=max(t.get("all_wind_max_kmh") or 0 for _, t in sides),
+            g=top.get("all_gust_max_kmh", "–"), gtal=tal_kurzname(top.get("all_gust_tal", "")), rh=rh))
+    else:
+        active = any(not _valley_quiet(t) for _, t in sides)
+        for side, t in sides:
+            if active and _valley_quiet(t):
+                parts.append(_lbl("fv_none_short").format(side=_lbl("fv_side_" + side),
+                                                          t=t.get("n_total", 0),
+                                                          w=t.get("all_wind_max_kmh", "–")))
+            else:
+                parts.append(_valley_side_sentence(side, t))
+    if sides:
+        # Fehlt eine Seite (Talpunkte ohne Daten): offen sagen, nie weglassen
+        parts.extend(_lbl("fv_side_na").format(side=_lbl("fv_side_" + s)) for s in missing)
+    g = sw.get("max_gust_kmh") or 0
+    if sw and g >= 40:
+        hour = int(sw.get("hour") or 12)
+        when = _lbl("hour_morning" if hour < 10 else "hour_midday" if hour < 14
+                    else "hour_afternoon" if hour < 18 else "hour_evening")
+        alt = sw.get("elevation_m")
+        line = _lbl("fv_aloft").format(
+            g=int(g), dir=(_sector_word(sw["dir_deg"]) if sw.get("dir_deg") is not None else "–"),
+            spot=_spot_kurz(sw.get("spot", "")), alt=(int(alt) if isinstance(alt, (int, float)) else "–"),
+            when=when)
+        parts.append(line)
+    claim = fo.get("claim") or {}
+    dps = [v for v in (claim.get("delta_p_sued_max_hpa"), claim.get("delta_p_nord_max_hpa"))
+           if isinstance(v, (int, float))]
+    return " ".join(parts)
+
+
+def _foehn_valley_reading(fo: dict, sw: dict) -> str:
+    """Einordnung zum Foehn-Block: EIN fester Satz je Datenlage, was das Muster
+    ueblicherweise bedeutet — mit Grenze, nie ein Urteil ueber den Tag.
+    Reihenfolge = Gewicht: Talmuster > Foehn ueber Kaltluftsee > Richtung+trocken
+    > grosser Druckunterschied > ruhig. Ohne Taldaten: leer."""
+    taeler = fo.get("taeler") or {}
+    sides = [t for t in (taeler.get("sued"), taeler.get("nord")) if t]
+    if not sides:
+        return ""
+    if any(t.get("n_dir_dry") for t in sides):
+        return _lbl("fvr_full")
+    g = sw.get("max_gust_kmh") or 0
+    aside = _aloft_foehn_side(sw) if g >= 40 else None
+    if aside and _valley_quiet(taeler.get(aside)):
+        return _lbl("fvr_pool")
+    claim = fo.get("claim") or {}
+    dps = [v for v in (claim.get("delta_p_sued_max_hpa"), claim.get("delta_p_nord_max_hpa"))
+           if isinstance(v, (int, float))]
+    if dps and max(dps) >= 8:
+        return _lbl("fvr_dp_high")
+    return _lbl("fvr_quiet")
+
+
+def _foehn_reading(wetterlage: dict, date: str) -> str:
+    fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
+    if not isinstance(fo.get("taeler"), dict):
+        return ""
+    sw = _per_day_index(wetterlage.get("starkwind_punkte"), [date]).get(date) or {}
+    return _foehn_valley_reading(fo, sw)
+
+
+def _foehn_legend(fo: dict) -> str:
+    """Legende zum Foehn-Block: wann ein Tal mitgezaehlt wird — Zahlen aus den
+    Konstanten (eine Quelle mit der Regel), nie von Hand nachgetragen."""
+    from foehn_indicators import TAL_MIN_HOURS, TAL_WIND_WEAK_KMH, TAL_GUST_WEAK_KMH, TAL_RH_WEAK
+    taeler = fo.get("taeler") or {}
+    sides = [t for t in (taeler.get("sued"), taeler.get("nord")) if t]
+    if not sides:
+        return ""
+    model = _model_short(next((t.get("model") for t in sides if t.get("model")), ""))
+    from foehn_talpunkte import load_talpunkte
+    gemessen = sum(1 for p in load_talpunkte() if p.get("sektor"))
+    return _lbl("fvr_legend").format(model=model, h=TAL_MIN_HOURS, h0=config.FLIGHT_HOURS_START,
+                                     h1=config.FLIGHT_HOURS_END, w=TAL_WIND_WEAK_KMH, g=TAL_GUST_WEAK_KMH,
+                                     rh=TAL_RH_WEAK, n=sum(t.get("n_total", 0) for t in sides), m=gemessen)
+
+
+def _foehn_legend_for(wetterlage: dict, date: str) -> str:
+    fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
+    return _foehn_legend(fo) if isinstance(fo.get("taeler"), dict) else ""
+
+
+def _foehn_guide_url() -> str:
+    """Blog-Artikel 'Foehn' als Lesehilfe in der Sprache des Briefings
+    (Webseite: Deutsch ohne Praefix, andere Sprachen unter /<lang>/)."""
+    import i18n
+    lang = i18n.get_current_lang()
+    prefix = "" if lang == "de" else f"/{lang}"
+    return config.MARKETING_URL.rstrip("/") + prefix + "/wetterkunde/foehn"
+
+
+def _foehn_valley_status(fo: dict, sw: dict):
+    """Pille + Kennzahlen zum neuen Block — dieselben Zahlen wie der Satz."""
+    taeler = fo.get("taeler") or {}
+    sides = [t for t in (taeler.get("sued"), taeler.get("nord")) if t]
+    tot = sum(t.get("n_total", 0) for t in sides)
+    full = sum(t.get("n_bestaetigt", 0) for t in sides)
+    dirdry = sum(t.get("n_dir_dry", 0) for t in sides)
+    claim = fo.get("claim") or {}
+    dps = [v for v in (claim.get("delta_p_sued_max_hpa"), claim.get("delta_p_nord_max_hpa"))
+           if isinstance(v, (int, float))]
+    dp = max(dps) if dps else None
+    g = sw.get("max_gust_kmh") or 0
+    aside = _aloft_foehn_side(sw) if g >= 40 else None
+    if dirdry:
+        kind, label = "warn", _lbl("fvs_full").format(n=dirdry, t=tot)
+    elif aside and _valley_quiet(taeler.get(aside)):
+        kind, label = "info", _lbl("fvs_aloft").format(g=int(g))
+    elif dp is not None and dp >= 8:
+        kind, label = "info", _lbl("fvs_dp").format(dp=f"{dp:.0f}")
+    else:
+        # Neutral statt "ok"/gruen: Gruen wirkt wie eine Entwarnung (Recherche
+        # 14.10.2026, SHV: Schweigen/Entwarnung bei seichtem Foehn = Unfallmuster)
+        kind, label = "neutral", _lbl("fvs_none").format(t=tot)
+    rh = min((t.get("rh_min_pct") for t in sides if t.get("rh_min_pct") is not None), default=None)
+    facts = [{"k": _lbl("fx_dp"), "v": (f"{dp:.0f} hPa" if dp is not None else "—")}]
+    if rh is not None:
+        facts.append({"k": _lbl("fx_rh"), "v": f"{rh} %"})
+    if g >= 40:
+        facts.append({"k": _lbl("fx_gust_aloft"), "v": f"{int(g)} km/h {_dir_abbr(sw.get('dir_deg'))}".strip()})
+    return kind, label, facts
+
+
+def _foehn_facts_legacy(chain: dict, fo: dict, sw: dict, dps: list) -> None:
+    """Kennzahlen des alten Foehn-Blocks (Caches ohne `taeler`)."""
+    chain["foehn"]["facts"] = [
+        {"k": _lbl("fx_dp"), "v": (f"{max(dps):.0f} hPa" if dps else "—")},
+        {"k": _lbl("fx_gust"), "v": (f"{int(sw['max_gust_kmh'])} km/h" if sw.get("max_gust_kmh") else "—")},
+    ]
+    if fo.get("sued_active") or fo.get("nord_active"):
+        # Foehnlage: Talwerte statt Starkwind-Boe (andere Groesse, jede Richtung) —
+        # eine Zahl, eine Quelle mit Satz und Warnbox
+        tal = fo.get("tal")
+        facts = chain["foehn"]["facts"][:1]
+        if tal:
+            facts.append({"k": _lbl("fx_tal"), "v": f"{tal.get('n_bestaetigt', 0)}/{tal.get('n_total', 0)}"})
+            if tal.get("n_bestaetigt"):
+                facts.append({"k": _lbl("fx_gust"), "v": f"{tal['gust_max_kmh']} km/h"})
+        else:
+            facts.append({"k": _lbl("fx_tal"), "v": _lbl("fx_tal_na")})
+        chain["foehn"]["facts"] = facts
 
 
 def _model_short(model_id: str) -> str:
@@ -2953,9 +3265,10 @@ def _week_line(wetterlage: dict, days: list) -> str:
         if wet < 0.5 and not regime.startswith("hoch"):
             words.append(_lbl("wl_dry"))
         fo = foehn.get(date) or {}
-        if fo.get("nord_active"):
+        tv = fo.get("taeler") or {}
+        if fo.get("nord_active") or (tv.get("nord") or {}).get("n_dir_dry"):
             words.append(_lbl("wl_foehn_n"))
-        if fo.get("sued_active"):
+        if fo.get("sued_active") or (tv.get("sued") or {}).get("n_dir_dry"):
             words.append(_lbl("wl_foehn_s"))
         strength = (flow.get(date) or {}).get("strength", "")
         if strength in ("kraeftig", "stuermisch"):
@@ -3005,8 +3318,12 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         {"k": _lbl("fx_dwd"), "v": (_front_type(dwd_typ) if dwd_typ else "—")},
         {"k": _lbl("fx_signature"), "v": _lbl("fx_sig_" + zst) if zst else _lbl("fx_sig_no")},
     ]
-    # Foehn
-    if fo.get("sued_active") or fo.get("nord_active"):
+    # Foehn — neuer Block: Pille/Kennzahlen aus den Talmerkmalen (14.10.2026)
+    if isinstance(fo.get("taeler"), dict):
+        kind, label, facts = _foehn_valley_status(fo, sw)
+        chain["foehn"]["status"] = kind
+        chain["foehn"]["status_label"] = label
+    elif fo.get("sued_active") or fo.get("nord_active"):
         st("foehn", "warn", "st_foehn_on")
     elif (sw.get("max_gust_kmh") or 0) >= 40:
         st("foehn", "info", "st_foehn_gusty")
@@ -3014,22 +3331,10 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         st("foehn", "ok", "st_foehn_off")
     claim = fo.get("claim") or {}
     dps = [v for v in (claim.get("delta_p_sued_max_hpa"), claim.get("delta_p_nord_max_hpa")) if isinstance(v, (int, float))]
-    chain["foehn"]["facts"] = [
-        {"k": _lbl("fx_dp"), "v": (f"{max(dps):.0f} hPa" if dps else "—")},
-        {"k": _lbl("fx_gust"), "v": (f"{int(sw['max_gust_kmh'])} km/h" if sw.get("max_gust_kmh") else "—")},
-    ]
-    if fo.get("sued_active") or fo.get("nord_active"):
-        # Foehnlage: Talwerte statt Starkwind-Boe (andere Groesse, jede Richtung) —
-        # eine Zahl, eine Quelle mit Satz und Warnbox
-        tal = fo.get("tal")
-        facts = chain["foehn"]["facts"][:1]
-        if tal:
-            facts.append({"k": _lbl("fx_tal"), "v": f"{tal.get('n_bestaetigt', 0)}/{tal.get('n_total', 0)}"})
-            if tal.get("n_bestaetigt"):
-                facts.append({"k": _lbl("fx_gust"), "v": f"{tal['gust_max_kmh']} km/h"})
-        else:
-            facts.append({"k": _lbl("fx_tal"), "v": _lbl("fx_tal_na")})
+    if isinstance(fo.get("taeler"), dict):
         chain["foehn"]["facts"] = facts
+    else:
+        _foehn_facts_legacy(chain, fo, sw, dps)
     # Hoehenwind
     w = chain["wind"]
     st("wind", {"stronger": "warn", "weaker": "info"}.get(w.get("verdict"), "ok"), "st_wind_" + (w.get("verdict") or "match"))
@@ -3109,6 +3414,9 @@ def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> di
                    "zugbahn": _zugbahn_text(wetterlage, date)},
         "foehn": {"foehn": _foehn_text(wetterlage, date),
                   "fazit": _foehn_fazit(wetterlage, date),
+                  "reading": _foehn_reading(wetterlage, date),
+                  "legend": _foehn_legend_for(wetterlage, date),
+                  "guide": {"label": _lbl("fvr_guide"), "url": _foehn_guide_url()},
                   "flags": strip.get("flags", [])},
         "wind": {
             "arrow": strip.get("wind_arrow", ""), "speed": strip.get("wind_speed", ""),
@@ -3314,6 +3622,8 @@ def _hazard_cause(topic: str, check: dict, wetterlage: dict, date: str) -> str:
             return _lbl("hz_cause_wind_aloft").format(sector=sector)
         return _lbl("hz_cause_wind_gusts")
     if topic == "FOEHN":
+        if (check.get("facts") or {}).get("valley_signs"):
+            return _lbl("hz_cause_foehn_tal")
         fo = _per_day_index(wl.get("foehn"), [date]).get(date) or {}
         side = "sued" if fo.get("sued_active") else "nord"
         dp = (fo.get("claim") or {}).get(f"delta_p_{side}_max_hpa")
@@ -3372,6 +3682,12 @@ def _hazard_base_text(topic: str, check: dict) -> str:
     if topic == "THUNDER":
         return _lbl("hz_code_thunder").format(zones=zones) + " " + _lbl("thunder_caveat")
     if topic == "FOEHN":
+        vs = f.get("valley_signs")
+        if vs:
+            from foehn_talpunkte import tal_kurzname
+            names = ", ".join(tal_kurzname(n) for n in vs["taeler"][:3])
+            return _lbl("hz_code_foehn_tal").format(n=vs["n"], t=vs["n_total"], names=names,
+                                                    g=vs["gust_max_kmh"], zones=zones_plain)
         side = "north" if f.get("side") == "nord" else "south"
         level = _lbl("level_danger" if f.get("peak") == "danger" else "level_caution")
         return _lbl("hz_code_foehn").format(side=_lbl(side), level=level,

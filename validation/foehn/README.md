@@ -59,3 +59,27 @@ validation/foehn/
 
 Alles unter `messwerte/` und `modell/` ist Klasse C (jederzeit neu
 beschaffbar) und deshalb nicht in Git.
+
+
+## Täglich seit 14.10.2026 — Föhn-Block des Briefings gegen den Föhnindex
+
+**Prüfling:** der Föhn-Block nach Talmerkmalen (`scripts/briefing_v3_context._foehn_valley_*`),
+nachgerechnet aus dem Freeze `data/weather_archive/YYYY-MM-DD.json → foehn_tal` mit der
+AKTUELLEN Regel (`evaluate_talpunkt` + gemessene Talsektoren `foehn_talpunkte.sektor_fuer`).
+**Skript:** `scripts/validate_foehn_daily.py` (Scheduler nach der Gewitter-Validierung, Tag D-2).
+**Ausgabe (server-lokal, gitignored):** `urteile/YYYY-MM-DD.json` (~7 KB/Tag),
+`scoreboard_daily.json`, `AUTO_REPORT_DAILY.md`. **Datenarm:** keine Rohmessungen —
+die Stationswerte werden per HTTP-Range geholt, gezählt und verworfen (User 14.10.2026).
+Keine Alarm-Mail; Blick auf den Report nach Bedarf, mindestens monatlich.
+
+Zwei Stufen: **voll** = alle drei Merkmale, **warn** = alle drei oder Föhnrichtung +
+trockene Luft (Wind ≥ 16/Böe ≥ 22, Feuchte ≤ 68 % — Modellfehler aus dem Blog).
+Erster Rückblick 05.–12.10.2026 (Stufe warn): 9 Treffer, 0 verpasst, 3 Fehlalarme bei
+176 Tal-Tagen. Davos 07.10. war mit Feuchte ≤ 60 % verpasst → Grenze 68 % (Modell zu feucht).
+
+Talsektoren (`data/foehn_talpunkte.geojson → sektor`): Messung MeteoSchweiz Jan–Okt 2026
+(95 % der Föhnrichtungen + 20°) vereinigt mit ICON-CH2 an Föhntagen (26.–28.08. Süd,
+26.03.–02.04. Nord; 95 % + 10°). Gegen Halbkreis: Station +1315 Treffer / −223 Fehlalarme,
+Modell 491 → 537 Treffer; kein Tal verliert. Ohne Station (Verzasca, Riviera, Oberengadin):
+Halbkreis. Höhenwind: Föhnrichtung SO–SW / NW–NO (Gütsch 2026: Süd 130–170°, Nord 315–30°,
+West 0–1 %).

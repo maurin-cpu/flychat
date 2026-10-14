@@ -2297,6 +2297,14 @@
     let fazit = blk.fazit || "";
     if (def.key === "foehn" && !fazit) fazit = blk.foehn || "";
     parts.push(chainVerdictHtml(fazit));
+    if (def.key === "foehn" && blk.reading) {
+      // Einordnung (fester Satz je Datenlage) + Legende + Lesehilfe (Blog)
+      parts.push(chainVerdictHtml(blk.reading));
+      if (blk.legend) parts.push(`<p class="bf-chain-caveat">${escapeHtml(blk.legend)}</p>`);
+      if (blk.guide && blk.guide.url) {
+        parts.push(`<p class="bf-chain-caveat"><a href="${escapeHtml(blk.guide.url)}" target="_blank" rel="noopener">&rarr; ${escapeHtml(blk.guide.label || "")}</a></p>`);
+      }
+    }
     if (def.key === "stability" && Array.isArray(blk.thunder) && blk.thunder.length && labels.thunder_caveat) {
       parts.push(`<p class="bf-chain-caveat">${escapeHtml(labels.thunder_caveat)}</p>`);
     }

@@ -249,6 +249,8 @@
 .bf-chain-status--info { color: var(--bf-chain-info-fg); background: var(--bf-chain-info-bg); }
 .bf-chain-status--warn { color: var(--bf-chain-warn-fg); background: var(--bf-chain-warn-bg); }
 .bf-chain-status--stop { color: var(--bf-chain-stop-fg); background: var(--bf-chain-stop-bg); }
+/* neutral = beschreibt nur, keine Entwarnung (Foehn-Block, ruhiger Tag) */
+.bf-chain-status--neutral { color: #475569; background: #f1f5f9; }
 .bf-chain-meta + .bf-chain-chev, .bf-chain-status + .bf-chain-chev { margin-left: 0; }
 .bf-chain-chev {
   flex: 0 0 auto;

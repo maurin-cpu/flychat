@@ -31,7 +31,9 @@ VERSION = 1
 _STEPS = ("lage", "fronts", "foehn", "wind", "stability", "sonne", "thermik", "modelle")
 # Je Schritt nur diese Felder. `num` sind die Zonentabellen (Sonne, Thermik),
 # `labile` steuert den Gewitter-Hinweis auf der Webseite.
-_STEP_FIELDS = ("fazit", "status", "status_label", "facts", "num", "labile")
+# reading/legend/guide: Einordnung + Zaehlregel + Lesehilfe des Foehn-Blocks (14.10.2026)
+_STEP_FIELDS = ("fazit", "status", "status_label", "facts", "num", "labile",
+                "reading", "legend", "guide")
 _TILE_FIELDS = ("tier", "band", "status", "rating", "n", "pressure_hpa",
                 "wind_arrow", "wind_sector", "wind_strength", "wind_hot")
 _WARN_FIELDS = ("any", "checks", "entries", "has_ki")
