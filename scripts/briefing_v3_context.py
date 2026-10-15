@@ -803,6 +803,64 @@ _L3 = {
         "fvr_dp_high": "Einordnung: Bei so grossem Druckunterschied tritt in den grossen Föhntälern häufig Föhn auf, auch wenn die Taldaten noch ruhig sind.",
         "fvr_guide":   "So liest du Föhn-Daten",
         "fvr_legend":  "So wird gezählt: Ein Tal zählt, wenn die Prognose ({model}) dort mindestens {h} Stunden zwischen {h0} und {h1} Uhr Wind aus der Föhnrichtung dieses Tals zeigt, mit Wind ab {w} km/h oder Böen ab {g} km/h und höchstens {rh} % Luftfeuchte. Die Föhnrichtung je Tal stammt aus Messungen von MeteoSchweiz ({m} von {n} Tälern, die übrigen: Halbkreis).",
+        # Vier Foehn-Indikatoren (15.10.2026): Labels oben, Datentext darunter
+        "fi_pill":       "Föhn-Indikatoren: {n} von 4",
+        "fi_k_dp":       "Druckdiff.",
+        "fi_v_dp":       "{dp} hPa ({side} höher)",
+        "fi_hi_sued":    "Süden", "fi_hi_nord": "Norden",
+        "fi_k_map":      "Starker Wind aus Föhnrichtung",
+        "fi_v_map":      "{n}/{t} Regionen",
+        "fi_k_luv_sued": "Südseite Höhe", "fi_k_luv_nord": "Nordseite Höhe",
+        "fi_v_cooler":   "{k} °C kühler", "fi_v_warmer": "{k} °C wärmer", "fi_v_equal": "gleich warm",
+        "fi_k_val":      "Trocken aus Föhnrichtung",
+        "fi_v_val":      "{n}/{t} Täler",
+        "fi_tal_multi":  "{n} von {t} Föhntälern zeigen trockenen Wind aus Föhnrichtung, am stärksten {name} (Böen bis {g} km/h)",
+        "fi_tal_one":    "{name} zeigt trockenen Wind aus Föhnrichtung (Böen bis {g} km/h)",
+        "fi_map_on":     "{n} von {t} Alpenregionen haben starken {dirw}, vor allem {names}",
+        "fi_dp_on":      "der Druck ist im {side} {dp} hPa höher",
+        "fi_luv_on":     "{side} ist in der Höhe {k} °C kühler",
+        # nicht erfuellt: Nominalgruppen nach dem Doppelpunkt, ohne Wertung (nie "nur"/"klein"/"schwach")
+        "fi_x_tal":      "kein Föhntal mit trockenem Wind aus Föhnrichtung",
+        "fi_x_map":      "starker {dirw} in {n} von {t} Regionen ({names})",
+        "fi_x_map_none": "keine Alpenregion mit starkem Wind aus Föhnrichtung",
+        "fi_x_dp":       "ein Druckunterschied von {dp} hPa",
+        "fi_x_luv":      "{side} in der Höhe {k} °C kühler",
+        "fi_x_luv_warm": "{side} in der Höhe {k} °C wärmer",
+        "fi_x_luv_eq":   "in der Höhe beide Seiten gleich warm",
+        "fi_dirw_sued":  "Südwind", "fi_dirw_nord": "Nordwind",
+        "fi_luv_sued":   "die Südseite", "fi_luv_nord": "die Nordseite",
+        "fi_all":        "Alle vier Indikatoren sind erfüllt: ",
+        "fi_none":       "Keiner der vier Indikatoren ist erfüllt: ",
+        "fi_rest_1":     "Der vierte Indikator ist nicht erfüllt: ",
+        "fi_rest_2":     "Die übrigen zwei Indikatoren sind nicht erfüllt: ",
+        "fi_rest_3":     "Die übrigen drei Indikatoren sind nicht erfüllt: ",
+        "fi_and":        " und ",
+        # Deutungstext (15.10.2026): erklaert, was die Labels zusammen bedeuten — Zahlen stehen oben
+        "fd_all":        "Alle vier Föhnzeichen stimmen überein und zeigen auf {foehn}: Druckunterschied und kühlere {luv}seite, starker {dirw} in {nmap} Alpenregionen und trockener Föhnwind in {nval} Tälern, am stärksten {name} (Böen bis {g} km/h).",
+        "fd_none":       "Die Daten zeigen kein Föhnmuster, weder über den Alpen noch in den Tälern.",
+        "fd_setup_2":    "Druckunterschied und kühlere {luv}seite zeigen auf {foehn}",
+        "fd_setup_dp":   "Der Druckunterschied zeigt auf {foehn}",
+        "fd_setup_tp":   "Die kühlere {luv}seite zeigt auf {foehn}",
+        "fd_nowind":     ", in den Daten folgt der Wind aber nicht: kein starker Wind aus Föhnrichtung, weder in den Regionen noch in den Tälern.",
+        "fd_local":      "Nur ein lokales Zeichen: {tal}.",
+        "fd_val_1":      "{name} zeigt trockenen Wind aus Föhnrichtung (Böen bis {g} km/h)",
+        "fd_val_n":      "{n} Täler zeigen trockenen Föhnwind, am stärksten {name} (Böen bis {g} km/h)",
+        "fd_map":        "Das Modell zeigt starken {dirw} in {n} Alpenregionen, vor allem {names}",
+        "fd_and":        ", und ",
+        "fd_missing":    " Die grossräumigen Föhnzeichen fehlen in den Daten: {liste}.",
+        "fd_missing_in": " In den Daten fehlen: {liste}.",
+        "fd_m_dp":       "Druckunterschied ab {dp} hPa", "fd_m_tp": "{luv}seite mindestens {k} °C kühler",
+        "fd_m_map":      "starker Wind in der Fläche", "fd_m_val": "trockener Föhnwind in den Tälern",
+        "fd_foehn_sued": "Südföhn", "fd_foehn_nord": "Nordföhn",
+        "fd_luv_sued":   "Süd", "fd_luv_nord": "Nord",
+        "fd_r_inner":    " Inneralpiner Föhn setzt oft ohne sie ein.",
+        "fd_r_dp":       " Faustregel: Ab 4 hPa ist Föhn möglich, und Modelle zeigen Föhnwind meist zu schwach.",
+        "fd_r_weak":     " Modelle zeigen Föhnwind meist zu schwach.",
+        "fd_r_none":     " Modellprognose — seichter Föhn wird oft nicht erfasst.",
+        "fi_close_none":  "Modellprognose — seichter Föhn wird oft nicht erfasst.",
+        "fi_close_inner": "Inneralpiner Föhn setzt oft ohne die übrigen Zeichen ein.",
+        "fi_close_weak":  "Modelle zeigen Föhnwind in den Tälern meist zu schwach.",
+        "fi_guide":      "So zählen wir",
         "fb_dir_sued":      "Süd", "fb_dir_nord": "Nord",
         "fb_strong_none":   " {models} zeigt auch keine starken Winde an den Startplätzen.",
         "fb_strong_some":   " {models} zeigt trotzdem starke Winde an einzelnen Startplätzen: Böen bis {gust} km/h aus {dir} ({spot}, {alt} m, {when}){cmp} — die Daten zeigen Höhenwind, ohne Föhn-Anzeichen.",
@@ -1263,6 +1321,61 @@ _L3 = {
         "fvr_dp_high": "Context: with a pressure difference this large, foehn is frequent in the large foehn valleys, even while the valley data are still calm.",
         "fvr_guide":   "How to read foehn data",
         "fvr_legend":  "How valleys are counted: a valley counts when the forecast ({model}) shows wind from that valley's foehn direction for at least {h} hours between {h0}:00 and {h1}:00, with wind from {w} km/h or gusts from {g} km/h and humidity of at most {rh} %. The foehn direction of each valley comes from MeteoSwiss measurements ({m} of {n} valleys; the rest: half-circle).",
+        "fi_pill":       "Foehn indicators: {n} of 4",
+        "fi_k_dp":       "Pressure diff.",
+        "fi_v_dp":       "{dp} hPa ({side} higher)",
+        "fi_hi_sued":    "south", "fi_hi_nord": "north",
+        "fi_k_map":      "Strong wind from foehn dir.",
+        "fi_v_map":      "{n}/{t} regions",
+        "fi_k_luv_sued": "South side aloft", "fi_k_luv_nord": "North side aloft",
+        "fi_v_cooler":   "{k} °C cooler", "fi_v_warmer": "{k} °C warmer", "fi_v_equal": "equally warm",
+        "fi_k_val":      "Dry from foehn dir.",
+        "fi_v_val":      "{n}/{t} valleys",
+        "fi_tal_multi":  "{n} of {t} foehn valleys show dry wind from the foehn direction, strongest {name} (gusts up to {g} km/h)",
+        "fi_tal_one":    "{name} shows dry wind from the foehn direction (gusts up to {g} km/h)",
+        "fi_map_on":     "{n} of {t} Alpine regions have strong {dirw}, mainly {names}",
+        "fi_dp_on":      "pressure is {dp} hPa higher in the {side}",
+        "fi_luv_on":     "{side} is {k} °C cooler aloft",
+        "fi_x_tal":      "no foehn valley with dry wind from the foehn direction",
+        "fi_x_map":      "strong {dirw} in {n} of {t} regions ({names})",
+        "fi_x_map_none": "no Alpine region with strong wind from a foehn direction",
+        "fi_x_dp":       "a pressure difference of {dp} hPa",
+        "fi_x_luv":      "{side} {k} °C cooler aloft",
+        "fi_x_luv_warm": "{side} {k} °C warmer aloft",
+        "fi_x_luv_eq":   "equal temperatures aloft on both sides",
+        "fi_dirw_sued":  "south wind", "fi_dirw_nord": "north wind",
+        "fi_luv_sued":   "the south side", "fi_luv_nord": "the north side",
+        "fi_all":        "All four indicators are met: ",
+        "fi_none":       "None of the four indicators is met: ",
+        "fi_rest_1":     "The fourth indicator is not met: ",
+        "fi_rest_2":     "The other two indicators are not met: ",
+        "fi_rest_3":     "The other three indicators are not met: ",
+        "fi_and":        " and ",
+        "fd_all":        "All four foehn signs agree and point to {foehn}: pressure difference and a cooler {luv} side, strong {dirw} in {nmap} Alpine regions and dry foehn wind in {nval} valleys, strongest {name} (gusts up to {g} km/h).",
+        "fd_none":       "The data show no foehn pattern, neither across the Alps nor in the valleys.",
+        "fd_setup_2":    "The pressure difference and the cooler {luv} side point to {foehn}",
+        "fd_setup_dp":   "The pressure difference points to {foehn}",
+        "fd_setup_tp":   "The cooler {luv} side points to {foehn}",
+        "fd_nowind":     ", but in the data the wind does not follow: no strong wind from the foehn direction, neither across the regions nor in the valleys.",
+        "fd_local":      "Only a local sign: {tal}.",
+        "fd_val_1":      "{name} shows dry wind from the foehn direction (gusts up to {g} km/h)",
+        "fd_val_n":      "{n} valleys show dry foehn wind, strongest {name} (gusts up to {g} km/h)",
+        "fd_map":        "The model shows strong {dirw} in {n} Alpine regions, mainly {names}",
+        "fd_and":        ", and ",
+        "fd_missing":    " The large-scale foehn signs are missing in the data: {liste}.",
+        "fd_missing_in": " Missing in the data: {liste}.",
+        "fd_m_dp":       "a pressure difference from {dp} hPa", "fd_m_tp": "a {luv} side at least {k} °C cooler",
+        "fd_m_map":      "strong wind across the regions", "fd_m_val": "dry foehn wind in the valleys",
+        "fd_foehn_sued": "south foehn", "fd_foehn_nord": "north foehn",
+        "fd_luv_sued":   "south", "fd_luv_nord": "north",
+        "fd_r_inner":    " Inner-Alpine foehn often sets in without them.",
+        "fd_r_dp":       " Rule of thumb: foehn is possible from 4 hPa, and models usually show foehn wind too weak.",
+        "fd_r_weak":     " Models usually show foehn wind too weak.",
+        "fd_r_none":     " Model forecast — shallow foehn is often missed.",
+        "fi_close_none":  "Model forecast — shallow foehn is often missed.",
+        "fi_close_inner": "Inner-Alpine foehn often sets in without the other signs.",
+        "fi_close_weak":  "Models usually show foehn wind in the valleys too weak.",
+        "fi_guide":      "How we count",
         "fb_dir_sued":      "south", "fb_dir_nord": "north",
         "fb_strong_none":   " {models} also shows no strong winds at the launch sites.",
         "fb_strong_some":   " {models} nevertheless shows strong winds at individual launch sites: gusts up to {gust} km/h from the {dir} ({spot}, {alt} m, {when}){cmp} — the data show upper wind, without signs of foehn.",
@@ -2867,6 +2980,9 @@ def _foehn_fazit(wetterlage: dict, date: str) -> str:
     fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
     claim, lee = fo.get("claim") or {}, fo.get("lee") or {}
     sw = _per_day_index(wetterlage.get("starkwind_punkte"), [date]).get(date) or {}
+    # Vier Indikatoren (15.10.2026) vor allem anderen; aeltere Caches unten
+    if isinstance(fo.get("indikatoren"), dict):
+        return _foehn_indicator_text(fo["indikatoren"])
     if not claim and not sw:
         return ""
     # Neuer Block (14.10.2026): Talmerkmale beider Seiten, Druck nur als Zahl.
@@ -3078,7 +3194,7 @@ def _foehn_valley_reading(fo: dict, sw: dict) -> str:
 
 def _foehn_reading(wetterlage: dict, date: str) -> str:
     fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
-    if not isinstance(fo.get("taeler"), dict):
+    if isinstance(fo.get("indikatoren"), dict) or not isinstance(fo.get("taeler"), dict):
         return ""
     sw = _per_day_index(wetterlage.get("starkwind_punkte"), [date]).get(date) or {}
     return _foehn_valley_reading(fo, sw)
@@ -3102,6 +3218,8 @@ def _foehn_legend(fo: dict) -> str:
 
 def _foehn_legend_for(wetterlage: dict, date: str) -> str:
     fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
+    if isinstance(fo.get("indikatoren"), dict):
+        return ""          # Zaehlregel steht auf der Erklaerseite (/foehn)
     return _foehn_legend(fo) if isinstance(fo.get("taeler"), dict) else ""
 
 
@@ -3144,6 +3262,113 @@ def _foehn_valley_status(fo: dict, sw: dict):
     if g >= 40:
         facts.append({"k": _lbl("fx_gust_aloft"), "v": f"{int(g)} km/h {_dir_abbr(sw.get('dir_deg'))}".strip()})
     return kind, label, facts
+
+
+def _fi_join(parts: list) -> str:
+    if len(parts) <= 1:
+        return "".join(parts)
+    return ", ".join(parts[:-1]) + _lbl("fi_and") + parts[-1]
+
+
+def _fi_cap(s: str) -> str:
+    return s[:1].upper() + s[1:]
+
+
+def _foehn_indicator_text(ind: dict) -> str:
+    """Block 3 (ab 15.10.2026): Deutung unter den vier Indikator-Labels. Die Zahlen
+    stehen in den Labels; der Text erklaert, was sie zusammen bedeuten (User
+    15.10.2026): (1) Gesamtbild — Anlage (Druck, kuehlere Luv-Seite) und Wind
+    (Windkarte, Taeler) stimmen ueberein / nur lokal / Anlage ohne Wind;
+    (2) was in den Daten fehlt; (3) Faustregel aus dem Blog. Kein Mechanismus
+    ("Luft wird gedrueckt" ist Spekulation), keine Wertungswoerter."""
+    from foehn_talpunkte import tal_kurzname
+    va, wk, dp, tp = (ind.get(k) or None for k in ("valleys", "wind_map", "pressure", "luv_cooler"))
+    on = {k: bool(x and x.get("on")) for k, x in (("dp", dp), ("tp", tp), ("map", wk), ("val", va))}
+    n = sum(on.values())
+    # Seite aus dem erfuellten Zeichen (Windkarte > Druck > Temperatur)
+    side = (((wk or {}).get("side") if on["map"] else None)
+            or ((dp or {}).get("high_side") if on["dp"] else None)
+            or ((tp or {}).get("side") if on["tp"] else None)
+            or (dp or {}).get("high_side") or "sued")
+    luv = _lbl("fd_luv_" + ((tp or {}).get("side") or side))
+    from foehn_indicators import DP_INDICATOR_HPA, LUV_COOLER_MIN_K
+    lim = {"luv": None, "dp": f"{DP_INDICATOR_HPA:.0f}", "k": f"{LUV_COOLER_MIN_K:.0f}"}
+    foehn = _lbl("fd_foehn_" + side)
+    top = (va or {}).get("top") or {}
+    name, g = tal_kurzname(top.get("tal", "")), top.get("gust_kmh", "–")
+    tal = ""
+    if on["val"]:
+        tal = (_lbl("fd_val_n").format(n=va["n"], name=name, g=g) if va["n"] > 1
+               else _lbl("fd_val_1").format(name=name, g=g))
+    if n == 4:
+        return _lbl("fd_all").format(foehn=foehn, luv=luv, dirw=_lbl("fi_dirw_" + side),
+                                     nmap=wk["n"], nval=va["n"], name=name, g=g)
+    if n == 0:
+        return _lbl("fd_none") + _lbl("fd_r_none")
+    setup = ""
+    if on["dp"] and on["tp"]:
+        setup = _lbl("fd_setup_2")
+    elif on["dp"]:
+        setup = _lbl("fd_setup_dp")
+    elif on["tp"]:
+        setup = _lbl("fd_setup_tp")
+    setup = setup.format(luv=luv, foehn=foehn)
+    if setup and not (on["map"] or on["val"]):
+        # Anlage ohne Wind
+        return setup + _lbl("fd_nowind") + (_lbl("fd_r_dp") if on["dp"] else _lbl("fd_r_weak"))
+    if not setup and on["val"] and not on["map"]:
+        # nur Taeler: lokales Zeichen
+        miss = [_lbl("fd_m_" + k).format(**{**lim, "luv": luv}) for k in ("dp", "tp", "map")]
+        return (_lbl("fd_local").format(tal=tal) + _lbl("fd_missing").format(liste=_fi_join(miss))
+                + _lbl("fd_r_inner"))
+    wind = []
+    if on["map"]:
+        wind.append(_lbl("fd_map").format(dirw=_lbl("fi_dirw_" + side), n=wk["n"],
+                                          names=_fi_join(list(wk.get("regions") or [])[:2])))
+    if on["val"]:
+        wind.append(tal)
+    w = _fi_join(wind)
+    head = (setup + _lbl("fd_and") + w[:1].lower() + w[1:]) if setup else w
+    missing = [_lbl("fd_m_" + k).format(**{**lim, "luv": luv}) for k in ("dp", "tp", "map", "val") if not on[k]]
+    return (_fi_cap(head) + "." + _lbl("fd_missing_in").format(liste=_fi_join(missing))
+            + ("" if on["val"] else _lbl("fd_r_weak")))
+
+
+def _foehn_indicator_status(ind: dict):
+    """Pille + vier Labels (on = Indikator erfuellt). Taeler oder >= 3 Indikatoren:
+    warn; 1-2 ohne Taeler: info; 0: neutral (nie gruen = keine Entwarnung)."""
+    n = ind.get("n_on", 0)
+    va = ind.get("valleys") or {}
+    kind = "warn" if (va.get("on") or n >= 3) else "info" if n else "neutral"
+    dp, wk, tp = ind.get("pressure"), ind.get("wind_map"), ind.get("luv_cooler")
+    facts = [{"k": _lbl("fi_k_dp"), "on": bool(dp and dp["on"]),
+              "v": (_lbl("fi_v_dp").format(dp=f"{dp['hpa']:.0f}", side=_lbl("fi_hi_" + dp["high_side"]))
+                    if dp else "—")},
+             {"k": _lbl("fi_k_map"), "on": bool(wk and wk["on"]),
+              "v": (_lbl("fi_v_map").format(n=wk.get("n", 0), t=wk.get("total", 0)) if wk else "—")}]
+    if tp:
+        k = tp["cooler_k"]
+        v = (_lbl("fi_v_equal") if abs(k) < 0.5 else
+             _lbl("fi_v_cooler").format(k=f"{k:.1f}") if k > 0 else _lbl("fi_v_warmer").format(k=f"{-k:.1f}"))
+        facts.append({"k": _lbl("fi_k_luv_" + tp["side"]), "v": v, "on": tp["on"]})
+    else:
+        facts.append({"k": _lbl("fi_k_luv_sued"), "v": "—", "on": False})
+    facts.append({"k": _lbl("fi_k_val"), "on": bool(va.get("on")),
+                  "v": (_lbl("fi_v_val").format(n=va.get("n", 0), t=va.get("total", 0)) if va else "—")})
+    return kind, _lbl("fi_pill").format(n=n), facts
+
+
+def _foehn_indicators_for(wetterlage: dict, date: str):
+    fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
+    ind = fo.get("indikatoren")
+    return ind if isinstance(ind, dict) else None
+
+
+def _foehn_explain_url() -> str:
+    """Erklaerseite 'So zaehlen wir' (App, /foehn) in der Sprache des Briefings."""
+    import i18n
+    lang = i18n.get_current_lang()
+    return config.BASE_URL.rstrip("/") + "/foehn" + ("" if lang == "de" else f"?lang={lang}")
 
 
 def _foehn_facts_legacy(chain: dict, fo: dict, sw: dict, dps: list) -> None:
@@ -3318,8 +3543,12 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         {"k": _lbl("fx_dwd"), "v": (_front_type(dwd_typ) if dwd_typ else "—")},
         {"k": _lbl("fx_signature"), "v": _lbl("fx_sig_" + zst) if zst else _lbl("fx_sig_no")},
     ]
-    # Foehn — neuer Block: Pille/Kennzahlen aus den Talmerkmalen (14.10.2026)
-    if isinstance(fo.get("taeler"), dict):
+    # Foehn — vier Indikatoren (15.10.2026), sonst Talmerkmale (14.10.2026)
+    if isinstance(fo.get("indikatoren"), dict):
+        kind, label, facts = _foehn_indicator_status(fo["indikatoren"])
+        chain["foehn"]["status"] = kind
+        chain["foehn"]["status_label"] = label
+    elif isinstance(fo.get("taeler"), dict):
         kind, label, facts = _foehn_valley_status(fo, sw)
         chain["foehn"]["status"] = kind
         chain["foehn"]["status_label"] = label
@@ -3331,7 +3560,7 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         st("foehn", "ok", "st_foehn_off")
     claim = fo.get("claim") or {}
     dps = [v for v in (claim.get("delta_p_sued_max_hpa"), claim.get("delta_p_nord_max_hpa")) if isinstance(v, (int, float))]
-    if isinstance(fo.get("taeler"), dict):
+    if isinstance(fo.get("indikatoren"), dict) or isinstance(fo.get("taeler"), dict):
         chain["foehn"]["facts"] = facts
     else:
         _foehn_facts_legacy(chain, fo, sw, dps)
@@ -3416,7 +3645,9 @@ def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> di
                   "fazit": _foehn_fazit(wetterlage, date),
                   "reading": _foehn_reading(wetterlage, date),
                   "legend": _foehn_legend_for(wetterlage, date),
-                  "guide": {"label": _lbl("fvr_guide"), "url": _foehn_guide_url()},
+                  "guide": ({"label": _lbl("fi_guide"), "url": _foehn_explain_url()}
+                            if _foehn_indicators_for(wetterlage, date)
+                            else {"label": _lbl("fvr_guide"), "url": _foehn_guide_url()}),
                   "flags": strip.get("flags", [])},
         "wind": {
             "arrow": strip.get("wind_arrow", ""), "speed": strip.get("wind_speed", ""),

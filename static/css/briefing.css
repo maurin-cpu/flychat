@@ -288,6 +288,8 @@
   text-transform: uppercase;
 }
 .bf-chain-fact--hot { border-color: #fca5a5; color: var(--bf-chain-stop-fg); }
+/* Foehn-Indikator erfuellt (gleiche Farben wie die Mail, fact(level='warn')) */
+.bf-chain-fact--warn { border-color: #fdba74; background: #fff7ed; color: #9a3412; }
 
 .bf-chain-verdict {
   margin: 0;

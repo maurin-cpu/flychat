@@ -81,7 +81,34 @@ TAL_SEKTOR = {
     "Nord": (270, 90),
 }
 
-
+# ============================================================================
+# VIER FÖHN-INDIKATOREN fürs Briefing (Blog wetterkunde/foehn, User 15.10.2026)
+# ============================================================================
+# Das Briefing zählt, wie viele der vier Planungszeichen aus dem Blog die Daten
+# zeigen — nie ein Urteil "Föhn"/"kein Föhn". Grenzen:
+# 1 Druck: Δp Lugano–Zürich ab 4 hPa (Blog: ab 4 hPa Föhn möglich).
+# 2 Windkarte (wie der Pilot die Windkarte liest, User 15.10.2026): Raster aus
+#   ICON-CH2-Prognosepunkten (~8 km) über die Alpenregionen. Ein Punkt ist "rot",
+#   wenn er mind. 2 h Mittelwind ab 30 oder Böen ab 50 km/h aus der Föhnrichtung
+#   zeigt; eine Region zählt ab einem Viertel roter Punkte. Föhnrichtung je Region
+#   aus regionen.csv `kritischer_foehn` (Süd/Nord/Beide); Mittelland und Jura
+#   zählen nicht (Kaltfront-Nordwind im Jura 17.10.2026 ist kein Föhn).
+#   Test 15.10.2026: Föhntag 27.08. 17 % der Punkte rot aus S, sonst <= 1 %.
+#   Statt Kammpunkten: 5 Pässe zeigten am 15.10. bei NW-Strömung "3 von 5".
+#   VORLÄUFIGE Grenzen — Abgleich gegen den Föhnindex 2026 steht aus.
+KARTE_PASS_SECTOR = {"sued": (135, 225), "nord": (315, 45)}
+KARTE_WIND_KMH = 30
+KARTE_GUST_KMH = 50
+KARTE_REGION_SHARE = 0.25
+KARTE_MIN_REGIONS = 3
+KARTE_TERRAIN = ("voralpen", "alpen", "hochalpin")
+KARTE_STEP_LAT, KARTE_STEP_LON = 0.07, 0.1
+# 3 Luv-Seite auf ~2000 m (800 hPa) kühler ab 2 °C (SHV: 1–2 °C = Föhnzeichen;
+#   obere Grenze, weil 1.5 °C an ruhigen Tagen vorkommt, 16.10.2026).
+LUV_COOLER_MIN_K = 2.0
+# 4 Föhn-Talpunkte: mindestens ein Tal mit trockenem Wind aus Föhnrichtung
+#   (evaluate_talpunkt dir_dry).
+DP_INDICATOR_HPA = THRESHOLD_DELTA_P_CAUTION
 
 
 def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
@@ -98,7 +125,8 @@ def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
         "longitude": ",".join(str(x) for x in lons),
         "hourly": (
             "pressure_msl,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,"
-            "wind_speed_700hPa,wind_direction_700hPa,surface_pressure,temperature_2m"
+            "wind_speed_700hPa,wind_direction_700hPa,surface_pressure,temperature_2m,"
+            "temperature_800hPa"
         ),
         "forecast_days": forecast_days,
         "timezone": config.TIMEZONE,
@@ -594,3 +622,186 @@ def summarize_taeler(results: list) -> dict:
                    gust_max_kmh=top["gust_max_kmh"], gust_tal=top["tal"],
                    first_hour=min(r["first_hour"] for r in best))
     return out
+
+
+_KARTE_PUNKTE: list = []
+
+
+def karte_punkte() -> list:
+    """Rasterpunkte der Windkarte: {lat, lon, region_id, region, sides} — nur Regionen
+    der Alpen (KARTE_TERRAIN); `sides` = Föhnrichtungen der Region (kritischer_foehn).
+    Punkt-in-Polygon gegen regionen_polygone_mapped.geojson. Einmal je Prozess."""
+    if _KARTE_PUNKTE:
+        return _KARTE_PUNKTE
+    import csv
+    import json as _json
+    from shapely.geometry import Point, shape
+    base = config.FOEHN_TALPUNKTE_PATH.parent
+    meta = {}
+    with open(base / "regionen.csv", encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            if r.get("terrain_type") not in KARTE_TERRAIN:
+                continue
+            kf = (r.get("kritischer_foehn") or "").strip()
+            sides = {"Süd": ("sued",), "Nord": ("nord",)}.get(kf, ("sued", "nord"))
+            meta[r["id"]] = {"region": r.get("region_name", r["id"]), "sides": sides}
+    with open(base / "regionen_polygone_mapped.geojson", encoding="utf-8") as f:
+        polys = [(ft["properties"]["id"], shape(ft["geometry"]))
+                 for ft in _json.load(f)["features"] if ft["properties"].get("id") in meta]
+    lat = 45.85
+    while lat <= 47.75:
+        lon = 6.0
+        while lon <= 10.5:
+            rid = next((i for i, g in polys if g.contains(Point(lon, lat))), None)
+            if rid:
+                _KARTE_PUNKTE.append({"lat": round(lat, 2), "lon": round(lon, 2),
+                                      "region_id": rid, **meta[rid]})
+            lon += KARTE_STEP_LON
+        lat += KARTE_STEP_LAT
+    return _KARTE_PUNKTE
+
+
+def fetch_wind_karte(forecast_days: int = 2) -> Optional[dict]:
+    """Stundenwind an allen Rasterpunkten (ICON-CH2, 10 m), Blöcke zu 150 Punkten.
+    {"model", "time", "punkte": [{..karte_punkte.., "hourly": {...}}]}; None bei Fehler."""
+    pts = karte_punkte()
+    if not pts:
+        return None
+    out, times = [], None
+    for i in range(0, len(pts), 150):
+        chunk = pts[i:i + 150]
+        params = config.with_api_key({
+            "latitude": ",".join(str(p["lat"]) for p in chunk),
+            "longitude": ",".join(str(p["lon"]) for p in chunk),
+            "hourly": "wind_speed_10m,wind_direction_10m,wind_gusts_10m",
+            "models": config.SURFACE_SECONDARY_MODEL,
+            "forecast_days": forecast_days, "timezone": config.TIMEZONE, "wind_speed_unit": "kmh",
+        })
+        try:
+            resp = requests.get(config.API_URL, params=params, timeout=config.API_TIMEOUT)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception:
+            return None
+        data = data if isinstance(data, list) else [data]
+        if len(data) != len(chunk):
+            return None
+        for p, d in zip(chunk, data):
+            h = d.get("hourly") or {}
+            times = times or h.get("time")
+            out.append({**p, "hourly": {k: h.get(k) or [] for k in
+                                        ("wind_speed_10m", "wind_direction_10m", "wind_gusts_10m")}})
+    return {"model": config.SURFACE_SECONDARY_MODEL, "time": times or [], "punkte": out}
+
+
+def _num(arr, i):
+    v = arr[i] if isinstance(arr, list) and i < len(arr) else None
+    return float(v) if isinstance(v, (int, float)) else None
+
+
+def _side_of(deg) -> Optional[str]:
+    if deg is None:
+        return None
+    for side, (lo, hi) in KARTE_PASS_SECTOR.items():
+        if dir_in_sector(deg, lo, hi):
+            return side
+    return None
+
+
+def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
+    """Indikator 2: in wie vielen Alpenregionen ist die Windkarte "rot" aus der
+    Föhnrichtung der Region? Die Seite mit mehr Regionen zählt."""
+    if not karte or not karte.get("punkte"):
+        return None
+    times = karte.get("time") or []
+    idx = [i for i, t in enumerate(times)
+           if t.startswith(date) and config.FLIGHT_HOURS_START <= int(t[11:13]) < config.FLIGHT_HOURS_END]
+    if not idx:
+        return None
+    per = {}
+    for p in karte["punkte"]:
+        h = p.get("hourly") or {}
+        r = per.setdefault(p["region_id"], {"n": 0, "sued": 0, "nord": 0,
+                                           "region": p.get("region", ""), "sides": p.get("sides") or ()})
+        r["n"] += 1
+        hits = {"sued": 0, "nord": 0}
+        for i in idx:
+            w, d, g = (_num(h.get("wind_speed_10m"), i), _num(h.get("wind_direction_10m"), i),
+                       _num(h.get("wind_gusts_10m"), i))
+            if w is None or d is None:
+                continue
+            side = _side_of(d)
+            if side and (w >= KARTE_WIND_KMH or (g or 0) >= KARTE_GUST_KMH):
+                hits[side] += 1
+        for side in hits:
+            if hits[side] >= TAL_MIN_HOURS:
+                r[side] += 1
+    res = {}
+    for side in ("sued", "nord"):
+        regs = [r for r in per.values() if side in r["sides"]]
+        red = sorted([r for r in regs if r["n"] and r[side] / r["n"] >= KARTE_REGION_SHARE],
+                     key=lambda r: -r[side] / r["n"])
+        res[side] = {"n": len(red), "total": len(regs), "regions": [r["region"] for r in red]}
+    side = "sued" if res["sued"]["n"] >= res["nord"]["n"] else "nord"
+    best = res[side]
+    return {"on": best["n"] >= KARTE_MIN_REGIONS, "side": side, "n": best["n"],
+            "total": best["total"], "regions": best["regions"][:3]}
+
+
+def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
+                        karte: Optional[dict], date: str, taeler: dict) -> dict:
+    """Die vier Föhn-Indikatoren eines Tages (Flugfenster `indices` der Zürich/Lugano-Reihe).
+
+    nord/sued_hourly: Zürich/Lugano (pressure_msl, temperature_800hPa).
+    karte: fetch_wind_karte (eigene Zeitachse). taeler: {"sued": …, "nord": …}
+    (synoptic_context.foehn_tal_for_day). Jeder Indikator {"on": bool, …} oder None,
+    wenn Daten fehlen (zählt dann nicht; das Briefing zeigt "—")."""
+    # 1 Druck: grösster Unterschied in eine Richtung über das Flugfenster
+    dps, dpn = [], []
+    for i in indices:
+        pn, ps = _num(nord_hourly.get("pressure_msl"), i), _num(sued_hourly.get("pressure_msl"), i)
+        if pn is not None and ps is not None:
+            dps.append(ps - pn)
+            dpn.append(pn - ps)
+    dp = None
+    if dps:
+        s_max, n_max = max(dps), max(dpn)
+        val = round(max(s_max, n_max), 1)
+        dp = {"on": val >= DP_INDICATOR_HPA, "hpa": val,
+              "high_side": "sued" if s_max >= n_max else "nord"}
+
+    # 2 Windkarte
+    wk = evaluate_wind_karte(karte, date)
+
+    # 3 Luv-Seite kühler (800 hPa): Seite aus der Windkarte (wenn rot), sonst aus dem Druck
+    tp = None
+    dts = []
+    for i in indices:
+        tn, ts = (_num(nord_hourly.get("temperature_800hPa"), i),
+                  _num(sued_hourly.get("temperature_800hPa"), i))
+        if tn is not None and ts is not None:
+            dts.append(ts - tn)
+    if dts:
+        luv = ((wk or {}).get("side") if (wk or {}).get("n") else None) or (dp or {}).get("high_side") or "sued"
+        mean = sum(dts) / len(dts)
+        cool = round(-mean if luv == "sued" else mean, 1)
+        tp = {"on": cool >= LUV_COOLER_MIN_K, "cooler_k": cool, "side": luv}
+
+    # 4 Täler
+    counted, total = [], 0
+    for side, t in (taeler or {}).items():
+        if not t:
+            continue
+        total += t.get("n_total", 0)
+        for e in t.get("taeler") or []:
+            if e.get("dir_dry"):
+                counted.append({"tal": e.get("tal", ""), "side": side,
+                                "gust_kmh": e.get("all_gust_max_kmh") or 0})
+    counted.sort(key=lambda e: -e["gust_kmh"])
+    va = {"on": bool(counted), "n": len(counted), "total": total,
+          "top": counted[0] if counted else None} if total else None
+
+    ind = {"pressure": dp, "wind_map": wk, "luv_cooler": tp, "valleys": va}
+    ind["n_on"] = sum(1 for k in ("pressure", "wind_map", "luv_cooler", "valleys")
+                      if (ind[k] or {}).get("on"))
+    return ind

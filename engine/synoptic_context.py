@@ -1164,6 +1164,9 @@ def decide_foehn_summary(forecast_dates: list[str],
         }
 
     _level_rank = {"none": 0, "caution": 1, "danger": 2}
+    # Windkarte (Raster ueber die Alpenregionen) fuer die vier Foehn-Indikatoren
+    from foehn_indicators import fetch_wind_karte, evaluate_indicators
+    karte = fetch_wind_karte(forecast_days=days_n)
 
     def _peak(a, b):
         return a if _level_rank[a] >= _level_rank[b] else b
@@ -1242,6 +1245,10 @@ def decide_foehn_summary(forecast_dates: list[str],
         # nicht die Druckschwelle (User 14.10.2026).
         taeler_beide = {s: foehn_tal_for_day(tal_series, date, s) for s in ("sued", "nord")}
         tal = taeler_beide.get(tal_side_) if tal_side_ else None
+        indikatoren = (evaluate_indicators(data["nord"].get("hourly") or {},
+                                           data["sued"].get("hourly") or {}, day_indices,
+                                           karte, date, taeler_beide)
+                       if day_indices else None)
         per_day.append({
             "date": date,
             "sued_active": sued_active,
@@ -1259,6 +1266,7 @@ def decide_foehn_summary(forecast_dates: list[str],
                     "gust_sued_max_kmh": (round(gust_sued_max) if gust_sued_max is not None else None)},
             "tal": tal,
             "taeler": taeler_beide,
+            "indikatoren": indikatoren,
         })
 
     any_sued = any(d["sued_active"] for d in per_day)

@@ -150,12 +150,13 @@
   {# 3 Foehn #}
   {{ step(3, v3_labels.step_foehn, v3_chain.foehn.status, v3_chain.foehn.status_label) }}
   <tr><td style="padding:0 18px 12px 56px;">
-    {% if v3_chain.foehn.facts %}<div>{% for f in v3_chain.foehn.facts %}{{ fact(f.k, f.v) }}{% endfor %}</div>{% endif %}
+    {#- Vier Indikatoren (15.10.2026): erfuellte orange (on), sonst neutral -#}
+    {% if v3_chain.foehn.facts %}<div>{% for f in v3_chain.foehn.facts %}{{ fact(f.k, f.v, level=('warn' if f.on else '')) }}{% endfor %}</div>{% endif %}
     {{ verdict(v3_chain.foehn.fazit or v3_chain.foehn.foehn) }}
-    {#- Einordnung: fester, gepruefter Satz je Datenlage (briefing_v3_context._foehn_valley_reading) -#}
+    {#- Einordnung: fester, gepruefter Satz je Datenlage (nur Caches 14.10.-Format) -#}
     {% if v3_chain.foehn.reading %}{{ verdict(v3_chain.foehn.reading) }}
-    {% if v3_chain.foehn.legend %}<p style="margin:8px 0 0;font:13px/1.45 {{ SANS }};color:{{ C.muted }};">{{ v3_chain.foehn.legend }}</p>{% endif %}
-    {% if v3_chain.foehn.guide and v3_chain.foehn.guide.url %}<p style="margin:6px 0 0;font:14px/1.5 {{ SANS }};"><a href="{{ track(v3_chain.foehn.guide.url) }}" style="color:{{ C.primary }};text-decoration:underline;">&rarr; {{ v3_chain.foehn.guide.label }}</a></p>{% endif %}{% endif %}
+    {% if v3_chain.foehn.legend %}<p style="margin:8px 0 0;font:13px/1.45 {{ SANS }};color:{{ C.muted }};">{{ v3_chain.foehn.legend }}</p>{% endif %}{% endif %}
+    {% if v3_chain.foehn.guide and v3_chain.foehn.guide.url and (v3_chain.foehn.reading or v3_chain.foehn.status_label) %}<p style="margin:6px 0 0;font:14px/1.5 {{ SANS }};"><a href="{{ track(v3_chain.foehn.guide.url) }}" style="color:{{ C.primary }};text-decoration:underline;">&rarr; {{ v3_chain.foehn.guide.label }}</a></p>{% endif %}
   </td></tr>
 
   {# 4 Hoehenwind #}

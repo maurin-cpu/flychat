@@ -2493,6 +2493,34 @@ def map_page():
     )
 
 
+@app.route("/foehn")
+def foehn_explain_page():
+    """Erklaerseite 'So zaehlen wir' zum Foehn-Block des Briefings (Link
+    "How we count" im Mail/App). Alle Grenzen aus den Konstanten in
+    foehn_indicators — eine Quelle mit der Zaehlregel. ?lang=de|en, sonst Server-Sprache."""
+    import foehn_indicators as fi
+    from foehn_talpunkte import load_talpunkte
+    pts = fi.karte_punkte()
+    regs = {p["region_id"]: p["sides"] for p in pts}
+    num = {
+        "dp": fi.DP_INDICATOR_HPA, "dp_high": fi.THRESHOLD_DELTA_P_DANGER,
+        "map_wind": fi.KARTE_WIND_KMH, "map_gust": fi.KARTE_GUST_KMH,
+        "map_share": int(round(fi.KARTE_REGION_SHARE * 100)), "map_min": fi.KARTE_MIN_REGIONS,
+        "map_regions": len(regs), "map_sued": sum(1 for s in regs.values() if "sued" in s),
+        "map_nord": sum(1 for s in regs.values() if "nord" in s), "map_points": len(pts),
+        "luv": fi.LUV_COOLER_MIN_K, "hours": fi.TAL_MIN_HOURS,
+        "h0": config.FLIGHT_HOURS_START, "h1": config.FLIGHT_HOURS_END,
+        "val_n": len(load_talpunkte()), "val_wind": fi.TAL_WIND_WEAK_KMH,
+        "val_gust": fi.TAL_GUST_WEAK_KMH, "val_rh": fi.TAL_RH_WEAK,
+    }
+    lang = (request.args.get("lang") or "").strip().lower()
+    blog = config.MARKETING_URL.rstrip("/")
+    with i18n.lang_override(lang if lang in ("de", "en") else i18n.get_current_lang()):
+        cur = i18n.get_current_lang()
+        return render_template("foehn.html", n=num, page_lang=cur,
+                               blog_url=blog + ("" if cur == "de" else f"/{cur}") + "/wetterkunde/foehn")
+
+
 @app.route("/regionen")
 def regionen_page():
     return render_template(

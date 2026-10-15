@@ -31,11 +31,12 @@ WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr
 {{ v3_chain.fronts.fazit }}
 
 3 {{ v3_labels.step_foehn }}{% if v3_chain.foehn.status_label %} [{{ v3_chain.foehn.status_label }}]{% endif %}
-{{ v3_chain.foehn.fazit or v3_chain.foehn.foehn }}
+{% if v3_chain.foehn.facts %}{% for f in v3_chain.foehn.facts %}{% if f.on %}* {% endif %}{{ f.k }} {{ f.v }}{% if not loop.last %} · {% endif %}{% endfor %}
+{% endif %}{{ v3_chain.foehn.fazit or v3_chain.foehn.foehn }}
 {% if v3_chain.foehn.reading %}{{ v3_chain.foehn.reading }}
 {% if v3_chain.foehn.legend %}{{ v3_chain.foehn.legend }}
-{% endif %}{% if v3_chain.foehn.guide and v3_chain.foehn.guide.url %}{{ v3_chain.foehn.guide.label }}: {{ v3_chain.foehn.guide.url }}
-{% endif %}{% endif %}
+{% endif %}{% endif %}{% if v3_chain.foehn.guide and v3_chain.foehn.guide.url and (v3_chain.foehn.reading or v3_chain.foehn.status_label) %}{{ v3_chain.foehn.guide.label }}: {{ v3_chain.foehn.guide.url }}
+{% endif %}
 4 {{ v3_labels.step_wind }}{% if v3_chain.wind.status_label %} [{{ v3_chain.wind.status_label }}]{% endif %}
 {% for f in v3_chain.wind.facts or [] %}{{ f.k }} {{ f.v }}{% if not loop.last %} · {% endif %}{% endfor %}
 {{ v3_chain.wind.fazit }}

@@ -2249,12 +2249,13 @@
     return `<p class="bf-chain-verdict"><b>${escapeHtml(text.slice(0, i + 1))}</b> ${escapeHtml(text.slice(i + 2))}</p>`;
   }
 
-  function chainFactsHtml(facts, hotFn) {
+  function chainFactsHtml(facts, hotFn, warnFn) {
     if (!Array.isArray(facts) || !facts.length) return "";
     const chips = facts.map((f, i) => {
       if (!f || !f.v) return "";
       const hot = hotFn ? hotFn(f, i) : false;
-      return `<span class="bf-chain-fact${hot ? " bf-chain-fact--hot" : ""}">${f.k ? `<span class="bf-chain-fact-k">${escapeHtml(f.k)}</span> ` : ""}${escapeHtml(f.v)}</span>`;
+      const warn = warnFn ? warnFn(f, i) : false;
+      return `<span class="bf-chain-fact${hot ? " bf-chain-fact--hot" : ""}${warn ? " bf-chain-fact--warn" : ""}">${f.k ? `<span class="bf-chain-fact-k">${escapeHtml(f.k)}</span> ` : ""}${escapeHtml(f.v)}</span>`;
     }).join("");
     return chips ? `<div class="bf-chain-facts">${chips}</div>` : "";
   }
@@ -2273,6 +2274,9 @@
       parts.push(chainFactsHtml(blk.facts, (f, i) => i === 0 && !!blk.hot));
     } else if (def.key === "modelle") {
       parts.push(chainFactsHtml(blk.facts, (f) => f.v === "✗"));
+    } else if (def.key === "foehn") {
+      // Vier Indikatoren: erfuellte orange (f.on)
+      parts.push(chainFactsHtml(blk.facts, null, (f) => !!f.on));
     } else {
       parts.push(chainFactsHtml(blk.facts));
     }
@@ -2298,9 +2302,11 @@
     if (def.key === "foehn" && !fazit) fazit = blk.foehn || "";
     parts.push(chainVerdictHtml(fazit));
     if (def.key === "foehn" && blk.reading) {
-      // Einordnung (fester Satz je Datenlage) + Legende + Lesehilfe (Blog)
+      // Einordnung (fester Satz je Datenlage) + Legende — nur Caches im 14.10.-Format
       parts.push(chainVerdictHtml(blk.reading));
       if (blk.legend) parts.push(`<p class="bf-chain-caveat">${escapeHtml(blk.legend)}</p>`);
+    }
+    if (def.key === "foehn" && (blk.reading || blk.status_label)) {
       if (blk.guide && blk.guide.url) {
         parts.push(`<p class="bf-chain-caveat"><a href="${escapeHtml(blk.guide.url)}" target="_blank" rel="noopener">&rarr; ${escapeHtml(blk.guide.label || "")}</a></p>`);
       }

@@ -119,3 +119,37 @@ Föhn am Talboden ankommt.
   (Gefahrensatz); unbestätigt → „bleibt in der Höhe" Pflicht, „in den Tälern"
   verboten; km/h-Zahlen nur aus den Talwerten.
 - **Drei Zustände:** bestätigt / bleibt in der Höhe / nicht prüfbar (keine Reihe).
+
+## Föhn-Block im Briefing: vier Indikatoren (seit 15.10.2026)
+
+Ersetzt im Block 3 den Talsatz, die Einordnung und die Legende vom 14.10.
+(Warnstufe, Safety, Warnbox und KI-Payload bleiben wie oben.) Der Block zählt,
+wie viele von vier Föhnzeichen aus dem Blog `wetterkunde/foehn` die Daten zeigen.
+Er sagt nie „Föhn“ oder „kein Föhn“.
+
+- **Indikatoren** (`foehn_indicators.evaluate_indicators`, eine Quelle für Labels und Text):
+  1. Druck Lugano−Zürich ab `DP_INDICATOR_HPA` (4 hPa), grösster Wert im Flugfenster.
+  2. **Windkarte** (`evaluate_wind_karte`): Raster aus ICON-CH2-Punkten (~8 km,
+     `karte_punkte`) über die 20 Alpenregionen (Mittelland/Jura ausgenommen).
+     Punkt rot ab 2 h Mittelwind ≥ 30 oder Böe ≥ 50 km/h aus S (135–225°) bzw.
+     N (315–45°); Region zählt ab 25 % roter Punkte, nur für ihre Föhnrichtung
+     (`regionen.csv` `kritischer_foehn`); Indikator ab 3 Regionen.
+     Ersetzt den Kammwind am Gütsch: fünf Pässe zeigten am 15.10. bei normaler
+     NW-Strömung „3 von 5“, die Karte 1 %. Föhntag 27.08.: 9 von 18 Regionen.
+     **Grenzen vorläufig** — Abgleich gegen den Föhnindex 2026 steht aus.
+  3. Luv-Seite auf 800 hPa (Lugano/Zürich) im Mittel ≥ `LUV_COOLER_MIN_K` (2 °C)
+     kühler (SHV: 1–2 °C; 1.5 °C kommt an ruhigen Tagen vor).
+  4. Täler: mindestens ein Talpunkt mit `dir_dry` (Regel siehe oben).
+- **Daten:** `synoptic_context.decide_foehn_summary` holt Zürich/Lugano (inkl.
+  `temperature_800hPa`) und die Windkarte (`fetch_wind_karte`, 3 Calls) und legt
+  `foehn.per_day[].indikatoren` ab. Noch **nicht** im Snapshot eingefroren und
+  nicht im täglichen Föhn-Richter.
+- **Darstellung** (`briefing_v3_context._foehn_indicator_status/_text`): Pille
+  „Foehn indicators: x of 4“ (Täler oder ≥ 3 → orange, 1–2 → info, 0 → grau),
+  vier Labels (erfüllte orange), darunter ein Deutungstext: Gesamtbild
+  (übereinstimmend / nur lokal / Druck ohne Wind), was in den Daten fehlt (mit
+  Grenzen), Faustregel aus dem Blog. Kein Mechanismus, keine Wertungswörter.
+- **Erklärseite** `/foehn` (`templates/foehn.html`), Link „How we count“ — alle
+  Zahlen aus den Konstanten.
+- Tests: `tests/test_foehn_indikatoren.py`; `tests/conftest.py` schaltet den
+  Netzabruf der Windkarte in allen Tests ab.
