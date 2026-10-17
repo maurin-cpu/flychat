@@ -219,6 +219,17 @@ def build_synoptic_context(weather_cache: dict,
         logger.exception("Frontsignatur fehlgeschlagen — Feld fehlt")
         frontsignatur = None
 
+    # 8f2. Frontzeichen je Zone und Stunde (Briefing-Block 2, 17.10.2026) —
+    # dieselben Startplatz-Reihen wie die Analyse, Zeichen als Aenderung ueber 6 h
+    try:
+        from front_indicators import detect_front_signs
+        front_zeichen = detect_front_signs(weather_cache, forecast_dates)
+        if front_zeichen:
+            decisions_applied.append("detect_front_signs")
+    except Exception:
+        logger.exception("Frontzeichen je Stunde fehlgeschlagen — Feld fehlt")
+        front_zeichen = None
+
     # 8e. DWD-Frontdurchgaenge (Zone, Typ, Zeitfenster) — fuer KI und Briefing
     try:
         fronten = load_dwd_frontdurchgaenge(forecast_dates)
@@ -271,6 +282,7 @@ def build_synoptic_context(weather_cache: dict,
         "aloft_regional": aloft_regional,
         "fronten": fronten,
         "frontsignatur": frontsignatur,
+        "front_zeichen": front_zeichen,
         "bise_boden": bise_bod,
         "starkwind_punkte": starkwind,
         "thermik_zonen": thermik,

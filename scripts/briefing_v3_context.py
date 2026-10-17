@@ -861,6 +861,30 @@ _L3 = {
         "fd_r_inner":    " Inneralpiner Föhn setzt oft ohne sie ein.",
         "fd_r_weak":     " Modelle zeigen Föhnwind meist zu schwach.",
         "fd_r_none":     " Föhn bleibt trotzdem möglich: Modelle übersehen oft Föhn, der nur flach über die Pässe kommt oder auf einzelne Täler beschränkt ist. Am Flugtag die Live-Werte an Tal- und Gipfelstationen prüfen.",
+        # Fronten-Block nach Zeichen (17.10.2026): DWD-Karte ohne Uhrzeit, dann die
+        # Modellzeichen mit Tageszeit; jedes Label kommt im Text vor
+        "fz_pill":        "Frontzeichen: {n} von 4", "fz_pill_from": " · ab ~{t}",
+        "fz_k_dwd":       "DWD-Karte", "fz_k_kaelter": "Kälter auf 1500 m", "fz_k_waermer": "Wärmer auf 1500 m",
+        "fz_k_luft":      "Luftmasse 1500 m ändert sich", "fz_k_dreh": "Winddrehung in der Höhe",
+        "fz_k_regen":     "Regen", "fz_k_dauerregen": "Dauerregen", "fz_k_wolken": "Bewölkung verdichtet sich",
+        "fz_typ_kalt":    "Kaltfront", "fz_typ_warm": "Warmfront", "fz_typ_okklusion": "Okklusion",
+        "fz_dwd_yes":     "DWD-Prognosekarte: {typ}.",
+        "fz_dwd_no":      "DWD-Prognosekarte: keine Front.",
+        "fz_match":       " {models} zeigt Zeichen ab etwa {t}{move}: {det}.",
+        "fz_nomatch":     " {models} zeigt keines der passenden Zeichen.",
+        "fz_only":        " {models} zeigt trotzdem Zeichen einer {typ} ab etwa {t}{move}: {det}.",
+        "fz_only_one":    " {models} zeigt ein Zeichen: {det}.",
+        "fz_only_none":   " {models} zeigt keines der Zeichen.",
+        "fz_absent":      " Nicht in den Daten: {liste}.",
+        "fz_carried":     " Vom Vortag noch in den Daten: {liste}.",
+        "fz_x_kaelter":   "kältere Luft auf 1500 m", "fz_x_waermer": "wärmere Luft auf 1500 m",
+        "fz_x_luft":      "eine andere Luftmasse auf 1500 m", "fz_x_dreh": "eine Winddrehung in der Höhe",
+        "fz_x_regen":     "Regen", "fz_x_dauerregen": "Dauerregen", "fz_x_wolken": "dichtere Bewölkung",
+        "fz_dp_0": "in der Nacht", "fz_dp_1": "am frühen Morgen", "fz_dp_2": "am Vormittag",
+        "fz_dp_3": "um die Mittagszeit", "fz_dp_4": "am Nachmittag", "fz_dp_5": "am Abend", "fz_dp_6": "in der Nacht",
+        "fz_move":        ", von {a} nach {b} fortschreitend",
+        "fz_dir_N": "Norden", "fz_dir_S": "Süden", "fz_dir_W": "Westen", "fz_dir_E": "Osten",
+        "fz_carried_v":   " (Vortag)", "fz_time": "{h} Uhr",
         "fi_close_none":  "Modellprognose — seichter Föhn wird oft nicht erfasst.",
         "fi_close_inner": "Inneralpiner Föhn setzt oft ohne die übrigen Zeichen ein.",
         "fi_close_weak":  "Modelle zeigen Föhnwind in den Tälern meist zu schwach.",
@@ -1380,6 +1404,28 @@ _L3 = {
         "fd_r_inner":    " Inner-Alpine foehn often sets in without them.",
         "fd_r_weak":     " Models usually show foehn wind too weak.",
         "fd_r_none":     " Foehn is still possible: models often miss foehn that only spills shallowly over the passes or stays in single valleys. On the day, check live readings at valley and summit stations.",
+        "fz_pill":        "Front signs: {n} of 4", "fz_pill_from": " · from ~{t}",
+        "fz_k_dwd":       "DWD map", "fz_k_kaelter": "Colder at 1500 m", "fz_k_waermer": "Warmer at 1500 m",
+        "fz_k_luft":      "Air mass change at 1500 m", "fz_k_dreh": "Wind shift aloft",
+        "fz_k_regen":     "Rain", "fz_k_dauerregen": "Continuous rain", "fz_k_wolken": "Cloud thickening",
+        "fz_typ_kalt":    "cold front", "fz_typ_warm": "warm front", "fz_typ_okklusion": "occlusion",
+        "fz_dwd_yes":     "DWD forecast map: {typ}.",
+        "fz_dwd_no":      "DWD forecast map: no front.",
+        "fz_match":       " {models} show signs from about {t}{move}: {det}.",
+        "fz_nomatch":     " {models} show none of the matching signs.",
+        "fz_only":        " {models} still show signs of a {typ} from about {t}{move}: {det}.",
+        "fz_only_one":    " {models} show one sign: {det}.",
+        "fz_only_none":   " {models} show none of the signs.",
+        "fz_absent":      " Not in the data: {liste}.",
+        "fz_carried":     " Carried over from the day before: {liste}.",
+        "fz_x_kaelter":   "colder air at 1500 m", "fz_x_waermer": "warmer air at 1500 m",
+        "fz_x_luft":      "an air mass change at 1500 m", "fz_x_dreh": "a wind shift aloft",
+        "fz_x_regen":     "rain", "fz_x_dauerregen": "continuous rain", "fz_x_wolken": "cloud thickening",
+        "fz_dp_0": "overnight", "fz_dp_1": "in the early morning", "fz_dp_2": "in the morning",
+        "fz_dp_3": "around midday", "fz_dp_4": "in the afternoon", "fz_dp_5": "in the evening", "fz_dp_6": "at night",
+        "fz_move":        ", spreading from {a} to {b}",
+        "fz_dir_N": "north", "fz_dir_S": "south", "fz_dir_W": "west", "fz_dir_E": "east",
+        "fz_carried_v":   " (day before)", "fz_time": "{h}:00",
         "fi_close_none":  "Model forecast — shallow foehn is often missed.",
         "fi_close_inner": "Inner-Alpine foehn often sets in without the other signs.",
         "fi_close_weak":  "Models usually show foehn wind in the valleys too weak.",
@@ -2490,8 +2536,15 @@ def _front_block(fronts: dict | None, passagen: dict | None, dates: list,
     #        "keine Front" neben einen Satz mit Front stellen konnte (19.09.2026).
     # zeichen  = Stufe der Frontzeichen in der eigenen Prognose (Pille)
     # ohne_dwd = keine DWD-Front, aber deutlich kaeltere Luft + Druckanstieg
+    # dwd_zone_hours: Stunde je Zone (Lokalzeit) der DWD-Fronten des Tages — nur fuer
+    # die Zugrichtung im neuen Block (die Uhrzeit selbst wird nie genannt, 17.10.2026)
+    zone_hours = {}
+    for l, a, _ in today_hits:
+        if not today_typ or a.get("typ") == today_typ:
+            zone_hours.setdefault(a.get("zone", ""), l.hour)
     return {"fazit": first, "rear": bool(passed),
             "dwd": bool(today_hits), "dwd_typ": today_typ or "",
+            "dwd_zone_hours": zone_hours,
             "zeichen": stufe, "ohne_dwd": ohne_dwd}
 
 
@@ -3543,6 +3596,111 @@ def _chain(wetterlage: dict, dates: list, date: str, fronts, passagen) -> dict:
     return chain
 
 
+# --- Fronten-Block nach Zeichen (17.10.2026) ---------------------------------
+# Mittelpunkte der vier Zonen fuer die Zugrichtung (nur aus der DWD-Frontlinie;
+# die Richtung aus den Modellzeichen ist ungeprueft und bleibt aus)
+_FZ_ZONE_POS = {"tessin": (46.2, 8.9), "alpennordhang": (46.9, 8.2), "wallis": (46.2, 7.5),
+                "graubuenden_engadin": (46.7, 9.8)}
+_FZ_DAYPART = (5, 8, 11, 14, 18, 22, 24)
+
+
+def _fz_time(h: int) -> str:
+    return _lbl("fz_time").format(h=f"{int(h):02d}")
+
+
+def _fz_daypart(h: int) -> str:
+    return _lbl("fz_dp_" + str(next(i for i, lim in enumerate(_FZ_DAYPART) if h < lim)))
+
+
+def _fz_direction(zone_hours: dict) -> str:
+    """', spreading from north to south' aus den Zonen-Stunden der DWD-Frontlinie;
+    leer bei weniger als 2 Zonen oder weniger als 2 h Abstand."""
+    hours = {z: h for z, h in (zone_hours or {}).items() if z in _FZ_ZONE_POS}
+    if len(hours) < 2:
+        return ""
+    t0, t1 = min(hours.values()), max(hours.values())
+    if t1 - t0 < 2:
+        return ""
+    early = [_FZ_ZONE_POS[z] for z, h in hours.items() if h - t0 < 2]
+    late = [_FZ_ZONE_POS[z] for z, h in hours.items() if t1 - h < 2]
+    la1, lo1 = sum(p[0] for p in early) / len(early), sum(p[1] for p in early) / len(early)
+    la2, lo2 = sum(p[0] for p in late) / len(late), sum(p[1] for p in late) / len(late)
+    dy, dx = la2 - la1, (lo2 - lo1) * 0.69
+    if abs(dy) >= abs(dx):
+        a, b = ("S", "N") if dy > 0 else ("N", "S")
+    else:
+        a, b = ("W", "E") if dx > 0 else ("E", "W")
+    return _lbl("fz_move").format(a=_lbl("fz_dir_" + a), b=_lbl("fz_dir_" + b))
+
+
+def _front_signs_zones(wetterlage: dict, date: str):
+    fz = (wetterlage or {}).get("front_zeichen") or {}
+    day = next((d for d in fz.get("per_day") or [] if d.get("date") == date), None)
+    return (day or {}).get("zones") if day else None
+
+
+def _front_signs_block(fb: dict, zones: dict):
+    """(Status, Pille, Chips, Text) des Fronten-Blocks: zuerst was die DWD-Karte zeigt
+    (ohne Uhrzeit), dann die Modellzeichen mit Tageszeit. Jedes Label kommt im Text
+    vor; nie "die Front kommt" (User 16./17.10.2026)."""
+    from front_indicators import evaluate_front_signs
+    dwd = {"typ": fb.get("dwd_typ"), "zone_hours": fb.get("dwd_zone_hours")} if fb.get("dwd") else None
+    ev = evaluate_front_signs(zones, dwd)
+    typ, keys, first = ev["typ"], ev["keys"], ev["first"]
+    carried, counted = set(ev["carried"]), set(ev["counted"])
+    typ_w = _lbl("fz_typ_" + typ)
+    n = ev["n_on"]
+    pill = _lbl("fz_pill").format(n=n)
+    if ev["from_hour"] is not None:
+        pill += _lbl("fz_pill_from").format(t=_fz_time(ev["from_hour"]))
+    facts = []
+    for k in keys:
+        if k == "dwd":
+            v = (typ_w[:1].upper() + typ_w[1:]) if fb.get("dwd") else "—"
+        elif first[k] is None:
+            v = "—"
+        else:
+            v = "~" + _fz_time(first[k]) + (_lbl("fz_carried_v") if k in carried else "")
+        facts.append({"k": _lbl("fz_k_" + k), "v": v, "on": k in counted})
+    kind = "warn" if n >= 3 else "info" if n else "neutral"
+
+    def names(ks):
+        return _fi_join([_lbl("fz_x_" + k) for k in ks])
+
+    model = [k for k in keys if k != "dwd"]
+    shown = sorted((k for k in model if k in counted), key=lambda k: first[k])
+    groups = []                     # gleiche Tageszeit zusammenfassen
+    for k in shown:
+        dp = _fz_daypart(first[k])
+        if groups and groups[-1][0] == dp:
+            groups[-1][1].append(k)
+        else:
+            groups.append((dp, [k]))
+    det = [(f"{dp} {names(ks)}" if _lang() == "de" else f"{names(ks)} {dp}") for dp, ks in groups]
+    det_txt = _fi_join(det)
+    models = _model_words()
+    move = _fz_direction(ev["dwd_zone_hours"])
+    t = _fz_time(first[shown[0]]) if shown else ""
+    if fb.get("dwd"):
+        txt = _lbl("fz_dwd_yes").format(typ=typ_w)
+        txt += (_lbl("fz_match").format(models=models, t=t, move=move, det=det_txt) if shown
+                else _lbl("fz_nomatch").format(models=models))
+    else:
+        txt = _lbl("fz_dwd_no")
+        if len(shown) >= 2:
+            txt += _lbl("fz_only").format(models=models, typ=typ_w, t=t, move="", det=det_txt)
+        elif shown:
+            txt += _lbl("fz_only_one").format(models=models, det=det_txt)
+        else:
+            txt += _lbl("fz_only_none").format(models=models)
+    absent = [k for k in model if first[k] is None]
+    if absent:
+        txt += _lbl("fz_absent").format(liste=names(absent))
+    if carried:
+        txt += _lbl("fz_carried").format(liste=names([k for k in model if k in carried]))
+    return kind, pill, facts, txt
+
+
 def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
     """Status-Pille (ok / info / warn + Kurzlabel) und Fakten-Chips je Block —
     die visuelle Schicht ueber den Saetzen. Alles aus Feldern, die die Bloecke
@@ -3576,6 +3734,12 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         {"k": _lbl("fx_dwd"), "v": (_front_type(dwd_typ) if dwd_typ else "—")},
         {"k": _lbl("fx_signature"), "v": _lbl("fx_sig_" + zst) if zst else _lbl("fx_sig_no")},
     ]
+    # Neuer Fronten-Block nach Zeichen (17.10.2026); aeltere Caches ohne
+    # `front_zeichen` behalten Satz, Pille und Chips von oben
+    fz_zones = _front_signs_zones(wl, date)
+    if fz_zones is not None:
+        kind, pill, facts, txt = _front_signs_block(chain["fronts"], fz_zones)
+        chain["fronts"].update(status=kind, status_label=pill, facts=facts, fazit=txt)
     # Foehn — vier Indikatoren (15.10.2026), sonst Talmerkmale (14.10.2026)
     if isinstance(fo.get("indikatoren"), dict):
         kind, label, facts = _foehn_indicator_status(fo["indikatoren"])

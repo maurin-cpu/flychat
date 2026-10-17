@@ -124,6 +124,33 @@ dem 25.09.2026 zeigen den Block nicht. Offen: Eichung der Drittel-Schwelle
 und der Bewölkungsklassen im Backtest gegen SwissMetNet — die Bewölkung war
 in der ersten Probe an jedem Tag in jeder Zone uneinig.
 
+### 3b. Fronten-Block nach Zeichen (seit 17.10.2026)
+
+Gleiche Bauart wie der Föhn-Block (docs/FOEHN.md): Pille „Front signs: x of 4 ·
+from ~HH:00“, vier Labels (erfüllte orange), darunter ein Text. Vorgaben des Users:
+
+- **Zuerst die DWD-Karte, ohne Uhrzeit und ohne Zonen:** „DWD forecast map: cold
+  front.“ / „… no front.“ (Karten liegen 12–24 h auseinander).
+- **Dann das Modell beim Namen** mit einer Uhrzeit: „ICON-CH1/ICON-D2 show signs from
+  about 06:00: …“, jedes Zeichen mit Tageszeit (gleiche Tageszeit zusammengefasst).
+- **Jedes Label kommt im Text vor** — fehlende als „Not in the data: …“, Zeichen vom
+  Vorabend als „Carried over from the day before: …“ (zählen nicht).
+- **Nie** „die Front kommt/zieht durch“, nie „Flugfenster“, keine Faustregel.
+- **Zugrichtung** nur aus der DWD-Frontlinie (Reihenfolge der Zonen, ≥ 2 h Abstand);
+  die Richtung aus den Modellzeichen ist ungeprüft (zeigte am 17.10. zweimal Ost→West)
+  und bleibt aus.
+
+Zeichen je Typ (`front_indicators.py`, Typ von der DWD-Karte, sonst aus der
+Temperaturänderung): Kaltfront = DWD, kälter auf 1500 m, Winddrehung 700 hPa, Regen;
+Warmfront = DWD, Bewölkung verdichtet sich, wärmer, Dauerregen; Okklusion = DWD,
+Bewölkung, Luftmasse ändert sich, Regen. Jedes Modellzeichen ist eine Änderung über
+6 h und gilt in einer Zone ab 30 % ihrer Startplätze. Daten: `synoptic_context`
+→ `front_zeichen.per_day[].zones` (aus `wetterdaten.json`, Startplatz→Region→Zone);
+DWD-Teil aus `_front_block` (`dwd`, `dwd_typ`, `dwd_zone_hours`, inkl. Karten-
+Gegenprobe älterer Läufe). Caches ohne `front_zeichen` zeigen den alten Satz.
+**Grenzen vorläufig** — Uhrzeiten noch nicht gegen SwissMetNet geprüft.
+Tests: `tests/test_front_indicators.py`.
+
 ## 4. Status-Pillen
 
 Fix definiert in `scripts/briefing_v3_context.py` (`st_*`-Labels DE/EN,

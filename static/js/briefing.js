@@ -2274,8 +2274,8 @@
       parts.push(chainFactsHtml(blk.facts, (f, i) => i === 0 && !!blk.hot));
     } else if (def.key === "modelle") {
       parts.push(chainFactsHtml(blk.facts, (f) => f.v === "✗"));
-    } else if (def.key === "foehn") {
-      // Vier Indikatoren: erfuellte orange (f.on)
+    } else if (def.key === "foehn" || def.key === "fronts") {
+      // Foehn-Indikatoren / Frontzeichen: erfuellte orange (f.on)
       parts.push(chainFactsHtml(blk.facts, null, (f) => !!f.on));
     } else {
       parts.push(chainFactsHtml(blk.facts));
