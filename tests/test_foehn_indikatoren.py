@@ -83,7 +83,22 @@ class IndikatorenTest(unittest.TestCase):
         ind = self._ind()
         self.assertEqual(ind["n_on"], 4)
         self.assertEqual(ind["pressure"]["high_side"], "sued")
-        self.assertEqual(ind["luv_cooler"], {"on": True, "cooler_k": 4.0, "side": "sued"})
+        self.assertEqual(ind["side"], "sued")
+        self.assertEqual(ind["luv_cooler"], {"on": True, "against": False, "cooler_k": 4.0, "side": "sued"})
+
+    def test_signs_of_other_side_count_against_not_for(self):
+        # 18.10.2026: Windkarte Süd + Tal, aber Druck und Kälte im Norden
+        nh, sh = _station(1019, 1014, -3.0, 0.0)
+        ind = fi.evaluate_indicators(nh, sh, IDX, _karte(red_regions=("r0", "r1", "r2")), DATE, _taeler(1))
+        self.assertEqual(ind["side"], "sued")            # Gleichstand 2:2 -> der Wind entscheidet
+        self.assertEqual(ind["n_on"], 2)
+        self.assertTrue(ind["pressure"]["against"])
+        self.assertFalse(ind["pressure"]["on"])
+        self.assertTrue(ind["luv_cooler"]["against"])
+        with i18n.lang_override("en"):
+            txt = bc._foehn_indicator_text(ind)
+            self.assertNotIn("pressure difference points to south", txt.lower())
+            self.assertIn("Against it: pressure is 5 hPa higher in the north", txt)
 
     def test_none(self):
         ind = self._ind(dp=(1015, 1016), t=(0.0, -0.5), red=(), val=0)
@@ -120,7 +135,7 @@ class BriefingTextTest(unittest.TestCase):
         (kind, pill, facts), txt = r["en"]
         self.assertEqual(kind, "neutral")
         self.assertEqual(pill, "Foehn indicators: 0 of 4")
-        self.assertIn("shallow foehn is often missed", txt)
+        self.assertIn("Foehn is still possible", txt)
         self.assertNotRegex(txt, r"(?i)\bno foehn\b(?! pattern)")
         self.assertNotRegex(r["de"][1], r"(?i)\bkein Föhn\b")
 
@@ -137,7 +152,12 @@ class BriefingTextTest(unittest.TestCase):
         (kind, _, _), txt = r["en"]
         self.assertEqual(kind, "info")
         self.assertTrue(txt.startswith("The pressure difference points to south foehn"))
-        self.assertIn("Rule of thumb", txt)
+        # Grenzen als Zahl statt "kein starker Wind"; keine Faustregel (User 17.10.2026)
+        self.assertIn("no Alpine region shows wind from 30 km/h or gusts from 50 km/h", txt)
+        self.assertIn("dry wind from 16 km/h or gusts from 22 km/h", txt)
+        self.assertIn("Keine Alpenregion zeigt Wind ab 30 km/h", r["de"][1])
+        self.assertNotIn("Rule of thumb", txt)
+        self.assertNotIn("Faustregel", r["de"][1])
 
     def test_all_four_names_strongest_valley(self):
         r = self._both(self._ind())
@@ -150,7 +170,8 @@ class BriefingTextTest(unittest.TestCase):
         (kind, pill, facts), txt = self._both(self._ind(val=3))["en"]
         self.assertEqual([f["on"] for f in facts], [True, True, True, True])
         self.assertEqual(facts[0]["v"], "7 hPa (south higher)")
-        self.assertEqual(facts[3]["v"], "3/23 valleys")
+        self.assertEqual(facts[3]["v"], "3 of 23")
+        self.assertEqual(facts[3]["k"], "Valleys with dry wind from foehn direction")
         self.assertIn("in 3 valleys", txt)
 
     def test_no_judgement_words(self):

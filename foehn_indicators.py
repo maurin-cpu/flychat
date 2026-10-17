@@ -773,35 +773,66 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
     # 2 Windkarte
     wk = evaluate_wind_karte(karte, date)
 
-    # 3 Luv-Seite kühler (800 hPa): Seite aus der Windkarte (wenn rot), sonst aus dem Druck
-    tp = None
+    # 3 Temperatur 800 hPa: Mittel Lugano − Zürich; welche Seite ist kühler?
     dts = []
     for i in indices:
         tn, ts = (_num(nord_hourly.get("temperature_800hPa"), i),
                   _num(sued_hourly.get("temperature_800hPa"), i))
         if tn is not None and ts is not None:
             dts.append(ts - tn)
-    if dts:
-        luv = ((wk or {}).get("side") if (wk or {}).get("n") else None) or (dp or {}).get("high_side") or "sued"
-        mean = sum(dts) / len(dts)
-        cool = round(-mean if luv == "sued" else mean, 1)
-        tp = {"on": cool >= LUV_COOLER_MIN_K, "cooler_k": cool, "side": luv}
+    dt_mean = sum(dts) / len(dts) if dts else None
+    t_side = None if dt_mean is None else ("sued" if dt_mean < 0 else "nord")
+    t_on = dt_mean is not None and abs(dt_mean) >= LUV_COOLER_MIN_K
 
-    # 4 Täler
-    counted, total = [], 0
-    for side, t in (taeler or {}).items():
+    # 4 Täler je Föhnseite
+    rows = {"sued": [], "nord": []}
+    total = 0
+    for s, t in (taeler or {}).items():
         if not t:
             continue
         total += t.get("n_total", 0)
         for e in t.get("taeler") or []:
-            if e.get("dir_dry"):
-                counted.append({"tal": e.get("tal", ""), "side": side,
+            if e.get("dir_dry") and s in rows:
+                rows[s].append({"tal": e.get("tal", ""), "side": s,
                                 "gust_kmh": e.get("all_gust_max_kmh") or 0})
-    counted.sort(key=lambda e: -e["gust_kmh"])
-    va = {"on": bool(counted), "n": len(counted), "total": total,
-          "top": counted[0] if counted else None} if total else None
 
-    ind = {"pressure": dp, "wind_map": wk, "luv_cooler": tp, "valleys": va}
+    # Föhnseite des Tages: Seite mit den meisten erfüllten Zeichen. Zeichen der
+    # Gegenseite zählen NICHT mit, sondern stehen als "dagegen" im Text
+    # (18.10.2026: Windkarte Süd + Davos, aber Druck und Kälte im Norden —
+    # zusammengezählt wären es falsche "3 von 4" gewesen).
+    votes = {s: 0 for s in ("sued", "nord")}
+    for on, s in ((bool(dp and dp["on"]), (dp or {}).get("high_side")),
+                  (bool(wk and wk["on"]), (wk or {}).get("side")),
+                  (t_on, t_side), (bool(rows["sued"]), "sued"), (bool(rows["nord"]), "nord")):
+        if on and s in votes:
+            votes[s] += 1
+    if votes["sued"] != votes["nord"]:
+        side = max(votes, key=votes.get)
+    else:   # Gleichstand: der Wind entscheidet, dann der Druck
+        side = ((wk or {}).get("side") if (wk or {}).get("on") else None) \
+            or ((dp or {}).get("high_side") if (dp or {}).get("on") else None) \
+            or (max(rows, key=lambda s: len(rows[s])) if rows["sued"] or rows["nord"] else None) \
+            or t_side or (dp or {}).get("high_side") or "sued"
+
+    if dp:
+        same = dp["high_side"] == side
+        dp["against"], dp["on"] = dp["on"] and not same, dp["on"] and same
+    if wk:
+        same = wk["side"] == side
+        wk["against"], wk["on"] = wk["on"] and not same, wk["on"] and same
+    tp = None
+    if dt_mean is not None:
+        cool = round(-dt_mean if side == "sued" else dt_mean, 1)   # > 0: Föhnseite kühler
+        tp = {"on": t_on and t_side == side, "against": t_on and t_side != side,
+              "cooler_k": cool, "side": side}
+    va = None
+    if total:
+        mine = sorted(rows[side], key=lambda e: -e["gust_kmh"])
+        other = "nord" if side == "sued" else "sued"
+        va = {"on": bool(mine), "n": len(mine), "total": total, "top": mine[0] if mine else None,
+              "against": bool(rows[other]) and not mine, "n_other": len(rows[other])}
+
+    ind = {"side": side, "pressure": dp, "wind_map": wk, "luv_cooler": tp, "valleys": va}
     ind["n_on"] = sum(1 for k in ("pressure", "wind_map", "luv_cooler", "valleys")
                       if (ind[k] or {}).get("on"))
     return ind

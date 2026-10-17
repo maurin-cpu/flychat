@@ -153,3 +153,8 @@ Er sagt nie „Föhn“ oder „kein Föhn“.
   Zahlen aus den Konstanten.
 - Tests: `tests/test_foehn_indikatoren.py`; `tests/conftest.py` schaltet den
   Netzabruf der Windkarte in allen Tests ab.
+- **16.10.2026:** Labels ausgeschrieben („Valleys with dry wind from foehn direction“,
+  „Regions with wind ≥30 or gusts ≥50 km/h …“, Grenzen aus den Konstanten statt „stark“);
+  Schlusssatz ruhiger Tage erklärt („Foehn is still possible: models often miss …“);
+  **Föhnseite** = Mehrheit der Zeichen (`ind["side"]`), Zeichen der Gegenseite zählen
+  nicht, sondern stehen als „Against it:“ im Text (18.10.: Windkarte Süd, Druck Nord).
