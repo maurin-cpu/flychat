@@ -130,7 +130,10 @@ Gleiche Bauart wie der Föhn-Block (docs/FOEHN.md): Pille „Front signs: x of 4
 from ~HH:00“, vier Labels (erfüllte orange), darunter ein Text. Vorgaben des Users:
 
 - **Zuerst die DWD-Karte, ohne Uhrzeit und ohne Zonen:** „DWD forecast map: cold
-  front.“ / „… no front.“ (Karten liegen 12–24 h auseinander).
+  front.“ (Karten liegen 12–24 h auseinander).
+- **Ohne Front auf der DWD-Karte nur dieser Satz** (User 19.10.2026): Pille „DWD map: no
+  front“ (grau), keine Chips, Text „DWD forecast map: no front forecast.“ — einzelne
+  Modellzeichen sind dann keine Frontzeichen und werden nicht genannt.
 - **Dann das Modell beim Namen** mit einer Uhrzeit: „ICON-CH1/ICON-D2 show signs from
   about 06:00: …“, jedes Zeichen mit Tageszeit (gleiche Tageszeit zusammengefasst).
 - **Jedes Label kommt im Text vor** — fehlende als „Not in the data: …“, Zeichen vom

@@ -869,12 +869,10 @@ _L3 = {
         "fz_k_regen":     "Regen", "fz_k_dauerregen": "Dauerregen", "fz_k_wolken": "Bewölkung verdichtet sich",
         "fz_typ_kalt":    "Kaltfront", "fz_typ_warm": "Warmfront", "fz_typ_okklusion": "Okklusion",
         "fz_dwd_yes":     "DWD-Prognosekarte: {typ}.",
-        "fz_dwd_no":      "DWD-Prognosekarte: keine Front.",
+        "fz_dwd_no":      "DWD-Prognosekarte: keine Front prognostiziert.",
+        "fz_pill_none":   "DWD-Karte: keine Front",
         "fz_match":       " {models} zeigt Zeichen ab etwa {t}{move}: {det}.",
         "fz_nomatch":     " {models} zeigt keines der passenden Zeichen.",
-        "fz_only":        " {models} zeigt trotzdem Zeichen einer {typ} ab etwa {t}{move}: {det}.",
-        "fz_only_one":    " {models} zeigt ein Zeichen: {det}.",
-        "fz_only_none":   " {models} zeigt keines der Zeichen.",
         "fz_absent":      " Nicht in den Daten: {liste}.",
         "fz_carried":     " Vom Vortag noch in den Daten: {liste}.",
         "fz_x_kaelter":   "kältere Luft auf 1500 m", "fz_x_waermer": "wärmere Luft auf 1500 m",
@@ -1410,12 +1408,10 @@ _L3 = {
         "fz_k_regen":     "Rain", "fz_k_dauerregen": "Continuous rain", "fz_k_wolken": "Cloud thickening",
         "fz_typ_kalt":    "cold front", "fz_typ_warm": "warm front", "fz_typ_okklusion": "occlusion",
         "fz_dwd_yes":     "DWD forecast map: {typ}.",
-        "fz_dwd_no":      "DWD forecast map: no front.",
+        "fz_dwd_no":      "DWD forecast map: no front forecast.",
+        "fz_pill_none":   "DWD map: no front",
         "fz_match":       " {models} show signs from about {t}{move}: {det}.",
         "fz_nomatch":     " {models} show none of the matching signs.",
-        "fz_only":        " {models} still show signs of a {typ} from about {t}{move}: {det}.",
-        "fz_only_one":    " {models} show one sign: {det}.",
-        "fz_only_none":   " {models} show none of the signs.",
         "fz_absent":      " Not in the data: {liste}.",
         "fz_carried":     " Carried over from the day before: {liste}.",
         "fz_x_kaelter":   "colder air at 1500 m", "fz_x_waermer": "warmer air at 1500 m",
@@ -3644,7 +3640,11 @@ def _front_signs_block(fb: dict, zones: dict):
     (ohne Uhrzeit), dann die Modellzeichen mit Tageszeit. Jedes Label kommt im Text
     vor; nie "die Front kommt" (User 16./17.10.2026)."""
     from front_indicators import evaluate_front_signs
-    dwd = {"typ": fb.get("dwd_typ"), "zone_hours": fb.get("dwd_zone_hours")} if fb.get("dwd") else None
+    # Ohne Front auf der DWD-Karte nur dieser Satz — einzelne Modellzeichen sind dann
+    # keine Frontzeichen (User 19.10.2026). Grau statt gruen: keine Entwarnung.
+    if not fb.get("dwd"):
+        return "neutral", _lbl("fz_pill_none"), [], _lbl("fz_dwd_no")
+    dwd = {"typ": fb.get("dwd_typ"), "zone_hours": fb.get("dwd_zone_hours")}
     ev = evaluate_front_signs(zones, dwd)
     typ, keys, first = ev["typ"], ev["keys"], ev["first"]
     carried, counted = set(ev["carried"]), set(ev["counted"])
@@ -3656,7 +3656,7 @@ def _front_signs_block(fb: dict, zones: dict):
     facts = []
     for k in keys:
         if k == "dwd":
-            v = (typ_w[:1].upper() + typ_w[1:]) if fb.get("dwd") else "—"
+            v = typ_w[:1].upper() + typ_w[1:]
         elif first[k] is None:
             v = "—"
         else:
@@ -3681,18 +3681,9 @@ def _front_signs_block(fb: dict, zones: dict):
     models = _model_words()
     move = _fz_direction(ev["dwd_zone_hours"])
     t = _fz_time(first[shown[0]]) if shown else ""
-    if fb.get("dwd"):
-        txt = _lbl("fz_dwd_yes").format(typ=typ_w)
-        txt += (_lbl("fz_match").format(models=models, t=t, move=move, det=det_txt) if shown
-                else _lbl("fz_nomatch").format(models=models))
-    else:
-        txt = _lbl("fz_dwd_no")
-        if len(shown) >= 2:
-            txt += _lbl("fz_only").format(models=models, typ=typ_w, t=t, move="", det=det_txt)
-        elif shown:
-            txt += _lbl("fz_only_one").format(models=models, det=det_txt)
-        else:
-            txt += _lbl("fz_only_none").format(models=models)
+    txt = _lbl("fz_dwd_yes").format(typ=typ_w)
+    txt += (_lbl("fz_match").format(models=models, t=t, move=move, det=det_txt) if shown
+            else _lbl("fz_nomatch").format(models=models))
     absent = [k for k in model if first[k] is None]
     if absent:
         txt += _lbl("fz_absent").format(liste=names(absent))

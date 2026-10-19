@@ -100,11 +100,14 @@ class BlockTextTest(unittest.TestCase):
         self.assertEqual([f["on"] for f in facts], [True, True, False, True])
         self.assertEqual(kind, "warn")
 
-    def test_no_front_on_map(self):
-        kind, pill, facts, txt = self._block({"tessin": {"waermer": 3}})
-        self.assertTrue(txt.startswith("DWD forecast map: no front."))
-        self.assertIn("show one sign: warmer air at 1500 m overnight", txt)
-        self.assertEqual(kind, "info")
+    def test_no_front_on_map_only_the_dwd_sentence(self):
+        # Modellzeichen ohne DWD-Front sind keine Frontzeichen (User 19.10.2026)
+        kind, pill, facts, txt = self._block({"tessin": {"waermer": 3, "regen": 9}})
+        self.assertEqual(txt, "DWD forecast map: no front forecast.")
+        self.assertEqual((kind, pill, facts), ("neutral", "DWD map: no front", []))
+        _, pill_de, _, txt_de = self._block({}, lang="de")
+        self.assertEqual(txt_de, "DWD-Prognosekarte: keine Front prognostiziert.")
+        self.assertEqual(pill_de, "DWD-Karte: keine Front")
 
     def test_carried_over_is_named_not_counted(self):
         kind, pill, facts, txt = self._block({"alpennordhang": {"kaelter": 0}}, "kalt")
