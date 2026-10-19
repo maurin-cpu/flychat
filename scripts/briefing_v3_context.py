@@ -836,31 +836,35 @@ _L3 = {
         "fi_rest_3":     "Die übrigen drei Indikatoren sind nicht erfüllt: ",
         "fi_and":        " und ",
         # Deutungstext (15.10.2026): erklaert, was die Labels zusammen bedeuten — Zahlen stehen oben
-        "fd_all":        "Alle vier Föhnzeichen stimmen überein und zeigen auf {foehn}: Druckunterschied und kühlere {luv}seite, {dirw} ab {mw} km/h oder Böen ab {mg} km/h in {nmap} Alpenregionen und trockener Föhnwind in {nval} Tälern, am stärksten {name} (Böen bis {g} km/h).",
-        "fd_none":       "Die Daten zeigen kein Föhnmuster, weder über den Alpen noch in den Tälern.",
-        "fd_setup_2":    "Druckunterschied und kühlere {luv}seite zeigen auf {foehn}",
-        "fd_setup_dp":   "Der Druckunterschied zeigt auf {foehn}",
-        "fd_setup_tp":   "Die kühlere {luv}seite zeigt auf {foehn}",
-        "fd_nowind":     ", in den Daten folgt der Wind aber nicht: Keine Alpenregion zeigt Wind ab {mw} km/h oder Böen ab {mg} km/h aus Föhnrichtung, kein Föhntal trockenen Wind ab {tw} km/h oder Böen ab {tg} km/h.",
+        "fd_setup_dp":   "In {m} zeigt der Druckunterschied{ab} auf {foehn}",
+        "fd_dp_below":   "In {m} zeigt der Druckunterschied nicht auf Föhn",
+        "fd_t_match":    " {m} zeigt ein passendes Zeichen{ab}: {item}.",
+        "fd_t_still":    " {m} zeigt trotzdem ein Zeichen von {foehn}{ab}: {item}.",
+        "fd_w_match":    " {m} zeigt passende Zeichen{ab}: {det}.",
+        "fd_w_match_1":  " {m} zeigt ein passendes Zeichen{ab}: {det}.",
+        "fd_w_still":    " {m} zeigt trotzdem Zeichen von {foehn}{ab}: {det}.",
+        "fd_w_still_1":  " {m} zeigt trotzdem ein Zeichen von {foehn}{ab}: {det}.",
+        "fd_w_none":     " {m} zeigt keines der Zeichen im Wind.",
+        "fd_i_map_wo":   " (vor allem {names})",
+        "fd_i_val_wo":   " (am stärksten {name})",
+        "fd_i_val_1":    "trockener Wind aus Föhnrichtung in {name}",
+        "fd_rest_none":  " {models} zeigen auch keines der übrigen drei Föhnzeichen.",
         "fd_against":    " Dagegen: {liste}.",
-        "fd_ag_dp":      "Der Druck ist im {hi} {dp} hPa höher",
-        "fd_ag_map":     "{n} Regionen zeigen {dirw} ab {mw} km/h oder Böen ab {mg} km/h",
-        "fd_ag_tp":      "die {luv}seite ist in der Höhe {k} °C wärmer",
-        "fd_ag_val":     "{n} Täler der Gegenseite zeigen trockenen Föhnwind",
-        "fd_local":      "Nur ein lokales Zeichen: {tal}.",
-        "fd_val_1":      "{name} zeigt trockenen Wind aus Föhnrichtung (Böen bis {g} km/h)",
-        "fd_val_n":      "{n} Täler zeigen trockenen Föhnwind, am stärksten {name} (Böen bis {g} km/h)",
-        "fd_map":        "In {n} Alpenregionen zeigt das Modell {dirw} ab {mw} km/h oder Böen ab {mg} km/h, vor allem {names}",
-        "fd_and":        ", und ",
-        "fd_missing":    " Die grossräumigen Föhnzeichen fehlen in den Daten: {liste}.",
-        "fd_missing_in": " In den Daten fehlen: {liste}.",
-        "fd_m_dp":       "Druckunterschied ab {dp} hPa", "fd_m_tp": "{luv}seite mindestens {k} °C kühler",
-        "fd_m_map":      "Wind ab {mw} km/h oder Böen ab {mg} km/h in den Regionen", "fd_m_val": "trockener Föhnwind in den Tälern",
+        "fd_ag_map":     "{dirw} in den Regionen ({m})",
+        "fd_ag_tp":      "wärmere {luv}seite in der Höhe ({m})",
+        "fd_ag_val":     "trockener Föhnwind in Tälern der Gegenseite ({m})",
+        "fd_m_tp":       "kühlere {luv}seite in der Höhe",
+        "fd_m_map":      "Wind aus Föhnrichtung in den Regionen", "fd_m_val": "trockener Wind aus Föhnrichtung in den Tälern",
         "fd_foehn_sued": "Südföhn", "fd_foehn_nord": "Nordföhn",
         "fd_luv_sued":   "Süd", "fd_luv_nord": "Nord",
         "fd_r_inner":    " Inneralpiner Föhn setzt oft ohne sie ein.",
         "fd_r_weak":     " Modelle zeigen Föhnwind meist zu schwach.",
         "fd_r_none":     " Föhn bleibt trotzdem möglich: Modelle übersehen oft Föhn, der nur flach über die Pässe kommt oder auf einzelne Täler beschränkt ist. Am Flugtag die Live-Werte an Tal- und Gipfelstationen prüfen.",
+        "fd_notin":      " Nicht in {m}: {liste}",
+        "fd_notin_next": "; nicht in {m}: {liste}",
+        "fd_ab":         " ab etwa {t}", "fd_ab_start": " bereits um {t}",
+        "fd_model_x":    "den Daten",
+        "fi_from":       ", ab ~{t}",
         # Fronten-Block nach Zeichen (17.10.2026): DWD-Karte ohne Uhrzeit, dann die
         # Modellzeichen mit Tageszeit; jedes Label kommt im Text vor
         "fz_pill":        "Frontzeichen: {n} von 4", "fz_pill_from": " · ab ~{t}",
@@ -1377,31 +1381,35 @@ _L3 = {
         "fi_rest_2":     "The other two indicators are not met: ",
         "fi_rest_3":     "The other three indicators are not met: ",
         "fi_and":        " and ",
-        "fd_all":        "All four foehn signs agree and point to {foehn}: pressure difference and a cooler {luv} side, {dirw} from {mw} km/h or gusts from {mg} km/h in {nmap} Alpine regions and dry foehn wind in {nval} valleys, strongest {name} (gusts up to {g} km/h).",
-        "fd_none":       "The data show no foehn pattern, neither across the Alps nor in the valleys.",
-        "fd_setup_2":    "The pressure difference and the cooler {luv} side point to {foehn}",
-        "fd_setup_dp":   "The pressure difference points to {foehn}",
-        "fd_setup_tp":   "The cooler {luv} side points to {foehn}",
-        "fd_nowind":     ", but in the data the wind does not follow: no Alpine region shows wind from {mw} km/h or gusts from {mg} km/h from the foehn direction, and none of the foehn valleys shows dry wind from {tw} km/h or gusts from {tg} km/h.",
+        "fd_setup_dp":   "In {m}, the pressure difference points to {foehn}{ab}",
+        "fd_dp_below":   "In {m}, the pressure difference does not point to foehn",
+        "fd_t_match":    " {m} shows a matching sign{ab}: {item}.",
+        "fd_t_still":    " {m} still shows a sign of {foehn}{ab}: {item}.",
+        "fd_w_match":    " {m} shows matching signs{ab}: {det}.",
+        "fd_w_match_1":  " {m} shows a matching sign{ab}: {det}.",
+        "fd_w_still":    " {m} still shows signs of {foehn}{ab}: {det}.",
+        "fd_w_still_1":  " {m} still shows a sign of {foehn}{ab}: {det}.",
+        "fd_w_none":     " {m} shows none of the signs in the wind.",
+        "fd_i_map_wo":   " (mainly {names})",
+        "fd_i_val_wo":   " (strongest {name})",
+        "fd_i_val_1":    "dry wind from the foehn direction in {name}",
+        "fd_rest_none":  " {models} show none of the other three foehn signs.",
         "fd_against":    " Against it: {liste}.",
-        "fd_ag_dp":      "pressure is {dp} hPa higher in the {hi}",
-        "fd_ag_map":     "{n} regions show {dirw} from {mw} km/h or gusts from {mg} km/h",
-        "fd_ag_tp":      "the {luv} side is {k} °C warmer aloft",
-        "fd_ag_val":     "{n} valleys on the other side show dry foehn wind",
-        "fd_local":      "Only a local sign: {tal}.",
-        "fd_val_1":      "{name} shows dry wind from the foehn direction (gusts up to {g} km/h)",
-        "fd_val_n":      "{n} valleys show dry foehn wind, strongest {name} (gusts up to {g} km/h)",
-        "fd_map":        "In {n} Alpine regions the model shows {dirw} from {mw} km/h or gusts from {mg} km/h, mainly {names}",
-        "fd_and":        ", and ",
-        "fd_missing":    " The large-scale foehn signs are missing in the data: {liste}.",
-        "fd_missing_in": " Missing in the data: {liste}.",
-        "fd_m_dp":       "a pressure difference from {dp} hPa", "fd_m_tp": "a {luv} side at least {k} °C cooler",
-        "fd_m_map":      "wind from {mw} km/h or gusts from {mg} km/h in the regions", "fd_m_val": "dry foehn wind in the valleys",
+        "fd_ag_map":     "{dirw} in the regions ({m})",
+        "fd_ag_tp":      "a warmer {luv} side aloft ({m})",
+        "fd_ag_val":     "dry foehn wind in valleys on the other side ({m})",
+        "fd_m_tp":       "a cooler {luv} side aloft",
+        "fd_m_map":      "wind from the foehn direction in the regions", "fd_m_val": "dry wind from the foehn direction in the valleys",
         "fd_foehn_sued": "south foehn", "fd_foehn_nord": "north foehn",
         "fd_luv_sued":   "south", "fd_luv_nord": "north",
         "fd_r_inner":    " Inner-Alpine foehn often sets in without them.",
         "fd_r_weak":     " Models usually show foehn wind too weak.",
         "fd_r_none":     " Foehn is still possible: models often miss foehn that only spills shallowly over the passes or stays in single valleys. On the day, check live readings at valley and summit stations.",
+        "fd_notin":      " Not in {m}: {liste}",
+        "fd_notin_next": "; not in {m}: {liste}",
+        "fd_ab":         " from about {t}", "fd_ab_start": " already at {t}",
+        "fd_model_x":    "the data",
+        "fi_from":       ", from ~{t}",
         "fz_pill":        "Front signs: {n} of 4", "fz_pill_from": " · from ~{t}",
         "fz_k_dwd":       "DWD map", "fz_k_kaelter": "Colder at 1500 m", "fz_k_waermer": "Warmer at 1500 m",
         "fz_k_luft":      "Air mass change at 1500 m", "fz_k_dreh": "Wind shift aloft",
@@ -3335,84 +3343,140 @@ def _fi_cap(s: str) -> str:
     return s[:1].upper() + s[1:]
 
 
+def _fi_models(*inds) -> str:
+    """Anzeigenamen der Modelle hinter den Indikatoren ("ICON-D2", "ICON-CH2"), in
+    Reihenfolge, ohne Doppel; ohne Angabe (aeltere Caches) "den Daten"."""
+    from engine.synoptic_context import MODEL_COMPARE_MODELS as names
+    out = []
+    for x in inds:
+        m = (x or {}).get("model")
+        for mid in (m if isinstance(m, list) else [m] if m else []):
+            nm = names.get(mid, mid)
+            if nm not in out:
+                out.append(nm)
+    return "/".join(out) if out else _lbl("fd_model_x")
+
+
+def _fi_ab(*hours) -> str:
+    """' ab etwa 10 Uhr' / ' from about 10:00' — fruehestes Zeichen, sonst leer."""
+    hs = [h for h in hours if h is not None]
+    if not hs:
+        return ""
+    # Vor dem Flugfenster schauen die Indikatoren nicht hin: erste Flugstunde = "bereits"
+    key = "fd_ab_start" if min(hs) <= config.FLIGHT_HOURS_START else "fd_ab"
+    return _lbl(key).format(t=_fz_time(min(hs)))
+
+
 def _foehn_indicator_text(ind: dict) -> str:
-    """Block 3 (ab 15.10.2026): Deutung unter den vier Indikator-Labels. Die Zahlen
-    stehen in den Labels; der Text erklaert, was sie zusammen bedeuten (User
-    15.10.2026): (1) Gesamtbild — Anlage (Druck, kuehlere Luv-Seite) und Wind
-    (Windkarte, Taeler) stimmen ueberein / nur lokal / Anlage ohne Wind;
-    (2) was in den Daten fehlt; (3) Faustregel aus dem Blog. Kein Mechanismus
-    ("Luft wird gedrueckt" ist Spekulation), keine Wertungswoerter."""
+    """Block 3 (ab 15.10.2026): Deutung unter den vier Indikator-Labels.
+
+    Aufbau wie der Fronten-Block (User 17.10.2026): zuerst immer der Druckunterschied
+    (wie dort die DWD-Karte), dann je Modell, ob es passende Zeichen zeigt — die
+    Zeichen beim Namen der Labels, mit Uhrzeit im Satzkopf und Tageszeit je Zeichen,
+    die Föhnrichtung (Süd/Nord) im Satz. Die Zahlen stehen nur in den Labels.
+    Kein Mechanismus, keine Wertungswoerter, keine Faustregel."""
     from foehn_talpunkte import tal_kurzname
     va, wk, dp, tp = (ind.get(k) or None for k in ("valleys", "wind_map", "pressure", "luv_cooler"))
-    on = {k: bool(x and x.get("on")) for k, x in (("dp", dp), ("tp", tp), ("map", wk), ("val", va))}
-    n = sum(on.values())
+    obj = {"dp": dp, "tp": tp, "map": wk, "val": va}
+    on = {k: bool(x and x.get("on")) for k, x in obj.items()}
+    against = {k: bool(x and x.get("against")) for k, x in obj.items()}
     # Foehnseite des Tages aus evaluate_indicators (Mehrheit der Zeichen);
     # Zeichen der Gegenseite stehen als "Dagegen:" im Text, nie als Treffer
     side = ind.get("side") or (dp or {}).get("high_side") or "sued"
-    other = "nord" if side == "sued" else "sued"
     luv = _lbl("fd_luv_" + side)
-    from foehn_indicators import (DP_INDICATOR_HPA, LUV_COOLER_MIN_K, KARTE_WIND_KMH, KARTE_GUST_KMH,
-                                  TAL_WIND_WEAK_KMH, TAL_GUST_WEAK_KMH)
-    lim = {"luv": None, "dp": f"{DP_INDICATOR_HPA:.0f}", "k": f"{LUV_COOLER_MIN_K:.0f}",
-           "mw": KARTE_WIND_KMH, "mg": KARTE_GUST_KMH, "tw": TAL_WIND_WEAK_KMH, "tg": TAL_GUST_WEAK_KMH}
     foehn = _lbl("fd_foehn_" + side)
-    top = (va or {}).get("top") or {}
-    name, g = tal_kurzname(top.get("tal", "")), top.get("gust_kmh", "–")
-    tal = ""
-    if on["val"]:
-        tal = (_lbl("fd_val_n").format(n=va["n"], name=name, g=g) if va["n"] > 1
-               else _lbl("fd_val_1").format(name=name, g=g))
-    ag = []
-    if dp and dp.get("against"):
-        ag.append(_lbl("fd_ag_dp").format(dp=f"{dp['hpa']:.0f}", hi=_lbl("fi_hi_" + dp["high_side"])))
-    if wk and wk.get("against"):
-        ag.append(_lbl("fd_ag_map").format(n=wk["n"], dirw=_lbl("fi_dirw_" + wk["side"]), mw=lim["mw"], mg=lim["mg"]))
-    if tp and tp.get("against"):
-        ag.append(_lbl("fd_ag_tp").format(luv=luv, k=f"{-tp['cooler_k']:.1f}"))
-    if va and va.get("against"):
-        ag.append(_lbl("fd_ag_val").format(n=va.get("n_other", 0)))
-    dagegen = _lbl("fd_against").format(liste=_fi_join(ag)) if ag else ""
-    against = {"dp": bool(dp and dp.get("against")), "tp": bool(tp and tp.get("against")),
-               "map": bool(wk and wk.get("against")), "val": bool(va and va.get("against"))}
-    if n == 4:
-        return _lbl("fd_all").format(mw=lim["mw"], mg=lim["mg"], foehn=foehn, luv=luv, dirw=_lbl("fi_dirw_" + side),
-                                     nmap=wk["n"], nval=va["n"], name=name, g=g)
-    if n == 0:
-        return _lbl("fd_none") + _lbl("fd_r_none")
-    setup = ""
-    if on["dp"] and on["tp"]:
-        setup = _lbl("fd_setup_2")
-    elif on["dp"]:
-        setup = _lbl("fd_setup_dp")
-    elif on["tp"]:
-        setup = _lbl("fd_setup_tp")
-    setup = setup.format(luv=luv, foehn=foehn)
-    if setup and not (on["map"] or on["val"]):
-        # Anlage ohne Wind
-        return (setup + _lbl("fd_nowind").format(**lim) + dagegen
-                + _lbl("fd_r_weak"))
-    if not setup and on["val"] and not on["map"]:
-        # nur Taeler: lokales Zeichen
-        miss = [_lbl("fd_m_" + k).format(**{**lim, "luv": luv}) for k in ("dp", "tp", "map") if not against[k]]
-        out = _lbl("fd_local").format(tal=tal)
-        if miss:
-            out += _lbl("fd_missing").format(liste=_fi_join(miss))
-        return out + dagegen + _lbl("fd_r_inner")
-    # Wind (Windkarte, Taeler) je ein eigener Satz; Anlage vorne angehaengt
+    # Modell je Zeichen: Druck/Temperatur aus der Stationsreihe, Wind aus Raster und Talpunkten
+    m_st, m_map, m_val = _fi_models(dp, tp), _fi_models(wk), _fi_models(va)
+    m_wind = _fi_models(wk, va)
+    # "passend", wenn der Druck auf dieselbe Seite zeigt — sonst "trotzdem" (Fronten: fz_only)
+    art = "match" if on["dp"] else "still"
+
+    def mit_tageszeit(items):
+        """Wie die Frontzeichen: gleiche Tageszeit zusammen, DE 'am Nachmittag Regen
+        und …', EN 'rain and … in the afternoon'. items: [(Stunde, Name, Zusatz)]."""
+        groups = []
+        for h, name, extra in items:
+            dpart = _fz_daypart(h) if h is not None else None
+            if groups and groups[-1][0] == dpart:
+                groups[-1][1].append(name + extra)
+            else:
+                groups.append((dpart, [name + extra]))
+        return _fi_join([(f"{d} {_fi_join(ns)}" if _lang() == "de" else f"{_fi_join(ns)} {d}") if d else _fi_join(ns)
+                         for d, ns in groups])
+
+    # 1 Druckunterschied
+    out = ""
+    if dp:
+        key = "fd_setup_dp" if (on["dp"] or against["dp"]) else "fd_dp_below"
+        out = _fi_cap(_lbl(key).format(m=m_st, ab=_fi_ab(dp.get("from_hour")),
+                                       foehn=_lbl("fd_foehn_" + dp["high_side"]))) + "."
+
+    if not any(on.values()):
+        models = _fi_join([m_st, m_wind]) if m_st != m_wind else m_st
+        return (out + _lbl("fd_rest_none").format(models=models) + _fi_against(ind, luv)
+                + _lbl("fd_r_none")).strip()
+
+    # 2 Je Modell ein Satz, das frueheste zuerst
+    saetze = []
+    if on["tp"]:
+        saetze.append((tp.get("from_hour"), _lbl("fd_t_" + art).format(
+            m=m_st, foehn=foehn, ab=_fi_ab(tp.get("from_hour")), item=_lbl("fd_m_tp").format(luv=luv))))
     wind = []
     if on["map"]:
-        wind.append(_lbl("fd_map").format(mw=lim["mw"], mg=lim["mg"], dirw=_lbl("fi_dirw_" + side), n=wk["n"],
-                                          names=_fi_join(list(wk.get("regions") or [])[:2])))
+        names = _fi_join(list(wk.get("regions") or [])[:2])
+        wind.append((wk.get("from_hour"), _lbl("fd_m_map"),
+                     _lbl("fd_i_map_wo").format(names=names) if names else ""))
     if on["val"]:
-        wind.append(tal)
-    first = wind[0]
-    head = (setup + _lbl("fd_and") + first[:1].lower() + first[1:]) if setup else first
-    out = _fi_cap(head) + "." + "".join(" " + _fi_cap(w) + "." for w in wind[1:])
-    missing = [_lbl("fd_m_" + k).format(**{**lim, "luv": luv}) for k in ("dp", "tp", "map", "val")
-               if not on[k] and not against[k]]
-    if missing:
-        out += _lbl("fd_missing_in").format(liste=_fi_join(missing))
-    return out + dagegen + ("" if on["val"] else _lbl("fd_r_weak"))
+        top = tal_kurzname(((va.get("top") or {}).get("tal")) or "")
+        if va["n"] > 1:
+            wind.append((va.get("from_hour"), _lbl("fd_m_val"), _lbl("fd_i_val_wo").format(name=top) if top else ""))
+        else:
+            wind.append((va.get("from_hour"), _lbl("fd_i_val_1").format(name=top), ""))
+    if wind:
+        wind.sort(key=lambda x: 99 if x[0] is None else x[0])
+        hours = [h for h, _, _ in wind]
+        if len(wind) == 1:          # Uhrzeit steht dann nur im Satzkopf
+            det, key = wind[0][1] + wind[0][2], "fd_w_" + art + "_1"
+        else:
+            det, key = mit_tageszeit(wind), "fd_w_" + art
+        saetze.append((min((h for h in hours if h is not None), default=None),
+                       _lbl(key).format(m=m_wind, foehn=foehn, ab=_fi_ab(*hours), det=det)))
+    saetze.sort(key=lambda x: 99 if x[0] is None else x[0])
+    out += "".join(t for _, t in saetze)
+    if not wind:
+        out += _lbl("fd_w_none").format(m=m_wind)
+
+    # 3 Was fehlt (Druck steht in Satz 1, Wind ohne Zeichen in fd_w_none)
+    groups = []
+    for k in ("tp", "map", "val"):
+        if on[k] or against[k] or (not wind and k in ("map", "val")):
+            continue
+        m = {"tp": m_st, "map": m_map, "val": m_val}[k]
+        item = _lbl("fd_m_" + k).format(luv=luv)
+        if groups and groups[-1][0] == m:
+            groups[-1][1].append(item)
+        else:
+            groups.append((m, [item]))
+    if groups:
+        out += "".join(_lbl("fd_notin" if i == 0 else "fd_notin_next").format(m=m, liste=_fi_join(items))
+                       for i, (m, items) in enumerate(groups)) + "."
+    out += _fi_against(ind, luv)
+    local = on["val"] and not (on["dp"] or on["tp"] or on["map"])
+    out += _lbl("fd_r_inner") if local else "" if on["val"] else _lbl("fd_r_weak")
+    return out.strip()
+
+
+def _fi_against(ind: dict, luv: str) -> str:
+    """' Against it: …' — Zeichen der Gegenseite (der Druck steht schon in Satz 1)."""
+    va, wk, tp = ind.get("valleys"), ind.get("wind_map"), ind.get("luv_cooler")
+    ag = []
+    if wk and wk.get("against"):
+        ag.append(_lbl("fd_ag_map").format(dirw=_lbl("fi_dirw_" + wk["side"]), m=_fi_models(wk)))
+    if tp and tp.get("against"):
+        ag.append(_lbl("fd_ag_tp").format(luv=luv, m=_fi_models(tp)))
+    if va and va.get("against"):
+        ag.append(_lbl("fd_ag_val").format(m=_fi_models(va)))
+    return _lbl("fd_against").format(liste=_fi_join(ag)) if ag else ""
 
 
 def _foehn_indicator_status(ind: dict):
@@ -3437,7 +3501,14 @@ def _foehn_indicator_status(ind: dict):
         facts.append({"k": _lbl("fi_k_luv_sued"), "v": "—", "on": False})
     facts.append({"k": _lbl("fi_k_val"), "on": bool(va.get("on")),
                   "v": (_lbl("fi_v_val").format(n=va.get("n", 0), t=va.get("total", 0)) if va else "—")})
-    return kind, _lbl("fi_pill").format(n=n), facts
+    # Ab wann (wie die Frontzeichen, 17.10.2026): je erfuelltes Zeichen und in der Pille
+    for f, x in zip(facts, (dp, wk, tp, va)):
+        if f["on"] and (x or {}).get("from_hour") is not None:
+            f["v"] += _lbl("fi_from").format(t=_fz_time(x["from_hour"]))
+    pill = _lbl("fi_pill").format(n=n)
+    if n and ind.get("from_hour") is not None:
+        pill += _lbl("fz_pill_from").format(t=_fz_time(ind["from_hour"]))
+    return kind, pill, facts
 
 
 def _foehn_indicators_for(wetterlage: dict, date: str):

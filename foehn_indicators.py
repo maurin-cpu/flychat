@@ -111,11 +111,36 @@ LUV_COOLER_MIN_K = 2.0
 DP_INDICATOR_HPA = THRESHOLD_DELTA_P_CAUTION
 
 
+FOEHN_STATION_MODELS = ("icon_d2", "icon_eu")   # Vorrang in dieser Reihenfolge
+
+
+def _merge_models(point: dict) -> dict:
+    """Je Stunde der erste Wert aus FOEHN_STATION_MODELS; Schluessel ohne Modell-Suffix
+    wie bei einer Ein-Modell-Abfrage, dazu `hourly["model"]`."""
+    h = point.get("hourly") or {}
+    times = h.get("time") or []
+    out = {"time": times, "model": [None] * len(times)}
+    for key in {k.rsplit("_" + m, 1)[0] for k in h for m in FOEHN_STATION_MODELS if k.endswith("_" + m)}:
+        vals = [None] * len(times)
+        for m in FOEHN_STATION_MODELS:
+            arr = h.get(f"{key}_{m}") or []
+            for i, v in enumerate(arr[:len(times)]):
+                if vals[i] is None and v is not None:
+                    vals[i] = v
+                    if out["model"][i] is None or key == "pressure_msl":
+                        out["model"][i] = m
+        out[key] = vals
+    return {**point, "hourly": out}
+
+
 def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
     """
     Holt Föhn-relevante Daten von Open-Meteo (MeteoSwiss ICON).
 
     Multi-Point-Abfrage: Nord (Zürich) + Süd (Lugano).
+    Quelle fest (17.10.2026): ICON-D2, nach dessen 48 h ICON-EU — ohne `models`
+    lieferte Open-Meteo dasselbe (nachgemessen), aber ohne Namen fuers Briefing.
+    `hourly["model"]` nennt je Stunde das Modell.
     """
     lats = [FOEHN_STATIONS["nord"]["lat"], FOEHN_STATIONS["sued"]["lat"]]
     lons = [FOEHN_STATIONS["nord"]["lon"], FOEHN_STATIONS["sued"]["lon"]]
@@ -128,6 +153,7 @@ def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
             "wind_speed_700hPa,wind_direction_700hPa,surface_pressure,temperature_2m,"
             "temperature_800hPa"
         ),
+        "models": ",".join(FOEHN_STATION_MODELS),
         "forecast_days": forecast_days,
         "timezone": config.TIMEZONE,
     })
@@ -144,7 +170,7 @@ def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
         if len(data) < 2:
             return None
 
-        return {"nord": data[0], "sued": data[1]}
+        return {"nord": _merge_models(data[0]), "sued": _merge_models(data[1])}
     except Exception as e:
         return None
 
@@ -549,7 +575,7 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str, sektor=None) 
 
     winds, gusts, hours = [], [], []
     all_w, all_g, all_rh = [], [], []
-    dir_dry_hours = 0
+    dir_dry_hours, first_dir_dry = 0, None
     foehn_dirs = []        # Richtungen der Merkmal-Stunden (fuer "Leventina aus W")
     has_data = False
     for i in indices:
@@ -567,6 +593,8 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str, sektor=None) 
         # 26.-28.08.2026 84-85 % der Foehnstunden, weil die Modelle den
         # Foehnwind zu schwach zeigen (Blog wetterkunde/foehn, Abschnitt Prognose)
         if in_dir and dry_weak and (w >= TAL_WIND_WEAK_KMH or g >= TAL_GUST_WEAK_KMH):
+            if not dir_dry_hours:
+                first_dir_dry = i
             dir_dry_hours += 1
             foehn_dirs.append(d)
         if in_dir and (w >= TAL_WIND_MIN_KMH or g >= TAL_GUST_MIN_KMH) and dry:
@@ -577,6 +605,8 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str, sektor=None) 
            "bestaetigt": has_data and len(hours) >= TAL_MIN_HOURS,
            "dir_dry_hours": dir_dry_hours,
            "dir_dry": has_data and dir_dry_hours >= TAL_MIN_HOURS}
+    if out["dir_dry"]:
+        out["first_dir_dry_index"] = first_dir_dry
     if has_data:
         # Hoechstwerte ueber ALLE Flugstunden, jede Richtung — damit das Briefing
         # auch ohne Foehnstunden die Windstaerke im Tal nennen kann (12.10.2026)
@@ -725,6 +755,7 @@ def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
                                            "region": p.get("region", ""), "sides": p.get("sides") or ()})
         r["n"] += 1
         hits = {"sued": 0, "nord": 0}
+        first = {"sued": None, "nord": None}
         for i in idx:
             w, d, g = (_num(h.get("wind_speed_10m"), i), _num(h.get("wind_direction_10m"), i),
                        _num(h.get("wind_gusts_10m"), i))
@@ -733,19 +764,27 @@ def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
             side = _side_of(d)
             if side and (w >= KARTE_WIND_KMH or (g or 0) >= KARTE_GUST_KMH):
                 hits[side] += 1
+                if first[side] is None:
+                    first[side] = int(times[i][11:13])
         for side in hits:
             if hits[side] >= TAL_MIN_HOURS:
                 r[side] += 1
+                r.setdefault("first_" + side, []).append(first[side])
     res = {}
     for side in ("sued", "nord"):
         regs = [r for r in per.values() if side in r["sides"]]
         red = sorted([r for r in regs if r["n"] and r[side] / r["n"] >= KARTE_REGION_SHARE],
                      key=lambda r: -r[side] / r["n"])
-        res[side] = {"n": len(red), "total": len(regs), "regions": [r["region"] for r in red]}
+        # Ab wann: eine Region ist "rot", sobald ein Viertel ihrer Punkte Wind zeigt;
+        # der Indikator, sobald KARTE_MIN_REGIONS Regionen rot sind
+        since = sorted(sorted(r["first_" + side])[math.ceil(KARTE_REGION_SHARE * r["n"]) - 1] for r in red)
+        res[side] = {"n": len(red), "total": len(regs), "regions": [r["region"] for r in red],
+                     "from_hour": since[KARTE_MIN_REGIONS - 1] if len(since) >= KARTE_MIN_REGIONS else None}
     side = "sued" if res["sued"]["n"] >= res["nord"]["n"] else "nord"
     best = res[side]
-    return {"on": best["n"] >= KARTE_MIN_REGIONS, "side": side, "n": best["n"],
-            "total": best["total"], "regions": best["regions"][:3]}
+    on = best["n"] >= KARTE_MIN_REGIONS
+    return {"on": on, "side": side, "n": best["n"], "total": best["total"], "regions": best["regions"][:3],
+            "from_hour": best["from_hour"] if on else None, "model": karte.get("model")}
 
 
 def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
@@ -756,30 +795,44 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
     karte: fetch_wind_karte (eigene Zeitachse). taeler: {"sued": …, "nord": …}
     (synoptic_context.foehn_tal_for_day). Jeder Indikator {"on": bool, …} oder None,
     wenn Daten fehlen (zählt dann nicht; das Briefing zeigt "—")."""
+    times = nord_hourly.get("time") or []
+
+    def _hour(i):
+        return int(times[i][11:13]) if i < len(times) else None
+
+    # Modell der Stationsreihe im Flugfenster (fetch_foehn_data: ICON-D2, dann ICON-EU)
+    mods = nord_hourly.get("model") or []
+    st_model = sorted({mods[i] for i in indices if i < len(mods) and mods[i]},
+                      key=lambda m: FOEHN_STATION_MODELS.index(m) if m in FOEHN_STATION_MODELS else 9)
+
     # 1 Druck: grösster Unterschied in eine Richtung über das Flugfenster
-    dps, dpn = [], []
+    dps, dpn, dp_i = [], [], []
     for i in indices:
         pn, ps = _num(nord_hourly.get("pressure_msl"), i), _num(sued_hourly.get("pressure_msl"), i)
         if pn is not None and ps is not None:
             dps.append(ps - pn)
             dpn.append(pn - ps)
+            dp_i.append(i)
     dp = None
     if dps:
         s_max, n_max = max(dps), max(dpn)
         val = round(max(s_max, n_max), 1)
-        dp = {"on": val >= DP_INDICATOR_HPA, "hpa": val,
-              "high_side": "sued" if s_max >= n_max else "nord"}
+        hs = "sued" if s_max >= n_max else "nord"
+        series = dps if hs == "sued" else dpn
+        dp = {"on": val >= DP_INDICATOR_HPA, "hpa": val, "high_side": hs, "model": st_model,
+              "from_hour": next((_hour(i) for i, v in zip(dp_i, series) if v >= DP_INDICATOR_HPA), None)}
 
     # 2 Windkarte
     wk = evaluate_wind_karte(karte, date)
 
     # 3 Temperatur 800 hPa: Mittel Lugano − Zürich; welche Seite ist kühler?
-    dts = []
+    dts, dt_i = [], []
     for i in indices:
         tn, ts = (_num(nord_hourly.get("temperature_800hPa"), i),
                   _num(sued_hourly.get("temperature_800hPa"), i))
         if tn is not None and ts is not None:
             dts.append(ts - tn)
+            dt_i.append(i)
     dt_mean = sum(dts) / len(dts) if dts else None
     t_side = None if dt_mean is None else ("sued" if dt_mean < 0 else "nord")
     t_on = dt_mean is not None and abs(dt_mean) >= LUV_COOLER_MIN_K
@@ -794,7 +847,8 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
         for e in t.get("taeler") or []:
             if e.get("dir_dry") and s in rows:
                 rows[s].append({"tal": e.get("tal", ""), "side": s,
-                                "gust_kmh": e.get("all_gust_max_kmh") or 0})
+                                "gust_kmh": e.get("all_gust_max_kmh") or 0,
+                                "from_hour": e.get("first_dir_dry_hour")})
 
     # Föhnseite des Tages: Seite mit den meisten erfüllten Zeichen. Zeichen der
     # Gegenseite zählen NICHT mit, sondern stehen als "dagegen" im Text
@@ -824,15 +878,24 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
     if dt_mean is not None:
         cool = round(-dt_mean if side == "sued" else dt_mean, 1)   # > 0: Föhnseite kühler
         tp = {"on": t_on and t_side == side, "against": t_on and t_side != side,
-              "cooler_k": cool, "side": side}
+              "cooler_k": cool, "side": side, "model": st_model, "from_hour": None}
+        if tp["on"]:   # erste Stunde, in der die Föhnseite um die Grenze kühler ist
+            sign = -1 if side == "sued" else 1
+            tp["from_hour"] = next((_hour(i) for i, v in zip(dt_i, dts) if sign * v >= LUV_COOLER_MIN_K), None)
     va = None
     if total:
         mine = sorted(rows[side], key=lambda e: -e["gust_kmh"])
         other = "nord" if side == "sued" else "sued"
+        hours = [e["from_hour"] for e in mine if e.get("from_hour") is not None]
         va = {"on": bool(mine), "n": len(mine), "total": total, "top": mine[0] if mine else None,
-              "against": bool(rows[other]) and not mine, "n_other": len(rows[other])}
+              "against": bool(rows[other]) and not mine, "n_other": len(rows[other]),
+              "from_hour": min(hours) if hours else None,
+              "model": next((t.get("model") for t in (taeler or {}).values() if t and t.get("model")), None)}
 
     ind = {"side": side, "pressure": dp, "wind_map": wk, "luv_cooler": tp, "valleys": va}
     ind["n_on"] = sum(1 for k in ("pressure", "wind_map", "luv_cooler", "valleys")
                       if (ind[k] or {}).get("on"))
+    # Ab wann zeigen die Daten das erste erfüllte Zeichen (wie "Front signs · from ~HH:00")
+    ind["from_hour"] = min((ind[k]["from_hour"] for k in ("pressure", "wind_map", "luv_cooler", "valleys")
+                            if (ind[k] or {}).get("on") and ind[k].get("from_hour") is not None), default=None)
     return ind

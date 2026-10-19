@@ -1111,6 +1111,8 @@ def foehn_tal_for_day(series: Optional[dict], date: str, side: str) -> Optional[
              "region_id": meta.get("region_id"), **r}
         if r.get("bestaetigt"):
             e["first_hour"] = int(times[e.pop("first_index")][11:13])
+        if "first_dir_dry_index" in e:
+            e["first_dir_dry_hour"] = int(times[e.pop("first_dir_dry_index")][11:13])
         taeler.append(e)
     if not taeler:
         return None

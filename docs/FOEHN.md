@@ -148,7 +148,7 @@ Er sagt nie „Föhn“ oder „kein Föhn“.
   „Foehn indicators: x of 4“ (Täler oder ≥ 3 → orange, 1–2 → info, 0 → grau),
   vier Labels (erfüllte orange), darunter ein Deutungstext: Gesamtbild
   (übereinstimmend / nur lokal / Druck ohne Wind), was in den Daten fehlt (mit
-  Grenzen), Faustregel aus dem Blog. Kein Mechanismus, keine Wertungswörter.
+  Grenzen). Kein Mechanismus, keine Wertungswörter, keine Faustregel (17.10.).
 - **Erklärseite** `/foehn` (`templates/foehn.html`), Link „How we count“ — alle
   Zahlen aus den Konstanten.
 - Tests: `tests/test_foehn_indikatoren.py`; `tests/conftest.py` schaltet den
@@ -158,3 +158,26 @@ Er sagt nie „Föhn“ oder „kein Föhn“.
   Schlusssatz ruhiger Tage erklärt („Foehn is still possible: models often miss …“);
   **Föhnseite** = Mehrheit der Zeichen (`ind["side"]`), Zeichen der Gegenseite zählen
   nicht, sondern stehen als „Against it:“ im Text (18.10.: Windkarte Süd, Druck Nord).
+- **17.10.2026 — Modell und Uhrzeit je Zeichen** (wie die Frontzeichen): der Text nennt
+  statt „in the data“ das Modell (Druck/Temperatur **ICON-D2**, nach dessen 48 h
+  **ICON-EU**; Windkarte und Täler **ICON-CH2**) und ab welcher Stunde das Zeichen sich
+  zeigt („from about 14:00“, erste Flugstunde: „already at 06:00“); Pille
+  „Foehn indicators: x of 4 · from ~HH:00“, erfüllte Labels mit „, from ~HH:00“;
+  fehlende Zeichen als „Not in ICON-D2: …; not in ICON-CH2: …“. Ab wann: Druck/Temperatur
+  = erste Stunde über der Grenze, Windkarte = Stunde, ab der die 3. Region rot ist,
+  Täler = früheste `first_dir_dry_hour`. `fetch_foehn_data` fragt dafür ICON-D2/ICON-EU
+  **ausdrücklich** ab (`FOEHN_STATION_MODELS`, `hourly["model"]` je Stunde) — vorher
+  ohne `models`; nachgemessen am 17.10. lieferte Open-Meteo an Tag 1–2 dieselben Werte
+  (ICON-D2), an Tag 3 eine Mischung. Der Faustregel-Satz („from 4 hPa …“) ist entfallen.
+  **Aufbau wie der Fronten-Block:** Satz 1 ist immer der Druckunterschied („In ICON-D2,
+  the pressure difference points to north foehn from about 14:00“ bzw. „does not point to
+  foehn“), wie dort die DWD-Karte. Dann je Modell ein Satz wie „ICON-CH1/ICON-D2 show
+  signs from about …“: „ICON-D2 shows a matching sign from about …: a cooler south side
+  aloft“, „ICON-CH2 shows matching signs from about 11:00: dry wind from the foehn
+  direction in the valleys (strongest Davos) and wind from the foehn direction in the
+  regions (mainly …) around midday“ — die Zeichen beim Namen der Labels, Uhrzeit im
+  Satzkopf, Tageszeit je Zeichen (gleiche zusammengefasst), Föhnrichtung im Satz;
+  „matching“, wenn der Druck auf dieselbe Seite zeigt, sonst „still shows signs of south
+  foehn“; ohne Windzeichen „ICON-CH2 shows none of the signs in the wind.“ Danach
+  „Not in ICON-D2: …“, „Against it: …“. **Zahlen nur in den Labels** (User 17.10.:
+  „zu viele Zahlen im Text“).
