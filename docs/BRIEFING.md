@@ -6,9 +6,11 @@ und die Vorschau-Seite (`scripts/preview_briefing_email.py` →
 `data/preview/briefing_preview.html`). Beide bauen denselben Kontext
 (`scripts/briefing_v3_context.build_v3_context`); die Vorschau ist die
 Design-Referenz, das Mail-Template die mail-sichere Fassung (Tabellen,
-Inline-CSS, Karte als Inline-Bild `cid:synoptik`). Schalter
-`WINGCAST_BRIEFING_VERSION=v2` fällt ohne Deploy auf das alte Layout zurück;
-bricht der v3-Aufbau, geht v2 automatisch raus.
+Inline-CSS, Karte als Inline-Bild `cid:synoptik`). Das alte Layout (v2)
+ist seit 24.10.2026 entfernt, ebenso sein KI-Wochen-Lead (`email_week_lead.md`)
+und die Vorschau `/preview/briefing`. Bricht der Aufbau, geht für das Abo
+nichts raus; der Zeitplaner meldet das per Mail an `OPS_ALERT_EMAIL`
+(`scheduler._melde_fehlversand`).
 
 ## Für den Manager
 

@@ -199,7 +199,6 @@ FLYABILITY = [
 | `foehn_chat_knowledge.md` | Chat | — | — |
 | `foehn_llm_regional_guide.md` | Analyse-Header | — | — |
 | `weekly_briefing.md` | Briefing | — | — |
-| `email_week_lead.md` | Mail | — | — |
 
 **Pipeline-Templates** (`spot_safety.md`, `spot_flyability.md`, `region_safety.md`, `region_flyability.md`) sind seit Mai 2026 nicht mehr auf Top-Level — sie leben als `00_template_<mode>.md` in `skills/shared/03_safety/` bzw. `04_flyability/`. Insert-Marker bleiben `<!-- INSERT_SHARED_SAFETY -->` / `<!-- INSERT_SHARED_FLYABILITY -->`.
 

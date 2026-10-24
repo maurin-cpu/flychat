@@ -597,187 +597,6 @@ def _extract_safety_warnings(days_with_all_my_spots: list) -> list[dict]:
     return result
 
 
-def _week_summary_prose(days_out: list[dict], warnings: list[dict]) -> str:
-    """1-2 Saetze zur Wochen-Gesamtsituation.
-
-    Beispiele:
-      "Mittwoch ist dein Tag der Woche. Freitag meiden wegen Foehn."
-      "Drei starke Tage: Mi, Do, Sa. Sonst bedingt."
-      "Diese Woche bleib am Boden - kein einziger fliegbarer Tag."
-    """
-    strong = [d for d in days_out if d["tier"] in ("violet", "green")]
-    conditional = [d for d in days_out if d["tier"] == "conditional"]
-    none = [d for d in days_out if d["tier"] == "none"]
-
-    if not strong and not conditional:
-        return i18n.t("ws.grounded")
-
-    parts: list[str] = []
-
-    # Satz 1: Top-Tage
-    if not strong:
-        parts.append(i18n.t("ws.no_top"))
-    elif len(strong) == 1:
-        d = strong[0]
-        wd_long = _weekday_long_list()[datetime.fromisoformat(d["date"]).weekday()]
-        parts.append(i18n.t("ws.one_strong", weekday=wd_long))
-    elif len(strong) <= 3:
-        wds = ", ".join(d["label"]["short"] for d in strong)
-        parts.append(i18n.t("ws.few_strong", n=len(strong), days=wds))
-    else:
-        parts.append(i18n.t("ws.many_strong", n=len(strong)))
-
-    # Satz 2: Warnungen oder Schlecht-Tage
-    if warnings:
-        # erste Warnung mit Tagen
-        w = warnings[0]
-        if w.get("days_short"):
-            wds = "/".join(w["days_short"])
-            parts.append(i18n.t("ws.warn_days", label=w["label"], days=wds))
-        else:
-            parts.append(i18n.t("ws.warn_coming", label=w["label"]))
-    elif none:
-        wds = "/".join(d["label"]["short"] for d in none[:2])
-        parts.append(i18n.t("ws.none_days", days=wds))
-
-    return " ".join(parts)
-
-
-_FOEHN_RANK = {"none": 0, "low": 1, "moderate": 2, "high": 3}
-_PHENOMENON_KEYWORDS = [
-    ("Gewitter",        ["gewitter", "thunderstorm", "blitz"]),
-    ("Überentwicklung", ["überentwicklung", "ueberentwicklung", "overdevelopment"]),
-    ("Schauer",         ["schauer", "regen", "niederschlag", "precip"]),
-    ("Sturm",           ["sturm", "orkan", "starker wind", "boeen", "starke boe"]),
-    ("Windscherung",    ["windscherung", "scherung", "shear"]),
-]
-
-
-def _build_week_lead_input(days_out: list[dict]) -> str:
-    """Kompakte, LLM-freundliche Wochenuebersicht aus Subscriber-Regionen.
-
-    Pro Tag eine Zeile:
-      Mo 27.04 [tier]: Foehn=<low|mod|high|—>, Phaenomene=Schauer/Gewitter,
-        Wind: <wind_summary der Top-Region, gekuerzt>
-
-    Gibt leeren String zurueck, wenn keine Regions-Daten verfuegbar sind —
-    dann sollte der Aufrufer auf den deterministischen Fallback gehen.
-    """
-    lines: list[str] = []
-    _tier_de = {
-        "violet": "top",
-        "green": "keine warnhinweise",
-        "conditional": "mit warnhinweisen",
-        "gray": "abgleiter",
-        "none": "nichts",
-    }
-
-    for d in days_out:
-        regions = d.get("_regions_meteo") or []
-        wd_short = d["label"].get("short", "")
-        try:
-            iso = datetime.fromisoformat(d["date"]).strftime("%d.%m.")
-        except Exception:
-            iso = d.get("date", "")
-        tier_de = _tier_de.get(d.get("tier", "none"), d.get("tier", "?"))
-
-        max_foehn = max(
-            (_FOEHN_RANK.get(r.get("foehn_risk", "none"), 0) for r in regions),
-            default=0,
-        )
-        foehn_label = {0: "—", 1: "low", 2: "mod", 3: "high"}[max_foehn]
-
-        haystack = " ".join(
-            (str(r.get("wind_summary", "")) + " " + " ".join(r.get("caution_notes") or []))
-            .lower()
-            for r in regions
-        )
-        phenomena = [
-            label for label, kws in _PHENOMENON_KEYWORDS
-            if any(k in haystack for k in kws)
-        ]
-        phen_str = "/".join(phenomena) if phenomena else "—"
-
-        wind_line = ""
-        for r in regions:
-            ws = (r.get("wind_summary") or "").strip()
-            if ws:
-                wind_line = ws[:140] + ("…" if len(ws) > 140 else "")
-                wind_line = f"{r.get('region_name', '?')}: {wind_line}"
-                break
-
-        line = f"{wd_short} {iso} [{tier_de}]: Foehn={foehn_label}, Phänomene={phen_str}"
-        if wind_line:
-            line += f"\n    Wind: {wind_line}"
-        lines.append(line)
-
-    if not any(d.get("_regions_meteo") for d in days_out):
-        return ""
-
-    return "\n".join(lines)
-
-
-def _week_summary_llm(days_out: list[dict], warnings: list[dict]) -> str:
-    """1-2 Saetze Wochen-Lead, vom LLM generiert.
-
-    Faellt bei jedem Fehler (kein API-Key, Timeout, leerer Output, leerer Input)
-    auf den deterministischen _week_summary_prose zurueck — Briefing-Versand
-    darf nie wegen LLM blockieren.
-    """
-    fallback = _week_summary_prose(days_out, warnings)
-
-    user_input = _build_week_lead_input(days_out)
-    if not user_input:
-        return fallback
-
-    try:
-        import config as _config
-        from llm_client import build_client
-        from prompts import _load_skill  # type: ignore
-    except Exception as e:
-        logger.warning("week_lead LLM: Imports fehlgeschlagen (%s) — Fallback.", e)
-        return fallback
-
-    provider = _config.CHAT_PROVIDER
-    api_key = _config.get_api_key(provider)
-    model = _config.get_model(provider, "chat")
-    if not api_key or not model:
-        return fallback
-
-    try:
-        system_prompt = _load_skill("email_week_lead.md") + i18n.llm_lang_instruction()
-    except Exception as e:
-        logger.warning("week_lead LLM: Skill-Datei fehlt (%s) — Fallback.", e)
-        return fallback
-
-    client = build_client(provider, api_key, timeout=15.0)
-    if client is None:
-        return fallback
-
-    try:
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_input},
-            ],
-            temperature=0.0,
-            max_tokens=120,
-        )
-        text = (resp.choices[0].message.content or "").strip()
-    except Exception as e:
-        logger.warning("week_lead LLM: Aufruf fehlgeschlagen (%s) — Fallback.", e)
-        return fallback
-
-    if not text:
-        return fallback
-
-    text = text.strip().strip('"').strip("'")
-    if len(text) > 300:
-        text = text[:297].rstrip() + "…"
-    return text
-
-
 def _matrix_tier_for_band(band: str, rating_int: int) -> str:
     """Mappt das Region-safety_band auf das Heatmap-Tier-Vokabular.
 
@@ -1063,8 +882,8 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
                            *, top_n_regions_per_day: int = 3,
                            top_n_spots_per_region: int = 3) -> dict:
     """
-    Filtert briefing_data auf Subscriber-Regionen und baut den Template-Kontext
-    fuer templates/email/briefing.html.
+    Filtert briefing_data auf Subscriber-Regionen und baut den Grund-Kontext,
+    auf dem das v3-Briefing aufsetzt (scripts/briefing_v3_context.py).
 
     Args:
       subscriber: {id, email, regions, skill_level, action_token}
@@ -1205,8 +1024,6 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
             # Intern fuer Heatmap-Aggregation: UNFILTERED, damit das Region-x-Tag-Raster
             # immer alle abonnierten Regionen abbildet (auch wenn user 'gray' gefiltert hat).
             "_my_spots_all": my_spots_unfiltered,
-            "_regions_meteo": [r for r in (day.get("regions_meteo") or [])
-                               if r.get("region_id") in subscriber_regions],
             # Region-Level-Verdikt pro Region (Quelle: briefing top_regions =
             # region_analyses). Fuer die Heatmap-Matrix, damit diese dasselbe
             # XC-Verdikt wie die Web-Regionsansicht zeigt — NICHT das Spot-Aggregat.
@@ -1326,19 +1143,6 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
     # Heatmap-Matrix der Subscriber-Regionen
     region_matrix = _build_region_matrix(days_out, subscriber_regions)
 
-    # Lead-Prosa: bevorzugt der neue Wetterlage-Block (kurz-Version), sonst
-    # Fallback auf den deterministisch+LLM-generierten 1-2-Satz Week-Lead.
-    # Der Wetterlage-Block enthaelt grossraeumige Synoptik (Druckeinfluss,
-    # Stroemung, Druckzentren, Niederschlag Nord/Sued), generiert 1x/Tag vom
-    # Scheduler. Wenn Refresh oder LLM-Call gescheitert sind, ist
-    # wetterlage.llm_overview = None → wir nehmen den alten Lead.
-    wetterlage = briefing_data.get("wetterlage") or {}
-    wetterlage_overview = wetterlage.get("llm_overview") if isinstance(wetterlage, dict) else None
-    if wetterlage_overview and wetterlage_overview.get("short"):
-        week_lead = wetterlage_overview["short"]
-    else:
-        week_lead = _week_summary_llm(days_out, warnings)
-
     # Kurzlabels fuer Heatmap-Kopfzeile (Mo/Di/Mi/...)
     day_short_labels = [d["label"].get("short", "") for d in days_out]
 
@@ -1431,7 +1235,6 @@ def build_briefing_context(subscriber: dict, briefing_data: dict,
         "briefing_weekday": _weekday_long_list()[today.weekday()],
         "kw": today.isocalendar().week,
         "region_matrix": region_matrix,
-        "week_lead": week_lead,
         "day_short_labels": day_short_labels,
         "tier_meta": _TIER_META,
     }
@@ -1501,27 +1304,21 @@ def send_briefing_email(subscriber: dict, briefing_data: dict,
                      coverage.get("regions", 0))
         return False
 
-    images, subject_v3 = None, ""
-    use_v3 = config.BRIEFING_VERSION == "v3"
-    if use_v3:
-        try:
-            html, text, subject_v3, images = _render_briefing_v3(ctx, briefing_data, subscriber)
-        except Exception:
-            # v3 braucht das Wetterlage-Strukturfeld; fehlt es oder bricht der
-            # Aufbau, geht das alte Layout raus — nie gar kein Briefing.
-            logger.exception("send_briefing_email: v3 fehlgeschlagen, Rueckfall auf v2 (%s)",
-                             subscriber.get("email"))
-            use_v3 = False
-    if not use_v3:
-        html = render_template("email/briefing.html", **ctx)
-        text = render_template("email/briefing.txt", **ctx)
+    try:
+        html, text, subject_v3, images = _render_briefing_v3(ctx, briefing_data, subscriber)
+    except Exception:
+        # Kein Ersatz-Layout mehr (v2 am 24.10.2026 entfernt): der Zeitplaner
+        # zaehlt das als Fehlversand und meldet es dem Betrieb.
+        logger.exception("send_briefing_email: Aufbau fehlgeschlagen, kein Versand an %s",
+                         subscriber.get("email"))
+        return False
 
     # Betreff dynamisch: wenn bester Tag legendaer -> markant, sonst sachlich
     verdict = ctx.get("verdict")
     today = datetime.now()
     kw = today.isocalendar().week
     kw_pfx = f"Wingcast {i18n.t('email.briefing.week_abbr')}{kw}: "
-    if use_v3 and subject_v3:
+    if subject_v3:
         subject = f"{kw_pfx}{subject_v3}"
     elif verdict and verdict["day"]["tier"] == "violet":
         subject = f"{kw_pfx}{verdict['headline']}"

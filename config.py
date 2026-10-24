@@ -1270,10 +1270,6 @@ META_PIXEL_ID   = os.environ.get("META_PIXEL_ID", "").strip()
 # Kacheln werden wie bisher ohne Key geladen, also mit Wasserzeichen.
 CARTO_API_KEY   = os.environ.get("CARTO_API_KEY", "").strip()
 
-# Morgenbriefing-Mail: "v3" = Analyse-Kette (docs/BRIEFING.md, seit 19.09.2026),
-# "v2" = altes Layout (templates/email/briefing.html). Umschaltbar ohne Deploy
-# ueber WINGCAST_BRIEFING_VERSION, falls v3 im Postfach Probleme macht.
-BRIEFING_VERSION = os.environ.get("WINGCAST_BRIEFING_VERSION", "v3").strip().lower()
 # Wo die laufende App fuer den Karten-Screenshot erreichbar ist (Playwright
 # auf dem Server; scripts/synoptik_snapshot.js). Leer = kein Kartenbild.
 BRIEFING_MAP_URL = os.environ.get("WINGCAST_BRIEFING_MAP_URL",

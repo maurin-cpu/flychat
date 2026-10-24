@@ -37,7 +37,7 @@ from thermik_calculator import compute_daily_thermals
 from source_area import get_all_regions_geojson, get_all_regions
 from subscriber import get_manager_from_env as _get_subscriber_manager
 from feedback import get_manager_from_env as _get_feedback_manager
-from email_service import send_confirm_email, send_welcome_email, build_briefing_context
+from email_service import send_confirm_email, send_welcome_email
 from fetch_weather import get_weather_for_location
 from foehn_indicators import fetch_foehn_data, evaluate_foehn, FOEHN_STATIONS, \
     THRESHOLD_DELTA_P_CAUTION, THRESHOLD_DELTA_P_DANGER, THRESHOLD_HUMIDITY_LOW
@@ -489,49 +489,6 @@ def _status_page(state: str, title: str, message: str = "", submessage: str = ""
         state=state, title=title, message=message, submessage=submessage,
     )
     return html, http_code
-
-
-@app.route("/preview/briefing", methods=["GET"])
-def preview_briefing():
-    """Rendert das Briefing mit Demo-Subscriber (alle Regionen) und aktuellen
-    echten Daten. Ohne Auth — fuer Landing-Page-Sample.
-    """
-    if engine is None:
-        return _status_page(
-            "error", "Vorschau nicht verfuegbar",
-            "Der Wingcast-Service ist gerade nicht geladen.",
-            http_code=503,
-        )
-
-    try:
-        briefing_data = engine.build_briefing_data()
-    except Exception as e:
-        logger.exception("preview_briefing: build_briefing_data failed: %s", e)
-        return _status_page(
-            "error", "Vorschau nicht verfuegbar",
-            "Die Wingcast-Daten konnten gerade nicht geladen werden.",
-            http_code=503,
-        )
-
-    # Demo-Subscriber mit allen Regionen (so sieht man Spots aus der ganzen Schweiz)
-    all_region_ids = [r["id"] for r in get_all_regions()]
-    demo_subscriber = {
-        "id": 0,
-        "email": "vorschau@wingcast.ch",
-        "regions": all_region_ids,
-        "skill_level": "standard",
-        "action_token": "demo",
-    }
-
-    ctx = build_briefing_context(demo_subscriber, briefing_data)
-    # Vorschau-Links neutralisieren, damit niemand versehentlich '/unsubscribe/demo' klickt
-    ctx["urls"]["unsubscribe"] = "#"
-    ctx["urls"]["feedback_correct"] = "#"
-    ctx["urls"]["feedback_wrong"] = "#"
-    ctx["urls"]["account"] = "#"
-    # Dashboard-Link darf bleiben — zeigt auf /briefing mit Filter
-
-    return render_template("email/briefing.html", **ctx)
 
 
 @app.route("/subscribe", methods=["GET"])
@@ -1184,10 +1141,12 @@ def admin_send_test():
         return redirect("/admin/subscribers?err=Engine+noch+nicht+geladen")
     try:
         briefing_data = engine.build_briefing_data()
-        send_briefing_email(sub, briefing_data, async_send=True)
+        ok = send_briefing_email(sub, briefing_data, async_send=True)
     except Exception as e:
         logger.exception("admin_send_test: %s", e)
         return redirect(f"/admin/subscribers?err=Versand-Fehler:+{e}")
+    if not ok:
+        return redirect("/admin/subscribers?err=Briefing+nicht+versendet+(siehe+Log)")
 
     return redirect(f"/admin/subscribers?ok=Test-Briefing+an+{email}+versendet")
 

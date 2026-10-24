@@ -205,21 +205,24 @@ def test_frischer_datenstand_ohne_hinweis():
 # Versand-Sperre
 # ---------------------------------------------------------------------------
 
-def _render(ctx):
-    """Beide Mail-Templates mit blankem Jinja2 rendern (ohne Flask).
+def _render(ctx, bd, abo):
+    """Die Briefing-Mail (v3) mit blankem Jinja2 rendern (ohne Flask).
 
-    Die Templates haengen an nichts ausser `t` — so faellt ein kaputter
-    Zweig hier auf, statt erst im Versand.
+    So faellt ein kaputter Zweig hier auf, statt erst im Versand.
     """
     from pathlib import Path
     from jinja2 import Environment, FileSystemLoader
     import i18n
+    from scripts.briefing_v3_context import build_v3_context
 
+    ctx = build_v3_context(ctx, bd, abo)
+    ctx.setdefault("track", lambda u: u)
+    ctx.setdefault("pixel_url", "")
     root = Path(__file__).resolve().parent.parent / "templates"
     env = Environment(loader=FileSystemLoader(str(root)))
     env.globals["t"] = i18n.t
-    return (env.get_template("email/briefing.html").render(**ctx),
-            env.get_template("email/briefing.txt").render(**ctx))
+    return (env.get_template("email/briefing_v3.html").render(**ctx),
+            env.get_template("email/briefing_v3.txt").render(**ctx))
 
 
 def test_mail_rendert_mit_luecken_und_nennt_sie():
@@ -227,23 +230,25 @@ def test_mail_rendert_mit_luecken_und_nennt_sie():
         ("2026-08-21", [_spot("S1", REGION_A)], [_region(REGION_A)]),
         ("2026-08-22", [], []),
     ])
-    ctx = es.build_briefing_context(_abo([REGION_A, REGION_B]), bd)
-    html, text = _render(ctx)
+    abo = _abo([REGION_A, REGION_B])
+    ctx = es.build_briefing_context(abo, bd)
+    html, text = _render(ctx, bd, abo)
     # Die Luecke steht als solche drin — nicht als "nicht fliegbar".
-    assert "KEINE BEWERTUNG" in text
-    assert "?" in text
+    assert ctx["gap_notice"]
     assert ctx["gap_notice"] in text
     assert ctx["gap_notice"] in html
+    assert REGION_B in text
 
 
 def test_mail_rendert_unveraendert_wenn_alles_da():
     bd = _briefing([
         ("2026-08-21", [_spot("S1", REGION_A)], [_region(REGION_A)]),
     ])
-    ctx = es.build_briefing_context(_abo([REGION_A]), bd)
-    html, text = _render(ctx)
-    assert "KEINE BEWERTUNG" not in text
-    assert "S1" in text and "S1" in html
+    abo = _abo([REGION_A])
+    ctx = es.build_briefing_context(abo, bd)
+    html, text = _render(ctx, bd, abo)
+    assert ctx["gap_notice"] == ""
+    assert REGION_A in text and REGION_A in html
 
 
 def test_kein_versand_ohne_jede_bewertung(monkeypatch):
@@ -253,6 +258,22 @@ def test_kein_versand_ohne_jede_bewertung(monkeypatch):
     monkeypatch.setattr(es, "send_email_async",
                         lambda *a, **k: gesendet.append(a))
     bd = _briefing([("2026-08-21", [], [])])
+    ok = es.send_briefing_email(_abo([REGION_A]), bd, async_send=False)
+    assert ok is False
+    assert gesendet == []
+
+
+def test_kein_ersatz_layout_wenn_aufbau_scheitert(monkeypatch):
+    """Seit v2 entfernt ist (24.10.2026), geht bei einem Fehler im Aufbau
+    nichts raus — der Zeitplaner zaehlt es als Fehlversand und meldet es."""
+    gesendet = []
+    monkeypatch.setattr(es, "send_email",
+                        lambda *a, **k: gesendet.append(a) or True)
+
+    def kaputt(*a, **k):
+        raise RuntimeError("Aufbau kaputt")
+    monkeypatch.setattr(es, "_render_briefing_v3", kaputt)
+    bd = _briefing([("2026-08-21", [_spot("S1", REGION_A)], [_region(REGION_A)])])
     ok = es.send_briefing_email(_abo([REGION_A]), bd, async_send=False)
     assert ok is False
     assert gesendet == []

@@ -304,27 +304,6 @@ STRINGS: dict[str, dict[str, str]] = {
                                "en": "Permanently delete your account? All data will be removed from the database. This cannot be undone."},
     "account.delete_btn": {"de": "Account endgültig löschen", "en": "Delete account permanently"},
 
-    # ======================= subscribe.html =======================
-    "subscribe.title": {"de": "Wingcast abonnieren", "en": "Subscribe to Wingcast"},
-    "subscribe.eyebrow": {"de": "E-Mail-Wingcast", "en": "Email Wingcast"},
-    "subscribe.heading": {"de": "Dein Flugwetter in 3 E-Mails pro Woche",
-                          "en": "Your flight weather in 3 emails a week"},
-    "subscribe.lead": {"de": "Schluss mit 5 Apps checken. Montag, Mittwoch, Freitag — du weisst wann, wo und warum.",
-                       "en": "No more checking 5 apps. Monday, Wednesday, Friday — you know when, where and why."},
-    "subscribe.proof_aria": {"de": "Produkt-Kennzahlen", "en": "Product metrics"},
-    "subscribe.proof_sites": {"de": "488 Startplätze", "en": "488 launch sites"},
-    "subscribe.proof_models": {"de": "5 Wettermodelle", "en": "5 weather models"},
-    "subscribe.proof_free": {"de": "Gratis im MVP", "en": "Free during MVP"},
-    "subscribe.preview_link": {"de": "So sieht der Wingcast aus", "en": "See what the Wingcast looks like"},
-    "subscribe.email_label": {"de": "Deine E-Mail-Adresse", "en": "Your email address"},
-    "subscribe.email_placeholder": {"de": "pilot@example.ch", "en": "pilot@example.com"},
-    "subscribe.regions_legend": {"de": "Deine Regionen", "en": "Your regions"},
-    "subscribe.regions_hint": {"de": "Wähle die Regionen, für die du den Wingcast erhalten willst. Mehrfachauswahl möglich — per Chip oder direkt auf der Karte.",
-                               "en": "Choose the regions you want the Wingcast for. Multiple selection possible — via chip or directly on the map."},
-    "subscribe.submit": {"de": "Kostenlos abonnieren", "en": "Subscribe for free"},
-    "subscribe.foot_html": {"de": "Mit dem Abonnieren erhältst du eine Bestätigungs-E-Mail.<br>Du kannst dich jederzeit mit einem Klick abmelden.",
-                            "en": "On subscribing you'll receive a confirmation email.<br>You can unsubscribe any time with one click."},
-
     # ======================= synoptik.html =======================
     "synoptik.title": {"de": "Synoptik – Wingcast", "en": "Synoptic – Wingcast"},
     "synoptik.heading": {"de": "Synoptische Analyse", "en": "Synoptic analysis"},
@@ -582,18 +561,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "email.briefing.hls_cond": {"de": "Fliegbar mit Warnhinweisen", "en": "Flyable with alerts"},
     "email.briefing.hls_violet_base": {"de": "{base} — Top", "en": "{base} — top"},
     "email.briefing.hls_cond_base": {"de": "{base} — mit Warnhinweisen", "en": "{base} — with alerts"},
-
-    # ======================= Wochen-Zusammenfassung (week_lead-Fallback) =======================
-    "ws.grounded": {"de": "Diese Woche ist in deinen Regionen kein Tag gelistet.",
-                    "en": "No day is listed in your regions this week."},
-    "ws.no_top": {"de": "Keine Top-Bedingungen, fliegbar mit Warnhinweisen.",
-                  "en": "No top conditions, flyable with alerts."},
-    "ws.one_strong": {"de": "{weekday} ist dein Tag der Woche.", "en": "{weekday} is your day of the week."},
-    "ws.few_strong": {"de": "{n} starke Tage: {days}.", "en": "{n} strong days: {days}."},
-    "ws.many_strong": {"de": "{n} starke Tage diese Woche.", "en": "{n} strong days this week."},
-    "ws.warn_days": {"de": "{label} an {days} — meiden.", "en": "{label} on {days} — avoid."},
-    "ws.warn_coming": {"de": "{label} aufziehend — meiden.", "en": "{label} building — avoid."},
-    "ws.none_days": {"de": "{days} nichts fliegbar.", "en": "{days} nothing flyable."},
 
     # Phaenomen-/Safety-Labels (DE exakt wie _SAFETY_KEYWORDS in email_service.py)
     "phenom.thunderstorm": {"de": "Gewitter", "en": "Thunderstorm"},

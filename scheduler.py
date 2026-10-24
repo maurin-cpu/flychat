@@ -207,6 +207,33 @@ def _melde_datenluecke(ohne_daten: list, luecken: list, days_count: int,
         logger.exception("Scheduler: Datenluecken-Meldung fehlgeschlagen: %s", e)
 
 
+def _melde_fehlversand(fehlversand: list, total: int) -> None:
+    """Meldet dem Betrieb Briefings, die trotz Daten nicht rausgingen.
+
+    Seit das alte Layout als Ersatz weg ist (24.10.2026), bekommt der Kunde
+    bei einem Fehler im Aufbau nichts — das muss hier auffallen.
+    """
+    if not fehlversand:
+        return
+    try:
+        erlaubt, grund = config.ops_produktion()
+        if not erlaubt:
+            logger.info("Scheduler: Fehlversand-Meldung unterdrueckt — %s", grund)
+            return
+        import email_service
+        zeilen = [f"Nicht versendet: {len(fehlversand)} von {total} Abos", ""]
+        zeilen += [f"  {e}" for e in fehlversand]
+        zeilen += ["", "Ursache im Log des Morgenlaufs: [BRIEF] FAIL / EXCEPTION.",
+                   f"Geprueft: {datetime.now().isoformat(timespec='seconds')}"]
+        text = "\n".join(zeilen)
+        betreff = f"[Wingcast] Briefing-Versand: {len(fehlversand)} nicht versendet"
+        html = "<pre>" + text.replace("<", "&lt;").replace(">", "&gt;") + "</pre>"
+        email_service.send_email(config.OPS_ALERT_EMAIL, betreff, html, text)
+        logger.info("Scheduler: Fehlversand-Meldung an %s raus", config.OPS_ALERT_EMAIL)
+    except Exception as e:
+        logger.exception("Scheduler: Fehlversand-Meldung fehlgeschlagen: %s", e)
+
+
 def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
     """Baut briefing_data einmal, loopt ueber aktive Subscriber.
     Returns: {'total': N, 'sent': n_sent, 'skipped': n_skipped, 'failed': n_failed}
@@ -327,6 +354,7 @@ def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
     failed = 0
     ohne_daten: list = []   # (email, coverage) — kein Versand
     mit_luecken: list = []  # (email, coverage) — versendet, aber unvollstaendig
+    fehlversand: list = []  # Adressen, deren Briefing nicht rausging
     for sub in subscribers:
         email = sub.get("email")
 
@@ -382,10 +410,12 @@ def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
                     logger.exception("[BRIEF] PostHog briefing_sent uebersprungen")
             else:
                 failed += 1
+                fehlversand.append(email)
                 logger.error("[BRIEF] -> %s (#%s) FAIL (send_email returned False)",
                              email, sub["id"])
         except Exception as e:
             failed += 1
+            fehlversand.append(email)
             logger.exception("[BRIEF] -> %s (#%s) EXCEPTION: %s", email, sub["id"], e)
 
     logger.info("Scheduler: fertig. sent=%d skipped=%d failed=%d / %d "
@@ -393,6 +423,7 @@ def _send_briefings_once(engine, nur_ohne_mail_heute: bool = False) -> dict:
                 sent, skipped, failed, total, len(ohne_daten), len(mit_luecken))
     _melde_datenluecke(ohne_daten, mit_luecken, days_count,
                        _abbruch_hinweis(engine))
+    _melde_fehlversand(fehlversand, total)
     return {"total": total, "sent": sent, "skipped": skipped, "failed": failed,
             "ohne_daten": len(ohne_daten), "mit_luecken": len(mit_luecken)}
 
