@@ -808,11 +808,11 @@ _L3 = {
         "fi_k_dp":       "Druckdiff.",
         "fi_v_dp":       "{dp} hPa ({side} höher)",
         "fi_hi_sued":    "Süden", "fi_hi_nord": "Norden",
-        "fi_k_map":      "Regionen mit Wind ≥{mw} oder Böen ≥{mg} km/h aus Föhnrichtung",
+        "fi_k_map":      "Wind in Regionen",
         "fi_v_map":      "{n} von {t}",
         "fi_k_luv_sued": "Südseite Höhe", "fi_k_luv_nord": "Nordseite Höhe",
         "fi_v_cooler":   "{k} °C kühler", "fi_v_warmer": "{k} °C wärmer", "fi_v_equal": "gleich warm",
-        "fi_k_val":      "Täler mit trockenem Wind aus Föhnrichtung",
+        "fi_k_val":      "Trockener Talwind",
         "fi_v_val":      "{n} von {t}",
         "fi_tal_multi":  "{n} von {t} Föhntälern zeigen trockenen Wind aus Föhnrichtung, am stärksten {name} (Böen bis {g} km/h)",
         "fi_tal_one":    "{name} zeigt trockenen Wind aus Föhnrichtung (Böen bis {g} km/h)",
@@ -861,7 +861,6 @@ _L3 = {
         "fd_r_none":     " Föhn bleibt trotzdem möglich: Modelle übersehen oft Föhn, der nur flach über die Pässe kommt oder auf einzelne Täler beschränkt ist. Am Flugtag die Live-Werte an Tal- und Gipfelstationen prüfen.",
         "fd_ab":         " ab etwa {t}", "fd_ab_start": " bereits um {t}",
         "fd_model_x":    "den Daten",
-        "fi_from":       ", ab ~{t}",
         # Fronten-Block nach Zeichen (17.10.2026): DWD-Karte ohne Uhrzeit, dann die
         # Modellzeichen mit Tageszeit; jedes Label kommt im Text vor
         "fz_pill":        "Frontzeichen: {n} von 4", "fz_pill_from": " · ab ~{t}",
@@ -1307,11 +1306,11 @@ _L3 = {
         "fi_k_dp":       "Pressure diff.",
         "fi_v_dp":       "{dp} hPa ({side} higher)",
         "fi_hi_sued":    "south", "fi_hi_nord": "north",
-        "fi_k_map":      "Regions with wind ≥{mw} or gusts ≥{mg} km/h from foehn direction",
+        "fi_k_map":      "Wind in regions",
         "fi_v_map":      "{n} of {t}",
         "fi_k_luv_sued": "South side aloft", "fi_k_luv_nord": "North side aloft",
         "fi_v_cooler":   "{k} °C cooler", "fi_v_warmer": "{k} °C warmer", "fi_v_equal": "equally warm",
-        "fi_k_val":      "Valleys with dry wind from foehn direction",
+        "fi_k_val":      "Dry valley wind",
         "fi_v_val":      "{n} of {t}",
         "fi_tal_multi":  "{n} of {t} foehn valleys show dry wind from the foehn direction, strongest {name} (gusts up to {g} km/h)",
         "fi_tal_one":    "{name} shows dry wind from the foehn direction (gusts up to {g} km/h)",
@@ -1358,7 +1357,6 @@ _L3 = {
         "fd_r_none":     " Foehn is still possible: models often miss foehn that only spills shallowly over the passes or stays in single valleys. On the day, check live readings at valley and summit stations.",
         "fd_ab":         " from about {t}", "fd_ab_start": " already at {t}",
         "fd_model_x":    "the data",
-        "fi_from":       ", from ~{t}",
         "fz_pill":        "Front signs: {n} of 4", "fz_pill_from": " · from ~{t}",
         "fz_k_dwd":       "DWD map", "fz_k_kaelter": "Colder at 1500 m", "fz_k_waermer": "Warmer at 1500 m",
         "fz_k_luft":      "Air mass change at 1500 m", "fz_k_dreh": "Wind shift aloft",
@@ -3343,7 +3341,6 @@ def _fi_against(ind: dict, luv: str) -> str:
 def _foehn_indicator_status(ind: dict):
     """Pille + vier Labels (on = Indikator erfuellt). Taeler oder >= 3 Indikatoren:
     warn; 1-2 ohne Taeler: info; 0: neutral (nie gruen = keine Entwarnung)."""
-    import foehn_indicators as fi
     n = ind.get("n_on", 0)
     va = ind.get("valleys") or {}
     kind = "warn" if (va.get("on") or n >= 3) else "info" if n else "neutral"
@@ -3351,7 +3348,7 @@ def _foehn_indicator_status(ind: dict):
     facts = [{"k": _lbl("fi_k_dp"), "on": bool(dp and dp["on"]),
               "v": (_lbl("fi_v_dp").format(dp=f"{dp['hpa']:.0f}", side=_lbl("fi_hi_" + dp["high_side"]))
                     if dp else "—")},
-             {"k": _lbl("fi_k_map").format(mw=fi.KARTE_WIND_KMH, mg=fi.KARTE_GUST_KMH), "on": bool(wk and wk["on"]),
+             {"k": _lbl("fi_k_map"), "on": bool(wk and wk["on"]),
               "v": (_lbl("fi_v_map").format(n=wk.get("n", 0), t=wk.get("total", 0)) if wk else "—")}]
     if tp:
         k = tp["cooler_k"]
@@ -3362,10 +3359,8 @@ def _foehn_indicator_status(ind: dict):
         facts.append({"k": _lbl("fi_k_luv_sued"), "v": "—", "on": False})
     facts.append({"k": _lbl("fi_k_val"), "on": bool(va.get("on")),
                   "v": (_lbl("fi_v_val").format(n=va.get("n", 0), t=va.get("total", 0)) if va else "—")})
-    # Ab wann (wie die Frontzeichen, 17.10.2026): je erfuelltes Zeichen und in der Pille
-    for f, x in zip(facts, (dp, wk, tp, va)):
-        if f["on"] and (x or {}).get("from_hour") is not None:
-            f["v"] += _lbl("fi_from").format(t=_fz_time(x["from_hour"]))
+    # Kurze Labels ohne Uhrzeit (User 24.10.2026): die Uhrzeiten stehen im Text,
+    # die Grenzen auf der Erklaerseite /foehn; nur die Pille nennt das frueheste Zeichen
     pill = _lbl("fi_pill").format(n=n)
     if n and ind.get("from_hour") is not None:
         pill += _lbl("fz_pill_from").format(t=_fz_time(ind["from_hour"]))

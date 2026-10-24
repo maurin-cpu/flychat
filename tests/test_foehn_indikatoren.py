@@ -244,15 +244,15 @@ class BriefingTextTest(unittest.TestCase):
     def test_labels_marked_and_same_numbers_as_text(self):
         (kind, pill, facts), txt = self._both(self._ind(val=3))["en"]
         self.assertEqual([f["on"] for f in facts], [True, True, True, True])
-        self.assertEqual(facts[0]["v"], "7 hPa (south higher), from ~06:00")
+        self.assertEqual(facts[0]["v"], "7 hPa (south higher)")   # Uhrzeit nur im Text
         self.assertEqual(facts[3]["v"], "3 of 23")
-        self.assertEqual(facts[3]["k"], "Valleys with dry wind from foehn direction")
+        self.assertEqual(facts[3]["k"], "Dry valley wind")
 
     def test_later_signs_get_their_own_time(self):
         r = self._both(self._ind(red=("r0", "r1", "r2"), val=2, t=(0.0, -0.5), from_h=11, val_h=13))
         (kind, pill, facts), txt = r["en"]
         self.assertEqual(pill, "Foehn indicators: 3 of 4 · from ~11:00")
-        self.assertEqual(facts[1]["v"], "3 of 6, from ~11:00")
+        self.assertEqual(facts[1], {"k": "Wind in regions", "v": "3 of 6", "on": True})
         self.assertEqual(txt, "In ICON-CH1/ICON-D2, the pressure difference points to south foehn from about 11:00. "
                               "The data also show signs of it: wind from the foehn direction in the regions (mainly "
                               "Region 0 and Region 1), from about 13:00 dry wind from the foehn direction in the "
