@@ -987,8 +987,67 @@ def login_consume(token):
     logger.info("login_consume: OK sub_id=%s email=%s first=%s host=%s",
                 res["id"], res["email"], bool(res.get("is_first_login")),
                 request.host)
-    # Nach erfolgreichem Magic-Link-Login direkt auf die Konto-Seite leiten
+    # Noch nie ueber das Briefing entschieden (keine Region, nicht abgelehnt):
+    # zuerst die eine Frage auf /willkommen. Sonst direkt auf die Konto-Seite.
+    sub = mgr.get_session_user(res["id"])
+    if _needs_briefing_choice(sub):
+        return redirect("/willkommen")
     return redirect("/account")
+
+
+def _needs_briefing_choice(sub: Optional[dict]) -> bool:
+    """True, solange ein aktives Konto keine Region hat und das Briefing nicht
+    bewusst abgelehnt hat. Bis 10/2026 war die Regionswahl ein freiwilliger
+    Abschnitt der Konto-Seite; 15 von 32 aktiven Konten bekamen deshalb nie
+    ein Briefing, ohne es gewaehlt oder abgelehnt zu haben."""
+    if not sub:
+        return False
+    return (sub.get("status") == "active"
+            and not sub.get("regions")
+            and not sub.get("briefing_declined_at"))
+
+
+@app.route("/willkommen", methods=["GET"])
+def welcome_page():
+    """Eine Frage nach dem ersten Login: Briefing fuer welche Region?"""
+    sub_id = session.get("sub_id")
+    mgr = _get_subscriber_manager()
+    sub = mgr.get_session_user(sub_id) if (sub_id and mgr) else None
+    if sub is None:
+        return redirect("/login")
+    if not _needs_briefing_choice(sub):
+        return redirect("/account")
+    return render_template(
+        "willkommen.html",
+        regions=_regions_for_form(),
+        prefill_regions=[],
+        flash_error=request.args.get("err", ""),
+    )
+
+
+@app.route("/willkommen", methods=["POST"])
+def welcome_submit():
+    sub_id = session.get("sub_id")
+    mgr = _get_subscriber_manager()
+    sub = mgr.get_session_user(sub_id) if (sub_id and mgr) else None
+    if sub is None:
+        return redirect("/login")
+
+    if request.form.get("choice") == "skip":
+        mgr.record_briefing_decline(sub["id"])
+        logger.info("welcome: briefing declined sub_id=%s", sub["id"])
+        return redirect("/")
+
+    regions = request.form.getlist("regions")
+    if not regions:
+        return redirect(f"/willkommen?err={_fm('flash.need_region')}")
+    # Nur die Regionen setzen. Versandtage und Spot-Auswahl behalten die
+    # DB-Defaults (alle Tage, violet+green+conditional) und sind auf der
+    # Konto-Seite einstellbar.
+    if not mgr.update_preferences(sub["action_token"], regions=regions):
+        return redirect(f"/willkommen?err={_fm('flash.save_failed')}")
+    logger.info("welcome: briefing started sub_id=%s regions=%d", sub["id"], len(regions))
+    return redirect(f"/account/{sub['action_token']}?ok={_fm('flash.briefing_started')}")
 
 
 @app.route("/logout", methods=["GET", "POST"])

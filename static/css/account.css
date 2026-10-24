@@ -515,3 +515,11 @@
 @media (max-width: 480px) {
     .sp-actions--two-col { grid-template-columns: 1fr; }
 }
+
+/* ── /willkommen: eine Frage nach dem ersten Login ───────────── */
+.wc-skip-btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 14px;
+}
+.wc-foot { text-align: center; }

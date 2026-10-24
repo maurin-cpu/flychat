@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('welcome.title') }}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subscribe.css') }}?v={{ static_v('css/subscribe.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/account.css') }}?v={{ static_v('css/account.css') }}">
+{% endblock %}
+
+{% block content %}
+{# Eine Frage nach dem ersten Login (web.py: welcome_page). Bewusst nur die
+   Regionen: Versandtage und Spot-Auswahl bleiben auf den DB-Defaults und sind
+   auf der Konto-Seite einstellbar. #}
+<main class="sp">
+
+  <header class="sp-header">
+    <div class="sp-hero__eyebrow">{{ t('welcome.eyebrow') }}</div>
+    <h1 class="sp-logo">{{ t('welcome.heading') }}</h1>
+    <p class="sp-subtitle">{{ t('welcome.lead') }}</p>
+  </header>
+
+  {% if flash_error %}
+    <div class="sp-flash sp-flash--error" role="alert">{{ flash_error }}</div>
+  {% endif %}
+
+  <form class="sp-form" method="post" action="/willkommen" novalidate>
+
+    <section class="sp-card" role="group" aria-labelledby="wcRegionsLabel">
+      <div class="sp-card__label" id="wcRegionsLabel">{{ t('nav.regions') }}</div>
+      <div class="sp-card__hint">{{ t('welcome.regions_hint') }}</div>
+
+      <div class="sp-filters" id="spRegionFilters"
+           data-regions='{{ regions|tojson }}'
+           data-prefill='{{ prefill_regions|tojson }}'>
+        <div class="sp-filter-row">
+          <div class="sp-filter-chips" id="spFilterChips" role="group" aria-label="{{ t('nav.regions') }}"></div>
+          <button type="button" class="sp-filter-reset" id="spFilterReset" title="{{ t('account.regions_all_title') }}">{{ t('account.regions_all') }}</button>
+          <button type="button" class="sp-filter-map-btn" id="spMapToggle" title="{{ t('account.map_toggle') }}" aria-label="{{ t('account.map_toggle') }}">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 3.5l4.5-2 5 2.5 4.5-2v11l-4.5 2-5-2.5-4.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 1.5v11M10.5 4v11" stroke="currentColor" stroke-width="1.3"/></svg>
+          </button>
+        </div>
+        <div class="sp-filter-map" id="spFilterMap"></div>
+        <div class="sp-filter-hidden" id="spRegionInputs" aria-hidden="true"></div>
+      </div>
+
+      <noscript>
+        <div class="sp-checkbox-grid" role="group" aria-label="{{ t('nav.regions') }}">
+          {% for region in regions %}
+          <label class="sp-checkbox-item">
+            <input type="checkbox" name="regions" value="{{ region.id }}">
+            <span>{{ region.region }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </noscript>
+    </section>
+
+    <button type="submit" name="choice" value="start" class="sp-btn sp-btn--primary ac-save-btn">
+      {{ t('welcome.start') }}
+    </button>
+    <button type="submit" name="choice" value="skip" class="sp-btn sp-btn--ghost wc-skip-btn">
+      {{ t('welcome.skip') }}
+    </button>
+    <p class="sp-card__hint wc-foot">{{ t('welcome.foot') }}</p>
+  </form>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/subscribe.js') }}?v={{ static_v('js/subscribe.js') }}"></script>
+{% endblock %}

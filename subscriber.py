@@ -258,6 +258,11 @@ class SubscriberManager:
             # einem Nutzer zuordenbar. Version = i18n-Fassung des Textes.
             self._migrate_add_column(conn, "subscribers", "disclaimer_accepted_at", "TEXT")
             self._migrate_add_column(conn, "subscribers", "disclaimer_version", "TEXT")
+            # Nach dem Login gefragt "Briefing fuer welche Region?" und bewusst
+            # "Ohne Briefing weiter" gewaehlt. NULL = noch nie entschieden (oder
+            # Regionen gewaehlt). Verhindert, dass /willkommen bei jedem Login
+            # erneut erscheint.
+            self._migrate_add_column(conn, "subscribers", "briefing_declined_at", "TEXT")
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS email_events (
                     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -880,6 +885,25 @@ class SubscriberManager:
             logger.error("record_disclaimer_accept failed: %s", e)
             return False
 
+    def record_briefing_decline(self, subscriber_id: int) -> bool:
+        """'Ohne Briefing weiter' auf /willkommen festhalten. Erster Zeitpunkt
+        zaehlt; wer spaeter Regionen waehlt, bekommt das Briefing trotzdem
+        (der Versand schaut nur auf regions/status)."""
+        try:
+            with self._cursor(write=True) as cur:
+                cur.execute(
+                    """
+                    UPDATE subscribers
+                       SET briefing_declined_at = COALESCE(briefing_declined_at, datetime('now'))
+                     WHERE id = ?
+                    """,
+                    (int(subscriber_id),),
+                )
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.error("record_briefing_decline failed: %s", e)
+            return False
+
     def count_feedback_overall(self, days: int = 30) -> dict:
         try:
             with self._cursor() as cur:
@@ -1278,7 +1302,8 @@ class SubscriberManager:
                     """
                     SELECT id, email, regions, skill_level, status, action_token,
                            active_weekdays, min_tier_set, min_rating,
-                           disclaimer_accepted_at, disclaimer_version
+                           disclaimer_accepted_at, disclaimer_version,
+                           briefing_declined_at
                       FROM subscribers
                      WHERE id = ?
                        AND status IN ('active', 'paused', 'unsubscribed')
@@ -1290,7 +1315,8 @@ class SubscriberManager:
                     row,
                     ("id", "email", "regions", "skill_level", "status", "action_token",
                      "active_weekdays", "min_tier_set", "min_rating",
-                     "disclaimer_accepted_at", "disclaimer_version"),
+                     "disclaimer_accepted_at", "disclaimer_version",
+                     "briefing_declined_at"),
                 )
         except Exception as e:
             logger.error("get_session_user(%s) failed: %s", sub_id, e)
