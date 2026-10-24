@@ -454,6 +454,8 @@ def build_foehn_tal_block(series: Optional[Dict], day: str) -> Optional[Dict]:
                                     sektor=sektor_fuer(pid, meta))
         if "first_index" in verdict:
             verdict["first_hour"] = int(times[verdict.pop("first_index")][11:13])
+        if "first_dir_dry_index" in verdict:
+            verdict["first_dir_dry_hour"] = int(times[verdict.pop("first_dir_dry_index")][11:13])
         punkte[pid] = {
             "meta": meta,
             "verdict": verdict,
@@ -463,8 +465,12 @@ def build_foehn_tal_block(series: Optional[Dict], day: str) -> Optional[Dict]:
                                         "rh": _v("relative_humidity_2m", i),
                                         "t2m": _v("temperature_2m", i)} for i in idx},
         }
+    model = series.get("model")
+    if isinstance(model, list):   # seit 24.10.2026 je Stunde (ICON-CH1, dann ICON-CH2)
+        from foehn_indicators import models_in
+        model = models_in(model, idx)
     return {
-        "model": series.get("model"),
+        "model": model,
         "thresholds": {"wind_min_kmh": TAL_WIND_MIN_KMH, "gust_min_kmh": TAL_GUST_MIN_KMH,
                        "rh_max": TAL_RH_MAX, "min_hours": TAL_MIN_HOURS,
                        "sektor": {k: list(v) for k, v in TAL_SEKTOR.items()}},

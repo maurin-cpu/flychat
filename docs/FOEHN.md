@@ -102,7 +102,7 @@ Ergänzung, kein Ersatz: Warnstufe, `foehn_risk`, Safety-Status und die orange
 Pille kommen weiterhin allein aus Δp/Kammwind. Neu sagt das Briefing, ob der
 Föhn am Talboden ankommt.
 
-- **Daten:** `foehn_talpunkte.fetch_talpunkt_wind` (ICON-CH2, ein Call) im
+- **Daten:** `foehn_talpunkte.fetch_talpunkt_wind` (ICON-CH1, danach ICON-CH2 — seit 24.10.; ein Call) im
   Wetterlauf → `wetterdaten._meta.foehn_tal_series`; eingefroren als Snapshot-Block
   `foehn_tal` (Urteil + Rohstunden).
 - **Regel** (`foehn_indicators.evaluate_talpunkt`, Konstanten `TAL_*`):
@@ -129,7 +129,7 @@ Er sagt nie „Föhn“ oder „kein Föhn“.
 
 - **Indikatoren** (`foehn_indicators.evaluate_indicators`, eine Quelle für Labels und Text):
   1. Druck Lugano−Zürich ab `DP_INDICATOR_HPA` (4 hPa), grösster Wert im Flugfenster.
-  2. **Windkarte** (`evaluate_wind_karte`): Raster aus ICON-CH2-Punkten (~8 km,
+  2. **Windkarte** (`evaluate_wind_karte`): Raster aus ICON-CH1/CH2-Punkten (~8 km,
      `karte_punkte`) über die 20 Alpenregionen (Mittelland/Jura ausgenommen).
      Punkt rot ab 2 h Mittelwind ≥ 30 oder Böe ≥ 50 km/h aus S (135–225°) bzw.
      N (315–45°); Region zählt ab 25 % roter Punkte, nur für ihre Föhnrichtung
@@ -181,3 +181,24 @@ Er sagt nie „Föhn“ oder „kein Föhn“.
   foehn“; ohne Windzeichen „ICON-CH2 shows none of the signs in the wind.“ Danach
   „Not in ICON-D2: …“, „Against it: …“. **Zahlen nur in den Labels** (User 17.10.:
   „zu viele Zahlen im Text“).
+- **24.10.2026 — Modelle wie die Spot-Daten und die Fronten:** Bodenwerte (Druck
+  Lugano–Zürich, Windkarte, Täler) aus **ICON-CH1**, nach dessen ~33 h **ICON-CH2**
+  (`FOEHN_SURFACE_MODELS`); die Höhentemperatur (800 hPa) aus **ICON-D2**, danach
+  ICON-EU (`FOEHN_PL_MODELS`) — ICON-CH liefert bei Open-Meteo keine Höhenwerte
+  (nachgemessen 24.10.). `_merge_models` wählt je Grösse und Stunde das Modell,
+  `hourly["model"]`/`["model_pl"]` bzw. `karte["model"]`/`series["model"]` nennen es
+  je Stunde. Der Text nennt die Modelle **zusammen** wie die Fronten („In
+  ICON-CH1/ICON-D2, the pressure difference points to … ICON-CH1/ICON-D2 show matching
+  signs from about …: … Not in ICON-CH1/ICON-D2: …“), Tageszeit-Gruppen mit „;“.
+  Gemessen Juli–23.10. (115 Tage): Druck CH1 vs. D2 Median +0.2 hPa, 4-hPa-Zeichen an 58
+  statt 52 Tagen (die 6 Mehr-Tage 4.1–4.3 hPa), Seite an 1 Tag verschieden; Täler CH1 vs.
+  CH2 392 vs. 396 Tal-Treffer, Indikator an 92 vs. 91 Tagen. Gilt auch für die
+  Regions-/Spot-Analyse, die `fetch_foehn_data` mitnutzt (eine Zahl, eine Quelle).
+  **Zuerst der Druck, dann die Daten** (User 24.10., wie DWD-Karte → Modellzeichen bei
+  den Fronten): „In ICON-CH1/ICON-D2, the pressure difference points to north foehn
+  already at 06:00. The data also show signs of it: a cooler north side aloft, from about
+  07:00 dry wind from the foehn direction in the valleys (strongest Misox), from about
+  09:00 wind from the foehn direction in the regions (mainly …).“ Modell einmal, Uhrzeit
+  nur, wenn ein Zeichen später kommt. Ohne Druck: „… does not point to foehn. Still, the
+  data show signs of south foehn …“; Druck zur Gegenseite: „The data, however, show signs
+  of south foehn …“; dann „Not in the data: …“.

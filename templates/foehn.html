@@ -22,16 +22,16 @@
   <p>Der Föhn-Block im Briefing zählt, wie viele von vier Föhnzeichen die Prognosedaten zeigen. Er beschreibt Modelldaten. Er ist keine Föhnprognose und keine Flugempfehlung. Die vier Zeichen stammen aus der Föhn-Planung, wie sie unser <a href="{{ blog_url }}">Wetterkunde-Artikel zum Föhn</a> beschreibt. Gezählt wird im Flugfenster {{ n.h0 }}–{{ n.h1 }} Uhr. Zu jedem Zeichen steht im Briefing, aus welchem Modell es stammt und ab welcher Stunde es sich zeigt.</p>
 
   <h2>1 · Druckunterschied</h2>
-  <p>Luftdruck auf Meereshöhe in Lugano und Zürich (ICON-D2, nach dessen 48 Stunden ICON-EU), grösster Unterschied im Flugfenster. Das Zeichen zählt ab {{ n.dp }} hPa. Faustregel: Ab {{ n.dp }} hPa ist Föhn möglich, ab {{ n.dp_high }} hPa häufig. Inneralpin setzt Föhn auch unter {{ n.dp }} hPa ein.</p>
+  <p>Luftdruck auf Meereshöhe in Lugano und Zürich (ICON-CH1, danach ICON-CH2), grösster Unterschied im Flugfenster. Das Zeichen zählt ab {{ n.dp }} hPa. Faustregel: Ab {{ n.dp }} hPa ist Föhn möglich, ab {{ n.dp_high }} hPa häufig. Inneralpin setzt Föhn auch unter {{ n.dp }} hPa ein.</p>
 
   <h2>2 · Starker Wind aus Föhnrichtung</h2>
-  <p>So, wie man eine Windkarte liest: Über die {{ n.map_regions }} Alpenregionen liegt ein Raster aus {{ n.map_points }} Prognosepunkten (ICON-CH2, etwa alle 8 km). Ein Punkt ist „rot“, wenn er mindestens {{ n.hours }} Stunden Mittelwind ab {{ n.map_wind }} km/h oder Böen ab {{ n.map_gust }} km/h aus Föhnrichtung zeigt (Süd: SO–SW, Nord: NW–NO). Eine Region zählt ab {{ n.map_share }} % roter Punkte, das Zeichen ab {{ n.map_min }} Regionen. Südwind wird in {{ n.map_sued }} Regionen gezählt, Nordwind in {{ n.map_nord }} – dort, wo die Föhnrichtung vorkommt. Mittelland und Jura zählen nicht.</p>
+  <p>So, wie man eine Windkarte liest: Über die {{ n.map_regions }} Alpenregionen liegt ein Raster aus {{ n.map_points }} Prognosepunkten (ICON-CH1, danach ICON-CH2; etwa alle 8 km). Ein Punkt ist „rot“, wenn er mindestens {{ n.hours }} Stunden Mittelwind ab {{ n.map_wind }} km/h oder Böen ab {{ n.map_gust }} km/h aus Föhnrichtung zeigt (Süd: SO–SW, Nord: NW–NO). Eine Region zählt ab {{ n.map_share }} % roter Punkte, das Zeichen ab {{ n.map_min }} Regionen. Südwind wird in {{ n.map_sued }} Regionen gezählt, Nordwind in {{ n.map_nord }} – dort, wo die Föhnrichtung vorkommt. Mittelland und Jura zählen nicht.</p>
 
   <h2>3 · Kühlere Luvseite</h2>
-  <p>Temperatur auf etwa 2000 m (800 hPa) über Lugano und Zürich (ICON-D2, danach ICON-EU), gemittelt über das Flugfenster. Das Zeichen zählt, wenn die Seite, von der der Wind kommt, mindestens {{ n.luv }} °C kühler ist. Der SHV nennt 1–2 °C als Föhnzeichen.</p>
+  <p>Temperatur auf etwa 2000 m (800 hPa) über Lugano und Zürich (ICON-D2, danach ICON-EU — ICON-CH liefert keine Höhenwerte), gemittelt über das Flugfenster. Das Zeichen zählt, wenn die Seite, von der der Wind kommt, mindestens {{ n.luv }} °C kühler ist. Der SHV nennt 1–2 °C als Föhnzeichen.</p>
 
   <h2>4 · Trockener Wind aus Föhnrichtung in den Tälern</h2>
-  <p>{{ n.val_n }} Punkte in bekannten Föhntälern, an den Messstationen des MeteoSchweiz-Föhnindex. Ein Tal zählt, wenn das Modell (ICON-CH2) mindestens {{ n.hours }} Stunden Wind aus der Föhnrichtung dieses Tals zeigt, mit Wind ab {{ n.val_wind }} km/h oder Böen ab {{ n.val_gust }} km/h und höchstens {{ n.val_rh }} % Luftfeuchte. Die Föhnrichtung je Tal stammt aus Messungen von MeteoSchweiz.</p>
+  <p>{{ n.val_n }} Punkte in bekannten Föhntälern, an den Messstationen des MeteoSchweiz-Föhnindex. Ein Tal zählt, wenn das Modell (ICON-CH1, danach ICON-CH2) mindestens {{ n.hours }} Stunden Wind aus der Föhnrichtung dieses Tals zeigt, mit Wind ab {{ n.val_wind }} km/h oder Böen ab {{ n.val_gust }} km/h und höchstens {{ n.val_rh }} % Luftfeuchte. Die Föhnrichtung je Tal stammt aus Messungen von MeteoSchweiz.</p>
 
   <div class="fx-box">
     <h2 style="margin-top:0">Grenzen</h2>
@@ -43,16 +43,16 @@
   <p>The foehn block in the briefing counts how many of four foehn signs the forecast data show. It describes model data. It is not a foehn forecast and not a flight recommendation. The four signs come from foehn planning as described in our <a href="{{ blog_url }}">weather guide on foehn</a>. Counting covers the flying window {{ n.h0 }}:00–{{ n.h1 }}:00. For each sign the briefing names the model it comes from and the hour from which it shows.</p>
 
   <h2>1 · Pressure difference</h2>
-  <p>Sea-level pressure in Lugano and Zurich (ICON-D2, after its 48 hours ICON-EU), largest difference in the flying window. The sign counts from {{ n.dp }} hPa. Rule of thumb: foehn is possible from {{ n.dp }} hPa and frequent from {{ n.dp_high }} hPa. In inner-Alpine valleys foehn also sets in below {{ n.dp }} hPa.</p>
+  <p>Sea-level pressure in Lugano and Zurich (ICON-CH1, then ICON-CH2), largest difference in the flying window. The sign counts from {{ n.dp }} hPa. Rule of thumb: foehn is possible from {{ n.dp }} hPa and frequent from {{ n.dp_high }} hPa. In inner-Alpine valleys foehn also sets in below {{ n.dp }} hPa.</p>
 
   <h2>2 · Strong wind from the foehn direction</h2>
-  <p>The way you read a wind map: a grid of {{ n.map_points }} forecast points (ICON-CH2, about every 8 km) covers the {{ n.map_regions }} Alpine regions. A point is “red” when it shows at least {{ n.hours }} hours of mean wind from {{ n.map_wind }} km/h or gusts from {{ n.map_gust }} km/h from a foehn direction (south: SE–SW, north: NW–NE). A region counts from {{ n.map_share }} % red points, the sign from {{ n.map_min }} regions. South wind is counted in {{ n.map_sued }} regions, north wind in {{ n.map_nord }} – where that foehn direction occurs. The Swiss Plateau and the Jura do not count.</p>
+  <p>The way you read a wind map: a grid of {{ n.map_points }} forecast points (ICON-CH1, then ICON-CH2; about every 8 km) covers the {{ n.map_regions }} Alpine regions. A point is “red” when it shows at least {{ n.hours }} hours of mean wind from {{ n.map_wind }} km/h or gusts from {{ n.map_gust }} km/h from a foehn direction (south: SE–SW, north: NW–NE). A region counts from {{ n.map_share }} % red points, the sign from {{ n.map_min }} regions. South wind is counted in {{ n.map_sued }} regions, north wind in {{ n.map_nord }} – where that foehn direction occurs. The Swiss Plateau and the Jura do not count.</p>
 
   <h2>3 · Cooler windward side</h2>
-  <p>Temperature at about 2000 m (800 hPa) above Lugano and Zurich (ICON-D2, then ICON-EU), averaged over the flying window. The sign counts when the side the wind comes from is at least {{ n.luv }} °C cooler. The Swiss hang gliding association (SHV) names 1–2 °C as a foehn sign.</p>
+  <p>Temperature at about 2000 m (800 hPa) above Lugano and Zurich (ICON-D2, then ICON-EU — ICON-CH provides no upper-air values), averaged over the flying window. The sign counts when the side the wind comes from is at least {{ n.luv }} °C cooler. The Swiss hang gliding association (SHV) names 1–2 °C as a foehn sign.</p>
 
   <h2>4 · Dry wind from the foehn direction in the valleys</h2>
-  <p>{{ n.val_n }} points in known foehn valleys, at the stations of the MeteoSwiss foehn index. A valley counts when the model (ICON-CH2) shows at least {{ n.hours }} hours of wind from that valley's foehn direction, with wind from {{ n.val_wind }} km/h or gusts from {{ n.val_gust }} km/h and humidity of at most {{ n.val_rh }} %. The foehn direction of each valley comes from MeteoSwiss measurements.</p>
+  <p>{{ n.val_n }} points in known foehn valleys, at the stations of the MeteoSwiss foehn index. A valley counts when the model (ICON-CH1, then ICON-CH2) shows at least {{ n.hours }} hours of wind from that valley's foehn direction, with wind from {{ n.val_wind }} km/h or gusts from {{ n.val_gust }} km/h and humidity of at most {{ n.val_rh }} %. The foehn direction of each valley comes from MeteoSwiss measurements.</p>
 
   <div class="fx-box">
     <h2 style="margin-top:0">Limits</h2>

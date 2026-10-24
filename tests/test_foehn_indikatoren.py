@@ -18,17 +18,18 @@ IDX = [i for i in range(24) if config.FLIGHT_HOURS_START <= i < config.FLIGHT_HO
 
 
 def _station(p_nord, p_sued, t_nord, t_sued, from_h=0):
-    """Zürich/Lugano (ICON-D2); vor `from_h` beide Seiten gleich (kein Zeichen)."""
+    """Zürich/Lugano (Boden ICON-CH1, Höhe ICON-D2); vor `from_h` beide Seiten gleich."""
     def ser(v, base):
         return [base if h < from_h else v for h in range(24)]
-    return ({"time": TIMES, "model": ["icon_d2"] * 24, "pressure_msl": ser(p_nord, p_nord),
+    mods = {"model": ["meteoswiss_icon_ch1"] * 24, "model_pl": ["icon_d2"] * 24}
+    return ({"time": TIMES, **mods, "pressure_msl": ser(p_nord, p_nord),
              "temperature_800hPa": ser(t_nord, t_nord)},
-            {"time": TIMES, "model": ["icon_d2"] * 24, "pressure_msl": ser(p_sued, p_nord),
+            {"time": TIMES, **mods, "pressure_msl": ser(p_sued, p_nord),
              "temperature_800hPa": ser(t_sued, t_nord)})
 
 
 def _karte(red_regions=(), direction=170.0, n_per_region=4, regions=None, from_h=0):
-    """Raster (ICON-CH2): je Region n Punkte; Regionen in red_regions zeigen ab
+    """Raster (ICON-CH1): je Region n Punkte; Regionen in red_regions zeigen ab
     `from_h` 35 km/h aus `direction`, die übrigen 10 km/h."""
     regions = regions or [(f"r{i}", f"Region {i}", ("sued", "nord")) for i in range(6)]
     punkte = []
@@ -39,13 +40,13 @@ def _karte(red_regions=(), direction=170.0, n_per_region=4, regions=None, from_h
                            "hourly": {"wind_speed_10m": [35.0 if x else 10.0 for x in strong],
                                       "wind_direction_10m": [direction] * 24,
                                       "wind_gusts_10m": [55.0 if x else 20.0 for x in strong]}})
-    return {"model": "meteoswiss_icon_ch2", "time": TIMES, "punkte": punkte}
+    return {"model": ["meteoswiss_icon_ch1"] * 24, "time": TIMES, "punkte": punkte}
 
 
 def _taeler(n_on=0, total=23, tal="Reusstal / Urnerland", gust=60, from_h=None):
     rows = [{"tal": tal, "dir_dry": True, "all_gust_max_kmh": gust,
              **({"first_dir_dry_hour": from_h} if from_h is not None else {})}] * n_on
-    return {"sued": {"n_total": total, "taeler": rows, "model": "meteoswiss_icon_ch2"}, "nord": None}
+    return {"sued": {"n_total": total, "taeler": rows, "model": ["meteoswiss_icon_ch1"]}, "nord": None}
 
 
 class WindKarteTest(unittest.TestCase):
@@ -93,6 +94,7 @@ class IndikatorenTest(unittest.TestCase):
         self.assertEqual(ind["side"], "sued")
         self.assertEqual(ind["luv_cooler"], {"on": True, "against": False, "cooler_k": 4.0, "side": "sued",
                                              "model": ["icon_d2"], "from_hour": config.FLIGHT_HOURS_START})
+        self.assertEqual(ind["pressure"]["model"], ["meteoswiss_icon_ch1"])
 
     def test_onset_hour_per_indicator(self):
         # wie die Frontzeichen: ab welcher Stunde zeigt jedes Zeichen sich
@@ -102,16 +104,25 @@ class IndikatorenTest(unittest.TestCase):
         self.assertEqual(ind["wind_map"]["from_hour"], 11)
         self.assertEqual(ind["valleys"]["from_hour"], 13)
         self.assertEqual(ind["from_hour"], 11)
-        self.assertEqual(ind["wind_map"]["model"], "meteoswiss_icon_ch2")
-        self.assertEqual(ind["valleys"]["model"], "meteoswiss_icon_ch2")
+        self.assertEqual(ind["wind_map"]["model"], ["meteoswiss_icon_ch1"])
+        self.assertEqual(ind["valleys"]["model"], ["meteoswiss_icon_ch1"])
 
-    def test_station_models_merged_d2_first(self):
-        # fetch_foehn_data: ICON-D2, nach dessen Horizont ICON-EU — Schlüssel ohne Suffix
-        raw = {"hourly": {"time": ["t0", "t1"], "pressure_msl_icon_d2": [1010.0, None],
-                          "pressure_msl_icon_eu": [1011.0, 1012.0]}}
+    def test_station_models_ch_first_upper_air_from_d2(self):
+        # Boden: ICON-CH1, nach dessen Horizont ICON-CH2; Höhe (hPa): ICON-D2, dann ICON-EU
+        # (ICON-CH liefert keine Höhenwerte) — Schlüssel ohne Suffix
+        raw = {"hourly": {"time": ["t0", "t1"],
+                          "pressure_msl_meteoswiss_icon_ch1": [1010.0, None],
+                          "pressure_msl_meteoswiss_icon_ch2": [1011.0, 1012.0],
+                          "pressure_msl_icon_d2": [1015.0, 1015.0],
+                          "temperature_800hPa_meteoswiss_icon_ch1": [None, None],
+                          "temperature_800hPa_icon_d2": [5.0, None],
+                          "temperature_800hPa_icon_eu": [6.0, 7.0]}}
         h = fi._merge_models(raw)["hourly"]
         self.assertEqual(h["pressure_msl"], [1010.0, 1012.0])
-        self.assertEqual(h["model"], ["icon_d2", "icon_eu"])
+        self.assertEqual(h["model"], ["meteoswiss_icon_ch1", "meteoswiss_icon_ch2"])
+        self.assertEqual(h["temperature_800hPa"], [5.0, 7.0])
+        self.assertEqual(h["model_pl"], ["icon_d2", "icon_eu"])
+        self.assertEqual(fi.models_in(h["model"], [0, 1]), ["meteoswiss_icon_ch1", "meteoswiss_icon_ch2"])
 
     def test_signs_of_other_side_count_against_not_for(self):
         # 18.10.2026: Windkarte Süd + Tal, aber Druck und Kälte im Norden
@@ -126,9 +137,9 @@ class IndikatorenTest(unittest.TestCase):
             txt = bc._foehn_indicator_text(ind)
             self.assertNotIn("points to south foehn", txt.lower())
             # Druck steht zuerst und zeigt auf seine Seite; die Zeichen des Tages danach
-            self.assertTrue(txt.startswith("In ICON-D2, the pressure difference points to north foehn already at "
-                                           "06:00. ICON-CH2 still shows signs of south foehn already at 06:00:"), txt)
-            self.assertIn("Against it: a warmer south side aloft (ICON-D2).", txt)
+            self.assertTrue(txt.startswith("In ICON-CH1/ICON-D2, the pressure difference points to north foehn "
+                                           "already at 06:00. The data, however, show signs of south foehn:"), txt)
+            self.assertIn("Against it: a warmer south side aloft.", txt)
 
     def test_none(self):
         ind = self._ind(dp=(1015, 1016), t=(0.0, -0.5), red=(), val=0)
@@ -173,23 +184,34 @@ class BriefingTextTest(unittest.TestCase):
         r = self._both(self._ind(dp=(1015, 1016), t=(0.0, -0.5), red=(), val=1))
         (kind, pill, facts), txt = r["en"]
         self.assertEqual(kind, "warn")
-        self.assertTrue(txt.startswith("In ICON-D2, the pressure difference does not point to foehn. ICON-CH2 still "
-                                       "shows a sign of south foehn: dry wind from the foehn direction in Reusstal."), txt)
-        self.assertIn("Not in ICON-D2: a cooler south side aloft; not in ICON-CH2: wind from the foehn direction "
-                      "in the regions.", txt)
-        self.assertIn("Inner-Alpine foehn", txt)
+        self.assertEqual(txt, "In ICON-CH1/ICON-D2, the pressure difference does not point to foehn. Still, the data "
+                              "show signs of south foehn: dry wind from the foehn direction in Reusstal. Not in the "
+                              "data: a cooler south side aloft and wind from the foehn direction in the regions. "
+                              "Inner-Alpine foehn often sets in without them.")
+
+    def test_pressure_first_then_data(self):
+        # User 24.10.2026: wie die Fronten — zuerst der Druck (übergeordnetes Bild), dann
+        # ob die Daten Föhnzeichen zeigen; Modell und Uhrzeit nur einmal
+        for kw in ({}, dict(dp=(1013, 1020), t=(0.0, -0.5), red=(), val=0),
+                   dict(red=("r0", "r1", "r2"), val=2, t=(0.0, -4.0), from_h=6, val_h=9),
+                   dict(dp=(1015, 1016), t=(0.0, -0.5), red=(), val=1)):
+            for lang, (_, txt) in self._both(self._ind(**kw)).items():
+                self.assertRegex(txt, r"^In ICON-CH1/ICON-D2,? (the pressure difference|zeigt der Druckunterschied)")
+                self.assertEqual(txt.count("ICON-"), 2, txt)
+                self.assertLessEqual(txt.count("06"), 1, txt)
 
     def test_setup_without_wind(self):
         r = self._both(self._ind(dp=(1013, 1020), t=(0.0, -0.5), red=(), val=0))
         (kind, _, _), txt = r["en"]
         self.assertEqual(kind, "info")
-        # Modell statt "in the data", Zeichen beim Namen statt Zahlen (User 17.10.2026)
-        self.assertEqual(txt, "In ICON-D2, the pressure difference points to south foehn already at 06:00. "
-                              "ICON-CH2 shows none of the signs in the wind. Not in ICON-D2: a cooler south side "
-                              "aloft. Models usually show foehn wind too weak.")
-        self.assertEqual(r["de"][1], "In ICON-D2 zeigt der Druckunterschied bereits um 06 Uhr auf Südföhn. "
-                                     "ICON-CH2 zeigt keines der Zeichen im Wind. Nicht in ICON-D2: kühlere Südseite "
-                                     "in der Höhe. Modelle zeigen Föhnwind meist zu schwach.")
+        self.assertEqual(txt, "In ICON-CH1/ICON-D2, the pressure difference points to south foehn already at 06:00. "
+                              "Not in the data: a cooler south side aloft, wind from the foehn direction in the "
+                              "regions and dry wind from the foehn direction in the valleys. "
+                              "Models usually show foehn wind too weak.")
+        self.assertEqual(r["de"][1], "In ICON-CH1/ICON-D2 zeigt der Druckunterschied bereits um 06 Uhr auf Südföhn. "
+                                     "Nicht in den Daten: kühlere Südseite in der Höhe, Wind aus Föhnrichtung in den "
+                                     "Regionen und trockener Wind aus Föhnrichtung in den Tälern. "
+                                     "Modelle zeigen Föhnwind meist zu schwach.")
 
     def test_text_has_no_numbers_but_labels_do(self):
         # die Zahlen stehen in den Labels, der Text nennt die Zeichen (wie die Frontzeichen)
@@ -200,20 +222,24 @@ class BriefingTextTest(unittest.TestCase):
                 self.assertNotRegex(no_clock, r"\d", f"{lang}: {txt}")
                 self.assertRegex(facts[0]["v"], r"\d+ hPa")
 
-    def test_all_four_names_strongest_valley(self):
-        r = self._both(self._ind())
+    def test_all_four(self):
+        r = self._both(self._ind(red=("r0", "r1", "r2"), val=2, t=(0.0, -4.0), from_h=6, val_h=9))
         (kind, pill, _), txt = r["en"]
         self.assertEqual((kind, pill), ("warn", "Foehn indicators: 4 of 4 · from ~06:00"))
-        self.assertTrue(txt.startswith("In ICON-D2, the pressure difference points to south foehn already at 06:00. "
-                                       "ICON-D2 shows a matching sign already at 06:00: a cooler south side aloft. "
-                                       "ICON-CH2 shows matching signs already at 06:00:"), txt)
-        self.assertIn("dry wind from the foehn direction in the valleys (strongest Reusstal)", txt)
+        self.assertEqual(txt, "In ICON-CH1/ICON-D2, the pressure difference points to south foehn already at 06:00. "
+                              "The data also show signs of it: a cooler south side aloft and wind from the foehn "
+                              "direction in the regions (mainly Region 0 and Region 1), from about 09:00 dry "
+                              "wind from the foehn direction in the valleys (strongest Reusstal).")
+        self.assertEqual(r["de"][1], "In ICON-CH1/ICON-D2 zeigt der Druckunterschied bereits um 06 Uhr auf Südföhn. "
+                                     "Auch die Daten zeigen Zeichen dafür: kühlere Südseite in der Höhe und Wind aus "
+                                     "Föhnrichtung in den Regionen (vor allem Region 0 und Region 1), ab etwa 09 Uhr "
+                                     "trockener Wind aus Föhnrichtung in den Tälern (am stärksten Reusstal).")
 
     def test_cooler_side_only(self):
         r = self._both(self._ind(dp=(1015, 1016), t=(0.0, -3.0), red=(), val=0, from_h=9))
-        self.assertTrue(r["en"][1].startswith("In ICON-D2, the pressure difference does not point to foehn. ICON-D2 "
-                                              "still shows a sign of south foehn from about 09:00: a cooler south side "
-                                              "aloft. ICON-CH2 shows none of the signs in the wind."), r["en"][1])
+        self.assertTrue(r["en"][1].startswith("In ICON-CH1/ICON-D2, the pressure difference does not point to foehn. "
+                                              "Still, the data show signs of south foehn from about 09:00: a cooler "
+                                              "south side aloft. Not in the data:"), r["en"][1])
 
     def test_labels_marked_and_same_numbers_as_text(self):
         (kind, pill, facts), txt = self._both(self._ind(val=3))["en"]
@@ -222,28 +248,24 @@ class BriefingTextTest(unittest.TestCase):
         self.assertEqual(facts[3]["v"], "3 of 23")
         self.assertEqual(facts[3]["k"], "Valleys with dry wind from foehn direction")
 
-    def test_onset_and_models_in_text(self):
+    def test_later_signs_get_their_own_time(self):
         r = self._both(self._ind(red=("r0", "r1", "r2"), val=2, t=(0.0, -0.5), from_h=11, val_h=13))
         (kind, pill, facts), txt = r["en"]
         self.assertEqual(pill, "Foehn indicators: 3 of 4 · from ~11:00")
         self.assertEqual(facts[1]["v"], "3 of 6, from ~11:00")
-        # wie die Frontzeichen: Druck zuerst, dann je Modell die Zeichen mit Uhrzeit und Tageszeit
-        self.assertEqual(txt, "In ICON-D2, the pressure difference points to south foehn from about 11:00. "
-                              "ICON-CH2 shows matching signs from about 11:00: wind from the foehn direction in the "
-                              "regions (mainly Region 0 and Region 1) and dry wind from the foehn direction in the "
-                              "valleys (strongest Reusstal) around midday. Not in ICON-D2: a cooler south side aloft.")
-        self.assertEqual(r["de"][1], "In ICON-D2 zeigt der Druckunterschied ab etwa 11 Uhr auf Südföhn. ICON-CH2 "
-                                     "zeigt passende Zeichen ab etwa 11 Uhr: um die Mittagszeit Wind aus Föhnrichtung "
-                                     "in den Regionen (vor allem Region 0 und Region 1) und trockener Wind aus "
-                                     "Föhnrichtung in den Tälern (am stärksten Reusstal). Nicht in ICON-D2: kühlere "
-                                     "Südseite in der Höhe.")
+        self.assertEqual(txt, "In ICON-CH1/ICON-D2, the pressure difference points to south foehn from about 11:00. "
+                              "The data also show signs of it: wind from the foehn direction in the regions (mainly "
+                              "Region 0 and Region 1), from about 13:00 dry wind from the foehn direction in the "
+                              "valleys (strongest Reusstal). Not in the data: a cooler south side aloft.")
 
-    def test_signs_sorted_by_time(self):
-        # Täler am frühen Morgen vor der Windkarte am Vormittag
-        txt = self._both(self._ind(red=("r0", "r1", "r2"), val=2, t=(0.0, -0.5), from_h=11, val_h=7))["en"][1]
-        self.assertIn("ICON-CH2 shows matching signs from about 07:00: dry wind from the foehn direction in the "
-                      "valleys (strongest Reusstal) in the early morning and wind from the foehn direction in the "
-                      "regions (mainly Region 0 and Region 1) around midday.", txt)
+    def test_signs_later_than_pressure_get_time_in_head(self):
+        # Druck ab 06 Uhr, Täler erst ab 09 Uhr: "The data also show signs of it from about 09:00"
+        nh, sh = _station(1013, 1020, 0.0, -0.5)
+        ind = fi.evaluate_indicators(nh, sh, IDX, _karte(red_regions=()), DATE, _taeler(2, from_h=9))
+        with i18n.lang_override("en"):
+            txt = bc._foehn_indicator_text(ind)
+        self.assertIn("already at 06:00. The data also show signs of it from about 09:00: dry wind from the "
+                      "foehn direction in the valleys", txt)
 
     def test_no_judgement_words(self):
         cases = [self._ind(), self._ind(dp=(1015, 1016), t=(0.0, -0.5), red=(), val=0),

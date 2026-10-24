@@ -1117,7 +1117,11 @@ def foehn_tal_for_day(series: Optional[dict], date: str, side: str) -> Optional[
     if not taeler:
         return None
     out = summarize_taeler(taeler)
-    out.update({"side": side, "model": series.get("model"), "taeler": taeler})
+    m = series.get("model")
+    if isinstance(m, list):      # seit 24.10.2026 je Stunde (ICON-CH1, dann ICON-CH2)
+        from foehn_indicators import models_in
+        m = models_in(m, idx)
+    out.update({"side": side, "model": m, "taeler": taeler})
     return out
 
 

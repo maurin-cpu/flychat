@@ -71,9 +71,10 @@ def update_talpunkt(punkt_id: str, lat: float, lon: float) -> dict:
 
 
 def fetch_talpunkt_wind(forecast_days: int = 5) -> Optional[dict]:
-    """Stundenwind an allen Talpunkten (ein Open-Meteo-Call, ICON-CH2, lokale Zeit).
+    """Stundenwind an allen Talpunkten (ein Open-Meteo-Call, ICON-CH1, dann ICON-CH2 —
+    wie die Spot-Daten, 24.10.2026; lokale Zeit).
 
-    Rückgabe: {"model", "fetched_at", "time": [...],
+    Rückgabe: {"model": [je Stunde], "fetched_at", "time": [...],
                "punkte": {id: {"meta": {Properties + lat/lon}, "hourly": {...}}}}
     `meta` wird mitgeschrieben, damit ein Archivtag auch nach späterem
     Verschieben eines Punkts im Admin nachvollziehbar bleibt. None bei Fehler.
@@ -81,12 +82,12 @@ def fetch_talpunkt_wind(forecast_days: int = 5) -> Optional[dict]:
     punkte = load_talpunkte()
     if not punkte:
         return None
-    model = config.SURFACE_SECONDARY_MODEL
+    from foehn_indicators import FOEHN_SURFACE_MODELS, _merge_models
     params = config.with_api_key({
         "latitude": ",".join(str(p["lat"]) for p in punkte),
         "longitude": ",".join(str(p["lon"]) for p in punkte),
         "hourly": _HOURLY,
-        "models": model,
+        "models": ",".join(FOEHN_SURFACE_MODELS),
         "forecast_days": forecast_days,
         "timezone": config.TIMEZONE,
         "wind_speed_unit": "kmh",
@@ -103,9 +104,10 @@ def fetch_talpunkt_wind(forecast_days: int = 5) -> Optional[dict]:
     if len(data) != len(punkte):
         logger.warning("fetch_talpunkt_wind: %d Antworten für %d Punkte", len(data), len(punkte))
         return None
+    data = [_merge_models(d) for d in data]
     times = (data[0].get("hourly") or {}).get("time") or []
-    out = {"model": model, "fetched_at": datetime.now().isoformat(timespec="seconds"),
-           "time": times, "punkte": {}}
+    out = {"model": (data[0].get("hourly") or {}).get("model") or [],
+           "fetched_at": datetime.now().isoformat(timespec="seconds"), "time": times, "punkte": {}}
     for p, d in zip(punkte, data):
         h = d.get("hourly") or {}
         out["punkte"][p["id"]] = {

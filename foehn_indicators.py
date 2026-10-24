@@ -88,7 +88,7 @@ TAL_SEKTOR = {
 # zeigen — nie ein Urteil "Föhn"/"kein Föhn". Grenzen:
 # 1 Druck: Δp Lugano–Zürich ab 4 hPa (Blog: ab 4 hPa Föhn möglich).
 # 2 Windkarte (wie der Pilot die Windkarte liest, User 15.10.2026): Raster aus
-#   ICON-CH2-Prognosepunkten (~8 km) über die Alpenregionen. Ein Punkt ist "rot",
+#   ICON-CH1/CH2-Prognosepunkten (~8 km) über die Alpenregionen. Ein Punkt ist "rot",
 #   wenn er mind. 2 h Mittelwind ab 30 oder Böen ab 50 km/h aus der Föhnrichtung
 #   zeigt; eine Region zählt ab einem Viertel roter Punkte. Föhnrichtung je Region
 #   aus regionen.csv `kritischer_foehn` (Süd/Nord/Beide); Mittelland und Jura
@@ -111,26 +111,49 @@ LUV_COOLER_MIN_K = 2.0
 DP_INDICATOR_HPA = THRESHOLD_DELTA_P_CAUTION
 
 
-FOEHN_STATION_MODELS = ("icon_d2", "icon_eu")   # Vorrang in dieser Reihenfolge
+# Modelle der Föhn-Indikatoren (User 24.10.2026: wie die Spot-Daten und die Fronten
+# "ICON-CH1/ICON-D2"): Bodenwerte aus MeteoSwiss ICON — CH1, nach dessen ~33 h CH2.
+# Höhenwerte (…hPa) liefert ICON-CH bei Open-Meteo nicht (nachgemessen 24.10.) —
+# dafür ICON-D2, nach dessen 48 h ICON-EU. Druckunterschied CH1 vs. D2 Juli–Okt.:
+# Median +0.2 hPa, 4-hPa-Zeichen an 58 statt 52 von 115 Tagen (alle 4.1–4.3 hPa).
+FOEHN_SURFACE_MODELS = (config.SURFACE_PRIMARY_MODEL, config.SURFACE_SECONDARY_MODEL)
+FOEHN_PL_MODELS = (config.PRESSURE_LEVEL_PRIMARY_MODEL, config.PRESSURE_LEVEL_FALLBACK_MODEL)
+
+
+def _models_for(key: str) -> tuple:
+    return FOEHN_PL_MODELS if "hPa" in key else FOEHN_SURFACE_MODELS
 
 
 def _merge_models(point: dict) -> dict:
-    """Je Stunde der erste Wert aus FOEHN_STATION_MODELS; Schluessel ohne Modell-Suffix
-    wie bei einer Ein-Modell-Abfrage, dazu `hourly["model"]`."""
+    """Je Stunde der erste Wert in Vorrang-Reihenfolge (_models_for); Schluessel ohne
+    Modell-Suffix wie bei einer Ein-Modell-Abfrage. Dazu je Stunde das Modell:
+    `model` (Bodenwerte) und `model_pl` (Höhenwerte, falls abgefragt)."""
     h = point.get("hourly") or {}
     times = h.get("time") or []
-    out = {"time": times, "model": [None] * len(times)}
-    for key in {k.rsplit("_" + m, 1)[0] for k in h for m in FOEHN_STATION_MODELS if k.endswith("_" + m)}:
-        vals = [None] * len(times)
-        for m in FOEHN_STATION_MODELS:
+    alle = FOEHN_SURFACE_MODELS + FOEHN_PL_MODELS
+    out, mods = {"time": times}, {}
+    for key in {k.rsplit("_" + m, 1)[0] for k in h for m in alle if k.endswith("_" + m)}:
+        vals, ms = [None] * len(times), [None] * len(times)
+        for m in _models_for(key):
             arr = h.get(f"{key}_{m}") or []
             for i, v in enumerate(arr[:len(times)]):
                 if vals[i] is None and v is not None:
-                    vals[i] = v
-                    if out["model"][i] is None or key == "pressure_msl":
-                        out["model"][i] = m
-        out[key] = vals
+                    vals[i], ms[i] = v, m
+        out[key], mods[key] = vals, ms
+    boden = [k for k in ("pressure_msl", "wind_speed_10m") if k in mods]
+    out["model"] = mods[boden[0]] if boden else [None] * len(times)
+    hoehe = sorted(k for k in mods if "hPa" in k)
+    if hoehe:
+        out["model_pl"] = mods["temperature_800hPa" if "temperature_800hPa" in mods else hoehe[0]]
     return {**point, "hourly": out}
+
+
+def models_in(series: list, indices: list) -> list:
+    """Modelle einer Stundenreihe (`hourly["model"]`) in den Stunden `indices`, in
+    Vorrang-Reihenfolge — fuer die Modellnamen im Briefing."""
+    alle = FOEHN_SURFACE_MODELS + FOEHN_PL_MODELS
+    found = {series[i] for i in indices if i < len(series) and series[i]}
+    return sorted(found, key=lambda m: alle.index(m) if m in alle else 9)
 
 
 def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
@@ -138,9 +161,8 @@ def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
     Holt Föhn-relevante Daten von Open-Meteo (MeteoSwiss ICON).
 
     Multi-Point-Abfrage: Nord (Zürich) + Süd (Lugano).
-    Quelle fest (17.10.2026): ICON-D2, nach dessen 48 h ICON-EU — ohne `models`
-    lieferte Open-Meteo dasselbe (nachgemessen), aber ohne Namen fuers Briefing.
-    `hourly["model"]` nennt je Stunde das Modell.
+    Quelle fest: Bodenwerte ICON-CH1/CH2, Höhenwerte ICON-D2/EU (FOEHN_SURFACE_MODELS,
+    FOEHN_PL_MODELS); `hourly["model"]`/`["model_pl"]` nennen je Stunde das Modell.
     """
     lats = [FOEHN_STATIONS["nord"]["lat"], FOEHN_STATIONS["sued"]["lat"]]
     lons = [FOEHN_STATIONS["nord"]["lon"], FOEHN_STATIONS["sued"]["lon"]]
@@ -153,7 +175,7 @@ def fetch_foehn_data(forecast_days: int = 2) -> Optional[dict]:
             "wind_speed_700hPa,wind_direction_700hPa,surface_pressure,temperature_2m,"
             "temperature_800hPa"
         ),
-        "models": ",".join(FOEHN_STATION_MODELS),
+        "models": ",".join(FOEHN_SURFACE_MODELS + FOEHN_PL_MODELS),
         "forecast_days": forecast_days,
         "timezone": config.TIMEZONE,
     })
@@ -692,19 +714,20 @@ def karte_punkte() -> list:
 
 
 def fetch_wind_karte(forecast_days: int = 2) -> Optional[dict]:
-    """Stundenwind an allen Rasterpunkten (ICON-CH2, 10 m), Blöcke zu 150 Punkten.
-    {"model", "time", "punkte": [{..karte_punkte.., "hourly": {...}}]}; None bei Fehler."""
+    """Stundenwind an allen Rasterpunkten (ICON-CH1, dann ICON-CH2, 10 m), Blöcke zu
+    150 Punkten. {"model": [je Stunde], "time", "punkte": [{..karte_punkte..,
+    "hourly": {...}}]}; None bei Fehler."""
     pts = karte_punkte()
     if not pts:
         return None
-    out, times = [], None
+    out, times, model = [], None, None
     for i in range(0, len(pts), 150):
         chunk = pts[i:i + 150]
         params = config.with_api_key({
             "latitude": ",".join(str(p["lat"]) for p in chunk),
             "longitude": ",".join(str(p["lon"]) for p in chunk),
             "hourly": "wind_speed_10m,wind_direction_10m,wind_gusts_10m",
-            "models": config.SURFACE_SECONDARY_MODEL,
+            "models": ",".join(FOEHN_SURFACE_MODELS),
             "forecast_days": forecast_days, "timezone": config.TIMEZONE, "wind_speed_unit": "kmh",
         })
         try:
@@ -717,11 +740,11 @@ def fetch_wind_karte(forecast_days: int = 2) -> Optional[dict]:
         if len(data) != len(chunk):
             return None
         for p, d in zip(chunk, data):
-            h = d.get("hourly") or {}
-            times = times or h.get("time")
+            h = _merge_models(d)["hourly"]
+            times, model = times or h.get("time"), model or h.get("model")
             out.append({**p, "hourly": {k: h.get(k) or [] for k in
                                         ("wind_speed_10m", "wind_direction_10m", "wind_gusts_10m")}})
-    return {"model": config.SURFACE_SECONDARY_MODEL, "time": times or [], "punkte": out}
+    return {"model": model or [], "time": times or [], "punkte": out}
 
 
 def _num(arr, i):
@@ -783,8 +806,10 @@ def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
     side = "sued" if res["sued"]["n"] >= res["nord"]["n"] else "nord"
     best = res[side]
     on = best["n"] >= KARTE_MIN_REGIONS
+    m = karte.get("model")
     return {"on": on, "side": side, "n": best["n"], "total": best["total"], "regions": best["regions"][:3],
-            "from_hour": best["from_hour"] if on else None, "model": karte.get("model")}
+            "from_hour": best["from_hour"] if on else None,
+            "model": models_in(m, idx) if isinstance(m, list) else m}
 
 
 def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
@@ -800,10 +825,10 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
     def _hour(i):
         return int(times[i][11:13]) if i < len(times) else None
 
-    # Modell der Stationsreihe im Flugfenster (fetch_foehn_data: ICON-D2, dann ICON-EU)
-    mods = nord_hourly.get("model") or []
-    st_model = sorted({mods[i] for i in indices if i < len(mods) and mods[i]},
-                      key=lambda m: FOEHN_STATION_MODELS.index(m) if m in FOEHN_STATION_MODELS else 9)
+    # Modelle der Stationsreihe im Flugfenster: Druck vom Boden-, Temperatur vom
+    # Höhenmodell (fetch_foehn_data)
+    dp_model = models_in(nord_hourly.get("model") or [], indices)
+    tp_model = models_in(nord_hourly.get("model_pl") or nord_hourly.get("model") or [], indices)
 
     # 1 Druck: grösster Unterschied in eine Richtung über das Flugfenster
     dps, dpn, dp_i = [], [], []
@@ -819,7 +844,7 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
         val = round(max(s_max, n_max), 1)
         hs = "sued" if s_max >= n_max else "nord"
         series = dps if hs == "sued" else dpn
-        dp = {"on": val >= DP_INDICATOR_HPA, "hpa": val, "high_side": hs, "model": st_model,
+        dp = {"on": val >= DP_INDICATOR_HPA, "hpa": val, "high_side": hs, "model": dp_model,
               "from_hour": next((_hour(i) for i, v in zip(dp_i, series) if v >= DP_INDICATOR_HPA), None)}
 
     # 2 Windkarte
@@ -878,7 +903,7 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
     if dt_mean is not None:
         cool = round(-dt_mean if side == "sued" else dt_mean, 1)   # > 0: Föhnseite kühler
         tp = {"on": t_on and t_side == side, "against": t_on and t_side != side,
-              "cooler_k": cool, "side": side, "model": st_model, "from_hour": None}
+              "cooler_k": cool, "side": side, "model": tp_model, "from_hour": None}
         if tp["on"]:   # erste Stunde, in der die Föhnseite um die Grenze kühler ist
             sign = -1 if side == "sued" else 1
             tp["from_hour"] = next((_hour(i) for i, v in zip(dt_i, dts) if sign * v >= LUV_COOLER_MIN_K), None)

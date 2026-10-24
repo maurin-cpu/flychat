@@ -101,7 +101,10 @@ class TestAbruf(unittest.TestCase):
     def _resp(self, n):
         r = mock.Mock()
         r.raise_for_status.return_value = None
-        r.json.return_value = [{"hourly": {"time": TIMES, "wind_speed_10m": [1.0] * 24}}] * n
+        # zwei Modelle wie bei Open-Meteo: ICON-CH1 bis Mittag, danach ICON-CH2
+        r.json.return_value = [{"hourly": {"time": TIMES,
+                                           "wind_speed_10m_meteoswiss_icon_ch1": [1.0] * 12 + [None] * 12,
+                                           "wind_speed_10m_meteoswiss_icon_ch2": [2.0] * 24}}] * n
         return r
 
     def test_fetch_maps_points_by_id(self):
@@ -109,7 +112,8 @@ class TestAbruf(unittest.TestCase):
         with mock.patch("foehn_talpunkte.requests.get", return_value=self._resp(n)):
             d = ft.fetch_talpunkt_wind(1)
         self.assertEqual(len(d["punkte"]), n)
-        self.assertEqual(d["model"], config.SURFACE_SECONDARY_MODEL)
+        self.assertEqual(d["model"], [config.SURFACE_PRIMARY_MODEL] * 12 + [config.SURFACE_SECONDARY_MODEL] * 12)
+        self.assertEqual(d["punkte"]["alt"]["hourly"]["wind_speed_10m"], [1.0] * 12 + [2.0] * 12)
         self.assertIn("foehn_typ", d["punkte"]["alt"]["meta"])
 
     def test_fetch_rejects_length_mismatch(self):
