@@ -809,6 +809,8 @@ def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
     m = karte.get("model")
     return {"on": on, "side": side, "n": best["n"], "total": best["total"], "regions": best["regions"][:3],
             "from_hour": best["from_hour"] if on else None,
+            # beide Seiten fuers Label der Tages-Foehnseite ("Regions with north wind 0 of 11")
+            "per_side": {sd: {"n": res[sd]["n"], "total": res[sd]["total"]} for sd in ("sued", "nord")},
             "model": models_in(m, idx) if isinstance(m, list) else m}
 
 
@@ -864,11 +866,13 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
 
     # 4 Täler je Föhnseite
     rows = {"sued": [], "nord": []}
-    total = 0
+    total, totals = 0, {"sued": 0, "nord": 0}
     for s, t in (taeler or {}).items():
         if not t:
             continue
         total += t.get("n_total", 0)
+        if s in totals:
+            totals[s] = t.get("n_total", 0)
         for e in t.get("taeler") or []:
             if e.get("dir_dry") and s in rows:
                 rows[s].append({"tal": e.get("tal", ""), "side": s,
@@ -912,7 +916,8 @@ def evaluate_indicators(nord_hourly: dict, sued_hourly: dict, indices: list,
         mine = sorted(rows[side], key=lambda e: -e["gust_kmh"])
         other = "nord" if side == "sued" else "sued"
         hours = [e["from_hour"] for e in mine if e.get("from_hour") is not None]
-        va = {"on": bool(mine), "n": len(mine), "total": total, "top": mine[0] if mine else None,
+        # "of N" = Täler, in denen Föhn dieser Seite vorkommt (Label "Valleys with dry north wind")
+        va = {"on": bool(mine), "n": len(mine), "total": totals[side] or total, "top": mine[0] if mine else None,
               "against": bool(rows[other]) and not mine, "n_other": len(rows[other]),
               "from_hour": min(hours) if hours else None,
               "model": next((t.get("model") for t in (taeler or {}).values() if t and t.get("model")), None)}

@@ -246,13 +246,28 @@ class BriefingTextTest(unittest.TestCase):
         self.assertEqual([f["on"] for f in facts], [True, True, True, True])
         self.assertEqual(facts[0]["v"], "7 hPa (south higher)")   # Uhrzeit nur im Text
         self.assertEqual(facts[3]["v"], "3 of 23")
-        self.assertEqual(facts[3]["k"], "Dry valley wind")
+        self.assertEqual([f["k"] for f in facts], ["Pressure diff.", "Regions with south wind", "South side aloft",
+                                                   "Valleys with dry south wind"])
+
+    def test_labels_follow_foehn_side(self):
+        # Nordföhn: Nordseite, Nordwind — Richtung im Label wie die Luv-Seite
+        nh, sh = _station(1020, 1014, -3.0, 0.0)
+        ind = fi.evaluate_indicators(nh, sh, IDX, _karte(red_regions=(), direction=350.0), DATE, _taeler(0))
+        self.assertEqual(ind["wind_map"]["side"], "sued")      # 0:0 -> Windkarte wählt Süd
+        with i18n.lang_override("en"):
+            self.assertEqual(bc._foehn_indicator_status(ind)[2][1]["v"], "0 of 6")   # Nord-Regionen zählen
+        for lang, keys in (("en", ["Pressure diff.", "Regions with north wind", "North side aloft",
+                                   "Valleys with dry north wind"]),
+                           ("de", ["Druckdiff.", "Regionen mit Nordwind", "Nordseite Höhe",
+                                   "Täler mit trockenem Nordwind"])):
+            with i18n.lang_override(lang):
+                self.assertEqual([f["k"] for f in bc._foehn_indicator_status(ind)[2]], keys)
 
     def test_later_signs_get_their_own_time(self):
         r = self._both(self._ind(red=("r0", "r1", "r2"), val=2, t=(0.0, -0.5), from_h=11, val_h=13))
         (kind, pill, facts), txt = r["en"]
         self.assertEqual(pill, "Foehn indicators: 3 of 4 · from ~11:00")
-        self.assertEqual(facts[1], {"k": "Wind in regions", "v": "3 of 6", "on": True})
+        self.assertEqual(facts[1], {"k": "Regions with south wind", "v": "3 of 6", "on": True})
         self.assertEqual(txt, "In ICON-CH1/ICON-D2, the pressure difference points to south foehn from about 11:00. "
                               "The data also show signs of it: wind from the foehn direction in the regions (mainly "
                               "Region 0 and Region 1), from about 13:00 dry wind from the foehn direction in the "
