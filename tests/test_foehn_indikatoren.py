@@ -72,6 +72,26 @@ class WindKarteTest(unittest.TestCase):
     def test_no_data_is_none(self):
         self.assertIsNone(fi.evaluate_wind_karte(None, DATE))
 
+    def test_regions_per_foehn_direction_from_csv(self):
+        # User 24.10.2026: alle vom Föhn betroffenen Regionen — "Beide" zählt für beide
+        # Richtungen, reine Süd-Regionen zählen keinen Nordwind
+        import csv
+        kf = {r["id"]: r["kritischer_foehn"] for r in csv.DictReader(
+            open(config.FOEHN_TALPUNKTE_PATH.parent / "regionen.csv", encoding="utf-8"))}
+        sides = {p["region_id"]: p["sides"] for p in fi.karte_punkte()}
+        for rid, s in sides.items():
+            self.assertEqual(s, {"Süd": ("sued",), "Nord": ("nord",), "Beide": ("sued", "nord")}[kf[rid]])
+        self.assertNotIn("nord", sides["zentralschweizer_alpen"])
+        self.assertIn("nord", sides["oberengadin"])
+
+    def test_min_regions_per_side(self):
+        self.assertEqual(fi.karte_min_regions(3), 2)       # Nordföhn: 2 von 3
+        self.assertEqual(fi.karte_min_regions(17), 3)
+        regs = ([(f"n{i}", f"Nord {i}", ("nord",)) for i in range(3)]
+                + [(f"s{i}", f"Süd {i}", ("sued",)) for i in range(15)])
+        out = fi.evaluate_wind_karte(_karte(red_regions=("n0", "n1"), direction=350.0, regions=regs), DATE)
+        self.assertEqual((out["on"], out["side"], out["n"], out["total"]), (True, "nord", 2, 3))
+
     def test_grid_only_alpine_regions(self):
         pts = fi.karte_punkte()
         self.assertGreater(len(pts), 300)

@@ -101,6 +101,16 @@ KARTE_WIND_KMH = 30
 KARTE_GUST_KMH = 50
 KARTE_REGION_SHARE = 0.25
 KARTE_MIN_REGIONS = 3
+# Welche Regionen je Föhnrichtung zählen, steht in regionen.csv `kritischer_foehn`
+# (Süd / Nord / Beide) — dieselbe Quelle wie die Regionsbewertung. "Beide" zählt für
+# beide Richtungen (User 24.10.2026: "alle Regionen, die vom Föhn betroffen sind");
+# Regionen nur mit Süd zählen keinen Nordwind und umgekehrt.
+
+
+def karte_min_regions(total: int) -> int:
+    """Regionen, ab denen das Zeichen zählt: KARTE_MIN_REGIONS, bei wenigen Lee-Regionen
+    die Hälfte (Nordföhn: 2 von 3)."""
+    return max(1, min(KARTE_MIN_REGIONS, math.ceil(total / 2)))
 KARTE_TERRAIN = ("voralpen", "alpen", "hochalpin")
 KARTE_STEP_LAT, KARTE_STEP_LON = 0.07, 0.1
 # 3 Luv-Seite auf ~2000 m (800 hPa) kühler ab 2 °C (SHV: 1–2 °C = Föhnzeichen;
@@ -681,7 +691,8 @@ _KARTE_PUNKTE: list = []
 
 def karte_punkte() -> list:
     """Rasterpunkte der Windkarte: {lat, lon, region_id, region, sides} — nur Regionen
-    der Alpen (KARTE_TERRAIN); `sides` = Föhnrichtungen der Region (kritischer_foehn).
+    der Alpen (KARTE_TERRAIN); `sides` = Föhnrichtungen der Region (kritischer_foehn:
+    Süd, Nord oder Beide).
     Punkt-in-Polygon gegen regionen_polygone_mapped.geojson. Einmal je Prozess."""
     if _KARTE_PUNKTE:
         return _KARTE_PUNKTE
@@ -695,7 +706,7 @@ def karte_punkte() -> list:
             if r.get("terrain_type") not in KARTE_TERRAIN:
                 continue
             kf = (r.get("kritischer_foehn") or "").strip()
-            sides = {"Süd": ("sued",), "Nord": ("nord",)}.get(kf, ("sued", "nord"))
+            sides = {"Süd": ("sued",), "Nord": ("nord",), "Beide": ("sued", "nord")}.get(kf, ())
             meta[r["id"]] = {"region": r.get("region_name", r["id"]), "sides": sides}
     with open(base / "regionen_polygone_mapped.geojson", encoding="utf-8") as f:
         polys = [(ft["properties"]["id"], shape(ft["geometry"]))
@@ -762,8 +773,9 @@ def _side_of(deg) -> Optional[str]:
 
 
 def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
-    """Indikator 2: in wie vielen Alpenregionen ist die Windkarte "rot" aus der
-    Föhnrichtung der Region? Die Seite mit mehr Regionen zählt."""
+    """Indikator 2: in wie vielen vom Föhn betroffenen Regionen ist die Windkarte "rot"
+    aus der Föhnrichtung? Erfüllt ab karte_min_regions je Seite; zählt die Seite, die erfüllt ist
+    (sonst die mit dem grösseren Anteil roter Regionen)."""
     if not karte or not karte.get("punkte"):
         return None
     times = karte.get("time") or []
@@ -799,13 +811,19 @@ def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
         red = sorted([r for r in regs if r["n"] and r[side] / r["n"] >= KARTE_REGION_SHARE],
                      key=lambda r: -r[side] / r["n"])
         # Ab wann: eine Region ist "rot", sobald ein Viertel ihrer Punkte Wind zeigt;
-        # der Indikator, sobald KARTE_MIN_REGIONS Regionen rot sind
+        # der Indikator, sobald genug Regionen dieser Seite rot sind
+        need = karte_min_regions(len(regs))
         since = sorted(sorted(r["first_" + side])[math.ceil(KARTE_REGION_SHARE * r["n"]) - 1] for r in red)
-        res[side] = {"n": len(red), "total": len(regs), "regions": [r["region"] for r in red],
-                     "from_hour": since[KARTE_MIN_REGIONS - 1] if len(since) >= KARTE_MIN_REGIONS else None}
-    side = "sued" if res["sued"]["n"] >= res["nord"]["n"] else "nord"
+        res[side] = {"n": len(red), "total": len(regs), "regions": [r["region"] for r in red], "need": need,
+                     "on": bool(regs) and len(red) >= need,
+                     "from_hour": since[need - 1] if len(since) >= need else None}
+
+    def anteil(sd):
+        return res[sd]["n"] / res[sd]["total"] if res[sd]["total"] else 0
+
+    side = max(("sued", "nord"), key=lambda sd: (res[sd]["on"], anteil(sd), sd == "sued"))
     best = res[side]
-    on = best["n"] >= KARTE_MIN_REGIONS
+    on = best["on"]
     m = karte.get("model")
     return {"on": on, "side": side, "n": best["n"], "total": best["total"], "regions": best["regions"][:3],
             "from_hour": best["from_hour"] if on else None,

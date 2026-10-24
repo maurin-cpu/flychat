@@ -202,3 +202,11 @@ Er sagt nie „Föhn“ oder „kein Föhn“.
   nur, wenn ein Zeichen später kommt. Ohne Druck: „… does not point to foehn. Still, the
   data show signs of south foehn …“; Druck zur Gegenseite: „The data, however, show signs
   of south foehn …“; dann „Not in the data: …“.
+- **24.10.2026 — Labels kurz, Windkarte je Föhnrichtung:** Welche Regionen bei Süd- bzw.
+  Nordwind zählen, steht in regionen.csv `kritischer_foehn` (Süd / Nord / Beide; „Beide“
+  zählt für beide Richtungen, User: „alle Regionen, die vom Föhn betroffen sind“) —
+  dieselbe Quelle wie die Regionsbewertung. Kurz erwogen und verworfen: Nordwind nur
+  südlich des Kamms (3 Regionen). Mindestzahl je Seite `karte_min_regions` (3, bei
+  wenigen Regionen die Hälfte). Labels ohne Uhrzeit und mit Richtung der Föhnseite:
+  „Regions with north wind 3 of 11“, „North side aloft 3.8 °C cooler“, „Valleys with dry
+  north wind 6 of 9“ („of N“ = Regionen/Täler dieser Föhnseite).

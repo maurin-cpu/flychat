@@ -2523,7 +2523,8 @@ def foehn_explain_page():
     num = {
         "dp": fi.DP_INDICATOR_HPA, "dp_high": fi.THRESHOLD_DELTA_P_DANGER,
         "map_wind": fi.KARTE_WIND_KMH, "map_gust": fi.KARTE_GUST_KMH,
-        "map_share": int(round(fi.KARTE_REGION_SHARE * 100)), "map_min": fi.KARTE_MIN_REGIONS,
+        "map_share": int(round(fi.KARTE_REGION_SHARE * 100)),
+        "map_min": fi.karte_min_regions(sum(1 for s in regs.values() if "sued" in s)),
         "map_regions": len(regs), "map_sued": sum(1 for s in regs.values() if "sued" in s),
         "map_nord": sum(1 for s in regs.values() if "nord" in s), "map_points": len(pts),
         "luv": fi.LUV_COOLER_MIN_K, "hours": fi.TAL_MIN_HOURS,
