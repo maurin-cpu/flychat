@@ -82,6 +82,30 @@ from engine._common import (
 logger = logging.getLogger(__name__)
 
 
+def _region_schwer(region_result) -> dict:
+    """Name + Gruende, falls die Region schwere Warnhinweise (not_safe) hat, sonst None.
+
+    Nimmt beide Formen: flaches Ergebnis aus dem Morgenlauf und gespeicherten
+    Eintrag mit {"safety": {...}} aus dem Spot-only-Lauf.
+    """
+    if not isinstance(region_result, dict):
+        return None
+    safety = region_result.get("safety") if isinstance(region_result.get("safety"), dict) else {}
+
+    def _g(key):
+        return safety.get(key) if key in safety else region_result.get(key)
+
+    if _g("safety_status") != "not_safe":
+        return None
+    gruende = _g("no_go_reasons") or []
+    return {
+        "name": region_result.get("region_name") or region_result.get("region")
+                or region_result.get("region_id") or "?",
+        "gruende": [str(g) for g in gruende] if isinstance(gruende, list) else [],
+        "haupt": _g("primary_no_go"),
+    }
+
+
 class AnalyzersMixin:
     def _build_and_analyze_spot(self, spot, date_str: str, region_result: dict = None) -> dict:
         """Worker-Wrapper: Split-Flow (Safety → Flyability) fuer einen Spot/Tag.
@@ -112,7 +136,7 @@ class AnalyzersMixin:
             return prefilter
 
         # Phase 1: Safety
-        safety_result = self._safety_analysis_single_spot_day(spot, date_str, ctx)
+        safety_result = self._safety_analysis_single_spot_day(spot, date_str, ctx, region_result=region_result)
         if safety_result.get("safety_status") not in ("safe", "conditional"):
             # not_safe oder error → kein Flyability-Call
             ns_result = self._not_safe_minimal_flyability(safety_result, is_spot=True)
@@ -309,8 +333,15 @@ class AnalyzersMixin:
     # SPLIT-FLOW: Separate Safety- und Flyability-Calls (Hebel 1 Kostenreduktion)
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def _safety_analysis_single_spot_day(self, spot, date_str: str, context: str) -> dict:
-        """Safety-only LLM-Call fuer einen Spot/Tag. Kleinerer Prompt (~7K tokens)."""
+    def _safety_analysis_single_spot_day(self, spot, date_str: str, context: str,
+                                         region_result: dict = None) -> dict:
+        """Safety-only LLM-Call fuer einen Spot/Tag. Kleinerer Prompt (~7K tokens).
+
+        region_result: Region-Ergebnis desselben Tages. Hat die Region schwere
+        Warnhinweise und die KI schreibt den Spot trotzdem gruen, fragt der Code
+        die KI einmal nach (_region_untergrenze_rueckfrage) — die Begruendung
+        schreibt immer die KI, der Code setzt den Status nie selbst.
+        """
         name = spot["name"]
         if getattr(self, '_api_abort', None) and self._api_abort.is_set():
             reason = getattr(self, '_api_abort_reason', 'Analyse abgebrochen')
@@ -367,11 +398,69 @@ class AnalyzersMixin:
                         time.sleep(sleep_s)
             if last_err:
                 raise last_err
-            return self._post_process_safety_spot(result, spot, date_str)
+            result = self._post_process_safety_spot(result, spot, date_str)
+            region = _region_schwer(region_result)
+            if region and result.get("safety_status") == "safe":
+                result = self._region_untergrenze_rueckfrage(
+                    spot, date_str, messages, raw, result, region)
+            return result
 
         except Exception as e:
             logger.error(f"Safety-Analyse fuer {name}/{date_str} fehlgeschlagen: {e}")
             return {"spot": name, "date": date_str, "safety_status": "error", "phase": "safety", "error": str(e)}
+
+    def _region_untergrenze_rueckfrage(self, spot, date_str: str, messages: list,
+                                       raw: str, erstes: dict, region: dict) -> dict:
+        """Region rot, Spot gruen → die KI einmal mit ihrer eigenen Antwort und
+        dem Region-Grund nachfragen lassen (User-Entscheid 25.10.2026).
+
+        Ein Code-Override waere ein gelber Spot ohne Begruendung; darum schreibt
+        die KI Status, Hinweis und Text selbst. Bleibt sie bei gruen, bleibt das
+        Ergebnis stehen — der Snapshot-Waechter zaehlt solche Faelle.
+        """
+        name = spot["name"]
+        gruende = "; ".join(region["gruende"]) or (region["haupt"] or "?")
+        korrektur = (
+            f"KORREKTUR NOETIG: Die Region {region['name']} hat SCHWERE Warnhinweise "
+            f"(safety_status not_safe). Region-Gruende: {gruende}.\n"
+            "Regel REGION-STATUS-UNTERGRENZE: Ist die Region not_safe, ist der Spot "
+            "MINDESTENS conditional — ohne Ausnahme, auch wenn der Grund Wind/Boeen ist "
+            "und der Spot lokal ruhig ist. Deine Antwort hatte safety_status=safe.\n"
+            "Gib das vollstaendige JSON erneut aus: safety_status mindestens conditional "
+            "(not_safe nur, wenn deine Spot-Daten es selbst zeigen), in caution_notes ein "
+            "Eintrag 'Region: <Grund mit Zahlen>', und im summary, warum die Region den "
+            "Spot auf Warnhinweise setzt — mit den Zahlen der Region. Alles andere bleibt, "
+            "soweit es weiter stimmt."
+            + i18n.llm_lang_instruction()
+        )
+        nachfrage = list(messages) + [
+            {"role": "assistant", "content": raw},
+            {"role": "user", "content": korrektur},
+        ]
+        try:
+            response = self.analysis_client.chat.completions.create(
+                model=self.analysis_model,
+                messages=nachfrage,
+                temperature=0.2,
+                max_tokens=_resolve_max_tokens(self.analysis_model, 2000),
+                response_format={"type": "json_object"},
+                **self._analysis_call_kwargs(),
+            )
+            self._record_call_usage(response, "spot_safety_region_rueckfrage")
+            zweites = parse_llm_json(response.choices[0].message.content or "", "safety_status")
+            zweites = self._post_process_safety_spot(zweites, spot, date_str)
+        except Exception as e:
+            logger.warning(f"[REGION-UNTERGRENZE] {name}/{date_str}: Rueckfrage gescheitert ({e}) "
+                           f"— erste Antwort bleibt (gruen trotz Region {region['name']} rot)")
+            return erstes
+        if zweites.get("safety_status") == "safe":
+            logger.warning(f"[REGION-UNTERGRENZE] {name}/{date_str}: KI bleibt nach Rueckfrage "
+                           f"bei gruen (Region {region['name']} rot)")
+            return zweites
+        logger.info(f"[REGION-UNTERGRENZE] {name}/{date_str}: nach Rueckfrage "
+                    f"{zweites.get('safety_status')} (Region {region['name']} rot)")
+        zweites.setdefault("_decisions_applied", []).append("RegionUntergrenzeRueckfrage")
+        return zweites
 
     def _flyability_analysis_single_spot_day(self, spot, date_str: str, context: str,
                                               safety_result: dict, region_result: dict = None) -> dict:
@@ -1476,11 +1565,11 @@ class AnalyzersMixin:
         # Kontext aus self.region_analyses an die Streckenflug-Bewertung
         # durchreichen kann. Ohne diese Injektion landet jeder Spot im
         # "Region-Kontext fehlt"-Branch von _format_region_context_block.
-        from source_area import find_region_for_point as _find_region
+        from source_area import find_region_for_spot as _find_region
         spot_region_map = {}  # spot_name → region_id oder None
         for spot in spots_to_analyze:
             try:
-                reg = _find_region(spot["latitude"], spot["longitude"])
+                reg = _find_region(spot)
                 spot_region_map[spot["name"]] = reg["id"] if reg else None
             except Exception as e:
                 logger.warning(f"Region-Mapping fuer {spot['name']} fehlgeschlagen: {e}")
@@ -2147,7 +2236,7 @@ class AnalyzersMixin:
             # PHASE 1: Region-Analysen (Regionen-Kontext fuer Phase 2 erforderlich)
             # PHASE 2: Spot-Analysen (inkl. Streckenflug-Synthese mit Region-Kontext)
             # ══════════════════════════════════════════════════════════════
-            from source_area import find_region_for_point as _find_region
+            from source_area import find_region_for_spot as _find_region
             region_total = len(regions_with_data) * n_days
             spot_total = total - region_total
 
@@ -2218,11 +2307,12 @@ class AnalyzersMixin:
             logger.info(f"[UNIFIED] Phase 2 (Spots): {spot_total} Calls "
                         f"({len(spots_to_analyze)} Spots x {n_days} Tage)")
 
-            # Pro-Spot Region-Mapping einmalig vorberechnen (Point-in-Polygon)
+            # Pro-Spot Region-Mapping einmalig vorberechnen (Point-in-Polygon,
+            # ausserhalb aller Polygone die angezeigte analyse_region)
             spot_region_map = {}  # spot_name → region_id oder None
             for spot in spots_to_analyze:
                 try:
-                    reg = _find_region(spot["latitude"], spot["longitude"])
+                    reg = _find_region(spot)
                     spot_region_map[spot["name"]] = reg["id"] if reg else None
                 except Exception as e:
                     logger.warning(f"Region-Mapping fuer {spot['name']} fehlgeschlagen: {e}")

@@ -116,6 +116,20 @@ Reihenfolge in `_post_process_safety_spot`:
 sondern entspannt. Sie hilft, wenn das LLM zu vorsichtig war und keine harten
 Warnungen vorliegen.
 
+### Region-Untergrenze (Rueckfrage statt Decision, seit 25.10.2026)
+
+Hat die Region `not_safe` und steht der Spot nach der Pipe oben auf `safe`, setzt
+der Code den Status **nicht** selbst — ein gelber Spot ohne Begruendung waere die
+Folge. `_region_untergrenze_rueckfrage` schickt der KI ihre eigene Antwort plus
+Region-Gruende zurueck; die KI liefert Status, `caution_notes`-Eintrag
+`Region: …` und Summary neu (Tracking-Tag `RegionUntergrenzeRueckfrage`). Bleibt
+sie bei gruen, bleibt das Ergebnis stehen und `scripts/snapshot_wache.py` meldet
+den Spot (Hinweis `region_rot_spot_gruen`). Die Regel selbst steht im Skill
+(`03_safety/00_template_spot.md`, STATUS-UNTERGRENZE) und im Region-Kontextblock.
+Spots ausserhalb aller Polygone bekommen die Region, unter der die App sie zeigt
+(`source_area.find_region_for_spot`). Anlass: 111 Faelle 02.08.–25.10.2026
+(104× Kontext vorhanden und uebergangen, 7× ausserhalb Polygon).
+
 ---
 
 ## 4. Decision-Engine — Region Safety

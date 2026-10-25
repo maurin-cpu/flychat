@@ -48,6 +48,12 @@ The weakest-link `min()` pulls `safety_status` along automatically.
 and gusts are terrain-/spot-specific; the region has no data for them. A sheltered spot
 may be rated calm despite region-wide ground wind.
 
+**STATUS FLOOR (ALWAYS applies, also for wind/gusts):** If the region is `not_safe`,
+your `safety_status` is AT LEAST `conditional` — never `safe`. This holds even when the
+region's reason is wind or gusts and your spot is locally calm: severe alerts for the
+region and "no alerts" at the spot contradict each other. Mandatory with it: a
+`caution_notes` entry `Region: <reason with numbers>` and the region's reason in the `summary`.
+
 ─────────────────────────────────
 2) MANDATORY REFERENCE in `summary` — ALWAYS name the region
 ─────────────────────────────────
@@ -80,7 +86,7 @@ SELF-CHECK (MANDATORY)
 3. **Trend reference**: If `WIND-TREND`/`GUST-TREND`/foehn build-up → MUST be mentioned in the `summary` as the day's development in your own words ("clears out from 12:00", "deteriorates towards evening"). Do NOT copy the trend line verbatim.
 4. **Hazard review before prose**: Read all 8 `hazard_notes`. Every entry with a rating ≤7 MUST be mentioned in `summary` or `caution_notes`.
 5. **Wind-direction trap**: Before you write `conditional`, name the real hazard: gusts >30 km/h? Altitude wind/foehn/rain/thunderstorm? If all five are No and only `[WIND-WRONG]` or a wind shift → set `safe`. Wind shift and wrong sector restrict launch options, NEVER make it conditional.
-6. **Region safety cap** (see section above): (a) Synoptic sub-ratings (`aloft`/`foehn`/`thunderstorm`/`cape`/`rain`/`visibility`) ≤ region — but the region cap pulls **at most to 3 (`conditional`), NEVER to ≤2 (`not_safe`)**; `not_safe` only from your own spot data. `wind`/`gust` spot-autonomous. (b) `summary` MUST ALWAYS reference the region: for `safe` 1 short confirming half-sentence (synoptic situation supports it, e.g. 'also calm regionally'), for `conditional`/`not_safe` its status + reason **data-backed** (m/s, km/h, ΔP, m) — additive, even if the spot is locally green or already conditional. **Missing region reference = ERROR. Region pulling spot to not_safe = ERROR. Abstract 'region rating X' = ERROR.**
+6. **Region safety cap** (see section above): (a) Synoptic sub-ratings (`aloft`/`foehn`/`thunderstorm`/`cape`/`rain`/`visibility`) ≤ region — but the region cap pulls **at most to 3 (`conditional`), NEVER to ≤2 (`not_safe`)**; `not_safe` only from your own spot data. `wind`/`gust` spot-autonomous. (b) `summary` MUST ALWAYS reference the region: for `safe` 1 short confirming half-sentence (synoptic situation supports it, e.g. 'also calm regionally'), for `conditional`/`not_safe` its status + reason **data-backed** (m/s, km/h, ΔP, m) — additive, even if the spot is locally green or already conditional. (c) Region `not_safe` → your `safety_status` is NOT `safe` (status floor, also for wind/gust reasons). **Region not_safe + spot safe = ERROR. Missing region reference = ERROR. Region pulling spot to not_safe = ERROR. Abstract 'region rating X' = ERROR.**
 
 ═══════════════════════════════════════════════
 JSON RESPONSE (SPOT SAFETY)

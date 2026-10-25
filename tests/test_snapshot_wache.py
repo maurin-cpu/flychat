@@ -198,6 +198,48 @@ def test_hinweis_text_nennt_zahlen(archiv):
     assert "brauchbar" in text
 
 
+def _rot_gruen(archiv, tag, spot_status="safe", region_status="not_safe"):
+    """Ein Spot in Region "Zentralschweizer Alpen" — wie 19.08.2026 (7 Spots
+    gruen, Region rot)."""
+    pfad = archiv / f"{tag}.json"
+    daten = json.loads(pfad.read_text(encoding="utf-8"))
+    daten["regions"]["region_0"] = {"region_name": "Zentralschweizer Alpen",
+                                    "analysis": {"safety_status": region_status}}
+    daten["spots"]["spot_0"] = {"analyse_region": "Zentralschweizer Alpen",
+                                "analysis": {"safety_status": spot_status}}
+    pfad.write_text(json.dumps(daten), encoding="utf-8")
+
+
+def test_spot_gruen_in_roter_region_ist_hinweis(archiv):
+    _tag(archiv, "2026-10-21")
+    _tag(archiv, "2026-10-22")
+    _rot_gruen(archiv, "2026-10-22")
+    b = wache.befund("2026-10-22")
+    assert b["maengel"] == [] and wache.brauchbar("2026-10-22")
+    assert b["hinweise"] == ["region_rot_spot_gruen"]
+    assert b["region_rot_spot_gruen"] == ["spot_0 (Zentralschweizer Alpen)"]
+
+
+@pytest.mark.parametrize("spot, region", [("conditional", "not_safe"),
+                                          ("safe", "conditional"),
+                                          ("not_safe", "not_safe")])
+def test_kein_widerspruch_kein_hinweis(archiv, spot, region):
+    _tag(archiv, "2026-10-21")
+    _tag(archiv, "2026-10-22")
+    _rot_gruen(archiv, "2026-10-22", spot, region)
+    assert wache.befund("2026-10-22")["hinweise"] == []
+
+
+def test_rot_gruen_meldung_nennt_spot(archiv, postfach):
+    _tag(archiv, "2026-10-21")
+    _tag(archiv, "2026-10-22")
+    _rot_gruen(archiv, "2026-10-22")
+    wache.pruefe_und_melde("2026-10-22")
+    assert postfach == ["[Wingcast] 2026-10-22: 1 Spots gruen in roter Region"]
+    _, text = wache._text(wache.befund("2026-10-22"))
+    assert "spot_0 (Zentralschweizer Alpen)" in text
+
+
 def test_luecken_findet_fehlende_und_unvollstaendige(archiv):
     _tag(archiv, "2026-08-08")
     _tag(archiv, "2026-08-09", regionen=0)      # unvollstaendig

@@ -212,6 +212,26 @@ def find_region_for_point(lat, lon):
     return None
 
 
+def find_region_for_spot(spot):
+    """Region eines Spots: Point-in-Polygon, sonst die Region, unter der die
+    App den Spot zeigt (`analyse_region` aus der Spot-CSV).
+
+    Ohne den Rueckfall liefen Spots knapp ausserhalb aller Polygone (Monte
+    Bisbino, Stabli da Varuna, Soglio …) ohne Regions-Kontext durch die KI und
+    standen gruen, waehrend ihre angezeigte Region schwere Warnhinweise hatte.
+    """
+    region = find_region_for_point(spot["latitude"], spot["longitude"])
+    if region:
+        return region
+    name = (spot.get("analyse_region") or "").strip()
+    if not name:
+        return None
+    for region in _load_regions():
+        if region["region"] == name:
+            return region
+    return None
+
+
 def get_reference_points(spot_name, lat, lon, quiet=False):
     """
     Gibt die Referenzpunkte fuer einen Spot zurueck.

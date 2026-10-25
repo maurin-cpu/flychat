@@ -48,6 +48,13 @@ Der Weakest-Link-`min()` zieht `safety_status` automatisch nach.
 & Boeen sind terrain-/spotspezifisch; die Region hat dafuer keine Daten. Ein
 geschuetzter Spot darf trotz region-weitem Bodenwind ruhig bewertet werden.
 
+**STATUS-UNTERGRENZE (gilt IMMER, auch fuer Wind/Boeen):** Ist die Region
+`not_safe`, ist dein `safety_status` MINDESTENS `conditional` — nie `safe`. Das gilt
+auch dann, wenn der Region-Grund Wind oder Boeen ist und dein Spot lokal ruhig ist:
+schwere Warnhinweise der Region und "keine Warnhinweise" am Spot widersprechen sich.
+Pflicht dazu: ein `caution_notes`-Eintrag `Region: <Grund mit Zahlen>` und der
+Region-Grund im `summary`.
+
 ─────────────────────────────────
 2) PFLICHT-REFERENZ in `summary` — Region IMMER benennen
 ─────────────────────────────────
@@ -81,7 +88,7 @@ SELBST-CHECK (PFLICHT)
 3. **Trend-Bezug**: Wenn `WIND-TREND`/`GUST-TREND`/Foehn-Aufbau → MUSS im `summary` als Tagesentwicklung in eigenen Worten erwaehnt ("zieht ab ab 12h", "verschlechtert sich gegen Abend"). Trend-Zeile NICHT wortwoertlich.
 4. **Hazard-Review vor Prosa**: Alle 8 `hazard_notes` lesen. Jeder Eintrag mit Rating ≤7 MUSS in `summary` oder `caution_notes` erwaehnt werden.
 5. **Windrichtungs-Falle**: Bevor du `conditional` schreibst, nenne den echten Hazard: Boeen >30 km/h? Hoehenwind/Foehn/Regen/Gewitter? Wenn alle fuenf Nein und nur `[WIND-WRONG]` oder Drehung → setze `safe`. Winddrehung und falscher Sektor beschraenken Startoptionen, machen NIE conditional.
-6. **Region-Safety-Cap** (siehe Abschnitt oben): (a) Synoptische Sub-Ratings (`aloft`/`foehn`/`thunderstorm`/`cape`/`rain`/`visibility`) ≤ Region — aber der Region-Cap zieht **hoechstens auf 3 (`conditional`), NIE auf ≤2 (`not_safe`)**; `not_safe` nur aus eigenen Spot-Daten. `wind`/`gust` spotautonom. (b) `summary` MUSS die Region IMMER referenzieren: bei `safe` 1 kurzer bestaetigender Halbsatz (Grosswetterlage traegt mit, z.B. 'auch regional ruhig'), bei `conditional`/`not_safe` ihren Status + Grund **datenbelegt** (m/s, km/h, ΔP, m) — additiv, auch wenn der Spot lokal gruen oder schon conditional ist. **Fehlende Region-Referenz = FEHLER. Region zieht Spot auf not_safe = FEHLER. Abstraktes 'Region-Rating X' = FEHLER.**
+6. **Region-Safety-Cap** (siehe Abschnitt oben): (a) Synoptische Sub-Ratings (`aloft`/`foehn`/`thunderstorm`/`cape`/`rain`/`visibility`) ≤ Region — aber der Region-Cap zieht **hoechstens auf 3 (`conditional`), NIE auf ≤2 (`not_safe`)**; `not_safe` nur aus eigenen Spot-Daten. `wind`/`gust` spotautonom. (b) `summary` MUSS die Region IMMER referenzieren: bei `safe` 1 kurzer bestaetigender Halbsatz (Grosswetterlage traegt mit, z.B. 'auch regional ruhig'), bei `conditional`/`not_safe` ihren Status + Grund **datenbelegt** (m/s, km/h, ΔP, m) — additiv, auch wenn der Spot lokal gruen oder schon conditional ist. (c) Region `not_safe` → dein `safety_status` ist NICHT `safe` (Status-Untergrenze, auch bei Wind-/Boeen-Grund). **Region not_safe + Spot safe = FEHLER. Fehlende Region-Referenz = FEHLER. Region zieht Spot auf not_safe = FEHLER. Abstraktes 'Region-Rating X' = FEHLER.**
 
 ═══════════════════════════════════════════════
 JSON-ANTWORT (SPOT SAFETY)

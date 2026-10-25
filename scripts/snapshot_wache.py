@@ -74,6 +74,9 @@ FOLGEN = {
     "fehlerhafte_bewertungen": "Diese Spots/Regionen stehen heute grau in der "
                                "App, auch der Reparaturdurchgang hat sie nicht "
                                "retten koennen.",
+    "region_rot_spot_gruen": "Die App zeigt den Spot ohne Warnhinweise, seine "
+                             "Region mit schweren — die KI blieb auch nach der "
+                             "Rueckfrage bei gruen.",
 }
 
 # Hinweise sind keine Maengel: der Tag ist brauchbar, Briefing und Nachversand
@@ -82,6 +85,9 @@ FOLGEN = {
 # meldete "in Ordnung", weil ein Fehler-Eintrag als "bewertet" zaehlte).
 HINWEISE = {
     "fehlerhafte_bewertungen": "Einzelne Bewertungen sind gescheitert",
+    # Seit 25.10.2026 fragt die Analyse die KI in diesem Fall nach; was danach
+    # noch gruen ist, steht hier (02.08.–25.10.: 111 Faelle ohne Rueckfrage).
+    "region_rot_spot_gruen": "Spots ohne Warnhinweise in einer Region mit schweren",
 }
 
 
@@ -117,6 +123,22 @@ def _gescheitert(eintrag: dict) -> bool:
     return isinstance(a, dict) and "error" in (a.get("safety_status"), a.get("status"))
 
 
+def _status(eintrag: dict) -> Optional[str]:
+    a = eintrag.get("analysis")
+    return a.get("safety_status") if isinstance(a, dict) else None
+
+
+def _region_rot_spot_gruen(spots: dict, regionen: dict) -> List[str]:
+    """Spots, die gruen stehen, waehrend die Region, unter der die App sie
+    zeigt (analyse_region), schwere Warnhinweise hat. Am Ergebnis gemessen,
+    nicht an der Ursache (fehlender Kontext, KI ignoriert Regel, …)."""
+    rot = {r.get("region_name") for r in regionen.values() if _status(r) == "not_safe"}
+    return sorted(
+        f"{name} ({s.get('analyse_region')})" for name, s in spots.items()
+        if _status(s) == "safe" and s.get("analyse_region") in rot
+    )
+
+
 def befund(tag: Optional[str] = None, archive_dir: Optional[Path] = None) -> dict:
     """Prueft einen Archivtag. Gibt Zahlen UND die Mangelliste zurueck.
 
@@ -127,7 +149,8 @@ def befund(tag: Optional[str] = None, archive_dir: Optional[Path] = None) -> dic
     tag = tag or date.today().isoformat()
     b: Dict = {"tag": tag, "spots": 0, "regionen": 0, "spots_bewertet": 0,
                "regionen_bewertet": 0, "spots_fehler": 0, "regionen_fehler": 0,
-               "referenz_spots": None, "schema": 0, "maengel": [], "hinweise": []}
+               "referenz_spots": None, "schema": 0, "maengel": [], "hinweise": [],
+               "region_rot_spot_gruen": []}
 
     pfad = archive_dir / f"{tag}.json"
     if not pfad.exists():
@@ -175,6 +198,9 @@ def befund(tag: Optional[str] = None, archive_dir: Optional[Path] = None) -> dic
     b["regionen_fehler"] = sum(1 for r in regionen.values() if _gescheitert(r))
     if b["spots_fehler"] or b["regionen_fehler"]:
         b["hinweise"].append("fehlerhafte_bewertungen")
+    b["region_rot_spot_gruen"] = _region_rot_spot_gruen(spots, regionen)
+    if b["region_rot_spot_gruen"]:
+        b["hinweise"].append("region_rot_spot_gruen")
     return b
 
 
@@ -241,14 +267,37 @@ def _zaehlung(b: dict) -> str:
     )
 
 
+def _text_rot_gruen(b: dict) -> str:
+    liste = b.get("region_rot_spot_gruen") or []
+    return (
+        f"- {HINWEISE['region_rot_spot_gruen']} ({len(liste)})\n"
+        f"    {FOLGEN['region_rot_spot_gruen']}\n"
+        + "".join(f"    {s}\n" for s in liste) +
+        "Ursache im Log:  journalctl -u wingcast.service | grep REGION-UNTERGRENZE\n\n"
+    )
+
+
 def _text_hinweise(b: dict) -> tuple:
-    """Tag ist brauchbar, aber einzelne Bewertungen fehlen (Status "error")."""
+    """Tag ist brauchbar, aber einzelne Bewertungen fehlen (Status "error")
+    und/oder Spots stehen gruen in einer roten Region."""
+    hinweise = b.get("hinweise") or []
+    if "fehlerhafte_bewertungen" not in hinweise:
+        n = len(b.get("region_rot_spot_gruen") or [])
+        betreff = f"[Wingcast] {b['tag']}: {n} Spots gruen in roter Region"
+        text = (
+            f"Der Archivtag {b['tag']} ist brauchbar, aber Spot und Region "
+            f"widersprechen sich.\n\n"
+            + _text_rot_gruen(b) + _zaehlung(b) +
+            "Hoechstens eine Meldung pro Archivtag.\n"
+        )
+        return betreff, text
     betreff = (f"[Wingcast] {b['tag']}: {b.get('regionen_fehler', 0)} Regionen / "
                f"{b.get('spots_fehler', 0)} Spots ohne Bewertung")
     text = (
         f"Der Archivtag {b['tag']} ist brauchbar, aber nicht vollstaendig bewertet.\n\n"
         f"- {HINWEISE['fehlerhafte_bewertungen']}\n"
         f"    {FOLGEN['fehlerhafte_bewertungen']}\n\n"
+        + (_text_rot_gruen(b) if "region_rot_spot_gruen" in hinweise else "")
         + _zaehlung(b) +
         "Der Analyse-Lauf rechnet gescheiterte Bewertungen in bis zu drei\n"
         "Runden nach (Pausen 30/90/180 s). Was danach noch fehlt, steht hier.\n"
@@ -501,6 +550,9 @@ def main(argv=None) -> int:
     for m in b["maengel"]:
         print(f"  - {MAENGEL.get(m, m)}: {FOLGEN.get(m, '')}")
     for h in b["hinweise"]:
+        if h == "region_rot_spot_gruen":
+            print(f"  - {HINWEISE[h]}: {', '.join(b['region_rot_spot_gruen'])}")
+            continue
         print(f"  - {HINWEISE.get(h, h)}: {b['regionen_fehler']} Regionen, "
               f"{b['spots_fehler']} Spots gescheitert")
     if args.melden:

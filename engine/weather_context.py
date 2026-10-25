@@ -40,7 +40,7 @@ from gust_calculator import (
 from station_observations import StationManager
 from source_area import (
     get_reference_points, _load_regions, find_region_for_point,
-    get_all_regions,
+    find_region_for_spot, get_all_regions,
 )
 from prompts import (
     SYSTEM_PROMPT,
@@ -322,6 +322,20 @@ def _format_region_context_block(region_result: dict, spot_region: dict) -> str:
     pno = _g("primary_no_go")
     if pno:
         parts.append(f"Region-Haupt-NoGo: {pno}")
+    if ss == "not_safe":
+        # Status-Untergrenze (User-Entscheid 25.10.2026): Region rot → Spot nie
+        # gruen. Bis dahin galt nur der Sub-Rating-Cap; kam das Region-Rot aus
+        # Wind/Boeen, blieb der Spot erlaubt gruen — 104× bis 10/2026.
+        gruende = _g("no_go_reasons") or []
+        if isinstance(gruende, list) and gruende:
+            parts.append("Region-NoGo-Gruende: " + " | ".join(str(g) for g in gruende))
+        parts.append(
+            "→ REGION-STATUS-UNTERGRENZE: Die Region hat SCHWERE Warnhinweise (not_safe). "
+            "Dein Spot-safety_status ist darum MINDESTENS conditional — ohne Ausnahme, auch "
+            "wenn der Grund Wind/Boeen ist und der Spot lokal ruhig ist. Nenne den Region-Grund "
+            "mit Zahlen in caution_notes (Eintrag 'Region: ...') und im summary. "
+            "not_safe nur aus Spot-eigenen Daten."
+        )
     if _g("wind_summary"):
         parts.append(f"Wind-Zusammenfassung: {_g('wind_summary')}")
     if _g("wind_shear"):
@@ -1530,7 +1544,7 @@ class WeatherContextMixin:
         elevation_m = spot["elevation_m"]
 
         # Region-ID für Terrain-Klassifikation (einmal pro Spot)
-        spot_region = find_region_for_point(spot["latitude"], spot["longitude"])
+        spot_region = find_region_for_spot(spot)
         spot_region_id = spot_region["id"] if spot_region else None
         spot_terrain_zone = get_terrain_zone(elevation_m, spot_region_id)
 
