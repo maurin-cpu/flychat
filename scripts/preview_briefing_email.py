@@ -282,8 +282,7 @@ def main() -> int:
           f"{'  Stand ' + map_stand if map_stand else ''}")
     w = ctx['v3_warnings']
     print(f"     - Warnungen CH:    "
-          + (" · ".join(f"{'+' if c['active'] else '-'}{c['label']}" for c in w['checks']) or '(keine Daten)')
-          + f"  ({sum(1 for i in w['entries'] if i['ki_text'])}/{len(w['entries'])} mit KI-Satz)")
+          + (" · ".join(f"{'+' if c['active'] else '-'}{c['label']}" for c in w['checks']) or '(keine Daten)'))
     cov2 = ctx['v3_coverage']
     print(f"     - Regionen:        {cov2['regions']} "
           f"({cov2['with_recommendation']} mit Einschaetzung, "

@@ -642,3 +642,40 @@ class TestLageLogik(unittest.TestCase):
         txt = bc._lage_fazit(self._wl(0.6, 0.05), "2026-09-18")
         self.assertTrue("calming down." in txt or "beruhigt sich." in txt, txt)
         self.assertTrue("fading" in txt or "abklingend" in txt, txt)
+
+
+class TestWarningsOnlyLabels(_De):
+    """User 25.10.2026: Warnungen nur als Labels — erklaert wird oben in der Kette."""
+    DATES = ("2026-09-16",)
+
+    def test_no_sentence_only_labels(self):
+        w = bc._ch_warnings(_wl(self.DATES, [{"RAIN", "WIND"}]), self.DATES[0])
+        self.assertTrue(w["any"])
+        # "verblasen" ist schwer (stop) und steht darum vorn
+        self.assertEqual([(e["topic"], e["severity"]) for e in w["entries"]],
+                         [("WIND", "stop"), ("RAIN", "warn")])
+        for e in w["entries"]:
+            self.assertEqual(set(e), {"topic", "label", "severity", "sev_label"})
+        self.assertEqual(len(w["checks"]), 4)
+        self.assertNotIn("has_ki", w)
+
+    def test_quiet_day(self):
+        w = bc._ch_warnings(_wl(self.DATES, [set()]), self.DATES[0])
+        self.assertFalse(w["any"])
+        self.assertEqual(w["entries"], [])
+
+
+class TestNoSynopticLlm(unittest.TestCase):
+    """Der Wetterlage-KI-Text ist abgeschaltet: der Lauf ruft kein Modell auf."""
+
+    def test_refresh_never_calls_the_model(self):
+        from unittest import mock
+        from engine import synoptic_llm as sl
+        with mock.patch("engine.synoptic_context.build_synoptic_context",
+                        return_value={"forecast_dates": []}), \
+                mock.patch.object(sl, "generate_synoptic_overview") as gen:
+            out = sl.refresh_synoptic_overview({}, object(), "m")
+            lang = sl.refresh_synoptic_overview_lang(out, object(), "m", "xx")
+        gen.assert_not_called()
+        self.assertIsNone(out["llm_overview"])
+        self.assertIsNone(lang["llm_overview"])

@@ -70,10 +70,11 @@
   // "2": neuer Default (alle Bloecke offen, 19.09.2026) — der alte Schluessel
   // haette bei Testern den damaligen Stand "nur Lage offen" konserviert.
   const LS_CHAIN_OPEN_KEY = "wingcast.briefing.chainOpen2";
-  // Reihenfolge wie CHAIN_BLOCKS unten plus die Warnungen. Bewusst als
-  // Literal: der State wird beim Laden gebaut, CHAIN_BLOCKS steht spaeter.
+  // Reihenfolge wie CHAIN_BLOCKS unten. Bewusst als Literal: der State wird
+  // beim Laden gebaut, CHAIN_BLOCKS steht spaeter. Die Warnungen klappen seit
+  // 25.10.2026 nicht mehr auf (nur Labels).
   const CHAIN_OPEN_DEFAULT = ["lage", "fronts", "foehn", "wind", "stability",
-                              "thermik", "sonne", "modelle", "warnings"];
+                              "thermik", "sonne", "modelle"];
   const LS_TIER_FILTER_KEY = "wingcast.briefing.tierFilter";       // legacy key (read-only fallback)
   const LS_SAFETY_FILTER_KEY = "wingcast.briefing.safetyFilter";   // v1.3
   const LS_MIN_STARS_KEY = "wingcast.briefing.minStars";           // legacy key (read-only fallback, v1.3 stars)
@@ -2320,20 +2321,29 @@
     return parts.filter(Boolean).join("");
   }
 
-  function chainWarningsBodyHtml(w, labels) {
-    const checks = (w.checks || []).map(c =>
-      `<span class="bf-chain-check${c.active ? (c.level === "stop" ? " bf-chain-check--stop" : " bf-chain-check--on") : ""}">${c.active ? "✓" : "–"} ${escapeHtml(c.label)}</span>`
-    ).join("");
+  // Warnungen nur als Labels, ohne Aufklappen: erklaert wird jede Gefahr in
+  // ihrem Block der Kette (User 25.10.2026). Aktive zuerst, schwere vorn.
+  function chainWarningsRowHtml(w, labels) {
     const entries = Array.isArray(w.entries) ? w.entries : [];
-    const body = entries.length
-      ? entries.map(e => `
-          <div class="bf-chain-entry${e.severity === "stop" ? " bf-chain-entry--stop" : ""}">
-            <div class="bf-chain-entry-title">${escapeHtml(e.label)} <span class="bf-chain-entry-sev">· ${escapeHtml(e.sev_label || "")}</span></div>
-            ${e.ki_text ? `<p class="bf-chain-entry-ki">${escapeHtml(e.ki_text)}</p>` : ""}
-            ${e.code_text ? `<p class="bf-chain-entry-code">${escapeHtml(e.code_text)}</p>` : ""}
-          </div>`).join("")
-      : `<p class="bf-chain-none">${escapeHtml(labels.hz_none || "")}</p>`;
-    return `<div class="bf-chain-checks">${checks}</div>${body}`;
+    const stop = entries.some(e => e.severity === "stop");
+    const on = entries.map(e => {
+      const sev = e.severity === "stop" ? "stop" : "warn";
+      return `<span class="bf-chain-check bf-chain-check--${sev}"><span aria-hidden="true">▲</span> ${escapeHtml(e.label)}`
+        + (sev === "stop" && e.sev_label ? ` <span class="bf-chain-check-sev">· ${escapeHtml(e.sev_label)}</span>` : "")
+        + `</span>`;
+    }).join("");
+    const off = (w.checks || []).filter(c => !c.active)
+      .map(c => `<span class="bf-chain-check">– ${escapeHtml(c.label)}</span>`).join("");
+    const none = entries.length ? "" : `<p class="bf-chain-none">${escapeHtml(labels.hz_none || "")}</p>`;
+    return `
+      <div class="bf-chain-row bf-chain-row--${entries.length ? (stop ? "stop" : "warn") : "ok"} bf-chain-warnrow">
+        <div class="bf-chain-warnrow-head">
+          <span class="bf-chain-no" aria-hidden="true">!</span>
+          <span class="bf-chain-title">${escapeHtml(labels.warnings_ch || "")}</span>
+        </div>
+        <div class="bf-chain-checks">${on}${off}</div>
+        ${none}
+      </div>`;
   }
 
   // Eine Akkordeon-Zeile. status: ok|info|warn|"" (Lage/ohne Urteil).
@@ -2402,17 +2412,7 @@
 
     const w = entry.warnings;
     if (w && Array.isArray(w.checks) && w.checks.length) {
-      const active = w.checks.filter(c => c.active);
-      const stop = active.some(c => c.level === "stop");
-      const open = state.chainOpen.has("warnings");
-      rows.push(chainRowHtml({
-        key: "warnings", no: "!",
-        title: labels.warnings_ch || "",
-        status: active.length ? (stop ? "stop" : "warn") : "ok",
-        statusLabel: active.length ? active.map(c => c.label).join(" · ") : wcT("js.chain.warn_none"),
-        meta: "", open,
-        body: open ? chainWarningsBodyHtml(w, labels) : "",
-      }));
+      rows.push(chainWarningsRowHtml(w, labels));
     }
 
     el.hidden = false;

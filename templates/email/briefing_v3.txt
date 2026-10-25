@@ -60,11 +60,11 @@ WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr
 {% for l in v3_chain.modelle.lines %}- {{ l.text }}
 {% endfor %}{% endif %}
 {{ v3_labels.warnings_ch }}
-{% for w in v3_warnings.entries -%}
-! {{ w.label }} ({{ w.sev_label }}): {% if w.ki_text %}{{ w.ki_text }} {% endif %}{{ w.code_text }}
+{% if v3_warnings.entries -%}
+{% for w in v3_warnings.entries %}! {{ w.label }}{% if w.severity == 'stop' %} ({{ w.sev_label }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}
 {% else -%}
 {{ v3_labels.hz_none }}
-{% endfor %}
+{% endif %}
 {{ v3_labels.regions }}
 {% for r in v3_regions -%}
 - {{ r.region_name }}{% if r.rating_display %} {{ r.rating_display }}/5{% endif %}{% if r.has_window and r.cls != 'not_safe' %} · {{ r.window }}{% endif %}{% if r.short %}: {{ r.short }}{% endif %}

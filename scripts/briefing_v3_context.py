@@ -4174,32 +4174,29 @@ def _hazard_base_text(topic: str, check: dict) -> str:
 
 
 def _ch_warnings(wetterlage: dict, date: str) -> dict:
-    """Warnungen als Gesamtlage Schweiz: zuerst die Schalter (Regen? Foehn? …,
-    vom Code), dann je aktiver Gefahr der KI-Satz (wo in der Schweiz, woher,
-    wohin) plus der Code-Satz mit Zahl. Die Regionen folgen erst danach —
-    ihre Warn-Chips stehen in den Regionszeilen."""
+    """Warnungen als Gesamtlage Schweiz — nur noch als Uebersicht: welche der
+    vier Gefahren die Daten heute schalten (vom Code). Kein Satz mehr: Erklaert
+    wird jede Gefahr in ihrem Block der Kette (Regen in Block 1, Foehn, Wind,
+    Gewitter in der Labilitaet) — der Warnsatz wiederholte das nur (User
+    25.10.2026). Die Regionen folgen erst danach mit ihren Warn-Chips.
+
+    `entries` = die aktiven Gefahren, schwere zuerst; die oeffentliche Webseite
+    (gleitcast_webpage/lib/briefing.ts) liest daraus Label und Stufe."""
     from engine.synoptic_llm import HAZARD_TOPICS
     day = _hazard_day(wetterlage, date) if wetterlage else None
     if not day:
-        return {"checks": [], "entries": [], "any": False, "has_ki": False}
-    ki = {i.get("topic"): i.get("text", "") for i in day.get("items") or []}
-    checks, items = [], []
+        return {"checks": [], "entries": [], "any": False}
+    checks = []
     for topic in HAZARD_TOPICS:
         c = day["checks"].get(topic) or {}
-        label = _lbl("hz_" + topic)
-        checks.append({"topic": topic, "label": label, "active": bool(c.get("active")),
-                       "level": c.get("level", "warn")})
-        if not c.get("active"):
-            continue
-        items.append({"topic": topic, "label": label, "severity": c.get("level", "warn"),
-                      "sev_label": _lbl("sev_" + c.get("level", "warn")),
-                      "ki_text": ki.get(topic, ""),
-                      "code_text": _hazard_code_text(topic, c, timing=not ki.get(topic),
-                                                     cause=_hazard_cause(topic, c, wetterlage, date))})
-    items.sort(key=lambda e: e["severity"] != "stop")
+        checks.append({"topic": topic, "label": _lbl("hz_" + topic),
+                       "active": bool(c.get("active")), "level": c.get("level", "warn"),
+                       "sev_label": _lbl("sev_" + c.get("level", "warn"))})
     # "entries", nicht "items": Jinja loest w.items auf die dict-Methode auf
-    return {"checks": checks, "entries": items, "any": bool(items),
-            "has_ki": any(e["ki_text"] for e in items)}
+    entries = sorted(({"topic": c["topic"], "label": c["label"], "severity": c["level"],
+                       "sev_label": c["sev_label"]} for c in checks if c["active"]),
+                     key=lambda e: e["severity"] != "stop")
+    return {"checks": checks, "entries": entries, "any": bool(entries)}
 
 
 # ----------------------------------------------------------------------

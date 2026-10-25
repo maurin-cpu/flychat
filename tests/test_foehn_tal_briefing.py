@@ -189,13 +189,11 @@ class TestBriefing(unittest.TestCase):
         facts = {f["k"]: f["v"] for f in day["chain"]["foehn"]["facts"]}
         self.assertEqual(facts["Föhntäler"], "2/3")
         self.assertEqual(facts["Böe"], "55 km/h")
-        code = _foehn_warning(day)["code_text"]
-        self.assertIn("In den Föhntälern Wind 22–34 km/h, Böen bis 55 km/h (Reusstal).", code)
-        self.assertNotIn("Im Lee", code)
-        # eine Zahl, eine Quelle: Block 3, Chips, Warnbox, KI-Payload
+        # Warnung nur noch als Label (25.10.2026): die Zahlen stehen allein in Block 3
+        self.assertEqual(set(_foehn_warning(day)), {"topic", "label", "severity", "sev_label"})
+        # eine Zahl, eine Quelle: Block 3, Chips, KI-Payload
         nums = lambda s: sorted(set(int(x) for x in re.findall(r"(\d+)(?=[–\s]*(?:\d+\s*)?km/h)", s)))  # noqa: E731
         self.assertEqual(nums(fazit), [22, 34, 55])
-        self.assertEqual(nums(code), [22, 34, 55])
         entry = sl._hazards_for_llm(sl.hazard_checks(_wetterlage(tal)))[0]["active"]["FOEHN"]
         self.assertEqual((entry["tal_wind_kmh"], entry["tal_gust_max_kmh"]), ("22-34", 55))
         self.assertEqual(entry["tal_confirmed"], ["Reusstal", "Haslital"])
@@ -215,8 +213,7 @@ class TestBriefing(unittest.TestCase):
         facts = {f["k"]: f["v"] for f in day["chain"]["foehn"]["facts"]}
         self.assertEqual(facts["Föhntäler"], "0/3")
         self.assertNotIn("Böe", facts)
-        # eine Zahl, eine Quelle: Warnbox nennt denselben Satz
-        self.assertIn(tal_txt, _foehn_warning(day)["code_text"])
+        self.assertEqual(_foehn_warning(day)["label"], "Föhn")
         self.assertEqual(day["chain"]["foehn"]["status"], "warn")      # Pille bleibt orange
 
     def test_unconfirmed_strong_wind_is_not_called_weak(self):
@@ -233,7 +230,7 @@ class TestBriefing(unittest.TestCase):
         self.assertIn("nicht prüfbar", day["chain"]["foehn"]["fazit"])
         facts = {f["k"]: f["v"] for f in day["chain"]["foehn"]["facts"]}
         self.assertEqual(facts["Föhntäler"], "n. prüfbar")
-        self.assertNotIn("Föhntälern", _foehn_warning(day)["code_text"])
+        self.assertNotIn("code_text", _foehn_warning(day))
 
 
 class TestValidator(unittest.TestCase):
@@ -532,11 +529,9 @@ class TestWarnungAusTaelern(unittest.TestCase):
         self.assertIsNone(chk["facts"]["tal"])              # KI-Validator: keine Talzahl-Pflicht
         self.assertEqual(chk["facts"]["valley_signs"]["n"], 2)
 
-    def test_warnbox_and_ki_payload_describe_the_valleys(self):
+    def test_warning_label_and_ki_payload_describe_the_valleys(self):
         day = bc.build_chain_all_days(self._wl(), [DATE])["by_date"][DATE]
-        code = _foehn_warning(day)["code_text"]
-        self.assertIn("Data show dry wind from the foehn direction in 2 of 3 valleys", code)
-        self.assertNotRegex(code, r"(?i)\bno foehn\b|south foehn \(")
+        self.assertEqual(_foehn_warning(day)["label"], "Foehn")
         entry = sl._hazards_for_llm(sl.hazard_checks(self._wl()))[0]["active"]["FOEHN"]
         self.assertEqual(entry["valley_dry_foehn_wind"]["n"], 2)
         self.assertNotIn("tal_confirmed", entry)

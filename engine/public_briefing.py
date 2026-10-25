@@ -36,7 +36,7 @@ _STEP_FIELDS = ("fazit", "status", "status_label", "facts", "num", "labile",
                 "reading", "legend", "guide")
 _TILE_FIELDS = ("tier", "band", "status", "rating", "n", "pressure_hpa",
                 "wind_arrow", "wind_sector", "wind_strength", "wind_hot")
-_WARN_FIELDS = ("any", "checks", "entries", "has_ki")
+_WARN_FIELDS = ("any", "checks", "entries")
 
 
 def path_for(lang: str) -> Path:

@@ -223,16 +223,18 @@
   {% if v3_warnings.checks %}
   <tr><td style="padding:14px 18px 6px;border-top:1px solid {{ C.border }};">
     <div style="font:600 12px/1 {{ MONO }};letter-spacing:.08em;text-transform:uppercase;color:{{ C.muted }};margin:0 0 8px;">{{ v3_labels.warnings_ch }}</div>
-    <div>{% for c in v3_warnings.checks %}<span style="display:inline-block;margin:0 6px 6px 0;padding:3px 8px;border-radius:100px;font:500 12px/1.3 {{ MONO }};{% if c.active %}color:{{ C.danger if c.level == 'stop' else C.warn_fg }};background-color:{{ '#fee2e2' if c.level == 'stop' else C.warn_bg }};{% else %}color:{{ C.muted }};background-color:{{ C.surface2 }};border:1px solid {{ C.border }};{% endif %}">{% if c.active %}&#10003;{% else %}&ndash;{% endif %} {{ c.label }}</span>{% endfor %}</div>
-    {% for w in v3_warnings.entries %}
-    <div style="margin:8px 0 0;padding:10px 12px;border-left:4px solid {{ C.danger if w.severity == 'stop' else C.accent }};border-radius:6px;background-color:{{ '#fef2f2' if w.severity == 'stop' else '#fffbeb' }};">
-      <div style="font:600 14px/1.4 {{ SANS }};color:{{ C.ink }};">{{ w.label }} <span style="font:500 11px/1.2 {{ MONO }};color:{{ C.muted }};text-transform:uppercase;letter-spacing:.04em;">· {{ w.sev_label }}</span></div>
-      {% if w.ki_text %}<p style="margin:4px 0 0;font:15px/1.5 {{ SANS }};color:{{ C.ink }};">{{ w.ki_text }}</p>{% endif %}
-      <p style="margin:4px 0 0;font:14px/1.5 {{ SANS }};color:{{ C.text2 }};">{{ w.code_text }}</p>
+    {#- Nur Labels: aktive Gefahren zuerst (schwere vorn), dann die ruhigen
+        gedaempft. Erklaert wird jede Gefahr in ihrem Block oben (User 25.10.2026). -#}
+    <div>
+      {%- for w in v3_warnings.entries -%}
+      {%- set stop = w.severity == 'stop' -%}
+      <span style="display:inline-block;margin:0 8px 8px 0;padding:7px 12px;border-radius:8px;border:1px solid {{ '#fca5a5' if stop else '#fdba74' }};background-color:{{ '#fee2e2' if stop else C.warn_bg }};font:600 14px/1.2 {{ SANS }};color:{{ C.danger if stop else C.warn_fg }};white-space:nowrap;">&#9650;&nbsp;{{ w.label }}{% if stop %}<span style="font:600 10px/1 {{ MONO }};letter-spacing:.06em;text-transform:uppercase;">&nbsp;&middot;&nbsp;{{ w.sev_label }}</span>{% endif %}</span>
+      {%- endfor -%}
+      {%- for c in v3_warnings.checks if not c.active -%}
+      <span style="display:inline-block;margin:0 8px 8px 0;padding:7px 12px;border-radius:8px;border:1px solid {{ C.border }};background-color:{{ C.surface2 }};font:500 14px/1.2 {{ SANS }};color:#94a3b8;white-space:nowrap;">&ndash;&nbsp;{{ c.label }}</span>
+      {%- endfor -%}
     </div>
-    {% else %}
-    <p style="margin:4px 0 0;font:15px/1.5 {{ SANS }};color:{{ C.muted }};font-style:italic;">{{ v3_labels.hz_none }}</p>
-    {% endfor %}
+    {% if not v3_warnings.entries %}<p style="margin:0 0 4px;font:14px/1.5 {{ SANS }};color:{{ C.muted }};">{{ v3_labels.hz_none }}</p>{% endif %}
   </td></tr>
   {% endif %}
 

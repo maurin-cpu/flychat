@@ -345,40 +345,43 @@
 }
 .bf-chain-sunbar > span { display: block; height: 100%; background: #d97706; }
 
-/* Warnungen Schweiz (letzte Zeile) */
-.bf-chain-checks { margin-bottom: 2px; }
+/* Warnungen Schweiz (letzte Zeile): nur Labels, kein Aufklappen —
+   erklaert wird jede Gefahr in ihrem Block oben (25.10.2026) */
+.bf-chain-warnrow { padding: 8px var(--space-2) 12px 0; }
+.bf-chain-warnrow-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  margin-bottom: 8px;
+}
+.bf-chain-checks { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 30px; }
 .bf-chain-check {
-  display: inline-block;
-  margin: 0 6px 6px 0;
-  padding: 3px 8px;
-  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
   border: 1px solid var(--color-border);
   background: var(--color-bg-elevated);
-  font-family: var(--bf-chain-mono);
-  font-size: 12px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.2;
   color: var(--color-text-muted);
+  opacity: 0.75;
 }
-.bf-chain-check--on   { color: var(--bf-chain-warn-fg); background: var(--bf-chain-warn-bg); border-color: transparent; }
-.bf-chain-check--stop { color: var(--bf-chain-stop-fg); background: var(--bf-chain-stop-bg); border-color: transparent; }
-.bf-chain-entry {
-  margin: 6px 0 0;
-  padding: 8px 12px;
-  border-left: 4px solid #d97706;
-  border-radius: 6px;
-  background: #fffbeb;
-}
-.bf-chain-entry--stop { border-left-color: var(--bf-chain-stop-fg); background: #fef2f2; }
-.bf-chain-entry-title { font-weight: 600; color: #1e293b; }
-.bf-chain-entry-sev {
+.bf-chain-check--warn,
+.bf-chain-check--stop { font-weight: 600; opacity: 1; }
+.bf-chain-check--warn { color: var(--bf-chain-warn-fg); background: var(--bf-chain-warn-bg); border-color: #fdba74; }
+.bf-chain-check--stop { color: var(--bf-chain-stop-fg); background: var(--bf-chain-stop-bg); border-color: #fca5a5; }
+.bf-chain-check > span[aria-hidden] { font-size: 10px; }
+.bf-chain-check-sev {
   font-family: var(--bf-chain-mono);
   font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #64748b;
 }
-.bf-chain-entry-ki { margin: 2px 0 0; color: #1e293b; }
-.bf-chain-entry-code { margin: 2px 0 0; color: #475569; font-size: var(--text-xs); }
+.bf-chain-warnrow .bf-chain-none { margin: 8px 0 0 30px; }
 .bf-chain-none { margin: 0; font-style: italic; color: var(--color-text-secondary); }
 
 /* Quellenzeile: welche Modelle hinter "Prognosedaten" stehen */

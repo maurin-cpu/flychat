@@ -45,7 +45,7 @@ Folgetage in den Blöcken (die haben ihr eigenes Briefing).
 | Woche als Bild | drei Tageskacheln: Einstufung (`_day_verdict`, seit 12.10.2026 ohne Mehrheits-Schwelle: Severe alerts, sobald **eine** Abo-Region schwere hat; No alerts nur, wenn **keine** Region Warnhinweise hat; sonst Alerts), Note, Druck, Höhenwind-Pfeil, Regionen-Gruppen, CH-Zählung. **Kein** Tages-Hinweis, keine Auffälligkeits-Zeile — beides las sich als Urteil über die gelisteten Regionen | Code |
 | Synoptik-Karte | Screenshot der App-Karte `/synoptik/karte` (Festland Spanien–Slowakei, Isobaren, H/T, DWD-Fronten, Höhenwind-Pfeile) | App + Playwright |
 | **Analyse-Kette** | acht Blöcke, §3 | Code (Block 1 künftig KI) |
-| Warnungen Schweiz | Gefahren-Schalter je Tag mit Ausmass, Zeitfenster und **synoptischer Ursache** | Code (+ KI-Satz, wenn vorhanden) |
+| Warnungen Schweiz | Nur Labels: welche der vier Gefahren (Regen, Gewitter, Föhn, starker Wind) die Daten schalten, schwere zuerst, ruhige gedämpft. Kein Satz — erklärt wird jede Gefahr in ihrem Block (seit 25.10.2026) | Code |
 | Deine Regionen | je Abo-Region Note, Fenster, Chips, erster Satz der Regions-Einschätzung | Code + KI (Regionsanalyse) |
 
 Die Seite zeigt nur, was das Mail am Ende zeigt — keine Vorschau-Kopfzeile,
@@ -206,10 +206,11 @@ seit 19.09.2026 eine Pille (Daten gegen Erwartung aus dem Druck).
 
 | Element | Quelle |
 |---|---|
-| Pillen, Chips, Fazit-Sätze Blöcke 2–8, Warnungen inkl. Ursache | Code |
-| Block 1 Tagessatz | heute Code; vorgesehen KI (`day_lines`), Skill verlangt dieselbe Form: Einfluss → Druck → Wetterfolge, max 35 Wörter, Laienworte für Hoch/Tief, Logik-Abgleich |
-| KI-Satz über einer Warnung | KI (`hazards`), optional |
+| Pillen, Chips, Fazit-Sätze Blöcke 2–8, Warnungs-Labels | Code |
+| Block 1 Tagessatz | Code |
 | Regionen-Einschätzung | KI (Regionsanalyse, eigener Skill) |
+
+Der Wetterlage-KI-Text (`engine/synoptic_llm.py`, Skill `synoptic_overview.md`: Lead, Gefahren-Sätze, Tagessätze) ist seit 25.10.2026 abgeschaltet — er brauchte fast täglich alle 4 Korrekturrunden und wiederholte nur, was die Blöcke schon sagen. `llm_overview` bleibt `null`, die Gefahren-Schalter rechnet das Briefing selbst (`hazard_checks`).
 
 Skill-Regeln zu Fronten: Fronten-Wörter nur, wenn `fronten.durchgaenge`
 Einträge hat; Validator lässt sie dann durch (`_FRONT_PATTERNS`). Ohne
@@ -275,7 +276,7 @@ Sätze in Mail und App 1:1 identisch.
 |---|---|
 | Payload | `/api/briefing` → `analyse.by_date[YYYY-MM-DD].{chain, warnings, fronts_kind}` + `analyse.labels` (`web.py _briefing_analyse`, bei Fehler `null`, die Spots kommen trotzdem) |
 | Cache | ETag zusätzlich über die Ordner-mtimes des DWD-Fronten-Archivs und der Prognose-Durchgänge sowie den Prozessstart (sonst liefert der Browser nach einem Deploy per 304 die alte Payload-Form bis zum nächsten Datenlauf) |
-| Darstellung | `static/js/briefing.js renderChain`: Akkordeon-Liste, eine Zeile je Block 1–8 plus Warnungen — Nummer, Titel, Status-Pille rechts, Chevron; Inhalt klappt unter der Zeile auf (ARIA-Disclosure, Tastatur-Fokus bleibt auf der Zeile). Lage trägt statt Pille Druck · Regime · Tendenz. Offene Blöcke bleiben über den Tageswechsel (`localStorage wingcast.briefing.chainOpen2`, Erstbesuch: **alle** offen) |
+| Darstellung | `static/js/briefing.js renderChain`: Akkordeon-Liste, eine Zeile je Block 1–8 — Nummer, Titel, Status-Pille rechts, Chevron; Inhalt klappt unter der Zeile auf (ARIA-Disclosure, Tastatur-Fokus bleibt auf der Zeile). Lage trägt statt Pille Druck · Regime · Tendenz. Offene Blöcke bleiben über den Tageswechsel (`localStorage wingcast.briefing.chainOpen2`, Erstbesuch: **alle** offen). Darunter die Warnungen als feste Zeile mit Labels, ohne Aufklappen |
 | Kopfzeile | „Stand" = Zeitpunkt des Morgenlaufs (`wetterlage.generated_at`, sonst mtime des Analyse-Caches) — **nie** die Abrufzeit |
 | Tages-Tabs | tragen die Kachel des Wochenstreifens (`tile`: Einstufung Safe/Caution/Not safe über **alle** bewerteten Regionen per `_day_verdict` — ohne die Note, die ist ohne Regionsliste daneben nicht einzuordnen —, Bodendruck, Höhenwind-Pfeil · Sektor · Stärke) plus die Zahl fliegbarer Spots |
 | Nicht übernommen | Kartenbild, „Deine Regionen", Betreff, Hero — die App hat Mini-Karte und Regionsfilter; sie kennt keine Abo-Regionen |

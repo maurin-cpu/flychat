@@ -68,10 +68,10 @@ def _analyse(n_days=5):
             "tile": {"tier": "green", "band": "green", "status": "Sicher", "rating": 3, "n": 29,
                      "pressure_hpa": "1029 hPa", "wind_arrow": "↙", "wind_sector": "NE",
                      "wind_strength": "schwach", "wind_hot": False, "wind_dir_deg": 34},
-            "warnings": {"any": True, "has_ki": True,
+            "warnings": {"any": True, "has_ki": True,  # has_ki: Altfeld, wird gefiltert
                          "checks": [{"topic": "RAIN", "label": "Regen", "active": True, "level": "warn"}],
                          "entries": [{"topic": "RAIN", "label": "Regen", "severity": "warn",
-                                      "ki_text": "Schauer ab Mittag.", "code_text": "Regen Nordalpen."}]},
+                                      "sev_label": "Warnung"}]},
             "chain": {
                 "situation": "Hochdruck mit schwacher Bise.",
                 "day_hint": "Trocken, am Nachmittag Schauer.",
@@ -100,7 +100,8 @@ class SlimChainTest(unittest.TestCase):
         d = out["by_date"][out["dates"][0]]
         self.assertNotIn("wind_dir_deg", d["tile"])
         self.assertEqual(d["tile"]["status"], "Sicher")
-        self.assertEqual(d["warnings"]["entries"][0]["ki_text"], "Schauer ab Mittag.")
+        self.assertEqual(d["warnings"]["entries"][0]["label"], "Regen")
+        self.assertNotIn("has_ki", d["warnings"])
         lage = d["chain"]["lage"]
         self.assertEqual(lage["fazit"], "Hoch Azoren.")
         for internal in ("centers", "pressure", "regime", "verdict", "label"):

@@ -194,20 +194,15 @@
   .centers small{color:var(--muted); font-weight:400}
   .conf{display:inline-block; padding:3px 8px; border-radius:100px; font:500 12px/1.2 var(--mono); background:var(--surface-2); border:1px solid var(--border); color:var(--muted)}
 
-  /* ---------- Warnungen ---------- */
-  .warnbox{background:var(--accent-soft); border-left:4px solid var(--accent); border-radius:var(--r-sm); padding:var(--s3) var(--s4)}
-  .warnbox + .warnbox{margin-top:var(--s2)}
-  .warnbox .wt{display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:16px; font-weight:600; color:var(--text)}
-  .warnbox .wt .ico{color:var(--accent); width:18px; height:18px}
-  .warnbox .days{margin-left:auto; font:600 12px/1 var(--mono); color:var(--text-2); background:var(--surface); border-radius:6px; padding:5px 8px; letter-spacing:.04em}
-  .warnbox p{margin:var(--s1) 0 0; font-size:15px; line-height:1.5; color:var(--text-2); max-width:62ch}
-  .warnbox .wr{color:var(--text)} .warnbox .wr b{font-weight:600}
-  .warnbox.stop{background:rgba(220,38,38,.07); border-left-color:var(--danger)} .warnbox.stop .wt .ico{color:var(--danger)}
-  .warnbox .wc{font:14px/1.5 var(--mono); color:var(--muted)}
-  .hzrow{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:var(--s3)}
-  .hz{font:600 13px/1 var(--mono); border-radius:6px; padding:7px 10px; border:1px solid var(--border); color:var(--muted); background:var(--surface-2)}
+  /* ---------- Warnungen: nur Labels, erklaert wird oben in den Bloecken ---------- */
+  .hzrow{display:flex; flex-wrap:wrap; gap:8px}
+  .hz{display:inline-flex; align-items:center; gap:6px; font:500 14px/1 var(--sans); border-radius:8px; padding:8px 12px; border:1px solid var(--border); color:var(--muted); background:var(--surface-2); opacity:.75}
+  .hz .ico{width:15px; height:15px}
+  .hz.on{font-weight:600; opacity:1}
   .hz.on.warn{color:#92400e; background:var(--accent-soft); border-color:var(--accent)}
   .hz.on.stop{color:#991b1b; background:rgba(220,38,38,.08); border-color:var(--danger)}
+  .hz .sev{font:600 10px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase}
+  .hznone{margin:var(--s2) 0 0; font-size:14px; color:var(--muted)}
 
   /* ---------- Regionen: kompakte Zeilen, jede Region einzeln (Notiz 13.09.) ---------- */
   .rrow{border:1px solid var(--border); border-left-width:4px; border-radius:var(--r-sm); padding:var(--s2) var(--s3); display:flex; flex-direction:column; gap:4px; background:var(--surface); transition:background var(--t), border-color var(--t)}
@@ -451,17 +446,12 @@
     {% if v3_warnings.checks %}
     <div class="block">
       <p class="label">{{ v3_labels.warnings_ch }}</p>
-      {# Schalter vom Code: welche Gefahr hat es heute ueberhaupt #}
-      <div class="hzrow">{% for c in v3_warnings.checks %}<span class="hz{% if c.active %} on {{ c.level }}{% endif %}">{% if c.active %}✓{% else %}–{% endif %} {{ c.label }}</span>{% endfor %}</div>
-      {% for w in v3_warnings.entries %}
-      <div class="warnbox {{ w.severity }}">
-        <div class="wt"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg>{{ w.label }}<span class="days">{{ w.sev_label }}</span></div>
-        {% if w.ki_text %}<p class="wr">{{ w.ki_text }}</p>{% endif %}
-        <p class="wc">{{ w.code_text }}</p>
+      {# Nur Labels: aktive Gefahren zuerst (schwere vorn), die ruhigen gedaempft #}
+      <div class="hzrow">
+        {%- for w in v3_warnings.entries %}<span class="hz on {{ w.severity }}"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg>{{ w.label }}{% if w.severity == 'stop' %}<span class="sev">· {{ w.sev_label }}</span>{% endif %}</span>{% endfor -%}
+        {%- for c in v3_warnings.checks if not c.active %}<span class="hz">– {{ c.label }}</span>{% endfor -%}
       </div>
-      {% else %}
-      <p class="empty">{{ v3_labels.hz_none }}</p>
-      {% endfor %}
+      {% if not v3_warnings.entries %}<p class="hznone">{{ v3_labels.hz_none }}</p>{% endif %}
     </div>
     {% endif %}
 

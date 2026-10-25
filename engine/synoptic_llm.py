@@ -1,5 +1,9 @@
 """LLM-Caller + Validierungs-/Korrektur-Loop fuer den Wetterlage-Block.
 
+ABGESCHALTET seit 25.10.2026: refresh_synoptic_overview() ruft kein Modell
+mehr auf (Warnungen nur noch als Labels, docs/BRIEFING.md §5). Weiter in
+Gebrauch: hazard_checks() — die Gefahren-Schalter fuer das Briefing.
+
 Nimmt das deterministisch erzeugte Strukturfeld aus synoptic_context.build_*
 und laesst den LLM daraus die Texte fuers Briefing generieren (lead,
 hazards, day_lines). Die frueheren Zonen-Texte sind seit 04.10.2026 weg —
@@ -200,34 +204,25 @@ def _foehn_tal_problems(text: str, tal: dict, *, require_name: bool,
 
 def refresh_synoptic_overview(weather_cache: dict, analysis_client,
                               analysis_model: str) -> Optional[dict]:
-    """End-to-end: deterministisches Strukturfeld + LLM-Overview + Cache-Update.
+    """Deterministisches Strukturfeld bauen und nach data/synoptic_context.json
+    schreiben. Wird vom Scheduler (oder bei manuellem Refresh) 1x/Tag aufgerufen.
 
-    Wird vom Scheduler (oder bei manuellem Refresh) 1x/Tag aufgerufen.
-    Schreibt das fertige Strukturfeld (inkl. llm_overview falls erfolgreich)
-    nach data/synoptic_context.json. Bei Fehlern in einem Schritt wird der
-    Block dennoch persistiert — fehlende Komponenten sind als null gekennzeichnet.
+    Der KI-Text (llm_overview) ist seit 25.10.2026 abgeschaltet: Das Briefing
+    zeigt die Warnungen nur noch als Labels, erklaert werden sie in den
+    Bloecken der Kette — Lead und Tagessatz hatten schon vorher keinen Abnehmer
+    mehr. llm_overview bleibt explizit null; das Briefing rechnet die
+    Gefahren-Schalter dann selbst (hazard_checks). analysis_client/-model
+    bleiben in der Signatur fuer die Aufrufer.
 
     Returns:
-        Das vollstaendige Strukturfeld (mit oder ohne llm_overview), oder
-        None wenn die Basis-Detektion komplett fehlschlaegt.
+        Das Strukturfeld, oder None wenn die Basis-Detektion fehlschlaegt.
     """
     from engine import synoptic_context as sc
 
     sctx = sc.build_synoptic_context(weather_cache, write_audit=True)
     if sctx is None:
         return None
-
-    overview = generate_synoptic_overview(sctx, analysis_client, analysis_model)
-    if overview is not None:
-        sctx["llm_overview"] = overview
-        # Cache erneut schreiben — inkl. LLM-Text
-        try:
-            sc._write_synoptic_cache(sctx)
-        except Exception as e:
-            logger.warning("synoptic cache rewrite mit LLM-Output fehlgeschlagen: %s", e)
-    else:
-        sctx["llm_overview"] = None  # explizit null fuer Frontend-Logik
-
+    sctx["llm_overview"] = None
     return sctx
 
 
@@ -235,10 +230,9 @@ def refresh_synoptic_overview_lang(sctx: dict, analysis_client,
                                    analysis_model: str, lang: str) -> Optional[dict]:
     """Zweite Sprachfassung des Wetterlage-Blocks fuer das oeffentliche Briefing.
 
-    Nimmt das fertige Strukturfeld des Hauptlaufs (deterministisch und
-    sprachneutral), erzeugt nur den LLM-Teil neu in `lang` — mit demselben
-    Validator und Korrektur-Loop — und schreibt synoptic_context.<lang>.json.
-    Thread-lokal (i18n.lang_override): Web-Requests und Mails bleiben in LANG.
+    Das Strukturfeld ist sprachneutral; die Texte baut das Briefing selbst in
+    `lang`. Seit dem Abschalten des KI-Texts (25.10.2026) ist das nur noch
+    eine Kopie mit Sprachvermerk in synoptic_context.<lang>.json.
     Fuer die Server-Sprache gibt es nichts zu tun, dann kommt sctx zurueck.
     """
     import copy
@@ -248,9 +242,7 @@ def refresh_synoptic_overview_lang(sctx: dict, analysis_client,
     if lang == i18n.get_server_lang():
         return sctx
     out = copy.deepcopy(sctx)
-    with i18n.lang_override(lang):
-        overview = generate_synoptic_overview(out, analysis_client, analysis_model)
-    out["llm_overview"] = overview   # None, wenn der Validator nichts durchliess
+    out["llm_overview"] = None
     out["lang"] = lang
     try:
         sc._write_synoptic_cache(out, lang=lang)
