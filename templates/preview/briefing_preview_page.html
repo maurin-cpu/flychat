@@ -291,23 +291,6 @@
     </div>
     {% endif %}
 
-    {# ---------- Warnhinweise: gleich unter dem Kopf, nur Befund ---------- #}
-    {% if v3_warnings.checks %}
-    <div class="block alerts">
-      <p class="label">{{ v3_labels.warnings_ch }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}</p>
-      {% if v3_warnings.entries %}
-      <div class="grid">
-        {%- for w in v3_warnings.entries %}
-        <div class="alert {{ w.severity }}"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg><span class="n">{{ w.label }}</span><span class="s">{{ w.sev_label }}</span><span class="g">→ {{ w.block_label }}</span></div>
-        {%- endfor %}
-      </div>
-      {% if v3_warnings.off %}<p class="off">{{ v3_labels.hz_off }}: {{ v3_warnings.off|join(' · ') }}</p>{% endif %}
-      {% else %}
-      <p class="none">{{ v3_labels.hz_none }}</p>
-      {% endif %}
-    </div>
-    {% endif %}
-
     {# ═══════════ SEKTION 1 — Woche als Bild ═══════════ #}
     <div class="chapter"><span class="q">{{ v3_labels.question }} 1</span><span class="t">{{ v3_labels.q1_long }}</span></div>
     <div class="block">
@@ -357,6 +340,23 @@
 
     {# ═══════════ SEKTION 2 — Tag entlang der Kette ═══════════ #}
     <div class="chapter"><span class="q">{{ v3_labels.question }} 2</span><span class="t">{{ v3_labels.q2_long }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}</span></div>
+    {# ---------- Warnhinweise: Anfang des Tages-Teils, nur Befund ---------- #}
+    {% if v3_warnings.checks %}
+    <div class="block alerts">
+      <p class="label">{{ v3_labels.warnings_ch }}</p>
+      {% if v3_warnings.entries %}
+      <div class="grid">
+        {%- for w in v3_warnings.entries %}
+        <div class="alert {{ w.severity }}"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg><span class="n">{{ w.label }}</span><span class="s">{{ w.sev_label }}</span><span class="g">→ {{ w.block_label }}</span></div>
+        {%- endfor %}
+      </div>
+      {% if v3_warnings.off %}<p class="off">{{ v3_labels.hz_off }}: {{ v3_warnings.off|join(' · ') }}</p>{% endif %}
+      {% else %}
+      <p class="none">{{ v3_labels.hz_none }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
 
     <div class="block">
       <p class="label">{{ v3_labels.map_title }}</p>

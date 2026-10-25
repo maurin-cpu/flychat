@@ -13,16 +13,6 @@ WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr
 {% endif %}{% if stale_notice %}
 ! {{ stale_notice }}
 {% endif %}
-{% if v3_warnings.checks -%}
-{{ v3_labels.warnings_ch }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}
-{% for w in v3_warnings.entries -%}
-! {{ w.label }} — {{ w.sev_label }} (-> {{ w.block_label }})
-{% else -%}
-{{ v3_labels.hz_none }}
-{% endfor -%}
-{% if v3_warnings.entries and v3_warnings.off %}{{ v3_labels.hz_off }}: {{ v3_warnings.off|join(' · ') }}
-{% endif %}
-{% endif -%}
 {{ v3_labels.question }} 1 — {{ v3_labels.q1_long }}
 {% for d in v3_strip -%}
 {{ d.name }}: {{ d.status }}{% if d.rating_display %} {{ d.rating_display }}/5{% endif %} · {{ d.pressure }}{% if d.wind_sector %} · {{ d.wind_sector }} {{ d.wind_strength }}{% endif %}
@@ -32,6 +22,17 @@ WINGCAST — {{ t('email.briefing.txt_header') }} {{ t('email.briefing.week_abbr
   {{ v3_labels.ch_context }} {{ d.ch.hi_safe }}/{{ d.ch.total }}
 {% endfor %}
 {{ v3_labels.question }} 2 — {{ v3_labels.q2_long }}{% if v3_focus_label.long %} · {{ v3_focus_label.long }}{% endif %}
+
+{% if v3_warnings.checks -%}
+{{ v3_labels.warnings_ch }}
+{% for w in v3_warnings.entries -%}
+! {{ w.label }} — {{ w.sev_label }} (-> {{ w.block_label }})
+{% else -%}
+{{ v3_labels.hz_none }}
+{% endfor -%}
+{% if v3_warnings.entries and v3_warnings.off %}{{ v3_labels.hz_off }}: {{ v3_warnings.off|join(' · ') }}
+{% endif %}
+{% endif -%}
 
 1 {{ v3_labels.step_lage }}{% if v3_chain.lage.status_label %} [{{ v3_chain.lage.status_label }}]{% endif %}
 {{ v3_chain.lage.pressure }} {{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}{% if v3_chain.lage.pressure_jump %} · {{ v3_chain.lage.pressure_jump }}{% endif %}
