@@ -357,11 +357,17 @@
   text-transform: uppercase;
   color: var(--color-text-secondary);
 }
+/* So viele Spalten wie Kacheln (max. 4) — die Reihe fuellt immer die volle
+   Breite; auf dem Handy zwei Spalten, eine einzelne letzte Kachel ueber beide. */
 .bf-alerts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr));
   grid-auto-rows: 1fr;          /* alle Kacheln gleich hoch, auch ueber Zeilen */
   gap: 10px;
+}
+@media (max-width: 560px) {
+  .bf-alerts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bf-alerts-grid > .bf-alert:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 .bf-alert {
   display: flex;

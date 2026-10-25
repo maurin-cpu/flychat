@@ -195,7 +195,8 @@
   .conf{display:inline-block; padding:3px 8px; border-radius:100px; font:500 12px/1.2 var(--mono); background:var(--surface-2); border:1px solid var(--border); color:var(--muted)}
 
   /* ---------- Warnhinweise ganz oben: grosse Kacheln, nur Befund (25.10.2026) ---------- */
-  .alerts .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); grid-auto-rows:1fr; gap:10px}
+  .alerts .grid{display:grid; grid-template-columns:repeat(var(--n,4),minmax(0,1fr)); grid-auto-rows:1fr; gap:10px}
+  @media (max-width:560px){ .alerts .grid{grid-template-columns:repeat(2,minmax(0,1fr))} .alerts .grid > .alert:last-child:nth-child(odd){grid-column:1/-1} }
   .alert{display:flex; flex-direction:column; gap:4px; padding:12px 14px; border:1px solid; border-top-width:4px; border-radius:10px}
   .alert .ico{width:24px; height:24px}
   .alert .n{font-size:17px; font-weight:700; line-height:1.25}
@@ -345,7 +346,7 @@
     <div class="block alerts">
       <p class="label">{{ v3_labels.warnings_ch }}</p>
       {% if v3_warnings.entries %}
-      <div class="grid">
+      <div class="grid" style="--n:{{ [v3_warnings.entries|length, 4]|min }}">
         {%- for w in v3_warnings.entries %}
         <div class="alert {{ w.severity }}"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg><span class="n">{{ w.label }}</span><span class="s">{{ w.sev_label }}</span><span class="g">→ {{ w.block_label }}</span></div>
         {%- endfor %}

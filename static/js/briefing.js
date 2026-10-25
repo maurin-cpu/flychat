@@ -2349,7 +2349,7 @@
         </${tag}>`;
     }).join("");
     const body = entries.length
-      ? `<div class="bf-alerts-grid">${tiles}</div>`
+      ? `<div class="bf-alerts-grid" style="--n:${Math.min(entries.length, 4)}">${tiles}</div>`
         + (off.length ? `<p class="bf-alerts-off">${escapeHtml(labels.hz_off || "")}: ${off.map(escapeHtml).join(" · ")}</p>` : "")
       : `<p class="bf-alerts-none">${escapeHtml(labels.hz_none || "")}</p>`;
     return `
