@@ -1004,6 +1004,9 @@ _L3 = {
         "alps_south":   "Alpensüdseite",
         "warnings_ch":  "Warnhinweise · Gesamtlage Schweiz",
         "hz_off":       "Nicht angezeigt",
+        # schmale Kacheln (alle Warnhinweise immer in einer Zeile, auch Handy/Mail)
+        "hzs_RAIN": "Regen", "hzs_THUNDER": "Gewitter", "hzs_FOEHN": "Föhn", "hzs_WIND": "Wind",
+        "sevs_stop": "Schwer", "sevs_warn": "Hinweis",
         "src_line":     "Prognosedaten: {surface} (Boden), {pl} (Höhe) — MeteoSchweiz/DWD via Open-Meteo · Grosswetterlage: ECMWF IFS · Fronten: DWD",
         "hz_RAIN": "Regen", "hz_THUNDER": "Gewitter", "hz_FOEHN": "Föhn",
         "hz_WIND": "Starker Wind",
@@ -1493,6 +1496,9 @@ _L3 = {
         "alps_south":   "southern Alps",
         "warnings_ch":  "Alerts · Switzerland overall",
         "hz_off":       "Not indicated",
+        # narrow tiles (all alerts always in one row, also on phones/in the mail)
+        "hzs_RAIN": "Rain", "hzs_THUNDER": "Thunder", "hzs_FOEHN": "Foehn", "hzs_WIND": "Wind",
+        "sevs_stop": "Severe", "sevs_warn": "Alert",
         "src_line":     "Forecast data: {surface} (surface), {pl} (upper levels) — MeteoSwiss/DWD via Open-Meteo · Synoptic pattern: ECMWF IFS · Fronts: DWD",
         "hz_RAIN": "Rain", "hz_THUNDER": "Thunderstorms", "hz_FOEHN": "Foehn",
         "hz_WIND": "Strong wind",
@@ -3824,7 +3830,9 @@ def _ch_warnings(wetterlage: dict, date: str) -> dict:
     # "entries", nicht "items": Jinja loest w.items auf die dict-Methode auf.
     # `block` = der Block der Kette, der die Gefahr erklaert (App springt hin).
     entries = sorted(({"topic": c["topic"], "label": c["label"], "severity": c["level"],
-                       "sev_label": c["sev_label"], "block": _HAZARD_BLOCK[c["topic"]][0],
+                       "sev_label": c["sev_label"], "short": _lbl("hzs_" + c["topic"]),
+                       "sev_short": _lbl("sevs_" + c["level"]),
+                       "block": _HAZARD_BLOCK[c["topic"]][0],
                        "block_label": _lbl(_HAZARD_BLOCK[c["topic"]][1])}
                       for c in checks if c["active"]),
                      key=lambda e: e["severity"] != "stop")

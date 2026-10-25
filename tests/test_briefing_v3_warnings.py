@@ -554,7 +554,7 @@ class TestWarningsOnlyLabels(_De):
         self.assertEqual([(e["topic"], e["severity"]) for e in w["entries"]],
                          [("WIND", "stop"), ("RAIN", "warn")])
         for e in w["entries"]:
-            self.assertEqual(set(e), {"topic", "label", "severity", "sev_label", "block", "block_label"})
+            self.assertEqual(set(e), {"topic", "label", "severity", "sev_label", "short", "sev_short", "block", "block_label"})
         self.assertEqual(len(w["checks"]), 4)
         self.assertNotIn("has_ki", w)
         # jede Kachel verweist auf den Block, der die Gefahr erklaert
@@ -569,6 +569,11 @@ class TestWarningsOnlyLabels(_De):
             w = bc._ch_warnings(_wl(self.DATES, [{"RAIN", "WIND"}]), self.DATES[0])
             for e in w["entries"]:
                 self.assertNotRegex(e["sev_label"], r"(?i)stop")
+                self.assertNotRegex(e["sev_short"], r"(?i)stop")
+            # schmale Kachel (eine Zeile auch auf dem Handy): kurze Woerter
+            self.assertEqual([(e["short"], e["sev_short"]) for e in w["entries"]],
+                             [("Wind", "Schwer"), ("Regen", "Hinweis")] if lang == "de"
+                             else [("Wind", "Severe"), ("Rain", "Alert")])
             self.assertEqual([e["sev_label"] for e in w["entries"]],
                              ["Schwerer Warnhinweis", "Warnhinweis"] if lang == "de"
                              else ["Severe alert", "Alert"])
