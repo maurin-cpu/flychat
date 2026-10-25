@@ -195,12 +195,12 @@
   .conf{display:inline-block; padding:3px 8px; border-radius:100px; font:500 12px/1.2 var(--mono); background:var(--surface-2); border:1px solid var(--border); color:var(--muted)}
 
   /* ---------- Warnhinweise ganz oben: grosse Kacheln, nur Befund (25.10.2026) ---------- */
-  .alerts .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
+  .alerts .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); grid-auto-rows:1fr; gap:10px}
   .alert{display:flex; flex-direction:column; gap:4px; padding:12px 14px; border:1px solid; border-top-width:4px; border-radius:10px}
   .alert .ico{width:24px; height:24px}
   .alert .n{font-size:17px; font-weight:700; line-height:1.25}
   .alert .s{font:600 11px/1.3 var(--mono); letter-spacing:.04em; text-transform:uppercase}
-  .alert .g{font-size:13px; color:var(--text-2)}
+  .alert .g{margin-top:auto; font-size:13px; color:var(--text-2)}
   .alert.stop{background:#fef2f2; border-color:#fca5a5; border-top-color:var(--danger)} .alert.stop .n{color:#7f1d1d} .alert.stop .s,.alert.stop .ico{color:var(--danger)}
   .alert.warn{background:#fff7ed; border-color:#fdba74; border-top-color:var(--accent)} .alert.warn .n{color:#7c2d12} .alert.warn .s,.alert.warn .ico{color:#9a3412}
   .alerts .off{margin:var(--s2) 0 0; font-size:14px; color:var(--muted)}

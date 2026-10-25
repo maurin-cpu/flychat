@@ -360,6 +360,7 @@
 .bf-alerts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-rows: 1fr;          /* alle Kacheln gleich hoch, auch ueber Zeilen */
   gap: 10px;
 }
 .bf-alert {
@@ -367,6 +368,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
+  width: 100%;
   min-height: 44px;
   padding: 12px 14px;
   border: 1px solid;
@@ -397,7 +399,7 @@ button.bf-alert:focus-visible { outline: 2px solid var(--color-primary); outline
 }
 .bf-alert--severe .bf-alert-sev { color: var(--bf-chain-stop-fg); }
 .bf-alert--alert  .bf-alert-sev { color: var(--bf-chain-warn-fg); }
-.bf-alert-goto { margin-top: 2px; font-size: var(--text-xs); color: var(--color-text-secondary); }
+.bf-alert-goto { margin-top: auto; padding-top: 2px; font-size: var(--text-xs); color: var(--color-text-secondary); }
 .bf-alerts-off { margin: 10px 0 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
 .bf-alerts-none {
   margin: 0;
