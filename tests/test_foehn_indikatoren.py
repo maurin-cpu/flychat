@@ -266,8 +266,8 @@ class BriefingTextTest(unittest.TestCase):
         self.assertEqual([f["on"] for f in facts], [True, True, True, True])
         self.assertEqual(facts[0]["v"], "7 hPa (south higher)")   # Uhrzeit nur im Text
         self.assertEqual(facts[3]["v"], "3 of 23")
-        self.assertEqual([f["k"] for f in facts], ["Pressure diff.", "Regions with south wind", "South side aloft",
-                                                   "Valleys with dry south wind"])
+        self.assertEqual([f["k"] for f in facts], ["Pressure diff.", "Regions with south wind ≥30 km/h", "South side aloft",
+                                                   "Valleys with dry south wind ≥16 km/h"])
 
     def test_labels_follow_foehn_side(self):
         # Nordföhn: Nordseite, Nordwind — Richtung im Label wie die Luv-Seite
@@ -276,10 +276,10 @@ class BriefingTextTest(unittest.TestCase):
         self.assertEqual(ind["wind_map"]["side"], "sued")      # 0:0 -> Windkarte wählt Süd
         with i18n.lang_override("en"):
             self.assertEqual(bc._foehn_indicator_status(ind)[2][1]["v"], "0 of 6")   # Nord-Regionen zählen
-        for lang, keys in (("en", ["Pressure diff.", "Regions with north wind", "North side aloft",
-                                   "Valleys with dry north wind"]),
-                           ("de", ["Druckdiff.", "Regionen mit Nordwind", "Nordseite Höhe",
-                                   "Täler mit trockenem Nordwind"])):
+        for lang, keys in (("en", ["Pressure diff.", "Regions with north wind ≥30 km/h", "North side aloft",
+                                   "Valleys with dry north wind ≥16 km/h"]),
+                           ("de", ["Druckdiff.", "Regionen mit Nordwind ≥30 km/h", "Nordseite Höhe",
+                                   "Täler mit trockenem Nordwind ≥16 km/h"])):
             with i18n.lang_override(lang):
                 self.assertEqual([f["k"] for f in bc._foehn_indicator_status(ind)[2]], keys)
 
@@ -287,7 +287,7 @@ class BriefingTextTest(unittest.TestCase):
         r = self._both(self._ind(red=("r0", "r1", "r2"), val=2, t=(0.0, -0.5), from_h=11, val_h=13))
         (kind, pill, facts), txt = r["en"]
         self.assertEqual(pill, "Foehn indicators: 3 of 4 · from ~11:00")
-        self.assertEqual(facts[1], {"k": "Regions with south wind", "v": "3 of 6", "on": True})
+        self.assertEqual(facts[1], {"k": "Regions with south wind ≥30 km/h", "v": "3 of 6", "on": True})
         self.assertEqual(txt, "In ICON-CH1/ICON-D2, the pressure difference points to south foehn from about 11:00. "
                               "The data also show signs of it: wind from the foehn direction in the regions (mainly "
                               "Region 0 and Region 1), from about 13:00 dry wind from the foehn direction in the "

@@ -808,11 +808,11 @@ _L3 = {
         "fi_k_dp":       "Druckdiff.",
         "fi_v_dp":       "{dp} hPa ({side} höher)",
         "fi_hi_sued":    "Süden", "fi_hi_nord": "Norden",
-        "fi_k_map":      "Regionen mit {dirw}",
+        "fi_k_map":      "Regionen mit {dirw} ≥{kmh} km/h",
         "fi_v_map":      "{n} von {t}",
         "fi_k_luv_sued": "Südseite Höhe", "fi_k_luv_nord": "Nordseite Höhe",
         "fi_v_cooler":   "{k} °C kühler", "fi_v_warmer": "{k} °C wärmer", "fi_v_equal": "gleich warm",
-        "fi_k_val":      "Täler mit trockenem {dirw}",
+        "fi_k_val":      "Täler mit trockenem {dirw} ≥{kmh} km/h",
         "fi_v_val":      "{n} von {t}",
         "fi_tal_multi":  "{n} von {t} Föhntälern zeigen trockenen Wind aus Föhnrichtung, am stärksten {name} (Böen bis {g} km/h)",
         "fi_tal_one":    "{name} zeigt trockenen Wind aus Föhnrichtung (Böen bis {g} km/h)",
@@ -1306,11 +1306,11 @@ _L3 = {
         "fi_k_dp":       "Pressure diff.",
         "fi_v_dp":       "{dp} hPa ({side} higher)",
         "fi_hi_sued":    "south", "fi_hi_nord": "north",
-        "fi_k_map":      "Regions with {dirw}",
+        "fi_k_map":      "Regions with {dirw} ≥{kmh} km/h",
         "fi_v_map":      "{n} of {t}",
         "fi_k_luv_sued": "South side aloft", "fi_k_luv_nord": "North side aloft",
         "fi_v_cooler":   "{k} °C cooler", "fi_v_warmer": "{k} °C warmer", "fi_v_equal": "equally warm",
-        "fi_k_val":      "Valleys with dry {dirw}",
+        "fi_k_val":      "Valleys with dry {dirw} ≥{kmh} km/h",
         "fi_v_val":      "{n} of {t}",
         "fi_tal_multi":  "{n} of {t} foehn valleys show dry wind from the foehn direction, strongest {name} (gusts up to {g} km/h)",
         "fi_tal_one":    "{name} shows dry wind from the foehn direction (gusts up to {g} km/h)",
@@ -3340,7 +3340,10 @@ def _fi_against(ind: dict, luv: str) -> str:
 
 def _foehn_indicator_status(ind: dict):
     """Pille + vier Labels (on = Indikator erfuellt). Taeler oder >= 3 Indikatoren:
-    warn; 1-2 ohne Taeler: info; 0: neutral (nie gruen = keine Entwarnung)."""
+    warn; 1-2 ohne Taeler: info; 0: neutral (nie gruen = keine Entwarnung).
+    Wind-Labels mit der Mittelwind-Grenze (User 25.10.2026: "Regions with north wind
+    ≥30 km/h"); die Böen-Grenzen stehen auf /foehn."""
+    import foehn_indicators as fi
     n = ind.get("n_on", 0)
     va = ind.get("valleys") or {}
     kind = "warn" if (va.get("on") or n >= 3) else "info" if n else "neutral"
@@ -3358,7 +3361,7 @@ def _foehn_indicator_status(ind: dict):
     facts = [{"k": _lbl("fi_k_dp"), "on": bool(dp and dp["on"]),
               "v": (_lbl("fi_v_dp").format(dp=f"{dp['hpa']:.0f}", side=_lbl("fi_hi_" + dp["high_side"]))
                     if dp else "—")},
-             {"k": _lbl("fi_k_map").format(dirw=dirw[map_side]), "on": bool(wk and wk["on"]),
+             {"k": _lbl("fi_k_map").format(dirw=dirw[map_side], kmh=fi.KARTE_WIND_KMH), "on": bool(wk and wk["on"]),
               "v": (_lbl("fi_v_map").format(**map_nt) if wk else "—")}]
     if tp:
         k = tp["cooler_k"]
@@ -3367,7 +3370,7 @@ def _foehn_indicator_status(ind: dict):
         facts.append({"k": _lbl("fi_k_luv_" + tp["side"]), "v": v, "on": tp["on"]})
     else:
         facts.append({"k": _lbl("fi_k_luv_" + side), "v": "—", "on": False})
-    facts.append({"k": _lbl("fi_k_val").format(dirw=dirw[side]), "on": bool(va.get("on")),
+    facts.append({"k": _lbl("fi_k_val").format(dirw=dirw[side], kmh=fi.TAL_WIND_WEAK_KMH), "on": bool(va.get("on")),
                   "v": (_lbl("fi_v_val").format(n=va.get("n", 0), t=va.get("total", 0)) if va else "—")})
     # Kurze Labels ohne Uhrzeit (User 24.10.2026): die Uhrzeiten stehen im Text,
     # die Grenzen auf der Erklaerseite /foehn; nur die Pille nennt das frueheste Zeichen
