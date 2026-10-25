@@ -73,6 +73,7 @@ _L2 = {
         "spots":         "Spots",
         "q1_long":       "Wann kann ich diese Woche fliegen?",
         "q2_long":       "Heute im Detail",
+        "q2_day":        "Im Detail",            # App: anderer Tag als heute gewaehlt
         "question":      "Sektion",
         "days_ahead":    "Die Tage voraus",
         "lead_title":    "Wie sich die Lage umstellt",
@@ -119,6 +120,7 @@ _L2 = {
         "spots":         "Spots",
         "q1_long":       "When can I fly this week?",
         "q2_long":       "Today in detail",
+        "q2_day":        "In detail",            # app: a day other than today selected
         "question":      "Section",
         "days_ahead":    "The days ahead",
         "lead_title":    "How the situation shifts",
@@ -3921,7 +3923,8 @@ def _load_passagen() -> dict | None:
 # Pillen-Woerter und Chip-Keys stehen schon fertig in den Bloecken.
 _APP_LABEL_KEYS = ("step_lage", "step_front", "step_foehn", "step_wind", "step_stab",
                    "step_thermik", "step_sonne", "step_modelle", "thunder_caveat",
-                   "warnings_ch", "hz_none", "hz_off")
+                   "warnings_ch", "hz_none", "hz_off",
+                   "question", "q1_long", "q2_long", "q2_day")
 
 
 def build_chain_all_days(wetterlage: dict | None, dates: list[str],

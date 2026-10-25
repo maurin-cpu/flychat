@@ -37,10 +37,20 @@
     </div>
   </header>
 
-  {# Tagesauswahl zuoberst: Synoptik-Karte und Analyse-Kette darunter
-     zeigen den GEWAEHLTEN Tag — die Tabs steuern also die ganze Seite,
-     nicht nur die Spot-Listen. #}
+  {# Aufbau wie das Mail-Briefing (docs/BRIEFING.md): Sektion 1 = die Tage
+     (Tabs = Wochenstreifen), Sektion 2 = der gewaehlte Tag im Detail —
+     zuerst die Warnhinweise, dann Synoptik-Karte, Analyse-Kette, Regionen.
+     Kopf-Texte setzt briefing.js aus denselben Labels wie das Mail. #}
+  <div class="bf-chapter" id="bfChapter1" hidden><span class="bf-chapter-q" id="bfChapter1Q"></span><h2 class="bf-chapter-t" id="bfChapter1T"></h2></div>
+
+  {# Tagesauswahl: Synoptik-Karte und Analyse-Kette darunter zeigen den
+     GEWAEHLTEN Tag — die Tabs steuern also die ganze Seite. #}
   <nav class="bf-day-tabs" id="bfDayTabs" role="tablist" aria-label="{{ t('briefing.day_tabs_aria') }}"></nav>
+
+  <div class="bf-chapter bf-chapter--day" id="bfChapter2" hidden><span class="bf-chapter-q" id="bfChapter2Q"></span><h2 class="bf-chapter-t" id="bfChapter2T"></h2></div>
+
+  {# Warnhinweise des gewaehlten Tages — vor der Karte, wie im Mail #}
+  <section class="bf-alerts-section" id="bfAlerts" hidden></section>
 
   <!-- Synoptik-Mini-Karte: nicht interaktiv, zeigt den Timestep 12:00 des
        gewaehlten Tages (briefing.js meldet den Tag an synoptic-embed.js).
@@ -61,9 +71,9 @@
     </div>
   </section>
 
-  {# Analyse-Kette + Warnungen Schweiz des GEWAEHLTEN Tages, unter der Karte (dieselben
-     Bloecke wie das Mail-Briefing, docs/BRIEFING.md; vom Server je Tag
-     gerechnet, briefing.js renderChain). #}
+  {# Analyse-Kette des GEWAEHLTEN Tages, unter der Karte (dieselben Bloecke
+     wie das Mail-Briefing, docs/BRIEFING.md; vom Server je Tag gerechnet,
+     briefing.js renderChain). #}
   <section class="bf-chain" id="bfChain" hidden></section>
 
   <section class="bf-filters" id="bfFilters">

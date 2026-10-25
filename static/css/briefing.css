@@ -345,9 +345,54 @@
 }
 .bf-chain-sunbar > span { display: block; height: 100%; background: #d97706; }
 
-/* Warnhinweise ganz oben im Tag: grosse Kacheln, nur Befund (25.10.2026).
-   Stufe steht als Wort in der Kachel — Farbe traegt nie allein. */
-.bf-alerts { margin: 0 0 var(--space-4); }
+/* Sektionskoepfe wie im Mail-Briefing: "Sektion 1 · …" ueber den Tages-Tabs,
+   "Sektion 2 · Heute im Detail · …" ueber dem gewaehlten Tag. */
+.bf-chapter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: var(--space-2) 0 var(--space-3);
+}
+.bf-chapter[hidden] { display: none; }
+.bf-chapter--day { margin-top: var(--space-2); }
+.bf-chapter-q {
+  display: inline-block;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+.bf-chapter-t {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+/* Warnhinweise des Tages: eigene Karte VOR der Synoptik-Karte (wie im Mail),
+   grosse Kacheln, nur Befund (25.10.2026). Stufe steht als Wort in der
+   Kachel — Farbe traegt nie allein. */
+.bf-alerts-section {
+  --bf-chain-mono: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  --bf-chain-warn-fg: #9a3412; --bf-chain-warn-bg: #ffedd5; --bf-chain-warn-line: #ea580c;
+  --bf-chain-stop-fg: #b91c1c; --bf-chain-stop-bg: #fee2e2; --bf-chain-stop-line: #dc2626;
+  margin-bottom: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.bf-alerts-section[hidden] { display: none; }
+.bf-alerts { margin: 0; }
 .bf-alerts-title {
   margin: 0 0 10px;
   font-family: var(--bf-chain-mono);
@@ -415,6 +460,8 @@ button.bf-alert:focus-visible { outline: 2px solid var(--color-primary); outline
 .bf-alert-short { display: none; }
 /* Handy: schmale Fassung — muss NACH den Grundregeln stehen */
 @media (max-width: 560px) {
+  .bf-alerts-section { padding: var(--space-3); }
+  .bf-chapter-t { font-size: 16px; }
   .bf-alerts-grid { gap: 6px; }
   .bf-alert { align-items: center; text-align: center; padding: 10px 6px; }
   .bf-alert-long, .bf-alert-goto { display: none; }

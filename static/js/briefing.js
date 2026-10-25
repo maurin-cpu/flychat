@@ -2376,6 +2376,68 @@
       </div>`;
   }
 
+  // Sektionskoepfe wie im Mail: "Sektion 1 · Wann kann ich diese Woche
+  // fliegen?" ueber den Tages-Tabs, "Sektion 2 · Heute im Detail · Sonntag,
+  // 25.10." ueber dem gewaehlten Tag. Ist nicht heute gewaehlt, faellt das
+  // "Heute" weg ("Im Detail · Montag, 26.10.").
+  function renderChapters(labels) {
+    const set = (id, txt) => { const n = $(id); if (n) n.textContent = txt || ""; };
+    const ok = !!(labels && labels.q1_long);
+    ["bfChapter1", "bfChapter2"].forEach(id => { const n = $(id); if (n) n.hidden = !ok; });
+    if (!ok) return;
+    set("bfChapter1Q", `${labels.question || ""} 1`);
+    set("bfChapter1T", labels.q1_long);
+    const days = (state.data && state.data.days) || [];
+    const d = days[state.selectedDayIdx] || {};
+    const iso = d.date || "";
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    // Wochentag in der Seitensprache (d.weekday ist immer deutsch), Form wie im Mail
+    let wd = d.weekday || "";
+    try {
+      wd = new Date(iso + "T12:00:00").toLocaleDateString(document.documentElement.lang || "de", { weekday: "long" });
+    } catch (e) { /* alter Browser: deutscher Name aus den Daten */ }
+    const dayLabel = iso ? `${wd}, ${iso.slice(8, 10)}.${iso.slice(5, 7)}.` : "";
+    set("bfChapter2Q", `${labels.question || ""} 2`);
+    set("bfChapter2T", [iso === today ? labels.q2_long : (labels.q2_day || labels.q2_long), dayLabel]
+      .filter(Boolean).join(" · "));
+  }
+
+  // Warnhinweis-Kachel: erklaerenden Block der Kette oeffnen und hinscrollen
+  function gotoChainBlock(key) {
+    const el = $("bfChain");
+    if (!el || !key) return;
+    state.chainOpen.add(key);
+    saveChainOpen(state.chainOpen);
+    renderChain(state.data);
+    const row = el.querySelector(`[data-chain-block="${key}"]`);
+    if (row) {
+      const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      row.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      row.focus({ preventScroll: true });
+    }
+  }
+
+  function renderAlerts(entry, labels) {
+    const box = $("bfAlerts");
+    if (!box) return;
+    const w = entry && entry.warnings;
+    if (!w || !Array.isArray(w.checks) || !w.checks.length) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    box.hidden = false;
+    box.innerHTML = chainAlertsHtml(w, labels);
+    if (!box._bound) {
+      box._bound = true;
+      box.addEventListener("click", (ev) => {
+        const tile = ev.target.closest("[data-chain-goto]");
+        if (tile && box.contains(tile)) gotoChainBlock(tile.getAttribute("data-chain-goto"));
+      });
+    }
+  }
+
   function renderChain(data) {
     const el = $("bfChain");
     if (!el) return;
@@ -2383,12 +2445,16 @@
     if (!analyse || !analyse.by_date) {
       el.hidden = true;
       el.innerHTML = "";
+      renderChapters(null);
+      renderAlerts(null, {});
       return;
     }
     const labels = analyse.labels || {};
     const date = selectedDate();
     const entry = (date && analyse.by_date[date]) || null;
     const chain = entry && entry.chain;
+    renderChapters(labels);
+    renderAlerts(entry, labels);
 
     const head = `
       <div class="bf-chain-head">
@@ -2423,31 +2489,13 @@
       }));
     });
 
-    const w = entry.warnings;
-    const alerts = (w && Array.isArray(w.checks) && w.checks.length) ? chainAlertsHtml(w, labels) : "";
-
     el.hidden = false;
-    el.innerHTML = head + alerts + `<div class="bf-chain-list">${rows.join("")}</div>`
+    el.innerHTML = head + `<div class="bf-chain-list">${rows.join("")}</div>`
       + (analyse.source ? `<p class="bf-chain-source">${escapeHtml(analyse.source)}</p>` : "");
 
     if (!el._chainBound) {
       el._chainBound = true;
       el.addEventListener("click", (ev) => {
-        // Warnhinweis-Kachel: erklaerenden Block oeffnen und hinscrollen
-        const tile = ev.target.closest("[data-chain-goto]");
-        if (tile && el.contains(tile)) {
-          const key = tile.getAttribute("data-chain-goto");
-          state.chainOpen.add(key);
-          saveChainOpen(state.chainOpen);
-          renderChain(state.data);
-          const row = el.querySelector(`[data-chain-block="${key}"]`);
-          if (row) {
-            const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-            row.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-            row.focus({ preventScroll: true });
-          }
-          return;
-        }
         const btn = ev.target.closest("[data-chain-block]");
         if (!btn || !el.contains(btn)) return;
         const key = btn.getAttribute("data-chain-block");
