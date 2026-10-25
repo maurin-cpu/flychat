@@ -62,7 +62,6 @@ def slim_chain(analyse: dict, days: int) -> dict:
             "tile": {k: tile.get(k) for k in _TILE_FIELDS if k in tile},
             "warnings": {k: w.get(k) for k in _WARN_FIELDS if k in w} or None,
             "chain": None if not isinstance(chain, dict) else {
-                "situation": chain.get("situation", ""),
                 "day_hint": chain.get("day_hint", ""),
                 **{k: _slim_step(chain.get(k)) for k in _STEPS},
             },

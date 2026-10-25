@@ -210,7 +210,7 @@ seit 19.09.2026 eine Pille (Daten gegen Erwartung aus dem Druck).
 | Block 1 Tagessatz | Code |
 | Regionen-Einschätzung | KI (Regionsanalyse, eigener Skill) |
 
-Der Wetterlage-KI-Text (`engine/synoptic_llm.py`, Skill `synoptic_overview.md`: Lead, Gefahren-Sätze, Tagessätze) ist seit 25.10.2026 abgeschaltet — er brauchte fast täglich alle 4 Korrekturrunden und wiederholte nur, was die Blöcke schon sagen. `llm_overview` bleibt `null`, die Gefahren-Schalter rechnet das Briefing selbst (`hazard_checks`).
+Der Wetterlage-KI-Text (`engine/synoptic_llm.py`, Skill `synoptic_overview.md`: Lead, Gefahren-Sätze, Tagessätze) ist seit 25.10.2026 abgeschaltet und samt Skill entfernt — er brauchte fast täglich alle 4 Korrekturrunden und wiederholte nur, was die Blöcke schon sagen. `llm_overview` bleibt `null`, die Gefahren-Schalter rechnet das Briefing selbst (`hazard_checks`).
 
 Skill-Regeln zu Fronten: Fronten-Wörter nur, wenn `fronten.durchgaenge`
 Einträge hat; Validator lässt sie dann durch (`_FRONT_PATTERNS`). Ohne

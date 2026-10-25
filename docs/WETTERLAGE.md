@@ -1,6 +1,10 @@
 # Wetterlage-Block (Synoptik)
 
-Status: v2.0 „Flugwetter-Zonen" (Juli 2026), Basis v1.0 (Mai 2026)
+Status: v2.0 „Flugwetter-Zonen" (Juli 2026), Basis v1.0 (Mai 2026).
+**Seit 25.10.2026 ohne KI-Text:** Der LLM-Pfad (Lead, Gefahren-Sätze,
+Tagessätze, Validator mit Korrekturrunden) ist entfernt. Das Briefing baut
+alle Texte aus festen Bausteinen und zeigt die Warnungen nur als Labels
+(`docs/BRIEFING.md` §5).
 Aufruf: 1×/Tag vom Scheduler im Daily-Cycle, kurz vor Versand des Casts.
 Ziel: Kompakte Einordnung der Grosswetterlage in Pilotensprache —
 zuoberst im Wingcast und in der E-Mail.
@@ -65,10 +69,9 @@ Jede Aussage muss bis zur Rohzahl rückverfolgbar sein. Architektur folgt dem
 
 1. Deterministische Klassifikatoren (`decide_*`) entscheiden alle
    Strukturfelder aus Wetterdaten und Druckraster.
-2. LLM bekommt **nur** die klassifizierten Felder, **keine** Rohzahlen.
-3. Skill-Prompt enthält Whitelist + Verbotsliste.
-4. Post-Filter prüft jedes Output-Statement gegen Verbotsbegriffe und Source-Tags.
-5. Bei Fehler in der Pipeline: Block wird **weggelassen**, kein Fallback-Text.
+2. Die Texte im Briefing entstehen aus festen Textbausteinen
+   (`scripts/briefing_v3_context.py`), kein Modell formuliert frei.
+3. Bei Fehler in der Pipeline: Block wird **weggelassen**, kein Fallback-Text.
 
 ## Datenfluss
 
@@ -114,12 +117,6 @@ build_synoptic_context()
     ↓
 data/synoptic_context.json (Cache)
 data/synoptic_audit/<date>.json (Audit)
-    ↓
-generate_synoptic_overview()            ← LLM-Call mit skills/synoptic_overview.md
-    ↓ Post-Filter (Verbotsbegriffe, Sources, Region-Validierung)
-short + long Prosa-Versionen
-    ↓
-data/synoptic_context.json (Re-write mit llm_overview)
     ↓
 build_briefing_data() → briefing_data["wetterlage"]
     ↓
@@ -185,8 +182,9 @@ mehr. Aggregation liefert pro Seite und Tag nur die Rohwerte:
 - `max_coverage`: max. precipitation_coverage (0–1) — DWD-Confidence
 - `n_spots`: Anzahl Spots auf dieser Seite
 
-Bewertung („Hitzegewitter", „Landregen", „trocken") macht der LLM in
-`skills/synoptic_overview.md`. Frühere if/elif-Kaskade mit char-Labels
+Bewertung („Hitzegewitter", „Landregen", „trocken") machte bis 25.10.2026
+der LLM in `skills/synoptic_overview.md`; heute nennen die Bausteine in
+`scripts/briefing_v3_context.py` die Daten ohne solche Etiketten. Frühere if/elif-Kaskade mit char-Labels
 (Schauer/Gewitter/flaechig/trocken) wurde im Mai 2026 entfernt, weil
 Edge-Cases (z.B. hohe CAPE + niedriger wet_share = Hitzegewitter) sich
 nicht sauber in starre Schwellen pressen liessen.
@@ -242,78 +240,20 @@ Jedes klassifizierte Feld trägt:
 Damit ist jede Aussage rückwärts auflösbar bis zur Rohzahl. Audit-Logs unter
 `data/synoptic_audit/<date>.json` (30 Tage Rotation).
 
-## Halluzinations-Schutz im LLM-Pfad
+## Gefahren-Schalter (`hazard_checks`)
 
-### Skill-Prompt (`skills/synoptic_overview.md`, EN: `skills/en/`)
-- Whitelist: erlaubte Strukturfeld-Quellen + erlaubte Phänomen-Begriffe
-- Verbotsliste explizit: Kaltfront, Warmfront, Okklusion, Frontdurchgang,
-  präfrontal, postfrontal, Trog, Rücken, Geopotential, Vorticity, hPa-Werte
-- Konfidenz-Decay: `level=low` nur weiche Sprache ("Tendenz", "dürfte")
-- v2.0: **Konsistenz-Pflicht** für die Druckzentren→Strömungs-Kette — passt
-  die Zentren-Lage nicht zu `flow_overhead.sector`, wird die Herleitung
-  weggelassen statt erfunden
+`engine/synoptic_llm.py:hazard_checks()` entscheidet je `forecast_dates`-Tag
+über `RAIN` (Nässe ≥ `SYNOPTIC_HAZARD_RAIN_WET_SHARE` in einer Zone),
+`THUNDER` (`gewitter_share` > 0 oder `konvektion.gewitter`), `FOEHN`
+(`foehn.per_day` bzw. Talpunkte) und `WIND` (`wind_class` verblasen/stark
+eingeschränkt). Das Briefing zeigt daraus die Warnungs-Labels; erklärt wird
+jede Gefahr im passenden Block der Kette. `llm_overview` im Cache ist `null`
+(Feld bleibt für ältere Leser).
 
-### Ausgabe-Format (seit 04.10.2026 ohne Zonen-Texte)
-```json
-{"lead": "...",
- "hazards": [{"items": [{"topic": "RAIN", "text": "..."}]}],
- "day_lines": ["...", "..."]}
-```
-Zuordnung `hazards[i]`/`day_lines[i] ↔ forecast_dates[i]` per Position.
-Cache: `llm_overview = {short, hazards, day_lines, attempts, unresolved,
-generated_at}`. Die vier Zonen-**Texte** (`zones`, `long`,
-`long_with_sources`) sind entfallen: sie erschienen nur auf der
-Synoptik-Seite, die seit 04.10.2026 nur noch die Karte zeigt. Die
-Zonen-**Daten** (`precip_zones`, `wind_zones`, …) bleiben — Briefing und
-Gefahren bauen darauf.
-
-**`hazards` (seit 15.09.2026) — Gefahren schweizweit** für die
-Briefing-Warnungen: ein Eintrag je `forecast_dates`-Tag. **Der Code schaltet**,
-`hazard_checks()` entscheidet je Tag über `RAIN` (Nässe ≥
-`SYNOPTIC_HAZARD_RAIN_WET_SHARE` in einer Zone), `THUNDER` (`gewitter_share`
-> 0 oder `konvektion.gewitter`), `FOEHN` (`foehn.per_day`), `BISE`,
-`WIND` (`wind_class` verblasen/stark eingeschränkt). Das Payload bekommt
-davon nur die aktiven Themen als `hazards_per_day`; der LLM schreibt je
-aktivem Thema 1–2 Sätze: wo in der Schweiz, woher/wohin, wann. Im Cache steht
-`llm_overview.hazards = [{date, checks, items: [{topic, text}]}]` — `checks`
-kommen immer vom Code, auch wenn ein Satz fehlt. Die App liest das Feld nicht;
-Konsument ist die Briefing-Vorschau (`scripts/briefing_v3_context.py`).
-
-### Validierung (`engine/synoptic_llm.py:_validate`)
-1. **Regex-Verbotsfilter**: `\bkaltfront\b`, `\btrog\b`, `\d{3,4}\s?hPa`,
-   dazu die Kürzel `\bcape\b` und `\bVb\b` — Kürzel gehören nicht in den
-   Fliesstext („Vb" = van-Bebber-Zugbahn, gemeint ist das Genua-Tief;
-   hohe CAPE heisst „labile Luft")
-2. **Region-Validierung**: erwähnte Region-Labels müssen für **diesen** Cast
-   detektiert worden sein (sonst Erfindung)
-3. **Föhn-Lee**: die Lee-Seite darf im Gefahrensatz nicht als ruhig/geschützt
-   gelten (`foehn_lee_inversion`)
-4. **Föhn nur an Föhntagen**: Jedes Föhn-Wort in Gefahrensatz oder
-   Tagessatz an einem Tag ohne aktiven Föhn ist ein Fehler (DE-Lauf 26.07.:
-   „Föhnschneisen kritisch" an einem föhnfreien Samstag)
-5. **Gewitter nur mit Signal**: ohne `THUNDER` kein „Gewitter"/„thunderstorm".
-6. **Föhn-Talwerte** (seit 04.10.2026, `docs/FOEHN.md`): Talname bei
-   bestätigtem Föhn, „bleibt in der Höhe" bei unbestätigtem, km/h nur aus den
-   Talwerten — in Gefahrensatz, `lead` und Tagessatz.
-7. **Gefahren nur, wenn der Code sie schaltet** (`_validate_hazards`): je
-   Tag genau die aktiven Themen (`hazard_missing` / `hazard_not_active`),
-   jeder Satz mit Ortsbezug (`no_place`: Zone, Alpennord/-süd, Mittelland,
-   Jura), dazu Verbotsbegriffe, Föhn- und Gewitter-Wörter wie oben. Beim
-   Bereinigen fällt nur der fehlerhafte Satz weg, der Schalter bleibt.
-
-Fehler → Korrekturrunde (max 4 Versuche) → chirurgisches Bereinigen der
-besten Version + Admin-Mail. Kein stilles Löschen.
-
-Die Fehlermeldung an den LLM ist **prescriptiv, nicht nur verbietend**:
-bei erfundenen Druckzentren steht die Positivliste der erlaubten
-`region_label` darin, bei Föhn-Talwerten die erlaubten Zahlen und Täler.
-Grund: Am 25.07.2026 fiel das Modell auf das blosse Verbot hin zweimal in
-dieselbe Formulierung zurück (3/3 Versuche verbraucht, keine Reserve) und
-ersetzte eine erfundene Region durch die nächste erfundene.
-
-### Kompatibilität
-`short` (Mail-Lead) heisst weiterhin so. Ältere Caches können noch `zones`,
-`long`, `long_with_sources` tragen — kein Konsument liest sie mehr.
+Bis 25.10.2026 schrieb hier ein LLM (Skill `synoptic_overview.md`) Lead,
+Gefahren- und Tagessätze, geprüft von einem Validator mit bis zu 4
+Korrekturrunden. Er brauchte im Oktober fast täglich alle Runden, die Sätze
+wiederholten nur die Blöcke — darum entfernt (Code und Skill, siehe Git).
 
 ## Integration
 
@@ -322,11 +262,8 @@ ersetzte eine erfundene Region durch die nächste erfundene.
   den Versand nicht.
 - **Briefing-Data** (`engine/analyzers.py:build_briefing_data`): lädt
   `data/synoptic_context.json` und packt es in `briefing_data["wetterlage"]`.
-- **Email** (`email_service.py`): wenn `wetterlage.llm_overview.short`
-  existiert → ersetzt `week_lead`. Sonst Fallback auf
-  `_week_summary_llm` (alter 1-2-Satz-Lead).
-- **App-Briefing** (`/briefing`, `scripts/briefing_v3_context.py`): dieselben
-  Bausteine wie die Mail (Kurzfassung, Tagessatz, Gefahren).
+- **Email + App-Briefing** (`email_service.py` → `scripts/briefing_v3_context.py`):
+  Kette aus Textbausteinen, Warnungen als Labels.
 - **Synoptik-Seite** (`/synoptik`): seit 04.10.2026 nur die interaktive
   Druckkarte, keine Wetterlage-Texte mehr.
 - **Admin** (`/admin/wetterlage_audit/<date>`): zeigt Audit-JSON für
@@ -335,16 +272,8 @@ ersetzte eine erfundene Region durch die nächste erfundene.
 
 ## Vorher/Nachher prüfen
 
-`python scripts/preview_synoptik_zonen.py` erzeugt den Wetterlage-Text
-(lead, Tagessätze, Gefahren) aus dem aktuellen Wettercache, ohne Prod-Caches
-zu überschreiben, und zeigt:
-1. **Rohdaten-Faktencheck** — `wet_share`/`p90_mm` je Zone/Tag/Fenster,
-   `wind_class`, Zugbahn-Einsetzzeiten
-2. den **alten** Block aus `synoptic_context.json`
-3. den **neuen** Text (LLM-Call)
-
-`--no-llm` überspringt den LLM-Call (nur Strukturfeld + Faktencheck).
-Ergebnis landet in `data/_preview_synoptik_zonen.json` (gitignored).
+`python scripts/preview_briefing_email.py` rendert das Briefing aus den
+lokalen Caches (`docs/BRIEFING.md`).
 
 ## Tests
 
@@ -356,15 +285,9 @@ Ergebnis landet in `data/_preview_synoptik_zonen.json` (gitignored).
     P90-Ausreisser-Resistenz, Tagesfenster erhalten die Zeitachse,
     `gewitter_share` rundet 1/200 nicht weg, Zugbahn (Richtung /
     "gleichzeitig" / trockener Tag / Mindest-Spotzahl)
-- `tests/test_synoptic_llm.py`:
-  - Validierung (Verbotsbegriffe inkl. CAPE-Jargon, Region-Mention-Check)
-  - Gefahren: Schalter, Tagesverlauf, Ortsbezug, Föhn/Gewitter nur mit Signal
-  - Korrektur-Nachrichten nennen die erlaubten `region_label`
-  - `_finalize`: Cache-Format ohne Zonen-Texte, Prune, EN-Wochentage
-  - Payload-Builder (Zonen-Daten + Fenster + Zugbahn drin, altes Nord/Süd raus)
-- `tests/test_foehn_tal_briefing.py` — Föhn-Talwerte im Briefing + Validator
-
-LLM-Calls selbst werden **nicht** getestet (Integration, kein Unit-Test).
+- `tests/test_synoptic_llm.py` — Gefahren-Schalter: Schwellen, Tagesform,
+  Zeitfenster, Föhn-Verlauf, Ausblick
+- `tests/test_foehn_tal_briefing.py` — Föhn-Talwerte im Briefing
 
 ## Lebenszyklus eines Casts
 
@@ -375,11 +298,8 @@ LLM-Calls selbst werden **nicht** getestet (Integration, kein Unit-Test).
    - `fetch_europe_pressure_grid()` → 15 Europa-Punkte (ECMWF-IFS)
    - Alle `decide_*` feuern, schreiben Tags in `_synoptic_decisions_applied`
    - `synoptic_context.json` + `synoptic_audit/<date>.json`
-   - `generate_synoptic_overview()` → LLM-Call mit Skill
-   - Post-Filter → verworfene Sätze werden geloggt
-   - Cache wird re-written mit `llm_overview`
 4. `build_briefing_data()` lädt Wetterlage und packt sie ins Result
-5. `send_briefing_email()` versendet — short-Text als Lead
+5. `send_briefing_email()` versendet
 6. Web-UI lädt `/api/briefing` und rendert den Block
 
 ## Audit nachvollziehen
@@ -396,6 +316,5 @@ Westströmung"*. Audit-Trail:
 4. `flow_overhead`: `{value: "West", strength: "schwach",
    inputs: {wind_700_by_day: [...]}}`
 
-→ Jede Aussage rückführbar bis zur Rohzahl. Kein "der LLM hat sich was
-ausgedacht" möglich, weil der LLM nur das Strukturfeld zu sehen bekommt
-und der Post-Filter alles ausserhalb der Whitelist verwirft.
+→ Jede Aussage rückführbar bis zur Rohzahl — die Texte entstehen aus
+festen Bausteinen über genau diesen Feldern.

@@ -2268,7 +2268,7 @@
     if (def.key === "lage") {
       const centers = Array.isArray(blk.centers) ? blk.centers : [];
       parts.push(chainFactsHtml(centers.map(c => ({ k: String(c.type || "").slice(0, 1), v: `${c.region || ""} ${c.msl || ""} hPa`.trim() }))));
-      parts.push(chainVerdictHtml(blk.fazit || chain.situation || ""));
+      parts.push(chainVerdictHtml(blk.fazit || ""));
       return parts.filter(Boolean).join("");
     }
     if (def.key === "wind") {
@@ -2394,7 +2394,7 @@
     CHAIN_BLOCKS.forEach(d => {
       const blk = chain[d.key];
       if (!blk) return;
-      if (!blk.status && !(d.key === "lage" && (blk.fazit || chain.situation))) return;   // Block ohne Daten
+      if (!blk.status && !(d.key === "lage" && blk.fazit)) return;   // Block ohne Daten
       no += 1;
       const open = state.chainOpen.has(d.key);
       const lage = d.key === "lage";

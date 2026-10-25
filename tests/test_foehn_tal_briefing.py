@@ -191,13 +191,9 @@ class TestBriefing(unittest.TestCase):
         self.assertEqual(facts["Böe"], "55 km/h")
         # Warnung nur noch als Label (25.10.2026): die Zahlen stehen allein in Block 3
         self.assertEqual(set(_foehn_warning(day)), {"topic", "label", "severity", "sev_label"})
-        # eine Zahl, eine Quelle: Block 3, Chips, KI-Payload
+        # eine Zahl, eine Quelle: Block 3 und Chips
         nums = lambda s: sorted(set(int(x) for x in re.findall(r"(\d+)(?=[–\s]*(?:\d+\s*)?km/h)", s)))  # noqa: E731
         self.assertEqual(nums(fazit), [22, 34, 55])
-        entry = sl._hazards_for_llm(sl.hazard_checks(_wetterlage(tal)))[0]["active"]["FOEHN"]
-        self.assertEqual((entry["tal_wind_kmh"], entry["tal_gust_max_kmh"]), ("22-34", 55))
-        self.assertEqual(entry["tal_confirmed"], ["Reusstal", "Haslital"])
-        self.assertNotIn("lee_gust_kmh", entry)
 
     def test_unconfirmed_names_valley_wind_never_no_foehn(self):
         # User 12.10.2026: nie "kein Foehn(wind)" — Windstaerke im Tal nennen,
@@ -231,46 +227,6 @@ class TestBriefing(unittest.TestCase):
         facts = {f["k"]: f["v"] for f in day["chain"]["foehn"]["facts"]}
         self.assertEqual(facts["Föhntäler"], "n. prüfbar")
         self.assertNotIn("code_text", _foehn_warning(day))
-
-
-class TestValidator(unittest.TestCase):
-    def setUp(self):
-        self.yes = sc.foehn_tal_for_day(_series(), DATE, "sued")
-        self.no = sc.foehn_tal_for_day(_series(confirmed=False), DATE, "sued")
-
-    def _kinds(self, text, tal, **kw):
-        opts = dict(require_name=True, require_aloft=True, only_foehn_sentences=False)
-        opts.update(kw)
-        return {k for k, _ in sl._foehn_tal_problems(text, tal, **opts)}
-
-    def test_confirmed_needs_valley_name_and_matching_numbers(self):
-        ok = "Moderate south foehn builds over the Northern Alps, gusty in the Reusstal, gusts up to 55 km/h."
-        self.assertEqual(self._kinds(ok, self.yes), set())
-        self.assertIn("foehn_tal_missing", self._kinds("Moderate south foehn over the Northern Alps.", self.yes))
-        self.assertIn("foehn_number_mismatch",
-                      self._kinds("South foehn in the Reusstal, gusts up to 45 km/h.", self.yes))
-
-    def test_unconfirmed_must_stay_aloft_and_not_claim_valleys(self):
-        self.assertEqual(self._kinds("South foehn stays aloft and does not reach the valleys.", self.no), set())
-        kinds = self._kinds("Moderate south foehn, gusty in the valleys.", self.no)
-        self.assertIn("foehn_tal_overclaim", kinds)
-        self.assertIn("foehn_tal_unconfirmed", kinds)
-        self.assertIn("foehn_number_mismatch",
-                      self._kinds("South foehn stays aloft, gusts 30 km/h.", self.no))
-
-    def test_day_line_checks_only_foehn_sentences(self):
-        line = "Rain from the west with gusts 40 km/h; south foehn stays aloft."
-        self.assertEqual(self._kinds(line, self.no, require_name=False, require_aloft=False,
-                                     only_foehn_sentences=True), set())
-
-    def test_old_cache_without_tal_adds_nothing(self):
-        self.assertEqual(sl._foehn_tal_problems("gusty in the valleys", None, require_name=True,
-                                                require_aloft=True, only_foehn_sentences=False), [])
-
-    def test_payload_foehn_block_has_no_tal_details(self):
-        out = sl._foehn_for_llm({"per_day": [{"date": DATE, "tal": self.yes}], "decided_by": "x"})
-        self.assertNotIn("tal", out["per_day"][0])
-        self.assertNotIn("decided_by", out)
 
 
 class TestSnapshot(unittest.TestCase):
@@ -529,12 +485,9 @@ class TestWarnungAusTaelern(unittest.TestCase):
         self.assertIsNone(chk["facts"]["tal"])              # KI-Validator: keine Talzahl-Pflicht
         self.assertEqual(chk["facts"]["valley_signs"]["n"], 2)
 
-    def test_warning_label_and_ki_payload_describe_the_valleys(self):
+    def test_warning_label_for_valley_signs(self):
         day = bc.build_chain_all_days(self._wl(), [DATE])["by_date"][DATE]
         self.assertEqual(_foehn_warning(day)["label"], "Foehn")
-        entry = sl._hazards_for_llm(sl.hazard_checks(self._wl()))[0]["active"]["FOEHN"]
-        self.assertEqual(entry["valley_dry_foehn_wind"]["n"], 2)
-        self.assertNotIn("tal_confirmed", entry)
 
     def test_no_valley_signs_no_warning(self):
         wl = self._wl()

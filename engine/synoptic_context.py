@@ -13,17 +13,11 @@ Erzeugt deterministisch eine 5-Tages-Einordnung der Grosswetterlage:
 - Konfidenz je Tag (high/medium/low) — abnehmend mit Forecast-Distanz
 
 Architektur (Stage-Inversion-Pattern, analog engine/decision_engine.py):
-  Alle Klassifikatoren sind deterministische `decide_*`-Funktionen. Der LLM
-  bekommt nur das fertige Strukturfeld, keine Rohzahlen. Jedes Feld traegt
-  Provenance (`decided_by`, `inputs`, `thresholds`) fuer Audit-Logs.
-
-Halluzinations-Schutz:
-  - Whitelist im LLM-Skill (synoptic_overview.md): nur detektierte Phaenomene
-    und Region-Labels duerfen genannt werden
-  - Verbot synoptischer Etiketten ohne Daten-Backing (Kaltfront, Trog,
-    Geopotential, hPa-Werte)
-  - Post-Filter prueft Output auf Verbotsbegriffe und Source-Konsistenz
-  - Bei API-Fehler oder leerer Detektion: Block wird weggelassen, kein Fallback-Text
+  Alle Klassifikatoren sind deterministische `decide_*`-Funktionen. Jedes Feld
+  traegt Provenance (`decided_by`, `inputs`, `thresholds`) fuer Audit-Logs.
+  Die Briefing-Texte baut scripts/briefing_v3_context.py aus festen
+  Textbausteinen; einen KI-Text zum Strukturfeld gibt es seit 25.10.2026 nicht
+  mehr (docs/BRIEFING.md §5).
 
 Konventionen:
   - Jede Decision liefert `{value, decided_by, inputs, thresholds}` zurueck

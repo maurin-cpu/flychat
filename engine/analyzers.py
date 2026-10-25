@@ -803,8 +803,8 @@ class AnalyzersMixin:
     # ════════════════════════════════════════════════════════════════════════
     # WEEKLY BRIEFING — Tages-Aggregation fuer den Wingcast
     # Das ehemalige LLM-"Fazit" (best_weekday/week_summary/day_highlights)
-    # wurde durch den synoptik-getriebenen Wetterlage-Block (engine/
-    # synoptic_llm.py + skills/synoptic_overview.md) ersetzt.
+    # wurde durch den synoptik-getriebenen Wetterlage-Block ersetzt
+    # (engine/synoptic_context.py; Texte baut scripts/briefing_v3_context.py).
     # ════════════════════════════════════════════════════════════════════════
 
     def build_briefing_data(self, spot_analyses: dict | None = None,
@@ -1116,7 +1116,7 @@ class AnalyzersMixin:
                 "counts_by_region": counts_by_region,
             })
 
-        # Wetterlage-Block aus synoptic_context.json (deterministisch + LLM-Prosa).
+        # Wetterlage-Block aus synoptic_context.json (deterministisch, ohne KI).
         # Wird vom Scheduler 1x/Tag via synoptic_llm.refresh_synoptic_overview()
         # generiert. Kann None sein wenn der Refresh fehlgeschlagen ist — Frontend
         # blendet den Block dann aus (kein Fallback-Text, keine Halluzination).

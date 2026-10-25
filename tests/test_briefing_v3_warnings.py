@@ -1,16 +1,10 @@
-"""Tests fuer die Code-Zeile der Warnungen im Briefing v3.
-
-Die Code-Zeile steht unter jedem KI-Satz und muss auch ohne KI stimmen:
-Worte statt Rohwerte, Zeitfenster konsolidiert, kein Abschnitt verschluckt.
+"""Tests fuer die Warnungen im Briefing v3: Tagessatz, Warn-Chips der Regionen
+und die Warnungen Schweiz als Labels.
 """
 import unittest
 
 import config
-from engine.synoptic_llm import _day_shape
 from scripts import briefing_v3_context as bc
-
-FULL = ["morning", "midday", "afternoon", "evening"]
-
 
 class _De(unittest.TestCase):
     def setUp(self):
@@ -19,101 +13,6 @@ class _De(unittest.TestCase):
 
     def tearDown(self):
         config.LANG = self._lang
-
-
-class TestRuns(unittest.TestCase):
-    def test_gap_splits_into_runs(self):
-        self.assertEqual(bc._runs(["morning", "afternoon", "evening"]),
-                         [["morning"], ["afternoon", "evening"]])
-
-    def test_order_is_normalised(self):
-        self.assertEqual(bc._runs(["evening", "morning"]),
-                         [["morning"], ["evening"]])
-
-
-class TestShapePhrase(_De):
-    def test_wechselnd_keeps_the_afternoon(self):
-        """Vorfall 16.09.2026: 'morgens und wieder abends' verschluckte den
-        Nachmittag."""
-        sh = _day_shape({"wallis": ["morning", "afternoon", "evening"]})
-        self.assertEqual(bc._shape_phrase(sh), "am Vormittag und wieder ab Nachmittag")
-
-    def test_two_single_windows(self):
-        sh = _day_shape({"wallis": ["morning", "evening"]})
-        self.assertEqual(bc._shape_phrase(sh), "am Vormittag und wieder am Abend")
-
-
-class TestWindowsText(_De):
-    def _text(self, wins):
-        return bc._hazard_windows_text({"facts": {"windows": wins,
-                                                  "day_shape": _day_shape(wins)}})
-
-    def test_common_course_has_no_place(self):
-        wins = {"alpennordhang": ["afternoon", "evening"],
-                "tessin": ["afternoon", "evening"]}
-        self.assertEqual(self._text(wins), "Ab Nachmittag.")
-
-    def test_two_groups_both_named(self):
-        wins = {"alpennordhang": FULL,
-                "wallis": ["morning", "afternoon", "evening"],
-                "graubuenden_engadin": ["morning", "afternoon", "evening"]}
-        text = self._text(wins)
-        self.assertIn("im Wallis und in Graubünden", text)
-        self.assertIn("am Alpennordhang", text)
-        self.assertNotIn("ganztägig.", text.split(",")[0])
-
-    def test_three_groups_name_the_earliest_onset_only(self):
-        wins = {"alpennordhang": FULL,
-                "wallis": ["morning", "afternoon", "evening"],
-                "tessin": ["afternoon", "evening"],
-                "graubuenden_engadin": ["midday", "afternoon", "evening"]}
-        text = self._text(wins)
-        self.assertTrue(text.startswith("Zeitlich gestaffelt: ab Vormittag"))
-        self.assertNotIn("ganztägig", text)
-
-
-class TestCodeLineWithKi(_De):
-    """Mit KI-Satz keine Zeiten in der Code-Zeile — sonst stehen sie doppelt."""
-    CHECK = {"zones": ["tessin"], "facts": {
-        "side": "nord", "peak": "caution", "hours": 6,
-        "windows": {"tessin": ["afternoon", "evening"]},
-        "day_shape": _day_shape({"tessin": ["afternoon", "evening"]}),
-        "course": "zunehmend", "lee_gust_kmh": 55}}
-
-    def test_with_timing(self):
-        text = bc._hazard_code_text("FOEHN", self.CHECK)
-        self.assertIn("Ab Nachmittag", text)
-        self.assertIn("Legt im Tagesverlauf zu", text)
-        self.assertIn("55 km/h", text)
-
-    def test_without_timing_keeps_the_numbers(self):
-        text = bc._hazard_code_text("FOEHN", self.CHECK, timing=False)
-        self.assertNotIn("Ab Nachmittag", text)
-        self.assertNotIn("Legt im Tagesverlauf zu", text)
-        self.assertIn("55 km/h", text)
-        self.assertIn("Nordf\u00f6hn", text)
-
-
-class TestWindCodeLine(_De):
-    def test_no_second_upper_wind_number(self):
-        """Nur eine Hoehenwind-Spitze auf der Seite — die im Hoehenwind-Abschnitt."""
-        text = bc._hazard_code_text("WIND", {"zones": ["alpennordhang", "wallis"], "facts": {
-            "classes": {"alpennordhang": "verblasen", "wallis": "stark_eingeschraenkt"},
-            "median_aloft_kmh": 32}}, timing=False)
-        self.assertEqual(text, "Verblasen am Alpennordhang, stark eingeschr\u00e4nkt im Wallis.")
-        self.assertNotIn("km/h", text)
-
-
-class TestWords(_De):
-    def test_extent(self):
-        self.assertEqual(bc._extent_word(0.93), "verbreitet")
-        self.assertEqual(bc._extent_word(0.4), "gebietsweise")
-        self.assertEqual(bc._extent_word(0.1), "vereinzelt")
-
-    def test_rain_intensity(self):
-        self.assertEqual(bc._rain_word(28.3), "kräftig, lokal mit Starkregen")
-        self.assertEqual(bc._rain_word(5), "kräftig")
-        self.assertEqual(bc._rain_word(0.4), "leicht")
 
 
 def _wl(dates, active_by_day):
@@ -666,16 +565,17 @@ class TestWarningsOnlyLabels(_De):
 
 
 class TestNoSynopticLlm(unittest.TestCase):
-    """Der Wetterlage-KI-Text ist abgeschaltet: der Lauf ruft kein Modell auf."""
+    """Der Wetterlage-KI-Text ist entfernt: der Lauf fasst den Client nie an."""
 
-    def test_refresh_never_calls_the_model(self):
+    def test_refresh_never_touches_the_client(self):
         from unittest import mock
         from engine import synoptic_llm as sl
+        client = mock.Mock()
         with mock.patch("engine.synoptic_context.build_synoptic_context",
                         return_value={"forecast_dates": []}), \
-                mock.patch.object(sl, "generate_synoptic_overview") as gen:
-            out = sl.refresh_synoptic_overview({}, object(), "m")
-            lang = sl.refresh_synoptic_overview_lang(out, object(), "m", "xx")
-        gen.assert_not_called()
+                mock.patch("engine.synoptic_context._write_synoptic_cache"):
+            out = sl.refresh_synoptic_overview({}, client, "m")
+            lang = sl.refresh_synoptic_overview_lang(out, client, "m", "xx")
+        self.assertEqual(client.mock_calls, [])
         self.assertIsNone(out["llm_overview"])
         self.assertIsNone(lang["llm_overview"])

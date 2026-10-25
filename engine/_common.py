@@ -502,8 +502,7 @@ def deepseek_thinking_kwargs(provider: str, model: str,
     abschalten. Leeres Dict, wenn nicht anwendbar (anderer Provider/Modell) oder
     per Config wieder eingeschaltet.
 
-    thinking_enabled — explizite Vorgabe der Call-Site (z.B.
-    config.SYNOPTIC_THINKING fuer den Wetterlage-Call). None = Default der
+    thinking_enabled — explizite Vorgabe der Call-Site. None = Default der
     Massen-Analyse (config.DEEPSEEK_DISABLE_THINKING).
 
     Bewusst NICHT global im llm_client, sondern per Call-Site: jeder Call

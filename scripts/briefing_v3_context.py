@@ -352,14 +352,6 @@ def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
     return out
 
 
-def _day_line(wetterlage: dict, date: str) -> str:
-    """Kurzer KI-Satz zur Lage dieses Tages (llm_overview.day_lines)."""
-    for e in ((wetterlage or {}).get("llm_overview") or {}).get("day_lines") or []:
-        if isinstance(e, dict) and e.get("date") == date:
-            return (e.get("text") or "").strip()
-    return ""
-
-
 def _wind_class(kmh: float) -> str:
     """Staerkeklasse wie decide_flow_overhead (schwach <15, maessig <30,
     kraeftig <50, sonst stuermisch)."""
@@ -789,8 +781,6 @@ _L3 = {
         "fx_rh":            "Tiefste Talfeuchte",
         "fx_gust_aloft":    "Böe in der Höhe",
         "fv_side_na":       "{side}: keine Taldaten — nicht prüfbar.",
-        "hz_code_foehn_tal": "Daten zeigen trockenen Wind aus Föhnrichtung in {n} von {t} Tälern ({names}), Böen bis {g} km/h — Lee-Seite {zones}.",
-        "hz_cause_foehn_tal": "— Wind aus der Föhnrichtung der Täler mit trockener Luft.",
         "fv_name_dir":      "{tal} aus {dir}",
         "fv_dir_N": "N", "fv_dir_NE": "NO", "fv_dir_E": "O", "fv_dir_SE": "SO",
         "fv_dir_S": "S", "fv_dir_SW": "SW", "fv_dir_W": "W", "fv_dir_NW": "NW",
@@ -1017,36 +1007,6 @@ _L3 = {
         "hz_RAIN": "Regen", "hz_THUNDER": "Gewitter", "hz_FOEHN": "Föhn",
         "hz_WIND": "Starker Wind",
         "hz_none":      "Daten zeigen schweizweit keine Gefahr.",
-        # Ursache je Warnung aus der Synoptik — Warnung = Daten, Ursache = Lage
-        "hz_cause_rain_south": "— laut Daten staut sich die feuchte {sector}luft im Süden.",
-        "hz_cause_rain_north": "— laut Daten staut sich die {sector}luft am Alpennordhang.",
-        "hz_cause_rain_front": "— mit Frontzeichen in den Daten.",
-        "hz_cause_rain_flow":  "— {sector}strömung laut Daten.",
-        "hz_cause_wind_aloft": "— laut Daten schlägt der {sector}-Höhenwind bis in die Täler durch.",
-        "hz_cause_wind_gusts": "— Daten zeigen böigen Wind.",
-        "hz_cause_foehn":      "— Druckgefälle {dp} hPa über die Alpen.",
-        "hz_cause_thunder":    "— Daten zeigen feuchte, labile Luft{cap}.",
-        "hz_cause_thunder_cap": ", im Norden gedeckelt",
-        "hz_code_rain": "Daten zeigen Regen {zones}, {extent} und {intensity}.",
-        "hz_extent_widespread": "verbreitet",
-        "hz_extent_scattered": "gebietsweise",
-        "hz_extent_isolated": "vereinzelt",
-        "hz_rain_light": "leicht",
-        "hz_rain_moderate": "mässig",
-        "hz_rain_heavy": "kräftig",
-        "hz_rain_severe": "kräftig, lokal mit Starkregen",
-        "hz_code_thunder": "Modell-Gewitter {zones}.",
-        "hz_code_foehn": "Daten deuten auf {side}föhn hin ({level}), {h} h — Lee-Seite {zones}.",
-        "hz_code_wind": "{classes}.",
-        "hz_class_verblasen": "verblasen", "hz_class_stark_eingeschraenkt": "stark eingeschränkt",
-        "win_morning": "Vormittag", "win_midday": "Mittag",
-        "win_afternoon": "Nachmittag", "win_evening": "Abend",
-        "hz_windows":   "{spans}.",
-        "hz_run_single": "am {a}",
-        "hz_run_open":   "ab {a}",
-        "hz_run_span":   "{a} bis {b}",
-        "hz_run_join":   " und wieder ",
-        "hz_windows_but": "{main}, {exception}",
         "lage_Westlage": "Westlage", "lage_Suedwestlage": "S\u00fcdwestlage",
         "lage_Nordwestlage": "Nordwestlage", "lage_Nordlage": "Nordlage",
         "lage_Nordostlage": "Nordostlage", "lage_Ostlage": "Ostlage",
@@ -1102,29 +1062,12 @@ _L3 = {
         "lage_Uebergangslage": "Übergangslage", "lage_unbestimmt": "unbestimmt",
         "zb_alpennordhang_west": "Alpennordhang West",
         "zb_alpennordhang_ost":  "Alpennordhang Ost",
-        "hz_windows_staggered": "Zeitlich gestaffelt: ab {a} {zones}, anderswo später.",
-        "hz_shape_ganztags": "ganztägig",
-        "hz_shape_ab":  "ab {a}",
-        "hz_shape_bis": "bis {b}",
-        "hz_shape_nur": "nur am {a}",
-        "hz_shape_spanne": "von {a} bis {b}",
-        "hz_shape_wechselnd": "am {a} und wieder am {b}",
         "zones_all":    "landesweit",
         "zones_except": "überall ausser {zone}",
         "zone_in_alpennordhang": "am Alpennordhang",
         "zone_in_wallis": "im Wallis",
         "zone_in_tessin": "im Tessin",
         "zone_in_graubuenden_engadin": "in Graubünden",
-        "hz_course_zunehmend": "Legt im Tagesverlauf zu.",
-        "hz_course_abflauend": "Flaut im Tagesverlauf ab.",
-        "hz_course_gleich":    "Bleibt den Tag über gleich stark.",
-        "hz_foehn_gust":       "An Startplätzen im Lee Böen bis {kmh} km/h.",
-        "hz_foehn_tal_yes":    "In den Föhntälern Wind {w1}–{w2} km/h, Böen bis {g} km/h ({gtal}).",
-        "hz_foehn_tal_no":     "{tal_wind}",
-        "hz_tm_vorbei":     "Folgetag: vorbei.",
-        "hz_tm_abklingend": "Folgetag: schwächer.",
-        "hz_tm_zunehmend":  "Folgetag: stärker.",
-        "hz_tm_gleich":     "Folgetag: unverändert.",
         "airspace_note": "Luftraum (DABS), Startplatz und Windsack prüft der Pilot vor Ort — das kann keine Prognose.",
         "days_ahead":   "Die Tage voraus",
         "week_hint":    "Oben je Tag: Mittelwert deiner Regionen (1–5). Keine Warnhinweise nur, wenn keine deiner Regionen Warnhinweise hat; schwere Warnhinweise, sobald eine Region schwere hat; sonst Warnhinweise. Darunter jede Region mit ihrer eigenen Bewertung.",
@@ -1336,8 +1279,6 @@ _L3 = {
         "fx_rh":            "Lowest valley humidity",
         "fx_gust_aloft":    "Gust aloft",
         "fv_side_na":       "{side}: no valley data — not verifiable.",
-        "hz_code_foehn_tal": "Data show dry wind from the foehn direction in {n} of {t} valleys ({names}), gusts up to {g} km/h — lee side {zones}.",
-        "hz_cause_foehn_tal": "— wind from the valleys' foehn direction with dry air.",
         "fv_name_dir":      "{tal} from {dir}",
         "fv_dir_N": "N", "fv_dir_NE": "NE", "fv_dir_E": "E", "fv_dir_SE": "SE",
         "fv_dir_S": "S", "fv_dir_SW": "SW", "fv_dir_W": "W", "fv_dir_NW": "NW",
@@ -1554,36 +1495,6 @@ _L3 = {
         "hz_RAIN": "Rain", "hz_THUNDER": "Thunderstorms", "hz_FOEHN": "Foehn",
         "hz_WIND": "Strong wind",
         "hz_none":      "Data show no hazards across Switzerland.",
-        # cause per warning from the synoptic picture — warning = data, cause = situation
-        "hz_cause_rain_south": "— data show the humid {sector} air piling up in the south.",
-        "hz_cause_rain_north": "— data show the {sector} air piling up on the Northern Alps.",
-        "hz_cause_rain_front": "— with front signs in the data.",
-        "hz_cause_rain_flow":  "— {sector} flow in the data.",
-        "hz_cause_wind_aloft": "— data show the {sector} upper wind reaching down into the valleys.",
-        "hz_cause_wind_gusts": "— data show gusty wind.",
-        "hz_cause_foehn":      "— pressure difference of {dp} hPa across the Alps.",
-        "hz_cause_thunder":    "— data show humid, unstable air{cap}.",
-        "hz_cause_thunder_cap": ", capped in the north",
-        "hz_code_rain": "Data indicate rain {zones}, {extent} and {intensity}.",
-        "hz_extent_widespread": "widespread",
-        "hz_extent_scattered": "in places",
-        "hz_extent_isolated": "isolated",
-        "hz_rain_light": "light",
-        "hz_rain_moderate": "moderate",
-        "hz_rain_heavy": "heavy",
-        "hz_rain_severe": "heavy, locally torrential",
-        "hz_code_thunder": "Model thunderstorms {zones}.",
-        "hz_code_foehn": "Data indicate {side} foehn ({level}), {h} h — lee side {zones}.",
-        "hz_code_wind": "{classes}.",
-        "hz_class_verblasen": "blown out", "hz_class_stark_eingeschraenkt": "heavily restricted",
-        "win_morning": "morning", "win_midday": "midday",
-        "win_afternoon": "afternoon", "win_evening": "evening",
-        "hz_windows":   "{spans}.",
-        "hz_run_single": "in the {a}",
-        "hz_run_open":   "from the {a}",
-        "hz_run_span":   "{a} to {b}",
-        "hz_run_join":   " and again ",
-        "hz_windows_but": "{main}, {exception}",
         "lage_Westlage": "Westerly flow", "lage_Suedwestlage": "South-westerly flow",
         "lage_Nordwestlage": "North-westerly flow", "lage_Nordlage": "Northerly flow",
         "lage_Nordostlage": "North-easterly flow", "lage_Ostlage": "Easterly flow",
@@ -1639,29 +1550,12 @@ _L3 = {
         "lage_Uebergangslage": "Transitional", "lage_unbestimmt": "undetermined",
         "zb_alpennordhang_west": "northern Alps west",
         "zb_alpennordhang_ost":  "northern Alps east",
-        "hz_windows_staggered": "Staggered: from the {a} {zones}, later elsewhere.",
-        "hz_shape_ganztags": "all day",
-        "hz_shape_ab":  "from {a} onwards",
-        "hz_shape_bis": "until {b}",
-        "hz_shape_nur": "in the {a} only",
-        "hz_shape_spanne": "from {a} to {b}",
-        "hz_shape_wechselnd": "in the {a} and again in the {b}",
         "zones_all":    "countrywide",
         "zones_except": "everywhere except {zone}",
         "zone_in_alpennordhang": "in the northern Alps",
         "zone_in_wallis": "in Valais",
         "zone_in_tessin": "in Ticino",
         "zone_in_graubuenden_engadin": "in the Grisons",
-        "hz_course_zunehmend": "Builds through the day.",
-        "hz_course_abflauend": "Eases off through the day.",
-        "hz_course_gleich":    "Stays at the same strength all day.",
-        "hz_foehn_gust":       "Gusts up to {kmh} km/h at launch sites in the lee.",
-        "hz_foehn_tal_yes":    "In the foehn valleys wind {w1}–{w2} km/h, gusts up to {g} km/h ({gtal}).",
-        "hz_foehn_tal_no":     "{tal_wind}",
-        "hz_tm_vorbei":     "Next day: over.",
-        "hz_tm_abklingend": "Next day: weaker.",
-        "hz_tm_zunehmend":  "Next day: stronger.",
-        "hz_tm_gleich":     "Next day: unchanged.",
         "airspace_note": "Airspace (DABS), launch site and windsock are checked by the pilot on site — no forecast can do that.",
         "days_ahead":   "The days ahead",
         "week_hint":    "Top of each day: average of your regions (1–5). No alerts only when none of your regions has any; severe alerts as soon as one region has severe ones; otherwise alerts. Below, each region with its own rating.",
@@ -1806,32 +1700,6 @@ def _region_thermals(spots: list) -> dict:
         "height": f"{round(q75(heights) / 50) * 50:.0f} m" if heights else "",
         "hours": f"{statistics.median(hours):.0f} h" if hours else "",
     }
-
-
-def _sentences(text: str, n: int) -> str:
-    """Die ersten n ganzen Saetze. Trennt nur an Satzzeichen + Leerzeichen +
-    Grossbuchstabe, damit 'z. B. ' oder '1.5 m/s' nicht zerschnitten werden."""
-    parts = re.split(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ])", (text or "").strip())
-    return " ".join(p for p in parts[:n] if p)
-
-
-_WEEKDAYS = (("monday", "montag"), ("tuesday", "dienstag"), ("wednesday", "mittwoch"),
-             ("thursday", "donnerstag"), ("friday", "freitag"), ("saturday", "samstag"),
-             ("sunday", "sonntag"))
-
-
-def _situation_sentences(text: str, date: str, n: int) -> str:
-    """Lage in n Saetzen fuer den Fokus-Tag. Der Wochen-Lead erzaehlt Tag fuer
-    Tag ('Sunday stays dry … on Monday foehn …') — Saetze, die einen ANDEREN
-    Wochentag nennen, fallen raus, sonst steht am Montag 'Sunday stays dry'."""
-    try:
-        own = _WEEKDAYS[datetime.fromisoformat(date).weekday()]
-    except (TypeError, ValueError):
-        return _sentences(text, n)
-    others = [w for day in _WEEKDAYS if day != own for w in day]
-    parts = re.split(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ])", (text or "").strip())
-    keep = [p for p in parts if p and not any(re.search(rf"\b{w}\b", p, re.I) for w in others)]
-    return " ".join(keep[:n])
 
 
 def _capitalize(text: str) -> str:
@@ -3567,16 +3435,6 @@ def _tal_wind_text(tal: dict) -> str:
         gtal=tal_kurzname(tal.get("all_gust_tal", "")), **args)
 
 
-def _foehn_tal_gust_text(tal: dict) -> str:
-    """Warnbox-Zusatz aus denselben Talwerten wie Block 3."""
-    from foehn_talpunkte import tal_kurzname
-    if tal.get("n_bestaetigt"):
-        return _lbl("hz_foehn_tal_yes").format(w1=tal["wind_min_kmh"], w2=tal["wind_max_kmh"],
-                                               g=tal["gust_max_kmh"],
-                                               gtal=tal_kurzname(tal.get("gust_tal", "")))
-    return _lbl("hz_foehn_tal_no").format(tal_wind=_tal_wind_text(tal))
-
-
 def _foehn_text(wetterlage: dict, date: str) -> str:
     fo = _per_day_index(wetterlage.get("foehn"), [date]).get(date) or {}
     parts = []
@@ -3867,13 +3725,6 @@ def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> di
             "pressure_jump_hot": jump_hot,
             "regime": syn.get("pressure_regime", ""),
         },
-        # Gesamtlage Schweiz in einem Satz: erster Satz des Wochen-Leads (der
-        # beschreibt die Grosswetterlage), dazu der kurze Tages-Hinweis.
-        # Ein kurzer KI-Satz je Tag (day_lines); aeltere Caches: erster
-        # tagesreiner Satz des Leads statt frueher drei (zu viel Text)
-        "situation": (_day_line(wetterlage, date)
-                      or _situation_sentences(((wetterlage.get("llm_overview") or {})
-                                               .get("short") or "").strip(), date, 1)),
         "day_hint": _day_summaries(wetterlage, dates).get(date, ""),
         "fronts": {**_front_block(fronts, passagen, dates, date, wetterlage),
                    "lines": _front_lines(fronts, passagen, date),
@@ -3917,15 +3768,11 @@ def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> di
 # ----------------------------------------------------------------------
 
 def _hazard_day(wetterlage: dict, date: str) -> dict | None:
-    """Gefahren-Eintrag des Tages: aus llm_overview.hazards (Schalter + KI-Saetze),
-    sonst — aelterer Cache ohne das Feld — nur die Schalter, frisch gerechnet."""
-    for h in ((wetterlage.get("llm_overview") or {}).get("hazards")) or []:
-        if isinstance(h, dict) and h.get("date") == date and h.get("checks"):
-            return h
+    """Gefahren-Schalter des Tages, frisch aus dem Strukturfeld gerechnet."""
     from engine.synoptic_llm import hazard_checks
     for h in hazard_checks(wetterlage):
         if h["date"] == date:
-            return {**h, "items": []}
+            return h
     return None
 
 
@@ -3951,226 +3798,6 @@ def _zones_text(zone_ids: list, where: bool = False) -> str:
         missing = [z for z in config.SYNOPTIC_ZONES if z not in ids][0]
         return _lbl("zones_except").format(zone=_zone_in(missing))
     return _join_days([(_zone_in(z) if where else _zone_name(z)) for z in ids])
-
-
-def _extent_word(wet_share) -> str:
-    """Flaechenanteil -> Wort. Ein Pilot kann mit "93 % der Spots nass" nichts
-    anfangen, mit "verbreitet" sofort."""
-    v = float(wet_share or 0)
-    if v >= config.SYNOPTIC_HAZARD_EXTENT_WIDESPREAD:
-        return _lbl("hz_extent_widespread")
-    if v >= config.SYNOPTIC_HAZARD_EXTENT_SCATTERED:
-        return _lbl("hz_extent_scattered")
-    return _lbl("hz_extent_isolated")
-
-
-def _rain_word(p90_mm) -> str:
-    """Spitzenintensitaet (P90 mm/h) -> Wort."""
-    v = float(p90_mm or 0)
-    if v >= config.SYNOPTIC_HAZARD_RAIN_MM_SEVERE:
-        return _lbl("hz_rain_severe")
-    if v >= config.SYNOPTIC_HAZARD_RAIN_MM_HEAVY:
-        return _lbl("hz_rain_heavy")
-    if v >= config.SYNOPTIC_HAZARD_RAIN_MM_MODERATE:
-        return _lbl("hz_rain_moderate")
-    return _lbl("hz_rain_light")
-
-
-def _runs(hit: list) -> list:
-    """Zusammenhaengende Fenster-Abschnitte: [morning, afternoon, evening] ->
-    [[morning], [afternoon, evening]]."""
-    order = [w[0] for w in config.SYNOPTIC_DAY_WINDOWS]
-    idx = sorted(order.index(w) for w in hit)
-    runs = []
-    for i in idx:
-        if runs and i == runs[-1][-1] + 1:
-            runs[-1].append(i)
-        else:
-            runs.append([i])
-    return [[order[i] for i in r] for r in runs]
-
-
-def _wechselnd_phrase(hit: list) -> str:
-    """Jeder Abschnitt einzeln: "am Vormittag und wieder ab Nachmittag"."""
-    last = config.SYNOPTIC_DAY_WINDOWS[-1][0]
-    parts = []
-    for r in _runs(hit):
-        a, b = _lbl("win_" + r[0]), _lbl("win_" + r[-1])
-        if len(r) == 1:
-            parts.append(_lbl("hz_run_single").format(a=a))
-        elif r[-1] == last:
-            parts.append(_lbl("hz_run_open").format(a=a))
-        else:
-            parts.append(_lbl("hz_run_span").format(a=a, b=b))
-    return _lbl("hz_run_join").join(parts)
-
-
-def _shape_phrase(shape: dict) -> str:
-    # "gemischt" wird in _hazard_windows_text je Zone aufgeloest
-    if shape["shape"] == "wechselnd" and shape.get("hit"):
-        return _wechselnd_phrase(shape["hit"])
-    """"ab Nachmittag", "nur Vormittag", "Mittag bis Abend" — aus day_shape."""
-    return _lbl("hz_shape_" + shape["shape"]).format(
-        a=_lbl("win_" + shape["from"]), b=_lbl("win_" + shape["to"]))
-
-
-def _hazard_windows_text(check: dict) -> str:
-    """Tagesverlauf als Code-Satz. Unterscheiden sich die Zonen im Zeitpunkt,
-    steht er je Zone — "Alpennordhang ab Mittag, Tessin nur Abend" ist die
-    Information, nach der der Pilot morgens sucht."""
-    from engine.synoptic_llm import _day_shape
-    f = check.get("facts") or {}
-    shape = f.get("day_shape")
-    if not shape:
-        return ""
-    wins = f.get("windows") or {}
-    per_zone = {z: _day_shape({z: w}) for z, w in wins.items()}
-    per_zone = {z: sh for z, sh in per_zone.items() if sh}
-    # Konsolidieren statt auflisten. Ein gemeinsamer Verlauf steht ohne Ort;
-    # zwei Gruppen bekommen beide ihren Ort (sonst weiss niemand, fuer wen die
-    # erste Haelfte gilt); ab drei Gruppen nur noch der frueheste Einsatz —
-    # die Vereinigung ("ganztags") waere dort schlicht falsch.
-    grouped = {}
-    for z, sh in per_zone.items():
-        grouped.setdefault((sh["shape"], sh["from"], sh["to"]), []).append(z)
-
-    def where(zs):
-        return _join_days([_zone_in(z) for z in zs])
-
-    if len(grouped) <= 1:
-        spans = _shape_phrase(shape)
-    elif len(grouped) == 2:
-        main_key, exc_key = sorted(grouped, key=lambda k: -len(grouped[k]))
-        spans = _lbl("hz_windows_but").format(
-            main=f"{_shape_phrase(per_zone[grouped[main_key][0]])} {where(grouped[main_key])}",
-            exception=f"{_shape_phrase(per_zone[grouped[exc_key][0]])} {where(grouped[exc_key])}")
-    else:
-        order = [w[0] for w in config.SYNOPTIC_DAY_WINDOWS]
-        first = min(order.index(k[1]) for k in grouped)
-        early = [z for k, zs in grouped.items() if order.index(k[1]) == first for z in zs]
-        return _lbl("hz_windows_staggered").format(a=_lbl("win_" + order[first]),
-                                                   zones=where(early))
-    return _capitalize(_lbl("hz_windows").format(spans=spans))
-
-
-def _hazard_tomorrow_text(check: dict) -> str:
-    """Folgetag-Trend als Text — NICHT fuer die Tages-Warnbox.
-
-    Die Warnungen stehen in Sektion 2 ("Heute im Detail") und sind
-    tagesrein; diese Zeile gehoert in eine Sektion, die das ganze
-    3-Tage-Fenster zeigt (Sektion 1).
-    """
-    tm = (check.get("facts") or {}).get("tomorrow")
-    if not tm or not tm.get("trend"):
-        return ""
-    return _lbl("hz_tm_" + tm["trend"])
-
-
-def _hazard_cause(topic: str, check: dict, wetterlage: dict, date: str) -> str:
-    """Die synoptische Ursache der Warnung als Halbsatz — dasselbe Prinzip wie
-    in der Kette: die Warnung kommt aus den Daten, die Ursache aus der Lage."""
-    wl = wetterlage or {}
-    flow = _per_day_index(wl.get("flow_overhead"), [date]).get(date) or {}
-    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
-    sector = _lbl("lg_sector_" + abbr) if abbr else ""
-    if topic == "RAIN":
-        _, zeichen = _front_zeichen(wl, date)
-        if zeichen.get("stufe") == "deutlich" and (zeichen.get("regen") or {}).get("stufe"):
-            return _lbl("hz_cause_rain_front")
-        zones = set(check.get("zones") or [])
-        if abbr in ("S", "SW", "SE") and "alpennordhang" not in zones:
-            return _lbl("hz_cause_rain_south").format(sector=sector)
-        if abbr in ("N", "NW", "W") and "alpennordhang" in zones:
-            return _lbl("hz_cause_rain_north").format(sector=sector)
-        return _lbl("hz_cause_rain_flow").format(sector=sector) if sector else ""
-    if topic == "WIND":
-        wp = _per_day_index(wl.get("wind_pattern"), [date]).get(date) or {}
-        drivers = {(wp.get(side) or {}).get("wind_driver") for side in ("alpennord", "alpensued")}
-        if "hoehenwind" in drivers and sector:
-            return _lbl("hz_cause_wind_aloft").format(sector=sector)
-        return _lbl("hz_cause_wind_gusts")
-    if topic == "FOEHN":
-        if (check.get("facts") or {}).get("valley_signs"):
-            return _lbl("hz_cause_foehn_tal")
-        fo = _per_day_index(wl.get("foehn"), [date]).get(date) or {}
-        side = "sued" if fo.get("sued_active") else "nord"
-        dp = (fo.get("claim") or {}).get(f"delta_p_{side}_max_hpa")
-        return _lbl("hz_cause_foehn").format(dp=f"{dp:.0f}") if isinstance(dp, (int, float)) else ""
-    if topic == "THUNDER":
-        regime, tkey = _lage_regime(wl, date)
-        zones = set(check.get("zones") or [])
-        cap = _lbl("hz_cause_thunder_cap") if (regime == "hoch" or tkey == "up") and "alpennordhang" not in zones else ""
-        return _lbl("hz_cause_thunder").format(cap=cap)
-    return ""
-
-
-def _hazard_code_text(topic: str, check: dict, timing: bool = True, cause: str = "") -> str:
-    """Der Code-Satz mit Zahl je Gefahr — steht immer, auch ohne KI-Satz.
-    Reihenfolge: Ausmass/Zahl, Tagesverlauf, Boeen. NUR dieser Tag.
-
-    timing=False: Zeitfenster und Verlauf weglassen — dann nennt sie der
-    KI-Satz direkt darueber schon (geprueft auf zu spaeten Beginn), und die
-    Zeile wiederholte sie nur (User 16.09.2026: zu viel Text)."""
-    base = _hazard_base_text(topic, check)
-    if cause:
-        base = base.rstrip(".") + " " + cause
-    parts = [base]
-    if timing:
-        parts += [_hazard_windows_text(check), _hazard_course_text(check)]
-    parts.append(_hazard_gust_text(check))
-    return " ".join(p for p in parts if p)
-
-
-def _hazard_course_text(check: dict) -> str:
-    """Verlauf innerhalb des Tages (bisher nur Foehn)."""
-    course = (check.get("facts") or {}).get("course")
-    return _lbl("hz_course_" + course) if course else ""
-
-
-def _hazard_gust_text(check: dict) -> str:
-    """Wind-Beleg zur Foehnlage: die Talwerte (gleiche Zahlen wie Block 3);
-    ohne Talreihe die Boeen an Startplaetzen im Lee (alte Groesse, so benannt)."""
-    f = check.get("facts") or {}
-    if f.get("tal"):
-        return _foehn_tal_gust_text(f["tal"])
-    kmh = f.get("lee_gust_kmh")
-    return _lbl("hz_foehn_gust").format(kmh=kmh) if kmh else ""
-
-
-def _hazard_base_text(topic: str, check: dict) -> str:
-    f = check.get("facts") or {}
-    zones = _zones_text(check.get("zones") or [], where=True)
-    # Foehn nennt die Lee-Seite als Gebiet, nicht als Ortsangabe —
-    # "im Lee im Tessin" waere doppelt gemoppelt.
-    zones_plain = _zones_text(check.get("zones") or [])
-    if topic == "RAIN":
-        return _lbl("hz_code_rain").format(zones=zones,
-                                           extent=_extent_word(f.get("wet_share")),
-                                           intensity=_rain_word(f.get("p90_mm")))
-    if topic == "THUNDER":
-        return _lbl("hz_code_thunder").format(zones=zones) + " " + _lbl("thunder_caveat")
-    if topic == "FOEHN":
-        vs = f.get("valley_signs")
-        if vs:
-            from foehn_talpunkte import tal_kurzname
-            names = ", ".join(tal_kurzname(n) for n in vs["taeler"][:3])
-            return _lbl("hz_code_foehn_tal").format(n=vs["n"], t=vs["n_total"], names=names,
-                                                    g=vs["gust_max_kmh"], zones=zones_plain)
-        side = "north" if f.get("side") == "nord" else "south"
-        level = _lbl("level_danger" if f.get("peak") == "danger" else "level_caution")
-        return _lbl("hz_code_foehn").format(side=_lbl(side), level=level,
-                                            h=f.get("hours", 0), zones=zones_plain)
-    if topic == "WIND":
-        # Gleiche Klasse buendeln: "verblasen am Alpennordhang und im Wallis"
-        by_class = {}
-        for z, c in (f.get("classes") or {}).items():
-            by_class.setdefault(c, []).append(z)
-        classes = ", ".join(
-            f"{_lbl('hz_class_' + c)} {_join_days([_zone_in(z) for z in zs])}"
-            for c, zs in by_class.items())
-        # keine eigene km/h-Zahl: die Spitze steht im Hoehenwind-Abschnitt
-        return _capitalize(_lbl("hz_code_wind").format(classes=classes))
-    return ""
 
 
 def _ch_warnings(wetterlage: dict, date: str) -> dict:

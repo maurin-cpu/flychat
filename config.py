@@ -638,7 +638,7 @@ SYNOPTIC_ZONE_LABELS = {
     "graubuenden_engadin": {"de": "Graubuenden & Engadin",
                             "en": "Grisons & Engadine"},
 }
-# Gefahren-Schalter schweizweit (llm_overview.hazards): "Regen" gilt als
+# Gefahren-Schalter schweizweit (synoptic_llm.hazard_checks): "Regen" gilt als
 # aktiv, sobald in mindestens einer Zone dieser Anteil der Spots am Tag nass
 # ist. Bewusst hoeher als SYNOPTIC_PRECIP_SHOWER_MIN_WETSHARE — die Warnung
 # soll verbreiteten Regen melden, nicht einzelne Schauer.
@@ -674,11 +674,6 @@ SYNOPTIC_ALOFT_REGION_MIN_SPOTS = 3
 # einer DWD-Frontkarte entfernt liegen (Analyse 00/12 UTC, Vorhersage +36/48/
 # 60/84/108 h -> lokal 02:00/14:00; die 6-h-Timesteps 00:00/12:00 passen).
 SYNOPTIC_FRONTS_TIMELINE_TOLERANCE_H = 3
-SYNOPTIC_HAZARD_EXTENT_WIDESPREAD = 0.7    # ab hier "verbreitet"
-SYNOPTIC_HAZARD_EXTENT_SCATTERED = 0.35    # ab hier "gebietsweise", darunter "vereinzelt"
-SYNOPTIC_HAZARD_RAIN_MM_MODERATE = 1.0     # ab hier "maessig"
-SYNOPTIC_HAZARD_RAIN_MM_HEAVY = 4.0        # ab hier "kraeftig"
-SYNOPTIC_HAZARD_RAIN_MM_SEVERE = 10.0      # ab hier "Starkregen"
 # Tagesfenster (lokale Stunden, [start, end)) — Niederschlag/Wind werden pro
 # Fenster aggregiert, damit der Block Tagesverlauf statt Tagespauschale kann
 # ("Vormittag trocken, ab dem Nachmittag Zellen"). Vorfall 25.07.2026:
@@ -1603,26 +1598,6 @@ def get_model(provider: str, purpose: str) -> str:
 # Dafuer: ~785 statt ~2750 Output-Tokens/Call, 3.9x schneller, ~36% guenstiger.
 # Auf "0" setzen, um Thinking wieder einzuschalten (z.B. fuer Vergleichslaeufe).
 DEEPSEEK_DISABLE_THINKING = os.environ.get("DEEPSEEK_DISABLE_THINKING", "1") == "1"
-
-# SYNOPTIC_THINKING — Thinking-Modus fuer den Wetterlage-Call (1x/Tag,
-# engine/synoptic_llm.py). Eigener Schalter, weil der Call NICHT an
-# DEEPSEEK_DISABLE_THINKING haengt (das gilt nur fuer die Massen-Analyse).
-#
-# Default AUS (Messung 01.08.2026, echter Prod-Call gegen synoptic_context):
-#   - thinking AN:  message.content in 8/8 Laeufen LEER (Antwort landet in
-#     message.reasoning_content, finish_reason=stop) -> Scheduler-Ausfall
-#     06:22 am 01.08.; 1/8 Laeufe lief ins Endlos-Reasoning (12k Tokens,
-#     gar keine Antwort). Treiber ist die Ausgabemenge (4 Zonen x 3 Tage),
-#     nicht die Prompt-Groesse: reduziert auf 1 Zone/1 Tag fuellt content.
-#   - thinking AUS: content gefuellt 3/3, valides JSON, ~810-910 out_tok.
-#   - Qualitaets-A/B (3 Laeufe je Modus, _validate()-Treffer): AN = 6/1/0,
-#     AUS = 1/0/1 — kein Qualitaetsvorteil durch Reasoning; plausibel, weil
-#     der Payload nur fertig klassifizierte Felder enthaelt, keine Rohzahlen.
-# Auf "1" setzen, um Thinking wieder zu aktivieren (erst sinnvoll, wenn der
-# Payload Rohdaten/Zeitachse enthaelt — siehe docs/pläne). Der
-# reasoning_content-Fallback in synoptic_llm._call_llm() faengt den
-# Leer-content-Fall dann ab.
-SYNOPTIC_THINKING = os.environ.get("SYNOPTIC_THINKING", "0") == "1"
 
 # Anzahl paralleler LLM-Calls im "parallel"-Modus.
 # OpenAI gpt-4o-mini erlaubt bis 500 RPM (Tier 1). Default 10 ist konservativ.

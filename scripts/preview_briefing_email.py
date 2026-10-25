@@ -152,10 +152,6 @@ def main() -> int:
                          "einer laufenden lokalen App, z.B. http://localhost:5001 . "
                          "Braucht node + playwright-core (Chrome-Kanal). Noetig, "
                          "solange /synoptik/karte nicht deployt ist.")
-    ap.add_argument("--synoptik", default="",
-                    help="JSON aus scripts/preview_synoptik_zonen.py: dessen "
-                         "llm_overview_neu ersetzt den Wetterlage-Text aus dem "
-                         "Cache — neuen Skill testen, ohne Prod-Cache zu schreiben.")
     args = ap.parse_args()
 
     # Admin-Overlay anwenden, BEVOR irgendwas config liest. Ohne das rendert die
@@ -172,19 +168,6 @@ def main() -> int:
     if not briefing_data.get("days"):
         print("FEHLER: keine Spot-/Region-Analysen verfuegbar", file=sys.stderr)
         return 2
-    if args.synoptik:
-        import json
-        syn_json = json.loads(Path(args.synoptik).read_text(encoding="utf-8"))
-        neu = syn_json.get("llm_overview_neu")
-        if neu and briefing_data.get("wetterlage"):
-            briefing_data["wetterlage"]["llm_overview"] = neu
-            # frisch gerechnete Felder, die der gecachte Kontext noch nicht hat
-            if syn_json.get("aloft_regional"):
-                briefing_data["wetterlage"]["aloft_regional"] = syn_json["aloft_regional"]
-            print(f"[--synoptik] Wetterlage-Text aus {args.synoptik}")
-        else:
-            print(f"WARN: --synoptik {args.synoptik} ohne llm_overview_neu - nehme Cache",
-                  file=sys.stderr)
 
     subscriber = {
         "id": 999,
@@ -274,14 +257,14 @@ def main() -> int:
         print(f"       {d['name']:<6} {d['status']:<10} {groups}"
               f"  CH {d['ch']['hi_safe']}/{d['ch']['total']} 4-5 sicher  {d['pressure']}  {d['notable']}")
     ch = ctx['v3_chain']
-    print(f"     - Lage:            {ch['lage']['label']} ({len(ch['lage']['centers'])} Zentren) — {ch['situation'][:90]}")
+    print(f"     - Lage:            {ch['lage']['label']} ({len(ch['lage']['centers'])} Zentren)")
     print(f"     - Fronten:         {' | '.join(ch['fronts']['lines'])[:140]}")
     print(f"     - Foehn/Bise:      {ch['foehn']['foehn']} {ch['foehn'].get('bise', '')}")
     print(f"     - Hoehenwind:      {ch['wind']['arrow']} {ch['wind']['sector']} {ch['wind']['speed']} -> {ch['wind']['ground']} am Boden")
     print(f"     - Karte (App):     {map_png if map_png else '(keine - siehe WARN)'}"
           f"{'  Stand ' + map_stand if map_stand else ''}")
     w = ctx['v3_warnings']
-    print(f"     - Warnungen CH:    "
+    print("     - Warnungen CH:    "
           + (" · ".join(f"{'+' if c['active'] else '-'}{c['label']}" for c in w['checks']) or '(keine Daten)'))
     cov2 = ctx['v3_coverage']
     print(f"     - Regionen:        {cov2['regions']} "
