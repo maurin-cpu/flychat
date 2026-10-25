@@ -721,6 +721,19 @@
 
   // ── Render: Day Tabs ────────────────────────────────────────
 
+  // Wochentag in der Seitensprache. Die Briefing-Daten liefern `weekday` nur
+  // deutsch (engine/_common._weekday_de) — in der englischen App stand darum
+  // "SO/MO/DI". style: "long" (Sonntag/Sunday) oder "short" (So/Sun).
+  function weekdayName(iso, style, fallback) {
+    try {
+      const txt = new Date(iso + "T12:00:00").toLocaleDateString(
+        document.documentElement.lang || "de", { weekday: style });
+      return style === "short" ? txt.replace(/\.$/, "") : txt;
+    } catch (e) {
+      return fallback || "";
+    }
+  }
+
   function renderDayTabs(data) {
     const container = $("bfDayTabs");
     if (!container) return;
@@ -757,7 +770,7 @@
 
       const dateObj = new Date(d.date + "T12:00:00");
       const dayNum = dateObj.getDate();
-      const wdShort = (d.weekday || "").substring(0, 2);
+      const wdShort = weekdayName(d.date, "short", (d.weekday || "").substring(0, 2));
 
       // Kachel wie im Mail-Wochenstreifen: Einstufung des Tages ueber alle
       // Regionen, Bodendruck, Hoehenwind (analyse.by_date[date].tile). Die
@@ -1118,7 +1131,7 @@
     }
 
     infoEl.innerHTML = `
-      <span class="bf-day-title">${escapeHtml(day.weekday || "")} ${formatDateDE(day.date)}</span>
+      <span class="bf-day-title">${escapeHtml(weekdayName(day.date, "long", day.weekday))} ${formatDateDE(day.date)}</span>
       <span class="bf-day-stats">
         ${counts.green > 0 ? `<span class="bf-stat bf-stat--green"><strong>${counts.green}</strong> ${wcT('js.stat.green')}</span>` : ""}
         ${counts.amber > 0 ? `<span class="bf-stat bf-stat--amber"><strong>${counts.amber}</strong> ${wcT('js.stat.amber')}</span>` : ""}
@@ -2392,12 +2405,8 @@
     const iso = d.date || "";
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    // Wochentag in der Seitensprache (d.weekday ist immer deutsch), Form wie im Mail
-    let wd = d.weekday || "";
-    try {
-      wd = new Date(iso + "T12:00:00").toLocaleDateString(document.documentElement.lang || "de", { weekday: "long" });
-    } catch (e) { /* alter Browser: deutscher Name aus den Daten */ }
-    const dayLabel = iso ? `${wd}, ${iso.slice(8, 10)}.${iso.slice(5, 7)}.` : "";
+    // Wochentag in der Seitensprache, Form wie im Mail
+    const dayLabel = iso ? `${weekdayName(iso, "long", d.weekday)}, ${iso.slice(8, 10)}.${iso.slice(5, 7)}.` : "";
     set("bfChapter2Q", `${labels.question || ""} 2`);
     set("bfChapter2T", [iso === today ? labels.q2_long : (labels.q2_day || labels.q2_long), dayLabel]
       .filter(Boolean).join(" · "));

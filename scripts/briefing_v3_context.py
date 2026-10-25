@@ -50,6 +50,10 @@ _L2 = {
         "subj_safe":     "{days} ohne Warnhinweise",
         "subj_caution":  "{days} mit Warnhinweisen",
         "subj_not_safe": "Warnhinweise an allen Tagen",
+        "subj_severe":   "{days} mit schweren Warnhinweisen",
+        "subj_all_safe":   "An allen Tagen ohne Warnhinweise",
+        "subj_all_caution": "Warnhinweise an allen Tagen",
+        "subj_all_severe": "Schwere Warnhinweise an allen Tagen",
         "conditional":   "fliegbar mit Warnhinweisen",
         "nothing":       "Nichts gelistet",
         "today":         "Heute",
@@ -97,6 +101,10 @@ _L2 = {
         "subj_safe":     "{days} without alerts",
         "subj_caution":  "{days} with alerts",
         "subj_not_safe": "Alerts every day",
+        "subj_severe":   "{days} with severe alerts",
+        "subj_all_safe":   "No alerts on any day",
+        "subj_all_caution": "Alerts on all days",
+        "subj_all_severe": "Severe alerts on all days",
         "conditional":   "flyable with alerts",
         "nothing":       "Nothing listed",
         "today":         "Today",
@@ -4033,6 +4041,31 @@ def _select_fronts_safe(fn, ts: str):
         return None
 
 
+def _subject_line(days: list, verdicts: dict) -> str:
+    """Betreff + Kopf-Pille: ALLE Tage, nach Stufe gruppiert, mit denselben
+    Worten wie die Tageskacheln — "Mo mit Warnhinweisen · Heute, Di mit
+    schweren Warnhinweisen". Frueher nannte die Pille nur die Tage der besten
+    vorhandenen Stufe ("Mon with alerts", 25.10.2026) und las sich, als haette
+    nur Montag Warnhinweise. Haben alle bewerteten Tage dieselbe Stufe, steht
+    die Kurzform ("Schwere Warnhinweise an allen Tagen"). Nie ein Superlativ,
+    nie "fliegbar": ob geflogen wird, entscheidet der Pilot."""
+    groups = {"green": [], "conditional": [], "not_safe": []}
+    for d in days:
+        tier = (verdicts.get(d.get("date")) or {}).get("tier")
+        if tier in groups:
+            groups[tier].append(d)
+    present = [t for t in ("green", "conditional", "not_safe") if groups[t]]
+    if not present:
+        return _lbl("subj_not_safe")
+    rated = sum(len(groups[t]) for t in present)
+    if len(present) == 1 and rated == len(days):
+        return _lbl({"green": "subj_all_safe", "conditional": "subj_all_caution",
+                     "not_safe": "subj_all_severe"}[present[0]])
+    key = {"green": "subj_safe", "conditional": "subj_caution", "not_safe": "subj_severe"}
+    return " · ".join(_capitalize(_lbl(key[t]).format(days=_join_days([_day_name(d) for d in groups[t]])))
+                      for t in present)
+
+
 def build_v3_context(ctx: dict, briefing_data: dict, subscriber: dict,
                      focus_date: str = "", top_n_regions_per_day: int = 0) -> dict:
     days = ctx.get("days") or []
@@ -4110,18 +4143,7 @@ def build_v3_context(ctx: dict, briefing_data: dict, subscriber: dict,
             "hint": hints.get(date_str, ""),
         })
 
-    # Betreff: Abo-Regionen, Aufzaehlung, nie ein Superlativ (wie v2)
-    # dieselbe Tages-Einstufung wie die Kacheln, sonst widerspricht der Betreff
-    good = [d for d in days if (verdicts.get(d.get("date")) or {}).get("tier") == "green"]
-    cond = [d for d in days if (verdicts.get(d.get("date")) or {}).get("tier") == "conditional"]
-    # Worte der Kacheln (Safe / Caution / Not safe), nicht "fliegbar": ob
-    # geflogen wird, entscheidet der Pilot (Entscheid 16.09.2026)
-    if good:
-        subject = _capitalize(_lbl("subj_safe").format(days=_join_days([_day_name(d) for d in good])))
-    elif cond:
-        subject = _capitalize(_lbl("subj_caution").format(days=_join_days([_day_name(d) for d in cond])))
-    else:
-        subject = _lbl("subj_not_safe")
+    subject = _subject_line(days, verdicts)
 
     # ---- Tag -------------------------------------------------------------
     passagen = _load_passagen()

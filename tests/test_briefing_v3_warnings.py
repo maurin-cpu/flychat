@@ -614,3 +614,32 @@ class TestMailHazardIcons(unittest.TestCase):
                 cid = w["entries"][0].get("icon_cid")
                 self.assertTrue(cid, (topic, sev))
                 self.assertTrue(imgs[cid].startswith(b"\x89PNG"), cid)
+
+
+class TestSubjectLine(_De):
+    """Betreff/Kopf-Pille nennt ALLE Tage nach Stufe (25.10.2026: "Mon with
+    alerts" las sich, als haette nur Montag Warnhinweise)."""
+    DAYS = [{"date": "2026-10-25", "is_today": True, "label": {"short": "So"}},
+            {"date": "2026-10-26", "label": {"short": "Mo"}},
+            {"date": "2026-10-27", "label": {"short": "Di"}}]
+
+    def _subj(self, tiers):
+        return bc._subject_line(self.DAYS, {d["date"]: {"tier": t} for d, t in zip(self.DAYS, tiers)})
+
+    def test_mixed_days_name_every_day(self):
+        self.assertEqual(self._subj(["not_safe", "conditional", "not_safe"]),
+                         "Mo mit Warnhinweisen · Heute und Di mit schweren Warnhinweisen")
+
+    def test_all_days_same_level_is_short(self):
+        self.assertEqual(self._subj(["not_safe"] * 3), "Schwere Warnhinweise an allen Tagen")
+        self.assertEqual(self._subj(["green"] * 3), "An allen Tagen ohne Warnhinweise")
+
+    def test_unrated_day_is_left_out(self):
+        self.assertEqual(self._subj(["green", "unknown", "green"]), "Heute und Di ohne Warnhinweise")
+
+    def test_english(self):
+        config.LANG = "en"
+        days = [dict(d, label={"short": en}) for d, en in zip(self.DAYS, ("Sun", "Mon", "Tue"))]
+        verdicts = {d["date"]: {"tier": t} for d, t in zip(days, ["not_safe", "conditional", "not_safe"])}
+        self.assertEqual(bc._subject_line(days, verdicts),
+                         "Mon with alerts · Today and Tue with severe alerts")
