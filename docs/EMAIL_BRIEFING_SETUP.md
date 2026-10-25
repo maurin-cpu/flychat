@@ -178,9 +178,12 @@ Zuerst **ohne** echten SMTP testen — HTML-Preview in Tempdir.
 #### B4.3 Scheduler-Thread im Production-Modus
 
 - [ ] `SCHEDULER_TEST_MODE=1 WINGCAST_SMTP_DRY_RUN=1 python main.py`
-- [ ] Log zeigt: „Scheduler: test-mode Wartezeit 30s"
+- [ ] Log zeigt: „Scheduler: SCHEDULER_TEST_MODE aktiv — Daily-Run in 30s"
 - [ ] Nach 30s: „Scheduler: ... sent=N ..."
-- [ ] Danach: „Scheduler: naechstes Event=briefing um <Datum>"
+- [ ] Danach: „Scheduler: schaut alle 60 s auf die Uhr — naechster Tageslauf <Datum>"
+- Planer seit 25.10.2026: jede Minute ein Blick auf die Wanduhr, Merkzettel
+  `data/.scheduler_zustand.json` (was heute schon lief). Kein Doppellauf bei
+  Zeitumstellung oder Neustart; ein verpasster Lauf wird nachgeholt (scheduler._nachlauf).
 
 #### B4.4 Account-Seite
 

@@ -15,8 +15,9 @@ Zusaetzlich:
     scripts/sync_from_server.ps1 geholt.
 
 Laufzeit-Modi:
-  - als Daemon-Thread (aus main.py aufgerufen): schlaeft bis zum naechsten
-    Slot und fuehrt dann die Sequenz aus
+  - als Daemon-Thread (aus main.py aufgerufen): schaut jede Minute auf die
+    Uhr und startet, was faellig und laut Merkzettel noch nicht gelaufen ist
+    (siehe _takt)
   - als CLI (`python scheduler.py --now`): sendet sofort einmal, Exit
 
 Umgebungsvariablen:
@@ -31,12 +32,15 @@ Umgebungsvariablen:
 
 from __future__ import annotations
 
+import contextlib
+import json
 import logging
 import os
 import threading
 import time as time_mod
-from datetime import datetime, time, timedelta
-from typing import Optional, Tuple
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import List, Optional
 
 import config
 
@@ -48,7 +52,8 @@ _wake_event = threading.Event()
 
 def notify_config_changed() -> None:
     """Signalisiert dem Scheduler-Thread, dass sich DAILY_RUN_* geaendert hat.
-    Der Thread wacht aus seinem Sleep auf und rechnet den naechsten Slot neu."""
+    Der Thread wartet dann nicht bis zum naechsten Takt, sondern schaut sofort
+    auf die Uhr."""
     _wake_event.set()
 
 
@@ -57,7 +62,7 @@ ACCURACY_HOUR = 7
 ACCURACY_MINUTE = 0
 
 # Bis zu dieser Stunde wird ein ausgefallener Morgenlauf nachgeholt
-# (_nachholen_falls_noetig). Spaeter friert ein Snapshot nicht mehr die
+# (_nachlauf). Spaeter friert ein Snapshot nicht mehr die
 # Tagesprognose ein, sondern einen Nowcast auf einen fast abgelaufenen Tag.
 NACHHOL_GRENZE_STUNDE = 12
 
@@ -89,10 +94,133 @@ NACHSENDE_GRENZE_STUNDE = 9
 FRONTEN_STUNDEN = (2, 8, 14, 20)
 FRONTEN_MINUTE = 10
 
+# Takt und Merkzettel (seit 25.10.2026).
+#
+# Frueher rechnete der Planer die Wartezeit bis zum naechsten Termin aus und
+# schlief sie am Stueck durch. Gerechnet wurde auf der Wanduhr, ohne
+# Zeitumstellung: in der Nacht auf den 25.10.2026 wachte er nach 2.8 h um
+# 04:00 statt 05:00 auf, lief, sah 05:00 noch vor sich und lief nochmals —
+# alle Abos bekamen ihr Briefing doppelt, die LLM-Analyse lief zweimal.
+#
+# Jetzt schaut er jede Minute auf die Wanduhr und fragt je Job: "Termin
+# erreicht, und laut Merkzettel noch nicht gelaufen?" Die Wanduhr kennt die
+# Zeitumstellung; der Merkzettel verhindert den zweiten Lauf, auch wenn eine
+# Uhrzeit wie 02:10 in der Herbstnacht zweimal vorkommt. Er liegt auf der
+# Platte, damit ein Neustart ihn nicht vergisst — und derselbe Blick holt
+# einen Lauf nach, den ein Neustart verpasst hat (_nachlauf).
+TAKT_SEKUNDEN = 60
+# Bewusst mit Punkt und ausserhalb von weather_archive, wie
+# scripts/snapshot_wache.ZUSTAND_DATEI.
+ZUSTAND_DATEI = Path(__file__).resolve().parent / "data" / ".scheduler_zustand.json"
+
+# Startet der Tageslauf spaeter als das nach seinem Termin, lief der Dienst zum
+# Termin nicht (Neustart, Deploy, Ubuntu-Update). Dann gelten die Regeln des
+# Nachlaufs: nur auf dem Server, nur wenn das Archiv Luecken hat, Mails nur an
+# Abos ohne heutige Mail.
+PUENKTLICH_TOLERANZ = timedelta(minutes=15)
+
 # Reissleine ohne Deploy: WINGCAST_FRONTEN=0 haelt die Kette an.
 def _fronten_aktiv() -> bool:
     return os.environ.get("WINGCAST_FRONTEN", "1").strip() not in ("0", "false", "no")
 
+
+# ---------------------------------------------------------------------------
+# Termine — "ist er heute schon erreicht?"
+# ---------------------------------------------------------------------------
+
+def _tageslauf_termin(now: datetime) -> Optional[datetime]:
+    """Heutiger Termin des Tageslaufs, sobald erreicht — sonst None."""
+    if now.weekday() not in config.DAILY_RUN_WEEKDAYS:
+        return None
+    termin = now.replace(hour=config.DAILY_RUN_HOUR, minute=config.DAILY_RUN_MINUTE,
+                         second=0, microsecond=0)
+    return termin if now >= termin else None
+
+
+def _fronten_termin(now: datetime) -> Optional[datetime]:
+    """Juengster heute erreichte Fronten-Termin — sonst None.
+
+    Nur der juengste: ein verpasster aelterer ist mit ihm erledigt, das Skript
+    holt ohnehin alles, was der DWD gerade vorhaelt.
+    """
+    erreicht = [now.replace(hour=h, minute=FRONTEN_MINUTE, second=0, microsecond=0)
+                for h in FRONTEN_STUNDEN]
+    erreicht = [t for t in erreicht if t <= now]
+    return erreicht[-1] if erreicht else None
+
+
+def _accuracy_termin(now: datetime) -> Optional[datetime]:
+    """Termin am Monatsersten, sobald erreicht — nur an diesem Tag.
+
+    Verpasst ein Ausfall den ganzen Ersten, faellt die Monatsmail aus, statt
+    mitten im Monat zu kommen.
+    """
+    if now.day != 1:
+        return None
+    termin = now.replace(hour=ACCURACY_HOUR, minute=ACCURACY_MINUTE,
+                         second=0, microsecond=0)
+    return termin if now >= termin else None
+
+
+# ---------------------------------------------------------------------------
+# Merkzettel — "ist er schon gelaufen?"
+# ---------------------------------------------------------------------------
+
+def _lade_zustand() -> dict:
+    try:
+        return json.loads(ZUSTAND_DATEI.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _vermerke(**eintraege) -> None:
+    """Merkzettel ergaenzen. Atomar geschrieben: ein Absturz mitten im
+    Schreiben darf ihn nicht leeren — leer hiesse "nichts gelaufen"."""
+    z = _lade_zustand()
+    z.update(eintraege)
+    ZUSTAND_DATEI.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ZUSTAND_DATEI.with_suffix(".tmp")
+    tmp.write_text(json.dumps(z, indent=1, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, ZUSTAND_DATEI)
+
+
+def _erststart_vermerken(now: datetime) -> None:
+    """Fehlt ein Eintrag ganz (erster Start mit Merkzettel, Datei geloescht),
+    gilt der laufende Fronten- und Accuracy-Termin als erledigt.
+
+    Sonst holte der erste Start nach, was laengst gelaufen ist — bei der
+    Monatsmail hiesse das: eine zweite an alle. Der Tageslauf braucht das
+    nicht, er sieht im Zweifel im Archiv nach (_nachlauf).
+    """
+    z = _lade_zustand()
+    neu = {}
+    if "fronten" not in z:
+        t = _fronten_termin(now)
+        neu["fronten"] = t.isoformat(timespec="minutes") if t else ""
+    if "accuracy" not in z:
+        neu["accuracy"] = now.strftime("%Y-%m") if _accuracy_termin(now) else ""
+    if neu:
+        _vermerke(**neu)
+
+
+def _tageslauf_art(now: datetime, z: dict) -> Optional[str]:
+    """None (nichts zu tun), 'regulaer' oder 'nachlauf'."""
+    termin = _tageslauf_termin(now)
+    if termin is None:
+        return None
+    heute = termin.date().isoformat()
+    if z.get("tageslauf_fertig") == heute or z.get("nachlauf") == heute:
+        return None
+    if z.get("tageslauf") != heute and now - termin <= PUENKTLICH_TOLERANZ:
+        return "regulaer"
+    # Zum Termin nicht gelaufen (Dienst war weg) — oder angefangen und nicht
+    # fertig geworden (Neustart mitten im Lauf, 29.08.2026 um 06:03).
+    return "nachlauf"
+
+
+# ---------------------------------------------------------------------------
+# Naechste Termine — nur fuer Log und `--next`
+# ---------------------------------------------------------------------------
 
 def _next_send_time(now: datetime) -> datetime:
     """Naechster konfigurierter Wochentag zur konfigurierten Uhrzeit, strikt NACH `now`."""
@@ -119,27 +247,6 @@ def _next_accuracy_time(now: datetime) -> datetime:
         year += 1
         month = 1
     return datetime(year, month, 1, ACCURACY_HOUR, ACCURACY_MINUTE, 0)
-
-
-def _next_fronten_time(now: datetime) -> datetime:
-    """Naechster Fronten-Slot strikt NACH `now`."""
-    for stunde in FRONTEN_STUNDEN:
-        candidate = now.replace(hour=stunde, minute=FRONTEN_MINUTE,
-                                second=0, microsecond=0)
-        if candidate > now:
-            return candidate
-    return (now + timedelta(days=1)).replace(
-        hour=FRONTEN_STUNDEN[0], minute=FRONTEN_MINUTE,
-        second=0, microsecond=0)
-
-
-def _next_event(now: datetime) -> Tuple[datetime, str]:
-    """Gibt (Zeitpunkt, 'briefing'|'accuracy'|'fronten') fuers naechste Event."""
-    kandidaten = [(_next_send_time(now), "briefing"),
-                  (_next_accuracy_time(now), "accuracy")]
-    if _fronten_aktiv():
-        kandidaten.append((_next_fronten_time(now), "fronten"))
-    return min(kandidaten, key=lambda k: k[0])
 
 
 def _abbruch_hinweis(engine) -> Optional[str]:
@@ -608,30 +715,22 @@ def _nachversand_falls_rechtzeitig(engine, nachher: dict) -> dict:
     return stats
 
 
-def _nachholen_falls_noetig(engine) -> None:
-    """Beim Start pruefen, ob der heutige Daily-Run ausgefallen ist — und ihn
-    fuer die Datenkette nachholen.
+def _nachlauf(engine, now: datetime) -> None:
+    """Tageslauf nachholen, den der Dienst verpasst oder nicht beendet hat.
 
-    Warum das noetig ist: `_next_send_time` liefert immer den naechsten Termin
-    STRIKT NACH jetzt. Startet der Dienst um 06:03 neu — der Normalfall bei
-    einem Deploy am Morgen —, faellt der 06:00-Lauf ersatzlos aus, und der
-    Archivtag ist endgueltig weg (die Prognose von heute Morgen existiert
-    nirgends sonst). Genau so sind zwischen Mai und Juli 2026 neun Tage
-    verschwunden, zusaetzlich zum abgeschnittenen 23.06.
+    Ein verlorener Morgenlauf kostet den Archivtag endgueltig — die Prognose
+    von heute Morgen existiert nirgends sonst. Zwischen Mai und Juli 2026 sind
+    so neun Tage verschwunden, jedes Mal durch einen Neustart kurz nach dem
+    Termin, dazu der abgeschnittene 23.06.
 
-    Nachgeholt wird die Datenkette (Wetter -> LLM-Analyse -> Snapshot) und —
-    wenn die Daten stehen und es noch vor NACHSENDE_GRENZE_STUNDE ist — auch
-    der Briefing-Versand, ausschliesslich an Abos ohne heutige Mail. Frueher
-    unterblieb der Versand ganz, mit zwei Begruendungen, die beide nicht
-    tragen: ein Doppelversand ist ausschliessbar (last_sent_at je Abo, siehe
-    subscriber.ids_sent_today), und "Morgenmail um 11:00" war die falsche
-    Vorstellung von der Verspaetung — der Nachlauf startet, sobald der Dienst
-    wieder laeuft. Was bleibt, ist die Zeitgrenze; nach ihr meldet der
-    Waechter den ausgefallenen Versand, statt ihn nachzuholen.
+    Nachgeholt wird der ganze Lauf; die Mails gehen dabei erst nach dem
+    Snapshot raus, nur wenn die Datenkette steht und es noch vor
+    NACHSENDE_GRENZE_STUNDE ist, und ausschliesslich an Abos ohne heutige Mail
+    (last_sent_at je Abo, subscriber.ids_sent_today). Nach der Zeitgrenze
+    meldet der Waechter den ausgefallenen Versand, statt ihn nachzuholen.
     """
     from scripts import snapshot_wache
 
-    now = datetime.now()
     heute = now.date().isoformat()
 
     # Nur auf dem Server. Ein Entwicklungsrechner hat kein aktuelles Archiv,
@@ -640,63 +739,56 @@ def _nachholen_falls_noetig(engine) -> None:
     # Archiv, das dort niemanden interessiert.
     erlaubt, grund = config.ops_produktion()
     if not erlaubt:
-        logger.info("Snapshot-Nachlauf uebersprungen — %s", grund)
+        logger.info("Nachlauf uebersprungen — %s", grund)
+        _vermerke(nachlauf=heute)
         return
-
-    if now.weekday() not in config.DAILY_RUN_WEEKDAYS:
-        return
-    slot = now.replace(hour=config.DAILY_RUN_HOUR, minute=config.DAILY_RUN_MINUTE,
-                       second=0, microsecond=0)
-    if now <= slot:
-        return                      # der heutige Lauf steht noch bevor
 
     vorher = snapshot_wache.befund(heute)
     if not vorher["maengel"]:
-        return                      # Lauf ist gelaufen, alles da
-
-    if not snapshot_wache.nachhol_versuch_offen(heute):
-        logger.warning("Snapshot-Nachlauf: fuer %s bereits versucht — kein "
-                       "zweiter Anlauf (Schutz gegen Neustart-Schleife)", heute)
+        # Der Tag liegt vollstaendig im Archiv: der Lauf ist gelaufen, nur
+        # nicht laut Merkzettel (erster Start nach dem Umbau, Handlauf per
+        # --now) — oder er brach erst nach dem Snapshot ab.
+        _vermerke(tageslauf_fertig=heute)
         return
+
     # Vermerk VOR dem Lauf: startet der Dienst wiederholt neu, weil etwas
     # anderes kaputt ist, darf das nicht jedes Mal eine volle LLM-Analyse kosten.
-    snapshot_wache.vermerke_nachhol_versuch(heute)
+    _vermerke(nachlauf=heute)
 
     if now.hour >= NACHHOL_GRENZE_STUNDE:
         # Nach der Mittagsgrenze friert ein Snapshot nicht mehr die
         # Tagesprognose ein, sondern einen Nowcast auf einen fast abgelaufenen
         # Tag. Als Beleg ist das wertlos — dann lieber ehrlich melden.
-        logger.error("Snapshot-Nachlauf: %s fehlt (%s), aber es ist %02d:%02d — "
+        logger.error("Nachlauf: %s fehlt (%s), aber es ist %02d:%02d — "
                      "nach %02d:00 ist der Tag als Prognose-Beleg nicht mehr "
                      "zu retten. Kein Nachlauf.", heute, ", ".join(vorher["maengel"]),
                      now.hour, now.minute, NACHHOL_GRENZE_STUNDE)
         _snapshot_pruefen(nachgeholt=False)
         return
 
-    logger.warning("Snapshot-Nachlauf: %s fehlt (%s) — hole Wetter, Analyse und "
-                   "Snapshot nach (ohne Briefing-Versand)",
+    logger.warning("Nachlauf: %s fehlt (%s) — hole den Tageslauf nach",
                    heute, ", ".join(vorher["maengel"]))
-    try:
-        engine.refresh_weather()
-        logger.info("Snapshot-Nachlauf: Wetter-Refresh OK")
-    except Exception as e:
-        logger.exception("Snapshot-Nachlauf: Wetter-Refresh fehlgeschlagen — "
-                         "weiter mit Cache-Daten: %s", e)
-    _run_llm_analysis(engine)
-    _run_snapshot()
+    _daily_run(engine, nachlauf_vorher=vorher)
 
-    nachher = snapshot_wache.befund(heute)
+
+def _nachversand_und_meldung(engine, vorher: dict) -> dict:
+    """Schluss des Nachlaufs: Mails nachsenden, wo es noch passt, und dem
+    Betrieb melden, dass ein Lauf ausgefallen war."""
+    from scripts import snapshot_wache
+
+    nachher = snapshot_wache.befund(vorher["tag"])
     # Versandstand VOR dem Nachversand festhalten: danach steht der Zaehler auf
     # den gerade verschickten Mails und die Meldung wuerde "Versand in Ordnung"
     # sagen — genau die Verwechslung, die _briefing_lage aufloesen soll.
     briefings_vorher = _briefings_heute()
     nachversand = _nachversand_falls_rechtzeitig(engine, nachher)
-    logger.info("Snapshot-Nachlauf: %s",
+    logger.info("Nachlauf: %s",
                 snapshot_wache.melde_nachlauf(vorher, nachher, briefings_vorher,
                                               nachversand=nachversand))
     if nachher["maengel"]:
-        logger.error("Snapshot-Nachlauf: %s bleibt unvollstaendig (%s)",
-                     heute, ", ".join(nachher["maengel"]))
+        logger.error("Nachlauf: %s bleibt unvollstaendig (%s)",
+                     vorher["tag"], ", ".join(nachher["maengel"]))
+    return nachversand
 
 
 def _run_gewitter_validation() -> bool:
@@ -855,14 +947,18 @@ def _run_mcp_export(engine) -> bool:
         return False
 
 
-def _daily_run(engine) -> dict:
+def _daily_run(engine, nachlauf_vorher: Optional[dict] = None) -> dict:
     """Sequenzieller Daily-Job: refresh_weather -> LLM-Analyse -> Briefings -> Snapshot.
 
     Jeder Schritt ist failure-tolerant: Wenn Wetter-Refresh oder LLM-Analyse
     scheitern, werden Briefings trotzdem mit den zuletzt gecachten Daten/Analysen
     versendet, statt ganz auszufallen. Snapshot laeuft am Ende und friert den
     Stand fuer XContest-Validierung ein.
+
+    Als Nachlauf (nachlauf_vorher = Archivbefund vor dem Lauf, siehe _nachlauf)
+    gehen die Mails erst nach dem Snapshot raus und nur unter dessen Regeln.
     """
+    nachlauf = nachlauf_vorher is not None
     logger.info("Daily run: starte Wetter-Refresh...")
     try:
         engine.refresh_weather()
@@ -877,12 +973,17 @@ def _daily_run(engine) -> dict:
     logger.info("Daily run: starte LLM-Analyse...")
     _run_llm_analysis(engine)
 
-    logger.info("Daily run: starte Briefing-Versand...")
-    stats = _send_briefings_once(engine)
+    stats: dict = {}
+    if not nachlauf:
+        logger.info("Daily run: starte Briefing-Versand...")
+        stats = _send_briefings_once(engine)
 
     logger.info("Daily run: starte Snapshot (Forecast einfrieren)...")
     _run_snapshot()
-    _snapshot_pruefen()
+    if nachlauf:
+        stats = _nachversand_und_meldung(engine, nachlauf_vorher)
+    else:
+        _snapshot_pruefen()
 
     logger.info("Daily run: starte Gewitter-Validierung (letzter komplett "
                 "publizierter Tag)...")
@@ -895,65 +996,92 @@ def _daily_run(engine) -> dict:
     return stats
 
 
+def _takt(engine, now: datetime, kontext=contextlib.nullcontext) -> List[str]:
+    """Ein Blick auf die Uhr: startet, was faellig ist und laut Merkzettel noch
+    nicht lief. Gibt die gestarteten Jobs zurueck.
+
+    `kontext` liefert den Flask-App-Context fuer den Mailversand — nur betreten,
+    wenn wirklich ein Job laeuft, nicht jede Minute.
+    """
+    z = _lade_zustand()
+    jobs: List[str] = []
+
+    art = _tageslauf_art(now, z)
+    if art:
+        jobs.append(art)
+        heute = now.date().isoformat()
+        with kontext():
+            if art == "regulaer":
+                # Vermerk VOR dem Lauf: ein Neustart mittendrin wird so als
+                # Abbruch erkannt und laeuft als Nachlauf weiter, nicht als
+                # zweiter Normallauf mit Mails an alle.
+                _vermerke(tageslauf=heute)
+                _daily_run(engine)
+                _vermerke(tageslauf_fertig=heute)
+            else:
+                _nachlauf(engine, now)
+
+    if _accuracy_termin(now) and z.get("accuracy") != now.strftime("%Y-%m"):
+        _vermerke(accuracy=now.strftime("%Y-%m"))
+        jobs.append("accuracy")
+        with kontext():
+            _send_accuracy_once()
+
+    termin = _fronten_termin(now)
+    if termin and _fronten_aktiv():
+        schluessel = termin.isoformat(timespec="minutes")
+        if z.get("fronten") != schluessel:
+            _vermerke(fronten=schluessel)
+            jobs.append("fronten")
+            with kontext():
+                _run_fronten()
+
+    return jobs
+
+
 def briefing_scheduler(engine) -> None:
-    """Daemon-Thread-Entry: dispatcht Daily-Run (konfig. Tage + Uhrzeit) UND
-    Monats-Accuracy (1. des Monats 07:00). Einheitlicher Sleep-Loop.
+    """Daemon-Thread-Entry: dispatcht Daily-Run (konfig. Tage + Uhrzeit),
+    Monats-Accuracy (1. des Monats 07:00) und Fronten-Archiv. Schaut jede
+    Minute auf die Uhr (_takt).
 
     Jobs werden innerhalb eines Flask-App-Contexts ausgefuehrt, damit
     render_template (Mailversand) funktioniert.
     """
     test_mode = os.environ.get("SCHEDULER_TEST_MODE", "").strip() in ("1", "true", "yes")
-    if test_mode:
-        logger.warning("Scheduler: SCHEDULER_TEST_MODE aktiv — erster Lauf in 30s, "
-                       "danach normaler Zeitplan")
 
     # Flask-App einmalig laden — wird pro Job-Aufruf mit app_context() gewrapped.
     from web import app as flask_app
     from email_service import mail_context
 
-    # Erst nachholen, dann in den Schlaf: ein Neustart nach 06:00 hat sonst
-    # gerade den Archivtag gekostet. Failure-tolerant wie jeder Job hier — ein
-    # Fehler beim Nachholen darf den Scheduler nicht am Starten hindern.
-    if not test_mode:
-        try:
-            with mail_context(flask_app):
-                _nachholen_falls_noetig(engine)
-        except Exception as e:
-            logger.exception("Scheduler: Nachhol-Pruefung fehlgeschlagen: %s", e)
+    def kontext():
+        return mail_context(flask_app)
 
-    first_iter = True
+    if test_mode:
+        logger.warning("Scheduler: SCHEDULER_TEST_MODE aktiv — Daily-Run in 30s, "
+                       "danach normaler Zeitplan")
+        time_mod.sleep(30)
+        try:
+            with kontext():
+                _daily_run(engine)
+        except Exception as e:
+            logger.exception("Scheduler: uncaught exception im Test-Lauf: %s", e)
+
+    _erststart_vermerken(datetime.now())
+    logger.info("Scheduler: schaut alle %d s auf die Uhr — naechster Tageslauf %s",
+                TAKT_SEKUNDEN, _next_send_time(datetime.now()).strftime("%Y-%m-%d %H:%M"))
+
     while True:
-        now = datetime.now()
-
-        if first_iter and test_mode:
-            wait_seconds = 30
-            next_event_type = "briefing"
-            logger.info("Scheduler: test-mode Wartezeit 30s (event=briefing)")
-        else:
-            next_run, next_event_type = _next_event(now)
-            wait_seconds = (next_run - now).total_seconds()
-            logger.info("Scheduler: naechstes Event=%s um %s (in %.1fh)",
-                        next_event_type, next_run.strftime("%Y-%m-%d %H:%M"),
-                        wait_seconds / 3600)
-
-        first_iter = False
-        woke_early = _wake_event.wait(timeout=max(1, wait_seconds))
-        _wake_event.clear()
-        if woke_early:
-            logger.info("Scheduler: Config-Aenderung signalisiert — rechne naechsten Slot neu")
-            continue  # kein Job ausfuehren, zurueck zum Anfang und Slot neu berechnen
-
         try:
-            with mail_context(flask_app):
-                if next_event_type == "accuracy":
-                    _send_accuracy_once()
-                elif next_event_type == "fronten":
-                    _run_fronten()
-                else:
-                    _daily_run(engine)
+            jobs = _takt(engine, datetime.now(), kontext)
+            if jobs:
+                logger.info("Scheduler: gelaufen %s — naechster Tageslauf %s",
+                            ", ".join(jobs),
+                            _next_send_time(datetime.now()).strftime("%Y-%m-%d %H:%M"))
         except Exception as e:
-            logger.exception("Scheduler: uncaught exception during %s: %s",
-                             next_event_type, e)
+            logger.exception("Scheduler: uncaught exception im Takt: %s", e)
+        # Eine Config-Aenderung (notify_config_changed) weckt sofort.
+        _wake_event.wait(timeout=TAKT_SEKUNDEN)
+        _wake_event.clear()
 
 
 # ---------------------------------------------------------------------------

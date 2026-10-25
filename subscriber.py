@@ -1408,7 +1408,7 @@ class SubscriberManager:
         """IDs der Abos, die heute schon eine Briefing-Mail bekommen haben.
 
         Fuer den Nachversand nach einem ausgefallenen Morgenlauf
-        (scheduler._nachholen_falls_noetig): count_sent_today sagt nur, DASS
+        (scheduler._nachlauf): count_sent_today sagt nur, DASS
         schon versendet wurde, nicht an wen. Faellt der Lauf mittendrin aus,
         haben die ersten Abos ihre Mail und der Rest nicht — nur mit den IDs
         laesst sich der Rest bedienen, ohne den ersten eine zweite zu schicken.

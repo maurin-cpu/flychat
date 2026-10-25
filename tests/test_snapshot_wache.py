@@ -266,13 +266,6 @@ def test_meldung_sagt_ob_nachversendet_wurde(archiv, monkeypatch):
     assert "nicht versucht" in briefe[2]
 
 
-def test_nachhol_versuch_wird_vermerkt(archiv):
-    assert wache.nachhol_versuch_offen("2026-08-12")
-    wache.vermerke_nachhol_versuch("2026-08-12")
-    assert not wache.nachhol_versuch_offen("2026-08-12")
-    assert wache.nachhol_versuch_offen("2026-08-13")
-
-
 def test_versandstand_wird_aus_der_abo_db_gelesen(tmp_path):
     """Die Meldung stuetzt sich auf eine Zahl aus der Abo-Datenbank —
     hier der Beleg, dass die Zahl stimmt."""
@@ -294,7 +287,7 @@ def test_versandstand_wird_aus_der_abo_db_gelesen(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Nachholen im Scheduler — der teure Pfad, darum eng gepruft
+# Nachlauf im Scheduler — der teure Pfad, darum eng gepruft
 # ---------------------------------------------------------------------------
 
 class _Engine:
@@ -306,8 +299,9 @@ class _Engine:
 
 
 @pytest.fixture
-def nachlauf(monkeypatch, archiv):
-    """Scheduler mit abgeklemmter LLM-Analyse und Snapshot."""
+def nachlauf(monkeypatch, archiv, tmp_path):
+    """Scheduler mit abgeklemmter LLM-Analyse, Snapshot und Nebenjobs, eigenem
+    Merkzettel und Tageslauf um 06:00 an jedem Wochentag."""
     import config
     import scheduler
     # Der Nachlauf laeuft nur in Produktion (config.ops_produktion(), seit
@@ -315,6 +309,12 @@ def nachlauf(monkeypatch, archiv):
     # sonst wuerden diese Tests je nach .env des Rechners gar nichts pruefen.
     monkeypatch.setattr(config, "BASE_URL", "https://app.wingcast.ch")
     monkeypatch.setattr(config, "OPS_PRODUKTION_HOST", "app.wingcast.ch")
+    monkeypatch.setattr(config, "DAILY_RUN_HOUR", 6)
+    monkeypatch.setattr(config, "DAILY_RUN_MINUTE", 0)
+    monkeypatch.setattr(config, "DAILY_RUN_WEEKDAYS", {0, 1, 2, 3, 4, 5, 6})
+    monkeypatch.setattr(scheduler, "ZUSTAND_DATEI", tmp_path / ".scheduler_zustand.json")
+    # Hier zaehlt nur der Tageslauf.
+    monkeypatch.setattr(scheduler, "_fronten_aktiv", lambda: False)
     protokoll = []
     monkeypatch.setattr(scheduler, "_run_llm_analysis",
                         lambda engine: protokoll.append("analyse") or True)
@@ -322,6 +322,14 @@ def nachlauf(monkeypatch, archiv):
                         lambda: protokoll.append("snapshot") or True)
     monkeypatch.setattr(scheduler, "_snapshot_pruefen",
                         lambda nachgeholt=None: protokoll.append(f"wache:{nachgeholt}"))
+    monkeypatch.setattr(scheduler, "_send_briefings_once",
+                        lambda engine, nur_ohne_mail_heute=False:
+                            protokoll.append(f"versand:nur_ohne={nur_ohne_mail_heute}")
+                            or {"sent": 0})
+    for nebenjob in ("_run_gewitter_validation", "_run_foehn_validation",
+                     "_run_ogn_sessions"):
+        monkeypatch.setattr(scheduler, nebenjob, lambda: True)
+    monkeypatch.setattr(scheduler, "_run_mcp_export", lambda engine: True)
     # Abo-Datenbank bleibt aussen vor — hier geht es um den Ablauf, nicht um
     # den Versandstand.
     monkeypatch.setattr(scheduler, "_briefings_heute", lambda: 0)
@@ -330,75 +338,77 @@ def nachlauf(monkeypatch, archiv):
     return scheduler, protokoll
 
 
-def _zeit(monkeypatch, scheduler, stunde, minute=0, tag="2026-08-12"):
-    """Friert datetime.now() im Scheduler ein."""
-    fix = datetime.fromisoformat(f"{tag}T{stunde:02d}:{minute:02d}:00")
-
-    class _DT(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return fix
-
-    monkeypatch.setattr(scheduler, "datetime", _DT)
-    return fix
+def _um(stunde, minute=0, tag="2026-08-12"):
+    return datetime.fromisoformat(f"{tag}T{stunde:02d}:{minute:02d}:00")
 
 
-def test_nachlauf_holt_ausgefallenen_morgenlauf(nachlauf, monkeypatch, archiv):
-    """06:03 Neustart, Archivtag fehlt -> Wetter, Analyse und Snapshot laufen."""
+def test_nachlauf_holt_verpassten_morgenlauf(nachlauf, archiv):
+    """06:40 Neustart, der Dienst war um 06:00 weg -> Wetter, Analyse und
+    Snapshot laufen nach, die Mails nur unter den Nachlauf-Regeln."""
     scheduler, protokoll = nachlauf
-    _zeit(monkeypatch, scheduler, 6, 3)
     _tag(archiv, "2026-08-11")
     eng = _Engine()
-    scheduler._nachholen_falls_noetig(eng)
+    assert scheduler._takt(eng, _um(6, 40)) == ["nachlauf"]
     assert eng.refreshed
     assert protokoll[:2] == ["analyse", "snapshot"]
-    assert "mail" in protokoll
+    assert "mail" in protokoll                    # Ausfall wird gemeldet
+    # Snapshot im Test leer -> Datenkette unvollstaendig -> kein Nachversand,
+    # und erst recht kein Versand an alle.
+    assert not any(p.startswith("versand") for p in protokoll)
 
 
-def test_kein_nachlauf_wenn_tag_schon_da(nachlauf, monkeypatch, archiv):
-    """Der haeufigste Fall: Neustart am Nachmittag, alles laengst gelaufen."""
+def test_abgebrochener_lauf_wird_nachgeholt_nicht_wiederholt(nachlauf, archiv):
+    """29.08.2026: Neustart um 06:03 mitten im Lauf. Laut Merkzettel angefangen,
+    nicht fertig -> Nachlauf, kein zweiter Normallauf mit Mails an alle."""
     scheduler, protokoll = nachlauf
-    _zeit(monkeypatch, scheduler, 15)
+    _tag(archiv, "2026-08-11")
+    scheduler._vermerke(tageslauf="2026-08-12")
+    assert scheduler._takt(_Engine(), _um(6, 3)) == ["nachlauf"]
+    assert "versand:nur_ohne=False" not in protokoll
+
+
+def test_kein_nachlauf_wenn_tag_schon_da(nachlauf, archiv):
+    """Erster Start nach dem Umbau am Nachmittag, alles laengst gelaufen."""
+    scheduler, protokoll = nachlauf
     _tag(archiv, "2026-08-11")
     _tag(archiv, "2026-08-12")
     eng = _Engine()
-    scheduler._nachholen_falls_noetig(eng)
+    scheduler._takt(eng, _um(15))
     assert not eng.refreshed
     assert protokoll == []
+    # ... und vermerkt, damit er nicht jede Minute ins Archiv schaut
+    assert scheduler._takt(eng, _um(15, 1)) == []
 
 
-def test_kein_nachlauf_vor_dem_slot(nachlauf, monkeypatch, archiv):
+def test_kein_lauf_vor_dem_termin(nachlauf, archiv):
     """05:58: der regulaere Lauf kommt gleich, nichts vorwegnehmen."""
     scheduler, protokoll = nachlauf
-    _zeit(monkeypatch, scheduler, 5, 58)
     _tag(archiv, "2026-08-11")
     eng = _Engine()
-    scheduler._nachholen_falls_noetig(eng)
+    assert scheduler._takt(eng, _um(5, 58)) == []
     assert not eng.refreshed
     assert protokoll == []
 
 
-def test_kein_nachlauf_nach_mittag(nachlauf, monkeypatch, archiv):
+def test_kein_nachlauf_nach_mittag(nachlauf, archiv):
     """Ein Snapshot um 14:00 waere ein Nowcast auf einen fast abgelaufenen Tag —
     als Prognose-Beleg wertlos. Dann lieber melden statt rechnen."""
     scheduler, protokoll = nachlauf
-    _zeit(monkeypatch, scheduler, 14)
     _tag(archiv, "2026-08-11")
     eng = _Engine()
-    scheduler._nachholen_falls_noetig(eng)
+    scheduler._takt(eng, _um(14))
     assert not eng.refreshed
     assert protokoll == ["wache:False"]
 
 
-def test_zweiter_neustart_loest_keinen_zweiten_lauf_aus(nachlauf, monkeypatch, archiv):
+def test_zweiter_neustart_loest_keinen_zweiten_lauf_aus(nachlauf, archiv):
     """Neustart-Schleife darf nicht jedes Mal eine LLM-Analyse kosten."""
     scheduler, protokoll = nachlauf
-    _zeit(monkeypatch, scheduler, 6, 3)
     _tag(archiv, "2026-08-11")
-    scheduler._nachholen_falls_noetig(_Engine())
+    scheduler._takt(_Engine(), _um(6, 40))
     protokoll.clear()
     eng2 = _Engine()
-    scheduler._nachholen_falls_noetig(eng2)
+    assert scheduler._takt(eng2, _um(6, 45)) == []
     assert not eng2.refreshed
     assert protokoll == []
 
@@ -406,10 +416,9 @@ def test_zweiter_neustart_loest_keinen_zweiten_lauf_aus(nachlauf, monkeypatch, a
 def test_kein_nachlauf_an_nicht_konfiguriertem_wochentag(nachlauf, monkeypatch, archiv):
     import config
     scheduler, protokoll = nachlauf
-    _zeit(monkeypatch, scheduler, 9)                      # 12.08.2026 = Mittwoch
-    monkeypatch.setattr(config, "DAILY_RUN_WEEKDAYS", {5, 6})
+    monkeypatch.setattr(config, "DAILY_RUN_WEEKDAYS", {5, 6})  # 12.08.2026 = Mittwoch
     _tag(archiv, "2026-08-11")
     eng = _Engine()
-    scheduler._nachholen_falls_noetig(eng)
+    assert scheduler._takt(eng, _um(9)) == []
     assert not eng.refreshed
     assert protokoll == []

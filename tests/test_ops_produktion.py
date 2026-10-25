@@ -118,7 +118,7 @@ def test_frontenalarm_sendet_nicht_vom_entwicklungsrechner(monkeypatch):
     assert gesendet == []
 
 
-def test_nachlauf_startet_nicht_vom_entwicklungsrechner(monkeypatch):
+def test_nachlauf_startet_nicht_vom_entwicklungsrechner(monkeypatch, tmp_path):
     """Der teuerste Teil: ein Vormittagsstart auf dem Laptop wuerde sonst
     Wetter neu ziehen und eine volle LLM-Analyse ausloesen."""
     import scheduler
@@ -130,4 +130,6 @@ def test_nachlauf_startet_nicht_vom_entwicklungsrechner(monkeypatch):
     monkeypatch.setattr(wache, "befund", _nie)
     monkeypatch.setattr(config, "BASE_URL", "http://localhost:5000")
 
-    scheduler._nachholen_falls_noetig(object())     # darf nur protokollieren
+    monkeypatch.setattr(scheduler, "ZUSTAND_DATEI", tmp_path / ".scheduler_zustand.json")
+    from datetime import datetime
+    scheduler._nachlauf(object(), datetime(2026, 8, 12, 9, 30))   # darf nur protokollieren

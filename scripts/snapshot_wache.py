@@ -12,10 +12,10 @@ deshalb meldet der Waechter sofort, statt auf den naechsten Blick ins Archiv
 zu warten.
 
 Die neun fehlenden Tage hatten alle dieselbe Ursache: ein Neustart kurz nach
-06:00. `_next_send_time` sucht immer nur den naechsten Termin STRIKT NACH
-jetzt — war der 06:00-Slot beim Start vorbei, faellt der Lauf ersatzlos aus.
-Das Gegenstueck dazu ist das Nachholen in `scheduler.py`; hier steht nur die
-Frage "liegt der Tag brauchbar im Archiv" und die Meldung darueber.
+dem Termin des Morgenlaufs, den der damalige Planer danach nicht mehr ansah.
+Das Gegenstueck dazu ist der Nachlauf in `scheduler.py` (_nachlauf); hier
+steht nur die Frage "liegt der Tag brauchbar im Archiv" und die Meldung
+darueber.
 
 Versandweg wie beim Frontenalarm: `email_service.send_email` an
 `config.OPS_ALERT_EMAIL` (scripts/fronten_alarm.py).
@@ -184,7 +184,7 @@ def luecken(archive_dir: Optional[Path] = None) -> List[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Zustand (Wiederholungssperre + Nachhol-Vermerk)
+# Zustand (Wiederholungssperre der Meldungen)
 # ---------------------------------------------------------------------------
 
 def _lade_zustand() -> dict:
@@ -198,22 +198,6 @@ def _speichere_zustand(z: dict) -> None:
     ZUSTAND_DATEI.parent.mkdir(parents=True, exist_ok=True)
     ZUSTAND_DATEI.write_text(json.dumps(z, indent=1, ensure_ascii=False),
                              encoding="utf-8")
-
-
-def nachhol_versuch_offen(tag: str) -> bool:
-    """False, sobald fuer diesen Tag schon einmal nachgeholt wurde.
-
-    Ohne diese Sperre wuerde ein Dienst, der in einer Schleife neu startet,
-    bei jedem Start eine volle LLM-Analyse ausloesen.
-    """
-    return _lade_zustand().get("nachhol_versuch") != tag
-
-
-def vermerke_nachhol_versuch(tag: str) -> None:
-    z = _lade_zustand()
-    z["nachhol_versuch"] = tag
-    z["nachhol_versuch_am"] = datetime.now().isoformat(timespec="seconds")
-    _speichere_zustand(z)
 
 
 # ---------------------------------------------------------------------------
@@ -242,9 +226,9 @@ def _text(b: dict, nachgeholt: Optional[bool] = None) -> tuple:
         text += ("Nachholen war nicht mehr sinnvoll (nach der Mittagsgrenze) oder\n"
                  "ist gescheitert. Der Tag laesst sich nicht rekonstruieren: die\n"
                  "Prognose von heute Morgen existiert nirgends mehr.\n\n")
-    text += ("Haeufigste Ursache: Neustart/Deploy kurz nach 06:00. Der Zeitplaner\n"
-             "sucht beim Start nur den naechsten Termin nach jetzt — ein bereits\n"
-             "vergangener Slot faellt aus.\n\n"
+    text += ("Haeufigste Ursache: der Dienst lief zum Termin des Morgenlaufs nicht\n"
+             "(Neustart, Deploy, Ubuntu-Update), und der Nachlauf konnte den Tag\n"
+             "nicht mehr retten.\n\n"
              "Nachpruefen:  python scripts/snapshot_wache.py --luecken\n"
              "Von Hand:     python scripts/snapshot_weather.py " + b["tag"] + "\n"
              "\nHoechstens eine Meldung pro Archivtag.\n")
@@ -375,9 +359,9 @@ def melde_nachlauf(vorher: dict, nachher: dict, briefings_heute: Optional[int] =
            if erfolg else
            f"weiterhin {', '.join(nachher.get('maengel', ['unbekannt']))}\n")
         + _briefing_lage(briefings_heute, nachversand) +
-        f"\nUrsache pruefen: gab es am {datetime.now().strftime('%d.%m.')} kurz nach\n"
-        f"06:00 einen Deploy oder Neustart? Der Zeitplaner sucht beim Start nur\n"
-        f"den naechsten Termin nach jetzt, ein vergangener Slot faellt aus.\n"
+        f"\nUrsache pruefen: gab es am {datetime.now().strftime('%d.%m.')} um den\n"
+        f"Termin des Morgenlaufs einen Deploy oder Neustart? Der Planer holt\n"
+        f"einen verpassten oder abgebrochenen Lauf einmal je Tag nach.\n"
         f"Auch ohne Zutun moeglich: das automatische Ubuntu-Update laeuft\n"
         f"taeglich zwischen 06:00 und 07:00 und startet bei manchen Paketen\n"
         f"(z.B. libpam) alle Dienste neu — so geschehen am 29.08.2026 um 06:03.\n"

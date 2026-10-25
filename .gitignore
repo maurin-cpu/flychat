@@ -63,6 +63,8 @@ data/public_briefing/
 # laeuft nur auf dem Server, dort ueberlebt die Datei den Neustart — im Repo
 # wuerde sie zwischen Server und Arbeitsplatz hin und her springen.
 data/.snapshot_wache.json
+data/.scheduler_zustand.json
+data/.scheduler_zustand.tmp
 
 # Remotion-Video Export (generierte Tages-Vorhersage, kein Quellcode)
 forecast_*_remotion.json
