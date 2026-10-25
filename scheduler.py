@@ -646,6 +646,10 @@ def _snapshot_pruefen(nachgeholt: Optional[bool] = None) -> dict:
         if b.get("maengel"):
             logger.error("Snapshot-Wache: %s hat Maengel: %s — %s", b["tag"],
                          ", ".join(b["maengel"]), b.get("meldung", "keine Meldung"))
+        elif b.get("hinweise"):
+            logger.error("Snapshot-Wache: %s brauchbar, aber %d Regionen / %d Spots "
+                         "ohne Bewertung — %s", b["tag"], b.get("regionen_fehler", 0),
+                         b.get("spots_fehler", 0), b.get("meldung", "keine Meldung"))
         else:
             logger.info("Snapshot-Wache: %s in Ordnung (%d Startplaetze, "
                         "%d bewertet, %d Regionen)", b["tag"], b["spots"],
@@ -788,6 +792,8 @@ def _nachversand_und_meldung(engine, vorher: dict) -> dict:
     if nachher["maengel"]:
         logger.error("Nachlauf: %s bleibt unvollstaendig (%s)",
                      vorher["tag"], ", ".join(nachher["maengel"]))
+    elif nachher.get("hinweise"):
+        logger.error("Nachlauf: %s — %s", vorher["tag"], snapshot_wache.melde(nachher))
     return nachversand
 
 

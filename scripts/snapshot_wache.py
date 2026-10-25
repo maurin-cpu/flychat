@@ -71,6 +71,17 @@ FOLGEN = {
                       "(so gingen im Juli 2026 29 Tage verloren).",
     "keine_spot_bewertung": "Spot-Ebene rueckwirkend nicht validierbar.",
     "keine_regions_bewertung": "Regionsurteile fehlen, Wetterwerte sind da.",
+    "fehlerhafte_bewertungen": "Diese Spots/Regionen stehen heute grau in der "
+                               "App, auch der Reparaturdurchgang hat sie nicht "
+                               "retten koennen.",
+}
+
+# Hinweise sind keine Maengel: der Tag ist brauchbar, Briefing und Nachversand
+# laufen normal. Gemeldet wird trotzdem — einzelne gescheiterte Bewertungen
+# liefen bis 10/2026 still durch (20.10.: 14 von 31 Regionen grau, Waechter
+# meldete "in Ordnung", weil ein Fehler-Eintrag als "bewertet" zaehlte).
+HINWEISE = {
+    "fehlerhafte_bewertungen": "Einzelne Bewertungen sind gescheitert",
 }
 
 
@@ -101,6 +112,11 @@ def _referenz_spots(tag: str, archive_dir: Path) -> Optional[int]:
     return None
 
 
+def _gescheitert(eintrag: dict) -> bool:
+    a = eintrag.get("analysis")
+    return isinstance(a, dict) and "error" in (a.get("safety_status"), a.get("status"))
+
+
 def befund(tag: Optional[str] = None, archive_dir: Optional[Path] = None) -> dict:
     """Prueft einen Archivtag. Gibt Zahlen UND die Mangelliste zurueck.
 
@@ -110,8 +126,8 @@ def befund(tag: Optional[str] = None, archive_dir: Optional[Path] = None) -> dic
     archive_dir = Path(archive_dir or ARCHIVE_DIR)
     tag = tag or date.today().isoformat()
     b: Dict = {"tag": tag, "spots": 0, "regionen": 0, "spots_bewertet": 0,
-               "regionen_bewertet": 0, "referenz_spots": None, "schema": 0,
-               "maengel": []}
+               "regionen_bewertet": 0, "spots_fehler": 0, "regionen_fehler": 0,
+               "referenz_spots": None, "schema": 0, "maengel": [], "hinweise": []}
 
     pfad = archive_dir / f"{tag}.json"
     if not pfad.exists():
@@ -152,6 +168,13 @@ def befund(tag: Optional[str] = None, archive_dir: Optional[Path] = None) -> dic
         # als Mangel gewertet waere die halbe Historie rot, und ein Waechter,
         # bei dem alles rot ist, meldet nichts mehr (Lehre aus fronten_alarm.py).
         b["maengel"].append("keine_regions_bewertung")
+
+    # Gescheiterte Bewertungen stehen als Eintrag mit Status "error" im
+    # Snapshot und zaehlen oben als "bewertet" — darum separat zaehlen.
+    b["spots_fehler"] = sum(1 for s in spots.values() if _gescheitert(s))
+    b["regionen_fehler"] = sum(1 for r in regionen.values() if _gescheitert(r))
+    if b["spots_fehler"] or b["regionen_fehler"]:
+        b["hinweise"].append("fehlerhafte_bewertungen")
     return b
 
 
@@ -204,21 +227,53 @@ def _speichere_zustand(z: dict) -> None:
 # Meldung
 # ---------------------------------------------------------------------------
 
+def _zaehlung(b: dict) -> str:
+    ref = b["referenz_spots"]
+    fehler_s = f", {b['spots_fehler']} gescheitert" if b.get("spots_fehler") else ""
+    fehler_r = f", {b['regionen_fehler']} gescheitert" if b.get("regionen_fehler") else ""
+    return (
+        f"Gezaehlt:  {b['spots']} Startplaetze "
+        f"({b['spots_bewertet']} bewertet{fehler_s})"
+        + (f", Referenz Vortag {ref}\n" if ref else "\n") +
+        f"           {b['regionen']} Regionen "
+        f"({b['regionen_bewertet']} bewertet{fehler_r})\n"
+        f"Geprueft:  {datetime.now().isoformat(timespec='seconds')}\n\n"
+    )
+
+
+def _text_hinweise(b: dict) -> tuple:
+    """Tag ist brauchbar, aber einzelne Bewertungen fehlen (Status "error")."""
+    betreff = (f"[Wingcast] {b['tag']}: {b.get('regionen_fehler', 0)} Regionen / "
+               f"{b.get('spots_fehler', 0)} Spots ohne Bewertung")
+    text = (
+        f"Der Archivtag {b['tag']} ist brauchbar, aber nicht vollstaendig bewertet.\n\n"
+        f"- {HINWEISE['fehlerhafte_bewertungen']}\n"
+        f"    {FOLGEN['fehlerhafte_bewertungen']}\n\n"
+        + _zaehlung(b) +
+        "Der Analyse-Lauf rechnet gescheiterte Bewertungen in bis zu drei\n"
+        "Runden nach (Pausen 30/90/180 s). Was danach noch fehlt, steht hier.\n"
+        "Ursache im Log:  journalctl -u wingcast.service | grep REPARATUR\n"
+        "Von Hand:        Admin -> Analyse fuer Regionen bzw. Spots neu starten,\n"
+        "                 danach python scripts/snapshot_weather.py " + b["tag"] + "\n"
+        "\nHoechstens eine Meldung pro Archivtag.\n"
+    )
+    return betreff, text
+
+
 def _text(b: dict, nachgeholt: Optional[bool] = None) -> tuple:
-    kopf = MAENGEL.get(b["maengel"][0], "Snapshot unvollstaendig")
+    maengel = b.get("maengel") or []
+    hinweise = b.get("hinweise") or []
+    if not maengel:
+        return _text_hinweise(b)
+    kopf = MAENGEL.get(maengel[0], "Snapshot unvollstaendig")
     betreff = f"[Wingcast] Prognose-Archiv {b['tag']}: {kopf}"
 
-    zeilen = [f"- {MAENGEL.get(m, m)}\n    {FOLGEN.get(m, '')}" for m in b["maengel"]]
-    ref = b["referenz_spots"]
+    zeilen = [f"- {MAENGEL.get(m, m)}\n    {FOLGEN.get(m, '')}" for m in maengel]
+    zeilen += [f"- {HINWEISE.get(h, h)}\n    {FOLGEN.get(h, '')}" for h in hinweise]
     text = (
         f"Der Archivtag {b['tag']} ist nicht in Ordnung.\n\n"
         + "\n".join(zeilen) + "\n\n"
-        f"Gezaehlt:  {b['spots']} Startplaetze "
-        f"({b['spots_bewertet']} bewertet)"
-        + (f", Referenz Vortag {ref}\n" if ref else "\n") +
-        f"           {b['regionen']} Regionen "
-        f"({b['regionen_bewertet']} bewertet)\n"
-        f"Geprueft:  {datetime.now().isoformat(timespec='seconds')}\n\n"
+        + _zaehlung(b)
     )
     if nachgeholt is True:
         text += "Der Lauf wurde automatisch nachgeholt, der Tag ist gerettet.\n\n"
@@ -269,17 +324,18 @@ def melde(b: dict, nachgeholt: Optional[bool] = None, versand: bool = True) -> s
     laeuft. Ein taeglich gleicher Alarm wird ignoriert, dann ist er wertlos
     (Lehre aus scripts/fronten_alarm.py).
     """
-    if not b["maengel"]:
+    befunde = b["maengel"] + b.get("hinweise", [])
+    if not befunde:
         return "kein Mangel"
     z = _lade_zustand()
-    if z.get("gemeldet_tag") == b["tag"] and z.get("gemeldet_maengel") == b["maengel"]:
+    if z.get("gemeldet_tag") == b["tag"] and z.get("gemeldet_maengel") == befunde:
         return f"schon gemeldet ({b['tag']})"
     betreff, text = _text(b, nachgeholt)
     _sende(betreff, text, versand)
-    z.update({"gemeldet_tag": b["tag"], "gemeldet_maengel": b["maengel"],
+    z.update({"gemeldet_tag": b["tag"], "gemeldet_maengel": befunde,
               "gemeldet_am": datetime.now().isoformat(timespec="seconds")})
     _speichere_zustand(z)
-    return f"gemeldet ({', '.join(b['maengel'])})"
+    return f"gemeldet ({', '.join(befunde)})"
 
 
 def _briefing_lage(briefings_heute: Optional[int],
@@ -378,7 +434,7 @@ def pruefe_und_melde(tag: Optional[str] = None, nachgeholt: Optional[bool] = Non
                      versand: bool = True) -> dict:
     """Einstieg fuer den Scheduler: pruefen, bei Mangel melden, Befund zurueck."""
     b = befund(tag)
-    if b["maengel"]:
+    if b["maengel"] or b["hinweise"]:
         b["meldung"] = melde(b, nachgeholt=nachgeholt, versand=versand)
     return b
 
@@ -436,14 +492,17 @@ def main(argv=None) -> int:
         return 1
 
     b = befund(args.tag)
-    if not b["maengel"]:
+    if not b["maengel"] and not b["hinweise"]:
         print(f"{b['tag']}: in Ordnung ({b['spots']} Startplaetze, "
               f"{b['spots_bewertet']} bewertet, {b['regionen']} Regionen, "
               f"{b['regionen_bewertet']} bewertet).")
         return 0
-    print(f"{b['tag']}: {', '.join(b['maengel'])}")
+    print(f"{b['tag']}: {', '.join(b['maengel'] + b['hinweise'])}")
     for m in b["maengel"]:
         print(f"  - {MAENGEL.get(m, m)}: {FOLGEN.get(m, '')}")
+    for h in b["hinweise"]:
+        print(f"  - {HINWEISE.get(h, h)}: {b['regionen_fehler']} Regionen, "
+              f"{b['spots_fehler']} Spots gescheitert")
     if args.melden:
         print(melde(b))
     return 1

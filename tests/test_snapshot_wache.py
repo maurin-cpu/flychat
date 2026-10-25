@@ -143,6 +143,61 @@ def test_alter_snapshot_ohne_zaehler_wird_gezaehlt(archiv):
     assert b["regionen_bewertet"] == 1
 
 
+def _mit_fehlern(archiv, tag, regionen_fehler=0, spots_fehler=0):
+    """Wie der 20.10.2026: Eintraege mit Status "error" zaehlen als "bewertet"."""
+    pfad = archiv / f"{tag}.json"
+    daten = json.loads(pfad.read_text(encoding="utf-8"))
+    for i in range(regionen_fehler):
+        daten["regions"][f"region_{i}"]["analysis"] = {"safety_status": "error",
+                                                       "status": "error"}
+    for i in range(spots_fehler):
+        daten["spots"][f"spot_{i}"]["analysis"] = {"safety_status": "error"}
+    pfad.write_text(json.dumps(daten), encoding="utf-8")
+
+
+def test_gescheiterte_regionen_sind_hinweis_kein_mangel(archiv):
+    """20.10.2026: 14 von 31 Regionen grau, Waechter sagte "in Ordnung".
+
+    Kein Mangel — der Tag bleibt brauchbar, Nachlauf und Nachversand duerfen
+    davon nicht blockiert werden — aber ein Hinweis, der gemeldet wird.
+    """
+    _tag(archiv, "2026-10-19", regionen=31)
+    _tag(archiv, "2026-10-20", regionen=31)
+    _mit_fehlern(archiv, "2026-10-20", regionen_fehler=14)
+    b = wache.befund("2026-10-20")
+    assert b["maengel"] == []
+    assert wache.brauchbar("2026-10-20")
+    assert b["hinweise"] == ["fehlerhafte_bewertungen"]
+    assert b["regionen_fehler"] == 14
+    assert b["spots_fehler"] == 0
+
+
+def test_gescheiterte_spots_sind_hinweis(archiv):
+    _tag(archiv, "2026-10-19")
+    _tag(archiv, "2026-10-20")
+    _mit_fehlern(archiv, "2026-10-20", spots_fehler=1)
+    b = wache.befund("2026-10-20")
+    assert b["hinweise"] == ["fehlerhafte_bewertungen"] and b["spots_fehler"] == 1
+
+
+def test_hinweis_wird_einmal_gemeldet(archiv, postfach):
+    _tag(archiv, "2026-10-19", regionen=31)
+    _tag(archiv, "2026-10-20", regionen=31)
+    _mit_fehlern(archiv, "2026-10-20", regionen_fehler=14, spots_fehler=3)
+    assert "gemeldet" in wache.pruefe_und_melde("2026-10-20")["meldung"]
+    assert wache.pruefe_und_melde("2026-10-20")["meldung"].startswith("schon gemeldet")
+    assert postfach == ["[Wingcast] 2026-10-20: 14 Regionen / 3 Spots ohne Bewertung"]
+
+
+def test_hinweis_text_nennt_zahlen(archiv):
+    _tag(archiv, "2026-10-19", regionen=31)
+    _tag(archiv, "2026-10-20", regionen=31)
+    _mit_fehlern(archiv, "2026-10-20", regionen_fehler=14)
+    _, text = wache._text(wache.befund("2026-10-20"))
+    assert "31 Regionen (31 bewertet, 14 gescheitert)" in text
+    assert "brauchbar" in text
+
+
 def test_luecken_findet_fehlende_und_unvollstaendige(archiv):
     _tag(archiv, "2026-08-08")
     _tag(archiv, "2026-08-09", regionen=0)      # unvollstaendig

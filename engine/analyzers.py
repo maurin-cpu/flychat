@@ -1154,6 +1154,96 @@ class AnalyzersMixin:
     _HEARTBEAT_INTERVAL = 15  # Sekunden zwischen Keepalive-Events
     _HEARTBEAT_EVENT = {"event": "heartbeat", "data": {}}
 
+    # ── Reparaturdurchgang ──────────────────────────────────────────────
+    # Vorgabe 16.08.2026 ("das darf gar nicht passieren, egal welcher
+    # Anbieter"). Am 20.10.2026 meldete DeepInfra beim Start des Morgenlaufs
+    # gut eine Minute lang "Model busy" (429). Die drei Wiederholungen je Call
+    # (3+6+12 s) lagen alle in dieser Minute — 40 von 93 Regions-Bewertungen
+    # blieben "error", 14 Regionen standen den ganzen Tag grau auf der Karte,
+    # und die Spots dieser Regionen liefen ohne Regions-Kontext.
+    #
+    # Entschieden wird am Ergebnis (Bewertung fehlt), nicht an der Ursache:
+    # dieselbe Reparatur greift bei 429, Timeout, kaputtem JSON oder einem
+    # Fehler, den es noch nicht gab. Die Pausen sind lang genug, um eine
+    # Anbieter-Stoerung von mehreren Minuten zu ueberbruecken, und kosten bei
+    # einem fehlerfreien Lauf nichts.
+    _REPARATUR_PAUSEN_S = (30, 90, 180)
+    _REPARATUR_MAX_WORKERS = 4
+
+    @staticmethod
+    def _bewertung_gescheitert(result) -> bool:
+        """True, wenn fuer diesen Spot/Region-Tag keine vollstaendige Bewertung vorliegt.
+
+        `error` im Ergebnis heisst: Safety- ODER Flyability-Call ist
+        gescheitert (bei Flyability bleibt safety_status stehen, aber Tier und
+        Texte fehlen). `no_data` ist kein Fehler — da fehlen die Wetterdaten,
+        ein zweiter Versuch aendert nichts.
+        """
+        if not result:
+            return True
+        return result.get("safety_status") == "error" or bool(result.get("error"))
+
+    def _reparaturdurchgang(self, art: str, results: dict, jobs: dict):
+        """Rechnet gescheiterte Bewertungen nach, bis alle da sind oder die Runden aus.
+
+        art:     "Regionen" / "Spots" (nur fuers Log)
+        results: {key: {date: result}} — wird an Ort und Stelle aktualisiert
+        jobs:    {(key, date): callable ohne Argumente -> result}
+
+        Generator, damit die Pausen Heartbeats liefern (SSE-Verbindung bleibt
+        offen). Gibt die Zahl der Bewertungen zurueck, die danach noch fehlen.
+        """
+        def _offen():
+            return [k for k in jobs
+                    if self._bewertung_gescheitert(results.get(k[0], {}).get(k[1]))]
+
+        offen = _offen()
+        for runde, pause in enumerate(self._REPARATUR_PAUSEN_S, start=1):
+            if not offen:
+                break
+            if getattr(self, "_api_abort", None) and self._api_abort.is_set():
+                # Permanenter Fehler (Guthaben, Key) — jeder Call bricht sofort
+                # ab, Warten aendert daran nichts.
+                logger.error(f"[REPARATUR] {art}: {len(offen)} Bewertungen fehlen, "
+                             f"kein Nachrechnen — {getattr(self, '_api_abort_reason', '')}")
+                return len(offen)
+            logger.warning(f"[REPARATUR] {art} Runde {runde}: {len(offen)} Bewertungen "
+                           f"fehlen — nachrechnen in {pause}s")
+            ende = time.monotonic() + pause
+            while (rest := ende - time.monotonic()) > 0:
+                time.sleep(min(rest, self._HEARTBEAT_INTERVAL))
+                yield self._HEARTBEAT_EVENT
+
+            workers = max(1, min(config.LLM_MAX_WORKERS, self._REPARATUR_MAX_WORKERS))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {executor.submit(jobs[k]): k for k in offen}
+                remaining = set(futures)
+                while remaining:
+                    done, remaining = wait(remaining, timeout=self._HEARTBEAT_INTERVAL,
+                                           return_when=FIRST_COMPLETED)
+                    if not done:
+                        yield self._HEARTBEAT_EVENT
+                        continue
+                    for future in done:
+                        key, date_str = futures[future]
+                        try:
+                            result = future.result()
+                        except Exception as e:
+                            logger.error(f"[REPARATUR] {key}/{date_str}: {e}")
+                            continue
+                        if not self._bewertung_gescheitert(result):
+                            results.setdefault(key, {})[date_str] = result
+            vorher, offen = len(offen), _offen()
+            logger.info(f"[REPARATUR] {art} Runde {runde}: {vorher - len(offen)} "
+                        f"nachgeholt, {len(offen)} fehlen noch")
+
+        if offen:
+            logger.error(f"[REPARATUR] {art}: {len(offen)} Bewertungen fehlen auch nach "
+                         f"{len(self._REPARATUR_PAUSEN_S)} Runden: "
+                         + ", ".join(f"{k}/{d}" for k, d in offen[:10])
+                         + (" …" if len(offen) > 10 else ""))
+        return len(offen)
+
     def run_region_analyses_stream(self):
         """Generator: yields progress events for region analyses (combined Safety+Flyability)."""
         self._api_abort = threading.Event()  # Early-Abort bei permanentem API-Fehler
@@ -1213,6 +1303,11 @@ class AnalyzersMixin:
                         "completed": completed, "total": total,
                         "result": result.get("flyability_tier") or result.get("safety_status", "error"),
                     }}
+
+        yield from self._reparaturdurchgang("Regionen", combined_results, {
+            (r["id"], d): (lambda r=r, d=d: self._build_and_analyze_region(r, d))
+            for r in regions_with_data for d in forecast_dates
+        })
 
         # ── Split + Merge (Abwaertskompatibilitaet: entry["safety"] + entry["flyability"]) ──
         merged = {}
@@ -1452,6 +1547,13 @@ class AnalyzersMixin:
                         "completed": completed, "total": total,
                         "result": result.get("flyability_tier") or result.get("safety_status", "error"),
                     }}
+
+        yield from self._reparaturdurchgang("Spots", combined_results, {
+            (s["name"], d): (lambda s=s, d=d: self._build_and_analyze_spot(
+                s, d, _lookup_region_result(spot_region_map.get(s["name"]), d)))
+            for s in spots_to_analyze for d in forecast_dates
+            if d not in incomplete_spot_days.get(s["name"], set())
+        })
 
         # ── Split + Merge (Abwaertskompatibilitaet: entry["safety"] + entry["flyability"]) ──
         merged = {}
@@ -2102,6 +2204,13 @@ class AnalyzersMixin:
                             "result": result.get("flyability_tier") or result.get("safety_status", "error"),
                         }}
 
+            # Vor Phase 2: die Spots bekommen den Regions-Kontext nur von
+            # erfolgreich bewerteten Regionen (Region-Safety-Cap).
+            yield from self._reparaturdurchgang("Regionen", region_results, {
+                (r["id"], d): (lambda r=r, d=d: self._build_and_analyze_region(r, d))
+                for r in regions_with_data for d in forecast_dates
+            })
+
             logger.info(f"[UNIFIED] Phase 1 fertig: {len(region_results)} Regionen analysiert")
 
             # ── PHASE 2: Spots (mit injiziertem Region-Kontext) ──
@@ -2158,6 +2267,17 @@ class AnalyzersMixin:
                             "completed": completed, "total": total,
                             "result": result.get("flyability_tier") or result.get("safety_status", "error"),
                         }}
+
+            def _region_ctx(name, date_str):
+                rr = region_results.get(spot_region_map.get(name), {}).get(date_str)
+                return rr if rr and rr.get("safety_status") not in ("error", "no_data") else None
+
+            yield from self._reparaturdurchgang("Spots", spot_results, {
+                (s["name"], d): (lambda s=s, d=d: self._build_and_analyze_spot(
+                    s, d, _region_ctx(s["name"], d)))
+                for s in spots_to_analyze for d in forecast_dates
+                if d not in incomplete_spot_days.get(s["name"], set())
+            })
 
             logger.info(f"[UNIFIED] Phase 2 fertig: {completed} Calls total")
 
