@@ -2321,29 +2321,42 @@
     return parts.filter(Boolean).join("");
   }
 
-  // Warnungen nur als Labels, ohne Aufklappen: erklaert wird jede Gefahr in
-  // ihrem Block der Kette (User 25.10.2026). Aktive zuerst, schwere vorn.
-  function chainWarningsRowHtml(w, labels) {
+  // Warnhinweise ganz oben im Tag (User 25.10.2026): eine grosse Kachel je
+  // angezeigter Gefahr — Name, Stufe als Wort (Farbe nie allein), Verweis auf
+  // den Block, der sie erklaert. Klick oeffnet und zeigt diesen Block. Kein
+  // Satz und keine Anweisung: Wingcast beschreibt nur.
+  const HAZARD_ICONS = {
+    RAIN: '<path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6"/><path d="M8 14v6"/><path d="M12 16v6"/>',
+    THUNDER: '<path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"/><path d="m13 12-3 5h4l-3 5"/>',
+    FOEHN: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
+    WIND: '<path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/>',
+  };
+
+  function chainAlertsHtml(w, labels) {
     const entries = Array.isArray(w.entries) ? w.entries : [];
-    const stop = entries.some(e => e.severity === "stop");
-    const on = entries.map(e => {
-      const sev = e.severity === "stop" ? "stop" : "warn";
-      return `<span class="bf-chain-check bf-chain-check--${sev}"><span aria-hidden="true">▲</span> ${escapeHtml(e.label)}`
-        + (sev === "stop" && e.sev_label ? ` <span class="bf-chain-check-sev">· ${escapeHtml(e.sev_label)}</span>` : "")
-        + `</span>`;
+    const off = Array.isArray(w.off) ? w.off
+      : (w.checks || []).filter(c => !c.active).map(c => c.label);
+    const tiles = entries.map(e => {
+      const sev = e.severity === "stop" ? "severe" : "alert";
+      const icon = HAZARD_ICONS[e.topic] || "";
+      const goto = e.block ? ` data-chain-goto="${escapeHtml(e.block)}"` : "";
+      const tag = e.block ? "button" : "div";
+      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="bf-alert bf-alert--${sev}"${goto}>
+          <svg class="bf-alert-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>
+          <span class="bf-alert-label">${escapeHtml(e.label)}</span>
+          <span class="bf-alert-sev">${escapeHtml(e.sev_label || "")}</span>
+          ${e.block_label ? `<span class="bf-alert-goto">→ ${escapeHtml(e.block_label)}</span>` : ""}
+        </${tag}>`;
     }).join("");
-    const off = (w.checks || []).filter(c => !c.active)
-      .map(c => `<span class="bf-chain-check">– ${escapeHtml(c.label)}</span>`).join("");
-    const none = entries.length ? "" : `<p class="bf-chain-none">${escapeHtml(labels.hz_none || "")}</p>`;
+    const body = entries.length
+      ? `<div class="bf-alerts-grid">${tiles}</div>`
+        + (off.length ? `<p class="bf-alerts-off">${escapeHtml(labels.hz_off || "")}: ${off.map(escapeHtml).join(" · ")}</p>` : "")
+      : `<p class="bf-alerts-none">${escapeHtml(labels.hz_none || "")}</p>`;
     return `
-      <div class="bf-chain-row bf-chain-row--${entries.length ? (stop ? "stop" : "warn") : "ok"} bf-chain-warnrow">
-        <div class="bf-chain-warnrow-head">
-          <span class="bf-chain-no" aria-hidden="true">!</span>
-          <span class="bf-chain-title">${escapeHtml(labels.warnings_ch || "")}</span>
-        </div>
-        <div class="bf-chain-checks">${on}${off}</div>
-        ${none}
-      </div>`;
+      <section class="bf-alerts" aria-label="${escapeHtml(labels.warnings_ch || "")}">
+        <h3 class="bf-alerts-title">${escapeHtml(labels.warnings_ch || "")}</h3>
+        ${body}
+      </section>`;
   }
 
   // Eine Akkordeon-Zeile. status: ok|info|warn|"" (Lage/ohne Urteil).
@@ -2411,17 +2424,30 @@
     });
 
     const w = entry.warnings;
-    if (w && Array.isArray(w.checks) && w.checks.length) {
-      rows.push(chainWarningsRowHtml(w, labels));
-    }
+    const alerts = (w && Array.isArray(w.checks) && w.checks.length) ? chainAlertsHtml(w, labels) : "";
 
     el.hidden = false;
-    el.innerHTML = head + `<div class="bf-chain-list">${rows.join("")}</div>`
+    el.innerHTML = head + alerts + `<div class="bf-chain-list">${rows.join("")}</div>`
       + (analyse.source ? `<p class="bf-chain-source">${escapeHtml(analyse.source)}</p>` : "");
 
     if (!el._chainBound) {
       el._chainBound = true;
       el.addEventListener("click", (ev) => {
+        // Warnhinweis-Kachel: erklaerenden Block oeffnen und hinscrollen
+        const tile = ev.target.closest("[data-chain-goto]");
+        if (tile && el.contains(tile)) {
+          const key = tile.getAttribute("data-chain-goto");
+          state.chainOpen.add(key);
+          saveChainOpen(state.chainOpen);
+          renderChain(state.data);
+          const row = el.querySelector(`[data-chain-block="${key}"]`);
+          if (row) {
+            const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            row.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+            row.focus({ preventScroll: true });
+          }
+          return;
+        }
         const btn = ev.target.closest("[data-chain-block]");
         if (!btn || !el.contains(btn)) return;
         const key = btn.getAttribute("data-chain-block");

@@ -998,11 +998,12 @@ _L3 = {
         "pt_up": "steigend", "pt_down": "fallend",
         "pt_jump": "Sprung {val} hPa in 3 h, {von}–{bis} Uhr ({zone})",
         "w_generic":    "{label} an {days}.",
-        "sev_stop":     "Stopp",
-        "sev_warn":     "Warnung",
+        "sev_stop":     "Schwerer Warnhinweis",
+        "sev_warn":     "Warnhinweis",
         "alps_north":   "Alpennordseite",
         "alps_south":   "Alpensüdseite",
-        "warnings_ch":  "Warnungen · Gesamtlage Schweiz",
+        "warnings_ch":  "Warnhinweise · Gesamtlage Schweiz",
+        "hz_off":       "Nicht angezeigt",
         "src_line":     "Prognosedaten: {surface} (Boden), {pl} (Höhe) — MeteoSchweiz/DWD via Open-Meteo · Grosswetterlage: ECMWF IFS · Fronten: DWD",
         "hz_RAIN": "Regen", "hz_THUNDER": "Gewitter", "hz_FOEHN": "Föhn",
         "hz_WIND": "Starker Wind",
@@ -1486,11 +1487,12 @@ _L3 = {
         "pt_up": "rising", "pt_down": "falling",
         "pt_jump": "jump of {val} hPa in 3 h, {von}–{bis} h ({zone})",
         "w_generic":    "{label} on {days}.",
-        "sev_stop":     "stop",
-        "sev_warn":     "warning",
+        "sev_stop":     "Severe alert",
+        "sev_warn":     "Alert",
         "alps_north":   "northern Alps",
         "alps_south":   "southern Alps",
-        "warnings_ch":  "Warnings · Switzerland overall",
+        "warnings_ch":  "Alerts · Switzerland overall",
+        "hz_off":       "Not indicated",
         "src_line":     "Forecast data: {surface} (surface), {pl} (upper levels) — MeteoSwiss/DWD via Open-Meteo · Synoptic pattern: ECMWF IFS · Fronts: DWD",
         "hz_RAIN": "Rain", "hz_THUNDER": "Thunderstorms", "hz_FOEHN": "Foehn",
         "hz_WIND": "Strong wind",
@@ -3819,11 +3821,20 @@ def _ch_warnings(wetterlage: dict, date: str) -> dict:
         checks.append({"topic": topic, "label": _lbl("hz_" + topic),
                        "active": bool(c.get("active")), "level": c.get("level", "warn"),
                        "sev_label": _lbl("sev_" + c.get("level", "warn"))})
-    # "entries", nicht "items": Jinja loest w.items auf die dict-Methode auf
+    # "entries", nicht "items": Jinja loest w.items auf die dict-Methode auf.
+    # `block` = der Block der Kette, der die Gefahr erklaert (App springt hin).
     entries = sorted(({"topic": c["topic"], "label": c["label"], "severity": c["level"],
-                       "sev_label": c["sev_label"]} for c in checks if c["active"]),
+                       "sev_label": c["sev_label"], "block": _HAZARD_BLOCK[c["topic"]][0],
+                       "block_label": _lbl(_HAZARD_BLOCK[c["topic"]][1])}
+                      for c in checks if c["active"]),
                      key=lambda e: e["severity"] != "stop")
-    return {"checks": checks, "entries": entries, "any": bool(entries)}
+    return {"checks": checks, "entries": entries, "any": bool(entries),
+            "off": [c["label"] for c in checks if not c["active"]]}
+
+
+# Welcher Block der Kette erklaert welche Gefahr: (Block-Schluessel, Titel-Label)
+_HAZARD_BLOCK = {"RAIN": ("lage", "step_lage"), "THUNDER": ("stability", "step_stab"),
+                 "FOEHN": ("foehn", "step_foehn"), "WIND": ("wind", "step_wind")}
 
 
 # ----------------------------------------------------------------------
@@ -3902,7 +3913,7 @@ def _load_passagen() -> dict | None:
 # Pillen-Woerter und Chip-Keys stehen schon fertig in den Bloecken.
 _APP_LABEL_KEYS = ("step_lage", "step_front", "step_foehn", "step_wind", "step_stab",
                    "step_thermik", "step_sonne", "step_modelle", "thunder_caveat",
-                   "warnings_ch", "hz_none")
+                   "warnings_ch", "hz_none", "hz_off")
 
 
 def build_chain_all_days(wetterlage: dict | None, dates: list[str],

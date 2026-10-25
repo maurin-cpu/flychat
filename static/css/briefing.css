@@ -345,44 +345,69 @@
 }
 .bf-chain-sunbar > span { display: block; height: 100%; background: #d97706; }
 
-/* Warnungen Schweiz (letzte Zeile): nur Labels, kein Aufklappen —
-   erklaert wird jede Gefahr in ihrem Block oben (25.10.2026) */
-.bf-chain-warnrow { padding: 8px var(--space-2) 12px 0; }
-.bf-chain-warnrow-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 28px;
-  margin-bottom: 8px;
-}
-.bf-chain-checks { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 30px; }
-.bf-chain-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  line-height: 1.2;
-  color: var(--color-text-muted);
-  opacity: 0.75;
-}
-.bf-chain-check--warn,
-.bf-chain-check--stop { font-weight: 600; opacity: 1; }
-.bf-chain-check--warn { color: var(--bf-chain-warn-fg); background: var(--bf-chain-warn-bg); border-color: #fdba74; }
-.bf-chain-check--stop { color: var(--bf-chain-stop-fg); background: var(--bf-chain-stop-bg); border-color: #fca5a5; }
-.bf-chain-check > span[aria-hidden] { font-size: 10px; }
-.bf-chain-check-sev {
+/* Warnhinweise ganz oben im Tag: grosse Kacheln, nur Befund (25.10.2026).
+   Stufe steht als Wort in der Kachel — Farbe traegt nie allein. */
+.bf-alerts { margin: 0 0 var(--space-4); }
+.bf-alerts-title {
+  margin: 0 0 10px;
   font-family: var(--bf-chain-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.bf-alerts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.bf-alert {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid;
+  border-top-width: 4px;
+  border-radius: 10px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  transition: background-color 150ms, box-shadow 150ms;
+}
+button.bf-alert { cursor: pointer; }
+button.bf-alert:hover { box-shadow: var(--shadow-sm); }
+button.bf-alert:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.bf-alert--severe { background: #fef2f2; border-color: #fca5a5; border-top-color: var(--bf-chain-stop-line); }
+.bf-alert--alert  { background: #fff7ed; border-color: #fdba74; border-top-color: var(--bf-chain-warn-line); }
+.bf-alert-icon { width: 24px; height: 24px; margin-bottom: 2px; }
+.bf-alert--severe .bf-alert-icon { color: var(--bf-chain-stop-fg); }
+.bf-alert--alert  .bf-alert-icon { color: var(--bf-chain-warn-fg); }
+.bf-alert-label { font-size: 17px; font-weight: 700; line-height: 1.25; }
+.bf-alert--severe .bf-alert-label { color: #7f1d1d; }
+.bf-alert--alert  .bf-alert-label { color: #7c2d12; }
+.bf-alert-sev {
+  font-family: var(--bf-chain-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.bf-chain-warnrow .bf-chain-none { margin: 8px 0 0 30px; }
-.bf-chain-none { margin: 0; font-style: italic; color: var(--color-text-secondary); }
+.bf-alert--severe .bf-alert-sev { color: var(--bf-chain-stop-fg); }
+.bf-alert--alert  .bf-alert-sev { color: var(--bf-chain-warn-fg); }
+.bf-alert-goto { margin-top: 2px; font-size: var(--text-xs); color: var(--color-text-secondary); }
+.bf-alerts-off { margin: 10px 0 0; font-size: var(--text-sm); color: var(--color-text-secondary); }
+.bf-alerts-none {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+@media (prefers-reduced-motion: reduce) { .bf-alert { transition: none; } }
 
 /* Quellenzeile: welche Modelle hinter "Prognosedaten" stehen */
 .bf-chain-source {

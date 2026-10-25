@@ -554,9 +554,24 @@ class TestWarningsOnlyLabels(_De):
         self.assertEqual([(e["topic"], e["severity"]) for e in w["entries"]],
                          [("WIND", "stop"), ("RAIN", "warn")])
         for e in w["entries"]:
-            self.assertEqual(set(e), {"topic", "label", "severity", "sev_label"})
+            self.assertEqual(set(e), {"topic", "label", "severity", "sev_label", "block", "block_label"})
         self.assertEqual(len(w["checks"]), 4)
         self.assertNotIn("has_ki", w)
+        # jede Kachel verweist auf den Block, der die Gefahr erklaert
+        self.assertEqual({e["topic"]: e["block"] for e in w["entries"]},
+                         {"WIND": "wind", "RAIN": "lage"})
+        self.assertEqual(w["off"], ["Gewitter", "Föhn"])
+
+    def test_severity_is_a_finding_not_an_instruction(self):
+        # Haftung (User 25.10.2026): keine Anweisung wie "Stopp"/"stop"
+        for lang in ("de", "en"):
+            config.LANG = lang
+            w = bc._ch_warnings(_wl(self.DATES, [{"RAIN", "WIND"}]), self.DATES[0])
+            for e in w["entries"]:
+                self.assertNotRegex(e["sev_label"], r"(?i)stop")
+            self.assertEqual([e["sev_label"] for e in w["entries"]],
+                             ["Schwerer Warnhinweis", "Warnhinweis"] if lang == "de"
+                             else ["Severe alert", "Alert"])
 
     def test_quiet_day(self):
         w = bc._ch_warnings(_wl(self.DATES, [set()]), self.DATES[0])

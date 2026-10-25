@@ -190,7 +190,7 @@ class TestBriefing(unittest.TestCase):
         self.assertEqual(facts["Föhntäler"], "2/3")
         self.assertEqual(facts["Böe"], "55 km/h")
         # Warnung nur noch als Label (25.10.2026): die Zahlen stehen allein in Block 3
-        self.assertEqual(set(_foehn_warning(day)), {"topic", "label", "severity", "sev_label"})
+        self.assertEqual(set(_foehn_warning(day)), {"topic", "label", "severity", "sev_label", "block", "block_label"})
         # eine Zahl, eine Quelle: Block 3 und Chips
         nums = lambda s: sorted(set(int(x) for x in re.findall(r"(\d+)(?=[–\s]*(?:\d+\s*)?km/h)", s)))  # noqa: E731
         self.assertEqual(nums(fazit), [22, 34, 55])
