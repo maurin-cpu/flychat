@@ -102,3 +102,27 @@ def test_guard_translates_old_mech_chop_note():
         # Mischform im Server-Cache (beim Erzeugen schon halb uebersetzt).
         assert englishify_text("Mechanisches Klappern: extreme turbulence in 100% der Thermikstunden") \
             == "Mechanical chop: extreme turbulence in 100% of thermal hours"
+
+
+def test_remaining_decision_texts_per_language():
+    """Nachmessung 25.10.2026: zwei weitere feste deutsche Code-Texte."""
+    from engine.decision_engine import decide_overclaim_relax
+    gi = {"hard_warning_hours": 0, "clean_hours_count": 10}
+    out = {}
+    for lang in ("de", "en"):
+        res = {"safety_status": "not_safe", "caution_notes": [], "no_go_reasons": ["x"]}
+        with i18n.lang_override(lang):
+            decide_overclaim_relax(res, gi, "X")
+        out[lang] = res["caution_notes"]
+    assert out["de"] == ["Automatische Korrektur: Die Wetterdaten zeigen 10 saubere Flugstunden "
+                         "ohne harte Warnungen — bitte Meteogramm selbst pruefen."]
+    assert out["en"] == ["Automatic correction: the weather data show 10 clean flight hours "
+                         "without hard warnings — please check the meteogram yourself."]
+    with i18n.lang_override("en"):
+        # schon gespeicherte Analysen zieht der Waechter nach
+        assert englishify_text("Automatische Korrektur: Die Wetterdaten zeigen 10 saubere Flugstunden "
+                               "ohne harte Warnungen — bitte Meteogramm selbst pruefen.") == out["en"][0]
+        assert englishify_text("Keine Stunde mit korrekter Windrichtung") == \
+            "No hour with a suitable wind direction"
+        assert englishify_text("only 1 productive hour (Region-Thermik weak)") == \
+            "only 1 productive hour (regional thermals weak)"

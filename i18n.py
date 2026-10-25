@@ -782,6 +782,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "decision.gust_tail": {"de": " — Trend und Fenster pruefen.", "en": " — see trend and window."},
     "decision.wind_strong_majority": {"de": "Durchgehend starker Wind ({s} von {n} Stunden), keine ruhige Phase",
                                       "en": "Strong wind throughout ({s} of {n} hours), no calm phase"},
+    "decision.no_wind_dir_hour": {"de": "Keine Stunde mit korrekter Windrichtung",
+                                  "en": "No hour with a suitable wind direction"},
+    "decision.overclaim_fix": {"de": "Automatische Korrektur: Die Wetterdaten zeigen {n} saubere Flugstunden ohne harte Warnungen — bitte Meteogramm selbst pruefen.",
+                               "en": "Automatic correction: the weather data show {n} clean flight hours without hard warnings — please check the meteogram yourself."},
     "decision.mech_chop": {"de": "Mechanisches Klappern: ROUGH-UNUSABLE in {pct}% der Thermikstunden",
                            "en": "Mechanical chop: extreme turbulence in {pct}% of thermal hours"},
 

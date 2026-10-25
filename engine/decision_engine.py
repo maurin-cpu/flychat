@@ -167,8 +167,9 @@ def decide_wind_ok_zero(result: dict, gust_info: dict, label: str) -> Optional[s
     result["safety_status"] = "not_safe"
     result["safe_window"] = i18n.t("analysis.window_none")
     nogo = result.get("no_go_reasons", []) or []
-    if not any("Windrichtung" in (r or "") for r in nogo):
-        nogo.append("Keine Stunde mit korrekter Windrichtung")
+    note = i18n.t("decision.no_wind_dir_hour")
+    if not any(note in (r or "") or "Windrichtung" in (r or "") for r in nogo):
+        nogo.append(note)
     result["no_go_reasons"] = nogo
     return "WindOk0"
 
@@ -316,10 +317,7 @@ def decide_overclaim_relax(result: dict, gust_info: dict, label: str) -> Optiona
     )
     result["safety_status"] = "conditional"
     cn = result.get("caution_notes", []) or []
-    cn.append(
-        f"Automatische Korrektur: Die Wetterdaten zeigen {clean_cnt} saubere "
-        f"Flugstunden ohne harte Warnungen — bitte Meteogramm selbst pruefen."
-    )
+    cn.append(i18n.t("decision.overclaim_fix", n=clean_cnt))
     result["caution_notes"] = cn
     result["no_go_reasons"] = []
     return f"OverclaimRelax({clean_cnt}h)"

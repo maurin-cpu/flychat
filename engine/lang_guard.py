@@ -58,6 +58,8 @@ _GLOSSARY = (
     # ROUGH-UNUSABLE ersetzt, gespeichert ist die Mischform
     # "Mechanisches Klappern: extreme turbulence in 100% der Thermikstunden".
     ("Mechanisches Klappern", "Mechanical chop"), ("der Thermikstunden", "of thermal hours"),
+    # Label aus dem (deutschen) Datenblock, von der KI uebernommen (25.10.2026)
+    ("Region-Thermik", "regional thermals"),
 )
 
 _FOEHN_DIR = {"süd": "south", "sued": "south", "nord": "north"}
