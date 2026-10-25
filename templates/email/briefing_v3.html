@@ -136,7 +136,8 @@
     <div style="font-size:0;line-height:0;">
       {%- for w in v3_warnings.entries -%}
       {%- set sev = w.severity == 'stop' -%}
-      <div style="display:inline-block;vertical-align:top;box-sizing:border-box;width:141px;height:116px;overflow:hidden;margin:0 8px 8px 0;padding:12px 10px 11px;border-radius:10px;border:1px solid {{ '#fca5a5' if sev else '#fdba74' }};border-top:4px solid {{ C.danger if sev else C.accent }};background-color:{{ '#fef2f2' if sev else '#fff7ed' }};">
+      <div style="display:inline-block;vertical-align:top;box-sizing:border-box;width:141px;height:146px;overflow:hidden;margin:0 8px 8px 0;padding:12px 10px 11px;border-radius:10px;border:1px solid {{ '#fca5a5' if sev else '#fdba74' }};border-top:4px solid {{ C.danger if sev else C.accent }};background-color:{{ '#fef2f2' if sev else '#fff7ed' }};">
+        {% if w.icon_cid %}<img src="cid:{{ w.icon_cid }}" width="24" height="24" alt="" style="display:block;width:24px;height:24px;margin:0 0 6px;border:0;">{% else %}<div style="height:30px;"></div>{% endif %}
         <div style="font:700 16px/1.25 {{ SANS }};color:{{ '#7f1d1d' if sev else '#7c2d12' }};">{{ w.label }}</div>
         <div style="height:29px;margin-top:6px;font:600 11px/1.3 {{ MONO }};letter-spacing:.04em;text-transform:uppercase;color:{{ C.danger if sev else C.warn_fg }};">{{ w.sev_label }}</div>
         <div style="margin-top:4px;font:12px/1.35 {{ SANS }};color:{{ C.text2 }};white-space:nowrap;">&rarr; {{ w.block_label }}</div>

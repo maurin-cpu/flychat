@@ -594,3 +594,18 @@ class TestNoSynopticLlm(unittest.TestCase):
         self.assertEqual(client.mock_calls, [])
         self.assertIsNone(out["llm_overview"])
         self.assertIsNone(lang["llm_overview"])
+
+
+class TestMailHazardIcons(unittest.TestCase):
+    """Mail-Kacheln tragen dieselben Symbole wie die App — als Inline-PNG."""
+
+    def test_every_topic_and_level_has_an_icon(self):
+        import email_service as es
+        from engine.synoptic_llm import HAZARD_TOPICS
+        for topic in HAZARD_TOPICS:
+            for sev in ("stop", "warn"):
+                w = {"entries": [{"topic": topic, "severity": sev}]}
+                imgs = es._hazard_icon_images(w)
+                cid = w["entries"][0].get("icon_cid")
+                self.assertTrue(cid, (topic, sev))
+                self.assertTrue(imgs[cid].startswith(b"\x89PNG"), cid)

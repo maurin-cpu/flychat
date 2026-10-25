@@ -1383,6 +1383,27 @@ def briefing_map_png(day_idx: int, iso_date: str) -> Optional[bytes]:
     return png
 
 
+_HAZARD_ICON_DIR = Path(config.PROJECT_ROOT) / "static" / "img" / "mail"
+
+
+def _hazard_icon_images(warnings: dict) -> dict:
+    """Symbole der Warnhinweis-Kacheln als Inline-Bilder {cid: png}. SVG zeigen
+    Gmail/Outlook nicht an — darum dieselben Lucide-Symbole wie in der App als
+    PNG (static/img/mail/hz_<thema>_<stufe>.png, 2x fuer scharfe Darstellung).
+    Setzt je Eintrag `icon_cid`; fehlt eine Datei, bleibt die Kachel ohne Symbol."""
+    images = {}
+    for e in warnings.get("entries") or []:
+        sev = "severe" if e.get("severity") == "stop" else "alert"
+        cid = f"hz_{str(e.get('topic', '')).lower()}_{sev}"
+        path = _HAZARD_ICON_DIR / f"{cid}.png"
+        try:
+            images[cid] = path.read_bytes()
+            e["icon_cid"] = cid
+        except OSError:
+            logger.warning("_hazard_icon_images: %s fehlt — Kachel ohne Symbol", path)
+    return images
+
+
 def _render_briefing_v3(ctx: dict, briefing_data: dict, subscriber: dict):
     """HTML, Text, Betreff-Kern und Inline-Bilder fuer das v3-Briefing."""
     from scripts.briefing_v3_context import build_v3_context
@@ -1400,6 +1421,7 @@ def _render_briefing_v3(ctx: dict, briefing_data: dict, subscriber: dict):
                 ctx["v3_map_cid"] = "synoptik"
     except Exception:
         logger.exception("_render_briefing_v3: Kartenbild uebersprungen")
+    images.update(_hazard_icon_images(ctx.get("v3_warnings") or {}))
     # Oeffnungs-Pixel + Klick-Weiterleitung (mail_tracking.py). Nur im HTML;
     # der Text-Teil bleibt unveraendert.
     try:
