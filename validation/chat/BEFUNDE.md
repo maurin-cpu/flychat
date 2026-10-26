@@ -229,6 +229,58 @@ bei der Böenfront vom 30.07.: **rollende Dateien sofort einfrieren.**
 Konkret: `konversationen/` beim Holen nicht überschreiben, sondern datiert ablegen, damit
 ein späterer Lauf einen früheren Befund noch belegen kann.
 
+## Nachtrag 26.10.2026: Spot-Auflösung neu, Antwortsprache
+
+Neu gelesen: Server-Stand vom 26.10. (datiert in `konversationen_2026-10-26/`, gitignored).
+Auswertung für das Marketing: `wingcast_marketing/1-planung/analysen/2026-10-26_chat-nutzung.md`.
+
+**Charmey war keine Datenlücke.** Der Startplatz von Charmey steht als `Vounetz-1620` in der
+Liste. Der Chat fand ihn nicht und antwortete zweimal zu Gastlosen, unter anderem weil die
+Zeile Gastlosen als Fluggebiet ebenfalls „Vounetse" trug (Gastlosen liegt bei Jaun). §3
+ordnete Charmey deshalb falsch als „echte Lücke" ein. `Mijoux` ist seit 27.09. in der Liste
+(`389e6f3`), wäre mit „Mijoux Col de la Faucille" aber weiter gescheitert, weil die ganze
+Anfrage im Namen stecken musste.
+
+**Umgesetzt:**
+
+- `engine/spot_resolver.py`: sucht in Name, Name ohne Höhenzahl, Klammerteilen, Fluggebiet
+  und `data/spot_aliases.csv`; faltet Akzente, Umlaut-Digraphen und St./Saint; meldet
+  Mehrdeutigkeit als Kandidaten statt „erster Treffer gewinnt"; Tippfehler ab 0,86.
+- Kennt der Resolver den Ort nicht, geokodiert der Chat ihn und gibt die fünf nächsten
+  Startplätze mit Distanz zurück, dazu die Anweisung, keinen davon als den gefragten
+  auszugeben (§4, Punkt 2 unter „Was daraus folgt"). Die Regel steht in der Tool-Antwort,
+  nicht nur im Prompt.
+- Schwache Treffer (Klammerteil, Gebiet, Bruchstück, Tippfehler) kommen mit dem Hinweis
+  ans Modell, dass es ein anderer Ort sein kann („Interlaken" → Schynige Platte).
+- Tool-Beschreibung: das Modell übergibt den Ortsnamen des Piloten unverändert, statt
+  selbst einen ähnlichen Startplatz zu suchen.
+- Alias Charmey → Vounetz-1620, Le Cernil/Cernil → Corgemont. Gastlosen: Fluggebiet Jaun.
+- Antwortsprache (§2): Regel 7 in `skills/system_chat.md` (+ EN) und
+  `i18n.chat_lang_instruction()` — Antwort in der Sprache des Piloten. Voranalysen und
+  Mail behalten die Oberflächensprache.
+- Tests: `tests/test_spot_resolver.py`, jeder Fall eine echte Eingabe aus diesem Ordner.
+
+**Lange Gespräche zerbrachen, und „Neuer Chat" löschte sie.** Das Server-Log (`journalctl -u
+wingcast.service`, reicht bis 08.06.) zeigt seit dem 27.09. 24 Chat-Aufrufe, 8 Klicks auf
+„Neuer Chat" und 4 Fehler von DeepSeek: 400 „Messages with role 'tool' must be a response to a
+preceding message with 'tool_calls'" (25.09. einmal, 16.10. dreimal). Ursache: Ab 40 Nachrichten
+schnitt `messages[:2] + messages[-38:]` mitten in eine Tool-Runde. Danach scheiterte jede Frage,
+der Pilot sah die rohe englische Fehlermeldung, und der einzige Ausweg „Neuer Chat" löschte
+den Verlauf. So ging am 25.09. das Jura-Gespräch von `user_16` verloren („Datenverlust" unten).
+Der längste Verlauf im Datensatz (`user_07`, 45 Nachrichten, August) zerbricht genau so; gegen
+DeepSeek nachgestellt mit Platzhaltertexten: alte Kürzung 400, neue Kürzung OK.
+Behoben: `_verlauf_kuerzen` schneidet nur an einer Frage, `_verlauf_reparieren` heilt vor jedem
+Senden bereits zerbrochene Verläufe (`engine/chat_orchestrator.py`, Tests
+`tests/test_chat_verlauf_kuerzen.py`). Die gelöschten Verläufe sind weg: nicht im Backup, im Log
+nur Zeitpunkte, kein Text. Einzige Chance: das Hetzner-Abbild (7 Tage rollend) für die Resets
+vom 19. und 21.10.
+
+**Offen:** Hohmattli und Gastlosen sind in `analyse_region` dem Berner Oberland zugeordnet,
+beide liegen im Kanton Freiburg. Nicht angefasst, weil die Spalte in die Bewertung eingeht.
+Chatverläufe werden bei „neuer Chat" weiter gelöscht; ein Archiv widerspricht der
+Datenschutzerklärung („Chat-Eingaben: nicht bei uns gespeichert"), die schon den heutigen
+Speicher in `data/history/` nicht abdeckt.
+
 ## Wiederholen
 
 ```bash

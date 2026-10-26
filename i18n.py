@@ -1323,6 +1323,28 @@ def llm_lang_instruction() -> str:
     return ""
 
 
+def chat_lang_instruction() -> str:
+    """Wie llm_lang_instruction, aber fuer den Chat: Ausgabe in der Sprache
+    des Piloten statt fest Englisch.
+
+    Bis 26.10.2026 hing auch am Chat die feste Englisch-Anweisung. Ergebnis:
+    0 von 7 franzoesischen Fragen auf Franzoesisch beantwortet, und wer Deutsch
+    wollte, musste "Auf Deutsch?" nachschieben (validation/chat/BEFUNDE.md §2).
+    Voranalysen und Mail behalten llm_lang_instruction (Sprache der Oberflaeche).
+    DE -> leer, die Regel steht in skills/system_chat.md (Regel 7)."""
+    if get_current_lang() == "en":
+        return (
+            "\n\nIMPORTANT — OUTPUT LANGUAGE: Reply in the language the pilot writes in "
+            "(German, French, Italian or English). If the message is too short to tell "
+            "(e.g. only a place name), reply in English. The data block contains German "
+            "labels — never copy German words into a French, Italian or English answer, "
+            "translate them (Gewitter = thunderstorm, Boeen/Böen = gusts, Hoehenwind = "
+            "upper wind, Wolkendecke = cloud cover, Regen = rain, Thermik = thermals, "
+            "Fenster = window, Bemerkung = site note). Place names stay as they are."
+        )
+    return ""
+
+
 # Keys OHNE 'js.'-Praefix, die das Frontend-JS dennoch braucht (Wiederverwendung
 # bereits existierender Template-Keys, statt den Wortlaut zu duplizieren).
 _JS_EXTRA_KEYS = (

@@ -245,7 +245,7 @@ durch" statt "100% Mittelbewoelkung". Umgekehrt mid=100% mit 280 W/m² →
 
 6. **Top-Einschaetzungs-Tags setzen** — am Ende der Antwort fuer jeden Top-Tipp-Spot: `[RECOMMENDED: SpotName]` (technisches UI-Tag, KEIN Empfehlungstext)
 
-7. **Antworte auf Deutsch.**
+7. **Antworte in der Sprache, in der der Pilot schreibt** (Deutsch, Französisch, Italienisch oder Englisch). Ist die Nachricht zu kurz, um das zu erkennen (z.B. nur ein Ortsname), antworte auf Deutsch. Wechselt der Pilot die Sprache, wechselst du mit.
 
 8. **Rueckfragen bei Unklarheit** — Wenn der Pilot eine Visualisierung will aber Spot, Region oder Datum fehlt, **frage nach** statt zu raten. Beispiel: "Zeig mir den Wind als Grafik" → "Fuer welchen Spot soll ich den Windverlauf zeigen?" Ebenso bei mehrdeutigen Anfragen ("Meteogramm" ohne Spot/Region → nachfragen).
 

@@ -47,6 +47,7 @@ import prompts
 import i18n
 from prompts import format_foehn_llm_regional_guide
 import routing
+from engine.spot_resolver import SpotResolver
 from engine._common import (
     MAX_HISTORY_MESSAGES, MAX_TOOL_ITERATIONS,
     _MODEL_TOKEN_LIMITS, _DEFAULT_TOKEN_LIMIT, _TOKEN_BUDGET_RESERVE,
@@ -82,6 +83,17 @@ logger = logging.getLogger(__name__)
 #   7. get_region_weather             — Rohe stuendliche Wetterdaten (Region + Tag)
 # Nach Erhalt eines Tool-Calls dispatcht answer_stream() an _dispatch_tool(),
 # yieldet Map-Action-Events sofort ans Frontend und ruft danach erneut das LLM.
+
+# Frueher "Exakter Spot-Name wie in der Kurzuebersicht". Das liess das Modell
+# selbst einen Namen aus der Liste suchen, und bei "Charmey" fand es Gastlosen.
+# Den Ort aufzuloesen ist Aufgabe des Tools (engine/spot_resolver.py).
+_SPOT_NAME_DESC = (
+    "Startplatz-Name aus der Kurzübersicht (z.B. '{beispiel}') ODER genau der Ort, "
+    "den der Pilot genannt hat (z.B. 'Charmey', 'Le Cernil'). Übergib den Ortsnamen "
+    "des Piloten unverändert, statt selbst einen ähnlichen Startplatz zu suchen: Das "
+    "Tool kennt lokale Namen und meldet sonst die nächsten Startplätze mit Distanz."
+)
+
 TOOLS: list = [
     {
         "type": "function",
@@ -190,7 +202,7 @@ TOOLS: list = [
                 "properties": {
                     "spot_name": {
                         "type": "string",
-                        "description": "Exakter Spot-Name wie in der Kurzübersicht (z.B. 'Niederbauen').",
+                        "description": _SPOT_NAME_DESC.format(beispiel="Niederbauen"),
                     },
                     "date": {
                         "type": "string",
@@ -219,7 +231,7 @@ TOOLS: list = [
                 "properties": {
                     "spot_name": {
                         "type": "string",
-                        "description": "Exakter Spot-Name wie in der Kurzübersicht (z.B. 'Brienzer Rothorn').",
+                        "description": _SPOT_NAME_DESC.format(beispiel="Brienzer Rothorn"),
                     },
                     "date": {
                         "type": "string",
@@ -288,6 +300,68 @@ TOOLS: list = [
     },
 ]
 
+
+
+def _verlauf_kuerzen(messages: list, max_n: int = MAX_HISTORY_MESSAGES) -> None:
+    """Kuerzt den Verlauf in place auf max_n Nachrichten, nur an einer Fragegrenze.
+
+    Bis 26.10.2026 schnitt `messages[:2] + messages[-(max_n-2):]` mitten in eine
+    Tool-Runde. Uebrig blieb eine Tool-Antwort ohne ihren Aufruf, und DeepSeek
+    lehnte jede weitere Frage mit 400 ab ("Messages with role 'tool' must be a
+    response to a preceding message with 'tool_calls'"). Getroffen hat das jeden,
+    der zu einem langen Gespraech zurueckkam: 25.09. (Jura-Gespraech, danach per
+    "Neuer Chat" geloescht) und 16.10. (dreimal). Der Rest beginnt deshalb immer
+    mit einer Frage des Piloten.
+    """
+    if len(messages) <= max_n:
+        return
+    kopf = messages[:2]  # System-Prompt + erste Frage mit Wetterkontext
+    rest = messages[2:]
+    start = len(rest) - (max_n - 2)
+    while start < len(rest) and rest[start].get("role") != "user":
+        start += 1
+    if start >= len(rest):
+        # Eine einzige Runde ist laenger als das Fenster: ab der letzten Frage behalten.
+        fragen = [i for i, m in enumerate(rest) if m.get("role") == "user"]
+        start = fragen[-1] if fragen else len(rest)
+    messages[:] = kopf + rest[start:]
+
+
+def _verlauf_reparieren(messages: list) -> int:
+    """Entfernt Tool-Antworten ohne Aufruf und Aufrufe ohne Antwort, in place.
+
+    Sicherheitsnetz fuer Verlaeufe, die vor dem Fix in _verlauf_kuerzen schon
+    zerbrochen im Speicher oder auf der Platte liegen. Gibt die Zahl der
+    entfernten Nachrichten zurueck.
+    """
+    sauber = []
+    entfernt = 0
+    i = 0
+    while i < len(messages):
+        m = messages[i]
+        if m.get("role") == "tool":
+            entfernt += 1  # verwaist: sonst haette der Aufruf sie unten mitgenommen
+            i += 1
+            continue
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            ids = {tc.get("id") for tc in m["tool_calls"]}
+            j = i + 1
+            antworten = []
+            while j < len(messages) and messages[j].get("role") == "tool":
+                antworten.append(messages[j])
+                j += 1
+            if ids and ids == {a.get("tool_call_id") for a in antworten}:
+                sauber.append(m)
+                sauber.extend(antworten)
+            else:
+                entfernt += 1 + len(antworten)
+            i = j
+            continue
+        sauber.append(m)
+        i += 1
+    if entfernt:
+        messages[:] = sauber
+    return entfernt
 
 
 def _chat_user_message(context_block: str, question: str, format_hint: str) -> str:
@@ -379,7 +453,7 @@ class ChatOrchestratorMixin:
             {
                 "role": "system",
                 "content": prompts.SYSTEM_PROMPT + "\n\n" + prompts.CAPABILITIES_GUIDE + "\n\n" + prompts.FOEHN_CHAT_KNOWLEDGE
-                           + i18n.llm_lang_instruction(),
+                           + i18n.chat_lang_instruction(),
             },
         ]
         self.conversations[session_id] = {
@@ -444,10 +518,10 @@ class ChatOrchestratorMixin:
 
         messages.append({"role": "user", "content": user_content})
 
-        # Token-Management: History trimmen wenn zu lang
-        if len(messages) > MAX_HISTORY_MESSAGES:
-            # Behalte System-Prompt + erste User-Message (mit Wetterdaten) + letzte N Messages
-            messages[:] = messages[:2] + messages[-(MAX_HISTORY_MESSAGES - 2):]
+        # Token-Management: History trimmen wenn zu lang (nur an Fragegrenzen)
+        _verlauf_kuerzen(messages)
+        if _verlauf_reparieren(messages):
+            logger.warning("Chat-Verlauf %s repariert (verwaiste Tool-Nachrichten entfernt)", session_id)
 
         # LLM Chat Call (Provider abhaengig: OpenAI / Anthropic / Gemini)
         reply_reasoning = None
@@ -552,25 +626,119 @@ class ChatOrchestratorMixin:
                 entry["analyses"] = days_summary
         return entry
 
-    def _resolve_spot_by_name(self, query: str) -> dict | None:
-        """Findet den Spot-Dict zu einem (ggf. ungenauen) Namen aus self.spots.
+    def _spot_resolver(self) -> SpotResolver:
+        """Index ueber self.spots, neu gebaut, sobald die Spot-Liste wechselt."""
+        cached = getattr(self, "_spot_resolver_cache", None)
+        if cached is None or cached[0] is not self.spots:
+            cached = (self.spots, SpotResolver(self.spots))
+            self._spot_resolver_cache = cached
+        return cached[1]
 
-        Reihenfolge: exakt → case-insensitive → Teilstring. None wenn nichts passt.
+    def _resolve_spot_by_name(self, query: str) -> dict | None:
+        """Spot-Dict zu einem (ggf. ungenauen) Namen, nur wenn eindeutig.
+
+        Name, Alias, Klammerteil, Fluggebiet, Wortweise, Tippfehler
+        (engine/spot_resolver.py). Mehrdeutig oder unbekannt → None.
         """
-        q = (query or "").strip()
-        if not q:
-            return None
-        for s in self.spots:
-            if s.get("name") == q:
-                return s
-        q_low = q.lower()
-        for s in self.spots:
-            if (s.get("name") or "").lower() == q_low:
-                return s
-        for s in self.spots:
-            if q_low in (s.get("name") or "").lower():
-                return s
-        return None
+        return self._spot_resolver().aufloesen(query).spot
+
+    def _spot_nicht_gefunden(self, query: str, ergebnis) -> dict:
+        """Tool-Antwort, wenn der Ort keinem Startplatz eindeutig entspricht.
+
+        Am 25.08. und 24.09. fragte ein Pilot nach Charmey, der Spot hiess anders,
+        und das Modell antwortete mit Gastlosen, als waere es derselbe Ort. Die
+        Regel steht deshalb hier in der Tool-Antwort und nicht nur im Prompt:
+        nennen, dass der Ort fehlt, die naechsten anbieten, keinen unterschieben.
+        """
+        if ergebnis.kandidaten:
+            return {
+                "error": f"'{query}' passt auf mehrere Startplätze.",
+                "candidates": [
+                    {"name": s["name"], "fluggebiet": s.get("fluggebiet", ""),
+                     "elevation_m": s.get("elevation_m")}
+                    for s in ergebnis.kandidaten
+                ],
+                "instruction": (
+                    "Nimm den Kandidaten, der eindeutig zur Frage des Piloten passt, "
+                    "und rufe das Tool mit seinem exakten Namen erneut auf. Passt keiner "
+                    "eindeutig, nenne dem Piloten die Kandidaten und frag, welchen er meint."
+                ),
+            }
+
+        ort = None
+        for suche in (f"{query}, Schweiz", query):
+            try:
+                ort = routing.geocode(suche)
+            except routing.RoutingError as e:
+                logger.warning(f"Geocoding fuer unbekannten Spot '{query}' fehlgeschlagen: {e}")
+                break
+            if ort:
+                break
+
+        antwort = {
+            "error": f"'{query}' ist kein Startplatz in unseren Daten.",
+            "not_in_data": True,
+        }
+        if ort:
+            naechste = sorted(
+                (
+                    (routing.haversine_km(ort["lat"], ort["lon"], s["latitude"], s["longitude"]), s)
+                    for s in self.spots
+                    if s.get("latitude") is not None and s.get("longitude") is not None
+                ),
+                key=lambda t: t[0],
+            )[:5]
+            antwort["place_found"] = ort.get("display_name", query)
+            antwort["nearest_spots"] = [
+                {"name": s["name"], "distance_km": round(d, 1),
+                 "fluggebiet": s.get("fluggebiet", ""), "elevation_m": s.get("elevation_m")}
+                for d, s in naechste
+            ]
+            antwort["instruction"] = (
+                f"Sag dem Piloten ausdrücklich, dass '{query}' nicht in unseren Daten ist. "
+                "Biete die nächsten Startplätze mit Distanz an. Liegt einer sehr nah "
+                "(wenige km) und ist offensichtlich derselbe Berg, darfst du ihn verwenden, "
+                "sagst aber dazu, dass du ihn statt des genannten Orts nimmst. Gib nie einen "
+                "anderen Startplatz als den gefragten aus, und rate keine weiteren Namen."
+            )
+        else:
+            antwort["instruction"] = (
+                f"Sag dem Piloten, dass '{query}' weder als Startplatz noch als Ort gefunden "
+                "wurde, und frag nach dem nächsten Dorf oder Berg. Rate keine anderen Namen."
+            )
+        return antwort
+
+    def _spot_aufloesen_fuer_tool(self, spot_query: str):
+        """(Ergebnis, None) bei Erfolg, sonst (None, Tool-Antwort fuer das Modell)."""
+        ergebnis = self._spot_resolver().aufloesen(spot_query)
+        if ergebnis.spot is None:
+            return None, self._spot_nicht_gefunden(spot_query, ergebnis)
+        return ergebnis, None
+
+    @staticmethod
+    def _aufloesung_vermerken(content: dict, spot_query: str, ergebnis) -> dict:
+        """Wenn der Pilot einen anderen Namen benutzt hat, das dem Modell sagen.
+
+        Name und Alias sind derselbe Startplatz. Alles Schwaechere (Klammerteil,
+        Gebiet, Bruchstueck, Tippfehler) kann ein anderer Ort sein: "Interlaken"
+        trifft "Schynige Platte (Interlaken)", gemeint sein kann ein anderer Start.
+        """
+        canonical = ergebnis.spot["name"]
+        if spot_query == canonical:
+            return content
+        if ergebnis.art in ("name", "alias"):
+            content["resolved_from"] = (
+                f"Der Pilot sagte '{spot_query}'; das ist in unseren Daten '{canonical}'. "
+                "Nenne beide Namen, damit der Pilot sieht, dass es derselbe Startplatz ist."
+            )
+        else:
+            content["resolved_from"] = (
+                f"Der Pilot sagte '{spot_query}'; am besten passt in unseren Daten "
+                f"'{canonical}' (Treffer über {ergebnis.art}). Das kann ein anderer Ort sein: "
+                "Sag dem Piloten, welchen Startplatz du nimmst, und frag nach, falls er "
+                "einen anderen meint."
+            )
+        return content
 
     def _resolve_region_by_name(self, query: str) -> dict | None:
         """Findet den Region-Dict zu einem (ggf. ungenauen) Namen via get_all_regions().
@@ -807,10 +975,10 @@ class ChatOrchestratorMixin:
             date_str = (args.get("date") or "").strip()
             if not spot_query or not date_str:
                 return {"content": {"error": "spot_name und date sind erforderlich"}, "map_actions": []}
-            spot = self._resolve_spot_by_name(spot_query)
-            if not spot:
-                return {"content": {"error": f"Spot '{spot_query}' nicht gefunden"}, "map_actions": []}
-            canonical = spot["name"]
+            treffer, fehlt = self._spot_aufloesen_fuer_tool(spot_query)
+            if not treffer:
+                return {"content": fehlt, "map_actions": []}
+            canonical = treffer.spot["name"]
             days = self.spot_analyses.get(canonical)
             if not days:
                 return {"content": {"error": f"Keine Voranalyse für '{canonical}' vorhanden"}, "map_actions": []}
@@ -824,7 +992,10 @@ class ChatOrchestratorMixin:
                     "map_actions": [],
                 }
             return {
-                "content": {"spot": canonical, "date": date_str, "analysis": entry},
+                "content": self._aufloesung_vermerken(
+                    {"spot": canonical, "date": date_str, "analysis": entry},
+                    spot_query, treffer,
+                ),
                 "map_actions": [],
             }
 
@@ -833,9 +1004,10 @@ class ChatOrchestratorMixin:
             date_str = (args.get("date") or "").strip()
             if not spot_query or not date_str:
                 return {"content": {"error": "spot_name und date sind erforderlich"}, "map_actions": []}
-            spot = self._resolve_spot_by_name(spot_query)
-            if not spot:
-                return {"content": {"error": f"Spot '{spot_query}' nicht gefunden"}, "map_actions": []}
+            treffer, fehlt = self._spot_aufloesen_fuer_tool(spot_query)
+            if not treffer:
+                return {"content": fehlt, "map_actions": []}
+            spot = treffer.spot
             canonical = spot["name"]
             try:
                 ctx = self._build_single_spot_context(spot, date_str, mode="chat")
@@ -845,7 +1017,10 @@ class ChatOrchestratorMixin:
             if not ctx or not ctx.strip():
                 return {"content": {"error": f"Keine Wetterdaten für '{canonical}' am {date_str}"}, "map_actions": []}
             return {
-                "content": {"spot": canonical, "date": date_str, "weather": ctx},
+                "content": self._aufloesung_vermerken(
+                    {"spot": canonical, "date": date_str, "weather": ctx},
+                    spot_query, treffer,
+                ),
                 "map_actions": [],
             }
 
@@ -985,9 +1160,10 @@ class ChatOrchestratorMixin:
 
         messages.append({"role": "user", "content": user_content})
 
-        # History trimmen
-        if len(messages) > MAX_HISTORY_MESSAGES:
-            messages[:] = messages[:2] + messages[-(MAX_HISTORY_MESSAGES - 2):]
+        # History trimmen (nur an Fragegrenzen) und zerbrochene Altverlaeufe heilen
+        _verlauf_kuerzen(messages)
+        if _verlauf_reparieren(messages):
+            logger.warning("Chat-Verlauf %s repariert (verwaiste Tool-Nachrichten entfernt)", session_id)
 
         # ───── Tool-Call-Loop ────────────────────────────────────────────────
         reply_text = ""

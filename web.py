@@ -818,8 +818,16 @@ def account_action(token, action):
 
     if action == "delete-account":
         # Self-Service Account-Loeschung: irreversibel, kaskadiert Feedback weg.
-        # Token-Verifikation via DELETE WHERE action_token = ? — kein extra Lookup noetig.
+        # Token-Verifikation via DELETE WHERE action_token = ?.
+        # Der Chatverlauf liegt nicht in der DB, sondern in data/history/user_<id>.json
+        # und muss eigens mit weg (Datenschutzerklaerung Punkt 6, seit 26.10.2026).
+        _sub = mgr.get_by_action_token(token)
         ok = mgr.delete_by_token(token)
+        if ok and _sub and _sub.get("id"):
+            try:
+                engine.reset_conversation(f"user_{_sub['id']}")
+            except Exception as e:
+                logger.error("Chatverlauf beim Kontoloeschen nicht entfernt (sub %s): %s", _sub["id"], e)
         session.clear()
         if not ok:
             return _status_page(
@@ -1255,6 +1263,10 @@ def admin_delete(sub_id):
     ok = mgr.delete(sub_id)
     if not ok:
         return redirect(f"/admin/subscribers?err=Loeschen+fehlgeschlagen+fuer+%23{sub_id}")
+    try:
+        engine.reset_conversation(f"user_{sub_id}")  # Chatverlauf liegt ausserhalb der DB
+    except Exception as e:
+        logger.error("Chatverlauf beim Loeschen nicht entfernt (sub %s): %s", sub_id, e)
     return redirect(f"/admin/subscribers?ok=Subscriber+%23{sub_id}+({email})+geloescht")
 
 
