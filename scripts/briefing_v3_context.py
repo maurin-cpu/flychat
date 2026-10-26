@@ -600,7 +600,6 @@ _L3 = {
         "step_sonne":   "Sonne / Bewölkung",
         "step_modelle": "Modelle",
         # Status-Pille je Kettenglied (kurz, max 3 Woerter)
-        "st_lage_match": "Daten passen zur Lage", "st_lage_partial": "Daten passen teilweise", "st_lage_contra": "Daten widersprechen der Lage",
         "st_front_signs": "Zeichen sichtbar", "st_front_weaksigns": "schwache Zeichen", "st_front_nosigns": "keine Zeichen", "st_front_airmass": "Luftmassenwechsel", "st_front_none": "keine Front angezeigt", "st_front_rear": "Rückseite",
         "st_foehn_on": "Föhn angezeigt", "st_foehn_gusty": "einzelne Böen", "st_foehn_off": "keine Föhn-Anzeichen",
         "st_wind_stronger": "regional stärker", "st_wind_match": "regional wie im Mittel", "st_wind_weaker": "regional schwächer",
@@ -704,40 +703,41 @@ _L3 = {
         "rule_23":      "⅔-Regel",
         "front_none":   "Daten zeigen keine Front im Vorhersagefenster (DWD).",
         # Fazit — Prognosedaten, nie eine finale Aussage
-        # Lage in drei kurzen Saetzen: Einfluss -> Druck -> Prognosedaten
-        "lg_between":      "Zwischen {a} und {b}: {strength} {sector}strömung mit {air}.",
-        "lg_single":       "{a}: {strength} {sector}strömung mit {air}.",
-        "lg_nocenter":     "Kein prägendes Druckzentrum: {strength} {sector}strömung mit {air}.",
-        "lg_center":       "{ctype} {name}",
-        "lg_air_SW":       "feuchter Mittelmeerluft", "lg_air_S": "Südströmung, Föhnrisiko im Norden",
-        "lg_air_SE":       "Südströmung, Föhnrisiko im Norden", "lg_air_W": "milder Atlantikluft",
-        "lg_air_NW":       "kühler Nordwestluft", "lg_air_N": "kühler Nordluft",
-        "lg_air_NE":       "trockener Kontinentalluft", "lg_air_E": "trockener Kontinentalluft",
+        # Stroemungsrichtung (Hoehenwind-Block, Wochenkacheln)
         "lg_sector_N":     "Nord", "lg_sector_NE": "Nordost", "lg_sector_E": "Ost", "lg_sector_SE": "Südost",
         "lg_sector_S":     "Süd", "lg_sector_SW": "Südwest", "lg_sector_W": "West", "lg_sector_NW": "Nordwest",
-        "lg_strength_schwach": "schwache", "lg_strength_maessig": "mässige",
-        "lg_strength_kraeftig": "kräftige", "lg_strength_stuermisch": "stürmische",
-        "lg_pressure":     "{regime} {trend} — {meaning}.",
-        "lg_regime_hoch":  "Hochdruck", "lg_regime_tief": "Tiefdruck", "lg_regime_neutral": "Der Druck",
-        "lg_trend_up":     "steigt", "lg_trend_down": "fällt", "lg_trend_flat": "bleibt",
-        # was das fuer das Wetter heisst — Hoch: stabil und trocken, Tief: unbestaendig
-        "lg_mean_hoch_up": "Hochdruckeinfluss festigt sich, stabiles und meist trockenes Wetter",
-        "lg_mean_hoch_flat": "stabiles, meist trockenes Wetter",
-        "lg_mean_hoch_down": "das Hoch gibt nach, das Wetter wird anfälliger",
-        "lg_mean_tief_up": "das Tief zieht ab, das Wetter beruhigt sich langsam",
-        "lg_mean_tief_flat": "unbeständig, Wolken und Regen",
-        "lg_mean_tief_down": "Tiefdruckeinfluss verstärkt sich, unbeständig mit Regen",
-        "lg_mean_neutral_up": "Hochdruckeinfluss nimmt zu, das Wetter beruhigt sich",
-        "lg_mean_neutral_flat": "Übergangslage, wechselhaft",
-        "lg_mean_neutral_down": "Tiefdruckeinfluss nimmt zu, das Wetter wird unbeständiger",
-        # Urteil Block 1 im Satz, nicht nur in der Pille: passt die Synoptik zu den Modellwerten?
-        "lg_data_match":   "{models} bestätigt das: {rain}{rain_trend}, {wind}.",
-        "lg_data_partial": "{models} passt nur teilweise dazu: {rain}{rain_trend}, {wind}.",
-        "lg_data_contra":  "{models} widerspricht: {rain}{rain_trend}, {wind}.",
+        # Lage wie Foehn (User 26.10.2026): gleicher Aufbau — Pille "n von 4", vier
+        # Chips (Luftdruck zuerst, erfuellte hervorgehoben), Satz "zeigt … auf",
+        # "Auch die Daten zeigen Zeichen dafür", "Nicht in den Daten", "Dagegen"
+        "li_pill":         "{side}-Indikatoren: {n} von 4",
+        "li_side_hoch":    "Hochdruck", "li_side_tief": "Tiefdruck",
+        "li_k_p_hoch":     "Luftdruck ≥{thr} hPa", "li_k_p_tief": "Luftdruck ≤{thr} hPa",
+        "li_k_trend":      "Tendenz 3 Tage",
+        "li_v_trend":      "{v} hPa/Tag",
+        "li_k_day":        "Druckverlauf 6–22 Uhr",
+        "li_v_mixed":      "uneinheitlich",
+        "li_k_c_hoch":     "Hoch ≤{km} km", "li_k_c_tief": "Tief ≤{km} km",
+        "li_v_none":       "keines",
+        # Satz 1: Zustand und Entwicklung des Drucks ueber der Schweiz (User 26.10.2026)
+        # Text (User 26.10.2026): Was liegt ueber der Schweiz, wie entwickelt sich der
+        # Druck ueber den Flugtag, Ausblick ueber die drei Tage — kein "Zeichen dafür"
+        "li_p_on":         "In {m} liegt über der Schweiz {side} ({hpa}).",
+        "li_p_off":        "In {m} liegt über der Schweiz weder Hoch- noch Tiefdruck ({hpa}).",
+        "li_day_up":       " Über den Tag (6–22 Uhr) steigt der Druck um {v} hPa.",
+        "li_day_down":     " Über den Tag (6–22 Uhr) fällt der Druck um {v} hPa.",
+        "li_day_flat":     " Über den Tag (6–22 Uhr) bleibt der Druck etwa gleich ({v} hPa).",
+        "li_day_mixed":    " Über den Tag (6–22 Uhr) verläuft der Druck uneinheitlich{wie}.",
+        "li_day_ns":       ": Norden {a}, Süden {b}",
+        "li_day_one":      ": {zone} {a}, übrige Zonen {b}",
+        "li_jump":         " Am stärksten ändert er sich zwischen {von} und {bis} Uhr: {v} hPa in 3 Stunden ({zone}).",
+        "li_dev":          " Über die drei Prognosetage {was} ({v} hPa pro Tag).",
+        "li_was_hoch_up":  "baut sich der Hochdruck auf", "li_was_hoch_down": "schwächt sich der Hochdruck ab",
+        "li_was_tief_down": "verstärkt sich der Tiefdruck", "li_was_tief_up": "schwächt sich der Tiefdruck ab",
+        "li_was_on_flat":  "bleibt der {side} etwa gleich",
+        "li_was_off_up":   "steigt der Druck", "li_was_off_down": "fällt der Druck",
+        "li_was_off_flat": "bleibt der Druck etwa gleich",
         "lg_rain_fading":  " und im Tagesverlauf abklingend",
-        "lg_mean_calm_north": "Hochdruckeinfluss nimmt zu, das Wetter beruhigt sich auf der Alpennordseite",
         "lg_rain_south_growing": "meist trocken, auf der Alpensüdseite Schauer und am Nachmittag zunehmend",
-        "lg_mean_calm_not_yet": "Hochdruckeinfluss nimmt zu, kommt aber noch nicht an",
         "lg_rain_for_now": "vorerst ",
         "lg_rain_growing": " und am Nachmittag zunehmend",
         "lg_rain_dry":     "trocken",
@@ -1104,7 +1104,6 @@ _L3 = {
         "step_sonne":   "Sun / cloud",
         "step_modelle": "Models",
         # status pill per chain step (short, max 3 words)
-        "st_lage_match": "data fit the pattern", "st_lage_partial": "data partly fit", "st_lage_contra": "data contradict the pattern",
         "st_front_signs": "signs visible", "st_front_weaksigns": "weak signs", "st_front_nosigns": "no signs", "st_front_airmass": "air-mass change", "st_front_none": "no front indicated", "st_front_rear": "rear side",
         "st_foehn_on": "foehn indicated", "st_foehn_gusty": "isolated gusts", "st_foehn_off": "no foehn signs",
         "st_wind_stronger": "regionally stronger", "st_wind_match": "regionally as average", "st_wind_weaker": "regionally weaker",
@@ -1208,40 +1207,42 @@ _L3 = {
         "rule_23":      "⅔ rule",
         "front_none":   "Data show no front within the forecast window (DWD).",
         # verdict — forecast data, never a final statement
-        # situation in three short sentences: influence -> pressure -> forecast data
-        "lg_between":      "Between {a} and {b}: {strength} {sector} flow with {air}.",
-        "lg_single":       "{a}: {strength} {sector} flow with {air}.",
-        "lg_nocenter":     "No dominant pressure centre: {strength} {sector} flow with {air}.",
-        "lg_center":       "{ctype} {name}",
-        "lg_air_SW":       "humid Mediterranean air", "lg_air_S": "a southerly flow, foehn risk in the north",
-        "lg_air_SE":       "a southerly flow, foehn risk in the north", "lg_air_W": "mild Atlantic air",
-        "lg_air_NW":       "cool north-westerly air", "lg_air_N": "cool northerly air",
-        "lg_air_NE":       "dry continental air", "lg_air_E": "dry continental air",
+        # flow direction (upper-wind block, week tiles)
         "lg_sector_N":     "northerly", "lg_sector_NE": "north-easterly", "lg_sector_E": "easterly",
         "lg_sector_SE":    "south-easterly", "lg_sector_S": "southerly", "lg_sector_SW": "south-westerly",
         "lg_sector_W":     "westerly", "lg_sector_NW": "north-westerly",
-        "lg_strength_schwach": "light", "lg_strength_maessig": "moderate",
-        "lg_strength_kraeftig": "strong", "lg_strength_stuermisch": "stormy",
-        "lg_pressure":     "{regime} {trend} — {meaning}.",
-        "lg_regime_hoch":  "High pressure", "lg_regime_tief": "Low pressure", "lg_regime_neutral": "Pressure",
-        "lg_trend_up":     "rising", "lg_trend_down": "falling", "lg_trend_flat": "steady",
-        # what it means for the weather — high: stable and dry, low: unsettled
-        "lg_mean_hoch_up": "high-pressure influence consolidating, stable and mostly dry weather",
-        "lg_mean_hoch_flat": "stable, mostly dry weather",
-        "lg_mean_hoch_down": "the high is giving way, weather turning more fragile",
-        "lg_mean_tief_up": "the low is moving off, weather slowly calming down",
-        "lg_mean_tief_flat": "unsettled, cloud and rain",
-        "lg_mean_tief_down": "low-pressure influence strengthening, unsettled with rain",
-        "lg_mean_neutral_up": "high-pressure influence growing, weather calming down",
-        "lg_mean_neutral_flat": "transitional, changeable",
-        "lg_mean_neutral_down": "low-pressure influence growing, weather turning more unsettled",
-        "lg_data_match":   "{models} confirms it: {rain}{rain_trend}, {wind}.",
-        "lg_data_partial": "{models} only partly fits: {rain}{rain_trend}, {wind}.",
-        "lg_data_contra":  "{models} contradicts it: {rain}{rain_trend}, {wind}.",
+        # situation like foehn (User 26.10.2026): same layout — pill "n of 4", four
+        # chips (pressure first, met ones highlighted), "points to", "also show",
+        # "Not in the data", "Against it"
+        "li_pill":         "{side} indicators: {n} of 4",
+        "li_side_hoch":    "High pressure", "li_side_tief": "Low pressure",
+        "li_k_p_hoch":     "Pressure ≥{thr} hPa", "li_k_p_tief": "Pressure ≤{thr} hPa",
+        "li_k_trend":      "Trend 3 days",
+        "li_v_trend":      "{v} hPa/day",
+        "li_k_day":        "Pressure 06–22h",
+        "li_v_mixed":      "mixed",
+        "li_k_c_hoch":     "High ≤{km} km", "li_k_c_tief": "Low ≤{km} km",
+        "li_v_none":       "none",
+        # sentence 1: state and development of pressure over Switzerland (User 26.10.2026)
+        # text (User 26.10.2026): what lies over Switzerland, how pressure develops over
+        # the flying day, outlook over the three days — no "signs of it"
+        "li_p_on":         "In {m}, Switzerland is under {side_l} ({hpa}).",
+        "li_p_off":        "In {m}, Switzerland is under neither high nor low pressure ({hpa}).",
+        "li_day_up":       " Over the day (06:00–22:00) pressure rises by {v} hPa.",
+        "li_day_down":     " Over the day (06:00–22:00) pressure falls by {v} hPa.",
+        "li_day_flat":     " Over the day (06:00–22:00) pressure stays about the same ({v} hPa).",
+        "li_day_mixed":    " Over the day (06:00–22:00) pressure is mixed{wie}.",
+        "li_day_ns":       ": north {a}, south {b}",
+        "li_day_one":      ": {zone} {a}, other zones {b}",
+        "li_jump":         " The strongest change is between {von}:00 and {bis}:00: {v} hPa in 3 hours ({zone}).",
+        "li_dev":          " Over the three forecast days {was} ({v} hPa per day).",
+        "li_was_hoch_up":  "high pressure builds", "li_was_hoch_down": "high pressure weakens",
+        "li_was_tief_down": "low pressure deepens", "li_was_tief_up": "low pressure weakens",
+        "li_was_on_flat":  "{side_l} stays about the same",
+        "li_was_off_up":   "pressure rises", "li_was_off_down": "pressure falls",
+        "li_was_off_flat": "pressure stays about the same",
         "lg_rain_fading":  " and fading during the day",
-        "lg_mean_calm_north": "high-pressure influence growing, weather calming down on the north side of the Alps",
         "lg_rain_south_growing": "mostly dry, showers on the south side of the Alps increasing in the afternoon",
-        "lg_mean_calm_not_yet": "high-pressure influence growing but not arriving yet",
         "lg_rain_for_now": "for now ",
         "lg_rain_growing": " and increasing in the afternoon",
         "lg_rain_dry":     "dry",
@@ -1965,8 +1966,8 @@ def _lage_regime(wl: dict, date: str) -> tuple[str, str]:
 
 def _lage_effects(wl: dict, date: str, regime: str, tkey: str) -> dict:
     """Wetterfolge fuer die ganze Schweiz aus den Nord/Sued-Aggregaten, in
-    Worten: {rain, rain_trend, wind, meaning} — inkl. Logik-Abgleich mit der
-    Druck-Tendenz. Von Block 1 (Lage) und den Wochenkacheln genutzt."""
+    Worten: {rain, rain_trend, wind} — inkl. Logik-Abgleich mit der
+    Druck-Tendenz. Fuer die Wochenkacheln."""
     pp = _per_day_index(wl.get("precip_pattern"), [date]).get(date) or {}
     wp = _per_day_index(wl.get("wind_pattern"), [date]).get(date) or {}
 
@@ -1984,19 +1985,19 @@ def _lage_effects(wl: dict, date: str, regime: str, tkey: str) -> dict:
     wet_n = ((pp.get("alpennord") or {}).get("wet_share"))
     wet_s = ((pp.get("alpensued") or {}).get("wet_share"))
     if wet is None:
-        rain, rain_key = _lbl("lg_rain_mostly_dry"), "mostly_dry"
+        rain = _lbl("lg_rain_mostly_dry")
     elif wet < 0.05:
-        rain, rain_key = _lbl("lg_rain_dry"), "dry"
+        rain = _lbl("lg_rain_dry")
     elif wet < 0.15 and wet_s is not None and wet_s >= 0.2 and (wet_n or 0) < 0.1:
-        rain, rain_key = _lbl("lg_rain_south_only"), "south_only"
+        rain = _lbl("lg_rain_south_only")
     elif wet < 0.15 and wet_n is not None and wet_n >= 0.2 and (wet_s or 0) < 0.1:
-        rain, rain_key = _lbl("lg_rain_north_only"), "north_only"
+        rain = _lbl("lg_rain_north_only")
     elif wet < 0.15:
-        rain, rain_key = _lbl("lg_rain_mostly_dry"), "mostly_dry"
+        rain = _lbl("lg_rain_mostly_dry")
     elif wet < 0.4:
-        rain, rain_key = _lbl("lg_rain_partly"), "partly"
+        rain = _lbl("lg_rain_partly")
     else:
-        rain, rain_key = _lbl("lg_rain_wide"), "wide"
+        rain = _lbl("lg_rain_wide")
 
     pz = ((_per_day_index(wl.get("precip_zones"), [date]).get(date) or {}).get("zones") or {})
 
@@ -2011,25 +2012,25 @@ def _lage_effects(wl: dict, date: str, regime: str, tkey: str) -> dict:
         return (acc / tot) if tot else None
 
     early, late = _win("morning"), _win("afternoon")
-    rain_trend, trend_key = "", ""
+    rain_trend = ""
     if early is not None and late is not None and wet is not None and wet >= 0.05:
         if early >= 0.1 and late <= early * 0.5:
-            rain_trend, trend_key = _lbl("lg_rain_fading"), "fading"
+            rain_trend = _lbl("lg_rain_fading")
         elif late >= 0.1 and late >= early * 2:
-            rain_trend, trend_key = _lbl("lg_rain_growing"), "growing"
+            rain_trend = _lbl("lg_rain_growing")
 
     warn = _wavg(wp, "share_wind_warn")
     crit = _wavg(wp, "share_wind_crit")
     warn_n = ((wp.get("alpennord") or {}).get("share_wind_warn"))
     warn_s = ((wp.get("alpensued") or {}).get("share_wind_warn"))
     if warn is None or warn < 0.3:
-        wind, wind_key = _lbl("lg_wind_calm"), "calm"
+        wind = _lbl("lg_wind_calm")
     elif (crit or 0) >= 0.3:
-        wind, wind_key = _lbl("lg_wind_strong"), "strong"
+        wind = _lbl("lg_wind_strong")
     elif warn < 0.6:
-        wind, wind_key = _lbl("lg_wind_partly"), "partly"
+        wind = _lbl("lg_wind_partly")
     else:
-        wind, wind_key = _lbl("lg_wind_wide"), "wide"
+        wind = _lbl("lg_wind_wide")
     if warn is not None and warn >= 0.3:
         drivers = {(wp.get(side) or {}).get("wind_driver") for side in ("alpennord", "alpensued")}
         if drivers == {"hoehenwind"}:
@@ -2042,33 +2043,112 @@ def _lage_effects(wl: dict, date: str, regime: str, tkey: str) -> dict:
     # Logik-Abgleich: "beruhigt sich" darf nicht neben "Schauer nehmen zu" stehen.
     # Steigt der Druck, aber der Regen nimmt zu, wird die Beruhigung eingegrenzt
     # (nur Norden) oder vertagt; ist es unbestaendig, aber trocken, gilt "vorerst".
-    meaning = _lbl(f"lg_mean_{regime}_{tkey}")
     calming = tkey == "up" or (regime == "hoch" and tkey == "flat")
-    if calming and rain_trend == _lbl("lg_rain_growing"):
-        if rain == _lbl("lg_rain_south_only"):
-            meaning, rain, rain_trend = _lbl("lg_mean_calm_north"), _lbl("lg_rain_south_growing"), ""
-            rain_key, trend_key = "south_only", "growing"
-        else:
-            meaning = _lbl("lg_mean_calm_not_yet")
+    if calming and rain_trend == _lbl("lg_rain_growing") and rain == _lbl("lg_rain_south_only"):
+        rain, rain_trend = _lbl("lg_rain_south_growing"), ""
     unsettled = tkey == "down" or (regime == "tief" and tkey == "flat")
     if unsettled and rain in (_lbl("lg_rain_dry"), _lbl("lg_rain_mostly_dry"))             and rain_trend != _lbl("lg_rain_growing"):
         rain = _lbl("lg_rain_for_now") + rain
-    # Urteil Block 1: Erwartung aus Druck/Tendenz (beruhigend / unbestaendig /
-    # Uebergang) gegen die Prognosedaten (Regen- und Windmuster CH-weit).
-    # Stufe 0 = trocken & ruhig, 1 = teils/einseitig, 2 = verbreitet/kraeftig.
-    wet_level = {"dry": 0, "mostly_dry": 0, "south_only": 1, "north_only": 1, "partly": 1, "wide": 2}[rain_key]
-    if trend_key == "growing":
-        wet_level = min(2, wet_level + 1)
-    wind_level = {"calm": 0, "partly": 1, "wide": 2, "strong": 2}[wind_key]
-    level = max(wet_level, wind_level)
-    if calming:
-        verdict = ("match", "partial", "contra")[level]
-    elif unsettled:
-        verdict = ("contra", "partial", "match")[level]
-    else:                       # Uebergangslage: wechselhaft ist erwartet
-        verdict = "match" if level <= 1 else "partial"
-    return {"rain": rain, "rain_trend": rain_trend, "wind": wind, "meaning": meaning,
-            "verdict": verdict}
+    return {"rain": rain, "rain_trend": rain_trend, "wind": wind}
+
+
+# Lage-Zeichen (User 26.10.2026): nur der Druck — Wind und Regen stehen in
+# anderen Bloecken. Druckzentren zaehlen nur in der Naehe der Schweiz
+_LI_CENTER_KM = 1000
+_LI_CH = (46.8, 8.2)
+
+
+def _lage_indicators(wl: dict, date: str):
+    """(Status, Pille, Chips, Satz) des Lage-Blocks — gleicher Aufbau wie der
+    Foehn-Block (User 26.10.2026), damit der Leser ihn gleich liest: vier
+    Indikatoren fuer Hoch- bzw. Tiefdruck, nur aus dem Druck (Wind und Regen
+    haben eigene Bloecke): Luftdruck ueber der Schweiz, Tendenz ueber 3 Tage,
+    Verlauf 06-22 h, Druckzentrum in der Naehe. Die Seite (Hoch/Tief) gibt der
+    Luftdruck vor; dazwischen die Seite mit mehr Zeichen. Pille immer grau:
+    Hoch ist nicht "gut", Tief nicht "schlecht"."""
+    press = _per_day_index(wl.get("pressure_influence"), [date]).get(date) or {}
+    msl = press.get("msl_hpa")
+    if not isinstance(msl, (int, float)):
+        return "", "", [], ""
+
+    def num(x):
+        return isinstance(x, (int, float))
+
+    regime = (press.get("regime") or "").lower().replace("druck", "")
+    slope = (wl.get("pressure_influence") or {}).get("slope_hpa_per_day")
+    thr_s = config.SYNOPTIC_PRESSURE_TREND_THRESHOLD_HPA
+    fs = wl.get("frontsignatur") or {}
+    tag = (next((d for d in fs.get("per_day") or [] if d.get("date") == date), None) or {}).get("druck_tag") or {}
+    t = tag.get("tendenz_hpa") if tag.get("einig") else None
+    thr_t = config.SYNOPTIC_DRUCK_TENDENZ_HPA
+    near = {}                                   # naechstes Hoch / Tief im Umkreis
+    for d in wl.get("pressure_centers_per_day") or []:
+        if d.get("date") != date:
+            continue
+        for c in d.get("centers") or []:
+            typ = {"Hoch": "hoch", "Tief": "tief"}.get(c.get("type"))
+            if typ and num(c.get("lat")) and num(c.get("lon")):
+                km = _haversine_km(_LI_CH[0], _LI_CH[1], c["lat"], c["lon"])
+                if km <= _LI_CENTER_KM and (typ not in near or km < near[typ][0]):
+                    near[typ] = (km, c)
+    # je Seite: welche Indikatoren erfuellt sind
+    hits = {
+        "hoch": {"p": msl >= config.SYNOPTIC_HOCH_HPA, "trend": num(slope) and slope >= thr_s,
+                 "day": num(t) and t >= thr_t, "c": "hoch" in near},
+        "tief": {"p": msl <= config.SYNOPTIC_TIEF_HPA, "trend": num(slope) and slope <= -thr_s,
+                 "day": num(t) and t <= -thr_t, "c": "tief" in near},
+    }
+    if regime in ("hoch", "tief"):
+        side = regime
+    else:
+        nh, nt = sum(hits["hoch"].values()), sum(hits["tief"].values())
+        side = "hoch" if nh > nt or (nh == nt and (slope or 0) >= 0) else "tief"
+    on = hits[side]
+    thr_p = config.SYNOPTIC_HOCH_HPA if side == "hoch" else config.SYNOPTIC_TIEF_HPA
+    c_on = near.get(side)
+    facts = [
+        {"k": _lbl("li_k_p_" + side).format(thr=f"{thr_p:.0f}"), "v": f"{float(msl):.1f} hPa", "on": on["p"]},
+        {"k": _lbl("li_k_trend"), "on": on["trend"],
+         "v": _lbl("li_v_trend").format(v=f"{slope:+.1f}") if num(slope) else "—"},
+        {"k": _lbl("li_k_day"), "on": on["day"],
+         "v": (f"{t:+.1f} hPa" if num(t) else _lbl("li_v_mixed") if tag else "—")},
+        {"k": _lbl("li_k_c_" + side).format(km=_LI_CENTER_KM), "on": on["c"],
+         "v": (f"{_center_name(c_on[1].get('region_label', ''))} {c_on[1]['msl_hpa']:.0f} hPa"
+               if c_on and num(c_on[1].get("msl_hpa")) else
+               _center_name(c_on[1].get("region_label", "")) if c_on else _lbl("li_v_none"))},
+    ]
+    n = sum(on.values())
+    side_w = _lbl("li_side_" + side)
+    pill = _lbl("li_pill").format(side=side_w, n=n)
+    fmt = {"m": _model_words(), "side": side_w, "side_l": side_w.lower()}
+    # 1 Was liegt ueber der Schweiz?
+    out = _lbl("li_p_on" if on["p"] else "li_p_off").format(hpa=f"{float(msl):.1f} hPa", **fmt)
+    # 2 Wie entwickelt sich der Druck ueber den Flugtag (06-22 h)?
+    if num(t):
+        way = "up" if t >= thr_t else "down" if t <= -thr_t else "flat"
+        out += _lbl("li_day_" + way).format(v=(f"{abs(t):.1f}" if way != "flat" else f"{t:+.1f}"))
+    elif tag:
+        m = tag.get("muster") or {}
+        wie = ""
+        if m.get("art") == "nord_sued":
+            wie = _lbl("li_day_ns").format(a=_lbl("pt_" + m["nord"]), b=_lbl("pt_" + m["sued"]))
+        elif m.get("art") == "einzel":
+            rest = "down" if m["richtung"] == "up" else "up"
+            wie = _lbl("li_day_one").format(zone=_zone_name(m["zone"]), a=_lbl("pt_" + m["richtung"]),
+                                            b=_lbl("pt_" + rest))
+        out += _lbl("li_day_mixed").format(wie=wie)
+    sp = tag.get("sprung") or {}
+    h = int((sp.get("hour") or "00:00")[:2]) if sp else -1
+    if tag.get("sprung_hot") and num(sp.get("hpa")) and 6 <= h and h + 3 <= 22:   # nur im Flugtag
+        out += _lbl("li_jump").format(von=f"{h:02d}", bis=f"{h + 3:02d}", v=f"{sp['hpa']:+.1f}",
+                                      zone=_zone_name(sp.get("zone", "")))
+    # 3 Ausblick ueber die drei Prognosetage
+    if num(slope):
+        way = "up" if slope >= thr_s else "down" if slope <= -thr_s else "flat"
+        key = ((f"li_was_{side}_{way}" if way != "flat" else "li_was_on_flat") if on["p"]
+               else f"li_was_off_{way}")
+        out += _lbl("li_dev").format(was=_lbl(key).format(**fmt), v=f"{slope:+.1f}")
+    return "neutral", pill, facts, out
 
 
 def _lage_data_words(wl: dict | None, date: str) -> str:
@@ -2088,47 +2168,18 @@ def _lage_fazit(wetterlage: dict | None, date: str) -> str:
 
 
 def _lage_block(wetterlage: dict | None, date: str) -> dict:
-    """Die Lage fuer die ganze Schweiz in drei kurzen Saetzen, ohne Zahlen:
-    Einfluss (Druckzentren -> Stroemung -> Luftmasse), Druck mit Tendenz und
-    Bedeutung, und was die Prognosedaten daraus machen (Wind je Zone, Regen
-    mit Seite und Beginn). Deterministisch — die Form, die der Skill auch von
-    der KI verlangt."""
+    """Die Lage fuer die ganze Schweiz (seit 26.10.2026): liegt Hoch- oder
+    Tiefdruck ueber der Schweiz, und woran sieht man das im Druck
+    (_lage_indicators)? Nur Druck — Wind und Regen haben eigene Bloecke. Ohne
+    Deutung ("beruhigt sich") und ohne Urteil "Daten passen/widersprechen"."""
     wl = wetterlage or {}
     if not wl:
-        return {"fazit": "", "verdict": ""}
-    lang = _lang()
-    centers = []
-    for d in wl.get("pressure_centers_per_day") or []:
-        if d.get("date") == date:
-            for c in d.get("centers") or []:
-                ctype = _CENTER_TYPE[lang].get(c.get("type"), c.get("type", ""))
-                centers.append(_lbl("lg_center").format(
-                    ctype=ctype, name=_center_name(c.get("region_label", ""))))
-            break
-    flow = _per_day_index(wl.get("flow_overhead"), [date]).get(date) or {}
-    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
-    sector = _lbl("lg_sector_" + abbr) if abbr else ""
-    air = _lbl("lg_air_" + abbr) if abbr else ""
-    strength = _lbl("lg_strength_" + (flow.get("strength") or "maessig"))
-    if len(centers) >= 2:
-        s1 = _lbl("lg_between").format(a=centers[0], b=centers[1], strength=strength, sector=sector, air=air)
-    elif centers:
-        s1 = _lbl("lg_single").format(a=centers[0], strength=strength, sector=sector, air=air)
-    else:
-        s1 = _lbl("lg_nocenter").format(strength=strength, sector=sector, air=air)
-    s1 = s1[0].upper() + s1[1:]
-
-    regime, tkey = _lage_regime(wl, date)
-    s2 = _lbl("lg_pressure").format(regime=_lbl("lg_regime_" + regime), trend=_lbl("lg_trend_" + tkey),
-                                    meaning=_lbl(f"lg_mean_{regime}_{tkey}"))
-
-    e = _lage_effects(wl, date, regime, tkey)
-    rain, rain_trend, wind, meaning = e["rain"], e["rain_trend"], e["wind"], e["meaning"]
-    s2 = _lbl("lg_pressure").format(regime=_lbl("lg_regime_" + regime), trend=_lbl("lg_trend_" + tkey),
-                                    meaning=meaning)
-    # Datensatz als eigener Satz mit Modellname — nie "unsere Prognose"
-    s3 = _lbl("lg_data_" + e["verdict"]).format(models=_model_words(), rain=rain, rain_trend=rain_trend, wind=wind)
-    return {"fazit": " ".join((s1, s2, _capitalize(s3))), "verdict": e["verdict"]}
+        return {"fazit": ""}
+    kind, pill, facts, txt = _lage_indicators(wl, date)
+    out = {"fazit": txt}
+    if kind:
+        out.update(status=kind, status_label=pill, facts=facts)
+    return out
 
 
 def _sector_word(deg) -> str:
@@ -3635,10 +3686,7 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         chain[block]["status"] = kind
         chain[block]["status_label"] = _lbl(label_key)
 
-    # Lage: Erwartung aus dem Druck gegen Regen-/Windmuster der Prognose
-    lv = (chain.get("lage") or {}).get("verdict")
-    if lv:
-        st("lage", {"match": "ok", "partial": "info"}.get(lv, "warn"), "st_lage_" + lv)
+    # Lage: Status, Pille und Chips setzt schon _lage_block (vier Indikatoren)
     # Fronten
     passed = bool(chain["fronts"].get("rear"))
     dwd_typ = chain["fronts"].get("dwd_typ") or ""

@@ -373,13 +373,12 @@
       <div class="chain">
         {# 1 Lage — ein Satz fuer die ganze Schweiz, keine Zonen #}
         <div class="step"><div class="no">1</div><div>
-          <div class="h">{{ v3_labels.step_lage }} <small>· {{ v3_chain.lage.label }}</small>
+          <div class="h">{{ v3_labels.step_lage }} <small>· {{ v3_chain.lage.label }}</small>{% if v3_chain.lage.status %}<span class="tag {{ v3_chain.lage.status }}">{{ v3_chain.lage.status_label }}</span>{% endif %}
             {% if v3_chain.stability.confidence %}<span class="conf">{{ v3_labels.confidence }} {{ v3_chain.stability.confidence }}</span>{% endif %}</div>
-          <div class="num">{{ v3_chain.lage.pressure or '—' }} <span class="k">{{ v3_chain.lage.regime }}{% if v3_chain.lage.pressure_note %} · {{ v3_chain.lage.pressure_note }}{% endif %}{% if v3_chain.lage.pressure_jump %} · <span{% if v3_chain.lage.pressure_jump_hot %} style="font-weight:700"{% endif %}>{{ v3_chain.lage.pressure_jump }}</span>{% endif %}</span></div>
-          {% if v3_chain.lage.centers %}<div class="centers">{% for c in v3_chain.lage.centers %}<span><i class="{% if c.is_high %}h{% else %}t{% endif %}">{{ c.type[0] }}</i>{{ c.region }} <small>{{ c.msl }} hPa</small></span>{% endfor %}</div>{% endif %}
+          {% if v3_chain.lage.facts %}<div class="facts">{% for f in v3_chain.lage.facts %}<span class="fact"><span class="k">{{ f.k }}</span>{{ f.v }}</span>{% endfor %}</div>{% endif %}
           {# Ein Text zur Lage: die Code-Fassung. Der KI-Tagessatz nimmt dieselbe
              Form an (Skill day_lines) und ersetzt sie, sobald er sie hat. #}
-          {% if v3_chain.lage.fazit %}<p>{{ v3_chain.lage.fazit }}</p>{% endif %}
+          {% if v3_chain.lage.fazit %}{% set t = v3_chain.lage.fazit.split('. ', 1) %}<p class="v"><em>{{ t[0] }}{% if t|length > 1 %}.{% endif %}</em>{% if t|length > 1 %} {{ t[1] }}{% endif %}</p>{% endif %}
         </div></div>
 
         {# 2 Fronten #}

@@ -481,66 +481,104 @@ class TestDruckTag(unittest.TestCase):
         self.assertEqual(jump, "")
 
 
-class TestLageFazit(unittest.TestCase):
-    """Die Code-Zeile zur Lage: Ursache -> Stroemung, dann je Zone Wind und
-    Regen in Worten, keine hPa-/km/h-Zahlen."""
+class TestLageIndikatoren(unittest.TestCase):
+    """Block 1 seit 26.10.2026: Pille und Chips wie Foehn ("n von 4", Luftdruck
+    zuerst); der Text sagt, was ueber der Schweiz liegt, wie sich der Druck
+    ueber den Flugtag entwickelt und den Ausblick ueber drei Tage. Nur Druck,
+    keine Deutung, kein "Zeichen dafür", Pille immer grau."""
 
-    def test_plain_words_no_numbers(self):
-        wl = {
-            "pressure_centers_per_day": [{"date": "2026-09-18", "centers": [
-                {"type": "Tief", "region_label": "Island", "msl_hpa": 983},
-                {"type": "Hoch", "region_label": "Azoren", "msl_hpa": 1026}]}],
-            "flow_overhead": {"per_day": [{"date": "2026-09-18", "dir_deg": 244, "speed_kmh": 16.8,
-                                           "sector": "Suedwest", "strength": "maessig"}]},
-            "pressure_influence": {"slope_hpa_per_day": 5.1, "per_day": [{"date": "2026-09-18"}]},
-            "precip_pattern": {"per_day": [{"date": "2026-09-18",
-                "alpennord": {"n_spots": 397, "wet_share": 0.06},
-                "alpensued": {"n_spots": 97, "wet_share": 0.28}}]},
-            "wind_pattern": {"per_day": [{"date": "2026-09-18",
-                "alpennord": {"n_spots": 397, "share_wind_warn": 0.76, "share_wind_crit": 0.26, "wind_driver": "hoehenwind"},
-                "alpensued": {"n_spots": 97, "share_wind_warn": 0.51, "share_wind_crit": 0.18, "wind_driver": "hoehenwind"}}]},
-        }
-        txt = bc._lage_fazit(wl, "2026-09-18")
-        import re
-        # keine Zahlen — ausser im Modellnamen (ICON-CH1/ICON-D2), der den
-        # Datensatz benennt (19.09.2026: nie "unsere Prognose")
-        self.assertFalse(re.search(r"\d", re.sub(r"ICON-\w+", "", txt)), txt)
-        self.assertTrue("showers only on the south side" in txt or "Schauer nur auf der Alpensüdseite" in txt, txt)
-        self.assertTrue("widely windy" in txt or "verbreitet windig" in txt, txt)
-        self.assertTrue("less on the south side" in txt or "auf der Alpensüdseite weniger" in txt, txt)
-        self.assertTrue("Mediterranean" in txt or "Mittelmeer" in txt, txt)   # Luftmasse der SW-Lage
-        self.assertTrue("calming down" in txt or "beruhigt sich" in txt, txt)  # Druck steigt
-        self.assertEqual(txt.count("."), 3, txt)                             # drei Saetze: Einfluss, Druck, Datensatz (Modellname)
-        self.assertNotIn("Forecast data", txt)
-        self.assertLess(len(txt.split()), 40, txt)
+    D = "2026-09-18"
 
-
-class TestLageLogik(unittest.TestCase):
-    """'beruhigt sich' und 'Schauer nehmen zu' duerfen nicht im selben Satz stehen."""
-
-    def _wl(self, morning, afternoon):
+    def _wl(self, msl=1005.0, regime="Tiefdruck", slope=-3.0, tendenz=-1.5, einig=True,
+            centers=None, muster=None, sprung=None, sprung_hot=False):
+        if centers is None:
+            centers = [{"type": "Tief", "region_label": "Island", "lat": 64.0, "lon": -20.0, "msl_hpa": 983},
+                       {"type": "Tief", "region_label": "Mitteleuropa", "lat": 50.0, "lon": 13.0, "msl_hpa": 1002}]
         return {
-            "pressure_centers_per_day": [{"date": "2026-09-18", "centers": []}],
-            "flow_overhead": {"per_day": [{"date": "2026-09-18", "dir_deg": 244, "sector": "Suedwest", "strength": "maessig"}]},
-            "pressure_influence": {"slope_hpa_per_day": 5.1, "per_day": [{"date": "2026-09-18"}]},
-            "precip_pattern": {"per_day": [{"date": "2026-09-18",
-                "alpennord": {"n_spots": 397, "wet_share": 0.06}, "alpensued": {"n_spots": 97, "wet_share": 0.28}}]},
-            "precip_zones": {"per_day": [{"date": "2026-09-18", "zones": {"tessin": {"windows": {
-                "morning": {"n_spots": 97, "wet_share": morning}, "afternoon": {"n_spots": 97, "wet_share": afternoon}}}}}]},
-            "wind_pattern": {"per_day": [{"date": "2026-09-18",
-                "alpennord": {"n_spots": 397, "share_wind_warn": 0.2, "share_wind_crit": 0.05},
-                "alpensued": {"n_spots": 97, "share_wind_warn": 0.2, "share_wind_crit": 0.05}}]},
+            "pressure_centers_per_day": [{"date": self.D, "centers": centers}],
+            "pressure_influence": {"slope_hpa_per_day": slope, "per_day": [
+                {"date": self.D, "regime": regime, "msl_hpa": msl}]},
+            "frontsignatur": {"per_day": [{"date": self.D, "druck_tag": {
+                "einig": einig, "tendenz_hpa": tendenz if einig else None, "muster": muster,
+                "sprung": sprung, "sprung_hot": sprung_hot}}]},
+            "precip_pattern": {"per_day": [{"date": self.D,
+                "alpennord": {"n_spots": 397, "wet_share": 0.9}, "alpensued": {"n_spots": 97, "wet_share": 0.9}}]},
+            "wind_pattern": {"per_day": [{"date": self.D,
+                "alpennord": {"n_spots": 397, "share_wind_warn": 0.9, "share_wind_crit": 0.9},
+                "alpensued": {"n_spots": 97, "share_wind_warn": 0.9, "share_wind_crit": 0.9}}]},
         }
 
-    def test_growing_showers_limit_the_calming(self):
-        txt = bc._lage_fazit(self._wl(0.05, 0.6), "2026-09-18")
-        self.assertTrue("calming down on the north side" in txt or "beruhigt sich auf der Alpennordseite" in txt, txt)
-        self.assertNotIn("calming down:", txt)
+    def test_pill_and_chips_like_foehn(self):
+        b = bc._lage_block(self._wl(), self.D)
+        self.assertTrue("4 of 4" in b["status_label"] or "4 von 4" in b["status_label"], b["status_label"])
+        self.assertTrue("Low pressure" in b["status_label"] or "Tiefdruck" in b["status_label"], b["status_label"])
+        self.assertEqual(len(b["facts"]), 4)
+        self.assertTrue(all(set(f) == {"k", "v", "on"} for f in b["facts"]))
+        self.assertEqual([f["on"] for f in b["facts"]], [True, True, True, True])
+        self.assertEqual(b["facts"][0]["v"], "1005.0 hPa")                       # Luftdruck zuerst
+        self.assertIn("Mitteleuropa", b["facts"][3]["v"])                        # nahes Tief
+        self.assertEqual(b["status"], "neutral")
 
-    def test_fading_showers_keep_the_calming(self):
-        txt = bc._lage_fazit(self._wl(0.6, 0.05), "2026-09-18")
-        self.assertTrue("calming down." in txt or "beruhigt sich." in txt, txt)
-        self.assertTrue("fading" in txt or "abklingend" in txt, txt)
+    def test_text_state_day_outlook(self):
+        txt = bc._lage_block(self._wl(), self.D)["fazit"]
+        state = txt.index("1005.0 hPa")
+        day = max(txt.find("Over the day"), txt.find("Über den Tag"))
+        outlook = max(txt.find("Over the three forecast days"), txt.find("Über die drei Prognosetage"))
+        self.assertTrue(0 <= state < day < outlook, txt)                          # Reihenfolge
+        self.assertIn("1.5 hPa", txt)
+        self.assertIn("-3.0 hPa", txt)
+        self.assertTrue("low pressure deepens" in txt or "verstärkt sich der Tiefdruck" in txt, txt)
+        for word in ("signs", "Zeichen", "Not in the data", "Nicht in den Daten", "Island", "Iceland"):
+            self.assertNotIn(word, txt)
+
+    def test_only_pressure_no_wind_no_rain(self):
+        txt = bc._lage_block(self._wl(), self.D)["fazit"].lower()
+        for word in ("rain", "regen", "wind", "böen", "gust", "spots", "startpl"):
+            self.assertNotIn(word, txt)
+
+    def test_no_interpretation(self):
+        for wl in (self._wl(), self._wl(msl=1025.0, regime="Hochdruck", slope=2.5, tendenz=1.2,
+                                        centers=[{"type": "Hoch", "region_label": "Frankreich",
+                                                  "lat": 47.0, "lon": 3.0, "msl_hpa": 1030}])):
+            low = bc._lage_block(wl, self.D)["fazit"].lower()
+            for word in ("calming", "beruhigt", "contradict", "widersprich", "stable", "stabil",
+                         "good", "gut ", "schlecht"):
+                self.assertNotIn(word, low)
+
+    def test_high_pressure_weakening(self):
+        b = bc._lage_block(self._wl(msl=1022.0, regime="Hochdruck", slope=-2.5, tendenz=0.3), self.D)
+        self.assertTrue("1 of 4" in b["status_label"] or "1 von 4" in b["status_label"], b["status_label"])
+        self.assertTrue("high pressure weakens" in b["fazit"] or "schwächt sich der Hochdruck ab" in b["fazit"],
+                        b["fazit"])
+        self.assertTrue("stays about the same (+0.3 hPa)" in b["fazit"]
+                        or "bleibt der Druck etwa gleich (+0.3 hPa)" in b["fazit"], b["fazit"])
+
+    def test_neither_takes_side_with_more_signs(self):
+        b = bc._lage_block(self._wl(msl=1015.0, regime="neutral", slope=2.5, tendenz=1.2,
+                                    centers=[]), self.D)
+        self.assertTrue("High pressure" in b["status_label"] or "Hochdruck" in b["status_label"], b["status_label"])
+        self.assertFalse(b["facts"][0]["on"])
+        self.assertTrue("neither high nor low pressure (1015.0 hPa)" in b["fazit"]
+                        or "weder Hoch- noch Tiefdruck (1015.0 hPa)" in b["fazit"], b["fazit"])
+        self.assertTrue("pressure rises (+2.5" in b["fazit"] or "steigt der Druck (+2.5" in b["fazit"], b["fazit"])
+
+    def test_mixed_day_names_north_south(self):
+        b = bc._lage_block(self._wl(einig=False, muster={"art": "nord_sued", "nord": "down", "sued": "up"}),
+                           self.D)
+        self.assertFalse(b["facts"][2]["on"])
+        self.assertTrue(b["facts"][2]["v"] in ("mixed", "uneinheitlich"), b["facts"][2]["v"])
+        self.assertTrue("north falling, south rising" in b["fazit"]
+                        or "Norden fallend, Süden steigend" in b["fazit"], b["fazit"])
+
+    def test_jump_only_within_flying_day(self):
+        jump = {"hpa": 2.4, "hour": "09:00", "zone": "tessin"}
+        b = bc._lage_block(self._wl(sprung=jump, sprung_hot=True), self.D)
+        self.assertIn("+2.4 hPa", b["fazit"])
+        night = {"hpa": 2.2, "hour": "03:00", "zone": "tessin"}
+        b = bc._lage_block(self._wl(sprung=night, sprung_hot=True), self.D)
+        self.assertNotIn("+2.2 hPa", b["fazit"])
+        b = bc._lage_block(self._wl(sprung=jump, sprung_hot=False), self.D)
+        self.assertNotIn("+2.4 hPa", b["fazit"])
 
 
 class TestWarningsOnlyLabels(_De):

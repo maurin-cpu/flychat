@@ -58,7 +58,7 @@ Status-Pille, Fakten-Chips, ein Satz (erster Teil fett = Aussage).
 
 | # | Block | Erwartung (Synoptik) | Daten (Prognose) | Urteil / Satz |
 |---|---|---|---|---|
-| 1 | Lage | Druckzentren → Strömung → Luftmasse; Druck und Tendenz | Regen und Wind für die ganze Schweiz (Nord/Süd-Aggregate), Regen-Trend im Tagesverlauf | drei Sätze: Einfluss, Druck mit Bedeutung, „ICON-CH1/ICON-D2 bestätigt das / passt nur teilweise dazu / widerspricht: …“. Urteil: Erwartung (beruhigend / unbeständig / Übergang) gegen Stufe der Daten (0 trocken & ruhig, 1 teils/einseitig, 2 verbreitet/kräftig) |
+| 1 | Lage | Hoch (≥ 1020 hPa) oder Tief (≤ 1010 hPa) über der Schweiz | seit 26.10.2026 **gleicher Aufbau wie Föhn**, nur Druck (Wind und Regen haben eigene Blöcke): vier Indikatoren je Seite — Luftdruck ≥ 1020 / ≤ 1010 hPa, Tendenz über die 3 Prognosetage (±2 hPa/Tag), Verlauf 6–22 Uhr (±1 hPa, alle Zonen einig), Hoch bzw. Tief ≤ 1000 km. Die Seite gibt der Luftdruck vor, dazwischen die Seite mit mehr Zeichen | Pille „Hochdruck-Indikatoren: n von 4“, Chips wie Föhn. Text in drei Schritten, nur Befunde: (1) was über der Schweiz liegt — „In ICON-CH1/ICON-D2 liegt über der Schweiz Hochdruck (1020.8 hPa).“ (2) wie sich der Druck über den Flugtag entwickelt — „Über den Tag (6–22 Uhr) verläuft der Druck uneinheitlich: Norden fallend, Süden steigend.“ plus der stärkste 3-h-Sprung, falls markant und zwischen 6 und 22 Uhr; (3) Ausblick — „Über die drei Prognosetage baut sich der Hochdruck auf (+2.8 hPa pro Tag).“ Kein „Zeichen dafür“ (User: doppelt), keine Deutung, kein Urteil — Haftung |
 | 2 | Fronten | DWD-Frontenprognose (`fronten.durchgaenge`), letzte drei Läufe zusammengeführt, ältere Aussagen gegen die Karte des Tages geprüft | **Frontzeichen** je Zone (seit 09.10.2026), je schwach/deutlich: Druckanstieg in 12 h (≥ 4 / ≥ 7 hPa), T850 gegen dieselbe Uhrzeit am Vortag (≥ 2.5 / ≥ 4 K), Regen (≥ 1 / ≥ 5 mm), Druckfall in 12 h (≥ 4 / ≥ 7 hPa), Höhenwind-Drehung ≥ 60° nur bei ≥ 25 km/h. Gezählt wird nur, was zum DWD-Typ passt: Kaltfront/Trog = Anstieg, kältere Luft, Regen, Drehung; Warmfront = Fall, wärmere Luft, Regen; Okklusion = beides | Kein Urteil: „DWD zeigt Front — unsere Prognose zeigt deutliche / nur schwache / keine Zeichen: …“ (Zeichen mit Zahl); zeigt die Luft deutlich das Gegenteil des Typs → „Stattdessen: …“. Ohne DWD-Front, aber deutlich kältere Luft + Druckanstieg → „Luftmassenwechsel“; gestern durchgezogen → „Rückseite“ |
 | 3 | Föhn / Bise | Druckgefälle über die Alpen (Schwelle 4 hPa), Druckgefälle NE–S und 700-hPa-Richtung für Bise | Bei Föhnlage: Wind an den **Föhn-Talpunkten** (`data/foehn_talpunkte.geojson`, ICON-CH2, `foehn.per_day[].tal`, Regel in `docs/FOEHN.md`); ohne Talreihe Böen am Lee-Prognosepunkt (Zürich / Lugano). Sonst starke Winde an einzelnen Startplätzen (≥ 40 km/h); Nordostwind im Mittelland | Föhn: „bestätigt am Boden in <Tälern> — Wind X–Y km/h, Böen bis Z (Tal)" / „bleibt laut Modell in der Höhe" / „nicht prüfbar". Föhntäler sind **nur** die Talpunkte (seit 04.10.2026), nie Startplätze. Dieselben Zahlen in Chips und Warnbox (eine Zahl, eine Quelle). Bise nur erwähnt, wenn Nord-/Ostkomponente, aktiv oder am Boden sichtbar |
 | 4 | Höhenwind | Schweizer Mittel 700 hPa (Vektormittel 12 Uhr) mit Stärkeklasse | Spanne der Regionsspitzen (schwächste bis stärkste Region, Stunde); ⅔-Regel für den Boden | Klasse der Spitze gegen Klasse des Mittels: „regional stärker / wie im Mittel / schwächer". Das ist ein Auflösungs-, kein Quellen-Vergleich |
@@ -166,7 +166,7 @@ ausführlich.
 
 | Block | grün | blau | orange |
 |---|---|---|---|
-| Lage | Daten passen zur Lage | Daten passen teilweise | Daten widersprechen der Lage |
+| Lage | — | — | — (immer grau, „Hochdruck-/Tiefdruck-Indikatoren: n von 4“: Hoch ist nicht „gut“, Tief nicht „schlecht“) |
 | Fronten | keine Front | Front schwächt ab · Rückseite | Front zieht durch |
 | Föhn / Bise | kein Föhn | einzelne Böen | Föhn aktiv · Bise |
 | Höhenwind | regional wie im Mittel | regional schwächer | regional stärker |
@@ -176,9 +176,13 @@ ausführlich.
 | Modelle | Modelle einig | ein offener Punkt | Modelle uneinig |
 
 Regeln:
-- **Lage**: beruhigend (Druck steigt, oder Hoch) erwartet trocken & ruhig,
-  unbeständig (fällt, oder Tief) erwartet Regen/Wind; Stufe 1 → teilweise,
-  Gegenteil → widersprechen; Übergangslage: nur Stufe 2 → teilweise.
+- **Lage** (`_lage_indicators`): Pille „Hochdruck-Indikatoren: n von 4“
+  (bzw. Tiefdruck), erfüllte Chips hervorgehoben wie bei Föhn und Front.
+  Pille immer grau — der Block beschreibt den Druck, er bewertet den
+  Flugtag nicht (Hoch ist nicht „gut“, Tief nicht „schlecht“). Bis
+  25.10.2026 verglich die Pille die Erwartung aus dem Druck mit Regen/Wind
+  („data contradict the pattern“) — unverständlich, ein Urteil und doppelt
+  zu den Wind-/Regen-Blöcken.
 - **Fronten**: DWD nennt Front → Pille nach Stärke der eigenen Zeichen
   („Zeichen sichtbar“ / „schwache Zeichen“ / „keine Zeichen“); keine DWD-Front,
   aber Kaltluft + Druckanstieg → „Luftmassenwechsel“; Ist-Durchgang der letzten
@@ -276,7 +280,7 @@ Sätze in Mail und App 1:1 identisch.
 |---|---|
 | Payload | `/api/briefing` → `analyse.by_date[YYYY-MM-DD].{chain, warnings, fronts_kind}` + `analyse.labels` (`web.py _briefing_analyse`, bei Fehler `null`, die Spots kommen trotzdem) |
 | Cache | ETag zusätzlich über die Ordner-mtimes des DWD-Fronten-Archivs und der Prognose-Durchgänge sowie den Prozessstart (sonst liefert der Browser nach einem Deploy per 304 die alte Payload-Form bis zum nächsten Datenlauf) |
-| Darstellung | `static/js/briefing.js renderChain`: Akkordeon-Liste, eine Zeile je Block 1–8 — Nummer, Titel, Status-Pille rechts, Chevron; Inhalt klappt unter der Zeile auf (ARIA-Disclosure, Tastatur-Fokus bleibt auf der Zeile). Lage trägt statt Pille Druck · Regime · Tendenz. Offene Blöcke bleiben über den Tageswechsel (`localStorage wingcast.briefing.chainOpen2`, Erstbesuch: **alle** offen). Über der Liste die Warnhinweis-Kacheln (`chainAlertsHtml`), Klick öffnet den erklärenden Block |
+| Darstellung | `static/js/briefing.js renderChain`: Akkordeon-Liste, eine Zeile je Block 1–8 — Nummer, Titel, Status-Pille rechts, Chevron; Inhalt klappt unter der Zeile auf (ARIA-Disclosure, Tastatur-Fokus bleibt auf der Zeile). Lage trägt wie Föhn und Front nur die Indikator-Pille (die frühere Druckzeile Druck · Regime · Tendenz · Sprung entfiel am 26.10.2026 — steht in Chips und Satz). Offene Blöcke bleiben über den Tageswechsel (`localStorage wingcast.briefing.chainOpen2`, Erstbesuch: **alle** offen). Über der Liste die Warnhinweis-Kacheln (`chainAlertsHtml`), Klick öffnet den erklärenden Block |
 | Kopfzeile | „Stand" = Zeitpunkt des Morgenlaufs (`wetterlage.generated_at`, sonst mtime des Analyse-Caches) — **nie** die Abrufzeit |
 | Tages-Tabs | tragen die Kachel des Wochenstreifens (`tile`: Einstufung Safe/Caution/Not safe über **alle** bewerteten Regionen per `_day_verdict` — ohne die Note, die ist ohne Regionsliste daneben nicht einzuordnen —, Bodendruck, Höhenwind-Pfeil · Sektor · Stärke) plus die Zahl fliegbarer Spots |
 | Nicht übernommen | Kartenbild, „Deine Regionen", Betreff, Hero — die App hat Mini-Karte und Regionsfilter; sie kennt keine Abo-Regionen |

@@ -2279,8 +2279,9 @@
     const blk = chain[def.key] || {};
     const parts = [];
     if (def.key === "lage") {
-      const centers = Array.isArray(blk.centers) ? blk.centers : [];
-      parts.push(chainFactsHtml(centers.map(c => ({ k: String(c.type || "").slice(0, 1), v: `${c.region || ""} ${c.msl || ""} hPa`.trim() }))));
+      // Keine Druckzentren mehr (User 26.10.2026) — nur die drei Zeichen in
+      // den Daten wie Foehn/Front: Zeichen fuer Unbestaendiges orange (f.on)
+      parts.push(chainFactsHtml(blk.facts, null, (f) => !!f.on));
       parts.push(chainVerdictHtml(blk.fazit || ""));
       return parts.filter(Boolean).join("");
     }
@@ -2485,14 +2486,14 @@
       if (!blk.status && !(d.key === "lage" && blk.fazit)) return;   // Block ohne Daten
       no += 1;
       const open = state.chainOpen.has(d.key);
-      const lage = d.key === "lage";
       rows.push(chainRowHtml({
         key: d.key, no,
         title: labels[d.label] || d.key,
         status: blk.status || "",
         statusLabel: blk.status_label || "",
-        // Lage traegt kein Urteil: Druck + Regime + Tendenz stehen als Meta
-        meta: lage ? [blk.pressure, blk.regime, blk.pressure_note, blk.pressure_jump].filter(Boolean).join(" · ") : "",
+        // Keine Druckzeile mehr (User 26.10.2026): Druck, Tendenz und Verlauf
+        // stehen in den Lage-Chips und im Satz — wie bei Foehn und Front
+        meta: "",
         open,
         body: open ? chainBodyHtml(d, chain, labels, entry) : "",
       }));
