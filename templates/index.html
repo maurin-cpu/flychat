@@ -622,6 +622,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (window.wingcastMap) window.wingcastMap.invalidateSize();
         });
 
+        // Welche Ansicht sieht der Besucher wirklich? Liest der PostHog-Hook in
+        // base.html (before_send). /, /chat und /map zeigen dieselbe Seite; bis
+        // 29.10.2026 meldete PostHog darum jeden Kartenbesuch als "/chat", auch
+        // nach einem Tipp auf "Spots". Breiter Bildschirm: Karte mit Chat-Spalte
+        // = 'spots'. Telefon: der sichtbare Reiter.
+        window.wcAppView = 'spots';
+
         // Mobile toggle (Chat / Karte) via bottom nav
         var mobileNav = document.getElementById('mobileNav');
         if (mobileNav && layout) {
@@ -641,10 +648,18 @@ document.addEventListener('DOMContentLoaded', function () {
             } catch (e) { /* ignore */ }
             if (window.innerWidth < 640) {
                 layout.classList.add('show-' + initialView);
+                window.wcAppView = initialView === 'map' ? 'spots' : 'chat';
             }
 
             function switchMobileView(target) {
                 if (target !== 'chat' && target !== 'map') return;
+                // Reiterwechsel = neue Ansicht: als eigenen Seitenaufruf zaehlen,
+                // damit "Spots" und "Chat" in PostHog getrennt erscheinen.
+                var ansicht = target === 'map' ? 'spots' : 'chat';
+                if (window.wcAppView !== ansicht) {
+                    window.wcAppView = ansicht;
+                    if (window.wcTrack) wcTrack('$pageview');
+                }
                 mobileNav.querySelectorAll('.mobile-nav-item[data-target]').forEach(function (b) {
                     b.classList.remove('active');
                 });

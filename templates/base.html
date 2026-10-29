@@ -662,7 +662,25 @@
             disable_session_recording: true, // Session-Replay aus (Consent-pflichtig)
             capture_pageview: true,
             autocapture: true,
-            person_profiles: 'identified_only'
+            person_profiles: 'identified_only',
+            // /, /chat und /map rendern dieselbe Seite (Karte + Chat). Der Pfad
+            // allein sagt deshalb nichts; massgeblich ist die sichtbare Ansicht
+            // (window.wcAppView, gesetzt in index.html): '/spots' oder '/chat'.
+            // Ob jemand den Chat wirklich nutzt, zeigt nur chat_message_sent.
+            before_send: function (ev) {
+                try {
+                    var p = ev && ev.properties;
+                    if (p && (p.$pathname === '/' || p.$pathname === '/chat' || p.$pathname === '/map')) {
+                        var pfad = window.wcAppView === 'chat' ? '/chat' : '/spots';
+                        p.$pathname = pfad;
+                        if (p.$current_url) {
+                            p.$current_url = p.$current_url.replace(
+                                /^(https?:\/\/[^\/?#]+)\/(?:chat|map)?(?=[?#]|$)/, '$1' + pfad);
+                        }
+                    }
+                } catch (e) { /* Messung darf die Seite nie stoeren */ }
+                return ev;
+            }
         });
         // Super-Property: App-Events von Marketing-Events (gleiches Projekt) trennen.
         posthog.register({ app: 'application' });
