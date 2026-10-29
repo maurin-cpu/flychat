@@ -661,6 +661,7 @@
 
 {% block content %}
 <div class="unified-layout">
+    {% if chat_enabled %}
     <!-- Links: Chat (gesperrt fuer anonyme User) -->
     <aside class="chat-sidebar" id="chatSidebar">
         {% if chat_open %}
@@ -735,6 +736,7 @@
     </aside>
 
     <div class="resizer" id="resizer"></div>
+    {% endif %}
 
     <!-- Rechts: Karte -->
     <main class="map-main">
@@ -806,7 +808,7 @@
 {% if chat_open %}
 <script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/chat.js') }}?v={{ static_v('js/chat.js') }}"></script>
-{% else %}
+{% elif chat_enabled %}
 <script>
 // Anonyme User: Chat-Sperrkarte oeffnet das Login-Modal beim Klick auf den CTA.
 document.addEventListener('DOMContentLoaded', function () {
@@ -887,7 +889,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var initialView = 'map';
         try {
             var v = new URLSearchParams(window.location.search).get('view');
-            if (v === 'chat' || v === 'map') {
+            if ((v === 'chat' && {{ 'true' if chat_enabled else 'false' }}) || v === 'map') {
                 initialView = v;
                 history.replaceState({}, '', window.location.pathname);
             }

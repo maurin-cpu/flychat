@@ -145,7 +145,9 @@ def _inject_session_flags():
         # chat_open steuert NUR die Chat-UI: eingeloggt ODER PUBLIC_DEMO_MODE.
         # is_logged_in bleibt fuer Navbar/Account/Login-Modal massgeblich, damit
         # der Demo-Schalter keine Account-Features fuer Anonyme vortaeuscht.
-        "chat_open": logged_in or config.PUBLIC_DEMO_MODE,
+        "chat_open": config.CHAT_ENABLED and (logged_in or config.PUBLIC_DEMO_MODE),
+        # chat_enabled: Chat-Feature ueberhaupt da (Spalte, Handy-Reiter).
+        "chat_enabled": config.CHAT_ENABLED,
         "public_demo": config.PUBLIC_DEMO_MODE,
         "is_admin": _is_admin(),
         "session_email": session.get("email", ""),
@@ -3089,6 +3091,9 @@ def _require_login_json(view_func):
     {error: ..., login_required: true} — Frontend kann das auswerten."""
     @wraps(view_func)
     def wrapper(*args, **kwargs):
+        # Chat abgeschaltet (config.CHAT_ENABLED): Endpoint gibt es nicht.
+        if not config.CHAT_ENABLED:
+            return jsonify({"error": "Chat deaktiviert"}), 404
         # PUBLIC_DEMO_MODE: Login-Pflicht faellt weg (oeffentlicher Test).
         if not session.get("sub_id") and not config.PUBLIC_DEMO_MODE:
             return jsonify({

@@ -1246,6 +1246,12 @@ MARKETING_URL   = os.environ.get("WINGCAST_MARKETING_URL", "https://wingcast.ch"
 # (Kosten/Missbrauch bei oeffentlichem Link). Nach dem Test wieder auf "0".
 PUBLIC_DEMO_MODE = os.environ.get("PUBLIC_DEMO_MODE", "0") == "1"
 
+# CHAT_ENABLED: Chat-Berater ueberhaupt anbieten. Seit 29.10.2026 aus — der
+# Chat wurde kaum genutzt (82 Nachrichten seit 26.08.; Eingeloggte fragten
+# einmal und nie wieder). Aus = keine Chat-Spalte, kein Chat-Reiter am Handy,
+# /api/chat* antworten 404. Der Code bleibt; "1" schaltet alles wieder ein.
+CHAT_ENABLED = os.environ.get("CHAT_ENABLED", "0") == "1"
+
 # PostHog Product-Analytics (nur nach Opt-in-Consent im Browser geladen).
 # Leerer KEY => Analytics komplett deaktiviert (Banner erscheint dann nicht).
 POSTHOG_KEY     = os.environ.get("POSTHOG_KEY", "").strip()

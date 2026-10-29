@@ -377,29 +377,36 @@
     <nav class="mobile-nav" id="mobileNav" role="navigation" aria-label="{{ t('mobile.aria_nav') }}">
         {% set is_chat = request.path == '/' or request.path == '/chat' %}
         {% set is_regionen = request.path == '/regionen' %}
+        {# Chat-Reiter nur, wenn das Chat-Feature an ist (config.CHAT_ENABLED). #}
         {% if is_chat %}
+        {% if chat_enabled %}
         <button class="mobile-nav-item active" data-target="chat" aria-label="{{ t('mobile.show_chat') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>{{ t('mobile.chat') }}</span>
         </button>
+        {% endif %}
         <button class="mobile-nav-item" data-target="map" aria-label="{{ t('mobile.show_spots') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span>{{ t('mobile.spots') }}</span>
         </button>
         {% elif is_regionen %}
+        {% if chat_enabled %}
         <button class="mobile-nav-item" data-target="chat" aria-label="{{ t('mobile.show_chat') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>{{ t('mobile.chat') }}</span>
         </button>
+        {% endif %}
         <a href="/chat?view=map" class="mobile-nav-item" aria-label="{{ t('mobile.show_spots') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span>{{ t('mobile.spots') }}</span>
         </a>
         {% else %}
+        {% if chat_enabled %}
         <a href="/chat" class="mobile-nav-item" aria-label="{{ t('mobile.show_chat') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span>{{ t('mobile.chat') }}</span>
         </a>
+        {% endif %}
         <a href="/chat?view=map" class="mobile-nav-item" aria-label="{{ t('mobile.show_spots') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span>{{ t('mobile.spots') }}</span>

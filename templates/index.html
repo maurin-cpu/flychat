@@ -313,6 +313,7 @@
 
 {% block content %}
 <div class="unified-layout">
+    {% if chat_enabled %}
     <!-- Links: Chat (gesperrt fuer anonyme User) -->
     <aside class="chat-sidebar" id="chatSidebar">
         {% if chat_open %}
@@ -388,6 +389,7 @@
     </aside>
 
     <div class="resizer" id="resizer"></div>
+    {% endif %}
 
     <!-- Rechts: Karte -->
     <main class="map-main">
@@ -485,7 +487,7 @@
 {% if chat_open %}
 <script defer src="{{ url_for('static', filename='js/chat-charts.js') }}?v={{ static_v('js/chat-charts.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/chat.js') }}?v={{ static_v('js/chat.js') }}"></script>
-{% else %}
+{% elif chat_enabled %}
 <script>
 // Anonyme User: Chat-Sperrkarte oeffnet das Login-Modal beim Klick auf den CTA.
 document.addEventListener('DOMContentLoaded', function () {
@@ -633,8 +635,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var mobileNav = document.getElementById('mobileNav');
         if (mobileNav && layout) {
             // Initial view from ?view=map or ?spot=<name> (deep-link from briefing pin),
-            // otherwise default to chat on phone (with mini-map peek)
-            var initialView = 'chat';
+            // otherwise default to chat on phone (with mini-map peek).
+            // Chat abgeschaltet (CHAT_ENABLED): immer die Karte.
+            var initialView = '{{ "chat" if chat_enabled else "map" }}';
             try {
                 var qs = new URLSearchParams(window.location.search);
                 if (qs.get('view') === 'map' || qs.get('spot')) {
