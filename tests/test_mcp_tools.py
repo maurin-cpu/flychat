@@ -29,10 +29,9 @@ def srv(tmp_path):
                  region_id="oberwallis_goms", lat=46.41, lon=8.11, elev=2200, date="2026-09-17", foehn_level="danger", foehn_dp=9.1),
     ]
     write_export(str(tmp_path), rows=rows)
-    server = build_server(str(tmp_path))
-    # Store des Servers auf feste Zeit setzen (Closure ueber register → via Attribut nicht erreichbar,
-    # darum ueber den in build_server erzeugten Store: wir bauen neu mit now_fn)
-    return server
+    # feste Uhr: sonst altert der Export mit dem Kalender und die Tools
+    # verweigern ihn (ab Ende September 2026 alle Tests rot)
+    return build_server(str(tmp_path), now_fn=lambda: NOW)
 
 
 def call(server, name, **args):

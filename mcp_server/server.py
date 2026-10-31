@@ -38,11 +38,12 @@ Regeln:
 """
 
 
-def build_server(export_dir: str | None = None, telemetry_sink=None) -> MCPServer:
+def build_server(export_dir: str | None = None, telemetry_sink=None, now_fn=None) -> MCPServer:
     """telemetry_sink: (distinct_id, event, props) -> None; Standard PostHog
-    (mcp_server/telemetry.py), False schaltet die Nutzungs-Telemetrie ab."""
+    (mcp_server/telemetry.py), False schaltet die Nutzungs-Telemetrie ab.
+    now_fn: feste Uhr fuer Tests (Alters-Pruefung des Exports)."""
     root = export_dir or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "mcp_export")
-    store = ExportStore(root)
+    store = ExportStore(root, now_fn=now_fn)
     server = MCPServer(name="wingcast", instructions=INSTRUCTIONS, version="0.1.0")
     register(server, store)
     if telemetry_sink is not False:
