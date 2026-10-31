@@ -2464,6 +2464,7 @@ def decide_aloft_regional(weather_cache: dict, forecast_dates: list[str],
     Returns: {"per_day": [{"date", "max_kmh", "region", "hour", "top",
               "n_regions"}], "decided_by", "thresholds"}
       top — die drei staerksten Regionen [{"region", "kmh"}]
+      n_by_class — Anzahl Regionen je Staerkeklasse ihrer Spitze
     """
     min_spots = config.SYNOPTIC_ALOFT_REGION_MIN_SPOTS
     h_start, h_end = config.FLIGHT_HOURS_START, config.FLIGHT_HOURS_END
@@ -2507,6 +2508,10 @@ def decide_aloft_regional(weather_cache: dict, forecast_dates: list[str],
             "min_kmh": round(lo_kmh), "min_region": lo_region,
             "top": [{"region": r, "kmh": round(k)} for k, r, _ in peaks[:3]],
             "n_regions": len(peaks),
+            # Regionen je Staerkeklasse ihrer Spitze — fuer die Briefing-Pille
+            # ("strong in places" vs. "strong wind"); gerundet wie max_kmh
+            "n_by_class": {c: sum(1 for k, _, _ in peaks if _flow_strength(round(k)) == c)
+                           for c in ("schwach", "maessig", "kraeftig", "stuermisch")},
         })
     return {
         "per_day": per_day,

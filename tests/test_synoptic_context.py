@@ -1149,6 +1149,16 @@ class TestAloftRegional(unittest.TestCase):
                                        {"a1": "Jura", "a2": "Jura", "a3": "Jura"})["per_day"][0]
         self.assertIsNone(day["max_kmh"])
 
+    def test_regions_are_counted_per_class(self):
+        """Fuer die Briefing-Pille: wie viele Regionen liegen in welcher Klasse."""
+        cache = _aloft_cache({"a1": 10, "a2": 11, "a3": 12,
+                              "b1": 35, "b2": 36, "b3": 34})
+        rmap = {"a1": "Jura", "a2": "Jura", "a3": "Jura",
+                "b1": "Berner Alpen", "b2": "Berner Alpen", "b3": "Berner Alpen"}
+        day = sc.decide_aloft_regional(cache, ["2026-09-16"], rmap)["per_day"][0]
+        self.assertEqual(day["n_by_class"],
+                         {"schwach": 1, "maessig": 0, "kraeftig": 1, "stuermisch": 0})
+
 
 # ============================================================================
 # Lage-Label je Tag (decide_lage_label_for_day)

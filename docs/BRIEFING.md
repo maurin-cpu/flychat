@@ -169,7 +169,7 @@ ausführlich.
 | Lage | — | — | — (immer blau/info, „Hochdruck“ / „Tiefdruck“ / „Weder Hoch noch Tief“: Hoch ist nicht „gut“ = grün, Tief nicht „schlecht“ = orange; grau war auf Weiss kaum zu sehen) |
 | Fronten | keine Front | Front schwächt ab · Rückseite | Front zieht durch |
 | Föhn / Bise | kein Föhn | einzelne Böen | Föhn aktiv · Bise |
-| Höhenwind | regional wie im Mittel | regional schwächer | regional stärker |
+| Höhenwind | schwacher · mässiger Wind | — | stellenweise kräftig · kräftiger Wind · stellenweise stürmisch · stürmischer Wind |
 | Labilität | stabil | teils labil | Gewitter |
 | Thermik / Basis | gutes Steigen (≥ 2 m/s) | mässiges Steigen (≥ 1) | schwaches Steigen |
 | Sonne / Bewölkung | wie erwartet | teils anders | anders als erwartet |
@@ -194,8 +194,14 @@ Regeln:
   und stellte „keine Front“ neben einen Satz mit Front (19.09.2026).
 - **Föhn/Bise**: aktiv → orange; sonst Böe ≥ 40 km/h an einem Startplatz →
   einzelne Böen.
-- **Höhenwind**: Stärkeklasse der Regionsspitze gegen Klasse des Mittels
-  (schwach < 15, mässig < 30, kräftig < 50 km/h).
+- **Höhenwind** (`_wind_pill`): Stärkeklasse der stärksten Regionsspitze
+  auf 700 hPa (schwach < 15, mässig < 30, kräftig < 50 km/h, sonst stürmisch).
+  Ab kräftig: liegt weniger als die Hälfte der Regionen in dieser Klasse →
+  „stellenweise …“ (Zählung `aloft_regional.n_by_class`). Bis 31.10.2026
+  verglich die Pille die Spitze mit dem Schweizer Mittel („regional stärker“)
+  — das beantwortete keine Pilotenfrage und war schief gebaut (Höchstwert
+  über Regionen und Stunden gegen Mittel um 12 Uhr). Der Vergleich bleibt
+  im Satz darunter.
 - **Labilität**: Modell-Gewitter → Gewitter; CAPE-Klasse in einer Zone →
   teils labil.
 - **Sonne**: Nord (Alpennordhang) und Süd (Tessin) je gegen Erwartung; eine

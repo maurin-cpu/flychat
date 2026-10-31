@@ -689,3 +689,47 @@ class TestSubjectLine(_De):
         verdicts = {d["date"]: {"tier": t} for d, t in zip(days, ["not_safe", "conditional", "not_safe"])}
         self.assertEqual(bc._subject_line(days, verdicts),
                          "Mon with alerts · Today and Tue with severe alerts")
+
+
+class TestWindPill(unittest.TestCase):
+    """Hoehenwind-Pille (31.10.2026): eine Aussage — wie stark oben, und
+    nur stellenweise oder verbreitet. Kein Vergleich mehr mit dem Mittel."""
+    D = "2026-10-31"
+
+    def _wl(self, max_kmh, n_regions=20, **n_by_class):
+        return {"aloft_regional": {"per_day": [{
+            "date": self.D, "max_kmh": max_kmh, "region": "Berner Alpen",
+            "n_regions": n_regions, "n_by_class": n_by_class}]},
+            "flow_overhead": {"per_day": [{"date": self.D, "speed_kmh": 10, "strength": "schwach"}]}}
+
+    def test_light_and_moderate_are_green(self):
+        self.assertEqual(bc._wind_pill(self._wl(12, schwach=20), self.D), ("ok", "st_wind_schwach"))
+        self.assertEqual(bc._wind_pill(self._wl(29, maessig=5), self.D), ("ok", "st_wind_maessig"))
+
+    def test_few_strong_regions_are_in_places(self):
+        self.assertEqual(bc._wind_pill(self._wl(38, kraeftig=4), self.D),
+                         ("warn", "st_wind_kraeftig_places"))
+
+    def test_half_the_regions_strong_is_plain(self):
+        self.assertEqual(bc._wind_pill(self._wl(38, kraeftig=10), self.D),
+                         ("warn", "st_wind_kraeftig"))
+
+    def test_stormy_counts_only_stormy_regions(self):
+        self.assertEqual(bc._wind_pill(self._wl(55, kraeftig=15, stuermisch=2), self.D),
+                         ("warn", "st_wind_stuermisch_places"))
+
+    def test_old_cache_without_counts_says_no_places(self):
+        """Ohne Zaehlung keine Verbreitungs-Aussage, nur die Klasse."""
+        wl = self._wl(38)
+        del wl["aloft_regional"]["per_day"][0]["n_by_class"]
+        self.assertEqual(bc._wind_pill(wl, self.D), ("warn", "st_wind_kraeftig"))
+
+    def test_no_regional_data_falls_back_to_swiss_mean(self):
+        wl = self._wl(None)
+        self.assertEqual(bc._wind_pill(wl, self.D), ("ok", "st_wind_schwach"))
+
+    def test_every_pill_has_a_label_in_both_languages(self):
+        for lang in ("de", "en"):
+            for key in ("schwach", "maessig", "kraeftig", "kraeftig_places",
+                        "stuermisch", "stuermisch_places"):
+                self.assertIn("st_wind_" + key, bc._L3[lang])

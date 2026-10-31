@@ -405,6 +405,28 @@ def _wind_range_block(wetterlage: dict, date: str, strip: dict) -> dict:
     }
 
 
+def _wind_pill(wetterlage: dict, date: str) -> tuple[str, str]:
+    """Pille des Hoehenwind-Blocks: wie stark ist es oben, und nur stellenweise
+    oder in mindestens der Haelfte der Regionen? Klasse der staerksten
+    Regionsspitze (700 hPa). Ersetzt am 31.10.2026 den Vergleich Mittel gegen
+    Spitze ("regional staerker"), der keine Pilotenfrage beantwortete.
+    Aeltere Caches ohne Regionsspitzen: Klasse des Schweizer Mittels."""
+    day = _per_day_index((wetterlage or {}).get("aloft_regional"), [date]).get(date) or {}
+    if day.get("max_kmh"):
+        cls = _wind_class(float(day["max_kmh"]))
+    else:
+        flow = _per_day_index((wetterlage or {}).get("flow_overhead"), [date]).get(date) or {}
+        cls = flow.get("strength") or _wind_class(float(flow.get("speed_kmh") or 0))
+        day = {}
+    if cls in ("schwach", "maessig"):
+        return "ok", "st_wind_" + cls
+    # Die staerkste Region liegt in `cls`, also keine darueber: n zaehlt die
+    # Regionen dieser Klasse. Ohne Zaehlung (Caches vor 31.10.) kein "stellenweise"
+    n = (day.get("n_by_class") or {}).get(cls)
+    places = n is not None and n * 2 < (day.get("n_regions") or 0)
+    return "warn", "st_wind_" + cls + ("_places" if places else "")
+
+
 def _aloft_regional_text(wetterlage: dict, date: str) -> str:
     """"Regional bis 45 km/h (Berner Alpen), staerkste Stunde 14 Uhr" — nur,
     wenn der Kontext das Feld hat (aeltere Caches: leer)."""
@@ -602,7 +624,9 @@ _L3 = {
         # Status-Pille je Kettenglied (kurz, max 3 Woerter)
         "st_front_signs": "Zeichen sichtbar", "st_front_weaksigns": "schwache Zeichen", "st_front_nosigns": "keine Zeichen", "st_front_airmass": "Luftmassenwechsel", "st_front_none": "keine Front angezeigt", "st_front_rear": "Rückseite",
         "st_foehn_on": "Föhn angezeigt", "st_foehn_gusty": "einzelne Böen", "st_foehn_off": "keine Föhn-Anzeichen",
-        "st_wind_stronger": "regional stärker", "st_wind_match": "regional wie im Mittel", "st_wind_weaker": "regional schwächer",
+        "st_wind_schwach": "schwacher Wind", "st_wind_maessig": "mässiger Wind",
+        "st_wind_kraeftig": "kräftiger Wind", "st_wind_kraeftig_places": "stellenweise kräftig",
+        "st_wind_stuermisch": "stürmischer Wind", "st_wind_stuermisch_places": "stellenweise stürmisch",
         "st_stab_thunder": "Gewitter angezeigt", "st_stab_labile": "teils Labilität angezeigt", "st_stab_stable": "stabile Luft angezeigt",
         "st_th_good": "gutes Steigen", "st_th_mod": "mässiges Steigen", "st_th_weak": "schwaches Steigen",
         "st_sun_match": "wie erwartet", "st_sun_partial": "teils anders", "st_sun_contra": "anders als erwartet",
@@ -1114,7 +1138,9 @@ _L3 = {
         # status pill per chain step (short, max 3 words)
         "st_front_signs": "signs visible", "st_front_weaksigns": "weak signs", "st_front_nosigns": "no signs", "st_front_airmass": "air-mass change", "st_front_none": "no front indicated", "st_front_rear": "rear side",
         "st_foehn_on": "foehn indicated", "st_foehn_gusty": "isolated gusts", "st_foehn_off": "no foehn signs",
-        "st_wind_stronger": "regionally stronger", "st_wind_match": "regionally as average", "st_wind_weaker": "regionally weaker",
+        "st_wind_schwach": "light wind", "st_wind_maessig": "moderate wind",
+        "st_wind_kraeftig": "strong wind", "st_wind_kraeftig_places": "strong in places",
+        "st_wind_stuermisch": "stormy wind", "st_wind_stuermisch_places": "stormy in places",
         "st_stab_thunder": "thunderstorms indicated", "st_stab_labile": "instability indicated in parts", "st_stab_stable": "stable air indicated",
         "st_th_good": "good climbs", "st_th_mod": "moderate climbs", "st_th_weak": "weak climbs",
         "st_sun_match": "as expected", "st_sun_partial": "partly different", "st_sun_contra": "different than expected",
@@ -3765,7 +3791,7 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
         _foehn_facts_legacy(chain, fo, sw, dps)
     # Hoehenwind
     w = chain["wind"]
-    st("wind", {"stronger": "warn", "weaker": "info"}.get(w.get("verdict"), "ok"), "st_wind_" + (w.get("verdict") or "match"))
+    st("wind", *_wind_pill(wl, date))
     w["facts"] = [f for f in [
         {"k": "700 hPa", "v": f"{w.get('arrow', '')} {w.get('sector', '')} {w.get('range') or w.get('speed') or ''}".strip()},
         {"k": _lbl("fx_ground"), "v": (lambda m: m.group(0) if m else "")(
