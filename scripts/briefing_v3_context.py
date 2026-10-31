@@ -709,7 +709,13 @@ _L3 = {
         # Lage wie Foehn (User 26.10.2026): gleicher Aufbau — Pille "n von 4", vier
         # Chips (Luftdruck zuerst, erfuellte hervorgehoben), Satz "zeigt … auf",
         # "Auch die Daten zeigen Zeichen dafür", "Nicht in den Daten", "Dagegen"
-        "li_pill":         "{side}-Indikatoren: {n} von 4",
+        # Labels als Woerter (User 31.10.2026): Zahlen stehen im Text darunter
+        "li_k_drucklage":  "Drucklage", "li_v_neither": "weder Hoch noch Tief",
+        "li_k_tend3":      "{subj} nächste 3 Tage", "li_k_tagesgang": "{subj} heute 6–22 Uhr",
+        "li_subj_none":    "Druck",
+        "li_w_aufbau":     "baut sich auf", "li_w_abklingen": "klingt ab", "li_w_gleich": "etwa gleich",
+        "li_w_verst":      "verstärkt sich", "li_w_abbau": "baut ab",
+        "li_w_steigt":     "steigt", "li_w_faellt": "fällt",
         "li_side_hoch":    "Hochdruck", "li_side_tief": "Tiefdruck",
         "li_k_p_hoch":     "Luftdruck ≥{thr} hPa", "li_k_p_tief": "Luftdruck ≤{thr} hPa",
         "li_k_trend":      "Tendenz 3 Tage",
@@ -723,6 +729,8 @@ _L3 = {
         # Druck ueber den Flugtag, Ausblick ueber die drei Tage — kein "Zeichen dafür"
         "li_p_on":         "In {m} liegt über der Schweiz {side} ({hpa}).",
         "li_p_off":        "In {m} liegt über der Schweiz weder Hoch- noch Tiefdruck ({hpa}).",
+        "li_dday_verst":   " Über den Tag (6–22 Uhr) verstärkt sich der {side} ({v} hPa).",
+        "li_dday_abbau":   " Über den Tag (6–22 Uhr) baut sich der {side} ab ({v} hPa).",
         "li_day_up":       " Über den Tag (6–22 Uhr) steigt der Druck um {v} hPa.",
         "li_day_down":     " Über den Tag (6–22 Uhr) fällt der Druck um {v} hPa.",
         "li_day_flat":     " Über den Tag (6–22 Uhr) bleibt der Druck etwa gleich ({v} hPa).",
@@ -731,8 +739,8 @@ _L3 = {
         "li_day_one":      ": {zone} {a}, übrige Zonen {b}",
         "li_jump":         " Am stärksten ändert er sich zwischen {von} und {bis} Uhr: {v} hPa in 3 Stunden ({zone}).",
         "li_dev":          " Über die drei Prognosetage {was} ({v} hPa pro Tag).",
-        "li_was_hoch_up":  "baut sich der Hochdruck auf", "li_was_hoch_down": "schwächt sich der Hochdruck ab",
-        "li_was_tief_down": "verstärkt sich der Tiefdruck", "li_was_tief_up": "schwächt sich der Tiefdruck ab",
+        "li_was_hoch_up":  "baut sich der Hochdruck auf", "li_was_hoch_down": "klingt der Hochdruck ab",
+        "li_was_tief_down": "baut sich der Tiefdruck auf", "li_was_tief_up": "klingt der Tiefdruck ab",
         "li_was_on_flat":  "bleibt der {side} etwa gleich",
         "li_was_off_up":   "steigt der Druck", "li_was_off_down": "fällt der Druck",
         "li_was_off_flat": "bleibt der Druck etwa gleich",
@@ -1214,7 +1222,12 @@ _L3 = {
         # situation like foehn (User 26.10.2026): same layout — pill "n of 4", four
         # chips (pressure first, met ones highlighted), "points to", "also show",
         # "Not in the data", "Against it"
-        "li_pill":         "{side} indicators: {n} of 4",
+        "li_k_drucklage":  "Pressure situation", "li_v_neither": "neither high nor low",
+        "li_k_tend3":      "{subj} next 3 days", "li_k_tagesgang": "{subj} today 6–22h",
+        "li_subj_none":    "Pressure",
+        "li_w_aufbau":     "builds up", "li_w_abklingen": "weakens", "li_w_gleich": "about the same",
+        "li_w_verst":      "strengthens", "li_w_abbau": "weakens",
+        "li_w_steigt":     "rises", "li_w_faellt": "falls",
         "li_side_hoch":    "High pressure", "li_side_tief": "Low pressure",
         "li_k_p_hoch":     "Pressure ≥{thr} hPa", "li_k_p_tief": "Pressure ≤{thr} hPa",
         "li_k_trend":      "Trend 3 days",
@@ -1228,6 +1241,8 @@ _L3 = {
         # the flying day, outlook over the three days — no "signs of it"
         "li_p_on":         "In {m}, Switzerland is under {side_l} ({hpa}).",
         "li_p_off":        "In {m}, Switzerland is under neither high nor low pressure ({hpa}).",
+        "li_dday_verst":   " Over the day (06:00–22:00) {side_l} strengthens ({v} hPa).",
+        "li_dday_abbau":   " Over the day (06:00–22:00) {side_l} weakens ({v} hPa).",
         "li_day_up":       " Over the day (06:00–22:00) pressure rises by {v} hPa.",
         "li_day_down":     " Over the day (06:00–22:00) pressure falls by {v} hPa.",
         "li_day_flat":     " Over the day (06:00–22:00) pressure stays about the same ({v} hPa).",
@@ -1236,8 +1251,8 @@ _L3 = {
         "li_day_one":      ": {zone} {a}, other zones {b}",
         "li_jump":         " The strongest change is between {von}:00 and {bis}:00: {v} hPa in 3 hours ({zone}).",
         "li_dev":          " Over the three forecast days {was} ({v} hPa per day).",
-        "li_was_hoch_up":  "high pressure builds", "li_was_hoch_down": "high pressure weakens",
-        "li_was_tief_down": "low pressure deepens", "li_was_tief_up": "low pressure weakens",
+        "li_was_hoch_up":  "high pressure builds up", "li_was_hoch_down": "high pressure weakens",
+        "li_was_tief_down": "low pressure builds up", "li_was_tief_up": "low pressure weakens",
         "li_was_on_flat":  "{side_l} stays about the same",
         "li_was_off_up":   "pressure rises", "li_was_off_down": "pressure falls",
         "li_was_off_flat": "pressure stays about the same",
@@ -2094,9 +2109,9 @@ def _lage_indicators(wl: dict, date: str):
     # je Seite: welche Indikatoren erfuellt sind
     hits = {
         "hoch": {"p": msl >= config.SYNOPTIC_HOCH_HPA, "trend": num(slope) and slope >= thr_s,
-                 "day": num(t) and t >= thr_t, "c": "hoch" in near},
+                 "day": num(t) and t >= thr_t},
         "tief": {"p": msl <= config.SYNOPTIC_TIEF_HPA, "trend": num(slope) and slope <= -thr_s,
-                 "day": num(t) and t <= -thr_t, "c": "tief" in near},
+                 "day": num(t) and t <= -thr_t},
     }
     if regime in ("hoch", "tief"):
         side = regime
@@ -2105,28 +2120,45 @@ def _lage_indicators(wl: dict, date: str):
         side = "hoch" if nh > nt or (nh == nt and (slope or 0) >= 0) else "tief"
     on = hits[side]
     thr_p = config.SYNOPTIC_HOCH_HPA if side == "hoch" else config.SYNOPTIC_TIEF_HPA
-    c_on = near.get(side)
+    def _word(delta, pos_side_word, neg_side_word, ok_word):
+        """Hoch: Anstieg = aufbauen; Tief: Abfall = aufbauen (Tief vertieft sich)."""
+        if delta is None or abs(delta) < 1e-9:
+            return _lbl("li_w_gleich")
+        rising = delta > 0
+        if side == "hoch" or side == "tief":
+            building = rising if side == "hoch" else not rising
+            return _lbl(ok_word[0] if building else ok_word[1])
+        return _lbl(pos_side_word if rising else neg_side_word)
+
+    trend_d = slope if num(slope) and abs(slope) >= thr_s else (0 if num(slope) else None)
+    day_d = t if num(t) and abs(t) >= thr_t else (0 if num(t) else None)
+    # Label nennt, WAS sich aendert (User 31.10.2026: "Trend 3 days: stays the same"
+    # war unklar) — "Hochdruck naechste 3 Tage: etwa gleich"
+    subj = _lbl("li_side_" + side) if on["p"] else _lbl("li_subj_none")
+    # Keine Zaehlung mehr (User 31.10.2026): die Pille sagt, was ueber der Schweiz
+    # liegt; die Chips beschreiben Tagesverlauf und Tendenz, ohne orange Markierung
     facts = [
-        {"k": _lbl("li_k_p_" + side).format(thr=f"{thr_p:.0f}"), "v": f"{float(msl):.1f} hPa", "on": on["p"]},
-        {"k": _lbl("li_k_trend"), "on": on["trend"],
-         "v": _lbl("li_v_trend").format(v=f"{slope:+.1f}") if num(slope) else "—"},
-        {"k": _lbl("li_k_day"), "on": on["day"],
-         "v": (f"{t:+.1f} hPa" if num(t) else _lbl("li_v_mixed") if tag else "—")},
-        {"k": _lbl("li_k_c_" + side).format(km=_LI_CENTER_KM), "on": on["c"],
-         "v": (f"{_center_name(c_on[1].get('region_label', ''))} {c_on[1]['msl_hpa']:.0f} hPa"
-               if c_on and num(c_on[1].get("msl_hpa")) else
-               _center_name(c_on[1].get("region_label", "")) if c_on else _lbl("li_v_none"))},
+        {"k": _lbl("li_k_tagesgang").format(subj=subj), "on": False,
+         "v": (_word(day_d, "li_w_steigt", "li_w_faellt", ("li_w_verst", "li_w_abbau"))
+               if num(t) else _lbl("li_v_mixed") if tag else "—")},
+        {"k": _lbl("li_k_tend3").format(subj=subj), "on": False,
+         "v": _word(trend_d, "li_w_steigt", "li_w_faellt", ("li_w_aufbau", "li_w_abklingen"))
+              if num(slope) else "—"},
     ]
-    n = sum(on.values())
     side_w = _lbl("li_side_" + side)
-    pill = _lbl("li_pill").format(side=side_w, n=n)
+    pill = side_w if on["p"] else _capitalize(_lbl("li_v_neither"))
     fmt = {"m": _model_words(), "side": side_w, "side_l": side_w.lower()}
     # 1 Was liegt ueber der Schweiz?
     out = _lbl("li_p_on" if on["p"] else "li_p_off").format(hpa=f"{float(msl):.1f} hPa", **fmt)
     # 2 Wie entwickelt sich der Druck ueber den Flugtag (06-22 h)?
     if num(t):
         way = "up" if t >= thr_t else "down" if t <= -thr_t else "flat"
-        out += _lbl("li_day_" + way).format(v=(f"{abs(t):.1f}" if way != "flat" else f"{t:+.1f}"))
+        if on["p"] and way != "flat":
+            # gleiche Woerter wie das Label "Tagesverlauf" (User 31.10.2026)
+            building = (way == "up") == (side == "hoch")
+            out += _lbl("li_dday_verst" if building else "li_dday_abbau").format(v=f"{t:+.1f}", **fmt)
+        else:
+            out += _lbl("li_day_" + way).format(v=(f"{abs(t):.1f}" if way != "flat" else f"{t:+.1f}"))
     elif tag:
         m = tag.get("muster") or {}
         wie = ""
@@ -2137,18 +2169,16 @@ def _lage_indicators(wl: dict, date: str):
             wie = _lbl("li_day_one").format(zone=_zone_name(m["zone"]), a=_lbl("pt_" + m["richtung"]),
                                             b=_lbl("pt_" + rest))
         out += _lbl("li_day_mixed").format(wie=wie)
-    sp = tag.get("sprung") or {}
-    h = int((sp.get("hour") or "00:00")[:2]) if sp else -1
-    if tag.get("sprung_hot") and num(sp.get("hpa")) and 6 <= h and h + 3 <= 22:   # nur im Flugtag
-        out += _lbl("li_jump").format(von=f"{h:02d}", bis=f"{h + 3:02d}", v=f"{sp['hpa']:+.1f}",
-                                      zone=_zone_name(sp.get("zone", "")))
+    # kein Satz zum staerksten 3-h-Sprung mehr (User 31.10.2026: braucht es nicht)
     # 3 Ausblick ueber die drei Prognosetage
     if num(slope):
         way = "up" if slope >= thr_s else "down" if slope <= -thr_s else "flat"
         key = ((f"li_was_{side}_{way}" if way != "flat" else "li_was_on_flat") if on["p"]
                else f"li_was_off_{way}")
         out += _lbl("li_dev").format(was=_lbl(key).format(**fmt), v=f"{slope:+.1f}")
-    return "neutral", pill, facts, out
+    # Pille sichtbar wie die anderen (User 31.10.2026): "info" (blau) — Hoch ist nicht
+    # "gut" (gruen), Tief nicht "schlecht" (orange); grau war auf Weiss kaum zu sehen
+    return "info", pill, facts, out
 
 
 def _lage_data_words(wl: dict | None, date: str) -> str:

@@ -373,8 +373,7 @@
       <div class="chain">
         {# 1 Lage — ein Satz fuer die ganze Schweiz, keine Zonen #}
         <div class="step"><div class="no">1</div><div>
-          <div class="h">{{ v3_labels.step_lage }} <small>· {{ v3_chain.lage.label }}</small>{% if v3_chain.lage.status %}<span class="tag {{ v3_chain.lage.status }}">{{ v3_chain.lage.status_label }}</span>{% endif %}
-            {% if v3_chain.stability.confidence %}<span class="conf">{{ v3_labels.confidence }} {{ v3_chain.stability.confidence }}</span>{% endif %}</div>
+          <div class="h">{{ v3_labels.step_lage }}{% if v3_chain.lage.status %}<span class="tag {{ v3_chain.lage.status }}">{{ v3_chain.lage.status_label }}</span>{% endif %}</div>
           {% if v3_chain.lage.facts %}<div class="facts">{% for f in v3_chain.lage.facts %}<span class="fact"><span class="k">{{ f.k }}</span>{{ f.v }}</span>{% endfor %}</div>{% endif %}
           {# Ein Text zur Lage: die Code-Fassung. Der KI-Tagessatz nimmt dieselbe
              Form an (Skill day_lines) und ersetzt sie, sobald er sie hat. #}

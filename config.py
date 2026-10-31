@@ -635,7 +635,7 @@ SYNOPTIC_ZONE_LABELS = {
     "alpennordhang":       {"de": "Alpennordhang", "en": "Northern Alps"},
     "wallis":              {"de": "Wallis", "en": "Valais"},
     "tessin":              {"de": "Tessin", "en": "Ticino"},
-    "graubuenden_engadin": {"de": "Graubuenden & Engadin",
+    "graubuenden_engadin": {"de": "Graubünden & Engadin",
                             "en": "Grisons & Engadine"},
 }
 # Gefahren-Schalter schweizweit (synoptic_llm.hazard_checks): "Regen" gilt als

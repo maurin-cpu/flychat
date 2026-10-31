@@ -508,16 +508,19 @@ class TestLageIndikatoren(unittest.TestCase):
                 "alpensued": {"n_spots": 97, "share_wind_warn": 0.9, "share_wind_crit": 0.9}}]},
         }
 
-    def test_pill_and_chips_like_foehn(self):
+    def test_pill_says_what_dominates_no_counting(self):
+        # User 31.10.2026: keine Indikatoren-Zaehlung — die Pille sagt Hoch oder Tief
         b = bc._lage_block(self._wl(), self.D)
-        self.assertTrue("4 of 4" in b["status_label"] or "4 von 4" in b["status_label"], b["status_label"])
-        self.assertTrue("Low pressure" in b["status_label"] or "Tiefdruck" in b["status_label"], b["status_label"])
-        self.assertEqual(len(b["facts"]), 4)
-        self.assertTrue(all(set(f) == {"k", "v", "on"} for f in b["facts"]))
-        self.assertEqual([f["on"] for f in b["facts"]], [True, True, True, True])
-        self.assertEqual(b["facts"][0]["v"], "1005.0 hPa")                       # Luftdruck zuerst
-        self.assertIn("Mitteleuropa", b["facts"][3]["v"])                        # nahes Tief
-        self.assertEqual(b["status"], "neutral")
+        self.assertIn(b["status_label"], ("Low pressure", "Tiefdruck"))
+        self.assertEqual(b["status"], "info")                                    # blau, sichtbar
+        self.assertEqual(len(b["facts"]), 2)                                     # heute, 3 Tage
+        self.assertTrue(all(set(f) == {"k", "v", "on"} and f["on"] is False for f in b["facts"]))
+        # heute zuerst, dann die naechsten 3 Tage (gleiche Reihenfolge wie der Text)
+        self.assertIn(b["facts"][0]["v"], ("strengthens", "verstärkt sich"))
+        self.assertIn(b["facts"][1]["v"], ("builds up", "baut sich auf"))
+        self.assertIn(b["facts"][1]["k"], ("Low pressure next 3 days", "Tiefdruck nächste 3 Tage"))
+        self.assertIn("1005.0 hPa", b["fazit"])
+        self.assertFalse(any("Mitteleuropa" in f["v"] or "Island" in f["v"] for f in b["facts"]))
 
     def test_text_state_day_outlook(self):
         txt = bc._lage_block(self._wl(), self.D)["fazit"]
@@ -525,11 +528,19 @@ class TestLageIndikatoren(unittest.TestCase):
         day = max(txt.find("Over the day"), txt.find("Über den Tag"))
         outlook = max(txt.find("Over the three forecast days"), txt.find("Über die drei Prognosetage"))
         self.assertTrue(0 <= state < day < outlook, txt)                          # Reihenfolge
-        self.assertIn("1.5 hPa", txt)
+        self.assertIn("-1.5 hPa", txt)
         self.assertIn("-3.0 hPa", txt)
-        self.assertTrue("low pressure deepens" in txt or "verstärkt sich der Tiefdruck" in txt, txt)
+        self.assertTrue("low pressure builds up" in txt or "baut sich der Tiefdruck auf" in txt, txt)
+        self.assertTrue("low pressure strengthens" in txt or "verstärkt sich der Tiefdruck" in txt, txt)
         for word in ("signs", "Zeichen", "Not in the data", "Nicht in den Daten", "Island", "Iceland"):
             self.assertNotIn(word, txt)
+
+    def test_distant_centers_are_not_named(self):
+        # Hoch ueber England (~1000 km) steht auf der Karte, nicht im Text (User 31.10.2026)
+        wl = self._wl(centers=[{"type": "Hoch", "region_label": "England", "lat": 52.0, "lon": -1.0, "msl_hpa": 1032}])
+        b = bc._lage_block(wl, self.D)
+        self.assertNotIn("England", b["fazit"])
+        self.assertFalse(any("England" in f["v"] or "1032" in f["v"] for f in b["facts"]))
 
     def test_only_pressure_no_wind_no_rain(self):
         txt = bc._lage_block(self._wl(), self.D)["fazit"].lower()
@@ -547,8 +558,8 @@ class TestLageIndikatoren(unittest.TestCase):
 
     def test_high_pressure_weakening(self):
         b = bc._lage_block(self._wl(msl=1022.0, regime="Hochdruck", slope=-2.5, tendenz=0.3), self.D)
-        self.assertTrue("1 of 4" in b["status_label"] or "1 von 4" in b["status_label"], b["status_label"])
-        self.assertTrue("high pressure weakens" in b["fazit"] or "schwächt sich der Hochdruck ab" in b["fazit"],
+        self.assertIn(b["status_label"], ("High pressure", "Hochdruck"))
+        self.assertTrue("high pressure weakens" in b["fazit"] or "klingt der Hochdruck ab" in b["fazit"],
                         b["fazit"])
         self.assertTrue("stays about the same (+0.3 hPa)" in b["fazit"]
                         or "bleibt der Druck etwa gleich (+0.3 hPa)" in b["fazit"], b["fazit"])
@@ -556,8 +567,7 @@ class TestLageIndikatoren(unittest.TestCase):
     def test_neither_takes_side_with_more_signs(self):
         b = bc._lage_block(self._wl(msl=1015.0, regime="neutral", slope=2.5, tendenz=1.2,
                                     centers=[]), self.D)
-        self.assertTrue("High pressure" in b["status_label"] or "Hochdruck" in b["status_label"], b["status_label"])
-        self.assertFalse(b["facts"][0]["on"])
+        self.assertIn(b["status_label"], ("Neither high nor low", "Weder Hoch noch Tief"))
         self.assertTrue("neither high nor low pressure (1015.0 hPa)" in b["fazit"]
                         or "weder Hoch- noch Tiefdruck (1015.0 hPa)" in b["fazit"], b["fazit"])
         self.assertTrue("pressure rises (+2.5" in b["fazit"] or "steigt der Druck (+2.5" in b["fazit"], b["fazit"])
@@ -565,20 +575,18 @@ class TestLageIndikatoren(unittest.TestCase):
     def test_mixed_day_names_north_south(self):
         b = bc._lage_block(self._wl(einig=False, muster={"art": "nord_sued", "nord": "down", "sued": "up"}),
                            self.D)
-        self.assertFalse(b["facts"][2]["on"])
-        self.assertTrue(b["facts"][2]["v"] in ("mixed", "uneinheitlich"), b["facts"][2]["v"])
+        self.assertFalse(b["facts"][0]["on"])
+        self.assertTrue(b["facts"][0]["v"] in ("mixed", "uneinheitlich"), b["facts"][0]["v"])
         self.assertTrue("north falling, south rising" in b["fazit"]
                         or "Norden fallend, Süden steigend" in b["fazit"], b["fazit"])
 
-    def test_jump_only_within_flying_day(self):
+    def test_no_jump_sentence(self):
+        # User 31.10.2026: der Satz zum staerksten 3-h-Sprung braucht es nicht
         jump = {"hpa": 2.4, "hour": "09:00", "zone": "tessin"}
-        b = bc._lage_block(self._wl(sprung=jump, sprung_hot=True), self.D)
-        self.assertIn("+2.4 hPa", b["fazit"])
-        night = {"hpa": 2.2, "hour": "03:00", "zone": "tessin"}
-        b = bc._lage_block(self._wl(sprung=night, sprung_hot=True), self.D)
-        self.assertNotIn("+2.2 hPa", b["fazit"])
-        b = bc._lage_block(self._wl(sprung=jump, sprung_hot=False), self.D)
-        self.assertNotIn("+2.4 hPa", b["fazit"])
+        txt = bc._lage_block(self._wl(sprung=jump, sprung_hot=True), self.D)["fazit"]
+        self.assertNotIn("+2.4 hPa", txt)
+        self.assertNotIn("3 hours", txt)
+        self.assertNotIn("3 Stunden", txt)
 
 
 class TestWarningsOnlyLabels(_De):
