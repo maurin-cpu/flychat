@@ -535,6 +535,8 @@
   window.WingcastWind = {
     create: create,
     legendGradient: legendGradient,
+    // Farbe einer Windstärke (km/h) auf derselben Skala wie Partikel und Pfeile
+    speedColor: function (kmh) { return speedScale()(kmh); },
     SPEED_MAX_KMH: SPEED_MAX_KMH,
   };
 })();

@@ -2528,6 +2528,10 @@ def map_page():
 
 @app.route("/foehn")
 def foehn_explain_page():
+    # Admin: Karte mit Briefing-Pille und Ebenen (foehn_karte.html); "So zaehlen wir"
+    # bleibt ueber ?erklaerung=1 erreichbar und fuer alle anderen Besucher.
+    if _is_admin() and request.args.get("erklaerung") != "1":
+        return render_template("foehn_karte.html", forecast_days=current_max_days())
     """Erklaerseite 'So zaehlen wir' zum Foehn-Block des Briefings (Link
     "How we count" im Mail/App). Alle Grenzen aus den Konstanten in
     foehn_indicators — eine Quelle mit der Zaehlregel. ?lang=de|en, sonst Server-Sprache."""
@@ -4370,6 +4374,42 @@ def api_foehn():
         },
         "stations": FOEHN_STATIONS,
     })
+
+
+@app.route("/api/foehn/karte")
+@_require_admin
+def api_foehn_karte():
+    """Föhn-Karte eines Tages (Admin): Windraster, Talpunkte, Druck je Flugstunde aus
+    data/foehn_karte.json plus Pille, Labels und Satz des Briefings (dieselben Funktionen
+    wie der Briefing-Block). ?tag=N, 0 = heute. 503, solange noch keine Datei existiert."""
+    import foehn_karte
+    from engine.synoptic_context import load_synoptic_cache
+    from scripts import briefing_v3_context as bc
+    store = foehn_karte.lade()
+    dates = ((store or {}).get("tage") or [])[:current_max_days()]
+    if not dates:
+        return jsonify({"error": "Noch keine Föhn-Karte gespeichert (entsteht im Morgenlauf)."}), 503
+    try:
+        idx = int(request.args.get("tag", 0))
+    except ValueError:
+        idx = 0
+    datum = dates[min(max(idx, 0), len(dates) - 1)]
+    wetterlage = load_synoptic_cache() or {}
+    tage = {}
+    for d in dates:
+        ind = bc._foehn_indicators_for(wetterlage, d)
+        if not ind:
+            tage[d] = None
+            continue
+        art, pille, facts = bc._foehn_indicator_status(ind)
+        tage[d] = {
+            "pille": pille, "pille_art": art,
+            "labels": [{"text": f"{f['k']}: {f['v']}", "on": bool(f.get("on"))} for f in facts],
+            "satz": bc._foehn_indicator_text(ind),
+        }
+    body = foehn_karte.ansicht(store, datum)
+    body.update(tage=tage, dates=dates)
+    return jsonify(body)
 
 
 def _safe_get(arr, i):

@@ -210,3 +210,25 @@ Er sagt nie „Föhn“ oder „kein Föhn“.
   wenigen Regionen die Hälfte). Labels ohne Uhrzeit und mit Richtung der Föhnseite:
   „Regions with north wind 3 of 11“, „North side aloft 3.8 °C cooler“, „Valleys with dry
   north wind 6 of 9“ („of N“ = Regionen/Täler dieser Föhnseite).
+
+## Föhn-Karte (/foehn, seit 01.11.2026, nur Admin)
+
+Die Seite zeigt, was das Briefing sagt, auf der Karte: Pille und Labels des Briefings
+(dieselben Funktionen wie der Block), Windpartikel über die Schweiz, Rasterzellen in
+Föhnrichtung (genau die Regionen, die gezählt werden), Talpunkte mit dem Stundenzustand
+(`foehn_indicators.talpunkt_stunde`, dieselbe Regel wie das Briefing) und Druck/Luvseite an
+Zürich und Lugano. Zeitleiste 06–17 Uhr mit Play.
+
+- **Daten:** `data/foehn_karte.json` (`foehn_karte.py`), geschrieben aus
+  `decide_foehn_summary` im Morgenlauf — server-lokal, gitignored, Klasse wie
+  `synoptic_context.json`. Enthält das volle Windraster (1334 Zellen, 29 × 46) je Flugstunde.
+- **API:** `GET /api/foehn/karte?tag=N` (Admin). 503, solange keine Datei existiert.
+- **Lokal:** `python scripts/foehn_karte_bauen.py` baut die Datei aus den Live-Prognosen und
+  ersetzt im lokalen `synoptic_context.json` nur den Block `foehn`.
+- **Erklärtext** „So zählen wir“: `/foehn?erklaerung=1`, für alle übrigen Besucher
+  ist `/foehn` der Erklärtext.
+- **Entfallen:** das Druck-/Wind-Verlaufsdiagramm im Admin-Overlay (der Block `foehn_diagram.js`
+  wird auf `/foehn` nicht mehr eingebunden). Der „Kammwind“ darin war der Wind auf 700 hPa über
+  Zürich, nicht der Alpenkamm. Ein Verlauf mit Luvseite-Temperatur statt Kammwind ist offen.
+- **Offen:** Regionsumrisse (nur die Zellen sind gezeichnet), DE/EN-Texte in `i18n.py` (derzeit
+  deutsch), Windfarbskala (noch auf die 700-hPa-Kalibrierung der Synoptik eingestellt).

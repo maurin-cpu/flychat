@@ -54,6 +54,7 @@ data/weather_archive/
 data/spot_analyses_en.json
 data/region_analyses_en.json
 data/synoptic_context.json
+data/foehn_karte.json
 # je weitere Sprache (oeffentliches Briefing) + dessen Tages-JSON — Laufzeit-Ausgaben
 data/synoptic_context.*.json
 data/public_briefing/

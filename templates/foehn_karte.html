@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Föhn – Karte · Wingcast{% endblock %}
+
+{# Texte in der Sprache des Briefings (lang = aktuelle i18n-Sprache, wie /foehn?lang=).
+   Karten-Texte (Windlegende, Stufen) kommen wie auf /synoptik aus den js.syn.*-Schlüsseln. #}
+{% set FK_TEXT = {
+  'de': {
+    'karte_aria': 'Karte: Föhnlage im Tagesverlauf',
+    'lage': 'Föhn-Zeichen',
+    'verlauf': 'Tagesverlauf',
+    'verlauf_druck': 'Druckunterschied', 'verlauf_druck_note': 'Süden höher: über 0',
+    'verlauf_kamm': 'Wind in 3000 m', 'verlauf_kamm_note': 'Mittel über zehn Alpenpässe',
+    'verlauf_luv': 'Temperatur auf 2000 m', 'verlauf_luv_note': 'unter 0: Lugano kühler',
+    'ebenen': 'Auf der Karte',
+    'eb_wind': 'Wind in 10 m', 'eb_kamm': 'Höhenwind je Region (700 hPa)', 'reg_hoehe': 'Höhenwind in der Region', 'hoehe_titel': 'Höhenwind 700 hPa (km/h)',
+    'eb_region': 'Regionen: Anteil mit Föhnwind', 'eb_taeler': 'Täler mit trockenem Föhnwind',
+    'eb_station': 'Druck Zürich und Lugano',
+    'zeichen_zahl': 'Regionen: Gesamtstärke', 'bloecke_hint': 'Gezeigt werden die Regionen der Föhnrichtung der Stunde (Druck).', 'reg_von_kurz': 'Zeichen',
+    'zurueck': 'Schließen',
+    'verlauf_rh': 'Luftfeuchte am Boden', 'verlauf_rh_note': 'Mittel Zürich und Lugano · Grenze 68 %',
+    'reg_von': 'von {m} Zeichen', 'reg_nicht_pruefbar': 'nicht prüfbar', 'reg_keine_messung': 'Trockener Föhnwind im Tal: keine Talmessung in dieser Region', 'tab_regionen': 'Föhntäler nach Stunde', 'panel_titel': 'Föhn-Übersicht', 'reg_matrix_hint': 'Zeile ein Föhntal, Spalte eine Stunde. Je dunkler, desto mehr und stärkere Hinweise.', 'st_kaum': 'kaum', 'st_einige': 'einige', 'st_deutlich': 'deutlich', 'st_stark6': 'stark', 'reg_leer': 'In diesem Tag erfüllt keine Region ein Zeichen.', 'reg_druck': 'Druckunterschied Lugano − Zürich', 'reg_wind': 'Wind in der Region',
+    'reg_luv': 'Kühlere Luvseite', 'reg_tal': 'Trockener Föhnwind in einem Tal', 'reg_taeler': 'Täler dieser Region',
+    'reg_ja': 'erfüllt', 'reg_nein': 'nicht erfüllt', 'reg_seite_sued': 'Südwind', 'reg_seite_nord': 'Nordwind',
+    'staerke': 'Windstärke (km/h)',
+    'taeler_btn': 'Verlauf und Täler', 'tab_verlauf': 'Verlauf', 'tab_taeler': 'Täler nach Stunde', 'taeler': 'Verlauf und Täler',
+    'panel_hint': 'Jede Zeile ein Tal, jede Spalte eine Stunde (06–17 Uhr). Die gewählte Stunde ist umrandet.',
+    'leg_stark': 'stark', 'leg_trocken': 'trocken, schwach', 'leg_kein': 'kein Föhnwind',
+    'satz_an': 'Zeichen und Text anzeigen', 'satz_aus': 'Ausblenden',
+    'foot': 'So zählen wir · Grenzen', 'schliessen': 'Schliessen',
+    'play': 'Abspielen', 'pause': 'Pause', 'stand': 'Stand',
+    'druck_sued': 'Süden höher um {x} hPa', 'druck_nord': 'Norden höher um {x} hPa',
+    'nicht_da': 'Föhnkarte gerade nicht verfügbar'
+  },
+  'en': {
+    'karte_aria': 'Map: foehn situation over the day',
+    'lage': 'Foehn signs',
+    'verlauf': 'Over the day',
+    'verlauf_druck': 'Pressure difference', 'verlauf_druck_note': 'south higher: above 0',
+    'verlauf_kamm': 'Wind at 3000 m', 'verlauf_kamm_note': 'mean over ten Alpine passes',
+    'verlauf_luv': 'Temperature at 2000 m', 'verlauf_luv_note': 'below 0: Lugano cooler',
+    'ebenen': 'On the map',
+    'eb_wind': 'Wind at 10 m', 'eb_kamm': 'Upper wind per region (700 hPa)', 'reg_hoehe': 'Upper wind in the region', 'hoehe_titel': 'Upper wind 700 hPa (km/h)',
+    'eb_region': 'Regions: share with foehn wind', 'eb_taeler': 'Valleys with dry foehn wind',
+    'eb_station': 'Pressure Zurich and Lugano',
+    'zeichen_zahl': 'Regions: overall strength', 'bloecke_hint': 'Shows the regions of the foehn direction of the hour (pressure).', 'reg_von_kurz': 'signs',
+    'zurueck': 'Close',
+    'verlauf_rh': 'Humidity at ground', 'verlauf_rh_note': 'mean Zurich and Lugano · limit 68 %',
+    'reg_von': 'of {m} signs', 'reg_nicht_pruefbar': 'not checkable', 'reg_keine_messung': 'Dry foehn wind in a valley: no valley measurement in this region', 'tab_regionen': 'Foehn valleys by hour', 'panel_titel': 'Foehn overview', 'reg_matrix_hint': 'Each row a foehn valley, each column an hour. The darker, the more and stronger signs.', 'st_kaum': 'faint', 'st_einige': 'some', 'st_deutlich': 'clear', 'st_stark6': 'strong', 'reg_leer': 'No region meets a sign on this day.', 'reg_druck': 'Pressure difference Lugano − Zurich', 'reg_wind': 'Wind in the region',
+    'reg_luv': 'Cooler windward side', 'reg_tal': 'Dry foehn wind in a valley', 'reg_taeler': 'Valleys in this region',
+    'reg_ja': 'met', 'reg_nein': 'not met', 'reg_seite_sued': 'south wind', 'reg_seite_nord': 'north wind',
+    'staerke': 'Wind speed (km/h)',
+    'taeler_btn': 'Profile and valleys', 'tab_verlauf': 'Over the day', 'tab_taeler': 'Valleys by hour', 'taeler': 'Profile and valleys',
+    'panel_hint': 'Each row a valley, each column an hour (06–18). The selected hour is outlined.',
+    'leg_stark': 'strong', 'leg_trocken': 'dry, weak', 'leg_kein': 'no foehn wind',
+    'satz_an': 'Show signs and text', 'satz_aus': 'Hide',
+    'foot': 'How we count · limits', 'schliessen': 'Close',
+    'play': 'Play', 'pause': 'Pause', 'stand': 'Status',
+    'druck_sued': 'south higher by {x} hPa', 'druck_nord': 'north higher by {x} hPa',
+    'nicht_da': 'Foehn map not available right now'
+  }
+} %}
+{% set T = FK_TEXT['en'] if lang == 'en' else FK_TEXT['de'] %}
+
+{% block head %}
+<link rel="preconnect" href="https://a.basemaps.cartocdn.com">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+      integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
+      crossorigin="anonymous" referrerpolicy="no-referrer" />
+{# Design wie /synoptik: dessen Stylesheet liefert Glas-Legende, Steuerleiste, Zeitleiste und Knöpfe #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/synoptik.css') }}?v={{ static_v('css/synoptik.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/foehn_karte.css') }}?v={{ static_v('css/foehn_karte.css') }}">
+{% endblock %}
+
+{% block content %}
+{# Vollbild wie /regionen und /airspace: Karte füllt alles unter dem Menü, Bedienelemente schweben darüber #}
+<div class="fk-layout" id="fkRoot" data-api="/api/foehn/karte" data-lang="{{ lang }}">
+  <div id="fkMap" role="region" aria-label="{{ T.karte_aria }}"></div>
+
+  <div class="floating-control floating-day-tabs" id="navDayTabs"></div>
+
+
+  {# Rechts oben: Ebenen wie die Legende auf /synoptik, mit Windstärke-Skala #}
+  <aside class="syn-legend fk-legende" aria-label="{{ T.ebenen }}">
+    <div class="syn-legend-title">{{ T.ebenen }}</div>
+    <label class="fk-ebene"><input type="checkbox" id="fkEbWind" disabled>
+      <span class="fk-sym fk-sym--pfeil" aria-hidden="true"></span> {{ T.eb_wind }}</label>
+    <label class="fk-ebene"><input type="checkbox" id="fkEbKamm" checked disabled>
+      <span class="fk-sym fk-sym--kamm" aria-hidden="true"></span> {{ T.eb_kamm }}</label>
+    <label class="fk-ebene"><input type="checkbox" id="fkEbRegion" checked>
+      <span class="fk-sym fk-sym--region" aria-hidden="true"></span> {{ T.zeichen_zahl }}</label>
+    <p class="fk-bloecke-hinweis">{{ T.bloecke_hint }}</p>
+    <div class="fk-stufen" aria-hidden="true">
+      <div class="fk-stufen-bar"></div>
+      <div class="fk-stufen-werte"><span>{{ T.st_kaum }}</span><span>{{ T.st_einige }}</span><span>{{ T.st_deutlich }}</span><span>{{ T.st_stark6 }}</span></div>
+    </div>
+    <label class="fk-ebene"><input type="checkbox" id="fkEbTaeler" checked>
+      <span class="fk-sym fk-sym--tal" aria-hidden="true"></span> {{ T.eb_taeler }}</label>
+    <label class="fk-ebene"><input type="checkbox" id="fkEbStation" checked>
+      <span class="fk-sym fk-sym--station" aria-hidden="true"></span> {{ T.eb_station }}</label>
+
+    <div class="syn-legend-title syn-legend-title--wind" id="fkLegWind"></div>
+    <div class="syn-legend-bar" id="fkLegBar" aria-hidden="true"></div>
+    <div class="syn-legend-scale" id="fkLegScale" aria-hidden="true"></div>
+
+    <div class="syn-legend-title syn-legend-title--wind" id="fkLegHoehe">{{ T.hoehe_titel }}</div>
+    <div class="syn-legend-bar" id="fkLegHoeheBar" aria-hidden="true"></div>
+    <div class="syn-legend-scale" id="fkLegHoeheScale" aria-hidden="true"></div>
+  </aside>
+
+
+  <div class="fk-notice" id="fkNotice" hidden></div>
+
+  {# Unten: Steuerleiste wie auf /synoptik (Abspielen, Uhrzeit, Zeitleiste) #}
+  <div class="syn-map-bar fk-zeit" role="group" aria-label="Uhrzeit wählen">
+    <div class="syn-controls">
+      <button type="button" class="syn-play" id="fkPlay" disabled aria-label="{{ T.play }}">
+        <svg class="syn-play-ic syn-play-ic--play" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M8 5.3v13.4L18.5 12z"/></svg>
+        <svg class="syn-play-ic syn-play-ic--pause" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M7 5h3.4v14H7zM13.6 5H17v14h-3.6z"/></svg>
+      </button>
+      <div class="syn-readout" id="fkReadout" aria-live="polite"></div>
+      <span class="syn-timestamp" id="fkStand"></span>
+    </div>
+    <div class="syn-timeline" id="fkTimeline"></div>
+  </div>
+
+  <button type="button" class="floating-control fk-panel-btn" id="fkPanelBtn" aria-controls="fkPanel" aria-expanded="false">
+    {{ T.taeler_btn }}
+  </button>
+
+  <aside class="fk-panel" id="fkPanel" aria-label="{{ T.taeler }}">
+    <header class="fk-panel-head">
+      <h1 class="fk-heading" id="fkPanelTitel">{{ T.panel_titel }}</h1>
+      <button type="button" class="fk-close" id="fkClose" aria-label="{{ T.schliessen }}">&times;</button>
+    </header>
+    <div class="fk-panel-body">
+      <section id="fkRegionenTab" class="fk-box-panel" aria-label="{{ T.tab_regionen }}">
+        <h2 class="fk-box-titel">{{ T.tab_regionen }}</h2>
+        <p class="fk-tab-hinweis">{{ T.reg_matrix_hint }}</p>
+        <div class="fk-stufen" aria-hidden="true">
+          <div class="fk-stufen-bar"></div>
+          <div class="fk-stufen-werte"><span>{{ T.st_kaum }}</span><span>{{ T.st_einige }}</span><span>{{ T.st_deutlich }}</span><span>{{ T.st_stark6 }}</span></div>
+        </div>
+        <div class="fk-tal-tabelle" id="fkRegionenMatrix"></div>
+      </section>
+      <div id="fkRegionDetail" hidden></div>
+      {# Tagesverlauf oben im Panel: Druck, Kammwind, Luvseite, Luftfeuchte. Die Zeitleiste unten steuert alles. #}
+      <section class="fk-verlauf-panel" id="fkVerlauf" aria-label="{{ T.verlauf }}">
+        <h2 class="fk-box-titel">{{ T.verlauf }}</h2>
+  <div class="fk-vz">
+    <div class="fk-vz-kopf"><span class="fk-vz-titel">{{ T.verlauf_druck }}</span><span class="fk-vz-wert" id="fkWDruck"></span></div>
+    <div class="fk-vz-note">{{ T.verlauf_druck_note }}</div>
+    <div class="fk-vz-note" id="fkNDruck"></div>
+      <svg class="fk-vz-svg" id="fkVDruck" viewBox="0 0 300 64" preserveAspectRatio="none" role="img" aria-label="{{ T.verlauf_druck }}"></svg>
+  </div>
+  <div class="fk-vz">
+    <div class="fk-vz-kopf"><span class="fk-vz-titel">{{ T.verlauf_kamm }}</span><span class="fk-vz-wert" id="fkWKamm"></span></div>
+    <div class="fk-vz-note">{{ T.verlauf_kamm_note }}</div>
+    <div class="fk-vz-note" id="fkNKamm"></div>
+      <svg class="fk-vz-svg" id="fkVKamm" viewBox="0 0 300 64" preserveAspectRatio="none" role="img" aria-label="{{ T.verlauf_kamm }}"></svg>
+  </div>
+  <div class="fk-vz">
+    <div class="fk-vz-kopf"><span class="fk-vz-titel">{{ T.verlauf_luv }}</span><span class="fk-vz-wert" id="fkWLuv"></span></div>
+    <div class="fk-vz-note">{{ T.verlauf_luv_note }}</div>
+    <div class="fk-vz-note" id="fkNLuv"></div>
+      <svg class="fk-vz-svg" id="fkVLuv" viewBox="0 0 300 64" preserveAspectRatio="none" role="img" aria-label="{{ T.verlauf_luv }}"></svg>
+  </div>
+  <div class="fk-vz">
+    <div class="fk-vz-kopf"><span class="fk-vz-titel">{{ T.verlauf_rh }}</span><span class="fk-vz-wert" id="fkWRh"></span></div>
+    <div class="fk-vz-note">{{ T.verlauf_rh_note }}</div>
+    <div class="fk-vz-note" id="fkNRh"></div>
+      <svg class="fk-vz-svg" id="fkVRh" viewBox="0 0 300 64" preserveAspectRatio="none" role="img" aria-label="{{ T.verlauf_rh }}"></svg>
+  </div>
+      <div class="fk-zeitachse" aria-hidden="true"><span>06</span><span>09</span><span>12</span><span>15</span><span>17</span></div>
+      </section>
+      <p class="fk-foot">
+        <a href="{{ url_for('foehn_explain_page', erklaerung=1) }}">{{ T.foot }}</a>
+      </p>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+        integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"
+        integrity="sha512-vc58qvvBdrDR4etbxMdlTt4GBQk1qjvyORR2nrsPsFPyrs+/u5c3+1Ct6upOgdZoIl7eq6k3a1UPDSNAQi/32A=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="{{ url_for('static', filename='js/synoptic-wind.js') }}?v={{ static_v('js/synoptic-wind.js') }}"></script>
+<script>window.FK_TEXT = {{ T | tojson }};</script>
+<script src="{{ url_for('static', filename='js/foehn_karte.js') }}?v={{ static_v('js/foehn_karte.js') }}"></script>
+{% endblock %}

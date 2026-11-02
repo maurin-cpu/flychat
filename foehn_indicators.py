@@ -582,6 +582,18 @@ def tal_side(foehn_typ: str) -> str:
     return "nord" if (foehn_typ or "").startswith("Nord") else "sued"
 
 
+def talpunkt_stunde(w: float, g: float, d: float, rh: float, lo: float, hi: float) -> dict:
+    """Eine Stunde eines Talpunkts (Wind km/h, Böe km/h, Richtung °, Feuchte %, Sektor lo→hi).
+    dir_dry: Richtung + trockene Luft, ohne Windstärke-Grenze der Stärke-Regel — erkannte im
+    Föhnfall 26.-28.08.2026 84-85 % der Föhnstunden, weil die Modelle den Foehnwind zu
+    schwach zeigen (Blog wetterkunde/foehn). strikt: Richtung + Stärke + Feuchte (Hauptregel)."""
+    in_dir = dir_in_sector(d, lo, hi)
+    return {
+        "dir_dry": in_dir and rh <= TAL_RH_WEAK and (w >= TAL_WIND_WEAK_KMH or g >= TAL_GUST_WEAK_KMH),
+        "strikt": in_dir and (w >= TAL_WIND_MIN_KMH or g >= TAL_GUST_MIN_KMH) and rh <= TAL_RH_MAX,
+    }
+
+
 def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str, sektor=None) -> dict:
     """Föhnstunden eines Talpunkts in den Stunden `indices` (Flugfenster eines Tages).
 
@@ -619,17 +631,13 @@ def evaluate_talpunkt(hourly: dict, indices: list, foehn_typ: str, sektor=None) 
         all_w.append(w)
         all_g.append(g)
         all_rh.append(rh)
-        in_dir, dry = dir_in_sector(d, lo, hi), rh <= TAL_RH_MAX
-        dry_weak = rh <= TAL_RH_WEAK
-        # Richtung + trockene Luft, ohne Windstaerke: erkannte im Foehnfall
-        # 26.-28.08.2026 84-85 % der Foehnstunden, weil die Modelle den
-        # Foehnwind zu schwach zeigen (Blog wetterkunde/foehn, Abschnitt Prognose)
-        if in_dir and dry_weak and (w >= TAL_WIND_WEAK_KMH or g >= TAL_GUST_WEAK_KMH):
+        st = talpunkt_stunde(w, g, d, rh, lo, hi)
+        if st["dir_dry"]:
             if not dir_dry_hours:
                 first_dir_dry = i
             dir_dry_hours += 1
             foehn_dirs.append(d)
-        if in_dir and (w >= TAL_WIND_MIN_KMH or g >= TAL_GUST_MIN_KMH) and dry:
+        if st["strikt"]:
             winds.append(w)
             gusts.append(g)
             hours.append(i)
@@ -689,16 +697,11 @@ def summarize_taeler(results: list) -> dict:
 _KARTE_PUNKTE: list = []
 
 
-def karte_punkte() -> list:
-    """Rasterpunkte der Windkarte: {lat, lon, region_id, region, sides} — nur Regionen
-    der Alpen (KARTE_TERRAIN); `sides` = Föhnrichtungen der Region (kritischer_foehn:
-    Süd, Nord oder Beide).
-    Punkt-in-Polygon gegen regionen_polygone_mapped.geojson. Einmal je Prozess."""
-    if _KARTE_PUNKTE:
-        return _KARTE_PUNKTE
+def _karte_regionen():
+    """Alpenregionen der Windkarte: ({id: {region, sides}}, [(id, Polygon)])."""
     import csv
     import json as _json
-    from shapely.geometry import Point, shape
+    from shapely.geometry import shape
     base = config.FOEHN_TALPUNKTE_PATH.parent
     meta = {}
     with open(base / "regionen.csv", encoding="utf-8") as f:
@@ -711,6 +714,18 @@ def karte_punkte() -> list:
     with open(base / "regionen_polygone_mapped.geojson", encoding="utf-8") as f:
         polys = [(ft["properties"]["id"], shape(ft["geometry"]))
                  for ft in _json.load(f)["features"] if ft["properties"].get("id") in meta]
+    return meta, polys
+
+
+def karte_punkte() -> list:
+    """Rasterpunkte der Windkarte: {lat, lon, region_id, region, sides} — nur Regionen
+    der Alpen (KARTE_TERRAIN); `sides` = Föhnrichtungen der Region (kritischer_foehn:
+    Süd, Nord oder Beide).
+    Punkt-in-Polygon gegen regionen_polygone_mapped.geojson. Einmal je Prozess."""
+    if _KARTE_PUNKTE:
+        return _KARTE_PUNKTE
+    from shapely.geometry import Point
+    meta, polys = _karte_regionen()
     lat = 45.85
     while lat <= 47.75:
         lon = 6.0
@@ -724,11 +739,121 @@ def karte_punkte() -> list:
     return _KARTE_PUNKTE
 
 
+# Volles Raster über die Schweiz auf dem Gitter von karte_punkte(): Zeilen Nord→Süd,
+# Spalten West→Ost (row-major, wie engine/synoptic_grid.py). 29 × 46 = 1334 Zellen.
+KARTE_RASTER = {"lat0": 47.81, "lon0": 6.0, "dlat": -0.07, "dlon": 0.1, "ny": 29, "nx": 46}
+_KARTE_RASTER: list = []
+
+
+def karte_raster() -> list:
+    """Alle Zellen des Schweizer Rasters: {lat, lon, region_id, region, sides}. region_id
+    ist None ausserhalb der Alpenregionen (Mittelland, Jura, Ausland). Einmal je Prozess."""
+    if _KARTE_RASTER:
+        return _KARTE_RASTER
+    from shapely.geometry import Point
+    g = KARTE_RASTER
+    meta, polys = _karte_regionen()
+    for j in range(g["ny"]):
+        lat = round(g["lat0"] + j * g["dlat"], 2)
+        for i in range(g["nx"]):
+            lon = round(g["lon0"] + i * g["dlon"], 2)
+            rid = next((r for r, poly in polys if poly.contains(Point(lon, lat))), None)
+            _KARTE_RASTER.append({"lat": lat, "lon": lon, "region_id": rid,
+                                  **(meta[rid] if rid else {"region": "", "sides": ()})})
+    return _KARTE_RASTER
+
+
+def karte_punkt_rot(w, d, g) -> Optional[str]:
+    """Föhnrichtung ("sued"/"nord") eines Rasterpunkts in einer Stunde, sonst None: Richtung
+    im Passsektor UND Mittelwind ≥ KARTE_WIND_KMH oder Böe ≥ KARTE_GUST_KMH."""
+    side = _side_of(d) if w is not None and d is not None else None
+    return side if side and (w >= KARTE_WIND_KMH or (g or 0) >= KARTE_GUST_KMH) else None
+
+
+# Kammpunkte: zehn feste Alpenpässe für den Wind in Kammhöhe (700 hPa, ca. 3000 m).
+# Ein einzelner Punkt wäre irreführend, mehrere zeigen die Strömung über den Kamm.
+KAMM_PUNKTE = [
+    {"id": "gotthard", "name": "Gotthard", "lat": 46.56, "lon": 8.56},
+    {"id": "furka", "name": "Furka", "lat": 46.57, "lon": 8.41},
+    {"id": "grimsel", "name": "Grimsel", "lat": 46.56, "lon": 8.33},
+    {"id": "oberalp", "name": "Oberalp", "lat": 46.63, "lon": 8.67},
+    {"id": "lukmanier", "name": "Lukmanier", "lat": 46.56, "lon": 8.96},
+    {"id": "simplon", "name": "Simplon", "lat": 46.27, "lon": 8.03},
+    {"id": "loetschen", "name": "Lötschenpass", "lat": 46.42, "lon": 7.82},
+    {"id": "julier", "name": "Julier", "lat": 46.54, "lon": 9.68},
+    {"id": "fluela", "name": "Flüela", "lat": 46.80, "lon": 9.94},
+    {"id": "bernina", "name": "Bernina", "lat": 46.41, "lon": 10.01},
+]
+
+
+def fetch_hoehen_raster(forecast_days: int = 2) -> Optional[list]:
+    """Wind in 700 hPa an den Rasterpunkten der Alpenregionen (karte_raster mit region_id).
+    Rückgabe je Punkt: {region_id, time, speed (km/h), dir (°, woher)}; None bei Fehler.
+    Blöcke zu 150 Punkten wie fetch_wind_karte; nur Höhenmodelle liefern 700 hPa."""
+    punkte = [c for c in karte_raster() if c.get("region_id")]
+    out = []
+    for i in range(0, len(punkte), 150):
+        chunk = punkte[i:i + 150]
+        params = config.with_api_key({
+            "latitude": ",".join(str(p["lat"]) for p in chunk),
+            "longitude": ",".join(str(p["lon"]) for p in chunk),
+            "hourly": "wind_speed_700hPa,wind_direction_700hPa",
+            "models": ",".join(FOEHN_SURFACE_MODELS + FOEHN_PL_MODELS),
+            "forecast_days": forecast_days,
+            "timezone": config.TIMEZONE,
+        })
+        try:
+            resp = requests.get(config.API_URL, params=params, timeout=config.API_TIMEOUT)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception:
+            return None
+        data = data if isinstance(data, list) else [data]
+        if len(data) != len(chunk):
+            return None
+        for p, d in zip(chunk, data):
+            h = _merge_models(d)["hourly"]
+            out.append({"region_id": p["region_id"], "time": h.get("time") or [],
+                        "speed": h.get("wind_speed_700hPa") or [], "dir": h.get("wind_direction_700hPa") or []})
+    return out
+
+
+def fetch_kamm_wind(forecast_days: int = 2) -> Optional[list]:
+    """Wind in 700 hPa an den KAMM_PUNKTEN. Nur die Höhenmodelle (ICON-D2/EU) liefern 700 hPa,
+    _merge_models nimmt je Stunde den ersten Wert. Rückgabe je Punkt:
+    {id, name, lat, lon, time, speed (km/h), dir (°, woher), model}; None bei Fehler."""
+    punkte = KAMM_PUNKTE
+    params = config.with_api_key({
+        "latitude": ",".join(str(p["lat"]) for p in punkte),
+        "longitude": ",".join(str(p["lon"]) for p in punkte),
+        "hourly": "wind_speed_700hPa,wind_direction_700hPa",
+        "models": ",".join(FOEHN_SURFACE_MODELS + FOEHN_PL_MODELS),
+        "forecast_days": forecast_days,
+        "timezone": config.TIMEZONE,
+    })
+    try:
+        resp = requests.get(config.API_URL, params=params, timeout=config.API_TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        return None
+    data = data if isinstance(data, list) else [data]
+    if len(data) != len(punkte):
+        return None
+    out = []
+    for p, d in zip(punkte, data):
+        h = _merge_models(d)["hourly"]
+        out.append({**p, "time": h.get("time") or [],
+                    "speed": h.get("wind_speed_700hPa") or [], "dir": h.get("wind_direction_700hPa") or [],
+                    "model": h.get("model_pl") or []})
+    return out
+
+
 def fetch_wind_karte(forecast_days: int = 2) -> Optional[dict]:
     """Stundenwind an allen Rasterpunkten (ICON-CH1, dann ICON-CH2, 10 m), Blöcke zu
     150 Punkten. {"model": [je Stunde], "time", "punkte": [{..karte_punkte..,
     "hourly": {...}}]}; None bei Fehler."""
-    pts = karte_punkte()
+    pts = karte_raster()
     if not pts:
         return None
     out, times, model = [], None, None
@@ -785,6 +910,8 @@ def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
         return None
     per = {}
     for p in karte["punkte"]:
+        if not p.get("region_id"):      # Raster-Zelle ausserhalb der Alpenregionen
+            continue
         h = p.get("hourly") or {}
         r = per.setdefault(p["region_id"], {"n": 0, "sued": 0, "nord": 0,
                                            "region": p.get("region", ""), "sides": p.get("sides") or ()})
@@ -794,10 +921,8 @@ def evaluate_wind_karte(karte: Optional[dict], date: str) -> Optional[dict]:
         for i in idx:
             w, d, g = (_num(h.get("wind_speed_10m"), i), _num(h.get("wind_direction_10m"), i),
                        _num(h.get("wind_gusts_10m"), i))
-            if w is None or d is None:
-                continue
-            side = _side_of(d)
-            if side and (w >= KARTE_WIND_KMH or (g or 0) >= KARTE_GUST_KMH):
+            side = karte_punkt_rot(w, d, g)
+            if side:
                 hits[side] += 1
                 if first[side] is None:
                     first[side] = int(times[i][11:13])

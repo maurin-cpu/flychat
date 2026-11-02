@@ -1,0 +1,760 @@
+/* Föhn (/foehn, Admin). Vollbild wie /regionen und /airspace: die Karte füllt alles unter
+   dem Menü, Bedienelemente schweben darüber. Die Glas-Optik, Legende, Steuerleiste,
+   Zeitleiste und Knöpfe kommen aus synoptik.css, damit alles wie /synoptik aussieht.
+   Hier nur, was dort fehlt: Zeichen-Box, Verlauf, Täler-Panel und Ebenen-Schalter. */
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  height: 60px;
+}
+
+body {
+  padding-top: 60px;
+  overflow: hidden;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+#main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.fk-layout {
+  --fk-panel-w: min(400px, 40vw);
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#fkMap {
+  position: absolute;
+  inset: 0;
+}
+
+.fk-layout.panel-open .floating-day-tabs {
+  left: calc((100% - var(--fk-panel-w)) / 2);
+}
+
+.fk-layout button:focus-visible,
+.fk-layout input:focus-visible,
+.fk-layout a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Leaflet-Zoom unter die Tagestasten schieben (wie /regionen) */
+.fk-layout .leaflet-control-zoom { margin-top: 56px; }
+
+/* ---------- Boxen (Glas, wie die Legende auf /synoptik) ---------- */
+
+.fk-box {
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  backdrop-filter: blur(12px) saturate(1.3);
+}
+
+.fk-box[hidden] { display: none; }
+
+.fk-box-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.fk-box-titel {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-secondary);
+}
+
+.fk-pille {
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+}
+
+.fk-pille--warn { background: #fed7aa; color: #9a3412; }
+.fk-pille--info { background: var(--color-primary-light); color: var(--color-primary); }
+
+/* ---------- Links oben: die vier Zeichen des Briefings ---------- */
+
+.fk-lage {
+  position: absolute;
+  top: 76px;
+  left: var(--space-4);
+  width: 300px;
+  max-width: calc(100% - 2 * var(--space-4));
+  font-size: var(--text-sm);
+  z-index: 1040;
+}
+
+.fk-zeichen {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.fk-zeichen li {
+  padding: 6px 10px;
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.fk-zeichen li.is-on {
+  border-left-color: #ea580c;
+  background: #fff7ed;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.fk-satz {
+  margin: 10px 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.fk-satz { display: none; }
+.fk-lage.is-offen .fk-satz { display: block; }
+
+.fk-satz-knopf {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+/* ---------- Reiter im Panel: Verlauf / Täler nach Stunde ---------- */
+
+.fk-reiter {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.fk-reiter-btn {
+  flex: 1;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fk-reiter-btn.is-active {
+  background: var(--color-bg-elevated);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Regionen × Stunden (Matrix), immer sichtbar oben im Panel ---------- */
+
+.fk-box-panel {
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.fk-box-panel .fk-box-titel { margin-bottom: 4px; }
+
+.fk-zeilen-knopf {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.fk-zeilen-knopf:hover { color: var(--color-primary); text-decoration: underline; }
+
+.fk-mz {
+  height: 22px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: transparent;
+  cursor: pointer;
+}
+
+/* Farbe nur, keine Zahl. Spezifisch genug, um die Tabellen-Grundfarbe (.fk-tab td) zu schlagen */
+.fk-tab td.fk-mz { background: #f1f5f9; }
+.fk-tab td.fk-mz--1 { background: #fde68a; }
+.fk-tab td.fk-mz--2 { background: #fb923c; }
+.fk-tab td.fk-mz--3 { background: #ef4444; }
+.fk-tab td.fk-mz--4 { background: #7f1d1d; }
+/* Gesamtstärke je Tal und Stunde (0–5): hell = wenig, dunkel = viel */
+.fk-tab td.fk-mz--s0 { background: #f1f5f9; }
+.fk-tab td.fk-mz--s1 { background: #fef9c3; }
+.fk-tab td.fk-mz--s2 { background: #fde047; }
+.fk-tab td.fk-mz--s3 { background: #fb923c; }
+.fk-tab td.fk-mz--s4 { background: #ef4444; }
+.fk-tab td.fk-mz--s5 { background: #7f1d1d; }
+.fk-tab td.fk-mz { transition: background var(--transition-fast); }
+.fk-tab td.fk-mz.is-now { box-shadow: inset 0 0 0 999px rgba(15, 23, 42, 0.10); }
+.fk-tab th.fk-hh.is-now { color: var(--color-text); font-weight: 800; }
+
+.fk-stufen { margin: 6px 0 10px; }
+.fk-stufen-bar {
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, #f1f5f9 0 16.6%, #fef9c3 16.6% 33.3%, #fde047 33.3% 50%, #fb923c 50% 66.6%, #ef4444 66.6% 83.3%, #7f1d1d 83.3% 100%);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+.fk-stufen-werte {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+
+/* Föhntäler auf der Karte: Füllfarbe = Föhn-Zustand, die Zahl daneben ist die Windstärke */
+.fk-talpunkt { display: flex; align-items: center; gap: 4px; pointer-events: auto; }
+.fk-talpunkt-dot {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.4);
+}
+.fk-talpunkt-wert {
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+/* Füllung = Windstärke (Startplatz-Skala, wie bei den Kammwinden). Föhn-Zustand als Ring. */
+.fk-talpunkt--leer .fk-talpunkt-dot { border-color: #94a3b8; }
+
+.fk-jn-na { background: var(--color-border); }
+.fk-zeichen li.is-na { border-left-style: dashed; color: var(--color-text-muted); }
+.fk-zeichen li.is-na .fk-jn { background: transparent; border: 1px dashed var(--color-border); }
+
+/* ---------- Verlauf oben im Täler-Panel rechts ---------- */
+
+.fk-verlauf-panel {
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.fk-verlauf-panel .fk-box-titel { margin-bottom: 4px; }
+
+.fk-vz { margin-top: 10px; }
+
+.fk-vz-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.fk-vz-titel { font-weight: 700; color: var(--color-text); }
+.fk-vz-wert { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-text); white-space: nowrap; }
+.fk-vz-note { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 2px; }
+
+.fk-vz-svg {
+  display: block;
+  width: 100%;
+  height: 64px;
+  cursor: pointer;
+  touch-action: manipulation;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.fk-band { pointer-events: none; }
+
+.fk-verlauf-panel .fk-vz-note { margin-bottom: 4px; }
+
+.fk-zeitachse {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.fk-linie {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.fk-null { stroke: #94a3b8; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.fk-schwelle { stroke: #cbd5e1; stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.fk-cursor { stroke: var(--color-text); stroke-width: 1; vector-effect: non-scaling-stroke; }
+
+/* ---------- Rechts oben: Ebenen (Legende wie /synoptik, klickbar) ---------- */
+
+.fk-legende {
+  pointer-events: auto;
+  width: 250px;
+  max-height: calc(100% - 220px);
+  overflow-y: auto;
+  z-index: 1040;
+}
+
+.fk-ebene {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  font-size: 12px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.fk-ebene input { margin: 0; width: 15px; height: 15px; accent-color: var(--color-primary); }
+.fk-ebene input:disabled { opacity: 0.4; }
+.fk-ebene input:disabled + .fk-sym { opacity: 0.4; }
+
+.fk-sym {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+}
+
+.fk-sym--pfeil { background: #0ea5e9; clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%); }
+.fk-sym--kamm { background: #0f172a; clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%); }
+.fk-sym--region { background: #ea580c; opacity: 0.55; border-radius: 3px; }
+.fk-sym--tal { background: linear-gradient(135deg, #fef9c3 0 33%, #fb923c 33% 66%, #7f1d1d 66%); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.25); border-radius: 50%; }
+.fk-sym--station { background: #fff; border: 2px solid #0f172a; border-radius: 50%; }
+
+.fk-legende .syn-legend-scale {
+  position: relative;
+  height: 14px;
+  margin-top: 4px;
+}
+
+.fk-legende .syn-legend-scale span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 10px;
+}
+
+.fk-legende .syn-legend-scale span:first-child { transform: none; }
+
+/* ---------- Zahl der erfüllten Zeichen je Region (0–4) ---------- */
+
+.fk-zahl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  background: #f1f5f9;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+}
+
+.fk-zahl--1 { background: #fde68a; }
+.fk-zahl--2 { background: #fb923c; color: #431407; }
+.fk-zahl--3 { background: #ef4444; color: #fff; }
+.fk-zahl--4 { background: #7f1d1d; color: #fff; }
+.fk-zahl--0 { color: #94a3b8; }
+
+.fk-zahl-legende {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0 6px 23px;
+}
+
+.fk-zahl-legende .fk-zahl { width: 20px; height: 20px; font-size: 11px; }
+
+.fk-zahl-gross {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.fk-zahl-gross .fk-zahl { width: 30px; height: 30px; font-size: 16px; }
+
+.fk-jn {
+  display: inline-block;
+  min-width: 90px;
+  margin-right: 8px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.fk-zeichen li.is-on .fk-jn { background: #ea580c; color: #fff; }
+
+.fk-talliste {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.fk-talliste li {
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  background: var(--color-bg);
+}
+
+.fk-talliste li.is-dry { background: #fee2e2; }
+
+.fk-zeichen li.is-info { border-left-color: #0ea5e9; background: #f0f9ff; color: var(--color-text); }
+.fk-zeichen li.is-info .fk-jn { background: #0ea5e9; color: #fff; }
+
+.fk-zurueck {
+  margin-top: var(--space-3);
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elevated);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- Karten-Symbole (Leaflet-Icons) ---------- */
+
+.fk-pfeil {
+  display: block;
+  pointer-events: none;
+}
+
+.fk-pfeil svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+/* Kammwind: Kreis in der Windfarbe, Zahl = km/h, Pfeil als Ring. Name nur im Hinweis. */
+.fk-kamm {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  margin: 7px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fk-kamm-ring {
+  position: absolute;
+  left: -9px;
+  top: -9px;
+  width: 40px;
+  height: 40px;
+  overflow: visible;
+}
+
+.fk-kamm-wert {
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow: 0 0 2px rgba(15, 23, 42, 0.5);
+}
+
+.fk-druckpfeil-label {
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--color-border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Unten: Steuerleiste schwebend über der Karte ---------- */
+
+.fk-zeit {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 2 * var(--space-4)));
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  backdrop-filter: blur(12px) saturate(1.3);
+  z-index: 1040;
+}
+
+.fk-zeit .syn-controls { gap: var(--space-3); }
+.fk-zeit .syn-timestamp { margin-left: auto; font-size: var(--text-xs); }
+.fk-zeit .syn-timeline { margin-top: 2px; }
+
+.fk-notice {
+  position: absolute;
+  top: 124px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(520px, calc(100% - 2 * var(--space-4)));
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: #7c2d12;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  z-index: 1045;
+}
+
+.fk-notice[hidden] { display: none; }
+
+/* Panel-Knopf rechts unter der Legende */
+.fk-panel-btn {
+  position: absolute;
+  right: var(--space-4);
+  bottom: 118px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  z-index: 1040;
+}
+
+/* ---------- Täler-Panel rechts ---------- */
+
+.fk-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--fk-panel-w);
+  z-index: 1500;
+  display: none;
+  flex-direction: column;
+  background: var(--color-bg-elevated);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.fk-layout.panel-open .fk-panel { display: flex; }
+
+.fk-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.fk-heading { margin: 0; font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; color: var(--color-primary); }
+
+.fk-close {
+  min-width: 40px;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.fk-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 20px;
+}
+
+.fk-tabelle-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-bottom: 6px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.fk-tabelle-legende span { display: inline-flex; align-items: center; gap: 6px; }
+
+.fk-cell {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--color-border);
+}
+
+.fk-cell--dry { background: #fca5a5; }
+.fk-cell--strikt { background: #b91c1c; }
+
+.fk-tab-hinweis {
+  margin: 0 0 8px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.fk-tal-tabelle { font-size: var(--text-sm); }
+
+.fk-gruppe {
+  margin: 14px 0 6px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+.fk-tab {
+  border-collapse: separate;
+  border-spacing: 2px;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.fk-tab th {
+  width: 120px;
+  padding: 2px 4px 2px 0;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fk-tab td {
+  height: 18px;
+  border-radius: 4px;
+  background: var(--color-border);
+}
+
+.fk-tab td.is-dry { background: #fca5a5; }
+.fk-tab td.is-strikt { background: #b91c1c; }
+
+
+.fk-tab th.fk-hh {
+  width: auto;
+  padding: 0 0 2px;
+  font-size: 10px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.fk-foot { margin-top: 14px; font-size: var(--text-sm); }
+
+/* ---------- Handy ---------- */
+
+@media (max-width: 639px) {
+  .fk-layout { --fk-panel-w: 100%; }
+  .fk-lage { width: calc(100% - 2 * var(--space-4)); top: 118px; }
+  .fk-lage:not(.is-offen) .fk-zeichen { display: none; }
+  .fk-legende { display: none; }
+  .fk-panel-btn { bottom: 96px; }
+  .fk-zeit { bottom: 8px; width: calc(100% - 16px); padding: 8px 10px; }
+  .fk-zeit .syn-timestamp { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fk-layout * { transition: none !important; animation: none !important; }
+}
+
+/* Föhntal-Punkte auf der Karte: Füllung = Gesamtstärke wie in der Matrix (0–5). */
+.fk-talpunkt-dot.fk-mz--s0 { background: #f1f5f9; }
+.fk-talpunkt-dot.fk-mz--s1 { background: #fef9c3; }
+.fk-talpunkt-dot.fk-mz--s2 { background: #fde047; }
+.fk-talpunkt-dot.fk-mz--s3 { background: #fb923c; }
+.fk-talpunkt-dot.fk-mz--s4 { background: #ef4444; }
+.fk-talpunkt-dot.fk-mz--s5 { background: #7f1d1d; }
+
+
+/* Föhn-Blöcke auf der Karte: Beschriftung am Schwerpunkt der Regionen einer Richtung */
+.fk-block { position: relative; left: -50%; top: -50%; white-space: nowrap; padding: 3px 8px; border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.95); font-size: 12px; font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; box-shadow: var(--shadow-sm); }
+.fk-block--sued { border: 2px solid #ea580c; }
+.fk-block--nord { border: 2px solid #2563eb; }
