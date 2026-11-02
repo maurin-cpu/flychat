@@ -316,12 +316,49 @@ class ErklaerseiteTest(unittest.TestCase):
     def test_page_renders_both_languages_with_constants(self):
         from web import app
         c = app.test_client()
-        en = c.get("/foehn?lang=en")
-        de = c.get("/foehn?lang=de")
+        en = c.get("/foehn?erklaerung=1&lang=en")
+        de = c.get("/foehn?erklaerung=1&lang=de")
         self.assertEqual((en.status_code, de.status_code), (200, 200))
         self.assertIn(f"from {fi.KARTE_WIND_KMH} km/h", en.get_data(as_text=True))
         self.assertIn(f"ab {fi.KARTE_WIND_KMH} km/h", de.get_data(as_text=True))
         self.assertIn("so zählen wir", de.get_data(as_text=True))
+
+
+class TalpunktStundeTest(unittest.TestCase):
+    """talpunkt_stunde ist die eine Stundenregel; evaluate_talpunkt zählt damit."""
+
+    LO, HI = 90, 270  # Südsektor
+
+    def test_dir_dry_bei_schwachem_wind(self):
+        st = fi.talpunkt_stunde(w=17, g=10, d=180, rh=60, lo=self.LO, hi=self.HI)
+        self.assertTrue(st["dir_dry"])
+        self.assertFalse(st["strikt"])   # unter 20 km/h, Böe unter 30
+
+    def test_strikt_braucht_stärke_und_trockene_luft(self):
+        st = fi.talpunkt_stunde(w=25, g=35, d=180, rh=50, lo=self.LO, hi=self.HI)
+        self.assertTrue(st["strikt"])
+        self.assertTrue(st["dir_dry"])
+
+    def test_falsche_richtung_zählt_nie(self):
+        st = fi.talpunkt_stunde(w=60, g=90, d=0, rh=30, lo=self.LO, hi=self.HI)
+        self.assertFalse(st["dir_dry"])
+        self.assertFalse(st["strikt"])
+
+    def test_feuchte_ueber_grenze(self):
+        st = fi.talpunkt_stunde(w=30, g=40, d=180, rh=80, lo=self.LO, hi=self.HI)
+        self.assertFalse(st["strikt"])
+        self.assertFalse(st["dir_dry"])
+
+    def test_evaluate_talpunkt_zaehlt_wie_der_helfer(self):
+        hourly = {
+            "wind_speed_10m": [17, 25, 5],
+            "wind_gusts_10m": [10, 35, 8],
+            "wind_direction_10m": [180, 180, 0],
+            "relative_humidity_2m": [60, 50, 40],
+        }
+        ev = fi.evaluate_talpunkt(hourly, [0, 1, 2], "Süd", sektor=[self.LO, self.HI])
+        self.assertEqual(ev["dir_dry_hours"], 2)
+        self.assertEqual(ev["hours"], 1)
 
 
 if __name__ == "__main__":

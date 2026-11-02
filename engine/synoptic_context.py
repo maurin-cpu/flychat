@@ -1179,6 +1179,18 @@ def decide_foehn_summary(forecast_dates: list[str],
     # Windkarte (Raster ueber die Alpenregionen) fuer die vier Foehn-Indikatoren
     from foehn_indicators import fetch_wind_karte, evaluate_indicators
     karte = fetch_wind_karte(forecast_days=days_n)
+    # Stundendaten fuer die Föhn-Karte (/foehn, Admin) einfrieren. Fehler hier
+    # darf den Morgenlauf nicht stoppen.
+    if karte and data:
+        try:
+            import foehn_karte
+            _tal = ((weather_cache or {}).get("_meta") or {}).get("foehn_tal_series")
+            from foehn_indicators import fetch_kamm_wind, fetch_hoehen_raster
+            _kamm = fetch_kamm_wind(forecast_days=days_n)
+            _hoehen = fetch_hoehen_raster(forecast_days=days_n)
+            foehn_karte.speichere(foehn_karte.build(karte, data, _tal, forecast_dates, kamm=_kamm, hoehen=_hoehen))
+        except Exception:
+            logger.exception("foehn_karte: Speichern fehlgeschlagen")
 
     def _peak(a, b):
         return a if _level_rank[a] >= _level_rank[b] else b

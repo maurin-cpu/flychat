@@ -366,6 +366,7 @@ REGIONEN_GEOJSON_PRECIP_PATH = DATA_DIR / "regionen_referenzpunkte_precip.geojso
 # (Wind-Median/Thermik-Anker würden verzerrt). Startlage = Föhnindex-Station.
 # Editierbar unter /admin/reference-points. Herleitung: docs/FOEHN.md.
 FOEHN_TALPUNKTE_PATH = DATA_DIR / "foehn_talpunkte.geojson"
+FOEHN_KARTE_PATH = DATA_DIR / "foehn_karte.json"  # Stundendaten /foehn (Admin), server-lokal, gitignored
 # Master-File fuer Region-Properties (Name, terrain_type, elevation_ref,
 # kritischer_foehn, description). Geometrie + reference_points kommen aus
 # der GeoJSON, alle textuellen Felder aus dieser CSV.

@@ -97,8 +97,8 @@
                <a href="/synoptik" class="{% if request.path == '/synoptik' %}active{% endif %}">{{ t('nav.synoptic') }}</a> #}
             <a href="/briefing" class="{% if request.path == '/briefing' %}active{% endif %}">Wingcast</a>
             {% if is_admin %}
-            <button type="button" class="navbar-link-btn" id="navFoehnBtn" title="{{ t('nav.foehn_open') }}" aria-label="{{ t('nav.foehn_open') }}">{{ t('nav.foehn') }}</button>
-            {% endif %}
+            <a href="/foehn" class="{% if request.path == '/foehn' %}active{% endif %}">{{ t('nav.foehn') }}</a>
+                        {% endif %}
             {% if is_logged_in %}
             <div class="navbar-avatar-wrap">
                 <button type="button" class="navbar-avatar" id="navAvatarBtn"
@@ -428,39 +428,18 @@
             <span>Wingcast</span>
         </a>
         {% if is_admin %}
-        <button class="mobile-nav-item" id="mobileNavFoehnBtn" aria-label="{{ t('nav.foehn_open') }}">
+        <a href="/foehn" class="mobile-nav-item {% if request.path == '/foehn' %}active{% endif %}" aria-label="{{ t('nav.foehn_open') }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
             <span>{{ t('nav.foehn') }}</span>
         </button>
         {% endif %}
     </nav>
 
-    <!-- Foehn Diagram Overlay (shared across all pages) -->
-    <div class="meteogram-overlay" id="foehnOverlay" role="dialog" aria-modal="true" aria-label="{{ t('foehn.title') }}">
-        <div class="meteogram-panel">
-            <div class="overlay-swipe-handle"></div>
-            <div class="meteogram-header">
-                <div>
-                    <h2>{{ t('foehn.title') }}</h2>
-                    <span class="spot-info">{{ t('foehn.subtitle') }}</span>
-                </div>
-                <button class="meteogram-close" id="foehnClose" aria-label="{{ t('common.close') }}">&times;</button>
-            </div>
-            <div class="meteogram-chart" id="foehnChart"></div>
-        </div>
-    </div>
-    <div class="tooltip" id="foehnTooltip"></div>
 
     {% block scripts %}{% endblock %}
     <script>
         (function () {
-            var foehnOverlay = document.getElementById('foehnOverlay');
-            var foehnChart = document.getElementById('foehnChart');
-            var foehnCloseBtn = document.getElementById('foehnClose');
-            var foehnTooltip = document.getElementById('foehnTooltip');
-            var _foehnTrigger = null;
             var _scrollY = 0;
-
             // Shared overlay scroll-lock helpers
             window._overlayScrollLock = function () {
                 _scrollY = window.scrollY;
@@ -473,85 +452,7 @@
                 window.scrollTo(0, _scrollY);
             };
 
-            function openFoehn(trigger) {
-                _foehnTrigger = trigger || null;
-                if (typeof FoehnDiagram === 'undefined') {
-                    window.location.href = '/chat?foehn=1';
-                    return;
-                }
-                foehnChart.innerHTML = '<div class="error-state">' + {{ t('foehn.loading')|tojson }} + '</div>';
-                foehnOverlay.style.display = 'flex';
-                foehnOverlay.classList.add('visible');
-                window._overlayScrollLock();
-                foehnCloseBtn.focus();
-
-                fetch('/api/foehn')
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (data.error) {
-                            foehnChart.innerHTML = '<div class="error-state">' + data.error + '</div>';
-                            return;
-                        }
-                        var dates = data.dates || [];
-                        if (dates.length === 0) {
-                            foehnChart.innerHTML = '<div class="error-state">' + {{ t('foehn.no_data')|tojson }} + '</div>';
-                            return;
-                        }
-                        var allData = [];
-                        dates.forEach(function (dateStr) {
-                            var dayArr = data.data[dateStr] || [];
-                            dayArr.forEach(function (entry) { allData.push(entry); });
-                        });
-                        FoehnDiagram.renderChart(foehnChart, foehnTooltip, allData, data.thresholds);
-                    })
-                    .catch(function (err) {
-                        foehnChart.innerHTML = '<div class="error-state">' + {{ t('foehn.error_prefix')|tojson }} + err.message + '</div>';
-                    });
-            }
-
-            function closeFoehn() {
-                foehnOverlay.style.display = 'none';
-                foehnOverlay.classList.remove('visible');
-                foehnTooltip.classList.remove('visible');
-                window._overlayScrollUnlock();
-                if (_foehnTrigger && _foehnTrigger.focus) _foehnTrigger.focus();
-            }
-
-            foehnCloseBtn.addEventListener('click', closeFoehn);
-            foehnOverlay.addEventListener('click', function (e) {
-                if (e.target === foehnOverlay) closeFoehn();
-            });
-            document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && foehnOverlay.classList.contains('visible')) {
-                    closeFoehn();
-                }
-            });
-
-            window.openFoehn = openFoehn;
-
-            // Auto-open if ?foehn=1 in URL — must wait for defer scripts
-            window.addEventListener('DOMContentLoaded', function () {
-                try {
-                    if (new URLSearchParams(window.location.search).get('foehn') === '1') {
-                        history.replaceState({}, '', window.location.pathname);
-                        openFoehn();
-                    }
-                } catch (e) { /* ignore */ }
-            });
-
-            // Desktop navbar foehn button
-            var btn = document.getElementById('navFoehnBtn');
-            if (btn) {
-                btn.addEventListener('click', function () { openFoehn(btn); });
-            }
-
-            // Mobile nav foehn button
-            var mobileBtn = document.getElementById('mobileNavFoehnBtn');
-            if (mobileBtn) {
-                mobileBtn.addEventListener('click', function () { openFoehn(mobileBtn); });
-            }
-
-            // Swipe-to-close on overlay swipe handles
+            // Wisch-zum-Schliessen fuer Overlays mit .overlay-swipe-handle (Meteogramm, Regionen).
             function setupSwipeDismiss(overlay, closeFn) {
                 var handle = overlay.querySelector('.overlay-swipe-handle');
                 if (!handle) return;
@@ -577,8 +478,6 @@
                     if (dy > 80) closeFn();
                 }, { passive: true });
             }
-
-            setupSwipeDismiss(foehnOverlay, closeFoehn);
             window._setupSwipeDismiss = setupSwipeDismiss;
         })();
     </script>
