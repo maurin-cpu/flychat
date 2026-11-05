@@ -788,7 +788,12 @@
         // (dir_deg ist "woher", daher +180), Sektor fett. Keine Staerke: nur die
         // Richtung (User 19.09.2026); die Staerke steht im Hoehenwind-Block.
         let wind = "";
-        if (tile.wind_sector) {
+        if (tile.wind_calm && tile.wind_calm_head) {
+          // Schwacher Hoehenwind (05.11.2026): keine Richtung — ein Pfeil laege
+          // dort nur in gut der Haelfte richtig. Fett "Schwacher Wind", klein
+          // "Richtung unklar" (validation/hoehenwind/PATTERNS.md).
+          wind = `<span class="bf-tab-wind" title="700 hPa"><span class="bf-tab-wind-arrow bf-tab-wind-arrow--txt" aria-hidden="true">${escapeHtml(tile.wind_arrow || "")}</span><span class="bf-tab-wind-txt"><b>${escapeHtml(tile.wind_calm_head)}</b><small class="bf-tab-wind-note">${escapeHtml(tile.wind_calm_note || "")}</small></span></span>`;
+        } else if (tile.wind_sector) {
           const deg = Number.isFinite(tile.wind_dir_deg) ? (tile.wind_dir_deg + 180) % 360 : null;
           const arrow = deg === null
             ? `<span class="bf-tab-wind-arrow bf-tab-wind-arrow--txt" aria-hidden="true">${escapeHtml(tile.wind_arrow || "")}</span>`

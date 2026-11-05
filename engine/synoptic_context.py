@@ -175,6 +175,14 @@ def build_synoptic_context(weather_cache: dict,
         logger.exception("Hoehenwind regional fehlgeschlagen — Feld fehlt")
         aloft_regional = None
 
+    # 8d2. Richtung der Tageskachel je Region (statt Vektor-Mittel aller Spots)
+    try:
+        flow_tile = decide_flow_tile(weather_cache, forecast_dates, build_spot_region_map())
+        decisions_applied.append("decide_flow_tile")
+    except Exception:
+        logger.exception("Kachel-Richtung fehlgeschlagen — Feld fehlt")
+        flow_tile = None
+
     # 8j. Modellvergleich (MeteoSchweiz, DWD, NOAA) auf allen Referenzpunkten
     try:
         modelle = modell_vergleich(forecast_dates, weather_cache.get("_regions") or {})
@@ -274,6 +282,7 @@ def build_synoptic_context(weather_cache: dict,
         "precip_zones": precip_zones,
         "wind_zones": wind_zones,
         "aloft_regional": aloft_regional,
+        "flow_tile": flow_tile,
         "fronten": fronten,
         "frontsignatur": frontsignatur,
         "front_zeichen": front_zeichen,
@@ -2518,6 +2527,68 @@ def decide_aloft_regional(weather_cache: dict, forecast_dates: list[str],
         "decided_by": "decide_aloft_regional",
         "thresholds": {"region_min_spots": min_spots,
                        "hours": [h_start, h_end], "level_hpa": 700},
+    }
+
+
+def decide_flow_tile(weather_cache: dict, forecast_dates: list[str],
+                     region_map: dict[str, str]) -> dict:
+    """Windrichtung der Tageskachel (700 hPa, SYNOPTIC_TILE_HOUR) je Region.
+
+    Das Vektor-Mittel ueber alle Spots (flow_overhead) heben gegenlaeufige und
+    schwache Winde auf — bei schwachem Wind lag der Pfeil gegen die Radiosonden
+    in 30-38 % daneben. Deshalb (validiert 05.11.2026, validation/hoehenwind/):
+      1. je Region der MEDIAN der u/v-Komponenten ihrer Spots (ein Ausreisser
+         treibt nichts; Regionen unter SYNOPTIC_ALOFT_REGION_MIN_SPOTS fehlen)
+      2. Region "mit Wind" ab SYNOPTIC_TILE_WIND_KMH
+      3. haben weniger als SYNOPTIC_TILE_CALM_SHARE der Regionen Wind: calm,
+         keine Richtung ("Schwacher Wind · Richtung unklar")
+      4. sonst Richtung = Mittel der Einheitsvektoren der Regionen mit Wind
+         (jede Region eine Stimme, schwache zaehlen nicht mit)
+
+    Returns: {"per_day": [{"date", "calm", "dir_deg", "n_regions", "n_wind"}], ...}
+    """
+    min_spots = config.SYNOPTIC_ALOFT_REGION_MIN_SPOTS
+    wind_kmh = config.SYNOPTIC_TILE_WIND_KMH
+    spots_by_region: dict[str, list[str]] = {}
+    for spot, region in region_map.items():
+        if spot in weather_cache:
+            spots_by_region.setdefault(region, []).append(spot)
+
+    per_day = []
+    for date in forecast_dates:
+        key = f"{date}T{config.SYNOPTIC_TILE_HOUR:02d}:00"
+        regions = []   # (u, v, kmh) — u/v zeigen woher der Wind kommt
+        for spot_names in spots_by_region.values():
+            us, vs = [], []
+            for name in spot_names:
+                rec = ((weather_cache[name].get("pressure_level_data") or {}).get(key) or {})
+                s, d = rec.get("wind_speed_700hPa"), rec.get("wind_direction_700hPa")
+                if isinstance(s, (int, float)) and isinstance(d, (int, float)):
+                    rad = math.radians(d)
+                    us.append(s * math.sin(rad))
+                    vs.append(s * math.cos(rad))
+            if len(us) < min_spots:
+                continue
+            u, v = statistics.median(us), statistics.median(vs)
+            regions.append((u, v, math.hypot(u, v)))
+        if not regions:
+            per_day.append({"date": date, "calm": None, "dir_deg": None, "n_regions": 0, "n_wind": 0})
+            continue
+        windy = [r for r in regions if r[2] >= wind_kmh]
+        calm = len(windy) / len(regions) < config.SYNOPTIC_TILE_CALM_SHARE
+        dir_deg = None
+        if windy and not calm:
+            uu = sum(u / s for u, _, s in windy) / len(windy)
+            vv = sum(v / s for _, v, s in windy) / len(windy)
+            dir_deg = round(math.degrees(math.atan2(uu, vv)) % 360)
+        per_day.append({"date": date, "calm": calm, "dir_deg": dir_deg,
+                        "n_regions": len(regions), "n_wind": len(windy)})
+    return {
+        "per_day": per_day,
+        "decided_by": "decide_flow_tile",
+        "thresholds": {"hour": config.SYNOPTIC_TILE_HOUR, "wind_kmh": wind_kmh,
+                       "calm_share": config.SYNOPTIC_TILE_CALM_SHARE,
+                       "region_min_spots": min_spots, "level_hpa": 700},
     }
 
 

@@ -570,6 +570,13 @@ SYNOPTIC_FLOW_SCHWACH_KMH = 15      # < 15 km/h → schwach
 SYNOPTIC_FLOW_MAESSIG_KMH = 30      # 15-30 → maessig
 SYNOPTIC_FLOW_KRAEFTIG_KMH = 50     # 30-50 → kraeftig
                                      # > 50 → stuermisch
+# Tageskachel-Richtung (decide_flow_tile, 05.11.2026, gegen Radiosonden validiert:
+# validation/hoehenwind/PATTERNS.md). Richtung nur aus Regionen mit Wind; haben
+# weniger als CALM_SHARE der Regionen Wind, zeigt die Kachel "Schwacher Wind ·
+# Richtung unklar" (ein Pfeil laege dort nur in 57 % richtig, sonst 92 %).
+SYNOPTIC_TILE_HOUR = 12             # Ortszeit, wie das Schweizer Mittel
+SYNOPTIC_TILE_WIND_KMH = 10         # Region "mit Wind" ab hier (Median ihrer Spots)
+SYNOPTIC_TILE_CALM_SHARE = 0.2      # < 20 % der Regionen mit Wind -> keine Richtung
 # Richtungs-Sektoren (Hauptwindrichtung)
 SYNOPTIC_FLOW_SECTORS = [
     (337.5,  22.5, "Nord"),

@@ -605,7 +605,8 @@ button.bf-alert:focus-visible { outline: 2px solid var(--color-primary); outline
   line-height: 1.1;
   text-align: left;
 }
-.bf-tab-wind-txt b { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; }
+.bf-tab-wind-txt b { font-size: 14px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
+.bf-tab-wind-note { font-size: 10.5px; font-weight: 600; opacity: 0.75; white-space: nowrap; }
 .bf-tab-wind--hot .bf-tab-wind-arrow, .bf-tab-wind--hot b { color: #b91c1c; }
 .bf-tab-press {
   font-family: 'SFMono-Regular', Menlo, Consolas, monospace;

@@ -304,6 +304,27 @@ def _per_day_index(block, dates: list[str]) -> dict:
     return out
 
 
+_CALM_GLYPH = "〰"
+
+
+def _flow_dir(wl: dict, date: str):
+    """Richtung der Tageskachel: (dir_deg | None, Sektor-Kuerzel, calm).
+
+    Quelle flow_tile (je Region, nur Regionen mit Wind; gegen Radiosonden
+    validiert 05.11.2026, validation/hoehenwind/). calm = weniger als 20 % der
+    Regionen mit Wind -> keine Richtung. Aeltere Caches ohne flow_tile: das
+    Vektor-Mittel aus flow_overhead wie bisher. Eine Quelle fuer Kachel,
+    Hoehenwind-, Sonnen- und Labilitaets-Block."""
+    t = _per_day_index((wl or {}).get("flow_tile"), [date]).get(date)
+    if isinstance(t, dict) and t.get("calm") is not None:
+        if t["calm"] or t.get("dir_deg") is None:
+            return None, "", True
+        from engine.synoptic_context import _wind_direction_to_sector
+        return t["dir_deg"], _SECTOR_ABBR.get(_wind_direction_to_sector(t["dir_deg"]), ""), False
+    f = _per_day_index((wl or {}).get("flow_overhead"), [date]).get(date) or {}
+    return f.get("dir_deg"), _SECTOR_ABBR.get(f.get("sector", ""), f.get("sector", "")), False
+
+
 def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
     """Pro Datum eine Kurzzeile: Druckregime + msl, T850, Foehn."""
     lang = _lang()
@@ -315,12 +336,17 @@ def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
     out = {}
     for d in dates:
         f = flow.get(d) or {}
-        sector = _SECTOR_ABBR.get(f.get("sector", ""), f.get("sector", ""))
-        strength = _STRENGTH[lang].get(f.get("strength", ""), f.get("strength", ""))
+        # Richtung je Region (flow_tile, 05.11.2026); Staerke bleibt das Schweizer Mittel
+        dir_deg, sector, calm = _flow_dir(wetterlage, d)
+        strength = "" if calm else _STRENGTH[lang].get(f.get("strength", ""), f.get("strength", ""))
         speed = f.get("speed_kmh")
         speed_txt = f"{round(float(speed))} km/h" if speed else ""
         wind = ""
-        if sector:
+        if calm:
+            # Schwacher Wind: keine Richtung — ein Pfeil laege nur in 57 % richtig
+            sector = f"{_lbl('tile_calm')} · {_lbl('tile_dir_unclear')}"
+            wind = sector
+        elif sector:
             wind = f"{sector} {strength}".strip()
             if speed_txt:
                 wind += f" · {speed_txt}"
@@ -345,13 +371,16 @@ def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
 
         out[d] = {
             "wind": wind,
-            "wind_arrow": _wind_arrow(f.get("dir_deg")),
+            "wind_arrow": _CALM_GLYPH if calm else _wind_arrow(dir_deg),
             "wind_sector": sector,
             "wind_strength": strength,
             "wind_speed": speed_txt,
-            "wind_deg": (f"{round(float(f['dir_deg']))}°"
-                         if f.get("dir_deg") is not None else ""),
-            "wind_hot": f.get("strength") in ("kraeftig", "stuermisch"),
+            "wind_deg": (f"{round(float(dir_deg))}°" if dir_deg is not None and not calm else ""),
+            "wind_hot": (not calm) and f.get("strength") in ("kraeftig", "stuermisch"),
+            # Kachel der App: fett "Schwacher Wind", klein "Richtung unklar"
+            "wind_calm": calm,
+            "wind_calm_head": _lbl("tile_calm") if calm else "",
+            "wind_calm_note": _lbl("tile_dir_unclear") if calm else "",
             "pressure": pressure,
             "pressure_regime": regime,
             "pressure_msl": (f"{float(msl):.1f} hPa" if msl else ""),
@@ -385,12 +414,17 @@ def _wind_range_block(wetterlage: dict, date: str, strip: dict) -> dict:
     syn_cls = flow.get("strength") or _wind_class(float(flow.get("speed_kmh") or 0))
     data_cls = _wind_class(float(hi))
     order = ["schwach", "maessig", "kraeftig", "stuermisch"]
-    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
+    _, abbr, calm = _flow_dir(wetterlage, date)
     sector = _lbl("lg_sector_" + abbr) if abbr else ""
     args = dict(models=_model_words(), strength=_lbl("wstr_" + syn_cls), sector=sector, lo=int(lo), hi=int(hi),
                 Strength=_capitalize(_lbl("wstr_" + syn_cls)),
                 region=day["region"], when=when, cls=_lbl("wcls_" + data_cls))
-    if order.index(data_cls) > order.index(syn_cls):
+    if calm:
+        # Keine Richtung: dieselbe Aussage wie die Kachel, dazu die staerkste Region
+        t = _per_day_index((wetterlage or {}).get("flow_tile"), [date]).get(date) or {}
+        fazit, verdict = _lbl("wind_fazit_calm").format(
+            n=t.get("n_wind", 0), t=t.get("n_regions", 0), **args), "calm"
+    elif order.index(data_cls) > order.index(syn_cls):
         fazit, verdict = _lbl("wind_fazit_stronger").format(**args), "stronger"
     elif order.index(data_cls) < order.index(syn_cls):
         fazit, verdict = _lbl("wind_fazit_weaker").format(**args), "weaker"
@@ -931,6 +965,7 @@ _L3 = {
         "lb_air_humid":     "Feuchte {sector}luft: Labilität zu erwarten",
         "lb_air_cool":      "Kühle {sector}luft: Schauer und Labilität am Nordhang zu erwarten",
         "lb_air_neutral":   "{Sector}strömung: keine ausgeprägt labile Luft",
+        "lb_air_calm":      "Schwacher Höhenwind: keine ausgeprägt labile Luft",
         "lb_press_cap":     ", der {regime} deckelt sie aber",
         "lb_press_up":      ", der steigende Druck deckelt sie aber zunehmend",
         "lb_press_low":     ", der Tiefdruck begünstigt sie",
@@ -1084,6 +1119,8 @@ _L3 = {
         "wind_fazit_match": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}), und die Regionen bleiben in dieser Klasse — {lo} bis {hi} km/h, am stärksten {region} am {when}.",
         "wind_fazit_stronger": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}) — regional ist es eine Klasse stärker, bis {hi} km/h {region} am {when}, also {cls}. Das Mittel verharmlost.",
         "wind_fazit_weaker": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}) — selbst die stärkste Region bleibt darunter, höchstens {hi} km/h ({region}).",
+        "wind_fazit_calm": "Schwacher Wind, Richtung unklar: Mittags haben nur {n} von {t} Regionen 10 km/h oder mehr ({models}). Am stärksten {region} am {when} mit {hi} km/h.",
+        "tile_calm": "Schwacher Wind", "tile_dir_unclear": "Richtung unklar",
         "wcls_schwach": "schwach", "wcls_maessig": "mässig", "wcls_kraeftig": "kräftig", "wcls_stuermisch": "stürmisch",
         "wstr_schwach": "schwache", "wstr_maessig": "mässige", "wstr_kraeftig": "kräftige", "wstr_stuermisch": "stürmische",
         "hour_morning": "Morgen", "hour_midday": "Mittag", "hour_afternoon": "Nachmittag", "hour_evening": "Abend",
@@ -1435,6 +1472,7 @@ _L3 = {
         "lb_air_humid":     "Humid {sector} air: instability expected",
         "lb_air_cool":      "Cool {sector} air: showers and instability on the north side expected",
         "lb_air_neutral":   "{Sector} flow: no distinctly unstable air",
+        "lb_air_calm":      "Light wind aloft: no distinctly unstable air",
         "lb_press_cap":     ", but the {regime} caps it",
         "lb_press_up":      ", but rising pressure increasingly caps it",
         "lb_press_low":     ", and low pressure favours it",
@@ -1585,6 +1623,8 @@ _L3 = {
         "wind_fazit_match": "{Strength} {sector} flow: that is the Swiss average ({models}), and the regions stay in that class — {lo} to {hi} km/h, strongest {region} in the {when}.",
         "wind_fazit_stronger": "{Strength} {sector} flow: that is the Swiss average ({models}) — regionally it is one class stronger, up to {hi} km/h {region} in the {when}, i.e. {cls}. The average understates it.",
         "wind_fazit_weaker": "{Strength} {sector} flow: that is the Swiss average ({models}) — even the strongest region stays below that, at most {hi} km/h ({region}).",
+        "wind_fazit_calm": "Light wind, direction unclear: at midday only {n} of {t} regions reach 10 km/h or more ({models}). Strongest {region} in the {when}, at {hi} km/h.",
+        "tile_calm": "Light wind", "tile_dir_unclear": "direction unclear",
         "wcls_schwach": "light", "wcls_maessig": "moderate", "wcls_kraeftig": "strong", "wcls_stuermisch": "stormy",
         "wstr_schwach": "light", "wstr_maessig": "moderate", "wstr_kraeftig": "strong", "wstr_stuermisch": "stormy",
         "hour_morning": "morning", "hour_midday": "midday", "hour_afternoon": "afternoon", "hour_evening": "evening",
@@ -2810,8 +2850,7 @@ def _sonne_block(wetterlage: dict, date: str) -> dict:
         expect = _lbl("su_exp_low").format(Press=_lbl("th_press_tief" if regime == "tief" else "th_press_down"))
     else:
         expect = _lbl("su_exp_flat")
-    flow = _per_day_index(wl.get("flow_overhead"), [date]).get(date) or {}
-    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
+    _, abbr, _calm = _flow_dir(wl, date)
     sector = _lbl("lg_sector_" + abbr) if abbr else ""
     if abbr in ("S", "SW", "SE"):
         expect += _lbl("su_air_south").format(sector=sector)
@@ -2956,13 +2995,14 @@ def _labilitaet_block(wetterlage: dict, date: str) -> dict:
     lang = _lang()
     joiner = " und " if lang == "de" else " and "
     # --- Erwartung ---
-    flow = _per_day_index(wl.get("flow_overhead"), [date]).get(date) or {}
-    abbr = _SECTOR_ABBR.get(flow.get("sector", ""), "")
+    _, abbr, calm = _flow_dir(wl, date)
     sector = _lbl("lg_sector_" + abbr) if abbr else ""
     if abbr in ("S", "SW", "SE"):
         air = _lbl("lb_air_humid").format(sector=sector)
     elif abbr in ("N", "NW"):
         air = _lbl("lb_air_cool").format(sector=sector)
+    elif calm:
+        air = _lbl("lb_air_calm")
     else:
         air = _lbl("lb_air_neutral").format(sector=sector, Sector=_capitalize(sector))
     regime, tkey = _lage_regime(wl, date)
@@ -3484,6 +3524,12 @@ def _foehn_indicator_status(ind: dict):
     pill = _lbl("fi_pill").format(n=n)
     if n and ind.get("from_hour") is not None:
         pill += _lbl("fz_pill_from").format(t=_fz_time(ind["from_hour"]))
+    if not n:
+        # Kein Zeichen erfuellt (05.11.2026): nur die Druckzeile — sie ist das
+        # Fruehzeichen und bleibt immer. Die Wind-/Temperaturzeilen ("Regionen mit
+        # Nordwind ...: 0 von 29") lasen sich wie eine Windprognose. Was dagegen
+        # spricht und dass Foehn moeglich bleibt, sagt der Text darunter.
+        facts = facts[:1]
     return kind, pill, facts
 
 
@@ -3793,7 +3839,10 @@ def _decorate_chain(chain: dict, wetterlage: dict, date: str) -> None:
     w = chain["wind"]
     st("wind", *_wind_pill(wl, date))
     w["facts"] = [f for f in [
-        {"k": "700 hPa", "v": f"{w.get('arrow', '')} {w.get('sector', '')} {w.get('range') or w.get('speed') or ''}".strip()},
+        # Schwacher Wind: keine Richtung, nur die Spanne (wie die Kachel)
+        {"k": "700 hPa", "v": (f"{_CALM_GLYPH} {_capitalize(_lbl('tile_dir_unclear'))} · {w.get('range') or w.get('speed') or ''}"
+                               if w.get("calm") else
+                               f"{w.get('arrow', '')} {w.get('sector', '')} {w.get('range') or w.get('speed') or ''}").strip(" ·")},
         {"k": _lbl("fx_ground"), "v": (lambda m: m.group(0) if m else "")(
             re.search(r"\d+(?:–\d+)? km/h", w.get("ground_range", "")))},
         {"k": _lbl("fx_peak"), "v": f"{w.get('peak_region', '')} {w.get('peak_hour', '')}h".strip()} if w.get("peak_region") else None,
@@ -3871,6 +3920,7 @@ def _chain_raw(wetterlage: dict, dates: list, date: str, fronts, passagen) -> di
             "arrow": strip.get("wind_arrow", ""), "speed": strip.get("wind_speed", ""),
             "sector": strip.get("wind_sector", ""), "strength": strip.get("wind_strength", ""),
             "deg": strip.get("wind_deg", ""), "hot": strip.get("wind_hot", False),
+            "calm": bool(strip.get("wind_calm")),
             "ground": _ground_estimate(strip.get("wind_speed", "")),
             # was der Wert IST: Vektor-Mittel ueber alle Spots, 12 Uhr —
             # gegenlaeufige Winde heben sich auf, regional ist es oft mehr
@@ -4121,6 +4171,10 @@ def _day_tile(raw_day: dict, region_ids, strip_entry: dict) -> dict:
         "wind_sector": strip_entry.get("wind_sector", ""),
         "wind_strength": strip_entry.get("wind_strength", ""),
         "wind_hot": bool(strip_entry.get("wind_hot")),
+        # Schwacher Wind (05.11.2026): fett + klein statt Pfeil und Sektor
+        "wind_calm": bool(strip_entry.get("wind_calm")),
+        "wind_calm_head": strip_entry.get("wind_calm_head", ""),
+        "wind_calm_note": strip_entry.get("wind_calm_note", ""),
     }
 
 
