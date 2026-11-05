@@ -1,0 +1,422 @@
+{
+ "tage": 261,
+ "regionen_im_mittel": 18.1,
+ "pfeil_punkt_alle": [
+  261,
+  23
+ ],
+ "pfeil_region_alle": [
+  261,
+  24
+ ],
+ "schwellen": [
+  {
+   "art": "punkt",
+   "Y": 0.6,
+   "alle": {
+    "unter": [
+     2,
+     100
+    ],
+    "ueber": [
+     259,
+     22
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     1,
+     100
+    ],
+    "ueber": [
+     153,
+     18
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     1,
+     100
+    ],
+    "ueber": [
+     106,
+     28
+    ]
+   }
+  },
+  {
+   "art": "punkt",
+   "Y": 0.7,
+   "alle": {
+    "unter": [
+     3,
+     67
+    ],
+    "ueber": [
+     258,
+     22
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     2,
+     50
+    ],
+    "ueber": [
+     152,
+     18
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     1,
+     100
+    ],
+    "ueber": [
+     106,
+     28
+    ]
+   }
+  },
+  {
+   "art": "punkt",
+   "Y": 0.8,
+   "alle": {
+    "unter": [
+     5,
+     40
+    ],
+    "ueber": [
+     256,
+     23
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     4,
+     25
+    ],
+    "ueber": [
+     150,
+     19
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     1,
+     100
+    ],
+    "ueber": [
+     106,
+     28
+    ]
+   }
+  },
+  {
+   "art": "punkt",
+   "Y": 0.85,
+   "alle": {
+    "unter": [
+     10,
+     50
+    ],
+    "ueber": [
+     251,
+     22
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     6,
+     33
+    ],
+    "ueber": [
+     148,
+     18
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     4,
+     75
+    ],
+    "ueber": [
+     103,
+     27
+    ]
+   }
+  },
+  {
+   "art": "punkt",
+   "Y": 0.9,
+   "alle": {
+    "unter": [
+     29,
+     41
+    ],
+    "ueber": [
+     232,
+     21
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     15,
+     27
+    ],
+    "ueber": [
+     139,
+     18
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     14,
+     57
+    ],
+    "ueber": [
+     93,
+     25
+    ]
+   }
+  },
+  {
+   "art": "punkt",
+   "Y": 0.95,
+   "alle": {
+    "unter": [
+     75,
+     24
+    ],
+    "ueber": [
+     186,
+     23
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     46,
+     15
+    ],
+    "ueber": [
+     108,
+     20
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     29,
+     38
+    ],
+    "ueber": [
+     78,
+     26
+    ]
+   }
+  },
+  {
+   "art": "region",
+   "Y": 0.6,
+   "alle": {
+    "unter": [
+     1,
+     100
+    ],
+    "ueber": [
+     260,
+     23
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     0,
+     null
+    ],
+    "ueber": [
+     154,
+     20
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     1,
+     100
+    ],
+    "ueber": [
+     106,
+     28
+    ]
+   }
+  },
+  {
+   "art": "region",
+   "Y": 0.7,
+   "alle": {
+    "unter": [
+     2,
+     100
+    ],
+    "ueber": [
+     259,
+     23
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     0,
+     null
+    ],
+    "ueber": [
+     154,
+     20
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     2,
+     100
+    ],
+    "ueber": [
+     105,
+     28
+    ]
+   }
+  },
+  {
+   "art": "region",
+   "Y": 0.8,
+   "alle": {
+    "unter": [
+     6,
+     67
+    ],
+    "ueber": [
+     255,
+     23
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     3,
+     33
+    ],
+    "ueber": [
+     151,
+     20
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     3,
+     100
+    ],
+    "ueber": [
+     104,
+     27
+    ]
+   }
+  },
+  {
+   "art": "region",
+   "Y": 0.85,
+   "alle": {
+    "unter": [
+     11,
+     55
+    ],
+    "ueber": [
+     250,
+     22
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     7,
+     43
+    ],
+    "ueber": [
+     147,
+     19
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     4,
+     75
+    ],
+    "ueber": [
+     103,
+     27
+    ]
+   }
+  },
+  {
+   "art": "region",
+   "Y": 0.9,
+   "alle": {
+    "unter": [
+     29,
+     31
+    ],
+    "ueber": [
+     232,
+     23
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     18,
+     28
+    ],
+    "ueber": [
+     136,
+     19
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     11,
+     36
+    ],
+    "ueber": [
+     96,
+     28
+    ]
+   }
+  },
+  {
+   "art": "region",
+   "Y": 0.95,
+   "alle": {
+    "unter": [
+     73,
+     22
+    ],
+    "ueber": [
+     188,
+     24
+    ]
+   },
+   "jan_jun": {
+    "unter": [
+     47,
+     17
+    ],
+    "ueber": [
+     107,
+     21
+    ]
+   },
+   "jul_nov": {
+    "unter": [
+     26,
+     31
+    ],
+    "ueber": [
+     81,
+     28
+    ]
+   }
+  }
+ ]
+}

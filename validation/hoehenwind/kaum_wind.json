@@ -1,0 +1,87 @@
+{
+ "tage": 308,
+ "ruhig_A": 39,
+ "ruhig_B": 57,
+ "regeln": [
+  {
+   "regel": "anteil<20",
+   "gezeigt": 20,
+   "A": {
+    "richtig_pct": 60,
+    "erkannt_pct": 31,
+    "h1": "58% (n=12)",
+    "h2": "62% (n=8)"
+   },
+   "B": {
+    "richtig_pct": 75,
+    "erkannt_pct": 26,
+    "h1": "83% (n=12)",
+    "h2": "62% (n=8)"
+   }
+  },
+  {
+   "regel": "anteil<30",
+   "gezeigt": 29,
+   "A": {
+    "richtig_pct": 52,
+    "erkannt_pct": 38,
+    "h1": "53% (n=19)",
+    "h2": "50% (n=10)"
+   },
+   "B": {
+    "richtig_pct": 69,
+    "erkannt_pct": 35,
+    "h1": "74% (n=19)",
+    "h2": "60% (n=10)"
+   }
+  },
+  {
+   "regel": "max<15",
+   "gezeigt": 15,
+   "A": {
+    "richtig_pct": 53,
+    "erkannt_pct": 21,
+    "h1": "54% (n=13)",
+    "h2": "50% (n=2)"
+   },
+   "B": {
+    "richtig_pct": 67,
+    "erkannt_pct": 18,
+    "h1": "69% (n=13)",
+    "h2": "50% (n=2)"
+   }
+  },
+  {
+   "regel": "max<20",
+   "gezeigt": 49,
+   "A": {
+    "richtig_pct": 39,
+    "erkannt_pct": 49,
+    "h1": "41% (n=29)",
+    "h2": "35% (n=20)"
+   },
+   "B": {
+    "richtig_pct": 61,
+    "erkannt_pct": 53,
+    "h1": "62% (n=29)",
+    "h2": "60% (n=20)"
+   }
+  },
+  {
+   "regel": "mittel<10",
+   "gezeigt": 38,
+   "A": {
+    "richtig_pct": 47,
+    "erkannt_pct": 46,
+    "h1": "48% (n=25)",
+    "h2": "46% (n=13)"
+   },
+   "B": {
+    "richtig_pct": 68,
+    "erkannt_pct": 46,
+    "h1": "68% (n=25)",
+    "h2": "69% (n=13)"
+   }
+  }
+ ]
+}

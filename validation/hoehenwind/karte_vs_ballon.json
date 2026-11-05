@@ -1,0 +1,187 @@
+{
+ "karte_12utc": [
+  {
+   "klasse": "0–5",
+   "n": 37,
+   "median_fehler": 53,
+   "daneben_pct": 65,
+   "grob_falsch_pct": 35
+  },
+  {
+   "klasse": "5–10",
+   "n": 93,
+   "median_fehler": 28,
+   "daneben_pct": 33,
+   "grob_falsch_pct": 12
+  },
+  {
+   "klasse": "10–15",
+   "n": 126,
+   "median_fehler": 21,
+   "daneben_pct": 15,
+   "grob_falsch_pct": 2
+  },
+  {
+   "klasse": "15–20",
+   "n": 174,
+   "median_fehler": 20,
+   "daneben_pct": 14,
+   "grob_falsch_pct": 3
+  },
+  {
+   "klasse": "20–25",
+   "n": 148,
+   "median_fehler": 15,
+   "daneben_pct": 6,
+   "grob_falsch_pct": 1
+  },
+  {
+   "klasse": "25–30",
+   "n": 129,
+   "median_fehler": 11,
+   "daneben_pct": 2,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": "30–40",
+   "n": 233,
+   "median_fehler": 8,
+   "daneben_pct": 3,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": ">40",
+   "n": 259,
+   "median_fehler": 8,
+   "daneben_pct": 0,
+   "grob_falsch_pct": 0
+  }
+ ],
+ "karte_12_ortszeit": [
+  {
+   "klasse": "0–5",
+   "n": 35,
+   "median_fehler": 49,
+   "daneben_pct": 51,
+   "grob_falsch_pct": 20
+  },
+  {
+   "klasse": "5–10",
+   "n": 87,
+   "median_fehler": 33,
+   "daneben_pct": 38,
+   "grob_falsch_pct": 13
+  },
+  {
+   "klasse": "10–15",
+   "n": 151,
+   "median_fehler": 19,
+   "daneben_pct": 13,
+   "grob_falsch_pct": 1
+  },
+  {
+   "klasse": "15–20",
+   "n": 158,
+   "median_fehler": 17,
+   "daneben_pct": 15,
+   "grob_falsch_pct": 3
+  },
+  {
+   "klasse": "20–25",
+   "n": 140,
+   "median_fehler": 15,
+   "daneben_pct": 4,
+   "grob_falsch_pct": 1
+  },
+  {
+   "klasse": "25–30",
+   "n": 147,
+   "median_fehler": 12,
+   "daneben_pct": 5,
+   "grob_falsch_pct": 1
+  },
+  {
+   "klasse": "30–40",
+   "n": 213,
+   "median_fehler": 7,
+   "daneben_pct": 0,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": ">40",
+   "n": 268,
+   "median_fehler": 7,
+   "daneben_pct": 0,
+   "grob_falsch_pct": 0
+  }
+ ],
+ "ecmwf_am_ort": [
+  {
+   "klasse": "0–5",
+   "n": 34,
+   "median_fehler": 33,
+   "daneben_pct": 29,
+   "grob_falsch_pct": 9
+  },
+  {
+   "klasse": "5–10",
+   "n": 100,
+   "median_fehler": 20,
+   "daneben_pct": 20,
+   "grob_falsch_pct": 6
+  },
+  {
+   "klasse": "10–15",
+   "n": 152,
+   "median_fehler": 14,
+   "daneben_pct": 9,
+   "grob_falsch_pct": 1
+  },
+  {
+   "klasse": "15–20",
+   "n": 159,
+   "median_fehler": 11,
+   "daneben_pct": 1,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": "20–25",
+   "n": 150,
+   "median_fehler": 10,
+   "daneben_pct": 1,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": "25–30",
+   "n": 100,
+   "median_fehler": 8,
+   "daneben_pct": 2,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": "30–40",
+   "n": 212,
+   "median_fehler": 7,
+   "daneben_pct": 0,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": ">40",
+   "n": 292,
+   "median_fehler": 5,
+   "daneben_pct": 0,
+   "grob_falsch_pct": 0
+  }
+ ],
+ "gesamt_daneben_pct": {
+  "karte_12utc": 10,
+  "karte_12_ortszeit": 9,
+  "ecmwf_am_ort": 4
+ },
+ "karte_je_ballon_daneben_pct": {
+  "Payerne": 11,
+  "Stuttgart": 8,
+  "München": 9,
+  "Novara-Cameri": 12
+ }
+}

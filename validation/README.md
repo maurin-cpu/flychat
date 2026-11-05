@@ -10,6 +10,7 @@ Pläne liegen wie üblich in `docs/pläne/`, fertige Verfahren in `docs/`.
 | [`fronten/`](fronten/README.md) | spätere DWD-Handanalyse derselben Gültigkeitszeit | automatisch | 07/2026 |
 | [`gewitter/`](gewitter/README.md) | SwissMetNet-Stationsmessungen (MeteoSchweiz OGD) | automatisch | 08/2026 |
 | [`foehn/`](foehn/README.md) | MeteoSchweiz-Föhnindex (OGD, 39 Stationen, 10 min) | Backtest 2024–26 manuell; Föhn-Block täglich automatisch (datenarm) | 09/2026, täglich ab 10/2026 |
+| [`hoehenwind/`](hoehenwind/README.md) | Radiosonden 700 hPa (IGRA2: Payerne, Stuttgart, München, Novara) + SwissMetNet-Gipfel | Backtest manuell (Kachel-Richtung, Synoptik-Karte) | 11/2026 |
 
 Kandidaten für weitere Domänen (Pläne existieren): Thermik
 (`PLAN_binaerer_thermiktag.md`), OGN-Flugaktivität (`PLAN_ogn_validation.md`),

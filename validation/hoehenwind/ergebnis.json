@@ -1,0 +1,621 @@
+{
+ "zeitraum": [
+  "2026-01-01",
+  "2026-11-04"
+ ],
+ "modell": "icon_d2",
+ "stationen": {
+  "COV": {
+   "name": "Piz Corvatsch",
+   "lat": 46.418039,
+   "lon": 9.821308,
+   "elev": 3294.0
+  },
+  "GOR": {
+   "name": "Gornergrat",
+   "lat": 45.983644,
+   "lon": 7.785944,
+   "elev": 3129.0
+  },
+  "GUE": {
+   "name": "Gütsch, Andermatt",
+   "lat": 46.652475,
+   "lon": 8.615531,
+   "elev": 2286.0
+  },
+  "JUN": {
+   "name": "Jungfraujoch",
+   "lat": 46.547556,
+   "lon": 7.985444,
+   "elev": 3571.0
+  },
+  "SAE": {
+   "name": "Säntis",
+   "lat": 47.249447,
+   "lon": 9.343469,
+   "elev": 2501.0
+  },
+  "WFJ": {
+   "name": "Weissfluhjoch",
+   "lat": 46.833342,
+   "lon": 9.806397,
+   "elev": 2691.0
+  }
+ },
+ "daneben_grenze_deg": 45,
+ "windstille_ausgelassen": 53,
+ "fehlend": 3,
+ "zeitachse_korrelation_lag_h": {
+  "JUN": {
+   "-3": 0.975,
+   "-2": 0.9789,
+   "-1": 0.9822,
+   "0": 0.9846,
+   "1": 0.9855,
+   "2": 0.9846,
+   "3": 0.9828
+  },
+  "GOR": {
+   "-3": 0.9794,
+   "-2": 0.9839,
+   "-1": 0.9867,
+   "0": 0.9876,
+   "1": 0.9858,
+   "2": 0.9811,
+   "3": 0.9748
+  },
+  "COV": {
+   "-3": 0.9829,
+   "-2": 0.9868,
+   "-1": 0.99,
+   "0": 0.9923,
+   "1": 0.993,
+   "2": 0.9919,
+   "3": 0.9894
+  },
+  "WFJ": {
+   "-3": 0.976,
+   "-2": 0.9789,
+   "-1": 0.9807,
+   "0": 0.9814,
+   "1": 0.9807,
+   "2": 0.9787,
+   "3": 0.9756
+  },
+  "SAE": {
+   "-3": 0.9668,
+   "-2": 0.9699,
+   "-1": 0.9722,
+   "0": 0.9739,
+   "1": 0.9747,
+   "2": 0.9744,
+   "3": 0.9732
+  },
+  "GUE": {
+   "-3": 0.9613,
+   "-2": 0.9635,
+   "-1": 0.9649,
+   "0": 0.9654,
+   "1": 0.9652,
+   "2": 0.9639,
+   "3": 0.9618
+  }
+ },
+ "test_a_alle": [
+  {
+   "klasse": "0–5",
+   "n": 212,
+   "median_fehler": 85,
+   "daneben_pct": 73,
+   "grob_falsch_pct": 47
+  },
+  {
+   "klasse": "5–10",
+   "n": 331,
+   "median_fehler": 57,
+   "daneben_pct": 58,
+   "grob_falsch_pct": 36
+  },
+  {
+   "klasse": "10–15",
+   "n": 305,
+   "median_fehler": 39,
+   "daneben_pct": 45,
+   "grob_falsch_pct": 19
+  },
+  {
+   "klasse": "15–20",
+   "n": 257,
+   "median_fehler": 29,
+   "daneben_pct": 32,
+   "grob_falsch_pct": 14
+  },
+  {
+   "klasse": "20–25",
+   "n": 183,
+   "median_fehler": 32,
+   "daneben_pct": 37,
+   "grob_falsch_pct": 11
+  },
+  {
+   "klasse": "25–30",
+   "n": 145,
+   "median_fehler": 29,
+   "daneben_pct": 30,
+   "grob_falsch_pct": 6
+  },
+  {
+   "klasse": "30–40",
+   "n": 177,
+   "median_fehler": 25,
+   "daneben_pct": 28,
+   "grob_falsch_pct": 3
+  },
+  {
+   "klasse": ">40",
+   "n": 182,
+   "median_fehler": 21,
+   "daneben_pct": 19,
+   "grob_falsch_pct": 2
+  }
+ ],
+ "test_a_je_station": {
+  "JUN": {
+   "n": 290,
+   "tabelle": [
+    {
+     "klasse": "0–5",
+     "n": 19,
+     "median_fehler": 69,
+     "daneben_pct": 58,
+     "grob_falsch_pct": 42
+    },
+    {
+     "klasse": "5–10",
+     "n": 48,
+     "median_fehler": 42,
+     "daneben_pct": 48,
+     "grob_falsch_pct": 31
+    },
+    {
+     "klasse": "10–15",
+     "n": 46,
+     "median_fehler": 33,
+     "daneben_pct": 39,
+     "grob_falsch_pct": 15
+    },
+    {
+     "klasse": "15–20",
+     "n": 47,
+     "median_fehler": 22,
+     "daneben_pct": 13,
+     "grob_falsch_pct": 2
+    },
+    {
+     "klasse": "20–25",
+     "n": 33,
+     "median_fehler": 31,
+     "daneben_pct": 27,
+     "grob_falsch_pct": 9
+    },
+    {
+     "klasse": "25–30",
+     "n": 32,
+     "median_fehler": 24,
+     "daneben_pct": 12,
+     "grob_falsch_pct": 0
+    },
+    {
+     "klasse": "30–40",
+     "n": 43,
+     "median_fehler": 20,
+     "daneben_pct": 14,
+     "grob_falsch_pct": 2
+    },
+    {
+     "klasse": ">40",
+     "n": 22,
+     "median_fehler": 13,
+     "daneben_pct": 23,
+     "grob_falsch_pct": 5
+    }
+   ]
+  },
+  "GOR": {
+   "n": 290,
+   "tabelle": [
+    {
+     "klasse": "0–5",
+     "n": 104,
+     "median_fehler": 99,
+     "daneben_pct": 79,
+     "grob_falsch_pct": 54
+    },
+    {
+     "klasse": "5–10",
+     "n": 79,
+     "median_fehler": 132,
+     "daneben_pct": 84,
+     "grob_falsch_pct": 71
+    },
+    {
+     "klasse": "10–15",
+     "n": 39,
+     "median_fehler": 81,
+     "daneben_pct": 72,
+     "grob_falsch_pct": 46
+    },
+    {
+     "klasse": "15–20",
+     "n": 28,
+     "median_fehler": 80,
+     "daneben_pct": 68,
+     "grob_falsch_pct": 39
+    },
+    {
+     "klasse": "20–25",
+     "n": 22,
+     "median_fehler": 37,
+     "daneben_pct": 41,
+     "grob_falsch_pct": 14
+    },
+    {
+     "klasse": "25–30",
+     "n": 9,
+     "median_fehler": 54,
+     "daneben_pct": 56,
+     "grob_falsch_pct": 33
+    },
+    {
+     "klasse": "30–40",
+     "n": 7,
+     "median_fehler": 10,
+     "daneben_pct": 14,
+     "grob_falsch_pct": 0
+    },
+    {
+     "klasse": ">40",
+     "n": 2,
+     "median_fehler": 9,
+     "daneben_pct": 0,
+     "grob_falsch_pct": 0
+    }
+   ]
+  },
+  "COV": {
+   "n": 299,
+   "tabelle": [
+    {
+     "klasse": "0–5",
+     "n": 29,
+     "median_fehler": 75,
+     "daneben_pct": 79,
+     "grob_falsch_pct": 34
+    },
+    {
+     "klasse": "5–10",
+     "n": 76,
+     "median_fehler": 31,
+     "daneben_pct": 33,
+     "grob_falsch_pct": 16
+    },
+    {
+     "klasse": "10–15",
+     "n": 76,
+     "median_fehler": 15,
+     "daneben_pct": 11,
+     "grob_falsch_pct": 5
+    },
+    {
+     "klasse": "15–20",
+     "n": 52,
+     "median_fehler": 16,
+     "daneben_pct": 2,
+     "grob_falsch_pct": 0
+    },
+    {
+     "klasse": "20–25",
+     "n": 31,
+     "median_fehler": 17,
+     "daneben_pct": 3,
+     "grob_falsch_pct": 0
+    },
+    {
+     "klasse": "25–30",
+     "n": 15,
+     "median_fehler": 13,
+     "daneben_pct": 0,
+     "grob_falsch_pct": 0
+    },
+    {
+     "klasse": "30–40",
+     "n": 12,
+     "median_fehler": 16,
+     "daneben_pct": 0,
+     "grob_falsch_pct": 0
+    },
+    {
+     "klasse": ">40",
+     "n": 8,
+     "median_fehler": 24,
+     "daneben_pct": 12,
+     "grob_falsch_pct": 0
+    }
+   ]
+  },
+  "WFJ": {
+   "n": 303,
+   "tabelle": [
+    {
+     "klasse": "0–5",
+     "n": 15,
+     "median_fehler": 74,
+     "daneben_pct": 60,
+     "grob_falsch_pct": 40
+    },
+    {
+     "klasse": "5–10",
+     "n": 53,
+     "median_fehler": 61,
+     "daneben_pct": 64,
+     "grob_falsch_pct": 30
+    },
+    {
+     "klasse": "10–15",
+     "n": 59,
+     "median_fehler": 48,
+     "daneben_pct": 54,
+     "grob_falsch_pct": 19
+    },
+    {
+     "klasse": "15–20",
+     "n": 46,
+     "median_fehler": 39,
+     "daneben_pct": 43,
+     "grob_falsch_pct": 17
+    },
+    {
+     "klasse": "20–25",
+     "n": 42,
+     "median_fehler": 38,
+     "daneben_pct": 45,
+     "grob_falsch_pct": 14
+    },
+    {
+     "klasse": "25–30",
+     "n": 26,
+     "median_fehler": 45,
+     "daneben_pct": 50,
+     "grob_falsch_pct": 8
+    },
+    {
+     "klasse": "30–40",
+     "n": 37,
+     "median_fehler": 46,
+     "daneben_pct": 57,
+     "grob_falsch_pct": 0
+    },
+    {
+     "klasse": ">40",
+     "n": 25,
+     "median_fehler": 20,
+     "daneben_pct": 32,
+     "grob_falsch_pct": 0
+    }
+   ]
+  },
+  "SAE": {
+   "n": 303,
+   "tabelle": [
+    {
+     "klasse": "0–5",
+     "n": 17,
+     "median_fehler": 68,
+     "daneben_pct": 65,
+     "grob_falsch_pct": 41
+    },
+    {
+     "klasse": "5–10",
+     "n": 32,
+     "median_fehler": 41,
+     "daneben_pct": 47,
+     "grob_falsch_pct": 16
+    },
+    {
+     "klasse": "10–15",
+     "n": 35,
+     "median_fehler": 47,
+     "daneben_pct": 51,
+     "grob_falsch_pct": 14
+    },
+    {
+     "klasse": "15–20",
+     "n": 39,
+     "median_fehler": 29,
+     "daneben_pct": 33,
+     "grob_falsch_pct": 8
+    },
+    {
+     "klasse": "20–25",
+     "n": 27,
+     "median_fehler": 30,
+     "daneben_pct": 41,
+     "grob_falsch_pct": 11
+    },
+    {
+     "klasse": "25–30",
+     "n": 29,
+     "median_fehler": 26,
+     "daneben_pct": 28,
+     "grob_falsch_pct": 3
+    },
+    {
+     "klasse": "30–40",
+     "n": 39,
+     "median_fehler": 16,
+     "daneben_pct": 18,
+     "grob_falsch_pct": 3
+    },
+    {
+     "klasse": ">40",
+     "n": 85,
+     "median_fehler": 18,
+     "daneben_pct": 6,
+     "grob_falsch_pct": 0
+    }
+   ]
+  },
+  "GUE": {
+   "n": 307,
+   "tabelle": [
+    {
+     "klasse": "0–5",
+     "n": 28,
+     "median_fehler": 81,
+     "daneben_pct": 68,
+     "grob_falsch_pct": 46
+    },
+    {
+     "klasse": "5–10",
+     "n": 43,
+     "median_fehler": 66,
+     "daneben_pct": 67,
+     "grob_falsch_pct": 33
+    },
+    {
+     "klasse": "10–15",
+     "n": 50,
+     "median_fehler": 57,
+     "daneben_pct": 64,
+     "grob_falsch_pct": 24
+    },
+    {
+     "klasse": "15–20",
+     "n": 45,
+     "median_fehler": 52,
+     "daneben_pct": 53,
+     "grob_falsch_pct": 27
+    },
+    {
+     "klasse": "20–25",
+     "n": 28,
+     "median_fehler": 62,
+     "daneben_pct": 64,
+     "grob_falsch_pct": 18
+    },
+    {
+     "klasse": "25–30",
+     "n": 34,
+     "median_fehler": 36,
+     "daneben_pct": 41,
+     "grob_falsch_pct": 6
+    },
+    {
+     "klasse": "30–40",
+     "n": 39,
+     "median_fehler": 33,
+     "daneben_pct": 36,
+     "grob_falsch_pct": 10
+    },
+    {
+     "klasse": ">40",
+     "n": 40,
+     "median_fehler": 40,
+     "daneben_pct": 38,
+     "grob_falsch_pct": 5
+    }
+   ]
+  }
+ },
+ "test_b_kachel": [
+  {
+   "klasse": "0–5",
+   "n": 25,
+   "median_fehler": 45,
+   "daneben_pct": 48,
+   "grob_falsch_pct": 24
+  },
+  {
+   "klasse": "5–10",
+   "n": 58,
+   "median_fehler": 28,
+   "daneben_pct": 29,
+   "grob_falsch_pct": 14
+  },
+  {
+   "klasse": "10–15",
+   "n": 62,
+   "median_fehler": 22,
+   "daneben_pct": 13,
+   "grob_falsch_pct": 2
+  },
+  {
+   "klasse": "15–20",
+   "n": 43,
+   "median_fehler": 21,
+   "daneben_pct": 19,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": "20–25",
+   "n": 45,
+   "median_fehler": 21,
+   "daneben_pct": 7,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": "25–30",
+   "n": 32,
+   "median_fehler": 19,
+   "daneben_pct": 12,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": "30–40",
+   "n": 27,
+   "median_fehler": 10,
+   "daneben_pct": 4,
+   "grob_falsch_pct": 0
+  },
+  {
+   "klasse": ">40",
+   "n": 15,
+   "median_fehler": 9,
+   "daneben_pct": 0,
+   "grob_falsch_pct": 0
+  }
+ ],
+ "test_b_nach_R": [
+  {
+   "R": "0.00–0.50",
+   "n": 6,
+   "median_fehler": 65,
+   "daneben_pct": 50
+  },
+  {
+   "R": "0.50–0.70",
+   "n": 15,
+   "median_fehler": 45,
+   "daneben_pct": 47
+  },
+  {
+   "R": "0.70–0.85",
+   "n": 41,
+   "median_fehler": 31,
+   "daneben_pct": 24
+  },
+  {
+   "R": "0.85–0.95",
+   "n": 104,
+   "median_fehler": 21,
+   "daneben_pct": 18
+  },
+  {
+   "R": "0.95–1.00",
+   "n": 141,
+   "median_fehler": 17,
+   "daneben_pct": 10
+  }
+ ],
+ "test_b_tage": 307
+}

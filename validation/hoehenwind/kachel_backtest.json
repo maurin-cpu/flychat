@@ -1,0 +1,3117 @@
+{
+ "termine": 305,
+ "labels": {
+  "pfeil": {
+   "tage": 208,
+   "anteil_pct": 68,
+   "richtung_stimmt": [
+    206,
+    98
+   ],
+   "nicht_teils_stimmt_gipfel": [
+    208,
+    42
+   ]
+  },
+  "teils": {
+   "tage": 53,
+   "anteil_pct": 17,
+   "richtung_stimmt": [
+    52,
+    73
+   ],
+   "teils_schwach_stimmt_gipfel": [
+    53,
+    94
+   ]
+  },
+  "wechselt": {
+   "tage": 27,
+   "anteil_pct": 9,
+   "keine_klare_richtung_ballone": [
+    27,
+    56
+   ],
+   "pfeil_waere_falsch": [
+    27,
+    22
+   ]
+  },
+  "wechselt+": {
+   "tage": 15,
+   "anteil_pct": 5,
+   "keine_klare_richtung_ballone": [
+    15,
+    40
+   ],
+   "pfeil_waere_falsch": [
+    0,
+    null
+   ],
+   "stellenweise_staerker_ballone": [
+    15,
+    67
+   ]
+  },
+  "schwach": {
+   "tage": 2,
+   "anteil_pct": 1,
+   "schwach_stimmt_ballone": [
+    2,
+    50
+   ]
+  }
+ },
+ "rows": [
+  {
+   "t": "2026-01-01T12:00:00",
+   "label": "pfeil",
+   "dir": 258.3872923361529,
+   "t_dir": 266.2517879879893,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-02T12:00:00",
+   "label": "pfeil",
+   "dir": 266.0615483197602,
+   "t_dir": 272.99862580303505,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-03T12:00:00",
+   "label": "pfeil",
+   "dir": 259.99829370503403,
+   "t_dir": 255.7475815350693,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-04T12:00:00",
+   "label": "teils",
+   "dir": 271.42712163226133,
+   "t_dir": 278.26395785979287,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-05T12:00:00",
+   "label": "pfeil",
+   "dir": 283.1973750929897,
+   "t_dir": 263.29504672941675,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-06T12:00:00",
+   "label": "teils",
+   "dir": 338.79525439596796,
+   "t_dir": 301.13063993435105,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-07T12:00:00",
+   "label": "pfeil",
+   "dir": 330.07183337493916,
+   "t_dir": 332.8712638583997,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-08T12:00:00",
+   "label": "pfeil",
+   "dir": 291.99375919926337,
+   "t_dir": 292.0042766920885,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-09T12:00:00",
+   "label": "pfeil",
+   "dir": 254.30188819167807,
+   "t_dir": 260.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-10T12:00:00",
+   "label": "pfeil",
+   "dir": 286.88845073874006,
+   "t_dir": 291.5137113852336,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-11T12:00:00",
+   "label": "pfeil",
+   "dir": 2.36580344432616,
+   "t_dir": 4.319129123118074,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-12T12:00:00",
+   "label": "pfeil",
+   "dir": 282.4282369014895,
+   "t_dir": 281.72637400662285,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-13T12:00:00",
+   "label": "pfeil",
+   "dir": 246.30985573988448,
+   "t_dir": 258.4011675916465,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-14T12:00:00",
+   "label": "pfeil",
+   "dir": 246.39664441059273,
+   "t_dir": 258.22745442457847,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-15T12:00:00",
+   "label": "pfeil",
+   "dir": 216.840058910056,
+   "t_dir": 233.33805518929267,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-16T12:00:00",
+   "label": "pfeil",
+   "dir": 206.0680757375525,
+   "t_dir": 199.67807002124104,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-17T12:00:00",
+   "label": "pfeil",
+   "dir": 186.55676046084156,
+   "t_dir": 195.32670721355169,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-18T12:00:00",
+   "label": "teils",
+   "dir": 192.0744251699582,
+   "t_dir": 142.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-19T12:00:00",
+   "label": "teils",
+   "dir": 162.6551979793234,
+   "t_dir": 157.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-20T12:00:00",
+   "label": "pfeil",
+   "dir": 189.06191018826607,
+   "t_dir": 190.85671523233327,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-21T12:00:00",
+   "label": "teils",
+   "dir": 196.4368610466493,
+   "t_dir": 172.5,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-22T12:00:00",
+   "label": "teils",
+   "dir": 233.49609172517745,
+   "t_dir": 237.1263265693575,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-23T12:00:00",
+   "label": "pfeil",
+   "dir": 196.23384768453562,
+   "t_dir": 226.64858783428127,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-24T12:00:00",
+   "label": "teils",
+   "dir": 165.54264681612796,
+   "t_dir": 195.78753556560605,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-25T12:00:00",
+   "label": "pfeil",
+   "dir": 211.3536235267591,
+   "t_dir": 176.12163866323772,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-26T12:00:00",
+   "label": "pfeil",
+   "dir": 293.83279065271046,
+   "t_dir": 288.5380418946329,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-27T12:00:00",
+   "label": "pfeil",
+   "dir": 223.07085509097382,
+   "t_dir": 253.11733735019823,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-28T12:00:00",
+   "label": "pfeil",
+   "dir": 166.7981897549931,
+   "t_dir": 192.38335983616793,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-01-29T12:00:00",
+   "label": "pfeil",
+   "dir": 317.8238428764582,
+   "t_dir": 325.38010984533463,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-30T12:00:00",
+   "label": "pfeil",
+   "dir": 267.9921268916343,
+   "t_dir": 258.0732550739479,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-01-31T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": null,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-01T12:00:00",
+   "label": "teils",
+   "dir": 255.81725919700511,
+   "t_dir": 286.0,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-02T12:00:00",
+   "label": "pfeil",
+   "dir": 240.54777159480165,
+   "t_dir": 247.25264272678987,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-03T12:00:00",
+   "label": "pfeil",
+   "dir": 222.77476913922695,
+   "t_dir": 224.78641950874803,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-04T12:00:00",
+   "label": "pfeil",
+   "dir": 175.95503148171304,
+   "t_dir": 146.24441561006165,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-05T12:00:00",
+   "label": "pfeil",
+   "dir": 219.98497785130456,
+   "t_dir": 221.8769005311244,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-06T12:00:00",
+   "label": "pfeil",
+   "dir": 278.67575653095605,
+   "t_dir": 283.16454403158525,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-07T12:00:00",
+   "label": "teils",
+   "dir": 197.46946238525987,
+   "t_dir": 258.14661072098033,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-08T12:00:00",
+   "label": "pfeil",
+   "dir": 135.27289285310164,
+   "t_dir": 61.28132645107192,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-09T12:00:00",
+   "label": "pfeil",
+   "dir": 214.6254250948997,
+   "t_dir": 232.27791808398112,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-10T12:00:00",
+   "label": "pfeil",
+   "dir": 240.58705269664324,
+   "t_dir": 248.55203951515023,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-11T12:00:00",
+   "label": "pfeil",
+   "dir": 272.6699723602568,
+   "t_dir": 270.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-12T12:00:00",
+   "label": "pfeil",
+   "dir": 281.0176366459293,
+   "t_dir": 276.14615372658636,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-13T12:00:00",
+   "label": "pfeil",
+   "dir": 228.6902434306496,
+   "t_dir": 255.2582477615179,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-14T12:00:00",
+   "label": "teils",
+   "dir": 15.626646813186174,
+   "t_dir": 70.81462019476206,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-15T12:00:00",
+   "label": "pfeil",
+   "dir": 309.56637492434163,
+   "t_dir": 316.7502555377411,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-16T12:00:00",
+   "label": "pfeil",
+   "dir": 280.01628854409444,
+   "t_dir": 280.7426130726477,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-17T12:00:00",
+   "label": "pfeil",
+   "dir": 299.9081601238936,
+   "t_dir": 294.4913716586966,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-18T12:00:00",
+   "label": "pfeil",
+   "dir": 257.29733516475005,
+   "t_dir": 273.2938253965036,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-19T12:00:00",
+   "label": "wechselt",
+   "dir": 291.54689940007006,
+   "t_dir": 203.16956979103793,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-20T12:00:00",
+   "label": "pfeil",
+   "dir": 329.9250013144779,
+   "t_dir": 353.7515658088342,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-21T12:00:00",
+   "label": "pfeil",
+   "dir": 310.41365966167496,
+   "t_dir": 306.1493607174601,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-22T12:00:00",
+   "label": "pfeil",
+   "dir": 273.65704241217236,
+   "t_dir": 267.6349143648839,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-23T12:00:00",
+   "label": "pfeil",
+   "dir": 287.217406707309,
+   "t_dir": 260.64629939959667,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-02-24T12:00:00",
+   "label": "pfeil",
+   "dir": 335.7994950176665,
+   "t_dir": 318.3046759420123,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-25T12:00:00",
+   "label": "schwach",
+   "dir": null,
+   "t_dir": 332.5,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-26T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 262.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-27T12:00:00",
+   "label": "pfeil",
+   "dir": 242.77750550350316,
+   "t_dir": 245.1092915732038,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-02-28T12:00:00",
+   "label": "pfeil",
+   "dir": 219.10119832182025,
+   "t_dir": 197.9970859202752,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-01T12:00:00",
+   "label": "pfeil",
+   "dir": 232.71968662396978,
+   "t_dir": 236.51045528913878,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-02T12:00:00",
+   "label": "teils",
+   "dir": 194.1316928035813,
+   "t_dir": 167.11227836888668,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-03T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": null,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-04T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 48.00031224557724,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-05T12:00:00",
+   "label": "pfeil",
+   "dir": 220.32455729582344,
+   "t_dir": 179.10660535086907,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-06T12:00:00",
+   "label": "teils",
+   "dir": 89.47220388891563,
+   "t_dir": 127.66373063013003,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-07T12:00:00",
+   "label": "teils",
+   "dir": 150.1102086834093,
+   "t_dir": 118.25568258560185,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-08T12:00:00",
+   "label": "schwach",
+   "dir": null,
+   "t_dir": null,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-09T12:00:00",
+   "label": "teils",
+   "dir": 196.5869947432732,
+   "t_dir": 209.46902321990288,
+   "t_keine_richtung": false,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-10T12:00:00",
+   "label": "pfeil",
+   "dir": 197.26266471226765,
+   "t_dir": 201.5,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-11T12:00:00",
+   "label": "pfeil",
+   "dir": 232.9248081637832,
+   "t_dir": 237.74575152774952,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-12T12:00:00",
+   "label": "wechselt",
+   "dir": 11.305164161994439,
+   "t_dir": 324.60235609603495,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-13T12:00:00",
+   "label": "pfeil",
+   "dir": 234.7678784244224,
+   "t_dir": 243.40717779123213,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-14T12:00:00",
+   "label": "wechselt",
+   "dir": 199.3937301012737,
+   "t_dir": 211.36031637946445,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-15T12:00:00",
+   "label": "pfeil",
+   "dir": 178.22065765042512,
+   "t_dir": 176.52754703435016,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-16T12:00:00",
+   "label": "pfeil",
+   "dir": 300.23575015965577,
+   "t_dir": 295.87256431509405,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-17T12:00:00",
+   "label": "pfeil",
+   "dir": 17.307491158065837,
+   "t_dir": 4.421866228309825,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-18T12:00:00",
+   "label": "pfeil",
+   "dir": 129.03639210407832,
+   "t_dir": 104.72620337746486,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-19T12:00:00",
+   "label": "pfeil",
+   "dir": 67.61906344553081,
+   "t_dir": 61.83814268124564,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-20T12:00:00",
+   "label": "pfeil",
+   "dir": 34.262651157368914,
+   "t_dir": 40.74382466867042,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-21T12:00:00",
+   "label": "teils",
+   "dir": 353.1347319411393,
+   "t_dir": 55.43998834277078,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-22T12:00:00",
+   "label": "pfeil",
+   "dir": 153.91311895279813,
+   "t_dir": 162.55723925705826,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-23T12:00:00",
+   "label": "teils",
+   "dir": 21.937276988514256,
+   "t_dir": 42.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-24T12:00:00",
+   "label": "pfeil",
+   "dir": 30.55785724778379,
+   "t_dir": 28.430433450131677,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-03-25T12:00:00",
+   "label": "pfeil",
+   "dir": 246.28169516115707,
+   "t_dir": 259.20682824939524,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-26T12:00:00",
+   "label": "pfeil",
+   "dir": 355.9040207605261,
+   "t_dir": 358.4445808466497,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-27T12:00:00",
+   "label": "pfeil",
+   "dir": 50.631727104960106,
+   "t_dir": 51.999186943912754,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-28T12:00:00",
+   "label": "pfeil",
+   "dir": 352.08127363043184,
+   "t_dir": 10.656771159866722,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-29T12:00:00",
+   "label": "pfeil",
+   "dir": 50.43308773922468,
+   "t_dir": 23.74705302426648,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-30T12:00:00",
+   "label": "pfeil",
+   "dir": 315.2874289108607,
+   "t_dir": 303.48689065869496,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-03-31T12:00:00",
+   "label": "pfeil",
+   "dir": 20.348487802017523,
+   "t_dir": 25.012765274367514,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-04-01T12:00:00",
+   "label": "pfeil",
+   "dir": 86.36497339278158,
+   "t_dir": 96.67043694469767,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-04-02T12:00:00",
+   "label": "pfeil",
+   "dir": 34.71720134004612,
+   "t_dir": 43.420439860151994,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-04-03T12:00:00",
+   "label": "pfeil",
+   "dir": 335.5970920568072,
+   "t_dir": 335.7542797823178,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-04T12:00:00",
+   "label": "pfeil",
+   "dir": 339.86453814922487,
+   "t_dir": 333.64169613616093,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-05T12:00:00",
+   "label": "pfeil",
+   "dir": 256.25690682412795,
+   "t_dir": 274.45175712692946,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-04-06T12:00:00",
+   "label": "teils",
+   "dir": 262.5362084741878,
+   "t_dir": 300.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-07T12:00:00",
+   "label": "teils",
+   "dir": 318.1929627136983,
+   "t_dir": 311.67043694469766,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-08T12:00:00",
+   "label": "wechselt",
+   "dir": 33.059929150091,
+   "t_dir": 15.039738472470969,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-09T12:00:00",
+   "label": "pfeil",
+   "dir": 313.4486002209186,
+   "t_dir": 326.2446292159902,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-10T12:00:00",
+   "label": "pfeil",
+   "dir": 287.22665586789634,
+   "t_dir": 292.7655432167183,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-11T12:00:00",
+   "label": "pfeil",
+   "dir": 270.0118294638923,
+   "t_dir": 282.8712638583997,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-12T12:00:00",
+   "label": "pfeil",
+   "dir": 193.69421649263992,
+   "t_dir": 200.974812333551,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-04-13T12:00:00",
+   "label": "pfeil",
+   "dir": 166.51135043796594,
+   "t_dir": 160.90074610720242,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-04-14T12:00:00",
+   "label": "teils",
+   "dir": 54.954471961775425,
+   "t_dir": 61.13359409084603,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-15T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 160.0,
+   "t_keine_richtung": false,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-16T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 292.8888224310748,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-17T12:00:00",
+   "label": "teils",
+   "dir": 257.11797818230315,
+   "t_dir": 307.5,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-18T12:00:00",
+   "label": "pfeil",
+   "dir": 292.9640335677985,
+   "t_dir": 306.9027910898648,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-19T12:00:00",
+   "label": "pfeil",
+   "dir": 285.97137350384105,
+   "t_dir": 281.1808677209634,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-20T12:00:00",
+   "label": "pfeil",
+   "dir": 273.56501679891375,
+   "t_dir": 288.9903551208651,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-21T12:00:00",
+   "label": "pfeil",
+   "dir": 283.6327265460849,
+   "t_dir": 306.7959155187991,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-22T12:00:00",
+   "label": "wechselt",
+   "dir": 63.318794377400096,
+   "t_dir": 61.704953270583246,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-23T12:00:00",
+   "label": "pfeil",
+   "dir": 62.01632520669644,
+   "t_dir": 33.31674344019159,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-24T12:00:00",
+   "label": "teils",
+   "dir": 348.54855223270795,
+   "t_dir": 358.26395785979287,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-25T12:00:00",
+   "label": "wechselt",
+   "dir": 291.7042746666251,
+   "t_dir": 266.04196510641054,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-26T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 327.49999999999994,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-27T12:00:00",
+   "label": "teils",
+   "dir": 236.6864256653553,
+   "t_dir": 283.4345555909769,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-28T12:00:00",
+   "label": "teils",
+   "dir": 214.6633866389055,
+   "t_dir": null,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-29T12:00:00",
+   "label": "wechselt",
+   "dir": 277.1664592476051,
+   "t_dir": 55.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-04-30T12:00:00",
+   "label": "wechselt",
+   "dir": 2.3593598605460366,
+   "t_dir": 46.26210693106208,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-01T12:00:00",
+   "label": "teils",
+   "dir": 143.9668239788648,
+   "t_dir": 98.70969414333031,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-02T12:00:00",
+   "label": "teils",
+   "dir": 192.48129116053806,
+   "t_dir": 179.41110083735094,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-03T12:00:00",
+   "label": "pfeil",
+   "dir": 196.33180357947234,
+   "t_dir": 206.99275193749105,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-04T12:00:00",
+   "label": "pfeil",
+   "dir": 194.46776573914582,
+   "t_dir": 199.1818572141897,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-05-05T12:00:00",
+   "label": "pfeil",
+   "dir": 206.71565780414525,
+   "t_dir": 208.19264408556444,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-05-06T12:00:00",
+   "label": "pfeil",
+   "dir": 215.87535715826135,
+   "t_dir": 216.28788449422635,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-05-07T12:00:00",
+   "label": "pfeil",
+   "dir": 227.39858610138992,
+   "t_dir": 255.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-08T12:00:00",
+   "label": "teils",
+   "dir": 198.16186893801583,
+   "t_dir": 232.9488597022476,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-09T12:00:00",
+   "label": "teils",
+   "dir": 183.6423047974879,
+   "t_dir": 236.37952280788468,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-10T12:00:00",
+   "label": "pfeil",
+   "dir": 188.88054908793768,
+   "t_dir": 185.1190483490048,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-05-11T12:00:00",
+   "label": "pfeil",
+   "dir": 262.9451743873699,
+   "t_dir": 251.25897414453596,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-05-12T12:00:00",
+   "label": "pfeil",
+   "dir": 315.7303450575862,
+   "t_dir": 299.9614089823915,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-05-13T12:00:00",
+   "label": "pfeil",
+   "dir": 255.78110218296638,
+   "t_dir": 275.3329905781327,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-05-14T12:00:00",
+   "label": "pfeil",
+   "dir": 242.8335471224736,
+   "t_dir": 249.02518766644897,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-15T12:00:00",
+   "label": "teils",
+   "dir": 341.0197407332349,
+   "t_dir": 230.89954089090557,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-16T12:00:00",
+   "label": "wechselt",
+   "dir": 308.979890503739,
+   "t_dir": 290.0,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-17T12:00:00",
+   "label": "pfeil",
+   "dir": 241.81493830543832,
+   "t_dir": 255.37156850225026,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-18T12:00:00",
+   "label": "pfeil",
+   "dir": 219.83657626017566,
+   "t_dir": 249.80248740151904,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-19T12:00:00",
+   "label": "pfeil",
+   "dir": 240.7796464169715,
+   "t_dir": 242.91635831388726,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-20T12:00:00",
+   "label": "pfeil",
+   "dir": 289.37411566911817,
+   "t_dir": 283.84084657237617,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-21T12:00:00",
+   "label": "teils",
+   "dir": 342.65313404741005,
+   "t_dir": 353.0765783883399,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-22T12:00:00",
+   "label": "teils",
+   "dir": 330.7193449029607,
+   "t_dir": 354.3432288401333,
+   "t_keine_richtung": false,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-23T12:00:00",
+   "label": "teils",
+   "dir": 35.19300003590157,
+   "t_dir": 30.03859101760849,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-24T12:00:00",
+   "label": "pfeil",
+   "dir": 58.612688269910116,
+   "t_dir": 41.59474552143899,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-25T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 42.49999999999999,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-26T12:00:00",
+   "label": "wechselt",
+   "dir": 257.57589578694757,
+   "t_dir": 275.6941870324082,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-27T12:00:00",
+   "label": "pfeil",
+   "dir": 298.31807731717015,
+   "t_dir": 283.2384065187765,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-28T12:00:00",
+   "label": "pfeil",
+   "dir": 7.273162512812947,
+   "t_dir": 340.08928921315703,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-29T12:00:00",
+   "label": "teils",
+   "dir": 43.401763303533,
+   "t_dir": 22.67329273535539,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-30T12:00:00",
+   "label": "teils",
+   "dir": 44.75249150225504,
+   "t_dir": 348.093841702242,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-05-31T12:00:00",
+   "label": "pfeil",
+   "dir": 254.015475077789,
+   "t_dir": 254.92846860290916,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-01T12:00:00",
+   "label": "wechselt",
+   "dir": 286.7694545842068,
+   "t_dir": 298.75298758294696,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-03T12:00:00",
+   "label": "pfeil",
+   "dir": 296.34919675464505,
+   "t_dir": 288.2948536346674,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-06-04T12:00:00",
+   "label": "pfeil",
+   "dir": 209.93930588485208,
+   "t_dir": 235.01298157946675,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-06-05T12:00:00",
+   "label": "teils",
+   "dir": 202.14170952159571,
+   "t_dir": 240.86374092615554,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-06T12:00:00",
+   "label": "pfeil",
+   "dir": 257.5722045235532,
+   "t_dir": 246.88266264980177,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-07T12:00:00",
+   "label": "pfeil",
+   "dir": 232.8014999134627,
+   "t_dir": 251.8741198401671,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-08T12:00:00",
+   "label": "pfeil",
+   "dir": 222.35267506815788,
+   "t_dir": 244.50060974554927,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-09T12:00:00",
+   "label": "pfeil",
+   "dir": 228.24895783357647,
+   "t_dir": 237.31583707352718,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-06-10T12:00:00",
+   "label": "pfeil",
+   "dir": 268.4975206021278,
+   "t_dir": 246.9983187134928,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-11T12:00:00",
+   "label": "pfeil",
+   "dir": 305.33355123767893,
+   "t_dir": 284.7977239522174,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-06-12T12:00:00",
+   "label": "pfeil",
+   "dir": 304.19876368545056,
+   "t_dir": 306.653343669476,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-13T12:00:00",
+   "label": "pfeil",
+   "dir": 304.78632903921937,
+   "t_dir": 309.6950935792088,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-14T12:00:00",
+   "label": "pfeil",
+   "dir": 308.3207891648535,
+   "t_dir": 306.5883255826382,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-06-15T12:00:00",
+   "label": "pfeil",
+   "dir": 316.27960007706656,
+   "t_dir": 304.24910423392953,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-06-16T12:00:00",
+   "label": "pfeil",
+   "dir": 296.0249248810577,
+   "t_dir": 285.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-17T12:00:00",
+   "label": "wechselt",
+   "dir": 279.87330647710644,
+   "t_dir": 301.57990146866354,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-18T12:00:00",
+   "label": "wechselt",
+   "dir": 247.36815825729394,
+   "t_dir": 272.3310893064982,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-19T12:00:00",
+   "label": "pfeil",
+   "dir": 197.96042541093527,
+   "t_dir": null,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-20T12:00:00",
+   "label": "wechselt",
+   "dir": 302.7293929032718,
+   "t_dir": 275.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-21T12:00:00",
+   "label": "wechselt",
+   "dir": 308.1513998584288,
+   "t_dir": 286.84974521309135,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-22T12:00:00",
+   "label": "teils",
+   "dir": 3.404586085043802,
+   "t_dir": 343.62557229794857,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-23T12:00:00",
+   "label": "pfeil",
+   "dir": 351.48071531331254,
+   "t_dir": 325.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-24T12:00:00",
+   "label": "teils",
+   "dir": 33.0038449283842,
+   "t_dir": 24.9661325366492,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-25T12:00:00",
+   "label": "wechselt",
+   "dir": 53.92278382314127,
+   "t_dir": 40.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-26T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 34.981923612029476,
+   "t_keine_richtung": false,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-27T12:00:00",
+   "label": "wechselt",
+   "dir": 216.4363308781682,
+   "t_dir": 211.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-28T12:00:00",
+   "label": "wechselt",
+   "dir": 248.34045936082742,
+   "t_dir": 246.3526563999613,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-29T12:00:00",
+   "label": "wechselt",
+   "dir": 272.73206973889063,
+   "t_dir": 210.8385402862933,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-06-30T12:00:00",
+   "label": "pfeil",
+   "dir": 203.66136739294058,
+   "t_dir": 224.99999999999997,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-01T12:00:00",
+   "label": "pfeil",
+   "dir": 339.954859499267,
+   "t_dir": 290.2146679198563,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-07-02T12:00:00",
+   "label": "pfeil",
+   "dir": 1.7870655505567388,
+   "t_dir": 348.9477595463987,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-03T12:00:00",
+   "label": "teils",
+   "dir": 337.3520161357608,
+   "t_dir": 331.9677028109944,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-04T12:00:00",
+   "label": "pfeil",
+   "dir": 343.75097312378716,
+   "t_dir": 329.3627518520366,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-05T12:00:00",
+   "label": "pfeil",
+   "dir": 313.4691548326735,
+   "t_dir": 309.0995494376261,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-06T12:00:00",
+   "label": "pfeil",
+   "dir": 316.06100353908835,
+   "t_dir": 314.2778188034496,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-07T12:00:00",
+   "label": "pfeil",
+   "dir": 303.1463039621896,
+   "t_dir": 307.441356507583,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-08T12:00:00",
+   "label": "pfeil",
+   "dir": 317.80688381012624,
+   "t_dir": 316.7488378922723,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-07-09T12:00:00",
+   "label": "pfeil",
+   "dir": 24.34047110364464,
+   "t_dir": 13.884608474246255,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-10T12:00:00",
+   "label": "wechselt",
+   "dir": 273.4027743182957,
+   "t_dir": 294.6284314977497,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-11T12:00:00",
+   "label": "teils",
+   "dir": 339.9857732346731,
+   "t_dir": 325.4160671269012,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-12T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 25.098362538418183,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-13T12:00:00",
+   "label": "pfeil",
+   "dir": 253.11504538107295,
+   "t_dir": 266.08238941802074,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-14T12:00:00",
+   "label": "pfeil",
+   "dir": 271.10278143807125,
+   "t_dir": 285.5444859624786,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-15T12:00:00",
+   "label": "pfeil",
+   "dir": 273.29736123653964,
+   "t_dir": 265.078083697715,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-16T12:00:00",
+   "label": "pfeil",
+   "dir": 249.31220024314942,
+   "t_dir": 261.4677261869432,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-07-17T12:00:00",
+   "label": "pfeil",
+   "dir": 249.2633533143034,
+   "t_dir": 248.02635099956206,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-18T12:00:00",
+   "label": "pfeil",
+   "dir": 253.86733889515872,
+   "t_dir": 258.5547934462058,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-19T12:00:00",
+   "label": "pfeil",
+   "dir": 271.2596708507382,
+   "t_dir": 273.9621414142597,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-07-20T12:00:00",
+   "label": "pfeil",
+   "dir": 256.33217136148346,
+   "t_dir": 274.74866320429487,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-21T12:00:00",
+   "label": "pfeil",
+   "dir": 273.42692024913225,
+   "t_dir": 278.46849701066446,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-07-22T12:00:00",
+   "label": "pfeil",
+   "dir": 294.1703478018182,
+   "t_dir": 311.59312599818844,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-23T12:00:00",
+   "label": "pfeil",
+   "dir": 303.6681817603626,
+   "t_dir": 311.44616770016165,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-24T12:00:00",
+   "label": "wechselt",
+   "dir": 315.07815937665805,
+   "t_dir": 351.6841866373945,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-25T12:00:00",
+   "label": "pfeil",
+   "dir": 223.64881727615122,
+   "t_dir": 245.03975343418387,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-26T12:00:00",
+   "label": "pfeil",
+   "dir": 309.172260701961,
+   "t_dir": 288.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-27T12:00:00",
+   "label": "pfeil",
+   "dir": 297.058486093561,
+   "t_dir": 291.92927130886034,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-28T12:00:00",
+   "label": "pfeil",
+   "dir": 233.61248850752793,
+   "t_dir": 270.7201586546649,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-29T12:00:00",
+   "label": "pfeil",
+   "dir": 242.83303630056307,
+   "t_dir": 240.65993600302613,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-30T12:00:00",
+   "label": "wechselt",
+   "dir": 251.00078675289433,
+   "t_dir": 271.579560139848,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-07-31T12:00:00",
+   "label": "pfeil",
+   "dir": 225.6539268506681,
+   "t_dir": 223.63613794103475,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-01T12:00:00",
+   "label": "pfeil",
+   "dir": 242.6068141565268,
+   "t_dir": 252.00252321164254,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-02T12:00:00",
+   "label": "pfeil",
+   "dir": 220.79810309469642,
+   "t_dir": 229.88704762818955,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-03T12:00:00",
+   "label": "pfeil",
+   "dir": 201.04632296237529,
+   "t_dir": 225.45294395697917,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-04T12:00:00",
+   "label": "pfeil",
+   "dir": 198.2422638851363,
+   "t_dir": 224.71078507560975,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-08-05T12:00:00",
+   "label": "pfeil",
+   "dir": 210.33156992049874,
+   "t_dir": 210.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-06T12:00:00",
+   "label": "pfeil",
+   "dir": 231.44519347342498,
+   "t_dir": 226.77870747981513,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-07T12:00:00",
+   "label": "pfeil",
+   "dir": 246.5824563465389,
+   "t_dir": 235.25222262499057,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-08T12:00:00",
+   "label": "pfeil",
+   "dir": 231.1373362345801,
+   "t_dir": 237.03011091468062,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-09T12:00:00",
+   "label": "pfeil",
+   "dir": 241.0649511615334,
+   "t_dir": 256.05916033817425,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-10T12:00:00",
+   "label": "pfeil",
+   "dir": 245.85009466258367,
+   "t_dir": 269.921916302285,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-11T12:00:00",
+   "label": "teils",
+   "dir": 270.69053672439054,
+   "t_dir": 258.4887465605456,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-12T12:00:00",
+   "label": "wechselt",
+   "dir": 144.25422566917206,
+   "t_dir": 299.9614089823915,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-13T12:00:00",
+   "label": "teils",
+   "dir": 327.92382409729146,
+   "t_dir": 12.5,
+   "t_keine_richtung": false,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-14T12:00:00",
+   "label": "teils",
+   "dir": 349.1187404215514,
+   "t_dir": 337.5,
+   "t_keine_richtung": false,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-15T12:00:00",
+   "label": "teils",
+   "dir": 236.56289711701461,
+   "t_dir": 295.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-16T12:00:00",
+   "label": "pfeil",
+   "dir": 274.3280429049191,
+   "t_dir": 258.3598088993636,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-17T12:00:00",
+   "label": "pfeil",
+   "dir": 300.3189799770524,
+   "t_dir": 268.6265768550119,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-08-18T12:00:00",
+   "label": "pfeil",
+   "dir": 303.4805030907208,
+   "t_dir": 294.83242726707533,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-08-19T12:00:00",
+   "label": "pfeil",
+   "dir": 236.60766759726505,
+   "t_dir": 257.2511034203815,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-08-20T12:00:00",
+   "label": "pfeil",
+   "dir": 239.72997503305754,
+   "t_dir": 228.26395785979287,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-08-21T12:00:00",
+   "label": "pfeil",
+   "dir": 255.88959994580853,
+   "t_dir": 218.5652321410438,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-08-22T12:00:00",
+   "label": "pfeil",
+   "dir": 258.376952810418,
+   "t_dir": 255.86252009971156,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-23T12:00:00",
+   "label": "pfeil",
+   "dir": 251.92671883373146,
+   "t_dir": 253.25966720222635,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-24T12:00:00",
+   "label": "pfeil",
+   "dir": 211.90105339727774,
+   "t_dir": 242.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-25T12:00:00",
+   "label": "pfeil",
+   "dir": 271.95553459413526,
+   "t_dir": 195.75519498279397,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-26T12:00:00",
+   "label": "pfeil",
+   "dir": 216.8763790409342,
+   "t_dir": 233.54718037863245,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-27T12:00:00",
+   "label": "pfeil",
+   "dir": 221.5008363834823,
+   "t_dir": 238.88929839369223,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-08-28T12:00:00",
+   "label": "pfeil",
+   "dir": 215.50296824985082,
+   "t_dir": 234.99999999999994,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-08-29T12:00:00",
+   "label": "pfeil",
+   "dir": 241.6901412661955,
+   "t_dir": 242.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-30T12:00:00",
+   "label": "pfeil",
+   "dir": 232.41846044013323,
+   "t_dir": 243.5073363146563,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-08-31T12:00:00",
+   "label": "pfeil",
+   "dir": 235.9193217185686,
+   "t_dir": 249.02252760333602,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-09-01T12:00:00",
+   "label": "pfeil",
+   "dir": 242.00472635724412,
+   "t_dir": 246.31907065193377,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-02T12:00:00",
+   "label": "pfeil",
+   "dir": 266.19040329569646,
+   "t_dir": 268.2382348662974,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-04T12:00:00",
+   "label": "pfeil",
+   "dir": 258.89099613729564,
+   "t_dir": 263.6265768550119,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-09-05T12:00:00",
+   "label": "pfeil",
+   "dir": 280.9733016626268,
+   "t_dir": 296.5931259981884,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-09-06T12:00:00",
+   "label": "pfeil",
+   "dir": 265.1708545606164,
+   "t_dir": 292.38363518291146,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-07T12:00:00",
+   "label": "pfeil",
+   "dir": 266.75155502834934,
+   "t_dir": 267.7328119000157,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-08T12:00:00",
+   "label": "pfeil",
+   "dir": 239.45281521082387,
+   "t_dir": 254.05445806768438,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-09-09T12:00:00",
+   "label": "pfeil",
+   "dir": 263.11886767964455,
+   "t_dir": 247.0452695129868,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-10T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 106.28873953372988,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-11T12:00:00",
+   "label": "pfeil",
+   "dir": 324.43026014084387,
+   "t_dir": 313.9743337603201,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-12T12:00:00",
+   "label": "teils",
+   "dir": 347.94992983213376,
+   "t_dir": 350.2901612500713,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-13T12:00:00",
+   "label": "pfeil",
+   "dir": 335.72830133499264,
+   "t_dir": 326.45718156769817,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-14T12:00:00",
+   "label": "teils",
+   "dir": 1.8517567759437858,
+   "t_dir": 343.9689230047408,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-15T12:00:00",
+   "label": "wechselt",
+   "dir": 273.30690081045316,
+   "t_dir": 337.5,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-16T12:00:00",
+   "label": "pfeil",
+   "dir": 227.87570429948056,
+   "t_dir": 255.47869360415143,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-17T12:00:00",
+   "label": "pfeil",
+   "dir": 255.75136941196547,
+   "t_dir": 270.8081252907655,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-18T12:00:00",
+   "label": "pfeil",
+   "dir": 242.98460117792712,
+   "t_dir": 257.9630564933679,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-19T12:00:00",
+   "label": "wechselt",
+   "dir": 292.8404361057872,
+   "t_dir": 292.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-20T12:00:00",
+   "label": "pfeil",
+   "dir": 303.343677299766,
+   "t_dir": 300.40238042844226,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-21T12:00:00",
+   "label": "pfeil",
+   "dir": 350.58271621693905,
+   "t_dir": 335.020647762183,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-22T12:00:00",
+   "label": "pfeil",
+   "dir": 9.107038630185084,
+   "t_dir": 1.9477814756494995,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-09-23T12:00:00",
+   "label": "pfeil",
+   "dir": 314.15514509687114,
+   "t_dir": 339.6782974598175,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-24T12:00:00",
+   "label": "pfeil",
+   "dir": 306.40113238071376,
+   "t_dir": 295.8215837197863,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-25T12:00:00",
+   "label": "pfeil",
+   "dir": 355.10685871894833,
+   "t_dir": 351.10024786608625,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-26T12:00:00",
+   "label": "teils",
+   "dir": 260.96987781993374,
+   "t_dir": 298.1000103023459,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-27T12:00:00",
+   "label": "teils",
+   "dir": 246.877485322006,
+   "t_dir": 267.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-28T12:00:00",
+   "label": "pfeil",
+   "dir": 189.72138133962625,
+   "t_dir": 201.2285571089199,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-29T12:00:00",
+   "label": "pfeil",
+   "dir": 183.01714445164123,
+   "t_dir": 182.83189109324582,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-09-30T12:00:00",
+   "label": "teils",
+   "dir": 204.68533123599596,
+   "t_dir": 228.19741306928697,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-01T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 254.08668907096506,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-02T12:00:00",
+   "label": "teils",
+   "dir": 214.15010231567558,
+   "t_dir": 187.0143935955338,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-03T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 231.60404204585217,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-04T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 319.08668907096506,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-05T12:00:00",
+   "label": "pfeil",
+   "dir": 324.98745349216307,
+   "t_dir": null,
+   "t_keine_richtung": true,
+   "t_schwach": true,
+   "t_staerker": false,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-06T12:00:00",
+   "label": "teils",
+   "dir": 201.44555534337132,
+   "t_dir": 135.05886143537705,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-07T12:00:00",
+   "label": "pfeil",
+   "dir": 205.53146602418235,
+   "t_dir": 240.5506696369603,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-10-08T12:00:00",
+   "label": "wechselt",
+   "dir": 291.0503482659226,
+   "t_dir": 263.05558153383566,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-09T12:00:00",
+   "label": "wechselt",
+   "dir": 327.444389543953,
+   "t_dir": 299.0514879917239,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-10T12:00:00",
+   "label": "pfeil",
+   "dir": 280.56403003160995,
+   "t_dir": 266.5388118988453,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-11T12:00:00",
+   "label": "pfeil",
+   "dir": 266.81561107620144,
+   "t_dir": 267.75584634479594,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-12T12:00:00",
+   "label": "pfeil",
+   "dir": 340.5855331518232,
+   "t_dir": 328.6681915313367,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-13T12:00:00",
+   "label": "pfeil",
+   "dir": 328.2453504116947,
+   "t_dir": 333.26395785979287,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-14T12:00:00",
+   "label": "pfeil",
+   "dir": 316.16079551819195,
+   "t_dir": 314.0006098385439,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-15T12:00:00",
+   "label": "pfeil",
+   "dir": 312.8932831586618,
+   "t_dir": 322.30404934025756,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-16T12:00:00",
+   "label": "wechselt+",
+   "dir": null,
+   "t_dir": 275.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-17T12:00:00",
+   "label": "teils",
+   "dir": 228.62775800976513,
+   "t_dir": 231.23738786941814,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-18T12:00:00",
+   "label": "pfeil",
+   "dir": 182.93006692414693,
+   "t_dir": 183.52514000434604,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-10-19T12:00:00",
+   "label": "teils",
+   "dir": 175.95308678511674,
+   "t_dir": 114.12035207116155,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-20T12:00:00",
+   "label": "pfeil",
+   "dir": 186.2010920784073,
+   "t_dir": 232.02350499898554,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-10-21T12:00:00",
+   "label": "pfeil",
+   "dir": 227.68411214828993,
+   "t_dir": 192.25441091493593,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-22T12:00:00",
+   "label": "pfeil",
+   "dir": 287.3293457115678,
+   "t_dir": 301.91751116596504,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-23T12:00:00",
+   "label": "pfeil",
+   "dir": 234.49350787999435,
+   "t_dir": 238.49893229407806,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-10-24T12:00:00",
+   "label": "pfeil",
+   "dir": 295.1776666763625,
+   "t_dir": 286.0496961328186,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-10-25T12:00:00",
+   "label": "pfeil",
+   "dir": 266.0191214783413,
+   "t_dir": 269.7501002345403,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-10-26T12:00:00",
+   "label": "pfeil",
+   "dir": 283.8451955626034,
+   "t_dir": 280.89339464913087,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-10-27T12:00:00",
+   "label": "pfeil",
+   "dir": 293.5538776341347,
+   "t_dir": 316.4009473274817,
+   "t_keine_richtung": true,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-28T12:00:00",
+   "label": "pfeil",
+   "dir": 315.1794853325141,
+   "t_dir": 285.0,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-29T12:00:00",
+   "label": "pfeil",
+   "dir": 19.03005665599038,
+   "t_dir": 16.736042140207125,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-30T12:00:00",
+   "label": "pfeil",
+   "dir": 59.18791100003031,
+   "t_dir": 63.7482120120107,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-10-31T12:00:00",
+   "label": "pfeil",
+   "dir": 62.57977685655105,
+   "t_dir": 52.5,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-11-01T12:00:00",
+   "label": "pfeil",
+   "dir": 56.79178423028967,
+   "t_dir": 50.00280138685772,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": false
+  },
+  {
+   "t": "2026-11-02T12:00:00",
+   "label": "teils",
+   "dir": 71.60673611126175,
+   "t_dir": 89.59844917301415,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  },
+  {
+   "t": "2026-11-03T12:00:00",
+   "label": "teils",
+   "dir": 164.69711157500126,
+   "t_dir": 83.65708869335216,
+   "t_keine_richtung": false,
+   "t_schwach": false,
+   "t_staerker": true,
+   "t_teils": true
+  }
+ ]
+}

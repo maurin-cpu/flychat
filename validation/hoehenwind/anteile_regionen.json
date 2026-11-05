@@ -1,0 +1,387 @@
+{
+ "tage": 308,
+ "kaum_wind": [
+  {
+   "art": "punkt",
+   "X": 0.1,
+   "alle": {
+    "gezeigt": 10,
+    "richtig_pct": 60,
+    "erkannt_pct": 15
+   },
+   "jan_jun": {
+    "gezeigt": 9,
+    "richtig_pct": 56,
+    "erkannt_pct": 23
+   },
+   "jul_nov": {
+    "gezeigt": 1,
+    "richtig_pct": 100,
+    "erkannt_pct": 6
+   }
+  },
+  {
+   "art": "punkt",
+   "X": 0.2,
+   "alle": {
+    "gezeigt": 21,
+    "richtig_pct": 62,
+    "erkannt_pct": 33
+   },
+   "jan_jun": {
+    "gezeigt": 14,
+    "richtig_pct": 64,
+    "erkannt_pct": 41
+   },
+   "jul_nov": {
+    "gezeigt": 7,
+    "richtig_pct": 57,
+    "erkannt_pct": 24
+   }
+  },
+  {
+   "art": "punkt",
+   "X": 0.3,
+   "alle": {
+    "gezeigt": 31,
+    "richtig_pct": 55,
+    "erkannt_pct": 44
+   },
+   "jan_jun": {
+    "gezeigt": 20,
+    "richtig_pct": 55,
+    "erkannt_pct": 50
+   },
+   "jul_nov": {
+    "gezeigt": 11,
+    "richtig_pct": 55,
+    "erkannt_pct": 35
+   }
+  },
+  {
+   "art": "punkt",
+   "X": 0.4,
+   "alle": {
+    "gezeigt": 42,
+    "richtig_pct": 48,
+    "erkannt_pct": 51
+   },
+   "jan_jun": {
+    "gezeigt": 29,
+    "richtig_pct": 48,
+    "erkannt_pct": 64
+   },
+   "jul_nov": {
+    "gezeigt": 13,
+    "richtig_pct": 46,
+    "erkannt_pct": 35
+   }
+  },
+  {
+   "art": "punkt",
+   "X": 0.5,
+   "alle": {
+    "gezeigt": 49,
+    "richtig_pct": 45,
+    "erkannt_pct": 56
+   },
+   "jan_jun": {
+    "gezeigt": 34,
+    "richtig_pct": 44,
+    "erkannt_pct": 68
+   },
+   "jul_nov": {
+    "gezeigt": 15,
+    "richtig_pct": 47,
+    "erkannt_pct": 41
+   }
+  },
+  {
+   "art": "region",
+   "X": 0.1,
+   "alle": {
+    "gezeigt": 11,
+    "richtig_pct": 64,
+    "erkannt_pct": 18
+   },
+   "jan_jun": {
+    "gezeigt": 9,
+    "richtig_pct": 67,
+    "erkannt_pct": 27
+   },
+   "jul_nov": {
+    "gezeigt": 2,
+    "richtig_pct": 50,
+    "erkannt_pct": 6
+   }
+  },
+  {
+   "art": "region",
+   "X": 0.2,
+   "alle": {
+    "gezeigt": 20,
+    "richtig_pct": 60,
+    "erkannt_pct": 31
+   },
+   "jan_jun": {
+    "gezeigt": 12,
+    "richtig_pct": 58,
+    "erkannt_pct": 32
+   },
+   "jul_nov": {
+    "gezeigt": 8,
+    "richtig_pct": 62,
+    "erkannt_pct": 29
+   }
+  },
+  {
+   "art": "region",
+   "X": 0.3,
+   "alle": {
+    "gezeigt": 29,
+    "richtig_pct": 52,
+    "erkannt_pct": 38
+   },
+   "jan_jun": {
+    "gezeigt": 19,
+    "richtig_pct": 53,
+    "erkannt_pct": 45
+   },
+   "jul_nov": {
+    "gezeigt": 10,
+    "richtig_pct": 50,
+    "erkannt_pct": 29
+   }
+  },
+  {
+   "art": "region",
+   "X": 0.4,
+   "alle": {
+    "gezeigt": 43,
+    "richtig_pct": 51,
+    "erkannt_pct": 56
+   },
+   "jan_jun": {
+    "gezeigt": 30,
+    "richtig_pct": 50,
+    "erkannt_pct": 68
+   },
+   "jul_nov": {
+    "gezeigt": 13,
+    "richtig_pct": 54,
+    "erkannt_pct": 41
+   }
+  },
+  {
+   "art": "region",
+   "X": 0.5,
+   "alle": {
+    "gezeigt": 52,
+    "richtig_pct": 46,
+    "erkannt_pct": 62
+   },
+   "jan_jun": {
+    "gezeigt": 35,
+    "richtig_pct": 43,
+    "erkannt_pct": 68
+   },
+   "jul_nov": {
+    "gezeigt": 17,
+    "richtig_pct": 53,
+    "erkannt_pct": 53
+   }
+  }
+ ],
+ "teils_schwach": [
+  {
+   "art": "punkt",
+   "Z": 0.1,
+   "alle": {
+    "gezeigt": 110,
+    "richtig_pct": 68,
+    "erkannt_pct": 62
+   },
+   "jan_jun": {
+    "gezeigt": 69,
+    "richtig_pct": 62,
+    "erkannt_pct": 69
+   },
+   "jul_nov": {
+    "gezeigt": 41,
+    "richtig_pct": 78,
+    "erkannt_pct": 54
+   }
+  },
+  {
+   "art": "punkt",
+   "Z": 0.2,
+   "alle": {
+    "gezeigt": 90,
+    "richtig_pct": 71,
+    "erkannt_pct": 53
+   },
+   "jan_jun": {
+    "gezeigt": 56,
+    "richtig_pct": 66,
+    "erkannt_pct": 60
+   },
+   "jul_nov": {
+    "gezeigt": 34,
+    "richtig_pct": 79,
+    "erkannt_pct": 46
+   }
+  },
+  {
+   "art": "punkt",
+   "Z": 0.3,
+   "alle": {
+    "gezeigt": 66,
+    "richtig_pct": 76,
+    "erkannt_pct": 41
+   },
+   "jan_jun": {
+    "gezeigt": 42,
+    "richtig_pct": 71,
+    "erkannt_pct": 48
+   },
+   "jul_nov": {
+    "gezeigt": 24,
+    "richtig_pct": 83,
+    "erkannt_pct": 34
+   }
+  },
+  {
+   "art": "punkt",
+   "Z": 0.4,
+   "alle": {
+    "gezeigt": 44,
+    "richtig_pct": 77,
+    "erkannt_pct": 28
+   },
+   "jan_jun": {
+    "gezeigt": 28,
+    "richtig_pct": 71,
+    "erkannt_pct": 32
+   },
+   "jul_nov": {
+    "gezeigt": 16,
+    "richtig_pct": 88,
+    "erkannt_pct": 24
+   }
+  },
+  {
+   "art": "punkt",
+   "Z": 0.5,
+   "alle": {
+    "gezeigt": 28,
+    "richtig_pct": 86,
+    "erkannt_pct": 20
+   },
+   "jan_jun": {
+    "gezeigt": 20,
+    "richtig_pct": 80,
+    "erkannt_pct": 26
+   },
+   "jul_nov": {
+    "gezeigt": 8,
+    "richtig_pct": 100,
+    "erkannt_pct": 14
+   }
+  },
+  {
+   "art": "region",
+   "Z": 0.1,
+   "alle": {
+    "gezeigt": 112,
+    "richtig_pct": 69,
+    "erkannt_pct": 63
+   },
+   "jan_jun": {
+    "gezeigt": 71,
+    "richtig_pct": 63,
+    "erkannt_pct": 70
+   },
+   "jul_nov": {
+    "gezeigt": 41,
+    "richtig_pct": 78,
+    "erkannt_pct": 55
+   }
+  },
+  {
+   "art": "region",
+   "Z": 0.2,
+   "alle": {
+    "gezeigt": 84,
+    "richtig_pct": 71,
+    "erkannt_pct": 49
+   },
+   "jan_jun": {
+    "gezeigt": 54,
+    "richtig_pct": 67,
+    "erkannt_pct": 56
+   },
+   "jul_nov": {
+    "gezeigt": 30,
+    "richtig_pct": 80,
+    "erkannt_pct": 41
+   }
+  },
+  {
+   "art": "region",
+   "Z": 0.3,
+   "alle": {
+    "gezeigt": 66,
+    "richtig_pct": 76,
+    "erkannt_pct": 41
+   },
+   "jan_jun": {
+    "gezeigt": 44,
+    "richtig_pct": 73,
+    "erkannt_pct": 50
+   },
+   "jul_nov": {
+    "gezeigt": 22,
+    "richtig_pct": 82,
+    "erkannt_pct": 31
+   }
+  },
+  {
+   "art": "region",
+   "Z": 0.4,
+   "alle": {
+    "gezeigt": 48,
+    "richtig_pct": 81,
+    "erkannt_pct": 32
+   },
+   "jan_jun": {
+    "gezeigt": 32,
+    "richtig_pct": 75,
+    "erkannt_pct": 38
+   },
+   "jul_nov": {
+    "gezeigt": 16,
+    "richtig_pct": 94,
+    "erkannt_pct": 26
+   }
+  },
+  {
+   "art": "region",
+   "Z": 0.5,
+   "alle": {
+    "gezeigt": 32,
+    "richtig_pct": 81,
+    "erkannt_pct": 21
+   },
+   "jan_jun": {
+    "gezeigt": 23,
+    "richtig_pct": 74,
+    "erkannt_pct": 27
+   },
+   "jul_nov": {
+    "gezeigt": 9,
+    "richtig_pct": 100,
+    "erkannt_pct": 16
+   }
+  }
+ ]
+}
