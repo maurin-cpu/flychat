@@ -338,7 +338,10 @@ def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
         f = flow.get(d) or {}
         # Richtung je Region (flow_tile, 05.11.2026); Staerke bleibt das Schweizer Mittel
         dir_deg, sector, calm = _flow_dir(wetterlage, d)
-        strength = "" if calm else _STRENGTH[lang].get(f.get("strength", ""), f.get("strength", ""))
+        # Stärke steht nicht oben (User 07.11.2026): die Richtung ist die Aussage der
+        # Kachel; die Stärke steht im Höhenwind-Block mit Pille. Eine Stärke aus dem
+        # Schweizer Mittel hätte der Pille widersprochen ("light" neben "kräftig").
+        strength = ""
         speed = f.get("speed_kmh")
         speed_txt = f"{round(float(speed))} km/h" if speed else ""
         wind = ""
@@ -376,7 +379,7 @@ def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
             "wind_strength": strength,
             "wind_speed": speed_txt,
             "wind_deg": (f"{round(float(dir_deg))}°" if dir_deg is not None and not calm else ""),
-            "wind_hot": (not calm) and f.get("strength") in ("kraeftig", "stuermisch"),
+            "wind_hot": False,
             # Kachel der App: fett "Schwacher Wind", klein "Richtung unklar"
             "wind_calm": calm,
             "wind_calm_head": _lbl("tile_calm") if calm else "",
