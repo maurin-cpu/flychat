@@ -2519,6 +2519,9 @@ def decide_aloft_regional(weather_cache: dict, forecast_dates: list[str],
             "n_regions": len(peaks),
             # Regionen je Staerkeklasse ihrer Spitze — fuer die Briefing-Pille
             # ("strong in places" vs. "strong wind"); gerundet wie max_kmh
+            # Typische Region: Median ueber alle Regionsspitzen (07.11.2026) — gleiche
+            # Regel wie die Richtung: jede Region zaehlt gleich viel
+            "median_kmh": round(statistics.median(k for k, _, _ in peaks)),
             "n_by_class": {c: sum(1 for k, _, _ in peaks if _flow_strength(round(k)) == c)
                            for c in ("schwach", "maessig", "kraeftig", "stuermisch")},
         })

@@ -415,7 +415,8 @@ def _wind_range_block(wetterlage: dict, date: str, strip: dict) -> dict:
                 else "hour_afternoon" if hour < 18 else "hour_evening")
     flow = _per_day_index((wetterlage or {}).get("flow_overhead"), [date]).get(date) or {}
     syn_cls = flow.get("strength") or _wind_class(float(flow.get("speed_kmh") or 0))
-    data_cls = _wind_class(float(hi))
+    # Einordnung gegen das Mittel: dieselbe Zahl wie die Pille (typische Region)
+    data_cls = _wind_class(float(day["median_kmh"])) if day.get("median_kmh") is not None else _wind_class(float(hi))
     order = ["schwach", "maessig", "kraeftig", "stuermisch"]
     _, abbr, calm = _flow_dir(wetterlage, date)
     sector = _lbl("lg_sector_" + abbr) if abbr else ""
@@ -443,25 +444,22 @@ def _wind_range_block(wetterlage: dict, date: str, strip: dict) -> dict:
 
 
 def _wind_pill(wetterlage: dict, date: str) -> tuple[str, str]:
-    """Pille des Hoehenwind-Blocks: wie stark ist es oben, und nur stellenweise
-    oder in mindestens der Haelfte der Regionen? Klasse der staerksten
-    Regionsspitze (700 hPa). Ersetzt am 31.10.2026 den Vergleich Mittel gegen
-    Spitze ("regional staerker"), der keine Pilotenfrage beantwortete.
+    """Pille des Hoehenwind-Blocks: Staerkeklasse der typischen Region — der
+    Median der Regionsspitzen (700 hPa, 07.11.2026). Der Hoechstwert einer
+    einzelnen Region haette den Tag als "stuermisch" gemeldet, obwohl nur ein
+    Ort so stark weht (121 von 308 Tagen). Ohne Median (aeltere Caches): Spitze.
     Aeltere Caches ohne Regionsspitzen: Klasse des Schweizer Mittels."""
     day = _per_day_index((wetterlage or {}).get("aloft_regional"), [date]).get(date) or {}
-    if day.get("max_kmh"):
+    if day.get("median_kmh") is not None:
+        cls = _wind_class(float(day["median_kmh"]))
+    elif day.get("max_kmh"):
         cls = _wind_class(float(day["max_kmh"]))
     else:
         flow = _per_day_index((wetterlage or {}).get("flow_overhead"), [date]).get(date) or {}
         cls = flow.get("strength") or _wind_class(float(flow.get("speed_kmh") or 0))
-        day = {}
     if cls in ("schwach", "maessig"):
         return "ok", "st_wind_" + cls
-    # Die staerkste Region liegt in `cls`, also keine darueber: n zaehlt die
-    # Regionen dieser Klasse. Ohne Zaehlung (Caches vor 31.10.) kein "stellenweise"
-    n = (day.get("n_by_class") or {}).get(cls)
-    places = n is not None and n * 2 < (day.get("n_regions") or 0)
-    return "warn", "st_wind_" + cls + ("_places" if places else "")
+    return "warn", "st_wind_" + cls
 
 
 def _aloft_regional_text(wetterlage: dict, date: str) -> str:

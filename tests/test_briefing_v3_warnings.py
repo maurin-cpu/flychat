@@ -706,20 +706,19 @@ class TestWindPill(unittest.TestCase):
         self.assertEqual(bc._wind_pill(self._wl(12, schwach=20), self.D), ("ok", "st_wind_schwach"))
         self.assertEqual(bc._wind_pill(self._wl(29, maessig=5), self.D), ("ok", "st_wind_maessig"))
 
-    def test_few_strong_regions_are_in_places(self):
-        self.assertEqual(bc._wind_pill(self._wl(38, kraeftig=4), self.D),
-                         ("warn", "st_wind_kraeftig_places"))
-
-    def test_half_the_regions_strong_is_plain(self):
-        self.assertEqual(bc._wind_pill(self._wl(38, kraeftig=10), self.D),
-                         ("warn", "st_wind_kraeftig"))
-
-    def test_stormy_counts_only_stormy_regions(self):
-        self.assertEqual(bc._wind_pill(self._wl(55, kraeftig=15, stuermisch=2), self.D),
-                         ("warn", "st_wind_stuermisch_places"))
+    def test_pill_follows_the_regional_median(self):
+        """07.11.2026: Klasse der typischen Region (Median), nicht der staerksten."""
+        def wl(median, max_kmh):
+            return {"aloft_regional": {"per_day": [{"date": self.D, "max_kmh": max_kmh,
+                    "median_kmh": median, "region": "Berner Alpen", "n_regions": 20,
+                    "n_by_class": {}}]},
+                    "flow_overhead": {"per_day": [{"date": self.D, "speed_kmh": 10, "strength": "schwach"}]}}
+        self.assertEqual(bc._wind_pill(wl(38, 55), self.D), ("warn", "st_wind_kraeftig"))
+        self.assertEqual(bc._wind_pill(wl(12, 55), self.D), ("ok", "st_wind_schwach"))
+        self.assertEqual(bc._wind_pill(wl(55, 60), self.D), ("warn", "st_wind_stuermisch"))
 
     def test_old_cache_without_counts_says_no_places(self):
-        """Ohne Zaehlung keine Verbreitungs-Aussage, nur die Klasse."""
+        """Ohne Median und ohne Zaehlung: Klasse der Spitze."""
         wl = self._wl(38)
         del wl["aloft_regional"]["per_day"][0]["n_by_class"]
         self.assertEqual(bc._wind_pill(wl, self.D), ("warn", "st_wind_kraeftig"))
