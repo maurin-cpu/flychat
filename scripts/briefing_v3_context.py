@@ -428,12 +428,15 @@ def _wind_range_block(wetterlage: dict, date: str, strip: dict) -> dict:
         t = _per_day_index((wetterlage or {}).get("flow_tile"), [date]).get(date) or {}
         fazit, verdict = _lbl("wind_fazit_calm").format(
             n=t.get("n_wind", 0), t=t.get("n_regions", 0), **args), "calm"
-    elif order.index(data_cls) > order.index(syn_cls):
-        fazit, verdict = _lbl("wind_fazit_stronger").format(**args), "stronger"
-    elif order.index(data_cls) < order.index(syn_cls):
-        fazit, verdict = _lbl("wind_fazit_weaker").format(**args), "weaker"
     else:
-        fazit, verdict = _lbl("wind_fazit_match").format(**args), "match"
+        # Ein Wert, eine Quelle (07.11.2026): dieselbe Stufe wie die Pille, typische
+        # Region = Median, Spitze = staerkste Region. Kein Schweizer Mittel mehr.
+        med = day.get("median_kmh")
+        med = int(round(med)) if isinstance(med, (int, float)) else int(hi)
+        fazit = _lbl("wind_fazit_median").format(
+            Pille=_capitalize(_lbl("st_wind_" + data_cls)), med=med, hi=int(hi),
+            region=day["region"], when=when)
+        verdict = "median"
     return {
         "verdict": verdict, "peak_region": day["region"], "peak_hour": f"{hour:02d}",
         "range": _lbl("wind_range").format(lo=int(lo), hi=int(hi)),
@@ -1120,6 +1123,7 @@ _L3 = {
         "wind_fazit_match": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}), und die Regionen bleiben in dieser Klasse — {lo} bis {hi} km/h, am stärksten {region} am {when}.",
         "wind_fazit_stronger": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}) — regional ist es eine Klasse stärker, bis {hi} km/h {region} am {when}, also {cls}. Das Mittel verharmlost.",
         "wind_fazit_weaker": "{Strength} {sector}strömung: so das Schweizer Mittel ({models}) — selbst die stärkste Region bleibt darunter, höchstens {hi} km/h ({region}).",
+        "wind_fazit_median": "{Pille}: typisch {med} km/h in den Regionen, stellenweise bis {hi} km/h {region} am {when}.",
         "wind_fazit_calm": "Schwacher Wind, Richtung unklar: Mittags haben nur {n} von {t} Regionen 10 km/h oder mehr ({models}). Am stärksten {region} am {when} mit {hi} km/h.",
         "tile_calm": "Schwacher Wind", "tile_dir_unclear": "Richtung unklar",
         "wcls_schwach": "schwach", "wcls_maessig": "mässig", "wcls_kraeftig": "kräftig", "wcls_stuermisch": "stürmisch",
@@ -1624,6 +1628,7 @@ _L3 = {
         "wind_fazit_match": "{Strength} {sector} flow: that is the Swiss average ({models}), and the regions stay in that class — {lo} to {hi} km/h, strongest {region} in the {when}.",
         "wind_fazit_stronger": "{Strength} {sector} flow: that is the Swiss average ({models}) — regionally it is one class stronger, up to {hi} km/h {region} in the {when}, i.e. {cls}. The average understates it.",
         "wind_fazit_weaker": "{Strength} {sector} flow: that is the Swiss average ({models}) — even the strongest region stays below that, at most {hi} km/h ({region}).",
+        "wind_fazit_median": "{Pille}: typically {med} km/h across the regions, in places up to {hi} km/h {region} in the {when}.",
         "wind_fazit_calm": "Light wind, direction unclear: at midday only {n} of {t} regions reach 10 km/h or more ({models}). Strongest {region} in the {when}, at {hi} km/h.",
         "tile_calm": "Light wind", "tile_dir_unclear": "direction unclear",
         "wcls_schwach": "light", "wcls_maessig": "moderate", "wcls_kraeftig": "strong", "wcls_stuermisch": "stormy",
