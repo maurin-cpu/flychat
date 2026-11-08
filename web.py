@@ -331,6 +331,7 @@ def _inject_analytics():
         "posthog_key": config.POSTHOG_KEY,
         "posthog_host": config.POSTHOG_HOST,
         "posthog_ui_host": config.POSTHOG_UI_HOST,
+        "ui_spots_version": config.UI_SPOTS_VERSION,
     }
 
 

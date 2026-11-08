@@ -341,3 +341,6 @@ Eigenschaften `briefing_last_opened_at`, `briefing_last_open_valid`,
 `briefing_last_open_client`, `briefing_last_valid_open_at`, `briefing_last_clicked_at`,
 `subscriber_status`, `regions_count`, … Einmal-Abgleich aller Konten:
 `python scripts/posthog_sync_subscribers.py`. Keine IPs, keine User-Agents gespeichert.
+
+Was Nutzer auf der App-Seite `/briefing` und im Spot-Fenster auf- und zuklappen
+(Browser-Events, Version `ui_spots`): `docs/ANALYTICS.md`.

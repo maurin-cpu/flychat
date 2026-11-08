@@ -74,6 +74,41 @@
     var currentDates = [];
     var currentDateIdx = 0;
     var currentSpotName = '';
+
+    // ===== MESSUNG (PostHog via wcTrack, Event-Liste: docs/ANALYTICS.md) =====
+    // Ein spot_opened je Oeffnen, genau ein spot_closed dazu (Schliessen, Tab
+    // verborgen oder Seite verlassen) mit der Dauer ms_open. ui_spots kommt als
+    // Super-Property aus base.html. Messung darf die Seite nie stoeren.
+    var spotOpenedAt = null;   // Zeitpunkt des Oeffnens, null = kein Spot offen
+    var spotOpenName = '';
+    function spotNow() {
+        return (window.performance && performance.now) ? performance.now() : Date.now();
+    }
+    function spotTrack(event, props, options) {
+        try {
+            if (!window.wcTrack) return;
+            var p = {
+                view: 'spots',
+                spot: currentSpotName || spotOpenName || '',
+                date: (currentDates.length && currentDates[currentDateIdx]) || window.currentDate || '',
+            };
+            for (var k in (props || {})) {
+                if (Object.prototype.hasOwnProperty.call(props, k)) p[k] = props[k];
+            }
+            window.wcTrack(event, p, options);
+        } catch (e) { /* Messung darf die Seite nie stoeren */ }
+    }
+    function spotTrackClose(reason) {
+        if (spotOpenedAt === null) return;
+        var ms = Math.round(spotNow() - spotOpenedAt);
+        spotOpenedAt = null;
+        spotTrack('spot_closed', { spot: spotOpenName, ms_open: ms, reason: reason },
+                  reason === 'close' ? undefined : { transport: 'sendBeacon' });
+    }
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') spotTrackClose('hidden');
+    });
+    window.addEventListener('pagehide', function () { spotTrackClose('pagehide'); });
     var currentSpotProps = null;
     var currentSpotExperienceScore = null;
     var currentSpotExperienceStars = null;
@@ -912,7 +947,7 @@
                             });
                         }
                         layer.on('click', function () {
-                            openMeteogram(p.name, p);
+                            openMeteogram(p.name, p, 'marker');
                         });
                         
                         // Hover Effect for Reference Points
@@ -1037,7 +1072,7 @@
                 map.setView(marker.getLatLng(), Math.max(map.getZoom(), 12));
             }
             var props = marker.featureProperties || (marker.feature && marker.feature.properties) || null;
-            openMeteogram(spotName, props);
+            openMeteogram(spotName, props, 'url');
         } catch (e) {
             console.warn('[map] Spot aus URL konnte nicht geöffnet werden:', e);
         }
@@ -1052,6 +1087,7 @@
             // Verhindern, dass interaktive Inhalte im Body den Toggle triggern
             if (ev && ev.target && ev.target.closest && ev.target.closest('.meteogram-aside-body')) return;
             var collapsed = asideEl.classList.toggle('collapsed');
+            spotTrack('spot_aside_toggled', { open: !collapsed });
             if (asideToggleBtn) {
                 asideToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
             }
@@ -1111,7 +1147,11 @@
 
     if (viewToggleEl) {
         viewToggleEl.querySelectorAll('.dv-toggle-btn').forEach(function (b) {
-            b.addEventListener('click', function () { setDataView(b.dataset.view === 'daten'); });
+            b.addEventListener('click', function () {
+                var toDaten = b.dataset.view === 'daten';
+                if (toDaten !== dataViewActive) spotTrack('spot_view_switched', { to: toDaten ? 'daten' : 'meteo' });
+                setDataView(toDaten);
+            });
         });
     }
 
@@ -1223,7 +1263,19 @@
     }
 
     // ===== METEOGRAM OVERLAY =====
-    function openMeteogram(spotName, props) {
+    function openMeteogram(spotName, props, source) {
+        if (source !== 'retry') {
+            spotTrackClose('switch');  // anderer Spot ohne Schliessen geoeffnet
+            spotOpenName = spotName;
+            spotOpenedAt = spotNow();
+            var _band = '';
+            try {
+                var _d = window.analysisData && window.analysisData[spotName];
+                var _a = _d && (_d[window.currentDate] || _d[Object.keys(_d).sort()[0]]);
+                _band = _a ? (_a.safety_band || legacySafetyBand(_a.safety_status)) : '';
+            } catch (e) {}
+            spotTrack('spot_opened', { spot: spotName, source: source || 'other', band: _band });
+        }
         currentSpotName = spotName;
         currentSpotProps = props || null;
         setDataView(false, true);  // neuer Spot startet im Meteogramm
@@ -1320,6 +1372,7 @@
                         if (idx >= 0 && idx !== currentDateIdx) {
                             currentDateIdx = idx;
                             window.currentDate = dateStr;
+                            spotTrack('spot_day_switched', { day_idx: idx });
                             renderCurrentDay();
                             // Sync floating map day tabs + marker colours
                             syncFloatingDayTabs(dateStr);
@@ -1353,7 +1406,7 @@
                 retryBtn.textContent = 'Erneut versuchen';
                 retryBtn.addEventListener('click', function () {
                     errBox.textContent = 'Lade...';
-                    openMeteogram(currentSpotName, null);
+                    openMeteogram(currentSpotName, null, 'retry');
                 });
                 errBox.appendChild(retryBtn);
                 chartContainer.appendChild(errBox);
@@ -1430,6 +1483,7 @@
     }
 
     function closeMeteogram() {
+        spotTrackClose('close');
         overlay.style.display = 'none';
         overlay.classList.remove('visible');
         tooltipEl.classList.remove('visible');
@@ -1485,6 +1539,15 @@
 
     // ===== EVENT LISTENERS =====
     closeBtn.addEventListener('click', closeMeteogram);
+    overlay.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest && e.target.closest('.mga-insight-toggle');
+        if (!btn || !btn.parentElement) return;
+        var box = btn.parentElement;
+        spotTrack('spot_insight_toggled', {
+            kind: box.classList.contains('safety') ? 'safety' : 'fly',
+            open: !box.classList.contains('open'),
+        });
+    }, true);
 
     if (shareBtn) {
         shareBtn.addEventListener('click', function () {

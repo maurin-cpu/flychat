@@ -65,11 +65,14 @@
             });
         };
         /* Sicherer Analytics-Helfer: sendet ein PostHog-Custom-Event, wenn PostHog
-           geladen ist — sonst No-op (z.B. Admin, oder Analytics deaktiviert). */
-        window.wcTrack = function (event, props) {
-            try { if (window.posthog && posthog.capture) posthog.capture(event, props || {}); } catch (e) {}
+           geladen ist — sonst No-op (z.B. Admin, oder Analytics deaktiviert).
+           options optional, z.B. { transport: 'sendBeacon' } beim Verlassen der Seite. */
+        window.wcTrack = function (event, props, options) {
+            try { if (window.posthog && posthog.capture) posthog.capture(event, props || {}, options); } catch (e) {}
         };
     </script>
+    <!-- Sichtbarkeits-Messung einzelner Bloecke (wcTrackVisible), baut auf wcTrack auf -->
+    <script src="{{ url_for('static', filename='js/ux-tracking.js') }}?v={{ static_v('js/ux-tracking.js') }}"></script>
     {% block head %}{% endblock %}
 </head>
 
@@ -690,7 +693,9 @@
             }
         });
         // Super-Property: App-Events von Marketing-Events (gleiches Projekt) trennen.
-        posthog.register({ app: 'application' });
+        // ui_spots: Version der Spot-/Regionsansicht (config.UI_SPOTS_VERSION),
+        // damit alte Ansicht und Umbau getrennt auswertbar sind (docs/ANALYTICS.md).
+        posthog.register({ app: 'application', ui_spots: {{ ui_spots_version|tojson }} });
         // Eingeloggte Nutzer identifizieren (distinct_id kommt aus dem Login, nicht
         // aus einem Cookie) => sitzungsuebergreifende Auswertung fuer bekannte User.
         {% if is_logged_in and session_email %}

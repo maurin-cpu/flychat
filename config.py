@@ -1265,6 +1265,12 @@ POSTHOG_KEY     = os.environ.get("POSTHOG_KEY", "").strip()
 POSTHOG_HOST    = os.environ.get("POSTHOG_HOST", "https://eu.i.posthog.com").strip()
 POSTHOG_UI_HOST = os.environ.get("POSTHOG_UI_HOST", "https://eu.posthog.com").strip()
 
+# Version der Spot- und Regionsansicht, als Super-Property `ui_spots` an jedem
+# PostHog-Event. Trennt in der Auswertung die alte Ansicht (KI-Fliesstext) vom
+# Umbau auf Fakten-Chips. Beim Umbau nur diesen Wert aendern ("chips_v2").
+# Events und Dashboard: docs/ANALYTICS.md
+UI_SPOTS_VERSION = os.environ.get("UI_SPOTS_VERSION", "text_v1").strip()
+
 # Meta Pixel (Facebook/Instagram Ads) — Conversion "CompleteRegistration" beim
 # ersten Login eines neuen Kontos. Laedt NUR, wenn der Besucher auf wingcast.ch
 # der Kategorie "Marketing" zugestimmt hat (Cookie wc_consent_marketing=1 auf

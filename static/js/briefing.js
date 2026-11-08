@@ -1800,6 +1800,36 @@
 
   // ── Spot Toggle (expand/collapse) ───────────────────────────
 
+  // ── Messung (PostHog via wcTrack, Event-Liste: docs/ANALYTICS.md) ──
+  // Misst, welche Teile der Spot-/Regionsansicht auf- und zugeklappt werden.
+  // Alle Events tragen view + day_idx; ui_spots kommt als Super-Property aus base.html.
+
+  function track(event, props) {
+    try {
+      if (!window.wcTrack) return;
+      window.wcTrack(event, Object.assign({ view: "briefing", day_idx: state.selectedDayIdx }, props || {}));
+    } catch (e) { /* Messung darf die Seite nie stoeren */ }
+  }
+
+  function spotProps(li) {
+    if (!li) return {};
+    const nameEl = li.querySelector(".bf-spot-name");
+    const region = li.closest(".bf-region");
+    return {
+      spot: nameEl ? nameEl.textContent.trim() : "",
+      region_id: region ? (region.dataset.regionId || "") : "",
+      band: li.dataset.band || "",
+      rating: li.dataset.rating ? Number(li.dataset.rating) : null,
+    };
+  }
+
+  function handleAssessmentToggle(ev) {
+    const det = ev.target;
+    if (!det || !det.matches || !det.matches("details.bf-assessment")) return;
+    const kind = det.classList.contains("bf-assessment--safety") ? "safety" : "fly";
+    track("bf_assessment_toggled", Object.assign(spotProps(det.closest(".bf-spot")), { kind, open: det.open }));
+  }
+
   function handleSpotToggle(ev) {
     if (ev.target.closest(".bf-share-btn")) return;
     if (ev.target.closest(".bf-spot-map-link")) return;
@@ -1813,6 +1843,7 @@
     if (!details) return;
     const isOpen = li.classList.toggle("is-expanded");
     toggle.setAttribute("aria-expanded", String(isOpen));
+    track("bf_spot_toggled", Object.assign(spotProps(li), { open: isOpen }));
     if (isOpen) {
       markExpandHintSeen();
       details.removeAttribute("hidden");
@@ -1848,6 +1879,7 @@
     ev.preventDefault();
     ev.stopPropagation();
     const expand = btn.dataset.bulkAction === "expand";
+    track("bf_regions_bulk_toggled", { open: expand });
     const contentEl = $("bfContent");
     if (!contentEl) return;
     const regions = contentEl.querySelectorAll(".bf-region");
@@ -1882,6 +1914,7 @@
     const willCollapse = !region.classList.contains("is-collapsed");
     region.classList.toggle("is-collapsed", willCollapse);
     head.setAttribute("aria-expanded", String(!willCollapse));
+    track("bf_region_toggled", { region_id: rid, open: !willCollapse });
     if (willCollapse) state.collapsedRegions.add(rid);
     else state.collapsedRegions.delete(rid);
     saveCollapsedRegions(state.collapsedRegions);
@@ -1905,6 +1938,7 @@
     ev.stopPropagation();
     state.showNumbers = !state.showNumbers;
     saveShowNumbers(state.showNumbers);
+    track("bf_numbers_toggled", { open: state.showNumbers });
     document.body.classList.toggle("bf-show-numbers", state.showNumbers);
     document.querySelectorAll("[data-meteogram-numbers]").forEach((b) => {
       b.setAttribute("aria-pressed", String(state.showNumbers));
@@ -2422,6 +2456,7 @@
   function gotoChainBlock(key) {
     const el = $("bfChain");
     if (!el || !key) return;
+    track("bf_chain_toggled", { block: key, open: true, source: "alert" });
     state.chainOpen.add(key);
     saveChainOpen(state.chainOpen);
     renderChain(state.data);
@@ -2515,6 +2550,7 @@
         if (!btn || !el.contains(btn)) return;
         const key = btn.getAttribute("data-chain-block");
         if (state.chainOpen.has(key)) state.chainOpen.delete(key); else state.chainOpen.add(key);
+        track("bf_chain_toggled", { block: key, open: state.chainOpen.has(key), source: "click" });
         saveChainOpen(state.chainOpen);
         renderChain(state.data);
         // Fokus bleibt auf der Zeile, die der User bedient hat (Tastatur)
@@ -2620,6 +2656,15 @@
       contentEl.addEventListener("click", handleSpotToggle);
       contentEl.addEventListener("keydown", handleSpotKeydown);
       contentEl.addEventListener("click", handleShareClick);
+      // <details>-toggle blubbert nicht, deshalb in der Capture-Phase
+      contentEl.addEventListener("toggle", handleAssessmentToggle, true);
+    }
+
+    // Wie lange stehen Warnungen, Analyse-Kette und Regionsliste im Bild?
+    if (window.wcTrackVisible) {
+      window.wcTrackVisible($("bfAlerts"), { view: "briefing", block: "alerts" });
+      window.wcTrackVisible($("bfChain"), { view: "briefing", block: "chain" });
+      window.wcTrackVisible(contentEl, { view: "briefing", block: "regions" });
     }
 
     loadBriefing();
