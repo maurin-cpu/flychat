@@ -69,7 +69,7 @@ Verlassen der Seite, per `sendBeacon`.
 
 ## Auswertung
 
-- **Dashboard** in PostHog: „Spots & Regionen: Text vs. Chips", angelegt vom
+- **Dashboard** in PostHog: [„Spots & Regionen: Text vs. Chips"](https://eu.posthog.com/project/190675/dashboard/1095492), angelegt vom
   Skript `3-betrieb/scripts/posthog_dashboard_spots_regionen.py` im
   Marketing-Repo. Jede Kachel ist nach `ui_spots` aufgeteilt.
 - **Bericht:** `3-betrieb/scripts/posthog_spots_regionen.py` im Marketing-Repo,
