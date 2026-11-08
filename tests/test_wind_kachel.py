@@ -83,7 +83,7 @@ class StripTest(unittest.TestCase):
         with i18n.lang_override("en"):
             s = bc._strip_synoptik(self._wl(False, 180), [DATE])[DATE]
         self.assertEqual(s["wind_sector"], "S")      # nicht "N" aus dem Vektor-Mittel
-        self.assertEqual(s["wind_strength"], "")     # keine Stärke oben (07.11.2026)
+        self.assertEqual(s["wind_strength"], "light")   # EN, Klasse des Mittels (kein Median in diesem Test)
         self.assertFalse(s["wind_hot"])
         self.assertEqual(s["wind_deg"], "180°")
         self.assertFalse(s["wind_calm"])

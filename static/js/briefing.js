@@ -798,7 +798,7 @@
           const arrow = deg === null
             ? `<span class="bf-tab-wind-arrow bf-tab-wind-arrow--txt" aria-hidden="true">${escapeHtml(tile.wind_arrow || "")}</span>`
             : `<svg class="bf-tab-wind-arrow" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" style="transform:rotate(${deg}deg)"><path d="M10 2.5v15M4.5 8l5.5-5.5L15.5 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-          wind = `<span class="bf-tab-wind${tile.wind_hot ? " bf-tab-wind--hot" : ""}" title="700 hPa">${arrow}<span class="bf-tab-wind-txt"><b>${escapeHtml(tile.wind_sector)}</b></span></span>`;
+          wind = `<span class="bf-tab-wind${tile.wind_hot ? " bf-tab-wind--hot" : ""}" title="700 hPa">${arrow}<span class="bf-tab-wind-txt"><b>${escapeHtml(tile.wind_sector)}</b>${tile.wind_strength ? `<small class="bf-tab-wind-note">${escapeHtml(tile.wind_strength)}</small>` : ""}</span></span>`;
         }
         const press = tile.pressure_hpa ? `<span class="bf-tab-press">${escapeHtml(tile.pressure_hpa)}</span>` : "";
         tileHtml = status + wind + press;

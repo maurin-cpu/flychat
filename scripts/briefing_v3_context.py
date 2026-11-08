@@ -341,7 +341,12 @@ def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
         # Stärke steht nicht oben (User 07.11.2026): die Richtung ist die Aussage der
         # Kachel; die Stärke steht im Höhenwind-Block mit Pille. Eine Stärke aus dem
         # Schweizer Mittel hätte der Pille widersprochen ("light" neben "kräftig").
-        strength = ""
+        # Stärke oben wieder da (08.11.2026): dieselbe Stufe wie die Pille — Median
+        # der Regionen. Ohne Regionsdaten (aeltere Caches) die Klasse des Mittels.
+        am = _per_day_index((wetterlage or {}).get("aloft_regional"), [d]).get(d) or {}
+        med_cls = (_wind_class(float(am["median_kmh"])) if am.get("median_kmh") is not None
+                   else f.get("strength", ""))
+        strength = "" if calm else _STRENGTH[lang].get(med_cls, med_cls or "")
         speed = f.get("speed_kmh")
         speed_txt = f"{round(float(speed))} km/h" if speed else ""
         wind = ""
@@ -379,7 +384,7 @@ def _strip_synoptik(wetterlage: dict, dates: list[str]) -> dict:
             "wind_strength": strength,
             "wind_speed": speed_txt,
             "wind_deg": (f"{round(float(dir_deg))}°" if dir_deg is not None and not calm else ""),
-            "wind_hot": False,
+            "wind_hot": (not calm) and med_cls in ("kraeftig", "stuermisch"),
             # Kachel der App: fett "Schwacher Wind", klein "Richtung unklar"
             "wind_calm": calm,
             "wind_calm_head": _lbl("tile_calm") if calm else "",
