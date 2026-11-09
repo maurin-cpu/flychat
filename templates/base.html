@@ -76,7 +76,7 @@
     {% block head %}{% endblock %}
 </head>
 
-<body{% if test_view_active %} class="test-view-active"{% endif %}>
+<body class="{% block body_class %}{% endblock %}{% if test_view_active %} test-view-active{% endif %}">
     {% if test_view_active %}
     <div role="status" aria-live="polite" style="
         position:sticky; top:0; z-index:9999;

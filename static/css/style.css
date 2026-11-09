@@ -372,6 +372,10 @@ body {
 .page-fixed-nav .app-footer {
     display: none;
 }
+/* Vollbild-Kartenseiten (Startplätze, Regionen, Föhn): Karte bis unten, kein Fuss */
+.karte-vollbild .app-footer {
+    display: none;
+}
 
 /* Chat-Locked-Card (anonyme User auf der Hauptseite) */
 .chat-locked {

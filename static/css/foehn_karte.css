@@ -37,11 +37,6 @@ body {
   overflow: hidden;
 }
 
-/* Karte füllt alles unter dem Menü: der Seitenfuss (Privacy, Imprint) entfällt auf dieser Seite */
-.app-footer {
-  display: none;
-}
-
 #fkMap {
   position: absolute;
   inset: 0;
