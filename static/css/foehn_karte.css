@@ -31,8 +31,9 @@ body {
 .fk-layout {
   --fk-panel-w: min(400px, 40vw);
   position: relative;
-  flex: 1;
-  min-height: 0;
+  /* feste Höhe: Fensterhöhe minus Navigation, unabhängig vom umgebenden Layout */
+  height: calc(100dvh - 60px);
+  min-height: 420px;
   overflow: hidden;
 }
 
