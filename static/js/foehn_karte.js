@@ -98,6 +98,11 @@
 
     $("fkPlay").addEventListener("click", togglePlay);
     $("fkPanelBtn").addEventListener("click", function () { panel(true); });
+    // Karte passt ihre Größe an: beim Laden, nach dem Fertigstellen des Layouts und bei Größenänderung
+    var neuBerechnen = function () { map.invalidateSize(); };
+    window.addEventListener("load", neuBerechnen);
+    window.addEventListener("resize", neuBerechnen);
+    setTimeout(neuBerechnen, 300);
     $("fkClose").addEventListener("click", function () { panel(false); });
 
     // Ebenen: jede Zeile der Legende schaltet genau ihre Schicht
